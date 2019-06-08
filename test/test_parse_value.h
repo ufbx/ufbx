@@ -40,7 +40,7 @@ UFBXT_TEST(parse_value_truncated)
 }
 #endif
 
-UFBXT_TEST(parse_value_bad_type)
+UFBXT_TEST(parse_value_bad_src_type)
 #if UFBXT_IMPL
 {
 	ufbxi_context *uc = ufbxt_memory_context_values(
@@ -49,6 +49,19 @@ UFBXT_TEST(parse_value_bad_type)
 
 	uint32_t value;
 	ufbxt_assert(!ufbxi_parse_value(uc, 'I', &value));
+	ufbxt_log_error(uc);
+}
+#endif
+
+UFBXT_TEST(parse_value_bad_dst_type)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"I\x01\x02\x03\x04"
+	);
+
+	uint32_t value;
+	ufbxt_assert(!ufbxi_parse_value(uc, 'X', &value));
 	ufbxt_log_error(uc);
 }
 #endif
