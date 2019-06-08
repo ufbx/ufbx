@@ -27,6 +27,18 @@ UFBXT_TEST(parse_multiple_values)
 }
 #endif
 
+UFBXT_TEST(parse_value_eof)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context("");
+
+	uint32_t value;
+	ufbxt_assert(!ufbxi_parse_value(uc, 'I', &value));
+	ufbxt_log_error(uc);
+}
+#endif
+
+
 UFBXT_TEST(parse_value_truncated)
 #if UFBXT_IMPL
 {
@@ -62,6 +74,19 @@ UFBXT_TEST(parse_value_bad_dst_type)
 
 	uint32_t value;
 	ufbxt_assert(!ufbxi_parse_value(uc, 'X', &value));
+	ufbxt_log_error(uc);
+}
+#endif
+
+UFBXT_TEST(parse_value_bad_conversion)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"F\x01\x02\x03\x04"
+	);
+
+	uint32_t value;
+	ufbxt_assert(!ufbxi_parse_value(uc, 'I', &value));
 	ufbxt_log_error(uc);
 }
 #endif
@@ -136,7 +161,7 @@ UFBXT_TEST(parse_string_value)
 }
 #endif
 
-UFBXT_TEST(parse_string_too_long)
+UFBXT_TEST(parse_string_long)
 #if UFBXT_IMPL
 {
 	ufbxi_context *uc = ufbxt_memory_context_values(
@@ -146,5 +171,35 @@ UFBXT_TEST(parse_string_too_long)
 	ufbxi_string str;
 	ufbxt_assert(!ufbxi_parse_value(uc, 'S', &str));
 	ufbxt_log_error(uc);
+}
+#endif
+
+UFBXT_TEST(parse_string_huge)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"S\xff\xff\xff\xffHello"
+	);
+
+	ufbxi_string str;
+	ufbxt_assert(!ufbxi_parse_value(uc, 'S', &str));
+	ufbxt_log_error(uc);
+}
+#endif
+
+
+UFBXT_TEST(parse_boolean_binary)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"C\x10"
+		"C\x20"
+	);
+
+	uint32_t a;
+	char b;
+	ufbxt_assert(ufbxi_parse_values(uc, "IB", &a, &b));
+	ufbxt_assert(a == 1);
+	ufbxt_assert(b == 1);
 }
 #endif

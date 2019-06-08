@@ -167,7 +167,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 	case 'I': val_class = ufbxi_val_int; val_int = ufbxi_read_u32(src); val_size += 4; break;
 	case 'L': val_class = ufbxi_val_int; val_int = ufbxi_read_u64(src); val_size += 8; break;
 	case 'Y': val_class = ufbxi_val_int; val_int = ufbxi_read_u16(src); val_size += 2; break;
-	case 'C': val_class = ufbxi_val_int; val_int = ufbxi_read_u8(src);  val_size += 1; break;
+	case 'C': val_class = ufbxi_val_int; val_int = (ufbxi_read_u8(src) ? 1 : 0); val_size += 1; break;
 	case 'F': val_class = ufbxi_val_float; val_float = ufbxi_read_f32(src); val_size += 4; break;
 	case 'D': val_class = ufbxi_val_float; val_float = ufbxi_read_f64(src); val_size += 8; break;
 	case 'S': case 'R':
