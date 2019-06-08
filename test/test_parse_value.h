@@ -187,6 +187,18 @@ UFBXT_TEST(parse_string_huge)
 }
 #endif
 
+UFBXT_TEST(parse_string_bad_dst)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"S\x05\x00\x00\x00Hello"
+	);
+
+	uint32_t value;
+	ufbxt_assert(!ufbxi_parse_values(uc, "I", &value));
+	ufbxt_log_error(uc);
+}
+#endif
 
 UFBXT_TEST(parse_boolean_binary)
 #if UFBXT_IMPL
@@ -194,12 +206,14 @@ UFBXT_TEST(parse_boolean_binary)
 	ufbxi_context *uc = ufbxt_memory_context_values(
 		"C\x10"
 		"C\x20"
+		"I\x20\x20\x20\x20"
 	);
 
 	uint32_t a;
-	char b;
-	ufbxt_assert(ufbxi_parse_values(uc, "IB", &a, &b));
+	char b, c;
+	ufbxt_assert(ufbxi_parse_values(uc, "IBB", &a, &b, &c));
 	ufbxt_assert(a == 1);
 	ufbxt_assert(b == 1);
+	ufbxt_assert(c == 1);
 }
 #endif
