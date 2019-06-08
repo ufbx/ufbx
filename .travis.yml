@@ -1,0 +1,8 @@
+sudo: false
+
+language: cpp
+
+script:
+    - mkdir -p proj
+    - clang test/runner.c -std=gnu99 -Wno-unused-value -o proj/test_runner -D_GNU_SOURCE
+    - proj/test_runner
