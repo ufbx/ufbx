@@ -135,3 +135,16 @@ UFBXT_TEST(parse_string_value)
 	ufbxt_assert(ufbxi_streq(b, "world"));
 }
 #endif
+
+UFBXT_TEST(parse_string_too_long)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"S\x40\x00\x00\x00Hello"
+	);
+
+	ufbxi_string str;
+	ufbxt_assert(!ufbxi_parse_value(uc, 'S', &str));
+	ufbxt_log_error(uc);
+}
+#endif
