@@ -91,3 +91,19 @@ UFBXT_TEST(parse_value_basic_types)
 	ufbxt_assert(d == 1.0);
 }
 #endif
+
+UFBXT_TEST(parse_int_to_float)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"I\x08\x00\x00\x00"
+		"Y\x04\x00"
+	);
+
+	float f;
+	double d;
+	ufbxt_assert(ufbxi_parse_values(uc, "FD", &f, &d));
+	ufbxt_assert(f == 8.0f);
+	ufbxt_assert(d == 4.0);
+}
+#endif
