@@ -108,7 +108,8 @@ void ufbxt_log_flush()
 
 void ufbxt_log_error(ufbxi_context *uc)
 {
-	ufbxt_logf("(at %u bytes) %s", uc->error->byte_offset, uc->error->desc);
+	ufbxt_logf("(line %u, offset %u) %s", uc->error->source_line,
+		uc->error->byte_offset, uc->error->desc);
 }
 
 #define UFBXT_IMPL 1

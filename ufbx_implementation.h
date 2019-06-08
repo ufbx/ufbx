@@ -86,6 +86,7 @@ static int ufbxi_do_error(ufbxi_context *uc, uint32_t line, const char *desc)
 	size_t length = strlen(desc);
 	if (length > UFBX_ERROR_DESC_MAX_LENGTH) length = UFBX_ERROR_DESC_MAX_LENGTH;
 	if (uc->error) {
+		uc->error->source_line = line;
 		uc->error->byte_offset = uc->pos;
 		memcpy(uc->error->desc, desc, length);
 		uc->error->desc[length] = '\0';
@@ -98,6 +99,7 @@ static int ufbxi_do_errorf(ufbxi_context *uc, uint32_t line, const char *fmt, ..
 	va_list args;
 	va_start(args, fmt);
 	if (uc->error) {
+		uc->error->source_line = line;
 		uc->error->byte_offset = uc->pos;
 		vsnprintf(uc->error->desc, sizeof(uc->error->desc), fmt, args);
 	}
