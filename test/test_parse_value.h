@@ -107,3 +107,18 @@ UFBXT_TEST(parse_int_to_float)
 	ufbxt_assert(d == 4.0);
 }
 #endif
+
+UFBXT_TEST(parse_string_value)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"S\x05\x00\x00\x00Hello"
+		"R\x05\x00\x00\x00world"
+	);
+
+	ufbxi_string a, b;
+	ufbxt_assert(ufbxi_parse_values(uc, "SS", &a, &b));
+	ufbxt_assert(ufbxi_streq(a, "Hello"));
+	ufbxt_assert(ufbxi_streq(b, "world"));
+}
+#endif

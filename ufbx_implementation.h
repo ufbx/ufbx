@@ -216,7 +216,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 
 		ufbxi_string *str = (ufbxi_string*)dst;
 		str->length = ufbxi_read_u32(src);
-		str->data = uc->data + 5;
+		str->data = uc->data + uc->pos + 5;
 		val_size += str->length;
 		if (str->length > 0x1000000) {
 			return ufbxi_errorf(uc, "String is too large: %u bytes", str->length);
