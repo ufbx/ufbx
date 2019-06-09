@@ -6,7 +6,10 @@ compiler: clang
 script:
     - mkdir -p build
     - cd build
-    - clang ../test/runner.c -fprofile-instr-generate -fcoverage-mapping -g -std=gnu99 -Wno-unused-value -o runner -D_GNU_SOURCE
-    - LLVM_PROFILE_FILE=runner.prowraw ./runner -v
-    - llvm-profdata merge -sparse runner.profraw -o runner.profdata
-    - llvm-cov show ./runner -instr-profile=runner.profdata
+    - clang -coverage -g -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
+    - ./runner -v
+    - gcov ../ufbx_implementation.h
+
+after_success:
+    - cd build
+    - bash <(curl -s https://codecov.io/bash)
