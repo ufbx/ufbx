@@ -321,6 +321,26 @@ UFBXT_TEST(parse_any_values)
 }
 #endif
 
+UFBXT_TEST(parse_skip_values)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"I\x01\x02\x03\x04"
+		"L\x11\x12\x13\x14\x15\x16\x17\x18"
+		"Y\x21\x22"
+		"C\x01"
+		"F\x00\x00\x80\x3f"
+		"D\x00\x00\x00\x00\x00\x00\xf0\x3f"
+		"S\x05\x00\x00\x00Hello"
+		"i" "\x03\x00\x00\x00" "\x00\x00\x00\x00" "\x0c\x00\x00\x00"
+		"\x01\x00\x00\x00" "\x02\x00\x00\x00" "\x03\x00\x00\x00"
+	);
+
+	ufbxt_assert(ufbxi_parse_values(uc, "........"));
+	ufbxt_assert(uc->pos == uc->values_end);
+}
+#endif
+
 UFBXT_TEST(parse_simple_array)
 #if UFBXT_IMPL
 {
@@ -596,4 +616,3 @@ UFBXT_TEST(parse_array_huge)
 	ufbxt_log_error(uc);
 }
 #endif
-
