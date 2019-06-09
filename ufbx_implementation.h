@@ -298,7 +298,7 @@ static int ufbxi_parse_values(ufbxi_context *uc, const char *fmt, ...)
 	va_start(args, fmt);
 	const char *fmt_ptr = fmt;
 	char ch;
-	while (ch = *fmt_ptr) {
+	while ((ch = *fmt_ptr) != '\0') {
 		void *dst = NULL;
 		if (ch != '.') dst = va_arg(args, void*);
 		if (!ufbxi_parse_value(uc, ch, dst)) {
