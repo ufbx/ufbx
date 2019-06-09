@@ -81,6 +81,17 @@ typedef struct {
 	char dst_type;
 } ufbxi_array;
 
+typedef struct {
+	char type_code;
+	ufbxi_val_class value_class;
+	union {
+		uint64_t i;
+		double f;
+		ufbxi_string str;
+		ufbxi_array arr;
+	} value;
+} ufbxi_any_value;
+
 static int ufbxi_do_error(ufbxi_context *uc, uint32_t line, const char *desc)
 {
 	size_t length = strlen(desc);
@@ -146,7 +157,7 @@ static int ufbxi_convert_multivalue_array(ufbxi_context *uc, ufbxi_array *dst, c
 // `dst_type` is a FBX-like type string:
 //   Numbers: "I" u/int32_t  "L" u/int64_t  "B" char (bool)  "F" float  "D" double
 //   Data: "SR" ufbxi_string  "ilfdb" ufbxi_val_array (matching upper-case type)
-//   Misc: "." (ignore)
+//   Misc: "." (ignore)  "?" ufbxi_any_value
 // Performs implicit conversions:
 //   FDILY -> FD, ILYC -> ILB, ILFDYilfd -> fd, ILYCilb -> ilb
 static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
@@ -160,11 +171,15 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 	char src_type = uc->data[uc->pos];
 	const char *src = uc->data + uc->pos + 1;
 
-	// Read the next value: Determine the class and size of the data
+	// Read the next value locally
 	uint32_t val_size = 1;
 	ufbxi_val_class val_class;
 	uint64_t val_int;
 	double val_float;
+	uint32_t val_num_elements;
+	uint32_t val_encoding;
+	uint32_t val_encoded_size;
+	uint32_t val_data_offset;
 	switch (src_type) {
 	case 'I': val_class = ufbxi_val_int; val_int = ufbxi_read_u32(src); val_size += 4; break;
 	case 'L': val_class = ufbxi_val_int; val_int = ufbxi_read_u64(src); val_size += 8; break;
@@ -174,14 +189,34 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 	case 'D': val_class = ufbxi_val_float; val_float = ufbxi_read_f64(src); val_size += 8; break;
 	case 'S': case 'R':
 		val_class = ufbxi_val_string;
-		val_size += 4;
+		val_num_elements = ufbxi_read_u32(src);
+		val_size += 4 + val_num_elements;
+		val_data_offset = uc->pos + 5;
 		break;
 	case 'i': case 'l': case 'f': case 'd': case 'b':
 		val_class = ufbxi_val_array;
-		val_size += 12;
+		val_num_elements = ufbxi_read_u32(src + 0);
+		val_encoding = ufbxi_read_u32(src + 4);
+		val_encoded_size = ufbxi_read_u32(src + 8);
+		val_size += 12 + val_encoded_size;
+		val_data_offset = uc->pos + 13;
 		break;
 	default:
 		return ufbxi_errorf(uc, "Invalid type code '%c'", src_type);
+	}
+
+	if (val_size > uc->value_end - uc->pos) {
+		return ufbxi_errorf(uc, "Value overflows data block: %u bytes", val_size);
+	}
+	uc->pos += val_size;
+
+	// Early return: Ignore the data
+	if (dst_type == '.') return 1;
+	ufbxi_any_value *any = NULL;
+	if (dst_type == '?') {
+		any = (ufbxi_any_value*)dst;
+		any->type_code = src_type;
+		any->value_class = val_class;
 	}
 
 	// Interpret the read value into the user pointer, potentially applying the
@@ -193,6 +228,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		case 'B': *(char*)dst = val_int ? 1 : 0; break;
 		case 'F': *(float*)dst = (float)val_int; break;
 		case 'D': *(double*)dst = (double)val_int; break;
+		case '?': any->value.i = val_int; break;
 		case 'i': case 'l': case 'f': case 'd': case 'b':
 			// Early return: Parse as multivalue array.
 			return ufbxi_convert_multivalue_array(uc, (ufbxi_array*)dst, dst_type);
@@ -204,6 +240,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		switch (dst_type) {
 		case 'F': *(float*)dst = (float)val_float; break;
 		case 'D': *(double*)dst = val_float; break;
+		case '?': any->value.f = val_float; break;
 		case 'f': case 'd':
 			// Early return: Parse as multivalue array.
 			return ufbxi_convert_multivalue_array(uc, (ufbxi_array*)dst, dst_type);
@@ -212,45 +249,44 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		}
 
 	} else if (val_class == ufbxi_val_string) {
-		if (dst_type != 'S') {
+		ufbxi_string *str;
+		switch (dst_type) {
+		case 'S': str = (ufbxi_string*)dst; break;
+		case '?': str = &any->value.str; break;
+		default:
 			return ufbxi_errorf(uc, "Cannot convert from string '%c' to '%c'", src_type, dst_type);
 		}
 
-		ufbxi_string *str = (ufbxi_string*)dst;
-		str->length = ufbxi_read_u32(src);
-		str->data = uc->data + uc->pos + 5;
-		val_size += str->length;
+		str->data = uc->data + val_data_offset;
+		str->length = val_num_elements;
 		if (str->length > 0x1000000) {
 			return ufbxi_errorf(uc, "String is too large: %u bytes", str->length);
 		}
 	} else if (val_class == ufbxi_val_array) {
+		ufbxi_array *arr;
 		switch (dst_type) {
-		case 'i': case 'l': case 'f': case 'd': case 'b': break;
+		case 'i': case 'l': case 'f': case 'd': case 'b':
+			arr = (ufbxi_array*)dst;
+			break;
+		case '?': arr = &any->value.arr; break;
 		default:
 			return ufbxi_errorf(uc, "Cannot convert from array '%c' to '%c'", src_type, dst_type);
 		}
 
-		ufbxi_array *arr = (ufbxi_array*)dst;
-		arr->num_elements = ufbxi_read_u32(src + 0);
-		uint32_t encoding = ufbxi_read_u32(src + 4);
-		arr->encoding = (ufbxi_array_encoding)encoding;
-		arr->encoded_size = ufbxi_read_u32(src + 8);
-		arr->data_offset = uc->pos + 12;
 		arr->src_type = src_type;
 		arr->dst_type = dst_type;
-		val_size += arr->encoded_size;
+		arr->num_elements = val_num_elements;
+		arr->encoding = (ufbxi_array_encoding)val_encoding;
+		arr->encoded_size = val_encoded_size;
+		arr->data_offset = val_data_offset;
 		if (arr->encoded_size > 0x1000000) {
 			return ufbxi_errorf(uc, "Array is too large: %u bytes", arr->encoded_size);
 		}
-		if (encoding != ufbxi_encoding_basic && encoding != ufbxi_encoding_deflate) {
-			return ufbxi_errorf(uc, "Unknown array encoding: %u", encoding);
+		if (val_encoding != ufbxi_encoding_basic && val_encoding != ufbxi_encoding_deflate) {
+			return ufbxi_errorf(uc, "Unknown array encoding: %u", val_encoding);
 		}
 	}
 
-	if (val_size > uc->value_end - uc->pos) {
-		return ufbxi_errorf(uc, "Value overflows data block: %u bytes", val_size);
-	}
-	uc->pos += val_size;
 	return 1;
 }
 
@@ -261,9 +297,11 @@ static int ufbxi_parse_values(ufbxi_context *uc, const char *fmt, ...)
 	va_list args;
 	va_start(args, fmt);
 	const char *fmt_ptr = fmt;
-	while (*fmt_ptr) {
-		void *dst = va_arg(args, void*);
-		if (!ufbxi_parse_value(uc, *fmt_ptr, dst)) {
+	char ch;
+	while (ch = *fmt_ptr) {
+		void *dst = NULL;
+		if (ch != '.') dst = va_arg(args, void*);
+		if (!ufbxi_parse_value(uc, ch, dst)) {
 			va_end(args);
 			return 0;
 		}

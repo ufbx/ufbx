@@ -217,3 +217,69 @@ UFBXT_TEST(parse_boolean_binary)
 	ufbxt_assert(c == 1);
 }
 #endif
+
+UFBXT_TEST(parse_ignore_value)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"I\x01\x02\x03\x04"
+	);
+
+	uint32_t value;
+	ufbxt_assert(ufbxi_parse_value(uc, '.', &value));
+	ufbxt_assert(uc->pos == 5);
+}
+#endif
+
+UFBXT_TEST(parse_skip_value)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"I\x01\x02\x03\x04"
+		"I\x11\x12\x13\x14"
+	);
+
+	uint32_t value;
+	ufbxt_assert(ufbxi_parse_values(uc, ".I", &value));
+	ufbxt_assert(value == 0x14131211);
+}
+#endif
+
+UFBXT_TEST(parse_any_values)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"I\x01\x02\x03\x04"
+		"L\x11\x12\x13\x14\x15\x16\x17\x18"
+		"Y\x21\x22"
+		"C\x01"
+		"F\x00\x00\x80\x3f"
+		"D\x00\x00\x00\x00\x00\x00\xf0\x3f"
+		"S\x05\x00\x00\x00Hello"
+	);
+
+	ufbxi_any_value i, l, y, c, f, d, s;
+	ufbxt_assert(ufbxi_parse_values(uc, "???????", &i, &l, &y, &c, &f, &d, &s));
+	ufbxt_assert(i.type_code == 'I');
+	ufbxt_assert(i.value_class == ufbxi_val_int);
+	ufbxt_assert(i.value.i == 0x04030201);
+	ufbxt_assert(l.type_code == 'L');
+	ufbxt_assert(l.value_class == ufbxi_val_int);
+	ufbxt_assert(l.value.i == UINT64_C(0x1817161514131211));
+	ufbxt_assert(y.type_code == 'Y');
+	ufbxt_assert(y.value_class == ufbxi_val_int);
+	ufbxt_assert(y.value.i == 0x2221);
+	ufbxt_assert(c.type_code == 'C');
+	ufbxt_assert(c.value_class == ufbxi_val_int);
+	ufbxt_assert(c.value.i == 1);
+	ufbxt_assert(f.type_code == 'F');
+	ufbxt_assert(f.value_class == ufbxi_val_float);
+	ufbxt_assert(f.value.f == 1.0f);
+	ufbxt_assert(d.type_code == 'D');
+	ufbxt_assert(d.value_class == ufbxi_val_float);
+	ufbxt_assert(d.value.f == 1.0);
+	ufbxt_assert(s.type_code == 'S');
+	ufbxt_assert(s.value_class == ufbxi_val_string);
+	ufbxt_assert(ufbxi_streq(s.value.str, "Hello"));
+}
+#endif
