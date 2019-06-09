@@ -313,7 +313,7 @@ static int ufbxi_parse_values(ufbxi_context *uc, const char *fmt, ...)
 
 // Decode the data of an multivalue array into memory. Requires the array to be
 // prepared with `ufbxi_convert_multivalue_array()`.
-static int ufbxi_decode_multivalue_array(ufbxi_context *uc, ufbxi_array *arr, void *dst, char dst_type)
+static int ufbxi_decode_multivalue_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 {
 	if (arr->encoding != ufbxi_encoding_multivalue) {
 		return ufbxi_error(uc, "Internal: Bad multivalue encoding");
@@ -327,7 +327,7 @@ static int ufbxi_decode_multivalue_array(ufbxi_context *uc, ufbxi_array *arr, vo
 
 	char dst_elem_type;
 	uint32_t dst_elem_size;
-	switch (dst_type) {
+	switch (arr->dst_type) {
 	case 'i': dst_elem_type = 'I'; dst_elem_size = 4; break;
 	case 'l': dst_elem_type = 'L'; dst_elem_size = 8; break;
 	case 'f': dst_elem_type = 'F'; dst_elem_size = 4; break;
@@ -352,11 +352,10 @@ static int ufbxi_decode_multivalue_array(ufbxi_context *uc, ufbxi_array *arr, vo
 
 // Decode the contents of an array into memory. Performs potential type conversion
 // and decoding of the data. Should not fail for a non-decoding failure reason.
-static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst, char dst_type)
+static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 {
-	if (arr->dst_type != dst_type) return ufbxi_error(uc, "Internal: Array type mismatch");
 	uint32_t elem_size;
-	switch (dst_type) {
+	switch (arr->dst_type) {
 	case 'i': case 'f': elem_size = 4; break;
 	case 'l': case 'd': elem_size = 8; break;
 	case 'b': elem_size = 1; break;
@@ -382,7 +381,7 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst, ch
 			return ufbxi_error(uc, "Internal: Unimplemented.");
 		case ufbxi_encoding_multivalue:
 			// Early return: Defer to multivalue implementation.
-			return ufbxi_decode_multivalue_array(uc, arr, dst, dst_type);
+			return ufbxi_decode_multivalue_array(uc, arr, dst);
 		default: return ufbxi_error(uc, "Internal: Bad array encoding");
 		}
 	} else {
@@ -419,37 +418,37 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst, ch
 		// Try to perform type conversion.
 		const char *sp = src_ptr, *ep = src_end;
 		int failed = 0;
-		if (dst_type == 'i') {
+		if (arr->dst_type == 'i') {
 			uint32_t *dp = (uint32_t*)dst;
 			switch (arr->src_type) {
-			case 'l': for (; sp!=ep; sp+=8) *dp++ = (uint32_t)*(uint64_t*)sp; break;
+			case 'l': for (; sp!=ep; sp+=8) *dp++ = (int32_t)*(uint64_t*)sp; break;
 			case 'b': for (; sp!=ep; sp+=1) *dp++ = *sp != 0 ? 1 : 0; break;
 			default: failed = 1; break;
 			}
-		} else if (dst_type == 'l') {
+		} else if (arr->dst_type == 'l') {
 			uint64_t *dp = (uint64_t*)dst;
 			switch (arr->src_type) {
-			case 'i': for (; sp!=ep; sp+=4) *dp++ = *(uint32_t*)sp; break;
+			case 'i': for (; sp!=ep; sp+=4) *dp++ = *(int32_t*)sp; break;
 			case 'b': for (; sp!=ep; sp+=1) *dp++ = *sp != 0 ? 1 : 0; break;
 			default: failed = 1; break;
 			}
-		} else if (dst_type == 'f') {
+		} else if (arr->dst_type == 'f') {
 			float *dp = (float*)dst;
 			switch (arr->src_type) {
-			case 'i': for (; sp!=ep; sp+=4) *dp++ = (float)*(uint32_t*)sp; break;
-			case 'l': for (; sp!=ep; sp+=8) *dp++ = (float)*(uint64_t*)sp; break;
+			case 'i': for (; sp!=ep; sp+=4) *dp++ = (float)*(int32_t*)sp; break;
+			case 'l': for (; sp!=ep; sp+=8) *dp++ = (float)*(int64_t*)sp; break;
 			case 'd': for (; sp!=ep; sp+=8) *dp++ = (float)*(double*)sp; break;
 			default: failed = 1; break;
 			}
-		} else if (dst_type == 'd') {
+		} else if (arr->dst_type == 'd') {
 			double *dp = (double*)dst;
 			switch (arr->src_type) {
-			case 'i': for (; sp!=ep; sp+=4) *dp++ = (double)*(uint32_t*)sp; break;
-			case 'l': for (; sp!=ep; sp+=8) *dp++ = (double)*(uint64_t*)sp; break;
+			case 'i': for (; sp!=ep; sp+=4) *dp++ = (double)*(int32_t*)sp; break;
+			case 'l': for (; sp!=ep; sp+=8) *dp++ = (double)*(int64_t*)sp; break;
 			case 'f': for (; sp!=ep; sp+=4) *dp++ = *(float*)sp; break;
 			default: failed = 1; break;
 			}
-		} else if (dst_type == 'b') {
+		} else if (arr->dst_type == 'b') {
 			char *dp = (char*)dst;
 			switch (arr->src_type) {
 			case 'i': for (; sp!=ep; sp+=4) *dp++ = *(uint32_t*)sp != 0 ? 1 : 0; break;
@@ -462,7 +461,7 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst, ch
 
 		if (failed) {
 			return ufbxi_errorf(uc, "Bad array conversion: '%c' -> '%c'",
-				arr->src_type, dst_type);
+				arr->src_type, arr->dst_type);
 		}
 	}
 

@@ -283,3 +283,108 @@ UFBXT_TEST(parse_any_values)
 	ufbxt_assert(ufbxi_streq(s.value.str, "Hello"));
 }
 #endif
+
+UFBXT_TEST(parse_simple_array)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"i" "\x03\x00\x00\x00" "\x00\x00\x00\x00" "\x0c\x00\x00\x00"
+		"\x01\x00\x00\x00" "\x02\x00\x00\x00" "\x03\x00\x00\x00"
+	);
+
+	ufbxi_array arr;
+	ufbxt_assert(ufbxi_parse_values(uc, "i", &arr));
+	ufbxt_assert(arr.src_type == 'i');
+	ufbxt_assert(arr.dst_type == 'i');
+	ufbxt_assert(arr.num_elements == 3);
+	ufbxt_assert(arr.encoding == ufbxi_encoding_basic);
+	ufbxt_assert(arr.encoded_size == 3*4);
+
+	int data[3];
+	ufbxt_assert(ufbxi_decode_array(uc, &arr, data));
+	ufbxt_assert(data[0] == 1);
+	ufbxt_assert(data[1] == 2);
+	ufbxt_assert(data[2] == 3);
+}
+#endif
+
+#if UFBXT_IMPL
+static void helper_array_conversion(ufbxi_context *uc, char dst_type, char src_type)
+{
+	ufbxt_hintf("dst = '%c', src = '%c'", dst_type, src_type);
+
+	ufbxi_array arr;
+	ufbxt_assert(ufbxi_parse_value(uc, dst_type, &arr));
+
+	ufbxt_assert(arr.encoding == ufbxi_encoding_basic);
+	ufbxt_assert(arr.src_type == src_type);
+	ufbxt_assert(arr.dst_type == dst_type);
+	ufbxt_assert(arr.num_elements == 2);
+
+	switch (src_type) {
+	case 'i': case 'f': ufbxt_assert(arr.encoded_size == 2 * 4); break;
+	case 'l': case 'd': ufbxt_assert(arr.encoded_size == 2 * 8); break;
+	}
+
+	switch (dst_type) {
+	case 'i': {
+		int32_t data[2] = { 0, 0 };
+		ufbxt_assert(ufbxi_decode_array(uc, &arr, data));
+		ufbxt_assert(data[0] == 4);
+		ufbxt_assert(data[1] == -8);
+	} break;
+	case 'l': {
+		int64_t data[2] = { 0, 0 };
+		ufbxt_assert(ufbxi_decode_array(uc, &arr, data));
+		ufbxt_assert(data[0] == 4);
+		ufbxt_assert(data[1] == -8);
+	} break;
+	case 'f': {
+		float data[2] = { 0.0f, 0.0f };
+		ufbxt_assert(ufbxi_decode_array(uc, &arr, data));
+		ufbxt_assert(data[0] == 4.0f);
+		ufbxt_assert(data[1] == -8.0f);
+	} break;
+	case 'd': {
+		double data[2] = { 0.0, 0.0 };
+		ufbxt_assert(ufbxi_decode_array(uc, &arr, data));
+		ufbxt_assert(data[0] == 4.0);
+		ufbxt_assert(data[1] == -8.0);
+	} break;
+	}
+}
+#endif
+
+UFBXT_TEST(parse_array_conversions)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"i" "\x02\x00\x00\x00" "\x00\x00\x00\x00" "\x08\x00\x00\x00"
+		"\x04\x00\x00\x00" "\xf8\xff\xff\xff"
+		"l" "\x02\x00\x00\x00" "\x00\x00\x00\x00" "\x10\x00\x00\x00"
+		"\x04\x00\x00\x00\x00\x00\x00\x00" "\xf8\xff\xff\xff\xff\xff\xff\xff"
+		"f" "\x02\x00\x00\x00" "\x00\x00\x00\x00" "\x08\x00\x00\x00"
+		"\x00\x00\x80\x40" "\x00\x00\x00\xc1"
+		"d" "\x02\x00\x00\x00" "\x00\x00\x00\x00" "\x10\x00\x00\x00"
+		"\x00\x00\x00\x00\x00\x00\x10\x40" "\x00\x00\x00\x00\x00\x00\x20\xc0"
+	);
+
+	uc->pos = 0;
+	helper_array_conversion(uc, 'i', 'i');
+	helper_array_conversion(uc, 'i', 'l');
+	uc->pos = 0;
+	helper_array_conversion(uc, 'l', 'i');
+	helper_array_conversion(uc, 'l', 'l');
+	uc->pos = 0;
+	helper_array_conversion(uc, 'f', 'i');
+	helper_array_conversion(uc, 'f', 'l');
+	helper_array_conversion(uc, 'f', 'f');
+	helper_array_conversion(uc, 'f', 'd');
+	uc->pos = 0;
+	helper_array_conversion(uc, 'd', 'i');
+	helper_array_conversion(uc, 'd', 'l');
+	helper_array_conversion(uc, 'd', 'f');
+	helper_array_conversion(uc, 'd', 'd');
+
+}
+#endif

@@ -38,6 +38,8 @@ int g_verbose;
 char g_log_buf[8*1024];
 uint32_t g_log_pos;
 
+char g_hint[8*1024];
+
 ufbxi_context *ufbxt_make_memory_context(const void *data, uint32_t size)
 {
 	ufbxi_context *uc = &g_context;
@@ -86,6 +88,15 @@ void ufbxt_logf(const char *fmt, ...)
 	va_end(args);
 }
 
+void ufbxt_hintf(const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(g_hint, sizeof(g_hint), fmt, args);
+	va_end(args);
+}
+
+
 void ufbxt_log_flush()
 {
 	int prev_newline = 1;
@@ -113,13 +124,13 @@ void ufbxt_log_error(ufbxi_context *uc)
 }
 
 #define UFBXT_IMPL 1
-#define UFBXT_TEST(name) void test_##name(void)
+#define UFBXT_TEST(name) void ufbxt_test_fn_##name(void)
 #include "all_tests.h"
 
 #undef UFBXT_IMPL
 #undef UFBXT_TEST
 #define UFBXT_IMPL 0
-#define UFBXT_TEST(name) { #name, &test_##name },
+#define UFBXT_TEST(name) { #name, &ufbxt_test_fn_##name },
 ufbxt_test g_tests[] = {
 	#include "all_tests.h"
 };
@@ -131,6 +142,7 @@ int ufbxt_run_test(ufbxt_test *test)
 
 	g_error.desc[0] = 0;
 	g_error.byte_offset = 0;
+	g_hint[0] = '\0';
 
 	g_current_test = test;
 	if (!setjmp(g_test_jmp)) {
@@ -139,6 +151,9 @@ int ufbxt_run_test(ufbxt_test *test)
 		fflush(stdout);
 		return 1;
 	} else {
+		if (g_hint[0]) {
+			ufbxt_logf("Hint: %s", g_hint);
+		}
 		if (g_error.desc[0]) {
 			ufbxt_log_error(&g_context);
 		}
