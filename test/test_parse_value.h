@@ -17,13 +17,38 @@ UFBXT_TEST(parse_multiple_values)
 {
 	ufbxi_context *uc = ufbxt_memory_context_values(
 		"I\x01\x02\x03\x04"
-		"Y\xAA\xBB"
+		"Y\x11\x12"
 	);
 
 	uint32_t a, b;
 	ufbxt_assert(ufbxi_parse_values(uc, "II", &a, &b));
 	ufbxt_assert(a == 0x04030201);
-	ufbxt_assert(b == 0xBBAA);
+	ufbxt_assert(b == 0x1211);
+}
+#endif
+
+UFBXT_TEST(parse_sign_extension)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"Y\xff\xff"
+		"I\xfe\xff\xff\xff"
+		"L\xfd\xff\xff\xff\xff\xff\xff\xff"
+	);
+
+	int32_t y32 = 0, i32 = 0, l32 = 0;
+	ufbxt_assert(ufbxi_parse_values(uc, "III", &y32, &i32, &l32));
+	ufbxt_assert(y32 == -1);
+	ufbxt_assert(i32 == -2);
+	ufbxt_assert(l32 == -3);
+
+	uc->pos = 0;
+
+	int64_t y64 = 0, i64 = 0, l64 = 0;
+	ufbxt_assert(ufbxi_parse_values(uc, "LLL", &y64, &i64, &l64));
+	ufbxt_assert(y64 == -1);
+	ufbxt_assert(i64 == -2);
+	ufbxt_assert(l64 == -3);
 }
 #endif
 

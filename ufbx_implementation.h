@@ -47,6 +47,11 @@ ufbxi_streq(ufbxi_string str, const char *ref)
 #define ufbxi_read_f32(ptr) (*(float*)(ptr))
 #define ufbxi_read_f64(ptr) (*(double*)(ptr))
 
+#define ufbxi_read_i8(ptr) (int8_t)(ufbxi_read_u8(ptr))
+#define ufbxi_read_i16(ptr) (int16_t)(ufbxi_read_u16(ptr))
+#define ufbxi_read_i32(ptr) (int32_t)(ufbxi_read_u32(ptr))
+#define ufbxi_read_i64(ptr) (int64_t)(ufbxi_read_u64(ptr))
+
 // -- Binary parsing
 
 typedef struct {
@@ -174,16 +179,16 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 	// Read the next value locally
 	uint32_t val_size = 1;
 	ufbxi_val_class val_class;
-	uint64_t val_int;
+	int64_t val_int;
 	double val_float;
 	uint32_t val_num_elements;
 	uint32_t val_encoding;
 	uint32_t val_encoded_size;
 	uint32_t val_data_offset;
 	switch (src_type) {
-	case 'I': val_class = ufbxi_val_int; val_int = ufbxi_read_u32(src); val_size += 4; break;
-	case 'L': val_class = ufbxi_val_int; val_int = ufbxi_read_u64(src); val_size += 8; break;
-	case 'Y': val_class = ufbxi_val_int; val_int = ufbxi_read_u16(src); val_size += 2; break;
+	case 'I': val_class = ufbxi_val_int; val_int = ufbxi_read_i32(src); val_size += 4; break;
+	case 'L': val_class = ufbxi_val_int; val_int = ufbxi_read_i64(src); val_size += 8; break;
+	case 'Y': val_class = ufbxi_val_int; val_int = ufbxi_read_i16(src); val_size += 2; break;
 	case 'C': val_class = ufbxi_val_int; val_int = (ufbxi_read_u8(src) ? 1 : 0); val_size += 1; break;
 	case 'F': val_class = ufbxi_val_float; val_float = ufbxi_read_f32(src); val_size += 4; break;
 	case 'D': val_class = ufbxi_val_float; val_float = ufbxi_read_f64(src); val_size += 8; break;
@@ -223,8 +228,8 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 	// implicit conversion rules.
 	if (val_class == ufbxi_val_int) {
 		switch (dst_type) {
-		case 'I': *(uint32_t*)dst = (uint32_t)val_int; break;
-		case 'L': *(uint64_t*)dst = val_int; break;
+		case 'I': *(int32_t*)dst = (int32_t)val_int; break;
+		case 'L': *(int64_t*)dst = val_int; break;
 		case 'B': *(char*)dst = val_int ? 1 : 0; break;
 		case 'F': *(float*)dst = (float)val_int; break;
 		case 'D': *(double*)dst = (double)val_int; break;
@@ -419,14 +424,14 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 		const char *sp = src_ptr, *ep = src_end;
 		int failed = 0;
 		if (arr->dst_type == 'i') {
-			uint32_t *dp = (uint32_t*)dst;
+			int32_t *dp = (uint32_t*)dst;
 			switch (arr->src_type) {
 			case 'l': for (; sp!=ep; sp+=8) *dp++ = (int32_t)*(uint64_t*)sp; break;
 			case 'b': for (; sp!=ep; sp+=1) *dp++ = *sp != 0 ? 1 : 0; break;
 			default: failed = 1; break;
 			}
 		} else if (arr->dst_type == 'l') {
-			uint64_t *dp = (uint64_t*)dst;
+			int64_t *dp = (uint64_t*)dst;
 			switch (arr->src_type) {
 			case 'i': for (; sp!=ep; sp+=4) *dp++ = *(int32_t*)sp; break;
 			case 'b': for (; sp!=ep; sp+=1) *dp++ = *sp != 0 ? 1 : 0; break;
