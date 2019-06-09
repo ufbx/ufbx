@@ -2,3 +2,6 @@
 # Project files
 proj/
 
+# Build output
+build/
+

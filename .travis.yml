@@ -1,8 +1,11 @@
 sudo: false
 
 language: cpp
+compiler: clang
 
 script:
-    - mkdir -p proj
-    - clang test/runner.c -std=gnu99 -Wno-unused-value -o proj/test_runner -D_GNU_SOURCE
-    - proj/test_runner -v
+    - mkdir -p build
+    - cd build
+    - clang ../test/runner.c --coverage -g -std=gnu99 -Wno-unused-value -o runner -D_GNU_SOURCE
+    - ./runner -v
+    - llvm-cov show .
