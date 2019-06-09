@@ -12,4 +12,4 @@ script:
     - ls -la
 
 after_success:
-    - bash <(curl -s https://codecov.io/bash) -s build -X gcov
+    - bash <(curl -s https://codecov.io/bash) -s /home/travis/build/bqqbarbhg/ufbx/build -X gcov
