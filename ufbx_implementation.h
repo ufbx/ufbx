@@ -219,6 +219,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 	if (val_size > uc->value_end - uc->pos) {
 		return ufbxi_errorf(uc, "Value overflows data block: %u bytes", val_size);
 	}
+	uint32_t begin = uc->pos;
 	uc->pos += val_size;
 
 	// Early return: Ignore the data
@@ -241,7 +242,8 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		case 'D': *(double*)dst = (double)val_int; break;
 		case '?': any->value.i = val_int; break;
 		case 'i': case 'l': case 'f': case 'd': case 'b':
-			// Early return: Parse as multivalue array.
+			// Early return: Parse as multivalue array. Reset position to beginning and rescan.
+			uc->pos = begin;
 			return ufbxi_convert_multivalue_array(uc, (ufbxi_array*)dst, dst_type);
 		default:
 			return ufbxi_errorf(uc, "Cannot convert from int '%c' to '%c'", src_type, dst_type);
@@ -253,7 +255,8 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		case 'D': *(double*)dst = val_float; break;
 		case '?': any->value.f = val_float; break;
 		case 'f': case 'd':
-			// Early return: Parse as multivalue array.
+			// Early return: Parse as multivalue array. Reset position to beginning and rescan.
+			uc->pos = begin;
 			return ufbxi_convert_multivalue_array(uc, (ufbxi_array*)dst, dst_type);
 		default:
 			return ufbxi_errorf(uc, "Cannot convert from float '%c' to '%c'", src_type, dst_type);

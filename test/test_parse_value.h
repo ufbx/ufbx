@@ -597,3 +597,26 @@ UFBXT_TEST(parse_array_huge)
 }
 #endif
 
+UFBXT_TEST(parse_multivalue_array)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"I\x01\x00\x00\x00I\x02\x00\x00\x00I\x03\x00\x00\x00"
+	);
+
+	ufbxi_array arr;
+	ufbxt_assert(ufbxi_parse_value(uc, 'i', &arr));
+	ufbxt_assert(arr.src_type == 'i');
+	ufbxt_assert(arr.dst_type == 'i');
+	ufbxt_assert(arr.num_elements == 3);
+	ufbxt_assert(arr.encoding == ufbxi_encoding_multivalue);
+	ufbxt_assert(arr.encoded_size == uc->value_end);
+
+	int data[3];
+	ufbxt_assert(ufbxi_decode_array(uc, &arr, data));
+	ufbxt_assert(data[0] == 1);
+	ufbxt_assert(data[1] == 2);
+	ufbxt_assert(data[2] == 3);
+}
+#endif
+
