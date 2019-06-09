@@ -413,3 +413,35 @@ UFBXT_TEST(parse_array_conversions)
 
 }
 #endif
+
+UFBXT_TEST(parse_array_bad_conversion)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"f" "\x03\x00\x00\x00" "\x00\x00\x00\x00" "\x0c\x00\x00\x00"
+		"\x00\x00\x80\x3f" "\x00\x00\x80\x3f" "\x00\x00\x80\x3f"
+		"b" "\x03\x00\x00\x00" "\x00\x00\x00\x00" "\x03\x00\x00\x00"
+		"\x01\x01\x01"
+	);
+
+	char data[128];
+	ufbxi_array arr;
+	uc->pos = 0;
+	ufbxt_assert(ufbxi_parse_value(uc, 'i', &arr));
+	ufbxt_assert(!ufbxi_decode_array(uc, &arr, data));
+	uc->pos = 0;
+	ufbxt_assert(ufbxi_parse_value(uc, 'l', &arr));
+	ufbxt_assert(!ufbxi_decode_array(uc, &arr, data));
+	uc->pos = 0;
+	ufbxt_assert(ufbxi_parse_value(uc, 'b', &arr));
+	ufbxt_assert(!ufbxi_decode_array(uc, &arr, data));
+
+	uint32_t begin = uc->pos;
+	ufbxt_assert(ufbxi_parse_value(uc, 'f', &arr));
+	ufbxt_assert(!ufbxi_decode_array(uc, &arr, data));
+	uc->pos = begin;
+	ufbxt_assert(ufbxi_parse_value(uc, 'd', &arr));
+	ufbxt_assert(!ufbxi_decode_array(uc, &arr, data));
+}
+#endif
+
