@@ -10,6 +10,7 @@ script:
     - ./runner -v
     - llvm-cov gcov runner
     - ls -la
+    - cp ufbx_implementation.h.gcov ../ufbx_implementation.h.gcov
 
 after_success:
-    - bash <(curl -s https://codecov.io/bash) -s /home/travis/build/bqqbarbhg/ufbx/build -X gcov
+    - bash <(curl -s https://codecov.io/bash) -X gcov
