@@ -8,7 +8,7 @@ script:
     - cd build
     - clang -coverage -g -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
     - ./runner -v
-    - gcov ../ufbx_implementation.h
+    - gcov runner
 
 after_success:
     - bash <(curl -s https://codecov.io/bash) -s build -X gcov
