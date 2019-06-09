@@ -9,6 +9,7 @@ script:
     - clang -coverage -g -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
     - ./runner -v
     - llvm-cov gcov runner
+    - ls -la
 
 after_success:
     - bash <(curl -s https://codecov.io/bash) -s build -X gcov
