@@ -11,4 +11,4 @@ script:
     - gcov ../ufbx_implementation.h
 
 after_success:
-    - bash <(curl -s https://codecov.io/bash) --root=build
+    - bash <(curl -s https://codecov.io/bash) -s build -X gcov
