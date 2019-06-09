@@ -195,6 +195,9 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 	case 'S': case 'R':
 		val_class = ufbxi_val_string;
 		val_num_elements = ufbxi_read_u32(src);
+		if (val_num_elements > 0x1000000) {
+			return ufbxi_errorf(uc, "String is too large: %u bytes", val_num_elements);
+		}
 		val_size += 4 + val_num_elements;
 		val_data_offset = uc->pos + 5;
 		break;
@@ -203,6 +206,9 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		val_num_elements = ufbxi_read_u32(src + 0);
 		val_encoding = ufbxi_read_u32(src + 4);
 		val_encoded_size = ufbxi_read_u32(src + 8);
+		if (val_encoded_size > 0x1000000) {
+			return ufbxi_errorf(uc, "Array is too large: %u bytes", val_encoded_size);
+		}
 		val_size += 12 + val_encoded_size;
 		val_data_offset = uc->pos + 13;
 		break;
@@ -264,9 +270,6 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 
 		str->data = uc->data + val_data_offset;
 		str->length = val_num_elements;
-		if (str->length > 0x1000000) {
-			return ufbxi_errorf(uc, "String is too large: %u bytes", str->length);
-		}
 	} else if (val_class == ufbxi_val_array) {
 		ufbxi_array *arr;
 		switch (dst_type) {
@@ -287,9 +290,6 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		arr->encoding = (ufbxi_array_encoding)val_encoding;
 		arr->encoded_size = val_encoded_size;
 		arr->data_offset = val_data_offset;
-		if (arr->encoded_size > 0x1000000) {
-			return ufbxi_errorf(uc, "Array is too large: %u bytes", arr->encoded_size);
-		}
 		if (val_encoding != ufbxi_encoding_basic && val_encoding != ufbxi_encoding_deflate) {
 			return ufbxi_errorf(uc, "Unknown array encoding: %u", val_encoding);
 		}

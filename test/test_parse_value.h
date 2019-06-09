@@ -345,6 +345,20 @@ UFBXT_TEST(parse_simple_array)
 }
 #endif
 
+UFBXT_TEST(parse_simple_array_conversion)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"i" "\x03\x00\x00\x00" "\x00\x00\x00\x00" "\x0c\x00\x00\x00"
+		"\x01\x00\x00\x00" "\x02\x00\x00\x00" "\x03\x00\x00\x00"
+	);
+
+	int32_t value;
+	ufbxt_assert(!ufbxi_parse_values(uc, "I", &value));
+	ufbxt_log_error(uc);
+}
+#endif
+
 #if UFBXT_IMPL
 static void helper_array_conversion(ufbxi_context *uc, char dst_type, char src_type)
 {
@@ -539,7 +553,6 @@ UFBXT_TEST(parse_array_bad_size)
 }
 #endif
 
-
 UFBXT_TEST(parse_array_bad_encoding)
 #if UFBXT_IMPL
 {
@@ -553,3 +566,18 @@ UFBXT_TEST(parse_array_bad_encoding)
 	ufbxt_log_error(uc);
 }
 #endif
+
+UFBXT_TEST(parse_array_huge)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"i" "\x03\x00\x00\x00" "\xff\x00\x00\x00" "\xff\xff\xff\xff"
+		"\x01\x00\x00\x00" "\x02\x00\x00\x00" "\x03\x00\x00\x00"
+	);
+
+	ufbxi_array arr;
+	ufbxt_assert(!ufbxi_parse_value(uc, 'i', &arr));
+	ufbxt_log_error(uc);
+}
+#endif
+
