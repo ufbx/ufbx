@@ -424,14 +424,14 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 		const char *sp = src_ptr, *ep = src_end;
 		int failed = 0;
 		if (arr->dst_type == 'i') {
-			int32_t *dp = (uint32_t*)dst;
+			int32_t *dp = (int32_t*)dst;
 			switch (arr->src_type) {
 			case 'l': for (; sp!=ep; sp+=8) *dp++ = (int32_t)*(uint64_t*)sp; break;
 			case 'b': for (; sp!=ep; sp+=1) *dp++ = *sp != 0 ? 1 : 0; break;
 			default: failed = 1; break;
 			}
 		} else if (arr->dst_type == 'l') {
-			int64_t *dp = (uint64_t*)dst;
+			int64_t *dp = (int64_t*)dst;
 			switch (arr->src_type) {
 			case 'i': for (; sp!=ep; sp+=4) *dp++ = *(int32_t*)sp; break;
 			case 'b': for (; sp!=ep; sp+=1) *dp++ = *sp != 0 ? 1 : 0; break;
