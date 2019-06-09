@@ -337,7 +337,7 @@ UFBXT_TEST(parse_skip_values)
 	);
 
 	ufbxt_assert(ufbxi_parse_values(uc, "........"));
-	ufbxt_assert(uc->pos == uc->values_end);
+	ufbxt_assert(uc->pos == uc->value_end);
 }
 #endif
 
