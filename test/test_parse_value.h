@@ -281,10 +281,13 @@ UFBXT_TEST(parse_any_values)
 		"F\x00\x00\x80\x3f"
 		"D\x00\x00\x00\x00\x00\x00\xf0\x3f"
 		"S\x05\x00\x00\x00Hello"
+		"i" "\x03\x00\x00\x00" "\x00\x00\x00\x00" "\x0c\x00\x00\x00"
+		"\x01\x00\x00\x00" "\x02\x00\x00\x00" "\x03\x00\x00\x00"
 	);
 
-	ufbxi_any_value i, l, y, c, f, d, s;
-	ufbxt_assert(ufbxi_parse_values(uc, "???????", &i, &l, &y, &c, &f, &d, &s));
+	ufbxi_any_value i, l, y, c, f, d, s, a;
+	int data[3];
+	ufbxt_assert(ufbxi_parse_values(uc, "????????", &i, &l, &y, &c, &f, &d, &s, &a));
 	ufbxt_assert(i.type_code == 'I');
 	ufbxt_assert(i.value_class == ufbxi_val_int);
 	ufbxt_assert(i.value.i == 0x04030201);
@@ -306,6 +309,15 @@ UFBXT_TEST(parse_any_values)
 	ufbxt_assert(s.type_code == 'S');
 	ufbxt_assert(s.value_class == ufbxi_val_string);
 	ufbxt_assert(ufbxi_streq(s.value.str, "Hello"));
+	ufbxt_assert(a.type_code == 'i');
+	ufbxt_assert(a.value_class == ufbxi_val_array);
+	ufbxt_assert(a.value.arr.src_type == 'i');
+	ufbxt_assert(a.value.arr.dst_type == 'i');
+	ufbxt_assert(a.value.arr.num_elements == 3);
+	ufbxt_assert(a.value.arr.encoding == ufbxi_encoding_basic);
+	ufbxt_assert(a.value.arr.encoded_size == 3*4);
+	ufbxt_assert(ufbxi_decode_array(uc, &a.value.arr, data));
+	ufbxt_assert(data[0] == 1 && data[1] == 2 && data[2] == 3);
 }
 #endif
 
@@ -527,3 +539,17 @@ UFBXT_TEST(parse_array_bad_size)
 }
 #endif
 
+
+UFBXT_TEST(parse_array_bad_encoding)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"i" "\x03\x00\x00\x00" "\xff\x00\x00\x00" "\x0c\x00\x00\x00"
+		"\x01\x00\x00\x00" "\x02\x00\x00\x00" "\x03\x00\x00\x00"
+	);
+
+	ufbxi_array arr;
+	ufbxt_assert(!ufbxi_parse_value(uc, 'i', &arr));
+	ufbxt_log_error(uc);
+}
+#endif

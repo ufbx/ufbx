@@ -272,14 +272,17 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		switch (dst_type) {
 		case 'i': case 'l': case 'f': case 'd': case 'b':
 			arr = (ufbxi_array*)dst;
+			arr->dst_type = dst_type;
 			break;
-		case '?': arr = &any->value.arr; break;
+		case '?':
+			arr = &any->value.arr;
+			arr->dst_type = src_type;
+			break;
 		default:
 			return ufbxi_errorf(uc, "Cannot convert from array '%c' to '%c'", src_type, dst_type);
 		}
 
 		arr->src_type = src_type;
-		arr->dst_type = dst_type;
 		arr->num_elements = val_num_elements;
 		arr->encoding = (ufbxi_array_encoding)val_encoding;
 		arr->encoded_size = val_encoded_size;
