@@ -545,9 +545,25 @@ UFBXT_TEST(parse_array_bad_size)
 		"\x01\x00\x00\x00" "\x02\x00\x00\x00" "\x03\x00\x00\x00"
 	);
 
-	int data[8];
+	int32_t data[8];
 	ufbxi_array arr;
 	ufbxt_assert(ufbxi_parse_value(uc, 'i', &arr));
+	ufbxt_assert(!ufbxi_decode_array(uc, &arr, data));
+	ufbxt_log_error(uc);
+}
+#endif
+
+UFBXT_TEST(parse_array_bad_size_conversion)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"i" "\x08\x00\x00\x00" "\x00\x00\x00\x00" "\x0c\x00\x00\x00"
+		"\x01\x00\x00\x00" "\x02\x00\x00\x00" "\x03\x00\x00\x00"
+	);
+
+	int64_t data[8];
+	ufbxi_array arr;
+	ufbxt_assert(ufbxi_parse_value(uc, 'l', &arr));
 	ufbxt_assert(!ufbxi_decode_array(uc, &arr, data));
 	ufbxt_log_error(uc);
 }
