@@ -74,7 +74,11 @@ typedef enum {
 typedef enum {
 	ufbxi_encoding_basic = 0,
 	ufbxi_encoding_deflate = 1,
-	ufbxi_encoding_multivalue = 0x80000000,
+
+	// Custom array encoding for older FBX compatability. Concatenates multiple
+	// individual values into a single array. Magic number 'UFmv' (little endian)
+	// chosen to minimize risk of colliding with other custom encodings.
+	ufbxi_encoding_multivalue = 0x766d4655,
 } ufbxi_array_encoding;
 
 typedef struct {
