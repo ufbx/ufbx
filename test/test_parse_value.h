@@ -640,6 +640,29 @@ UFBXT_TEST(parse_multivalue_array)
 }
 #endif
 
+UFBXT_TEST(parse_multivalue_array_float)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"F\x00\x00\x80\x3f" "F\x00\x00\x00\x40" "F\x00\x00\x80\x40"
+	);
+
+	ufbxi_array arr;
+	ufbxt_assert(ufbxi_parse_value(uc, 'f', &arr));
+	ufbxt_assert(arr.src_type == 'f');
+	ufbxt_assert(arr.dst_type == 'f');
+	ufbxt_assert(arr.num_elements == 3);
+	ufbxt_assert(arr.encoding == ufbxi_encoding_multivalue);
+	ufbxt_assert(arr.encoded_size == uc->value_end);
+
+	float data[3];
+	ufbxt_assert(ufbxi_decode_array(uc, &arr, data));
+	ufbxt_assert(data[0] == 1.0f);
+	ufbxt_assert(data[1] == 2.0f);
+	ufbxt_assert(data[2] == 4.0f);
+}
+#endif
+
 UFBXT_TEST(parse_multivalue_convert_ints)
 #if UFBXT_IMPL
 {
@@ -758,7 +781,7 @@ UFBXT_TEST(parse_multivalue_convert_floats)
 }
 #endif
 
-UFBXT_TEST(parse_multivalue_bad_type)
+UFBXT_TEST(parse_multivalue_bad_leading_type)
 #if UFBXT_IMPL
 {
 	ufbxi_context *uc = ufbxt_memory_context_values(
@@ -767,6 +790,21 @@ UFBXT_TEST(parse_multivalue_bad_type)
 
 	ufbxi_array arr;
 	ufbxt_assert(!ufbxi_parse_value(uc, 'i', &arr));
+	ufbxt_log_error(uc);
+}
+#endif
+
+UFBXT_TEST(parse_multivalue_bad_following_type)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"I\x01\x00\x00\x00"
+		"S\x05\x00\x00\x00Hello"
+	);
+
+	ufbxi_array arr;
+	ufbxt_assert(!ufbxi_parse_value(uc, 'i', &arr));
+	ufbxt_log_error(uc);
 }
 #endif
 
