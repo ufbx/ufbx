@@ -7,7 +7,6 @@
 
 typedef struct ufbx_error_s {
 	uint32_t source_line;
-	uint32_t byte_offset;
 	char desc[UFBX_ERROR_DESC_MAX_LENGTH + 1];
 } ufbx_error;
 

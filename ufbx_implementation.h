@@ -55,12 +55,29 @@ ufbxi_streq(ufbxi_string str, const char *ref)
 // -- Binary parsing
 
 typedef struct {
+	uint32_t value_begin_pos;
+	uint32_t child_begin_pos;
+	uint32_t end_pos;
+	ufbxi_string name;
+	uint32_t next_child_pos;
+	uint32_t next_value_pos;
+} ufbxi_node;
+
+#define UFBXI_NODE_STACK_SIZE 16
+
+typedef struct {
 	const char *data;
 	uint32_t size;
-	uint32_t pos;
 
-	uint32_t value_end;
+	// Currently focused (via find or iteration) node.
+	ufbxi_node focused_node;
 
+	// Entered node stack.
+	ufbxi_node node_stack[UFBXI_NODE_STACK_SIZE];
+	ufbxi_node *node_stack_top;
+
+	// Error status
+	int failed;
 	ufbx_error *error;
 } ufbxi_context;
 
@@ -103,11 +120,11 @@ typedef struct {
 
 static int ufbxi_do_error(ufbxi_context *uc, uint32_t line, const char *desc)
 {
+	uc->failed = 1;
 	size_t length = strlen(desc);
 	if (length > UFBX_ERROR_DESC_MAX_LENGTH) length = UFBX_ERROR_DESC_MAX_LENGTH;
 	if (uc->error) {
 		uc->error->source_line = line;
-		uc->error->byte_offset = uc->pos;
 		memcpy(uc->error->desc, desc, length);
 		uc->error->desc[length] = '\0';
 	}
@@ -116,11 +133,11 @@ static int ufbxi_do_error(ufbxi_context *uc, uint32_t line, const char *desc)
 
 static int ufbxi_do_errorf(ufbxi_context *uc, uint32_t line, const char *fmt, ...)
 {
+	uc->failed = 1;
 	va_list args;
 	va_start(args, fmt);
 	if (uc->error) {
 		uc->error->source_line = line;
-		uc->error->byte_offset = uc->pos;
 		vsnprintf(uc->error->desc, sizeof(uc->error->desc), fmt, args);
 	}
 	va_end(args);
@@ -134,10 +151,10 @@ static int ufbxi_do_errorf(ufbxi_context *uc, uint32_t line, const char *fmt, ..
 // only counts the number of elements, checks types, and skips the array data.
 static int ufbxi_convert_multivalue_array(ufbxi_context *uc, ufbxi_array *dst, char dst_type)
 {
-	uint32_t begin = uc->pos;
+	uint32_t begin = uc->focused_node.next_value_pos;
 	uint32_t num_elements = 0;
-	while (uc->pos < uc->value_end) {
-		char src_type = uc->data[uc->pos];
+	while (uc->focused_node.next_value_pos < uc->focused_node.child_begin_pos) {
+		char src_type = uc->data[uc->focused_node.next_value_pos];
 		uint32_t size;
 		switch (src_type) {
 		case 'I': size = 4; break;
@@ -148,15 +165,17 @@ static int ufbxi_convert_multivalue_array(ufbxi_context *uc, ufbxi_array *dst, c
 		case 'D': size = 8; break;
 		default: return ufbxi_errorf(uc, "Bad multivalue array type '%c'", src_type);
 		}
-		uc->pos += 1 + size;
+		uc->focused_node.next_value_pos += 1 + size;
 		num_elements++;
 	}
-	if (uc->pos != uc->value_end) return ufbxi_error(uc, "Multivalue array overrun");
+	if (uc->focused_node.next_value_pos != uc->focused_node.child_begin_pos) {
+		return ufbxi_error(uc, "Multivalue array overrun");
+	}
 
 	dst->num_elements = num_elements;
 	dst->data_offset = begin;
 	dst->encoding = ufbxi_encoding_multivalue;
-	dst->encoded_size = uc->pos - begin;
+	dst->encoded_size = uc->focused_node.next_value_pos - begin;
 	// NOTE: Multivalue arrays can be heterogenous, just use `dst_type` as `src_type`
 	dst->src_type = dst_type; 
 	dst->dst_type = dst_type;
@@ -173,12 +192,13 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 {
 	// An FBX file must end in a 13-byte NULL node. Due to this a valid
 	// FBX file must always have space for the largest possible property header.
-	if (uc->size - uc->pos < 13) {
+	if (uc->size - uc->focused_node.next_value_pos < 13) {
 		return ufbxi_error(uc, "Reading value at the end of file");
 	}
 
-	char src_type = uc->data[uc->pos];
-	const char *src = uc->data + uc->pos + 1;
+	uint32_t pos = uc->focused_node.next_value_pos;
+	char src_type = uc->data[pos];
+	const char *src = uc->data + pos + 1;
 
 	// Read the next value locally
 	uint32_t val_size = 1;
@@ -203,7 +223,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 			return ufbxi_errorf(uc, "String is too large: %u bytes", val_num_elements);
 		}
 		val_size += 4 + val_num_elements;
-		val_data_offset = uc->pos + 5;
+		val_data_offset = pos + 5;
 		break;
 	case 'i': case 'l': case 'f': case 'd': case 'b':
 		val_class = ufbxi_val_array;
@@ -214,17 +234,17 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 			return ufbxi_errorf(uc, "Array is too large: %u bytes", val_encoded_size);
 		}
 		val_size += 12 + val_encoded_size;
-		val_data_offset = uc->pos + 13;
+		val_data_offset = pos + 13;
 		break;
 	default:
 		return ufbxi_errorf(uc, "Invalid type code '%c'", src_type);
 	}
 
-	if (val_size > uc->value_end - uc->pos) {
+	uint32_t val_end = pos + val_size;
+	if (val_end < pos || val_end > uc->focused_node.child_begin_pos) {
 		return ufbxi_errorf(uc, "Value overflows data block: %u bytes", val_size);
 	}
-	uint32_t begin = uc->pos;
-	uc->pos += val_size;
+	uc->focused_node.next_value_pos = val_end;
 
 	// Early return: Ignore the data
 	if (dst_type == '.') return 1;
@@ -247,7 +267,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		case '?': any->value.i = val_int; break;
 		case 'i': case 'l': case 'f': case 'd': case 'b':
 			// Early return: Parse as multivalue array. Reset position to beginning and rescan.
-			uc->pos = begin;
+			uc->focused_node.next_value_pos = pos;
 			return ufbxi_convert_multivalue_array(uc, (ufbxi_array*)dst, dst_type);
 		default:
 			return ufbxi_errorf(uc, "Cannot convert from int '%c' to '%c'", src_type, dst_type);
@@ -260,7 +280,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		case '?': any->value.f = val_float; break;
 		case 'f': case 'd':
 			// Early return: Parse as multivalue array. Reset position to beginning and rescan.
-			uc->pos = begin;
+			uc->focused_node.next_value_pos = pos;
 			return ufbxi_convert_multivalue_array(uc, (ufbxi_array*)dst, dst_type);
 		default:
 			return ufbxi_errorf(uc, "Cannot convert from float '%c' to '%c'", src_type, dst_type);
@@ -305,12 +325,9 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 	return 1;
 }
 
-// Parse multiple values, works like `scanf()`.
-// See `ufbxi_parse_value()` for more information.
-static int ufbxi_parse_values(ufbxi_context *uc, const char *fmt, ...)
+// VA-list version of `ufbxi_parse_values()`
+static int ufbxi_parse_values_va(ufbxi_context *uc, const char *fmt, va_list args)
 {
-	va_list args;
-	va_start(args, fmt);
 	const char *fmt_ptr = fmt;
 	char ch;
 	while ((ch = *fmt_ptr) != '\0') {
@@ -322,8 +339,18 @@ static int ufbxi_parse_values(ufbxi_context *uc, const char *fmt, ...)
 		}
 		fmt_ptr++;
 	}
-	va_end(args);
 	return 1;
+}
+
+// Parse multiple values, works like `scanf()`.
+// See `ufbxi_parse_value()` for more information.
+static int ufbxi_parse_values(ufbxi_context *uc, const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	int ret = ufbxi_parse_values_va(uc, fmt, args);
+	va_end(args);
+	return ret;
 }
 
 // Decode the data of an multivalue array into memory. Requires the array to be
@@ -334,11 +361,18 @@ static int ufbxi_decode_multivalue_array(ufbxi_context *uc, ufbxi_array *arr, vo
 		return ufbxi_error(uc, "Internal: Bad multivalue encoding");
 	}
 
-	// HACK: Set the parsing position to the array temporarily
-	uint32_t old_pos = uc->pos;
-	uint32_t old_value_end = uc->value_end;
-	uc->pos = arr->data_offset;
-	uc->value_end = arr->data_offset + arr->encoded_size;
+	// HACK: Create a virtual node for the multivalue array and set it as
+	// the current one.
+	ufbxi_node focused_node = uc->focused_node;
+	memset(&uc->focused_node, 0, sizeof(ufbxi_node));
+
+	uint32_t arr_begin = arr->data_offset;
+	uint32_t arr_end = arr_begin + arr->encoded_size;
+	uc->focused_node.value_begin_pos = arr_begin;
+	uc->focused_node.next_value_pos = arr_begin;
+	uc->focused_node.child_begin_pos = arr_end;
+	uc->focused_node.next_child_pos = arr_end;
+	uc->focused_node.end_pos = arr_end;
 
 	char dst_elem_type;
 	uint32_t dst_elem_size;
@@ -351,17 +385,18 @@ static int ufbxi_decode_multivalue_array(ufbxi_context *uc, ufbxi_array *arr, vo
 	}
 
 	char *dst_ptr = (char*)dst;
-	while (uc->pos < uc->value_end) {
+	while (uc->focused_node.next_value_pos < uc->focused_node.child_begin_pos) {
 		if (!ufbxi_parse_value(uc, dst_elem_type, dst_ptr)) return 0;
 		dst_ptr += dst_elem_size;
 	}
-	if (uc->pos != uc->value_end) return ufbxi_error(uc, "Multivalue array overrun");
+	if (uc->focused_node.next_value_pos != uc->focused_node.child_begin_pos) {
+		return ufbxi_error(uc, "Multivalue array overrun");
+	}
 	if (dst_ptr != (char*)dst + arr->num_elements * dst_elem_size) {
 		return ufbxi_error(uc, "Internal: Multivalue array read failed");
 	}
 
-	uc->pos = old_pos;
-	uc->value_end = old_value_end;
+	uc->focused_node = focused_node;
 	return 1;
 }
 
@@ -481,6 +516,164 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 	}
 
 	return 1;
+}
+
+// Enter the currently focused node. Pushes the node to stack and allows inspecting its
+// children. Does not fail if the node is empty.
+static int ufbxi_enter_node(ufbxi_context *uc)
+{
+	if (uc->node_stack_top == uc->node_stack + UFBXI_NODE_STACK_SIZE) {
+		return ufbxi_error(uc, "Node stack overflow: Too many nested nodes");
+	}
+
+	uc->node_stack_top++;
+	*uc->node_stack_top = uc->focused_node;
+	return 1;
+}
+
+// Exit a node previously entered using `ufbxi_enter_node()`. Future child node
+// iteration and find queries will be done to the parent node.
+static int ufbxi_exit_node(ufbxi_context *uc)
+{
+	if (uc->node_stack_top == uc->node_stack) {
+		return ufbxi_error(uc, "Internal: Trying to pop root node");
+	}
+
+	uc->focused_node = *uc->node_stack_top;
+	uc->node_stack_top--;
+	return 1;
+}
+
+// Parse the node starting from `pos` to `node`. Does not modify `node` if the
+// function fails. Returns zero when parsing a NULL-record without failure.
+static int ufbxi_parse_node(ufbxi_context *uc, uint32_t pos, ufbxi_node *node)
+{
+	if (pos > uc->size - 13) {
+		return ufbxi_error(uc, "Internall: Trying to read node out of bounds");
+	}
+
+	uint32_t end_pos = ufbxi_read_u32(uc->data + pos + 0);
+	uint32_t values_len = ufbxi_read_u32(uc->data + pos + 8);
+	uint8_t name_len = ufbxi_read_u8(uc->data + pos + 12);
+
+	if (end_pos == 0) {
+		// NULL-record: Return without failure
+		return 0;
+	}
+
+	uint32_t name_pos = pos + 13;
+	uint32_t value_pos = name_pos + name_len;
+	uint32_t child_pos = value_pos + values_len;
+
+	// Check for integer overflow and out-of-bounds at the same time. `name_pos`
+	// cannot overflow due to the precondition check.
+	if (value_pos < name_pos || value_pos > uc->size) {
+		return ufbxi_error(uc, "Node name out of bounds");
+	}
+	if (child_pos < value_pos || child_pos > uc->size) {
+		return ufbxi_error(uc, "Node values out of bounds");
+	}
+	if (end_pos < child_pos || end_pos > uc->size) {
+		return ufbxi_error(uc, "Node children out of bounds");
+	}
+
+	node->name.data = uc->data + name_pos;
+	node->name.length = name_len;
+	node->value_begin_pos = value_pos;
+	node->next_value_pos = value_pos;
+	node->child_begin_pos = child_pos;
+	node->end_pos = end_pos;
+	node->next_child_pos = child_pos;
+	return 1;
+}
+
+// Move the focus to the next child of the currently entered node.
+static int ufbxi_next_child(ufbxi_context *uc, ufbxi_string *name)
+{
+	ufbxi_node *top = uc->node_stack_top;
+	uint32_t pos = top->next_child_pos;
+	if (pos == top->end_pos) return 0;
+
+	// Parse the node to be focused. If we encounter a NULL-record here
+	// it will be reported as not having found the next child without error.
+	if (!ufbxi_parse_node(uc, pos, &uc->focused_node)) return 0;
+
+	top->next_child_pos = uc->focused_node.end_pos;
+	if (name) *name = uc->focused_node.name;
+	return 1;
+}
+
+// Move the focus to the first node matching a name in the currently entered node.
+// Does not affect iteration with `ufbxi_next_child()`
+static int ufbxi_find_node_str(ufbxi_context *uc, ufbxi_string str)
+{
+	// TODO
+	return 0;
+}
+
+// Move to the nth node matching a name in the currently entered node.
+// In/out `index`, finds the next node following `index`. Specify `-1` to
+// find the first node. Call with the same variable pointer to step through
+// all the found matching nodes.
+// Does not affect iteration with `ufbxi_next_child()`
+static int ufbxi_find_node_str_nth(ufbxi_context *uc, ufbxi_string str, int32_t *index)
+{
+	// TODO
+	return 0;
+}
+
+// Convenient shorthands for the above functions.
+
+static ufbxi_forceinline int
+ufbxi_find_node(ufbxi_context *uc, const char *name)
+{
+	ufbxi_string str = { name, strlen(name) };
+	return ufbxi_find_node_str(uc, str);
+}
+
+static ufbxi_forceinline int
+ufbxi_find_node_nth(ufbxi_context *uc, const char *name, int32_t *index)
+{
+	ufbxi_string str = { name, strlen(name) };
+	return ufbxi_find_node_str_nth(uc, str, index);
+}
+
+static ufbxi_forceinline int
+ufbxi_find_value_str(ufbxi_context *uc, ufbxi_string str, char dst_type, void *dst)
+{
+	if (!ufbxi_find_node_str(uc, str)) return 0;
+	return ufbxi_parse_value(uc, dst_type, dst);
+}
+
+static ufbxi_forceinline int
+ufbxi_find_value(ufbxi_context *uc, const char *name, char dst_type, void *dst)
+{
+	ufbxi_string str = { name, strlen(name) };
+	if (!ufbxi_find_node_str(uc, str)) return 0;
+	return ufbxi_parse_value(uc, dst_type, dst);
+}
+
+static ufbxi_forceinline int
+ufbxi_find_values_str(ufbxi_context *uc, ufbxi_string str, const char *fmt, ...)
+{
+	if (!ufbxi_find_node_str(uc, str)) return 0;
+	va_list args;
+	va_start(args, fmt);
+	int ret = ufbxi_parse_values_va(uc, fmt, args);
+	va_end(args);
+	return ret;
+}
+
+static ufbxi_forceinline int
+ufbxi_find_values(ufbxi_context *uc, const char *name, const char *fmt, ...)
+{
+	ufbxi_string str = { name, strlen(name) };
+	if (!ufbxi_find_node_str(uc, str)) return 0;
+	va_list args;
+	va_start(args, fmt);
+	int ret = ufbxi_parse_values_va(uc, fmt, args);
+	va_end(args);
+	return ret;
 }
 
 #endif

@@ -42,21 +42,25 @@ char g_hint[8*1024];
 
 ufbxi_context *ufbxt_make_memory_context(const void *data, uint32_t size)
 {
+	char *data_copy = malloc(size + 13);
+	memcpy(data_copy, data, size);
+	memset(data_copy + size, 0, 13);
 	ufbxi_context *uc = &g_context;
+	memset(uc, 0, sizeof(ufbxi_context));
 	uc->error = &g_error;
-	uc->data = data;
-	uc->size = size;
-	uc->pos = 0;
+	uc->data = data_copy;
+	uc->size = size + 13;
+	uc->node_stack_top = uc->node_stack;
+	uc->node_stack_top->end_pos = size;
 	return uc;
 }
 
 ufbxi_context *ufbxt_make_memory_context_values(const void *data, uint32_t size)
 {
-	char *data_copy = malloc(size + 13);
-	memcpy(data_copy, data, size);
-	memset(data_copy + size, 0, 13);
-	ufbxi_context *uc = ufbxt_make_memory_context(data_copy, size + 13);
-	uc->value_end = size;
+	ufbxi_context *uc = ufbxt_make_memory_context(data, size);
+	uc->focused_node.child_begin_pos = size;
+	uc->focused_node.next_child_pos = size;
+	uc->focused_node.end_pos = size;
 	return uc;
 }
 
@@ -119,8 +123,7 @@ void ufbxt_log_flush()
 
 void ufbxt_log_error(ufbxi_context *uc)
 {
-	ufbxt_logf("(line %u, offset %u) %s", uc->error->source_line,
-		uc->error->byte_offset, uc->error->desc);
+	ufbxt_logf("(line %u) %s", uc->error->source_line, uc->error->desc);
 }
 
 #define UFBXT_IMPL 1
@@ -141,7 +144,6 @@ int ufbxt_run_test(ufbxt_test *test)
 	fflush(stdout);
 
 	g_error.desc[0] = 0;
-	g_error.byte_offset = 0;
 	g_hint[0] = '\0';
 
 	g_current_test = test;
