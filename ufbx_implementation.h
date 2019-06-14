@@ -549,7 +549,7 @@ static int ufbxi_exit_node(ufbxi_context *uc)
 static int ufbxi_parse_node(ufbxi_context *uc, uint32_t pos, ufbxi_node *node)
 {
 	if (pos > uc->size - 13) {
-		return ufbxi_error(uc, "Internall: Trying to read node out of bounds");
+		return ufbxi_error(uc, "Internal: Trying to read node out of bounds");
 	}
 
 	uint32_t end_pos = ufbxi_read_u32(uc->data + pos + 0);
