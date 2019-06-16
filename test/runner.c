@@ -153,6 +153,11 @@ void ufbxt_log_error(ufbxi_context *uc)
 	ufbxt_logf("(line %u) %s", uc->error->source_line, uc->error->desc);
 }
 
+void ufbxt_log_ascii_error(ufbxi_ascii *ua)
+{
+	ufbxt_logf("(line %u) %s", ua->error->source_line, ua->error->desc);
+}
+
 #define UFBXT_IMPL 1
 #define UFBXT_TEST(name) void ufbxt_test_fn_##name(void)
 #include "all_tests.h"
