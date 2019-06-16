@@ -14,8 +14,28 @@ UFBXT_TEST(parse_single_node)
 	ufbxt_assert(ufbxi_streq(node.name, "Hello"));
 	ufbxt_assert(node.value_begin_pos == 18);
 	ufbxt_assert(node.child_begin_pos == 18);
-	ufbxt_assert(node.next_child_pos == 18);
 	ufbxt_assert(node.end_pos == 18);
+}
+#endif
+
+UFBXT_TEST(parse_single_node_7500)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context(
+		"\x1e\x00\x00\x00\x00\x00\x00\x00" "\x00\x00\x00\x00\x00\x00\x00\x00"
+		"\x00\x00\x00\x00\x00\x00\x00\x00"
+		"\x05" "Hello"
+	);
+	uc->version = 7500;
+
+	ufbxi_node node;
+	memset(&node, 0, sizeof(ufbxi_node));
+	ufbxt_assert(ufbxi_parse_node(uc, 0, &node));
+
+	ufbxt_assert(ufbxi_streq(node.name, "Hello"));
+	ufbxt_assert(node.value_begin_pos == 30);
+	ufbxt_assert(node.child_begin_pos == 30);
+	ufbxt_assert(node.end_pos == 30);
 }
 #endif
 

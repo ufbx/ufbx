@@ -2,14 +2,14 @@
 UFBXT_TEST(parse_ascii_empty)
 #if UFBXT_IMPL
 {
-	const char *header = "Kaydara FBX Binary  \x00\x1a\x00\xe8\x1c\x00\x00";
-	const char *null_node = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+	const char *header = "Kaydara FBX Binary  \x00\x1a\x00\x4c\x1d\x00\x00";
+	const char *null_node = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
 	ufbxi_ascii *ua = ufbxt_ascii_context("");
 	ufbxt_assert(ufbxi_ascii_parse(ua));
-	ufbxt_assert(ua->dst_pos == 40);
+	ufbxt_assert(ua->dst_pos == 52);
 	ufbxt_assert_eq(ua->dst, header, 27);
-	ufbxt_assert_eq(ua->dst + 27, null_node, 13);
+	ufbxt_assert_eq(ua->dst + 27, null_node, 25);
 }
 #endif
 
@@ -28,14 +28,14 @@ UFBXT_TEST(parse_ascii_simple)
 {
 	const char *src = "Node: 1 {Sub:2,3} ; Comment";
 	const char dst[] =
-		/* 27 */ "Kaydara FBX Binary  \x00\x1a\x00\xe8\x1c\x00\x00"
-		/* 39 */ "\x52\x00\x00\x00" "\x01\x00\x00\x00" "\x03\x00\x00\x00"
-		/* 47 */ "\x04" "Node" "Y\x01\x00"
-		/* 59 */ "\x45\x00\x00\x00" "\x02\x00\x00\x00" "\x06\x00\x00\x00"
-		/* 69 */ "\x03" "Sub" "Y\x02\x00" "Y\x03\x00"
-		/* 82 */  "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-		/* 95 */  "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-	const uint32_t dst_len = 95;
+		/*  27 */ "Kaydara FBX Binary  \x00\x1a\x00\x4c\x1d\x00\x00"
+		/*  51 */ "\x76\0\0\0\0\0\0\0" "\x01\0\0\0\0\0\0\0" "\x03\0\0\0\0\0\0\0"
+		/*  59 */ "\x04" "Node" "Y\x01\x00"
+		/*  83 */ "\x5d\0\0\0\0\0\0\0" "\x02\0\0\0\0\0\0\0" "\x06\0\0\0\0\0\0\0"
+		/*  93 */ "\x03" "Sub" "Y\x02\x00" "Y\x03\x00"
+		/* 118 */  "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+		/* 143 */  "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+	const uint32_t dst_len = 143;
 	ufbxt_assert(sizeof(dst) == dst_len + 1);
 	test_ascii_to_binary(src, dst, dst_len);
 }
@@ -50,13 +50,13 @@ UFBXT_TEST(parse_ascii_version_from_header)
 		"}";
 	const char dst[] =
 		/*  27 */ "Kaydara FBX Binary  \x00\x1a\x00\xd4\x17\x00\x00"
-		/*  39 */ "\x64\x00\x00\x00" "\x00\x00\x00\x00" "\x00\x00\x00\x00"
-		/*  58 */ "\x12" "FBXHeaderExtension"
-		/*  70 */ "\x57\x00\x00\x00" "\x02\x00\x00\x00" "\x06\x00\x00\x00"
-		/*  87 */ "\x0a" "FBXVersion" "Y\xd4\x17" "Y\xff\x00"
-		/* 100 */  "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-		/* 113 */  "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-	const uint32_t dst_len = 113;
+		/*  51 */ "\x88\0\0\0\0\0\0\0" "\0\0\0\0\0\0\0\0" "\0\0\0\0\0\0\0\0"
+		/*  79 */ "\x12" "FBXHeaderExtension"
+		/*  94 */ "\x6f\0\0\0\0\0\0\0" "\x02\0\0\0\0\0\0\0" "\x06\0\0\0\0\0\0\0"
+		/* 111 */ "\x0a" "FBXVersion" "Y\xd4\x17" "Y\xff\x00"
+		/* 136 */  "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+		/* 161 */  "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+	const uint32_t dst_len = 161;
 	ufbxt_assert(sizeof(dst) == dst_len + 1);
 	test_ascii_to_binary(src, dst, dst_len);
 }
@@ -66,23 +66,28 @@ UFBXT_TEST(parse_ascii_version_from_header)
 static void test_ascii_to_binary_value(const char *src, const char *dst, uint32_t dst_arr_size, uint32_t num)
 {
 	uint32_t dst_len = dst_arr_size - 1;
-	const char *header = "Kaydara FBX Binary  \x00\x1a\x00\xe8\x1c\x00\x00";
-	const char *null_node = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+	const char *header = "Kaydara FBX Binary  \x00\x1a\x00\x4c\x1d\x00\x00";
+	const char *null_node = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
 	ufbxi_ascii *ua = ufbxt_ascii_context(src);
 	ufbxt_assert(ufbxi_ascii_parse(ua));
-	ufbxt_assert(ua->dst_pos - 13 - 41 == dst_len);
+
+	uint64_t node_pos = 27;
+	uint64_t value_pos = node_pos + 25 + 1;
+	uint64_t null_pos = ua->dst_pos - 25;
+	uint64_t end_pos = null_pos + 25;
+	ufbxt_assert(null_pos - value_pos == dst_len);
 
 	ufbxt_assert_eq(ua->dst, header, 27);
-	ufbxt_assert_eq(ua->dst + ua->dst_pos - 13, null_node, 13);
+	ufbxt_assert_eq(ua->dst + null_pos, null_node, 25);
 
-	uint32_t node_end = ufbxi_read_u32(ua->dst + 27 + 0);
-	uint32_t num_values = ufbxi_read_u32(ua->dst + 27 + 4);
-	uint32_t value_size = ufbxi_read_u32(ua->dst + 27 + 8);
-	ufbxt_assert(node_end == 41 + dst_len);
+	size_t node_end = (size_t)ufbxi_read_u64(ua->dst + node_pos + 0);
+	size_t num_values = (size_t)ufbxi_read_u64(ua->dst + node_pos + 8);
+	size_t value_size = (size_t)ufbxi_read_u64(ua->dst + node_pos + 16);
+	ufbxt_assert(node_end == null_pos);
 	ufbxt_assert(value_size == dst_len);
 	ufbxt_assert(num_values == num);
-	ufbxt_assert_eq(ua->dst + 41, dst, dst_len);
+	ufbxt_assert_eq(ua->dst + value_pos, dst, dst_len);
 }
 #endif
 

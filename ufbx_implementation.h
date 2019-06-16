@@ -29,13 +29,13 @@
 
 typedef struct {
 	const char *data;
-	uint32_t length;
+	size_t length;
 } ufbxi_string;
 
 static ufbxi_forceinline int
 ufbxi_streq(ufbxi_string str, const char *ref)
 {
-	uint32_t length = (uint32_t)strlen(ref);
+	size_t length = strlen(ref);
 	return str.length == length && !memcmp(str.data, ref, length);
 }
 
@@ -65,19 +65,23 @@ ufbxi_streq(ufbxi_string str, const char *ref)
 // -- Binary parsing
 
 typedef struct {
-	uint32_t value_begin_pos;
-	uint32_t child_begin_pos;
-	uint32_t end_pos;
 	ufbxi_string name;
-	uint32_t next_child_pos;
-	uint32_t next_value_pos;
+	size_t value_begin_pos;
+	size_t child_begin_pos;
+	size_t end_pos;
+
+	size_t next_value_pos;
+	size_t next_child_pos;
 } ufbxi_node;
 
 #define UFBXI_NODE_STACK_SIZE 16
 
 typedef struct {
 	const char *data;
-	uint32_t size;
+	size_t size;
+
+	uint32_t version;
+	int from_ascii;
 
 	// Currently focused (via find or iteration) node.
 	ufbxi_node focused_node;
@@ -109,10 +113,10 @@ typedef enum {
 } ufbxi_array_encoding;
 
 typedef struct {
-	uint32_t num_elements;
+	size_t num_elements;
 	ufbxi_array_encoding encoding;  
-	uint32_t encoded_size;
-	uint32_t data_offset;
+	size_t encoded_size;
+	size_t data_offset;
 	char src_type;
 	char dst_type;
 } ufbxi_array;
@@ -163,7 +167,7 @@ static int ufbxi_do_errorf(ufbxi_context *uc, uint32_t line, const char *fmt, ..
 // only counts the number of elements, checks types, and skips the array data.
 static int ufbxi_convert_multivalue_array(ufbxi_context *uc, ufbxi_array *dst, char dst_type)
 {
-	uint32_t begin = uc->focused_node.next_value_pos;
+	size_t begin = uc->focused_node.next_value_pos;
 	uint32_t num_elements = 0;
 	while (uc->focused_node.next_value_pos < uc->focused_node.child_begin_pos) {
 		char src_type = uc->data[uc->focused_node.next_value_pos];
@@ -202,25 +206,25 @@ static int ufbxi_convert_multivalue_array(ufbxi_context *uc, ufbxi_array *dst, c
 //   FDILY -> FD, ILYC -> ILB, ILFDYilfd -> fd, ILYCilb -> ilb
 static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 {
-	// An FBX file must end in a 13-byte NULL node. Due to this a valid
+	// An FBX file must end in a 13 or 25-byte NULL node. Due to this a valid
 	// FBX file must always have space for the largest possible property header.
 	if (uc->size - uc->focused_node.next_value_pos < 13) {
 		return ufbxi_error(uc, "Reading value at the end of file");
 	}
 
-	uint32_t pos = uc->focused_node.next_value_pos;
+	size_t pos = uc->focused_node.next_value_pos;
 	char src_type = uc->data[pos];
 	const char *src = uc->data + pos + 1;
 
 	// Read the next value locally
-	uint32_t val_size = 1;
+	size_t val_size = 1;
 	ufbxi_val_class val_class;
 	int64_t val_int;
 	double val_float;
-	uint32_t val_num_elements;
+	size_t val_num_elements;
 	uint32_t val_encoding;
-	uint32_t val_encoded_size;
-	uint32_t val_data_offset;
+	size_t val_encoded_size;
+	size_t val_data_offset;
 	switch (src_type) {
 	case 'I': val_class = ufbxi_val_int; val_int = ufbxi_read_i32(src); val_size += 4; break;
 	case 'L': val_class = ufbxi_val_int; val_int = ufbxi_read_i64(src); val_size += 8; break;
@@ -252,7 +256,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		return ufbxi_errorf(uc, "Invalid type code '%c'", src_type);
 	}
 
-	uint32_t val_end = pos + val_size;
+	size_t val_end = pos + val_size;
 	if (val_end < pos || val_end > uc->focused_node.child_begin_pos) {
 		return ufbxi_errorf(uc, "Value overflows data block: %u bytes", val_size);
 	}
@@ -378,8 +382,8 @@ static int ufbxi_decode_multivalue_array(ufbxi_context *uc, ufbxi_array *arr, vo
 	ufbxi_node focused_node = uc->focused_node;
 	memset(&uc->focused_node, 0, sizeof(ufbxi_node));
 
-	uint32_t arr_begin = arr->data_offset;
-	uint32_t arr_end = arr_begin + arr->encoded_size;
+	size_t arr_begin = arr->data_offset;
+	size_t arr_end = arr_begin + arr->encoded_size;
 	uc->focused_node.value_begin_pos = arr_begin;
 	uc->focused_node.next_value_pos = arr_begin;
 	uc->focused_node.child_begin_pos = arr_end;
@@ -424,7 +428,7 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 	default: return ufbxi_error(uc, "Internal: Invalid array type");
 	}
 
-	uint32_t arr_size = arr->num_elements * elem_size;
+	size_t arr_size = arr->num_elements * elem_size;
 
 	if (arr->dst_type == arr->src_type) {
 		const void *src = uc->data + arr->data_offset;
@@ -560,22 +564,34 @@ static int ufbxi_exit_node(ufbxi_context *uc)
 // function fails. Returns zero when parsing a NULL-record without failure.
 static int ufbxi_parse_node(ufbxi_context *uc, uint32_t pos, ufbxi_node *node)
 {
-	if (pos > uc->size - 13) {
-		return ufbxi_error(uc, "Internal: Trying to read node out of bounds");
-	}
+	uint64_t end_pos, values_len, name_pos;
+	uint8_t name_len;
 
-	uint32_t end_pos = ufbxi_read_u32(uc->data + pos + 0);
-	uint32_t values_len = ufbxi_read_u32(uc->data + pos + 8);
-	uint8_t name_len = ufbxi_read_u8(uc->data + pos + 12);
+	if (uc->version >= 7500 || uc->from_ascii) {
+		if (pos > uc->size - 25) {
+			return ufbxi_error(uc, "Internal: Trying to read node out of bounds");
+		}
+		end_pos = ufbxi_read_u64(uc->data + pos + 0);
+		values_len = ufbxi_read_u64(uc->data + pos + 16);
+		name_len = ufbxi_read_u8(uc->data + pos + 24);
+		name_pos = pos + 25;
+	} else {
+		if (pos > uc->size - 13) {
+			return ufbxi_error(uc, "Internal: Trying to read node out of bounds");
+		}
+		end_pos = ufbxi_read_u32(uc->data + pos + 0);
+		values_len = ufbxi_read_u32(uc->data + pos + 8);
+		name_len = ufbxi_read_u8(uc->data + pos + 12);
+		name_pos = pos + 13;
+	}
 
 	if (end_pos == 0) {
 		// NULL-record: Return without failure
 		return 0;
 	}
 
-	uint32_t name_pos = pos + 13;
-	uint32_t value_pos = name_pos + name_len;
-	uint32_t child_pos = value_pos + values_len;
+	uint64_t value_pos = name_pos + name_len;
+	uint64_t child_pos = value_pos + values_len;
 
 	// Check for integer overflow and out-of-bounds at the same time. `name_pos`
 	// cannot overflow due to the precondition check.
@@ -589,13 +605,18 @@ static int ufbxi_parse_node(ufbxi_context *uc, uint32_t pos, ufbxi_node *node)
 		return ufbxi_error(uc, "Node children out of bounds");
 	}
 
+	if (value_pos > (uint64_t)SIZE_MAX || child_pos > (uint64_t)SIZE_MAX
+		|| end_pos > (uint64_t)SIZE_MAX) {
+		return ufbxi_error(uc, "The file requires 64-bit build");
+	}
+
 	node->name.data = uc->data + name_pos;
 	node->name.length = name_len;
-	node->value_begin_pos = value_pos;
-	node->next_value_pos = value_pos;
-	node->child_begin_pos = child_pos;
-	node->end_pos = end_pos;
-	node->next_child_pos = child_pos;
+	node->value_begin_pos = (size_t)value_pos;
+	node->next_value_pos = (size_t)value_pos;
+	node->child_begin_pos = (size_t)child_pos;
+	node->end_pos = (size_t)end_pos;
+	node->next_child_pos = (size_t)child_pos;
 	return 1;
 }
 
@@ -714,8 +735,8 @@ typedef struct {
 	const char *src_end;
 
 	char *dst;
-	uint32_t dst_pos;
-	uint32_t dst_size;
+	size_t dst_pos;
+	size_t dst_size;
 
 	ufbxi_ascii_token prev_token;
 	ufbxi_ascii_token token;
@@ -857,10 +878,10 @@ static int ufbxi_ascii_accept(ufbxi_ascii *ua, char type)
 	}
 }
 
-static uint32_t ufbxi_ascii_push_output(ufbxi_ascii *ua, uint32_t size)
+static size_t ufbxi_ascii_push_output(ufbxi_ascii *ua, size_t size)
 {
 	if (ua->dst_size - ua->dst_pos < size) {
-		uint32_t new_size = 2 * ua->dst_size;
+		size_t new_size = 2 * ua->dst_size;
 		if (new_size < 1024) new_size = 1024;
 		if (new_size < size) new_size = size;
 		char *new_dst = (char*)realloc(ua->dst, new_size);
@@ -868,7 +889,7 @@ static uint32_t ufbxi_ascii_push_output(ufbxi_ascii *ua, uint32_t size)
 		ua->dst = new_dst;
 		ua->dst_size = new_size;
 	}
-	uint32_t pos = ua->dst_pos;
+	size_t pos = ua->dst_pos;
 	ua->dst_pos += size;
 	return pos;
 }
@@ -892,15 +913,15 @@ static int ufbxi_ascii_parse_node(ufbxi_ascii *ua)
 	ua->node_stack[ua->node_stack_size].length = name_len;
 	ua->node_stack_size++;
 
-	uint32_t node_pos = ufbxi_ascii_push_output(ua, 13 + name_len);
+	size_t node_pos = ufbxi_ascii_push_output(ua, 25 + name_len);
 	if (node_pos == ~0u) return 0;
-	ufbxi_write_u8(ua->dst + node_pos + 12, name_len);
-	memcpy(ua->dst + node_pos + 13, ua->prev_token.str.data, name_len);
+	ufbxi_write_u8(ua->dst + node_pos + 24, name_len);
+	memcpy(ua->dst + node_pos + 25, ua->prev_token.str.data, name_len);
 
-	uint32_t value_begin_pos = ua->dst_pos;
+	size_t value_begin_pos = ua->dst_pos;
 
 	int in_array = 0;
-	uint32_t num_values = 0;
+	size_t num_values = 0;
 
 	// NOTE: Infinite loop to allow skipping the comma parsing via `continue`.
 	for (;;) {
@@ -910,12 +931,12 @@ static int ufbxi_ascii_parse_node(ufbxi_ascii *ua)
 			// to be no way to escape "&quot;" itself. Exporting and importing converts
 			// strings with "&quot;" to "\"". Append worst-case data and rewind the
 			// write position in case we find "&quot;" escapes.
-			uint32_t string_len = tok->str.length - 2;
-			uint32_t pos = ufbxi_ascii_push_output(ua, 5 + string_len);
+			size_t string_len = tok->str.length - 2;
+			size_t pos = ufbxi_ascii_push_output(ua, 5 + string_len);
 			if (pos == ~0u) return 0;
 			char *dst = ua->dst + pos + 5;
-			uint32_t bytes_escaped = 0;
-			for (uint32_t i = 0; i < string_len; i++) {
+			size_t bytes_escaped = 0;
+			for (size_t i = 0; i < string_len; i++) {
 				char c = tok->str.data[1 + i];
 				if (c == '&' && i + 6 <= string_len) {
 					if (!memcmp(tok->str.data + 1 + i, "&quot;", 6)) {
@@ -935,17 +956,17 @@ static int ufbxi_ascii_parse_node(ufbxi_ascii *ua)
 		} else if (ufbxi_ascii_accept(ua, UFBXI_ASCII_INT)) {
 			int64_t val = tok->value.i64;
 			if (val >= INT16_MIN && val <= INT16_MAX) {
-				uint32_t pos = ufbxi_ascii_push_output(ua, 3);
+				size_t pos = ufbxi_ascii_push_output(ua, 3);
 				if (pos == ~0u) return 0;
 				ua->dst[pos] = 'Y';
 				ufbxi_write_i16(ua->dst + pos + 1, val);
 			} else if (val >= INT32_MIN && val <= INT32_MAX) {
-				uint32_t pos = ufbxi_ascii_push_output(ua, 5);
+				size_t pos = ufbxi_ascii_push_output(ua, 5);
 				if (pos == ~0u) return 0;
 				ua->dst[pos] = 'I';
 				ufbxi_write_i32(ua->dst + pos + 1, val);
 			} else {
-				uint32_t pos = ufbxi_ascii_push_output(ua, 9);
+				size_t pos = ufbxi_ascii_push_output(ua, 9);
 				if (pos == ~0u) return 0;
 				ua->dst[pos] = 'L';
 				ufbxi_write_i64(ua->dst + pos + 1, val);
@@ -963,12 +984,12 @@ static int ufbxi_ascii_parse_node(ufbxi_ascii *ua)
 		} else if (ufbxi_ascii_accept(ua, UFBXI_ASCII_FLOAT)) {
 			double val = tok->value.f64;
 			if ((double)(float)val == val) {
-				uint32_t pos = ufbxi_ascii_push_output(ua, 5);
+				size_t pos = ufbxi_ascii_push_output(ua, 5);
 				if (pos == ~0u) return 0;
 				ua->dst[pos] = 'F';
 				ufbxi_write_f32(ua->dst + pos + 1, val);
 			} else {
-				uint32_t pos = ufbxi_ascii_push_output(ua, 9);
+				size_t pos = ufbxi_ascii_push_output(ua, 9);
 				if (pos == ~0u) return 0;
 				ua->dst[pos] = 'D';
 				ufbxi_write_f64(ua->dst + pos + 1, val);
@@ -976,12 +997,12 @@ static int ufbxi_ascii_parse_node(ufbxi_ascii *ua)
 
 		} else if (ufbxi_ascii_accept(ua, UFBXI_ASCII_BARE_WORD)) {
 			if (ufbxi_streq(tok->str, "Y") || ufbxi_streq(tok->str, "T")) {
-				uint32_t pos = ufbxi_ascii_push_output(ua, 2);
+				size_t pos = ufbxi_ascii_push_output(ua, 2);
 				if (pos == ~0u) return 0;
 				ua->dst[pos] = 'C';
 				ua->dst[pos + 1] = 1;
 			} else if (ufbxi_streq(tok->str, "N") || ufbxi_streq(tok->str, "F")) {
-				uint32_t pos = ufbxi_ascii_push_output(ua, 2);
+				size_t pos = ufbxi_ascii_push_output(ua, 2);
 				if (pos == ~0u) return 0;
 				ua->dst[pos] = 'C';
 				ua->dst[pos + 1] = 0;
@@ -1020,7 +1041,7 @@ static int ufbxi_ascii_parse_node(ufbxi_ascii *ua)
 		}
 	}
 
-	uint32_t value_end_pos = ua->dst_pos;
+	size_t value_end_pos = ua->dst_pos;
 
 	if (ufbxi_ascii_accept(ua, '{')) {
 		while (!ufbxi_ascii_accept(ua, '}')) {
@@ -1028,15 +1049,15 @@ static int ufbxi_ascii_parse_node(ufbxi_ascii *ua)
 			ufbxi_ascii_parse_node(ua);
 		}
 
-		uint32_t null_pos = ufbxi_ascii_push_output(ua, 13);
+		size_t null_pos = ufbxi_ascii_push_output(ua, 25);
 		if (null_pos == ~0u) return 0;
-		memset(ua->dst + null_pos, 0, 13);
+		memset(ua->dst + null_pos, 0, 25);
 	}
 
-	uint32_t child_end_pos = ua->dst_pos;
-	ufbxi_write_u32(ua->dst + node_pos + 0, child_end_pos);
-	ufbxi_write_u32(ua->dst + node_pos + 4, num_values);
-	ufbxi_write_u32(ua->dst + node_pos + 8, value_end_pos - value_begin_pos);
+	size_t child_end_pos = ua->dst_pos;
+	ufbxi_write_u64(ua->dst + node_pos + 0, child_end_pos);
+	ufbxi_write_u64(ua->dst + node_pos + 8, num_values);
+	ufbxi_write_u64(ua->dst + node_pos + 16, value_end_pos - value_begin_pos);
 
 	ua->node_stack_size--;
 	return !ua->failed;
@@ -1047,18 +1068,18 @@ static const char ufbxi_binary_magic[] = "Kaydara FBX Binary  \x00\x1a\x00";
 
 static int ufbxi_ascii_parse(ufbxi_ascii *ua)
 {
-	uint32_t magic_pos = ufbxi_ascii_push_output(ua, UFBXI_BINARY_MAGIC_SIZE + 4);
+	size_t magic_pos = ufbxi_ascii_push_output(ua, UFBXI_BINARY_MAGIC_SIZE + 4);
 
 	ufbxi_ascii_next_token(ua, &ua->token);
 	while (!ufbxi_ascii_accept(ua, UFBXI_ASCII_END)) {
 		if (ua->failed) return 0;
 		if (!ufbxi_ascii_parse_node(ua)) return 0;
 	}
-	uint32_t null_pos = ufbxi_ascii_push_output(ua, 13);
+	size_t null_pos = ufbxi_ascii_push_output(ua, 25);
 	if (null_pos == ~0u) return 0;
-	memset(ua->dst + null_pos, 0, 13);
+	memset(ua->dst + null_pos, 0, 25);
 
-	uint32_t version = ua->version ? ua->version : 7400;
+	size_t version = ua->version ? ua->version : 7500;
 	memcpy(ua->dst + magic_pos, ufbxi_binary_magic, UFBXI_BINARY_MAGIC_SIZE);
 	ufbxi_write_u32(ua->dst + UFBXI_BINARY_MAGIC_SIZE, version);
 
