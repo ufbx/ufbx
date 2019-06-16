@@ -158,6 +158,15 @@ UFBXT_TEST(parse_ascii_double)
 }
 #endif
 
+UFBXT_TEST(parse_ascii_array_syntax)
+#if UFBXT_IMPL
+{
+	const char *src = "V: *4 { a: 1,2,3,-5 }";
+	const char dst[] = "Y\x01\x00Y\x02\x00Y\x03\x00Y\xfb\xff";
+	test_ascii_to_binary_value(src, dst, sizeof(dst), 4);
+}
+#endif
+
 UFBXT_TEST(parse_ascii_invalid_character_name)
 #if UFBXT_IMPL
 {

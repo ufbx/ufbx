@@ -899,8 +899,11 @@ static int ufbxi_ascii_parse_node(ufbxi_ascii *ua)
 
 	uint32_t value_begin_pos = ua->dst_pos;
 
+	int in_array = 0;
 	uint32_t num_values = 0;
-	do {
+
+	// NOTE: Infinite loop to allow skipping the comma parsing via `continue`.
+	for (;;) {
 		ufbxi_ascii_token *tok = &ua->prev_token;
 		if (ufbxi_ascii_accept(ua, UFBXI_ASCII_STRING)) {
 			// The ASCII format supports escaping quotes via "&quot;". There seems
@@ -984,12 +987,38 @@ static int ufbxi_ascii_parse_node(ufbxi_ascii *ua)
 				ua->dst[pos + 1] = 0;
 			}
 
+		} else if (ufbxi_ascii_accept(ua, '*')) {
+			if (in_array) {
+				return ufbxi_ascii_error(ua, "Nested array values");
+			}
+			if (!ufbxi_ascii_accept(ua, UFBXI_ASCII_INT)) {
+				return ufbxi_ascii_error(ua, "Expected array size");
+			}
+			if (ufbxi_ascii_accept(ua, '{')) {
+				if (!ufbxi_ascii_accept(ua, UFBXI_ASCII_NAME)) {
+					return ufbxi_ascii_error(ua, "Expected array content name");
+				}
+
+				// NOTE: This `continue` skips incrementing `num_values` and parsing
+				// a comma, continuing to parse the values in the array.
+				in_array = 1;
+				continue;
+			}
 		} else {
 			break;
 		}
 
+		// Add value and keep parsing if there's a comma. This part may be
+		// skipped if we enter an array block.
 		num_values++;
-	} while (ufbxi_ascii_accept(ua, ','));
+		if (!ufbxi_ascii_accept(ua, ',')) break;
+	}
+
+	if (in_array) {
+		if (!ufbxi_ascii_accept(ua, '}')) {
+			return ufbxi_ascii_error(ua, "Unclosed value array");
+		}
+	}
 
 	uint32_t value_end_pos = ua->dst_pos;
 
