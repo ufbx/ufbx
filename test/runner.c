@@ -14,6 +14,11 @@
 		if (!(cond)) ufbxt_assert_fail(__FILE__, __LINE__, #cond); \
 	} while (0)
 
+#define ufbxt_assert_eq(a, b, size) do { \
+		ufbxt_assert_eq_test(a, b, size, __FILE__, __LINE__, \
+			"ufbxt_assert_eq(" #a ", " #b ", " #size ")"); \
+	} while (0)
+
 typedef struct {
 	int failed;
 	const char *file;
@@ -32,6 +37,7 @@ ufbxt_test *g_current_test;
 
 ufbx_error g_error;
 ufbxi_context g_context;
+ufbxi_ascii g_ascii;
 jmp_buf g_test_jmp;
 int g_verbose;
 
@@ -62,6 +68,16 @@ ufbxi_context *ufbxt_make_memory_context_values(const void *data, uint32_t size)
 	uc->focused_node.next_child_pos = size;
 	uc->focused_node.end_pos = size;
 	return uc;
+}
+
+ufbxi_ascii *ufbxt_ascii_context(const char *data)
+{
+	ufbxi_ascii *ua = &g_ascii;
+	memset(ua, 0, sizeof(ufbxi_ascii));
+	ua->src = data;
+	ua->src_end = data + strlen(data);
+	ua->error = &g_error;
+	return ua;
 }
 
 void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
@@ -100,6 +116,17 @@ void ufbxt_hintf(const char *fmt, ...)
 	va_end(args);
 }
 
+void ufbxt_assert_eq_test(const void *a, const void *b, size_t size, const char *file, uint32_t line, const char *expr)
+{
+	const char *ac = (const char *)a;
+	const char *bc = (const char *)b;
+	for (size_t i = 0; i < size; i++) {
+		if (ac[i] == bc[i]) continue;
+
+		ufbxt_logf("Byte offset %u: 0x%02x != 0x%02x\n", (uint32_t)i, (uint8_t)ac[i], (uint8_t)bc[i]);
+		ufbxt_assert_fail(file, line, expr);
+	}
+}
 
 void ufbxt_log_flush()
 {

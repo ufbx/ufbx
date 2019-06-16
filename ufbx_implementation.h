@@ -40,17 +40,27 @@ ufbxi_streq(ufbxi_string str, const char *ref)
 }
 
 // TODO: Unaligned loads for some platforms
-#define ufbxi_read_u8(ptr) (*(uint8_t*)(ptr))
-#define ufbxi_read_u16(ptr) (*(uint16_t*)(ptr))
-#define ufbxi_read_u32(ptr) (*(uint32_t*)(ptr))
-#define ufbxi_read_u64(ptr) (*(uint64_t*)(ptr))
-#define ufbxi_read_f32(ptr) (*(float*)(ptr))
-#define ufbxi_read_f64(ptr) (*(double*)(ptr))
-
+#define ufbxi_read_u8(ptr) (*(const uint8_t*)(ptr))
+#define ufbxi_read_u16(ptr) (*(const uint16_t*)(ptr))
+#define ufbxi_read_u32(ptr) (*(const uint32_t*)(ptr))
+#define ufbxi_read_u64(ptr) (*(const uint64_t*)(ptr))
+#define ufbxi_read_f32(ptr) (*(const float*)(ptr))
+#define ufbxi_read_f64(ptr) (*(const double*)(ptr))
 #define ufbxi_read_i8(ptr) (int8_t)(ufbxi_read_u8(ptr))
 #define ufbxi_read_i16(ptr) (int16_t)(ufbxi_read_u16(ptr))
 #define ufbxi_read_i32(ptr) (int32_t)(ufbxi_read_u32(ptr))
 #define ufbxi_read_i64(ptr) (int64_t)(ufbxi_read_u64(ptr))
+
+#define ufbxi_write_u8(ptr, val) (*(uint8_t*)(ptr) = (uint8_t)(val))
+#define ufbxi_write_u16(ptr, val) (*(uint16_t*)(ptr) = (uint16_t)(val))
+#define ufbxi_write_u32(ptr, val) (*(uint32_t*)(ptr) = (uint32_t)(val))
+#define ufbxi_write_u64(ptr, val) (*(uint64_t*)(ptr) = (uint64_t)(val))
+#define ufbxi_write_f32(ptr, val) (*(float*)(ptr) = (float)(val))
+#define ufbxi_write_f64(ptr, val) (*(double*)(ptr) = (double)(val))
+#define ufbxi_write_i8(ptr, val) ufbxi_write_u8(ptr, val)
+#define ufbxi_write_i16(ptr, val) ufbxi_write_u16(ptr, val)
+#define ufbxi_write_i32(ptr, val) ufbxi_write_u32(ptr, val)
+#define ufbxi_write_i64(ptr, val) ufbxi_write_u64(ptr, val)
 
 // -- Binary parsing
 
@@ -120,6 +130,7 @@ typedef struct {
 
 static int ufbxi_do_error(ufbxi_context *uc, uint32_t line, const char *desc)
 {
+	if (uc->failed) return 0;
 	uc->failed = 1;
 	size_t length = strlen(desc);
 	if (length > UFBX_ERROR_DESC_MAX_LENGTH) length = UFBX_ERROR_DESC_MAX_LENGTH;
@@ -133,6 +144,7 @@ static int ufbxi_do_error(ufbxi_context *uc, uint32_t line, const char *desc)
 
 static int ufbxi_do_errorf(ufbxi_context *uc, uint32_t line, const char *fmt, ...)
 {
+	if (uc->failed) return 0;
 	uc->failed = 1;
 	va_list args;
 	va_start(args, fmt);
@@ -674,6 +686,354 @@ ufbxi_find_values(ufbxi_context *uc, const char *name, const char *fmt, ...)
 	int ret = ufbxi_parse_values_va(uc, fmt, args);
 	va_end(args);
 	return ret;
+}
+
+// ASCII format parsing
+
+#define UFBXI_ASCII_END '\0'
+#define UFBXI_ASCII_NAME 'N'
+#define UFBXI_ASCII_BARE_WORD 'B'
+#define UFBXI_ASCII_INT 'I'
+#define UFBXI_ASCII_FLOAT 'F'
+#define UFBXI_ASCII_STRING 'S'
+
+#define UFBXI_ASCII_MAX_STACK_SIZE 64
+
+typedef struct {
+	ufbxi_string str;
+	char type;
+	union {
+		double f64;
+		int64_t i64;
+		uint32_t name_len;
+	} value;
+} ufbxi_ascii_token;
+
+typedef struct {
+	const char *src;
+	const char *src_end;
+
+	char *dst;
+	uint32_t dst_pos;
+	uint32_t dst_size;
+
+	ufbxi_ascii_token prev_token;
+	ufbxi_ascii_token token;
+
+	ufbxi_string node_stack[UFBXI_ASCII_MAX_STACK_SIZE];
+	uint32_t node_stack_size;
+
+	uint32_t version;
+
+	int failed;
+	ufbx_error *error;
+} ufbxi_ascii;
+
+static int ufbxi_ascii_do_error(ufbxi_ascii *ua, uint32_t line, const char *desc)
+{
+	if (ua->failed) return 0;
+	ua->failed = 1;
+	size_t length = strlen(desc);
+	if (length > UFBX_ERROR_DESC_MAX_LENGTH) length = UFBX_ERROR_DESC_MAX_LENGTH;
+	if (ua->error) {
+		ua->error->source_line = line;
+		memcpy(ua->error->desc, desc, length);
+		ua->error->desc[length] = '\0';
+	}
+	return 0;
+}
+
+#define ufbxi_ascii_error(ua, desc) ufbxi_ascii_do_error((ua), __LINE__, (desc))
+
+static char ufbxi_ascii_peek(ufbxi_ascii *ua)
+{
+	return ua->src != ua->src_end ? *ua->src : '\0';
+}
+
+static char ufbxi_ascii_next(ufbxi_ascii *ua)
+{
+	if (ua->src != ua->src_end) ua->src++;
+	return ua->src != ua->src_end ? *ua->src : '\0';
+}
+
+static char ufbxi_ascii_skip_whitespace(ufbxi_ascii *ua)
+{
+	// Ignore whitespace
+	char c = ufbxi_ascii_peek(ua);
+	for (;;) {
+		while (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+			c = ufbxi_ascii_next(ua);
+		}
+		if (c == ';') {
+			c = ufbxi_ascii_next(ua);
+			while (c != '\n' && c != '\0') {
+				c = ufbxi_ascii_next(ua);
+			}
+		} else {
+			break;
+		}
+	}
+	return c;
+}
+
+static int ufbxi_ascii_next_token(ufbxi_ascii *ua, ufbxi_ascii_token *token)
+{
+	char c = ufbxi_ascii_skip_whitespace(ua);
+	token->str.data = ua->src;
+
+	if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_') {
+		token->type = UFBXI_ASCII_BARE_WORD;
+		uint32_t len = 0;
+		while ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+			|| (c >= '0' && c <= '9') || c == '_') {
+			len++;
+			c = ufbxi_ascii_next(ua);
+		}
+
+		// Skip whitespace to find if there's a following ':'
+		c = ufbxi_ascii_skip_whitespace(ua);
+		if (c == ':') {
+			token->value.name_len = len;
+			token->type = UFBXI_ASCII_NAME;
+			ufbxi_ascii_next(ua);
+		}
+	} else if ((c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.') {
+		token->type = UFBXI_ASCII_INT;
+
+		char buf[128];
+		uint32_t len = 0;
+		while ((c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.' || c == 'e' || c == 'E') {
+			if (c == '.' || c == 'e' || c == 'E') {
+				token->type = UFBXI_ASCII_FLOAT;
+			}
+			if (len == sizeof(buf) - 1) {
+				return ufbxi_ascii_error(ua, "Number is too long");
+			}
+			buf[len++] = c;
+			c = ufbxi_ascii_next(ua);
+		}
+		buf[len] = '\0';
+
+		char *end;
+		if (token->type == UFBXI_ASCII_INT) {
+			token->value.i64 = strtoll(buf, &end, 10);
+			if (end != buf + len) {
+				return ufbxi_ascii_error(ua, "Bad integer constant");
+			}
+		} else if (token->type == UFBXI_ASCII_FLOAT) {
+			token->value.f64 = strtod(buf, &end);
+			if (end != buf + len) {
+				return ufbxi_ascii_error(ua, "Bad float constant");
+			}
+		}
+	} else if (c == '"') {
+		token->type = UFBXI_ASCII_STRING;
+		c = ufbxi_ascii_next(ua);
+		while (c != '"') {
+			c = ufbxi_ascii_next(ua);
+			if (c == '\0') {
+				return ufbxi_ascii_error(ua, "Unclosed string");
+			}
+		}
+		// Skip closing quote
+		ufbxi_ascii_next(ua);
+	} else {
+		token->type = c;
+		ufbxi_ascii_next(ua);
+	}
+
+	token->str.length = ua->src - token->str.data;
+	return 1;
+}
+
+static int ufbxi_ascii_accept(ufbxi_ascii *ua, char type)
+{
+	if (ua->token.type == type) {
+		ua->prev_token = ua->token;
+		if (!ufbxi_ascii_next_token(ua, &ua->token)) return 0;
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+static uint32_t ufbxi_ascii_push_output(ufbxi_ascii *ua, uint32_t size)
+{
+	if (ua->dst_size - ua->dst_pos < size) {
+		uint32_t new_size = 2 * ua->dst_size;
+		if (new_size < 1024) new_size = 1024;
+		if (new_size < size) new_size = size;
+		char *new_dst = (char*)realloc(ua->dst, new_size);
+		if (!new_dst) return ~0u;
+		ua->dst = new_dst;
+		ua->dst_size = new_size;
+	}
+	uint32_t pos = ua->dst_pos;
+	ua->dst_pos += size;
+	return pos;
+}
+
+static int ufbxi_ascii_parse_node(ufbxi_ascii *ua)
+{
+	if (ua->node_stack_size >= UFBXI_ASCII_MAX_STACK_SIZE) {
+		return ufbxi_ascii_error(ua, "Too many nested nodes");
+	}
+
+	if (!ufbxi_ascii_accept(ua, UFBXI_ASCII_NAME)) {
+		return ufbxi_ascii_error(ua, "Expected node name");
+	}
+
+	uint32_t name_len = ua->prev_token.value.name_len;
+	if (name_len > 0xff) {
+		return ufbxi_ascii_error(ua, "Node name is too long");
+	}
+
+	ua->node_stack[ua->node_stack_size].data = ua->prev_token.str.data;
+	ua->node_stack[ua->node_stack_size].length = name_len;
+	ua->node_stack_size++;
+
+	uint32_t node_pos = ufbxi_ascii_push_output(ua, 13 + name_len);
+	if (node_pos == ~0u) return 0;
+	ufbxi_write_u8(ua->dst + node_pos + 12, name_len);
+	memcpy(ua->dst + node_pos + 13, ua->prev_token.str.data, name_len);
+
+	uint32_t value_begin_pos = ua->dst_pos;
+
+	uint32_t num_values = 0;
+	do {
+		ufbxi_ascii_token *tok = &ua->prev_token;
+		if (ufbxi_ascii_accept(ua, UFBXI_ASCII_STRING)) {
+			// The ASCII format supports escaping quotes via "&quot;". There seems
+			// to be no way to escape "&quot;" itself. Exporting and importing converts
+			// strings with "&quot;" to "\"". Append worst-case data and rewind the
+			// write position in case we find "&quot;" escapes.
+			uint32_t string_len = tok->str.length - 2;
+			uint32_t pos = ufbxi_ascii_push_output(ua, 5 + string_len);
+			if (pos == ~0u) return 0;
+			char *dst = ua->dst + pos + 5;
+			uint32_t bytes_escaped = 0;
+			for (uint32_t i = 0; i < string_len; i++) {
+				char c = tok->str.data[1 + i];
+				if (c == '&' && i + 6 <= string_len) {
+					if (!memcmp(tok->str.data + 1 + i, "&quot;", 6)) {
+						bytes_escaped += 5;
+						i += 5;
+						c = '\"';
+					}
+				}
+				*dst++ = c;
+			}
+
+			ua->dst_pos -= bytes_escaped;
+			string_len -= bytes_escaped;
+			ua->dst[pos + 0] = 'S';
+			ufbxi_write_u32(ua->dst + pos + 1, string_len);
+
+		} else if (ufbxi_ascii_accept(ua, UFBXI_ASCII_INT)) {
+			int64_t val = tok->value.i64;
+			if (val >= INT16_MIN && val <= INT16_MAX) {
+				uint32_t pos = ufbxi_ascii_push_output(ua, 3);
+				if (pos == ~0u) return 0;
+				ua->dst[pos] = 'Y';
+				ufbxi_write_i16(ua->dst + pos + 1, val);
+			} else if (val >= INT32_MIN && val <= INT32_MAX) {
+				uint32_t pos = ufbxi_ascii_push_output(ua, 5);
+				if (pos == ~0u) return 0;
+				ua->dst[pos] = 'I';
+				ufbxi_write_i32(ua->dst + pos + 1, val);
+			} else {
+				uint32_t pos = ufbxi_ascii_push_output(ua, 9);
+				if (pos == ~0u) return 0;
+				ua->dst[pos] = 'L';
+				ufbxi_write_i64(ua->dst + pos + 1, val);
+			}
+
+			// Try to guesstimate the FBX version
+			if (!ua->version
+				&& ua->node_stack_size == 2
+				&& val > 0 && val < INT32_MAX
+				&& ufbxi_streq(ua->node_stack[0], "FBXHeaderExtension")
+				&& ufbxi_streq(ua->node_stack[1], "FBXVersion")) {
+				ua->version = (uint32_t)val;
+			}
+
+		} else if (ufbxi_ascii_accept(ua, UFBXI_ASCII_FLOAT)) {
+			double val = tok->value.f64;
+			if ((double)(float)val == val) {
+				uint32_t pos = ufbxi_ascii_push_output(ua, 5);
+				if (pos == ~0u) return 0;
+				ua->dst[pos] = 'F';
+				ufbxi_write_f32(ua->dst + pos + 1, val);
+			} else {
+				uint32_t pos = ufbxi_ascii_push_output(ua, 9);
+				if (pos == ~0u) return 0;
+				ua->dst[pos] = 'D';
+				ufbxi_write_f64(ua->dst + pos + 1, val);
+			}
+
+		} else if (ufbxi_ascii_accept(ua, UFBXI_ASCII_BARE_WORD)) {
+			if (ufbxi_streq(tok->str, "Y") || ufbxi_streq(tok->str, "T")) {
+				uint32_t pos = ufbxi_ascii_push_output(ua, 2);
+				if (pos == ~0u) return 0;
+				ua->dst[pos] = 'C';
+				ua->dst[pos + 1] = 1;
+			} else if (ufbxi_streq(tok->str, "N") || ufbxi_streq(tok->str, "F")) {
+				uint32_t pos = ufbxi_ascii_push_output(ua, 2);
+				if (pos == ~0u) return 0;
+				ua->dst[pos] = 'C';
+				ua->dst[pos + 1] = 0;
+			}
+
+		} else {
+			break;
+		}
+
+		num_values++;
+	} while (ufbxi_ascii_accept(ua, ','));
+
+	uint32_t value_end_pos = ua->dst_pos;
+
+	if (ufbxi_ascii_accept(ua, '{')) {
+		while (!ufbxi_ascii_accept(ua, '}')) {
+			if (ua->failed) return 0;
+			ufbxi_ascii_parse_node(ua);
+		}
+
+		uint32_t null_pos = ufbxi_ascii_push_output(ua, 13);
+		if (null_pos == ~0u) return 0;
+		memset(ua->dst + null_pos, 0, 13);
+	}
+
+	uint32_t child_end_pos = ua->dst_pos;
+	ufbxi_write_u32(ua->dst + node_pos + 0, child_end_pos);
+	ufbxi_write_u32(ua->dst + node_pos + 4, num_values);
+	ufbxi_write_u32(ua->dst + node_pos + 8, value_end_pos - value_begin_pos);
+
+	ua->node_stack_size--;
+	return !ua->failed;
+}
+
+#define UFBXI_BINARY_MAGIC_SIZE 23
+static const char ufbxi_binary_magic[] = "Kaydara FBX Binary  \x00\x1a\x00";
+
+static int ufbxi_ascii_parse(ufbxi_ascii *ua)
+{
+	uint32_t magic_pos = ufbxi_ascii_push_output(ua, UFBXI_BINARY_MAGIC_SIZE + 4);
+
+	ufbxi_ascii_next_token(ua, &ua->token);
+	while (!ufbxi_ascii_accept(ua, UFBXI_ASCII_END)) {
+		if (ua->failed) return 0;
+		if (!ufbxi_ascii_parse_node(ua)) return 0;
+	}
+	uint32_t null_pos = ufbxi_ascii_push_output(ua, 13);
+	if (null_pos == ~0u) return 0;
+	memset(ua->dst + null_pos, 0, 13);
+
+	uint32_t version = ua->version ? ua->version : 7400;
+	memcpy(ua->dst + magic_pos, ufbxi_binary_magic, UFBXI_BINARY_MAGIC_SIZE);
+	ufbxi_write_u32(ua->dst + UFBXI_BINARY_MAGIC_SIZE, version);
+
+	return 1;
 }
 
 #endif
