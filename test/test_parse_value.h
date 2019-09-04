@@ -825,3 +825,21 @@ UFBXT_TEST(parse_multivalue_bad_conversion)
 	ufbxt_log_error(uc);
 }
 #endif
+
+UFBXT_TEST(parse_multivalue_overrun)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context(
+		"\x1b\x00\x00\x00" "\x02\x00\x00\x00" "\x09\x00\x00\x00"
+		"\x05" "Hello"
+		"I\x01\x00\x00\x00"
+		"I\x01\x00\x00\x00"
+	);
+
+	ufbxi_array arr;
+	ufbxi_string name;
+	ufbxt_assert(ufbxi_next_child(uc, &name));
+	ufbxt_assert(!ufbxi_parse_value(uc, 'i', &arr));
+	ufbxt_log_error(uc);
+}
+#endif
