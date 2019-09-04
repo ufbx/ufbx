@@ -4,11 +4,11 @@
 #include "ufbx.h"
 #include <stdarg.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
 
 // -- Platform
 
