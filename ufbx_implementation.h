@@ -128,12 +128,11 @@ ufbxi_forceinline uint64_t
 ufbxi_bit_read(ufbxi_bit_stream *s, uint64_t offset_bits)
 {
 	uint64_t fast_pos_bits = offset_bits - s->fast_begin_bits;
-	uint64_t a, b;
 	unsigned shift = fast_pos_bits & 63;
 	if (fast_pos_bits < s->fast_size_bits) {
 		uint64_t word = fast_pos_bits >> 6;
-		a = s->fast_data[word];
-		b = s->fast_data[word + 1];
+		uint64_t a = s->fast_data[word];
+		uint64_t b = s->fast_data[word + 1];
 		return a >> shift | (b << 1) << (63 - shift);
 	} else {
 		return ufbxi_bit_read_slow(s, offset_bits);
