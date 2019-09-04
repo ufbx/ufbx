@@ -62,6 +62,84 @@ ufbxi_streq(ufbxi_string str, const char *ref)
 #define ufbxi_write_i32(ptr, val) ufbxi_write_u32(ptr, val)
 #define ufbxi_write_i64(ptr, val) ufbxi_write_u64(ptr, val)
 
+// -- DEFLATE implementation
+
+typedef struct {
+	uint64_t fast_begin_bits, fast_size_bits;
+	const uint64_t *fast_data;
+	const char *data;
+	size_t size;
+	uint64_t prefix[2], suffix[2];
+} ufbxi_bit_stream;
+
+ufbxi_noinline void
+ufbxi_bit_init(ufbxi_bit_stream *s, const void *data, size_t size)
+{
+	uintptr_t fast_begin_addr = ((uintptr_t)data + ((8 - (uintptr_t)data) & 7u));
+	uintptr_t fast_end_addr = ((uintptr_t)data + size) & ~(uintptr_t)7u;
+	const char *bytes = (const char*)data;
+
+	s->data = bytes;
+	s->size = size;
+
+	if ((ptrdiff_t)(fast_end_addr - fast_begin_addr) > 16) {
+		uint64_t fast_begin_offset = fast_begin_addr - (uintptr_t)data;
+		s->fast_begin_bits = fast_begin_offset * 8;
+		s->fast_size_bits = (fast_end_addr - fast_begin_addr) * 8 - 64;
+		s->fast_data = (const uint64_t*)((const char*)data + fast_begin_offset);
+	} else {
+		s->fast_begin_bits = 0;
+		s->fast_size_bits = 0;
+		s->fast_data = NULL;
+	}
+
+	s->prefix[0] = s->prefix[1] = 0;
+	s->suffix[0] = s->suffix[1] = 0;
+	for (size_t i = 0; i < 8; i++) {
+		if (i < size) {
+			s->prefix[0] |= (uint64_t)(uint8_t)bytes[i] << (i * 8);
+			s->suffix[1] |= (uint64_t)(uint8_t)bytes[size - i - 1] << (56 - i * 8);
+		}
+		if (i + 8 < size) {
+			s->prefix[1] |= (uint64_t)(uint8_t)bytes[i + 8] << (i * 8);
+			s->suffix[0] |= (uint64_t)(uint8_t)bytes[size - i - 9] << (56 - i * 8);
+		}
+	}
+}
+
+ufbxi_noinline uint64_t
+ufbxi_bit_read_slow(ufbxi_bit_stream *s, uint64_t offset_bits)
+{
+	if (offset_bits < 64) {
+		return s->prefix[0] >> offset_bits | (s->prefix[1] << 1) << (63 - offset_bits);
+	} else {
+		uint64_t suffix_shift = (uint64_t)offset_bits - ((uint64_t)s->size * 8 - 128);
+		if (suffix_shift < 64) {
+			return s->suffix[0] >> suffix_shift | (s->suffix[1] << 1) << (64 - suffix_shift);
+		} else if (suffix_shift < 128) {
+			return s->suffix[1] >> (suffix_shift - 64);
+		} else {
+			return 0;
+		}
+	}
+}
+
+ufbxi_forceinline uint64_t
+ufbxi_bit_read(ufbxi_bit_stream *s, uint64_t offset_bits)
+{
+	uint64_t fast_pos_bits = offset_bits - s->fast_begin_bits;
+	uint64_t a, b;
+	unsigned shift = fast_pos_bits & 63;
+	if (fast_pos_bits < s->fast_size_bits) {
+		uint64_t word = fast_pos_bits >> 6;
+		a = s->fast_data[word];
+		b = s->fast_data[word + 1];
+		return a >> shift | (b << 1) << (63 - shift);
+	} else {
+		return ufbxi_bit_read_slow(s, offset_bits);
+	}
+}
+
 // -- Binary parsing
 
 typedef struct {
