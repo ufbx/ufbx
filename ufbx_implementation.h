@@ -82,7 +82,7 @@ ufbxi_bit_init(ufbxi_bit_stream *s, const void *data, size_t size)
 	s->data = bytes;
 	s->size = size;
 
-	if ((ptrdiff_t)(fast_end_addr - fast_begin_addr) > 16) {
+	if ((ptrdiff_t)(fast_end_addr - fast_begin_addr) >= 16) {
 		uint64_t fast_begin_offset = fast_begin_addr - (uintptr_t)data;
 		s->fast_begin_bits = fast_begin_offset * 8;
 		s->fast_size_bits = (fast_end_addr - fast_begin_addr) * 8 - 64;
