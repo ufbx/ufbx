@@ -562,7 +562,7 @@ static int ufbxi_exit_node(ufbxi_context *uc)
 
 // Parse the node starting from `pos` to `node`. Does not modify `node` if the
 // function fails. Returns zero when parsing a NULL-record without failure.
-static int ufbxi_parse_node(ufbxi_context *uc, uint32_t pos, ufbxi_node *node)
+static int ufbxi_parse_node(ufbxi_context *uc, uint64_t pos, ufbxi_node *node)
 {
 	uint64_t end_pos, values_len, name_pos;
 	uint8_t name_len;
@@ -624,7 +624,7 @@ static int ufbxi_parse_node(ufbxi_context *uc, uint32_t pos, ufbxi_node *node)
 static int ufbxi_next_child(ufbxi_context *uc, ufbxi_string *name)
 {
 	ufbxi_node *top = uc->node_stack_top;
-	uint32_t pos = top->next_child_pos;
+	uint64_t pos = top->next_child_pos;
 	if (pos == top->end_pos) return 0;
 
 	// Parse the node to be focused. If we encounter a NULL-record here

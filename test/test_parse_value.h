@@ -547,7 +547,7 @@ UFBXT_TEST(parse_array_bad_conversion)
 	ufbxt_assert(ufbxi_parse_value(uc, 'b', &arr));
 	ufbxt_assert(!ufbxi_decode_array(uc, &arr, data));
 
-	uint32_t begin = uc->focused_node.next_value_pos;
+	uint64_t begin = uc->focused_node.next_value_pos;
 	ufbxt_assert(ufbxi_parse_value(uc, 'f', &arr));
 	ufbxt_assert(!ufbxi_decode_array(uc, &arr, data));
 	uc->focused_node.next_value_pos = begin;
