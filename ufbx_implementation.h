@@ -17,7 +17,7 @@
 	#define ufbxi_forceinline __forceinline
 #elif defined(__GNUC__) || defined(__clang__)
 	#define ufbxi_noinline __attribute__((noinline))
-	#define ufbxi_forceinline __attribute__((always_inline))
+	#define ufbxi_forceinline inline __attribute__((always_inline))
 #else
 	#define ufbxi_noinline
 	#define ufbxi_forceinline
