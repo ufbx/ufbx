@@ -167,7 +167,7 @@ ufbxi_bit_read_slow(ufbxi_bit_stream *s, uint64_t offset_bits)
 	} else {
 		uint64_t suffix_shift = (uint64_t)offset_bits - ((uint64_t)s->size * 8 - 128);
 		if (suffix_shift < 64) {
-			return s->suffix[0] >> suffix_shift | (s->suffix[1] << 1) << (64 - suffix_shift);
+			return s->suffix[0] >> suffix_shift | (s->suffix[1] << 1) << (63 - suffix_shift);
 		} else if (suffix_shift < 128) {
 			return s->suffix[1] >> (suffix_shift - 64);
 		} else {
@@ -250,10 +250,13 @@ ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 			if (code & (1 << bit)) rev_code |= 1 << (bits - bit - 1);
 		}
 
-		uint16_t fast_sym = i | bits << 12;
-		uint32_t hi_max = 1 << (UFBXI_HUFF_FAST_BITS - bits);
-		for (uint32_t hi = 0; hi < hi_max; hi++) {
-			tree->fast_sym[rev_code | hi << bits] = fast_sym;
+		if (bits <= UFBXI_HUFF_FAST_BITS) {
+			uint16_t fast_sym = i | bits << 12;
+			uint32_t hi_max = 1 << (UFBXI_HUFF_FAST_BITS - bits);
+			for (uint32_t hi = 0; hi < hi_max; hi++) {
+				ufbx_assert(tree->fast_sym[rev_code | hi << bits] == 0);
+				tree->fast_sym[rev_code | hi << bits] = fast_sym;
+			}
 		}
 	}
 
@@ -350,7 +353,7 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 			}
 
 			if (distance > out_ptr - dc->out_begin) return 0;
-			if (length > out_ptr - dc->out_begin) return 0;
+			if (length > dc->out_end - out_ptr) return 0;
 
 			// TODO: Do something better than per-byte copy
 			const char *src_ptr = out_ptr - distance;
@@ -359,6 +362,8 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 			do {
 				*out_ptr++ = *src_ptr++;
 			} while (out_ptr != end);
+		} else {
+			break;
 		}
 	}
 
@@ -371,7 +376,7 @@ ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 {
 	ufbxi_deflate_context dc;
 	ufbxi_bit_init(&dc.stream, src, src_size);
-	dc.out_ptr = (char*)dst;
+	dc.out_begin = (char*)dst;
 	dc.out_ptr = (char*)dst;
 	dc.out_end = (char*)dst + dst_size;
 
