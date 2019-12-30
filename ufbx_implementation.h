@@ -412,10 +412,9 @@ ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 			if (src_size - byte_pos < len) return 0;
 			if (dc.out_end - dc.out_ptr < len) return 0;
 
+			// Copy literal data (skipping header) and advance
 			memcpy(dc.out_ptr, src_pos + 4, len);
 			dc.out_ptr += len;
-
-			// Advance past header and literals and convert to bits
 			pos = (byte_pos + 4 + len) << 3;
 		} else if (type <= 2) {
 			if (type == 1) {
