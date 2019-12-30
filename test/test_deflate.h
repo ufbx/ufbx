@@ -89,3 +89,34 @@ UFBXT_TEST(bits_empty)
 	ufbxt_assert(bits == 0);
 }
 #endif
+
+UFBXT_TEST(deflate_empty)
+#if UFBXT_IMPL
+{
+	char src[1], dst[1];
+	int ok = ufbxi_inflate(dst, 1, src, 0);
+	ufbxt_assert(ok == 0);
+}
+#endif
+
+UFBXT_TEST(deflate_simple)
+#if UFBXT_IMPL
+{
+	const char src[] = "\x78\x9C\x01\x06\x00\xf9\xffHello!";
+	char dst[6];
+	int ok = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+	ufbxt_assert(ok != 0);
+	ufbxt_assert(!memcmp(dst, "Hello!", 6));
+}
+#endif
+
+UFBXT_TEST(deflate_simple_chunks)
+#if UFBXT_IMPL
+{
+	const char src[] = "\x78\x9C\x00\x06\x00\xf9\xffHello,\x01\x06\x00\xf9\xffWorld!";
+	char dst[12];
+	int ok = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+	ufbxt_assert(ok != 0);
+	ufbxt_assert(!memcmp(dst, "Hello,World!", 12));
+}
+#endif

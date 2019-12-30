@@ -1,4 +1,13 @@
+#include <stdint.h>
+void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr);
+
+#define ufbx_assert(cond) do { \
+		if (!(cond)) ufbxt_assert_fail(__FILE__, __LINE__, "Internal assert: " #cond); \
+	} while (0)
+
 #include "../ufbx_implementation.h"
+
+#undef ufbx_assert
 
 #include <string.h>
 #include <stdio.h>
