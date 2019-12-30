@@ -209,3 +209,25 @@ UFBXT_TEST(deflate_static)
 	ufbxt_assert(!memcmp(dst, "Hello world!", 12));
 }
 #endif
+
+UFBXT_TEST(deflate_static_match)
+#if UFBXT_IMPL
+{
+	const char src[] = "x\xda\xf3H\xcd\xc9\xc9W\xf0\x00\x91\x8a\x00\x1b\xbb\x04*";
+	char dst[12];
+	int ok = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+	ufbxt_assert(ok != 0);
+	ufbxt_assert(!memcmp(dst, "Hello Hello!", 12));
+}
+#endif
+
+UFBXT_TEST(deflate_static_rle)
+#if UFBXT_IMPL
+{
+	const char src[] = "x\xdastD\x00\x00\x13\xda\x03\r";
+	char dst[12];
+	int ok = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+	ufbxt_assert(ok != 0);
+	ufbxt_assert(!memcmp(dst, "AAAAAAAAAAAA", 12));
+}
+#endif
