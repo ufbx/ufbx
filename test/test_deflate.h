@@ -120,3 +120,13 @@ UFBXT_TEST(deflate_simple_chunks)
 	ufbxt_assert(!memcmp(dst, "Hello,World!", 12));
 }
 #endif
+
+UFBXT_TEST(deflate_bad_chunk_type)
+#if UFBXT_IMPL
+{
+	const char src[] = "\x78\x9C\x06";
+	char dst[1];
+	int ok = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+	ufbxt_assert(ok == 0);
+}
+#endif
