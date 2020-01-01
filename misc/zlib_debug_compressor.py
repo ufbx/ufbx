@@ -149,7 +149,7 @@ def decode(message):
         result += m.decode(result)
     return result
 
-def compress_block(buf, message, final):
+def compress_block(buf, message, final, override_litlen_counts={}):
     litlen_count = [0] * 286
     distance_count = [0] * 30
 
@@ -158,6 +158,9 @@ def compress_block(buf, message, final):
 
     for m in message:
         m.count_codes(litlen_count, distance_count)
+
+    for sym,count in override_litlen_counts.items():
+        litlen_count[sym] = count
 
     litlen_map = { sym: count for sym,count in enumerate(litlen_count) if count > 0 }
     distance_map = { sym: count for sym,count in enumerate(distance_count) if count > 0 }
@@ -211,31 +214,35 @@ def compress_block(buf, message, final):
     # End-of-block
     buf.push_rev_code(litlen_syms[256], "End-of-block")
 
+def compress_message(message):
+    buf = BitBuf()
+
+    # ZLIB CFM byte
+    buf.push(8, 4, "CM")    # CM=8     Compression method: DEFLATE
+    buf.push(7, 4, "CINFO") # CINFO=7  Compression info: 32kB window size
+
+    # ZLIB FLG byte
+    buf.push(28, 5, "FCHECK") # FCHECK    (CMF*256+FLG) % 31 == 0
+    buf.push(0, 1, "FDICT")   # FDICT=0   Preset dictionary: No
+    buf.push(2, 2, "FLEVEL")  # FLEVEL=2  Compression level: Default
+
+    compress_block(buf, message, True)
+
+    # Pad to byte
+    buf.push(0, -buf.pos & 7, "Pad to byte")
+
+    print(decode(message))
+    adler_hash = zlib.adler32(decode(message))
+
+    buf.push((adler_hash >> 24) & 0xff, 8, "Adler[24:32]")
+    buf.push((adler_hash >> 16) & 0xff, 8, "Adler[16:24]")
+    buf.push((adler_hash >>  8) & 0xff, 8, "Adler[8:16]")
+    buf.push((adler_hash >>  0) & 0xff, 8, "Adler[0:8]")
+
+    return buf
+
 message = [Literal(b"Hello World!")]
-buf = BitBuf()
-
-# ZLIB CFM byte
-buf.push(8, 4, "CM")    # CM=8     Compression method: DEFLATE
-buf.push(7, 4, "CINFO") # CINFO=7  Compression info: 32kB window size
-
-# ZLIB FLG byte
-buf.push(28, 5, "FCHECK") # FCHECK    (CMF*256+FLG) % 31 == 0
-buf.push(0, 1, "FDICT")   # FDICT=0   Preset dictionary: No
-buf.push(2, 2, "FLEVEL")  # FLEVEL=2  Compression level: Default
-
-compress_block(buf, message, True)
-
-# Pad to byte
-buf.push(0, -buf.pos & 7, "Pad to byte")
-
-print(decode(message))
-adler_hash = zlib.adler32(decode(message))
-
-buf.push((adler_hash >> 24) & 0xff, 8, "Adler[24:32]")
-buf.push((adler_hash >> 16) & 0xff, 8, "Adler[16:24]")
-buf.push((adler_hash >>  8) & 0xff, 8, "Adler[8:16]")
-buf.push((adler_hash >>  0) & 0xff, 8, "Adler[0:8]")
-
+buf = compress_message(message)
 encoded = buf.to_bytes()
 
 for d in buf.desc:
