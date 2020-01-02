@@ -5,6 +5,7 @@ import itertools
 Code = namedtuple("Code", "code bits")
 IntCoding = namedtuple("IntCoding", "symbol base bits")
 BinDesc = namedtuple("BinDesc", "offset value bits desc")
+SymExtra = namedtuple("Code", "symbol extra bits")
 
 null_code = Code(0,0)
 
@@ -79,8 +80,8 @@ class Match:
     def __init__(self, length, distance):
         self.length = length
         self.distance = distance
-        self.lcode = find_int_coding(length_coding, self.length)
-        self.dcode = find_int_coding(distance_coding, self.distance)
+        self.lcode = find_int_coding(length_coding, length)
+        self.dcode = find_int_coding(distance_coding, distance)
 
     def count_codes(self, litlen_count, dist_count):
         litlen_count[self.lcode.symbol] += 1
@@ -108,6 +109,11 @@ def make_huffman(syms, max_code_length):
     `max_code_length` is the maximum length of the resulting Huffman codes.
     The function will return a dict mapping from symbol to its code.
     """
+
+    if len(syms) == 0:
+        return { }
+    if len(syms) == 1:
+        return { next(iter(syms)): Code(0, 1) }
 
     sym_groups = ((prob, (sym,)) for sym,prob in syms.items())
     initial_groups = list(sorted(sym_groups))
@@ -149,6 +155,56 @@ def decode(message):
         result += m.decode(result)
     return result
 
+def encode_huff_bits(bits):
+    encoded = []
+    for value,copies in itertools.groupby(bits):
+        num = len(list(copies))
+        if value == 0:
+            while num >= 11:
+                amount = min(num, 138)
+                encoded.append(SymExtra(18, amount-11, 7))
+                num -= amount
+            while num >= 3:
+                amount = min(num, 10)
+                encoded.append(SymExtra(17, amount-3, 3))
+                num -= amount
+            while num >= 1:
+                encoded.append(SymExtra(0, 0, 0))
+                num -= 1
+        else:
+            encoded.append(SymExtra(value, 0, 0))
+            num -= 1
+            while num >= 3:
+                amount = min(num, 3)
+                encoded.append(SymExtra(16, amount-3, 2))
+                num -= amount
+            while num >= 1:
+                encoded.append(SymExtra(value, 0, 0))
+                num -= 1
+    return encoded
+
+def write_encoded_huff_bits(buf, codes, syms, desc):
+    value = 0
+    prev = 0
+    for code in codes:
+        sym = code.symbol
+        num = 1
+        if sym <= 15:
+            buf.push_rev_code(syms[sym], "{} {} bits: {}".format(desc, value, sym))
+            prev = sym
+        elif sym == 16:
+            num = code.extra + 3
+            buf.push_rev_code(syms[sym], "{} {}-{} bits: {}".format(desc, value, value+num-1, prev))
+        elif sym == 17:
+            num = code.extra + 3
+            buf.push_rev_code(syms[sym], "{} {}-{} bits: {}".format(desc, value, value+num-1, 0))
+        elif sym == 18:
+            num = code.extra + 11
+            buf.push_rev_code(syms[sym], "{} {}-{} bits: {}".format(desc, value, value+num-1, 0))
+        value += num
+        if code.bits > 0:
+            buf.push(code.extra, code.bits, "{} N={}".format(desc, num))
+
 def compress_block(buf, message, final, override_litlen_counts={}):
     litlen_count = [0] * 286
     distance_count = [0] * 30
@@ -168,15 +224,18 @@ def compress_block(buf, message, final, override_litlen_counts={}):
     litlen_syms = make_huffman(litlen_map, 16)
     distance_syms = make_huffman(distance_map, 16)
 
-    num_litlens = max(itertools.chain((k for k in litlen_map.keys()), (257,)))
-    num_distances = max(itertools.chain((k for k in distance_map.keys()), (1,)))
+    num_litlens = max(itertools.chain((k for k in litlen_map.keys()), (256,))) + 1
+    num_distances = max(itertools.chain((k for k in distance_map.keys()), (0,))) + 1
 
     litlen_bits = [litlen_syms.get(s, null_code).bits for s in range(num_litlens)]
     distance_bits = [distance_syms.get(s, null_code).bits for s in range(num_distances)]
 
+    litlen_bit_codes = encode_huff_bits(litlen_bits)
+    distance_bit_codes = encode_huff_bits(distance_bits)
+
     codelen_count = [0] * 20
-    for bits in itertools.chain(litlen_bits, distance_bits):
-        codelen_count[bits] += 1
+    for code in itertools.chain(litlen_bit_codes, distance_bit_codes):
+        codelen_count[code.symbol] += 1
 
     codelen_map = { sym: count for sym,count in enumerate(codelen_count) if count > 0 }
     codelen_syms = make_huffman(codelen_map, 8)
@@ -202,11 +261,8 @@ def compress_block(buf, message, final, override_litlen_counts={}):
             bits = codelen_syms[p].bits
         buf.push(bits, 3, "Codelen {} bits".format(p))
 
-    for sym,bits in enumerate(litlen_bits):
-        buf.push_rev_code(codelen_syms[bits], "Litlen {} bits".format(sym))
-
-    for sym,bits in enumerate(distance_bits):
-        buf.push_rev_code(codelen_syms[bits], "Dist {} bits".format(sym))
+    write_encoded_huff_bits(buf, litlen_bit_codes, codelen_syms, "Litlen")
+    write_encoded_huff_bits(buf, distance_bit_codes, codelen_syms, "Distance")
 
     for m in message:
         m.encode(buf, litlen_syms, distance_syms)
@@ -241,7 +297,7 @@ def compress_message(message):
 
     return buf
 
-message = [Literal(b"Hello World!")]
+message = [Literal(b"Hello World!"), Match(6, 7), Literal(b"?")]
 buf = compress_message(message)
 encoded = buf.to_bytes()
 
