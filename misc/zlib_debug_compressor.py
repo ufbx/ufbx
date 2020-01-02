@@ -460,29 +460,6 @@ def print_buf(buf):
 def print_bytes(data):
     print(''.join('\\x%02x' % b for b in data))
 
-###
-
-def test_deflate_dynamic():
-    """Simple dynamic Huffman tree compressed block"""
-    opts = Options(allow_block_types=[2])
-    return deflate(b"Hello Hello!", opts)
-
-def test_deflate_repeat_length():
-    """Dynamic Huffman compressed block with repeat lengths"""
-    return deflate(b"ABCDEFGHIJKLMNOPQRSTUVWXYZZYXWVUTSRQPONMLKJIHGFEDCBA")
-
-def test_deflate_huff_lengths():
-    """Test all possible lit/len code lengths"""
-    data = b"0123456789ABCDE"
-    freq = 1
-    probs = { }
-    for c in data:
-        probs[c] = freq
-        freq *= 2
-    opts = Options(allow_block_types=[2], override_litlen_counts=probs)
-    return deflate(data, opts)
-
-###
 
 
 

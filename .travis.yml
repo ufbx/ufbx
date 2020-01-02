@@ -4,6 +4,7 @@ language: cpp
 compiler: clang
 
 script:
+    - python3 misc/test_zlib_debug_compressor.py
     - mkdir -p build
     - cd build
     - clang -coverage -g -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
