@@ -7,6 +7,8 @@ script:
     - python3 misc/test_zlib_debug_compressor.py
     - mkdir -p build
     - cd build
+    - clang -O2 -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
+    - ./runner -v
     - clang -coverage -g -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
     - ./runner -v
     - llvm-cov gcov runner
