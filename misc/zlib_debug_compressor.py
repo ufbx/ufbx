@@ -1,6 +1,14 @@
-import zlib
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import itertools
+
+class Options:
+    def __init__(self):
+        self.override_litlen_counts = { }
+        self.max_uncompressed_length = 0xffff
+        self.prune_interval = 1024
+        self.max_match_distance = 32768
+        self.search_budget = 4096
+        self.allow_block_types = [0,1,2]
 
 Code = namedtuple("Code", "code bits")
 IntCoding = namedtuple("IntCoding", "symbol base bits")
@@ -39,6 +47,7 @@ class BitBuf:
         self.desc = []
 
     def push(self, val, bits, desc=""):
+        if bits == 0: return
         assert val < 1 << bits
         val = int(val)
         self.desc.append(BinDesc(self.pos, val, bits, desc))
@@ -46,6 +55,7 @@ class BitBuf:
         self.pos += bits
 
     def push_rev(self, val, bits, desc=""):
+        if bits == 0: return
         assert val < 1 << bits
         rev = 0
         for n in range(bits):
@@ -56,6 +66,13 @@ class BitBuf:
         self.push(code.code, code.bits, desc)
     def push_rev_code(self, code, desc=""):
         self.push_rev(code.code, code.bits, desc)
+
+    def append(self, buf):
+        for desc in buf.desc:
+            self.desc.append(desc._replace(offset = desc.offset + self.pos))
+        self.data |= buf.data << self.pos
+        self.pos += buf.pos
+        
 
     def to_bytes(self):
         return bytes((self.data>>p&0xff) for p in range(0, self.pos, 8))
@@ -71,16 +88,23 @@ class Literal:
     def encode(self, buf, litlen_syms, dist_syms):
         for c in self.data:
             sym = litlen_syms[c]
-            buf.push_rev_code(sym, "Literal '{}'".format(chr(c)))
+            buf.push_rev_code(sym, "Literal '{}' (0x{:02x})".format(chr(c), c))
 
-    def decode(self, history):
-        return self.data
+    def decode(self, result):
+        result += self.data
+
+    def __repr__(self):
+        return "Literal({!r})".format(self.data)
 
 class Match:
     def __init__(self, length, distance):
         self.length = length
         self.distance = distance
-        self.lcode = find_int_coding(length_coding, length)
+        if length < 258:
+            self.lcode = find_int_coding(length_coding, length)
+        else:
+            assert length == 258
+            self.lcode = IntCoding(285, 0, 0)
         self.dcode = find_int_coding(distance_coding, distance)
 
     def count_codes(self, litlen_count, dist_count):
@@ -90,30 +114,27 @@ class Match:
     def encode(self, buf, litlen_syms, dist_syms):
         lsym = litlen_syms[self.lcode.symbol]
         dsym = dist_syms[self.dcode.symbol]
-        buf.push_rev_code(lsym, "Length")
+        buf.push_rev_code(lsym, "Length: {}".format(self.length))
         if self.lcode.bits > 0:
             buf.push(self.length - self.lcode.base, self.lcode.bits, "Length extra")
-        buf.push_rev_code(dsym, "Distance")
+        buf.push_rev_code(dsym, "Distance: {}".format(self.distance))
         if self.dcode.bits > 0:
             buf.push(self.distance - self.dcode.base, self.dcode.bits, "Distance extra")
     
-    def decode(self, history):
-        # TODO: RLE!
-        return history[-self.distance:-self.distance + self.length]
+    def decode(self, result):
+        begin = len(result) - self.distance
+        assert begin >= 0
+        for n in range(begin, begin + self.length):
+            result.append(result[n])
 
+    def __repr__(self):
+        return "Match({}, {})".format(self.length, self.distance)
 
-def make_huffman(syms, max_code_length):
-    """Build a canonical Huffman tree containing `syms`
-
-    `syms` must be a dict mapping from symbol to probability.
-    `max_code_length` is the maximum length of the resulting Huffman codes.
-    The function will return a dict mapping from symbol to its code.
-    """
-
+def make_huffman_bits(syms, max_code_length):
     if len(syms) == 0:
         return { }
     if len(syms) == 1:
-        return { next(iter(syms)): Code(0, 1) }
+        return { next(iter(syms)): 1 }
 
     sym_groups = ((prob, (sym,)) for sym,prob in syms.items())
     initial_groups = list(sorted(sym_groups))
@@ -127,7 +148,12 @@ def make_huffman(syms, max_code_length):
     for g in groups[:(len(syms) - 1) * 2]:
         for sym in g[1]:
             sym_bits[sym] = sym_bits.get(sym, 0) + 1
+    return sym_bits
 
+def make_huffman_codes(sym_bits, max_code_length):
+    if len(sym_bits) == 0:
+        return { }
+    
     bl_count = [0] * (max_code_length + 1)
     next_code = [0] * (max_code_length + 1)
     for bits in sym_bits.values():
@@ -144,16 +170,27 @@ def make_huffman(syms, max_code_length):
 
     return codes
 
+def make_huffman(syms, max_code_length):
+    sym_bits = make_huffman_bits(syms, max_code_length)
+    return make_huffman_codes(sym_bits, max_code_length)
+
 def print_huffman(tree):
     width = max(len(str(s)) for s in tree.keys())
     for sym,code in tree.items():
         print("{:{}} {:0{}b}".format(sym, width, code.code, code.bits))
 
+def print_buf(buf):
+    for d in buf.desc:
+        val = "({0}) {0:0{1}b}".format(d.value, d.bits)
+        if len(val) > 16:
+            val = "({0})".format(d.value, d.bits)
+        print("{:>8x} {:>4} | {:>16} | {}".format(d.offset, d.bits, val, d.desc))
+
 def decode(message):
-    result = b""
+    result = []
     for m in message:
-        result += m.decode(result)
-    return result
+        m.decode(result)
+    return bytes(result)
 
 def encode_huff_bits(bits):
     encoded = []
@@ -205,7 +242,104 @@ def write_encoded_huff_bits(buf, codes, syms, desc):
         if code.bits > 0:
             buf.push(code.extra, code.bits, "{} N={}".format(desc, num))
 
-def compress_block(buf, message, final, override_litlen_counts={}):
+def prune_matches(matches, offset, opts):
+    new_matches = defaultdict(list)
+    begin = offset - opts.max_match_distance
+    for trigraph,chain in matches.items():
+        new_chain = [o for o in chain if o >= begin]
+        if new_chain:
+            new_matches[trigraph] = new_chain
+    return new_matches
+
+def match_block(data, opts):
+    message = []
+    matches = defaultdict(list)
+    literal = []
+    offset = 0
+    size = len(data)
+    prune_interval = 0
+    while offset + 3 <= size:
+        trigraph = data[offset:offset+3]
+        advance = 1
+        match_begin, match_length = 0, 0
+        search_steps = 0
+
+        for m in reversed(matches[trigraph]):
+            length = 3
+            while offset + length < size and length < 258:
+                if data[offset + length] != data[m + length]: break
+                length += 1
+                search_steps += 1
+            if length > match_length and m - offset <= 32768:
+                match_begin, match_length = m, length
+            if search_steps >= opts.search_budget:
+                break
+
+        if match_length > 0:
+            if literal:
+                message.append(Literal(bytes(literal)))
+                literal.clear()
+            message.append(Match(match_length, offset - match_begin))
+            advance = match_length
+        else:
+            literal.append(data[offset])
+
+        for n in range(advance):
+            if offset >= 3:
+                trigraph = data[offset - 3:offset]
+                matches[trigraph].append(offset - 3)
+            offset += 1
+
+        prune_interval += advance
+        if prune_interval >= opts.prune_interval:
+            matches = prune_matches(matches, offset, opts)
+            prune_interval = 0
+
+    while offset < size:
+        literal.append(data[offset])
+        offset += 1
+
+    if literal:
+        message.append(Literal(bytes(literal)))
+
+    return message
+
+def compress_block_uncompressed(buf, message, final, opts):
+    data = decode(message)
+    size = len(data)
+    begin = 0
+    while begin < size:
+        amount = min(size - begin, opts.max_uncompressed_length)
+        end = begin + amount
+        real_final = final and end == size
+        buf.push(real_final, 1, "BFINAL      Final chunk: {}".format(real_final))
+        buf.push(0b00, 2,       "BTYPE       Chunk type: Uncompressed")
+
+        buf.push(0, -buf.pos & 7, "Pad to byte")
+
+        buf.push(amount, 16, "LEN: {}".format(amount))
+        buf.push(~amount&0xffff, 16, "NLEN: ~{}".format(amount))
+        for byte in data[begin:end]:
+            buf.push(byte, 8, "Byte '{}' ({:02x})".format(chr(byte), byte))
+        begin = end
+
+def compress_block_static(buf, message, final, opts):
+    litlen_bits = [8]*(144-0) + [9]*(256-144) + [7]*(280-256) + [8]*(287-280)
+    distance_bits = [5] * 32
+
+    litlen_syms = make_huffman_codes(dict(enumerate(litlen_bits)), 16)
+    distance_syms = make_huffman_codes(dict(enumerate(distance_bits)), 16)
+
+    buf.push(final, 1, "BFINAL      Final chunk: {}".format(final))
+    buf.push(0b01, 2,  "BTYPE       Chunk type: Static Huffman")
+
+    for m in message:
+        m.encode(buf, litlen_syms, distance_syms)
+
+    # End-of-block
+    buf.push_rev_code(litlen_syms[256], "End-of-block")
+
+def compress_block_dynamic(buf, message, final, opts):
     litlen_count = [0] * 286
     distance_count = [0] * 30
 
@@ -215,7 +349,7 @@ def compress_block(buf, message, final, override_litlen_counts={}):
     for m in message:
         m.count_codes(litlen_count, distance_count)
 
-    for sym,count in override_litlen_counts.items():
+    for sym,count in opts.override_litlen_counts.items():
         litlen_count[sym] = count
 
     litlen_map = { sym: count for sym,count in enumerate(litlen_count) if count > 0 }
@@ -248,18 +382,18 @@ def compress_block(buf, message, final, override_litlen_counts={}):
             num_codelens = i + 1
     num_codelens = max(num_codelens, 4)
 
-    buf.push(final, 1, "BFINAL")
-    buf.push(0b10, 2, "BTYPE")
+    buf.push(final, 1, "BFINAL      Final chunk: {}".format(final))
+    buf.push(0b10, 2,  "BTYPE       Chunk type: Dynamic Huffman")
 
-    buf.push(num_litlens - 257, 5, "HLIT")
-    buf.push(num_distances - 1, 5, "HDIST")
-    buf.push(num_codelens - 4, 4, "HCLEN")
+    buf.push(num_litlens - 257, 5, "HLIT        Number of Litlen codes: {} (257 + {})".format(num_litlens, num_litlens - 257))
+    buf.push(num_distances - 1, 5, "HDIST       Number of Distance codes: {} (1 + {})".format(num_distances, num_distances - 1))
+    buf.push(num_codelens - 4, 4,  "HCLEN       Number of Codelen codes: {} (4 + {})".format(num_codelens, num_codelens - 4))
 
     for p in codelen_permutation[:num_codelens]:
         bits = 0
         if p in codelen_syms:
             bits = codelen_syms[p].bits
-        buf.push(bits, 3, "Codelen {} bits".format(p))
+        buf.push(bits, 3, "Codelen {} bits: {}".format(p, bits))
 
     write_encoded_huff_bits(buf, litlen_bit_codes, codelen_syms, "Litlen")
     write_encoded_huff_bits(buf, distance_bit_codes, codelen_syms, "Distance")
@@ -270,25 +404,45 @@ def compress_block(buf, message, final, override_litlen_counts={}):
     # End-of-block
     buf.push_rev_code(litlen_syms[256], "End-of-block")
 
-def compress_message(message):
+def adler32(data):
+    a, b = 1, 0
+    for d in data:
+        a = (a + d) % 65521
+        b = (b + a) % 65521
+    return b << 16 | a
+
+def compress_message(message, opts=Options()):
     buf = BitBuf()
 
     # ZLIB CFM byte
-    buf.push(8, 4, "CM")    # CM=8     Compression method: DEFLATE
-    buf.push(7, 4, "CINFO") # CINFO=7  Compression info: 32kB window size
+    buf.push(8, 4,  "CM=8        Compression method: DEFLATE")
+    buf.push(7, 4,  "CINFO=7     Compression info: 32kB window size")
 
     # ZLIB FLG byte
-    buf.push(28, 5, "FCHECK") # FCHECK    (CMF*256+FLG) % 31 == 0
-    buf.push(0, 1, "FDICT")   # FDICT=0   Preset dictionary: No
-    buf.push(2, 2, "FLEVEL")  # FLEVEL=2  Compression level: Default
+    buf.push(28, 5, "FCHECK      (CMF*256+FLG) % 31 == 0")
+    buf.push(0, 1,  "FDICT=0     Preset dictionary: No")
+    buf.push(2, 2,  "FLEVEL=2    Compression level: Default")
 
-    compress_block(buf, message, True)
+    best_buf = None
+    for block_type in range(3):
+        if block_type not in opts.allow_block_types: continue
+        block_buf = BitBuf()
 
-    # Pad to byte
+        if block_type == 0:
+            compress_block_uncompressed(block_buf, message, True, opts)
+        elif block_type == 1:
+            compress_block_static(block_buf, message, True, opts)
+        elif block_type == 2:
+            compress_block_dynamic(block_buf, message, True, opts)
+
+        if not best_buf or block_buf.pos < best_buf.pos:
+            best_buf = block_buf
+
+    buf.append(best_buf)
+
     buf.push(0, -buf.pos & 7, "Pad to byte")
 
-    print(decode(message))
-    adler_hash = zlib.adler32(decode(message))
+    adler_hash = adler32(decode(message))
 
     buf.push((adler_hash >> 24) & 0xff, 8, "Adler[24:32]")
     buf.push((adler_hash >> 16) & 0xff, 8, "Adler[16:24]")
@@ -297,14 +451,9 @@ def compress_message(message):
 
     return buf
 
-message = [Literal(b"Hello World!"), Match(6, 7), Literal(b"?")]
-buf = compress_message(message)
-encoded = buf.to_bytes()
+def deflate(data, opts=Options()):
+    message = match_block(data, opts)
+    encoded = compress_message(message, opts)
+    return encoded
 
-for d in buf.desc:
-    val = "({0}) {0:0{1}b}".format(d.value, d.bits)
-    print("{:>8x} {:>4} | {:>16} | {}".format(d.offset, d.bits, val, d.desc))
-
-print("".join("\\x%02x" % b for b in encoded))
-print(zlib.decompress(encoded))
 
