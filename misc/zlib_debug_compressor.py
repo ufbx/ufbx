@@ -200,7 +200,7 @@ def encode_huff_bits(bits):
             encoded.append(SymExtra(value, 0, 0))
             num -= 1
             while num >= 3:
-                amount = min(num, 3)
+                amount = min(num, 6)
                 encoded.append(SymExtra(16, amount-3, 2))
                 num -= amount
             while num >= 1:
@@ -464,6 +464,9 @@ def print_bytes(data):
 def test_deflate_dynamic():
     opts = Options(allow_block_types=[2])
     return deflate(b"Hello Hello!", opts)
+
+def test_deflate_repeat_length():
+    return deflate(b"ABCDEFGHIJKLMNOPQRSTUVWXYZZYXWVUTSRQPONMLKJIHGFEDCBA")
 
 ###
 
