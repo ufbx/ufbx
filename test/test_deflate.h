@@ -138,7 +138,7 @@ UFBXT_TEST(huff_static_lit_length)
 #if UFBXT_IMPL
 {
 	ufbxi_deflate_context dc;
-	ufbxi_init_static(&dc);
+	ufbxi_init_static_huff(&dc);
 
 	test_huff_range(&dc.huff_lit_length, 0, 143, 8, 0x30);
 	test_huff_range(&dc.huff_lit_length, 144, 255, 9, 0x190);
@@ -151,7 +151,7 @@ UFBXT_TEST(huff_static_dist)
 #if UFBXT_IMPL
 {
 	ufbxi_deflate_context dc;
-	ufbxi_init_static(&dc);
+	ufbxi_init_static_huff(&dc);
 
 	test_huff_range(&dc.huff_dist, 0, 31, 5, 0x0);
 }
@@ -170,7 +170,7 @@ UFBXT_TEST(deflate_empty)
 UFBXT_TEST(deflate_simple)
 #if UFBXT_IMPL
 {
-	const char src[] = "\x78\x9C\x01\x06\x00\xf9\xffHello!";
+	const char src[] = "\x78\x9C\x01\x06\x00\xf9\xffHello!\x07\xa2\x02\x16";
 	char dst[6];
 	int ok = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 	ufbxt_assert(ok != 0);
@@ -181,7 +181,7 @@ UFBXT_TEST(deflate_simple)
 UFBXT_TEST(deflate_simple_chunks)
 #if UFBXT_IMPL
 {
-	const char src[] = "\x78\x9C\x00\x06\x00\xf9\xffHello \x01\x06\x00\xf9\xffworld!";
+	const char src[] = "\x78\x9C\x00\x06\x00\xf9\xffHello \x01\x06\x00\xf9\xffworld!\x1d\x09\x04\x5e";
 	char dst[12];
 	int ok = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 	ufbxt_assert(ok != 0);
@@ -192,7 +192,7 @@ UFBXT_TEST(deflate_simple_chunks)
 UFBXT_TEST(deflate_bad_chunk_type)
 #if UFBXT_IMPL
 {
-	const char src[] = "\x78\x9C\x06";
+	const char src[] = "\x78\x9c\x06";
 	char dst[1];
 	int ok = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 	ufbxt_assert(ok == 0);
@@ -229,5 +229,17 @@ UFBXT_TEST(deflate_static_rle)
 	int ok = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 	ufbxt_assert(ok != 0);
 	ufbxt_assert(!memcmp(dst, "AAAAAAAAAAAA", 12));
+}
+#endif
+
+UFBXT_TEST(deflate_dynamic)
+#if UFBXT_IMPL
+{
+	const char src[] = "\x78\x9c\x1d\xc4\x31\x0d\x00\x00\x0c\x02\x41\x2b\xad"
+		"\x1b\x8c\xb0\x7d\x82\xff\x8d\x84\xe5\x64\xc8\xcd\x2f\x1b\xbb\x04\x2a";
+	char dst[64];
+	int ok = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+	ufbxt_assert(ok != 0);
+	ufbxt_assert(!memcmp(dst, "Hello Hello!", 12));
 }
 #endif

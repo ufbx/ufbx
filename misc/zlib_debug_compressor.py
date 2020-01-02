@@ -2,13 +2,13 @@ from collections import namedtuple, defaultdict
 import itertools
 
 class Options:
-    def __init__(self):
-        self.override_litlen_counts = { }
-        self.max_uncompressed_length = 0xffff
-        self.prune_interval = 1024
-        self.max_match_distance = 32768
-        self.search_budget = 4096
-        self.allow_block_types = [0,1,2]
+    def __init__(self, **kwargs):
+        self.override_litlen_counts = kwargs.get("override_litlen_counts", { })
+        self.max_uncompressed_length = kwargs.get("max_uncompressed_length", 0xffff)
+        self.prune_interval = kwargs.get("prune_interval", 1024)
+        self.max_match_distance = kwargs.get("max_match_distance", 32768)
+        self.search_budget = kwargs.get("search_budget", 4096)
+        self.allow_block_types = kwargs.get("allow_block_types", [0,1,2])
 
 Code = namedtuple("Code", "code bits")
 IntCoding = namedtuple("IntCoding", "symbol base bits")
@@ -174,18 +174,6 @@ def make_huffman(syms, max_code_length):
     sym_bits = make_huffman_bits(syms, max_code_length)
     return make_huffman_codes(sym_bits, max_code_length)
 
-def print_huffman(tree):
-    width = max(len(str(s)) for s in tree.keys())
-    for sym,code in tree.items():
-        print("{:{}} {:0{}b}".format(sym, width, code.code, code.bits))
-
-def print_buf(buf):
-    for d in buf.desc:
-        val = "({0}) {0:0{1}b}".format(d.value, d.bits)
-        if len(val) > 16:
-            val = "({0})".format(d.value, d.bits)
-        print("{:>8x} {:>4} | {:>16} | {}".format(d.offset, d.bits, val, d.desc))
-
 def decode(message):
     result = []
     for m in message:
@@ -251,7 +239,7 @@ def prune_matches(matches, offset, opts):
             new_matches[trigraph] = new_chain
     return new_matches
 
-def match_block(data, opts):
+def match_block(data, opts=Options()):
     message = []
     matches = defaultdict(list)
     literal = []
@@ -374,7 +362,7 @@ def compress_block_dynamic(buf, message, final, opts):
     codelen_map = { sym: count for sym,count in enumerate(codelen_count) if count > 0 }
     codelen_syms = make_huffman(codelen_map, 8)
 
-    codelen_permutation = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]
+    codelen_permutation = [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15]
 
     num_codelens = 0
     for i, p in enumerate(codelen_permutation):
@@ -456,4 +444,26 @@ def deflate(data, opts=Options()):
     encoded = compress_message(message, opts)
     return encoded
 
+def print_huffman(tree):
+    width = max(len(str(s)) for s in tree.keys())
+    for sym,code in tree.items():
+        print("".format(sym, width, code.code, code.bits))
+
+def print_buf(buf):
+    for d in buf.desc:
+        val = " {0:0{1}b}".format(d.value, d.bits)
+        if len(val) > 16:
+            val = "({0})".format(d.value, d.bits)
+        print("{0:>5} {0:>4x} |{1:>2} | {2:>10} | {3:>4} | {4}".format(d.offset, d.bits, val, d.value, d.desc))
+
+def print_bytes(data):
+    print(''.join('\\x%02x' % b for b in data))
+
+###
+
+def test_deflate_dynamic():
+    opts = Options(allow_block_types=[2])
+    return deflate(b"Hello Hello!", opts)
+
+###
 

@@ -88,8 +88,9 @@ static const uint32_t ufbxi_deflate_dist_lut[] = {
 	0x200367ff, 0x300367ff, 0x40038fff, 0x60038fff, 0x8003bfff, 0xc003bfff, 
 };
 
-static const uint8_t ufbxi_deflate_code_length_swizzle[] = {
-	16,17,18,0,8,7,9,6,10,5,11,4,123,13,2,14,1,15 };
+static const uint8_t ufbxi_deflate_code_length_permutation[] = {
+	16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15,
+};
 
 #define UFBXI_HUFF_MAX_BITS 16
 #define UFBXI_HUFF_MAX_VALUE 288
@@ -191,7 +192,7 @@ ufbxi_bit_read(ufbxi_bit_stream *s, uint64_t offset_bits)
 	}
 }
 
-static int
+static ufbxi_noinline int
 ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 {
 	if (sym_count > UFBXI_HUFF_MAX_VALUE) return 0;
@@ -201,7 +202,7 @@ ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 	memset(bits_counts, 0, sizeof(bits_counts));
 	for (uint32_t i = 0; i < sym_count; i++) {
 		uint32_t bits = sym_bits[i];
-		if (bits == 0 || bits > UFBXI_HUFF_MAX_BITS) return 0; 
+		if (bits > UFBXI_HUFF_MAX_BITS) return 0; 
 		bits_counts[bits]++;
 	}
 
@@ -240,6 +241,8 @@ ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 	memset(tree->sorted_to_sym, 0xff, sizeof(tree->sorted_to_sym));
 	for (uint32_t i = 0; i < sym_count; i++) {
 		uint32_t bits = sym_bits[i];
+		if (bits == 0) continue;
+
 		uint32_t index = bits_index[bits]++;
 		uint32_t sorted = total_syms[bits - 1] + index;
 		tree->sorted_to_sym[sorted] = i;
@@ -290,7 +293,7 @@ ufbxi_huff_decode_bits(const ufbxi_huff_tree *tree, uint64_t *p_bits, uint64_t *
 }
 
 static void
-ufbxi_init_static(ufbxi_deflate_context *dc)
+ufbxi_init_static_huff(ufbxi_deflate_context *dc)
 {
 	int ok;
 
@@ -308,11 +311,138 @@ ufbxi_init_static(ufbxi_deflate_context *dc)
 	ufbx_assert(ok != 0);
 }
 
+static ufbxi_noinline int
+ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *huff_code_length,
+	ufbxi_huff_tree *tree, uint32_t num_symbols, uint64_t *p_pos)
+{
+	uint8_t code_lengths[UFBXI_HUFF_MAX_VALUE];
+	if (num_symbols > UFBXI_HUFF_MAX_VALUE) return 0;
+	uint64_t pos = *p_pos;
+
+	uint32_t symbol_index = 0;
+	uint8_t prev = 0;
+	while (symbol_index < num_symbols) {
+		uint64_t bits = ufbxi_bit_read(&dc->stream, pos);
+
+		uint32_t inst = ufbxi_huff_decode_bits(huff_code_length, &bits, &pos);
+		if (inst <= 15) {
+			prev = (uint8_t)inst;
+			code_lengths[symbol_index++] = (uint8_t)inst;
+		} else if (inst == 16) {
+			uint32_t num = 3 + ((uint32_t)bits & 0x3);
+			pos += 2;
+			if (symbol_index + num > num_symbols) return 0;
+			memset(code_lengths + symbol_index, prev, num);
+			symbol_index += num;
+		} else if (inst == 17) {
+			uint32_t num = 3 + ((uint32_t)bits & 0x7);
+			pos += 3;
+			if (symbol_index + num > num_symbols) return 0;
+			memset(code_lengths + symbol_index, 0, num);
+			symbol_index += num;
+			prev = 0;
+		} else if (inst == 18) {
+			uint32_t num = 11 + ((uint32_t)bits & 0x7f);
+			pos += 7;
+			if (symbol_index + num > num_symbols) return 0;
+			memset(code_lengths + symbol_index, 0, num);
+			symbol_index += num;
+			prev = 0;
+		} else {
+			return 0;
+		}
+	}
+
+	if (!ufbxi_huff_build(tree, code_lengths, num_symbols)) return 0;
+
+	*p_pos = pos;
+	return 1;
+}
+
+static int
+ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, uint64_t *p_pos)
+{
+	uint64_t pos = *p_pos;
+	uint64_t bits = ufbxi_bit_read(&dc->stream, pos);
+	pos += 14;
+
+	uint32_t num_lit_lengths = 257 + (bits & 0x1f);
+	uint32_t num_dists = 1 + (bits >> 5 & 0x1f);
+	uint32_t num_code_lengths = 4 + (bits >> 10 & 0xf);
+	if (num_lit_lengths > 288) return 0;
+	if (num_dists > 32) return 0;
+	if (num_code_lengths > 19) return 0;
+
+	uint8_t code_lengths[19];
+	memset(code_lengths, 0, sizeof(code_lengths));
+
+	bits = ufbxi_bit_read(&dc->stream, pos);
+	for (uint32_t i = 0; i < num_code_lengths; i++) {
+		code_lengths[ufbxi_deflate_code_length_permutation[i]] = (uint32_t)bits & 0x7;
+		bits >>= 3;
+	}
+	pos += num_code_lengths * 3;
+
+	ufbxi_huff_tree huff_code_length;
+	if (!ufbxi_huff_build(&huff_code_length, code_lengths, ufbxi_arraycount(code_lengths))) {
+		return 0;
+	}
+	if (!ufbxi_init_dynamic_huff_tree(dc, &huff_code_length, &dc->huff_lit_length, num_lit_lengths, &pos)) {
+		return 0;
+	}
+	if (!ufbxi_init_dynamic_huff_tree(dc, &huff_code_length, &dc->huff_dist, num_dists, &pos)) {
+		return 0;
+	}
+
+	*p_pos = pos;
+	return 1;
+}
+
+static uint32_t
+ufbxi_adler32(const void *data, size_t size)
+{
+	size_t a = 1, b = 0;
+	const size_t num_before_wrap = sizeof(size_t) == 8 ? 380368439u : 5552u;
+
+	const char *p = (const char*)data;
+
+	size_t size_left = size;
+	while (size_left > 0) {
+		size_t num = size_left <= num_before_wrap ? size_left : num_before_wrap;
+		size_left -= num;
+		const char *end = p + num;
+
+		while (end - p >= 8) {
+			a += (size_t)(uint8_t)p[0]; b += a;
+			a += (size_t)(uint8_t)p[1]; b += a;
+			a += (size_t)(uint8_t)p[2]; b += a;
+			a += (size_t)(uint8_t)p[3]; b += a;
+			a += (size_t)(uint8_t)p[4]; b += a;
+			a += (size_t)(uint8_t)p[5]; b += a;
+			a += (size_t)(uint8_t)p[6]; b += a;
+			a += (size_t)(uint8_t)p[7]; b += a;
+			p += 8;
+		}
+
+		while (p != end) {
+			a += (size_t)(uint8_t)p[0]; b += a;
+			p++;
+		}
+
+		a %= 65521u;
+		b %= 65521u;
+	}
+
+	return (b << 16) | (a & 0xffff);
+}
+
 static int
 ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 {
 	uint64_t pos = *p_pos;
 	char *out_ptr = dc->out_ptr;
+	char *const out_begin = dc->out_begin;
+	char *const out_end = dc->out_end;
 
 	for (;;) {
 		uint64_t bits = ufbxi_bit_read(&dc->stream, pos); // 64 bits
@@ -322,7 +452,7 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 
 		// If value < 256: copy value (literal byte) to output stream
 		if (lit_length < 256) {
-			if (out_ptr == dc->out_end) return 0;
+			if (out_ptr == out_end) return 0;
 			*out_ptr++ = (char)lit_length;
 		} else if (lit_length - 257 <= 285 - 257) {
 			// If value = 257..285: Decode extra length and distance
@@ -352,21 +482,23 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 				distance = base + offset;
 			}
 
-			if (distance > out_ptr - dc->out_begin) return 0;
-			if (length > dc->out_end - out_ptr) return 0;
+			if (distance > out_ptr - out_begin) return 0;
+			if (length > out_end - out_ptr) return 0;
 
 			// TODO: Do something better than per-byte copy
 			const char *src_ptr = out_ptr - distance;
 			char *end = out_ptr + length;
 			ufbx_assert(length > 0);
 			do {
-				*out_ptr++ = *src_ptr++;
+				char c = *src_ptr++;
+				*out_ptr++ = c;
 			} while (out_ptr != end);
 		} else {
 			break;
 		}
 	}
 
+	dc->out_ptr = out_ptr;
 	*p_pos = pos;
 	return 1;
 }
@@ -407,7 +539,7 @@ ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 		if (type == 0) {
 			// 0b00 - no compression
 			// Round up to the next byte
-			uint64_t byte_pos = (pos + 7) >> 3;
+			size_t byte_pos = (size_t)((pos + 7) >> 3);
 
 			// Literal header: [0:2] LEN [2:4] NLEN = ~LEN
 			const uint8_t *src_pos = (const uint8_t*)src + byte_pos;
@@ -424,9 +556,9 @@ ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 		} else if (type <= 2) {
 			if (type == 1) {
 				// TODO: Cache the trees?
-				ufbxi_init_static(&dc);
+				ufbxi_init_static_huff(&dc);
 			} else { 
-				ufbx_assert(0 && "Unimplemented");
+				ufbxi_init_dynamic_huff(&dc, &pos);
 			}
 
 			if (!ufbxi_inflate_block(&dc, &pos)) return 0;
@@ -437,6 +569,17 @@ ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 
 		// BFINAL: End of stream
 		if (header & 1) break;
+	}
+
+	// Check Adler-32
+	{
+		// Round up to the next byte
+		size_t byte_pos = (size_t)((pos + 7) >> 3);
+		if (src_size - byte_pos < 4) return 0;
+		const uint8_t *p = (const uint8_t*)src + byte_pos;
+		uint32_t ref = p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3];
+		uint32_t checksum = ufbxi_adler32(dc.out_begin, dc.out_ptr - dc.out_begin);
+		if (ref != checksum) return 0;
 	}
 
 	return 1;
