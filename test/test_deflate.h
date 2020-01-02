@@ -256,3 +256,16 @@ UFBXT_TEST(deflate_repeat_length)
 	ufbxt_assert(!memcmp(dst, "ABCDEFGHIJKLMNOPQRSTUVWXYZZYXWVUTSRQPONMLKJIHGFEDCBA", 52));
 }
 #endif
+
+UFBXT_TEST(deflate_huff_lengths)
+#if UFBXT_IMPL
+{
+	const char src[] = "\x78\x9c\x05\xe0\xc1\x95\x65\x59\x96\x65\xd9\xb1\x84"
+		"\xca\x70\x53\xf9\xaf\x79\xcf\x5e\x93\x7f\x96\x30\xfe\x7f\xff\xdf\xff"
+		"\xfb\xbf\xff\xfd\xf7\xef\xef\xf7\xbd\x5b\xfe\xff\x19\x28\x03\x5d";
+	char dst[64];
+	int ok = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+	ufbxt_assert(ok != 0);
+	ufbxt_assert(!memcmp(dst, "0123456789ABCDE", 15));
+}
+#endif

@@ -184,6 +184,7 @@ def encode_huff_bits(bits):
     encoded = []
     for value,copies in itertools.groupby(bits):
         num = len(list(copies))
+        assert value < 16
         if value == 0:
             while num >= 11:
                 amount = min(num, 138)
@@ -343,8 +344,8 @@ def compress_block_dynamic(buf, message, final, opts):
     litlen_map = { sym: count for sym,count in enumerate(litlen_count) if count > 0 }
     distance_map = { sym: count for sym,count in enumerate(distance_count) if count > 0 }
 
-    litlen_syms = make_huffman(litlen_map, 16)
-    distance_syms = make_huffman(distance_map, 16)
+    litlen_syms = make_huffman(litlen_map, 15)
+    distance_syms = make_huffman(distance_map, 15)
 
     num_litlens = max(itertools.chain((k for k in litlen_map.keys()), (256,))) + 1
     num_distances = max(itertools.chain((k for k in distance_map.keys()), (0,))) + 1
@@ -462,11 +463,26 @@ def print_bytes(data):
 ###
 
 def test_deflate_dynamic():
+    """Simple dynamic Huffman tree compressed block"""
     opts = Options(allow_block_types=[2])
     return deflate(b"Hello Hello!", opts)
 
 def test_deflate_repeat_length():
+    """Dynamic Huffman compressed block with repeat lengths"""
     return deflate(b"ABCDEFGHIJKLMNOPQRSTUVWXYZZYXWVUTSRQPONMLKJIHGFEDCBA")
 
+def test_deflate_huff_lengths():
+    """Test all possible lit/len code lengths"""
+    data = b"0123456789ABCDE"
+    freq = 1
+    probs = { }
+    for c in data:
+        probs[c] = freq
+        freq *= 2
+    opts = Options(allow_block_types=[2], override_litlen_counts=probs)
+    return deflate(data, opts)
+
 ###
+
+
 
