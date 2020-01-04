@@ -209,15 +209,27 @@ int main(int argc, char **argv)
 {
 	uint32_t num_tests = ufbxi_arraycount(g_tests);
 	uint32_t num_ok = 0;
+	const char *test_filter = NULL;
 
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-v")) {
 			g_verbose = 1;
 		}
+		if (!strcmp(argv[i], "-t")) {
+			if (++i < argc) {
+				test_filter = argv[i];
+			}
+		}
 	}
 
+	uint32_t num_ran = 0;
 	for (uint32_t i = 0; i < num_tests; i++) {
 		ufbxt_test *test = &g_tests[i];
+		if (test_filter && strcmp(test->name, test_filter)) {
+			continue;
+		}
+
+		num_ran++;
 		if (ufbxt_run_test(test)) {
 			num_ok++;
 		}
@@ -241,7 +253,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	printf("\nTests passed: %u/%u\n", num_ok, num_tests);
+	printf("\nTests passed: %u/%u\n", num_ok, num_ran);
 
-	return num_ok == num_tests ? 0 : 1;
+	return num_ok == num_ran ? 0 : 1;
 }

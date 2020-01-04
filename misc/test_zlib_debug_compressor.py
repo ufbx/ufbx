@@ -30,6 +30,73 @@ def test_multi_part_matches():
     opts = zz.Options(block_size=4, force_block_types=[0,1,2,0,1,2])
     return data, zz.deflate(data, opts)
 
+def test_fail_codelen_16_overflow():
+    """Test oveflow of codelen symbol 16"""
+    data = b"\xfd\xfe\xff"
+    opts = zz.Options(force_block_types=[2])
+    buf = zz.deflate(data, opts)
+    
+    # Patch Litlen 254-256 repeat extra N to 4
+    buf.data |= 1 << 0x66
+
+    return data, buf
+
+def test_fail_codelen_17_overflow():
+    """Test oveflow of codelen symbol 17"""
+    data = b"\xfc"
+    opts = zz.Options(force_block_types=[2])
+    buf = zz.deflate(data, opts)
+    
+    # Patch Litlen 254-256 zero extra N to 5
+    buf.data |= 2 << 0x6c
+
+    return data, buf
+
+def test_fail_codelen_18_overflow():
+    """Test oveflow of codelen symbol 18"""
+    data = b"\xf4"
+    opts = zz.Options(force_block_types=[2])
+    buf = zz.deflate(data, opts)
+    
+    # Patch Litlen 254-256 extra N to 13
+    buf.data |= 2 << 0x6a
+
+    return data, buf
+
+def test_fail_codelen_bad_huffman():
+    """Test bad codelen Huffman tree"""
+    data = b"Codelen"
+    opts = zz.Options(force_block_types=[2])
+    buf = zz.deflate(data, opts)
+    
+    # Over-filled Huffman tree
+    buf.data |= 1 << 0x30
+
+    return data, buf
+
+def test_fail_litlen_bad_huffman():
+    """Test bad lit/len Huffman tree"""
+    data = b"Literal/Length codes"
+    opts = zz.Options(force_block_types=[2])
+    buf = zz.deflate(data, opts)
+    
+    # Under-filled Huffman tree
+    buf.data &= ~(0b11 << 0x6d)
+    buf.data |= 0b01 << 0x6d
+
+    return data, buf
+
+def test_fail_distance_bad_huffman():
+    """Test bad distance Huffman tree"""
+    data = b"Dist Dist .. Dist"
+    opts = zz.Options(force_block_types=[2])
+    buf = zz.deflate(data, opts)
+    
+    # Under-filled Huffman tree
+    buf.data &= ~(0b1111 << 0xb1)
+    buf.data |= 0b1111 << 0xb1
+
+    return data, buf
 test_cases = [
     test_dynamic,
     test_repeat_length,

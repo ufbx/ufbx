@@ -123,6 +123,8 @@ typedef struct {
 	char *out_begin;
 	char *out_ptr;
 	char *out_end;
+
+	const char **error;
 } ufbxi_deflate_context;
 
 static ufbxi_noinline void
@@ -195,16 +197,18 @@ ufbxi_bit_read(ufbxi_bit_stream *s, uint64_t offset_bits)
 static ufbxi_noinline int
 ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 {
-	if (sym_count > UFBXI_HUFF_MAX_VALUE) return 0;
+	ufbx_assert(sym_count > 0);
+	ufbx_assert(sym_count <= UFBXI_HUFF_MAX_VALUE);
 	tree->num_symbols = sym_count;
 
 	uint32_t bits_counts[UFBXI_HUFF_MAX_BITS];
 	memset(bits_counts, 0, sizeof(bits_counts));
 	for (uint32_t i = 0; i < sym_count; i++) {
 		uint32_t bits = sym_bits[i];
-		if (bits > UFBXI_HUFF_MAX_BITS) return 0; 
+		ufbx_assert(bits <= UFBXI_HUFF_MAX_BITS);
 		bits_counts[bits]++;
 	}
+	uint32_t nonzero_sym_count = sym_count - bits_counts[0];
 
 	uint32_t total_syms[UFBXI_HUFF_MAX_BITS];
 	uint32_t first_code[UFBXI_HUFF_MAX_BITS];
@@ -213,18 +217,23 @@ ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 	tree->past_max_code[0] = 0;
 	total_syms[0] = 0;
 
+	int num_codes_left = 1;
 	uint32_t code = 0;
 	uint32_t prev_count = 0;
 	for (uint32_t bits = 1; bits < UFBXI_HUFF_MAX_BITS; bits++) {
 		uint32_t count = bits_counts[bits];
 		code = (code + prev_count) << 1;
-		if (code > UINT16_MAX) return 0;
 		first_code[bits] = code;
 		tree->past_max_code[bits] = (uint16_t)(code + count);
-		if (tree->past_max_code[bits] > 1 << bits) return 0;
 
 		uint32_t prev_syms = total_syms[bits - 1];
 		total_syms[bits] = prev_syms + count;
+
+		// Each bit level doubles the amount of codes and potentially removes some
+		num_codes_left = (num_codes_left << 1) - count;
+		if (num_codes_left < 0) {
+			return 0;
+		}
 
 		if (count > 0) {
 			tree->code_to_sorted[bits] = (int16_t)((int)prev_syms - (int)code);
@@ -232,6 +241,33 @@ ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 			tree->code_to_sorted[bits] = INT16_MAX;
 		}
 		prev_count = count;
+	}
+
+	// All codes should be used if there's more than one symbol
+	if (nonzero_sym_count > 1 && num_codes_left != 0) {
+		return 0;
+	}
+
+	if (nonzero_sym_count == 1) {
+		// Special case for single symbol alphabets: Both 0 and 1 map to the symbol
+
+		// Find the non-zero symbol
+		uint32_t sym = ~0u;
+		for (uint32_t i = 0; i < sym_count; i++) {
+			if (sym_bits[i] != 0) {
+				sym = i;
+				break;
+			}
+		}
+		ufbx_assert(sym != ~0u);
+
+		// Because `fast_sym` is filled the slow path is never taken
+		// and we can ignore the `sorted_to_sym` and `code_to_sorted` tables.
+		const uint16_t fast_sym = sym | 1 << 12; // All fast symbols are equal with a single bit
+		for (uint32_t i = 0; i <= UFBXI_HUFF_FAST_MASK; i++) {
+			tree->fast_sym[i] = fast_sym;
+		}
+		return 1;
 	}
 
 	memset(tree->fast_sym, 0, sizeof(tree->fast_sym));
@@ -289,26 +325,27 @@ ufbxi_huff_decode_bits(const ufbxi_huff_tree *tree, uint64_t *p_bits, uint64_t *
 		}
 	}
 
+	ufbx_assert(0 && "Bad Huffman tree");
 	return ~0u;
 }
 
 static void
 ufbxi_init_static_huff(ufbxi_deflate_context *dc)
 {
-	int ok;
+	int ok = 1;
 
 	uint8_t lit_length_bits[288];
 	memset(lit_length_bits +   0, 8, 144 -   0);
 	memset(lit_length_bits + 144, 9, 256 - 144);
 	memset(lit_length_bits + 256, 7, 280 - 256);
 	memset(lit_length_bits + 280, 8, 288 - 280);
-	ok = ufbxi_huff_build(&dc->huff_lit_length, lit_length_bits, sizeof(lit_length_bits));
-	ufbx_assert(ok != 0);
+	ok &= ufbxi_huff_build(&dc->huff_lit_length, lit_length_bits, sizeof(lit_length_bits));
 
 	uint8_t dist_bits[32];
 	memset(dist_bits + 0, 5, 32 - 0);
-	ok = ufbxi_huff_build(&dc->huff_dist, dist_bits, sizeof(dist_bits));
-	ufbx_assert(ok != 0);
+	ok &= ufbxi_huff_build(&dc->huff_dist, dist_bits, sizeof(dist_bits));
+
+	ufbx_assert(ok == 1);
 }
 
 static ufbxi_noinline int
@@ -316,7 +353,7 @@ ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *h
 	ufbxi_huff_tree *tree, uint32_t num_symbols, uint64_t *p_pos)
 {
 	uint8_t code_lengths[UFBXI_HUFF_MAX_VALUE];
-	if (num_symbols > UFBXI_HUFF_MAX_VALUE) return 0;
+	ufbx_assert(num_symbols <= UFBXI_HUFF_MAX_VALUE);
 	uint64_t pos = *p_pos;
 
 	uint32_t symbol_index = 0;
@@ -325,35 +362,47 @@ ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *h
 		uint64_t bits = ufbxi_bit_read(&dc->stream, pos);
 
 		uint32_t inst = ufbxi_huff_decode_bits(huff_code_length, &bits, &pos);
+		ufbx_assert(inst <= 18);
+
 		if (inst <= 15) {
 			prev = (uint8_t)inst;
 			code_lengths[symbol_index++] = (uint8_t)inst;
 		} else if (inst == 16) {
 			uint32_t num = 3 + ((uint32_t)bits & 0x3);
 			pos += 2;
-			if (symbol_index + num > num_symbols) return 0;
+			if (symbol_index + num > num_symbols) {
+				*dc->error = "Codelen 16 overflow";
+				return 0;
+			}
 			memset(code_lengths + symbol_index, prev, num);
 			symbol_index += num;
 		} else if (inst == 17) {
 			uint32_t num = 3 + ((uint32_t)bits & 0x7);
 			pos += 3;
-			if (symbol_index + num > num_symbols) return 0;
+			if (symbol_index + num > num_symbols) {
+				*dc->error = "Codelen 17 overflow";
+				return 0;
+			}
 			memset(code_lengths + symbol_index, 0, num);
 			symbol_index += num;
 			prev = 0;
 		} else if (inst == 18) {
 			uint32_t num = 11 + ((uint32_t)bits & 0x7f);
 			pos += 7;
-			if (symbol_index + num > num_symbols) return 0;
+			if (symbol_index + num > num_symbols) {
+				*dc->error = "Codelen 18 overflow";
+				return 0;
+			}
 			memset(code_lengths + symbol_index, 0, num);
 			symbol_index += num;
 			prev = 0;
-		} else {
-			return 0;
 		}
 	}
 
-	if (!ufbxi_huff_build(tree, code_lengths, num_symbols)) return 0;
+	if (!ufbxi_huff_build(tree, code_lengths, num_symbols)) {
+		*dc->error = "Bad Huffman";
+		return 0;
+	}
 
 	*p_pos = pos;
 	return 1;
@@ -369,9 +418,6 @@ ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, uint64_t *p_pos)
 	uint32_t num_lit_lengths = 257 + (bits & 0x1f);
 	uint32_t num_dists = 1 + (bits >> 5 & 0x1f);
 	uint32_t num_code_lengths = 4 + (bits >> 10 & 0xf);
-	if (num_lit_lengths > 288) return 0;
-	if (num_dists > 32) return 0;
-	if (num_code_lengths > 19) return 0;
 
 	uint8_t code_lengths[19];
 	memset(code_lengths, 0, sizeof(code_lengths));
@@ -385,6 +431,7 @@ ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, uint64_t *p_pos)
 
 	ufbxi_huff_tree huff_code_length;
 	if (!ufbxi_huff_build(&huff_code_length, code_lengths, ufbxi_arraycount(code_lengths))) {
+		*dc->error = "Bad Codelen Huffman";
 		return 0;
 	}
 	if (!ufbxi_init_dynamic_huff_tree(dc, &huff_code_length, &dc->huff_lit_length, num_lit_lengths, &pos)) {
@@ -433,7 +480,7 @@ ufbxi_adler32(const void *data, size_t size)
 		b %= 65521u;
 	}
 
-	return (b << 16) | (a & 0xffff);
+	return (uint32_t)((b << 16) | (a & 0xffff));
 }
 
 static int
@@ -449,12 +496,16 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 
 		// Decode literal/length value from input stream
 		uint32_t lit_length = ufbxi_huff_decode_bits(&dc->huff_lit_length, &bits, &pos); // 49 bits
+		ufbx_assert(lit_length <= 285);
 
 		// If value < 256: copy value (literal byte) to output stream
 		if (lit_length < 256) {
-			if (out_ptr == out_end) return 0;
+			if (out_ptr == out_end) {
+				*dc->error = "Literal overflow";
+				return 0;
+			}
 			*out_ptr++ = (char)lit_length;
-		} else if (lit_length - 257 <= 285 - 257) {
+		} else if (lit_length != 256) {
 			// If value = 257..285: Decode extra length and distance
 			uint32_t length, distance;
 
@@ -472,7 +523,10 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 			// Distance
 			{
 				uint32_t dist = ufbxi_huff_decode_bits(&dc->huff_dist, &bits, &pos); // 19 bits
-				if (dist >= 30) return 0;
+				if (dist >= 30) {
+					*dc->error = "Bad match distance";
+					return 0;
+				}
 				uint32_t lut = ufbxi_deflate_dist_lut[dist];
 				uint32_t base = lut >> 17;
 				uint32_t offset = ((uint32_t)bits & lut & 0x1fff); // 6 bits
@@ -482,8 +536,10 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 				distance = base + offset;
 			}
 
-			if (distance > out_ptr - out_begin) return 0;
-			if (length > out_end - out_ptr) return 0;
+			if (distance > out_ptr - out_begin || length > out_end - out_ptr) {
+				*dc->error = "Match out of bounds";
+				return 0;
+			}
 
 			// TODO: Do something better than per-byte copy
 			const char *src_ptr = out_ptr - distance;
@@ -504,13 +560,19 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 }
 
 static int
-ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
+ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size, const char **error)
 {
 	ufbxi_deflate_context dc;
 	ufbxi_bit_init(&dc.stream, src, src_size);
 	dc.out_begin = (char*)dst;
 	dc.out_ptr = (char*)dst;
 	dc.out_end = (char*)dst + dst_size;
+	const char *null_error;
+	if (error) {
+		dc.error = error;
+	} else {
+		dc.error = &null_error;
+	}
 
 	uint64_t pos = 0;
 	uint64_t bits = ufbxi_bit_read(&dc.stream, pos);
@@ -522,9 +584,18 @@ ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 		bits >>= 16;
 		pos += 16;
 
-		if ((cmf & 0xf) != 0x8) return 0; // Unknown compression method
-		if ((flg & 0x20) != 0) return 0; // Requires dictionary
-		if ((cmf << 8 | flg) % 31u != 0) return 0; // Bad FCHECK
+		if ((cmf & 0xf) != 0x8) {
+			*dc.error = "Bad compression method";
+			return 0;
+		}
+		if ((flg & 0x20) != 0) {
+			*dc.error = "Requires dictionary";
+			return 0;
+		}
+		if ((cmf << 8 | flg) % 31u != 0) {
+			*dc.error = "Bad FCHECK";
+			return 0;
+		}
 	}
 
 	for (;;) { 
@@ -543,11 +614,20 @@ ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 
 			// Literal header: [0:2] LEN [2:4] NLEN = ~LEN
 			const uint8_t *src_pos = (const uint8_t*)src + byte_pos;
-			uint16_t len = ufbxi_read_u16(src_pos);
-			uint16_t nlen = ufbxi_read_u16(src_pos + 2);
-			if (len != (uint16_t)~nlen) return 0;
-			if (src_size - byte_pos < len) return 0;
-			if (dc.out_end - dc.out_ptr < len) return 0;
+			size_t len = ufbxi_read_u16(src_pos);
+			size_t nlen = ufbxi_read_u16(src_pos + 2);
+			if ((len ^ nlen) != 0xffff) {
+				*dc.error = "Bad NLEN";
+				return 0;
+			}
+			if (src_size - byte_pos < len + 4) {
+				*dc.error = "Uncompressed src overflow";
+				return 0;
+			}
+			if (dc.out_end - dc.out_ptr < len) {
+				*dc.error = "Uncompressed dst overflow";
+				return 0;
+			}
 
 			// Copy literal data (skipping header) and advance
 			memcpy(dc.out_ptr, src_pos + 4, len);
@@ -558,12 +638,13 @@ ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 				// TODO: Cache the trees?
 				ufbxi_init_static_huff(&dc);
 			} else { 
-				ufbxi_init_dynamic_huff(&dc, &pos);
+				if (!ufbxi_init_dynamic_huff(&dc, &pos)) return 0;
 			}
 
 			if (!ufbxi_inflate_block(&dc, &pos)) return 0;
 		} else {
 			// 0b11 - reserved (error)
+			*dc.error = "Bad block type";
 			return 0;
 		}
 
@@ -575,11 +656,17 @@ ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 	{
 		// Round up to the next byte
 		size_t byte_pos = (size_t)((pos + 7) >> 3);
-		if (src_size - byte_pos < 4) return 0;
+		if (src_size - byte_pos < 4) {
+			*dc.error = "Truncated checksum";
+			return 0;
+		}
 		const uint8_t *p = (const uint8_t*)src + byte_pos;
 		uint32_t ref = p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3];
 		uint32_t checksum = ufbxi_adler32(dc.out_begin, dc.out_ptr - dc.out_begin);
-		if (ref != checksum) return 0;
+		if (ref != checksum) {
+			*dc.error = "Checksum mismatch";
+			return 0;
+		}
 	}
 
 	return 1;

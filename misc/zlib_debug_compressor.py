@@ -90,7 +90,10 @@ class Literal:
     def encode(self, buf, litlen_syms, dist_syms):
         for c in self.data:
             sym = litlen_syms[c]
-            buf.push_rev_code(sym, "Literal '{}' (0x{:02x})".format(chr(c), c))
+            if c >= 32 and c <= 128:
+                buf.push_rev_code(sym, "Literal '{}' (0x{:02x})".format(chr(c), c))
+            else:
+                buf.push_rev_code(sym, "Literal {:3d} (0x{:02x})".format(c, c))
 
     def decode(self, result):
         result += self.data
@@ -504,7 +507,13 @@ def print_buf(buf):
         val = " {0:0{1}b}".format(d.value, d.bits)
         if len(val) > 16:
             val = "({0})".format(d.value, d.bits)
-        print("{0:>5} {0:>4x} |{1:>2} | {2:>10} | {3:>4} | {4}".format(d.offset, d.bits, val, d.value, d.desc))
+        desc = d.desc
+        patched_value = (buf.data >> d.offset) & ((1 << d.bits) - 1)
+        spacer = "|"
+        if patched_value != d.value:
+            desc += "  >>> Patched to: {0:0{1}b} ({0})".format(patched_value, d.bits)
+            spacer = ">"
+        print("{0:>4} {0:>4x} {5}{1:>2} {5} {2:>10} {5} {3:>4} {5} {4}".format(d.offset, d.bits, val, d.value, desc, spacer))
 
 def print_bytes(data):
     print(''.join('\\x%02x' % b for b in data))
