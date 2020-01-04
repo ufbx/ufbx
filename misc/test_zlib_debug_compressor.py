@@ -2,18 +2,18 @@ import zlib_debug_compressor as zz
 import zlib
 import sys
 
-def test_deflate_dynamic():
+def test_dynamic():
     """Simple dynamic Huffman tree compressed block"""
-    opts = zz.Options(allow_block_types=[2])
+    opts = zz.Options(force_block_types=[2])
     data = b"Hello Hello!"
     return data, zz.deflate(data, opts)
 
-def test_deflate_repeat_length():
+def test_repeat_length():
     """Dynamic Huffman compressed block with repeat lengths"""
     data = b"ABCDEFGHIJKLMNOPQRSTUVWXYZZYXWVUTSRQPONMLKJIHGFEDCBA"
     return data, zz.deflate(data)
 
-def test_deflate_huff_lengths():
+def test_huff_lengths():
     """Test all possible lit/len code lengths"""
     data = b"0123456789ABCDE"
     freq = 1
@@ -21,13 +21,20 @@ def test_deflate_huff_lengths():
     for c in data:
         probs[c] = freq
         freq *= 2
-    opts = zz.Options(allow_block_types=[2], override_litlen_counts=probs)
+    opts = zz.Options(force_block_types=[2], override_litlen_counts=probs)
+    return data, zz.deflate(data, opts)
+
+def test_multi_part_matches():
+    """Matches that refer to earlier compression blocks"""
+    data = b"Test Part Data Data Test Data Part New Test Data"
+    opts = zz.Options(block_size=4, force_block_types=[0,1,2,0,1,2])
     return data, zz.deflate(data, opts)
 
 test_cases = [
-    test_deflate_dynamic,
-    test_deflate_repeat_length,
-    test_deflate_huff_lengths,
+    test_dynamic,
+    test_repeat_length,
+    test_huff_lengths,
+    test_multi_part_matches,
 ]
 
 good = True

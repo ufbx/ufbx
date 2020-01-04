@@ -5,10 +5,11 @@ class Options:
     def __init__(self, **kwargs):
         self.override_litlen_counts = kwargs.get("override_litlen_counts", { })
         self.max_uncompressed_length = kwargs.get("max_uncompressed_length", 0xffff)
-        self.prune_interval = kwargs.get("prune_interval", 1024)
+        self.prune_interval = kwargs.get("prune_interval", 65536)
         self.max_match_distance = kwargs.get("max_match_distance", 32768)
         self.search_budget = kwargs.get("search_budget", 4096)
-        self.allow_block_types = kwargs.get("allow_block_types", [0,1,2])
+        self.force_block_types = kwargs.get("force_block_types", [])
+        self.block_size = kwargs.get("block_size", 32768)
 
 Code = namedtuple("Code", "code bits")
 IntCoding = namedtuple("IntCoding", "symbol base bits")
@@ -80,6 +81,7 @@ class BitBuf:
 class Literal:
     def __init__(self, data):
         self.data = data
+        self.length = len(data)
 
     def count_codes(self, litlen_count, dist_count):
         for c in self.data:
@@ -92,6 +94,10 @@ class Literal:
 
     def decode(self, result):
         result += self.data
+
+    def split(self, pos):
+        assert pos >= 0
+        return Literal(self.data[:pos]), Literal(self.data[pos:])
 
     def __repr__(self):
         return "Literal({!r})".format(self.data)
@@ -120,12 +126,15 @@ class Match:
         buf.push_rev_code(dsym, "Distance: {}".format(self.distance))
         if self.dcode.bits > 0:
             buf.push(self.distance - self.dcode.base, self.dcode.bits, "Distance extra")
-    
+
     def decode(self, result):
         begin = len(result) - self.distance
         assert begin >= 0
         for n in range(begin, begin + self.length):
             result.append(result[n])
+
+    def split(self, pos):
+        return self, Literal(b"")
 
     def __repr__(self):
         return "Match({}, {})".format(self.length, self.distance)
@@ -293,8 +302,7 @@ def match_block(data, opts=Options()):
 
     return message
 
-def compress_block_uncompressed(buf, message, final, opts):
-    data = decode(message)
+def compress_block_uncompressed(buf, data, align, final, opts):
     size = len(data)
     begin = 0
     while begin < size:
@@ -304,7 +312,7 @@ def compress_block_uncompressed(buf, message, final, opts):
         buf.push(real_final, 1, "BFINAL      Final chunk: {}".format(real_final))
         buf.push(0b00, 2,       "BTYPE       Chunk type: Uncompressed")
 
-        buf.push(0, -buf.pos & 7, "Pad to byte")
+        buf.push(0, -(buf.pos + align) & 7, "Pad to byte")
 
         buf.push(amount, 16, "LEN: {}".format(amount))
         buf.push(~amount&0xffff, 16, "NLEN: ~{}".format(amount))
@@ -412,26 +420,67 @@ def compress_message(message, opts=Options()):
     buf.push(0, 1,  "FDICT=0     Preset dictionary: No")
     buf.push(2, 2,  "FLEVEL=2    Compression level: Default")
 
-    best_buf = None
-    for block_type in range(3):
-        if block_type not in opts.allow_block_types: continue
-        block_buf = BitBuf()
+    byte_offset = 0
+    part_pos = 0
+    block_index = 0
+    num_parts = len(message)
+    overflow_part = Literal(b"")
+    block_message = []
 
-        if block_type == 0:
-            compress_block_uncompressed(block_buf, message, True, opts)
-        elif block_type == 1:
-            compress_block_static(block_buf, message, True, opts)
-        elif block_type == 2:
-            compress_block_dynamic(block_buf, message, True, opts)
+    message_bytes = decode(message)
 
-        if not best_buf or block_buf.pos < best_buf.pos:
-            best_buf = block_buf
+    last_part = False
+    while not last_part:
+        block_message.clear()
 
-    buf.append(best_buf)
+        part, overflow_part = overflow_part.split(opts.block_size)
+        if part.length > 0:
+            block_message.append(part)
+        size = part.length
+
+        # Append parts until desired block size is reached
+        if size < opts.block_size:
+            while part_pos < num_parts:
+                part = message[part_pos]
+                part_pos += 1
+                if size + part.length >= opts.block_size:
+                    last_part, overflow_part = part.split(opts.block_size - size)
+                    if last_part.length > 0:
+                        block_message.append(last_part)
+                    size += last_part.length
+                    break
+                else:
+                    block_message.append(part)
+                    size += part.length
+
+        last_part = part_pos >= num_parts and overflow_part.length == 0
+
+        # Compress the block
+        best_buf = None
+        for block_type in range(3):
+            if block_index < len(opts.force_block_types):
+                if block_type != opts.force_block_types[block_index]:
+                    continue
+
+            block_buf = BitBuf()
+
+            if block_type == 0:
+                compress_block_uncompressed(block_buf, message_bytes[byte_offset:byte_offset + size], buf.pos, last_part, opts)
+            elif block_type == 1:
+                compress_block_static(block_buf, block_message, last_part, opts)
+            elif block_type == 2:
+                compress_block_dynamic(block_buf, block_message, last_part, opts)
+
+            if not best_buf or block_buf.pos < best_buf.pos:
+                best_buf = block_buf
+
+        buf.append(best_buf)
+        byte_offset += size
+        block_index += 1
 
     buf.push(0, -buf.pos & 7, "Pad to byte")
 
-    adler_hash = adler32(decode(message))
+    adler_hash = adler32(message_bytes)
 
     buf.push((adler_hash >> 24) & 0xff, 8, "Adler[24:32]")
     buf.push((adler_hash >> 16) & 0xff, 8, "Adler[16:24]")
