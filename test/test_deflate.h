@@ -473,3 +473,38 @@ UFBXT_TEST(deflate_fail_bad_distance)
 	ufbxt_assert(res == -11);
 }
 #endif
+
+UFBXT_TEST(deflate_fail_literal_overflow)
+#if UFBXT_IMPL
+{
+	const char src[] = "x\xda\xf3H\xcd\xc9\xc9W(\xcf/\xcaIQ\x04\x00\x1d\t\x04^";
+	char dst[8];
+	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+	ufbxt_hintf("res = %d", (int)res);
+	ufbxt_assert(res == -10);
+}
+#endif
+
+UFBXT_TEST(deflate_fail_match_overflow)
+#if UFBXT_IMPL
+{
+	const char src[] = "x\xda\xf3H\xcd\xc9\xc9W\xf0\x00\x91\x8a\x00\x1b\xbb\x04*";
+	char dst[8];
+	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+	ufbxt_hintf("res = %d", (int)res);
+	ufbxt_assert(res == -12);
+}
+#endif
+
+UFBXT_TEST(deflate_fail_bad_distance_bit)
+#if UFBXT_IMPL
+{
+	const char src[] = "\x78\x9c\x0d\xc3\x41\x09\x00\x00\x00\xc2\xc0\x2a\x56\x13"
+		"\x6c\x60\x7f\xd8\x1e\xd7\x2f\x06\x0a\x41\x02\x91";
+	char dst[8];
+	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+	ufbxt_hintf("res = %d", (int)res);
+	ufbxt_assert(res == -11);
+}
+#endif
+

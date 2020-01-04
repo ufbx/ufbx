@@ -118,6 +118,17 @@ def test_fail_bad_distance():
     
     return data, buf
 
+def test_fail_bad_distance_bit():
+    """Test bad distance symbol in one symbol alphabet"""
+    data = b"asd asd"
+    opts = zz.Options(force_block_types=[2])
+    buf = zz.deflate(data, opts)
+    
+    # Distance code 1
+    buf.patch(0xaa, 0b1, 1)
+    
+    return data, buf
+
 test_cases = [
     test_dynamic,
     test_repeat_length,

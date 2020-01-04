@@ -249,28 +249,6 @@ ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 		return -2;
 	}
 
-	if (nonzero_sym_count == 1) {
-		// Special case for single symbol alphabets: Both 0 and 1 map to the symbol
-
-		// Find the non-zero symbol
-		uint32_t sym = ~0u;
-		for (uint32_t i = 0; i < sym_count; i++) {
-			if (sym_bits[i] != 0) {
-				sym = i;
-				break;
-			}
-		}
-		ufbx_assert(sym != ~0u);
-
-		// Because `fast_sym` is filled the slow path is never taken
-		// and we can ignore the `sorted_to_sym` and `code_to_sorted` tables.
-		const uint16_t fast_sym = sym | 1 << 12; // All fast symbols are equal with a single bit
-		for (uint32_t i = 0; i <= UFBXI_HUFF_FAST_MASK; i++) {
-			tree->fast_sym[i] = fast_sym;
-		}
-		return 0;
-	}
-
 	memset(tree->fast_sym, 0, sizeof(tree->fast_sym));
 
 	uint32_t bits_index[UFBXI_HUFF_MAX_BITS];
@@ -326,7 +304,6 @@ ufbxi_huff_decode_bits(const ufbxi_huff_tree *tree, uint64_t *p_bits, uint64_t *
 		}
 	}
 
-	ufbx_assert(0 && "Bad Huffman tree");
 	return ~0u;
 }
 
@@ -560,7 +537,7 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 // -8: Truncated checksum
 // -9: Checksum mismatch
 // -10: Literal destination overflow
-// -11: Bad match distance (30..31)
+// -11: Bad match distance (30..31) or bad symbol in single-symbol tree
 // -12: Match out of bounds
 // -13: Codelen Huffman Overfull
 // -14: Codelen Huffman Underfull
