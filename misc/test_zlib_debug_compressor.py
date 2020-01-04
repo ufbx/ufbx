@@ -37,7 +37,7 @@ def test_fail_codelen_16_overflow():
     buf = zz.deflate(data, opts)
     
     # Patch Litlen 254-256 repeat extra N to 4
-    buf.data |= 1 << 0x66
+    buf.patch(0x66, 1, 2)
 
     return data, buf
 
@@ -48,7 +48,7 @@ def test_fail_codelen_17_overflow():
     buf = zz.deflate(data, opts)
     
     # Patch Litlen 254-256 zero extra N to 5
-    buf.data |= 2 << 0x6c
+    buf.patch(0x6c, 2, 3)
 
     return data, buf
 
@@ -59,7 +59,7 @@ def test_fail_codelen_18_overflow():
     buf = zz.deflate(data, opts)
     
     # Patch Litlen 254-256 extra N to 13
-    buf.data |= 2 << 0x6a
+    buf.patch(0x6a, 2, 7)
 
     return data, buf
 
@@ -70,7 +70,7 @@ def test_fail_codelen_overfull():
     buf = zz.deflate(data, opts)
     
     # Over-filled Huffman tree
-    buf.data |= 1 << 0x30
+    buf.patch(0x30, 1, 3)
 
     return data, buf
 
@@ -81,8 +81,7 @@ def test_fail_codelen_underfull():
     buf = zz.deflate(data, opts)
     
     # Under-filled Huffman tree
-    buf.data &= ~(0b111 << 0x4e)
-    buf.data |= 5 << 0x4e
+    buf.patch(0x4e, 5, 3)
     
     return data, buf
 
@@ -93,8 +92,7 @@ def test_fail_litlen_bad_huffman():
     buf = zz.deflate(data, opts)
     
     # Under-filled Huffman tree
-    buf.data &= ~(0b11 << 0x6d)
-    buf.data |= 0b01 << 0x6d
+    buf.patch(0x6d, 1, 2)
 
     return data, buf
 
@@ -105,10 +103,21 @@ def test_fail_distance_bad_huffman():
     buf = zz.deflate(data, opts)
     
     # Under-filled Huffman tree
-    buf.data &= ~(0b1111 << 0xb1)
-    buf.data |= 0b1111 << 0xb1
+    buf.patch(0xb1, 0b1111, 4)
 
     return data, buf
+
+def test_fail_bad_distance():
+    """Test bad distance symbol (30..31)"""
+    data = b"Dist Dist"
+    opts = zz.Options(force_block_types=[1])
+    buf = zz.deflate(data, opts)
+    
+    # Distance symbol 30
+    buf.patch(0x42, 0b01111, 5)
+    
+    return data, buf
+
 test_cases = [
     test_dynamic,
     test_repeat_length,
@@ -127,11 +136,6 @@ for case in test_cases:
     except Exception as e:
         print("{}: FAIL ({})".format(case.__name__, e))
         good = False
-
-_, buf = test_fail_codelen_underfull()
-zz.print_buf(buf)
-zz.print_bytes(buf.to_bytes())
-zlib.decompress(buf.to_bytes())
 
 sys.exit(0 if good else 1)
         

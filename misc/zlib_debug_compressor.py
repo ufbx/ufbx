@@ -73,7 +73,9 @@ class BitBuf:
             self.desc.append(desc._replace(offset = desc.offset + self.pos))
         self.data |= buf.data << self.pos
         self.pos += buf.pos
-        
+
+    def patch(self, offset, value, bits, desc=""):
+        self.data = self.data & ~(((1 << bits) - 1) << offset) | (value << offset)
 
     def to_bytes(self):
         return bytes((self.data>>p&0xff) for p in range(0, self.pos, 8))
