@@ -63,8 +63,8 @@ def test_fail_codelen_18_overflow():
 
     return data, buf
 
-def test_fail_codelen_bad_huffman():
-    """Test bad codelen Huffman tree"""
+def test_fail_codelen_overfull():
+    """Test bad codelen Huffman tree with too many symbols"""
     data = b"Codelen"
     opts = zz.Options(force_block_types=[2])
     buf = zz.deflate(data, opts)
@@ -72,6 +72,18 @@ def test_fail_codelen_bad_huffman():
     # Over-filled Huffman tree
     buf.data |= 1 << 0x30
 
+    return data, buf
+
+def test_fail_codelen_underfull():
+    """Test bad codelen Huffman tree too few symbols"""
+    data = b"Codelen"
+    opts = zz.Options(force_block_types=[2])
+    buf = zz.deflate(data, opts)
+    
+    # Under-filled Huffman tree
+    buf.data &= ~(0b111 << 0x4e)
+    buf.data |= 5 << 0x4e
+    
     return data, buf
 
 def test_fail_litlen_bad_huffman():
@@ -115,6 +127,11 @@ for case in test_cases:
     except Exception as e:
         print("{}: FAIL ({})".format(case.__name__, e))
         good = False
+
+_, buf = test_fail_codelen_underfull()
+zz.print_buf(buf)
+zz.print_bytes(buf.to_bytes())
+zlib.decompress(buf.to_bytes())
 
 sys.exit(0 if good else 1)
         
