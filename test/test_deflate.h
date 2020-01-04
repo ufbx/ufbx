@@ -518,6 +518,7 @@ UFBXT_TEST(deflate_bit_flip)
 		"\x12\x80\xf9\xa5\x96\x23\x84\x00\x8e\x36\x10\x41";
 
 	char dst[64];
+	int num_res[64] = { 0 };
 
 	for (size_t byte_ix = 0; byte_ix < sizeof(src) - 1; byte_ix++) {
 		for (size_t bit_ix = 0; bit_ix < 8; bit_ix++) {
@@ -526,8 +527,24 @@ UFBXT_TEST(deflate_bit_flip)
 			ufbxt_hintf("byte_ix==%u && bit_ix==%u", (unsigned)byte_ix, (unsigned)bit_ix);
 
 			src[byte_ix] ^= bit;
-			ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+			ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 			src[byte_ix] ^= bit;
+
+			res = -res;
+			if (res < 0) res = 0;
+			if (res > ufbxi_arraycount(num_res)) res = ufbxi_arraycount(num_res);
+			num_res[res]++;
+		}
+	}
+
+	char line[128], *ptr = line, *end = line + sizeof(line);
+	for (size_t i = 0; i < ufbxi_arraycount(num_res); i++) {
+		if (num_res[i] > 0) {
+			ptr += snprintf(ptr, end - ptr, "%3d:%3d    ", -(int)i, num_res[i]);
+			if (ptr - line > 70) {
+				ufbxt_logf("%s", line);
+				ptr = line;
+			}
 		}
 	}
 }
