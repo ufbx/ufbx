@@ -391,7 +391,7 @@ UFBXT_TEST(deflate_fail_codelen_16_overflow)
 	char dst[64];
 	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 	ufbxt_hintf("res = %d", (int)res);
-	ufbxt_assert(res == -17);
+	ufbxt_assert(res == -18);
 }
 #endif
 
@@ -402,7 +402,7 @@ UFBXT_TEST(deflate_fail_codelen_17_overflow)
 	char dst[64];
 	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 	ufbxt_hintf("res = %d", (int)res);
-	ufbxt_assert(res == -18);
+	ufbxt_assert(res == -19);
 }
 #endif
 
@@ -413,7 +413,7 @@ UFBXT_TEST(deflate_fail_codelen_18_overflow)
 	char dst[64];
 	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 	ufbxt_hintf("res = %d", (int)res);
-	ufbxt_assert(res == -19);
+	ufbxt_assert(res == -20);
 }
 #endif
 
@@ -424,7 +424,7 @@ UFBXT_TEST(deflate_fail_codelen_overfull)
 	char dst[64];
 	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 	ufbxt_hintf("res = %d", (int)res);
-	ufbxt_assert(res == -13);
+	ufbxt_assert(res == -14);
 }
 #endif
 
@@ -435,7 +435,7 @@ UFBXT_TEST(deflate_fail_codelen_underfull)
 	char dst[64];
 	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 	ufbxt_hintf("res = %d", (int)res);
-	ufbxt_assert(res == -14);
+	ufbxt_assert(res == -15);
 }
 #endif
 
@@ -447,7 +447,7 @@ UFBXT_TEST(deflate_fail_litlen_bad_huffman)
 	char dst[64];
 	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 	ufbxt_hintf("res = %d", (int)res);
-	ufbxt_assert(res == -16);
+	ufbxt_assert(res == -17);
 }
 #endif
 
@@ -459,7 +459,7 @@ UFBXT_TEST(deflate_fail_distance_bad_huffman)
 	char dst[64];
 	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 	ufbxt_hintf("res = %d", (int)res);
-	ufbxt_assert(res == -21);
+	ufbxt_assert(res == -23);
 }
 #endif
 
@@ -505,6 +505,31 @@ UFBXT_TEST(deflate_fail_bad_distance_bit)
 	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 	ufbxt_hintf("res = %d", (int)res);
 	ufbxt_assert(res == -11);
+}
+#endif
+
+UFBXT_TEST(deflate_bit_flip)
+#if UFBXT_IMPL
+{
+	char src[] = "\x78\x9c\x00\x04\x00\xfb\xff\x54\x65\x73\x74\x52\x08"
+		"\x48\x2c\x02\x10\x00\x06\x32\x00\x00\x00\x0c\x52\x39\xcc\x45\x72\xc8"
+		"\x7f\xcd\x9d\x00\x08\x00\xf7\xff\x74\x61\x20\x44\x61\x74\x61\x20\x02"
+		"\x8b\x01\x38\x8c\x43\x12\x00\x00\x00\x00\x40\xff\x5f\x0b\x36\x8b\xc0"
+		"\x12\x80\xf9\xa5\x96\x23\x84\x00\x8e\x36\x10\x41";
+
+	char dst[64];
+
+	for (size_t byte_ix = 0; byte_ix < sizeof(src) - 1; byte_ix++) {
+		for (size_t bit_ix = 0; bit_ix < 8; bit_ix++) {
+			size_t bit = 1 << bit_ix;
+
+			ufbxt_hintf("byte_ix==%u && bit_ix==%u", (unsigned)byte_ix, (unsigned)bit_ix);
+
+			src[byte_ix] ^= bit;
+			ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+			src[byte_ix] ^= bit;
+		}
+	}
 }
 #endif
 

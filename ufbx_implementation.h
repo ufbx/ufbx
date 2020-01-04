@@ -198,7 +198,6 @@ ufbxi_bit_read(ufbxi_bit_stream *s, uint64_t offset_bits)
 static ufbxi_noinline ptrdiff_t
 ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 {
-	ufbx_assert(sym_count > 0);
 	ufbx_assert(sym_count <= UFBXI_HUFF_MAX_VALUE);
 	tree->num_symbols = sym_count;
 
@@ -332,6 +331,7 @@ ufbxi_init_static_huff(ufbxi_deflate_context *dc)
 // -3: Code 16 repeat overflow
 // -4: Code 17 repeat overflow
 // -5: Code 18 repeat overflow
+// -6: Bad length code
 static ufbxi_noinline ptrdiff_t
 ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *huff_code_length,
 	ufbxi_huff_tree *tree, uint32_t num_symbols, uint64_t *p_pos)
@@ -346,8 +346,6 @@ ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *h
 		uint64_t bits = ufbxi_bit_read(&dc->stream, pos);
 
 		uint32_t inst = ufbxi_huff_decode_bits(huff_code_length, &bits, &pos);
-		ufbx_assert(inst <= 18);
-
 		if (inst <= 15) {
 			prev = (uint8_t)inst;
 			code_lengths[symbol_index++] = (uint8_t)inst;
@@ -371,6 +369,8 @@ ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *h
 			memset(code_lengths + symbol_index, 0, num);
 			symbol_index += num;
 			prev = 0;
+		} else {
+			return -6;
 		}
 	}
 
@@ -405,11 +405,11 @@ ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, uint64_t *p_pos)
 	ufbxi_huff_tree huff_code_length;
 	ptrdiff_t err;
 	err = ufbxi_huff_build(&huff_code_length, code_lengths, ufbxi_arraycount(code_lengths));
-	if (err) return -13 + 1 + err;
+	if (err) return -14 + 1 + err;
 	err = ufbxi_init_dynamic_huff_tree(dc, &huff_code_length, &dc->huff_lit_length, num_lit_lengths, &pos);
-	if (err) return -15 + 1 + err;
+	if (err) return -16 + 1 + err;
 	err = ufbxi_init_dynamic_huff_tree(dc, &huff_code_length, &dc->huff_dist, num_dists, &pos);
-	if (err) return -20 + 1 + err;
+	if (err) return -22 + 1 + err;
 
 	*p_pos = pos;
 	return 0;
@@ -466,7 +466,6 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 
 		// Decode literal/length value from input stream
 		uint32_t lit_length = ufbxi_huff_decode_bits(&dc->huff_lit_length, &bits, &pos); // 49 bits
-		ufbx_assert(lit_length <= 285);
 
 		// If value < 256: copy value (literal byte) to output stream
 		if (lit_length < 256) {
@@ -474,7 +473,7 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 				return -10;
 			}
 			*out_ptr++ = (char)lit_length;
-		} else if (lit_length != 256) {
+		} else if (lit_length - 257 <= 285 - 257) {
 			// If value = 257..285: Decode extra length and distance
 			uint32_t length, distance;
 
@@ -516,8 +515,10 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 				char c = *src_ptr++;
 				*out_ptr++ = c;
 			} while (out_ptr != end);
-		} else {
+		} else if (lit_length == 256) {
 			break;
+		} else {
+			return -13;
 		}
 	}
 
@@ -539,10 +540,11 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 // -10: Literal destination overflow
 // -11: Bad match distance (30..31) or bad symbol in single-symbol tree
 // -12: Match out of bounds
-// -13: Codelen Huffman Overfull
-// -14: Codelen Huffman Underfull
-// -15 - -19: Litlen Huffman: Overfull / Underfull / Repeat 16/17/18 overflow
-// -20 - -24: Distance Huffman: Overfull / Underfull / Repeat 16/17/18 overflow
+// -13: Bad lit/length code
+// -14: Codelen Huffman Overfull
+// -15: Codelen Huffman Underfull
+// -16 - -21: Litlen Huffman: Overfull / Underfull / Repeat 16/17/18 overflow / Bad length code
+// -22 - -27: Distance Huffman: Overfull / Underfull / Repeat 16/17/18 overflow / Bad length code
 static ptrdiff_t
 ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 {
