@@ -1,6 +1,7 @@
 import zlib_debug_compressor as zz
 import zlib
 import sys
+import itertools
 
 def test_dynamic():
     """Simple dynamic Huffman tree compressed block"""
@@ -29,6 +30,40 @@ def test_multi_part_matches():
     data = b"Test Part Data Data Test Data Part New Test Data"
     opts = zz.Options(block_size=4, force_block_types=[0,1,2,0,1,2])
     return data, zz.deflate(data, opts)
+
+def test_match_distances_and_lengths():
+    """Test all possible match length and distance buckets"""
+    
+    lens = [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,
+            23,24,25,26,27,28,29,30,31,32,33,34,35,39,42,43,48,50,51,
+            55,58,59,63,66,67,70,82,83,90,98,99,105,114,115,120,130,
+            131,140,150,162,163,170,180,194,195,200,210,226,227,230,
+            240,250,257,258]
+    dists = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,20,24,25,28,
+             32,33,40,48,49,50,64,65,75,96,97,110,128,129,160,192,
+             193,230,256,257,330,384,385,400,512,513,600,768,769,
+             900,1024,1025,1250,1536,1537,1800,2048,2049,2500,3072,
+             3073,3500,4096,4097,5000,6144,6145,7000,8192,8193,10000,
+             12288,12289,14000,16384,16385,20000,24576,24577,25000,
+             26000, 27000, 28000, 29000, 30000, 31000, 32768, 32768+300]
+
+    message = []
+    
+    l_iter = itertools.chain(lens, itertools.repeat(lens[-1]))
+    lit_iter = itertools.cycle(b"Hello world!")
+    pos = 0
+    prev_d = 1
+    for d in dists:
+        while pos < d:
+            l = next(l_iter)
+            pos += l
+            message.append(zz.Literal(bytes([next(lit_iter)])))
+            message.append(zz.Match(l, prev_d))
+        prev_d = d
+
+    opts = zz.Options(block_size=4294967296)
+    data = zz.decode(message)
+    return data, zz.compress_message(message, opts)
 
 def test_fail_codelen_16_overflow():
     """Test oveflow of codelen symbol 16"""
@@ -129,11 +164,36 @@ def test_fail_bad_distance_bit():
     
     return data, buf
 
+def test_fail_bad_lit_length():
+    """Test bad lit/length symbol"""
+    data = b""
+    opts = zz.Options(force_block_types=[2])
+    buf = zz.deflate(data, opts)
+
+    # Patch end-of-block 0 to 1
+    buf.patch(0x6b, 0b1, 1)
+
+    return data, buf
+
+def fmt_bytes(data, cols=20):
+    lines = []
+    for begin in range(0, len(data), cols):
+        chunk = data[begin:begin+cols]
+        lines.append("\"" + "".join("\\x%02x" % c for c in chunk) + "\"")
+    return "\n".join(lines)
+
+def fnv1a(data):
+    h = 0x811c9dc5
+    for d in data:
+        h = ((h ^ d) * 0x01000193) & 0xffffffff
+    return h
+
 test_cases = [
     test_dynamic,
     test_repeat_length,
     test_huff_lengths,
     test_multi_part_matches,
+    test_match_distances_and_lengths,
 ]
 
 good = True

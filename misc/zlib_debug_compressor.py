@@ -507,8 +507,8 @@ def print_huffman(tree):
 def print_buf(buf):
     for d in buf.desc:
         val = " {0:0{1}b}".format(d.value, d.bits)
-        if len(val) > 16:
-            val = "({0})".format(d.value, d.bits)
+        if len(val) > 10:
+            val = "0x{0:x}".format(d.value)
         desc = d.desc
         patched_value = (buf.data >> d.offset) & ((1 << d.bits) - 1)
         spacer = "|"
