@@ -54,5 +54,5 @@ for r,dirs,files in os.walk(path):
         except Exception as e:
             print()
             print("FAIL ({})".format(e))
-            break
+            sys.exit(1)
         f.close()
