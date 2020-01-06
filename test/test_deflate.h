@@ -682,7 +682,7 @@ UFBXT_TEST(deflate_match_distances_and_lengths)
 }
 #endif
 
-UFBXT_TEST(deflate_fuzz_001)
+UFBXT_TEST(deflate_fuzz_1)
 #if UFBXT_IMPL
 {
 	const char src[] =
@@ -696,7 +696,7 @@ UFBXT_TEST(deflate_fuzz_001)
 }
 #endif
 
-UFBXT_TEST(deflate_fuzz_002)
+UFBXT_TEST(deflate_fuzz_2)
 #if UFBXT_IMPL
 {
 	const char src[] =
