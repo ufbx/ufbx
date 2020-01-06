@@ -313,6 +313,18 @@ UFBXT_TEST(deflate_multi_part_matches)
 }
 #endif
 
+UFBXT_TEST(deflate_uncompressed_bounds)
+#if UFBXT_IMPL
+{
+	const char src[] = "\x78\x9c\x01\x06\x00\xf9\xffHello!";
+
+	char dst[64];
+	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+	ufbxt_hintf("res = %d", (int)res);
+	ufbxt_assert(res == -8);
+}
+#endif
+
 UFBXT_TEST(deflate_fail_cfm)
 #if UFBXT_IMPL
 {
@@ -667,5 +679,33 @@ UFBXT_TEST(deflate_match_distances_and_lengths)
 		}
 		ufbxt_assert(h == 0x88398917);
 	}
+}
+#endif
+
+UFBXT_TEST(deflate_fuzz_001)
+#if UFBXT_IMPL
+{
+	const char src[] =
+		"\x78\x9c\x30\x04\x00\xfb\xff\x30\x30\x30\x30\x52\x30\x30\x30\x02\x10\x00\x06\x32"
+		"\x00\x00\x00\x0c\x52\x39\xcc\x45\x72\xc8\x7f\xcd\x9d\x30\x08\x00\xf7\xff\x30\x30"
+		"\x30\x30\x30\x30\x30\x30\x02\x8b\x01\x38\x8c\x43\x12\x00\x00\x00\x00\x40\xff\x5f"
+		"\x0b";
+
+	char dst[4096];
+	ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+}
+#endif
+
+UFBXT_TEST(deflate_fuzz_002)
+#if UFBXT_IMPL
+{
+	const char src[] =
+		"\x78\x9c\x00\x04\x00\xfb\xff\x54\x65\x73\x74\x52\x08\x48\x2c\x02\x10\x00\x06\x32"
+		"\x00\x00\x00\x0c\x52\x39\xcc\x45\x72\xc8\x7f\xcd\x9d\x00\x08\x00\xf7\xff\x74\x61"
+		"\x20\x44\x61\x74\x61\x20\x02\x8b\x01\x38\x8c\x43\x12\x00\x00\x00\x00\x40\xff\x5f"
+		"\x0b\x36\x8b\xc0\x12\x80\xf9\xa5\x92\x23\x84\x00\x8e\x36\x10\x41";
+
+	char dst[4096];
+	ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
 }
 #endif
