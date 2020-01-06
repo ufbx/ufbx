@@ -30,10 +30,18 @@ def test(data):
             raise ValueError("Decompression mismatch")
 
 for r,dirs,files in os.walk(path):
+    # HACK: Ignore .git directories
+    if ".git" in r:
+        continue
+    
     for file in files:
         sys.stdout.flush()
         path = os.path.join(r, file)
-        print(path, end=': ')
+        try:
+            print(path, end=': ')
+        except:
+            # Print fails sometimes with weird filenames (?)
+            continue
         try:
             f = open(path, "rb")
         except:
@@ -46,4 +54,5 @@ for r,dirs,files in os.walk(path):
         except Exception as e:
             print()
             print("FAIL ({})".format(e))
+            break
         f.close()
