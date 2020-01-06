@@ -522,6 +522,19 @@ UFBXT_TEST(deflate_fail_bad_distance_bit)
 }
 #endif
 
+UFBXT_TEST(deflate_fail_bad_distance_empty)
+#if UFBXT_IMPL
+{
+	const char src[] =
+		"\x78\x9c\x0d\xc4\x41\x09\x00\x00\x00\xc2\xc0\x2a\x56\x13\x6c\x60\x7f\xd8\x1e\xd0"
+		"\x2f\x02\x0a\x41\x02\x91";
+	char dst[8];
+	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+	ufbxt_hintf("res = %d", (int)res);
+	ufbxt_assert(res == -11);
+}
+#endif
+
 UFBXT_TEST(deflate_fail_bad_lit_length)
 #if UFBXT_IMPL
 {

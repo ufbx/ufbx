@@ -170,6 +170,19 @@ def test_fail_bad_distance_bit():
     
     return data, buf
 
+def test_fail_bad_distance_empty():
+    """Test using distance code from an empty tree"""
+    data = b"asd asd"
+    opts = zz.Options(force_block_types=[2])
+    buf = zz.deflate(data, opts)
+
+    # Add another distance code and replace distance 3 code for 1 (0111)
+    # with the code for 0 (00) for distances 3 and 4
+    buf.patch(0x18, 4, 5)
+    buf.patch(0x98, 0b0000, 4)
+    
+    return data, buf
+
 def test_fail_bad_lit_length():
     """Test bad lit/length symbol"""
     data = b""

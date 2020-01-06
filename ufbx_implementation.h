@@ -538,7 +538,7 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 // -8: Truncated checksum
 // -9: Checksum mismatch
 // -10: Literal destination overflow
-// -11: Bad match distance (30..31) or bad symbol in single-symbol tree
+// -11: Bad distance code or distance of (30..31)
 // -12: Match out of bounds
 // -13: Bad lit/length code
 // -14: Codelen Huffman Overfull
