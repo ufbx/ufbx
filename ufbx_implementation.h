@@ -527,6 +527,7 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 	return 0;
 }
 
+// TODO: Error codes should have a quick test if the destination buffer overflowed
 // Returns actual number of decompressed bytes or negative error:
 // -1: Bad compression method (ZLIB header)
 // -2: Requires dictionary (ZLIB header)

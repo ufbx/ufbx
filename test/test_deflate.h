@@ -255,6 +255,20 @@ UFBXT_TEST(deflate_dynamic_no_match)
 }
 #endif
 
+UFBXT_TEST(deflate_dynamic_rle)
+#if UFBXT_IMPL
+{
+	const char src[] =
+		"\x78\x9c\x5d\xc0\xb1\x00\x00\x00\x00\x80\x30\xb6\xfc\xa5\xfa\xb7\x34\x26\xea\x04"
+		"\x52";
+	char dst[64];
+	ptrdiff_t res = ufbxi_inflate(dst, sizeof(dst), src, sizeof(src) - 1);
+	ufbxt_hintf("res = %d", (int)res);
+	ufbxt_assert(res == 17);
+	ufbxt_assert(!memcmp(dst, "AAAAAAAAAAAAAAAAA", 17));
+}
+#endif
+
 UFBXT_TEST(deflate_repeat_length)
 #if UFBXT_IMPL
 {

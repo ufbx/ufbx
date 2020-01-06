@@ -15,6 +15,13 @@ def test_dynamic_no_match():
     data = b"Hello World!"
     return data, zz.deflate(data, opts)
 
+def test_dynamic_rle():
+    """Simple dynamic Huffman with a single repeating match"""
+    opts = zz.Options(force_block_types=[2])
+    data = b"AAAAAAAAAAAAAAAAA"
+    message = [zz.Literal(b"A"), zz.Match(16, 1)]
+    return data, zz.compress_message(message, opts)
+
 def test_repeat_length():
     """Dynamic Huffman compressed block with repeat lengths"""
     data = b"ABCDEFGHIJKLMNOPQRSTUVWXYZZYXWVUTSRQPONMLKJIHGFEDCBA"
@@ -210,6 +217,7 @@ def fnv1a(data):
 test_cases = [
     test_dynamic,
     test_dynamic_no_match,
+    test_dynamic_rle,
     test_repeat_length,
     test_huff_lengths,
     test_multi_part_matches,
