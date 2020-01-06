@@ -9,8 +9,6 @@
 #ifdef _WIN32
 	#include <fcntl.h>
 	#include <io.h>
-#else
-	// TODO: Implement binary stdin/stdout
 #endif
 
 int main(int argc, char **argv)
