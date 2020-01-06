@@ -585,13 +585,14 @@ ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 			// 0b00 - no compression
 			// Round up to the next byte
 			size_t byte_pos = (size_t)((pos + 7) >> 3);
+			bits >>= ((uint64_t)byte_pos << 3) - pos;
 
 			// Literal header: [0:2] LEN [2:4] NLEN = ~LEN
 			const uint8_t *src_pos = (const uint8_t*)src + byte_pos;
-			size_t len = ufbxi_read_u16(src_pos);
-			size_t nlen = ufbxi_read_u16(src_pos + 2);
+			size_t len = (size_t)(bits & 0xffff);
+			size_t nlen = (size_t)((bits >> 16) & 0xffff);
 			if ((len ^ nlen) != 0xffff) return -4;
-			if (src_size - byte_pos < len + 4) return -5;
+			if (byte_pos + len + 4 > src_size) return -5;
 			if (dc.out_end - dc.out_ptr < len) return -6;
 
 			// Copy literal data (skipping header) and advance
@@ -622,7 +623,7 @@ ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 	{
 		// Round up to the next byte
 		size_t byte_pos = (size_t)((pos + 7) >> 3);
-		if (src_size - byte_pos < 4) {
+		if (src_size < byte_pos + 4) {
 			return -8;
 		}
 		const uint8_t *p = (const uint8_t*)src + byte_pos;

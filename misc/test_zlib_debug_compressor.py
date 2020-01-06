@@ -236,5 +236,11 @@ for case in test_cases:
         print("{}: FAIL ({})".format(case.__name__, e))
         good = False
 
+data, buf = test_dynamic_rle()
+zz.print_buf(buf)
+print(fmt_bytes(buf.to_bytes()))
+# print(fmt_bytes(buf.to_bytes()))
+print(zlib.decompress(buf.to_bytes()))
+
 sys.exit(0 if good else 1)
         

@@ -27,7 +27,7 @@ UFBXT_TEST(bits_small)
 		uint64_t ref;
 		if (pos == 0) ref = lo;
 		else if (pos < 64) ref = lo >> pos | hi << (64 - pos);
-		else if (pos < 128) ref = hi >> pos;
+		else if (pos < 128) ref = hi >> (pos - 64);
 		else ref = 0;
 		ufbxt_assert(bits == ref);
 	}
