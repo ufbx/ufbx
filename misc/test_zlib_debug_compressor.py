@@ -9,6 +9,12 @@ def test_dynamic():
     data = b"Hello Hello!"
     return data, zz.deflate(data, opts)
 
+def test_dynamic_no_match():
+    """Simple dynamic Huffman tree without matches"""
+    opts = zz.Options(force_block_types=[2])
+    data = b"Hello World!"
+    return data, zz.deflate(data, opts)
+
 def test_repeat_length():
     """Dynamic Huffman compressed block with repeat lengths"""
     data = b"ABCDEFGHIJKLMNOPQRSTUVWXYZZYXWVUTSRQPONMLKJIHGFEDCBA"
@@ -50,18 +56,18 @@ def test_match_distances_and_lengths():
     message = []
     
     l_iter = itertools.chain(lens, itertools.repeat(lens[-1]))
-    lit_iter = itertools.cycle(b"Hello world!")
+    lit_iter = itertools.cycle(range(0,256))
     pos = 0
     prev_d = 1
     for d in dists:
         while pos < d:
             l = next(l_iter)
             pos += l
-            message.append(zz.Literal(bytes([next(lit_iter)])))
+            message.append(zz.Literal(bytes([next(lit_iter), next(lit_iter)])))
             message.append(zz.Match(l, prev_d))
         prev_d = d
 
-    opts = zz.Options(block_size=4294967296)
+    opts = zz.Options(block_size=4294967296, force_block_types=[2])
     data = zz.decode(message)
     return data, zz.compress_message(message, opts)
 
@@ -185,11 +191,12 @@ def fmt_bytes(data, cols=20):
 def fnv1a(data):
     h = 0x811c9dc5
     for d in data:
-        h = ((h ^ d) * 0x01000193) & 0xffffffff
+        h = ((h ^ (d&0xff)) * 0x01000193) & 0xffffffff
     return h
 
 test_cases = [
     test_dynamic,
+    test_dynamic_no_match,
     test_repeat_length,
     test_huff_lengths,
     test_multi_part_matches,
