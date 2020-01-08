@@ -1487,7 +1487,10 @@ static size_t ufbxi_ascii_push_output(ufbxi_ascii *ua, size_t size)
 		if (new_size < 1024) new_size = 1024;
 		if (new_size < size) new_size = size;
 		char *new_dst = (char*)realloc(ua->dst, new_size);
-		if (!new_dst) return ~0u;
+		if (!new_dst) {
+			ufbxi_ascii_error(ua, "Out of memory");
+			return ~0u;
+		}
 		ua->dst = new_dst;
 		ua->dst_size = new_size;
 	}
