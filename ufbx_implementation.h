@@ -471,11 +471,16 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 	char *const out_begin = dc->out_begin;
 	char *const out_end = dc->out_end;
 
+	uint64_t bits;
+	uint32_t pos_end = pos;
 	for (;;) {
-		uint64_t bits = ufbxi_bit_read(&dc->stream, pos); // 64 bits
+		if (pos_end - pos < 15) {
+			bits = ufbxi_bit_read(&dc->stream, pos);
+			pos_end = pos + 64;
+		}
 
 		// Decode literal/length value from input stream
-		uint32_t lit_length = ufbxi_huff_decode_bits(&dc->huff_lit_length, &bits, &pos); // 49 bits
+		uint32_t lit_length = ufbxi_huff_decode_bits(&dc->huff_lit_length, &bits, &pos);
 
 		// If value < 256: copy value (literal byte) to output stream
 		if (lit_length < 256) {
@@ -487,11 +492,16 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 			// If value = 257..285: Decode extra length and distance
 			uint32_t length, distance;
 
+			if (pos_end - pos < 33) {
+				bits = ufbxi_bit_read(&dc->stream, pos);
+				pos_end = pos + 64;
+			}
+
 			// Length
 			{
 				uint32_t lut = ufbxi_deflate_length_lut[lit_length - 257];
 				uint32_t base = lut >> 17;
-				uint32_t offset = ((uint32_t)bits & lut & 0x1fff); // 34 bits
+				uint32_t offset = ((uint32_t)bits & lut & 0x1fff); // 33-5 = 28 bits
 				uint32_t offset_bits = (lut >> 13) & 0xf;
 				bits >>= offset_bits;
 				pos += offset_bits;
@@ -500,13 +510,13 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 
 			// Distance
 			{
-				uint32_t dist = ufbxi_huff_decode_bits(&dc->huff_dist, &bits, &pos); // 19 bits
+				uint32_t dist = ufbxi_huff_decode_bits(&dc->huff_dist, &bits, &pos); // 28-15 = 13 bits
 				if (dist >= 30) {
 					return -11;
 				}
 				uint32_t lut = ufbxi_deflate_dist_lut[dist];
 				uint32_t base = lut >> 17;
-				uint32_t offset = ((uint32_t)bits & lut & 0x1fff); // 6 bits
+				uint32_t offset = ((uint32_t)bits & lut & 0x1fff); // 13-13 = 0 bits
 				uint32_t offset_bits = (lut >> 13) & 0xf;
 				bits >>= offset_bits;
 				pos += offset_bits;
@@ -517,14 +527,17 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 				return -12;
 			}
 
-			// TODO: Do something better than per-byte copy
-			const char *src_ptr = out_ptr - distance;
-			char *end = out_ptr + length;
 			ufbx_assert(length > 0);
-			do {
-				char c = *src_ptr++;
-				*out_ptr++ = c;
-			} while (out_ptr != end);
+			const char *src = out_ptr - distance;
+			char *dst = out_ptr;
+			out_ptr += length;
+			{
+				// TODO: Do something better than per-byte copy
+				char *end = dst + length;
+				do {
+					*dst++ = *src++;
+				} while (dst != end);
+			}
 		} else if (lit_length == 256) {
 			break;
 		} else {
@@ -1093,7 +1106,7 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 				uc->decompress_buffer_size = buf_size;
 				void *buf = realloc(uc->decompress_buffer, buf_size);
 				if (!buf) {
-					return ufbxi_error(uc, "Failed to allocate decompression buffer: %zu bytes", buf_size);
+					return ufbxi_errorf(uc, "Failed to allocate decompression buffer: %zu bytes", buf_size);
 				}
 				uc->decompress_buffer = buf;
 			}

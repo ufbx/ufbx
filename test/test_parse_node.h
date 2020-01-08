@@ -181,7 +181,7 @@ UFBXT_TEST(node_stack_error)
 	ufbxt_assert(ufbxi_enter_node(uc));
 	ufbxt_assert(ufbxi_next_child(uc, &name));
 	ufbxt_assert(ufbxi_enter_node(uc));
-	ufbxt_assert(!ufbxi_parse_value(uc, "I", &dummy));
+	ufbxt_assert(!ufbxi_parse_value(uc, 'I', &dummy));
 	ufbxt_log_error(uc);
 	ufbxt_assert(uc->error->stack_size == 2);
 	ufbxt_assert(!strcmp(uc->error->stack[0], "Hello"));
