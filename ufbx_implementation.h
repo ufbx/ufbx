@@ -669,6 +669,10 @@ typedef struct {
 	ufbxi_node node_stack[UFBXI_NODE_STACK_SIZE];
 	ufbxi_node *node_stack_top;
 
+	// Temporary buffer for decompression
+	void *decompress_buffer;
+	size_t decompress_buffer_size;
+
 	// Error status
 	int failed;
 	ufbx_error *error;
@@ -1000,7 +1004,7 @@ static int ufbxi_decode_multivalue_array(ufbxi_context *uc, ufbxi_array *arr, vo
 static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 {
 	uint32_t elem_size;
-	switch (arr->dst_type) {
+	switch (arr->src_type) {
 	case 'i': case 'f': elem_size = 4; break;
 	case 'l': case 'd': elem_size = 8; break;
 	case 'b': elem_size = 1; break;
@@ -1022,8 +1026,16 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 			}
 			memcpy(dst, src, arr_size);
 			break;
-		case ufbxi_encoding_deflate:
-			return ufbxi_error(uc, "Internal: Unimplemented.");
+		case ufbxi_encoding_deflate: {
+			ptrdiff_t res = ufbx_inflate(dst, arr_size, src, arr->encoded_size);
+			if (res != arr_size) {
+				if (res < 0) {
+					return ufbxi_errorf(uc, "Deflate error: %d", (int)res);
+				} else {
+					return ufbxi_error(uc, "Deflate size mismatch");
+				}
+			}
+		} break;
 		case ufbxi_encoding_multivalue:
 			// Early return: Defer to multivalue implementation.
 			return ufbxi_decode_multivalue_array(uc, arr, dst);
@@ -1031,34 +1043,45 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 		}
 	} else {
 		const char *src_ptr;
+		const void *src = uc->data + arr->data_offset;
 
 		// Slow path: Need to do conversion, allocate temporary buffer if necessary
 		switch (arr->encoding) {
 		case ufbxi_encoding_basic:
-			src_ptr = uc->data + arr->data_offset;
+			if (arr->encoded_size != arr_size) {
+				return ufbxi_errorf(uc, "Array size mismatch, encoded %u bytes, decoded %u bytes",
+					arr->encoded_size, arr_size);
+			}
+			src_ptr = (const char*)src;
 			break;
-		case ufbxi_encoding_deflate:
-			return ufbxi_error(uc, "Internal: Unimplemented.");
-			break;
+		case ufbxi_encoding_deflate: {
+			size_t buf_size = uc->decompress_buffer_size;
+			if (buf_size < arr_size) {
+				buf_size = buf_size * 2 > arr_size ? buf_size * 2 : arr_size;
+				uc->decompress_buffer_size = buf_size;
+				void *buf = realloc(uc->decompress_buffer, buf_size);
+				if (!buf) {
+					return ufbxi_error(uc, "Failed to allocate decompression buffer: %zu bytes", buf_size);
+				}
+				uc->decompress_buffer = buf;
+			}
+			ptrdiff_t res = ufbx_inflate(uc->decompress_buffer, arr_size, src, arr->encoded_size);
+			if (res != arr_size) {
+				if (res < 0) {
+					return ufbxi_errorf(uc, "Deflate error: %d", (int)res);
+				} else {
+					return ufbxi_error(uc, "Deflate size mismatch");
+				}
+			}
+			src_ptr = (const char*)uc->decompress_buffer;
+		} break;
 		case ufbxi_encoding_multivalue:
 			// Multivalue arrays should always have `src_type == dst_type`.
 			return ufbxi_error(uc, "Internal: Multivalue array has invalid type");
 		default: return ufbxi_error(uc, "Internal: Bad array encoding");
 		}
 
-		uint32_t src_elem_size;
-		switch (arr->src_type) {
-		case 'i': case 'f': src_elem_size = 4; break;
-		case 'l': case 'd': src_elem_size = 8; break;
-		case 'b': src_elem_size = 1; break;
-		default: return ufbxi_error(uc, "Internal: Invalid array type");
-		}
-
-		if (arr->num_elements * src_elem_size != arr->encoded_size) {
-			return ufbxi_errorf(uc, "Array size mismatch, encoded %u bytes, decoded %u bytes",
-				arr->encoded_size, arr->num_elements * src_elem_size);
-		}
-		const char *src_end = src_ptr + arr->encoded_size;
+		const char *src_end = src_ptr + arr_size;
 
 		// Try to perform type conversion.
 		const char *sp = src_ptr, *ep = src_end;

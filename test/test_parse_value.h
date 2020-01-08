@@ -458,6 +458,152 @@ UFBXT_TEST(parse_array_conversions)
 }
 #endif
 
+UFBXT_TEST(parse_array_deflate)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"i" "\x08\x00\x00\x00" "\x01\x00\x00\x00" "\x16\x00\x00\x00"
+		"\x78\x9c\x63\x64\x60\x60\x60\x02\x62\x66\x20\x66\x01\x62\x46\x34\x3e\x00\x01\x60\x00\x15"
+	);
+
+	ufbxi_array arr;
+	ufbxt_assert(ufbxi_parse_values(uc, "i", &arr));
+	ufbxt_assert(arr.src_type == 'i');
+	ufbxt_assert(arr.dst_type == 'i');
+	ufbxt_assert(arr.num_elements == 8);
+	ufbxt_assert(arr.encoding == ufbxi_encoding_deflate);
+	ufbxt_assert(arr.encoded_size == 22);
+
+	int32_t data[8];
+	ufbxt_assert(ufbxi_decode_array(uc, &arr, data));
+	ufbxt_assert(data[0] == 1);
+	ufbxt_assert(data[1] == 2);
+	ufbxt_assert(data[2] == 3);
+	ufbxt_assert(data[3] == 4);
+	ufbxt_assert(data[4] == 1);
+	ufbxt_assert(data[5] == 2);
+	ufbxt_assert(data[6] == 3);
+	ufbxt_assert(data[7] == 4);
+}
+#endif
+
+UFBXT_TEST(parse_array_deflate_conversion)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"i" "\x08\x00\x00\x00" "\x01\x00\x00\x00" "\x16\x00\x00\x00"
+		"\x78\x9c\x63\x64\x60\x60\x60\x02\x62\x66\x20\x66\x01\x62\x46\x34\x3e\x00\x01\x60\x00\x15"
+	);
+
+	ufbxi_array arr;
+	ufbxt_assert(ufbxi_parse_values(uc, "f", &arr));
+	ufbxt_assert(arr.src_type == 'i');
+	ufbxt_assert(arr.dst_type == 'f');
+	ufbxt_assert(arr.num_elements == 8);
+	ufbxt_assert(arr.encoding == ufbxi_encoding_deflate);
+	ufbxt_assert(arr.encoded_size == 22);
+
+	float data[8];
+	ufbxt_assert(ufbxi_decode_array(uc, &arr, data));
+	ufbxt_assert(data[0] == 1.0f);
+	ufbxt_assert(data[1] == 2.0f);
+	ufbxt_assert(data[2] == 3.0f);
+	ufbxt_assert(data[3] == 4.0f);
+	ufbxt_assert(data[4] == 1.0f);
+	ufbxt_assert(data[5] == 2.0f);
+	ufbxt_assert(data[6] == 3.0f);
+	ufbxt_assert(data[7] == 4.0f);
+}
+#endif
+
+UFBXT_TEST(parse_array_deflate_bad_data)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"i" "\x08\x00\x00\x00" "\x01\x00\x00\x00" "\x16\x00\x00\x00"
+		"\x78\x9c\x63\x64\x60\x60\x60\x02\x62\x66\x20\x66\x01\x62\x46\x34\x3e\x00\x02\x60\x00\x15"
+	);
+
+	ufbxi_array arr;
+	ufbxt_assert(ufbxi_parse_values(uc, "i", &arr));
+	ufbxt_assert(arr.src_type == 'i');
+	ufbxt_assert(arr.dst_type == 'i');
+	ufbxt_assert(arr.num_elements == 8);
+	ufbxt_assert(arr.encoding == ufbxi_encoding_deflate);
+	ufbxt_assert(arr.encoded_size == 22);
+
+	int32_t data[8];
+	ufbxt_assert(!ufbxi_decode_array(uc, &arr, data));
+	ufbxt_log_error(uc);
+}
+#endif
+
+UFBXT_TEST(parse_array_deflate_bad_data_conversion)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"i" "\x08\x00\x00\x00" "\x01\x00\x00\x00" "\x16\x00\x00\x00"
+		"\x78\x9c\x63\x64\x60\x60\x60\x02\x62\x66\x20\x66\x01\x62\x46\x34\x3e\x00\x02\x60\x00\x16"
+	);
+
+	ufbxi_array arr;
+	ufbxt_assert(ufbxi_parse_values(uc, "f", &arr));
+	ufbxt_assert(arr.src_type == 'i');
+	ufbxt_assert(arr.dst_type == 'f');
+	ufbxt_assert(arr.num_elements == 8);
+	ufbxt_assert(arr.encoding == ufbxi_encoding_deflate);
+	ufbxt_assert(arr.encoded_size == 22);
+
+	int32_t data[8];
+	ufbxt_assert(!ufbxi_decode_array(uc, &arr, data));
+	ufbxt_log_error(uc);
+}
+#endif
+
+UFBXT_TEST(parse_array_deflate_bad_size)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"i" "\x09\x00\x00\x00" "\x01\x00\x00\x00" "\x16\x00\x00\x00"
+		"\x78\x9c\x63\x64\x60\x60\x60\x02\x62\x66\x20\x66\x01\x62\x46\x34\x3e\x00\x01\x60\x00\x15"
+	);
+
+	ufbxi_array arr;
+	ufbxt_assert(ufbxi_parse_values(uc, "i", &arr));
+	ufbxt_assert(arr.src_type == 'i');
+	ufbxt_assert(arr.dst_type == 'i');
+	ufbxt_assert(arr.num_elements == 9);
+	ufbxt_assert(arr.encoding == ufbxi_encoding_deflate);
+	ufbxt_assert(arr.encoded_size == 22);
+
+	int32_t data[9];
+	ufbxt_assert(!ufbxi_decode_array(uc, &arr, data));
+	ufbxt_log_error(uc);
+}
+#endif
+
+UFBXT_TEST(parse_array_deflate_bad_size_conversion)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context_values(
+		"i" "\x09\x00\x00\x00" "\x01\x00\x00\x00" "\x16\x00\x00\x00"
+		"\x78\x9c\x63\x64\x60\x60\x60\x02\x62\x66\x20\x66\x01\x62\x46\x34\x3e\x00\x01\x60\x00\x15"
+	);
+
+	ufbxi_array arr;
+	ufbxt_assert(ufbxi_parse_values(uc, "f", &arr));
+	ufbxt_assert(arr.src_type == 'i');
+	ufbxt_assert(arr.dst_type == 'f');
+	ufbxt_assert(arr.num_elements == 9);
+	ufbxt_assert(arr.encoding == ufbxi_encoding_deflate);
+	ufbxt_assert(arr.encoded_size == 22);
+
+	int32_t data[9];
+	ufbxt_assert(!ufbxi_decode_array(uc, &arr, data));
+	ufbxt_log_error(uc);
+}
+#endif
+
 #if UFBXT_IMPL
 static void helper_array_bool(ufbxi_context *uc, char dst_type, char src_type)
 {
