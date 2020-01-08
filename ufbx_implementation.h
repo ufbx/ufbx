@@ -125,6 +125,17 @@ typedef struct {
 	char *out_end;
 } ufbxi_deflate_context;
 
+static ufbxi_forceinline uint32_t ufbxi_bit_reverse(uint32_t mask, uint32_t num_bits)
+{
+	ufbx_assert(num_bits <= 16);
+	uint32_t x = mask;
+    x = (((x & 0xaaaa) >> 1) | ((x & 0x5555) << 1));
+    x = (((x & 0xcccc) >> 2) | ((x & 0x3333) << 2));
+    x = (((x & 0xf0f0) >> 4) | ((x & 0x0f0f) << 4));
+	x = (((x & 0xff00) >> 8) | ((x & 0x00ff) << 8));
+	return x >> (16 - num_bits);
+}
+
 static ufbxi_noinline void
 ufbxi_bit_init(ufbxi_bit_stream *s, const void *data, size_t size)
 {
@@ -262,10 +273,7 @@ ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 		tree->sorted_to_sym[sorted] = i;
 
 		uint32_t code = first_code[bits] + index;
-		uint32_t rev_code = 0;
-		for (uint32_t bit = 0; bit < bits; bit++) {
-			if (code & (1 << bit)) rev_code |= 1 << (bits - bit - 1);
-		}
+		uint32_t rev_code = ufbxi_bit_reverse(code, bits);
 
 		if (bits <= UFBXI_HUFF_FAST_BITS) {
 			uint16_t fast_sym = i | bits << 12;
@@ -291,16 +299,18 @@ ufbxi_huff_decode_bits(const ufbxi_huff_tree *tree, uint64_t *p_bits, uint64_t *
 		return fast_sym_bits & 0x3ff;
 	}
 
-	uint32_t code = 0;
-	for (uint32_t bits = 1; bits < UFBXI_HUFF_MAX_BITS; bits++) {
-		code = code << 1 | (*p_bits & 1);
-		*p_bits >>= 1;
-		*p_pos += 1;
+	uint32_t code = ufbxi_bit_reverse((uint32_t)*p_bits, UFBXI_HUFF_FAST_BITS + 1);
+	*p_bits >>= UFBXI_HUFF_FAST_BITS + 1;
+	*p_pos += UFBXI_HUFF_FAST_BITS + 1;
+	for (uint32_t bits = UFBXI_HUFF_FAST_BITS + 1; bits < UFBXI_HUFF_MAX_BITS; bits++) {
 		if (code < tree->past_max_code[bits]) {
 			uint32_t sorted = code + tree->code_to_sorted[bits];
 			if (sorted >= tree->num_symbols) return ~0u;
 			return tree->sorted_to_sym[sorted];
 		}
+		code = code << 1 | (*p_bits & 1);
+		*p_bits >>= 1;
+		*p_pos += 1;
 	}
 
 	return ~0u;
