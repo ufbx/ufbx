@@ -252,3 +252,49 @@ UFBXT_TEST(parse_ascii_bad_node_name)
 	ufbxt_log_ascii_error(ua);
 }
 #endif
+
+UFBXT_TEST(parse_ascii_nested_error)
+#if UFBXT_IMPL
+{
+	ufbxi_ascii *ua = ufbxt_ascii_context("First: { Second: { Third: { ? } } }");
+	ufbxt_assert(!ufbxi_ascii_parse(ua));
+	ufbxt_assert(ua->error->stack_size == 3);
+	ufbxt_assert(!strcmp(ua->error->stack[0], "First"));
+	ufbxt_assert(!strcmp(ua->error->stack[1], "Second"));
+	ufbxt_assert(!strcmp(ua->error->stack[2], "Third"));
+	ufbxt_log_ascii_error(ua);
+}
+#endif
+
+UFBXT_TEST(parse_ascii_stack_truncation)
+#if UFBXT_IMPL
+{
+	ufbxi_ascii *ua = ufbxt_ascii_context(
+		"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+		"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+		"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA: { ? }");
+	ufbxt_assert(!ufbxi_ascii_parse(ua));
+	ufbxt_assert(ua->error->stack_size == 1);
+	ufbxt_assert(strlen(ua->error->stack[0]) == UFBX_ERROR_STACK_NAME_MAX_LENGTH);
+	ufbxt_log_ascii_error(ua);
+}
+#endif
+
+UFBXT_TEST(parse_ascii_stack_max_depth)
+#if UFBXT_IMPL
+{
+	ufbxi_ascii *ua = ufbxt_ascii_context(
+		"A: { A: { A: { A: { A: { A: { A: { A: { A: { A: { A: {"
+		"A: { A: { A: { A: { A: { A: { A: { A: { A: { A: { A: {"
+		"A: { A: { A: { A: { A: { A: { A: { A: { A: { A: { A: {"
+		"A: { A: { A: { A: { A: { A: { A: { A: { A: { A: { A: {"
+		"A: { A: { A: { A: { A: { A: { A: { A: { A: { A: { A: {"
+		"A: { A: { A: { A: { A: { A: { A: { A: { A: { A: { A: {"
+		"A: { A: { A: { A: { A: { A: { A: { A: { A: { A: { A: {"
+		"A: { A: { A: { A: { A: { A: { A: { A: { A: { A: { A: {"
+		"A: { A: { A: { A: { A: { A: { A: { A: { A: { A: { A: { ? ");
+	ufbxt_assert(!ufbxi_ascii_parse(ua));
+	ufbxt_assert(ua->error->stack_size == UFBX_ERROR_STACK_MAX_DEPTH);
+	ufbxt_log_ascii_error(ua);
+}
+#endif

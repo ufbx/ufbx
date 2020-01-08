@@ -715,14 +715,33 @@ typedef struct {
 	} value;
 } ufbxi_any_value;
 
+static void ufbxi_do_error_common(ufbxi_context *uc, uint32_t line)
+{
+	uc->failed = 1;
+	ufbx_error *err = uc->error;
+	if (err) {
+		err->source_line = line;
+		ufbxi_node *node = uc->node_stack + 1;
+		uint32_t ix = 0;
+		for (; node <= uc->node_stack_top && ix < UFBX_ERROR_STACK_MAX_DEPTH; node++, ix++) {
+			size_t len = node->name.length;
+			if (len > UFBX_ERROR_STACK_NAME_MAX_LENGTH) {
+				len = UFBX_ERROR_STACK_NAME_MAX_LENGTH;
+			}
+			memcpy(err->stack[ix], node->name.data, len);
+			err->stack[ix][len] = '\0';
+		}
+		err->stack_size = ix;
+	}
+}
+
 static int ufbxi_do_error(ufbxi_context *uc, uint32_t line, const char *desc)
 {
 	if (uc->failed) return 0;
-	uc->failed = 1;
-	size_t length = strlen(desc);
-	if (length > UFBX_ERROR_DESC_MAX_LENGTH) length = UFBX_ERROR_DESC_MAX_LENGTH;
+	ufbxi_do_error_common(uc, line);
 	if (uc->error) {
-		uc->error->source_line = line;
+		size_t length = strlen(desc);
+		if (length > UFBX_ERROR_DESC_MAX_LENGTH) length = UFBX_ERROR_DESC_MAX_LENGTH;
 		memcpy(uc->error->desc, desc, length);
 		uc->error->desc[length] = '\0';
 	}
@@ -732,14 +751,13 @@ static int ufbxi_do_error(ufbxi_context *uc, uint32_t line, const char *desc)
 static int ufbxi_do_errorf(ufbxi_context *uc, uint32_t line, const char *fmt, ...)
 {
 	if (uc->failed) return 0;
-	uc->failed = 1;
-	va_list args;
-	va_start(args, fmt);
+	ufbxi_do_error_common(uc, line);
 	if (uc->error) {
-		uc->error->source_line = line;
+		va_list args;
+		va_start(args, fmt);
 		vsnprintf(uc->error->desc, sizeof(uc->error->desc), fmt, args);
+		va_end(args);
 	}
-	va_end(args);
 	return 0;
 }
 
@@ -836,7 +854,11 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		val_data_offset = pos + 13;
 		break;
 	default:
-		return ufbxi_errorf(uc, "Invalid type code '%c'", src_type);
+		if (src_type >= 32 && src_type < 127) {
+			return ufbxi_errorf(uc, "Invalid type code 0x%02x '%c'", src_type, src_type);
+		} else {
+			return ufbxi_errorf(uc, "Invalid type code 0x%02x", src_type);
+		}
 	}
 
 	size_t val_end = pos + val_size;
@@ -1356,12 +1378,23 @@ static int ufbxi_ascii_do_error(ufbxi_ascii *ua, uint32_t line, const char *desc
 {
 	if (ua->failed) return 0;
 	ua->failed = 1;
-	size_t length = strlen(desc);
-	if (length > UFBX_ERROR_DESC_MAX_LENGTH) length = UFBX_ERROR_DESC_MAX_LENGTH;
-	if (ua->error) {
-		ua->error->source_line = line;
-		memcpy(ua->error->desc, desc, length);
-		ua->error->desc[length] = '\0';
+	ufbx_error *err = ua->error;
+	if (err) {
+		err->source_line = line;
+		size_t length = strlen(desc);
+		if (length > UFBX_ERROR_DESC_MAX_LENGTH) length = UFBX_ERROR_DESC_MAX_LENGTH;
+		memcpy(err->desc, desc, length);
+		err->desc[length] = '\0';
+		uint32_t ix = 0;
+		for (; ix < ua->node_stack_size && ix < UFBX_ERROR_STACK_MAX_DEPTH; ix++) {
+			size_t len = ua->node_stack[ix].length;
+			if (len > UFBX_ERROR_STACK_NAME_MAX_LENGTH) {
+				len = UFBX_ERROR_STACK_NAME_MAX_LENGTH;
+			}
+			memcpy(err->stack[ix], ua->node_stack[ix].data, len);
+			err->stack[ix][len] = '\0';
+		}
+		err->stack_size = ix;
 	}
 	return 0;
 }

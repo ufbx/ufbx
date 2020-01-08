@@ -163,3 +163,28 @@ UFBXT_TEST(enter_single_node)
 	ufbxt_assert(!uc->failed);
 }
 #endif
+
+UFBXT_TEST(node_stack_error)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context(
+		"\x31\x00\x00\x00" "\x00\x00\x00\x00" "\x00\x00\x00\x00"
+		"\x05" "Hello"
+		"\x24\x00\x00\x00" "\x00\x00\x00\x00" "\x00\x00\x00\x00"
+		"\x05" "World"
+		"\x00\x00\x00\x00" "\x00\x00\x00\x00" "\x00\x00\x00\x00" "\x00"
+	);
+
+	int32_t dummy;
+	ufbxi_string name;
+	ufbxt_assert(ufbxi_next_child(uc, &name));
+	ufbxt_assert(ufbxi_enter_node(uc));
+	ufbxt_assert(ufbxi_next_child(uc, &name));
+	ufbxt_assert(ufbxi_enter_node(uc));
+	ufbxt_assert(!ufbxi_parse_value(uc, "I", &dummy));
+	ufbxt_log_error(uc);
+	ufbxt_assert(uc->error->stack_size == 2);
+	ufbxt_assert(!strcmp(uc->error->stack[0], "Hello"));
+	ufbxt_assert(!strcmp(uc->error->stack[1], "World"));
+}
+#endif

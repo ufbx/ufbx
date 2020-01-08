@@ -157,14 +157,28 @@ void ufbxt_log_flush()
 	g_log_pos = 0;
 }
 
+void ufbxt_log_error_common(ufbx_error *err)
+{
+	if (!err) return;
+	if (err->stack_size > 0) {
+		char stack[128];
+		char *ptr = stack, *end = stack + sizeof(stack);
+		for (uint32_t i = 0; i < err->stack_size; i++) {
+			ptr += snprintf(ptr, end - ptr, " / %s", err->stack[i]);
+		}
+		ufbxt_logf("%s", stack);
+	}
+	ufbxt_logf("(line %u) %s", err->source_line, err->desc);
+}
+
 void ufbxt_log_error(ufbxi_context *uc)
 {
-	ufbxt_logf("(line %u) %s", uc->error->source_line, uc->error->desc);
+	ufbxt_log_error_common(uc->error);
 }
 
 void ufbxt_log_ascii_error(ufbxi_ascii *ua)
 {
-	ufbxt_logf("(line %u) %s", ua->error->source_line, ua->error->desc);
+	ufbxt_log_error_common(ua->error);
 }
 
 #define UFBXT_IMPL 1
