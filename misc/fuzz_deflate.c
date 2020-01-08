@@ -1,6 +1,15 @@
+#define _CRT_SECURE_NO_WARNINGS
+
+#if defined(_WIN32)
+#define ufbx_assert(cond) do { \
+		if (!(cond)) __debugbreak(); \
+	} while (0)
+#else
 #define ufbx_assert(cond) do { \
 		if (!(cond)) __builtin_trap(); \
 	} while (0)
+#endif
+
 #include "../ufbx_implementation.h"
 
 #include <stdio.h>
@@ -29,6 +38,10 @@ int main(int argc, char **argv)
 	fclose(f);
 
 	size_t dst_size = 1024*src_size;
+	if (argc >= 3) {
+		dst_size = (size_t)atoi(argv[2]);
+	}
+
 	char *dst = malloc(dst_size);
 
 	ptrdiff_t result = ufbxi_inflate(dst, dst_size, src, src_size);
