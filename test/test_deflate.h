@@ -1405,7 +1405,8 @@ UFBXT_TEST(deflate_benchmark)
 
 	ufbxt_bechmark_begin();
 	ptrdiff_t res = ufbxi_inflate(dst, dst_size, src, sizeof(src) - 1);
-	ufbxt_bechmark_end();
+	double sec = ufbxt_bechmark_end();
+	ufbxt_logf("-> %.2f MB/s", (double)dst_size / sec * 1e-6);
 
 	ufbxt_hintf("res = %d", (int)res);
 	ufbxt_assert(res == dst_size);

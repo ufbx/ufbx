@@ -408,13 +408,14 @@ void ufbxt_bechmark_begin()
 	g_bechmark_begin_tick = cputime_cpu_tick();
 }
 
-void ufbxt_bechmark_end()
+double ufbxt_bechmark_end()
 {
 	uint64_t end_tick = cputime_cpu_tick();
 	uint64_t delta = end_tick - g_bechmark_begin_tick;
 	double sec = cputime_cpu_delta_to_sec(NULL, delta);
 	double ghz = (double)cputime_default_sync->cpu_freq / 1e9;
 	ufbxt_logf("%.3fms / %ukcy at %.2fGHz", sec * 1e3, (uint32_t)(delta / 1000), ghz);
+	return sec;
 }
 
 #define UFBXT_IMPL 1
