@@ -4,6 +4,7 @@ import itertools
 class Options:
     def __init__(self, **kwargs):
         self.override_litlen_counts = kwargs.get("override_litlen_counts", { })
+        self.override_dist_counts = kwargs.get("override_dist_counts", { })
         self.max_uncompressed_length = kwargs.get("max_uncompressed_length", 0xffff)
         self.prune_interval = kwargs.get("prune_interval", 65536)
         self.max_match_distance = kwargs.get("max_match_distance", 32768)
@@ -353,6 +354,8 @@ def compress_block_dynamic(buf, message, final, opts):
 
     for sym,count in opts.override_litlen_counts.items():
         litlen_count[sym] = count
+    for sym,count in opts.override_dist_counts.items():
+        distance_count[sym] = count
 
     litlen_map = { sym: count for sym,count in enumerate(litlen_count) if count > 0 }
     distance_map = { sym: count for sym,count in enumerate(distance_count) if count > 0 }

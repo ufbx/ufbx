@@ -573,6 +573,18 @@ UFBXT_TEST(deflate_fail_bad_lit_length)
 }
 #endif
 
+#if UFBXT_IMPL
+static uint32_t fnv1a(const void *data, size_t size)
+{
+	const char *ptr = data, *end = ptr + size;
+	uint32_t h = 0x811c9dc5u;
+	for (; ptr != end; ptr++) {
+		h = (h ^ (uint8_t)*ptr) * 0x01000193;
+	}
+	return h;
+}
+#endif
+
 UFBXT_TEST(deflate_bit_flip)
 #if UFBXT_IMPL
 {
@@ -672,15 +684,8 @@ UFBXT_TEST(deflate_static_distances_and_lengths)
 	ptrdiff_t res = ufbxi_inflate(dst, dst_size, src, sizeof(src) - 1);
 	ufbxt_hintf("res = %d", (int)res);
 	ufbxt_assert(res == dst_size);
-
-	// Double check with FNV-1a hash
-	{
-		uint32_t h = 0x811c9dc5u;
-		for (size_t i = 0; i < dst_size; i++) {
-			h = (h ^ (uint8_t)dst[i]) * 0x01000193;
-		}
-		ufbxt_assert(h == 0x88398917);
-	}
+	ufbxt_assert(fnv1a(dst, dst_size) == 0x88398917);
+	free(dst);
 }
 #endif
 
@@ -739,15 +744,36 @@ UFBXT_TEST(deflate_dynamic_distances_and_lengths)
 	ptrdiff_t res = ufbxi_inflate(dst, dst_size, src, sizeof(src) - 1);
 	ufbxt_hintf("res = %d", (int)res);
 	ufbxt_assert(res == dst_size);
+	ufbxt_assert(fnv1a(dst, dst_size) == 0x88398917);
+	free(dst);
+}
+#endif
 
-	// Double check with FNV-1a hash
-	{
-		uint32_t h = 0x811c9dc5u;
-		for (size_t i = 0; i < dst_size; i++) {
-			h = (h ^ (uint8_t)dst[i]) * 0x01000193;
-		}
-		ufbxt_assert(h == 0x88398917);
-	}
+UFBXT_TEST(deflate_long_codes)
+#if UFBXT_IMPL
+{
+	const char src[] =
+		"\x78\x9c\xed\xfd\xc7\xb9\x65\x5d\xb6\x65\xd9\xc9\x06\x40\x85\xae\xc2\x90\x60\x2e"
+		"\xfd\x3f\x14\xf6\xb9\xe6\xfe\x32\xc1\x39\x69\x85\x56\xeb\x63\xae\x7d\xae\xfd\x1e"
+		"\x01\x8e\xb7\x7b\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc0\xff\x27\xfd\x7f\x1e\xee"
+		"\xff\xa3\xfe\x3f\x0f\xf7\xbf\xf9\xff\xac\xff\xcf\xc3\xfd\x6f\xfe\xb7\xff\x1f\xf6"
+		"\xff\x79\xb8\xff\xcd\xff\xf6\x7f\xf7\xff\x69\xff\x9f\x87\x03\x00\x00\xe0\xff\x1b"
+		"\xff\xbf\xaf\xf6\xff\x95\xff\xdf\x57\xfb\xdf\xfc\x7f\xe7\xff\xf7\xd5\xfe\x37\xff"
+		"\xdb\xff\x2f\xfd\xff\xbe\xda\xff\xe6\x7f\xfb\xbf\xfb\xff\xd6\xff\xef\xab\x01\x00"
+		"\x00\x00\x00\xfc\xff\xde\xff\xef\xc3\xfd\xff\xe0\xff\xef\xc3\xfd\x6f\xfe\x7f\xf1"
+		"\xff\xf7\xe1\xfe\x37\xff\xdb\xff\x9f\xfc\xff\x7d\xb8\xff\xcd\xff\xf6\x7f\xf7\xff"
+		"\x9b\xff\xbf\x0f\x07\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\xf1\xff\x7f\xa9\xff"
+		"\x7f\xf2\xff\x7f\xa9\xff\x9b\xff\x7f\xf9\xff\xbf\xd4\xff\xcd\xff\xf6\xff\x6f\xfe"
+		"\xff\x2f\xf5\x7f\xf3\xbf\xfd\xdf\xfd\xff\xcf\xff\xff\xa5\xfe\xef\x01\x7e\xa8\x57"
+		"\xe0";
+
+	size_t dst_size = 31216;
+	char *dst = malloc(dst_size);
+	ptrdiff_t res = ufbxi_inflate(dst, dst_size, src, sizeof(src) - 1);
+	ufbxt_hintf("res = %d", (int)res);
+	ufbxt_assert(res == dst_size);
+	ufbxt_assert(fnv1a(dst, dst_size) == 0x9e9ed1e5);
+	free(dst);
 }
 #endif
 

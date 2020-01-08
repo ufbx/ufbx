@@ -87,6 +87,42 @@ def test_dynamic_distances_and_lengths():
     data = zz.decode(message)
     return data, zz.compress_message(message, opts)
 
+def test_long_codes():
+    """Test longest possible bit-codes for symbols"""
+    message = [zz.Literal(b"test")]
+    pos = 0
+    matches = [(140,10000),(180,14000),(210,20000),(230,30000)]
+    while pos < 30000:
+        message.append(zz.Match(258, 4))
+        next_pos = pos + 258
+        for l,o in matches:
+            if pos < o and next_pos >= o:
+                for n in range(5):
+                    for m in range(n - 1):
+                        message.append(zz.Literal(bytes([ord("A") + m])))
+                    message.append(zz.Match(l, o))
+                    next_pos += l
+                    l += 1
+        pos = next_pos
+
+    ll_override = { }
+    count = 1000000000
+    for ll in itertools.chain([285], b"Test", range(260,284)):
+        ll_override[ll] = count
+        count /= 2
+
+    dist_override = { }
+    count = 1000000000
+    for dist in itertools.chain([3], range(10,28)):
+        dist_override[dist] = count
+        count /= 2
+
+    opts = zz.Options(block_size=4294967296, force_block_types=[2],
+                      override_litlen_counts=ll_override,
+                      override_dist_counts=dist_override)
+    data = zz.decode(message)
+    return data, zz.compress_message(message, opts)
+
 def test_fail_codelen_16_overflow():
     """Test oveflow of codelen symbol 16"""
     data = b"\xfd\xfe\xff"
@@ -232,6 +268,7 @@ test_cases = [
     test_multi_part_matches,
     test_static_distances_and_lengths,
     test_dynamic_distances_and_lengths,
+    test_long_codes,
 ]
 
 good = True
@@ -247,4 +284,3 @@ for case in test_cases:
         good = False
 
 sys.exit(0 if good else 1)
-        
