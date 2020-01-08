@@ -326,7 +326,7 @@ def compress_block_uncompressed(buf, data, align, final, opts):
         begin = end
 
 def compress_block_static(buf, message, final, opts):
-    litlen_bits = [8]*(144-0) + [9]*(256-144) + [7]*(280-256) + [8]*(287-280)
+    litlen_bits = [8]*(144-0) + [9]*(256-144) + [7]*(280-256) + [8]*(288-280)
     distance_bits = [5] * 32
 
     litlen_syms = make_huffman_codes(dict(enumerate(litlen_bits)), 16)

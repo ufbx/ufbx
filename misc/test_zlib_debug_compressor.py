@@ -44,9 +44,7 @@ def test_multi_part_matches():
     opts = zz.Options(block_size=4, force_block_types=[0,1,2,0,1,2])
     return data, zz.deflate(data, opts)
 
-def test_match_distances_and_lengths():
-    """Test all possible match length and distance buckets"""
-    
+def create_match_distances_and_lengths_message():
     lens = [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,
             23,24,25,26,27,28,29,30,31,32,33,34,35,39,42,43,48,50,51,
             55,58,59,63,66,67,70,82,83,90,98,99,105,114,115,120,130,
@@ -73,7 +71,18 @@ def test_match_distances_and_lengths():
             message.append(zz.Literal(bytes([next(lit_iter), next(lit_iter)])))
             message.append(zz.Match(l, prev_d))
         prev_d = d
+    return message
 
+def test_static_distances_and_lengths():
+    """Test all possible match length and distance buckets (Static)"""
+    message = create_match_distances_and_lengths_message()
+    opts = zz.Options(block_size=4294967296, force_block_types=[1])
+    data = zz.decode(message)
+    return data, zz.compress_message(message, opts)
+
+def test_dynamic_distances_and_lengths():
+    """Test all possible match length and distance buckets (Dynamic)"""
+    message = create_match_distances_and_lengths_message()
     opts = zz.Options(block_size=4294967296, force_block_types=[2])
     data = zz.decode(message)
     return data, zz.compress_message(message, opts)
@@ -221,7 +230,8 @@ test_cases = [
     test_repeat_length,
     test_huff_lengths,
     test_multi_part_matches,
-    test_match_distances_and_lengths,
+    test_static_distances_and_lengths,
+    test_dynamic_distances_and_lengths,
 ]
 
 good = True
