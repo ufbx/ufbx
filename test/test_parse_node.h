@@ -54,14 +54,12 @@ UFBXT_TEST(iter_two_nodes)
 	ufbxt_assert(ufbxi_streq(name, "Hello"));
 	ufbxt_assert(uc->focused_node.value_begin_pos == 18);
 	ufbxt_assert(uc->focused_node.child_begin_pos == 18);
-	ufbxt_assert(uc->focused_node.next_child_pos == 18);
 	ufbxt_assert(uc->focused_node.end_pos == 18);
 
 	ufbxt_assert(ufbxi_next_child(uc, &name));
 	ufbxt_assert(ufbxi_streq(name, "World"));
 	ufbxt_assert(uc->focused_node.value_begin_pos == 36);
 	ufbxt_assert(uc->focused_node.child_begin_pos == 36);
-	ufbxt_assert(uc->focused_node.next_child_pos == 36);
 	ufbxt_assert(uc->focused_node.end_pos == 36);
 
 	ufbxt_assert(!ufbxi_next_child(uc, &name));
@@ -85,7 +83,6 @@ UFBXT_TEST(parse_single_node_value)
 	ufbxt_assert(ufbxi_streq(node.name, "Hello"));
 	ufbxt_assert(node.value_begin_pos == 18);
 	ufbxt_assert(node.child_begin_pos == 28);
-	ufbxt_assert(node.next_child_pos == 28);
 	ufbxt_assert(node.end_pos == 28);
 	uc->focused_node = node;
 
@@ -115,7 +112,6 @@ UFBXT_TEST(parse_single_node_child)
 	ufbxt_assert(ufbxi_streq(node.name, "Hello"));
 	ufbxt_assert(node.value_begin_pos == 18);
 	ufbxt_assert(node.child_begin_pos == 18);
-	ufbxt_assert(node.next_child_pos == 18);
 	ufbxt_assert(node.end_pos == 49);
 	uc->focused_node = node;
 
@@ -126,7 +122,6 @@ UFBXT_TEST(parse_single_node_child)
 	ufbxt_assert(ufbxi_streq(child.name, "World"));
 	ufbxt_assert(child.value_begin_pos == 36);
 	ufbxt_assert(child.child_begin_pos == 36);
-	ufbxt_assert(child.next_child_pos == 36);
 	ufbxt_assert(child.end_pos == 36);
 }
 #endif
@@ -147,7 +142,6 @@ UFBXT_TEST(enter_single_node)
 	ufbxt_assert(ufbxi_streq(name, "Hello"));
 	ufbxt_assert(uc->focused_node.value_begin_pos == 18);
 	ufbxt_assert(uc->focused_node.child_begin_pos == 18);
-	ufbxt_assert(uc->focused_node.next_child_pos == 18);
 	ufbxt_assert(uc->focused_node.end_pos == 49);
 
 	ufbxt_assert(ufbxi_enter_node(uc));
@@ -155,8 +149,7 @@ UFBXT_TEST(enter_single_node)
 	ufbxt_assert(ufbxi_streq(name, "World"));
 	ufbxt_assert(uc->focused_node.value_begin_pos == 36);
 	ufbxt_assert(uc->focused_node.child_begin_pos == 36);
-	ufbxt_assert(uc->focused_node.next_child_pos == 36);
-	ufbxt_assert(uc->focused_node.end_pos == 36);
+	
 	ufbxt_assert(!ufbxi_next_child(uc, &name));
 	ufbxt_assert(ufbxi_exit_node(uc));
 	ufbxt_assert(!ufbxi_next_child(uc, &name));
@@ -186,5 +179,32 @@ UFBXT_TEST(node_stack_error)
 	ufbxt_assert(uc->error->stack_size == 2);
 	ufbxt_assert(!strcmp(uc->error->stack[0], "Hello"));
 	ufbxt_assert(!strcmp(uc->error->stack[1], "World"));
+}
+#endif
+
+UFBXT_TEST(find_two_nodes)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context(
+		"\x12\x00\x00\x00" "\x00\x00\x00\x00" "\x00\x00\x00\x00"
+		"\x05" "Hello"
+		"\x24\x00\x00\x00" "\x00\x00\x00\x00" "\x00\x00\x00\x00"
+		"\x05" "World"
+	);
+
+	ufbxt_assert(ufbxi_find_node(uc, "Hello"));
+	ufbxt_assert(ufbxi_streq(uc->focused_node.name, "Hello"));
+	ufbxt_assert(uc->focused_node.value_begin_pos == 18);
+	ufbxt_assert(uc->focused_node.child_begin_pos == 18);
+	ufbxt_assert(uc->focused_node.end_pos == 18);
+
+	ufbxt_assert(ufbxi_find_node(uc, "World"));
+	ufbxt_assert(ufbxi_streq(uc->focused_node.name, "World"));
+	ufbxt_assert(uc->focused_node.value_begin_pos == 36);
+	ufbxt_assert(uc->focused_node.child_begin_pos == 36);
+	ufbxt_assert(uc->focused_node.end_pos == 36);
+
+	ufbxt_assert(!ufbxi_find_node(uc, "Other"));
+	ufbxt_assert(!uc->failed);
 }
 #endif

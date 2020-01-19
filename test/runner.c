@@ -201,7 +201,7 @@ void cputime_end_sync(cputime_sync_span *span)
 	cputime_sync_now(&span->end, 0);
 	uint64_t len_os = span->end.os_tick - span->begin.os_tick;
 	uint64_t len_cpu = span->end.cpu_tick - span->begin.cpu_tick;
-	double cpu_freq = (uint64_t)((double)len_cpu / (double)len_os * (double)os_freq);
+	double cpu_freq = (double)len_cpu / (double)len_os * (double)os_freq;
 
 	span->os_freq = os_freq;
 	span->cpu_freq = (uint64_t)cpu_freq;
@@ -288,7 +288,7 @@ ufbxi_context *ufbxt_make_memory_context(const void *data, uint32_t size)
 	uc->data = data_copy;
 	uc->size = size + 13;
 	uc->node_stack_top = uc->node_stack;
-	uc->node_stack_top->end_pos = size;
+	uc->node_stack_top->node.end_pos = size;
 	return uc;
 }
 
@@ -296,7 +296,6 @@ ufbxi_context *ufbxt_make_memory_context_values(const void *data, uint32_t size)
 {
 	ufbxi_context *uc = ufbxt_make_memory_context(data, size);
 	uc->focused_node.child_begin_pos = size;
-	uc->focused_node.next_child_pos = size;
 	uc->focused_node.end_pos = size;
 	return uc;
 }

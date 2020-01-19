@@ -118,7 +118,7 @@ test_huff_range(ufbxi_huff_tree *tree, uint32_t begin, uint32_t end, uint32_t nu
 		uint64_t code = code_begin + i;
 		uint64_t rev_code = 0;
 		for (uint32_t bit = 0; bit < num_bits; bit++) {
-			if (code & (1 << bit)) rev_code |= 1 << (num_bits - bit - 1);
+			if (code & (uint64_t)(1 << bit)) rev_code |= (uint64_t)1 << (num_bits - bit - 1);
 		}
 
 		uint32_t hi_max = 1 << (12 - num_bits);
@@ -599,7 +599,7 @@ UFBXT_TEST(deflate_bit_flip)
 
 	for (size_t byte_ix = 0; byte_ix < sizeof(src) - 1; byte_ix++) {
 		for (size_t bit_ix = 0; bit_ix < 8; bit_ix++) {
-			size_t bit = 1 << bit_ix;
+			size_t bit = (size_t)1 << bit_ix;
 
 			ufbxt_hintf("byte_ix==%u && bit_ix==%u", (unsigned)byte_ix, (unsigned)bit_ix);
 

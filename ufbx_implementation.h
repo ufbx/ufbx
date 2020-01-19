@@ -45,6 +45,12 @@ ufbxi_streq(ufbxi_string str, const char *ref)
 	return str.length == length && !memcmp(str.data, ref, length);
 }
 
+static ufbxi_forceinline int
+ufbxi_streq_str(ufbxi_string str, ufbxi_string ref)
+{
+	return str.length == ref.length && !memcmp(str.data, ref.data, ref.length);
+}
+
 // TODO: Unaligned loads for some platforms
 #define ufbxi_read_u8(ptr) (*(const uint8_t*)(ptr))
 #define ufbxi_read_u16(ptr) (*(const uint16_t*)(ptr))
@@ -472,7 +478,7 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 	char *const out_end = dc->out_end;
 
 	uint64_t bits;
-	uint32_t pos_end = pos;
+	uint64_t pos_end = pos;
 	for (;;) {
 		if (pos_end - pos < 15) {
 			bits = ufbxi_bit_read(&dc->stream, pos);
@@ -523,7 +529,7 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 				distance = base + offset;
 			}
 
-			if (distance > out_ptr - out_begin || length > out_end - out_ptr) {
+			if ((ptrdiff_t)distance > out_ptr - out_begin || (ptrdiff_t)length > out_end - out_ptr) {
 				return -12;
 			}
 
@@ -570,7 +576,7 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 // -16 - -21: Litlen Huffman: Overfull / Underfull / Repeat 16/17/18 overflow / Bad length code
 // -22 - -27: Distance Huffman: Overfull / Underfull / Repeat 16/17/18 overflow / Bad length code
 static ptrdiff_t
-ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
+ufbxi_inflate(void *dst, size_t dst_size, const void *src, size_t src_size)
 {
 	ptrdiff_t err;
 	ufbxi_deflate_context dc;
@@ -578,7 +584,6 @@ ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 	dc.out_begin = (char*)dst;
 	dc.out_ptr = (char*)dst;
 	dc.out_end = (char*)dst + dst_size;
-	const char *null_error;
 
 	uint64_t pos = 0;
 	uint64_t bits = ufbxi_bit_read(&dc.stream, pos);
@@ -616,7 +621,7 @@ ufbxi_inflate(void *dst, uint32_t dst_size, const void *src, uint32_t src_size)
 			size_t nlen = (size_t)((bits >> 16) & 0xffff);
 			if ((len ^ nlen) != 0xffff) return -4;
 			if (byte_pos + len + 4 > src_size) return -5;
-			if (dc.out_end - dc.out_ptr < len) return -6;
+			if (dc.out_end - dc.out_ptr < (ptrdiff_t)len) return -6;
 
 			// Copy literal data (skipping header) and advance
 			memcpy(dc.out_ptr, src_pos + 4, len);
@@ -673,8 +678,28 @@ typedef struct {
 	size_t end_pos;
 
 	size_t next_value_pos;
-	size_t next_child_pos;
 } ufbxi_node;
+
+typedef struct {
+	uint32_t hash;
+	uint32_t index;
+} ufbxi_map_entry;
+
+typedef struct {
+	uint64_t *offsets;
+	ufbxi_map_entry *entries;
+	size_t capacity;
+	size_t mask;
+} ufbxi_child_map;
+
+typedef struct {
+	ufbxi_node node;
+
+	// Offset for iterating children
+	size_t next_child_pos;
+
+	ufbxi_child_map map;
+} ufbxi_stack_node;
 
 #define UFBXI_NODE_STACK_SIZE 16
 
@@ -689,8 +714,8 @@ typedef struct {
 	ufbxi_node focused_node;
 
 	// Entered node stack.
-	ufbxi_node node_stack[UFBXI_NODE_STACK_SIZE];
-	ufbxi_node *node_stack_top;
+	ufbxi_stack_node node_stack[UFBXI_NODE_STACK_SIZE];
+	ufbxi_stack_node *node_stack_top;
 
 	// Temporary buffer for decompression
 	void *decompress_buffer;
@@ -744,14 +769,14 @@ static void ufbxi_do_error_common(ufbxi_context *uc, uint32_t line)
 	ufbx_error *err = uc->error;
 	if (err) {
 		err->source_line = line;
-		ufbxi_node *node = uc->node_stack + 1;
+		ufbxi_stack_node *node = uc->node_stack + 1;
 		uint32_t ix = 0;
 		for (; node <= uc->node_stack_top && ix < UFBX_ERROR_STACK_MAX_DEPTH; node++, ix++) {
-			size_t len = node->name.length;
+			size_t len = node->node.name.length;
 			if (len > UFBX_ERROR_STACK_NAME_MAX_LENGTH) {
 				len = UFBX_ERROR_STACK_NAME_MAX_LENGTH;
 			}
-			memcpy(err->stack[ix], node->name.data, len);
+			memcpy(err->stack[ix], node->node.name.data, len);
 			err->stack[ix][len] = '\0';
 		}
 		err->stack_size = ix;
@@ -1015,7 +1040,6 @@ static int ufbxi_decode_multivalue_array(ufbxi_context *uc, ufbxi_array *arr, vo
 	uc->focused_node.value_begin_pos = arr_begin;
 	uc->focused_node.next_value_pos = arr_begin;
 	uc->focused_node.child_begin_pos = arr_end;
-	uc->focused_node.next_child_pos = arr_end;
 	uc->focused_node.end_pos = arr_end;
 
 	char dst_elem_type;
@@ -1185,12 +1209,15 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 // children. Does not fail if the node is empty.
 static int ufbxi_enter_node(ufbxi_context *uc)
 {
-	if (uc->node_stack_top == uc->node_stack + UFBXI_NODE_STACK_SIZE) {
+	if (uc->node_stack_top + 1 == uc->node_stack + UFBXI_NODE_STACK_SIZE) {
 		return ufbxi_error(uc, "Node stack overflow: Too many nested nodes");
 	}
 
-	uc->node_stack_top++;
-	*uc->node_stack_top = uc->focused_node;
+	ufbxi_stack_node *top = ++uc->node_stack_top;
+	top->node = uc->focused_node;
+	top->next_child_pos = top->node.child_begin_pos;
+	top->map.mask = 0;
+
 	return 1;
 }
 
@@ -1202,8 +1229,8 @@ static int ufbxi_exit_node(ufbxi_context *uc)
 		return ufbxi_error(uc, "Internal: Trying to pop root node");
 	}
 
-	uc->focused_node = *uc->node_stack_top;
-	uc->node_stack_top--;
+	ufbxi_stack_node *top = uc->node_stack_top--;
+	uc->focused_node = top->node;
 	return 1;
 }
 
@@ -1263,16 +1290,15 @@ static int ufbxi_parse_node(ufbxi_context *uc, uint64_t pos, ufbxi_node *node)
 	node->next_value_pos = (size_t)value_pos;
 	node->child_begin_pos = (size_t)child_pos;
 	node->end_pos = (size_t)end_pos;
-	node->next_child_pos = (size_t)child_pos;
 	return 1;
 }
 
 // Move the focus to the next child of the currently entered node.
 static int ufbxi_next_child(ufbxi_context *uc, ufbxi_string *name)
 {
-	ufbxi_node *top = uc->node_stack_top;
+	ufbxi_stack_node *top = uc->node_stack_top;
 	uint64_t pos = top->next_child_pos;
-	if (pos == top->end_pos) return 0;
+	if (pos == top->node.end_pos) return 0;
 
 	// Parse the node to be focused. If we encounter a NULL-record here
 	// it will be reported as not having found the next child without error.
@@ -1283,23 +1309,119 @@ static int ufbxi_next_child(ufbxi_context *uc, ufbxi_string *name)
 	return 1;
 }
 
+static uint32_t ufbxi_hash_string(ufbxi_string str)
+{
+	// FNV-1a
+	uint32_t hash = 0x811c9dc5;
+	for (const char *c = str.data, *e = c + str.length; c != e; c++) {
+		hash = (hash ^ *c) * 0x01000193;
+	}
+	if (hash == 0) hash = 1;
+	return hash;
+}
+
+static int ufbxi_build_map(ufbxi_context *uc)
+{
+	// Collect all the offsets of the topmost entered node
+	ufbxi_stack_node *top = uc->node_stack_top;
+	ufbxi_child_map *map = &top->map;
+
+	uint64_t pos = top->node.child_begin_pos;
+	if (pos == top->node.end_pos) {
+		// No children -> no map -> fail to find without error
+		return 0;
+	}
+
+	size_t num = 0;
+
+	// Follow linked list
+	ufbxi_node node;
+	while (ufbxi_parse_node(uc, pos, &node)) {
+		if (num >= map->capacity) {
+			// Re-allocate map buffers if necessary
+			size_t cap = map->capacity * 2;
+			if (cap == 0) cap = 16;
+			size_t offset_size = cap * sizeof(uint64_t);
+			size_t entry_size = cap * 2 * sizeof(ufbxi_map_entry);
+			size_t size = offset_size + entry_size;
+			void *mem = malloc(offset_size + entry_size);
+			if (!mem) {
+				return ufbxi_errorf(uc, "Failed to allocate memory: %zu bytes", size);
+			}
+			uint64_t *offsets = (uint64_t*)mem;
+			ufbxi_map_entry *entries = (ufbxi_map_entry*)(offsets + cap);
+			memcpy(offsets, map->offsets, num * sizeof(uint64_t));
+			map->offsets = offsets;
+			map->entries = entries;
+			map->capacity = cap;
+		}
+
+		map->offsets[num] = pos;
+		pos = node.end_pos;
+		num++;
+	}
+
+	// Propagate failure from ufbxi_parse_node()
+	if (uc->failed) return 0;
+
+	// Find the lowest power of two map size that's large enough
+	size_t map_size = 1;
+	while (map_size < num * 2) {
+		map_size *= 2;
+	}
+	size_t mask = map_size - 1;
+	map->mask = mask;
+
+	// Clear the map
+	memset(map->entries, 0, sizeof(ufbxi_map_entry) * map_size);
+
+	// Insert entries to the map
+	for (size_t index = 0; index < num; index++) {
+		uint64_t offset = map->offsets[index];
+		int res = ufbxi_parse_node(uc, offset, &node);
+		ufbx_assert(res != 0); // We have parsed this offset already!
+
+		uint32_t hash = ufbxi_hash_string(node.name);
+		for (size_t entry_ix = hash; ; entry_ix++) {
+			ufbxi_map_entry *entry = &map->entries[entry_ix & mask];
+			if (entry->hash == 0) {
+				entry->hash = hash;
+				entry->index = (uint32_t)index;
+				break;
+			}
+		}
+	}
+
+	return 1;
+}
+
 // Move the focus to the first node matching a name in the currently entered node.
 // Does not affect iteration with `ufbxi_next_child()`
 static int ufbxi_find_node_str(ufbxi_context *uc, ufbxi_string str)
 {
-	// TODO
-	return 0;
-}
+	ufbxi_stack_node *top = uc->node_stack_top;
+	if (top->map.mask == 0) {
+		if (!ufbxi_build_map(uc)) return 0;
+	}
 
-// Move to the nth node matching a name in the currently entered node.
-// In/out `index`, finds the next node following `index`. Specify `-1` to
-// find the first node. Call with the same variable pointer to step through
-// all the found matching nodes.
-// Does not affect iteration with `ufbxi_next_child()`
-static int ufbxi_find_node_str_nth(ufbxi_context *uc, ufbxi_string str, int32_t *index)
-{
-	// TODO
-	return 0;
+	ufbxi_node node;
+	size_t mask = top->map.mask;
+	uint32_t hash = ufbxi_hash_string(str);
+	for (size_t entry_ix = hash; ; entry_ix++) {
+		ufbxi_map_entry *entry = &top->map.entries[entry_ix & mask];
+		if (entry->hash == hash) {
+			uint64_t offset = top->map.offsets[entry->index];
+			int res = ufbxi_parse_node(uc, offset, &node);
+			ufbx_assert(res == 1); // The node has been parsed already!
+			// TODO: Case insensitive?
+			if (ufbxi_streq_str(node.name, str)) {
+				uc->focused_node = node;
+				return 1;
+			}
+		} else if (entry->hash == 0) {
+			return 0;
+		}
+	}
 }
 
 // Convenient shorthands for the above functions.
@@ -1309,13 +1431,6 @@ ufbxi_find_node(ufbxi_context *uc, const char *name)
 {
 	ufbxi_string str = { name, strlen(name) };
 	return ufbxi_find_node_str(uc, str);
-}
-
-static ufbxi_forceinline int
-ufbxi_find_node_nth(ufbxi_context *uc, const char *name, int32_t *index)
-{
-	ufbxi_string str = { name, strlen(name) };
-	return ufbxi_find_node_str_nth(uc, str, index);
 }
 
 static ufbxi_forceinline int
