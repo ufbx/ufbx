@@ -419,6 +419,8 @@ double ufbxt_bechmark_end()
 	return sec;
 }
 
+char data_root[256];
+
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 {
 	const uint32_t file_versions[] = { 6100, 7400 };
@@ -431,7 +433,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 		for (uint32_t fi = 0; fi < 2; fi++) {
 			uint32_t version = file_versions[vi];
 			const char *format = fi == 1 ? "ascii" : "binary";
-			snprintf(buf, sizeof(buf), "%s_%u_%s.fbx", name, version, format);
+			snprintf(buf, sizeof(buf), "%s%s_%u_%s.fbx", data_root, name, version, format);
 
 			FILE *file = fopen(buf, "rb");
 			if (!file) continue;
@@ -534,6 +536,21 @@ int main(int argc, char **argv)
 		if (!strcmp(argv[i], "-t")) {
 			if (++i < argc) {
 				test_filter = argv[i];
+			}
+		}
+		if (!strcmp(argv[i], "-d")) {
+			if (++i < argc) {
+				size_t len = strlen(argv[i]);
+				if (len + 2 > sizeof(data_root)) {
+					fprintf(stderr, "-d: Data root too long");
+					return 1;
+				}
+				memcpy(data_root, argv[i], len);
+				char end = argv[i][len - 1];
+				if (end != '/' && end != '\\') {
+					data_root[len] = '/';
+					data_root[len + 1] = '\0';
+				}
 			}
 		}
 	}
