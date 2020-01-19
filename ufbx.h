@@ -2,6 +2,7 @@
 #define UFBX_UFBX_H_INLCUDED
 
 #include <stdint.h>
+#include <stddef.h>
 
 #define UFBX_ERROR_DESC_MAX_LENGTH 255
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
