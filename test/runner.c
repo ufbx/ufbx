@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <stdint.h>
 void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr);
 
@@ -417,14 +419,76 @@ double ufbxt_bechmark_end()
 	return sec;
 }
 
+void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
+{
+	const uint32_t file_versions[] = { 6100, 7400 };
+
+	char buf[512];
+
+	uint32_t num_opened = 0;
+
+	for (uint32_t vi = 0; vi < ufbxi_arraycount(file_versions); vi++) {
+		for (uint32_t fi = 0; fi < 2; fi++) {
+			uint32_t version = file_versions[vi];
+			const char *format = fi == 1 ? "ascii" : "binary";
+			snprintf(buf, sizeof(buf), "%s_%u_%s.fbx", name, version, format);
+
+			FILE *file = fopen(buf, "rb");
+			if (!file) continue;
+			num_opened++;
+
+			ufbxt_logf("%s", buf);
+
+			fseek(file, 0, SEEK_END);
+			size_t size = ftell(file);
+			fseek(file, 0, SEEK_SET);
+
+			char *data = malloc(size);
+			ufbxt_assert(data != NULL);
+			size_t num_read = fread(data, 1, size, file);
+			fclose(file);
+
+			if (num_read != size) {
+				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to load file");
+			}
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_memory(data, size, &error);
+			if (!scene) {
+				ufbxt_log_error_common(&error);
+				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file");
+			}
+
+			ufbxt_assert(scene->metadata.ascii == ((fi == 1) ? 1 : 0));
+			ufbxt_assert(scene->metadata.version == version);
+
+			test_fn(scene);
+
+			ufbx_free_scene(scene);
+			free(data);
+		}
+	}
+
+	if (num_opened == 0) {
+		ufbxt_assert_fail(__FILE__, __LINE__, "File not found");
+	}
+}
+
 #define UFBXT_IMPL 1
 #define UFBXT_TEST(name) void ufbxt_test_fn_##name(void)
+#define UFBXT_FILE_TEST(name) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene); \
+	void ufbxt_test_fn_file_##name(void) { \
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name); } \
+	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene)
+
 #include "all_tests.h"
 
 #undef UFBXT_IMPL
 #undef UFBXT_TEST
+#undef UFBXT_FILE_TEST
 #define UFBXT_IMPL 0
 #define UFBXT_TEST(name) { #name, &ufbxt_test_fn_##name },
+#define UFBXT_FILE_TEST(name) { "file_" #name, &ufbxt_test_fn_file_##name },
 ufbxt_test g_tests[] = {
 	#include "all_tests.h"
 };

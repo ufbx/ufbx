@@ -704,6 +704,11 @@ typedef struct {
 #define UFBXI_NODE_STACK_SIZE 16
 
 typedef struct {
+	ufbx_scene scene;
+	void *memory;
+} ufbxi_scene_imp;
+
+typedef struct {
 	const char *data;
 	size_t size;
 
@@ -721,9 +726,19 @@ typedef struct {
 	void *decompress_buffer;
 	size_t decompress_buffer_size;
 
+	// Output arena
+	char *result_data;
+	size_t result_pos;
+	size_t result_size;
+
 	// Error status
 	int failed;
 	ufbx_error *error;
+
+	// Result
+	ufbxi_scene_imp *scene_imp;
+	ufbx_scene *scene;
+
 } ufbxi_context;
 
 typedef enum {
@@ -811,6 +826,69 @@ static int ufbxi_do_errorf(ufbxi_context *uc, uint32_t line, const char *fmt, ..
 
 #define ufbxi_error(uc, desc) ufbxi_do_error((uc), __LINE__, (desc))
 #define ufbxi_errorf(uc, fmt, ...) ufbxi_do_errorf((uc), __LINE__, (fmt), __VA_ARGS__)
+
+static void *ufbxi_push_size_uninit(ufbxi_context *uc, size_t size, uint32_t line)
+{
+	// Align to 8 bytes
+	size += (size_t)-(intptr_t)size & 7u;
+
+	size_t pos = uc->result_pos;
+	if (uc->result_size - pos >= size) {
+		uc->result_pos = pos + size;
+		return uc->result_data + pos;
+	} else {
+		size_t page_size = uc->result_size * 2;
+		if (page_size == 0) page_size = 512;
+		while (page_size + 8 < size) {
+			page_size *= 2;
+		}
+
+		void *page = malloc(page_size);
+		if (!page) {
+			ufbxi_do_errorf(uc, line, "Failed to allocate memory: %zu bytes", page_size);
+			return NULL;
+		}
+		*(void**)page = uc->result_data;
+		uc->result_pos = 8 + size;
+		uc->result_data = page;
+		uc->result_size = page_size;
+		return (char*)page + 8;
+	}
+}
+
+static void *ufbxi_push_size_zero(ufbxi_context *uc, size_t size, uint32_t line)
+{
+	void *ptr = ufbxi_push_size_uninit(uc, size, line);
+	if (ptr) {
+		memset(ptr, 0, size);
+	}
+	return ptr;
+}
+
+static const char *ufbxi_push_string_size(ufbxi_context *uc, ufbxi_string str, uint32_t line)
+{
+	char *ptr = (char*)ufbxi_push_size_uninit(uc, str.length + 1, line);
+	memcpy(ptr, str.data, str.length);
+	ptr[str.length] = 0;
+	return ptr;
+}
+
+static void ufbxi_free_result(void *page)
+{
+	while (page) {
+		void *next = *(void**)page;
+		free(page);
+		page = next;
+	}
+}
+
+#define ufbxi_push_uninit(uc, type) (type*)ufbxi_push_size((uc), sizeof(type), __LINE__)
+#define ufbxi_push_uninit_n(uc, type, n) (type*)ufbxi_push_size((uc), (n) * sizeof(type), __LINE__)
+
+#define ufbxi_push_zero(uc, type) (type*)ufbxi_push_size_zero((uc), sizeof(type), __LINE__)
+#define ufbxi_push_zero_n(uc, type, n) (type*)ufbxi_push_size_zero((uc), (n) * sizeof(type), __LINE__)
+
+#define ufbxi_push_string(uc, str) ufbxi_push_string_size((uc), (str), __LINE__)
 
 // Prepare `dst` as an multivalue encoded array. Does not parse the data yet,
 // only counts the number of elements, checks types, and skips the array data.
@@ -1223,15 +1301,11 @@ static int ufbxi_enter_node(ufbxi_context *uc)
 
 // Exit a node previously entered using `ufbxi_enter_node()`. Future child node
 // iteration and find queries will be done to the parent node.
-static int ufbxi_exit_node(ufbxi_context *uc)
+static void ufbxi_exit_node(ufbxi_context *uc)
 {
-	if (uc->node_stack_top == uc->node_stack) {
-		return ufbxi_error(uc, "Internal: Trying to pop root node");
-	}
-
+	ufbx_assert(uc->node_stack_top != uc->node_stack);
 	ufbxi_stack_node *top = uc->node_stack_top--;
 	uc->focused_node = top->node;
-	return 1;
 }
 
 // Parse the node starting from `pos` to `node`. Does not modify `node` if the
@@ -1469,6 +1543,27 @@ ufbxi_find_values(ufbxi_context *uc, const char *name, const char *fmt, ...)
 	int ret = ufbxi_parse_values_va(uc, fmt, args);
 	va_end(args);
 	return ret;
+}
+
+static ufbxi_forceinline int
+ufbxi_find_enter_str(ufbxi_context *uc, ufbxi_string str)
+{
+	if (ufbxi_find_node_str(uc, str)) {
+		return ufbxi_enter_node(uc);
+	} else {
+		return 0;
+	}
+}
+
+static ufbxi_forceinline int
+ufbxi_find_enter(ufbxi_context *uc, const char *name)
+{
+	ufbxi_string str = { name, strlen(name) };
+	if (ufbxi_find_node_str(uc, str)) {
+		return ufbxi_enter_node(uc);
+	} else {
+		return 0;
+	}
 }
 
 // ASCII format parsing
@@ -1860,6 +1955,103 @@ static int ufbxi_ascii_parse(ufbxi_ascii *ua)
 	ufbxi_write_u32(ua->dst + UFBXI_BINARY_MAGIC_SIZE, version);
 
 	return 1;
+}
+
+// -- Parser
+
+static int ufbxi_read_root(ufbxi_context *uc)
+{
+	// Parse root node
+	const uint64_t root_pos = 27;
+	ufbxi_node root;
+
+	// Parse the root node if it exists
+	if (ufbxi_parse_node(uc, root_pos, &root) && root.name.length == 0) {
+		uc->focused_node = root;
+	} else {
+		uc->focused_node.child_begin_pos = 27;
+		uc->focused_node.next_value_pos = 27;
+		uc->focused_node.end_pos = uc->size;
+	}
+
+	uc->node_stack[0].node = uc->focused_node;
+	uc->node_stack[0].next_child_pos = uc->focused_node.child_begin_pos;
+	uc->node_stack_top = uc->node_stack;
+
+	// Read the header
+	if (ufbxi_find_enter(uc, "FBXHeaderExtension")) {
+		ufbxi_string creator;
+		if (ufbxi_find_value(uc, "Creator", 'S', &creator)) {
+			uc->scene->metadata.creator = ufbxi_push_string(uc, creator);
+		}
+
+		ufbxi_exit_node(uc);
+	}
+
+	return 1;
+}
+
+// -- API
+
+ufbx_scene *ufbx_load_memory(const void *data, size_t size, ufbx_error *error)
+{
+	void *data_to_free = NULL;
+	ufbxi_context uc = { data, size };
+	uc.error = error;
+
+	if (size < UFBXI_BINARY_MAGIC_SIZE + 2
+		|| memcmp(data, ufbxi_binary_magic, UFBXI_BINARY_MAGIC_SIZE)) {
+		// Parse as ASCII
+		if (size == 0) {
+			ufbxi_error(&uc, "Empty file");
+			return NULL;
+		}
+
+		const char *src = (const char*)data;
+		ufbxi_ascii ua = { src, src + size };
+		ua.error = error;
+
+		if (!ufbxi_ascii_parse(&ua)) {
+			free(ua.dst);
+			return NULL;
+		}
+
+		uc.data = ua.dst;
+		uc.size = ua.dst_pos;
+		uc.from_ascii = 1;
+		uc.version = ua.version;
+		data_to_free = ua.dst;
+	} else {
+		uc.version = ufbxi_read_u32((const char*)data + 23);
+	}
+
+	ufbx_scene *result = NULL;
+	uc.scene_imp = ufbxi_push_zero(&uc, ufbxi_scene_imp);
+	if (uc.scene_imp) {
+		uc.scene = &uc.scene_imp->scene;
+		uc.scene->metadata.ascii = uc.from_ascii;
+		uc.scene->metadata.version = uc.version;
+		if (ufbxi_read_root(&uc)) {
+			if (!uc.failed) {
+				result = uc.scene;
+			}
+		}
+	}
+
+	// Free temporary memory
+	free(data_to_free);
+	free(uc.decompress_buffer);
+	if (!result) {
+		ufbxi_free_result(uc.result_data);
+	}
+
+	return result;
+}
+
+void ufbx_free_scene(ufbx_scene *scene)
+{
+	ufbxi_scene_imp *imp = (ufbxi_scene_imp*)scene;
+	ufbxi_free_result(imp->memory);
 }
 
 #endif

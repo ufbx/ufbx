@@ -151,7 +151,7 @@ UFBXT_TEST(enter_single_node)
 	ufbxt_assert(uc->focused_node.child_begin_pos == 36);
 	
 	ufbxt_assert(!ufbxi_next_child(uc, &name));
-	ufbxt_assert(ufbxi_exit_node(uc));
+	ufbxi_exit_node(uc);
 	ufbxt_assert(!ufbxi_next_child(uc, &name));
 	ufbxt_assert(!uc->failed);
 }
