@@ -535,9 +535,19 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, uint64_t *p_pos)
 			{
 				// TODO: Do something better than per-byte copy
 				char *end = dst + length;
-				do {
+
+				while (end - dst >= 4) {
+					dst[0] = src[0];
+					dst[1] = src[1];
+					dst[2] = src[2];
+					dst[3] = src[3];
+					dst += 4;
+					src += 4;
+				}
+
+				while (dst != end) {
 					*dst++ = *src++;
-				} while (dst != end);
+				}
 			}
 		} else if (lit_length == 256) {
 			break;
@@ -1512,6 +1522,8 @@ static int ufbxi_parse_node(ufbxi_context *uc, uint64_t pos, ufbxi_node *node)
 	if (end_pos == 0) {
 		// NULL-record: Return without failure
 		return 0;
+	} else if (end_pos < pos + 13) {
+		return ufbxi_error(uc, "Node end offset is too low");
 	}
 
 	uint64_t value_pos = name_pos + name_len;
@@ -1540,6 +1552,34 @@ static int ufbxi_parse_node(ufbxi_context *uc, uint64_t pos, ufbxi_node *node)
 	node->next_value_pos = (size_t)value_pos;
 	node->child_begin_pos = (size_t)child_pos;
 	node->end_pos = (size_t)end_pos;
+	return 1;
+}
+
+// Find the starting offset of the next node.
+// Returns zero when parsing a NULL-record without failure.
+static ufbxi_forceinline int ufbxi_next_node_pos(ufbxi_context *uc, uint64_t pos, uint64_t *p_next_pos)
+{
+	uint64_t end_pos;
+	if (uc->version >= 7500 || uc->from_ascii) {
+		if (pos > uc->size - 25) {
+			return ufbxi_error(uc, "Internal: Trying to read node out of bounds");
+		}
+		end_pos = ufbxi_read_u64(uc->data + pos + 0);
+	} else {
+		if (pos > uc->size - 13) {
+			return ufbxi_error(uc, "Internal: Trying to read node out of bounds");
+		}
+		end_pos = ufbxi_read_u32(uc->data + pos + 0);
+	}
+
+	if (end_pos == 0) {
+		// NULL-record: Return without failure
+		return 0;
+	} else if (end_pos < pos + 13) {
+		return ufbxi_error(uc, "Node end offset is too low");
+	}
+
+	*p_next_pos = end_pos;
 	return 1;
 }
 
@@ -1574,14 +1614,14 @@ static int ufbxi_build_map(ufbxi_context *uc)
 	size_t num = 0;
 
 	// Follow linked list
-	ufbxi_node node;
-	while (ufbxi_parse_node(uc, pos, &node)) {
+	uint64_t next_pos;
+	while (ufbxi_next_node_pos(uc, pos, &next_pos)) {
 		if (num >= map->capacity) {
 			// Re-allocate map buffers if necessary
 			size_t cap = map->capacity * 2;
 			if (cap == 0) cap = 16;
 			size_t offset_size = cap * sizeof(uint64_t);
-			size_t entry_size = cap * 2 * sizeof(ufbxi_map_entry);
+			size_t entry_size = cap * 4 * sizeof(ufbxi_map_entry);
 			size_t size = offset_size + entry_size;
 			void *mem = malloc(offset_size + entry_size);
 			if (!mem) {
@@ -1597,7 +1637,7 @@ static int ufbxi_build_map(ufbxi_context *uc)
 		}
 
 		map->offsets[num] = pos;
-		pos = node.end_pos;
+		pos = next_pos;
 		num++;
 	}
 
@@ -1616,10 +1656,11 @@ static int ufbxi_build_map(ufbxi_context *uc)
 	memset(map->entries, 0, sizeof(ufbxi_map_entry) * map_size);
 
 	// Insert entries to the map
+	ufbxi_node node;
 	for (size_t index = 0; index < num; index++) {
 		uint64_t offset = map->offsets[index];
 		int res = ufbxi_parse_node(uc, offset, &node);
-		ufbx_assert(res != 0); // We have parsed this offset already!
+		if (!res) return 0;
 
 		uint32_t hash = ufbxi_hash_string(node.name);
 		for (size_t entry_ix = hash; ; entry_ix++) {
