@@ -33,20 +33,15 @@
 
 // -- Utility
 
-typedef struct {
-	const char *data;
-	size_t length;
-} ufbxi_string;
-
 static ufbxi_forceinline int
-ufbxi_streq(ufbxi_string str, const char *ref)
+ufbxi_streq(ufbx_string str, const char *ref)
 {
 	size_t length = strlen(ref);
 	return str.length == length && !memcmp(str.data, ref, length);
 }
 
 static ufbxi_forceinline int
-ufbxi_streq_str(ufbxi_string str, ufbxi_string ref)
+ufbxi_streq_str(ufbx_string str, ufbx_string ref)
 {
 	return str.length == ref.length && !memcmp(str.data, ref.data, ref.length);
 }
@@ -672,7 +667,7 @@ ufbxi_inflate(void *dst, size_t dst_size, const void *src, size_t src_size)
 // -- Binary parsing
 
 typedef struct {
-	ufbxi_string name;
+	ufbx_string name;
 	size_t value_begin_pos;
 	size_t child_begin_pos;
 	size_t end_pos;
@@ -702,6 +697,30 @@ typedef struct {
 } ufbxi_stack_node;
 
 #define UFBXI_NODE_STACK_SIZE 16
+#define UFBXI_STRING_POOL_SIZE 512
+#define UFBXI_STRING_SCAN_DISTANCE 16
+#define UFBXI_MAX_TEMP_STACKS 4
+#define UFBXI_MAX_TEMP_STACK_PAGES 6
+
+static const size_t ufbxi_temp_page_sizes[UFBXI_MAX_TEMP_STACK_PAGES] = {
+	1 << 12, 1 << 14, 1 << 16, 1 << 17, 1 << 18, 1 << 18,
+};
+
+typedef struct {
+	uint32_t hash;
+	uint32_t reftime;
+	ufbx_string str;
+} ufbxi_pushed_string;
+
+typedef struct {
+	char *data;
+	size_t offset;
+} ufbxi_temp_page;
+
+typedef struct {
+	ufbxi_temp_page pages[UFBXI_MAX_TEMP_STACK_PAGES];
+	size_t page_index;
+} ufbxi_temp_stack;
 
 typedef struct {
 	ufbx_scene scene;
@@ -731,9 +750,16 @@ typedef struct {
 	size_t result_pos;
 	size_t result_size;
 
+	// Temp stacks
+	ufbxi_temp_stack temp_stacks[UFBXI_MAX_TEMP_STACKS];
+
 	// Error status
 	int failed;
 	ufbx_error *error;
+
+	// Pushed string pool LRU cache
+	ufbxi_pushed_string string_pool[UFBXI_STRING_POOL_SIZE];
+	uint32_t string_pool_time;
 
 	// Result
 	ufbxi_scene_imp *scene_imp;
@@ -771,9 +797,9 @@ typedef struct {
 	char type_code;
 	ufbxi_val_class value_class;
 	union {
-		uint64_t i;
+		int64_t i;
 		double f;
-		ufbxi_string str;
+		ufbx_string str;
 		ufbxi_array arr;
 	} value;
 } ufbxi_any_value;
@@ -865,12 +891,150 @@ static void *ufbxi_push_size_zero(ufbxi_context *uc, size_t size, uint32_t line)
 	return ptr;
 }
 
-static const char *ufbxi_push_string_size(ufbxi_context *uc, ufbxi_string str, uint32_t line)
+static void *ufbxi_temp_push_size_uninit(ufbxi_context *uc, int index, size_t num, size_t size, uint32_t line)
 {
+	ufbx_assert(index < UFBXI_MAX_TEMP_STACKS);
+	ufbxi_temp_stack *stack = &uc->temp_stacks[index];
+
+	// Align to 8 bytes
+	size += (size_t)-(intptr_t)size & 7u;
+	size *= num;
+
+	while (stack->page_index < UFBXI_MAX_TEMP_STACK_PAGES) {
+		ufbxi_temp_page *page = &stack->pages[stack->page_index];
+		size_t page_size = ufbxi_temp_page_sizes[stack->page_index];
+		size_t space_left = page_size - page->offset;
+		if (space_left >= size) {
+			if (page->data == NULL) {
+				page->data = (char*)malloc(page_size);
+				if (!page->data) {
+					ufbxi_do_errorf(uc, line, "Failed to allocate memory: %zu bytes", page_size);
+					return NULL;
+				}
+			}
+			void *ptr = page->data + page->offset;
+			page->offset += size;
+			return ptr;
+		}
+		stack->page_index++;
+	}
+
+	ufbxi_do_errorf(uc, line, "Temp stack overflow: %d", index);
+	return NULL;
+}
+
+static void *ufbxi_temp_push_size_zero(ufbxi_context *uc, int index, size_t num, size_t size, uint32_t line)
+{
+	void *ptr = ufbxi_temp_push_size_uninit(uc, index, num, size, line);
+	if (ptr) {
+		memset(ptr, 0, size);
+	}
+	return ptr;
+}
+
+static void ufbxi_temp_pop_size(ufbxi_context *uc, int index, size_t num, size_t size)
+{
+	ufbx_assert(index < UFBXI_MAX_TEMP_STACKS);
+	ufbxi_temp_stack *stack = &uc->temp_stacks[index];
+	ufbx_assert(stack->page_index < UFBXI_MAX_TEMP_STACK_PAGES);
+
+	// Align to 8 bytes
+	size += (size_t)-(intptr_t)size & 7u;
+
+	size_t size_left = num * size;
+	for (;;) {
+		ufbxi_temp_page *page = &stack->pages[stack->page_index];
+		if (page->offset >= size_left) {
+			page->offset -= size_left;
+			return;
+		} else {
+			size_left -= page->offset;
+			page->offset = 0;
+			ufbx_assert(stack->page_index > 0);
+			stack->page_index--;
+		}
+	}
+}
+
+static void *ufbxi_temp_retain_size(ufbxi_context *uc, int index, size_t num, size_t size, uint32_t line)
+{
+	ufbxi_temp_stack *stack = &uc->temp_stacks[index];
+	ufbx_assert(stack->page_index < UFBXI_MAX_TEMP_STACK_PAGES);
+
+	// Align to 8 bytes
+	size_t unaligned_size = size;
+	size += (size_t)-(intptr_t)size & 7u;
+
+	char *dst = ufbxi_push_size_uninit(uc, num * unaligned_size, line);
+	if (!dst) return NULL;
+	dst += num * unaligned_size;
+
+	for (size_t i = 0; i < num; i++) {
+		dst -= size;
+		while (stack->pages[stack->page_index].offset == 0) {
+			stack->page_index--;
+		}
+
+		ufbxi_temp_page *page = &stack->pages[stack->page_index];
+		ufbx_assert(page->offset >= size);
+		page->offset -= size;
+		memcpy(dst, page->data + page->offset, unaligned_size);
+	}
+
+	return dst;
+}
+
+static uint32_t ufbxi_hash_string(ufbx_string str)
+{
+	// FNV-1a
+	uint32_t hash = 0x811c9dc5;
+	for (const char *c = str.data, *e = c + str.length; c != e; c++) {
+		hash = (hash ^ (uint32_t)(unsigned char)*c) * 0x01000193;
+	}
+	if (hash == 0) hash = 1;
+	return hash;
+}
+
+static ufbx_string ufbxi_push_string_size(ufbxi_context *uc, ufbx_string str, uint32_t line)
+{
+	// Special case zero length
+	if (str.length == 0) {
+		ufbx_string zero_str = { "", 0 };
+		return zero_str;
+	}
+
+	uint32_t hash = ufbxi_hash_string(str);
+	uint32_t base_index = hash >> 16;
+	uint32_t insert_index = 0;
+	uint32_t insert_time = UINT32_MAX;
+	for (uint32_t scan = 0; scan < UFBXI_STRING_SCAN_DISTANCE; scan++) {
+		uint32_t index = (base_index + (scan*scan)) & (UFBXI_STRING_POOL_SIZE - 1);
+		ufbxi_pushed_string *ps = &uc->string_pool[index];
+		if (ps->hash == hash && ufbxi_streq_str(str, ps->str)) {
+			ps->reftime = ++uc->string_pool_time;
+			return ps->str;
+		} else if (ps->hash == 0) {
+			insert_index = index;
+			break;
+		} else if (ps->reftime < insert_time) {
+			insert_index = index;
+		}
+	}
+
 	char *ptr = (char*)ufbxi_push_size_uninit(uc, str.length + 1, line);
 	memcpy(ptr, str.data, str.length);
 	ptr[str.length] = 0;
-	return ptr;
+
+	ufbx_string s;
+	s.data = ptr;
+	s.length = str.length;
+
+	ufbxi_pushed_string *ps = &uc->string_pool[insert_index];
+	ps->hash = hash;
+	ps->reftime = ++uc->string_pool_time;
+	ps->str = s;
+
+	return s;
 }
 
 static void ufbxi_free_result(void *page)
@@ -882,13 +1046,25 @@ static void ufbxi_free_result(void *page)
 	}
 }
 
-#define ufbxi_push_uninit(uc, type) (type*)ufbxi_push_size((uc), sizeof(type), __LINE__)
-#define ufbxi_push_uninit_n(uc, type, n) (type*)ufbxi_push_size((uc), (n) * sizeof(type), __LINE__)
+#define ufbxi_push_uninit(uc, type) (type*)ufbxi_push_size_uninit((uc), sizeof(type), __LINE__)
+#define ufbxi_push_uninit_n(uc, type, n) (type*)ufbxi_push_size_uninit((uc), (n) * sizeof(type), __LINE__)
 
 #define ufbxi_push_zero(uc, type) (type*)ufbxi_push_size_zero((uc), sizeof(type), __LINE__)
 #define ufbxi_push_zero_n(uc, type, n) (type*)ufbxi_push_size_zero((uc), (n) * sizeof(type), __LINE__)
 
 #define ufbxi_push_string(uc, str) ufbxi_push_string_size((uc), (str), __LINE__)
+
+#define ufbxi_temp_push_uninit(uc, index, type) (type*)ufbxi_temp_push_size_uninit((uc), (index), 1, sizeof(type), __LINE__)
+#define ufbxi_temp_push_uninit_n(uc, index, type, n) (type*)ufbxi_temp_push_size_uninit((uc), (index), (n), sizeof(type), __LINE__)
+
+#define ufbxi_temp_push_zero(uc, index, type) (type*)ufbxi_temp_push_size_zero((uc), (index), 1, sizeof(type), __LINE__)
+#define ufbxi_temp_push_zero_n(uc, index, type, n) (type*)ufbxi_temp_push_size_zero((uc), (index), (n), sizeof(type), __LINE__)
+
+#define ufbxi_temp_pop(uc, index, type) ufbxi_temp_pop_size((uc), (index), 1, sizeof(type), __LINE__)
+#define ufbxi_temp_pop_n(uc, index, type, n) ufbxi_temp_pop_size((uc), (index), (n), sizeof(type), __LINE__)
+
+#define ufbxi_temp_retain(uc, index, type) (type*)ufbxi_temp_retain_size((uc), (index), 1, sizeof(type), __LINE__)
+#define ufbxi_temp_retain_n(uc, index, type, n) (type*)ufbxi_temp_retain_size((uc), (index), (n), sizeof(type), __LINE__)
 
 // Prepare `dst` as an multivalue encoded array. Does not parse the data yet,
 // only counts the number of elements, checks types, and skips the array data.
@@ -927,7 +1103,7 @@ static int ufbxi_convert_multivalue_array(ufbxi_context *uc, ufbxi_array *dst, c
 // Parse the next node value in the input stream.
 // `dst_type` is a FBX-like type string:
 //   Numbers: "I" u/int32_t  "L" u/int64_t  "B" char (bool)  "F" float  "D" double
-//   Data: "SR" ufbxi_string  "ilfdb" ufbxi_val_array (matching upper-case type)
+//   Data: "SR" ufbx_string  "ilfdb" ufbxi_val_array (matching upper-case type)
 //   Misc: "." (ignore)  "?" ufbxi_any_value
 // Performs implicit conversions:
 //   FDILY -> FD, ILYC -> ILB, ILFDYilfd -> fd, ILYCilb -> ilb
@@ -1034,9 +1210,9 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		}
 
 	} else if (val_class == ufbxi_val_string) {
-		ufbxi_string *str;
+		ufbx_string *str;
 		switch (dst_type) {
-		case 'S': str = (ufbxi_string*)dst; break;
+		case 'S': str = (ufbx_string*)dst; break;
 		case '?': str = &any->value.str; break;
 		default:
 			return ufbxi_errorf(uc, "Cannot convert from string '%c' to '%c'", src_type, dst_type);
@@ -1368,7 +1544,7 @@ static int ufbxi_parse_node(ufbxi_context *uc, uint64_t pos, ufbxi_node *node)
 }
 
 // Move the focus to the next child of the currently entered node.
-static int ufbxi_next_child(ufbxi_context *uc, ufbxi_string *name)
+static int ufbxi_next_child(ufbxi_context *uc, ufbx_string *name)
 {
 	ufbxi_stack_node *top = uc->node_stack_top;
 	uint64_t pos = top->next_child_pos;
@@ -1381,17 +1557,6 @@ static int ufbxi_next_child(ufbxi_context *uc, ufbxi_string *name)
 	top->next_child_pos = uc->focused_node.end_pos;
 	if (name) *name = uc->focused_node.name;
 	return 1;
-}
-
-static uint32_t ufbxi_hash_string(ufbxi_string str)
-{
-	// FNV-1a
-	uint32_t hash = 0x811c9dc5;
-	for (const char *c = str.data, *e = c + str.length; c != e; c++) {
-		hash = (hash ^ (uint32_t)(unsigned char)*c) * 0x01000193;
-	}
-	if (hash == 0) hash = 1;
-	return hash;
 }
 
 static int ufbxi_build_map(ufbxi_context *uc)
@@ -1425,6 +1590,7 @@ static int ufbxi_build_map(ufbxi_context *uc)
 			uint64_t *offsets = (uint64_t*)mem;
 			ufbxi_map_entry *entries = (ufbxi_map_entry*)(offsets + cap);
 			memcpy(offsets, map->offsets, num * sizeof(uint64_t));
+			free(map->offsets);
 			map->offsets = offsets;
 			map->entries = entries;
 			map->capacity = cap;
@@ -1471,7 +1637,7 @@ static int ufbxi_build_map(ufbxi_context *uc)
 
 // Move the focus to the first node matching a name in the currently entered node.
 // Does not affect iteration with `ufbxi_next_child()`
-static int ufbxi_find_node_str(ufbxi_context *uc, ufbxi_string str)
+static int ufbxi_find_node_str(ufbxi_context *uc, ufbx_string str)
 {
 	ufbxi_stack_node *top = uc->node_stack_top;
 	if (top->map.mask == 0) {
@@ -1503,12 +1669,12 @@ static int ufbxi_find_node_str(ufbxi_context *uc, ufbxi_string str)
 static ufbxi_forceinline int
 ufbxi_find_node(ufbxi_context *uc, const char *name)
 {
-	ufbxi_string str = { name, strlen(name) };
+	ufbx_string str = { name, strlen(name) };
 	return ufbxi_find_node_str(uc, str);
 }
 
 static ufbxi_forceinline int
-ufbxi_find_value_str(ufbxi_context *uc, ufbxi_string str, char dst_type, void *dst)
+ufbxi_find_value_str(ufbxi_context *uc, ufbx_string str, char dst_type, void *dst)
 {
 	if (!ufbxi_find_node_str(uc, str)) return 0;
 	return ufbxi_parse_value(uc, dst_type, dst);
@@ -1517,13 +1683,13 @@ ufbxi_find_value_str(ufbxi_context *uc, ufbxi_string str, char dst_type, void *d
 static ufbxi_forceinline int
 ufbxi_find_value(ufbxi_context *uc, const char *name, char dst_type, void *dst)
 {
-	ufbxi_string str = { name, strlen(name) };
+	ufbx_string str = { name, strlen(name) };
 	if (!ufbxi_find_node_str(uc, str)) return 0;
 	return ufbxi_parse_value(uc, dst_type, dst);
 }
 
 static ufbxi_forceinline int
-ufbxi_find_values_str(ufbxi_context *uc, ufbxi_string str, const char *fmt, ...)
+ufbxi_find_values_str(ufbxi_context *uc, ufbx_string str, const char *fmt, ...)
 {
 	if (!ufbxi_find_node_str(uc, str)) return 0;
 	va_list args;
@@ -1536,7 +1702,7 @@ ufbxi_find_values_str(ufbxi_context *uc, ufbxi_string str, const char *fmt, ...)
 static ufbxi_forceinline int
 ufbxi_find_values(ufbxi_context *uc, const char *name, const char *fmt, ...)
 {
-	ufbxi_string str = { name, strlen(name) };
+	ufbx_string str = { name, strlen(name) };
 	if (!ufbxi_find_node_str(uc, str)) return 0;
 	va_list args;
 	va_start(args, fmt);
@@ -1546,7 +1712,7 @@ ufbxi_find_values(ufbxi_context *uc, const char *name, const char *fmt, ...)
 }
 
 static ufbxi_forceinline int
-ufbxi_find_enter_str(ufbxi_context *uc, ufbxi_string str)
+ufbxi_find_enter_str(ufbxi_context *uc, ufbx_string str)
 {
 	if (ufbxi_find_node_str(uc, str)) {
 		return ufbxi_enter_node(uc);
@@ -1558,7 +1724,7 @@ ufbxi_find_enter_str(ufbxi_context *uc, ufbxi_string str)
 static ufbxi_forceinline int
 ufbxi_find_enter(ufbxi_context *uc, const char *name)
 {
-	ufbxi_string str = { name, strlen(name) };
+	ufbx_string str = { name, strlen(name) };
 	if (ufbxi_find_node_str(uc, str)) {
 		return ufbxi_enter_node(uc);
 	} else {
@@ -1578,7 +1744,7 @@ ufbxi_find_enter(ufbxi_context *uc, const char *name)
 #define UFBXI_ASCII_MAX_STACK_SIZE 64
 
 typedef struct {
-	ufbxi_string str;
+	ufbx_string str;
 	char type;
 	union {
 		double f64;
@@ -1598,7 +1764,7 @@ typedef struct {
 	ufbxi_ascii_token prev_token;
 	ufbxi_ascii_token token;
 
-	ufbxi_string node_stack[UFBXI_ASCII_MAX_STACK_SIZE];
+	ufbx_string node_stack[UFBXI_ASCII_MAX_STACK_SIZE];
 	uint32_t node_stack_size;
 
 	uint32_t version;
@@ -1961,32 +2127,47 @@ static int ufbxi_ascii_parse(ufbxi_ascii *ua)
 
 typedef struct {
 	uint32_t hash;
-	ufbxi_string name;
+	ufbx_string name;
 	ufbx_property_type type;
 } ufbxi_proptype_map_entry;
 
 // Generated by `misc/prop_type_perfect_hash.py`
-#define ufbxi_proptype_permute_hash(h) ((((h) * 5741) >> 12) % 16)
-static const ufbxi_proptype_map_entry ufbxi_proptype_map[16] = {
-	{ 0x9bec7490u, { "DateTime", 8 }, UFBX_PROP_DATE_TIME },
-	{ 0xa0eb0f08u, { "double", 6 }, UFBX_PROP_NUMBER },
+#define ufbxi_proptype_permute_hash(h) ((((h) * 51) >> 8) % 32)
+static const ufbxi_proptype_map_entry ufbxi_proptype_map[32] = {
+	{ 0xffcc7052u, { "Lcl Rotation", 12 }, UFBX_PROP_ROTATION },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
+	{ 0x61e9eac0u, { "Number", 6 }, UFBX_PROP_NUMBER },
+	{ 0xe5b43cf8u, { "Color", 5 }, UFBX_PROP_COLOR },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
+	{ 0x604f4858u, { "String", 6 }, UFBX_PROP_STRING },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
+	{ 0xec95435fu, { "Boolean", 7 }, UFBX_PROP_BOOLEAN },
+	{ 0x95e97e5eu, { "int", 3 }, UFBX_PROP_INTEGER },
+	{ 0x84006183u, { "KString", 7 }, UFBX_PROP_STRING },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
+	{ 0x53b2b785u, { "Vector3D", 8 }, UFBX_PROP_VECTOR },
+	{ 0x816cb000u, { "enum", 4 }, UFBX_PROP_INTEGER },
 	{ 0x519a291fu, { "Lcl Translation", 15 }, UFBX_PROP_TRANSLATION },
 	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
-	{ 0xe5b43cf8u, { "Color", 5 }, UFBX_PROP_COLOR },
-	{ 0x604f4858u, { "String", 6 }, UFBX_PROP_STRING },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
 	{ 0xd9a953e5u, { "Integer", 7 }, UFBX_PROP_INTEGER },
-	{ 0x61e9eac0u, { "Number", 6 }, UFBX_PROP_NUMBER },
 	{ 0x679a6399u, { "Lcl Scaling", 11 }, UFBX_PROP_SCALING },
-	{ 0x53b2b785u, { "Vector3D", 8 }, UFBX_PROP_VECTOR },
+	{ 0x9bec7490u, { "DateTime", 8 }, UFBX_PROP_DATE_TIME },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
+	{ 0xc894953du, { "bool", 4 }, UFBX_PROP_BOOLEAN },
+	{ 0u, { 0,0 }, UFBX_PROP_UNKNOWN },
 	{ 0xbc50ad22u, { "Vector", 6 }, UFBX_PROP_VECTOR },
+	{ 0xa0eb0f08u, { "double", 6 }, UFBX_PROP_NUMBER },
 	{ 0xff873b9bu, { "ColorRGB", 8 }, UFBX_PROP_COLOR },
-	{ 0x84006183u, { "KString", 7 }, UFBX_PROP_STRING },
-	{ 0xffcc7052u, { "Lcl Rotation", 12 }, UFBX_PROP_ROTATION },
-	{ 0x95e97e5eu, { "int", 3 }, UFBX_PROP_INTEGER },
-	{ 0x816cb000u, { "enum", 4 }, UFBX_PROP_INTEGER },
 };
-
-static ufbx_property_type ufbxi_get_prop_type(ufbxi_string name)
+static ufbx_property_type ufbxi_get_prop_type(ufbx_string name)
 {
 	uint32_t hash = ufbxi_hash_string(name);
 	uint32_t index = ufbxi_proptype_permute_hash(hash);
@@ -1996,6 +2177,110 @@ static ufbx_property_type ufbxi_get_prop_type(ufbxi_string name)
 	} else {
 		return UFBX_PROP_UNKNOWN;
 	}
+}
+
+static int ufbxi_read_property(ufbxi_context *uc, ufbx_property *prop, int version)
+{
+	if (!ufbxi_parse_value(uc, 'S', &prop->name)) return 0;
+	if (!ufbxi_parse_value(uc, 'S', &prop->type_str)) return 0;
+	if (version == 70) {
+		if (!ufbxi_parse_value(uc, 'S', &prop->subtype_str)) return 0;
+	} else {
+		prop->subtype_str.data = "";
+		prop->subtype_str.length = 0;
+	}
+	if (!ufbxi_parse_value(uc, 'S', &prop->flags)) return 0;
+
+	prop->name = ufbxi_push_string(uc, prop->name);
+	prop->type_str = ufbxi_push_string(uc, prop->type_str);
+	prop->subtype_str = ufbxi_push_string(uc, prop->subtype_str);
+	prop->flags = ufbxi_push_string(uc, prop->flags);
+
+	prop->type = ufbxi_get_prop_type(prop->type_str);
+	if (prop->type == UFBX_PROP_UNKNOWN) {
+		prop->type = ufbxi_get_prop_type(prop->subtype_str);
+	}
+
+	memset(&prop->value_str, 0, sizeof(prop->value_str));
+	memset(prop->value_int, 0, sizeof(prop->value_int));
+	memset(prop->value_float, 0, sizeof(prop->value_float));
+
+	for (size_t i = 0; i < 4; i++) {
+		if (uc->focused_node.next_value_pos == uc->focused_node.child_begin_pos) break;
+
+		ufbxi_any_value val;
+		if (!ufbxi_parse_value(uc, '?', &val)) return 0;
+
+		if (val.value_class == ufbxi_val_int) {
+			prop->value_int[i] = val.value.i;
+			prop->value_float[i] = (double)val.value.i;
+		} else if (val.value_class == ufbxi_val_float) {
+			prop->value_int[i] = (int64_t)val.value.f;
+			prop->value_float[i] = val.value.f;
+		} else if (val.value_class == ufbxi_val_string) {
+			if (prop->value_str.data) {
+				return ufbxi_error(uc, "Multiple strings in property");
+			}
+			prop->value_str = ufbxi_push_string(uc, val.value.str);
+		} else {
+			return ufbxi_errorf(uc, "Bad property value type: '%c'", val.type_code);
+		}
+	}
+
+	return 1;
+}
+
+static int ufbxi_read_properties(ufbxi_context *uc, ufbx_property **p_props, size_t *p_num)
+{
+	int version = 0;
+	if (ufbxi_find_enter(uc, "Properties70")) {
+		version = 70;
+	} else if (ufbxi_find_enter(uc, "Properties60")) {
+		version = 60;
+	} else {
+		return 1;
+	}
+
+	size_t num = 0;
+	while (ufbxi_next_child(uc, NULL)) {
+		ufbx_property *prop = ufbxi_temp_push_uninit(uc, 0, ufbx_property);
+		if (!prop) return 0;
+		if (!ufbxi_read_property(uc, prop, version)) return 0;
+		num++;
+	}
+
+	*p_props = ufbxi_temp_retain_n(uc, 0, ufbx_property, num);
+	*p_num = num;
+
+	ufbxi_exit_node(uc);
+	return 1;
+}
+
+static int ufbxi_read_definitions(ufbxi_context *uc)
+{
+	ufbx_string name;
+
+	size_t num = 0;
+	while (ufbxi_next_child(uc, &name)) {
+		if (ufbxi_streq(name, "ObjectType")) {
+			if (!ufbxi_enter_node(uc)) return 0;
+
+			ufbx_node *node = ufbxi_temp_push_zero(uc, 0, ufbx_node);
+			if (!node) return 0;
+			num++;
+
+			if (ufbxi_find_enter(uc, "PropertyTemplate")) {
+				if (!ufbxi_read_properties(uc, &node->properties, &node->num_properties)) return 0;
+				ufbxi_exit_node(uc);
+			}
+
+			ufbxi_exit_node(uc);
+		}
+	}
+
+	ufbx_node *nodes = ufbxi_temp_retain_n(uc, 0, ufbx_node, num);
+
+	return 1;
 }
 
 static int ufbxi_read_root(ufbxi_context *uc)
@@ -2019,11 +2304,17 @@ static int ufbxi_read_root(ufbxi_context *uc)
 
 	// Read the header
 	if (ufbxi_find_enter(uc, "FBXHeaderExtension")) {
-		ufbxi_string creator;
+		ufbx_string creator;
 		if (ufbxi_find_value(uc, "Creator", 'S', &creator)) {
 			uc->scene->metadata.creator = ufbxi_push_string(uc, creator);
 		}
 
+		ufbxi_exit_node(uc);
+	}
+
+	// Read definitions
+	if (ufbxi_find_enter(uc, "Definitions")) {
+		if (!ufbxi_read_definitions(uc)) return 0;
 		ufbxi_exit_node(uc);
 	}
 

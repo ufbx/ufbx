@@ -49,7 +49,7 @@ UFBXT_TEST(iter_two_nodes)
 		"\x05" "World"
 	);
 
-	ufbxi_string name;
+	ufbx_string name;
 	ufbxt_assert(ufbxi_next_child(uc, &name));
 	ufbxt_assert(ufbxi_streq(name, "Hello"));
 	ufbxt_assert(uc->focused_node.value_begin_pos == 18);
@@ -137,7 +137,7 @@ UFBXT_TEST(enter_single_node)
 		"\x00\x00\x00\x00" "\x00\x00\x00\x00" "\x00\x00\x00\x00" "\x00"
 	);
 
-	ufbxi_string name;
+	ufbx_string name;
 	ufbxt_assert(ufbxi_next_child(uc, &name));
 	ufbxt_assert(ufbxi_streq(name, "Hello"));
 	ufbxt_assert(uc->focused_node.value_begin_pos == 18);
@@ -169,7 +169,7 @@ UFBXT_TEST(node_stack_error)
 	);
 
 	int32_t dummy;
-	ufbxi_string name;
+	ufbx_string name;
 	ufbxt_assert(ufbxi_next_child(uc, &name));
 	ufbxt_assert(ufbxi_enter_node(uc));
 	ufbxt_assert(ufbxi_next_child(uc, &name));

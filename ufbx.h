@@ -15,12 +15,6 @@ typedef struct ufbx_error {
 	char stack[UFBX_ERROR_STACK_MAX_DEPTH][UFBX_ERROR_DESC_MAX_LENGTH + 1];
 } ufbx_error;
 
-typedef struct ufbx_metadata {
-	int ascii;
-	uint32_t version;
-	const char *creator;
-} ufbx_metadata;
-
 typedef enum ufbx_property_type {
 	UFBX_PROP_UNKNOWN,
 	UFBX_PROP_BOOLEAN,
@@ -35,12 +29,20 @@ typedef enum ufbx_property_type {
 	UFBX_PROP_SCALING,
 } ufbx_property_type;
 
+typedef struct ufbx_string {
+	const char *data;
+	size_t length;
+} ufbx_string;
+
 typedef struct ufbx_property {
-	const char *name;
-	const char *type_str;
+	ufbx_string name;
 	ufbx_property_type type;
 
-	const char *value_str;
+	ufbx_string type_str;
+	ufbx_string subtype_str;
+	ufbx_string flags;
+
+	ufbx_string value_str;
 	int64_t value_int[4];
 	double value_float[4];
 } ufbx_property;
@@ -64,8 +66,8 @@ typedef struct ufbx_model_node ufbx_model_node;
 typedef struct ufbx_mesh_node ufbx_mesh_node;
 
 struct ufbx_node {
-	const char *name;
-	const char *type_str;
+	ufbx_string name;
+	ufbx_string type_str;
 
 	ufbx_property *properties;
 	size_t num_properties;
@@ -79,8 +81,17 @@ struct ufbx_node {
 	size_t num_children;
 };
 
+typedef struct ufbx_metadata {
+	int ascii;
+	uint32_t version;
+	ufbx_string creator;
+} ufbx_metadata;
+
 typedef struct ufbx_scene {
 	ufbx_metadata metadata;
+
+	ufbx_node *templates;
+	size_t num_templates;
 
 	ufbx_model_node *root_model;
 

@@ -13,6 +13,8 @@ def propType(name, enum):
     return PropType(name, str_hash(name), enum)
 
 types = [
+    propType("Boolean", "BOOLEAN"),
+    propType("bool", "BOOLEAN"),
     propType("Integer", "INTEGER"),
     propType("int", "INTEGER"),
     propType("enum", "INTEGER"),
@@ -30,7 +32,7 @@ types = [
     propType("Lcl Scaling", "SCALING"),
 ]
 
-MAP_SIZE = 16
+MAP_SIZE = 32
 
 arr = [None] * MAP_SIZE
 
@@ -64,4 +66,4 @@ print()
 print()
 
 for t in types:
-	print("ufbxt_assert(ufbxi_get_prop_type(make_str(\"{}\")) == UFBX_PROP_{});".format(t.name, t.enum))
+	print("\tufbxt_assert(ufbxi_get_prop_type(make_str(\"{}\")) == UFBX_PROP_{});".format(t.name, t.enum))
