@@ -700,10 +700,10 @@ typedef struct {
 #define UFBXI_STRING_POOL_SIZE 512
 #define UFBXI_STRING_SCAN_DISTANCE 16
 #define UFBXI_MAX_TEMP_STACKS 4
-#define UFBXI_MAX_TEMP_STACK_PAGES 6
+#define UFBXI_MAX_TEMP_STACK_PAGES 8
 
 static const size_t ufbxi_temp_page_sizes[UFBXI_MAX_TEMP_STACK_PAGES] = {
-	1 << 12, 1 << 14, 1 << 16, 1 << 17, 1 << 18, 1 << 18,
+	1 << 12, 1 << 14, 1 << 16, 1 << 17, 1 << 18, 1 << 18, 1 << 18, 1 << 18
 };
 
 typedef struct {
@@ -970,7 +970,7 @@ static void *ufbxi_temp_retain_size(ufbxi_context *uc, int index, size_t num, si
 	dst += num * unaligned_size;
 
 	for (size_t i = 0; i < num; i++) {
-		dst -= size;
+		dst -= unaligned_size;
 		while (stack->pages[stack->page_index].offset == 0) {
 			stack->page_index--;
 		}

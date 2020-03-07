@@ -53,3 +53,25 @@ UFBXT_TEST(table_proptype_map_self)
 	}
 }
 #endif
+
+UFBXT_TEST(temp_stacks)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context("");
+
+	uint32_t num = 100000;
+	for (uint32_t i = 0; i < num; i++) {
+		uint32_t *a = ufbxi_temp_push_uninit(uc, 0, uint32_t);
+		uint32_t *b = ufbxi_temp_push_uninit(uc, 1, uint32_t);
+		*a = i;
+		*b = i*i;
+	}
+
+	uint32_t *as = ufbxi_temp_retain_n(uc, 0, uint32_t, num);
+	uint32_t *bs = ufbxi_temp_retain_n(uc, 1, uint32_t, num);
+	for (uint32_t i = 0; i < num; i++) {
+		ufbxt_assert(as[i] == i);
+		ufbxt_assert(bs[i] == i*i);
+	}
+}
+#endif
