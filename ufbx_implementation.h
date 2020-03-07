@@ -2279,6 +2279,7 @@ static int ufbxi_read_definitions(ufbxi_context *uc)
 	}
 
 	ufbx_node *nodes = ufbxi_temp_retain_n(uc, 0, ufbx_node, num);
+	if (!nodes) return 0;
 
 	return 1;
 }
