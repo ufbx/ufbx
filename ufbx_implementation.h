@@ -2212,6 +2212,8 @@ static const ufbxi_proptype_map_entry ufbxi_proptype_map[32] = {
 	{ 0xa0eb0f08u, { "double", 6 }, UFBX_PROP_NUMBER },
 	{ 0xff873b9bu, { "ColorRGB", 8 }, UFBX_PROP_COLOR },
 };
+
+// Resolve an FBX property type name into a enum
 static ufbx_property_type ufbxi_get_prop_type(ufbx_string name)
 {
 	uint32_t hash = ufbxi_hash_string(name);
