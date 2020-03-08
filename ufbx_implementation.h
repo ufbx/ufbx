@@ -61,7 +61,7 @@ ufbxi_streq_imp(ufbx_string str, const char *data, size_t length)
 	return str.length == length && !memcmp(str.data, data, length);
 }
 
-const ufbx_string ufbx_empty_string;
+const ufbx_string ufbx_empty_string = { "", 0 };
 
 // TODO: Unaligned loads for some platforms
 #define ufbxi_read_u8(ptr) (*(const uint8_t*)(ptr))
@@ -2906,10 +2906,11 @@ static int ufbxi_read_objects(ufbxi_context *uc)
 		ufbxi_push_string_place(uc, &node->type_str);
 		ufbxi_push_string_place(uc, &node->sub_type_str);
 
-		int res = 1;
+		int res;
 		switch (node->type) {
 		case UFBX_NODE_MODEL: res = ufbxi_read_model(uc, (ufbx_model*)node); break;
 		case UFBX_NODE_MESH: res = ufbxi_read_mesh(uc, (ufbx_mesh*)node); break;
+		default: res = 1; break; // Nothing to do
 		}
 		if (!res) return 0;
 
