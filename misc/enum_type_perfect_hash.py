@@ -37,6 +37,10 @@ node_types = [
     nameEnum("Geometry", "MESH"),
     nameEnum("Material", "MATERIAL"),
     nameEnum("Texture", "TEXTURE"),
+    nameEnum("AnimationCurveNode", "ANIMATION"),
+    nameEnum("AnimationCurve", "ANIMATION_CURVE"),
+    nameEnum("AnimationLayer", "ANIMATION_LAYER"),
+    nameEnum("NodeAttribute", "ATTRIBUTE"),
 ]
 
 def find_params(names, map_size, max_k, max_s):

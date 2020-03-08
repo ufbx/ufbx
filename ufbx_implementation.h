@@ -2227,12 +2227,16 @@ static const ufbxi_prop_type_map_entry ufbxi_prop_type_map[32] = {
 	{ 0xa0eb0f08u, { "double", 6 }, UFBX_PROP_NUMBER },
 	{ 0xff873b9bu, { "ColorRGB", 8 }, UFBX_PROP_COLOR },
 };
-#define ufbxi_node_type_permute_hash(h) ((((h) * 1) >> 15) % 4)
-static const ufbxi_node_type_map_entry ufbxi_node_type_map[4] = {
-	{ 0x994c5594u, { "Texture", 7 }, UFBX_NODE_TEXTURE },
-	{ 0x243eddb1u, { "Geometry", 8 }, UFBX_NODE_MESH },
+#define ufbxi_node_type_permute_hash(h) ((((h) * 3) >> 2) % 8)
+static const ufbxi_node_type_map_entry ufbxi_node_type_map[8] = {
 	{ 0xcbd54f80u, { "Material", 8 }, UFBX_NODE_MATERIAL },
+	{ 0x5431f217u, { "NodeAttribute", 13 }, UFBX_NODE_ATTRIBUTE },
+	{ 0x7f64b258u, { "AnimationCurveNode", 18 }, UFBX_NODE_ANIMATION },
 	{ 0x8285e8fau, { "Model", 5 }, UFBX_NODE_MODEL },
+	{ 0x243eddb1u, { "Geometry", 8 }, UFBX_NODE_MESH },
+	{ 0xdbe5783cu, { "AnimationCurve", 14 }, UFBX_NODE_ANIMATION_CURVE },
+	{ 0xdafc83beu, { "AnimationLayer", 14 }, UFBX_NODE_ANIMATION_LAYER },
+	{ 0x994c5594u, { "Texture", 7 }, UFBX_NODE_TEXTURE },
 };
 // End of generated code
 

@@ -37,6 +37,10 @@ UFBXT_TEST(table_node_type_map_values)
 	ufbxt_assert(ufbxi_get_node_type(make_str("Geometry")) == UFBX_NODE_MESH);
 	ufbxt_assert(ufbxi_get_node_type(make_str("Material")) == UFBX_NODE_MATERIAL);
 	ufbxt_assert(ufbxi_get_node_type(make_str("Texture")) == UFBX_NODE_TEXTURE);
+	ufbxt_assert(ufbxi_get_node_type(make_str("AnimationCurveNode")) == UFBX_NODE_ANIMATION);
+	ufbxt_assert(ufbxi_get_node_type(make_str("AnimationCurve")) == UFBX_NODE_ANIMATION_CURVE);
+	ufbxt_assert(ufbxi_get_node_type(make_str("AnimationLayer")) == UFBX_NODE_ANIMATION_LAYER);
+	ufbxt_assert(ufbxi_get_node_type(make_str("NodeAttribute")) == UFBX_NODE_ATTRIBUTE);
 }
 #endif
 // End of generated code
