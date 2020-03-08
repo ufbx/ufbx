@@ -167,16 +167,16 @@ const char *ufbx_node_type_name(ufbx_node_type type);
 
 #ifdef __cplusplus
 
-static inline void begin(const ufbx_node_list &l) { return l.data; }
-static inline void end(const ufbx_node_list &l) { return l.data + l.size; }
-static inline void begin(const ufbx_model_list &l) { return l.data; }
-static inline void end(const ufbx_model_list &l) { return l.data + l.size; }
-static inline void begin(const ufbx_mesh_list &l) { return l.data; }
-static inline void end(const ufbx_mesh_list &l) { return l.data + l.size; }
-static inline void begin(const ufbx_template_list &l) { return l.data; }
-static inline void end(const ufbx_template_list &l) { return l.data + l.size; }
-static inline void begin(const ufbx_prop_list &l) { return l.data; }
-static inline void end(const ufbx_prop_list &l) { return l.data + l.size; }
+static inline ufbx_node **begin(const ufbx_node_list &l) { return l.data; }
+static inline ufbx_node **end(const ufbx_node_list &l) { return l.data + l.size; }
+static inline ufbx_model **begin(const ufbx_model_list &l) { return l.data; }
+static inline ufbx_model **end(const ufbx_model_list &l) { return l.data + l.size; }
+static inline ufbx_mesh **begin(const ufbx_mesh_list &l) { return l.data; }
+static inline ufbx_mesh **end(const ufbx_mesh_list &l) { return l.data + l.size; }
+static inline ufbx_template *begin(const ufbx_template_list &l) { return l.data; }
+static inline ufbx_template *end(const ufbx_template_list &l) { return l.data + l.size; }
+static inline ufbx_prop *begin(const ufbx_prop_list &l) { return l.data; }
+static inline ufbx_prop *end(const ufbx_prop_list &l) { return l.data + l.size; }
 
 #endif
 
