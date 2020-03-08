@@ -43,6 +43,22 @@ node_types = [
     nameEnum("NodeAttribute", "ATTRIBUTE"),
 ]
 
+element_mapping_types = [
+    nameEnum("ByVertex", "VERTEX"),
+    nameEnum("ByVertice", "VERTEX"),
+    nameEnum("ByPolygon", "POLYGON"),
+    nameEnum("ByPolygonVertex", "POLYGON_VERTEX"),
+    nameEnum("ByEdge", "EDGE"),
+    nameEnum("AllSame", "ALL_SAME"),
+]
+
+element_types = [
+    nameEnum("Normal", "NORMAL"),
+    nameEnum("UV", "UV"),
+    nameEnum("Material", "MATERIAL"),
+    nameEnum("EdgeCrease", "EDGE_CREASE"),
+]
+
 def find_params(names, map_size, max_k, max_s):
     arr = [None] * map_size
     for k in range(max_k):
@@ -98,6 +114,8 @@ def gen_table(names, type_name, enum_name, test_extra):
 
 gen_table(prop_types, "prop_type", "PROP", "")
 gen_table(node_types, "node_type", "NODE", ", ufbx_empty_string")
+gen_table(element_mapping_types, "element_mapping", "ELEMENT_BY", "")
+gen_table(element_types, "element_type", "ELEMENT", "")
 
 print("\n".join(decl))
 print()

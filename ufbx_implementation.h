@@ -738,6 +738,9 @@ typedef enum {
 	// Pointers to all parsed nodes
 	UFBXI_TEMP_NODE_PTR,
 
+	// Virtual model/mesh connections
+	UFBXI_TEMP_VIRTUAL_CONNECTIONS,
+
 	UFBXI_NUM_TEMP_STACKS,
 } ufbxi_temp_stack_index;
 
@@ -763,13 +766,29 @@ typedef struct {
 } ufbxi_temp_stack;
 
 typedef struct {
-	ufbx_scene scene;
-	void *memory;
-} ufbxi_scene_imp;
-
-typedef struct {
 	const char *data;
 	size_t size;
+
+	// Error status
+	int failed;
+	ufbx_error *error;
+
+	// Temporary buffer for decompression
+	void *decompress_buffer;
+	size_t decompress_buffer_size;
+
+	struct ufbxi_context *uc;
+} ufbxi_base_context;
+
+typedef struct {
+	ufbx_scene scene;
+	void *memory;
+
+	ufbxi_base_context bc;
+} ufbxi_scene_imp;
+
+typedef struct ufbxi_context {
+	ufbxi_base_context base;
 
 	uint32_t version;
 	int from_ascii;
@@ -781,10 +800,6 @@ typedef struct {
 	ufbxi_stack_node node_stack[UFBXI_NODE_STACK_SIZE];
 	ufbxi_stack_node *node_stack_top;
 
-	// Temporary buffer for decompression
-	void *decompress_buffer;
-	size_t decompress_buffer_size;
-
 	// Output arena
 	char *result_data;
 	size_t result_pos;
@@ -792,10 +807,6 @@ typedef struct {
 
 	// Temp stacks
 	ufbxi_temp_stack temp_stacks[UFBXI_NUM_TEMP_STACKS];
-
-	// Error status
-	int failed;
-	ufbx_error *error;
 
 	// Pushed string pool LRU cache
 	ufbxi_pushed_string string_pool[UFBXI_STRING_POOL_SIZE];
@@ -844,54 +855,61 @@ typedef struct {
 	} value;
 } ufbxi_any_value;
 
-static void ufbxi_do_error_common(ufbxi_context *uc, uint32_t line)
+static void ufbxi_do_error_common(ufbxi_base_context *bc, uint32_t line)
 {
-	uc->failed = 1;
-	ufbx_error *err = uc->error;
+	bc->failed = 1;
+	ufbx_error *err = bc->error;
 	if (err) {
 		err->source_line = line;
-		ufbxi_stack_node *node = uc->node_stack + 1;
-		uint32_t ix = 0;
-		for (; node <= uc->node_stack_top && ix < UFBX_ERROR_STACK_MAX_DEPTH; node++, ix++) {
-			size_t len = node->node.name.length;
-			if (len > UFBX_ERROR_STACK_NAME_MAX_LENGTH) {
-				len = UFBX_ERROR_STACK_NAME_MAX_LENGTH;
+
+		ufbxi_context *uc = bc->uc;
+		if (uc) {
+			ufbxi_stack_node *node = uc->node_stack + 1;
+			uint32_t ix = 0;
+			for (; node <= uc->node_stack_top && ix < UFBX_ERROR_STACK_MAX_DEPTH; node++, ix++) {
+				size_t len = node->node.name.length;
+				if (len > UFBX_ERROR_STACK_NAME_MAX_LENGTH) {
+					len = UFBX_ERROR_STACK_NAME_MAX_LENGTH;
+				}
+				memcpy(err->stack[ix], node->node.name.data, len);
+				err->stack[ix][len] = '\0';
 			}
-			memcpy(err->stack[ix], node->node.name.data, len);
-			err->stack[ix][len] = '\0';
+			err->stack_size = ix;
 		}
-		err->stack_size = ix;
 	}
 }
 
-static int ufbxi_do_error(ufbxi_context *uc, uint32_t line, const char *desc)
+static int ufbxi_do_error(ufbxi_base_context *bc, uint32_t line, const char *desc)
 {
-	if (uc->failed) return 0;
-	ufbxi_do_error_common(uc, line);
-	if (uc->error) {
+	if (bc->failed) return 0;
+	ufbxi_do_error_common(bc, line);
+	if (bc->error) {
 		size_t length = strlen(desc);
 		if (length > UFBX_ERROR_DESC_MAX_LENGTH) length = UFBX_ERROR_DESC_MAX_LENGTH;
-		memcpy(uc->error->desc, desc, length);
-		uc->error->desc[length] = '\0';
+		memcpy(bc->error->desc, desc, length);
+		bc->error->desc[length] = '\0';
 	}
 	return 0;
 }
 
-static int ufbxi_do_errorf(ufbxi_context *uc, uint32_t line, const char *fmt, ...)
+static int ufbxi_do_errorf(ufbxi_base_context *bc, uint32_t line, const char *fmt, ...)
 {
-	if (uc->failed) return 0;
-	ufbxi_do_error_common(uc, line);
-	if (uc->error) {
+	if (bc->failed) return 0;
+	ufbxi_do_error_common(bc, line);
+	if (bc->error) {
 		va_list args;
 		va_start(args, fmt);
-		vsnprintf(uc->error->desc, sizeof(uc->error->desc), fmt, args);
+		vsnprintf(bc->error->desc, sizeof(bc->error->desc), fmt, args);
 		va_end(args);
 	}
 	return 0;
 }
 
-#define ufbxi_error(uc, desc) ufbxi_do_error((uc), __LINE__, (desc))
-#define ufbxi_errorf(uc, fmt, ...) ufbxi_do_errorf((uc), __LINE__, (fmt), __VA_ARGS__)
+#define ufbxi_base_error(bc, desc) ufbxi_do_error((bc), __LINE__, (desc))
+#define ufbxi_base_errorf(bc, fmt, ...) ufbxi_do_errorf((bc), __LINE__, (fmt), __VA_ARGS__)
+
+#define ufbxi_error(uc, desc) ufbxi_do_error(&(uc)->base, __LINE__, (desc))
+#define ufbxi_errorf(uc, fmt, ...) ufbxi_do_errorf(&(uc)->base, __LINE__, (fmt), __VA_ARGS__)
 
 static void *ufbxi_push_size_uninit(ufbxi_context *uc, size_t size, uint32_t line)
 {
@@ -911,7 +929,7 @@ static void *ufbxi_push_size_uninit(ufbxi_context *uc, size_t size, uint32_t lin
 
 		void *page = malloc(page_size);
 		if (!page) {
-			ufbxi_do_errorf(uc, line, "Failed to allocate memory: %zu bytes", page_size);
+			ufbxi_do_errorf(&uc->base, line, "Failed to allocate memory: %zu bytes", page_size);
 			return NULL;
 		}
 		*(void**)page = uc->result_data;
@@ -931,6 +949,13 @@ static void *ufbxi_push_size_zero(ufbxi_context *uc, size_t size, uint32_t line)
 	return ptr;
 }
 
+static int ufbxi_temp_is_empty(ufbxi_context *uc, ufbxi_temp_stack_index index)
+{
+	ufbx_assert((unsigned)index < UFBXI_NUM_TEMP_STACKS);
+	ufbxi_temp_stack *stack = &uc->temp_stacks[index];
+	return stack->page_index == 0 && stack->pages[0].offset == 0;
+}
+
 static void *ufbxi_temp_push_size_uninit(ufbxi_context *uc, ufbxi_temp_stack_index index, size_t size, uint32_t line)
 {
 	ufbx_assert((unsigned)index < UFBXI_NUM_TEMP_STACKS);
@@ -947,7 +972,7 @@ static void *ufbxi_temp_push_size_uninit(ufbxi_context *uc, ufbxi_temp_stack_ind
 			if (page->data == NULL) {
 				page->data = (char*)malloc(page_size);
 				if (!page->data) {
-					ufbxi_do_errorf(uc, line, "Failed to allocate memory: %zu bytes", page_size);
+					ufbxi_do_errorf(&uc->base, line, "Failed to allocate memory: %zu bytes", page_size);
 					return NULL;
 				}
 			}
@@ -958,7 +983,7 @@ static void *ufbxi_temp_push_size_uninit(ufbxi_context *uc, ufbxi_temp_stack_ind
 		stack->page_index++;
 	}
 
-	ufbxi_do_errorf(uc, line, "Temp stack overflow: %d", index);
+	ufbxi_do_errorf(&uc->base, line, "Temp stack overflow: %d", index);
 	return NULL;
 }
 
@@ -971,7 +996,7 @@ static void *ufbxi_temp_push_size_zero(ufbxi_context *uc, ufbxi_temp_stack_index
 	return ptr;
 }
 
-static void ufbxi_temp_pop_size(ufbxi_context *uc, ufbxi_temp_stack_index index, size_t num, size_t size)
+static void *ufbxi_temp_pop_size(ufbxi_context *uc, ufbxi_temp_stack_index index, size_t num, size_t size)
 {
 	ufbx_assert((unsigned)index < UFBXI_NUM_TEMP_STACKS);
 	ufbxi_temp_stack *stack = &uc->temp_stacks[index];
@@ -985,8 +1010,9 @@ static void ufbxi_temp_pop_size(ufbxi_context *uc, ufbxi_temp_stack_index index,
 		ufbxi_temp_page *page = &stack->pages[stack->page_index];
 		if (page->offset >= size_left) {
 			page->offset -= size_left;
-			return;
+			return page->data + page->offset;
 		} else {
+			ufbx_assert(stack->page_index > 0);
 			size_left -= page->offset;
 			page->offset = 0;
 			ufbx_assert(stack->page_index > 0);
@@ -1049,7 +1075,7 @@ static ufbxi_forceinline uint32_t ufbxi_hash_string(ufbx_string str)
 static ufbx_string ufbxi_push_string_size(ufbxi_context *uc, ufbx_string str, uint32_t line)
 {
 	// Special case zero length
-	if (str.length == 0 || uc->failed) {
+	if (str.length == 0 || uc->base.failed) {
 		ufbx_string zero_str = { "", 0 };
 		return zero_str;
 	}
@@ -1115,8 +1141,8 @@ static void ufbxi_free_result(void *page)
 
 #define ufbxi_temp_push_zero(uc, index, type) (type*)ufbxi_temp_push_size_zero((uc), (index), sizeof(type), __LINE__)
 
-#define ufbxi_temp_pop(uc, index, type) ufbxi_temp_pop_size((uc), (index), 1, sizeof(type), __LINE__)
-#define ufbxi_temp_pop_n(uc, index, type, n) ufbxi_temp_pop_size((uc), (index), (n), sizeof(type), __LINE__)
+#define ufbxi_temp_pop(uc, index, type) (type*)ufbxi_temp_pop_size((uc), (index), 1, sizeof(type))
+#define ufbxi_temp_pop_n(uc, index, type, n) (type*)ufbxi_temp_pop_size((uc), (index), (n), sizeof(type))
 
 #define ufbxi_temp_retain(uc, index, type) (type*)ufbxi_temp_retain_size((uc), (index), 1, sizeof(type), __LINE__)
 #define ufbxi_temp_retain_n(uc, index, type, n) (type*)ufbxi_temp_retain_size((uc), (index), (n), sizeof(type), __LINE__)
@@ -1131,7 +1157,7 @@ static int ufbxi_convert_multivalue_array(ufbxi_context *uc, ufbxi_array *dst, c
 	size_t begin = uc->focused_node.next_value_pos;
 	uint32_t num_elements = 0;
 	while (uc->focused_node.next_value_pos < uc->focused_node.child_begin_pos) {
-		char src_type = uc->data[uc->focused_node.next_value_pos];
+		char src_type = uc->base.data[uc->focused_node.next_value_pos];
 		uint32_t size;
 		switch (src_type) {
 		case 'I': size = 4; break;
@@ -1158,18 +1184,19 @@ static int ufbxi_convert_multivalue_array(ufbxi_context *uc, ufbxi_array *dst, c
 	dst->dst_type = dst_type;
 	return 1;
 }
+
 // Parse the next node value in the input stream.
 // `dst_type` is a FBX-like type string:
 //   Numbers: "I" u/int32_t  "L" u/int64_t  "B" char (bool)  "F" float  "D" double
 //   Data: "SR" ufbx_string  "ilfdb" ufbxi_val_array (matching upper-case type)
-//   Misc: "." (ignore)  "?" ufbxi_any_value
+//   Misc: "." (ignore)  "?" ufbxi_any_value  "_" ufbxi_val_array (any type)
 // Performs implicit conversions:
 //   FDILY -> FD, ILYC -> ILB, ILFDYilfd -> fd, ILYCilb -> ilb
 static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 {
 	// An FBX file must end in a 13 or 25-byte NULL node. Due to this a valid
 	// FBX file must always have space for the largest possible property header.
-	if (uc->size - uc->focused_node.next_value_pos < 13) {
+	if (uc->base.size - uc->focused_node.next_value_pos < 13) {
 		return ufbxi_error(uc, "Reading value at the end of file");
 	}
 
@@ -1178,8 +1205,8 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 	}
 
 	size_t pos = uc->focused_node.next_value_pos;
-	char src_type = uc->data[pos];
-	const char *src = uc->data + pos + 1;
+	char src_type = uc->base.data[pos];
+	const char *src = uc->base.data + pos + 1;
 
 	// Read the next value locally
 	size_t val_size = 1;
@@ -1250,7 +1277,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		case 'F': *(float*)dst = (float)val_int; break;
 		case 'D': *(double*)dst = (double)val_int; break;
 		case '?': any->value.i = val_int; break;
-		case 'i': case 'l': case 'f': case 'd': case 'b':
+		case 'i': case 'l': case 'f': case 'd': case 'b': case '_':
 			// Early return: Parse as multivalue array. Reset position to beginning and rescan.
 			uc->focused_node.next_value_pos = pos;
 			return ufbxi_convert_multivalue_array(uc, (ufbxi_array*)dst, dst_type);
@@ -1263,7 +1290,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		case 'F': *(float*)dst = (float)val_float; break;
 		case 'D': *(double*)dst = val_float; break;
 		case '?': any->value.f = val_float; break;
-		case 'f': case 'd':
+		case 'f': case 'd': case '_':
 			// Early return: Parse as multivalue array. Reset position to beginning and rescan.
 			uc->focused_node.next_value_pos = pos;
 			return ufbxi_convert_multivalue_array(uc, (ufbxi_array*)dst, dst_type);
@@ -1280,7 +1307,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 			return ufbxi_errorf(uc, "Cannot convert from string '%c' to '%c'", src_type, dst_type);
 		}
 
-		str->data = uc->data + val_data_offset;
+		str->data = uc->base.data + val_data_offset;
 		str->length = val_num_elements;
 	} else if (val_class == UFBXI_VAL_ARRAY) {
 		ufbxi_array *arr;
@@ -1288,6 +1315,10 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		case 'i': case 'l': case 'f': case 'd': case 'b':
 			arr = (ufbxi_array*)dst;
 			arr->dst_type = dst_type;
+			break;
+		case '_':
+			arr = (ufbxi_array*)dst;
+			arr->dst_type = '_';
 			break;
 		case '?':
 			arr = &any->value.arr;
@@ -1340,23 +1371,23 @@ static int ufbxi_parse_values(ufbxi_context *uc, const char *fmt, ...)
 
 // Decode the data of an multivalue array into memory. Requires the array to be
 // prepared with `ufbxi_convert_multivalue_array()`.
-static int ufbxi_decode_multivalue_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
+static int ufbxi_decode_multivalue_array(ufbxi_base_context *bc, ufbxi_array *arr, void *dst)
 {
 	if (arr->encoding != UFBXI_ENCODING_MULTIVALUE) {
-		return ufbxi_error(uc, "Internal: Bad multivalue encoding");
+		return ufbxi_base_error(bc, "Internal: Bad multivalue encoding");
 	}
 
-	// HACK: Create a virtual node for the multivalue array and set it as
-	// the current one.
-	ufbxi_node focused_node = uc->focused_node;
-	memset(&uc->focused_node, 0, sizeof(ufbxi_node));
+	// HACK: Create a new virtual `ufbxi_context` for the multivalue
+	// array to read values from.
+	ufbxi_context uc = { *bc };
+	uc.base.uc = &uc;
 
 	size_t arr_begin = arr->data_offset;
 	size_t arr_end = arr_begin + arr->encoded_size;
-	uc->focused_node.value_begin_pos = arr_begin;
-	uc->focused_node.next_value_pos = arr_begin;
-	uc->focused_node.child_begin_pos = arr_end;
-	uc->focused_node.end_pos = arr_end;
+	uc.focused_node.value_begin_pos = arr_begin;
+	uc.focused_node.next_value_pos = arr_begin;
+	uc.focused_node.child_begin_pos = arr_end;
+	uc.focused_node.end_pos = arr_end;
 
 	char dst_elem_type;
 	uint32_t dst_elem_size;
@@ -1366,47 +1397,48 @@ static int ufbxi_decode_multivalue_array(ufbxi_context *uc, ufbxi_array *arr, vo
 	case 'f': dst_elem_type = 'F'; dst_elem_size = 4; break;
 	case 'd': dst_elem_type = 'D'; dst_elem_size = 8; break;
 	case 'b': dst_elem_type = 'B'; dst_elem_size = 1; break;
+	default:
+		return ufbxi_base_error(bc, "Internal: Bad dst element type");
 	}
 
 	char *dst_ptr = (char*)dst;
-	while (uc->focused_node.next_value_pos < uc->focused_node.child_begin_pos) {
-		if (!ufbxi_parse_value(uc, dst_elem_type, dst_ptr)) return 0;
+	while (uc.focused_node.next_value_pos < uc.focused_node.child_begin_pos) {
+		if (!ufbxi_parse_value(&uc, dst_elem_type, dst_ptr)) return 0;
 		dst_ptr += dst_elem_size;
 	}
-	if (uc->focused_node.next_value_pos != uc->focused_node.child_begin_pos) {
-		return ufbxi_error(uc, "Multivalue array overrun");
+	if (uc.focused_node.next_value_pos != uc.focused_node.child_begin_pos) {
+		return ufbxi_base_error(bc, "Multivalue array overrun");
 	}
 	if (dst_ptr != (char*)dst + arr->num_elements * dst_elem_size) {
-		return ufbxi_error(uc, "Internal: Multivalue array read failed");
+		return ufbxi_base_error(bc, "Internal: Multivalue array read failed");
 	}
 
-	uc->focused_node = focused_node;
 	return 1;
 }
 
 // Decode the contents of an array into memory. Performs potential type conversion
 // and decoding of the data. Should not fail for a non-decoding failure reason.
-static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
+static int ufbxi_decode_array(ufbxi_base_context *bc, ufbxi_array *arr, void *dst)
 {
 	uint32_t elem_size;
 	switch (arr->src_type) {
 	case 'i': case 'f': elem_size = 4; break;
 	case 'l': case 'd': elem_size = 8; break;
 	case 'b': elem_size = 1; break;
-	default: return ufbxi_error(uc, "Internal: Invalid array type");
+	default: return ufbxi_base_error(bc, "Internal: Invalid array type");
 	}
 
 	size_t arr_size = arr->num_elements * elem_size;
 
 	if (arr->dst_type == arr->src_type) {
-		const void *src = uc->data + arr->data_offset;
+		const void *src = bc->data + arr->data_offset;
 
 		// Fast path: Source is memory-compatible with destination, decode directly to
 		// the destination memory.
 		switch (arr->encoding) {
 		case UFBXI_ENCODING_BASIC:
 			if (arr->encoded_size != arr_size) {
-				return ufbxi_errorf(uc, "Array size mismatch, encoded %u bytes, decoded %u bytes",
+				return ufbxi_base_errorf(bc, "Array size mismatch, encoded %u bytes, decoded %u bytes",
 					arr->encoded_size, arr_size);
 			}
 			memcpy(dst, src, arr_size);
@@ -1415,55 +1447,55 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 			ptrdiff_t res = ufbx_inflate(dst, arr_size, src, arr->encoded_size);
 			if (res != arr_size) {
 				if (res < 0) {
-					return ufbxi_errorf(uc, "Deflate error: %d", (int)res);
+					return ufbxi_base_errorf(bc, "Deflate error: %d", (int)res);
 				} else {
-					return ufbxi_error(uc, "Deflate size mismatch");
+					return ufbxi_base_error(bc, "Deflate size mismatch");
 				}
 			}
 		} break;
 		case UFBXI_ENCODING_MULTIVALUE:
 			// Early return: Defer to multivalue implementation.
-			return ufbxi_decode_multivalue_array(uc, arr, dst);
-		default: return ufbxi_error(uc, "Internal: Bad array encoding");
+			return ufbxi_decode_multivalue_array(bc, arr, dst);
+		default: return ufbxi_base_error(bc, "Internal: Bad array encoding");
 		}
 	} else {
 		const char *src_ptr;
-		const void *src = uc->data + arr->data_offset;
+		const void *src = bc->data + arr->data_offset;
 
 		// Slow path: Need to do conversion, allocate temporary buffer if necessary
 		switch (arr->encoding) {
 		case UFBXI_ENCODING_BASIC:
 			if (arr->encoded_size != arr_size) {
-				return ufbxi_errorf(uc, "Array size mismatch, encoded %u bytes, decoded %u bytes",
+				return ufbxi_base_errorf(bc, "Array size mismatch, encoded %u bytes, decoded %u bytes",
 					arr->encoded_size, arr_size);
 			}
 			src_ptr = (const char*)src;
 			break;
 		case UFBXI_ENCODING_DEFLATE: {
-			size_t buf_size = uc->decompress_buffer_size;
+			size_t buf_size = bc->decompress_buffer_size;
 			if (buf_size < arr_size) {
 				buf_size = buf_size * 2 > arr_size ? buf_size * 2 : arr_size;
-				uc->decompress_buffer_size = buf_size;
-				void *buf = realloc(uc->decompress_buffer, buf_size);
+				bc->decompress_buffer_size = buf_size;
+				void *buf = realloc(bc->decompress_buffer, buf_size);
 				if (!buf) {
-					return ufbxi_errorf(uc, "Failed to allocate decompression buffer: %zu bytes", buf_size);
+					return ufbxi_base_errorf(bc, "Failed to allocate decompression buffer: %zu bytes", buf_size);
 				}
-				uc->decompress_buffer = buf;
+				bc->decompress_buffer = buf;
 			}
-			ptrdiff_t res = ufbx_inflate(uc->decompress_buffer, arr_size, src, arr->encoded_size);
+			ptrdiff_t res = ufbx_inflate(bc->decompress_buffer, arr_size, src, arr->encoded_size);
 			if (res != arr_size) {
 				if (res < 0) {
-					return ufbxi_errorf(uc, "Deflate error: %d", (int)res);
+					return ufbxi_base_errorf(bc, "Deflate error: %d", (int)res);
 				} else {
-					return ufbxi_error(uc, "Deflate size mismatch");
+					return ufbxi_base_error(bc, "Deflate size mismatch");
 				}
 			}
-			src_ptr = (const char*)uc->decompress_buffer;
+			src_ptr = (const char*)bc->decompress_buffer;
 		} break;
 		case UFBXI_ENCODING_MULTIVALUE:
 			// Multivalue arrays should always have `src_type == dst_type`.
-			return ufbxi_error(uc, "Internal: Multivalue array has invalid type");
-		default: return ufbxi_error(uc, "Internal: Bad array encoding");
+			return ufbxi_base_error(bc, "Internal: Multivalue array has invalid type");
+		default: return ufbxi_base_error(bc, "Internal: Bad array encoding");
 		}
 
 		const char *src_end = src_ptr + arr_size;
@@ -1509,11 +1541,11 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 			default: failed = 1; break;
 			}
 		} else {
-			return ufbxi_error(uc, "Internal: Unexpected array type");
+			return ufbxi_base_error(bc, "Internal: Unexpected array type");
 		}
 
 		if (failed) {
-			return ufbxi_errorf(uc, "Bad array conversion: '%c' -> '%c'",
+			return ufbxi_base_errorf(bc, "Bad array conversion: '%c' -> '%c'",
 				arr->src_type, arr->dst_type);
 		}
 	}
@@ -1559,20 +1591,20 @@ static int ufbxi_parse_node(ufbxi_context *uc, uint64_t pos, ufbxi_node *node)
 	uint8_t name_len;
 
 	if (uc->version >= 7500 || uc->from_ascii) {
-		if (pos > uc->size - 25) {
+		if (pos > uc->base.size - 25) {
 			return ufbxi_error(uc, "Internal: Trying to read node out of bounds");
 		}
-		end_pos = ufbxi_read_u64(uc->data + pos + 0);
-		values_len = ufbxi_read_u64(uc->data + pos + 16);
-		name_len = ufbxi_read_u8(uc->data + pos + 24);
+		end_pos = ufbxi_read_u64(uc->base.data + pos + 0);
+		values_len = ufbxi_read_u64(uc->base.data + pos + 16);
+		name_len = ufbxi_read_u8(uc->base.data + pos + 24);
 		name_pos = pos + 25;
 	} else {
-		if (pos > uc->size - 13) {
+		if (pos > uc->base.size - 13) {
 			return ufbxi_error(uc, "Internal: Trying to read node out of bounds");
 		}
-		end_pos = ufbxi_read_u32(uc->data + pos + 0);
-		values_len = ufbxi_read_u32(uc->data + pos + 8);
-		name_len = ufbxi_read_u8(uc->data + pos + 12);
+		end_pos = ufbxi_read_u32(uc->base.data + pos + 0);
+		values_len = ufbxi_read_u32(uc->base.data + pos + 8);
+		name_len = ufbxi_read_u8(uc->base.data + pos + 12);
 		name_pos = pos + 13;
 	}
 
@@ -1588,13 +1620,13 @@ static int ufbxi_parse_node(ufbxi_context *uc, uint64_t pos, ufbxi_node *node)
 
 	// Check for integer overflow and out-of-bounds at the same time. `name_pos`
 	// cannot overflow due to the precondition check.
-	if (value_pos < name_pos || value_pos > uc->size) {
+	if (value_pos < name_pos || value_pos > uc->base.size) {
 		return ufbxi_error(uc, "Node name out of bounds");
 	}
-	if (child_pos < value_pos || child_pos > uc->size) {
+	if (child_pos < value_pos || child_pos > uc->base.size) {
 		return ufbxi_error(uc, "Node values out of bounds");
 	}
-	if (end_pos < child_pos || end_pos > uc->size) {
+	if (end_pos < child_pos || end_pos > uc->base.size) {
 		return ufbxi_error(uc, "Node children out of bounds");
 	}
 
@@ -1603,7 +1635,7 @@ static int ufbxi_parse_node(ufbxi_context *uc, uint64_t pos, ufbxi_node *node)
 		return ufbxi_error(uc, "The file requires 64-bit build");
 	}
 
-	node->name.data = uc->data + name_pos;
+	node->name.data = uc->base.data + name_pos;
 	node->name.length = name_len;
 	node->value_begin_pos = (size_t)value_pos;
 	node->next_value_pos = (size_t)value_pos;
@@ -1618,15 +1650,15 @@ static ufbxi_forceinline int ufbxi_next_node_pos(ufbxi_context *uc, uint64_t pos
 {
 	uint64_t end_pos;
 	if (uc->version >= 7500 || uc->from_ascii) {
-		if (pos > uc->size - 25) {
+		if (pos > uc->base.size - 25) {
 			return ufbxi_error(uc, "Internal: Trying to read node out of bounds");
 		}
-		end_pos = ufbxi_read_u64(uc->data + pos + 0);
+		end_pos = ufbxi_read_u64(uc->base.data + pos + 0);
 	} else {
-		if (pos > uc->size - 13) {
+		if (pos > uc->base.size - 13) {
 			return ufbxi_error(uc, "Internal: Trying to read node out of bounds");
 		}
-		end_pos = ufbxi_read_u32(uc->data + pos + 0);
+		end_pos = ufbxi_read_u32(uc->base.data + pos + 0);
 	}
 
 	if (end_pos == 0) {
@@ -1711,7 +1743,7 @@ static int ufbxi_build_map(ufbxi_context *uc)
 	}
 
 	// Propagate failure from ufbxi_parse_node()
-	if (uc->failed) return 0;
+	if (uc->base.failed) return 0;
 
 	// Find the lowest power of two map size that's large enough
 	size_t map_size = ufbxi_ceil_pow2((uint32_t)num * 2);
@@ -2244,6 +2276,18 @@ typedef struct {
 	ufbx_node_type type;
 } ufbxi_node_type_map_entry;
 
+typedef struct {
+	uint32_t hash;
+	ufbx_string name;
+	ufbx_element_mapping mapping;
+} ufbxi_element_mapping_map_entry;
+
+typedef struct {
+	uint32_t hash;
+	ufbx_string name;
+	ufbx_element_type type;
+} ufbxi_element_type_map_entry;
+
 // Generated by `misc/enum_type_perfect_hash.py`
 #define ufbxi_prop_type_permute_hash(h) ((((h) * 51) >> 8) % 32)
 static const ufbxi_prop_type_map_entry ufbxi_prop_type_map[32] = {
@@ -2291,6 +2335,24 @@ static const ufbxi_node_type_map_entry ufbxi_node_type_map[8] = {
 	{ 0xdafc83beu, { "AnimationLayer", 14 }, UFBX_NODE_ANIMATION_LAYER },
 	{ 0x994c5594u, { "Texture", 7 }, UFBX_NODE_TEXTURE },
 };
+#define ufbxi_element_mapping_permute_hash(h) ((((h) * 1) >> 3) % 8)
+static const ufbxi_element_mapping_map_entry ufbxi_element_mapping_map[8] = {
+	{ 0x8f0b1802u, { "ByVertex", 8 }, UFBX_ELEMENT_BY_VERTEX },
+	{ 0u, { 0,0 }, UFBX_ELEMENT_BY_UNKNOWN },
+	{ 0u, { 0,0 }, UFBX_ELEMENT_BY_UNKNOWN },
+	{ 0x65f0ae19u, { "ByEdge", 6 }, UFBX_ELEMENT_BY_EDGE },
+	{ 0x03031be2u, { "ByVertice", 9 }, UFBX_ELEMENT_BY_VERTEX },
+	{ 0xf6b4bb28u, { "ByPolygonVertex", 15 }, UFBX_ELEMENT_BY_POLYGON_VERTEX },
+	{ 0xf07b3af2u, { "AllSame", 7 }, UFBX_ELEMENT_BY_ALL_SAME },
+	{ 0x5e66f4fau, { "ByPolygon", 9 }, UFBX_ELEMENT_BY_POLYGON },
+};
+#define ufbxi_element_type_permute_hash(h) ((((h) * 1) >> 17) % 4)
+static const ufbxi_element_type_map_entry ufbxi_element_type_map[4] = {
+	{ 0xc0c90f07u, { "EdgeCrease", 10 }, UFBX_ELEMENT_EDGE_CREASE },
+	{ 0x68f39512u, { "UV", 2 }, UFBX_ELEMENT_UV },
+	{ 0xcbd54f80u, { "Material", 8 }, UFBX_ELEMENT_MATERIAL },
+	{ 0x58de2772u, { "Normal", 6 }, UFBX_ELEMENT_NORMAL },
+};
 // End of generated code
 
 typedef struct {
@@ -2319,8 +2381,8 @@ ufbx_static_assert(prop_info_count, ufbxi_arraycount(ufbxi_prop_type_info_table)
 
 static const ufbxi_node_type_info ufbxi_node_type_info_table[] = {
 	{ "unknown", sizeof(ufbx_node) },
-	{ "model", sizeof(ufbx_node) },
-	{ "mesh", sizeof(ufbx_node) },
+	{ "model", sizeof(ufbx_model) },
+	{ "mesh", sizeof(ufbx_mesh) },
 	{ "material", sizeof(ufbx_node) },
 	{ "texture", sizeof(ufbx_node) },
 	{ "bone", sizeof(ufbx_node) },
@@ -2332,7 +2394,7 @@ static const ufbxi_node_type_info ufbxi_node_type_info_table[] = {
 };
 ufbx_static_assert(node_info_count, ufbxi_arraycount(ufbxi_node_type_info_table) == UFBX_NUM_NODE_TYPES);
 
-// Resolve an FBX property type name into a enum
+// Resolve an FBX property type name into an enum
 static ufbx_prop_type ufbxi_get_prop_type(ufbx_string name)
 {
 	uint32_t hash = ufbxi_hash_string(name);
@@ -2345,7 +2407,7 @@ static ufbx_prop_type ufbxi_get_prop_type(ufbx_string name)
 	}
 }
 
-// Resolve an FBX node type name into a enum
+// Resolve an FBX node type name into an enum
 static ufbx_node_type ufbxi_get_node_type(ufbx_string type, ufbx_string sub_type)
 {
 	uint32_t hash = ufbxi_hash_string(type);
@@ -2362,6 +2424,37 @@ static ufbx_node_type ufbxi_get_node_type(ufbx_string type, ufbx_string sub_type
 	}
 	return UFBX_NODE_UNKNOWN;
 }
+
+// Resolve FBX element mapping type into an enum
+static ufbx_element_mapping ufbxi_get_element_mapping(ufbx_string type)
+{
+	uint32_t hash = ufbxi_hash_string(type);
+	uint32_t index = ufbxi_element_mapping_permute_hash(hash);
+	const ufbxi_element_mapping_map_entry *entry = &ufbxi_element_mapping_map[index];
+	if (hash == entry->hash && ufbxi_streq_str(type, entry->name)) {
+		return entry->mapping;
+	}
+	return UFBX_ELEMENT_BY_UNKNOWN;
+}
+
+// Resolve FBX element mapping type into an enum
+static ufbx_element_type ufbxi_get_element_type(ufbx_string type)
+{
+	uint32_t hash = ufbxi_hash_string(type);
+	uint32_t index = ufbxi_element_type_permute_hash(hash);
+	const ufbxi_element_type_map_entry *entry = &ufbxi_element_type_map[index];
+	if (hash == entry->hash && ufbxi_streq_str(type, entry->name)) {
+		return entry->type;
+	}
+	return UFBX_ELEMENT_UNKNOWN;
+}
+
+typedef struct {
+	ufbx_element element;
+	ufbxi_scene_imp *scene;
+	ufbxi_array data_array;
+	ufbxi_array index_array;
+} ufbxi_element_imp;
 
 static int ufbxi_read_property(ufbxi_context *uc, ufbx_prop *prop, int version)
 {
@@ -2454,7 +2547,7 @@ static void ufbxi_hash_map_insert(ufbxi_hash_map_init_ctx *ctx, uint32_t hash, u
 	uint32_t scan = 0;
 
 	for (;;) {
-		ufbxi_hash_map_entry *entry = &entries[(hash + scan*scan) & mask];
+		ufbxi_hash_map_entry *entry = &entries[(hash + scan) & mask];
 		if (!entry->hash) {
 			entry->hash = hash;
 			entry->index = index;
@@ -2473,7 +2566,7 @@ static ufbxi_forceinline uint32_t ufbxi_hash_map_find(const void *hash_map, cons
 	uint32_t mask = map_size - 1;
 	uint32_t scan = *p_scan;
 	for (;;) {
-		const ufbxi_hash_map_entry *entry = &entries[(hash + scan*scan) & mask];
+		const ufbxi_hash_map_entry *entry = &entries[(hash + scan) & mask];
 		if (entry->hash == hash) {
 			*p_scan = scan + 1;
 			return entry->index;
@@ -2564,7 +2657,7 @@ static int ufbxi_read_definitions(ufbxi_context *uc)
 			ufbxi_push_string_place(uc, &prop_template->type_str);
 		}
 	}
-	if (uc->failed) return 0;
+	if (uc->base.failed) return 0;
 
 	ufbx_template *templates = ufbxi_temp_retain_n(uc, UFBXI_TEMP_PRIMARY_RESULT, ufbx_template, num);
 	if (!templates) return 0;
@@ -2575,11 +2668,180 @@ static int ufbxi_read_definitions(ufbxi_context *uc)
 	return 1;
 }
 
+typedef struct {
+	ufbx_node *parent;
+	ufbx_node *child;
+} ufbxi_virtual_connection;
+
+static int ufbxi_read_element(ufbxi_context *uc, ufbxi_element_imp *elem)
+{
+	ufbx_string mapping_str, reference_str;
+	if (!ufbxi_find_value(uc, "MappingInformationType", 'S', &mapping_str)) return 0;
+	if (!ufbxi_find_value(uc, "ReferenceInformationType", 'S', &reference_str)) return 0;
+
+	elem->element.mapping = ufbxi_get_element_mapping(mapping_str);
+
+	const char *data_name, *index_name;
+	switch (elem->element.type) {
+	case UFBX_ELEMENT_POSITION:
+		return ufbxi_error(uc, "Internal: Trying to read to UFBX_ELEMENT_POSITION");
+	case UFBX_ELEMENT_NORMAL:
+		data_name = "Normals";
+		index_name = "NormalsIndex";
+		break;
+	case UFBX_ELEMENT_UV:
+		data_name = "UV";
+		index_name = "UVIndex";
+		break;
+	case UFBX_ELEMENT_MATERIAL:
+		data_name = "Materials";
+		index_name = "MaterialsIndex";
+		break;
+	case UFBX_ELEMENT_EDGE_CREASE:
+		data_name = "EdgeCrease";
+		index_name = "EdgeCreaseIndex";
+		break;
+	default:
+		return ufbxi_errorf(uc, "Internal: Bad element type: %d", elem->element.type);
+	}
+
+	ufbxi_find_value(uc, data_name, '_', &elem->data_array);
+	ufbxi_find_value(uc, index_name, '_', &elem->index_array);
+
+	return !uc->base.failed;
+}
+
+// Forward declared as `ufbxi_read_model()` may call this since
+// in pre-7000 versions of FBX model and mesh data is in the same node!
+static int ufbxi_read_mesh(ufbxi_context *uc, ufbx_mesh *mesh);
+
+static int ufbxi_read_model(ufbxi_context *uc, ufbx_model *model)
+{
+
+	// Create a "virtual" mesh node if the model has geometry
+	if (uc->version < 7000) {
+		if (ufbxi_find_node(uc, "Vertices")) {
+			ufbx_mesh *mesh = ufbxi_push_zero(uc, ufbx_mesh);
+			mesh->node.type = UFBX_NODE_MESH;
+			mesh->node.prop_template = model->node.prop_template;
+			mesh->node.props = model->node.props;
+
+			if (!ufbxi_read_mesh(uc, mesh)) return 0;
+			uc->scene->nodes.size++;
+
+			ufbx_node **p_node = ufbxi_temp_push_uninit(uc, UFBXI_TEMP_NODE_PTR, ufbx_node*);
+			if (!p_node) return 0;
+			*p_node = &mesh->node;
+
+			// Connect the model to the mesh
+			model->node.children.size++;
+			mesh->node.parents.size++;
+			ufbxi_virtual_connection *connect = ufbxi_temp_push_uninit(uc, UFBXI_TEMP_VIRTUAL_CONNECTIONS, ufbxi_virtual_connection);
+			if (!connect) return 0;
+			connect->parent = &model->node;
+			connect->child = &mesh->node;
+		}
+	}
+
+	return !uc->base.failed;
+}
+
+static int ufbxi_read_mesh(ufbxi_context *uc, ufbx_mesh *mesh)
+{
+	ufbx_string name;
+	while (ufbxi_next_child(uc, &name)) {
+		ufbxi_element_imp *elem = NULL;
+
+		if (ufbxi_streq(name, "Vertices")) {
+			// Vertex position data
+			elem = ufbxi_push_zero(uc, ufbxi_element_imp);
+			elem->element.type = UFBX_ELEMENT_POSITION;
+			elem->element.mapping = UFBX_ELEMENT_BY_VERTEX;
+			elem->scene = uc->scene_imp;
+			if (!ufbxi_parse_value(uc, '_', &elem->data_array)) return 0;
+		} else if (ufbxi_streq(name, "PolygonVertexIndex")) {
+
+			// Polygon faces
+			ufbxi_array arr;
+			if (!ufbxi_parse_value(uc, 'i', &arr)) return 0;
+
+			size_t num_indices = arr.num_elements;
+			uint32_t *indices = ufbxi_push_uninit_n(uc, uint32_t, num_indices);
+			if (!indices) return 0;
+			if (!ufbxi_decode_array(&uc->base, &arr, indices)) return 0;
+
+			mesh->face_vertices.data = indices;
+			mesh->face_vertices.size = arr.num_elements;
+
+			// Count the number of faces
+			uint32_t num_faces = 0;
+			for (size_t i = 0; i < num_indices; i++) {
+				if ((int32_t)indices[i] < 0) num_faces++;
+			}
+
+			ufbx_face *faces = ufbxi_push_uninit_n(uc, ufbx_face, num_faces);
+			if (!faces) return 0;
+
+			mesh->faces.data = faces;
+			mesh->faces.size = num_faces;
+
+			uint32_t face_ix = 0;
+			uint32_t face_begin = 0;
+			for (uint32_t i = 0; i < num_indices; i++) {
+				uint32_t ix = indices[i];
+				if ((int32_t)ix < 0) {
+					indices[i] = ~ix;
+					faces[face_ix].begin = face_begin;
+					faces[face_ix].num_vertices = i - face_begin + 1;
+					face_ix++;
+					face_begin = i + 1;
+				}
+			}
+
+		} else if (ufbxi_streq(name, "Edges")) {
+
+		} else if (name.length > 12 && !memcmp(name.data, "LayerElement", 12)) {
+			ufbx_string type_str = { name.data + 12, name.length - 12 };
+			ufbx_element_type type = ufbxi_get_element_type(type_str);
+
+			if (type == UFBX_ELEMENT_UNKNOWN) {
+				// TODO: Don't ignore unknown elements
+				continue;
+			}
+
+			elem = ufbxi_push_zero(uc, ufbxi_element_imp);
+			elem->element.type = type;
+			elem->scene = uc->scene_imp;
+
+			if (ufbxi_has_next_value(uc)) {
+				if (!ufbxi_parse_value(uc, 'I', &elem->element.index)) return 0;
+			}
+
+			if (!ufbxi_enter_node(uc)) return 0;
+			if (!ufbxi_read_element(uc, elem)) return 0;
+			ufbxi_exit_node(uc);
+
+		}
+
+		if (elem) {
+			ufbx_element **p_elem = ufbxi_temp_push_uninit(uc, UFBXI_TEMP_PRIMARY_RESULT, ufbx_element*);
+			if (!p_elem) return 0;
+			*p_elem = (ufbx_element*)elem;
+			mesh->elements.size++;
+		}
+	}
+
+	// Retrieve the elements
+	mesh->elements.data = ufbxi_temp_retain_n(uc, UFBXI_TEMP_PRIMARY_RESULT, ufbx_element*, mesh->elements.size);
+	if (!mesh->elements.data) return 0;
+
+	return !uc->base.failed;
+}
+
 static int ufbxi_read_objects(ufbxi_context *uc)
 {
 	ufbx_string node_name;
 
-	size_t num = 0;
 	while (ufbxi_next_child(uc, &node_name)) {
 		uint64_t id = 0;
 		ufbx_string name = { 0 }, type_str = { 0 }, sub_type = { 0 };
@@ -2631,7 +2893,7 @@ static int ufbxi_read_objects(ufbxi_context *uc)
 		ufbx_node **p_node = ufbxi_temp_push_uninit(uc, UFBXI_TEMP_NODE_PTR, ufbx_node*);
 		if (!p_node) return 0;
 		*p_node = node;
-		num++;
+		uc->scene->nodes.size++;
 
 		node->name = name;
 		node->type = type;
@@ -2640,13 +2902,22 @@ static int ufbxi_read_objects(ufbxi_context *uc)
 
 		if (!ufbxi_read_properties(uc, &node->props)) return 0;
 
-		ufbxi_exit_node(uc);
-
 		ufbxi_push_string_place(uc, &node->name);
 		ufbxi_push_string_place(uc, &node->type_str);
 		ufbxi_push_string_place(uc, &node->sub_type_str);
+
+		int res = 1;
+		switch (node->type) {
+		case UFBX_NODE_MODEL: res = ufbxi_read_model(uc, (ufbx_model*)node); break;
+		case UFBX_NODE_MESH: res = ufbxi_read_mesh(uc, (ufbx_mesh*)node); break;
+		}
+		if (!res) return 0;
+
+		ufbxi_exit_node(uc);
 	}
-	if (uc->failed) return 0;
+	if (uc->base.failed) return 0;
+
+	size_t num = uc->scene->nodes.size;
 
 	ufbxi_hash_map_init_ctx map_ctx;
 	size_t map_size = ufbxi_hash_map_size(&map_ctx, num);
@@ -2666,7 +2937,6 @@ static int ufbxi_read_objects(ufbxi_context *uc)
 	}
 
 	uc->scene->nodes.data = node_data;
-	uc->scene->nodes.size = num;
 
 	return 1;
 }
@@ -2683,7 +2953,7 @@ static int ufbxi_read_root(ufbxi_context *uc)
 	} else {
 		uc->focused_node.child_begin_pos = 27;
 		uc->focused_node.next_value_pos = 27;
-		uc->focused_node.end_pos = uc->size;
+		uc->focused_node.end_pos = uc->base.size;
 	}
 
 	uc->node_stack[0].node = uc->focused_node;
@@ -2712,6 +2982,36 @@ static int ufbxi_read_root(ufbxi_context *uc)
 		ufbxi_exit_node(uc);
 	}
 
+	// Read connections
+	while (!ufbxi_temp_is_empty(uc, UFBXI_TEMP_VIRTUAL_CONNECTIONS)) {
+		ufbxi_virtual_connection *connection = ufbxi_temp_pop(uc, UFBXI_TEMP_VIRTUAL_CONNECTIONS, ufbxi_virtual_connection);
+	}
+
+	// Gather all typed nodes
+	{
+		ufbx_scene *scene = uc->scene;
+		for (size_t i = 0; i < scene->nodes.size; i++) {
+			switch (scene->nodes.data[i]->type) {
+			case UFBX_NODE_MODEL: scene->models.size++; break;
+			case UFBX_NODE_MESH: scene->meshes.size++; break;
+			}
+		}
+
+		scene->models.data = ufbxi_push_uninit_n(uc, ufbx_model*, scene->models.size);
+		scene->meshes.data = ufbxi_push_uninit_n(uc, ufbx_mesh*, scene->meshes.size);
+		if (uc->base.failed) return 0;
+
+		ufbx_model **dst_model = scene->models.data;
+		ufbx_mesh **dst_mesh = scene->meshes.data;
+		for (size_t i = 0; i < scene->nodes.size; i++) {
+			ufbx_node *node = scene->nodes.data[i];
+			switch (node->type) {
+			case UFBX_NODE_MODEL: *dst_model++ = (ufbx_model*)node; break;
+			case UFBX_NODE_MESH: *dst_mesh++ = (ufbx_mesh*)node; break;
+			}
+		}
+	}
+
 	return 1;
 }
 
@@ -2721,7 +3021,8 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, ufbx_error *error)
 {
 	void *data_to_free = NULL;
 	ufbxi_context uc = { (const char*)data, size };
-	uc.error = error;
+	uc.base.error = error;
+	uc.base.uc = &uc;
 
 	if (size < UFBXI_BINARY_MAGIC_SIZE + 2
 		|| memcmp(data, ufbxi_binary_magic, UFBXI_BINARY_MAGIC_SIZE)) {
@@ -2740,8 +3041,8 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, ufbx_error *error)
 			return NULL;
 		}
 
-		uc.data = ua.dst;
-		uc.size = ua.dst_pos;
+		uc.base.data = ua.dst;
+		uc.base.size = ua.dst_pos;
 		uc.from_ascii = 1;
 		uc.version = ua.version;
 		data_to_free = ua.dst;
@@ -2752,11 +3053,13 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, ufbx_error *error)
 	ufbx_scene *result = NULL;
 	uc.scene_imp = ufbxi_push_zero(&uc, ufbxi_scene_imp);
 	if (uc.scene_imp) {
+		uc.scene_imp->bc.data = uc.base.data;
+		uc.scene_imp->bc.size = uc.base.size;
 		uc.scene = &uc.scene_imp->scene;
 		uc.scene->metadata.ascii = uc.from_ascii;
 		uc.scene->metadata.version = uc.version;
 		if (ufbxi_read_root(&uc)) {
-			if (!uc.failed) {
+			if (!uc.base.failed) {
 				result = uc.scene;
 			}
 		}
@@ -2764,7 +3067,6 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, ufbx_error *error)
 
 	// Free temporary memory
 	free(data_to_free);
-	free(uc.decompress_buffer);
 	for (uint32_t si = 0; si < UFBXI_NUM_TEMP_STACKS; si++) {
 		ufbxi_temp_stack *stack = &uc.temp_stacks[si];
 		ufbx_assert(!result || stack->page_index == 0);
@@ -2783,6 +3085,7 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, ufbx_error *error)
 void ufbx_free_scene(ufbx_scene *scene)
 {
 	ufbxi_scene_imp *imp = (ufbxi_scene_imp*)scene;
+	free(imp->bc.decompress_buffer);
 	ufbxi_free_result(imp->memory);
 }
 

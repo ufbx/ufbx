@@ -43,6 +43,28 @@ UFBXT_TEST(table_node_type_map_values)
 	ufbxt_assert(ufbxi_get_node_type(make_str("NodeAttribute"), ufbx_empty_string) == UFBX_NODE_ATTRIBUTE);
 }
 #endif
+
+UFBXT_TEST(table_element_mapping_map_values)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByVertex")) == UFBX_ELEMENT_BY_VERTEX);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByVertice")) == UFBX_ELEMENT_BY_VERTEX);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByPolygon")) == UFBX_ELEMENT_BY_POLYGON);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByPolygonVertex")) == UFBX_ELEMENT_BY_POLYGON_VERTEX);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByEdge")) == UFBX_ELEMENT_BY_EDGE);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("AllSame")) == UFBX_ELEMENT_BY_ALL_SAME);
+}
+#endif
+
+UFBXT_TEST(table_element_type_map_values)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(ufbxi_get_element_type(make_str("Normal")) == UFBX_ELEMENT_NORMAL);
+	ufbxt_assert(ufbxi_get_element_type(make_str("UV")) == UFBX_ELEMENT_UV);
+	ufbxt_assert(ufbxi_get_element_type(make_str("Material")) == UFBX_ELEMENT_MATERIAL);
+	ufbxt_assert(ufbxi_get_element_type(make_str("EdgeCrease")) == UFBX_ELEMENT_EDGE_CREASE);
+}
+#endif
 // End of generated code
 
 UFBXT_TEST(table_prop_type_map_self)
@@ -98,6 +120,54 @@ UFBXT_TEST(table_node_type_map_not_found)
 	ufbxt_assert(ufbxi_get_node_type(make_str(""), ufbx_empty_string) == UFBX_NODE_UNKNOWN);
 	ufbxt_assert(ufbxi_get_node_type(make_str("Test"), ufbx_empty_string) == UFBX_NODE_UNKNOWN);
 	ufbxt_assert(ufbxi_get_node_type(make_str("Another"), ufbx_empty_string) == UFBX_NODE_UNKNOWN);
+}
+#endif
+
+UFBXT_TEST(table_element_mapping_map_self)
+#if UFBXT_IMPL
+{
+	size_t num = ufbxi_arraycount(ufbxi_element_mapping_map);
+	for (size_t i = 0; i < num; i++) {
+		const ufbxi_element_mapping_map_entry *entry = &ufbxi_element_mapping_map[i];
+		if (entry->hash == 0) continue;
+
+		uint32_t hash = ufbxi_hash_string(entry->name);
+		ufbxt_assert(entry->hash == hash);
+		ufbxt_assert(ufbxi_element_mapping_permute_hash(hash) == i);
+	}
+}
+#endif
+
+UFBXT_TEST(table_element_mapping_map_not_found)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("")) == UFBX_ELEMENT_BY_UNKNOWN);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("Test")) == UFBX_ELEMENT_BY_UNKNOWN);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("Another")) == UFBX_ELEMENT_BY_UNKNOWN);
+}
+#endif
+
+UFBXT_TEST(table_element_type_map_self)
+#if UFBXT_IMPL
+{
+	size_t num = ufbxi_arraycount(ufbxi_element_type_map);
+	for (size_t i = 0; i < num; i++) {
+		const ufbxi_element_type_map_entry *entry = &ufbxi_element_type_map[i];
+		if (entry->hash == 0) continue;
+
+		uint32_t hash = ufbxi_hash_string(entry->name);
+		ufbxt_assert(entry->hash == hash);
+		ufbxt_assert(ufbxi_element_type_permute_hash(hash) == i);
+	}
+}
+#endif
+
+UFBXT_TEST(table_element_type_map_not_found)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(ufbxi_get_element_type(make_str("")) == UFBX_ELEMENT_UNKNOWN);
+	ufbxt_assert(ufbxi_get_element_type(make_str("Test")) == UFBX_ELEMENT_UNKNOWN);
+	ufbxt_assert(ufbxi_get_element_type(make_str("Another")) == UFBX_ELEMENT_UNKNOWN);
 }
 #endif
 

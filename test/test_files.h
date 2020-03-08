@@ -25,7 +25,6 @@ UFBXT_FILE_TEST(blender_279_default)
 }
 #endif
 
-
 UFBXT_FILE_TEST(maya_cube)
 #if UFBXT_IMPL
 {

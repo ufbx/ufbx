@@ -63,7 +63,7 @@ UFBXT_TEST(iter_two_nodes)
 	ufbxt_assert(uc->focused_node.end_pos == 36);
 
 	ufbxt_assert(!ufbxi_next_child(uc, &name));
-	ufbxt_assert(!uc->failed);
+	ufbxt_assert(!uc->base.failed);
 }
 #endif
 
@@ -153,7 +153,7 @@ UFBXT_TEST(enter_single_node)
 	ufbxt_assert(!ufbxi_next_child(uc, &name));
 	ufbxi_exit_node(uc);
 	ufbxt_assert(!ufbxi_next_child(uc, &name));
-	ufbxt_assert(!uc->failed);
+	ufbxt_assert(!uc->base.failed);
 }
 #endif
 
@@ -176,9 +176,9 @@ UFBXT_TEST(node_stack_error)
 	ufbxt_assert(ufbxi_enter_node(uc));
 	ufbxt_assert(!ufbxi_parse_value(uc, 'I', &dummy));
 	ufbxt_log_error(uc);
-	ufbxt_assert(uc->error->stack_size == 2);
-	ufbxt_assert(!strcmp(uc->error->stack[0], "Hello"));
-	ufbxt_assert(!strcmp(uc->error->stack[1], "World"));
+	ufbxt_assert(uc->base.error->stack_size == 2);
+	ufbxt_assert(!strcmp(uc->base.error->stack[0], "Hello"));
+	ufbxt_assert(!strcmp(uc->base.error->stack[1], "World"));
 }
 #endif
 
@@ -205,7 +205,7 @@ UFBXT_TEST(find_two_nodes)
 	ufbxt_assert(uc->focused_node.end_pos == 36);
 
 	ufbxt_assert(!ufbxi_find_node(uc, "Other"));
-	ufbxt_assert(!uc->failed);
+	ufbxt_assert(!uc->base.failed);
 }
 #endif
 

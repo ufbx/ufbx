@@ -287,9 +287,10 @@ ufbxi_context *ufbxt_make_memory_context(const void *data, uint32_t size)
 	memset(data_copy + size, 0, 13);
 	ufbxi_context *uc = &g_context;
 	memset(uc, 0, sizeof(ufbxi_context));
-	uc->error = &g_error;
-	uc->data = data_copy;
-	uc->size = size + 13;
+	uc->base.error = &g_error;
+	uc->base.data = data_copy;
+	uc->base.size = size + 13;
+	uc->base.uc = uc;
 	uc->node_stack_top = uc->node_stack;
 	uc->node_stack_top->node.end_pos = size;
 	return uc;
@@ -397,7 +398,7 @@ void ufbxt_log_error_common(ufbx_error *err)
 
 void ufbxt_log_error(ufbxi_context *uc)
 {
-	ufbxt_log_error_common(uc->error);
+	ufbxt_log_error_common(uc->base.error);
 }
 
 void ufbxt_log_ascii_error(ufbxi_ascii *ua)
