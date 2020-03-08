@@ -4,13 +4,28 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define ufbx_define_list_type(name, type) \
+	typedef struct name { type* data; size_t size; } name; \
+	static inline type *begin(const type &l) { return l.data; } \
+	static inline type *end(const type &l) { return l.data + l.size; } \
 
 #define UFBX_ERROR_DESC_MAX_LENGTH 255
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
 #define UFBX_ERROR_STACK_NAME_MAX_LENGTH 31
+
+// Types
+
+typedef struct ufbx_node ufbx_node;
+typedef struct ufbx_model ufbx_model;
+typedef struct ufbx_mesh ufbx_mesh;
+typedef struct ufbx_template ufbx_template;
+typedef struct ufbx_prop ufbx_prop;
+
+typedef struct ufbx_node_list { ufbx_node **data; size_t size; } ufbx_node_list;
+typedef struct ufbx_model_list { ufbx_model **data; size_t size; } ufbx_model_list;
+typedef struct ufbx_mesh_list { ufbx_mesh **data; size_t size; } ufbx_mesh_list;
+typedef struct ufbx_template_list { ufbx_template *data; size_t size; } ufbx_template_list;
+typedef struct ufbx_prop_list { ufbx_prop *data; size_t size; } ufbx_prop_list;
 
 typedef struct ufbx_error {
 	uint32_t source_line;
@@ -39,8 +54,9 @@ typedef struct ufbx_string {
 	const char *data;
 	size_t length;
 } ufbx_string;
+extern const ufbx_string ufbx_empty_string;
 
-typedef struct ufbx_property {
+struct ufbx_prop {
 	ufbx_string name;
 	ufbx_prop_type type;
 
@@ -51,7 +67,7 @@ typedef struct ufbx_property {
 	ufbx_string value_str;
 	int64_t value_int[4];
 	double value_float[4];
-} ufbx_property;
+};
 
 typedef enum ufbx_node_type {
 	UFBX_NODE_UNKNOWN,
@@ -69,24 +85,37 @@ typedef enum ufbx_node_type {
 	UFBX_NUM_NODE_TYPES,
 } ufbx_node_type;
 
-typedef struct ufbx_node ufbx_node;
-typedef struct ufbx_model_node ufbx_model_node;
-typedef struct ufbx_mesh_node ufbx_mesh_node;
-
-struct ufbx_node {
+struct ufbx_template {
 	ufbx_string name;
 	ufbx_string type_str;
+	ufbx_prop_list props;
+};
 
-	ufbx_property *properties;
-	size_t num_properties;
+struct ufbx_node {
+	ufbx_node_type type;
 
-	ufbx_model_node *parent_model;
+	ufbx_string name;
+	ufbx_string type_str;
+	ufbx_string sub_type_str;
+
+	ufbx_template *prop_template;
+	ufbx_prop_list props;
+
+	ufbx_model *parent_model;
 
 	ufbx_node *parents;
 	size_t num_parents;
 
 	ufbx_node *children;
 	size_t num_children;
+};
+
+struct ufbx_model {
+	ufbx_node node;
+};
+
+struct ufbx_mesh {
+	ufbx_node node;
 };
 
 typedef struct ufbx_metadata {
@@ -98,26 +127,57 @@ typedef struct ufbx_metadata {
 typedef struct ufbx_scene {
 	ufbx_metadata metadata;
 
-	ufbx_node *templates;
-	size_t num_templates;
+	ufbx_model *root_model;
 
-	ufbx_model_node *root_model;
-
-	ufbx_model_node *models;
-	size_t num_models;
-
-	ufbx_mesh_node *meshes;
-	size_t num_meshes;
+	ufbx_node_list nodes;
+	ufbx_model_list models;
+	ufbx_mesh_list meshes;
+	ufbx_template_list templates;
 } ufbx_scene;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, ufbx_error *error);
 void ufbx_free_scene(ufbx_scene *scene);
+
+ufbx_node *ufbx_find_node(ufbx_scene *scene, const char *name, ufbx_node_type type);
+ufbx_node *ufbx_find_node_str(ufbx_scene *scene, ufbx_string name, ufbx_node_type type);
+ufbx_node *ufbx_find_node_any(ufbx_scene *scene, const char *name);
+ufbx_node *ufbx_find_node_any_str(ufbx_scene *scene, ufbx_string name);
+ufbx_model *ufbx_find_model(ufbx_scene *scene, const char *name);
+ufbx_model *ufbx_find_model_str(ufbx_scene *scene, ufbx_string name);
+ufbx_mesh *ufbx_find_mesh(ufbx_scene *scene, const char *name);
+ufbx_mesh *ufbx_find_mesh_str(ufbx_scene *scene, ufbx_string name);
+
+ufbx_prop *ufbx_get_prop_from_list(const ufbx_prop_list *list, const char *name);
+ufbx_prop *ufbx_get_prop_from_list_str(const ufbx_prop_list *list, ufbx_string name);
+ufbx_prop *ufbx_get_prop(const ufbx_node *node, const char *name);
+ufbx_prop *ufbx_get_prop_str(const ufbx_node *node, ufbx_string name);
 
 const char *ufbx_prop_type_name(ufbx_prop_type type);
 const char *ufbx_node_type_name(ufbx_node_type type);
 
 #ifdef __cplusplus
 }
+#endif
+
+// Range overloads for lists
+
+#ifdef __cplusplus
+
+static inline void begin(const ufbx_node_list &l) { return l.data; }
+static inline void end(const ufbx_node_list &l) { return l.data + l.size; }
+static inline void begin(const ufbx_model_list &l) { return l.data; }
+static inline void end(const ufbx_model_list &l) { return l.data + l.size; }
+static inline void begin(const ufbx_mesh_list &l) { return l.data; }
+static inline void end(const ufbx_mesh_list &l) { return l.data + l.size; }
+static inline void begin(const ufbx_template_list &l) { return l.data; }
+static inline void end(const ufbx_template_list &l) { return l.data + l.size; }
+static inline void begin(const ufbx_prop_list &l) { return l.data; }
+static inline void end(const ufbx_prop_list &l) { return l.data + l.size; }
+
 #endif
 
 #endif

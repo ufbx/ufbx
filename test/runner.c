@@ -15,6 +15,7 @@ void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr);
 #include <stdio.h>
 #include <setjmp.h>
 #include <stdarg.h>
+#include <math.h>
 
 // -- Timing
 

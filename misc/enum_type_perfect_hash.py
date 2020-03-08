@@ -62,12 +62,21 @@ def find_params(names, map_size, max_k, max_s):
 decl = []
 test = []
 
-def gen_table_imp(names, map_size, type_name, enum_name):
+def gen_table(names, type_name, enum_name, test_extra):
     global decl
     global test
 
-    k, s, arr = find_params(names, map_size, 10000, 24)
- 
+    map_size = 1
+    while map_size < len(names):
+        map_size *= 2
+
+    while True:
+        try:
+            k, s, arr = find_params(names, map_size, 10000, 24)
+            break
+        except:
+            map_size *= 2
+
     decl.append("#define ufbxi_{0}_permute_hash(h) ((((h) * {1}) >> {2}) % {3})".format(type_name, k, s, map_size))
     decl.append("static const ufbxi_{0}_map_entry ufbxi_{0}_map[{1}] = {{".format(type_name, map_size))
     for n in arr:
@@ -82,25 +91,13 @@ def gen_table_imp(names, map_size, type_name, enum_name):
     test.append("#if UFBXT_IMPL")
     test.append("{")
     for n in names:
-        test.append("\tufbxt_assert(ufbxi_get_{0}(make_str(\"{1}\")) == UFBX_{2}_{3});".format(type_name, n.name, enum_name, n.enum))
+        test.append("\tufbxt_assert(ufbxi_get_{0}(make_str(\"{1}\"){2}) == UFBX_{3}_{4});".format(type_name, n.name, test_extra, enum_name, n.enum))
     test.append("}")
     test.append("#endif")
 
-    return decl, test
 
-def gen_table(names, type_name, enum_name):
-    map_size = 1
-    while map_size < len(names):
-        map_size *= 2
-
-    while True:
-        try:
-            return gen_table_imp(names, map_size, type_name, enum_name)
-        except:
-            map_size *= 2
-
-gen_table(prop_types, "prop_type", "PROP")
-gen_table(node_types, "node_type", "NODE")
+gen_table(prop_types, "prop_type", "PROP", "")
+gen_table(node_types, "node_type", "NODE", ", ufbx_empty_string")
 
 print("\n".join(decl))
 print()

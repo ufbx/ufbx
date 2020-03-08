@@ -33,14 +33,14 @@ UFBXT_TEST(table_prop_type_map_values)
 UFBXT_TEST(table_node_type_map_values)
 #if UFBXT_IMPL
 {
-	ufbxt_assert(ufbxi_get_node_type(make_str("Model")) == UFBX_NODE_MODEL);
-	ufbxt_assert(ufbxi_get_node_type(make_str("Geometry")) == UFBX_NODE_MESH);
-	ufbxt_assert(ufbxi_get_node_type(make_str("Material")) == UFBX_NODE_MATERIAL);
-	ufbxt_assert(ufbxi_get_node_type(make_str("Texture")) == UFBX_NODE_TEXTURE);
-	ufbxt_assert(ufbxi_get_node_type(make_str("AnimationCurveNode")) == UFBX_NODE_ANIMATION);
-	ufbxt_assert(ufbxi_get_node_type(make_str("AnimationCurve")) == UFBX_NODE_ANIMATION_CURVE);
-	ufbxt_assert(ufbxi_get_node_type(make_str("AnimationLayer")) == UFBX_NODE_ANIMATION_LAYER);
-	ufbxt_assert(ufbxi_get_node_type(make_str("NodeAttribute")) == UFBX_NODE_ATTRIBUTE);
+	ufbxt_assert(ufbxi_get_node_type(make_str("Model"), ufbx_empty_string) == UFBX_NODE_MODEL);
+	ufbxt_assert(ufbxi_get_node_type(make_str("Geometry"), ufbx_empty_string) == UFBX_NODE_MESH);
+	ufbxt_assert(ufbxi_get_node_type(make_str("Material"), ufbx_empty_string) == UFBX_NODE_MATERIAL);
+	ufbxt_assert(ufbxi_get_node_type(make_str("Texture"), ufbx_empty_string) == UFBX_NODE_TEXTURE);
+	ufbxt_assert(ufbxi_get_node_type(make_str("AnimationCurveNode"), ufbx_empty_string) == UFBX_NODE_ANIMATION);
+	ufbxt_assert(ufbxi_get_node_type(make_str("AnimationCurve"), ufbx_empty_string) == UFBX_NODE_ANIMATION_CURVE);
+	ufbxt_assert(ufbxi_get_node_type(make_str("AnimationLayer"), ufbx_empty_string) == UFBX_NODE_ANIMATION_LAYER);
+	ufbxt_assert(ufbxi_get_node_type(make_str("NodeAttribute"), ufbx_empty_string) == UFBX_NODE_ATTRIBUTE);
 }
 #endif
 // End of generated code
@@ -63,6 +63,7 @@ UFBXT_TEST(table_prop_type_map_self)
 UFBXT_TEST(table_prop_type_map_not_found)
 #if UFBXT_IMPL
 {
+	ufbxt_assert(ufbxi_get_prop_type(make_str("")) == UFBX_PROP_UNKNOWN);
 	ufbxt_assert(ufbxi_get_prop_type(make_str("Test")) == UFBX_PROP_UNKNOWN);
 	ufbxt_assert(ufbxi_get_prop_type(make_str("Another")) == UFBX_PROP_UNKNOWN);
 }
@@ -83,11 +84,20 @@ UFBXT_TEST(table_node_type_map_self)
 }
 #endif
 
+UFBXT_TEST(table_node_type_sub_types)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(ufbxi_get_node_type(make_str("Deformer"), make_str("Cluster")) == UFBX_NODE_BONE);
+	ufbxt_assert(ufbxi_get_node_type(make_str("Deformer"), make_str("Skin")) == UFBX_NODE_SKIN);
+}
+#endif
+
 UFBXT_TEST(table_node_type_map_not_found)
 #if UFBXT_IMPL
 {
-	ufbxt_assert(ufbxi_get_node_type(make_str("Test")) == UFBX_NODE_UNKNOWN);
-	ufbxt_assert(ufbxi_get_node_type(make_str("Another")) == UFBX_NODE_UNKNOWN);
+	ufbxt_assert(ufbxi_get_node_type(make_str(""), ufbx_empty_string) == UFBX_NODE_UNKNOWN);
+	ufbxt_assert(ufbxi_get_node_type(make_str("Test"), ufbx_empty_string) == UFBX_NODE_UNKNOWN);
+	ufbxt_assert(ufbxi_get_node_type(make_str("Another"), ufbx_empty_string) == UFBX_NODE_UNKNOWN);
 }
 #endif
 
