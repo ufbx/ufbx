@@ -2471,7 +2471,7 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, ufbx_error *error)
 		ufbx_assert(stack->page_index == 0);
 		for (uint32_t i = 0; i < UFBXI_MAX_TEMP_STACK_PAGES; i++) {
 			ufbx_assert(stack->pages[i].offset == 0);
-			free(stack->pages[i].data);
+			if (stack->pages[i].data) free(stack->pages[i].data);
 		}
 	}
 	if (!result) {
