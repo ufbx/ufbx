@@ -243,6 +243,9 @@ int ufbx_get_element_by_face_f64(const ufbx_element *element, double *dst, size_
 int ufbx_get_element_by_edge_i32(const ufbx_element *element, int32_t *dst, size_t stride, ufbx_error *error);
 int ufbx_get_element_by_edge_f32(const ufbx_element *element, float *dst, size_t stride, ufbx_error *error);
 int ufbx_get_element_by_edge_f64(const ufbx_element *element, double *dst, size_t stride, ufbx_error *error);
+int ufbx_get_element_by_all_same_i32(const ufbx_element *element, int32_t *dst, size_t stride, ufbx_error *error);
+int ufbx_get_element_by_all_same_f32(const ufbx_element *element, float *dst, size_t stride, ufbx_error *error);
+int ufbx_get_element_by_all_same_f64(const ufbx_element *element, double *dst, size_t stride, ufbx_error *error);
 
 const char *ufbx_prop_type_name(ufbx_prop_type type);
 const char *ufbx_node_type_name(ufbx_node_type type);
