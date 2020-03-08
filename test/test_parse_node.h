@@ -208,3 +208,31 @@ UFBXT_TEST(find_two_nodes)
 	ufbxt_assert(!uc->failed);
 }
 #endif
+
+UFBXT_TEST(fail_parse_node_backwards)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context(
+		"\x01\x00\x00\x00" "\x00\x00\x00\x00" "\x00\x00\x00\x00"
+		"\x05" "Hello"
+	);
+
+	ufbxi_node node;
+	ufbxt_assert(!ufbxi_parse_node(uc, 0, &node));
+	ufbxt_log_error(uc);
+}
+#endif
+
+UFBXT_TEST(fail_next_node_backwards)
+#if UFBXT_IMPL
+{
+	ufbxi_context *uc = ufbxt_memory_context(
+		"\x01\x00\x00\x00" "\x00\x00\x00\x00" "\x00\x00\x00\x00"
+		"\x05" "Hello"
+	);
+
+	uint64_t next_pos;
+	ufbxt_assert(!ufbxi_next_node_pos(uc, 0, &next_pos));
+	ufbxt_log_error(uc);
+}
+#endif
