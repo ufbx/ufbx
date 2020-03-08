@@ -9,6 +9,7 @@ script:
     - cd build
     - clang -O2 ../misc/fuzz_deflate.c -o fuzz_deflate
     - clang -O2 ../misc/test_deflate.c -o test_deflate
+    - clang++ ../misc/test_build.cpp -o test_build_cpp
     - python3 ../misc/test_deflate.py ./test_deflate ..
     - clang -O2 -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
     - ./runner -v -d ../data

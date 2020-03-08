@@ -31,6 +31,10 @@
 	#define ufbx_assert(cond) (void)0
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // -- Utility
 
 static ufbxi_forceinline int
@@ -886,7 +890,7 @@ static void *ufbxi_push_size_uninit(ufbxi_context *uc, size_t size, uint32_t lin
 		}
 		*(void**)page = uc->result_data;
 		uc->result_pos = 8 + size;
-		uc->result_data = page;
+		uc->result_data = (char*)page;
 		uc->result_size = page_size;
 		return (char*)page + 8;
 	}
@@ -975,7 +979,7 @@ static void *ufbxi_temp_retain_size(ufbxi_context *uc, int index, size_t num, si
 	size_t unaligned_size = size;
 	size += (size_t)-(intptr_t)size & 7u;
 
-	char *dst = ufbxi_push_size_uninit(uc, num * unaligned_size, line);
+	char *dst = (char*)ufbxi_push_size_uninit(uc, num * unaligned_size, line);
 	if (!dst) return NULL;
 	dst += num * unaligned_size;
 
@@ -2368,7 +2372,7 @@ static int ufbxi_read_root(ufbxi_context *uc)
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, ufbx_error *error)
 {
 	void *data_to_free = NULL;
-	ufbxi_context uc = { data, size };
+	ufbxi_context uc = { (const char*)data, size };
 	uc.error = error;
 
 	if (size < UFBXI_BINARY_MAGIC_SIZE + 2
@@ -2425,5 +2429,9 @@ void ufbx_free_scene(ufbx_scene *scene)
 	ufbxi_scene_imp *imp = (ufbxi_scene_imp*)scene;
 	ufbxi_free_result(imp->memory);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

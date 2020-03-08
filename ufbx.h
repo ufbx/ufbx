@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define UFBX_ERROR_DESC_MAX_LENGTH 255
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
 #define UFBX_ERROR_STACK_NAME_MAX_LENGTH 31
@@ -104,5 +108,9 @@ typedef struct ufbx_scene {
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, ufbx_error *error);
 void ufbx_free_scene(ufbx_scene *scene);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
