@@ -288,32 +288,32 @@ UFBXT_TEST(parse_any_values)
 	int data[3];
 	ufbxt_assert(ufbxi_parse_values(uc, "????????", &i, &l, &y, &c, &f, &d, &s, &a));
 	ufbxt_assert(i.type_code == 'I');
-	ufbxt_assert(i.value_class == ufbxi_val_int);
+	ufbxt_assert(i.value_class == UFBXI_VAL_INT);
 	ufbxt_assert(i.value.i == 0x04030201);
 	ufbxt_assert(l.type_code == 'L');
-	ufbxt_assert(l.value_class == ufbxi_val_int);
+	ufbxt_assert(l.value_class == UFBXI_VAL_INT);
 	ufbxt_assert(l.value.i == UINT64_C(0x1817161514131211));
 	ufbxt_assert(y.type_code == 'Y');
-	ufbxt_assert(y.value_class == ufbxi_val_int);
+	ufbxt_assert(y.value_class == UFBXI_VAL_INT);
 	ufbxt_assert(y.value.i == 0x2221);
 	ufbxt_assert(c.type_code == 'C');
-	ufbxt_assert(c.value_class == ufbxi_val_int);
+	ufbxt_assert(c.value_class == UFBXI_VAL_INT);
 	ufbxt_assert(c.value.i == 1);
 	ufbxt_assert(f.type_code == 'F');
-	ufbxt_assert(f.value_class == ufbxi_val_float);
+	ufbxt_assert(f.value_class == UFBXI_VAL_FLOAT);
 	ufbxt_assert(f.value.f == 1.0f);
 	ufbxt_assert(d.type_code == 'D');
-	ufbxt_assert(d.value_class == ufbxi_val_float);
+	ufbxt_assert(d.value_class == UFBXI_VAL_FLOAT);
 	ufbxt_assert(d.value.f == 1.0);
 	ufbxt_assert(s.type_code == 'S');
-	ufbxt_assert(s.value_class == ufbxi_val_string);
+	ufbxt_assert(s.value_class == UFBXI_VAL_STRING);
 	ufbxt_assert(ufbxi_streq(s.value.str, "Hello"));
 	ufbxt_assert(a.type_code == 'i');
-	ufbxt_assert(a.value_class == ufbxi_val_array);
+	ufbxt_assert(a.value_class == UFBXI_VAL_ARRAY);
 	ufbxt_assert(a.value.arr.src_type == 'i');
 	ufbxt_assert(a.value.arr.dst_type == 'i');
 	ufbxt_assert(a.value.arr.num_elements == 3);
-	ufbxt_assert(a.value.arr.encoding == ufbxi_encoding_basic);
+	ufbxt_assert(a.value.arr.encoding == UFBXI_ENCODING_BASIC);
 	ufbxt_assert(a.value.arr.encoded_size == 3*4);
 	ufbxt_assert(ufbxi_decode_array(uc, &a.value.arr, data));
 	ufbxt_assert(data[0] == 1 && data[1] == 2 && data[2] == 3);
@@ -353,7 +353,7 @@ UFBXT_TEST(parse_simple_array)
 	ufbxt_assert(arr.src_type == 'i');
 	ufbxt_assert(arr.dst_type == 'i');
 	ufbxt_assert(arr.num_elements == 3);
-	ufbxt_assert(arr.encoding == ufbxi_encoding_basic);
+	ufbxt_assert(arr.encoding == UFBXI_ENCODING_BASIC);
 	ufbxt_assert(arr.encoded_size == 3*4);
 
 	int data[3];
@@ -386,7 +386,7 @@ static void helper_array_conversion(ufbxi_context *uc, char dst_type, char src_t
 	ufbxi_array arr;
 	ufbxt_assert(ufbxi_parse_value(uc, dst_type, &arr));
 
-	ufbxt_assert(arr.encoding == ufbxi_encoding_basic);
+	ufbxt_assert(arr.encoding == UFBXI_ENCODING_BASIC);
 	ufbxt_assert(arr.src_type == src_type);
 	ufbxt_assert(arr.dst_type == dst_type);
 	ufbxt_assert(arr.num_elements == 2);
@@ -471,7 +471,7 @@ UFBXT_TEST(parse_array_deflate)
 	ufbxt_assert(arr.src_type == 'i');
 	ufbxt_assert(arr.dst_type == 'i');
 	ufbxt_assert(arr.num_elements == 8);
-	ufbxt_assert(arr.encoding == ufbxi_encoding_deflate);
+	ufbxt_assert(arr.encoding == UFBXI_ENCODING_DEFLATE);
 	ufbxt_assert(arr.encoded_size == 22);
 
 	int32_t data[8];
@@ -500,7 +500,7 @@ UFBXT_TEST(parse_array_deflate_conversion)
 	ufbxt_assert(arr.src_type == 'i');
 	ufbxt_assert(arr.dst_type == 'f');
 	ufbxt_assert(arr.num_elements == 8);
-	ufbxt_assert(arr.encoding == ufbxi_encoding_deflate);
+	ufbxt_assert(arr.encoding == UFBXI_ENCODING_DEFLATE);
 	ufbxt_assert(arr.encoded_size == 22);
 
 	float data[8];
@@ -529,7 +529,7 @@ UFBXT_TEST(parse_array_deflate_bad_data)
 	ufbxt_assert(arr.src_type == 'i');
 	ufbxt_assert(arr.dst_type == 'i');
 	ufbxt_assert(arr.num_elements == 8);
-	ufbxt_assert(arr.encoding == ufbxi_encoding_deflate);
+	ufbxt_assert(arr.encoding == UFBXI_ENCODING_DEFLATE);
 	ufbxt_assert(arr.encoded_size == 22);
 
 	int32_t data[8];
@@ -551,7 +551,7 @@ UFBXT_TEST(parse_array_deflate_bad_data_conversion)
 	ufbxt_assert(arr.src_type == 'i');
 	ufbxt_assert(arr.dst_type == 'f');
 	ufbxt_assert(arr.num_elements == 8);
-	ufbxt_assert(arr.encoding == ufbxi_encoding_deflate);
+	ufbxt_assert(arr.encoding == UFBXI_ENCODING_DEFLATE);
 	ufbxt_assert(arr.encoded_size == 22);
 
 	int32_t data[8];
@@ -573,7 +573,7 @@ UFBXT_TEST(parse_array_deflate_bad_size)
 	ufbxt_assert(arr.src_type == 'i');
 	ufbxt_assert(arr.dst_type == 'i');
 	ufbxt_assert(arr.num_elements == 9);
-	ufbxt_assert(arr.encoding == ufbxi_encoding_deflate);
+	ufbxt_assert(arr.encoding == UFBXI_ENCODING_DEFLATE);
 	ufbxt_assert(arr.encoded_size == 22);
 
 	int32_t data[9];
@@ -595,7 +595,7 @@ UFBXT_TEST(parse_array_deflate_bad_size_conversion)
 	ufbxt_assert(arr.src_type == 'i');
 	ufbxt_assert(arr.dst_type == 'f');
 	ufbxt_assert(arr.num_elements == 9);
-	ufbxt_assert(arr.encoding == ufbxi_encoding_deflate);
+	ufbxt_assert(arr.encoding == UFBXI_ENCODING_DEFLATE);
 	ufbxt_assert(arr.encoded_size == 22);
 
 	int32_t data[9];
@@ -612,7 +612,7 @@ static void helper_array_bool(ufbxi_context *uc, char dst_type, char src_type)
 	ufbxi_array arr;
 	ufbxt_assert(ufbxi_parse_value(uc, dst_type, &arr));
 
-	ufbxt_assert(arr.encoding == ufbxi_encoding_basic);
+	ufbxt_assert(arr.encoding == UFBXI_ENCODING_BASIC);
 	ufbxt_assert(arr.src_type == src_type);
 	ufbxt_assert(arr.dst_type == dst_type);
 	ufbxt_assert(arr.num_elements == 3);
@@ -774,7 +774,7 @@ UFBXT_TEST(parse_multivalue_array)
 	ufbxt_assert(arr.src_type == 'i');
 	ufbxt_assert(arr.dst_type == 'i');
 	ufbxt_assert(arr.num_elements == 3);
-	ufbxt_assert(arr.encoding == ufbxi_encoding_multivalue);
+	ufbxt_assert(arr.encoding == UFBXI_ENCODING_MULTIVALUE);
 	ufbxt_assert(arr.encoded_size == uc->focused_node.child_begin_pos);
 
 	int32_t data[3];
@@ -797,7 +797,7 @@ UFBXT_TEST(parse_multivalue_array_float)
 	ufbxt_assert(arr.src_type == 'f');
 	ufbxt_assert(arr.dst_type == 'f');
 	ufbxt_assert(arr.num_elements == 3);
-	ufbxt_assert(arr.encoding == ufbxi_encoding_multivalue);
+	ufbxt_assert(arr.encoding == UFBXI_ENCODING_MULTIVALUE);
 	ufbxt_assert(arr.encoded_size == uc->focused_node.child_begin_pos);
 
 	float data[3];
@@ -824,7 +824,7 @@ UFBXT_TEST(parse_multivalue_convert_ints)
 		ufbxt_assert(arr.src_type == 'b');
 		ufbxt_assert(arr.dst_type == 'b');
 		ufbxt_assert(arr.num_elements == 4);
-		ufbxt_assert(arr.encoding == ufbxi_encoding_multivalue);
+		ufbxt_assert(arr.encoding == UFBXI_ENCODING_MULTIVALUE);
 		ufbxt_assert(arr.encoded_size == uc->focused_node.child_begin_pos);
 
 		char data[4];
@@ -843,7 +843,7 @@ UFBXT_TEST(parse_multivalue_convert_ints)
 		ufbxt_assert(arr.src_type == 'i');
 		ufbxt_assert(arr.dst_type == 'i');
 		ufbxt_assert(arr.num_elements == 4);
-		ufbxt_assert(arr.encoding == ufbxi_encoding_multivalue);
+		ufbxt_assert(arr.encoding == UFBXI_ENCODING_MULTIVALUE);
 		ufbxt_assert(arr.encoded_size == uc->focused_node.child_begin_pos);
 
 		int32_t data[4];
@@ -862,7 +862,7 @@ UFBXT_TEST(parse_multivalue_convert_ints)
 		ufbxt_assert(arr.src_type == 'l');
 		ufbxt_assert(arr.dst_type == 'l');
 		ufbxt_assert(arr.num_elements == 4);
-		ufbxt_assert(arr.encoding == ufbxi_encoding_multivalue);
+		ufbxt_assert(arr.encoding == UFBXI_ENCODING_MULTIVALUE);
 		ufbxt_assert(arr.encoded_size == uc->focused_node.child_begin_pos);
 
 		int64_t data[4];
@@ -892,7 +892,7 @@ UFBXT_TEST(parse_multivalue_convert_floats)
 		ufbxt_assert(arr.src_type == 'f');
 		ufbxt_assert(arr.dst_type == 'f');
 		ufbxt_assert(arr.num_elements == 5);
-		ufbxt_assert(arr.encoding == ufbxi_encoding_multivalue);
+		ufbxt_assert(arr.encoding == UFBXI_ENCODING_MULTIVALUE);
 		ufbxt_assert(arr.encoded_size == uc->focused_node.child_begin_pos);
 
 		float data[5];
@@ -912,7 +912,7 @@ UFBXT_TEST(parse_multivalue_convert_floats)
 		ufbxt_assert(arr.src_type == 'd');
 		ufbxt_assert(arr.dst_type == 'd');
 		ufbxt_assert(arr.num_elements == 5);
-		ufbxt_assert(arr.encoding == ufbxi_encoding_multivalue);
+		ufbxt_assert(arr.encoding == UFBXI_ENCODING_MULTIVALUE);
 		ufbxt_assert(arr.encoded_size == uc->focused_node.child_begin_pos);
 
 		double data[5];

@@ -782,20 +782,20 @@ typedef struct {
 } ufbxi_context;
 
 typedef enum {
-	ufbxi_val_int,    // < I,L,Y,C
-	ufbxi_val_float,  // < F,D
-	ufbxi_val_string, // < S
-	ufbxi_val_array,  // < i,l,f,d,b
+	UFBXI_VAL_INT,    // < I,L,Y,C
+	UFBXI_VAL_FLOAT,  // < F,D
+	UFBXI_VAL_STRING, // < S
+	UFBXI_VAL_ARRAY,  // < i,l,f,d,b
 } ufbxi_val_class;
 
 typedef enum {
-	ufbxi_encoding_basic = 0,
-	ufbxi_encoding_deflate = 1,
+	UFBXI_ENCODING_BASIC = 0,
+	UFBXI_ENCODING_DEFLATE = 1,
 
 	// Custom array encoding for older FBX compatability. Concatenates multiple
 	// individual values into a single array. Magic number 'UFmv' (little endian)
 	// chosen to minimize risk of colliding with other custom encodings.
-	ufbxi_encoding_multivalue = 0x766d4655,
+	UFBXI_ENCODING_MULTIVALUE = 0x766d4655,
 } ufbxi_array_encoding;
 
 typedef struct {
@@ -1107,7 +1107,7 @@ static int ufbxi_convert_multivalue_array(ufbxi_context *uc, ufbxi_array *dst, c
 
 	dst->num_elements = num_elements;
 	dst->data_offset = begin;
-	dst->encoding = ufbxi_encoding_multivalue;
+	dst->encoding = UFBXI_ENCODING_MULTIVALUE;
 	dst->encoded_size = uc->focused_node.next_value_pos - begin;
 	// NOTE: Multivalue arrays can be heterogenous, just use `dst_type` as `src_type`
 	dst->src_type = dst_type; 
@@ -1143,14 +1143,14 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 	size_t val_encoded_size;
 	size_t val_data_offset;
 	switch (src_type) {
-	case 'I': val_class = ufbxi_val_int; val_int = ufbxi_read_i32(src); val_size += 4; break;
-	case 'L': val_class = ufbxi_val_int; val_int = ufbxi_read_i64(src); val_size += 8; break;
-	case 'Y': val_class = ufbxi_val_int; val_int = ufbxi_read_i16(src); val_size += 2; break;
-	case 'C': val_class = ufbxi_val_int; val_int = (ufbxi_read_u8(src) ? 1 : 0); val_size += 1; break;
-	case 'F': val_class = ufbxi_val_float; val_float = ufbxi_read_f32(src); val_size += 4; break;
-	case 'D': val_class = ufbxi_val_float; val_float = ufbxi_read_f64(src); val_size += 8; break;
+	case 'I': val_class = UFBXI_VAL_INT; val_int = ufbxi_read_i32(src); val_size += 4; break;
+	case 'L': val_class = UFBXI_VAL_INT; val_int = ufbxi_read_i64(src); val_size += 8; break;
+	case 'Y': val_class = UFBXI_VAL_INT; val_int = ufbxi_read_i16(src); val_size += 2; break;
+	case 'C': val_class = UFBXI_VAL_INT; val_int = (ufbxi_read_u8(src) ? 1 : 0); val_size += 1; break;
+	case 'F': val_class = UFBXI_VAL_FLOAT; val_float = ufbxi_read_f32(src); val_size += 4; break;
+	case 'D': val_class = UFBXI_VAL_FLOAT; val_float = ufbxi_read_f64(src); val_size += 8; break;
 	case 'S': case 'R':
-		val_class = ufbxi_val_string;
+		val_class = UFBXI_VAL_STRING;
 		val_num_elements = ufbxi_read_u32(src);
 		if (val_num_elements > 0x1000000) {
 			return ufbxi_errorf(uc, "String is too large: %u bytes", val_num_elements);
@@ -1159,7 +1159,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		val_data_offset = pos + 5;
 		break;
 	case 'i': case 'l': case 'f': case 'd': case 'b':
-		val_class = ufbxi_val_array;
+		val_class = UFBXI_VAL_ARRAY;
 		val_num_elements = ufbxi_read_u32(src + 0);
 		val_encoding = ufbxi_read_u32(src + 4);
 		val_encoded_size = ufbxi_read_u32(src + 8);
@@ -1194,7 +1194,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 
 	// Interpret the read value into the user pointer, potentially applying the
 	// implicit conversion rules.
-	if (val_class == ufbxi_val_int) {
+	if (val_class == UFBXI_VAL_INT) {
 		switch (dst_type) {
 		case 'I': *(int32_t*)dst = (int32_t)val_int; break;
 		case 'L': *(int64_t*)dst = val_int; break;
@@ -1210,7 +1210,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 			return ufbxi_errorf(uc, "Cannot convert from int '%c' to '%c'", src_type, dst_type);
 		}
 
-	} else if (val_class == ufbxi_val_float) {
+	} else if (val_class == UFBXI_VAL_FLOAT) {
 		switch (dst_type) {
 		case 'F': *(float*)dst = (float)val_float; break;
 		case 'D': *(double*)dst = val_float; break;
@@ -1223,7 +1223,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 			return ufbxi_errorf(uc, "Cannot convert from float '%c' to '%c'", src_type, dst_type);
 		}
 
-	} else if (val_class == ufbxi_val_string) {
+	} else if (val_class == UFBXI_VAL_STRING) {
 		ufbx_string *str;
 		switch (dst_type) {
 		case 'S': str = (ufbx_string*)dst; break;
@@ -1234,7 +1234,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 
 		str->data = uc->data + val_data_offset;
 		str->length = val_num_elements;
-	} else if (val_class == ufbxi_val_array) {
+	} else if (val_class == UFBXI_VAL_ARRAY) {
 		ufbxi_array *arr;
 		switch (dst_type) {
 		case 'i': case 'l': case 'f': case 'd': case 'b':
@@ -1254,7 +1254,7 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		arr->encoding = (ufbxi_array_encoding)val_encoding;
 		arr->encoded_size = val_encoded_size;
 		arr->data_offset = val_data_offset;
-		if (val_encoding != ufbxi_encoding_basic && val_encoding != ufbxi_encoding_deflate) {
+		if (val_encoding != UFBXI_ENCODING_BASIC && val_encoding != UFBXI_ENCODING_DEFLATE) {
 			return ufbxi_errorf(uc, "Unknown array encoding: %u", val_encoding);
 		}
 	}
@@ -1294,7 +1294,7 @@ static int ufbxi_parse_values(ufbxi_context *uc, const char *fmt, ...)
 // prepared with `ufbxi_convert_multivalue_array()`.
 static int ufbxi_decode_multivalue_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 {
-	if (arr->encoding != ufbxi_encoding_multivalue) {
+	if (arr->encoding != UFBXI_ENCODING_MULTIVALUE) {
 		return ufbxi_error(uc, "Internal: Bad multivalue encoding");
 	}
 
@@ -1356,14 +1356,14 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 		// Fast path: Source is memory-compatible with destination, decode directly to
 		// the destination memory.
 		switch (arr->encoding) {
-		case ufbxi_encoding_basic:
+		case UFBXI_ENCODING_BASIC:
 			if (arr->encoded_size != arr_size) {
 				return ufbxi_errorf(uc, "Array size mismatch, encoded %u bytes, decoded %u bytes",
 					arr->encoded_size, arr_size);
 			}
 			memcpy(dst, src, arr_size);
 			break;
-		case ufbxi_encoding_deflate: {
+		case UFBXI_ENCODING_DEFLATE: {
 			ptrdiff_t res = ufbx_inflate(dst, arr_size, src, arr->encoded_size);
 			if (res != arr_size) {
 				if (res < 0) {
@@ -1373,7 +1373,7 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 				}
 			}
 		} break;
-		case ufbxi_encoding_multivalue:
+		case UFBXI_ENCODING_MULTIVALUE:
 			// Early return: Defer to multivalue implementation.
 			return ufbxi_decode_multivalue_array(uc, arr, dst);
 		default: return ufbxi_error(uc, "Internal: Bad array encoding");
@@ -1384,14 +1384,14 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 
 		// Slow path: Need to do conversion, allocate temporary buffer if necessary
 		switch (arr->encoding) {
-		case ufbxi_encoding_basic:
+		case UFBXI_ENCODING_BASIC:
 			if (arr->encoded_size != arr_size) {
 				return ufbxi_errorf(uc, "Array size mismatch, encoded %u bytes, decoded %u bytes",
 					arr->encoded_size, arr_size);
 			}
 			src_ptr = (const char*)src;
 			break;
-		case ufbxi_encoding_deflate: {
+		case UFBXI_ENCODING_DEFLATE: {
 			size_t buf_size = uc->decompress_buffer_size;
 			if (buf_size < arr_size) {
 				buf_size = buf_size * 2 > arr_size ? buf_size * 2 : arr_size;
@@ -1412,7 +1412,7 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 			}
 			src_ptr = (const char*)uc->decompress_buffer;
 		} break;
-		case ufbxi_encoding_multivalue:
+		case UFBXI_ENCODING_MULTIVALUE:
 			// Multivalue arrays should always have `src_type == dst_type`.
 			return ufbxi_error(uc, "Internal: Multivalue array has invalid type");
 		default: return ufbxi_error(uc, "Internal: Bad array encoding");
@@ -2256,13 +2256,13 @@ static int ufbxi_read_property(ufbxi_context *uc, ufbx_property *prop, int versi
 		ufbxi_any_value val;
 		if (!ufbxi_parse_value(uc, '?', &val)) return 0;
 
-		if (val.value_class == ufbxi_val_int) {
+		if (val.value_class == UFBXI_VAL_INT) {
 			prop->value_int[i] = val.value.i;
 			prop->value_float[i] = (double)val.value.i;
-		} else if (val.value_class == ufbxi_val_float) {
+		} else if (val.value_class == UFBXI_VAL_FLOAT) {
 			prop->value_int[i] = (int64_t)val.value.f;
 			prop->value_float[i] = val.value.f;
-		} else if (val.value_class == ufbxi_val_string) {
+		} else if (val.value_class == UFBXI_VAL_STRING) {
 			if (prop->value_str.data) {
 				return ufbxi_error(uc, "Multiple strings in property");
 			}
