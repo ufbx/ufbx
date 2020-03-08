@@ -10,3 +10,11 @@ UFBXT_FILE_TEST(blender_279_default)
 	}
 }
 #endif
+
+
+UFBXT_FILE_TEST(maya_cube)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!strcmp(scene->metadata.creator.data, "FBX SDK/FBX Plugins version 2019.2"));
+}
+#endif

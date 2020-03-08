@@ -423,7 +423,7 @@ char data_root[256];
 
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 {
-	const uint32_t file_versions[] = { 6100, 7400 };
+	const uint32_t file_versions[] = { 6100, 7100, 7400, 7500 };
 
 	char buf[512];
 
