@@ -4,4 +4,5 @@
 #include "test_ascii_parse.h"
 #include "test_deflate.h"
 #include "test_internal.h"
+#include "test_api.h"
 #include "test_files.h"

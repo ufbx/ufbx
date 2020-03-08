@@ -31,7 +31,9 @@ typedef enum ufbx_property_type {
 	UFBX_PROP_TRANSLATION,
 	UFBX_PROP_ROTATION,
 	UFBX_PROP_SCALING,
-} ufbx_property_type;
+
+	UFBX_NUM_PROP_TYPES,
+} ufbx_prop_type;
 
 typedef struct ufbx_string {
 	const char *data;
@@ -40,7 +42,7 @@ typedef struct ufbx_string {
 
 typedef struct ufbx_property {
 	ufbx_string name;
-	ufbx_property_type type;
+	ufbx_prop_type type;
 
 	ufbx_string type_str;
 	ufbx_string subtype_str;
@@ -63,6 +65,8 @@ typedef enum ufbx_node_type {
 	UFBX_NODE_ANIMATION_CURVE,
 	UFBX_NODE_ANIMATION_LAYER,
 	UFBX_NODE_ATTRIBUTE,
+
+	UFBX_NUM_NODE_TYPES,
 } ufbx_node_type;
 
 typedef struct ufbx_node ufbx_node;
@@ -108,6 +112,9 @@ typedef struct ufbx_scene {
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, ufbx_error *error);
 void ufbx_free_scene(ufbx_scene *scene);
+
+const char *ufbx_prop_type_name(ufbx_prop_type type);
+const char *ufbx_node_type_name(ufbx_node_type type);
 
 #ifdef __cplusplus
 }
