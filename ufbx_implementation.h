@@ -1129,6 +1129,10 @@ static int ufbxi_parse_value(ufbxi_context *uc, char dst_type, void *dst)
 		return ufbxi_error(uc, "Reading value at the end of file");
 	}
 
+	if (uc->focused_node.next_value_pos >= uc->focused_node.child_begin_pos) {
+		return ufbxi_error(uc, "Out of values to parse");
+	}
+
 	size_t pos = uc->focused_node.next_value_pos;
 	char src_type = uc->data[pos];
 	const char *src = uc->data + pos + 1;
@@ -1471,6 +1475,11 @@ static int ufbxi_decode_array(ufbxi_context *uc, ufbxi_array *arr, void *dst)
 	}
 
 	return 1;
+}
+
+static ufbxi_forceinline int ufbxi_has_next_value(ufbxi_context *uc)
+{
+	return uc->focused_node.next_value_pos != uc->focused_node.child_begin_pos;
 }
 
 // Enter the currently focused node. Pushes the node to stack and allows inspecting its
@@ -2253,7 +2262,7 @@ static int ufbxi_read_property(ufbxi_context *uc, ufbx_property *prop, int versi
 	memset(prop->value_float, 0, sizeof(prop->value_float));
 
 	for (size_t i = 0; i < 4; i++) {
-		if (uc->focused_node.next_value_pos == uc->focused_node.child_begin_pos) break;
+		if (!ufbxi_has_next_value(uc)) break;
 
 		ufbxi_any_value val;
 		if (!ufbxi_parse_value(uc, '?', &val)) return 0;
@@ -2324,9 +2333,41 @@ static int ufbxi_read_definitions(ufbxi_context *uc)
 			ufbxi_exit_node(uc);
 		}
 	}
+	if (uc->failed) return 0;
 
 	ufbx_node *nodes = ufbxi_temp_retain_n(uc, 0, ufbx_node, num);
 	if (!nodes) return 0;
+
+	return 1;
+}
+
+static int ufbxi_read_objects(ufbxi_context *uc)
+{
+	ufbx_string name;
+
+	size_t num = 0;
+	while (ufbxi_next_child(uc, &name)) {
+		uint64_t id = 0;
+		ufbx_string type_and_name, sub_type;
+		if (uc->version >= 7000) {
+			if (!ufbxi_parse_value(uc, 'L', &id)) return 0;
+		}
+		if (ufbxi_has_next_value(uc)) {
+			if (!ufbxi_parse_values(uc, "SS", &type_and_name, &sub_type)) return 0;
+		} else {
+			type_and_name.length = 0;
+			sub_type.length = 0;
+		}
+
+		if (!ufbxi_enter_node(uc)) return 0;
+
+		ufbx_property *properties;
+		size_t num_properties;
+		ufbxi_read_properties(uc, &properties, &num_properties);
+
+		ufbxi_exit_node(uc);
+	}
+	if (uc->failed) return 0;
 
 	return 1;
 }
@@ -2363,6 +2404,12 @@ static int ufbxi_read_root(ufbxi_context *uc)
 	// Read definitions
 	if (ufbxi_find_enter(uc, "Definitions")) {
 		if (!ufbxi_read_definitions(uc)) return 0;
+		ufbxi_exit_node(uc);
+	}
+
+	// Read objects
+	if (ufbxi_find_enter(uc, "Objects")) {
+		if (!ufbxi_read_objects(uc)) return 0;
 		ufbxi_exit_node(uc);
 	}
 
