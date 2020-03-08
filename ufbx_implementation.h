@@ -2906,11 +2906,11 @@ static int ufbxi_read_objects(ufbxi_context *uc)
 		ufbxi_push_string_place(uc, &node->type_str);
 		ufbxi_push_string_place(uc, &node->sub_type_str);
 
-		int res;
+		int res = 1;
 		switch (node->type) {
 		case UFBX_NODE_MODEL: res = ufbxi_read_model(uc, (ufbx_model*)node); break;
 		case UFBX_NODE_MESH: res = ufbxi_read_mesh(uc, (ufbx_mesh*)node); break;
-		default: res = 1; break; // Nothing to do
+		default: /* nop */ break;
 		}
 		if (!res) return 0;
 
@@ -2995,6 +2995,7 @@ static int ufbxi_read_root(ufbxi_context *uc)
 			switch (scene->nodes.data[i]->type) {
 			case UFBX_NODE_MODEL: scene->models.size++; break;
 			case UFBX_NODE_MESH: scene->meshes.size++; break;
+			default: /* nop */ break;
 			}
 		}
 
@@ -3009,6 +3010,7 @@ static int ufbxi_read_root(ufbxi_context *uc)
 			switch (node->type) {
 			case UFBX_NODE_MODEL: *dst_model++ = (ufbx_model*)node; break;
 			case UFBX_NODE_MESH: *dst_mesh++ = (ufbx_mesh*)node; break;
+			default: /* nop */ break;
 			}
 		}
 	}
