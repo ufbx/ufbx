@@ -2991,12 +2991,12 @@ static int ufbxi_get_rotation(ufbx_model *model, const char *name, const char *o
 
 static int ufbxi_read_model(ufbxi_context *uc, ufbx_model *model)
 {
-	ufbx_vec3 sp, soff, rp, roff, t, ot;
-	ufbx_vec3 s, os;
-	ufbx_transform r, rpre, rpost, or;
+	ufbx_vec3 sp, soff, rp, roff, t, gt;
+	ufbx_vec3 s, gs;
+	ufbx_transform r, rpre, rpost, gr;
 
 	int has_rpp = 0;
-	int has_o = 0;
+	int has_gr = 0;
 
 	// Read all the offsets
 	ufbxi_get_translation(model, "ScalingPivot", &sp);
@@ -3029,16 +3029,16 @@ static int ufbxi_read_model(ufbxi_context *uc, ufbx_model *model)
 	ufbxi_add_translate(tm, t);
 
 	// Geometric properties (used by 3ds Max)
-	ufbxi_get_scaling(model, "GeometricScaling", &os);
-	has_o |= ufbxi_get_rotation(model, "GeometricRotation", NULL, &or);
-	ufbxi_get_translation(model, "GeometricTranslation", &ot);
+	ufbxi_get_scaling(model, "GeometricScaling", &gs);
+	has_gr |= ufbxi_get_rotation(model, "GeometricRotation", NULL, &gr);
+	ufbxi_get_translation(model, "GeometricTranslation", &gt);
 
 	ufbx_transform *otm = &model->geometry_to_self;
-	ufbxi_make_scale(otm, os);
-	if (has_o) {
-		ufbx_transform_mul(otm, &model->geometry_to_self, &or);
+	ufbxi_make_scale(otm, gs);
+	if (has_gr) {
+		ufbx_transform_mul(otm, &model->geometry_to_self, &gr);
 	}
-	ufbxi_add_translate(otm, ot);
+	ufbxi_add_translate(otm, gt);
 
 	// Create a "virtual" mesh node if the model has geometry
 	if (uc->version < 7000) {

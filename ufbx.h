@@ -22,16 +22,14 @@ typedef struct ufbx_vec2 ufbx_vec2;
 typedef struct ufbx_vec3 ufbx_vec3;
 typedef struct ufbx_vec4 ufbx_vec4;
 typedef struct ufbx_transform ufbx_transform;
+typedef struct ufbx_edge ufbx_edge;
+typedef struct ufbx_face ufbx_face;
 
-typedef struct ufbx_element ufbx_element;
-typedef struct ufbx_mesh_layer ufbx_mesh_layer;
 typedef struct ufbx_node ufbx_node;
 typedef struct ufbx_model ufbx_model;
 typedef struct ufbx_mesh ufbx_mesh;
 typedef struct ufbx_template ufbx_template;
 typedef struct ufbx_prop ufbx_prop;
-typedef struct ufbx_edge ufbx_edge;
-typedef struct ufbx_face ufbx_face;
 typedef struct ufbx_uv_set ufbx_uv_set;
 typedef struct ufbx_color_set ufbx_color_set;
 
@@ -211,15 +209,15 @@ typedef union ufbx_vertex_vec4 {
 	};
 } ufbx_vertex_vec4;
 
-typedef struct ufbx_uv_set {
+struct ufbx_uv_set {
 	ufbx_string name;
 	ufbx_vertex_vec2 vertex_uv;
-} ufbx_uv_set;
+};
 
-typedef struct ufbx_color_set {
+struct ufbx_color_set {
 	ufbx_string name;
 	ufbx_vertex_vec4 vertex_color;
-} ufbx_color_set;
+};
 
 struct ufbx_edge {
 	int32_t indices[2];

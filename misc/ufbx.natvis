@@ -5,16 +5,13 @@
     <DisplayString>{data,[length]s}</DisplayString>
   </Type>
 
-  <Type Name="ufbx_uint32_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
-  <Type Name="ufbx_element_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
-  <Type Name="ufbx_mesh_layer_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_node_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_model_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_mesh_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_template_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_prop_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
-  <Type Name="ufbx_edge_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
-  <Type Name="ufbx_face_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
+  <Type Name="ufbx_uv_set_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
+  <Type Name="ufbx_color_set_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
 
 
 </AutoVisualizer>

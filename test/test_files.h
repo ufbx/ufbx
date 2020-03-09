@@ -37,6 +37,17 @@ UFBXT_FILE_TEST(maya_cube)
 UFBXT_FILE_TEST(blender_282_suzanne)
 #if UFBXT_IMPL
 {
+	ufbx_model *model = ufbx_find_model(scene, "Suzanne");
+	ufbxt_assert(model);
+	ufbxt_assert(model->meshes.size == 1);
+
+	ufbx_mesh *mesh = model->meshes.data[0];
+	ufbxt_assert(mesh->uv_sets.size == 1);
+
+	ufbx_uv_set *set = &mesh->uv_sets.data[0];
+	ufbxt_assert(ufbxi_streq(set->name, "UVMap"));
+	ufbxt_assert(set->vertex_uv.data == mesh->vertex_uv.data);
+	ufbxt_assert(set->vertex_uv.indices == mesh->vertex_uv.indices);
 }
 #endif
 
