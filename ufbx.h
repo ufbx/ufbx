@@ -17,10 +17,11 @@ extern "C" {
 
 // Types
 
-typedef float ufbx_real;
+typedef double ufbx_real;
 typedef struct ufbx_vec2 ufbx_vec2;
 typedef struct ufbx_vec3 ufbx_vec3;
 typedef struct ufbx_vec4 ufbx_vec4;
+typedef struct ufbx_transform ufbx_transform;
 
 typedef struct ufbx_element ufbx_element;
 typedef struct ufbx_mesh_layer ufbx_mesh_layer;
@@ -92,6 +93,18 @@ struct ufbx_vec4 {
 	};
 };
 
+struct ufbx_transform {
+	union {
+		struct {
+			ufbx_real m00, m10, m20;
+			ufbx_real m01, m11, m21;
+			ufbx_real m02, m12, m22;
+			ufbx_real m03, m13, m23;
+		};
+		ufbx_vec3 cols[4];
+		ufbx_real v[12];
+	};
+};
 
 struct ufbx_prop {
 	ufbx_string name;
@@ -136,6 +149,7 @@ struct ufbx_template {
 struct ufbx_node {
 	ufbx_node_type type;
 
+	uint64_t id;
 	ufbx_string name;
 	ufbx_string type_str;
 	ufbx_string sub_type_str;
@@ -151,6 +165,13 @@ struct ufbx_node {
 
 struct ufbx_model {
 	ufbx_node node;
+
+	ufbx_transform self_to_root;
+	ufbx_transform self_to_parent;
+	ufbx_transform geometry_to_self;
+
+	ufbx_model_list models;
+	ufbx_mesh_list meshes;
 };
 
 typedef struct ufbx_vertex_element {
@@ -277,6 +298,11 @@ ufbx_prop *ufbx_get_prop_str(const ufbx_node *node, ufbx_string name);
 
 const char *ufbx_prop_type_name(ufbx_prop_type type);
 const char *ufbx_node_type_name(ufbx_node_type type);
+
+void ufbx_transform_mul(ufbx_transform *dst, const ufbx_transform *l, const ufbx_transform *r);
+ufbx_vec3 ufbx_transform_position(const ufbx_transform *t, ufbx_vec3 v);
+ufbx_vec3 ufbx_transform_direction(const ufbx_transform *t, ufbx_vec3 v);
+ufbx_vec3 ufbx_transform_normal(const ufbx_transform *t, ufbx_vec3 v);
 
 #ifdef __cplusplus
 }

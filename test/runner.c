@@ -423,11 +423,285 @@ double ufbxt_bechmark_end()
 
 char data_root[256];
 
+static void *ufbxt_read_file(const char *name, size_t *p_size)
+{
+	FILE *file = fopen(name, "rb");
+	if (!file) return NULL;
+
+	fseek(file, 0, SEEK_END);
+	size_t size = ftell(file);
+	fseek(file, 0, SEEK_SET);
+
+	char *data = malloc(size);
+	ufbxt_assert(data != NULL);
+	size_t num_read = fread(data, 1, size, file);
+	fclose(file);
+
+	if (num_read != size) {
+		ufbxt_assert_fail(__FILE__, __LINE__, "Failed to load file");
+	}
+
+	*p_size = size;
+	return data;
+}
+
+typedef struct {
+	char name[64];
+
+	size_t num_faces;
+	size_t num_indices;
+
+	ufbx_face *faces;
+
+	ufbx_vertex_vec3 vertex_position;
+	ufbx_vertex_vec3 vertex_normal;
+	ufbx_vertex_vec2 vertex_uv;
+} ufbxt_obj_mesh;
+
+typedef struct {
+
+	ufbxt_obj_mesh *meshes;
+	size_t num_meshes;
+
+} ufbxt_obj_file;
+
+static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
+{
+	size_t num_positions = 0;
+	size_t num_normals = 0;
+	size_t num_uvs = 0;
+	size_t num_faces = 0;
+	size_t num_meshes = 0;
+
+	char *line = (char*)obj_data;
+	for (;;) {
+		char *end = strpbrk(line, "\r\n");
+		char prev = '\0';
+		if (end) {
+			prev = *end;
+			*end = '\0';
+		}
+
+		if (!strncmp(line, "v ", 2)) num_positions++;
+		else if (!strncmp(line, "vt ", 3)) num_uvs++;
+		else if (!strncmp(line, "vn ", 3)) num_normals++;
+		else if (!strncmp(line, "f ", 2)) num_faces++;
+		else if (!strncmp(line, "g default", 7)) { /* ignore default group */ }
+		else if (!strncmp(line, "g ", 2)) num_meshes++;
+
+		if (end) {
+			*end = prev;
+			line = end + 1;
+		} else {
+			break;
+		}
+	}
+
+	size_t alloc_size = 0;
+	alloc_size += sizeof(ufbxt_obj_file);
+	alloc_size += num_positions * sizeof(ufbx_vec3);
+	alloc_size += num_normals * sizeof(ufbx_vec3);
+	alloc_size += num_uvs * sizeof(ufbx_vec2);
+	alloc_size += num_faces * sizeof(ufbx_face);
+	alloc_size += num_faces * 3 * 4 * sizeof(int32_t);
+	alloc_size += num_meshes * sizeof(ufbxt_obj_mesh);
+
+	void *data = malloc(alloc_size);
+	ufbxt_assert(data);
+
+	ufbxt_obj_file *obj = (ufbxt_obj_file*)data;
+	ufbx_vec3 *positions = (ufbx_vec3*)(obj + 1);
+	ufbx_vec3 *normals = (ufbx_vec3*)(positions + num_positions);
+	ufbx_vec2 *uvs = (ufbx_vec2*)(normals + num_normals);
+	ufbx_face *faces = (ufbx_face*)(uvs + num_uvs);
+	int32_t *position_indices = (int32_t*)(faces + num_faces);
+	int32_t *normal_indices = (int32_t*)(position_indices + num_faces * 4);
+	int32_t *uv_indices = (int32_t*)(normal_indices + num_faces * 4);
+	ufbxt_obj_mesh *meshes = (ufbxt_obj_mesh*)(uv_indices + num_faces * 4);
+	void *data_end = meshes + num_meshes;
+	ufbxt_assert((char*)data_end - (char*)data == alloc_size);
+
+	ufbx_vec3 *dp = positions;
+	ufbx_vec3 *dn = normals;
+	ufbx_vec2 *du = uvs;
+	ufbxt_obj_mesh *mesh = NULL;
+
+	int32_t *dpi = position_indices;
+	int32_t *dni = normal_indices;
+	int32_t *dui = uv_indices;
+
+	ufbx_face *df = faces;
+
+	obj->meshes = meshes;
+	obj->num_meshes = num_meshes;
+
+	line = (char*)obj_data;
+	for (;;) {
+		char *end = strpbrk(line, "\r\n");
+		char prev = '\0';
+		if (end) {
+			prev = *end;
+			*end = '\0';
+		}
+
+		if (!strncmp(line, "v ", 2)) {
+			ufbxt_assert(sscanf(line, "v %lf %lf %lf", &dp->x, &dp->y, &dp->z) == 3);
+			dp++;
+		} else if (!strncmp(line, "vt ", 3)) {
+			ufbxt_assert(sscanf(line, "vt %lf %lf", &du->x, &du->y) == 2);
+			du++;
+		} else if (!strncmp(line, "vn ", 3)) {
+			ufbxt_assert(sscanf(line, "vn %lf %lf %lf", &dn->x, &dn->y, &dn->z) == 3);
+			dn++;
+		} else if (!strncmp(line, "f ", 2)) {
+			ufbxt_assert(mesh);
+
+			df->index_begin = (uint32_t)mesh->num_indices;
+			df->num_indices = 0;
+
+			char *begin = line + 2;
+			do {
+				char *end = strchr(begin, ' ');
+				if (end) *end++ = '\0';
+
+				int pi = 0, ui = 0, ni = 0;
+				if (sscanf(begin, "%d/%d/%d", &pi, &ui, &ni) == 3) {
+				} else if (sscanf(begin, "%d//%d", &pi, &ni) == 2) {
+				} else {
+					ufbxt_assert(0 && "Failed to parse face indices");
+				}
+
+				*dpi++ = pi - 1;
+				*dni++ = ni - 1;
+				*dui++ = ui - 1;
+				mesh->num_indices++;
+				df->num_indices++;
+
+				begin = end;
+			} while (begin);
+
+			mesh->num_faces++;
+			df++;
+		} else if (!strncmp(line, "g default", 7)) {
+			/* ignore default group */
+		} else if (!strncmp(line, "g ", 2)) {
+			mesh = mesh ? mesh + 1 : meshes;
+			memset(mesh, 0, sizeof(ufbxt_obj_mesh));
+
+			// HACK: Truncate name at '_' to separate Blender
+			// model and mesh names
+			size_t len = strcspn(line + 2, "_");
+
+			ufbxt_assert(len < sizeof(mesh->name));
+			memcpy(mesh->name, line + 2, len);
+			mesh->faces = df;
+			mesh->vertex_position.data = positions;
+			mesh->vertex_normal.data = normals;
+			mesh->vertex_uv.data = uvs;
+			mesh->vertex_position.indices = dpi;
+			mesh->vertex_normal.indices = dni;
+			mesh->vertex_uv.indices = dui;
+		}
+
+		if (end) {
+			*end = prev;
+			line = end + 1;
+		} else {
+			break;
+		}
+	}
+
+	return obj;
+}
+
+typedef struct {
+	size_t num;
+	ufbx_real sum;
+	ufbx_real max;
+} ufbxt_diff_error;
+
+static void ufbxt_assert_close_real(ufbxt_diff_error *p_err, ufbx_real a, ufbx_real b)
+{
+	ufbx_real err = fabs(a - b);
+	ufbxt_assert(err < 0.001);
+	p_err->num++;
+	p_err->sum += err;
+	if (err > p_err->max) p_err->max = err;
+}
+
+static void ufbxt_assert_close_vec2(ufbxt_diff_error *p_err, ufbx_vec2 a, ufbx_vec2 b)
+{
+	ufbxt_assert_close_real(p_err, a.x, b.x);
+	ufbxt_assert_close_real(p_err, a.y, b.y);
+}
+
+static void ufbxt_assert_close_vec3(ufbxt_diff_error *p_err, ufbx_vec3 a, ufbx_vec3 b)
+{
+	ufbxt_assert_close_real(p_err, a.x, b.x);
+	ufbxt_assert_close_real(p_err, a.y, b.y);
+	ufbxt_assert_close_real(p_err, a.z, b.z);
+}
+
+static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err)
+{
+	for (size_t mesh_i = 0; mesh_i < obj->num_meshes; mesh_i++) {
+		ufbxt_obj_mesh *obj_mesh = &obj->meshes[mesh_i];
+		ufbx_model *model = ufbx_find_model(scene, obj_mesh->name);
+		ufbxt_assert(model);
+		ufbxt_assert(model->meshes.size == 1);
+		ufbx_mesh *mesh = model->meshes.data[0];
+
+		ufbxt_assert(obj_mesh->num_faces == mesh->num_faces);
+		ufbxt_assert(obj_mesh->num_indices == mesh->num_indices);
+
+		ufbx_transform *xform = &model->self_to_root;
+
+		// Assume that the indices are in the same order!
+		for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
+			ufbx_face obj_face = obj_mesh->faces[face_ix];
+			ufbx_face face = mesh->faces[face_ix];
+			ufbxt_assert(obj_face.index_begin == face.index_begin);
+			ufbxt_assert(obj_face.num_indices == face.num_indices);
+
+			for (size_t ix = 0; ix < face.num_indices; ix++) {
+				ufbx_vec3 op = obj_mesh->vertex_position.data[obj_mesh->vertex_position.indices[ix]];
+				ufbx_vec3 fp = mesh->vertex_position.data[mesh->vertex_position.indices[ix]];
+				ufbx_vec3 on = obj_mesh->vertex_normal.data[obj_mesh->vertex_normal.indices[ix]];
+				ufbx_vec3 fn = mesh->vertex_normal.data[mesh->vertex_normal.indices[ix]];
+
+				fp = ufbx_transform_position(xform, fp);
+				fn = ufbx_transform_normal(xform, fn);
+
+				ufbx_real fn_len = sqrt(fn.x*fn.x + fn.y*fn.y + fn.z*fn.z);
+				fn.x /= fn_len;
+				fn.y /= fn_len;
+				fn.z /= fn_len;
+
+				ufbxt_assert_close_vec3(p_err, op, fp);
+				ufbxt_assert_close_vec3(p_err, on, fn);
+
+				if (mesh->vertex_uv.data) {
+					ufbxt_assert(obj_mesh->vertex_uv.data);
+					ufbx_vec2 ou = obj_mesh->vertex_uv.data[obj_mesh->vertex_uv.indices[ix]];
+					ufbx_vec2 fu = mesh->vertex_uv.data[mesh->vertex_uv.indices[ix]];
+					ufbxt_assert_close_vec2(p_err, ou, fu);
+				}
+
+			}
+		}
+	}
+}
+
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 {
 	const uint32_t file_versions[] = { 6100, 7100, 7400, 7500 };
 
 	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s.obj", data_root, name);
+	size_t obj_size = 0;
+	void *obj_data = ufbxt_read_file(buf, &obj_size);
+	ufbxt_obj_file *obj_file = obj_data ? ufbxt_load_obj(obj_data, obj_size) : NULL;
+	free(obj_data);
 
 	uint32_t num_opened = 0;
 
@@ -437,24 +711,12 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 			const char *format = fi == 1 ? "ascii" : "binary";
 			snprintf(buf, sizeof(buf), "%s%s_%u_%s.fbx", data_root, name, version, format);
 
-			FILE *file = fopen(buf, "rb");
-			if (!file) continue;
+			size_t size = 0;
+			void *data = ufbxt_read_file(buf, &size);
+			if (!data) continue;
+
 			num_opened++;
-
 			ufbxt_logf("%s", buf);
-
-			fseek(file, 0, SEEK_END);
-			size_t size = ftell(file);
-			fseek(file, 0, SEEK_SET);
-
-			char *data = malloc(size);
-			ufbxt_assert(data != NULL);
-			size_t num_read = fread(data, 1, size, file);
-			fclose(file);
-
-			if (num_read != size) {
-				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to load file");
-			}
 
 			ufbx_error error;
 			ufbx_scene *scene = ufbx_load_memory(data, size, NULL, &error);
@@ -466,6 +728,13 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 			ufbxt_assert(scene->metadata.ascii == ((fi == 1) ? 1 : 0));
 			ufbxt_assert(scene->metadata.version == version);
 
+			if (obj_file) {
+				ufbxt_diff_error err = { 0 };
+				ufbxt_diff_to_obj(scene, obj_file, &err);
+				ufbx_real avg = err.sum / (ufbx_real)err.num;
+				ufbxt_logf(".. Absolute diff to .obj: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+			}
+
 			test_fn(scene);
 
 			ufbx_free_scene(scene);
@@ -476,6 +745,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 	if (num_opened == 0) {
 		ufbxt_assert_fail(__FILE__, __LINE__, "File not found");
 	}
+
+	free(obj_file);
 }
 
 #define UFBXT_IMPL 1

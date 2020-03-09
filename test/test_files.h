@@ -33,3 +33,15 @@ UFBXT_FILE_TEST(maya_cube)
 	ufbx_model *model = ufbx_find_model(scene, "pCube1");
 }
 #endif
+
+UFBXT_FILE_TEST(blender_282_suzanne)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST(blender_282_suzanne_and_transform)
+#if UFBXT_IMPL
+{
+}
+#endif
