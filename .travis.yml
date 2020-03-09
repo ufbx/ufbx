@@ -7,13 +7,13 @@ script:
     - python3 misc/test_zlib_debug_compressor.py
     - mkdir -p build
     - cd build
-    - clang -O2 ../misc/fuzz_deflate.c -o fuzz_deflate
-    - clang -O2 ../misc/test_deflate.c -o test_deflate
-    - clang++ ../misc/test_build.cpp -o test_build_cpp
+    - clang -lm -O2 ../misc/fuzz_deflate.c -o fuzz_deflate
+    - clang -lm -O2 ../misc/test_deflate.c -o test_deflate
+    - clang++ -lm ../misc/test_build.cpp -o test_build_cpp
     - python3 ../misc/test_deflate.py ./test_deflate ..
-    - clang -O2 -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
+    - clang -lm -O2 -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
     - ./runner -v -d ../data
-    - clang -coverage -g -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
+    - clang -lm -coverage -g -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
     - ./runner -v -d ../data/
     - llvm-cov gcov runner
     - cp ufbx_implementation.h.gcov ../ufbx_implementation.h.gcov

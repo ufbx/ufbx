@@ -2591,7 +2591,7 @@ static const ufbxi_element_mapping_info ufbxi_element_mapping_info_table[] = {
 	{ "ByEdge" },
 	{ "AllSame" },
 };
-ufbx_static_assert(element_info_count, ufbxi_arraycount(ufbxi_element_mapping_info_table) == UFBXI_NUM_ELEMENT_MAPPINGS);
+ufbx_static_assert(mapping_info_count, ufbxi_arraycount(ufbxi_element_mapping_info_table) == UFBXI_NUM_ELEMENT_MAPPINGS);
 
 // Resolve an FBX property type name into an enum
 static ufbx_prop_type ufbxi_get_prop_type(ufbx_string name)
