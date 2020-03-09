@@ -54,5 +54,22 @@ UFBXT_FILE_TEST(blender_282_suzanne)
 UFBXT_FILE_TEST(blender_282_suzanne_and_transform)
 #if UFBXT_IMPL
 {
+	ufbx_model *model_a = ufbx_find_model(scene, "Suzanne");
+	ufbx_model *model_b = ufbx_find_model(scene, "Transformed");
+	ufbxt_assert(model_a && model_b);
+	ufbxt_assert(model_a->meshes.size == 1);
+	ufbxt_assert(model_b->meshes.size == 1);
+
+	ufbx_mesh *mesh_a = model_a->meshes.data[0];
+	ufbx_mesh *mesh_b = model_b->meshes.data[0];
+	ufbxt_assert(mesh_a->num_vertices == mesh_b->num_vertices);
+
+	for (size_t i = 0; i < mesh_a->num_vertices; i++) {
+		ufbx_vec3 a = mesh_a->vertex_position.data[i];
+		ufbx_vec3 b = mesh_b->vertex_position.data[i];
+		ufbxt_assert(a.x == b.x);
+		ufbxt_assert(a.y == b.y);
+		ufbxt_assert(a.z == b.z);
+	}
 }
 #endif

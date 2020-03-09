@@ -664,10 +664,10 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			ufbxt_assert(obj_face.num_indices == face.num_indices);
 
 			for (size_t ix = 0; ix < face.num_indices; ix++) {
-				ufbx_vec3 op = obj_mesh->vertex_position.data[obj_mesh->vertex_position.indices[ix]];
-				ufbx_vec3 fp = mesh->vertex_position.data[mesh->vertex_position.indices[ix]];
-				ufbx_vec3 on = obj_mesh->vertex_normal.data[obj_mesh->vertex_normal.indices[ix]];
-				ufbx_vec3 fn = mesh->vertex_normal.data[mesh->vertex_normal.indices[ix]];
+				ufbx_vec3 op = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, ix);
+				ufbx_vec3 fp = ufbx_get_vertex_vec3(&mesh->vertex_position, ix);
+				ufbx_vec3 on = ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, ix);
+				ufbx_vec3 fn = ufbx_get_vertex_vec3(&mesh->vertex_normal, ix);
 
 				fp = ufbx_transform_position(xform, fp);
 				fn = ufbx_transform_normal(xform, fn);
@@ -682,8 +682,8 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 
 				if (mesh->vertex_uv.data) {
 					ufbxt_assert(obj_mesh->vertex_uv.data);
-					ufbx_vec2 ou = obj_mesh->vertex_uv.data[obj_mesh->vertex_uv.indices[ix]];
-					ufbx_vec2 fu = mesh->vertex_uv.data[mesh->vertex_uv.indices[ix]];
+					ufbx_vec2 ou = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, ix);
+					ufbx_vec2 fu = ufbx_get_vertex_vec2(&mesh->vertex_uv, ix);
 					ufbxt_assert_close_vec2(p_err, ou, fu);
 				}
 

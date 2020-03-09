@@ -177,14 +177,6 @@ typedef struct ufbx_vertex_element {
 	int32_t *indices;
 } ufbx_vertex_element;
 
-typedef union ufbx_vertex_real {
-	ufbx_vertex_element element;
-	struct {
-		ufbx_real *data;
-		int32_t *indices;
-	};
-} ufbx_vertex_real;
-
 typedef union ufbx_vertex_vec2 {
 	ufbx_vertex_element element;
 	struct {
@@ -301,6 +293,10 @@ void ufbx_transform_mul(ufbx_transform *dst, const ufbx_transform *l, const ufbx
 ufbx_vec3 ufbx_transform_position(const ufbx_transform *t, ufbx_vec3 v);
 ufbx_vec3 ufbx_transform_direction(const ufbx_transform *t, ufbx_vec3 v);
 ufbx_vec3 ufbx_transform_normal(const ufbx_transform *t, ufbx_vec3 v);
+
+static ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }
+static ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }
+static ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->indices[index]]; }
 
 #ifdef __cplusplus
 }
