@@ -18,9 +18,9 @@ UFBXT_FILE_TEST(blender_279_default)
 		ufbxt_assert(prop != NULL);
 		ufbxt_assert(ufbxi_streq(prop->name, "Lcl Rotation"));
 		ufbxt_assert(prop->type == UFBX_PROP_ROTATION);
-		ufbxt_assert(fabs(prop->value_float[0] - -90.0) <= 0.1);
-		ufbxt_assert(fabs(prop->value_float[1] - 0.0) <= 0.1);
-		ufbxt_assert(fabs(prop->value_float[2] - 0.0) <= 0.1);
+		ufbxt_assert(fabs(prop->value_vec3.x - -90.0) <= 0.1);
+		ufbxt_assert(fabs(prop->value_vec3.y - 0.0) <= 0.1);
+		ufbxt_assert(fabs(prop->value_vec3.z - 0.0) <= 0.1);
 	}
 }
 #endif

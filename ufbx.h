@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
+
+#define UFBX_MAX_ELEMENTS_PER_MESH 256
 
 #define UFBX_ERROR_DESC_MAX_LENGTH 255
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
@@ -14,8 +17,10 @@ extern "C" {
 
 // Types
 
+typedef float ufbx_real;
 typedef struct ufbx_vec2 ufbx_vec2;
 typedef struct ufbx_vec3 ufbx_vec3;
+typedef struct ufbx_vec4 ufbx_vec4;
 
 typedef struct ufbx_element ufbx_element;
 typedef struct ufbx_mesh_layer ufbx_mesh_layer;
@@ -26,17 +31,16 @@ typedef struct ufbx_template ufbx_template;
 typedef struct ufbx_prop ufbx_prop;
 typedef struct ufbx_edge ufbx_edge;
 typedef struct ufbx_face ufbx_face;
+typedef struct ufbx_uv_set ufbx_uv_set;
+typedef struct ufbx_color_set ufbx_color_set;
 
-typedef struct ufbx_uint32_list { uint32_t *data; size_t size; } ufbx_uint32_list;
-typedef struct ufbx_element_list { ufbx_element **data; size_t size; } ufbx_element_list;
-typedef struct ufbx_mesh_layer_list { ufbx_mesh_layer *data; size_t size; } ufbx_mesh_layer_list;
 typedef struct ufbx_node_list { ufbx_node **data; size_t size; } ufbx_node_list;
 typedef struct ufbx_model_list { ufbx_model **data; size_t size; } ufbx_model_list;
 typedef struct ufbx_mesh_list { ufbx_mesh **data; size_t size; } ufbx_mesh_list;
 typedef struct ufbx_template_list { ufbx_template *data; size_t size; } ufbx_template_list;
 typedef struct ufbx_prop_list { ufbx_prop *data; size_t size; } ufbx_prop_list;
-typedef struct ufbx_edge_list { ufbx_edge *data; size_t size; } ufbx_edge_list;
-typedef struct ufbx_face_list { ufbx_face *data; size_t size; } ufbx_face_list;
+typedef struct ufbx_uv_set_list { ufbx_uv_set *data; size_t size; } ufbx_uv_set_list;
+typedef struct ufbx_color_set_list { ufbx_color_set *data; size_t size; } ufbx_color_set_list;
 
 typedef struct ufbx_error {
 	uint32_t source_line;
@@ -69,17 +73,25 @@ extern const ufbx_string ufbx_empty_string;
 
 struct ufbx_vec2 {
 	union {
-		struct { double x, y; };
-		double v[2];
+		struct { ufbx_real x, y; };
+		ufbx_real v[2];
 	};
 };
 
 struct ufbx_vec3 {
 	union {
-		struct { double x, y, z; };
-		double v[3];
+		struct { ufbx_real x, y, z; };
+		ufbx_real v[3];
 	};
 };
+
+struct ufbx_vec4 {
+	union {
+		struct { ufbx_real x, y, z, w; };
+		ufbx_real v[4];
+	};
+};
+
 
 struct ufbx_prop {
 	ufbx_string name;
@@ -92,9 +104,10 @@ struct ufbx_prop {
 	ufbx_string value_str;
 	int64_t value_int[4];
 	union {
-		double value_float[4];
+		ufbx_real value_real[4];
 		ufbx_vec2 value_vec2;
 		ufbx_vec3 value_vec3;
+		ufbx_vec4 value_vec4;
 	};
 };
 
@@ -139,66 +152,93 @@ struct ufbx_node {
 struct ufbx_model {
 	ufbx_node node;
 };
-typedef enum ufbx_element_mapping {
-	UFBX_ELEMENT_BY_UNKNOWN,
-	UFBX_ELEMENT_BY_VERTEX,
-	UFBX_ELEMENT_BY_POLYGON,
-	UFBX_ELEMENT_BY_POLYGON_VERTEX,
-	UFBX_ELEMENT_BY_EDGE,
-	UFBX_ELEMENT_BY_ALL_SAME,
-} ufbx_element_mapping;
 
-typedef enum ufbx_element_type {
-	UFBX_ELEMENT_UNKNOWN,
-	UFBX_ELEMENT_POSITION,
-	UFBX_ELEMENT_NORMAL,
-	UFBX_ELEMENT_UV,
-	UFBX_ELEMENT_MATERIAL,
-	UFBX_ELEMENT_EDGE_CREASE,
+typedef struct ufbx_vertex_element {
+	void *data;
+	int32_t *indices;
+} ufbx_vertex_element;
 
-	UFBX_NUM_ELEMENT_TYPES,
-} ufbx_element_type;
+typedef union ufbx_vertex_real {
+	ufbx_vertex_element element;
+	struct {
+		ufbx_real *data;
+		int32_t *indices;
+	};
+} ufbx_vertex_real;
+
+typedef union ufbx_vertex_vec2 {
+	ufbx_vertex_element element;
+	struct {
+		ufbx_vec2 *data;
+		int32_t *indices;
+	};
+} ufbx_vertex_vec2;
+
+typedef union ufbx_vertex_vec3 {
+	ufbx_vertex_element element;
+	struct {
+		ufbx_vec3 *data;
+		int32_t *indices;
+	};
+} ufbx_vertex_vec3;
+
+typedef union ufbx_vertex_vec4 {
+	ufbx_vertex_element element;
+	struct {
+		ufbx_vec4 *data;
+		int32_t *indices;
+	};
+} ufbx_vertex_vec4;
+
+typedef struct ufbx_uv_set {
+	ufbx_string name;
+	ufbx_vertex_vec2 vertex_uv;
+} ufbx_uv_set;
+
+typedef struct ufbx_color_set {
+	ufbx_string name;
+	ufbx_vertex_vec4 vertex_color;
+} ufbx_color_set;
 
 struct ufbx_edge {
-	uint32_t a, b;
+	int32_t indices[2];
 };
 
 struct ufbx_face {
-	uint32_t begin;
-	uint32_t num_vertices;
-};
-
-struct ufbx_element {
-	ufbx_element_type type;
-	uint32_t index;
-	ufbx_string name;
-	ufbx_element_mapping mapping;
-};
-
-struct ufbx_mesh_layer {
-	ufbx_element *element[UFBX_NUM_ELEMENT_TYPES];
+	uint32_t index_begin;
+	uint32_t num_indices;
 };
 
 struct ufbx_mesh {
 	ufbx_node node;
 
 	size_t num_vertices;
+	size_t num_indices;
 	size_t num_faces;
+	size_t num_edges;
 
-	ufbx_uint32_list face_vertices;
-	ufbx_edge_list edges;
-	ufbx_face_list faces;
+	ufbx_face *faces;
+	ufbx_edge *edges;
 
-	ufbx_element *position;
-	ufbx_element *uv;
-	ufbx_element *normal;
+	ufbx_vertex_vec3 vertex_position;
+	ufbx_vertex_vec3 vertex_normal;
+	ufbx_vertex_vec3 vertex_binormal;
+	ufbx_vertex_vec3 vertex_tangent;
+	ufbx_vertex_vec4 vertex_color;
+	ufbx_vertex_vec2 vertex_uv;
 
-	ufbx_element_list elements;
-	ufbx_mesh_layer_list layers;
+	bool *edge_smoothing;
+	ufbx_real *edge_crease;
+
+	bool *face_smoothing;
+	int32_t *face_material;
+
+	ufbx_uv_set_list uv_sets;
+	ufbx_color_set_list color_sets;
 };
 
 typedef struct ufbx_metadata {
-	int ascii;
+	bool ascii;
 	uint32_t version;
 	ufbx_string creator;
 } ufbx_metadata;
@@ -214,7 +254,11 @@ typedef struct ufbx_scene {
 	ufbx_template_list templates;
 } ufbx_scene;
 
-ufbx_scene *ufbx_load_memory(const void *data, size_t size, ufbx_error *error);
+typedef struct ufbx_load_opts {
+	bool allow_nonexistent_indices;
+} ufbx_load_opts;
+
+ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error);
 void ufbx_free_scene(ufbx_scene *scene);
 
 ufbx_node *ufbx_find_node(ufbx_scene *scene, const char *name, ufbx_node_type type);
@@ -230,22 +274,6 @@ ufbx_prop *ufbx_get_prop_from_list(const ufbx_prop_list *list, const char *name)
 ufbx_prop *ufbx_get_prop_from_list_str(const ufbx_prop_list *list, ufbx_string name);
 ufbx_prop *ufbx_get_prop(const ufbx_node *node, const char *name);
 ufbx_prop *ufbx_get_prop_str(const ufbx_node *node, ufbx_string name);
-
-int ufbx_get_element_by_vertex_i32(const ufbx_element *element, int32_t *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_vertex_f32(const ufbx_element *element, float *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_vertex_f64(const ufbx_element *element, double *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_face_vertex_i32(const ufbx_element *element, int32_t *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_face_vertex_f32(const ufbx_element *element, float *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_face_vertex_f64(const ufbx_element *element, double *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_face_i32(const ufbx_element *element, int32_t *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_face_f32(const ufbx_element *element, float *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_face_f64(const ufbx_element *element, double *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_edge_i32(const ufbx_element *element, int32_t *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_edge_f32(const ufbx_element *element, float *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_edge_f64(const ufbx_element *element, double *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_all_same_i32(const ufbx_element *element, int32_t *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_all_same_f32(const ufbx_element *element, float *dst, size_t stride, ufbx_error *error);
-int ufbx_get_element_by_all_same_f64(const ufbx_element *element, double *dst, size_t stride, ufbx_error *error);
 
 const char *ufbx_prop_type_name(ufbx_prop_type type);
 const char *ufbx_node_type_name(ufbx_node_type type);

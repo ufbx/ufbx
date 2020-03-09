@@ -47,22 +47,25 @@ UFBXT_TEST(table_node_type_map_values)
 UFBXT_TEST(table_element_mapping_map_values)
 #if UFBXT_IMPL
 {
-	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByVertex")) == UFBX_ELEMENT_BY_VERTEX);
-	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByVertice")) == UFBX_ELEMENT_BY_VERTEX);
-	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByPolygon")) == UFBX_ELEMENT_BY_POLYGON);
-	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByPolygonVertex")) == UFBX_ELEMENT_BY_POLYGON_VERTEX);
-	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByEdge")) == UFBX_ELEMENT_BY_EDGE);
-	ufbxt_assert(ufbxi_get_element_mapping(make_str("AllSame")) == UFBX_ELEMENT_BY_ALL_SAME);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByVertex")) == UFBXI_ELEMENT_BY_VERTEX);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByVertice")) == UFBXI_ELEMENT_BY_VERTEX);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByPolygon")) == UFBXI_ELEMENT_BY_POLYGON);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByPolygonVertex")) == UFBXI_ELEMENT_BY_POLYGON_VERTEX);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("ByEdge")) == UFBXI_ELEMENT_BY_EDGE);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("AllSame")) == UFBXI_ELEMENT_BY_ALL_SAME);
 }
 #endif
 
 UFBXT_TEST(table_element_type_map_values)
 #if UFBXT_IMPL
 {
-	ufbxt_assert(ufbxi_get_element_type(make_str("Normal")) == UFBX_ELEMENT_NORMAL);
-	ufbxt_assert(ufbxi_get_element_type(make_str("UV")) == UFBX_ELEMENT_UV);
-	ufbxt_assert(ufbxi_get_element_type(make_str("Material")) == UFBX_ELEMENT_MATERIAL);
-	ufbxt_assert(ufbxi_get_element_type(make_str("EdgeCrease")) == UFBX_ELEMENT_EDGE_CREASE);
+	ufbxt_assert(ufbxi_get_element_type(make_str("Normal"), UFBXI_ELEMENT_BY_UNKNOWN) == UFBXI_ELEMENT_NORMAL);
+	ufbxt_assert(ufbxi_get_element_type(make_str("Binormal"), UFBXI_ELEMENT_BY_UNKNOWN) == UFBXI_ELEMENT_BINORMAL);
+	ufbxt_assert(ufbxi_get_element_type(make_str("Tangent"), UFBXI_ELEMENT_BY_UNKNOWN) == UFBXI_ELEMENT_TANGENT);
+	ufbxt_assert(ufbxi_get_element_type(make_str("Color"), UFBXI_ELEMENT_BY_UNKNOWN) == UFBXI_ELEMENT_VERTEX_COLOR);
+	ufbxt_assert(ufbxi_get_element_type(make_str("UV"), UFBXI_ELEMENT_BY_UNKNOWN) == UFBXI_ELEMENT_UV);
+	ufbxt_assert(ufbxi_get_element_type(make_str("EdgeCrease"), UFBXI_ELEMENT_BY_UNKNOWN) == UFBXI_ELEMENT_EDGE_CREASE);
+	ufbxt_assert(ufbxi_get_element_type(make_str("Material"), UFBXI_ELEMENT_BY_UNKNOWN) == UFBXI_ELEMENT_FACE_MATERIAL);
 }
 #endif
 // End of generated code
@@ -141,9 +144,9 @@ UFBXT_TEST(table_element_mapping_map_self)
 UFBXT_TEST(table_element_mapping_map_not_found)
 #if UFBXT_IMPL
 {
-	ufbxt_assert(ufbxi_get_element_mapping(make_str("")) == UFBX_ELEMENT_BY_UNKNOWN);
-	ufbxt_assert(ufbxi_get_element_mapping(make_str("Test")) == UFBX_ELEMENT_BY_UNKNOWN);
-	ufbxt_assert(ufbxi_get_element_mapping(make_str("Another")) == UFBX_ELEMENT_BY_UNKNOWN);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("")) == UFBXI_ELEMENT_BY_UNKNOWN);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("Test")) == UFBXI_ELEMENT_BY_UNKNOWN);
+	ufbxt_assert(ufbxi_get_element_mapping(make_str("Another")) == UFBXI_ELEMENT_BY_UNKNOWN);
 }
 #endif
 
@@ -162,12 +165,21 @@ UFBXT_TEST(table_element_type_map_self)
 }
 #endif
 
+UFBXT_TEST(table_element_type_sub_types)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(ufbxi_get_element_type(make_str("Smoothing"), UFBXI_ELEMENT_BY_EDGE) == UFBXI_ELEMENT_EDGE_SMOOTHING);
+	ufbxt_assert(ufbxi_get_element_type(make_str("Smoothing"), UFBXI_ELEMENT_BY_POLYGON) == UFBXI_ELEMENT_FACE_SMOOTHING);
+	ufbxt_assert(ufbxi_get_element_type(make_str("Smoothing"), UFBXI_ELEMENT_BY_VERTEX) == UFBXI_ELEMENT_UNKNOWN);
+}
+#endif
+
 UFBXT_TEST(table_element_type_map_not_found)
 #if UFBXT_IMPL
 {
-	ufbxt_assert(ufbxi_get_element_type(make_str("")) == UFBX_ELEMENT_UNKNOWN);
-	ufbxt_assert(ufbxi_get_element_type(make_str("Test")) == UFBX_ELEMENT_UNKNOWN);
-	ufbxt_assert(ufbxi_get_element_type(make_str("Another")) == UFBX_ELEMENT_UNKNOWN);
+	ufbxt_assert(ufbxi_get_element_type(make_str(""), UFBXI_ELEMENT_BY_UNKNOWN) == UFBXI_ELEMENT_UNKNOWN);
+	ufbxt_assert(ufbxi_get_element_type(make_str("Test"), UFBXI_ELEMENT_BY_UNKNOWN) == UFBXI_ELEMENT_UNKNOWN);
+	ufbxt_assert(ufbxi_get_element_type(make_str("Another"), UFBXI_ELEMENT_BY_UNKNOWN) == UFBXI_ELEMENT_UNKNOWN);
 }
 #endif
 

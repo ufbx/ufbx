@@ -54,9 +54,12 @@ element_mapping_types = [
 
 element_types = [
     nameEnum("Normal", "NORMAL"),
+    nameEnum("Binormal", "BINORMAL"),
+    nameEnum("Tangent", "TANGENT"),
+    nameEnum("Color", "VERTEX_COLOR"),
     nameEnum("UV", "UV"),
-    nameEnum("Material", "MATERIAL"),
     nameEnum("EdgeCrease", "EDGE_CREASE"),
+    nameEnum("Material", "FACE_MATERIAL"),
 ]
 
 def find_params(names, map_size, max_k, max_s):
@@ -78,7 +81,7 @@ def find_params(names, map_size, max_k, max_s):
 decl = []
 test = []
 
-def gen_table(names, type_name, enum_name, test_extra):
+def gen_table(names, type_name, enum_name, test_extra=""):
     global decl
     global test
 
@@ -97,9 +100,9 @@ def gen_table(names, type_name, enum_name, test_extra):
     decl.append("static const ufbxi_{0}_map_entry ufbxi_{0}_map[{1}] = {{".format(type_name, map_size))
     for n in arr:
         if not n:
-            decl.append("\t{{ 0u, {{ 0,0 }}, UFBX_{0}_UNKNOWN }},".format(enum_name))
+            decl.append("\t{{ 0u, {{ 0,0 }}, {0}_UNKNOWN }},".format(enum_name))
         else:
-            decl.append("\t{{ 0x{0:08x}u, {{ \"{1}\", {2} }}, UFBX_{3}_{4} }},".format(n.hash, n.name, len(n.name), enum_name, n.enum))
+            decl.append("\t{{ 0x{0:08x}u, {{ \"{1}\", {2} }}, {3}_{4} }},".format(n.hash, n.name, len(n.name), enum_name, n.enum))
     decl.append("};")
 
     test.append("")
@@ -107,15 +110,15 @@ def gen_table(names, type_name, enum_name, test_extra):
     test.append("#if UFBXT_IMPL")
     test.append("{")
     for n in names:
-        test.append("\tufbxt_assert(ufbxi_get_{0}(make_str(\"{1}\"){2}) == UFBX_{3}_{4});".format(type_name, n.name, test_extra, enum_name, n.enum))
+        test.append("\tufbxt_assert(ufbxi_get_{0}(make_str(\"{1}\"){2}) == {3}_{4});".format(type_name, n.name, test_extra, enum_name, n.enum))
     test.append("}")
     test.append("#endif")
 
 
-gen_table(prop_types, "prop_type", "PROP", "")
-gen_table(node_types, "node_type", "NODE", ", ufbx_empty_string")
-gen_table(element_mapping_types, "element_mapping", "ELEMENT_BY", "")
-gen_table(element_types, "element_type", "ELEMENT", "")
+gen_table(prop_types, "prop_type", "UFBX_PROP", "")
+gen_table(node_types, "node_type", "UFBX_NODE", ", ufbx_empty_string")
+gen_table(element_mapping_types, "element_mapping", "UFBXI_ELEMENT_BY", "")
+gen_table(element_types, "element_type", "UFBXI_ELEMENT", ", UFBXI_ELEMENT_BY_UNKNOWN")
 
 print("\n".join(decl))
 print()

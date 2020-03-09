@@ -457,7 +457,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 			}
 
 			ufbx_error error;
-			ufbx_scene *scene = ufbx_load_memory(data, size, &error);
+			ufbx_scene *scene = ufbx_load_memory(data, size, NULL, &error);
 			if (!scene) {
 				ufbxt_log_error_common(&error);
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file");
