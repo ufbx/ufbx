@@ -7,9 +7,7 @@
 
 #define UFBX_MAX_ELEMENTS_PER_MESH 256
 
-#define UFBX_ERROR_DESC_MAX_LENGTH 255
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
-#define UFBX_ERROR_STACK_NAME_MAX_LENGTH 31
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,11 +39,15 @@ typedef struct ufbx_prop_list { ufbx_prop *data; size_t size; } ufbx_prop_list;
 typedef struct ufbx_uv_set_list { ufbx_uv_set *data; size_t size; } ufbx_uv_set_list;
 typedef struct ufbx_color_set_list { ufbx_color_set *data; size_t size; } ufbx_color_set_list;
 
-typedef struct ufbx_error {
+typedef struct ufbx_error_frame {
 	uint32_t source_line;
+	const char *function;
+	const char *description;
+} ufbx_error_frame;
+
+typedef struct ufbx_error {
 	uint32_t stack_size;
-	char desc[UFBX_ERROR_DESC_MAX_LENGTH + 1];
-	char stack[UFBX_ERROR_STACK_MAX_DEPTH][UFBX_ERROR_DESC_MAX_LENGTH + 1];
+	ufbx_error_frame stack[UFBX_ERROR_STACK_MAX_DEPTH];
 } ufbx_error;
 
 typedef enum ufbx_property_type {
@@ -269,7 +271,18 @@ typedef struct ufbx_load_opts {
 	bool allow_nonexistent_indices;
 } ufbx_load_opts;
 
+typedef struct ufbx_io_buffer {
+	void *data;
+	size_t size;
+
+	// Currently resident data
+	uint64_t begin_offset, end_offset;
+} ufbx_io_buffer;
+
+typedef size_t ufbx_read_fn(void *user, uint64_t offset, void *data, size_t size, bool contiguous);
+
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error);
+ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error);
 void ufbx_free_scene(ufbx_scene *scene);
 
 ufbx_node *ufbx_find_node(ufbx_scene *scene, const char *name, ufbx_node_type type);
