@@ -1541,6 +1541,7 @@ static int ufbxi_binary_parse_node(ufbxi_context *uc, uint64_t *p_offset, int de
 					node->prop_type[i] = UFBXI_PROP_NUMBER; \
 					vals[i].i = (int64_t)(vals[i].f = m_expr); }
 
+				// TODO: Looks like old FBX files use 'C' with 'T'/'F' as well?
 				case 'C': case 'B': ufbxi_int_prop(1, *val != 0 ? 1 : 0); break;
 				case 'Y': ufbxi_int_prop(2, ufbxi_read_i16(val)); break;
 				case 'I': ufbxi_int_prop(4, ufbxi_read_i32(val)); break;
