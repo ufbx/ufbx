@@ -5,6 +5,17 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#if defined(_MSC_VER)
+	#pragma warning(push)
+	#pragma warning(disable: 4201) // nonstandard extension used: nameless struct/union
+	#pragma warning(disable: 4505) // unreferenced local function has been removed
+	#define ufbx_inline static __forceinline
+#elif defined(__GNUC__)
+	#define ufbx_inline static __attribute__((always_inline, unused))
+#else
+	#define ufbx_inline static
+#endif
+
 #define UFBX_MAX_ELEMENTS_PER_MESH 256
 
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
@@ -50,7 +61,7 @@ typedef struct ufbx_error {
 	ufbx_error_frame stack[UFBX_ERROR_STACK_MAX_DEPTH];
 } ufbx_error;
 
-typedef enum ufbx_property_type {
+typedef enum ufbx_prop_type {
 	UFBX_PROP_UNKNOWN,
 	UFBX_PROP_BOOLEAN,
 	UFBX_PROP_INTEGER,
@@ -108,6 +119,7 @@ struct ufbx_transform {
 
 struct ufbx_prop {
 	ufbx_string name;
+	uint32_t imp_key;
 	ufbx_prop_type type;
 
 	ufbx_string type_str;
@@ -285,31 +297,19 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts
 ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error);
 void ufbx_free_scene(ufbx_scene *scene);
 
-ufbx_node *ufbx_find_node(ufbx_scene *scene, const char *name, ufbx_node_type type);
-ufbx_node *ufbx_find_node_str(ufbx_scene *scene, ufbx_string name, ufbx_node_type type);
-ufbx_node *ufbx_find_node_any(ufbx_scene *scene, const char *name);
-ufbx_node *ufbx_find_node_any_str(ufbx_scene *scene, ufbx_string name);
-ufbx_model *ufbx_find_model(ufbx_scene *scene, const char *name);
-ufbx_model *ufbx_find_model_str(ufbx_scene *scene, ufbx_string name);
-ufbx_mesh *ufbx_find_mesh(ufbx_scene *scene, const char *name);
-ufbx_mesh *ufbx_find_mesh_str(ufbx_scene *scene, ufbx_string name);
-
 ufbx_prop *ufbx_get_prop_from_list(const ufbx_prop_list *list, const char *name);
-ufbx_prop *ufbx_get_prop_from_list_str(const ufbx_prop_list *list, ufbx_string name);
+ufbx_prop *ufbx_get_prop_from_list_len(const ufbx_prop_list *list, const char *name, size_t len);
 ufbx_prop *ufbx_get_prop(const ufbx_node *node, const char *name);
-ufbx_prop *ufbx_get_prop_str(const ufbx_node *node, ufbx_string name);
-
-const char *ufbx_prop_type_name(ufbx_prop_type type);
-const char *ufbx_node_type_name(ufbx_node_type type);
+ufbx_prop *ufbx_get_prop_len(const ufbx_node *node, const char *name, size_t len);
 
 void ufbx_transform_mul(ufbx_transform *dst, const ufbx_transform *l, const ufbx_transform *r);
 ufbx_vec3 ufbx_transform_position(const ufbx_transform *t, ufbx_vec3 v);
 ufbx_vec3 ufbx_transform_direction(const ufbx_transform *t, ufbx_vec3 v);
 ufbx_vec3 ufbx_transform_normal(const ufbx_transform *t, ufbx_vec3 v);
 
-static ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }
-static ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }
-static ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->indices[index]]; }
+ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }
+ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }
+ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->indices[index]]; }
 
 #ifdef __cplusplus
 }
@@ -319,17 +319,21 @@ static ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) {
 
 #ifdef __cplusplus
 
-static inline ufbx_node **begin(const ufbx_node_list &l) { return l.data; }
-static inline ufbx_node **end(const ufbx_node_list &l) { return l.data + l.size; }
-static inline ufbx_model **begin(const ufbx_model_list &l) { return l.data; }
-static inline ufbx_model **end(const ufbx_model_list &l) { return l.data + l.size; }
-static inline ufbx_mesh **begin(const ufbx_mesh_list &l) { return l.data; }
-static inline ufbx_mesh **end(const ufbx_mesh_list &l) { return l.data + l.size; }
-static inline ufbx_template *begin(const ufbx_template_list &l) { return l.data; }
-static inline ufbx_template *end(const ufbx_template_list &l) { return l.data + l.size; }
-static inline ufbx_prop *begin(const ufbx_prop_list &l) { return l.data; }
-static inline ufbx_prop *end(const ufbx_prop_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_node **begin(const ufbx_node_list &l) { return l.data; }
+ufbx_inline ufbx_node **end(const ufbx_node_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_model **begin(const ufbx_model_list &l) { return l.data; }
+ufbx_inline ufbx_model **end(const ufbx_model_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_mesh **begin(const ufbx_mesh_list &l) { return l.data; }
+ufbx_inline ufbx_mesh **end(const ufbx_mesh_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_template *begin(const ufbx_template_list &l) { return l.data; }
+ufbx_inline ufbx_template *end(const ufbx_template_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_prop *begin(const ufbx_prop_list &l) { return l.data; }
+ufbx_inline ufbx_prop *end(const ufbx_prop_list &l) { return l.data + l.size; }
 
+#endif
+
+#if defined(_MSC_VER)
+	#pragma warning(pop)
 #endif
 
 #endif
