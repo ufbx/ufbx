@@ -1304,6 +1304,7 @@ static size_t ufbxi_get_array_size(ufbxi_node *node)
 		size_t num = 0;
 		while (num < UFBXI_MAX_NON_ARRAY_VALUES) {
 			if ((ufbxi_prop_type)((node->prop_type_mask >> (num*2)) & 0x3f) == UFBXI_PROP_NONE) break;
+			num++;
 		}
 		return num;
 	}
@@ -1543,6 +1544,13 @@ static ufbxi_forceinline const char *ufbxi_try_get_buffer(ufbxi_context *uc, uin
 	int64_t right = end - offset;
 	if (left >= 0 && right >= (int64_t)size) {
 		return uc->buffer + (size_t)left;
+	} else if (!uc->read_fn) {
+		// Fail without error if there's no read function as any refill is
+		// equivalent to an EOF condition.
+		uc->buffer = NULL;
+		uc->buffer_begin = offset;
+		uc->buffer_end = offset;
+		return NULL;
 	} else {
 		if (!ufbxi_get_buffer_refill(uc, offset, size, true)) return NULL;
 		return uc->buffer;
@@ -1649,9 +1657,9 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint64_t *
 				// If the array of multiple individual values use the value count
 				array_size = num_values;
 				node->prop_array->real_array = false;
-				node->prop_array->offset = values_end_offset;
-				node->prop_array->data_size = (size_t)end_offset - values_end_offset;
-				ufbxi_check(end_offset - values_end_offset < UFBXI_MAX_ARRAY_SIZE_BYTES);
+				node->prop_array->offset = offset;
+				node->prop_array->data_size = (size_t)values_len;
+				ufbxi_check(values_len < UFBXI_MAX_ARRAY_SIZE_BYTES);
 			}
 			ufbxi_check(array_size <= UFBXI_MAX_ARRAY_SIZE);
 			node->prop_array->num_values = (size_t)array_size;
@@ -1701,6 +1709,9 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint64_t *
 					prop_type_mask |= UFBXI_PROP_STRING << (i*2);
 				}
 				break;
+
+				default:
+					ufbxi_fail("Bad property type");
 
 				}
 
@@ -2073,7 +2084,7 @@ static ufbxi_noinline char ufbxi_ascii_refill(ufbxi_ascii *ua)
 {
 	ufbxi_context *uc = ua->uc;
 	ua->src = ufbxi_try_get_buffer(uc, ua->offset, 1);
-	ufbxi_check_return(ua->src, '\0');
+	if (!ua->src) return '\0';
 	ua->offset_end = ua->uc->buffer_end;
 	if (ua->offset == ua->offset_end) {
 		return '\0';
@@ -2090,6 +2101,7 @@ static ufbxi_forceinline char ufbxi_ascii_peek(ufbxi_ascii *ua)
 
 static ufbxi_forceinline char ufbxi_ascii_next(ufbxi_ascii *ua)
 {
+	if (ua->offset == ua->offset_end) return ufbxi_ascii_refill(ua);
 	ua->offset++;
 	ua->src++;
 	if (ua->offset == ua->offset_end) return ufbxi_ascii_refill(ua);
@@ -2680,7 +2692,7 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 	ufbxi_check(node_data);
 
 	const char *mapping;
-	ufbxi_check(ufbxi_find_val1(node, uc->s.MappingInformationType, "C", &mapping));
+	ufbxi_check(ufbxi_find_val1(node, uc->s.MappingInformationType, "C", (void*)&mapping));
 
 	size_t num_elems;
 	ufbxi_check(ufbxi_get_array_size_divisor(uc, node_data, &num_elems, num_components));
@@ -2702,7 +2714,7 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 			// Indexed by polygon vertex: We can use the indices directly,
 			// possibly filling the rest with `invalid_index`
 			size_t arr_size = ufbxi_max_sz(num_indices, mesh_num_indices);
-			indices = ufbxi_push_uninit(uc, int32_t, arr_size);
+			indices = ufbxi_push_uninit(&uc->result, int32_t, arr_size);
 			ufbxi_check(ufbxi_parse_array(uc, node_index, 'i', indices));
 			for (size_t i = num_indices; i < mesh_num_indices; i++) {
 				indices[i] = invalid_index;
@@ -2720,10 +2732,10 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 			// Indexed by vertex: We need to temporarily decode the vertex
 			// mapping and follow through the position mapping to get the
 			// final indices.
-			indices = ufbxi_push_uninit(uc, int32_t, mesh_num_indices);
+			indices = ufbxi_push_uninit(&uc->result, int32_t, mesh_num_indices);
 			ufbxi_check(indices);
 
-			int32_t temp_indices = ufbxi_push_uninit(&uc->tmp, int32_t, num_indices);
+			int32_t *temp_indices = ufbxi_push_uninit(&uc->tmp, int32_t, num_indices);
 			ufbxi_check(ufbxi_parse_array(uc, node_index, 'i', indices));
 
 			int32_t *vert_ix = mesh->vertex_position.indices;
@@ -2743,6 +2755,8 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 
 	} else {
 	}
+
+	return 1;
 }
 
 ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, const ufbx_node *desc)
@@ -2849,8 +2863,8 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 
 		if (n->name == uc->s.LayerElementNormal) {
 			if (mesh->vertex_normal.data) continue;
-			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &mesh->vertex_normal,
-				&uc->s.Normals, &uc->s.NormalsIndex, 'r', 3));
+			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &mesh->vertex_normal.element,
+				uc->s.Normals, uc->s.NormalsIndex, 'r', 3));
 		} else if (n->name == uc->s.LayerElementUV) {
 		}
 	}

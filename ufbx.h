@@ -127,12 +127,11 @@ struct ufbx_prop {
 	ufbx_string flags;
 
 	ufbx_string value_str;
-	int64_t value_int[4];
+	int64_t value_int;
 	union {
-		ufbx_real value_real[4];
+		ufbx_real value_real[3];
 		ufbx_vec2 value_vec2;
 		ufbx_vec3 value_vec3;
-		ufbx_vec4 value_vec4;
 	};
 };
 
