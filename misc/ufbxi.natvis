@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+  <Type Name="ufbxi_node">
+
+    <DisplayString>{{ name={name,s} }}</DisplayString>
+
+    <Expand>
+
+      <Item Name="name">name,s</Item>
+
+      <Synthetic Name="children">
+        <DisplayString>{{ num_children={num_children} }}</DisplayString>
+        <Expand>
+          <ArrayItems>
+            <Size>num_children</Size>
+            <ValuePointer>children</ValuePointer>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="values" Condition="prop_type_mask!=3">
+        <DisplayString Condition="(prop_type_mask&amp;0xffff) == 0">{{ num_values = 0 }}</DisplayString>
+        <DisplayString Condition="(prop_type_mask&amp;0xfffc) == 0">{{ num_values = 1 }}</DisplayString>
+        <DisplayString Condition="(prop_type_mask&amp;0xfff0) == 0">{{ num_values = 2 }}</DisplayString>
+        <DisplayString Condition="(prop_type_mask&amp;0xffc0) == 0">{{ num_values = 3 }}</DisplayString>
+        <DisplayString Condition="(prop_type_mask&amp;0xff00) == 0">{{ num_values = 4 }}</DisplayString>
+        <DisplayString Condition="(prop_type_mask&amp;0xfc00) == 0">{{ num_values = 5 }}</DisplayString>
+        <DisplayString Condition="(prop_type_mask&amp;0xf000) == 0">{{ num_values = 6 }}</DisplayString>
+        <DisplayString Condition="(prop_type_mask&amp;0xc000) == 0">{{ num_values = 7 }}</DisplayString>
+        <Expand>
+          <CustomListItems MaxItemsPerView="7">
+            <Variable Name="mask" InitialValue="prop_type_mask"/>
+            <Variable Name="ix" InitialValue="0"/>
+            <Loop>
+              <Break Condition="mask == 0" />
+              <Item Condition="(mask &amp; 0x3) == 1">prop_val[ix].f</Item>
+              <Item Condition="(mask &amp; 0x3) == 2">prop_val[ix].s</Item>
+              <Exec>mask = mask >> 2</Exec>
+              <Exec>ix = ix + 1</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+
+      <Item Name="array" Condition="prop_type_mask==3">prop_array</Item>
+
+    </Expand>
+  </Type>
+
+  <Type Name="ufbxi_prop_array">
+    <DisplayString>{{ num_elements={num_elements} }}</DisplayString>
+    <Expand>
+
+      <ArrayItems Condition="type=='b'">
+        <Size>num_elements</Size>
+        <ValuePointer>(bool*)data</ValuePointer>
+      </ArrayItems>
+
+      <ArrayItems Condition="type=='i'">
+        <Size>num_elements</Size>
+        <ValuePointer>(int32_t*)data</ValuePointer>
+      </ArrayItems>
+
+      <ArrayItems Condition="type=='l'">
+        <Size>num_elements</Size>
+        <ValuePointer>(int64_t*)data</ValuePointer>
+      </ArrayItems>
+
+      <ArrayItems Condition="type=='f'">
+        <Size>num_elements</Size>
+        <ValuePointer>(float*)data</ValuePointer>
+      </ArrayItems>
+
+      <ArrayItems Condition="type=='d'">
+        <Size>num_elements</Size>
+        <ValuePointer>(double*)data</ValuePointer>
+      </ArrayItems>
+
+    </Expand>
+  </Type>
+
+</AutoVisualizer>

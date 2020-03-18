@@ -278,19 +278,28 @@ typedef struct ufbx_scene {
 	ufbx_template_list templates;
 } ufbx_scene;
 
+typedef void *ufbx_alloc_fn(void *user, size_t size);
+typedef void *ufbx_realloc_fn(void *user, void *old_ptr, size_t old_size, size_t new_size);
+typedef void ufbx_free_fn(void *user, void *ptr, size_t size);
+
+typedef struct ufbx_allocator {
+	ufbx_alloc_fn *alloc_fn;
+	ufbx_realloc_fn *realloc_fn;
+	ufbx_free_fn *free_fn;
+	void *user;
+} ufbx_allocator;
+
 typedef struct ufbx_load_opts {
+	ufbx_allocator temp_allocator;
+	ufbx_allocator result_allocator;
+
+	size_t max_temp_memory;
+	size_t max_result_memory;
+
 	bool allow_nonexistent_indices;
 } ufbx_load_opts;
 
-typedef struct ufbx_io_buffer {
-	void *data;
-	size_t size;
-
-	// Currently resident data
-	uint64_t begin_offset, end_offset;
-} ufbx_io_buffer;
-
-typedef size_t ufbx_read_fn(void *user, uint64_t offset, void *data, size_t size, bool contiguous);
+typedef size_t ufbx_read_fn(void *user, void *data, size_t size);
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error);
 ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error);
@@ -309,6 +318,28 @@ ufbx_vec3 ufbx_transform_normal(const ufbx_transform *t, ufbx_vec3 v);
 ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }
 ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }
 ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->indices[index]]; }
+
+// Utility
+
+typedef struct ufbx_inflate_input {
+	size_t total_size;
+
+	const void *data;
+	size_t data_size;
+
+	void *buffer;
+	size_t buffer_size;
+
+	ufbx_read_fn *read_fn;
+	void *read_user;
+} ufbx_inflate_input;
+
+typedef struct ufbx_inflate_retain {
+	bool initialized;
+	uint64_t data[512];
+} ufbx_inflate_retain;
+
+ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);
 
 #ifdef __cplusplus
 }
