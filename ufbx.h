@@ -293,8 +293,18 @@ typedef struct ufbx_load_opts {
 	ufbx_allocator temp_allocator;
 	ufbx_allocator result_allocator;
 
+	// Limits
 	size_t max_temp_memory;
 	size_t max_result_memory;
+	size_t max_ascii_token_length;
+	size_t read_buffer_size;
+
+	uint32_t max_string_length;
+	uint32_t max_strings;
+	uint32_t max_node_depth;
+	uint32_t max_node_values;
+	uint32_t max_node_children;
+	uint32_t max_array_size;
 
 	bool allow_nonexistent_indices;
 } ufbx_load_opts;
