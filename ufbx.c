@@ -1286,8 +1286,10 @@ static void ufbxi_buf_clear(ufbxi_buf *buf)
 
 static const char ufbxi_FBXHeaderExtension[] = "FBXHeaderExtension";
 static const char ufbxi_FBXVersion[] = "FBXVersion";
+static const char ufbxi_Creator[] = "Creator";
 static const char ufbxi_Definitions[] = "Definitions";
 static const char ufbxi_Objects[] = "Objects";
+static const char ufbxi_Connections[] = "Connections";
 static const char ufbxi_ObjectType[] = "ObjectType";
 static const char ufbxi_PropertyTemplate[] = "PropertyTemplate";
 static const char ufbxi_Properties60[] = "Properties60";
@@ -1301,8 +1303,10 @@ static const char ufbxi_Edges[] = "Edges";
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FBXHeaderExtension, sizeof(ufbxi_FBXHeaderExtension) - 1 },
 	{ ufbxi_FBXVersion, sizeof(ufbxi_FBXVersion) - 1 },
+	{ ufbxi_Creator, sizeof(ufbxi_Creator) - 1 },
 	{ ufbxi_Definitions, sizeof(ufbxi_Definitions) - 1 },
 	{ ufbxi_Objects, sizeof(ufbxi_Objects) - 1 },
+	{ ufbxi_Connections, sizeof(ufbxi_Connections) - 1 },
 	{ ufbxi_ObjectType, sizeof(ufbxi_ObjectType) - 1 },
 	{ ufbxi_PropertyTemplate, sizeof(ufbxi_PropertyTemplate) - 1 },
 	{ ufbxi_Properties60, sizeof(ufbxi_Properties60) - 1 },
@@ -2712,6 +2716,19 @@ ufbxi_nodiscard static int ufbxi_ascii_parse(ufbxi_context *uc)
 	return ret;
 }
 
+// -- Setup
+
+ufbxi_nodiscard static int ufbxi_load_strings(ufbxi_context *uc)
+{
+	// Push all the global 'ufbxi_*' strings into the pool without copying them
+	// This allows us to compare name pointers to the global values
+	ufbxi_for(ufbx_string, str, ufbxi_strings, ufbxi_arraycount(ufbxi_strings)) {
+		ufbxi_check(ufbxi_push_string_imp(uc, str->data, str->length, false));
+	}
+
+	return 1;
+}
+
 // -- General parsing
 
 ufbxi_nodiscard static int ufbxi_parse(ufbxi_context *uc)
@@ -2752,14 +2769,57 @@ ufbxi_nodiscard static int ufbxi_parse(ufbxi_context *uc)
 	return 1;
 }
 
+// -- Reading the parsed data
+
+ufbxi_nodiscard static int ufbxi_read_header_extension(ufbxi_context *uc, ufbxi_node *header)
+{
+	ufbxi_ignore(ufbxi_find_val1(header, ufbxi_Creator, "S", &uc->scene.metadata.creator));
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc, ufbxi_node *definitions)
+{
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
+{
+	// FBXHeaderExtension: Some metadata (optional)
+	ufbxi_node *header = ufbxi_find_child(&uc->root, ufbxi_FBXHeaderExtension);
+	if (header) {
+		ufbxi_check(ufbxi_read_header_extension(uc, header));
+	}
+
+	// Definitions: Object type counts and property templates (optional)
+	ufbxi_node *definitions = ufbxi_find_child(&uc->root, ufbxi_Definitions);
+	if (definitions) {
+		ufbxi_check(ufbxi_read_definitions(uc, definitions));
+	}
+
+	// Objects: Actual scene data (required)
+	ufbxi_node *objects = ufbxi_find_child(&uc->root, ufbxi_Objects);
+	ufbxi_check(objects);
+	ufbxi_check(ufbxi_read_definitions(uc, objects));
+
+	// Connections: Relationships between nodes (required)
+	ufbxi_node *connections = ufbxi_find_child(&uc->root, ufbxi_Connections);
+	ufbxi_check(connections);
+	ufbxi_check(ufbxi_read_definitions(uc, connections));
+
+
+	return 1;
+}
+
+
 // -- Loading
 
 ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 {
-	// ufbxi_check(ufbxi_load_strings(uc));
+	ufbxi_check(ufbxi_load_strings(uc));
 	// ufbxi_check(ufbxi_load_maps(uc));
 	ufbxi_check(ufbxi_parse(uc));
-	// ufbxi_check(ufbxi_read_root(uc));
+	ufbxi_check(ufbxi_read_root(uc));
 
 	// Copy local data to the scene
 	uc->scene.metadata.version = uc->version;
