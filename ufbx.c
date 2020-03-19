@@ -3316,6 +3316,16 @@ ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc, ufbxi_node 
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc, ufbxi_node *objects)
+{
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_connections(ufbxi_context *uc, ufbxi_node *connections)
+{
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 {
 	// FBXHeaderExtension: Some metadata (optional)
@@ -3333,12 +3343,12 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 	// Objects: Actual scene data (required)
 	ufbxi_node *objects = ufbxi_find_child(&uc->root, ufbxi_Objects);
 	ufbxi_check(objects);
-	ufbxi_check(ufbxi_read_definitions(uc, objects));
+	ufbxi_check(ufbxi_read_objects(uc, objects));
 
 	// Connections: Relationships between nodes (required)
 	ufbxi_node *connections = ufbxi_find_child(&uc->root, ufbxi_Connections);
 	ufbxi_check(connections);
-	ufbxi_check(ufbxi_read_definitions(uc, connections));
+	ufbxi_check(ufbxi_read_connections(uc, connections));
 
 	return 1;
 }
