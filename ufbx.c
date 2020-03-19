@@ -102,6 +102,312 @@ static ufbxi_forceinline uint64_t ufbxi_max64(uint64_t a, uint64_t b) { return a
 static ufbxi_forceinline size_t ufbxi_min_sz(size_t a, size_t b) { return a < b ? a : b; }
 static ufbxi_forceinline size_t ufbxi_max_sz(size_t a, size_t b) { return a < b ? b : a; }
 
+#ifndef RHMAP_H_INCLUDED
+#define RHMAP_H_INCLUDED
+
+#ifndef RHMAP_NO_STDINT
+#include <stddef.h>
+#include <stdint.h>
+#endif
+
+typedef struct rhmap_s {
+	uint64_t *entries;
+	uint32_t mask;
+
+	uint32_t capacity;
+	uint32_t size;
+} rhmap;
+
+typedef struct rhmap_iter_s {
+	rhmap *map;
+	uint32_t hash;
+
+	uint32_t scan;
+} rhmap_iter;
+
+void rhmap_init(rhmap *map);
+void *rhmap_reset(rhmap *map);
+void rhmap_clear(rhmap *map);
+
+void rhmap_grow(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor);
+void rhmap_shrink(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor);
+void *rhmap_rehash(rhmap *map, size_t count, size_t alloc_size, void *data_ptr);
+
+int rhmap_find(rhmap_iter *iter, uint32_t *value);
+void rhmap_insert(rhmap_iter *iter, uint32_t value);
+void rhmap_remove(rhmap_iter *iter);
+void rhmap_set(rhmap_iter *iter, uint32_t value);
+int rhmap_next(rhmap_iter *iter, uint32_t *hash, uint32_t *value);
+
+void rhmap_update(rhmap *map, uint32_t hash, uint32_t old_value, uint32_t new_value);
+
+#endif
+
+// -- Inline rhmap.h
+
+#define RHMAP_INLINE static ufbxi_forceinline
+
+#if defined(RHMAP_IMPLEMENTATION) || defined(RHMAP_INLINE)
+#if (defined(RHMAP_IMPLEMENTATION) && !defined(RHMAP_H_IMPLEMENTED)) || (defined(RHMAP_INLINE) && !defined(RHMAP_H_INLINED))
+#ifdef RHMAP_IMPLEMENTATION
+#define RHMAP_H_IMPLEMENTED
+#endif
+#ifdef RHMAP_INLINE
+#define RHMAP_H_INLINED
+#endif
+
+#ifndef RHMAP_MEMSET
+#ifdef RHMAP_NO_STDLIB
+static void rhmap_imp_memset(void *data, int value, size_t num)
+{
+	uint64_t *ptr = (uint64_t*)data, *end = ptr + num / 8;
+	while (ptr != end) *ptr++ = 0;
+}
+#define RHMAP_MEMSET rhmap_imp_memset
+#else
+#include <string.h>
+#define RHMAP_MEMSET memset
+#endif
+#endif
+
+#ifdef RHMAP_INLINE
+RHMAP_INLINE void rhmap_init_inline(rhmap *map)
+#else
+void rhmap_init(rhmap *map)
+#endif
+{
+	map->entries = 0;
+	map->mask = map->capacity = map->size = 0;
+}
+
+#ifdef RHMAP_INLINE
+RHMAP_INLINE void *rhmap_reset_inline(rhmap *map)
+#else
+void *rhmap_reset(rhmap *map)
+#endif
+{
+	void *data = map->entries;
+	map->entries = 0;
+	map->mask = map->capacity = map->size = 0;
+	return data;
+}
+
+#ifdef RHMAP_INLINE
+RHMAP_INLINE void rhmap_clear_inline(rhmap *map)
+#else
+void rhmap_clear(rhmap *map)
+#endif
+{
+	map->size = 0;
+	RHMAP_MEMSET(map->entries, 0, sizeof(uint64_t) * (map->mask + 1));
+}
+
+#ifdef RHMAP_INLINE
+RHMAP_INLINE void rhmap_grow_inline(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor)
+#else
+void rhmap_grow(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor)
+#endif
+{
+	size_t num_entries = map->mask + 1;
+	size_t size = (size_t)((double)num_entries * load_factor);
+	if (min_size < map->capacity + 1) min_size = map->capacity + 1;
+	while (size < min_size) {
+		num_entries *= 2;
+		size = (size_t)((double)num_entries * load_factor);
+	}
+	*count = size;
+	*alloc_size = num_entries * sizeof(uint64_t);
+}
+
+#ifdef RHMAP_INLINE
+RHMAP_INLINE void rhmap_shrink_inline(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor)
+#else
+void rhmap_shrink(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor)
+#endif
+{
+	size_t num_entries = 1;
+	size_t size = (size_t)((double)num_entries * load_factor);
+	if (min_size < map->size) min_size = map->size;
+	while (size < min_size) {
+		num_entries *= 2;
+		size = (size_t)((double)num_entries * load_factor);
+	}
+	*count = size;
+	*alloc_size = num_entries * sizeof(uint64_t);
+}
+
+#ifdef RHMAP_INLINE
+RHMAP_INLINE int rhmap_find_inline(rhmap_iter *iter, uint32_t *value)
+#else
+int rhmap_find(rhmap_iter *iter, uint32_t *value)
+#endif
+{
+	rhmap *map = iter->map;
+	uint64_t *entries = map->entries;
+	uint32_t mask = map->mask, hash = iter->hash, scan = iter->scan;
+	uint32_t ref = hash & ~mask;
+	if (!mask) return 0;
+	for (;;) {
+		uint64_t entry = entries[(hash + scan) & mask];
+		scan += 1;
+		if ((uint32_t)entry == ref + scan) {
+			iter->scan = scan;
+			*value = (uint32_t)(entry >> 32u);
+			return 1;
+		} else if ((entry & mask) < scan) {
+			iter->scan = scan - 1;
+			return 0;
+		}
+	}
+}
+
+#ifdef RHMAP_INLINE
+RHMAP_INLINE void rhmap_insert_inline(rhmap_iter *iter, uint32_t value)
+#else
+void rhmap_insert(rhmap_iter *iter, uint32_t value)
+#endif
+{
+	rhmap *map = iter->map;
+	uint64_t *entries = map->entries;
+	uint32_t mask = map->mask, hash = iter->hash, scan = iter->scan;
+	uint32_t slot = (hash + scan) & mask;
+	uint64_t entry, new_entry = (uint64_t)value << 32u | (hash & ~mask);
+	scan += 1;
+	while ((entry = entries[slot]) != 0) {
+		uint32_t entry_scan = (entry & mask);
+		if (entry_scan < scan) {
+			entries[slot] = new_entry + scan;
+			new_entry = (entry & ~(uint64_t)mask);
+			scan = entry_scan;
+		}
+		scan += 1;
+		slot = (slot + 1) & mask;
+	}
+	entries[slot] = new_entry + scan;
+	map->size++;
+}
+
+#ifdef RHMAP_INLINE
+RHMAP_INLINE void *rhmap_rehash_inline(rhmap *map, size_t count, size_t alloc_size, void *data_ptr)
+#else
+void *rhmap_rehash(rhmap *map, size_t count, size_t alloc_size, void *data_ptr)
+#endif
+{
+	rhmap old_map = *map;
+	size_t num_entries = alloc_size / sizeof(uint64_t);
+	uint64_t *entries = (uint64_t*)data_ptr;
+	uint32_t mask = old_map.mask;
+	map->entries = entries;
+	map->mask = (uint32_t)(num_entries) - 1;
+	map->capacity = (uint32_t)count;
+	map->size = 0;
+	RHMAP_MEMSET(entries, 0, sizeof(uint64_t) * num_entries);
+	if (old_map.mask) {
+		uint32_t i;
+		for (i = 0; i <= old_map.mask; i++) {
+			uint64_t entry = old_map.entries[i];
+			if (entry) {
+				uint32_t scan = (uint32_t)(entry & mask) - 1;
+				uint32_t hash = ((uint32_t)entry & ~mask) | ((i - scan) & mask);
+				uint32_t value = (uint32_t)(entry >> 32u);
+				rhmap_iter iter = { map, hash };
+				#ifdef RHMAP_INLINE
+					rhmap_insert_inline(&iter, value);
+				#else
+					rhmap_insert(&iter, value);
+				#endif
+			}
+		}
+	}
+	return old_map.entries;
+}
+
+#ifdef RHMAP_INLINE
+RHMAP_INLINE void rhmap_remove_inline(rhmap_iter *iter)
+#else
+void rhmap_remove(rhmap_iter *iter)
+#endif
+{
+	rhmap *map = iter->map;
+	uint64_t *entries = map->entries;
+	uint32_t mask = map->mask, hash = iter->hash, scan = iter->scan;
+	uint32_t slot = (hash + scan - 1) & mask;
+	iter->scan = scan - 1;
+	for (;;) {
+		uint32_t next_slot = (slot + 1) & mask;
+		uint64_t next_entry = entries[next_slot];
+		uint32_t next_scan = (next_entry & mask);
+		if (next_scan <= 1) break;
+		entries[slot] = next_entry - 1;
+		slot = next_slot;
+	}
+	entries[slot] = 0;
+	map->size--;
+}
+
+#ifdef RHMAP_INLINE
+RHMAP_INLINE int rhmap_next_inline(rhmap_iter *iter, uint32_t *hash, uint32_t *value)
+#else
+int rhmap_next(rhmap_iter *iter, uint32_t *hash, uint32_t *value)
+#endif
+{
+	rhmap *map = iter->map;
+	uint64_t *entries = map->entries;
+	uint32_t mask = map->mask;
+	uint32_t scan = (iter->hash & mask) + iter->scan;
+	if (!mask) return 0;
+	while (scan != mask + 1) {
+		uint64_t entry = entries[scan & mask];
+		scan += 1;
+		if (entry) {
+			uint32_t ref_scan = (uint32_t)(entry & mask) - 1;
+			uint32_t ref_hash = ((uint32_t)entry & ~mask) | ((scan - ref_scan - 1) & mask);
+			*hash = ref_hash;
+			*value = (uint64_t)entry >> 32u;
+			iter->hash = ref_hash;
+			iter->scan = ref_scan + 1;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+#ifdef RHMAP_INLINE
+RHMAP_INLINE void rhmap_set_inline(rhmap_iter *iter, uint32_t value)
+#else
+void rhmap_set(rhmap_iter *iter, uint32_t value)
+#endif
+{
+	rhmap *map = iter->map;
+	uint32_t mask = map->mask, hash = iter->hash, scan = iter->scan;
+	uint32_t slot = (hash + scan - 1) & mask;
+	uint64_t *entries = map->entries;
+	entries[slot] = (entries[slot] & 0xffffffffu) | (uint64_t)value << 32u;
+}
+
+#ifdef RHMAP_INLINE
+RHMAP_INLINE void rhmap_update_inline(rhmap *map, uint32_t hash, uint32_t old_value, uint32_t new_value)
+#else
+void rhmap_update(rhmap *map, uint32_t hash, uint32_t old_value, uint32_t new_value)
+#endif
+{
+	uint64_t *entries = map->entries;
+	uint32_t mask = map->mask, scan = 0;
+	uint64_t old_entry = (uint64_t)old_value << 32u | (hash & ~mask);
+	uint64_t new_entry = (uint64_t)new_value << 32u | (hash & ~mask);
+	for (;;) {
+		uint32_t slot = (hash + scan) & mask;
+		scan += 1;
+		if (entries[slot] == old_entry + scan) {
+			entries[slot] = new_entry + scan;
+			return;
+		}
+	}
+}
+
+#endif
+#endif
+
 // -- DEFLATE implementation
 // Pretty much based on Sean Barrett's `stb_image` deflate
 
@@ -886,6 +1192,10 @@ static ufbxi_forceinline bool ufbxi_does_overflow(size_t total, size_t a, size_t
 
 static void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size, size_t n)
 {
+	// Always succeed with an emtpy non-NULL buffer for empty allocations
+	ufbx_assert(size > 0);
+	if (n == 0) return "";
+
 	size_t total = size * n;
 	ufbxi_check_return_err(ator->error, !ufbxi_does_overflow(total, size, n), NULL);
 	ufbxi_check_return_err(ator->error, total <= UFBXI_MAX_ALLOCATION_SIZE, NULL);
@@ -907,6 +1217,7 @@ static void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size, size_t n)
 static void ufbxi_free_size(ufbxi_allocator *ator, size_t size, void *ptr, size_t n);
 static void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t size, void *old_ptr, size_t old_n, size_t n)
 {
+	ufbx_assert(size > 0);
 	// realloc() with zero old/new size is equivalent to alloc()/free()
 	if (old_n == 0) return ufbxi_alloc_size(ator, size, n);
 	if (n == 0) { ufbxi_free_size(ator, size, old_ptr, old_n); return NULL; }
@@ -946,6 +1257,7 @@ static void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t size, void *old_pt
 
 static void ufbxi_free_size(ufbxi_allocator *ator, size_t size, void *ptr, size_t n)
 {
+	ufbx_assert(size > 0);
 	if (n == 0) return;
 
 	size_t total = size * n;
@@ -1114,8 +1426,12 @@ static ufbxi_forceinline uint32_t ufbxi_size_align_mask(size_t size)
 	return ((size ^ (size - 1)) >> 1) & 0x7;
 }
 
-static ufbxi_forceinline void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
+static void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
 {
+	// Always succeed with an emtpy non-NULL buffer for empty allocations
+	ufbx_assert(size > 0);
+	if (n == 0) return "";
+
 	b->num_items += n;
 
 	size_t total = size * n;
@@ -1152,6 +1468,7 @@ ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_push_size_copy(ufbxi_buf *b
 
 static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 {
+	ufbx_assert(size > 0);
 	b->num_items -= n;
 
 	char *ptr = (char*)dst;
@@ -1232,6 +1549,10 @@ static void *ufbxi_push_pop_size(ufbxi_buf *dst, ufbxi_buf *src, size_t size, si
 
 static void *ufbxi_make_array_size(ufbxi_buf *b, size_t size, size_t n)
 {
+	// Always succeed with an emtpy non-NULL buffer for empty allocations
+	ufbx_assert(size > 0);
+	if (n == 0) return "";
+
 	size_t total = size * n;
 	if (ufbxi_does_overflow(total, size, n)) return NULL;
 
@@ -1261,7 +1582,10 @@ static void ufbxi_buf_free(ufbxi_buf *buf)
 			chunk = next;
 		}
 	}
-	memset(buf, 0, sizeof(ufbxi_buf));
+	buf->chunk = NULL;
+	buf->pos = 0;
+	buf->size = 0;
+	buf->num_items = 0;
 }
 
 static void ufbxi_buf_clear(ufbxi_buf *buf)
@@ -1281,6 +1605,136 @@ static void ufbxi_buf_clear(ufbxi_buf *buf)
 #define ufbxi_pop(b, type, n, dst) ufbxi_pop_size((b), sizeof(type), (n), (dst))
 #define ufbxi_push_pop(dst, src, type, n) (type*)ufbxi_push_pop_size((dst), (src), sizeof(type), (n))
 #define ufbxi_make_array(b, type, n) (type*)ufbxi_make_array_size((b), sizeof(type), (n))
+
+// -- Hash map
+
+typedef struct {
+	ufbxi_allocator *ator;
+	size_t data_size;
+
+	void *items;
+	rhmap map;
+} ufbxi_map;
+
+static ufbxi_noinline bool ufbxi_map_grow_size_imp(ufbxi_map *map, size_t size, size_t min_size)
+{
+	size_t count, alloc_size;
+	rhmap_grow_inline(&map->map, &count, &alloc_size, min_size, 0.8);
+
+	// TODO: Overflow
+
+	size_t data_size = alloc_size + size * count;
+	char *data = ufbxi_alloc(map->ator, char, data_size);
+	ufbxi_check_return_err(map->ator->error, data, false);
+	void *items = data + alloc_size;
+	memcpy(items, map->items, size * map->map.size);
+
+	void *old_data = rhmap_rehash_inline(&map->map, count, alloc_size, data);
+	ufbxi_free(map->ator, char, old_data, map->data_size);
+
+	map->items = items;
+	map->data_size = data_size;
+
+	return true;
+}
+
+static ufbxi_forceinline bool ufbxi_map_grow_size(ufbxi_map *map, size_t size, size_t min_size)
+{
+	if (map->map.size < map->map.capacity) return true;
+	return ufbxi_map_grow_size_imp(map, size, min_size);
+}
+
+static ufbxi_forceinline void *ufbxi_map_find_size(ufbxi_map *map, size_t size, uint32_t *p_scan, uint32_t hash)
+{
+	rhmap_iter iter;
+	iter.map = &map->map;
+	iter.scan = *p_scan;
+	iter.hash = hash;
+
+	uint32_t index;
+	if (rhmap_find_inline(&iter, &index)) {
+		*p_scan = iter.scan;
+		return (char*)map->items + size * index;
+	} else {
+		return NULL;
+	}
+}
+
+static ufbxi_forceinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size, uint32_t scan, uint32_t hash)
+{
+	rhmap_iter iter;
+	iter.map = &map->map;
+	iter.scan = scan;
+	iter.hash = hash;
+	uint32_t index = map->map.size;
+	rhmap_insert_inline(&iter, index);
+	return (char*)map->items + size * index;
+}
+
+static void ufbxi_map_free(ufbxi_map *map)
+{
+	void *ptr = rhmap_reset_inline(&map->map);
+	ufbxi_free(map->ator, char, ptr, map->data_size);
+	map->items = NULL;
+}
+
+#define ufbxi_map_grow(map, type, min_size) ufbxi_map_grow_size((map), sizeof(type), (min_size))
+#define ufbxi_map_find(map, type, p_scan, hash) ufbxi_map_find_size((map), sizeof(type), (p_scan), (hash))
+#define ufbxi_map_insert(map, type, scan, hash) ufbxi_map_insert_size((map), sizeof(type), (scan), (hash))
+
+// -- Hash functions
+
+static uint32_t ufbxi_hash_string(const char *str, size_t length)
+{
+	uint32_t hash = 0;
+	uint32_t seed = UINT32_C(0x9e3779b9);
+	if (length >= 4) {
+		do {
+			uint32_t word = ufbxi_read_u32(str);
+			hash = ((hash << 5u | hash >> 27u) ^ word) * seed;
+			str += 4;
+			length -= 4;
+		} while (length >= 4);
+
+		uint32_t word = ufbxi_read_u32(str + length - 4);
+		hash = ((hash << 5u | hash >> 27u) ^ word) * seed;
+		return hash;
+	} else {
+		uint32_t word = 0;
+		if (length >= 1) word |= (uint32_t)(uint8_t)str[0] << 0;
+		if (length >= 2) word |= (uint32_t)(uint8_t)str[1] << 8;
+		if (length >= 3) word |= (uint32_t)(uint8_t)str[2] << 16;
+		hash = ((hash << 5u | hash >> 27u) ^ word) * seed;
+		return hash;
+	}
+}
+
+static ufbxi_forceinline uint32_t ufbxi_hash32(uint32_t x)
+{
+    x ^= x >> 16;
+    x *= UINT32_C(0x7feb352d);
+    x ^= x >> 15;
+    x *= UINT32_C(0x846ca68b);
+    x ^= x >> 16;
+    return x;	
+}
+
+static ufbxi_forceinline uint32_t ufbxi_hash64(uint64_t x)
+{
+    x ^= x >> 32;
+    x *= UINT64_C(0xd6e8feb86659fd93);
+    x ^= x >> 32;
+    x *= UINT64_C(0xd6e8feb86659fd93);
+    x ^= x >> 32;
+    return (uint32_t)x;
+}
+
+static ufbxi_forceinline uint32_t ufbxi_hash_uptr(uintptr_t ptr)
+{
+	return sizeof(ptr) == 8 ? ufbxi_hash64((uint64_t)ptr) : ufbxi_hash32((uint32_t)ptr);
+}
+
+#define ufbxi_hash_ptr(ptr) ufbxi_hash_uptr((uintptr_t)(ptr))
 
 // -- String constants
 
@@ -1319,19 +1773,6 @@ static ufbx_string ufbxi_strings[] = {
 };
 
 // -- Type definitions
-
-typedef struct {
-	uint32_t hash;
-	uint32_t length;
-	const char *data;
-} ufbxi_string_pool_entry;
-
-typedef struct {
-	ufbxi_string_pool_entry *entries;
-	size_t map_size;
-	size_t num_entries;
-	size_t max_entries;
-} ufbxi_string_pool;
 
 typedef struct ufbxi_node ufbxi_node;
 
@@ -1407,8 +1848,9 @@ typedef struct {
 	ufbxi_allocator ator_result;
 	ufbxi_allocator ator_tmp;
 
-	// String pool
-	ufbxi_string_pool string_pool;
+	// Temporary maps
+	ufbxi_map string_map;
+	ufbxi_map prop_type_map;
 
 	// Conversion source buffer
 	char *convert_buffer;
@@ -1418,7 +1860,6 @@ typedef struct {
 	ufbxi_buf tmp;
 	ufbxi_buf tmp_node;
 	ufbxi_buf tmp_template;
-	ufbxi_buf tmp_property;
 
 	// Result buffers
 	ufbxi_buf result;
@@ -1448,92 +1889,35 @@ static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, co
 
 // -- String pool
 
-static uint32_t ufbxi_string_hash(const char *str, size_t length)
-{
-	uint32_t hash = 0;
-	uint32_t seed = UINT32_C(0x9e3779b9);
-	if (length >= 4) {
-		do {
-			uint32_t word = ufbxi_read_u32(str);
-			hash = ((hash << 5u | hash >> 27u) ^ word) * seed;
-			str += 4;
-			length -= 4;
-		} while (length >= 4);
-
-		uint32_t word = ufbxi_read_u32(str + length - 4);
-		hash = ((hash << 5u | hash >> 27u) ^ word) * seed;
-		return hash;
-	} else {
-		uint32_t word = 0;
-		if (length >= 1) word |= (uint32_t)(uint8_t)str[0] << 0;
-		if (length >= 2) word |= (uint32_t)(uint8_t)str[1] << 8;
-		if (length >= 3) word |= (uint32_t)(uint8_t)str[2] << 16;
-		hash = ((hash << 5u | hash >> 27u) ^ word) * seed;
-		return hash;
-	}
-}
-
 ufbxi_nodiscard static const char *ufbxi_push_string_imp(ufbxi_context *uc, const char *str, size_t length, bool copy)
 {
 	if (length == 0) return "";
 	ufbxi_check_return(length <= uc->opts.max_string_length, NULL);
-	ufbxi_string_pool pool = uc->string_pool;
 
-	// Re-hash the old string pool if necessary
-	if (pool.num_entries == pool.max_entries) {
-		// TODO: Set the initial `map_size` based on experimental data
-		pool.map_size = ufbxi_max_sz(pool.map_size * 2, 512);
-		pool.entries = ufbxi_alloc_zero(&uc->ator_tmp, ufbxi_string_pool_entry, pool.map_size);
-		ufbxi_check_return(pool.entries, NULL);
+	// TODO: Set the initial size based on experimental data
+	ufbxi_check_return(ufbxi_map_grow(&uc->string_map, ufbx_string, 16), NULL);
+	ufbxi_check_return(uc->string_map.map.size <= uc->opts.max_strings, NULL);
 
-		// Use hard-coded 50% load factor
-		pool.max_entries = pool.map_size / 2;
-
-		// Insert all the previous entries into the new pool and free them
-		ufbxi_string_pool old_pool = uc->string_pool;
-		for (size_t i = 0; i < old_pool.map_size; i++) {
-			ufbxi_string_pool_entry *src = &old_pool.entries[i];
-			if (!src->length) continue;
-			for (uint32_t ix = src->hash; ; ix++) {
-				ufbxi_string_pool_entry *dst = &pool.entries[ix & (pool.map_size - 1)];
-				if (dst->length == 0) {
-					*dst = *src;
-					break;
-				}
-			}
-		}
-		ufbxi_free(&uc->ator_tmp, ufbxi_string_pool_entry, old_pool.entries, old_pool.map_size);
-
-		uc->string_pool = pool;
-	}
-
-	ufbxi_check_return(pool.num_entries <= uc->opts.max_strings, NULL);
-
-	uint32_t hash = ufbxi_string_hash(str, length);
-	for (uint32_t ix = hash; ; ix++) {
-		ufbxi_string_pool_entry *entry = &pool.entries[ix & (pool.map_size - 1)];
-		if (entry->hash == hash && entry->length == length && !memcmp(str, entry->data, length)) {
+	uint32_t hash = ufbxi_hash_string(str, length);
+	uint32_t scan = 0;
+	ufbx_string *entry;
+	while ((entry = ufbxi_map_find(&uc->string_map, ufbx_string, &scan, hash)) != NULL) {
+		if (entry->length == length && !memcmp(entry->data, str, length)) {
 			return entry->data;
-		} else if (entry->length == 0) {
-			uc->string_pool.num_entries = pool.num_entries + 1;
-
-			const char *data;
-			if (copy) {
-				char *dst = ufbxi_push(&uc->string_buf, char, length + 1);
-				ufbxi_check_return(dst, NULL);
-				memcpy(dst, str, length);
-				dst[length] = '\0';
-				data = dst;
-			} else {
-				data = str;
-			}
-
-			entry->data = data;
-			entry->hash = hash;
-			entry->length = (uint32_t)length;
-			return data;
 		}
 	}
+	entry = ufbxi_map_insert(&uc->string_map, ufbx_string, scan, hash);
+	entry->length = length;
+	if (copy) {
+		char *dst = ufbxi_push(&uc->string_buf, char, length + 1);
+		ufbxi_check_return(dst, NULL);
+		memcpy(dst, str, length);
+		dst[length] = '\0';
+		entry->data = dst;
+	} else {
+		entry->data = str;
+	}
+	return entry->data;
 }
 
 ufbxi_nodiscard static ufbxi_forceinline const char *ufbxi_push_string(ufbxi_context *uc, const char *str, size_t length)
@@ -2233,11 +2617,9 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 	}
 
 	// Pop children from `tmp_node` to a contiguous array
-	if (num_children) {
-		node->num_children = num_children;
-		node->children = ufbxi_push_pop(&uc->tmp, &uc->tmp_node, ufbxi_node, num_children);
-		ufbxi_check(node->children);
-	}
+	node->num_children = num_children;
+	node->children = ufbxi_push_pop(&uc->tmp, &uc->tmp_node, ufbxi_node, num_children);
+	ufbxi_check(node->children);
 
 	return 1;
 }
@@ -2662,11 +3044,9 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 		}
 
 		// Pop children from `tmp_node` to a contiguous array
-		if (num_children) {
-			node->children = ufbxi_push_pop(&uc->tmp, &uc->tmp_node, ufbxi_node, num_children);
-			ufbxi_check(node->children);
-			node->num_children = (uint32_t)num_children;
-		}
+		node->children = ufbxi_push_pop(&uc->tmp, &uc->tmp_node, ufbxi_node, num_children);
+		ufbxi_check(node->children);
+		node->num_children = (uint32_t)num_children;
 	}
 
 	return 1;
@@ -2729,6 +3109,59 @@ ufbxi_nodiscard static int ufbxi_load_strings(ufbxi_context *uc)
 	return 1;
 }
 
+typedef struct {
+	ufbx_prop_type type;
+	const char *name;
+} ufbxi_prop_type_name;
+
+const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
+	{ UFBX_PROP_BOOLEAN, "Boolean" },
+	{ UFBX_PROP_BOOLEAN, "bool" },
+	{ UFBX_PROP_INTEGER, "Integer" },
+	{ UFBX_PROP_INTEGER, "int" },
+	{ UFBX_PROP_INTEGER, "enum" },
+	{ UFBX_PROP_NUMBER, "Number" },
+	{ UFBX_PROP_NUMBER, "double" },
+	{ UFBX_PROP_VECTOR, "Vector" },
+	{ UFBX_PROP_VECTOR, "Vector3D" },
+	{ UFBX_PROP_COLOR, "Color" },
+	{ UFBX_PROP_COLOR, "ColorRGB" },
+	{ UFBX_PROP_STRING, "String" },
+	{ UFBX_PROP_STRING, "KString" },
+	{ UFBX_PROP_DATE_TIME, "DateTime" },
+	{ UFBX_PROP_TRANSLATION, "Lcl Translation" },
+	{ UFBX_PROP_ROTATION, "Lcl Rotation" },
+	{ UFBX_PROP_SCALING, "Lcl Scaling" },
+};
+
+ufbxi_nodiscard static int ufbxi_load_maps(ufbxi_context *uc)
+{
+	ufbxi_check(ufbxi_map_grow(&uc->prop_type_map, ufbxi_prop_type_name, ufbxi_arraycount(ufbxi_prop_type_names)));
+	ufbxi_for(const ufbxi_prop_type_name, name, ufbxi_prop_type_names, ufbxi_arraycount(ufbxi_prop_type_names)) {
+		const char *pooled = ufbxi_push_string_imp(uc, name->name, strlen(name->name), false);
+		ufbxi_check(pooled);
+		uint32_t hash = ufbxi_hash_ptr(pooled);
+		ufbxi_prop_type_name *entry = ufbxi_map_insert(&uc->prop_type_map, ufbxi_prop_type_name, 0, hash);
+		entry->type = name->type;
+		entry->name = pooled;
+	}
+
+	return 1;
+}
+
+static ufbx_prop_type ufbxi_get_prop_type(ufbxi_context *uc, const char *name)
+{
+	uint32_t hash = ufbxi_hash_ptr(name);
+	uint32_t scan = 0;
+	ufbxi_prop_type_name *entry;
+	while ((entry = ufbxi_map_find(&uc->prop_type_map, ufbxi_prop_type_name, &scan, hash)) != NULL) {
+		if (entry->name == name) {
+			return entry->type;
+		}
+	}
+	return UFBX_PROP_UNKNOWN;
+}
+
 // -- General parsing
 
 ufbxi_nodiscard static int ufbxi_parse(ufbxi_context *uc)
@@ -2769,6 +3202,23 @@ ufbxi_nodiscard static int ufbxi_parse(ufbxi_context *uc)
 	return 1;
 }
 
+// -- Find implementation
+
+static ufbxi_forceinline uint32_t ufbxi_get_name_key(const char *name, size_t len)
+{
+	uint32_t key = 0;
+	if (len >= 4) {
+		key = (uint8_t)name[0]<<24 | (uint8_t)name[1]<<16 | (uint8_t)name[2]<<8 | (uint8_t)name[3];
+	} else {
+		for (size_t i = 0; i < 4; i++) {
+			key <<= 8;
+			if (i < len) key |= (uint8_t)name[i];
+		}
+	}
+	return key;
+}
+
+
 // -- Reading the parsed data
 
 ufbxi_nodiscard static int ufbxi_read_header_extension(ufbxi_context *uc, ufbxi_node *header)
@@ -2778,8 +3228,91 @@ ufbxi_nodiscard static int ufbxi_read_header_extension(ufbxi_context *uc, ufbxi_
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_read_property(ufbxi_context *uc, ufbxi_node *node, ufbx_prop *prop, int version)
+{
+	ufbxi_check(ufbxi_get_val2(node, "SS", &prop->name, &prop->type_str));
+	uint32_t ix = 2;
+	if (version == 70) {
+		ufbxi_check(ufbxi_get_val_at(node, ix++, 'S', &prop->subtype_str));
+	} else {
+		prop->subtype_str = ufbx_empty_string;
+	}
+	ufbxi_check(ufbxi_get_val_at(node, ix++, 'S', &prop->flags));
+
+	prop->imp_key = ufbxi_get_name_key(node->name, node->name_len);
+	prop->type = ufbxi_get_prop_type(uc, prop->type_str.data);
+	if (prop->type == UFBX_PROP_UNKNOWN) {
+		prop->type = ufbxi_get_prop_type(uc, prop->subtype_str.data);
+	}
+	
+	return 1;
+}
+
+static int ufbxi_cmp_prop(const void *va, const void *vb)
+{
+	const ufbx_prop *a = (const ufbx_prop*)va, *b = (const ufbx_prop*)vb;
+	if (a->imp_key < b->imp_key) return -1;
+	if (a->imp_key > b->imp_key) return +1;
+	return strcmp(a->name.data, b->name.data);
+}
+
+ufbxi_nodiscard static int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *parent, ufbx_prop_list *props)
+{
+	int version = 70;
+	ufbxi_node *node = ufbxi_find_child(parent, ufbxi_Properties70);
+	if (!node) {
+		node = ufbxi_find_child(parent, ufbxi_Properties60);
+		if (!node) {
+			// No properties found, not an error
+			return 1;
+		}
+		version = 60;
+	}
+
+	// Parse properties directly to `result` buffer and linearize them using `ufbxi_make_array()`
+	ufbxi_check(node->num_children < uc->opts.max_properties);
+	ufbxi_for(ufbxi_node, prop_node, node->children, node->num_children) {
+		ufbx_prop *prop = ufbxi_push_zero(&uc->result, ufbx_prop, 1);
+		ufbxi_check(prop);
+		ufbxi_check(ufbxi_read_property(uc, prop_node, prop, version));
+	}
+
+	props->data = ufbxi_make_array(&uc->result, ufbx_prop, node->num_children);
+	props->size = node->num_children;
+	ufbxi_check(props->data);
+
+	// Sort the properties by `name_hash`
+	qsort(props->data, props->size, sizeof(ufbx_prop), ufbxi_cmp_prop);
+
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc, ufbxi_node *definitions)
 {
+	ufbxi_for(ufbxi_node, object, definitions->children, definitions->num_children) {
+		if (object->name != ufbxi_ObjectType) continue;
+
+		ufbx_template *tmpl = ufbxi_push_zero(&uc->tmp_template, ufbx_template, 1);
+		ufbxi_check(tmpl);
+		ufbxi_check(ufbxi_get_val1(object, "S", &tmpl->type_str));
+
+		// Pre-7000 FBX versions don't have property templates, they just have
+		// the object counts by themselves.
+		ufbxi_node *props = ufbxi_find_child(object, ufbxi_PropertyTemplate);
+		if (props) {
+			ufbxi_check(ufbxi_get_val1(props, "S", &tmpl->name));
+			ufbxi_check(ufbxi_read_properties(uc, props, &tmpl->props));
+		}
+	}
+
+	// Copy the templates to the destination buffer
+	size_t num = uc->tmp_template.num_items;
+	uc->scene.templates.data = ufbxi_push_pop(&uc->result, &uc->tmp_template, ufbx_template, num);
+	uc->scene.templates.size = num;
+	ufbxi_check(uc->scene.templates.data);
+
+	ufbxi_buf_free(&uc->tmp_template);
+
 	return 1;
 }
 
@@ -2807,17 +3340,15 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 	ufbxi_check(connections);
 	ufbxi_check(ufbxi_read_definitions(uc, connections));
 
-
 	return 1;
 }
-
 
 // -- Loading
 
 ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 {
 	ufbxi_check(ufbxi_load_strings(uc));
-	// ufbxi_check(ufbxi_load_maps(uc));
+	ufbxi_check(ufbxi_load_maps(uc));
 	ufbxi_check(ufbxi_parse(uc));
 	ufbxi_check(ufbxi_read_root(uc));
 
@@ -2849,8 +3380,7 @@ static void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->tmp);
 	ufbxi_buf_free(&uc->tmp_node);
 	ufbxi_buf_free(&uc->tmp_template);
-	ufbxi_buf_free(&uc->tmp_property);
-	ufbxi_free(&uc->ator_tmp, ufbxi_string_pool_entry, uc->string_pool.entries, uc->string_pool.map_size);
+	ufbxi_map_free(&uc->string_map);
 	ufbxi_free(&uc->ator_tmp, char, uc->read_buffer, uc->read_buffer_size);
 	ufbxi_free(&uc->ator_tmp, char, uc->convert_buffer, uc->convert_buffer_size);
 }
@@ -2869,6 +3399,7 @@ static void ufbxi_expand_defaults(ufbx_load_opts *opts)
 	ufbxi_default_opt(max_result_memory, 0x10000000);
 	ufbxi_default_opt(max_ascii_token_length, 0x10000000);
 	ufbxi_default_opt(read_buffer_size, 4096);
+	ufbxi_default_opt(max_properties, 0x10000000);
 	ufbxi_default_opt(max_string_length, 0x10000000);
 	ufbxi_default_opt(max_strings, 0x10000000);
 	ufbxi_default_opt(max_node_depth, 0x10000000);
@@ -2905,10 +3436,12 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->ator_result.ator = uc->opts.result_allocator;
 	uc->ator_result.max_size = uc->opts.max_result_memory;
 
+	uc->string_map.ator = &uc->ator_tmp;
+	uc->prop_type_map.ator = &uc->ator_tmp;
+
 	uc->tmp.ator = &uc->ator_tmp;
 	uc->tmp_node.ator = &uc->ator_tmp;
 	uc->tmp_template.ator = &uc->ator_tmp;
-	uc->tmp_property.ator = &uc->ator_tmp;
 
 	uc->result.ator = &uc->ator_result;
 	uc->string_buf.ator = &uc->ator_result;
