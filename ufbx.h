@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <string.h>
 
 #if defined(_MSC_VER)
 	#pragma warning(push)
@@ -37,10 +38,14 @@ typedef struct ufbx_face ufbx_face;
 typedef struct ufbx_node ufbx_node;
 typedef struct ufbx_model ufbx_model;
 typedef struct ufbx_mesh ufbx_mesh;
+typedef struct ufbx_anim_curve ufbx_anim_curve;
 typedef struct ufbx_template ufbx_template;
 typedef struct ufbx_prop ufbx_prop;
 typedef struct ufbx_uv_set ufbx_uv_set;
 typedef struct ufbx_color_set ufbx_color_set;
+typedef enum ufbx_interpolation ufbx_interpolation;
+typedef struct ufbx_tangent ufbx_tangent;
+typedef struct ufbx_keyframe ufbx_keyframe;
 
 typedef struct ufbx_node_list { ufbx_node **data; size_t size; } ufbx_node_list;
 typedef struct ufbx_model_list { ufbx_model **data; size_t size; } ufbx_model_list;
@@ -49,6 +54,7 @@ typedef struct ufbx_template_list { ufbx_template *data; size_t size; } ufbx_tem
 typedef struct ufbx_prop_list { ufbx_prop *data; size_t size; } ufbx_prop_list;
 typedef struct ufbx_uv_set_list { ufbx_uv_set *data; size_t size; } ufbx_uv_set_list;
 typedef struct ufbx_color_set_list { ufbx_color_set *data; size_t size; } ufbx_color_set_list;
+typedef struct ufbx_keyframe_list { ufbx_keyframe *data; size_t size; } ufbx_keyframe_list;
 
 typedef struct ufbx_error_frame {
 	uint32_t source_line;
@@ -143,9 +149,7 @@ typedef enum ufbx_node_type {
 	UFBX_NODE_TEXTURE,
 	UFBX_NODE_BONE,
 	UFBX_NODE_SKIN,
-	UFBX_NODE_ANIMATION,
-	UFBX_NODE_ANIMATION_CURVE,
-	UFBX_NODE_ANIMATION_LAYER,
+	UFBX_NODE_ANIM_CURVE,
 	UFBX_NODE_ATTRIBUTE,
 
 	UFBX_NUM_NODE_TYPES,
@@ -261,6 +265,31 @@ struct ufbx_mesh {
 	ufbx_color_set_list color_sets;
 };
 
+enum ufbx_interpolation {
+	UFBX_INTERPOLATION_CONSTANT_PREV,
+	UFBX_INTERPOLATION_CONSTANT_NEXT,
+	UFBX_INTERPOLATION_LINEAR,
+	UFBX_INTERPOLATION_CUBIC,
+};
+
+struct ufbx_tangent {
+	float dx;
+	float dy;
+};
+
+struct ufbx_keyframe {
+	double time;
+	ufbx_real value;
+	ufbx_interpolation interpolation;
+	ufbx_tangent left;
+	ufbx_tangent right;
+};
+
+struct ufbx_anim_curve {
+	ufbx_node node;
+	ufbx_keyframe_list keyframes;
+};
+
 typedef struct ufbx_metadata {
 	bool ascii;
 	uint32_t version;
@@ -316,15 +345,32 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts
 ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error);
 void ufbx_free_scene(ufbx_scene *scene);
 
-ufbx_prop *ufbx_get_prop_from_list(const ufbx_prop_list *list, const char *name);
 ufbx_prop *ufbx_get_prop_from_list_len(const ufbx_prop_list *list, const char *name, size_t len);
-ufbx_prop *ufbx_get_prop(const ufbx_node *node, const char *name);
 ufbx_prop *ufbx_get_prop_len(const ufbx_node *node, const char *name, size_t len);
+
+ufbx_inline ufbx_prop *ufbx_get_prop_from_list(const ufbx_prop_list *list, const char *name) {
+	return ufbx_get_prop_from_list_len(list, name, strlen(name));
+}
+ufbx_inline ufbx_prop *ufbx_get_prop(const ufbx_node *node, const char *name) {
+	return ufbx_get_prop_len(node, name, strlen(name));
+}
 
 void ufbx_transform_mul(ufbx_transform *dst, const ufbx_transform *l, const ufbx_transform *r);
 ufbx_vec3 ufbx_transform_position(const ufbx_transform *t, ufbx_vec3 v);
 ufbx_vec3 ufbx_transform_direction(const ufbx_transform *t, ufbx_vec3 v);
 ufbx_vec3 ufbx_transform_normal(const ufbx_transform *t, ufbx_vec3 v);
+
+ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *c, ufbx_real time);
+ufbx_real ufbx_evaluate_real_len(const ufbx_node *node, ufbx_real time, const char *name, size_t len);
+ufbx_vec3 ufbx_evaluate_vec3_len(const ufbx_node *node, ufbx_real time, const char *name, size_t len);
+ufbx_transform ufbx_evaluate_transform(const ufbx_node *node, ufbx_real time);
+
+ufbx_inline ufbx_real ufbx_evaluate_real(const ufbx_node *node, ufbx_real time, const char *name) {
+	return ufbx_evaluate_real_len(node, time, name, strlen(name));
+}
+ufbx_inline ufbx_vec3 ufbx_evaluate_vec3(const ufbx_node *node, ufbx_real time, const char *name) {
+	return ufbx_evaluate_vec3_len(node, time, name, strlen(name));
+}
 
 ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }
 ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }

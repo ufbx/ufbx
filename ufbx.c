@@ -1744,15 +1744,26 @@ static const char ufbxi_Creator[] = "Creator";
 static const char ufbxi_Definitions[] = "Definitions";
 static const char ufbxi_Objects[] = "Objects";
 static const char ufbxi_Connections[] = "Connections";
+static const char ufbxi_Takes[] = "Takes";
 static const char ufbxi_ObjectType[] = "ObjectType";
 static const char ufbxi_PropertyTemplate[] = "PropertyTemplate";
 static const char ufbxi_Properties60[] = "Properties60";
 static const char ufbxi_Properties70[] = "Properties70";
 static const char ufbxi_Model[] = "Model";
 static const char ufbxi_Geometry[] = "Geometry";
+static const char ufbxi_AnimationCurve[] = "AnimationCurve";
 static const char ufbxi_Vertices[] = "Vertices";
 static const char ufbxi_PolygonVertexIndex[] = "PolygonVertexIndex";
 static const char ufbxi_Edges[] = "Edges";
+static const char ufbxi_KeyTime[] = "KeyTime";
+static const char ufbxi_KeyValueFloat[] = "KeyValueFloat";
+static const char ufbxi_KeyAttrFlags[] = "KeyAttrFlags";
+static const char ufbxi_KeyAttrDataFloat[] = "KeyAttrDataFloat";
+static const char ufbxi_KeyAttrRefCount[] = "KeyAttrRefCount";
+static const char ufbxi_Take[] = "Take";
+static const char ufbxi_Channel[] = "Channel";
+static const char ufbxi_Key[] = "Key";
+static const char ufbxi_KeyCount[] = "KeyCount";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FBXHeaderExtension, sizeof(ufbxi_FBXHeaderExtension) - 1 },
@@ -1761,15 +1772,26 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Definitions, sizeof(ufbxi_Definitions) - 1 },
 	{ ufbxi_Objects, sizeof(ufbxi_Objects) - 1 },
 	{ ufbxi_Connections, sizeof(ufbxi_Connections) - 1 },
+	{ ufbxi_Takes, sizeof(ufbxi_Takes) - 1 },
 	{ ufbxi_ObjectType, sizeof(ufbxi_ObjectType) - 1 },
 	{ ufbxi_PropertyTemplate, sizeof(ufbxi_PropertyTemplate) - 1 },
 	{ ufbxi_Properties60, sizeof(ufbxi_Properties60) - 1 },
 	{ ufbxi_Properties70, sizeof(ufbxi_Properties70) - 1 },
 	{ ufbxi_Model, sizeof(ufbxi_Model) - 1 },
 	{ ufbxi_Geometry, sizeof(ufbxi_Geometry) - 1 },
+	{ ufbxi_AnimationCurve, sizeof(ufbxi_AnimationCurve) - 1 },
 	{ ufbxi_Vertices, sizeof(ufbxi_Vertices) - 1 },
 	{ ufbxi_PolygonVertexIndex, sizeof(ufbxi_PolygonVertexIndex) - 1 },
 	{ ufbxi_Edges, sizeof(ufbxi_Edges) - 1 },
+	{ ufbxi_KeyTime, sizeof(ufbxi_KeyTime) - 1 },
+	{ ufbxi_KeyValueFloat, sizeof(ufbxi_KeyValueFloat) - 1 },
+	{ ufbxi_KeyAttrFlags, sizeof(ufbxi_KeyAttrFlags) - 1 },
+	{ ufbxi_KeyAttrDataFloat, sizeof(ufbxi_KeyAttrDataFloat) - 1 },
+	{ ufbxi_KeyAttrRefCount, sizeof(ufbxi_KeyAttrRefCount) - 1 },
+	{ ufbxi_Take, sizeof(ufbxi_Take) - 1 },
+	{ ufbxi_Channel, sizeof(ufbxi_Channel) - 1 },
+	{ ufbxi_Key, sizeof(ufbxi_Key) - 1 },
+	{ ufbxi_KeyCount, sizeof(ufbxi_KeyCount) - 1 },
 };
 
 // -- Type definitions
@@ -1873,6 +1895,8 @@ typedef struct {
 	ufbx_error error;
 
 	ufbx_inflate_retain *inflate_retain;
+
+	double ktime_to_sec;
 
 } ufbxi_context;
 
@@ -2034,9 +2058,14 @@ static int ufbxi_read_to(ufbxi_context *uc, void *dst, size_t size)
 	// If there's data left to copy try to read from user IO
 	if (size > 0) {
 		uc->data_offset += uc->data - uc->data_begin;
+
+		uc->data_begin = uc->data = NULL;
+		uc->data_size = 0;
 		ufbxi_check(uc->read_fn);
 		len = uc->read_fn(uc->read_user, ptr, size);
 		ufbxi_check(len == size);
+
+		uc->data_offset += size;
 	}
 
 	return 1;
@@ -2110,6 +2139,17 @@ ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, 
 	}
 }
 
+ufbxi_nodiscard ufbxi_forceinline static ufbxi_value_array *ufbxi_get_array(ufbxi_node *node, char fmt)
+{
+	if (node->value_type_mask != UFBXI_VALUE_ARRAY) return NULL;
+	ufbxi_value_array *array = node->array;
+	if (fmt != '?') {
+		fmt = ufbxi_normalize_array_type(fmt);
+		if (array->type != fmt) return NULL;
+	}
+	return array;
+}
+
 ufbxi_nodiscard static ufbxi_forceinline int ufbxi_get_val1(ufbxi_node *node, const char *fmt, void *v0)
 {
 	if (!ufbxi_get_val_at(node, 0, fmt[0], v0)) return 0;
@@ -2148,14 +2188,27 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_find_val2(ufbxi_node *node, c
 	return 1;
 }
 
+ufbxi_nodiscard static ufbxi_forceinline ufbxi_value_array *ufbxi_find_array(ufbxi_node *node, const char *name, char fmt)
+{
+	ufbxi_node *child = ufbxi_find_child(node, name);
+	if (!child) return NULL;
+	return ufbxi_get_array(child, fmt);
+}
+
+
 // -- Parsing state machine
 
 typedef enum {
 	UFBXI_PARSE_ROOT,
 	UFBXI_PARSE_DEFINITIONS,
 	UFBXI_PARSE_OBJECTS,
+	UFBXI_PARSE_TAKES,
 	UFBXI_PARSE_MODEL,
 	UFBXI_PARSE_GEOMETRY,
+	UFBXI_PARSE_ANIMATION_CURVE,
+	UFBXI_PARSE_TAKE,
+	UFBXI_PARSE_TAKE_OBJECT,
+	UFBXI_PARSE_CHANNEL,
 	UFBXI_PARSE_UNKNOWN,
 } ufbxi_parse_state;
 
@@ -2171,11 +2224,28 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 	case UFBXI_PARSE_ROOT:
 		if (name == ufbxi_Definitions) return UFBXI_PARSE_DEFINITIONS;
 		if (name == ufbxi_Objects) return UFBXI_PARSE_OBJECTS;
+		if (name == ufbxi_Takes) return UFBXI_PARSE_TAKES;
 		break;
 
 	case UFBXI_PARSE_OBJECTS:
 		if (name == ufbxi_Model) return UFBXI_PARSE_MODEL;
 		if (name == ufbxi_Geometry) return UFBXI_PARSE_GEOMETRY;
+		if (name == ufbxi_AnimationCurve) return UFBXI_PARSE_ANIMATION_CURVE;
+		break;
+
+	case UFBXI_PARSE_TAKES:
+		if (name == ufbxi_Take) return UFBXI_PARSE_TAKE;
+		break;
+
+	case UFBXI_PARSE_TAKE:
+		return UFBXI_PARSE_TAKE_OBJECT;
+
+	case UFBXI_PARSE_TAKE_OBJECT:
+		if (name == ufbxi_Channel) return UFBXI_PARSE_CHANNEL;
+		break;
+
+	case UFBXI_PARSE_CHANNEL:
+		if (name == ufbxi_Channel) return UFBXI_PARSE_CHANNEL;
 		break;
 
 	}
@@ -2183,7 +2253,7 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 	return UFBXI_PARSE_UNKNOWN;
 }
 
-static bool ufbxi_is_array_node(ufbxi_parse_state parent, const char *name, ufbxi_array_info *info)
+static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, const char *name, ufbxi_array_info *info)
 {
 	switch (parent) {
 
@@ -2199,6 +2269,39 @@ static bool ufbxi_is_array_node(ufbxi_parse_state parent, const char *name, ufbx
 			return true;
 		} else if (name == ufbxi_Edges) {
 			info->type = 'i';
+			info->result = false;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_ANIMATION_CURVE:
+		if (name == ufbxi_KeyTime) {
+			info->type = 'l';
+			info->result = false;
+			return true;
+		} else if (name == ufbxi_KeyValueFloat) {
+			info->type = 'r';
+			info->result = false;
+			return true;
+		} else if (name == ufbxi_KeyAttrFlags) {
+			info->type = 'i';
+			info->result = false;
+			return true;
+		} else if (name == ufbxi_KeyAttrDataFloat) {
+			// ?? Float data of this specific array is represented as integers in ASCII
+			info->type = uc->from_ascii ? 'i' : 'f';
+			info->result = false;
+			return true;
+		} else if (name == ufbxi_KeyAttrRefCount) {
+			info->type = 'i';
+			info->result = false;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_CHANNEL:
+		if (name == ufbxi_Key) {
+			info->type = 'd';
 			info->result = false;
 			return true;
 		}
@@ -2277,7 +2380,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 			ufbxi_check(val); \
 			switch (*val++) { \
 				case 'C': \
-				case 'B': ufbxi_convert_parse(m_dst, 1, ufbxi_parse_bool(*val)); break; \
+				case 'B': ufbxi_convert_parse(m_dst, 1, *val); break; \
 				case 'Y': ufbxi_convert_parse(m_dst, 2, ufbxi_read_i16(val)); break; \
 				case 'I': ufbxi_convert_parse(m_dst, 4, ufbxi_read_i32(val)); break; \
 				case 'L': ufbxi_convert_parse(m_dst, 8, ufbxi_read_i64(val)); break; \
@@ -2297,7 +2400,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 			ufbxi_check(val);
 			switch (*val++) {
 				case 'C':
-				case 'B': ufbxi_convert_parse(char, 1, ufbxi_parse_bool(*val)); break;
+				case 'B': ufbxi_convert_parse(char, 1, *val != 0); break;
 				case 'Y': ufbxi_convert_parse(char, 2, ufbxi_read_i16(val) != 0); break;
 				case 'I': ufbxi_convert_parse(char, 4, ufbxi_read_i32(val) != 0); break;
 				case 'L': ufbxi_convert_parse(char, 8, ufbxi_read_i64(val) != 0); break;
@@ -2377,7 +2480,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 	// Check if the values of the node we're parsing currently should be
 	// treated as an array.
 	ufbxi_array_info arr_info;
-	if (ufbxi_is_array_node(parent_state, name, &arr_info)) {
+	if (ufbxi_is_array_node(uc, parent_state, name, &arr_info)) {
 
 		// Normalize the array type (eg. 'r' to 'f'/'d' depending on the build)
 		// and get the per-element size of the array.
@@ -2525,7 +2628,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 
 			case 'C': case 'B':
 				type_mask |= UFBXI_VALUE_NUMBER << (i*2);
-				vals[i].f = (double)(vals[i].i = ufbxi_parse_bool(data[1]));
+				vals[i].f = (double)(vals[i].i = (int64_t)data[1]);
 				ufbxi_consume_bytes(uc, 2);
 				break;
 
@@ -2886,7 +2989,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 	// Check if the values of the node we're parsing currently should be
 	// treated as an array.
 	ufbxi_array_info arr_info;
-	if (ufbxi_is_array_node(parent_state, name, &arr_info)) {
+	if (ufbxi_is_array_node(uc, parent_state, name, &arr_info)) {
 		arr_type = ufbxi_normalize_array_type(arr_info.type);
 		arr_buf = arr_info.result ? &uc->result : &uc->tmp;
 
@@ -2965,13 +3068,8 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 		} else if (ufbxi_ascii_accept(ua, UFBXI_ASCII_BARE_WORD)) {
 
 			int64_t val = 0;
-			if (tok->str_len == 1 && (tok->str_data[0] == 'Y' || tok->str_data[0] == 'T' || tok->str_data[0] == '1')) {
-				val = 1;
-			} else if (tok->str_len == 1 && (tok->str_data[0] == 'N' || tok->str_data[0] == 'F' || tok->str_data[0] == '0')) {
-				val = 0;
-			} else {
-				// Ignore other bare words that tend to appear, treat them as 0
-				// TODO: What does eg. "Shading: W" mean?
+			if (tok->str_len >= 1) {
+				val = (int64_t)tok->str_data[0];
 			}
 
 			switch (arr_type) {
@@ -3225,6 +3323,9 @@ ufbxi_nodiscard static int ufbxi_read_header_extension(ufbxi_context *uc, ufbxi_
 {
 	ufbxi_ignore(ufbxi_find_val1(header, ufbxi_Creator, "S", &uc->scene.metadata.creator));
 
+	// TODO: Read TCDefinition and adjust timestamps
+	uc->ktime_to_sec = (1.0 / 46186158000.0);
+
 	return 1;
 }
 
@@ -3316,8 +3417,275 @@ ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc, ufbxi_node 
 	return 1;
 }
 
+static float ufbxi_convert_weight(const float *p_value)
+{
+	// Even though FBX stores the values as floats _and_ the record is named
+	// KeyAttrDataFloat, for some reason tangents weights are stored as integers.
+	int32_t val_i = *(int32_t*)p_value;
+}
+
+ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_node *node, ufbx_node *desc)
+{
+	ufbx_anim_curve *curve = ufbxi_push_zero(&uc->result, ufbx_anim_curve, 1);
+	curve->node = *desc;
+	curve->node.type = UFBX_NODE_ANIM_CURVE;
+
+	ufbxi_value_array *times, *values, *flags, *attrs, *refs;
+	ufbxi_check(times = ufbxi_find_array(node, ufbxi_KeyTime, 'l'));
+	ufbxi_check(values = ufbxi_find_array(node, ufbxi_KeyValueFloat, 'r'));
+	ufbxi_check(flags = ufbxi_find_array(node, ufbxi_KeyAttrFlags, 'i'));
+	ufbxi_check(attrs = ufbxi_find_array(node, ufbxi_KeyAttrDataFloat, '?'));
+	ufbxi_check(refs = ufbxi_find_array(node, ufbxi_KeyAttrRefCount, 'i'));
+
+	// Time and value arrays that define the keyframes should be parallel
+	ufbxi_check(times->size == values->size);
+
+	// Flags and attributes are run-length encoded where KeyAttrRefCount (refs)
+	// is an array that describes how many times to repeat a given flag/attribute.
+	// Attributes consist of 4 32-bit floating point values per key.
+	ufbxi_check(flags->size == refs->size);
+	ufbxi_check(attrs->size == refs->size * 4u);
+
+	size_t num_keys = times->size;
+	ufbx_keyframe *keys = ufbxi_push(&uc->result, ufbx_keyframe, num_keys);
+	ufbxi_check(keys);
+
+	curve->keyframes.data = keys;
+	curve->keyframes.size = num_keys;
+
+	int64_t *p_time = (int64_t*)times->data;
+	ufbx_real *p_value = (ufbx_real*)values->data;
+	int32_t *p_flag = (int32_t*)flags->data;
+	float *p_attr = (float*)attrs->data;
+	int32_t *p_ref = (int32_t*)refs->data;
+
+	// The previous key defines the weight/slope of the left tangent
+	float slope_left = 0.0f;
+	float weight_left = 0.333333f;
+
+	double prev_time = 0.0;
+	double next_time = 0.0;
+
+	if (num_keys > 0) {
+		next_time = (double)p_time[0] * uc->ktime_to_sec;
+	}
+
+	for (size_t i = 0; i < num_keys; i++) {
+		ufbx_keyframe *key = &keys[i];
+
+		key->time = next_time;
+		key->value = *p_value;
+
+		if (i + 1 < num_keys) {
+			next_time = (double)p_time[1] * uc->ktime_to_sec;
+		}
+
+		uint32_t flags = (uint32_t)*p_flag;
+
+		float slope_right = p_attr[0];
+		float weight_right = 0.333333f;
+		float next_slope_left = p_attr[1];
+		float next_weight_left = 0.333333f;
+
+		if (flags & 0x3000000) {
+			// At least one of the tangents is weighted. The weights are encoded as
+			// two 0.4 _decimal_ fixed point values that are packed into 32 bits and
+			// interpreted as a 32-bit float.
+			uint32_t packed_weights;
+			memcpy(&packed_weights, &p_attr[2], sizeof(uint32_t));
+
+			if (flags & 0x1000000) {
+				// Right tangent is weighted
+				weight_right = (float)(packed_weights & 0xffff) * 0.0001f;
+			}
+
+			if (flags & 0x2000000) {
+				// Next left tangent is weighted
+				next_weight_left = (float)(packed_weights >> 16) * 0.0001f;
+			}
+		}
+
+		if (flags & 0x2) {
+			// Constant interpolation: Set cubic tangents to flat.
+
+			if (flags & 0x100) {
+				// Take constant value from next key
+				key->interpolation = UFBX_INTERPOLATION_CONSTANT_NEXT;
+
+			} else {
+				// Take constant value from the previous key
+				key->interpolation = UFBX_INTERPOLATION_CONSTANT_PREV;
+			}
+
+			weight_right = next_weight_left = 0.333333f;
+			slope_right = next_slope_left = 0.0f;
+
+		} else if (flags & 0x8) {
+			// Cubic interpolation
+			key->interpolation = UFBX_INTERPOLATION_CUBIC;
+
+			if (flags & 0x400) {
+				// User tangents
+
+				if (flags & 0x800) {
+					// Broken tangents: No need to modify slopes
+				} else {
+					// Unified tangents: Use right slope for both sides
+					slope_left = slope_right;
+				}
+
+			} else {
+				// Automatic (0x100) or unknown tangents
+				// TODO: TCB tangents (0x200)
+				// TODO: Auto break (0x800)
+
+				if (i > 0 && i + 1 < num_keys && key->time > prev_time && next_time > key->time) {
+					// In between two keyframes: Set the initial slope to be the difference between
+					// the two keyframes. Prevent overshooting by clamping the slope in case either
+					// tangent goes above/below the endpoints.
+					double slope = (p_value[1] - p_value[-1]) / (next_time - prev_time);
+
+					// Split the slope to sign and a non-negative absolute value
+					double slope_sign = slope >= 0.0 ? 1.0 : -1.0;
+					double abs_slope = slope_sign * slope;
+
+					// Find limits for the absolute value of the sign
+					double max_left = slope_sign * (key->value - p_value[-1]) / (weight_left * (key->time - prev_time));
+					double max_right = slope_sign * (p_value[1] - key->value) / (weight_right * (next_time - key->time));
+
+					// Clamp negative values and NaNs (in case weight*delta_time underflows) to zero 
+					if (!(max_left > 0.0)) max_left = 0.0;
+					if (!(max_right > 0.0)) max_right = 0.0;
+
+					// Clamp the absolute slope from both sides
+					if (abs_slope > max_left) abs_slope = max_left;
+					if (abs_slope > max_right) abs_slope = max_right;
+
+					slope_left = slope_right = (float)(slope_sign * abs_slope);
+				} else {
+					// Endpoint / invalid keyframe: Set both slopes to zero
+					slope_left = slope_right = 0.0f;
+				}
+
+			}
+
+		} else {
+			// Linear (0x4) or unknown interpolation: Set cubic tangents to match
+			// the linear interpolation with weights of 1/3.
+			key->interpolation = UFBX_INTERPOLATION_LINEAR;
+
+			weight_right = 0.333333f;
+			next_weight_left = 0.333333f;
+
+			if (next_time > key->time) {
+				double slope = (p_value[1] - key->value) / (next_time - key->time);
+				slope_right = next_slope_left = (float)slope;
+			} else {
+				slope_right = next_slope_left = 0.0f;
+			}
+		}
+
+		// Set the tangents based on weights (dx relative to the time difference
+		// between the previous/next key) and slope (simply dy = slope * dx)
+
+		if (key->time > prev_time) {
+			key->left.dx = (float)(weight_left * (key->time - prev_time));
+			key->left.dy = key->left.dx * slope_left;
+		} else {
+			key->left.dx = 0.0f;
+			key->left.dy = 0.0f;
+		}
+
+		if (next_time > key->time) {
+			key->right.dx = (float)(weight_right * (next_time - key->time));
+			key->right.dy = key->right.dx * slope_right;
+		} else {
+			key->right.dx = 0.0f;
+			key->right.dy = 0.0f;
+		}
+
+		slope_left = next_slope_left;
+		weight_left = next_weight_left;
+		prev_time = key->time;
+
+		// Decrement attribute refcount and potentially move to the next one.
+		int32_t refs = --*p_ref;
+		ufbxi_check(refs >= 0);
+		if (refs == 0) {
+			p_flag++;
+			p_attr += 4;
+			p_ref++;
+		}
+		p_time++;
+		p_value++;
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_string type_and_name, ufbx_string *type, ufbx_string *name)
+{
+	// Name and type are packed in a single property as Type::Name (in ASCII)
+	// or Type\x01\x02Name (in binary)
+	const char *sep = uc->from_ascii ? "::" : "\x00\x01";
+	size_t type_end;
+	for (type_end = 2; type_end < type_and_name.length; type_end++) {
+		const char *ch = type_and_name.data + type_end - 2;
+		if (ch[0] == sep[0] && ch[1] == sep[1]) break;
+	}
+
+	// ???: ASCII and binary store type and name in different order
+	if (type_end < type_and_name.length) {
+		if (uc->from_ascii) {
+			name->data = type_and_name.data + type_end;
+			name->length = type_and_name.length - type_end;
+			type->data = type_and_name.data;
+			type->length = type_end - 2;
+		} else {
+			name->data = type_and_name.data;
+			name->length = type_end - 2;
+			type->data = type_and_name.data + type_end;
+			type->length = type_and_name.length - type_end;
+		}
+	} else {
+		*type = type_and_name;
+		name->data = NULL;
+		name->length = 0;
+	}
+
+	ufbxi_check(ufbxi_push_string_place_str(uc, type));
+	ufbxi_check(ufbxi_push_string_place_str(uc, name));
+
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc, ufbxi_node *objects)
 {
+	ufbx_node node = { 0 };
+	ufbxi_for(ufbxi_node, object, objects->children, objects->num_children) {
+		ufbx_string type_and_name;
+
+		// Failing to parse the object properties is not an error since
+		// there's some weird objects mixed in every now and then.
+		// FBX version 7000 and up uses 64-bit unique IDs per object,
+		// older FBX versions just use name/type pairs, which we can
+		// use as IDs since all strings are interned into a string pool.
+		if (uc->version >= 7000) {
+			if (!ufbxi_get_val3(object, "LSS", &node.id, &type_and_name, &node.sub_type_str)) continue;
+		} else {
+			if (!ufbxi_get_val2(object, "SS", &type_and_name, &node.sub_type_str)) continue;
+			node.id = (uintptr_t)type_and_name.data;
+		}
+
+		ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &node.type_str, &node.name));
+		ufbxi_check(ufbxi_read_properties(uc, object, &node.props));
+
+		const char *name = object->name;
+		if (name == ufbxi_AnimationCurve) {
+			ufbxi_check(ufbxi_read_animation_curve(uc, object, &node));
+		}
+	}
+
 	return 1;
 }
 
@@ -3498,11 +3866,19 @@ ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufb
 {
 	FILE *file;
 	#ifdef _WIN32
-		if (fopen_s(&file, filename, "rb")) return NULL;
+		if (fopen_s(&file, filename, "rb")) file = NULL;
 	#else
 		file = fopen(filename, "rb");
 	#endif
-	if (!file) return NULL;
+	if (!file) {
+		if (error) {
+			error->stack_size = 1;
+			error->stack[0].description = "File not found";
+			error->stack[0].function = __FUNCTION__;
+			error->stack[0].source_line = __LINE__;
+		}
+		return NULL;
+	}
 
 	ufbxi_context uc = { 0 };
 	uc.read_fn = &ufbxi_file_read;
@@ -3529,6 +3905,22 @@ void ufbx_free_scene(ufbx_scene *scene)
 	// from the same result buffer!
 	ufbxi_buf result = imp->result_buf;
 	ufbxi_buf_free(&result);
+}
+
+ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *c, ufbx_real time)
+{
+}
+
+ufbx_real ufbx_evaluate_real_len(const ufbx_node *node, ufbx_real time, const char *name, size_t len)
+{
+}
+
+ufbx_vec3 ufbx_evaluate_vec3_len(const ufbx_node *node, ufbx_real time, const char *name, size_t len)
+{
+}
+
+ufbx_transform ufbx_evaluate_transform(const ufbx_node *node, ufbx_real time)
+{
 }
 
 #ifdef __cplusplus
