@@ -4479,22 +4479,6 @@ void ufbx_free_scene(ufbx_scene *scene)
 	ufbxi_buf_free(&result);
 }
 
-ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *c, ufbx_real time)
-{
-}
-
-ufbx_real ufbx_evaluate_real_len(const ufbx_node *node, ufbx_real time, const char *name, size_t len)
-{
-}
-
-ufbx_vec3 ufbx_evaluate_vec3_len(const ufbx_node *node, ufbx_real time, const char *name, size_t len)
-{
-}
-
-ufbx_transform ufbx_evaluate_transform(const ufbx_node *node, ufbx_real time)
-{
-}
-
 #ifdef __cplusplus
 }
 #endif
