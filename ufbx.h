@@ -1,10 +1,14 @@
 #ifndef UFBX_UFBX_H_INLCUDED
 #define UFBX_UFBX_H_INLCUDED
 
+// -- Headers
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <string.h>
+
+// -- Platform
 
 #if defined(_MSC_VER)
 	#pragma warning(push)
@@ -17,57 +21,71 @@
 	#define ufbx_inline static
 #endif
 
-#define UFBX_MAX_ELEMENTS_PER_MESH 256
+// -- Configuration
+
+typedef double ufbx_real;
 
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+// -- Basic types
 
-// Types
+typedef struct ufbx_string {
+	const char *data;
+	size_t length;
+} ufbx_string;
 
-typedef double ufbx_real;
-typedef struct ufbx_vec2 ufbx_vec2;
-typedef struct ufbx_vec3 ufbx_vec3;
-typedef struct ufbx_vec4 ufbx_vec4;
-typedef struct ufbx_transform ufbx_transform;
-typedef struct ufbx_edge ufbx_edge;
-typedef struct ufbx_face ufbx_face;
+typedef struct ufbx_vec2 {
+	union {
+		struct { ufbx_real x, y; };
+		ufbx_real v[2];
+	};
+} ufbx_vec2;
 
-typedef struct ufbx_node ufbx_node;
-typedef struct ufbx_model ufbx_model;
-typedef struct ufbx_mesh ufbx_mesh;
-typedef struct ufbx_anim_curve ufbx_anim_curve;
-typedef struct ufbx_template ufbx_template;
+typedef struct ufbx_vec3 {
+	union {
+		struct { ufbx_real x, y, z; };
+		ufbx_real v[3];
+	};
+} ufbx_vec3;
+
+typedef struct ufbx_vec4 {
+	union {
+		struct { ufbx_real x, y, z, w; };
+		ufbx_real v[4];
+	};
+} ufbx_vec4;
+
+typedef enum ufbx_rotation_order {
+	UFBX_ROTATION_XYZ,
+} ufbx_rotation_order;
+
+typedef struct ufbx_transform {
+	ufbx_vec3 translation;
+	ufbx_rotation_order rotation_order;
+	ufbx_vec3 rotation_euler;
+	ufbx_vec3 scale;
+} ufbx_transform;
+
+typedef struct ufbx_matrix {
+	union {
+		struct {
+			ufbx_real m00, m10, m20;
+			ufbx_real m01, m11, m21;
+			ufbx_real m02, m12, m22;
+			ufbx_real m03, m13, m23;
+		};
+		ufbx_vec3 cols[4];
+		ufbx_real v[12];
+	};
+} ufbx_matrix;
+
+// -- Properties
+
+typedef enum ufbx_prop_type ufbx_prop_type;
 typedef struct ufbx_prop ufbx_prop;
-typedef struct ufbx_uv_set ufbx_uv_set;
-typedef struct ufbx_color_set ufbx_color_set;
-typedef enum ufbx_interpolation ufbx_interpolation;
-typedef struct ufbx_tangent ufbx_tangent;
-typedef struct ufbx_keyframe ufbx_keyframe;
+typedef struct ufbx_props ufbx_props;
 
-typedef struct ufbx_node_list { ufbx_node **data; size_t size; } ufbx_node_list;
-typedef struct ufbx_model_list { ufbx_model **data; size_t size; } ufbx_model_list;
-typedef struct ufbx_mesh_list { ufbx_mesh **data; size_t size; } ufbx_mesh_list;
-typedef struct ufbx_template_list { ufbx_template *data; size_t size; } ufbx_template_list;
-typedef struct ufbx_prop_list { ufbx_prop *data; size_t size; } ufbx_prop_list;
-typedef struct ufbx_uv_set_list { ufbx_uv_set *data; size_t size; } ufbx_uv_set_list;
-typedef struct ufbx_color_set_list { ufbx_color_set *data; size_t size; } ufbx_color_set_list;
-typedef struct ufbx_keyframe_list { ufbx_keyframe *data; size_t size; } ufbx_keyframe_list;
-
-typedef struct ufbx_error_frame {
-	uint32_t source_line;
-	const char *function;
-	const char *description;
-} ufbx_error_frame;
-
-typedef struct ufbx_error {
-	uint32_t stack_size;
-	ufbx_error_frame stack[UFBX_ERROR_STACK_MAX_DEPTH];
-} ufbx_error;
-
-typedef enum ufbx_prop_type {
+enum ufbx_prop_type {
 	UFBX_PROP_UNKNOWN,
 	UFBX_PROP_BOOLEAN,
 	UFBX_PROP_INTEGER,
@@ -81,56 +99,12 @@ typedef enum ufbx_prop_type {
 	UFBX_PROP_SCALING,
 
 	UFBX_NUM_PROP_TYPES,
-} ufbx_prop_type;
-
-typedef struct ufbx_string {
-	const char *data;
-	size_t length;
-} ufbx_string;
-extern const ufbx_string ufbx_empty_string;
-
-struct ufbx_vec2 {
-	union {
-		struct { ufbx_real x, y; };
-		ufbx_real v[2];
-	};
-};
-
-struct ufbx_vec3 {
-	union {
-		struct { ufbx_real x, y, z; };
-		ufbx_real v[3];
-	};
-};
-
-struct ufbx_vec4 {
-	union {
-		struct { ufbx_real x, y, z, w; };
-		ufbx_real v[4];
-	};
-};
-
-struct ufbx_transform {
-	union {
-		struct {
-			ufbx_real m00, m10, m20;
-			ufbx_real m01, m11, m21;
-			ufbx_real m02, m12, m22;
-			ufbx_real m03, m13, m23;
-		};
-		ufbx_vec3 cols[4];
-		ufbx_real v[12];
-	};
 };
 
 struct ufbx_prop {
 	ufbx_string name;
 	uint32_t imp_key;
 	ufbx_prop_type type;
-
-	ufbx_string type_str;
-	ufbx_string subtype_str;
-	ufbx_string flags;
 
 	ufbx_string value_str;
 	int64_t value_int;
@@ -141,82 +115,50 @@ struct ufbx_prop {
 	};
 };
 
-typedef enum ufbx_node_type {
-	UFBX_NODE_UNKNOWN,
-	UFBX_NODE_MODEL,
-	UFBX_NODE_MESH,
-	UFBX_NODE_MATERIAL,
-	UFBX_NODE_TEXTURE,
-	UFBX_NODE_BONE,
-	UFBX_NODE_SKIN,
-	UFBX_NODE_ANIM_CURVE,
-	UFBX_NODE_ATTRIBUTE,
+struct ufbx_props {
+	ufbx_prop *defaults;
 
-	UFBX_NUM_NODE_TYPES,
-} ufbx_node_type;
-
-struct ufbx_template {
-	ufbx_string name;
-	ufbx_string type_str;
-	ufbx_prop_list props;
+	ufbx_prop *props;
+	size_t num_props;
 };
 
-struct ufbx_node {
-	ufbx_node_type type;
+// -- Static data
 
-	uint64_t id;
-	ufbx_string name;
-	ufbx_string type_str;
-	ufbx_string sub_type_str;
+typedef struct ufbx_geometry ufbx_geometry;
+typedef struct ufbx_material ufbx_material;
 
-	ufbx_template *prop_template;
-	ufbx_prop_list props;
+typedef union ufbx_vertex_vec2 ufbx_vertex_vec2;
+typedef union ufbx_vertex_vec3 ufbx_vertex_vec3;
+typedef union ufbx_vertex_vec4 ufbx_vertex_vec4;
+typedef struct ufbx_uv_set ufbx_uv_set;
+typedef struct ufbx_color_set ufbx_color_set;
+typedef struct ufbx_edge ufbx_edge;
+typedef struct ufbx_face ufbx_face;
 
-	ufbx_model *parent_model;
+typedef struct ufbx_material_list { ufbx_material **data; size_t size; } ufbx_material_list;
+typedef struct ufbx_uv_set_list { ufbx_uv_set *data; size_t size; } ufbx_uv_set_list;
+typedef struct ufbx_color_set_list { ufbx_color_set *data; size_t size; } ufbx_color_set_list;
 
-	ufbx_node_list parents;
-	ufbx_node_list children;
-};
-
-struct ufbx_model {
-	ufbx_node node;
-
-	ufbx_transform self_to_root;
-	ufbx_transform self_to_parent;
-	ufbx_transform geometry_to_self;
-
-	ufbx_model_list models;
-	ufbx_mesh_list meshes;
-};
-
-typedef struct ufbx_vertex_element {
-	void *data;
-	int32_t *indices;
-} ufbx_vertex_element;
-
-typedef union ufbx_vertex_vec2 {
-	ufbx_vertex_element element;
+union ufbx_vertex_vec2 {
 	struct {
 		ufbx_vec2 *data;
 		int32_t *indices;
 	};
-} ufbx_vertex_vec2;
+};
 
-typedef union ufbx_vertex_vec3 {
-	ufbx_vertex_element element;
+union ufbx_vertex_vec3 {
 	struct {
 		ufbx_vec3 *data;
 		int32_t *indices;
 	};
-} ufbx_vertex_vec3;
+};
 
-typedef union ufbx_vertex_vec4 {
-	ufbx_vertex_element element;
+union ufbx_vertex_vec4 {
 	struct {
 		ufbx_vec4 *data;
 		int32_t *indices;
 	};
-} ufbx_vertex_vec4;
+};
 
 struct ufbx_uv_set {
 	ufbx_string name;
@@ -237,8 +179,8 @@ struct ufbx_face {
 	uint32_t num_indices;
 };
 
-struct ufbx_mesh {
-	ufbx_node node;
+struct ufbx_geometry {
+	ufbx_props props;
 
 	size_t num_vertices;
 	size_t num_indices;
@@ -265,6 +207,79 @@ struct ufbx_mesh {
 	ufbx_color_set_list color_sets;
 };
 
+struct ufbx_material {
+	ufbx_props props;
+
+	ufbx_vec3 color;
+};
+
+// -- Scene graph
+
+typedef enum ufbx_node_type ufbx_node_type;
+typedef struct ufbx_node ufbx_node;
+typedef struct ufbx_model ufbx_model;
+typedef struct ufbx_mesh ufbx_mesh;
+typedef struct ufbx_light ufbx_light;
+
+typedef struct ufbx_node_list { ufbx_node **data; size_t size; } ufbx_node_list;
+typedef struct ufbx_model_list { ufbx_model *data; size_t size; } ufbx_model_list;
+typedef struct ufbx_mesh_list { ufbx_mesh *data; size_t size; } ufbx_mesh_list;
+typedef struct ufbx_light_list { ufbx_light *data; size_t size; } ufbx_light_list;
+
+enum ufbx_node_type {
+	UFBX_NODE_UNKNOWN,
+	UFBX_NODE_MODEL,
+	UFBX_NODE_MESH,
+	UFBX_NODE_LIGHT,
+};
+
+struct ufbx_node {
+	ufbx_string name;
+	ufbx_props props;
+	ufbx_model *parent;
+	ufbx_transform transform;
+};
+
+struct ufbx_model {
+	ufbx_node node;
+
+	ufbx_node_list children;
+};
+
+struct ufbx_mesh {
+	ufbx_node node;
+
+	ufbx_geometry *geometry;
+	ufbx_material_list materials;
+};
+
+struct ufbx_light {
+	ufbx_node node;
+
+	ufbx_vec3 color;
+	ufbx_real intensity;
+};
+
+// -- Animations
+
+typedef struct ufbx_anim_layer ufbx_anim_layer;
+typedef struct ufbx_anim_prop ufbx_anim_prop;
+typedef struct ufbx_anim_curve ufbx_anim_curve;
+typedef struct ufbx_keyframe ufbx_keyframe;
+typedef struct ufbx_tangent ufbx_tangent;
+typedef enum ufbx_interpolation ufbx_interpolation;
+typedef struct ufbx_anim_state ufbx_anim_state;
+
+typedef struct ufbx_anim_layer_list { ufbx_anim_layer *data; size_t size; } ufbx_anim_layer_list;
+typedef struct ufbx_anim_prop_list { ufbx_anim_prop *data; size_t size; } ufbx_anim_prop_list;
+typedef struct ufbx_anim_curve_list { ufbx_anim_curve *data; size_t size; } ufbx_anim_curve_list;
+typedef struct ufbx_keyframe_list { ufbx_keyframe *data; size_t size; } ufbx_keyframe_list;
+
+struct ufbx_tangent {
+	float dx;
+	float dy;
+};
+
 enum ufbx_interpolation {
 	UFBX_INTERPOLATION_CONSTANT_PREV,
 	UFBX_INTERPOLATION_CONSTANT_NEXT,
@@ -272,9 +287,22 @@ enum ufbx_interpolation {
 	UFBX_INTERPOLATION_CUBIC,
 };
 
-struct ufbx_tangent {
-	float dx;
-	float dy;
+struct ufbx_anim_layer {
+	ufbx_string name;
+	ufbx_anim_prop_list props;
+};
+
+struct ufbx_anim_curve {
+	ufbx_anim_prop *prop;
+	ufbx_keyframe_list keyframes;
+};
+
+struct ufbx_anim_prop {
+	ufbx_string name;
+	uint32_t imp_key;
+	ufbx_anim_layer *layer;
+	ufbx_node *node;
+	ufbx_anim_curve curves[3];
 };
 
 struct ufbx_keyframe {
@@ -285,10 +313,15 @@ struct ufbx_keyframe {
 	ufbx_tangent right;
 };
 
-struct ufbx_anim_curve {
-	ufbx_node node;
-	ufbx_keyframe_list keyframes;
+struct ufbx_anim_state {
+	const ufbx_anim_layer *layers;
+	size_t num_layers;
+	ufbx_real time;
 };
+
+// -- Scene
+
+typedef struct ufbx_scene ufbx_scene;
 
 typedef struct ufbx_metadata {
 	bool ascii;
@@ -296,20 +329,37 @@ typedef struct ufbx_metadata {
 	ufbx_string creator;
 } ufbx_metadata;
 
-typedef struct ufbx_scene {
+struct ufbx_scene {
 	ufbx_metadata metadata;
 
-	ufbx_model *root_model;
+	ufbx_model *root;
 
 	ufbx_node_list nodes;
 	ufbx_model_list models;
 	ufbx_mesh_list meshes;
-	ufbx_template_list templates;
-} ufbx_scene;
+	ufbx_light_list lights;
+	ufbx_anim_layer_list anim_layers;
+	ufbx_anim_prop_list anim_props;
+	ufbx_anim_curve_list anim_curves;
+};
+
+// -- Loading
 
 typedef void *ufbx_alloc_fn(void *user, size_t size);
 typedef void *ufbx_realloc_fn(void *user, void *old_ptr, size_t old_size, size_t new_size);
 typedef void ufbx_free_fn(void *user, void *ptr, size_t size);
+typedef size_t ufbx_read_fn(void *user, void *data, size_t size);
+
+typedef struct ufbx_error_frame {
+	uint32_t source_line;
+	const char *function;
+	const char *description;
+} ufbx_error_frame;
+
+typedef struct ufbx_error {
+	uint32_t stack_size;
+	ufbx_error_frame stack[UFBX_ERROR_STACK_MAX_DEPTH];
+} ufbx_error;
 
 typedef struct ufbx_allocator {
 	ufbx_alloc_fn *alloc_fn;
@@ -339,46 +389,18 @@ typedef struct ufbx_load_opts {
 	bool allow_nonexistent_indices;
 } ufbx_load_opts;
 
-typedef size_t ufbx_read_fn(void *user, void *data, size_t size);
+typedef struct ufbx_evaluate_opts {
+	ufbx_scene *reuse_scene;
+	ufbx_allocator allocator;
+	size_t max_memory;
+} ufbx_evaluate_opts;
 
-ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error);
-ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error);
-void ufbx_free_scene(ufbx_scene *scene);
+// -- Inflate
 
-ufbx_prop *ufbx_get_prop_from_list_len(const ufbx_prop_list *list, const char *name, size_t len);
-ufbx_prop *ufbx_get_prop_len(const ufbx_node *node, const char *name, size_t len);
+typedef struct ufbx_inflate_input ufbx_inflate_input;
+typedef struct ufbx_inflate_retain ufbx_inflate_retain;
 
-ufbx_inline ufbx_prop *ufbx_get_prop_from_list(const ufbx_prop_list *list, const char *name) {
-	return ufbx_get_prop_from_list_len(list, name, strlen(name));
-}
-ufbx_inline ufbx_prop *ufbx_get_prop(const ufbx_node *node, const char *name) {
-	return ufbx_get_prop_len(node, name, strlen(name));
-}
-
-void ufbx_transform_mul(ufbx_transform *dst, const ufbx_transform *l, const ufbx_transform *r);
-ufbx_vec3 ufbx_transform_position(const ufbx_transform *t, ufbx_vec3 v);
-ufbx_vec3 ufbx_transform_direction(const ufbx_transform *t, ufbx_vec3 v);
-ufbx_vec3 ufbx_transform_normal(const ufbx_transform *t, ufbx_vec3 v);
-
-ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *c, ufbx_real time);
-ufbx_real ufbx_evaluate_real_len(const ufbx_node *node, ufbx_real time, const char *name, size_t len);
-ufbx_vec3 ufbx_evaluate_vec3_len(const ufbx_node *node, ufbx_real time, const char *name, size_t len);
-ufbx_transform ufbx_evaluate_transform(const ufbx_node *node, ufbx_real time);
-
-ufbx_inline ufbx_real ufbx_evaluate_real(const ufbx_node *node, ufbx_real time, const char *name) {
-	return ufbx_evaluate_real_len(node, time, name, strlen(name));
-}
-ufbx_inline ufbx_vec3 ufbx_evaluate_vec3(const ufbx_node *node, ufbx_real time, const char *name) {
-	return ufbx_evaluate_vec3_len(node, time, name, strlen(name));
-}
-
-ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }
-ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }
-ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->indices[index]]; }
-
-// Utility
-
-typedef struct ufbx_inflate_input {
+struct ufbx_inflate_input {
 	size_t total_size;
 
 	const void *data;
@@ -389,34 +411,63 @@ typedef struct ufbx_inflate_input {
 
 	ufbx_read_fn *read_fn;
 	void *read_user;
-} ufbx_inflate_input;
+};
 
-typedef struct ufbx_inflate_retain {
+struct ufbx_inflate_retain {
 	bool initialized;
 	uint64_t data[512];
-} ufbx_inflate_retain;
+};
+
+// -- API
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern const ufbx_string ufbx_empty_string;
+
+ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error);
+ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error);
+void ufbx_free_scene(ufbx_scene *scene);
+
+ufbx_prop *ufbx_get_prop_len(const ufbx_props *props, const char *name, size_t name_len);
+
+ufbx_vec4 ufbx_get_rotation_quaternion(ufbx_rotation_order order, ufbx_vec3 euler);
+ufbx_matrix ufbx_get_transform_matrix(const ufbx_transform *transform);
+
+ufbx_real ufbx_evaluate_prop_real_len(const ufbx_anim_state *state, const ufbx_node *node, const char *prop, size_t prop_len);
+ufbx_vec3 ufbx_evaluate_prop_vec3_len(const ufbx_anim_state *state, const ufbx_node *node, const char *prop, size_t prop_len);
+
+ufbx_model ufbx_evaluate_model(const ufbx_anim_state *state, const ufbx_model *model);
+ufbx_light ufbx_evaluate_light(const ufbx_anim_state *state, const ufbx_light *light);
+ufbx_scene *ufbx_evaluate_scene(const ufbx_anim_state *state, const ufbx_scene *scene, const ufbx_evaluate_opts *opts);
 
 ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);
 
+// Utility
+
+ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);
+
+// -- Inline API
+
+ufbx_inline ufbx_prop *ufbx_get_prop(const ufbx_props *props, const char *name) {
+	return ufbx_get_prop_len(props, name, strlen(name));
+}
+
+ufbx_inline ufbx_real ufbx_evaluate_prop_real(const ufbx_anim_state *state, const ufbx_node *node, const char *prop) {
+	return ufbx_evaluate_prop_real_len(state, node, prop, strlen(prop));
+}
+
+ufbx_inline ufbx_vec3 ufbx_evaluate_prop_vec3(const ufbx_anim_state *state, const ufbx_node *node, const char *prop) {
+	return ufbx_evaluate_prop_vec3_len(state, node, prop, strlen(prop));
+}
+
+ufbx_inline ufbx_vec4 ufbx_get_transform_quaternion(const ufbx_transform *transform) {
+	return ufbx_get_rotation_quaternion(transform->rotation_order, transform->rotation_euler);
+}
+
 #ifdef __cplusplus
 }
-#endif
-
-// Range overloads for lists
-
-#ifdef __cplusplus
-
-ufbx_inline ufbx_node **begin(const ufbx_node_list &l) { return l.data; }
-ufbx_inline ufbx_node **end(const ufbx_node_list &l) { return l.data + l.size; }
-ufbx_inline ufbx_model **begin(const ufbx_model_list &l) { return l.data; }
-ufbx_inline ufbx_model **end(const ufbx_model_list &l) { return l.data + l.size; }
-ufbx_inline ufbx_mesh **begin(const ufbx_mesh_list &l) { return l.data; }
-ufbx_inline ufbx_mesh **end(const ufbx_mesh_list &l) { return l.data + l.size; }
-ufbx_inline ufbx_template *begin(const ufbx_template_list &l) { return l.data; }
-ufbx_inline ufbx_template *end(const ufbx_template_list &l) { return l.data + l.size; }
-ufbx_inline ufbx_prop *begin(const ufbx_prop_list &l) { return l.data; }
-ufbx_inline ufbx_prop *end(const ufbx_prop_list &l) { return l.data + l.size; }
-
 #endif
 
 #if defined(_MSC_VER)

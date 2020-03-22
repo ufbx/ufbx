@@ -94,6 +94,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 #define ufbxi_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
 #define ufbxi_ignore(cond) (void)(cond)
 #define ufbxi_for(m_type, m_name, m_begin, m_num) for (m_type *m_name = m_begin, *m_name##_end = m_name + (m_num); m_name != m_name##_end; m_name++)
+#define ufbxi_for_ptr(m_type, m_name, m_begin, m_num) for (m_type **m_name = m_begin, **m_name##_end = m_name + (m_num); m_name != m_name##_end; m_name++)
 
 static ufbxi_forceinline uint32_t ufbxi_min32(uint32_t a, uint32_t b) { return a < b ? a : b; }
 static ufbxi_forceinline uint32_t ufbxi_max32(uint32_t a, uint32_t b) { return a < b ? b : a; }
@@ -1739,6 +1740,9 @@ static ufbxi_forceinline uint32_t ufbxi_hash_uptr(uintptr_t ptr)
 // -- String constants
 
 static const char ufbxi_FBXHeaderExtension[] = "FBXHeaderExtension";
+static const char ufbxi_Documents[] = "Documents";
+static const char ufbxi_Document[] = "Document";
+static const char ufbxi_RootNode[] = "RootNode";
 static const char ufbxi_FBXVersion[] = "FBXVersion";
 static const char ufbxi_Creator[] = "Creator";
 static const char ufbxi_Definitions[] = "Definitions";
@@ -1750,8 +1754,12 @@ static const char ufbxi_PropertyTemplate[] = "PropertyTemplate";
 static const char ufbxi_Properties60[] = "Properties60";
 static const char ufbxi_Properties70[] = "Properties70";
 static const char ufbxi_Model[] = "Model";
+static const char ufbxi_NodeAttribute[] = "NodeAttribute";
 static const char ufbxi_Geometry[] = "Geometry";
+static const char ufbxi_AnimationLayer[] = "AnimationLayer";
 static const char ufbxi_AnimationCurve[] = "AnimationCurve";
+static const char ufbxi_AnimationCurveNode[] = "AnimationCurveNode";
+static const char ufbxi_Light[] = "Light";
 static const char ufbxi_Vertices[] = "Vertices";
 static const char ufbxi_PolygonVertexIndex[] = "PolygonVertexIndex";
 static const char ufbxi_Edges[] = "Edges";
@@ -1764,9 +1772,27 @@ static const char ufbxi_Take[] = "Take";
 static const char ufbxi_Channel[] = "Channel";
 static const char ufbxi_Key[] = "Key";
 static const char ufbxi_KeyCount[] = "KeyCount";
+static const char ufbxi_Transform[] = "Transform";
+static const char ufbxi_T[] = "T";
+static const char ufbxi_R[] = "R";
+static const char ufbxi_S[] = "S";
+static const char ufbxi_X[] = "X";
+static const char ufbxi_Y[] = "Y";
+static const char ufbxi_Z[] = "Z";
+static const char ufbxi_D_X[] = "d|X";
+static const char ufbxi_D_Y[] = "d|Y";
+static const char ufbxi_D_Z[] = "d|Z";
+static const char ufbxi_Lcl_Translation[] = "Lcl Translation";
+static const char ufbxi_Lcl_Rotation[] = "Lcl Rotation";
+static const char ufbxi_Lcl_Scaling[] = "Lcl Scaling";
+static const char ufbxi_OO[] = "OO";
+static const char ufbxi_OP[] = "OP";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FBXHeaderExtension, sizeof(ufbxi_FBXHeaderExtension) - 1 },
+	{ ufbxi_Documents, sizeof(ufbxi_Documents) - 1 },
+	{ ufbxi_Document, sizeof(ufbxi_Document) - 1 },
+	{ ufbxi_RootNode, sizeof(ufbxi_RootNode) - 1 },
 	{ ufbxi_FBXVersion, sizeof(ufbxi_FBXVersion) - 1 },
 	{ ufbxi_Creator, sizeof(ufbxi_Creator) - 1 },
 	{ ufbxi_Definitions, sizeof(ufbxi_Definitions) - 1 },
@@ -1778,8 +1804,12 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Properties60, sizeof(ufbxi_Properties60) - 1 },
 	{ ufbxi_Properties70, sizeof(ufbxi_Properties70) - 1 },
 	{ ufbxi_Model, sizeof(ufbxi_Model) - 1 },
+	{ ufbxi_NodeAttribute, sizeof(ufbxi_NodeAttribute) - 1 },
 	{ ufbxi_Geometry, sizeof(ufbxi_Geometry) - 1 },
+	{ ufbxi_AnimationLayer, sizeof(ufbxi_AnimationLayer) - 1 },
 	{ ufbxi_AnimationCurve, sizeof(ufbxi_AnimationCurve) - 1 },
+	{ ufbxi_AnimationCurveNode, sizeof(ufbxi_AnimationCurveNode) - 1 },
+	{ ufbxi_Light, sizeof(ufbxi_Light) - 1 },
 	{ ufbxi_Vertices, sizeof(ufbxi_Vertices) - 1 },
 	{ ufbxi_PolygonVertexIndex, sizeof(ufbxi_PolygonVertexIndex) - 1 },
 	{ ufbxi_Edges, sizeof(ufbxi_Edges) - 1 },
@@ -1792,6 +1822,21 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Channel, sizeof(ufbxi_Channel) - 1 },
 	{ ufbxi_Key, sizeof(ufbxi_Key) - 1 },
 	{ ufbxi_KeyCount, sizeof(ufbxi_KeyCount) - 1 },
+	{ ufbxi_Transform, sizeof(ufbxi_Transform) - 1 },
+	{ ufbxi_T, sizeof(ufbxi_T) - 1 },
+	{ ufbxi_R, sizeof(ufbxi_R) - 1 },
+	{ ufbxi_S, sizeof(ufbxi_S) - 1 },
+	{ ufbxi_X, sizeof(ufbxi_X) - 1 },
+	{ ufbxi_Y, sizeof(ufbxi_Y) - 1 },
+	{ ufbxi_Z, sizeof(ufbxi_Z) - 1 },
+	{ ufbxi_D_X, sizeof(ufbxi_D_X) - 1 },
+	{ ufbxi_D_Y, sizeof(ufbxi_D_Y) - 1 },
+	{ ufbxi_D_Z, sizeof(ufbxi_D_Z) - 1 },
+	{ ufbxi_Lcl_Translation, sizeof(ufbxi_Lcl_Translation) - 1 },
+	{ ufbxi_Lcl_Rotation, sizeof(ufbxi_Lcl_Rotation) - 1 },
+	{ ufbxi_Lcl_Scaling, sizeof(ufbxi_Lcl_Scaling) - 1 },
+	{ ufbxi_OO, sizeof(ufbxi_OO) - 1 },
+	{ ufbxi_OP, sizeof(ufbxi_OP) - 1 },
 };
 
 // -- Type definitions
@@ -1845,6 +1890,28 @@ typedef struct {
 	ufbxi_buf string_buf;
 } ufbxi_scene_imp;
 
+typedef enum {
+	UFBXI_CONNECTABLE_MODEL,
+	UFBXI_CONNECTABLE_MESH,
+	UFBXI_CONNECTABLE_LIGHT,
+	UFBXI_CONNECTABLE_GEOMETRY,
+	UFBXI_CONNECTABLE_ANIM_LAYER,
+	UFBXI_CONNECTABLE_ANIM_PROP,
+	UFBXI_CONNECTABLE_ANIM_CURVE,
+} ufbxi_connectable_type;
+
+typedef struct {
+	uint64_t id;
+	ufbxi_connectable_type type;
+	size_t index;
+} ufbxi_connectable;
+
+typedef struct {
+	uint64_t parent_id;
+	uint64_t child_id;
+	const char *prop_name;
+} ufbxi_connection;
+
 typedef struct {
 
 	uint32_t version;
@@ -1873,6 +1940,7 @@ typedef struct {
 	// Temporary maps
 	ufbxi_map string_map;
 	ufbxi_map prop_type_map;
+	ufbxi_map connectable_map;
 
 	// Conversion source buffer
 	char *convert_buffer;
@@ -1882,6 +1950,15 @@ typedef struct {
 	ufbxi_buf tmp;
 	ufbxi_buf tmp_node;
 	ufbxi_buf tmp_template;
+	ufbxi_buf tmp_connection;
+
+	// Temporary arrays
+	ufbxi_buf tmp_arr_models;
+	ufbxi_buf tmp_arr_meshes;
+	ufbxi_buf tmp_arr_lights;
+	ufbxi_buf tmp_arr_anim_layers;
+	ufbxi_buf tmp_arr_anim_props;
+	ufbxi_buf tmp_arr_anim_curves;
 
 	// Result buffers
 	ufbxi_buf result;
@@ -2920,13 +2997,11 @@ ufbxi_nodiscard static int ufbxi_ascii_next_token(ufbxi_ascii *ua, ufbxi_ascii_t
 	} else if (c == '"') {
 		token->type = UFBXI_ASCII_STRING;
 		c = ufbxi_ascii_next(ua);
-		uint32_t len = 0;
 		while (c != '"') {
 			ufbxi_check(ufbxi_ascii_push_token_char(ua, token, c));
 			c = ufbxi_ascii_next(ua);
 			ufbxi_check(c != '\0');
 		}
-		token->str_len = len;
 		// Skip closing quote
 		ufbxi_ascii_next(ua);
 	} else {
@@ -3319,6 +3394,13 @@ static ufbxi_forceinline uint32_t ufbxi_get_name_key(const char *name, size_t le
 
 // -- Reading the parsed data
 
+typedef struct {
+	ufbx_string name;
+	ufbx_string sub_type;
+	uint64_t id;
+	ufbx_props props;
+} ufbxi_object;
+
 ufbxi_nodiscard static int ufbxi_read_header_extension(ufbxi_context *uc, ufbxi_node *header)
 {
 	ufbxi_ignore(ufbxi_find_val1(header, ufbxi_Creator, "S", &uc->scene.metadata.creator));
@@ -3331,19 +3413,17 @@ ufbxi_nodiscard static int ufbxi_read_header_extension(ufbxi_context *uc, ufbxi_
 
 ufbxi_nodiscard static int ufbxi_read_property(ufbxi_context *uc, ufbxi_node *node, ufbx_prop *prop, int version)
 {
-	ufbxi_check(ufbxi_get_val2(node, "SS", &prop->name, &prop->type_str));
+	const char *type_str = NULL, *subtype_str = NULL;
+	ufbxi_check(ufbxi_get_val2(node, "SC", &prop->name, (char**)&type_str));
 	uint32_t ix = 2;
 	if (version == 70) {
-		ufbxi_check(ufbxi_get_val_at(node, ix++, 'S', &prop->subtype_str));
-	} else {
-		prop->subtype_str = ufbx_empty_string;
+		ufbxi_check(ufbxi_get_val_at(node, ix++, 'C', (char**)&subtype_str));
 	}
-	ufbxi_check(ufbxi_get_val_at(node, ix++, 'S', &prop->flags));
 
 	prop->imp_key = ufbxi_get_name_key(node->name, node->name_len);
-	prop->type = ufbxi_get_prop_type(uc, prop->type_str.data);
-	if (prop->type == UFBX_PROP_UNKNOWN) {
-		prop->type = ufbxi_get_prop_type(uc, prop->subtype_str.data);
+	prop->type = ufbxi_get_prop_type(uc, type_str);
+	if (prop->type == UFBX_PROP_UNKNOWN && subtype_str) {
+		prop->type = ufbxi_get_prop_type(uc, subtype_str);
 	}
 	
 	return 1;
@@ -3357,7 +3437,7 @@ static int ufbxi_cmp_prop(const void *va, const void *vb)
 	return strcmp(a->name.data, b->name.data);
 }
 
-ufbxi_nodiscard static int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *parent, ufbx_prop_list *props)
+ufbxi_nodiscard static int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *parent, ufbx_props *props)
 {
 	int version = 70;
 	ufbxi_node *node = ufbxi_find_child(parent, ufbxi_Properties70);
@@ -3378,18 +3458,19 @@ ufbxi_nodiscard static int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *
 		ufbxi_check(ufbxi_read_property(uc, prop_node, prop, version));
 	}
 
-	props->data = ufbxi_make_array(&uc->result, ufbx_prop, node->num_children);
-	props->size = node->num_children;
-	ufbxi_check(props->data);
+	props->props = ufbxi_make_array(&uc->result, ufbx_prop, node->num_children);
+	props->num_props = node->num_children;
+	ufbxi_check(props->props);
 
 	// Sort the properties by `name_hash`
-	qsort(props->data, props->size, sizeof(ufbx_prop), ufbxi_cmp_prop);
+	qsort(props->props, props->num_props, sizeof(ufbx_prop), ufbxi_cmp_prop);
 
 	return 1;
 }
 
 ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc, ufbxi_node *definitions)
 {
+#if 0
 	ufbxi_for(ufbxi_node, object, definitions->children, definitions->num_children) {
 		if (object->name != ufbxi_ObjectType) continue;
 
@@ -3413,6 +3494,7 @@ ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc, ufbxi_node 
 	ufbxi_check(uc->scene.templates.data);
 
 	ufbxi_buf_free(&uc->tmp_template);
+#endif
 
 	return 1;
 }
@@ -3424,11 +3506,86 @@ static float ufbxi_convert_weight(const float *p_value)
 	int32_t val_i = *(int32_t*)p_value;
 }
 
-ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_node *node, ufbx_node *desc)
+ufbxi_nodiscard static int ufbxi_add_connection(ufbxi_context *uc, uint64_t parent_id, uint64_t child_id, const char *prop_name)
 {
-	ufbx_anim_curve *curve = ufbxi_push_zero(&uc->result, ufbx_anim_curve, 1);
-	curve->node = *desc;
-	curve->node.type = UFBX_NODE_ANIM_CURVE;
+	ufbxi_connection *conn = ufbxi_push(&uc->tmp_connection, ufbxi_connection, 1);
+	ufbxi_check(conn);
+
+	conn->parent_id = parent_id;
+	conn->child_id = child_id;
+	conn->prop_name = prop_name;
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_add_connectable(ufbxi_context *uc, ufbxi_connectable_type type, uint64_t id, size_t index)
+{
+	ufbxi_check(ufbxi_map_grow(&uc->connectable_map, ufbxi_connectable, 64));
+	uint32_t hash = ufbxi_hash64(id);
+	ufbxi_connectable *conn = ufbxi_map_insert(&uc->connectable_map, ufbxi_connectable, 0, hash);
+	conn->id = id;
+	conn->type = type;
+	conn->index = index;
+
+	return 1;
+}
+
+static ufbxi_connectable *ufbxi_find_connectable(ufbxi_context *uc, uint64_t id)
+{
+	uint32_t hash = ufbxi_hash64(id);
+	uint32_t scan = 0;
+	ufbxi_connectable *conn;
+	while ((conn = ufbxi_map_find(&uc->connectable_map, ufbxi_connectable, &scan, hash)) != NULL) {
+		if (conn->id == id) {
+			return conn;
+		}
+	}
+	return NULL;
+}
+
+ufbxi_nodiscard static int ufbxi_read_model(ufbxi_context *uc, ufbxi_node *node, ufbxi_object *object)
+{
+	ufbx_model *model = ufbxi_push_zero(&uc->tmp_arr_models, ufbx_model, 1);
+	ufbxi_check(model);
+	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_MODEL, object->id, uc->tmp_arr_models.num_items - 1));
+
+	model->node.name = object->name;
+	model->node.props = object->props;
+
+	// TODO: Read model properties
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_node_attribute(ufbxi_context *uc, ufbxi_node *node, ufbxi_object *object)
+{
+	if (object->sub_type.data == ufbxi_Light) {
+		ufbx_light *light = ufbxi_push_zero(&uc->tmp_arr_lights, ufbx_light, 1);
+		ufbxi_check(light);
+		ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_LIGHT, object->id, uc->tmp_arr_lights.num_items - 1));
+
+		// TODO: Read light properties
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_animation_layer(ufbxi_context *uc, ufbxi_node *node, ufbxi_object *object)
+{
+	ufbx_anim_layer *layer = ufbxi_push_zero(&uc->tmp_arr_anim_layers, ufbx_anim_layer, 1);
+	ufbxi_check(layer);
+	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ANIM_LAYER, object->id, uc->tmp_arr_anim_layers.num_items - 1));
+
+	layer->name = object->name;
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_object *object)
+{
+	ufbx_anim_curve *curve = ufbxi_push_zero(&uc->tmp_arr_anim_curves, ufbx_anim_curve, 1);
+	ufbxi_check(curve);
+	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ANIM_CURVE, object->id, uc->tmp_arr_anim_curves.num_items - 1));
 
 	ufbxi_value_array *times, *values, *flags, *attrs, *refs;
 	ufbxi_check(times = ufbxi_find_array(node, ufbxi_KeyTime, 'l'));
@@ -3623,6 +3780,15 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_n
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_read_animation_curve_node(ufbxi_context *uc, ufbxi_node *node, ufbxi_object *object)
+{
+	ufbx_anim_prop *prop = ufbxi_push_zero(&uc->tmp_arr_anim_props, ufbx_anim_prop, 1);
+	ufbxi_check(prop);
+	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ANIM_PROP, object->id, uc->tmp_arr_anim_props.num_items - 1));
+
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_string type_and_name, ufbx_string *type, ufbx_string *name)
 {
 	// Name and type are packed in a single property as Type::Name (in ASCII)
@@ -3661,8 +3827,8 @@ ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_str
 
 ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc, ufbxi_node *objects)
 {
-	ufbx_node node = { 0 };
-	ufbxi_for(ufbxi_node, object, objects->children, objects->num_children) {
+	ufbxi_object object = { 0 };
+	ufbxi_for(ufbxi_node, node, objects->children, objects->num_children) {
 		ufbx_string type_and_name;
 
 		// Failing to parse the object properties is not an error since
@@ -3671,18 +3837,169 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc, ufbxi_node *obj
 		// older FBX versions just use name/type pairs, which we can
 		// use as IDs since all strings are interned into a string pool.
 		if (uc->version >= 7000) {
-			if (!ufbxi_get_val3(object, "LSS", &node.id, &type_and_name, &node.sub_type_str)) continue;
+			if (!ufbxi_get_val3(node, "LSS", &object.id, &type_and_name, &object.sub_type)) continue;
 		} else {
-			if (!ufbxi_get_val2(object, "SS", &type_and_name, &node.sub_type_str)) continue;
-			node.id = (uintptr_t)type_and_name.data;
+			if (!ufbxi_get_val2(node, "SS", &type_and_name, &object.sub_type)) continue;
+			object.id = (uintptr_t)type_and_name.data;
 		}
 
-		ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &node.type_str, &node.name));
-		ufbxi_check(ufbxi_read_properties(uc, object, &node.props));
+		ufbx_string type_str;
+		ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type_str, &object.name));
+		ufbxi_check(ufbxi_read_properties(uc, node, &object.props));
 
-		const char *name = object->name;
-		if (name == ufbxi_AnimationCurve) {
-			ufbxi_check(ufbxi_read_animation_curve(uc, object, &node));
+		const char *name = node->name;
+		if (name == ufbxi_Model) {
+			ufbxi_check(ufbxi_read_model(uc, node, &object));
+		} else if (name == ufbxi_NodeAttribute) {
+			ufbxi_check(ufbxi_read_node_attribute(uc, node, &object));
+		} else if (name == ufbxi_AnimationLayer) {
+			ufbxi_check(ufbxi_read_animation_layer(uc, node, &object));
+		} else if (name == ufbxi_AnimationCurve) {
+			ufbxi_check(ufbxi_read_animation_curve(uc, node, &object));
+		} else if (name == ufbxi_AnimationCurveNode) {
+			ufbxi_check(ufbxi_read_animation_curve_node(uc, node, &object));
+		}
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_take_anim_channel(ufbxi_context *uc, ufbxi_node *node, uint64_t parent_id, const char *name)
+{
+	ufbx_anim_curve *curve = ufbxi_push_zero(&uc->tmp_arr_anim_curves, ufbx_anim_curve, 1);
+	ufbxi_check(curve);
+
+	// Add a "virtual" connection between the animation curve and the property
+	uint64_t id = (uintptr_t)curve;
+	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ANIM_CURVE, id, uc->tmp_arr_anim_curves.num_items - 1));
+	ufbxi_check(ufbxi_add_connection(uc, parent_id, id, name));
+
+	// TODO: Read keyframes
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_take_prop_channel(ufbxi_context *uc, ufbxi_node *node, uint64_t node_id, uint64_t layer_id, const char *name)
+{
+	if (name == ufbxi_Transform) {
+		// Pre-7000 have transform keyframes in a deeply nested structure,
+		// flatten it to make it resemble post-7000 structure a bit closer:
+		// old: Model: { Channel: "Transform" { Channel: "T" { Channel "X": { ... } } } }
+		// new: Model: { Channel: "Lcl Translation" { Channel "X": { ... } } }
+
+		ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
+			if (child->name != ufbxi_Channel) continue;
+
+			const char *old_name;
+			ufbxi_check(ufbxi_get_val1(child, "C", (char**)&old_name));
+
+			const char *new_name = NULL;
+			if (old_name == ufbxi_T) new_name = ufbxi_Lcl_Translation;
+			else if (old_name == ufbxi_R) new_name = ufbxi_Lcl_Rotation;
+			else if (old_name == ufbxi_S) new_name = ufbxi_Lcl_Scaling;
+			else {
+				continue;
+			}
+
+			// Read child as a top-level property channel
+			ufbxi_check(ufbxi_read_take_prop_channel(uc, child, node_id, layer_id, new_name));
+		}
+
+	} else {
+
+		// Find 1-3 channel nodes thast contain a `Key:` node
+		ufbxi_node *channel_nodes[3] = { 0 };
+		const char *channel_names[3] = { 0 };
+		size_t num_channel_nodes = 0;
+
+		if (ufbxi_find_child(node, ufbxi_Key)) {
+			// Channel has only a single curve
+			channel_nodes[0] = node;
+			channel_names[0] = name;
+			num_channel_nodes = 1;
+		} else {
+			// Channel is a compound of multiple curves
+			ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
+				if (child->name != ufbxi_Channel) continue;
+				if (!ufbxi_find_child(child, ufbxi_Key)) continue;
+				if (!ufbxi_get_val1(child, "C", (char**)&channel_names[num_channel_nodes])) continue;
+				channel_nodes[num_channel_nodes] = child;
+				if (++num_channel_nodes == 3) break;
+			}
+		}
+
+		// Early return: No valid channels found, not an error
+		if (num_channel_nodes == 0) return 1;
+
+		ufbx_anim_prop *prop = ufbxi_push_zero(&uc->tmp_arr_anim_props, ufbx_anim_prop, 1);
+		ufbxi_check(prop);
+		prop->name.data = name;
+		prop->name.length = strlen(name);
+		prop->imp_key = ufbxi_get_name_key(name, prop->name.length);
+
+		// Add a "virtual" connection between the animated property and the layer/node
+		uint64_t id = (uintptr_t)prop;
+		ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ANIM_PROP, id, uc->tmp_arr_anim_props.num_items - 1));
+		ufbxi_check(ufbxi_add_connection(uc, layer_id, id, name));
+		ufbxi_check(ufbxi_add_connection(uc, node_id, id, name));
+
+		for (size_t i = 0; i < num_channel_nodes; i++) {
+			ufbxi_check(ufbxi_read_take_anim_channel(uc, channel_nodes[i], id, channel_names[i]));
+		}
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_take_object(ufbxi_context *uc, ufbxi_node *node, uint64_t layer_id)
+{
+	// Takes are used only in pre-7000 FBX versions so objects are identified
+	// by their unique Type::Name pair that we use as unique IDs through the
+	// pooled interned string pointers.
+	const char *type_and_name;
+	ufbxi_check(ufbxi_get_val1(node, "C", (char**)&type_and_name));
+	uint64_t node_id = (uintptr_t)type_and_name;
+
+	// Add all suitable Channels as animated properties
+	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
+		const char *name;
+		if (child->name != ufbxi_Channel) continue;
+		if (!ufbxi_get_val1(child, "C", (char**)&name)) continue;
+
+		ufbxi_check(ufbxi_read_take_prop_channel(uc, child, node_id, layer_id, name));
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_take(ufbxi_context *uc, ufbxi_node *node)
+{
+	// Treat the Take as a post-7000 version animation layer.
+	ufbx_anim_layer *layer = ufbxi_push_zero(&uc->tmp_arr_anim_layers, ufbx_anim_layer, 1);
+	ufbxi_check(layer);
+	ufbxi_check(ufbxi_get_val1(node, "S", &layer->name));
+
+	// Add a "virtual" connectable layer instead of connecting all the animated
+	// properties and curves directly to keep the code consistent with post-7000.
+	uint64_t layer_id = (uintptr_t)layer;
+	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ANIM_LAYER, layer_id, uc->tmp_arr_anim_layers.num_items - 1));
+
+	// Read all properties of objects included in the take
+	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
+		// TODO: Do some object types have another name?
+		if (child->name != ufbxi_Model) continue;
+
+		ufbxi_check(ufbxi_read_take_object(uc, child, layer_id));
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_takes(ufbxi_context *uc, ufbxi_node *takes)
+{
+	ufbxi_for(ufbxi_node, node, takes->children, takes->num_children) {
+		if (node->name == ufbxi_Take) {
+			ufbxi_check(ufbxi_read_take(uc, node));
 		}
 	}
 
@@ -3691,11 +4008,68 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc, ufbxi_node *obj
 
 ufbxi_nodiscard static int ufbxi_read_connections(ufbxi_context *uc, ufbxi_node *connections)
 {
+	// Read the connections to the list first
+	ufbxi_for(ufbxi_node, node, connections->children, connections->num_children) {
+		const char *type;
+
+		uint64_t parent_id, child_id;
+		if (uc->version < 7000) {
+			const char *parent_name, *child_name;
+			// Pre-7000 versions use Type::Name pairs as identifiers
+			if (!ufbxi_get_val3(node, "CCC", (char**)&type, (char**)&child_name, (char**)&parent_name)) continue;
+			parent_id = (uintptr_t)parent_name;
+			child_id = (uintptr_t)child_name;
+		} else {
+			// Post-7000 versions use proper unique 64-bit IDs
+			if (!ufbxi_get_val3(node, "CLL", (char**)&type, &child_id, &parent_id)) continue;
+		}
+
+		const char *prop = NULL;
+		if (type == ufbxi_OP) {
+			ufbxi_check(ufbxi_get_val_at(node, 3, 'C', (char**)&prop));
+		}
+
+		ufbxi_check(ufbxi_add_connection(uc, parent_id, child_id, prop));
+	}
+
 	return 1;
 }
 
 ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 {
+	// Initialize root node before reading any models
+	{
+		uint64_t root_id = 0;
+
+		if (uc->version >= 7000) {
+			// Post-7000: Try to find the first document node and root ID.
+			// TODO: Multiple documents / roots?
+			ufbxi_node *documents = ufbxi_find_child(&uc->root, ufbxi_Documents);
+			if (documents) {
+				ufbxi_node *document = ufbxi_find_child(documents, ufbxi_Document);
+				if (document) {
+					ufbxi_ignore(ufbxi_find_val1(document, ufbxi_RootNode, "L", &root_id));
+				}
+			}
+		} else {
+			// Pre-7000: Root node has a specific type-name pair "Model::Scene"
+			// (or reversed in binary). Use the interned name as ID as usual.
+			const char *root_name = uc->from_ascii ? "Model::Scene" : "Scene\x00\x01Model";
+			root_name = ufbxi_push_string_imp(uc, root_name, 12, false);
+			ufbxi_check(root_name);
+			root_id = (uintptr_t)root_name;
+		}
+
+		// The root is always the first model in the array
+		ufbx_assert(uc->tmp_arr_models.size == 0);
+		ufbx_model *model = ufbxi_push_zero(&uc->tmp_arr_models, ufbx_model, 1);
+		ufbxi_check(model);
+		model->node.name.data = "Root";
+		model->node.name.length = 4;
+
+		ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_MODEL, root_id, 0));
+	}
+
 	// FBXHeaderExtension: Some metadata (optional)
 	ufbxi_node *header = ufbxi_find_child(&uc->root, ufbxi_FBXHeaderExtension);
 	if (header) {
@@ -3713,6 +4087,15 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 	ufbxi_check(objects);
 	ufbxi_check(ufbxi_read_objects(uc, objects));
 
+	// Takes: Pre-7000 animations, don't even try to read them in
+	// post-7000 versions as the code has some assumptions about the version.
+	if (uc->version < 7000) {
+		ufbxi_node *takes = ufbxi_find_child(&uc->root, ufbxi_Takes);
+		if (takes) {
+			ufbxi_check(ufbxi_read_takes(uc, takes));
+		}
+	}
+
 	// Connections: Relationships between nodes (required)
 	ufbxi_node *connections = ufbxi_find_child(&uc->root, ufbxi_Connections);
 	ufbxi_check(connections);
@@ -3723,12 +4106,193 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 
 // -- Loading
 
+typedef struct {
+	void *data;
+	size_t size;
+} ufbxi_void_array;
+
+typedef struct {
+	ufbx_node *node;
+	ufbx_model *model;
+	ufbx_mesh *mesh;
+	ufbx_light *light;
+	ufbx_anim_layer *anim_layer;
+	ufbx_anim_prop *anim_prop;
+	ufbx_anim_curve *anim_curve;
+} ufbxi_connectable_data;
+
+ufbxi_nodiscard static int ufbxi_retain_array(ufbxi_context *uc, size_t size, void *p_array, ufbxi_buf *buf)
+{
+	ufbxi_void_array *arr = (ufbxi_void_array*)p_array;
+	arr->size = buf->num_items;
+	arr->data = ufbxi_push_pop_size(&uc->result, buf, size, buf->num_items);
+	ufbxi_check(arr->data);
+
+	ufbxi_buf_free(buf);
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_find_connectable_data(ufbxi_context *uc, ufbxi_connectable_data *data, uint64_t id)
+{
+	ufbxi_connectable *conn = ufbxi_find_connectable(uc, id);
+	if (!conn) return 0;
+
+	memset(data, 0, sizeof(ufbxi_connectable_data));
+
+	switch (conn->type) {
+	case UFBXI_CONNECTABLE_MODEL:
+		data->model = &uc->scene.models.data[conn->index];
+		data->node = &data->model->node;
+		break;
+	case UFBXI_CONNECTABLE_MESH:
+		data->mesh = &uc->scene.meshes.data[conn->index];
+		data->node = &data->mesh->node;
+		break;
+	case UFBXI_CONNECTABLE_LIGHT:
+		data->light = &uc->scene.lights.data[conn->index];
+		data->node = &data->light->node;
+		break;
+	case UFBXI_CONNECTABLE_GEOMETRY:
+		// TODO
+		break;
+	case UFBXI_CONNECTABLE_ANIM_LAYER:
+		data->anim_layer = &uc->scene.anim_layers.data[conn->index];
+		break;
+	case UFBXI_CONNECTABLE_ANIM_PROP:
+		data->anim_prop = &uc->scene.anim_props.data[conn->index];
+		break;
+	case UFBXI_CONNECTABLE_ANIM_CURVE:
+		data->anim_curve = &uc->scene.anim_curves.data[conn->index];
+		break;
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_collect_nodes(ufbxi_context *uc, size_t size, ufbx_node ***p_dst, void *data, size_t num)
+{
+	// Collect pointers to the node headers of unknown node "sub-classes"
+	ufbx_node **dst = *p_dst;
+	char *ptr = (char*)data;
+	for (size_t i = 0; i < num; i++) {
+		*dst++ = (ufbx_node*)ptr;
+		ptr += size;
+	}
+	*p_dst = dst;
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
+{
+	// Retrieve all temporary arrays
+	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_model), &uc->scene.models, &uc->tmp_arr_models));
+	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_mesh), &uc->scene.meshes, &uc->tmp_arr_meshes));
+	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_light), &uc->scene.lights, &uc->tmp_arr_lights));
+	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_anim_layer), &uc->scene.anim_layers, &uc->tmp_arr_anim_layers));
+	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_anim_prop), &uc->scene.anim_props, &uc->tmp_arr_anim_props));
+	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_anim_curve), &uc->scene.anim_curves, &uc->tmp_arr_anim_curves));
+
+	// Linearize the connections into an array for processing. This includes both
+	// connections read from `Connections` and "virtual" connections added elsewhere using
+	// `ufbxi_add_connection()`
+	size_t num_conns = uc->tmp_connection.num_items;
+	ufbxi_connection *conns = ufbxi_make_array(&uc->tmp_connection, ufbxi_connection, num_conns);
+	ufbxi_check(conns);
+
+	// Process the connections
+	ufbxi_for(ufbxi_connection, conn, conns, num_conns) {
+		ufbxi_connectable_data parent, child;
+		if (!ufbxi_find_connectable_data(uc, &parent, conn->parent_id)) continue;
+		if (!ufbxi_find_connectable_data(uc, &child, conn->child_id)) continue;
+		const char *prop = conn->prop_name;
+
+		if (parent.model) {
+			if (child.node) {
+				child.node->parent = parent.model;
+				parent.model->children.size++;
+			}
+		}
+
+		if (parent.node) {
+			if (child.anim_prop) {
+				if (prop) {
+					size_t len = strlen(prop);
+					child.anim_prop->node = parent.node;
+					child.anim_prop->name.data = prop;
+					child.anim_prop->name.length = strlen(prop);
+					child.anim_prop->imp_key = ufbxi_get_name_key(prop, len);
+				} else {
+					child.anim_prop->name.data = "";
+				}
+			}
+		}
+
+		if (parent.anim_layer) {
+			if (child.anim_prop) {
+				parent.anim_layer->props.size++;
+				child.anim_prop->layer = parent.anim_layer;
+			}
+		}
+
+		if (parent.anim_prop) {
+			if (child.anim_curve) {
+				child.anim_curve->prop = parent.anim_prop;
+
+				size_t index = 0;
+				if (prop) {
+					if (prop == ufbxi_Y || prop == ufbxi_D_Y) index = 1;
+					if (prop == ufbxi_Z || prop == ufbxi_D_Z) index = 2;
+				}
+
+				parent.anim_prop->curves[index] = *child.anim_curve;
+			}
+		}
+	}
+
+	// Allocate storage for child arrays
+	ufbxi_for(ufbx_model, model, uc->scene.models.data, uc->scene.models.size) {
+		model->children.data = ufbxi_push(&uc->result, ufbx_node*, model->children.size);
+		model->children.size = 0;
+	}
+	ufbxi_for(ufbx_anim_layer, layer, uc->scene.anim_layers.data, uc->scene.anim_layers.size) {
+		layer->props.data = ufbxi_push(&uc->result, ufbx_anim_prop, layer->props.size);
+		layer->props.size = 0;
+	}
+
+	// Add all nodes to the scenes node list
+	size_t num_nodes = uc->scene.models.size + uc->scene.meshes.size + uc->scene.lights.size;
+	ufbx_node **nodes = ufbxi_push(&uc->result, ufbx_node*, num_nodes);
+	ufbxi_check(nodes);
+	uc->scene.nodes.data = nodes;
+	uc->scene.nodes.size = num_nodes;
+	ufbxi_check(ufbxi_collect_nodes(uc, sizeof(ufbx_model), &nodes, uc->scene.models.data, uc->scene.models.size));
+	ufbxi_check(ufbxi_collect_nodes(uc, sizeof(ufbx_mesh), &nodes, uc->scene.meshes.data, uc->scene.meshes.size));
+	ufbxi_check(ufbxi_collect_nodes(uc, sizeof(ufbx_light), &nodes, uc->scene.lights.data, uc->scene.lights.size));
+
+	// Fill child arrays
+	ufbxi_for_ptr(ufbx_node, p_node, uc->scene.nodes.data, uc->scene.nodes.size) {
+		ufbx_model *parent = (*p_node)->parent;
+		if (!parent) continue;
+		parent->children.data[parent->children.size++] = *p_node;
+	}
+	ufbxi_for(ufbx_anim_prop, prop, uc->scene.anim_props.data, uc->scene.anim_props.size) {
+		ufbx_anim_layer *layer = prop->layer;
+		if (!layer) continue;
+		layer->props.data[layer->props.size++] = *prop;
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 {
 	ufbxi_check(ufbxi_load_strings(uc));
 	ufbxi_check(ufbxi_load_maps(uc));
 	ufbxi_check(ufbxi_parse(uc));
 	ufbxi_check(ufbxi_read_root(uc));
+	ufbxi_check(ufbxi_finalize_scene(uc));
 
 	// Copy local data to the scene
 	uc->scene.metadata.version = uc->version;
@@ -3816,10 +4380,18 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 
 	uc->string_map.ator = &uc->ator_tmp;
 	uc->prop_type_map.ator = &uc->ator_tmp;
+	uc->connectable_map.ator = &uc->ator_tmp;
 
 	uc->tmp.ator = &uc->ator_tmp;
 	uc->tmp_node.ator = &uc->ator_tmp;
 	uc->tmp_template.ator = &uc->ator_tmp;
+	uc->tmp_connection.ator = &uc->ator_tmp;
+	uc->tmp_arr_models.ator = &uc->ator_tmp;
+	uc->tmp_arr_meshes.ator = &uc->ator_tmp;
+	uc->tmp_arr_lights.ator = &uc->ator_tmp;
+	uc->tmp_arr_anim_layers.ator = &uc->ator_tmp;
+	uc->tmp_arr_anim_props.ator = &uc->ator_tmp;
+	uc->tmp_arr_anim_curves.ator = &uc->ator_tmp;
 
 	uc->result.ator = &uc->ator_result;
 	uc->string_buf.ator = &uc->ator_result;
