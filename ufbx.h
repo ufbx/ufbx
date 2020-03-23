@@ -234,16 +234,16 @@ enum ufbx_node_type {
 };
 
 struct ufbx_node {
+	ufbx_node_type type;
 	ufbx_string name;
 	ufbx_props props;
-	ufbx_model *parent;
+	ufbx_node *parent;
 	ufbx_transform transform;
+	ufbx_node_list children;
 };
 
 struct ufbx_model {
 	ufbx_node node;
-
-	ufbx_node_list children;
 };
 
 struct ufbx_mesh {
@@ -303,6 +303,7 @@ struct ufbx_anim_prop {
 	ufbx_anim_layer *layer;
 	ufbx_node *node;
 	ufbx_anim_curve curves[3];
+	ufbx_real defaults[3];
 };
 
 struct ufbx_keyframe {
