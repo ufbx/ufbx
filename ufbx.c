@@ -4414,7 +4414,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 					child.anim_prop->name.length = strlen(prop);
 					child.anim_prop->imp_key = ufbxi_get_name_key(prop, len);
 				} else {
-					child.anim_prop->name.data = "";
+					child.anim_prop->name = ufbx_empty_string;
 				}
 			}
 		}
