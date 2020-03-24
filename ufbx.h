@@ -81,11 +81,10 @@ typedef struct ufbx_matrix {
 
 // -- Properties
 
-typedef enum ufbx_prop_type ufbx_prop_type;
 typedef struct ufbx_prop ufbx_prop;
 typedef struct ufbx_props ufbx_props;
 
-enum ufbx_prop_type {
+typedef enum ufbx_prop_type {
 	UFBX_PROP_UNKNOWN,
 	UFBX_PROP_BOOLEAN,
 	UFBX_PROP_INTEGER,
@@ -99,7 +98,7 @@ enum ufbx_prop_type {
 	UFBX_PROP_SCALING,
 
 	UFBX_NUM_PROP_TYPES,
-};
+} ufbx_prop_type;
 
 struct ufbx_prop {
 	ufbx_string name;
@@ -215,7 +214,6 @@ struct ufbx_material {
 
 // -- Scene graph
 
-typedef enum ufbx_node_type ufbx_node_type;
 typedef struct ufbx_node ufbx_node;
 typedef struct ufbx_model ufbx_model;
 typedef struct ufbx_mesh ufbx_mesh;
@@ -226,12 +224,12 @@ typedef struct ufbx_model_list { ufbx_model *data; size_t size; } ufbx_model_lis
 typedef struct ufbx_mesh_list { ufbx_mesh *data; size_t size; } ufbx_mesh_list;
 typedef struct ufbx_light_list { ufbx_light *data; size_t size; } ufbx_light_list;
 
-enum ufbx_node_type {
+typedef enum ufbx_node_type {
 	UFBX_NODE_UNKNOWN,
 	UFBX_NODE_MODEL,
 	UFBX_NODE_MESH,
 	UFBX_NODE_LIGHT,
-};
+} ufbx_node_type;
 
 struct ufbx_node {
 	ufbx_node_type type;
@@ -267,7 +265,6 @@ typedef struct ufbx_anim_prop ufbx_anim_prop;
 typedef struct ufbx_anim_curve ufbx_anim_curve;
 typedef struct ufbx_keyframe ufbx_keyframe;
 typedef struct ufbx_tangent ufbx_tangent;
-typedef enum ufbx_interpolation ufbx_interpolation;
 typedef struct ufbx_anim_state ufbx_anim_state;
 
 typedef struct ufbx_anim_layer_list { ufbx_anim_layer *data; size_t size; } ufbx_anim_layer_list;
@@ -280,12 +277,12 @@ struct ufbx_tangent {
 	float dy;
 };
 
-enum ufbx_interpolation {
+typedef enum ufbx_interpolation {
 	UFBX_INTERPOLATION_CONSTANT_PREV,
 	UFBX_INTERPOLATION_CONSTANT_NEXT,
 	UFBX_INTERPOLATION_LINEAR,
 	UFBX_INTERPOLATION_CUBIC,
-};
+} ufbx_interpolation;
 
 struct ufbx_anim_layer {
 	ufbx_string name;

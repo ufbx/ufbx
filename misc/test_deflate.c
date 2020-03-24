@@ -1,7 +1,7 @@
 #define ufbx_assert(cond) do { \
 		if (!(cond)) exit(1); \
 	} while (0)
-#include "../ufbx_implementation.h"
+#include "../ufbx.c"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,7 +35,13 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	ptrdiff_t result = ufbxi_inflate(dst, dst_size, src, src_size);
+	ufbx_inflate_retain retain;
+	retain.initialized = false;
+	ufbx_inflate_input input = { 0 };
+	input.data = src;
+	input.data_size = src_size;
+
+	ptrdiff_t result = ufbx_inflate(dst, dst_size, &input, &retain);
 	if (result != dst_size) {
 		fprintf(stderr, "Failed to decompress: %d\n", (int)result);
 		return 1;
