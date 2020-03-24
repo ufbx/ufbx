@@ -3536,13 +3536,6 @@ ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc, ufbxi_node 
 	return 1;
 }
 
-static float ufbxi_convert_weight(const float *p_value)
-{
-	// Even though FBX stores the values as floats _and_ the record is named
-	// KeyAttrDataFloat, for some reason tangents weights are stored as integers.
-	int32_t val_i = *(int32_t*)p_value;
-}
-
 ufbxi_nodiscard static int ufbxi_add_connection(ufbxi_context *uc, uint64_t parent_id, uint64_t child_id, const char *prop_name)
 {
 	ufbxi_connection *conn = ufbxi_push(&uc->tmp_connection, ufbxi_connection, 1);
