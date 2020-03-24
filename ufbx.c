@@ -1145,7 +1145,7 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 		ufbxi_bit_refill(&bits, &left, &data, &dc.stream);
 
 		uint32_t ref = (uint32_t)bits;
-		ref = (ref>>24) | (ref>>8)&0xff00 | (ref<<8)&0xff0000 | (ref<<24);
+		ref = (ref>>24) | ((ref>>8)&0xff00) | ((ref<<8)&0xff0000) | (ref<<24);
 
 		uint32_t checksum = ufbxi_adler32(dc.out_begin, dc.out_ptr - dc.out_begin);
 		if (ref != checksum) {
@@ -2348,6 +2348,9 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 		if (name == ufbxi_Channel) return UFBXI_PARSE_CHANNEL;
 		break;
 
+	default:
+		break;
+
 	}
 
 	return UFBXI_PARSE_UNKNOWN;
@@ -2407,6 +2410,8 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 		}
 		break;
 
+	default:
+		break;
 	}
 
 	return false;
@@ -4194,6 +4199,7 @@ ufbxi_nodiscard static int ufbxi_read_connections(ufbxi_context *uc, ufbxi_node 
 				attr->parent_type = parent->type;
 				attr->parent_index = parent->index;
 				break;
+			default: break;
 			}
 		}
 
@@ -4323,6 +4329,9 @@ ufbxi_nodiscard static int ufbxi_find_connectable_data(ufbxi_context *uc, ufbxi_
 	}
 
 	switch (type) {
+	case UFBXI_CONNECTABLE_UNKNOWN:
+		// Nop
+		break;
 	case UFBXI_CONNECTABLE_MODEL:
 		data->model = &uc->scene.models.data[index];
 		data->node = &data->model->node;
@@ -4346,6 +4355,9 @@ ufbxi_nodiscard static int ufbxi_find_connectable_data(ufbxi_context *uc, ufbxi_
 		break;
 	case UFBXI_CONNECTABLE_ANIM_CURVE:
 		data->anim_curve = &uc->scene.anim_curves.data[index];
+		break;
+	case UFBXI_CONNECTABLE_ATTRIBUTE:
+		// Handled above
 		break;
 	}
 
@@ -4613,7 +4625,7 @@ static size_t ufbxi_file_read(void *user, void *data, size_t max_size)
 extern "C" {
 #endif
 
-const ufbx_string ufbx_empty_string;
+const ufbx_string ufbx_empty_string = { "", 0 };
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)
 {
