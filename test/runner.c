@@ -7,11 +7,14 @@ void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr);
 		if (!(cond)) ufbxt_assert_fail(__FILE__, __LINE__, "Internal assert: " #cond); \
 	} while (0)
 
-#include "../ufbx_implementation.h"
+#define ufbxt_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
 
 #undef ufbx_assert
 
+#include "../ufbx.h"
+
 #include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <setjmp.h>
 #include <stdarg.h>
@@ -270,8 +273,6 @@ ufbxt_test *g_current_test;
 uint64_t g_bechmark_begin_tick;
 
 ufbx_error g_error;
-ufbxi_context g_context;
-ufbxi_ascii g_ascii;
 jmp_buf g_test_jmp;
 int g_verbose;
 
@@ -279,40 +280,6 @@ char g_log_buf[8*1024];
 uint32_t g_log_pos;
 
 char g_hint[8*1024];
-
-ufbxi_context *ufbxt_make_memory_context(const void *data, uint32_t size)
-{
-	char *data_copy = malloc(size + 13);
-	memcpy(data_copy, data, size);
-	memset(data_copy + size, 0, 13);
-	ufbxi_context *uc = &g_context;
-	memset(uc, 0, sizeof(ufbxi_context));
-	uc->base.error = &g_error;
-	uc->base.data = data_copy;
-	uc->base.size = size + 13;
-	uc->base.uc = uc;
-	uc->node_stack_top = uc->node_stack;
-	uc->node_stack_top->node.end_pos = size;
-	return uc;
-}
-
-ufbxi_context *ufbxt_make_memory_context_values(const void *data, uint32_t size)
-{
-	ufbxi_context *uc = ufbxt_make_memory_context(data, size);
-	uc->focused_node.child_begin_pos = size;
-	uc->focused_node.end_pos = size;
-	return uc;
-}
-
-ufbxi_ascii *ufbxt_ascii_context(const char *data)
-{
-	ufbxi_ascii *ua = &g_ascii;
-	memset(ua, 0, sizeof(ufbxi_ascii));
-	ua->src = data;
-	ua->src_end = data + strlen(data);
-	ua->error = &g_error;
-	return ua;
-}
 
 void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
 {
@@ -382,28 +349,13 @@ void ufbxt_log_flush()
 	g_log_pos = 0;
 }
 
-void ufbxt_log_error_common(ufbx_error *err)
+void ufbxt_log_error(ufbx_error *err)
 {
 	if (!err) return;
-	if (err->stack_size > 0) {
-		char stack[128];
-		char *ptr = stack, *end = stack + sizeof(stack);
-		for (uint32_t i = 0; i < err->stack_size; i++) {
-			ptr += snprintf(ptr, end - ptr, " / %s", err->stack[i]);
-		}
-		ufbxt_logf("%s", stack);
+	for (size_t i = 0; i < err->stack_size; i++) {
+		ufbx_error_frame *f = &err->stack[i];
+		ufbxt_logf("Line %u %s: %s\n", f->source_line, f->function, f->description);
 	}
-	ufbxt_logf("(line %u) %s", err->source_line, err->desc);
-}
-
-void ufbxt_log_error(ufbxi_context *uc)
-{
-	ufbxt_log_error_common(uc->base.error);
-}
-
-void ufbxt_log_ascii_error(ufbxi_ascii *ua)
-{
-	ufbxt_log_error_common(ua->error);
 }
 
 void ufbxt_bechmark_begin()
@@ -646,10 +598,10 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 {
 	for (size_t mesh_i = 0; mesh_i < obj->num_meshes; mesh_i++) {
 		ufbxt_obj_mesh *obj_mesh = &obj->meshes[mesh_i];
-		ufbx_model *model = ufbx_find_model(scene, obj_mesh->name);
-		ufbxt_assert(model);
-		ufbxt_assert(model->meshes.size == 1);
-		ufbx_mesh *mesh = model->meshes.data[0];
+		ufbx_mesh *mesh = ufbx_find_mesh(scene, obj_mesh->name);
+		ufbxt_assert(mesh);
+
+#if 0
 
 		ufbxt_assert(obj_mesh->num_faces == mesh->num_faces);
 		ufbxt_assert(obj_mesh->num_indices == mesh->num_indices);
@@ -689,12 +641,13 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 
 			}
 		}
+#endif
 	}
 }
 
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 {
-	const uint32_t file_versions[] = { 6100, 7100, 7400, 7500 };
+	const uint32_t file_versions[] = { 6100, 7100, 7400, 7500, 7700 };
 
 	char buf[512];
 	snprintf(buf, sizeof(buf), "%s%s.obj", data_root, name);
@@ -705,7 +658,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 
 	uint32_t num_opened = 0;
 
-	for (uint32_t vi = 0; vi < ufbxi_arraycount(file_versions); vi++) {
+	for (uint32_t vi = 0; vi < ufbxt_arraycount(file_versions); vi++) {
 		for (uint32_t fi = 0; fi < 2; fi++) {
 			uint32_t version = file_versions[vi];
 			const char *format = fi == 1 ? "ascii" : "binary";
@@ -721,7 +674,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 			ufbx_error error;
 			ufbx_scene *scene = ufbx_load_memory(data, size, NULL, &error);
 			if (!scene) {
-				ufbxt_log_error_common(&error);
+				ufbxt_log_error(&error);
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file");
 			}
 
@@ -773,7 +726,7 @@ int ufbxt_run_test(ufbxt_test *test)
 	printf("%s: ", test->name);
 	fflush(stdout);
 
-	g_error.desc[0] = 0;
+	g_error.stack_size = 0;
 	g_hint[0] = '\0';
 
 	g_current_test = test;
@@ -786,8 +739,8 @@ int ufbxt_run_test(ufbxt_test *test)
 		if (g_hint[0]) {
 			ufbxt_logf("Hint: %s", g_hint);
 		}
-		if (g_error.desc[0]) {
-			ufbxt_log_error(&g_context);
+		if (g_error.stack_size) {
+			ufbxt_log_error(&g_error);
 		}
 
 		return 0;
@@ -796,7 +749,7 @@ int ufbxt_run_test(ufbxt_test *test)
 
 int main(int argc, char **argv)
 {
-	uint32_t num_tests = ufbxi_arraycount(g_tests);
+	uint32_t num_tests = ufbxt_arraycount(g_tests);
 	uint32_t num_ok = 0;
 	const char *test_filter = NULL;
 

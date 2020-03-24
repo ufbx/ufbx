@@ -16,7 +16,7 @@ script:
     - clang -lm -coverage -g -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
     - ./runner -v -d ../data/
     - llvm-cov gcov runner
-    - cp ufbx_implementation.h.gcov ../ufbx_implementation.h.gcov
+    - cp ufbx.c.gcov ../ufbx.c.gcov
     - rm *.gcov
 
 after_success:

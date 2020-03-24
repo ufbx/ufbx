@@ -598,6 +598,10 @@ ufbxi_bit_copy_bytes(void *dst, ufbxi_bit_stream *s, size_t len)
 		s->left -= 8;
 	}
 
+	// We need to clear the top bits as there may be data
+	// read ahead past `s->left` in some cases
+	s->bits = 0;
+
 	// Copy the current chunk
 	size_t chunk_left = s->chunk_real_end - s->chunk_ptr;
 	if (chunk_left >= len) {
@@ -1023,7 +1027,7 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 // -5: Uncompressed source overflow
 // -6: Uncompressed destination overflow
 // -7: Bad block type
-// -8: Truncated checksum
+// -8: Truncated checksum (deprecated, reported as -9)
 // -9: Checksum mismatch
 // -10: Literal destination overflow
 // -11: Bad distance code or distance of (30..31)
@@ -2209,7 +2213,7 @@ static ufbxi_node *ufbxi_find_child(ufbxi_node *node, const char *name)
 
 // Retrieve values from nodes with type codes:
 // Any: '_' (ignore)
-// NUMBER: 'I' int32_t 'L' int64_t 'F' float 'D' double 'R' ufbxi_real 'B' bool
+// NUMBER: 'I' int32_t 'L' int64_t 'F' float 'D' double 'R' ufbxi_real 'B' bool 'Z' size_t
 // STRING: 'S' ufbx_string 'C' const char*
 
 ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, size_t ix, char fmt, void *v)
@@ -2223,6 +2227,7 @@ ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, 
 	case 'D': if (type == UFBXI_VALUE_NUMBER) { *(double*)v = (double)node->vals[ix].f; return 1; } else return 0;
 	case 'R': if (type == UFBXI_VALUE_NUMBER) { *(ufbx_real*)v = (ufbx_real)node->vals[ix].f; return 1; } else return 0;
 	case 'B': if (type == UFBXI_VALUE_NUMBER) { *(bool*)v = node->vals[ix].i != 0; return 1; } else return 0;
+	case 'Z': if (type == UFBXI_VALUE_NUMBER) { if (node->vals[ix].i < 0) return 0; *(size_t*)v = (size_t)node->vals[ix].i; return 1; } else return 0;
 	case 'S': if (type == UFBXI_VALUE_STRING) { *(ufbx_string*)v = node->vals[ix].s; return 1; } else return 0;
 	case 'C': if (type == UFBXI_VALUE_STRING) { *(const char**)v = node->vals[ix].s.data; return 1; } else return 0;
 	default:
@@ -3727,7 +3732,7 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_n
 					// Broken tangents: No need to modify slopes
 				} else {
 					// Unified tangents: Use right slope for both sides
-					slope_left = slope_right;
+					// TODO: ??? slope_left = slope_right;
 				}
 
 			} else {
@@ -3735,34 +3740,9 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_n
 				// TODO: TCB tangents (0x200)
 				// TODO: Auto break (0x800)
 
-				if (i > 0 && i + 1 < num_keys && key->time > prev_time && next_time > key->time) {
-					// In between two keyframes: Set the initial slope to be the difference between
-					// the two keyframes. Prevent overshooting by clamping the slope in case either
-					// tangent goes above/below the endpoints.
-					double slope = (p_value[1] - p_value[-1]) / (next_time - prev_time);
-
-					// Split the slope to sign and a non-negative absolute value
-					double slope_sign = slope >= 0.0 ? 1.0 : -1.0;
-					double abs_slope = slope_sign * slope;
-
-					// Find limits for the absolute value of the sign
-					double max_left = slope_sign * (key->value - p_value[-1]) / (weight_left * (key->time - prev_time));
-					double max_right = slope_sign * (p_value[1] - key->value) / (weight_right * (next_time - key->time));
-
-					// Clamp negative values and NaNs (in case weight*delta_time underflows) to zero 
-					if (!(max_left > 0.0)) max_left = 0.0;
-					if (!(max_right > 0.0)) max_right = 0.0;
-
-					// Clamp the absolute slope from both sides
-					if (abs_slope > max_left) abs_slope = max_left;
-					if (abs_slope > max_right) abs_slope = max_right;
-
-					slope_left = slope_right = (float)(slope_sign * abs_slope);
-				} else {
-					// Endpoint / invalid keyframe: Set both slopes to zero
-					slope_left = slope_right = 0.0f;
-				}
-
+				// Automatic tangents are specified via the previous tangent's
+				// NextLeftSlope value
+				slope_right = slope_left;
 			}
 
 		} else {
@@ -3916,6 +3896,12 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc, ufbxi_node *obj
 
 ufbxi_nodiscard static int ufbxi_read_take_anim_channel(ufbxi_context *uc, ufbxi_node *node, uint64_t parent_id, const char *name, ufbx_real *p_default)
 {
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Default, "R", p_default));
+
+	// Find the key array, early return with success if not found as we may have only a default
+	ufbxi_value_array *keys = ufbxi_find_array(node, ufbxi_Key, 'd');
+	if (!keys) return 1;
+
 	ufbx_anim_curve *curve = ufbxi_push_zero(&uc->tmp_arr_anim_curves, ufbx_anim_curve, 1);
 	ufbxi_check(curve);
 
@@ -3924,9 +3910,114 @@ ufbxi_nodiscard static int ufbxi_read_take_anim_channel(ufbxi_context *uc, ufbxi
 	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ANIM_CURVE, id, uc->tmp_arr_anim_curves.num_items - 1));
 	ufbxi_check(ufbxi_add_connection(uc, parent_id, id, name));
 
-	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Default, "R", p_default));
+	size_t num_keys;
+	ufbxi_check(ufbxi_find_val1(node, ufbxi_KeyCount, "Z", &num_keys));
+	curve->keyframes.data = ufbxi_push(&uc->result, ufbx_keyframe, num_keys);
+	curve->keyframes.size = num_keys;
+	ufbxi_check(curve->keyframes.data);
 
-	// TODO: Read keyframes
+	float slope_left = 0.0f;
+	float weight_left = 0.333333f;
+
+	double next_time = 0.0;
+	double next_value = 0.0;
+	double prev_time = 0.0;
+
+	// The pre-7000 keyframe data is stored as a _heterogenous_ array containing 64-bit integers,
+	// floating point values, and _bare characters_. We cast all values to double and interpret them.
+	double *data = (double*)keys->data, *data_end = data + keys->size;
+
+	if (num_keys > 0) {
+		ufbxi_check(data_end - data >= 2);
+		next_time = data[0] * uc->ktime_to_sec;
+		next_value = data[1];
+	}
+
+	for (size_t i = 0; i < num_keys; i++) {
+		ufbx_keyframe *key = &curve->keyframes.data[i];
+
+		// First three values: Time, Value, InterpolationMode
+		ufbxi_check(data_end - data >= 3);
+		key->time = next_time;
+		key->value = (ufbx_real)next_value;
+		char mode = (char)data[2];
+		data += 3;
+
+		float slope_right = 0.0f;
+		float weight_right = 0.333333f;
+		float next_slope_left = 0.0f;
+		float next_weight_left = 0.333333f;
+
+		if (mode == 'U') {
+			// Cubic interpolation: At least 4 parameters: mode/broken (ignored), RightSlope, NextLeftSlope, weight mode
+			key->interpolation = UFBX_INTERPOLATION_CUBIC;
+			ufbxi_check(data_end - data >= 4);
+			slope_right = (float)data[1];
+			next_slope_left = (float)data[2];
+			char weight_mode = (char)data[3];
+			data += 4;
+
+			if (weight_mode == 'n') {
+				// Automatic weights (0.3333...)
+			} else if (weight_mode == 'a') {
+				// Manual weights: RightWeight, NextLeftWeight
+				ufbxi_check(data_end - data >= 2);
+				weight_right = (float)data[0];
+				next_weight_left = (float)data[1];
+				data += 2;
+			}
+
+		} else if (mode == 'L') {
+			// Linear interpolation: No parameters
+			key->interpolation = UFBX_INTERPOLATION_LINEAR;
+		} else if (mode == 'C') {
+			// Constant interpolation: Single parameter (use prev/next)
+			ufbxi_check(data_end - data >= 1);
+			key->interpolation = (char)data[0] == 'n' ? UFBX_INTERPOLATION_CONSTANT_NEXT : UFBX_INTERPOLATION_CONSTANT_PREV;
+			data += 1;
+		} else {
+			ufbxi_fail("Unknown key mode");
+		}
+
+		// Retrieve next key and value
+		if (i + 1 < num_keys) {
+			ufbxi_check(data_end - data >= 2);
+			next_time = data[0] * uc->ktime_to_sec;
+			next_value = data[1];
+		}
+
+		// Set up linear cubic tangents if necessary
+		if (key->interpolation == UFBX_INTERPOLATION_LINEAR) {
+			if (next_time > key->time) {
+				double slope = (next_value - key->value) / (next_time - key->time);
+				slope_right = next_slope_left = (float)slope;
+			} else {
+				slope_right = next_slope_left = 0.0f;
+			}
+		}
+
+		if (key->time > prev_time) {
+			key->left.dx = (float)(weight_left * (key->time - prev_time));
+			key->left.dy = key->left.dx * slope_left;
+		} else {
+			key->left.dx = 0.0f;
+			key->left.dy = 0.0f;
+		}
+
+		if (next_time > key->time) {
+			key->right.dx = (float)(weight_right * (next_time - key->time));
+			key->right.dy = key->right.dx * slope_right;
+		} else {
+			key->right.dx = 0.0f;
+			key->right.dy = 0.0f;
+		}
+
+		slope_left = next_slope_left;
+		weight_left = next_weight_left;
+		prev_time = key->time;
+	}
+
+	ufbxi_check(data == data_end);
 
 	return 1;
 }
@@ -4572,6 +4663,16 @@ void ufbx_free_scene(ufbx_scene *scene)
 	// from the same result buffer!
 	ufbxi_buf result = imp->result_buf;
 	ufbxi_buf_free(&result);
+}
+
+ufbx_mesh *ufbx_find_mesh_len(const ufbx_scene *scene, const char *name, size_t name_len)
+{
+	ufbxi_for(ufbx_mesh, mesh, scene->meshes.data, scene->meshes.size) {
+		if (mesh->node.name.length == name_len && !memcmp(mesh->node.name.data, name, name_len)) {
+			return mesh;
+		}
+	}
+	return NULL;
 }
 
 #ifdef __cplusplus

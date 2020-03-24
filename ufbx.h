@@ -431,7 +431,9 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts
 ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error);
 void ufbx_free_scene(ufbx_scene *scene);
 
-ufbx_prop *ufbx_get_prop_len(const ufbx_props *props, const char *name, size_t name_len);
+ufbx_mesh *ufbx_find_mesh_len(const ufbx_scene *scene, const char *name, size_t name_len);
+
+ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len);
 
 ufbx_vec4 ufbx_get_rotation_quaternion(ufbx_rotation_order order, ufbx_vec3 euler);
 ufbx_matrix ufbx_get_transform_matrix(const ufbx_transform *transform);
@@ -451,8 +453,12 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 
 // -- Inline API
 
-ufbx_inline ufbx_prop *ufbx_get_prop(const ufbx_props *props, const char *name) {
-	return ufbx_get_prop_len(props, name, strlen(name));
+ufbx_inline ufbx_mesh *ufbx_find_mesh(const ufbx_scene *scene, const char *name) {
+	return ufbx_find_mesh_len(scene, name, strlen(name));
+}
+
+ufbx_inline ufbx_prop *ufbx_find_prop(const ufbx_props *props, const char *name) {
+	return ufbx_find_prop_len(props, name, strlen(name));
 }
 
 ufbx_inline ufbx_real ufbx_evaluate_prop_real(const ufbx_anim_state *state, const ufbx_node *node, const char *prop) {
