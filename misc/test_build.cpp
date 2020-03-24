@@ -1,4 +1,4 @@
-#include "../ufbx_implementation.h"
+#include "../ufbx.c"
 
 int main(int argc, char **argv)
 {

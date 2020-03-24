@@ -1179,6 +1179,9 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 
 // -- Allocator
 
+// Returned for zero size allocations
+static char ufbxi_zero_size_buffer[1];
+
 typedef struct {
 	ufbx_error *error;
 	size_t current_size;
@@ -1199,7 +1202,7 @@ static void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size, size_t n)
 {
 	// Always succeed with an emtpy non-NULL buffer for empty allocations
 	ufbx_assert(size > 0);
-	if (n == 0) return "";
+	if (n == 0) return ufbxi_zero_size_buffer;
 
 	size_t total = size * n;
 	ufbxi_check_return_err(ator->error, !ufbxi_does_overflow(total, size, n), NULL);
@@ -1435,7 +1438,7 @@ static void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
 {
 	// Always succeed with an emtpy non-NULL buffer for empty allocations
 	ufbx_assert(size > 0);
-	if (n == 0) return "";
+	if (n == 0) return ufbxi_zero_size_buffer;
 
 	b->num_items += n;
 
@@ -1556,7 +1559,7 @@ static void *ufbxi_make_array_size(ufbxi_buf *b, size_t size, size_t n)
 {
 	// Always succeed with an emtpy non-NULL buffer for empty allocations
 	ufbx_assert(size > 0);
-	if (n == 0) return "";
+	if (n == 0) return ufbxi_zero_size_buffer;
 
 	size_t total = size * n;
 	if (ufbxi_does_overflow(total, size, n)) return NULL;
@@ -1684,8 +1687,8 @@ static void ufbxi_map_free(ufbxi_map *map)
 }
 
 #define ufbxi_map_grow(map, type, min_size) ufbxi_map_grow_size((map), sizeof(type), (min_size))
-#define ufbxi_map_find(map, type, p_scan, hash) ufbxi_map_find_size((map), sizeof(type), (p_scan), (hash))
-#define ufbxi_map_insert(map, type, scan, hash) ufbxi_map_insert_size((map), sizeof(type), (scan), (hash))
+#define ufbxi_map_find(map, type, p_scan, hash) (type*)ufbxi_map_find_size((map), sizeof(type), (p_scan), (hash))
+#define ufbxi_map_insert(map, type, scan, hash) (type*)ufbxi_map_insert_size((map), sizeof(type), (scan), (hash))
 
 // -- Hash functions
 
@@ -2793,7 +2796,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 	uint64_t offset = ufbxi_get_read_offset(uc);
 	ufbxi_check(offset <= values_end_offset);
 	if (offset < values_end_offset) {
-		ufbxi_skip_bytes(uc, values_end_offset - offset);
+		ufbxi_check(ufbxi_skip_bytes(uc, values_end_offset - offset));
 	}
 
 	// Recursively parse the children of this node. Update the parse state
