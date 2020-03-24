@@ -9,9 +9,9 @@ script:
     - clang -lm -O2 ../misc/test_deflate.c -o test_deflate
     - clang++ -lm ../misc/test_build.cpp -o test_build_cpp
     - python3 ../misc/test_deflate.py ./test_deflate ..
-    - clang -lm -O2 -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
+    - clang -lm -O2 -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../ufbx.c ../test/runner.c -o runner
     - ./runner -v -d ../data
-    - clang -lm -coverage -g -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../test/runner.c -o runner
+    - clang -lm -coverage -g -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../ufbx.c ../test/runner.c -o runner
     - ./runner -v -d ../data/
     - llvm-cov gcov runner
     - cp ufbx.c.gcov ../ufbx.c.gcov
