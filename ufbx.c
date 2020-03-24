@@ -2178,12 +2178,6 @@ static ufbxi_forceinline uint64_t ufbxi_get_read_offset(ufbxi_context *uc)
 
 // -- FBX value type information
 
-static ufbxi_forceinline bool ufbxi_parse_bool(char c)
-{
-	// Treat \0, 'F', 'N' as falsey values, other values are true
-	return (c == 0 || c == 'F' || c == 'N' || c == '0') ? 0 : 1;
-}
-
 static char ufbxi_normalize_array_type(char type) {
 	switch (type) {
 	case 'r': return sizeof(ufbx_real) == sizeof(float) ? 'f' : 'd';
@@ -2434,7 +2428,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 
 	#define ufbxi_convert_switch(m_dst) \
 		switch (src_type) { \
-		case 'b': ufbxi_convert_loop(m_dst, 1, ufbxi_parse_bool(*val)); break; \
+		case 'b': ufbxi_convert_loop(m_dst, 1, *val != 0); break; \
 		case 'i': ufbxi_convert_loop(m_dst, 4, ufbxi_read_i32(val)); break; \
 		case 'l': ufbxi_convert_loop(m_dst, 8, ufbxi_read_i64(val)); break; \
 		case 'f': ufbxi_convert_loop(m_dst, 4, ufbxi_read_f32(val)); break; \
@@ -2445,7 +2439,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 
 	case 'b':
 		switch (src_type) {
-		case 'b': ufbxi_convert_loop(char, 1, ufbxi_parse_bool(*val)); break;
+		case 'b': ufbxi_convert_loop(char, 1, *val != 0); break;
 		case 'i': ufbxi_convert_loop(char, 4, ufbxi_read_i32(val) != 0); break;
 		case 'l': ufbxi_convert_loop(char, 8, ufbxi_read_i64(val) != 0); break;
 		case 'f': ufbxi_convert_loop(char, 4, ufbxi_read_f32(val) != 0); break;
@@ -2699,7 +2693,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 				ufbxi_check(ufbxi_binary_convert_array(uc, src_type, dst_type, decoded_data, arr_data, size));
 			} else if (dst_type == 'b') {
 				ufbxi_for(char, c, (char*)arr_data, size) {
-					*c = (char)ufbxi_parse_bool(*c);
+					*c = (char)(c != 0);
 				}
 			}
 
