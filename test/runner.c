@@ -61,7 +61,7 @@ double cputime_os_tick_to_sec(const cputime_sync_span *span, uint64_t os_tick);
 void cputime_sync_now(cputime_sync_point *sync, int accuracy)
 {
 	uint64_t best_delta = UINT64_MAX;
-	uint64_t os_tick, cpu_tick;
+	uint64_t os_tick = 0, cpu_tick = 0;
 
 	int runs = accuracy ? accuracy : 100;
 	for (int i = 0; i < runs; i++) {
@@ -489,11 +489,11 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
 
 	line = (char*)obj_data;
 	for (;;) {
-		char *end = strpbrk(line, "\r\n");
+		char *line_end = strpbrk(line, "\r\n");
 		char prev = '\0';
-		if (end) {
-			prev = *end;
-			*end = '\0';
+		if (line_end) {
+			prev = *line_end;
+			*line_end = '\0';
 		}
 
 		if (!strncmp(line, "v ", 2)) {
@@ -555,9 +555,9 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
 			mesh->vertex_uv.indices = dui;
 		}
 
-		if (end) {
-			*end = prev;
-			line = end + 1;
+		if (line_end) {
+			*line_end = prev;
+			line = line_end + 1;
 		} else {
 			break;
 		}

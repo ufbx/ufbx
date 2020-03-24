@@ -40,6 +40,7 @@
 	#pragma warning(disable: 4200) // nonstandard extension used: zero-sized array in struct/union
 	#pragma warning(disable: 4201) // nonstandard extension used: nameless struct/union
 	#pragma warning(disable: 4127) // conditional expression is constant
+	#pragma warning(disable: 4706) // assignment within conditional expression
 #endif
 
 #ifndef ufbx_assert
