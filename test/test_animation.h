@@ -92,7 +92,7 @@ UFBXT_FILE_TEST(maya_interpolation_modes)
 	}
 
 	ufbx_real avg = err.sum / (ufbx_real)err.num;
-	ufbxt_logf(".. Absolute key diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 }
 #endif
 
@@ -125,7 +125,7 @@ UFBXT_FILE_TEST(maya_auto_clamp)
 	}
 
 	ufbx_real avg = err.sum / (ufbx_real)err.num;
-	ufbxt_logf(".. Absolute key diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 }
 #endif
 
