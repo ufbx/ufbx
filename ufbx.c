@@ -3881,7 +3881,7 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve_node(ufbxi_context *uc, uf
 		size_t index = 0;
 		if (def->name.data == ufbxi_Y || def->name.data == ufbxi_D_Y) index = 1;
 		if (def->name.data == ufbxi_Z || def->name.data == ufbxi_D_Z) index = 2;
-		prop->defaults[index] = def->value_real[0];
+		prop->curves[index].default_value = def->value_real[0];
 	}
 
 	return 1;
@@ -4159,7 +4159,7 @@ ufbxi_nodiscard static int ufbxi_read_take_prop_channel(ufbxi_context *uc, ufbxi
 		ufbxi_check(ufbxi_add_connection(uc, node_id, id, name));
 
 		for (size_t i = 0; i < num_channel_nodes; i++) {
-			ufbxi_check(ufbxi_read_take_anim_channel(uc, channel_nodes[i], id, channel_names[i], &prop->defaults[i]));
+			ufbxi_check(ufbxi_read_take_anim_channel(uc, channel_nodes[i], id, channel_names[i], &prop->curves[i].default_value));
 		}
 	}
 
@@ -4504,14 +4504,15 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 
 		if (parent.anim_prop) {
 			if (child.anim_curve) {
-				child.anim_curve->prop = parent.anim_prop;
-
-				size_t index = 0;
+				uint32_t index = 0;
 				if (prop) {
 					if (prop == ufbxi_Y || prop == ufbxi_D_Y) index = 1;
 					if (prop == ufbxi_Z || prop == ufbxi_D_Z) index = 2;
 				}
 
+				child.anim_curve->prop = parent.anim_prop;
+				child.anim_curve->index = index;
+				child.anim_curve->default_value = parent.anim_prop->curves[index].default_value;
 				parent.anim_prop->curves[index] = *child.anim_curve;
 			}
 		}

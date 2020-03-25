@@ -291,6 +291,7 @@ struct ufbx_anim_layer {
 
 struct ufbx_anim_curve {
 	ufbx_real default_value;
+	uint32_t index;
 	ufbx_anim_prop *prop;
 	ufbx_keyframe_list keyframes;
 };
@@ -301,7 +302,6 @@ struct ufbx_anim_prop {
 	ufbx_anim_layer *layer;
 	ufbx_node *node;
 	ufbx_anim_curve curves[3];
-	ufbx_real defaults[3];
 };
 
 struct ufbx_keyframe {
