@@ -2295,9 +2295,11 @@ ufbxi_nodiscard static ufbxi_forceinline ufbxi_value_array *ufbxi_find_array(ufb
 
 typedef enum {
 	UFBXI_PARSE_ROOT,
+	UFBXI_PARSE_FBX_HEADER_EXTENSION,
 	UFBXI_PARSE_DEFINITIONS,
 	UFBXI_PARSE_OBJECTS,
 	UFBXI_PARSE_TAKES,
+	UFBXI_PARSE_FBX_VERSION,
 	UFBXI_PARSE_MODEL,
 	UFBXI_PARSE_GEOMETRY,
 	UFBXI_PARSE_ANIMATION_CURVE,
@@ -2317,9 +2319,14 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 	switch (parent) {
 
 	case UFBXI_PARSE_ROOT:
+		if (name == ufbxi_FBXHeaderExtension) return UFBXI_PARSE_FBX_HEADER_EXTENSION;
 		if (name == ufbxi_Definitions) return UFBXI_PARSE_DEFINITIONS;
 		if (name == ufbxi_Objects) return UFBXI_PARSE_OBJECTS;
 		if (name == ufbxi_Takes) return UFBXI_PARSE_TAKES;
+		break;
+
+	case UFBXI_PARSE_FBX_HEADER_EXTENSION:
+		if (name == ufbxi_FBXVersion) return UFBXI_PARSE_FBX_VERSION;
 		break;
 
 	case UFBXI_PARSE_OBJECTS:
@@ -2386,8 +2393,9 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			info->result = false;
 			return true;
 		} else if (name == ufbxi_KeyAttrDataFloat) {
-			// ?? Float data of this specific array is represented as integers in ASCII
-			info->type = uc->from_ascii ? 'i' : 'f';
+			// The float data in a keyframe attribute array is represented as integers
+			// in versions >= 7200 as some of the elements aren't actually floats (!)
+			info->type = uc->from_ascii && uc->version >= 7200 ? 'i' : 'f';
 			info->result = false;
 			return true;
 		} else if (name == ufbxi_KeyAttrRefCount) {
@@ -2892,6 +2900,10 @@ typedef struct {
 	const char *src;
 	const char *src_end;
 
+	bool read_first_comment;
+	bool found_version;
+	bool parse_as_f32;
+
 	ufbxi_ascii_token prev_token;
 	ufbxi_ascii_token token;
 } ufbxi_ascii;
@@ -2937,6 +2949,44 @@ static ufbxi_forceinline char ufbxi_ascii_next(ufbxi_ascii *ua)
 	return *ua->src;
 }
 
+static uint32_t ufbxi_ascii_parse_version(ufbxi_ascii *ua)
+{
+	uint8_t digits[3];
+	uint32_t num_digits = 0;
+
+	char c = ufbxi_ascii_next(ua);
+
+	const char fmt[] = " FBX ?.?.?";
+	uint32_t ix = 0;
+	while (num_digits < 3) {
+		char ref = fmt[ix++];
+		switch (ref) {
+
+		// Digit
+		case '?':
+			if (c < '0' || c > '9') return 0;
+			digits[num_digits++] = (uint8_t)(c - '0');
+			c = ufbxi_ascii_next(ua);
+			break;
+
+		// Whitespace 
+		case ' ':
+			while (c == ' ' || c == '\t') {
+				c = ufbxi_ascii_next(ua);
+			}
+			break;
+
+		// Literal character
+		default:
+			if (c != ref) return 0;
+			c = ufbxi_ascii_next(ua);
+			break;
+		}
+	}
+
+	return 1000*digits[0] + 100*digits[1] + 10*digits[2];
+}
+
 static char ufbxi_ascii_skip_whitespace(ufbxi_ascii *ua)
 {
 	// Ignore whitespace
@@ -2948,6 +2998,18 @@ static char ufbxi_ascii_skip_whitespace(ufbxi_ascii *ua)
 
 		// Line comment
 		if (c == ';') {
+
+			// FBX ASCII files begin with a magic comment of form "; FBX 7.7.0 project file"
+			// Try to extract the version number from the magic comment
+			if (!ua->read_first_comment) {
+				ua->read_first_comment = true;
+				uint32_t version = ufbxi_ascii_parse_version(ua);
+				if (version) {
+					ua->uc->version = version;
+					ua->found_version = true;
+				}
+			}
+
 			c = ufbxi_ascii_next(ua);
 			while (c != '\n' && c != '\0') {
 				c = ufbxi_ascii_next(ua);
@@ -3014,7 +3076,11 @@ ufbxi_nodiscard static int ufbxi_ascii_next_token(ufbxi_ascii *ua, ufbxi_ascii_t
 			token->value.i64 = strtoll(token->str_data, &end, 10);
 			ufbxi_check(end == token->str_data + token->str_len - 1);
 		} else if (token->type == UFBXI_ASCII_FLOAT) {
-			token->value.f64 = strtod(token->str_data, &end);
+			if (ua->parse_as_f32) {
+				token->value.f64 = strtof(token->str_data, &end);
+			} else {
+				token->value.f64 = strtod(token->str_data, &end);
+			}
 			ufbxi_check(end == token->str_data + token->str_len - 1);
 		}
 	} else if (c == '"') {
@@ -3096,8 +3162,16 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 		node->value_type_mask = UFBXI_VALUE_ARRAY;
 		node->array = arr;
 		arr->type = arr_type;
+
+		// HACK: Parse array values using strtof() if the array destination is 32-bit float
+		// since KeyAttrDataFloat packs integer data (!) into floating point values so we
+		// should try to be as exact as possible.
+		if (arr->type == 'f') {
+			ua->parse_as_f32 = true;
+		}
 	}
 
+	ufbxi_parse_state parse_state = ufbxi_update_parse_state(parent_state, node->name);
 	ufbxi_value vals[UFBXI_MAX_NON_ARRAY_VALUES];
 
 	// NOTE: Infinite loop to allow skipping the comma parsing via `continue`.
@@ -3121,6 +3195,14 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 			switch (arr_type) {
 
 			case 0:
+				// Parse version from comment if there was no magic comment
+				if (!ua->found_version && parse_state == UFBXI_PARSE_FBX_VERSION && num_values == 0) {
+					if (val >= 6000 && val <= 10000) {
+						ua->found_version = true;
+						ua->uc->version = (uint32_t)val;
+					}
+				}
+
 				if (num_values < UFBXI_MAX_NON_ARRAY_VALUES) {
 					type_mask |= UFBXI_VALUE_NUMBER << (num_values*2);
 					ufbxi_value *v = &vals[num_values];
@@ -3216,6 +3298,8 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 		ufbxi_check(ufbxi_ascii_accept(ua, '}'));
 	}
 
+	ua->parse_as_f32 = false;
+
 	if (arr_type) {
 		size_t arr_elem_size = ufbxi_array_type_size(arr_type);
 		void *arr_data = ufbxi_make_array_size(arr_buf, arr_elem_size, num_values);
@@ -3230,7 +3314,6 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 
 	// Recursively parse the children of this node. Update the parse state
 	// to provide context for child node parsing.
-	ufbxi_parse_state parse_state = ufbxi_update_parse_state(parent_state, node->name);
 	if (ufbxi_ascii_accept(ua, '{')) {
 		size_t num_children = 0;
 		while (!ufbxi_ascii_accept(ua, '}')) {
@@ -3378,21 +3461,10 @@ ufbxi_nodiscard static int ufbxi_parse(ufbxi_context *uc)
 	} else {
 		uc->from_ascii = true;
 
-		ufbxi_check(ufbxi_ascii_parse(uc));
-
-		// TODO: Parse the version from the initial magic comment eg. "; FBX 6.1.0 project file"
-		// The magic comment seems to be _required_ by some FBX parsers, so it seems pretty safe
-		// to assume it's always present
-
 		// Default to version 7400 if not found in header
 		uc->version = 7400;
 
-		// Try to get the version from the header
-		ufbxi_node *header_extension = ufbxi_find_child(&uc->root, ufbxi_FBXHeaderExtension);
-		if (header_extension) {
-			// Doesn't matter if it's not found
-			ufbxi_ignore(ufbxi_find_val1(header_extension, ufbxi_FBXVersion, "I", &uc->version));
-		}
+		ufbxi_check(ufbxi_ascii_parse(uc));
 	}
 
 	return 1;
@@ -3758,19 +3830,21 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_n
 		}
 
 		// Set the tangents based on weights (dx relative to the time difference
-		// between the previous/next key) and slope (simply dy = slope * dx)
+		// between the previous/next key) and slope (simply d = slope * dx)
 
 		if (key->time > prev_time) {
-			key->left.dx = (float)(weight_left * (key->time - prev_time));
-			key->left.dy = key->left.dx * slope_left;
+			double delta = key->time - prev_time;
+			key->left.dx = weight_left;
+			key->left.dy = (float)(key->left.dx * slope_left * delta);
 		} else {
 			key->left.dx = 0.0f;
 			key->left.dy = 0.0f;
 		}
 
 		if (next_time > key->time) {
-			key->right.dx = (float)(weight_right * (next_time - key->time));
-			key->right.dy = key->right.dx * slope_right;
+			double delta = next_time - key->time;
+			key->right.dx = weight_right;
+			key->right.dy = (float)(key->right.dx * slope_right * delta);
 		} else {
 			key->right.dx = 0.0f;
 			key->right.dy = 0.0f;
@@ -3993,16 +4067,18 @@ ufbxi_nodiscard static int ufbxi_read_take_anim_channel(ufbxi_context *uc, ufbxi
 		}
 
 		if (key->time > prev_time) {
-			key->left.dx = (float)(weight_left * (key->time - prev_time));
-			key->left.dy = key->left.dx * slope_left;
+			double delta = key->time - prev_time;
+			key->left.dx = weight_left;
+			key->left.dy = (float)(key->left.dx * slope_left * delta);
 		} else {
 			key->left.dx = 0.0f;
 			key->left.dy = 0.0f;
 		}
 
 		if (next_time > key->time) {
-			key->right.dx = (float)(weight_right * (next_time - key->time));
-			key->right.dy = key->right.dx * slope_right;
+			double delta = next_time - key->time;
+			key->right.dx = weight_right;
+			key->right.dy = (float)(key->right.dx * slope_right * delta);
 		} else {
 			key->right.dx = 0.0f;
 			key->right.dy = 0.0f;
@@ -4607,6 +4683,42 @@ static size_t ufbxi_file_read(void *user, void *data, size_t max_size)
 	return fread(data, 1, max_size, file);
 }
 
+// -- Curve evaluation
+
+static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, double x0)
+{
+	double p1_3 = p1 * 3.0, p2_3 = p2 * 3.0;
+	double a = p1_3 - p2_3 + 1.0;
+	double b = p2_3 - p1_3 - p1_3;
+	double c = p1_3;
+
+	double a_3 = 3.0*a, b_2 = 2.0*b;
+	double t = x0;
+	double x1, t2, t3;
+
+	// Manually unroll three iterations of Newton-Rhapson, this is enough
+	// for most tangents
+	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
+	t -= x1 / (a_3*t2 + b_2*t + c);
+
+	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
+	t -= x1 / (a_3*t2 + b_2*t + c);
+
+	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
+	t -= x1 / (a_3*t2 + b_2*t + c);
+
+	const double eps = 0.00001;
+	if (x1 >= -eps && x1 <= eps) return t;
+
+	// Perform more iterations until we reach desired accuracy
+	for (size_t i = 0; i < 4; i++) {
+		t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
+		t -= x1 / (a_3*t2 + b_2*t + c);
+		if (x1 >= -eps && x1 <= eps) break;
+	}
+	return t;
+}
+
 // -- API
 
 #ifdef __cplusplus
@@ -4676,6 +4788,63 @@ ufbx_mesh *ufbx_find_mesh_len(const ufbx_scene *scene, const char *name, size_t 
 		}
 	}
 	return NULL;
+}
+
+ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time)
+{
+	// TODO: Binary search
+	if (curve->keyframes.size <= 1) {
+		if (curve->keyframes.size == 1) {
+			return curve->keyframes.data[0].value;
+		} else {
+			return curve->default_value;
+		}
+	}
+
+	for (size_t i = 0; i < curve->keyframes.size; i++) {
+		const ufbx_keyframe *next = &curve->keyframes.data[i];
+		if (next->time < time) continue;
+
+		// First keyframe
+		if (i == 0) return next->value;
+
+		const ufbx_keyframe *prev = next - 1;
+
+		double t = (time - prev->time) / (next->time - prev->time);
+
+		switch (prev->interpolation) {
+
+		case UFBX_INTERPOLATION_CONSTANT_PREV:
+			return prev->value;
+
+		case UFBX_INTERPOLATION_CONSTANT_NEXT:
+			return next->value;
+
+		case UFBX_INTERPOLATION_LINEAR:
+			return prev->value*(1.0 - t) + next->value*t;
+
+		case UFBX_INTERPOLATION_CUBIC:
+		{
+			double x1 = prev->right.dx;
+			double x2 = 1.0 - next->left.dx;
+			t = ufbxi_find_cubic_bezier_t(x1, x2, t);
+
+			double t2 = t*t, t3 = t2*t;
+			double u = 1.0 - t, u2 = u*u, u3 = u2*u;
+
+			double y0 = prev->value;
+			double y3 = next->value;
+			double y1 = y0 + prev->right.dy;
+			double y2 = y3 - next->left.dy;
+
+			return u3*y0 + 3.0 * (u2*t*y1 + u*t2*y2) + t3*y3;
+		}
+
+		}
+	}
+
+	// Last keyframe
+	return curve->keyframes.data[curve->keyframes.size - 1].value;
 }
 
 #ifdef __cplusplus

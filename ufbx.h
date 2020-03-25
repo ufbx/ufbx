@@ -290,6 +290,7 @@ struct ufbx_anim_layer {
 };
 
 struct ufbx_anim_curve {
+	ufbx_real default_value;
 	ufbx_anim_prop *prop;
 	ufbx_keyframe_list keyframes;
 };
@@ -435,6 +436,7 @@ ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t 
 ufbx_vec4 ufbx_get_rotation_quaternion(ufbx_rotation_order order, ufbx_vec3 euler);
 ufbx_matrix ufbx_get_transform_matrix(const ufbx_transform *transform);
 
+ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time);
 ufbx_real ufbx_evaluate_prop_real_len(const ufbx_anim_state *state, const ufbx_node *node, const char *prop, size_t prop_len);
 ufbx_vec3 ufbx_evaluate_prop_vec3_len(const ufbx_anim_state *state, const ufbx_node *node, const char *prop, size_t prop_len);
 
