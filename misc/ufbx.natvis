@@ -16,5 +16,6 @@
   <Type Name="ufbx_anim_prop_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_anim_curve_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_keyframe_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
+  <Type Name="ufbx_prop_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
 
 </AutoVisualizer>

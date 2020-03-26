@@ -384,10 +384,12 @@ static void *ufbxt_read_file(const char *name, size_t *p_size)
 	size_t size = ftell(file);
 	fseek(file, 0, SEEK_SET);
 
-	char *data = malloc(size);
+	char *data = malloc(size + 1);
 	ufbxt_assert(data != NULL);
 	size_t num_read = fread(data, 1, size, file);
 	fclose(file);
+
+	data[size] = '\0';
 
 	if (num_read != size) {
 		ufbxt_assert_fail(__FILE__, __LINE__, "Failed to load file");
@@ -601,11 +603,10 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		ufbx_mesh *mesh = ufbx_find_mesh(scene, obj_mesh->name);
 		ufbxt_assert(mesh);
 
-#if 0
-
 		ufbxt_assert(obj_mesh->num_faces == mesh->num_faces);
 		ufbxt_assert(obj_mesh->num_indices == mesh->num_indices);
 
+#if 0
 		ufbx_transform *xform = &model->self_to_root;
 
 		// Assume that the indices are in the same order!
@@ -638,7 +639,6 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 					ufbx_vec2 fu = ufbx_get_vertex_vec2(&mesh->vertex_uv, ix);
 					ufbxt_assert_close_vec2(p_err, ou, fu);
 				}
-
 			}
 		}
 #endif
