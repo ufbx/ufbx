@@ -20,7 +20,7 @@
 #if defined(_MSC_VER)
 	#define ufbxi_noinline __declspec(noinline)
 	#define ufbxi_forceinline __forceinline
-	#define ufbxi_restrict_return __declspec(restrict)
+	#define ufbxi_malloc_like __declspec(restrict)
 	#if defined(__cplusplus) && _MSC_VER >= 1900
 		#define ufbxi_nodiscard [[nodiscard]]
 	#else
@@ -29,12 +29,12 @@
 #elif defined(__GNUC__) || defined(__clang__)
 	#define ufbxi_noinline __attribute__((noinline))
 	#define ufbxi_forceinline inline __attribute__((always_inline))
-	#define ufbxi_restrict_return __attribute__((malloc))
+	#define ufbxi_malloc_like __attribute__((malloc))
 	#define ufbxi_nodiscard __attribute__((warn_unused_result))
 #else
 	#define ufbxi_noinline
 	#define ufbxi_forceinline
-	#define ufbxi_restrict_return
+	#define ufbxi_malloc_like
 	#define ufbxi_nodiscard
 #endif
 
@@ -1441,7 +1441,7 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 	return new_chunk->data;
 }
 
-static ufbxi_restrict_return void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
+static ufbxi_malloc_like void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
 {
 	// Always succeed with an emtpy non-NULL buffer for empty allocations
 	ufbx_assert(size > 0);
@@ -1466,14 +1466,14 @@ static ufbxi_restrict_return void *ufbxi_push_size(ufbxi_buf *b, size_t size, si
 	}
 }
 
-static ufbxi_restrict_return ufbxi_forceinline void *ufbxi_push_size_zero(ufbxi_buf *b, size_t size, size_t n)
+static ufbxi_malloc_like ufbxi_forceinline void *ufbxi_push_size_zero(ufbxi_buf *b, size_t size, size_t n)
 {
 	void *ptr = ufbxi_push_size(b, size, n);
 	if (ptr) memset(ptr, 0, size * n);
 	return ptr;
 }
 
-ufbxi_nodiscard static ufbxi_restrict_return ufbxi_forceinline void *ufbxi_push_size_copy(ufbxi_buf *b, size_t size, size_t n, const void *data)
+ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_push_size_copy(ufbxi_buf *b, size_t size, size_t n, const void *data)
 {
 	void *ptr = ufbxi_push_size(b, size, n);
 	if (ptr) memcpy(ptr, data, size * n);
@@ -1674,7 +1674,7 @@ static ufbxi_forceinline void *ufbxi_map_find_size(ufbxi_map *map, size_t size, 
 	}
 }
 
-static ufbxi_restrict_return ufbxi_forceinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size, uint32_t scan, uint32_t hash)
+static ufbxi_malloc_like ufbxi_forceinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size, uint32_t scan, uint32_t hash)
 {
 	rhmap_iter iter;
 	iter.map = &map->map;
