@@ -3905,14 +3905,12 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 
 		if (mapping == ufbxi_ByPolygonVertex) {
 
-			// Indexed by polygon vertex: We can use the indices directly,
-			// possibly filling the rest with `invalid_index`
+			// Indexed by polygon vertex: We can use the provided indices directly.
 			ufbxi_check(ufbxi_check_indices(uc, mesh, p_dst_index, index_data, true, num_indices, num_elems));
 
 		} else if (mapping == ufbxi_ByVertex || mapping == ufbxi_ByVertice) {
 
-			// Indexed by vertex: We need to temporarily decode the vertex
-			// mapping and follow through the position mapping to get the
+			// Indexed by vertex: Follow through the position index mapping to get the
 			// final indices.
 			int32_t *new_index_data = ufbxi_push(&uc->result, int32_t, mesh->num_indices);
 			ufbxi_check(new_index_data);
@@ -3930,11 +3928,13 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 			ufbxi_check(ufbxi_check_indices(uc, mesh, p_dst_index, new_index_data, true, num_indices, num_elems));
 
 		} else if (mapping == ufbxi_AllSame) {
+
 			// Indexed by all same: ??? This could be possibly used for making
 			// holes with invalid indices, but that seems really fringe.
 			// Just use the shared zero index buffer for this.
 			uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, mesh->num_indices);
 			*p_dst_index = (int32_t*)ufbxi_sentinel_index_zero;
+
 		} else {
 			ufbxi_fail("Invalid mapping");
 		}
@@ -3942,6 +3942,7 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 	} else {
 
 		if (mapping == ufbxi_ByPolygonVertex) {
+
 			// Direct by polygon index: Use shared consecutive array if there's enough
 			// elements, otherwise use a unique truncated consecutive index array.
 			if (num_elems >= mesh->num_indices) {
@@ -3954,13 +3955,18 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 				}
 				ufbxi_check(ufbxi_check_indices(uc, mesh, p_dst_index, index_data, true, mesh->num_indices, num_elems));
 			}
+
 		} else if (mapping == ufbxi_ByVertex || mapping == ufbxi_ByVertice) {
+
 			// Direct by vertex: We can re-use the position indices.
 			ufbxi_check(ufbxi_check_indices(uc, mesh, p_dst_index, mesh->vertex_position.indices, false, mesh->num_indices, num_elems));
+
 		} else if (mapping == ufbxi_AllSame) {
+
 			// Direct by all same: This cannot fail as the index list is just zero.
 			uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, mesh->num_indices);
 			*p_dst_index = (int32_t*)ufbxi_sentinel_index_zero;
+
 		} else {
 			ufbxi_fail("Invalid mapping");
 		}
