@@ -4090,10 +4090,9 @@ ufbxi_nodiscard static ufbx_props *ufbxi_find_template(ufbxi_context *uc, const 
 	ufbxi_for(ufbxi_template, tmpl, uc->templates, uc->num_templates) {
 		if (tmpl->type == name) {
 
-			// Check that sub_type matches unless the type is Material as it
-			// has the type FbxSurfacePhong/FbxSurfaceLambert which doesn't match
-			// the node's `sub_type`. Ignore potential "Fbx" prefix.
-			if (tmpl->type != ufbxi_Material) {
+			// Check that sub_type matches unless the type is Material or Model,
+			// both of those match to all sub-types.
+			if (tmpl->type != ufbxi_Material && tmpl->type != ufbxi_Model) {
 				if (sub_type.length > 3 && !strncmp(sub_type.data, "Fbx", 3)) {
 					sub_type.data += 3;
 					sub_type.length -= 3;
@@ -5935,6 +5934,17 @@ void ufbx_free_scene(ufbx_scene *scene)
 	ufbxi_buf_free(&result);
 }
 
+ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t name_len)
+{
+	ufbxi_for_ptr(ufbx_node, p_node, scene->nodes.data, scene->nodes.size) {
+		ufbx_node *node = *p_node;
+		if (node->name.length == name_len && !memcmp(node->name.data, name, name_len)) {
+			return node;
+		}
+	}
+	return NULL;
+}
+
 ufbx_mesh *ufbx_find_mesh_len(const ufbx_scene *scene, const char *name, size_t name_len)
 {
 	ufbxi_for(ufbx_mesh, mesh, scene->meshes.data, scene->meshes.size) {
@@ -5973,6 +5983,7 @@ ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t 
 			}
 		}
 
+		end = props->num_props;
 		for (; begin < end; begin++) {
 			const ufbx_prop *p = &prop_data[begin];
 			if (p->imp_key > key) break;

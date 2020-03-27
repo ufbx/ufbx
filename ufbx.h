@@ -432,6 +432,7 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts
 ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error);
 void ufbx_free_scene(ufbx_scene *scene);
 
+ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_mesh *ufbx_find_mesh_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_t name_len);
 
@@ -461,6 +462,10 @@ ufbx_vec3 ufbx_rotate_vector(ufbx_vec4 q, ufbx_vec3 v);
 ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);
 
 // -- Inline API
+
+ufbx_inline ufbx_node *ufbx_find_node(const ufbx_scene *scene, const char *name) {
+	return ufbx_find_node_len(scene, name, strlen(name));
+}
 
 ufbx_inline ufbx_mesh *ufbx_find_mesh(const ufbx_scene *scene, const char *name) {
 	return ufbx_find_mesh_len(scene, name, strlen(name));
