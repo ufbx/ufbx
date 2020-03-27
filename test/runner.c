@@ -646,7 +646,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 static uint32_t g_file_version = 0;
 static const char *g_file_type = NULL;
 
-void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
+void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err))
 {
 	const uint32_t file_versions[] = { 6100, 7100, 7400, 7500, 7700 };
 
@@ -685,14 +685,18 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 			ufbxt_assert(scene->metadata.ascii == ((fi == 1) ? 1 : 0));
 			ufbxt_assert(scene->metadata.version == version);
 
+			ufbxt_diff_error err = { 0 };
+
 			if (obj_file) {
-				ufbxt_diff_error err = { 0 };
 				ufbxt_diff_to_obj(scene, obj_file, &err);
-				ufbx_real avg = err.sum / (ufbx_real)err.num;
-				ufbxt_logf(".. Absolute diff to .obj: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 			}
 
-			test_fn(scene);
+			test_fn(scene, &err);
+
+			if (err.num > 0) {
+				ufbx_real avg = err.sum / (ufbx_real)err.num;
+				ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+			}
 
 			ufbx_free_scene(scene);
 			free(data);
@@ -708,10 +712,10 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 
 #define UFBXT_IMPL 1
 #define UFBXT_TEST(name) void ufbxt_test_fn_##name(void)
-#define UFBXT_FILE_TEST(name) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene); \
+#define UFBXT_FILE_TEST(name) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err); \
 	void ufbxt_test_fn_file_##name(void) { \
 	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name); } \
-	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene)
+	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err)
 
 #include "all_tests.h"
 

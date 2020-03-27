@@ -9,8 +9,6 @@ typedef struct {
 UFBXT_FILE_TEST(maya_interpolation_modes)
 #if UFBXT_IMPL
 {
-	ufbxt_diff_error err = { 0 };
-
 	// Curve evaluated values at 24fps
 	static const ufbx_real values[] = {
 		-8.653366, // Start from zero time
@@ -56,8 +54,8 @@ UFBXT_FILE_TEST(maya_interpolation_modes)
 		ufbxt_assert(ufbxt_arraycount(key_ref) == num_keys);
 
 		for (size_t i = 0; i < num_keys; i++) {
-			ufbxt_assert_close_real(&err, keys[i].time, (double)key_ref[i].frame / 24.0);
-			ufbxt_assert_close_real(&err, keys[i].value, key_ref[i].value);
+			ufbxt_assert_close_real(err, keys[i].time, (double)key_ref[i].frame / 24.0);
+			ufbxt_assert_close_real(err, keys[i].value, key_ref[i].value);
 			if (i > 0) ufbxt_assert(keys[i].left.dx > 0.0f);
 			if (i + 1 < num_keys) ufbxt_assert(keys[i].right.dx > 0.0f);
 		}
@@ -65,11 +63,11 @@ UFBXT_FILE_TEST(maya_interpolation_modes)
 		ufbxt_assert(keys[0].interpolation == UFBX_INTERPOLATION_CUBIC);
 		ufbxt_assert(keys[0].right.dy == 0.0f);
 		ufbxt_assert(keys[1].interpolation == UFBX_INTERPOLATION_CUBIC);
-		ufbxt_assert_close_real(&err, keys[1].left.dy/keys[1].left.dx, keys[1].right.dy/keys[1].left.dx);
+		ufbxt_assert_close_real(err, keys[1].left.dy/keys[1].left.dx, keys[1].right.dy/keys[1].left.dx);
 		ufbxt_assert(keys[2].interpolation == UFBX_INTERPOLATION_LINEAR);
-		ufbxt_assert_close_real(&err, keys[3].left.dy/keys[3].left.dx, keys[2].right.dy/keys[2].right.dx);
+		ufbxt_assert_close_real(err, keys[3].left.dy/keys[3].left.dx, keys[2].right.dy/keys[2].right.dx);
 		ufbxt_assert(keys[3].interpolation == UFBX_INTERPOLATION_LINEAR);
-		ufbxt_assert_close_real(&err, keys[4].left.dy/keys[4].left.dx, keys[3].right.dy/keys[3].right.dx);
+		ufbxt_assert_close_real(err, keys[4].left.dy/keys[4].left.dx, keys[3].right.dy/keys[3].right.dx);
 		ufbxt_assert(keys[4].interpolation == UFBX_INTERPOLATION_CUBIC);
 		ufbxt_assert(keys[4].right.dy == 0.0f);
 		ufbxt_assert(keys[5].interpolation == UFBX_INTERPOLATION_CUBIC);
@@ -87,20 +85,15 @@ UFBXT_FILE_TEST(maya_interpolation_modes)
 			// Round up to the next frame to make stepped tangents consistent
 			double time = (double)i * (1.0/24.0) + 0.000001;
 			ufbx_real value = ufbx_evaluate_curve(curve, time);
-			ufbxt_assert_close_real(&err, value, values[i]);
+			ufbxt_assert_close_real(err, value, values[i]);
 		}
 	}
-
-	ufbx_real avg = err.sum / (ufbx_real)err.num;
-	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 }
 #endif
 
 UFBXT_FILE_TEST(maya_auto_clamp)
 #if UFBXT_IMPL
 {
-	ufbxt_diff_error err = { 0 };
-
 	// Curve evaluated values at 24fps
 	static const ufbx_real values[] = {
 		0.000, 0.000, 0.273, 0.515, 0.718, 0.868, 0.945, 0.920, 0.779, 0.611,
@@ -120,12 +113,9 @@ UFBXT_FILE_TEST(maya_auto_clamp)
 		for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
 			double time = (double)i * (1.0/24.0);
 			ufbx_real value = ufbx_evaluate_curve(curve, time);
-			ufbxt_assert_close_real(&err, value, values[i]);
+			ufbxt_assert_close_real(err, value, values[i]);
 		}
 	}
-
-	ufbx_real avg = err.sum / (ufbx_real)err.num;
-	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 }
 #endif
 
