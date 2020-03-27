@@ -130,9 +130,9 @@ struct ufbx_props {
 
 typedef struct ufbx_material ufbx_material;
 
-typedef union ufbx_vertex_vec2 ufbx_vertex_vec2;
-typedef union ufbx_vertex_vec3 ufbx_vertex_vec3;
-typedef union ufbx_vertex_vec4 ufbx_vertex_vec4;
+typedef struct ufbx_vertex_vec2 ufbx_vertex_vec2;
+typedef struct ufbx_vertex_vec3 ufbx_vertex_vec3;
+typedef struct ufbx_vertex_vec4 ufbx_vertex_vec4;
 typedef struct ufbx_uv_set ufbx_uv_set;
 typedef struct ufbx_color_set ufbx_color_set;
 typedef struct ufbx_edge ufbx_edge;
@@ -142,25 +142,22 @@ typedef struct ufbx_material_list { ufbx_material **data; size_t size; } ufbx_ma
 typedef struct ufbx_uv_set_list { ufbx_uv_set *data; size_t size; } ufbx_uv_set_list;
 typedef struct ufbx_color_set_list { ufbx_color_set *data; size_t size; } ufbx_color_set_list;
 
-union ufbx_vertex_vec2 {
-	struct {
-		ufbx_vec2 *data;
-		int32_t *indices;
-	};
+struct ufbx_vertex_vec2 {
+	ufbx_vec2 *data;
+	int32_t *indices;
+	size_t num_elements;
 };
 
-union ufbx_vertex_vec3 {
-	struct {
-		ufbx_vec3 *data;
-		int32_t *indices;
-	};
+struct ufbx_vertex_vec3 {
+	ufbx_vec3 *data;
+	int32_t *indices;
+	size_t num_elements;
 };
 
-union ufbx_vertex_vec4 {
-	struct {
-		ufbx_vec4 *data;
-		int32_t *indices;
-	};
+struct ufbx_vertex_vec4 {
+	ufbx_vec4 *data;
+	int32_t *indices;
+	size_t num_elements;
 };
 
 struct ufbx_uv_set {
@@ -229,6 +226,7 @@ struct ufbx_mesh {
 
 	size_t num_vertices;
 	size_t num_indices;
+	size_t num_triangles;
 	size_t num_faces;
 	size_t num_edges;
 

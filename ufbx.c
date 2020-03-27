@@ -4204,7 +4204,7 @@ static const int32_t ufbxi_sentinel_index_zero[1] = { 100000000 };
 static const int32_t ufbxi_sentinel_index_consecutive[1] = { 123456789 };
 
 ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mesh *mesh, ufbxi_node *node,
-	void *p_dst_data_void, int32_t **p_dst_index, const char *data_name, const char *index_name, char data_type, size_t num_components)
+	void *p_dst_data_void, int32_t **p_dst_index, size_t *p_num_elems, const char *data_name, const char *index_name, char data_type, size_t num_components)
 {
 	ufbx_real **p_dst_data = (ufbx_real**)p_dst_data_void;
 
@@ -4220,6 +4220,11 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 
 	const char *mapping;
 	ufbxi_check(ufbxi_find_val1(node, ufbxi_MappingInformationType, "C", (char**)&mapping));
+
+	if (num_elems > mesh->num_indices) {
+		num_elems = mesh->num_indices;
+	}
+	*p_num_elems = num_elems;
 
 	// Data array is always used as-is, if empty set the data to a global
 	// zero buffer so invalid zero index can point to some valid data.
@@ -4341,6 +4346,7 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 
 	mesh->vertex_position.data = (ufbx_vec3*)vertices->data;
 	mesh->vertex_position.indices = index_data;
+	mesh->vertex_position.num_elements = mesh->num_vertices;
 
 	// Check that the last index is negated (last of polygon)
 	if (mesh->num_indices > 0) {
@@ -4389,6 +4395,8 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 	mesh->num_faces = num_faces;
 	ufbxi_check(mesh->faces);
 
+	size_t num_triangles = 0;
+
 	ufbx_face *dst_face = mesh->faces;
 	int32_t *p_face_begin = index_data;
 	ufbxi_for (int32_t, p_ix, index_data, mesh->num_indices) {
@@ -4397,8 +4405,12 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 		if (ix < 0) {
 			ix = ~ix;
 			*p_ix =  ix;
-			dst_face->index_begin = (int32_t)(p_face_begin - index_data);
-			dst_face->num_indices = (int32_t)((p_ix - p_face_begin) + 1);
+			dst_face->index_begin = (uint32_t)(p_face_begin - index_data);
+			uint32_t num_indices = (uint32_t)((p_ix - p_face_begin) + 1);
+			dst_face->num_indices = num_indices;
+			if (num_indices >= 3) {
+				num_triangles += num_indices - 2;
+			}
 			dst_face++;
 			p_face_begin = p_ix + 1;
 		}
@@ -4406,6 +4418,8 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 	}
 	ufbx_assert(dst_face == mesh->faces + num_faces);
 	mesh->vertex_position.indices = index_data;
+
+	mesh->num_triangles = num_triangles;
 
 	// Count the number of UV/color sets
 	size_t num_uv = 0, num_color = 0;
@@ -4423,7 +4437,7 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 		if (n->name == ufbxi_LayerElementNormal) {
 			if (mesh->vertex_normal.data) continue;
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &mesh->vertex_normal.data,
-				&mesh->vertex_normal.indices, ufbxi_Normals, ufbxi_NormalIndex, 'r', 3));
+				&mesh->vertex_normal.indices, &mesh->vertex_normal.num_elements, ufbxi_Normals, ufbxi_NormalIndex, 'r', 3));
 		} else if (n->name == ufbxi_LayerElementUV) {
 			ufbx_uv_set *set = &mesh->uv_sets.data[mesh->uv_sets.size++];
 
@@ -4433,7 +4447,7 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 			}
 
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &set->vertex_uv.data,
-				&set->vertex_uv.indices, ufbxi_UV, ufbxi_UVIndex, 'r', 2));
+				&set->vertex_uv.indices, &set->vertex_uv.num_elements, ufbxi_UV, ufbxi_UVIndex, 'r', 2));
 		} else if (n->name == ufbxi_LayerElementColor) {
 			ufbx_color_set *set = &mesh->color_sets.data[mesh->color_sets.size++];
 
@@ -4443,7 +4457,7 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 			}
 
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &set->vertex_color.data,
-				&set->vertex_color.indices, ufbxi_Colors, ufbxi_ColorIndex, 'r', 4));
+				&set->vertex_color.indices, &set->vertex_color.num_elements, ufbxi_Colors, ufbxi_ColorIndex, 'r', 4));
 		}
 	}
 
