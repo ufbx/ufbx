@@ -14,6 +14,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 // -- Platform
 
@@ -1849,6 +1850,11 @@ static const char ufbxi_Lcl_Rotation[] = "Lcl Rotation";
 static const char ufbxi_Lcl_Scaling[] = "Lcl Scaling";
 static const char ufbxi_OO[] = "OO";
 static const char ufbxi_OP[] = "OP";
+static const char ufbxi_ScalingPivot[] = "ScalingPivot";
+static const char ufbxi_RotationPivot[] = "RotationPivot";
+static const char ufbxi_ScalingOffset[] = "ScalingOffset";
+static const char ufbxi_RotationOffset[] = "RotationOffset";
+static const char ufbxi_RotationOrder[] = "RotationOrder";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FBXHeaderExtension, sizeof(ufbxi_FBXHeaderExtension) - 1 },
@@ -1919,6 +1925,10 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Lcl_Scaling, sizeof(ufbxi_Lcl_Scaling) - 1 },
 	{ ufbxi_OO, sizeof(ufbxi_OO) - 1 },
 	{ ufbxi_OP, sizeof(ufbxi_OP) - 1 },
+	{ ufbxi_ScalingPivot, sizeof(ufbxi_ScalingPivot) - 1 },
+	{ ufbxi_RotationPivot, sizeof(ufbxi_RotationPivot) - 1 },
+	{ ufbxi_ScalingOffset, sizeof(ufbxi_ScalingOffset) - 1 },
+	{ ufbxi_RotationOrder, sizeof(ufbxi_RotationOrder) - 1 },
 };
 
 // -- Type definitions
@@ -3516,6 +3526,9 @@ ufbxi_nodiscard static int ufbxi_ascii_parse(ufbxi_context *uc)
 	ua.src = uc->data;
 	ua.src_end = uc->data + uc->data_size;
 
+	// Default to version 7400 if not found in header
+	uc->version = 7400;
+
 	int ret = ufbxi_ascii_parse_imp(&ua);
 
 	// Free temporary token string data
@@ -3801,9 +3814,6 @@ ufbxi_nodiscard static int ufbxi_parse(ufbxi_context *uc)
 
 	} else {
 		uc->from_ascii = true;
-
-		// Default to version 7400 if not found in header
-		uc->version = 7400;
 
 		ufbxi_check(ufbxi_ascii_parse(uc));
 	}
@@ -4455,7 +4465,7 @@ ufbxi_nodiscard static int ufbxi_read_model(ufbxi_context *uc, ufbxi_node *node,
 	if (object->sub_type.data == ufbxi_Mesh) {
 		ufbx_mesh *mesh = ufbxi_push_zero(&uc->tmp_arr_meshes, ufbx_mesh, 1);
 		ufbxi_check(mesh);
-		ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_MESH, object->id, uc->tmp_arr_models.num_items - 1));
+		ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_MESH, object->id, uc->tmp_arr_meshes.num_items - 1));
 		mesh->node.type = UFBX_NODE_MESH;
 		scene_node = &mesh->node;
 
@@ -5133,6 +5143,9 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 		model->node.type = UFBX_NODE_MODEL;
 		model->node.name.data = "Root";
 		model->node.name.length = 4;
+		model->node.transform.scale.x = 1.0;
+		model->node.transform.scale.y = 1.0;
+		model->node.transform.scale.z = 1.0;
 
 		ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_MODEL, root_id, 0));
 	}
@@ -5169,6 +5182,263 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 	ufbxi_check(ufbxi_read_connections(uc, connections));
 
 	return 1;
+}
+
+// -- Curve evaluation
+
+static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, double x0)
+{
+	double p1_3 = p1 * 3.0, p2_3 = p2 * 3.0;
+	double a = p1_3 - p2_3 + 1.0;
+	double b = p2_3 - p1_3 - p1_3;
+	double c = p1_3;
+
+	double a_3 = 3.0*a, b_2 = 2.0*b;
+	double t = x0;
+	double x1, t2, t3;
+
+	// Manually unroll three iterations of Newton-Rhapson, this is enough
+	// for most tangents
+	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
+	t -= x1 / (a_3*t2 + b_2*t + c);
+
+	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
+	t -= x1 / (a_3*t2 + b_2*t + c);
+
+	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
+	t -= x1 / (a_3*t2 + b_2*t + c);
+
+	const double eps = 0.00001;
+	if (x1 >= -eps && x1 <= eps) return t;
+
+	// Perform more iterations until we reach desired accuracy
+	for (size_t i = 0; i < 4; i++) {
+		t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
+		t -= x1 / (a_3*t2 + b_2*t + c);
+		if (x1 >= -eps && x1 <= eps) break;
+	}
+	return t;
+}
+
+// -- Property interpretation
+
+ufbx_prop *ufbxi_find_prop_imp(const ufbx_props *props, const char *name, size_t name_len, uint32_t key)
+{
+	do {
+		ufbx_prop *prop_data = props->props;
+		size_t begin = 0;
+		size_t end = props->num_props;
+		while (end - begin >= 16) {
+			size_t mid = (begin + end) >> 1;
+			const ufbx_prop *p = &prop_data[mid];
+			if (p->imp_key < key) {
+				begin = mid + 1;
+			} else { 
+				end = mid;
+			}
+		}
+
+		for (; begin < end; begin++) {
+			const ufbx_prop *p = &prop_data[begin];
+			if (p->imp_key > key) break;
+			if (p->name.data == name) {
+				return (ufbx_prop*)p;
+			}
+		}
+
+		props = props->defaults;
+	} while (props);
+
+	return NULL;
+}
+
+#define ufbxi_find_prop(props, name) ufbxi_find_prop_imp((props), (name), sizeof(name) - 1, \
+	(name[0] << 24) | (name[1] << 16) | (name[2] << 8) | name[3])
+
+static ufbxi_forceinline ufbx_vec3 ufbxi_find_vec3(const ufbx_props *props, const char *name)
+{
+	ufbx_prop *prop = ufbxi_find_prop(props, name);
+	if (prop) {
+		return prop->value_vec3;
+	} else {
+		ufbx_vec3 zero = { 0 };
+		return zero;
+	}
+}
+
+static ufbxi_forceinline void ufbxi_add_translate(ufbx_transform *t, ufbx_vec3 v)
+{
+	t->translation.x += v.x;
+	t->translation.y += v.y;
+	t->translation.z += v.z;
+}
+
+static ufbxi_forceinline void ufbxi_sub_translate(ufbx_transform *t, ufbx_vec3 v)
+{
+	t->translation.x -= v.x;
+	t->translation.y -= v.y;
+	t->translation.z -= v.z;
+}
+
+static ufbxi_forceinline void ufbxi_mul_scale(ufbx_transform *t, ufbx_vec3 v)
+{
+	t->translation.x *= v.x;
+	t->translation.y *= v.y;
+	t->translation.z *= v.z;
+	t->scale.x *= v.x;
+	t->scale.y *= v.y;
+	t->scale.z *= v.z;
+}
+
+#define UFBXI_PI ((ufbx_real)3.14159265358979323846)
+#define UFBXI_DEG_TO_RAD ((ufbx_real)(UFBXI_PI / 180.0))
+
+static ufbx_vec4 ufbxi_to_quat(ufbx_vec3 v, ufbx_rotation_order order)
+{
+	v.x *= UFBXI_DEG_TO_RAD * 0.5;
+	v.y *= UFBXI_DEG_TO_RAD * 0.5;
+	v.z *= UFBXI_DEG_TO_RAD * 0.5;
+	ufbx_real cx = (ufbx_real)cos(v.x), sx = (ufbx_real)sin(v.x);
+	ufbx_real cy = (ufbx_real)cos(v.y), sy = (ufbx_real)sin(v.y);
+	ufbx_real cz = (ufbx_real)cos(v.z), sz = (ufbx_real)sin(v.z);
+	ufbx_vec4 q;
+
+	// Generated by `misc/gen_rotation_order.py`
+	switch (order) {
+	case UFBX_ROTATION_XYZ:
+		q.x = -cx*sy*sz + cy*cz*sx;
+		q.y = cx*cz*sy + cy*sx*sz;
+		q.z = cx*cy*sz - cz*sx*sy;
+		q.w = cx*cy*cz + sx*sy*sz;
+		break;
+	case UFBX_ROTATION_XZY:
+		q.x = cx*sy*sz + cy*cz*sx;
+		q.y = cx*cz*sy + cy*sx*sz;
+		q.z = cx*cy*sz - cz*sx*sy;
+		q.w = cx*cy*cz - sx*sy*sz;
+		break;
+	case UFBX_ROTATION_YZX:
+		q.x = -cx*sy*sz + cy*cz*sx;
+		q.y = cx*cz*sy - cy*sx*sz;
+		q.z = cx*cy*sz + cz*sx*sy;
+		q.w = cx*cy*cz + sx*sy*sz;
+		break;
+	case UFBX_ROTATION_YXZ:
+		q.x = -cx*sy*sz + cy*cz*sx;
+		q.y = cx*cz*sy + cy*sx*sz;
+		q.z = cx*cy*sz + cz*sx*sy;
+		q.w = cx*cy*cz - sx*sy*sz;
+		break;
+	case UFBX_ROTATION_ZXY:
+		q.x = cx*sy*sz + cy*cz*sx;
+		q.y = cx*cz*sy - cy*sx*sz;
+		q.z = cx*cy*sz - cz*sx*sy;
+		q.w = cx*cy*cz + sx*sy*sz;
+		break;
+	case UFBX_ROTATION_ZYX:
+		q.x = cx*sy*sz + cy*cz*sx;
+		q.y = cx*cz*sy - cy*sx*sz;
+		q.z = cx*cy*sz + cz*sx*sy;
+		q.w = cx*cy*cz - sx*sy*sz;
+		break;
+	default:
+		q.x = q.y = q.z = 0.0; q.w = 1.0;
+		break;
+	}
+
+	return q;
+}
+
+static ufbxi_forceinline ufbx_vec4 ufbxi_mul_quat(ufbx_vec4 a, ufbx_vec4 b)
+{
+	ufbx_vec4 r;
+	r.x = a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y;
+	r.y = a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x;
+	r.z = a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w;
+	r.w = a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z;
+	return r;
+}
+
+static ufbxi_forceinline bool ufbxi_is_vec3_zero(ufbx_vec3 v)
+{
+	return (v.x == 0.0) & (v.y == 0.0) && (v.z == 0.0);
+}
+
+static void ufbxi_mul_rotate(ufbx_transform *t, ufbx_vec3 v, ufbx_rotation_order order)
+{
+	if (ufbxi_is_vec3_zero(v)) return;
+
+	ufbx_vec4 q = ufbxi_to_quat(v, order);
+	if (t->rotation.w != 1.0) {
+		t->rotation = ufbxi_mul_quat(q, t->rotation);
+	} else {
+		t->rotation = q;
+	}
+
+	if (!ufbxi_is_vec3_zero(t->translation)) {
+		t->translation = ufbx_rotate_vector(q, t->translation);
+	}
+}
+
+static ufbx_transform ufbxi_get_transform(const ufbx_props *props)
+{
+	ufbx_vec3 scale_pivot = ufbxi_find_vec3(props, ufbxi_ScalingPivot);
+	ufbx_vec3 rot_pivot = ufbxi_find_vec3(props, ufbxi_RotationPivot);
+	ufbx_vec3 scale_offset = ufbxi_find_vec3(props, ufbxi_ScalingOffset);
+	ufbx_vec3 rot_offset = ufbxi_find_vec3(props, ufbxi_RotationOffset);
+
+	ufbx_vec3 translation = ufbxi_find_vec3(props, ufbxi_Lcl_Translation);
+	ufbx_vec3 rotation = ufbxi_find_vec3(props, ufbxi_Lcl_Rotation);
+	ufbx_vec3 scaling = ufbxi_find_vec3(props, ufbxi_Lcl_Scaling);
+
+	ufbx_rotation_order order = UFBX_ROTATION_XYZ;
+	ufbx_prop *order_prop = ufbxi_find_prop(props, ufbxi_RotationOrder);
+	if (order_prop) {
+		if (order_prop->value_int >= 0 && order_prop->value_int <= 5) {
+			order = (ufbx_rotation_order)order_prop->value_int;
+		}
+	}
+
+
+	ufbx_transform t = { { 0,0,0 }, { 0,0,0,1 }, { 1,1,1 }};
+
+	// WorldTransform = ParentWorldTransform * T * Roff * Rp * Rpre * R * Rpost * Rp-1 * Soff * Sp * S * Sp-1
+	// TODO: Pre/post rotations, which order do they use?
+
+	ufbxi_sub_translate(&t, scale_pivot);
+	ufbxi_mul_scale(&t, scaling);
+	ufbxi_add_translate(&t, scale_pivot);
+
+	ufbxi_add_translate(&t, scale_offset);
+
+	ufbxi_sub_translate(&t, rot_pivot);
+	ufbxi_mul_rotate(&t, rotation, order);
+	ufbxi_add_translate(&t, rot_pivot);
+
+	ufbxi_add_translate(&t, rot_offset);
+
+	ufbxi_add_translate(&t, translation);
+
+	return t;
+}
+
+static int ufbxi_get_properties(ufbxi_context *uc)
+{
+	ufbxi_for_ptr(ufbx_node, p_node, uc->scene.nodes.data, uc->scene.nodes.size) {
+		ufbx_node *node = *p_node;
+		node->transform = ufbxi_get_transform(&node->props);
+	}
+
+	return 1;
+}
+
+static void ufbxi_update_transform_matrix(ufbx_node *node, const ufbx_matrix *parent_to_root)
+{
+	node->to_parent = ufbx_get_transform_matrix(&node->transform);
+	ufbx_matrix_mul(&node->to_root, parent_to_root, &node->to_parent);
+	ufbxi_for_ptr(ufbx_node, p_child, node->children.data, node->children.size) {
+		ufbxi_update_transform_matrix(*p_child, &node->to_root);
+	}
 }
 
 // -- Loading
@@ -5474,6 +5744,9 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_check(ufbxi_parse(uc));
 	ufbxi_check(ufbxi_read_root(uc));
 	ufbxi_check(ufbxi_finalize_scene(uc));
+	ufbxi_check(ufbxi_get_properties(uc));
+
+	ufbxi_update_transform_matrix(&uc->scene.root->node, &ufbx_identity_matrix);
 
 	// Copy local data to the scene
 	uc->scene.metadata.version = uc->version;
@@ -5600,42 +5873,6 @@ static size_t ufbxi_file_read(void *user, void *data, size_t max_size)
 	return fread(data, 1, max_size, file);
 }
 
-// -- Curve evaluation
-
-static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, double x0)
-{
-	double p1_3 = p1 * 3.0, p2_3 = p2 * 3.0;
-	double a = p1_3 - p2_3 + 1.0;
-	double b = p2_3 - p1_3 - p1_3;
-	double c = p1_3;
-
-	double a_3 = 3.0*a, b_2 = 2.0*b;
-	double t = x0;
-	double x1, t2, t3;
-
-	// Manually unroll three iterations of Newton-Rhapson, this is enough
-	// for most tangents
-	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
-	t -= x1 / (a_3*t2 + b_2*t + c);
-
-	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
-	t -= x1 / (a_3*t2 + b_2*t + c);
-
-	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
-	t -= x1 / (a_3*t2 + b_2*t + c);
-
-	const double eps = 0.00001;
-	if (x1 >= -eps && x1 <= eps) return t;
-
-	// Perform more iterations until we reach desired accuracy
-	for (size_t i = 0; i < 4; i++) {
-		t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
-		t -= x1 / (a_3*t2 + b_2*t + c);
-		if (x1 >= -eps && x1 <= eps) break;
-	}
-	return t;
-}
-
 // -- API
 
 #ifdef __cplusplus
@@ -5643,6 +5880,7 @@ extern "C" {
 #endif
 
 const ufbx_string ufbx_empty_string = { ufbxi_empty_char, 0 };
+const ufbx_matrix ufbx_identity_matrix = { 1,0,0, 0,1,0, 0,0,1, 0,0,0 };
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)
 {
@@ -5749,6 +5987,82 @@ ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t 
 	return NULL;
 }
 
+ufbx_matrix ufbx_get_transform_matrix(const ufbx_transform *t)
+{
+	ufbx_vec4 q = t->rotation;
+	ufbx_real sx = 2.0 * t->scale.x, sy = 2.0 * t->scale.y, sz = 2.0 * t->scale.z;
+	ufbx_real xx = q.x*q.x, xy = q.x*q.y, xz = q.x*q.z, xw = q.x*q.w;
+	ufbx_real yy = q.y*q.y, yz = q.y*q.z, yw = q.y*q.w;
+	ufbx_real zz = q.z*q.z, zw = q.z*q.w;
+	ufbx_real ww = q.w*q.w;
+	ufbx_matrix m;
+	m.m00 = sx * (- yy - zz + 0.5);
+	m.m10 = sx * (+ xy + zw);
+	m.m20 = sx * (- yw + xz);
+	m.m01 = sy * (- zw + xy);
+	m.m11 = sy * (- xx - zz + 0.5);
+	m.m21 = sy * (+ xw + yz);
+	m.m02 = sz * (+ xz + yw);
+	m.m12 = sz * (- xw + yz);
+	m.m22 = sz * (- xx - yy + 0.5);
+	m.m03 = t->translation.x;
+	m.m13 = t->translation.y;
+	m.m23 = t->translation.z;
+	return m;
+}
+
+void ufbx_matrix_mul(ufbx_matrix *dst, const ufbx_matrix *p_l, const ufbx_matrix *p_r)
+{
+	ufbx_matrix l = *p_l;
+	ufbx_matrix r = *p_r;
+
+	dst->m03 = l.m00*r.m03 + l.m01*r.m13 + l.m02*r.m23 + l.m03;
+	dst->m13 = l.m10*r.m03 + l.m11*r.m13 + l.m12*r.m23 + l.m03;
+	dst->m23 = l.m20*r.m03 + l.m21*r.m13 + l.m22*r.m23 + l.m03;
+
+	dst->m00 = l.m00*r.m00 + l.m01*r.m10 + l.m02*r.m20;
+	dst->m10 = l.m10*r.m00 + l.m11*r.m10 + l.m12*r.m20;
+	dst->m20 = l.m20*r.m00 + l.m21*r.m10 + l.m22*r.m20;
+
+	dst->m01 = l.m00*r.m01 + l.m01*r.m11 + l.m02*r.m21;
+	dst->m11 = l.m10*r.m01 + l.m11*r.m11 + l.m12*r.m21;
+	dst->m21 = l.m20*r.m01 + l.m21*r.m11 + l.m22*r.m21;
+
+	dst->m02 = l.m00*r.m02 + l.m01*r.m12 + l.m02*r.m22;
+	dst->m12 = l.m10*r.m02 + l.m11*r.m12 + l.m12*r.m22;
+	dst->m22 = l.m20*r.m02 + l.m21*r.m12 + l.m22*r.m22;
+}
+
+ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v)
+{
+	ufbx_vec3 r;
+	r.x = m->m00*v.x + m->m01*v.y + m->m02*v.z + m->m03;
+	r.y = m->m10*v.x + m->m11*v.y + m->m12*v.z + m->m13;
+	r.z = m->m20*v.x + m->m21*v.y + m->m22*v.z + m->m23;
+	return r;
+}
+
+ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v)
+{
+	ufbx_vec3 r;
+	r.x = m->m00*v.x + m->m01*v.y + m->m02*v.z;
+	r.y = m->m10*v.x + m->m11*v.y + m->m12*v.z;
+	r.z = m->m20*v.x + m->m21*v.y + m->m22*v.z;
+	return r;
+}
+
+ufbx_vec3 ufbx_transform_normal(const ufbx_matrix *m, ufbx_vec3 v)
+{
+	// https://twitter.com/zeuxcg/status/1226334381091872769
+	ufbx_real rx = m->m00*m->m00 + m->m10*m->m10 + m->m20*m->m20;
+	ufbx_real ry = m->m01*m->m01 + m->m11*m->m11 + m->m21*m->m21;
+	ufbx_real rz = m->m02*m->m02 + m->m12*m->m12 + m->m22*m->m22;
+	v.x /= rx != 0 ? rx : (ufbx_real)1;
+	v.y /= ry != 0 ? ry : (ufbx_real)1;
+	v.z /= rz != 0 ? rz : (ufbx_real)1;
+	return ufbx_transform_direction(m, v);
+}
+
 ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time)
 {
 	// TODO: Binary search
@@ -5805,6 +6119,18 @@ ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time)
 
 	// Last keyframe
 	return curve->keyframes.data[curve->keyframes.size - 1].value;
+}
+
+ufbx_vec3 ufbx_rotate_vector(ufbx_vec4 q, ufbx_vec3 v)
+{
+	ufbx_real xy = q.x*v.y - q.y*v.x;
+	ufbx_real xz = q.x*v.z - q.z*v.x;
+	ufbx_real yz = q.y*v.z - q.z*v.y;
+	ufbx_vec3 r;
+	r.x = 2.0 * (+ q.w*yz + q.y*xy + q.z*xz) + v.x;
+	r.y = 2.0 * (- q.x*xy - q.w*xz + q.z*yz) + v.y;
+	r.z = 2.0 * (- q.x*xz - q.y*yz + q.w*xy) + v.z;
+	return r;
 }
 
 #ifdef __cplusplus

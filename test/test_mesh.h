@@ -30,3 +30,15 @@ UFBXT_FILE_TEST(blender_279_default)
 	ufbxt_assert_close_vec3(&err, scaling->value_vec3, scaling_ref);
 }
 #endif
+
+UFBXT_FILE_TEST(blender_282_suzanne)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST(blender_282_suzanne_and_transform)
+#if UFBXT_IMPL
+{
+}
+#endif

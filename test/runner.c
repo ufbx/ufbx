@@ -606,8 +606,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		ufbxt_assert(obj_mesh->num_faces == mesh->num_faces);
 		ufbxt_assert(obj_mesh->num_indices == mesh->num_indices);
 
-#if 0
-		ufbx_transform *xform = &model->self_to_root;
+		ufbx_matrix *mat = &mesh->node.to_root;
 
 		// Assume that the indices are in the same order!
 		for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
@@ -622,8 +621,8 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 				ufbx_vec3 on = ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, ix);
 				ufbx_vec3 fn = ufbx_get_vertex_vec3(&mesh->vertex_normal, ix);
 
-				fp = ufbx_transform_position(xform, fp);
-				fn = ufbx_transform_normal(xform, fn);
+				fp = ufbx_transform_position(mat, fp);
+				fn = ufbx_transform_normal(mat, fn);
 
 				ufbx_real fn_len = sqrt(fn.x*fn.x + fn.y*fn.y + fn.z*fn.z);
 				fn.x /= fn_len;
@@ -641,7 +640,6 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 				}
 			}
 		}
-#endif
 	}
 }
 

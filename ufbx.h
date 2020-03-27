@@ -57,12 +57,16 @@ typedef struct ufbx_vec4 {
 
 typedef enum ufbx_rotation_order {
 	UFBX_ROTATION_XYZ,
+	UFBX_ROTATION_XZY,
+	UFBX_ROTATION_YZX,
+	UFBX_ROTATION_YXZ,
+	UFBX_ROTATION_ZXY,
+	UFBX_ROTATION_ZYX,
 } ufbx_rotation_order;
 
 typedef struct ufbx_transform {
 	ufbx_vec3 translation;
-	ufbx_rotation_order rotation_order;
-	ufbx_vec3 rotation_euler;
+	ufbx_vec4 rotation;
 	ufbx_vec3 scale;
 } ufbx_transform;
 
@@ -211,6 +215,8 @@ struct ufbx_node {
 	ufbx_props props;
 	ufbx_node *parent;
 	ufbx_transform transform;
+	ufbx_matrix to_parent;
+	ufbx_matrix to_root;
 	ufbx_node_list children;
 };
 
@@ -420,6 +426,7 @@ extern "C" {
 #endif
 
 extern const ufbx_string ufbx_empty_string;
+extern const ufbx_matrix ufbx_identity_matrix;
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error);
 ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error);
@@ -430,8 +437,12 @@ ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_
 
 ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len);
 
-ufbx_vec4 ufbx_get_rotation_quaternion(ufbx_rotation_order order, ufbx_vec3 euler);
 ufbx_matrix ufbx_get_transform_matrix(const ufbx_transform *transform);
+
+void ufbx_matrix_mul(ufbx_matrix *dst, const ufbx_matrix *l, const ufbx_matrix *r);
+ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v);
+ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v);
+ufbx_vec3 ufbx_transform_normal(const ufbx_matrix *m, ufbx_vec3 v);
 
 ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time);
 ufbx_real ufbx_evaluate_prop_real_len(const ufbx_anim_state *state, const ufbx_node *node, const char *prop, size_t prop_len);
@@ -442,6 +453,8 @@ ufbx_light ufbx_evaluate_light(const ufbx_anim_state *state, const ufbx_light *l
 ufbx_scene *ufbx_evaluate_scene(const ufbx_anim_state *state, const ufbx_scene *scene, const ufbx_evaluate_opts *opts);
 
 ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);
+
+ufbx_vec3 ufbx_rotate_vector(ufbx_vec4 q, ufbx_vec3 v);
 
 // Utility
 
@@ -469,9 +482,9 @@ ufbx_inline ufbx_vec3 ufbx_evaluate_prop_vec3(const ufbx_anim_state *state, cons
 	return ufbx_evaluate_prop_vec3_len(state, node, prop, strlen(prop));
 }
 
-ufbx_inline ufbx_vec4 ufbx_get_transform_quaternion(const ufbx_transform *transform) {
-	return ufbx_get_rotation_quaternion(transform->rotation_order, transform->rotation_euler);
-}
+ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }
+ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }
+ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->indices[index]]; }
 
 #ifdef __cplusplus
 }
