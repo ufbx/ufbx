@@ -1,6 +1,5 @@
 # This file uses centimeters as units for non-parametric coordinates.
 
-mtllib maya_rotation_order.mtl
 g default
 v -4.566987 -1.332532 -0.191987
 v -4.001747 -0.484671 0.297525
