@@ -82,7 +82,7 @@ typedef struct ufbx_matrix {
 // -- Properties
 
 typedef struct ufbx_prop ufbx_prop;
-typedef struct ufbx_prop_list { ufbx_prop *data; size_t size; } ufbx_prop_list;
+typedef struct ufbx_props ufbx_props;
 
 typedef enum ufbx_prop_type {
 	UFBX_PROP_UNKNOWN,
@@ -113,6 +113,13 @@ struct ufbx_prop {
 		ufbx_vec2 value_vec2;
 		ufbx_vec3 value_vec3;
 	};
+};
+
+struct ufbx_props {
+	ufbx_prop *props;
+	size_t num_props;
+
+	ufbx_props *defaults;
 };
 
 // -- Static data
@@ -174,7 +181,7 @@ struct ufbx_face {
 };
 
 struct ufbx_material {
-	ufbx_prop_list props;
+	ufbx_props props;
 
 	ufbx_vec3 color;
 };
@@ -201,7 +208,7 @@ typedef enum ufbx_node_type {
 struct ufbx_node {
 	ufbx_node_type type;
 	ufbx_string name;
-	ufbx_prop_list props;
+	ufbx_props props;
 	ufbx_node *parent;
 	ufbx_transform transform;
 	ufbx_node_list children;
@@ -421,7 +428,7 @@ void ufbx_free_scene(ufbx_scene *scene);
 ufbx_mesh *ufbx_find_mesh_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_t name_len);
 
-ufbx_prop *ufbx_find_prop_len(const ufbx_prop_list *props, const char *name, size_t name_len);
+ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len);
 
 ufbx_vec4 ufbx_get_rotation_quaternion(ufbx_rotation_order order, ufbx_vec3 euler);
 ufbx_matrix ufbx_get_transform_matrix(const ufbx_transform *transform);
@@ -450,7 +457,7 @@ ufbx_inline ufbx_light *ufbx_find_light(const ufbx_scene *scene, const char *nam
 	return ufbx_find_light_len(scene, name, strlen(name));
 }
 
-ufbx_inline ufbx_prop *ufbx_find_prop(const ufbx_prop_list *props, const char *name) {
+ufbx_inline ufbx_prop *ufbx_find_prop(const ufbx_props *props, const char *name) {
 	return ufbx_find_prop_len(props, name, strlen(name));
 }
 

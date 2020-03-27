@@ -1168,7 +1168,7 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, const char *func, uint32_t line)
 {
 	// NOTE: This is the base function all fails boil down to, place a breakpoint here to
-	// break at the first error.
+	// break at the first error
 	if (err->stack_size < UFBX_ERROR_STACK_MAX_DEPTH) {
 		ufbx_error_frame *frame = &err->stack[err->stack_size++];
 		frame->description = cond;
@@ -1370,6 +1370,12 @@ typedef struct {
 	uint32_t size;    // < Size of the current chunk ie. `chunk->size` (or 0 if `chunk == NULL`)
 	size_t num_items; // < Number of individual items pushed to the buffer
 } ufbxi_buf;
+
+typedef struct {
+	ufbxi_buf_chunk *chunk;
+	uint32_t pos;
+	size_t num_items;
+} ufbxi_buf_state;
 
 static ufbxi_forceinline uint32_t ufbxi_align_to_mask(uint32_t value, uint32_t align_mask)
 {
@@ -1613,6 +1619,29 @@ static void ufbxi_buf_clear(ufbxi_buf *buf)
 	}
 }
 
+static ufbxi_forceinline ufbxi_buf_state ufbxi_buf_push_state(ufbxi_buf *buf)
+{
+	ufbxi_buf_state s;
+	s.chunk = buf->chunk;
+	s.pos = buf->pos;
+	s.num_items = buf->num_items;
+	return s;
+}
+
+static void ufbxi_buf_pop_state(ufbxi_buf *buf, const ufbxi_buf_state *state)
+{
+	if (state->chunk) {
+		buf->chunk = state->chunk;
+	} else if (buf->chunk) {
+		buf->chunk = buf->chunk->root;
+	}
+	if (buf->chunk) {
+		buf->size = buf->chunk->size;
+	}
+	buf->num_items = state->num_items;
+	buf->pos = state->pos;
+}
+
 #define ufbxi_push(b, type, n) (type*)ufbxi_push_size((b), sizeof(type), (n))
 #define ufbxi_push_zero(b, type, n) (type*)ufbxi_push_size_zero((b), sizeof(type), (n))
 #define ufbxi_push_copy(b, type, n, data) (type*)ufbxi_push_size_copy((b), sizeof(type), (n), (data))
@@ -1772,6 +1801,7 @@ static const char ufbxi_Geometry[] = "Geometry";
 static const char ufbxi_AnimationLayer[] = "AnimationLayer";
 static const char ufbxi_AnimationCurve[] = "AnimationCurve";
 static const char ufbxi_AnimationCurveNode[] = "AnimationCurveNode";
+static const char ufbxi_Material[] = "Material";
 static const char ufbxi_Mesh[] = "Mesh";
 static const char ufbxi_Light[] = "Light";
 static const char ufbxi_Vertices[] = "Vertices";
@@ -1841,6 +1871,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AnimationLayer, sizeof(ufbxi_AnimationLayer) - 1 },
 	{ ufbxi_AnimationCurve, sizeof(ufbxi_AnimationCurve) - 1 },
 	{ ufbxi_AnimationCurveNode, sizeof(ufbxi_AnimationCurveNode) - 1 },
+	{ ufbxi_Material, sizeof(ufbxi_Material) - 1 },
 	{ ufbxi_Mesh, sizeof(ufbxi_Mesh) - 1 },
 	{ ufbxi_Light, sizeof(ufbxi_Light) - 1 },
 	{ ufbxi_Vertices, sizeof(ufbxi_Vertices) - 1 },
@@ -1968,12 +1999,13 @@ typedef struct {
 typedef struct {
 	ufbxi_connectable_type parent_type;
 	uint32_t parent_index;
-	ufbx_prop_list props;
+	ufbx_props props;
 } ufbxi_attribute;
 
 typedef struct {
 	const char *type;
-	ufbx_prop_list props;
+	ufbx_string sub_type;
+	ufbx_props props;
 } ufbxi_template;
 
 typedef struct {
@@ -2022,9 +2054,8 @@ typedef struct {
 
 	// Temporary buffers
 	ufbxi_buf tmp;
-	ufbxi_buf tmp_node;
+	ufbxi_buf tmp_stack;
 	ufbxi_buf tmp_connection;
-	ufbxi_buf tmp_props;
 	ufbxi_buf tmp_sort;
 
 	// Temporary arrays
@@ -2044,6 +2075,8 @@ typedef struct {
 	ufbxi_node root;
 
 	ufbxi_attribute *attributes;
+
+	ufbx_props *default_props;
 
 	ufbx_scene scene;
 	ufbxi_scene_imp *scene_imp;
@@ -2068,6 +2101,11 @@ static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, co
 #define ufbxi_fail_uc(uc, desc) return ufbxi_fail_imp(uc, desc, __FUNCTION__, __LINE__)
 
 // -- String pool
+
+static ufbxi_forceinline bool ufbxi_streq(ufbx_string a, ufbx_string b)
+{
+	return a.length == b.length && !memcmp(a.data, b.data, a.length);
+}
 
 ufbxi_nodiscard static const char *ufbxi_push_string_imp(ufbxi_context *uc, const char *str, size_t length, bool copy)
 {
@@ -2672,9 +2710,9 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 		return 1;
 	}
 
-	// Push the parsed node into the `tmp_node` buffer, the nodes will be popped by
+	// Push the parsed node into the `tmp_stack` buffer, the nodes will be popped by
 	// calling code after its done parsing all of it's children.
-	ufbxi_node *node = ufbxi_push_zero(&uc->tmp_node, ufbxi_node, 1);
+	ufbxi_node *node = ufbxi_push_zero(&uc->tmp_stack, ufbxi_node, 1);
 	ufbxi_check(node);
 
 	// Parse and intern the name to the string pool.
@@ -2909,6 +2947,8 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 		ufbxi_check(ufbxi_skip_bytes(uc, values_end_offset - offset));
 	}
 
+	ufbxi_buf_state stack_state = ufbxi_buf_push_state(&uc->tmp_stack);
+
 	// Recursively parse the children of this node. Update the parse state
 	// to provide context for child node parsing.
 	ufbxi_parse_state parse_state = ufbxi_update_parse_state(parent_state, node->name);
@@ -2929,10 +2969,12 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 		num_children++;
 	}
 
-	// Pop children from `tmp_node` to a contiguous array
+	// Pop children from `tmp_stack` to a contiguous array
 	node->num_children = num_children;
-	node->children = ufbxi_push_pop(&uc->tmp, &uc->tmp_node, ufbxi_node, num_children);
+	node->children = ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_node, num_children);
 	ufbxi_check(node->children);
+
+	ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
 
 	return 1;
 }
@@ -2943,6 +2985,8 @@ static const char ufbxi_binary_magic[] = "Kaydara FBX Binary  \x00\x1a\x00";
 
 ufbxi_nodiscard static int ufbxi_binary_parse(ufbxi_context *uc)
 {
+	ufbxi_buf_state stack_state = ufbxi_buf_push_state(&uc->tmp_stack);
+
 	// Parse top-level nodes until we hit a NULL record
 	uint32_t num_nodes = 0;
 	for (;;) {
@@ -2952,12 +2996,11 @@ ufbxi_nodiscard static int ufbxi_binary_parse(ufbxi_context *uc)
 		num_nodes++;
 	}
 
-	// Pop top-level nodes from `tmp_node` to a contiguous array
-	ufbxi_node *top_nodes = ufbxi_push_pop(&uc->tmp, &uc->tmp_node, ufbxi_node, num_nodes);
+	// Pop top-level nodes from `tmp_stack` to a contiguous array
+	ufbxi_node *top_nodes = ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_node, num_nodes);
 	ufbxi_check(top_nodes);
 
-	// We don't need `tmp_node` after this point anymore
-	ufbxi_buf_free(&uc->tmp_node);
+	ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
 
 	// Setup the root node
 	uc->root.children = top_nodes;
@@ -3238,9 +3281,9 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 	const char *name = ufbxi_push_string(uc, ua->prev_token.str_data, ua->prev_token.str_len);
 	ufbxi_check(name);
 
-	// Push the parsed node into the `tmp_node` buffer, the nodes will be popped by
+	// Push the parsed node into the `tmp_stack` buffer, the nodes will be popped by
 	// calling code after its done parsing all of it's children.
-	ufbxi_node *node = ufbxi_push_zero(&uc->tmp_node, ufbxi_node, 1);
+	ufbxi_node *node = ufbxi_push_zero(&uc->tmp_stack, ufbxi_node, 1);
 	node->name = name;
 	node->name_len = (uint8_t)name_len;
 
@@ -3417,6 +3460,8 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 	// Recursively parse the children of this node. Update the parse state
 	// to provide context for child node parsing.
 	if (ufbxi_ascii_accept(ua, '{')) {
+		ufbxi_buf_state stack_state = ufbxi_buf_push_state(&uc->tmp_stack);
+
 		size_t num_children = 0;
 		while (!ufbxi_ascii_accept(ua, '}')) {
 			ufbxi_check(num_children < uc->opts.max_node_children);
@@ -3424,10 +3469,12 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 			num_children++;
 		}
 
-		// Pop children from `tmp_node` to a contiguous array
-		node->children = ufbxi_push_pop(&uc->tmp, &uc->tmp_node, ufbxi_node, num_children);
+		// Pop children from `tmp_stack` to a contiguous array
+		node->children = ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_node, num_children);
 		ufbxi_check(node->children);
 		node->num_children = (uint32_t)num_children;
+
+		ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
 	}
 
 	return 1;
@@ -3436,6 +3483,8 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 ufbxi_nodiscard static int ufbxi_ascii_parse_imp(ufbxi_ascii *ua)
 {
 	ufbxi_context *uc = ua->uc;
+
+	ufbxi_buf_state stack_state = ufbxi_buf_push_state(&uc->tmp_stack);
 
 	// Parse top-level nodes until we hit `UFBXI_ASCII_END`
 	uint32_t num_nodes = 0;
@@ -3446,15 +3495,14 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_imp(ufbxi_ascii *ua)
 		num_nodes++;
 	}
 
-	// Pop top-level nodes from `tmp_node` to a contiguous array
-	ufbxi_node *top_nodes = ufbxi_push_pop(&uc->tmp, &uc->tmp_node, ufbxi_node, num_nodes);
+	// Pop top-level nodes from `tmp_stack` to a contiguous array
+	ufbxi_node *top_nodes = ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_node, num_nodes);
 	ufbxi_check(top_nodes);
+
+	ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
 
 	uc->root.children = top_nodes;
 	uc->root.num_children = num_nodes;
-
-	// We don't need `tmp_node` after this point anymore
-	ufbxi_buf_free(&uc->tmp_node);
 
 	return 1;
 }
@@ -3495,15 +3543,21 @@ typedef struct {
 	const char *name;
 } ufbxi_prop_type_name;
 
+const char ufbxi_empty_char[1] = { '\0' };
+
 const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
 	{ UFBX_PROP_BOOLEAN, "Boolean" },
 	{ UFBX_PROP_BOOLEAN, "bool" },
+	{ UFBX_PROP_BOOLEAN, "Bool" },
 	{ UFBX_PROP_INTEGER, "Integer" },
 	{ UFBX_PROP_INTEGER, "int" },
 	{ UFBX_PROP_INTEGER, "enum" },
+	{ UFBX_PROP_INTEGER, "Visibility" },
+	{ UFBX_PROP_INTEGER, "Visibility Inheritance" },
 	{ UFBX_PROP_NUMBER, "Number" },
 	{ UFBX_PROP_NUMBER, "double" },
 	{ UFBX_PROP_NUMBER, "Real" },
+	{ UFBX_PROP_NUMBER, "Float" },
 	{ UFBX_PROP_NUMBER, "Intensity" },
 	{ UFBX_PROP_VECTOR, "Vector" },
 	{ UFBX_PROP_VECTOR, "Vector3D" },
@@ -3511,6 +3565,7 @@ const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
 	{ UFBX_PROP_COLOR, "ColorRGB" },
 	{ UFBX_PROP_STRING, "String" },
 	{ UFBX_PROP_STRING, "KString" },
+	{ UFBX_PROP_STRING, "object" },
 	{ UFBX_PROP_DATE_TIME, "DateTime" },
 	{ UFBX_PROP_TRANSLATION, "Lcl Translation" },
 	{ UFBX_PROP_ROTATION, "Lcl Rotation" },
@@ -3545,6 +3600,188 @@ static ufbx_prop_type ufbxi_get_prop_type(ufbxi_context *uc, const char *name)
 	return UFBX_PROP_UNKNOWN;
 }
 
+typedef struct {
+	const char *name;
+	uint32_t name_len;
+	ufbx_prop_type type;
+	const char *value_str;
+	ufbx_real value_real[3];
+} ufbxi_default_prop;
+
+// Generated by `misc/gen_default_props.py`
+static const ufbxi_default_prop ufbxi_default_props[] = {
+	{ "AmbientColor", 12, UFBX_PROP_COLOR, 0, 0.2, 0.2, 0.2 },
+	{ "AmbientFactor", 13, UFBX_PROP_NUMBER, 0, 1.0 },
+	{ "AreaLightShape", 14, UFBX_PROP_INTEGER, 0, 0.0 },
+	{ "AxisLen", 7, UFBX_PROP_NUMBER, 0, 10.0 },
+	{ "BBoxMax", 7, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "BBoxMin", 7, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "BottomBarnDoor", 14, UFBX_PROP_NUMBER, 0, 20.0 },
+	{ "Bump", 4, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "BumpFactor", 10, UFBX_PROP_NUMBER, 0, 1.0 },
+	{ "CastLightOnObject", 17, UFBX_PROP_BOOLEAN, 0, 1.0 },
+	{ "CastShadows", 11, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "Casts Shadows", 13, UFBX_PROP_BOOLEAN, 0, 1.0 },
+	{ "Color", 5, UFBX_PROP_COLOR, 0, 0.8, 0.8, 0.8 },
+	{ "DecayStart", 10, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "DecayType", 9, UFBX_PROP_INTEGER, 0, 0.0 },
+	{ "DefaultAttributeIndex", 21, UFBX_PROP_INTEGER, 0, -1.0 },
+	{ "DiffuseColor", 12, UFBX_PROP_COLOR, 0, 0.8, 0.8, 0.8 },
+	{ "DiffuseFactor", 13, UFBX_PROP_NUMBER, 0, 1.0 },
+	{ "DisplacementColor", 17, UFBX_PROP_COLOR, 0, 0.0, 0.0, 0.0 },
+	{ "DisplacementFactor", 18, UFBX_PROP_NUMBER, 0, 1.0 },
+	{ "DrawFrontFacingVolumetricLight", 30, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "DrawGroundProjection", 20, UFBX_PROP_BOOLEAN, 0, 1.0 },
+	{ "DrawVolumetricLight", 19, UFBX_PROP_BOOLEAN, 0, 1.0 },
+	{ "EmissiveColor", 13, UFBX_PROP_COLOR, 0, 0.0, 0.0, 0.0 },
+	{ "EmissiveFactor", 14, UFBX_PROP_NUMBER, 0, 1.0 },
+	{ "EnableBarnDoor", 14, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "EnableFarAttenuation", 20, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "EnableNearAttenuation", 21, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "FarAttenuationEnd", 17, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "FarAttenuationStart", 19, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "FileName", 8, UFBX_PROP_STRING, "" },
+	{ "Fog", 3, UFBX_PROP_NUMBER, 0, 50.0 },
+	{ "Freeze", 6, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "GeometricRotation", 17, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "GeometricScaling", 16, UFBX_PROP_VECTOR, 0, 1.0, 1.0, 1.0 },
+	{ "GeometricTranslation", 20, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "InheritType", 11, UFBX_PROP_INTEGER, 0, 0.0 },
+	{ "InnerAngle", 10, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "Intensity", 9, UFBX_PROP_NUMBER, 0, 100.0 },
+	{ "LODBox", 6, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "Lcl Rotation", 12, UFBX_PROP_ROTATION, 0, 0.0, 0.0, 0.0 },
+	{ "Lcl Scaling", 11, UFBX_PROP_SCALING, 0, 1.0, 1.0, 1.0 },
+	{ "Lcl Translation", 15, UFBX_PROP_TRANSLATION, 0, 0.0, 0.0, 0.0 },
+	{ "LeftBarnDoor", 12, UFBX_PROP_NUMBER, 0, 20.0 },
+	{ "LookAtProperty", 14, UFBX_PROP_STRING, 0 },
+	{ "MaxDampRangeX", 13, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "MaxDampRangeY", 13, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "MaxDampRangeZ", 13, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "MaxDampStrengthX", 16, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "MaxDampStrengthY", 16, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "MaxDampStrengthZ", 16, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "MinDampRangeX", 13, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "MinDampRangeY", 13, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "MinDampRangeZ", 13, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "MinDampStrengthX", 16, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "MinDampStrengthY", 16, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "MinDampStrengthZ", 16, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "MultiLayer", 10, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "NearAttenuationEnd", 18, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "NearAttenuationStart", 20, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "NegativePercentShapeSupport", 27, UFBX_PROP_BOOLEAN, 0, 1.0 },
+	{ "NormalMap", 9, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "OuterAngle", 10, UFBX_PROP_NUMBER, 0, 45.0 },
+	{ "PostRotation", 12, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "PreRotation", 11, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "PreferedAngleX", 14, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "PreferedAngleY", 14, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "PreferedAngleZ", 14, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "Primary Visibility", 18, UFBX_PROP_BOOLEAN, 0, 1.0 },
+	{ "QuaternionInterpolate", 21, UFBX_PROP_INTEGER, 0, 0.0 },
+	{ "Receive Shadows", 15, UFBX_PROP_BOOLEAN, 0, 1.0 },
+	{ "RightBarnDoor", 13, UFBX_PROP_NUMBER, 0, 20.0 },
+	{ "RotationActive", 14, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "RotationMax", 11, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "RotationMaxX", 12, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "RotationMaxY", 12, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "RotationMaxZ", 12, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "RotationMin", 11, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "RotationMinX", 12, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "RotationMinY", 12, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "RotationMinZ", 12, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "RotationOffset", 14, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "RotationOrder", 13, UFBX_PROP_INTEGER, 0, 0.0 },
+	{ "RotationPivot", 13, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "RotationSpaceForLimitOnly", 25, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "RotationStiffnessX", 18, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "RotationStiffnessY", 18, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "RotationStiffnessZ", 18, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "ScalingActive", 13, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "ScalingMax", 10, UFBX_PROP_VECTOR, 0, 1.0, 1.0, 1.0 },
+	{ "ScalingMaxX", 11, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "ScalingMaxY", 11, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "ScalingMaxZ", 11, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "ScalingMin", 10, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "ScalingMinX", 11, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "ScalingMinY", 11, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "ScalingMinZ", 11, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "ScalingOffset", 13, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "ScalingPivot", 12, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "ShadingModel", 12, UFBX_PROP_STRING, "Lambert" },
+	{ "ShadowColor", 11, UFBX_PROP_COLOR, 0, 0.0, 0.0, 0.0 },
+	{ "Show", 4, UFBX_PROP_BOOLEAN, 0, 1.0 },
+	{ "TopBarnDoor", 11, UFBX_PROP_NUMBER, 0, 20.0 },
+	{ "TranslationActive", 17, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "TranslationMax", 14, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "TranslationMaxX", 15, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "TranslationMaxY", 15, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "TranslationMaxZ", 15, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "TranslationMin", 14, UFBX_PROP_VECTOR, 0, 0.0, 0.0, 0.0 },
+	{ "TranslationMinX", 15, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "TranslationMinY", 15, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "TranslationMinZ", 15, UFBX_PROP_BOOLEAN, 0, 0.0 },
+	{ "TransparencyFactor", 18, UFBX_PROP_NUMBER, 0, 0.0 },
+	{ "TransparentColor", 16, UFBX_PROP_COLOR, 0, 0.0, 0.0, 0.0 },
+	{ "UpVectorProperty", 16, UFBX_PROP_STRING, 0 },
+	{ "VectorDisplacementColor", 23, UFBX_PROP_COLOR, 0, 0.0, 0.0, 0.0 },
+	{ "VectorDisplacementFactor", 24, UFBX_PROP_NUMBER, 0, 1.0 },
+	{ "Visibility", 10, UFBX_PROP_INTEGER, 0, 1.0 },
+	{ "Visibility Inheritance", 22, UFBX_PROP_INTEGER, 0, 1.0 },
+};
+
+static ufbxi_forceinline uint32_t ufbxi_get_name_key(const char *name, size_t len)
+{
+	uint32_t key = 0;
+	if (len >= 4) {
+		key = (uint8_t)name[0]<<24 | (uint8_t)name[1]<<16 | (uint8_t)name[2]<<8 | (uint8_t)name[3];
+	} else {
+		for (size_t i = 0; i < 4; i++) {
+			key <<= 8;
+			if (i < len) key |= (uint8_t)name[i];
+		}
+	}
+	return key;
+}
+
+ufbxi_nodiscard static int ufbxi_load_default_props(ufbxi_context *uc)
+{
+	size_t num = ufbxi_arraycount(ufbxi_default_props);
+	ufbx_props *defs = ufbxi_push(&uc->result, ufbx_props, 1);
+	ufbxi_check(defs);
+	uc->default_props = defs;
+
+	defs->num_props = num;
+	defs->props = ufbxi_push(&uc->result, ufbx_prop, num);
+	defs->defaults = NULL;
+	ufbxi_check(defs->props);
+
+	for (size_t i = 0; i < num; i++) {
+		const ufbxi_default_prop *def = &ufbxi_default_props[i];
+		ufbx_prop *prop = &defs->props[i];
+
+		prop->name.data = def->name;
+		prop->name.length = def->name_len;
+		ufbxi_check(ufbxi_push_string_place_str(uc, &prop->name));
+		prop->imp_key = ufbxi_get_name_key(def->name, def->name_len);
+		prop->type = def->type;
+		if (def->value_str) {
+			prop->value_str.data = def->value_str;
+			prop->value_str.length = strlen(def->value_str);
+			ufbxi_check(ufbxi_push_string_place_str(uc, &prop->value_str));
+		} else {
+			prop->value_str = ufbx_empty_string;
+		}
+		prop->value_int = (int64_t)def->value_real[0];
+		prop->value_real_arr[0] = def->value_real[0];
+		prop->value_real_arr[1] = def->value_real[1];
+		prop->value_real_arr[2] = def->value_real[2];
+	}
+
+	return 1;
+}
+
 // -- General parsing
 
 ufbxi_nodiscard static int ufbxi_parse(ufbxi_context *uc)
@@ -3574,30 +3811,13 @@ ufbxi_nodiscard static int ufbxi_parse(ufbxi_context *uc)
 	return 1;
 }
 
-// -- Find implementation
-
-static ufbxi_forceinline uint32_t ufbxi_get_name_key(const char *name, size_t len)
-{
-	uint32_t key = 0;
-	if (len >= 4) {
-		key = (uint8_t)name[0]<<24 | (uint8_t)name[1]<<16 | (uint8_t)name[2]<<8 | (uint8_t)name[3];
-	} else {
-		for (size_t i = 0; i < 4; i++) {
-			key <<= 8;
-			if (i < len) key |= (uint8_t)name[i];
-		}
-	}
-	return key;
-}
-
-
 // -- Reading the parsed data
 
 typedef struct {
 	ufbx_string name;
 	ufbx_string sub_type;
 	uint64_t id;
-	ufbx_prop_list props;
+	ufbx_props props;
 } ufbxi_object;
 
 ufbxi_nodiscard static int ufbxi_read_header_extension(ufbxi_context *uc, ufbxi_node *header)
@@ -3628,7 +3848,10 @@ ufbxi_nodiscard static int ufbxi_read_property(ufbxi_context *uc, ufbxi_node *no
 		prop->type = ufbxi_get_prop_type(uc, subtype_str);
 	}
 
-	ufbxi_ignore(ufbxi_get_val_at(node, val_ix, 'S', &prop->value_str));
+	if (!ufbxi_get_val_at(node, val_ix, 'S', &prop->value_str)) {
+		prop->value_str = ufbx_empty_string;
+	}
+
 	ufbxi_ignore(ufbxi_get_val_at(node, val_ix, 'L', &prop->value_int));
 	for (size_t i = 0; i < 3; i++) {
 		if (!ufbxi_get_val_at(node, val_ix + i, 'R', &prop->value_real_arr[i])) break;
@@ -3645,50 +3868,61 @@ static ufbxi_forceinline int ufbxi_cmp_prop(const void *va, const void *vb)
 	return strcmp(a->name.data, b->name.data);
 }
 
-ufbxi_nodiscard static int ufbxi_merge_properties(ufbxi_context *uc, ufbx_prop_list *dst, ufbx_prop_list a, ufbx_prop_list b, ufbxi_buf *buf)
+ufbxi_nodiscard static int ufbxi_merge_properties(ufbxi_context *uc, ufbx_props *dst, const ufbx_props *p_a, const ufbx_props *p_b, ufbxi_buf *buf)
 {
-	size_t max_dst = a.size + b.size;
-	dst->data = ufbxi_push(buf, ufbx_prop, max_dst);
-	dst->size = 0;
-	ufbxi_check(dst->data);
+	ufbx_props a, b;
+	if (p_a) a = *p_a; else a.num_props = 0;
+	if (p_b) b = *p_b; else b.num_props = 0;
+
+	size_t max_dst = a.num_props + b.num_props;
+	dst->props = ufbxi_push(buf, ufbx_prop, max_dst);
+	dst->num_props = 0;
+	ufbxi_check(dst->props);
 
 	// Merge properties preferring values from `b`
 	size_t ai = 0, bi = 0, di = 0;
-	while (ai < a.size && bi < b.size) {
-		int cmp = ufbxi_cmp_prop(&a.data[ai], &b.data[bi]);
+	while (ai < a.num_props && bi < b.num_props) {
+		int cmp = ufbxi_cmp_prop(&a.props[ai], &b.props[bi]);
 		if (cmp >= 0) {
-			dst->data[di++] = b.data[bi++];
+			dst->props[di++] = b.props[bi++];
 			if (cmp == 0) ai++;
 		} else {
-			dst->data[di++] = a.data[ai++];
+			dst->props[di++] = a.props[ai++];
 		}
 	}
 
 	// Add rest of the properties from both
-	while (ai < a.size) dst->data[di++] = a.data[ai++];
-	while (bi < b.size) dst->data[di++] = b.data[bi++];
+	while (ai < a.num_props) dst->props[di++] = a.props[ai++];
+	while (bi < b.num_props) dst->props[di++] = b.props[bi++];
 
 	// Pop unused values from the end of `result`
 	ufbxi_pop(buf, ufbx_prop, max_dst - di, NULL);
-	dst->size = di;
+	dst->num_props = di;
 
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_properties(ufbxi_context *uc, ufbx_prop_list *dst, ufbxi_buf *buf)
+ufbxi_nodiscard static int ufbxi_sort_properties(ufbxi_context *uc, ufbx_props *dst, ufbxi_buf *buf)
 {
-	size_t num = dst->size;
+	size_t num = dst->num_props;
 	if (num > 32) {
 		// Merge sort
 		size_t mid = num / 2;
-		ufbx_prop_list left = { dst->data, mid };
-		ufbx_prop_list right = { dst->data + mid, num - mid };
+		ufbx_props left = { dst->props, mid };
+		ufbx_props right = { dst->props + mid, num - mid };
 		ufbxi_check(ufbxi_sort_properties(uc, &left, &uc->tmp_sort));
 		ufbxi_check(ufbxi_sort_properties(uc, &right, &uc->tmp_sort));
-		ufbxi_check(ufbxi_merge_properties(uc, dst, left, right, buf));
+		ufbxi_check(ufbxi_merge_properties(uc, dst, &left, &right, buf));
 	} else {
 		// Insertion sort
-		ufbx_prop *props = dst->data;
+
+		// Top-level properties are in temporary storage
+		if (buf != &uc->tmp_sort) {
+			dst->props = ufbxi_push_copy(buf, ufbx_prop, num, dst->props);
+			ufbxi_check(dst->props);
+		}
+
+		ufbx_prop *props = dst->props;
 		size_t num_removed = 0;
 		for (size_t hi = 1; hi < num; hi++) {
 			size_t lo = hi - num_removed;
@@ -3710,22 +3944,76 @@ ufbxi_nodiscard static int ufbxi_sort_properties(ufbxi_context *uc, ufbx_prop_li
 				props[lo] = prop;
 			}
 		}
-		dst->size -= num_removed;
+		dst->num_props -= num_removed;
 	}
 
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *parent, ufbx_prop_list *props, ufbxi_buf *buf)
+static ufbxi_forceinline bool ufbxi_prop_value_equal(const ufbx_prop *a, const ufbx_prop *b)
 {
+	// Strings are interned so we can do shallow compare of the pointers,
+	// this also includes the check for `value_str.length`!
+	if (a->value_str.data != b->value_str.data) return false;
+	if (a->value_int != b->value_int) return false;
+	if (a->value_real_arr[0] != b->value_real_arr[0]) return false;
+	if (a->value_real_arr[1] != b->value_real_arr[1]) return false;
+	if (a->value_real_arr[2] != b->value_real_arr[2]) return false;
+	return true;
+}
+
+static void ufbxi_remove_default_properties(ufbx_props *dst, ufbx_props *defaults, ufbxi_buf *buf)
+{
+	size_t num_dst = dst->num_props, num_def = defaults->num_props;
+	size_t dst_i = 0, src_i = 0, def_i = 0;
+	ufbx_prop *dst_props = dst->props;
+	ufbx_prop *def_props = defaults->props;
+
+	// Iterate through `dst` and `defaults` in lock-step, removing properties
+	// from `dst` if they are equal to the default values.
+	while (src_i < num_dst && def_i < num_def) {
+		int cmp = ufbxi_cmp_prop(&dst_props[src_i], &def_props[def_i]);
+		if (cmp == 0) {
+			if (!ufbxi_prop_value_equal(&dst_props[src_i], &def_props[def_i])) {
+				if (dst_i != src_i) dst_props[dst_i] = dst_props[src_i];
+				dst_i++;
+			}
+			src_i++;
+		} else if (cmp < 0) {
+			if (dst_i != src_i) dst_props[dst_i] = dst_props[src_i];
+			src_i++;
+			dst_i++;
+		} else {
+			def_i++;
+		}
+	}
+
+	// Shift down the remaining values if necessary
+	while (src_i < num_dst) {
+		if (dst_i != src_i) dst_props[dst_i] = dst_props[src_i];
+		src_i++;
+		dst_i++;
+	}
+
+	// Pop removed default values
+	ufbxi_pop(buf, ufbx_prop, dst->num_props - dst_i, NULL);
+
+	dst->num_props = dst_i;
+	dst->defaults = defaults;
+}
+
+ufbxi_nodiscard static int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *parent, ufbx_props *props, ufbxi_buf *buf)
+{
+	props->defaults = NULL;
+
 	int version = 70;
 	ufbxi_node *node = ufbxi_find_child(parent, ufbxi_Properties70);
 	if (!node) {
 		node = ufbxi_find_child(parent, ufbxi_Properties60);
 		if (!node) {
 			// No properties found, not an error
-			props->data = NULL;
-			props->size = 0;
+			props->props = NULL;
+			props->num_props = 0;
 			return 1;
 		}
 		version = 60;
@@ -3739,9 +4027,9 @@ ufbxi_nodiscard static int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *
 		ufbxi_check(ufbxi_read_property(uc, prop_node, prop, version));
 	}
 
-	props->data = ufbxi_make_array(&uc->tmp_sort, ufbx_prop, node->num_children);
-	props->size = node->num_children;
-	ufbxi_check(props->data);
+	props->props = ufbxi_make_array(&uc->tmp_sort, ufbx_prop, node->num_children);
+	props->num_props = node->num_children;
+	ufbxi_check(props->props);
 
 	// Sort and deduplicate the properties
 	ufbxi_check(ufbxi_sort_properties(uc, props, buf));
@@ -3752,6 +4040,8 @@ ufbxi_nodiscard static int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *
 
 ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc, ufbxi_node *definitions)
 {
+	ufbxi_buf_state stack_state = ufbxi_buf_push_state(&uc->tmp_stack);
+
 	ufbxi_for(ufbxi_node, object, definitions->children, definitions->num_children) {
 		if (object->name != ufbxi_ObjectType) continue;
 
@@ -3759,26 +4049,57 @@ ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc, ufbxi_node 
 		// the object counts by themselves.
 		ufbxi_node *props = ufbxi_find_child(object, ufbxi_PropertyTemplate);
 		if (props) {
-			ufbxi_template *tmpl = ufbxi_push_zero(&uc->tmp_props, ufbxi_template, 1);
+			ufbxi_template *tmpl = ufbxi_push_zero(&uc->tmp_stack, ufbxi_template, 1);
 			ufbxi_check(tmpl);
+			ufbxi_check(ufbxi_get_val1(props, "S", &tmpl->sub_type));
+
+			// Ignore potential "Fbx" prefix.
+			if (tmpl->sub_type.length > 3 && !strncmp(tmpl->sub_type.data, "Fbx", 3)) {
+				tmpl->sub_type.data += 3;
+				tmpl->sub_type.length -= 3;
+			}
 
 			ufbxi_check(ufbxi_get_val1(object, "C", (char**)&tmpl->type));
 			ufbxi_check(ufbxi_read_properties(uc, props, &tmpl->props, &uc->tmp));
+			ufbxi_remove_default_properties(&tmpl->props, uc->default_props, &uc->tmp);
 		}
 	}
 
 	// Copy the templates to the destination buffer
-	uc->num_templates = uc->tmp_props.num_items;
-	uc->templates = ufbxi_push_pop(&uc->tmp, &uc->tmp_props, ufbxi_template, uc->num_templates);
+	uc->num_templates = uc->tmp_stack.num_items - stack_state.num_items;
+	uc->templates = ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_template, uc->num_templates);
 	ufbxi_check(uc->templates);
+
+	ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
 
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_template *ufbxi_find_template(ufbxi_context *uc, const char *name)
+ufbxi_nodiscard static ufbx_props *ufbxi_find_template(ufbxi_context *uc, const char *name, ufbx_string sub_type)
 {
 	ufbxi_for(ufbxi_template, tmpl, uc->templates, uc->num_templates) {
-		if (tmpl->type == name) return tmpl;
+		if (tmpl->type == name) {
+
+			// Check that sub_type matches unless the type is Material as it
+			// has the type FbxSurfacePhong/FbxSurfaceLambert which doesn't match
+			// the node's `sub_type`. Ignore potential "Fbx" prefix.
+			if (tmpl->type != ufbxi_Material) {
+				if (sub_type.length > 3 && !strncmp(sub_type.data, "Fbx", 3)) {
+					sub_type.data += 3;
+					sub_type.length -= 3;
+				}
+
+				if (!ufbxi_streq(sub_type, tmpl->sub_type)) {
+					return NULL;
+				}
+			}
+
+			if (tmpl->props.num_props > 0) {
+				return &tmpl->props;
+			} else {
+				return NULL;
+			}
+		}
 	}
 	return NULL;
 }
@@ -4369,7 +4690,7 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve_node(ufbxi_context *uc, uf
 	ufbxi_check(prop);
 	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ANIM_PROP, object->id, uc->tmp_arr_anim_props.num_items - 1));
 
-	ufbxi_for(ufbx_prop, def, object->props.data, object->props.size) {
+	ufbxi_for(ufbx_prop, def, object->props.props, object->props.num_props) {
 		if (def->type != UFBX_PROP_NUMBER) continue;
 
 		size_t index = 0;
@@ -4440,16 +4761,17 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc, ufbxi_node *obj
 
 		const char *name = node->name;
 
-		// Merge properties from template
-		// TODO: Most of these will be re-merged when connecting geometries to meshes etc.
-		// leading to some result buffer wastage
-		ufbxi_template *tmpl = ufbxi_find_template(uc, name);
-		ufbx_prop_list tmpl_props = { 0 };
-		if (tmpl) tmpl_props = tmpl->props;
-
-		ufbxi_check(ufbxi_read_properties(uc, node, &object.props, &uc->tmp_props));
-		ufbxi_check(ufbxi_merge_properties(uc, &object.props, tmpl_props, object.props, &uc->result));
-		ufbxi_buf_clear(&uc->tmp_props);
+		if (uc->version >= 7000) {
+			// Post-7000 FBX files have templates and potentially need to merge
+			// attributes so read all the properties to `tmp` for now.
+			ufbxi_check(ufbxi_read_properties(uc, node, &object.props, &uc->tmp));
+			object.props.defaults = ufbxi_find_template(uc, name, object.sub_type);
+		} else {
+			// Pre-7000 FBX files don't need to further property merging so we can
+			// read the properties to `result` and remove defaults immediately.
+			ufbxi_check(ufbxi_read_properties(uc, node, &object.props, &uc->result));
+			ufbxi_remove_default_properties(&object.props, uc->default_props, &uc->result);
+		}
 
 		if (name == ufbxi_Model) {
 			ufbxi_check(ufbxi_read_model(uc, node, &object));
@@ -4946,6 +5268,13 @@ ufbxi_nodiscard static int ufbxi_collect_nodes(ufbxi_context *uc, size_t size, u
 		node->children.data = ufbxi_push(&uc->result, ufbx_node*, node->children.size);
 		node->children.size = 0;
 
+		// Remove default properties for nodes that were not merged. Merge default
+		// values into the properties before removing defaults.
+		if (node->props.defaults != uc->default_props) {
+			ufbxi_check(ufbxi_merge_properties(uc, &node->props, node->props.defaults, &node->props, &uc->result));
+			ufbxi_remove_default_properties(&node->props, uc->default_props, &uc->result);
+		}
+
 		*dst++ = (ufbx_node*)node;
 		ptr += size;
 	}
@@ -4961,6 +5290,31 @@ ufbxi_forceinline static void ufbxi_patch_index(int32_t **p_index, int32_t *zero
 	} else if (*p_index == ufbxi_sentinel_index_consecutive) {
 		*p_index = consecutive;
 	}
+}
+
+ufbxi_nodiscard static int ufbxi_merge_attribute_properties(ufbxi_context *uc, ufbx_props *props, ufbx_props *attr)
+{
+	ufbxi_buf_state stack_state = ufbxi_buf_push_state(&uc->tmp_stack);
+
+	// Merge default values into the node first if necessary, store the result in `tmp_stack`
+	// as the properties will be re-merged immediately afterwards. Merge defaults from both
+	// the node and the attribute.
+	if (props->defaults != uc->default_props) {
+		if (attr->defaults) {
+			ufbxi_check(ufbxi_merge_properties(uc, props, attr->defaults, props, &uc->tmp_stack));
+		}
+		ufbxi_check(ufbxi_merge_properties(uc, props, props->defaults, props, &uc->tmp_stack));
+
+	}
+
+	// Merge the attributes to the properties
+	ufbxi_check(ufbxi_merge_properties(uc, props, props, attr, &uc->result));
+
+	ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
+
+	ufbxi_remove_default_properties(props, uc->default_props, &uc->result);
+
+	return 1;
 }
 
 ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
@@ -5030,7 +5384,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 
 			// Merge attribute properties to the node
 			if (child.attribute) {
-				ufbxi_check(ufbxi_merge_properties(uc, &parent.node->props, parent.node->props, child.attribute->props, &uc->result));
+				ufbxi_check(ufbxi_merge_attribute_properties(uc, &parent.node->props, &child.attribute->props));
 			}
 		}
 
@@ -5051,7 +5405,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		if (parent.mesh) {
 			if (child.geometry) {
 				// Copy all non-node properties
-				ufbxi_check(ufbxi_merge_properties(uc, &parent.node->props, parent.node->props, child.geometry->node.props, &uc->result));
+				ufbxi_check(ufbxi_merge_attribute_properties(uc, &parent.node->props, &child.geometry->node.props));
 				memcpy((char*)parent.mesh + sizeof(ufbx_node), (char*)child.geometry + sizeof(ufbx_node), sizeof(ufbx_mesh) - sizeof(ufbx_node));
 			}
 		}
@@ -5116,6 +5470,7 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 {
 	ufbxi_check(ufbxi_load_strings(uc));
 	ufbxi_check(ufbxi_load_maps(uc));
+	ufbxi_check(ufbxi_load_default_props(uc));
 	ufbxi_check(ufbxi_parse(uc));
 	ufbxi_check(ufbxi_read_root(uc));
 	ufbxi_check(ufbxi_finalize_scene(uc));
@@ -5146,8 +5501,7 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 static void ufbxi_free_temp(ufbxi_context *uc)
 {
 	ufbxi_buf_free(&uc->tmp);
-	ufbxi_buf_free(&uc->tmp_node);
-	ufbxi_buf_free(&uc->tmp_props);
+	ufbxi_buf_free(&uc->tmp_stack);
 	ufbxi_map_free(&uc->string_map);
 	ufbxi_free(&uc->ator_tmp, char, uc->read_buffer, uc->read_buffer_size);
 	ufbxi_free(&uc->ator_tmp, char, uc->convert_buffer, uc->convert_buffer_size);
@@ -5209,9 +5563,8 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->connectable_map.ator = &uc->ator_tmp;
 
 	uc->tmp.ator = &uc->ator_tmp;
-	uc->tmp_node.ator = &uc->ator_tmp;
+	uc->tmp_stack.ator = &uc->ator_tmp;
 	uc->tmp_connection.ator = &uc->ator_tmp;
-	uc->tmp_props.ator = &uc->ator_tmp;
 	uc->tmp_sort.ator = &uc->ator_tmp;
 	uc->tmp_arr_models.ator = &uc->ator_tmp;
 	uc->tmp_arr_meshes.ator = &uc->ator_tmp;
@@ -5289,7 +5642,7 @@ static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, 
 extern "C" {
 #endif
 
-const ufbx_string ufbx_empty_string = { "", 0 };
+const ufbx_string ufbx_empty_string = { ufbxi_empty_char, 0 };
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)
 {
@@ -5364,29 +5717,34 @@ ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_
 	return NULL;
 }
 
-ufbx_prop *ufbx_find_prop_len(const ufbx_prop_list *props, const char *name, size_t name_len)
+ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len)
 {
 	uint32_t key = ufbxi_get_name_key(name, name_len);
-	ufbx_prop *prop_data = props->data;
-	size_t begin = 0;
-	size_t end = props->size;
-	while (end - begin >= 16) {
-		size_t mid = (begin + end) >> 1;
-		const ufbx_prop *p = &prop_data[mid];
-		if (p->imp_key < key) {
-			begin = mid + 1;
-		} else { 
-			end = mid;
-		}
-	}
 
-	for (; begin < end; begin++) {
-		const ufbx_prop *p = &prop_data[begin];
-		if (p->imp_key > key) break;
-		if (p->imp_key == key && p->name.length == name_len && !memcmp(p->name.data, name, name_len)) {
-			return (ufbx_prop*)p;
+	do {
+		ufbx_prop *prop_data = props->props;
+		size_t begin = 0;
+		size_t end = props->num_props;
+		while (end - begin >= 16) {
+			size_t mid = (begin + end) >> 1;
+			const ufbx_prop *p = &prop_data[mid];
+			if (p->imp_key < key) {
+				begin = mid + 1;
+			} else { 
+				end = mid;
+			}
 		}
-	}
+
+		for (; begin < end; begin++) {
+			const ufbx_prop *p = &prop_data[begin];
+			if (p->imp_key > key) break;
+			if (p->imp_key == key && p->name.length == name_len && !memcmp(p->name.data, name, name_len)) {
+				return (ufbx_prop*)p;
+			}
+		}
+
+		props = props->defaults;
+	} while (props);
 
 	return NULL;
 }

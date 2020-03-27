@@ -645,6 +645,9 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 	}
 }
 
+static uint32_t g_file_version = 0;
+static const char *g_file_type = NULL;
+
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 {
 	const uint32_t file_versions[] = { 6100, 7100, 7400, 7500, 7700 };
@@ -663,6 +666,9 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 			uint32_t version = file_versions[vi];
 			const char *format = fi == 1 ? "ascii" : "binary";
 			snprintf(buf, sizeof(buf), "%s%s_%u_%s.fbx", data_root, name, version, format);
+
+			if (g_file_version && version != g_file_version) continue;
+			if (g_file_type && strcmp(format, g_file_type)) continue;
 
 			size_t size = 0;
 			void *data = ufbxt_read_file(buf, &size);
@@ -716,7 +722,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s))
 #undef UFBXT_FILE_TEST
 #define UFBXT_IMPL 0
 #define UFBXT_TEST(name) { #name, &ufbxt_test_fn_##name },
-#define UFBXT_FILE_TEST(name) { "file_" #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST(name) { #name, &ufbxt_test_fn_file_##name },
 ufbxt_test g_tests[] = {
 	#include "all_tests.h"
 };
@@ -778,6 +784,10 @@ int main(int argc, char **argv)
 					data_root[len + 1] = '\0';
 				}
 			}
+		}
+		if (!strcmp(argv[i], "-f")) {
+			if (++i < argc) g_file_version = (uint32_t)atoi(argv[i]);
+			if (++i < argc) g_file_type = argv[i];
 		}
 	}
 
