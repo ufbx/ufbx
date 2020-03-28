@@ -5864,6 +5864,8 @@ static void ufbxi_free_result(ufbxi_context *uc)
 {
 	ufbxi_buf_free(&uc->result);
 	ufbxi_buf_free(&uc->string_buf);
+
+	ufbx_assert(uc->ator_result.current_size == 0);
 }
 
 #define ufbxi_default_opt(name, value) if (!opts->name) opts->name = value
@@ -6012,8 +6014,12 @@ void ufbx_free_scene(ufbx_scene *scene)
 	// We need to free `result_buf` last and be careful to copy it to
 	// the stack since the `ufbxi_scene_imp` that contains it is allocated
 	// from the same result buffer!
+	ufbxi_allocator ator = imp->ator;
 	ufbxi_buf result = imp->result_buf;
+	result.ator = &ator;
 	ufbxi_buf_free(&result);
+
+	ufbx_assert(ator.current_size == 0);
 }
 
 ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t name_len)
