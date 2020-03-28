@@ -5140,15 +5140,17 @@ ufbxi_nodiscard static int ufbxi_read_connections(ufbxi_context *uc, ufbxi_node 
 		ufbxi_connectable *child = ufbxi_find_connectable(uc, child_id);
 		if (child && child->type == UFBXI_CONNECTABLE_ATTRIBUTE) {
 			ufbxi_connectable *parent = ufbxi_find_connectable(uc, parent_id);
-			ufbxi_attribute *attr = &uc->attributes[child->index];
-			switch (parent->type) {
-			case UFBXI_CONNECTABLE_MODEL:
-			case UFBXI_CONNECTABLE_MESH:
-			case UFBXI_CONNECTABLE_LIGHT:
-				attr->parent_type = parent->type;
-				attr->parent_index = parent->index;
-				break;
-			default: break;
+			if (parent) {
+				ufbxi_attribute *attr = &uc->attributes[child->index];
+				switch (parent->type) {
+				case UFBXI_CONNECTABLE_MODEL:
+				case UFBXI_CONNECTABLE_MESH:
+				case UFBXI_CONNECTABLE_LIGHT:
+					attr->parent_type = parent->type;
+					attr->parent_index = parent->index;
+					break;
+				default: break;
+				}
 			}
 		}
 

@@ -20,6 +20,20 @@ void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr);
 #include <stdarg.h>
 #include <math.h>
 
+#if defined(_OPENMP)
+	#include <omp.h>
+#else
+	static int omp_get_thread_num() { return 0; }
+#endif
+
+// -- Thread local
+
+#ifdef _MSC_VER
+	#define ufbxt_threadlocal __declspec(thread)
+#else
+	#define ufbxt_threadlocal __thread
+#endif
+
 // -- Timing
 
 typedef struct {
@@ -281,8 +295,14 @@ uint32_t g_log_pos;
 
 char g_hint[8*1024];
 
+ufbxt_threadlocal jmp_buf *t_jmp_buf;
+
 void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
 {
+	if (t_jmp_buf) {
+		longjmp(g_test_jmp, 1);
+	}
+
 	printf("FAIL\n");
 	fflush(stdout);
 
@@ -796,16 +816,29 @@ static const char *g_file_type = NULL;
 static bool g_fuzz = false;
 static size_t g_fuzz_step = 0;
 
-void ufbxt_test_fuzz(void *data, size_t size, size_t step)
+int ufbxt_test_fuzz(void *data, size_t size, size_t step)
 {
-	if (g_fuzz_step && step != g_fuzz_step) return;
+	if (g_fuzz_step && step != g_fuzz_step) return 1;
 
-	ufbx_error error;
-	ufbx_scene *scene = ufbx_load_memory(data, size, NULL, &error);
-	if (scene) {
-		ufbxt_check_scene(scene);
-		ufbx_free_scene(scene);
+	t_jmp_buf = (jmp_buf*)calloc(1, sizeof(jmp_buf));
+	int ret = 1;
+	if (!setjmp(*t_jmp_buf)) {
+
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_memory(data, size, NULL, &error);
+		if (scene) {
+			ufbxt_check_scene(scene);
+			ufbx_free_scene(scene);
+		}
+	} else {
+		ret = 0;
 	}
+
+	free(t_jmp_buf);
+	t_jmp_buf = NULL;
+
+	return ret;
+
 }
 
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err))
@@ -868,34 +901,44 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				size_t step = 0;
 				uint8_t *data_u8 = (uint8_t*)data;
 				printf("\n");
-				for (size_t i = 0; i < size; i++) {
-					printf("\r.. Fuzzing: %zu/%zu", i, size);
+
+				size_t fail_step = 0;
+				int i;
+
+				#pragma omp parallel for schedule(dynamic)
+				for (i = 0; i < (int)size; i++) {
+
+					if (omp_get_thread_num() == 0) {
+						printf("\r.. Fuzzing: %d/%d", i, (int)size);
+					}
+
+					size_t step = i * 10;
 
 					uint8_t original = data_u8[i];
 
-					ufbxt_hintf("Fuzz byte %zu += 1 (step %zu)", i, ++step);
 					data_u8[i] = original + 1;
-					ufbxt_test_fuzz(data, size, step);
+					if (!ufbxt_test_fuzz(data, size, step + 1)) fail_step = step + 1;
 
-					ufbxt_hintf("Fuzz byte %zu -= 1 (step %zu)", i, ++step);
 					data_u8[i] = original - 1;
-					ufbxt_test_fuzz(data, size, step);
+					if (!ufbxt_test_fuzz(data, size, step + 2)) fail_step = step + 2;
 
 					if (original != 0) {
-						ufbxt_hintf("Fuzz byte %zu = 0 (step %zu)", i, ++step);
 						data_u8[i] = 0;
-						ufbxt_test_fuzz(data, size, step);
+						if (!ufbxt_test_fuzz(data, size, step + 3)) fail_step = step + 3;
 					}
 
 					if (original != 0xff) {
-						ufbxt_hintf("Fuzz byte %zu = 0xff (step %zu)", i, ++step);
 						data_u8[i] = 0xff;
-						ufbxt_test_fuzz(data, size, step);
+						if (!ufbxt_test_fuzz(data, size, step + 4)) fail_step = step + 4;
 					}
 
 					data_u8[i] = original;
+
 				}
 				printf("\n");
+
+				ufbxt_hintf("Fuzz failed on step: %zu", step);
+				ufbxt_assert(fail_step == 0);
 			}
 
 			free(data);
