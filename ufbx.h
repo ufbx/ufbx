@@ -180,7 +180,7 @@ struct ufbx_color_set {
 };
 
 struct ufbx_edge {
-	int32_t indices[2];
+	uint32_t indices[2];
 };
 
 struct ufbx_face {

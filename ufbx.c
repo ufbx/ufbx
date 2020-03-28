@@ -4403,8 +4403,8 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 			}
 			ufbxi_check(index_ix >= 0 && (size_t)index_ix < mesh->num_indices);
 			int32_t next = index_data[index_ix];
-			edges[i].indices[0] = prev;
-			edges[i].indices[1] = next;
+			edges[i].indices[0] = (uint32_t)(prev >= 0 ? prev : ~prev);
+			edges[i].indices[1] = (uint32_t)(next >= 0 ? next : ~next);
 		}
 
 		mesh->edges = edges;

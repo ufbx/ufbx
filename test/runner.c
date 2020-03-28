@@ -737,6 +737,24 @@ void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_check_vertex_element(scene, mesh, &mesh->vertex_uv, sizeof(ufbx_vec2));
 	ufbxt_check_vertex_element(scene, mesh, &mesh->vertex_color, sizeof(ufbx_vec4));
 
+	ufbxt_assert(mesh->num_vertices == mesh->vertex_position.num_elements);
+	ufbxt_assert(mesh->num_triangles >= mesh->num_faces);
+	ufbxt_assert(mesh->num_triangles <= mesh->num_indices);
+
+	uint32_t prev_end = 0;
+	for (size_t i = 0; i < mesh->num_faces; i++) {
+		ufbx_face face = mesh->faces[i];
+		ufbxt_assert(face.index_begin == prev_end);
+		prev_end = face.index_begin + face.num_indices;
+		ufbxt_assert(prev_end <= mesh->num_indices);
+	}
+
+	for (size_t i = 0; i < mesh->num_edges; i++) {
+		ufbx_edge edge = mesh->edges[i];
+		ufbxt_assert(edge.indices[0] < mesh->num_indices);
+		ufbxt_assert(edge.indices[1] < mesh->num_indices);
+	}
+
 	for (size_t i = 0; i < mesh->uv_sets.size; i++) {
 		ufbx_uv_set *set = &mesh->uv_sets.data[i];
 		if (i == 0) {
