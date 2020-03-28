@@ -5837,11 +5837,27 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 
 static void ufbxi_free_temp(ufbxi_context *uc)
 {
+	ufbxi_map_free(&uc->string_map);
+	ufbxi_map_free(&uc->prop_type_map);
+	ufbxi_map_free(&uc->connectable_map);
+
 	ufbxi_buf_free(&uc->tmp);
 	ufbxi_buf_free(&uc->tmp_stack);
-	ufbxi_map_free(&uc->string_map);
+	ufbxi_buf_free(&uc->tmp_connection);
+	ufbxi_buf_free(&uc->tmp_sort);
+	ufbxi_buf_free(&uc->tmp_arr_models);
+	ufbxi_buf_free(&uc->tmp_arr_meshes);
+	ufbxi_buf_free(&uc->tmp_arr_geometry);
+	ufbxi_buf_free(&uc->tmp_arr_lights);
+	ufbxi_buf_free(&uc->tmp_arr_anim_layers);
+	ufbxi_buf_free(&uc->tmp_arr_anim_props);
+	ufbxi_buf_free(&uc->tmp_arr_anim_curves);
+	ufbxi_buf_free(&uc->tmp_arr_attributes);
+
 	ufbxi_free(&uc->ator_tmp, char, uc->read_buffer, uc->read_buffer_size);
 	ufbxi_free(&uc->ator_tmp, char, uc->convert_buffer, uc->convert_buffer_size);
+
+	ufbx_assert(uc->ator_tmp.current_size == 0);
 }
 
 static void ufbxi_free_result(ufbxi_context *uc)
