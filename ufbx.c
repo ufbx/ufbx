@@ -5057,7 +5057,7 @@ ufbxi_nodiscard static int ufbxi_read_take_object(ufbxi_context *uc, ufbxi_node 
 	// by their unique Type::Name pair that we use as unique IDs through the
 	// pooled interned string pointers.
 	const char *type_and_name;
-	ufbxi_check(ufbxi_get_val1(node, "C", (char**)&type_and_name));
+	ufbxi_check(ufbxi_get_val1(node, "c", (char**)&type_and_name));
 	uint64_t node_id = (uintptr_t)type_and_name;
 
 	// Add all suitable Channels as animated properties
@@ -5123,7 +5123,7 @@ ufbxi_nodiscard static int ufbxi_read_connections(ufbxi_context *uc, ufbxi_node 
 		if (uc->version < 7000) {
 			const char *parent_name, *child_name;
 			// Pre-7000 versions use Type::Name pairs as identifiers
-			if (!ufbxi_get_val3(node, "CCC", (char**)&type, (char**)&child_name, (char**)&parent_name)) continue;
+			if (!ufbxi_get_val3(node, "Ccc", (char**)&type, (char**)&child_name, (char**)&parent_name)) continue;
 			parent_id = (uintptr_t)parent_name;
 			child_id = (uintptr_t)child_name;
 		} else {
