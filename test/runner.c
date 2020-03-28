@@ -793,6 +793,19 @@ void ufbxt_check_scene(ufbx_scene *scene)
 
 static uint32_t g_file_version = 0;
 static const char *g_file_type = NULL;
+static bool g_fuzz = false;
+static size_t g_fuzz_step = 0;
+
+void ufbxt_test_fuzz(void *data, size_t size, size_t step)
+{
+	if (g_fuzz_step && step != g_fuzz_step) return;
+
+	ufbx_error error;
+	ufbx_scene *scene = ufbx_load_memory(data, size, NULL, &error);
+	if (scene) {
+		ufbxt_check_scene(scene);
+	}
+}
 
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err))
 {
@@ -849,6 +862,41 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			}
 
 			ufbx_free_scene(scene);
+
+			if (g_fuzz) {
+				size_t step = 0;
+				uint8_t *data_u8 = (uint8_t*)data;
+				printf("\n");
+				for (size_t i = 0; i < size; i++) {
+					printf("\r.. Fuzzing: %zu/%zu", i, size);
+
+					uint8_t original = data_u8[i];
+
+					ufbxt_hintf("Fuzz byte %zu += 1 (step %zu)", i, ++step);
+					data_u8[i] = original + 1;
+					ufbxt_test_fuzz(data, size, step);
+
+					ufbxt_hintf("Fuzz byte %zu -= 1 (step %zu)", i, ++step);
+					data_u8[i] = original - 1;
+					ufbxt_test_fuzz(data, size, step);
+
+					if (original != 0) {
+						ufbxt_hintf("Fuzz byte %zu = 0 (step %zu)", i, ++step);
+						data_u8[i] = 0;
+						ufbxt_test_fuzz(data, size, step);
+					}
+
+					if (original != 0xff) {
+						ufbxt_hintf("Fuzz byte %zu = 0xff (step %zu)", i, ++step);
+						data_u8[i] = 0xff;
+						ufbxt_test_fuzz(data, size, step);
+					}
+
+					data_u8[i] = original;
+				}
+				printf("\n");
+			}
+
 			free(data);
 		}
 	}
@@ -940,6 +988,14 @@ int main(int argc, char **argv)
 		if (!strcmp(argv[i], "-f")) {
 			if (++i < argc) g_file_version = (uint32_t)atoi(argv[i]);
 			if (++i < argc) g_file_type = argv[i];
+		}
+
+		if (!strcmp(argv[i], "--fuzz")) {
+			g_fuzz = true;
+		}
+
+		if (!strcmp(argv[i], "--fuzz-step")) {
+			if (++i < argc) g_fuzz_step = (size_t)atoi(argv[i]);
 		}
 	}
 

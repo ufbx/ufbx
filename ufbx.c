@@ -2313,10 +2313,15 @@ static ufbxi_node *ufbxi_find_child(ufbxi_node *node, const char *name)
 	return NULL;
 }
 
+static ufbxi_forceinline bool ufbxi_check_string(ufbx_string s)
+{
+	return memchr(s.data, 0, s.length) == NULL;
+}
+
 // Retrieve values from nodes with type codes:
 // Any: '_' (ignore)
 // NUMBER: 'I' int32_t 'L' int64_t 'F' float 'D' double 'R' ufbxi_real 'B' bool 'Z' size_t
-// STRING: 'S' ufbx_string 'C' const char*
+// STRING: 'S' ufbx_string 'C' const char* (checked) 's' ufbx_string 'c' const char * (unchecked)
 
 ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, size_t ix, char fmt, void *v)
 {
@@ -2330,8 +2335,10 @@ ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, 
 	case 'R': if (type == UFBXI_VALUE_NUMBER) { *(ufbx_real*)v = (ufbx_real)node->vals[ix].f; return 1; } else return 0;
 	case 'B': if (type == UFBXI_VALUE_NUMBER) { *(bool*)v = node->vals[ix].i != 0; return 1; } else return 0;
 	case 'Z': if (type == UFBXI_VALUE_NUMBER) { if (node->vals[ix].i < 0) return 0; *(size_t*)v = (size_t)node->vals[ix].i; return 1; } else return 0;
-	case 'S': if (type == UFBXI_VALUE_STRING) { *(ufbx_string*)v = node->vals[ix].s; return 1; } else return 0;
-	case 'C': if (type == UFBXI_VALUE_STRING) { *(const char**)v = node->vals[ix].s.data; return 1; } else return 0;
+	case 'S': if (type == UFBXI_VALUE_STRING && ufbxi_check_string(node->vals[ix].s)) { *(ufbx_string*)v = node->vals[ix].s; return 1; } else return 0;
+	case 'C': if (type == UFBXI_VALUE_STRING && ufbxi_check_string(node->vals[ix].s)) { *(const char**)v = node->vals[ix].s.data; return 1; } else return 0;
+	case 's': if (type == UFBXI_VALUE_STRING) { *(ufbx_string*)v = node->vals[ix].s; return 1; } else return 0;
+	case 'c': if (type == UFBXI_VALUE_STRING) { *(const char**)v = node->vals[ix].s.data; return 1; } else return 0;
 	default:
 		ufbx_assert(0 && "Bad format char");
 		return 0;
@@ -5152,6 +5159,11 @@ ufbxi_nodiscard static int ufbxi_read_connections(ufbxi_context *uc, ufbxi_node 
 
 ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 {
+	// Initialize the scene
+	{
+		uc->scene.metadata.creator = ufbx_empty_string;
+	}
+
 	// Initialize root node before reading any models
 	{
 		uint64_t root_id = 0;
