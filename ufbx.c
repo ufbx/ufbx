@@ -4790,6 +4790,8 @@ ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_str
 
 	ufbxi_check(ufbxi_push_string_place_str(uc, type));
 	ufbxi_check(ufbxi_push_string_place_str(uc, name));
+	ufbxi_check(ufbxi_check_string(*type));
+	ufbxi_check(ufbxi_check_string(*name));
 
 	return 1;
 }
@@ -4806,9 +4808,9 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc, ufbxi_node *obj
 		// older FBX versions just use name/type pairs, which we can
 		// use as IDs since all strings are interned into a string pool.
 		if (uc->version >= 7000) {
-			if (!ufbxi_get_val3(node, "LSS", &object.id, &type_and_name, &object.sub_type)) continue;
+			if (!ufbxi_get_val3(node, "LsS", &object.id, &type_and_name, &object.sub_type)) continue;
 		} else {
-			if (!ufbxi_get_val2(node, "SS", &type_and_name, &object.sub_type)) continue;
+			if (!ufbxi_get_val2(node, "sS", &type_and_name, &object.sub_type)) continue;
 			object.id = (uintptr_t)type_and_name.data;
 		}
 

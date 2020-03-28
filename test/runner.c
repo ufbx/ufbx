@@ -804,6 +804,7 @@ void ufbxt_test_fuzz(void *data, size_t size, size_t step)
 	ufbx_scene *scene = ufbx_load_memory(data, size, NULL, &error);
 	if (scene) {
 		ufbxt_check_scene(scene);
+		ufbx_free_scene(scene);
 	}
 }
 
