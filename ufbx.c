@@ -2417,8 +2417,9 @@ typedef enum {
 } ufbxi_parse_state;
 
 typedef struct {
-	char type;
-	bool result;
+	char type;      // < FBX type code of the array: b,i,l,f,d (or 'r' meaning ufbx_real)
+	bool result;    // < Alloacte the array from the result buffer
+	bool pad_begin; // < Pad the begin of the array with 4 zero elements to guard from invalid -1 index accesses
 } ufbxi_array_info;
 
 static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, const char *name)
@@ -2474,6 +2475,8 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 
 static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, const char *name, ufbxi_array_info *info)
 {
+	info->result = false;
+	info->pad_begin = false;
 	switch (parent) {
 
 	case UFBXI_PARSE_GEOMETRY:
@@ -2481,6 +2484,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 		if (name == ufbxi_Vertices) {
 			info->type = 'r';
 			info->result = true;
+			info->pad_begin = true;
 			return true;
 		} else if (name == ufbxi_PolygonVertexIndex) {
 			info->type = 'i';
@@ -2488,7 +2492,6 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			return true;
 		} else if (name == ufbxi_Edges) {
 			info->type = 'i';
-			info->result = false;
 			return true;
 		}
 		break;
@@ -2496,25 +2499,20 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_ANIMATION_CURVE:
 		if (name == ufbxi_KeyTime) {
 			info->type = 'l';
-			info->result = false;
 			return true;
 		} else if (name == ufbxi_KeyValueFloat) {
 			info->type = 'r';
-			info->result = false;
 			return true;
 		} else if (name == ufbxi_KeyAttrFlags) {
 			info->type = 'i';
-			info->result = false;
 			return true;
 		} else if (name == ufbxi_KeyAttrDataFloat) {
 			// The float data in a keyframe attribute array is represented as integers
 			// in versions >= 7200 as some of the elements aren't actually floats (!)
 			info->type = uc->from_ascii && uc->version >= 7200 ? 'i' : 'f';
-			info->result = false;
 			return true;
 		} else if (name == ufbxi_KeyAttrRefCount) {
 			info->type = 'i';
-			info->result = false;
 			return true;
 		}
 		break;
@@ -2523,6 +2521,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 		if (name == ufbxi_Normals) {
 			info->type = 'r';
 			info->result = true;
+			info->pad_begin = true;
 			return true;
 		} else if (name == ufbxi_NormalIndex) {
 			info->type = 'i';
@@ -2535,6 +2534,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 		if (name == ufbxi_UV) {
 			info->type = 'r';
 			info->result = true;
+			info->pad_begin = true;
 			return true;
 		} else if (name == ufbxi_UVIndex) {
 			info->type = 'i';
@@ -2547,6 +2547,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 		if (name == ufbxi_Colors) {
 			info->type = 'r';
 			info->result = true;
+			info->pad_begin = true;
 			return true;
 		} else if (name == ufbxi_ColorIndex) {
 			info->type = 'i';
@@ -2558,7 +2559,6 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_CHANNEL:
 		if (name == ufbxi_Key) {
 			info->type = 'd';
-			info->result = false;
 			return true;
 		}
 		break;
@@ -2683,6 +2683,28 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 	return 1;
 }
 
+ufbxi_nodiscard static void *ufbxi_push_array_data(ufbxi_context *uc, const ufbxi_array_info *info, size_t size)
+{
+	ufbxi_check_return(size <= uc->opts.max_array_size, NULL);
+
+	char type = ufbxi_normalize_array_type(info->type);
+	size_t elem_size = ufbxi_array_type_size(type);
+	if (info->pad_begin) size += 4;
+
+	// The array may be pushed either to the result or temporary buffer depending
+	// if it's already in the right format
+	ufbxi_buf *arr_buf = info->result ? &uc->result : &uc->tmp;
+	char *data = (char*)ufbxi_push_size(arr_buf, elem_size, size);
+	ufbxi_check_return(data, NULL);
+
+	if (info->pad_begin) {
+		memset(data, 0, elem_size * 4);
+		data += elem_size * 4;
+	}
+
+	return data;
+}
+
 ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t depth, ufbxi_parse_state parent_state, bool *p_end)
 {
 	// https://code.blender.org/2013/08/fbx-binary-file-format-specification
@@ -2743,7 +2765,6 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 		// Normalize the array type (eg. 'r' to 'f'/'d' depending on the build)
 		// and get the per-element size of the array.
 		char dst_type = ufbxi_normalize_array_type(arr_info.type);
-		size_t dst_elem_size = ufbxi_array_type_size(dst_type);
 
 		ufbxi_value_array *arr = ufbxi_push(&uc->tmp, ufbxi_value_array, 1);
 		ufbxi_check(arr);
@@ -2751,10 +2772,6 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 		node->value_type_mask = UFBXI_VALUE_ARRAY;
 		node->array = arr;
 		arr->type = dst_type;
-
-		// The array may be pushed either to the result or temporary buffer depending
-		// if it's already in the right format
-		ufbxi_buf *arr_buf = arr_info.result ? &uc->result : &uc->tmp;
 
 		// Peek the first bytes of the array. We can always look at least 13 bytes
 		// ahead safely as valid FBX files must end in a 13/25 byte NULL record.
@@ -2783,7 +2800,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 			size_t decoded_data_size = src_elem_size * size;
 
 			// Allocate `size` elements for the array.
-			char *arr_data = (char*)ufbxi_push_size(arr_buf, dst_elem_size, size);
+			char *arr_data = (char*)ufbxi_push_array_data(uc, &arr_info, size);
 			ufbxi_check(arr_data);
 
 			// If the source and destination types are equal and our build is binary-compatible
@@ -2861,7 +2878,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 		} else {
 			// Allocate `num_values` elements for the array and parse single values into it.
 			ufbxi_check(num_values <= uc->opts.max_array_size);
-			char *arr_data = (char*)ufbxi_push_size(arr_buf, dst_elem_size, num_values);
+			char *arr_data = (char*)ufbxi_push_array_data(uc, &arr_info, num_values);
 			ufbxi_check(arr_data);
 			ufbxi_check(ufbxi_binary_parse_multivalue_array(uc, dst_type, arr_data, num_values));
 			arr->data = arr_data;
@@ -3304,6 +3321,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 
 	int arr_type = 0;
 	ufbxi_buf *arr_buf = NULL;
+	size_t arr_elem_size = 0;
 
 	// Check if the values of the node we're parsing currently should be
 	// treated as an array.
@@ -3324,7 +3342,15 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 		if (arr->type == 'f') {
 			ua->parse_as_f32 = true;
 		}
+
+		arr_elem_size = ufbxi_array_type_size(arr_type);
+
+		// Pad with 4 zero elements to make indexing with `-1` safe.
+		if (arr_info.pad_begin) {
+			ufbxi_push_size_zero(arr_buf, arr_elem_size, 4);
+		}
 	}
+
 
 	ufbxi_parse_state parse_state = ufbxi_update_parse_state(parent_state, node->name);
 	ufbxi_value vals[UFBXI_MAX_NON_ARRAY_VALUES];
@@ -3456,7 +3482,6 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_ascii *ua, uint32_t dept
 	ua->parse_as_f32 = false;
 
 	if (arr_type) {
-		size_t arr_elem_size = ufbxi_array_type_size(arr_type);
 		void *arr_data = ufbxi_make_array_size(arr_buf, arr_elem_size, num_values);
 		ufbxi_check(arr_data);
 		node->array->data = arr_data;
@@ -4197,7 +4222,7 @@ ufbxi_nodiscard static int ufbxi_check_indices(ufbxi_context *uc, ufbx_mesh *mes
 	return 1;
 }
 
-static ufbx_real ufbxi_zero_element[4] = { 0 };
+static ufbx_real ufbxi_zero_element[8] = { 0 };
 
 // Sentinel pointers used for zero/sequential index buffers
 static const int32_t ufbxi_sentinel_index_zero[1] = { 100000000 };
@@ -4224,14 +4249,15 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 	if (num_elems > mesh->num_indices) {
 		num_elems = mesh->num_indices;
 	}
-	*p_num_elems = num_elems;
+	*p_num_elems = num_elems ? num_elems : 1;
 
 	// Data array is always used as-is, if empty set the data to a global
 	// zero buffer so invalid zero index can point to some valid data.
+	// The zero data is offset by 4 elements to accomodate for invalid index (-1)
 	if (num_elems > 0) {
 		*p_dst_data = (ufbx_real*)data->data;
 	} else {
-		*p_dst_data = ufbxi_zero_element;
+		*p_dst_data = ufbxi_zero_element + 4;
 	}
 
 	if (indices) {
@@ -5435,14 +5461,12 @@ static ufbx_transform ufbxi_get_transform(const ufbx_props *props)
 	return t;
 }
 
-static int ufbxi_get_properties(ufbxi_context *uc)
+static void ufbxi_get_properties(ufbx_scene *scene)
 {
-	ufbxi_for_ptr(ufbx_node, p_node, uc->scene.nodes.data, uc->scene.nodes.size) {
+	ufbxi_for_ptr(ufbx_node, p_node, scene->nodes.data, scene->nodes.size) {
 		ufbx_node *node = *p_node;
 		node->transform = ufbxi_get_transform(&node->props);
 	}
-
-	return 1;
 }
 
 static void ufbxi_update_transform_matrix(ufbx_node *node, const ufbx_matrix *parent_to_root)
@@ -5600,6 +5624,16 @@ ufbxi_nodiscard static int ufbxi_merge_attribute_properties(ufbxi_context *uc, u
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_check_node_depth(ufbxi_context *uc, ufbx_node *node, uint32_t depth)
+{
+	ufbxi_check(depth < uc->opts.max_child_depth);
+	ufbxi_for_ptr(ufbx_node, p_child, node->children.data, node->children.size) {
+		ufbxi_check(ufbxi_check_node_depth(uc, *p_child, depth + 1));
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	// Retrieve all temporary arrays
@@ -5746,6 +5780,9 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 
 	uc->scene.root = &uc->scene.models.data[0];
 
+	// Check that the nodes are not too nested
+	ufbxi_check(ufbxi_check_node_depth(uc, &uc->scene.root->node, 0));
+
 	return 1;
 }
 
@@ -5757,8 +5794,8 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_check(ufbxi_parse(uc));
 	ufbxi_check(ufbxi_read_root(uc));
 	ufbxi_check(ufbxi_finalize_scene(uc));
-	ufbxi_check(ufbxi_get_properties(uc));
 
+	ufbxi_get_properties(&uc->scene);
 	ufbxi_update_transform_matrix(&uc->scene.root->node, &ufbx_identity_matrix);
 
 	// Copy local data to the scene
@@ -5814,6 +5851,7 @@ static void ufbxi_expand_defaults(ufbx_load_opts *opts)
 	ufbxi_default_opt(max_node_values, 0x10000000);
 	ufbxi_default_opt(max_node_children, 0x10000000);
 	ufbxi_default_opt(max_array_size, 0x10000000);
+	ufbxi_default_opt(max_child_depth, 200);
 }
 
 static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts, ufbx_error *p_error)

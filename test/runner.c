@@ -643,6 +643,136 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 	}
 }
 
+void ufbxt_check_string(ufbx_string str)
+{
+	// Data may never be NULL, empty strings should have data = ""
+	ufbxt_assert(str.data != NULL);
+	ufbxt_assert(strlen(str.data) == str.length);
+}
+
+void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void *void_elem, size_t elem_size)
+{
+	ufbx_vertex_void *elem = (ufbx_vertex_void*)void_elem;
+	if (elem->data == NULL) {
+		ufbxt_assert(elem->indices == NULL);
+		ufbxt_assert(elem->num_elements == 0);
+		return;
+	}
+
+	ufbxt_assert(elem->num_elements >= 0);
+	ufbxt_assert(elem->num_elements <= mesh->num_indices);
+	ufbxt_assert(elem->indices != NULL);
+
+	// Check that the indices are in range
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		int32_t ix = elem->indices[i];
+		ufbxt_assert(ix >= -1 && ix < elem->num_elements);
+	}
+
+	// Check that the data at invalid index is valid and zero
+	char zero[32] = { 0 };
+	ufbxt_assert(elem_size <= 32);
+	ufbxt_assert(!memcmp((char*)elem->data - elem_size, zero, elem_size));
+}
+
+void ufbxt_check_props(ufbx_scene *scene, ufbx_props *props, bool top)
+{
+	ufbx_prop *prev = NULL;
+	for (size_t i = 0; i < props->num_props; i++) {
+		ufbx_prop *prop = &props->props[i];
+
+		ufbxt_assert(prop->type < UFBX_NUM_PROP_TYPES);
+		ufbxt_check_string(prop->name);
+		ufbxt_check_string(prop->value_str);
+
+		// Properties should be sorted by name and duplicates should be removed
+		if (prev) {
+			ufbxt_assert(prop->imp_key >= prev->imp_key);
+			ufbxt_assert(strcmp(prop->name.data, prev->name.data) > 0);
+		}
+
+		if (top) {
+			ufbx_prop *ref = ufbx_find_prop(props, prop->name.data);
+			ufbxt_assert(prop == ref);
+		}
+
+		prev = prop;
+	}
+
+	if (props->defaults) {
+		ufbxt_check_props(scene, props->defaults, false);
+	}
+}
+
+void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
+{
+	ufbxt_check_string(node->name);
+	ufbxt_check_props(scene, &node->props, true);
+
+	if (node->parent) {
+		bool found = false;
+		for (size_t i = 0; i < node->parent->children.size; i++) {
+			if (node->parent->children.data[i] == node) {
+				found = true;
+				break;
+			}
+		}
+		ufbxt_assert(found);
+	}
+
+	for (size_t i = 0; i < node->children.size; i++) {
+		ufbxt_assert(node->children.data[i]->parent == node);
+	}
+}
+
+void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
+{
+	ufbx_mesh *found = ufbx_find_mesh(scene, mesh->node.name.data);
+	ufbxt_assert(found && !strcmp(found->node.name.data, mesh->node.name.data));
+
+	ufbxt_check_vertex_element(scene, mesh, &mesh->vertex_position, sizeof(ufbx_vec3));
+	ufbxt_check_vertex_element(scene, mesh, &mesh->vertex_normal, sizeof(ufbx_vec3));
+	ufbxt_check_vertex_element(scene, mesh, &mesh->vertex_binormal, sizeof(ufbx_vec3));
+	ufbxt_check_vertex_element(scene, mesh, &mesh->vertex_tangent, sizeof(ufbx_vec3));
+	ufbxt_check_vertex_element(scene, mesh, &mesh->vertex_uv, sizeof(ufbx_vec2));
+	ufbxt_check_vertex_element(scene, mesh, &mesh->vertex_color, sizeof(ufbx_vec4));
+
+	for (size_t i = 0; i < mesh->uv_sets.size; i++) {
+		ufbx_uv_set *set = &mesh->uv_sets.data[i];
+		if (i == 0) {
+			ufbxt_assert(mesh->vertex_uv.data == set->vertex_uv.data);
+			ufbxt_assert(mesh->vertex_uv.indices == set->vertex_uv.indices);
+			ufbxt_assert(mesh->vertex_uv.num_elements == set->vertex_uv.num_elements);
+		}
+		ufbxt_check_string(set->name);
+		ufbxt_check_vertex_element(scene, mesh, &set->vertex_uv, sizeof(ufbx_vec2));
+	}
+
+	for (size_t i = 0; i < mesh->color_sets.size; i++) {
+		ufbx_color_set *set = &mesh->color_sets.data[i];
+		if (i == 0) {
+			ufbxt_assert(mesh->vertex_color.data == set->vertex_color.data);
+			ufbxt_assert(mesh->vertex_color.indices == set->vertex_color.indices);
+			ufbxt_assert(mesh->vertex_color.num_elements == set->vertex_color.num_elements);
+		}
+		ufbxt_check_string(set->name);
+		ufbxt_check_vertex_element(scene, mesh, &set->vertex_color, sizeof(ufbx_vec4));
+	}
+}
+
+void ufbxt_check_scene(ufbx_scene *scene)
+{
+	ufbxt_check_string(scene->metadata.creator);
+
+	for (size_t i = 0; i < scene->nodes.size; i++) {
+		ufbxt_check_node(scene, scene->nodes.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->meshes.size; i++) {
+		ufbxt_check_mesh(scene, &scene->meshes.data[i]);
+	}
+}
+
 static uint32_t g_file_version = 0;
 static const char *g_file_type = NULL;
 
@@ -684,6 +814,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			ufbxt_assert(scene->metadata.ascii == ((fi == 1) ? 1 : 0));
 			ufbxt_assert(scene->metadata.version == version);
+
+			ufbxt_check_scene(scene);
 
 			ufbxt_diff_error err = { 0 };
 

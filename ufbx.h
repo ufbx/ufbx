@@ -130,6 +130,7 @@ struct ufbx_props {
 
 typedef struct ufbx_material ufbx_material;
 
+typedef struct ufbx_vertex_void ufbx_vertex_void;
 typedef struct ufbx_vertex_vec2 ufbx_vertex_vec2;
 typedef struct ufbx_vertex_vec3 ufbx_vertex_vec3;
 typedef struct ufbx_vertex_vec4 ufbx_vertex_vec4;
@@ -141,6 +142,12 @@ typedef struct ufbx_face ufbx_face;
 typedef struct ufbx_material_list { ufbx_material **data; size_t size; } ufbx_material_list;
 typedef struct ufbx_uv_set_list { ufbx_uv_set *data; size_t size; } ufbx_uv_set_list;
 typedef struct ufbx_color_set_list { ufbx_color_set *data; size_t size; } ufbx_color_set_list;
+
+struct ufbx_vertex_void {
+	void *data;
+	int32_t *indices;
+	size_t num_elements;
+};
 
 struct ufbx_vertex_vec2 {
 	ufbx_vec2 *data;
@@ -237,8 +244,8 @@ struct ufbx_mesh {
 	ufbx_vertex_vec3 vertex_normal;
 	ufbx_vertex_vec3 vertex_binormal;
 	ufbx_vertex_vec3 vertex_tangent;
-	ufbx_vertex_vec4 vertex_color;
 	ufbx_vertex_vec2 vertex_uv;
+	ufbx_vertex_vec4 vertex_color;
 
 	bool *edge_smoothing;
 	ufbx_real *edge_crease;
@@ -384,6 +391,7 @@ typedef struct ufbx_load_opts {
 	uint32_t max_node_values;
 	uint32_t max_node_children;
 	uint32_t max_array_size;
+	uint32_t max_child_depth;
 
 	bool allow_nonexistent_indices;
 } ufbx_load_opts;
