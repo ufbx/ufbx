@@ -1081,7 +1081,6 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbx_free_scene(scene);
 
 			uint16_t packed_version = (uint16_t)(version + fi + 1);
-			uint8_t *data_u8 = (uint8_t*)data;
 			if (g_fuzz) {
 				size_t step = 0;
 
@@ -1090,6 +1089,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 				g_fuzz_test_name = name;
 				g_fuzz_test_version = packed_version;
+
+				uint8_t *data_copy[256] = { 0 };
 
 				#pragma omp parallel for schedule(static, 16)
 				for (i = 0; i < (int)size; i++) {
@@ -1101,35 +1102,49 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 						}
 					}
 
+					uint8_t **p_data_copy = &data_copy[omp_get_thread_num()];
+					if (*p_data_copy == NULL) {
+						*p_data_copy = malloc(size);
+						memcpy(*p_data_copy, data, size);
+					}
+					uint8_t *data_u8 = *p_data_copy;
+
 					size_t step = i * 10;
 
 					uint8_t original = data_u8[i];
 
 					data_u8[i] = original + 1;
-					if (!ufbxt_test_fuzz(data, size, step + 1, i)) fail_step = step + 1;
+					if (!ufbxt_test_fuzz(data_u8, size, step + 1, i)) fail_step = step + 1;
 
 					data_u8[i] = original - 1;
-					if (!ufbxt_test_fuzz(data, size, step + 2, i)) fail_step = step + 2;
+					if (!ufbxt_test_fuzz(data_u8, size, step + 2, i)) fail_step = step + 2;
 
 					if (original != 0) {
 						data_u8[i] = 0;
-						if (!ufbxt_test_fuzz(data, size, step + 3, i)) fail_step = step + 3;
+						if (!ufbxt_test_fuzz(data_u8, size, step + 3, i)) fail_step = step + 3;
 					}
 
 					if (original != 0xff) {
 						data_u8[i] = 0xff;
-						if (!ufbxt_test_fuzz(data, size, step + 4, i)) fail_step = step + 4;
+						if (!ufbxt_test_fuzz(data_u8, size, step + 4, i)) fail_step = step + 4;
 					}
 
 					data_u8[i] = original;
 
 				}
+
+				for (size_t i = 0; i < ufbxt_arraycount(data_copy); i++) {
+					free(data_copy[i]);
+				}
+
 				fprintf(stderr, "\rFuzzing %s_%u_%s: %d/%d\n", name, version, format, (int)size, (int)size);
 
 				ufbxt_hintf("Fuzz failed on step: %zu", step);
 				ufbxt_assert(fail_step == 0);
 
 			} else {
+				uint8_t *data_u8 = (uint8_t*)data;
+
 				// Run a couple of known fuzz checks
 				for (size_t i = 0; i < ufbxt_arraycount(g_fuzz_checks); i++) {
 					const ufbxt_fuzz_check *check = &g_fuzz_checks[i];
@@ -1266,7 +1281,11 @@ int main(int argc, char **argv)
 		}
 	}
 
-	#ifndef _OPENMP
+	#ifdef _OPENMP
+	if (omp_get_num_threads() > 256) {
+		omp_set_num_threads(256);
+	}
+	#else
 	if (g_fuzz) {
 		fprintf(stderr, "Fuzzing without threads, compile with OpenMP for better performance!\n");
 	}
@@ -1329,7 +1348,7 @@ int main(int argc, char **argv)
 			safe_desc[safe_desc_len] = '\0';
 
 			printf("\t{ \"%s\", %u, %u, %u, \"%s\" },\n", check->test_name, (uint32_t)check->test_version,
-				(uint32_t)check->patch_offset, (uint32_t)check->patch_value, safe_desc);
+				(uint32_t)(check->patch_offset - 1), (uint32_t)check->patch_value, safe_desc);
 		}
 		printf("};\n");
 	}

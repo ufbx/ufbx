@@ -20,8 +20,9 @@ static ptrdiff_t ufbxt_inflate(void *dst, size_t dst_size, const void *src, size
 		input.data = src;
 		input.data_size = src_size;
 
-		uint8_t *data_u8 = (uint8_t*)src;
 		int i;
+
+		uint8_t *data_copy[256] = { 0 };
 
 		#pragma omp parallel for schedule(static, 16)
 		for (i = 0; i < (int)src_size; i++) {
@@ -34,6 +35,13 @@ static ptrdiff_t ufbxt_inflate(void *dst, size_t dst_size, const void *src, size
 					fflush(stderr);
 				}
 			}
+
+			uint8_t **p_data_copy = &data_copy[omp_get_thread_num()];
+			if (*p_data_copy == NULL) {
+				*p_data_copy = malloc(src_size);
+				memcpy(*p_data_copy, src, src_size);
+			}
+			uint8_t *data_u8 = *p_data_copy;
 
 			size_t step = i * 10;
 
@@ -68,6 +76,10 @@ static ptrdiff_t ufbxt_inflate(void *dst, size_t dst_size, const void *src, size
 			}
 
 			data_u8[i] = original;
+		}
+
+		for (size_t i = 0; i < ufbxt_arraycount(data_copy); i++) {
+			free(data_copy[i]);
 		}
 
 		fprintf(stderr, "\rFuzzing %d/%d\n", (int)src_size, (int)src_size);
