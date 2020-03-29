@@ -1194,6 +1194,7 @@ typedef struct {
 	ufbx_error *error;
 	size_t current_size;
 	size_t max_size;
+	size_t allocs_left;
 	ufbx_allocator ator;
 } ufbxi_allocator;
 
@@ -1216,6 +1217,8 @@ static void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size, size_t n)
 	ufbxi_check_return_err(ator->error, !ufbxi_does_overflow(total, size, n), NULL);
 	ufbxi_check_return_err(ator->error, total <= UFBXI_MAX_ALLOCATION_SIZE, NULL);
 	ufbxi_check_return_err(ator->error, total <= ator->max_size - ator->current_size, NULL);
+	ufbxi_check_return_err(ator->error, ator->allocs_left > 1, NULL);
+	ator->allocs_left--;
 
 	ator->current_size += total;
 
@@ -1249,6 +1252,8 @@ static void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t size, void *old_pt
 	ufbxi_check_return_err(ator->error, !ufbxi_does_overflow(total, size, n), NULL);
 	ufbxi_check_return_err(ator->error, total <= UFBXI_MAX_ALLOCATION_SIZE, NULL);
 	ufbxi_check_return_err(ator->error, total <= ator->max_size - ator->current_size, NULL);
+	ufbxi_check_return_err(ator->error, ator->allocs_left > 1, NULL);
+	ator->allocs_left--;
 
 	ator->current_size += total;
 	ator->current_size -= old_total;
@@ -1463,6 +1468,8 @@ static ufbxi_malloc_like void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t
 
 	size_t total = size * n;
 	if (ufbxi_does_overflow(total, size, n)) return NULL;
+	if (b->ator->allocs_left <= 1) return NULL;
+	b->ator->allocs_left--;
 
 	// Align to the natural alignment based on the size
 	uint32_t align_mask = ufbxi_size_align_mask(size);
@@ -1581,6 +1588,8 @@ static void *ufbxi_make_array_size(ufbxi_buf *b, size_t size, size_t n)
 
 	size_t total = size * n;
 	if (ufbxi_does_overflow(total, size, n)) return NULL;
+	if (b->ator->allocs_left <= 1) return NULL;
+	b->ator->allocs_left--;
 
 	if (total <= b->pos) {
 		return b->chunk->data + b->pos - total;
@@ -3322,6 +3331,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 	// Push the parsed node into the `tmp_stack` buffer, the nodes will be popped by
 	// calling code after its done parsing all of it's children.
 	ufbxi_node *node = ufbxi_push_zero(&uc->tmp_stack, ufbxi_node, 1);
+	ufbxi_check(node);
 	node->name = name;
 	node->name_len = (uint8_t)name_len;
 
@@ -3359,6 +3369,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 		// Pad with 4 zero elements to make indexing with `-1` safe.
 		if (arr_info.pad_begin) {
 			ufbxi_push_size_zero(arr_buf, arr_elem_size, 4);
+			num_values += 4;
 		}
 	}
 
@@ -3495,12 +3506,18 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 	if (arr_type) {
 		void *arr_data = ufbxi_make_array_size(arr_buf, arr_elem_size, num_values);
 		ufbxi_check(arr_data);
-		node->array->data = arr_data;
-		node->array->size = num_values;
+		if (arr_info.pad_begin) {
+			node->array->data = (char*)arr_data + 4*arr_elem_size;
+			node->array->size = num_values - 4;
+		} else {
+			node->array->data = arr_data;
+			node->array->size = num_values;
+		}
 	} else {
 		num_values = ufbxi_min32(num_values, UFBXI_MAX_NON_ARRAY_VALUES);
 		node->value_type_mask = (uint16_t)type_mask;
 		node->vals = ufbxi_push_copy(tmp_buf, ufbxi_value, num_values, vals);
+		ufbxi_check(node->vals);
 	}
 
 	// Recursively parse the children of this node. Update the parse state
@@ -4492,6 +4509,10 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 	mesh->vertex_position.indices = index_data;
 	mesh->vertex_position.num_elements = mesh->num_vertices;
 
+	// TEMP
+	char zero[32] = { 0 };
+	ufbx_assert(!memcmp((char*)vertices->data - 32, zero, 32));
+
 	// Check that the last index is negated (last of polygon)
 	if (mesh->num_indices > 0) {
 		ufbxi_check(index_data[mesh->num_indices - 1] < 0);
@@ -4574,6 +4595,8 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 
 	mesh->uv_sets.data = ufbxi_push_zero(&uc->result, ufbx_uv_set, num_uv);
 	mesh->color_sets.data = ufbxi_push_zero(&uc->result, ufbx_color_set, num_color);
+	ufbxi_check(mesh->uv_sets.data);
+	ufbxi_check(mesh->color_sets.data);
 
 	ufbxi_for (ufbxi_node, n, node->children, node->num_children) {
 		if (n->name[0] != 'L') continue; // All names start with 'LayerElement*'
@@ -5702,6 +5725,7 @@ ufbxi_nodiscard static int ufbxi_collect_nodes(ufbxi_context *uc, size_t size, u
 		// Allocate space for children and reset count
 		node->children.data = ufbxi_push(&uc->result, ufbx_node*, node->children.size);
 		node->children.size = 0;
+		ufbxi_check(node->children.data);
 
 		// Remove default properties for nodes that were not merged. Merge default
 		// values into the properties before removing defaults.
@@ -5881,6 +5905,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	// Allocate storage for child arrays
 	ufbxi_for(ufbx_anim_layer, layer, uc->scene.anim_layers.data, uc->scene.anim_layers.size) {
 		layer->props.data = ufbxi_push(&uc->result, ufbx_anim_prop, layer->props.size);
+		ufbxi_check(layer->props.data);
 		layer->props.size = 0;
 	}
 
@@ -5946,6 +5971,8 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 
 	imp->scene.metadata.result_memory_used = imp->ator.current_size;
 	imp->scene.metadata.temp_memory_used = uc->ator_tmp.current_size;
+	imp->scene.metadata.result_allocs = uc->opts.max_result_allocs - imp->ator.allocs_left;
+	imp->scene.metadata.temp_allocs = uc->opts.max_temp_allocs - uc->ator_tmp.allocs_left;
 
 	uc->scene_imp = imp;
 
@@ -5997,6 +6024,8 @@ static void ufbxi_expand_defaults(ufbx_load_opts *opts)
 {
 	ufbxi_default_opt(max_temp_memory, 0x10000000);
 	ufbxi_default_opt(max_result_memory, 0x10000000);
+	ufbxi_default_opt(max_temp_allocs, 0x10000000);
+	ufbxi_default_opt(max_result_allocs, 0x10000000);
 	ufbxi_default_opt(max_ascii_token_length, 0x10000000);
 	ufbxi_default_opt(read_buffer_size, 4096);
 	ufbxi_default_opt(max_properties, 0x10000000);
@@ -6033,9 +6062,11 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->ator_tmp.error = &uc->error;
 	uc->ator_tmp.ator = uc->opts.temp_allocator;
 	uc->ator_tmp.max_size = uc->opts.max_temp_memory;
+	uc->ator_tmp.allocs_left = uc->opts.max_temp_allocs;
 	uc->ator_result.error = &uc->error;
 	uc->ator_result.ator = uc->opts.result_allocator;
 	uc->ator_result.max_size = uc->opts.max_result_memory;
+	uc->ator_result.allocs_left = uc->opts.max_result_allocs;
 
 	uc->string_map.ator = &uc->ator_tmp;
 	uc->prop_type_map.ator = &uc->ator_tmp;

@@ -336,6 +336,8 @@ typedef struct ufbx_metadata {
 
 	size_t result_memory_used;
 	size_t temp_memory_used;
+	size_t result_allocs;
+	size_t temp_allocs;
 } ufbx_metadata;
 
 struct ufbx_scene {
@@ -384,6 +386,8 @@ typedef struct ufbx_load_opts {
 	// Limits
 	size_t max_temp_memory;
 	size_t max_result_memory;
+	size_t max_temp_allocs;
+	size_t max_result_allocs;
 	size_t max_ascii_token_length;
 	size_t read_buffer_size;
 	size_t max_properties;
