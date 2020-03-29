@@ -290,7 +290,7 @@ ufbx_error g_error;
 jmp_buf g_test_jmp;
 int g_verbose;
 
-char g_log_buf[8*1024];
+char g_log_buf[16*1024];
 uint32_t g_log_pos;
 
 char g_hint[8*1024];
