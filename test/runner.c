@@ -1317,8 +1317,9 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 					if (check->version != packed_version) continue;
 					if (strcmp(check->name, name)) continue;
 
-					uint8_t original = data_u8[check->patch_offset];
+					uint8_t original;
 					if (check->patch_offset >= 0) {
+						original = data_u8[check->patch_offset];
 						ufbxt_logf(".. Patch byte %u from 0x%02x to 0x%02x: %s", check->patch_offset, original, check->patch_value, check->description);
 						ufbxt_assert(check->patch_offset < size);
 						data_u8[check->patch_offset] = check->patch_value;
@@ -1343,7 +1344,9 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 						ufbx_free_scene(scene);
 					}
 
-					data_u8[check->patch_offset] = original;
+					if (check->patch_offset >= 0) {
+						data_u8[check->patch_offset] = original;
+					}
 				}
 
 			}
