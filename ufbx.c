@@ -2874,6 +2874,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 
 			if (encoding == 0) {
 				// Encoding 0: Plain binary data.
+				ufbxi_check(encoded_size == decoded_data_size);
 
 				// If the array is contained in the current read buffer and we need to convert
 				// the data anyway we can use the read buffer as the decoded array source, otherwise

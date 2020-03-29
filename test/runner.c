@@ -295,6 +295,8 @@ uint32_t g_log_pos;
 
 char g_hint[8*1024];
 
+bool g_skip_print_ok = false;
+
 ufbxt_threadlocal jmp_buf *t_jmp_buf;
 
 void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
@@ -816,6 +818,19 @@ static const char *g_file_type = NULL;
 static bool g_fuzz = false;
 static size_t g_fuzz_step = 0;
 
+static bool ufbxt_begin_fuzz()
+{
+	if (g_fuzz) {
+		if (!g_skip_print_ok) {
+			printf("FUZZ\n");
+			g_skip_print_ok = true;
+		}
+		return true;
+	} else {
+		return false;
+	}
+}
+
 int ufbxt_test_fuzz(void *data, size_t size, size_t step)
 {
 	if (g_fuzz_step && step != g_fuzz_step) return 1;
@@ -851,6 +866,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	void *obj_data = ufbxt_read_file(buf, &obj_size);
 	ufbxt_obj_file *obj_file = obj_data ? ufbxt_load_obj(obj_data, obj_size) : NULL;
 	free(obj_data);
+
+	ufbxt_begin_fuzz();
 
 	uint32_t num_opened = 0;
 
@@ -911,16 +928,18 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			if (g_fuzz) {
 				size_t step = 0;
 				uint8_t *data_u8 = (uint8_t*)data;
-				printf("\n");
 
 				size_t fail_step = 0;
 				int i;
 
-				#pragma omp parallel for schedule(dynamic)
+				#pragma omp parallel for schedule(static, 16)
 				for (i = 0; i < (int)size; i++) {
 
 					if (omp_get_thread_num() == 0) {
-						printf("\r.. Fuzzing: %d/%d", i, (int)size);
+						if (i % 16 == 0) {
+							fprintf(stderr, "\rFuzzing %s_%u_%s: %d/%d", name, version, format, i, (int)size);
+							fflush(stderr);
+						}
 					}
 
 					size_t step = i * 10;
@@ -946,7 +965,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 					data_u8[i] = original;
 
 				}
-				printf("\n");
+				fprintf(stderr, "\rFuzzing %s_%u_%s: %d/%d\n", name, version, format, (int)size, (int)size);
 
 				ufbxt_hintf("Fuzz failed on step: %zu", step);
 				ufbxt_assert(fail_step == 0);
@@ -992,9 +1011,12 @@ int ufbxt_run_test(ufbxt_test *test)
 
 	g_current_test = test;
 	if (!setjmp(g_test_jmp)) {
+		g_skip_print_ok = false;
 		test->func();
-		printf("OK\n");
-		fflush(stdout);
+		if (!g_skip_print_ok) {
+			printf("OK\n");
+			fflush(stdout);
+		}
 		return 1;
 	} else {
 		if (g_hint[0]) {
@@ -1049,10 +1071,22 @@ int main(int argc, char **argv)
 			g_fuzz = true;
 		}
 
+		if (!strcmp(argv[i], "--threads")) {
+			#if _OPENMP
+			if (++i < argc) omp_set_num_threads(atoi(argv[i]));
+			#endif
+		}
+
 		if (!strcmp(argv[i], "--fuzz-step")) {
 			if (++i < argc) g_fuzz_step = (size_t)atoi(argv[i]);
 		}
 	}
+
+	#ifndef _OPENMP
+	if (g_fuzz) {
+		fprintf(stderr, "Fuzzing without threads, compile with OpenMP for better performance!\n");
+	}
+	#endif
 
 	uint32_t num_ran = 0;
 	for (uint32_t i = 0; i < num_tests; i++) {
