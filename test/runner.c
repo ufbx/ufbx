@@ -369,6 +369,7 @@ void ufbxt_log_flush()
 {
 	int prev_newline = 1;
 	for (uint32_t i = 0; i < g_log_pos; i++) {
+		if (i >= sizeof(g_log_buf)) break;
 		char ch = g_log_buf[i];
 		if (ch == '\n') {
 			putchar('\n');
