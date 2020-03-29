@@ -19,7 +19,7 @@ script:
     - llvm-cov gcov ufbx -b
     - printf '#!/bin/bash\nexec llvm-cov gcov "$@"\n' > llvm-gcov.sh
     - chmod +x llvm-gcov.sh
-    - lcov --directory . --base-directory . --gcov-tool llvm-gcov.sh --capture --o build/cov.lcov
+    - lcov --directory . --base-directory . --gcov-tool ./llvm-gcov.sh --capture --o build/cov.lcov
     - rm *.gcov
 
 after_success:
