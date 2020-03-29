@@ -1676,6 +1676,9 @@ typedef struct {
 
 static ufbxi_noinline bool ufbxi_map_grow_size_imp(ufbxi_map *map, size_t size, size_t min_size)
 {
+	if (map->ator->allocs_left <= 1) return false;
+	map->ator->allocs_left--;
+
 	size_t count, alloc_size;
 	rhmap_grow_inline(&map->map, &count, &alloc_size, min_size, 0.8);
 
