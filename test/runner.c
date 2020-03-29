@@ -334,11 +334,13 @@ void ufbxt_logf(const char *fmt, ...)
 
 	va_list args;
 	va_start(args, fmt);
-	g_log_pos += vsnprintf(g_log_buf + g_log_pos,
-		sizeof(g_log_buf) - g_log_pos, fmt, args);
 	if (g_log_pos < sizeof(g_log_buf)) {
-		g_log_buf[g_log_pos] = '\n';
-		g_log_pos++;
+		g_log_pos += vsnprintf(g_log_buf + g_log_pos,
+			sizeof(g_log_buf) - g_log_pos, fmt, args);
+		if (g_log_pos < sizeof(g_log_buf)) {
+			g_log_buf[g_log_pos] = '\n';
+			g_log_pos++;
+		}
 	}
 	va_end(args);
 }
