@@ -15,7 +15,7 @@ script:
     - clang -lm -O2 -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../ufbx.c ../test/runner.c -o runner
     - ./runner -v -d ../data
     - clang -lm -coverage -g -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../ufbx.c ../test/runner.c -o runner
-    - ./runner -v -d ../data/
+    - catchsegv ./runner -v -d ../data/
     - llvm-cov gcov ufbx runner -b
     - printf '#!/bin/bash\nexec llvm-cov gcov "$@"\n' > llvm-gcov.sh
     - chmod +x llvm-gcov.sh
