@@ -4509,10 +4509,6 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 	mesh->vertex_position.indices = index_data;
 	mesh->vertex_position.num_elements = mesh->num_vertices;
 
-	// TEMP
-	char zero[32] = { 0 };
-	ufbx_assert(!memcmp((char*)vertices->data - 32, zero, 32));
-
 	// Check that the last index is negated (last of polygon)
 	if (mesh->num_indices > 0) {
 		ufbxi_check(index_data[mesh->num_indices - 1] < 0);
