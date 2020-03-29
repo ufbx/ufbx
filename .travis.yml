@@ -19,7 +19,7 @@ script:
     - llvm-cov gcov ufbx runner -b
     - printf '#!/bin/bash\nexec llvm-cov gcov "$@"\n' > llvm-gcov.sh
     - chmod +x llvm-gcov.sh
-    - lcov --directory . --base-directory . --gcov-tool ./llvm-gcov.sh --capture -o coverage.lcov
+    - lcov --directory . --base-directory . --gcov-tool ./llvm-gcov.sh --rc lcov_branch_coverage=1 --capture -o coverage.lcov
 
 after_success:
     - bash <(curl -s https://codecov.io/bash) -f coverage.lcov -y misc/codecov.yml
