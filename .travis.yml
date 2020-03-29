@@ -13,7 +13,7 @@ script:
     - ./runner -v -d ../data
     - clang -lm -coverage -g -std=gnu99 -Wno-unused-value -D_GNU_SOURCE ../ufbx.c ../test/runner.c -o runner
     - ./runner -v -d ../data/
-    - llvm-cov gcov ufbx -a
+    - llvm-cov gcov ufbx -a -b
     - cp ufbx.c.gcov ../ufbx.c.gcov
     - rm *.gcov
 
