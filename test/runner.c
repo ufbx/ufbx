@@ -1135,12 +1135,13 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 					const ufbxt_fuzz_check *check = &g_fuzz_checks[i];
 					if (check->version != packed_version) continue;
 					if (strcmp(check->name, name)) continue;
-					ufbxt_assert(check->patch_offset < size);
 
 					uint8_t original = data_u8[check->patch_offset];
+					ufbxt_logf(".. Patch byte %u from 0x%02x to 0x%02x: %s",check->patch_offset, original, check->patch_value, check->description);
+					ufbxt_assert(check->patch_offset < size);
+
 					data_u8[check->patch_offset] = check->patch_value;
 
-					ufbxt_logf(".. Patch byte %u from 0x%02x to 0x%02x: %s",check->patch_offset, original, check->patch_value, check->description);
 
 					ufbx_error error;
 					ufbx_scene *scene = ufbx_load_memory(data, size, NULL, &error);
