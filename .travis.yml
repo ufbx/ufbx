@@ -22,4 +22,4 @@ script:
     - lcov --directory . --base-directory . --gcov-tool ./llvm-gcov.sh --capture -o coverage.lcov
 
 after_success:
-    - bash <(curl -s https://codecov.io/bash) -f build/coverage.lcov -y misc/codecov.yml
+    - bash <(curl -s https://codecov.io/bash) -f coverage.lcov -y misc/codecov.yml
