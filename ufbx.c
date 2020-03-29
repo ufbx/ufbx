@@ -1313,6 +1313,7 @@ static bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t size, void *p_pt
 {
 	void *ptr = *(void**)p_ptr;
 	size_t old_n = *p_cap;
+	if (old_n >= n) return true;
 	size_t new_n = ufbxi_max_sz(old_n * 2, n);
 	void *new_ptr = ufbxi_realloc_size(ator, size, ptr, old_n, new_n);
 	if (!new_ptr) return false;
@@ -1325,6 +1326,7 @@ static bool ufbxi_grow_array_zero_size(ufbxi_allocator *ator, size_t size, void 
 {
 	void *ptr = *(void**)p_ptr;
 	size_t old_n = *p_cap;
+	if (old_n >= n) return true;
 	size_t new_n = ufbxi_max_sz(old_n * 2, n);
 	void *new_ptr = ufbxi_realloc_zero_size(ator, size, ptr, old_n, new_n);
 	if (!new_ptr) return false;
