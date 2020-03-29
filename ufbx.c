@@ -508,9 +508,9 @@ ufbxi_bit_reverse(uint32_t mask, uint32_t num_bits)
 {
 	ufbx_assert(num_bits <= 16);
 	uint32_t x = mask;
-    x = (((x & 0xaaaa) >> 1) | ((x & 0x5555) << 1));
-    x = (((x & 0xcccc) >> 2) | ((x & 0x3333) << 2));
-    x = (((x & 0xf0f0) >> 4) | ((x & 0x0f0f) << 4));
+	x = (((x & 0xaaaa) >> 1) | ((x & 0x5555) << 1));
+	x = (((x & 0xcccc) >> 2) | ((x & 0x3333) << 2));
+	x = (((x & 0xf0f0) >> 4) | ((x & 0x0f0f) << 4));
 	x = (((x & 0xff00) >> 8) | ((x & 0x00ff) << 8));
 	return x >> (16 - num_bits);
 }
@@ -1758,22 +1758,22 @@ static uint32_t ufbxi_hash_string(const char *str, size_t length)
 
 static ufbxi_forceinline uint32_t ufbxi_hash32(uint32_t x)
 {
-    x ^= x >> 16;
-    x *= UINT32_C(0x7feb352d);
-    x ^= x >> 15;
-    x *= UINT32_C(0x846ca68b);
-    x ^= x >> 16;
-    return x;	
+	x ^= x >> 16;
+	x *= UINT32_C(0x7feb352d);
+	x ^= x >> 15;
+	x *= UINT32_C(0x846ca68b);
+	x ^= x >> 16;
+	return x;	
 }
 
 static ufbxi_forceinline uint32_t ufbxi_hash64(uint64_t x)
 {
-    x ^= x >> 32;
-    x *= UINT64_C(0xd6e8feb86659fd93);
-    x ^= x >> 32;
-    x *= UINT64_C(0xd6e8feb86659fd93);
-    x ^= x >> 32;
-    return (uint32_t)x;
+	x ^= x >> 32;
+	x *= UINT64_C(0xd6e8feb86659fd93);
+	x ^= x >> 32;
+	x *= UINT64_C(0xd6e8feb86659fd93);
+	x ^= x >> 32;
+	return (uint32_t)x;
 }
 
 static ufbxi_forceinline uint32_t ufbxi_hash_uptr(uintptr_t ptr)
