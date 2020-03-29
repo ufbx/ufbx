@@ -374,7 +374,7 @@ void ufbxt_log_error(ufbx_error *err)
 	if (!err) return;
 	for (size_t i = 0; i < err->stack_size; i++) {
 		ufbx_error_frame *f = &err->stack[i];
-		ufbxt_logf("Line %u %s: %s\n", f->source_line, f->function, f->description);
+		ufbxt_logf("Line %u %s: %s", f->source_line, f->function, f->description);
 	}
 }
 
@@ -870,12 +870,23 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			num_opened++;
 			ufbxt_logf("%s", buf);
 
+
 			ufbx_error error;
+
+			uint64_t load_begin = cputime_cpu_tick();
 			ufbx_scene *scene = ufbx_load_memory(data, size, NULL, &error);
+			uint64_t load_end = cputime_cpu_tick();
+
 			if (!scene) {
 				ufbxt_log_error(&error);
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file");
 			}
+
+			ufbxt_logf(".. Loaded in %.2fms: File %.1fkB, temp %.1fkB, result %.1fkB",
+				cputime_cpu_delta_to_sec(NULL, load_end - load_begin) * 1e3,
+				(double)size * 1e-3,
+				(double)scene->metadata.temp_memory_used * 1e-3,
+				(double)scene->metadata.result_memory_used * 1e-3);
 
 			ufbxt_assert(scene->metadata.ascii == ((fi == 1) ? 1 : 0));
 			ufbxt_assert(scene->metadata.version == version);

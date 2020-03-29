@@ -333,6 +333,9 @@ typedef struct ufbx_metadata {
 	bool ascii;
 	uint32_t version;
 	ufbx_string creator;
+
+	size_t result_memory_used;
+	size_t temp_memory_used;
 } ufbx_metadata;
 
 struct ufbx_scene {
