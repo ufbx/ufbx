@@ -24,6 +24,7 @@ void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr);
 	#include <omp.h>
 #else
 	static int omp_get_thread_num() { return 0; }
+	static int omp_get_num_threads() { return 1; }
 #endif
 
 // -- Thread local
