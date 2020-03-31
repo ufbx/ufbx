@@ -41,6 +41,41 @@ UFBXT_FILE_TEST(blender_282_suzanne_and_transform)
 }
 #endif
 
+UFBXT_FILE_TEST(maya_cube)
+#if UFBXT_IMPL
+{
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
+	ufbxt_assert(mesh);
+
+	for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
+		ufbx_face face = mesh->faces[face_i];
+		for (size_t i = face.index_begin; i < face.index_begin + face.num_indices; i++) {
+			ufbx_vec3 n = ufbx_get_vertex_vec3(&mesh->vertex_normal, i);
+			ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_binormal, i);
+			ufbx_vec3 t = ufbx_get_vertex_vec3(&mesh->vertex_tangent, i);
+			ufbxt_assert_close_real(err, ufbxt_dot3(n, n), 1.0);
+			ufbxt_assert_close_real(err, ufbxt_dot3(b, b), 1.0);
+			ufbxt_assert_close_real(err, ufbxt_dot3(t, t), 1.0);
+			ufbxt_assert_close_real(err, ufbxt_dot3(n, b), 0.0);
+			ufbxt_assert_close_real(err, ufbxt_dot3(n, t), 0.0);
+			ufbxt_assert_close_real(err, ufbxt_dot3(b, t), 0.0);
+
+			for (size_t j = 0; j < face.num_indices; j++) {
+				ufbx_vec3 p0 = ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + j);
+				ufbx_vec3 p1 = ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + (j + 1) % face.num_indices);
+				ufbx_vec3 edge;
+				edge.x = p1.x - p0.x;
+				edge.y = p1.y - p0.y;
+				edge.z = p1.z - p0.z;
+				ufbxt_assert_close_real(err, ufbxt_dot3(edge, edge), 1.0);
+				ufbxt_assert_close_real(err, ufbxt_dot3(n, edge), 0.0);
+			}
+
+		}
+	}
+}
+#endif
+
 UFBXT_FILE_TEST(maya_color_sets)
 #if UFBXT_IMPL
 {
@@ -207,4 +242,3 @@ UFBXT_FILE_TEST(synthetic_sets_reorder)
 	ufbxt_assert(!strcmp(mesh->uv_sets.data[2].name.data, "Row"));
 }
 #endif
-

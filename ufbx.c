@@ -1836,10 +1836,16 @@ static const char ufbxi_Vertices[] = "Vertices";
 static const char ufbxi_PolygonVertexIndex[] = "PolygonVertexIndex";
 static const char ufbxi_Edges[] = "Edges";
 static const char ufbxi_LayerElementNormal[] = "LayerElementNormal";
+static const char ufbxi_LayerElementBinormal[] = "LayerElementBinormal";
+static const char ufbxi_LayerElementTangent[] = "LayerElementTangent";
 static const char ufbxi_LayerElementUV[] = "LayerElementUV";
 static const char ufbxi_LayerElementColor[] = "LayerElementColor";
 static const char ufbxi_Normals[] = "Normals";
 static const char ufbxi_NormalIndex[] = "NormalIndex";
+static const char ufbxi_Binormals[] = "Binormals";
+static const char ufbxi_BinormalIndex[] = "BinormalIndex";
+static const char ufbxi_Tangents[] = "Tangents";
+static const char ufbxi_TangentIndex[] = "TangentIndex";
 static const char ufbxi_UV[] = "UV";
 static const char ufbxi_UVIndex[] = "UVIndex";
 static const char ufbxi_Colors[] = "Colors";
@@ -1911,10 +1917,16 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_PolygonVertexIndex, sizeof(ufbxi_PolygonVertexIndex) - 1 },
 	{ ufbxi_Edges, sizeof(ufbxi_Edges) - 1 },
 	{ ufbxi_LayerElementNormal, sizeof(ufbxi_LayerElementNormal) - 1 },
+	{ ufbxi_LayerElementBinormal, sizeof(ufbxi_LayerElementBinormal) - 1 },
+	{ ufbxi_LayerElementTangent, sizeof(ufbxi_LayerElementTangent) - 1 },
 	{ ufbxi_LayerElementUV, sizeof(ufbxi_LayerElementUV) - 1 },
 	{ ufbxi_LayerElementColor, sizeof(ufbxi_LayerElementColor) - 1 },
 	{ ufbxi_Normals, sizeof(ufbxi_Normals) - 1 },
 	{ ufbxi_NormalIndex, sizeof(ufbxi_NormalIndex) - 1 },
+	{ ufbxi_Tangents, sizeof(ufbxi_Tangents) - 1 },
+	{ ufbxi_TangentIndex, sizeof(ufbxi_TangentIndex) - 1 },
+	{ ufbxi_Binormals, sizeof(ufbxi_Binormals) - 1 },
+	{ ufbxi_BinormalIndex, sizeof(ufbxi_BinormalIndex) - 1 },
 	{ ufbxi_UV, sizeof(ufbxi_UV) - 1 },
 	{ ufbxi_UVIndex, sizeof(ufbxi_UVIndex) - 1 },
 	{ ufbxi_Colors, sizeof(ufbxi_Colors) - 1 },
@@ -2489,6 +2501,8 @@ typedef enum {
 	UFBXI_PARSE_GEOMETRY,
 	UFBXI_PARSE_ANIMATION_CURVE,
 	UFBXI_PARSE_LAYER_ELEMENT_NORMAL,
+	UFBXI_PARSE_LAYER_ELEMENT_BINORMAL,
+	UFBXI_PARSE_LAYER_ELEMENT_TANGENT,
 	UFBXI_PARSE_LAYER_ELEMENT_UV,
 	UFBXI_PARSE_LAYER_ELEMENT_COLOR,
 	UFBXI_PARSE_TAKE,
@@ -2527,6 +2541,8 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 	case UFBXI_PARSE_MODEL:
 	case UFBXI_PARSE_GEOMETRY:
 		if (name == ufbxi_LayerElementNormal) return UFBXI_PARSE_LAYER_ELEMENT_NORMAL;
+		if (name == ufbxi_LayerElementBinormal) return UFBXI_PARSE_LAYER_ELEMENT_BINORMAL;
+		if (name == ufbxi_LayerElementTangent) return UFBXI_PARSE_LAYER_ELEMENT_TANGENT;
 		if (name == ufbxi_LayerElementUV) return UFBXI_PARSE_LAYER_ELEMENT_UV;
 		if (name == ufbxi_LayerElementColor) return UFBXI_PARSE_LAYER_ELEMENT_COLOR;
 		break;
@@ -2605,6 +2621,32 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			info->pad_begin = true;
 			return true;
 		} else if (name == ufbxi_NormalIndex) {
+			info->type = 'i';
+			info->result = true;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_LAYER_ELEMENT_BINORMAL:
+		if (name == ufbxi_Binormals) {
+			info->type = 'r';
+			info->result = true;
+			info->pad_begin = true;
+			return true;
+		} else if (name == ufbxi_BinormalIndex) {
+			info->type = 'i';
+			info->result = true;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_LAYER_ELEMENT_TANGENT:
+		if (name == ufbxi_Tangents) {
+			info->type = 'r';
+			info->result = true;
+			info->pad_begin = true;
+			return true;
+		} else if (name == ufbxi_TangentIndex) {
 			info->type = 'i';
 			info->result = true;
 			return true;
@@ -4626,6 +4668,14 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 			if (mesh->vertex_normal.data) continue;
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &mesh->vertex_normal.data,
 				&mesh->vertex_normal.indices, &mesh->vertex_normal.num_elements, ufbxi_Normals, ufbxi_NormalIndex, 'r', 3));
+		} else if (n->name == ufbxi_LayerElementBinormal) {
+			if (mesh->vertex_binormal.data) continue;
+			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &mesh->vertex_binormal.data,
+				&mesh->vertex_binormal.indices, &mesh->vertex_binormal.num_elements, ufbxi_Binormals, ufbxi_BinormalIndex, 'r', 3));
+		} else if (n->name == ufbxi_LayerElementTangent) {
+			if (mesh->vertex_tangent.data) continue;
+			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &mesh->vertex_tangent.data,
+				&mesh->vertex_tangent.indices, &mesh->vertex_tangent.num_elements, ufbxi_Tangents, ufbxi_TangentIndex, 'r', 3));
 		} else if (n->name == ufbxi_LayerElementUV) {
 			ufbx_uv_set *set = &mesh->uv_sets.data[mesh->uv_sets.size++];
 

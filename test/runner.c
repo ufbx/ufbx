@@ -1441,6 +1441,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	free(obj_file);
 }
 
+static ufbx_real ufbxt_dot3(ufbx_vec3 a, ufbx_vec3 b)
+{
+	return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
 #define UFBXT_IMPL 1
 #define UFBXT_TEST(name) void ufbxt_test_fn_##name(void)
 #define UFBXT_FILE_TEST(name) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err); \
