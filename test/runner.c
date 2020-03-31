@@ -839,6 +839,7 @@ void ufbxt_check_scene(ufbx_scene *scene)
 static uint32_t g_file_version = 0;
 static const char *g_file_type = NULL;
 static bool g_fuzz = false;
+static bool g_all_byte_values = false;
 static size_t g_fuzz_step = 0;
 
 const char *g_fuzz_test_name = NULL;
@@ -1312,25 +1313,33 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 					}
 					uint8_t *data_u8 = *p_data_copy;
 
-					size_t step = i * 10;
+					size_t step = i * 1000;
 
 					uint8_t original = data_u8[i];
 
-					data_u8[i] = original + 1;
-					if (!ufbxt_test_fuzz(data_u8, size, step + 1, i, 0, 0, 0)) fail_step = step + 1;
+					if (g_all_byte_values) {
+						for (uint32_t v = 0; v < 256; v++) {
+							data_u8[i] = (uint8_t)v;
+							if (!ufbxt_test_fuzz(data_u8, size, step + v, i, 0, 0, 0)) fail_step = step + v;
+						}
+					} else {
+						data_u8[i] = original + 1;
+						if (!ufbxt_test_fuzz(data_u8, size, step + 1, i, 0, 0, 0)) fail_step = step + 1;
 
-					data_u8[i] = original - 1;
-					if (!ufbxt_test_fuzz(data_u8, size, step + 2, i, 0, 0, 0)) fail_step = step + 2;
+						data_u8[i] = original - 1;
+						if (!ufbxt_test_fuzz(data_u8, size, step + 2, i, 0, 0, 0)) fail_step = step + 2;
 
-					if (original != 0) {
-						data_u8[i] = 0;
-						if (!ufbxt_test_fuzz(data_u8, size, step + 3, i, 0, 0, 0)) fail_step = step + 3;
+						if (original != 0) {
+							data_u8[i] = 0;
+							if (!ufbxt_test_fuzz(data_u8, size, step + 3, i, 0, 0, 0)) fail_step = step + 3;
+						}
+
+						if (original != 0xff) {
+							data_u8[i] = 0xff;
+							if (!ufbxt_test_fuzz(data_u8, size, step + 4, i, 0, 0, 0)) fail_step = step + 4;
+						}
 					}
 
-					if (original != 0xff) {
-						data_u8[i] = 0xff;
-						if (!ufbxt_test_fuzz(data_u8, size, step + 4, i, 0, 0, 0)) fail_step = step + 4;
-					}
 
 					data_u8[i] = original;
 				}
@@ -1491,6 +1500,10 @@ int main(int argc, char **argv)
 
 		if (!strcmp(argv[i], "--fuzz")) {
 			g_fuzz = true;
+		}
+
+		if (!strcmp(argv[i], "--all-byte-values")) {
+			g_all_byte_values = true;
 		}
 
 		if (!strcmp(argv[i], "--threads")) {
