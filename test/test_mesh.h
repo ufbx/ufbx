@@ -68,7 +68,7 @@ UFBXT_FILE_TEST(maya_color_sets)
 
 		for (size_t set_i = 0; set_i < 4; set_i++) {
 			ufbx_vec4 color = ufbx_get_vertex_vec4(&mesh->color_sets.data[set_i].vertex_color, i);
-			ufbxt_assert_close_vec4(&err, color, refs[set_i]);
+			ufbxt_assert_close_vec4(err, color, refs[set_i]);
 		}
 	}
 }
