@@ -1436,7 +1436,7 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 	// but use a dedicated allocation.
 	if (size >= b->ator->huge_size) {
 		 next_size = chunk ? chunk->next_size : 4096;
-		 chunk_size = size;
+		 chunk_size = (uint32_t)size;
 	} else {
 		 next_size = chunk ? chunk->next_size * 2 : 4096;
 		chunk_size = next_size - sizeof(ufbxi_buf_chunk);
