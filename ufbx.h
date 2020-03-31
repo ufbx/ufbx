@@ -388,6 +388,8 @@ typedef struct ufbx_load_opts {
 	size_t max_result_memory;
 	size_t max_temp_allocs;
 	size_t max_result_allocs;
+	size_t temp_huge_size;
+	size_t result_huge_size;
 	size_t max_ascii_token_length;
 	size_t read_buffer_size;
 	size_t max_properties;

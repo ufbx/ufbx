@@ -1195,6 +1195,7 @@ typedef struct {
 	size_t current_size;
 	size_t max_size;
 	size_t allocs_left;
+	size_t huge_size;
 	ufbx_allocator ator;
 } ufbxi_allocator;
 
@@ -1429,9 +1430,18 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 
 	// Allocate a new chunk, grow `next_size` geometrically but don't double
 	// the current or previous user sizes if they are larger.
-	uint32_t next_size = chunk ? chunk->next_size * 2 : 4096;
-	uint32_t chunk_size = next_size - sizeof(ufbxi_buf_chunk);
-	if (chunk_size < size) chunk_size = (uint32_t)size;
+	uint32_t chunk_size, next_size;
+
+	// If `size` is larger than `huge_size` don't grow `next_size` geometrically,
+	// but use a dedicated allocation.
+	if (size >= b->ator->huge_size) {
+		 next_size = chunk ? chunk->next_size : 4096;
+		 chunk_size = size;
+	} else {
+		 next_size = chunk ? chunk->next_size * 2 : 4096;
+		chunk_size = next_size - sizeof(ufbxi_buf_chunk);
+		if (chunk_size < size) chunk_size = (uint32_t)size;
+	}
 
 	// Align chunk sizes to 16 bytes
 	chunk_size = ufbxi_align_to_mask(chunk_size, 0xf);
@@ -3393,7 +3403,11 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 		ufbxi_ascii_token *tok = &ua->prev_token;
 		if (ufbxi_ascii_accept(uc, UFBXI_ASCII_STRING)) {
 
-			if (num_values < UFBXI_MAX_NON_ARRAY_VALUES && !arr_type) {
+			if (arr_type) {
+				// Ignore strings in arrays, decrement `num_values` as it will be incremented
+				// after the loop iteration is done to ignore it.
+				num_values--;
+			} else if (num_values < UFBXI_MAX_NON_ARRAY_VALUES) {
 				type_mask |= UFBXI_VALUE_STRING << (num_values*2);
 				ufbxi_value *v = &vals[num_values];
 				v->s.data = tok->str_data;
@@ -3493,8 +3507,8 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 				// NOTE: This `continue` skips incrementing `num_values` and parsing
 				// a comma, continuing to parse the values in the array.
 				in_ascii_array = true;
-				continue;
 			}
+			continue;
 		} else {
 			break;
 		}
@@ -4353,7 +4367,7 @@ ufbxi_nodiscard static int ufbxi_check_indices(ufbxi_context *uc, ufbx_mesh *mes
 			if (!owns_indices) {
 				int32_t *new_indices = ufbxi_push(&uc->result, int32_t, num_indices);
 				ufbxi_check(new_indices);
-				memcpy(new_indices, indices, num_indices);
+				memcpy(new_indices, indices, sizeof(int32_t) * num_indices);
 				indices = new_indices;
 				owns_indices = true;
 			}
@@ -4403,6 +4417,8 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 	} else {
 		*p_dst_data = ufbxi_zero_element + 4;
 	}
+
+	size_t elem_size = ufbxi_array_type_size(data_type);
 
 	if (indices) {
 		size_t num_indices = indices->size;
@@ -6031,6 +6047,8 @@ static void ufbxi_expand_defaults(ufbx_load_opts *opts)
 	ufbxi_default_opt(max_result_memory, 0xf0000000);
 	ufbxi_default_opt(max_temp_allocs, 0x10000000);
 	ufbxi_default_opt(max_result_allocs, 0x10000000);
+	ufbxi_default_opt(temp_huge_size, 0x100000);
+	ufbxi_default_opt(result_huge_size, 0x100000);
 	ufbxi_default_opt(max_ascii_token_length, 0x10000000);
 	ufbxi_default_opt(read_buffer_size, 4096);
 	ufbxi_default_opt(max_properties, 0x10000000);
@@ -6068,10 +6086,12 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->ator_tmp.ator = uc->opts.temp_allocator;
 	uc->ator_tmp.max_size = uc->opts.max_temp_memory;
 	uc->ator_tmp.allocs_left = uc->opts.max_temp_allocs;
+	uc->ator_tmp.huge_size = uc->opts.temp_huge_size;
 	uc->ator_result.error = &uc->error;
 	uc->ator_result.ator = uc->opts.result_allocator;
 	uc->ator_result.max_size = uc->opts.max_result_memory;
 	uc->ator_result.allocs_left = uc->opts.max_result_allocs;
+	uc->ator_result.huge_size = uc->opts.result_huge_size;
 
 	uc->string_map.ator = &uc->ator_tmp;
 	uc->prop_type_map.ator = &uc->ator_tmp;

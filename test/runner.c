@@ -840,6 +840,8 @@ static uint32_t g_file_version = 0;
 static const char *g_file_type = NULL;
 static bool g_fuzz = false;
 static bool g_all_byte_values = false;
+static bool g_dedicated_allocs = false;
+static int g_patch_start = 0;
 static size_t g_fuzz_step = 0;
 
 const char *g_fuzz_test_name = NULL;
@@ -869,6 +871,11 @@ int ufbxt_test_fuzz(void *data, size_t size, size_t step, int offset, size_t tem
 		ufbx_load_opts opts = { 0 };
 		opts.max_temp_allocs = temp_limit;
 		opts.max_result_allocs = result_limit;
+
+		if (g_dedicated_allocs) {
+			opts.temp_huge_size = 1;
+			opts.result_huge_size = 1;
+		}
 
 		if (truncate_length > 0) size = truncate_length;
 
@@ -1195,8 +1202,14 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			ufbx_error error;
 
+			ufbx_load_opts load_opts = { 0 };
+			if (g_dedicated_allocs) {
+				load_opts.temp_huge_size = 1;
+				load_opts.result_huge_size = 1;
+			}
+
 			uint64_t load_begin = cputime_cpu_tick();
-			ufbx_scene *scene = ufbx_load_memory(data, size, NULL, &error);
+			ufbx_scene *scene = ufbx_load_memory(data, size, &load_opts, &error);
 			uint64_t load_end = cputime_cpu_tick();
 
 			if (!scene) {
@@ -1296,8 +1309,13 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 				uint8_t *data_copy[256] = { 0 };
 
+				int patch_start = g_patch_start - omp_get_num_threads() * 16;
+				if (patch_start < 0) {
+					patch_start = 0;
+				}
+
 				#pragma omp parallel for schedule(static, 16)
-				for (i = 0; i < (int)size; i++) {
+				for (i = patch_start; i < (int)size; i++) {
 
 					if (omp_get_thread_num() == 0) {
 						if (i % 16 == 0) {
@@ -1502,8 +1520,16 @@ int main(int argc, char **argv)
 			g_fuzz = true;
 		}
 
-		if (!strcmp(argv[i], "--all-byte-values")) {
+		if (!strcmp(argv[i], "--patch-all-byte-values")) {
 			g_all_byte_values = true;
+		}
+
+		if (!strcmp(argv[i], "--patch-start")) {
+			if (++i < argc) g_patch_start = atoi(argv[i]);
+		}
+
+		if (!strcmp(argv[i], "--dedicated-allocs")) {
+			g_dedicated_allocs = true;
 		}
 
 		if (!strcmp(argv[i], "--threads")) {
