@@ -3317,8 +3317,14 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 {
 	ufbxi_ascii *ua = &uc->ascii;
 
-	if (ua->token.type == '}' || ua->token.type == UFBXI_ASCII_END) {
+	if (ua->token.type == '}') {
 		ufbxi_check(ufbxi_ascii_next_token(uc, &ua->token));
+		*p_end = true;
+		return 1;
+	}
+
+	if (ua->token.type == UFBXI_ASCII_END) {
+		ufbxi_check(depth == 0);
 		*p_end = true;
 		return 1;
 	}
