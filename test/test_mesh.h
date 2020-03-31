@@ -74,19 +74,6 @@ UFBXT_FILE_TEST(maya_color_sets)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_color_sets_reorder)
-#if UFBXT_IMPL
-{
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
-	ufbxt_assert(mesh);
-	ufbxt_assert(mesh->color_sets.size == 4);
-	ufbxt_assert(!strcmp(mesh->color_sets.data[0].name.data, "RGBCube"));
-	ufbxt_assert(!strcmp(mesh->color_sets.data[1].name.data, "White"));
-	ufbxt_assert(!strcmp(mesh->color_sets.data[2].name.data, "Black"));
-	ufbxt_assert(!strcmp(mesh->color_sets.data[3].name.data, "Alpha"));
-}
-#endif
-
 UFBXT_FILE_TEST(maya_uv_sets)
 #if UFBXT_IMPL
 {
@@ -130,3 +117,20 @@ UFBXT_FILE_TEST(maya_uv_sets)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_sets_reorder)
+#if UFBXT_IMPL
+{
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
+	ufbxt_assert(mesh);
+	ufbxt_assert(mesh->color_sets.size == 4);
+	ufbxt_assert(!strcmp(mesh->color_sets.data[0].name.data, "RGBCube"));
+	ufbxt_assert(!strcmp(mesh->color_sets.data[1].name.data, "White"));
+	ufbxt_assert(!strcmp(mesh->color_sets.data[2].name.data, "Black"));
+	ufbxt_assert(!strcmp(mesh->color_sets.data[3].name.data, "Alpha"));
+	ufbxt_assert(!strcmp(mesh->uv_sets.data[0].name.data, "Default"));
+	ufbxt_assert(!strcmp(mesh->uv_sets.data[1].name.data, "PerFace"));
+	ufbxt_assert(!strcmp(mesh->uv_sets.data[2].name.data, "Row"));
+}
+#endif
+
