@@ -1827,7 +1827,7 @@ static const char ufbxi_PolygonVertexIndex[] = "PolygonVertexIndex";
 static const char ufbxi_Edges[] = "Edges";
 static const char ufbxi_LayerElementNormal[] = "LayerElementNormal";
 static const char ufbxi_LayerElementUV[] = "LayerElementUV";
-static const char ufbxi_LayerElementColor[] = "LayerElementtColor";
+static const char ufbxi_LayerElementColor[] = "LayerElementColor";
 static const char ufbxi_Normals[] = "Normals";
 static const char ufbxi_NormalIndex[] = "NormalIndex";
 static const char ufbxi_UV[] = "UV";
@@ -6027,8 +6027,8 @@ static void ufbxi_free_result(ufbxi_context *uc)
 
 static void ufbxi_expand_defaults(ufbx_load_opts *opts)
 {
-	ufbxi_default_opt(max_temp_memory, 0x10000000);
-	ufbxi_default_opt(max_result_memory, 0x10000000);
+	ufbxi_default_opt(max_temp_memory, 0xf0000000);
+	ufbxi_default_opt(max_result_memory, 0xf0000000);
 	ufbxi_default_opt(max_temp_allocs, 0x10000000);
 	ufbxi_default_opt(max_result_allocs, 0x10000000);
 	ufbxi_default_opt(max_ascii_token_length, 0x10000000);

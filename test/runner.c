@@ -634,6 +634,14 @@ static void ufbxt_assert_close_vec3(ufbxt_diff_error *p_err, ufbx_vec3 a, ufbx_v
 	ufbxt_assert_close_real(p_err, a.z, b.z);
 }
 
+static void ufbxt_assert_close_vec4(ufbxt_diff_error *p_err, ufbx_vec4 a, ufbx_vec4 b)
+{
+	ufbxt_assert_close_real(p_err, a.x, b.x);
+	ufbxt_assert_close_real(p_err, a.y, b.y);
+	ufbxt_assert_close_real(p_err, a.z, b.z);
+	ufbxt_assert_close_real(p_err, a.w, b.w);
+}
+
 static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err)
 {
 	for (size_t mesh_i = 0; mesh_i < obj->num_meshes; mesh_i++) {

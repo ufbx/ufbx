@@ -40,3 +40,50 @@ UFBXT_FILE_TEST(blender_282_suzanne_and_transform)
 {
 }
 #endif
+
+UFBXT_FILE_TEST(maya_color_sets)
+#if UFBXT_IMPL
+{
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
+	ufbxt_assert(mesh);
+	ufbxt_assert(mesh->color_sets.size == 4);
+	ufbxt_assert(!strcmp(mesh->color_sets.data[0].name.data, "RGBCube"));
+	ufbxt_assert(!strcmp(mesh->color_sets.data[1].name.data, "White"));
+	ufbxt_assert(!strcmp(mesh->color_sets.data[2].name.data, "Black"));
+	ufbxt_assert(!strcmp(mesh->color_sets.data[3].name.data, "Alpha"));
+
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, i);
+		ufbx_vec4 refs[4] = {
+			{ 0.0, 0.0, 0.0, 1.0 },
+			{ 1.0, 1.0, 1.0, 1.0 },
+			{ 0.0, 0.0, 0.0, 1.0 },
+			{ 1.0, 1.0, 1.0, 0.0 },
+		};
+
+		refs[0].x = pos.x + 0.5;
+		refs[0].y = pos.y + 0.5;
+		refs[0].z = pos.z + 0.5;
+		refs[3].w = (pos.x + 0.5) * 0.1 + (pos.y + 0.5) * 0.2 + (pos.z + 0.5) * 0.4;
+
+		for (size_t set_i = 0; set_i < 4; set_i++) {
+			ufbx_vec4 color = ufbx_get_vertex_vec4(&mesh->color_sets.data[set_i].vertex_color, i);
+			ufbxt_assert_close_vec4(&err, color, refs[set_i]);
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_color_sets_reorder)
+#if UFBXT_IMPL
+{
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
+	ufbxt_assert(mesh);
+	ufbxt_assert(mesh->color_sets.size == 4);
+	ufbxt_assert(!strcmp(mesh->color_sets.data[0].name.data, "RGBCube"));
+	ufbxt_assert(!strcmp(mesh->color_sets.data[1].name.data, "White"));
+	ufbxt_assert(!strcmp(mesh->color_sets.data[2].name.data, "Black"));
+	ufbxt_assert(!strcmp(mesh->color_sets.data[3].name.data, "Alpha"));
+}
+#endif
+
