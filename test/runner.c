@@ -1218,6 +1218,15 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file");
 			}
 
+			ufbx_load_opts stream_opts = load_opts;
+			stream_opts.read_buffer_size = 1;
+			ufbx_scene *streamed_scene = ufbx_load_file(buf, &stream_opts, &error);
+			if (!streamed_scene) {
+				ufbxt_log_error(&error);
+				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse streamed file");
+			}
+			ufbx_free_scene(streamed_scene);
+
 			ufbxt_logf(".. Loaded in %.2fms: File %.1fkB, temp %.1fkB (%zu allocs), result %.1fkB (%zu allocs)",
 				cputime_cpu_delta_to_sec(NULL, load_end - load_begin) * 1e3,
 				(double)size * 1e-3,
