@@ -1281,6 +1281,7 @@ static void ufbxi_free_size(ufbxi_allocator *ator, size_t size, void *ptr, size_
 {
 	ufbx_assert(size > 0);
 	if (n == 0) return;
+	ufbx_assert(ptr);
 
 	size_t total = size * n;
 
@@ -2262,15 +2263,28 @@ static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size)
 	ufbx_assert(uc->data_size < size);
 	ufbxi_check_return(uc->read_fn, NULL);
 
+	void *data_to_free = NULL;
+	size_t size_to_free = 0;
+
 	// Grow the read buffer if necessary
 	if (size > uc->read_buffer_size) {
 		size_t new_size = ufbxi_max_sz(size, uc->opts.read_buffer_size);
-		ufbxi_check_return(ufbxi_grow_array(&uc->ator_tmp, &uc->read_buffer, &uc->read_buffer_size, new_size), NULL);
+		new_size = ufbxi_max_sz(new_size, uc->read_buffer_size * 2);
+		size_to_free = uc->read_buffer_size;
+		data_to_free = uc->read_buffer;
+		char *new_buffer = ufbxi_alloc(&uc->ator_tmp, char, new_size);
+		ufbxi_check_return(new_buffer, NULL);
+		uc->read_buffer = new_buffer;
+		uc->read_buffer_size = new_size;
 	}
 
 	// Copy the remains of the previous buffer to the beginning of the new one
 	size_t num_read = uc->data_size;
 	memmove(uc->read_buffer, uc->data, num_read);
+
+	if (size_to_free) {
+		ufbxi_free(&uc->ator_tmp, char, data_to_free, size_to_free);
+	}
 
 	// Fill the rest of the buffer with user data
 	size_t to_read = uc->read_buffer_size - num_read;
