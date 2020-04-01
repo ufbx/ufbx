@@ -851,6 +851,19 @@ void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
 	ufbxt_check_props(scene, &material->props, true);
 }
 
+void ufbxt_check_anim_prop(ufbx_scene *scene, ufbx_anim_prop *anim_prop)
+{
+	ufbxt_check_string(anim_prop->name);
+	switch (anim_prop->target)
+	{
+	case UFBX_ANIM_UNKNOWN: /* Nop */ break;
+	case UFBX_ANIM_MODEL: ufbxt_assert(anim_prop->index < scene->models.size); break;
+	case UFBX_ANIM_MESH: ufbxt_assert(anim_prop->index < scene->meshes.size); break;
+	case UFBX_ANIM_LIGHT: ufbxt_assert(anim_prop->index < scene->lights.size); break;
+	case UFBX_ANIM_MATERIAL: ufbxt_assert(anim_prop->index < scene->materials.size); break;
+	}
+}
+
 void ufbxt_check_scene(ufbx_scene *scene)
 {
 	ufbxt_check_string(scene->metadata.creator);
@@ -865,6 +878,10 @@ void ufbxt_check_scene(ufbx_scene *scene)
 
 	for (size_t i = 0; i < scene->materials.size; i++) {
 		ufbxt_check_material(scene, &scene->materials.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->anim_props.size; i++) {
+		ufbxt_check_anim_prop(scene, &scene->anim_props.data[i]);
 	}
 }
 
