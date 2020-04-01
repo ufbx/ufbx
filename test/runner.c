@@ -790,8 +790,14 @@ void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	for (size_t i = 0; i < mesh->num_faces; i++) {
 		ufbx_face face = mesh->faces[i];
 		ufbxt_assert(face.index_begin == prev_end);
+		ufbxt_assert(face.num_indices > 0);
 		prev_end = face.index_begin + face.num_indices;
 		ufbxt_assert(prev_end <= mesh->num_indices);
+
+		for (size_t j = face.index_begin; j < face.index_begin + face.num_indices; j++) {
+			ufbx_face *p_face = ufbx_find_face(mesh, j);
+			ufbxt_assert(p_face - mesh->faces == i);
+		}
 	}
 
 	for (size_t i = 0; i < mesh->num_edges; i++) {
@@ -820,6 +826,15 @@ void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		}
 		ufbxt_check_string(set->name);
 		ufbxt_check_vertex_element(scene, mesh, &set->vertex_color, sizeof(ufbx_vec4));
+	}
+
+	for (size_t i = 0; i < mesh->num_edges; i++) {
+		ufbx_edge edge = mesh->edges[i];
+		ufbxt_assert(edge.indices[0] < mesh->num_indices);
+		ufbxt_assert(edge.indices[1] < mesh->num_indices);
+		ufbx_face *face = ufbx_find_face(mesh, edge.indices[0]);
+		ufbxt_assert(face);
+		ufbxt_assert(face == ufbx_find_face(mesh, edge.indices[1]));
 	}
 }
 

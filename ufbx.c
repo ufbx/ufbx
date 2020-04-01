@@ -1841,6 +1841,10 @@ static const char ufbxi_LayerElementBinormal[] = "LayerElementBinormal";
 static const char ufbxi_LayerElementTangent[] = "LayerElementTangent";
 static const char ufbxi_LayerElementUV[] = "LayerElementUV";
 static const char ufbxi_LayerElementColor[] = "LayerElementColor";
+static const char ufbxi_LayerElementVertexCrease[] = "LayerElementVertexCrease";
+static const char ufbxi_LayerElementEdgeCrease[] = "LayerElementEdgeCrease";
+static const char ufbxi_LayerElementSmoothing[] = "LayerElementSmoothing";
+static const char ufbxi_LayerElementMaterial[] = "LayerElementMaterial";
 static const char ufbxi_Normals[] = "Normals";
 static const char ufbxi_NormalIndex[] = "NormalIndex";
 static const char ufbxi_Binormals[] = "Binormals";
@@ -1851,6 +1855,10 @@ static const char ufbxi_UV[] = "UV";
 static const char ufbxi_UVIndex[] = "UVIndex";
 static const char ufbxi_Colors[] = "Colors";
 static const char ufbxi_ColorIndex[] = "ColorIndex";
+static const char ufbxi_VertexCrease[] = "VertexCrease";
+static const char ufbxi_VertexCreaseIndex[] = "VertexCreaseIndex";
+static const char ufbxi_EdgeCrease[] = "EdgeCrease";
+static const char ufbxi_Smoothing[] = "Smoothing";
 static const char ufbxi_MappingInformationType[] = "MappingInformationType";
 static const char ufbxi_Name[] = "Name";
 static const char ufbxi_ByVertex[] = "ByVertex";
@@ -1922,16 +1930,24 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_LayerElementTangent, sizeof(ufbxi_LayerElementTangent) - 1 },
 	{ ufbxi_LayerElementUV, sizeof(ufbxi_LayerElementUV) - 1 },
 	{ ufbxi_LayerElementColor, sizeof(ufbxi_LayerElementColor) - 1 },
+	{ ufbxi_LayerElementVertexCrease, sizeof(ufbxi_LayerElementVertexCrease) - 1 },
+	{ ufbxi_LayerElementEdgeCrease, sizeof(ufbxi_LayerElementEdgeCrease) - 1 },
+	{ ufbxi_LayerElementSmoothing, sizeof(ufbxi_LayerElementSmoothing) - 1 },
+	{ ufbxi_LayerElementMaterial, sizeof(ufbxi_LayerElementMaterial) - 1 },
 	{ ufbxi_Normals, sizeof(ufbxi_Normals) - 1 },
 	{ ufbxi_NormalIndex, sizeof(ufbxi_NormalIndex) - 1 },
-	{ ufbxi_Tangents, sizeof(ufbxi_Tangents) - 1 },
-	{ ufbxi_TangentIndex, sizeof(ufbxi_TangentIndex) - 1 },
 	{ ufbxi_Binormals, sizeof(ufbxi_Binormals) - 1 },
 	{ ufbxi_BinormalIndex, sizeof(ufbxi_BinormalIndex) - 1 },
+	{ ufbxi_Tangents, sizeof(ufbxi_Tangents) - 1 },
+	{ ufbxi_TangentIndex, sizeof(ufbxi_TangentIndex) - 1 },
 	{ ufbxi_UV, sizeof(ufbxi_UV) - 1 },
 	{ ufbxi_UVIndex, sizeof(ufbxi_UVIndex) - 1 },
 	{ ufbxi_Colors, sizeof(ufbxi_Colors) - 1 },
 	{ ufbxi_ColorIndex, sizeof(ufbxi_ColorIndex) - 1 },
+	{ ufbxi_VertexCrease, sizeof(ufbxi_VertexCrease) - 1 },
+	{ ufbxi_VertexCreaseIndex, sizeof(ufbxi_VertexCreaseIndex) - 1 },
+	{ ufbxi_EdgeCrease, sizeof(ufbxi_EdgeCrease) - 1 },
+	{ ufbxi_Smoothing, sizeof(ufbxi_Smoothing) - 1 },
 	{ ufbxi_MappingInformationType, sizeof(ufbxi_MappingInformationType) - 1 },
 	{ ufbxi_Name, sizeof(ufbxi_Name) - 1 },
 	{ ufbxi_ByVertex, sizeof(ufbxi_ByVertex) - 1 },
@@ -1968,6 +1984,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_ScalingPivot, sizeof(ufbxi_ScalingPivot) - 1 },
 	{ ufbxi_RotationPivot, sizeof(ufbxi_RotationPivot) - 1 },
 	{ ufbxi_ScalingOffset, sizeof(ufbxi_ScalingOffset) - 1 },
+	{ ufbxi_RotationOffset, sizeof(ufbxi_RotationOffset) - 1 },
 	{ ufbxi_RotationOrder, sizeof(ufbxi_RotationOrder) - 1 },
 };
 
@@ -2519,6 +2536,10 @@ typedef enum {
 	UFBXI_PARSE_LAYER_ELEMENT_TANGENT,
 	UFBXI_PARSE_LAYER_ELEMENT_UV,
 	UFBXI_PARSE_LAYER_ELEMENT_COLOR,
+	UFBXI_PARSE_LAYER_ELEMENT_VERTEX_CREASE,
+	UFBXI_PARSE_LAYER_ELEMENT_EDGE_CREASE,
+	UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING,
+	UFBXI_PARSE_LAYER_ELEMENT_MATERIAL,
 	UFBXI_PARSE_TAKE,
 	UFBXI_PARSE_TAKE_OBJECT,
 	UFBXI_PARSE_CHANNEL,
@@ -2559,6 +2580,10 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 		if (name == ufbxi_LayerElementTangent) return UFBXI_PARSE_LAYER_ELEMENT_TANGENT;
 		if (name == ufbxi_LayerElementUV) return UFBXI_PARSE_LAYER_ELEMENT_UV;
 		if (name == ufbxi_LayerElementColor) return UFBXI_PARSE_LAYER_ELEMENT_COLOR;
+		if (name == ufbxi_LayerElementVertexCrease) return UFBXI_PARSE_LAYER_ELEMENT_VERTEX_CREASE;
+		if (name == ufbxi_LayerElementEdgeCrease) return UFBXI_PARSE_LAYER_ELEMENT_EDGE_CREASE;
+		if (name == ufbxi_LayerElementSmoothing) return UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING;
+		if (name == ufbxi_LayerElementMaterial) return UFBXI_PARSE_LAYER_ELEMENT_MATERIAL;
 		break;
 
 	case UFBXI_PARSE_TAKES:
@@ -2688,6 +2713,35 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			return true;
 		} else if (name == ufbxi_ColorIndex) {
 			info->type = 'i';
+			info->result = true;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_LAYER_ELEMENT_VERTEX_CREASE:
+		if (name == ufbxi_VertexCrease) {
+			info->type = 'r';
+			info->result = true;
+			info->pad_begin = true;
+			return true;
+		} else if (name == ufbxi_VertexCreaseIndex) {
+			info->type = 'i';
+			info->result = true;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_LAYER_ELEMENT_EDGE_CREASE:
+		if (name == ufbxi_EdgeCrease) {
+			info->type = 'r';
+			info->result = true;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING:
+		if (name == ufbxi_Smoothing) {
+			info->type = 'b';
 			info->result = true;
 			return true;
 		}
@@ -4568,6 +4622,25 @@ static int ufbxi_cmp_color_set(const void *va, const void *vb)
 	return 0;
 }
 
+ufbxi_nodiscard static int ufbxi_read_truncated_array(ufbxi_context *uc, void *p_data, ufbxi_node *node, const char *name, char fmt, size_t size)
+{
+	ufbxi_value_array *arr = ufbxi_find_array(node, name, fmt);
+	ufbxi_check(arr);
+
+	void *data = arr->data;
+	if (arr->size < size) {
+		size_t elem_size = ufbxi_array_type_size(fmt);
+		void *new_data = ufbxi_push_size(&uc->result, elem_size, size);
+		ufbxi_check(new_data);
+		memcpy(new_data, data, arr->size * elem_size);
+		memset((char*)new_data + arr->size * elem_size, 0, (size - arr->size) * elem_size);
+		data = new_data;
+	}
+
+	*(void**)p_data = data;
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *node, ufbxi_object *object)
 {
 	ufbx_mesh *mesh = ufbxi_push_zero(&uc->tmp_arr_geometry, ufbx_mesh, 1);
@@ -4607,8 +4680,8 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 		for (size_t i = 0; i < num_edges; i++) {
 			int32_t index_ix = edge_data[i];
 			ufbxi_check(index_ix >= 0 && (size_t)index_ix < mesh->num_indices);
-			int32_t prev = index_data[index_ix];
-			if (prev < 0) {
+			edges[i].indices[0] = index_ix;
+			if (index_data[index_ix] < 0) {
 				// Previous index is the last one of this polygon, rewind to first index.
 				while (index_ix > 0 && index_data[index_ix - 1] >= 0) {
 					index_ix--;
@@ -4618,9 +4691,7 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 				index_ix++;
 			}
 			ufbxi_check(index_ix >= 0 && (size_t)index_ix < mesh->num_indices);
-			int32_t next = index_data[index_ix];
-			edges[i].indices[0] = (uint32_t)(prev >= 0 ? prev : ~prev);
-			edges[i].indices[1] = (uint32_t)(next >= 0 ? next : ~next);
+			edges[i].indices[1] = index_ix;
 		}
 
 		mesh->edges = edges;
@@ -4710,6 +4781,26 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &set->vertex_color.data,
 				&set->vertex_color.indices, &set->vertex_color.num_elements, ufbxi_Colors, ufbxi_ColorIndex, 'r', 4));
+		} else if (n->name == ufbxi_LayerElementVertexCrease) {
+			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &mesh->vertex_crease.data,
+				&mesh->vertex_crease.indices, &mesh->vertex_crease.num_elements, ufbxi_VertexCrease, ufbxi_VertexCreaseIndex, 'r', 1));
+		} else if (n->name == ufbxi_LayerElementEdgeCrease) {
+			const char *mapping;
+			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "C", (char**)&mapping));
+			if (mapping == ufbxi_ByEdge) {
+				if (mesh->edge_crease) continue;
+				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->edge_crease, n, ufbxi_EdgeCrease, 'r', mesh->num_edges));
+			}
+		} else if (n->name == ufbxi_LayerElementSmoothing) {
+			const char *mapping;
+			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "C", (char**)&mapping));
+			if (mapping == ufbxi_ByEdge) {
+				if (mesh->edge_smoothing) continue;
+				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->edge_smoothing, n, ufbxi_Smoothing, 'b', mesh->num_edges));
+			} else if (mapping == ufbxi_ByPolygon) {
+				if (mesh->face_smoothing) continue;
+				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->face_smoothing, n, ufbxi_Smoothing, 'b', mesh->num_faces));
+			}
 		}
 	}
 
@@ -6350,6 +6441,30 @@ ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t 
 
 		props = props->defaults;
 	} while (props);
+
+	return NULL;
+}
+
+ufbx_face *ufbx_find_face(const ufbx_mesh *mesh, size_t index)
+{
+	size_t begin = 0;
+	size_t end = mesh->num_faces;
+	const ufbx_face *faces = mesh->faces;
+	while (end - begin >= 16) {
+		size_t mid = (begin + end) >> 1;
+		const ufbx_face *f = &faces[mid];
+		if (f->index_begin + f->num_indices < index) {
+			begin = mid + 1;
+		} else { 
+			end = mid;
+		}
+	}
+
+	end = mesh->num_faces;
+	for (; begin < end; begin++) {
+		const ufbx_face *f = &faces[begin];
+		if (index - f->index_begin < f->num_indices) return (ufbx_face*)f;
+	}
 
 	return NULL;
 }

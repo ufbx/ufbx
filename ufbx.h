@@ -131,6 +131,7 @@ struct ufbx_props {
 typedef struct ufbx_material ufbx_material;
 
 typedef struct ufbx_vertex_void ufbx_vertex_void;
+typedef struct ufbx_vertex_real ufbx_vertex_real;
 typedef struct ufbx_vertex_vec2 ufbx_vertex_vec2;
 typedef struct ufbx_vertex_vec3 ufbx_vertex_vec3;
 typedef struct ufbx_vertex_vec4 ufbx_vertex_vec4;
@@ -145,6 +146,12 @@ typedef struct ufbx_color_set_list { ufbx_color_set *data; size_t size; } ufbx_c
 
 struct ufbx_vertex_void {
 	void *data;
+	int32_t *indices;
+	size_t num_elements;
+};
+
+struct ufbx_vertex_real {
+	ufbx_real *data;
 	int32_t *indices;
 	size_t num_elements;
 };
@@ -246,6 +253,7 @@ struct ufbx_mesh {
 	ufbx_vertex_vec3 vertex_tangent;
 	ufbx_vertex_vec2 vertex_uv;
 	ufbx_vertex_vec4 vertex_color;
+	ufbx_vertex_real vertex_crease;
 
 	bool *edge_smoothing;
 	ufbx_real *edge_crease;
@@ -453,6 +461,8 @@ ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_
 
 ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len);
 
+ufbx_face *ufbx_find_face(const ufbx_mesh *mesh, size_t index);
+
 ufbx_matrix ufbx_get_transform_matrix(const ufbx_transform *transform);
 
 void ufbx_matrix_mul(ufbx_matrix *dst, const ufbx_matrix *l, const ufbx_matrix *r);
@@ -502,6 +512,7 @@ ufbx_inline ufbx_vec3 ufbx_evaluate_prop_vec3(const ufbx_anim_state *state, cons
 	return ufbx_evaluate_prop_vec3_len(state, node, prop, strlen(prop));
 }
 
+ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t index) { return v->data[v->indices[index]]; }
 ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }
 ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }
 ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->indices[index]]; }

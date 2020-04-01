@@ -242,3 +242,41 @@ UFBXT_FILE_TEST(synthetic_sets_reorder)
 	ufbxt_assert(!strcmp(mesh->uv_sets.data[2].name.data, "Row"));
 }
 #endif
+
+UFBXT_FILE_TEST(maya_cone)
+#if UFBXT_IMPL
+{
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCone1");
+	ufbxt_assert(mesh);
+	ufbxt_assert(mesh->vertex_crease.data);
+	ufbxt_assert(mesh->edges);
+	ufbxt_assert(mesh->edge_crease);
+	ufbxt_assert(mesh->edge_smoothing);
+
+	ufbxt_assert(mesh->faces[0].num_indices == 16);
+
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, i);
+		ufbx_real crease = ufbx_get_vertex_real(&mesh->vertex_crease, i);
+
+		ufbxt_assert_close_real(err, crease, pos.y > 0.0 ? 0.998 : 0.0);
+	}
+
+	for (size_t i = 0; i < mesh->num_edges; i++) {
+		ufbx_edge edge = mesh->edges[i];
+		ufbx_real crease = mesh->edge_crease[i];
+		bool smoothing = mesh->edge_smoothing[i];
+		ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[0]);
+		ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[1]);
+
+		if (a.y < 0.0 && b.y < 0.0) {
+			ufbxt_assert_close_real(err, crease, 0.583);
+			ufbxt_assert(!smoothing);
+		} else {
+			ufbxt_assert(a.y > 0.0 || b.y > 0.0);
+			ufbxt_assert_close_real(err, crease, 0.0);
+			ufbxt_assert(smoothing);
+		}
+	}
+}
+#endif
