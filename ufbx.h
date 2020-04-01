@@ -178,6 +178,8 @@ struct ufbx_uv_set {
 	ufbx_string name;
 	int32_t index;
 	ufbx_vertex_vec2 vertex_uv;
+	ufbx_vertex_vec3 vertex_binormal;
+	ufbx_vertex_vec3 vertex_tangent;
 };
 
 struct ufbx_color_set {

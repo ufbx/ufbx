@@ -1648,9 +1648,31 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	free(obj_file);
 }
 
+static ufbx_real ufbxt_dot2(ufbx_vec2 a, ufbx_vec2 b)
+{
+	return a.x*b.x + a.y*b.y;
+}
+
 static ufbx_real ufbxt_dot3(ufbx_vec3 a, ufbx_vec3 b)
 {
 	return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+static ufbx_vec2 ufbxt_sub2(ufbx_vec2 a, ufbx_vec2 b)
+{
+	ufbx_vec2 v;
+	v.x = a.x - b.x;
+	v.y = a.y - b.y;
+	return v;
+}
+
+static ufbx_vec3 ufbxt_sub3(ufbx_vec3 a, ufbx_vec3 b)
+{
+	ufbx_vec3 v;
+	v.x = a.x - b.x;
+	v.y = a.y - b.y;
+	v.z = a.z - b.z;
+	return v;
 }
 
 #define UFBXT_IMPL 1

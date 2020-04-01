@@ -280,3 +280,82 @@ UFBXT_FILE_TEST(maya_cone)
 	}
 }
 #endif
+
+#if UFBXT_IMPL
+static void ufbxt_check_tangent_space(ufbxt_diff_error *err, ufbx_mesh *mesh)
+{
+	for (size_t set_i = 0; set_i < mesh->uv_sets.size; set_i++) {
+		ufbx_uv_set set = mesh->uv_sets.data[set_i];
+		ufbxt_assert(set.vertex_uv.data);
+		ufbxt_assert(set.vertex_binormal.data);
+		ufbxt_assert(set.vertex_tangent.data);
+
+		for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
+			ufbx_face face = mesh->faces[face_i];
+
+			for (size_t i = 0; i < face.num_indices; i++) {
+				size_t a = face.index_begin + i;
+				size_t b = face.index_begin + (i + 1) % face.num_indices;
+
+				ufbx_vec3 pa = ufbx_get_vertex_vec3(&mesh->vertex_position, a);
+				ufbx_vec3 pb = ufbx_get_vertex_vec3(&mesh->vertex_position, b);
+				ufbx_vec3 ba = ufbx_get_vertex_vec3(&set.vertex_binormal, a);
+				ufbx_vec3 bb = ufbx_get_vertex_vec3(&set.vertex_binormal, b);
+				ufbx_vec3 ta = ufbx_get_vertex_vec3(&set.vertex_tangent, a);
+				ufbx_vec3 tb = ufbx_get_vertex_vec3(&set.vertex_tangent, b);
+				ufbx_vec2 ua = ufbx_get_vertex_vec2(&set.vertex_uv, a);
+				ufbx_vec2 ub = ufbx_get_vertex_vec2(&set.vertex_uv, b);
+
+				ufbx_vec3 dp = ufbxt_sub3(pb, pa);
+				ufbx_vec2 du = ufbxt_sub2(ua, ub);
+
+				ufbx_real dp_len = sqrt(ufbxt_dot3(dp, dp));
+				dp.x /= dp_len;
+				dp.y /= dp_len;
+				dp.z /= dp_len;
+
+				ufbx_real du_len = sqrt(ufbxt_dot2(du, du));
+				du.x /= du_len;
+				du.y /= du_len;
+
+				ufbx_real dba = ufbxt_dot3(dp, ba);
+				ufbx_real dbb = ufbxt_dot3(dp, bb);
+				ufbx_real dta = ufbxt_dot3(dp, ta);
+				ufbx_real dtb = ufbxt_dot3(dp, tb);
+				ufbxt_assert_close_real(err, dba, dbb);
+				ufbxt_assert_close_real(err, dta, dtb);
+
+				ufbxt_assert_close_real(err, ub.x - ua.x, dta);
+				ufbxt_assert_close_real(err, ub.y - ua.y, dba);
+			}
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(maya_uv_set_tangents)
+#if UFBXT_IMPL
+{
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pPlane1");
+	ufbxt_assert(mesh);
+	ufbxt_check_tangent_space(err, mesh);
+}
+#endif
+
+UFBXT_FILE_TEST(blender_279_uv_set_tangents)
+#if UFBXT_IMPL
+{
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "Plane");
+	ufbxt_assert(mesh);
+	ufbxt_check_tangent_space(err, mesh);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_tangents_reorder)
+#if UFBXT_IMPL
+{
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pPlane1");
+	ufbxt_assert(mesh);
+	ufbxt_check_tangent_space(err, mesh);
+}
+#endif
