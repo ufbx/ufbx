@@ -1302,21 +1302,21 @@ static void ufbxi_free_size(ufbxi_allocator *ator, size_t size, void *ptr, size_
 	}
 }
 
-static ufbxi_forceinline void *ufbxi_alloc_zero_size(ufbxi_allocator *ator, size_t size, size_t n)
+ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_alloc_zero_size(ufbxi_allocator *ator, size_t size, size_t n)
 {
 	void *ptr = ufbxi_alloc_size(ator, size, n);
 	if (ptr) memset(ptr, 0, size * n);
 	return ptr;
 }
 
-static ufbxi_forceinline void *ufbxi_realloc_zero_size(ufbxi_allocator *ator, size_t size, void *old_ptr, size_t old_n, size_t n)
+ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_realloc_zero_size(ufbxi_allocator *ator, size_t size, void *old_ptr, size_t old_n, size_t n)
 {
 	void *ptr = ufbxi_realloc_size(ator, size, old_ptr, old_n, n);
 	if (ptr && n > old_n) memset((char*)ptr + size*old_n, 0, size*(n - old_n));
 	return ptr;
 }
 
-static bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t size, void *p_ptr, size_t *p_cap, size_t n)
+ufbxi_nodiscard static bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t size, void *p_ptr, size_t *p_cap, size_t n)
 {
 	void *ptr = *(void**)p_ptr;
 	size_t old_n = *p_cap;
@@ -1329,7 +1329,7 @@ static bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t size, void *p_pt
 	return true;
 }
 
-static bool ufbxi_grow_array_zero_size(ufbxi_allocator *ator, size_t size, void *p_ptr, size_t *p_cap, size_t n)
+ufbxi_nodiscard static bool ufbxi_grow_array_zero_size(ufbxi_allocator *ator, size_t size, void *p_ptr, size_t *p_cap, size_t n)
 {
 	void *ptr = *(void**)p_ptr;
 	size_t old_n = *p_cap;
@@ -3032,7 +3032,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 			void *decoded_data = arr_data;
 			if (src_type != dst_type || uc->big_endian) {
 				if (uc->convert_buffer_size < decoded_data_size) {
-					ufbxi_grow_array(&uc->ator_tmp, &uc->convert_buffer, &uc->convert_buffer_size, decoded_data_size);
+					ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->convert_buffer, &uc->convert_buffer_size, decoded_data_size));
 				}
 				decoded_data = uc->convert_buffer;
 			}
