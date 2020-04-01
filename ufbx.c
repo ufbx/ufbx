@@ -6535,6 +6535,7 @@ ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v)
 ufbx_vec3 ufbx_transform_normal(const ufbx_matrix *m, ufbx_vec3 v)
 {
 	// https://twitter.com/zeuxcg/status/1226334381091872769
+	// TODO: This doesn't support shear..
 	ufbx_real rx = m->m00*m->m00 + m->m10*m->m10 + m->m20*m->m20;
 	ufbx_real ry = m->m01*m->m01 + m->m11*m->m11 + m->m21*m->m21;
 	ufbx_real rz = m->m02*m->m02 + m->m12*m->m12 + m->m22*m->m22;
