@@ -129,7 +129,7 @@ UFBXT_FILE_TEST(synthetic_missing_version)
 UFBXT_FILE_TEST(maya_resampled)
 #if UFBXT_IMPL
 {
-	static const ufbx_real values[] = {
+	static const ufbx_real values6[] = {
 		0,0,0,0,0,0,0,0,0,
 		-0.004, -0.022, -0.056, -0.104, -0.166, -0.241, -0.328, -0.427, -0.536, -0.654, -0.783,
 		-0.919, -1.063, -1.214, -1.371, -1.533, -1.700, -1.871, -2.044, -2.220, -2.398, -2.577,
@@ -139,24 +139,18 @@ UFBXT_FILE_TEST(maya_resampled)
 		-4.919, -4.810, -4.686,
 	};
 
-	// Curve evaluated values at 200fps
-	// 7000+ values?!?
-#if 0
-	static const ufbx_real values[] = {
+	static const ufbx_real values7[] = {
 		0,0,0,0,0,0,0,0,
 		0.000, -0.004, -0.025, -0.061, -0.112, -0.176, -0.252, -0.337, -0.431, -0.533, -0.648, 
-		-0.776, -0.915, -1.064, -1.378, -1.539, -1.700, -1.865, -2.037, -2.216, -2.397, -2.580, 
+		-0.776, -0.915, -1.064, -1.219, -1.378, -1.539, -1.700, -1.865, -2.037, -2.216, -2.397, -2.580, 
 		-2.761, -2.939, -3.111, -3.278, -3.447, -3.615, -3.782, -3.943, -4.098, -4.244, -4.379, 
-		-4.500, -4.614, -4.722, -4.821, -4.911, -4.990, -5.5056, -5.143, -5.168, -5.186, -5.200, 
+		-4.500, -4.614, -4.722, -4.821, -4.911, -4.990, -5.056, -5.107, -5.143, -5.168, -5.186, -5.200, 
 		-5.209, -5.215, -5.218, -5.220, -5.220, -5.215, -5.190, -5.145, -5.082, -5.002, -4.908, 
 		-4.800, -4.680, -4.550, -4.403, -4.239, 
 	};
-#endif
 
-	// TODO: Auto keyframe tangents
-	if (scene->metadata.version >= 7000) {
-		return;
-	}
+	const ufbx_real *values = scene->metadata.version >= 7000 ? values7 : values6;
+	size_t num_values = scene->metadata.version >= 7000 ? ufbxt_arraycount(values7) : ufbxt_arraycount(values6);
 
 	ufbxt_assert(scene->anim_layers.size == 1);
 	ufbx_anim_layer *layer = &scene->anim_layers.data[0];
@@ -165,7 +159,7 @@ UFBXT_FILE_TEST(maya_resampled)
 		if (strcmp(prop->name.data, "Lcl Translation")) continue;
 		ufbx_anim_curve *curve = &prop->curves[0];
 
-		for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
+		for (size_t i = 0; i < num_values; i++) {
 			double time = (double)i * (1.0/200.0);
 			ufbx_real value = ufbx_evaluate_curve(curve, time);
 			ufbxt_assert_close_real(err, value, values[i]);

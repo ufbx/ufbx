@@ -4901,9 +4901,33 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_n
 				// TODO: TCB tangents (0x200)
 				// TODO: Auto break (0x800)
 
-				// Automatic tangents are specified via the previous tangent's
-				// NextLeftSlope value
-				slope_right = slope_left;
+				if (i > 0 && i + 1 < num_keys && key->time > prev_time && next_time > key->time) {
+					// In between two keyframes: Set the initial slope to be the difference between
+					// the two keyframes. Prevent overshooting by clamping the slope in case either
+					// tangent goes above/below the endpoints.
+					double slope = (p_value[1] - p_value[-1]) / (next_time - prev_time);
+
+					// Split the slope to sign and a non-negative absolute value
+					double slope_sign = slope >= 0.0 ? 1.0 : -1.0;
+					double abs_slope = slope_sign * slope;
+
+					// Find limits for the absolute value of the sign
+					double max_left = slope_sign * (key->value - p_value[-1]) / (weight_left * (key->time - prev_time));
+					double max_right = slope_sign * (p_value[1] - key->value) / (weight_right * (next_time - key->time));
+
+					// Clamp negative values and NaNs (in case weight*delta_time underflows) to zero 
+					if (!(max_left > 0.0)) max_left = 0.0;
+					if (!(max_right > 0.0)) max_right = 0.0;
+
+					// Clamp the absolute slope from both sides
+					if (abs_slope > max_left) abs_slope = max_left;
+					if (abs_slope > max_right) abs_slope = max_right;
+
+					slope_left = slope_right = (float)(slope_sign * abs_slope);
+				} else {
+					// Endpoint / invalid keyframe: Set both slopes to zero
+					slope_left = slope_right = 0.0f;
+				}
 			}
 
 		} else {
