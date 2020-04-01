@@ -167,3 +167,49 @@ UFBXT_FILE_TEST(maya_resampled)
 	}
 }
 #endif
+
+#if UFBXT_IMPL
+
+typedef struct {
+	int frame;
+	ufbx_real intensity;
+	ufbx_vec3 color;
+} ufbxt_anim_light_ref;
+
+#endif
+
+UFBXT_FILE_TEST(maya_anim_light)
+#if UFBXT_IMPL
+{
+	ufbx_scene *state = NULL;
+
+	static const ufbxt_anim_light_ref refs[] = {
+		{  0, 3.072, { 0.148, 0.095, 0.440 } },
+		{ 12, 1.638, { 0.102, 0.136, 0.335 } },
+		{ 24, 1.948, { 0.020, 0.208, 0.149 } },
+		{ 32, 3.676, { 0.010, 0.220, 0.113 } },
+		{ 40, 4.801, { 0.118, 0.195, 0.115 } },
+		{ 48, 3.690, { 0.288, 0.155, 0.117 } },
+		{ 56, 1.565, { 0.421, 0.124, 0.119 } },
+		{ 60, 1.145, { 0.442, 0.119, 0.119 } },
+	};
+
+	ufbx_evaluate_opts opts = { 0 };
+	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		const ufbxt_anim_light_ref *ref = &refs[i];
+		opts.reuse_scene = state;
+
+		double time = ref->frame * (1.0/24.0);
+		state = ufbx_evaluate_scene(scene, &opts, time);
+		ufbxt_assert(state);
+
+		ufbx_light *light = ufbx_find_light(state, "pointLight1");
+		ufbxt_assert(light);
+
+		ufbxt_assert_close_real(err, light->intensity * 0.01f, ref->intensity);
+		ufbxt_assert_close_vec3(err, light->color, ref->color);
+	}
+
+	ufbx_free_scene(state);
+}
+#endif

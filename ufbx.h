@@ -286,7 +286,6 @@ typedef struct ufbx_anim_prop ufbx_anim_prop;
 typedef struct ufbx_anim_curve ufbx_anim_curve;
 typedef struct ufbx_keyframe ufbx_keyframe;
 typedef struct ufbx_tangent ufbx_tangent;
-typedef struct ufbx_anim_state ufbx_anim_state;
 
 typedef struct ufbx_anim_layer_list { ufbx_anim_layer *data; size_t size; } ufbx_anim_layer_list;
 typedef struct ufbx_anim_prop_list { ufbx_anim_prop *data; size_t size; } ufbx_anim_prop_list;
@@ -305,6 +304,14 @@ typedef enum ufbx_interpolation {
 	UFBX_INTERPOLATION_CUBIC,
 } ufbx_interpolation;
 
+typedef enum ufbx_anim_target {
+	UFBX_ANIM_UNKNOWN,
+	UFBX_ANIM_MODEL,
+	UFBX_ANIM_MESH,
+	UFBX_ANIM_LIGHT,
+	UFBX_ANIM_MATERIAL,
+} ufbx_anim_target;
+
 struct ufbx_anim_layer {
 	ufbx_string name;
 	ufbx_anim_prop_list props;
@@ -321,7 +328,8 @@ struct ufbx_anim_prop {
 	ufbx_string name;
 	uint32_t imp_key;
 	ufbx_anim_layer *layer;
-	ufbx_node *node;
+	ufbx_anim_target target;
+	uint32_t index;
 	ufbx_anim_curve curves[3];
 };
 
@@ -331,12 +339,6 @@ struct ufbx_keyframe {
 	ufbx_interpolation interpolation;
 	ufbx_tangent left;
 	ufbx_tangent right;
-};
-
-struct ufbx_anim_state {
-	const ufbx_anim_layer *layers;
-	size_t num_layers;
-	ufbx_real time;
 };
 
 // -- Scene
@@ -352,6 +354,9 @@ typedef struct ufbx_metadata {
 	size_t temp_memory_used;
 	size_t result_allocs;
 	size_t temp_allocs;
+
+	size_t num_total_child_refs;
+	size_t num_total_material_refs;
 } ufbx_metadata;
 
 struct ufbx_scene {
@@ -363,10 +368,10 @@ struct ufbx_scene {
 	ufbx_model_list models;
 	ufbx_mesh_list meshes;
 	ufbx_light_list lights;
+	ufbx_material_list materials;
 	ufbx_anim_layer_list anim_layers;
 	ufbx_anim_prop_list anim_props;
 	ufbx_anim_curve_list anim_curves;
-	ufbx_material_list materials;
 };
 
 // -- Loading
@@ -422,8 +427,13 @@ typedef struct ufbx_load_opts {
 
 typedef struct ufbx_evaluate_opts {
 	ufbx_scene *reuse_scene;
+
 	ufbx_allocator allocator;
 	size_t max_memory;
+	size_t max_allocs;
+	size_t huge_size;
+
+	const ufbx_anim_layer *layer;
 } ufbx_evaluate_opts;
 
 // -- Inflate
@@ -479,12 +489,8 @@ ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v);
 ufbx_vec3 ufbx_transform_normal(const ufbx_matrix *m, ufbx_vec3 v);
 
 ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time);
-ufbx_real ufbx_evaluate_prop_real_len(const ufbx_anim_state *state, const ufbx_node *node, const char *prop, size_t prop_len);
-ufbx_vec3 ufbx_evaluate_prop_vec3_len(const ufbx_anim_state *state, const ufbx_node *node, const char *prop, size_t prop_len);
 
-ufbx_model ufbx_evaluate_model(const ufbx_anim_state *state, const ufbx_model *model);
-ufbx_light ufbx_evaluate_light(const ufbx_anim_state *state, const ufbx_light *light);
-ufbx_scene *ufbx_evaluate_scene(const ufbx_anim_state *state, const ufbx_scene *scene, const ufbx_evaluate_opts *opts);
+ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_evaluate_opts *opts, double time);
 
 ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);
 
@@ -514,14 +520,6 @@ ufbx_inline ufbx_light *ufbx_find_light(const ufbx_scene *scene, const char *nam
 
 ufbx_inline ufbx_prop *ufbx_find_prop(const ufbx_props *props, const char *name) {
 	return ufbx_find_prop_len(props, name, strlen(name));
-}
-
-ufbx_inline ufbx_real ufbx_evaluate_prop_real(const ufbx_anim_state *state, const ufbx_node *node, const char *prop) {
-	return ufbx_evaluate_prop_real_len(state, node, prop, strlen(prop));
-}
-
-ufbx_inline ufbx_vec3 ufbx_evaluate_prop_vec3(const ufbx_anim_state *state, const ufbx_node *node, const char *prop) {
-	return ufbx_evaluate_prop_vec3_len(state, node, prop, strlen(prop));
 }
 
 ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t index) { return v->data[v->indices[index]]; }

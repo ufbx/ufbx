@@ -1904,6 +1904,8 @@ static const char ufbxi_RotationOffset[] = "RotationOffset";
 static const char ufbxi_RotationOrder[] = "RotationOrder";
 static const char ufbxi_DiffuseColor[] = "DiffuseColor";
 static const char ufbxi_SpecularColor[] = "SpecularColor";
+static const char ufbxi_Color[] = "Color";
+static const char ufbxi_Intensity[] = "Intensity";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FBXHeaderExtension, sizeof(ufbxi_FBXHeaderExtension) - 1 },
@@ -2000,6 +2002,8 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_RotationOrder, sizeof(ufbxi_RotationOrder) - 1 },
 	{ ufbxi_DiffuseColor, sizeof(ufbxi_DiffuseColor) - 1 },
 	{ ufbxi_SpecularColor, sizeof(ufbxi_SpecularColor) - 1 },
+	{ ufbxi_Color, sizeof(ufbxi_Color) - 1 },
+	{ ufbxi_Intensity, sizeof(ufbxi_Intensity) - 1 },
 };
 
 // -- Type definitions
@@ -2051,6 +2055,9 @@ typedef struct {
 	ufbxi_allocator ator;
 	ufbxi_buf result_buf;
 	ufbxi_buf string_buf;
+
+	char *memory_block;
+	size_t memory_block_size;
 } ufbxi_scene_imp;
 
 typedef enum {
@@ -5214,6 +5221,8 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve_node(ufbxi_context *uc, uf
 	ufbxi_check(prop);
 	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ANIM_PROP, object->id, uc->tmp_arr_anim_props.num_items - 1));
 
+	prop->name = ufbx_empty_string;
+
 	ufbxi_for(ufbx_prop, def, object->props.props, object->props.num_props) {
 		if (def->type != UFBX_PROP_NUMBER) continue;
 
@@ -5779,6 +5788,16 @@ ufbx_prop *ufbxi_find_prop_imp(const ufbx_props *props, const char *name, uint32
 #define ufbxi_find_prop(props, name) ufbxi_find_prop_imp((props), (name), \
 	(name[0] << 24) | (name[1] << 16) | (name[2] << 8) | name[3])
 
+static ufbxi_forceinline ufbx_real ufbxi_find_real(const ufbx_props *props, const char *name)
+{
+	ufbx_prop *prop = ufbxi_find_prop(props, name);
+	if (prop) {
+		return prop->value_real;
+	} else {
+		return 0.0;
+	}
+}
+
 static ufbxi_forceinline ufbx_vec3 ufbxi_find_vec3(const ufbx_props *props, const char *name)
 {
 	ufbx_prop *prop = ufbxi_find_prop(props, name);
@@ -5946,6 +5965,18 @@ static ufbx_transform ufbxi_get_transform(const ufbx_props *props)
 	return t;
 }
 
+static void ufbxi_get_light_properties(ufbx_light *light)
+{
+	light->color = ufbxi_find_vec3(&light->node.props, ufbxi_Color);
+	light->intensity = ufbxi_find_real(&light->node.props, ufbxi_Intensity);
+}
+
+static void ufbxi_get_material_properties(ufbx_material *material)
+{
+	material->diffuse_color = ufbxi_find_vec3(&material->props, ufbxi_DiffuseColor);
+	material->specular_color = ufbxi_find_vec3(&material->props, ufbxi_SpecularColor);
+}
+
 static void ufbxi_get_properties(ufbx_scene *scene)
 {
 	ufbxi_for_ptr(ufbx_node, p_node, scene->nodes.data, scene->nodes.size) {
@@ -5953,9 +5984,12 @@ static void ufbxi_get_properties(ufbx_scene *scene)
 		node->transform = ufbxi_get_transform(&node->props);
 	}
 
+	ufbxi_for(ufbx_light, light, scene->lights.data, scene->lights.size) {
+		ufbxi_get_light_properties(light);
+	}
+
 	ufbxi_for(ufbx_material, material, scene->materials.data, scene->materials.size) {
-		material->diffuse_color = ufbxi_find_vec3(&material->props, ufbxi_DiffuseColor);
-		material->specular_color = ufbxi_find_vec3(&material->props, ufbxi_SpecularColor);
+		ufbxi_get_material_properties(material);
 	}
 }
 
@@ -5976,6 +6010,9 @@ typedef struct {
 } ufbxi_void_array;
 
 typedef struct {
+	ufbxi_connectable_type type;
+	uint32_t index;
+
 	ufbx_node *node;
 	ufbx_model *model;
 	ufbx_mesh *mesh;
@@ -6017,6 +6054,9 @@ ufbxi_nodiscard static int ufbxi_find_connectable_data(ufbxi_context *uc, ufbxi_
 		type = attr->parent_type;
 		index = attr->parent_index;
 	}
+
+	data->type = type;
+	data->index = index;
 
 	switch (type) {
 	case UFBXI_CONNECTABLE_UNKNOWN:
@@ -6066,6 +6106,7 @@ ufbxi_nodiscard static int ufbxi_collect_nodes(ufbxi_context *uc, size_t size, u
 		ufbx_node *node = (ufbx_node*)ptr;
 
 		// Allocate space for children and reset count
+		uc->scene.metadata.num_total_child_refs += node->children.size;
 		node->children.data = ufbxi_push(&uc->result, ufbx_node*, node->children.size);
 		node->children.size = 0;
 		ufbxi_check(node->children.data);
@@ -6127,6 +6168,18 @@ ufbxi_nodiscard static int ufbxi_check_node_depth(ufbxi_context *uc, ufbx_node *
 	}
 
 	return 1;
+}
+
+static ufbxi_forceinline int ufbxi_cmp_anim_prop(const void *va, const void *vb)
+{
+	const ufbx_anim_prop *a = (const ufbx_anim_prop*)va, *b = (const ufbx_anim_prop*)vb;
+	if (a->target < b->target) return -1;
+	if (a->target > b->target) return +1;
+	if (a->index < b->index) return -1;
+	if (a->index > b->index) return +1;
+	if (a->imp_key < b->imp_key) return -1;
+	if (a->imp_key > b->imp_key) return +1;
+	return strcmp(a->name.data, b->name.data);
 }
 
 ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
@@ -6208,17 +6261,23 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 			}
 		}
 
-		if (parent.node) {
-			if (child.anim_prop) {
-				if (prop) {
-					size_t len = strlen(prop);
-					child.anim_prop->node = parent.node;
-					child.anim_prop->name.data = prop;
-					child.anim_prop->name.length = strlen(prop);
-					child.anim_prop->imp_key = ufbxi_get_name_key(prop, len);
-				} else {
-					child.anim_prop->name = ufbx_empty_string;
-				}
+		if (child.anim_prop && prop) {
+			ufbx_anim_target target;
+			switch (parent.type) {
+			case UFBXI_CONNECTABLE_MODEL: target = UFBX_ANIM_MODEL; break;
+			case UFBXI_CONNECTABLE_MESH: target = UFBX_ANIM_MESH; break;
+			case UFBXI_CONNECTABLE_LIGHT: target = UFBX_ANIM_LIGHT; break;
+			case UFBXI_CONNECTABLE_MATERIAL: target = UFBX_ANIM_MATERIAL; break;
+			default: target = UFBX_ANIM_UNKNOWN;
+			}
+
+			if (target != UFBX_ANIM_UNKNOWN) {
+				size_t len = strlen(prop);
+				child.anim_prop->target = target;
+				child.anim_prop->index = parent.index;
+				child.anim_prop->name.data = prop;
+				child.anim_prop->name.length = strlen(prop);
+				child.anim_prop->imp_key = ufbxi_get_name_key(prop, len);
 			}
 		}
 
@@ -6278,6 +6337,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 			}
 		}
 
+		uc->scene.metadata.num_total_material_refs += mesh->materials.size;
 		mesh->materials.data = ufbxi_push(&uc->result, ufbx_material*, mesh->materials.size);
 		ufbxi_check(mesh->materials.data);
 		mesh->materials.size = 0;
@@ -6319,6 +6379,9 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		}
 	}
 
+	// Sort animated properties by target/index/name
+	qsort(uc->scene.anim_props.data, uc->scene.anim_props.size, sizeof(ufbx_anim_prop), &ufbxi_cmp_anim_prop);
+
 	uc->scene.root = &uc->scene.models.data[0];
 
 	// Check that the nodes are not too nested
@@ -6356,11 +6419,14 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	imp->result_buf.ator = &imp->ator;
 	imp->string_buf = uc->string_buf;
 	imp->string_buf.ator = &imp->ator;
+	imp->memory_block = NULL;
+	imp->memory_block_size = 0;
 
 	imp->scene.metadata.result_memory_used = imp->ator.current_size;
 	imp->scene.metadata.temp_memory_used = uc->ator_tmp.current_size;
 	imp->scene.metadata.result_allocs = uc->opts.max_result_allocs - imp->ator.allocs_left;
 	imp->scene.metadata.temp_allocs = uc->opts.max_temp_allocs - uc->ator_tmp.allocs_left;
+
 
 	uc->scene_imp = imp;
 
@@ -6427,6 +6493,13 @@ static void ufbxi_expand_defaults(ufbx_load_opts *opts)
 	ufbxi_default_opt(max_node_children, 0x10000000);
 	ufbxi_default_opt(max_array_size, 0x10000000);
 	ufbxi_default_opt(max_child_depth, 200);
+}
+
+static void ufbxi_expand_evaluate_defaults(ufbx_evaluate_opts *opts)
+{
+	ufbxi_default_opt(max_memory, 0xf0000000);
+	ufbxi_default_opt(max_allocs, 0x10000000);
+	ufbxi_default_opt(huge_size, 0x100000);
 }
 
 static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts, ufbx_error *p_error)
@@ -6505,6 +6578,286 @@ static size_t ufbxi_file_read(void *user, void *data, size_t max_size)
 	return fread(data, 1, max_size, file);
 }
 
+// -- Animation evaluation
+
+static ufbxi_forceinline void ufbxi_evaluate_reserve_size(uint32_t *p_offset, size_t size, size_t num)
+{
+	uint32_t align_mask = ufbxi_size_align_mask(size);
+	*p_offset = ufbxi_align_to_mask(*p_offset, align_mask) + (uint32_t)(size*num);
+}
+
+static ufbxi_forceinline void *ufbxi_evaluate_push_size(char *data, uint32_t *p_offset, size_t size, size_t num)
+{
+	uint32_t align_mask = ufbxi_size_align_mask(size);
+	uint32_t pos = ufbxi_align_to_mask(*p_offset, align_mask);
+	*p_offset = pos + (uint32_t)(size*num);
+	return data + pos;
+}
+
+#define ufbxi_evaluate_reserve(p_offset, type, num) ufbxi_evaluate_reserve_size((p_offset), sizeof(type), (num))
+#define ufbxi_evaluate_push(data, p_offset, type, num) (type*)ufbxi_evaluate_push_size((data), (p_offset), sizeof(type), (num))
+
+static void ufbxi_evaluate_prop(ufbx_prop *prop, ufbx_anim_prop *anim_prop, double time)
+{
+	prop->name = anim_prop->name;
+	prop->imp_key = anim_prop->imp_key;
+	prop->value_str = ufbx_empty_string;
+
+	prop->value_real_arr[0] = ufbx_evaluate_curve(&anim_prop->curves[0], time);
+	prop->value_real_arr[1] = ufbx_evaluate_curve(&anim_prop->curves[1], time);
+	prop->value_real_arr[2] = ufbx_evaluate_curve(&anim_prop->curves[2], time);
+
+	prop->value_int = (int64_t)prop->value_real_arr[0];
+}
+
+static ufbx_node *ufbxi_translate_node(const ufbx_scene *src, ufbx_scene *dst, ufbx_node *old)
+{
+	if (old == NULL) return NULL;
+
+	void *src_base, *dst_base;
+	switch (old->type) {
+	case UFBX_NODE_MODEL: src_base = src->models.data; dst_base = dst->models.data; break;
+	case UFBX_NODE_MESH: src_base = src->meshes.data; dst_base = dst->meshes.data; break;
+	case UFBX_NODE_LIGHT: src_base = src->lights.data; dst_base = dst->lights.data; break;
+	default: return old;
+	}
+
+	return (ufbx_node*)((char*)dst_base + ((char*)old - (char*)src_base));
+}
+
+static ufbx_material *ufbxi_translate_material(const ufbx_scene *src, ufbx_scene *dst, ufbx_material *old)
+{
+	if (old == NULL) return NULL;
+
+	void *src_base = src->materials.data, *dst_base = dst->materials.data;
+	return (ufbx_material*)((char*)dst_base + ((char*)old - (char*)src_base));
+}
+
+static void ufbxi_translate_node_refs(ufbx_node ***p_child_refs, const ufbx_scene *src, ufbx_scene *dst, ufbx_node *node)
+{
+	node->parent = ufbxi_translate_node(src, dst, node->parent);
+
+	size_t num_children = node->children.size;
+	if (num_children > 0) {
+		ufbx_node **src_node = node->children.data;
+		ufbx_node **dst_node = *p_child_refs;
+		*p_child_refs = dst_node + num_children;
+		node->children.data = dst_node;
+		for (size_t i = 0; i < num_children; i++) {
+			dst_node[i] = ufbxi_translate_node(src, dst, src_node[i]);
+		}
+	}
+}
+
+static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_evaluate_opts *user_opts, double time)
+{
+	ufbx_evaluate_opts opts;
+	if (user_opts) {
+		opts = *user_opts;
+	} else {
+		memset(&opts, 0, sizeof(opts));
+	}
+	ufbxi_expand_evaluate_defaults(&opts);
+	if (opts.layer == NULL) {
+		if (scene->anim_layers.size == 0) return 0;
+		opts.layer = &scene->anim_layers.data[0];
+	}
+
+	ufbx_anim_layer layer = *opts.layer;
+
+	uint32_t alloc_size = 0;
+
+	ufbxi_evaluate_reserve(&alloc_size, ufbxi_scene_imp, 1);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_node*, scene->nodes.size);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_model, scene->models.size);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_mesh, scene->meshes.size);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_light, scene->lights.size);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_material, scene->materials.size);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_prop, layer.props.size);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_node*, scene->metadata.num_total_child_refs);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_material*, scene->metadata.num_total_material_refs);
+
+	ufbx_error err;
+	ufbxi_allocator ator;
+	ator.ator = opts.allocator;
+	ator.error = &err;
+	ator.current_size = 0;
+	ator.max_size = 0xf0000000;
+	ator.allocs_left = 3;
+	ator.huge_size = 0xf0000000;
+
+	ufbxi_scene_imp *old_imp = (ufbxi_scene_imp*)opts.reuse_scene;
+
+	char *data = NULL;
+	if (old_imp) {
+		ufbx_assert(old_imp->magic == UFBXI_SCENE_IMP_MAGIC);
+		if (old_imp->memory_block_size >= alloc_size) {
+			data = old_imp->memory_block;
+			alloc_size = (uint32_t)old_imp->memory_block_size;
+			ator = old_imp->ator;
+		} else {
+			ufbxi_allocator ator = old_imp->ator;
+			ufbxi_free(&ator, char, old_imp->memory_block, old_imp->memory_block_size);
+		}
+	}
+
+	if (!data) {
+		data = ufbxi_alloc(&ator, char, alloc_size);
+		if (!data) return NULL;
+	}
+	uint32_t offset = 0;
+
+	ufbxi_scene_imp *imp = ufbxi_evaluate_push(data, &offset, ufbxi_scene_imp, 1);
+	ufbx_node **nodes = ufbxi_evaluate_push(data, &offset, ufbx_node*, scene->nodes.size);
+	ufbx_model *models = ufbxi_evaluate_push(data, &offset, ufbx_model, scene->models.size);
+	ufbx_mesh *meshes = ufbxi_evaluate_push(data, &offset, ufbx_mesh, scene->meshes.size);
+	ufbx_light *lights = ufbxi_evaluate_push(data, &offset, ufbx_light, scene->lights.size);
+	ufbx_material *materials = ufbxi_evaluate_push(data, &offset, ufbx_material, scene->materials.size);
+	ufbx_prop *props = ufbxi_evaluate_push(data, &offset, ufbx_prop, layer.props.size);
+	ufbx_node **child_refs = ufbxi_evaluate_push(data, &offset, ufbx_node*, scene->metadata.num_total_child_refs);
+	ufbx_material **material_refs = ufbxi_evaluate_push(data, &offset, ufbx_material*, scene->metadata.num_total_material_refs);
+
+	ufbx_assert(offset == alloc_size);
+
+	memset((char*)imp + sizeof(ufbx_scene), 0, sizeof(ufbxi_scene_imp) - sizeof(ufbx_scene));
+	imp->scene = *scene;
+	imp->scene.nodes.data = nodes;
+	imp->scene.models.data = models;
+	imp->scene.meshes.data = meshes;
+	imp->scene.lights.data = lights;
+	imp->scene.materials.data = materials;
+
+	imp->magic = UFBXI_SCENE_IMP_MAGIC;
+	imp->ator = ator;
+	imp->memory_block = data;
+	imp->memory_block_size = alloc_size;
+
+	ufbx_anim_prop *ap = scene->anim_props.data;
+	ufbx_anim_prop *ap_end = ap + scene->anim_props.size;
+
+	ufbx_prop *prop = props;
+	ufbx_node **node = nodes;
+
+	// Skip unknown animation properties
+	while (ap != ap_end && ap->target == UFBX_ANIM_UNKNOWN) {
+		continue;
+	}
+
+	size_t num_models = scene->models.size;
+	for (size_t i = 0; i < num_models; i++) {
+		ufbx_model *model = &imp->scene.models.data[i];
+		ufbx_model *src = &scene->models.data[i];
+		*model = *src;
+
+		ufbxi_translate_node_refs(&child_refs, scene, &imp->scene, &model->node);
+		*node++ = &model->node;
+
+		ufbx_prop *props_begin = prop;
+		while (ap != ap_end && ap->target == UFBX_ANIM_MODEL && ap->index == i) {
+			ufbxi_evaluate_prop(prop, ap, time);
+			prop++;
+			ap++;
+		}
+
+		if (prop - props_begin > 0) {
+			model->node.props.defaults = &src->node.props;
+			model->node.props.props = props_begin;
+			model->node.props.num_props = prop - props_begin;
+
+			model->node.transform = ufbxi_get_transform(&model->node.props);
+		}
+	}
+
+	size_t num_meshes = scene->meshes.size;
+	for (size_t i = 0; i < num_meshes; i++) {
+		ufbx_mesh *mesh = &imp->scene.meshes.data[i];
+		ufbx_mesh *src = &scene->meshes.data[i];
+		*mesh = *src;
+
+		ufbxi_translate_node_refs(&child_refs, scene, &imp->scene, &mesh->node);
+		*node++ = &mesh->node;
+
+		{
+			size_t num_materials = src->materials.size;
+			ufbx_material **src_mat = src->materials.data;
+			ufbx_material **dst_mat = material_refs;
+			material_refs += num_materials;
+			mesh->materials.data = dst_mat;
+			for (size_t i = 0; i < num_materials; i++) {
+				dst_mat[i] = ufbxi_translate_material(scene, &imp->scene, src_mat[i]);
+			}
+		}
+
+		ufbx_prop *props_begin = prop;
+		while (ap != ap_end && ap->target == UFBX_ANIM_MESH && ap->index == i) {
+			ufbxi_evaluate_prop(prop, ap, time);
+			prop++;
+			ap++;
+		}
+
+		if (prop - props_begin > 0) {
+			mesh->node.props.defaults = &src->node.props;
+			mesh->node.props.props = props_begin;
+			mesh->node.props.num_props = prop - props_begin;
+
+			mesh->node.transform = ufbxi_get_transform(&mesh->node.props);
+		}
+	}
+
+	size_t num_lights = scene->lights.size;
+	for (size_t i = 0; i < num_lights; i++) {
+		ufbx_light *light = &imp->scene.lights.data[i];
+		ufbx_light *src = &scene->lights.data[i];
+		*light = *src;
+
+		ufbxi_translate_node_refs(&child_refs, scene, &imp->scene, &light->node);
+		*node++ = &light->node;
+
+		ufbx_prop *props_begin = prop;
+		while (ap != ap_end && ap->target == UFBX_ANIM_LIGHT && ap->index == i) {
+			ufbxi_evaluate_prop(prop, ap, time);
+			prop++;
+			ap++;
+		}
+
+		if (prop - props_begin > 0) {
+			light->node.props.defaults = &src->node.props;
+			light->node.props.props = props_begin;
+			light->node.props.num_props = prop - props_begin;
+
+			light->node.transform = ufbxi_get_transform(&light->node.props);
+			ufbxi_get_light_properties(light);
+		}
+	}
+
+	size_t num_materials = scene->materials.size;
+	for (size_t i = 0; i < num_materials; i++) {
+		ufbx_material *material = &imp->scene.materials.data[i];
+		ufbx_material *src = &scene->materials.data[i];
+		*material = *src;
+
+		ufbx_prop *props_begin = prop;
+		while (ap != ap_end && ap->target == UFBX_ANIM_MATERIAL && ap->index == i) {
+			ufbxi_evaluate_prop(prop, ap, time);
+			prop++;
+			ap++;
+		}
+
+		if (prop - props_begin > 0) {
+			material->props.defaults = &src->props;
+			material->props.props = props_begin;
+			material->props.num_props = prop - props_begin;
+
+			ufbxi_get_material_properties(material);
+		}
+	}
+
+	ufbx_assert(ap == ap_end);
+	ufbx_assert(node == imp->scene.nodes.data + imp->scene.nodes.size);
+
+	return &imp->scene;
+}
+
 // -- API
 
 #ifdef __cplusplus
@@ -6560,6 +6913,9 @@ void ufbx_free_scene(ufbx_scene *scene)
 
 	ufbxi_buf_free(&imp->string_buf);
 
+	char *memory_block = imp->memory_block;
+	size_t memory_block_size = imp->memory_block_size;
+
 	// We need to free `result_buf` last and be careful to copy it to
 	// the stack since the `ufbxi_scene_imp` that contains it is allocated
 	// from the same result buffer!
@@ -6567,6 +6923,7 @@ void ufbx_free_scene(ufbx_scene *scene)
 	ufbxi_buf result = imp->result_buf;
 	result.ator = &ator;
 	ufbxi_buf_free(&result);
+	ufbxi_free(&ator, char, memory_block, memory_block_size);
 
 	ufbx_assert(ator.current_size == 0);
 }
@@ -6801,6 +7158,11 @@ ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time)
 
 	// Last keyframe
 	return curve->keyframes.data[curve->keyframes.size - 1].value;
+}
+
+ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_evaluate_opts *user_opts, double time)
+{
+	return ufbxi_evaluate_scene(scene, user_opts, time);
 }
 
 ufbx_vec3 ufbx_rotate_vector(ufbx_vec4 q, ufbx_vec3 v)
