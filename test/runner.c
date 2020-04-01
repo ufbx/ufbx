@@ -836,6 +836,19 @@ void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_assert(face);
 		ufbxt_assert(face == ufbx_find_face(mesh, edge.indices[1]));
 	}
+
+	if (mesh->face_material) {
+		for (size_t i = 0; i < mesh->num_faces; i++) {
+			int32_t material = mesh->face_material[i];
+			ufbxt_assert(material >= 0 && material < mesh->materials.size);
+		}
+	}
+}
+
+void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
+{
+	ufbxt_check_string(material->name);
+	ufbxt_check_props(scene, &material->props, true);
 }
 
 void ufbxt_check_scene(ufbx_scene *scene)
@@ -848,6 +861,10 @@ void ufbxt_check_scene(ufbx_scene *scene)
 
 	for (size_t i = 0; i < scene->meshes.size; i++) {
 		ufbxt_check_mesh(scene, &scene->meshes.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->materials.size; i++) {
+		ufbxt_check_material(scene, &scene->materials.data[i]);
 	}
 }
 
@@ -1657,6 +1674,24 @@ static ufbx_real ufbxt_dot3(ufbx_vec3 a, ufbx_vec3 b)
 {
 	return a.x*b.x + a.y*b.y + a.z*b.z;
 }
+
+static ufbx_vec2 ufbxt_add2(ufbx_vec2 a, ufbx_vec2 b)
+{
+	ufbx_vec2 v;
+	v.x = a.x + b.x;
+	v.y = a.y + b.y;
+	return v;
+}
+
+static ufbx_vec3 ufbxt_add3(ufbx_vec3 a, ufbx_vec3 b)
+{
+	ufbx_vec3 v;
+	v.x = a.x + b.x;
+	v.y = a.y + b.y;
+	v.z = a.z + b.z;
+	return v;
+}
+
 
 static ufbx_vec2 ufbxt_sub2(ufbx_vec2 a, ufbx_vec2 b)
 {

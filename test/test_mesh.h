@@ -359,3 +359,53 @@ UFBXT_FILE_TEST(synthetic_tangents_reorder)
 	ufbxt_check_tangent_space(err, mesh);
 }
 #endif
+
+UFBXT_FILE_TEST(blender_279_ball)
+#if UFBXT_IMPL
+{
+	ufbx_material *red = ufbx_find_material(scene, "Red");
+	ufbx_material *white = ufbx_find_material(scene, "White");
+	ufbxt_assert(!strcmp(red->name.data, "Red"));
+	ufbxt_assert(!strcmp(white->name.data, "White"));
+
+	ufbx_vec3 red_ref = { 0.8, 0.0, 0.0 };
+	ufbx_vec3 white_ref = { 0.8, 0.8, 0.8 };
+	ufbxt_assert_close_vec3(err, red->diffuse_color, red_ref);
+	ufbxt_assert_close_vec3(err, white->diffuse_color, white_ref);
+
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "Icosphere");
+	ufbxt_assert(mesh);
+	ufbxt_assert(mesh->face_material);
+	ufbxt_assert(mesh->face_smoothing);
+
+	ufbxt_assert(mesh->materials.size == 2);
+	ufbxt_assert(mesh->materials.data[0] == red);
+	ufbxt_assert(mesh->materials.data[1] == white);
+
+	for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
+		ufbx_face face = mesh->faces[face_i];
+		ufbx_vec3 mid = { 0 };
+		for (size_t i = 0; i < face.num_indices; i++) {
+			mid = ufbxt_add3(mid, ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + i));
+		}
+		mid.x /= (ufbx_real)face.num_indices;
+		mid.y /= (ufbx_real)face.num_indices;
+		mid.z /= (ufbx_real)face.num_indices;
+
+		bool smoothing = mesh->face_smoothing[face_i];
+		int32_t material = mesh->face_material[face_i];
+		ufbxt_assert(smoothing == (mid.x > 0.0));
+		ufbxt_assert(material == (mid.z < 0.0 ? 1 : 0));
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_broken_material)
+#if UFBXT_IMPL
+{
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
+	ufbxt_assert(mesh);
+	ufbxt_assert(mesh->materials.size == 0);
+	ufbxt_assert(mesh->face_material == NULL);
+}
+#endif

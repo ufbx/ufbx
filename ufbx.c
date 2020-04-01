@@ -1863,6 +1863,7 @@ static const char ufbxi_VertexCrease[] = "VertexCrease";
 static const char ufbxi_VertexCreaseIndex[] = "VertexCreaseIndex";
 static const char ufbxi_EdgeCrease[] = "EdgeCrease";
 static const char ufbxi_Smoothing[] = "Smoothing";
+static const char ufbxi_Materials[] = "Materials";
 static const char ufbxi_MappingInformationType[] = "MappingInformationType";
 static const char ufbxi_Name[] = "Name";
 static const char ufbxi_ByVertex[] = "ByVertex";
@@ -1901,6 +1902,8 @@ static const char ufbxi_RotationPivot[] = "RotationPivot";
 static const char ufbxi_ScalingOffset[] = "ScalingOffset";
 static const char ufbxi_RotationOffset[] = "RotationOffset";
 static const char ufbxi_RotationOrder[] = "RotationOrder";
+static const char ufbxi_DiffuseColor[] = "DiffuseColor";
+static const char ufbxi_SpecularColor[] = "SpecularColor";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FBXHeaderExtension, sizeof(ufbxi_FBXHeaderExtension) - 1 },
@@ -1956,6 +1959,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_VertexCreaseIndex, sizeof(ufbxi_VertexCreaseIndex) - 1 },
 	{ ufbxi_EdgeCrease, sizeof(ufbxi_EdgeCrease) - 1 },
 	{ ufbxi_Smoothing, sizeof(ufbxi_Smoothing) - 1 },
+	{ ufbxi_Materials, sizeof(ufbxi_Materials) - 1 },
 	{ ufbxi_MappingInformationType, sizeof(ufbxi_MappingInformationType) - 1 },
 	{ ufbxi_Name, sizeof(ufbxi_Name) - 1 },
 	{ ufbxi_ByVertex, sizeof(ufbxi_ByVertex) - 1 },
@@ -1994,6 +1998,8 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_ScalingOffset, sizeof(ufbxi_ScalingOffset) - 1 },
 	{ ufbxi_RotationOffset, sizeof(ufbxi_RotationOffset) - 1 },
 	{ ufbxi_RotationOrder, sizeof(ufbxi_RotationOrder) - 1 },
+	{ ufbxi_DiffuseColor, sizeof(ufbxi_DiffuseColor) - 1 },
+	{ ufbxi_SpecularColor, sizeof(ufbxi_SpecularColor) - 1 },
 };
 
 // -- Type definitions
@@ -2053,6 +2059,7 @@ typedef enum {
 	UFBXI_CONNECTABLE_MESH,
 	UFBXI_CONNECTABLE_LIGHT,
 	UFBXI_CONNECTABLE_GEOMETRY,
+	UFBXI_CONNECTABLE_MATERIAL,
 	UFBXI_CONNECTABLE_ANIM_LAYER,
 	UFBXI_CONNECTABLE_ANIM_PROP,
 	UFBXI_CONNECTABLE_ANIM_CURVE,
@@ -2171,6 +2178,7 @@ typedef struct {
 	ufbxi_buf tmp_arr_models;
 	ufbxi_buf tmp_arr_meshes;
 	ufbxi_buf tmp_arr_geometry;
+	ufbxi_buf tmp_arr_materials;
 	ufbxi_buf tmp_arr_lights;
 	ufbxi_buf tmp_arr_anim_layers;
 	ufbxi_buf tmp_arr_anim_props;
@@ -2750,6 +2758,14 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING:
 		if (name == ufbxi_Smoothing) {
 			info->type = 'b';
+			info->result = true;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_LAYER_ELEMENT_MATERIAL:
+		if (name == ufbxi_Materials) {
+			info->type = 'i';
 			info->result = true;
 			return true;
 		}
@@ -4827,6 +4843,27 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 				if (mesh->face_smoothing) continue;
 				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->face_smoothing, n, ufbxi_Smoothing, 'b', mesh->num_faces));
 			}
+		} else if (n->name == ufbxi_LayerElementMaterial) {
+			if (mesh->face_material) continue;
+			const char *mapping;
+			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "C", (char**)&mapping));
+			if (mapping == ufbxi_ByPolygon) {
+				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->face_material, n, ufbxi_Materials, 'i', mesh->num_faces));
+			} else if (mapping == ufbxi_AllSame) {
+				ufbxi_value_array *arr = ufbxi_find_array(n, ufbxi_Materials, 'i');
+				ufbxi_check(arr->size >= 1);
+				int32_t material = *(int32_t*)arr->data;
+				if (material == 0) {
+					uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, mesh->num_faces);
+					mesh->face_material = (int32_t*)ufbxi_sentinel_index_zero;
+				} else {
+					mesh->face_material = ufbxi_push(&uc->result, int32_t, mesh->num_faces);
+					ufbxi_check(mesh->face_material);
+					ufbxi_for(int32_t, p_mat, mesh->face_material, mesh->num_faces) {
+						*p_mat = material;
+					}
+				}
+			}
 		}
 	}
 
@@ -4889,6 +4926,22 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 	qsort(mesh->color_sets.data, mesh->color_sets.size, sizeof(ufbx_color_set), &ufbxi_cmp_color_set);
 
 	ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_material(ufbxi_context *uc, ufbxi_node *node, ufbxi_object *object)
+{
+	ufbx_material *material = ufbxi_push_zero(&uc->tmp_arr_materials, ufbx_material, 1);
+	ufbxi_check(material);
+	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_MATERIAL, object->id, uc->tmp_arr_materials.num_items - 1));
+
+	material->name = object->name;
+	material->props = object->props;
+
+	// Merge defaults immediately
+	ufbxi_check(ufbxi_merge_properties(uc, &material->props, material->props.defaults, &material->props, &uc->result));
+	ufbxi_remove_default_properties(&material->props, uc->default_props, &uc->result);
 
 	return 1;
 }
@@ -5256,6 +5309,8 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			ufbxi_check(ufbxi_read_model(uc, node, &object));
 		} else if (name == ufbxi_Geometry) {
 			ufbxi_check(ufbxi_read_geometry(uc, node, &object));
+		} else if (name == ufbxi_Material) {
+			ufbxi_check(ufbxi_read_material(uc, node, &object));
 		} else if (name == ufbxi_NodeAttribute) {
 			ufbxi_check(ufbxi_read_node_attribute(uc, node, &object));
 		} else if (name == ufbxi_AnimationLayer) {
@@ -5896,6 +5951,11 @@ static void ufbxi_get_properties(ufbx_scene *scene)
 		ufbx_node *node = *p_node;
 		node->transform = ufbxi_get_transform(&node->props);
 	}
+
+	ufbxi_for(ufbx_material, material, scene->materials.data, scene->materials.size) {
+		material->diffuse_color = ufbxi_find_vec3(&material->props, ufbxi_DiffuseColor);
+		material->specular_color = ufbxi_find_vec3(&material->props, ufbxi_SpecularColor);
+	}
 }
 
 static void ufbxi_update_transform_matrix(ufbx_node *node, const ufbx_matrix *parent_to_root)
@@ -5920,6 +5980,7 @@ typedef struct {
 	ufbx_mesh *mesh;
 	ufbx_light *light;
 	ufbx_mesh *geometry;
+	ufbx_material *material;
 	ufbx_anim_layer *anim_layer;
 	ufbx_anim_prop *anim_prop;
 	ufbx_anim_curve *anim_curve;
@@ -5974,6 +6035,9 @@ ufbxi_nodiscard static int ufbxi_find_connectable_data(ufbxi_context *uc, ufbxi_
 		break;
 	case UFBXI_CONNECTABLE_GEOMETRY:
 		data->geometry = &uc->geometries[index];
+		break;
+	case UFBXI_CONNECTABLE_MATERIAL:
+		data->material = &uc->scene.materials.data[index];
 		break;
 	case UFBXI_CONNECTABLE_ANIM_LAYER:
 		data->anim_layer = &uc->scene.anim_layers.data[index];
@@ -6069,6 +6133,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	// Retrieve all temporary arrays
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_model), &uc->scene.models, &uc->tmp_arr_models));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_mesh), &uc->scene.meshes, &uc->tmp_arr_meshes));
+	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_material), &uc->scene.materials, &uc->tmp_arr_materials));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_light), &uc->scene.lights, &uc->tmp_arr_lights));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_anim_layer), &uc->scene.anim_layers, &uc->tmp_arr_anim_layers));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_anim_prop), &uc->scene.anim_props, &uc->tmp_arr_anim_props));
@@ -6086,9 +6151,9 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	ufbxi_check(uc->geometries);
 
 	// Generate and patch procedural index buffers
+	int32_t *zero_indices = ufbxi_push(&uc->result, int32_t, uc->max_zero_indices);
+	int32_t *consecutive_indices = ufbxi_push(&uc->result, int32_t, uc->max_consecutive_indices);
 	{
-		int32_t *zero_indices = ufbxi_push(&uc->result, int32_t, uc->max_zero_indices);
-		int32_t *consecutive_indices = ufbxi_push(&uc->result, int32_t, uc->max_consecutive_indices);
 		ufbxi_check(zero_indices && consecutive_indices);
 		memset(zero_indices, 0, sizeof(int32_t) * uc->max_zero_indices);
 		for (size_t i = 0; i < uc->max_consecutive_indices; i++) {
@@ -6099,6 +6164,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 			ufbxi_patch_index(&geom->vertex_normal.indices, zero_indices, consecutive_indices);
 			ufbxi_patch_index(&geom->vertex_binormal.indices, zero_indices, consecutive_indices);
 			ufbxi_patch_index(&geom->vertex_tangent.indices, zero_indices, consecutive_indices);
+			ufbxi_patch_index(&geom->face_material, zero_indices, consecutive_indices);
 
 			ufbxi_for(ufbx_uv_set, set, geom->uv_sets.data, geom->uv_sets.size) {
 				ufbxi_patch_index(&set->vertex_uv.indices, zero_indices, consecutive_indices);
@@ -6161,6 +6227,10 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 				ufbxi_check(ufbxi_merge_attribute_properties(uc, &parent.node->props, &child.geometry->node.props));
 				memcpy((char*)parent.mesh + sizeof(ufbx_node), (char*)child.geometry + sizeof(ufbx_node), sizeof(ufbx_mesh) - sizeof(ufbx_node));
 			}
+
+			if (child.material) {
+				parent.mesh->materials.size++;
+			}
 		}
 
 		if (parent.anim_layer) {
@@ -6192,6 +6262,25 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		ufbxi_check(layer->props.data);
 		layer->props.size = 0;
 	}
+	ufbxi_for(ufbx_mesh, mesh, uc->scene.meshes.data, uc->scene.meshes.size) {
+
+		// Clamp `face_material` array / remove it if there's no materials
+		size_t num_materials = mesh->materials.size;
+		if (num_materials == 0) {
+			mesh->face_material = NULL;
+		} else if (mesh->face_material != zero_indices) {
+			ufbxi_for(int32_t, p_mat, mesh->face_material, mesh->num_faces) {
+				int32_t mat = *p_mat;
+				if (mat < 0 || (size_t)mat >= num_materials) {
+					*p_mat = 0;
+				}
+			}
+		}
+
+		mesh->materials.data = ufbxi_push(&uc->result, ufbx_material*, mesh->materials.size);
+		ufbxi_check(mesh->materials.data);
+		mesh->materials.size = 0;
+	}
 
 	// Add all nodes to the scenes node list
 	size_t num_nodes = uc->scene.models.size + uc->scene.meshes.size + uc->scene.lights.size;
@@ -6213,6 +6302,20 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		ufbx_anim_layer *layer = prop->layer;
 		if (!layer) continue;
 		layer->props.data[layer->props.size++] = *prop;
+	}
+
+	// Second pass of connections
+	ufbxi_for(ufbxi_connection, conn, conns, num_conns) {
+		ufbxi_connectable_data parent, child;
+		if (!ufbxi_find_connectable_data(uc, &parent, conn->parent_id)) continue;
+		if (!ufbxi_find_connectable_data(uc, &child, conn->child_id)) continue;
+		const char *prop = conn->prop_name;
+
+		if (parent.mesh) {
+			if (child.material) {
+				parent.mesh->materials.data[parent.mesh->materials.size++] = child.material;
+			}
+		}
 	}
 
 	uc->scene.root = &uc->scene.models.data[0];
@@ -6277,6 +6380,7 @@ static void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->tmp_arr_models);
 	ufbxi_buf_free(&uc->tmp_arr_meshes);
 	ufbxi_buf_free(&uc->tmp_arr_geometry);
+	ufbxi_buf_free(&uc->tmp_arr_materials);
 	ufbxi_buf_free(&uc->tmp_arr_lights);
 	ufbxi_buf_free(&uc->tmp_arr_anim_layers);
 	ufbxi_buf_free(&uc->tmp_arr_anim_props);
@@ -6369,6 +6473,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->tmp_arr_meshes.ator = &uc->ator_tmp;
 	uc->tmp_arr_lights.ator = &uc->ator_tmp;
 	uc->tmp_arr_geometry.ator = &uc->ator_tmp;
+	uc->tmp_arr_materials.ator = &uc->ator_tmp;
 	uc->tmp_arr_anim_layers.ator = &uc->ator_tmp;
 	uc->tmp_arr_anim_props.ator = &uc->ator_tmp;
 	uc->tmp_arr_anim_curves.ator = &uc->ator_tmp;
@@ -6481,6 +6586,16 @@ ufbx_mesh *ufbx_find_mesh_len(const ufbx_scene *scene, const char *name, size_t 
 	ufbxi_for(ufbx_mesh, mesh, scene->meshes.data, scene->meshes.size) {
 		if (mesh->node.name.length == name_len && !memcmp(mesh->node.name.data, name, name_len)) {
 			return mesh;
+		}
+	}
+	return NULL;
+}
+
+ufbx_material *ufbx_find_material_len(const ufbx_scene *scene, const char *name, size_t name_len)
+{
+	ufbxi_for(ufbx_material, material, scene->materials.data, scene->materials.size) {
+		if (material->name.length == name_len && !memcmp(material->name.data, name, name_len)) {
+			return material;
 		}
 	}
 	return NULL;

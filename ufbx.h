@@ -140,7 +140,8 @@ typedef struct ufbx_color_set ufbx_color_set;
 typedef struct ufbx_edge ufbx_edge;
 typedef struct ufbx_face ufbx_face;
 
-typedef struct ufbx_material_list { ufbx_material **data; size_t size; } ufbx_material_list;
+typedef struct ufbx_material_list { ufbx_material *data; size_t size; } ufbx_material_list;
+typedef struct ufbx_material_ptr_list { ufbx_material **data; size_t size; } ufbx_material_ptr_list;
 typedef struct ufbx_uv_set_list { ufbx_uv_set *data; size_t size; } ufbx_uv_set_list;
 typedef struct ufbx_color_set_list { ufbx_color_set *data; size_t size; } ufbx_color_set_list;
 
@@ -198,9 +199,12 @@ struct ufbx_face {
 };
 
 struct ufbx_material {
+	ufbx_string name;
+
 	ufbx_props props;
 
-	ufbx_vec3 color;
+	ufbx_vec3 diffuse_color;
+	ufbx_vec3 specular_color;
 };
 
 // -- Scene graph
@@ -210,7 +214,7 @@ typedef struct ufbx_model ufbx_model;
 typedef struct ufbx_mesh ufbx_mesh;
 typedef struct ufbx_light ufbx_light;
 
-typedef struct ufbx_node_list { ufbx_node **data; size_t size; } ufbx_node_list;
+typedef struct ufbx_node_ptr_list { ufbx_node **data; size_t size; } ufbx_node_ptr_list;
 typedef struct ufbx_model_list { ufbx_model *data; size_t size; } ufbx_model_list;
 typedef struct ufbx_mesh_list { ufbx_mesh *data; size_t size; } ufbx_mesh_list;
 typedef struct ufbx_light_list { ufbx_light *data; size_t size; } ufbx_light_list;
@@ -230,7 +234,7 @@ struct ufbx_node {
 	ufbx_transform transform;
 	ufbx_matrix to_parent;
 	ufbx_matrix to_root;
-	ufbx_node_list children;
+	ufbx_node_ptr_list children;
 };
 
 struct ufbx_model {
@@ -265,7 +269,7 @@ struct ufbx_mesh {
 
 	ufbx_uv_set_list uv_sets;
 	ufbx_color_set_list color_sets;
-	ufbx_material_list materials;
+	ufbx_material_ptr_list materials;
 };
 
 struct ufbx_light {
@@ -355,13 +359,14 @@ struct ufbx_scene {
 
 	ufbx_model *root;
 
-	ufbx_node_list nodes;
+	ufbx_node_ptr_list nodes;
 	ufbx_model_list models;
 	ufbx_mesh_list meshes;
 	ufbx_light_list lights;
 	ufbx_anim_layer_list anim_layers;
 	ufbx_anim_prop_list anim_props;
 	ufbx_anim_curve_list anim_curves;
+	ufbx_material_list materials;
 };
 
 // -- Loading
@@ -459,6 +464,7 @@ void ufbx_free_scene(ufbx_scene *scene);
 
 ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_mesh *ufbx_find_mesh_len(const ufbx_scene *scene, const char *name, size_t name_len);
+ufbx_material *ufbx_find_material_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_t name_len);
 
 ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len);
@@ -496,6 +502,10 @@ ufbx_inline ufbx_node *ufbx_find_node(const ufbx_scene *scene, const char *name)
 
 ufbx_inline ufbx_mesh *ufbx_find_mesh(const ufbx_scene *scene, const char *name) {
 	return ufbx_find_mesh_len(scene, name, strlen(name));
+}
+
+ufbx_inline ufbx_material *ufbx_find_material(const ufbx_scene *scene, const char *name) {
+	return ufbx_find_material_len(scene, name, strlen(name));
 }
 
 ufbx_inline ufbx_light *ufbx_find_light(const ufbx_scene *scene, const char *name) {
