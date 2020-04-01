@@ -5761,6 +5761,7 @@ ufbx_prop *ufbxi_find_prop_imp(const ufbx_props *props, const char *name, uint32
 			}
 		}
 
+		end = props->num_props;
 		for (; begin < end; begin++) {
 			const ufbx_prop *p = &prop_data[begin];
 			if (p->imp_key > key) break;
