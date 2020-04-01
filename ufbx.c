@@ -4858,7 +4858,7 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->face_material, n, ufbxi_Materials, 'i', mesh->num_faces));
 			} else if (mapping == ufbxi_AllSame) {
 				ufbxi_value_array *arr = ufbxi_find_array(n, ufbxi_Materials, 'i');
-				ufbxi_check(arr->size >= 1);
+				ufbxi_check(arr && arr->size >= 1);
 				int32_t material = *(int32_t*)arr->data;
 				if (material == 0) {
 					uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, mesh->num_faces);
@@ -6328,7 +6328,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		size_t num_materials = mesh->materials.size;
 		if (num_materials == 0) {
 			mesh->face_material = NULL;
-		} else if (mesh->face_material != zero_indices) {
+		} else if (mesh->face_material && mesh->face_material != zero_indices) {
 			ufbxi_for(int32_t, p_mat, mesh->face_material, mesh->num_faces) {
 				int32_t mat = *p_mat;
 				if (mat < 0 || (size_t)mat >= num_materials) {
