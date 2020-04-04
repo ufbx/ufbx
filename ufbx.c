@@ -6922,6 +6922,9 @@ static void ufbxi_evaluate_prop(ufbx_prop *prop, ufbx_anim_prop *anim_prop, doub
 	prop->imp_key = anim_prop->imp_key;
 	prop->value_str = ufbx_empty_string;
 
+	// TODO: Set this based on something
+	prop->type = UFBX_PROP_UNKNOWN;
+
 	prop->value_real_arr[0] = ufbx_evaluate_curve(&anim_prop->curves[0], time);
 	prop->value_real_arr[1] = ufbx_evaluate_curve(&anim_prop->curves[1], time);
 	prop->value_real_arr[2] = ufbx_evaluate_curve(&anim_prop->curves[2], time);
