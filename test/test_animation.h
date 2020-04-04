@@ -203,6 +203,8 @@ UFBXT_FILE_TEST(maya_anim_light)
 		state = ufbx_evaluate_scene(scene, &opts, time);
 		ufbxt_assert(state);
 
+		ufbxt_check_scene(state);
+
 		ufbx_light *light = ufbx_find_light(state, "pointLight1");
 		ufbxt_assert(light);
 

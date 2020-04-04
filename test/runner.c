@@ -254,6 +254,53 @@ double cputime_os_tick_to_sec(const cputime_sync_span *span, uint64_t os_tick)
 	return (double)(os_tick - span->begin.os_tick) * span->rcp_os_freq;
 }
 
+// -- Vector helpers
+
+static ufbx_real ufbxt_dot2(ufbx_vec2 a, ufbx_vec2 b)
+{
+	return a.x*b.x + a.y*b.y;
+}
+
+static ufbx_real ufbxt_dot3(ufbx_vec3 a, ufbx_vec3 b)
+{
+	return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+static ufbx_vec2 ufbxt_add2(ufbx_vec2 a, ufbx_vec2 b)
+{
+	ufbx_vec2 v;
+	v.x = a.x + b.x;
+	v.y = a.y + b.y;
+	return v;
+}
+
+static ufbx_vec3 ufbxt_add3(ufbx_vec3 a, ufbx_vec3 b)
+{
+	ufbx_vec3 v;
+	v.x = a.x + b.x;
+	v.y = a.y + b.y;
+	v.z = a.z + b.z;
+	return v;
+}
+
+
+static ufbx_vec2 ufbxt_sub2(ufbx_vec2 a, ufbx_vec2 b)
+{
+	ufbx_vec2 v;
+	v.x = a.x - b.x;
+	v.y = a.y - b.y;
+	return v;
+}
+
+static ufbx_vec3 ufbxt_sub3(ufbx_vec3 a, ufbx_vec3 b)
+{
+	ufbx_vec3 v;
+	v.x = a.x - b.x;
+	v.y = a.y - b.y;
+	v.z = a.z - b.z;
+	return v;
+}
+
 // -- Test framework
 
 #define ufbxt_memory_context(data) \
@@ -643,10 +690,12 @@ static void ufbxt_assert_close_vec4(ufbxt_diff_error *p_err, ufbx_vec4 a, ufbx_v
 	ufbxt_assert_close_real(p_err, a.w, b.w);
 }
 
-static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err)
+static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, bool approx_normals)
 {
 	for (size_t mesh_i = 0; mesh_i < obj->num_meshes; mesh_i++) {
 		ufbxt_obj_mesh *obj_mesh = &obj->meshes[mesh_i];
+		if (obj_mesh->num_indices == 0) continue;
+
 		ufbx_mesh *mesh = ufbx_find_mesh(scene, obj_mesh->name);
 		ufbxt_assert(mesh);
 
@@ -654,6 +703,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		ufbxt_assert(obj_mesh->num_indices == mesh->num_indices);
 
 		ufbx_matrix *mat = &mesh->node.to_root;
+		ufbx_matrix norm_mat = ufbx_get_normal_matrix(mat);
 
 		// Assume that the indices are in the same order!
 		for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
@@ -669,7 +719,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 				ufbx_vec3 fn = ufbx_get_vertex_vec3(&mesh->vertex_normal, ix);
 
 				fp = ufbx_transform_position(mat, fp);
-				fn = ufbx_transform_normal(mat, fn);
+				fn = ufbx_transform_direction(&norm_mat, fn);
 
 				ufbx_real fn_len = sqrt(fn.x*fn.x + fn.y*fn.y + fn.z*fn.z);
 				fn.x /= fn_len;
@@ -677,7 +727,13 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 				fn.z /= fn_len;
 
 				ufbxt_assert_close_vec3(p_err, op, fp);
-				ufbxt_assert_close_vec3(p_err, on, fn);
+
+				if (approx_normals) {
+					ufbx_real dot = ufbxt_dot3(on, fn);
+					ufbxt_assert(dot >= 0.9);
+				} else {
+					ufbxt_assert_close_vec3(p_err, on, fn);
+				}
 
 				if (mesh->vertex_uv.data) {
 					ufbxt_assert(obj_mesh->vertex_uv.data);
@@ -841,6 +897,16 @@ void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		for (size_t i = 0; i < mesh->num_faces; i++) {
 			int32_t material = mesh->face_material[i];
 			ufbxt_assert(material >= 0 && material < mesh->materials.size);
+		}
+	}
+
+	for (size_t i = 0; i < mesh->skins.size; i++) {
+		ufbx_skin *skin = &mesh->skins.data[i];
+		ufbxt_assert(skin->bone);
+		ufbxt_check_node(scene, skin->bone);
+
+		for (size_t j = 0; j < skin->num_weights; j++) {
+			ufbxt_assert(skin->indices[j] >= -1 && skin->indices[j] < mesh->num_vertices);
 		}
 	}
 }
@@ -1442,7 +1508,7 @@ static const ufbxt_fuzz_check g_fuzz_checks[] = {
         { "blender_279_default", 6102, -1, 0, 5305, 0, 0, "ufbxi_finalize_scene(uc)" },
 };
 
-void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err))
+void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err), const char *suffix)
 {
 	const uint32_t file_versions[] = { 6100, 7100, 7400, 7500, 7700 };
 
@@ -1461,7 +1527,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 		for (uint32_t fi = 0; fi < 2; fi++) {
 			uint32_t version = file_versions[vi];
 			const char *format = fi == 1 ? "ascii" : "binary";
-			snprintf(buf, sizeof(buf), "%s%s_%u_%s.fbx", data_root, name, version, format);
+			if (suffix) {
+				snprintf(buf, sizeof(buf), "%s%s_%u_%s_%s.fbx", data_root, name, version, format, suffix);
+			} else {
+				snprintf(buf, sizeof(buf), "%s%s_%u_%s.fbx", data_root, name, version, format);
+			}
 
 			if (g_file_version && version != g_file_version) continue;
 			if (g_file_type && strcmp(format, g_file_type)) continue;
@@ -1500,6 +1570,33 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			}
 			ufbx_free_scene(streamed_scene);
 
+			// Ignore geometry, animations, and both
+
+			{
+				ufbx_load_opts opts = load_opts;
+				opts.ignore_geometry = true;
+				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, NULL);
+				ufbxt_check_scene(scene);
+				ufbx_free_scene(ignore_scene);
+			}
+
+			{
+				ufbx_load_opts opts = load_opts;
+				opts.ignore_animation = true;
+				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, NULL);
+				ufbxt_check_scene(scene);
+				ufbx_free_scene(ignore_scene);
+			}
+
+			{
+				ufbx_load_opts opts = load_opts;
+				opts.ignore_geometry = true;
+				opts.ignore_animation = true;
+				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, NULL);
+				ufbxt_check_scene(scene);
+				ufbx_free_scene(ignore_scene);
+			}
+
 			ufbxt_logf(".. Loaded in %.2fms: File %.1fkB, temp %.1fkB (%zu allocs), result %.1fkB (%zu allocs)",
 				cputime_cpu_delta_to_sec(NULL, load_end - load_begin) * 1e3,
 				(double)size * 1e-3,
@@ -1517,7 +1614,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbxt_diff_error err = { 0 };
 
 			if (obj_file) {
-				ufbxt_diff_to_obj(scene, obj_file, &err);
+				ufbxt_diff_to_obj(scene, obj_file, &err, false);
 			}
 
 			test_fn(scene, &err);
@@ -1718,66 +1815,27 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	free(obj_file);
 }
 
-static ufbx_real ufbxt_dot2(ufbx_vec2 a, ufbx_vec2 b)
-{
-	return a.x*b.x + a.y*b.y;
-}
-
-static ufbx_real ufbxt_dot3(ufbx_vec3 a, ufbx_vec3 b)
-{
-	return a.x*b.x + a.y*b.y + a.z*b.z;
-}
-
-static ufbx_vec2 ufbxt_add2(ufbx_vec2 a, ufbx_vec2 b)
-{
-	ufbx_vec2 v;
-	v.x = a.x + b.x;
-	v.y = a.y + b.y;
-	return v;
-}
-
-static ufbx_vec3 ufbxt_add3(ufbx_vec3 a, ufbx_vec3 b)
-{
-	ufbx_vec3 v;
-	v.x = a.x + b.x;
-	v.y = a.y + b.y;
-	v.z = a.z + b.z;
-	return v;
-}
-
-
-static ufbx_vec2 ufbxt_sub2(ufbx_vec2 a, ufbx_vec2 b)
-{
-	ufbx_vec2 v;
-	v.x = a.x - b.x;
-	v.y = a.y - b.y;
-	return v;
-}
-
-static ufbx_vec3 ufbxt_sub3(ufbx_vec3 a, ufbx_vec3 b)
-{
-	ufbx_vec3 v;
-	v.x = a.x - b.x;
-	v.y = a.y - b.y;
-	v.z = a.z - b.z;
-	return v;
-}
-
 #define UFBXT_IMPL 1
 #define UFBXT_TEST(name) void ufbxt_test_fn_##name(void)
 #define UFBXT_FILE_TEST(name) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err); \
 	void ufbxt_test_fn_file_##name(void) { \
-	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name); } \
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL); } \
 	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err)
+#define UFBXT_FILE_TEST_SUFFIX(name, suffix) void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err); \
+	void ufbxt_test_fn_file_##name##_##suffix(void) { \
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name##_##suffix, #suffix); } \
+	void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err)
 
 #include "all_tests.h"
 
 #undef UFBXT_IMPL
 #undef UFBXT_TEST
 #undef UFBXT_FILE_TEST
+#undef UFBXT_FILE_TEST_SUFFIX
 #define UFBXT_IMPL 0
 #define UFBXT_TEST(name) { #name, &ufbxt_test_fn_##name },
 #define UFBXT_FILE_TEST(name) { #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST_SUFFIX(name, suffix) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
 ufbxt_test g_tests[] = {
 	#include "all_tests.h"
 };

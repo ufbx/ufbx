@@ -126,7 +126,19 @@ struct ufbx_props {
 	ufbx_props *defaults;
 };
 
-// -- Static data
+// -- Scene data
+
+typedef struct ufbx_node ufbx_node;
+typedef struct ufbx_model ufbx_model;
+typedef struct ufbx_mesh ufbx_mesh;
+typedef struct ufbx_light ufbx_light;
+typedef struct ufbx_bone ufbx_bone;
+
+typedef struct ufbx_node_ptr_list { ufbx_node **data; size_t size; } ufbx_node_ptr_list;
+typedef struct ufbx_model_list { ufbx_model *data; size_t size; } ufbx_model_list;
+typedef struct ufbx_mesh_list { ufbx_mesh *data; size_t size; } ufbx_mesh_list;
+typedef struct ufbx_light_list { ufbx_light *data; size_t size; } ufbx_light_list;
+typedef struct ufbx_bone_list { ufbx_bone *data; size_t size; } ufbx_bone_list;
 
 typedef struct ufbx_material ufbx_material;
 
@@ -139,11 +151,13 @@ typedef struct ufbx_uv_set ufbx_uv_set;
 typedef struct ufbx_color_set ufbx_color_set;
 typedef struct ufbx_edge ufbx_edge;
 typedef struct ufbx_face ufbx_face;
+typedef struct ufbx_skin ufbx_skin;
 
 typedef struct ufbx_material_list { ufbx_material *data; size_t size; } ufbx_material_list;
 typedef struct ufbx_material_ptr_list { ufbx_material **data; size_t size; } ufbx_material_ptr_list;
 typedef struct ufbx_uv_set_list { ufbx_uv_set *data; size_t size; } ufbx_uv_set_list;
 typedef struct ufbx_color_set_list { ufbx_color_set *data; size_t size; } ufbx_color_set_list;
+typedef struct ufbx_skin_list { ufbx_skin *data; size_t size; } ufbx_skin_list;
 
 struct ufbx_vertex_void {
 	void *data;
@@ -198,6 +212,18 @@ struct ufbx_face {
 	uint32_t num_indices;
 };
 
+struct ufbx_skin {
+	ufbx_node *bone;
+
+	ufbx_matrix mesh_to_bind;
+	ufbx_matrix bind_to_world;
+
+	size_t num_weights;
+
+	int32_t *indices;
+	ufbx_real *weights;
+};
+
 struct ufbx_material {
 	ufbx_string name;
 
@@ -207,31 +233,28 @@ struct ufbx_material {
 	ufbx_vec3 specular_color;
 };
 
-// -- Scene graph
-
-typedef struct ufbx_node ufbx_node;
-typedef struct ufbx_model ufbx_model;
-typedef struct ufbx_mesh ufbx_mesh;
-typedef struct ufbx_light ufbx_light;
-
-typedef struct ufbx_node_ptr_list { ufbx_node **data; size_t size; } ufbx_node_ptr_list;
-typedef struct ufbx_model_list { ufbx_model *data; size_t size; } ufbx_model_list;
-typedef struct ufbx_mesh_list { ufbx_mesh *data; size_t size; } ufbx_mesh_list;
-typedef struct ufbx_light_list { ufbx_light *data; size_t size; } ufbx_light_list;
-
 typedef enum ufbx_node_type {
 	UFBX_NODE_UNKNOWN,
 	UFBX_NODE_MODEL,
 	UFBX_NODE_MESH,
 	UFBX_NODE_LIGHT,
+	UFBX_NODE_BONE,
 } ufbx_node_type;
+
+typedef enum ufbx_inherit_type {
+	UFBX_INHERIT_NO_SHEAR,  // R*r*S*s
+	UFBX_INHERIT_NORMAL,    // R*S*r*s
+	UFBX_INHERIT_NO_SCALE,  // R*r*s
+} ufbx_inherit_type;
 
 struct ufbx_node {
 	ufbx_node_type type;
 	ufbx_string name;
 	ufbx_props props;
 	ufbx_node *parent;
+	ufbx_inherit_type inherit_type;
 	ufbx_transform transform;
+	ufbx_transform world_transform;
 	ufbx_matrix to_parent;
 	ufbx_matrix to_root;
 	ufbx_node_ptr_list children;
@@ -270,6 +293,7 @@ struct ufbx_mesh {
 	ufbx_uv_set_list uv_sets;
 	ufbx_color_set_list color_sets;
 	ufbx_material_ptr_list materials;
+	ufbx_skin_list skins;
 };
 
 struct ufbx_light {
@@ -277,6 +301,12 @@ struct ufbx_light {
 
 	ufbx_vec3 color;
 	ufbx_real intensity;
+};
+
+struct ufbx_bone {
+	ufbx_node node;
+
+	ufbx_real length;
 };
 
 // -- Animations
@@ -310,6 +340,7 @@ typedef enum ufbx_anim_target {
 	UFBX_ANIM_MESH,
 	UFBX_ANIM_LIGHT,
 	UFBX_ANIM_MATERIAL,
+	UFBX_ANIM_BONE,
 } ufbx_anim_target;
 
 struct ufbx_anim_layer {
@@ -357,6 +388,11 @@ typedef struct ufbx_metadata {
 
 	size_t num_total_child_refs;
 	size_t num_total_material_refs;
+	size_t num_total_skins;
+	size_t num_skinned_positions;
+	size_t num_skinned_indices;
+	size_t max_skinned_positions;
+	size_t max_skinned_indices;
 } ufbx_metadata;
 
 struct ufbx_scene {
@@ -368,7 +404,10 @@ struct ufbx_scene {
 	ufbx_model_list models;
 	ufbx_mesh_list meshes;
 	ufbx_light_list lights;
+	ufbx_bone_list bones;
+
 	ufbx_material_list materials;
+
 	ufbx_anim_layer_list anim_layers;
 	ufbx_anim_prop_list anim_props;
 	ufbx_anim_curve_list anim_curves;
@@ -403,6 +442,10 @@ typedef struct ufbx_load_opts {
 	ufbx_allocator temp_allocator;
 	ufbx_allocator result_allocator;
 
+	// Preferences
+	bool ignore_geometry;
+	bool ignore_animation;
+
 	// Limits
 	size_t max_temp_memory;
 	size_t max_result_memory;
@@ -429,9 +472,8 @@ typedef struct ufbx_evaluate_opts {
 	ufbx_scene *reuse_scene;
 
 	ufbx_allocator allocator;
-	size_t max_memory;
-	size_t max_allocs;
-	size_t huge_size;
+
+	bool evaluate_skinned_vertices;
 
 	const ufbx_anim_layer *layer;
 } ufbx_evaluate_opts;
@@ -486,7 +528,7 @@ ufbx_matrix ufbx_get_transform_matrix(const ufbx_transform *transform);
 void ufbx_matrix_mul(ufbx_matrix *dst, const ufbx_matrix *l, const ufbx_matrix *r);
 ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v);
 ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v);
-ufbx_vec3 ufbx_transform_normal(const ufbx_matrix *m, ufbx_vec3 v);
+ufbx_matrix ufbx_get_normal_matrix(const ufbx_matrix *m);
 
 ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time);
 

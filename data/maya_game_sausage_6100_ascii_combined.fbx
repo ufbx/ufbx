@@ -1,0 +1,2179 @@
+; FBX 6.1.0 project file
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 6100
+	CurrentCameraResolution:  {
+		CameraName: "Producer Perspective"
+		CameraResolutionMode: "Fixed Resolution"
+		CameraResolutionW: 960
+		CameraResolutionH: 540
+	}
+	CreationTimeStamp:  {
+		Version: 1000
+		Year: 2020
+		Month: 4
+		Day: 4
+		Hour: 15
+		Minute: 51
+		Second: 57
+		Millisecond: 398
+	}
+	Creator: "FBX SDK/FBX Plugins version 2019.2"
+}
+
+; Document Description
+;------------------------------------------------------------------
+
+Document:  {
+	Name: ""
+}
+
+; Document References
+;------------------------------------------------------------------
+
+References:  {
+}
+
+; Object definitions
+;------------------------------------------------------------------
+
+Definitions:  {
+	Version: 100
+	Count: 13
+	ObjectType: "Model" {
+		Count: 5
+	}
+	ObjectType: "Material" {
+		Count: 1
+	}
+	ObjectType: "SceneInfo" {
+		Count: 1
+	}
+	ObjectType: "GlobalSettings" {
+		Count: 1
+	}
+	ObjectType: "Pose" {
+		Count: 1
+	}
+	ObjectType: "Deformer" {
+		Count: 4
+	}
+}
+
+; Object properties
+;------------------------------------------------------------------
+
+Objects:  {
+	Model: "Model::pCube1", "Mesh" {
+		Version: 232
+		Properties60:  {
+			Property: "QuaternionInterpolate", "enum", "",0
+			Property: "RotationOffset", "Vector3D", "",0,0,0
+			Property: "RotationPivot", "Vector3D", "",0,0,0
+			Property: "ScalingOffset", "Vector3D", "",0,0,0
+			Property: "ScalingPivot", "Vector3D", "",0,0,0
+			Property: "TranslationActive", "bool", "",0
+			Property: "TranslationMin", "Vector3D", "",0,0,0
+			Property: "TranslationMax", "Vector3D", "",0,0,0
+			Property: "TranslationMinX", "bool", "",0
+			Property: "TranslationMinY", "bool", "",0
+			Property: "TranslationMinZ", "bool", "",0
+			Property: "TranslationMaxX", "bool", "",0
+			Property: "TranslationMaxY", "bool", "",0
+			Property: "TranslationMaxZ", "bool", "",0
+			Property: "RotationOrder", "enum", "",0
+			Property: "RotationSpaceForLimitOnly", "bool", "",0
+			Property: "RotationStiffnessX", "double", "",0
+			Property: "RotationStiffnessY", "double", "",0
+			Property: "RotationStiffnessZ", "double", "",0
+			Property: "AxisLen", "double", "",10
+			Property: "PreRotation", "Vector3D", "",0,0,0
+			Property: "PostRotation", "Vector3D", "",0,0,0
+			Property: "RotationActive", "bool", "",1
+			Property: "RotationMin", "Vector3D", "",0,0,0
+			Property: "RotationMax", "Vector3D", "",0,0,0
+			Property: "RotationMinX", "bool", "",0
+			Property: "RotationMinY", "bool", "",0
+			Property: "RotationMinZ", "bool", "",0
+			Property: "RotationMaxX", "bool", "",0
+			Property: "RotationMaxY", "bool", "",0
+			Property: "RotationMaxZ", "bool", "",0
+			Property: "InheritType", "enum", "",1
+			Property: "ScalingActive", "bool", "",0
+			Property: "ScalingMin", "Vector3D", "",0,0,0
+			Property: "ScalingMax", "Vector3D", "",0,0,0
+			Property: "ScalingMinX", "bool", "",0
+			Property: "ScalingMinY", "bool", "",0
+			Property: "ScalingMinZ", "bool", "",0
+			Property: "ScalingMaxX", "bool", "",0
+			Property: "ScalingMaxY", "bool", "",0
+			Property: "ScalingMaxZ", "bool", "",0
+			Property: "GeometricTranslation", "Vector3D", "",0,0,0
+			Property: "GeometricRotation", "Vector3D", "",0,0,0
+			Property: "GeometricScaling", "Vector3D", "",1,1,1
+			Property: "MinDampRangeX", "double", "",0
+			Property: "MinDampRangeY", "double", "",0
+			Property: "MinDampRangeZ", "double", "",0
+			Property: "MaxDampRangeX", "double", "",0
+			Property: "MaxDampRangeY", "double", "",0
+			Property: "MaxDampRangeZ", "double", "",0
+			Property: "MinDampStrengthX", "double", "",0
+			Property: "MinDampStrengthY", "double", "",0
+			Property: "MinDampStrengthZ", "double", "",0
+			Property: "MaxDampStrengthX", "double", "",0
+			Property: "MaxDampStrengthY", "double", "",0
+			Property: "MaxDampStrengthZ", "double", "",0
+			Property: "PreferedAngleX", "double", "",0
+			Property: "PreferedAngleY", "double", "",0
+			Property: "PreferedAngleZ", "double", "",0
+			Property: "LookAtProperty", "object", ""
+			Property: "UpVectorProperty", "object", ""
+			Property: "Show", "bool", "",1
+			Property: "NegativePercentShapeSupport", "bool", "",1
+			Property: "DefaultAttributeIndex", "int", "",0
+			Property: "Freeze", "bool", "",0
+			Property: "LODBox", "bool", "",0
+			Property: "Lcl Translation", "Lcl Translation", "A",0,0,0
+			Property: "Lcl Rotation", "Lcl Rotation", "A",0,0,0
+			Property: "Lcl Scaling", "Lcl Scaling", "A",1,1.23333332718325,1
+			Property: "Visibility", "Visibility", "A",1
+			Property: "currentUVSet", "KString", "U", "map1"
+			Property: "Color", "ColorRGB", "N",0.8,0.8,0.8
+			Property: "BBoxMin", "Vector3D", "N",0,0,0
+			Property: "BBoxMax", "Vector3D", "N",0,0,0
+			Property: "Primary Visibility", "bool", "N",1
+			Property: "Casts Shadows", "bool", "N",1
+			Property: "Receive Shadows", "bool", "N",1
+		}
+		MultiLayer: 0
+		MultiTake: 0
+		Shading: T
+		Culling: "CullingOff"
+		Vertices: -0.5,0.0147619247436523,0.5,0.5,0.0147619247436523,0.5,-0.5,2.71626615524292,0.5,0.5,2.71626615524292,0.5,-0.5,2.71626615524292
+        ,-0.5,0.5,2.71626615524292,-0.5,-0.5,0.014761745929718,-0.5,0.5,0.014761745929718,-0.5,-0.5,0.555062592029572,-0.5
+        ,-0.5,0.555062711238861,0.5,0.5,0.555062711238861,0.5,0.5,0.555062592029572,-0.5,-0.5,1.09536349773407,-0.5,-0.5,1.09536361694336
+        ,0.5,0.5,1.09536361694336,0.5,0.5,1.09536349773407,-0.5,-0.5,1.63566446304321,-0.5,-0.5,1.63566446304321,0.5,0.5,1.63566446304321
+        ,0.5,0.5,1.63566446304321,-0.5,-0.5,2.17596530914307,-0.5,-0.5,2.17596530914307,0.5,0.5,2.17596530914307,0.5,0.5,2.17596530914307
+        ,-0.5
+		PolygonVertexIndex: 21,22,3,-3,2,3,5,-5,4,5,23,-21,6,7,1,-1,22,23,5,-4,20,21,2,-5,6,0,9,-9,0,1,10,-10,1,7,11,-11,8,11,7,-7,8,9,13,-13
+        ,9,10,14,-14,10,11,15,-15,12,15,11,-9,12,13,17,-17,13,14,18,-18,14,15,19,-19,16,19,15,-13,16,17,21,-21,17,18,22,-22
+        ,18,19,23,-23,20,23,19,-17
+		Edges: 14,2,6,12,25,29,7,5,11,9,15,13,27,41,26,45,30,33,34,36,43,57,42,61,46,49,50,52,59,73,58,77,62,65,66,68,75,3,20,1,0
+        ,81,16,10
+		GeometryVersion: 124
+		LayerElementNormal: 0 {
+			Version: 101
+			Name: ""
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "Direct"
+			Normals: 0,0,1,0,0,1,0,0,1,0,0,1,0,1,0,0,1,0,0,1,0,0,1,0,0,0,-1,0,0,-1,0,0,-1,0,0,-1,0,-1,1.78813934326172e-07,0,-1,1.78813934326172e-07
+             ,0,-1,1.78813934326172e-07,0,-1,1.78813934326172e-07,1,0,0,1,0,0,1,0,0,1,0,0,-1,0,0,-1,0,0,-1,0,0,-1,0,0,-1,0
+             ,0,-1,0,0,-0.999999940395355,0,0,-1,0,0,0,0,0.999999940395355,0,0,0.999999940395355,0,0,1,0,0,1,1,0,0,1,0,0,1
+             ,0,0,0.999999940395355,0,0,0,0,-0.999999940395355,0,0,-0.999999940395355,0,0,-1,0,0,-1,-1,0,0,-0.999999940395355
+             ,0,0,-0.999999940395355,0,0,-0.999999940395355,0,0,0,0,1,0,0,1,0,0,0.999999940395355,0,0,0.999999940395355,0.999999940395355
+             ,0,0,1,0,0,0.999999940395355,0,0,0.999999940395355,0,0,0,0,-1,0,0,-1,0,0,-0.999999940395355,0,0,-0.999999940395355
+             ,-0.999999940395355,0,0,-0.999999940395355,0,0,-0.999999940395355,0,0,-0.999999940395355,0,0,0,0,0.999999940395355
+             ,0,0,0.999999940395355,0,0,1,0,0,1,0.999999940395355,0,0,0.999999940395355,0,0,0.999999940395355,0,0,0.999999940395355
+             ,0,0,0,0,-0.999999940395355,0,0,-0.999999940395355,0,0,-1,0,0,-1,-0.999999940395355,0,0,-0.999999940395355,0
+             ,0,-1,0,0,-1,0,0,0,0,1,0,0,1,0,0,1,0,0,1,0.999999940395355,0,0,0.999999940395355,0,0,1,0,0,1,0,0,0,0,-1,0,0,-1
+             ,0,0,-0.999999940395355,0,0,-0.999999940395355
+		}
+		LayerElementUV: 0 {
+			Version: 101
+			Name: "map1"
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "IndexToDirect"
+			UV: 0.375,0,0.625,0,0.375,0.25,0.625,0.25,0.375,0.5,0.625,0.5,0.375,0.75,0.625,0.75,0.375,1,0.625,1,0.875,0,0.875
+             ,0.25,0.125,0,0.125,0.25,0.125,0.0499999970197678,0.375,0.700000047683716,0.375,0.0499999970197678,0.625,0.0499999970197678
+             ,0.625,0.700000047683716,0.875,0.0499999970197678,0.125,0.0999999940395355,0.375,0.650000035762787,0.375,0.0999999940395355
+             ,0.625,0.0999999940395355,0.625,0.650000035762787,0.875,0.0999999940395355,0.125,0.150000005960464,0.375,0.600000023841858
+             ,0.375,0.150000005960464,0.625,0.150000005960464,0.625,0.600000023841858,0.875,0.150000005960464,0.125,0.200000002980232
+             ,0.375,0.550000011920929,0.375,0.200000002980232,0.625,0.200000002980232,0.625,0.550000011920929,0.875,0.200000002980232
+             
+			UVIndex: 34,35,3,2,2,3,5,4,4,5,36,33,6,7,9,8,35,37,11,3,32,34,2,13,12,0,16,14,0,1,17,16,1,10,19,17,15,18,7,6,14,16,22
+             ,20,16,17,23,22,17,19,25,23,21,24,18,15,20,22,28,26,22,23,29,28,23,25,31,29,27,30,24,21,26,28,34,32,28,29,35
+             ,34,29,31,37,35,33,36,30,27
+		}
+		LayerElementSmoothing: 0 {
+			Version: 102
+			Name: ""
+			MappingInformationType: "ByEdge"
+			ReferenceInformationType: "Direct"
+			Smoothing: 0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0,1,0,1,0,1,1
+		}
+		LayerElementMaterial: 0 {
+			Version: 101
+			Name: ""
+			MappingInformationType: "AllSame"
+			ReferenceInformationType: "IndexToDirect"
+			Materials: 0
+		}
+		Layer: 0 {
+			Version: 100
+			LayerElement:  {
+				Type: "LayerElementNormal"
+				TypedIndex: 0
+			}
+			LayerElement:  {
+				Type: "LayerElementMaterial"
+				TypedIndex: 0
+			}
+			LayerElement:  {
+				Type: "LayerElementSmoothing"
+				TypedIndex: 0
+			}
+			LayerElement:  {
+				Type: "LayerElementUV"
+				TypedIndex: 0
+			}
+		}
+		NodeAttributeName: "Geometry::pCube1_ncl1_1"
+	}
+	Model: "Model::joint1", "LimbNode" {
+		Version: 232
+		Properties60:  {
+			Property: "QuaternionInterpolate", "enum", "",0
+			Property: "RotationOffset", "Vector3D", "",0,0,0
+			Property: "RotationPivot", "Vector3D", "",0,0,0
+			Property: "ScalingOffset", "Vector3D", "",0,0,0
+			Property: "ScalingPivot", "Vector3D", "",0,0,0
+			Property: "TranslationActive", "bool", "",0
+			Property: "TranslationMin", "Vector3D", "",0,0,0
+			Property: "TranslationMax", "Vector3D", "",0,0,0
+			Property: "TranslationMinX", "bool", "",0
+			Property: "TranslationMinY", "bool", "",0
+			Property: "TranslationMinZ", "bool", "",0
+			Property: "TranslationMaxX", "bool", "",0
+			Property: "TranslationMaxY", "bool", "",0
+			Property: "TranslationMaxZ", "bool", "",0
+			Property: "RotationOrder", "enum", "",0
+			Property: "RotationSpaceForLimitOnly", "bool", "",0
+			Property: "RotationStiffnessX", "double", "",0
+			Property: "RotationStiffnessY", "double", "",0
+			Property: "RotationStiffnessZ", "double", "",0
+			Property: "AxisLen", "double", "",10
+			Property: "PreRotation", "Vector3D", "",0,-0,90
+			Property: "PostRotation", "Vector3D", "",0,0,0
+			Property: "RotationActive", "bool", "",1
+			Property: "RotationMin", "Vector3D", "",0,0,0
+			Property: "RotationMax", "Vector3D", "",0,0,0
+			Property: "RotationMinX", "bool", "",0
+			Property: "RotationMinY", "bool", "",0
+			Property: "RotationMinZ", "bool", "",0
+			Property: "RotationMaxX", "bool", "",0
+			Property: "RotationMaxY", "bool", "",0
+			Property: "RotationMaxZ", "bool", "",0
+			Property: "InheritType", "enum", "",1
+			Property: "ScalingActive", "bool", "",0
+			Property: "ScalingMin", "Vector3D", "",0,0,0
+			Property: "ScalingMax", "Vector3D", "",0,0,0
+			Property: "ScalingMinX", "bool", "",0
+			Property: "ScalingMinY", "bool", "",0
+			Property: "ScalingMinZ", "bool", "",0
+			Property: "ScalingMaxX", "bool", "",0
+			Property: "ScalingMaxY", "bool", "",0
+			Property: "ScalingMaxZ", "bool", "",0
+			Property: "GeometricTranslation", "Vector3D", "",0,0,0
+			Property: "GeometricRotation", "Vector3D", "",0,0,0
+			Property: "GeometricScaling", "Vector3D", "",1,1,1
+			Property: "MinDampRangeX", "double", "",0
+			Property: "MinDampRangeY", "double", "",0
+			Property: "MinDampRangeZ", "double", "",0
+			Property: "MaxDampRangeX", "double", "",0
+			Property: "MaxDampRangeY", "double", "",0
+			Property: "MaxDampRangeZ", "double", "",0
+			Property: "MinDampStrengthX", "double", "",0
+			Property: "MinDampStrengthY", "double", "",0
+			Property: "MinDampStrengthZ", "double", "",0
+			Property: "MaxDampStrengthX", "double", "",0
+			Property: "MaxDampStrengthY", "double", "",0
+			Property: "MaxDampStrengthZ", "double", "",0
+			Property: "PreferedAngleX", "double", "",0
+			Property: "PreferedAngleY", "double", "",0
+			Property: "PreferedAngleZ", "double", "",0
+			Property: "LookAtProperty", "object", ""
+			Property: "UpVectorProperty", "object", ""
+			Property: "Show", "bool", "",1
+			Property: "NegativePercentShapeSupport", "bool", "",1
+			Property: "DefaultAttributeIndex", "int", "",0
+			Property: "Freeze", "bool", "",0
+			Property: "LODBox", "bool", "",0
+			Property: "Lcl Translation", "Lcl Translation", "A+",0,0,0
+			Property: "Lcl Rotation", "Lcl Rotation", "A+",0,0,0
+			Property: "Lcl Scaling", "Lcl Scaling", "A+",1,1,1
+			Property: "Visibility", "Visibility", "A+",1
+			Property: "lockInfluenceWeights", "Bool", "A+U",0
+			Property: "Color", "ColorRGB", "N",0.8,0.8,0.8
+			Property: "Size", "double", "N",3.33333333333333
+			Property: "LimbLength", "double", "HN",1
+		}
+		MultiLayer: 0
+		MultiTake: 0
+		Shading: Y
+		Culling: "CullingOff"
+		TypeFlags: "Skeleton"
+		NodeAttributeName: "NodeAttribute::joint1_ncl1_1"
+	}
+	Model: "Model::joint2", "LimbNode" {
+		Version: 232
+		Properties60:  {
+			Property: "QuaternionInterpolate", "enum", "",0
+			Property: "RotationOffset", "Vector3D", "",0,0,0
+			Property: "RotationPivot", "Vector3D", "",0,0,0
+			Property: "ScalingOffset", "Vector3D", "",0,0,0
+			Property: "ScalingPivot", "Vector3D", "",0,0,0
+			Property: "TranslationActive", "bool", "",0
+			Property: "TranslationMin", "Vector3D", "",0,0,0
+			Property: "TranslationMax", "Vector3D", "",0,0,0
+			Property: "TranslationMinX", "bool", "",0
+			Property: "TranslationMinY", "bool", "",0
+			Property: "TranslationMinZ", "bool", "",0
+			Property: "TranslationMaxX", "bool", "",0
+			Property: "TranslationMaxY", "bool", "",0
+			Property: "TranslationMaxZ", "bool", "",0
+			Property: "RotationOrder", "enum", "",0
+			Property: "RotationSpaceForLimitOnly", "bool", "",0
+			Property: "RotationStiffnessX", "double", "",0
+			Property: "RotationStiffnessY", "double", "",0
+			Property: "RotationStiffnessZ", "double", "",0
+			Property: "AxisLen", "double", "",10
+			Property: "PreRotation", "Vector3D", "",0,0,0
+			Property: "PostRotation", "Vector3D", "",0,0,0
+			Property: "RotationActive", "bool", "",1
+			Property: "RotationMin", "Vector3D", "",0,0,0
+			Property: "RotationMax", "Vector3D", "",0,0,0
+			Property: "RotationMinX", "bool", "",0
+			Property: "RotationMinY", "bool", "",0
+			Property: "RotationMinZ", "bool", "",0
+			Property: "RotationMaxX", "bool", "",0
+			Property: "RotationMaxY", "bool", "",0
+			Property: "RotationMaxZ", "bool", "",0
+			Property: "InheritType", "enum", "",2
+			Property: "ScalingActive", "bool", "",0
+			Property: "ScalingMin", "Vector3D", "",0,0,0
+			Property: "ScalingMax", "Vector3D", "",0,0,0
+			Property: "ScalingMinX", "bool", "",0
+			Property: "ScalingMinY", "bool", "",0
+			Property: "ScalingMinZ", "bool", "",0
+			Property: "ScalingMaxX", "bool", "",0
+			Property: "ScalingMaxY", "bool", "",0
+			Property: "ScalingMaxZ", "bool", "",0
+			Property: "GeometricTranslation", "Vector3D", "",0,0,0
+			Property: "GeometricRotation", "Vector3D", "",0,0,0
+			Property: "GeometricScaling", "Vector3D", "",1,1,1
+			Property: "MinDampRangeX", "double", "",0
+			Property: "MinDampRangeY", "double", "",0
+			Property: "MinDampRangeZ", "double", "",0
+			Property: "MaxDampRangeX", "double", "",0
+			Property: "MaxDampRangeY", "double", "",0
+			Property: "MaxDampRangeZ", "double", "",0
+			Property: "MinDampStrengthX", "double", "",0
+			Property: "MinDampStrengthY", "double", "",0
+			Property: "MinDampStrengthZ", "double", "",0
+			Property: "MaxDampStrengthX", "double", "",0
+			Property: "MaxDampStrengthY", "double", "",0
+			Property: "MaxDampStrengthZ", "double", "",0
+			Property: "PreferedAngleX", "double", "",0
+			Property: "PreferedAngleY", "double", "",0
+			Property: "PreferedAngleZ", "double", "",0
+			Property: "LookAtProperty", "object", ""
+			Property: "UpVectorProperty", "object", ""
+			Property: "Show", "bool", "",1
+			Property: "NegativePercentShapeSupport", "bool", "",1
+			Property: "DefaultAttributeIndex", "int", "",0
+			Property: "Freeze", "bool", "",0
+			Property: "LODBox", "bool", "",0
+			Property: "Lcl Translation", "Lcl Translation", "A+",1,0,0
+			Property: "Lcl Rotation", "Lcl Rotation", "A+",0,0,0
+			Property: "Lcl Scaling", "Lcl Scaling", "A+",1,1,1
+			Property: "Visibility", "Visibility", "A+",1
+			Property: "lockInfluenceWeights", "Bool", "A+U",0
+			Property: "Color", "ColorRGB", "N",0.8,0.8,0.8
+			Property: "Size", "double", "N",3.33333333333333
+			Property: "LimbLength", "double", "HN",1
+		}
+		MultiLayer: 0
+		MultiTake: 0
+		Shading: Y
+		Culling: "CullingOff"
+		TypeFlags: "Skeleton"
+		NodeAttributeName: "NodeAttribute::joint2_ncl1_1"
+	}
+	Model: "Model::joint3", "LimbNode" {
+		Version: 232
+		Properties60:  {
+			Property: "QuaternionInterpolate", "enum", "",0
+			Property: "RotationOffset", "Vector3D", "",0,0,0
+			Property: "RotationPivot", "Vector3D", "",0,0,0
+			Property: "ScalingOffset", "Vector3D", "",0,0,0
+			Property: "ScalingPivot", "Vector3D", "",0,0,0
+			Property: "TranslationActive", "bool", "",0
+			Property: "TranslationMin", "Vector3D", "",0,0,0
+			Property: "TranslationMax", "Vector3D", "",0,0,0
+			Property: "TranslationMinX", "bool", "",0
+			Property: "TranslationMinY", "bool", "",0
+			Property: "TranslationMinZ", "bool", "",0
+			Property: "TranslationMaxX", "bool", "",0
+			Property: "TranslationMaxY", "bool", "",0
+			Property: "TranslationMaxZ", "bool", "",0
+			Property: "RotationOrder", "enum", "",0
+			Property: "RotationSpaceForLimitOnly", "bool", "",0
+			Property: "RotationStiffnessX", "double", "",0
+			Property: "RotationStiffnessY", "double", "",0
+			Property: "RotationStiffnessZ", "double", "",0
+			Property: "AxisLen", "double", "",10
+			Property: "PreRotation", "Vector3D", "",0,0,0
+			Property: "PostRotation", "Vector3D", "",0,0,0
+			Property: "RotationActive", "bool", "",1
+			Property: "RotationMin", "Vector3D", "",0,0,0
+			Property: "RotationMax", "Vector3D", "",0,0,0
+			Property: "RotationMinX", "bool", "",0
+			Property: "RotationMinY", "bool", "",0
+			Property: "RotationMinZ", "bool", "",0
+			Property: "RotationMaxX", "bool", "",0
+			Property: "RotationMaxY", "bool", "",0
+			Property: "RotationMaxZ", "bool", "",0
+			Property: "InheritType", "enum", "",2
+			Property: "ScalingActive", "bool", "",0
+			Property: "ScalingMin", "Vector3D", "",0,0,0
+			Property: "ScalingMax", "Vector3D", "",0,0,0
+			Property: "ScalingMinX", "bool", "",0
+			Property: "ScalingMinY", "bool", "",0
+			Property: "ScalingMinZ", "bool", "",0
+			Property: "ScalingMaxX", "bool", "",0
+			Property: "ScalingMaxY", "bool", "",0
+			Property: "ScalingMaxZ", "bool", "",0
+			Property: "GeometricTranslation", "Vector3D", "",0,0,0
+			Property: "GeometricRotation", "Vector3D", "",0,0,0
+			Property: "GeometricScaling", "Vector3D", "",1,1,1
+			Property: "MinDampRangeX", "double", "",0
+			Property: "MinDampRangeY", "double", "",0
+			Property: "MinDampRangeZ", "double", "",0
+			Property: "MaxDampRangeX", "double", "",0
+			Property: "MaxDampRangeY", "double", "",0
+			Property: "MaxDampRangeZ", "double", "",0
+			Property: "MinDampStrengthX", "double", "",0
+			Property: "MinDampStrengthY", "double", "",0
+			Property: "MinDampStrengthZ", "double", "",0
+			Property: "MaxDampStrengthX", "double", "",0
+			Property: "MaxDampStrengthY", "double", "",0
+			Property: "MaxDampStrengthZ", "double", "",0
+			Property: "PreferedAngleX", "double", "",0
+			Property: "PreferedAngleY", "double", "",0
+			Property: "PreferedAngleZ", "double", "",0
+			Property: "LookAtProperty", "object", ""
+			Property: "UpVectorProperty", "object", ""
+			Property: "Show", "bool", "",1
+			Property: "NegativePercentShapeSupport", "bool", "",1
+			Property: "DefaultAttributeIndex", "int", "",0
+			Property: "Freeze", "bool", "",0
+			Property: "LODBox", "bool", "",0
+			Property: "Lcl Translation", "Lcl Translation", "A+",1.15431302203923,0,0
+			Property: "Lcl Rotation", "Lcl Rotation", "A+",0,0,0
+			Property: "Lcl Scaling", "Lcl Scaling", "A+",1,1,1
+			Property: "Visibility", "Visibility", "A+",1
+			Property: "lockInfluenceWeights", "Bool", "A+U",0
+			Property: "Color", "ColorRGB", "N",0.8,0.8,0.8
+			Property: "Size", "double", "N",3.33333333333333
+			Property: "LimbLength", "double", "HN",1
+		}
+		MultiLayer: 0
+		MultiTake: 0
+		Shading: Y
+		Culling: "CullingOff"
+		TypeFlags: "Skeleton"
+		NodeAttributeName: "NodeAttribute::joint3_ncl1_1"
+	}
+	Model: "Model::joint4", "LimbNode" {
+		Version: 232
+		Properties60:  {
+			Property: "QuaternionInterpolate", "enum", "",0
+			Property: "RotationOffset", "Vector3D", "",0,0,0
+			Property: "RotationPivot", "Vector3D", "",0,0,0
+			Property: "ScalingOffset", "Vector3D", "",0,0,0
+			Property: "ScalingPivot", "Vector3D", "",0,0,0
+			Property: "TranslationActive", "bool", "",0
+			Property: "TranslationMin", "Vector3D", "",0,0,0
+			Property: "TranslationMax", "Vector3D", "",0,0,0
+			Property: "TranslationMinX", "bool", "",0
+			Property: "TranslationMinY", "bool", "",0
+			Property: "TranslationMinZ", "bool", "",0
+			Property: "TranslationMaxX", "bool", "",0
+			Property: "TranslationMaxY", "bool", "",0
+			Property: "TranslationMaxZ", "bool", "",0
+			Property: "RotationOrder", "enum", "",0
+			Property: "RotationSpaceForLimitOnly", "bool", "",0
+			Property: "RotationStiffnessX", "double", "",0
+			Property: "RotationStiffnessY", "double", "",0
+			Property: "RotationStiffnessZ", "double", "",0
+			Property: "AxisLen", "double", "",10
+			Property: "PreRotation", "Vector3D", "",0,0,-90
+			Property: "PostRotation", "Vector3D", "",0,0,0
+			Property: "RotationActive", "bool", "",1
+			Property: "RotationMin", "Vector3D", "",0,0,0
+			Property: "RotationMax", "Vector3D", "",0,0,0
+			Property: "RotationMinX", "bool", "",0
+			Property: "RotationMinY", "bool", "",0
+			Property: "RotationMinZ", "bool", "",0
+			Property: "RotationMaxX", "bool", "",0
+			Property: "RotationMaxY", "bool", "",0
+			Property: "RotationMaxZ", "bool", "",0
+			Property: "InheritType", "enum", "",2
+			Property: "ScalingActive", "bool", "",0
+			Property: "ScalingMin", "Vector3D", "",0,0,0
+			Property: "ScalingMax", "Vector3D", "",0,0,0
+			Property: "ScalingMinX", "bool", "",0
+			Property: "ScalingMinY", "bool", "",0
+			Property: "ScalingMinZ", "bool", "",0
+			Property: "ScalingMaxX", "bool", "",0
+			Property: "ScalingMaxY", "bool", "",0
+			Property: "ScalingMaxZ", "bool", "",0
+			Property: "GeometricTranslation", "Vector3D", "",0,0,0
+			Property: "GeometricRotation", "Vector3D", "",0,0,0
+			Property: "GeometricScaling", "Vector3D", "",1,1,1
+			Property: "MinDampRangeX", "double", "",0
+			Property: "MinDampRangeY", "double", "",0
+			Property: "MinDampRangeZ", "double", "",0
+			Property: "MaxDampRangeX", "double", "",0
+			Property: "MaxDampRangeY", "double", "",0
+			Property: "MaxDampRangeZ", "double", "",0
+			Property: "MinDampStrengthX", "double", "",0
+			Property: "MinDampStrengthY", "double", "",0
+			Property: "MinDampStrengthZ", "double", "",0
+			Property: "MaxDampStrengthX", "double", "",0
+			Property: "MaxDampStrengthY", "double", "",0
+			Property: "MaxDampStrengthZ", "double", "",0
+			Property: "PreferedAngleX", "double", "",0
+			Property: "PreferedAngleY", "double", "",0
+			Property: "PreferedAngleZ", "double", "",0
+			Property: "LookAtProperty", "object", ""
+			Property: "UpVectorProperty", "object", ""
+			Property: "Show", "bool", "",1
+			Property: "NegativePercentShapeSupport", "bool", "",1
+			Property: "DefaultAttributeIndex", "int", "",0
+			Property: "Freeze", "bool", "",0
+			Property: "LODBox", "bool", "",0
+			Property: "Lcl Translation", "Lcl Translation", "A",1.07370048859635,0,0
+			Property: "Lcl Rotation", "Lcl Rotation", "A",0,0,0
+			Property: "Lcl Scaling", "Lcl Scaling", "A",1,1,1
+			Property: "Visibility", "Visibility", "A",1
+			Property: "Color", "ColorRGB", "N",0.8,0.8,0.8
+			Property: "Size", "double", "N",3.33333333333333
+			Property: "LimbLength", "double", "HN",1
+		}
+		MultiLayer: 0
+		MultiTake: 0
+		Shading: Y
+		Culling: "CullingOff"
+		TypeFlags: "Skeleton"
+		NodeAttributeName: "NodeAttribute::joint4_ncl1_1"
+	}
+	SceneInfo: "SceneInfo::GlobalInfo", "UserData" {
+		Type: "UserData"
+		Version: 100
+		MetaData:  {
+			Version: 100
+			Title: ""
+			Subject: ""
+			Author: ""
+			Keywords: ""
+			Revision: ""
+			Comment: ""
+		}
+		Properties60:  {
+			Property: "DocumentUrl", "KString", "", "D:\Dev\ufbx\data\maya_game_sausage_6100_ascii_combined.fbx"
+			Property: "SrcDocumentUrl", "KString", "", "D:\Dev\ufbx\data\maya_game_sausage_6100_ascii_combined.fbx"
+			Property: "Original", "Compound", ""
+			Property: "Original|ApplicationVendor", "KString", "", "Autodesk"
+			Property: "Original|ApplicationName", "KString", "", "Maya"
+			Property: "Original|ApplicationVersion", "KString", "", "201900"
+			Property: "Original|DateTime_GMT", "DateTime", "", "04/04/2020 12:51:57.396"
+			Property: "Original|FileName", "KString", "", "D:\Dev\ufbx\data\maya_game_sausage_6100_ascii_combined.fbx"
+			Property: "LastSaved", "Compound", ""
+			Property: "LastSaved|ApplicationVendor", "KString", "", "Autodesk"
+			Property: "LastSaved|ApplicationName", "KString", "", "Maya"
+			Property: "LastSaved|ApplicationVersion", "KString", "", "201900"
+			Property: "LastSaved|DateTime_GMT", "DateTime", "", "04/04/2020 12:51:57.396"
+			Property: "Original|ApplicationActiveProject", "KString", "", "W:\Temp\ufbx_test_source"
+			Property: "Original|ApplicationNativeFile", "KString", "", "W:\Temp\ufbx_test_source\sausage.fbx"
+		}
+	}
+	Pose: "Pose::skinCluster1", "BindPose" {
+		Type: "BindPose"
+		Version: 100
+		Properties60:  {
+		}
+		NbPoseNodes: 4
+		PoseNode:  {
+			Node: "Model::pCube1"
+			Matrix: 1,0,0,0,0,1.23333332718325,0,0,0,0,1,0,0,0,0,1
+		}
+		PoseNode:  {
+			Node: "Model::joint3"
+			Matrix: 0,1,0,0,-1,0,0,0,0,0,1,0,0,2.15431302203923,0,1
+		}
+		PoseNode:  {
+			Node: "Model::joint2"
+			Matrix: 0,1,0,0,-1,0,0,0,0,0,1,0,0,1,0,1
+		}
+		PoseNode:  {
+			Node: "Model::joint1"
+			Matrix: 0,1,0,0,-1,0,0,0,0,0,1,0,0,0,0,1
+		}
+	}
+	Material: "Material::lambert1", "" {
+		Version: 102
+		ShadingModel: "lambert"
+		MultiLayer: 0
+		Properties60:  {
+			Property: "ShadingModel", "KString", "", "Lambert"
+			Property: "MultiLayer", "bool", "",0
+			Property: "EmissiveColor", "Color", "A",0,0,0
+			Property: "EmissiveFactor", "Number", "A",1
+			Property: "AmbientColor", "Color", "A",0,0,0
+			Property: "AmbientFactor", "Number", "A",1
+			Property: "DiffuseColor", "Color", "A",0.5,0.5,0.5
+			Property: "DiffuseFactor", "Number", "A",0.800000011920929
+			Property: "Bump", "Vector3D", "",0,0,0
+			Property: "NormalMap", "Vector3D", "",0,0,0
+			Property: "BumpFactor", "double", "",1
+			Property: "TransparentColor", "Color", "A",0,0,0
+			Property: "TransparencyFactor", "Number", "A",1
+			Property: "DisplacementColor", "ColorRGB", "",0,0,0
+			Property: "DisplacementFactor", "double", "",1
+			Property: "VectorDisplacementColor", "ColorRGB", "",0,0,0
+			Property: "VectorDisplacementFactor", "double", "",1
+			Property: "Emissive", "Vector3D", "",0,0,0
+			Property: "Ambient", "Vector3D", "",0,0,0
+			Property: "Diffuse", "Vector3D", "",0.400000005960464,0.400000005960464,0.400000005960464
+			Property: "Opacity", "double", "",1
+		}
+	}
+	Deformer: "Deformer::Skin pCube1", "Skin" {
+		Version: 100
+		Properties60:  {
+		}
+		Link_DeformAcuracy: 50
+	}
+	Deformer: "SubDeformer::Cluster joint3", "Cluster" {
+		Version: 100
+		Properties60:  {
+			Property: "SrcModelReference", "object", ""
+		}
+		UserData: "", ""
+		Indexes: 2,3,4,5,20,21,22,23
+		Weights: 1,1,1,1,1,1,1,1
+		Transform: 6.12323399573677e-17,-1,0,0,1.23333332718325,7.55198855708364e-17,0,0,0,0,1,0,-2.15431302203923,-1.3191362734009e-16
+        ,0,1
+		TransformLink: 6.12323399573677e-17,1,0,0,-1,6.12323399573677e-17,0,0,0,-0,1,0,-0,2.15431302203923,0,1
+	}
+	Deformer: "SubDeformer::Cluster joint2", "Cluster" {
+		Version: 100
+		Properties60:  {
+			Property: "SrcModelReference", "object", ""
+		}
+		UserData: "", ""
+		Indexes: 12,13,14,15,16,17,18,19
+		Weights: 1,1,1,1,1,1,1,1
+		Transform: 6.12323399573677e-17,-1,0,0,1.23333332718325,7.55198855708364e-17,0,0,0,0,1,0,-1,-6.12323399573677e-17,0,1
+		TransformLink: 6.12323399573677e-17,1,0,0,-1,6.12323399573677e-17,0,0,0,-0,1,0,-0,1,0,1
+	}
+	Deformer: "SubDeformer::Cluster joint1", "Cluster" {
+		Version: 100
+		Properties60:  {
+			Property: "SrcModelReference", "object", ""
+		}
+		UserData: "", ""
+		Indexes: 0,1,6,7,8,9,10,11
+		Weights: 1,1,1,1,1,1,1,1
+		Transform: 6.12323399573677e-17,-1,0,0,1.23333332718325,7.55198855708364e-17,0,0,0,0,1,0,0,0,0,1
+		TransformLink: 6.12323399573677e-17,1,0,0,-1,6.12323399573677e-17,0,0,0,-0,1,0,-0,0,0,1
+	}
+	GlobalSettings:  {
+		Version: 1000
+		Properties60:  {
+			Property: "UpAxis", "int", "",1
+			Property: "UpAxisSign", "int", "",1
+			Property: "FrontAxis", "int", "",2
+			Property: "FrontAxisSign", "int", "",1
+			Property: "CoordAxis", "int", "",0
+			Property: "CoordAxisSign", "int", "",1
+			Property: "OriginalUpAxis", "int", "",1
+			Property: "OriginalUpAxisSign", "int", "",1
+			Property: "UnitScaleFactor", "double", "",1
+			Property: "OriginalUnitScaleFactor", "double", "",1
+			Property: "AmbientColor", "ColorRGB", "",0,0,0
+			Property: "DefaultCamera", "KString", "", "Producer Perspective"
+			Property: "TimeMode", "enum", "",11
+			Property: "TimeProtocol", "enum", "",2
+			Property: "SnapOnFrameMode", "enum", "",0
+			Property: "TimeSpanStart", "KTime", "",1924423250
+			Property: "TimeSpanStop", "KTime", "",384884650000
+			Property: "CustomFrameRate", "double", "",-1
+		}
+	}
+}
+
+; Object connections
+;------------------------------------------------------------------
+
+Connections:  {
+	Connect: "OO", "Model::pCube1", "Model::Scene"
+	Connect: "OO", "Model::joint1", "Model::Scene"
+	Connect: "OO", "Deformer::Skin pCube1", "Model::pCube1"
+	Connect: "OO", "Material::lambert1", "Model::pCube1"
+	Connect: "OO", "Model::joint2", "Model::joint1"
+	Connect: "OO", "Model::joint3", "Model::joint2"
+	Connect: "OO", "Model::joint4", "Model::joint3"
+	Connect: "OO", "SubDeformer::Cluster joint3", "Deformer::Skin pCube1"
+	Connect: "OO", "SubDeformer::Cluster joint2", "Deformer::Skin pCube1"
+	Connect: "OO", "SubDeformer::Cluster joint1", "Deformer::Skin pCube1"
+	Connect: "OO", "Model::joint3", "SubDeformer::Cluster joint3"
+	Connect: "OO", "Model::joint2", "SubDeformer::Cluster joint2"
+	Connect: "OO", "Model::joint1", "SubDeformer::Cluster joint1"
+}
+;Takes and animation section
+;----------------------------------------------------
+
+Takes:  {
+	Current: "Take 001"
+	Take: "wiggle" {
+		FileName: "wiggle.tak"
+		LocalTime: 1924423250,38488465000
+		ReferenceTime: 1924423250,38488465000
+		
+		;Models animation
+		;----------------------------------------------------
+		Model: "Model::joint1" {
+			Version: 1.1
+			Channel: "Transform" {
+				Channel: "T" {
+					Channel: "X" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,0,U,s,0,0,n,3848846500,0,U,s,0,0,n,5773269750,0,U,s,0,0,n,7697693000,0
+                                        ,U,s,0,0,n,9622116250,0,U,s,0,0,n,11546539500,0,U,s,0,0,n,13470962750,0,U,s,0,0,n
+                                        ,15395386000,0,U,s,0,0,n,17319809250,0,U,s,0,0,n,19244232500,0,U,s,0,0,n,21168655750
+                                        ,0,U,s,0,0,n,23093079000,0,U,s,0,0,n,25017502250,0,U,s,0,0,n,26941925500,0,U,s,0,0
+                                        ,n,28866348750,0,U,s,0,0,n,30790772000,0,U,s,0,0,n,32715195250,0,U,s,0,0,n,34639618500
+                                        ,0,U,s,0,0,n,36564041750,0,U,s,0,0,n,38488465000,0,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,0,U,s,0,0,n,3848846500,0,U,s,0,0,n,5773269750,0,U,s,0,0,n,7697693000,0
+                                        ,U,s,0,0,n,9622116250,0,U,s,0,0,n,11546539500,0,U,s,0,0,n,13470962750,0,U,s,0,0,n
+                                        ,15395386000,0,U,s,0,0,n,17319809250,0,U,s,0,0,n,19244232500,0,U,s,0,0,n,21168655750
+                                        ,0,U,s,0,0,n,23093079000,0,U,s,0,0,n,25017502250,0,U,s,0,0,n,26941925500,0,U,s,0,0
+                                        ,n,28866348750,0,U,s,0,0,n,30790772000,0,U,s,0,0,n,32715195250,0,U,s,0,0,n,34639618500
+                                        ,0,U,s,0,0,n,36564041750,0,U,s,0,0,n,38488465000,0,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,0,U,s,0,0,n,3848846500,0,U,s,0,0,n,5773269750,0,U,s,0,0,n,7697693000,0
+                                        ,U,s,0,0,n,9622116250,0,U,s,0,0,n,11546539500,0,U,s,0,0,n,13470962750,0,U,s,0,0,n
+                                        ,15395386000,0,U,s,0,0,n,17319809250,0,U,s,0,0,n,19244232500,0,U,s,0,0,n,21168655750
+                                        ,0,U,s,0,0,n,23093079000,0,U,s,0,0,n,25017502250,0,U,s,0,0,n,26941925500,0,U,s,0,0
+                                        ,n,28866348750,0,U,s,0,0,n,30790772000,0,U,s,0,0,n,32715195250,0,U,s,0,0,n,34639618500
+                                        ,0,U,s,0,0,n,36564041750,0,U,s,0,0,n,38488465000,0,U,s,0,0,n
+						Color: 1,1,1
+					}
+					LayerType: 1
+				}
+				Channel: "R" {
+					Channel: "X" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,0,U,s,0,0,n,3848846500,0,U,s,0,0,n,5773269750,0,U,s,0,0,n,7697693000,0
+                                        ,U,s,0,0,n,9622116250,0,U,s,0,0,n,11546539500,0,U,s,0,0,n,13470962750,0,U,s,0,0,n
+                                        ,15395386000,0,U,s,0,0,n,17319809250,0,U,s,0,0,n,19244232500,0,U,s,0,0,n,21168655750
+                                        ,0,U,s,0,0,n,23093079000,0,U,s,0,0,n,25017502250,0,U,s,0,0,n,26941925500,0,U,s,0,0
+                                        ,n,28866348750,0,U,s,0,0,n,30790772000,0,U,s,0,0,n,32715195250,0,U,s,0,0,n,34639618500
+                                        ,0,U,s,0,0,n,36564041750,0,U,s,0,0,n,38488465000,0,U,s,0,149.82275390625,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,0,U,s,0,0,n,3848846500,0,U,s,0,0,n,5773269750,0,U,s,0,0,n,7697693000,0
+                                        ,U,s,0,0,n,9622116250,0,U,s,0,0,n,11546539500,0,U,s,0,0,n,13470962750,0,U,s,0,0,n
+                                        ,15395386000,0,U,s,0,0,n,17319809250,0,U,s,0,0,n,19244232500,0,U,s,0,0,n,21168655750
+                                        ,0,U,s,0,0,n,23093079000,0,U,s,0,0,n,25017502250,0,U,s,0,0,n,26941925500,0,U,s,0,0
+                                        ,n,28866348750,0,U,s,0,0,n,30790772000,0,U,s,0,0,n,32715195250,0,U,s,0,0,n,34639618500
+                                        ,0,U,s,0,0,n,36564041750,0,U,s,0,0,n,38488465000,0,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,-46.0104217529297,U,s,0,109.28205871582,n,3848846500,-43.6388473510742
+                                        ,U,s,109.28205871582,191.243606567383,n,5773269750,-37.2830352783203,U,s,191.243606567383
+                                        ,245.884628295898,n,7697693000,-28.0813331604004,U,s,245.884628295898,273.205139160156
+                                        ,n,9622116250,-17.1721038818359,U,s,273.205139160156,273.205139160156,n,11546539500
+                                        ,-5.69369220733643,U,s,273.205139160156,245.884628295898,n,13470962750,5.21554279327393
+                                        ,U,s,245.884628295898,191.243591308594,n,15395386000,14.4172439575195,U,s,191.243591308594
+                                        ,109.282051086426,n,17319809250,20.7730579376221,U,s,109.282051086426,0,n,19244232500
+                                        ,23.1446304321289,U,s,0,-107.657447814941,n,21168655750,20.7949638366699,U,s,-107.657447814941
+                                        ,-184.555633544922,n,23093079000,14.6003875732422,U,s,-184.555633544922,-230.694549560547
+                                        ,n,25017502250,5.84254026412964,U,s,-230.694549560547,-246.074172973633,n,26941925500
+                                        ,-4.19694519042969,U,s,-246.074172973633,-230.694549560547,n,28866348750,-14.2364292144775
+                                        ,U,s,-230.694549560547,-184.555633544922,n,30790772000,-22.9942779541016,U,s,-184.555633544922
+                                        ,-107.657447814941,n,32715195250,-29.1888523101807,U,s,-107.657447814941,0,n,34639618500
+                                        ,-31.5385189056396,U,s,0,567.693298339844,n,36564041750,-15.7692594528198,U,s,567.693298339844
+                                        ,0,n,38488465000,0,U,s,0,0,n
+						Color: 1,1,1
+					}
+					LayerType: 2
+				}
+				Channel: "S" {
+					Channel: "X" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,1,U,s,0,0,n,3848846500,1,U,s,0,0,n,5773269750,1,U,s,0,0,n,7697693000,1
+                                        ,U,s,0,0,n,9622116250,1,U,s,0,0,n,11546539500,1,U,s,0,0,n,13470962750,1,U,s,0,0,n
+                                        ,15395386000,1,U,s,0,0,n,17319809250,1,U,s,0,0,n,19244232500,1,U,s,0,0,n,21168655750
+                                        ,1,U,s,0,0,n,23093079000,1,U,s,0,0,n,25017502250,1,U,s,0,0,n,26941925500,1,U,s,0,0
+                                        ,n,28866348750,1,U,s,0,0,n,30790772000,1,U,s,0,0,n,32715195250,1,U,s,0,0,n,34639618500
+                                        ,1,U,s,0,0,n,36564041750,1,U,s,0,0,n,38488465000,1,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,1,U,s,0,0,n,3848846500,1,U,s,0,0,n,5773269750,1,U,s,0,0,n,7697693000,1
+                                        ,U,s,0,0,n,9622116250,1,U,s,0,0,n,11546539500,1,U,s,0,0,n,13470962750,1,U,s,0,0,n
+                                        ,15395386000,1,U,s,0,0,n,17319809250,1,U,s,0,0,n,19244232500,1,U,s,0,0,n,21168655750
+                                        ,1,U,s,0,0,n,23093079000,1,U,s,0,0,n,25017502250,1,U,s,0,0,n,26941925500,1,U,s,0,0
+                                        ,n,28866348750,1,U,s,0,0,n,30790772000,1,U,s,0,0,n,32715195250,1,U,s,0,0,n,34639618500
+                                        ,1,U,s,0,0,n,36564041750,1,U,s,0,0,n,38488465000,1,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,1,U,s,0,0,n,3848846500,1,U,s,0,0,n,5773269750,1,U,s,0,0,n,7697693000,1
+                                        ,U,s,0,0,n,9622116250,1,U,s,0,0,n,11546539500,1,U,s,0,0,n,13470962750,1,U,s,0,0,n
+                                        ,15395386000,1,U,s,0,0,n,17319809250,1,U,s,0,0,n,19244232500,1,U,s,0,0,n,21168655750
+                                        ,1,U,s,0,0,n,23093079000,1,U,s,0,0,n,25017502250,1,U,s,0,0,n,26941925500,1,U,s,0,0
+                                        ,n,28866348750,1,U,s,0,0,n,30790772000,1,U,s,0,0,n,32715195250,1,U,s,0,0,n,34639618500
+                                        ,1,U,s,0,0,n,36564041750,1,U,s,0,0,n,38488465000,1,U,s,0,0,n
+						Color: 1,1,1
+					}
+					LayerType: 3
+				}
+			}
+			Channel: "Visibility" {
+				Default: 1
+				KeyVer: 4005
+				KeyCount: 20
+				Key: 1924423250,1,C,s,3848846500,1,C,s,5773269750,1,C,s,7697693000,1,C,s,9622116250,1,C,s,11546539500,1,C,s
+                    ,13470962750,1,C,s,15395386000,1,C,s,17319809250,1,C,s,19244232500,1,C,s,21168655750,1,C,s,23093079000
+                    ,1,C,s,25017502250,1,C,s,26941925500,1,C,s,28866348750,1,C,s,30790772000,1,C,s,32715195250,1,C,s,34639618500
+                    ,1,C,s,36564041750,1,C,s,38488465000,1,C,s
+				Color: 1,1,1
+			}
+			Channel: "lockInfluenceWeights" {
+				Default: 0
+				Color: 1,1,1
+			}
+		}
+		Model: "Model::joint2" {
+			Version: 1.1
+			Channel: "Transform" {
+				Channel: "T" {
+					Channel: "X" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,1,U,s,0,0,n,3848846500,1,U,s,0,0,n,5773269750,1,U,s,0,0,n,7697693000,1
+                                        ,U,s,0,0,n,9622116250,1,U,s,0,0,n,11546539500,1,U,s,0,0,n,13470962750,1,U,s,0,0,n
+                                        ,15395386000,1,U,s,0,0,n,17319809250,1,U,s,0,0,n,19244232500,1,U,s,0,0,n,21168655750
+                                        ,1,U,s,0,0,n,23093079000,1,U,s,0,0,n,25017502250,1,U,s,0,0,n,26941925500,1,U,s,0,0
+                                        ,n,28866348750,1,U,s,0,0,n,30790772000,1,U,s,0,0,n,32715195250,1,U,s,0,0,n,34639618500
+                                        ,1,U,s,0,0,n,36564041750,1,U,s,0,0,n,38488465000,1,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,0,U,s,0,0,n,3848846500,0,U,s,0,0,n,5773269750,0,U,s,0,0,n,7697693000,0
+                                        ,U,s,0,0,n,9622116250,0,U,s,0,0,n,11546539500,0,U,s,0,0,n,13470962750,0,U,s,0,0,n
+                                        ,15395386000,0,U,s,0,0,n,17319809250,0,U,s,0,0,n,19244232500,0,U,s,0,0,n,21168655750
+                                        ,0,U,s,0,0,n,23093079000,0,U,s,0,0,n,25017502250,0,U,s,0,0,n,26941925500,0,U,s,0,0
+                                        ,n,28866348750,0,U,s,0,0,n,30790772000,0,U,s,0,0,n,32715195250,0,U,s,0,0,n,34639618500
+                                        ,0,U,s,0,0,n,36564041750,0,U,s,0,0,n,38488465000,0,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,0,U,s,0,0,n,3848846500,0,U,s,0,0,n,5773269750,0,U,s,0,0,n,7697693000,0
+                                        ,U,s,0,0,n,9622116250,0,U,s,0,0,n,11546539500,0,U,s,0,0,n,13470962750,0,U,s,0,0,n
+                                        ,15395386000,0,U,s,0,0,n,17319809250,0,U,s,0,0,n,19244232500,0,U,s,0,0,n,21168655750
+                                        ,0,U,s,0,0,n,23093079000,0,U,s,0,0,n,25017502250,0,U,s,0,0,n,26941925500,0,U,s,0,0
+                                        ,n,28866348750,0,U,s,0,0,n,30790772000,0,U,s,0,0,n,32715195250,0,U,s,0,0,n,34639618500
+                                        ,0,U,s,0,0,n,36564041750,0,U,s,0,0,n,38488465000,0,U,s,0,0,n
+						Color: 1,1,1
+					}
+					LayerType: 1
+				}
+				Channel: "R" {
+					Channel: "X" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,0,U,s,0,0,n,3848846500,0,U,s,0,0,n,5773269750,0,U,s,0,0,n,7697693000,0
+                                        ,U,s,0,0,n,9622116250,0,U,s,0,0,n,11546539500,0,U,s,0,0,n,13470962750,0,U,s,0,0,n
+                                        ,15395386000,0,U,s,0,0,n,17319809250,0,U,s,0,0,n,19244232500,0,U,s,0,0,n,21168655750
+                                        ,0,U,s,0,0,n,23093079000,0,U,s,0,0,n,25017502250,0,U,s,0,0,n,26941925500,0,U,s,0,0
+                                        ,n,28866348750,0,U,s,0,0,n,30790772000,0,U,s,0,0,n,32715195250,0,U,s,0,0,n,34639618500
+                                        ,0,U,s,0,0,n,36564041750,0,U,s,0,0,n,38488465000,0,U,s,0,125.077178955078,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,0,U,s,0,0,n,3848846500,0,U,s,0,0,n,5773269750,0,U,s,0,0,n,7697693000,0
+                                        ,U,s,0,0,n,9622116250,0,U,s,0,0,n,11546539500,0,U,s,0,0,n,13470962750,0,U,s,0,0,n
+                                        ,15395386000,0,U,s,0,0,n,17319809250,0,U,s,0,0,n,19244232500,0,U,s,0,0,n,21168655750
+                                        ,0,U,s,0,0,n,23093079000,0,U,s,0,0,n,25017502250,0,U,s,0,0,n,26941925500,0,U,s,0,0
+                                        ,n,28866348750,0,U,s,0,0,n,30790772000,0,U,s,0,0,n,32715195250,0,U,s,0,0,n,34639618500
+                                        ,0,U,s,0,0,n,36564041750,0,U,s,0,0,n,38488465000,0,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,67.3346862792969,U,s,0,-221.996795654297,n,3848846500,62.5170440673828
+                                        ,U,s,-221.996795654297,-388.494384765625,n,5773269750,49.6057739257813,U,s,-388.494384765625
+                                        ,-499.492767333984,n,7697693000,30.9133358001709,U,s,-499.492767333984,-554.992004394531
+                                        ,n,9622116250,8.75220108032227,U,s,-554.992004394531,-554.992004394531,n,11546539500
+                                        ,-14.5651721954346,U,s,-554.992004394531,-499.492767333984,n,13470962750,-36.7263107299805
+                                        ,U,s,-499.492767333984,-388.494384765625,n,15395386000,-55.4187469482422,U,s,-388.494384765625
+                                        ,-221.996780395508,n,17319809250,-68.3300170898438,U,s,-221.996780395508,0,n,19244232500
+                                        ,-73.1476593017578,U,s,0,245.2412109375,n,21168655750,-67.7951736450195,U,s,245.2412109375
+                                        ,420.413482666016,n,23093079000,-53.6840744018555,U,s,420.413482666016,525.516906738281
+                                        ,n,25017502250,-33.7338943481445,U,s,525.516906738281,560.551330566406,n,26941925500
+                                        ,-10.8641777038574,U,s,560.551330566406,525.516906738281,n,28866348750,12.0055389404297
+                                        ,U,s,525.516906738281,420.413482666016,n,30790772000,31.9557151794434,U,s,420.413482666016
+                                        ,245.2412109375,n,32715195250,46.0668182373047,U,s,245.2412109375,0,n,34639618500
+                                        ,51.419303894043,U,s,0,-925.547424316406,n,36564041750,25.7096519470215,U,s,-925.547424316406
+                                        ,0,n,38488465000,0,U,s,0,0,n
+						Color: 1,1,1
+					}
+					LayerType: 2
+				}
+				Channel: "S" {
+					Channel: "X" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,1,U,s,0,0,n,3848846500,1,U,s,0,0,n,5773269750,1,U,s,0,0,n,7697693000,1
+                                        ,U,s,0,0,n,9622116250,1,U,s,0,0,n,11546539500,1,U,s,0,0,n,13470962750,1,U,s,0,0,n
+                                        ,15395386000,1,U,s,0,0,n,17319809250,1,U,s,0,0,n,19244232500,1,U,s,0,0,n,21168655750
+                                        ,1,U,s,0,0,n,23093079000,1,U,s,0,0,n,25017502250,1,U,s,0,0,n,26941925500,1,U,s,0,0
+                                        ,n,28866348750,1,U,s,0,0,n,30790772000,1,U,s,0,0,n,32715195250,1,U,s,0,0,n,34639618500
+                                        ,1,U,s,0,0,n,36564041750,1,U,s,0,0,n,38488465000,1,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,1,U,s,0,0,n,3848846500,1,U,s,0,0,n,5773269750,1,U,s,0,0,n,7697693000,1
+                                        ,U,s,0,0,n,9622116250,1,U,s,0,0,n,11546539500,1,U,s,0,0,n,13470962750,1,U,s,0,0,n
+                                        ,15395386000,1,U,s,0,0,n,17319809250,1,U,s,0,0,n,19244232500,1,U,s,0,0,n,21168655750
+                                        ,1,U,s,0,0,n,23093079000,1,U,s,0,0,n,25017502250,1,U,s,0,0,n,26941925500,1,U,s,0,0
+                                        ,n,28866348750,1,U,s,0,0,n,30790772000,1,U,s,0,0,n,32715195250,1,U,s,0,0,n,34639618500
+                                        ,1,U,s,0,0,n,36564041750,1,U,s,0,0,n,38488465000,1,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,1,U,s,0,0,n,3848846500,1,U,s,0,0,n,5773269750,1,U,s,0,0,n,7697693000,1
+                                        ,U,s,0,0,n,9622116250,1,U,s,0,0,n,11546539500,1,U,s,0,0,n,13470962750,1,U,s,0,0,n
+                                        ,15395386000,1,U,s,0,0,n,17319809250,1,U,s,0,0,n,19244232500,1,U,s,0,0,n,21168655750
+                                        ,1,U,s,0,0,n,23093079000,1,U,s,0,0,n,25017502250,1,U,s,0,0,n,26941925500,1,U,s,0,0
+                                        ,n,28866348750,1,U,s,0,0,n,30790772000,1,U,s,0,0,n,32715195250,1,U,s,0,0,n,34639618500
+                                        ,1,U,s,0,0,n,36564041750,1,U,s,0,0,n,38488465000,1,U,s,0,0,n
+						Color: 1,1,1
+					}
+					LayerType: 3
+				}
+			}
+			Channel: "Visibility" {
+				Default: 1
+				KeyVer: 4005
+				KeyCount: 20
+				Key: 1924423250,1,C,s,3848846500,1,C,s,5773269750,1,C,s,7697693000,1,C,s,9622116250,1,C,s,11546539500,1,C,s
+                    ,13470962750,1,C,s,15395386000,1,C,s,17319809250,1,C,s,19244232500,1,C,s,21168655750,1,C,s,23093079000
+                    ,1,C,s,25017502250,1,C,s,26941925500,1,C,s,28866348750,1,C,s,30790772000,1,C,s,32715195250,1,C,s,34639618500
+                    ,1,C,s,36564041750,1,C,s,38488465000,1,C,s
+				Color: 1,1,1
+			}
+			Channel: "lockInfluenceWeights" {
+				Default: 0
+				Color: 1,1,1
+			}
+		}
+		Model: "Model::joint3" {
+			Version: 1.1
+			Channel: "Transform" {
+				Channel: "T" {
+					Channel: "X" {
+						Default: 1.15431296825409
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,1.15431296825409,U,s,0,0,n,3848846500,1.15431296825409,U,s,0,0,n,5773269750
+                                        ,1.15431296825409,U,s,0,0,n,7697693000,1.15431296825409,U,s,0,0,n,9622116250,1.15431296825409
+                                        ,U,s,0,0,n,11546539500,1.15431296825409,U,s,0,0,n,13470962750,1.15431296825409,U,s
+                                        ,0,0,n,15395386000,1.15431296825409,U,s,0,0,n,17319809250,1.15431296825409,U,s,0,0
+                                        ,n,19244232500,1.15431296825409,U,s,0,0,n,21168655750,1.15431296825409,U,s,0,0,n,23093079000
+                                        ,1.15431296825409,U,s,0,0,n,25017502250,1.15431296825409,U,s,0,0,n,26941925500,1.15431296825409
+                                        ,U,s,0,0,n,28866348750,1.15431296825409,U,s,0,0,n,30790772000,1.15431296825409,U,s
+                                        ,0,0,n,32715195250,1.15431296825409,U,s,0,0,n,34639618500,1.15431296825409,U,s,0,0
+                                        ,n,36564041750,1.15431296825409,U,s,0,0,n,38488465000,1.15431296825409,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,0,U,s,0,0,n,3848846500,0,U,s,0,0,n,5773269750,0,U,s,0,0,n,7697693000,0
+                                        ,U,s,0,0,n,9622116250,0,U,s,0,0,n,11546539500,0,U,s,0,0,n,13470962750,0,U,s,0,0,n
+                                        ,15395386000,0,U,s,0,0,n,17319809250,0,U,s,0,0,n,19244232500,0,U,s,0,0,n,21168655750
+                                        ,0,U,s,0,0,n,23093079000,0,U,s,0,0,n,25017502250,0,U,s,0,0,n,26941925500,0,U,s,0,0
+                                        ,n,28866348750,0,U,s,0,0,n,30790772000,0,U,s,0,0,n,32715195250,0,U,s,0,0,n,34639618500
+                                        ,0,U,s,0,0,n,36564041750,0,U,s,0,0,n,38488465000,0,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,0,U,s,0,0,n,3848846500,0,U,s,0,0,n,5773269750,0,U,s,0,0,n,7697693000,0
+                                        ,U,s,0,0,n,9622116250,0,U,s,0,0,n,11546539500,0,U,s,0,0,n,13470962750,0,U,s,0,0,n
+                                        ,15395386000,0,U,s,0,0,n,17319809250,0,U,s,0,0,n,19244232500,0,U,s,0,0,n,21168655750
+                                        ,0,U,s,0,0,n,23093079000,0,U,s,0,0,n,25017502250,0,U,s,0,0,n,26941925500,0,U,s,0,0
+                                        ,n,28866348750,0,U,s,0,0,n,30790772000,0,U,s,0,0,n,32715195250,0,U,s,0,0,n,34639618500
+                                        ,0,U,s,0,0,n,36564041750,0,U,s,0,0,n,38488465000,0,U,s,0,0,n
+						Color: 1,1,1
+					}
+					LayerType: 1
+				}
+				Channel: "R" {
+					Channel: "X" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,0,U,s,0,0,n,3848846500,0,U,s,0,0,n,5773269750,0,U,s,0,0,n,7697693000,0
+                                        ,U,s,0,0,n,9622116250,0,U,s,0,0,n,11546539500,0,U,s,0,0,n,13470962750,0,U,s,0,0,n
+                                        ,15395386000,0,U,s,0,0,n,17319809250,0,U,s,0,0,n,19244232500,0,U,s,0,0,n,21168655750
+                                        ,0,U,s,0,0,n,23093079000,0,U,s,0,0,n,25017502250,0,U,s,0,0,n,26941925500,0,U,s,0,0
+                                        ,n,28866348750,0,U,s,0,0,n,30790772000,0,U,s,0,0,n,32715195250,0,U,s,0,0,n,34639618500
+                                        ,0,U,s,0,0,n,36564041750,0,U,s,0,0,n,38488465000,0,U,s,0,-144.71484375,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,0,U,s,0,0,n,3848846500,0,U,s,0,0,n,5773269750,0,U,s,0,0,n,7697693000,0
+                                        ,U,s,0,0,n,9622116250,0,U,s,0,0,n,11546539500,0,U,s,0,0,n,13470962750,0,U,s,0,0,n
+                                        ,15395386000,0,U,s,0,0,n,17319809250,0,U,s,0,0,n,19244232500,0,U,s,0,0,n,21168655750
+                                        ,0,U,s,0,0,n,23093079000,0,U,s,0,0,n,25017502250,0,U,s,0,0,n,26941925500,0,U,s,0,0
+                                        ,n,28866348750,0,U,s,0,0,n,30790772000,0,U,s,0,0,n,32715195250,0,U,s,0,0,n,34639618500
+                                        ,0,U,s,0,0,n,36564041750,0,U,s,0,0,n,38488465000,0,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,39.172191619873,U,s,0,-124.010719299316,n,3848846500,36.4809875488281,U
+                                        ,s,-124.010719299316,-217.018753051758,n,5773269750,29.2685585021973,U,s,-217.018753051758
+                                        ,-279.024108886719,n,7697693000,18.8266830444336,U,s,-279.024108886719,-310.026794433594
+                                        ,n,9622116250,6.44714164733887,U,s,-310.026794433594,-310.026794433594,n,11546539500
+                                        ,-6.57829093933105,U,s,-310.026794433594,-279.024108886719,n,13470962750,-18.9578304290771
+                                        ,U,s,-279.024108886719,-217.018753051758,n,15395386000,-29.3997058868408,U,s,-217.018753051758
+                                        ,-124.010711669922,n,17319809250,-36.6121368408203,U,s,-124.010711669922,0,n,19244232500
+                                        ,-39.3033409118652,U,s,0,151.208068847656,n,21168655750,-36.0031623840332,U,s,151.208068847656
+                                        ,259.213806152344,n,23093079000,-27.3027019500732,U,s,259.213806152344,324.017303466797
+                                        ,n,25017502250,-15.0020446777344,U,s,324.017303466797,345.618438720703,n,26941925500
+                                        ,-0.901290893554688,U,s,345.618438720703,324.017303466797,n,28866348750,13.199462890625
+                                        ,U,s,324.017303466797,259.213806152344,n,30790772000,25.5001182556152,U,s,259.213806152344
+                                        ,151.208068847656,n,32715195250,34.2005805969238,U,s,151.208068847656,0,n,34639618500
+                                        ,37.5007591247559,U,s,0,-675.013671875,n,36564041750,18.7503795623779,U,s,-675.013671875
+                                        ,0,n,38488465000,0,U,s,0,0,n
+						Color: 1,1,1
+					}
+					LayerType: 2
+				}
+				Channel: "S" {
+					Channel: "X" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,1,U,s,0,0,n,3848846500,1,U,s,0,0,n,5773269750,1,U,s,0,0,n,7697693000,1
+                                        ,U,s,0,0,n,9622116250,1,U,s,0,0,n,11546539500,1,U,s,0,0,n,13470962750,1,U,s,0,0,n
+                                        ,15395386000,1,U,s,0,0,n,17319809250,1,U,s,0,0,n,19244232500,1,U,s,0,0,n,21168655750
+                                        ,1,U,s,0,0,n,23093079000,1,U,s,0,0,n,25017502250,1,U,s,0,0,n,26941925500,1,U,s,0,0
+                                        ,n,28866348750,1,U,s,0,0,n,30790772000,1,U,s,0,0,n,32715195250,1,U,s,0,0,n,34639618500
+                                        ,1,U,s,0,0,n,36564041750,1,U,s,0,0,n,38488465000,1,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,1,U,s,0,0,n,3848846500,1,U,s,0,0,n,5773269750,1,U,s,0,0,n,7697693000,1
+                                        ,U,s,0,0,n,9622116250,1,U,s,0,0,n,11546539500,1,U,s,0,0,n,13470962750,1,U,s,0,0,n
+                                        ,15395386000,1,U,s,0,0,n,17319809250,1,U,s,0,0,n,19244232500,1,U,s,0,0,n,21168655750
+                                        ,1,U,s,0,0,n,23093079000,1,U,s,0,0,n,25017502250,1,U,s,0,0,n,26941925500,1,U,s,0,0
+                                        ,n,28866348750,1,U,s,0,0,n,30790772000,1,U,s,0,0,n,32715195250,1,U,s,0,0,n,34639618500
+                                        ,1,U,s,0,0,n,36564041750,1,U,s,0,0,n,38488465000,1,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 20
+						Key: 1924423250,1,U,s,0,0,n,3848846500,1,U,s,0,0,n,5773269750,1,U,s,0,0,n,7697693000,1
+                                        ,U,s,0,0,n,9622116250,1,U,s,0,0,n,11546539500,1,U,s,0,0,n,13470962750,1,U,s,0,0,n
+                                        ,15395386000,1,U,s,0,0,n,17319809250,1,U,s,0,0,n,19244232500,1,U,s,0,0,n,21168655750
+                                        ,1,U,s,0,0,n,23093079000,1,U,s,0,0,n,25017502250,1,U,s,0,0,n,26941925500,1,U,s,0,0
+                                        ,n,28866348750,1,U,s,0,0,n,30790772000,1,U,s,0,0,n,32715195250,1,U,s,0,0,n,34639618500
+                                        ,1,U,s,0,0,n,36564041750,1,U,s,0,0,n,38488465000,1,U,s,0,0,n
+						Color: 1,1,1
+					}
+					LayerType: 3
+				}
+			}
+			Channel: "Visibility" {
+				Default: 1
+				KeyVer: 4005
+				KeyCount: 20
+				Key: 1924423250,1,C,s,3848846500,1,C,s,5773269750,1,C,s,7697693000,1,C,s,9622116250,1,C,s,11546539500,1,C,s
+                    ,13470962750,1,C,s,15395386000,1,C,s,17319809250,1,C,s,19244232500,1,C,s,21168655750,1,C,s,23093079000
+                    ,1,C,s,25017502250,1,C,s,26941925500,1,C,s,28866348750,1,C,s,30790772000,1,C,s,32715195250,1,C,s,34639618500
+                    ,1,C,s,36564041750,1,C,s,38488465000,1,C,s
+				Color: 1,1,1
+			}
+			Channel: "lockInfluenceWeights" {
+				Default: 0
+				Color: 1,1,1
+			}
+		}
+		
+		;Generic nodes animation
+		;----------------------------------------------------
+		
+		;Textures animation
+		;----------------------------------------------------
+		
+		;Materials animation
+		;----------------------------------------------------
+		
+		
+		;Constraints animation
+		;----------------------------------------------------
+	}
+	Take: "spin" {
+		FileName: "spin.tak"
+		LocalTime: 38488465000,76976930000
+		ReferenceTime: 38488465000,76976930000
+		
+		;Models animation
+		;----------------------------------------------------
+		Model: "Model::joint1" {
+			Version: 1.1
+			Channel: "Transform" {
+				Channel: "T" {
+					Channel: "X" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,0,n,40412888250,0,U,s,0,0,n,42337311500,0,U,s,0,0,n,44261734750
+                                        ,0,U,s,0,0,n,46186158000,0,U,s,0,0,n,48110581250,0,U,s,0,0,n,50035004500,0,U,s,0,0
+                                        ,n,51959427750,0,U,s,0,0,n,53883851000,0,U,s,0,0,n,55808274250,0,U,s,0,0,n,57732697500
+                                        ,0,U,s,0,0,n,59657120750,0,U,s,0,0,n,61581544000,0,U,s,0,0,n,63505967250,0,U,s,0,0
+                                        ,n,65430390500,0,U,s,0,0,n,67354813750,0,U,s,0,0,n,69279237000,0,U,s,0,0,n,71203660250
+                                        ,0,U,s,0,0,n,73128083500,0,U,s,0,0,n,75052506750,0,U,s,0,0,n,76976930000,0,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,0,n,40412888250,0,U,s,0,0,n,42337311500,0,U,s,0,0,n,44261734750
+                                        ,0,U,s,0,0,n,46186158000,0,U,s,0,0,n,48110581250,0,U,s,0,0,n,50035004500,0,U,s,0,0
+                                        ,n,51959427750,0,U,s,0,0,n,53883851000,0,U,s,0,0,n,55808274250,0,U,s,0,0,n,57732697500
+                                        ,0,U,s,0,0,n,59657120750,0,U,s,0,0,n,61581544000,0,U,s,0,0,n,63505967250,0,U,s,0,0
+                                        ,n,65430390500,0,U,s,0,0,n,67354813750,0,U,s,0,0,n,69279237000,0,U,s,0,0,n,71203660250
+                                        ,0,U,s,0,0,n,73128083500,0,U,s,0,0,n,75052506750,0,U,s,0,0,n,76976930000,0,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,0,n,40412888250,0,U,s,0,0,n,42337311500,0,U,s,0,0,n,44261734750
+                                        ,0,U,s,0,0,n,46186158000,0,U,s,0,0,n,48110581250,0,U,s,0,0,n,50035004500,0,U,s,0,0
+                                        ,n,51959427750,0,U,s,0,0,n,53883851000,0,U,s,0,0,n,55808274250,0,U,s,0,0,n,57732697500
+                                        ,0,U,s,0,0,n,59657120750,0,U,s,0,0,n,61581544000,0,U,s,0,0,n,63505967250,0,U,s,0,0
+                                        ,n,65430390500,0,U,s,0,0,n,67354813750,0,U,s,0,0,n,69279237000,0,U,s,0,0,n,71203660250
+                                        ,0,U,s,0,0,n,73128083500,0,U,s,0,0,n,75052506750,0,U,s,0,0,n,76976930000,0,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					LayerType: 1
+				}
+				Channel: "R" {
+					Channel: "X" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,149.82275390625,n,40412888250,3.26072907447815,U,s,149.82275390625
+                                        ,259.492004394531,n,42337311500,11.9275407791138,U,s,259.492004394531,329.007690429688
+                                        ,n,44261734750,24.32737159729,U,s,329.007690429688,358.369903564453,n,46186158000
+                                        ,38.7871589660645,U,s,358.369903564453,347.578552246094,n,48110581250,53.6338386535645
+                                        ,U,s,347.578552246094,296.633758544922,n,50035004500,67.1943511962891,U,s,296.633758544922
+                                        ,205.535415649414,n,51959427750,77.7956314086914,U,s,205.535415649414,219.148864746094
+                                        ,n,53883851000,86.6626281738281,U,s,219.148864746094,227.172958374023,n,55808274250
+                                        ,95.9804077148438,U,s,227.172958374023,229.607711791992,n,57732697500,105.516067504883
+                                        ,U,s,229.607711791992,226.453094482422,n,59657120750,115.036743164063,U,s,226.453094482422
+                                        ,217.70915222168,n,61581544000,124.309539794922,U,s,217.70915222168,203.375885009766
+                                        ,n,63505967250,133.101547241211,U,s,203.375885009766,183.453262329102,n,65430390500
+                                        ,141.179901123047,U,s,183.453262329102,157.941299438477,n,67354813750,148.31169128418
+                                        ,U,s,157.941299438477,126.839996337891,n,69279237000,154.264038085938,U,s,126.839996337891
+                                        ,90.1493377685547,n,71203660250,158.804061889648,U,s,90.1493377685547,47.8693237304688
+                                        ,n,73128083500,161.698852539063,U,s,47.8693237304688,0,n,75052506750,162.715545654297
+                                        ,U,s,0,-1735.63256835938,n,76976930000,120.53003692627,U,s,-1735.63256835938,-1735.63232421875
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,0,n,40412888250,0,U,s,0,0,n,42337311500,0,U,s,0,0,n,44261734750
+                                        ,0,U,s,0,0,n,46186158000,0,U,s,0,0,n,48110581250,0,U,s,0,0,n,50035004500,0,U,s,0,0
+                                        ,n,51959427750,0,U,s,0,0,n,53883851000,0,U,s,0,0,n,55808274250,0,U,s,0,0,n,57732697500
+                                        ,0,U,s,0,0,n,59657120750,0,U,s,0,0,n,61581544000,0,U,s,0,0,n,63505967250,0,U,s,0,0
+                                        ,n,65430390500,0,U,s,0,0,n,67354813750,0,U,s,0,0,n,69279237000,0,U,s,0,0,n,71203660250
+                                        ,0,U,s,0,0,n,73128083500,0,U,s,0,0,n,75052506750,0,U,s,0,0,n,76976930000,0,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,0,n,40412888250,0,U,s,0,0,n,42337311500,0,U,s,0,0,n,44261734750
+                                        ,0,U,s,0,0,n,46186158000,0,U,s,0,0,n,48110581250,0,U,s,0,0,n,50035004500,0,U,s,0,0
+                                        ,n,51959427750,0,U,s,0,0,n,53883851000,0,U,s,0,0,n,55808274250,0,U,s,0,0,n,57732697500
+                                        ,0,U,s,0,0,n,59657120750,0,U,s,0,0,n,61581544000,0,U,s,0,0,n,63505967250,0,U,s,0,0
+                                        ,n,65430390500,0,U,s,0,0,n,67354813750,0,U,s,0,0,n,69279237000,0,U,s,0,0,n,71203660250
+                                        ,0,U,s,0,0,n,73128083500,0,U,s,0,0,n,75052506750,0,U,s,0,0,n,76976930000,0,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					LayerType: 2
+				}
+				Channel: "S" {
+					Channel: "X" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,1,U,s,0,0,n,40412888250,1,U,s,0,0,n,42337311500,1,U,s,0,0,n,44261734750
+                                        ,1,U,s,0,0,n,46186158000,1,U,s,0,0,n,48110581250,1,U,s,0,0,n,50035004500,1,U,s,0,0
+                                        ,n,51959427750,1,U,s,0,0,n,53883851000,1,U,s,0,0,n,55808274250,1,U,s,0,0,n,57732697500
+                                        ,1,U,s,0,0,n,59657120750,1,U,s,0,0,n,61581544000,1,U,s,0,0,n,63505967250,1,U,s,0,0
+                                        ,n,65430390500,1,U,s,0,0,n,67354813750,1,U,s,0,0,n,69279237000,1,U,s,0,0,n,71203660250
+                                        ,1,U,s,0,0,n,73128083500,1,U,s,0,0,n,75052506750,1,U,s,0,0,n,76976930000,1,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,1,U,s,0,0,n,40412888250,1,U,s,0,0,n,42337311500,1,U,s,0,0,n,44261734750
+                                        ,1,U,s,0,0,n,46186158000,1,U,s,0,0,n,48110581250,1,U,s,0,0,n,50035004500,1,U,s,0,0
+                                        ,n,51959427750,1,U,s,0,0,n,53883851000,1,U,s,0,0,n,55808274250,1,U,s,0,0,n,57732697500
+                                        ,1,U,s,0,0,n,59657120750,1,U,s,0,0,n,61581544000,1,U,s,0,0,n,63505967250,1,U,s,0,0
+                                        ,n,65430390500,1,U,s,0,0,n,67354813750,1,U,s,0,0,n,69279237000,1,U,s,0,0,n,71203660250
+                                        ,1,U,s,0,0,n,73128083500,1,U,s,0,0,n,75052506750,1,U,s,0,0,n,76976930000,1,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,1,U,s,0,0,n,40412888250,1,U,s,0,0,n,42337311500,1,U,s,0,0,n,44261734750
+                                        ,1,U,s,0,0,n,46186158000,1,U,s,0,0,n,48110581250,1,U,s,0,0,n,50035004500,1,U,s,0,0
+                                        ,n,51959427750,1,U,s,0,0,n,53883851000,1,U,s,0,0,n,55808274250,1,U,s,0,0,n,57732697500
+                                        ,1,U,s,0,0,n,59657120750,1,U,s,0,0,n,61581544000,1,U,s,0,0,n,63505967250,1,U,s,0,0
+                                        ,n,65430390500,1,U,s,0,0,n,67354813750,1,U,s,0,0,n,69279237000,1,U,s,0,0,n,71203660250
+                                        ,1,U,s,0,0,n,73128083500,1,U,s,0,0,n,75052506750,1,U,s,0,0,n,76976930000,1,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					LayerType: 3
+				}
+			}
+			Channel: "Visibility" {
+				Default: 1
+				KeyVer: 4005
+				KeyCount: 21
+				Key: 38488465000,1,C,s,40412888250,1,C,s,42337311500,1,C,s,44261734750,1,C,s,46186158000,1,C,s,48110581250
+                    ,1,C,s,50035004500,1,C,s,51959427750,1,C,s,53883851000,1,C,s,55808274250,1,C,s,57732697500,1,C,s,59657120750
+                    ,1,C,s,61581544000,1,C,s,63505967250,1,C,s,65430390500,1,C,s,67354813750,1,C,s,69279237000,1,C,s,71203660250
+                    ,1,C,s,73128083500,1,C,s,75052506750,1,C,s,76976930000,1,C,s
+				Color: 1,1,1
+			}
+			Channel: "lockInfluenceWeights" {
+				Default: 0
+				Color: 1,1,1
+			}
+		}
+		Model: "Model::joint2" {
+			Version: 1.1
+			Channel: "Transform" {
+				Channel: "T" {
+					Channel: "X" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,1,U,s,0,0,n,40412888250,1,U,s,0,0,n,42337311500,1,U,s,0,0,n,44261734750
+                                        ,1,U,s,0,0,n,46186158000,1,U,s,0,0,n,48110581250,1,U,s,0,0,n,50035004500,1,U,s,0,0
+                                        ,n,51959427750,1,U,s,0,0,n,53883851000,1,U,s,0,0,n,55808274250,1,U,s,0,0,n,57732697500
+                                        ,1,U,s,0,0,n,59657120750,1,U,s,0,0,n,61581544000,1,U,s,0,0,n,63505967250,1,U,s,0,0
+                                        ,n,65430390500,1,U,s,0,0,n,67354813750,1,U,s,0,0,n,69279237000,1,U,s,0,0,n,71203660250
+                                        ,1,U,s,0,0,n,73128083500,1,U,s,0,0,n,75052506750,1,U,s,0,0,n,76976930000,1,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,0,n,40412888250,0,U,s,0,0,n,42337311500,0,U,s,0,0,n,44261734750
+                                        ,0,U,s,0,0,n,46186158000,0,U,s,0,0,n,48110581250,0,U,s,0,0,n,50035004500,0,U,s,0,0
+                                        ,n,51959427750,0,U,s,0,0,n,53883851000,0,U,s,0,0,n,55808274250,0,U,s,0,0,n,57732697500
+                                        ,0,U,s,0,0,n,59657120750,0,U,s,0,0,n,61581544000,0,U,s,0,0,n,63505967250,0,U,s,0,0
+                                        ,n,65430390500,0,U,s,0,0,n,67354813750,0,U,s,0,0,n,69279237000,0,U,s,0,0,n,71203660250
+                                        ,0,U,s,0,0,n,73128083500,0,U,s,0,0,n,75052506750,0,U,s,0,0,n,76976930000,0,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,0,n,40412888250,0,U,s,0,0,n,42337311500,0,U,s,0,0,n,44261734750
+                                        ,0,U,s,0,0,n,46186158000,0,U,s,0,0,n,48110581250,0,U,s,0,0,n,50035004500,0,U,s,0,0
+                                        ,n,51959427750,0,U,s,0,0,n,53883851000,0,U,s,0,0,n,55808274250,0,U,s,0,0,n,57732697500
+                                        ,0,U,s,0,0,n,59657120750,0,U,s,0,0,n,61581544000,0,U,s,0,0,n,63505967250,0,U,s,0,0
+                                        ,n,65430390500,0,U,s,0,0,n,67354813750,0,U,s,0,0,n,69279237000,0,U,s,0,0,n,71203660250
+                                        ,0,U,s,0,0,n,73128083500,0,U,s,0,0,n,75052506750,0,U,s,0,0,n,76976930000,0,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					LayerType: 1
+				}
+				Channel: "R" {
+					Channel: "X" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,125.077178955078,n,40412888250,2.72235298156738,U,s,125.077178955078
+                                        ,216.579727172852,n,42337311500,9.95678329467773,U,s,216.579727172852,274.507659912109
+                                        ,n,44261734750,20.304349899292,U,s,274.507659912109,298.860961914063,n,46186158000
+                                        ,32.3661079406738,U,s,298.860961914063,289.639678955078,n,48110581250,44.7431144714355
+                                        ,U,s,289.639678955078,246.84375,n,50035004500,56.0364303588867,U,s,246.84375,170.473205566406
+                                        ,n,51959427750,64.8471145629883,U,s,170.473205566406,181.46858215332,n,53883851000
+                                        ,72.1951446533203,U,s,181.46858215332,187.881896972656,n,55808274250,79.9058609008789
+                                        ,U,s,187.881896972656,189.713104248047,n,57732697500,87.788330078125,U,s,189.713104248047
+                                        ,186.962219238281,n,59657120750,95.6516418457031,U,s,186.962219238281,179.629257202148
+                                        ,n,61581544000,103.304870605469,U,s,179.629257202148,167.714202880859,n,63505967250
+                                        ,110.557098388672,U,s,167.714202880859,151.217056274414,n,65430390500,117.217422485352
+                                        ,U,s,151.217056274414,130.137802124023,n,67354813750,123.094886779785,U,s,130.137802124023
+                                        ,104.476486206055,n,69279237000,127.998588562012,U,s,104.476486206055,74.2330932617188
+                                        ,n,71203660250,131.73762512207,U,s,74.2330932617188,39.4075775146484,n,73128083500
+                                        ,134.121032714844,U,s,39.4075775146484,0,n,75052506750,134.957946777344,U,s,0,-1439.55151367188
+                                        ,n,76976930000,99.9688491821289,U,s,-1439.55151367188,-1439.55139160156,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,0,n,40412888250,0,U,s,0,0,n,42337311500,0,U,s,0,0,n,44261734750
+                                        ,0,U,s,0,0,n,46186158000,0,U,s,0,0,n,48110581250,0,U,s,0,0,n,50035004500,0,U,s,0,0
+                                        ,n,51959427750,0,U,s,0,0,n,53883851000,0,U,s,0,0,n,55808274250,0,U,s,0,0,n,57732697500
+                                        ,0,U,s,0,0,n,59657120750,0,U,s,0,0,n,61581544000,0,U,s,0,0,n,63505967250,0,U,s,0,0
+                                        ,n,65430390500,0,U,s,0,0,n,67354813750,0,U,s,0,0,n,69279237000,0,U,s,0,0,n,71203660250
+                                        ,0,U,s,0,0,n,73128083500,0,U,s,0,0,n,75052506750,0,U,s,0,0,n,76976930000,0,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,0,n,40412888250,0,U,s,0,0,n,42337311500,0,U,s,0,0,n,44261734750
+                                        ,0,U,s,0,0,n,46186158000,0,U,s,0,0,n,48110581250,0,U,s,0,0,n,50035004500,0,U,s,0,0
+                                        ,n,51959427750,0,U,s,0,0,n,53883851000,0,U,s,0,0,n,55808274250,0,U,s,0,0,n,57732697500
+                                        ,0,U,s,0,0,n,59657120750,0,U,s,0,0,n,61581544000,0,U,s,0,0,n,63505967250,0,U,s,0,0
+                                        ,n,65430390500,0,U,s,0,0,n,67354813750,0,U,s,0,0,n,69279237000,0,U,s,0,0,n,71203660250
+                                        ,0,U,s,0,0,n,73128083500,0,U,s,0,0,n,75052506750,0,U,s,0,0,n,76976930000,0,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					LayerType: 2
+				}
+				Channel: "S" {
+					Channel: "X" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,1,U,s,0,0,n,40412888250,1,U,s,0,0,n,42337311500,1,U,s,0,0,n,44261734750
+                                        ,1,U,s,0,0,n,46186158000,1,U,s,0,0,n,48110581250,1,U,s,0,0,n,50035004500,1,U,s,0,0
+                                        ,n,51959427750,1,U,s,0,0,n,53883851000,1,U,s,0,0,n,55808274250,1,U,s,0,0,n,57732697500
+                                        ,1,U,s,0,0,n,59657120750,1,U,s,0,0,n,61581544000,1,U,s,0,0,n,63505967250,1,U,s,0,0
+                                        ,n,65430390500,1,U,s,0,0,n,67354813750,1,U,s,0,0,n,69279237000,1,U,s,0,0,n,71203660250
+                                        ,1,U,s,0,0,n,73128083500,1,U,s,0,0,n,75052506750,1,U,s,0,0,n,76976930000,1,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,1,U,s,0,0,n,40412888250,1,U,s,0,0,n,42337311500,1,U,s,0,0,n,44261734750
+                                        ,1,U,s,0,0,n,46186158000,1,U,s,0,0,n,48110581250,1,U,s,0,0,n,50035004500,1,U,s,0,0
+                                        ,n,51959427750,1,U,s,0,0,n,53883851000,1,U,s,0,0,n,55808274250,1,U,s,0,0,n,57732697500
+                                        ,1,U,s,0,0,n,59657120750,1,U,s,0,0,n,61581544000,1,U,s,0,0,n,63505967250,1,U,s,0,0
+                                        ,n,65430390500,1,U,s,0,0,n,67354813750,1,U,s,0,0,n,69279237000,1,U,s,0,0,n,71203660250
+                                        ,1,U,s,0,0,n,73128083500,1,U,s,0,0,n,75052506750,1,U,s,0,0,n,76976930000,1,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,1,U,s,0,0,n,40412888250,1,U,s,0,0,n,42337311500,1,U,s,0,0,n,44261734750
+                                        ,1,U,s,0,0,n,46186158000,1,U,s,0,0,n,48110581250,1,U,s,0,0,n,50035004500,1,U,s,0,0
+                                        ,n,51959427750,1,U,s,0,0,n,53883851000,1,U,s,0,0,n,55808274250,1,U,s,0,0,n,57732697500
+                                        ,1,U,s,0,0,n,59657120750,1,U,s,0,0,n,61581544000,1,U,s,0,0,n,63505967250,1,U,s,0,0
+                                        ,n,65430390500,1,U,s,0,0,n,67354813750,1,U,s,0,0,n,69279237000,1,U,s,0,0,n,71203660250
+                                        ,1,U,s,0,0,n,73128083500,1,U,s,0,0,n,75052506750,1,U,s,0,0,n,76976930000,1,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					LayerType: 3
+				}
+			}
+			Channel: "Visibility" {
+				Default: 1
+				KeyVer: 4005
+				KeyCount: 21
+				Key: 38488465000,1,C,s,40412888250,1,C,s,42337311500,1,C,s,44261734750,1,C,s,46186158000,1,C,s,48110581250
+                    ,1,C,s,50035004500,1,C,s,51959427750,1,C,s,53883851000,1,C,s,55808274250,1,C,s,57732697500,1,C,s,59657120750
+                    ,1,C,s,61581544000,1,C,s,63505967250,1,C,s,65430390500,1,C,s,67354813750,1,C,s,69279237000,1,C,s,71203660250
+                    ,1,C,s,73128083500,1,C,s,75052506750,1,C,s,76976930000,1,C,s
+				Color: 1,1,1
+			}
+			Channel: "lockInfluenceWeights" {
+				Default: 0
+				Color: 1,1,1
+			}
+		}
+		Model: "Model::joint3" {
+			Version: 1.1
+			Channel: "Transform" {
+				Channel: "T" {
+					Channel: "X" {
+						Default: 1.15431296825409
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,1.15431296825409,U,s,0,0,n,40412888250,1.15431296825409,U,s,0,0,n,42337311500
+                                        ,1.15431296825409,U,s,0,0,n,44261734750,1.15431296825409,U,s,0,0,n,46186158000,1.15431296825409
+                                        ,U,s,0,0,n,48110581250,1.15431296825409,U,s,0,0,n,50035004500,1.15431296825409,U,s
+                                        ,0,0,n,51959427750,1.15431296825409,U,s,0,0,n,53883851000,1.15431296825409,U,s,0,0
+                                        ,n,55808274250,1.15431296825409,U,s,0,0,n,57732697500,1.15431296825409,U,s,0,0,n,59657120750
+                                        ,1.15431296825409,U,s,0,0,n,61581544000,1.15431296825409,U,s,0,0,n,63505967250,1.15431296825409
+                                        ,U,s,0,0,n,65430390500,1.15431296825409,U,s,0,0,n,67354813750,1.15431296825409,U,s
+                                        ,0,0,n,69279237000,1.15431296825409,U,s,0,0,n,71203660250,1.15431296825409,U,s,0,0
+                                        ,n,73128083500,1.15431296825409,U,s,0,0,n,75052506750,1.15431296825409,U,s,0,0,n,76976930000
+                                        ,1.15431296825409,U,s,0,0,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,0,n,40412888250,0,U,s,0,0,n,42337311500,0,U,s,0,0,n,44261734750
+                                        ,0,U,s,0,0,n,46186158000,0,U,s,0,0,n,48110581250,0,U,s,0,0,n,50035004500,0,U,s,0,0
+                                        ,n,51959427750,0,U,s,0,0,n,53883851000,0,U,s,0,0,n,55808274250,0,U,s,0,0,n,57732697500
+                                        ,0,U,s,0,0,n,59657120750,0,U,s,0,0,n,61581544000,0,U,s,0,0,n,63505967250,0,U,s,0,0
+                                        ,n,65430390500,0,U,s,0,0,n,67354813750,0,U,s,0,0,n,69279237000,0,U,s,0,0,n,71203660250
+                                        ,0,U,s,0,0,n,73128083500,0,U,s,0,0,n,75052506750,0,U,s,0,0,n,76976930000,0,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,0,n,40412888250,0,U,s,0,0,n,42337311500,0,U,s,0,0,n,44261734750
+                                        ,0,U,s,0,0,n,46186158000,0,U,s,0,0,n,48110581250,0,U,s,0,0,n,50035004500,0,U,s,0,0
+                                        ,n,51959427750,0,U,s,0,0,n,53883851000,0,U,s,0,0,n,55808274250,0,U,s,0,0,n,57732697500
+                                        ,0,U,s,0,0,n,59657120750,0,U,s,0,0,n,61581544000,0,U,s,0,0,n,63505967250,0,U,s,0,0
+                                        ,n,65430390500,0,U,s,0,0,n,67354813750,0,U,s,0,0,n,69279237000,0,U,s,0,0,n,71203660250
+                                        ,0,U,s,0,0,n,73128083500,0,U,s,0,0,n,75052506750,0,U,s,0,0,n,76976930000,0,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					LayerType: 1
+				}
+				Channel: "R" {
+					Channel: "X" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,-144.71484375,n,40412888250,-3.15094780921936,U,s,-144.71484375
+                                        ,-250.245712280273,n,42337311500,-11.5153474807739,U,s,-250.245712280273,-316.592590332031
+                                        ,n,44261734750,-23.4605312347412,U,s,-316.592590332031,-343.755523681641,n,46186158000
+                                        ,-37.3538398742676,U,s,-343.755523681641,-331.734436035156,n,48110581250,-51.5626029968262
+                                        ,U,s,-331.734436035156,-280.529418945313,n,50035004500,-64.4541549682617,U,s,-280.529418945313
+                                        ,-190.140380859375,n,51959427750,-74.3958282470703,U,s,-190.140380859375,-200.509140014648
+                                        ,n,53883851000,-82.550910949707,U,s,-200.509140014648,-206.111785888672,n,55808274250
+                                        ,-91.0387268066406,U,s,-206.111785888672,-206.948272705078,n,57732697500,-99.6606903076172
+                                        ,U,s,-206.948272705078,-203.018600463867,n,59657120750,-108.218223571777,U,s,-203.018600463867
+                                        ,-194.322784423828,n,61581544000,-116.512718200684,U,s,-194.322784423828,-180.860824584961
+                                        ,n,63505967250,-124.345596313477,U,s,-180.860824584961,-162.632720947266,n,65430390500
+                                        ,-131.518249511719,U,s,-162.632720947266,-139.638458251953,n,67354813750,-137.832122802734
+                                        ,U,s,-139.638458251953,-111.878067016602,n,69279237000,-143.088592529297,U,s,-111.878067016602
+                                        ,-79.3515319824219,n,71203660250,-147.089096069336,U,s,-79.3515319824219,-42.0588302612305
+                                        ,n,73128083500,-149.635025024414,U,s,-42.0588302612305,0,n,75052506750,-150.527801513672
+                                        ,U,s,0,1605.6298828125,n,76976930000,-111.502075195313,U,s,1605.6298828125,1605.6298828125
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,0,n,40412888250,0,U,s,0,0,n,42337311500,0,U,s,0,0,n,44261734750
+                                        ,0,U,s,0,0,n,46186158000,0,U,s,0,0,n,48110581250,0,U,s,0,0,n,50035004500,0,U,s,0,0
+                                        ,n,51959427750,0,U,s,0,0,n,53883851000,0,U,s,0,0,n,55808274250,0,U,s,0,0,n,57732697500
+                                        ,0,U,s,0,0,n,59657120750,0,U,s,0,0,n,61581544000,0,U,s,0,0,n,63505967250,0,U,s,0,0
+                                        ,n,65430390500,0,U,s,0,0,n,67354813750,0,U,s,0,0,n,69279237000,0,U,s,0,0,n,71203660250
+                                        ,0,U,s,0,0,n,73128083500,0,U,s,0,0,n,75052506750,0,U,s,0,0,n,76976930000,0,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,0,U,s,0,0,n,40412888250,0,U,s,0,0,n,42337311500,0,U,s,0,0,n,44261734750
+                                        ,0,U,s,0,0,n,46186158000,0,U,s,0,0,n,48110581250,0,U,s,0,0,n,50035004500,0,U,s,0,0
+                                        ,n,51959427750,0,U,s,0,0,n,53883851000,0,U,s,0,0,n,55808274250,0,U,s,0,0,n,57732697500
+                                        ,0,U,s,0,0,n,59657120750,0,U,s,0,0,n,61581544000,0,U,s,0,0,n,63505967250,0,U,s,0,0
+                                        ,n,65430390500,0,U,s,0,0,n,67354813750,0,U,s,0,0,n,69279237000,0,U,s,0,0,n,71203660250
+                                        ,0,U,s,0,0,n,73128083500,0,U,s,0,0,n,75052506750,0,U,s,0,0,n,76976930000,0,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					LayerType: 2
+				}
+				Channel: "S" {
+					Channel: "X" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,1,U,s,0,0,n,40412888250,1,U,s,0,0,n,42337311500,1,U,s,0,0,n,44261734750
+                                        ,1,U,s,0,0,n,46186158000,1,U,s,0,0,n,48110581250,1,U,s,0,0,n,50035004500,1,U,s,0,0
+                                        ,n,51959427750,1,U,s,0,0,n,53883851000,1,U,s,0,0,n,55808274250,1,U,s,0,0,n,57732697500
+                                        ,1,U,s,0,0,n,59657120750,1,U,s,0,0,n,61581544000,1,U,s,0,0,n,63505967250,1,U,s,0,0
+                                        ,n,65430390500,1,U,s,0,0,n,67354813750,1,U,s,0,0,n,69279237000,1,U,s,0,0,n,71203660250
+                                        ,1,U,s,0,0,n,73128083500,1,U,s,0,0,n,75052506750,1,U,s,0,0,n,76976930000,1,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,1,U,s,0,0,n,40412888250,1,U,s,0,0,n,42337311500,1,U,s,0,0,n,44261734750
+                                        ,1,U,s,0,0,n,46186158000,1,U,s,0,0,n,48110581250,1,U,s,0,0,n,50035004500,1,U,s,0,0
+                                        ,n,51959427750,1,U,s,0,0,n,53883851000,1,U,s,0,0,n,55808274250,1,U,s,0,0,n,57732697500
+                                        ,1,U,s,0,0,n,59657120750,1,U,s,0,0,n,61581544000,1,U,s,0,0,n,63505967250,1,U,s,0,0
+                                        ,n,65430390500,1,U,s,0,0,n,67354813750,1,U,s,0,0,n,69279237000,1,U,s,0,0,n,71203660250
+                                        ,1,U,s,0,0,n,73128083500,1,U,s,0,0,n,75052506750,1,U,s,0,0,n,76976930000,1,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 38488465000,1,U,s,0,0,n,40412888250,1,U,s,0,0,n,42337311500,1,U,s,0,0,n,44261734750
+                                        ,1,U,s,0,0,n,46186158000,1,U,s,0,0,n,48110581250,1,U,s,0,0,n,50035004500,1,U,s,0,0
+                                        ,n,51959427750,1,U,s,0,0,n,53883851000,1,U,s,0,0,n,55808274250,1,U,s,0,0,n,57732697500
+                                        ,1,U,s,0,0,n,59657120750,1,U,s,0,0,n,61581544000,1,U,s,0,0,n,63505967250,1,U,s,0,0
+                                        ,n,65430390500,1,U,s,0,0,n,67354813750,1,U,s,0,0,n,69279237000,1,U,s,0,0,n,71203660250
+                                        ,1,U,s,0,0,n,73128083500,1,U,s,0,0,n,75052506750,1,U,s,0,0,n,76976930000,1,U,s,0,0
+                                        ,n
+						Color: 1,1,1
+					}
+					LayerType: 3
+				}
+			}
+			Channel: "Visibility" {
+				Default: 1
+				KeyVer: 4005
+				KeyCount: 21
+				Key: 38488465000,1,C,s,40412888250,1,C,s,42337311500,1,C,s,44261734750,1,C,s,46186158000,1,C,s,48110581250
+                    ,1,C,s,50035004500,1,C,s,51959427750,1,C,s,53883851000,1,C,s,55808274250,1,C,s,57732697500,1,C,s,59657120750
+                    ,1,C,s,61581544000,1,C,s,63505967250,1,C,s,65430390500,1,C,s,67354813750,1,C,s,69279237000,1,C,s,71203660250
+                    ,1,C,s,73128083500,1,C,s,75052506750,1,C,s,76976930000,1,C,s
+				Color: 1,1,1
+			}
+			Channel: "lockInfluenceWeights" {
+				Default: 0
+				Color: 1,1,1
+			}
+		}
+		
+		;Generic nodes animation
+		;----------------------------------------------------
+		
+		;Textures animation
+		;----------------------------------------------------
+		
+		;Materials animation
+		;----------------------------------------------------
+		
+		
+		;Constraints animation
+		;----------------------------------------------------
+	}
+	Take: "deform" {
+		FileName: "deform.tak"
+		LocalTime: 76976930000,115465395000
+		ReferenceTime: 76976930000,115465395000
+		
+		;Models animation
+		;----------------------------------------------------
+		Model: "Model::joint1" {
+			Version: 1.1
+			Channel: "Transform" {
+				Channel: "T" {
+					Channel: "X" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,0,U,s,0,0,n,78901353250,0,U,s,0,0,n,80825776500,0,U,s,0,0,n,82750199750
+                                        ,0,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0
+                                        ,n,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,0,n,98145585750,0,U,a,n,100070009000,0,U,a,n,101994432250,0,U,a,n,103918855500
+                                        ,0,U,a,n,105843278750,0,U,a,n,107767702000,0,U,a,n,109692125250,0,U,a,n,111616548500
+                                        ,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,0,U,s,0,0,n,78901353250,0,U,s,0,0,n,80825776500,0,U,s,0,0,n,82750199750
+                                        ,0,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0
+                                        ,n,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,0,n,98145585750,0,U,a,n,100070009000,0,U,a,n,101994432250,0,U,a,n,103918855500
+                                        ,0,U,a,n,105843278750,0,U,a,n,107767702000,0,U,a,n,109692125250,0,U,a,n,111616548500
+                                        ,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,0,U,s,0,0,n,78901353250,0,U,s,0,0,n,80825776500,0,U,s,0,0,n,82750199750
+                                        ,0,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0
+                                        ,n,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,0,n,98145585750,0,U,a,n,100070009000,0,U,a,n,101994432250,0,U,a,n,103918855500
+                                        ,0,U,a,n,105843278750,0,U,a,n,107767702000,0,U,a,n,109692125250,0,U,a,n,111616548500
+                                        ,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					LayerType: 1
+				}
+				Channel: "R" {
+					Channel: "X" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,120.53003692627,U,s,-1735.63256835938,-1735.63232421875,n,78901353250
+                                        ,42.1855125427246,U,s,-1735.63232421875,0,n,80825776500,0,U,s,0,0,n,82750199750,0
+                                        ,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0,n
+                                        ,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,0,n,98145585750,0,U,a,n,100070009000,0,U,a,n,101994432250,0,U,a,n,103918855500
+                                        ,0,U,a,n,105843278750,0,U,a,n,107767702000,0,U,a,n,109692125250,0,U,a,n,111616548500
+                                        ,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,0,U,s,0,0,n,78901353250,0,U,s,0,0,n,80825776500,0,U,s,0,0,n,82750199750
+                                        ,0,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0
+                                        ,n,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,0,n,98145585750,0,U,a,n,100070009000,0,U,a,n,101994432250,0,U,a,n,103918855500
+                                        ,0,U,a,n,105843278750,0,U,a,n,107767702000,0,U,a,n,109692125250,0,U,a,n,111616548500
+                                        ,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,0,U,s,0,0,n,78901353250,0,U,s,0,0,n,80825776500,0,U,s,0,0,n,82750199750
+                                        ,0,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0
+                                        ,n,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,0,n,98145585750,0,U,a,n,100070009000,0,U,a,n,101994432250,0,U,a,n,103918855500
+                                        ,0,U,a,n,105843278750,0,U,a,n,107767702000,0,U,a,n,109692125250,0,U,a,n,111616548500
+                                        ,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					LayerType: 2
+				}
+				Channel: "S" {
+					Channel: "X" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,1,U,s,0,0,n,78901353250,1,U,s,0,0,n,80825776500,1,U,s,0,-0.998422801494598
+                                        ,n,82750199750,0.97820907831192,U,s,-0.998422801494598,-1.71158194541931,n,84674623000
+                                        ,0.920760095119476,U,s,-1.71158194541931,-2.13947725296021,n,86599046250,0.839539229869843
+                                        ,U,s,-2.13947725296021,-2.28210926055908,n,88523469500,0.746432304382324,U,s,-2.28210926055908
+                                        ,-2.13947725296021,n,90447892750,0.653325438499451,U,s,-2.13947725296021,-1.71158194541931
+                                        ,n,92372316000,0.572104513645172,U,s,-1.71158194541931,-0.998422801494598,n,94296739250
+                                        ,0.514655590057373,U,s,-0.998422801494598,0,n,96221162500,0.492864638566971,U,s,0
+                                        ,0,n,98145585750,0.492864638566971,U,a,n,100070009000,0.492864638566971,U,a,n,101994432250
+                                        ,0.492864638566971,U,a,n,103918855500,0.492864638566971,U,a,n,105843278750,0.492864638566971
+                                        ,U,a,n,107767702000,0.492864638566971,U,a,n,109692125250,0.492864638566971,U,a,n,111616548500
+                                        ,0.492864638566971,U,a,n,113540971750,0.492864638566971,U,a,n,115465395000,0.492864638566971
+                                        ,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,1,U,s,0,0,n,78901353250,1,U,s,0,0,n,80825776500,1,U,s,0,0,n,82750199750
+                                        ,1,U,s,0,0,n,84674623000,1,U,s,0,0,n,86599046250,1,U,s,0,0,n,88523469500,1,U,s,0,0
+                                        ,n,90447892750,1,U,s,0,0,n,92372316000,1,U,s,0,0,n,94296739250,1,U,s,0,0,n,96221162500
+                                        ,1,U,s,0,0,n,98145585750,1,U,a,n,100070009000,1,U,a,n,101994432250,1,U,a,n,103918855500
+                                        ,1,U,a,n,105843278750,1,U,a,n,107767702000,1,U,a,n,109692125250,1,U,a,n,111616548500
+                                        ,1,U,a,n,113540971750,1,U,a,n,115465395000,1,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,1,U,s,0,0,n,78901353250,1,U,s,0,0,n,80825776500,1,U,s,0,0,n,82750199750
+                                        ,1,U,s,0,0,n,84674623000,1,U,s,0,0,n,86599046250,1,U,s,0,0,n,88523469500,1,U,s,0,0
+                                        ,n,90447892750,1,U,s,0,0,n,92372316000,1,U,s,0,0,n,94296739250,1,U,s,0,0,n,96221162500
+                                        ,1,U,s,0,0,n,98145585750,1,U,a,n,100070009000,1,U,a,n,101994432250,1,U,a,n,103918855500
+                                        ,1,U,a,n,105843278750,1,U,a,n,107767702000,1,U,a,n,109692125250,1,U,a,n,111616548500
+                                        ,1,U,a,n,113540971750,1,U,a,n,115465395000,1,U,a,n
+						Color: 1,1,1
+					}
+					LayerType: 3
+				}
+			}
+			Channel: "Visibility" {
+				Default: 1
+				KeyVer: 4005
+				KeyCount: 21
+				Key: 76976930000,1,C,s,78901353250,1,C,s,80825776500,1,C,s,82750199750,1,C,s,84674623000,1,C,s,86599046250
+                    ,1,C,s,88523469500,1,C,s,90447892750,1,C,s,92372316000,1,C,s,94296739250,1,C,s,96221162500,1,C,s,98145585750
+                    ,1,U,a,n,100070009000,1,U,a,n,101994432250,1,U,a,n,103918855500,1,U,a,n,105843278750,1,U,a,n,107767702000
+                    ,1,U,a,n,109692125250,1,U,a,n,111616548500,1,U,a,n,113540971750,1,U,a,n,115465395000,1,U,a,n
+				Color: 1,1,1
+			}
+			Channel: "lockInfluenceWeights" {
+				Default: 0
+				Color: 1,1,1
+			}
+		}
+		Model: "Model::joint2" {
+			Version: 1.1
+			Channel: "Transform" {
+				Channel: "T" {
+					Channel: "X" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,1,U,s,0,0,n,78901353250,1,U,s,0,0,n,80825776500,1,U,s,0,0,n,82750199750
+                                        ,1,U,s,0,0,n,84674623000,1,U,s,0,0,n,86599046250,1,U,s,0,0,n,88523469500,1,U,s,0,0
+                                        ,n,90447892750,1,U,s,0,0,n,92372316000,1,U,s,0,0,n,94296739250,1,U,s,0,0,n,96221162500
+                                        ,1,U,s,0,0,n,98145585750,1,U,s,0,0,n,100070009000,1,U,s,0,0,n,101994432250,1,U,s,0
+                                        ,0,n,103918855500,1,U,s,0,0,n,105843278750,1,U,s,0,0,n,107767702000,1,U,a,n,109692125250
+                                        ,1,U,a,n,111616548500,1,U,a,n,113540971750,1,U,a,n,115465395000,1,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,0,U,s,0,0,n,78901353250,0,U,s,0,0,n,80825776500,0,U,s,0,0,n,82750199750
+                                        ,0,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0
+                                        ,n,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,3.00915336608887,n,98145585750,0.0679149180650711,U,s,3.00915336608887,4.5137300491333
+                                        ,n,100070009000,0.229865878820419,U,s,4.5137300491333,4.5137300491333,n,101994432250
+                                        ,0.423162192106247,U,s,4.5137300491333,3.00915336608887,n,103918855500,0.585113108158112
+                                        ,U,s,3.00915336608887,0,n,105843278750,0.653028070926666,U,s,0,0,n,107767702000,0.653028070926666
+                                        ,U,a,n,109692125250,0.653028070926666,U,a,n,111616548500,0.653028070926666,U,a,n,113540971750
+                                        ,0.653028070926666,U,a,n,115465395000,0.653028070926666,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,0,U,s,0,0,n,78901353250,0,U,s,0,0,n,80825776500,0,U,s,0,0,n,82750199750
+                                        ,0,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0
+                                        ,n,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,0,n,98145585750,0,U,s,0,0,n,100070009000,0,U,s,0,0,n,101994432250,0,U,s,0
+                                        ,0,n,103918855500,0,U,s,0,0,n,105843278750,0,U,s,0,0,n,107767702000,0,U,a,n,109692125250
+                                        ,0,U,a,n,111616548500,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					LayerType: 1
+				}
+				Channel: "R" {
+					Channel: "X" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,99.9688491821289,U,s,-1439.55151367188,-1439.55139160156,n,78901353250
+                                        ,34.9890937805176,U,s,-1439.55139160156,0,n,80825776500,0,U,s,0,0,n,82750199750,0
+                                        ,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0,n
+                                        ,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,0,n,98145585750,0,U,s,0,0,n,100070009000,0,U,s,0,0,n,101994432250,0,U,s,0
+                                        ,0,n,103918855500,0,U,s,0,0,n,105843278750,0,U,s,0,0,n,107767702000,0,U,a,n,109692125250
+                                        ,0,U,a,n,111616548500,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,0,U,s,0,0,n,78901353250,0,U,s,0,0,n,80825776500,0,U,s,0,0,n,82750199750
+                                        ,0,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0
+                                        ,n,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,0,n,98145585750,0,U,s,0,0,n,100070009000,0,U,s,0,0,n,101994432250,0,U,s,0
+                                        ,0,n,103918855500,0,U,s,0,0,n,105843278750,0,U,s,0,0,n,107767702000,0,U,a,n,109692125250
+                                        ,0,U,a,n,111616548500,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,0,U,s,0,0,n,78901353250,0,U,s,0,0,n,80825776500,0,U,s,0,0,n,82750199750
+                                        ,0,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0
+                                        ,n,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,0,n,98145585750,0,U,s,0,0,n,100070009000,0,U,s,0,0,n,101994432250,0,U,s,0
+                                        ,0,n,103918855500,0,U,s,0,0,n,105843278750,0,U,s,0,0,n,107767702000,0,U,a,n,109692125250
+                                        ,0,U,a,n,111616548500,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					LayerType: 2
+				}
+				Channel: "S" {
+					Channel: "X" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,1,U,s,0,0,n,78901353250,1,U,s,0,0,n,80825776500,1,U,s,0,-1.17206144332886
+                                        ,n,82750199750,0.974419295787811,U,s,-1.17206144332886,-2.00924825668335,n,84674623000
+                                        ,0.906979203224182,U,s,-2.00924825668335,-2.51156044006348,n,86599046250,0.811632990837097
+                                        ,U,s,-2.51156044006348,-2.67899775505066,n,88523469500,0.702333569526672,U,s,-2.67899775505066
+                                        ,-2.51156044006348,n,90447892750,0.593034148216248,U,s,-2.51156044006348,-2.00924825668335
+                                        ,n,92372316000,0.49768790602684,U,s,-2.00924825668335,-1.17206144332886,n,94296739250
+                                        ,0.430247873067856,U,s,-1.17206144332886,0,n,96221162500,0.404667168855667,U,s,0,0
+                                        ,n,98145585750,0.404667168855667,U,s,0,0,n,100070009000,0.404667168855667,U,s,0,0
+                                        ,n,101994432250,0.404667168855667,U,s,0,0,n,103918855500,0.404667168855667,U,s,0,0
+                                        ,n,105843278750,0.404667168855667,U,s,0,0,n,107767702000,0.404667168855667,U,a,n,109692125250
+                                        ,0.404667168855667,U,a,n,111616548500,0.404667168855667,U,a,n,113540971750,0.404667168855667
+                                        ,U,a,n,115465395000,0.404667168855667,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,1,U,s,0,0,n,78901353250,1,U,s,0,0,n,80825776500,1,U,s,0,0,n,82750199750
+                                        ,1,U,s,0,0,n,84674623000,1,U,s,0,0,n,86599046250,1,U,s,0,0,n,88523469500,1,U,s,0,0
+                                        ,n,90447892750,1,U,s,0,0,n,92372316000,1,U,s,0,0,n,94296739250,1,U,s,0,0,n,96221162500
+                                        ,1,U,s,0,0,n,98145585750,1,U,s,0,0,n,100070009000,1,U,s,0,0,n,101994432250,1,U,s,0
+                                        ,0,n,103918855500,1,U,s,0,0,n,105843278750,1,U,s,0,0,n,107767702000,1,U,a,n,109692125250
+                                        ,1,U,a,n,111616548500,1,U,a,n,113540971750,1,U,a,n,115465395000,1,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,1,U,s,0,0,n,78901353250,1,U,s,0,0,n,80825776500,1,U,s,0,0,n,82750199750
+                                        ,1,U,s,0,0,n,84674623000,1,U,s,0,0,n,86599046250,1,U,s,0,0,n,88523469500,1,U,s,0,0
+                                        ,n,90447892750,1,U,s,0,0,n,92372316000,1,U,s,0,0,n,94296739250,1,U,s,0,0,n,96221162500
+                                        ,1,U,s,0,0,n,98145585750,1,U,s,0,0,n,100070009000,1,U,s,0,0,n,101994432250,1,U,s,0
+                                        ,0,n,103918855500,1,U,s,0,0,n,105843278750,1,U,s,0,0,n,107767702000,1,U,a,n,109692125250
+                                        ,1,U,a,n,111616548500,1,U,a,n,113540971750,1,U,a,n,115465395000,1,U,a,n
+						Color: 1,1,1
+					}
+					LayerType: 3
+				}
+			}
+			Channel: "Visibility" {
+				Default: 1
+				KeyVer: 4005
+				KeyCount: 21
+				Key: 76976930000,1,C,s,78901353250,1,C,s,80825776500,1,C,s,82750199750,1,C,s,84674623000,1,C,s,86599046250
+                    ,1,C,s,88523469500,1,C,s,90447892750,1,C,s,92372316000,1,C,s,94296739250,1,C,s,96221162500,1,C,s,98145585750
+                    ,1,C,s,100070009000,1,C,s,101994432250,1,C,s,103918855500,1,C,s,105843278750,1,C,s,107767702000,1,U,a
+                    ,n,109692125250,1,U,a,n,111616548500,1,U,a,n,113540971750,1,U,a,n,115465395000,1,U,a,n
+				Color: 1,1,1
+			}
+			Channel: "lockInfluenceWeights" {
+				Default: 0
+				Color: 1,1,1
+			}
+		}
+		Model: "Model::joint3" {
+			Version: 1.1
+			Channel: "Transform" {
+				Channel: "T" {
+					Channel: "X" {
+						Default: 1.15431296825409
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,1.15431296825409,U,s,0,0,n,78901353250,1.15431296825409,U,s,0,0,n,80825776500
+                                        ,1.15431296825409,U,s,0,0,n,82750199750,1.15431296825409,U,s,0,0,n,84674623000,1.15431296825409
+                                        ,U,s,0,0,n,86599046250,1.15431296825409,U,s,0,0,n,88523469500,1.15431296825409,U,s
+                                        ,0,0,n,90447892750,1.15431296825409,U,s,0,0,n,92372316000,1.15431296825409,U,s,0,0
+                                        ,n,94296739250,1.15431296825409,U,s,0,0,n,96221162500,1.15431296825409,U,s,0,0,n,98145585750
+                                        ,1.15431296825409,U,s,0,0,n,100070009000,1.15431296825409,U,s,0,0,n,101994432250,1.15431296825409
+                                        ,U,s,0,0,n,103918855500,1.15431296825409,U,s,0,0,n,105843278750,1.15431296825409,U
+                                        ,s,0,0,n,107767702000,1.15431296825409,U,a,n,109692125250,1.15431296825409,U,a,n,111616548500
+                                        ,1.15431296825409,U,a,n,113540971750,1.15431296825409,U,a,n,115465395000,1.15431296825409
+                                        ,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,0,U,s,0,0,n,78901353250,0,U,s,0,0,n,80825776500,0,U,s,0,0,n,82750199750
+                                        ,0,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0
+                                        ,n,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,0,n,98145585750,0,U,s,0,0,n,100070009000,0,U,s,0,0,n,101994432250,0,U,s,0
+                                        ,0,n,103918855500,0,U,s,0,0,n,105843278750,0,U,s,0,0,n,107767702000,0,U,a,n,109692125250
+                                        ,0,U,a,n,111616548500,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,0,U,s,0,0,n,78901353250,0,U,s,0,0,n,80825776500,0,U,s,0,0,n,82750199750
+                                        ,0,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0
+                                        ,n,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,0,n,98145585750,0,U,s,0,0,n,100070009000,0,U,s,0,0,n,101994432250,0,U,s,0
+                                        ,0,n,103918855500,0,U,s,0,0,n,105843278750,0,U,s,0,0,n,107767702000,0,U,a,n,109692125250
+                                        ,0,U,a,n,111616548500,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					LayerType: 1
+				}
+				Channel: "R" {
+					Channel: "X" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,-111.502075195313,U,s,1605.6298828125,1605.6298828125,n,78901353250,-39.0257263183594
+                                        ,U,s,1605.6298828125,0,n,80825776500,0,U,s,0,0,n,82750199750,0,U,s,0,0,n,84674623000
+                                        ,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0,n,90447892750,0,U,s,0,0
+                                        ,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500,0,U,s,0,0,n,98145585750
+                                        ,0,U,s,0,0,n,100070009000,0,U,s,0,0,n,101994432250,0,U,s,0,0,n,103918855500,0,U,s
+                                        ,0,0,n,105843278750,0,U,s,0,0,n,107767702000,0,U,a,n,109692125250,0,U,a,n,111616548500
+                                        ,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,0,U,s,0,0,n,78901353250,0,U,s,0,0,n,80825776500,0,U,s,0,0,n,82750199750
+                                        ,0,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0
+                                        ,n,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,0,n,98145585750,0,U,s,0,0,n,100070009000,0,U,s,0,0,n,101994432250,0,U,s,0
+                                        ,0,n,103918855500,0,U,s,0,0,n,105843278750,0,U,s,0,0,n,107767702000,0,U,a,n,109692125250
+                                        ,0,U,a,n,111616548500,0,U,a,n,113540971750,0,U,a,n,115465395000,0,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,0,U,s,0,0,n,78901353250,0,U,s,0,0,n,80825776500,0,U,s,0,0,n,82750199750
+                                        ,0,U,s,0,0,n,84674623000,0,U,s,0,0,n,86599046250,0,U,s,0,0,n,88523469500,0,U,s,0,0
+                                        ,n,90447892750,0,U,s,0,0,n,92372316000,0,U,s,0,0,n,94296739250,0,U,s,0,0,n,96221162500
+                                        ,0,U,s,0,-267.092803955078,n,98145585750,-6.02813625335693,U,s,-267.092803955078,-400.639221191406
+                                        ,n,100070009000,-20.4029216766357,U,s,-400.639221191406,-400.639221191406,n,101994432250
+                                        ,-37.5599250793457,U,s,-400.639221191406,-267.092803955078,n,103918855500,-51.9347114562988
+                                        ,U,s,-267.092803955078,0,n,105843278750,-57.9628486633301,U,s,0,0,n,107767702000,-57.9628486633301
+                                        ,U,a,n,109692125250,-57.9628486633301,U,a,n,111616548500,-57.9628486633301,U,a,n,113540971750
+                                        ,-57.9628486633301,U,a,n,115465395000,-57.9628486633301,U,a,n
+						Color: 1,1,1
+					}
+					LayerType: 2
+				}
+				Channel: "S" {
+					Channel: "X" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,1,U,s,0,0,n,78901353250,1,U,s,0,0,n,80825776500,1,U,s,0,-1.19376635551453
+                                        ,n,82750199750,0.973945558071136,U,s,-1.19376635551453,-2.04645657539368,n,84674623000
+                                        ,0.905256628990173,U,s,-2.04645657539368,-2.55807065963745,n,86599046250,0.808144688606262
+                                        ,U,s,-2.55807065963745,-2.72860884666443,n,88523469500,0.696821212768555,U,s,-2.72860884666443
+                                        ,-2.55807065963745,n,90447892750,0.585497796535492,U,s,-2.55807065963745,-2.04645657539368
+                                        ,n,92372316000,0.488385856151581,U,s,-2.04645657539368,-1.19376635551453,n,94296739250
+                                        ,0.419696927070618,U,s,-1.19376635551453,0,n,96221162500,0.393642485141754,U,s,0,2.33973336219788
+                                        ,n,98145585750,0.446448981761932,U,s,2.33973336219788,3.5096001625061,n,100070009000
+                                        ,0.572372138500214,U,s,3.5096001625061,3.50959992408752,n,101994432250,0.722667455673218
+                                        ,U,s,3.50959992408752,2.33973336219788,n,103918855500,0.848590672016144,U,s,2.33973336219788
+                                        ,0,n,105843278750,0.901397109031677,U,s,0,0,n,107767702000,0.901397109031677,U,a,n
+                                        ,109692125250,0.901397109031677,U,a,n,111616548500,0.901397109031677,U,a,n,113540971750
+                                        ,0.901397109031677,U,a,n,115465395000,0.901397109031677,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,1,U,s,0,0,n,78901353250,1,U,s,0,0,n,80825776500,1,U,s,0,0,n,82750199750
+                                        ,1,U,s,0,0,n,84674623000,1,U,s,0,0,n,86599046250,1,U,s,0,0,n,88523469500,1,U,s,0,0
+                                        ,n,90447892750,1,U,s,0,0,n,92372316000,1,U,s,0,0,n,94296739250,1,U,s,0,0,n,96221162500
+                                        ,1,U,s,0,0,n,98145585750,1,U,s,0,0,n,100070009000,1,U,s,0,0,n,101994432250,1,U,s,0
+                                        ,0,n,103918855500,1,U,s,0,0,n,105843278750,1,U,s,0,0,n,107767702000,1,U,a,n,109692125250
+                                        ,1,U,a,n,111616548500,1,U,a,n,113540971750,1,U,a,n,115465395000,1,U,a,n
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 1
+						KeyVer: 4005
+						KeyCount: 21
+						Key: 76976930000,1,U,s,0,0,n,78901353250,1,U,s,0,0,n,80825776500,1,U,s,0,0,n,82750199750
+                                        ,1,U,s,0,0,n,84674623000,1,U,s,0,0,n,86599046250,1,U,s,0,0,n,88523469500,1,U,s,0,0
+                                        ,n,90447892750,1,U,s,0,0,n,92372316000,1,U,s,0,0,n,94296739250,1,U,s,0,0,n,96221162500
+                                        ,1,U,s,0,0,n,98145585750,1,U,s,0,0,n,100070009000,1,U,s,0,0,n,101994432250,1,U,s,0
+                                        ,0,n,103918855500,1,U,s,0,0,n,105843278750,1,U,s,0,0,n,107767702000,1,U,a,n,109692125250
+                                        ,1,U,a,n,111616548500,1,U,a,n,113540971750,1,U,a,n,115465395000,1,U,a,n
+						Color: 1,1,1
+					}
+					LayerType: 3
+				}
+			}
+			Channel: "Visibility" {
+				Default: 1
+				KeyVer: 4005
+				KeyCount: 21
+				Key: 76976930000,1,C,s,78901353250,1,C,s,80825776500,1,C,s,82750199750,1,C,s,84674623000,1,C,s,86599046250
+                    ,1,C,s,88523469500,1,C,s,90447892750,1,C,s,92372316000,1,C,s,94296739250,1,C,s,96221162500,1,C,s,98145585750
+                    ,1,C,s,100070009000,1,C,s,101994432250,1,C,s,103918855500,1,C,s,105843278750,1,C,s,107767702000,1,U,a
+                    ,n,109692125250,1,U,a,n,111616548500,1,U,a,n,113540971750,1,U,a,n,115465395000,1,U,a,n
+				Color: 1,1,1
+			}
+			Channel: "lockInfluenceWeights" {
+				Default: 0
+				Color: 1,1,1
+			}
+		}
+		
+		;Generic nodes animation
+		;----------------------------------------------------
+		
+		;Textures animation
+		;----------------------------------------------------
+		
+		;Materials animation
+		;----------------------------------------------------
+		
+		
+		;Constraints animation
+		;----------------------------------------------------
+	}
+}
+;Version 5 settings
+;------------------------------------------------------------------
+
+Version5:  {
+	AmbientRenderSettings:  {
+		Version: 101
+		AmbientLightColor: 0,0,0,1
+	}
+	FogOptions:  {
+		FlogEnable: 0
+		FogMode: 0
+		FogDensity: 0.002
+		FogStart: 0.3
+		FogEnd: 1000
+		FogColor: 1,1,1,1
+	}
+	Settings:  {
+		FrameRate: "24"
+		TimeFormat: 1
+		SnapOnFrames: 0
+		ReferenceTimeIndex: -1
+		TimeLineStartTime: 1924423250
+		TimeLineStopTime: 384884650000
+	}
+	RendererSetting:  {
+		DefaultCamera: "Producer Perspective"
+		DefaultViewingMode: 0
+	}
+}
