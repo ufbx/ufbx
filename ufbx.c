@@ -521,7 +521,7 @@ ufbxi_bit_chunk_refill(ufbxi_bit_stream *s, const char *ptr)
 	// Copy any left-over data to the beginning of `buffer`
 	size_t left = s->chunk_real_end - ptr;
 	ufbx_assert(left < 64);
-	memcpy(s->buffer, ptr, left);
+	memmove(s->buffer, ptr, left);
 
 	// Read more user data if the user supplied a `read_fn()`, otherwise
 	// we assume the initial data chunk is the whole input buffer.
