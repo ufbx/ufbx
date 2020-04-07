@@ -6089,7 +6089,24 @@ static void ufbxi_mul_rotate(ufbx_transform *t, ufbx_vec3 v, ufbx_rotation_order
 
 	ufbx_vec4 q = ufbxi_to_quat(v, order);
 	if (t->rotation.w != 1.0) {
-		t->rotation = ufbxi_mul_quat(t->rotation, q);
+		t->rotation = ufbxi_mul_quat(q, t->rotation);
+	} else {
+		t->rotation = q;
+	}
+
+	if (!ufbxi_is_vec3_zero(t->translation)) {
+		t->translation = ufbx_rotate_vector(q, t->translation);
+	}
+}
+
+static void ufbxi_mul_inv_rotate(ufbx_transform *t, ufbx_vec3 v, ufbx_rotation_order order)
+{
+	if (ufbxi_is_vec3_zero(v)) return;
+
+	ufbx_vec4 q = ufbxi_to_quat(v, order);
+	q.x = -q.x; q.y = -q.y; q.z = -q.z;
+	if (t->rotation.w != 1.0) {
+		t->rotation = ufbxi_mul_quat(q, t->rotation);
 	} else {
 		t->rotation = q;
 	}
@@ -6125,6 +6142,7 @@ static ufbx_transform ufbxi_get_transform(const ufbx_props *props)
 	ufbx_transform t = { { 0,0,0 }, { 0,0,0,1 }, { 1,1,1 }};
 
 	// WorldTransform = ParentWorldTransform * T * Roff * Rp * Rpre * R * Rpost * Rp-1 * Soff * Sp * S * Sp-1
+	// NOTE: Rpost is inverted (!) after converting from PostRotation Euler angles
 
 	ufbxi_sub_translate(&t, scale_pivot);
 	ufbxi_mul_scale(&t, scaling);
@@ -6133,9 +6151,9 @@ static ufbx_transform ufbxi_get_transform(const ufbx_props *props)
 	ufbxi_add_translate(&t, scale_offset);
 
 	ufbxi_sub_translate(&t, rot_pivot);
-	ufbxi_mul_rotate(&t, pre_rotation, UFBX_ROTATION_XYZ);
+	ufbxi_mul_inv_rotate(&t, post_rotation, UFBX_ROTATION_XYZ);
 	ufbxi_mul_rotate(&t, rotation, order);
-	ufbxi_mul_rotate(&t, post_rotation, UFBX_ROTATION_XYZ);
+	ufbxi_mul_rotate(&t, pre_rotation, UFBX_ROTATION_XYZ);
 	ufbxi_add_translate(&t, rot_pivot);
 
 	ufbxi_add_translate(&t, rot_offset);
