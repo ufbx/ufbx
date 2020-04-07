@@ -4,3 +4,4 @@
 #include "test_transform.h"
 #include "test_animation.h"
 #include "test_skin.h"
+#include "test_fuzz.h"

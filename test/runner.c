@@ -1670,7 +1670,9 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbx_load_opts stream_opts = load_opts;
 			stream_opts.read_buffer_size = 1;
 			ufbx_scene *streamed_scene = ufbx_load_file(buf, &stream_opts, &error);
-			if (!streamed_scene) {
+			if (streamed_scene) {
+				ufbxt_check_scene(scene);
+			} else {
 				ufbxt_log_error(&error);
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse streamed file");
 			}
