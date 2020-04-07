@@ -177,16 +177,6 @@ static void rhmap_imp_memset(void *data, int value, size_t num)
 #endif
 
 #ifdef RHMAP_INLINE
-RHMAP_INLINE void rhmap_init_inline(rhmap *map)
-#else
-void rhmap_init(rhmap *map)
-#endif
-{
-	map->entries = 0;
-	map->mask = map->capacity = map->size = 0;
-}
-
-#ifdef RHMAP_INLINE
 RHMAP_INLINE void *rhmap_reset_inline(rhmap *map)
 #else
 void *rhmap_reset(rhmap *map)
@@ -199,16 +189,6 @@ void *rhmap_reset(rhmap *map)
 }
 
 #ifdef RHMAP_INLINE
-RHMAP_INLINE void rhmap_clear_inline(rhmap *map)
-#else
-void rhmap_clear(rhmap *map)
-#endif
-{
-	map->size = 0;
-	RHMAP_MEMSET(map->entries, 0, sizeof(uint64_t) * (map->mask + 1));
-}
-
-#ifdef RHMAP_INLINE
 RHMAP_INLINE void rhmap_grow_inline(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor)
 #else
 void rhmap_grow(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor)
@@ -217,23 +197,6 @@ void rhmap_grow(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, 
 	size_t num_entries = map->mask + 1;
 	size_t size = (size_t)((double)num_entries * load_factor);
 	if (min_size < map->capacity + 1) min_size = map->capacity + 1;
-	while (size < min_size) {
-		num_entries *= 2;
-		size = (size_t)((double)num_entries * load_factor);
-	}
-	*count = size;
-	*alloc_size = num_entries * sizeof(uint64_t);
-}
-
-#ifdef RHMAP_INLINE
-RHMAP_INLINE void rhmap_shrink_inline(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor)
-#else
-void rhmap_shrink(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor)
-#endif
-{
-	size_t num_entries = 1;
-	size_t size = (size_t)((double)num_entries * load_factor);
-	if (min_size < map->size) min_size = map->size;
 	while (size < min_size) {
 		num_entries *= 2;
 		size = (size_t)((double)num_entries * load_factor);
@@ -332,29 +295,6 @@ void *rhmap_rehash(rhmap *map, size_t count, size_t alloc_size, void *data_ptr)
 }
 
 #ifdef RHMAP_INLINE
-RHMAP_INLINE void rhmap_remove_inline(rhmap_iter *iter)
-#else
-void rhmap_remove(rhmap_iter *iter)
-#endif
-{
-	rhmap *map = iter->map;
-	uint64_t *entries = map->entries;
-	uint32_t mask = map->mask, hash = iter->hash, scan = iter->scan;
-	uint32_t slot = (hash + scan - 1) & mask;
-	iter->scan = scan - 1;
-	for (;;) {
-		uint32_t next_slot = (slot + 1) & mask;
-		uint64_t next_entry = entries[next_slot];
-		uint32_t next_scan = (next_entry & mask);
-		if (next_scan <= 1) break;
-		entries[slot] = next_entry - 1;
-		slot = next_slot;
-	}
-	entries[slot] = 0;
-	map->size--;
-}
-
-#ifdef RHMAP_INLINE
 RHMAP_INLINE int rhmap_next_inline(rhmap_iter *iter, uint32_t *hash, uint32_t *value)
 #else
 int rhmap_next(rhmap_iter *iter, uint32_t *hash, uint32_t *value)
@@ -379,39 +319,6 @@ int rhmap_next(rhmap_iter *iter, uint32_t *hash, uint32_t *value)
 		}
 	}
 	return 0;
-}
-
-#ifdef RHMAP_INLINE
-RHMAP_INLINE void rhmap_set_inline(rhmap_iter *iter, uint32_t value)
-#else
-void rhmap_set(rhmap_iter *iter, uint32_t value)
-#endif
-{
-	rhmap *map = iter->map;
-	uint32_t mask = map->mask, hash = iter->hash, scan = iter->scan;
-	uint32_t slot = (hash + scan - 1) & mask;
-	uint64_t *entries = map->entries;
-	entries[slot] = (entries[slot] & 0xffffffffu) | (uint64_t)value << 32u;
-}
-
-#ifdef RHMAP_INLINE
-RHMAP_INLINE void rhmap_update_inline(rhmap *map, uint32_t hash, uint32_t old_value, uint32_t new_value)
-#else
-void rhmap_update(rhmap *map, uint32_t hash, uint32_t old_value, uint32_t new_value)
-#endif
-{
-	uint64_t *entries = map->entries;
-	uint32_t mask = map->mask, scan = 0;
-	uint64_t old_entry = (uint64_t)old_value << 32u | (hash & ~mask);
-	uint64_t new_entry = (uint64_t)new_value << 32u | (hash & ~mask);
-	for (;;) {
-		uint32_t slot = (hash + scan) & mask;
-		scan += 1;
-		if (entries[slot] == old_entry + scan) {
-			entries[slot] = new_entry + scan;
-			return;
-		}
-	}
 }
 
 #endif
