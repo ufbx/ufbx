@@ -16,7 +16,7 @@
 	#pragma warning(disable: 4505) // unreferenced local function has been removed
 	#define ufbx_inline static __forceinline
 #elif defined(__GNUC__)
-	#define ufbx_inline static __attribute__((always_inline, unused))
+	#define ufbx_inline static inline __attribute__((always_inline, unused))
 #else
 	#define ufbx_inline static
 #endif

@@ -21,7 +21,6 @@
 #if defined(_MSC_VER)
 	#define ufbxi_noinline __declspec(noinline)
 	#define ufbxi_forceinline __forceinline
-	#define ufbxi_malloc_like __declspec(restrict)
 	#if defined(__cplusplus) && _MSC_VER >= 1900
 		#define ufbxi_nodiscard [[nodiscard]]
 	#else
@@ -30,13 +29,17 @@
 #elif defined(__GNUC__) || defined(__clang__)
 	#define ufbxi_noinline __attribute__((noinline))
 	#define ufbxi_forceinline inline __attribute__((always_inline))
-	#define ufbxi_malloc_like __attribute__((malloc))
 	#define ufbxi_nodiscard __attribute__((warn_unused_result))
 #else
 	#define ufbxi_noinline
 	#define ufbxi_forceinline
-	#define ufbxi_malloc_like
 	#define ufbxi_nodiscard
+#endif
+
+#if defined(__GNUC__) && !defined(__clang__)
+	#define ufbxi_ignore(cond) (void)!(cond)
+#else
+	#define ufbxi_ignore(cond) (void)(cond)
 #endif
 
 #if defined(_MSC_VER)
@@ -97,7 +100,6 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 // -- Utility
 
 #define ufbxi_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
-#define ufbxi_ignore(cond) (void)(cond)
 #define ufbxi_for(m_type, m_name, m_begin, m_num) for (m_type *m_name = m_begin, *m_name##_end = m_name + (m_num); m_name != m_name##_end; m_name++)
 #define ufbxi_for_ptr(m_type, m_name, m_begin, m_num) for (m_type **m_name = m_begin, **m_name##_end = m_name + (m_num); m_name != m_name##_end; m_name++)
 
@@ -1376,7 +1378,7 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 	return new_chunk->data;
 }
 
-static ufbxi_malloc_like void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
+static void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
 {
 	// Always succeed with an emtpy non-NULL buffer for empty allocations
 	ufbx_assert(size > 0);
@@ -1403,7 +1405,7 @@ static ufbxi_malloc_like void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t
 	}
 }
 
-static ufbxi_malloc_like ufbxi_forceinline void *ufbxi_push_size_zero(ufbxi_buf *b, size_t size, size_t n)
+static ufbxi_forceinline void *ufbxi_push_size_zero(ufbxi_buf *b, size_t size, size_t n)
 {
 	void *ptr = ufbxi_push_size(b, size, n);
 	if (ptr) memset(ptr, 0, size * n);
@@ -1639,7 +1641,7 @@ static ufbxi_forceinline void *ufbxi_map_find_size(ufbxi_map *map, size_t size, 
 	}
 }
 
-static ufbxi_malloc_like ufbxi_forceinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size, uint32_t scan, uint32_t hash)
+static ufbxi_forceinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size, uint32_t scan, uint32_t hash)
 {
 	rhmap_iter iter;
 	iter.map = &map->map;
@@ -6432,6 +6434,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		}
 
 		if (child.anim_prop && prop) {
+
 			ufbx_anim_target target;
 			switch (parent.type) {
 			case UFBXI_CONNECTABLE_MODEL: target = UFBX_ANIM_MODEL; break;
