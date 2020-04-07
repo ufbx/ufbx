@@ -40,3 +40,11 @@ UFBXT_FILE_TEST(maya_post_rotate_order)
 	ufbxt_check_rotation_order(scene, "pCube2", UFBX_ROTATION_ZYX);
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_pre_post_rotate)
+#if UFBXT_IMPL
+{
+	ufbxt_check_rotation_order(scene, "pCube1", UFBX_ROTATION_XYZ);
+	ufbxt_check_rotation_order(scene, "pCube2", UFBX_ROTATION_ZYX);
+}
+#endif
