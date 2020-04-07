@@ -7614,7 +7614,6 @@ ufbx_matrix ufbx_get_normal_matrix(const ufbx_matrix *m)
 
 ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time)
 {
-	// TODO: Binary search
 	if (curve->keyframes.size <= 1) {
 		if (curve->keyframes.size == 1) {
 			return curve->keyframes.data[0].value;
@@ -7623,12 +7622,25 @@ ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time)
 		}
 	}
 
-	for (size_t i = 0; i < curve->keyframes.size; i++) {
-		const ufbx_keyframe *next = &curve->keyframes.data[i];
+	size_t begin = 0;
+	size_t end = curve->keyframes.size;
+	const ufbx_keyframe *keys = curve->keyframes.data;
+	while (end - begin >= 8) {
+		size_t mid = (begin + end) >> 1;
+		if (keys[mid].time < time) {
+			begin = mid + 1;
+		} else { 
+			end = mid;
+		}
+	}
+
+	end = curve->keyframes.size;
+	for (; begin < end; begin++) {
+		const ufbx_keyframe *next = &keys[begin];
 		if (next->time < time) continue;
 
 		// First keyframe
-		if (i == 0) return next->value;
+		if (begin == 0) return next->value;
 
 		const ufbx_keyframe *prev = next - 1;
 
