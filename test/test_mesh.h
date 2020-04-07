@@ -409,3 +409,17 @@ UFBXT_FILE_TEST(synthetic_broken_material)
 	ufbxt_assert(mesh->face_material == NULL);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_uv_and_color_sets)
+#if UFBXT_IMPL
+{
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
+	ufbxt_assert(mesh);
+	ufbxt_assert(mesh->uv_sets.size == 2);
+	ufbxt_assert(mesh->color_sets.size == 2);
+	ufbxt_assert(!strcmp(mesh->uv_sets.data[0].name.data, "UVA"));
+	ufbxt_assert(!strcmp(mesh->uv_sets.data[1].name.data, "UVB"));
+	ufbxt_assert(!strcmp(mesh->color_sets.data[0].name.data, "ColorA"));
+	ufbxt_assert(!strcmp(mesh->color_sets.data[1].name.data, "ColorB"));
+}
+#endif
