@@ -1828,6 +1828,9 @@ static const char ufbxi_SpecularColor[] = "SpecularColor";
 static const char ufbxi_Color[] = "Color";
 static const char ufbxi_Intensity[] = "Intensity";
 static const char ufbxi_Size[] = "Size";
+static const char ufbxi_RotationAccumulationMode[] = "RotationAccumulationMode";
+static const char ufbxi_ScaleAccumulationMode[] = "ScaleAccumulationMode";
+static const char ufbxi_Weight[] = "Weight";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FBXHeaderExtension, sizeof(ufbxi_FBXHeaderExtension) - 1 },
@@ -1939,6 +1942,9 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Color, sizeof(ufbxi_Color) - 1 },
 	{ ufbxi_Intensity, sizeof(ufbxi_Intensity) - 1 },
 	{ ufbxi_Size, sizeof(ufbxi_Size) - 1 },
+	{ ufbxi_RotationAccumulationMode, sizeof(ufbxi_RotationAccumulationMode) - 1 },
+	{ ufbxi_ScaleAccumulationMode, sizeof(ufbxi_ScaleAccumulationMode) - 1 },
+	{ ufbxi_Weight, sizeof(ufbxi_Weight) - 1 },
 };
 
 // -- Type definitions
@@ -4917,10 +4923,9 @@ ufbxi_nodiscard static int ufbxi_read_material(ufbxi_context *uc, ufbxi_node *no
 	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_MATERIAL, object->id, uc->tmp_arr_materials.num_items - 1));
 
 	material->name = object->name;
-	material->props = object->props;
 
 	// Merge defaults immediately
-	ufbxi_check(ufbxi_merge_properties(uc, &material->props, material->props.defaults, &material->props, &uc->result));
+	ufbxi_check(ufbxi_merge_properties(uc, &material->props, object->props.defaults, &object->props, &uc->result));
 	ufbxi_remove_default_properties(&material->props, uc->default_props, &uc->result);
 
 	return 1;
@@ -5036,6 +5041,11 @@ ufbxi_nodiscard static int ufbxi_read_animation_layer(ufbxi_context *uc, ufbxi_n
 	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ANIM_LAYER, object->id, uc->tmp_arr_anim_layers.num_items - 1));
 
 	layer->name = object->name;
+
+	// Merge defaults immediately
+	ufbxi_check(ufbxi_merge_properties(uc, &layer->layer_props, object->props.defaults, &object->props, &uc->result));
+	ufbxi_remove_default_properties(&layer->layer_props, uc->default_props, &uc->result);
+
 	(void)node;
 
 	return 1;
@@ -5638,6 +5648,9 @@ ufbxi_nodiscard static int ufbxi_read_take(ufbxi_context *uc, ufbxi_node *node)
 	ufbxi_check(layer);
 	ufbxi_check(ufbxi_get_val1(node, "S", &layer->name));
 
+	// Set default properties
+	layer->layer_props.defaults = uc->default_props;
+
 	// Add a "virtual" connectable layer instead of connecting all the animated
 	// properties and curves directly to keep the code consistent with post-7000.
 	uint64_t layer_id = (uintptr_t)layer;
@@ -5894,6 +5907,16 @@ static ufbxi_forceinline ufbx_vec3 ufbxi_find_vec3(const ufbx_props *props, cons
 	}
 }
 
+static ufbxi_forceinline int64_t ufbxi_find_int(const ufbx_props *props, const char *name)
+{
+	ufbx_prop *prop = ufbxi_find_prop(props, name);
+	if (prop) {
+		return prop->value_int;
+	} else {
+		return 0;
+	}
+}
+
 static ufbxi_forceinline void ufbxi_add_translate(ufbx_transform *t, ufbx_vec3 v)
 {
 	t->translation.x += v.x;
@@ -6089,6 +6112,13 @@ static void ufbxi_get_material_properties(ufbx_material *material)
 	material->specular_color = ufbxi_find_vec3(&material->props, ufbxi_SpecularColor);
 }
 
+static void ufbxi_get_anim_layer_properties(ufbx_anim_layer *layer)
+{
+	layer->weight = ufbxi_find_real(&layer->layer_props, ufbxi_Weight);
+	layer->compose_rotation = ufbxi_find_int(&layer->layer_props, ufbxi_RotationAccumulationMode) == 0;
+	layer->compose_scale = ufbxi_find_int(&layer->layer_props, ufbxi_ScaleAccumulationMode) == 0;
+}
+
 static void ufbxi_get_properties(ufbx_scene *scene)
 {
 	ufbxi_for_ptr(ufbx_node, p_node, scene->nodes.data, scene->nodes.size) {
@@ -6115,6 +6145,10 @@ static void ufbxi_get_properties(ufbx_scene *scene)
 
 	ufbxi_for(ufbx_material, material, scene->materials.data, scene->materials.size) {
 		ufbxi_get_material_properties(material);
+	}
+
+	ufbxi_for(ufbx_anim_layer, layer, scene->anim_layers.data, scene->anim_layers.size) {
+		ufbxi_get_anim_layer_properties(layer);
 	}
 }
 
@@ -7308,6 +7342,16 @@ ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufb
 	return scene;
 }
 
+ufbx_scene *ufbx_load_stdio(void *file, const ufbx_load_opts *opts, ufbx_error *error)
+{
+	ufbxi_context uc = { 0 };
+	uc.read_fn = &ufbxi_file_read;
+	uc.read_user = file;
+	ufbx_scene *scene = ufbxi_load(&uc, opts, error);
+
+	return scene;
+}
+
 void ufbx_free_scene(ufbx_scene *scene)
 {
 	if (!scene) return;
@@ -7369,6 +7413,16 @@ ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_
 	ufbxi_for(ufbx_light, light, scene->lights.data, scene->lights.size) {
 		if (light->node.name.length == name_len && !memcmp(light->node.name.data, name, name_len)) {
 			return light;
+		}
+	}
+	return NULL;
+}
+
+ufbx_anim_layer *ufbx_find_anim_layer_len(const ufbx_scene *scene, const char *name, size_t name_len)
+{
+	ufbxi_for(ufbx_anim_layer, layer, scene->anim_layers.data, scene->anim_layers.size) {
+		if (layer->name.length == name_len && !memcmp(layer->name.data, name, name_len)) {
+			return layer;
 		}
 	}
 	return NULL;

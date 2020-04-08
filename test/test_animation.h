@@ -215,3 +215,48 @@ UFBXT_FILE_TEST(maya_anim_light)
 	ufbx_free_scene(state);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_anim_layers)
+#if UFBXT_IMPL
+{
+	ufbx_anim_layer *x = ufbx_find_anim_layer(scene, "X");
+	ufbx_anim_layer *y = ufbx_find_anim_layer(scene, "Y");
+	ufbxt_assert(x && y);
+	ufbxt_assert(y->compose_rotation == false);
+	ufbxt_assert(y->compose_scale == false);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_anim_layers_acc)
+#if UFBXT_IMPL
+{
+	ufbx_anim_layer *x = ufbx_find_anim_layer(scene, "X");
+	ufbx_anim_layer *y = ufbx_find_anim_layer(scene, "Y");
+	ufbxt_assert(x && y);
+	ufbxt_assert(y->compose_rotation == true);
+	ufbxt_assert(y->compose_scale == true);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_anim_layers_over)
+#if UFBXT_IMPL
+{
+	ufbx_anim_layer *x = ufbx_find_anim_layer(scene, "X");
+	ufbx_anim_layer *y = ufbx_find_anim_layer(scene, "Y");
+	ufbxt_assert(x && y);
+	ufbxt_assert(y->compose_rotation == false);
+	ufbxt_assert(y->compose_scale == false);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_anim_layers_over_acc)
+#if UFBXT_IMPL
+{
+	ufbx_anim_layer *x = ufbx_find_anim_layer(scene, "X");
+	ufbx_anim_layer *y = ufbx_find_anim_layer(scene, "Y");
+	ufbxt_assert(x && y);
+	ufbxt_assert(y->compose_rotation == true);
+	ufbxt_assert(y->compose_scale == true);
+}
+#endif
+

@@ -345,7 +345,13 @@ typedef enum ufbx_anim_target {
 
 struct ufbx_anim_layer {
 	ufbx_string name;
+	ufbx_props layer_props;
+
 	ufbx_anim_prop_list props;
+	ufbx_real weight;
+	bool compose_rotation;
+	bool compose_scale;
+
 };
 
 struct ufbx_anim_curve {
@@ -512,12 +518,15 @@ extern const ufbx_matrix ufbx_identity_matrix;
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error);
 ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error);
+ufbx_scene *ufbx_load_stdio(void *file, const ufbx_load_opts *opts, ufbx_error *error);
 void ufbx_free_scene(ufbx_scene *scene);
 
 ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_mesh *ufbx_find_mesh_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_material *ufbx_find_material_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_t name_len);
+
+ufbx_anim_layer *ufbx_find_anim_layer_len(const ufbx_scene *scene, const char *name, size_t name_len);
 
 ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len);
 
@@ -558,6 +567,10 @@ ufbx_inline ufbx_material *ufbx_find_material(const ufbx_scene *scene, const cha
 
 ufbx_inline ufbx_light *ufbx_find_light(const ufbx_scene *scene, const char *name) {
 	return ufbx_find_light_len(scene, name, strlen(name));
+}
+
+ufbx_inline ufbx_anim_layer *ufbx_find_anim_layer(const ufbx_scene *scene, const char *name) {
+	return ufbx_find_anim_layer_len(scene, name, strlen(name));
 }
 
 ufbx_inline ufbx_prop *ufbx_find_prop(const ufbx_props *props, const char *name) {
