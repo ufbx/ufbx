@@ -49,6 +49,7 @@ int main(int argc, char **argv)
 	ufbx_inflate_input input = { 0 };
 	input.data = src;
 	input.data_size = src_size;
+	input.total_size = src_size;
 	ptrdiff_t result = ufbx_inflate(dst, dst_size, &input, &retain);
 
 	free(src);
