@@ -4684,6 +4684,11 @@ typedef struct {
 
 ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *node, ufbxi_object *object)
 {
+	// Only read polygon meshes, ignore eg. NURBS without error
+	ufbxi_node *node_vertices = ufbxi_find_child(node, ufbxi_Vertices);
+	ufbxi_node *node_indices = ufbxi_find_child(node, ufbxi_PolygonVertexIndex);
+	if (!node_vertices || !node_indices) return 1;
+
 	ufbx_mesh *mesh = ufbxi_push_zero(&uc->tmp_arr_geometry, ufbx_mesh, 1);
 	ufbxi_check(mesh);
 	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_GEOMETRY, object->id, uc->tmp_arr_geometry.num_items - 1));
@@ -4691,8 +4696,8 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 
 	if (uc->opts.ignore_geometry) return 1;
 
-	ufbxi_value_array *vertices = ufbxi_find_array(node, ufbxi_Vertices, 'r');
-	ufbxi_value_array *indices = ufbxi_find_array(node, ufbxi_PolygonVertexIndex, 'i');
+	ufbxi_value_array *vertices = ufbxi_get_array(node_vertices, 'r');
+	ufbxi_value_array *indices = ufbxi_get_array(node_indices, 'i');
 	ufbxi_value_array *edge_indices = ufbxi_find_array(node, ufbxi_Edges, 'i');
 	ufbxi_check(vertices && indices);
 	ufbxi_check(vertices->size % 3 == 0);
