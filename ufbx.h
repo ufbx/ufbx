@@ -341,6 +341,7 @@ typedef enum ufbx_anim_target {
 	UFBX_ANIM_LIGHT,
 	UFBX_ANIM_MATERIAL,
 	UFBX_ANIM_BONE,
+	UFBX_ANIM_INVALID,
 } ufbx_anim_target;
 
 struct ufbx_anim_layer {
@@ -515,6 +516,7 @@ extern "C" {
 
 extern const ufbx_string ufbx_empty_string;
 extern const ufbx_matrix ufbx_identity_matrix;
+extern const ufbx_transform ufbx_identity_transform;
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error);
 ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error);
@@ -530,6 +532,8 @@ ufbx_anim_layer *ufbx_find_anim_layer_len(const ufbx_scene *scene, const char *n
 
 ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len);
 
+ufbx_anim_prop *ufbx_find_node_anim_prop_begin(const ufbx_scene *scene, const ufbx_anim_layer *layer, const ufbx_node *node);
+
 ufbx_face *ufbx_find_face(const ufbx_mesh *mesh, size_t index);
 
 ufbx_matrix ufbx_get_transform_matrix(const ufbx_transform *transform);
@@ -538,8 +542,11 @@ void ufbx_matrix_mul(ufbx_matrix *dst, const ufbx_matrix *l, const ufbx_matrix *
 ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v);
 ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v);
 ufbx_matrix ufbx_get_normal_matrix(const ufbx_matrix *m);
+ufbx_matrix ufbx_get_inverse_matrix(const ufbx_matrix *m);
 
 ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time);
+
+ufbx_transform ufbx_evaluate_transform(const ufbx_scene *scene, const ufbx_node *node, const ufbx_evaluate_opts *opts, double time);
 
 ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_evaluate_opts *opts, double time);
 
@@ -584,6 +591,39 @@ ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t ind
 
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+
+ufbx_inline ufbx_material *begin(const ufbx_material_list &l) { return l.data; }
+ufbx_inline ufbx_material *end(const ufbx_material_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_material **begin(const ufbx_material_ptr_list &l) { return l.data; }
+ufbx_inline ufbx_material **end(const ufbx_material_ptr_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_uv_set *begin(const ufbx_uv_set_list &l) { return l.data; }
+ufbx_inline ufbx_uv_set *end(const ufbx_uv_set_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_color_set *begin(const ufbx_color_set_list &l) { return l.data; }
+ufbx_inline ufbx_color_set *end(const ufbx_color_set_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_node **begin(const ufbx_node_ptr_list &l) { return l.data; }
+ufbx_inline ufbx_node **end(const ufbx_node_ptr_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_model *begin(const ufbx_model_list &l) { return l.data; }
+ufbx_inline ufbx_model *end(const ufbx_model_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_mesh *begin(const ufbx_mesh_list &l) { return l.data; }
+ufbx_inline ufbx_mesh *end(const ufbx_mesh_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_light *begin(const ufbx_light_list &l) { return l.data; }
+ufbx_inline ufbx_light *end(const ufbx_light_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_bone *begin(const ufbx_bone_list &l) { return l.data; }
+ufbx_inline ufbx_bone *end(const ufbx_bone_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_anim_layer *begin(const ufbx_anim_layer_list &l) { return l.data; }
+ufbx_inline ufbx_anim_layer *end(const ufbx_anim_layer_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_anim_prop *begin(const ufbx_anim_prop_list &l) { return l.data; }
+ufbx_inline ufbx_anim_prop *end(const ufbx_anim_prop_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_anim_curve *begin(const ufbx_anim_curve_list &l) { return l.data; }
+ufbx_inline ufbx_anim_curve *end(const ufbx_anim_curve_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_keyframe *begin(const ufbx_keyframe_list &l) { return l.data; }
+ufbx_inline ufbx_keyframe *end(const ufbx_keyframe_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_skin *begin(const ufbx_skin_list& l) { return l.data; }
+ufbx_inline ufbx_skin *end(const ufbx_skin_list& l) { return l.data + l.size; }
+
 #endif
 
 #if defined(_MSC_VER)

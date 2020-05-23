@@ -48,6 +48,7 @@
 	#pragma warning(disable: 4201) // nonstandard extension used: nameless struct/union
 	#pragma warning(disable: 4127) // conditional expression is constant
 	#pragma warning(disable: 4706) // assignment within conditional expression
+	#pragma warning(disable: 4789) // buffer 'type_and_name' of size 8 bytes will be overrun; 16 bytes will be written starting at offset 0
 #endif
 
 #ifndef ufbx_assert
@@ -439,6 +440,7 @@ ufbxi_bit_chunk_refill(ufbxi_bit_stream *s, const char *ptr)
 		if (to_read > 0) {
 			size_t num_read = s->read_fn(s->read_user, s->buffer + left, to_read);
 			if (num_read > to_read) num_read = 0;
+			ufbx_assert(s->input_left >= num_read);
 			s->input_left -= num_read;
 			left += num_read;
 		}
@@ -459,13 +461,18 @@ ufbxi_bit_chunk_refill(ufbxi_bit_stream *s, const char *ptr)
 
 static void ufbxi_bit_stream_init(ufbxi_bit_stream *s, const ufbx_inflate_input *input)
 {
+	size_t data_size = input->data_size;
+	if (data_size > input->total_size) {
+		data_size = input->total_size;
+	}
+
 	s->read_fn = input->read_fn;
 	s->read_user = input->read_user;
 	s->chunk_begin = (const char*)input->data;
 	s->chunk_ptr = (const char*)input->data;
-	s->chunk_end = (const char*)input->data + input->data_size - 8;
-	s->chunk_real_end = (const char*)input->data + input->data_size;
-	s->input_left = input->total_size - input->data_size;
+	s->chunk_end = (const char*)input->data + data_size - 8;
+	s->chunk_real_end = (const char*)input->data + data_size;
+	s->input_left = input->total_size - data_size;
 
 	// Use the user buffer if it's large enough, otherwise `local_buffer`
 	if (input->buffer_size >= 64) {
@@ -482,7 +489,7 @@ static void ufbxi_bit_stream_init(ufbxi_bit_stream *s, const ufbx_inflate_input 
 
 	// If the initial data buffer is not large enough to be read directly
 	// from refill the chunk once.
-	if (input->data_size < 64) {
+	if (data_size < 64) {
 		ufbxi_bit_chunk_refill(s, s->chunk_begin);
 	}
 }
@@ -529,12 +536,15 @@ ufbxi_bit_copy_bytes(void *dst, ufbxi_bit_stream *s, size_t len)
 		memcpy(ptr, s->chunk_ptr, chunk_left);
 		s->chunk_ptr += chunk_left;
 		ptr += chunk_left;
+		len -= chunk_left;
 	}
 
 	// Read extra bytes from user
+	if (len > s->input_left) return 0;
 	size_t num_read = 0;
 	if (s->read_fn) {
 		num_read = s->read_fn(s->read_user, ptr, len);
+		s->input_left -= num_read;
 	}
 	return num_read == len;
 }
@@ -2743,11 +2753,11 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			info->type = 'r';
 			info->result = false;
 			return true;
-		} else if (name == ufbxi_Indexes) {
+		} else if (name == ufbxi_Indexes && !uc->opts.ignore_geometry) {
 			info->type = 'i';
 			info->result = true;
 			return true;
-		} else if (name == ufbxi_Weights) {
+		} else if (name == ufbxi_Weights && !uc->opts.ignore_geometry) {
 			info->type = 'r';
 			info->result = true;
 			return true;
@@ -4656,12 +4666,12 @@ typedef struct {
 
 ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *node, ufbxi_object *object)
 {
-	if (uc->opts.ignore_geometry) return 1;
-
 	ufbx_mesh *mesh = ufbxi_push_zero(&uc->tmp_arr_geometry, ufbx_mesh, 1);
 	ufbxi_check(mesh);
 	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_GEOMETRY, object->id, uc->tmp_arr_geometry.num_items - 1));
 	mesh->node.props = object->props;
+
+	if (uc->opts.ignore_geometry) return 1;
 
 	ufbxi_value_array *vertices = ufbxi_find_array(node, ufbxi_Vertices, 'r');
 	ufbxi_value_array *indices = ufbxi_find_array(node, ufbxi_PolygonVertexIndex, 'i');
@@ -5010,18 +5020,21 @@ ufbxi_nodiscard static int ufbxi_read_deformer(ufbxi_context *uc, ufbxi_node *no
 		ufbxi_value_array *transform_link = ufbxi_find_array(node, ufbxi_TransformLink, 'r');
 
 		// TODO: Transform and TransformLink may be missing (?) use BindPose node in that case
-		if (indices && weights && transform && transform_link) {
+		if (transform && transform_link) {
 			ufbx_skin *skin = ufbxi_push_zero(&uc->tmp_arr_skin_clusters, ufbx_skin, 1);
 			ufbxi_check(skin);
 			ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_SKIN_CLUSTER, object->id, uc->tmp_arr_skin_clusters.num_items - 1));
 
-			ufbxi_check(indices->size == weights->size);
 			ufbxi_check(transform->size >= 16);
 			ufbxi_check(transform_link->size >= 16);
 
-			skin->num_weights = indices->size;
-			skin->indices = (int32_t*)indices->data;
-			skin->weights = (ufbx_real*)weights->data;
+			if (indices && weights) {
+				ufbxi_check(indices->size == weights->size);
+				skin->num_weights = indices->size;
+				skin->indices = (int32_t*)indices->data;
+				skin->weights = (ufbx_real*)weights->data;
+			}
+
 			ufbxi_read_transform_matrix(&skin->mesh_to_bind, (ufbx_real*)transform->data);
 			ufbxi_read_transform_matrix(&skin->bind_to_world, (ufbx_real*)transform_link->data);
 		}
@@ -5886,6 +5899,24 @@ ufbx_prop *ufbxi_find_prop_imp(const ufbx_props *props, const char *name, uint32
 #define ufbxi_find_prop(props, name) ufbxi_find_prop_imp((props), (name), \
 	(name[0] << 24) | (name[1] << 16) | (name[2] << 8) | name[3])
 
+#define ufbxi_init_prop_int(m_prop, m_name, m_x) \
+	(m_prop)->name.data = m_name; \
+	(m_prop)->name.length = sizeof(m_name) - 1; \
+	(m_prop)->imp_key = (m_name[0] << 24) | (m_name[1] << 16) | (m_name[2] << 8) | m_name[3]; \
+	(m_prop)->type = UFBX_PROP_INTEGER; \
+	(m_prop)->value_int = m_x; \
+	(m_prop)->value_real = (double)(m_x)
+
+#define ufbxi_init_prop_vec3(m_prop, m_name, m_x, m_y, m_z) \
+	(m_prop)->name.data = m_name; \
+	(m_prop)->name.length = sizeof(m_name) - 1; \
+	(m_prop)->imp_key = (m_name[0] << 24) | (m_name[1] << 16) | (m_name[2] << 8) | m_name[3]; \
+	(m_prop)->type = UFBX_PROP_VECTOR; \
+	(m_prop)->value_int = (int64_t)(m_x); \
+	(m_prop)->value_real_arr[0] = m_x; \
+	(m_prop)->value_real_arr[1] = m_y; \
+	(m_prop)->value_real_arr[2] = m_z
+
 static ufbxi_forceinline ufbx_real ufbxi_find_real(const ufbx_props *props, const char *name)
 {
 	ufbx_prop *prop = ufbxi_find_prop(props, name);
@@ -6376,6 +6407,15 @@ static ufbxi_forceinline int ufbxi_cmp_anim_prop(const void *va, const void *vb)
 	return strcmp(a->name.data, b->name.data);
 }
 
+static ufbxi_forceinline int ufbxi_cmp_anim_prop_imp(const ufbx_anim_prop *a, ufbx_anim_target target, uint32_t index)
+{
+	if (a->target < target) return -1;
+	if (a->target > target) return +1;
+	if (a->index < index) return -1;
+	if (a->index > index) return +1;
+	return 0;
+}
+
 ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	// Retrieve all temporary arrays
@@ -6541,7 +6581,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 
 	// Allocate storage for child arrays
 	ufbxi_for(ufbx_anim_layer, layer, uc->scene.anim_layers.data, uc->scene.anim_layers.size) {
-		layer->props.data = ufbxi_push(&uc->result, ufbx_anim_prop, layer->props.size);
+		layer->props.data = ufbxi_push(&uc->result, ufbx_anim_prop, layer->props.size + 1);
 		ufbxi_check(layer->props.data);
 		layer->props.size = 0;
 	}
@@ -6656,9 +6696,16 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	}
 
 	// Sort animated properties by target/index/name
-	qsort(uc->scene.anim_props.data, uc->scene.anim_props.size, sizeof(ufbx_anim_prop), &ufbxi_cmp_anim_prop);
 	ufbxi_for(ufbx_anim_layer, layer, uc->scene.anim_layers.data, uc->scene.anim_layers.size) {
 		qsort(layer->props.data, layer->props.size, sizeof(ufbx_anim_prop), &ufbxi_cmp_anim_prop);
+
+		// Set one past the last anim prop as sentinel INVALID anim prop
+		ufbx_anim_prop *sentinel = &layer->props.data[layer->props.size];
+		sentinel->name = ufbx_empty_string;
+		sentinel->imp_key = 0;
+		sentinel->target = UFBX_ANIM_INVALID;
+		sentinel->index = 0;
+		sentinel->layer = layer;
 	}
 
 	uc->scene.root = &uc->scene.models.data[0];
@@ -7049,13 +7096,12 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	imp->memory_block_size = alloc_size;
 
 	ufbx_anim_prop *ap = layer.props.data;
-	ufbx_anim_prop *ap_end = ap + layer.props.size;
 
 	ufbx_prop *prop = props;
 	ufbx_node **node = nodes;
 
 	// Skip unknown animation properties
-	while (ap != ap_end && ap->target == UFBX_ANIM_UNKNOWN) {
+	while (ap->target == UFBX_ANIM_UNKNOWN) {
 		continue;
 	}
 
@@ -7069,7 +7115,7 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 		*node++ = &model->node;
 
 		ufbx_prop *props_begin = prop;
-		while (ap != ap_end && ap->target == UFBX_ANIM_MODEL && ap->index == i) {
+		while (ap->target == UFBX_ANIM_MODEL && ap->index == i) {
 			ufbxi_evaluate_prop(prop, ap, time);
 			prop++;
 			ap++;
@@ -7116,7 +7162,7 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 		}
 
 		ufbx_prop *props_begin = prop;
-		while (ap != ap_end && ap->target == UFBX_ANIM_MESH && ap->index == i) {
+		while (ap->target == UFBX_ANIM_MESH && ap->index == i) {
 			ufbxi_evaluate_prop(prop, ap, time);
 			prop++;
 			ap++;
@@ -7141,7 +7187,7 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 		*node++ = &light->node;
 
 		ufbx_prop *props_begin = prop;
-		while (ap != ap_end && ap->target == UFBX_ANIM_LIGHT && ap->index == i) {
+		while (ap->target == UFBX_ANIM_LIGHT && ap->index == i) {
 			ufbxi_evaluate_prop(prop, ap, time);
 			prop++;
 			ap++;
@@ -7167,7 +7213,7 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 		*node++ = &bone->node;
 
 		ufbx_prop *props_begin = prop;
-		while (ap != ap_end && ap->target == UFBX_ANIM_BONE && ap->index == i) {
+		while (ap->target == UFBX_ANIM_BONE && ap->index == i) {
 			ufbxi_evaluate_prop(prop, ap, time);
 			prop++;
 			ap++;
@@ -7190,7 +7236,7 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 		*material = *src;
 
 		ufbx_prop *props_begin = prop;
-		while (ap != ap_end && ap->target == UFBX_ANIM_MATERIAL && ap->index == i) {
+		while (ap->target == UFBX_ANIM_MATERIAL && ap->index == i) {
 			ufbxi_evaluate_prop(prop, ap, time);
 			prop++;
 			ap++;
@@ -7205,7 +7251,7 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 		}
 	}
 
-	ufbx_assert(ap == ap_end);
+	ufbx_assert(ap->target == UFBX_ANIM_INVALID);
 	ufbx_assert(node == imp->scene.nodes.data + imp->scene.nodes.size);
 
 	imp->scene.root = &imp->scene.models.data[0];
@@ -7297,6 +7343,38 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	return &imp->scene;
 }
 
+ufbxi_forceinline static void ufbxi_eval_anim_prop_imp(ufbx_anim_target target, uint32_t index, ufbx_anim_prop **p_ap, double time,
+	ufbx_prop *prop, const char *name, size_t name_len, uint32_t imp_key, ufbx_real x, ufbx_real y, ufbx_real z)
+{
+	prop->name.data = name;
+	prop->name.length = name_len;
+	prop->imp_key = imp_key;
+
+	ufbx_anim_prop *ap = *p_ap;
+	for (; ap->target == target && ap->index == index && ap->imp_key <= imp_key; ap++) {
+		if (ap->name.data == name) {
+			prop->value_real_arr[0] = ufbx_evaluate_curve(&ap->curves[0], time);
+			prop->value_real_arr[1] = ufbx_evaluate_curve(&ap->curves[1], time);
+			prop->value_real_arr[2] = ufbx_evaluate_curve(&ap->curves[2], time);
+			*p_ap = ap;
+			return;
+		}
+	}
+
+	prop->value_int = (int64_t)x;
+	prop->value_real_arr[0] = x;
+	prop->value_real_arr[1] = y;
+	prop->value_real_arr[2] = z;
+
+	*p_ap = ap;
+}
+
+#define ufbxi_eval_anim_prop(m_target, m_index, m_p_ap, m_time, m_prop, m_name, m_x, m_y, m_z) \
+	ufbxi_eval_anim_prop_imp(m_target, m_index, m_p_ap, m_time, m_prop, m_name, sizeof(m_name) - 1, \
+	(m_name[0] << 24) | (m_name[1] << 16) | (m_name[2] << 8) | m_name[3], \
+	m_x, m_y, m_z)
+
+
 // -- API
 
 #ifdef __cplusplus
@@ -7305,6 +7383,7 @@ extern "C" {
 
 const ufbx_string ufbx_empty_string = { ufbxi_empty_char, 0 };
 const ufbx_matrix ufbx_identity_matrix = { 1,0,0, 0,1,0, 0,0,1, 0,0,0 };
+const ufbx_transform ufbx_identity_transform = { {0,0,0}, {0,0,0,1}, {1,1,1} };
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)
 {
@@ -7461,6 +7540,51 @@ ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t 
 	return NULL;
 }
 
+ufbx_anim_prop *ufbx_find_node_anim_prop_begin(const ufbx_scene *scene, const ufbx_anim_layer *layer, const ufbx_node *node)
+{
+	ufbx_anim_target target = UFBX_ANIM_UNKNOWN;
+	uint32_t index = ~0u;
+	switch (node->type) {
+	case UFBX_NODE_UNKNOWN: return NULL;
+	case UFBX_NODE_MODEL:
+		target = UFBX_ANIM_MODEL;
+		index = (uint32_t)((ufbx_model*)node - scene->models.data);
+		break;
+	case UFBX_NODE_MESH:
+		target = UFBX_ANIM_MESH;
+		index = (uint32_t)((ufbx_mesh*)node - scene->meshes.data);
+		break;
+	case UFBX_NODE_LIGHT:
+		target = UFBX_ANIM_LIGHT;
+		index = (uint32_t)((ufbx_light*)node - scene->lights.data);
+		break;
+	case UFBX_NODE_BONE:
+		target = UFBX_ANIM_BONE;
+		index = (uint32_t)((ufbx_bone*)node - scene->bones.data);
+		break;
+	}
+
+	size_t begin = 0;
+	size_t end = layer->props.size;
+	const ufbx_anim_prop *props = layer->props.data;
+	while (end - begin >= 16) {
+		size_t mid = (begin + end) >> 1;
+		if (ufbxi_cmp_anim_prop_imp(&props[mid], target, index) < 0) {
+			begin = mid + 1;
+		} else { 
+			end = mid;
+		}
+	}
+
+	end = layer->props.size;
+	for (; begin < end; begin++) {
+		const ufbx_anim_prop *prop = &props[begin];
+		if (prop->target == target && prop->index == index) return (ufbx_anim_prop*)prop;
+	}
+
+	return NULL;
+}
+
 ufbx_face *ufbx_find_face(const ufbx_mesh *mesh, size_t index)
 {
 	size_t begin = 0;
@@ -7576,6 +7700,36 @@ ufbx_matrix ufbx_get_normal_matrix(const ufbx_matrix *m)
 	return r;
 }
 
+ufbx_matrix ufbx_get_inverse_matrix(const ufbx_matrix *m)
+{
+	ufbx_real det = 
+		- m->m02*m->m11*m->m20 + m->m01*m->m12*m->m20 + m->m02*m->m10*m->m21
+		- m->m00*m->m12*m->m21 - m->m01*m->m10*m->m22 + m->m00*m->m11*m->m22;
+
+	ufbx_matrix r;
+	if (det == 0.0) {
+		memset(&r, 0, sizeof(r));
+		return r;
+	}
+
+	ufbx_real rcp_det = 1.0 / det;
+
+	r.m00 = ( - m->m12*m->m21 + m->m11*m->m22) * rcp_det;
+	r.m10 = ( + m->m12*m->m20 - m->m10*m->m22) * rcp_det;
+	r.m20 = ( - m->m11*m->m20 + m->m10*m->m21) * rcp_det;
+	r.m01 = ( + m->m02*m->m21 - m->m01*m->m22) * rcp_det;
+	r.m11 = ( - m->m02*m->m20 + m->m00*m->m22) * rcp_det;
+	r.m21 = ( + m->m01*m->m20 - m->m00*m->m21) * rcp_det;
+	r.m02 = ( - m->m02*m->m11 + m->m01*m->m12) * rcp_det;
+	r.m12 = ( + m->m02*m->m10 - m->m00*m->m12) * rcp_det;
+	r.m22 = ( - m->m01*m->m10 + m->m00*m->m11) * rcp_det;
+	r.m03 = (m->m03*m->m12*m->m21 - m->m02*m->m13*m->m21 - m->m03*m->m11*m->m22 + m->m01*m->m13*m->m22 + m->m02*m->m11*m->m23 - m->m01*m->m12*m->m23) * rcp_det;
+	r.m13 = (m->m02*m->m13*m->m20 - m->m03*m->m12*m->m20 + m->m03*m->m10*m->m22 - m->m00*m->m13*m->m22 - m->m02*m->m10*m->m23 + m->m00*m->m12*m->m23) * rcp_det;
+	r.m23 = (m->m03*m->m11*m->m20 - m->m01*m->m13*m->m20 - m->m03*m->m10*m->m21 + m->m00*m->m13*m->m21 + m->m01*m->m10*m->m23 - m->m00*m->m11*m->m23) * rcp_det;
+
+	return r;
+}
+
 ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time)
 {
 	if (curve->keyframes.size <= 1) {
@@ -7644,6 +7798,34 @@ ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time)
 
 	// Last keyframe
 	return curve->keyframes.data[curve->keyframes.size - 1].value;
+}
+
+ufbx_transform ufbx_evaluate_transform(const ufbx_scene *scene, const ufbx_node *node, const ufbx_evaluate_opts *opts, double time)
+{
+	const ufbx_anim_layer *layer = opts && opts->layer ? opts->layer : scene->anim_layers.data;
+	ufbx_anim_prop *ap = ufbx_find_node_anim_prop_begin(scene, layer, node);
+	if (!ap) return ufbx_identity_transform;
+	ufbx_anim_target target = ap->target;
+	uint32_t index = ap->index;
+
+	ufbx_prop props[10];
+
+	ufbxi_eval_anim_prop(target, index, &ap, time, &props[0], ufbxi_Lcl_Rotation, 0,0,0);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &props[1], ufbxi_Lcl_Scaling, 1,1,1);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &props[2], ufbxi_Lcl_Translation, 0,0,0);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &props[3], ufbxi_PostRotation, 0,0,0);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &props[4], ufbxi_PreRotation, 0,0,0);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &props[5], ufbxi_RotationOffset, 0,0,0);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &props[6], ufbxi_RotationOrder, (ufbx_real)UFBX_ROTATION_XYZ,0,0);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &props[7], ufbxi_RotationPivot, 0,0,0);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &props[8], ufbxi_ScalingOffset, 0,0,0);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &props[9], ufbxi_ScalingPivot, 0,0,0);
+
+	ufbx_props eval_props;
+	eval_props.props = props;
+	eval_props.num_props = ufbxi_arraycount(props);
+	eval_props.defaults = (ufbx_props*)&node->props;
+	return ufbxi_get_transform(&eval_props);
 }
 
 ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_evaluate_opts *user_opts, double time)
