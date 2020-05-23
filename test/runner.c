@@ -916,6 +916,24 @@ void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
 	ufbxt_check_props(scene, &material->props, true);
 }
 
+void ufbxt_check_anim_stack(ufbx_scene *scene, ufbx_anim_stack *anim_stack)
+{
+	ufbxt_check_string(anim_stack->name);
+	ufbxt_check_props(scene, &anim_stack->props, true);
+	for (size_t i = 0; i < anim_stack->layers.size; i++) {
+		ufbx_anim_layer *layer = anim_stack->layers.data[i];
+		ptrdiff_t layer_i = scene->anim_layers.data - layer;
+		ufbxt_assert(layer >= scene->anim_layers.data);
+		ufbxt_assert(layer < scene->anim_layers.data + scene->anim_layers.size);
+	}
+}
+
+void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_layer)
+{
+	ufbxt_check_string(anim_layer->name);
+	ufbxt_check_props(scene, &anim_layer->layer_props, true);
+}
+
 void ufbxt_check_anim_prop(ufbx_scene *scene, ufbx_anim_prop *anim_prop)
 {
 	ufbxt_check_string(anim_prop->name);
@@ -946,6 +964,14 @@ void ufbxt_check_scene(ufbx_scene *scene)
 
 	for (size_t i = 0; i < scene->materials.size; i++) {
 		ufbxt_check_material(scene, &scene->materials.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->anim_stacks.size; i++) {
+		ufbxt_check_anim_stack(scene, &scene->anim_stacks.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->anim_layers.size; i++) {
+		ufbxt_check_anim_layer(scene, &scene->anim_layers.data[i]);
 	}
 
 	for (size_t i = 0; i < scene->anim_props.size; i++) {
