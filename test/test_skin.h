@@ -50,9 +50,20 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, const char *fil
 UFBXT_FILE_TEST(blender_279_sausage)
 #if UFBXT_IMPL
 {
+	if (scene->metadata.ascii) {
+		// ???: In the 6100 ASCII file Spin Take starts from -1 frames
+		ufbxt_check_stack_times(scene, err, "Base", 0.0, 1.0/24.0);
+		ufbxt_check_stack_times(scene, err, "Spin", -1.0/24.0, 18.0/24.0);
+		ufbxt_check_stack_times(scene, err, "Wiggle", 0.0, 19.0/24.0);
+	} else {
+		ufbxt_check_stack_times(scene, err, "Skeleton|Base", 0.0, 1.0/24.0);
+		ufbxt_check_stack_times(scene, err, "Skeleton|Spin", 0.0, 19.0/24.0);
+		ufbxt_check_stack_times(scene, err, "Skeleton|Wiggle", 0.0, 19.0/24.0);
+	}
+
 	ufbxt_check_frame(scene, err, "blender_279_sausage_base_0", "Base", 0.0);
-	ufbxt_check_frame(scene, err, "blender_279_sausage_wiggle_20", "Wiggle", 20.0/24.0);
 	ufbxt_check_frame(scene, err, "blender_279_sausage_spin_15", "Spin", 15.0/24.0);
+	ufbxt_check_frame(scene, err, "blender_279_sausage_wiggle_20", "Wiggle", 20.0/24.0);
 }
 #endif
 

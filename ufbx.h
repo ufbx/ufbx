@@ -592,7 +592,7 @@ ufbx_inline ufbx_light *ufbx_find_light(const ufbx_scene *scene, const char *nam
 	return ufbx_find_light_len(scene, name, strlen(name));
 }
 
-ufbx_inline ufbx_anim_layer *ufbx_find_anim_stack(const ufbx_scene *scene, const char *name) {
+ufbx_inline ufbx_anim_stack *ufbx_find_anim_stack(const ufbx_scene *scene, const char *name) {
 	return ufbx_find_anim_stack_len(scene, name, strlen(name));
 }
 

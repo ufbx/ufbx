@@ -4458,9 +4458,10 @@ ufbxi_nodiscard static ufbx_props *ufbxi_find_template(ufbxi_context *uc, const 
 	ufbxi_for(ufbxi_template, tmpl, uc->templates, uc->num_templates) {
 		if (tmpl->type == name) {
 
-			// Check that sub_type matches unless the type is Material or Model,
-			// both of those match to all sub-types.
-			if (tmpl->type != ufbxi_Material && tmpl->type != ufbxi_Model) {
+			// Check that sub_type matches unless the type is Material, Model, AnimationStack, AnimationLayer
+			// those match to all sub-types.
+			if (tmpl->type != ufbxi_Material && tmpl->type != ufbxi_Model
+				&& tmpl->type != ufbxi_AnimationStack && tmpl->type != ufbxi_AnimationLayer) {
 				if (sub_type.length > 3 && !strncmp(sub_type.data, "Fbx", 3)) {
 					sub_type.data += 3;
 					sub_type.length -= 3;
@@ -5717,7 +5718,7 @@ ufbxi_nodiscard static int ufbxi_read_take(ufbxi_context *uc, ufbxi_node *node)
 	ufbxi_check(ufbxi_add_connection(uc, stack_id, layer_id, NULL));
 
 	// Read stack properties from node
-	uint64_t begin = 0, end = 0;
+	int64_t begin = 0, end = 0;
 	if (!ufbxi_find_val2(node, ufbxi_LocalTime, "LL", &begin, &end)) {
 		ufbxi_check(ufbxi_find_val2(node, ufbxi_ReferenceTime, "LL", &begin, &end));
 	}
