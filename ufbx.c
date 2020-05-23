@@ -1746,6 +1746,7 @@ static const char ufbxi_Properties70[] = "Properties70";
 static const char ufbxi_Model[] = "Model";
 static const char ufbxi_NodeAttribute[] = "NodeAttribute";
 static const char ufbxi_Geometry[] = "Geometry";
+static const char ufbxi_AnimationStack[] = "AnimationStack";
 static const char ufbxi_AnimationLayer[] = "AnimationLayer";
 static const char ufbxi_AnimationCurve[] = "AnimationCurve";
 static const char ufbxi_AnimationCurveNode[] = "AnimationCurveNode";
@@ -1803,6 +1804,12 @@ static const char ufbxi_KeyAttrFlags[] = "KeyAttrFlags";
 static const char ufbxi_KeyAttrDataFloat[] = "KeyAttrDataFloat";
 static const char ufbxi_KeyAttrRefCount[] = "KeyAttrRefCount";
 static const char ufbxi_Take[] = "Take";
+static const char ufbxi_LocalTime[] = "LocalTime";
+static const char ufbxi_ReferenceTime[] = "ReferenceTime";
+static const char ufbxi_LocalStart[] = "LocalStart";
+static const char ufbxi_LocalStop[] = "LocalStop";
+static const char ufbxi_ReferenceStart[] = "ReferenceStart";
+static const char ufbxi_ReferenceStop[] = "ReferenceStop";
 static const char ufbxi_Channel[] = "Channel";
 static const char ufbxi_Default[] = "Default";
 static const char ufbxi_Key[] = "Key";
@@ -1860,6 +1867,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Model, sizeof(ufbxi_Model) - 1 },
 	{ ufbxi_NodeAttribute, sizeof(ufbxi_NodeAttribute) - 1 },
 	{ ufbxi_Geometry, sizeof(ufbxi_Geometry) - 1 },
+	{ ufbxi_AnimationStack, sizeof(ufbxi_AnimationStack) - 1 },
 	{ ufbxi_AnimationLayer, sizeof(ufbxi_AnimationLayer) - 1 },
 	{ ufbxi_AnimationCurve, sizeof(ufbxi_AnimationCurve) - 1 },
 	{ ufbxi_AnimationCurveNode, sizeof(ufbxi_AnimationCurveNode) - 1 },
@@ -1917,6 +1925,12 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_KeyAttrDataFloat, sizeof(ufbxi_KeyAttrDataFloat) - 1 },
 	{ ufbxi_KeyAttrRefCount, sizeof(ufbxi_KeyAttrRefCount) - 1 },
 	{ ufbxi_Take, sizeof(ufbxi_Take) - 1 },
+	{ ufbxi_LocalTime, sizeof(ufbxi_LocalTime) - 1 },
+	{ ufbxi_ReferenceTime, sizeof(ufbxi_ReferenceTime) - 1 },
+	{ ufbxi_LocalStart, sizeof(ufbxi_LocalStart) - 1 },
+	{ ufbxi_LocalStop, sizeof(ufbxi_LocalStop) - 1 },
+	{ ufbxi_ReferenceStart, sizeof(ufbxi_ReferenceStart) - 1 },
+	{ ufbxi_ReferenceStop, sizeof(ufbxi_ReferenceStop) - 1 },
 	{ ufbxi_Channel, sizeof(ufbxi_Channel) - 1 },
 	{ ufbxi_Default, sizeof(ufbxi_Default) - 1 },
 	{ ufbxi_Key, sizeof(ufbxi_Key) - 1 },
@@ -2019,6 +2033,7 @@ typedef enum {
 	UFBXI_CONNECTABLE_BONE,
 	UFBXI_CONNECTABLE_GEOMETRY,
 	UFBXI_CONNECTABLE_MATERIAL,
+	UFBXI_CONNECTABLE_ANIM_STACK,
 	UFBXI_CONNECTABLE_ANIM_LAYER,
 	UFBXI_CONNECTABLE_ANIM_PROP,
 	UFBXI_CONNECTABLE_ANIM_CURVE,
@@ -2147,6 +2162,7 @@ typedef struct {
 	ufbxi_buf tmp_arr_materials;
 	ufbxi_buf tmp_arr_lights;
 	ufbxi_buf tmp_arr_bones;
+	ufbxi_buf tmp_arr_anim_stacks;
 	ufbxi_buf tmp_arr_anim_layers;
 	ufbxi_buf tmp_arr_anim_props;
 	ufbxi_buf tmp_arr_anim_curves;
@@ -3864,6 +3880,7 @@ const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
 	{ UFBX_PROP_INTEGER, "enum" },
 	{ UFBX_PROP_INTEGER, "Visibility" },
 	{ UFBX_PROP_INTEGER, "Visibility Inheritance" },
+	{ UFBX_PROP_INTEGER, "KTime" },
 	{ UFBX_PROP_NUMBER, "Number" },
 	{ UFBX_PROP_NUMBER, "double" },
 	{ UFBX_PROP_NUMBER, "Real" },
@@ -5047,6 +5064,23 @@ ufbxi_nodiscard static int ufbxi_read_deformer(ufbxi_context *uc, ufbxi_node *no
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_read_animation_stack(ufbxi_context *uc, ufbxi_node *node, ufbxi_object *object)
+{
+	ufbx_anim_stack *stack = ufbxi_push_zero(&uc->tmp_arr_anim_stacks, ufbx_anim_stack, 1);
+	ufbxi_check(stack);
+	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ANIM_STACK, object->id, uc->tmp_arr_anim_stacks.num_items - 1));
+
+	stack->name = object->name;
+
+	// Merge defaults immediately
+	ufbxi_check(ufbxi_merge_properties(uc, &stack->props, object->props.defaults, &object->props, &uc->result));
+	ufbxi_remove_default_properties(&stack->props, uc->default_props, &uc->result);
+
+	(void)node;
+
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_read_animation_layer(ufbxi_context *uc, ufbxi_node *node, ufbxi_object *object)
 {
 	ufbx_anim_layer *layer = ufbxi_push_zero(&uc->tmp_arr_anim_layers, ufbx_anim_layer, 1);
@@ -5381,6 +5415,8 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			ufbxi_check(ufbxi_read_material(uc, node, &object));
 		} else if (name == ufbxi_NodeAttribute) {
 			ufbxi_check(ufbxi_read_node_attribute(uc, node, &object));
+		} else if (name == ufbxi_AnimationStack) {
+			ufbxi_check(ufbxi_read_animation_stack(uc, node, &object));
 		} else if (name == ufbxi_AnimationLayer) {
 			ufbxi_check(ufbxi_read_animation_layer(uc, node, &object));
 		} else if (name == ufbxi_AnimationCurve) {
@@ -5656,18 +5692,37 @@ ufbxi_nodiscard static int ufbxi_read_take_object(ufbxi_context *uc, ufbxi_node 
 
 ufbxi_nodiscard static int ufbxi_read_take(ufbxi_context *uc, ufbxi_node *node)
 {
-	// Treat the Take as a post-7000 version animation layer.
+	// Treat the Take as a post-7000 version animation stack and layer.
+	ufbx_anim_stack *stack = ufbxi_push_zero(&uc->tmp_arr_anim_stacks, ufbx_anim_stack, 1);
+	ufbxi_check(stack);
+	ufbxi_check(ufbxi_get_val1(node, "S", &stack->name));
+
 	ufbx_anim_layer *layer = ufbxi_push_zero(&uc->tmp_arr_anim_layers, ufbx_anim_layer, 1);
 	ufbxi_check(layer);
-	ufbxi_check(ufbxi_get_val1(node, "S", &layer->name));
+	layer->name.data = "BaseLayer";
+	layer->name.length = 9;
+	ufbxi_check(ufbxi_push_string_place_str(uc, &layer->name));
 
 	// Set default properties
+	stack->props.defaults = uc->default_props;
 	layer->layer_props.defaults = uc->default_props;
 
 	// Add a "virtual" connectable layer instead of connecting all the animated
 	// properties and curves directly to keep the code consistent with post-7000.
+	uint64_t stack_id = (uintptr_t)stack;
 	uint64_t layer_id = (uintptr_t)layer;
+	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ANIM_STACK, stack_id, uc->tmp_arr_anim_stacks.num_items - 1));
 	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ANIM_LAYER, layer_id, uc->tmp_arr_anim_layers.num_items - 1));
+
+	ufbxi_check(ufbxi_add_connection(uc, stack_id, layer_id, NULL));
+
+	// Read stack properties from node
+	uint64_t begin = 0, end = 0;
+	if (!ufbxi_find_val2(node, ufbxi_LocalTime, "LL", &begin, &end)) {
+		ufbxi_check(ufbxi_find_val2(node, ufbxi_ReferenceTime, "LL", &begin, &end));
+	}
+	stack->time_begin = (double)begin * uc->ktime_to_sec;
+	stack->time_end = (double)end * uc->ktime_to_sec;
 
 	// Read all properties of objects included in the take
 	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
@@ -6143,6 +6198,24 @@ static void ufbxi_get_material_properties(ufbx_material *material)
 	material->specular_color = ufbxi_find_vec3(&material->props, ufbxi_SpecularColor);
 }
 
+static void ufbxi_get_anim_stack_properties(ufbx_anim_stack *stack, ufbx_scene *scene)
+{
+	ufbx_prop *begin, *end;
+	begin = ufbxi_find_prop(&stack->props, ufbxi_LocalStart);
+	end = ufbxi_find_prop(&stack->props, ufbxi_LocalStop);
+	if (begin && end) {
+		stack->time_begin = (double)begin->value_int * scene->metadata.ktime_to_sec;
+		stack->time_end = (double)end->value_int * scene->metadata.ktime_to_sec;
+	} else {
+		begin = ufbxi_find_prop(&stack->props, ufbxi_ReferenceStart);
+		end = ufbxi_find_prop(&stack->props, ufbxi_ReferenceStop);
+		if (begin && end) {
+			stack->time_begin = (double)begin->value_int * scene->metadata.ktime_to_sec;
+			stack->time_end = (double)end->value_int * scene->metadata.ktime_to_sec;
+		}
+	}
+}
+
 static void ufbxi_get_anim_layer_properties(ufbx_anim_layer *layer)
 {
 	layer->weight = ufbxi_find_real(&layer->layer_props, ufbxi_Weight);
@@ -6176,6 +6249,10 @@ static void ufbxi_get_properties(ufbx_scene *scene)
 
 	ufbxi_for(ufbx_material, material, scene->materials.data, scene->materials.size) {
 		ufbxi_get_material_properties(material);
+	}
+
+	ufbxi_for(ufbx_anim_stack, stack, scene->anim_stacks.data, scene->anim_stacks.size) {
+		ufbxi_get_anim_stack_properties(stack, scene);
 	}
 
 	ufbxi_for(ufbx_anim_layer, layer, scene->anim_layers.data, scene->anim_layers.size) {
@@ -6232,6 +6309,7 @@ typedef struct {
 	ufbx_bone *bone;
 	ufbx_mesh *geometry;
 	ufbx_material *material;
+	ufbx_anim_stack *anim_stack;
 	ufbx_anim_layer *anim_layer;
 	ufbx_anim_prop *anim_prop;
 	ufbx_anim_curve *anim_curve;
@@ -6298,6 +6376,9 @@ ufbxi_nodiscard static int ufbxi_find_connectable_data(ufbxi_context *uc, ufbxi_
 		break;
 	case UFBXI_CONNECTABLE_MATERIAL:
 		data->material = &uc->scene.materials.data[index];
+		break;
+	case UFBXI_CONNECTABLE_ANIM_STACK:
+		data->anim_stack = &uc->scene.anim_stacks.data[index];
 		break;
 	case UFBXI_CONNECTABLE_ANIM_LAYER:
 		data->anim_layer = &uc->scene.anim_layers.data[index];
@@ -6424,6 +6505,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_material), &uc->scene.materials, &uc->tmp_arr_materials));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_light), &uc->scene.lights, &uc->tmp_arr_lights));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_bone), &uc->scene.bones, &uc->tmp_arr_bones));
+	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_anim_stack), &uc->scene.anim_stacks, &uc->tmp_arr_anim_stacks));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_anim_layer), &uc->scene.anim_layers, &uc->tmp_arr_anim_layers));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_anim_prop), &uc->scene.anim_props, &uc->tmp_arr_anim_props));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_anim_curve), &uc->scene.anim_curves, &uc->tmp_arr_anim_curves));
@@ -6507,6 +6589,13 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 			}
 		}
 
+		// Count animation stack layers
+		if (parent.anim_stack) {
+			if (child.anim_layer) {
+				parent.anim_stack->layers.size++;
+			}
+		}
+
 		if (child.anim_prop && prop) {
 
 			ufbx_anim_target target;
@@ -6516,6 +6605,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 			case UFBXI_CONNECTABLE_LIGHT: target = UFBX_ANIM_LIGHT; break;
 			case UFBXI_CONNECTABLE_BONE: target = UFBX_ANIM_BONE; break;
 			case UFBXI_CONNECTABLE_MATERIAL: target = UFBX_ANIM_MATERIAL; break;
+			case UFBXI_CONNECTABLE_ANIM_LAYER: target = UFBX_ANIM_ANIM_LAYER; break;
 			default: target = UFBX_ANIM_UNKNOWN;
 			}
 
@@ -6580,11 +6670,18 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	}
 
 	// Allocate storage for child arrays
+	ufbxi_for(ufbx_anim_stack, stack, uc->scene.anim_stacks.data, uc->scene.anim_stacks.size) {
+		stack->layers.data = ufbxi_push(&uc->result, ufbx_anim_layer*, stack->layers.size);
+		ufbxi_check(stack->layers.data);
+		stack->layers.size = 0;
+	}
+
 	ufbxi_for(ufbx_anim_layer, layer, uc->scene.anim_layers.data, uc->scene.anim_layers.size) {
 		layer->props.data = ufbxi_push(&uc->result, ufbx_anim_prop, layer->props.size + 1);
 		ufbxi_check(layer->props.data);
 		layer->props.size = 0;
 	}
+
 	ufbxi_for(ufbx_mesh, mesh, uc->scene.meshes.data, uc->scene.meshes.size) {
 
 		// Clamp `face_material` array / remove it if there's no materials
@@ -6640,6 +6737,12 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		if (parent.mesh) {
 			if (child.material) {
 				parent.mesh->materials.data[parent.mesh->materials.size++] = child.material;
+			}
+		}
+
+		if (parent.anim_stack) {
+			if (child.anim_layer) {
+				parent.anim_stack->layers.data[parent.anim_stack->layers.size++] = child.anim_layer;
 			}
 		}
 
@@ -6709,6 +6812,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	}
 
 	uc->scene.root = &uc->scene.models.data[0];
+	uc->scene.metadata.ktime_to_sec = uc->ktime_to_sec;
 
 	// Check that the nodes are not too nested
 	ufbxi_check(ufbxi_check_node_depth(uc, &uc->scene.root->node, 0));
@@ -6775,6 +6879,7 @@ static void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->tmp_arr_materials);
 	ufbxi_buf_free(&uc->tmp_arr_lights);
 	ufbxi_buf_free(&uc->tmp_arr_bones);
+	ufbxi_buf_free(&uc->tmp_arr_anim_stacks);
 	ufbxi_buf_free(&uc->tmp_arr_anim_layers);
 	ufbxi_buf_free(&uc->tmp_arr_anim_props);
 	ufbxi_buf_free(&uc->tmp_arr_anim_curves);
@@ -6874,6 +6979,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->tmp_arr_bones.ator = &uc->ator_tmp;
 	uc->tmp_arr_geometry.ator = &uc->ator_tmp;
 	uc->tmp_arr_materials.ator = &uc->ator_tmp;
+	uc->tmp_arr_anim_stacks.ator = &uc->ator_tmp;
 	uc->tmp_arr_anim_layers.ator = &uc->ator_tmp;
 	uc->tmp_arr_anim_props.ator = &uc->ator_tmp;
 	uc->tmp_arr_anim_curves.ator = &uc->ator_tmp;
@@ -7497,6 +7603,16 @@ ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_
 	return NULL;
 }
 
+ufbx_anim_stack *ufbx_find_anim_stack_len(const ufbx_scene *scene, const char *name, size_t name_len)
+{
+	ufbxi_for(ufbx_anim_stack, stack, scene->anim_stacks.data, scene->anim_stacks.size) {
+		if (stack->name.length == name_len && !memcmp(stack->name.data, name, name_len)) {
+			return stack;
+		}
+	}
+	return NULL;
+}
+
 ufbx_anim_layer *ufbx_find_anim_layer_len(const ufbx_scene *scene, const char *name, size_t name_len)
 {
 	ufbxi_for(ufbx_anim_layer, layer, scene->anim_layers.data, scene->anim_layers.size) {
@@ -7542,10 +7658,12 @@ ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t 
 
 ufbx_anim_prop *ufbx_find_node_anim_prop_begin(const ufbx_scene *scene, const ufbx_anim_layer *layer, const ufbx_node *node)
 {
+	if (!scene || !layer || !node) return NULL;
+
 	ufbx_anim_target target = UFBX_ANIM_UNKNOWN;
 	uint32_t index = ~0u;
 	switch (node->type) {
-	case UFBX_NODE_UNKNOWN: return NULL;
+	default: return NULL;
 	case UFBX_NODE_MODEL:
 		target = UFBX_ANIM_MODEL;
 		index = (uint32_t)((ufbx_model*)node - scene->models.data);
@@ -7800,9 +7918,15 @@ ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time)
 	return curve->keyframes.data[curve->keyframes.size - 1].value;
 }
 
-ufbx_transform ufbx_evaluate_transform(const ufbx_scene *scene, const ufbx_node *node, const ufbx_evaluate_opts *opts, double time)
+ufbx_transform ufbx_evaluate_transform(const ufbx_scene *scene, const ufbx_node *node, const ufbx_anim_stack *stack, double time)
 {
-	const ufbx_anim_layer *layer = opts && opts->layer ? opts->layer : scene->anim_layers.data;
+	const ufbx_anim_layer *layer = NULL;
+	if (!stack && scene->anim_stacks.size > 0) {
+		stack = &scene->anim_stacks.data[0];
+	}
+	if (stack && stack->layers.size > 0) {
+		layer = stack->layers.data[0];
+	}
 	ufbx_anim_prop *ap = ufbx_find_node_anim_prop_begin(scene, layer, node);
 	if (!ap) return ufbx_identity_transform;
 	ufbx_anim_target target = ap->target;

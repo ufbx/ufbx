@@ -1,5 +1,14 @@
 
 #if UFBXT_IMPL
+void ufbxt_check_stack_times(ufbx_scene *scene, ufbxt_diff_error *err, const char *stack_name, double begin, double end)
+{
+	ufbx_anim_stack *stack = ufbx_find_anim_stack(scene, stack_name);
+	ufbxt_assert(stack);
+	ufbxt_assert(!strcmp(stack->name.data, stack_name));
+	ufbxt_assert_close_real(err, (ufbx_real)stack->time_begin, (ufbx_real)begin);
+	ufbxt_assert_close_real(err, (ufbx_real)stack->time_end, (ufbx_real)end);
+}
+
 void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, const char *file_name, const char *anim_name, ufbx_real time)
 {
 	char buf[512];
@@ -15,9 +24,11 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, const char *fil
 	opts.evaluate_skinned_vertices = true;
 
 	if (anim_name) {
-		for (size_t i = 0; i < scene->anim_layers.size; i++) {
-			if (strstr(scene->anim_layers.data[i].name.data, anim_name)) {
-				opts.layer = &scene->anim_layers.data[i];
+		for (size_t i = 0; i < scene->anim_stacks.size; i++) {
+			ufbx_anim_stack *stack = &scene->anim_stacks.data[i];
+			if (strstr(stack->name.data, anim_name)) {
+				ufbxt_assert(stack->layers.size > 0);
+				opts.layer = stack->layers.data[0];
 				break;
 			}
 		}
@@ -78,14 +89,15 @@ UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, deform)
 UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, combined)
 #if UFBXT_IMPL
 {
-	// TODO: These need proper AnimationStack support..
-#if 0
+	ufbxt_check_stack_times(scene, err, "wiggle", 1.0/24.0, 20.0/24.0);
+	ufbxt_check_stack_times(scene, err, "spin", 20.0/24.0, 40.0/24.0);
+	ufbxt_check_stack_times(scene, err, "deform", 40.0/24.0, 60.0/24.0);
+
 	ufbxt_check_frame(scene, err, "maya_game_sausage_wiggle_10", "wiggle", 10.0/24.0);
 	ufbxt_check_frame(scene, err, "maya_game_sausage_wiggle_18", "wiggle", 18.0/24.0);
 	ufbxt_check_frame(scene, err, "maya_game_sausage_spin_7", "spin", 27.0/24.0);
 	ufbxt_check_frame(scene, err, "maya_game_sausage_spin_15", "spin", 35.0/24.0);
-	ufbxt_check_frame(scene, err, "maya_game_sausage_deform_8", NULL, 48.0/24.0);
-	ufbxt_check_frame(scene, err, "maya_game_sausage_deform_15", NULL, 55.0/24.0);
-#endif
+	ufbxt_check_frame(scene, err, "maya_game_sausage_deform_8", "deform", 48.0/24.0);
+	ufbxt_check_frame(scene, err, "maya_game_sausage_deform_15", "deform", 55.0/24.0);
 }
 #endif

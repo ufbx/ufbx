@@ -311,13 +311,16 @@ struct ufbx_bone {
 
 // -- Animations
 
+typedef struct ufbx_anim_stack ufbx_anim_stack;
 typedef struct ufbx_anim_layer ufbx_anim_layer;
 typedef struct ufbx_anim_prop ufbx_anim_prop;
 typedef struct ufbx_anim_curve ufbx_anim_curve;
 typedef struct ufbx_keyframe ufbx_keyframe;
 typedef struct ufbx_tangent ufbx_tangent;
 
+typedef struct ufbx_anim_stack_list { ufbx_anim_stack *data; size_t size; } ufbx_anim_stack_list;
 typedef struct ufbx_anim_layer_list { ufbx_anim_layer *data; size_t size; } ufbx_anim_layer_list;
+typedef struct ufbx_anim_layer_ptr_list { ufbx_anim_layer **data; size_t size; } ufbx_anim_layer_ptr_list;
 typedef struct ufbx_anim_prop_list { ufbx_anim_prop *data; size_t size; } ufbx_anim_prop_list;
 typedef struct ufbx_anim_curve_list { ufbx_anim_curve *data; size_t size; } ufbx_anim_curve_list;
 typedef struct ufbx_keyframe_list { ufbx_keyframe *data; size_t size; } ufbx_keyframe_list;
@@ -336,6 +339,7 @@ typedef enum ufbx_interpolation {
 
 typedef enum ufbx_anim_target {
 	UFBX_ANIM_UNKNOWN,
+	UFBX_ANIM_ANIM_LAYER,
 	UFBX_ANIM_MODEL,
 	UFBX_ANIM_MESH,
 	UFBX_ANIM_LIGHT,
@@ -343,6 +347,16 @@ typedef enum ufbx_anim_target {
 	UFBX_ANIM_BONE,
 	UFBX_ANIM_INVALID,
 } ufbx_anim_target;
+
+struct ufbx_anim_stack {
+	ufbx_string name;
+	ufbx_props props;
+
+	double time_begin;
+	double time_end;
+
+	ufbx_anim_layer_ptr_list layers;
+};
 
 struct ufbx_anim_layer {
 	ufbx_string name;
@@ -352,7 +366,6 @@ struct ufbx_anim_layer {
 	ufbx_real weight;
 	bool compose_rotation;
 	bool compose_scale;
-
 };
 
 struct ufbx_anim_curve {
@@ -400,6 +413,8 @@ typedef struct ufbx_metadata {
 	size_t num_skinned_indices;
 	size_t max_skinned_positions;
 	size_t max_skinned_indices;
+
+	double ktime_to_sec;
 } ufbx_metadata;
 
 struct ufbx_scene {
@@ -415,6 +430,7 @@ struct ufbx_scene {
 
 	ufbx_material_list materials;
 
+	ufbx_anim_stack_list anim_stacks;
 	ufbx_anim_layer_list anim_layers;
 	ufbx_anim_prop_list anim_props;
 	ufbx_anim_curve_list anim_curves;
@@ -527,7 +543,7 @@ ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t 
 ufbx_mesh *ufbx_find_mesh_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_material *ufbx_find_material_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_t name_len);
-
+ufbx_anim_stack *ufbx_find_anim_stack_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_anim_layer *ufbx_find_anim_layer_len(const ufbx_scene *scene, const char *name, size_t name_len);
 
 ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len);
@@ -546,7 +562,7 @@ ufbx_matrix ufbx_get_inverse_matrix(const ufbx_matrix *m);
 
 ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time);
 
-ufbx_transform ufbx_evaluate_transform(const ufbx_scene *scene, const ufbx_node *node, const ufbx_evaluate_opts *opts, double time);
+ufbx_transform ufbx_evaluate_transform(const ufbx_scene *scene, const ufbx_node *node, const ufbx_anim_stack *stack, double time);
 
 ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_evaluate_opts *opts, double time);
 
@@ -574,6 +590,10 @@ ufbx_inline ufbx_material *ufbx_find_material(const ufbx_scene *scene, const cha
 
 ufbx_inline ufbx_light *ufbx_find_light(const ufbx_scene *scene, const char *name) {
 	return ufbx_find_light_len(scene, name, strlen(name));
+}
+
+ufbx_inline ufbx_anim_layer *ufbx_find_anim_stack(const ufbx_scene *scene, const char *name) {
+	return ufbx_find_anim_stack_len(scene, name, strlen(name));
 }
 
 ufbx_inline ufbx_anim_layer *ufbx_find_anim_layer(const ufbx_scene *scene, const char *name) {
@@ -613,8 +633,12 @@ ufbx_inline ufbx_light *begin(const ufbx_light_list &l) { return l.data; }
 ufbx_inline ufbx_light *end(const ufbx_light_list &l) { return l.data + l.size; }
 ufbx_inline ufbx_bone *begin(const ufbx_bone_list &l) { return l.data; }
 ufbx_inline ufbx_bone *end(const ufbx_bone_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_anim_stack *begin(const ufbx_anim_stack_list &l) { return l.data; }
+ufbx_inline ufbx_anim_stack *end(const ufbx_anim_stack_list &l) { return l.data + l.size; }
 ufbx_inline ufbx_anim_layer *begin(const ufbx_anim_layer_list &l) { return l.data; }
 ufbx_inline ufbx_anim_layer *end(const ufbx_anim_layer_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_anim_layer **begin(const ufbx_anim_layer_ptr_list &l) { return l.data; }
+ufbx_inline ufbx_anim_layer **end(const ufbx_anim_layer_ptr_list &l) { return l.data + l.size; }
 ufbx_inline ufbx_anim_prop *begin(const ufbx_anim_prop_list &l) { return l.data; }
 ufbx_inline ufbx_anim_prop *end(const ufbx_anim_prop_list &l) { return l.data + l.size; }
 ufbx_inline ufbx_anim_curve *begin(const ufbx_anim_curve_list &l) { return l.data; }
