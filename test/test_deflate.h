@@ -9,6 +9,7 @@ static ptrdiff_t ufbxt_inflate_no_fuzz(void *dst, size_t dst_size, const void *s
 	ufbx_inflate_input input = { 0 };
 	input.data = src;
 	input.data_size = src_size;
+	input.total_size = src_size;
 
 	return ufbx_inflate(dst, dst_size, &input, &retain);
 }
@@ -19,6 +20,7 @@ static ptrdiff_t ufbxt_inflate(void *dst, size_t dst_size, const void *src, size
 		ufbx_inflate_input input = { 0 };
 		input.data = src;
 		input.data_size = src_size;
+		input.total_size = src_size;
 
 		int i;
 
