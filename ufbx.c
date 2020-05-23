@@ -6931,6 +6931,7 @@ static void ufbxi_expand_defaults(ufbx_load_opts *opts)
 
 static void ufbxi_expand_evaluate_defaults(ufbx_evaluate_opts *opts)
 {
+	(void)opts;
 }
 
 static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts, ufbx_error *p_error)
@@ -7152,8 +7153,8 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 			alloc_size = (uint32_t)old_imp->memory_block_size;
 			ator = old_imp->ator;
 		} else {
-			ufbxi_allocator ator = old_imp->ator;
-			ufbxi_free(&ator, char, old_imp->memory_block, old_imp->memory_block_size);
+			ufbxi_allocator old_ator = old_imp->ator;
+			ufbxi_free(&old_ator, char, old_imp->memory_block, old_imp->memory_block_size);
 		}
 	}
 
