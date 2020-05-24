@@ -2224,9 +2224,11 @@ static ufbxi_forceinline bool ufbxi_streq(ufbx_string a, ufbx_string b)
 	return a.length == b.length && !memcmp(a.data, b.data, a.length);
 }
 
+const char ufbxi_empty_char[1] = { '\0' };
+
 ufbxi_nodiscard static const char *ufbxi_push_string_imp(ufbxi_context *uc, const char *str, size_t length, bool copy)
 {
-	if (length == 0) return "";
+	if (length == 0) return ufbxi_empty_char;
 	ufbxi_check_return(length <= uc->opts.max_string_length, NULL);
 
 	// TODO: Set the initial size based on experimental data
@@ -3868,8 +3870,6 @@ typedef struct {
 	ufbx_prop_type type;
 	const char *name;
 } ufbxi_prop_type_name;
-
-const char ufbxi_empty_char[1] = { '\0' };
 
 const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
 	{ UFBX_PROP_BOOLEAN, "Boolean" },
@@ -5841,8 +5841,7 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 		ufbx_model *model = ufbxi_push_zero(&uc->tmp_arr_models, ufbx_model, 1);
 		ufbxi_check(model);
 		model->node.type = UFBX_NODE_MODEL;
-		model->node.name.data = "Root";
-		model->node.name.length = 4;
+		model->node.name = ufbx_empty_string;
 		model->node.transform.scale.x = 1.0;
 		model->node.transform.scale.y = 1.0;
 		model->node.transform.scale.z = 1.0;
@@ -7457,15 +7456,15 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 }
 
 ufbxi_forceinline static void ufbxi_eval_anim_prop_imp(ufbx_anim_target target, uint32_t index, ufbx_anim_prop **p_ap, double time,
-	ufbx_prop *prop, const char *name, size_t name_len, uint32_t imp_key, ufbx_real x, ufbx_real y, ufbx_real z)
+	ufbx_prop **p_prop, const char *name, size_t name_len, uint32_t imp_key)
 {
-	prop->name.data = name;
-	prop->name.length = name_len;
-	prop->imp_key = imp_key;
-
 	ufbx_anim_prop *ap = *p_ap;
 	for (; ap->target == target && ap->index == index && ap->imp_key <= imp_key; ap++) {
 		if (ap->name.data == name) {
+			ufbx_prop *prop = (*p_prop)++;
+			prop->name.data = name;
+			prop->name.length = name_len;
+			prop->imp_key = imp_key;
 			prop->value_real_arr[0] = ufbx_evaluate_curve(&ap->curves[0], time);
 			prop->value_real_arr[1] = ufbx_evaluate_curve(&ap->curves[1], time);
 			prop->value_real_arr[2] = ufbx_evaluate_curve(&ap->curves[2], time);
@@ -7474,18 +7473,12 @@ ufbxi_forceinline static void ufbxi_eval_anim_prop_imp(ufbx_anim_target target, 
 		}
 	}
 
-	prop->value_int = (int64_t)x;
-	prop->value_real_arr[0] = x;
-	prop->value_real_arr[1] = y;
-	prop->value_real_arr[2] = z;
-
 	*p_ap = ap;
 }
 
-#define ufbxi_eval_anim_prop(m_target, m_index, m_p_ap, m_time, m_prop, m_name, m_x, m_y, m_z) \
+#define ufbxi_eval_anim_prop(m_target, m_index, m_p_ap, m_time, m_prop, m_name) \
 	ufbxi_eval_anim_prop_imp(m_target, m_index, m_p_ap, m_time, m_prop, m_name, sizeof(m_name) - 1, \
-	(m_name[0] << 24) | (m_name[1] << 16) | (m_name[2] << 8) | m_name[3], \
-	m_x, m_y, m_z)
+	(m_name[0] << 24) | (m_name[1] << 16) | (m_name[2] << 8) | m_name[3])
 
 
 // -- API
@@ -7935,26 +7928,27 @@ ufbx_transform ufbx_evaluate_transform(const ufbx_scene *scene, const ufbx_node 
 		layer = stack->layers.data[0];
 	}
 	ufbx_anim_prop *ap = ufbx_find_node_anim_prop_begin(scene, layer, node);
-	if (!ap) return ufbx_identity_transform;
+	if (!ap) return node->transform;
 	ufbx_anim_target target = ap->target;
 	uint32_t index = ap->index;
 
 	ufbx_prop props[10];
 
-	ufbxi_eval_anim_prop(target, index, &ap, time, &props[0], ufbxi_Lcl_Rotation, 0,0,0);
-	ufbxi_eval_anim_prop(target, index, &ap, time, &props[1], ufbxi_Lcl_Scaling, 1,1,1);
-	ufbxi_eval_anim_prop(target, index, &ap, time, &props[2], ufbxi_Lcl_Translation, 0,0,0);
-	ufbxi_eval_anim_prop(target, index, &ap, time, &props[3], ufbxi_PostRotation, 0,0,0);
-	ufbxi_eval_anim_prop(target, index, &ap, time, &props[4], ufbxi_PreRotation, 0,0,0);
-	ufbxi_eval_anim_prop(target, index, &ap, time, &props[5], ufbxi_RotationOffset, 0,0,0);
-	ufbxi_eval_anim_prop(target, index, &ap, time, &props[6], ufbxi_RotationOrder, (ufbx_real)UFBX_ROTATION_XYZ,0,0);
-	ufbxi_eval_anim_prop(target, index, &ap, time, &props[7], ufbxi_RotationPivot, 0,0,0);
-	ufbxi_eval_anim_prop(target, index, &ap, time, &props[8], ufbxi_ScalingOffset, 0,0,0);
-	ufbxi_eval_anim_prop(target, index, &ap, time, &props[9], ufbxi_ScalingPivot, 0,0,0);
+	ufbx_prop *pp = props;
+	ufbxi_eval_anim_prop(target, index, &ap, time, &pp, ufbxi_Lcl_Rotation);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &pp, ufbxi_Lcl_Scaling);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &pp, ufbxi_Lcl_Translation);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &pp, ufbxi_PostRotation);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &pp, ufbxi_PreRotation);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &pp, ufbxi_RotationOffset);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &pp, ufbxi_RotationOrder);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &pp, ufbxi_RotationPivot);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &pp, ufbxi_ScalingOffset);
+	ufbxi_eval_anim_prop(target, index, &ap, time, &pp, ufbxi_ScalingPivot);
 
 	ufbx_props eval_props;
 	eval_props.props = props;
-	eval_props.num_props = ufbxi_arraycount(props);
+	eval_props.num_props = pp - props;
 	eval_props.defaults = (ufbx_props*)&node->props;
 	return ufbxi_get_transform(&eval_props);
 }
