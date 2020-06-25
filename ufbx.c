@@ -64,27 +64,65 @@
 	#endif
 #endif
 
-// TODO: Unaligned loads for some platforms
 #define ufbxi_read_u8(ptr) (*(const uint8_t*)(ptr))
-#define ufbxi_read_u16(ptr) (*(const uint16_t*)(ptr))
-#define ufbxi_read_u32(ptr) (*(const uint32_t*)(ptr))
-#define ufbxi_read_u64(ptr) (*(const uint64_t*)(ptr))
-#define ufbxi_read_f32(ptr) (*(const float*)(ptr))
-#define ufbxi_read_f64(ptr) (*(const double*)(ptr))
+
+#if (defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__)) && !defined(UFBX_NO_UNALIGNED_LOADS)
+	#define ufbxi_read_u16(ptr) (*(const uint16_t*)(ptr))
+	#define ufbxi_read_u32(ptr) (*(const uint32_t*)(ptr))
+	#define ufbxi_read_u64(ptr) (*(const uint64_t*)(ptr))
+	#define ufbxi_read_f32(ptr) (*(const float*)(ptr))
+	#define ufbxi_read_f64(ptr) (*(const double*)(ptr))
+#elif defined(__wasm__) || defined(__EMSCRIPTEN__)
+	#define ufbxi_read_u16(ptr) ((uint16_t)*(const unsigned short ((aligned(1)))*)(ptr))
+	#define ufbxi_read_u32(ptr) ((uint32_t)*(const unsigned int ((aligned(1)))*)(ptr))
+	#define ufbxi_read_u64(ptr) ((uint64_t)*(const unsigned long long ((aligned(1)))*)(ptr))
+	#define ufbxi_read_f32(ptr) ((float)*(const float ((aligned(1)))*)(ptr))
+	#define ufbxi_read_f64(ptr) ((double)*(const double ((aligned(1)))*)(ptr))
+#else
+	static ufbxi_forceinline uint16_t ufbxi_read_u16(const void *ptr) {
+		const char *p = ptr;
+		return (uint16_t)(
+			(unsigned)(uint8_t)p[0] << 0u |
+			(unsigned)(uint8_t)p[1] << 8u );
+	}
+	static ufbxi_forceinline uint32_t ufbxi_read_u32(const void *ptr) {
+		const char *p = ptr;
+		return (uint32_t)(
+			(unsigned)(uint8_t)p[0] <<  0u |
+			(unsigned)(uint8_t)p[1] <<  8u |
+			(unsigned)(uint8_t)p[2] << 16u |
+			(unsigned)(uint8_t)p[3] << 24u );
+	}
+	static ufbxi_forceinline uint64_t ufbxi_read_u64(const void *ptr) {
+		const char *p = ptr;
+		return (uint64_t)(
+			(uint64_t)(uint8_t)p[0] <<  0u |
+			(uint64_t)(uint8_t)p[1] <<  8u |
+			(uint64_t)(uint8_t)p[2] << 16u |
+			(uint64_t)(uint8_t)p[3] << 24u |
+			(uint64_t)(uint8_t)p[4] << 32u |
+			(uint64_t)(uint8_t)p[5] << 40u |
+			(uint64_t)(uint8_t)p[6] << 48u |
+			(uint64_t)(uint8_t)p[7] << 56u );
+	}
+	static ufbxi_forceinline float ufbxi_read_f32(const void *ptr) {
+		uint32_t u = ufbxi_read_u32(ptr);
+		float f;
+		memcpy(&f, &u, 4);
+		return f;
+	}
+	static ufbxi_forceinline double ufbxi_read_f64(const void *ptr) {
+		uint64_t u = ufbxi_read_u64(ptr);
+		double f;
+		memcpy(&f, &u, 8);
+		return f;
+	}
+#endif
+
 #define ufbxi_read_i8(ptr) (int8_t)(ufbxi_read_u8(ptr))
 #define ufbxi_read_i16(ptr) (int16_t)(ufbxi_read_u16(ptr))
 #define ufbxi_read_i32(ptr) (int32_t)(ufbxi_read_u32(ptr))
 #define ufbxi_read_i64(ptr) (int64_t)(ufbxi_read_u64(ptr))
-
-#define ufbxi_write_u8(ptr, val) (*(uint8_t*)(ptr) = (uint8_t)(val))
-#define ufbxi_write_u16(ptr, val) (*(uint16_t*)(ptr) = (uint16_t)(val))
-#define ufbxi_write_u32(ptr, val) (*(uint32_t*)(ptr) = (uint32_t)(val))
-#define ufbxi_write_u64(ptr, val) (*(uint64_t*)(ptr) = (uint64_t)(val))
-#define ufbxi_write_f32(ptr, val) (*(float*)(ptr) = (float)(val))
-#define ufbxi_write_f64(ptr, val) (*(double*)(ptr) = (double)(val))
-#define ufbxi_write_i8(ptr, val) ufbxi_write_u8(ptr, val)
-#define ufbxi_write_i16(ptr, val) ufbxi_write_u16(ptr, val)
-#define ufbxi_write_i32(ptr, val) ufbxi_write_u32(ptr, val)
 
 ufbx_static_assert(sizeof_bool, sizeof(bool) == 1);
 ufbx_static_assert(sizeof_i8, sizeof(int8_t) == 1);
