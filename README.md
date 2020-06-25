@@ -1,4 +1,5 @@
-# ufbx
+# ufbx [![Build Status](https://travis-ci.org/bqqbarbhg/ufbx.svg?branch=master)](https://travis-ci.org/bqqbarbhg/ufbx) [![codecov](https://codecov.io/gh/bqqbarbhg/ufbx/branch/master/graph/badge.svg)](https://codecov.io/gh/bqqbarbhg/ufbx)
+
 
 Single source file FBX reader. Supports both ASCII and binary files starting from version 6100.
 
