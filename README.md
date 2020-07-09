@@ -1,6 +1,5 @@
 # ufbx [![Build Status](https://travis-ci.org/bqqbarbhg/ufbx.svg?branch=master)](https://travis-ci.org/bqqbarbhg/ufbx) [![codecov](https://codecov.io/gh/bqqbarbhg/ufbx/branch/master/graph/badge.svg)](https://codecov.io/gh/bqqbarbhg/ufbx)
 
-
 Single source file FBX reader. Supports both ASCII and binary files starting from version 6100.
 
 ## Usage
@@ -39,8 +38,10 @@ ufbx_free_scene(scene);
 
 ## WIP
 
-The library is relatively heavily tested and fuzzed so it should be reasonably stable.
-The animation stack API is still in progress but otherwise the library is starting to mature.
+This library is still a work in progress, but most of the implemented features are quite
+usable as the library is heavily tested and fuzzed.
+
+The API might change in the future, especially materials and evaluating animations.
 
 ## License
 
