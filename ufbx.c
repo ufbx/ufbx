@@ -6664,9 +6664,15 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 
 		if (parent.mesh) {
 			if (child.geometry) {
+				// Retain some properties of the mesh node (not geometry)
+				size_t num_materials = parent.mesh->materials.size;
+
 				// Copy all non-node properties
 				ufbxi_check(ufbxi_merge_attribute_properties(uc, &parent.node->props, &child.geometry->node.props));
 				memcpy((char*)parent.mesh + sizeof(ufbx_node), (char*)child.geometry + sizeof(ufbx_node), sizeof(ufbx_mesh) - sizeof(ufbx_node));
+
+				// Restore the mesh properties
+				parent.mesh->materials.size = num_materials;
 
 				// HACK: Store the parent mesh in the geometry's node `parent`
 				child.geometry->node.parent = &parent.mesh->node;
