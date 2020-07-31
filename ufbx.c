@@ -3530,6 +3530,11 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 	const char *name = ufbxi_push_string(uc, ua->prev_token.str_data, ua->prev_token.str_len);
 	ufbxi_check(name);
 
+	// Some fields in ASCII may have leading commas eg. `Content: , "base64-string"`
+	if (ua->token.type == ',') {
+		ufbxi_check(ufbxi_ascii_next_token(uc, &ua->token));
+	}
+
 	// Push the parsed node into the `tmp_stack` buffer, the nodes will be popped by
 	// calling code after its done parsing all of it's children.
 	ufbxi_node *node = ufbxi_push_zero(&uc->tmp_stack, ufbxi_node, 1);
