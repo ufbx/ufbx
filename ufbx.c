@@ -2999,9 +2999,9 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 	ufbxi_check(num_values64 <= (uint64_t)uc->opts.max_node_values);
 	uint32_t num_values = (uint32_t)num_values64;
 
-	// If `end_offset` is zero we treat as the node as a NULL-sentinel
+	// If `end_offset` and `name_len` is zero we treat as the node as a NULL-sentinel
 	// that terminates a node list.
-	if (end_offset == 0) {
+	if (end_offset == 0 && name_len == 0) {
 		*p_end = true;
 		return 1;
 	}
@@ -3252,7 +3252,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 			// Stop at end offset
 			uint64_t current_offset = ufbxi_get_read_offset(uc);
 			if (current_offset >= end_offset) {
-				ufbxi_check(current_offset == end_offset);
+				ufbxi_check(current_offset == end_offset || end_offset == 0);
 				break;
 			}
 
