@@ -4550,7 +4550,7 @@ ufbxi_nodiscard static int ufbxi_check_indices(ufbxi_context *uc, ufbx_mesh *mes
 	// Normalize out-of-bounds indices to `invalid_index`
 	for (size_t i = 0; i < num_indices; i++) {
 		int32_t ix = indices[i];
-		if (ix < 0 || ix >= num_elems) {
+		if (ix < 0 || (uint32_t)ix >= num_elems) {
 			// If the indices refer to an external buffer we need to
 			// allocate a separate buffer for them
 			if (!owns_indices) {
@@ -4628,7 +4628,7 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 			int32_t *vert_ix = mesh->vertex_position.indices;
 			for (size_t i = 0; i < mesh_num_indices; i++) {
 				int32_t ix = index_data[i];
-				if (ix >= 0 && ix < mesh->num_vertices) {
+				if (ix >= 0 && (uint32_t)ix < mesh->num_vertices) {
 					new_index_data[i] = vert_ix[ix];
 				} else {
 					new_index_data[i] = -1;
@@ -6835,7 +6835,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 					int32_t invalid_index = uc->opts.allow_nonexistent_indices ? -1 : 0;
 					ufbxi_for(int32_t, p_ix, skin->indices, skin->num_weights) {
 						int32_t ix = *p_ix;
-						if (ix < 0 || ix >= mesh->num_vertices) {
+						if (ix < 0 || (uint32_t)ix >= mesh->num_vertices) {
 							*p_ix = invalid_index;
 						}
 					}
