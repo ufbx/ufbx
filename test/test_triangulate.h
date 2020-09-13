@@ -20,7 +20,7 @@ UFBXT_FILE_TEST(maya_triangulate)
 		for (size_t ix = 0; ix < 4; ix++) {
 			ufbx_vec3 v = ufbx_get_vertex_vec3(&mesh->vertex_position, ix);
 			ufbx_real dot = v.x + v.z;
-			if (dot < top_left_ix) {
+			if (dot < best_dot) {
 				top_left_ix = ix;
 				best_dot = dot;
 			}

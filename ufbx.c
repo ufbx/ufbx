@@ -8086,10 +8086,20 @@ bool ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, uf
 		ufbx_real dot_na = ufbxi_dot3(na1, na3);
 		ufbx_real dot_nb = ufbxi_dot3(nb0, nb2);
 
+		// printf("  %s: E: %+.2f / %+.2f  N: %+.2f / %+.2f\n", mesh->node.name.data, dot_aa, dot_bb, dot_na, dot_nb);
+
 		bool split_a = dot_aa <= dot_bb;
 
+#if 0
 		if (dot_na < 0.0f || dot_nb < 0.0f) {
 			split_a = dot_na >= dot_nb;
+		}
+#endif
+
+		if (dot_na < 0.0f && dot_nb >= 0.0f) {
+			split_a = false;
+		} else if (dot_nb < 0.0f && dot_na >= 0.0f) {
+			split_a = true;
 		}
 
 		if (split_a) {
@@ -8098,7 +8108,7 @@ bool ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, uf
 			indices[2] = i2;
 			indices[3] = i2;
 			indices[4] = i3;
-			indices[5] = i1;
+			indices[5] = i0;
 		} else {
 			indices[0] = i1;
 			indices[1] = i2;
