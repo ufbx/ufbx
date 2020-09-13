@@ -54,8 +54,30 @@ UFBXT_FILE_TEST(maya_triangulate)
 UFBXT_FILE_TEST(maya_triangulate_down)
 #if UFBXT_IMPL
 {
-	printf("\n");
 	size_t num_fail = do_triangulate_test(scene);
 	ufbxt_assert(num_fail <= 1);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_tri_cone)
+#if UFBXT_IMPL
+{
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCone1");
+	ufbxt_assert(mesh);
+
+	for (size_t i = 0; i < mesh->num_faces; i++) {
+		ufbx_face face = mesh->faces[i];
+		ufbxt_assert(face.num_indices >= 3 && face.num_indices <= 32);
+
+		uint32_t tris[32];
+
+		size_t num_tris = face.num_indices - 2;
+		for (size_t i = 0; i < 32; i++) {
+			bool ok = ufbx_triangulate(tris, i, mesh, face);
+			ufbxt_assert(ok == (i >= num_tris * 3));
+		}
+
+		ufbxt_assert(ufbx_triangulate(tris, ufbxt_arraycount(tris), mesh, face));
+	}
 }
 #endif

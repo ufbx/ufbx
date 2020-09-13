@@ -853,6 +853,32 @@ void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 			ufbx_face *p_face = ufbx_find_face(mesh, j);
 			ufbxt_assert(p_face - mesh->faces == i);
 		}
+
+		if (face.num_indices >= 3) {
+			size_t num_tris = face.num_indices - 2;
+			uint32_t tris[256];
+			memset(tris, 0xff, sizeof(tris));
+			size_t ix_count[256] = { 0 };
+			ufbxt_assert(ufbx_triangulate(tris, ufbxt_arraycount(tris), mesh, face));
+
+			for (size_t i = 0; i < num_tris; i++) {
+				uint32_t a = tris[i*3 + 0];
+				uint32_t b = tris[i*3 + 1];
+				uint32_t c = tris[i*3 + 2];
+				ufbxt_assert(a != b);
+				ufbxt_assert(b != c);
+				ufbxt_assert(a >= face.index_begin && a - face.index_begin < face.num_indices);
+				ufbxt_assert(b >= face.index_begin && b - face.index_begin < face.num_indices);
+				ufbxt_assert(c >= face.index_begin && c - face.index_begin < face.num_indices);
+				ix_count[a - face.index_begin]++;
+				ix_count[b - face.index_begin]++;
+				ix_count[c - face.index_begin]++;
+			}
+
+			for (uint32_t i = 0; i < face.num_indices; i++) {
+				ufbxt_assert(ix_count[i] >= 0);
+			}
+		}
 	}
 
 	for (size_t i = 0; i < mesh->num_edges; i++) {

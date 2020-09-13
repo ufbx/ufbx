@@ -8111,9 +8111,9 @@ bool ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, uf
 		// N-Gon: TODO something reasonable
 		uint32_t *dst = indices;
 		for (uint32_t i = 1; i + 2 <= face.num_indices; i++) {
-			dst[0] = 0;
-			dst[1] = i;
-			dst[2] = i + 1;
+			dst[0] = face.index_begin;
+			dst[1] = face.index_begin + i;
+			dst[2] = face.index_begin + i + 1;
 			dst += 3;
 		}
 	}
