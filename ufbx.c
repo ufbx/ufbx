@@ -4815,6 +4815,9 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 			if (num_indices >= 3) {
 				num_triangles += num_indices - 2;
 			}
+			if (!uc->opts.allow_bad_faces) {
+				ufbxi_check(num_indices >= 3);
+			}
 			dst_face++;
 			p_face_begin = p_ix + 1;
 		}

@@ -423,3 +423,25 @@ UFBXT_FILE_TEST(maya_uv_and_color_sets)
 	ufbxt_assert(!strcmp(mesh->color_sets.data[1].name.data, "ColorB"));
 }
 #endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_bad_face_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.allow_bad_faces = true;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(maya_bad_face, ufbxt_bad_face_opts())
+#if UFBXT_IMPL
+{
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
+	ufbxt_assert(mesh);
+	ufbxt_assert(mesh->num_faces == 6);
+	ufbxt_assert(mesh->faces[0].num_indices == 1);
+	ufbxt_assert(mesh->faces[1].num_indices == 2);
+	ufbxt_assert(mesh->faces[2].num_indices == 3);
+	ufbxt_assert(mesh->faces[3].num_indices == 4);
+}
+#endif

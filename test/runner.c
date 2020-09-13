@@ -1496,7 +1496,7 @@ static const ufbxt_fuzz_check g_fuzz_checks[] = {
 	{ "maya_interpolation_modes_7500_binary", 25023, 0, 0, 0, 0, "refs_left >= 0" },
 };
 
-void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err), const char *suffix)
+void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err), const char *suffix, ufbx_load_opts user_opts)
 {
 	const uint32_t file_versions[] = { 6100, 7100, 7400, 7500, 7700 };
 
@@ -1537,7 +1537,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			ufbx_error error;
 
-			ufbx_load_opts load_opts = { 0 };
+			ufbx_load_opts load_opts = user_opts;
 			if (g_dedicated_allocs) {
 				load_opts.temp_huge_size = 1;
 				load_opts.result_huge_size = 1;
@@ -1809,11 +1809,21 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 #define UFBXT_TEST(name) void ufbxt_test_fn_##name(void)
 #define UFBXT_FILE_TEST(name) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err); \
 	void ufbxt_test_fn_file_##name(void) { \
-	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL); } \
+	ufbx_load_opts user_opts = { 0 }; \
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL, user_opts); } \
+	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err)
+#define UFBXT_FILE_TEST_OPTS(name, get_opts) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err); \
+	void ufbxt_test_fn_file_##name(void) { \
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL, get_opts); } \
 	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err)
 #define UFBXT_FILE_TEST_SUFFIX(name, suffix) void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err); \
 	void ufbxt_test_fn_file_##name##_##suffix(void) { \
-	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name##_##suffix, #suffix); } \
+	ufbx_load_opts user_opts = { 0 }; \
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name##_##suffix, #suffix, user_opts); } \
+	void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err)
+#define UFBXT_FILE_TEST_SUFFIX_OPTS(name, suffix, get_opts) void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err); \
+	void ufbxt_test_fn_file_##name##_##suffix(void) { \
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name##_##suffix, #suffix, get_opts); } \
 	void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err)
 
 #include "all_tests.h"
@@ -1821,11 +1831,15 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 #undef UFBXT_IMPL
 #undef UFBXT_TEST
 #undef UFBXT_FILE_TEST
+#undef UFBXT_FILE_TEST_OPTS
 #undef UFBXT_FILE_TEST_SUFFIX
+#undef UFBXT_FILE_TEST_SUFFIX_OPTS
 #define UFBXT_IMPL 0
 #define UFBXT_TEST(name) { #name, &ufbxt_test_fn_##name },
 #define UFBXT_FILE_TEST(name) { #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST_OPTS(name, get_opts) { #name, &ufbxt_test_fn_file_##name },
 #define UFBXT_FILE_TEST_SUFFIX(name, suffix) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
+#define UFBXT_FILE_TEST_SUFFIX_OPTS(name, suffix, get_opts) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
 ufbxt_test g_tests[] = {
 	#include "all_tests.h"
 };

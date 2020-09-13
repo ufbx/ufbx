@@ -489,6 +489,7 @@ typedef struct ufbx_load_opts {
 	uint32_t max_child_depth;
 
 	bool allow_nonexistent_indices;
+	bool allow_bad_faces;
 } ufbx_load_opts;
 
 typedef struct ufbx_evaluate_opts {
