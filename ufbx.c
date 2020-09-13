@@ -7539,8 +7539,28 @@ ufbx_inline ufbx_vec3 ufbxi_sub3(ufbx_vec3 a, ufbx_vec3 b) {
 	return v;
 }
 
+ufbx_inline ufbx_vec3 ufbxi_mul3(ufbx_vec3 a, ufbx_real b) {
+	ufbx_vec3 v = { a.x * b, a.y * b, a.z * b };
+	return v;
+}
+
 ufbx_inline ufbx_real ufbxi_dot3(ufbx_vec3 a, ufbx_vec3 b) {
 	return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+ufbx_inline ufbx_vec3 ufbxi_cross3(ufbx_vec3 a, ufbx_vec3 b) {
+	ufbx_vec3 v = { a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x };
+	return v;
+}
+
+ufbx_inline ufbx_vec3 ufbxi_normalize(ufbx_vec3 a) {
+	ufbx_real len = (ufbx_real)sqrt(ufbxi_dot3(a, a));
+	if (len != 0.0) {
+		return ufbxi_mul3(a, (ufbx_real)1.0 / len);
+	} else {
+		ufbx_vec3 zero = { (ufbx_real)0 };
+		return zero;
+	}
 }
 
 // -- API
@@ -8055,25 +8075,22 @@ bool ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, uf
 
 		ufbx_vec3 a = ufbxi_sub3(v2, v0);
 		ufbx_vec3 b = ufbxi_sub3(v3, v1);
+
+		ufbx_vec3 na1 = ufbxi_normalize(ufbxi_cross3(a, ufbxi_sub3(v1, v0)));
+		ufbx_vec3 na3 = ufbxi_normalize(ufbxi_cross3(a, ufbxi_sub3(v0, v3)));
+		ufbx_vec3 nb0 = ufbxi_normalize(ufbxi_cross3(b, ufbxi_sub3(v1, v0)));
+		ufbx_vec3 nb2 = ufbxi_normalize(ufbxi_cross3(b, ufbxi_sub3(v2, v1)));
+
 		ufbx_real dot_aa = ufbxi_dot3(a, a);
 		ufbx_real dot_bb = ufbxi_dot3(b, b);
-
-		ufbx_real dot_a0 = ufbxi_dot3(a, v0);
-		ufbx_real dot_a1 = ufbxi_dot3(a, v1);
-		ufbx_real dot_a2 = ufbxi_dot3(a, v2);
-		ufbx_real dot_a3 = ufbxi_dot3(a, v3);
-
-		ufbx_real dot_b0 = ufbxi_dot3(b, v0);
-		ufbx_real dot_b1 = ufbxi_dot3(b, v1);
-		ufbx_real dot_b2 = ufbxi_dot3(b, v2);
-		ufbx_real dot_b3 = ufbxi_dot3(b, v3);
-
-		bool bad_a = (dot_a1 > dot_a2 || dot_a3 > dot_a2) || (dot_a1 < dot_a0 || dot_a3 < dot_a0);
-		bool bad_b = (dot_b0 > dot_b3 || dot_b2 > dot_b3) || (dot_b0 < dot_b1 || dot_b2 < dot_b1);
+		ufbx_real dot_na = ufbxi_dot3(na1, na3);
+		ufbx_real dot_nb = ufbxi_dot3(nb0, nb2);
 
 		bool split_a = dot_aa <= dot_bb;
-		if (bad_a && !bad_b) split_a = true;
-		if (bad_b && !bad_a) split_a = false;
+
+		if (dot_na < 0.0f || dot_nb < 0.0f) {
+			split_a = dot_na >= dot_nb;
+		}
 
 		if (split_a) {
 			indices[0] = i0;
