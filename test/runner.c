@@ -842,10 +842,19 @@ void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_assert(mesh->num_triangles <= mesh->num_indices);
 
 	uint32_t prev_end = 0;
-	for (size_t i = 0; i < mesh->num_faces; i++) {
+	for (size_t i = 0; i < mesh->num_faces + mesh->num_bad_faces; i++) {
 		ufbx_face face = mesh->faces[i];
-		ufbxt_assert(face.index_begin == prev_end);
-		ufbxt_assert(face.num_indices > 0);
+		if (i == mesh->num_faces) prev_end = 0;
+		if (mesh->num_bad_faces == 0) {
+			ufbxt_assert(face.index_begin == prev_end);
+		} else {
+			ufbxt_assert(face.index_begin >= prev_end);
+		}
+		if (i < mesh->num_faces) {
+			ufbxt_assert(face.num_indices >= 3);
+		} else {
+			ufbxt_assert(face.num_indices > 0 && face.num_indices < 3);
+		}
 		prev_end = face.index_begin + face.num_indices;
 		ufbxt_assert(prev_end <= mesh->num_indices);
 
@@ -856,9 +865,11 @@ void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 
 		if (face.num_indices >= 3) {
 			size_t num_tris = face.num_indices - 2;
-			uint32_t tris[256];
-			memset(tris, 0xff, sizeof(tris));
-			size_t ix_count[256] = { 0 };
+			ufbxt_assert(face.num_indices <= 1024);
+			uint32_t tris[1024];
+			size_t ix_count[1024];
+			memset(tris, 0xff, num_tris * 3 * sizeof(uint32_t));
+			memset(ix_count, 0, face.num_indices * sizeof(uint32_t));
 			ufbxt_assert(ufbx_triangulate(tris, ufbxt_arraycount(tris), mesh, face));
 
 			for (size_t i = 0; i < num_tris; i++) {

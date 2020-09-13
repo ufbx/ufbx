@@ -271,6 +271,7 @@ struct ufbx_mesh {
 	size_t num_indices;
 	size_t num_triangles;
 	size_t num_faces;
+	size_t num_bad_faces;
 	size_t num_edges;
 
 	ufbx_face *faces;
@@ -489,7 +490,6 @@ typedef struct ufbx_load_opts {
 	uint32_t max_child_depth;
 
 	bool allow_nonexistent_indices;
-	bool allow_bad_faces;
 } ufbx_load_opts;
 
 typedef struct ufbx_evaluate_opts {

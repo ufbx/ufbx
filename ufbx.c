@@ -4791,17 +4791,17 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 
 	// Count the number of faces and allocate the index list
 	// Indices less than zero (~actual_index) ends a polygon
-	size_t num_faces = 0;
+	size_t num_total_faces = 0;
 	ufbxi_for (int32_t, p_ix, index_data, mesh->num_indices) {
-		if (*p_ix < 0) num_faces++;
+		if (*p_ix < 0) num_total_faces++;
 	}
-	mesh->faces = ufbxi_push(&uc->result, ufbx_face, num_faces);
-	mesh->num_faces = num_faces;
+	mesh->faces = ufbxi_push(&uc->result, ufbx_face, num_total_faces);
 	ufbxi_check(mesh->faces);
 
 	size_t num_triangles = 0;
 
 	ufbx_face *dst_face = mesh->faces;
+	ufbx_face *dst_bad_face = mesh->faces + num_total_faces;
 	int32_t *p_face_begin = index_data;
 	ufbxi_for (int32_t, p_ix, index_data, mesh->num_indices) {
 		int32_t ix = *p_ix;
@@ -4809,22 +4809,39 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 		if (ix < 0) {
 			ix = ~ix;
 			*p_ix =  ix;
-			dst_face->index_begin = (uint32_t)(p_face_begin - index_data);
 			uint32_t num_indices = (uint32_t)((p_ix - p_face_begin) + 1);
-			dst_face->num_indices = num_indices;
 			if (num_indices >= 3) {
+				dst_face->index_begin = (uint32_t)(p_face_begin - index_data);
+				dst_face->num_indices = num_indices;
 				num_triangles += num_indices - 2;
+				dst_face++;
+			} else {
+				dst_bad_face--;
+				dst_bad_face->index_begin = (uint32_t)(p_face_begin - index_data);
+				dst_bad_face->num_indices = num_indices;
 			}
-			if (!uc->opts.allow_bad_faces) {
-				ufbxi_check(num_indices >= 3);
-			}
-			dst_face++;
 			p_face_begin = p_ix + 1;
 		}
 		ufbxi_check(ix < mesh->num_vertices);
 	}
-	ufbx_assert(dst_face == mesh->faces + num_faces);
+	ufbx_assert(dst_face == dst_bad_face);
+
 	mesh->vertex_position.indices = index_data;
+	mesh->num_faces = dst_face - mesh->faces;
+	mesh->num_bad_faces = num_total_faces - mesh->num_faces;
+
+	// Swap bad faces
+	if (mesh->num_bad_faces > 0) {
+		ufbx_face *lo = mesh->faces + mesh->num_faces;
+		ufbx_face *hi = lo + mesh->num_bad_faces - 1;
+		while (lo < hi) {
+			ufbx_face tmp = *lo;
+			*lo = *hi;
+			*hi = tmp;
+			lo++;
+			hi--;
+		}
+	}
 
 	mesh->num_triangles = num_triangles;
 
@@ -7790,26 +7807,33 @@ ufbx_anim_prop *ufbx_find_node_anim_prop_begin(const ufbx_scene *scene, const uf
 
 ufbx_face *ufbx_find_face(const ufbx_mesh *mesh, size_t index)
 {
-	size_t begin = 0;
-	size_t end = mesh->num_faces;
-	const ufbx_face *faces = mesh->faces;
-	while (end - begin >= 16) {
-		size_t mid = (begin + end) >> 1;
-		const ufbx_face *f = &faces[mid];
-		if (f->index_begin + f->num_indices < index) {
-			begin = mid + 1;
-		} else { 
-			end = mid;
+	size_t range_end = mesh->num_faces;
+	size_t begin = 0, end = range_end;
+
+	for (;;) {
+		const ufbx_face *faces = mesh->faces;
+		while (end - begin >= 16) {
+			size_t mid = (begin + end) >> 1;
+			const ufbx_face *f = &faces[mid];
+			if (f->index_begin + f->num_indices < index) {
+				begin = mid + 1;
+			} else { 
+				end = mid;
+			}
 		}
-	}
 
-	end = mesh->num_faces;
-	for (; begin < end; begin++) {
-		const ufbx_face *f = &faces[begin];
-		if (index - f->index_begin < f->num_indices) return (ufbx_face*)f;
-	}
+		end = range_end;
+		for (; begin < end; begin++) {
+			const ufbx_face *f = &faces[begin];
+			if (index - f->index_begin < f->num_indices) return (ufbx_face*)f;
+		}
 
-	return NULL;
+		// Check bad faces if not found in regular ones
+		size_t total_faces = mesh->num_faces + mesh->num_bad_faces;
+		if (range_end == total_faces) return NULL;
+		begin = mesh->num_faces;
+		range_end = end = total_faces;
+	}
 }
 
 ufbx_matrix ufbx_get_transform_matrix(const ufbx_transform *t)
