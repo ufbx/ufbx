@@ -571,6 +571,8 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 
 ufbx_vec3 ufbx_rotate_vector(ufbx_vec4 q, ufbx_vec3 v);
 
+bool ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, ufbx_face face);
+
 // Utility
 
 ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);

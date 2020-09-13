@@ -7532,6 +7532,39 @@ ufbxi_forceinline static void ufbxi_eval_anim_prop_imp(ufbx_anim_target target, 
 	ufbxi_eval_anim_prop_imp(m_target, m_index, m_p_ap, m_time, m_prop, m_name, sizeof(m_name) - 1, \
 	(m_name[0] << 24) | (m_name[1] << 16) | (m_name[2] << 8) | m_name[3])
 
+ufbx_inline ufbx_vec3 ufbxi_add3(ufbx_vec3 a, ufbx_vec3 b) {
+	ufbx_vec3 v = { a.x + b.x, a.y + b.y, a.z + b.z };
+	return v;
+}
+
+ufbx_inline ufbx_vec3 ufbxi_sub3(ufbx_vec3 a, ufbx_vec3 b) {
+	ufbx_vec3 v = { a.x - b.x, a.y - b.y, a.z - b.z };
+	return v;
+}
+
+ufbx_inline ufbx_vec3 ufbxi_mul3(ufbx_vec3 a, ufbx_real b) {
+	ufbx_vec3 v = { a.x * b, a.y * b, a.z * b };
+	return v;
+}
+
+ufbx_inline ufbx_real ufbxi_dot3(ufbx_vec3 a, ufbx_vec3 b) {
+	return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+ufbx_inline ufbx_vec3 ufbxi_cross3(ufbx_vec3 a, ufbx_vec3 b) {
+	ufbx_vec3 v = { a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x };
+	return v;
+}
+
+ufbx_inline ufbx_vec3 ufbxi_normalize(ufbx_vec3 a) {
+	ufbx_real len = (ufbx_real)sqrt(ufbxi_dot3(a, a));
+	if (len != 0.0) {
+		return ufbxi_mul3(a, (ufbx_real)1.0 / len);
+	} else {
+		ufbx_vec3 zero = { (ufbx_real)0 };
+		return zero;
+	}
+}
 
 // -- API
 
@@ -8020,6 +8053,75 @@ ufbx_vec3 ufbx_rotate_vector(ufbx_vec4 q, ufbx_vec3 v)
 	r.y = 2.0 * (- q.x*xy - q.w*xz + q.z*yz) + v.y;
 	r.z = 2.0 * (- q.x*xz - q.y*yz + q.w*xy) + v.z;
 	return r;
+}
+
+bool ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, ufbx_face face)
+{
+	if (face.num_indices < 3 || num_indices < ((size_t)face.num_indices - 2) * 3) return false;
+
+	if (face.num_indices == 3) {
+		// Fast case: Already a triangle
+		indices[0] = face.index_begin + 0;
+		indices[1] = face.index_begin + 1;
+		indices[2] = face.index_begin + 2;
+		return true;
+	} else if (face.num_indices == 4) {
+		// Quad: Split along the shortest axis unless a vertex crosses the axis
+		uint32_t i0 = face.index_begin + 0;
+		uint32_t i1 = face.index_begin + 1;
+		uint32_t i2 = face.index_begin + 2;
+		uint32_t i3 = face.index_begin + 3;
+		ufbx_vec3 v0 = mesh->vertex_position.data[mesh->vertex_position.indices[i0]];
+		ufbx_vec3 v1 = mesh->vertex_position.data[mesh->vertex_position.indices[i1]];
+		ufbx_vec3 v2 = mesh->vertex_position.data[mesh->vertex_position.indices[i2]];
+		ufbx_vec3 v3 = mesh->vertex_position.data[mesh->vertex_position.indices[i3]];
+
+		ufbx_vec3 a = ufbxi_sub3(v2, v0);
+		ufbx_vec3 b = ufbxi_sub3(v3, v1);
+
+		ufbx_vec3 na1 = ufbxi_normalize(ufbxi_cross3(a, ufbxi_sub3(v1, v0)));
+		ufbx_vec3 na3 = ufbxi_normalize(ufbxi_cross3(a, ufbxi_sub3(v0, v3)));
+		ufbx_vec3 nb0 = ufbxi_normalize(ufbxi_cross3(b, ufbxi_sub3(v1, v0)));
+		ufbx_vec3 nb2 = ufbxi_normalize(ufbxi_cross3(b, ufbxi_sub3(v2, v1)));
+
+		ufbx_real dot_aa = ufbxi_dot3(a, a);
+		ufbx_real dot_bb = ufbxi_dot3(b, b);
+		ufbx_real dot_na = ufbxi_dot3(na1, na3);
+		ufbx_real dot_nb = ufbxi_dot3(nb0, nb2);
+
+		bool split_a = dot_aa <= dot_bb;
+
+		if (dot_na < 0.0f || dot_nb < 0.0f) {
+			split_a = dot_na >= dot_nb;
+		}
+
+		if (split_a) {
+			indices[0] = i0;
+			indices[1] = i1;
+			indices[2] = i2;
+			indices[3] = i2;
+			indices[4] = i3;
+			indices[5] = i0;
+		} else {
+			indices[0] = i1;
+			indices[1] = i2;
+			indices[2] = i3;
+			indices[3] = i3;
+			indices[4] = i0;
+			indices[5] = i1;
+		}
+	} else {
+		// N-Gon: TODO something reasonable
+		uint32_t *dst = indices;
+		for (uint32_t i = 1; i + 2 <= face.num_indices; i++) {
+			dst[0] = face.index_begin;
+			dst[1] = face.index_begin + i;
+			dst[2] = face.index_begin + i + 1;
+			dst += 3;
+		}
+	}
+
+	return true;
 }
 
 #ifdef __cplusplus
