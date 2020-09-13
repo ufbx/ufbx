@@ -1,6 +1,7 @@
 
-UFBXT_FILE_TEST(maya_triangulate)
+
 #if UFBXT_IMPL
+size_t do_triangulate_test(ufbx_scene *scene)
 {
 	size_t num_fail = 0;
 
@@ -38,6 +39,23 @@ UFBXT_FILE_TEST(maya_triangulate)
 	}
 
 	ufbxt_logf("Triangulations OK: %zu/%zu", scene->meshes.size - num_fail, scene->meshes.size);
-	ufbxt_assert(num_fail == 0);
+	return num_fail;
+}
+#endif
+
+UFBXT_FILE_TEST(maya_triangulate)
+#if UFBXT_IMPL
+{
+	size_t num_fail = do_triangulate_test(scene);
+	ufbxt_assert(num_fail <= 4);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_triangulate_down)
+#if UFBXT_IMPL
+{
+	printf("\n");
+	size_t num_fail = do_triangulate_test(scene);
+	ufbxt_assert(num_fail <= 1);
 }
 #endif
