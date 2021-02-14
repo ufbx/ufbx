@@ -172,21 +172,14 @@ typedef struct rhmap_iter_s {
 	uint32_t scan;
 } rhmap_iter;
 
-void rhmap_init(rhmap *map);
 void *rhmap_reset(rhmap *map);
-void rhmap_clear(rhmap *map);
 
 void rhmap_grow(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor);
-void rhmap_shrink(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor);
 void *rhmap_rehash(rhmap *map, size_t count, size_t alloc_size, void *data_ptr);
 
 int rhmap_find(rhmap_iter *iter, uint32_t *value);
 void rhmap_insert(rhmap_iter *iter, uint32_t value);
-void rhmap_remove(rhmap_iter *iter);
-void rhmap_set(rhmap_iter *iter, uint32_t value);
 int rhmap_next(rhmap_iter *iter, uint32_t *hash, uint32_t *value);
-
-void rhmap_update(rhmap *map, uint32_t hash, uint32_t old_value, uint32_t new_value);
 
 #endif
 
