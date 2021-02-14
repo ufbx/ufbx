@@ -4806,7 +4806,7 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 			}
 			p_face_begin = p_ix + 1;
 		}
-		ufbxi_check(ix < mesh->num_vertices);
+		ufbxi_check((size_t)ix < mesh->num_vertices);
 	}
 	ufbx_assert(dst_face == dst_bad_face);
 
