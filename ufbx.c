@@ -66,7 +66,7 @@
 
 #define ufbxi_read_u8(ptr) (*(const uint8_t*)(ptr))
 
-#if (defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__)) && !defined(UFBX_NO_UNALIGNED_LOADS)
+#if (defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__)) && !defined(UFBX_NO_UNALIGNED_LOADS) || defined(UFBX_USE_UNALIGNED_LOADS)
 	#define ufbxi_read_u16(ptr) (*(const uint16_t*)(ptr))
 	#define ufbxi_read_u32(ptr) (*(const uint32_t*)(ptr))
 	#define ufbxi_read_u64(ptr) (*(const uint64_t*)(ptr))
