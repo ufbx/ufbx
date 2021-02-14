@@ -5386,7 +5386,7 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve_node(ufbxi_context *uc, uf
 ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_string type_and_name, ufbx_string *type, ufbx_string *name)
 {
 	// Name and type are packed in a single property as Type::Name (in ASCII)
-	// or Type\x01\x02Name (in binary)
+	// or Type\x00\x01Name (in binary)
 	const char *sep = uc->from_ascii ? "::" : "\x00\x01";
 	size_t type_end;
 	for (type_end = 2; type_end < type_and_name.length; type_end++) {
