@@ -4830,6 +4830,7 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 
 			size_t num_shape_props = 1;
 			ufbx_prop *shape_props = ufbxi_push_zero(&uc->tmp, ufbx_prop, num_shape_props);
+			ufbxi_check(shape_props);
 			shape_props[0].name.data = ufbxi_DeformPercent;
 			shape_props[0].name.length = sizeof(ufbxi_DeformPercent) - 1;
 			shape_props[0].imp_key = ufbxi_get_name_key(ufbxi_DeformPercent, sizeof(ufbxi_DeformPercent) - 1);

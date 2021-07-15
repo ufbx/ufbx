@@ -1534,7 +1534,7 @@ static const ufbxt_fuzz_check g_fuzz_checks[] = {
 	{ "maya_interpolation_modes_7500_binary", 25023, 0, 0, 0, 0, "refs_left >= 0" },
 };
 
-void ufbxt_do_fuzz(ufbx_scene *scene, const char *base_name, const void *data, size_t size)
+void ufbxt_do_fuzz(ufbx_scene *scene, const char *base_name, void *data, size_t size)
 {
 	if (g_fuzz) {
 		size_t step = 0;
