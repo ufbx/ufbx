@@ -26,6 +26,8 @@
   <Type Name="ufbx_light_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_bone_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_skin_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
+  <Type Name="ufbx_blend_shape_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
+  <Type Name="ufbx_blend_shape_ptr_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_anim_stack_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_anim_layer_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_anim_layer_ptr_list"><DisplayString>{{ size={size} }}</DisplayString><Expand><ArrayItems><Size>size</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>

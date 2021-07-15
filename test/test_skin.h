@@ -112,3 +112,48 @@ UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, combined)
 	ufbxt_check_frame(scene, err, "maya_game_sausage_deform_15", "deform", 55.0/24.0);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_blend_shape_cube)
+#if UFBXT_IMPL
+{
+	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
+	ufbxt_assert(mesh);
+	ufbxt_assert(mesh->blend_shapes.size == 2);
+
+	ufbx_blend_shape *top[2] = { NULL, NULL };
+	for (size_t i = 0; i < mesh->blend_shapes.size; i++) {
+		ufbx_blend_shape *shape = mesh->blend_shapes.data[i];
+		if (!strcmp(shape->name.data, "TopH")) top[0] = shape;
+		if (!strcmp(shape->name.data, "TopV")) top[1] = shape;
+	}
+	ufbxt_assert(top[0] && top[1]);
+
+	double keyframes[][3] = {
+		{ 1.0/24.0, 1.0, 1.0 },
+		{ 16.0/24.0, 0.279, 0.670 },
+		{ 53.0/24.0, 0.901, 0.168 },
+		{ 120.0/24.0, 1.0, 1.0 },
+	};
+
+	for (size_t shape_ix = 0; shape_ix < 2; shape_ix++) {
+		ufbx_blend_shape *shape = top[shape_ix];
+		ufbx_anim_prop *props = ufbx_find_blend_shape_anim_prop_begin(scene, NULL, shape);
+		ufbxt_assert(props);
+
+		size_t count = ufbx_anim_prop_count(props);
+		ufbxt_assert(count == 1);
+
+		ufbx_anim_prop *percent = ufbx_find_anim_prop(props, "DeformPercent");
+		ufbxt_assert(percent);
+
+		for (size_t key_ix = 0; key_ix < ufbxt_arraycount(keyframes); key_ix++) {
+			double *frame = keyframes[key_ix];
+			double time = frame[0];
+
+			ufbx_real ref = (ufbx_real)frame[1 + shape_ix];
+			ufbx_real value = ufbx_evaluate_curve(&percent->curves[0], time) / 100.0;
+			ufbxt_assert_close_real(&err, value, ref);
+		}
+	}
+}
+#endif

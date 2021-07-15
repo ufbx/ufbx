@@ -983,6 +983,7 @@ void ufbxt_check_anim_prop(ufbx_scene *scene, ufbx_anim_prop *anim_prop)
 	case UFBX_ANIM_MATERIAL: ufbxt_assert(anim_prop->index < scene->materials.size); break;
 	case UFBX_ANIM_BONE: ufbxt_assert(anim_prop->index < scene->bones.size); break;
 	case UFBX_ANIM_ANIM_LAYER: ufbxt_assert(anim_prop->index < scene->anim_layers.size); break;
+	case UFBX_ANIM_BLEND_SHAPE: ufbxt_assert(anim_prop->index < scene->blend_shapes.size); break;
 	default: ufbxt_assert(0 && "Bad anim target"); break;
 	}
 }

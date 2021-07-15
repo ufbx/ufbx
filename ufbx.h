@@ -141,6 +141,7 @@ typedef struct ufbx_light_list { ufbx_light *data; size_t size; } ufbx_light_lis
 typedef struct ufbx_bone_list { ufbx_bone *data; size_t size; } ufbx_bone_list;
 
 typedef struct ufbx_material ufbx_material;
+typedef struct ufbx_blend_shape ufbx_blend_shape;
 
 typedef struct ufbx_vertex_void ufbx_vertex_void;
 typedef struct ufbx_vertex_real ufbx_vertex_real;
@@ -158,6 +159,8 @@ typedef struct ufbx_material_ptr_list { ufbx_material **data; size_t size; } ufb
 typedef struct ufbx_uv_set_list { ufbx_uv_set *data; size_t size; } ufbx_uv_set_list;
 typedef struct ufbx_color_set_list { ufbx_color_set *data; size_t size; } ufbx_color_set_list;
 typedef struct ufbx_skin_list { ufbx_skin *data; size_t size; } ufbx_skin_list;
+typedef struct ufbx_blend_shape_list { ufbx_blend_shape *data; size_t size; } ufbx_blend_shape_list;
+typedef struct ufbx_blend_shape_ptr_list { ufbx_blend_shape **data; size_t size; } ufbx_blend_shape_ptr_list;
 
 struct ufbx_vertex_void {
 	void *data;
@@ -233,6 +236,16 @@ struct ufbx_material {
 	ufbx_vec3 specular_color;
 };
 
+struct ufbx_blend_shape {
+	ufbx_string name;
+
+	ufbx_props props;
+
+	size_t num_offsets;
+	ufbx_vec3 *position_offsets;
+	int32_t *indices;
+};
+
 typedef enum ufbx_node_type {
 	UFBX_NODE_UNKNOWN,
 	UFBX_NODE_MODEL,
@@ -295,8 +308,8 @@ struct ufbx_mesh {
 	ufbx_color_set_list color_sets;
 	ufbx_material_ptr_list materials;
 	ufbx_skin_list skins;
+	ufbx_blend_shape_ptr_list blend_shapes;
 };
-
 struct ufbx_light {
 	ufbx_node node;
 
@@ -346,6 +359,7 @@ typedef enum ufbx_anim_target {
 	UFBX_ANIM_LIGHT,
 	UFBX_ANIM_MATERIAL,
 	UFBX_ANIM_BONE,
+	UFBX_ANIM_BLEND_SHAPE,
 	UFBX_ANIM_INVALID,
 } ufbx_anim_target;
 
@@ -428,6 +442,7 @@ struct ufbx_scene {
 	ufbx_mesh_list meshes;
 	ufbx_light_list lights;
 	ufbx_bone_list bones;
+	ufbx_blend_shape_list blend_shapes;
 
 	ufbx_material_list materials;
 
@@ -490,6 +505,7 @@ typedef struct ufbx_load_opts {
 	uint32_t max_child_depth;
 
 	bool allow_nonexistent_indices;
+	bool allow_out_of_bounds_indices;
 } ufbx_load_opts;
 
 typedef struct ufbx_evaluate_opts {
@@ -549,7 +565,12 @@ ufbx_anim_layer *ufbx_find_anim_layer_len(const ufbx_scene *scene, const char *n
 
 ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len);
 
+ufbx_anim_prop *ufbx_find_anim_prop_len(const ufbx_anim_prop *props, const char *name, size_t name_len);
+size_t ufbx_anim_prop_count(const ufbx_anim_prop *props);
+
+ufbx_anim_prop *ufbx_find_anim_prop_begin(const ufbx_scene *scene, const ufbx_anim_layer *layer, ufbx_anim_target target, uint32_t index);
 ufbx_anim_prop *ufbx_find_node_anim_prop_begin(const ufbx_scene *scene, const ufbx_anim_layer *layer, const ufbx_node *node);
+ufbx_anim_prop *ufbx_find_blend_shape_anim_prop_begin(const ufbx_scene *scene, const ufbx_anim_layer *layer, const ufbx_blend_shape *shape);
 
 ufbx_face *ufbx_find_face(const ufbx_mesh *mesh, size_t index);
 
@@ -607,6 +628,10 @@ ufbx_inline ufbx_prop *ufbx_find_prop(const ufbx_props *props, const char *name)
 	return ufbx_find_prop_len(props, name, strlen(name));
 }
 
+ufbx_inline ufbx_anim_prop *ufbx_find_anim_prop(const ufbx_anim_prop *props, const char *name) {
+	return ufbx_find_anim_prop_len(props, name, strlen(name));
+}
+
 ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t index) { return v->data[v->indices[index]]; }
 ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }
 ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }
@@ -650,6 +675,10 @@ ufbx_inline ufbx_keyframe *begin(const ufbx_keyframe_list &l) { return l.data; }
 ufbx_inline ufbx_keyframe *end(const ufbx_keyframe_list &l) { return l.data + l.size; }
 ufbx_inline ufbx_skin *begin(const ufbx_skin_list& l) { return l.data; }
 ufbx_inline ufbx_skin *end(const ufbx_skin_list& l) { return l.data + l.size; }
+ufbx_inline ufbx_blend_shape *begin(const ufbx_blend_shape_list& l) { return l.data; }
+ufbx_inline ufbx_blend_shape *end(const ufbx_blend_shape_list& l) { return l.data + l.size; }
+ufbx_inline ufbx_blend_shape **begin(const ufbx_blend_shape_ptr_list& l) { return l.data; }
+ufbx_inline ufbx_blend_shape **end(const ufbx_blend_shape_ptr_list& l) { return l.data + l.size; }
 
 #endif
 
