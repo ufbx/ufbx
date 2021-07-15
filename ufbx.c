@@ -1783,6 +1783,7 @@ static const char ufbxi_D_Y[] = "d|Y";
 static const char ufbxi_D_Z[] = "d|Z";
 static const char ufbxi_Default[] = "Default";
 static const char ufbxi_Definitions[] = "Definitions";
+static const char ufbxi_DeformPercent[] = "DeformPercent";
 static const char ufbxi_Deformer[] = "Deformer";
 static const char ufbxi_DiffuseColor[] = "DiffuseColor";
 static const char ufbxi_Document[] = "Document";
@@ -1879,7 +1880,6 @@ static const char ufbxi_Weights[] = "Weights";
 static const char ufbxi_X[] = "X";
 static const char ufbxi_Y[] = "Y";
 static const char ufbxi_Z[] = "Z";
-static const char ufbxi_DeformPercent[] = "DeformPercent";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, sizeof(ufbxi_AllSame) - 1 },
@@ -1908,6 +1908,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_D_Z, sizeof(ufbxi_D_Z) - 1 },
 	{ ufbxi_Default, sizeof(ufbxi_Default) - 1 },
 	{ ufbxi_Definitions, sizeof(ufbxi_Definitions) - 1 },
+	{ ufbxi_DeformPercent, sizeof(ufbxi_DeformPercent) - 1 },
 	{ ufbxi_Deformer, sizeof(ufbxi_Deformer) - 1 },
 	{ ufbxi_DiffuseColor, sizeof(ufbxi_DiffuseColor) - 1 },
 	{ ufbxi_Document, sizeof(ufbxi_Document) - 1 },
@@ -2004,7 +2005,6 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_X, sizeof(ufbxi_X) - 1 },
 	{ ufbxi_Y, sizeof(ufbxi_Y) - 1 },
 	{ ufbxi_Z, sizeof(ufbxi_Z) - 1 },
-	{ ufbxi_DeformPercent, sizeof(ufbxi_DeformPercent) - 1 },
 };
 
 // -- Type definitions
