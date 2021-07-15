@@ -27,6 +27,11 @@ UFBXT_TEST(fuzz_files)
 			ufbxt_check_scene(scene);
 			ok++;
 		}
+
+		if (g_fuzz) {
+			ufbxt_do_fuzz(scene, name, data, size);
+		}
+
 		ufbx_free_scene(scene);
 
 		ufbx_load_opts stream_opts = load_opts;

@@ -1534,6 +1534,185 @@ static const ufbxt_fuzz_check g_fuzz_checks[] = {
 	{ "maya_interpolation_modes_7500_binary", 25023, 0, 0, 0, 0, "refs_left >= 0" },
 };
 
+void ufbxt_do_fuzz(ufbx_scene *scene, const char *base_name, const void *data, size_t size)
+{
+	if (g_fuzz) {
+		size_t step = 0;
+		size_t fail_step = 0;
+		int i;
+
+		g_fuzz_test_name = base_name;
+
+		size_t temp_allocs = 1000;
+		size_t result_allocs = 500;
+		if (scene) {
+			temp_allocs = scene->metadata.temp_allocs;
+			result_allocs = scene->metadata.result_allocs;
+		}
+
+		#pragma omp parallel for schedule(static, 16)
+		for (i = 0; i < (int)temp_allocs; i++) {
+			if (omp_get_thread_num() == 0) {
+				if (i % 16 == 0) {
+					fprintf(stderr, "\rFuzzing temp limit %s: %d/%d", base_name, i, (int)temp_allocs);
+					fflush(stderr);
+				}
+			}
+
+			size_t step = 10000000 + (size_t)i;
+
+			if (!ufbxt_test_fuzz(data, size, step, -1, (size_t)i, 0, 0)) fail_step = step;
+		}
+
+		fprintf(stderr, "\rFuzzing temp limit %s: %d/%d\n", base_name, (int)temp_allocs, (int)temp_allocs);
+
+		#pragma omp parallel for schedule(static, 16)
+		for (i = 0; i < (int)result_allocs; i++) {
+			if (omp_get_thread_num() == 0) {
+				if (i % 16 == 0) {
+					fprintf(stderr, "\rFuzzing result limit %s: %d/%d", base_name, i, (int)result_allocs);
+					fflush(stderr);
+				}
+			}
+
+			size_t step = 20000000 + (size_t)i;
+
+			if (!ufbxt_test_fuzz(data, size, step, -1, 0, (size_t)i, 0)) fail_step = step;
+		}
+
+		fprintf(stderr, "\rFuzzing result limit %s: %d/%d\n", base_name, (int)result_allocs, (int)result_allocs);
+
+		#pragma omp parallel for schedule(static, 16)
+		for (i = 1; i < (int)size; i++) {
+			if (omp_get_thread_num() == 0) {
+				if (i % 16 == 0) {
+					fprintf(stderr, "\rFuzzing truncate %s: %d/%d", base_name, i, (int)size);
+					fflush(stderr);
+				}
+			}
+
+			size_t step = 30000000 + (size_t)i;
+
+			if (!ufbxt_test_fuzz(data, size, step, -1, 0, 0, (size_t)i)) fail_step = step;
+		}
+
+		fprintf(stderr, "\rFuzzing truncate %s: %d/%d\n", base_name, (int)size, (int)size);
+
+		if (!g_no_patch) {
+
+			uint8_t *data_copy[256] = { 0 };
+
+			int patch_start = g_patch_start - omp_get_num_threads() * 16;
+			if (patch_start < 0) {
+				patch_start = 0;
+			}
+
+			#pragma omp parallel for schedule(static, 16)
+			for (i = patch_start; i < (int)size; i++) {
+
+				if (omp_get_thread_num() == 0) {
+					if (i % 16 == 0) {
+						fprintf(stderr, "\rFuzzing patch %s: %d/%d", base_name, i, (int)size);
+						fflush(stderr);
+					}
+				}
+
+				uint8_t **p_data_copy = &data_copy[omp_get_thread_num()];
+				if (*p_data_copy == NULL) {
+					*p_data_copy = malloc(size);
+					memcpy(*p_data_copy, data, size);
+				}
+				uint8_t *data_u8 = *p_data_copy;
+
+				size_t step = i * 1000;
+
+				uint8_t original = data_u8[i];
+
+				if (g_all_byte_values) {
+					for (uint32_t v = 0; v < 256; v++) {
+						data_u8[i] = (uint8_t)v;
+						if (!ufbxt_test_fuzz(data_u8, size, step + v, i, 0, 0, 0)) fail_step = step + v;
+					}
+				} else {
+					data_u8[i] = original + 1;
+					if (!ufbxt_test_fuzz(data_u8, size, step + 1, i, 0, 0, 0)) fail_step = step + 1;
+
+					data_u8[i] = original - 1;
+					if (!ufbxt_test_fuzz(data_u8, size, step + 2, i, 0, 0, 0)) fail_step = step + 2;
+
+					if (original != 0) {
+						data_u8[i] = 0;
+						if (!ufbxt_test_fuzz(data_u8, size, step + 3, i, 0, 0, 0)) fail_step = step + 3;
+					}
+
+					if (original != 0xff) {
+						data_u8[i] = 0xff;
+						if (!ufbxt_test_fuzz(data_u8, size, step + 4, i, 0, 0, 0)) fail_step = step + 4;
+					}
+				}
+
+
+				data_u8[i] = original;
+			}
+
+			fprintf(stderr, "\rFuzzing patch %s: %d/%d\n", base_name, (int)size, (int)size);
+
+			for (size_t i = 0; i < ufbxt_arraycount(data_copy); i++) {
+				free(data_copy[i]);
+			}
+
+		}
+
+		ufbxt_hintf("Fuzz failed on step: %zu", step);
+		ufbxt_assert(fail_step == 0);
+	} else {
+		uint8_t *data_u8 = (uint8_t*)data;
+
+		// Run a couple of known fuzz checks
+		for (size_t i = 0; i < ufbxt_arraycount(g_fuzz_checks); i++) {
+			const ufbxt_fuzz_check *check = &g_fuzz_checks[i];
+			if (strcmp(check->name, base_name)) continue;
+
+			uint8_t original;
+			if (check->patch_offset >= 0) {
+				original = data_u8[check->patch_offset];
+				ufbxt_logf(".. Patch byte %u from 0x%02x to 0x%02x: %s", check->patch_offset, original, check->patch_value, check->description);
+				ufbxt_assert(check->patch_offset < size);
+				data_u8[check->patch_offset] = check->patch_value;
+			}
+
+			ufbx_load_opts opts = { 0 };
+
+			if (check->temp_limit > 0) {
+				ufbxt_logf(".. Temp limit %u: %s", check->temp_limit, check->description);
+				opts.max_temp_allocs = check->temp_limit;
+			}
+
+			if (check->result_limit > 0) {
+				ufbxt_logf(".. Result limit %u: %s", check->result_limit, check->description);
+				opts.max_result_allocs = check->result_limit;
+			}
+
+			size_t truncated_size = size;
+			if (check->truncate_length > 0) {
+				ufbxt_logf(".. Truncated length %u: %s", check->truncate_length, check->description);
+				truncated_size = check->truncate_length;
+			}
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_memory(data, truncated_size, &opts, &error);
+			if (scene) {
+				ufbxt_check_scene(scene);
+				ufbx_free_scene(scene);
+			}
+
+			if (check->patch_offset >= 0) {
+				data_u8[check->patch_offset] = original;
+			}
+		}
+	}
+}
+
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err), const char *suffix, ufbx_load_opts user_opts)
 {
 	const uint32_t file_versions[] = { 6100, 7100, 7400, 7500, 7700 };
@@ -1655,182 +1834,9 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 			}
 
-			size_t temp_allocs = scene->metadata.temp_allocs;
-			size_t result_allocs = scene->metadata.result_allocs;
+			ufbxt_do_fuzz(scene, base_name, data, size);
 
 			ufbx_free_scene(scene);
-
-			if (g_fuzz) {
-				size_t step = 0;
-
-				size_t fail_step = 0;
-				int i;
-
-				g_fuzz_test_name = base_name;
-
-				#pragma omp parallel for schedule(static, 16)
-				for (i = 0; i < (int)temp_allocs; i++) {
-					if (omp_get_thread_num() == 0) {
-						if (i % 16 == 0) {
-							fprintf(stderr, "\rFuzzing temp limit %s: %d/%d", base_name, i, (int)temp_allocs);
-							fflush(stderr);
-						}
-					}
-
-					size_t step = 10000000 + (size_t)i;
-
-					if (!ufbxt_test_fuzz(data, size, step, -1, (size_t)i, 0, 0)) fail_step = step;
-				}
-
-				fprintf(stderr, "\rFuzzing temp limit %s: %d/%d\n", base_name, (int)temp_allocs, (int)temp_allocs);
-
-				#pragma omp parallel for schedule(static, 16)
-				for (i = 0; i < (int)result_allocs; i++) {
-					if (omp_get_thread_num() == 0) {
-						if (i % 16 == 0) {
-							fprintf(stderr, "\rFuzzing result limit %s: %d/%d", base_name, i, (int)result_allocs);
-							fflush(stderr);
-						}
-					}
-
-					size_t step = 20000000 + (size_t)i;
-
-					if (!ufbxt_test_fuzz(data, size, step, -1, 0, (size_t)i, 0)) fail_step = step;
-				}
-
-				fprintf(stderr, "\rFuzzing result limit %s: %d/%d\n", base_name, (int)result_allocs, (int)result_allocs);
-
-				#pragma omp parallel for schedule(static, 16)
-				for (i = 1; i < (int)size; i++) {
-					if (omp_get_thread_num() == 0) {
-						if (i % 16 == 0) {
-							fprintf(stderr, "\rFuzzing truncate %s: %d/%d", base_name, i, (int)size);
-							fflush(stderr);
-						}
-					}
-
-					size_t step = 30000000 + (size_t)i;
-
-					if (!ufbxt_test_fuzz(data, size, step, -1, 0, 0, (size_t)i)) fail_step = step;
-				}
-
-				fprintf(stderr, "\rFuzzing truncate %s: %d/%d\n", base_name, (int)size, (int)size);
-
-				if (!g_no_patch) {
-
-					uint8_t *data_copy[256] = { 0 };
-
-					int patch_start = g_patch_start - omp_get_num_threads() * 16;
-					if (patch_start < 0) {
-						patch_start = 0;
-					}
-
-					#pragma omp parallel for schedule(static, 16)
-					for (i = patch_start; i < (int)size; i++) {
-
-						if (omp_get_thread_num() == 0) {
-							if (i % 16 == 0) {
-								fprintf(stderr, "\rFuzzing patch %s: %d/%d", base_name, i, (int)size);
-								fflush(stderr);
-							}
-						}
-
-						uint8_t **p_data_copy = &data_copy[omp_get_thread_num()];
-						if (*p_data_copy == NULL) {
-							*p_data_copy = malloc(size);
-							memcpy(*p_data_copy, data, size);
-						}
-						uint8_t *data_u8 = *p_data_copy;
-
-						size_t step = i * 1000;
-
-						uint8_t original = data_u8[i];
-
-						if (g_all_byte_values) {
-							for (uint32_t v = 0; v < 256; v++) {
-								data_u8[i] = (uint8_t)v;
-								if (!ufbxt_test_fuzz(data_u8, size, step + v, i, 0, 0, 0)) fail_step = step + v;
-							}
-						} else {
-							data_u8[i] = original + 1;
-							if (!ufbxt_test_fuzz(data_u8, size, step + 1, i, 0, 0, 0)) fail_step = step + 1;
-
-							data_u8[i] = original - 1;
-							if (!ufbxt_test_fuzz(data_u8, size, step + 2, i, 0, 0, 0)) fail_step = step + 2;
-
-							if (original != 0) {
-								data_u8[i] = 0;
-								if (!ufbxt_test_fuzz(data_u8, size, step + 3, i, 0, 0, 0)) fail_step = step + 3;
-							}
-
-							if (original != 0xff) {
-								data_u8[i] = 0xff;
-								if (!ufbxt_test_fuzz(data_u8, size, step + 4, i, 0, 0, 0)) fail_step = step + 4;
-							}
-						}
-
-
-						data_u8[i] = original;
-					}
-
-					fprintf(stderr, "\rFuzzing patch %s: %d/%d\n", base_name, (int)size, (int)size);
-
-					for (size_t i = 0; i < ufbxt_arraycount(data_copy); i++) {
-						free(data_copy[i]);
-					}
-
-				}
-
-				ufbxt_hintf("Fuzz failed on step: %zu", step);
-				ufbxt_assert(fail_step == 0);
-
-			} else {
-				uint8_t *data_u8 = (uint8_t*)data;
-
-				// Run a couple of known fuzz checks
-				for (size_t i = 0; i < ufbxt_arraycount(g_fuzz_checks); i++) {
-					const ufbxt_fuzz_check *check = &g_fuzz_checks[i];
-					if (strcmp(check->name, base_name)) continue;
-
-					uint8_t original;
-					if (check->patch_offset >= 0) {
-						original = data_u8[check->patch_offset];
-						ufbxt_logf(".. Patch byte %u from 0x%02x to 0x%02x: %s", check->patch_offset, original, check->patch_value, check->description);
-						ufbxt_assert(check->patch_offset < size);
-						data_u8[check->patch_offset] = check->patch_value;
-					}
-
-					ufbx_load_opts opts = { 0 };
-
-					if (check->temp_limit > 0) {
-						ufbxt_logf(".. Temp limit %u: %s", check->temp_limit, check->description);
-						opts.max_temp_allocs = check->temp_limit;
-					}
-
-					if (check->result_limit > 0) {
-						ufbxt_logf(".. Result limit %u: %s", check->result_limit, check->description);
-						opts.max_result_allocs = check->result_limit;
-					}
-
-					size_t truncated_size = size;
-					if (check->truncate_length > 0) {
-						ufbxt_logf(".. Truncated length %u: %s", check->truncate_length, check->description);
-						truncated_size = check->truncate_length;
-					}
-
-					ufbx_error error;
-					ufbx_scene *scene = ufbx_load_memory(data, truncated_size, &opts, &error);
-					if (scene) {
-						ufbxt_check_scene(scene);
-						ufbx_free_scene(scene);
-					}
-
-					if (check->patch_offset >= 0) {
-						data_u8[check->patch_offset] = original;
-					}
-				}
-
-			}
 
 			free(data);
 		}

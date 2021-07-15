@@ -4700,6 +4700,7 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 				*p_dst_index = (int32_t*)ufbxi_sentinel_index_consecutive;
 			} else {
 				int32_t *index_data = ufbxi_push(&uc->result, int32_t, mesh->num_indices);
+				ufbxi_check(index_data);
 				for (size_t i = 0; i < mesh->num_indices; i++) {
 					index_data[i] = (int32_t)i;
 				}
@@ -7116,7 +7117,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 			if (prop->target != UFBX_ANIM_MESH) continue;
 			ufbx_mesh *mesh = &uc->scene.meshes.data[prop->index];
 
-			ufbxi_for(ufbx_blend_shape*, p_shape, mesh->blend_shapes.data, mesh->blend_shapes.size) {
+			ufbxi_for_ptr(ufbx_blend_shape, p_shape, mesh->blend_shapes.data, mesh->blend_shapes.size) {
 				ufbx_blend_shape *shape = *p_shape;
 				if (ufbxi_streq(prop->name, shape->name)) {
 					prop->name.data = ufbxi_DeformPercent;
