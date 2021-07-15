@@ -152,7 +152,7 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 
 			ufbx_real ref = (ufbx_real)frame[1 + shape_ix];
 			ufbx_real value = ufbx_evaluate_curve(&percent->curves[0], time) / 100.0;
-			ufbxt_assert_close_real(&err, value, ref);
+			ufbxt_assert_close_real(err, value, ref);
 		}
 	}
 }
