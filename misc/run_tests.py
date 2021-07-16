@@ -200,6 +200,9 @@ class GCCCompiler(Compiler):
         
         if self.has_m32 and config.get("arch", "") == "x86":
             args.append("-m32")
+
+        args.append("-std=gnu99")
+        args.append("-lm")
         
         args += sources
         args += ["-o", output]
@@ -364,6 +367,8 @@ def copy_file(src, dst):
 exit_code = 0
 
 async def main():
+    global exit_code
+
     log_comment("-- Searching for compilers --")
     compilers = await find_compilers()
     for compiler in compilers:
