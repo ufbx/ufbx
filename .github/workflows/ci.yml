@@ -13,11 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Run tests
-        run: python3 test/run_tests.py
+        run: python3 misc/run_tests.py
 
   ci_windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
       - name: Run tests
-        run: python test/run_tests.py
+        run: python misc/run_tests.py
