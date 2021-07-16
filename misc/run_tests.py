@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import asyncio
 import itertools
 from platform import platform
