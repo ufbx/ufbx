@@ -27,6 +27,10 @@ typedef double ufbx_real;
 
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
 
+// -- Version
+
+#define UFBX_HEADER_VERSION 1001001 // v1.1.1
+
 // -- Basic types
 
 typedef struct ufbx_string {
@@ -466,6 +470,7 @@ typedef struct ufbx_error_frame {
 } ufbx_error_frame;
 
 typedef struct ufbx_error {
+	const char *description;
 	uint32_t stack_size;
 	ufbx_error_frame stack[UFBX_ERROR_STACK_MAX_DEPTH];
 } ufbx_error;
@@ -550,11 +555,14 @@ extern "C" {
 extern const ufbx_string ufbx_empty_string;
 extern const ufbx_matrix ufbx_identity_matrix;
 extern const ufbx_transform ufbx_identity_transform;
+extern const uint32_t ufbx_source_version;
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error);
 ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error);
 ufbx_scene *ufbx_load_stdio(void *file, const ufbx_load_opts *opts, ufbx_error *error);
 void ufbx_free_scene(ufbx_scene *scene);
+
+size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error);
 
 ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_mesh *ufbx_find_mesh_len(const ufbx_scene *scene, const char *name, size_t name_len);

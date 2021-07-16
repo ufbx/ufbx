@@ -64,6 +64,10 @@
 	#endif
 #endif
 
+// Unaligned little-endian load functions
+// On platforms that support unaligned access natively (x86, x64, ARM64) just use normal loads,
+// WASM uses unaligned compiler attribute otherwise do manual byte-wise load.
+
 #define ufbxi_read_u8(ptr) (*(const uint8_t*)(ptr))
 
 #if (defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__)) && !defined(UFBX_NO_UNALIGNED_LOADS) || defined(UFBX_USE_UNALIGNED_LOADS)
@@ -136,6 +140,13 @@ ufbx_static_assert(sizeof_u64, sizeof(uint64_t) == 8);
 ufbx_static_assert(sizeof_f32, sizeof(float) == 4);
 ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 
+// -- Version
+
+#define UFBX_SOURCE_VERSION 1001001 // v1.1.1
+const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
+
+ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/100 == UFBX_HEADER_VERSION/100);
+
 // -- Utility
 
 #define ufbxi_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
@@ -148,206 +159,6 @@ static ufbxi_forceinline uint64_t ufbxi_min64(uint64_t a, uint64_t b) { return a
 static ufbxi_forceinline uint64_t ufbxi_max64(uint64_t a, uint64_t b) { return a < b ? b : a; }
 static ufbxi_forceinline size_t ufbxi_min_sz(size_t a, size_t b) { return a < b ? a : b; }
 static ufbxi_forceinline size_t ufbxi_max_sz(size_t a, size_t b) { return a < b ? b : a; }
-
-#ifndef RHMAP_H_INCLUDED
-#define RHMAP_H_INCLUDED
-
-#ifndef RHMAP_NO_STDINT
-#include <stddef.h>
-#include <stdint.h>
-#endif
-
-typedef struct rhmap_s {
-	uint64_t *entries;
-	uint32_t mask;
-
-	uint32_t capacity;
-	uint32_t size;
-} rhmap;
-
-typedef struct rhmap_iter_s {
-	rhmap *map;
-	uint32_t hash;
-
-	uint32_t scan;
-} rhmap_iter;
-
-#endif
-
-// -- Inline rhmap.h
-
-#define RHMAP_INLINE static ufbxi_forceinline
-
-#if defined(RHMAP_IMPLEMENTATION) || defined(RHMAP_INLINE)
-#if (defined(RHMAP_IMPLEMENTATION) && !defined(RHMAP_H_IMPLEMENTED)) || (defined(RHMAP_INLINE) && !defined(RHMAP_H_INLINED))
-#ifdef RHMAP_IMPLEMENTATION
-#define RHMAP_H_IMPLEMENTED
-#endif
-#ifdef RHMAP_INLINE
-#define RHMAP_H_INLINED
-#endif
-
-#ifndef RHMAP_MEMSET
-#ifdef RHMAP_NO_STDLIB
-static void rhmap_imp_memset(void *data, int value, size_t num)
-{
-	uint64_t *ptr = (uint64_t*)data, *end = ptr + num / 8;
-	while (ptr != end) *ptr++ = 0;
-}
-#define RHMAP_MEMSET rhmap_imp_memset
-#else
-#include <string.h>
-#define RHMAP_MEMSET memset
-#endif
-#endif
-
-#ifdef RHMAP_INLINE
-RHMAP_INLINE void *rhmap_reset_inline(rhmap *map)
-#else
-void *rhmap_reset(rhmap *map)
-#endif
-{
-	void *data = map->entries;
-	map->entries = 0;
-	map->mask = map->capacity = map->size = 0;
-	return data;
-}
-
-#ifdef RHMAP_INLINE
-RHMAP_INLINE void rhmap_grow_inline(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor)
-#else
-void rhmap_grow(rhmap *map, size_t *count, size_t *alloc_size, size_t min_size, double load_factor)
-#endif
-{
-	size_t num_entries = map->mask + 1;
-	size_t size = (size_t)((double)num_entries * load_factor);
-	if (min_size < map->capacity + 1) min_size = map->capacity + 1;
-	while (size < min_size) {
-		num_entries *= 2;
-		size = (size_t)((double)num_entries * load_factor);
-	}
-	*count = size;
-	*alloc_size = num_entries * sizeof(uint64_t);
-}
-
-#ifdef RHMAP_INLINE
-RHMAP_INLINE int rhmap_find_inline(rhmap_iter *iter, uint32_t *value)
-#else
-int rhmap_find(rhmap_iter *iter, uint32_t *value)
-#endif
-{
-	rhmap *map = iter->map;
-	uint64_t *entries = map->entries;
-	uint32_t mask = map->mask, hash = iter->hash, scan = iter->scan;
-	uint32_t ref = hash & ~mask;
-	if (!mask) return 0;
-	for (;;) {
-		uint64_t entry = entries[(hash + scan) & mask];
-		scan += 1;
-		if ((uint32_t)entry == ref + scan) {
-			iter->scan = scan;
-			*value = (uint32_t)(entry >> 32u);
-			return 1;
-		} else if ((entry & mask) < scan) {
-			iter->scan = scan - 1;
-			return 0;
-		}
-	}
-}
-
-#ifdef RHMAP_INLINE
-RHMAP_INLINE void rhmap_insert_inline(rhmap_iter *iter, uint32_t value)
-#else
-void rhmap_insert(rhmap_iter *iter, uint32_t value)
-#endif
-{
-	rhmap *map = iter->map;
-	uint64_t *entries = map->entries;
-	uint32_t mask = map->mask, hash = iter->hash, scan = iter->scan;
-	uint32_t slot = (hash + scan) & mask;
-	uint64_t entry, new_entry = (uint64_t)value << 32u | (hash & ~mask);
-	scan += 1;
-	while ((entry = entries[slot]) != 0) {
-		uint32_t entry_scan = (entry & mask);
-		if (entry_scan < scan) {
-			entries[slot] = new_entry + scan;
-			new_entry = (entry & ~(uint64_t)mask);
-			scan = entry_scan;
-		}
-		scan += 1;
-		slot = (slot + 1) & mask;
-	}
-	entries[slot] = new_entry + scan;
-	map->size++;
-}
-
-#ifdef RHMAP_INLINE
-RHMAP_INLINE void *rhmap_rehash_inline(rhmap *map, size_t count, size_t alloc_size, void *data_ptr)
-#else
-void *rhmap_rehash(rhmap *map, size_t count, size_t alloc_size, void *data_ptr)
-#endif
-{
-	rhmap old_map = *map;
-	size_t num_entries = alloc_size / sizeof(uint64_t);
-	uint64_t *entries = (uint64_t*)data_ptr;
-	uint32_t mask = old_map.mask;
-	map->entries = entries;
-	map->mask = (uint32_t)(num_entries) - 1;
-	map->capacity = (uint32_t)count;
-	map->size = 0;
-	RHMAP_MEMSET(entries, 0, sizeof(uint64_t) * num_entries);
-	if (old_map.mask) {
-		uint32_t i;
-		for (i = 0; i <= old_map.mask; i++) {
-			uint64_t entry = old_map.entries[i];
-			if (entry) {
-				uint32_t scan = (uint32_t)(entry & mask) - 1;
-				uint32_t hash = ((uint32_t)entry & ~mask) | ((i - scan) & mask);
-				uint32_t value = (uint32_t)(entry >> 32u);
-				rhmap_iter iter;
-				iter.map = map;
-				iter.hash = hash;
-				iter.scan = 0;
-				#ifdef RHMAP_INLINE
-					rhmap_insert_inline(&iter, value);
-				#else
-					rhmap_insert(&iter, value);
-				#endif
-			}
-		}
-	}
-	return old_map.entries;
-}
-
-#ifdef RHMAP_INLINE
-RHMAP_INLINE int rhmap_next_inline(rhmap_iter *iter, uint32_t *hash, uint32_t *value)
-#else
-int rhmap_next(rhmap_iter *iter, uint32_t *hash, uint32_t *value)
-#endif
-{
-	rhmap *map = iter->map;
-	uint64_t *entries = map->entries;
-	uint32_t mask = map->mask;
-	uint32_t scan = (iter->hash & mask) + iter->scan;
-	if (!mask) return 0;
-	while (scan != mask + 1) {
-		uint64_t entry = entries[scan & mask];
-		scan += 1;
-		if (entry) {
-			uint32_t ref_scan = (uint32_t)(entry & mask) - 1;
-			uint32_t ref_hash = ((uint32_t)entry & ~mask) | ((scan - ref_scan - 1) & mask);
-			*hash = ref_hash;
-			*value = (uint64_t)entry >> 32u;
-			iter->hash = ref_hash;
-			iter->scan = ref_scan + 1;
-			return 1;
-		}
-	}
-	return 0;
-}
-
-#endif
-#endif
 
 // -- DEFLATE implementation
 // Pretty much based on Sean Barrett's `stb_image` deflate
@@ -1110,8 +921,18 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 
 // -- Errors
 
+// Prefix the error condition with $Description\0 for a human readable description
+#define ufbxi_error_msg(cond, msg) "$" msg "\0" cond
+
 static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, const char *func, uint32_t line)
 {
+	if (cond[0] == '$') {
+		if (!err->description) {
+			err->description = cond + 1;
+		}
+		cond = cond + strlen(cond) + 1;
+	}
+
 	// NOTE: This is the base function all fails boil down to, place a breakpoint here to
 	// break at the first error
 	if (err->stack_size < UFBX_ERROR_STACK_MAX_DEPTH) {
@@ -1123,8 +944,12 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 	return 0;
 }
 
+
 #define ufbxi_check_return_err(err, cond, ret) do { if (!(cond)) { ufbxi_fail_imp_err((err), #cond, __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail_err(err, desc) return ufbxi_fail_imp_err(err, desc, __FUNCTION__, __LINE__)
+
+#define ufbxi_check_return_err_msg(err, cond, ret, msg) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__); return ret; } } while (0)
+#define ufbxi_fail_err_msg(err, desc, msg) return ufbxi_fail_imp_err(err, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
 
 // -- Allocator
 
@@ -1157,8 +982,8 @@ static void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size, size_t n)
 
 	size_t total = size * n;
 	ufbxi_check_return_err(ator->error, !ufbxi_does_overflow(total, size, n), NULL);
-	ufbxi_check_return_err(ator->error, total <= UFBXI_MAX_ALLOCATION_SIZE, NULL);
-	ufbxi_check_return_err(ator->error, total <= ator->max_size - ator->current_size, NULL);
+	ufbxi_check_return_err_msg(ator->error, total <= UFBXI_MAX_ALLOCATION_SIZE, NULL, "Allocation too big");
+	ufbxi_check_return_err_msg(ator->error, total <= ator->max_size - ator->current_size, NULL, "Memory limit exceeded");
 	ufbxi_check_return_err(ator->error, ator->allocs_left > 1, NULL);
 	ator->allocs_left--;
 
@@ -1171,7 +996,7 @@ static void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size, size_t n)
 		ptr = malloc(total);
 	}
 
-	ufbxi_check_return_err(ator->error, ptr, NULL);
+	ufbxi_check_return_err_msg(ator->error, ptr, NULL, "Out of memory");
 	return ptr;
 }
 
@@ -1192,8 +1017,8 @@ static void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t size, void *old_pt
 	ufbx_assert(old_total <= ator->current_size);
 
 	ufbxi_check_return_err(ator->error, !ufbxi_does_overflow(total, size, n), NULL);
-	ufbxi_check_return_err(ator->error, total <= UFBXI_MAX_ALLOCATION_SIZE, NULL);
-	ufbxi_check_return_err(ator->error, total <= ator->max_size - ator->current_size, NULL);
+	ufbxi_check_return_err_msg(ator->error, total <= UFBXI_MAX_ALLOCATION_SIZE, NULL, "Allocation too big");
+	ufbxi_check_return_err_msg(ator->error, total <= ator->max_size - ator->current_size, NULL, "Memory limit exceeded");
 	ufbxi_check_return_err(ator->error, ator->allocs_left > 1, NULL);
 	ator->allocs_left--;
 
@@ -1214,7 +1039,7 @@ static void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t size, void *old_pt
 		ptr = realloc(old_ptr, total);
 	}
 
-	ufbxi_check_return_err(ator->error, ptr, NULL);
+	ufbxi_check_return_err_msg(ator->error, ptr, NULL, "Out of memory");
 	return ptr;
 }
 
@@ -1292,7 +1117,11 @@ ufbxi_nodiscard static bool ufbxi_grow_array_zero_size(ufbxi_allocator *ator, si
 #define ufbxi_grow_array(ator, p_ptr, p_cap, n) ufbxi_grow_array_size((ator), sizeof(**(p_ptr)), (p_ptr), (p_cap), (n))
 #define ufbxi_grow_array_zero(ator, p_ptr, p_cap, n) ufbxi_grow_array_zero_size((ator), sizeof(**(p_ptr)), (p_ptr), (p_cap), (n))
 
-// -- General purpose chunked buffer
+// -- Memory buffer
+//
+// General purpose memory buffer that can be used either as a chunked linear memory
+// allocator or a non-contiguous stack. You can convert the contents of `ufbxi_buf`
+// to a contiguous range of memory by calling `ufbxi_make_array[_all]()`
 
 typedef struct ufbxi_buf_chunk ufbxi_buf_chunk;
 
@@ -1623,78 +1452,191 @@ static void ufbxi_buf_pop_state(ufbxi_buf *buf, const ufbxi_buf_state *state)
 #define ufbxi_make_array_all(b, type) (type*)ufbxi_make_array_all_size((b), sizeof(type))
 
 // -- Hash map
+//
+// The actual element comparison is left to the user of `ufbxi_map`, see usage below.
+//
+// NOTES:
+//   You must call ufbxi_map_grow() before calling ufbxi_map_insert()
+//   ufbxi_map_insert() inserts duplicates, use ufbxi_map_find() before if necessary
+//
+// void my_insert_or_set(ufbxi_map *map, my_key key, my_value value) {
+//     my_item *result;
+//     uint32_t scan = 0, hash = my_hash(key);
+//     ufbxi_map_grow(map, my_type, 16);
+//     while ((my_result = ufbxi_map_find(map, my_type, &scan, hash)) != NULL) {
+//         if (my_equal(key, result->key)) {
+//             result->value = value;
+//             return;
+//         }
+//     }
+//     result = ufbxi_map_insert(map, m_type, scan, hash);
+//     result->key = key;
+//     result->value = value;
+// }
+//
+// void my_find(ufbxi_map *map, my_key key) {
+//     my_item *result;
+//     uint32_t scan = 0, hash = my_hash(key);
+//     while ((my_result = ufbxi_map_find(map, my_type, &scan, hash)) != NULL) {
+//         if (my_equal(key, result->key)) return result;
+//     }
+//     return NULL;
+// }
 
 typedef struct {
 	ufbxi_allocator *ator;
 	size_t data_size;
 
 	void *items;
-	rhmap map;
+	uint64_t *entries;
+	uint32_t mask;
+
+	uint32_t capacity;
+	uint32_t size;
 } ufbxi_map;
 
-static ufbxi_noinline bool ufbxi_map_grow_size_imp(ufbxi_map *map, size_t size, size_t min_size)
+static ufbxi_noinline bool ufbxi_map_grow_size_imp(ufbxi_map *map, size_t item_size, size_t min_size)
 {
 	if (map->ator->allocs_left <= 1) return false;
 	map->ator->allocs_left--;
 
-	size_t count, alloc_size;
-	rhmap_grow_inline(&map->map, &count, &alloc_size, min_size, 0.8);
+	const double load_factor = 0.8;
 
-	// TODO: Overflow
+	// Find the lowest power of two size that fits `min_size` within `load_factor`
+	size_t num_entries = map->mask + 1;
+	size_t new_size = (size_t)((double)num_entries * load_factor);
+	if (min_size < map->capacity + 1) min_size = map->capacity + 1;
+	while (new_size < min_size) {
+		num_entries *= 2;
+		new_size = (size_t)((double)num_entries * load_factor);
+	}
 
-	size_t data_size = alloc_size + size * count;
+	// Check for overflow
+	ufbxi_check_return_err(map->ator->error, UFBXI_MAX_ALLOCATION_SIZE / num_entries > sizeof(uint64_t), false);
+	size_t alloc_size = num_entries * sizeof(uint64_t);
+
+	// Allocate a combined entry/item memory block
+	size_t data_size = alloc_size + new_size * item_size;
 	char *data = ufbxi_alloc(map->ator, char, data_size);
 	ufbxi_check_return_err(map->ator->error, data, false);
-	void *items = data + alloc_size;
-	memcpy(items, map->items, size * map->map.size);
 
-	void *old_data = rhmap_rehash_inline(&map->map, count, alloc_size, data);
-	ufbxi_free(map->ator, char, old_data, map->data_size);
+	// Copy the previous user items over
+	uint64_t *old_entries = map->entries;
+	uint64_t *new_entries = (uint64_t*)data;
+	void *new_items = data + alloc_size;
+	memcpy(new_items, map->items, item_size * map->size);
 
-	map->items = items;
+	// Re-hash the entries
+	uint32_t old_mask = map->mask;
+	uint32_t new_mask = (uint32_t)(num_entries) - 1;
+	memset(new_entries, 0, sizeof(uint64_t) * num_entries);
+	if (old_mask) {
+		for (uint32_t i = 0; i <= old_mask; i++) {
+			uint64_t entry, new_entry = old_entries[i];
+			if (!new_entry) continue;
+
+			// Reconstruct the hash of the old entry at `i`
+			uint32_t old_scan = (uint32_t)(new_entry & old_mask) - 1;
+			uint32_t hash = ((uint32_t)new_entry & ~old_mask) | ((i - old_scan) & old_mask);
+			uint32_t slot = hash & new_mask;
+			new_entry &= ~(uint64_t)new_mask;
+
+			// Scan forward until we find an empty slot, potentially swapping
+			// `new_element` if it has a shorter scan distance (Robin Hood).
+			uint32_t scan = 1;
+			while ((entry = new_entries[slot]) != 0) {
+				uint32_t entry_scan = (entry & new_mask);
+				if (entry_scan < scan) {
+					new_entries[slot] = new_entry + scan;
+					new_entry = (entry & ~(uint64_t)new_mask);
+					scan = entry_scan;
+				}
+				scan += 1;
+				slot = (slot + 1) & new_mask;
+			}
+			new_entries[slot] = new_entry + scan;
+		}
+	}
+
+	// And finally free the previous allocation
+	ufbxi_free(map->ator, char, (char*)old_entries, map->data_size);
+	map->items = new_items;
 	map->data_size = data_size;
+	map->entries = new_entries;
+	map->mask = new_mask;
+	map->capacity = (uint32_t)new_size;
 
 	return true;
 }
 
 static ufbxi_forceinline bool ufbxi_map_grow_size(ufbxi_map *map, size_t size, size_t min_size)
 {
-	if (map->map.size < map->map.capacity) return true;
+	if (map->size < map->capacity) return true;
 	return ufbxi_map_grow_size_imp(map, size, min_size);
 }
 
 static ufbxi_forceinline void *ufbxi_map_find_size(ufbxi_map *map, size_t size, uint32_t *p_scan, uint32_t hash)
 {
-	rhmap_iter iter;
-	iter.map = &map->map;
-	iter.scan = *p_scan;
-	iter.hash = hash;
+	uint64_t *entries = map->entries;
+	uint32_t mask = map->mask, scan = *p_scan;
 
-	uint32_t index;
-	if (rhmap_find_inline(&iter, &index)) {
-		*p_scan = iter.scan;
-		return (char*)map->items + size * index;
-	} else {
-		return NULL;
+	uint32_t ref = hash & ~mask;
+	if (!mask) return 0;
+
+	// Scan entries until we find an exact match of the hash or until we hit
+	// an element that has lower scan distance than our search (Robin Hood).
+	// The encoding guarantees that zero slots also terminate with the same test.
+	for (;;) {
+		uint64_t entry = entries[(hash + scan) & mask];
+		scan += 1;
+		if ((uint32_t)entry == ref + scan) {
+			*p_scan = scan;
+			uint32_t index = (uint32_t)(entry >> 32u);
+			return (char*)map->items + size * index;
+		} else if ((entry & mask) < scan) {
+			*p_scan = scan - 1;
+			return NULL;
+		}
 	}
 }
 
 static ufbxi_forceinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size, uint32_t scan, uint32_t hash)
 {
-	rhmap_iter iter;
-	iter.map = &map->map;
-	iter.scan = scan;
-	iter.hash = hash;
-	uint32_t index = map->map.size;
-	rhmap_insert_inline(&iter, index);
+	// ufbxi_map_grow() must always be called before insert!
+	ufbx_assert(map->size < map->capacity);
+
+	uint32_t index = map->size;
+
+	uint64_t *entries = map->entries;
+	uint32_t mask = map->mask;
+
+	// Scan forward until we find an empty slot, potentially swapping
+	// `new_element` if it has a shorter scan distance (Robin Hood).
+	uint32_t slot = (hash + scan) & mask;
+	uint64_t entry, new_entry = (uint64_t)index << 32u | (hash & ~mask);
+	scan += 1;
+	while ((entry = entries[slot]) != 0) {
+		uint32_t entry_scan = (entry & mask);
+		if (entry_scan < scan) {
+			entries[slot] = new_entry + scan;
+			new_entry = (entry & ~(uint64_t)mask);
+			scan = entry_scan;
+		}
+		scan += 1;
+		slot = (slot + 1) & mask;
+	}
+	entries[slot] = new_entry + scan;
+	map->size++;
+
 	return (char*)map->items + size * index;
 }
 
 static void ufbxi_map_free(ufbxi_map *map)
 {
-	void *ptr = rhmap_reset_inline(&map->map);
-	ufbxi_free(map->ator, char, ptr, map->data_size);
+	ufbxi_free(map->ator, char, map->entries, map->data_size);
+	map->entries = NULL;
 	map->items = NULL;
+	map->mask = map->capacity = map->size = 0;
 }
 
 #define ufbxi_map_grow(map, type, min_size) ufbxi_map_grow_size((map), sizeof(type), (min_size))
@@ -1756,6 +1698,10 @@ static ufbxi_forceinline uint32_t ufbxi_hash_uptr(uintptr_t ptr)
 #define ufbxi_hash_ptr(ptr) ufbxi_hash_uptr((uintptr_t)(ptr))
 
 // -- String constants
+//
+// All strings in FBX files are pooled so by having canonical string constant
+// addresses we can compare strings to these constants by comparing pointers.
+// Keep the list alphabetically sorted!
 
 static const char ufbxi_AllSame[] = "AllSame";
 static const char ufbxi_AnimationCurveNode[] = "AnimationCurveNode";
@@ -2223,7 +2169,7 @@ typedef struct {
 	ufbxi_buf tmp_arr_shape_deformers;
 	ufbxi_buf tmp_arr_shape_channels;
 
-	// Result buffers
+	// Result buffers, these are retained in `ufbx_scene` returned to user.
 	ufbxi_buf result;
 	ufbxi_buf string_buf;
 
@@ -2268,9 +2214,11 @@ static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, co
 
 #define ufbxi_check(cond) if (!(cond)) return ufbxi_fail_imp(uc, #cond, __FUNCTION__, __LINE__)
 #define ufbxi_check_return(cond, ret) do { if (!(cond)) { ufbxi_fail_imp(uc, #cond, __FUNCTION__, __LINE__); return ret; } } while (0)
-
 #define ufbxi_fail(desc) return ufbxi_fail_imp(uc, desc, __FUNCTION__, __LINE__)
-#define ufbxi_fail_uc(uc, desc) return ufbxi_fail_imp(uc, desc, __FUNCTION__, __LINE__)
+
+#define ufbxi_check_msg(cond, msg) if (!(cond)) return ufbxi_fail_imp(uc, ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__)
+#define ufbxi_check_return_msg(cond, ret, msg) do { if (!(cond)) { ufbxi_fail_imp(uc, ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__); return ret; } } while (0)
+#define ufbxi_fail_msg(desc, msg) return ufbxi_fail_imp(uc, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
 
 // -- String pool
 
@@ -2286,9 +2234,8 @@ ufbxi_nodiscard static const char *ufbxi_push_string_imp(ufbxi_context *uc, cons
 	if (length == 0) return ufbxi_empty_char;
 	ufbxi_check_return(length <= uc->opts.max_string_length, NULL);
 
-	// TODO: Set the initial size based on experimental data
-	ufbxi_check_return(ufbxi_map_grow(&uc->string_map, ufbx_string, 16), NULL);
-	ufbxi_check_return(uc->string_map.map.size <= uc->opts.max_strings, NULL);
+	ufbxi_check_return(ufbxi_map_grow(&uc->string_map, ufbx_string, ufbxi_arraycount(ufbxi_strings) * 2), NULL);
+	ufbxi_check_return(uc->string_map.size <= uc->opts.max_strings, NULL);
 
 	uint32_t hash = ufbxi_hash_string(str, length);
 	uint32_t scan = 0;
@@ -2338,7 +2285,7 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place_str(ufbxi_c
 static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size)
 {
 	ufbx_assert(uc->data_size < size);
-	ufbxi_check_return(uc->read_fn, NULL);
+	ufbxi_check_return_msg(uc->read_fn, NULL, "Truncated file");
 
 	void *data_to_free = NULL;
 	size_t size_to_free = 0;
@@ -2580,6 +2527,10 @@ ufbxi_nodiscard static ufbxi_forceinline ufbxi_value_array *ufbxi_find_array(ufb
 
 
 // -- Parsing state machine
+//
+// When reading the file we maintain a coarse representation of the structure so
+// that we can resolve array info (type, included in result, etc). Using this info
+// we can often read/decompress the contents directly into the right memory area.
 
 typedef enum {
 	UFBXI_PARSE_ROOT,
@@ -2986,7 +2937,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 
 ufbxi_nodiscard static void *ufbxi_push_array_data(ufbxi_context *uc, const ufbxi_array_info *info, size_t size, ufbxi_buf *tmp_buf)
 {
-	ufbxi_check_return(size <= uc->opts.max_array_size, NULL);
+	ufbxi_check_return_msg(size <= uc->opts.max_array_size, NULL, "Maximum array size exceeded");
 
 	char type = ufbxi_normalize_array_type(info->type);
 	size_t elem_size = ufbxi_array_type_size(type);
@@ -3148,7 +3099,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 				input.read_fn = uc->read_fn;
 				input.read_user = uc->read_user;
 				ptrdiff_t res = ufbx_inflate(decoded_data, decoded_data_size, &input, uc->inflate_retain);
-				ufbxi_check(res == (ptrdiff_t)decoded_data_size);
+				ufbxi_check_msg(res == (ptrdiff_t)decoded_data_size, "Bad DEFLATE data");
 
 				// Consume the IO buffer / advance offset as necessary
 				if (encoded_size > input.data_size) {
@@ -4321,9 +4272,9 @@ static ufbxi_forceinline int ufbxi_cmp_prop(const void *va, const void *vb)
 
 ufbxi_nodiscard static int ufbxi_merge_properties(ufbxi_context *uc, ufbx_props *dst, const ufbx_props *p_a, const ufbx_props *p_b, ufbxi_buf *buf)
 {
-	ufbx_props a, b;
-	if (p_a) a = *p_a; else a.num_props = 0;
-	if (p_b) b = *p_b; else b.num_props = 0;
+	ufbx_props a = { 0 }, b = { 0 };
+	if (p_a) a = *p_a;
+	if (p_b) b = *p_b;
 
 	size_t max_dst = a.num_props + b.num_props;
 	dst->props = ufbxi_push(buf, ufbx_prop, max_dst);
@@ -6690,7 +6641,7 @@ ufbxi_nodiscard static int ufbxi_merge_attribute_properties(ufbxi_context *uc, u
 
 ufbxi_nodiscard static int ufbxi_check_node_depth(ufbxi_context *uc, ufbx_node *node, uint32_t depth)
 {
-	ufbxi_check(depth < uc->opts.max_child_depth);
+	ufbxi_check_msg(depth < uc->opts.max_child_depth, "Max child depth exceeded");
 	ufbxi_for_ptr(ufbx_node, p_child, node->children.data, node->children.size) {
 		ufbxi_check(ufbxi_check_node_depth(uc, *p_child, depth + 1));
 	}
@@ -7341,10 +7292,14 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->inflate_retain = &inflate_retain;
 
 	if (ufbxi_load_imp(uc)) {
-		if (p_error) p_error->stack_size = 0;
+		if (p_error) {
+			p_error->description = NULL;
+			p_error->stack_size = 0;
+		}
 		ufbxi_free_temp(uc);
 		return &uc->scene_imp->scene;
 	} else {
+		if (!uc->error.description) uc->error.description = "Failed to load";
 		if (p_error) *p_error = uc->error;
 		ufbxi_free_temp(uc);
 		ufbxi_free_result(uc);
@@ -7936,6 +7891,33 @@ void ufbx_free_scene(ufbx_scene *scene)
 	ufbxi_free(&ator, char, memory_block, memory_block_size);
 
 	ufbx_assert(ator.current_size == 0);
+}
+
+size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error)
+{
+	if (!dst || !dst_size) return 0;
+	if (!error) {
+		*dst = '\0';
+		return 0;
+	}
+
+	size_t offset = 0;
+
+	{
+		size_t num = snprintf(dst + offset, dst_size - offset, "ufbx v%u.%u.%u error: %s\n",
+			UFBX_SOURCE_VERSION/1000000, UFBX_SOURCE_VERSION/1000%1000, UFBX_SOURCE_VERSION%1000,
+			error->description ? error->description : "Unknown error");
+		offset = ufbxi_min_sz(offset + num, dst_size - 1);
+	}
+
+	size_t stack_size = ufbxi_min_sz(error->stack_size, UFBX_ERROR_STACK_MAX_DEPTH);
+	for (size_t i = 0; i < stack_size; i++) {
+		const ufbx_error_frame *frame = &error->stack[i];
+		size_t num = snprintf(dst + offset, dst_size - offset, "%6u:%s: %s\n", frame->source_line, frame->function, frame->description);
+		offset = ufbxi_min_sz(offset + num, dst_size - 1);
+	}
+
+	return offset;
 }
 
 ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t name_len)
