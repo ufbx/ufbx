@@ -1095,19 +1095,6 @@ ufbxi_nodiscard static bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t 
 	return true;
 }
 
-ufbxi_nodiscard static bool ufbxi_grow_array_zero_size(ufbxi_allocator *ator, size_t size, void *p_ptr, size_t *p_cap, size_t n)
-{
-	void *ptr = *(void**)p_ptr;
-	size_t old_n = *p_cap;
-	if (old_n >= n) return true;
-	size_t new_n = ufbxi_max_sz(old_n * 2, n);
-	void *new_ptr = ufbxi_realloc_zero_size(ator, size, ptr, old_n, new_n);
-	if (!new_ptr) return false;
-	*(void**)p_ptr = new_ptr;
-	*p_cap = new_n;
-	return true;
-}
-
 #define ufbxi_alloc(ator, type, n) (type*)ufbxi_alloc_size((ator), sizeof(type), (n))
 #define ufbxi_alloc_zero(ator, type, n) (type*)ufbxi_alloc_zero_size((ator), sizeof(type), (n))
 #define ufbxi_realloc(ator, type, old_ptr, old_n, n) (type*)ufbxi_realloc_size((ator), sizeof(type), (old_ptr), (old_n), (n))
@@ -1115,7 +1102,6 @@ ufbxi_nodiscard static bool ufbxi_grow_array_zero_size(ufbxi_allocator *ator, si
 #define ufbxi_free(ator, type, ptr, n) ufbxi_free_size((ator), sizeof(type), (ptr), (n))
 
 #define ufbxi_grow_array(ator, p_ptr, p_cap, n) ufbxi_grow_array_size((ator), sizeof(**(p_ptr)), (p_ptr), (p_cap), (n))
-#define ufbxi_grow_array_zero(ator, p_ptr, p_cap, n) ufbxi_grow_array_zero_size((ator), sizeof(**(p_ptr)), (p_ptr), (p_cap), (n))
 
 // -- Memory buffer
 //
@@ -4598,8 +4584,6 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 		*p_dst_data = ufbxi_zero_element + 4;
 	}
 
-	size_t elem_size = ufbxi_array_type_size(data_type);
-
 	if (indices) {
 		size_t num_indices = indices->size;
 		int32_t *index_data = (int32_t*)indices->data;
@@ -5092,6 +5076,8 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 
 ufbxi_nodiscard static int ufbxi_read_material(ufbxi_context *uc, ufbxi_node *node, ufbxi_object *object)
 {
+	(void)node;
+
 	ufbx_material *material = ufbxi_push_zero(&uc->tmp_arr_materials, ufbx_material, 1);
 	ufbxi_check(material);
 	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_MATERIAL, object->id, uc->tmp_arr_materials.num_items - 1));
@@ -6991,7 +6977,6 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		ufbxi_connectable_data parent, child;
 		if (!ufbxi_find_connectable_data(uc, &parent, conn->parent_id)) continue;
 		if (!ufbxi_find_connectable_data(uc, &child, conn->child_id)) continue;
-		const char *prop = conn->prop_name;
 
 		if (parent.mesh) {
 			if (child.material) {
@@ -7554,8 +7539,8 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 			ufbx_material **dst_mat = material_refs;
 			material_refs += num_materials;
 			mesh->materials.data = dst_mat;
-			for (size_t i = 0; i < num_materials; i++) {
-				dst_mat[i] = ufbxi_translate_material(scene, &imp->scene, src_mat[i]);
+			for (size_t j = 0; j < num_materials; j++) {
+				dst_mat[j] = ufbxi_translate_material(scene, &imp->scene, src_mat[j]);
 			}
 		}
 
@@ -7565,8 +7550,8 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 			ufbx_skin *dst_skin = skins;
 			skins += num_skins;
 			mesh->skins.data = dst_skin;
-			for (size_t i = 0; i < num_skins; i++) {
-				ufbxi_translate_skin(scene, &imp->scene, &dst_skin[i], &src_skin[i]);
+			for (size_t j = 0; j < num_skins; j++) {
+				ufbxi_translate_skin(scene, &imp->scene, &dst_skin[j], &src_skin[j]);
 			}
 		}
 
