@@ -45,7 +45,10 @@ def log_comment(line, fail=False):
     else:
         log("# " + line, style=style)
 
-loop = asyncio.ProactorEventLoop()
+if sys.platform == "win32":
+    loop = asyncio.ProactorEventLoop()
+else:
+    loop = asyncio.get_event_loop()
 
 def flatten_str_list(str_list):
     """Flatten arbitrarily nested str list `item` to `dst`"""
@@ -271,10 +274,10 @@ all_compilers = [
     ClangCompiler("clang", "clang++", True),
     VsCompiler("vs_cl64", "vcvars64.bat", CLCompiler("cl", "cl.exe")),
     VsCompiler("vs_cl32", "vcvars32.bat", CLCompiler("cl", "cl.exe")),
-    VsCompiler("vs_clang64", "vcvars64.bat", ClangCompiler("clang", "clang.exe", False, has_m32=False)),
-    VsCompiler("vs_clang64", "vcvars64.bat", ClangCompiler("clang", "clang++.exe", True, has_m32=False)),
-    VsCompiler("vs_clang32", "vcvars32.bat", ClangCompiler("clang", "clang.exe", False, has_m32=False)),
-    VsCompiler("vs_clang32", "vcvars32.bat", ClangCompiler("clang", "clang++.exe", True, has_m32=False)),
+    # VsCompiler("vs_clang64", "vcvars64.bat", ClangCompiler("clang", "clang.exe", False, has_m32=False)),
+    # VsCompiler("vs_clang64", "vcvars64.bat", ClangCompiler("clang", "clang++.exe", True, has_m32=False)),
+    # VsCompiler("vs_clang32", "vcvars32.bat", ClangCompiler("clang", "clang.exe", False, has_m32=False)),
+    # VsCompiler("vs_clang32", "vcvars32.bat", ClangCompiler("clang", "clang++.exe", True, has_m32=False)),
     # EmscriptenCompiler("emcc", emcc", False),
     # EmscriptenCompiler("emcc", emcc++", True),
 ]
@@ -307,6 +310,11 @@ async def compile_target(t):
     if t.config["arch"] not in t.compiler.supported_archs():
         t.skipped = True
         return
+
+    path = os.path.dirname(t.config["output"])
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
+        log_mkdir(path)
 
     ok, out, err, cmdline, time = await t.compiler.compile(t.config)
 
@@ -398,9 +406,6 @@ async def main():
                 name = f"{prefix}_{compiler.name}_{optstring}"
 
                 path = os.path.join(build_path, name)
-                if not os.path.exists(path):
-                    os.makedirs(path, exist_ok=True)
-                    log_mkdir(path)
 
                 conf = dict(config)
                 conf["output"] = os.path.join(path, config.get("output", "a.exe"))
