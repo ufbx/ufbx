@@ -2,13 +2,13 @@
 
 import asyncio
 import itertools
-from platform import platform
 import subprocess
 import time
 import re
 import os
 import sys
 import shutil
+import functools
 
 color_out = sys.stdout
 
@@ -61,7 +61,7 @@ def flatten_str_list(str_list):
 
 cmd_sema = asyncio.Semaphore(os.cpu_count(), loop=loop)
 
-async def run_cmd(cmd, *args, realtime_output=False):
+async def run_cmd(cmd, *args, realtime_output=False, env=None):
     """Asynchronously run a command"""
 
     await cmd_sema.acquire()
@@ -80,7 +80,7 @@ async def run_cmd(cmd, *args, realtime_output=False):
 
     try:
         proc = await asyncio.create_subprocess_exec(cmd, *cmd_args,
-            stdout=pipe, stderr=pipe)
+            stdout=pipe, stderr=pipe, env=env)
 
         if not realtime_output:
             out, err = await proc.communicate()
@@ -101,9 +101,10 @@ class Compiler:
     def __init__(self, name, exe):
         self.name = name
         self.exe = exe
+        self.env = None
 
     def run(self, *args, **kwargs):
-        return run_cmd(self.exe, args, **kwargs)
+        return run_cmd(self.exe, args, env=self.env, **kwargs)
 
 class CLCompiler(Compiler):
     def __init__(self, name, exe):
@@ -157,10 +158,11 @@ class CLCompiler(Compiler):
         return self.run(args)
 
 class GCCCompiler(Compiler):
-    def __init__(self, name, exe, cpp):
+    def __init__(self, name, exe, cpp, has_m32=True):
         super().__init__(name, exe)
         self.has_c = not cpp
         self.has_cpp = cpp
+        self.has_m32 = has_m32
 
     async def check_version(self):
         _, out, err, _, _ = await self.run("--version")
@@ -173,7 +175,7 @@ class GCCCompiler(Compiler):
 
     def supported_archs(self):
         if "x86_64" in self.arch:
-            return ["x86", "x64"]
+            return ["x86", "x64"] if self.has_m32 else ["x64"]
         if "i686" in self.arch:
             return ["x86"]
         return []
@@ -193,18 +195,73 @@ class GCCCompiler(Compiler):
         if config.get("openmp", False):
             args.append("-openmp")
         
+        if self.has_m32 and config.get("arch", "") == "x86":
+            args.append("-m32")
+        
         args += sources
         args += ["-o", output]
 
         return self.run(args)
 
 class ClangCompiler(GCCCompiler):
-    def __init__(self, name, exe, cpp):
-        super().__init__(name, exe, cpp)
+    def __init__(self, name, exe, cpp, **kwargs):
+        super().__init__(name, exe, cpp, **kwargs)
 
 class EmscriptenCompiler(ClangCompiler):
     def __init__(self, name, exe, cpp):
         super().__init__(name, exe, cpp)
+
+@functools.lru_cache(8)
+def get_vcvars(bat_name):
+    vswhere_path = r"%ProgramFiles(x86)%/Microsoft Visual Studio/Installer/vswhere.exe"
+    vswhere_path = os.path.expandvars(vswhere_path)
+    if not os.path.exists(vswhere_path):
+        raise EnvironmentError("vswhere.exe not found at: %s", vswhere_path)
+
+    vs_path = os.popen('"{}" -latest -property installationPath'.format(vswhere_path)).read().rstrip()
+    vsvars_path = os.path.join(vs_path, f"VC\\Auxiliary\\Build\\{bat_name}")
+
+    output = os.popen('"{}" && set'.format(vsvars_path)).read()
+    env = { }
+    for line in output.splitlines():
+        items = tuple(line.split("=", 1))
+        if len(items) == 2:
+            env[items[0]] = items[1]
+    return env
+
+class VsCompiler(Compiler):
+    def __init__(self, name, bat, inner):
+        self.name = name
+        self.bat = bat
+        self.exe = inner.exe
+        self.inner = inner
+
+    async def check_version(self):
+        try:
+            env = get_vcvars(self.bat)
+            self.inner.env = env
+            for key, value in env.items():
+                if key.upper() != "PATH": continue
+                for path in value.split(";"):
+                    cl_path = os.path.join(path, self.exe)
+                    if os.path.exists(cl_path):
+                        self.inner.exe = cl_path
+                        if await self.inner.check_version():
+                            self.exe = self.inner.exe
+                            self.arch = self.inner.arch
+                            self.version = self.inner.version
+                            self.has_c = self.inner.has_c
+                            self.has_cpp = self.inner.has_cpp
+                            return True
+            return False
+        except:
+            return False
+    
+    def supported_archs(self):
+        return self.inner.supported_archs()
+    
+    def compile(self, config):
+        return self.inner.compile(config)
 
 all_compilers = [
     CLCompiler("cl", "cl.exe"),
@@ -212,6 +269,12 @@ all_compilers = [
     GCCCompiler("gcc", "g++", True),
     ClangCompiler("clang", "clang", False),
     ClangCompiler("clang", "clang++", True),
+    VsCompiler("vs_cl64", "vcvars64.bat", CLCompiler("cl", "cl.exe")),
+    VsCompiler("vs_cl32", "vcvars32.bat", CLCompiler("cl", "cl.exe")),
+    VsCompiler("vs_clang64", "vcvars64.bat", ClangCompiler("clang", "clang.exe", False, has_m32=False)),
+    VsCompiler("vs_clang64", "vcvars64.bat", ClangCompiler("clang", "clang++.exe", True, has_m32=False)),
+    VsCompiler("vs_clang32", "vcvars32.bat", ClangCompiler("clang", "clang.exe", False, has_m32=False)),
+    VsCompiler("vs_clang32", "vcvars32.bat", ClangCompiler("clang", "clang++.exe", True, has_m32=False)),
     # EmscriptenCompiler("emcc", emcc", False),
     # EmscriptenCompiler("emcc", emcc++", True),
 ]
@@ -372,7 +435,7 @@ async def main():
         log(f"-- FAIL: {target.name}", style=STYLE_FAIL)
         print("\n".join(target.log))
         num_fail += 1
-    
+
     print()
     print(f"{len(targets) - num_fail}/{len(targets)} targets succeeded")
     if num_fail > 0:
