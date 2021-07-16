@@ -57,7 +57,7 @@ def flatten_str_list(str_list):
     inner(result, str_list)
     return result
 
-cmd_sema = asyncio.Semaphore(8, loop=loop)
+cmd_sema = asyncio.Semaphore(os.cpu_count(), loop=loop)
 
 async def run_cmd(cmd, *args, realtime_output=False):
     """Asynchronously run a command"""
