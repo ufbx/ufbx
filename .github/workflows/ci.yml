@@ -13,13 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install apt dependencies
-        run: sudo apt install -y gcc-multilib g++-multilib lcov llvm-9
+        run: sudo apt install -y gcc-multilib g++-multilib lcov llvm-11
       - name: Run tests
         run: python3 misc/run_tests.py
       - name: Verbose test info
         run: build/runner_clang_release_x64/runner -d data -v
       - name: Generate coverage
-        run: LLVM_COV=llvm-cov-9 bash misc/generate_coverage.sh
+        run: LLVM_COV=llvm-cov-11 bash misc/generate_coverage.sh
       - name: Upload coverage
         run: bash <(curl -s https://codecov.io/bash) -f coverage.lcov -y misc/codecov.yml
 
