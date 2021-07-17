@@ -1,3 +1,11 @@
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
 parsers:
   gcov:
     branch_detection:
@@ -7,3 +15,5 @@ parsers:
       macro: yes
 ignore:
   - "test"
+comment: 
+  layout: "diff"
