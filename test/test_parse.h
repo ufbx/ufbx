@@ -42,10 +42,19 @@ UFBXT_TEST(error_format_short)
 	ufbxt_assert(!scene);
 
 	char error_buf[512];
-	for (size_t len = 1; len <= ufbxt_arraycount(error_buf); len++) {
-		size_t length = ufbx_format_error(error_buf, len, &error);
-		ufbxt_hintf("len = %zu, length = %zu", len, length);
-		ufbxt_assert(strlen(error_buf) == length);
+	for (size_t buf_len = 0; buf_len <= ufbxt_arraycount(error_buf); buf_len++) {
+		size_t ret_len = ufbx_format_error(error_buf, buf_len, &error);
+		if (buf_len == 0) {
+			ufbxt_assert(ret_len == 0);
+			continue;
+		}
+
+		size_t str_len = strlen(error_buf);
+		ufbxt_hintf("buf_len = %zu, ret_len = %zu, str_len = %zu", buf_len, ret_len, str_len);
+		ufbxt_assert(ret_len == str_len);
+		if (buf_len < 16) {
+			ufbxt_assert(ret_len == buf_len - 1);
+		}
 	}
 }
 #endif
