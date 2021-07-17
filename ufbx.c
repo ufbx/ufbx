@@ -7896,17 +7896,17 @@ size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error)
 	size_t offset = 0;
 
 	{
-		size_t num = snprintf(dst + offset, dst_size - offset, "ufbx v%u.%u.%u error: %s\n",
+		int num = snprintf(dst + offset, dst_size - offset, "ufbx v%u.%u.%u error: %s\n",
 			UFBX_SOURCE_VERSION/1000000, UFBX_SOURCE_VERSION/1000%1000, UFBX_SOURCE_VERSION%1000,
 			error->description ? error->description : "Unknown error");
-		offset = ufbxi_min_sz(offset + num, dst_size - 1);
+		if (num > 0) offset = ufbxi_min_sz(offset + (size_t)num, dst_size - 1);
 	}
 
 	size_t stack_size = ufbxi_min_sz(error->stack_size, UFBX_ERROR_STACK_MAX_DEPTH);
 	for (size_t i = 0; i < stack_size; i++) {
 		const ufbx_error_frame *frame = &error->stack[i];
-		size_t num = snprintf(dst + offset, dst_size - offset, "%6u:%s: %s\n", frame->source_line, frame->function, frame->description);
-		offset = ufbxi_min_sz(offset + num, dst_size - 1);
+		int num = snprintf(dst + offset, dst_size - offset, "%6u:%s: %s\n", frame->source_line, frame->function, frame->description);
+		if (num > 0) offset = ufbxi_min_sz(offset + (size_t)num, dst_size - 1);
 	}
 
 	// HACK: On some MSYS/MinGW implementations `snprintf` is broken and does

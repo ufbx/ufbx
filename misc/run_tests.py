@@ -218,6 +218,9 @@ class GCCCompiler(Compiler):
         else:
             args.append("-std=gnu99")
         
+        if "mingw" in self.arch:
+            args.append("-D__USE_MINGW_ANSI_STDIO=1")
+
         args += sources
 
         if "msvc" not in self.arch:
