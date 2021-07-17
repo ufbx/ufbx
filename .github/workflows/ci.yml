@@ -19,7 +19,7 @@ jobs:
       - name: Verbose test info
         run: build/runner_clang_release_x64/runner -d data -v
       - name: Generate coverage
-        run: build/generate_coverage.sh
+        run: misc/generate_coverage.sh
       - name: Upload coverage
         run: bash <(curl -s https://codecov.io/bash) -f coverage.lcov -y misc/codecov.yml
 
