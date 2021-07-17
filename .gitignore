@@ -8,3 +8,8 @@ build/
 # Python cache files
 __pycache__/
 
+# Coverage files
+*.lcov
+*.gcov
+*.gcda
+*.gcno
