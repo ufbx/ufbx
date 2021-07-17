@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
       - name: Install apt dependencies
         run: sudo apt install -y gcc-multilib g++-multilib lcov llvm-11
       - name: Run tests
