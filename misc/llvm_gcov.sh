@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-exec llvm-cov gcov "$@"
+exec $LLVM_COV gcov "$@"
