@@ -6,5 +6,4 @@ parsers:
       method: yes
       macro: yes
 ignore:
-  - "runner.c"
-  - "test/"
+  - "test/*"
