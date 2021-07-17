@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Install 32-bit libc
+        run: sudo apt install gcc-multilib
       - name: Run tests
         run: python3 misc/run_tests.py
 
