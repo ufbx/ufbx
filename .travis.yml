@@ -2,7 +2,7 @@ language: cpp
 compiler: clang
 
 before_install:
-    - sudo apt-get -y install lcov llvm-11
+    - sudo apt-get -y install lcov
 
 script:
     - python3 misc/test_zlib_debug_compressor.py

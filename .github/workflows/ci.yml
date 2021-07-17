@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install apt dependencies
-        run: sudo apt install -y gcc-multilib g++-multilib lcov
+        run: sudo apt install -y gcc-multilib g++-multilib lcov llvm-9
       - name: Run tests
         run: python3 misc/run_tests.py
       - name: Verbose test info
