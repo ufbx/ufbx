@@ -7825,7 +7825,7 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts
 ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error)
 {
 	FILE *file;
-	#ifdef _WIN32
+	#ifdef _MSC_VER
 		if (fopen_s(&file, filename, "rb")) file = NULL;
 	#else
 		file = fopen(filename, "rb");
@@ -7908,6 +7908,11 @@ size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error)
 		size_t num = snprintf(dst + offset, dst_size - offset, "%6u:%s: %s\n", frame->source_line, frame->function, frame->description);
 		offset = ufbxi_min_sz(offset + num, dst_size - 1);
 	}
+
+	// HACK: On some MSYS/MinGW implementations `snprintf` is broken and does
+	// not write the null terminator on trunctation, it's always safe to do so
+	// let's just do it unconditionally here...
+	dst[offset] = '\0';
 
 	return offset;
 }

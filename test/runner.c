@@ -73,6 +73,13 @@ double cputime_os_tick_to_sec(const cputime_sync_span *span, uint64_t os_tick);
 #define NOMINMAX
 #include <Windows.h>
 
+#if defined(_MSC_VER)
+	#include <intrin.h>
+#else
+	#include <x86intrin.h>
+#endif
+
+
 void cputime_sync_now(cputime_sync_point *sync, int accuracy)
 {
 	uint64_t best_delta = UINT64_MAX;
