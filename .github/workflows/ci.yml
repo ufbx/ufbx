@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install 32-bit libc
-        run: sudo apt install gcc-multilib
+        run: sudo apt install -y gcc-multilib g++-multilib
       - name: Run tests
         run: python3 misc/run_tests.py
 
