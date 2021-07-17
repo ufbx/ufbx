@@ -6,4 +6,4 @@ parsers:
       method: yes
       macro: yes
 ignore:
-  - test
+  - "test"
