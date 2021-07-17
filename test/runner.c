@@ -1907,7 +1907,7 @@ int ufbxt_run_test(ufbxt_test *test)
 		return 1;
 	} else {
 		if (g_hint[0]) {
-			printf("Hint: %s", g_hint);
+			printf("Hint: %s\n", g_hint);
 		}
 		if (g_error.stack_size) {
 			ufbxt_log_error(&g_error);

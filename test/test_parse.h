@@ -43,8 +43,8 @@ UFBXT_TEST(error_format_short)
 
 	char error_buf[512];
 	for (size_t len = 1; len <= ufbxt_arraycount(error_buf); len++) {
-		ufbxt_hintf("len = %zu", len);
 		size_t length = ufbx_format_error(error_buf, len, &error);
+		ufbxt_hintf("len = %zu, length = %zu", len, length);
 		ufbxt_assert(strlen(error_buf) == length);
 	}
 }
