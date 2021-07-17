@@ -3,13 +3,7 @@
 #include <stdint.h>
 void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr);
 
-#define ufbx_assert(cond) do { \
-		if (!(cond)) ufbxt_assert_fail(__FILE__, __LINE__, "Internal assert: " #cond); \
-	} while (0)
-
 #define ufbxt_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
-
-#undef ufbx_assert
 
 #include "../ufbx.h"
 
