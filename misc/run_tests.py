@@ -162,6 +162,8 @@ class CLCompiler(Compiler):
 
         if config.get("optimize", False):
             args.append("/Ox")
+        else:
+            args.append("/DDEBUG=1")
 
         if config.get("openmp", False):
             args.append("/openmp")
@@ -206,6 +208,7 @@ class GCCCompiler(Compiler):
 
         if config.get("optimize", False):
             args.append("-O2")
+            args.append("-DNDEBUG=1")
 
         if config.get("openmp", False):
             args.append("-openmp")
