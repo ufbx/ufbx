@@ -66,7 +66,10 @@ def flatten_str_list(str_list):
     inner(result, str_list)
     return result
 
-cmd_sema = asyncio.Semaphore(os.cpu_count(), loop=loop)
+if sys.version_info < (3,8):
+    cmd_sema = asyncio.Semaphore(os.cpu_count(), loop=loop)
+else:
+    cmd_sema = asyncio.Semaphore(os.cpu_count())
 
 async def run_cmd(*args, realtime_output=False, env=None):
     """Asynchronously run a command"""
@@ -472,17 +475,26 @@ async def main():
     }
     ctest_tasks += compile_permutations("cpptest", cpptest_config, arch_configs, ["1.5"])
 
+    bad_compiles = 0
+    bad_runs = 0
+
     compiler_test_tasks = await gather(ctest_tasks)
     for target in compiler_test_tasks:
         arch = target.config["arch"]
         if target.compiled:
             target.compiler.compile_archs.add(arch)
+        else:
+            bad_compiles += 1
         if target.ran and "sin(1.50) = 1.00" in target.log:
             target.compiler.run_archs.add(arch)
+        else:
+            bad_runs += 1
+
+    log_comment("-- Detected the following compilers --")
 
     for compiler in compilers:
         archs = ", ".join(decorate_arch(compiler, arch) for arch in compiler.supported_archs())
-        log_comment(f"{compiler.exe}: {compiler.arch} {compiler.version} [{archs}]")
+        log_comment(f"  {compiler.exe}: {compiler.arch} {compiler.version} [{archs}]")
 
     log_comment("-- Compiling and running tests --")
 
@@ -513,6 +525,10 @@ async def main():
         num_fail += 1
 
     print()
+    if bad_compiles > 0:
+        print(f"WARNING: {bad_compiles} pre-test configurations failed to compile")
+    if bad_runs > 0:
+        print(f"WARNING: {bad_runs} pre-test configurations failed to run")
     print(f"{len(targets) - num_fail}/{len(targets)} targets succeeded")
     if num_fail > 0:
         exit_code = 1
