@@ -9,6 +9,7 @@ import os
 import sys
 import shutil
 import functools
+import platform
 
 color_out = sys.stdout
 
@@ -25,6 +26,7 @@ else:
     has_color = sys.stdout.isatty()
 
 STYLE_FAIL = "\x1b[31m"
+STYLE_WARN = "\x1b[33m"
 STYLE_CMD = "\x1b[36m"
 
 def log(line, *, style=""):
@@ -38,8 +40,10 @@ def log_cmd(line):
 def log_mkdir(path):
     log_cmd("mkdir " + path)
 
-def log_comment(line, fail=False):
-    style = STYLE_FAIL if fail else ""
+def log_comment(line, fail=False, warn=False):
+    style = ""
+    if fail: style = STYLE_FAIL
+    if warn: style = STYLE_WARN
     if sys.platform == "win32":
         log("rem " + line, style=style)
     else:
@@ -64,12 +68,14 @@ def flatten_str_list(str_list):
 
 cmd_sema = asyncio.Semaphore(os.cpu_count(), loop=loop)
 
-async def run_cmd(cmd, *args, realtime_output=False, env=None):
+async def run_cmd(*args, realtime_output=False, env=None):
     """Asynchronously run a command"""
 
     await cmd_sema.acquire()
 
     cmd_args = flatten_str_list(args)
+    cmd = cmd_args[0]
+    cmd_args = cmd_args[1:]
 
     pipe = None if realtime_output else asyncio.subprocess.PIPE
     cmdline = subprocess.list2cmdline([cmd] + cmd_args)
@@ -93,6 +99,8 @@ async def run_cmd(cmd, *args, realtime_output=False, env=None):
         ok = proc.returncode == 0
     except FileNotFoundError:
         err = f"{cmd} not found"
+    except OSError as e:
+        err = str(e)
 
     end = time.time()
 
@@ -105,6 +113,8 @@ class Compiler:
         self.name = name
         self.exe = exe
         self.env = None
+        self.compile_archs = set()
+        self.run_archs = set()
 
     def run(self, *args, **kwargs):
         return run_cmd(self.exe, args, env=self.env, **kwargs)
@@ -168,12 +178,11 @@ class GCCCompiler(Compiler):
         self.has_m32 = has_m32
 
     async def check_version(self):
-        _, out, err, _, _ = await self.run("--version")
-        mv = re.search(r"version ([.0-9]+)", out + err, re.M)
-        ma = re.search(r"Target: ([a-zA-Z0-9_-]+)", out + err, re.M)
-        if not (ma and mv): return False
-        self.arch = ma.group(1).lower()
-        self.version = mv.group(1)
+        _, vout, _, _, _ = await self.run("-dumpversion")
+        _, mout, _, _, _ = await self.run("-dumpmachine")
+        if not (vout and mout): return False
+        self.version = vout
+        self.arch = mout.lower()
         return True
 
     def supported_archs(self):
@@ -190,7 +199,7 @@ class GCCCompiler(Compiler):
         args = []
 
         if config.get("warnings", False):
-            args.append("-Wall -Wextra -Werror")
+            args += ["-Wall", "-Wextra", "-Werror"]
 
         if config.get("optimize", False):
             args.append("-O2")
@@ -201,10 +210,16 @@ class GCCCompiler(Compiler):
         if self.has_m32 and config.get("arch", "") == "x86":
             args.append("-m32")
 
-        args.append("-std=gnu99")
-        args.append("-lm")
+        if self.has_cpp:
+            args.append("-std=c++11")
+        else:
+            args.append("-std=gnu99")
         
         args += sources
+
+        if "msvc" not in self.arch:
+            args.append("-lm")
+
         args += ["-o", output]
 
         return self.run(args)
@@ -214,6 +229,10 @@ class ClangCompiler(GCCCompiler):
         super().__init__(name, exe, cpp, **kwargs)
 
 class EmscriptenCompiler(ClangCompiler):
+    def __init__(self, name, exe, cpp):
+        super().__init__(name, exe, cpp)
+
+class ZigCompiler(ClangCompiler):
     def __init__(self, name, exe, cpp):
         super().__init__(name, exe, cpp)
 
@@ -237,9 +256,8 @@ def get_vcvars(bat_name):
 
 class VsCompiler(Compiler):
     def __init__(self, name, bat, inner):
-        self.name = name
+        super().__init__(name, inner.exe)
         self.bat = bat
-        self.exe = inner.exe
         self.inner = inner
 
     async def check_version(self):
@@ -306,11 +324,13 @@ class Target:
         self.config = config
         self.skipped = False
         self.compiled = False
+        self.ran = False
         self.ok = True
         self.log = []
 
 async def compile_target(t):
-    if t.config["arch"] not in t.compiler.supported_archs():
+    arch_test = t.config.get("arch_test", False)
+    if t.config["arch"] not in t.compiler.compile_archs and not arch_test:
         t.skipped = True
         return
 
@@ -331,12 +351,17 @@ async def compile_target(t):
         t.ok = False
 
     head = f"Compile {t.name}"
-    tail = f"[{time:.1f}s OK]" if ok else "[FAIL]"
-    log_comment(f"{tail} {head}", fail=not ok)
+    tail = f"[{time:.1f}s OK]" if ok else ("[WARN]" if arch_test else "[FAIL]")
+    log_comment(f"{tail} {head}",
+        fail=not ok and not arch_test,
+        warn=not ok and arch_test)
     return t
 
 async def run_target(t, args):
     if not t.compiled: return
+    arch_test = t.config.get("arch_test", False)
+    if t.config["arch"] not in t.compiler.run_archs and not arch_test:
+        return
 
     ok, out, err, cmdline, time = await run_cmd(t.config["output"], args)
 
@@ -344,12 +369,16 @@ async def run_target(t, args):
     t.log.append(out)
     t.log.append(err)
 
-    if not ok:
+    if ok:
+        t.ran = True
+    else:
         t.ok = False
 
     head = f"Run {t.name}"
-    tail = f"[{time:.1f}s OK]" if ok else "[FAIL]"
-    log_comment(f"{tail} {head}", fail=not ok)
+    tail = f"[{time:.1f}s OK]" if ok else ("[WARN]" if arch_test else "[FAIL]")
+    log_comment(f"{tail} {head}",
+        fail=not ok and not arch_test,
+        warn=not ok and arch_test)
     return t
 
 async def compile_and_run_target(t, args):
@@ -366,14 +395,18 @@ def copy_file(src, dst):
 
 exit_code = 0
 
+def decorate_arch(compiler, arch):
+    if arch not in compiler.compile_archs:
+        return arch + " (FAIL)"
+    if arch not in compiler.run_archs:
+        return arch + " (compile only)"
+    return arch
+
 async def main():
     global exit_code
 
     log_comment("-- Searching for compilers --")
     compilers = await find_compilers()
-    for compiler in compilers:
-        archs = ", ".join(compiler.supported_archs())
-        log_comment(f"{compiler.exe}: {compiler.arch} {compiler.version} [{archs}]")
 
     all_configs = {
         "optimize": {
@@ -388,14 +421,12 @@ async def main():
 
     arch_configs = { "arch": all_configs["arch"] }
 
-    log_comment("-- Compiling and running tests --")
-
     build_path = "build"
     if not os.path.exists(build_path):
         os.makedirs(build_path, exist_ok=True)
         log_mkdir(build_path)
 
-    def compile_permutations(prefix, config, config_options):
+    def compile_permutations(prefix, config, config_options, run_args):
         opt_combos = [[(name, opt) for opt in opts] for name, opts in config_options.items()]
         opt_combos = list(itertools.product(*opt_combos))
 
@@ -418,23 +449,58 @@ async def main():
                     conf.update(config_options[opt_name][opt])
 
                 target = Target(name, compiler, conf)
-                yield compile_and_run_target(target, ["-d", "data"])
+                yield compile_and_run_target(target, run_args)
+
+    exe_suffix = ""
+    if sys.platform == "win32":
+        exe_suffix = ".exe"
+
+    ctest_tasks = []
+
+    ctest_config = {
+        "sources": ["misc/compiler_test.c"],
+        "output": "ctest" + exe_suffix,
+        "arch_test": True,
+    }
+    ctest_tasks += compile_permutations("ctest", ctest_config, arch_configs, ["1.5"])
+
+    cpptest_config = {
+        "sources": ["misc/compiler_test.cpp"],
+        "output": "cpptest" + exe_suffix,
+        "cpp": True,
+        "arch_test": True,
+    }
+    ctest_tasks += compile_permutations("cpptest", cpptest_config, arch_configs, ["1.5"])
+
+    compiler_test_tasks = await gather(ctest_tasks)
+    for target in compiler_test_tasks:
+        arch = target.config["arch"]
+        if target.compiled:
+            target.compiler.compile_archs.add(arch)
+        if target.ran and "sin(1.50) = 1.00" in target.log:
+            target.compiler.run_archs.add(arch)
+
+    for compiler in compilers:
+        archs = ", ".join(decorate_arch(compiler, arch) for arch in compiler.supported_archs())
+        log_comment(f"{compiler.exe}: {compiler.arch} {compiler.version} [{archs}]")
+
+    log_comment("-- Compiling and running tests --")
 
     target_tasks = []
 
     runner_config = {
         "sources": ["test/runner.c", "ufbx.c"],
-        "output": "runner.exe",
+        "output": "runner" + exe_suffix,
     }
-    target_tasks += compile_permutations("runner", runner_config, all_configs)
+    target_tasks += compile_permutations("runner", runner_config, all_configs, ["-d", "data"])
 
     cpp_config = {
         "sources": ["misc/test_build.cpp"],
-        "output": "cpp.exe",
+        "output": "cpp" + exe_suffix,
         "cpp": True,
         "warnings": True,
     }
-    target_tasks += compile_permutations("cpp", cpp_config, arch_configs)
+    target_tasks += compile_permutations("cpp", cpp_config, arch_configs, [])
 
     targets = await gather(target_tasks)
 
