@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Install 32-bit libc
-        run: sudo apt install -y gcc-multilib g++-multilib
+      - name: Install apt dependencies
+        run: sudo apt install -y gcc-multilib g++-multilib lcov
       - name: Run tests
         run: python3 misc/run_tests.py
       - name: Verbose test info
