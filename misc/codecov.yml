@@ -5,3 +5,6 @@ parsers:
       loop: yes
       method: yes
       macro: yes
+ignore:
+  - "runner.c"
+  - "test/"
