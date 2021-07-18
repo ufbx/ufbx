@@ -113,12 +113,18 @@ UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, combined)
 }
 #endif
 
+
 UFBXT_FILE_TEST(maya_blend_shape_cube)
 #if UFBXT_IMPL
 {
 	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
+
+	ufbxt_assert(0 && "TODO");
+
+#if 0
 	ufbxt_assert(mesh);
 	ufbxt_assert(mesh->blend_shapes.size == 2);
+
 
 	ufbx_blend_shape *top[2] = { NULL, NULL };
 	for (size_t i = 0; i < mesh->blend_shapes.size; i++) {
@@ -127,6 +133,9 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 		if (!strcmp(shape->name.data, "TopV")) top[1] = shape;
 	}
 	ufbxt_assert(top[0] && top[1]);
+
+	ufbxt_assert_close_real(err, top[0]->weight, 1.0);
+	ufbxt_assert_close_real(err, top[1]->weight, 1.0);
 
 	double keyframes[][3] = {
 		{ 1.0/24.0, 1.0, 1.0 },
@@ -155,5 +164,13 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 			ufbxt_assert_close_real(err, value, ref);
 		}
 	}
+#endif
+}
+#endif
+
+
+UFBXT_FILE_TEST(maya_blend_inbetween)
+#if UFBXT_IMPL
+{
 }
 #endif
