@@ -146,6 +146,8 @@ typedef struct ufbx_bone_list { ufbx_bone *data; size_t size; } ufbx_bone_list;
 
 typedef struct ufbx_material ufbx_material;
 typedef struct ufbx_blend_shape ufbx_blend_shape;
+typedef struct ufbx_blend_keyframe ufbx_blend_keyframe;
+typedef struct ufbx_blend_channel ufbx_blend_channel;
 
 typedef struct ufbx_vertex_void ufbx_vertex_void;
 typedef struct ufbx_vertex_real ufbx_vertex_real;
@@ -164,7 +166,9 @@ typedef struct ufbx_uv_set_list { ufbx_uv_set *data; size_t size; } ufbx_uv_set_
 typedef struct ufbx_color_set_list { ufbx_color_set *data; size_t size; } ufbx_color_set_list;
 typedef struct ufbx_skin_list { ufbx_skin *data; size_t size; } ufbx_skin_list;
 typedef struct ufbx_blend_shape_list { ufbx_blend_shape *data; size_t size; } ufbx_blend_shape_list;
-typedef struct ufbx_blend_shape_ptr_list { ufbx_blend_shape **data; size_t size; } ufbx_blend_shape_ptr_list;
+typedef struct ufbx_blend_keyframe_list { ufbx_blend_keyframe *data; size_t size; } ufbx_blend_keyframe_list;
+typedef struct ufbx_blend_channel_list { ufbx_blend_channel *data; size_t size; } ufbx_blend_channel_list;
+typedef struct ufbx_blend_channel_ptr_list { ufbx_blend_channel **data; size_t size; } ufbx_blend_channel_ptr_list;
 
 struct ufbx_vertex_void {
 	void *data;
@@ -250,6 +254,20 @@ struct ufbx_blend_shape {
 	int32_t *indices;
 };
 
+struct ufbx_blend_keyframe {
+	ufbx_blend_shape *shape;
+	ufbx_real target_weight;
+};
+
+struct ufbx_blend_channel {
+	ufbx_string name;
+	ufbx_props props;
+
+	ufbx_real weight;
+
+	ufbx_blend_keyframe_list keyframes;
+};
+
 typedef enum ufbx_node_type {
 	UFBX_NODE_UNKNOWN,
 	UFBX_NODE_MODEL,
@@ -312,7 +330,7 @@ struct ufbx_mesh {
 	ufbx_color_set_list color_sets;
 	ufbx_material_ptr_list materials;
 	ufbx_skin_list skins;
-	ufbx_blend_shape_ptr_list blend_shapes;
+	ufbx_blend_channel_ptr_list blend_channels;
 };
 struct ufbx_light {
 	ufbx_node node;
@@ -363,7 +381,7 @@ typedef enum ufbx_anim_target {
 	UFBX_ANIM_LIGHT,
 	UFBX_ANIM_MATERIAL,
 	UFBX_ANIM_BONE,
-	UFBX_ANIM_BLEND_SHAPE,
+	UFBX_ANIM_BLEND_CHANNEL,
 	UFBX_ANIM_INVALID,
 } ufbx_anim_target;
 
@@ -447,6 +465,7 @@ struct ufbx_scene {
 	ufbx_light_list lights;
 	ufbx_bone_list bones;
 	ufbx_blend_shape_list blend_shapes;
+	ufbx_blend_channel_list blend_channels;
 
 	ufbx_material_list materials;
 
@@ -685,8 +704,6 @@ ufbx_inline ufbx_skin *begin(const ufbx_skin_list& l) { return l.data; }
 ufbx_inline ufbx_skin *end(const ufbx_skin_list& l) { return l.data + l.size; }
 ufbx_inline ufbx_blend_shape *begin(const ufbx_blend_shape_list& l) { return l.data; }
 ufbx_inline ufbx_blend_shape *end(const ufbx_blend_shape_list& l) { return l.data + l.size; }
-ufbx_inline ufbx_blend_shape **begin(const ufbx_blend_shape_ptr_list& l) { return l.data; }
-ufbx_inline ufbx_blend_shape **end(const ufbx_blend_shape_ptr_list& l) { return l.data + l.size; }
 
 #endif
 
