@@ -7229,6 +7229,10 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	return 1;
 }
 
+// Use skinning evaluation code from below, should these be re-ordered?
+static size_t ufbxi_get_skinning_buffer_size(const ufbx_scene *scene);
+static void ufbxi_evaluate_skinning(ufbx_scene *scene, void *buffer);
+
 ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 {
 	ufbxi_check(ufbxi_load_strings(uc));
@@ -7240,6 +7244,13 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 
 	ufbxi_get_properties(&uc->scene);
 	ufbxi_update_transform_matrix(&uc->scene.root->node, NULL);
+
+	if (uc->opts.evaluate_skinning) {
+		size_t size_uint64s = ufbxi_get_skinning_buffer_size(&uc->scene) / 8;
+		void *skinning_buffer = ufbxi_push(&uc->result, uint64_t, size_uint64s);
+		ufbxi_check(skinning_buffer);
+		ufbxi_evaluate_skinning(&uc->scene, skinning_buffer);
+	}
 
 	// Copy local data to the scene
 	uc->scene.metadata.version = uc->version;
@@ -7523,6 +7534,187 @@ static void ufbxi_translate_node_refs(ufbx_node ***p_child_refs, const ufbx_scen
 	}
 }
 
+static size_t ufbxi_get_skinning_buffer_size(const ufbx_scene *scene)
+{
+	uint32_t alloc_size = 0;
+
+	// Reserve one extra NULL -1 vertex position/normal per mesh
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_vec3, scene->metadata.num_skinned_positions + scene->meshes.size);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_vec3, scene->metadata.num_skinned_indices + scene->meshes.size);
+	ufbxi_evaluate_reserve(&alloc_size, int32_t, scene->metadata.num_skinned_indices);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_real, scene->metadata.max_skinned_positions);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_real, scene->metadata.max_skinned_positions);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_vec3, scene->metadata.max_skinned_blended_positions);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_vec3, scene->metadata.max_skinned_blended_indices);
+
+	return ufbxi_align_to_mask(alloc_size, 0x7);
+}
+
+static void ufbxi_evaluate_skinning(ufbx_scene *scene, void *buffer)
+{
+	char *data = (char*)buffer;
+	uint32_t offset = 0;
+
+	ufbx_vec3 *skinned_positions = ufbxi_evaluate_push(data, &offset, ufbx_vec3, scene->metadata.num_skinned_positions + scene->meshes.size);
+	ufbx_vec3 *skinned_normals = ufbxi_evaluate_push(data, &offset, ufbx_vec3, scene->metadata.num_skinned_indices + scene->meshes.size);
+	int32_t *skinned_normal_indices = ufbxi_evaluate_push(data, &offset, int32_t, scene->metadata.num_skinned_indices);
+	ufbx_real *skinned_pos_weights = ufbxi_evaluate_push(data, &offset, ufbx_real, scene->metadata.max_skinned_positions);
+	ufbx_real *skinned_pos_total_weight = ufbxi_evaluate_push(data, &offset, ufbx_real, scene->metadata.max_skinned_positions);
+	ufbx_vec3 *skinned_blended_positions = ufbxi_evaluate_push(data, &offset, ufbx_vec3, scene->metadata.max_skinned_blended_positions);
+	ufbx_vec3 *skinned_blended_normals = ufbxi_evaluate_push(data, &offset, ufbx_vec3, scene->metadata.max_skinned_blended_indices);
+
+	ufbxi_for(ufbx_mesh, mesh, scene->meshes.data, scene->meshes.size) {
+		if (mesh->skins.size == 0 && mesh->blend_channels.size == 0) continue;
+
+		ufbx_vec3 *positions = skinned_positions;
+		ufbx_vec3 *normals = skinned_normals;
+		int32_t *normal_indices = skinned_normal_indices;
+		skinned_positions += mesh->num_vertices + 1;
+		skinned_normals += mesh->num_indices + 1;
+		skinned_normal_indices += mesh->num_indices;
+
+		// Leave zero position/normal at index - 1
+		memset(positions, 0, mesh->num_vertices * (sizeof(ufbx_vec3) + 1));
+		memset(normals, 0, mesh->num_indices * (sizeof(ufbx_vec3) + 1));
+		positions += 1;
+		normals += 1;
+		for (size_t i = 0 ; i < mesh->num_indices; i++) {
+			normal_indices[i] = (int32_t)i;
+		}
+
+		ufbx_vec3 *blend_positions = mesh->vertex_position.data;
+		ufbx_vec3 *blend_normals = mesh->vertex_normal.data;
+		int32_t *blend_normal_indices = mesh->vertex_normal.indices;
+		size_t num_indices = mesh->num_indices;
+		size_t num_positions = mesh->vertex_position.num_elements;
+
+		if (mesh->blend_channels.size > 0) {
+
+			// Store blended normals either to a temporary buffer or the result
+			// directly depending if there's a skinning stage afterwards
+			if (mesh->skins.size > 0) {
+				blend_positions = skinned_blended_positions;
+				blend_normals = skinned_blended_normals;
+				blend_normal_indices = normal_indices;
+			} else {
+				blend_positions = positions;
+				blend_normals = normals;
+			}
+
+			// Copy the initial positions from the mesh
+			{
+				const ufbx_vec3 *vertex_position = mesh->vertex_position.data;
+				for (size_t i = 0; i < num_positions; i++) {
+					blend_positions[i] = vertex_position[i];
+				}
+
+				const ufbx_vec3 *vertex_normal = mesh->vertex_normal.data;
+				const int32_t *vertex_normal_index = mesh->vertex_normal.indices;
+				for (size_t i = 0; i < num_indices; i++) {
+					blend_normals[i] = vertex_normal[vertex_normal_index[i]];
+				}
+			}
+
+			// Apply the weighted offsets from all blend shape channels
+			ufbxi_for_ptr(ufbx_blend_channel, p_channel, mesh->blend_channels.data, mesh->blend_channels.size) {
+				ufbx_blend_channel *channel = *p_channel;
+				ufbxi_for(ufbx_blend_keyframe, keyframe, channel->keyframes.data, channel->keyframes.size) {
+					ufbx_real weight = keyframe->effective_weight;
+					const ufbx_real epsilon = (ufbx_real)1e-9;
+					if (weight >= -epsilon && weight <= epsilon) continue;
+
+					ufbx_blend_shape *shape = keyframe->shape;
+					const int32_t *indices = shape->indices;
+					const ufbx_vec3 *offsets = shape->position_offsets;
+					size_t num_offsets = shape->num_offsets;
+					for (size_t i = 0; i < num_offsets; i++) {
+						int32_t index = indices[i];
+						ufbx_vec3 p = offsets[i];
+						if (index >= 0 && index < (int32_t)num_positions) {
+							blend_positions[index].x += p.x * weight;
+							blend_positions[index].y += p.y * weight;
+							blend_positions[index].z += p.z * weight;
+						}
+
+						// TODO: Offset normals?
+					}
+				}
+			}
+
+			mesh->skinned_position.data = blend_positions;
+
+			mesh->skinned_normal.data = blend_normals;
+			mesh->skinned_normal.indices = normal_indices;
+			mesh->skinned_normal.num_elements = num_indices;
+		}
+
+		if (mesh->skins.size > 0) {
+
+			memset(skinned_pos_total_weight, 0, mesh->num_vertices * sizeof(ufbx_real));
+
+			ufbxi_for(ufbx_skin, skin, mesh->skins.data, mesh->skins.size) {
+				ufbx_matrix mesh_to_root;
+				ufbx_matrix_mul(&mesh_to_root, &skin->bone->to_root, &skin->mesh_to_bind);
+
+				memset(skinned_pos_weights, 0, mesh->num_vertices * sizeof(ufbx_real));
+
+				ufbx_vec3 *pos_src = blend_positions;
+				ufbx_vec3 *pos_dst = positions;
+				for (size_t i = 0; i < skin->num_weights; i++) {
+					int32_t index = skin->indices[i];
+					ufbx_real weight = skin->weights[i];
+					skinned_pos_weights[index] = weight;
+					skinned_pos_total_weight[index] += weight;
+					ufbx_vec3 p = ufbx_transform_position(&mesh_to_root, pos_src[index]);
+					pos_dst[index].x += p.x * weight;
+					pos_dst[index].y += p.y * weight;
+					pos_dst[index].z += p.z * weight;
+				}
+
+				ufbx_vec3 *normal_dst = normals;
+				if (mesh->vertex_normal.data) {
+					for (size_t i = 0; i < mesh->num_indices; i++) {
+						ufbx_real weight = skinned_pos_weights[mesh->vertex_position.indices[i]];
+						if (weight <= 0.0) continue;
+
+						ufbx_vec3 n = blend_normals[blend_normal_indices[i]];
+						n = ufbx_transform_direction(&mesh_to_root, n);
+						normal_dst[i].x += n.x * weight;
+						normal_dst[i].y += n.y * weight;
+						normal_dst[i].z += n.z * weight;
+					}
+				}
+			}
+
+			mesh->skinned_is_local = false;
+
+			for (size_t i = 0; i < mesh->num_vertices; i++) {
+				ufbx_real rcp_weight = 1.0 / skinned_pos_total_weight[i];
+				positions[i].x *= rcp_weight;
+				positions[i].y *= rcp_weight;
+				positions[i].z *= rcp_weight;
+			}
+			mesh->skinned_position.data = positions;
+			mesh->skinned_position.indices = mesh->vertex_position.indices;
+			mesh->skinned_position.num_elements = mesh->vertex_position.num_elements;
+
+			if (mesh->vertex_normal.data) {
+				for (size_t i = 0; i < mesh->num_indices; i++) {
+					ufbx_vec3 n = normals[i];
+					ufbx_real rcp_len = 1.0 / sqrt(n.x*n.x + n.y*n.y + n.z*n.z);
+					normals[i].x = n.x * rcp_len;
+					normals[i].y = n.y * rcp_len;
+					normals[i].z = n.z * rcp_len;
+				}
+
+				mesh->skinned_normal.data = normals;
+				mesh->skinned_normal.indices = normal_indices;
+				mesh->skinned_normal.num_elements = mesh->num_indices;
+			}
+		}
+	}
+}
+
 static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_evaluate_opts *user_opts, double time)
 {
 	ufbx_evaluate_opts opts;
@@ -7555,15 +7747,11 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_blend_channel*, scene->metadata.num_total_blend_channel_refs);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_skin, scene->metadata.num_total_skins);
 
+	size_t skinning_data_uint64s = 0;
 	if (opts.evaluate_skinned_vertices) {
-		// Reserve one extra NULL -1 vertex position/normal per mesh
-		ufbxi_evaluate_reserve(&alloc_size, ufbx_vec3, scene->metadata.num_skinned_positions + scene->meshes.size);
-		ufbxi_evaluate_reserve(&alloc_size, ufbx_vec3, scene->metadata.num_skinned_indices + scene->meshes.size);
-		ufbxi_evaluate_reserve(&alloc_size, int32_t, scene->metadata.num_skinned_indices);
-		ufbxi_evaluate_reserve(&alloc_size, ufbx_real, scene->metadata.max_skinned_positions);
-		ufbxi_evaluate_reserve(&alloc_size, ufbx_real, scene->metadata.max_skinned_positions);
-		ufbxi_evaluate_reserve(&alloc_size, ufbx_vec3, scene->metadata.max_skinned_blended_positions);
-		ufbxi_evaluate_reserve(&alloc_size, ufbx_vec3, scene->metadata.max_skinned_blended_indices);
+		// Reserve the opaque buffer aligned to 8 bytes
+		skinning_data_uint64s = ufbxi_get_skinning_buffer_size(scene) / 8;
+		ufbxi_evaluate_reserve(&alloc_size, uint64_t, skinning_data_uint64s);
 	}
 
 	ufbx_error err;
@@ -7610,19 +7798,10 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	ufbx_blend_channel **blend_channel_refs = ufbxi_evaluate_push(data, &offset, ufbx_blend_channel*, scene->metadata.num_total_blend_channel_refs);
 	ufbx_skin *skins = ufbxi_evaluate_push(data, &offset, ufbx_skin, scene->metadata.num_total_skins);
 	ufbx_vec3 *skinned_positions = NULL, *skinned_normals = NULL;
-	int32_t *skinned_normal_indices = NULL;
-	ufbx_real *skinned_pos_weights = NULL;
-	ufbx_real *skinned_pos_total_weight = NULL;
-	ufbx_vec3 *skinned_blended_positions = NULL;
-	ufbx_vec3 *skinned_blended_normals = NULL;
+
+	void *skinning_data = NULL;
 	if (opts.evaluate_skinned_vertices) {
-		skinned_positions = ufbxi_evaluate_push(data, &offset, ufbx_vec3, scene->metadata.num_skinned_positions + scene->meshes.size);
-		skinned_normals = ufbxi_evaluate_push(data, &offset, ufbx_vec3, scene->metadata.num_skinned_indices + scene->meshes.size);
-		skinned_normal_indices = ufbxi_evaluate_push(data, &offset, int32_t, scene->metadata.num_skinned_indices);
-		skinned_pos_weights = ufbxi_evaluate_push(data, &offset, ufbx_real, scene->metadata.max_skinned_positions);
-		skinned_pos_total_weight = ufbxi_evaluate_push(data, &offset, ufbx_real, scene->metadata.max_skinned_positions);
-		skinned_blended_positions = ufbxi_evaluate_push(data, &offset, ufbx_vec3, scene->metadata.max_skinned_blended_positions);
-		skinned_blended_normals = ufbxi_evaluate_push(data, &offset, ufbx_vec3, scene->metadata.max_skinned_blended_indices);
+		skinning_data = ufbxi_evaluate_push(data, &offset, uint64_t, skinning_data_uint64s);
 	}
 
 	ufbx_assert(offset == alloc_size);
@@ -7839,156 +8018,7 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	ufbxi_update_transform_matrix(&imp->scene.root->node, NULL);
 
 	if (opts.evaluate_skinned_vertices) {
-		ufbxi_for(ufbx_mesh, mesh, imp->scene.meshes.data, imp->scene.meshes.size) {
-			if (mesh->skins.size == 0 && mesh->blend_channels.size == 0) continue;
-
-			ufbx_vec3 *positions = skinned_positions;
-			ufbx_vec3 *normals = skinned_normals;
-			int32_t *normal_indices = skinned_normal_indices;
-			skinned_positions += mesh->num_vertices + 1;
-			skinned_normals += mesh->num_indices + 1;
-			skinned_normal_indices += mesh->num_indices;
-
-			// Leave zero position/normal at index - 1
-			memset(positions, 0, mesh->num_vertices * (sizeof(ufbx_vec3) + 1));
-			memset(normals, 0, mesh->num_indices * (sizeof(ufbx_vec3) + 1));
-			positions += 1;
-			normals += 1;
-			for (size_t i = 0 ; i < mesh->num_indices; i++) {
-				normal_indices[i] = (int32_t)i;
-			}
-
-			ufbx_vec3 *blend_positions = mesh->vertex_position.data;
-			ufbx_vec3 *blend_normals = mesh->vertex_normal.data;
-			int32_t *blend_normal_indices = mesh->vertex_normal.indices;
-			size_t num_indices = mesh->num_indices;
-			size_t num_positions = mesh->vertex_position.num_elements;
-
-			if (mesh->blend_channels.size > 0) {
-
-				// Store blended normals either to a temporary buffer or the result
-				// directly depending if there's a skinning stage afterwards
-				if (mesh->skins.size > 0) {
-					blend_positions = skinned_blended_positions;
-					blend_normals = skinned_blended_normals;
-					blend_normal_indices = normal_indices;
-				} else {
-					blend_positions = positions;
-					blend_normals = normals;
-				}
-
-				// Copy the initial positions from the mesh
-				{
-					const ufbx_vec3 *vertex_position = mesh->vertex_position.data;
-					for (size_t i = 0; i < num_positions; i++) {
-						blend_positions[i] = vertex_position[i];
-					}
-
-					const ufbx_vec3 *vertex_normal = mesh->vertex_normal.data;
-					const int32_t *vertex_normal_index = mesh->vertex_normal.indices;
-					for (size_t i = 0; i < num_indices; i++) {
-						blend_normals[i] = vertex_normal[vertex_normal_index[i]];
-					}
-				}
-
-				// Apply the weighted offsets from all blend shape channels
-				ufbxi_for_ptr(ufbx_blend_channel, p_channel, mesh->blend_channels.data, mesh->blend_channels.size) {
-					ufbx_blend_channel *channel = *p_channel;
-					ufbxi_for(ufbx_blend_keyframe, keyframe, channel->keyframes.data, channel->keyframes.size) {
-						ufbx_real weight = keyframe->effective_weight;
-						const ufbx_real epsilon = (ufbx_real)1e-9;
-						if (weight >= -epsilon && weight <= epsilon) continue;
-
-						ufbx_blend_shape *shape = keyframe->shape;
-						const int32_t *indices = shape->indices;
-						const ufbx_vec3 *offsets = shape->position_offsets;
-						size_t num_offsets = shape->num_offsets;
-						for (size_t i = 0; i < num_offsets; i++) {
-							int32_t index = indices[i];
-							ufbx_vec3 p = offsets[i];
-							if (index >= 0 && index < (int32_t)num_positions) {
-								blend_positions[index].x += p.x * weight;
-								blend_positions[index].y += p.y * weight;
-								blend_positions[index].z += p.z * weight;
-							}
-
-							// TODO: Offset normals?
-						}
-					}
-				}
-
-				mesh->skinned_position.data = blend_positions;
-
-				mesh->skinned_normal.data = blend_normals;
-				mesh->skinned_normal.indices = normal_indices;
-				mesh->skinned_normal.num_elements = num_indices;
-			}
-
-			if (mesh->skins.size > 0) {
-
-				memset(skinned_pos_total_weight, 0, mesh->num_vertices * sizeof(ufbx_real));
-
-				ufbxi_for(ufbx_skin, skin, mesh->skins.data, mesh->skins.size) {
-					ufbx_matrix mesh_to_root;
-					ufbx_matrix_mul(&mesh_to_root, &skin->bone->to_root, &skin->mesh_to_bind);
-
-					memset(skinned_pos_weights, 0, mesh->num_vertices * sizeof(ufbx_real));
-
-					ufbx_vec3 *pos_src = blend_positions;
-					ufbx_vec3 *pos_dst = positions;
-					for (size_t i = 0; i < skin->num_weights; i++) {
-						int32_t index = skin->indices[i];
-						ufbx_real weight = skin->weights[i];
-						skinned_pos_weights[index] = weight;
-						skinned_pos_total_weight[index] += weight;
-						ufbx_vec3 p = ufbx_transform_position(&mesh_to_root, pos_src[index]);
-						pos_dst[index].x += p.x * weight;
-						pos_dst[index].y += p.y * weight;
-						pos_dst[index].z += p.z * weight;
-					}
-
-					ufbx_vec3 *normal_dst = normals;
-					if (mesh->vertex_normal.data) {
-						for (size_t i = 0; i < mesh->num_indices; i++) {
-							ufbx_real weight = skinned_pos_weights[mesh->vertex_position.indices[i]];
-							if (weight <= 0.0) continue;
-
-							ufbx_vec3 n = blend_normals[blend_normal_indices[i]];
-							n = ufbx_transform_direction(&mesh_to_root, n);
-							normal_dst[i].x += n.x * weight;
-							normal_dst[i].y += n.y * weight;
-							normal_dst[i].z += n.z * weight;
-						}
-					}
-				}
-
-				mesh->skinned_is_local = false;
-
-				for (size_t i = 0; i < mesh->num_vertices; i++) {
-					ufbx_real rcp_weight = 1.0 / skinned_pos_total_weight[i];
-					positions[i].x *= rcp_weight;
-					positions[i].y *= rcp_weight;
-					positions[i].z *= rcp_weight;
-				}
-				mesh->skinned_position.data = positions;
-				mesh->skinned_position.indices = mesh->vertex_position.indices;
-				mesh->skinned_position.num_elements = mesh->vertex_position.num_elements;
-
-				if (mesh->vertex_normal.data) {
-					for (size_t i = 0; i < mesh->num_indices; i++) {
-						ufbx_vec3 n = normals[i];
-						ufbx_real rcp_len = 1.0 / sqrt(n.x*n.x + n.y*n.y + n.z*n.z);
-						normals[i].x = n.x * rcp_len;
-						normals[i].y = n.y * rcp_len;
-						normals[i].z = n.z * rcp_len;
-					}
-
-					mesh->skinned_normal.data = normals;
-					mesh->skinned_normal.indices = normal_indices;
-					mesh->skinned_normal.num_elements = mesh->num_indices;
-				}
-			}
-		}
+		ufbxi_evaluate_skinning(&imp->scene, skinning_data);
 	}
 
 	return &imp->scene;

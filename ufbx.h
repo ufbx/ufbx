@@ -516,6 +516,7 @@ typedef struct ufbx_load_opts {
 	// Preferences
 	bool ignore_geometry;
 	bool ignore_animation;
+	bool evaluate_skinning;
 
 	// Limits
 	size_t max_temp_memory;
