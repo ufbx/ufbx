@@ -5241,7 +5241,7 @@ ufbxi_nodiscard static int ufbxi_read_deformer(ufbxi_context *uc, ufbxi_node *no
 		ufbxi_value_array *full_weights = ufbxi_find_array(node, ufbxi_FullWeights, 'd');
 		if (full_weights) {
 			extra->num_weights = full_weights->size;
-			extra->full_weights = full_weights->data;
+			extra->full_weights = (ufbx_real*)full_weights->data;
 		}
 
 		// Merge defaults immediately
@@ -7548,7 +7548,6 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_light, scene->lights.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_bone, scene->bones.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_blend_channel, scene->blend_channels.size);
-	ufbxi_evaluate_reserve(&alloc_size, ufbx_blend_shape, scene->blend_shapes.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_material, scene->materials.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_prop, layer.props.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_node*, scene->metadata.num_total_child_refs);
@@ -7604,7 +7603,6 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	ufbx_light *lights = ufbxi_evaluate_push(data, &offset, ufbx_light, scene->lights.size);
 	ufbx_bone *bones = ufbxi_evaluate_push(data, &offset, ufbx_bone, scene->bones.size);
 	ufbx_blend_channel *blend_channels = ufbxi_evaluate_push(data, &offset, ufbx_blend_channel, scene->blend_channels.size);
-	ufbx_blend_shape *blend_shapes = ufbxi_evaluate_push(data, &offset, ufbx_blend_shape, scene->blend_shapes.size);
 	ufbx_material *materials = ufbxi_evaluate_push(data, &offset, ufbx_material, scene->materials.size);
 	ufbx_prop *props = ufbxi_evaluate_push(data, &offset, ufbx_prop, layer.props.size);
 	ufbx_node **child_refs = ufbxi_evaluate_push(data, &offset, ufbx_node*, scene->metadata.num_total_child_refs);
@@ -7908,7 +7906,7 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 						for (size_t i = 0; i < num_offsets; i++) {
 							int32_t index = indices[i];
 							ufbx_vec3 p = offsets[i];
-							if (index >= 0 && index < num_positions) {
+							if (index >= 0 && index < (int32_t)num_positions) {
 								blend_positions[index].x += p.x * weight;
 								blend_positions[index].y += p.y * weight;
 								blend_positions[index].z += p.z * weight;
