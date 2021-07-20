@@ -9,10 +9,15 @@ void ufbxt_check_stack_times(ufbx_scene *scene, ufbxt_diff_error *err, const cha
 	ufbxt_assert_close_real(err, (ufbx_real)stack->time_end, (ufbx_real)end);
 }
 
-void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, const char *file_name, const char *anim_name, ufbx_real time)
+void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, double min_normal_dot, const char *file_name, const char *anim_name, ufbx_real time)
 {
 	char buf[512];
 	snprintf(buf, sizeof(buf), "%s%s.obj", data_root, file_name);
+
+	ufbxt_hintf("Frame from '%s' %s time %.2fs",
+		anim_name ? anim_name : "(implicit animation)",
+		buf, time);
+
 	size_t obj_size = 0;
 	void *obj_data = ufbxt_read_file(buf, &obj_size);
 	ufbxt_obj_file *obj_file = obj_data ? ufbxt_load_obj(obj_data, obj_size) : NULL;
@@ -40,7 +45,7 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, const char *fil
 
 	ufbxt_check_scene(eval);
 
-	ufbxt_diff_to_obj(eval, obj_file, err, true);
+	ufbxt_diff_to_obj(eval, obj_file, err, min_normal_dot);
 
 	ufbx_free_scene(eval);
 	free(obj_file);
@@ -61,9 +66,9 @@ UFBXT_FILE_TEST(blender_279_sausage)
 		ufbxt_check_stack_times(scene, err, "Skeleton|Wiggle", 0.0, 19.0/24.0);
 	}
 
-	ufbxt_check_frame(scene, err, "blender_279_sausage_base_0", "Base", 0.0);
-	ufbxt_check_frame(scene, err, "blender_279_sausage_spin_15", "Spin", 15.0/24.0);
-	ufbxt_check_frame(scene, err, "blender_279_sausage_wiggle_20", "Wiggle", 20.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "blender_279_sausage_base_0", "Base", 0.0);
+	ufbxt_check_frame(scene, err, 0.0, "blender_279_sausage_spin_15", "Spin", 15.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "blender_279_sausage_wiggle_20", "Wiggle", 20.0/24.0);
 }
 #endif
 
@@ -76,24 +81,24 @@ UFBXT_FILE_TEST(maya_game_sausage)
 UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, wiggle)
 #if UFBXT_IMPL
 {
-	ufbxt_check_frame(scene, err, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0);
-	ufbxt_check_frame(scene, err, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0);
 }
 #endif
 
 UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, spin)
 #if UFBXT_IMPL
 {
-	ufbxt_check_frame(scene, err, "maya_game_sausage_spin_7", NULL, 27.0/24.0);
-	ufbxt_check_frame(scene, err, "maya_game_sausage_spin_15", NULL, 35.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_spin_7", NULL, 27.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_spin_15", NULL, 35.0/24.0);
 }
 #endif
 
 UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, deform)
 #if UFBXT_IMPL
 {
-	ufbxt_check_frame(scene, err, "maya_game_sausage_deform_8", NULL, 48.0/24.0);
-	ufbxt_check_frame(scene, err, "maya_game_sausage_deform_15", NULL, 55.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_deform_8", NULL, 48.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_deform_15", NULL, 55.0/24.0);
 }
 #endif
 
@@ -104,12 +109,12 @@ UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, combined)
 	ufbxt_check_stack_times(scene, err, "spin", 20.0/24.0, 40.0/24.0);
 	ufbxt_check_stack_times(scene, err, "deform", 40.0/24.0, 60.0/24.0);
 
-	ufbxt_check_frame(scene, err, "maya_game_sausage_wiggle_10", "wiggle", 10.0/24.0);
-	ufbxt_check_frame(scene, err, "maya_game_sausage_wiggle_18", "wiggle", 18.0/24.0);
-	ufbxt_check_frame(scene, err, "maya_game_sausage_spin_7", "spin", 27.0/24.0);
-	ufbxt_check_frame(scene, err, "maya_game_sausage_spin_15", "spin", 35.0/24.0);
-	ufbxt_check_frame(scene, err, "maya_game_sausage_deform_8", "deform", 48.0/24.0);
-	ufbxt_check_frame(scene, err, "maya_game_sausage_deform_15", "deform", 55.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_wiggle_10", "wiggle", 10.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_wiggle_18", "wiggle", 18.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_spin_7", "spin", 27.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_spin_15", "spin", 35.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_deform_8", "deform", 48.0/24.0);
+	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_deform_15", "deform", 55.0/24.0);
 }
 #endif
 
@@ -119,18 +124,14 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 {
 	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
 
-	ufbxt_assert(0 && "TODO");
-
-#if 0
 	ufbxt_assert(mesh);
-	ufbxt_assert(mesh->blend_shapes.size == 2);
+	ufbxt_assert(mesh->blend_channels.size == 2);
 
-
-	ufbx_blend_shape *top[2] = { NULL, NULL };
-	for (size_t i = 0; i < mesh->blend_shapes.size; i++) {
-		ufbx_blend_shape *shape = mesh->blend_shapes.data[i];
-		if (!strcmp(shape->name.data, "TopH")) top[0] = shape;
-		if (!strcmp(shape->name.data, "TopV")) top[1] = shape;
+	ufbx_blend_channel *top[2] = { NULL, NULL };
+	for (size_t i = 0; i < mesh->blend_channels.size; i++) {
+		ufbx_blend_channel *chan = mesh->blend_channels.data[i];
+		if (strstr(chan->name.data, "TopH")) top[0] = chan;
+		if (strstr(chan->name.data, "TopV")) top[1] = chan;
 	}
 	ufbxt_assert(top[0] && top[1]);
 
@@ -144,9 +145,14 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 		{ 120.0/24.0, 1.0, 1.0 },
 	};
 
-	for (size_t shape_ix = 0; shape_ix < 2; shape_ix++) {
-		ufbx_blend_shape *shape = top[shape_ix];
-		ufbx_anim_prop *props = ufbx_find_blend_shape_anim_prop_begin(scene, NULL, shape);
+	for (size_t chan_ix = 0; chan_ix < 2; chan_ix++) {
+		ufbx_blend_channel *chan = top[chan_ix];
+		ufbxt_assert(chan->keyframes.size == 1);
+
+		ufbxt_assert_close_real(err, chan->keyframes.data[0].target_weight, 1.0);
+		ufbx_blend_shape *shape = chan->keyframes.data[0].shape;
+
+		ufbx_anim_prop *props = ufbx_find_blend_channel_anim_prop_begin(scene, NULL, chan);
 		ufbxt_assert(props);
 
 		size_t count = ufbx_anim_prop_count(props);
@@ -159,12 +165,47 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 			double *frame = keyframes[key_ix];
 			double time = frame[0];
 
-			ufbx_real ref = (ufbx_real)frame[1 + shape_ix];
+			ufbx_real ref = (ufbx_real)frame[1 + chan_ix];
 			ufbx_real value = ufbx_evaluate_curve(&percent->curves[0], time) / 100.0;
 			ufbxt_assert_close_real(err, value, ref);
 		}
 	}
-#endif
+
+	ufbx_scene *eval = NULL;
+	for (int eval_skin = 0; eval_skin <= 1; eval_skin++) {
+		for (size_t key_ix = 0; key_ix < ufbxt_arraycount(keyframes); key_ix++) {
+			double *frame = keyframes[key_ix];
+			double time = frame[0];
+
+			ufbx_evaluate_opts opts = { 0 };
+
+			opts.reuse_scene = eval;
+			opts.evaluate_skinned_vertices = eval_skin != 0;
+
+			eval = ufbx_evaluate_scene(scene, &opts, time);
+			ufbxt_assert(eval);
+
+			for (size_t chan_ix = 0; chan_ix < 2; chan_ix++) {
+				ufbx_real ref = (ufbx_real)frame[1 + chan_ix];
+
+				ufbx_blend_channel *chan = ufbx_find_blend_channel(eval, top[chan_ix]->name.data);
+				ufbxt_assert(chan);
+
+				ufbx_prop *prop = ufbx_find_prop(&chan->props, "DeformPercent");
+				ufbxt_assert(prop);
+
+				ufbxt_assert(chan->keyframes.size == 1);
+				ufbxt_assert_close_real(err, chan->keyframes.data[0].effective_weight, chan->weight);
+
+				ufbxt_assert_close_real(err, prop->value_real / 100.0, ref);
+				ufbxt_assert_close_real(err, chan->weight, ref);
+			}
+
+			ufbxt_check_scene(eval);
+		}
+	}
+
+	ufbx_free_scene(eval);
 }
 #endif
 
@@ -172,5 +213,13 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 UFBXT_FILE_TEST(maya_blend_inbetween)
 #if UFBXT_IMPL
 {
+	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_1", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_30", NULL, 30.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_60", NULL, 60.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_65", NULL, 65.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_71", NULL, 71.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_80", NULL, 80.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_89", NULL, 89.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_120", NULL, 120.0/24.0);
 }
 #endif

@@ -257,6 +257,7 @@ struct ufbx_blend_shape {
 struct ufbx_blend_keyframe {
 	ufbx_blend_shape *shape;
 	ufbx_real target_weight;
+	ufbx_real effective_weight;
 };
 
 struct ufbx_blend_channel {
@@ -319,6 +320,10 @@ struct ufbx_mesh {
 	ufbx_vertex_vec2 vertex_uv;
 	ufbx_vertex_vec4 vertex_color;
 	ufbx_vertex_real vertex_crease;
+
+	bool skinned_is_local;
+	ufbx_vertex_vec3 skinned_position;
+	ufbx_vertex_vec3 skinned_normal;
 
 	bool *edge_smoothing;
 	ufbx_real *edge_crease;
@@ -445,11 +450,14 @@ typedef struct ufbx_metadata {
 
 	size_t num_total_child_refs;
 	size_t num_total_material_refs;
+	size_t num_total_blend_channel_refs;
 	size_t num_total_skins;
 	size_t num_skinned_positions;
 	size_t num_skinned_indices;
 	size_t max_skinned_positions;
 	size_t max_skinned_indices;
+	size_t max_skinned_blended_positions;
+	size_t max_skinned_blended_indices;
 
 	double ktime_to_sec;
 } ufbx_metadata;
@@ -587,6 +595,8 @@ ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t 
 ufbx_mesh *ufbx_find_mesh_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_material *ufbx_find_material_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_t name_len);
+ufbx_bone *ufbx_find_bone_len(const ufbx_scene *scene, const char *name, size_t name_len);
+ufbx_blend_channel *ufbx_find_blend_channel_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_anim_stack *ufbx_find_anim_stack_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_anim_layer *ufbx_find_anim_layer_len(const ufbx_scene *scene, const char *name, size_t name_len);
 
@@ -597,7 +607,7 @@ size_t ufbx_anim_prop_count(const ufbx_anim_prop *props);
 
 ufbx_anim_prop *ufbx_find_anim_prop_begin(const ufbx_scene *scene, const ufbx_anim_layer *layer, ufbx_anim_target target, uint32_t index);
 ufbx_anim_prop *ufbx_find_node_anim_prop_begin(const ufbx_scene *scene, const ufbx_anim_layer *layer, const ufbx_node *node);
-ufbx_anim_prop *ufbx_find_blend_shape_anim_prop_begin(const ufbx_scene *scene, const ufbx_anim_layer *layer, const ufbx_blend_shape *shape);
+ufbx_anim_prop *ufbx_find_blend_channel_anim_prop_begin(const ufbx_scene *scene, const ufbx_anim_layer *layer, const ufbx_blend_channel *channel);
 
 ufbx_face *ufbx_find_face(const ufbx_mesh *mesh, size_t index);
 
@@ -641,6 +651,14 @@ ufbx_inline ufbx_material *ufbx_find_material(const ufbx_scene *scene, const cha
 
 ufbx_inline ufbx_light *ufbx_find_light(const ufbx_scene *scene, const char *name) {
 	return ufbx_find_light_len(scene, name, strlen(name));
+}
+
+ufbx_inline ufbx_bone *ufbx_find_bone(const ufbx_scene *scene, const char *name) {
+	return ufbx_find_bone_len(scene, name, strlen(name));
+}
+
+ufbx_inline ufbx_blend_channel *ufbx_find_blend_channel(const ufbx_scene *scene, const char *name) {
+	return ufbx_find_blend_channel_len(scene, name, strlen(name));
 }
 
 ufbx_inline ufbx_anim_stack *ufbx_find_anim_stack(const ufbx_scene *scene, const char *name) {

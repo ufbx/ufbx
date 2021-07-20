@@ -1176,11 +1176,12 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 		// Store the final position for the retired chunk
 		chunk->pushed_pos = b->pos;
 
-		// Try to re-use old chunks first
+		// Try to re-use old chunks first _unless_ `huge_size` is 1 meaning we want
+		// to do dedicated allocations for everything for debug purposes.
 		ufbxi_buf_chunk *next;
 		while ((next = chunk->next) != NULL) {
 			chunk = next;
-			if (size <= chunk->size) {
+			if (size <= chunk->size && b->ator->huge_size > 1) {
 				b->chunk = chunk;
 				b->pos = (uint32_t)size;
 				b->size = chunk->size;
@@ -1198,17 +1199,18 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 
 	// If `size` is larger than `huge_size` don't grow `next_size` geometrically,
 	// but use a dedicated allocation.
-	if (size >= b->ator->huge_size) {
+	if (size < b->ator->huge_size) {
 		 next_size = chunk ? chunk->next_size : 4096;
 		 chunk_size = (uint32_t)size;
 	} else {
-		 next_size = chunk ? chunk->next_size * 2 : 4096;
+		next_size = chunk ? chunk->next_size * 2 : 4096;
 		chunk_size = next_size - sizeof(ufbxi_buf_chunk);
 		if (chunk_size < size) chunk_size = (uint32_t)size;
 	}
 
 	// Align chunk sizes to 16 bytes
 	chunk_size = ufbxi_align_to_mask(chunk_size, 0xf);
+
 	ufbxi_buf_chunk *new_chunk = (ufbxi_buf_chunk*)ufbxi_alloc_size(b->ator, 1, sizeof(ufbxi_buf_chunk) + chunk_size);
 	if (!new_chunk) return NULL;
 
@@ -2047,6 +2049,7 @@ typedef struct {
 
 typedef struct {
 	size_t num_channels;
+	size_t write_index;
 	uint32_t *channel_index;
 } ufbxi_shape_deformer;
 
@@ -3546,7 +3549,9 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 	ufbxi_array_info arr_info;
 	if (ufbxi_is_array_node(uc, parent_state, name, &arr_info)) {
 		arr_type = ufbxi_normalize_array_type(arr_info.type);
-		arr_buf = arr_info.result ? &uc->result : tmp_buf;
+		arr_buf = tmp_buf;
+		if (arr_info.result) arr_buf = &uc->result;
+		else if (arr_info.tmp_buf) arr_buf = &uc->tmp;
 
 		ufbxi_value_array *arr = ufbxi_push(tmp_buf, ufbxi_value_array, 1);
 		ufbxi_check(arr);
@@ -4804,6 +4809,9 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 			uint64_t shape_channel_id = (uintptr_t)channel;
 			uint64_t shape_geometry_id = shape_channel_id + 1;
 
+			ufbxi_blend_channel_extra *extra = ufbxi_push_zero(&uc->tmp_arr_blend_channels_extra, ufbxi_blend_channel_extra, 1);
+			ufbxi_check(extra);
+
 			ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_BLEND_CHANNEL, shape_channel_id, uc->tmp_arr_blend_channels.num_items - 1));
 			channel->name = name;
 			channel->props.props = shape_props;
@@ -5088,6 +5096,11 @@ ufbxi_nodiscard static int ufbxi_read_geometry(ufbxi_context *uc, ufbxi_node *no
 	// TODO: Stable sort
 	qsort(mesh->uv_sets.data, mesh->uv_sets.size, sizeof(ufbx_uv_set), &ufbxi_cmp_uv_set);
 	qsort(mesh->color_sets.data, mesh->color_sets.size, sizeof(ufbx_color_set), &ufbxi_cmp_color_set);
+
+	// Setup the initial skinned state
+	mesh->skinned_is_local = true;
+	mesh->skinned_position = mesh->vertex_position;
+	mesh->skinned_normal = mesh->vertex_normal;
 
 	ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
 
@@ -6373,7 +6386,46 @@ static void ufbxi_get_bone_properties(ufbx_bone *bone)
 
 static void ufbxi_get_blend_channel_properties(ufbx_blend_channel *channel)
 {
-	channel->weight = ufbxi_find_real(&channel->props, ufbxi_DeformPercent) * (ufbx_real)0.01;
+	ufbx_real weight = ufbxi_find_real(&channel->props, ufbxi_DeformPercent) * (ufbx_real)0.01;
+	channel->weight = weight;
+
+	ptrdiff_t num_keys = (ptrdiff_t)channel->keyframes.size;
+	if (num_keys > 0) {
+		ufbx_blend_keyframe *keys = channel->keyframes.data;
+
+		// Reset the effective weights to zero and find the split around zero
+		ptrdiff_t last_negative = -1;
+		for (ptrdiff_t i = 0; i < num_keys; i++) {
+			keys[i].effective_weight = (ufbx_real)0.0;
+			if (keys[i].target_weight < 0.0) last_negative = i;
+		}
+
+		// Find either the next or last keyframe away from zero
+		ufbx_blend_keyframe zero_key = { NULL };
+		ufbx_blend_keyframe *prev = &zero_key, *next = &zero_key;
+		if (weight > 0.0) {
+			if (last_negative >= 0) prev = &keys[last_negative];
+			for (ptrdiff_t i = last_negative + 1; i < num_keys; i++) {
+				prev = next;
+				next = &keys[i];
+				if (next->target_weight > weight) break;
+			}
+		} else {
+			if (last_negative + 1 < num_keys) prev = &keys[last_negative + 1];
+			for (ptrdiff_t i = last_negative; i >= 0; i--) {
+				prev = next;
+				next = &keys[i];
+				if (next->target_weight < weight) break;
+			}
+		}
+
+		// Linearly interpolate between the endpoints with the weight
+		ufbx_real t = (weight - prev->target_weight) / (next->target_weight - prev->target_weight);
+		if (isfinite(t)) {
+			prev->effective_weight = 1.0f - t;
+			next->effective_weight = t;
+		}
+	}
 }
 
 static void ufbxi_get_material_properties(ufbx_material *material)
@@ -6792,6 +6844,9 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 			ufbxi_patch_index(&geom->vertex_tangent.indices, zero_indices, consecutive_indices);
 			ufbxi_patch_index(&geom->face_material, zero_indices, consecutive_indices);
 
+			ufbxi_patch_index(&geom->skinned_position.indices, zero_indices, consecutive_indices);
+			ufbxi_patch_index(&geom->skinned_normal.indices, zero_indices, consecutive_indices);
+
 			ufbxi_for(ufbx_uv_set, set, geom->uv_sets.data, geom->uv_sets.size) {
 				ufbxi_patch_index(&set->vertex_uv.indices, zero_indices, consecutive_indices);
 				ufbxi_patch_index(&set->vertex_binormal.indices, zero_indices, consecutive_indices);
@@ -6910,15 +6965,15 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 				if (parent.shape_deformer->channel_index == NULL) {
 					parent.shape_deformer->channel_index = ufbxi_push(&uc->tmp, uint32_t, parent.shape_deformer->num_channels);
 					ufbxi_check(parent.shape_deformer->channel_index);
-					parent.shape_deformer->num_channels = 0;
+					parent.shape_deformer->write_index = 0;
 				}
-				parent.shape_deformer->channel_index[parent.shape_deformer->num_channels++] = child.index;
+				parent.shape_deformer->channel_index[parent.shape_deformer->write_index++] = child.index;
 			}
 		}
 
 		if (parent.geometry) {
 			if (child.shape_deformer) {
-				parent.geometry->blend_channels.size++;
+				parent.geometry->blend_channels.size += child.shape_deformer->num_channels;
 			}
 		}
 
@@ -6972,12 +7027,14 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		ufbxi_pop(&uc->tmp_arr_blend_channels_extra, ufbxi_blend_channel_extra, 1, &extra);
 
 		channel->keyframes.data = ufbxi_push(&uc->result, ufbx_blend_keyframe, channel->keyframes.size);
-		ufbxi_check(channel->keyframes.size);
+		ufbxi_check(channel->keyframes.data);
 
 		for (size_t i = 0; i < channel->keyframes.size; i++) {
-			double weight = i < extra.num_weights ? extra.full_weights[i] : 0.0;
-			channel->keyframes.data[i].target_weight = (ufbx_real)weight;
+			double weight = i < extra.num_weights ? extra.full_weights[i] : 100.0;
+			channel->keyframes.data[i].target_weight = (ufbx_real)weight / 100.0;
 		}
+
+		channel->keyframes.size = 0;
 	}
 
 	ufbxi_for(ufbx_mesh, mesh, uc->scene.meshes.data, uc->scene.meshes.size) {
@@ -7000,6 +7057,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		ufbxi_check(mesh->materials.data);
 		mesh->materials.size = 0;
 
+		uc->scene.metadata.num_total_blend_channel_refs += mesh->blend_channels.size;
 		mesh->blend_channels.data = ufbxi_push(&uc->result, ufbx_blend_channel*, mesh->blend_channels.size);
 		mesh->blend_channels.size = 0;
 	}
@@ -7056,7 +7114,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 			if (mesh) {
 				ufbx_assert(mesh->node.type == UFBX_NODE_MESH);
 				bool prev_deformed = mesh->skins.size > 0 || mesh->blend_channels.size > 0;
-				bool new_deformed = false;
+				bool prev_skin_blend = mesh->skins.size > 0 && mesh->blend_channels.size > 0;
 
 				if (child.skin_deformer) {
 					// Grow the skin array if there's multiple clusters per mesh
@@ -7077,7 +7135,6 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 						skins[mesh->skins.size++] = *skin;
 					}
 
-					new_deformed = num_new_skins > 0;
 					uc->scene.metadata.num_total_skins += mesh->skins.size - num_old_skins;
 
 				} else if (child.shape_deformer) {
@@ -7097,8 +7154,10 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 						mesh->blend_channels.data[mesh->blend_channels.size++] = channel;
 					}
 
-					new_deformed = true;
 				}
+
+				bool new_deformed = mesh->skins.size > 0 || mesh->blend_channels.size > 0;
+				bool new_skin_blend = mesh->skins.size > 0 && mesh->blend_channels.size > 0;
 				
 				// Count the number of deformed vertices/indices that we need for evaluating the scene
 				if (!prev_deformed && new_deformed) {
@@ -7106,6 +7165,10 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 					uc->scene.metadata.num_skinned_indices += mesh->num_indices;
 					uc->scene.metadata.max_skinned_positions = ufbxi_max_sz(uc->scene.metadata.max_skinned_positions, mesh->num_vertices);
 					uc->scene.metadata.max_skinned_indices = ufbxi_max_sz(uc->scene.metadata.max_skinned_indices, mesh->num_indices);
+				}
+				if (!prev_skin_blend && new_skin_blend) {
+					uc->scene.metadata.max_skinned_blended_positions = ufbxi_max_sz(uc->scene.metadata.max_skinned_blended_positions, mesh->num_vertices);
+					uc->scene.metadata.max_skinned_blended_indices = ufbxi_max_sz(uc->scene.metadata.max_skinned_blended_indices, mesh->num_indices);
 				}
 			}
 		}
@@ -7430,6 +7493,14 @@ static ufbx_material *ufbxi_translate_material(const ufbx_scene *src, ufbx_scene
 	return (ufbx_material*)((char*)dst_base + ((char*)old - (char*)src_base));
 }
 
+static ufbx_blend_channel *ufbxi_translate_blend_channel(const ufbx_scene *src, ufbx_scene *dst, ufbx_blend_channel *old)
+{
+	if (old == NULL) return NULL;
+
+	void *src_base = src->blend_channels.data, *dst_base = dst->blend_channels.data;
+	return (ufbx_blend_channel*)((char*)dst_base + ((char*)old - (char*)src_base));
+}
+
 static void ufbxi_translate_skin(const ufbx_scene *src, ufbx_scene *dst, ufbx_skin *p_new, ufbx_skin *p_old)
 {
 	*p_new = *p_old;
@@ -7476,10 +7547,13 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_mesh, scene->meshes.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_light, scene->lights.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_bone, scene->bones.size);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_blend_channel, scene->blend_channels.size);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_blend_shape, scene->blend_shapes.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_material, scene->materials.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_prop, layer.props.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_node*, scene->metadata.num_total_child_refs);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_material*, scene->metadata.num_total_material_refs);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_blend_channel*, scene->metadata.num_total_blend_channel_refs);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_skin, scene->metadata.num_total_skins);
 
 	if (opts.evaluate_skinned_vertices) {
@@ -7489,6 +7563,8 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 		ufbxi_evaluate_reserve(&alloc_size, int32_t, scene->metadata.num_skinned_indices);
 		ufbxi_evaluate_reserve(&alloc_size, ufbx_real, scene->metadata.max_skinned_positions);
 		ufbxi_evaluate_reserve(&alloc_size, ufbx_real, scene->metadata.max_skinned_positions);
+		ufbxi_evaluate_reserve(&alloc_size, ufbx_vec3, scene->metadata.max_skinned_blended_positions);
+		ufbxi_evaluate_reserve(&alloc_size, ufbx_vec3, scene->metadata.max_skinned_blended_indices);
 	}
 
 	ufbx_error err;
@@ -7527,21 +7603,28 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	ufbx_mesh *meshes = ufbxi_evaluate_push(data, &offset, ufbx_mesh, scene->meshes.size);
 	ufbx_light *lights = ufbxi_evaluate_push(data, &offset, ufbx_light, scene->lights.size);
 	ufbx_bone *bones = ufbxi_evaluate_push(data, &offset, ufbx_bone, scene->bones.size);
+	ufbx_blend_channel *blend_channels = ufbxi_evaluate_push(data, &offset, ufbx_blend_channel, scene->blend_channels.size);
+	ufbx_blend_shape *blend_shapes = ufbxi_evaluate_push(data, &offset, ufbx_blend_shape, scene->blend_shapes.size);
 	ufbx_material *materials = ufbxi_evaluate_push(data, &offset, ufbx_material, scene->materials.size);
 	ufbx_prop *props = ufbxi_evaluate_push(data, &offset, ufbx_prop, layer.props.size);
 	ufbx_node **child_refs = ufbxi_evaluate_push(data, &offset, ufbx_node*, scene->metadata.num_total_child_refs);
 	ufbx_material **material_refs = ufbxi_evaluate_push(data, &offset, ufbx_material*, scene->metadata.num_total_material_refs);
+	ufbx_blend_channel **blend_channel_refs = ufbxi_evaluate_push(data, &offset, ufbx_blend_channel*, scene->metadata.num_total_blend_channel_refs);
 	ufbx_skin *skins = ufbxi_evaluate_push(data, &offset, ufbx_skin, scene->metadata.num_total_skins);
 	ufbx_vec3 *skinned_positions = NULL, *skinned_normals = NULL;
 	int32_t *skinned_normal_indices = NULL;
 	ufbx_real *skinned_pos_weights = NULL;
 	ufbx_real *skinned_pos_total_weight = NULL;
+	ufbx_vec3 *skinned_blended_positions = NULL;
+	ufbx_vec3 *skinned_blended_normals = NULL;
 	if (opts.evaluate_skinned_vertices) {
 		skinned_positions = ufbxi_evaluate_push(data, &offset, ufbx_vec3, scene->metadata.num_skinned_positions + scene->meshes.size);
 		skinned_normals = ufbxi_evaluate_push(data, &offset, ufbx_vec3, scene->metadata.num_skinned_indices + scene->meshes.size);
 		skinned_normal_indices = ufbxi_evaluate_push(data, &offset, int32_t, scene->metadata.num_skinned_indices);
 		skinned_pos_weights = ufbxi_evaluate_push(data, &offset, ufbx_real, scene->metadata.max_skinned_positions);
 		skinned_pos_total_weight = ufbxi_evaluate_push(data, &offset, ufbx_real, scene->metadata.max_skinned_positions);
+		skinned_blended_positions = ufbxi_evaluate_push(data, &offset, ufbx_vec3, scene->metadata.max_skinned_blended_positions);
+		skinned_blended_normals = ufbxi_evaluate_push(data, &offset, ufbx_vec3, scene->metadata.max_skinned_blended_indices);
 	}
 
 	ufbx_assert(offset == alloc_size);
@@ -7553,6 +7636,7 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	imp->scene.meshes.data = meshes;
 	imp->scene.lights.data = lights;
 	imp->scene.bones.data = bones;
+	imp->scene.blend_channels.data = blend_channels;
 	imp->scene.materials.data = materials;
 
 	imp->magic = UFBXI_SCENE_IMP_MAGIC;
@@ -7615,6 +7699,17 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 			}
 		}
 
+		{
+			size_t num_channels = src->blend_channels.size;
+			ufbx_blend_channel **src_channel = src->blend_channels.data;
+			ufbx_blend_channel **dst_channel = blend_channel_refs;
+			blend_channel_refs += num_channels;
+			mesh->blend_channels.data = dst_channel;
+			for (size_t j = 0; j < num_channels; j++) {
+				dst_channel[j] = ufbxi_translate_blend_channel(scene, &imp->scene, src_channel[j]);
+			}
+		}
+
 		if (src->skins.size) {
 			size_t num_skins = src->skins.size;
 			ufbx_skin *src_skin = src->skins.data;
@@ -7668,6 +7763,28 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 		}
 	}
 
+	size_t num_materials = scene->materials.size;
+	for (size_t i = 0; i < num_materials; i++) {
+		ufbx_material *material = &imp->scene.materials.data[i];
+		ufbx_material *src = &scene->materials.data[i];
+		*material = *src;
+
+		ufbx_prop *props_begin = prop;
+		while (ap->target == UFBX_ANIM_MATERIAL && ap->index == i) {
+			ufbxi_evaluate_prop(prop, ap, time);
+			prop++;
+			ap++;
+		}
+
+		if (prop - props_begin > 0) {
+			material->props.defaults = &src->props;
+			material->props.props = props_begin;
+			material->props.num_props = prop - props_begin;
+
+			ufbxi_get_material_properties(material);
+		}
+	}
+
 	size_t num_bones = scene->bones.size;
 	for (size_t i = 0; i < num_bones; i++) {
 		ufbx_bone *bone = &imp->scene.bones.data[i];
@@ -7694,25 +7811,25 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 		}
 	}
 
-	size_t num_materials = scene->materials.size;
-	for (size_t i = 0; i < num_materials; i++) {
-		ufbx_material *material = &imp->scene.materials.data[i];
-		ufbx_material *src = &scene->materials.data[i];
-		*material = *src;
+	size_t num_blend_channels = scene->blend_channels.size;
+	for (size_t i = 0; i < num_blend_channels; i++) {
+		ufbx_blend_channel *channel = &imp->scene.blend_channels.data[i];
+		ufbx_blend_channel *src = &scene->blend_channels.data[i];
+		*channel = *src;
 
 		ufbx_prop *props_begin = prop;
-		while (ap->target == UFBX_ANIM_MATERIAL && ap->index == i) {
+		while (ap->target == UFBX_ANIM_BLEND_CHANNEL && ap->index == i) {
 			ufbxi_evaluate_prop(prop, ap, time);
 			prop++;
 			ap++;
 		}
 
 		if (prop - props_begin > 0) {
-			material->props.defaults = &src->props;
-			material->props.props = props_begin;
-			material->props.num_props = prop - props_begin;
+			channel->props.defaults = &src->props;
+			channel->props.props = props_begin;
+			channel->props.num_props = prop - props_begin;
 
-			ufbxi_get_material_properties(material);
+			ufbxi_get_blend_channel_properties(channel);
 		}
 	}
 
@@ -7725,7 +7842,7 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 
 	if (opts.evaluate_skinned_vertices) {
 		ufbxi_for(ufbx_mesh, mesh, imp->scene.meshes.data, imp->scene.meshes.size) {
-			if (mesh->skins.size == 0) continue;
+			if (mesh->skins.size == 0 && mesh->blend_channels.size == 0) continue;
 
 			ufbx_vec3 *positions = skinned_positions;
 			ufbx_vec3 *normals = skinned_normals;
@@ -7743,64 +7860,135 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 				normal_indices[i] = (int32_t)i;
 			}
 
-			memset(skinned_pos_total_weight, 0, mesh->num_vertices * sizeof(ufbx_real));
+			ufbx_vec3 *blend_positions = mesh->vertex_position.data;
+			ufbx_vec3 *blend_normals = mesh->vertex_normal.data;
+			int32_t *blend_normal_indices = mesh->vertex_normal.indices;
+			size_t num_indices = mesh->num_indices;
+			size_t num_positions = mesh->vertex_position.num_elements;
 
-			ufbxi_for(ufbx_skin, skin, mesh->skins.data, mesh->skins.size) {
-				ufbx_matrix mesh_to_root;
-				ufbx_matrix_mul(&mesh_to_root, &skin->bone->to_root, &skin->mesh_to_bind);
+			if (mesh->blend_channels.size > 0) {
 
-				memset(skinned_pos_weights, 0, mesh->num_vertices * sizeof(ufbx_real));
-
-				ufbx_vec3 *pos_src = mesh->vertex_position.data;
-				ufbx_vec3 *pos_dst = positions;
-				for (size_t i = 0; i < skin->num_weights; i++) {
-					int32_t index = skin->indices[i];
-					ufbx_real weight = skin->weights[i];
-					skinned_pos_weights[index] = weight;
-					skinned_pos_total_weight[index] += weight;
-					ufbx_vec3 p = ufbx_transform_position(&mesh_to_root, pos_src[index]);
-					pos_dst[index].x += p.x * weight;
-					pos_dst[index].y += p.y * weight;
-					pos_dst[index].z += p.z * weight;
+				// Store blended normals either to a temporary buffer or the result
+				// directly depending if there's a skinning stage afterwards
+				if (mesh->skins.size > 0) {
+					blend_positions = skinned_blended_positions;
+					blend_normals = skinned_blended_normals;
+					blend_normal_indices = normal_indices;
+				} else {
+					blend_positions = positions;
+					blend_normals = normals;
 				}
 
-				ufbx_vec3 *normal_dst = normals;
-				if (mesh->vertex_normal.data) {
-					for (size_t i = 0; i < mesh->num_indices; i++) {
-						ufbx_real weight = skinned_pos_weights[mesh->vertex_position.indices[i]];
-						if (weight <= 0.0) continue;
+				// Copy the initial positions from the mesh
+				{
+					const ufbx_vec3 *vertex_position = mesh->vertex_position.data;
+					for (size_t i = 0; i < num_positions; i++) {
+						blend_positions[i] = vertex_position[i];
+					}
 
-						ufbx_vec3 n = ufbx_get_vertex_vec3(&mesh->vertex_normal, i);
-						n = ufbx_transform_direction(&mesh_to_root, n);
-						normal_dst[i].x += n.x * weight;
-						normal_dst[i].y += n.y * weight;
-						normal_dst[i].z += n.z * weight;
+					const ufbx_vec3 *vertex_normal = mesh->vertex_normal.data;
+					const int32_t *vertex_normal_index = mesh->vertex_normal.indices;
+					for (size_t i = 0; i < num_indices; i++) {
+						blend_normals[i] = vertex_normal[vertex_normal_index[i]];
 					}
 				}
-			}
 
-			mesh->node.to_parent = ufbx_identity_matrix;
-			mesh->node.to_root = ufbx_identity_matrix;
+				// Apply the weighted offsets from all blend shape channels
+				ufbxi_for_ptr(ufbx_blend_channel, p_channel, mesh->blend_channels.data, mesh->blend_channels.size) {
+					ufbx_blend_channel *channel = *p_channel;
+					ufbxi_for(ufbx_blend_keyframe, keyframe, channel->keyframes.data, channel->keyframes.size) {
+						ufbx_real weight = keyframe->effective_weight;
+						const ufbx_real epsilon = (ufbx_real)1e-9;
+						if (weight >= -epsilon && weight <= epsilon) continue;
 
-			for (size_t i = 0; i < mesh->num_vertices; i++) {
-				ufbx_real rcp_weight = 1.0 / skinned_pos_total_weight[i];
-				positions[i].x *= rcp_weight;
-				positions[i].y *= rcp_weight;
-				positions[i].z *= rcp_weight;
-			}
-			mesh->vertex_position.data = positions;
+						ufbx_blend_shape *shape = keyframe->shape;
+						const int32_t *indices = shape->indices;
+						const ufbx_vec3 *offsets = shape->position_offsets;
+						size_t num_offsets = shape->num_offsets;
+						for (size_t i = 0; i < num_offsets; i++) {
+							int32_t index = indices[i];
+							ufbx_vec3 p = offsets[i];
+							if (index >= 0 && index < num_positions) {
+								blend_positions[index].x += p.x * weight;
+								blend_positions[index].y += p.y * weight;
+								blend_positions[index].z += p.z * weight;
+							}
 
-			if (mesh->vertex_normal.data) {
-				for (size_t i = 0; i < mesh->num_indices; i++) {
-					ufbx_vec3 n = normals[i];
-					ufbx_real rcp_len = 1.0 / sqrt(n.x*n.x + n.y*n.y + n.z*n.z);
-					normals[i].x = n.x * rcp_len;
-					normals[i].y = n.y * rcp_len;
-					normals[i].z = n.z * rcp_len;
+							// TODO: Offset normals?
+						}
+					}
 				}
 
-				mesh->vertex_normal.data = normals;
-				mesh->vertex_normal.indices = normal_indices;
+				mesh->skinned_position.data = blend_positions;
+
+				mesh->skinned_normal.data = blend_normals;
+				mesh->skinned_normal.indices = normal_indices;
+				mesh->skinned_normal.num_elements = num_indices;
+			}
+
+			if (mesh->skins.size > 0) {
+
+				memset(skinned_pos_total_weight, 0, mesh->num_vertices * sizeof(ufbx_real));
+
+				ufbxi_for(ufbx_skin, skin, mesh->skins.data, mesh->skins.size) {
+					ufbx_matrix mesh_to_root;
+					ufbx_matrix_mul(&mesh_to_root, &skin->bone->to_root, &skin->mesh_to_bind);
+
+					memset(skinned_pos_weights, 0, mesh->num_vertices * sizeof(ufbx_real));
+
+					ufbx_vec3 *pos_src = blend_positions;
+					ufbx_vec3 *pos_dst = positions;
+					for (size_t i = 0; i < skin->num_weights; i++) {
+						int32_t index = skin->indices[i];
+						ufbx_real weight = skin->weights[i];
+						skinned_pos_weights[index] = weight;
+						skinned_pos_total_weight[index] += weight;
+						ufbx_vec3 p = ufbx_transform_position(&mesh_to_root, pos_src[index]);
+						pos_dst[index].x += p.x * weight;
+						pos_dst[index].y += p.y * weight;
+						pos_dst[index].z += p.z * weight;
+					}
+
+					ufbx_vec3 *normal_dst = normals;
+					if (mesh->vertex_normal.data) {
+						for (size_t i = 0; i < mesh->num_indices; i++) {
+							ufbx_real weight = skinned_pos_weights[mesh->vertex_position.indices[i]];
+							if (weight <= 0.0) continue;
+
+							ufbx_vec3 n = blend_normals[blend_normal_indices[i]];
+							n = ufbx_transform_direction(&mesh_to_root, n);
+							normal_dst[i].x += n.x * weight;
+							normal_dst[i].y += n.y * weight;
+							normal_dst[i].z += n.z * weight;
+						}
+					}
+				}
+
+				mesh->skinned_is_local = false;
+
+				for (size_t i = 0; i < mesh->num_vertices; i++) {
+					ufbx_real rcp_weight = 1.0 / skinned_pos_total_weight[i];
+					positions[i].x *= rcp_weight;
+					positions[i].y *= rcp_weight;
+					positions[i].z *= rcp_weight;
+				}
+				mesh->skinned_position.data = positions;
+				mesh->skinned_position.indices = mesh->vertex_position.indices;
+				mesh->skinned_position.num_elements = mesh->vertex_position.num_elements;
+
+				if (mesh->vertex_normal.data) {
+					for (size_t i = 0; i < mesh->num_indices; i++) {
+						ufbx_vec3 n = normals[i];
+						ufbx_real rcp_len = 1.0 / sqrt(n.x*n.x + n.y*n.y + n.z*n.z);
+						normals[i].x = n.x * rcp_len;
+						normals[i].y = n.y * rcp_len;
+						normals[i].z = n.z * rcp_len;
+					}
+
+					mesh->skinned_normal.data = normals;
+					mesh->skinned_normal.indices = normal_indices;
+					mesh->skinned_normal.num_elements = mesh->num_indices;
+				}
 			}
 		}
 	}
@@ -8022,6 +8210,26 @@ ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_
 	return NULL;
 }
 
+ufbx_bone *ufbx_find_bone_len(const ufbx_scene *scene, const char *name, size_t name_len)
+{
+	ufbxi_for(ufbx_bone, bone, scene->bones.data, scene->bones.size) {
+		if (bone->node.name.length == name_len && !memcmp(bone->node.name.data, name, name_len)) {
+			return bone;
+		}
+	}
+	return NULL;
+}
+
+ufbx_blend_channel *ufbx_find_blend_channel_len(const ufbx_scene *scene, const char *name, size_t name_len)
+{
+	ufbxi_for(ufbx_blend_channel, channel, scene->blend_channels.data, scene->blend_channels.size) {
+		if (channel->name.length == name_len && !memcmp(channel->name.data, name, name_len)) {
+			return channel;
+		}
+	}
+	return NULL;
+}
+
 ufbx_anim_stack *ufbx_find_anim_stack_len(const ufbx_scene *scene, const char *name, size_t name_len)
 {
 	ufbxi_for(ufbx_anim_stack, stack, scene->anim_stacks.data, scene->anim_stacks.size) {
@@ -8163,11 +8371,11 @@ ufbx_anim_prop *ufbx_find_node_anim_prop_begin(const ufbx_scene *scene, const uf
 	return ufbx_find_anim_prop_begin(scene, layer, target, index);
 }
 
-ufbx_anim_prop *ufbx_find_blend_shape_anim_prop_begin(const ufbx_scene *scene, const ufbx_anim_layer *layer, const ufbx_blend_shape *shape)
+ufbx_anim_prop *ufbx_find_blend_channel_anim_prop_begin(const ufbx_scene *scene, const ufbx_anim_layer *layer, const ufbx_blend_channel *channel)
 {
-	if (!scene || !shape) return NULL;
+	if (!scene || !channel) return NULL;
 	ufbx_anim_target target = UFBX_ANIM_BLEND_CHANNEL;
-	uint32_t index = (uint32_t)(shape - scene->blend_shapes.data);
+	uint32_t index = (uint32_t)(channel - scene->blend_channels.data);
 	return ufbx_find_anim_prop_begin(scene, layer, target, index);
 }
 
