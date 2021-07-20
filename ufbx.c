@@ -7797,7 +7797,6 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	ufbx_material **material_refs = ufbxi_evaluate_push(data, &offset, ufbx_material*, scene->metadata.num_total_material_refs);
 	ufbx_blend_channel **blend_channel_refs = ufbxi_evaluate_push(data, &offset, ufbx_blend_channel*, scene->metadata.num_total_blend_channel_refs);
 	ufbx_skin *skins = ufbxi_evaluate_push(data, &offset, ufbx_skin, scene->metadata.num_total_skins);
-	ufbx_vec3 *skinned_positions = NULL, *skinned_normals = NULL;
 
 	void *skinning_data = NULL;
 	if (opts.evaluate_skinned_vertices) {
