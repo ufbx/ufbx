@@ -136,12 +136,14 @@ typedef struct ufbx_node ufbx_node;
 typedef struct ufbx_model ufbx_model;
 typedef struct ufbx_mesh ufbx_mesh;
 typedef struct ufbx_light ufbx_light;
+typedef struct ufbx_camera ufbx_camera;
 typedef struct ufbx_bone ufbx_bone;
 
 typedef struct ufbx_node_ptr_list { ufbx_node **data; size_t size; } ufbx_node_ptr_list;
 typedef struct ufbx_model_list { ufbx_model *data; size_t size; } ufbx_model_list;
 typedef struct ufbx_mesh_list { ufbx_mesh *data; size_t size; } ufbx_mesh_list;
 typedef struct ufbx_light_list { ufbx_light *data; size_t size; } ufbx_light_list;
+typedef struct ufbx_camera_list { ufbx_camera *data; size_t size; } ufbx_camera_list;
 typedef struct ufbx_bone_list { ufbx_bone *data; size_t size; } ufbx_bone_list;
 
 typedef struct ufbx_material ufbx_material;
@@ -274,6 +276,7 @@ typedef enum ufbx_node_type {
 	UFBX_NODE_MODEL,
 	UFBX_NODE_MESH,
 	UFBX_NODE_LIGHT,
+	UFBX_NODE_CAMERA,
 	UFBX_NODE_BONE,
 } ufbx_node_type;
 
@@ -282,6 +285,45 @@ typedef enum ufbx_inherit_type {
 	UFBX_INHERIT_NORMAL,    // R*S*r*s
 	UFBX_INHERIT_NO_SCALE,  // R*r*s
 } ufbx_inherit_type;
+
+typedef enum ufbx_aspect_mode {
+	UFBX_ASPECT_MODE_WINDOW_SIZE,
+	UFBX_ASPECT_MODE_FIXED_RATIO,
+	UFBX_ASPECT_MODE_FIXED_RESOLUTION,
+	UFBX_ASPECT_MODE_FIXED_WIDTH,
+	UFBX_ASPECT_MODE_FIXED_HEIGHT,
+} ufbx_aspect_mode;
+
+typedef enum ufbx_aperture_mode {
+	UFBX_APERTURE_MODE_HORIZONTAL_AND_VERTICAL,
+	UFBX_APERTURE_MODE_HORIZONTAL,
+	UFBX_APERTURE_MODE_VERTICAL,
+	UFBX_APERTURE_MODE_FOCAL_LENGTH,
+} ufbx_aperture_mode;
+
+typedef enum ufbx_aperture_format {
+	UFBX_APERTURE_FORMAT_CUSTOM,
+	UFBX_APERTURE_FORMAT_16MM_THEATRICAL,
+	UFBX_APERTURE_FORMAT_SUPER_16MM,
+	UFBX_APERTURE_FORMAT_35MM_ACADEMY,
+	UFBX_APERTURE_FORMAT_35MM_TV_PROJECTION,
+	UFBX_APERTURE_FORMAT_35MM_FULL_APERTURE,
+	UFBX_APERTURE_FORMAT_35MM_185_PROJECTION,
+	UFBX_APERTURE_FORMAT_35MM_ANAMORPHIC,
+	UFBX_APERTURE_FORMAT_70MM_PROJECTION,
+	UFBX_APERTURE_FORMAT_VISTAVISION,
+	UFBX_APERTURE_FORMAT_DYNAVISION,
+	UFBX_APERTURE_FORMAT_IMAX,
+} ufbx_aperture_format;
+
+typedef enum ufbx_gate_fit {
+	UFBX_GATE_FIT_NONE,
+	UFBX_GATE_FIT_VERTICAL,
+	UFBX_GATE_FIT_HORIZONTAL,
+	UFBX_GATE_FIT_FILL,
+	UFBX_GATE_FIT_OVERSCAN,
+	UFBX_GATE_FIT_STRETCH,
+} ufbx_gate_fit;
 
 struct ufbx_node {
 	ufbx_node_type type;
@@ -344,6 +386,24 @@ struct ufbx_light {
 	ufbx_real intensity;
 };
 
+struct ufbx_camera {
+	ufbx_node node;
+
+	bool resolution_is_pixels;
+	ufbx_vec2 resolution;
+	ufbx_vec2 field_of_view_deg;
+	ufbx_vec2 field_of_view_tan;
+
+	ufbx_aspect_mode aspect_mode;
+	ufbx_aperture_format aperture_format;
+	ufbx_aperture_mode aperture_mode;
+	ufbx_gate_fit gate_fit;
+	ufbx_real focal_length_mm;
+	ufbx_vec2 film_size_inch;
+	ufbx_vec2 aperture_size_inch;
+	ufbx_real squeeze_ratio;
+};
+
 struct ufbx_bone {
 	ufbx_node node;
 
@@ -384,6 +444,7 @@ typedef enum ufbx_anim_target {
 	UFBX_ANIM_MODEL,
 	UFBX_ANIM_MESH,
 	UFBX_ANIM_LIGHT,
+	UFBX_ANIM_CAMERA,
 	UFBX_ANIM_MATERIAL,
 	UFBX_ANIM_BONE,
 	UFBX_ANIM_BLEND_CHANNEL,
@@ -471,6 +532,7 @@ struct ufbx_scene {
 	ufbx_model_list models;
 	ufbx_mesh_list meshes;
 	ufbx_light_list lights;
+	ufbx_camera_list cameras;
 	ufbx_bone_list bones;
 	ufbx_blend_shape_list blend_shapes;
 	ufbx_blend_channel_list blend_channels;
@@ -596,6 +658,7 @@ ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t 
 ufbx_mesh *ufbx_find_mesh_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_material *ufbx_find_material_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_t name_len);
+ufbx_camera *ufbx_find_camera_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_bone *ufbx_find_bone_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_blend_channel *ufbx_find_blend_channel_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_anim_stack *ufbx_find_anim_stack_len(const ufbx_scene *scene, const char *name, size_t name_len);
@@ -630,7 +693,7 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 
 ufbx_vec3 ufbx_rotate_vector(ufbx_vec4 q, ufbx_vec3 v);
 
-bool ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, ufbx_face face);
+size_t ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, ufbx_face face);
 
 // Utility
 
@@ -652,6 +715,10 @@ ufbx_inline ufbx_material *ufbx_find_material(const ufbx_scene *scene, const cha
 
 ufbx_inline ufbx_light *ufbx_find_light(const ufbx_scene *scene, const char *name) {
 	return ufbx_find_light_len(scene, name, strlen(name));
+}
+
+ufbx_inline ufbx_camera *ufbx_find_camera(const ufbx_scene *scene, const char *name) {
+	return ufbx_find_camera_len(scene, name, strlen(name));
 }
 
 ufbx_inline ufbx_bone *ufbx_find_bone(const ufbx_scene *scene, const char *name) {
@@ -705,6 +772,8 @@ ufbx_inline ufbx_mesh *begin(const ufbx_mesh_list &l) { return l.data; }
 ufbx_inline ufbx_mesh *end(const ufbx_mesh_list &l) { return l.data + l.size; }
 ufbx_inline ufbx_light *begin(const ufbx_light_list &l) { return l.data; }
 ufbx_inline ufbx_light *end(const ufbx_light_list &l) { return l.data + l.size; }
+ufbx_inline ufbx_camera *begin(const ufbx_camera_list &l) { return l.data; }
+ufbx_inline ufbx_camera *end(const ufbx_camera_list &l) { return l.data + l.size; }
 ufbx_inline ufbx_bone *begin(const ufbx_bone_list &l) { return l.data; }
 ufbx_inline ufbx_bone *end(const ufbx_bone_list &l) { return l.data + l.size; }
 ufbx_inline ufbx_anim_stack *begin(const ufbx_anim_stack_list &l) { return l.data; }

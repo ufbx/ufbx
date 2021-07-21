@@ -1822,6 +1822,22 @@ static const char ufbxi_Weights[] = "Weights";
 static const char ufbxi_X[] = "X";
 static const char ufbxi_Y[] = "Y";
 static const char ufbxi_Z[] = "Z";
+static const char ufbxi_Camera[] = "Camera";
+static const char ufbxi_AspectWidth[] = "AspectWidth";
+static const char ufbxi_AspectHeight[] = "AspectHeight";
+static const char ufbxi_AspectW[] = "AspectW";
+static const char ufbxi_AspectH[] = "AspectH";
+static const char ufbxi_AspectRatioMode[] = "AspectRatioMode";
+static const char ufbxi_ApertureMode[] = "ApertureMode";
+static const char ufbxi_FieldOfView[] = "FieldOfView";
+static const char ufbxi_FieldOfViewX[] = "FieldOfViewX";
+static const char ufbxi_FieldOfViewY[] = "FieldOfViewY";
+static const char ufbxi_FilmWidth[] = "FilmWidth";
+static const char ufbxi_FilmHeight[] = "FilmHeight";
+static const char ufbxi_ApertureFormat[] = "ApertureFormat";
+static const char ufbxi_GateFit[] = "GateFit";
+static const char ufbxi_FilmSqueezeRatio[] = "FilmSqueezeRatio";
+static const char ufbxi_FocalLength[] = "FocalLength";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, sizeof(ufbxi_AllSame) - 1 },
@@ -1948,6 +1964,22 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_X, sizeof(ufbxi_X) - 1 },
 	{ ufbxi_Y, sizeof(ufbxi_Y) - 1 },
 	{ ufbxi_Z, sizeof(ufbxi_Z) - 1 },
+	{ ufbxi_Camera, sizeof(ufbxi_Camera) - 1 },
+	{ ufbxi_AspectWidth, sizeof(ufbxi_AspectWidth) - 1 },
+	{ ufbxi_AspectHeight, sizeof(ufbxi_AspectHeight) - 1 },
+	{ ufbxi_AspectW, sizeof(ufbxi_AspectW) - 1 },
+	{ ufbxi_AspectH, sizeof(ufbxi_AspectH) - 1 },
+	{ ufbxi_AspectRatioMode, sizeof(ufbxi_AspectRatioMode) - 1 },
+	{ ufbxi_ApertureMode, sizeof(ufbxi_ApertureMode) - 1 },
+	{ ufbxi_FieldOfView, sizeof(ufbxi_FieldOfView) - 1 },
+	{ ufbxi_FieldOfViewX, sizeof(ufbxi_FieldOfViewX) - 1 },
+	{ ufbxi_FieldOfViewY, sizeof(ufbxi_FieldOfViewY) - 1 },
+	{ ufbxi_FilmWidth, sizeof(ufbxi_FilmWidth) - 1 },
+	{ ufbxi_FilmHeight, sizeof(ufbxi_FilmHeight) - 1 },
+	{ ufbxi_ApertureFormat, sizeof(ufbxi_ApertureFormat) - 1 },
+	{ ufbxi_GateFit, sizeof(ufbxi_GateFit) - 1 },
+	{ ufbxi_FilmSqueezeRatio, sizeof(ufbxi_FilmSqueezeRatio) - 1 },
+	{ ufbxi_FocalLength, sizeof(ufbxi_FocalLength) - 1 },
 };
 
 // -- Type definitions
@@ -2009,6 +2041,7 @@ typedef enum {
 	UFBXI_CONNECTABLE_MODEL,
 	UFBXI_CONNECTABLE_MESH,
 	UFBXI_CONNECTABLE_LIGHT,
+	UFBXI_CONNECTABLE_CAMERA,
 	UFBXI_CONNECTABLE_BONE,
 	UFBXI_CONNECTABLE_BLEND_SHAPE,
 	UFBXI_CONNECTABLE_BLEND_CHANNEL,
@@ -2154,6 +2187,7 @@ typedef struct {
 	ufbxi_buf tmp_arr_geometry;
 	ufbxi_buf tmp_arr_materials;
 	ufbxi_buf tmp_arr_lights;
+	ufbxi_buf tmp_arr_cameras;
 	ufbxi_buf tmp_arr_bones;
 	ufbxi_buf tmp_arr_blend_shapes;
 	ufbxi_buf tmp_arr_blend_channels;
@@ -5150,6 +5184,12 @@ ufbxi_nodiscard static int ufbxi_read_model(ufbxi_context *uc, ufbxi_node *node,
 		ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_LIGHT, object->id, uc->tmp_arr_lights.num_items - 1));
 		light->node.type = UFBX_NODE_LIGHT;
 		scene_node = &light->node;
+	} else if (object->sub_type.data == ufbxi_Camera) {
+		ufbx_camera *camera = ufbxi_push_zero(&uc->tmp_arr_cameras, ufbx_camera, 1);
+		ufbxi_check(camera);
+		ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_CAMERA, object->id, uc->tmp_arr_cameras.num_items - 1));
+		camera->node.type = UFBX_NODE_CAMERA;
+		scene_node = &camera->node;
 	} else if (object->sub_type.data == ufbxi_LimbNode || object->sub_type.data == ufbxi_Limb) {
 		ufbx_bone *bone = ufbxi_push_zero(&uc->tmp_arr_bones, ufbx_bone, 1);
 		ufbxi_check(bone);
@@ -5174,12 +5214,10 @@ ufbxi_nodiscard static int ufbxi_read_model(ufbxi_context *uc, ufbxi_node *node,
 
 ufbxi_nodiscard static int ufbxi_read_node_attribute(ufbxi_context *uc, ufbxi_node *node, ufbxi_object *object)
 {
-	if (object->sub_type.data == ufbxi_Light || object->sub_type.data == ufbxi_LimbNode || object->sub_type.data == ufbxi_Limb) {
-		ufbxi_attribute *attr = ufbxi_push_zero(&uc->tmp_arr_attributes, ufbxi_attribute, 1);
-		ufbxi_check(attr);
-		ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ATTRIBUTE, object->id, uc->tmp_arr_attributes.num_items - 1));
-		attr->props = object->props;
-	}
+	ufbxi_attribute *attr = ufbxi_push_zero(&uc->tmp_arr_attributes, ufbxi_attribute, 1);
+	ufbxi_check(attr);
+	ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_ATTRIBUTE, object->id, uc->tmp_arr_attributes.num_items - 1));
+	attr->props = object->props;
 
 	(void)node;
 
@@ -5999,6 +6037,7 @@ ufbxi_nodiscard static int ufbxi_read_connections(ufbxi_context *uc)
 			case UFBXI_CONNECTABLE_MODEL:
 			case UFBXI_CONNECTABLE_MESH:
 			case UFBXI_CONNECTABLE_LIGHT:
+			case UFBXI_CONNECTABLE_CAMERA:
 			case UFBXI_CONNECTABLE_BONE:
 				attr->parent_type = parent->type;
 				attr->parent_index = parent->index;
@@ -6165,34 +6204,34 @@ ufbx_prop *ufbxi_find_prop_imp(const ufbx_props *props, const char *name, uint32
 	(m_prop)->value_real_arr[1] = m_y; \
 	(m_prop)->value_real_arr[2] = m_z
 
-static ufbxi_forceinline ufbx_real ufbxi_find_real(const ufbx_props *props, const char *name)
+static ufbxi_forceinline ufbx_real ufbxi_find_real(const ufbx_props *props, const char *name, ufbx_real def)
 {
 	ufbx_prop *prop = ufbxi_find_prop(props, name);
 	if (prop) {
 		return prop->value_real;
 	} else {
-		return 0.0;
+		return def;
 	}
 }
 
-static ufbxi_forceinline ufbx_vec3 ufbxi_find_vec3(const ufbx_props *props, const char *name)
+static ufbxi_forceinline ufbx_vec3 ufbxi_find_vec3(const ufbx_props *props, const char *name, ufbx_real def_x, ufbx_real def_y, ufbx_real def_z)
 {
 	ufbx_prop *prop = ufbxi_find_prop(props, name);
 	if (prop) {
 		return prop->value_vec3;
 	} else {
-		ufbx_vec3 zero = { 0 };
-		return zero;
+		ufbx_vec3 def = { def_x, def_y, def_z };
+		return def;
 	}
 }
 
-static ufbxi_forceinline int64_t ufbxi_find_int(const ufbx_props *props, const char *name)
+static ufbxi_forceinline int64_t ufbxi_find_int(const ufbx_props *props, const char *name, int64_t def)
 {
 	ufbx_prop *prop = ufbxi_find_prop(props, name);
 	if (prop) {
 		return prop->value_int;
 	} else {
-		return 0;
+		return def;
 	}
 }
 
@@ -6222,6 +6261,8 @@ static ufbxi_forceinline void ufbxi_mul_scale(ufbx_transform *t, ufbx_vec3 v)
 
 #define UFBXI_PI ((ufbx_real)3.14159265358979323846)
 #define UFBXI_DEG_TO_RAD ((ufbx_real)(UFBXI_PI / 180.0))
+#define UFBXI_RAD_TO_DEG ((ufbx_real)(180.0 / UFBXI_PI))
+#define UFBXI_MM_TO_INCH ((ufbx_real)0.0393700787)
 
 static ufbx_vec4 ufbxi_to_quat(ufbx_vec3 v, ufbx_rotation_order order)
 {
@@ -6329,17 +6370,17 @@ static void ufbxi_mul_inv_rotate(ufbx_transform *t, ufbx_vec3 v, ufbx_rotation_o
 
 static ufbx_transform ufbxi_get_transform(const ufbx_props *props)
 {
-	ufbx_vec3 scale_pivot = ufbxi_find_vec3(props, ufbxi_ScalingPivot);
-	ufbx_vec3 rot_pivot = ufbxi_find_vec3(props, ufbxi_RotationPivot);
-	ufbx_vec3 scale_offset = ufbxi_find_vec3(props, ufbxi_ScalingOffset);
-	ufbx_vec3 rot_offset = ufbxi_find_vec3(props, ufbxi_RotationOffset);
+	ufbx_vec3 scale_pivot = ufbxi_find_vec3(props, ufbxi_ScalingPivot, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 rot_pivot = ufbxi_find_vec3(props, ufbxi_RotationPivot, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 scale_offset = ufbxi_find_vec3(props, ufbxi_ScalingOffset, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 rot_offset = ufbxi_find_vec3(props, ufbxi_RotationOffset, 0.0f, 0.0f, 0.0f);
 
-	ufbx_vec3 translation = ufbxi_find_vec3(props, ufbxi_Lcl_Translation);
-	ufbx_vec3 rotation = ufbxi_find_vec3(props, ufbxi_Lcl_Rotation);
-	ufbx_vec3 scaling = ufbxi_find_vec3(props, ufbxi_Lcl_Scaling);
+	ufbx_vec3 translation = ufbxi_find_vec3(props, ufbxi_Lcl_Translation, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 rotation = ufbxi_find_vec3(props, ufbxi_Lcl_Rotation, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 scaling = ufbxi_find_vec3(props, ufbxi_Lcl_Scaling, 0.0f, 0.0f, 0.0f);
 
-	ufbx_vec3 pre_rotation = ufbxi_find_vec3(props, ufbxi_PreRotation);
-	ufbx_vec3 post_rotation = ufbxi_find_vec3(props, ufbxi_PostRotation);
+	ufbx_vec3 pre_rotation = ufbxi_find_vec3(props, ufbxi_PreRotation, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 post_rotation = ufbxi_find_vec3(props, ufbxi_PostRotation, 0.0f, 0.0f, 0.0f);
 
 	ufbx_rotation_order order = UFBX_ROTATION_XYZ;
 	ufbx_prop *order_prop = ufbxi_find_prop(props, ufbxi_RotationOrder);
@@ -6375,18 +6416,175 @@ static ufbx_transform ufbxi_get_transform(const ufbx_props *props)
 
 static void ufbxi_get_light_properties(ufbx_light *light)
 {
-	light->color = ufbxi_find_vec3(&light->node.props, ufbxi_Color);
-	light->intensity = ufbxi_find_real(&light->node.props, ufbxi_Intensity);
+	light->color = ufbxi_find_vec3(&light->node.props, ufbxi_Color, 1.0f, 1.0f, 1.0f);
+	light->intensity = ufbxi_find_real(&light->node.props, ufbxi_Intensity, 1.0f);
+}
+
+typedef struct {
+	ufbx_vec2 film_size;
+	ufbx_real squeeze_ratio;
+} ufbxi_aperture_format;
+
+static const ufbxi_aperture_format ufbxi_aperture_formats[] = {
+	{ (ufbx_real)1.000, (ufbx_real)1.000, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_CUSTOM
+	{ (ufbx_real)0.404, (ufbx_real)0.295, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_16MM_THEATRICAL
+	{ (ufbx_real)0.493, (ufbx_real)0.292, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_SUPER_16MM
+	{ (ufbx_real)0.864, (ufbx_real)0.630, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_35MM_ACADEMY
+	{ (ufbx_real)0.816, (ufbx_real)0.612, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_35MM_TV_PROJECTION
+	{ (ufbx_real)0.980, (ufbx_real)0.735, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_35MM_FULL_APERTURE
+	{ (ufbx_real)0.825, (ufbx_real)0.446, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_35MM_185_PROJECTION
+	{ (ufbx_real)0.864, (ufbx_real)0.732, (ufbx_real)2.0 }, // UFBX_APERTURE_FORMAT_35MM_ANAMORPHIC
+	{ (ufbx_real)2.066, (ufbx_real)0.906, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_70MM_PROJECTION
+	{ (ufbx_real)1.485, (ufbx_real)0.991, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_VISTAVISION
+	{ (ufbx_real)2.080, (ufbx_real)1.480, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_DYNAVISION
+	{ (ufbx_real)2.772, (ufbx_real)2.072, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_IMAX
+};
+
+static void ufbxi_get_camera_properties(ufbx_camera *camera)
+{
+	{
+		int64_t mode = ufbxi_find_int(&camera->node.props, ufbxi_AspectRatioMode, 0);
+		if (mode < 0 || mode > UFBX_ASPECT_MODE_FIXED_HEIGHT) mode = 0;
+		camera->aspect_mode = (ufbx_aspect_mode)mode;
+	}
+
+	{
+		int64_t mode = ufbxi_find_int(&camera->node.props, ufbxi_ApertureMode, 2);
+		if (mode < 0 || mode > UFBX_APERTURE_MODE_FOCAL_LENGTH) mode = 2;
+		camera->aperture_mode = (ufbx_aperture_mode)mode;
+	}
+
+	{
+		int64_t format = ufbxi_find_int(&camera->node.props, ufbxi_ApertureFormat, 0);
+		if (format < 0 || format > UFBX_APERTURE_FORMAT_IMAX) format = 0;
+		camera->aperture_format = (ufbx_aperture_format)format;
+	}
+
+	{
+		int64_t fit = ufbxi_find_int(&camera->node.props, ufbxi_GateFit, 0);
+		if (fit < 0 || fit > UFBX_GATE_FIT_STRETCH) fit = 0;
+		camera->gate_fit = (ufbx_gate_fit)fit;
+	}
+
+	// Search both W/H and Width/Height but prefer the latter
+	ufbx_real aspect_x = ufbxi_find_real(&camera->node.props, ufbxi_AspectW, 0.0f);
+	ufbx_real aspect_y = ufbxi_find_real(&camera->node.props, ufbxi_AspectH, 0.0f);
+	aspect_x = ufbxi_find_real(&camera->node.props, ufbxi_AspectWidth, aspect_x);
+	aspect_y = ufbxi_find_real(&camera->node.props, ufbxi_AspectHeight, aspect_y);
+
+	ufbx_real fov = ufbxi_find_real(&camera->node.props, ufbxi_FieldOfView, 0.0f);
+	ufbx_real fov_x = ufbxi_find_real(&camera->node.props, ufbxi_FieldOfViewX, 0.0f);
+	ufbx_real fov_y = ufbxi_find_real(&camera->node.props, ufbxi_FieldOfViewY, 0.0f);
+
+	ufbx_real focal_length = ufbxi_find_real(&camera->node.props, ufbxi_FocalLength, 0.0f);
+
+	ufbx_vec2 film_size = ufbxi_aperture_formats[camera->aperture_format].film_size;
+	ufbx_real squeeze_ratio = ufbxi_aperture_formats[camera->aperture_format].squeeze_ratio;
+
+	film_size.x = ufbxi_find_real(&camera->node.props, ufbxi_FilmWidth, film_size.x);
+	film_size.y = ufbxi_find_real(&camera->node.props, ufbxi_FilmHeight, film_size.y);
+	squeeze_ratio = ufbxi_find_real(&camera->node.props, ufbxi_FilmSqueezeRatio, squeeze_ratio);
+
+	film_size.y *= squeeze_ratio;
+
+	camera->focal_length_mm = focal_length;
+	camera->film_size_inch = film_size;
+	camera->squeeze_ratio = squeeze_ratio;
+
+	switch (camera->aspect_mode) {
+	case UFBX_ASPECT_MODE_WINDOW_SIZE:
+	case UFBX_ASPECT_MODE_FIXED_RATIO:
+		camera->resolution_is_pixels = false;
+		camera->resolution.x = aspect_x;
+		camera->resolution.y = aspect_y;
+		break;
+	case UFBX_ASPECT_MODE_FIXED_RESOLUTION:
+		camera->resolution_is_pixels = true;
+		camera->resolution.x = aspect_x;
+		camera->resolution.y = aspect_y;
+		break;
+	case UFBX_ASPECT_MODE_FIXED_WIDTH:
+		camera->resolution_is_pixels = true;
+		camera->resolution.x = aspect_x;
+		camera->resolution.y = aspect_x * aspect_y;
+		break;
+	case UFBX_ASPECT_MODE_FIXED_HEIGHT:
+		camera->resolution_is_pixels = true;
+		camera->resolution.x = aspect_y * aspect_x;
+		camera->resolution.y = aspect_y;
+		break;
+	}
+
+	ufbx_real aspect_ratio = camera->resolution.x / camera->resolution.y;
+	ufbx_real film_ratio = film_size.x / film_size.y;
+
+	ufbx_gate_fit effective_fit = camera->gate_fit;
+	if (effective_fit == UFBX_GATE_FIT_FILL) {
+		effective_fit = aspect_ratio < film_ratio ? UFBX_GATE_FIT_HORIZONTAL : UFBX_GATE_FIT_VERTICAL;
+	} else if (effective_fit == UFBX_GATE_FIT_OVERSCAN) {
+		effective_fit = aspect_ratio > film_ratio ? UFBX_GATE_FIT_HORIZONTAL : UFBX_GATE_FIT_VERTICAL;
+	}
+
+	switch (camera->gate_fit) {
+	case UFBX_GATE_FIT_NONE:
+		camera->aperture_size_inch = camera->film_size_inch;
+		break;
+	case UFBX_GATE_FIT_VERTICAL:
+		camera->aperture_size_inch.x = camera->film_size_inch.y * aspect_ratio;
+		camera->aperture_size_inch.y = camera->aperture_size_inch.y;
+		break;
+	case UFBX_GATE_FIT_HORIZONTAL:
+		camera->aperture_size_inch.x = camera->film_size_inch.x;
+		camera->aperture_size_inch.y = camera->aperture_size_inch.x / aspect_ratio;
+		break;
+	case UFBX_GATE_FIT_FILL:
+	case UFBX_GATE_FIT_OVERSCAN:
+		camera->aperture_size_inch = camera->film_size_inch;
+		ufbx_assert(0 && "Unreachable, set to vertical/horizontal above"); break;
+		break;
+	case UFBX_GATE_FIT_STRETCH:
+		camera->aperture_size_inch = camera->film_size_inch;
+		// TODO: Not sure what to do here...
+		break;
+	}
+
+	switch (camera->aperture_mode) {
+	case UFBX_APERTURE_MODE_HORIZONTAL_AND_VERTICAL:
+		camera->field_of_view_deg.x = fov_x;
+		camera->field_of_view_deg.y = fov_y;
+		camera->field_of_view_tan.x = (ufbx_real)tan(fov_x * (UFBXI_DEG_TO_RAD * 0.5f));
+		camera->field_of_view_tan.y = (ufbx_real)tan(fov_y * (UFBXI_DEG_TO_RAD * 0.5f));
+		break;
+	case UFBX_APERTURE_MODE_HORIZONTAL:
+		camera->field_of_view_deg.x = fov;
+		camera->field_of_view_tan.x = (ufbx_real)tan(fov * (UFBXI_DEG_TO_RAD * 0.5f));
+		camera->field_of_view_tan.y = camera->field_of_view_tan.x / aspect_ratio;
+		camera->field_of_view_deg.y = (ufbx_real)atan(camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
+		break;
+	case UFBX_APERTURE_MODE_VERTICAL:
+		camera->field_of_view_deg.y = fov;
+		camera->field_of_view_tan.y = (ufbx_real)tan(fov * (UFBXI_DEG_TO_RAD * 0.5f));
+		camera->field_of_view_tan.x = camera->field_of_view_tan.y * aspect_ratio;
+		camera->field_of_view_deg.x = (ufbx_real)atan(camera->field_of_view_tan.x) * UFBXI_RAD_TO_DEG * 2.0f;
+		break;
+	case UFBX_APERTURE_MODE_FOCAL_LENGTH:
+		camera->field_of_view_tan.x = camera->aperture_size_inch.x / (camera->focal_length_mm * UFBXI_MM_TO_INCH) * 0.5f;
+		camera->field_of_view_tan.y = camera->aperture_size_inch.y / (camera->focal_length_mm * UFBXI_MM_TO_INCH) * 0.5f;
+		camera->field_of_view_deg.x = (ufbx_real)atan(camera->field_of_view_tan.x) * UFBXI_RAD_TO_DEG * 2.0f;
+		camera->field_of_view_deg.y = (ufbx_real)atan(camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
+		break;
+	}
+
 }
 
 static void ufbxi_get_bone_properties(ufbx_bone *bone)
 {
-	bone->length = ufbxi_find_real(&bone->node.props, ufbxi_Size);
+	bone->length = ufbxi_find_real(&bone->node.props, ufbxi_Size, 0.0f);
 }
 
 static void ufbxi_get_blend_channel_properties(ufbx_blend_channel *channel)
 {
-	ufbx_real weight = ufbxi_find_real(&channel->props, ufbxi_DeformPercent) * (ufbx_real)0.01;
+	ufbx_real weight = ufbxi_find_real(&channel->props, ufbxi_DeformPercent, 0.0f) * (ufbx_real)0.01;
 	channel->weight = weight;
 
 	ptrdiff_t num_keys = (ptrdiff_t)channel->keyframes.size;
@@ -6430,8 +6628,8 @@ static void ufbxi_get_blend_channel_properties(ufbx_blend_channel *channel)
 
 static void ufbxi_get_material_properties(ufbx_material *material)
 {
-	material->diffuse_color = ufbxi_find_vec3(&material->props, ufbxi_DiffuseColor);
-	material->specular_color = ufbxi_find_vec3(&material->props, ufbxi_SpecularColor);
+	material->diffuse_color = ufbxi_find_vec3(&material->props, ufbxi_DiffuseColor, 1.0f, 1.0f, 1.0f);
+	material->specular_color = ufbxi_find_vec3(&material->props, ufbxi_SpecularColor, 1.0f, 1.0f, 1.0f);
 }
 
 static void ufbxi_get_anim_stack_properties(ufbx_anim_stack *stack, ufbx_scene *scene)
@@ -6454,9 +6652,9 @@ static void ufbxi_get_anim_stack_properties(ufbx_anim_stack *stack, ufbx_scene *
 
 static void ufbxi_get_anim_layer_properties(ufbx_anim_layer *layer)
 {
-	layer->weight = ufbxi_find_real(&layer->layer_props, ufbxi_Weight);
-	layer->compose_rotation = ufbxi_find_int(&layer->layer_props, ufbxi_RotationAccumulationMode) == 0;
-	layer->compose_scale = ufbxi_find_int(&layer->layer_props, ufbxi_ScaleAccumulationMode) == 0;
+	layer->weight = ufbxi_find_real(&layer->layer_props, ufbxi_Weight, 1.0f);
+	layer->compose_rotation = ufbxi_find_int(&layer->layer_props, ufbxi_RotationAccumulationMode, 0) == 0;
+	layer->compose_scale = ufbxi_find_int(&layer->layer_props, ufbxi_ScaleAccumulationMode, 0) == 0;
 }
 
 static void ufbxi_get_properties(ufbx_scene *scene)
@@ -6477,6 +6675,10 @@ static void ufbxi_get_properties(ufbx_scene *scene)
 
 	ufbxi_for(ufbx_light, light, scene->lights.data, scene->lights.size) {
 		ufbxi_get_light_properties(light);
+	}
+
+	ufbxi_for(ufbx_camera, camera, scene->cameras.data, scene->cameras.size) {
+		ufbxi_get_camera_properties(camera);
 	}
 
 	ufbxi_for(ufbx_bone, bone, scene->bones.data, scene->bones.size) {
@@ -6546,6 +6748,7 @@ typedef struct {
 	ufbx_model *model;
 	ufbx_mesh *mesh;
 	ufbx_light *light;
+	ufbx_camera *camera;
 	ufbx_bone *bone;
 	ufbx_blend_shape *blend_shape;
 	ufbx_blend_channel *blend_channel;
@@ -6609,6 +6812,10 @@ ufbxi_nodiscard static int ufbxi_find_connectable_data(ufbxi_context *uc, ufbxi_
 	case UFBXI_CONNECTABLE_LIGHT:
 		data->light = &uc->scene.lights.data[index];
 		data->node = &data->light->node;
+		break;
+	case UFBXI_CONNECTABLE_CAMERA:
+		data->camera = &uc->scene.cameras.data[index];
+		data->node = &data->camera->node;
 		break;
 	case UFBXI_CONNECTABLE_BONE:
 		data->bone = &uc->scene.bones.data[index];
@@ -6802,6 +7009,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_mesh), &uc->scene.meshes, &uc->tmp_arr_meshes));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_material), &uc->scene.materials, &uc->tmp_arr_materials));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_light), &uc->scene.lights, &uc->tmp_arr_lights));
+	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_camera), &uc->scene.cameras, &uc->tmp_arr_cameras));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_bone), &uc->scene.bones, &uc->tmp_arr_bones));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_blend_shape), &uc->scene.blend_shapes, &uc->tmp_arr_blend_shapes));
 	ufbxi_check(ufbxi_retain_array(uc, sizeof(ufbx_blend_channel), &uc->scene.blend_channels, &uc->tmp_arr_blend_channels));
@@ -6909,6 +7117,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 			case UFBXI_CONNECTABLE_MODEL: target = UFBX_ANIM_MODEL; break;
 			case UFBXI_CONNECTABLE_MESH: target = UFBX_ANIM_MESH; break;
 			case UFBXI_CONNECTABLE_LIGHT: target = UFBX_ANIM_LIGHT; break;
+			case UFBXI_CONNECTABLE_CAMERA: target = UFBX_ANIM_CAMERA; break;
 			case UFBXI_CONNECTABLE_BONE: target = UFBX_ANIM_BONE; break;
 			case UFBXI_CONNECTABLE_MATERIAL: target = UFBX_ANIM_MATERIAL; break;
 			case UFBXI_CONNECTABLE_ANIM_LAYER: target = UFBX_ANIM_ANIM_LAYER; break;
@@ -7063,7 +7272,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	}
 
 	// Add all nodes to the scenes node list
-	size_t num_nodes = uc->scene.models.size + uc->scene.meshes.size + uc->scene.lights.size + uc->scene.bones.size;
+	size_t num_nodes = uc->scene.models.size + uc->scene.meshes.size + uc->scene.lights.size + uc->scene.cameras.size + uc->scene.bones.size;
 	ufbx_node **nodes = ufbxi_push(&uc->result, ufbx_node*, num_nodes);
 	ufbxi_check(nodes);
 	uc->scene.nodes.data = nodes;
@@ -7071,6 +7280,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	ufbxi_check(ufbxi_collect_nodes(uc, sizeof(ufbx_model), &nodes, uc->scene.models.data, uc->scene.models.size));
 	ufbxi_check(ufbxi_collect_nodes(uc, sizeof(ufbx_mesh), &nodes, uc->scene.meshes.data, uc->scene.meshes.size));
 	ufbxi_check(ufbxi_collect_nodes(uc, sizeof(ufbx_light), &nodes, uc->scene.lights.data, uc->scene.lights.size));
+	ufbxi_check(ufbxi_collect_nodes(uc, sizeof(ufbx_camera), &nodes, uc->scene.cameras.data, uc->scene.cameras.size));
 	ufbxi_check(ufbxi_collect_nodes(uc, sizeof(ufbx_bone), &nodes, uc->scene.bones.data, uc->scene.bones.size));
 	ufbx_assert(nodes == uc->scene.nodes.data + uc->scene.nodes.size);
 
@@ -7298,6 +7508,7 @@ static void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->tmp_arr_geometry);
 	ufbxi_buf_free(&uc->tmp_arr_materials);
 	ufbxi_buf_free(&uc->tmp_arr_lights);
+	ufbxi_buf_free(&uc->tmp_arr_cameras);
 	ufbxi_buf_free(&uc->tmp_arr_bones);
 	ufbxi_buf_free(&uc->tmp_arr_blend_shapes);
 	ufbxi_buf_free(&uc->tmp_arr_blend_channels);
@@ -7401,6 +7612,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->tmp_arr_models.ator = &uc->ator_tmp;
 	uc->tmp_arr_meshes.ator = &uc->ator_tmp;
 	uc->tmp_arr_lights.ator = &uc->ator_tmp;
+	uc->tmp_arr_cameras.ator = &uc->ator_tmp;
 	uc->tmp_arr_bones.ator = &uc->ator_tmp;
 	uc->tmp_arr_blend_shapes.ator = &uc->ator_tmp;
 	uc->tmp_arr_blend_channels.ator = &uc->ator_tmp;
@@ -7489,6 +7701,7 @@ static ufbx_node *ufbxi_translate_node(const ufbx_scene *src, ufbx_scene *dst, u
 	case UFBX_NODE_MODEL: src_base = src->models.data; dst_base = dst->models.data; break;
 	case UFBX_NODE_MESH: src_base = src->meshes.data; dst_base = dst->meshes.data; break;
 	case UFBX_NODE_LIGHT: src_base = src->lights.data; dst_base = dst->lights.data; break;
+	case UFBX_NODE_CAMERA: src_base = src->cameras.data; dst_base = dst->cameras.data; break;
 	case UFBX_NODE_BONE: src_base = src->bones.data; dst_base = dst->bones.data; break;
 	default: ufbx_assert(0 && "Unhandled node type"); return old;
 	}
@@ -7738,6 +7951,7 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_model, scene->models.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_mesh, scene->meshes.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_light, scene->lights.size);
+	ufbxi_evaluate_reserve(&alloc_size, ufbx_camera, scene->cameras.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_bone, scene->bones.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_blend_channel, scene->blend_channels.size);
 	ufbxi_evaluate_reserve(&alloc_size, ufbx_material, scene->materials.size);
@@ -7789,6 +8003,7 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	ufbx_model *models = ufbxi_evaluate_push(data, &offset, ufbx_model, scene->models.size);
 	ufbx_mesh *meshes = ufbxi_evaluate_push(data, &offset, ufbx_mesh, scene->meshes.size);
 	ufbx_light *lights = ufbxi_evaluate_push(data, &offset, ufbx_light, scene->lights.size);
+	ufbx_camera *cameras = ufbxi_evaluate_push(data, &offset, ufbx_camera, scene->cameras.size);
 	ufbx_bone *bones = ufbxi_evaluate_push(data, &offset, ufbx_bone, scene->bones.size);
 	ufbx_blend_channel *blend_channels = ufbxi_evaluate_push(data, &offset, ufbx_blend_channel, scene->blend_channels.size);
 	ufbx_material *materials = ufbxi_evaluate_push(data, &offset, ufbx_material, scene->materials.size);
@@ -7811,6 +8026,7 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 	imp->scene.models.data = models;
 	imp->scene.meshes.data = meshes;
 	imp->scene.lights.data = lights;
+	imp->scene.cameras.data = cameras;
 	imp->scene.bones.data = bones;
 	imp->scene.blend_channels.data = blend_channels;
 	imp->scene.materials.data = materials;
@@ -7936,6 +8152,32 @@ static ufbx_scene *ufbxi_evaluate_scene(const ufbx_scene *scene, const ufbx_eval
 
 			light->node.transform = ufbxi_get_transform(&light->node.props);
 			ufbxi_get_light_properties(light);
+		}
+	}
+
+	size_t num_cameras = scene->cameras.size;
+	for (size_t i = 0; i < num_cameras; i++) {
+		ufbx_camera *camera = &imp->scene.cameras.data[i];
+		ufbx_camera *src = &scene->cameras.data[i];
+		*camera = *src;
+
+		ufbxi_translate_node_refs(&child_refs, scene, &imp->scene, &camera->node);
+		*node++ = &camera->node;
+
+		ufbx_prop *props_begin = prop;
+		while (ap->target == UFBX_ANIM_CAMERA && ap->index == i) {
+			ufbxi_evaluate_prop(prop, ap, time);
+			prop++;
+			ap++;
+		}
+
+		if (prop - props_begin > 0) {
+			camera->node.props.defaults = &src->node.props;
+			camera->node.props.props = props_begin;
+			camera->node.props.num_props = prop - props_begin;
+
+			camera->node.transform = ufbxi_get_transform(&camera->node.props);
+			ufbxi_get_camera_properties(camera);
 		}
 	}
 
@@ -8237,6 +8479,16 @@ ufbx_light *ufbx_find_light_len(const ufbx_scene *scene, const char *name, size_
 	return NULL;
 }
 
+ufbx_camera *ufbx_find_camera_len(const ufbx_scene *scene, const char *name, size_t name_len)
+{
+	ufbxi_for(ufbx_camera, camera, scene->cameras.data, scene->cameras.size) {
+		if (camera->node.name.length == name_len && !memcmp(camera->node.name.data, name, name_len)) {
+			return camera;
+		}
+	}
+	return NULL;
+}
+
 ufbx_bone *ufbx_find_bone_len(const ufbx_scene *scene, const char *name, size_t name_len)
 {
 	ufbxi_for(ufbx_bone, bone, scene->bones.data, scene->bones.size) {
@@ -8388,6 +8640,10 @@ ufbx_anim_prop *ufbx_find_node_anim_prop_begin(const ufbx_scene *scene, const uf
 	case UFBX_NODE_LIGHT:
 		target = UFBX_ANIM_LIGHT;
 		index = (uint32_t)((ufbx_light*)node - scene->lights.data);
+		break;
+	case UFBX_NODE_CAMERA:
+		target = UFBX_ANIM_CAMERA;
+		index = (uint32_t)((ufbx_camera*)node - scene->cameras.data);
 		break;
 	case UFBX_NODE_BONE:
 		target = UFBX_ANIM_BONE;
@@ -8680,16 +8936,16 @@ ufbx_vec3 ufbx_rotate_vector(ufbx_vec4 q, ufbx_vec3 v)
 	return r;
 }
 
-bool ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, ufbx_face face)
+size_t ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, ufbx_face face)
 {
-	if (face.num_indices < 3 || num_indices < ((size_t)face.num_indices - 2) * 3) return false;
+	if (face.num_indices < 3 || num_indices < ((size_t)face.num_indices - 2) * 3) return 0;
 
 	if (face.num_indices == 3) {
 		// Fast case: Already a triangle
 		indices[0] = face.index_begin + 0;
 		indices[1] = face.index_begin + 1;
 		indices[2] = face.index_begin + 2;
-		return true;
+		return 1;
 	} else if (face.num_indices == 4) {
 		// Quad: Split along the shortest axis unless a vertex crosses the axis
 		uint32_t i0 = face.index_begin + 0;
@@ -8735,6 +8991,8 @@ bool ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, uf
 			indices[4] = i0;
 			indices[5] = i1;
 		}
+
+		return 2;
 	} else {
 		// N-Gon: TODO something reasonable
 		uint32_t *dst = indices;
@@ -8744,9 +9002,8 @@ bool ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, uf
 			dst[2] = face.index_begin + i + 1;
 			dst += 3;
 		}
+		return (dst - indices) / 3;
 	}
-
-	return true;
 }
 
 #ifdef __cplusplus
