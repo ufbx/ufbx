@@ -27,17 +27,30 @@ typedef double ufbx_real;
 
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
 
+// -- Language
+
+#if defined(__cplusplus)
+	#define UFBX_LIST_TYPE(p_name, p_type) struct p_name { p_type *data; size_t count; \
+		p_type &operator[](size_t index) const { return data[index]; } \
+		p_type *begin() const { return data; } \
+		p_type *end() const { return data + size; }
+#else
+	#define UFBX_LIST_TYPE(p_name, p_type) typedef struct p_name { p_type *data; size_t count; } p_name
+#endif
+
 // -- Version
 
 #define UFBX_HEADER_VERSION 1001001 // v1.1.1
 
 // -- Basic types
 
+// Null-terminated string within an FBX file
 typedef struct ufbx_string {
 	const char *data;
 	size_t length;
 } ufbx_string;
 
+// 2D vector
 typedef struct ufbx_vec2 {
 	union {
 		struct { ufbx_real x, y; };
@@ -45,6 +58,7 @@ typedef struct ufbx_vec2 {
 	};
 } ufbx_vec2;
 
+// 3D vector
 typedef struct ufbx_vec3 {
 	union {
 		struct { ufbx_real x, y, z; };
@@ -52,6 +66,7 @@ typedef struct ufbx_vec3 {
 	};
 } ufbx_vec3;
 
+// 4D vector
 typedef struct ufbx_vec4 {
 	union {
 		struct { ufbx_real x, y, z, w; };
@@ -59,6 +74,18 @@ typedef struct ufbx_vec4 {
 	};
 } ufbx_vec4;
 
+// Quaternion
+typedef struct ufbx_quat {
+	union {
+		struct { ufbx_real x, y, z, w; };
+		ufbx_real v[4];
+	};
+} ufbx_quat;
+
+// Order in which Euler-angle rotation axes are applied for a transform
+// NOTE: The order in the name refers to the order of axes *applied*,
+// not the multiplication order: eg. `UFBX_ROTATION_XYZ` is `Z*Y*X`
+// [TODO: Figure out what the spheric rotation order is...]
 typedef enum ufbx_rotation_order {
 	UFBX_ROTATION_XYZ,
 	UFBX_ROTATION_XZY,
@@ -66,14 +93,19 @@ typedef enum ufbx_rotation_order {
 	UFBX_ROTATION_YXZ,
 	UFBX_ROTATION_ZXY,
 	UFBX_ROTATION_ZYX,
+	UFBX_ROTATION_SPHERIC,
 } ufbx_rotation_order;
 
+// Explicit translation+rotation+scale transformation.
+// NOTE: Rotation is a quaternion, not Euler angles!
 typedef struct ufbx_transform {
 	ufbx_vec3 translation;
-	ufbx_vec4 rotation;
+	ufbx_quat rotation;
 	ufbx_vec3 scale;
 } ufbx_transform;
 
+// 4x3 matrix encoding an affine transformation.
+// `cols[0..2]` are the X/Y/Z basis vectors, `cols[3]` is the translation
 typedef struct ufbx_matrix {
 	union {
 		struct {
@@ -89,9 +121,19 @@ typedef struct ufbx_matrix {
 
 // -- Properties
 
+// FBX elements have properties which are arbitrary key/value pairs that can
+// have inherited default values or be animated. In most cases you don't need
+// to access these unless you need a feature not implemented directly in ufbx.
+// NOTE: Prefer using `ufbx_find_prop[_len](...)` to search for a property by
+// name as it can find it from the defaults if necessary.
+
 typedef struct ufbx_prop ufbx_prop;
 typedef struct ufbx_props ufbx_props;
 
+// Data type contained within the property. All the data fields are always
+// populated regardless of type, so there's no need to switch by type usually
+// eg. `prop->value_real` and `prop->value_int` have the same value (well, close)
+// if `prop->type == UFBX_PROP_INTEGER`. String values are not converted from/to.
 typedef enum ufbx_prop_type {
 	UFBX_PROP_UNKNOWN,
 	UFBX_PROP_BOOLEAN,
@@ -108,9 +150,10 @@ typedef enum ufbx_prop_type {
 	UFBX_NUM_PROP_TYPES,
 } ufbx_prop_type;
 
+// Single property with name/type/value.
 struct ufbx_prop {
 	ufbx_string name;
-	uint32_t imp_key;
+	uint32_t ufbx_internal_key;
 	ufbx_prop_type type;
 
 	ufbx_string value_str;
@@ -123,6 +166,9 @@ struct ufbx_prop {
 	};
 };
 
+// List of alphabetically sorted properties with potential defaults.
+// For animated objects in as scene from `ufbx_evaluate_scene()` this list
+// only has the animated properties, the originals are stored under `defaults`.
 struct ufbx_props {
 	ufbx_prop *props;
 	size_t num_props;
@@ -130,14 +176,364 @@ struct ufbx_props {
 	ufbx_props *defaults;
 };
 
-// -- Scene data
+// -- Elements
 
+// Element is the lowest level representation of the FBX file in ufbx.
+// An element contains type, id, name, and properties (see `ufbx_props` above)
+// Elements may be connected to each other aribtrarily via `ufbx_connection`
+
+typedef struct ufbx_element ufbx_element;
+typedef struct ufbx_connection ufbx_connection;
 typedef struct ufbx_node ufbx_node;
 typedef struct ufbx_model ufbx_model;
 typedef struct ufbx_mesh ufbx_mesh;
 typedef struct ufbx_light ufbx_light;
 typedef struct ufbx_camera ufbx_camera;
 typedef struct ufbx_bone ufbx_bone;
+typedef struct ufbx_material ufbx_material;
+
+UFBX_LIST_TYPE(ufbx_connection_list, ufbx_connection);
+UFBX_LIST_TYPE(ufbx_node_list, ufbx_node);
+UFBX_LIST_TYPE(ufbx_model_list, ufbx_model);
+UFBX_LIST_TYPE(ufbx_mesh_list, ufbx_mesh);
+UFBX_LIST_TYPE(ufbx_light_list, ufbx_light);
+UFBX_LIST_TYPE(ufbx_camera_list, ufbx_camera);
+UFBX_LIST_TYPE(ufbx_bone_list, ufbx_bone);
+UFBX_LIST_TYPE(ufbx_material_list, ufbx_material);
+
+UFBX_LIST_TYPE(ufbx_element_ptr_list, ufbx_element*);
+UFBX_LIST_TYPE(ufbx_node_ptr_list, ufbx_node*);
+UFBX_LIST_TYPE(ufbx_material_ptr_list, ufbx_material*);
+
+typedef union ufbx_any_node ufbx_any_node;
+
+typedef enum ufbx_element_type {
+	UFBX_ELEMENT_UNKNOWN, // < Element not handled by ufbx, just `ufbx_element`
+	UFBX_ELEMENT_NODE,    // < `ufbx_node`
+	UFBX_ELEMENT_MESH,    // < `ufbx_mesh`
+	UFBX_ELEMENT_LIGHT,   // < `ufbx_light`
+	UFBX_ELEMENT_CAMERA,  // < `ufbx_camera`
+	UFBX_ELEMENT_BONE,    // < `ufbx_bone`
+} ufbx_element_type;
+
+// Element "base class" found in the head of every element object
+// NOTE: The `id` value is consistent across loading the _same_ file multiple
+// times, but re-exporting the file from DCC programs most changes all the IDs.
+struct ufbx_element {
+	ufbx_element_type element_type;
+	uint64_t id;
+	ufbx_string name;
+	ufbx_props props;
+};
+
+// Connection between two elements (or properties), does not imply any generic
+// semantic relationship between the two elements, it's all case-by-case.
+//
+// NOTE: Properties are stored as C-strings instead of `ufbx_string` as they
+// are relatively rare (especially `src_prop` is almost never populated).
+struct ufbx_connection {
+	ufbx_element *src;
+	ufbx_element *dst;
+	const char *src_prop;
+	const char *dst_prop;
+};
+
+// -- Nodes
+
+// Inherit type specifies how hierarchial node transforms are combined.
+// UFBX_INHERIT_NORMAL is combined using the "proper" multiplication
+// UFBX_INHERIT_NO_SHEAR does component-wise { pos+pos, rot*rot, scale*scale }
+// UFBX_INHERIT_NO_SCALE ignores the parent scale { pos+pos, rot*rot, scale }
+typedef enum ufbx_inherit_type {
+	UFBX_INHERIT_NO_SHEAR, // R*r*S*s
+	UFBX_INHERIT_NORMAL,   // R*S*r*s
+	UFBX_INHERIT_NO_SCALE, // R*r*s
+} ufbx_inherit_type;
+
+// Specialized type of a node, subset of possible element types
+typedef enum ufbx_node_type {
+	UFBX_NODE_PLAIN  = UFBX_ELEMENT_NODE,    // < Plain node, nothing attached
+	UFBX_NODE_MESH   = UFBX_ELEMENT_MESH,    // < Contains `ufbx_mesh`
+	UFBX_NODE_LIGHT  = UFBX_ELEMENT_LIGHT,   // < Contains `ufbx_light`
+	UFBX_NODE_CAMERA = UFBX_ELEMENT_CAMERA,  // < Contains `ufbx_camera`
+	UFBX_NODE_BONE   = UFBX_ELEMENT_BONE,    // < Contains `ufbx_bone`
+	UFBX_NODE_MULTI  = UFBX_ELEMENT_UNKNOWN, // < Node contains multiple types, see `ufbx_node.elements`
+} ufbx_node_type;
+
+// Nodes form the scene transformation hierarchy and can contain attached
+// elements such as meshes or lights. In normal cases a single `ufbx_node`
+// contains only a single attached element, so using `type/mesh/...` is safe.
+struct ufbx_node {
+	union { ufbx_element element; struct {
+		ufbx_element_type element_type;
+		uint64_t id;
+		ufbx_string name;
+		ufbx_props props;
+	}; };
+
+	// Node hierarchy
+	ufbx_node *parent;
+	ufbx_node_ptr_list children;
+
+	// Attached element type and typed pointers. Nonexistent elements are `NULL`
+	// so checking `type` is not necessary if acccessing eg. `node->mesh`.
+	ufbx_node_type type;
+	ufbx_mesh *mesh;
+	ufbx_light *light;
+	ufbx_camera *camera;
+	ufbx_bone *bone;
+
+	// All the elements in the node, necessary if `type == UFBX_NODE_MULTI`.
+	ufbx_element_ptr_list elements;
+
+	// Local transform in parent, geometry transform is a non-inherited
+	// transform applied only to attachments like meshes
+	ufbx_inherit_type inherit_type;
+	ufbx_transform local_transform;
+	ufbx_transform geometry_transform;
+
+	// Transform to the global "world" space, may be incorrect if the node
+	// uses `UFBX_INHERIT_NORMAL`, prefer using the `node_to_world` matrix.
+	ufbx_transform world_transform;
+
+	// Matrices derived from the transformations, for transforming geometry
+	// prefer using `geometry_to_world` as that supports geometric transforms.
+	ufbx_matrix node_to_parent;
+	ufbx_matrix node_to_world;
+	ufbx_matrix geometry_to_node;
+	ufbx_matrix geometry_to_world;
+};
+
+// Vertex attribute base type
+typedef struct ufbx_vertex_void {
+	void *data;
+	int32_t *indices;
+	size_t num_elements;
+} ufbx_vertex_void;
+
+// 1D vertex attribute
+typedef struct ufbx_vertex_real {
+	ufbx_real *data;
+	int32_t *indices;
+	size_t num_elements;
+} ufbx_vertex_real;
+
+// 2D vertex attribute
+typedef struct ufbx_vertex_vec2 {
+	ufbx_vec2 *data;
+	int32_t *indices;
+	size_t num_elements;
+} ufbx_vertex_vec2;
+
+// 3D vertex attribute
+typedef struct ufbx_vertex_vec3 {
+	ufbx_vec3 *data;
+	int32_t *indices;
+	size_t num_elements;
+} ufbx_vertex_vec3;
+
+// 4D vertex attribute
+typedef struct ufbx_vertex_vec4 {
+	ufbx_vec4 *data;
+	int32_t *indices;
+	size_t num_elements;
+} ufbx_vertex_vec4;
+
+// Vertex UV set/layer
+typedef struct ufbx_uv_set {
+	ufbx_string name;
+	int32_t index;
+
+	// Vertex attributes, see `ufbx_mesh` attributes for more information
+	ufbx_vertex_vec2 vertex_uv;        // < UV / texture coordinates
+	ufbx_vertex_vec3 vertex_tangent;   // < Tangent vector in UV.x direction
+	ufbx_vertex_vec3 vertex_bitangent; // < Tangent vector in UV.y direction
+} ufbx_uv_set;
+
+// Vertex color set/layer
+typedef struct ufbx_color_set {
+	ufbx_string name;
+	int32_t index;
+
+	// Vertex attributes, see `ufbx_mesh` attributes for more information
+	ufbx_vertex_vec4 vertex_color; // < Per-vertex RGBA color
+} ufbx_color_set;
+
+UFBX_LIST_TYPE(ufbx_uv_set_list, ufbx_uv_set);
+UFBX_LIST_TYPE(ufbx_color_set_list, ufbx_color_set);
+
+// Edge between two _indices_ in a mesh
+typedef struct ufbx_edge {
+	uint32_t indices[2];
+} ufbx_edge;
+
+// Polygonal face with arbitrary number vertices, a single face contains a 
+// contiguous range of mesh indices, eg. `{5,3}` would have indices 5, 6, 7
+//
+// NOTE: `num_indices` maybe less than 3 in which case the face is invalid!
+// [TODO #23: should probably remove the bad faces at load time]
+typedef struct ufbx_face {
+	uint32_t index_begin;
+	uint32_t num_indices;
+} ufbx_face;
+
+// Polygonal mesh geometry.
+struct ufbx_mesh {
+	// Element "base class" header
+	union { ufbx_element element; struct {
+		ufbx_element_type element_type;
+		uint64_t id;
+		ufbx_string name;
+		ufbx_props props;
+	}; };
+
+	// Number of "logical" vertices that would be treated as a single point,
+	// one vertex may be split to multiple indices for split attributes, eg. UVs
+	size_t num_vertices;  // < Number of logical "vertex" points
+	size_t num_indices;   // < Number of combiend vertex/attribute tuples
+	size_t num_triangles; // < Number of triangles if triangulated
+
+	// Faces and optional per-face extra data
+	size_t num_faces;
+	ufbx_face *faces;       // < Face index range
+	bool *face_smoothing;   // < Should the face have soft normals
+	int32_t *face_material; // < Indices to `ufbx_mesh.materials`
+
+	// Edges and optional per-edge extra data
+	size_t num_edges;
+	ufbx_edge *edges;       // < Edge index range
+	bool *edge_smoothing;   // < Should the edge have soft normals
+	ufbx_real *edge_crease; // < Crease value for subdivision surfaces
+
+	// Vertex attributes: Every attribute is stored in a consistent indexed
+	// format so you can access all attributes for a given index using
+	// `vertex_ATTRIB.data[vertex_attrib.indices[index]]` or via the equivalent
+	// helper function `ufbx_get_vertex_TYPE(&vertex_ATTRIB, index)`.
+	//
+	// NOTE: Not all meshes have all attributes, in that case `data == NULL`!
+	//
+	// NOTE: UV/tangent/bitangent and color are the from first sets,
+	// use `uv_sets/color_sets` to access the other layers.
+	ufbx_vertex_vec3 vertex_position;  // < Vertex positions
+	ufbx_vertex_vec3 vertex_normal;    // < Normal vectors
+	ufbx_vertex_vec2 vertex_uv;        // < UV / texture coordinates
+	ufbx_vertex_vec3 vertex_tangent;   // < Tangent vector in UV.x direction
+	ufbx_vertex_vec3 vertex_bitangent; // < Tangent vector in UV.y direction
+	ufbx_vertex_vec4 vertex_color;     // < Per-vertex RGBA color
+	ufbx_vertex_real vertex_crease;    // < Crease value for subdivision surfaces
+
+	// Multiple named UV/color sets
+	// NOTE: The first set contains the same data as `vertex_uv/color`!
+	ufbx_uv_set_list uv_sets;
+	ufbx_color_set_list color_sets;
+
+	// List of materials used by the mesh, indexed by `ufbx_mesh.face_material`
+	ufbx_material_ptr_list materials;
+
+	// TODO
+#if 0
+	ufbx_skin_list skins;
+	ufbx_blend_channel_ptr_list blend_channels;
+#endif
+};
+
+// -- Nodes bound with data
+
+typedef struct ufbx_mesh_node { ufbx_node *node; ufbx_mesh *mesh; } ufbx_mesh_node;
+typedef struct ufbx_light_node { ufbx_node *node; ufbx_light *light; } ufbx_light_node;
+typedef struct ufbx_camera_node { ufbx_node *node; ufbx_camera *camera; } ufbx_camera_node;
+typedef struct ufbx_bone_node { ufbx_node *node; ufbx_bone *bone; } ufbx_bone_node;
+
+UFBX_LIST_TYPE(ufbx_mesh_node_list, ufbx_mesh_node);
+UFBX_LIST_TYPE(ufbx_light_node_list, ufbx_light_node);
+UFBX_LIST_TYPE(ufbx_camera_node_list, ufbx_camera_node);
+UFBX_LIST_TYPE(ufbx_bone_node_list, ufbx_bone_node);
+
+// -- Scene
+
+// Scene is the root object loaded by ufbx that everything is accessed from.
+
+typedef struct ufbx_scene ufbx_scene;
+
+// Miscellaneous data related to the loaded file
+typedef struct ufbx_metadata {
+	bool ascii;
+	uint32_t version;
+	ufbx_string creator;
+
+	size_t result_memory_used;
+	size_t temp_memory_used;
+	size_t result_allocs;
+	size_t temp_allocs;
+
+	size_t num_total_child_refs;
+	size_t num_total_material_refs;
+	size_t num_total_blend_channel_refs;
+	size_t num_total_skins;
+	size_t num_skinned_positions;
+	size_t num_skinned_indices;
+	size_t max_skinned_positions;
+	size_t max_skinned_indices;
+	size_t max_skinned_blended_positions;
+	size_t max_skinned_blended_indices;
+
+	double ktime_to_sec;
+} ufbx_metadata;
+
+struct ufbx_scene {
+	ufbx_metadata metadata;
+
+	// Node instances in the scene
+	ufbx_node *root_node;
+	ufbx_node_list nodes;
+	ufbx_mesh_node_list mesh_nodes;
+	ufbx_light_node_list light_nodes;
+	ufbx_camera_node_list camera_nodes;
+	ufbx_bone_node_list bone_nodes;
+
+	// These elements are just "types" of meshes/lights/cameras, use
+	// the `TYPE_nodes` lists to get ones bound to instanced nodes!
+	ufbx_mesh_list meshes;
+	ufbx_light_list lights;
+	ufbx_camera_list cameras;
+	ufbx_bone_list bones;
+
+	// All elements and connections in the whole file
+	ufbx_element_ptr_list elements;         // < Sorted by `id`
+	ufbx_element_ptr_list elements_by_name; // < Sorted by `name`
+	ufbx_connection_list connections;       // < Sorted by `src`
+	ufbx_connection_list connections_to;    // < Sorted by `dst`
+};
+
+// Elements may be instanced, eg. one `ufbx_mesh` can be parented under
+// multiple `ufbx_node` instances.
+
+// TODO
+
+typedef struct ufbx_error_frame {
+	uint32_t source_line;
+	const char *function;
+	const char *description;
+} ufbx_error_frame;
+
+typedef struct ufbx_error {
+	const char *description;
+	uint32_t stack_size;
+	ufbx_error_frame stack[UFBX_ERROR_STACK_MAX_DEPTH];
+} ufbx_error;
+
+#if 0
+
+// -- Scene data
+
+typedef struct ufbx_element ufbx_element;
+typedef struct ufbx_node ufbx_node;
+typedef struct ufbx_model ufbx_model;
+typedef struct ufbx_mesh ufbx_mesh;
+typedef struct ufbx_light ufbx_light;
+typedef struct ufbx_camera ufbx_camera;
+typedef struct ufbx_bone ufbx_bone;
+typedef union ufbx_any_element ufbx_any_element;
 
 typedef struct ufbx_node_ptr_list { ufbx_node **data; size_t size; } ufbx_node_ptr_list;
 typedef struct ufbx_model_list { ufbx_model *data; size_t size; } ufbx_model_list;
@@ -280,12 +676,6 @@ typedef enum ufbx_node_type {
 	UFBX_NODE_BONE,
 } ufbx_node_type;
 
-typedef enum ufbx_inherit_type {
-	UFBX_INHERIT_NO_SHEAR,  // R*r*S*s
-	UFBX_INHERIT_NORMAL,    // R*S*r*s
-	UFBX_INHERIT_NO_SCALE,  // R*r*s
-} ufbx_inherit_type;
-
 typedef enum ufbx_aspect_mode {
 	UFBX_ASPECT_MODE_WINDOW_SIZE,
 	UFBX_ASPECT_MODE_FIXED_RATIO,
@@ -325,10 +715,23 @@ typedef enum ufbx_gate_fit {
 	UFBX_GATE_FIT_STRETCH,
 } ufbx_gate_fit;
 
-struct ufbx_node {
-	ufbx_node_type type;
+struct ufbx_element {
+	ufbx_element_type element_type;
 	ufbx_string name;
 	ufbx_props props;
+};
+
+struct ufbx_node {
+	union {
+		ufbx_element element;
+		struct {
+			ufbx_element_type element_type;
+			ufbx_string name;
+			ufbx_props props;
+		};
+	};
+
+	ufbx_node_type type;
 	ufbx_node *parent;
 	ufbx_inherit_type inherit_type;
 	ufbx_transform transform;
@@ -339,11 +742,26 @@ struct ufbx_node {
 };
 
 struct ufbx_model {
-	ufbx_node node;
+	union {
+		ufbx_element element;
+		struct {
+			ufbx_element_type element_type;
+			ufbx_string name;
+			ufbx_props props;
+		};
+	};
+
 };
 
 struct ufbx_mesh {
-	ufbx_node node;
+	union {
+		ufbx_element element;
+		struct {
+			ufbx_element_type element_type;
+			ufbx_string name;
+			ufbx_props props;
+		};
+	};
 
 	size_t num_vertices;
 	size_t num_indices;
@@ -363,10 +781,6 @@ struct ufbx_mesh {
 	ufbx_vertex_vec4 vertex_color;
 	ufbx_vertex_real vertex_crease;
 
-	bool skinned_is_local;
-	ufbx_vertex_vec3 skinned_position;
-	ufbx_vertex_vec3 skinned_normal;
-
 	bool *edge_smoothing;
 	ufbx_real *edge_crease;
 
@@ -379,15 +793,30 @@ struct ufbx_mesh {
 	ufbx_skin_list skins;
 	ufbx_blend_channel_ptr_list blend_channels;
 };
+
 struct ufbx_light {
-	ufbx_node node;
+	union {
+		ufbx_element element;
+		struct {
+			ufbx_element_type element_type;
+			ufbx_string name;
+			ufbx_props props;
+		};
+	};
 
 	ufbx_vec3 color;
 	ufbx_real intensity;
 };
 
 struct ufbx_camera {
-	ufbx_node node;
+	union {
+		ufbx_element element;
+		struct {
+			ufbx_element_type element_type;
+			ufbx_string name;
+			ufbx_props props;
+		};
+	};
 
 	bool resolution_is_pixels;
 	ufbx_vec2 resolution;
@@ -405,10 +834,48 @@ struct ufbx_camera {
 };
 
 struct ufbx_bone {
-	ufbx_node node;
+	union {
+		ufbx_element element;
+		struct {
+			ufbx_element_type element_type;
+			ufbx_string name;
+			ufbx_props props;
+		};
+	};
 
 	ufbx_real length;
 };
+
+union ufbx_any_element {
+	ufbx_element_type element_type;
+	ufbx_element element;
+	ufbx_node node;
+	ufbx_model model;
+	ufbx_mesh mesh;
+	ufbx_light light;
+	ufbx_bone bone;
+};
+
+struct ufbx_light_node {
+	ufbx_node *node;
+	ufbx_light *light;
+};
+
+struct ufbx_camera_node {
+	ufbx_node *node;
+	ufbx_camera *camera;
+};
+
+struct ufbx_mesh_node {
+	ufbx_node *node;
+	ufbx_mesh *mesh;
+};
+
+struct ufbx_any_node {
+	ufbx_node *node;
+	ufbx_any_element *element;
+};
+
 
 // -- Animations
 
@@ -480,7 +947,7 @@ struct ufbx_anim_curve {
 
 struct ufbx_anim_prop {
 	ufbx_string name;
-	uint32_t imp_key;
+	uint32_t internal_key;
 	ufbx_anim_layer *layer;
 	ufbx_anim_target target;
 	uint32_t index;
@@ -749,6 +1216,8 @@ ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t ind
 ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }
 ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }
 ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->indices[index]]; }
+
+#endif
 
 #ifdef __cplusplus
 }

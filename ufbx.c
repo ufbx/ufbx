@@ -167,6 +167,85 @@ static ufbxi_forceinline uint64_t ufbxi_max64(uint64_t a, uint64_t b) { return a
 static ufbxi_forceinline size_t ufbxi_min_sz(size_t a, size_t b) { return a < b ? a : b; }
 static ufbxi_forceinline size_t ufbxi_max_sz(size_t a, size_t b) { return a < b ? b : a; }
 
+#define ufbxi_stable_sort_impl(m_type, m_linear_size, m_data, m_tmp, m_size, m_cmp_lambda) do { \
+	typedef m_type mi_type; \
+	mi_type *mi_src = (mi_type*)(m_tmp); \
+	mi_type *mi_data = m_data, *mi_dst = mi_data; \
+	size_t mi_block_size = m_linear_size, mi_size = m_size; \
+	for (size_t mi_base = 0; mi_base < mi_size; mi_base += mi_block_size) { \
+		size_t mi_i_end = mi_base + mi_block_size; \
+		if (mi_i_end > mi_size) mi_i_end = mi_size; \
+		for (size_t mi_i = mi_base + 1; mi_i < mi_i_end; mi_i++) { \
+			size_t mi_j = mi_i; \
+			mi_src[0] = mi_dst[mi_i]; \
+			for (; mi_j != mi_base; --mi_j) { \
+				mi_type *a = &mi_src[0], *b = &mi_dst[mi_j - 1]; \
+				if (!( m_cmp_lambda )) break; \
+				mi_dst[mi_j] = mi_dst[mi_j - 1]; \
+			} \
+			mi_dst[mi_j] = mi_src[0]; \
+		} \
+	} \
+	for (; mi_block_size < mi_size; mi_block_size *= 2) { \
+		mi_type *mi_swap = mi_dst; mi_dst = mi_src; mi_src = mi_swap; \
+		for (size_t mi_base = 0; mi_base < mi_size; mi_base += mi_block_size * 2) { \
+			size_t mi_i = mi_base, mi_i_end = mi_base + mi_block_size; \
+			size_t mi_j = mi_i_end, mi_j_end = mi_j + mi_block_size; \
+			size_t mi_k = mi_base; \
+			if (mi_i_end > mi_size) mi_i_end = mi_size; \
+			if (mi_j_end > mi_size) mi_j_end = mi_size; \
+			while ((mi_i < mi_i_end) & (mi_j < mi_j_end)) { \
+				mi_type *a = &mi_src[mi_j], *b = &mi_src[mi_i]; \
+				if ( m_cmp_lambda ) { \
+					mi_dst[mi_k] = *a; mi_j++; \
+				} else { \
+					mi_dst[mi_k] = *b; mi_i++; \
+				} \
+				mi_k++; \
+			} \
+			while (mi_i < mi_i_end) mi_dst[mi_k++] = mi_src[mi_i++]; \
+			while (mi_j < mi_j_end) mi_dst[mi_k++] = mi_src[mi_j++]; \
+		} \
+	} \
+	if (mi_dst != mi_data) memcpy((void*)mi_data, mi_dst, sizeof(mi_type) * mi_size); \
+	} while (0)
+
+#define ufbxi_find_first_impl(m_type, m_linear_size, m_result_ptr, m_data, m_begin, m_size, m_cmp_lambda) do { \
+	typedef m_type mi_type; \
+	const mi_type *mi_data = (m_data); \
+	size_t mi_lo = m_begin, mi_hi = m_size, mi_linear_size = m_linear_size; \
+	while (mi_hi - mi_lo > mi_linear_size) { \
+		size_t mi_mid = mi_lo + (mi_hi - mi_lo) / 2; \
+		const mi_type *a = &mi_data[mi_mid]; \
+		if ( m_cmp_lambda ) { mi_lo = mi_mid + 1; } else { mi_hi = mi_mid; } \
+	} \
+	for (; mi_lo < mi_hi; mi_lo++) { \
+		const mi_type *a = &mi_data[mi_lo]; \
+		if (!( m_cmp_lambda )) break; \
+	} \
+	*(m_result_ptr) = mi_lo; \
+	} while (0)
+
+void ufbxi_sort_connetions_by_src(ufbx_connection *data, ufbx_connection *tmp, size_t size) {
+	ufbxi_stable_sort_impl(ufbx_connection, 32, data, tmp, size, (a->src < b->src) );
+}
+
+ufbx_connection *ufbxi_find_first_connetion_by_src(const ufbx_connection *data, size_t size, ufbx_element *element) {
+	size_t ix;
+	ufbxi_find_first_impl(ufbx_connection, 32, &ix, data, 0, size, (a->src < element));
+	return ix < size && data[ix].src == element ? (ufbx_connection*)&data[ix] : NULL;
+}
+
+ufbx_connection_list ufbxi_find_connections_by_src(const ufbx_connection *data, size_t size, ufbx_element *element) {
+	size_t begin, end;
+	ufbxi_find_first_impl(ufbx_connection, 32, &begin, data, 0, size, (a->src < element));
+	ufbxi_find_first_impl(ufbx_connection, 32, &end, data, begin, size, (a->src == element));
+	ufbx_connection_list ret = { begin < end ? (ufbx_connection*)data + begin : NULL, end - begin };
+	return ret;
+}
+
+#if 0
+
 // -- DEFLATE implementation
 // Pretty much based on Sean Barrett's `stb_image` deflate
 
@@ -3924,6 +4003,8 @@ ufbxi_nodiscard static int ufbxi_parse_toplevel_child(ufbxi_context *uc, ufbxi_n
 
 	return 1;
 }
+
+#if 0
 
 // -- Setup
 
@@ -9006,8 +9087,13 @@ size_t ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, 
 	}
 }
 
+
 #ifdef __cplusplus
 }
+#endif
+
+#endif
+
 #endif
 
 #if defined(_MSC_VER)
