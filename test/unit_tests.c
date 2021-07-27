@@ -68,30 +68,9 @@ size_t find_first_string(const char **data, size_t size, const char *str)
 {
 	size_t str_index;
 
-#define m_type const char *
-#define m_linear_size g_linear_size
-#define m_p_result &str_index
-#define m_data data
-#define m_begin 0
-#define m_size size
-#define m_cmp_lambda (strcmp(*a, str) < 0)
-
-	do { 
-		typedef m_type mi_type;
-		mi_type *mi_data = (m_data);
-		size_t mi_lo = m_begin, mi_hi = m_size, mi_linear_size = m_linear_size; 
-		while (mi_hi - mi_lo > mi_linear_size) { 
-			size_t mi_mid = mi_lo + (mi_hi - mi_lo) / 2; 
-			mi_type *a = &mi_data[mi_mid];
-			if ( m_cmp_lambda ) { mi_lo = mi_mid + 1; } else { mi_hi = mi_mid; } 
-		} 
-		for (; mi_lo < mi_hi; mi_lo++) {
-			mi_type *a = &mi_data[mi_lo];
-			if (!( m_cmp_lambda )) break;
-		}
-		*(m_p_result) = mi_lo; 
-	} while (0)
-		;
+	ufbxi_macro_lower_bound_eq(const char*, g_linear_size, &str_index, data, 0, size,
+		(strcmp(*a, str) < 0),
+		(strcmp(*a, str) == 0));
 
 	return str_index;
 }
