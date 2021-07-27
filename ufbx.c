@@ -155,6 +155,10 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/100 == UFBX_HEADER
 #define ufbxi_for(m_type, m_name, m_begin, m_num) for (m_type *m_name = m_begin, *m_name##_end = m_name + (m_num); m_name != m_name##_end; m_name++)
 #define ufbxi_for_ptr(m_type, m_name, m_begin, m_num) for (m_type **m_name = m_begin, **m_name##_end = m_name + (m_num); m_name != m_name##_end; m_name++)
 
+// WARNING: Evaluates `m_list` twice!
+#define ufbxi_for_list(m_type, m_name, m_list) for (m_type *m_name = (m_list).data, *m_name##_end = m_name + (m_list).count; m_name != m_name##_end; m_name++)
+#define ufbxi_for_ptr_list(m_type, m_name, m_list) for (m_type **m_name = (m_list).data, **m_name##_end = m_name + (m_list).count; m_name != m_name##_end; m_name++)
+
 static ufbxi_forceinline uint32_t ufbxi_min32(uint32_t a, uint32_t b) { return a < b ? a : b; }
 static ufbxi_forceinline uint32_t ufbxi_max32(uint32_t a, uint32_t b) { return a < b ? b : a; }
 static ufbxi_forceinline uint64_t ufbxi_min64(uint64_t a, uint64_t b) { return a < b ? a : b; }
@@ -211,23 +215,45 @@ static ufbxi_forceinline size_t ufbxi_max_sz(size_t a, size_t b) { return a < b 
 	if (mi_dst != mi_data) memcpy((void*)mi_data, mi_dst, sizeof(mi_type) * mi_size); \
 	} while (0)
 
-// Find the first element in sorted `m_type m_data[m_begin:m_size]` where `m_cmp_lambda(a)` returns false
-// Equivalently finds the first element which does not compare less with `m_cmp_lambda(*a < value)`
-// Writes the resulting index (or `m_size` if not found) to `size_t *m_result_ptr`
-#define ufbxi_macro_lower_bound(m_type, m_linear_size, m_result_ptr, m_data, m_begin, m_size, m_cmp_lambda) do { \
+#define ufbxi_macro_lower_bound_eq(m_type, m_linear_size, m_result_ptr, m_data, m_begin, m_size, m_cmp_lambda, m_eq_lambda) do { \
 	typedef m_type mi_type; \
 	const mi_type *mi_data = (m_data); \
 	size_t mi_lo = m_begin, mi_hi = m_size, mi_linear_size = m_linear_size; \
+	ufbx_assert(mi_linear_size > 1); \
+	/* Binary search until we get down to `m_linear_size` elements */ \
+	while (mi_hi - mi_lo > mi_linear_size) { \
+			size_t mi_mid = mi_lo + (mi_hi - mi_lo) / 2; \
+			const mi_type *a = &mi_data[mi_mid]; \
+			if ( m_cmp_lambda ) { mi_lo = mi_mid + 1; } else { mi_hi = mi_mid + 1; } \
+	} \
+	/* Linearly scan until we find the edge */ \
+	for (; mi_lo < mi_hi; mi_lo++) { \
+			const mi_type *a = &mi_data[mi_lo]; \
+			if ( m_eq_lambda ) { *(m_result_ptr) = mi_lo; break; } \
+	} \
+	} while (0)
+
+#define ufbxi_macro_upper_bound_eq(m_type, m_linear_size, m_result_ptr, m_data, m_begin, m_size, m_eq_lambda) do { \
+	typedef m_type mi_type; \
+	const mi_type *mi_data = (m_data); \
+	size_t mi_lo = m_begin, mi_hi = m_size, mi_linear_size = m_linear_size; \
+	ufbx_assert(mi_linear_size > 1); \
+	/* Linearly scan with galloping */ \
+	for (size_t mi_step = 1; mi_step < 100 && mi_hi - mi_lo > mi_step; mi_step *= 2) { \
+		const mi_type *a = &mi_data[mi_lo + mi_step]; \
+		if (!( m_eq_lambda )) { mi_hi = mi_lo + mi_step; break; } \
+		mi_lo += mi_step; \
+	} \
 	/* Binary search until we get down to `m_linear_size` elements */ \
 	while (mi_hi - mi_lo > mi_linear_size) { \
 		size_t mi_mid = mi_lo + (mi_hi - mi_lo) / 2; \
 		const mi_type *a = &mi_data[mi_mid]; \
-		if ( m_cmp_lambda ) { mi_lo = mi_mid + 1; } else { mi_hi = mi_mid; } \
+		if ( m_eq_lambda ) { mi_lo = mi_mid + 1; } else { mi_hi = mi_mid + 1; } \
 	} \
 	/* Linearly scan until we find the edge */ \
 	for (; mi_lo < mi_hi; mi_lo++) { \
 		const mi_type *a = &mi_data[mi_lo]; \
-		if (!( m_cmp_lambda )) break; \
+		if (!( m_eq_lambda )) break; \
 	} \
 	*(m_result_ptr) = mi_lo; \
 	} while (0)
@@ -2158,7 +2184,8 @@ typedef struct {
 // Temporary connection before we resolve the element pointers
 typedef struct {
 	uint64_t src, dst;
-	const char *src_prop, *dst_prop;
+	ufbx_string src_prop;
+	ufbx_string dst_prop;
 } ufbxi_tmp_connection;
 
 typedef struct {
@@ -4060,6 +4087,9 @@ ufbx_prop *ufbxi_find_prop_with_key(const ufbx_props *props, const char *name, u
 	return NULL;
 }
 
+#define ufbxi_find_prop(props, name) ufbxi_find_prop_with_key((props), (name), \
+	(name[0] << 24) | (name[1] << 16) | (name[2] << 8) | name[3])
+
 static ufbxi_forceinline uint32_t ufbxi_get_name_key(const char *name, size_t len)
 {
 	uint32_t key = 0;
@@ -4322,8 +4352,8 @@ ufbxi_nodiscard static ufbx_element *ufbxi_push_element_size(ufbxi_context *uc, 
 {
 	ufbx_element *elem = (ufbx_element*)ufbxi_push_size_zero(&uc->tmp_elements[type], size, 1);
 	ufbxi_check_return(elem, NULL);
-	elem->element_type = type;
-	elem->element_id = uc->num_elements++;
+	elem->type = type;
+	elem->id = uc->num_elements++;
 	elem->name = info->name;
 	elem->props = info->props;
 
@@ -4332,7 +4362,7 @@ ufbxi_nodiscard static ufbx_element *ufbxi_push_element_size(ufbxi_context *uc, 
 	uint32_t hash = ufbxi_hash64(info->fbx_id);
 	ufbxi_fbx_id_entry *entry = ufbxi_map_insert(&uc->fbx_id_map, ufbxi_fbx_id_entry, 0, hash);
 	entry->fbx_id = info->fbx_id;
-	entry->element_id = elem->element_id;
+	entry->element_id = elem->id;
 
 	return elem;
 }
@@ -4361,7 +4391,7 @@ ufbxi_nodiscard static int ufbxi_connect_oo(ufbxi_context *uc, uint64_t src, uin
 	ufbxi_check(conn);
 	conn->src = src;
 	conn->dst = dst;
-	conn->src_prop = conn->dst_prop = NULL;
+	conn->src_prop = conn->dst_prop = ufbx_empty_string;
 	return 1;
 }
 
@@ -4946,6 +4976,215 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 	return 1;
 }
 
+static ufbxi_forceinline float ufbxi_solve_auto_tangent(double prev_time, double time, double next_time, ufbx_real prev_value, ufbx_real value, ufbx_real next_value, float weight_left, float weight_right)
+{
+	// In between two keyframes: Set the initial slope to be the difference between
+	// the two keyframes. Prevent overshooting by clamping the slope in case either
+	// tangent goes above/below the endpoints.
+	double slope = (next_value - prev_value) / (next_time - prev_time);
+
+	// Split the slope to sign and a non-negative absolute value
+	double slope_sign = slope >= 0.0 ? 1.0 : -1.0;
+	double abs_slope = slope_sign * slope;
+
+	// Find limits for the absolute value of the sign
+	double max_left = slope_sign * (value - prev_value) / (weight_left * (time - prev_time));
+	double max_right = slope_sign * (next_value - value) / (weight_right * (next_time - time));
+
+	// Clamp negative values and NaNs (in case weight*delta_time underflows) to zero 
+	if (!(max_left > 0.0)) max_left = 0.0;
+	if (!(max_right > 0.0)) max_right = 0.0;
+
+	// Clamp the absolute slope from both sides
+	if (abs_slope > max_left) abs_slope = max_left;
+	if (abs_slope > max_right) abs_slope = max_right;
+
+	return (float)(slope_sign * abs_slope);
+}
+
+ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_anim_curve *curve = ufbxi_push_element(uc, info, ufbx_anim_curve, UFBX_ELEMENT_ANIM_CURVE);
+	ufbxi_check(curve);
+
+	if (uc->opts.ignore_animation) return 1;
+
+	ufbxi_value_array *times, *values, *attr_flags, *attrs, *refs;
+	ufbxi_check(times = ufbxi_find_array(node, ufbxi_KeyTime, 'l'));
+	ufbxi_check(values = ufbxi_find_array(node, ufbxi_KeyValueFloat, 'r'));
+	ufbxi_check(attr_flags = ufbxi_find_array(node, ufbxi_KeyAttrFlags, 'i'));
+	ufbxi_check(attrs = ufbxi_find_array(node, ufbxi_KeyAttrDataFloat, '?'));
+	ufbxi_check(refs = ufbxi_find_array(node, ufbxi_KeyAttrRefCount, 'i'));
+
+	// Time and value arrays that define the keyframes should be parallel
+	ufbxi_check(times->size == values->size);
+
+	// Flags and attributes are run-length encoded where KeyAttrRefCount (refs)
+	// is an array that describes how many times to repeat a given flag/attribute.
+	// Attributes consist of 4 32-bit floating point values per key.
+	ufbxi_check(attr_flags->size == refs->size);
+	ufbxi_check(attrs->size == refs->size * 4u);
+
+	size_t num_keys = times->size;
+	ufbx_keyframe *keys = ufbxi_push(&uc->result, ufbx_keyframe, num_keys);
+	ufbxi_check(keys);
+
+	curve->keyframes.data = keys;
+	curve->keyframes.count = num_keys;
+
+	int64_t *p_time = (int64_t*)times->data;
+	ufbx_real *p_value = (ufbx_real*)values->data;
+	int32_t *p_flag = (int32_t*)attr_flags->data;
+	float *p_attr = (float*)attrs->data;
+	int32_t *p_ref = (int32_t*)refs->data;
+
+	// The previous key defines the weight/slope of the left tangent
+	float slope_left = 0.0f;
+	float weight_left = 0.333333f;
+
+	double prev_time = 0.0;
+	double next_time = 0.0;
+
+	if (num_keys > 0) {
+		next_time = (double)p_time[0] * uc->ktime_to_sec;
+	}
+
+	for (size_t i = 0; i < num_keys; i++) {
+		ufbx_keyframe *key = &keys[i];
+
+		key->time = next_time;
+		key->value = *p_value;
+
+		if (i + 1 < num_keys) {
+			next_time = (double)p_time[1] * uc->ktime_to_sec;
+		}
+
+		uint32_t flags = (uint32_t)*p_flag;
+
+		float slope_right = p_attr[0];
+		float weight_right = 0.333333f;
+		float next_slope_left = p_attr[1];
+		float next_weight_left = 0.333333f;
+
+		if (flags & 0x3000000) {
+			// At least one of the tangents is weighted. The weights are encoded as
+			// two 0.4 _decimal_ fixed point values that are packed into 32 bits and
+			// interpreted as a 32-bit float.
+			uint32_t packed_weights;
+			memcpy(&packed_weights, &p_attr[2], sizeof(uint32_t));
+
+			if (flags & 0x1000000) {
+				// Right tangent is weighted
+				weight_right = (float)(packed_weights & 0xffff) * 0.0001f;
+			}
+
+			if (flags & 0x2000000) {
+				// Next left tangent is weighted
+				next_weight_left = (float)(packed_weights >> 16) * 0.0001f;
+			}
+		}
+
+		if (flags & 0x2) {
+			// Constant interpolation: Set cubic tangents to flat.
+
+			if (flags & 0x100) {
+				// Take constant value from next key
+				key->interpolation = UFBX_INTERPOLATION_CONSTANT_NEXT;
+
+			} else {
+				// Take constant value from the previous key
+				key->interpolation = UFBX_INTERPOLATION_CONSTANT_PREV;
+			}
+
+			weight_right = next_weight_left = 0.333333f;
+			slope_right = next_slope_left = 0.0f;
+
+		} else if (flags & 0x8) {
+			// Cubic interpolation
+			key->interpolation = UFBX_INTERPOLATION_CUBIC;
+
+			if (flags & 0x400) {
+				// User tangents
+
+				if (flags & 0x800) {
+					// Broken tangents: No need to modify slopes
+				} else {
+					// Unified tangents: Use right slope for both sides
+					// TODO: ??? slope_left = slope_right;
+				}
+
+			} else {
+				// Automatic (0x100) or unknown tangents
+				// TODO: TCB tangents (0x200)
+				// TODO: Auto break (0x800)
+
+				if (i > 0 && i + 1 < num_keys && key->time > prev_time && next_time > key->time) {
+					slope_left = slope_right = ufbxi_solve_auto_tangent(
+						prev_time, key->time, next_time,
+						p_value[-1], key->value, p_value[1],
+						weight_left, weight_right);
+				} else {
+					// Endpoint / invalid keyframe: Set both slopes to zero
+					slope_left = slope_right = 0.0f;
+				}
+			}
+
+		} else {
+			// Linear (0x4) or unknown interpolation: Set cubic tangents to match
+			// the linear interpolation with weights of 1/3.
+			key->interpolation = UFBX_INTERPOLATION_LINEAR;
+
+			weight_right = 0.333333f;
+			next_weight_left = 0.333333f;
+
+			if (next_time > key->time) {
+				double slope = (p_value[1] - key->value) / (next_time - key->time);
+				slope_right = next_slope_left = (float)slope;
+			} else {
+				slope_right = next_slope_left = 0.0f;
+			}
+		}
+
+		// Set the tangents based on weights (dx relative to the time difference
+		// between the previous/next key) and slope (simply d = slope * dx)
+
+		if (key->time > prev_time) {
+			double delta = key->time - prev_time;
+			key->left.dx = (float)(weight_left * delta);
+			key->left.dy = key->left.dx * slope_left;
+		} else {
+			key->left.dx = 0.0f;
+			key->left.dy = 0.0f;
+		}
+
+		if (next_time > key->time) {
+			double delta = next_time - key->time;
+			key->right.dx = (float)(weight_right * delta);
+			key->right.dy = key->right.dx * slope_right;
+		} else {
+			key->right.dx = 0.0f;
+			key->right.dy = 0.0f;
+		}
+
+		slope_left = next_slope_left;
+		weight_left = next_weight_left;
+		prev_time = key->time;
+
+		// Decrement attribute refcount and potentially move to the next one.
+		int32_t refs_left = --*p_ref;
+		ufbxi_check(refs_left >= 0);
+		if (refs_left == 0) {
+			p_flag++;
+			p_attr += 4;
+			p_ref++;
+		}
+		p_time++;
+		p_value++;
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 {
 	ufbxi_element_info info = { 0 };
@@ -5005,7 +5244,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 		} else if (name == ufbxi_AnimationCurveNode) {
 			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_prop), UFBX_ELEMENT_ANIM_PROP));
 		} else if (name == ufbxi_AnimationCurve) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_curve), UFBX_ELEMENT_ANIM_CURVE));
+			ufbxi_check(ufbxi_read_animation_curve(uc, node, &info));
 #if 0
 		} else if (name == ufbxi_Deformer) {
 			ufbxi_check(ufbxi_read_deformer(uc, node, &object));
@@ -5031,7 +5270,7 @@ ufbxi_nodiscard static int ufbxi_read_connections(ufbxi_context *uc)
 		if (!ufbxi_get_val1(node, "C", &type)) continue;
 
 		uint64_t src_id = 0, dst_id = 0;
-		char *src_prop = NULL, *dst_prop = NULL;
+		ufbx_string src_prop = ufbx_empty_string, dst_prop = ufbx_empty_string;
 
 		if (uc->version < 7000) {
 			char *src_name = NULL, *dst_name = NULL;
@@ -5040,11 +5279,11 @@ ufbxi_nodiscard static int ufbxi_read_connections(ufbxi_context *uc)
 			if (type == ufbxi_OO) {
 				if (!ufbxi_get_val3(node, "_cc", NULL, &src_name, &dst_name)) continue;
 			} else if (type == ufbxi_OP) {
-				if (!ufbxi_get_val4(node, "_ccC", NULL, &src_name, &dst_name, &dst_prop)) continue;
+				if (!ufbxi_get_val4(node, "_ccS", NULL, &src_name, &dst_name, &dst_prop)) continue;
 			} else if (type == ufbxi_PO) {
-				if (!ufbxi_get_val4(node, "_cCc", NULL, &src_name, &src_prop, &dst_name)) continue;
+				if (!ufbxi_get_val4(node, "_cSc", NULL, &src_name, &src_prop, &dst_name)) continue;
 			} else if (type == ufbxi_PP) {
-				if (!ufbxi_get_val5(node, "_cCcC", NULL, &src_name, &src_prop, &dst_name, &dst_prop)) continue;
+				if (!ufbxi_get_val5(node, "_cScS", NULL, &src_name, &src_prop, &dst_name, &dst_prop)) continue;
 			} else {
 				continue;
 			}
@@ -5057,11 +5296,11 @@ ufbxi_nodiscard static int ufbxi_read_connections(ufbxi_context *uc)
 			if (type == ufbxi_OO) {
 				if (!ufbxi_get_val3(node, "_LL", NULL, &src_id, &dst_id)) continue;
 			} else if (type == ufbxi_OP) {
-				if (!ufbxi_get_val4(node, "_LLC", NULL, &src_id, &dst_id, &dst_prop)) continue;
+				if (!ufbxi_get_val4(node, "_LLS", NULL, &src_id, &dst_id, &dst_prop)) continue;
 			} else if (type == ufbxi_PO) {
-				if (!ufbxi_get_val4(node, "_LCL", NULL, &src_id, &src_prop, &dst_id)) continue;
+				if (!ufbxi_get_val4(node, "_LSL", NULL, &src_id, &src_prop, &dst_id)) continue;
 			} else if (type == ufbxi_PP) {
-				if (!ufbxi_get_val5(node, "_LCLC", NULL, &src_id, &src_prop, &dst_id, &dst_prop)) continue;
+				if (!ufbxi_get_val5(node, "_LSLS", NULL, &src_id, &src_prop, &dst_id, &dst_prop)) continue;
 			} else {
 				continue;
 			}
@@ -5136,30 +5375,30 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 
 typedef struct {
 	void *data;
-	size_t size;
-} ufbxi_void_array;
+	size_t count;
+} ufbxi_void_list;
 
-ufbxi_nodiscard static int ufbxi_retain_array(ufbxi_context *uc, size_t size, void *p_array, ufbxi_buf *buf)
+ufbxi_nodiscard static int ufbxi_retain_array(ufbxi_context *uc, size_t size, void *p_list, ufbxi_buf *buf)
 {
-	ufbxi_void_array *arr = (ufbxi_void_array*)p_array;
-	arr->size = buf->num_items;
-	arr->data = ufbxi_push_pop_size(&uc->result, buf, size, buf->num_items);
-	ufbxi_check(arr->data);
+	ufbxi_void_list *list = (ufbxi_void_list*)p_list;
+	list->count = buf->num_items;
+	list->data = ufbxi_push_pop_size(&uc->result, buf, size, buf->num_items);
+	ufbxi_check(list->data);
 	ufbxi_buf_free(buf);
 	return 1;
 }
 
 
-ufbxi_nodiscard static int ufbxi_retain_elements(ufbxi_context *uc, void *p_array, size_t size, ufbx_element_type type)
+ufbxi_nodiscard static int ufbxi_retain_elements(ufbxi_context *uc, void *p_list, size_t size, ufbx_element_type type)
 {
-	ufbxi_void_array *arr = (ufbxi_void_array*)p_array;
+	ufbxi_void_list *list = (ufbxi_void_list*)p_list;
 	size_t count = uc->tmp_elements[type].num_items;
-	ufbxi_check(ufbxi_retain_array(uc, size, arr, &uc->tmp_elements[type]));
+	ufbxi_check(ufbxi_retain_array(uc, size, list, &uc->tmp_elements[type]));
 
-	char *ptr = (char*)arr->data;
+	char *ptr = (char*)list->data;
 	for (size_t i = 0; i < count; i++) {
 		ufbx_element *element = (ufbx_element*)ptr;
-		uc->scene.elements.data[element->element_id] = element;
+		uc->scene.elements.data[element->id] = element;
 		ptr += size;
 	}
 
@@ -5196,7 +5435,7 @@ ufbxi_forceinline static bool ufbxi_cmp_element_less(ufbx_element *a, ufbx_eleme
 {
 	int name_cmp = strcmp(a->name.data, b->name.data);
 	if (name_cmp != 0) return name_cmp < 0;
-	return a->element_type < b->element_type;
+	return a->type < b->type;
 }
 
 ufbxi_nodiscard static int ufbxi_sort_element_ptrs(ufbxi_context *uc, ufbx_element **elements, size_t count)
@@ -5206,17 +5445,23 @@ ufbxi_nodiscard static int ufbxi_sort_element_ptrs(ufbxi_context *uc, ufbx_eleme
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_connections_by_src(ufbxi_context *uc, ufbx_connection *connections, size_t count)
+// We need to be able to assume no padding!
+ufbx_static_assert(connection_size, sizeof(ufbx_connection) == sizeof(ufbx_element*)*2 + sizeof(ufbx_string)*2);
+
+ufbxi_forceinline static bool ufbxi_cmp_connection_less(ufbx_connection *a, ufbx_connection *b, size_t index)
 {
-	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_connection)));
-	ufbxi_macro_stable_sort(ufbx_connection, 32, connections, uc->tmp_arr, count, ( a->src->element_id < b->src->element_id ));
-	return 1;
+	ufbx_element *a_elem = (&a->src)[index], *b_elem = (&b->src)[index];
+	if (a_elem->id != b_elem->id) return a_elem->id < b_elem->id;
+	int cmp = strcmp((&a->src_prop)[index].data, (&b->dst_prop)[index].data);
+	if (cmp != 0) return cmp < 0;
+	cmp = strcmp((&a->src_prop)[index ^ 1].data, (&b->dst_prop)[index ^ 1].data);
+	return cmp < 0;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_connections_by_dst(ufbxi_context *uc, ufbx_connection *connections, size_t count)
+ufbxi_nodiscard static int ufbxi_sort_connections(ufbxi_context *uc, ufbx_connection *connections, size_t count, size_t index)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_connection)));
-	ufbxi_macro_stable_sort(ufbx_connection, 32, connections, uc->tmp_arr, count, ( a->dst->element_id < b->dst->element_id ));
+	ufbxi_macro_stable_sort(ufbx_connection, 32, connections, uc->tmp_arr, count, ( ufbxi_cmp_connection_less(a, b, index) ));
 	return 1;
 }
 
@@ -5238,18 +5483,18 @@ ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *uc)
 	// NOTE: `uc->num_elements + 1` since we _probably_ add a root here
 	ufbxi_for_ptr(ufbx_node, p_node, node_ptrs, num_nodes) {
 		ufbx_node *node = *p_node;
-		uc->scene.elements.data[node->element_id] = &node->element;
+		uc->scene.elements.data[node->element.id] = &node->element;
 	}
 
 	// Hook up the parent nodes, we'll assume that there's no cycles at this point
 	ufbxi_for(ufbxi_tmp_connection, conn, tmp_connections, num_connections) {
-		if (conn->src_prop || conn->dst_prop) continue;
+		if (conn->src_prop.length > 0 || conn->dst_prop.length > 0) continue;
 
 		ufbx_element *src = ufbxi_find_element_by_fbx_id(uc, conn->src);
 		ufbx_element *dst = ufbxi_find_element_by_fbx_id(uc, conn->dst);
 		if (!src || !dst) continue;
-		if (src->element_type != UFBX_ELEMENT_NODE) continue;
-		if (dst->element_type != UFBX_ELEMENT_NODE) continue;
+		if (src->type != UFBX_ELEMENT_NODE) continue;
+		if (dst->type != UFBX_ELEMENT_NODE) continue;
 
 		((ufbx_node*)src)->parent = (ufbx_node*)dst;
 	}
@@ -5295,8 +5540,8 @@ ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *uc)
 
 				// Resolve the real parent pointer
 				if (node->parent) {
-					node->parent = (ufbx_node*)uc->scene.elements.data[node->parent->element_id];
-					ufbx_assert(node->parent && node->parent->element_type == UFBX_ELEMENT_NODE);
+					node->parent = (ufbx_node*)uc->scene.elements.data[node->parent->element.id];
+					ufbx_assert(node->parent && node->parent->element.type == UFBX_ELEMENT_NODE);
 				}
 
 				if (node->node_depth != depth) break;
@@ -5312,7 +5557,7 @@ ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *uc)
 				ufbx_node *src = span_begin[i];
 				ufbx_node *dst = node_dst++;
 
-				uc->scene.elements.data[src->element_id] = &dst->element;
+				uc->scene.elements.data[src->element.id] = &dst->element;
 				*dst = *src;
 				dst->children.data = child_dst;
 				child_dst += src->children.count;
@@ -5325,35 +5570,35 @@ ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *uc)
 
 	// Now we can resolve all the connection elements
 	// NOTE: We truncate this array in case not all connections are resolved
-	uc->scene.connections.data = ufbxi_push(&uc->result, ufbx_connection, num_connections);
-	ufbxi_check(uc->scene.connections.data);
+	uc->scene.connections_src.data = ufbxi_push(&uc->result, ufbx_connection, num_connections);
+	ufbxi_check(uc->scene.connections_src.data);
 
 	ufbxi_for(ufbxi_tmp_connection, tmp_conn, tmp_connections, num_connections) {
 		ufbx_element *src = ufbxi_find_element_by_fbx_id(uc, tmp_conn->src);
 		ufbx_element *dst = ufbxi_find_element_by_fbx_id(uc, tmp_conn->dst);
 		if (!src || !dst) continue;
 
-		ufbx_connection *conn = &uc->scene.connections.data[uc->scene.connections.count++];
+		ufbx_connection *conn = &uc->scene.connections_src.data[uc->scene.connections_src.count++];
 		conn->src = src;
 		conn->dst = dst;
 		conn->src_prop = tmp_conn->src_prop;
 		conn->dst_prop = tmp_conn->dst_prop;
 	}
 
-	uc->scene.connections_to.count = uc->scene.connections.count;
-	uc->scene.connections_to.data = ufbxi_push_copy(&uc->result, ufbx_connection,
-		uc->scene.connections.count, uc->scene.connections.data);
-	ufbxi_check(uc->scene.connections_to.data);
+	uc->scene.connections_dst.count = uc->scene.connections_src.count;
+	uc->scene.connections_dst.data = ufbxi_push_copy(&uc->result, ufbx_connection,
+		uc->scene.connections_src.count, uc->scene.connections_src.data);
+	ufbxi_check(uc->scene.connections_dst.data);
 
 	// Now there's no more incoming references by element ID so we can sort them
 	// by name and re-enumerate the IDs...
 	ufbxi_check(ufbxi_sort_element_ptrs(uc, uc->scene.elements.data, uc->scene.elements.count));
 	for (uint32_t i = 0; i < uc->scene.elements.count; i++) {
-		uc->scene.elements.data[i]->element_id = i;
+		uc->scene.elements.data[i]->id = i;
 	}
 
-	ufbxi_check(ufbxi_sort_connections_by_src(uc, uc->scene.connections.data, uc->scene.connections.count));
-	ufbxi_check(ufbxi_sort_connections_by_dst(uc, uc->scene.connections_to.data, uc->scene.connections_to.count));
+	ufbxi_check(ufbxi_sort_connections(uc, uc->scene.connections_src.data, uc->scene.connections_src.count, 0));
+	ufbxi_check(ufbxi_sort_connections(uc, uc->scene.connections_dst.data, uc->scene.connections_dst.count, 1));
 
 	// We don't need the temporary connections at this point anymore
 	ufbxi_buf_free(&uc->tmp_connections);
@@ -5361,66 +5606,73 @@ ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *uc)
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_connect_prop_elements(ufbxi_context *uc)
+ufbxi_nodiscard static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
 {
-	// Find all the connections from element to property
-	ufbx_connection *conns = uc->scene.connections.data;
-	size_t num_conns = uc->scene.connections.count;
-	for (size_t begin = 0; begin < num_conns; ) {
-		size_t end = begin;
-		size_t num_props = 0;
-		size_t num_not_found = 0;
-		ufbx_element *dst = conns[begin].dst;
+	ufbx_connection *conn_src = uc->scene.connections_src.data;
+	ufbx_connection *conn_src_end = conn_src + uc->scene.connections_src.count;
+	ufbx_connection *conn_dst = uc->scene.connections_dst.data;
+	ufbx_connection *conn_dst_end = conn_dst + uc->scene.connections_dst.count;
 
-		for (; end < num_conns; end++) {
-			ufbx_connection *conn = &conns[end];
-			if (conn->dst != dst) break;
-			const char *name = conn->dst_prop;
-			if (conn->src_prop || !name) continue;
+	ufbxi_for_ptr(ufbx_element, p_elem, uc->scene.elements.data, uc->scene.elements.count) {
+		ufbx_element *elem = *p_elem;
+		uint32_t id = elem->id;
 
-			num_props++;
-			uint32_t key = ufbxi_get_name_key_c(name);
-			ufbx_prop *prop = ufbxi_find_prop_with_key(&dst->props, name, key);
-			if (!prop) num_not_found++;
-		}
+		while (conn_src < conn_src_end && conn_src->src->id < id) conn_src++;
+		while (conn_dst < conn_dst_end && conn_dst->dst->id < id) conn_dst++;
+		ufbx_connection *src_end = conn_src, *dst_end = conn_dst;
 
-		if (num_props > 0) {
-			// Reallocate the properties if there are any that weren't found
-			if (num_not_found > 0) {
-				size_t new_num = num_not_found + dst->props.num_props;
-				ufbx_prop *new_props = ufbxi_push_zero(&uc->result, ufbx_prop, new_num);
-				ufbxi_check(new_props);
-				memcpy(new_props, dst->props.props, dst->props.num_props * sizeof(ufbx_prop));
-			}
+		while (src_end < conn_src_end && src_end->src->id == id) src_end++;
+		while (dst_end < conn_dst_end && dst_end->dst->id == id) dst_end++;
 
-			size_t new_prop_ix = dst->props.num_props;
-			for (size_t i = begin; i < end; i++) {
-				ufbx_connection *conn = &conns[i];
-				const char *name = conn->dst_prop;
-				if (conn->src_prop || !name) continue;
+		elem->connections_src.data = conn_src;
+		elem->connections_src.count = (size_t)(src_end - conn_src);
+		elem->connections_dst.data = conn_dst;
+		elem->connections_dst.count = (size_t)(dst_end - conn_dst);
 
-				uint32_t key = ufbxi_get_name_key_c(name);
-				ufbx_prop *prop = ufbxi_find_prop_with_key(&dst->props, name, key);
-				if (!prop) {
-					prop = &dst->props.props[new_prop_ix++];
-					prop->name.data = name;
-					prop->name.length = strlen(name);
-					prop->internal_key = key;
-					prop->flags = UFBX_PROP_FLAG_SYNTHETIC;
-				}
-				prop->value_element = conn->src;
-			}
-			ufbx_assert(new_prop_ix == dst->props.num_props + num_not_found);
-
-			// Sort the properties if we added any to the end
-			if (num_not_found > 0) {
-				dst->props.num_props += num_not_found;
-				ufbxi_check(ufbxi_sort_properties(uc, dst->props.props, dst->props.num_props));
-			}
-		}
-
-		begin = end;
+		conn_src = src_end;
+		conn_dst = dst_end;
 	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbx_connection_list ufbxi_find_dst_connections(ufbxi_context *uc, ufbx_element *element, const char *prop)
+{
+	if (!prop) prop = ufbxi_empty_char;
+
+	size_t begin = element->connections_dst.count, end = begin;
+
+	ufbxi_macro_lower_bound_eq(ufbx_connection, 32, &begin,
+		element->connections_dst.data, 0, element->connections_dst.count,
+		(strcmp(a->dst_prop.data, prop) < 0),
+		(a->dst_prop.data == prop && a->src_prop.length == 0));
+
+	ufbxi_macro_upper_bound_eq(ufbx_connection, 32, &end,
+		element->connections_dst.data, begin, element->connections_dst.count,
+		(a->dst_prop.data == prop && a->src_prop.length == 0));
+
+	ufbx_connection_list result = { element->connections_dst.data + begin, end - begin };
+	return result;
+}
+
+ufbxi_nodiscard static int ufbxi_fetch_dst_elements(ufbxi_context *uc, void *p_dst_list, ufbx_element *element, const char *prop, ufbx_element_type src_type)
+{
+	ufbx_connection_list conns = ufbxi_find_dst_connections(uc, element, prop);
+
+	size_t num_layers = 0;
+	ufbxi_for_list(ufbx_connection, conn, conns) {
+		if (conn->src->type == src_type) {
+			ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_element*, 1, &conn->src));
+			num_layers++;
+		}
+	}
+
+	ufbxi_void_list *list = (ufbxi_void_list*)p_dst_list;
+	list->data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_element*, num_layers);
+	list->count = num_layers;
+	ufbxi_check(list->data);
+
+	return 1;
 }
 
 ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
@@ -5443,10 +5695,37 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	ufbxi_check(ufbxi_retain_elements(uc, &uc->scene.anim_curves, sizeof(ufbx_anim_curve), UFBX_ELEMENT_ANIM_CURVE));
 
 	ufbxi_check(ufbxi_linearize_nodes(uc));
-	ufbxi_check(ufbxi_connect_prop_elements(uc));
+	ufbxi_check(ufbxi_add_connections_to_elements(uc));
+
+	ufbxi_for_list(ufbx_anim_stack, stack, uc->scene.anim_stacks) {
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &stack->layers, &stack->element, NULL, UFBX_ELEMENT_ANIM_LAYER));
+	}
+
+	ufbxi_for_list(ufbx_anim_layer, layer, uc->scene.anim_layers) {
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &layer->anim_props, &layer->element, NULL, UFBX_ELEMENT_ANIM_PROP));
+	}
+
+	ufbxi_for_list(ufbx_anim_prop, aprop, uc->scene.anim_props) {
+		ufbxi_for_list(ufbx_connection, conn, aprop->element.connections_dst) {
+			if (conn->src->type == UFBX_ELEMENT_ANIM_CURVE && conn->src_prop.length == 0) {
+				ufbx_anim_curve *curve = (ufbx_anim_curve*)conn->src;
+
+				uint32_t index = 0;
+				const char *name = conn->dst_prop.data;
+				if (name == ufbxi_Y || name == ufbxi_D_Y) index = 1;
+				if (name == ufbxi_Z || name == ufbxi_D_Z) index = 2;
+
+				ufbx_prop *prop = ufbx_find_prop_len(&aprop->props, conn->dst_prop.data, conn->dst_prop.length);
+				aprop->default_value.v[index] = prop->value_real;
+				aprop->curves[index] = curve;
+			}
+		}
+	}
 
 	return 1;
 }
+
+// -- Interpret the read scene
 
 #if 0
 
@@ -7503,6 +7782,8 @@ static ufbxi_forceinline int64_t ufbxi_find_int(const ufbx_props *props, const c
 	}
 }
 
+#endif
+
 static ufbxi_forceinline void ufbxi_add_translate(ufbx_transform *t, ufbx_vec3 v)
 {
 	t->translation.x += v.x;
@@ -7532,65 +7813,32 @@ static ufbxi_forceinline void ufbxi_mul_scale(ufbx_transform *t, ufbx_vec3 v)
 #define UFBXI_RAD_TO_DEG ((ufbx_real)(180.0 / UFBXI_PI))
 #define UFBXI_MM_TO_INCH ((ufbx_real)0.0393700787)
 
-static ufbx_vec4 ufbxi_to_quat(ufbx_vec3 v, ufbx_rotation_order order)
-{
-	v.x *= UFBXI_DEG_TO_RAD * 0.5;
-	v.y *= UFBXI_DEG_TO_RAD * 0.5;
-	v.z *= UFBXI_DEG_TO_RAD * 0.5;
-	ufbx_real cx = (ufbx_real)cos(v.x), sx = (ufbx_real)sin(v.x);
-	ufbx_real cy = (ufbx_real)cos(v.y), sy = (ufbx_real)sin(v.y);
-	ufbx_real cz = (ufbx_real)cos(v.z), sz = (ufbx_real)sin(v.z);
-	ufbx_vec4 q;
 
-	// Generated by `misc/gen_rotation_order.py`
+static ufbx_vec3 ufbxi_to_euler(ufbx_quat q, ufbx_rotation_order order)
+{
+	ufbx_real x, y, z, w = q.w;
 	switch (order) {
-	case UFBX_ROTATION_XYZ:
-		q.x = -cx*sy*sz + cy*cz*sx;
-		q.y = cx*cz*sy + cy*sx*sz;
-		q.z = cx*cy*sz - cz*sx*sy;
-		q.w = cx*cy*cz + sx*sy*sz;
-		break;
-	case UFBX_ROTATION_XZY:
-		q.x = cx*sy*sz + cy*cz*sx;
-		q.y = cx*cz*sy + cy*sx*sz;
-		q.z = cx*cy*sz - cz*sx*sy;
-		q.w = cx*cy*cz - sx*sy*sz;
-		break;
-	case UFBX_ROTATION_YZX:
-		q.x = -cx*sy*sz + cy*cz*sx;
-		q.y = cx*cz*sy - cy*sx*sz;
-		q.z = cx*cy*sz + cz*sx*sy;
-		q.w = cx*cy*cz + sx*sy*sz;
-		break;
-	case UFBX_ROTATION_YXZ:
-		q.x = -cx*sy*sz + cy*cz*sx;
-		q.y = cx*cz*sy + cy*sx*sz;
-		q.z = cx*cy*sz + cz*sx*sy;
-		q.w = cx*cy*cz - sx*sy*sz;
-		break;
-	case UFBX_ROTATION_ZXY:
-		q.x = cx*sy*sz + cy*cz*sx;
-		q.y = cx*cz*sy - cy*sx*sz;
-		q.z = cx*cy*sz - cz*sx*sy;
-		q.w = cx*cy*cz + sx*sy*sz;
-		break;
-	case UFBX_ROTATION_ZYX:
-		q.x = cx*sy*sz + cy*cz*sx;
-		q.y = cx*cz*sy - cy*sx*sz;
-		q.z = cx*cy*sz + cz*sx*sy;
-		q.w = cx*cy*cz - sx*sy*sz;
-		break;
+	case UFBX_ROTATION_XYZ: x = q.x; y = q.y; z = q.z; break;
+	case UFBX_ROTATION_XZY: x = q.x; y = q.z; z = q.y; break;
+	case UFBX_ROTATION_YZX: x = q.y; y = q.z; z = q.x; break;
+	case UFBX_ROTATION_YXZ: x = q.y; y = q.x; z = q.z; break;
+	case UFBX_ROTATION_ZXY: x = q.z; y = q.x; z = q.y; break;
+	case UFBX_ROTATION_ZYX: x = q.z; y = q.y; z = q.x; break;
 	default:
-		q.x = q.y = q.z = 0.0; q.w = 1.0;
+		x = y = z = 0.0f;
 		break;
 	}
 
-	return q;
+	ufbx_vec3 euler;
+	double sp = 2.0f * (w*y - z*x);
+	euler.x = atan2(2.0f*(w*x + y*z), 1.0f - 2.0f*(x*x + y*y));
+	euler.y = fabs(sp) >= 1.0f ? copysign(UFBXI_PI*0.5f, sp) : asin(sp);
+	euler.z = atan2(2.0f*(w*z + x*y), 1.0f - 2.0f*(y*y + z*z));
 }
 
-static ufbxi_forceinline ufbx_vec4 ufbxi_mul_quat(ufbx_vec4 a, ufbx_vec4 b)
+static ufbxi_forceinline ufbx_quat ufbxi_mul_quat(ufbx_quat a, ufbx_quat b)
 {
-	ufbx_vec4 r;
+	ufbx_quat r;
 	r.x = a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y;
 	r.y = a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x;
 	r.z = a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w;
@@ -7607,7 +7855,7 @@ static void ufbxi_mul_rotate(ufbx_transform *t, ufbx_vec3 v, ufbx_rotation_order
 {
 	if (ufbxi_is_vec3_zero(v)) return;
 
-	ufbx_vec4 q = ufbxi_to_quat(v, order);
+	ufbx_quat q = ufbx_euler_to_quat(v, order);
 	if (t->rotation.w != 1.0) {
 		t->rotation = ufbxi_mul_quat(q, t->rotation);
 	} else {
@@ -7623,7 +7871,7 @@ static void ufbxi_mul_inv_rotate(ufbx_transform *t, ufbx_vec3 v, ufbx_rotation_o
 {
 	if (ufbxi_is_vec3_zero(v)) return;
 
-	ufbx_vec4 q = ufbxi_to_quat(v, order);
+	ufbx_quat q = ufbx_euler_to_quat(v, order);
 	q.x = -q.x; q.y = -q.y; q.z = -q.z;
 	if (t->rotation.w != 1.0) {
 		t->rotation = ufbxi_mul_quat(q, t->rotation);
@@ -7635,6 +7883,8 @@ static void ufbxi_mul_inv_rotate(ufbx_transform *t, ufbx_vec3 v, ufbx_rotation_o
 		t->translation = ufbx_rotate_vector(q, t->translation);
 	}
 }
+
+#if 0
 
 static ufbx_transform ufbxi_get_transform(const ufbx_props *props)
 {
@@ -8709,6 +8959,42 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 
 #endif
 
+// -- Curve evaluation
+
+static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, double x0)
+{
+	double p1_3 = p1 * 3.0, p2_3 = p2 * 3.0;
+	double a = p1_3 - p2_3 + 1.0;
+	double b = p2_3 - p1_3 - p1_3;
+	double c = p1_3;
+
+	double a_3 = 3.0*a, b_2 = 2.0*b;
+	double t = x0;
+	double x1, t2, t3;
+
+	// Manually unroll three iterations of Newton-Rhapson, this is enough
+	// for most tangents
+	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
+	t -= x1 / (a_3*t2 + b_2*t + c);
+
+	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
+	t -= x1 / (a_3*t2 + b_2*t + c);
+
+	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
+	t -= x1 / (a_3*t2 + b_2*t + c);
+
+	const double eps = 0.00001;
+	if (x1 >= -eps && x1 <= eps) return t;
+
+	// Perform more iterations until we reach desired accuracy
+	for (size_t i = 0; i < 4; i++) {
+		t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
+		t -= x1 / (a_3*t2 + b_2*t + c);
+		if (x1 >= -eps && x1 <= eps) break;
+	}
+	return t;
+}
+
 // Use skinning evaluation code from below, should these be re-ordered?
 static size_t ufbxi_get_skinning_buffer_size(const ufbx_scene *scene);
 static void ufbxi_evaluate_skinning(ufbx_scene *scene, void *buffer);
@@ -9587,6 +9873,13 @@ static ufbxi_forceinline bool ufbxi_name_key_less(ufbx_prop *prop, const char *d
 	return name_len < prop_len;
 }
 
+static ufbxi_forceinline double ufbxi_asin(double a)
+{
+	if (a <= -1.0) return UFBXI_PI*-0.5f;
+	if (a >= 1.0) return UFBXI_PI*0.5f;
+	return asin(a);
+}
+
 // -- API
 
 #ifdef __cplusplus
@@ -9712,6 +10005,261 @@ ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t 
 
 	return NULL;
 }
+
+ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_real default_value)
+{
+	if (!curve) return default_value;
+	if (curve->keyframes.count <= 1) {
+		if (curve->keyframes.count == 1) {
+			return curve->keyframes.data[0].value;
+		} else {
+			return default_value;
+		}
+	}
+
+	size_t begin = 0;
+	size_t end = curve->keyframes.count;
+	const ufbx_keyframe *keys = curve->keyframes.data;
+	while (end - begin >= 8) {
+		size_t mid = (begin + end) >> 1;
+		if (keys[mid].time < time) {
+			begin = mid + 1;
+		} else { 
+			end = mid;
+		}
+	}
+
+	end = curve->keyframes.count;
+	for (; begin < end; begin++) {
+		const ufbx_keyframe *next = &keys[begin];
+		if (next->time < time) continue;
+
+		// First keyframe
+		if (begin == 0) return next->value;
+
+		const ufbx_keyframe *prev = next - 1;
+
+		double rcp_delta = 1.0 / (next->time - prev->time);
+		double t = (time - prev->time) * rcp_delta;
+
+		switch (prev->interpolation) {
+
+		case UFBX_INTERPOLATION_CONSTANT_PREV:
+			return prev->value;
+
+		case UFBX_INTERPOLATION_CONSTANT_NEXT:
+			return next->value;
+
+		case UFBX_INTERPOLATION_LINEAR:
+			return prev->value*(1.0 - t) + next->value*t;
+
+		case UFBX_INTERPOLATION_CUBIC:
+		{
+			double x1 = prev->right.dx * rcp_delta;
+			double x2 = 1.0 - next->left.dx * rcp_delta;
+			t = ufbxi_find_cubic_bezier_t(x1, x2, t);
+
+			double t2 = t*t, t3 = t2*t;
+			double u = 1.0 - t, u2 = u*u, u3 = u2*u;
+
+			double y0 = prev->value;
+			double y3 = next->value;
+			double y1 = y0 + prev->right.dy;
+			double y2 = y3 - next->left.dy;
+
+			return u3*y0 + 3.0 * (u2*t*y1 + u*t2*y2) + t3*y3;
+		}
+
+		}
+	}
+
+	// Last keyframe
+	return curve->keyframes.data[curve->keyframes.count - 1].value;
+}
+
+
+ufbx_anim_prop *ufbx_find_anim_prop_len(ufbx_anim_layer *layer, ufbx_element *element, const char *prop, size_t prop_len)
+{
+	return NULL;
+}
+
+ufbx_real ufbx_evaluate_real_len(ufbx_anim_layer_ptr_list layers, double time, ufbx_element *element, const char *prop, size_t prop_len)
+{
+	ufbx_prop *pprop = ufbx_find_prop_len(&element->props, prop, prop_len);
+
+	ufbx_real value = pprop ? pprop->value_real : (ufbx_real)0.0f;
+	ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, layers) {
+		ufbx_anim_layer *layer = *p_layer;
+		ufbx_anim_prop *ap = ufbx_find_anim_prop_len(layer, element, prop, prop_len);
+		if (!ap) continue;
+
+		ufbx_real x = ufbx_evaluate_curve(ap->curves[0], time, ap->default_value.x);
+		value = x;
+	}
+
+	return value;
+}
+
+ufbx_vec3 ufbx_rotate_vector(ufbx_quat q, ufbx_vec3 v)
+{
+	ufbx_real xy = q.x*v.y - q.y*v.x;
+	ufbx_real xz = q.x*v.z - q.z*v.x;
+	ufbx_real yz = q.y*v.z - q.z*v.y;
+	ufbx_vec3 r;
+	r.x = 2.0 * (+ q.w*yz + q.y*xy + q.z*xz) + v.x;
+	r.y = 2.0 * (- q.x*xy - q.w*xz + q.z*yz) + v.y;
+	r.z = 2.0 * (- q.x*xz - q.y*yz + q.w*xy) + v.z;
+	return r;
+}
+
+ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order)
+{
+	v.x *= UFBXI_DEG_TO_RAD * 0.5;
+	v.y *= UFBXI_DEG_TO_RAD * 0.5;
+	v.z *= UFBXI_DEG_TO_RAD * 0.5;
+	ufbx_real cx = (ufbx_real)cos(v.x), sx = (ufbx_real)sin(v.x);
+	ufbx_real cy = (ufbx_real)cos(v.y), sy = (ufbx_real)sin(v.y);
+	ufbx_real cz = (ufbx_real)cos(v.z), sz = (ufbx_real)sin(v.z);
+	ufbx_quat q;
+
+	// Generated by `misc/gen_rotation_order.py`
+	switch (order) {
+	case UFBX_ROTATION_XYZ:
+		q.x = -cx*sy*sz + cy*cz*sx;
+		q.y = cx*cz*sy + cy*sx*sz;
+		q.z = cx*cy*sz - cz*sx*sy;
+		q.w = cx*cy*cz + sx*sy*sz;
+		break;
+	case UFBX_ROTATION_XZY:
+		q.x = cx*sy*sz + cy*cz*sx;
+		q.y = cx*cz*sy + cy*sx*sz;
+		q.z = cx*cy*sz - cz*sx*sy;
+		q.w = cx*cy*cz - sx*sy*sz;
+		break;
+	case UFBX_ROTATION_YZX:
+		q.x = -cx*sy*sz + cy*cz*sx;
+		q.y = cx*cz*sy - cy*sx*sz;
+		q.z = cx*cy*sz + cz*sx*sy;
+		q.w = cx*cy*cz + sx*sy*sz;
+		break;
+	case UFBX_ROTATION_YXZ:
+		q.x = -cx*sy*sz + cy*cz*sx;
+		q.y = cx*cz*sy + cy*sx*sz;
+		q.z = cx*cy*sz + cz*sx*sy;
+		q.w = cx*cy*cz - sx*sy*sz;
+		break;
+	case UFBX_ROTATION_ZXY:
+		q.x = cx*sy*sz + cy*cz*sx;
+		q.y = cx*cz*sy - cy*sx*sz;
+		q.z = cx*cy*sz - cz*sx*sy;
+		q.w = cx*cy*cz + sx*sy*sz;
+		break;
+	case UFBX_ROTATION_ZYX:
+		q.x = cx*sy*sz + cy*cz*sx;
+		q.y = cx*cz*sy - cy*sx*sz;
+		q.z = cx*cy*sz + cz*sx*sy;
+		q.w = cx*cy*cz - sx*sy*sz;
+		break;
+	default:
+		q.x = q.y = q.z = 0.0; q.w = 1.0;
+		break;
+	}
+
+	return q;
+}
+
+ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order)
+{
+	const double eps = 0.999999999;
+
+	ufbx_vec3 v;
+	double t;
+
+	// Generated by `misc/gen_quat_to_euler.py`
+	switch (order) {
+	case UFBX_ROTATION_XYZ:
+		t = 2.0f*(q.w*q.y - q.x*q.z);
+		if (fabs(t) < eps) {
+			v.y = (ufbx_real)asin(t);
+			v.z = (ufbx_real)atan2(2.0f*(q.w*q.z + q.x*q.y), 2.0f*(q.w*q.w + q.x*q.x) - 1.0f);
+			v.x = (ufbx_real)-atan2(-2.0f*(q.w*q.x + q.y*q.z), 2.0f*(q.w*q.w + q.z*q.z) - 1.0f);
+		} else {
+			v.y = (ufbx_real)copysign(UFBXI_PI*0.5f, t);
+			v.z = (ufbx_real)(atan2(-2.0f*t*(q.w*q.x - q.y*q.z), t*(2.0f*q.w*q.y + 2.0f*q.x*q.z)));
+			v.x = 0.0f;
+		}
+		break;
+	case UFBX_ROTATION_XZY:
+		t = 2.0f*(q.w*q.z + q.x*q.y);
+		if (fabs(t) < eps) {
+			v.z = (ufbx_real)asin(t);
+			v.y = (ufbx_real)atan2(2.0f*(q.w*q.y - q.x*q.z), 2.0f*(q.w*q.w + q.x*q.x) - 1.0f);
+			v.x = (ufbx_real)-atan2(-2.0f*(q.w*q.x - q.y*q.z), 2.0f*(q.w*q.w + q.y*q.y) - 1.0f);
+		} else {
+			v.z = (ufbx_real)copysign(UFBXI_PI*0.5f, t);
+			v.y = (ufbx_real)(atan2(2.0f*t*(q.w*q.x + q.y*q.z), -t*(2.0f*q.x*q.y - 2.0f*q.w*q.z)));
+			v.x = 0.0f;
+		}
+		break;
+	case UFBX_ROTATION_YZX:
+		t = 2.0f*(q.w*q.z - q.x*q.y);
+		if (fabs(t) < eps) {
+			v.z = (ufbx_real)asin(t);
+			v.x = (ufbx_real)atan2(2.0f*(q.w*q.x + q.y*q.z), 2.0f*(q.w*q.w + q.y*q.y) - 1.0f);
+			v.y = (ufbx_real)-atan2(-2.0f*(q.w*q.y + q.x*q.z), 2.0f*(q.w*q.w + q.x*q.x) - 1.0f);
+		} else {
+			v.z = (ufbx_real)copysign(UFBXI_PI*0.5f, t);
+			v.x = (ufbx_real)(atan2(-2.0f*t*(q.w*q.y - q.x*q.z), t*(2.0f*q.w*q.z + 2.0f*q.x*q.y)));
+			v.y = 0.0f;
+		}
+		break;
+	case UFBX_ROTATION_YXZ:
+		t = 2.0f*(q.w*q.x + q.y*q.z);
+		if (fabs(t) < eps) {
+			v.x = (ufbx_real)asin(t);
+			v.z = (ufbx_real)atan2(2.0f*(q.w*q.z - q.x*q.y), 2.0f*(q.w*q.w + q.y*q.y) - 1.0f);
+			v.y = (ufbx_real)-atan2(-2.0f*(q.w*q.y - q.x*q.z), 2.0f*(q.w*q.w + q.z*q.z) - 1.0f);
+		} else {
+			v.x = (ufbx_real)copysign(UFBXI_PI*0.5f, t);
+			v.z = (ufbx_real)(atan2(2.0f*t*(q.w*q.y + q.x*q.z), -t*(2.0f*q.y*q.z - 2.0f*q.w*q.x)));
+			v.y = 0.0f;
+		}
+		break;
+	case UFBX_ROTATION_ZXY:
+		t = 2.0f*(q.w*q.x - q.y*q.z);
+		if (fabs(t) < eps) {
+			v.x = (ufbx_real)asin(t);
+			v.y = (ufbx_real)atan2(2.0f*(q.w*q.y + q.x*q.z), 2.0f*(q.w*q.w + q.z*q.z) - 1.0f);
+			v.z = (ufbx_real)-atan2(-2.0f*(q.w*q.z + q.x*q.y), 2.0f*(q.w*q.w + q.y*q.y) - 1.0f);
+		} else {
+			v.x = (ufbx_real)copysign(UFBXI_PI*0.5f, t);
+			v.y = (ufbx_real)(atan2(-2.0f*t*(q.w*q.z - q.x*q.y), t*(2.0f*q.w*q.x + 2.0f*q.y*q.z)));
+			v.z = 0.0f;
+		}
+		break;
+	case UFBX_ROTATION_ZYX:
+		t = 2.0f*(q.w*q.y + q.x*q.z);
+		if (fabs(t) < eps) {
+			v.y = (ufbx_real)asin(t);
+			v.x = (ufbx_real)atan2(2.0f*(q.w*q.x - q.y*q.z), 2.0f*(q.w*q.w + q.z*q.z) - 1.0f);
+			v.z = (ufbx_real)-atan2(-2.0f*(q.w*q.z - q.x*q.y), 2.0f*(q.w*q.w + q.x*q.x) - 1.0f);
+		} else {
+			v.y = (ufbx_real)copysign(UFBXI_PI*0.5f, t);
+			v.x = (ufbx_real)(atan2(2.0f*t*(q.w*q.z + q.x*q.y), -t*(2.0f*q.x*q.z - 2.0f*q.w*q.y)));
+			v.z = 0.0f;
+		}
+		break;
+	default:
+		v.x = v.y = v.z = 0.0;
+		break;
+	}
+
+	v.x *= UFBXI_RAD_TO_DEG;
+	v.y *= UFBXI_RAD_TO_DEG;
+	v.z *= UFBXI_RAD_TO_DEG;
+	return v;
+}
+
 
 #if 0
 

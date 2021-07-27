@@ -197,7 +197,6 @@ struct ufbx_prop {
 		ufbx_vec2 value_vec2;
 		ufbx_vec3 value_vec3;
 	};
-	ufbx_element *value_element;
 };
 
 // List of alphabetically sorted properties with potential defaults.
@@ -232,6 +231,10 @@ typedef struct ufbx_anim_curve ufbx_anim_curve;
 
 UFBX_LIST_TYPE(ufbx_node_ptr_list, ufbx_node*);
 UFBX_LIST_TYPE(ufbx_material_ptr_list, ufbx_material*);
+UFBX_LIST_TYPE(ufbx_element_ptr_list, ufbx_element*);
+UFBX_LIST_TYPE(ufbx_anim_layer_ptr_list, ufbx_anim_layer*);
+UFBX_LIST_TYPE(ufbx_anim_prop_ptr_list, ufbx_anim_prop*);
+UFBX_LIST_TYPE(ufbx_anim_curve_ptr_list, ufbx_anim_curve*);
 
 typedef union ufbx_any_node ufbx_any_node;
 
@@ -252,40 +255,32 @@ typedef enum ufbx_element_type {
 	UFBX_NUM_ELEMENT_TYPES,
 } ufbx_element_type;
 
-// Element "base class" found in the head of every element object
-// NOTE: The `element_id` value is consistent when loading the
-// _same_ file, but re-exporting the file will invalidate them.
-struct ufbx_element {
-	ufbx_element_type element_type;
-	uint32_t element_id;
-	ufbx_string name;
-	ufbx_props props;
-};
-
-UFBX_LIST_TYPE(ufbx_element_ptr_list, ufbx_element*);
-
-// Connection between two elements (or properties), does not imply any generic
-// semantic relationship between the two elements, it's all case-by-case.
-//
-// NOTE: Properties are stored as C-strings instead of `ufbx_string` as they
-// are relatively rare (especially `src_prop` is almost never populated).
+// Connection between two elements source and destination are somewhat
+// arbitrary but the destination is often the "container" eg. parent node
+// and source is the object conneted to it eg. child node.
 typedef struct ufbx_connection {
 	ufbx_element *src;
 	ufbx_element *dst;
-	const char *src_prop;
-	const char *dst_prop;
+	ufbx_string src_prop;
+	ufbx_string dst_prop;
 } ufbx_connection;
 
 UFBX_LIST_TYPE(ufbx_connection_list, ufbx_connection);
 
+// Element "base class" found in the head of every element object
+// NOTE: The `element_id` value is consistent when loading the
+// _same_ file, but re-exporting the file will invalidate them.
+struct ufbx_element {
+	ufbx_string name;
+	ufbx_props props;
+	ufbx_element_type type;
+	uint32_t id;
+	ufbx_connection_list connections_src;
+	ufbx_connection_list connections_dst;
+};
 
 struct ufbx_unknown_element {
-	union { ufbx_element element; struct {
-		ufbx_element_type element_type;
-		uint32_t id;
-		ufbx_string name;
-		ufbx_props props;
-	}; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	ufbx_string type;
 	ufbx_string sub_type;
@@ -321,12 +316,7 @@ UFBX_LIST_TYPE_DECL(ufbx_node_list, ufbx_node);
 // elements such as meshes or lights. In normal cases a single `ufbx_node`
 // contains only a single attached element, so using `type/mesh/...` is safe.
 struct ufbx_node {
-	union { ufbx_element element; struct {
-		ufbx_element_type element_type;
-		uint32_t element_id;
-		ufbx_string name;
-		ufbx_props props;
-	}; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	// Node hierarchy
 	ufbx_node *parent;
@@ -442,13 +432,7 @@ typedef struct ufbx_face {
 
 // Polygonal mesh geometry.
 struct ufbx_mesh {
-	// Element "base class" header
-	union { ufbx_element element; struct {
-		ufbx_element_type element_type;
-		uint32_t element_id;
-		ufbx_string name;
-		ufbx_props props;
-	}; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	// Number of "logical" vertices that would be treated as a single point,
 	// one vertex may be split to multiple indices for split attributes, eg. UVs
@@ -504,48 +488,25 @@ UFBX_LIST_TYPE(ufbx_mesh_list, ufbx_mesh);
 
 struct ufbx_light {
 	// Element "base class" header
-	union { ufbx_element element; struct {
-		ufbx_element_type element_type;
-		uint32_t element_id;
-		ufbx_string name;
-		ufbx_props props;
-	}; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 };
 
 UFBX_LIST_TYPE(ufbx_light_list, ufbx_light);
 
 struct ufbx_camera {
-	// Element "base class" header
-	union { ufbx_element element; struct {
-		ufbx_element_type element_type;
-		uint32_t element_id;
-		ufbx_string name;
-		ufbx_props props;
-	}; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 };
 
 UFBX_LIST_TYPE(ufbx_camera_list, ufbx_camera);
 
 struct ufbx_bone {
-	// Element "base class" header
-	union { ufbx_element element; struct {
-		ufbx_element_type element_type;
-		uint32_t element_id;
-		ufbx_string name;
-		ufbx_props props;
-	}; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 };
 
 UFBX_LIST_TYPE(ufbx_bone_list, ufbx_bone);
 
 struct ufbx_blend_shape {
-	// Element "base class" header
-	union { ufbx_element element; struct {
-		ufbx_element_type element_type;
-		uint32_t element_id;
-		ufbx_string name;
-		ufbx_props props;
-	}; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	// Vertex offsets to apply over the base mesh
 	// NOTE: `indices` refers to VERTEX indices not mesh indices, so it ranges
@@ -560,61 +521,79 @@ struct ufbx_blend_shape {
 UFBX_LIST_TYPE(ufbx_blend_shape_list, ufbx_blend_shape);
 
 struct ufbx_material {
-	// Element "base class" header
-	union { ufbx_element element; struct {
-		ufbx_element_type element_type;
-		uint32_t element_id;
-		ufbx_string name;
-		ufbx_props props;
-	}; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 };
 
 UFBX_LIST_TYPE(ufbx_material_list, ufbx_material);
 
 struct ufbx_anim_stack {
-	// Element "base class" header
-	union { ufbx_element element; struct {
-		ufbx_element_type element_type;
-		uint32_t element_id;
-		ufbx_string name;
-		ufbx_props props;
-	}; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	double time_begin;
+	double time_end;
+
+	ufbx_anim_layer_ptr_list layers;
 };
 
 UFBX_LIST_TYPE(ufbx_anim_stack_list, ufbx_anim_stack);
 
 struct ufbx_anim_layer {
-	// Element "base class" header
-	union { ufbx_element element; struct {
-		ufbx_element_type element_type;
-		uint32_t element_id;
-		ufbx_string name;
-		ufbx_props props;
-	}; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_anim_prop_ptr_list anim_props;
 };
 
 UFBX_LIST_TYPE(ufbx_anim_layer_list, ufbx_anim_layer);
 
 struct ufbx_anim_prop {
-	// Element "base class" header
-	union { ufbx_element element; struct {
-		ufbx_element_type element_type;
-		uint32_t element_id;
-		ufbx_string name;
-		ufbx_props props;
-	}; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_vec3 default_value;
+	ufbx_anim_curve *curves[3];
 };
 
 UFBX_LIST_TYPE(ufbx_anim_prop_list, ufbx_anim_prop);
 
+// Animation curve segment interpolation mode between two keyframes
+typedef enum ufbx_interpolation {
+	UFBX_INTERPOLATION_CONSTANT_PREV, // < Hold previous key value
+	UFBX_INTERPOLATION_CONSTANT_NEXT, // < Hold next key value
+	UFBX_INTERPOLATION_LINEAR,        // < Linear interpolation between two keys
+	UFBX_INTERPOLATION_CUBIC,         // < Cubic interpolation, see `ufbx_tangent`
+} ufbx_interpolation;
+
+// Tangent vector at a keyframe, may be split into left/right
+typedef struct ufbx_tangent {
+	ufbx_real dx; // < Derivative in the time axis
+	ufbx_real dy; // < Derivative in the (curve specific) value axis
+} ufbx_tangent;
+
+// Single real `value` at a specified `time`, interpolation between two keyframes
+// is determined by the `interpolation` field of the _previous_ key.
+// If `interpolation == UFBX_INTERPOLATION_CUBIC` the span is evaluated as a
+// cubic bezier curve through the following points:
+//
+//   (prev->time, prev->value)
+//   (prev->time + prev->dx, prev->value + prev->dy)
+//   (next->time - prev->dx, next->value - prev->dy)
+//   (next->time, next->value)
+//
+// PROTIP: Use `ufbx_evaluate_curve(ufbx_anim_curve *curve, double time)` rather
+// than trying to manually handle all the interpolation modes.
+typedef struct ufbx_keyframe {
+	double time;
+	ufbx_real value;
+	ufbx_interpolation interpolation;
+	ufbx_tangent left;
+	ufbx_tangent right;
+} ufbx_keyframe;
+
+UFBX_LIST_TYPE(ufbx_keyframe_list, ufbx_keyframe);
+
 struct ufbx_anim_curve {
-	// Element "base class" header
-	union { ufbx_element element; struct {
-		ufbx_element_type element_type;
-		uint32_t element_id;
-		ufbx_string name;
-		ufbx_props props;
-	}; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_keyframe_list keyframes;
 };
 
 UFBX_LIST_TYPE(ufbx_anim_curve_list, ufbx_anim_curve);
@@ -673,6 +652,9 @@ struct ufbx_scene {
 	ufbx_camera_node_list camera_nodes;
 	ufbx_bone_node_list bone_nodes;
 
+	// Default animation layers
+	ufbx_anim_layer_ptr_list default_anim;
+
 	// Elements that were parsed but not supported by ufbx natively
 	// NOTE: Some information like data arrays might be missing
 	ufbx_unknown_element_list unknown_elements;
@@ -691,9 +673,9 @@ struct ufbx_scene {
 	ufbx_anim_curve_list anim_curves;
 
 	// All elements and connections in the whole file
-	ufbx_element_ptr_list elements;      // < Sorted by `name,element_type`
-	ufbx_connection_list connections;    // < Sorted by `src->element_id`
-	ufbx_connection_list connections_to; // < Sorted by `dst->element_id`
+	ufbx_element_ptr_list elements;       // < Sorted by `name,element_type`
+	ufbx_connection_list connections_src; // < Sorted by `src->element_id,src_prop`
+	ufbx_connection_list connections_dst; // < Sorted by `dst->element_id,dst_prop`
 };
 
 // -- Memory callbacks
@@ -853,6 +835,23 @@ ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t 
 // Utility
 
 ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);
+
+// Animation evaluation
+
+ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_real default_value);
+ufbx_anim_prop *ufbx_find_anim_prop_len(ufbx_anim_layer *layer, ufbx_element *element, const char *prop, size_t prop_len);
+ufbx_real ufbx_evaluate_real_len(ufbx_anim_layer_ptr_list layers, double time, ufbx_element *element, const char *prop, size_t prop_len);
+ufbx_vec2 ufbx_evaluate_vec2_len(ufbx_anim_layer_ptr_list layers, double time, ufbx_element *element, const char *prop, size_t prop_len);
+ufbx_vec3 ufbx_evaluate_vec3_len(ufbx_anim_layer_ptr_list layers, double time, ufbx_element *element, const char *prop, size_t prop_len);
+ufbx_quat ufbx_evaluate_rotation_len(ufbx_anim_layer_ptr_list layers, double time, ufbx_element *element, const char *prop, size_t prop_len);
+ufbx_vec3 ufbx_evaluate_scaling_len(ufbx_anim_layer_ptr_list layers, double time, ufbx_element *element, const char *prop, size_t prop_len);
+
+// Math
+
+ufbx_vec3 ufbx_rotate_vector(ufbx_quat q, ufbx_vec3 v);
+ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order);
+ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order);
+
 // -- Inline API
 
 ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t index) { return v->data[v->indices[index]]; }
