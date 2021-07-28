@@ -2295,9 +2295,17 @@ static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, co
 // comparison. Our fixed internal strings (`ufbxi_String`) are considered the
 // canonical pointers for said strings so we can compare them by address.
 
-static ufbxi_forceinline bool ufbxi_streq(ufbx_string a, ufbx_string b)
+static ufbxi_forceinline bool ufbxi_str_equal(ufbx_string a, ufbx_string b)
 {
 	return a.length == b.length && !memcmp(a.data, b.data, a.length);
+}
+
+static ufbxi_forceinline bool ufbxi_str_less(ufbx_string a, ufbx_string b)
+{
+	size_t len = ufbxi_min_sz(a.length, b.length);
+	int cmp = memcmp(a.data, b.data, len);
+	if (cmp != 0) return cmp < 0;
+	return a.length < b.length;
 }
 
 const char ufbxi_empty_char[1] = { '\0' };
@@ -4112,6 +4120,18 @@ static ufbxi_forceinline uint32_t ufbxi_get_name_key_c(const char *name)
 	return (uint8_t)name[0]<<24 | (uint8_t)name[1]<<16 | (uint8_t)name[2]<<8 | (uint8_t)name[3];
 }
 
+static ufbxi_forceinline bool ufbxi_name_key_less(ufbx_prop *prop, const char *data, size_t name_len, uint32_t key)
+{
+	if (prop->internal_key < key) return true;
+	if (prop->internal_key > key) return false;
+
+	size_t prop_len = prop->name.length;
+	size_t len = ufbxi_min_sz(prop_len, name_len);
+	int cmp = memcmp(prop->name.data, data, len);
+	if (cmp != 0) return cmp < 0;
+	return name_len < prop_len;
+}
+
 // -- Reading the parsed data
 
 ufbxi_nodiscard static int ufbxi_read_header_extension(ufbxi_context *uc)
@@ -4275,7 +4295,8 @@ ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc)
 		}
 	}
 
-	uc->templates = ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_template, uc->num_templates);
+	// TODO: Preserve only the `props` part of the templates
+	uc->templates = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbxi_template, uc->num_templates);
 	ufbxi_check(uc->templates);
 
 	return 1;
@@ -5452,9 +5473,9 @@ ufbxi_forceinline static bool ufbxi_cmp_connection_less(ufbx_connection *a, ufbx
 {
 	ufbx_element *a_elem = (&a->src)[index], *b_elem = (&b->src)[index];
 	if (a_elem->id != b_elem->id) return a_elem->id < b_elem->id;
-	int cmp = strcmp((&a->src_prop)[index].data, (&b->dst_prop)[index].data);
+	int cmp = strcmp((&a->src_prop)[index].data, (&b->src_prop)[index].data);
 	if (cmp != 0) return cmp < 0;
-	cmp = strcmp((&a->src_prop)[index ^ 1].data, (&b->dst_prop)[index ^ 1].data);
+	cmp = strcmp((&a->src_prop)[index ^ 1].data, (&b->src_prop)[index ^ 1].data);
 	return cmp < 0;
 }
 
@@ -5629,6 +5650,69 @@ ufbxi_nodiscard static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
 		elem->connections_dst.data = conn_dst;
 		elem->connections_dst.count = (size_t)(dst_end - conn_dst);
 
+		// Setup animated properties
+		// TODO: It seems we're invalidating a lot of properties here actually, maybe they
+		// should be initially pushed to `tmp` instead of result if this happens so much..
+		{
+			ufbx_connection *conn = conn_dst;
+			ufbx_prop *prop = elem->props.props, *prop_end = prop + elem->props.num_props;
+			ufbx_prop *copy_start = prop;
+			bool needs_copy = false;
+			size_t num_animated = 0, num_synthetic = 0;
+			while (conn != dst_end && conn->dst_prop.length == 0) conn++;
+
+			while (conn != dst_end) {
+				// We are only interested in ufbx_anim_prop connections
+				if (conn->src->type != UFBX_ELEMENT_ANIM_PROP && conn->src_prop.length == 0) {
+					conn++;
+					continue;
+				}
+				num_animated++;
+
+				ufbx_string name = conn->dst_prop;
+				uint32_t key = ufbxi_get_name_key(name.data, name.length);
+				while (prop != prop_end && ufbxi_name_key_less(prop, name.data, name.length, key)) prop++;
+
+				if (prop != prop_end && prop->name.data == name.data) {
+					prop->flags |= UFBX_PROP_FLAG_ANIMATED;
+				} else {
+					// Animated property that is not in the element property list
+					// Copy the preceeding properties to the stack, then push a
+					// synthetic property for the animated property.
+					ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_prop, (size_t)(prop - copy_start), copy_start));
+					copy_start = prop;
+					needs_copy = true;
+
+					// Let's hope we can find the property in the defaults at least
+					ufbx_prop *def_prop = NULL;
+					if (elem->props.defaults) {
+						def_prop = ufbxi_find_prop_with_key(elem->props.defaults, name.data, key);
+					}
+
+					ufbx_prop *new_prop = ufbxi_push_zero(&uc->tmp_stack, ufbx_prop, 1);
+					ufbxi_check(new_prop);
+					if (def_prop) *new_prop = *def_prop;
+					new_prop->flags |= UFBX_PROP_FLAG_ANIMATABLE | UFBX_PROP_FLAG_SYNTHETIC | UFBX_PROP_FLAG_ANIMATED;
+					new_prop->name = name;
+					new_prop->internal_key = key;
+					num_synthetic++;
+				}
+
+				// Skip over until we reach the next property connection
+				while (conn != dst_end && conn->dst_prop.data == name.data) conn++;
+			}
+
+			// Copy the properties if necessary
+			if (needs_copy) {
+				size_t num_new_props = elem->props.num_props + num_synthetic;
+				ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_prop, (size_t)(prop_end - copy_start), copy_start));
+				elem->props.props = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_prop, num_new_props);
+				ufbxi_check(elem->props.props);
+				elem->props.num_props = num_new_props;
+			}
+			elem->props.num_animated = num_animated;
+		}
+
 		conn_src = src_end;
 		conn_dst = dst_end;
 	}
@@ -5675,6 +5759,38 @@ ufbxi_nodiscard static int ufbxi_fetch_dst_elements(ufbxi_context *uc, void *p_d
 	return 1;
 }
 
+ufbxi_nodiscard static bool ufbxi_cmp_element_anim_prop_less(const ufbx_element_anim_prop *a, const ufbx_element_anim_prop *b)
+{
+	if (a->element_id != b->element_id) return a->element_id < b->element_id;
+	if (a->internal_key != b->internal_key) return a->internal_key < b->internal_key;
+	return ufbxi_str_less(a->prop_name, b->prop_name);
+}
+
+ufbxi_nodiscard static int ufbxi_sort_element_anim_props(ufbxi_context *uc, ufbx_element_anim_prop *eaps, size_t count)
+{
+	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_element_anim_prop)));
+	ufbxi_macro_stable_sort(ufbx_element_anim_prop, 32, eaps, uc->tmp_arr, count,
+		( ufbxi_cmp_element_anim_prop_less(a, b) ));
+	return 1;
+}
+
+ufbxi_nodiscard static ufbx_element_anim_prop *ufbxi_find_element_anim_prop_start(ufbx_anim_layer *layer, uint32_t element_id)
+{
+	size_t index = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbx_element_anim_prop, 16, &index, layer->element_props.data, 0, layer->element_props.count,
+		(a->element_id < element_id), (a->element_id == element_id));
+	return index != SIZE_MAX ? &layer->element_props.data[index] : NULL;
+}
+
+ufbxi_nodiscard static ufbx_element_anim_prop *ufbxi_find_element_anim_prop(ufbx_anim_layer *layer, const ufbx_element_anim_prop *ref)
+{
+	size_t index = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbx_element_anim_prop, 16, &index, layer->element_props.data, 0, layer->element_props.count,
+		( ufbxi_cmp_element_anim_prop_less(a, ref) ),
+		( a->element_id == ref->element_id && a->prop_name.data == ref->prop_name.data));
+	return index != SIZE_MAX ? &layer->element_props.data[index] : NULL;
+}
+
 ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	uc->scene.elements.data = ufbxi_push_zero(&uc->result, ufbx_element*, uc->num_elements);
@@ -5703,6 +5819,37 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 
 	ufbxi_for_list(ufbx_anim_layer, layer, uc->scene.anim_layers) {
 		ufbxi_check(ufbxi_fetch_dst_elements(uc, &layer->anim_props, &layer->element, NULL, UFBX_ELEMENT_ANIM_PROP));
+
+		// Combine the animated properties with elements (potentially duplicates!)
+		size_t num_eaps = 0;
+		ufbx_connection_list layer_conns = ufbxi_find_dst_connections(uc, &layer->element, NULL);
+		ufbxi_for_list(ufbx_connection, lc, layer_conns) {
+			if (lc->src->type != UFBX_ELEMENT_ANIM_PROP) continue;
+			ufbx_anim_prop *aprop = (ufbx_anim_prop*)lc->src;
+			ufbxi_for_list(ufbx_connection, ac, aprop->element.connections_src) {
+				if (ac->src_prop.length == 0 && ac->dst_prop.length > 0) {
+					ufbx_element_anim_prop *eap = ufbxi_push(&uc->tmp_stack, ufbx_element_anim_prop, 1);
+					ufbxi_check(eap);
+					eap->anim_prop = aprop;
+					eap->element = ac->dst;
+					eap->element_id = ac->dst->id;
+					eap->internal_key = ufbxi_get_name_key(ac->dst_prop.data, ac->dst_prop.length);
+					eap->prop_name = ac->dst_prop;
+					num_eaps++;
+				}
+			}
+		}
+
+		// Add a dummy NULL element animated prop at the end so we can iterate
+		// animated props without worrying about boundary conditions..
+		{
+			ufbx_element_anim_prop *eap = ufbxi_push_zero(&uc->tmp_stack, ufbx_element_anim_prop, 1);
+			ufbxi_check(eap);
+		}
+
+		layer->element_props.data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_element_anim_prop, num_eaps + 1);
+		layer->element_props.count = num_eaps;
+		ufbxi_check(ufbxi_sort_element_anim_props(uc, layer->element_props.data, layer->element_props.count));
 	}
 
 	ufbxi_for_list(ufbx_anim_prop, aprop, uc->scene.anim_props) {
@@ -7813,7 +7960,6 @@ static ufbxi_forceinline void ufbxi_mul_scale(ufbx_transform *t, ufbx_vec3 v)
 #define UFBXI_RAD_TO_DEG ((ufbx_real)(180.0 / UFBXI_PI))
 #define UFBXI_MM_TO_INCH ((ufbx_real)0.0393700787)
 
-
 static ufbx_vec3 ufbxi_to_euler(ufbx_quat q, ufbx_rotation_order order)
 {
 	ufbx_real x, y, z, w = q.w;
@@ -9849,6 +9995,74 @@ ufbx_inline ufbx_vec3 ufbxi_normalize(ufbx_vec3 a) {
 
 #endif
 
+// -- Animation evaluation
+
+typedef struct ufbxi_anim_layer_combine_ctx {
+	ufbx_anim_layer_ptr_list layers;
+	ufbx_element *element;
+	double time;
+	ufbx_rotation_order rotation_order;
+	bool has_rotation_order;
+} ufbxi_anim_layer_combine_ctx;
+
+static ufbxi_noinline void ufbxi_combine_anim_layer_slow(ufbxi_anim_layer_combine_ctx *ctx, ufbx_anim_layer *layer, ufbx_real weight, const char *prop_name, ufbx_vec3 *result, const ufbx_vec3 *value)
+{
+	if (layer->compose_rotation && prop_name == ufbxi_Lcl_Rotation && !ctx->has_rotation_order) {
+		ufbx_prop rp = ufbx_evaluate_prop_len(ctx->layers, ctx->element, ufbxi_RotationOrder, sizeof(ufbxi_RotationOrder) - 1, ctx->time);
+		// NOTE: Defaults to 0 (UFBX_ROTATION_XYZ) gracefully if property is not found
+		if (rp.value_int >= 0 && rp.value_int <= UFBX_ROTATION_SPHERIC) {
+			ctx->rotation_order = (ufbx_rotation_order)rp.value_int;
+		} else {
+			ctx->rotation_order = UFBX_ROTATION_XYZ;
+		}
+	}
+
+	if (layer->additive) {
+		if (layer->compose_scale && prop_name == ufbxi_Lcl_Scaling) {
+			result->x *= (ufbx_real)pow(value->x, weight);
+			result->y *= (ufbx_real)pow(value->y, weight);
+			result->z *= (ufbx_real)pow(value->z, weight);
+		} else if (layer->compose_rotation && prop_name == ufbxi_Lcl_Rotation) {
+			ufbx_quat a = ufbx_euler_to_quat(*result, ctx->rotation_order);
+			ufbx_quat b = ufbx_euler_to_quat(*value, ctx->rotation_order);
+			b = ufbx_slerp(ufbx_identity_quat, b, weight);
+			ufbx_quat res = ufbx_mul_quat(b, a);
+			*result = ufbx_quat_to_euler(res, ctx->rotation_order);
+		} else {
+			result->x += value->x * weight;
+			result->y += value->y * weight;
+			result->z += value->z * weight;
+		}
+	} else {
+		ufbx_real res_weight = 1.0f - weight;
+		if (layer->compose_scale && prop_name == ufbxi_Lcl_Scaling) {
+			// TODO: This is technically correct but do we want correct...
+			result->x = (ufbx_real)(pow(result->x, res_weight) * pow(value->x, weight));
+			result->y = (ufbx_real)(pow(result->y, res_weight) * pow(value->y, weight));
+			result->z = (ufbx_real)(pow(result->z, res_weight) * pow(value->z, weight));
+		} else if (layer->compose_rotation && prop_name == ufbxi_Lcl_Rotation) {
+			// TODO: This is technically correct but do we want correct...
+			ufbx_quat a = ufbx_euler_to_quat(*result, ctx->rotation_order);
+			ufbx_quat b = ufbx_euler_to_quat(*value, ctx->rotation_order);
+			ufbx_quat res = ufbx_slerp(a, b, weight);
+			*result = ufbx_quat_to_euler(res, ctx->rotation_order);
+		} else {
+			result->x = result->x * res_weight + value->x * weight;
+			result->y = result->y * res_weight + value->y * weight;
+			result->z = result->z * res_weight + value->z * weight;
+		}
+	}
+}
+
+static ufbxi_forceinline void ufbxi_combine_anim_layer(ufbxi_anim_layer_combine_ctx *ctx, ufbx_anim_layer *layer, ufbx_real weight, const char *prop_name, ufbx_vec3 *result, const ufbx_vec3 *value)
+{
+	if (!layer->blended) {
+		*result = *value;
+	} else {
+		ufbxi_combine_anim_layer_slow(ctx, layer, weight, prop_name, result, value);
+	}
+}
+
 // -- File IO
 
 static size_t ufbxi_file_read(void *user, void *data, size_t max_size)
@@ -9856,28 +10070,6 @@ static size_t ufbxi_file_read(void *user, void *data, size_t max_size)
 	FILE *file = (FILE*)user;
 	if (ferror(file)) return SIZE_MAX;
 	return fread(data, 1, max_size, file);
-}
-
-// -- Utility
-
-static ufbxi_forceinline bool ufbxi_name_key_less(ufbx_prop *prop, const char *data, size_t name_len, uint32_t key)
-{
-	if (prop->internal_key < key) return true;
-	if (prop->internal_key > key) return false;
-
-	size_t prop_len = prop->name.length;
-	size_t len = ufbxi_min_sz(prop_len, name_len);
-	int cmp = memcmp(prop->name.data, data, len);
-	if (cmp != 0) return cmp;
-
-	return name_len < prop_len;
-}
-
-static ufbxi_forceinline double ufbxi_asin(double a)
-{
-	if (a <= -1.0) return UFBXI_PI*-0.5f;
-	if (a >= 1.0) return UFBXI_PI*0.5f;
-	return asin(a);
 }
 
 // -- API
@@ -9889,6 +10081,10 @@ extern "C" {
 const ufbx_string ufbx_empty_string = { ufbxi_empty_char, 0 };
 const ufbx_matrix ufbx_identity_matrix = { 1,0,0, 0,1,0, 0,0,1, 0,0,0 };
 const ufbx_transform ufbx_identity_transform = { {0,0,0}, {0,0,0,1}, {1,1,1} };
+const ufbx_vec2 ufbx_zero_vec2 = { 0,0 };
+const ufbx_vec3 ufbx_zero_vec3 = { 0,0,0 };
+const ufbx_vec4 ufbx_zero_vec4 = { 0,0,0,0 };
+const ufbx_quat ufbx_identity_quat = { 0,0,0,1 };
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)
 {
@@ -10077,27 +10273,180 @@ ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_re
 	return curve->keyframes.data[curve->keyframes.count - 1].value;
 }
 
-
-ufbx_anim_prop *ufbx_find_anim_prop_len(ufbx_anim_layer *layer, ufbx_element *element, const char *prop, size_t prop_len)
+ufbx_real ufbx_evaluate_anim_prop_real(const ufbx_anim_prop *anim_prop, double time)
 {
-	return NULL;
-}
-
-ufbx_real ufbx_evaluate_real_len(ufbx_anim_layer_ptr_list layers, double time, ufbx_element *element, const char *prop, size_t prop_len)
-{
-	ufbx_prop *pprop = ufbx_find_prop_len(&element->props, prop, prop_len);
-
-	ufbx_real value = pprop ? pprop->value_real : (ufbx_real)0.0f;
-	ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, layers) {
-		ufbx_anim_layer *layer = *p_layer;
-		ufbx_anim_prop *ap = ufbx_find_anim_prop_len(layer, element, prop, prop_len);
-		if (!ap) continue;
-
-		ufbx_real x = ufbx_evaluate_curve(ap->curves[0], time, ap->default_value.x);
-		value = x;
+	if (!anim_prop) {
+		return 0.0f;
 	}
 
-	return value;
+	ufbx_real res = anim_prop->default_value.x;
+	if (anim_prop->curves[0]) res= ufbx_evaluate_curve(anim_prop->curves[0], time, res);
+	return res;
+}
+
+ufbx_vec2 ufbx_evaluate_anim_prop_vec2(const ufbx_anim_prop *anim_prop, double time)
+{
+	if (!anim_prop) {
+		ufbx_vec2 zero = { 0.0f };
+		return zero;
+	}
+
+	ufbx_vec2 res = { anim_prop->default_value.x, anim_prop->default_value.y };
+	if (anim_prop->curves[0]) res.x = ufbx_evaluate_curve(anim_prop->curves[0], time, res.x);
+	if (anim_prop->curves[1]) res.y = ufbx_evaluate_curve(anim_prop->curves[1], time, res.y);
+	return res;
+}
+
+ufbx_vec3 ufbx_evaluate_anim_prop_vec3(const ufbx_anim_prop *anim_prop, double time)
+{
+	if (!anim_prop) {
+		ufbx_vec3 zero = { 0.0f };
+		return zero;
+	}
+
+	ufbx_vec3 res = anim_prop->default_value;
+	if (anim_prop->curves[0]) res.x = ufbx_evaluate_curve(anim_prop->curves[0], time, res.x);
+	if (anim_prop->curves[1]) res.y = ufbx_evaluate_curve(anim_prop->curves[1], time, res.y);
+	if (anim_prop->curves[2]) res.z = ufbx_evaluate_curve(anim_prop->curves[2], time, res.z);
+	return res;
+}
+
+ufbx_prop ufbx_evaluate_prop_len(ufbx_anim_layer_ptr_list layers, ufbx_element *element, const char *name, size_t name_len, double time)
+{
+	ufbx_prop result;
+
+	ufbx_prop *prop = ufbx_find_prop_len(&element->props, name, name_len);
+	if (prop) {
+		result = *prop;
+	} else {
+		memset(&result, 0, sizeof(result));
+		result.name.data = name;
+		result.name.length = name_len;
+		result.internal_key = ufbxi_get_name_key(name, name_len);
+		result.flags = UFBX_PROP_FLAG_NOT_FOUND;
+	}
+
+	if ((result.flags & UFBX_PROP_FLAG_ANIMATED) == 0) return result;
+
+	ufbxi_anim_layer_combine_ctx combine_ctx = { layers, element, time };
+
+	ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, layers) {
+		ufbx_anim_layer *layer = *p_layer;
+
+		// Find the weight for the current layer
+		// TODO: Should this be searched from multipler layers?
+		ufbx_real weight = layer->weight;
+		if (layer->weight_is_animated && layer->blended) {
+			ufbx_element_anim_prop *weight_eap = ufbxi_find_element_anim_prop_start(layer, layer->element.id);
+			if (weight_eap) {
+				weight = ufbx_evaluate_anim_prop_real(weight_eap->anim_prop, time) * 0.01f;
+			}
+		}
+
+		ufbx_element_anim_prop eap_ref = { NULL };
+		eap_ref.element_id = element->id;
+		eap_ref.internal_key = prop->internal_key;
+		eap_ref.prop_name.data = prop->name.data;
+		eap_ref.prop_name.length = prop->name.length;
+		ufbx_element_anim_prop *eap = ufbxi_find_element_anim_prop(layer, &eap_ref);
+		if (!eap) continue;
+
+		ufbx_vec3 v = ufbx_evaluate_anim_prop_vec3(eap->anim_prop, time);
+		ufbxi_combine_anim_layer(&combine_ctx, layer, weight, prop->name.data, &result.value_vec3, &v);
+	}
+
+	result.value_int = (int64_t)result.value_real;
+
+	return result;
+}
+
+ufbx_props ufbx_evaluate_props(ufbx_anim_layer_ptr_list layers, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size)
+{
+	ufbx_props ret = { NULL };
+	if (!element) return ret;
+
+	size_t num_anim = 0;
+	ufbxi_for(ufbx_prop, prop, element->props.props, element->props.num_props) {
+		if (!(prop->flags & UFBX_PROP_FLAG_ANIMATED)) continue;
+		if (num_anim >= buffer_size) break;
+		buffer[num_anim++] = *prop;
+	}
+
+	ufbxi_anim_layer_combine_ctx combine_ctx = { layers, element, time };
+
+	ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, layers) {
+		ufbx_anim_layer *layer = *p_layer;
+
+		// Find the weight for the current layer
+		// TODO: Should this be searched from multipler layers?
+		ufbx_real weight = layer->weight;
+		if (layer->weight_is_animated && layer->blended) {
+			ufbx_element_anim_prop *weight_eap = ufbxi_find_element_anim_prop_start(layer, layer->element.id);
+			if (weight_eap) {
+				weight = ufbx_evaluate_anim_prop_real(weight_eap->anim_prop, time) * 0.01f;
+			}
+		}
+
+		ufbx_element_anim_prop *eap = ufbxi_find_element_anim_prop_start(layer, element->id);
+		if (!eap) continue;
+
+		for (size_t i = 0; i < num_anim; i++) {
+			ufbx_prop *prop = &buffer[i];
+
+			// Skip until we reach `eap >= prop`
+			while (eap->element == element && eap->internal_key < prop->internal_key) eap++;
+			if (eap->prop_name.data != prop->name.data) {
+				while (eap->element == element && strcmp(eap->prop_name.data, prop->name.data) < 0) eap++;
+			}
+
+			if (eap->prop_name.data == prop->name.data) {
+				ufbx_vec3 v = ufbx_evaluate_anim_prop_vec3(eap->anim_prop, time);
+				ufbxi_combine_anim_layer(&combine_ctx, layer, weight, prop->name.data, &prop->value_vec3, &v);
+			}
+		}
+	}
+
+	ufbxi_for(ufbx_prop, prop, buffer, num_anim) {
+		prop->value_int = (int64_t)prop->value_real;
+	}
+
+	ret.props = buffer;
+	ret.num_props = ret.num_animated = num_anim;
+	ret.defaults = &element->props;
+	return ret;
+}
+
+ufbx_quat ufbx_mul_quat(ufbx_quat a, ufbx_quat b)
+{
+	return ufbxi_mul_quat(a, b);
+}
+
+ufbx_quat ufbx_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t)
+{
+	double dot = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
+	double omega = acos(fmin(fmax(dot, 0.0), 1.0));
+	if (dot < 0.0) {
+		b.x = -b.x; b.y = -b.y; b.z = -b.z; b.w = -b.w;
+	}
+	if (omega <= 0.0) return a;
+	if (omega >= 1.0) return b;
+
+	double rcp_so = 1.0 / sin(omega);
+	double af = sin((1.0 - t) * omega) * rcp_so;
+	double bf = sin(t * omega) * rcp_so;
+
+	double x = af*a.x + bf*b.x;
+	double y = af*a.y + bf*b.y;
+	double z = af*a.z + bf*b.z;
+	double w = af*a.w + bf*b.w;
+	double rcp_len = 1.0 / sqrt(x*x + y*y + z*z + w*w);
+
+	ufbx_quat ret;
+	ret.x = (ufbx_real)(x * rcp_len);
+	ret.y = (ufbx_real)(y * rcp_len);
+	ret.z = (ufbx_real)(z * rcp_len);
+	ret.w = (ufbx_real)(w * rcp_len);
+	return ret;
 }
 
 ufbx_vec3 ufbx_rotate_vector(ufbx_quat q, ufbx_vec3 v)
@@ -10259,7 +10608,6 @@ ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order)
 	v.z *= UFBXI_RAD_TO_DEG;
 	return v;
 }
-
 
 #if 0
 

@@ -167,7 +167,7 @@ typedef enum ufbx_prop_type {
 	UFBX_NUM_PROP_TYPES,
 } ufbx_prop_type;
 
-typedef enum ufbx_prop_flag {
+typedef enum ufbx_prop_flags {
 	UFBX_PROP_FLAG_ANIMATABLE = 0x1,
 	UFBX_PROP_FLAG_USER_DEFINED = 0x2,
 	UFBX_PROP_FLAG_HIDDEN = 0x4,
@@ -180,14 +180,16 @@ typedef enum ufbx_prop_flag {
 	UFBX_PROP_FLAG_MUTE_Z = 0x400,
 	UFBX_PROP_FLAG_MUTE_W = 0x800,
 	UFBX_PROP_FLAG_SYNTHETIC = 0x1000,
-} ufbx_prop_flag;
+	UFBX_PROP_FLAG_ANIMATED = 0x2000,
+	UFBX_PROP_FLAG_NOT_FOUND = 0x4000,
+} ufbx_prop_flags;
 
 // Single property with name/type/value.
 struct ufbx_prop {
 	ufbx_string name;
 	uint32_t internal_key;
 	ufbx_prop_type type;
-	uint32_t flags; // < See `ufbx_prop_flag`
+	ufbx_prop_flags flags;
 
 	ufbx_string value_str;
 	int64_t value_int;
@@ -205,6 +207,7 @@ struct ufbx_prop {
 struct ufbx_props {
 	ufbx_prop *props;
 	size_t num_props;
+	size_t num_animated;
 
 	ufbx_props *defaults;
 };
@@ -537,10 +540,28 @@ struct ufbx_anim_stack {
 
 UFBX_LIST_TYPE(ufbx_anim_stack_list, ufbx_anim_stack);
 
+typedef struct ufbx_element_anim_prop {
+	ufbx_element *element;
+	uint32_t element_id;
+	uint32_t internal_key;
+	ufbx_string prop_name;
+	ufbx_anim_prop *anim_prop;
+} ufbx_element_anim_prop;
+
+UFBX_LIST_TYPE(ufbx_element_anim_prop_list, ufbx_element_anim_prop);
+
 struct ufbx_anim_layer {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
+	ufbx_real weight;
+	bool weight_is_animated;
+	bool blended;
+	bool additive;
+	bool compose_rotation;
+	bool compose_scale;
+
 	ufbx_anim_prop_ptr_list anim_props;
+	ufbx_element_anim_prop_list element_props; // < Sorted by `element_id,prop_name`
 };
 
 UFBX_LIST_TYPE(ufbx_anim_layer_list, ufbx_anim_layer);
@@ -801,6 +822,10 @@ extern "C" {
 extern const ufbx_string ufbx_empty_string;
 extern const ufbx_matrix ufbx_identity_matrix;
 extern const ufbx_transform ufbx_identity_transform;
+extern const ufbx_vec2 ufbx_zero_vec2;
+extern const ufbx_vec3 ufbx_zero_vec3;
+extern const ufbx_vec4 ufbx_zero_vec4;
+extern const ufbx_quat ufbx_identity_quat;
 extern const uint32_t ufbx_source_version;
 
 // Load a scene from a `size` byte memory buffer at `data`
@@ -839,15 +864,18 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 // Animation evaluation
 
 ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_real default_value);
-ufbx_anim_prop *ufbx_find_anim_prop_len(ufbx_anim_layer *layer, ufbx_element *element, const char *prop, size_t prop_len);
-ufbx_real ufbx_evaluate_real_len(ufbx_anim_layer_ptr_list layers, double time, ufbx_element *element, const char *prop, size_t prop_len);
-ufbx_vec2 ufbx_evaluate_vec2_len(ufbx_anim_layer_ptr_list layers, double time, ufbx_element *element, const char *prop, size_t prop_len);
-ufbx_vec3 ufbx_evaluate_vec3_len(ufbx_anim_layer_ptr_list layers, double time, ufbx_element *element, const char *prop, size_t prop_len);
-ufbx_quat ufbx_evaluate_rotation_len(ufbx_anim_layer_ptr_list layers, double time, ufbx_element *element, const char *prop, size_t prop_len);
-ufbx_vec3 ufbx_evaluate_scaling_len(ufbx_anim_layer_ptr_list layers, double time, ufbx_element *element, const char *prop, size_t prop_len);
+
+ufbx_real ufbx_evaluate_anim_prop_real(const ufbx_anim_prop *anim_prop, double time);
+ufbx_vec2 ufbx_evaluate_anim_prop_vec2(const ufbx_anim_prop *anim_prop, double time);
+ufbx_vec3 ufbx_evaluate_anim_prop_vec3(const ufbx_anim_prop *anim_prop, double time);
+
+ufbx_prop ufbx_evaluate_prop_len(ufbx_anim_layer_ptr_list layers, ufbx_element *element, const char *name, size_t name_len, double time);
+ufbx_props ufbx_evaluate_props(ufbx_anim_layer_ptr_list layers, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
 
 // Math
 
+ufbx_quat ufbx_mul_quat(ufbx_quat a, ufbx_quat b);
+ufbx_quat ufbx_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t);
 ufbx_vec3 ufbx_rotate_vector(ufbx_quat q, ufbx_vec3 v);
 ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order);
 ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order);
