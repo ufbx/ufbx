@@ -1936,6 +1936,7 @@ static const char ufbxi_GateFit[] = "GateFit";
 static const char ufbxi_FilmSqueezeRatio[] = "FilmSqueezeRatio";
 static const char ufbxi_FocalLength[] = "FocalLength";
 static const char ufbxi_Count[] = "Count";
+static const char ufbxi_BlendMode[] = "BlendMode";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, sizeof(ufbxi_AllSame) - 1 },
@@ -2081,6 +2082,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FilmSqueezeRatio, sizeof(ufbxi_FilmSqueezeRatio) - 1 },
 	{ ufbxi_FocalLength, sizeof(ufbxi_FocalLength) - 1 },
 	{ ufbxi_Count, sizeof(ufbxi_Count) - 1 },
+	{ ufbxi_BlendMode, sizeof(ufbxi_BlendMode) - 1 },
 };
 
 // -- Type definitions
@@ -5791,6 +5793,37 @@ ufbxi_nodiscard static ufbx_element_anim_prop *ufbxi_find_element_anim_prop(ufbx
 	return index != SIZE_MAX ? &layer->element_props.data[index] : NULL;
 }
 
+static ufbxi_forceinline ufbx_real ufbxi_find_real(const ufbx_props *props, const char *name, ufbx_real def)
+{
+	ufbx_prop *prop = ufbxi_find_prop(props, name);
+	if (prop) {
+		return prop->value_real;
+	} else {
+		return def;
+	}
+}
+
+static ufbxi_forceinline ufbx_vec3 ufbxi_find_vec3(const ufbx_props *props, const char *name, ufbx_real def_x, ufbx_real def_y, ufbx_real def_z)
+{
+	ufbx_prop *prop = ufbxi_find_prop(props, name);
+	if (prop) {
+		return prop->value_vec3;
+	} else {
+		ufbx_vec3 def = { def_x, def_y, def_z };
+		return def;
+	}
+}
+
+static ufbxi_forceinline int64_t ufbxi_find_int(const ufbx_props *props, const char *name, int64_t def)
+{
+	ufbx_prop *prop = ufbxi_find_prop(props, name);
+	if (prop) {
+		return prop->value_int;
+	} else {
+		return def;
+	}
+}
+
 ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	uc->scene.elements.data = ufbxi_push_zero(&uc->result, ufbx_element*, uc->num_elements);
@@ -5840,6 +5873,38 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 			}
 		}
 
+		switch (ufbxi_find_int(&layer->props, ufbxi_BlendMode, 0)) {
+		case 0: // Additive
+			layer->blended = true;
+			layer->additive = true;
+			break;
+		case 1: // Override
+			layer->blended = false;
+			layer->additive = false;
+			break;
+		case 2: // Override Passthrough
+			layer->blended = true;
+			layer->additive = false;
+			break;
+		default: // Unknown
+			layer->blended = false;
+			layer->additive = false;
+			break;
+		}
+
+		ufbx_prop *weight_prop = ufbxi_find_prop(&layer->props, ufbxi_Weight);
+		if (weight_prop) {
+			layer->weight = weight_prop->value_real * 0.01f;
+			if (layer->weight < 0.0f) layer->weight = 0.0f;
+			if (layer->weight > 0.99999f) layer->weight = 1.0f;
+			layer->weight_is_animated = (weight_prop->flags & UFBX_PROP_FLAG_ANIMATED) != 0;
+		} else {
+			layer->weight = 1.0f;
+			layer->weight_is_animated = false;
+		}
+		layer->compose_rotation = ufbxi_find_int(&layer->props, ufbxi_RotationAccumulationMode, 0) == 0;
+		layer->compose_scale = ufbxi_find_int(&layer->props, ufbxi_ScaleAccumulationMode, 0) == 0;
+
 		// Add a dummy NULL element animated prop at the end so we can iterate
 		// animated props without worrying about boundary conditions..
 		{
@@ -5853,6 +5918,15 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	}
 
 	ufbxi_for_list(ufbx_anim_prop, aprop, uc->scene.anim_props) {
+
+		// TODO: Search for things like d|Visibility with a constructed name
+		aprop->default_value.x = ufbxi_find_real(&aprop->props, ufbxi_X, aprop->default_value.x);
+		aprop->default_value.x = ufbxi_find_real(&aprop->props, ufbxi_D_X, aprop->default_value.x);
+		aprop->default_value.y = ufbxi_find_real(&aprop->props, ufbxi_Y, aprop->default_value.y);
+		aprop->default_value.y = ufbxi_find_real(&aprop->props, ufbxi_D_Y, aprop->default_value.y);
+		aprop->default_value.z = ufbxi_find_real(&aprop->props, ufbxi_Z, aprop->default_value.z);
+		aprop->default_value.z = ufbxi_find_real(&aprop->props, ufbxi_D_Z, aprop->default_value.z);
+
 		ufbxi_for_list(ufbx_connection, conn, aprop->element.connections_dst) {
 			if (conn->src->type == UFBX_ELEMENT_ANIM_CURVE && conn->src_prop.length == 0) {
 				ufbx_anim_curve *curve = (ufbx_anim_curve*)conn->src;
@@ -5863,7 +5937,9 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 				if (name == ufbxi_Z || name == ufbxi_D_Z) index = 2;
 
 				ufbx_prop *prop = ufbx_find_prop_len(&aprop->props, conn->dst_prop.data, conn->dst_prop.length);
-				aprop->default_value.v[index] = prop->value_real;
+				if (prop) {
+					aprop->default_value.v[index] = prop->value_real;
+				}
 				aprop->curves[index] = curve;
 			}
 		}
@@ -10015,6 +10091,7 @@ static ufbxi_noinline void ufbxi_combine_anim_layer_slow(ufbxi_anim_layer_combin
 		} else {
 			ctx->rotation_order = UFBX_ROTATION_XYZ;
 		}
+		ctx->has_rotation_order = true;
 	}
 
 	if (layer->additive) {
@@ -10026,7 +10103,7 @@ static ufbxi_noinline void ufbxi_combine_anim_layer_slow(ufbxi_anim_layer_combin
 			ufbx_quat a = ufbx_euler_to_quat(*result, ctx->rotation_order);
 			ufbx_quat b = ufbx_euler_to_quat(*value, ctx->rotation_order);
 			b = ufbx_slerp(ufbx_identity_quat, b, weight);
-			ufbx_quat res = ufbx_mul_quat(b, a);
+			ufbx_quat res = ufbx_mul_quat(a, b);
 			*result = ufbx_quat_to_euler(res, ctx->rotation_order);
 		} else {
 			result->x += value->x * weight;
@@ -10036,12 +10113,10 @@ static ufbxi_noinline void ufbxi_combine_anim_layer_slow(ufbxi_anim_layer_combin
 	} else {
 		ufbx_real res_weight = 1.0f - weight;
 		if (layer->compose_scale && prop_name == ufbxi_Lcl_Scaling) {
-			// TODO: This is technically correct but do we want correct...
 			result->x = (ufbx_real)(pow(result->x, res_weight) * pow(value->x, weight));
 			result->y = (ufbx_real)(pow(result->y, res_weight) * pow(value->y, weight));
 			result->z = (ufbx_real)(pow(result->z, res_weight) * pow(value->z, weight));
 		} else if (layer->compose_rotation && prop_name == ufbxi_Lcl_Rotation) {
-			// TODO: This is technically correct but do we want correct...
 			ufbx_quat a = ufbx_euler_to_quat(*result, ctx->rotation_order);
 			ufbx_quat b = ufbx_euler_to_quat(*value, ctx->rotation_order);
 			ufbx_quat res = ufbx_slerp(a, b, weight);
@@ -10280,7 +10355,7 @@ ufbx_real ufbx_evaluate_anim_prop_real(const ufbx_anim_prop *anim_prop, double t
 	}
 
 	ufbx_real res = anim_prop->default_value.x;
-	if (anim_prop->curves[0]) res= ufbx_evaluate_curve(anim_prop->curves[0], time, res);
+	if (anim_prop->curves[0]) res = ufbx_evaluate_curve(anim_prop->curves[0], time, res);
 	return res;
 }
 
@@ -10340,6 +10415,8 @@ ufbx_prop ufbx_evaluate_prop_len(ufbx_anim_layer_ptr_list layers, ufbx_element *
 			ufbx_element_anim_prop *weight_eap = ufbxi_find_element_anim_prop_start(layer, layer->element.id);
 			if (weight_eap) {
 				weight = ufbx_evaluate_anim_prop_real(weight_eap->anim_prop, time) * 0.01f;
+				if (weight < 0.0f) weight = 0.0f;
+				if (weight > 0.99999f) weight = 1.0f;
 			}
 		}
 
@@ -10352,7 +10429,11 @@ ufbx_prop ufbx_evaluate_prop_len(ufbx_anim_layer_ptr_list layers, ufbx_element *
 		if (!eap) continue;
 
 		ufbx_vec3 v = ufbx_evaluate_anim_prop_vec3(eap->anim_prop, time);
-		ufbxi_combine_anim_layer(&combine_ctx, layer, weight, prop->name.data, &result.value_vec3, &v);
+		if (p_layer == layers.data) {
+			prop->value_vec3 = v;
+		} else {
+			ufbxi_combine_anim_layer(&combine_ctx, layer, weight, prop->name.data, &prop->value_vec3, &v);
+		}
 	}
 
 	result.value_int = (int64_t)result.value_real;
@@ -10384,6 +10465,8 @@ ufbx_props ufbx_evaluate_props(ufbx_anim_layer_ptr_list layers, ufbx_element *el
 			ufbx_element_anim_prop *weight_eap = ufbxi_find_element_anim_prop_start(layer, layer->element.id);
 			if (weight_eap) {
 				weight = ufbx_evaluate_anim_prop_real(weight_eap->anim_prop, time) * 0.01f;
+				if (weight < 0.0f) weight = 0.0f;
+				if (weight > 0.99999f) weight = 1.0f;
 			}
 		}
 
@@ -10401,7 +10484,11 @@ ufbx_props ufbx_evaluate_props(ufbx_anim_layer_ptr_list layers, ufbx_element *el
 
 			if (eap->prop_name.data == prop->name.data) {
 				ufbx_vec3 v = ufbx_evaluate_anim_prop_vec3(eap->anim_prop, time);
-				ufbxi_combine_anim_layer(&combine_ctx, layer, weight, prop->name.data, &prop->value_vec3, &v);
+				if (p_layer == layers.data) {
+					prop->value_vec3 = v;
+				} else {
+					ufbxi_combine_anim_layer(&combine_ctx, layer, weight, prop->name.data, &prop->value_vec3, &v);
+				}
 			}
 		}
 	}

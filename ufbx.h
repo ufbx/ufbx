@@ -343,6 +343,10 @@ struct ufbx_node {
 	ufbx_transform local_transform;
 	ufbx_transform geometry_transform;
 
+	// Raw Euler angles in degrees for those who want them
+	ufbx_rotation_order rotation_order;
+	ufbx_vec3 euler_rotation;
+
 	// Transform to the global "world" space, may be incorrect if the node
 	// uses `UFBX_INHERIT_NORMAL`, prefer using the `node_to_world` matrix.
 	ufbx_transform world_transform;
