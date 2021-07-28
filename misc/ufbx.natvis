@@ -16,6 +16,10 @@
     </Expand>
   </Type>
 
+  <Type Name="ufbx_vec2"><DisplayString>{{ x={x} y={y} }}</DisplayString></Type>
+  <Type Name="ufbx_vec3"><DisplayString>{{ x={x} y={y} z={z} }}</DisplayString></Type>
+  <Type Name="ufbx_vec4"><DisplayString>{{ x={x} y={y} z={z} w={w} }}</DisplayString></Type>
+  <Type Name="ufbx_quat"><DisplayString>{{ x={x} y={y} z={z} w={w} }}</DisplayString></Type>
   <Type Name="ufbx_material_list"><DisplayString>{{ count={count} }}</DisplayString><Expand><ArrayItems><Size>count</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_uv_set_list"><DisplayString>{{ count={count} }}</DisplayString><Expand><ArrayItems><Size>count</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_color_set_list"><DisplayString>{{ count={count} }}</DisplayString><Expand><ArrayItems><Size>count</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>

@@ -149,6 +149,14 @@ const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
 
 ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/100 == UFBX_HEADER_VERSION/100);
 
+// -- Debug
+
+#if defined(UFBX_DEBUG_BINARY_SEARCH)
+	#define ufbxi_clamp_linear_threshold(v) (2)
+#else
+	#define ufbxi_clamp_linear_threshold(v) (v)
+#endif
+
 // -- Utility
 
 #define ufbxi_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
@@ -173,7 +181,7 @@ static ufbxi_forceinline size_t ufbxi_max_sz(size_t a, size_t b) { return a < b 
 	typedef m_type mi_type; \
 	mi_type *mi_src = (mi_type*)(m_tmp); \
 	mi_type *mi_data = m_data, *mi_dst = mi_data; \
-	size_t mi_block_size = m_linear_size, mi_size = m_size; \
+	size_t mi_block_size = ufbxi_clamp_linear_threshold(m_linear_size), mi_size = m_size; \
 	/* Insertion sort in `m_linear_size` blocks */ \
 	for (size_t mi_base = 0; mi_base < mi_size; mi_base += mi_block_size) { \
 		size_t mi_i_end = mi_base + mi_block_size; \
@@ -218,7 +226,7 @@ static ufbxi_forceinline size_t ufbxi_max_sz(size_t a, size_t b) { return a < b 
 #define ufbxi_macro_lower_bound_eq(m_type, m_linear_size, m_result_ptr, m_data, m_begin, m_size, m_cmp_lambda, m_eq_lambda) do { \
 	typedef m_type mi_type; \
 	const mi_type *mi_data = (m_data); \
-	size_t mi_lo = m_begin, mi_hi = m_size, mi_linear_size = m_linear_size; \
+	size_t mi_lo = m_begin, mi_hi = m_size, mi_linear_size = ufbxi_clamp_linear_threshold(m_linear_size); \
 	ufbx_assert(mi_linear_size > 1); \
 	/* Binary search until we get down to `m_linear_size` elements */ \
 	while (mi_hi - mi_lo > mi_linear_size) { \
@@ -236,7 +244,7 @@ static ufbxi_forceinline size_t ufbxi_max_sz(size_t a, size_t b) { return a < b 
 #define ufbxi_macro_upper_bound_eq(m_type, m_linear_size, m_result_ptr, m_data, m_begin, m_size, m_eq_lambda) do { \
 	typedef m_type mi_type; \
 	const mi_type *mi_data = (m_data); \
-	size_t mi_lo = m_begin, mi_hi = m_size, mi_linear_size = m_linear_size; \
+	size_t mi_lo = m_begin, mi_hi = m_size, mi_linear_size = ufbxi_clamp_linear_threshold(m_linear_size); \
 	ufbx_assert(mi_linear_size > 1); \
 	/* Linearly scan with galloping */ \
 	for (size_t mi_step = 1; mi_step < 100 && mi_hi - mi_lo > mi_step; mi_step *= 2) { \
