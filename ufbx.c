@@ -10081,6 +10081,14 @@ typedef struct ufbxi_anim_layer_combine_ctx {
 	bool has_rotation_order;
 } ufbxi_anim_layer_combine_ctx;
 
+static double ufbxi_pow_abs(double v, double e)
+{
+	if (e <= 0.0) return 1.0;
+	if (e >= 1.0) return v;
+	double sign = v < 0.0 ? -1.0 : 1.0;
+	return sign * pow(v * sign, e);
+}
+
 static ufbxi_noinline void ufbxi_combine_anim_layer_slow(ufbxi_anim_layer_combine_ctx *ctx, ufbx_anim_layer *layer, ufbx_real weight, const char *prop_name, ufbx_vec3 *result, const ufbx_vec3 *value)
 {
 	if (layer->compose_rotation && prop_name == ufbxi_Lcl_Rotation && !ctx->has_rotation_order) {
@@ -10096,9 +10104,9 @@ static ufbxi_noinline void ufbxi_combine_anim_layer_slow(ufbxi_anim_layer_combin
 
 	if (layer->additive) {
 		if (layer->compose_scale && prop_name == ufbxi_Lcl_Scaling) {
-			result->x *= (ufbx_real)pow(value->x, weight);
-			result->y *= (ufbx_real)pow(value->y, weight);
-			result->z *= (ufbx_real)pow(value->z, weight);
+			result->x *= (ufbx_real)ufbxi_pow_abs(value->x, weight);
+			result->y *= (ufbx_real)ufbxi_pow_abs(value->y, weight);
+			result->z *= (ufbx_real)ufbxi_pow_abs(value->z, weight);
 		} else if (layer->compose_rotation && prop_name == ufbxi_Lcl_Rotation) {
 			ufbx_quat a = ufbx_euler_to_quat(*result, ctx->rotation_order);
 			ufbx_quat b = ufbx_euler_to_quat(*value, ctx->rotation_order);
@@ -10113,9 +10121,9 @@ static ufbxi_noinline void ufbxi_combine_anim_layer_slow(ufbxi_anim_layer_combin
 	} else {
 		ufbx_real res_weight = 1.0f - weight;
 		if (layer->compose_scale && prop_name == ufbxi_Lcl_Scaling) {
-			result->x = (ufbx_real)(pow(result->x, res_weight) * pow(value->x, weight));
-			result->y = (ufbx_real)(pow(result->y, res_weight) * pow(value->y, weight));
-			result->z = (ufbx_real)(pow(result->z, res_weight) * pow(value->z, weight));
+			result->x = (ufbx_real)(ufbxi_pow_abs(result->x, res_weight) * ufbxi_pow_abs(value->x, weight));
+			result->y = (ufbx_real)(ufbxi_pow_abs(result->y, res_weight) * ufbxi_pow_abs(value->y, weight));
+			result->z = (ufbx_real)(ufbxi_pow_abs(result->z, res_weight) * ufbxi_pow_abs(value->z, weight));
 		} else if (layer->compose_rotation && prop_name == ufbxi_Lcl_Rotation) {
 			ufbx_quat a = ufbx_euler_to_quat(*result, ctx->rotation_order);
 			ufbx_quat b = ufbx_euler_to_quat(*value, ctx->rotation_order);
@@ -10516,7 +10524,6 @@ ufbx_quat ufbx_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t)
 		b.x = -b.x; b.y = -b.y; b.z = -b.z; b.w = -b.w;
 	}
 	if (omega <= 0.0) return a;
-	if (omega >= 1.0) return b;
 
 	double rcp_so = 1.0 / sin(omega);
 	double af = sin((1.0 - t) * omega) * rcp_so;
