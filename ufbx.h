@@ -258,7 +258,7 @@ typedef struct ufbx_anim_value ufbx_anim_value;
 typedef struct ufbx_anim_curve ufbx_anim_curve;
 
 // Miscellaneous
-typedef struct ufbx_bind_pose ufbx_bind_pose;
+typedef struct ufbx_pose ufbx_pose;
 
 UFBX_LIST_TYPE(ufbx_element_list, ufbx_element*);
 UFBX_LIST_TYPE(ufbx_unknown_list, ufbx_unknown*);
@@ -291,7 +291,7 @@ UFBX_LIST_TYPE(ufbx_anim_stack_list, ufbx_anim_stack*);
 UFBX_LIST_TYPE(ufbx_anim_layer_list, ufbx_anim_layer*);
 UFBX_LIST_TYPE(ufbx_anim_value_list, ufbx_anim_value*);
 UFBX_LIST_TYPE(ufbx_anim_curve_list, ufbx_anim_curve*);
-UFBX_LIST_TYPE(ufbx_bind_pose_list, ufbx_bind_pose*);
+UFBX_LIST_TYPE(ufbx_pose_list, ufbx_pose*);
 
 typedef enum ufbx_element_type {
 	UFBX_ELEMENT_UNKNOWN,             // < `ufbx_unknown`
@@ -324,7 +324,7 @@ typedef enum ufbx_element_type {
 	UFBX_ELEMENT_ANIM_LAYER,          // < `ufbx_anim_layer`
 	UFBX_ELEMENT_ANIM_VALUE,          // < `ufbx_anim_value`
 	UFBX_ELEMENT_ANIM_CURVE,          // < `ufbx_anim_curve`
-	UFBX_ELEMENT_BIND_POSE,           // < `ufbx_bind_pose`
+	UFBX_ELEMENT_POSE,                // < `ufbx_pose`
 
 	UFBX_NUM_ELEMENT_TYPES,
 } ufbx_element_type;
@@ -395,7 +395,7 @@ struct ufbx_node {
 	ufbx_light *light;
 	ufbx_camera *camera;
 	ufbx_bone *bone;
-	ufbx_element_list multi_attribs;
+	ufbx_element_list all_attribs;
 
 	// Local transform in parent, geometry transform is a non-inherited
 	// transform applied only to attachments like meshes
@@ -616,6 +616,20 @@ struct ufbx_material {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 };
 
+
+// -- Animation
+
+typedef struct ufbx_anim_layer_desc {
+	ufbx_anim_layer *layer;
+	ufbx_real weight;
+} ufbx_anim_layer_desc;
+
+UFBX_LIST_TYPE(ufbx_anim_layer_desc_list, ufbx_anim_layer_desc);
+
+typedef struct ufbx_anim {
+	ufbx_anim_layer_desc_list layers;
+} ufbx_anim;
+
 struct ufbx_anim_stack {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
@@ -623,6 +637,7 @@ struct ufbx_anim_stack {
 	double time_end;
 
 	ufbx_anim_layer_list layers;
+	ufbx_anim anim;
 };
 
 typedef struct ufbx_anim_prop {
@@ -662,9 +677,10 @@ typedef struct ufbx_bone_pose {
 
 UFBX_LIST_TYPE(ufbx_bone_pose_list, ufbx_bone_pose);
 
-struct ufbx_bind_pose {
+struct ufbx_pose {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
+	bool bind_pose;
 	ufbx_bone_pose_list bone_poses;
 };
 
@@ -710,18 +726,15 @@ struct ufbx_anim_curve {
 	ufbx_keyframe_list keyframes;
 };
 
-// -- Animation
+// -- Misc
 
-typedef struct ufbx_anim_layer_desc {
-	ufbx_anim_layer *layer;
-	ufbx_real weight;
-} ufbx_anim_layer_desc;
+typedef struct ufbx_name_element {
+	ufbx_string name;
+	ufbx_element_type type;
+	ufbx_element *element;
+} ufbx_name_element;
 
-UFBX_LIST_TYPE(ufbx_anim_layer_desc_list, ufbx_anim_layer_desc);
-
-typedef struct ufbx_anim {
-	ufbx_anim_layer_desc_list layers;
-} ufbx_anim;
+UFBX_LIST_TYPE(ufbx_name_element_list, ufbx_name_element);
 
 // -- Scene
 
@@ -811,16 +824,19 @@ struct ufbx_scene {
 			ufbx_anim_curve_list anim_curves;
 
 			// Miscellaneous
-			ufbx_bind_pose_list bind_poses;
+			ufbx_pose_list poses;
 		};
 
 		ufbx_element_list elements_by_type[UFBX_NUM_ELEMENT_TYPES];
 	};
 
 	// All elements and connections in the whole file
-	ufbx_element_list elements;       // < Sorted by `id,element_type`
-	ufbx_connection_list connections_src; // < Sorted by `src->element_id,src_prop`
-	ufbx_connection_list connections_dst; // < Sorted by `dst->element_id,dst_prop`
+	ufbx_element_list elements;           // < Sorted by `id`
+	ufbx_connection_list connections_src; // < Sorted by `src,src_prop`
+	ufbx_connection_list connections_dst; // < Sorted by `dst,dst_prop`
+
+	// Elements sorted by name, type
+	ufbx_name_element_list elements_by_name;
 };
 
 // -- Memory callbacks
@@ -993,6 +1009,8 @@ ufbx_inline ufbx_element *ufbx_find_element(ufbx_scene *scene, ufbx_element_type
 ufbx_node *ufbx_find_node_len(ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_inline ufbx_node *ufbx_find_node(ufbx_scene *scene, const char *name) { return ufbx_find_node_len(scene, name, strlen(name));}
 
+ufbx_matrix ufbx_get_compatible_normal_matrix(ufbx_node *node);
+
 // Utility
 
 ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);
@@ -1015,6 +1033,16 @@ ufbx_quat ufbx_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t);
 ufbx_vec3 ufbx_rotate_vector(ufbx_quat q, ufbx_vec3 v);
 ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order);
 ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order);
+
+ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v);
+
+ufbx_matrix ufbx_get_transform_matrix(const ufbx_transform *t);
+void ufbx_matrix_mul(ufbx_matrix *dst, const ufbx_matrix *p_l, const ufbx_matrix *p_r);
+
+ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v);
+ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v);
+ufbx_matrix ufbx_get_normal_matrix(const ufbx_matrix *m);
+ufbx_matrix ufbx_get_inverse_matrix(const ufbx_matrix *m);
 
 // -- Inline API
 

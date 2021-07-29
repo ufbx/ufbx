@@ -117,7 +117,7 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	if (node->parent) {
 		bool found = false;
 		for (size_t i = 0; i < node->parent->children.count; i++) {
-			if (&node->parent->children.data[i] == node) {
+			if (node->parent->children.data[i] == node) {
 				found = true;
 				break;
 			}
@@ -126,7 +126,7 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	}
 
 	for (size_t i = 0; i < node->children.count; i++) {
-		ufbxt_assert(node->children.data[i].parent == node);
+		ufbxt_assert(node->children.data[i]->parent == node);
 	}
 }
 
@@ -284,11 +284,11 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 	ufbxt_check_string(scene->metadata.creator);
 
 	for (size_t i = 0; i < scene->nodes.count; i++) {
-		ufbxt_check_node(scene, &scene->nodes.data[i]);
+		ufbxt_check_node(scene, scene->nodes.data[i]);
 	}
 
 	for (size_t i = 0; i < scene->meshes.count; i++) {
-		ufbxt_check_mesh(scene, &scene->meshes.data[i]);
+		ufbxt_check_mesh(scene, scene->meshes.data[i]);
 	}
 
 #if 0

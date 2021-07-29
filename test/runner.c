@@ -486,7 +486,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		ufbxt_assert(obj_mesh->num_indices == mesh->num_indices);
 
 		ufbx_matrix *mat = &node->geometry_to_world;
-		ufbx_matrix norm_mat = ufbx_get_normal_matrix(mat);
+		ufbx_matrix norm_mat = ufbx_get_compatible_normal_matrix(node);
 
 		// Assume that the indices are in the same order!
 		for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
@@ -501,10 +501,9 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 				ufbx_vec3 on = ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, ix);
 				ufbx_vec3 fn = ufbx_get_vertex_vec3(&mesh->vertex_normal, ix);
 
-				if (mesh->skinned_is_local) {
-					fp = ufbx_transform_position(mat, fp);
-					fn = ufbx_transform_direction(&norm_mat, fn);
-				}
+				// TODO: Skinning
+				fp = ufbx_transform_position(mat, fp);
+				fn = ufbx_transform_direction(&norm_mat, fn);
 
 				ufbx_real fn_len = sqrt(fn.x*fn.x + fn.y*fn.y + fn.z*fn.z);
 				fn.x /= fn_len;

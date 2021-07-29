@@ -2,11 +2,11 @@
 UFBXT_FILE_TEST(maya_pivots)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
-	ufbxt_assert(mesh);
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
 
 	ufbx_vec3 origin_ref = { 0.7211236250, 1.8317762500, -0.6038020000 };
-	ufbxt_assert_close_vec3(err, mesh->node.transform.translation, origin_ref);
+	ufbxt_assert_close_vec3(err, node->local_transform.translation, origin_ref);
 }
 #endif
 
@@ -46,5 +46,23 @@ UFBXT_FILE_TEST(synthetic_pre_post_rotate)
 {
 	ufbxt_check_rotation_order(scene, "pCube1", UFBX_ROTATION_XYZ);
 	ufbxt_check_rotation_order(scene, "pCube2", UFBX_ROTATION_ZYX);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_parented_cubes)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_geometric_squish)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_geometric_transform)
+#if UFBXT_IMPL
+{
 }
 #endif
