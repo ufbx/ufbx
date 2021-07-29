@@ -471,17 +471,21 @@ static void ufbxt_assert_close_vec4(ufbxt_diff_error *p_err, ufbx_vec4 a, ufbx_v
 
 static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, double min_normal_dot)
 {
+	// TODO
+#if 1
 	for (size_t mesh_i = 0; mesh_i < obj->num_meshes; mesh_i++) {
 		ufbxt_obj_mesh *obj_mesh = &obj->meshes[mesh_i];
 		if (obj_mesh->num_indices == 0) continue;
 
-		ufbx_mesh *mesh = ufbx_find_mesh(scene, obj_mesh->name);
+		ufbx_node *node = ufbx_find_node(scene, obj_mesh->name);
+		ufbxt_assert(node);
+		ufbx_mesh *mesh = node->mesh;
 		ufbxt_assert(mesh);
 
 		ufbxt_assert(obj_mesh->num_faces == mesh->num_faces);
 		ufbxt_assert(obj_mesh->num_indices == mesh->num_indices);
 
-		ufbx_matrix *mat = &mesh->node.to_root;
+		ufbx_matrix *mat = &node->geometry_to_world;
 		ufbx_matrix norm_mat = ufbx_get_normal_matrix(mat);
 
 		// Assume that the indices are in the same order!
@@ -493,9 +497,9 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 
 			for (size_t ix = face.index_begin; ix < face.index_begin + face.num_indices; ix++) {
 				ufbx_vec3 op = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, ix);
-				ufbx_vec3 fp = ufbx_get_vertex_vec3(&mesh->skinned_position, ix);
+				ufbx_vec3 fp = ufbx_get_vertex_vec3(&mesh->vertex_position, ix);
 				ufbx_vec3 on = ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, ix);
-				ufbx_vec3 fn = ufbx_get_vertex_vec3(&mesh->skinned_normal, ix);
+				ufbx_vec3 fn = ufbx_get_vertex_vec3(&mesh->vertex_normal, ix);
 
 				if (mesh->skinned_is_local) {
 					fp = ufbx_transform_position(mat, fp);
@@ -525,6 +529,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			}
 		}
 	}
+#endif
 }
 
 static uint32_t g_file_version = 0;
