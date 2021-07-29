@@ -5071,23 +5071,22 @@ ufbxi_nodiscard static int ufbxi_read_skin_cluster(ufbxi_context *uc, ufbxi_node
 
 	ufbxi_value_array *indices = ufbxi_find_array(node, ufbxi_Indexes, 'i');
 	ufbxi_value_array *weights = ufbxi_find_array(node, ufbxi_Weights, 'r');
+
+	if (indices && weights) {
+		ufbxi_check(indices->size == weights->size);
+		cluster->num_weights = indices->size;
+		cluster->indices = (int32_t*)indices->data;
+		cluster->weights = (ufbx_real*)weights->data;
+	}
+
 	ufbxi_value_array *transform = ufbxi_find_array(node, ufbxi_Transform, 'r');
 	ufbxi_value_array *transform_link = ufbxi_find_array(node, ufbxi_TransformLink, 'r');
-
-	// TODO: Transform and TransformLink may be missing (?) use BindPose node in that case
 	if (transform && transform_link) {
 		ufbxi_check(transform->size >= 16);
 		ufbxi_check(transform_link->size >= 16);
 
-		if (indices && weights) {
-			ufbxi_check(indices->size == weights->size);
-			cluster->num_weights = indices->size;
-			cluster->indices = (int32_t*)indices->data;
-			cluster->weights = (ufbx_real*)weights->data;
-		}
-
-		ufbxi_read_transform_matrix(&cluster->mesh_to_bind, (ufbx_real*)transform->data);
-		ufbxi_read_transform_matrix(&cluster->bind_to_world, (ufbx_real*)transform_link->data);
+		// ufbxi_read_transform_matrix(&cluster->mesh_to_bind, (ufbx_real*)transform->data);
+		// ufbxi_read_transform_matrix(&cluster->bind_to_world, (ufbx_real*)transform_link->data);
 	}
 
 	return 1;
@@ -5820,6 +5819,25 @@ ufbxi_nodiscard static ufbx_connection_list ufbxi_find_dst_connections(ufbxi_con
 	return result;
 }
 
+ufbxi_nodiscard static ufbx_connection_list ufbxi_find_src_connections(ufbxi_context *uc, ufbx_element *element, const char *prop)
+{
+	if (!prop) prop = ufbxi_empty_char;
+
+	size_t begin = element->connections_src.count, end = begin;
+
+	ufbxi_macro_lower_bound_eq(ufbx_connection, 32, &begin,
+		element->connections_src.data, 0, element->connections_src.count,
+		(strcmp(a->src_prop.data, prop) < 0),
+		(a->src_prop.data == prop && a->dst_prop.length == 0));
+
+	ufbxi_macro_upper_bound_eq(ufbx_connection, 32, &end,
+		element->connections_src.data, begin, element->connections_src.count,
+		(a->src_prop.data == prop && a->dst_prop.length == 0));
+
+	ufbx_connection_list result = { element->connections_src.data + begin, end - begin };
+	return result;
+}
+
 ufbxi_nodiscard static int ufbxi_fetch_dst_elements(ufbxi_context *uc, void *p_dst_list, ufbx_element *element, const char *prop, ufbx_element_type src_type)
 {
 	ufbx_connection_list conns = ufbxi_find_dst_connections(uc, element, prop);
@@ -5838,6 +5856,19 @@ ufbxi_nodiscard static int ufbxi_fetch_dst_elements(ufbxi_context *uc, void *p_d
 	ufbxi_check(list->data);
 
 	return 1;
+}
+
+ufbxi_nodiscard static ufbx_element *ufbxi_fetch_dst_element(ufbxi_context *uc, ufbx_element *element, const char *prop, ufbx_element_type src_type)
+{
+	ufbx_connection_list conns = ufbxi_find_dst_connections(uc, element, prop);
+
+	size_t num_layers = 0;
+	ufbxi_for_list(ufbx_connection, conn, conns) {
+		if (conn->src->type == src_type) {
+			return conn->src;
+		}
+	}
+	return NULL;
 }
 
 ufbxi_forceinline static void ufbxi_patch_index_pointer(ufbxi_context *uc, int32_t **p_index)
@@ -5911,6 +5942,14 @@ static ufbxi_forceinline int64_t ufbxi_find_int(const ufbx_props *props, const c
 	}
 }
 
+static bool ufbxi_matrix_all_zero(const ufbx_matrix *matrix)
+{
+	for (size_t i = 0; i < 12; i++) {
+		if (matrix->v[i] != 0.0f) return false;
+	}
+	return true;
+}
+
 ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	size_t num_elements = uc->num_elements;
@@ -5969,7 +6008,30 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 			ufbx_bone_pose *bone = &pose->bone_poses.data[pose->bone_poses.count++];
 			bone->bone = (ufbx_node*)elem;
 			bone->bone_to_world = tmp_poses[i].bone_to_world;
+
+			ufbx_connection_list node_conns = ufbxi_find_src_connections(uc, elem, NULL);
+			ufbxi_for_list(ufbx_connection, conn, node_conns) {
+				if (conn->dst->type != UFBX_ELEMENT_SKIN_CLUSTER) continue;
+				ufbx_skin_cluster *cluster = (ufbx_skin_cluster*)conn->dst;
+				if (ufbxi_matrix_all_zero(&cluster->bind_to_world)) {
+					cluster->bind_to_world = bone->bone_to_world;
+				}
+			}
 		}
+	}
+
+	ufbxi_for_ptr_list(ufbx_skin_deformer, p_skin, uc->scene.skin_deformers) {
+		ufbx_skin_deformer *skin = *p_skin;
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &skin->clusters, &skin->element, NULL, UFBX_ELEMENT_SKIN_CLUSTER));
+	}
+
+	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, uc->scene.skin_clusters) {
+		ufbx_skin_cluster *cluster = *p_cluster;
+		cluster->bone = (ufbx_node*)ufbxi_fetch_dst_element(uc, &cluster->element, NULL, UFBX_ELEMENT_NODE);
+		// TODO: ufbxi_check() with `allow_missing_references`
+		if (!cluster->bone) continue;
+
+
 	}
 
 #if 0
@@ -7223,8 +7285,6 @@ ufbxi_nodiscard static int ufbxi_read_deformer(ufbxi_context *uc, ufbxi_node *no
 			ufbxi_check(skin);
 			ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_SKIN_CLUSTER, object->id, uc->tmp_arr_skin_clusters.num_items - 1));
 
-			ufbxi_check(transform->size >= 16);
-			ufbxi_check(transform_link->size >= 16);
 
 			if (indices && weights) {
 				ufbxi_check(indices->size == weights->size);
@@ -7233,6 +7293,8 @@ ufbxi_nodiscard static int ufbxi_read_deformer(ufbxi_context *uc, ufbxi_node *no
 				skin->weights = (ufbx_real*)weights->data;
 			}
 
+			ufbxi_check(transform->size >= 16);
+			ufbxi_check(transform_link->size >= 16);
 			ufbxi_read_transform_matrix(&skin->mesh_to_bind, (ufbx_real*)transform->data);
 			ufbxi_read_transform_matrix(&skin->bind_to_world, (ufbx_real*)transform_link->data);
 		}
