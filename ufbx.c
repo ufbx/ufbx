@@ -2261,7 +2261,7 @@ typedef struct {
 	ufbxi_buf tmp_parse;
 	ufbxi_buf tmp_stack;
 	ufbxi_buf tmp_connections;
-	ufbxi_buf tmp_node_ptrs;
+	ufbxi_buf tmp_node_ids;
 	ufbxi_buf tmp_elements;
 	ufbxi_buf tmp_element_offsets;
 	ufbxi_buf tmp_typed_element_offsets[UFBX_NUM_ELEMENT_TYPES];
@@ -4454,7 +4454,7 @@ ufbxi_nodiscard static int ufbxi_read_model(ufbxi_context *uc, ufbxi_node *node,
 {
 	ufbx_node *elem_node = ufbxi_push_element(uc, info, ufbx_node, UFBX_ELEMENT_NODE);
 	ufbxi_check(elem_node);
-	ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ptrs, ufbx_node*, 1, &elem_node));
+	ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &elem_node->element.id));
 	return 1;
 }
 
@@ -5509,7 +5509,7 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 		root_info.name = ufbx_empty_string;
 		ufbx_node *root = ufbxi_push_element(uc, &root_info, ufbx_node, UFBX_ELEMENT_NODE);
 		ufbxi_check(root);
-		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ptrs, ufbx_node*, 1, &root));
+		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &root->element.id));
 	}
 
 	// Definitions: Object type counts and property templates (optional)
@@ -5546,10 +5546,23 @@ static ufbx_element *ufbxi_find_element_by_fbx_id(ufbxi_context *uc, uint64_t fb
 	return NULL;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_node_ptrs_by_depth(ufbxi_context *uc, ufbx_node **nodes, size_t count)
+ufbxi_forceinline static bool ufbxi_cmp_node_less(ufbx_node *a, ufbx_node *b)
+{
+	if (a->node_depth != b->node_depth) return a->node_depth < b->node_depth;
+	if (a->parent && b->parent) {
+		uint32_t a_pid = a->parent->element.id, b_pid = b->parent->element.id;
+		if (a_pid != b_pid) return a_pid < b_pid;
+	} else {
+		ufbx_assert(a->parent == NULL && b->parent == NULL);
+	}
+	return a->element.id < b->element.id;
+}
+
+ufbxi_nodiscard static int ufbxi_sort_node_ptrs(ufbxi_context *uc, ufbx_node **nodes, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_node*)));
-	ufbxi_macro_stable_sort(ufbx_node*, 32, nodes, uc->tmp_arr, count, ( (*a)->node_depth < (*b)->node_depth ));
+	ufbxi_macro_stable_sort(ufbx_node*, 32, nodes, uc->tmp_arr, count,
+		( ufbxi_cmp_node_less(*a, *b) ) );
 	return 1;
 }
 
@@ -5567,20 +5580,13 @@ ufbxi_forceinline static bool ufbxi_cmp_element_less(ufbx_element *a, ufbx_eleme
 	return a->type < b->type;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_element_ptrs(ufbxi_context *uc, ufbx_element **elements, size_t count)
-{
-	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_element*)));
-	ufbxi_macro_stable_sort(ufbx_element*, 32, elements, uc->tmp_arr, count, ( ufbxi_cmp_element_less(*a, *b) ));
-	return 1;
-}
-
 // We need to be able to assume no padding!
 ufbx_static_assert(connection_size, sizeof(ufbx_connection) == sizeof(ufbx_element*)*2 + sizeof(ufbx_string)*2);
 
 ufbxi_forceinline static bool ufbxi_cmp_connection_less(ufbx_connection *a, ufbx_connection *b, size_t index)
 {
 	ufbx_element *a_elem = (&a->src)[index], *b_elem = (&b->src)[index];
-	if (a_elem->id != b_elem->id) return a_elem->id < b_elem->id;
+	if (a_elem != b_elem) return a_elem < b_elem;
 	int cmp = strcmp((&a->src_prop)[index].data, (&b->src_prop)[index].data);
 	if (cmp != 0) return cmp < 0;
 	cmp = strcmp((&a->src_prop)[index ^ 1].data, (&b->src_prop)[index ^ 1].data);
@@ -5594,111 +5600,12 @@ ufbxi_nodiscard static int ufbxi_sort_connections(ufbxi_context *uc, ufbx_connec
 	return 1;
 }
 
-#if 0
-ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *uc)
+ufbxi_nodiscard static int ufbxi_resolve_connections(ufbxi_context *uc)
 {
-	// Ugh.. we want to sort `scene.nodes` topologically so that parent nodes
-	// always come first, but to get the connections resolved we need to have
-	// stable element pointers for each ID...
 	size_t num_connections = uc->tmp_connections.num_items;
 	ufbxi_tmp_connection *tmp_connections = ufbxi_make_array(&uc->tmp_connections, ufbxi_tmp_connection, num_connections);
 	ufbxi_check(tmp_connections);
 
-	size_t num_nodes = uc->tmp_node_ptrs.num_items;
-	ufbx_node **node_ptrs = ufbxi_make_array(&uc->tmp_node_ptrs, ufbx_node*, num_nodes);
-	ufbxi_check(node_ptrs);
-
-	// Reserve the future space for all elements but start with inserting only
-	// the nodes as we'll count the depths and reset the map after that
-	// NOTE: `uc->num_elements + 1` since we _probably_ add a root here
-	ufbxi_for_ptr(ufbx_node, p_node, node_ptrs, num_nodes) {
-		ufbx_node *node = *p_node;
-		uc->scene.elements.data[node->element.id] = &node->element;
-	}
-
-	// Hook up the parent nodes, we'll assume that there's no cycles at this point
-	ufbxi_for(ufbxi_tmp_connection, conn, tmp_connections, num_connections) {
-		if (conn->src_prop.length > 0 || conn->dst_prop.length > 0) continue;
-
-		ufbx_element *src = ufbxi_find_element_by_fbx_id(uc, conn->src);
-		ufbx_element *dst = ufbxi_find_element_by_fbx_id(uc, conn->dst);
-		if (!src || !dst) continue;
-		if (src->type != UFBX_ELEMENT_NODE) continue;
-		if (dst->type != UFBX_ELEMENT_NODE) continue;
-
-		((ufbx_node*)src)->parent = (ufbx_node*)dst;
-	}
-
-	// Count the parent depths and child amounts
-	ufbxi_for_ptr(ufbx_node, p_node, node_ptrs, num_nodes) {
-		ufbx_node *node = *p_node;
-		uint32_t depth = 0;
-
-		for (ufbx_node *p = node->parent; p; p = p->parent) {
-			depth += p->node_depth + 1;
-			if (p->node_depth > 0) break;
-			ufbxi_check_msg(depth <= num_nodes, "Cyclic node hierarchy");
-		}
-
-		node->node_depth = depth;
-		if (node->parent) {
-			node->parent->children.count++;
-		}
-
-		// Second pass to cache the depths to avoid O(n^2)
-		for (ufbx_node *p = node->parent; p; p = p->parent) {
-			if (--depth <= p->node_depth) break;
-			p->node_depth = --depth;
-		}
-	}
-
-	ufbxi_check(ufbxi_sort_node_ptrs_by_depth(uc, node_ptrs, num_nodes));
-
-	uc->scene.nodes.data = ufbxi_push(&uc->result, ufbx_node, num_nodes);
-	uc->scene.nodes.count = num_nodes;
-
-	{
-		ufbx_node *node_dst = uc->scene.nodes.data;
-
-		uint32_t depth = 0;
-		ufbx_node **span_begin = node_ptrs, **end = node_ptrs + num_nodes;
-		while (span_begin < end) {
-			ufbx_assert((*span_begin)->node_depth == depth);
-			ufbx_node **span_end = span_begin;
-			for (; span_end < end; span_end++) {
-				ufbx_node *node = *span_end;
-
-				// Resolve the real parent pointer
-				if (node->parent) {
-					node->parent = (ufbx_node*)uc->scene.elements.data[node->parent->element.id];
-					ufbx_assert(node->parent && node->parent->element.type == UFBX_ELEMENT_NODE);
-				}
-
-				if (node->node_depth != depth) break;
-			}
-
-			// Linearize the current depth layer
-			size_t span_length = span_end - span_begin;
-			ufbx_node *child_dst = node_dst + span_length;
-
-			ufbxi_check(ufbxi_sort_node_ptrs_by_parent(uc, span_begin, span_length));
-
-			for (size_t i = 0; i < span_length; i++) {
-				ufbx_node *src = span_begin[i];
-				ufbx_node *dst = node_dst++;
-
-				uc->scene.elements.data[src->element.id] = &dst->element;
-				*dst = *src;
-				dst->children.data = child_dst;
-				child_dst += src->children.count;
-			}
-
-			span_begin = span_end;
-			depth++;
-		}
-	}
-
-	// Now we can resolve all the connection elements
 	// NOTE: We truncate this array in case not all connections are resolved
 	uc->scene.connections_src.data = ufbxi_push(&uc->result, ufbx_connection, num_connections);
 	ufbxi_check(uc->scene.connections_src.data);
@@ -5720,13 +5627,6 @@ ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *uc)
 		uc->scene.connections_src.count, uc->scene.connections_src.data);
 	ufbxi_check(uc->scene.connections_dst.data);
 
-	// Now there's no more incoming references by element ID so we can sort them
-	// by name and re-enumerate the IDs...
-	ufbxi_check(ufbxi_sort_element_ptrs(uc, uc->scene.elements.data, uc->scene.elements.count));
-	for (uint32_t i = 0; i < uc->scene.elements.count; i++) {
-		uc->scene.elements.data[i]->id = i;
-	}
-
 	ufbxi_check(ufbxi_sort_connections(uc, uc->scene.connections_src.data, uc->scene.connections_src.count, 0));
 	ufbxi_check(ufbxi_sort_connections(uc, uc->scene.connections_dst.data, uc->scene.connections_dst.count, 1));
 
@@ -5735,7 +5635,6 @@ ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *uc)
 
 	return 1;
 }
-#endif
 
 ufbxi_nodiscard static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
 {
@@ -5829,6 +5728,78 @@ ufbxi_nodiscard static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
 
 	return 1;
 }
+
+ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *uc)
+{
+	size_t num_nodes = uc->tmp_node_ids.num_items;
+	uint32_t *node_ids = ufbxi_make_array(&uc->tmp_node_ids, uint32_t, num_nodes);
+	ufbxi_check(node_ids);
+
+	ufbx_node **node_ptrs = ufbxi_push(&uc->tmp_stack, ufbx_node*, num_nodes);
+	ufbxi_check(node_ptrs);
+
+	// Fetch the node pointers
+	for (size_t i = 0; i < num_nodes; i++) {
+		node_ptrs[i] = (ufbx_node*)uc->scene.elements.data[node_ids[i]];
+		ufbx_assert(node_ptrs[i]->element.type == UFBX_ELEMENT_NODE);
+	}
+
+	size_t *node_offsets = ufbxi_push_pop(&uc->tmp_stack, &uc->tmp_typed_element_offsets[UFBX_ELEMENT_NODE], size_t, num_nodes);
+	ufbxi_check(node_offsets);
+
+	// Hook up the parent nodes, we'll assume that there's no cycles at this point
+	ufbxi_for_ptr(ufbx_node, p_node, node_ptrs, num_nodes) {
+		ufbx_node *node = *p_node;
+
+		ufbxi_for_list(ufbx_connection, conn, node->element.connections_dst) {
+			if (conn->src_prop.length > 0 || conn->dst_prop.length > 0) continue;
+			if (conn->src->type != UFBX_ELEMENT_NODE) continue;
+			((ufbx_node*)conn->src)->parent = node;
+		}
+	}
+
+	// Count the parent depths and child amounts
+	ufbxi_for_ptr(ufbx_node, p_node, node_ptrs, num_nodes) {
+		ufbx_node *node = *p_node;
+		uint32_t depth = 0;
+
+		for (ufbx_node *p = node->parent; p; p = p->parent) {
+			depth += p->node_depth + 1;
+			if (p->node_depth > 0) break;
+			ufbxi_check_msg(depth <= num_nodes, "Cyclic node hierarchy");
+		}
+
+		node->node_depth = depth;
+		if (node->parent) {
+			node->parent->children.count++;
+		}
+
+		// Second pass to cache the depths to avoid O(n^2)
+		for (ufbx_node *p = node->parent; p; p = p->parent) {
+			if (--depth <= p->node_depth) break;
+			p->node_depth = --depth;
+		}
+	}
+
+	ufbxi_check(ufbxi_sort_node_ptrs(uc, node_ptrs, num_nodes));
+
+	for (uint32_t i = 0; i < num_nodes; i++) {
+		size_t *p_offset = ufbxi_push(&uc->tmp_typed_element_offsets[UFBX_ELEMENT_NODE], size_t, 1);
+		ufbxi_check(p_offset);
+		ufbx_node *node = node_ptrs[i];
+
+		uint32_t original_id = node->element.typed_id;
+		node->element.typed_id = i;
+		*p_offset = node_offsets[original_id];
+	}
+
+	// Pop the temporary arrays
+	ufbxi_pop(&uc->tmp_stack, size_t, num_nodes, NULL);
+	ufbxi_pop(&uc->tmp_stack, ufbx_node*, num_nodes, NULL);
+
+	return 1;
+}
+
 
 ufbxi_nodiscard static ufbx_connection_list ufbxi_find_dst_connections(ufbxi_context *uc, ufbx_element *element, const char *prop)
 {
@@ -5957,6 +5928,11 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	}
 	uc->scene.elements.count = num_elements;
 	ufbxi_buf_free(&uc->tmp_element_offsets);
+
+	// Resolve and add the connections to elements
+	ufbxi_check(ufbxi_resolve_connections(uc));
+	ufbxi_check(ufbxi_add_connections_to_elements(uc));
+	ufbxi_check(ufbxi_linearize_nodes(uc));
 
 	for (size_t type = 0; type < UFBX_NUM_ELEMENT_TYPES; type++) {
 		size_t num_typed = uc->tmp_typed_element_offsets[type].num_items;
@@ -9517,7 +9493,7 @@ static void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->tmp_parse);
 	ufbxi_buf_free(&uc->tmp_stack);
 	ufbxi_buf_free(&uc->tmp_connections);
-	ufbxi_buf_free(&uc->tmp_node_ptrs);
+	ufbxi_buf_free(&uc->tmp_node_ids);
 	ufbxi_buf_free(&uc->tmp_elements);
 	ufbxi_buf_free(&uc->tmp_element_offsets);
 	for (size_t i = 0; i < UFBX_NUM_ELEMENT_TYPES; i++) {
@@ -9606,7 +9582,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->tmp_parse.ator = &uc->ator_tmp;
 	uc->tmp_stack.ator = &uc->ator_tmp;
 	uc->tmp_connections.ator = &uc->ator_tmp;
-	uc->tmp_node_ptrs.ator = &uc->ator_tmp;
+	uc->tmp_node_ids.ator = &uc->ator_tmp;
 	uc->tmp_elements.ator = &uc->ator_tmp;
 	uc->tmp_element_offsets.ator = &uc->ator_tmp;
 	for (size_t i = 0; i < UFBX_NUM_ELEMENT_TYPES; i++) {
