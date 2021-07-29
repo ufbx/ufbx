@@ -58,11 +58,26 @@ UFBXT_FILE_TEST(maya_parented_cubes)
 UFBXT_FILE_TEST(synthetic_geometric_squish)
 #if UFBXT_IMPL
 {
+	ufbx_node *node = ufbx_find_node(scene, "pSphere1");
+	ufbxt_assert(node);
+	ufbxt_assert_close_real(err, node->geometry_transform.scale.y, 0.01f);
 }
 #endif
 
 UFBXT_FILE_TEST(synthetic_geometric_transform)
 #if UFBXT_IMPL
 {
+	ufbx_node *node = ufbx_find_node(scene, "Parent");
+	ufbxt_assert(node);
+	ufbx_vec3 euler = ufbx_quat_to_euler(node->geometry_transform.rotation, UFBX_ROTATION_XYZ);
+	ufbxt_assert_close_real(err, node->geometry_transform.translation.x, -0.5f);
+	ufbxt_assert_close_real(err, node->geometry_transform.translation.y, -1.0f);
+	ufbxt_assert_close_real(err, node->geometry_transform.translation.z, -1.5f);
+	ufbxt_assert_close_real(err, euler.x, 20.0f);
+	ufbxt_assert_close_real(err, euler.y, 40.0f);
+	ufbxt_assert_close_real(err, euler.z, 60.0f);
+	ufbxt_assert_close_real(err, node->geometry_transform.scale.x, 2.0f);
+	ufbxt_assert_close_real(err, node->geometry_transform.scale.y, 3.0f);
+	ufbxt_assert_close_real(err, node->geometry_transform.scale.z, 4.0f);
 }
 #endif

@@ -1238,6 +1238,10 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	ufbxt_obj_file *obj_file = obj_data ? ufbxt_load_obj(obj_data, obj_size) : NULL;
 	free(obj_data);
 
+	if (obj_file) {
+		ufbxt_logf("%s [diff target found]", buf);
+	}
+
 	char base_name[512];
 
 	ufbxt_begin_fuzz();
