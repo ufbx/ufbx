@@ -39,18 +39,8 @@ typedef double ufbx_real;
 		p_type &operator[](size_t index) const { ufbx_assert(index < count); return data[index]; } \
 		p_type *begin() const { return data; } \
 		p_type *end() const { return data + count; } }
-	#define UFBX_LIST_TYPE_DECL(p_name, p_type) struct p_name { p_type *data; size_t count; \
-		p_type &operator[](size_t index) const; \
-		p_type *begin() const; \
-		p_type *end() const; }
-	#define UFBX_LIST_TYPE_DEF(p_name, p_type) \
-		inline p_type &p_name::operator[](size_t index) const { ufbx_assert(index < count); return data[index]; } \
-		inline p_type *p_name::begin() const { return data; } \
-		inline p_type *p_name::end() const { return data + count; }
 #else
 	#define UFBX_LIST_TYPE(p_name, p_type) typedef struct p_name { p_type *data; size_t count; } p_name
-	#define UFBX_LIST_TYPE_DECL(p_name, p_type) typedef struct p_name { p_type *data; size_t count; } p_name
-	#define UFBX_LIST_TYPE_DEF(p_name, p_type)
 #endif
 
 // -- Version
@@ -162,6 +152,7 @@ typedef enum ufbx_prop_type {
 	UFBX_PROP_TRANSLATION,
 	UFBX_PROP_ROTATION,
 	UFBX_PROP_SCALING,
+	UFBX_PROP_DISTANCE,
 	UFBX_PROP_COMPOUND,
 
 	UFBX_NUM_PROP_TYPES,
@@ -218,54 +209,122 @@ struct ufbx_props {
 // An element contains type, id, name, and properties (see `ufbx_props` above)
 // Elements may be connected to each other aribtrarily via `ufbx_connection`
 
-typedef struct ufbx_unknown_element ufbx_unknown_element;
+typedef struct ufbx_element ufbx_element;
+
+// Unknown
+typedef struct ufbx_unknown ufbx_unknown;
+
+// Nodes
 typedef struct ufbx_node ufbx_node;
-typedef struct ufbx_model ufbx_model;
+
+// Node attributes (common)
 typedef struct ufbx_mesh ufbx_mesh;
 typedef struct ufbx_light ufbx_light;
 typedef struct ufbx_camera ufbx_camera;
 typedef struct ufbx_bone ufbx_bone;
+typedef struct ufbx_empty ufbx_empty;
+
+// Node attributes (curves/surfaces)
+typedef struct ufbx_line_curve ufbx_line_curve;
+typedef struct ufbx_nurbs_curve ufbx_nurbs_curve;
+typedef struct ufbx_patch_surface ufbx_patch_surface;
+typedef struct ufbx_nurbs_surface ufbx_nurbs_surface;
+typedef struct ufbx_nurbs_trim_surface ufbx_nurbs_trim_surface;
+typedef struct ufbx_nurbs_trim_boundary ufbx_nurbs_trim_boundary;
+
+// Node attributes (advanced)
+typedef struct ufbx_procedural_geometry ufbx_procedural_geometry;
+typedef struct ufbx_camera_stereo ufbx_camera_stereo;
+typedef struct ufbx_camera_switcher ufbx_camera_switcher;
+typedef struct ufbx_lod_group ufbx_lod_group;
+
+// Deformers
 typedef struct ufbx_skin_deformer ufbx_skin_deformer;
 typedef struct ufbx_skin_cluster ufbx_skin_cluster;
 typedef struct ufbx_blend_deformer ufbx_blend_deformer;
 typedef struct ufbx_blend_channel ufbx_blend_channel;
 typedef struct ufbx_blend_shape ufbx_blend_shape;
 typedef struct ufbx_cache_deformer ufbx_cache_deformer;
+
+// Materials
 typedef struct ufbx_material ufbx_material;
+typedef struct ufbx_texture ufbx_texture;
+typedef struct ufbx_video ufbx_video;
+
+// Animation
 typedef struct ufbx_anim_stack ufbx_anim_stack;
 typedef struct ufbx_anim_layer ufbx_anim_layer;
-typedef struct ufbx_anim_prop ufbx_anim_prop;
+typedef struct ufbx_anim_value ufbx_anim_value;
 typedef struct ufbx_anim_curve ufbx_anim_curve;
 
-UFBX_LIST_TYPE(ufbx_node_ptr_list, ufbx_node*);
-UFBX_LIST_TYPE(ufbx_material_ptr_list, ufbx_material*);
-UFBX_LIST_TYPE(ufbx_element_ptr_list, ufbx_element*);
-UFBX_LIST_TYPE(ufbx_skin_ptr_list, ufbx_skin_deformer*);
-UFBX_LIST_TYPE(ufbx_skin_cluster_ptr_list, ufbx_skin_cluster*);
-UFBX_LIST_TYPE(ufbx_anim_layer_ptr_list, ufbx_anim_layer*);
-UFBX_LIST_TYPE(ufbx_anim_prop_ptr_list, ufbx_anim_prop*);
-UFBX_LIST_TYPE(ufbx_anim_curve_ptr_list, ufbx_anim_curve*);
+// Miscellaneous
+typedef struct ufbx_bind_pose ufbx_bind_pose;
 
-typedef union ufbx_any_node ufbx_any_node;
+UFBX_LIST_TYPE(ufbx_element_list, ufbx_element*);
+UFBX_LIST_TYPE(ufbx_unknown_list, ufbx_unknown*);
+UFBX_LIST_TYPE(ufbx_node_list, ufbx_node*);
+UFBX_LIST_TYPE(ufbx_mesh_list, ufbx_mesh*);
+UFBX_LIST_TYPE(ufbx_light_list, ufbx_light*);
+UFBX_LIST_TYPE(ufbx_camera_list, ufbx_camera*);
+UFBX_LIST_TYPE(ufbx_bone_list, ufbx_bone*);
+UFBX_LIST_TYPE(ufbx_empty_list, ufbx_empty*);
+UFBX_LIST_TYPE(ufbx_line_curve_list, ufbx_line_curve*);
+UFBX_LIST_TYPE(ufbx_nurbs_curve_list, ufbx_nurbs_curve*);
+UFBX_LIST_TYPE(ufbx_patch_surface_list, ufbx_patch_surface*);
+UFBX_LIST_TYPE(ufbx_nurbs_surface_list, ufbx_nurbs_surface*);
+UFBX_LIST_TYPE(ufbx_nurbs_trim_surface_list, ufbx_nurbs_trim_surface*);
+UFBX_LIST_TYPE(ufbx_nurbs_trim_boundary_list, ufbx_nurbs_trim_boundary*);
+UFBX_LIST_TYPE(ufbx_procedural_geometry_list, ufbx_procedural_geometry*);
+UFBX_LIST_TYPE(ufbx_camera_stereo_list, ufbx_camera_stereo*);
+UFBX_LIST_TYPE(ufbx_camera_switcher_list, ufbx_camera_switcher*);
+UFBX_LIST_TYPE(ufbx_lod_group_list, ufbx_lod_group*);
+UFBX_LIST_TYPE(ufbx_skin_deformer_list, ufbx_skin_deformer*);
+UFBX_LIST_TYPE(ufbx_skin_cluster_list, ufbx_skin_cluster*);
+UFBX_LIST_TYPE(ufbx_blend_deformer_list, ufbx_blend_deformer*);
+UFBX_LIST_TYPE(ufbx_blend_channel_list, ufbx_blend_channel*);
+UFBX_LIST_TYPE(ufbx_blend_shape_list, ufbx_blend_shape*);
+UFBX_LIST_TYPE(ufbx_cache_deformer_list, ufbx_cache_deformer*);
+UFBX_LIST_TYPE(ufbx_material_list, ufbx_material*);
+UFBX_LIST_TYPE(ufbx_texture_list, ufbx_texture*);
+UFBX_LIST_TYPE(ufbx_video_list, ufbx_video*);
+UFBX_LIST_TYPE(ufbx_anim_stack_list, ufbx_anim_stack*);
+UFBX_LIST_TYPE(ufbx_anim_layer_list, ufbx_anim_layer*);
+UFBX_LIST_TYPE(ufbx_anim_value_list, ufbx_anim_value*);
+UFBX_LIST_TYPE(ufbx_anim_curve_list, ufbx_anim_curve*);
+UFBX_LIST_TYPE(ufbx_bind_pose_list, ufbx_bind_pose*);
 
 typedef enum ufbx_element_type {
-	UFBX_ELEMENT_UNKNOWN,        // < `ufbx_unknown_element`
-	UFBX_ELEMENT_NODE,           // < `ufbx_node`
-	UFBX_ELEMENT_MESH,           // < `ufbx_mesh`
-	UFBX_ELEMENT_LIGHT,          // < `ufbx_light`
-	UFBX_ELEMENT_CAMERA,         // < `ufbx_camera`
-	UFBX_ELEMENT_BONE,           // < `ufbx_bone`
-	UFBX_ELEMENT_SKIN_DEFORMER,  // < `ufbx_skin_deformer`
-	UFBX_ELEMENT_SKIN_CLUSTER,   // < `ufbx_skin_cluster`
-	UFBX_ELEMENT_BLEND_DEFORMER, // < `ufbx_blend_deformer`
-	UFBX_ELEMENT_BLEND_CHANNEL,  // < `ufbx_blend_channel`
-	UFBX_ELEMENT_BLEND_SHAPE,    // < `ufbx_blend_shape`
-	UFBX_ELEMENT_CACHE_DEFORMER, // < `ufbx_cache_deformer`
-	UFBX_ELEMENT_MATERIAL,       // < `ufbx_material`
-	UFBX_ELEMENT_ANIM_STACK,     // < `ufbx_anim_stack`
-	UFBX_ELEMENT_ANIM_LAYER,     // < `ufbx_anim_layer`
-	UFBX_ELEMENT_ANIM_PROP,      // < `ufbx_anim_prop`
-	UFBX_ELEMENT_ANIM_CURVE,     // < `ufbx_anim_curve`
+	UFBX_ELEMENT_UNKNOWN,             // < `ufbx_unknown`
+	UFBX_ELEMENT_NODE,                // < `ufbx_node`
+	UFBX_ELEMENT_MESH,                // < `ufbx_mesh`
+	UFBX_ELEMENT_LIGHT,               // < `ufbx_light`
+	UFBX_ELEMENT_CAMERA,              // < `ufbx_camera`
+	UFBX_ELEMENT_BONE,                // < `ufbx_bone`
+	UFBX_ELEMENT_EMPTY,               // < `ufbx_empty`
+	UFBX_ELEMENT_LINE_CURVE,          // < `ufbx_line_curve`
+	UFBX_ELEMENT_NURBS_CURVE,         // < `ufbx_nurbs_curve`
+	UFBX_ELEMENT_PATCH_SURFACE,       // < `ufbx_patch_surface`
+	UFBX_ELEMENT_NURBS_SURFACE,       // < `ufbx_nurbs_surface`
+	UFBX_ELEMENT_NURBS_TRIM_SURFACE,  // < `ufbx_nurbs_trim_surface`
+	UFBX_ELEMENT_NURBS_TRIM_BOUNDARY, // < `ufbx_nurbs_trim_boundary`
+	UFBX_ELEMENT_PROCEDURAL_GEOMETRY, // < `ufbx_procedural_geometry`
+	UFBX_ELEMENT_CAMERA_STEREO,       // < `ufbx_camera_stereo`
+	UFBX_ELEMENT_CAMERA_SWITCHER,     // < `ufbx_camera_switcher`
+	UFBX_ELEMENT_LOD_GROUP,           // < `ufbx_lod_group`
+	UFBX_ELEMENT_SKIN_DEFORMER,       // < `ufbx_skin_deformer`
+	UFBX_ELEMENT_SKIN_CLUSTER,        // < `ufbx_skin_cluster`
+	UFBX_ELEMENT_BLEND_DEFORMER,      // < `ufbx_blend_deformer`
+	UFBX_ELEMENT_BLEND_CHANNEL,       // < `ufbx_blend_channel`
+	UFBX_ELEMENT_BLEND_SHAPE,         // < `ufbx_blend_shape`
+	UFBX_ELEMENT_CACHE_DEFORMER,      // < `ufbx_cache_deformer`
+	UFBX_ELEMENT_MATERIAL,            // < `ufbx_material`
+	UFBX_ELEMENT_TEXTURE,             // < `ufbx_texture`
+	UFBX_ELEMENT_VIDEO,               // < `ufbx_video`
+	UFBX_ELEMENT_ANIM_STACK,          // < `ufbx_anim_stack`
+	UFBX_ELEMENT_ANIM_LAYER,          // < `ufbx_anim_layer`
+	UFBX_ELEMENT_ANIM_VALUE,          // < `ufbx_anim_value`
+	UFBX_ELEMENT_ANIM_CURVE,          // < `ufbx_anim_curve`
+	UFBX_ELEMENT_BIND_POSE,           // < `ufbx_bind_pose`
 
 	UFBX_NUM_ELEMENT_TYPES,
 } ufbx_element_type;
@@ -290,18 +349,20 @@ struct ufbx_element {
 	ufbx_props props;
 	ufbx_element_type type;
 	uint32_t id;
+	uint32_t typed_id;
 	ufbx_connection_list connections_src;
 	ufbx_connection_list connections_dst;
 };
 
-struct ufbx_unknown_element {
+// -- Unknown
+
+struct ufbx_unknown {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
+	// FBX format specific type information
 	ufbx_string type;
 	ufbx_string sub_type;
 };
-
-UFBX_LIST_TYPE(ufbx_unknown_element_list, ufbx_unknown_element);
 
 // -- Nodes
 
@@ -315,18 +376,6 @@ typedef enum ufbx_inherit_type {
 	UFBX_INHERIT_NO_SCALE, // R*r*s
 } ufbx_inherit_type;
 
-// Specialized type of a node, subset of possible element types
-typedef enum ufbx_node_type {
-	UFBX_NODE_PLAIN  = UFBX_ELEMENT_NODE,    // < Plain node, nothing attached
-	UFBX_NODE_MESH   = UFBX_ELEMENT_MESH,    // < Contains `ufbx_mesh`
-	UFBX_NODE_LIGHT  = UFBX_ELEMENT_LIGHT,   // < Contains `ufbx_light`
-	UFBX_NODE_CAMERA = UFBX_ELEMENT_CAMERA,  // < Contains `ufbx_camera`
-	UFBX_NODE_BONE   = UFBX_ELEMENT_BONE,    // < Contains `ufbx_bone`
-	UFBX_NODE_MULTI  = UFBX_ELEMENT_UNKNOWN, // < Node contains multiple types, see `ufbx_node.elements`
-} ufbx_node_type;
-
-UFBX_LIST_TYPE_DECL(ufbx_node_list, ufbx_node);
-
 // Nodes form the scene transformation hierarchy and can contain attached
 // elements such as meshes or lights. In normal cases a single `ufbx_node`
 // contains only a single attached element, so using `type/mesh/...` is safe.
@@ -338,16 +387,15 @@ struct ufbx_node {
 	ufbx_node_list children;
 	uint32_t node_depth;
 
-	// Attached element type and typed pointers. Nonexistent elements are `NULL`
+	// Attached element type and typed pointers. Nonexistent attributes are `NULL`
 	// so checking `type` is not necessary if acccessing eg. `node->mesh`.
-	ufbx_node_type node_type;
+	ufbx_element_type attrib_type;
+	ufbx_element *attrib;
 	ufbx_mesh *mesh;
 	ufbx_light *light;
 	ufbx_camera *camera;
 	ufbx_bone *bone;
-
-	// All the elements in the node, necessary if `type == UFBX_NODE_MULTI`.
-	ufbx_element_ptr_list elements;
+	ufbx_element_list multi_attribs;
 
 	// Local transform in parent, geometry transform is a non-inherited
 	// transform applied only to attachments like meshes
@@ -370,8 +418,6 @@ struct ufbx_node {
 	ufbx_matrix geometry_to_node;
 	ufbx_matrix geometry_to_world;
 };
-
-UFBX_LIST_TYPE_DEF(ufbx_node_list, ufbx_node)
 
 // Vertex attribute: All attributes are stored in a consistent indexed format
 // regardless of how it's actually stored in the file.
@@ -494,34 +540,24 @@ struct ufbx_mesh {
 	ufbx_color_set_list color_sets;
 
 	// List of materials used by the mesh, indexed by `ufbx_mesh.face_material`
-	ufbx_material_ptr_list materials;
+	ufbx_material_list materials;
 
-	// TODO
-#if 0
-	ufbx_skin_list skins;
-	ufbx_blend_channel_ptr_list blend_channels;
-#endif
+	ufbx_element_list deformers;
+	ufbx_skin_deformer_list skins;
+	ufbx_blend_deformer_list blends;
 };
-
-UFBX_LIST_TYPE(ufbx_mesh_list, ufbx_mesh);
 
 struct ufbx_light {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 };
 
-UFBX_LIST_TYPE(ufbx_light_list, ufbx_light);
-
 struct ufbx_camera {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 };
 
-UFBX_LIST_TYPE(ufbx_camera_list, ufbx_camera);
-
 struct ufbx_bone {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 };
-
-UFBX_LIST_TYPE(ufbx_bone_list, ufbx_bone);
 
 // Method to evaluate the skinning on a per-vertex level
 typedef enum ufbx_skinning_method {
@@ -535,10 +571,8 @@ struct ufbx_skin_deformer {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	ufbx_skinning_method skinning_method;
-	ufbx_skin_cluster_ptr_list clusters;
+	ufbx_skin_cluster_list clusters;
 };
-
-UFBX_LIST_TYPE(ufbx_skin_list, ufbx_skin_deformer);
 
 struct ufbx_skin_cluster {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
@@ -553,7 +587,17 @@ struct ufbx_skin_cluster {
 	ufbx_real *weights;
 };
 
-UFBX_LIST_TYPE(ufbx_skin_cluster_list, ufbx_skin_cluster);
+struct ufbx_blend_deformer {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_blend_channel_list channels;
+};
+
+struct ufbx_blend_channel {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_blend_shape_list shapes;
+};
 
 struct ufbx_blend_shape {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
@@ -568,13 +612,9 @@ struct ufbx_blend_shape {
 	int32_t *indices;
 };
 
-UFBX_LIST_TYPE(ufbx_blend_shape_list, ufbx_blend_shape);
-
 struct ufbx_material {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 };
-
-UFBX_LIST_TYPE(ufbx_material_list, ufbx_material);
 
 struct ufbx_anim_stack {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
@@ -582,20 +622,17 @@ struct ufbx_anim_stack {
 	double time_begin;
 	double time_end;
 
-	ufbx_anim_layer_ptr_list layers;
+	ufbx_anim_layer_list layers;
 };
 
-UFBX_LIST_TYPE(ufbx_anim_stack_list, ufbx_anim_stack);
-
-typedef struct ufbx_element_anim_prop {
+typedef struct ufbx_anim_prop {
 	ufbx_element *element;
-	uint32_t element_id;
 	uint32_t internal_key;
 	ufbx_string prop_name;
-	ufbx_anim_prop *anim_prop;
-} ufbx_element_anim_prop;
+	ufbx_anim_value *anim_value;
+} ufbx_anim_prop;
 
-UFBX_LIST_TYPE(ufbx_element_anim_prop_list, ufbx_element_anim_prop);
+UFBX_LIST_TYPE(ufbx_anim_prop_list, ufbx_anim_prop);
 
 struct ufbx_anim_layer {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
@@ -607,20 +644,29 @@ struct ufbx_anim_layer {
 	bool compose_rotation;
 	bool compose_scale;
 
-	ufbx_anim_prop_ptr_list anim_props;
-	ufbx_element_anim_prop_list element_props; // < Sorted by `element_id,prop_name`
+	ufbx_anim_value_list anim_values;
+	ufbx_anim_prop_list anim_props; // < Sorted by `element,prop_name`
 };
 
-UFBX_LIST_TYPE(ufbx_anim_layer_list, ufbx_anim_layer);
-
-struct ufbx_anim_prop {
+struct ufbx_anim_value {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	ufbx_vec3 default_value;
 	ufbx_anim_curve *curves[3];
 };
 
-UFBX_LIST_TYPE(ufbx_anim_prop_list, ufbx_anim_prop);
+typedef struct ufbx_bone_pose {
+	ufbx_node *bone;
+	ufbx_matrix bone_to_world;
+} ufbx_bone_pose;
+
+UFBX_LIST_TYPE(ufbx_bone_pose_list, ufbx_bone_pose);
+
+struct ufbx_bind_pose {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_bone_pose_list bone_poses;
+};
 
 // Animation curve segment interpolation mode between two keyframes
 typedef enum ufbx_interpolation {
@@ -664,19 +710,18 @@ struct ufbx_anim_curve {
 	ufbx_keyframe_list keyframes;
 };
 
-UFBX_LIST_TYPE(ufbx_anim_curve_list, ufbx_anim_curve);
+// -- Animation
 
-// -- Nodes bound with data
+typedef struct ufbx_anim_layer_desc {
+	ufbx_anim_layer *layer;
+	ufbx_real weight;
+} ufbx_anim_layer_desc;
 
-typedef struct ufbx_mesh_node { ufbx_node *node; ufbx_mesh *mesh; } ufbx_mesh_node;
-typedef struct ufbx_light_node { ufbx_node *node; ufbx_light *light; } ufbx_light_node;
-typedef struct ufbx_camera_node { ufbx_node *node; ufbx_camera *camera; } ufbx_camera_node;
-typedef struct ufbx_bone_node { ufbx_node *node; ufbx_bone *bone; } ufbx_bone_node;
+UFBX_LIST_TYPE(ufbx_anim_layer_desc_list, ufbx_anim_layer_desc);
 
-UFBX_LIST_TYPE(ufbx_mesh_node_list, ufbx_mesh_node);
-UFBX_LIST_TYPE(ufbx_light_node_list, ufbx_light_node);
-UFBX_LIST_TYPE(ufbx_camera_node_list, ufbx_camera_node);
-UFBX_LIST_TYPE(ufbx_bone_node_list, ufbx_bone_node);
+typedef struct ufbx_anim {
+	ufbx_anim_layer_desc_list layers;
+} ufbx_anim;
 
 // -- Scene
 
@@ -714,35 +759,66 @@ struct ufbx_scene {
 
 	// Node instances in the scene
 	ufbx_node *root_node;
-	ufbx_node_list nodes;
-	ufbx_mesh_node_list mesh_nodes;
-	ufbx_light_node_list light_nodes;
-	ufbx_camera_node_list camera_nodes;
-	ufbx_bone_node_list bone_nodes;
 
-	// Default animation layers
-	ufbx_anim_layer_ptr_list default_anim;
+	// Default animation descriptor
+	ufbx_anim default_anim;
 
-	// Elements that were parsed but not supported by ufbx natively
-	// NOTE: Some information like data arrays might be missing
-	ufbx_unknown_element_list unknown_elements;
+	union {
+		struct {
+			ufbx_unknown_list unknowns;
 
-	// These elements are just "types" of meshes/lights/cameras, use
-	// the `TYPE_nodes` lists to get ones bound to instanced nodes!
-	ufbx_mesh_list meshes;
-	ufbx_light_list lights;
-	ufbx_camera_list cameras;
-	ufbx_bone_list bones;
-	ufbx_skin_list skins;
-	ufbx_blend_shape_list blend_shapes;
-	ufbx_material_list materials;
-	ufbx_anim_stack_list anim_stacks;
-	ufbx_anim_layer_list anim_layers;
-	ufbx_anim_prop_list anim_props;
-	ufbx_anim_curve_list anim_curves;
+			// Nodes
+			ufbx_node_list nodes;
+
+			// Node attributes (common)
+			ufbx_mesh_list meshes;
+			ufbx_light_list lights;
+			ufbx_camera_list cameras;
+			ufbx_bone_list bones;
+			ufbx_empty_list empties;
+
+			// Node attributes (curves/surfaces)
+			ufbx_line_curve_list line_curves;
+			ufbx_nurbs_curve_list nurbs_curves;
+			ufbx_patch_surface_list patch_surfaces;
+			ufbx_nurbs_surface_list nurbs_surfaces;
+			ufbx_nurbs_trim_surface_list nurbs_trim_surfaces;
+			ufbx_nurbs_trim_boundary_list nurbs_trim_boundaries;
+
+			// Node attributes (advanced)
+			ufbx_procedural_geometry_list procedural_geometries;
+			ufbx_camera_stereo_list camera_stereos;
+			ufbx_camera_switcher_list camera_switchers;
+			ufbx_lod_group_list lod_groups;
+
+			// Deformers
+			ufbx_skin_deformer_list skin_deformers;
+			ufbx_skin_cluster_list skin_clusters;
+			ufbx_blend_deformer_list blend_deformers;
+			ufbx_blend_channel_list blend_channels;
+			ufbx_blend_shape_list blend_shapes;
+			ufbx_cache_deformer_list cache_deformers;
+
+			// Materials
+			ufbx_material_list materials;
+			ufbx_texture_list textures;
+			ufbx_video_list videos;
+
+			// Animation
+			ufbx_anim_stack_list anim_stacks;
+			ufbx_anim_layer_list anim_layers;
+			ufbx_anim_value_list anim_values;
+			ufbx_anim_curve_list anim_curves;
+
+			// Miscellaneous
+			ufbx_bind_pose_list bind_poses;
+		};
+
+		ufbx_element_list elements_by_type[UFBX_NUM_ELEMENT_TYPES];
+	};
 
 	// All elements and connections in the whole file
-	ufbx_element_ptr_list elements;       // < Sorted by `name,element_type`
+	ufbx_element_list elements;       // < Sorted by `id,element_type`
 	ufbx_connection_list connections_src; // < Sorted by `src->element_id,src_prop`
 	ufbx_connection_list connections_dst; // < Sorted by `dst->element_id,dst_prop`
 };
@@ -925,12 +1001,12 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 
 ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_real default_value);
 
-ufbx_real ufbx_evaluate_anim_prop_real(const ufbx_anim_prop *anim_prop, double time);
-ufbx_vec2 ufbx_evaluate_anim_prop_vec2(const ufbx_anim_prop *anim_prop, double time);
-ufbx_vec3 ufbx_evaluate_anim_prop_vec3(const ufbx_anim_prop *anim_prop, double time);
+ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, double time);
+ufbx_vec2 ufbx_evaluate_anim_value_vec2(const ufbx_anim_value *anim_value, double time);
+ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, double time);
 
-ufbx_prop ufbx_evaluate_prop_len(ufbx_anim_layer_ptr_list layers, ufbx_element *element, const char *name, size_t name_len, double time);
-ufbx_props ufbx_evaluate_props(ufbx_anim_layer_ptr_list layers, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
+ufbx_prop ufbx_evaluate_prop_len(ufbx_anim anim, ufbx_element *element, const char *name, size_t name_len, double time);
+ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
 
 // Math
 
