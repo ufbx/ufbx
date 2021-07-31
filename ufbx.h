@@ -559,6 +559,56 @@ struct ufbx_bone {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 };
 
+struct ufbx_empty {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+// -- Node attributes (curves/surfaces)
+
+struct ufbx_line_curve {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+struct ufbx_nurbs_curve {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+struct ufbx_patch_surface {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+struct ufbx_nurbs_surface {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+struct ufbx_nurbs_trim_surface {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+struct ufbx_nurbs_trim_boundary {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+// -- Node attributes (advanced)
+
+struct ufbx_procedural_geometry {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+struct ufbx_camera_stereo {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+struct ufbx_camera_switcher {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+struct ufbx_lod_group {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+// -- Deformers
+
 // Method to evaluate the skinning on a per-vertex level
 typedef enum ufbx_skinning_method {
 	UFBX_SKINNING_RIGID,
@@ -612,10 +662,19 @@ struct ufbx_blend_shape {
 	int32_t *indices;
 };
 
+// -- Materials
+
 struct ufbx_material {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 };
 
+struct ufbx_texture {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+struct ufbx_video {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
 
 // -- Animation
 
@@ -731,6 +790,7 @@ struct ufbx_anim_curve {
 typedef struct ufbx_name_element {
 	ufbx_string name;
 	ufbx_element_type type;
+	uint32_t internal_key;
 	ufbx_element *element;
 } ufbx_name_element;
 

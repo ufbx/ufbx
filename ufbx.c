@@ -1953,6 +1953,15 @@ static const char ufbxi_Matrix[] = "Matrix";
 static const char ufbxi_GeometricTranslation[] = "GeometricTranslation";
 static const char ufbxi_GeometricRotation[] = "GeometricRotation";
 static const char ufbxi_GeometricScaling[] = "GeometricScaling";
+static const char ufbxi_Null[] = "Null";
+static const char ufbxi_CameraSwitcher[] = "CameraSwitcher";
+static const char ufbxi_CameraStereo[] = "CameraStereo";
+static const char ufbxi_Nurbs[] = "Nurbs";
+static const char ufbxi_NurbsCurve[] = "NurbsCurve";
+static const char ufbxi_NurbsSurface[] = "NurbsSurface";
+static const char ufbxi_TrimNurbsSurface[] = "TrimNurbsSurface";
+static const char ufbxi_Boundary[] = "Boundary";
+static const char ufbxi_LodGroup[] = "LodGroup";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, sizeof(ufbxi_AllSame) - 1 },
@@ -2107,6 +2116,15 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_GeometricTranslation, sizeof(ufbxi_GeometricTranslation) - 1 },
 	{ ufbxi_GeometricRotation, sizeof(ufbxi_GeometricRotation) - 1 },
 	{ ufbxi_GeometricScaling, sizeof(ufbxi_GeometricScaling) - 1 },
+	{ ufbxi_Null, sizeof(ufbxi_Null) - 1 },
+	{ ufbxi_CameraSwitcher, sizeof(ufbxi_CameraSwitcher) - 1 },
+	{ ufbxi_CameraStereo, sizeof(ufbxi_CameraStereo) - 1 },
+	{ ufbxi_Nurbs, sizeof(ufbxi_Nurbs) - 1 },
+	{ ufbxi_NurbsCurve, sizeof(ufbxi_NurbsCurve) - 1 },
+	{ ufbxi_NurbsSurface, sizeof(ufbxi_NurbsSurface) - 1 },
+	{ ufbxi_TrimNurbsSurface, sizeof(ufbxi_TrimNurbsSurface) - 1 },
+	{ ufbxi_Boundary, sizeof(ufbxi_Boundary) - 1 },
+	{ ufbxi_LodGroup, sizeof(ufbxi_LodGroup) - 1 },
 };
 
 // -- Type definitions
@@ -4494,25 +4512,6 @@ ufbxi_nodiscard static int ufbxi_connect_oo(ufbxi_context *uc, uint64_t src, uin
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type)
-{
-	ufbxi_element_info attrib_info = *info;
-	attrib_info.fbx_id = info->fbx_id + 1;
-
-	if (sub_type == ufbxi_Light) {
-		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_light), UFBX_ELEMENT_LIGHT));
-	} else if (sub_type == ufbxi_Camera) {
-		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera), UFBX_ELEMENT_CAMERA));
-	} else if (sub_type == ufbxi_LimbNode) {
-		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_bone), UFBX_ELEMENT_BONE));
-	} else {
-		return 1;
-	}
-
-	ufbxi_check(ufbxi_connect_oo(uc, info->fbx_id, attrib_info.fbx_id));
-	return 1;
-}
-
 ufbxi_nodiscard static int ufbxi_read_unknown(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *element, ufbx_string type, ufbx_string sub_type)
 {
 	ufbx_unknown *unknown = ufbxi_push_element(uc, element, ufbx_unknown, UFBX_ELEMENT_UNKNOWN);
@@ -4727,7 +4726,6 @@ ufbxi_nodiscard static int ufbxi_sort_color_sets(ufbxi_context *uc, ufbx_color_s
 
 ufbxi_nodiscard static int ufbxi_read_shape(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
-	// Only read polygon meshes, ignore eg. NURBS without error
 	ufbxi_node *node_vertices = ufbxi_find_child(node, ufbxi_Vertices);
 	ufbxi_node *node_indices = ufbxi_find_child(node, ufbxi_Indexes);
 	if (!node_vertices || !node_indices) return 1;
@@ -5360,6 +5358,51 @@ ufbxi_nodiscard static int ufbxi_read_pose(ufbxi_context *uc, ufbxi_node *node, 
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type)
+{
+	ufbxi_element_info attrib_info = *info;
+
+	// HACK: We can create an unique FBX ID from the existing node ID as the
+	// IDs are derived from NULL-terminated string pool pointers so bumping
+	// the ID value by one can never cross to the next string...
+	attrib_info.fbx_id = info->fbx_id + 1;
+
+	// TODO: Filter node properties?
+
+	if (sub_type == ufbxi_Mesh) {
+		ufbxi_check(ufbxi_read_mesh(uc, node, &attrib_info));
+	} else if (sub_type == ufbxi_Light) {
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_light), UFBX_ELEMENT_LIGHT));
+	} else if (sub_type == ufbxi_Camera) {
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera), UFBX_ELEMENT_CAMERA));
+	} else if (sub_type == ufbxi_LimbNode) {
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_bone), UFBX_ELEMENT_BONE));
+	} else if (sub_type == ufbxi_Null) {
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_empty), UFBX_ELEMENT_EMPTY));
+	} else if (sub_type == ufbxi_NurbsCurve) {
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_nurbs_curve), UFBX_ELEMENT_NURBS_CURVE));
+	} else if (sub_type == ufbxi_Nurbs) {
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_nurbs_surface), UFBX_ELEMENT_NURBS_SURFACE));
+	} else if (sub_type == ufbxi_NurbsSurface) {
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_nurbs_surface), UFBX_ELEMENT_NURBS_SURFACE));
+	} else if (sub_type == ufbxi_TrimNurbsSurface) {
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_nurbs_trim_surface), UFBX_ELEMENT_NURBS_TRIM_SURFACE));
+	} else if (sub_type == ufbxi_Boundary) {
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_nurbs_trim_boundary), UFBX_ELEMENT_NURBS_TRIM_BOUNDARY));
+	} else if (sub_type == ufbxi_CameraStereo) {
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera_stereo), UFBX_ELEMENT_CAMERA_STEREO));
+	} else if (sub_type == ufbxi_CameraSwitcher) {
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_CAMERA_SWITCHER));
+	} else if (sub_type == ufbxi_LodGroup) {
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_LOD_GROUP));
+	} else {
+		return 1;
+	}
+
+	ufbxi_check(ufbxi_connect_oo(uc, attrib_info.fbx_id, info->fbx_id));
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 {
 	ufbxi_element_info info = { 0 };
@@ -5379,6 +5422,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			if (!ufbxi_get_val3(node, "LsS", &info.fbx_id, &type_and_name, &sub_type_str)) continue;
 		} else {
 			if (!ufbxi_get_val2(node, "sS", &type_and_name, &sub_type_str)) continue;
+			info.fbx_id = (uintptr_t)type_and_name.data;
 		}
 
 		// Remove the "Fbx" prefix from sub-types, remember to re-intern!
@@ -5400,24 +5444,54 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			if (uc->version < 7000) {
 				ufbxi_check(ufbxi_read_synthetic_attribute(uc, node, &info, sub_type));
 			}
-		} else if (name == ufbxi_NodeAttribute && sub_type == ufbxi_Light) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_light), UFBX_ELEMENT_LIGHT));
-		} else if (name == ufbxi_NodeAttribute && sub_type == ufbxi_Camera) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera), UFBX_ELEMENT_CAMERA));
-		} else if (name == ufbxi_NodeAttribute && sub_type == ufbxi_LimbNode) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_bone), UFBX_ELEMENT_BONE));
-		} else if (name == ufbxi_Geometry && sub_type == ufbxi_Mesh) {
-			ufbxi_check(ufbxi_read_mesh(uc, node, &info));
-		} else if (name == ufbxi_Deformer && sub_type == ufbxi_Cluster) {
-			ufbxi_check(ufbxi_read_skin_cluster(uc, node, &info));
-		} else if (name == ufbxi_Deformer && sub_type == ufbxi_Skin) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_skin_deformer), UFBX_ELEMENT_SKIN_DEFORMER));
-		} else if (name == ufbxi_Geometry && sub_type == ufbxi_BlendShape) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_blend_deformer), UFBX_ELEMENT_BLEND_DEFORMER));
-		} else if (name == ufbxi_Geometry && sub_type == ufbxi_BlendShapeChannel) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_blend_channel), UFBX_ELEMENT_BLEND_CHANNEL));
-		} else if (name == ufbxi_Geometry && sub_type == ufbxi_Shape) {
-			ufbxi_check(ufbxi_read_shape(uc, node, &info));
+		} else if (name == ufbxi_NodeAttribute) {
+			if (sub_type == ufbxi_Light) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_light), UFBX_ELEMENT_LIGHT));
+			} else if (sub_type == ufbxi_Camera) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera), UFBX_ELEMENT_CAMERA));
+			} else if (sub_type == ufbxi_LimbNode) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_bone), UFBX_ELEMENT_BONE));
+			} else if (sub_type == ufbxi_Null) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_empty), UFBX_ELEMENT_EMPTY));
+			} else if (sub_type == ufbxi_CameraStereo) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera_stereo), UFBX_ELEMENT_CAMERA_STEREO));
+			} else if (sub_type == ufbxi_CameraSwitcher) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_CAMERA_SWITCHER));
+			} else if (sub_type == ufbxi_LodGroup) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_LOD_GROUP));
+			} else {
+				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str));
+			}
+		} else if (name == ufbxi_Geometry) {
+			if (sub_type == ufbxi_Mesh) {
+				ufbxi_check(ufbxi_read_mesh(uc, node, &info));
+			} else if (sub_type == ufbxi_Shape) {
+				ufbxi_check(ufbxi_read_shape(uc, node, &info));
+			} else if (sub_type == ufbxi_NurbsCurve) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_curve), UFBX_ELEMENT_NURBS_CURVE));
+			} else if (sub_type == ufbxi_Nurbs) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_surface), UFBX_ELEMENT_NURBS_SURFACE));
+			} else if (sub_type == ufbxi_NurbsSurface) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_surface), UFBX_ELEMENT_NURBS_SURFACE));
+			} else if (sub_type == ufbxi_TrimNurbsSurface) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_trim_surface), UFBX_ELEMENT_NURBS_TRIM_SURFACE));
+			} else if (sub_type == ufbxi_Boundary) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_trim_boundary), UFBX_ELEMENT_NURBS_TRIM_BOUNDARY));
+			} else {
+				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str));
+			}
+		} else if (name == ufbxi_Deformer) {
+			if (sub_type == ufbxi_Cluster) {
+				ufbxi_check(ufbxi_read_skin_cluster(uc, node, &info));
+			} else if (sub_type == ufbxi_Skin) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_skin_deformer), UFBX_ELEMENT_SKIN_DEFORMER));
+			} else if (sub_type == ufbxi_BlendShape) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_blend_deformer), UFBX_ELEMENT_BLEND_DEFORMER));
+			} else if (sub_type == ufbxi_BlendShapeChannel) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_blend_channel), UFBX_ELEMENT_BLEND_CHANNEL));
+			} else {
+				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str));
+			}
 		} else if (name == ufbxi_Material) {
 			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_material), UFBX_ELEMENT_MATERIAL));
 		} else if (name == ufbxi_AnimationStack) {
@@ -5568,13 +5642,15 @@ static ufbx_element *ufbxi_find_element_by_fbx_id(ufbxi_context *uc, uint64_t fb
 
 ufbxi_forceinline static bool ufbxi_cmp_name_element_less(const ufbx_name_element *a, const ufbx_name_element *b)
 {
+	if (a->internal_key != b->internal_key) return a->internal_key < b->internal_key;
 	int cmp = strcmp(a->name.data, b->name.data);
 	if (cmp != 0) return cmp < 0;
 	return a->type < b->type;
 }
 
-ufbxi_forceinline static bool ufbxi_cmp_name_element_less_ref(const ufbx_name_element *a, ufbx_string name, ufbx_element_type type)
+ufbxi_forceinline static bool ufbxi_cmp_name_element_less_ref(const ufbx_name_element *a, ufbx_string name, ufbx_element_type type, uint32_t key)
 {
+	if (a->internal_key != key) return a->internal_key < key;
 	int cmp = ufbxi_str_cmp(a->name, name);
 	if (cmp != 0) return cmp < 0;
 	return a->type < type;
@@ -6047,14 +6123,19 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	// Create named elements
 	uc->scene.elements_by_name.count = num_elements;
 	uc->scene.elements_by_name.data = ufbxi_push(&uc->result, ufbx_name_element, num_elements);
+	ufbxi_check(uc->scene.elements_by_name.data);
+
 	for (size_t i = 0; i < num_elements; i++) {
 		ufbx_element *elem = uc->scene.elements.data[i];
 		ufbx_name_element *name_elem = &uc->scene.elements_by_name.data[i];
 
 		name_elem->name = elem->name;
 		name_elem->type = elem->type;
+		name_elem->internal_key = ufbxi_get_name_key(elem->name.data, elem->name.length);
 		name_elem->element = elem;
 	}
+
+	ufbxi_check(ufbxi_sort_name_elements(uc, uc->scene.elements_by_name.data, num_elements));
 
 	// Setup node children arrays and attribute pointers/lists
 	ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
@@ -10768,11 +10849,13 @@ ufbx_element *ufbx_find_element_len(ufbx_scene *scene, ufbx_element_type type, c
 {
 	if (!scene) return NULL;
 	ufbx_string name_str = { name, name_len };
+	uint32_t key = ufbxi_get_name_key(name, name_len);
 
 	size_t index = SIZE_MAX;
 	ufbxi_macro_lower_bound_eq(ufbx_name_element, 16, &index, scene->elements_by_name.data, 0, scene->elements_by_name.count,
-		( ufbxi_cmp_name_element_less_ref(a, name_str, type) ), ( ufbxi_str_equal(a->name, name_str) && a->type == type ));
-	return index < SIZE_MAX ? scene->elements.data[index] : NULL;
+		( ufbxi_cmp_name_element_less_ref(a, name_str, type, key) ), ( ufbxi_str_equal(a->name, name_str) && a->type == type ));
+
+	return index < SIZE_MAX ? scene->elements_by_name.data[index].element : NULL;
 }
 
 ufbx_node *ufbx_find_node_len(ufbx_scene *scene, const char *name, size_t name_len)

@@ -58,3 +58,54 @@ UFBXT_TEST(error_format_short)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(maya_node_attribute_zoo)
+#if UFBXT_IMPL
+{
+	ufbx_node *node;
+
+	node = ufbx_find_node(scene, "Null");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_EMPTY);
+	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_EMPTY);
+
+	node = ufbx_find_node(scene, "Mesh");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_MESH);
+	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_MESH);
+	ufbxt_assert(&node->mesh->element == node->attrib);
+
+	node = ufbx_find_node(scene, "Bone");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_BONE);
+	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_BONE);
+	ufbxt_assert(&node->bone->element == node->attrib);
+
+	node = ufbx_find_node(scene, "Camera");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_CAMERA);
+	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_CAMERA);
+	ufbxt_assert(&node->camera->element == node->attrib);
+
+	node = ufbx_find_node(scene, "Light");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_LIGHT);
+	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_LIGHT);
+	ufbxt_assert(&node->light->element == node->attrib);
+
+	node = ufbx_find_node(scene, "StereoCamera");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_CAMERA_STEREO);
+	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_CAMERA_STEREO);
+
+	node = ufbx_find_node(scene, "NurbsCurve");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_NURBS_CURVE);
+	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_NURBS_CURVE);
+
+	node = ufbx_find_node(scene, "NurbsSurface");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_NURBS_SURFACE);
+	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_NURBS_SURFACE);
+
+	node = ufbx_find_node(scene, "NurbsTrim");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_NURBS_TRIM_SURFACE);
+	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_NURBS_TRIM_SURFACE);
+
+	node = ufbx_find_node(scene, "LodGroup");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_LOD_GROUP);
+	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_LOD_GROUP);
+}
+#endif
