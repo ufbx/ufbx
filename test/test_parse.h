@@ -91,6 +91,9 @@ UFBXT_FILE_TEST(maya_node_attribute_zoo)
 	node = ufbx_find_node(scene, "StereoCamera");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_CAMERA_STEREO);
 	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_CAMERA_STEREO);
+	ufbx_camera_stereo *stereo = (ufbx_camera_stereo*)node->attrib;
+	ufbxt_assert(stereo->left && stereo->left->element.type == UFBX_ELEMENT_CAMERA);
+	ufbxt_assert(stereo->right && stereo->right->element.type == UFBX_ELEMENT_CAMERA);
 
 	node = ufbx_find_node(scene, "NurbsCurve");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_NURBS_CURVE);

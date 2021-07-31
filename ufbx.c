@@ -1962,6 +1962,9 @@ static const char ufbxi_NurbsSurface[] = "NurbsSurface";
 static const char ufbxi_TrimNurbsSurface[] = "TrimNurbsSurface";
 static const char ufbxi_Boundary[] = "Boundary";
 static const char ufbxi_LodGroup[] = "LodGroup";
+static const char ufbxi_NodeAttributeName[] = "NodeAttributeName";
+static const char ufbxi_LeftCamera[] = "LeftCamera";
+static const char ufbxi_RightCamera[] = "RightCamera";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, sizeof(ufbxi_AllSame) - 1 },
@@ -2125,6 +2128,9 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_TrimNurbsSurface, sizeof(ufbxi_TrimNurbsSurface) - 1 },
 	{ ufbxi_Boundary, sizeof(ufbxi_Boundary) - 1 },
 	{ ufbxi_LodGroup, sizeof(ufbxi_LodGroup) - 1 },
+	{ ufbxi_NodeAttributeName, sizeof(ufbxi_NodeAttributeName) - 1 },
+	{ ufbxi_LeftCamera, sizeof(ufbxi_LeftCamera) - 1 },
+	{ ufbxi_RightCamera, sizeof(ufbxi_RightCamera) - 1 },
 };
 
 // -- Type definitions
@@ -4444,7 +4450,7 @@ ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_str
 		}
 	} else {
 		*type = type_and_name;
-		name->data = NULL;
+		name->data = ufbxi_empty_char;
 		name->length = 0;
 	}
 
@@ -5367,6 +5373,19 @@ ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_context *uc, ufb
 	// the ID value by one can never cross to the next string...
 	attrib_info.fbx_id = info->fbx_id + 1;
 
+	// Use type and name from NodeAttributeName if it exists
+	ufbx_string type_and_name;
+	if (ufbxi_find_val1(node, ufbxi_NodeAttributeName, "s", &type_and_name)) {
+		ufbx_string type_str, name_str;
+		ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type_str, &name_str));
+		if (name_str.length > 0) {
+			attrib_info.name = name_str;
+			if (info->fbx_id != (uintptr_t)type_and_name.data) {
+				attrib_info.fbx_id = (uintptr_t)type_and_name.data;
+			}
+		}
+	}
+
 	// TODO: Filter node properties?
 
 	if (sub_type == ufbxi_Mesh) {
@@ -6288,6 +6307,13 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 				}
 			}
 		}
+	}
+
+	ufbxi_for_ptr_list(ufbx_camera_stereo, p_stereo, uc->scene.camera_stereos) {
+		ufbx_camera_stereo *stereo = *p_stereo;
+
+		stereo->left = (ufbx_camera*)ufbxi_fetch_dst_element(uc, &stereo->element, ufbxi_LeftCamera, UFBX_ELEMENT_CAMERA);
+		stereo->right = (ufbx_camera*)ufbxi_fetch_dst_element(uc, &stereo->element, ufbxi_RightCamera, UFBX_ELEMENT_CAMERA);
 	}
 
 	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {

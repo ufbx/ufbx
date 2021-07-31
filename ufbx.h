@@ -597,6 +597,9 @@ struct ufbx_procedural_geometry {
 
 struct ufbx_camera_stereo {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_camera *left;
+	ufbx_camera *right;
 };
 
 struct ufbx_camera_switcher {
