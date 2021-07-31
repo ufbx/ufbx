@@ -4341,7 +4341,7 @@ ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc)
 
 		if (object->name != ufbxi_ObjectType) continue;
 
-		ufbxi_template *tmpl = ufbxi_push(&uc->tmp_stack, ufbxi_template, 1);
+		ufbxi_template *tmpl = ufbxi_push_zero(&uc->tmp_stack, ufbxi_template, 1);
 		uc->num_templates++;
 		ufbxi_check(tmpl);
 		ufbxi_check(ufbxi_get_val1(object, "C", (char**)&tmpl->type));
@@ -4372,6 +4372,7 @@ ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc)
 
 ufbxi_nodiscard static ufbx_props *ufbxi_find_template(ufbxi_context *uc, const char *name, const char *sub_type)
 {
+	// TODO: Binary search
 	ufbxi_for(ufbxi_template, tmpl, uc->templates, uc->num_templates) {
 		if (tmpl->type == name) {
 
