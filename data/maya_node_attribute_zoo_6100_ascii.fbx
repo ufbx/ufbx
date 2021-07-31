@@ -15,10 +15,10 @@ FBXHeaderExtension:  {
 		Year: 2021
 		Month: 7
 		Day: 31
-		Hour: 16
-		Minute: 53
-		Second: 16
-		Millisecond: 774
+		Hour: 23
+		Minute: 13
+		Second: 49
+		Millisecond: 139
 	}
 	Creator: "FBX SDK/FBX Plugins version 2020.1"
 }
@@ -772,7 +772,7 @@ Objects:  {
 			Property: "FieldOfView", "FieldOfView", "AN",25.1149997711182
 			Property: "FieldOfViewX", "FieldOfViewX", "AN",40
 			Property: "FieldOfViewY", "FieldOfViewY", "AN",40
-			Property: "FocalLength", "Number", "AN",35
+			Property: "FocalLength", "Number", "A+N",35.6990219446043
 			Property: "CameraFormat", "enum", "N",0
 			Property: "UseFrameColor", "bool", "N",0
 			Property: "FrameColor", "ColorRGB", "N",0.3,0.3,0.3
@@ -2027,7 +2027,7 @@ Objects:  {
 			Property: "AspectWidth", "double", "",960
 			Property: "AspectHeight", "double", "",540
 			Property: "PixelAspectRatio", "double", "",1
-			Property: "FilmOffsetX", "Number", "A+",0.00281818746589124
+			Property: "FilmOffsetX", "Number", "A+",0.00287447241134942
 			Property: "FilmOffsetY", "Number", "A",0
 			Property: "FilmWidth", "Number", "A+",1.41732
 			Property: "FilmHeight", "Number", "A+",0.94488
@@ -2046,7 +2046,7 @@ Objects:  {
 			Property: "FieldOfView", "FieldOfView", "A",25.1149997711182
 			Property: "FieldOfViewX", "FieldOfViewX", "A",40
 			Property: "FieldOfViewY", "FieldOfViewY", "A",40
-			Property: "FocalLength", "Number", "A+",35
+			Property: "FocalLength", "Number", "A+",35.6990219446043
 			Property: "CameraFormat", "enum", "",0
 			Property: "UseFrameColor", "bool", "",0
 			Property: "FrameColor", "ColorRGB", "",0.3,0.3,0.3
@@ -2138,7 +2138,7 @@ Objects:  {
 			Property: "AspectWidth", "double", "",960
 			Property: "AspectHeight", "double", "",540
 			Property: "PixelAspectRatio", "double", "",1
-			Property: "FilmOffsetX", "Number", "A+",-0.00281818746589124
+			Property: "FilmOffsetX", "Number", "A+",-0.00287447241134942
 			Property: "FilmOffsetY", "Number", "A",0
 			Property: "FilmWidth", "Number", "A+",1.41732
 			Property: "FilmHeight", "Number", "A+",0.94488
@@ -2157,7 +2157,7 @@ Objects:  {
 			Property: "FieldOfView", "FieldOfView", "A",25.1149997711182
 			Property: "FieldOfViewX", "FieldOfViewX", "A",40
 			Property: "FieldOfViewY", "FieldOfViewY", "A",40
-			Property: "FocalLength", "Number", "A+",35
+			Property: "FocalLength", "Number", "A+",35.6990219446043
 			Property: "CameraFormat", "enum", "",0
 			Property: "UseFrameColor", "bool", "",0
 			Property: "FrameColor", "ColorRGB", "",0.3,0.3,0.3
@@ -2573,13 +2573,13 @@ Objects:  {
 			Property: "Original|ApplicationVendor", "KString", "", "Autodesk"
 			Property: "Original|ApplicationName", "KString", "", "Maya"
 			Property: "Original|ApplicationVersion", "KString", "", "2022"
-			Property: "Original|DateTime_GMT", "DateTime", "", "31/07/2021 13:53:16.765"
+			Property: "Original|DateTime_GMT", "DateTime", "", "31/07/2021 20:13:49.138"
 			Property: "Original|FileName", "KString", "", "D:\Dev\clean\ufbx\data\maya_node_attribute_zoo_6100_ascii.fbx"
 			Property: "LastSaved", "Compound", ""
 			Property: "LastSaved|ApplicationVendor", "KString", "", "Autodesk"
 			Property: "LastSaved|ApplicationName", "KString", "", "Maya"
 			Property: "LastSaved|ApplicationVersion", "KString", "", "2022"
-			Property: "LastSaved|DateTime_GMT", "DateTime", "", "31/07/2021 13:53:16.765"
+			Property: "LastSaved|DateTime_GMT", "DateTime", "", "31/07/2021 20:13:49.138"
 			Property: "Original|ApplicationActiveProject", "KString", "", "D:\Dev\clean\ufbx\data"
 			Property: "Original|ApplicationNativeFile", "KString", "", "W:\Temp\ufbx_test_source\attribute_zoo.mb"
 		}
@@ -2703,6 +2703,16 @@ Takes:  {
 		
 		;Models animation
 		;----------------------------------------------------
+		Model: "Model::StereoCamera" {
+			Version: 1.1
+			Channel: "FocalLength" {
+				Default: 35.6990203857422
+				KeyVer: 4005
+				KeyCount: 2
+				Key: 1924423250,35,U,s,0,0,n,46186158000,50,U,s,0,0,n
+				Color: 1,1,1
+			}
+		}
 		
 		;Generic nodes animation
 		;----------------------------------------------------

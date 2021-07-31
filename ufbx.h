@@ -173,6 +173,7 @@ typedef enum ufbx_prop_flags {
 	UFBX_PROP_FLAG_SYNTHETIC = 0x1000,
 	UFBX_PROP_FLAG_ANIMATED = 0x2000,
 	UFBX_PROP_FLAG_NOT_FOUND = 0x4000,
+	UFBX_PROP_FLAG_CONNECTED = 0x8000,
 } ufbx_prop_flags;
 
 // Single property with name/type/value.
@@ -690,6 +691,7 @@ UFBX_LIST_TYPE(ufbx_anim_layer_desc_list, ufbx_anim_layer_desc);
 
 typedef struct ufbx_anim {
 	ufbx_anim_layer_desc_list layers;
+	bool ignore_connections;
 } ufbx_anim;
 
 struct ufbx_anim_stack {
@@ -837,7 +839,7 @@ struct ufbx_scene {
 	ufbx_node *root_node;
 
 	// Default animation descriptor
-	ufbx_anim default_anim;
+	ufbx_anim anim;
 
 	union {
 		struct {
@@ -1087,6 +1089,10 @@ ufbx_vec2 ufbx_evaluate_anim_value_vec2(const ufbx_anim_value *anim_value, doubl
 ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, double time);
 
 ufbx_prop ufbx_evaluate_prop_len(ufbx_anim anim, ufbx_element *element, const char *name, size_t name_len, double time);
+ufbx_inline ufbx_prop ufbx_evaluate_prop(ufbx_anim anim, ufbx_element *element, const char *name, double time) {
+	return ufbx_evaluate_prop_len(anim, element, name, strlen(name), time);
+}
+
 ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
 
 // Math

@@ -5800,27 +5800,43 @@ ufbxi_nodiscard static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
 		// TODO: It seems we're invalidating a lot of properties here actually, maybe they
 		// should be initially pushed to `tmp` instead of result if this happens so much..
 		{
-			ufbx_connection *conn = conn_dst;
 			ufbx_prop *prop = elem->props.props, *prop_end = prop + elem->props.num_props;
 			ufbx_prop *copy_start = prop;
 			bool needs_copy = false;
 			size_t num_animated = 0, num_synthetic = 0;
-			while (conn != dst_end && conn->dst_prop.length == 0) conn++;
 
-			while (conn != dst_end) {
-				// We are only interested in ufbx_anim_value connections
-				if (conn->src->type != UFBX_ELEMENT_ANIM_VALUE && conn->src_prop.length == 0) {
-					conn++;
-					continue;
+			for (;;) {
+				// Scan to the next animation connection
+				for (; conn_dst < dst_end; conn_dst++) {
+					if (conn_dst->dst_prop.length == 0) continue;
+					if (conn_dst->src_prop.length > 0) break;
+					if (conn_dst->src->type == UFBX_ELEMENT_ANIM_VALUE) break;
 				}
+
+				ufbx_string name = ufbx_empty_string;
+				if (conn_dst < dst_end) {
+					name = conn_dst->dst_prop;
+				}
+				if (name.length == 0) break;
+
+				// NOTE: "Animated" properties also include connected ones as we need
+				// to resolve them during evaluation
 				num_animated++;
 
-				ufbx_string name = conn->dst_prop;
+				uint32_t flags = 0;
+				for (; conn_dst->dst_prop.data == name.data; conn_dst++) {
+					if (conn_dst->src_prop.length > 0) {
+						flags |= UFBX_PROP_FLAG_CONNECTED;
+					} else if (conn_dst->src->type == UFBX_ELEMENT_ANIM_VALUE) {
+						flags |= UFBX_PROP_FLAG_ANIMATED;
+					}
+				}
+
 				uint32_t key = ufbxi_get_name_key(name.data, name.length);
 				while (prop != prop_end && ufbxi_name_key_less(prop, name.data, name.length, key)) prop++;
 
 				if (prop != prop_end && prop->name.data == name.data) {
-					prop->flags |= UFBX_PROP_FLAG_ANIMATED;
+					prop->flags |= flags;
 				} else {
 					// Animated property that is not in the element property list
 					// Copy the preceeding properties to the stack, then push a
@@ -5838,14 +5854,11 @@ ufbxi_nodiscard static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
 					ufbx_prop *new_prop = ufbxi_push_zero(&uc->tmp_stack, ufbx_prop, 1);
 					ufbxi_check(new_prop);
 					if (def_prop) *new_prop = *def_prop;
-					new_prop->flags |= UFBX_PROP_FLAG_ANIMATABLE | UFBX_PROP_FLAG_SYNTHETIC | UFBX_PROP_FLAG_ANIMATED;
+					new_prop->flags |= UFBX_PROP_FLAG_ANIMATABLE | UFBX_PROP_FLAG_SYNTHETIC | flags;
 					new_prop->name = name;
 					new_prop->internal_key = key;
 					num_synthetic++;
 				}
-
-				// Skip over until we reach the next property connection
-				while (conn != dst_end && conn->dst_prop.data == name.data) conn++;
 			}
 
 			// Copy the properties if necessary
@@ -6004,6 +6017,27 @@ ufbxi_nodiscard static ufbx_element *ufbxi_fetch_dst_element(ufbxi_context *uc, 
 		}
 	}
 	return NULL;
+}
+
+static ufbxi_forceinline bool ufbxi_prop_connection_less(const ufbx_connection *a, const char *prop)
+{
+	int cmp = strcmp(a->dst_prop.data, prop);
+	if (cmp != 0) return cmp < 0;
+	return a->src_prop.length == 0;
+}
+
+ufbxi_nodiscard static ufbx_connection *ufbxi_find_prop_connection(ufbx_element *element, const char *prop)
+{
+	if (!prop) prop = ufbxi_empty_char;
+
+	size_t index = SIZE_MAX;
+
+	ufbxi_macro_lower_bound_eq(ufbx_connection, 32, &index,
+		element->connections_dst.data, 0, element->connections_dst.count,
+		(ufbxi_prop_connection_less(a, prop)),
+		(a->dst_prop.data == prop && a->src_prop.length > 0));
+
+	return index < SIZE_MAX ? &element->connections_dst.data[index] : NULL;
 }
 
 ufbxi_forceinline static void ufbxi_patch_index_pointer(ufbxi_context *uc, int32_t **p_index)
@@ -6318,6 +6352,16 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
 		ufbx_anim_stack *stack = *p_stack;
 		ufbxi_check(ufbxi_fetch_dst_elements(uc, &stack->layers, &stack->element, NULL, UFBX_ELEMENT_ANIM_LAYER));
+
+		stack->anim.layers.count = stack->layers.count;
+		stack->anim.layers.data = ufbxi_push_zero(&uc->result, ufbx_anim_layer_desc, stack->layers.count);
+		ufbxi_check(stack->anim.layers.data);
+
+		for (size_t i = 0; i < stack->layers.count; i++) {
+			ufbx_anim_layer_desc *desc = &stack->anim.layers.data[i];
+			desc->layer = stack->layers.data[i];
+			desc->weight = 1.0f;
+		}
 	}
 
 	ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, uc->scene.anim_layers) {
@@ -6414,6 +6458,10 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 				value->curves[index] = curve;
 			}
 		}
+	}
+
+	if (uc->scene.anim_stacks.count > 0) {
+		uc->scene.anim = uc->scene.anim_stacks.data[0]->anim;
 	}
 
 	return 1;
@@ -11026,7 +11074,22 @@ ufbx_prop ufbx_evaluate_prop_len(ufbx_anim anim, ufbx_element *element, const ch
 		result.flags = UFBX_PROP_FLAG_NOT_FOUND;
 	}
 
-	if ((result.flags & UFBX_PROP_FLAG_ANIMATED) == 0) return result;
+	if ((result.flags & (UFBX_PROP_FLAG_ANIMATED|UFBX_PROP_FLAG_CONNECTED)) == 0) return result;
+
+	if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim.ignore_connections) {
+		ufbx_connection *conn = ufbxi_find_prop_connection(element, prop->name.data);
+
+		for (size_t i = 0; i < 1000 && conn; i++) {
+			ufbx_connection *next_conn = ufbxi_find_prop_connection(conn->src, conn->src_prop.data);
+			if (!next_conn) break;
+			conn = next_conn;
+		}
+
+		ufbx_prop ep = ufbx_evaluate_prop_len(anim, conn->src, conn->src_prop.data, conn->src_prop.length, time);
+		result.value_vec3 = ep.value_vec3;
+		result.value_int = (int64_t)result.value_real;
+		return result;
+	}
 
 	ufbxi_anim_layer_combine_ctx combine_ctx = { anim, element, time };
 
@@ -11048,11 +11111,14 @@ ufbx_prop ufbx_evaluate_prop_len(ufbx_anim anim, ufbx_element *element, const ch
 		ufbx_anim_prop *eap = ufbxi_find_anim_prop(layer, element, prop->name.data);
 		if (!eap) continue;
 
+		// TODO: Should we skip the blending for the first layer _per property_
+		// This could be done by having `UFBX_PROP_FLAG_ANIMATION_EVALUATED`
+		// that gets set for the first layer of animation that is applied.
 		ufbx_vec3 v = ufbx_evaluate_anim_value_vec3(eap->anim_value, time);
 		if (layer_desc == anim.layers.data) {
-			prop->value_vec3 = v;
+			result.value_vec3 = v;
 		} else {
-			ufbxi_combine_anim_layer(&combine_ctx, layer, weight, prop->name.data, &prop->value_vec3, &v);
+			ufbxi_combine_anim_layer(&combine_ctx, layer, weight, prop->name.data, &result.value_vec3, &v);
 		}
 	}
 
@@ -11068,9 +11134,24 @@ ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double tim
 
 	size_t num_anim = 0;
 	ufbxi_for(ufbx_prop, prop, element->props.props, element->props.num_props) {
-		if (!(prop->flags & UFBX_PROP_FLAG_ANIMATED)) continue;
+		if (!(prop->flags & (UFBX_PROP_FLAG_ANIMATED|UFBX_PROP_FLAG_CONNECTED))) continue;
 		if (num_anim >= buffer_size) break;
-		buffer[num_anim++] = *prop;
+
+		ufbx_prop *dst = &buffer[num_anim++];
+		*dst = *prop;
+
+		if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim.ignore_connections) {
+			ufbx_connection *conn = ufbxi_find_prop_connection(element, prop->name.data);
+
+			for (size_t i = 0; i < 1000 && conn; i++) {
+				ufbx_connection *next_conn = ufbxi_find_prop_connection(conn->src, conn->src_prop.data);
+				if (!next_conn) break;
+				conn = next_conn;
+			}
+
+			ufbx_prop ep = ufbx_evaluate_prop_len(anim, conn->src, conn->src_prop.data, conn->src_prop.length, time);
+			dst->value_vec3 = ep.value_vec3;
+		}
 	}
 
 	ufbxi_anim_layer_combine_ctx combine_ctx = { anim, element, time };
@@ -11097,12 +11178,18 @@ ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double tim
 		for (size_t i = 0; i < num_anim; i++) {
 			ufbx_prop *prop = &buffer[i];
 
+			// Connections override animation by default
+			if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim.ignore_connections) continue;
+
 			// Skip until we reach `aprop >= prop`
 			while (aprop->element == element && aprop->internal_key < prop->internal_key) aprop++;
 			if (aprop->prop_name.data != prop->name.data) {
 				while (aprop->element == element && strcmp(aprop->prop_name.data, prop->name.data) < 0) aprop++;
 			}
 
+			// TODO: Should we skip the blending for the first layer _per property_
+			// This could be done by having `UFBX_PROP_FLAG_ANIMATION_EVALUATED`
+			// that gets set for the first layer of animation that is applied.
 			if (aprop->prop_name.data == prop->name.data) {
 				ufbx_vec3 v = ufbx_evaluate_anim_value_vec3(aprop->anim_value, time);
 				if (layer_desc == anim.layers.data) {
