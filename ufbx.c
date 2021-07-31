@@ -6311,7 +6311,6 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 
 	ufbxi_for_ptr_list(ufbx_camera_stereo, p_stereo, uc->scene.camera_stereos) {
 		ufbx_camera_stereo *stereo = *p_stereo;
-
 		stereo->left = (ufbx_camera*)ufbxi_fetch_dst_element(uc, &stereo->element, ufbxi_LeftCamera, UFBX_ELEMENT_CAMERA);
 		stereo->right = (ufbx_camera*)ufbxi_fetch_dst_element(uc, &stereo->element, ufbxi_RightCamera, UFBX_ELEMENT_CAMERA);
 	}
