@@ -25,6 +25,30 @@ UFBXT_FILE_TEST(maya_textured_cube)
 }
 #endif
 
+UFBXT_FILE_TEST(maya_shared_textures)
+#if UFBXT_IMPL
+{
+	ufbx_material *material;
+
+	material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Shared");
+	ufbxt_assert(material);
+	ufbxt_assert(material->textures.count == 6);
+
+	ufbxt_assert(!strcmp(material->diffuse.color_texture->relative_filename.data, "textures\\checkerboard_ambient.png")); // sic: test has wrong texture
+	ufbxt_assert(!strcmp(material->diffuse.factor_texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
+	ufbxt_assert(!strcmp(material->emission.color_texture->relative_filename.data, "textures\\checkerboard_emissive.png"));
+	ufbxt_assert(!strcmp(material->ambient.color_texture->relative_filename.data, "textures\\checkerboard_ambient.png"));
+	ufbxt_assert(!strcmp(material->transparency.color_texture->relative_filename.data, "textures\\checkerboard_transparency.png"));
+	ufbxt_assert(!strcmp(material->bump.color_texture->relative_filename.data, "textures\\checkerboard_bump.png"));
+
+	material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Special");
+	ufbxt_assert(material);
+	ufbxt_assert(material->textures.count == 1);
+
+	ufbxt_assert(!strcmp(material->diffuse.color_texture->relative_filename.data, "textures\\tiny_clouds.png"));
+}
+#endif
+
 UFBXT_FILE_TEST(maya_arnold_textures)
 #if UFBXT_IMPL
 {

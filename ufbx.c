@@ -1979,6 +1979,7 @@ static const char ufbxi_FileName[] = "FileName";
 static const char ufbxi_Filename[] = "Filename";
 static const char ufbxi_RelativeFileName[] = "RelativeFileName";
 static const char ufbxi_RelativeFilename[] = "RelativeFilename";
+static const char ufbxi_TextureId[] = "TextureId";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, sizeof(ufbxi_AllSame) - 1 },
@@ -2157,6 +2158,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Filename, sizeof(ufbxi_Filename) - 1 },
 	{ ufbxi_RelativeFileName, sizeof(ufbxi_RelativeFileName) - 1 },
 	{ ufbxi_RelativeFilename, sizeof(ufbxi_RelativeFilename) - 1 },
+	{ ufbxi_TextureId, sizeof(ufbxi_TextureId) - 1 },
 };
 
 // -- Type definitions
@@ -2287,6 +2289,24 @@ typedef struct {
 } ufbxi_material_map_prop;
 
 typedef struct {
+	ufbx_string prop_name;
+	int32_t *face_texture;
+	size_t num_faces;
+	bool all_same;
+} ufbxi_tmp_mesh_texture;
+
+typedef struct {
+	ufbxi_tmp_mesh_texture *data;
+	size_t count;
+} ufbxi_tmp_mesh_texture_list;
+
+typedef struct {
+	int32_t material_id;
+	int32_t texture_id;
+	ufbx_string prop_name;
+} ufbxi_tmp_material_texture;
+
+typedef struct {
 
 	uint32_t version;
 	bool from_ascii;
@@ -2337,6 +2357,8 @@ typedef struct {
 	ufbxi_buf tmp_elements;
 	ufbxi_buf tmp_element_offsets;
 	ufbxi_buf tmp_typed_element_offsets[UFBX_NUM_ELEMENT_TYPES];
+	ufbxi_buf tmp_mesh_textures;
+	ufbxi_buf tmp_mesh_texture_lists;
 	size_t tmp_element_byte_offset;
 
 	ufbxi_template *templates;
@@ -2765,6 +2787,7 @@ typedef enum {
 	UFBXI_PARSE_LAYER_ELEMENT_EDGE_CREASE,
 	UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING,
 	UFBXI_PARSE_LAYER_ELEMENT_MATERIAL,
+	UFBXI_PARSE_LAYER_ELEMENT_OTHER,
 	UFBXI_PARSE_SHAPE,
 	UFBXI_PARSE_TAKE,
 	UFBXI_PARSE_TAKE_OBJECT,
@@ -2813,6 +2836,7 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 		if (name == ufbxi_LayerElementEdgeCrease) return UFBXI_PARSE_LAYER_ELEMENT_EDGE_CREASE;
 		if (name == ufbxi_LayerElementSmoothing) return UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING;
 		if (name == ufbxi_LayerElementMaterial) return UFBXI_PARSE_LAYER_ELEMENT_MATERIAL;
+		if (!strncmp(name, "LayerElement", 12)) return UFBXI_PARSE_LAYER_ELEMENT_OTHER;
 		if (name == ufbxi_Shape) return UFBXI_PARSE_SHAPE;
 		break;
 
@@ -2990,6 +3014,14 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 		if (name == ufbxi_Materials && !uc->opts.ignore_geometry) {
 			info->type = 'i';
 			info->result = true;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_LAYER_ELEMENT_OTHER:
+		if (name == ufbxi_TextureId && !uc->opts.ignore_geometry) {
+			info->type = 'i';
+			info->tmp_buf = true;
 			return true;
 		}
 		break;
@@ -5044,6 +5076,8 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 		if (n->name == ufbxi_LayerElementTangent) num_tangents++;
 	}
 
+	size_t num_textures = 0;
+
 	ufbxi_buf_state stack_state = ufbxi_buf_push_state(&uc->tmp_stack);
 
 	ufbxi_tangent_layer *bitangents = ufbxi_push(&uc->tmp_stack, ufbxi_tangent_layer, num_bitangents);
@@ -5136,6 +5170,39 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 					}
 				}
 			}
+		} else if (!strncmp(n->name, "LayerElement", 12)) {
+			// What?! 6x00 stores textures in mesh geometry, eg. "LayerElementTexture",
+			// "LayerElementDiffuseFactorTextures", "LayerElementEmissive_Textures"...
+			ufbx_string prop_name = ufbx_empty_string;
+			if (n->name_len > 20 && !strcmp(n->name + n->name_len - 8, "Textures")) {
+				prop_name.data = n->name + 12;
+				prop_name.length = n->name_len - 20;
+				if (prop_name.data[prop_name.length - 1] == '_') {
+					prop_name.length -= 1;
+				}
+			} else if (!strcmp(n->name, "LayerElementTexture")) {
+				prop_name.data = "Diffuse";
+				prop_name.length = 7;
+			}
+
+			if (prop_name.length > 0) {
+				ufbxi_check(ufbxi_push_string_place_str(uc, &prop_name));
+				const char *mapping;
+				if (ufbxi_find_val1(n, ufbxi_MappingInformationType, "C", (char**)&mapping)) {
+					ufbxi_value_array *arr = ufbxi_find_array(n, ufbxi_TextureId, 'i');
+
+					ufbxi_tmp_mesh_texture *tex = ufbxi_push(&uc->tmp_mesh_textures, ufbxi_tmp_mesh_texture, 1);
+					ufbxi_check(tex);
+					if (arr) {
+						tex->face_texture = (int32_t*)arr->data;
+						tex->num_faces = arr->size;
+					}
+					tex->prop_name = prop_name;
+					tex->all_same = (mapping == ufbxi_AllSame);
+					num_textures++;
+				}
+			}
+
 		}
 	}
 
@@ -5197,6 +5264,14 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 	ufbxi_check(ufbxi_sort_color_sets(uc, mesh->color_sets.data, mesh->color_sets.count));
 
 	ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
+
+	ufbxi_tmp_mesh_texture_list *tex_list = ufbxi_push_zero(&uc->tmp_mesh_texture_lists, ufbxi_tmp_mesh_texture_list, 1);
+	ufbxi_check(tex_list);
+
+	if (num_textures > 0) {
+		tex_list->count = num_textures;
+		tex_list->data = ufbxi_make_array(&uc->tmp_mesh_textures, ufbxi_tmp_mesh_texture, num_textures);
+	}
 
 	return 1;
 }
@@ -6216,6 +6291,21 @@ ufbxi_nodiscard static int ufbxi_sort_node_ptrs_by_parent(ufbxi_context *uc, ufb
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_cmp_tmp_material_texture_less(const ufbxi_tmp_material_texture *a, const ufbxi_tmp_material_texture *b)
+{
+	if (a->material_id != b->material_id) return a->material_id < b->material_id;
+	if (a->texture_id != b->texture_id) return a->texture_id < b->texture_id;
+	return ufbxi_str_less(a->prop_name, b->prop_name);
+}
+
+ufbxi_nodiscard static int ufbxi_sort_tmp_material_textures(ufbxi_context *uc, ufbxi_tmp_material_texture *mat_texs, size_t count)
+{
+	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbxi_tmp_material_texture)));
+	ufbxi_macro_stable_sort(ufbxi_tmp_material_texture, 32, mat_texs, uc->tmp_arr, count,
+		( ufbxi_cmp_tmp_material_texture_less(a, b) ));
+	return 1;
+}
+
 ufbxi_forceinline static bool ufbxi_cmp_element_less(ufbx_element *a, ufbx_element *b)
 {
 	int name_cmp = strcmp(a->name.data, b->name.data);
@@ -6785,6 +6875,7 @@ static const ufbxi_shader_mapping ufbxi_fbx_shader_mapping[] = {
 	{ UFBX_MATERIAL_MAP_REFLECTION, UFBXI_MAT_COLOR, ufbxi_string_literal("Reflection") },
 	{ UFBX_MATERIAL_MAP_REFLECTION, UFBXI_MAT_FACTOR, ufbxi_string_literal("ReflectionFactor") },
 	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_COLOR, ufbxi_string_literal("TransparentColor") },
+	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_COLOR, ufbxi_string_literal("Transparent") },
 	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_FACTOR, ufbxi_string_literal("TransparentFactor") },
 	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_FACTOR, ufbxi_string_literal("TransparencyFactor") },
 	{ UFBX_MATERIAL_MAP_EMISSION, UFBXI_MAT_COLOR, ufbxi_string_literal("EmissiveColor") },
@@ -7047,10 +7138,16 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 				mesh->vertex_color = mesh->color_sets.data[0].vertex_color;
 			}
 
-			// TODO: Truncate material index arrays
 			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->materials, &mesh->element, NULL, UFBX_ELEMENT_MATERIAL));
 
-			// Clamp `face_material` array / remove it if there's no materials
+			// Try to fetch materials from a node if not found in the mesh
+			if (mesh->materials.count == 0) {
+				ufbx_node *node = (ufbx_node*)ufbxi_fetch_src_element(uc, &mesh->element, NULL, UFBX_ELEMENT_NODE);
+				if (node) {
+					ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->materials, &node->element, NULL, UFBX_ELEMENT_MATERIAL));
+				}
+			}
+
 			size_t num_materials = mesh->materials.count;
 			if (num_materials == 0) {
 				mesh->face_material = NULL;
@@ -7199,10 +7296,127 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		material->shader = (ufbx_shader*)ufbxi_fetch_src_element(uc, &material->element, NULL, UFBX_ELEMENT_SHADER);
 
 		ufbxi_check(ufbxi_fetch_textures(uc, &material->textures, &material->element));
-		ufbxi_check(ufbxi_sort_material_textures(uc, material->textures.data, material->textures.count));
+	}
 
+	// Ugh.. Patch the textures from meshes for legacy LayerElement-style textures
+	{
+		ufbxi_tmp_mesh_texture_list *mesh_textures = ufbxi_make_array_all(&uc->tmp_mesh_texture_lists, ufbxi_tmp_mesh_texture_list);
+
+		ufbxi_for_ptr_list(ufbx_mesh, p_mesh, uc->scene.meshes) {
+			ufbx_mesh *mesh = *p_mesh;
+			size_t num_materials = mesh->materials.count;
+
+			if (mesh_textures->count > 0 && num_materials > 0) {
+				// TODO: This leaks currently to result, probably doesn't matter..
+				ufbx_texture_list textures;
+				ufbxi_check(ufbxi_fetch_dst_elements(uc, &textures, &mesh->element, NULL, UFBX_ELEMENT_TEXTURE));
+				if (textures.count == 0) {
+					ufbx_node *node = (ufbx_node*)ufbxi_fetch_src_element(uc, &mesh->element, NULL, UFBX_ELEMENT_NODE);
+					if (node) {
+						ufbxi_check(ufbxi_fetch_dst_elements(uc, &textures, &node->element, NULL, UFBX_ELEMENT_TEXTURE));
+					}
+				}
+
+				size_t num_material_textures = 0;
+				ufbxi_for(ufbxi_tmp_mesh_texture, tex, mesh_textures->data, mesh_textures->count) {
+					if (tex->all_same) {
+						ufbxi_tmp_material_texture *mat_texs = ufbxi_push(&uc->tmp_stack, ufbxi_tmp_material_texture, num_materials);
+						ufbxi_check(mat_texs);
+						num_material_textures += num_materials;
+						int32_t texture_id = tex->num_faces > 0 ? tex->face_texture[0] : 0;
+						if (texture_id < textures.count) {
+							for (size_t i = 0; i < num_materials; i++) {
+								mat_texs[i].material_id = (int32_t)i;
+								mat_texs[i].texture_id = texture_id;
+								mat_texs[i].prop_name = tex->prop_name;
+							}
+						}
+					} else if (mesh->face_material) {
+						size_t num_faces = ufbxi_min_sz(tex->num_faces, mesh->num_faces);
+						int32_t prev_material = -1;
+						int32_t prev_texture = -1;
+						for (size_t i = 0; i < num_faces; i++) {
+							int32_t texture_id = tex->face_texture[i];
+							int32_t material_id = mesh->face_material[i];
+							if (texture_id < 0 || texture_id >= textures.count) continue;
+							if (material_id < 0 || (size_t)material_id >= num_materials) continue;
+							if (material_id == prev_material && texture_id == prev_texture) continue;
+							prev_material = material_id;
+							prev_texture = texture_id;
+
+							ufbxi_tmp_material_texture *mat_tex = ufbxi_push(&uc->tmp_stack, ufbxi_tmp_material_texture, 1);
+							ufbxi_check(mat_tex);
+							mat_tex->material_id = material_id;
+							mat_tex->texture_id = texture_id;
+							mat_tex->prop_name = tex->prop_name;
+							num_material_textures++;
+						}
+					}
+				}
+
+				// Push a sentinel material texture to the end so we don't need to
+				// duplicate the material texture flushing code twice.
+				{
+					ufbxi_tmp_material_texture *mat_tex = ufbxi_push(&uc->tmp_stack, ufbxi_tmp_material_texture, 1);
+					ufbxi_check(mat_tex);
+					mat_tex->material_id = -1;
+					mat_tex->texture_id = -1;
+				}
+
+				ufbxi_tmp_material_texture *mat_texs = ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_tmp_material_texture, num_material_textures + 1);
+				ufbxi_check(mat_texs);
+				ufbxi_check(ufbxi_sort_tmp_material_textures(uc, mat_texs, num_material_textures));
+
+				int32_t prev_material = -1;
+				int32_t prev_texture = -1;
+				const char *prev_prop = NULL;
+				size_t num_textures_in_material = 0;
+				for (size_t i = 0; i < num_material_textures + 1; i++) {
+					ufbxi_tmp_material_texture mat_tex = mat_texs[i];
+					if (mat_tex.material_id != prev_material) {
+						if (prev_material >= 0 && num_textures_in_material > 0) {
+							ufbx_material *mat = mesh->materials.data[prev_material];
+							if (mat->textures.count == 0) {
+								ufbx_material_texture *texs = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_material_texture, num_textures_in_material);
+								ufbxi_check(texs);
+								mat->textures.data = texs;
+								mat->textures.count = num_textures_in_material;
+							} else {
+								ufbxi_pop(&uc->tmp_stack, ufbx_material_texture, num_textures_in_material, NULL);
+							}
+						}
+
+						if (mat_tex.material_id < 0) break;
+						prev_material = mat_tex.material_id;
+						prev_texture = -1;
+						prev_prop = NULL;
+						num_textures_in_material = 0;
+					}
+					if (mat_tex.texture_id == prev_texture && mat_tex.prop_name.data == prev_prop) continue;
+					prev_texture = mat_tex.texture_id;
+					prev_prop = mat_tex.prop_name.data;
+
+					ufbx_material_texture *tex = ufbxi_push(&uc->tmp_stack, ufbx_material_texture, 1);
+					tex->texture = textures.data[prev_texture];
+					tex->prop_name = mat_tex.prop_name;
+					num_textures_in_material++;
+				}
+			}
+		}
+
+		// Not needed anymore!
+		ufbxi_buf_free(&uc->tmp_mesh_textures);
+		ufbxi_buf_free(&uc->tmp_mesh_texture_lists);
+	}
+
+	// Second pass to fetch material maps
+	ufbxi_for_ptr_list(ufbx_material, p_material, uc->scene.materials) {
+		ufbx_material *material = *p_material;
+
+		ufbxi_check(ufbxi_sort_material_textures(uc, material->textures.data, material->textures.count));
 		ufbxi_fetch_maps(material);
 	}
+
 
 	if (uc->scene.anim_stacks.count > 0) {
 		uc->scene.anim = uc->scene.anim_stacks.data[0]->anim;
@@ -10684,6 +10898,8 @@ static void ufbxi_free_temp(ufbxi_context *uc)
 	for (size_t i = 0; i < UFBX_NUM_ELEMENT_TYPES; i++) {
 		ufbxi_buf_free(&uc->tmp_typed_element_offsets[i]);
 	}
+	ufbxi_buf_free(&uc->tmp_mesh_textures);
+	ufbxi_buf_free(&uc->tmp_mesh_texture_lists);
 
 	ufbxi_free(&uc->ator_tmp, ufbxi_node, uc->top_nodes, uc->top_nodes_cap);
 
@@ -10774,6 +10990,8 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	for (size_t i = 0; i < UFBX_NUM_ELEMENT_TYPES; i++) {
 		uc->tmp_typed_element_offsets[i].ator = &uc->ator_tmp;
 	}
+	uc->tmp_mesh_textures.ator = &uc->ator_tmp;
+	uc->tmp_mesh_texture_lists.ator = &uc->ator_tmp;
 
 	uc->result.ator = &uc->ator_result;
 	uc->string_buf.ator = &uc->ator_result;
