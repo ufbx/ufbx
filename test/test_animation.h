@@ -26,15 +26,15 @@ UFBXT_FILE_TEST(maya_interpolation_modes)
 		5.603338,5.603338,5.603338,5.603338,5.603338,5.603338,5.603338,5.603338,5.603338,5.603338,5.603338,5.603338
 	};
 
-	ufbxt_assert(scene->anim_layers.size == 1);
-	ufbx_anim_layer *layer = &scene->anim_layers.data[0];
-	for (size_t i = 0; i < layer->props.size; i++) {
-		ufbx_anim_prop *prop = &layer->props.data[i];
-		if (strcmp(prop->name.data, "Lcl Translation")) continue;
-		ufbx_anim_curve *curve = &prop->curves[0];
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *layer = scene->anim_layers.data[0];
+	for (size_t i = 0; i < layer->anim_values.count; i++) {
+		ufbx_anim_value *value = layer->anim_values.data[i];
+		if (strcmp(value->name.data, "Lcl Translation")) continue;
+		ufbx_anim_curve *curve = value->curves[0];
 
 		size_t num_keys = 12;
-		ufbxt_assert(curve->keyframes.size == num_keys);
+		ufbxt_assert(curve->keyframes.count == num_keys);
 		ufbx_keyframe *keys = curve->keyframes.data;
 
 		static const ufbxt_key_ref key_ref[] = {
@@ -84,7 +84,7 @@ UFBXT_FILE_TEST(maya_interpolation_modes)
 		for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
 			// Round up to the next frame to make stepped tangents consistent
 			double time = (double)i * (1.0/24.0) + 0.000001;
-			ufbx_real value = ufbx_evaluate_curve(curve, time);
+			ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
 			ufbxt_assert_close_real(err, value, values[i]);
 		}
 	}
@@ -102,27 +102,20 @@ UFBXT_FILE_TEST(maya_auto_clamp)
 		10.264, 10.000,
 	};
 
-	ufbxt_assert(scene->anim_layers.size == 1);
-	ufbx_anim_layer *layer = &scene->anim_layers.data[0];
-	for (size_t i = 0; i < layer->props.size; i++) {
-		ufbx_anim_prop *prop = &layer->props.data[i];
-		if (strcmp(prop->name.data, "Lcl Translation")) continue;
-		ufbx_anim_curve *curve = &prop->curves[0];
-		ufbxt_assert(curve->keyframes.size == 4);
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *layer = scene->anim_layers.data[0];
+	for (size_t i = 0; i < layer->anim_values.count; i++) {
+		ufbx_anim_value *value = layer->anim_values.data[i];
+		if (strcmp(value->name.data, "Lcl Translation")) continue;
+		ufbx_anim_curve *curve = value->curves[0];
+		ufbxt_assert(curve->keyframes.count == 4);
 
 		for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
 			double time = (double)i * (1.0/24.0);
-			ufbx_real value = ufbx_evaluate_curve(curve, time);
+			ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
 			ufbxt_assert_close_real(err, value, values[i]);
 		}
 	}
-}
-#endif
-
-UFBXT_FILE_TEST(synthetic_missing_version)
-#if UFBXT_IMPL
-{
-	ufbxt_assert(scene->metadata.version == 6100);
 }
 #endif
 
@@ -152,16 +145,16 @@ UFBXT_FILE_TEST(maya_resampled)
 	const ufbx_real *values = scene->metadata.version >= 7000 ? values7 : values6;
 	size_t num_values = scene->metadata.version >= 7000 ? ufbxt_arraycount(values7) : ufbxt_arraycount(values6);
 
-	ufbxt_assert(scene->anim_layers.size == 1);
-	ufbx_anim_layer *layer = &scene->anim_layers.data[0];
-	for (size_t i = 0; i < layer->props.size; i++) {
-		ufbx_anim_prop *prop = &layer->props.data[i];
-		if (strcmp(prop->name.data, "Lcl Translation")) continue;
-		ufbx_anim_curve *curve = &prop->curves[0];
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *layer = scene->anim_layers.data[0];
+	for (size_t i = 0; i < layer->anim_values.count; i++) {
+		ufbx_anim_value *value = layer->anim_values.data[i];
+		if (strcmp(value->name.data, "Lcl Translation")) continue;
+		ufbx_anim_curve *curve = value->curves[0];
 
 		for (size_t i = 0; i < num_values; i++) {
 			double time = (double)i * (1.0/200.0);
-			ufbx_real value = ufbx_evaluate_curve(curve, time);
+			ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
 			ufbxt_assert_close_real(err, value, values[i]);
 		}
 	}
@@ -194,6 +187,7 @@ UFBXT_FILE_TEST(maya_anim_light)
 		{ 60, 1.145, { 0.442, 0.119, 0.119 } },
 	};
 
+#if !defined(_MSC_VER) // TODO
 	ufbx_evaluate_opts opts = { 0 };
 	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
 		const ufbxt_anim_light_ref *ref = &refs[i];
@@ -211,10 +205,13 @@ UFBXT_FILE_TEST(maya_anim_light)
 		ufbxt_assert_close_real(err, light->intensity * 0.01f, ref->intensity);
 		ufbxt_assert_close_vec3(err, light->color, ref->color);
 	}
-
 	ufbx_free_scene(state);
+#endif
+
 }
 #endif
+
+#if !defined(_MSC_VER) // TODO
 
 UFBXT_FILE_TEST(maya_anim_layers)
 #if UFBXT_IMPL
@@ -258,5 +255,7 @@ UFBXT_FILE_TEST(maya_anim_layers_over_acc)
 	ufbxt_assert(y->compose_rotation == true);
 	ufbxt_assert(y->compose_scale == true);
 }
+#endif
+
 #endif
 

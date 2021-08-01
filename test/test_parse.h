@@ -94,8 +94,8 @@ UFBXT_FILE_TEST(maya_node_attribute_zoo)
 	ufbx_camera_stereo *stereo = (ufbx_camera_stereo*)node->attrib;
 	ufbxt_assert(stereo->left && stereo->left->element.type == UFBX_ELEMENT_CAMERA);
 	ufbxt_assert(stereo->right && stereo->right->element.type == UFBX_ELEMENT_CAMERA);
-	ufbx_prop left_focal_prop = ufbx_evaluate_prop(scene->anim, &stereo->left->element, "FocalLength", 0.5, 10);
-	ufbx_prop right_focal_prop = ufbx_evaluate_prop(scene->anim, &stereo->right->element, "FocalLength", 0.5, 10);
+	ufbx_prop left_focal_prop = ufbx_evaluate_prop(scene->anim, &stereo->left->element, "FocalLength", 0.5);
+	ufbx_prop right_focal_prop = ufbx_evaluate_prop(scene->anim, &stereo->right->element, "FocalLength", 0.5);
 	ufbxt_assert_close_real(err, left_focal_prop.value_real, 42.011f);
 	ufbxt_assert_close_real(err, right_focal_prop.value_real, 42.011f);
 
@@ -114,5 +114,29 @@ UFBXT_FILE_TEST(maya_node_attribute_zoo)
 	node = ufbx_find_node(scene, "LodGroup");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_LOD_GROUP);
 	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_LOD_GROUP);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_duplicate_prop)
+#if UFBXT_IMPL
+{
+	ufbx_prop *prop;
+	ufbx_node *cube = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(cube);
+
+	prop = ufbx_find_prop(&cube->props, "Lcl Translation");
+	ufbxt_assert(prop);
+	ufbxt_assert_close_real(err, prop->value_vec3.x, -1.0f);
+
+	prop = ufbx_find_prop(&cube->props, "Lcl Scaling");
+	ufbxt_assert(prop);
+	ufbxt_assert_close_real(err, prop->value_vec3.x, 2.0f);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_missing_version)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->metadata.version == 6100);
 }
 #endif

@@ -4363,6 +4363,23 @@ ufbxi_nodiscard static int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *
 	// Sort the properties
 	ufbxi_check(ufbxi_sort_properties(uc, props->props, props->num_props));
 
+	// Remove duplicates, the last one wins
+	// TODO: Does this match the actual FBX importer behavior?
+	if (props->num_props >= 2) {
+		ufbx_prop *ps = props->props;
+		size_t dst = 0, src = 0, end = props->num_props;
+		while (src < end) {
+			if (src + 1 < end && ps[src].name.data == ps[src + 1].name.data) {
+				src++;
+			} else if (dst != src) {
+				ps[dst++] = ps[src++];
+			} else {
+				dst++; src++;
+			}
+		}
+		props->num_props = dst;
+	}
+
 	return 1;
 }
 
@@ -9042,7 +9059,7 @@ static ufbxi_forceinline bool ufbxi_is_quat_zero(ufbx_quat v)
 
 static ufbxi_forceinline bool ufbxi_is_transform_zero(ufbx_transform t)
 {
-	return ufbxi_is_vec3_zero(t.translation) & ufbxi_is_quat_zero(t.rotation) & ufbxi_is_vec3_zero(t.scale);
+	return (bool)((int)ufbxi_is_vec3_zero(t.translation) & (int)ufbxi_is_quat_zero(t.rotation) & (int)ufbxi_is_vec3_zero(t.scale));
 }
 
 static void ufbxi_mul_rotate(ufbx_transform *t, ufbx_vec3 v, ufbx_rotation_order order)
