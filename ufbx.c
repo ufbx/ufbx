@@ -167,6 +167,8 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/100 == UFBX_HEADER
 #define ufbxi_for_list(m_type, m_name, m_list) for (m_type *m_name = (m_list).data, *m_name##_end = m_name + (m_list).count; m_name != m_name##_end; m_name++)
 #define ufbxi_for_ptr_list(m_type, m_name, m_list) for (m_type **m_name = (m_list).data, **m_name##_end = m_name + (m_list).count; m_name != m_name##_end; m_name++)
 
+#define ufbxi_string_literal(str) { str, sizeof(str) - 1 }
+
 static ufbxi_forceinline uint32_t ufbxi_min32(uint32_t a, uint32_t b) { return a < b ? a : b; }
 static ufbxi_forceinline uint32_t ufbxi_max32(uint32_t a, uint32_t b) { return a < b ? b : a; }
 static ufbxi_forceinline uint64_t ufbxi_min64(uint64_t a, uint64_t b) { return a < b ? a : b; }
@@ -1806,21 +1808,37 @@ static const char ufbxi_AnimationCurveNode[] = "AnimationCurveNode";
 static const char ufbxi_AnimationCurve[] = "AnimationCurve";
 static const char ufbxi_AnimationLayer[] = "AnimationLayer";
 static const char ufbxi_AnimationStack[] = "AnimationStack";
+static const char ufbxi_ApertureFormat[] = "ApertureFormat";
+static const char ufbxi_ApertureMode[] = "ApertureMode";
+static const char ufbxi_AspectH[] = "AspectH";
+static const char ufbxi_AspectHeight[] = "AspectHeight";
+static const char ufbxi_AspectRatioMode[] = "AspectRatioMode";
+static const char ufbxi_AspectW[] = "AspectW";
+static const char ufbxi_AspectWidth[] = "AspectWidth";
+static const char ufbxi_BaseLayer[] = "BaseLayer";
+static const char ufbxi_BindPose[] = "BindPose";
+static const char ufbxi_BindingTable[] = "BindingTable";
 static const char ufbxi_BinormalIndex[] = "BinormalIndex";
 static const char ufbxi_Binormals[] = "Binormals";
+static const char ufbxi_BlendMode[] = "BlendMode";
 static const char ufbxi_BlendShapeChannel[] = "BlendShapeChannel";
 static const char ufbxi_BlendShape[] = "BlendShape";
+static const char ufbxi_Boundary[] = "Boundary";
 static const char ufbxi_ByEdge[] = "ByEdge";
 static const char ufbxi_ByPolygonVertex[] = "ByPolygonVertex";
 static const char ufbxi_ByPolygon[] = "ByPolygon";
 static const char ufbxi_ByVertex[] = "ByVertex";
 static const char ufbxi_ByVertice[] = "ByVertice";
+static const char ufbxi_CameraStereo[] = "CameraStereo";
+static const char ufbxi_CameraSwitcher[] = "CameraSwitcher";
+static const char ufbxi_Camera[] = "Camera";
 static const char ufbxi_Channel[] = "Channel";
 static const char ufbxi_Cluster[] = "Cluster";
 static const char ufbxi_ColorIndex[] = "ColorIndex";
 static const char ufbxi_Color[] = "Color";
 static const char ufbxi_Colors[] = "Colors";
 static const char ufbxi_Connections[] = "Connections";
+static const char ufbxi_Count[] = "Count";
 static const char ufbxi_Creator[] = "Creator";
 static const char ufbxi_D_X[] = "d|X";
 static const char ufbxi_D_Y[] = "d|Y";
@@ -1834,10 +1852,23 @@ static const char ufbxi_Document[] = "Document";
 static const char ufbxi_Documents[] = "Documents";
 static const char ufbxi_EdgeCrease[] = "EdgeCrease";
 static const char ufbxi_Edges[] = "Edges";
+static const char ufbxi_Entry[] = "Entry";
 static const char ufbxi_FBXHeaderExtension[] = "FBXHeaderExtension";
 static const char ufbxi_FBXVersion[] = "FBXVersion";
+static const char ufbxi_FieldOfViewX[] = "FieldOfViewX";
+static const char ufbxi_FieldOfViewY[] = "FieldOfViewY";
+static const char ufbxi_FieldOfView[] = "FieldOfView";
+static const char ufbxi_FilmHeight[] = "FilmHeight";
+static const char ufbxi_FilmSqueezeRatio[] = "FilmSqueezeRatio";
+static const char ufbxi_FilmWidth[] = "FilmWidth";
+static const char ufbxi_FocalLength[] = "FocalLength";
 static const char ufbxi_FullWeights[] = "FullWeights";
+static const char ufbxi_GateFit[] = "GateFit";
+static const char ufbxi_GeometricRotation[] = "GeometricRotation";
+static const char ufbxi_GeometricScaling[] = "GeometricScaling";
+static const char ufbxi_GeometricTranslation[] = "GeometricTranslation";
 static const char ufbxi_Geometry[] = "Geometry";
+static const char ufbxi_Implementation[] = "Implementation";
 static const char ufbxi_Indexes[] = "Indexes";
 static const char ufbxi_InheritType[] = "InheritType";
 static const char ufbxi_Intensity[] = "Intensity";
@@ -1862,28 +1893,39 @@ static const char ufbxi_Layer[] = "Layer";
 static const char ufbxi_Lcl_Rotation[] = "Lcl Rotation";
 static const char ufbxi_Lcl_Scaling[] = "Lcl Scaling";
 static const char ufbxi_Lcl_Translation[] = "Lcl Translation";
+static const char ufbxi_LeftCamera[] = "LeftCamera";
 static const char ufbxi_Light[] = "Light";
 static const char ufbxi_LimbNode[] = "LimbNode";
 static const char ufbxi_Limb[] = "Limb";
 static const char ufbxi_LocalStart[] = "LocalStart";
 static const char ufbxi_LocalStop[] = "LocalStop";
 static const char ufbxi_LocalTime[] = "LocalTime";
+static const char ufbxi_LodGroup[] = "LodGroup";
 static const char ufbxi_MappingInformationType[] = "MappingInformationType";
 static const char ufbxi_Material[] = "Material";
 static const char ufbxi_Materials[] = "Materials";
+static const char ufbxi_Matrix[] = "Matrix";
 static const char ufbxi_Mesh[] = "Mesh";
 static const char ufbxi_Model[] = "Model";
 static const char ufbxi_Name[] = "Name";
+static const char ufbxi_NodeAttributeName[] = "NodeAttributeName";
 static const char ufbxi_NodeAttribute[] = "NodeAttribute";
+static const char ufbxi_Node[] = "Node";
 static const char ufbxi_NormalIndex[] = "NormalIndex";
 static const char ufbxi_Normals[] = "Normals";
+static const char ufbxi_Null[] = "Null";
+static const char ufbxi_NurbsCurve[] = "NurbsCurve";
+static const char ufbxi_NurbsSurface[] = "NurbsSurface";
+static const char ufbxi_Nurbs[] = "Nurbs";
 static const char ufbxi_OO[] = "OO";
 static const char ufbxi_OP[] = "OP";
-static const char ufbxi_PO[] = "PO";
-static const char ufbxi_PP[] = "PP";
 static const char ufbxi_ObjectType[] = "ObjectType";
 static const char ufbxi_Objects[] = "Objects";
+static const char ufbxi_PO[] = "PO";
+static const char ufbxi_PP[] = "PP";
 static const char ufbxi_PolygonVertexIndex[] = "PolygonVertexIndex";
+static const char ufbxi_PoseNode[] = "PoseNode";
+static const char ufbxi_Pose[] = "Pose";
 static const char ufbxi_PostRotation[] = "PostRotation";
 static const char ufbxi_PreRotation[] = "PreRotation";
 static const char ufbxi_Properties60[] = "Properties60";
@@ -1893,6 +1935,7 @@ static const char ufbxi_R[] = "R";
 static const char ufbxi_ReferenceStart[] = "ReferenceStart";
 static const char ufbxi_ReferenceStop[] = "ReferenceStop";
 static const char ufbxi_ReferenceTime[] = "ReferenceTime";
+static const char ufbxi_RightCamera[] = "RightCamera";
 static const char ufbxi_RootNode[] = "RootNode";
 static const char ufbxi_RotationAccumulationMode[] = "RotationAccumulationMode";
 static const char ufbxi_RotationOffset[] = "RotationOffset";
@@ -1915,6 +1958,7 @@ static const char ufbxi_TangentIndex[] = "TangentIndex";
 static const char ufbxi_Tangents[] = "Tangents";
 static const char ufbxi_TransformLink[] = "TransformLink";
 static const char ufbxi_Transform[] = "Transform";
+static const char ufbxi_TrimNurbsSurface[] = "TrimNurbsSurface";
 static const char ufbxi_Type[] = "Type";
 static const char ufbxi_TypedIndex[] = "TypedIndex";
 static const char ufbxi_UVIndex[] = "UVIndex";
@@ -1927,45 +1971,14 @@ static const char ufbxi_Weights[] = "Weights";
 static const char ufbxi_X[] = "X";
 static const char ufbxi_Y[] = "Y";
 static const char ufbxi_Z[] = "Z";
-static const char ufbxi_Camera[] = "Camera";
-static const char ufbxi_AspectWidth[] = "AspectWidth";
-static const char ufbxi_AspectHeight[] = "AspectHeight";
-static const char ufbxi_AspectW[] = "AspectW";
-static const char ufbxi_AspectH[] = "AspectH";
-static const char ufbxi_AspectRatioMode[] = "AspectRatioMode";
-static const char ufbxi_ApertureMode[] = "ApertureMode";
-static const char ufbxi_FieldOfView[] = "FieldOfView";
-static const char ufbxi_FieldOfViewX[] = "FieldOfViewX";
-static const char ufbxi_FieldOfViewY[] = "FieldOfViewY";
-static const char ufbxi_FilmWidth[] = "FilmWidth";
-static const char ufbxi_FilmHeight[] = "FilmHeight";
-static const char ufbxi_ApertureFormat[] = "ApertureFormat";
-static const char ufbxi_GateFit[] = "GateFit";
-static const char ufbxi_FilmSqueezeRatio[] = "FilmSqueezeRatio";
-static const char ufbxi_FocalLength[] = "FocalLength";
-static const char ufbxi_Count[] = "Count";
-static const char ufbxi_BlendMode[] = "BlendMode";
-static const char ufbxi_Pose[] = "Pose";
-static const char ufbxi_BindPose[] = "BindPose";
-static const char ufbxi_PoseNode[] = "PoseNode";
-static const char ufbxi_Node[] = "Node";
-static const char ufbxi_Matrix[] = "Matrix";
-static const char ufbxi_GeometricTranslation[] = "GeometricTranslation";
-static const char ufbxi_GeometricRotation[] = "GeometricRotation";
-static const char ufbxi_GeometricScaling[] = "GeometricScaling";
-static const char ufbxi_Null[] = "Null";
-static const char ufbxi_CameraSwitcher[] = "CameraSwitcher";
-static const char ufbxi_CameraStereo[] = "CameraStereo";
-static const char ufbxi_Nurbs[] = "Nurbs";
-static const char ufbxi_NurbsCurve[] = "NurbsCurve";
-static const char ufbxi_NurbsSurface[] = "NurbsSurface";
-static const char ufbxi_TrimNurbsSurface[] = "TrimNurbsSurface";
-static const char ufbxi_Boundary[] = "Boundary";
-static const char ufbxi_LodGroup[] = "LodGroup";
-static const char ufbxi_NodeAttributeName[] = "NodeAttributeName";
-static const char ufbxi_LeftCamera[] = "LeftCamera";
-static const char ufbxi_RightCamera[] = "RightCamera";
-static const char ufbxi_BaseLayer[] = "BaseLayer";
+static const char ufbxi_FbxPropertyEntry[] = "FbxPropertyEntry";
+static const char ufbxi_FbxSemanticEntry[] = "FbxSemanticEntry";
+static const char ufbxi_Texture[] = "Texture";
+static const char ufbxi_Video[] = "Video";
+static const char ufbxi_FileName[] = "FileName";
+static const char ufbxi_Filename[] = "Filename";
+static const char ufbxi_RelativeFileName[] = "RelativeFileName";
+static const char ufbxi_RelativeFilename[] = "RelativeFilename";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, sizeof(ufbxi_AllSame) - 1 },
@@ -1973,21 +1986,37 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AnimationCurveNode, sizeof(ufbxi_AnimationCurveNode) - 1 },
 	{ ufbxi_AnimationLayer, sizeof(ufbxi_AnimationLayer) - 1 },
 	{ ufbxi_AnimationStack, sizeof(ufbxi_AnimationStack) - 1 },
+	{ ufbxi_ApertureFormat, sizeof(ufbxi_ApertureFormat) - 1 },
+	{ ufbxi_ApertureMode, sizeof(ufbxi_ApertureMode) - 1 },
+	{ ufbxi_AspectH, sizeof(ufbxi_AspectH) - 1 },
+	{ ufbxi_AspectHeight, sizeof(ufbxi_AspectHeight) - 1 },
+	{ ufbxi_AspectRatioMode, sizeof(ufbxi_AspectRatioMode) - 1 },
+	{ ufbxi_AspectW, sizeof(ufbxi_AspectW) - 1 },
+	{ ufbxi_AspectWidth, sizeof(ufbxi_AspectWidth) - 1 },
+	{ ufbxi_BaseLayer, sizeof(ufbxi_BaseLayer) - 1 },
+	{ ufbxi_BindPose, sizeof(ufbxi_BindPose) - 1 },
+	{ ufbxi_BindingTable, sizeof(ufbxi_BindingTable) - 1 },
 	{ ufbxi_BinormalIndex, sizeof(ufbxi_BinormalIndex) - 1 },
 	{ ufbxi_Binormals, sizeof(ufbxi_Binormals) - 1 },
+	{ ufbxi_BlendMode, sizeof(ufbxi_BlendMode) - 1 },
 	{ ufbxi_BlendShape, sizeof(ufbxi_BlendShape) - 1 },
 	{ ufbxi_BlendShapeChannel, sizeof(ufbxi_BlendShapeChannel) - 1 },
+	{ ufbxi_Boundary, sizeof(ufbxi_Boundary) - 1 },
 	{ ufbxi_ByEdge, sizeof(ufbxi_ByEdge) - 1 },
 	{ ufbxi_ByPolygon, sizeof(ufbxi_ByPolygon) - 1 },
 	{ ufbxi_ByPolygonVertex, sizeof(ufbxi_ByPolygonVertex) - 1 },
 	{ ufbxi_ByVertex, sizeof(ufbxi_ByVertex) - 1 },
 	{ ufbxi_ByVertice, sizeof(ufbxi_ByVertice) - 1 },
+	{ ufbxi_Camera, sizeof(ufbxi_Camera) - 1 },
+	{ ufbxi_CameraStereo, sizeof(ufbxi_CameraStereo) - 1 },
+	{ ufbxi_CameraSwitcher, sizeof(ufbxi_CameraSwitcher) - 1 },
 	{ ufbxi_Channel, sizeof(ufbxi_Channel) - 1 },
 	{ ufbxi_Cluster, sizeof(ufbxi_Cluster) - 1 },
 	{ ufbxi_Color, sizeof(ufbxi_Color) - 1 },
 	{ ufbxi_ColorIndex, sizeof(ufbxi_ColorIndex) - 1 },
 	{ ufbxi_Colors, sizeof(ufbxi_Colors) - 1 },
 	{ ufbxi_Connections, sizeof(ufbxi_Connections) - 1 },
+	{ ufbxi_Count, sizeof(ufbxi_Count) - 1 },
 	{ ufbxi_Creator, sizeof(ufbxi_Creator) - 1 },
 	{ ufbxi_D_X, sizeof(ufbxi_D_X) - 1 },
 	{ ufbxi_D_Y, sizeof(ufbxi_D_Y) - 1 },
@@ -2001,10 +2030,23 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Documents, sizeof(ufbxi_Documents) - 1 },
 	{ ufbxi_EdgeCrease, sizeof(ufbxi_EdgeCrease) - 1 },
 	{ ufbxi_Edges, sizeof(ufbxi_Edges) - 1 },
+	{ ufbxi_Entry, sizeof(ufbxi_Entry) - 1 },
 	{ ufbxi_FBXHeaderExtension, sizeof(ufbxi_FBXHeaderExtension) - 1 },
 	{ ufbxi_FBXVersion, sizeof(ufbxi_FBXVersion) - 1 },
+	{ ufbxi_FieldOfView, sizeof(ufbxi_FieldOfView) - 1 },
+	{ ufbxi_FieldOfViewX, sizeof(ufbxi_FieldOfViewX) - 1 },
+	{ ufbxi_FieldOfViewY, sizeof(ufbxi_FieldOfViewY) - 1 },
+	{ ufbxi_FilmHeight, sizeof(ufbxi_FilmHeight) - 1 },
+	{ ufbxi_FilmSqueezeRatio, sizeof(ufbxi_FilmSqueezeRatio) - 1 },
+	{ ufbxi_FilmWidth, sizeof(ufbxi_FilmWidth) - 1 },
+	{ ufbxi_FocalLength, sizeof(ufbxi_FocalLength) - 1 },
 	{ ufbxi_FullWeights, sizeof(ufbxi_FullWeights) - 1 },
+	{ ufbxi_GateFit, sizeof(ufbxi_GateFit) - 1 },
+	{ ufbxi_GeometricRotation, sizeof(ufbxi_GeometricRotation) - 1 },
+	{ ufbxi_GeometricScaling, sizeof(ufbxi_GeometricScaling) - 1 },
+	{ ufbxi_GeometricTranslation, sizeof(ufbxi_GeometricTranslation) - 1 },
 	{ ufbxi_Geometry, sizeof(ufbxi_Geometry) - 1 },
+	{ ufbxi_Implementation, sizeof(ufbxi_Implementation) - 1 },
 	{ ufbxi_Indexes, sizeof(ufbxi_Indexes) - 1 },
 	{ ufbxi_InheritType, sizeof(ufbxi_InheritType) - 1 },
 	{ ufbxi_Intensity, sizeof(ufbxi_Intensity) - 1 },
@@ -2029,28 +2071,39 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Lcl_Rotation, sizeof(ufbxi_Lcl_Rotation) - 1 },
 	{ ufbxi_Lcl_Scaling, sizeof(ufbxi_Lcl_Scaling) - 1 },
 	{ ufbxi_Lcl_Translation, sizeof(ufbxi_Lcl_Translation) - 1 },
+	{ ufbxi_LeftCamera, sizeof(ufbxi_LeftCamera) - 1 },
 	{ ufbxi_Light, sizeof(ufbxi_Light) - 1 },
 	{ ufbxi_Limb, sizeof(ufbxi_Limb) - 1 },
 	{ ufbxi_LimbNode, sizeof(ufbxi_LimbNode) - 1 },
 	{ ufbxi_LocalStart, sizeof(ufbxi_LocalStart) - 1 },
 	{ ufbxi_LocalStop, sizeof(ufbxi_LocalStop) - 1 },
 	{ ufbxi_LocalTime, sizeof(ufbxi_LocalTime) - 1 },
+	{ ufbxi_LodGroup, sizeof(ufbxi_LodGroup) - 1 },
 	{ ufbxi_MappingInformationType, sizeof(ufbxi_MappingInformationType) - 1 },
 	{ ufbxi_Material, sizeof(ufbxi_Material) - 1 },
 	{ ufbxi_Materials, sizeof(ufbxi_Materials) - 1 },
+	{ ufbxi_Matrix, sizeof(ufbxi_Matrix) - 1 },
 	{ ufbxi_Mesh, sizeof(ufbxi_Mesh) - 1 },
 	{ ufbxi_Model, sizeof(ufbxi_Model) - 1 },
 	{ ufbxi_Name, sizeof(ufbxi_Name) - 1 },
+	{ ufbxi_Node, sizeof(ufbxi_Node) - 1 },
 	{ ufbxi_NodeAttribute, sizeof(ufbxi_NodeAttribute) - 1 },
+	{ ufbxi_NodeAttributeName, sizeof(ufbxi_NodeAttributeName) - 1 },
 	{ ufbxi_NormalIndex, sizeof(ufbxi_NormalIndex) - 1 },
 	{ ufbxi_Normals, sizeof(ufbxi_Normals) - 1 },
+	{ ufbxi_Null, sizeof(ufbxi_Null) - 1 },
+	{ ufbxi_Nurbs, sizeof(ufbxi_Nurbs) - 1 },
+	{ ufbxi_NurbsCurve, sizeof(ufbxi_NurbsCurve) - 1 },
+	{ ufbxi_NurbsSurface, sizeof(ufbxi_NurbsSurface) - 1 },
 	{ ufbxi_OO, sizeof(ufbxi_OO) - 1 },
 	{ ufbxi_OP, sizeof(ufbxi_OP) - 1 },
-	{ ufbxi_PO, sizeof(ufbxi_PO) - 1 },
-	{ ufbxi_PP, sizeof(ufbxi_PP) - 1 },
 	{ ufbxi_ObjectType, sizeof(ufbxi_ObjectType) - 1 },
 	{ ufbxi_Objects, sizeof(ufbxi_Objects) - 1 },
+	{ ufbxi_PO, sizeof(ufbxi_PO) - 1 },
+	{ ufbxi_PP, sizeof(ufbxi_PP) - 1 },
 	{ ufbxi_PolygonVertexIndex, sizeof(ufbxi_PolygonVertexIndex) - 1 },
+	{ ufbxi_Pose, sizeof(ufbxi_Pose) - 1 },
+	{ ufbxi_PoseNode, sizeof(ufbxi_PoseNode) - 1 },
 	{ ufbxi_PostRotation, sizeof(ufbxi_PostRotation) - 1 },
 	{ ufbxi_PreRotation, sizeof(ufbxi_PreRotation) - 1 },
 	{ ufbxi_Properties60, sizeof(ufbxi_Properties60) - 1 },
@@ -2060,6 +2113,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_ReferenceStart, sizeof(ufbxi_ReferenceStart) - 1 },
 	{ ufbxi_ReferenceStop, sizeof(ufbxi_ReferenceStop) - 1 },
 	{ ufbxi_ReferenceTime, sizeof(ufbxi_ReferenceTime) - 1 },
+	{ ufbxi_RightCamera, sizeof(ufbxi_RightCamera) - 1 },
 	{ ufbxi_RootNode, sizeof(ufbxi_RootNode) - 1 },
 	{ ufbxi_RotationAccumulationMode, sizeof(ufbxi_RotationAccumulationMode) - 1 },
 	{ ufbxi_RotationOffset, sizeof(ufbxi_RotationOffset) - 1 },
@@ -2082,6 +2136,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Tangents, sizeof(ufbxi_Tangents) - 1 },
 	{ ufbxi_Transform, sizeof(ufbxi_Transform) - 1 },
 	{ ufbxi_TransformLink, sizeof(ufbxi_TransformLink) - 1 },
+	{ ufbxi_TrimNurbsSurface, sizeof(ufbxi_TrimNurbsSurface) - 1 },
 	{ ufbxi_Type, sizeof(ufbxi_Type) - 1 },
 	{ ufbxi_TypedIndex, sizeof(ufbxi_TypedIndex) - 1 },
 	{ ufbxi_UV, sizeof(ufbxi_UV) - 1 },
@@ -2094,45 +2149,14 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_X, sizeof(ufbxi_X) - 1 },
 	{ ufbxi_Y, sizeof(ufbxi_Y) - 1 },
 	{ ufbxi_Z, sizeof(ufbxi_Z) - 1 },
-	{ ufbxi_Camera, sizeof(ufbxi_Camera) - 1 },
-	{ ufbxi_AspectWidth, sizeof(ufbxi_AspectWidth) - 1 },
-	{ ufbxi_AspectHeight, sizeof(ufbxi_AspectHeight) - 1 },
-	{ ufbxi_AspectW, sizeof(ufbxi_AspectW) - 1 },
-	{ ufbxi_AspectH, sizeof(ufbxi_AspectH) - 1 },
-	{ ufbxi_AspectRatioMode, sizeof(ufbxi_AspectRatioMode) - 1 },
-	{ ufbxi_ApertureMode, sizeof(ufbxi_ApertureMode) - 1 },
-	{ ufbxi_FieldOfView, sizeof(ufbxi_FieldOfView) - 1 },
-	{ ufbxi_FieldOfViewX, sizeof(ufbxi_FieldOfViewX) - 1 },
-	{ ufbxi_FieldOfViewY, sizeof(ufbxi_FieldOfViewY) - 1 },
-	{ ufbxi_FilmWidth, sizeof(ufbxi_FilmWidth) - 1 },
-	{ ufbxi_FilmHeight, sizeof(ufbxi_FilmHeight) - 1 },
-	{ ufbxi_ApertureFormat, sizeof(ufbxi_ApertureFormat) - 1 },
-	{ ufbxi_GateFit, sizeof(ufbxi_GateFit) - 1 },
-	{ ufbxi_FilmSqueezeRatio, sizeof(ufbxi_FilmSqueezeRatio) - 1 },
-	{ ufbxi_FocalLength, sizeof(ufbxi_FocalLength) - 1 },
-	{ ufbxi_Count, sizeof(ufbxi_Count) - 1 },
-	{ ufbxi_BlendMode, sizeof(ufbxi_BlendMode) - 1 },
-	{ ufbxi_Pose, sizeof(ufbxi_Pose) - 1 },
-	{ ufbxi_BindPose, sizeof(ufbxi_BindPose) - 1 },
-	{ ufbxi_PoseNode, sizeof(ufbxi_PoseNode) - 1 },
-	{ ufbxi_Node, sizeof(ufbxi_Node) - 1 },
-	{ ufbxi_Matrix, sizeof(ufbxi_Matrix) - 1 },
-	{ ufbxi_GeometricTranslation, sizeof(ufbxi_GeometricTranslation) - 1 },
-	{ ufbxi_GeometricRotation, sizeof(ufbxi_GeometricRotation) - 1 },
-	{ ufbxi_GeometricScaling, sizeof(ufbxi_GeometricScaling) - 1 },
-	{ ufbxi_Null, sizeof(ufbxi_Null) - 1 },
-	{ ufbxi_CameraSwitcher, sizeof(ufbxi_CameraSwitcher) - 1 },
-	{ ufbxi_CameraStereo, sizeof(ufbxi_CameraStereo) - 1 },
-	{ ufbxi_Nurbs, sizeof(ufbxi_Nurbs) - 1 },
-	{ ufbxi_NurbsCurve, sizeof(ufbxi_NurbsCurve) - 1 },
-	{ ufbxi_NurbsSurface, sizeof(ufbxi_NurbsSurface) - 1 },
-	{ ufbxi_TrimNurbsSurface, sizeof(ufbxi_TrimNurbsSurface) - 1 },
-	{ ufbxi_Boundary, sizeof(ufbxi_Boundary) - 1 },
-	{ ufbxi_LodGroup, sizeof(ufbxi_LodGroup) - 1 },
-	{ ufbxi_NodeAttributeName, sizeof(ufbxi_NodeAttributeName) - 1 },
-	{ ufbxi_LeftCamera, sizeof(ufbxi_LeftCamera) - 1 },
-	{ ufbxi_RightCamera, sizeof(ufbxi_RightCamera) - 1 },
-	{ ufbxi_BaseLayer, sizeof(ufbxi_BaseLayer) - 1 },
+	{ ufbxi_FbxPropertyEntry, sizeof(ufbxi_FbxPropertyEntry) - 1 },
+	{ ufbxi_FbxSemanticEntry, sizeof(ufbxi_FbxSemanticEntry) - 1 },
+	{ ufbxi_Texture, sizeof(ufbxi_Texture) - 1 },
+	{ ufbxi_Video, sizeof(ufbxi_Video) - 1 },
+	{ ufbxi_FileName, sizeof(ufbxi_FileName) - 1 },
+	{ ufbxi_Filename, sizeof(ufbxi_Filename) - 1 },
+	{ ufbxi_RelativeFileName, sizeof(ufbxi_RelativeFileName) - 1 },
+	{ ufbxi_RelativeFilename, sizeof(ufbxi_RelativeFilename) - 1 },
 };
 
 // -- Type definitions
@@ -2255,6 +2279,12 @@ typedef struct {
 	uint64_t bone_fbx_id;
 	ufbx_matrix bone_to_world;
 } ufbxi_tmp_bone_pose;
+
+typedef struct {
+	ufbx_material_map_name name_enum;
+	const char *name;
+	uint32_t internal_key;
+} ufbxi_material_map_prop;
 
 typedef struct {
 
@@ -4133,21 +4163,6 @@ const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
 	{ UFBX_PROP_COMPOUND, "Compound" },
 };
 
-ufbxi_nodiscard static int ufbxi_load_maps(ufbxi_context *uc)
-{
-	ufbxi_check(ufbxi_map_grow(&uc->prop_type_map, ufbxi_prop_type_name, ufbxi_arraycount(ufbxi_prop_type_names)));
-	ufbxi_for(const ufbxi_prop_type_name, name, ufbxi_prop_type_names, ufbxi_arraycount(ufbxi_prop_type_names)) {
-		const char *pooled = ufbxi_push_string_imp(uc, name->name, strlen(name->name), false);
-		ufbxi_check(pooled);
-		uint32_t hash = ufbxi_hash_ptr(pooled);
-		ufbxi_prop_type_name *entry = ufbxi_map_insert(&uc->prop_type_map, ufbxi_prop_type_name, 0, hash);
-		entry->type = name->type;
-		entry->name = pooled;
-	}
-
-	return 1;
-}
-
 static ufbx_prop_type ufbxi_get_prop_type(ufbxi_context *uc, const char *name)
 {
 	uint32_t hash = ufbxi_hash_ptr(name);
@@ -4227,6 +4242,34 @@ static ufbxi_forceinline bool ufbxi_name_key_less(ufbx_prop *prop, const char *d
 	int cmp = memcmp(prop->name.data, data, len);
 	if (cmp != 0) return cmp < 0;
 	return name_len < prop_len;
+}
+
+ufbxi_nodiscard static int ufbxi_load_material_props(ufbxi_context *uc, ufbxi_material_map_prop *dst, const ufbxi_material_map_prop *src, size_t count)
+{
+	for (size_t i = 0; i < count; i++) {
+		size_t len = strlen(src[i].name);
+		dst[i].name_enum = src[i].name_enum;
+		dst[i].name = ufbxi_push_string_imp(uc, src[i].name, len, false);
+		dst[i].internal_key = ufbxi_get_name_key(src[i].name, len);
+		ufbxi_check(dst[i].name);
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_load_maps(ufbxi_context *uc)
+{
+	ufbxi_check(ufbxi_map_grow(&uc->prop_type_map, ufbxi_prop_type_name, ufbxi_arraycount(ufbxi_prop_type_names)));
+	ufbxi_for(const ufbxi_prop_type_name, name, ufbxi_prop_type_names, ufbxi_arraycount(ufbxi_prop_type_names)) {
+		const char *pooled = ufbxi_push_string_imp(uc, name->name, strlen(name->name), false);
+		ufbxi_check(pooled);
+		uint32_t hash = ufbxi_hash_ptr(pooled);
+		ufbxi_prop_type_name *entry = ufbxi_map_insert(&uc->prop_type_map, ufbxi_prop_type_name, 0, hash);
+		entry->type = name->type;
+		entry->name = pooled;
+	}
+
+	return 1;
 }
 
 // -- Reading the parsed data
@@ -4664,6 +4707,12 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 
 	size_t num_elems = data->size / num_components;
 
+	// HACK: If there's no elements at all keep the attribute as NULL
+	// TODO: Strict mode for this?
+	if (num_elems == 0) {
+		return 1;
+	}
+
 	size_t mesh_num_indices = mesh->num_indices;
 
 	const char *mapping;
@@ -4972,7 +5021,9 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 			uint32_t num_indices = (uint32_t)((p_ix - p_face_begin) + 1);
 			dst_face->index_begin = (uint32_t)(p_face_begin - index_data);
 			dst_face->num_indices = num_indices;
-			num_triangles += num_indices - 2;
+			if (num_indices >= 3) {
+				num_triangles += num_indices - 2;
+			}
 			dst_face++;
 			p_face_begin = p_ix + 1;
 		}
@@ -5394,6 +5445,22 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_n
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_read_texture(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_texture *texture = ufbxi_push_element(uc, info, ufbx_texture, UFBX_ELEMENT_TEXTURE);
+	ufbxi_check(texture);
+
+	texture->filename = ufbx_empty_string;
+	texture->relative_filename = ufbx_empty_string;
+
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_FileName, "S", &texture->filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Filename, "S", &texture->filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFileName, "S", &texture->relative_filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFilename, "S", &texture->relative_filename));
+
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_read_pose(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type)
 {
 	ufbx_pose *pose = ufbxi_push_element(uc, info, ufbx_pose, UFBX_ELEMENT_POSE);
@@ -5431,6 +5498,54 @@ ufbxi_nodiscard static int ufbxi_read_pose(ufbxi_context *uc, ufbxi_node *node, 
 	pose->bone_poses.count = num_bones;
 	pose->bone_poses.data = (ufbx_bone_pose*)ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_tmp_bone_pose, num_bones);
 	ufbxi_check(pose->bone_poses.data);
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_sort_shader_prop_bindings(ufbxi_context *uc, ufbx_shader_prop_binding *bindings, size_t count)
+{
+	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_shader_prop_binding)));
+	ufbxi_macro_stable_sort(ufbx_shader_prop_binding, 32, bindings, uc->tmp_arr, count,
+		( ufbxi_str_less(a->shader_prop, b->shader_prop) ) );
+	return 1;
+}
+
+
+ufbxi_nodiscard static int ufbxi_read_binding_table(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_shader_binding *bindings = ufbxi_push_element(uc, info, ufbx_shader_binding, UFBX_ELEMENT_SHADER_BINDING);
+	ufbxi_check(bindings);
+
+	size_t num_entries = 0;
+	ufbxi_for (ufbxi_node, n, node->children, node->num_children) {
+		if (n->name != ufbxi_Entry) continue;
+
+		ufbx_string src, dst;
+		const char *src_type = NULL, *dst_type = NULL;
+		if (!ufbxi_get_val4(n, "SCSC", &src, (char**)&src_type, &dst, (char**)&dst_type)) {
+			continue;
+		}
+
+		if (src_type == ufbxi_FbxPropertyEntry && dst_type == ufbxi_FbxSemanticEntry) {
+			ufbx_shader_prop_binding *bind = ufbxi_push(&uc->tmp_stack, ufbx_shader_prop_binding, 1);
+			ufbxi_check(bind);
+			bind->material_prop = src;
+			bind->shader_prop = dst;
+			num_entries++;
+		} else if (src_type == ufbxi_FbxSemanticEntry && dst_type == ufbxi_FbxPropertyEntry) {
+			ufbx_shader_prop_binding *bind = ufbxi_push(&uc->tmp_stack, ufbx_shader_prop_binding, 1);
+			ufbxi_check(bind);
+			bind->material_prop = dst;
+			bind->shader_prop = src;
+			num_entries++;
+		}
+	}
+
+	bindings->prop_bindings.count = num_entries;
+	bindings->prop_bindings.data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_shader_prop_binding, num_entries);
+	ufbxi_check(bindings->prop_bindings.data);
+
+	ufbxi_check(ufbxi_sort_shader_prop_bindings(uc, bindings->prop_bindings.data, bindings->prop_bindings.count));
 
 	return 1;
 }
@@ -5594,6 +5709,10 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			}
 		} else if (name == ufbxi_Material) {
 			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_material), UFBX_ELEMENT_MATERIAL));
+		} else if (name == ufbxi_Texture) {
+			ufbxi_check(ufbxi_read_texture(uc, node, &info));
+		} else if (name == ufbxi_Video) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_video), UFBX_ELEMENT_VIDEO));
 		} else if (name == ufbxi_AnimationStack) {
 			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_stack), UFBX_ELEMENT_ANIM_STACK));
 		} else if (name == ufbxi_AnimationLayer) {
@@ -5604,6 +5723,10 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			ufbxi_check(ufbxi_read_animation_curve(uc, node, &info));
 		} else if (name == ufbxi_Pose) {
 			ufbxi_check(ufbxi_read_pose(uc, node, &info, sub_type));
+		} else if (name == ufbxi_Implementation) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_shader), UFBX_ELEMENT_SHADER));
+		} else if (name == ufbxi_BindingTable) {
+			ufbxi_check(ufbxi_read_binding_table(uc, node, &info));
 		} else {
 			ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str));
 		}
@@ -6450,17 +6573,17 @@ ufbxi_nodiscard static int ufbxi_fetch_dst_elements(ufbxi_context *uc, void *p_d
 {
 	ufbx_connection_list conns = ufbxi_find_dst_connections(uc, element, prop);
 
-	size_t num_layers = 0;
+	size_t num_elements = 0;
 	ufbxi_for_list(ufbx_connection, conn, conns) {
 		if (conn->src->type == src_type) {
 			ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_element*, 1, &conn->src));
-			num_layers++;
+			num_elements++;
 		}
 	}
 
 	ufbx_element_list *list = (ufbx_element_list*)p_dst_list;
-	list->data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_element*, num_layers);
-	list->count = num_layers;
+	list->data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_element*, num_elements);
+	list->count = num_elements;
 	ufbxi_check(list->data);
 
 	return 1;
@@ -6470,13 +6593,45 @@ ufbxi_nodiscard static ufbx_element *ufbxi_fetch_dst_element(ufbxi_context *uc, 
 {
 	ufbx_connection_list conns = ufbxi_find_dst_connections(uc, element, prop);
 
-	size_t num_layers = 0;
 	ufbxi_for_list(ufbx_connection, conn, conns) {
 		if (conn->src->type == src_type) {
 			return conn->src;
 		}
 	}
 	return NULL;
+}
+
+ufbxi_nodiscard static ufbx_element *ufbxi_fetch_src_element(ufbxi_context *uc, ufbx_element *element, const char *prop, ufbx_element_type dst_type)
+{
+	ufbx_connection_list conns = ufbxi_find_src_connections(uc, element, prop);
+
+	ufbxi_for_list(ufbx_connection, conn, conns) {
+		if (conn->dst->type == dst_type) {
+			return conn->dst;
+		}
+	}
+	return NULL;
+}
+
+ufbxi_nodiscard static int ufbxi_fetch_textures(ufbxi_context *uc, ufbx_material_texture_list *list, ufbx_element *element)
+{
+	size_t num_textures = 0;
+	ufbxi_for_list(ufbx_connection, conn, element->connections_dst) {
+		if (conn->src_prop.length > 0) continue;
+		if (conn->src->type == UFBX_ELEMENT_TEXTURE) {
+			ufbx_material_texture *tex = ufbxi_push(&uc->tmp_stack, ufbx_material_texture, 1);
+			ufbxi_check(tex);
+			tex->prop_name = conn->dst_prop;
+			tex->texture = (ufbx_texture*)conn->src;
+			num_textures++;
+		}
+	}
+
+	list->data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_material_texture, num_textures);
+	list->count = num_textures;
+	ufbxi_check(list->data);
+
+	return 1;
 }
 
 static ufbxi_forceinline bool ufbxi_prop_connection_less(const ufbx_connection *a, const char *prop)
@@ -6520,6 +6675,13 @@ ufbxi_nodiscard static int ufbxi_sort_anim_props(ufbxi_context *uc, ufbx_anim_pr
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_anim_prop)));
 	ufbxi_macro_stable_sort(ufbx_anim_prop, 32, aprops, uc->tmp_arr, count, ( ufbxi_cmp_anim_prop_less(a, b) ));
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_sort_material_textures(ufbxi_context *uc, ufbx_material_texture *textures, size_t count)
+{
+	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_material_texture)));
+	ufbxi_macro_stable_sort(ufbx_material_texture, 32, textures, uc->tmp_arr, count, ( ufbxi_str_less(a->prop_name, b->prop_name) ));
 	return 1;
 }
 
@@ -6594,6 +6756,105 @@ static bool ufbxi_matrix_all_zero(const ufbx_matrix *matrix)
 	return true;
 }
 
+// Material tables
+
+typedef enum {
+	UFBXI_MAT_COLOR,
+	UFBXI_MAT_FACTOR,
+} ufbxi_mat_property;
+
+typedef struct {
+	ufbx_material_map_name map;
+	ufbxi_mat_property tex;
+	ufbx_string prop;
+} ufbxi_shader_mapping;
+
+typedef struct {
+	const ufbxi_shader_mapping *data;
+	size_t count;
+} ufbxi_shader_mapping_list;
+
+static const ufbxi_shader_mapping ufbxi_fbx_shader_mapping[] = {
+	{ UFBX_MATERIAL_MAP_DIFFUSE, UFBXI_MAT_COLOR, ufbxi_string_literal("DiffuseColor") },
+	{ UFBX_MATERIAL_MAP_DIFFUSE, UFBXI_MAT_COLOR, ufbxi_string_literal("Diffuse") },
+	{ UFBX_MATERIAL_MAP_DIFFUSE, UFBXI_MAT_FACTOR, ufbxi_string_literal("DiffuseFactor") },
+	{ UFBX_MATERIAL_MAP_SPECULAR, UFBXI_MAT_COLOR, ufbxi_string_literal("SpecularColor") },
+	{ UFBX_MATERIAL_MAP_SPECULAR, UFBXI_MAT_COLOR, ufbxi_string_literal("Specular") },
+	{ UFBX_MATERIAL_MAP_SPECULAR, UFBXI_MAT_FACTOR, ufbxi_string_literal("SpecularFactor") },
+	{ UFBX_MATERIAL_MAP_REFLECTION, UFBXI_MAT_COLOR, ufbxi_string_literal("ReflectionColor") },
+	{ UFBX_MATERIAL_MAP_REFLECTION, UFBXI_MAT_COLOR, ufbxi_string_literal("Reflection") },
+	{ UFBX_MATERIAL_MAP_REFLECTION, UFBXI_MAT_FACTOR, ufbxi_string_literal("ReflectionFactor") },
+	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_COLOR, ufbxi_string_literal("TransparentColor") },
+	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_FACTOR, ufbxi_string_literal("TransparentFactor") },
+	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_FACTOR, ufbxi_string_literal("TransparencyFactor") },
+	{ UFBX_MATERIAL_MAP_EMISSION, UFBXI_MAT_COLOR, ufbxi_string_literal("EmissiveColor") },
+	{ UFBX_MATERIAL_MAP_EMISSION, UFBXI_MAT_COLOR, ufbxi_string_literal("Emissive") },
+	{ UFBX_MATERIAL_MAP_EMISSION, UFBXI_MAT_FACTOR, ufbxi_string_literal("EmissiveFactor") },
+	{ UFBX_MATERIAL_MAP_AMBIENT, UFBXI_MAT_COLOR, ufbxi_string_literal("AmbientColor") },
+	{ UFBX_MATERIAL_MAP_AMBIENT, UFBXI_MAT_COLOR, ufbxi_string_literal("Ambient") },
+	{ UFBX_MATERIAL_MAP_AMBIENT, UFBXI_MAT_FACTOR, ufbxi_string_literal("AmbientFactor") },
+	{ UFBX_MATERIAL_MAP_NORMAL, UFBXI_MAT_COLOR, ufbxi_string_literal("NormalMap") },
+	{ UFBX_MATERIAL_MAP_BUMP, UFBXI_MAT_COLOR, ufbxi_string_literal("Bump") },
+	{ UFBX_MATERIAL_MAP_BUMP, UFBXI_MAT_FACTOR, ufbxi_string_literal("BumpFactor") },
+	{ UFBX_MATERIAL_MAP_DISPLACEMENT, UFBXI_MAT_COLOR, ufbxi_string_literal("DisplacementColor") },
+	{ UFBX_MATERIAL_MAP_DISPLACEMENT, UFBXI_MAT_FACTOR, ufbxi_string_literal("DisplacementFactor") },
+	{ UFBX_MATERIAL_MAP_VECTOR_DISPLACEMENT, UFBXI_MAT_COLOR, ufbxi_string_literal("VectorDisplacementColor") },
+	{ UFBX_MATERIAL_MAP_VECTOR_DISPLACEMENT, UFBXI_MAT_FACTOR, ufbxi_string_literal("VectorDisplacementFactor") },
+	{ UFBX_MATERIAL_MAP_ROUGHNESS, UFBXI_MAT_COLOR, ufbxi_string_literal("Shininess") },
+};
+
+static const ufbxi_shader_mapping ufbxi_arnold_shader_mapping[] = {
+	{ UFBX_MATERIAL_MAP_DIFFUSE, UFBXI_MAT_COLOR, ufbxi_string_literal("baseColor") },
+	{ UFBX_MATERIAL_MAP_DIFFUSE, UFBXI_MAT_FACTOR, ufbxi_string_literal("base") },
+	{ UFBX_MATERIAL_MAP_SPECULAR, UFBXI_MAT_COLOR, ufbxi_string_literal("specularColor") },
+	{ UFBX_MATERIAL_MAP_SPECULAR, UFBXI_MAT_FACTOR, ufbxi_string_literal("specular") },
+	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_COLOR, ufbxi_string_literal("transmissionColor") },
+	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_FACTOR, ufbxi_string_literal("transmission") },
+	{ UFBX_MATERIAL_MAP_EMISSION, UFBXI_MAT_COLOR, ufbxi_string_literal("emissionColor") },
+	{ UFBX_MATERIAL_MAP_EMISSION, UFBXI_MAT_FACTOR, ufbxi_string_literal("emission") },
+	{ UFBX_MATERIAL_MAP_ROUGHNESS, UFBXI_MAT_COLOR, ufbxi_string_literal("specularRoughness") },
+	{ UFBX_MATERIAL_MAP_METALLIC, UFBXI_MAT_COLOR, ufbxi_string_literal("metalness") },
+	{ UFBX_MATERIAL_MAP_COAT, UFBXI_MAT_COLOR, ufbxi_string_literal("coatColor") },
+	{ UFBX_MATERIAL_MAP_COAT, UFBXI_MAT_FACTOR, ufbxi_string_literal("coat") },
+	{ UFBX_MATERIAL_MAP_DIFFUSE_ROUGHNESS, UFBXI_MAT_COLOR, ufbxi_string_literal("diffuseRoughness") },
+	{ UFBX_MATERIAL_MAP_COAT_ROUGHNESS, UFBXI_MAT_COLOR, ufbxi_string_literal("coatRoughness") },
+};
+
+static const ufbxi_shader_mapping_list ufbxi_shader_mappings[] = {
+	{ NULL, 0 }, // UFBX_SHADER_UNKNOWN
+	{ ufbxi_arnold_shader_mapping, ufbxi_arraycount(ufbxi_arnold_shader_mapping) }, // UFBX_SHADER_ARNOLD
+};
+
+ufbx_static_assert(shader_mapping_list, ufbxi_arraycount(ufbxi_shader_mappings) == UFBX_NUM_SHADER_TYPES);
+
+static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufbx_shader *shader, const ufbxi_shader_mapping *mappings, size_t count)
+{
+	ufbxi_for(const ufbxi_shader_mapping, mapping, mappings, count) {
+		ufbx_string name = ufbx_find_shader_prop_len(shader, mapping->prop.data, mapping->prop.length);
+		ufbx_texture *texture = ufbx_find_prop_texture_len(material, name.data, name.length);
+		ufbx_prop *prop = ufbx_find_prop_len(&material->props, name.data, name.length);
+		ufbx_material_map *map = &material->maps[mapping->map];
+
+		if (mapping->tex == UFBXI_MAT_COLOR) {
+			if (prop) map->color = prop->value_vec3;
+			if (texture) map->color_texture = texture;
+		} else if (mapping->tex == UFBXI_MAT_FACTOR) {
+			if (prop) map->factor = prop->value_real;
+			if (texture) map->factor_texture = texture;
+		}
+	}
+}
+
+static void ufbxi_fetch_maps(ufbx_material *material)
+{
+	ufbx_shader *shader = material->shader;
+	ufbxi_fetch_mapping_maps(material, NULL, ufbxi_fbx_shader_mapping, ufbxi_arraycount(ufbxi_fbx_shader_mapping));
+	if (shader && shader->type >= 0 && shader->type < UFBX_NUM_SHADER_TYPES) {
+		ufbxi_shader_mapping_list list = ufbxi_shader_mappings[shader->type];
+		ufbxi_fetch_mapping_maps(material, shader, list.data, list.count);
+	}
+}
+
 ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	size_t num_elements = uc->num_elements;
@@ -6620,6 +6881,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	for (size_t type = 0; type < UFBX_NUM_ELEMENT_TYPES; type++) {
 		size_t num_typed = uc->tmp_typed_element_offsets[type].num_items;
 		size_t *typed_offsets = ufbxi_make_array_all(&uc->tmp_typed_element_offsets[type], size_t);
+		ufbxi_check(typed_offsets);
 
 		ufbx_element_list *typed_elems = &uc->scene.elements_by_type[type];
 		typed_elems->count = num_typed;
@@ -6918,6 +7180,28 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 				value->curves[index] = curve;
 			}
 		}
+	}
+
+	ufbxi_for_ptr_list(ufbx_shader, p_shader, uc->scene.shaders) {
+		ufbx_shader *shader = *p_shader;
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &shader->bindings, &shader->element, NULL, UFBX_ELEMENT_SHADER_BINDING));
+
+		ufbx_prop *api = ufbx_find_prop(&shader->props, "RenderAPI");
+		if (api) {
+			if (!strcmp(api->value_str.data, "ARNOLD_SHADER_ID")) {
+				shader->type = UFBX_SHADER_ARNOLD;
+			}
+		}
+	}
+
+	ufbxi_for_ptr_list(ufbx_material, p_material, uc->scene.materials) {
+		ufbx_material *material = *p_material;
+		material->shader = (ufbx_shader*)ufbxi_fetch_src_element(uc, &material->element, NULL, UFBX_ELEMENT_SHADER);
+
+		ufbxi_check(ufbxi_fetch_textures(uc, &material->textures, &material->element));
+		ufbxi_check(ufbxi_sort_material_textures(uc, material->textures.data, material->textures.count));
+
+		ufbxi_fetch_maps(material);
 	}
 
 	if (uc->scene.anim_stacks.count > 0) {
@@ -9194,10 +9478,21 @@ static void ufbxi_update_node(ufbx_node *node)
 	}
 }
 
+static void ufbxi_update_material(ufbx_material *material)
+{
+	if (material->props.num_animated > 0) {
+		ufbxi_fetch_maps(material);
+	}
+}
+
 static void ufbxi_update_scene(ufbx_scene *scene)
 {
 	ufbxi_for_ptr_list(ufbx_node, p_node, scene->nodes) {
 		ufbxi_update_node(*p_node);
+	}
+
+	ufbxi_for_ptr_list(ufbx_material, p_material, scene->materials) {
+		ufbxi_update_material(*p_material);
 	}
 }
 
@@ -11671,6 +11966,36 @@ ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double tim
 	ret.num_props = ret.num_animated = num_anim;
 	ret.defaults = &element->props;
 	return ret;
+}
+
+ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const char *name, size_t name_len)
+{
+	ufbx_string name_str = { name, name_len };
+	if (!material) return NULL;
+
+	size_t index = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbx_material_texture, 4, &index, material->textures.data, 0, material->textures.count, 
+		( ufbxi_str_less(a->prop_name, name_str) ), ( ufbxi_str_equal(a->prop_name, name_str) ));
+	return index < SIZE_MAX ? material->textures.data[index].texture : NULL;
+}
+
+ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *name, size_t name_len)
+{
+	ufbx_string name_str = { name, name_len };
+	if (!shader) return name_str;
+
+	ufbxi_for_ptr_list(ufbx_shader_binding, p_bind, shader->bindings) {
+		ufbx_shader_binding *bind = *p_bind;
+
+		size_t index = SIZE_MAX;
+		ufbxi_macro_lower_bound_eq(ufbx_shader_prop_binding, 4, &index, bind->prop_bindings.data, 0, bind->prop_bindings.count, 
+			( ufbxi_str_less(a->shader_prop, name_str) ), ( ufbxi_str_equal(a->shader_prop, name_str) ));
+		if (index != SIZE_MAX) {
+			return bind->prop_bindings.data[index].material_prop;
+		}
+	}
+
+	return name_str;
 }
 
 ufbx_quat ufbx_mul_quat(ufbx_quat a, ufbx_quat b)

@@ -251,6 +251,8 @@ typedef struct ufbx_cache_deformer ufbx_cache_deformer;
 typedef struct ufbx_material ufbx_material;
 typedef struct ufbx_texture ufbx_texture;
 typedef struct ufbx_video ufbx_video;
+typedef struct ufbx_shader ufbx_shader;
+typedef struct ufbx_shader_binding ufbx_shader_binding;
 
 // Animation
 typedef struct ufbx_anim_stack ufbx_anim_stack;
@@ -288,6 +290,8 @@ UFBX_LIST_TYPE(ufbx_cache_deformer_list, ufbx_cache_deformer*);
 UFBX_LIST_TYPE(ufbx_material_list, ufbx_material*);
 UFBX_LIST_TYPE(ufbx_texture_list, ufbx_texture*);
 UFBX_LIST_TYPE(ufbx_video_list, ufbx_video*);
+UFBX_LIST_TYPE(ufbx_shader_list, ufbx_shader*);
+UFBX_LIST_TYPE(ufbx_shader_binding_list, ufbx_shader_binding*);
 UFBX_LIST_TYPE(ufbx_anim_stack_list, ufbx_anim_stack*);
 UFBX_LIST_TYPE(ufbx_anim_layer_list, ufbx_anim_layer*);
 UFBX_LIST_TYPE(ufbx_anim_value_list, ufbx_anim_value*);
@@ -321,6 +325,8 @@ typedef enum ufbx_element_type {
 	UFBX_ELEMENT_MATERIAL,            // < `ufbx_material`
 	UFBX_ELEMENT_TEXTURE,             // < `ufbx_texture`
 	UFBX_ELEMENT_VIDEO,               // < `ufbx_video`
+	UFBX_ELEMENT_SHADER,              // < `ufbx_shader`
+	UFBX_ELEMENT_SHADER_BINDING,      // < `ufbx_shader_binding`
 	UFBX_ELEMENT_ANIM_STACK,          // < `ufbx_anim_stack`
 	UFBX_ELEMENT_ANIM_LAYER,          // < `ufbx_anim_layer`
 	UFBX_ELEMENT_ANIM_VALUE,          // < `ufbx_anim_value`
@@ -668,16 +674,105 @@ struct ufbx_blend_shape {
 
 // -- Materials
 
+typedef struct ufbx_material_map {
+	ufbx_vec3 color;
+	ufbx_texture *color_texture;
+	ufbx_real factor;
+	ufbx_texture *factor_texture;
+} ufbx_material_map;
+
+typedef struct ufbx_material_texture {
+	ufbx_string prop_name;
+	ufbx_texture *texture;
+} ufbx_material_texture;
+
+UFBX_LIST_TYPE(ufbx_material_texture_list, ufbx_material_texture);
+
+typedef enum ufbx_material_map_name {
+	UFBX_MATERIAL_MAP_DIFFUSE,
+	UFBX_MATERIAL_MAP_SPECULAR,
+	UFBX_MATERIAL_MAP_REFLECTION,
+	UFBX_MATERIAL_MAP_TRANSPARENCY,
+	UFBX_MATERIAL_MAP_EMISSION,
+	UFBX_MATERIAL_MAP_AMBIENT,
+	UFBX_MATERIAL_MAP_NORMAL,
+	UFBX_MATERIAL_MAP_BUMP,
+	UFBX_MATERIAL_MAP_DISPLACEMENT,
+	UFBX_MATERIAL_MAP_VECTOR_DISPLACEMENT,
+	UFBX_MATERIAL_MAP_ROUGHNESS,
+	UFBX_MATERIAL_MAP_METALLIC,
+	UFBX_MATERIAL_MAP_COAT,
+	UFBX_MATERIAL_MAP_DIFFUSE_ROUGHNESS,
+	UFBX_MATERIAL_MAP_COAT_ROUGHNESS,
+
+	UFBX_NUM_MATERIAL_MAPS,
+} ufbx_material_map_name;
+
 struct ufbx_material {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_shader *shader;
+
+	union {
+		ufbx_material_map maps[UFBX_NUM_MATERIAL_MAPS];
+		struct {
+			ufbx_material_map diffuse;
+			ufbx_material_map specular;
+			ufbx_material_map reflection;
+			ufbx_material_map transparency;
+			ufbx_material_map emission;
+			ufbx_material_map ambient;
+			ufbx_material_map normal;
+			ufbx_material_map bump;
+			ufbx_material_map displacement;
+			ufbx_material_map vector_displacement;
+			ufbx_material_map roughness;
+			ufbx_material_map metallic;
+			ufbx_material_map coat;
+			ufbx_material_map diffuse_roughness;
+			ufbx_material_map coat_roughness;
+		};
+	};
+
+	ufbx_material_texture_list textures; // < Sorted by `prop_name`
 };
 
 struct ufbx_texture {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_string filename;
+	ufbx_string relative_filename;
 };
 
 struct ufbx_video {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+typedef enum ufbx_shader_type {
+	UFBX_SHADER_UNKNOWN,
+	UFBX_SHADER_ARNOLD,
+
+	UFBX_NUM_SHADER_TYPES,
+} ufbx_shader_type;
+
+struct ufbx_shader {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_shader_type type;
+	ufbx_shader_binding_list bindings;
+};
+
+typedef struct ufbx_shader_prop_binding {
+	ufbx_string shader_prop;
+	ufbx_string material_prop;
+} ufbx_shader_prop_binding;
+
+UFBX_LIST_TYPE(ufbx_shader_prop_binding_list, ufbx_shader_prop_binding);
+
+struct ufbx_shader_binding {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_shader_prop_binding_list prop_bindings; // < Sorted by `shader_prop`
 };
 
 // -- Animation
@@ -881,6 +976,8 @@ struct ufbx_scene {
 			ufbx_material_list materials;
 			ufbx_texture_list textures;
 			ufbx_video_list videos;
+			ufbx_shader_list shaders;
+			ufbx_shader_binding_list shader_bindings;
 
 			// Animation
 			ufbx_anim_stack_list anim_stacks;
@@ -1095,6 +1192,11 @@ ufbx_inline ufbx_prop ufbx_evaluate_prop(ufbx_anim anim, ufbx_element *element, 
 
 ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
 
+// Materials
+
+ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const char *name, size_t name_len);
+ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *name, size_t name_len);
+
 // Math
 
 ufbx_quat ufbx_mul_quat(ufbx_quat a, ufbx_quat b);
@@ -1114,7 +1216,6 @@ ufbx_matrix ufbx_get_normal_matrix(const ufbx_matrix *m);
 ufbx_matrix ufbx_get_inverse_matrix(const ufbx_matrix *m);
 
 // -- Inline API
-
 
 ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t index) { return v->data[v->indices[index]]; }
 ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }

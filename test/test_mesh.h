@@ -2,28 +2,30 @@
 UFBXT_FILE_TEST(blender_279_default)
 #if UFBXT_IMPL
 {
-	ufbx_light *light = ufbx_find_light(scene, "Lamp");
+	ufbx_node *node = ufbx_find_node(scene, "Lamp");
+	ufbxt_assert(node);
+	ufbx_light *light = node->light;
 	ufbxt_assert(light);
 
 	// Light attribute properties
 	ufbx_vec3 color_ref = { 1.0, 1.0, 1.0 };
-	ufbx_prop *color = ufbx_find_prop(&light->node.props, "Color");
+	ufbx_prop *color = ufbx_find_prop(&light->props, "Color");
 	ufbxt_assert(color && color->type == UFBX_PROP_COLOR);
 	ufbxt_assert_close_vec3(err, color->value_vec3, color_ref);
 
-	ufbx_prop *intensity = ufbx_find_prop(&light->node.props, "Intensity");
+	ufbx_prop *intensity = ufbx_find_prop(&light->props, "Intensity");
 	ufbxt_assert(intensity && intensity->type == UFBX_PROP_NUMBER);
 	ufbxt_assert_close_real(err, intensity->value_real, 100.0);
 
 	// Model properties
 	ufbx_vec3 translation_ref = { 4.076245307922363, 5.903861999511719, -1.0054539442062378 };
-	ufbx_prop *translation = ufbx_find_prop(&light->node.props, "Lcl Translation");
+	ufbx_prop *translation = ufbx_find_prop(&node->props, "Lcl Translation");
 	ufbxt_assert(translation && translation->type == UFBX_PROP_TRANSLATION);
 	ufbxt_assert_close_vec3(err, translation->value_vec3, translation_ref);
 
 	// Model defaults
 	ufbx_vec3 scaling_ref = { 1.0, 1.0, 1.0 };
-	ufbx_prop *scaling = ufbx_find_prop(&light->node.props, "GeometricScaling");
+	ufbx_prop *scaling = ufbx_find_prop(&node->props, "GeometricScaling");
 	ufbxt_assert(scaling && scaling->type == UFBX_PROP_VECTOR);
 	ufbxt_assert_close_vec3(err, scaling->value_vec3, scaling_ref);
 }
@@ -44,14 +46,15 @@ UFBXT_FILE_TEST(blender_282_suzanne_and_transform)
 UFBXT_FILE_TEST(maya_cube)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
-	ufbxt_assert(mesh);
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
 
 	for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
 		ufbx_face face = mesh->faces[face_i];
 		for (size_t i = face.index_begin; i < face.index_begin + face.num_indices; i++) {
 			ufbx_vec3 n = ufbx_get_vertex_vec3(&mesh->vertex_normal, i);
-			ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_binormal, i);
+			ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_bitangent, i);
 			ufbx_vec3 t = ufbx_get_vertex_vec3(&mesh->vertex_tangent, i);
 			ufbxt_assert_close_real(err, ufbxt_dot3(n, n), 1.0);
 			ufbxt_assert_close_real(err, ufbxt_dot3(b, b), 1.0);
@@ -79,9 +82,11 @@ UFBXT_FILE_TEST(maya_cube)
 UFBXT_FILE_TEST(maya_color_sets)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
-	ufbxt_assert(mesh);
-	ufbxt_assert(mesh->color_sets.size == 4);
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->color_sets.count == 4);
 	ufbxt_assert(!strcmp(mesh->color_sets.data[0].name.data, "RGBCube"));
 	ufbxt_assert(!strcmp(mesh->color_sets.data[1].name.data, "White"));
 	ufbxt_assert(!strcmp(mesh->color_sets.data[2].name.data, "Black"));
@@ -112,9 +117,11 @@ UFBXT_FILE_TEST(maya_color_sets)
 UFBXT_FILE_TEST(maya_uv_sets)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
-	ufbxt_assert(mesh);
-	ufbxt_assert(mesh->uv_sets.size == 3);
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->uv_sets.count == 3);
 	ufbxt_assert(!strcmp(mesh->uv_sets.data[0].name.data, "Default"));
 	ufbxt_assert(!strcmp(mesh->uv_sets.data[1].name.data, "PerFace"));
 	ufbxt_assert(!strcmp(mesh->uv_sets.data[2].name.data, "Row"));
@@ -156,9 +163,11 @@ UFBXT_FILE_TEST(maya_uv_sets)
 UFBXT_FILE_TEST(blender_279_color_sets)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "Cube");
-	ufbxt_assert(mesh);
-	ufbxt_assert(mesh->color_sets.size == 3);
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->color_sets.count == 3);
 	ufbxt_assert(!strcmp(mesh->color_sets.data[0].name.data, "RGBCube"));
 	ufbxt_assert(!strcmp(mesh->color_sets.data[1].name.data, "White"));
 	ufbxt_assert(!strcmp(mesh->color_sets.data[2].name.data, "Black"));
@@ -186,9 +195,11 @@ UFBXT_FILE_TEST(blender_279_color_sets)
 UFBXT_FILE_TEST(blender_279_uv_sets)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "Cube");
-	ufbxt_assert(mesh);
-	ufbxt_assert(mesh->uv_sets.size == 3);
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->uv_sets.count == 3);
 	ufbxt_assert(!strcmp(mesh->uv_sets.data[0].name.data, "Default"));
 	ufbxt_assert(!strcmp(mesh->uv_sets.data[1].name.data, "PerFace"));
 	ufbxt_assert(!strcmp(mesh->uv_sets.data[2].name.data, "Row"));
@@ -230,9 +241,11 @@ UFBXT_FILE_TEST(blender_279_uv_sets)
 UFBXT_FILE_TEST(synthetic_sets_reorder)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
-	ufbxt_assert(mesh);
-	ufbxt_assert(mesh->color_sets.size == 4);
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->color_sets.count == 4);
 	ufbxt_assert(!strcmp(mesh->color_sets.data[0].name.data, "RGBCube"));
 	ufbxt_assert(!strcmp(mesh->color_sets.data[1].name.data, "White"));
 	ufbxt_assert(!strcmp(mesh->color_sets.data[2].name.data, "Black"));
@@ -246,8 +259,10 @@ UFBXT_FILE_TEST(synthetic_sets_reorder)
 UFBXT_FILE_TEST(maya_cone)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCone1");
-	ufbxt_assert(mesh);
+	ufbx_node *node = ufbx_find_node(scene, "pCone1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
 	ufbxt_assert(mesh->vertex_crease.data);
 	ufbxt_assert(mesh->edges);
 	ufbxt_assert(mesh->edge_crease);
@@ -284,10 +299,10 @@ UFBXT_FILE_TEST(maya_cone)
 #if UFBXT_IMPL
 static void ufbxt_check_tangent_space(ufbxt_diff_error *err, ufbx_mesh *mesh)
 {
-	for (size_t set_i = 0; set_i < mesh->uv_sets.size; set_i++) {
+	for (size_t set_i = 0; set_i < mesh->uv_sets.count; set_i++) {
 		ufbx_uv_set set = mesh->uv_sets.data[set_i];
 		ufbxt_assert(set.vertex_uv.data);
-		ufbxt_assert(set.vertex_binormal.data);
+		ufbxt_assert(set.vertex_bitangent.data);
 		ufbxt_assert(set.vertex_tangent.data);
 
 		for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
@@ -299,8 +314,8 @@ static void ufbxt_check_tangent_space(ufbxt_diff_error *err, ufbx_mesh *mesh)
 
 				ufbx_vec3 pa = ufbx_get_vertex_vec3(&mesh->vertex_position, a);
 				ufbx_vec3 pb = ufbx_get_vertex_vec3(&mesh->vertex_position, b);
-				ufbx_vec3 ba = ufbx_get_vertex_vec3(&set.vertex_binormal, a);
-				ufbx_vec3 bb = ufbx_get_vertex_vec3(&set.vertex_binormal, b);
+				ufbx_vec3 ba = ufbx_get_vertex_vec3(&set.vertex_bitangent, a);
+				ufbx_vec3 bb = ufbx_get_vertex_vec3(&set.vertex_bitangent, b);
 				ufbx_vec3 ta = ufbx_get_vertex_vec3(&set.vertex_tangent, a);
 				ufbx_vec3 tb = ufbx_get_vertex_vec3(&set.vertex_tangent, b);
 				ufbx_vec2 ua = ufbx_get_vertex_vec2(&set.vertex_uv, a);
@@ -336,8 +351,10 @@ static void ufbxt_check_tangent_space(ufbxt_diff_error *err, ufbx_mesh *mesh)
 UFBXT_FILE_TEST(maya_uv_set_tangents)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pPlane1");
-	ufbxt_assert(mesh);
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
 	ufbxt_check_tangent_space(err, mesh);
 }
 #endif
@@ -345,8 +362,10 @@ UFBXT_FILE_TEST(maya_uv_set_tangents)
 UFBXT_FILE_TEST(blender_279_uv_set_tangents)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "Plane");
-	ufbxt_assert(mesh);
+	ufbx_node *node = ufbx_find_node(scene, "Plane");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
 	ufbxt_check_tangent_space(err, mesh);
 }
 #endif
@@ -354,11 +373,15 @@ UFBXT_FILE_TEST(blender_279_uv_set_tangents)
 UFBXT_FILE_TEST(synthetic_tangents_reorder)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pPlane1");
-	ufbxt_assert(mesh);
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
 	ufbxt_check_tangent_space(err, mesh);
 }
 #endif
+
+#if 0
 
 UFBXT_FILE_TEST(blender_279_ball)
 #if UFBXT_IMPL
@@ -400,12 +423,16 @@ UFBXT_FILE_TEST(blender_279_ball)
 }
 #endif
 
+#endif
+
 UFBXT_FILE_TEST(synthetic_broken_material)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
-	ufbxt_assert(mesh);
-	ufbxt_assert(mesh->materials.size == 0);
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->materials.count == 0);
 	ufbxt_assert(mesh->face_material == NULL);
 }
 #endif
@@ -413,10 +440,12 @@ UFBXT_FILE_TEST(synthetic_broken_material)
 UFBXT_FILE_TEST(maya_uv_and_color_sets)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
-	ufbxt_assert(mesh);
-	ufbxt_assert(mesh->uv_sets.size == 2);
-	ufbxt_assert(mesh->color_sets.size == 2);
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->uv_sets.count == 2);
+	ufbxt_assert(mesh->color_sets.count == 2);
 	ufbxt_assert(!strcmp(mesh->uv_sets.data[0].name.data, "UVA"));
 	ufbxt_assert(!strcmp(mesh->uv_sets.data[1].name.data, "UVB"));
 	ufbxt_assert(!strcmp(mesh->color_sets.data[0].name.data, "ColorA"));
@@ -427,39 +456,21 @@ UFBXT_FILE_TEST(maya_uv_and_color_sets)
 UFBXT_FILE_TEST(maya_bad_face)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
-	ufbxt_assert(mesh);
-	ufbxt_assert(mesh->num_faces == 4);
-	ufbxt_assert(mesh->num_bad_faces == 2);
-	ufbxt_assert(mesh->faces[0].num_indices == 3);
-	ufbxt_assert(mesh->faces[1].num_indices == 4);
-	ufbxt_assert(mesh->faces[2].num_indices == 4);
-	ufbxt_assert(mesh->faces[3].num_indices == 4);
-	ufbxt_assert(mesh->faces[4].num_indices == 1);
-	ufbxt_assert(mesh->faces[5].num_indices == 2);
+	// TODO: Implement this if bad faces are trimmed
 }
 #endif
 
 UFBXT_FILE_TEST(blender_279_edge_vertex)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "Plane");
-	ufbxt_assert(mesh);
-	ufbxt_assert(mesh->num_vertices == 3);
-	ufbxt_assert(mesh->num_faces == 0);
-	ufbxt_assert(mesh->num_bad_faces == 1);
-	if (scene->metadata.ascii) {
-		ufbxt_assert(mesh->num_edges == 2);
-	} else {
-		ufbxt_assert(mesh->num_edges == 1);
-	}
+	// TODO: Implement this if bad faces are trimmed
 }
 #endif
 
 UFBXT_FILE_TEST(blender_279_edge_circle)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "Circle");
-	ufbxt_assert(mesh);
+	ufbx_node *node = ufbx_find_node(scene, "Circle");
+	ufbxt_assert(node && node->mesh);
 }
 #endif
