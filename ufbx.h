@@ -45,7 +45,12 @@ typedef double ufbx_real;
 
 // -- Version
 
-#define UFBX_HEADER_VERSION 1001001 // v1.1.1
+#define ufbx_pack_version(major, minor, patch) ((uint32_t)(major)*1000000u + (uint32_t)(minor)*1000u + (uint32_t)(patch))
+#define ufbx_version_major(version) ((uint32_t)(version)/1000000u%1000u)
+#define ufbx_version_minor(version) ((uint32_t)(version)/1000u%1000u)
+#define ufbx_version_patch(version) ((uint32_t)(version)%1000u)
+
+#define UFBX_HEADER_VERSION ufbx_pack_version(0, 1, 1)
 
 // -- Basic types
 
@@ -675,10 +680,9 @@ struct ufbx_blend_shape {
 // -- Materials
 
 typedef struct ufbx_material_map {
-	ufbx_vec3 color;
-	ufbx_texture *color_texture;
-	ufbx_real factor;
-	ufbx_texture *factor_texture;
+	ufbx_vec3 value;
+	bool has_value;
+	ufbx_texture *texture;
 } ufbx_material_map;
 
 typedef struct ufbx_material_texture {
@@ -688,51 +692,168 @@ typedef struct ufbx_material_texture {
 
 UFBX_LIST_TYPE(ufbx_material_texture_list, ufbx_material_texture);
 
-typedef enum ufbx_material_map_name {
-	UFBX_MATERIAL_MAP_DIFFUSE,
-	UFBX_MATERIAL_MAP_SPECULAR,
-	UFBX_MATERIAL_MAP_REFLECTION,
-	UFBX_MATERIAL_MAP_TRANSPARENCY,
-	UFBX_MATERIAL_MAP_EMISSION,
-	UFBX_MATERIAL_MAP_AMBIENT,
-	UFBX_MATERIAL_MAP_NORMAL,
-	UFBX_MATERIAL_MAP_BUMP,
-	UFBX_MATERIAL_MAP_DISPLACEMENT,
-	UFBX_MATERIAL_MAP_VECTOR_DISPLACEMENT,
-	UFBX_MATERIAL_MAP_ROUGHNESS,
-	UFBX_MATERIAL_MAP_METALLIC,
-	UFBX_MATERIAL_MAP_COAT,
-	UFBX_MATERIAL_MAP_DIFFUSE_ROUGHNESS,
-	UFBX_MATERIAL_MAP_COAT_ROUGHNESS,
+typedef enum ufbx_shader_type {
+	UFBX_SHADER_UNKNOWN,
+	UFBX_SHADER_ARNOLD,
+	UFBX_SHADER_BLENDER_PHONG,
 
-	UFBX_NUM_MATERIAL_MAPS,
-} ufbx_material_map_name;
+	UFBX_NUM_SHADER_TYPES,
+} ufbx_shader_type;
+
+typedef enum ufbx_material_fbx_map {
+	UFBX_MATERIAL_FBX_DIFFUSE_FACTOR,
+	UFBX_MATERIAL_FBX_DIFFUSE_COLOR,
+	UFBX_MATERIAL_FBX_SPECULAR_FACTOR,
+	UFBX_MATERIAL_FBX_SPECULAR_COLOR,
+	UFBX_MATERIAL_FBX_SPECULAR_EXPONENT,
+	UFBX_MATERIAL_FBX_REFLECTION_FACTOR,
+	UFBX_MATERIAL_FBX_REFLECTION_COLOR,
+	UFBX_MATERIAL_FBX_TRANSPARENCY_FACTOR,
+	UFBX_MATERIAL_FBX_TRANSPARENCY_COLOR,
+	UFBX_MATERIAL_FBX_EMISSION_FACTOR,
+	UFBX_MATERIAL_FBX_EMISSION_COLOR,
+	UFBX_MATERIAL_FBX_AMBIENT_FACTOR,
+	UFBX_MATERIAL_FBX_AMBIENT_COLOR,
+	UFBX_MATERIAL_FBX_NORMAL_MAP,
+	UFBX_MATERIAL_FBX_BUMP,
+	UFBX_MATERIAL_FBX_BUMP_FACTOR,
+	UFBX_MATERIAL_FBX_DISPLACEMENT_FACTOR,
+	UFBX_MATERIAL_FBX_DISPLACEMENT,
+	UFBX_MATERIAL_FBX_VECTOR_DISPLACEMENT_FACTOR,
+	UFBX_MATERIAL_FBX_VECTOR_DISPLACEMENT,
+	UFBX_NUM_MATERIAL_FBX_MAPS,
+} ufbx_material_fbx_map;
+
+typedef enum ufbx_material_pbr_map {
+	UFBX_MATERIAL_PBR_BASE_FACTOR,
+	UFBX_MATERIAL_PBR_BASE_COLOR,
+	UFBX_MATERIAL_PBR_ROUGHNESS,
+	UFBX_MATERIAL_PBR_METALLIC,
+	UFBX_MATERIAL_PBR_DIFFUSE_ROUGHNESS,
+	UFBX_MATERIAL_PBR_SPECULAR_FACTOR,
+	UFBX_MATERIAL_PBR_SPECULAR_COLOR,
+	UFBX_MATERIAL_PBR_SPECULAR_ROUGHNESS,
+	UFBX_MATERIAL_PBR_SPECULAR_IOR,
+	UFBX_MATERIAL_PBR_SPECULAR_ANISOTROPY,
+	UFBX_MATERIAL_PBR_SPECULAR_ROTATION,
+	UFBX_MATERIAL_PBR_TRANSMISSION_FACTOR,
+	UFBX_MATERIAL_PBR_TRANSMISSION_COLOR,
+	UFBX_MATERIAL_PBR_TRANSMISSION_DEPTH,
+	UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER,
+	UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER_ANISOTROPY,
+	UFBX_MATERIAL_PBR_TRANSMISSION_DISPERSION,
+	UFBX_MATERIAL_PBR_TRANSMISSION_ROUGHNESS,
+	UFBX_MATERIAL_PBR_SUBSURFACE_FACTOR,
+	UFBX_MATERIAL_PBR_SUBSURFACE_COLOR,
+	UFBX_MATERIAL_PBR_SUBSURFACE_RADIUS,
+	UFBX_MATERIAL_PBR_SUBSURFACE_SCALE,
+	UFBX_MATERIAL_PBR_SUBSURFACE_ANISOTROPY,
+	UFBX_MATERIAL_PBR_SHEEN_FACTOR,
+	UFBX_MATERIAL_PBR_SHEEN_COLOR,
+	UFBX_MATERIAL_PBR_SHEEN_ROUGHNESS,
+	UFBX_MATERIAL_PBR_COAT_FACTOR,
+	UFBX_MATERIAL_PBR_COAT_COLOR,
+	UFBX_MATERIAL_PBR_COAT_ROUGHNESS,
+	UFBX_MATERIAL_PBR_COAT_IOR,
+	UFBX_MATERIAL_PBR_COAT_ANISOTROPY,
+	UFBX_MATERIAL_PBR_COAT_ROTATION,
+	UFBX_MATERIAL_PBR_COAT_NORMAL,
+	UFBX_MATERIAL_PBR_THIN_FILM_THICKNESS,
+	UFBX_MATERIAL_PBR_THIN_FILM_IOR,
+	UFBX_MATERIAL_PBR_EMISSION_FACTOR,
+	UFBX_MATERIAL_PBR_EMISSION_COLOR,
+	UFBX_MATERIAL_PBR_OPACITY,
+	UFBX_MATERIAL_PBR_INDIRECT_DIFFUSE,
+	UFBX_MATERIAL_PBR_INDIRECT_SPECULAR,
+	UFBX_MATERIAL_PBR_NORMAL_MAP,
+	UFBX_NUM_MATERIAL_PBR_MAPS,
+} ufbx_material_fbx_map;
+
+typedef struct ufbx_material_fbx_maps {
+	union {
+		ufbx_material_map maps[UFBX_NUM_MATERIAL_FBX_MAPS];
+		struct {
+			ufbx_material_map diffuse_factor;
+			ufbx_material_map diffuse_color;
+			ufbx_material_map specular_factor;
+			ufbx_material_map specular_color;
+			ufbx_material_map specular_exponent;
+			ufbx_material_map reflection_factor;
+			ufbx_material_map reflection_color;
+			ufbx_material_map transparency_factor;
+			ufbx_material_map transparency_color;
+			ufbx_material_map emission_factor;
+			ufbx_material_map emission_color;
+			ufbx_material_map ambient_factor;
+			ufbx_material_map ambient_color;
+			ufbx_material_map normal_map;
+			ufbx_material_map bump;
+			ufbx_material_map bump_factor;
+			ufbx_material_map displacement_factor;
+			ufbx_material_map displacement;
+			ufbx_material_map vector_displacement_factor;
+			ufbx_material_map vector_displacement;
+		};
+	};
+} ufbx_material_fbx_maps;
+
+typedef struct ufbx_material_pbr_maps {
+	union {
+		ufbx_material_map maps[UFBX_NUM_MATERIAL_PBR_MAPS];
+		struct {
+			ufbx_material_map base_factor;
+			ufbx_material_map base_color;
+			ufbx_material_map roughness;
+			ufbx_material_map metallic;
+			ufbx_material_map diffuse_roughness;
+			ufbx_material_map specular_factor;
+			ufbx_material_map specular_color;
+			ufbx_material_map specular_roughness;
+			ufbx_material_map specular_ior;
+			ufbx_material_map specular_anisotropy;
+			ufbx_material_map specular_rotation;
+			ufbx_material_map transmission_factor;
+			ufbx_material_map transmission_color;
+			ufbx_material_map transmission_depth;
+			ufbx_material_map transmission_scatter;
+			ufbx_material_map transmission_scatter_anisotropy;
+			ufbx_material_map transmission_dispersion;
+			ufbx_material_map transmission_roughness;
+			ufbx_material_map subsurface_factor;
+			ufbx_material_map subsurface_color;
+			ufbx_material_map subsurface_radius;
+			ufbx_material_map subsurface_scale;
+			ufbx_material_map subsurface_anisotropy;
+			ufbx_material_map sheen_factor;
+			ufbx_material_map sheen_color;
+			ufbx_material_map sheen_roughness;
+			ufbx_material_map coat_factor;
+			ufbx_material_map coat_color;
+			ufbx_material_map coat_roughness;
+			ufbx_material_map coat_ior;
+			ufbx_material_map coat_anisotropy;
+			ufbx_material_map coat_rotation;
+			ufbx_material_map coat_normal;
+			ufbx_material_map thin_film_thickness;
+			ufbx_material_map thin_film_ior;
+			ufbx_material_map emission_factor;
+			ufbx_material_map emission_color;
+			ufbx_material_map opacity;
+			ufbx_material_map indirect_diffuse;
+			ufbx_material_map indirect_specular;
+			ufbx_material_map normal_map;
+		};
+	};
+} ufbx_material_pbr_maps;
 
 struct ufbx_material {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	ufbx_shader *shader;
+	ufbx_shader_type shader_type;
 
-	union {
-		ufbx_material_map maps[UFBX_NUM_MATERIAL_MAPS];
-		struct {
-			ufbx_material_map diffuse;
-			ufbx_material_map specular;
-			ufbx_material_map reflection;
-			ufbx_material_map transparency;
-			ufbx_material_map emission;
-			ufbx_material_map ambient;
-			ufbx_material_map normal;
-			ufbx_material_map bump;
-			ufbx_material_map displacement;
-			ufbx_material_map vector_displacement;
-			ufbx_material_map roughness;
-			ufbx_material_map metallic;
-			ufbx_material_map coat;
-			ufbx_material_map diffuse_roughness;
-			ufbx_material_map coat_roughness;
-		};
-	};
+	ufbx_material_fbx_maps fbx;
+	ufbx_material_pbr_maps pbr;
 
 	ufbx_material_texture_list textures; // < Sorted by `prop_name`
 };
@@ -747,13 +868,6 @@ struct ufbx_texture {
 struct ufbx_video {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 };
-
-typedef enum ufbx_shader_type {
-	UFBX_SHADER_UNKNOWN,
-	UFBX_SHADER_ARNOLD,
-
-	UFBX_NUM_SHADER_TYPES,
-} ufbx_shader_type;
 
 struct ufbx_shader {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
@@ -902,11 +1016,21 @@ UFBX_LIST_TYPE(ufbx_name_element_list, ufbx_name_element);
 
 typedef struct ufbx_scene ufbx_scene;
 
+typedef enum ufbx_exporter {
+	UFBX_EXPORTER_UNKNOWN,
+	UFBX_EXPORTER_FBX_SDK,
+	UFBX_EXPORTER_BLENDER_BINARY,
+	UFBX_EXPORTER_BLENDER_ASCII,
+} ufbx_exporter;
+
 // Miscellaneous data related to the loaded file
 typedef struct ufbx_metadata {
 	bool ascii;
 	uint32_t version;
 	ufbx_string creator;
+
+	ufbx_exporter exporter;
+	uint32_t exporter_version;
 
 	size_t result_memory_used;
 	size_t temp_memory_used;

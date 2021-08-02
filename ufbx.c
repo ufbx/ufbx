@@ -144,10 +144,10 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 
 // -- Version
 
-#define UFBX_SOURCE_VERSION 1001001 // v1.1.1
+#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 1, 1)
 const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
 
-ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/100 == UFBX_HEADER_VERSION/100);
+ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEADER_VERSION/1000u);
 
 // -- Debug
 
@@ -2283,12 +2283,6 @@ typedef struct {
 } ufbxi_tmp_bone_pose;
 
 typedef struct {
-	ufbx_material_map_name name_enum;
-	const char *name;
-	uint32_t internal_key;
-} ufbxi_material_map_prop;
-
-typedef struct {
 	ufbx_string prop_name;
 	int32_t *face_texture;
 	size_t num_faces;
@@ -2309,6 +2303,8 @@ typedef struct {
 typedef struct {
 
 	uint32_t version;
+	ufbx_exporter exporter;
+	uint32_t exporter_version;
 	bool from_ascii;
 	bool big_endian;
 
@@ -3633,6 +3629,7 @@ static char ufbxi_ascii_skip_whitespace(ufbxi_context *uc)
 		// Line comment
 		if (c == ';') {
 
+			bool read_magic = false;
 			// FBX ASCII files begin with a magic comment of form "; FBX 7.7.0 project file"
 			// Try to extract the version number from the magic comment
 			if (!ua->read_first_comment) {
@@ -3641,6 +3638,7 @@ static char ufbxi_ascii_skip_whitespace(ufbxi_context *uc)
 				if (version) {
 					uc->version = version;
 					ua->found_version = true;
+					read_magic = true;
 				}
 			}
 
@@ -3648,6 +3646,28 @@ static char ufbxi_ascii_skip_whitespace(ufbxi_context *uc)
 			while (c != '\n' && c != '\0') {
 				c = ufbxi_ascii_next(uc);
 			}
+			c = ufbxi_ascii_next(uc);
+
+			// Try to determine if this is a Blender 6100 ASCII file
+			if (read_magic) {
+				if (c == ';') {
+					char line[32];
+					size_t line_len = 0;
+
+					c = ufbxi_ascii_next(uc);
+					while (c != '\n' && c != '\0') {
+						if (line_len < sizeof(line)) {
+							line[line_len++] = c;
+						}
+						c = ufbxi_ascii_next(uc);
+					}
+
+					if (line_len >= 19 && !memcmp(line, " Created by Blender", 19)) {
+						uc->exporter = UFBX_EXPORTER_BLENDER_ASCII;
+					}
+				}
+			}
+
 		} else {
 			break;
 		}
@@ -4276,19 +4296,6 @@ static ufbxi_forceinline bool ufbxi_name_key_less(ufbx_prop *prop, const char *d
 	return name_len < prop_len;
 }
 
-ufbxi_nodiscard static int ufbxi_load_material_props(ufbxi_context *uc, ufbxi_material_map_prop *dst, const ufbxi_material_map_prop *src, size_t count)
-{
-	for (size_t i = 0; i < count; i++) {
-		size_t len = strlen(src[i].name);
-		dst[i].name_enum = src[i].name_enum;
-		dst[i].name = ufbxi_push_string_imp(uc, src[i].name, len, false);
-		dst[i].internal_key = ufbxi_get_name_key(src[i].name, len);
-		ufbxi_check(dst[i].name);
-	}
-
-	return 1;
-}
-
 ufbxi_nodiscard static int ufbxi_load_maps(ufbxi_context *uc)
 {
 	ufbxi_check(ufbxi_map_grow(&uc->prop_type_map, ufbxi_prop_type_name, ufbxi_arraycount(ufbxi_prop_type_names)));
@@ -4320,6 +4327,79 @@ ufbxi_nodiscard static int ufbxi_read_header_extension(ufbxi_context *uc)
 			ufbxi_ignore(ufbxi_get_val1(child, "S", &uc->scene.metadata.creator));
 		}
 
+	}
+
+	return 1;
+}
+
+static bool ufbxi_match_version_string(ufbxi_context *uc, const char *fmt, ufbx_string str, uint32_t *p_version)
+{
+	size_t num_ix = 0;
+	size_t pos = 0;
+	while (*fmt) {
+		char c = *fmt++;
+		if (c >= 'a' && c <= 'z') {
+			if (pos >= str.length) return false;
+			char s = str.data[pos];
+			if (s != c && (int)s + (int)('a' - 'A') != (int)c) return false;
+			pos++;
+		} else if (c == ' ') {
+			while (pos < str.length) {
+				char s = str.data[pos];
+				if (s != ' ' && s != '\t') break;
+				pos++;
+			}
+		} else if (c == '-') {
+			while (pos < str.length) {
+				char s = str.data[pos];
+				if (s == '-') break;
+				pos++;
+			}
+			if (pos >= str.length) return false;
+			pos++;
+		} else if (c == '/' || c == '.') {
+			if (pos >= str.length) return false;
+			if (str.data[pos] != c) return false;
+			pos++;
+		} else if (c == '?') {
+			uint32_t num = 0;
+			size_t len = 0;
+			while (pos < str.length) {
+				char s = str.data[pos];
+				if (!(s >= '0' && s <= '9')) break;
+				num = num*10 + (uint32_t)(s - '0');
+				pos++;
+				len++;
+			}
+			if (len == 0) return false;
+			p_version[num_ix++] = num;
+		} else {
+			ufbx_assert(0 && "Unhandled match character");
+		}
+	}
+
+	return true;
+}
+
+ufbxi_nodiscard static int ufbxi_match_exporter(ufbxi_context *uc)
+{
+	ufbx_string creator = uc->scene.metadata.creator;
+	uint32_t version[3] = { 0 };
+	if (ufbxi_match_version_string(uc, "blender-- ?.?.?", creator, version)) {
+		uc->exporter = UFBX_EXPORTER_BLENDER_BINARY;
+		uc->exporter_version = ufbx_pack_version(version[0], version[1], version[2]);
+	} else if (ufbxi_match_version_string(uc, "blender- ?.?", creator, version)) {
+		uc->exporter = UFBX_EXPORTER_BLENDER_BINARY;
+		uc->exporter_version = ufbx_pack_version(version[0], version[1], 0);
+	} else if (ufbxi_match_version_string(uc, "blender version ?.?", creator, version)) {
+		uc->exporter = UFBX_EXPORTER_BLENDER_ASCII;
+		uc->exporter_version = ufbx_pack_version(version[0], version[1], 0);
+	} else if (ufbxi_match_version_string(uc, "fbx sdk/fbx plugins version ?.?", creator, version)) {
+		uc->exporter = UFBX_EXPORTER_FBX_SDK;
+		uc->exporter_version = ufbx_pack_version(version[0], version[1], 0);
+	} else if (ufbxi_match_version_string(uc, "fbx sdk/fbx plugins build ?", creator, version)) {
+		uc->exporter = UFBX_EXPORTER_FBX_SDK;
+		uc->exporter_version = ufbx_pack_version(version[0]/10000u, version[0]/100u%100u, version[0]%100u);
 	}
 
 	return 1;
@@ -6184,6 +6264,17 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 	ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_FBXHeaderExtension));
 	ufbxi_check(ufbxi_read_header_extension(uc));
 
+	// The ASCII exporter version is stored in top-level
+	if (uc->exporter == UFBX_EXPORTER_BLENDER_ASCII) {
+		ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_Creator));
+		if (uc->top_node) {
+			ufbxi_ignore(ufbxi_get_val1(uc->top_node, "S", &uc->scene.metadata.creator));
+		}
+	}
+
+	// Resolve the exporter before continuing
+	ufbxi_check(ufbxi_match_exporter(uc));
+
 	// Document: Read root ID
 	if (uc->version >= 7000) {
 		ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_Documents));
@@ -6848,15 +6939,12 @@ static bool ufbxi_matrix_all_zero(const ufbx_matrix *matrix)
 
 // Material tables
 
-typedef enum {
-	UFBXI_MAT_COLOR,
-	UFBXI_MAT_FACTOR,
-} ufbxi_mat_property;
+typedef void (*ufbxi_mat_transform_fn)(ufbx_vec3 *a);
 
 typedef struct {
-	ufbx_material_map_name map;
-	ufbxi_mat_property tex;
+	int32_t index;
 	ufbx_string prop;
+	ufbxi_mat_transform_fn transform_fn;
 } ufbxi_shader_mapping;
 
 typedef struct {
@@ -6865,73 +6953,120 @@ typedef struct {
 } ufbxi_shader_mapping_list;
 
 static const ufbxi_shader_mapping ufbxi_fbx_shader_mapping[] = {
-	{ UFBX_MATERIAL_MAP_DIFFUSE, UFBXI_MAT_COLOR, ufbxi_string_literal("DiffuseColor") },
-	{ UFBX_MATERIAL_MAP_DIFFUSE, UFBXI_MAT_COLOR, ufbxi_string_literal("Diffuse") },
-	{ UFBX_MATERIAL_MAP_DIFFUSE, UFBXI_MAT_FACTOR, ufbxi_string_literal("DiffuseFactor") },
-	{ UFBX_MATERIAL_MAP_SPECULAR, UFBXI_MAT_COLOR, ufbxi_string_literal("SpecularColor") },
-	{ UFBX_MATERIAL_MAP_SPECULAR, UFBXI_MAT_COLOR, ufbxi_string_literal("Specular") },
-	{ UFBX_MATERIAL_MAP_SPECULAR, UFBXI_MAT_FACTOR, ufbxi_string_literal("SpecularFactor") },
-	{ UFBX_MATERIAL_MAP_REFLECTION, UFBXI_MAT_COLOR, ufbxi_string_literal("ReflectionColor") },
-	{ UFBX_MATERIAL_MAP_REFLECTION, UFBXI_MAT_COLOR, ufbxi_string_literal("Reflection") },
-	{ UFBX_MATERIAL_MAP_REFLECTION, UFBXI_MAT_FACTOR, ufbxi_string_literal("ReflectionFactor") },
-	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_COLOR, ufbxi_string_literal("TransparentColor") },
-	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_COLOR, ufbxi_string_literal("Transparent") },
-	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_FACTOR, ufbxi_string_literal("TransparentFactor") },
-	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_FACTOR, ufbxi_string_literal("TransparencyFactor") },
-	{ UFBX_MATERIAL_MAP_EMISSION, UFBXI_MAT_COLOR, ufbxi_string_literal("EmissiveColor") },
-	{ UFBX_MATERIAL_MAP_EMISSION, UFBXI_MAT_COLOR, ufbxi_string_literal("Emissive") },
-	{ UFBX_MATERIAL_MAP_EMISSION, UFBXI_MAT_FACTOR, ufbxi_string_literal("EmissiveFactor") },
-	{ UFBX_MATERIAL_MAP_AMBIENT, UFBXI_MAT_COLOR, ufbxi_string_literal("AmbientColor") },
-	{ UFBX_MATERIAL_MAP_AMBIENT, UFBXI_MAT_COLOR, ufbxi_string_literal("Ambient") },
-	{ UFBX_MATERIAL_MAP_AMBIENT, UFBXI_MAT_FACTOR, ufbxi_string_literal("AmbientFactor") },
-	{ UFBX_MATERIAL_MAP_NORMAL, UFBXI_MAT_COLOR, ufbxi_string_literal("NormalMap") },
-	{ UFBX_MATERIAL_MAP_BUMP, UFBXI_MAT_COLOR, ufbxi_string_literal("Bump") },
-	{ UFBX_MATERIAL_MAP_BUMP, UFBXI_MAT_FACTOR, ufbxi_string_literal("BumpFactor") },
-	{ UFBX_MATERIAL_MAP_DISPLACEMENT, UFBXI_MAT_COLOR, ufbxi_string_literal("DisplacementColor") },
-	{ UFBX_MATERIAL_MAP_DISPLACEMENT, UFBXI_MAT_FACTOR, ufbxi_string_literal("DisplacementFactor") },
-	{ UFBX_MATERIAL_MAP_VECTOR_DISPLACEMENT, UFBXI_MAT_COLOR, ufbxi_string_literal("VectorDisplacementColor") },
-	{ UFBX_MATERIAL_MAP_VECTOR_DISPLACEMENT, UFBXI_MAT_FACTOR, ufbxi_string_literal("VectorDisplacementFactor") },
-	{ UFBX_MATERIAL_MAP_ROUGHNESS, UFBXI_MAT_COLOR, ufbxi_string_literal("Shininess") },
+	{ UFBX_MATERIAL_FBX_DIFFUSE_COLOR, ufbxi_string_literal("DiffuseColor") },
+	{ UFBX_MATERIAL_FBX_DIFFUSE_COLOR, ufbxi_string_literal("Diffuse") },
+	{ UFBX_MATERIAL_FBX_DIFFUSE_FACTOR, ufbxi_string_literal("DiffuseFactor") },
+	{ UFBX_MATERIAL_FBX_SPECULAR_COLOR, ufbxi_string_literal("SpecularColor") },
+	{ UFBX_MATERIAL_FBX_SPECULAR_COLOR, ufbxi_string_literal("Specular") },
+	{ UFBX_MATERIAL_FBX_SPECULAR_FACTOR, ufbxi_string_literal("SpecularFactor") },
+	{ UFBX_MATERIAL_FBX_SPECULAR_EXPONENT, ufbxi_string_literal("Shininess") },
+	{ UFBX_MATERIAL_FBX_SPECULAR_EXPONENT, ufbxi_string_literal("ShininessExponent") },
+	{ UFBX_MATERIAL_FBX_REFLECTION_COLOR, ufbxi_string_literal("ReflectionColor") },
+	{ UFBX_MATERIAL_FBX_REFLECTION_COLOR, ufbxi_string_literal("Reflection") },
+	{ UFBX_MATERIAL_FBX_REFLECTION_FACTOR, ufbxi_string_literal("ReflectionFactor") },
+	{ UFBX_MATERIAL_FBX_TRANSPARENCY_COLOR, ufbxi_string_literal("TransparentColor") },
+	{ UFBX_MATERIAL_FBX_TRANSPARENCY_COLOR, ufbxi_string_literal("Transparent") },
+	{ UFBX_MATERIAL_FBX_TRANSPARENCY_FACTOR, ufbxi_string_literal("TransparentFactor") },
+	{ UFBX_MATERIAL_FBX_TRANSPARENCY_FACTOR, ufbxi_string_literal("TransparencyFactor") },
+	{ UFBX_MATERIAL_FBX_EMISSION_COLOR, ufbxi_string_literal("EmissiveColor") },
+	{ UFBX_MATERIAL_FBX_EMISSION_COLOR, ufbxi_string_literal("Emissive") },
+	{ UFBX_MATERIAL_FBX_EMISSION_FACTOR, ufbxi_string_literal("EmissiveFactor") },
+	{ UFBX_MATERIAL_FBX_AMBIENT_COLOR, ufbxi_string_literal("AmbientColor") },
+	{ UFBX_MATERIAL_FBX_AMBIENT_COLOR, ufbxi_string_literal("Ambient") },
+	{ UFBX_MATERIAL_FBX_AMBIENT_FACTOR, ufbxi_string_literal("AmbientFactor") },
+	{ UFBX_MATERIAL_FBX_NORMAL_MAP, ufbxi_string_literal("NormalMap") },
+	{ UFBX_MATERIAL_FBX_BUMP, ufbxi_string_literal("Bump") },
+	{ UFBX_MATERIAL_FBX_BUMP_FACTOR, ufbxi_string_literal("BumpFactor") },
+	{ UFBX_MATERIAL_FBX_DISPLACEMENT, ufbxi_string_literal("DisplacementColor") },
+	{ UFBX_MATERIAL_FBX_DISPLACEMENT_FACTOR, ufbxi_string_literal("DisplacementFactor") },
+	{ UFBX_MATERIAL_FBX_VECTOR_DISPLACEMENT, ufbxi_string_literal("VectorDisplacementColor") },
+	{ UFBX_MATERIAL_FBX_VECTOR_DISPLACEMENT_FACTOR, ufbxi_string_literal("VectorDisplacementFactor") },
 };
 
 static const ufbxi_shader_mapping ufbxi_arnold_shader_mapping[] = {
-	{ UFBX_MATERIAL_MAP_DIFFUSE, UFBXI_MAT_COLOR, ufbxi_string_literal("baseColor") },
-	{ UFBX_MATERIAL_MAP_DIFFUSE, UFBXI_MAT_FACTOR, ufbxi_string_literal("base") },
-	{ UFBX_MATERIAL_MAP_SPECULAR, UFBXI_MAT_COLOR, ufbxi_string_literal("specularColor") },
-	{ UFBX_MATERIAL_MAP_SPECULAR, UFBXI_MAT_FACTOR, ufbxi_string_literal("specular") },
-	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_COLOR, ufbxi_string_literal("transmissionColor") },
-	{ UFBX_MATERIAL_MAP_TRANSPARENCY, UFBXI_MAT_FACTOR, ufbxi_string_literal("transmission") },
-	{ UFBX_MATERIAL_MAP_EMISSION, UFBXI_MAT_COLOR, ufbxi_string_literal("emissionColor") },
-	{ UFBX_MATERIAL_MAP_EMISSION, UFBXI_MAT_FACTOR, ufbxi_string_literal("emission") },
-	{ UFBX_MATERIAL_MAP_ROUGHNESS, UFBXI_MAT_COLOR, ufbxi_string_literal("specularRoughness") },
-	{ UFBX_MATERIAL_MAP_METALLIC, UFBXI_MAT_COLOR, ufbxi_string_literal("metalness") },
-	{ UFBX_MATERIAL_MAP_COAT, UFBXI_MAT_COLOR, ufbxi_string_literal("coatColor") },
-	{ UFBX_MATERIAL_MAP_COAT, UFBXI_MAT_FACTOR, ufbxi_string_literal("coat") },
-	{ UFBX_MATERIAL_MAP_DIFFUSE_ROUGHNESS, UFBXI_MAT_COLOR, ufbxi_string_literal("diffuseRoughness") },
-	{ UFBX_MATERIAL_MAP_COAT_ROUGHNESS, UFBXI_MAT_COLOR, ufbxi_string_literal("coatRoughness") },
+	{ UFBX_MATERIAL_PBR_BASE_FACTOR, ufbxi_string_literal("base") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, ufbxi_string_literal("baseColor") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, ufbxi_string_literal("specularRoughness") },
+	{ UFBX_MATERIAL_PBR_DIFFUSE_ROUGHNESS, ufbxi_string_literal("diffuseRoughness") },
+	{ UFBX_MATERIAL_PBR_METALLIC, ufbxi_string_literal("metalness") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_FACTOR, ufbxi_string_literal("specular") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, ufbxi_string_literal("specularColor") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_ROUGHNESS, ufbxi_string_literal("specularRoughness") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_IOR, ufbxi_string_literal("specularIOR") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_ANISOTROPY, ufbxi_string_literal("specularAnisotropy") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_ROTATION, ufbxi_string_literal("specularRotation") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_FACTOR, ufbxi_string_literal("transmission") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, ufbxi_string_literal("transmissionColor") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_DEPTH, ufbxi_string_literal("transmissionDepth") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER, ufbxi_string_literal("transmissionScatter") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER_ANISOTROPY, ufbxi_string_literal("transmissionScatterAnisotropy") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_DISPERSION, ufbxi_string_literal("transmissionDispersion") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_ROUGHNESS, ufbxi_string_literal("transmissionExtraRoughness") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_FACTOR, ufbxi_string_literal("subsurface") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_COLOR, ufbxi_string_literal("subsurfaceColor") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_RADIUS, ufbxi_string_literal("subsurfaceRadius") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_SCALE, ufbxi_string_literal("subsurfaceScale") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_ANISOTROPY, ufbxi_string_literal("subsurfaceAnisotropy") },
+	{ UFBX_MATERIAL_PBR_SHEEN_FACTOR, ufbxi_string_literal("sheen") },
+	{ UFBX_MATERIAL_PBR_SHEEN_COLOR, ufbxi_string_literal("sheenColor") },
+	{ UFBX_MATERIAL_PBR_SHEEN_ROUGHNESS, ufbxi_string_literal("sheenRoughness") },
+	{ UFBX_MATERIAL_PBR_COAT_FACTOR, ufbxi_string_literal("coat") },
+	{ UFBX_MATERIAL_PBR_COAT_COLOR, ufbxi_string_literal("coatColor") },
+	{ UFBX_MATERIAL_PBR_COAT_ROUGHNESS, ufbxi_string_literal("coatRoughness") },
+	{ UFBX_MATERIAL_PBR_COAT_IOR, ufbxi_string_literal("coatIOR") },
+	{ UFBX_MATERIAL_PBR_COAT_ANISOTROPY, ufbxi_string_literal("coatAnisotropy") },
+	{ UFBX_MATERIAL_PBR_COAT_ROTATION, ufbxi_string_literal("coatRotation") },
+	{ UFBX_MATERIAL_PBR_COAT_NORMAL, ufbxi_string_literal("coatNormal") },
+	{ UFBX_MATERIAL_PBR_THIN_FILM_THICKNESS, ufbxi_string_literal("thinFilmThickness") },
+	{ UFBX_MATERIAL_PBR_THIN_FILM_IOR, ufbxi_string_literal("thinFilmIOR") },
+	{ UFBX_MATERIAL_PBR_EMISSION_FACTOR, ufbxi_string_literal("emission") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, ufbxi_string_literal("emissionColor") },
+	{ UFBX_MATERIAL_PBR_OPACITY, ufbxi_string_literal("opacity") },
+	{ UFBX_MATERIAL_PBR_INDIRECT_DIFFUSE, ufbxi_string_literal("indirectDiffuse") },
+	{ UFBX_MATERIAL_PBR_INDIRECT_SPECULAR, ufbxi_string_literal("indirectSpecular") },
+	{ UFBX_MATERIAL_PBR_NORMAL_MAP, ufbxi_string_literal("cameraNormal") },
 };
 
-static const ufbxi_shader_mapping_list ufbxi_shader_mappings[] = {
+static void ufbxi_mat_transform_blender_opacity(ufbx_vec3 *v) { v->x = 1.0f - v->x; }
+static void ufbxi_mat_transform_blender_shininess(ufbx_vec3 *v) { v->x = (ufbx_real)(1.0f - sqrt(v->x) * 0.1f); }
+
+static const ufbxi_shader_mapping ufbxi_blender_phong_shader_mapping[] = {
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, ufbxi_string_literal("DiffuseColor") },
+	{ UFBX_MATERIAL_PBR_OPACITY, ufbxi_string_literal("TransparencyFactor"), &ufbxi_mat_transform_blender_opacity },
+	{ UFBX_MATERIAL_PBR_EMISSION_FACTOR, ufbxi_string_literal("EmissiveFactor") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, ufbxi_string_literal("EmissiveColor") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, ufbxi_string_literal("Shininess"), &ufbxi_mat_transform_blender_shininess },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, ufbxi_string_literal("ShininessExponent"), &ufbxi_mat_transform_blender_shininess },
+	{ UFBX_MATERIAL_PBR_METALLIC, ufbxi_string_literal("ReflectionFactor") },
+	{ UFBX_MATERIAL_PBR_NORMAL_MAP, ufbxi_string_literal("NormalMap") },
+};
+
+
+static const ufbxi_shader_mapping_list ufbxi_shader_pbr_mappings[] = {
 	{ NULL, 0 }, // UFBX_SHADER_UNKNOWN
 	{ ufbxi_arnold_shader_mapping, ufbxi_arraycount(ufbxi_arnold_shader_mapping) }, // UFBX_SHADER_ARNOLD
+	{ ufbxi_blender_phong_shader_mapping, ufbxi_arraycount(ufbxi_blender_phong_shader_mapping) }, // UFBX_SHADER_BLENDER_PHONG
 };
 
-ufbx_static_assert(shader_mapping_list, ufbxi_arraycount(ufbxi_shader_mappings) == UFBX_NUM_SHADER_TYPES);
+ufbx_static_assert(shader_pbr_mapping_list, ufbxi_arraycount(ufbxi_shader_pbr_mappings) == UFBX_NUM_SHADER_TYPES);
 
-static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufbx_shader *shader, const ufbxi_shader_mapping *mappings, size_t count)
+static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufbx_material_map *maps, ufbx_shader *shader, const ufbxi_shader_mapping *mappings, size_t count)
 {
 	ufbxi_for(const ufbxi_shader_mapping, mapping, mappings, count) {
 		ufbx_string name = ufbx_find_shader_prop_len(shader, mapping->prop.data, mapping->prop.length);
 		ufbx_texture *texture = ufbx_find_prop_texture_len(material, name.data, name.length);
 		ufbx_prop *prop = ufbx_find_prop_len(&material->props, name.data, name.length);
-		ufbx_material_map *map = &material->maps[mapping->map];
+		ufbx_material_map *map = &maps[mapping->index];
 
-		if (mapping->tex == UFBXI_MAT_COLOR) {
-			if (prop) map->color = prop->value_vec3;
-			if (texture) map->color_texture = texture;
-		} else if (mapping->tex == UFBXI_MAT_FACTOR) {
-			if (prop) map->factor = prop->value_real;
-			if (texture) map->factor_texture = texture;
+		if (prop) {
+			map->value = prop->value_vec3;
+			map->has_value = true;
+			if (mapping->transform_fn) {
+				mapping->transform_fn(&map->value);
+			}
+		}
+		if (texture) {
+			map->texture = texture;
 		}
 	}
 }
@@ -6939,11 +7074,10 @@ static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufbx_shader *shade
 static void ufbxi_fetch_maps(ufbx_material *material)
 {
 	ufbx_shader *shader = material->shader;
-	ufbxi_fetch_mapping_maps(material, NULL, ufbxi_fbx_shader_mapping, ufbxi_arraycount(ufbxi_fbx_shader_mapping));
-	if (shader && shader->type >= 0 && shader->type < UFBX_NUM_SHADER_TYPES) {
-		ufbxi_shader_mapping_list list = ufbxi_shader_mappings[shader->type];
-		ufbxi_fetch_mapping_maps(material, shader, list.data, list.count);
-	}
+	ufbxi_fetch_mapping_maps(material, material->fbx.maps, NULL, ufbxi_fbx_shader_mapping, ufbxi_arraycount(ufbxi_fbx_shader_mapping));
+	ufbx_assert(material->shader_type < UFBX_NUM_SHADER_TYPES);
+	ufbxi_shader_mapping_list list = ufbxi_shader_pbr_mappings[material->shader_type];
+	ufbxi_fetch_mapping_maps(material, material->pbr.maps, shader, list.data, list.count);
 }
 
 ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
@@ -7294,6 +7428,13 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	ufbxi_for_ptr_list(ufbx_material, p_material, uc->scene.materials) {
 		ufbx_material *material = *p_material;
 		material->shader = (ufbx_shader*)ufbxi_fetch_src_element(uc, &material->element, NULL, UFBX_ELEMENT_SHADER);
+		if (material->shader) {
+			material->shader_type = material->shader->type;
+		} else {
+			if (uc->exporter == UFBX_EXPORTER_BLENDER_BINARY && uc->exporter_version >= ufbx_pack_version(4,12,0)) {
+				material->shader_type = UFBX_SHADER_BLENDER_PHONG;
+			}
+		}
 
 		ufbxi_check(ufbxi_fetch_textures(uc, &material->textures, &material->element));
 	}
@@ -10848,6 +10989,8 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 
 	// Copy local data to the scene
 	uc->scene.metadata.version = uc->version;
+	uc->scene.metadata.exporter = uc->exporter;
+	uc->scene.metadata.exporter_version = uc->exporter_version;
 	uc->scene.metadata.ascii = uc->from_ascii;
 
 	// Retain the scene, this must be the final allocation as we copy
