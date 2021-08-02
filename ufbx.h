@@ -694,6 +694,8 @@ UFBX_LIST_TYPE(ufbx_material_texture_list, ufbx_material_texture);
 
 typedef enum ufbx_shader_type {
 	UFBX_SHADER_UNKNOWN,
+	UFBX_SHADER_FBX_LAMBERT,
+	UFBX_SHADER_FBX_PHONG,
 	UFBX_SHADER_ARNOLD,
 	UFBX_SHADER_BLENDER_PHONG,
 
@@ -851,6 +853,7 @@ struct ufbx_material {
 
 	ufbx_shader *shader;
 	ufbx_shader_type shader_type;
+	ufbx_string shading_model_name;
 
 	ufbx_material_fbx_maps fbx;
 	ufbx_material_pbr_maps pbr;

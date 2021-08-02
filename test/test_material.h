@@ -106,3 +106,33 @@ UFBXT_FILE_TEST(blender_293_material_mapping)
 	ufbxt_assert_close_real(err, material->pbr.roughness.value.x, 0.123f);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_different_shaders)
+#if UFBXT_IMPL
+{
+	ufbx_material *lambert1 = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "lambert1");
+	ufbx_material *phong1 = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "phong1");
+	ufbx_material *arnold = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "aiStandardSurface1");
+	ufbxt_assert(lambert1 && phong1 && arnold);
+
+	ufbx_vec3 r = { 1.0f, 0.0f, 0.0f };
+	ufbx_vec3 g = { 0.0f, 1.0f, 0.0f };
+	ufbx_vec3 b = { 0.0f, 0.0f, 1.0f };
+
+	ufbxt_assert(lambert1->shader_type == UFBX_SHADER_FBX_LAMBERT);
+	ufbxt_assert(!strcmp(lambert1->shading_model_name.data, "lambert"));
+	ufbxt_assert_close_vec3(err, lambert1->fbx.diffuse_color.value, g);
+	ufbxt_assert_close_vec3(err, lambert1->pbr.base_color.value, g);
+	ufbxt_assert_close_real(err, lambert1->pbr.specular_factor.value.x, 0.0f);
+
+	ufbxt_assert(phong1->shader_type == UFBX_SHADER_FBX_PHONG);
+	ufbxt_assert(!strcmp(phong1->shading_model_name.data, "phong"));
+	ufbxt_assert_close_vec3(err, phong1->fbx.diffuse_color.value, b);
+	ufbxt_assert_close_vec3(err, phong1->pbr.base_color.value, b);
+	ufbxt_assert_close_real(err, phong1->pbr.specular_factor.value.x, 1.0f);
+
+	ufbxt_assert(arnold->shader_type == UFBX_SHADER_ARNOLD);
+	ufbxt_assert(!strcmp(arnold->shading_model_name.data, "unknown"));
+	ufbxt_assert_close_vec3(err, arnold->pbr.base_color.value, r);
+}
+#endif
