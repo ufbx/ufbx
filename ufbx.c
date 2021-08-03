@@ -6848,6 +6848,24 @@ ufbxi_nodiscard static int ufbxi_fetch_textures(ufbxi_context *uc, ufbx_material
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_fetch_deformers(ufbxi_context *uc,  ufbx_element_list *list, ufbx_element *element)
+{
+	size_t num_deformers = 0;
+	ufbxi_for_list(ufbx_connection, conn, element->connections_dst) {
+		if (conn->src_prop.length > 0) continue;
+		ufbx_element_type type = conn->src->type;
+		if (type == UFBX_ELEMENT_SKIN_DEFORMER || type == UFBX_ELEMENT_BLEND_DEFORMER || type == UFBX_ELEMENT_CACHE_DEFORMER) {
+			ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_element*, 1, &conn->src));
+		}
+	}
+
+	list->data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_element*, num_deformers);
+	list->count = num_deformers;
+	ufbxi_check(list->data);
+
+	return 1;
+}
+
 static ufbxi_forceinline bool ufbxi_prop_connection_less(const ufbx_connection *a, const char *prop)
 {
 	int cmp = strcmp(a->dst_prop.data, prop);
@@ -7359,11 +7377,9 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->materials, &mesh->element, NULL, UFBX_ELEMENT_MATERIAL));
 
 			// Try to fetch materials from a node if not found in the mesh
-			if (mesh->materials.count == 0) {
-				ufbx_node *node = (ufbx_node*)ufbxi_fetch_src_element(uc, &mesh->element, NULL, UFBX_ELEMENT_NODE);
-				if (node) {
-					ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->materials, &node->element, NULL, UFBX_ELEMENT_MATERIAL));
-				}
+			if (mesh->materials.count == 0 && mesh->instances.count > 0) {
+				ufbx_node *node = mesh->instances.data[0];
+				ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->materials, &node->element, NULL, UFBX_ELEMENT_MATERIAL));
 			}
 
 			size_t num_materials = mesh->materials.count;
@@ -7377,6 +7393,12 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 					}
 				}
 			}
+
+			// Fetch deformers
+			ufbxi_check(ufbxi_fetch_src_elements(uc, &mesh->skins, &mesh->element, NULL, UFBX_ELEMENT_SKIN_DEFORMER));
+			ufbxi_check(ufbxi_fetch_src_elements(uc, &mesh->blend_shapes, &mesh->element, NULL, UFBX_ELEMENT_BLEND_DEFORMER));
+			ufbxi_check(ufbxi_fetch_src_elements(uc, &mesh->geometry_caches, &mesh->element, NULL, UFBX_ELEMENT_CACHE_DEFORMER));
+			ufbxi_check(ufbxi_fetch_deformers(uc, &mesh->all_deformers, &mesh->element));
 		}
 	}
 

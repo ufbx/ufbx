@@ -557,9 +557,11 @@ struct ufbx_mesh {
 	// List of materials used by the mesh, indexed by `ufbx_mesh.face_material`
 	ufbx_material_list materials;
 
-	ufbx_element_list deformers;
+	// Deformers
 	ufbx_skin_deformer_list skins;
-	ufbx_blend_deformer_list blends;
+	ufbx_blend_deformer_list blend_shapes;
+	ufbx_cache_deformer_list geometry_caches;
+	ufbx_element_list all_deformers;
 };
 
 struct ufbx_light {
