@@ -90,10 +90,11 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 			int cmp = strcmp(c[-1].src_prop.data, c[0].src_prop.data);
 			ufbxt_assert(cmp <= 0);
 			if (cmp == 0) {
-				ufbxt_assert(strcmp(c[-1].dst_prop.data, c[0].dst_prop.data));
+				ufbxt_assert(strcmp(c[-1].dst_prop.data, c[0].dst_prop.data) <= 0);
 			}
 		}
 	}
+
 	for (size_t i = 0; i < element->connections_dst.count; i++) {
 		ufbx_connection *c = &element->connections_dst.data[i];
 		ufbxt_check_string(c->src_prop);
@@ -103,17 +104,32 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 			int cmp = strcmp(c[-1].dst_prop.data, c[0].dst_prop.data);
 			ufbxt_assert(cmp <= 0);
 			if (cmp == 0) {
-				ufbxt_assert(strcmp(c[-1].src_prop.data, c[0].src_prop.data));
+				ufbxt_assert(strcmp(c[-1].src_prop.data, c[0].src_prop.data) <= 0);
 			}
 		}
+	}
+
+	ufbxt_assert(element->type >= 0);
+	ufbxt_assert(element->type < UFBX_NUM_ELEMENT_TYPES);
+	if (element->type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && element->type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB) {
+		for (size_t i = 0; i < element->instances.count; i++) {
+			ufbx_node *node = element->instances.data[i];
+			bool found = false;
+			for (size_t j = 0; j < node->all_attribs.count; j++) {
+				if (node->all_attribs.data[j] == element) {
+					found = true;
+					break;
+				}
+			}
+			ufbxt_assert(found);
+		}
+	} else {
+		ufbxt_assert(element->instances.count == 0);
 	}
 }
 
 static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 {
-	ufbxt_check_string(node->name);
-	ufbxt_check_props(scene, &node->props, true);
-
 	if (node->parent) {
 		bool found = false;
 		for (size_t i = 0; i < node->parent->children.count; i++) {
@@ -139,6 +155,20 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 			}
 		}
 		ufbxt_assert(found);
+	}
+
+	if (node->all_attribs.count > 0) {
+		ufbxt_assert(node->attrib == node->all_attribs.data[0]);
+		if (node->all_attribs.count == 1) {
+			ufbxt_assert(node->attrib_type == node->attrib->type);
+		}
+	}
+
+	switch (node->attrib_type) {
+	case UFBX_ELEMENT_MESH: ufbxt_assert(node->mesh); break;
+	case UFBX_ELEMENT_LIGHT: ufbxt_assert(node->light); break;
+	case UFBX_ELEMENT_CAMERA: ufbxt_assert(node->camera); break;
+	case UFBX_ELEMENT_BONE: ufbxt_assert(node->bone); break;
 	}
 }
 
@@ -294,6 +324,10 @@ static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_laye
 static void ufbxt_check_scene(ufbx_scene *scene)
 {
 	ufbxt_check_string(scene->metadata.creator);
+
+	for (size_t i = 0; i < scene->elements.count; i++) {
+		ufbxt_check_element(scene, scene->elements.data[i]);
+	}
 
 	for (size_t i = 0; i < scene->nodes.count; i++) {
 		ufbxt_check_node(scene, scene->nodes.data[i]);

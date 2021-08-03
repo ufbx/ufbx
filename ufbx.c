@@ -6144,9 +6144,9 @@ ufbxi_nodiscard static int ufbxi_read_take_prop_channel(ufbxi_context *uc, ufbxi
 			ufbxi_check(ufbxi_get_val1(child, "C", (char**)&old_name));
 
 			ufbx_string new_name;
-			if (old_name == ufbxi_T) { new_name.data = ufbxi_Lcl_Translation; new_name.length = sizeof(ufbxi_Lcl_Translation - 1); }
-			else if (old_name == ufbxi_R) { new_name.data = ufbxi_Lcl_Rotation; new_name.length = sizeof(ufbxi_Lcl_Rotation - 1); }
-			else if (old_name == ufbxi_S) { new_name.data = ufbxi_Lcl_Scaling; new_name.length = sizeof(ufbxi_Lcl_Scaling - 1); }
+			if (old_name == ufbxi_T) { new_name.data = ufbxi_Lcl_Translation; new_name.length = sizeof(ufbxi_Lcl_Translation) - 1; }
+			else if (old_name == ufbxi_R) { new_name.data = ufbxi_Lcl_Rotation; new_name.length = sizeof(ufbxi_Lcl_Rotation) - 1; }
+			else if (old_name == ufbxi_S) { new_name.data = ufbxi_Lcl_Scaling; new_name.length = sizeof(ufbxi_Lcl_Scaling) - 1; }
 			else {
 				continue;
 			}
@@ -6633,6 +6633,7 @@ ufbxi_nodiscard static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
 					new_prop->flags |= UFBX_PROP_FLAG_ANIMATABLE | UFBX_PROP_FLAG_SYNTHETIC | flags;
 					new_prop->name = name;
 					new_prop->internal_key = key;
+					new_prop->value_str = ufbx_empty_string;
 					num_synthetic++;
 				}
 			}
@@ -7214,10 +7215,11 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	// Setup node children arrays and attribute pointers/lists
 	ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
 		ufbx_node *node = *p_node, *parent = node->parent;
-		if (!parent) continue;
-		parent->children.count++;
-		if (parent->children.data == NULL) {
-			parent->children.data = p_node;
+		if (parent) {
+			parent->children.count++;
+			if (parent->children.data == NULL) {
+				parent->children.data = p_node;
+			}
 		}
 
 		ufbx_connection_list conns = ufbxi_find_dst_connections(uc, &node->element, NULL);
@@ -7225,7 +7227,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		ufbxi_for_list(ufbx_connection, conn, conns) {
 			ufbx_element *elem = conn->src;
 			ufbx_element_type type = elem->type;
-			if (!(type >= UFBX_ELEMENT_MESH && type <= UFBX_ELEMENT_LOD_GROUP)) continue;
+			if (!(type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB)) continue;
 
 			size_t index = node->all_attribs.count++;
 			if (index == 0) {
@@ -7288,7 +7290,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	}
 
 	// Setup node attribute instances
-	for (int type = UFBX_ELEMENT_MESH; type <= UFBX_ELEMENT_LOD_GROUP; type++) {
+	for (int type = UFBX_ELEMENT_TYPE_FIRST_ATTRIB; type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB; type++) {
 		ufbxi_for_ptr_list(ufbx_element, p_elem, uc->scene.elements_by_type[type]) {
 			ufbx_element *elem = *p_elem;
 			ufbxi_check(ufbxi_fetch_src_elements(uc, &elem->instances, elem, NULL, UFBX_ELEMENT_NODE));
