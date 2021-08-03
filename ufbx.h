@@ -339,6 +339,8 @@ typedef enum ufbx_element_type {
 	UFBX_ELEMENT_POSE,                // < `ufbx_pose`
 
 	UFBX_NUM_ELEMENT_TYPES,
+	UFBX_ELEMENT_TYPE_FIRST_ATTRIB = UFBX_ELEMENT_MESH,
+	UFBX_ELEMENT_TYPE_LAST_ATTRIB = UFBX_ELEMENT_LOD_GROUP,
 } ufbx_element_type;
 
 // Connection between two elements source and destination are somewhat
@@ -359,6 +361,7 @@ UFBX_LIST_TYPE(ufbx_connection_list, ufbx_connection);
 struct ufbx_element {
 	ufbx_string name;
 	ufbx_props props;
+	ufbx_node_list instances;
 	ufbx_element_type type;
 	uint32_t id;
 	uint32_t typed_id;
@@ -509,7 +512,7 @@ typedef struct ufbx_face {
 
 // Polygonal mesh geometry.
 struct ufbx_mesh {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 
 	// Number of "logical" vertices that would be treated as a single point,
 	// one vertex may be split to multiple indices for split attributes, eg. UVs
@@ -560,66 +563,66 @@ struct ufbx_mesh {
 };
 
 struct ufbx_light {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 struct ufbx_camera {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 struct ufbx_bone {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 struct ufbx_empty {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 // -- Node attributes (curves/surfaces)
 
 struct ufbx_line_curve {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 struct ufbx_nurbs_curve {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 struct ufbx_patch_surface {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 struct ufbx_nurbs_surface {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 struct ufbx_nurbs_trim_surface {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 struct ufbx_nurbs_trim_boundary {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 // -- Node attributes (advanced)
 
 struct ufbx_procedural_geometry {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 struct ufbx_camera_stereo {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 
 	ufbx_camera *left;
 	ufbx_camera *right;
 };
 
 struct ufbx_camera_switcher {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 struct ufbx_lod_group {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 // -- Deformers

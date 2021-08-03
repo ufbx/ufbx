@@ -6782,6 +6782,26 @@ ufbxi_nodiscard static int ufbxi_fetch_dst_elements(ufbxi_context *uc, void *p_d
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_fetch_src_elements(ufbxi_context *uc, void *p_dst_list, ufbx_element *element, const char *prop, ufbx_element_type dst_type)
+{
+	ufbx_connection_list conns = ufbxi_find_src_connections(uc, element, prop);
+
+	size_t num_elements = 0;
+	ufbxi_for_list(ufbx_connection, conn, conns) {
+		if (conn->dst->type == dst_type) {
+			ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_element*, 1, &conn->dst));
+			num_elements++;
+		}
+	}
+
+	ufbx_element_list *list = (ufbx_element_list*)p_dst_list;
+	list->data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_element*, num_elements);
+	list->count = num_elements;
+	ufbxi_check(list->data);
+
+	return 1;
+}
+
 ufbxi_nodiscard static ufbx_element *ufbxi_fetch_dst_element(ufbxi_context *uc, ufbx_element *element, const char *prop, ufbx_element_type src_type)
 {
 	ufbx_connection_list conns = ufbxi_find_dst_connections(uc, element, prop);
@@ -7264,6 +7284,14 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 					}
 				}
 			}
+		}
+	}
+
+	// Setup node attribute instances
+	for (int type = UFBX_ELEMENT_MESH; type <= UFBX_ELEMENT_LOD_GROUP; type++) {
+		ufbxi_for_ptr_list(ufbx_element, p_elem, uc->scene.elements_by_type[type]) {
+			ufbx_element *elem = *p_elem;
+			ufbxi_check(ufbxi_fetch_src_elements(uc, &elem->instances, elem, NULL, UFBX_ELEMENT_NODE));
 		}
 	}
 

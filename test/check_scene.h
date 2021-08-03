@@ -128,6 +128,18 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	for (size_t i = 0; i < node->children.count; i++) {
 		ufbxt_assert(node->children.data[i]->parent == node);
 	}
+
+	for (size_t i = 0; i < node->all_attribs.count; i++) {
+		ufbx_element *attrib = node->all_attribs.data[i];
+		bool found = false;
+		for (size_t j = 0; j < attrib->instances.count; j++) {
+			if (attrib->instances.data[j] == node) {
+				found = true;
+				break;
+			}
+		}
+		ufbxt_assert(found);
+	}
 }
 
 static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
