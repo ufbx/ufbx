@@ -34,7 +34,7 @@ UFBXT_FILE_TEST(maya_shared_textures)
 	ufbxt_assert(material);
 	ufbxt_assert(material->textures.count == 6);
 
-	ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_PHONG);
+	ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_LAMBERT);
 	ufbxt_assert(!strcmp(material->fbx.diffuse_color.texture->relative_filename.data, "textures\\checkerboard_ambient.png")); // sic: test has wrong texture
 	ufbxt_assert(!strcmp(material->fbx.diffuse_factor.texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
 	ufbxt_assert(!strcmp(material->fbx.emission_color.texture->relative_filename.data, "textures\\checkerboard_emissive.png"));
