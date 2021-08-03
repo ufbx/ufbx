@@ -34,6 +34,7 @@ UFBXT_FILE_TEST(maya_shared_textures)
 	ufbxt_assert(material);
 	ufbxt_assert(material->textures.count == 6);
 
+	ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_PHONG);
 	ufbxt_assert(!strcmp(material->fbx.diffuse_color.texture->relative_filename.data, "textures\\checkerboard_ambient.png")); // sic: test has wrong texture
 	ufbxt_assert(!strcmp(material->fbx.diffuse_factor.texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
 	ufbxt_assert(!strcmp(material->fbx.emission_color.texture->relative_filename.data, "textures\\checkerboard_emissive.png"));
@@ -42,6 +43,7 @@ UFBXT_FILE_TEST(maya_shared_textures)
 	ufbxt_assert(!strcmp(material->fbx.bump.texture->relative_filename.data, "textures\\checkerboard_bump.png"));
 
 	material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Special");
+	ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_PHONG);
 	ufbxt_assert(material);
 	ufbxt_assert(material->textures.count == 1);
 
@@ -56,6 +58,7 @@ UFBXT_FILE_TEST(maya_arnold_textures)
 	ufbxt_assert(material);
 	ufbxt_assert(material->textures.count == 5);
 
+	ufbxt_assert(material->shader_type == UFBX_SHADER_ARNOLD);
 	ufbxt_assert(!strcmp(material->pbr.base_color.texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
 	ufbxt_assert(!strcmp(material->pbr.specular_color.texture->relative_filename.data, "textures\\checkerboard_specular.png"));
 	ufbxt_assert(!strcmp(material->pbr.roughness.texture->relative_filename.data, "textures\\checkerboard_roughness.png"));
@@ -71,6 +74,7 @@ UFBXT_FILE_TEST(blender_279_internal_textures)
 	ufbxt_assert(material);
 	ufbxt_assert(material->textures.count == 5);
 
+	ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_PHONG);
 	ufbxt_assert(!strcmp(material->fbx.diffuse_color.texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
 	ufbxt_assert(!strcmp(material->fbx.specular_color.texture->relative_filename.data, "textures\\checkerboard_specular.png"));
 	ufbxt_assert(!strcmp(material->fbx.specular_factor.texture->relative_filename.data, "textures\\checkerboard_weight.png"));
@@ -86,6 +90,7 @@ UFBXT_FILE_TEST(blender_293_textures)
 	ufbxt_assert(material);
 	ufbxt_assert(material->textures.count == 5);
 
+	ufbxt_assert(material->shader_type == UFBX_SHADER_BLENDER_PHONG);
 	ufbxt_assert(!strcmp(material->pbr.base_color.texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
 	ufbxt_assert(!strcmp(material->pbr.roughness.texture->relative_filename.data, "textures\\checkerboard_roughness.png"));
 	ufbxt_assert(!strcmp(material->pbr.metallic.texture->relative_filename.data, "textures\\checkerboard_metallic.png"));
@@ -100,6 +105,7 @@ UFBXT_FILE_TEST(blender_293_material_mapping)
 	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Material.001");
 	ufbxt_assert(material);
 
+	ufbxt_assert(material->shader_type == UFBX_SHADER_BLENDER_PHONG);
 	ufbxt_assert_close_real(err, material->fbx.specular_exponent.value.x, 76.913f);
 	ufbxt_assert_close_real(err, material->fbx.transparency_factor.value.x, 0.544f);
 	ufbxt_assert_close_real(err, material->pbr.opacity.value.x, 0.456f);
@@ -134,5 +140,35 @@ UFBXT_FILE_TEST(maya_different_shaders)
 	ufbxt_assert(arnold->shader_type == UFBX_SHADER_ARNOLD);
 	ufbxt_assert(!strcmp(arnold->shading_model_name.data, "unknown"));
 	ufbxt_assert_close_vec3(err, arnold->pbr.base_color.value, r);
+}
+#endif
+
+UFBXT_TEST(blender_phong_quirks)
+#if UFBXT_IMPL
+{
+	for (int quirks = 0; quirks <= 1; quirks++) {
+		ufbx_load_opts opts = { 0 };
+		opts.disable_quirks = (quirks == 0);
+
+		char buf[512];
+		snprintf(buf, sizeof(buf), "%s%s", data_root, "blender_293_textures_7400_binary.fbx");
+
+		ufbx_scene *scene = ufbx_load_file(buf, &opts, NULL);
+		ufbxt_assert(scene);
+
+		// Exporter should be detected even with quirks off
+		ufbxt_assert(scene->metadata.exporter == UFBX_EXPORTER_BLENDER_BINARY);
+		ufbxt_assert(scene->metadata.exporter_version == ufbx_pack_version(4, 22, 0));
+
+		ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Material.001");
+		ufbxt_assert(material);
+		if (quirks) {
+			ufbxt_assert(material->shader_type == UFBX_SHADER_BLENDER_PHONG);
+		} else {
+			ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_PHONG);
+		}
+
+		ufbx_free_scene(scene);
+	}
 }
 #endif

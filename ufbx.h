@@ -682,6 +682,10 @@ struct ufbx_blend_shape {
 	int32_t *indices;
 };
 
+struct ufbx_cache_deformer {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
 // -- Materials
 
 typedef struct ufbx_material_map {
@@ -1045,16 +1049,7 @@ typedef struct ufbx_metadata {
 	size_t result_allocs;
 	size_t temp_allocs;
 
-	size_t num_total_child_refs;
-	size_t num_total_material_refs;
-	size_t num_total_blend_channel_refs;
-	size_t num_total_skins;
-	size_t num_skinned_positions;
-	size_t num_skinned_indices;
-	size_t max_skinned_positions;
-	size_t max_skinned_indices;
-	size_t max_skinned_blended_positions;
-	size_t max_skinned_blended_indices;
+	size_t element_buffer_size;
 
 	double ktime_to_sec;
 } ufbx_metadata;
@@ -1222,6 +1217,9 @@ typedef struct ufbx_load_opts {
 	bool ignore_animation;  // < Do not load animation curves
 	bool evaluate_skinning; // < Evaluate skinning (see ufbx_mesh.skinned_vertices)
 
+	// Don't adjust reading the FBX file depending on the detected exporter
+	bool disable_quirks;
+
 	// Allow indices in `ufbx_vertex_TYPE` arrays that area larger than the data
 	// array. Enabling this makes `ufbx_get_vertex_TYPE()` unsafe as they don't
 	// do bounds checking.
@@ -1247,6 +1245,12 @@ typedef struct ufbx_load_opts {
 
 } ufbx_load_opts;
 
+typedef struct ufbx_evaluate_opts {
+
+	ufbx_allocator result_allocator; // < Allocator used for the final scene
+	bool evaluate_skinning; // < Evaluate skinning (see ufbx_mesh.skinned_vertices)
+} ufbx_evaluate_opts;
+
 // -- API
 
 #ifdef __cplusplus
@@ -1260,6 +1264,7 @@ extern const ufbx_vec2 ufbx_zero_vec2;
 extern const ufbx_vec3 ufbx_zero_vec3;
 extern const ufbx_vec4 ufbx_zero_vec4;
 extern const ufbx_quat ufbx_identity_quat;
+extern const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES];
 extern const uint32_t ufbx_source_version;
 
 // Load a scene from a `size` byte memory buffer at `data`
@@ -1323,6 +1328,8 @@ ufbx_inline ufbx_prop ufbx_evaluate_prop(ufbx_anim anim, ufbx_element *element, 
 }
 
 ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
+
+ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, ufbx_anim anim, double time, const ufbx_evaluate_opts *opts);
 
 // Materials
 

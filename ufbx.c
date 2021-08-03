@@ -4404,6 +4404,15 @@ ufbxi_nodiscard static int ufbxi_match_exporter(ufbxi_context *uc)
 		uc->exporter_version = ufbx_pack_version(version[0]/10000u, version[0]/100u%100u, version[0]%100u);
 	}
 
+	uc->scene.metadata.exporter = uc->exporter;
+	uc->scene.metadata.exporter_version = uc->exporter_version;
+
+	// Un-detect the exporter in `ufbxi_context` to disable special cases
+	if (uc->opts.disable_quirks) {
+		uc->exporter = UFBX_EXPORTER_UNKNOWN;
+		uc->exporter_version = 0;
+	}
+
 	return 1;
 }
 
@@ -7181,6 +7190,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	uc->scene.elements.data = ufbxi_push(&uc->result, ufbx_element*, num_elements);
 	ufbxi_check(uc->scene.elements.data);
 
+	uc->scene.metadata.element_buffer_size = uc->tmp_element_byte_offset;
 	char *element_data = (char*)ufbxi_push_pop(&uc->result, &uc->tmp_elements, uint64_t, uc->tmp_element_byte_offset/8);
 	ufbxi_check(element_data);
 
@@ -11102,8 +11112,6 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 
 	// Copy local data to the scene
 	uc->scene.metadata.version = uc->version;
-	uc->scene.metadata.exporter = uc->exporter;
-	uc->scene.metadata.exporter_version = uc->exporter_version;
 	uc->scene.metadata.ascii = uc->from_ascii;
 
 	// Retain the scene, this must be the final allocation as we copy
@@ -12032,6 +12040,41 @@ const ufbx_vec2 ufbx_zero_vec2 = { 0,0 };
 const ufbx_vec3 ufbx_zero_vec3 = { 0,0,0 };
 const ufbx_vec4 ufbx_zero_vec4 = { 0,0,0,0 };
 const ufbx_quat ufbx_identity_quat = { 0,0,0,1 };
+const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES] = {
+	sizeof(ufbx_unknown),
+	sizeof(ufbx_node),
+	sizeof(ufbx_mesh),
+	sizeof(ufbx_light),
+	sizeof(ufbx_camera),
+	sizeof(ufbx_bone),
+	sizeof(ufbx_empty),
+	sizeof(ufbx_line_curve),
+	sizeof(ufbx_nurbs_curve),
+	sizeof(ufbx_patch_surface),
+	sizeof(ufbx_nurbs_surface),
+	sizeof(ufbx_nurbs_trim_surface),
+	sizeof(ufbx_nurbs_trim_boundary),
+	sizeof(ufbx_procedural_geometry),
+	sizeof(ufbx_camera_stereo),
+	sizeof(ufbx_camera_switcher),
+	sizeof(ufbx_lod_group),
+	sizeof(ufbx_skin_deformer),
+	sizeof(ufbx_skin_cluster),
+	sizeof(ufbx_blend_deformer),
+	sizeof(ufbx_blend_channel),
+	sizeof(ufbx_blend_shape),
+	sizeof(ufbx_cache_deformer),
+	sizeof(ufbx_material),
+	sizeof(ufbx_texture),
+	sizeof(ufbx_video),
+	sizeof(ufbx_shader),
+	sizeof(ufbx_shader_binding),
+	sizeof(ufbx_anim_stack),
+	sizeof(ufbx_anim_layer),
+	sizeof(ufbx_anim_value),
+	sizeof(ufbx_anim_curve),
+	sizeof(ufbx_pose),
+};
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)
 {
@@ -12440,6 +12483,10 @@ ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double tim
 	ret.num_props = ret.num_animated = num_anim;
 	ret.defaults = &element->props;
 	return ret;
+}
+
+ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, ufbx_anim anim, double time, const ufbx_evaluate_opts *opts)
+{
 }
 
 ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const char *name, size_t name_len)
