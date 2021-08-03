@@ -138,5 +138,34 @@ UFBXT_FILE_TEST(synthetic_missing_version)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(scene->metadata.version == 6100);
+	ufbxt_assert(scene->metadata.exporter == UFBX_EXPORTER_FBX_SDK);
+	ufbxt_assert(scene->metadata.exporter_version == ufbx_pack_version(2007, 2, 28));
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_missing_exporter)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->metadata.version == 6100);
+	ufbxt_assert(scene->metadata.exporter == UFBX_EXPORTER_UNKNOWN);
+	ufbxt_assert(scene->metadata.exporter_version == 0);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_blender_old_exporter)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->metadata.version == 6100);
+	ufbxt_assert(scene->metadata.exporter == UFBX_EXPORTER_UNKNOWN);
+	ufbxt_assert(scene->metadata.exporter_version == 0);
+}
+#endif
+
+UFBXT_FILE_TEST(blender_272_cube)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->metadata.version == 7400);
+	ufbxt_assert(scene->metadata.exporter == UFBX_EXPORTER_BLENDER_BINARY);
+	ufbxt_assert(scene->metadata.exporter_version == ufbx_pack_version(2, 72, 0));
 }
 #endif

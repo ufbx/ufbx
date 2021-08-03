@@ -2,6 +2,14 @@
 UFBXT_FILE_TEST(blender_279_default)
 #if UFBXT_IMPL
 {
+	if (scene->metadata.ascii) {
+		ufbxt_assert(scene->metadata.exporter == UFBX_EXPORTER_BLENDER_ASCII);
+		ufbxt_assert(scene->metadata.exporter_version == ufbx_pack_version(2, 79, 0));
+	} else {
+		ufbxt_assert(scene->metadata.exporter == UFBX_EXPORTER_BLENDER_BINARY);
+		ufbxt_assert(scene->metadata.exporter_version == ufbx_pack_version(3, 7, 13));
+	}
+
 	ufbx_node *node = ufbx_find_node(scene, "Lamp");
 	ufbxt_assert(node);
 	ufbx_light *light = node->light;
@@ -46,6 +54,9 @@ UFBXT_FILE_TEST(blender_282_suzanne_and_transform)
 UFBXT_FILE_TEST(maya_cube)
 #if UFBXT_IMPL
 {
+	ufbxt_assert(scene->metadata.exporter == UFBX_EXPORTER_FBX_SDK);
+	ufbxt_assert(scene->metadata.exporter_version == ufbx_pack_version(2019, 2, 0));
+
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
