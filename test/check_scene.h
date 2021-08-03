@@ -81,6 +81,9 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 	ufbxt_check_string(element->name);
 	ufbxt_assert(scene->elements.data[element->id] == element);
 
+	ufbxt_assert(scene->elements.data[element->id] == element);
+	ufbxt_assert(scene->elements_by_type[element->type].data[element->typed_id] == element);
+
 	for (size_t i = 0; i < element->connections_src.count; i++) {
 		ufbx_connection *c = &element->connections_src.data[i];
 		ufbxt_check_string(c->src_prop);

@@ -4789,7 +4789,7 @@ ufbxi_nodiscard static int ufbxi_check_indices(ufbxi_context *uc, ufbx_mesh *mes
 		// Normalize out-of-bounds indices to `invalid_index`
 		for (size_t i = 0; i < num_indices; i++) {
 			int32_t ix = indices[i];
-			if (ix < 0 || ix > (int32_t)num_elems) {
+			if (ix < 0 || ix >= (int32_t)num_elems) {
 				// If the indices refer to an external buffer we need to
 				// allocate a separate buffer for them
 				if (!owns_indices) {

@@ -3,8 +3,8 @@ UFBXT_TEST(fuzz_files)
 #if UFBXT_IMPL
 {
 	size_t ok = 0;
-	size_t i;
-	for (i = 0; i < 10000; i++) {
+	size_t i = g_fuzz_step < SIZE_MAX ? g_fuzz_step : 0;
+	for (; i < 10000; i++) {
 		char name[512];
 		char buf[512];
 		snprintf(name, sizeof(name), "fuzz_%04zu", i);

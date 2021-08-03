@@ -538,7 +538,7 @@ static bool g_all_byte_values = false;
 static bool g_dedicated_allocs = false;
 static bool g_no_patch = false;
 static int g_patch_start = 0;
-static size_t g_fuzz_step = 0;
+static size_t g_fuzz_step = SIZE_MAX;
 
 const char *g_fuzz_test_name = NULL;
 
@@ -557,7 +557,7 @@ static bool ufbxt_begin_fuzz()
 
 int ufbxt_test_fuzz(void *data, size_t size, size_t step, int offset, size_t temp_limit, size_t result_limit, size_t truncate_length)
 {
-	if (g_fuzz_step && step != g_fuzz_step) return 1;
+	if (g_fuzz_step < SIZE_MAX && step != g_fuzz_step) return 1;
 
 	t_jmp_buf = (jmp_buf*)calloc(1, sizeof(jmp_buf));
 	int ret = 1;
