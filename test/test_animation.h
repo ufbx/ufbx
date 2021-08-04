@@ -174,8 +174,6 @@ typedef struct {
 UFBXT_FILE_TEST(maya_anim_light)
 #if UFBXT_IMPL
 {
-	ufbx_scene *state = NULL;
-
 	static const ufbxt_anim_light_ref refs[] = {
 		{  0, 3.072, { 0.148, 0.095, 0.440 } },
 		{ 12, 1.638, { 0.102, 0.136, 0.335 } },
@@ -191,7 +189,7 @@ UFBXT_FILE_TEST(maya_anim_light)
 		const ufbxt_anim_light_ref *ref = &refs[i];
 
 		double time = ref->frame * (1.0/24.0);
-		state = ufbx_evaluate_scene(scene, scene->anim, time, NULL, NULL);
+		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, NULL, NULL);
 		ufbxt_assert(state);
 
 		ufbxt_check_scene(state);
@@ -201,7 +199,7 @@ UFBXT_FILE_TEST(maya_anim_light)
 		ufbx_light *light = light_node->light;
 		ufbxt_assert(light);
 
-		ufbxt_assert_close_real(err, light->intensity * 0.01f, ref->intensity);
+		ufbxt_assert_close_real(err, light->intensity, ref->intensity);
 		ufbxt_assert_close_vec3(err, light->color, ref->color);
 
 		ufbx_free_scene(state);
