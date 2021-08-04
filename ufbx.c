@@ -4621,7 +4621,7 @@ ufbxi_nodiscard static int ufbxi_read_property(ufbxi_context *uc, ufbxi_node *no
 			case 'M': flags |= ((uint32_t)(next - '0') & 0xf) << 8; break; // UFBX_PROP_FLAG_MUTE_*
 			}
 		}
-		prop->flags = flags;
+		prop->flags = (ufbx_prop_flags)flags;
 	}
 
 	prop->type = ufbxi_get_prop_type(uc, type_str);
@@ -6818,7 +6818,7 @@ ufbxi_nodiscard static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
 				while (prop != prop_end && ufbxi_name_key_less(prop, name.data, name.length, key)) prop++;
 
 				if (prop != prop_end && prop->name.data == name.data) {
-					prop->flags |= flags;
+					prop->flags = (ufbx_prop_flags)(prop->flags | flags);
 				} else {
 					// Animated property that is not in the element property list
 					// Copy the preceeding properties to the stack, then push a
@@ -6836,7 +6836,8 @@ ufbxi_nodiscard static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
 					ufbx_prop *new_prop = ufbxi_push_zero(&uc->tmp_stack, ufbx_prop, 1);
 					ufbxi_check(new_prop);
 					if (def_prop) *new_prop = *def_prop;
-					new_prop->flags |= UFBX_PROP_FLAG_ANIMATABLE | UFBX_PROP_FLAG_SYNTHETIC | flags;
+					flags |= new_prop->flags;
+					new_prop->flags = (ufbx_prop_flags)(UFBX_PROP_FLAG_ANIMATABLE | UFBX_PROP_FLAG_SYNTHETIC | flags);
 					new_prop->name = name;
 					new_prop->internal_key = key;
 					new_prop->value_str = ufbx_empty_string;
@@ -7785,7 +7786,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 						ufbxi_check(mat_texs);
 						num_material_textures += num_materials;
 						int32_t texture_id = tex->num_faces > 0 ? tex->face_texture[0] : 0;
-						if (texture_id < textures.count) {
+						if (texture_id >= 0 && (size_t)texture_id < textures.count) {
 							for (size_t i = 0; i < num_materials; i++) {
 								mat_texs[i].material_id = (int32_t)i;
 								mat_texs[i].texture_id = texture_id;
@@ -7799,7 +7800,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 						for (size_t i = 0; i < num_faces; i++) {
 							int32_t texture_id = tex->face_texture[i];
 							int32_t material_id = mesh->face_material[i];
-							if (texture_id < 0 || texture_id >= textures.count) continue;
+							if (texture_id < 0 || (size_t)texture_id >= textures.count) continue;
 							if (material_id < 0 || (size_t)material_id >= num_materials) continue;
 							if (material_id == prev_material && texture_id == prev_texture) continue;
 							prev_material = material_id;
@@ -10161,9 +10162,9 @@ static void ufbxi_update_light(ufbx_light *light)
 	light->intensity = ufbxi_find_real(&light->props, ufbxi_Intensity, 1.0f) * 0.01f;
 
 	light->color = ufbxi_find_vec3(&light->props, ufbxi_Color, 1.0f, 1.0f, 1.0f);
-	light->type = ufbxi_find_enum(&light->props, ufbxi_LightType, 0, UFBX_LIGHT_VOLUME);
-	light->decay = ufbxi_find_enum(&light->props, ufbxi_DecayType, 0, UFBX_LIGHT_DECAY_CUBIC);
-	light->area_shape = ufbxi_find_enum(&light->props, ufbxi_AreaLightShape, 0, UFBX_LIGHT_AREA_SPHERE);
+	light->type = (ufbx_light_type)ufbxi_find_enum(&light->props, ufbxi_LightType, 0, UFBX_LIGHT_VOLUME);
+	light->decay = (ufbx_light_decay)ufbxi_find_enum(&light->props, ufbxi_DecayType, 0, UFBX_LIGHT_DECAY_CUBIC);
+	light->area_shape = (ufbx_light_area_shape)ufbxi_find_enum(&light->props, ufbxi_AreaLightShape, 0, UFBX_LIGHT_AREA_SPHERE);
 	light->inner_angle = ufbxi_find_real(&light->props, ufbxi_InnerAngle, 0.0f);
 	light->outer_angle = ufbxi_find_real(&light->props, ufbxi_OuterAngle, 0.0f);
 	light->cast_light = ufbxi_find_int(&light->props, ufbxi_CastLight, 1) != 0;

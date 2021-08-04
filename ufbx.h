@@ -845,7 +845,7 @@ typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_INDIRECT_SPECULAR,
 	UFBX_MATERIAL_PBR_NORMAL_MAP,
 	UFBX_NUM_MATERIAL_PBR_MAPS,
-} ufbx_material_fbx_map;
+} ufbx_material_pbr_map;
 
 typedef struct ufbx_material_fbx_maps {
 	union {
