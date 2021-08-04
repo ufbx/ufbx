@@ -1406,6 +1406,13 @@ ufbx_inline ufbx_prop ufbx_evaluate_prop(ufbx_anim anim, ufbx_element *element, 
 
 ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
 
+// Evaluate the whole `scene` at a specific `time` in the animation `anim`.
+// The returned scene behaves as if it had been exported at a specific time
+// in the specified animation, except that animated elements properties contain
+// only the animated values, the original ones are in `props->defaults`.
+//
+// NOTE: The returned scene refers to the original `scene` so it cannot be
+// freed until all evaluated scenes are freed.
 ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, ufbx_anim anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error);
 
 // Materials
