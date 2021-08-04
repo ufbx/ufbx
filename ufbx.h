@@ -92,6 +92,9 @@ typedef struct ufbx_quat {
 	};
 } ufbx_quat;
 
+UFBX_LIST_TYPE(ufbx_real_list, ufbx_real);
+UFBX_LIST_TYPE(ufbx_vec4_list, ufbx_vec4);
+
 // Order in which Euler-angle rotation axes are applied for a transform
 // NOTE: The order in the name refers to the order of axes *applied*,
 // not the multiplication order: eg. `UFBX_ROTATION_XYZ` is `Z*Y*X`
@@ -582,12 +585,28 @@ struct ufbx_empty {
 
 // -- Node attributes (curves/surfaces)
 
+typedef enum ufbx_nurbs_edges {
+	UFBX_NURBS_PERIODIC,
+	UFBX_NURBS_CLOSED,
+	UFBX_NURBS_OPEN,
+} ufbx_nurbs_edges;
+
+typedef struct ufbx_nurbs_topology {
+	uint32_t dimension;
+	uint32_t order;
+	ufbx_nurbs_edges edges;
+	ufbx_real_list knot_vector;
+} ufbx_nurbs_topology;
+
 struct ufbx_line_curve {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
 
 struct ufbx_nurbs_curve {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+
+	ufbx_nurbs_topology topology;
+	ufbx_vec4_list control_points;
 };
 
 struct ufbx_patch_surface {
@@ -596,6 +615,11 @@ struct ufbx_patch_surface {
 
 struct ufbx_nurbs_surface {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+
+	ufbx_nurbs_topology topology[2];
+	ufbx_vec4_list control_points;
+
+	// TODO: Materials
 };
 
 struct ufbx_nurbs_trim_surface {
@@ -1247,8 +1271,18 @@ typedef struct ufbx_load_opts {
 
 typedef struct ufbx_evaluate_opts {
 
+	ufbx_allocator temp_allocator;   // < Allocator used during evaluation
 	ufbx_allocator result_allocator; // < Allocator used for the final scene
 	bool evaluate_skinning; // < Evaluate skinning (see ufbx_mesh.skinned_vertices)
+
+	// Limits
+	size_t max_temp_memory;
+	size_t max_result_memory;
+	size_t max_temp_allocs;
+	size_t max_result_allocs;
+	size_t temp_huge_size;
+	size_t result_huge_size;
+
 } ufbx_evaluate_opts;
 
 // -- API
@@ -1329,7 +1363,7 @@ ufbx_inline ufbx_prop ufbx_evaluate_prop(ufbx_anim anim, ufbx_element *element, 
 
 ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
 
-ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, ufbx_anim anim, double time, const ufbx_evaluate_opts *opts);
+ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, ufbx_anim anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error);
 
 // Materials
 

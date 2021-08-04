@@ -1052,9 +1052,11 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 }
 
 
-#define ufbxi_check_return_err(err, cond, ret) do { if (!(cond)) { ufbxi_fail_imp_err((err), #cond, __FUNCTION__, __LINE__); return ret; } } while (0)
+#define ufbxi_check_err(err, cond) do { if (!(cond)) { ufbxi_fail_imp_err((err), #cond, __FUNCTION__, __LINE__); return ret; } } while (0)
+#define ufbxi_check_return_err(err, cond, ret) do { if (!(cond)) { ufbxi_fail_imp_err((err), #cond, __FUNCTION__, __LINE__); return 0; } } while (0)
 #define ufbxi_fail_err(err, desc) return ufbxi_fail_imp_err(err, desc, __FUNCTION__, __LINE__)
 
+#define ufbxi_check_err_msg(err, cond, msg) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_check_return_err_msg(err, cond, ret, msg) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail_err_msg(err, desc, msg) return ufbxi_fail_imp_err(err, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
 
@@ -1981,6 +1983,18 @@ static const char ufbxi_RelativeFileName[] = "RelativeFileName";
 static const char ufbxi_RelativeFilename[] = "RelativeFilename";
 static const char ufbxi_TextureId[] = "TextureId";
 static const char ufbxi_ShadingModel[] = "ShadingModel";
+static const char ufbxi_Order[] = "Order";
+static const char ufbxi_NurbsSurfaceOrder[] = "NurbsSurfaceOrder";
+static const char ufbxi_Form[] = "Form";
+static const char ufbxi_Open[] = "Open";
+static const char ufbxi_Closed[] = "Closed";
+static const char ufbxi_Periodic[] = "Periodic";
+static const char ufbxi_Points[] = "Points";
+static const char ufbxi_KnotVector[] = "KnotVector";
+static const char ufbxi_KnotVectorU[] = "KnotVectorU";
+static const char ufbxi_KnotVectorV[] = "KnotVectorV";
+static const char ufbxi_Dimension[] = "Dimension";
+static const char ufbxi_Dimensions[] = "Dimensions";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, sizeof(ufbxi_AllSame) - 1 },
@@ -2161,6 +2175,18 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_RelativeFilename, sizeof(ufbxi_RelativeFilename) - 1 },
 	{ ufbxi_TextureId, sizeof(ufbxi_TextureId) - 1 },
 	{ ufbxi_ShadingModel, sizeof(ufbxi_ShadingModel) - 1 },
+	{ ufbxi_Order, sizeof(ufbxi_Order) - 1 },
+	{ ufbxi_NurbsSurfaceOrder, sizeof(ufbxi_NurbsSurfaceOrder) - 1 },
+	{ ufbxi_Form, sizeof(ufbxi_Form) - 1 },
+	{ ufbxi_Open, sizeof(ufbxi_Open) - 1 },
+	{ ufbxi_Closed, sizeof(ufbxi_Closed) - 1 },
+	{ ufbxi_Periodic, sizeof(ufbxi_Periodic) - 1 },
+	{ ufbxi_Points, sizeof(ufbxi_Points) - 1 },
+	{ ufbxi_KnotVector, sizeof(ufbxi_KnotVector) - 1 },
+	{ ufbxi_KnotVectorU, sizeof(ufbxi_KnotVectorU) - 1 },
+	{ ufbxi_KnotVectorV, sizeof(ufbxi_KnotVectorV) - 1 },
+	{ ufbxi_Dimension, sizeof(ufbxi_Dimension) - 1 },
+	{ ufbxi_Dimensions, sizeof(ufbxi_Dimensions) - 1 },
 };
 
 // -- Type definitions
@@ -2888,6 +2914,22 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			return true;
 		} else if (name == ufbxi_Indexes && !uc->opts.ignore_geometry) {
 			info->type = 'i';
+			info->result = true;
+			return true;
+		} else if (name == ufbxi_Points && !uc->opts.ignore_geometry) {
+			info->type = 'r';
+			info->result = true;
+			return true;
+		} else if (name == ufbxi_KnotVector && !uc->opts.ignore_geometry) {
+			info->type = 'r';
+			info->result = true;
+			return true;
+		} else if (name == ufbxi_KnotVectorU && !uc->opts.ignore_geometry) {
+			info->type = 'r';
+			info->result = true;
+			return true;
+		} else if (name == ufbxi_KnotVectorV && !uc->opts.ignore_geometry) {
+			info->type = 'r';
 			info->result = true;
 			return true;
 		}
@@ -5367,6 +5409,77 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 	return 1;
 }
 
+static ufbx_nurbs_edges ufbxi_read_nurbs_edges(const char *form)
+{
+	if (form == ufbxi_Open) {
+		return UFBX_NURBS_OPEN;
+	} else if (form == ufbxi_Closed) {
+		return UFBX_NURBS_CLOSED;
+	} else if (form == ufbxi_Periodic) {
+		return UFBX_NURBS_PERIODIC;
+	}
+	return UFBX_NURBS_OPEN;
+}
+
+ufbxi_nodiscard static int ufbxi_read_nurbs_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_nurbs_curve *nurbs = ufbxi_push_element(uc, info, ufbx_nurbs_curve, UFBX_ELEMENT_NURBS_CURVE);
+	ufbxi_check(nurbs);
+
+	const char *form = NULL;
+	ufbxi_check(ufbxi_find_val1(node, ufbxi_Order, "I", &nurbs->topology.order));
+	ufbxi_check(ufbxi_find_val1(node, ufbxi_Dimension, "I", &nurbs->topology.dimension));
+	ufbxi_check(ufbxi_find_val1(node, ufbxi_Form, "C", (char**)&form));
+	nurbs->topology.edges = ufbxi_read_nurbs_edges(form);
+
+	if (!uc->opts.ignore_geometry) {
+		ufbxi_value_array *points = ufbxi_find_array(node, ufbxi_Points, 'r');
+		ufbxi_value_array *knot = ufbxi_find_array(node, ufbxi_KnotVector, 'r');
+		ufbxi_check(points);
+		ufbxi_check(knot);
+		ufbxi_check(points->size % 4 == 0);
+
+		nurbs->control_points.count = points->size / 4;
+		nurbs->control_points.data = (ufbx_vec4*)points->data;
+		nurbs->topology.knot_vector.data = (ufbx_real*)knot->data;
+		nurbs->topology.knot_vector.count = knot->size;
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_nurbs_surface(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_nurbs_surface *nurbs = ufbxi_push_element(uc, info, ufbx_nurbs_surface, UFBX_ELEMENT_NURBS_SURFACE);
+	ufbxi_check(nurbs);
+
+	const char *form_u = NULL, *form_v = NULL;
+	ufbxi_check(ufbxi_find_val2(node, ufbxi_NurbsSurfaceOrder, "II", &nurbs->topology[0].order, &nurbs->topology[1].order));
+	ufbxi_check(ufbxi_find_val2(node, ufbxi_Dimensions, "II", &nurbs->topology[0].dimension, &nurbs->topology[1].dimension));
+	ufbxi_check(ufbxi_find_val2(node, ufbxi_Form, "CC", (char**)&form_u, (char**)&form_v));
+	nurbs->topology[0].edges = ufbxi_read_nurbs_edges(form_u);
+	nurbs->topology[1].edges = ufbxi_read_nurbs_edges(form_v);
+
+	if (!uc->opts.ignore_geometry) {
+		ufbxi_value_array *points = ufbxi_find_array(node, ufbxi_Points, 'r');
+		ufbxi_value_array *knot_u = ufbxi_find_array(node, ufbxi_KnotVectorU, 'r');
+		ufbxi_value_array *knot_v = ufbxi_find_array(node, ufbxi_KnotVectorV, 'r');
+		ufbxi_check(points);
+		ufbxi_check(knot_u);
+		ufbxi_check(knot_v);
+		ufbxi_check(points->size % 4 == 0);
+
+		nurbs->control_points.count = points->size / 4;
+		nurbs->control_points.data = (ufbx_vec4*)points->data;
+		nurbs->topology[0].knot_vector.data = (ufbx_real*)knot_u->data;
+		nurbs->topology[0].knot_vector.count = knot_u->size;
+		nurbs->topology[1].knot_vector.data = (ufbx_real*)knot_v->data;
+		nurbs->topology[1].knot_vector.count = knot_v->size;
+	}
+
+	return 1;
+}
+
 static void ufbxi_read_transform_matrix(ufbx_matrix *m, ufbx_real *data)
 {
 	m->m00 = data[ 0]; m->m10 = data[ 1]; m->m20 = data[ 2];
@@ -5771,11 +5884,12 @@ ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_context *uc, ufb
 	} else if (sub_type == ufbxi_Null) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_empty), UFBX_ELEMENT_EMPTY));
 	} else if (sub_type == ufbxi_NurbsCurve) {
-		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_nurbs_curve), UFBX_ELEMENT_NURBS_CURVE));
-	} else if (sub_type == ufbxi_Nurbs) {
-		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_nurbs_surface), UFBX_ELEMENT_NURBS_SURFACE));
+		if (!ufbxi_find_child(node, ufbxi_KnotVector)) return 1;
+		ufbxi_check(ufbxi_read_nurbs_curve(uc, node, &attrib_info));
 	} else if (sub_type == ufbxi_NurbsSurface) {
-		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_nurbs_surface), UFBX_ELEMENT_NURBS_SURFACE));
+		if (!ufbxi_find_child(node, ufbxi_KnotVectorU)) return 1;
+		if (!ufbxi_find_child(node, ufbxi_KnotVectorV)) return 1;
+		ufbxi_check(ufbxi_read_nurbs_surface(uc, node, &attrib_info));
 	} else if (sub_type == ufbxi_TrimNurbsSurface) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_nurbs_trim_surface), UFBX_ELEMENT_NURBS_TRIM_SURFACE));
 	} else if (sub_type == ufbxi_Boundary) {
@@ -5859,11 +5973,9 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			} else if (sub_type == ufbxi_Shape) {
 				ufbxi_check(ufbxi_read_shape(uc, node, &info));
 			} else if (sub_type == ufbxi_NurbsCurve) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_curve), UFBX_ELEMENT_NURBS_CURVE));
-			} else if (sub_type == ufbxi_Nurbs) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_surface), UFBX_ELEMENT_NURBS_SURFACE));
+				ufbxi_check(ufbxi_read_nurbs_curve(uc, node, &info));
 			} else if (sub_type == ufbxi_NurbsSurface) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_surface), UFBX_ELEMENT_NURBS_SURFACE));
+				ufbxi_check(ufbxi_read_nurbs_surface(uc, node, &info));
 			} else if (sub_type == ufbxi_TrimNurbsSurface) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_trim_surface), UFBX_ELEMENT_NURBS_TRIM_SURFACE));
 			} else if (sub_type == ufbxi_Boundary) {
@@ -12018,6 +12130,100 @@ static ufbxi_noinline void ufbxi_combine_anim_layer(ufbxi_anim_layer_combine_ctx
 	}
 }
 
+typedef struct {
+	ufbx_scene *src_scene;
+	ufbx_evaluate_opts opts;
+	ufbx_anim anim;
+	double time;
+
+	ufbx_error error;
+
+	// Allocators
+	ufbxi_allocator ator_result;
+	ufbxi_allocator ator_tmp;
+
+	ufbxi_buf result;
+
+	ufbx_scene scene;
+
+	ufbxi_scene_imp *scene_imp;
+} ufbxi_eval_context;
+
+static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
+{
+}
+
+static ufbxi_nodiscard int ufbxi_evaluate_scene(ufbxi_eval_context *ec, ufbx_scene *scene, ufbx_anim anim, double time, const ufbx_evaluate_opts *user_opts, ufbx_error *p_error)
+{
+#if 0
+	if (user_opts) {
+		ec->opts = *user_opts;
+	} else {
+		memset(&ec->opts, 0, sizeof(ec->opts));
+	}
+
+	ufbx_inflate_retain inflate_retain;
+	inflate_retain.initialized = false;
+
+	ec->src_scene = scene;
+	ec->anim = anim;
+	ec->time = time;
+
+	// Setup allocators
+	ec->ator_tmp.error = &ec->error;
+	ec->ator_tmp.ator = ec->opts.temp_allocator;
+	ec->ator_tmp.max_size = ec->opts.max_temp_memory;
+	ec->ator_tmp.allocs_left = ec->opts.max_temp_allocs;
+	ec->ator_tmp.huge_size = ec->opts.temp_huge_size;
+	ec->ator_result.error = &ec->error;
+	ec->ator_result.ator = ec->opts.result_allocator;
+	ec->ator_result.max_size = ec->opts.max_result_memory;
+	ec->ator_result.allocs_left = ec->opts.max_result_allocs;
+	ec->ator_result.huge_size = ec->opts.result_huge_size;
+
+	// Retain the scene, this must be the final allocation as we copy
+	// `ator_result` to `ufbx_scene_imp`.
+	ufbxi_scene_imp *imp = ufbxi_push_zero(&ec->result, ufbxi_scene_imp, 1);
+	ufbxi_check_err(&ec->error, imp);
+
+	imp->magic = UFBXI_SCENE_IMP_MAGIC;
+	imp->scene = ec->scene;
+	imp->ator = ec->ator_result;
+	imp->ator.error = NULL;
+
+	// Copy retained buffers and translate the allocator struct to the one
+	// contained within `ufbxi_scene_imp`
+	imp->result_buf = ec->result;
+	imp->result_buf.ator = &imp->ator;
+
+	imp->memory_block = NULL;
+	imp->memory_block_size = 0;
+
+	imp->scene.metadata.result_memory_used = imp->ator.current_size;
+	imp->scene.metadata.temp_memory_used = ec->ator_tmp.current_size;
+	imp->scene.metadata.result_allocs = ec->opts.max_result_allocs - imp->ator.allocs_left;
+	imp->scene.metadata.temp_allocs = ec->opts.max_temp_allocs - ec->ator_tmp.allocs_left;
+
+	uc->scene_imp = imp;
+
+	uc->result.ator = &uc->ator_result;
+
+	if (ufbxi_load_imp(uc)) {
+		if (p_error) {
+			p_error->description = NULL;
+			p_error->stack_size = 0;
+		}
+		return &ec->scene;
+	} else {
+		if (!uc->error.description) uc->error.description = "Failed to load";
+		if (p_error) *p_error = uc->error;
+		ufbxi_free_temp(&ec->result);
+		return NULL;
+	}
+#endif
+	return 0;
+}
+
 // -- File IO
 
 static size_t ufbxi_file_read(void *user, void *data, size_t max_size)
@@ -12485,8 +12691,14 @@ ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double tim
 	return ret;
 }
 
-ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, ufbx_anim anim, double time, const ufbx_evaluate_opts *opts)
+ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, ufbx_anim anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error)
 {
+	ufbxi_eval_context ec = { 0 };
+	if (ufbxi_evaluate_scene(&ec, scene, anim, time, opts, error)) {
+		return &ec.scene_imp->scene;
+	} else {
+		return NULL;
+	}
 }
 
 ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const char *name, size_t name_len)
