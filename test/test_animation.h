@@ -187,27 +187,25 @@ UFBXT_FILE_TEST(maya_anim_light)
 		{ 60, 1.145, { 0.442, 0.119, 0.119 } },
 	};
 
-#if !defined(_MSC_VER) // TODO
-	ufbx_evaluate_opts opts = { 0 };
 	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
 		const ufbxt_anim_light_ref *ref = &refs[i];
-		opts.reuse_scene = state;
 
 		double time = ref->frame * (1.0/24.0);
-		state = ufbx_evaluate_scene(scene, &opts, time);
+		state = ufbx_evaluate_scene(scene, scene->anim, time, NULL, NULL);
 		ufbxt_assert(state);
 
 		ufbxt_check_scene(state);
 
-		ufbx_light *light = ufbx_find_light(state, "pointLight1");
+		ufbx_node *light_node = ufbx_find_node(state, "pointLight1");
+		ufbxt_assert(light_node);
+		ufbx_light *light = light_node->light;
 		ufbxt_assert(light);
 
 		ufbxt_assert_close_real(err, light->intensity * 0.01f, ref->intensity);
 		ufbxt_assert_close_vec3(err, light->color, ref->color);
-	}
-	ufbx_free_scene(state);
-#endif
 
+		ufbx_free_scene(state);
+	}
 }
 #endif
 

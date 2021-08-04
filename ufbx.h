@@ -567,8 +567,39 @@ struct ufbx_mesh {
 	ufbx_element_list all_deformers;
 };
 
+typedef enum ufbx_light_type {
+	UFBX_LIGHT_POINT,
+	UFBX_LIGHT_DIRECTIONAL,
+	UFBX_LIGHT_SPOT,
+	UFBX_LIGHT_AREA,
+	UFBX_LIGHT_VOLUME,
+} ufbx_light_type;
+
+typedef enum ufbx_light_decay {
+	UFBX_LIGHT_DECAY_NONE,
+	UFBX_LIGHT_DECAY_LINEAR,
+	UFBX_LIGHT_DECAY_QUADRATIC,
+	UFBX_LIGHT_DECAY_CUBIC,
+} ufbx_light_decay;
+
+typedef enum ufbx_light_area_shape {
+	UFBX_LIGHT_AREA_RECTANGLE,
+	UFBX_LIGHT_AREA_SPHERE,
+} ufbx_light_area_shape;
+
 struct ufbx_light {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+
+	ufbx_vec3 color;
+	ufbx_real intensity;
+
+	ufbx_light_type type;
+	ufbx_light_decay decay;
+	ufbx_light_area_shape area_shape;
+	ufbx_real inner_angle;
+	ufbx_real outer_angle;
+	bool cast_light;
+	bool cast_shadows;
 };
 
 struct ufbx_camera {
@@ -687,10 +718,22 @@ struct ufbx_blend_deformer {
 	ufbx_blend_channel_list channels;
 };
 
+typedef struct ufbx_blend_keyframe {
+	ufbx_blend_shape *shape;
+
+	// Weight value at which to apply the keyframe at full strength
+	ufbx_real target_weight;
+
+	// The weight the shape should be currently applied with
+	ufbx_real effective_weight;
+} ufbx_blend_keyframe;
+
+UFBX_LIST_TYPE(ufbx_blend_keyframe_list, ufbx_blend_keyframe);
+
 struct ufbx_blend_channel {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
-	ufbx_blend_shape_list shapes;
+	ufbx_blend_keyframe_list keyframes;
 };
 
 struct ufbx_blend_shape {
@@ -979,20 +1022,6 @@ struct ufbx_anim_value {
 	ufbx_anim_curve *curves[3];
 };
 
-typedef struct ufbx_bone_pose {
-	ufbx_node *bone;
-	ufbx_matrix bone_to_world;
-} ufbx_bone_pose;
-
-UFBX_LIST_TYPE(ufbx_bone_pose_list, ufbx_bone_pose);
-
-struct ufbx_pose {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
-
-	bool bind_pose;
-	ufbx_bone_pose_list bone_poses;
-};
-
 // Animation curve segment interpolation mode between two keyframes
 typedef enum ufbx_interpolation {
 	UFBX_INTERPOLATION_CONSTANT_PREV, // < Hold previous key value
@@ -1035,7 +1064,21 @@ struct ufbx_anim_curve {
 	ufbx_keyframe_list keyframes;
 };
 
-// -- Misc
+// -- Miscellaneous
+
+typedef struct ufbx_bone_pose {
+	ufbx_node *bone;
+	ufbx_matrix bone_to_world;
+} ufbx_bone_pose;
+
+UFBX_LIST_TYPE(ufbx_bone_pose_list, ufbx_bone_pose);
+
+struct ufbx_pose {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	bool bind_pose;
+	ufbx_bone_pose_list bone_poses;
+};
 
 typedef struct ufbx_name_element {
 	ufbx_string name;

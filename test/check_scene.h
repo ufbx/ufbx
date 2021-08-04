@@ -20,6 +20,13 @@ static void ufbxt_check_string(ufbx_string str)
 	ufbxt_assert(strlen(str.data) == str.length);
 }
 
+static void ufbxt_check_element_ptr(ufbx_scene *scene, ufbx_element *element)
+{
+	if (!element) return;
+	ufbxt_assert(scene->elements.data[element->id] == element);
+	ufbxt_assert(scene->elements_by_type[element->type].data[element->typed_id] == element);
+}
+
 static void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void *void_elem, size_t elem_size)
 {
 	ufbx_vertex_void *elem = (ufbx_vertex_void*)void_elem;
@@ -117,6 +124,7 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 	if (element->type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && element->type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB) {
 		for (size_t i = 0; i < element->instances.count; i++) {
 			ufbx_node *node = element->instances.data[i];
+			ufbxt_check_element_ptr(scene, &node->element);
 			bool found = false;
 			for (size_t j = 0; j < node->all_attribs.count; j++) {
 				if (node->all_attribs.data[j] == element) {
@@ -133,6 +141,7 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 
 static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 {
+	ufbxt_check_element_ptr(scene, &node->parent->element);
 	if (node->parent) {
 		bool found = false;
 		for (size_t i = 0; i < node->parent->children.count; i++) {
@@ -150,6 +159,7 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 
 	for (size_t i = 0; i < node->all_attribs.count; i++) {
 		ufbx_element *attrib = node->all_attribs.data[i];
+		ufbxt_check_element_ptr(scene, attrib);
 		bool found = false;
 		for (size_t j = 0; j < attrib->instances.count; j++) {
 			if (attrib->instances.data[j] == node) {
@@ -284,6 +294,22 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		}
 	}
 
+	for (size_t i = 0; i < mesh->materials.count; i++) {
+		ufbxt_check_element_ptr(scene, &mesh->materials.data[i]->element);
+	}
+	for (size_t i = 0; i < mesh->skins.count; i++) {
+		ufbxt_check_element_ptr(scene, &mesh->skins.data[i]->element);
+	}
+	for (size_t i = 0; i < mesh->blend_shapes.count; i++) {
+		ufbxt_check_element_ptr(scene, &mesh->blend_shapes.data[i]->element);
+	}
+	for (size_t i = 0; i < mesh->geometry_caches.count; i++) {
+		ufbxt_check_element_ptr(scene, &mesh->geometry_caches.data[i]->element);
+	}
+	for (size_t i = 0; i < mesh->all_deformers.count; i++) {
+		ufbxt_check_element_ptr(scene, mesh->all_deformers.data[i]);
+	}
+
 	// Real TODO
 #if 0
 	for (size_t i = 0; i < mesh->skins.count; i++) {
@@ -316,13 +342,20 @@ static void ufbxt_check_anim_stack(ufbx_scene *scene, ufbx_anim_stack *anim_stac
 		ufbxt_assert(layer < scene->anim_layers.data + scene->anim_layers.count);
 	}
 }
+#endif
 
 static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_layer)
 {
 	ufbxt_check_string(anim_layer->name);
-	ufbxt_check_props(scene, &anim_layer->layer_props, true);
+
+	for (size_t i = 0; i < anim_layer->anim_values.count; i++) {
+		ufbxt_check_element_ptr(scene, &anim_layer->anim_values.data[i]->element);
+	}
+	for (size_t i = 0; i < anim_layer->anim_props.count; i++) {
+		ufbxt_check_element_ptr(scene, anim_layer->anim_props.data[i].element);
+		ufbxt_check_element_ptr(scene, &anim_layer->anim_props.data[i].anim_value->element);
+	}
 }
-#endif
 
 static void ufbxt_check_scene(ufbx_scene *scene)
 {
@@ -338,6 +371,10 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 
 	for (size_t i = 0; i < scene->meshes.count; i++) {
 		ufbxt_check_mesh(scene, scene->meshes.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->anim_layers.count; i++) {
+		ufbxt_check_anim_layer(scene, scene->anim_layers.data[i]);
 	}
 
 #if 0
