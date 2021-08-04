@@ -485,3 +485,12 @@ UFBXT_FILE_TEST(blender_279_edge_circle)
 	ufbxt_assert(node && node->mesh);
 }
 #endif
+
+UFBXT_FILE_TEST(blender_293_instancing)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->meshes.count == 1);
+	ufbx_mesh *mesh = scene->meshes.data[0];
+	ufbxt_assert(mesh->instances.count == 8);
+}
+#endif
