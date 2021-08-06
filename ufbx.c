@@ -5386,8 +5386,11 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 
 	mesh->vertex_position.by_index = index_data;
 	mesh->num_faces = dst_face - mesh->faces;
-
 	mesh->num_triangles = num_triangles;
+
+	// HACK(consecutive-faces): Prepare for finalize to re-use a consecutive
+	// index buffer for face materials.. `mesh->num_faces >= mesh->num_vertices` usually anyway.
+	uc->max_consecutive_indices = ufbxi_max_sz(uc->max_consecutive_indices, mesh->num_faces);
 
 	// Count the number of UV/color sets
 	size_t num_uv = 0, num_color = 0, num_bitangents = 0, num_tangents = 0;
@@ -5524,8 +5527,13 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 					num_textures++;
 				}
 			}
-
 		}
+	}
+
+	// Always use a default zero material, this will be removed if no materials are found
+	if (!mesh->face_material) {
+		uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, mesh->num_faces);
+		mesh->face_material = (int32_t*)ufbxi_sentinel_index_zero;
 	}
 
 	ufbx_assert(mesh->uv_sets.count == num_uv);
@@ -7177,6 +7185,28 @@ ufbxi_nodiscard static int ufbxi_fetch_textures(ufbxi_context *uc, ufbx_material
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_fetch_mesh_materials(ufbxi_context *uc, ufbx_mesh_material_list *list, ufbx_element *element, bool search_node)
+{
+	size_t num_materials = 0;
+
+	do {
+		ufbx_connection_list conns = ufbxi_find_dst_connections(element, NULL);
+		ufbxi_for_list(ufbx_connection, conn, conns) {
+			if (conn->src->type == UFBX_ELEMENT_MATERIAL) {
+				ufbx_mesh_material mesh_mat = { (ufbx_material*)conn->src };
+				ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_mesh_material, 1, &mesh_mat));
+				num_materials++;
+			}
+		}
+	} while (search_node && (element = ufbxi_get_element_node(element)) != NULL);
+
+	list->data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_mesh_material, num_materials);
+	list->count = num_materials;
+	ufbxi_check(list->data);
+
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_fetch_deformers(ufbxi_context *uc,  ufbx_element_list *list, ufbx_element *element, bool search_node)
 {
 	size_t num_deformers = 0;
@@ -7823,21 +7853,58 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 				mesh->vertex_color = mesh->color_sets.data[0].vertex_color;
 			}
 
-			// Blender writes materials attached to models even in 7x00
-			// TODO: Should per-instance materials be supported?
-			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->materials, &mesh->element, true, NULL, UFBX_ELEMENT_MATERIAL));
+			ufbxi_check(ufbxi_fetch_mesh_materials(uc, &mesh->materials, &mesh->element, true));
 
-			size_t num_materials = mesh->materials.count;
-			if (num_materials == 0) {
-				mesh->face_material = NULL;
-			} else if (mesh->face_material && mesh->face_material != zero_indices) {
-				ufbxi_for(int32_t, p_mat, mesh->face_material, mesh->num_faces) {
-					int32_t mat = *p_mat;
-					if (mat < 0 || (size_t)mat >= num_materials) {
-						*p_mat = 0;
+			if (mesh->materials.count == 1) {
+				// Use the shared consecutive index buffer for mesh faces if there's only one material
+				// See HACK(consecutive-faces) in `ufbxi_read_mesh()`.
+				ufbx_mesh_material *mat = &mesh->materials.data[0];
+				mat->num_faces = mesh->num_faces;
+				mat->num_triangles = mesh->num_triangles;
+				mat->faces = uc->consecutive_indices;
+			} else if (mesh->materials.count > 0 && mesh->face_material) {
+				size_t num_materials = mesh->materials.count;
+
+				// Count the number of faces and triangles per material
+				for (size_t i = 0; i < mesh->num_faces; i++) {
+					ufbx_face face = mesh->faces[i];
+					int32_t mat_ix = mesh->face_material[i];
+					if (mat_ix >= 0 && (size_t)mat_ix < num_materials) {
+						mesh->materials.data[mat_ix].num_faces++;
+						if (face.num_indices >= 3) {
+							mesh->materials.data[mat_ix].num_triangles += face.num_indices - 2;
+						}
+					} else {
+						mesh->face_material[i] = 0;
 					}
 				}
+
+				// Allocate per-material buffers (clear `num_faces` to 0 to re-use it as
+				// an index when fetching the face indices).
+				ufbxi_for_list(ufbx_mesh_material, mat, mesh->materials) {
+					mat->faces = ufbxi_push(&uc->result, int32_t, mat->num_faces);
+					ufbxi_check(mat->faces);
+					mat->num_faces = 0;
+				}
+
+				// Fetch the per-material face indices
+				for (size_t i = 0; i < mesh->num_faces; i++) {
+					int32_t mat_ix = mesh->face_material[i];
+					if (mat_ix >= 0 && (size_t)mat_ix < num_materials) {
+						ufbx_mesh_material *mat = &mesh->materials.data[mat_ix];
+						mat->faces[mat->num_faces++] = (int32_t)i;
+					}
+				}
+			} else {
+				mesh->face_material = NULL;
 			}
+
+			// Blender writes materials attached to models even in 7x00
+			// TODO: Should per-instance materials be supported?
+			// TODO TODO
+#if 0
+
+#endif
 
 			// Fetch deformers
 			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->skins, &mesh->element, search_node, NULL, UFBX_ELEMENT_SKIN_DEFORMER));
@@ -8068,7 +8135,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 					ufbxi_tmp_material_texture mat_tex = mat_texs[i];
 					if (mat_tex.material_id != prev_material) {
 						if (prev_material >= 0 && num_textures_in_material > 0) {
-							ufbx_material *mat = mesh->materials.data[prev_material];
+							ufbx_material *mat = mesh->materials.data[prev_material].material;
 							if (mat->textures.count == 0) {
 								ufbx_material_texture *texs = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_material_texture, num_textures_in_material);
 								ufbxi_check(texs);
@@ -12644,7 +12711,15 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 
 	ufbxi_for_ptr_list(ufbx_mesh, p_mesh, ec->scene.meshes) {
 		ufbx_mesh *mesh = *p_mesh;
-		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->materials));
+
+		ufbx_mesh_material *materials = ufbxi_push(&ec->result, ufbx_mesh_material, mesh->materials.count);
+		ufbxi_check_err(&ec->error, materials);
+		for (size_t i = 0; i < mesh->materials.count; i++) {
+			materials[i] = mesh->materials.data[i];
+			materials[i].material = (ufbx_material*)ufbxi_translate_element(ec, &materials[i].material->element);
+		}
+		mesh->materials.data = materials;
+
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->skins));
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->blend_shapes));
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->geometry_caches));

@@ -298,7 +298,12 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	}
 
 	for (size_t i = 0; i < mesh->materials.count; i++) {
-		ufbxt_check_element_ptr(scene, &mesh->materials.data[i]->element);
+		ufbx_mesh_material *mat = &mesh->materials.data[i];
+		ufbxt_check_element_ptr(scene, &mat->material->element);
+
+		for (size_t j = 0; j < mat->num_faces; j++) {
+			ufbxt_assert(mesh->face_material[mat->faces[j]] == (int32_t)i);
+		}
 	}
 	for (size_t i = 0; i < mesh->skins.count; i++) {
 		ufbxt_check_element_ptr(scene, &mesh->skins.data[i]->element);

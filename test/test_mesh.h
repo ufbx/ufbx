@@ -413,8 +413,8 @@ UFBXT_FILE_TEST(blender_279_ball)
 	ufbxt_assert(mesh->face_smoothing);
 
 	ufbxt_assert(mesh->materials.count == 2);
-	ufbxt_assert(mesh->materials.data[0] == red);
-	ufbxt_assert(mesh->materials.data[1] == white);
+	ufbxt_assert(mesh->materials.data[0].material == red);
+	ufbxt_assert(mesh->materials.data[1].material == white);
 
 	for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
 		ufbx_face face = mesh->faces[face_i];

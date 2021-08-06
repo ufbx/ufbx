@@ -520,6 +520,16 @@ typedef struct ufbx_face {
 	uint32_t num_indices;
 } ufbx_face;
 
+typedef struct ufbx_mesh_material {
+	ufbx_material *material;
+
+	size_t num_faces;
+	size_t num_triangles;
+	int32_t *faces;
+} ufbx_mesh_material;
+
+UFBX_LIST_TYPE(ufbx_mesh_material_list, ufbx_mesh_material);
+
 // Polygonal mesh geometry.
 //
 // Example mesh with two triangles (x, z) and a quad (y).
@@ -610,8 +620,8 @@ struct ufbx_mesh {
 	ufbx_uv_set_list uv_sets;
 	ufbx_color_set_list color_sets;
 
-	// List of materials used by the mesh, indexed by `ufbx_mesh.face_material`
-	ufbx_material_list materials;
+	// List of materials used by the mesh
+	ufbx_mesh_material_list materials;
 
 	// Skinned vertex positions, for efficiency the skinned positions are the
 	// same as the static ones for non-skinned meshes and `skinned_is_local`
