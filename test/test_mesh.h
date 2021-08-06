@@ -64,9 +64,9 @@ UFBXT_FILE_TEST(maya_cube)
 	for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
 		ufbx_face face = mesh->faces[face_i];
 		for (size_t i = face.index_begin; i < face.index_begin + face.num_indices; i++) {
-			ufbx_vec3 n = ufbx_get_vertex_vec3(&mesh->vertex_normal, i);
-			ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_bitangent, i);
-			ufbx_vec3 t = ufbx_get_vertex_vec3(&mesh->vertex_tangent, i);
+			ufbx_vec3 n = ufbx_get_by_index_vec3(&mesh->vertex_normal, i);
+			ufbx_vec3 b = ufbx_get_by_index_vec3(&mesh->vertex_bitangent, i);
+			ufbx_vec3 t = ufbx_get_by_index_vec3(&mesh->vertex_tangent, i);
 			ufbxt_assert_close_real(err, ufbxt_dot3(n, n), 1.0);
 			ufbxt_assert_close_real(err, ufbxt_dot3(b, b), 1.0);
 			ufbxt_assert_close_real(err, ufbxt_dot3(t, t), 1.0);
@@ -75,8 +75,8 @@ UFBXT_FILE_TEST(maya_cube)
 			ufbxt_assert_close_real(err, ufbxt_dot3(b, t), 0.0);
 
 			for (size_t j = 0; j < face.num_indices; j++) {
-				ufbx_vec3 p0 = ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + j);
-				ufbx_vec3 p1 = ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + (j + 1) % face.num_indices);
+				ufbx_vec3 p0 = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + j);
+				ufbx_vec3 p1 = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + (j + 1) % face.num_indices);
 				ufbx_vec3 edge;
 				edge.x = p1.x - p0.x;
 				edge.y = p1.y - p0.y;
@@ -104,7 +104,7 @@ UFBXT_FILE_TEST(maya_color_sets)
 	ufbxt_assert(!strcmp(mesh->color_sets.data[3].name.data, "Alpha"));
 
 	for (size_t i = 0; i < mesh->num_indices; i++) {
-		ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, i);
+		ufbx_vec3 pos = ufbx_get_by_index_vec3(&mesh->vertex_position, i);
 		ufbx_vec4 refs[4] = {
 			{ 0.0, 0.0, 0.0, 1.0 },
 			{ 1.0, 1.0, 1.0, 1.0 },
@@ -118,7 +118,7 @@ UFBXT_FILE_TEST(maya_color_sets)
 		refs[3].w = (pos.x + 0.5) * 0.1 + (pos.y + 0.5) * 0.2 + (pos.z + 0.5) * 0.4;
 
 		for (size_t set_i = 0; set_i < 4; set_i++) {
-			ufbx_vec4 color = ufbx_get_vertex_vec4(&mesh->color_sets.data[set_i].vertex_color, i);
+			ufbx_vec4 color = ufbx_get_by_index_vec4(&mesh->color_sets.data[set_i].vertex_color, i);
 			ufbxt_assert_close_vec4(err, color, refs[set_i]);
 		}
 	}
@@ -141,9 +141,9 @@ UFBXT_FILE_TEST(maya_uv_sets)
 	size_t counts2[7][2] = { 0 };
 
 	for (size_t i = 0; i < mesh->num_indices; i++) {
-		ufbx_vec2 uv0 = ufbx_get_vertex_vec2(&mesh->uv_sets.data[0].vertex_uv, i);
-		ufbx_vec2 uv1 = ufbx_get_vertex_vec2(&mesh->uv_sets.data[1].vertex_uv, i);
-		ufbx_vec2 uv2 = ufbx_get_vertex_vec2(&mesh->uv_sets.data[2].vertex_uv, i);
+		ufbx_vec2 uv0 = ufbx_get_by_index_vec2(&mesh->uv_sets.data[0].vertex_uv, i);
+		ufbx_vec2 uv1 = ufbx_get_by_index_vec2(&mesh->uv_sets.data[1].vertex_uv, i);
+		ufbx_vec2 uv2 = ufbx_get_by_index_vec2(&mesh->uv_sets.data[2].vertex_uv, i);
 
 		ufbxt_assert(uv0.x > 0.05f && uv0.y > 0.05f && uv0.x < 0.95f && uv0.y < 0.95f);
 		int x1 = (int)(uv1.x + 0.5f), y1 = (int)(uv1.y + 0.5f);
@@ -184,7 +184,7 @@ UFBXT_FILE_TEST(blender_279_color_sets)
 	ufbxt_assert(!strcmp(mesh->color_sets.data[2].name.data, "Black"));
 
 	for (size_t i = 0; i < mesh->num_indices; i++) {
-		ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, i);
+		ufbx_vec3 pos = ufbx_get_by_index_vec3(&mesh->vertex_position, i);
 		ufbx_vec4 refs[3] = {
 			{ 0.0, 0.0, 0.0, 1.0 },
 			{ 1.0, 1.0, 1.0, 1.0 },
@@ -196,7 +196,7 @@ UFBXT_FILE_TEST(blender_279_color_sets)
 		refs[0].z = pos.z + 0.5;
 
 		for (size_t set_i = 0; set_i < 3; set_i++) {
-			ufbx_vec4 color = ufbx_get_vertex_vec4(&mesh->color_sets.data[set_i].vertex_color, i);
+			ufbx_vec4 color = ufbx_get_by_index_vec4(&mesh->color_sets.data[set_i].vertex_color, i);
 			ufbxt_assert_close_vec4(err, color, refs[set_i]);
 		}
 	}
@@ -219,9 +219,9 @@ UFBXT_FILE_TEST(blender_279_uv_sets)
 	size_t counts2[7][2] = { 0 };
 
 	for (size_t i = 0; i < mesh->num_indices; i++) {
-		ufbx_vec2 uv0 = ufbx_get_vertex_vec2(&mesh->uv_sets.data[0].vertex_uv, i);
-		ufbx_vec2 uv1 = ufbx_get_vertex_vec2(&mesh->uv_sets.data[1].vertex_uv, i);
-		ufbx_vec2 uv2 = ufbx_get_vertex_vec2(&mesh->uv_sets.data[2].vertex_uv, i);
+		ufbx_vec2 uv0 = ufbx_get_by_index_vec2(&mesh->uv_sets.data[0].vertex_uv, i);
+		ufbx_vec2 uv1 = ufbx_get_by_index_vec2(&mesh->uv_sets.data[1].vertex_uv, i);
+		ufbx_vec2 uv2 = ufbx_get_by_index_vec2(&mesh->uv_sets.data[2].vertex_uv, i);
 
 		ufbxt_assert(uv0.x > 0.05f && uv0.y > 0.05f && uv0.x < 0.95f && uv0.y < 0.95f);
 		int x1 = (int)(uv1.x + 0.5f), y1 = (int)(uv1.y + 0.5f);
@@ -282,8 +282,8 @@ UFBXT_FILE_TEST(maya_cone)
 	ufbxt_assert(mesh->faces[0].num_indices == 16);
 
 	for (size_t i = 0; i < mesh->num_indices; i++) {
-		ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, i);
-		ufbx_real crease = ufbx_get_vertex_real(&mesh->vertex_crease, i);
+		ufbx_vec3 pos = ufbx_get_by_index_vec3(&mesh->vertex_position, i);
+		ufbx_real crease = ufbx_get_by_index_real(&mesh->vertex_crease, i);
 
 		ufbxt_assert_close_real(err, crease, pos.y > 0.0 ? 0.998 : 0.0);
 	}
@@ -292,8 +292,8 @@ UFBXT_FILE_TEST(maya_cone)
 		ufbx_edge edge = mesh->edges[i];
 		ufbx_real crease = mesh->edge_crease[i];
 		bool smoothing = mesh->edge_smoothing[i];
-		ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[0]);
-		ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[1]);
+		ufbx_vec3 a = ufbx_get_by_index_vec3(&mesh->vertex_position, edge.indices[0]);
+		ufbx_vec3 b = ufbx_get_by_index_vec3(&mesh->vertex_position, edge.indices[1]);
 
 		if (a.y < 0.0 && b.y < 0.0) {
 			ufbxt_assert_close_real(err, crease, 0.583);
@@ -323,14 +323,14 @@ static void ufbxt_check_tangent_space(ufbxt_diff_error *err, ufbx_mesh *mesh)
 				size_t a = face.index_begin + i;
 				size_t b = face.index_begin + (i + 1) % face.num_indices;
 
-				ufbx_vec3 pa = ufbx_get_vertex_vec3(&mesh->vertex_position, a);
-				ufbx_vec3 pb = ufbx_get_vertex_vec3(&mesh->vertex_position, b);
-				ufbx_vec3 ba = ufbx_get_vertex_vec3(&set.vertex_bitangent, a);
-				ufbx_vec3 bb = ufbx_get_vertex_vec3(&set.vertex_bitangent, b);
-				ufbx_vec3 ta = ufbx_get_vertex_vec3(&set.vertex_tangent, a);
-				ufbx_vec3 tb = ufbx_get_vertex_vec3(&set.vertex_tangent, b);
-				ufbx_vec2 ua = ufbx_get_vertex_vec2(&set.vertex_uv, a);
-				ufbx_vec2 ub = ufbx_get_vertex_vec2(&set.vertex_uv, b);
+				ufbx_vec3 pa = ufbx_get_by_index_vec3(&mesh->vertex_position, a);
+				ufbx_vec3 pb = ufbx_get_by_index_vec3(&mesh->vertex_position, b);
+				ufbx_vec3 ba = ufbx_get_by_index_vec3(&set.vertex_bitangent, a);
+				ufbx_vec3 bb = ufbx_get_by_index_vec3(&set.vertex_bitangent, b);
+				ufbx_vec3 ta = ufbx_get_by_index_vec3(&set.vertex_tangent, a);
+				ufbx_vec3 tb = ufbx_get_by_index_vec3(&set.vertex_tangent, b);
+				ufbx_vec2 ua = ufbx_get_by_index_vec2(&set.vertex_uv, a);
+				ufbx_vec2 ub = ufbx_get_by_index_vec2(&set.vertex_uv, b);
 
 				ufbx_vec3 dp = ufbxt_sub3(pb, pa);
 				ufbx_vec2 du = ufbxt_sub2(ua, ub);
@@ -392,27 +392,27 @@ UFBXT_FILE_TEST(synthetic_tangents_reorder)
 }
 #endif
 
-#if 0
-
 UFBXT_FILE_TEST(blender_279_ball)
 #if UFBXT_IMPL
 {
-	ufbx_material *red = ufbx_find_material(scene, "Red");
-	ufbx_material *white = ufbx_find_material(scene, "White");
+	ufbx_material *red = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Red");
+	ufbx_material *white = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "White");
 	ufbxt_assert(!strcmp(red->name.data, "Red"));
 	ufbxt_assert(!strcmp(white->name.data, "White"));
 
 	ufbx_vec3 red_ref = { 0.8, 0.0, 0.0 };
 	ufbx_vec3 white_ref = { 0.8, 0.8, 0.8 };
-	ufbxt_assert_close_vec3(err, red->diffuse_color, red_ref);
-	ufbxt_assert_close_vec3(err, white->diffuse_color, white_ref);
+	ufbxt_assert_close_vec3(err, red->fbx.diffuse_color.value, red_ref);
+	ufbxt_assert_close_vec3(err, white->fbx.diffuse_color.value, white_ref);
 
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "Icosphere");
+	ufbx_node *node = ufbx_find_node(scene, "Icosphere");
+	ufbxt_assert(node);
+	ufbx_mesh *mesh = node->mesh;
 	ufbxt_assert(mesh);
 	ufbxt_assert(mesh->face_material);
 	ufbxt_assert(mesh->face_smoothing);
 
-	ufbxt_assert(mesh->materials.size == 2);
+	ufbxt_assert(mesh->materials.count == 2);
 	ufbxt_assert(mesh->materials.data[0] == red);
 	ufbxt_assert(mesh->materials.data[1] == white);
 
@@ -420,7 +420,7 @@ UFBXT_FILE_TEST(blender_279_ball)
 		ufbx_face face = mesh->faces[face_i];
 		ufbx_vec3 mid = { 0 };
 		for (size_t i = 0; i < face.num_indices; i++) {
-			mid = ufbxt_add3(mid, ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + i));
+			mid = ufbxt_add3(mid, ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + i));
 		}
 		mid.x /= (ufbx_real)face.num_indices;
 		mid.y /= (ufbx_real)face.num_indices;
@@ -432,8 +432,6 @@ UFBXT_FILE_TEST(blender_279_ball)
 		ufbxt_assert(material == (mid.z < 0.0 ? 1 : 0));
 	}
 }
-#endif
-
 #endif
 
 UFBXT_FILE_TEST(synthetic_broken_material)
@@ -492,5 +490,28 @@ UFBXT_FILE_TEST(blender_293_instancing)
 	ufbxt_assert(scene->meshes.count == 1);
 	ufbx_mesh *mesh = scene->meshes.data[0];
 	ufbxt_assert(mesh->instances.count == 8);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_indexed_by_vertex)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->meshes.count == 1);
+	ufbx_mesh *mesh = scene->meshes.data[0];
+
+	for (size_t vi = 0; vi < mesh->num_vertices; vi++) {
+		ufbx_vec3 pos = mesh->vertex_position.data[mesh->vertex_position.by_vertex[vi]];
+		ufbx_vec3 normal = mesh->vertex_normal.data[mesh->vertex_normal.by_vertex[vi]];
+		ufbx_vec3 ref_normal = { 0.0f, pos.y > 0.0f ? 1.0f : -1.0f, 0.0f };
+		ufbxt_assert_close_vec3(err, normal, ref_normal);
+	}
+
+	for (size_t ii = 0; ii < mesh->num_indices; ii++) {
+		ufbx_vec3 pos = mesh->vertex_position.data[mesh->vertex_position.by_index[ii]];
+		ufbx_vec3 normal = mesh->vertex_normal.data[mesh->vertex_normal.by_index[ii]];
+		ufbx_vec3 ref_normal = { 0.0f, pos.y > 0.0f ? 1.0f : -1.0f, 0.0f };
+		ufbxt_assert_close_vec3(err, normal, ref_normal);
+	}
+
 }
 #endif

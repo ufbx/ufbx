@@ -5,9 +5,10 @@ size_t do_triangulate_test(ufbx_scene *scene)
 {
 	size_t num_fail = 0;
 
-	for (size_t mesh_ix = 0; mesh_ix < scene->meshes.size; mesh_ix++) {
+	for (size_t mesh_ix = 0; mesh_ix < scene->meshes.count; mesh_ix++) {
 		ufbx_mesh *mesh = &scene->meshes.data[mesh_ix];
-		bool should_be_top_left = mesh->node.name.data[0] == 'A';
+		ufbxt_assert(mesh->instances.count == 1);
+		bool should_be_top_left = mesh->instances.data[0]->name.data[0] == 'A';
 		ufbxt_assert(mesh->num_faces == 1);
 		ufbx_face face = mesh->faces[0];
 		ufbxt_assert(face.index_begin == 0);

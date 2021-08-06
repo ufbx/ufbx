@@ -439,39 +439,46 @@ struct ufbx_node {
 
 // Vertex attribute: All attributes are stored in a consistent indexed format
 // regardless of how it's actually stored in the file.
-// `data` is a contiguous array of `num_elements` attribute values
-// `indices` map each mesh index into a value in the `data` array
+// `data` is a contiguous array of `num_elements` attribute values.
+// `by_index` maps each mesh index into a value in the `data` array.
+// _If_ the vertex element is specified uniquely per logical vertex you can 
+// get the per-vertex value through `by_vertex[vertex_index]`.
 typedef struct ufbx_vertex_void {
 	void *data;
-	int32_t *indices;
+	int32_t *by_index;
+	int32_t *by_vertex;
 	size_t num_elements;
 } ufbx_vertex_void;
 
 // 1D vertex attribute, see `ufbx_vertex_void` for information
 typedef struct ufbx_vertex_real {
 	ufbx_real *data;
-	int32_t *indices;
+	int32_t *by_index;
+	int32_t *by_vertex;
 	size_t num_elements;
 } ufbx_vertex_real;
 
 // 2D vertex attribute, see `ufbx_vertex_void` for information
 typedef struct ufbx_vertex_vec2 {
 	ufbx_vec2 *data;
-	int32_t *indices;
+	int32_t *by_index;
+	int32_t *by_vertex;
 	size_t num_elements;
 } ufbx_vertex_vec2;
 
 // 3D vertex attribute, see `ufbx_vertex_void` for information
 typedef struct ufbx_vertex_vec3 {
 	ufbx_vec3 *data;
-	int32_t *indices;
+	int32_t *by_index;
+	int32_t *by_vertex;
 	size_t num_elements;
 } ufbx_vertex_vec3;
 
 // 4D vertex attribute, see `ufbx_vertex_void` for information
 typedef struct ufbx_vertex_vec4 {
 	ufbx_vec4 *data;
-	int32_t *indices;
+	int32_t *by_index;
+	int32_t *by_vertex;
 	size_t num_elements;
 } ufbx_vertex_vec4;
 
@@ -514,6 +521,50 @@ typedef struct ufbx_face {
 } ufbx_face;
 
 // Polygonal mesh geometry.
+//
+// Example mesh with two triangles (x, z) and a quad (y).
+// The faces have a constant UV coordinate x/y/z.
+// The vertices have _per vertex_ normals that point up/down.
+// 
+//     ^   ^     ^
+//     A---B-----C
+//     |x /     /|
+//     | /  y  / |
+//     |/     / z|
+//     D-----E---F
+//     v     v   v
+//
+// Some geometry data is specified per logical vertex. Vertex positions are
+// the only element that is guaranteed to be defined _uniquely_ per vertex.
+// Other vertex elements _may_ be defined per vertex if `by_vertex != NULL`.
+//
+//   0 1 2 3 4 5  vertex
+//   A B C D E F  vertices[vertex]
+//
+//   0 0 0 1 1 1  vertex_normal.by_vertex[vertex]
+//   ^ ^ ^ v v v  vertex_normal.data[vertex_normal.by_vertex[vertex]]
+//
+// Attributes may have multiple values within a single vertex, for example a
+// UV seam vertex has two UV coordinates. Thus polygons are defined using
+// an index that counts each corner of each face polygon. If an attribute is
+// defined (even per-vertex) it will always have a valid `by_index` array.
+//
+//   {0,3}    {3,4}    {7,3}   faces ({ index_begin, num_indices })
+//   0 1 2   3 4 5 6   7 8 9   index
+//
+//   0 1 3   1 2 4 3   2 4 5   vertex_indices[index]
+//   A B D   B C E D   C E F   vertices[vertex_indices[index]]
+//
+//   0 0 1   0 0 1 1   0 1 1   vertex_normal.by_index[index]
+//   ^ ^ v   ^ ^ v v   ^ v v   vertex_normal.data[vertex_normal.by_index[index]]
+//
+//   0 0 0   1 1 1 1   2 2 2   vertex_uv.by_index[index]
+//   x x x   y y y y   z z z   vertex_uv.data[vertex_uv.by_index[index]]
+//
+// Vertex position can also be accessed uniformly through an accessor:
+//   0 1 3   1 2 4 3   2 4 5   vertex_position.by_index[index]
+//   A B D   B C E D   C E F   vertex_position.data[vertex_position.by_index[index]]
+//
 struct ufbx_mesh {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 
@@ -535,10 +586,12 @@ struct ufbx_mesh {
 	bool *edge_smoothing;   // < Should the edge have soft normals
 	ufbx_real *edge_crease; // < Crease value for subdivision surfaces
 
-	// Vertex attributes: Every attribute is stored in a consistent indexed
-	// format so you can access all attributes for a given index using
-	// `vertex_ATTRIB.data[vertex_attrib.indices[index]]` or via the equivalent
-	// helper function `ufbx_get_vertex_TYPE(&vertex_ATTRIB, index)`.
+	// Logical vertices and positions, alternatively you can use
+	// `vertex_position` for consistent interface with other attributes.
+	int32_t *vertex_indices;
+	ufbx_vec3 *vertices;
+
+	// Vertex attributes, see the comment over the struct.
 	//
 	// NOTE: Not all meshes have all attributes, in that case `data == NULL`!
 	//
@@ -559,6 +612,13 @@ struct ufbx_mesh {
 
 	// List of materials used by the mesh, indexed by `ufbx_mesh.face_material`
 	ufbx_material_list materials;
+
+	// Skinned vertex positions, for efficiency the skinned positions are the
+	// same as the static ones for non-skinned meshes and `skinned_is_local`
+	// is set to true meaning you need to transform them manually using
+	// `ufbx_transform_position(&node->geometry_to_world, skinned_pos)`!
+	bool skinned_is_local;
+	ufbx_vertex_vec3 skinned_position;
 
 	// Deformers
 	ufbx_skin_deformer_list skins;
@@ -686,17 +746,43 @@ struct ufbx_lod_group {
 
 // Method to evaluate the skinning on a per-vertex level
 typedef enum ufbx_skinning_method {
-	UFBX_SKINNING_RIGID,
 	UFBX_SKINNING_LINEAR,
+	UFBX_SKINNING_RIGID,
 	UFBX_SKINNING_DUAL_QUATERNION,
-	UFBX_SKINNING_BLEND,
+	UFBX_SKINNING_BLENDED_DQ_LINEAR,
 } ufbx_skinning_method;
+
+typedef struct ufbx_skin_vertex {
+	uint32_t weight_begin;
+	uint32_t num_weights;
+	ufbx_real dq_weight;
+} ufbx_skin_vertex;
+
+UFBX_LIST_TYPE(ufbx_skin_vertex_list, ufbx_skin_vertex);
+
+typedef struct ufbx_skin_weight {
+	uint32_t cluster_index;
+	ufbx_real weight;
+} ufbx_skin_weight;
+
+UFBX_LIST_TYPE(ufbx_skin_weight_list, ufbx_skin_weight);
 
 struct ufbx_skin_deformer {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	ufbx_skinning_method skinning_method;
 	ufbx_skin_cluster_list clusters;
+
+	ufbx_skin_vertex_list vertices;
+	ufbx_skin_weight_list weights;
+
+	size_t max_weights_per_vertex;
+
+	// Blend weights between Linear Blend Skinning (0.0) and Dual Quaternion (1.0)
+	// Should be used if `skinning_method == UFBX_SKINNING_BLENDED_DQ_LINEAR`
+	size_t num_dq_weights;
+	int32_t *dq_vertices;
+	ufbx_real *dq_weights;
 };
 
 struct ufbx_skin_cluster {
@@ -704,12 +790,16 @@ struct ufbx_skin_cluster {
 
 	ufbx_node *bone;
 
-	ufbx_matrix mesh_to_bind;
+	ufbx_matrix geometry_to_bone;
 	ufbx_matrix bind_to_world;
 
 	size_t num_weights;
-	int32_t *indices;
+	int32_t *vertices;
 	ufbx_real *weights;
+
+	// Range of vertices this cluster effects
+	int32_t min_vertex;
+	int32_t max_vertex;
 };
 
 struct ufbx_blend_deformer {
@@ -740,13 +830,10 @@ struct ufbx_blend_shape {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	// Vertex offsets to apply over the base mesh
-	// NOTE: `indices` refers to VERTEX indices not mesh indices, so it ranges
-	// from `0 .. mesh->num_vertices` and refers to `mesh->vertex_position.data`
-	// NOTE: The blend shape indices are _not_ sanitized and may point outside
-	// the mesh vertex buffers!
 	size_t num_offsets;
+	int32_t *offset_vertices;
 	ufbx_vec3 *position_offsets;
-	int32_t *indices;
+	ufbx_vec3 *normal_offsets;
 };
 
 struct ufbx_cache_deformer {
@@ -1284,6 +1371,10 @@ typedef struct ufbx_load_opts {
 	bool ignore_animation;  // < Do not load animation curves
 	bool evaluate_skinning; // < Evaluate skinning (see ufbx_mesh.skinned_vertices)
 
+	// Don't compute `ufbx_skin_deformer` `vertices` and `weights` arrays saving
+	// a bit of memory and time if not needed
+	bool skip_skin_vertices;
+
 	// Don't adjust reading the FBX file depending on the detected exporter
 	bool disable_quirks;
 
@@ -1423,6 +1514,7 @@ ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *nam
 // Math
 
 ufbx_quat ufbx_mul_quat(ufbx_quat a, ufbx_quat b);
+ufbx_real ufbx_dot_quat(ufbx_quat a, ufbx_quat b);
 ufbx_quat ufbx_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t);
 ufbx_vec3 ufbx_rotate_vector(ufbx_quat q, ufbx_vec3 v);
 ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order);
@@ -1438,12 +1530,28 @@ ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v);
 ufbx_matrix ufbx_get_normal_matrix(const ufbx_matrix *m);
 ufbx_matrix ufbx_get_inverse_matrix(const ufbx_matrix *m);
 
+// Skinning
+
+ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t vertex);
+
+ufbx_vec3 ufbx_get_blend_shape_vertex_offset(const ufbx_blend_shape *shape, size_t vertex);
+ufbx_vec3 ufbx_get_blend_vertex_offset(const ufbx_blend_deformer *blend, size_t vertex);
+
+void ufbx_add_blend_shape_vertex_offsets(const ufbx_blend_shape *shape, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
+void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
+
+
 // -- Inline API
 
-ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t index) { return v->data[v->indices[index]]; }
-ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }
-ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }
-ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->indices[index]]; }
+ufbx_inline ufbx_real ufbx_get_by_vertex_real(const ufbx_vertex_real *v, size_t vertex) { ufbx_assert(v->by_vertex); return v->data[v->by_vertex[vertex]]; }
+ufbx_inline ufbx_vec2 ufbx_get_by_vertex_vec2(const ufbx_vertex_vec2 *v, size_t vertex) { ufbx_assert(v->by_vertex); return v->data[v->by_vertex[vertex]]; }
+ufbx_inline ufbx_vec3 ufbx_get_by_vertex_vec3(const ufbx_vertex_vec3 *v, size_t vertex) { ufbx_assert(v->by_vertex); return v->data[v->by_vertex[vertex]]; }
+ufbx_inline ufbx_vec4 ufbx_get_by_vertex_vec4(const ufbx_vertex_vec4 *v, size_t vertex) { ufbx_assert(v->by_vertex); return v->data[v->by_vertex[vertex]]; }
+
+ufbx_inline ufbx_real ufbx_get_by_index_real(const ufbx_vertex_real *v, size_t index) { return v->data[v->by_index[index]]; }
+ufbx_inline ufbx_vec2 ufbx_get_by_index_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->by_index[index]]; }
+ufbx_inline ufbx_vec3 ufbx_get_by_index_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->by_index[index]]; }
+ufbx_inline ufbx_vec4 ufbx_get_by_index_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->by_index[index]]; }
 
 #endif
 

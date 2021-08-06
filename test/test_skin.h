@@ -2,7 +2,7 @@
 #if UFBXT_IMPL
 void ufbxt_check_stack_times(ufbx_scene *scene, ufbxt_diff_error *err, const char *stack_name, double begin, double end)
 {
-	ufbx_anim_stack *stack = ufbx_find_anim_stack(scene, stack_name);
+	ufbx_anim_stack *stack = (ufbx_anim_stack*)ufbx_find_element(scene, UFBX_ELEMENT_ANIM_STACK, stack_name);
 	ufbxt_assert(stack);
 	ufbxt_assert(!strcmp(stack->name.data, stack_name));
 	ufbxt_assert_close_real(err, (ufbx_real)stack->time_begin, (ufbx_real)begin);
@@ -26,21 +26,21 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, double min_norm
 
 	ufbx_evaluate_opts opts = { 0 };
 
-	opts.evaluate_skinned_vertices = true;
+	opts.evaluate_skinning = true;
+	ufbx_anim anim = scene->anim;
 
 	if (anim_name) {
-		for (size_t i = 0; i < scene->anim_stacks.size; i++) {
-			ufbx_anim_stack *stack = &scene->anim_stacks.data[i];
+		for (size_t i = 0; i < scene->anim_stacks.count; i++) {
+			ufbx_anim_stack *stack = scene->anim_stacks.data[i];
 			if (strstr(stack->name.data, anim_name)) {
-				ufbxt_assert(stack->layers.size > 0);
-				opts.layer = stack->layers.data[0];
+				ufbxt_assert(stack->layers.count > 0);
+				anim = stack->anim;
 				break;
 			}
 		}
-		ufbxt_assert(opts.layer);
 	}
 
-	ufbx_scene *eval = ufbx_evaluate_scene(scene, &opts, time);
+	ufbx_scene *eval = ufbx_evaluate_scene(scene, anim, time, &opts, NULL);
 	ufbxt_assert(eval);
 
 	ufbxt_check_scene(eval);
@@ -66,9 +66,38 @@ UFBXT_FILE_TEST(blender_279_sausage)
 		ufbxt_check_stack_times(scene, err, "Skeleton|Wiggle", 0.0, 19.0/24.0);
 	}
 
-	ufbxt_check_frame(scene, err, 0.0, "blender_279_sausage_base_0", "Base", 0.0);
-	ufbxt_check_frame(scene, err, 0.0, "blender_279_sausage_spin_15", "Spin", 15.0/24.0);
-	ufbxt_check_frame(scene, err, 0.0, "blender_279_sausage_wiggle_20", "Wiggle", 20.0/24.0);
+	const char *cluster_names[][2] = {
+		{ "Bottom", "Cluster Skin Bottom" },
+		{ "Middle", "Cluster Skin Middle" },
+		{ "Top", "Cluster Skin Top" },
+	};
+	const ufbx_matrix cluster_bind_ref[][2] = {
+		{
+			{ 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f },
+			{ 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f },
+		},
+		{
+			{ 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, -1.9f, 0.0f },
+			{ 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, -1.9f, 0.0f, 0.0f },
+		},
+		{
+			{ 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, -3.8f, 0.0f },
+			{ 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, -3.8f, 0.0f, 0.0f },
+		},
+	};
+
+	for (size_t i = 0; i < 3; i++) {
+		ufbx_skin_cluster *cluster = (ufbx_skin_cluster*)ufbx_find_element(scene, UFBX_ELEMENT_SKIN_CLUSTER, cluster_names[i][scene->metadata.ascii]);
+		ufbxt_assert(cluster);
+		ufbxt_assert_close_vec3(err, cluster->geometry_to_bone.cols[0], cluster_bind_ref[i][scene->metadata.ascii].cols[0]);
+		ufbxt_assert_close_vec3(err, cluster->geometry_to_bone.cols[1], cluster_bind_ref[i][scene->metadata.ascii].cols[1]);
+		ufbxt_assert_close_vec3(err, cluster->geometry_to_bone.cols[2], cluster_bind_ref[i][scene->metadata.ascii].cols[2]);
+		ufbxt_assert_close_vec3(err, cluster->geometry_to_bone.cols[3], cluster_bind_ref[i][scene->metadata.ascii].cols[3]);
+	}
+
+	ufbxt_check_frame(scene, err, -1.0, "blender_279_sausage_base_0", "Base", 0.0);
+	ufbxt_check_frame(scene, err, -1.0, "blender_279_sausage_spin_15", "Spin", 15.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "blender_279_sausage_wiggle_20", "Wiggle", 20.0/24.0);
 }
 #endif
 
@@ -81,24 +110,24 @@ UFBXT_FILE_TEST(maya_game_sausage)
 UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, wiggle)
 #if UFBXT_IMPL
 {
-	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0);
-	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0);
 }
 #endif
 
 UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, spin)
 #if UFBXT_IMPL
 {
-	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_spin_7", NULL, 27.0/24.0);
-	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_spin_15", NULL, 35.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_spin_7", NULL, 27.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_spin_15", NULL, 35.0/24.0);
 }
 #endif
 
 UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, deform)
 #if UFBXT_IMPL
 {
-	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_deform_8", NULL, 48.0/24.0);
-	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_deform_15", NULL, 55.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_deform_8", NULL, 48.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_deform_15", NULL, 55.0/24.0);
 }
 #endif
 
@@ -109,16 +138,16 @@ UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, combined)
 	ufbxt_check_stack_times(scene, err, "spin", 20.0/24.0, 40.0/24.0);
 	ufbxt_check_stack_times(scene, err, "deform", 40.0/24.0, 60.0/24.0);
 
-	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_wiggle_10", "wiggle", 10.0/24.0);
-	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_wiggle_18", "wiggle", 18.0/24.0);
-	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_spin_7", "spin", 27.0/24.0);
-	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_spin_15", "spin", 35.0/24.0);
-	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_deform_8", "deform", 48.0/24.0);
-	ufbxt_check_frame(scene, err, 0.0, "maya_game_sausage_deform_15", "deform", 55.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_wiggle_10", "wiggle", 10.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_wiggle_18", "wiggle", 18.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_spin_7", "spin", 27.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_spin_15", "spin", 35.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_deform_8", "deform", 48.0/24.0);
+	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_deform_15", "deform", 55.0/24.0);
 }
 #endif
 
-
+#if 0
 UFBXT_FILE_TEST(maya_blend_shape_cube)
 #if UFBXT_IMPL
 {
@@ -179,8 +208,7 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 
 			ufbx_evaluate_opts opts = { 0 };
 
-			opts.reuse_scene = eval;
-			opts.evaluate_skinned_vertices = eval_skin != 0;
+			opts.evaluate_skinning = eval_skin != 0;
 
 			eval = ufbx_evaluate_scene(scene, &opts, time);
 			ufbxt_assert(eval);
@@ -209,7 +237,6 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 }
 #endif
 
-
 UFBXT_FILE_TEST(maya_blend_inbetween)
 #if UFBXT_IMPL
 {
@@ -221,5 +248,47 @@ UFBXT_FILE_TEST(maya_blend_inbetween)
 	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_80", NULL, 80.0/24.0);
 	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_89", NULL, 89.0/24.0);
 	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_120", NULL, 120.0/24.0);
+}
+#endif
+
+#endif
+
+UFBXT_FILE_TEST(synthetic_blend_shape_order)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pPlatonic1");
+	ufbxt_assert(node);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh);
+
+	static const ufbx_vec3 ref[] = {
+		{ -0.041956f, -0.004164f, -1.064113f },
+		{  0.736301f,  0.734684f, -0.451944f },
+		{ -0.263699f,  1.059604f, -0.451944f },
+		{ -0.951595f, -0.168521f, -0.372847f },
+		{ -0.333561f, -1.019172f, -0.372847f },
+		{  1.004034f, -0.525731f, -0.447214f },
+		{  1.019802f, -0.010427f,  0.466597f },
+		{  0.289087f,  1.059604f,  0.442483f },
+		{ -0.816271f,  0.564766f,  0.459767f },
+		{ -0.870921f, -0.699814f,  0.400384f },
+		{  0.514865f, -0.854815f,  0.383101f },
+		{  0.238471f, -0.004164f,  0.935887f },
+	};
+
+	ufbx_blend_shape *shape = (ufbx_blend_shape*)ufbx_find_element(scene, UFBX_ELEMENT_BLEND_SHAPE, "Target");
+	ufbxt_assert(shape);
+
+	ufbx_vec3 pos[12];
+	memcpy(pos, mesh->vertices, sizeof(pos));
+	ufbx_add_blend_shape_vertex_offsets(shape, pos, 12, 0.5f);
+
+	for (size_t i = 0; i < mesh->num_vertices; i++) {
+		ufbx_vec3 vert = mesh->vertices[i];
+		ufbx_vec3 off = ufbx_get_blend_shape_vertex_offset(shape, i);
+		ufbx_vec3 res = { vert.x+off.x*0.5f, vert.y+off.y*0.5f, vert.z+off.z*0.5f };
+		ufbxt_assert_close_vec3(err, res, ref[i]);
+		ufbxt_assert_close_vec3(err, pos[i], ref[i]);
+	}
 }
 #endif

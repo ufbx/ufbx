@@ -31,17 +31,17 @@ static void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void 
 {
 	ufbx_vertex_void *elem = (ufbx_vertex_void*)void_elem;
 	if (elem->data == NULL) {
-		ufbxt_assert(elem->indices == NULL);
+		ufbxt_assert(elem->by_index == NULL);
 		ufbxt_assert(elem->num_elements == 0);
 		return;
 	}
 
 	ufbxt_assert(elem->num_elements >= 0);
-	ufbxt_assert(elem->indices != NULL);
+	ufbxt_assert(elem->by_index != NULL);
 
 	// Check that the indices are in range
 	for (size_t i = 0; i < mesh->num_indices; i++) {
-		int32_t ix = elem->indices[i];
+		int32_t ix = elem->by_index[i];
 		ufbxt_assert(ix >= -1 && ix < elem->num_elements);
 	}
 
@@ -190,6 +190,9 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	// ufbx_mesh *found = ufbx_find_mesh(scene, mesh->node.name.data);
 	// ufbxt_assert(found && !strcmp(found->node.name.data, mesh->node.name.data));
 
+	ufbxt_assert(mesh->vertices == mesh->vertex_position.data);
+	ufbxt_assert(mesh->vertex_indices == mesh->vertex_position.by_index);
+
 	ufbxt_check_vertex_element(scene, mesh, &mesh->vertex_position, sizeof(ufbx_vec3));
 	ufbxt_check_vertex_element(scene, mesh, &mesh->vertex_normal, sizeof(ufbx_vec3));
 	ufbxt_check_vertex_element(scene, mesh, &mesh->vertex_bitangent, sizeof(ufbx_vec3));
@@ -257,7 +260,7 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbx_uv_set *set = &mesh->uv_sets.data[i];
 		if (i == 0) {
 			ufbxt_assert(mesh->vertex_uv.data == set->vertex_uv.data);
-			ufbxt_assert(mesh->vertex_uv.indices == set->vertex_uv.indices);
+			ufbxt_assert(mesh->vertex_uv.by_index == set->vertex_uv.by_index);
 			ufbxt_assert(mesh->vertex_uv.num_elements == set->vertex_uv.num_elements);
 		}
 		ufbxt_check_string(set->name);
@@ -268,7 +271,7 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbx_color_set *set = &mesh->color_sets.data[i];
 		if (i == 0) {
 			ufbxt_assert(mesh->vertex_color.data == set->vertex_color.data);
-			ufbxt_assert(mesh->vertex_color.indices == set->vertex_color.indices);
+			ufbxt_assert(mesh->vertex_color.by_index == set->vertex_color.by_index);
 			ufbxt_assert(mesh->vertex_color.num_elements == set->vertex_color.num_elements);
 		}
 		ufbxt_check_string(set->name);
