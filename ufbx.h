@@ -1529,6 +1529,7 @@ ufbx_quat ufbx_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t);
 ufbx_vec3 ufbx_rotate_vector(ufbx_quat q, ufbx_vec3 v);
 ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order);
 ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order);
+ufbx_real ufbx_vec3_length(ufbx_vec3 v);
 
 ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v);
 
@@ -1540,9 +1541,11 @@ ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v);
 ufbx_matrix ufbx_get_normal_matrix(const ufbx_matrix *m);
 ufbx_matrix ufbx_get_inverse_matrix(const ufbx_matrix *m);
 
+ufbx_transform ufbx_get_matrix_transform(const ufbx_matrix *m);
+
 // Skinning
 
-ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t vertex);
+ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback);
 
 ufbx_vec3 ufbx_get_blend_shape_vertex_offset(const ufbx_blend_shape *shape, size_t vertex);
 ufbx_vec3 ufbx_get_blend_vertex_offset(const ufbx_blend_deformer *blend, size_t vertex);

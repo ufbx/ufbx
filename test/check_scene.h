@@ -306,6 +306,7 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		}
 	}
 	for (size_t i = 0; i < mesh->skins.count; i++) {
+		ufbxt_assert(mesh->skins.data[i]->vertices.count >= mesh->num_vertices);
 		ufbxt_check_element_ptr(scene, &mesh->skins.data[i]->element);
 	}
 	for (size_t i = 0; i < mesh->blend_shapes.count; i++) {

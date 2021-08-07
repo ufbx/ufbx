@@ -514,10 +514,8 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 
 				ufbxt_assert_close_vec3(p_err, op, fp);
 
-				if (min_normal_dot < 1.0) {
-					ufbx_real dot = ufbxt_dot3(on, fn);
-					ufbxt_assert(dot >= min_normal_dot);
-				} else {
+				// TODO: Remove `min_normal_dot` and such
+				if (mesh->all_deformers.count == 0) {
 					ufbxt_assert_close_vec3(p_err, on, fn);
 				}
 
@@ -1279,6 +1277,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				load_opts.temp_huge_size = 1;
 				load_opts.result_huge_size = 1;
 			}
+
+			load_opts.evaluate_skinning = true;
 
 			uint64_t load_begin = cputime_cpu_tick();
 			ufbx_scene *scene = ufbx_load_memory(data, size, &load_opts, &error);

@@ -7735,6 +7735,22 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		ufbxi_check((uint32_t)max_vertex < uc->opts.max_array_size);
 		size_t num_vertices = (size_t)max_vertex + 1;
 
+		// Iterate through meshes so we can pad the vertices to the largest one
+		{
+			ufbx_connection_list conns = ufbxi_find_src_connections(&skin->element, NULL);
+			ufbxi_for_list(ufbx_connection, conn, conns) {
+				ufbx_mesh *mesh = NULL;
+				if (conn->dst_prop.length > 0) continue;
+				if (conn->dst->type == UFBX_ELEMENT_MESH) {
+					mesh = (ufbx_mesh*)conn->dst;
+				} else if (conn->dst->type == UFBX_ELEMENT_NODE) {
+					mesh = ((ufbx_node*)conn->dst)->mesh;
+				}
+				if (!mesh) continue;
+				num_vertices = ufbxi_max_sz(num_vertices, mesh->num_vertices);
+			}
+		}
+
 		if (!uc->opts.skip_skin_vertices) {
 			skin->vertices.count = num_vertices;
 			skin->vertices.data = ufbxi_push_zero(&uc->result, ufbx_skin_vertex, num_vertices);
@@ -11660,14 +11676,37 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	// ufbxi_get_properties(&uc->scene);
 	// ufbxi_update_transform_matrix(&uc->scene.root_node, NULL);
 
-#if 0
+	// Evaluate skinning if requested
+	// TODO: Factor this into a function
 	if (uc->opts.evaluate_skinning) {
-		size_t size_uint64s = ufbxi_get_skinning_buffer_size(&uc->scene) / 8;
-		void *skinning_buffer = ufbxi_push(&uc->result, uint64_t, size_uint64s);
-		ufbxi_check(skinning_buffer);
-		ufbxi_evaluate_skinning(&uc->scene, skinning_buffer);
+
+		ufbxi_for_ptr_list(ufbx_mesh, p_mesh, uc->scene.meshes) {
+			ufbx_mesh *mesh = *p_mesh;
+			if (mesh->blend_shapes.count == 0 && mesh->skins.count == 0) continue;
+
+			size_t num_vertices = mesh->num_vertices;
+			ufbx_vec3 *result_pos = ufbxi_push_copy(&uc->result, ufbx_vec3, num_vertices, mesh->vertices);
+			ufbxi_check_err(&uc->error, result_pos);
+
+			ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, mesh->blend_shapes) {
+				ufbx_add_blend_vertex_offsets(*p_blend, result_pos, num_vertices, 1.0f);
+			}
+
+			// TODO: What should we do about multiple skins??
+			if (mesh->skins.count > 0) {
+				ufbx_matrix *fallback = mesh->instances.count > 0 ? &mesh->instances.data[0]->geometry_to_world : NULL;
+				ufbx_skin_deformer *skin = mesh->skins.data[0];
+				for (size_t i = 0; i < num_vertices; i++) {
+					ufbx_matrix mat = ufbx_get_skin_vertex_matrix(skin, i, fallback);
+					result_pos[i] = ufbx_transform_position(&mat, result_pos[i]);
+				}
+
+				mesh->skinned_is_local = false;
+			}
+
+			mesh->skinned_position.data = result_pos;
+		}
 	}
-#endif
 
 	// Copy local data to the scene
 	uc->scene.metadata.version = uc->version;
@@ -12842,9 +12881,10 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 
 			// TODO: What should we do about multiple skins??
 			if (mesh->skins.count > 0) {
+				ufbx_matrix *fallback = mesh->instances.count > 0 ? &mesh->instances.data[0]->geometry_to_world : NULL;
 				ufbx_skin_deformer *skin = mesh->skins.data[0];
 				for (size_t i = 0; i < num_vertices; i++) {
-					ufbx_matrix mat = ufbx_get_skin_vertex_matrix(skin, i);
+					ufbx_matrix mat = ufbx_get_skin_vertex_matrix(skin, i, fallback);
 					result_pos[i] = ufbx_transform_position(&mat, result_pos[i]);
 				}
 
@@ -13639,6 +13679,11 @@ ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order)
 	return v;
 }
 
+ufbx_real ufbx_vec3_length(ufbx_vec3 v)
+{
+	return (ufbx_real)sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+}
+
 size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error)
 {
 	if (!dst || !dst_size) return 0;
@@ -14051,7 +14096,20 @@ ufbx_matrix ufbx_get_inverse_matrix(const ufbx_matrix *m)
 	return r;
 }
 
-ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t vertex)
+ufbx_transform ufbx_get_matrix_transform(const ufbx_matrix *m)
+{
+	ufbx_transform t;
+	t.translation = m->cols[3];
+	t.scale.x = ufbx_vec3_length(m->cols[0]);
+	t.scale.y = ufbx_vec3_length(m->cols[1]);
+	t.scale.z = ufbx_vec3_length(m->cols[2]);
+
+	// TODO TODO
+
+	return t;
+}
+
+ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback)
 {
 	if (!skin || vertex >= skin->vertices.count) return ufbx_identity_matrix;
 	ufbx_skin_vertex skin_vertex = skin->vertices.data[vertex];
@@ -14059,6 +14117,7 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 	ufbx_matrix mat = { 0.0f };
 	ufbx_quat q0 = { 0.0f }, qe = { 0.0f };
 	ufbx_quat first_q0 = { 0.0f };
+	ufbx_vec3 qs = { 1.0f, 1.0f, 1.0f };
 	ufbx_real total_weight = 0.0f;
 
 	for (uint32_t i = 0; i < skin_vertex.num_weights; i++) {
@@ -14067,11 +14126,13 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 		const ufbx_node *node = cluster->bone;
 		if (!node) continue;
 
+		ufbx_matrix geometry_to_world;
+		ufbx_matrix_mul(&geometry_to_world, &node->node_to_world, &cluster->geometry_to_bone);
+
 		total_weight += weight.weight;
 		if (skin_vertex.dq_weight > 0.0f) {
-			// TODO: Bind pose
-			const ufbx_transform *t = &node->world_transform;
-			ufbx_quat vq0 = t->rotation;
+			const ufbx_transform t = ufbx_get_matrix_transform(&geometry_to_world);
+			ufbx_quat vq0 = t.rotation;
 			if (i == 0) first_q0 = vq0;
 
 			if (ufbx_dot_quat(first_q0, vq0) < 0.0f) {
@@ -14081,16 +14142,23 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 				vq0.w = -vq0.w;
 			}
 
-			ufbx_quat vqt = { 0.5f * t->translation.x, 0.5f * t->translation.y, 0.5f * t->translation.z };
+			ufbx_quat vqt = { 0.5f * t.translation.x, 0.5f * t.translation.y, 0.5f * t.translation.z };
 			ufbx_quat vqe = ufbxi_mul_quat(vq0, vqt);
 			ufbxi_add_weighted_quat(&q0, vq0, weight.weight);
 			ufbxi_add_weighted_quat(&qe, vqe, weight.weight);
+			ufbxi_add_weighted_vec3(&qs, t.scale, weight.weight);
 		}
 
 		if (skin_vertex.dq_weight < 1.0f) {
-			ufbx_matrix geometry_to_world;
-			ufbx_matrix_mul(&geometry_to_world, &node->node_to_world, &cluster->geometry_to_bone);
 			ufbxi_add_weighted_mat(&mat, &geometry_to_world, (1.0f-skin_vertex.dq_weight) * weight.weight);
+		}
+	}
+
+	if (total_weight <= 0.0f) {
+		if (fallback) {
+			return *fallback;
+		} else {
+			return ufbx_identity_matrix;
 		}
 	}
 

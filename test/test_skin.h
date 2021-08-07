@@ -292,3 +292,23 @@ UFBXT_FILE_TEST(synthetic_blend_shape_order)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(blender_293_half_skinned)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Plane");
+	ufbxt_assert(node);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh);
+	ufbxt_assert(mesh->num_vertices == 4);
+	ufbxt_assert(mesh->skins.count == 1);
+	ufbx_skin_deformer *skin = mesh->skins.data[0];
+	ufbxt_assert(skin->vertices.count == 4);
+	ufbxt_assert(skin->vertices.data[0].num_weights == 1);
+	ufbxt_assert(skin->vertices.data[0].weight_begin == 0);
+	ufbxt_assert(skin->vertices.data[1].num_weights == 1);
+	ufbxt_assert(skin->vertices.data[1].weight_begin == 1);
+	ufbxt_assert(skin->vertices.data[2].num_weights == 0);
+	ufbxt_assert(skin->vertices.data[3].num_weights == 0);
+}
+#endif
