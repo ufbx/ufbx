@@ -147,6 +147,22 @@ UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, combined)
 }
 #endif
 
+UFBXT_FILE_TEST(synthetic_sausage_wiggle_no_link)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_sausage_wiggle_no_bind)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0);
+}
+#endif
+
 #if 0
 UFBXT_FILE_TEST(maya_blend_shape_cube)
 #if UFBXT_IMPL
