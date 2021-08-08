@@ -1295,6 +1295,17 @@ struct ufbx_scene {
 	ufbx_name_element_list elements_by_name;
 };
 
+// -- Mesh topology
+
+typedef struct ufbx_topo_index {
+	int32_t index, prev, next, twin;
+	int32_t edge, face;
+} ufbx_topo_index;
+
+typedef struct ufbx_topo_vertex {
+	uint32_t first_index;
+} ufbx_topo_vertex;
+
 // -- Memory callbacks
 
 // You can optionally provide an allocator to ufbx, the default is to use the
@@ -1556,6 +1567,16 @@ ufbx_vec3 ufbx_get_blend_vertex_offset(const ufbx_blend_deformer *blend, size_t 
 void ufbx_add_blend_shape_vertex_offsets(const ufbx_blend_shape *shape, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
 void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
 
+// Mesh Topology
+
+void ufbx_get_mesh_topology(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo_vertex *vertices);
+int32_t ufbx_topo_next_vertex_edge(ufbx_topo_index *indices, int32_t index);
+int32_t ufbx_topo_prev_vertex_edge(ufbx_topo_index *indices, int32_t index);
+
+ufbx_vec3 ufbx_get_face_normal(ufbx_mesh *mesh, ufbx_face face);
+
+size_t ufbx_generate_normal_mapping(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo_vertex *vertices, int32_t *normal_indices);
+void ufbx_recompute_normals(ufbx_mesh *mesh, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals);
 
 // -- Inline API
 

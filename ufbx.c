@@ -11890,6 +11890,32 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	}
 }
 
+// -- TODO: Find a place for these...
+
+ufbx_inline ufbx_vec3 ufbxi_add3(ufbx_vec3 a, ufbx_vec3 b) {
+	ufbx_vec3 v = { a.x + b.x, a.y + b.y, a.z + b.z };
+	return v;
+}
+
+ufbx_inline ufbx_vec3 ufbxi_sub3(ufbx_vec3 a, ufbx_vec3 b) {
+	ufbx_vec3 v = { a.x - b.x, a.y - b.y, a.z - b.z };
+	return v;
+}
+
+ufbx_inline ufbx_vec3 ufbxi_mul3(ufbx_vec3 a, ufbx_real b) {
+	ufbx_vec3 v = { a.x * b, a.y * b, a.z * b };
+	return v;
+}
+
+ufbx_inline ufbx_real ufbxi_dot3(ufbx_vec3 a, ufbx_vec3 b) {
+	return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+ufbx_inline ufbx_vec3 ufbxi_cross3(ufbx_vec3 a, ufbx_vec3 b) {
+	ufbx_vec3 v = { a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x };
+	return v;
+}
+
 #if 0
 
 // -- Animation evaluation
@@ -12991,6 +13017,136 @@ static ufbxi_nodiscard ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 		ufbxi_buf_free(&ec->result);
 		return NULL;
 	}
+}
+
+// -- Topology
+
+static int ufbxi_cmp_topo_index_prev_next(const void *va, const void *vb)
+{
+	const ufbx_topo_index *a = (const ufbx_topo_index*)va, *b = (const ufbx_topo_index*)vb;
+	if (a->prev != b->prev) return a->prev < b->prev ? -1 : +1;
+	if (a->next != b->next) return a->next < b->next ? -1 : +1;
+	return 0;
+}
+
+static int ufbxi_cmp_topo_index_index(const void *va, const void *vb)
+{
+	const ufbx_topo_index *a = (const ufbx_topo_index*)va, *b = (const ufbx_topo_index*)vb;
+	if (a->index != b->index) return a->index < b->index ? -1 : +1;
+	return 0;
+}
+
+static void ufbxi_get_mesh_topology(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo_vertex *vertices)
+{
+	size_t num_vertices = mesh->num_vertices;
+	size_t num_indices = mesh->num_indices;
+
+	for (size_t vi = 0; vi < num_vertices; vi++) {
+		vertices[vi].first_index = -1;
+	}
+
+	// Temporarily use `prev` and `next` for vertices
+	for (uint32_t fi = 0; fi < mesh->num_faces; fi++) {
+		ufbx_face face = mesh->faces[fi];
+		for (uint32_t pi = 0; pi < face.num_indices; pi++) {
+			ufbx_topo_index *ti = &indices[face.index_begin + pi];
+			uint32_t ni = (pi + 1) % face.num_indices;
+			int32_t va = mesh->vertex_indices[face.index_begin + pi];
+			int32_t vb = mesh->vertex_indices[face.index_begin + ni];
+
+			if (vertices[va].first_index == -1) {
+				vertices[va].first_index = face.index_begin + pi;
+			}
+
+			if (vb < va) {
+				int32_t vt = va; va = vb; vb = vt;
+			}
+			ti->index = face.index_begin + pi;
+			ti->twin = -1;
+			ti->edge = -1;
+			ti->prev = va;
+			ti->next = vb;
+			ti->face = fi;
+		}
+	}
+
+	// TODO: Macro unstable/non allocating sort
+	qsort(indices, num_indices, sizeof(ufbx_topo_index), &ufbxi_cmp_topo_index_prev_next);
+
+	if (mesh->edges) {
+		for (uint32_t ei = 0; ei < mesh->num_edges; ei++) {
+			ufbx_edge edge = mesh->edges[ei];
+			int32_t va = mesh->vertex_indices[edge.indices[0]];
+			int32_t vb = mesh->vertex_indices[edge.indices[1]];
+			if (vb < va) {
+				int32_t vt = va; va = vb; vb = vt;
+			}
+
+			size_t ix = num_indices;
+			ufbxi_macro_lower_bound_eq(ufbx_topo_index, 32, &ix, indices, 0, num_indices,
+				(a->prev == va ? a->next < vb : a->prev < va), (a->prev == va && a->next == vb));
+
+			for (; ix < num_indices && indices[ix].prev == va && indices[ix].next == vb; ix++) {
+				indices[ix].edge = ei;
+			}
+		}
+	}
+
+	// Connect paired edges
+	for (size_t i0 = 0; i0 < num_indices; ) {
+		size_t i1 = i0;
+
+		int32_t a = indices[i0].prev, b = indices[i0].next;
+		while (i1 + 1 < num_indices && indices[i1 + 1].prev == a && indices[i1 + 1].next == b) i1++;
+
+		if (i1 == i0 + 1) {
+			indices[i0].twin = indices[i1].index;
+			indices[i1].twin = indices[i0].index;
+		}
+
+		i0 = i1 + 1;
+	}
+
+	// TODO: Macro unstable/non allocating sort
+	qsort(indices, num_indices, sizeof(ufbx_topo_index), &ufbxi_cmp_topo_index_index);
+
+	// Fix `prev` and `next` to the actual index values
+	for (uint32_t fi = 0; fi < mesh->num_faces; fi++) {
+		ufbx_face face = mesh->faces[fi];
+		for (uint32_t i = 0; i < face.num_indices; i++) {
+			ufbx_topo_index *ti = &indices[face.index_begin + i];
+			ti->prev = (int32_t)(face.index_begin + (i + face.num_indices - 1) % face.num_indices);
+			ti->next = (int32_t)(face.index_begin + (i + 1) % face.num_indices);
+		}
+	}
+}
+
+static bool ufbxi_is_edge_smooth(ufbx_mesh *mesh, ufbx_topo_index *indices, int32_t index)
+{
+	if (mesh->edge_smoothing) {
+		int32_t edge = indices[index].edge;
+		if (edge >= 0 && mesh->edge_smoothing[edge]) return true;
+	}
+
+	if (mesh->face_smoothing) {
+		if (mesh->face_smoothing[indices[index].face]) return true;
+		int32_t twin = indices[index].twin;
+		if (twin >= 0) {
+			if (mesh->face_smoothing[indices[twin].face]) return true;
+		}
+	}
+
+	if (!mesh->edge_smoothing && !mesh->face_smoothing && mesh->vertex_normal.data) {
+		int32_t twin = indices[index].twin;
+		if (twin >= 0) {
+			int32_t pair = indices[twin].next;
+			ufbx_vec3 na = ufbx_get_by_index_vec3(&mesh->vertex_normal, index);
+			ufbx_vec3 nb = ufbx_get_by_index_vec3(&mesh->vertex_normal, pair);
+			if (na.x == nb.x && na.y == nb.y && na.z == nb.z) return true;
+		}
+	}
+
+	return false;
 }
 
 // -- File IO
@@ -14267,6 +14423,113 @@ void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *
 		}
 	}
 }
+
+void ufbx_get_mesh_topology(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo_vertex *vertices)
+{
+	ufbxi_get_mesh_topology(mesh, indices, vertices);
+}
+
+int32_t ufbx_topo_next_vertex_edge(ufbx_topo_index *indices, int32_t index)
+{
+	if (index < 0) return -1;
+	int32_t twin = indices[index].twin;
+	if (twin < 0) return -1;
+	return indices[twin].next;
+}
+
+int32_t ufbx_topo_prev_vertex_edge(ufbx_topo_index *indices, int32_t index)
+{
+	if (index < 0) return -1;
+	return indices[indices[index].prev].twin;
+}
+
+ufbx_vec3 ufbx_get_face_normal(ufbx_mesh *mesh, ufbx_face face)
+{
+	if (face.num_indices < 3) {
+		return ufbx_zero_vec3;
+	} else if (face.num_indices == 3) {
+		ufbx_vec3 a = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 0);
+		ufbx_vec3 b = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 1);
+		ufbx_vec3 c = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 2);
+		return ufbxi_cross3(ufbxi_sub3(b, a), ufbxi_sub3(c, a));
+	} else if (face.num_indices == 4) {
+		ufbx_vec3 a = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 0);
+		ufbx_vec3 b = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 1);
+		ufbx_vec3 c = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 2);
+		ufbx_vec3 d = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 3);
+		return ufbxi_cross3(ufbxi_sub3(c, a), ufbxi_sub3(d, b));
+	} else {
+		// TODO
+		return ufbx_zero_vec3;
+	}
+}
+
+size_t ufbx_generate_normal_mapping(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo_vertex *vertices, int32_t *normal_indices)
+{
+	int32_t next_index = 0;
+
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		normal_indices[i] = -1;
+	}
+
+	// Walk around vertices and merge around smooth edges
+	for (size_t vi = 0; vi < mesh->num_vertices; vi++) {
+		int32_t original_start = vertices[vi].first_index;
+		if (original_start < 0) continue;
+		int32_t start = original_start;
+		for (;;) {
+			if (!ufbxi_is_edge_smooth(mesh, indices, start)) break;
+			int32_t prev = ufbx_topo_next_vertex_edge(indices, start);
+			if (prev < 0 || prev == original_start) break;
+			start = prev;
+		}
+
+		normal_indices[start] = next_index++;
+		int32_t next = start;
+		for (;;) {
+			next = ufbx_topo_prev_vertex_edge(indices, next);
+			if (next == -1 || next == start) break;
+
+			if (!ufbxi_is_edge_smooth(mesh, indices, next)) {
+				++next_index;
+			}
+			normal_indices[next] = next_index - 1;
+		}
+	}
+
+	// Assign non-manifold indices
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		if (normal_indices[i] < 0) {
+			normal_indices[i] = next_index++;
+		}
+	}
+
+	return (size_t)next_index;
+}
+
+void ufbx_recompute_normals(ufbx_mesh *mesh, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals)
+{
+	memset(normals, 0, sizeof(ufbx_vec3)*num_normals);
+
+	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
+		ufbx_face face = mesh->faces[fi];
+		ufbx_vec3 normal = ufbx_get_face_normal(mesh, face);
+		for (size_t ix = 0; ix < face.num_indices; ix++) {
+			ufbx_vec3 *n = &normals[normal_indices[face.index_begin + ix]];
+			*n = ufbxi_add3(*n, normal);
+		}
+	}
+
+	for (size_t i = 0; i < num_normals; i++) {
+		ufbx_real len = ufbx_vec3_length(normals[i]);
+		if (len > 0.0f) {
+			normals[i].x /= len;
+			normals[i].y /= len;
+			normals[i].z /= len;
+		}
+	}
+}
+
 
 #if 0
 
