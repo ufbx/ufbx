@@ -10508,6 +10508,16 @@ static void ufbxi_update_light(ufbx_light *light)
 	light->cast_shadows = ufbxi_find_int(&light->props, ufbxi_CastShadows, 0) != 0;
 }
 
+static void ufbxi_update_skin_cluster(ufbx_skin_cluster *cluster)
+{
+	if (cluster->bone) {
+		ufbx_matrix_mul(&cluster->geometry_to_world, &cluster->bone->node_to_world, &cluster->geometry_to_bone);
+	} else {
+		ufbx_matrix_mul(&cluster->geometry_to_world, &cluster->bind_to_world, &cluster->geometry_to_bone);
+	}
+	cluster->geometry_to_world_transform = ufbx_get_matrix_transform(&cluster->geometry_to_world);
+}
+
 static void ufbxi_update_material(ufbx_scene *scene, ufbx_material *material)
 {
 	if (material->props.num_animated > 0) {
@@ -10541,6 +10551,10 @@ static void ufbxi_update_scene(ufbx_scene *scene)
 
 	ufbxi_for_ptr_list(ufbx_light, p_light, scene->lights) {
 		ufbxi_update_light(*p_light);
+	}
+
+	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
+		ufbxi_update_skin_cluster(*p_cluster);
 	}
 
 	ufbxi_for_ptr_list(ufbx_material, p_material, scene->materials) {
@@ -14126,12 +14140,9 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 		const ufbx_node *node = cluster->bone;
 		if (!node) continue;
 
-		ufbx_matrix geometry_to_world;
-		ufbx_matrix_mul(&geometry_to_world, &node->node_to_world, &cluster->geometry_to_bone);
-
 		total_weight += weight.weight;
 		if (skin_vertex.dq_weight > 0.0f) {
-			const ufbx_transform t = ufbx_get_matrix_transform(&geometry_to_world);
+			ufbx_transform t = cluster->geometry_to_world_transform;
 			ufbx_quat vq0 = t.rotation;
 			if (i == 0) first_q0 = vq0;
 
@@ -14150,7 +14161,7 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 		}
 
 		if (skin_vertex.dq_weight < 1.0f) {
-			ufbxi_add_weighted_mat(&mat, &geometry_to_world, (1.0f-skin_vertex.dq_weight) * weight.weight);
+			ufbxi_add_weighted_mat(&mat, &cluster->geometry_to_world, (1.0f-skin_vertex.dq_weight) * weight.weight);
 		}
 	}
 

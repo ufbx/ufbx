@@ -803,6 +803,9 @@ struct ufbx_skin_cluster {
 	ufbx_matrix geometry_to_bone;
 	ufbx_matrix bind_to_world;
 
+	ufbx_matrix geometry_to_world;
+	ufbx_transform geometry_to_world_transform;
+
 	size_t num_weights;
 	int32_t *vertices;
 	ufbx_real *weights;
