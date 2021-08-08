@@ -5591,6 +5591,7 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 
 	mesh->skinned_is_local = true;
 	mesh->skinned_position = mesh->vertex_position;
+	mesh->skinned_normal = mesh->vertex_normal;
 
 	// Sort UV and color sets by set index
 	ufbxi_check(ufbxi_sort_uv_sets(uc, mesh->uv_sets.data, mesh->uv_sets.count));
@@ -7842,8 +7843,8 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 
 			ufbxi_patch_index_pointer(uc, &mesh->skinned_position.by_index);
 			ufbxi_patch_index_pointer(uc, &mesh->skinned_position.by_vertex);
-			// ufbxi_patch_index_pointer(uc, &mesh->skinned_normal.by_index);
-			// ufbxi_patch_index_pointer(uc, &mesh->skinned_normal.by_vertex);
+			ufbxi_patch_index_pointer(uc, &mesh->skinned_normal.by_index);
+			ufbxi_patch_index_pointer(uc, &mesh->skinned_normal.by_vertex);
 
 			ufbxi_for_list(ufbx_uv_set, set, mesh->uv_sets) {
 				ufbxi_patch_index_pointer(uc, &set->vertex_uv.by_index);
@@ -11916,6 +11917,16 @@ ufbx_inline ufbx_vec3 ufbxi_cross3(ufbx_vec3 a, ufbx_vec3 b) {
 	return v;
 }
 
+ufbx_inline ufbx_vec3 ufbxi_normalize(ufbx_vec3 a) {
+	ufbx_real len = (ufbx_real)sqrt(ufbxi_dot3(a, a));
+	if (len != 0.0) {
+		return ufbxi_mul3(a, (ufbx_real)1.0 / len);
+	} else {
+		ufbx_vec3 zero = { (ufbx_real)0 };
+		return zero;
+	}
+}
+
 #if 0
 
 // -- Animation evaluation
@@ -12672,6 +12683,7 @@ typedef struct {
 	ufbxi_allocator ator_tmp;
 
 	ufbxi_buf result;
+	ufbxi_buf tmp;
 
 	ufbx_scene scene;
 
@@ -12907,6 +12919,21 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 	// Evaluate skinning if requested
 	if (ec->opts.evaluate_skinning) {
 
+		size_t max_skinned_indices = 0;
+		size_t max_skinned_vertices = 0;
+
+		ufbxi_for_ptr_list(ufbx_mesh, p_mesh, ec->scene.meshes) {
+			ufbx_mesh *mesh = *p_mesh;
+			if (mesh->blend_shapes.count == 0 && mesh->skins.count == 0) continue;
+			max_skinned_indices = ufbxi_max_sz(max_skinned_indices, mesh->num_indices);
+			max_skinned_vertices = ufbxi_max_sz(max_skinned_vertices, mesh->num_vertices);
+		}
+
+		ufbx_topo_index *topo_indices = ufbxi_push(&ec->tmp, ufbx_topo_index, max_skinned_indices);
+		ufbx_topo_vertex *topo_vertices = ufbxi_push(&ec->tmp, ufbx_topo_vertex, max_skinned_vertices);
+		ufbxi_check_err(&ec->error, topo_indices);
+		ufbxi_check_err(&ec->error, topo_vertices);
+
 		ufbxi_for_ptr_list(ufbx_mesh, p_mesh, ec->scene.meshes) {
 			ufbx_mesh *mesh = *p_mesh;
 			if (mesh->blend_shapes.count == 0 && mesh->skins.count == 0) continue;
@@ -12932,6 +12959,28 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 			}
 
 			mesh->skinned_position.data = result_pos;
+
+			int32_t *normal_indices = ufbxi_push(&ec->result, int32_t, mesh->num_indices);
+			ufbxi_check_err(&ec->error, normal_indices);
+
+			ufbx_get_mesh_topology(mesh, topo_indices, topo_vertices);
+			size_t num_normals = ufbx_generate_normal_mapping(mesh, topo_indices, topo_vertices, normal_indices);
+
+			if (num_normals == mesh->num_vertices) {
+				normal_indices = mesh->skinned_position.by_index;
+				mesh->skinned_normal.by_vertex = mesh->skinned_position.by_vertex;
+			} else {
+				mesh->skinned_normal.by_vertex = NULL;
+			}
+
+			ufbx_vec3 *normal_data = ufbxi_push(&ec->result, ufbx_vec3, num_normals);
+			ufbxi_check_err(&ec->error, normal_data);
+
+			ufbx_compute_normals(mesh, &mesh->skinned_position, normal_indices, normal_data, num_normals);
+
+			mesh->skinned_normal.data = normal_data;
+			mesh->skinned_normal.by_index = normal_indices;
+			mesh->skinned_normal.num_elements = num_normals;
 		}
 	}
 
@@ -13004,8 +13053,10 @@ static ufbxi_nodiscard ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 	ec->ator_result.huge_size = ec->opts.result_huge_size;
 
 	ec->result.ator = &ec->ator_result;
+	ec->tmp.ator = &ec->ator_tmp;
 
 	if (ufbxi_evaluate_imp(ec)) {
+		ufbxi_buf_free(&ec->tmp);
 		if (p_error) {
 			p_error->description = NULL;
 			p_error->stack_size = 0;
@@ -13014,6 +13065,7 @@ static ufbxi_nodiscard ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 	} else {
 		if (!ec->error.description) ec->error.description = "Failed to evaluate";
 		if (p_error) *p_error = ec->error;
+		ufbxi_buf_free(&ec->tmp);
 		ufbxi_buf_free(&ec->result);
 		return NULL;
 	}
@@ -14424,6 +14476,76 @@ void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *
 	}
 }
 
+size_t ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, ufbx_face face)
+{
+	if (face.num_indices < 3 || num_indices < ((size_t)face.num_indices - 2) * 3) return 0;
+
+	if (face.num_indices == 3) {
+		// Fast case: Already a triangle
+		indices[0] = face.index_begin + 0;
+		indices[1] = face.index_begin + 1;
+		indices[2] = face.index_begin + 2;
+		return 1;
+	} else if (face.num_indices == 4) {
+		// Quad: Split along the shortest axis unless a vertex crosses the axis
+		uint32_t i0 = face.index_begin + 0;
+		uint32_t i1 = face.index_begin + 1;
+		uint32_t i2 = face.index_begin + 2;
+		uint32_t i3 = face.index_begin + 3;
+		ufbx_vec3 v0 = mesh->vertex_position.data[mesh->vertex_position.by_index[i0]];
+		ufbx_vec3 v1 = mesh->vertex_position.data[mesh->vertex_position.by_index[i1]];
+		ufbx_vec3 v2 = mesh->vertex_position.data[mesh->vertex_position.by_index[i2]];
+		ufbx_vec3 v3 = mesh->vertex_position.data[mesh->vertex_position.by_index[i3]];
+
+		ufbx_vec3 a = ufbxi_sub3(v2, v0);
+		ufbx_vec3 b = ufbxi_sub3(v3, v1);
+
+		ufbx_vec3 na1 = ufbxi_normalize(ufbxi_cross3(a, ufbxi_sub3(v1, v0)));
+		ufbx_vec3 na3 = ufbxi_normalize(ufbxi_cross3(a, ufbxi_sub3(v0, v3)));
+		ufbx_vec3 nb0 = ufbxi_normalize(ufbxi_cross3(b, ufbxi_sub3(v1, v0)));
+		ufbx_vec3 nb2 = ufbxi_normalize(ufbxi_cross3(b, ufbxi_sub3(v2, v1)));
+
+		ufbx_real dot_aa = ufbxi_dot3(a, a);
+		ufbx_real dot_bb = ufbxi_dot3(b, b);
+		ufbx_real dot_na = ufbxi_dot3(na1, na3);
+		ufbx_real dot_nb = ufbxi_dot3(nb0, nb2);
+
+		bool split_a = dot_aa <= dot_bb;
+
+		if (dot_na < 0.0f || dot_nb < 0.0f) {
+			split_a = dot_na >= dot_nb;
+		}
+
+		if (split_a) {
+			indices[0] = i0;
+			indices[1] = i1;
+			indices[2] = i2;
+			indices[3] = i2;
+			indices[4] = i3;
+			indices[5] = i0;
+		} else {
+			indices[0] = i1;
+			indices[1] = i2;
+			indices[2] = i3;
+			indices[3] = i3;
+			indices[4] = i0;
+			indices[5] = i1;
+		}
+
+		return 2;
+	} else {
+		// N-Gon: TODO something reasonable
+		uint32_t *dst = indices;
+		for (uint32_t i = 1; i + 2 <= face.num_indices; i++) {
+			dst[0] = face.index_begin;
+			dst[1] = face.index_begin + i;
+			dst[2] = face.index_begin + i + 1;
+			dst += 3;
+		}
+		return (dst - indices) / 3;
+	}
+}
+
 void ufbx_get_mesh_topology(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo_vertex *vertices)
 {
 	ufbxi_get_mesh_topology(mesh, indices, vertices);
@@ -14443,33 +14565,33 @@ int32_t ufbx_topo_prev_vertex_edge(ufbx_topo_index *indices, int32_t index)
 	return indices[indices[index].prev].twin;
 }
 
-ufbx_vec3 ufbx_get_weighted_face_normal(ufbx_mesh *mesh, ufbx_face face)
+ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_face face)
 {
 	if (face.num_indices < 3) {
 		return ufbx_zero_vec3;
 	} else if (face.num_indices == 3) {
-		ufbx_vec3 a = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 0);
-		ufbx_vec3 b = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 1);
-		ufbx_vec3 c = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 2);
+		ufbx_vec3 a = ufbx_get_by_index_vec3(positions, face.index_begin + 0);
+		ufbx_vec3 b = ufbx_get_by_index_vec3(positions, face.index_begin + 1);
+		ufbx_vec3 c = ufbx_get_by_index_vec3(positions, face.index_begin + 2);
 		return ufbxi_cross3(ufbxi_sub3(b, a), ufbxi_sub3(c, a));
 	} else if (face.num_indices == 4) {
-		ufbx_vec3 a = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 0);
-		ufbx_vec3 b = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 1);
-		ufbx_vec3 c = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 2);
-		ufbx_vec3 d = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 3);
+		ufbx_vec3 a = ufbx_get_by_index_vec3(positions, face.index_begin + 0);
+		ufbx_vec3 b = ufbx_get_by_index_vec3(positions, face.index_begin + 1);
+		ufbx_vec3 c = ufbx_get_by_index_vec3(positions, face.index_begin + 2);
+		ufbx_vec3 d = ufbx_get_by_index_vec3(positions, face.index_begin + 3);
 		return ufbxi_cross3(ufbxi_sub3(c, a), ufbxi_sub3(d, b));
 	} else {
 		// Assumes that the N-gon is convex!
 		ufbx_vec3 mid = ufbx_zero_vec3;
 		for (size_t i = 0; i < face.num_indices; i++) {
-			mid = ufbxi_add3(mid, ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + i));
+			mid = ufbxi_add3(mid, ufbx_get_by_index_vec3(positions, face.index_begin + i));
 		}
 		mid = ufbxi_mul3(mid, 1.0f / (ufbx_real)face.num_indices);
 
 		ufbx_vec3 result = ufbx_zero_vec3;
 		for (size_t i = 0; i < face.num_indices; i++) {
-			ufbx_vec3 a = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + i);
-			ufbx_vec3 b = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + (i+1)%face.num_indices);
+			ufbx_vec3 a = ufbx_get_by_index_vec3(positions, face.index_begin + i);
+			ufbx_vec3 b = ufbx_get_by_index_vec3(positions, face.index_begin + (i+1)%face.num_indices);
 			ufbx_vec3 n = ufbxi_cross3(ufbxi_sub3(mid, a), ufbxi_sub3(mid, b));
 			result = ufbxi_add3(result, n);
 		}
@@ -14520,13 +14642,13 @@ size_t ufbx_generate_normal_mapping(ufbx_mesh *mesh, ufbx_topo_index *indices, u
 	return (size_t)next_index;
 }
 
-void ufbx_recompute_normals(ufbx_mesh *mesh, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals)
+void ufbx_compute_normals(ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals)
 {
 	memset(normals, 0, sizeof(ufbx_vec3)*num_normals);
 
 	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
 		ufbx_face face = mesh->faces[fi];
-		ufbx_vec3 normal = ufbx_get_face_normal(mesh, face);
+		ufbx_vec3 normal = ufbx_get_weighted_face_normal(positions, face);
 		for (size_t ix = 0; ix < face.num_indices; ix++) {
 			ufbx_vec3 *n = &normals[normal_indices[face.index_begin + ix]];
 			*n = ufbxi_add3(*n, normal);
@@ -14542,7 +14664,6 @@ void ufbx_recompute_normals(ufbx_mesh *mesh, int32_t *normal_indices, ufbx_vec3 
 		}
 	}
 }
-
 
 #if 0
 

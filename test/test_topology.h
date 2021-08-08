@@ -16,7 +16,7 @@ void ufbxt_check_generated_normals(ufbx_mesh *mesh, ufbxt_diff_error *err, size_
 	}
 
 	ufbx_vec3 *normals = calloc(num_normals, sizeof(ufbx_vec3));
-	ufbx_recompute_normals(mesh, normal_indices, normals, num_normals);
+	ufbx_compute_normals(mesh, &mesh->vertex_position, normal_indices, normals, num_normals);
 
 	ufbx_vertex_vec3 new_normals = { 0 };
 	new_normals.data = normals;

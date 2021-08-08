@@ -9,7 +9,7 @@ void ufbxt_check_stack_times(ufbx_scene *scene, ufbxt_diff_error *err, const cha
 	ufbxt_assert_close_real(err, (ufbx_real)stack->time_end, (ufbx_real)end);
 }
 
-void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, double min_normal_dot, const char *file_name, const char *anim_name, ufbx_real time)
+void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_normals, const char *file_name, const char *anim_name, ufbx_real time)
 {
 	char buf[512];
 	snprintf(buf, sizeof(buf), "%s%s.obj", data_root, file_name);
@@ -45,7 +45,7 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, double min_norm
 
 	ufbxt_check_scene(eval);
 
-	ufbxt_diff_to_obj(eval, obj_file, err, min_normal_dot);
+	ufbxt_diff_to_obj(eval, obj_file, err, check_normals);
 
 	ufbx_free_scene(eval);
 	free(obj_file);
@@ -95,9 +95,9 @@ UFBXT_FILE_TEST(blender_279_sausage)
 		ufbxt_assert_close_vec3(err, cluster->geometry_to_bone.cols[3], cluster_bind_ref[i][scene->metadata.ascii].cols[3]);
 	}
 
-	ufbxt_check_frame(scene, err, -1.0, "blender_279_sausage_base_0", "Base", 0.0);
-	ufbxt_check_frame(scene, err, -1.0, "blender_279_sausage_spin_15", "Spin", 15.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "blender_279_sausage_wiggle_20", "Wiggle", 20.0/24.0);
+	ufbxt_check_frame(scene, err, true, "blender_279_sausage_base_0", "Base", 0.0);
+	ufbxt_check_frame(scene, err, false, "blender_279_sausage_spin_15", "Spin", 15.0/24.0);
+	ufbxt_check_frame(scene, err, false, "blender_279_sausage_wiggle_20", "Wiggle", 20.0/24.0);
 }
 #endif
 
@@ -110,24 +110,24 @@ UFBXT_FILE_TEST(maya_game_sausage)
 UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, wiggle)
 #if UFBXT_IMPL
 {
-	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0);
 }
 #endif
 
 UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, spin)
 #if UFBXT_IMPL
 {
-	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_spin_7", NULL, 27.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_spin_15", NULL, 35.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_game_sausage_spin_7", NULL, 27.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_game_sausage_spin_15", NULL, 35.0/24.0);
 }
 #endif
 
 UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, deform)
 #if UFBXT_IMPL
 {
-	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_deform_8", NULL, 48.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_deform_15", NULL, 55.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_game_sausage_deform_8", NULL, 48.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_game_sausage_deform_15", NULL, 55.0/24.0);
 }
 #endif
 
@@ -138,12 +138,12 @@ UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, combined)
 	ufbxt_check_stack_times(scene, err, "spin", 20.0/24.0, 40.0/24.0);
 	ufbxt_check_stack_times(scene, err, "deform", 40.0/24.0, 60.0/24.0);
 
-	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_wiggle_10", "wiggle", 10.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_wiggle_18", "wiggle", 18.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_spin_7", "spin", 27.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_spin_15", "spin", 35.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_deform_8", "deform", 48.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_game_sausage_deform_15", "deform", 55.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_10", "wiggle", 10.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_18", "wiggle", 18.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_game_sausage_spin_7", "spin", 27.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_game_sausage_spin_15", "spin", 35.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_game_sausage_deform_8", "deform", 48.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_game_sausage_deform_15", "deform", 55.0/24.0);
 }
 #endif
 

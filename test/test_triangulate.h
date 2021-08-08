@@ -6,7 +6,7 @@ size_t do_triangulate_test(ufbx_scene *scene)
 	size_t num_fail = 0;
 
 	for (size_t mesh_ix = 0; mesh_ix < scene->meshes.count; mesh_ix++) {
-		ufbx_mesh *mesh = &scene->meshes.data[mesh_ix];
+		ufbx_mesh *mesh = scene->meshes.data[mesh_ix];
 		ufbxt_assert(mesh->instances.count == 1);
 		bool should_be_top_left = mesh->instances.data[0]->name.data[0] == 'A';
 		ufbxt_assert(mesh->num_faces == 1);
@@ -20,7 +20,7 @@ size_t do_triangulate_test(ufbx_scene *scene)
 		size_t top_left_ix = 0;
 		ufbx_real best_dot = HUGE_VALF;
 		for (size_t ix = 0; ix < 4; ix++) {
-			ufbx_vec3 v = ufbx_get_vertex_vec3(&mesh->vertex_position, ix);
+			ufbx_vec3 v = ufbx_get_by_index_vec3(&mesh->vertex_position, ix);
 			ufbx_real dot = v.x + v.z;
 			if (dot < best_dot) {
 				top_left_ix = ix;
@@ -34,12 +34,12 @@ size_t do_triangulate_test(ufbx_scene *scene)
 		}
 
 		if (should_be_top_left != (top_left_count == 2)) {
-			ufbxt_logf("Fail: %s", mesh->node.name.data);
+			ufbxt_logf("Fail: %s", mesh->name.data);
 			num_fail++;
 		}
 	}
 
-	ufbxt_logf("Triangulations OK: %zu/%zu", scene->meshes.size - num_fail, scene->meshes.size);
+	ufbxt_logf("Triangulations OK: %zu/%zu", scene->meshes.count - num_fail, scene->meshes.count);
 	return num_fail;
 }
 #endif
@@ -63,8 +63,9 @@ UFBXT_FILE_TEST(maya_triangulate_down)
 UFBXT_FILE_TEST(maya_tri_cone)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCone1");
-	ufbxt_assert(mesh);
+	ufbx_node *node = ufbx_find_node(scene, "pCone1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
 
 	for (size_t i = 0; i < mesh->num_faces; i++) {
 		ufbx_face face = mesh->faces[i];

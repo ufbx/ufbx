@@ -469,10 +469,8 @@ static void ufbxt_assert_close_vec4(ufbxt_diff_error *p_err, ufbx_vec4 a, ufbx_v
 	ufbxt_assert_close_real(p_err, a.w, b.w);
 }
 
-static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, double min_normal_dot)
+static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, bool check_deformed_normals)
 {
-	// TODO
-#if 1
 	for (size_t mesh_i = 0; mesh_i < obj->num_meshes; mesh_i++) {
 		ufbxt_obj_mesh *obj_mesh = &obj->meshes[mesh_i];
 		if (obj_mesh->num_indices == 0) continue;
@@ -499,23 +497,21 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 				ufbx_vec3 op = ufbx_get_by_index_vec3(&obj_mesh->vertex_position, ix);
 				ufbx_vec3 fp = ufbx_get_by_index_vec3(&mesh->skinned_position, ix);
 				ufbx_vec3 on = ufbx_get_by_index_vec3(&obj_mesh->vertex_normal, ix);
-				ufbx_vec3 fn = ufbx_get_by_index_vec3(&mesh->vertex_normal, ix);
+				ufbx_vec3 fn = ufbx_get_by_index_vec3(&mesh->skinned_normal, ix);
 
-				// TODO: Skinning
 				if (mesh->skinned_is_local) {
 					fp = ufbx_transform_position(mat, fp);
-				}
-				fn = ufbx_transform_direction(&norm_mat, fn);
+					fn = ufbx_transform_direction(&norm_mat, fn);
 
-				ufbx_real fn_len = sqrt(fn.x*fn.x + fn.y*fn.y + fn.z*fn.z);
-				fn.x /= fn_len;
-				fn.y /= fn_len;
-				fn.z /= fn_len;
+					ufbx_real fn_len = (ufbx_real)sqrt(fn.x*fn.x + fn.y*fn.y + fn.z*fn.z);
+					fn.x /= fn_len;
+					fn.y /= fn_len;
+					fn.z /= fn_len;
+				}
 
 				ufbxt_assert_close_vec3(p_err, op, fp);
 
-				// TODO: Remove `min_normal_dot` and such
-				if (mesh->all_deformers.count == 0) {
+				if (check_deformed_normals || mesh->all_deformers.count == 0) {
 					ufbxt_assert_close_vec3(p_err, on, fn);
 				}
 
@@ -528,7 +524,6 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			}
 		}
 	}
-#endif
 }
 
 static uint32_t g_file_version = 0;
@@ -1379,7 +1374,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbxt_diff_error err = { 0 };
 
 			if (obj_file) {
-				ufbxt_diff_to_obj(scene, obj_file, &err, 1.0);
+				ufbxt_diff_to_obj(scene, obj_file, &err, false);
 			}
 
 			test_fn(scene, &err);

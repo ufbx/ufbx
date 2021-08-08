@@ -629,6 +629,7 @@ struct ufbx_mesh {
 	// `ufbx_transform_position(&node->geometry_to_world, skinned_pos)`!
 	bool skinned_is_local;
 	ufbx_vertex_vec3 skinned_position;
+	ufbx_vertex_vec3 skinned_normal;
 
 	// Deformers
 	ufbx_skin_deformer_list skins;
@@ -1569,14 +1570,16 @@ void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *
 
 // Mesh Topology
 
+size_t ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, ufbx_face face);
+
 void ufbx_get_mesh_topology(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo_vertex *vertices);
 int32_t ufbx_topo_next_vertex_edge(ufbx_topo_index *indices, int32_t index);
 int32_t ufbx_topo_prev_vertex_edge(ufbx_topo_index *indices, int32_t index);
 
-ufbx_vec3 ufbx_get_weighted_face_normal(ufbx_mesh *mesh, ufbx_face face);
+ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_face face);
 
 size_t ufbx_generate_normal_mapping(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo_vertex *vertices, int32_t *normal_indices);
-void ufbx_recompute_normals(ufbx_mesh *mesh, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals);
+void ufbx_compute_normals(ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals);
 
 // -- Inline API
 
