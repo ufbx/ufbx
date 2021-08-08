@@ -1573,7 +1573,7 @@ void ufbx_get_mesh_topology(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo
 int32_t ufbx_topo_next_vertex_edge(ufbx_topo_index *indices, int32_t index);
 int32_t ufbx_topo_prev_vertex_edge(ufbx_topo_index *indices, int32_t index);
 
-ufbx_vec3 ufbx_get_face_normal(ufbx_mesh *mesh, ufbx_face face);
+ufbx_vec3 ufbx_get_weighted_face_normal(ufbx_mesh *mesh, ufbx_face face);
 
 size_t ufbx_generate_normal_mapping(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo_vertex *vertices, int32_t *normal_indices);
 void ufbx_recompute_normals(ufbx_mesh *mesh, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals);

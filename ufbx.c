@@ -14443,7 +14443,7 @@ int32_t ufbx_topo_prev_vertex_edge(ufbx_topo_index *indices, int32_t index)
 	return indices[indices[index].prev].twin;
 }
 
-ufbx_vec3 ufbx_get_face_normal(ufbx_mesh *mesh, ufbx_face face)
+ufbx_vec3 ufbx_get_weighted_face_normal(ufbx_mesh *mesh, ufbx_face face)
 {
 	if (face.num_indices < 3) {
 		return ufbx_zero_vec3;
@@ -14459,8 +14459,21 @@ ufbx_vec3 ufbx_get_face_normal(ufbx_mesh *mesh, ufbx_face face)
 		ufbx_vec3 d = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + 3);
 		return ufbxi_cross3(ufbxi_sub3(c, a), ufbxi_sub3(d, b));
 	} else {
-		// TODO
-		return ufbx_zero_vec3;
+		// Assumes that the N-gon is convex!
+		ufbx_vec3 mid = ufbx_zero_vec3;
+		for (size_t i = 0; i < face.num_indices; i++) {
+			mid = ufbxi_add3(mid, ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + i));
+		}
+		mid = ufbxi_mul3(mid, 1.0f / (ufbx_real)face.num_indices);
+
+		ufbx_vec3 result = ufbx_zero_vec3;
+		for (size_t i = 0; i < face.num_indices; i++) {
+			ufbx_vec3 a = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + i);
+			ufbx_vec3 b = ufbx_get_by_index_vec3(&mesh->vertex_position, face.index_begin + (i+1)%face.num_indices);
+			ufbx_vec3 n = ufbxi_cross3(ufbxi_sub3(mid, a), ufbxi_sub3(mid, b));
+			result = ufbxi_add3(result, n);
+		}
+		return result;
 	}
 }
 

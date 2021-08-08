@@ -56,3 +56,13 @@ UFBXT_FILE_TEST(maya_no_smoothing)
 	ufbxt_check_generated_normals(mesh, err, 16);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_planar_ngon)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pDisc1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_check_generated_normals(mesh, err, 0);
+}
+#endif
