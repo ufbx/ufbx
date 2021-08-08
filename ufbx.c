@@ -11678,6 +11678,75 @@ static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, 
 	return t;
 }
 
+ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error *error, ufbxi_buf *buf_result, ufbxi_buf *buf_tmp)
+{
+	size_t max_skinned_indices = 0;
+	size_t max_skinned_vertices = 0;
+
+	ufbxi_for_ptr_list(ufbx_mesh, p_mesh, scene->meshes) {
+		ufbx_mesh *mesh = *p_mesh;
+		if (mesh->blend_shapes.count == 0 && mesh->skins.count == 0) continue;
+		max_skinned_indices = ufbxi_max_sz(max_skinned_indices, mesh->num_indices);
+		max_skinned_vertices = ufbxi_max_sz(max_skinned_vertices, mesh->num_vertices);
+	}
+
+	ufbx_topo_index *topo_indices = ufbxi_push(buf_tmp, ufbx_topo_index, max_skinned_indices);
+	ufbx_topo_vertex *topo_vertices = ufbxi_push(buf_tmp, ufbx_topo_vertex, max_skinned_vertices);
+	ufbxi_check_err(error, topo_indices);
+	ufbxi_check_err(error, topo_vertices);
+
+	ufbxi_for_ptr_list(ufbx_mesh, p_mesh, scene->meshes) {
+		ufbx_mesh *mesh = *p_mesh;
+		if (mesh->blend_shapes.count == 0 && mesh->skins.count == 0) continue;
+
+		size_t num_vertices = mesh->num_vertices;
+		ufbx_vec3 *result_pos = ufbxi_push_copy(buf_result, ufbx_vec3, num_vertices, mesh->vertices);
+		ufbxi_check_err(error, result_pos);
+
+		ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, mesh->blend_shapes) {
+			ufbx_add_blend_vertex_offsets(*p_blend, result_pos, num_vertices, 1.0f);
+		}
+
+		// TODO: What should we do about multiple skins??
+		if (mesh->skins.count > 0) {
+			ufbx_matrix *fallback = mesh->instances.count > 0 ? &mesh->instances.data[0]->geometry_to_world : NULL;
+			ufbx_skin_deformer *skin = mesh->skins.data[0];
+			for (size_t i = 0; i < num_vertices; i++) {
+				ufbx_matrix mat = ufbx_get_skin_vertex_matrix(skin, i, fallback);
+				result_pos[i] = ufbx_transform_position(&mat, result_pos[i]);
+			}
+
+			mesh->skinned_is_local = false;
+		}
+
+		mesh->skinned_position.data = result_pos;
+
+		int32_t *normal_indices = ufbxi_push(buf_result, int32_t, mesh->num_indices);
+		ufbxi_check_err(error, normal_indices);
+
+		ufbx_get_mesh_topology(mesh, topo_indices, topo_vertices);
+		size_t num_normals = ufbx_generate_normal_mapping(mesh, topo_indices, topo_vertices, normal_indices);
+
+		if (num_normals == mesh->num_vertices) {
+			normal_indices = mesh->skinned_position.by_index;
+			mesh->skinned_normal.by_vertex = mesh->skinned_position.by_vertex;
+		} else {
+			mesh->skinned_normal.by_vertex = NULL;
+		}
+
+		ufbx_vec3 *normal_data = ufbxi_push(buf_result, ufbx_vec3, num_normals);
+		ufbxi_check_err(error, normal_data);
+
+		ufbx_compute_normals(mesh, &mesh->skinned_position, normal_indices, normal_data, num_normals);
+
+		mesh->skinned_normal.data = normal_data;
+		mesh->skinned_normal.by_index = normal_indices;
+		mesh->skinned_normal.num_elements = num_normals;
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 {
 	ufbxi_check(ufbxi_load_strings(uc));
@@ -11692,35 +11761,8 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	// ufbxi_update_transform_matrix(&uc->scene.root_node, NULL);
 
 	// Evaluate skinning if requested
-	// TODO: Factor this into a function
 	if (uc->opts.evaluate_skinning) {
-
-		ufbxi_for_ptr_list(ufbx_mesh, p_mesh, uc->scene.meshes) {
-			ufbx_mesh *mesh = *p_mesh;
-			if (mesh->blend_shapes.count == 0 && mesh->skins.count == 0) continue;
-
-			size_t num_vertices = mesh->num_vertices;
-			ufbx_vec3 *result_pos = ufbxi_push_copy(&uc->result, ufbx_vec3, num_vertices, mesh->vertices);
-			ufbxi_check_err(&uc->error, result_pos);
-
-			ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, mesh->blend_shapes) {
-				ufbx_add_blend_vertex_offsets(*p_blend, result_pos, num_vertices, 1.0f);
-			}
-
-			// TODO: What should we do about multiple skins??
-			if (mesh->skins.count > 0) {
-				ufbx_matrix *fallback = mesh->instances.count > 0 ? &mesh->instances.data[0]->geometry_to_world : NULL;
-				ufbx_skin_deformer *skin = mesh->skins.data[0];
-				for (size_t i = 0; i < num_vertices; i++) {
-					ufbx_matrix mat = ufbx_get_skin_vertex_matrix(skin, i, fallback);
-					result_pos[i] = ufbx_transform_position(&mat, result_pos[i]);
-				}
-
-				mesh->skinned_is_local = false;
-			}
-
-			mesh->skinned_position.data = result_pos;
-		}
+		ufbxi_check(ufbxi_evaluate_skinning(&uc->scene, &uc->error, &uc->result, &uc->tmp));
 	}
 
 	// Copy local data to the scene
@@ -12918,70 +12960,7 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 
 	// Evaluate skinning if requested
 	if (ec->opts.evaluate_skinning) {
-
-		size_t max_skinned_indices = 0;
-		size_t max_skinned_vertices = 0;
-
-		ufbxi_for_ptr_list(ufbx_mesh, p_mesh, ec->scene.meshes) {
-			ufbx_mesh *mesh = *p_mesh;
-			if (mesh->blend_shapes.count == 0 && mesh->skins.count == 0) continue;
-			max_skinned_indices = ufbxi_max_sz(max_skinned_indices, mesh->num_indices);
-			max_skinned_vertices = ufbxi_max_sz(max_skinned_vertices, mesh->num_vertices);
-		}
-
-		ufbx_topo_index *topo_indices = ufbxi_push(&ec->tmp, ufbx_topo_index, max_skinned_indices);
-		ufbx_topo_vertex *topo_vertices = ufbxi_push(&ec->tmp, ufbx_topo_vertex, max_skinned_vertices);
-		ufbxi_check_err(&ec->error, topo_indices);
-		ufbxi_check_err(&ec->error, topo_vertices);
-
-		ufbxi_for_ptr_list(ufbx_mesh, p_mesh, ec->scene.meshes) {
-			ufbx_mesh *mesh = *p_mesh;
-			if (mesh->blend_shapes.count == 0 && mesh->skins.count == 0) continue;
-
-			size_t num_vertices = mesh->num_vertices;
-			ufbx_vec3 *result_pos = ufbxi_push_copy(&ec->result, ufbx_vec3, num_vertices, mesh->vertices);
-			ufbxi_check_err(&ec->error, result_pos);
-
-			ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, mesh->blend_shapes) {
-				ufbx_add_blend_vertex_offsets(*p_blend, result_pos, num_vertices, 1.0f);
-			}
-
-			// TODO: What should we do about multiple skins??
-			if (mesh->skins.count > 0) {
-				ufbx_matrix *fallback = mesh->instances.count > 0 ? &mesh->instances.data[0]->geometry_to_world : NULL;
-				ufbx_skin_deformer *skin = mesh->skins.data[0];
-				for (size_t i = 0; i < num_vertices; i++) {
-					ufbx_matrix mat = ufbx_get_skin_vertex_matrix(skin, i, fallback);
-					result_pos[i] = ufbx_transform_position(&mat, result_pos[i]);
-				}
-
-				mesh->skinned_is_local = false;
-			}
-
-			mesh->skinned_position.data = result_pos;
-
-			int32_t *normal_indices = ufbxi_push(&ec->result, int32_t, mesh->num_indices);
-			ufbxi_check_err(&ec->error, normal_indices);
-
-			ufbx_get_mesh_topology(mesh, topo_indices, topo_vertices);
-			size_t num_normals = ufbx_generate_normal_mapping(mesh, topo_indices, topo_vertices, normal_indices);
-
-			if (num_normals == mesh->num_vertices) {
-				normal_indices = mesh->skinned_position.by_index;
-				mesh->skinned_normal.by_vertex = mesh->skinned_position.by_vertex;
-			} else {
-				mesh->skinned_normal.by_vertex = NULL;
-			}
-
-			ufbx_vec3 *normal_data = ufbxi_push(&ec->result, ufbx_vec3, num_normals);
-			ufbxi_check_err(&ec->error, normal_data);
-
-			ufbx_compute_normals(mesh, &mesh->skinned_position, normal_indices, normal_data, num_normals);
-
-			mesh->skinned_normal.data = normal_data;
-			mesh->skinned_normal.by_index = normal_indices;
-			mesh->skinned_normal.num_elements = num_normals;
-		}
+		ufbxi_check_err(&ec->error, ufbxi_evaluate_skinning(&ec->scene, &ec->error, &ec->result, &ec->tmp));
 	}
 
 	// Retain the scene, this must be the final allocation as we copy
