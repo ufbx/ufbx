@@ -10612,6 +10612,148 @@ static void ufbxi_update_light(ufbx_light *light)
 	light->cast_shadows = ufbxi_find_int(&light->props, ufbxi_CastShadows, 0) != 0;
 }
 
+typedef struct {
+	ufbx_vec2 film_size;
+	ufbx_real squeeze_ratio;
+} ufbxi_aperture_format;
+
+static const ufbxi_aperture_format ufbxi_aperture_formats[] = {
+	{ (ufbx_real)1.000, (ufbx_real)1.000, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_CUSTOM
+	{ (ufbx_real)0.404, (ufbx_real)0.295, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_16MM_THEATRICAL
+	{ (ufbx_real)0.493, (ufbx_real)0.292, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_SUPER_16MM
+	{ (ufbx_real)0.864, (ufbx_real)0.630, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_35MM_ACADEMY
+	{ (ufbx_real)0.816, (ufbx_real)0.612, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_35MM_TV_PROJECTION
+	{ (ufbx_real)0.980, (ufbx_real)0.735, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_35MM_FULL_APERTURE
+	{ (ufbx_real)0.825, (ufbx_real)0.446, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_35MM_185_PROJECTION
+	{ (ufbx_real)0.864, (ufbx_real)0.732, (ufbx_real)2.0 }, // UFBX_APERTURE_FORMAT_35MM_ANAMORPHIC
+	{ (ufbx_real)2.066, (ufbx_real)0.906, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_70MM_PROJECTION
+	{ (ufbx_real)1.485, (ufbx_real)0.991, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_VISTAVISION
+	{ (ufbx_real)2.080, (ufbx_real)1.480, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_DYNAVISION
+	{ (ufbx_real)2.772, (ufbx_real)2.072, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_IMAX
+};
+
+static void ufbxi_update_camera(ufbx_camera *camera)
+{
+	camera->aspect_mode = (ufbx_aspect_mode) ufbxi_find_enum(&camera->props, ufbxi_AspectRatioMode, 0, UFBX_ASPECT_MODE_FIXED_HEIGHT);
+	camera->aperture_mode = (ufbx_aperture_mode)ufbxi_find_enum(&camera->props, ufbxi_ApertureMode, UFBX_APERTURE_MODE_VERTICAL, UFBX_APERTURE_MODE_FOCAL_LENGTH);
+	camera->aperture_format = (ufbx_aperture_format)ufbxi_find_enum(&camera->props, ufbxi_ApertureFormat, UFBX_APERTURE_FORMAT_CUSTOM, UFBX_APERTURE_FORMAT_IMAX);
+	camera->gate_fit = (ufbx_gate_fit)ufbxi_find_enum(&camera->props, ufbxi_GateFit, 0, UFBX_GATE_FIT_STRETCH);
+
+	// Search both W/H and Width/Height but prefer the latter
+	ufbx_real aspect_x = ufbxi_find_real(&camera->props, ufbxi_AspectW, 0.0f);
+	ufbx_real aspect_y = ufbxi_find_real(&camera->props, ufbxi_AspectH, 0.0f);
+	aspect_x = ufbxi_find_real(&camera->props, ufbxi_AspectWidth, aspect_x);
+	aspect_y = ufbxi_find_real(&camera->props, ufbxi_AspectHeight, aspect_y);
+
+	ufbx_real fov = ufbxi_find_real(&camera->props, ufbxi_FieldOfView, 0.0f);
+	ufbx_real fov_x = ufbxi_find_real(&camera->props, ufbxi_FieldOfViewX, 0.0f);
+	ufbx_real fov_y = ufbxi_find_real(&camera->props, ufbxi_FieldOfViewY, 0.0f);
+
+	ufbx_real focal_length = ufbxi_find_real(&camera->props, ufbxi_FocalLength, 0.0f);
+
+	ufbx_vec2 film_size = ufbxi_aperture_formats[camera->aperture_format].film_size;
+	ufbx_real squeeze_ratio = ufbxi_aperture_formats[camera->aperture_format].squeeze_ratio;
+
+	film_size.x = ufbxi_find_real(&camera->props, ufbxi_FilmWidth, film_size.x);
+	film_size.y = ufbxi_find_real(&camera->props, ufbxi_FilmHeight, film_size.y);
+	squeeze_ratio = ufbxi_find_real(&camera->props, ufbxi_FilmSqueezeRatio, squeeze_ratio);
+
+	film_size.y *= squeeze_ratio;
+
+	camera->focal_length_mm = focal_length;
+	camera->film_size_inch = film_size;
+	camera->squeeze_ratio = squeeze_ratio;
+
+	switch (camera->aspect_mode) {
+	case UFBX_ASPECT_MODE_WINDOW_SIZE:
+	case UFBX_ASPECT_MODE_FIXED_RATIO:
+		camera->resolution_is_pixels = false;
+		camera->resolution.x = aspect_x;
+		camera->resolution.y = aspect_y;
+		break;
+	case UFBX_ASPECT_MODE_FIXED_RESOLUTION:
+		camera->resolution_is_pixels = true;
+		camera->resolution.x = aspect_x;
+		camera->resolution.y = aspect_y;
+		break;
+	case UFBX_ASPECT_MODE_FIXED_WIDTH:
+		camera->resolution_is_pixels = true;
+		camera->resolution.x = aspect_x;
+		camera->resolution.y = aspect_x * aspect_y;
+		break;
+	case UFBX_ASPECT_MODE_FIXED_HEIGHT:
+		camera->resolution_is_pixels = true;
+		camera->resolution.x = aspect_y * aspect_x;
+		camera->resolution.y = aspect_y;
+		break;
+	}
+
+	ufbx_real aspect_ratio = camera->resolution.x / camera->resolution.y;
+	ufbx_real film_ratio = film_size.x / film_size.y;
+
+	ufbx_gate_fit effective_fit = camera->gate_fit;
+	if (effective_fit == UFBX_GATE_FIT_FILL) {
+		effective_fit = aspect_ratio < film_ratio ? UFBX_GATE_FIT_HORIZONTAL : UFBX_GATE_FIT_VERTICAL;
+	} else if (effective_fit == UFBX_GATE_FIT_OVERSCAN) {
+		effective_fit = aspect_ratio > film_ratio ? UFBX_GATE_FIT_HORIZONTAL : UFBX_GATE_FIT_VERTICAL;
+	}
+
+	switch (camera->gate_fit) {
+	case UFBX_GATE_FIT_NONE:
+		camera->aperture_size_inch = camera->film_size_inch;
+		break;
+	case UFBX_GATE_FIT_VERTICAL:
+		camera->aperture_size_inch.x = camera->film_size_inch.y * aspect_ratio;
+		camera->aperture_size_inch.y = camera->aperture_size_inch.y;
+		break;
+	case UFBX_GATE_FIT_HORIZONTAL:
+		camera->aperture_size_inch.x = camera->film_size_inch.x;
+		camera->aperture_size_inch.y = camera->aperture_size_inch.x / aspect_ratio;
+		break;
+	case UFBX_GATE_FIT_FILL:
+	case UFBX_GATE_FIT_OVERSCAN:
+		camera->aperture_size_inch = camera->film_size_inch;
+		ufbx_assert(0 && "Unreachable, set to vertical/horizontal above"); break;
+		break;
+	case UFBX_GATE_FIT_STRETCH:
+		camera->aperture_size_inch = camera->film_size_inch;
+		// TODO: Not sure what to do here...
+		break;
+	}
+
+	switch (camera->aperture_mode) {
+	case UFBX_APERTURE_MODE_HORIZONTAL_AND_VERTICAL:
+		camera->field_of_view_deg.x = fov_x;
+		camera->field_of_view_deg.y = fov_y;
+		camera->field_of_view_tan.x = (ufbx_real)tan(fov_x * (UFBXI_DEG_TO_RAD * 0.5f));
+		camera->field_of_view_tan.y = (ufbx_real)tan(fov_y * (UFBXI_DEG_TO_RAD * 0.5f));
+		break;
+	case UFBX_APERTURE_MODE_HORIZONTAL:
+		camera->field_of_view_deg.x = fov;
+		camera->field_of_view_tan.x = (ufbx_real)tan(fov * (UFBXI_DEG_TO_RAD * 0.5f));
+		camera->field_of_view_tan.y = camera->field_of_view_tan.x / aspect_ratio;
+		camera->field_of_view_deg.y = (ufbx_real)atan(camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
+		break;
+	case UFBX_APERTURE_MODE_VERTICAL:
+		camera->field_of_view_deg.y = fov;
+		camera->field_of_view_tan.y = (ufbx_real)tan(fov * (UFBXI_DEG_TO_RAD * 0.5f));
+		camera->field_of_view_tan.x = camera->field_of_view_tan.y * aspect_ratio;
+		camera->field_of_view_deg.x = (ufbx_real)atan(camera->field_of_view_tan.x) * UFBXI_RAD_TO_DEG * 2.0f;
+		break;
+	case UFBX_APERTURE_MODE_FOCAL_LENGTH:
+		camera->field_of_view_tan.x = camera->aperture_size_inch.x / (camera->focal_length_mm * UFBXI_MM_TO_INCH) * 0.5f;
+		camera->field_of_view_tan.y = camera->aperture_size_inch.y / (camera->focal_length_mm * UFBXI_MM_TO_INCH) * 0.5f;
+		camera->field_of_view_deg.x = (ufbx_real)atan(camera->field_of_view_tan.x) * UFBXI_RAD_TO_DEG * 2.0f;
+		camera->field_of_view_deg.y = (ufbx_real)atan(camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
+		break;
+	}
+}
+
+static void ufbxi_update_bone(ufbx_bone *bone)
+{
+	bone->length = ufbxi_find_real(&bone->props, ufbxi_Size, 0.0f);
+}
+
 static void ufbxi_update_skin_cluster(ufbx_skin_cluster *cluster)
 {
 	if (cluster->bone) {
@@ -10699,6 +10841,14 @@ static void ufbxi_update_scene(ufbx_scene *scene)
 
 	ufbxi_for_ptr_list(ufbx_light, p_light, scene->lights) {
 		ufbxi_update_light(*p_light);
+	}
+
+	ufbxi_for_ptr_list(ufbx_camera, p_camera, scene->cameras) {
+		ufbxi_update_camera(*p_camera);
+	}
+
+	ufbxi_for_ptr_list(ufbx_bone, p_bone, scene->bones) {
+		ufbxi_update_bone(*p_bone);
 	}
 
 	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {

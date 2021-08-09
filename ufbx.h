@@ -682,12 +682,67 @@ struct ufbx_light {
 	bool cast_shadows;
 };
 
+typedef enum ufbx_aspect_mode {
+	UFBX_ASPECT_MODE_WINDOW_SIZE,
+	UFBX_ASPECT_MODE_FIXED_RATIO,
+	UFBX_ASPECT_MODE_FIXED_RESOLUTION,
+	UFBX_ASPECT_MODE_FIXED_WIDTH,
+	UFBX_ASPECT_MODE_FIXED_HEIGHT,
+} ufbx_aspect_mode;
+
+typedef enum ufbx_aperture_mode {
+	UFBX_APERTURE_MODE_HORIZONTAL_AND_VERTICAL,
+	UFBX_APERTURE_MODE_HORIZONTAL,
+	UFBX_APERTURE_MODE_VERTICAL,
+	UFBX_APERTURE_MODE_FOCAL_LENGTH,
+} ufbx_aperture_mode;
+
+typedef enum ufbx_aperture_format {
+	UFBX_APERTURE_FORMAT_CUSTOM,
+	UFBX_APERTURE_FORMAT_16MM_THEATRICAL,
+	UFBX_APERTURE_FORMAT_SUPER_16MM,
+	UFBX_APERTURE_FORMAT_35MM_ACADEMY,
+	UFBX_APERTURE_FORMAT_35MM_TV_PROJECTION,
+	UFBX_APERTURE_FORMAT_35MM_FULL_APERTURE,
+	UFBX_APERTURE_FORMAT_35MM_185_PROJECTION,
+	UFBX_APERTURE_FORMAT_35MM_ANAMORPHIC,
+	UFBX_APERTURE_FORMAT_70MM_PROJECTION,
+	UFBX_APERTURE_FORMAT_VISTAVISION,
+	UFBX_APERTURE_FORMAT_DYNAVISION,
+	UFBX_APERTURE_FORMAT_IMAX,
+} ufbx_aperture_format;
+
+typedef enum ufbx_gate_fit {
+	UFBX_GATE_FIT_NONE,
+	UFBX_GATE_FIT_VERTICAL,
+	UFBX_GATE_FIT_HORIZONTAL,
+	UFBX_GATE_FIT_FILL,
+	UFBX_GATE_FIT_OVERSCAN,
+	UFBX_GATE_FIT_STRETCH,
+} ufbx_gate_fit;
+
 struct ufbx_camera {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+
+	bool resolution_is_pixels;
+	ufbx_vec2 resolution;
+	ufbx_vec2 field_of_view_deg;
+	ufbx_vec2 field_of_view_tan;
+
+	ufbx_aspect_mode aspect_mode;
+	ufbx_aperture_format aperture_format;
+	ufbx_aperture_mode aperture_mode;
+	ufbx_gate_fit gate_fit;
+	ufbx_real focal_length_mm;
+	ufbx_vec2 film_size_inch;
+	ufbx_vec2 aperture_size_inch;
+	ufbx_real squeeze_ratio;
 };
 
 struct ufbx_bone {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+
+	ufbx_real length;
 };
 
 struct ufbx_empty {
