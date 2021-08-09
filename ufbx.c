@@ -5436,8 +5436,8 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 
 	ufbxi_buf_state stack_state = ufbxi_buf_push_state(&uc->tmp_stack);
 
-	ufbxi_tangent_layer *bitangents = ufbxi_push(&uc->tmp_stack, ufbxi_tangent_layer, num_bitangents);
-	ufbxi_tangent_layer *tangents = ufbxi_push(&uc->tmp_stack, ufbxi_tangent_layer, num_tangents);
+	ufbxi_tangent_layer *bitangents = ufbxi_push_zero(&uc->tmp_stack, ufbxi_tangent_layer, num_bitangents);
+	ufbxi_tangent_layer *tangents = ufbxi_push_zero(&uc->tmp_stack, ufbxi_tangent_layer, num_tangents);
 	ufbxi_check(bitangents);
 	ufbxi_check(tangents);
 
@@ -5457,7 +5457,7 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 		} else if (n->name == ufbxi_LayerElementBinormal) {
 			ufbxi_tangent_layer *layer = &bitangents[num_bitangents_read++];
 			ufbxi_ignore(ufbxi_get_val1(n, "I", &layer->index));
-			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &layer->elem.data,&layer->elem.by_index,
+			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &layer->elem.data ,&layer->elem.by_index,
 				&layer->elem.by_vertex, &layer->elem.num_elements, ufbxi_Binormals, ufbxi_BinormalsIndex, 'r', 3));
 
 		} else if (n->name == ufbxi_LayerElementTangent) {
