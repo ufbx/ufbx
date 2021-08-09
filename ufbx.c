@@ -5546,7 +5546,7 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 				if (ufbxi_find_val1(n, ufbxi_MappingInformationType, "C", (char**)&mapping)) {
 					ufbxi_value_array *arr = ufbxi_find_array(n, ufbxi_TextureId, 'i');
 
-					ufbxi_tmp_mesh_texture *tex = ufbxi_push(&uc->tmp_mesh_textures, ufbxi_tmp_mesh_texture, 1);
+					ufbxi_tmp_mesh_texture *tex = ufbxi_push_zero(&uc->tmp_mesh_textures, ufbxi_tmp_mesh_texture, 1);
 					ufbxi_check(tex);
 					if (arr) {
 						tex->face_texture = (int32_t*)arr->data;
@@ -5635,6 +5635,7 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 	if (num_textures > 0) {
 		tex_list->count = num_textures;
 		tex_list->data = ufbxi_make_array(&uc->tmp_mesh_textures, ufbxi_tmp_mesh_texture, num_textures);
+		ufbxi_check(tex_list->data);
 	}
 
 	return 1;
@@ -8279,6 +8280,8 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 					num_textures_in_material++;
 				}
 			}
+
+			mesh_textures++;
 		}
 
 		// Not needed anymore!
