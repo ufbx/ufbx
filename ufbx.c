@@ -4366,7 +4366,7 @@ static ufbxi_forceinline bool ufbxi_name_key_less(ufbx_prop *prop, const char *d
 	size_t len = ufbxi_min_sz(prop_len, name_len);
 	int cmp = memcmp(prop->name.data, data, len);
 	if (cmp != 0) return cmp < 0;
-	return name_len < prop_len;
+	return prop_len < name_len;
 }
 
 static const char *ufbxi_node_prop_names[] = {
@@ -5418,8 +5418,9 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 	}
 #endif
 
-	// HACK(consecutive-faces): Prepare for finalize to re-use a consecutive
+	// HACK(consecutive-faces): Prepare for finalize to re-use a consecutive/zero
 	// index buffer for face materials.. `mesh->num_faces >= mesh->num_vertices` usually anyway.
+	uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, mesh->num_faces);
 	uc->max_consecutive_indices = ufbxi_max_sz(uc->max_consecutive_indices, mesh->num_faces);
 
 	// Count the number of UV/color sets
@@ -5515,7 +5516,6 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 				ufbxi_check(arr && arr->size >= 1);
 				int32_t material = *(int32_t*)arr->data;
 				if (material == 0) {
-					uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, mesh->num_faces);
 					mesh->face_material = (int32_t*)ufbxi_sentinel_index_zero;
 				} else {
 					mesh->face_material = ufbxi_push(&uc->result, int32_t, mesh->num_faces);
@@ -6006,7 +6006,9 @@ ufbxi_nodiscard static int ufbxi_read_material(ufbxi_context *uc, ufbxi_node *no
 	ufbx_material *material = ufbxi_push_element(uc, info, ufbx_material, UFBX_ELEMENT_MATERIAL);
 	ufbxi_check(material);
 
-	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_ShadingModel, "S", &material->shading_model_name));
+	if (!ufbxi_find_val1(node, ufbxi_ShadingModel, "S", &material->shading_model_name)) {
+		material->shading_model_name = ufbx_empty_string;
+	}
 
 	return 1;
 }
@@ -7979,6 +7981,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 				mat->num_faces = mesh->num_faces;
 				mat->num_triangles = mesh->num_triangles;
 				mat->faces = uc->consecutive_indices;
+				mesh->face_material = uc->zero_indices;
 			} else if (mesh->materials.count > 0 && mesh->face_material) {
 				size_t num_materials = mesh->materials.count;
 
@@ -7986,13 +7989,12 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 				for (size_t i = 0; i < mesh->num_faces; i++) {
 					ufbx_face face = mesh->faces[i];
 					int32_t mat_ix = mesh->face_material[i];
-					if (mat_ix >= 0 && (size_t)mat_ix < num_materials) {
-						mesh->materials.data[mat_ix].num_faces++;
-						if (face.num_indices >= 3) {
-							mesh->materials.data[mat_ix].num_triangles += face.num_indices - 2;
-						}
-					} else {
+					if (!(mat_ix >= 0 && (size_t)mat_ix < num_materials)) {
 						mesh->face_material[i] = 0;
+					}
+					mesh->materials.data[mat_ix].num_faces++;
+					if (face.num_indices >= 3) {
+						mesh->materials.data[mat_ix].num_triangles += face.num_indices - 2;
 					}
 				}
 
@@ -8111,6 +8113,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		}
 
 		layer->anim_props.data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_anim_prop, num_anim_props + 1);
+		ufbxi_check(layer->anim_props.data);
 		layer->anim_props.count = num_anim_props;
 		ufbxi_check(ufbxi_sort_anim_props(uc, layer->anim_props.data, layer->anim_props.count));
 	}
@@ -8180,6 +8183,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	// Ugh.. Patch the textures from meshes for legacy LayerElement-style textures
 	{
 		ufbxi_tmp_mesh_texture_list *mesh_textures = ufbxi_make_array_all(&uc->tmp_mesh_texture_lists, ufbxi_tmp_mesh_texture_list);
+		ufbxi_check(mesh_textures);
 
 		ufbxi_for_ptr_list(ufbx_mesh, p_mesh, uc->scene.meshes) {
 			ufbx_mesh *mesh = *p_mesh;
