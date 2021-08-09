@@ -163,18 +163,20 @@ UFBXT_FILE_TEST(synthetic_sausage_wiggle_no_bind)
 }
 #endif
 
-#if 0
 UFBXT_FILE_TEST(maya_blend_shape_cube)
 #if UFBXT_IMPL
 {
-	ufbx_mesh *mesh = ufbx_find_mesh(scene, "pCube1");
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
 
-	ufbxt_assert(mesh);
-	ufbxt_assert(mesh->blend_channels.size == 2);
+	ufbxt_assert(mesh->blend_shapes.count == 1);
+	ufbx_blend_deformer *deformer = mesh->blend_shapes.data[0];
+	ufbxt_assert(deformer);
 
 	ufbx_blend_channel *top[2] = { NULL, NULL };
-	for (size_t i = 0; i < mesh->blend_channels.size; i++) {
-		ufbx_blend_channel *chan = mesh->blend_channels.data[i];
+	for (size_t i = 0; i < deformer->channels.count; i++) {
+		ufbx_blend_channel *chan = deformer->channels.data[i];
 		if (strstr(chan->name.data, "TopH")) top[0] = chan;
 		if (strstr(chan->name.data, "TopV")) top[1] = chan;
 	}
@@ -192,31 +194,21 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 
 	for (size_t chan_ix = 0; chan_ix < 2; chan_ix++) {
 		ufbx_blend_channel *chan = top[chan_ix];
-		ufbxt_assert(chan->keyframes.size == 1);
+		ufbxt_assert(chan->keyframes.count == 1);
 
 		ufbxt_assert_close_real(err, chan->keyframes.data[0].target_weight, 1.0);
 		ufbx_blend_shape *shape = chan->keyframes.data[0].shape;
-
-		ufbx_anim_prop *props = ufbx_find_blend_channel_anim_prop_begin(scene, NULL, chan);
-		ufbxt_assert(props);
-
-		size_t count = ufbx_anim_prop_count(props);
-		ufbxt_assert(count == 1);
-
-		ufbx_anim_prop *percent = ufbx_find_anim_prop(props, "DeformPercent");
-		ufbxt_assert(percent);
 
 		for (size_t key_ix = 0; key_ix < ufbxt_arraycount(keyframes); key_ix++) {
 			double *frame = keyframes[key_ix];
 			double time = frame[0];
 
 			ufbx_real ref = (ufbx_real)frame[1 + chan_ix];
-			ufbx_real value = ufbx_evaluate_curve(&percent->curves[0], time) / 100.0;
-			ufbxt_assert_close_real(err, value, ref);
+			ufbx_prop prop = ufbx_evaluate_prop(scene->anim, &chan->element, "DeformPercent", time);
+			ufbxt_assert_close_real(err, prop.value_real / 100.0f, ref);
 		}
 	}
 
-	ufbx_scene *eval = NULL;
 	for (int eval_skin = 0; eval_skin <= 1; eval_skin++) {
 		for (size_t key_ix = 0; key_ix < ufbxt_arraycount(keyframes); key_ix++) {
 			double *frame = keyframes[key_ix];
@@ -226,47 +218,41 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 
 			opts.evaluate_skinning = eval_skin != 0;
 
-			eval = ufbx_evaluate_scene(scene, &opts, time);
-			ufbxt_assert(eval);
+			ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, &opts, NULL);
+			ufbxt_assert(state);
 
 			for (size_t chan_ix = 0; chan_ix < 2; chan_ix++) {
 				ufbx_real ref = (ufbx_real)frame[1 + chan_ix];
 
-				ufbx_blend_channel *chan = ufbx_find_blend_channel(eval, top[chan_ix]->name.data);
+				ufbx_blend_channel *chan = state->blend_channels.data[top[chan_ix]->element.typed_id];
 				ufbxt_assert(chan);
 
-				ufbx_prop *prop = ufbx_find_prop(&chan->props, "DeformPercent");
-				ufbxt_assert(prop);
+				ufbx_prop prop = ufbx_evaluate_prop(scene->anim, &chan->element, "DeformPercent", time);
 
-				ufbxt_assert(chan->keyframes.size == 1);
-				ufbxt_assert_close_real(err, chan->keyframes.data[0].effective_weight, chan->weight);
-
-				ufbxt_assert_close_real(err, prop->value_real / 100.0, ref);
+				ufbxt_assert_close_real(err, prop.value_real / 100.0, ref);
 				ufbxt_assert_close_real(err, chan->weight, ref);
 			}
 
-			ufbxt_check_scene(eval);
+			ufbxt_check_scene(state);
+
+			ufbx_free_scene(state);
 		}
 	}
-
-	ufbx_free_scene(eval);
 }
 #endif
 
 UFBXT_FILE_TEST(maya_blend_inbetween)
 #if UFBXT_IMPL
 {
-	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_1", NULL, 1.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_30", NULL, 30.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_60", NULL, 60.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_65", NULL, 65.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_71", NULL, 71.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_80", NULL, 80.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_89", NULL, 89.0/24.0);
-	ufbxt_check_frame(scene, err, -1.0, "maya_blend_inbetween_120", NULL, 120.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_blend_inbetween_1", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_blend_inbetween_30", NULL, 30.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_blend_inbetween_60", NULL, 60.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_blend_inbetween_65", NULL, 65.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_blend_inbetween_71", NULL, 71.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_blend_inbetween_80", NULL, 80.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_blend_inbetween_89", NULL, 89.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_blend_inbetween_120", NULL, 120.0/24.0);
 }
-#endif
-
 #endif
 
 UFBXT_FILE_TEST(synthetic_blend_shape_order)

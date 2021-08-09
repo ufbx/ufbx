@@ -510,6 +510,12 @@ typedef struct ufbx_edge {
 	uint32_t indices[2];
 } ufbx_edge;
 
+// Triangle face
+typedef struct ufbx_triangle {
+	uint32_t indices[3];
+	uint32_t face_index;
+} ufbx_triangle;
+
 // Polygonal face with arbitrary number vertices, a single face contains a 
 // contiguous range of mesh indices, eg. `{5,3}` would have indices 5, 6, 7
 //
@@ -582,13 +588,16 @@ struct ufbx_mesh {
 	// one vertex may be split to multiple indices for split attributes, eg. UVs
 	size_t num_vertices;  // < Number of logical "vertex" points
 	size_t num_indices;   // < Number of combiend vertex/attribute tuples
-	size_t num_triangles; // < Number of triangles if triangulated
+	size_t num_triangles; // < Number of triangles
 
 	// Faces and optional per-face extra data
 	size_t num_faces;
 	ufbx_face *faces;       // < Face index range
 	bool *face_smoothing;   // < Should the face have soft normals
 	int32_t *face_material; // < Indices to `ufbx_mesh.materials`
+
+	// Triangles, refer to `face_material[tri.face_index]` for materials
+	ufbx_triangle *triangles;
 
 	// Edges and optional per-edge extra data
 	size_t num_edges;
@@ -836,6 +845,8 @@ UFBX_LIST_TYPE(ufbx_blend_keyframe_list, ufbx_blend_keyframe);
 
 struct ufbx_blend_channel {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_real weight;
 
 	ufbx_blend_keyframe_list keyframes;
 };
@@ -1570,7 +1581,7 @@ void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *
 
 // Mesh Topology
 
-size_t ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, ufbx_face face);
+size_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, ufbx_face face);
 
 void ufbx_get_mesh_topology(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo_vertex *vertices);
 int32_t ufbx_topo_next_vertex_edge(ufbx_topo_index *indices, int32_t index);

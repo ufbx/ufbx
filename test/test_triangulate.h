@@ -14,7 +14,7 @@ size_t do_triangulate_test(ufbx_scene *scene)
 		ufbxt_assert(face.index_begin == 0);
 		ufbxt_assert(face.num_indices == 4);
 		uint32_t tris[6];
-		bool ok = ufbx_triangulate(tris, 6, mesh, face);
+		bool ok = ufbx_triangulate_face(tris, 6, mesh, face);
 		ufbxt_assert(ok);
 
 		size_t top_left_ix = 0;
@@ -75,11 +75,11 @@ UFBXT_FILE_TEST(maya_tri_cone)
 
 		size_t num_tris = face.num_indices - 2;
 		for (size_t i = 0; i < 32; i++) {
-			bool ok = ufbx_triangulate(tris, i, mesh, face);
+			bool ok = ufbx_triangulate_face(tris, i, mesh, face);
 			ufbxt_assert(ok == (i >= num_tris * 3));
 		}
 
-		ufbxt_assert(ufbx_triangulate(tris, ufbxt_arraycount(tris), mesh, face));
+		ufbxt_assert(ufbx_triangulate_face(tris, ufbxt_arraycount(tris), mesh, face));
 	}
 }
 #endif

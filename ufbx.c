@@ -2401,6 +2401,7 @@ typedef struct {
 	ufbxi_buf tmp_typed_element_offsets[UFBX_NUM_ELEMENT_TYPES];
 	ufbxi_buf tmp_mesh_textures;
 	ufbxi_buf tmp_mesh_texture_lists;
+	ufbxi_buf tmp_full_weights;
 	size_t tmp_element_byte_offset;
 
 	ufbxi_template *templates;
@@ -3120,6 +3121,12 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			info->result = true;
 			return true;
 		} else if (name == ufbxi_FullWeights) {
+			// Ignore blend shape FullWeights as it's used in Blender for vertex groups
+			// which we don't currently handle. https://developer.blender.org/T90382
+			// TODO: Should we present this to users anyway somehow?
+			if (!uc->opts.disable_quirks && uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
+				return false;
+			}
 			info->type = 'd';
 			info->tmp_buf = true;
 			return true;
@@ -4924,6 +4931,17 @@ ufbxi_nodiscard static int ufbxi_connect_op(ufbxi_context *uc, uint64_t src, uin
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_connect_pp(ufbxi_context *uc, uint64_t src, uint64_t dst, ufbx_string src_prop, ufbx_string dst_prop)
+{
+	ufbxi_tmp_connection *conn = ufbxi_push(&uc->tmp_connections, ufbxi_tmp_connection, 1);
+	ufbxi_check(conn);
+	conn->src = src;
+	conn->dst = dst;
+	conn->src_prop = src_prop;
+	conn->dst_prop = dst_prop;
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_read_unknown(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *element, ufbx_string type, ufbx_string sub_type)
 {
 	(void)node;
@@ -5222,6 +5240,66 @@ ufbxi_nodiscard static int ufbxi_read_shape(ufbxi_context *uc, ufbxi_node *node,
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_read_synthetic_blend_shapes(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_blend_deformer *deformer = NULL;
+	uint64_t deformer_fbx_id = 0;
+
+	ufbxi_for (ufbxi_node, n, node->children, node->num_children) {
+		if (n->name != ufbxi_Shape) continue;
+
+		ufbx_string name;
+		ufbxi_check(ufbxi_get_val1(n, "S", &name));
+
+		if (deformer == NULL) {
+			deformer = ufbxi_push_synthetic_element(uc, &deformer_fbx_id, name.data, ufbx_blend_deformer, UFBX_ELEMENT_BLEND_DEFORMER);
+			ufbxi_check(deformer);
+			ufbxi_check(ufbxi_connect_oo(uc, deformer_fbx_id, info->fbx_id));
+		}
+
+		uint64_t channel_fbx_id = 0;
+		ufbx_blend_channel *channel = ufbxi_push_synthetic_element(uc, &channel_fbx_id, name.data, ufbx_blend_channel, UFBX_ELEMENT_BLEND_CHANNEL);
+		ufbxi_check(channel);
+
+		size_t num_shape_props = 1;
+		ufbx_prop *shape_props = ufbxi_push_zero(&uc->result, ufbx_prop, num_shape_props);
+		ufbxi_check(shape_props);
+		shape_props[0].name.data = ufbxi_DeformPercent;
+		shape_props[0].name.length = sizeof(ufbxi_DeformPercent) - 1;
+		shape_props[0].internal_key = ufbxi_get_name_key_c(ufbxi_DeformPercent);
+		shape_props[0].type = UFBX_PROP_NUMBER;
+		shape_props[0].value_real = (ufbx_real)0.0;
+		shape_props[0].value_str = ufbx_empty_string;
+
+		ufbx_prop *self_prop = ufbx_find_prop_len(&info->props, name.data, name.length);
+		if (self_prop && (self_prop->type == UFBX_PROP_NUMBER || self_prop->type == UFBX_PROP_INTEGER)) {
+			shape_props[0].value_real = self_prop->value_real;
+			ufbxi_check(ufbxi_connect_pp(uc, info->fbx_id, channel_fbx_id, name, shape_props[0].name));
+		}
+
+		channel->name = name;
+		channel->props.props = shape_props;
+		channel->props.num_props = num_shape_props;
+
+		ufbxi_check(ufbxi_connect_oo(uc, channel_fbx_id, deformer_fbx_id));
+
+		ufbxi_element_info shape_info = { 0 };
+
+		// HACK: Derive an FBX ID for the shape from the channel. Synthetic IDs are
+		// equivalent to resulting object pointers (as `uintptr_t`) so incrementing
+		// it gives us an unique ID (as long as `sizeof(ufbx_blend_channel) > 0`...)
+		shape_info.fbx_id = channel_fbx_id + 1;
+		shape_info.name = name;
+
+		ufbxi_check(ufbxi_read_shape(uc, n, &shape_info));
+
+		ufbxi_check(ufbxi_connect_oo(uc, channel_fbx_id, deformer_fbx_id));
+		ufbxi_check(ufbxi_connect_oo(uc, shape_info.fbx_id, channel_fbx_id));
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	// Only read polygon meshes, ignore eg. NURBS without error
@@ -5232,67 +5310,10 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 	ufbx_mesh *mesh = ufbxi_push_element(uc, info, ufbx_mesh, UFBX_ELEMENT_MESH);
 	ufbxi_check(mesh);
 
-#if 0
 	// Legacy pre-7000 blend shapes are contained within the same geometry node
 	if (uc->version < 7000) {
-		ufbx_assert(model_object);
-
-		ufbxi_shape_deformer *deformer = NULL;
-		uint64_t shape_deformer_id = 0;
-
-		ufbxi_for (ufbxi_node, n, node->children, node->num_children) {
-			if (n->name != ufbxi_Shape) continue;
-
-			if (deformer == NULL) {
-				deformer = ufbxi_push_zero(&uc->tmp_arr_shape_deformers, ufbxi_shape_deformer, 1);
-				shape_deformer_id = (uintptr_t)deformer;
-				ufbxi_check(deformer);
-				ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_SHAPE_DEFORMER, shape_deformer_id, uc->tmp_arr_shape_deformers.num_items - 1));
-				ufbxi_check(ufbxi_add_connection(uc, object->id, shape_deformer_id, NULL));
-			}
-
-			deformer->num_channels++;
-
-			size_t num_shape_props = 1;
-			ufbx_prop *shape_props = ufbxi_push_zero(&uc->tmp, ufbx_prop, num_shape_props);
-			ufbxi_check(shape_props);
-			shape_props[0].name.data = ufbxi_DeformPercent;
-			shape_props[0].name.length = sizeof(ufbxi_DeformPercent) - 1;
-			shape_props[0].imp_key = ufbxi_get_name_key(ufbxi_DeformPercent, sizeof(ufbxi_DeformPercent) - 1);
-			shape_props[0].type = UFBX_PROP_NUMBER;
-			shape_props[0].value_real = (ufbx_real)0.0;
-
-			ufbx_string name;
-			ufbxi_check(ufbxi_get_val1(n, "S", &name));
-
-			ufbx_prop *self_prop = ufbx_find_prop_len(&model_object->props, name.data, name.length);
-			if (self_prop && (self_prop->type == UFBX_PROP_NUMBER || self_prop->type == UFBX_PROP_INTEGER)) {
-				shape_props[0].value_real = self_prop->value_real;
-			}
-
-			ufbx_blend_channel *channel = ufbxi_push_zero(&uc->tmp_arr_blend_channels, ufbx_blend_channel, 1);
-			ufbxi_check(channel);
-			uint64_t shape_channel_id = (uintptr_t)channel;
-			uint64_t shape_geometry_id = shape_channel_id + 1;
-
-			ufbxi_blend_channel_extra *extra = ufbxi_push_zero(&uc->tmp_arr_blend_channels_extra, ufbxi_blend_channel_extra, 1);
-			ufbxi_check(extra);
-
-			ufbxi_check(ufbxi_add_connectable(uc, UFBXI_CONNECTABLE_BLEND_CHANNEL, shape_channel_id, uc->tmp_arr_blend_channels.num_items - 1));
-			channel->name = name;
-			channel->props.props = shape_props;
-			channel->props.num_props = num_shape_props;
-
-			ufbxi_object shape_obj = { 0 };
-			shape_obj.name = name;
-			shape_obj.id = shape_geometry_id;
-			ufbxi_check(ufbxi_read_shape_geometry(uc, n, &shape_obj));
-
-			ufbxi_check(ufbxi_add_connection(uc, shape_deformer_id, shape_channel_id, NULL));
-			ufbxi_check(ufbxi_add_connection(uc, shape_channel_id, shape_geometry_id, NULL));
-		}
+		ufbxi_check(ufbxi_read_synthetic_blend_shapes(uc, node, info));
 	}
-#endif
 
 	if (uc->opts.ignore_geometry) return 1;
 
@@ -5387,6 +5408,15 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 	mesh->vertex_position.by_index = index_data;
 	mesh->num_faces = dst_face - mesh->faces;
 	mesh->num_triangles = num_triangles;
+
+	mesh->triangles = ufbxi_push(&uc->result, ufbx_triangle, num_triangles);
+	ufbxi_check(mesh->triangles);
+
+#ifndef _MSC_VER
+	for (size_t i = 0; i < mesh->num_faces; i++) {
+		ufbx_assert(0 && "TODO");
+	}
+#endif
 
 	// HACK(consecutive-faces): Prepare for finalize to re-use a consecutive
 	// index buffer for face materials.. `mesh->num_faces >= mesh->num_vertices` usually anyway.
@@ -5721,6 +5751,7 @@ ufbxi_nodiscard static int ufbxi_read_skin(ufbxi_context *uc, ufbxi_node *node, 
 ufbxi_nodiscard static int ufbxi_read_skin_cluster(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_skin_cluster *cluster = ufbxi_push_element(uc, info, ufbx_skin_cluster, UFBX_ELEMENT_SKIN_CLUSTER);
+	ufbxi_check(cluster);
 
 	ufbxi_value_array *indices = ufbxi_find_array(node, ufbxi_Indexes, 'i');
 	ufbxi_value_array *weights = ufbxi_find_array(node, ufbxi_Weights, 'r');
@@ -5741,6 +5772,22 @@ ufbxi_nodiscard static int ufbxi_read_skin_cluster(ufbxi_context *uc, ufbxi_node
 		ufbxi_read_transform_matrix(&cluster->geometry_to_bone, (ufbx_real*)transform->data);
 		ufbxi_read_transform_matrix(&cluster->bind_to_world, (ufbx_real*)transform_link->data);
 	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_blend_channel(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_blend_channel *channel = ufbxi_push_element(uc, info, ufbx_blend_channel, UFBX_ELEMENT_BLEND_CHANNEL);
+	ufbxi_check(channel);
+
+	ufbx_real_list list = { NULL, 0 };
+	ufbxi_value_array *full_weights = ufbxi_find_array(node, ufbxi_FullWeights, 'd');
+	if (full_weights) {
+		list.data = (ufbx_real*)full_weights->data;
+		list.count = full_weights->size;
+	}
+	ufbxi_check(ufbxi_push_copy(&uc->tmp_full_weights, ufbx_real_list, 1, &list));
 
 	return 1;
 }
@@ -6237,7 +6284,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			} else if (sub_type == ufbxi_BlendShape) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_blend_deformer), UFBX_ELEMENT_BLEND_DEFORMER));
 			} else if (sub_type == ufbxi_BlendShapeChannel) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_blend_channel), UFBX_ELEMENT_BLEND_CHANNEL));
+				ufbxi_check(ufbxi_read_blend_channel(uc, node, &info));
 			} else {
 				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str));
 			}
@@ -7227,6 +7274,26 @@ ufbxi_nodiscard static int ufbxi_fetch_deformers(ufbxi_context *uc,  ufbx_elemen
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_fetch_blend_keyframes(ufbxi_context *uc, ufbx_blend_keyframe_list *list, ufbx_element *element)
+{
+	size_t num_keyframes = 0;
+
+	ufbx_connection_list conns = ufbxi_find_dst_connections(element, NULL);
+	ufbxi_for_list(ufbx_connection, conn, conns) {
+		if (conn->src->type == UFBX_ELEMENT_BLEND_SHAPE) {
+			ufbx_blend_keyframe key = { (ufbx_blend_shape*)conn->src };
+			ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_blend_keyframe, 1, &key));
+			num_keyframes++;
+		}
+	}
+
+	list->data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_blend_keyframe, num_keyframes);
+	list->count = num_keyframes;
+	ufbxi_check(list->data);
+
+	return 1;
+}
+
 static ufbxi_forceinline bool ufbxi_prop_connection_less(const ufbx_connection *a, const char *prop)
 {
 	int cmp = strcmp(a->dst_prop.data, prop);
@@ -7307,6 +7374,17 @@ ufbxi_nodiscard static int ufbxi_sort_skin_weights(ufbxi_context *uc, ufbx_skin_
 
 	return 1;
 }
+
+ufbxi_nodiscard static int ufbxi_sort_blend_keyframes(ufbxi_context *uc, ufbx_blend_keyframe *keyframes, size_t count)
+{
+	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_blend_keyframe)));
+
+	ufbxi_macro_stable_sort(ufbx_blend_keyframe, 32, keyframes, uc->tmp_arr, count,
+		( a->target_weight < b->target_weight ));
+
+	return 1;
+}
+
 
 static ufbxi_forceinline ufbx_real ufbxi_find_real(const ufbx_props *props, const char *name, ufbx_real def)
 {
@@ -7811,6 +7889,31 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		}
 	}
 
+	ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, uc->scene.blend_deformers) {
+		ufbx_blend_deformer *blend = *p_blend;
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &blend->channels, &blend->element, false, NULL, UFBX_ELEMENT_BLEND_CHANNEL));
+	}
+
+	ufbx_real_list *full_weights = ufbxi_make_array_all(&uc->tmp_full_weights, ufbx_real_list);
+	ufbxi_for_ptr_list(ufbx_blend_channel, p_channel, uc->scene.blend_channels) {
+		ufbx_blend_channel *channel = *p_channel;
+
+		ufbxi_check(ufbxi_fetch_blend_keyframes(uc, &channel->keyframes, &channel->element));
+
+		for (size_t i = 0; i < channel->keyframes.count; i++) {
+			ufbx_blend_keyframe *key = &channel->keyframes.data[i];
+			if (i < full_weights->count) {
+				key->target_weight = full_weights->data[i] * 0.01f;
+			} else {
+				key->target_weight = 1.0f;
+			}
+		}
+
+		ufbxi_check(ufbxi_sort_blend_keyframes(uc, channel->keyframes.data, channel->keyframes.count));
+		full_weights++;
+	}
+	ufbxi_buf_free(&uc->tmp_full_weights);
+
 	{
 		// Generate and patch procedural index buffers
 		int32_t *zero_indices = ufbxi_push(&uc->result, int32_t, uc->max_zero_indices);
@@ -7915,10 +8018,6 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 
 			// Blender writes materials attached to models even in 7x00
 			// TODO: Should per-instance materials be supported?
-			// TODO TODO
-#if 0
-
-#endif
 
 			// Fetch deformers
 			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->skins, &mesh->element, search_node, NULL, UFBX_ELEMENT_SKIN_DEFORMER));
@@ -10516,6 +10615,50 @@ static void ufbxi_update_skin_cluster(ufbx_skin_cluster *cluster)
 	cluster->geometry_to_world_transform = ufbx_get_matrix_transform(&cluster->geometry_to_world);
 }
 
+static void ufbxi_update_blend_channel(ufbx_blend_channel *channel)
+{
+	ufbx_real weight = ufbxi_find_real(&channel->props, ufbxi_DeformPercent, 0.0f) * (ufbx_real)0.01;
+	channel->weight = weight;
+
+	ptrdiff_t num_keys = (ptrdiff_t)channel->keyframes.count;
+	if (num_keys > 0) {
+		ufbx_blend_keyframe *keys = channel->keyframes.data;
+
+		// Reset the effective weights to zero and find the split around zero
+		ptrdiff_t last_negative = -1;
+		for (ptrdiff_t i = 0; i < num_keys; i++) {
+			keys[i].effective_weight = (ufbx_real)0.0;
+			if (keys[i].target_weight < 0.0) last_negative = i;
+		}
+
+		// Find either the next or last keyframe away from zero
+		ufbx_blend_keyframe zero_key = { NULL };
+		ufbx_blend_keyframe *prev = &zero_key, *next = &zero_key;
+		if (weight > 0.0) {
+			if (last_negative >= 0) prev = &keys[last_negative];
+			for (ptrdiff_t i = last_negative + 1; i < num_keys; i++) {
+				prev = next;
+				next = &keys[i];
+				if (next->target_weight > weight) break;
+			}
+		} else {
+			if (last_negative + 1 < num_keys) prev = &keys[last_negative + 1];
+			for (ptrdiff_t i = last_negative; i >= 0; i--) {
+				prev = next;
+				next = &keys[i];
+				if (next->target_weight < weight) break;
+			}
+		}
+
+		// Linearly interpolate between the endpoints with the weight
+		ufbx_real t = (weight - prev->target_weight) / (next->target_weight - prev->target_weight);
+		if (isfinite(t)) {
+			prev->effective_weight = 1.0f - t;
+			next->effective_weight = t;
+		}
+	}
+}
+
 static void ufbxi_update_material(ufbx_scene *scene, ufbx_material *material)
 {
 	if (material->props.num_animated > 0) {
@@ -10553,6 +10696,10 @@ static void ufbxi_update_scene(ufbx_scene *scene)
 
 	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
 		ufbxi_update_skin_cluster(*p_cluster);
+	}
+
+	ufbxi_for_ptr_list(ufbx_blend_channel, p_channel, scene->blend_channels) {
+		ufbxi_update_blend_channel(*p_channel);
 	}
 
 	ufbxi_for_ptr_list(ufbx_material, p_material, scene->materials) {
@@ -11838,6 +11985,7 @@ static void ufbxi_free_temp(ufbxi_context *uc)
 	}
 	ufbxi_buf_free(&uc->tmp_mesh_textures);
 	ufbxi_buf_free(&uc->tmp_mesh_texture_lists);
+	ufbxi_buf_free(&uc->tmp_full_weights);
 
 	ufbxi_free(&uc->ator_tmp, ufbxi_node, uc->top_nodes, uc->top_nodes_cap);
 
@@ -11930,6 +12078,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	}
 	uc->tmp_mesh_textures.ator = &uc->ator_tmp;
 	uc->tmp_mesh_texture_lists.ator = &uc->ator_tmp;
+	uc->tmp_full_weights.ator = &uc->ator_tmp;
 
 	uc->result.ator = &uc->ator_result;
 	uc->string_buf.ator = &uc->ator_result;
@@ -14474,7 +14623,7 @@ void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *
 	}
 }
 
-size_t ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, ufbx_face face)
+size_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, ufbx_face face)
 {
 	if (face.num_indices < 3 || num_indices < ((size_t)face.num_indices - 2) * 3) return 0;
 
