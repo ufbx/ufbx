@@ -29,20 +29,20 @@ static void ufbxt_check_element_ptr(ufbx_scene *scene, ufbx_element *element)
 
 static void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void *void_elem, size_t elem_size)
 {
-	ufbx_vertex_void *elem = (ufbx_vertex_void*)void_elem;
+	ufbx_vertex_attrib *elem = (ufbx_vertex_attrib*)void_elem;
 	if (elem->data == NULL) {
 		ufbxt_assert(elem->by_index == NULL);
-		ufbxt_assert(elem->num_elements == 0);
+		ufbxt_assert(elem->num_values == 0);
 		return;
 	}
 
-	ufbxt_assert(elem->num_elements >= 0);
+	ufbxt_assert(elem->num_values >= 0);
 	ufbxt_assert(elem->by_index != NULL);
 
 	// Check that the indices are in range
 	for (size_t i = 0; i < mesh->num_indices; i++) {
 		int32_t ix = elem->by_index[i];
-		ufbxt_assert(ix >= -1 && ix < elem->num_elements);
+		ufbxt_assert(ix >= -1 && ix < elem->num_values);
 	}
 
 	// Check that the data at invalid index is valid and zero
@@ -202,8 +202,16 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_check_vertex_element(scene, mesh, &mesh->skinned_position, sizeof(ufbx_vec3));
 	ufbxt_check_vertex_element(scene, mesh, &mesh->skinned_normal, sizeof(ufbx_vec3));
 
-	ufbxt_assert(mesh->num_vertices == mesh->vertex_position.num_elements);
+	ufbxt_assert(mesh->num_vertices == mesh->vertex_position.num_values);
 	ufbxt_assert(mesh->num_triangles <= mesh->num_indices);
+
+	ufbxt_assert(mesh->vertex_position.value_reals == 3);
+	ufbxt_assert(mesh->vertex_normal.value_reals == 3);
+	ufbxt_assert(mesh->vertex_tangent.value_reals == 3);
+	ufbxt_assert(mesh->vertex_bitangent.value_reals == 3);
+	ufbxt_assert(mesh->vertex_uv.value_reals == 2);
+	ufbxt_assert(mesh->vertex_color.value_reals == 4);
+	ufbxt_assert(mesh->vertex_crease.value_reals == 1);
 
 	uint32_t prev_end = 0;
 	for (size_t i = 0; i < mesh->num_faces; i++) {
@@ -260,10 +268,14 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 
 	for (size_t i = 0; i < mesh->uv_sets.count; i++) {
 		ufbx_uv_set *set = &mesh->uv_sets.data[i];
+		ufbxt_assert(set->vertex_uv.value_reals == 2);
+		ufbxt_assert(set->vertex_tangent.value_reals == 3);
+		ufbxt_assert(set->vertex_bitangent.value_reals == 3);
+
 		if (i == 0) {
 			ufbxt_assert(mesh->vertex_uv.data == set->vertex_uv.data);
 			ufbxt_assert(mesh->vertex_uv.by_index == set->vertex_uv.by_index);
-			ufbxt_assert(mesh->vertex_uv.num_elements == set->vertex_uv.num_elements);
+			ufbxt_assert(mesh->vertex_uv.num_values == set->vertex_uv.num_values);
 		}
 		ufbxt_check_string(set->name);
 		ufbxt_check_vertex_element(scene, mesh, &set->vertex_uv, sizeof(ufbx_vec2));
@@ -271,10 +283,12 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 
 	for (size_t i = 0; i < mesh->color_sets.count; i++) {
 		ufbx_color_set *set = &mesh->color_sets.data[i];
+		ufbxt_assert(set->vertex_color.value_reals == 4);
+
 		if (i == 0) {
 			ufbxt_assert(mesh->vertex_color.data == set->vertex_color.data);
 			ufbxt_assert(mesh->vertex_color.by_index == set->vertex_color.by_index);
-			ufbxt_assert(mesh->vertex_color.num_elements == set->vertex_color.num_elements);
+			ufbxt_assert(mesh->vertex_color.num_values == set->vertex_color.num_values);
 		}
 		ufbxt_check_string(set->name);
 		ufbxt_check_vertex_element(scene, mesh, &set->vertex_color, sizeof(ufbx_vec4));

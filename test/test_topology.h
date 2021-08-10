@@ -21,7 +21,7 @@ void ufbxt_check_generated_normals(ufbx_mesh *mesh, ufbxt_diff_error *err, size_
 	ufbx_vertex_vec3 new_normals = { 0 };
 	new_normals.data = normals;
 	new_normals.by_index = normal_indices;
-	new_normals.num_elements = num_normals;
+	new_normals.num_values = num_normals;
 
 	for (size_t i = 0; i < mesh->num_indices; i++) {
 		ufbx_vec3 fn = ufbx_get_by_index_vec3(&mesh->vertex_normal, i);
@@ -64,5 +64,23 @@ UFBXT_FILE_TEST(maya_planar_ngon)
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
 	ufbxt_check_generated_normals(mesh, err, 0);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_subsurf_cube)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST(maya_subsurf_cube_crease)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST(blender_293_suzanne_subsurf)
+#if UFBXT_IMPL
+{
 }
 #endif

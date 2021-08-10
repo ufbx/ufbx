@@ -2004,6 +2004,10 @@ static const char ufbxi_Weights[] = "Weights";
 static const char ufbxi_X[] = "X";
 static const char ufbxi_Y[] = "Y";
 static const char ufbxi_Z[] = "Z";
+static const char ufbxi_PreviewDivisionLevels[] = "PreviewDivisionLevels";
+static const char ufbxi_RenderDivisionLevels[] = "RenderDivisionLevels";
+static const char ufbxi_Smoothness[] = "Smoothness";
+static const char ufbxi_BoundaryRule[] = "BoundaryRule";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, sizeof(ufbxi_AllSame) - 1 },
@@ -2205,6 +2209,10 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_X, sizeof(ufbxi_X) - 1 },
 	{ ufbxi_Y, sizeof(ufbxi_Y) - 1 },
 	{ ufbxi_Z, sizeof(ufbxi_Z) - 1 },
+	{ ufbxi_PreviewDivisionLevels, sizeof(ufbxi_PreviewDivisionLevels) - 1 },
+	{ ufbxi_RenderDivisionLevels, sizeof(ufbxi_RenderDivisionLevels) - 1 },
+	{ ufbxi_Smoothness, sizeof(ufbxi_Smoothness) - 1 },
+	{ ufbxi_BoundaryRule, sizeof(ufbxi_BoundaryRule) - 1 },
 };
 
 // -- Type definitions
@@ -5333,7 +5341,7 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 
 	mesh->vertex_position.data = (ufbx_vec3*)vertices->data;
 	mesh->vertex_position.by_index = index_data;
-	mesh->vertex_position.num_elements = mesh->num_vertices;
+	mesh->vertex_position.num_values = mesh->num_vertices;
 
 	// Vertex positions are always consecutive by vertex
 	uc->max_consecutive_indices = ufbxi_max_sz(uc->max_consecutive_indices, mesh->num_vertices);
@@ -5446,6 +5454,14 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 	ufbxi_check(mesh->uv_sets.data);
 	ufbxi_check(mesh->color_sets.data);
 
+	mesh->vertex_position.value_reals = 3;
+	mesh->vertex_normal.value_reals = 3;
+	mesh->vertex_uv.value_reals = 2;
+	mesh->vertex_tangent.value_reals = 3;
+	mesh->vertex_bitangent.value_reals = 3;
+	mesh->vertex_color.value_reals = 4;
+	mesh->vertex_crease.value_reals = 1;
+
 	size_t num_bitangents_read = 0, num_tangents_read = 0;
 	ufbxi_for (ufbxi_node, n, node->children, node->num_children) {
 		if (n->name[0] != 'L') continue; // All names start with 'LayerElement*'
@@ -5453,20 +5469,27 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 		if (n->name == ufbxi_LayerElementNormal) {
 			if (mesh->vertex_normal.data) continue;
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &mesh->vertex_normal.data, &mesh->vertex_normal.by_index, 
-				&mesh->vertex_normal.by_vertex, &mesh->vertex_normal.num_elements, ufbxi_Normals, ufbxi_NormalsIndex, 'r', 3));
+				&mesh->vertex_normal.by_vertex, &mesh->vertex_normal.num_values, ufbxi_Normals, ufbxi_NormalsIndex, 'r', 3));
 		} else if (n->name == ufbxi_LayerElementBinormal) {
 			ufbxi_tangent_layer *layer = &bitangents[num_bitangents_read++];
+			layer->elem.value_reals = 3;
+
 			ufbxi_ignore(ufbxi_get_val1(n, "I", &layer->index));
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &layer->elem.data ,&layer->elem.by_index,
-				&layer->elem.by_vertex, &layer->elem.num_elements, ufbxi_Binormals, ufbxi_BinormalsIndex, 'r', 3));
+				&layer->elem.by_vertex, &layer->elem.num_values, ufbxi_Binormals, ufbxi_BinormalsIndex, 'r', 3));
 
 		} else if (n->name == ufbxi_LayerElementTangent) {
 			ufbxi_tangent_layer *layer = &tangents[num_tangents_read++];
+			layer->elem.value_reals = 3;
+
 			ufbxi_ignore(ufbxi_get_val1(n, "I", &layer->index));
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &layer->elem.data, &layer->elem.by_index,
-				&layer->elem.by_vertex, &layer->elem.num_elements, ufbxi_Tangents, ufbxi_TangentsIndex, 'r', 3));
+				&layer->elem.by_vertex, &layer->elem.num_values, ufbxi_Tangents, ufbxi_TangentsIndex, 'r', 3));
 		} else if (n->name == ufbxi_LayerElementUV) {
 			ufbx_uv_set *set = &mesh->uv_sets.data[mesh->uv_sets.count++];
+			set->vertex_uv.value_reals = 2;
+			set->vertex_tangent.value_reals = 3;
+			set->vertex_bitangent.value_reals = 3;
 
 			ufbxi_ignore(ufbxi_get_val1(n, "I", &set->index));
 			if (!ufbxi_find_val1(n, ufbxi_Name, "S", &set->name)) {
@@ -5474,9 +5497,10 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 			}
 
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &set->vertex_uv.data, &set->vertex_uv.by_index,
-				&set->vertex_uv.by_vertex, &set->vertex_uv.num_elements, ufbxi_UV, ufbxi_UVIndex, 'r', 2));
+				&set->vertex_uv.by_vertex, &set->vertex_uv.num_values, ufbxi_UV, ufbxi_UVIndex, 'r', 2));
 		} else if (n->name == ufbxi_LayerElementColor) {
 			ufbx_color_set *set = &mesh->color_sets.data[mesh->color_sets.count++];
+			set->vertex_color.value_reals = 4;
 
 			ufbxi_ignore(ufbxi_get_val1(n, "I", &set->index));
 			if (!ufbxi_find_val1(n, ufbxi_Name, "S", &set->name)) {
@@ -5484,10 +5508,10 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 			}
 
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &set->vertex_color.data, &set->vertex_color.by_index,
-				&set->vertex_color.by_vertex, &set->vertex_color.num_elements, ufbxi_Colors, ufbxi_ColorIndex, 'r', 4));
+				&set->vertex_color.by_vertex, &set->vertex_color.num_values, ufbxi_Colors, ufbxi_ColorIndex, 'r', 4));
 		} else if (n->name == ufbxi_LayerElementVertexCrease) {
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &mesh->vertex_crease.data, &mesh->vertex_crease.by_index,
-				&mesh->vertex_crease.by_vertex, &mesh->vertex_crease.num_elements, ufbxi_VertexCrease, ufbxi_VertexCreaseIndex, 'r', 1));
+				&mesh->vertex_crease.by_vertex, &mesh->vertex_crease.num_values, ufbxi_VertexCrease, ufbxi_VertexCreaseIndex, 'r', 1));
 		} else if (n->name == ufbxi_LayerElementEdgeCrease) {
 			const char *mapping;
 			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "C", (char**)&mapping));
@@ -5636,6 +5660,23 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 		tex_list->count = num_textures;
 		tex_list->data = ufbxi_make_array(&uc->tmp_mesh_textures, ufbxi_tmp_mesh_texture, num_textures);
 		ufbxi_check(tex_list->data);
+	}
+
+	// Subdivision
+
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_PreviewDivisionLevels, "I", &mesh->subdivision_preview_levels));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RenderDivisionLevels, "I", &mesh->subdivision_render_levels));
+
+	int32_t smoothness, boundary;
+	if (ufbxi_find_val1(node, ufbxi_Smoothness, "I", &smoothness)) {
+		if (smoothness >= 0 && smoothness <= UFBX_SUBDIVISION_DISPLAY_SMOOTH) {
+			mesh->subdivision_display_mode = (ufbx_subdivision_display_mode)smoothness;
+		}
+	}
+	if (ufbxi_find_val1(node, ufbxi_BoundaryRule, "I", &boundary)) {
+		if (boundary >= 0 && boundary <= UFBX_SUBDIVISION_BOUNDARY_CREASE_EDGES - 1) {
+			mesh->subdivision_boundary = (ufbx_subdivision_boundary)(boundary + 1);
+		}
 	}
 
 	return 1;
@@ -10698,7 +10739,7 @@ static void ufbxi_update_camera(ufbx_camera *camera)
 		effective_fit = aspect_ratio > film_ratio ? UFBX_GATE_FIT_HORIZONTAL : UFBX_GATE_FIT_VERTICAL;
 	}
 
-	switch (camera->gate_fit) {
+	switch (effective_fit) {
 	case UFBX_GATE_FIT_NONE:
 		camera->aperture_size_inch = camera->film_size_inch;
 		break;
@@ -12024,8 +12065,12 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 		if (mesh->blend_shapes.count == 0 && mesh->skins.count == 0) continue;
 
 		size_t num_vertices = mesh->num_vertices;
-		ufbx_vec3 *result_pos = ufbxi_push_copy(buf_result, ufbx_vec3, num_vertices, mesh->vertices);
+		ufbx_vec3 *result_pos = ufbxi_push(buf_result, ufbx_vec3, num_vertices + 1);
 		ufbxi_check_err(error, result_pos);
+
+		result_pos[0] = ufbx_zero_vec3;
+		result_pos++;
+		memcpy(result_pos, mesh->vertices, num_vertices * sizeof(ufbx_vec3));
 
 		ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, mesh->blend_shapes) {
 			ufbx_add_blend_vertex_offsets(*p_blend, result_pos, num_vertices, 1.0f);
@@ -12058,14 +12103,17 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 			mesh->skinned_normal.by_vertex = NULL;
 		}
 
-		ufbx_vec3 *normal_data = ufbxi_push(buf_result, ufbx_vec3, num_normals);
+		ufbx_vec3 *normal_data = ufbxi_push(buf_result, ufbx_vec3, num_normals + 1);
 		ufbxi_check_err(error, normal_data);
+
+		normal_data[0] = ufbx_zero_vec3;
+		normal_data++;
 
 		ufbx_compute_normals(mesh, &mesh->skinned_position, normal_indices, normal_data, num_normals);
 
 		mesh->skinned_normal.data = normal_data;
 		mesh->skinned_normal.by_index = normal_indices;
-		mesh->skinned_normal.num_elements = num_normals;
+		mesh->skinned_normal.num_values = num_normals;
 	}
 
 	return 1;
@@ -13495,14 +13543,44 @@ static bool ufbxi_is_edge_smooth(ufbx_mesh *mesh, ufbx_topo_index *indices, int3
 	if (!mesh->edge_smoothing && !mesh->face_smoothing && mesh->vertex_normal.data) {
 		int32_t twin = indices[index].twin;
 		if (twin >= 0) {
-			int32_t pair = indices[twin].next;
-			ufbx_vec3 na = ufbx_get_by_index_vec3(&mesh->vertex_normal, index);
-			ufbx_vec3 nb = ufbx_get_by_index_vec3(&mesh->vertex_normal, pair);
-			if (na.x == nb.x && na.y == nb.y && na.z == nb.z) return true;
+			ufbx_vec3 a0 = ufbx_get_by_index_vec3(&mesh->vertex_normal, index);
+			ufbx_vec3 a1 = ufbx_get_by_index_vec3(&mesh->vertex_normal, indices[index].next);
+			ufbx_vec3 b0 = ufbx_get_by_index_vec3(&mesh->vertex_normal, indices[twin].next);
+			ufbx_vec3 b1 = ufbx_get_by_index_vec3(&mesh->vertex_normal, twin);
+			if (a0.x == b0.x && a0.y == b0.y && a0.z == b0.z) return true;
+			if (a1.x == b1.x && a1.y == b1.y && a1.z == b1.z) return true;
 		}
 	}
 
 	return false;
+}
+
+static bool ufbxi_is_edge_split(const ufbx_vertex_attrib *attrib, ufbx_topo_index *topo, int32_t index)
+{		  
+	int32_t twin = topo[index].twin;
+	if (twin >= 0) {
+		int32_t a0 = attrib->by_index[index];
+		int32_t a1 = attrib->by_index[topo[index].next];
+		int32_t b0 = attrib->by_index[topo[twin].next];
+		int32_t b1 = attrib->by_index[twin];
+		if (a0 == b0 && a1 == b1) return false;
+		size_t num_reals = attrib->value_reals;
+		size_t size = sizeof(ufbx_real) * num_reals;
+		ufbx_real *da0 = (ufbx_real*)attrib->data + a0 * num_reals;
+		ufbx_real *da1 = (ufbx_real*)attrib->data + a1 * num_reals;
+		ufbx_real *db0 = (ufbx_real*)attrib->data + b0 * num_reals;
+		ufbx_real *db1 = (ufbx_real*)attrib->data + b1 * num_reals;
+		if (!memcmp(da0, db0, size) && !memcmp(da1, db1, size)) return false;
+	}
+
+	return true;
+}
+
+static ufbx_real ufbxi_edge_crease(ufbx_mesh *mesh, ufbx_topo_index *topo, int32_t index)
+{
+	if (topo[index].twin < 0) return 1.0f;
+	if (mesh->edge_crease && topo[index].edge >= 0) return mesh->edge_crease[topo[index].edge] * 10.0f;
+	return 0.0f;
 }
 
 // -- File IO
@@ -14915,12 +14993,14 @@ size_t ufbx_generate_normal_mapping(ufbx_mesh *mesh, ufbx_topo_index *indices, u
 	for (size_t vi = 0; vi < mesh->num_vertices; vi++) {
 		int32_t original_start = vertices[vi].first_index;
 		if (original_start < 0) continue;
-		int32_t start = original_start;
+		int32_t start = original_start, cur = start;
+
 		for (;;) {
-			if (!ufbxi_is_edge_smooth(mesh, indices, start)) break;
-			int32_t prev = ufbx_topo_next_vertex_edge(indices, start);
-			if (prev < 0 || prev == original_start) break;
-			start = prev;
+			int32_t prev = ufbx_topo_next_vertex_edge(indices, cur);
+			if (!ufbxi_is_edge_smooth(mesh, indices, cur)) start = cur;
+			if (prev < 0) { start = cur; break; }
+			if (prev == original_start) break;
+			cur = prev;
 		}
 
 		normal_indices[start] = next_index++;
@@ -14967,6 +15047,361 @@ void ufbx_compute_normals(ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, in
 			normals[i].z /= len;
 		}
 	}
+}
+
+void ufbx_subdivide_layer(ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufbx_vertex_attrib *layer, ufbx_topo_index *topo, ufbx_topo_vertex *topo_vertices, const ufbx_subdivide_opts *opts)
+{
+	int32_t *edge_indices = malloc(mesh->num_indices * sizeof(int32_t));
+
+	size_t num_edge_values = 0;
+	for (int32_t ix = 0; ix < mesh->num_indices; ix++) {
+		int32_t twin = topo[ix].twin;
+		if (twin >= 0 && twin < ix && !ufbxi_is_edge_split(layer, topo, ix)) {
+			edge_indices[ix] = edge_indices[twin];
+		} else {
+			edge_indices[ix] = (int32_t)num_edge_values++;
+		}
+	}
+
+	size_t reals = layer->value_reals;
+
+	ufbx_real *values = malloc((num_edge_values + mesh->num_faces + mesh->num_indices) * reals * sizeof(ufbx_real));
+
+	ufbx_real *face_values = values;
+	ufbx_real *edge_values = face_values + mesh->num_faces * reals;
+	ufbx_real *vertex_values = edge_values + num_edge_values * reals;
+
+	size_t num_vertex_values = 0;
+
+	int32_t *vertex_indices = malloc(mesh->num_indices * sizeof(int32_t));
+
+	// Mark unused indices as -1 so we can patch non-manifold
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		vertex_indices[i] = -1;
+	}
+
+	// Face points
+	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
+		ufbx_face face = mesh->faces[fi];
+		ufbx_real *dst = face_values + fi * reals;
+
+		for (size_t i = 0; i < reals; i++) dst[i] = 0.0f;
+
+		for (uint32_t ci = 0; ci < face.num_indices; ci++) {
+			int32_t ix = (int32_t)(face.index_begin + ci);
+			ufbx_real *value = layer->data + layer->by_index[ix] * reals;
+			for (size_t i = 0; i < reals; i++) dst[i] += value[i];
+		}
+
+		ufbx_real weight = 1.0f / face.num_indices;
+		for (size_t i = 0; i < reals; i++) dst[i] *= weight;
+	}
+
+	// Edge points
+	for (int32_t ix = 0; ix < mesh->num_indices; ix++) {
+		ufbx_real *dst = edge_values + edge_indices[ix] * reals;
+
+		int32_t twin = topo[ix].twin;
+		bool split = ufbxi_is_edge_split(layer, topo, ix);
+
+		ufbx_real crease = 0.0f;
+		if (split) {
+			crease = 1.0f;
+		} else if (topo[ix].edge >= 0 && mesh->edge_crease) {
+			crease = mesh->edge_crease[topo[ix].edge] * 10.0f;
+		}
+
+		ufbx_real *v0 = layer->data + layer->by_index[ix] * reals;
+		ufbx_real *v1 = layer->data + layer->by_index[topo[ix].next] * reals;
+
+		if (twin >= 0 && topo[ix].twin < ix && !split) {
+			// Already calculated
+		} else if (crease <= 0.0f) {
+			ufbx_real *f0 = face_values + topo[ix].face * reals;
+			ufbx_real *f1 = face_values + topo[twin].face * reals;
+			for (size_t i = 0; i < reals; i++) dst[i] = (v0[i] + v1[i] + f0[i] + f1[i]) * 0.25f;
+		} else if (crease >= 1.0f) {
+			for (size_t i = 0; i < reals; i++) dst[i] = (v0[i] + v1[i]) * 0.5f;
+		} else if (crease < 1.0f) {
+			ufbx_real *f0 = face_values + topo[ix].face * reals;
+			ufbx_real *f1 = face_values + topo[twin].face * reals;
+			for (size_t i = 0; i < reals; i++) {
+				ufbx_real smooth = (v0[i] + v1[i] + f0[i] + f1[i]) * 0.25f;
+				ufbx_real hard = (v0[i] + v1[i]) * 0.5f;
+				dst[i] = smooth * (1.0f - crease) + hard * crease;
+			}
+		}
+	}
+
+	// Vertex points
+	for (size_t vi = 0; vi < mesh->num_vertices; vi++) {
+		int32_t original_start = topo_vertices[vi].first_index;
+		if (original_start < 0) continue;
+
+		// Find a topological boundary, or if not found a split edge
+		int32_t start = original_start;
+		for (int32_t cur = start;;) {
+			int32_t prev = ufbx_topo_prev_vertex_edge(topo, cur);
+			if (ufbxi_is_edge_split(layer, topo, cur)) start = cur; // Split edge: Consider as start
+			if (prev < 0) { start = cur; break; } // Topological boundary: Stop and use as start
+			if (prev == original_start) break; // Loop: Stop, use original start or split if found
+			cur = prev;
+		}
+
+		while (start >= 0) {
+			int32_t value_index = (int32_t)num_vertex_values++;
+			ufbx_real *dst = vertex_values + value_index * reals;
+
+			// We need to compute the average crease value and keep track of
+			// two creased edges, if there's more we use the corner rule that
+			// does not need the information.
+			ufbx_real total_crease = 0.0f;
+			size_t num_crease = 0;
+			int32_t edge_points[2];
+
+			// At start we always have two edges and a single face
+			int32_t start_prev = topo[start].prev;
+			int32_t end_edge = topo[start_prev].twin;
+			size_t valence = 2;
+
+			const ufbx_real *v0 = layer->data + layer->by_index[start] * reals;
+
+			{
+				const ufbx_real *e0 = layer->data + layer->by_index[topo[start].next] * reals;
+				const ufbx_real *e1 = layer->data + layer->by_index[start_prev] * reals;
+				const ufbx_real *f0 = face_values + topo[start].face * reals;
+				for (size_t i = 0; i < reals; i++) dst[i] = e0[i] + e1[i] + f0[i];
+
+				// Either of the first two edges may be creased
+				ufbx_real start_crease = ufbxi_edge_crease(mesh, topo, start);
+				if (start_crease > 0.0f) {
+					total_crease += start_crease;
+					edge_points[num_crease++] = topo[start].next;
+				}
+				ufbx_real prev_crease = ufbxi_edge_crease(mesh, topo, start_prev);
+				if (prev_crease > 0.0f) {
+					total_crease += prev_crease;
+					edge_points[num_crease++] = start_prev;
+				}
+			}
+
+			vertex_indices[start] = value_index;
+
+			// Follow vertex edges until we either hit a topological/split boundary
+			// or loop back to the left edge we accounted for in `start_prev`
+			int32_t cur = start;
+			for (;;) {
+				cur = ufbx_topo_next_vertex_edge(topo, cur);
+
+				// Topological boundary: Finished
+				if (cur < 0) {
+					start = -1;
+					break;
+				}
+
+				vertex_indices[cur] = value_index;
+
+				// Looped: Add the face from the other side still
+				if (cur == end_edge) {
+					const ufbx_real *f0 = face_values + topo[cur].face * reals;
+					for (size_t i = 0; i < reals; i++) dst[i] += f0[i];
+					start = -1;
+					break;
+				}
+
+				// Add the edge crease, this also handles boundaries as they
+				// have an implicit crease of 1.0 using `ufbxi_edge_crease()`
+				ufbx_real cur_crease = ufbxi_edge_crease(mesh, topo, cur);
+				if (cur_crease > 0.0f) {
+					total_crease += cur_crease;
+					if (num_crease < 2) edge_points[num_crease] = topo[cur].next;
+					num_crease++;
+				}
+
+				// Add the new edge and face to the sum
+				const ufbx_real *e0 = layer->data + layer->by_index[topo[cur].next] * reals;
+				const ufbx_real *f0 = face_values + topo[cur].face * reals;
+				for (size_t i = 0; i < reals; i++) dst[i] += e0[i] + f0[i];
+				valence++;
+
+				// If we landed at a split edge advance to the next one
+				// and continue from there in the outer loop
+				if (ufbxi_is_edge_split(layer, topo, cur)) {
+					start = ufbx_topo_next_vertex_edge(topo, cur);
+				}
+			}
+
+			// Weights for various subdivision masks
+			ufbx_real fe_weight = 1.0f / (ufbx_real)(valence*valence);
+			ufbx_real v_weight = (ufbx_real)(valence - 2) / (ufbx_real)valence;
+
+			// Select the right subdivision mask depending on valence and crease
+			// TODO: Different rules for vertices and UVs
+			if (num_crease > 2 || (valence == 2 && opts->boundary == UFBX_SUBDIVISION_BOUNDARY_CREASE_CORNERS)) {
+				// Corner: Copy as-is
+				for (size_t i = 0; i < reals; i++) dst[i] = v0[i];
+			} else if (num_crease == 2) {
+				// Boundary: Interpolate edge
+				ufbx_real *e0 = layer->data + layer->by_index[edge_points[0]] * reals;
+				ufbx_real *e1 = layer->data + layer->by_index[edge_points[1]] * reals;
+
+				total_crease *= 0.5f;
+				if (total_crease < 0.0f) total_crease = 0.0f;
+				if (total_crease > 1.0f) total_crease = 1.0f;
+
+				for (size_t i = 0; i < reals; i++) {
+					ufbx_real smooth = dst[i] * fe_weight + v0[i] * v_weight;
+					ufbx_real hard = (e0[i] + e1[i]) * 0.125f + v0[i] * 0.75f;
+					dst[i] = smooth * (1.0f - total_crease) + hard * total_crease;
+				}
+			} else {
+				// Regular: Weighted sum with the accumulated edge/face points
+				for (size_t i = 0; i < reals; i++) {
+					dst[i] = dst[i] * fe_weight + v0[i] * v_weight;
+				}
+			}
+		}
+	}
+
+	// Copy non-manifold vertex values as-is
+	for (size_t old_ix = 0; old_ix < mesh->num_indices; old_ix++) {
+		int32_t ix = vertex_indices[old_ix];
+		if (ix < 0) {
+			ix = (int32_t)num_vertex_values++;
+			vertex_indices[old_ix] = ix;
+			const ufbx_real *src = layer->data + layer->by_index[old_ix] * reals;
+			ufbx_real *dst = vertex_values + ix * reals;
+			for (size_t i = 0; i < reals; i++) dst[i] = src[i];
+		}
+	}
+
+	int32_t *new_indices = malloc(mesh->num_indices * 4 * sizeof(int32_t));
+
+	int32_t face_start = 0;
+	int32_t edge_start = (int32_t)(face_start + mesh->num_faces);
+	int32_t vert_start = (int32_t)(edge_start + num_edge_values);
+	int32_t *p_ix = new_indices;
+	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
+		p_ix[0] = vert_start + vertex_indices[ix];
+		p_ix[1] = edge_start + edge_indices[ix];
+		p_ix[2] = face_start + topo[ix].face;
+		p_ix[3] = edge_start + edge_indices[topo[ix].prev];
+		p_ix += 4;
+	}
+
+	size_t num_values = num_edge_values + mesh->num_faces + num_vertex_values;
+	ufbx_real *new_values = malloc(num_values * reals * sizeof(ufbx_real));
+	memcpy(new_values, values, num_values * reals * sizeof(ufbx_real));
+	free(values);
+
+	result->data = new_values;
+	result->by_index = new_indices;
+	result->by_vertex = NULL;
+	result->num_values = num_values;
+	result->value_reals = layer->value_reals;
+}
+
+ufbx_mesh *ufbx_subdivide_mesh(ufbx_mesh *mesh, const ufbx_subdivide_opts *user_opts)
+{
+	ufbx_subdivide_opts opts = { 0 };
+	if (user_opts) {
+		opts = *user_opts;
+	}
+
+	if (opts.boundary == UFBX_SUBDIVISION_BOUNDARY_DEFAULT) {
+		opts.boundary = mesh->subdivision_boundary;
+	}
+
+	ufbx_mesh *result = malloc(sizeof(ufbx_mesh));
+	*result = *mesh;
+
+	ufbx_topo_index *topo = malloc(mesh->num_indices * sizeof(ufbx_topo_index));
+	ufbx_topo_vertex *topo_vertices = malloc(mesh->num_vertices * sizeof(ufbx_topo_vertex));
+	ufbx_get_mesh_topology(mesh, topo, topo_vertices);
+	ufbx_subdivide_layer(mesh, (ufbx_vertex_attrib*)&result->vertex_position, (ufbx_vertex_attrib*)&mesh->vertex_position, topo, topo_vertices, &opts);
+
+	mesh->num_vertices = result->vertex_position.num_values;
+
+	result->num_indices = mesh->num_indices * 4;
+	result->num_faces = mesh->num_indices;
+	result->faces = malloc(result->num_faces * sizeof(ufbx_face));
+
+	// TODO: Calculate normals
+
+	if (mesh->face_material) {
+		result->face_material = malloc(result->num_faces * sizeof(int32_t));
+	}
+	if (mesh->face_smoothing) {
+		result->face_smoothing = malloc(result->num_faces * sizeof(bool));
+	}
+
+	size_t fi = 0;
+	for (size_t i = 0; i < mesh->num_faces; i++) {
+		ufbx_face face = mesh->faces[i];
+		if (mesh->face_material) {
+			int32_t mat = mesh->face_material[i];
+			for (size_t ci = 0; ci < face.num_indices; ci++) {
+				result->face_material[fi + ci] = mat;
+			}
+		}
+		if (mesh->face_smoothing) {
+			bool flag = mesh->face_smoothing[i];
+			for (size_t ci = 0; ci < face.num_indices; ci++) {
+				result->face_smoothing[fi + ci] = flag;
+			}
+		}
+		fi += face.num_indices;
+	}
+
+	for (size_t i = 0; i < result->num_faces; i++) {
+		result->faces[i].index_begin = (uint32_t)(i * 4);
+		result->faces[i].num_indices = 4;
+	}
+
+	if (mesh->edges) {
+		result->num_edges = mesh->num_edges*2 + result->num_faces;
+		result->edges = malloc(result->num_edges * sizeof(ufbx_edge));
+
+		if (mesh->edge_crease) {
+			result->edge_crease = malloc(result->num_edges * sizeof(ufbx_real));
+		}
+		if (mesh->edge_smoothing) {
+			result->edge_smoothing = malloc(result->num_edges * sizeof(bool));
+		}
+
+		size_t di = 0;
+		for (size_t i = 0; i < mesh->num_edges; i++) {
+			ufbx_edge edge = mesh->edges[i];
+			int32_t face_ix = topo[edge.indices[0]].face;
+			ufbx_face face = mesh->faces[face_ix];
+			int32_t offset = edge.indices[0] - face.index_begin;
+			int32_t next = (offset + 1) % (int32_t)face.num_indices;
+
+			int32_t a = (face_ix + offset) * 4;
+			int32_t b = (face_ix + next) * 4;
+
+			result->edges[di + 0].indices[0] = a;
+			result->edges[di + 0].indices[1] = a + 1;
+			result->edges[di + 1].indices[2] = b + 3;
+			result->edges[di + 1].indices[3] = b;
+
+			if (mesh->edge_crease) {
+				ufbx_real crease = mesh->edge_crease[i] - 1.0f;
+				if (crease < 0.0f) crease = 0.0f;
+				result->edge_crease[di + 0] = crease;
+				result->edge_crease[di + 1] = crease;
+			}
+
+			if (mesh->edge_smoothing) {
+				result->edge_smoothing[di + 0] = mesh->edge_smoothing[i];
+				result->edge_smoothing[di + 1] = mesh->edge_smoothing[i];
+			}
+
+			di++;
+		}
+	}
+
+	return result;
 }
 
 #if 0
@@ -15178,4 +15613,3 @@ size_t ufbx_triangulate(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, 
 #elif defined(__GNUC__)
 	#pragma GCC diagnostic pop
 #endif
-

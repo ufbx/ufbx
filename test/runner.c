@@ -433,6 +433,29 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
 	return obj;
 }
 
+static void ufbxt_debug_dump_obj(const char *file, ufbx_node *node, ufbx_mesh *mesh)
+{
+	FILE *f = fopen(file, "wb");
+	ufbxt_assert(f);
+
+	for (size_t i = 0; i < mesh->vertex_position.num_values; i++) {
+		ufbx_vec3 v = mesh->vertex_position.data[i];
+		v = ufbx_transform_position(&node->geometry_to_world, v);
+		fprintf(f, "v %f %f %f\n", v.x, v.y, v.z);
+	}
+
+	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
+		ufbx_face face = mesh->faces[fi];
+		fprintf(f, "f");
+		for (size_t ci = 0; ci < face.num_indices; ci++) {
+			fprintf(f, " %d", mesh->vertex_position.by_index[face.index_begin + ci] + 1);
+		}
+		fprintf(f, "\n");
+	}
+
+	fclose(f);
+}
+
 typedef struct {
 	size_t num;
 	ufbx_real sum;
@@ -469,6 +492,15 @@ static void ufbxt_assert_close_vec4(ufbxt_diff_error *p_err, ufbx_vec4 a, ufbx_v
 	ufbxt_assert_close_real(p_err, a.w, b.w);
 }
 
+static int ufbxt_cmp_vec3(const void *va, const void *vb)
+{
+	const ufbx_vec3 *a = (const ufbx_vec3*)va, *b = (const ufbx_vec3*)vb;
+	if (a->x != b->x) return a->x < b->x ? -1 : +1;
+	if (a->y != b->y) return a->y < b->y ? -1 : +1;
+	if (a->z != b->z) return a->z < b->z ? -1 : +1;
+	return 0;
+}
+
 static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, bool check_deformed_normals)
 {
 	for (size_t mesh_i = 0; mesh_i < obj->num_meshes; mesh_i++) {
@@ -480,11 +512,65 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		ufbx_mesh *mesh = node->mesh;
 		ufbxt_assert(mesh);
 
+		ufbx_matrix *mat = &node->geometry_to_world;
+		ufbx_matrix norm_mat = ufbx_get_compatible_normal_matrix(node);
+
+		if (mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_SMOOTH || mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_HULL_AND_SMOOTH) {
+			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, NULL);
+
+			ufbxt_assert(sub_mesh->num_faces == obj_mesh->num_faces);
+			ufbxt_assert(sub_mesh->num_indices == obj_mesh->num_indices);
+
+			// Check that all vertices exist, anything more doesn't really make sense
+			ufbx_vec3 *obj_verts = (ufbx_vec3*)malloc(obj_mesh->num_indices * sizeof(ufbx_vec3));
+			ufbx_vec3 *sub_verts = (ufbx_vec3*)malloc(sub_mesh->num_indices * sizeof(ufbx_vec3));
+			ufbxt_assert(obj_verts && sub_verts);
+
+			for (size_t i = 0; i < obj_mesh->num_indices; i++) {
+				obj_verts[i] = ufbx_get_by_index_vec3(&obj_mesh->vertex_position, i);
+			}
+			for (size_t i = 0; i < sub_mesh->num_indices; i++) {
+				ufbx_vec3 fp = ufbx_get_by_index_vec3(&sub_mesh->vertex_position, i);
+				fp = ufbx_transform_position(mat, fp);
+				sub_verts[i] = fp;
+			}
+
+			qsort(obj_verts, obj_mesh->num_indices, sizeof(ufbx_vec3), &ufbxt_cmp_vec3);
+			qsort(sub_verts, sub_mesh->num_indices, sizeof(ufbx_vec3), &ufbxt_cmp_vec3);
+
+			for (int32_t i = (int32_t)sub_mesh->num_indices - 1; i >= 0; i--) {
+				ufbx_vec3 v = sub_verts[i];
+
+				bool found = false;
+				for (int32_t j = i; j >= 0 && obj_verts[j].x >= v.x - 0.002f; j--) {
+					ufbx_real dx = obj_verts[j].x - v.x;
+					ufbx_real dy = obj_verts[j].y - v.y;
+					ufbx_real dz = obj_verts[j].z - v.z;
+					ufbxt_assert(dx <= 0.002f);
+					ufbx_real err = (ufbx_real)sqrt(dx*dx + dy*dy + dz*dz);
+					if (err < 0.001f) {
+						if (err > p_err->max) p_err->max = err;
+						p_err->sum += err;
+						p_err->num++;
+
+						obj_verts[j] = obj_verts[i];
+						found = true;
+						break;
+					}
+				}
+
+				ufbxt_assert(found);
+			}
+
+			free(obj_verts);
+			free(sub_verts);
+
+			continue;
+		}
+
 		ufbxt_assert(obj_mesh->num_faces == mesh->num_faces);
 		ufbxt_assert(obj_mesh->num_indices == mesh->num_indices);
 
-		ufbx_matrix *mat = &node->geometry_to_world;
-		ufbx_matrix norm_mat = ufbx_get_compatible_normal_matrix(node);
 
 		// Assume that the indices are in the same order!
 		for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {

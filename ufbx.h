@@ -439,23 +439,25 @@ struct ufbx_node {
 
 // Vertex attribute: All attributes are stored in a consistent indexed format
 // regardless of how it's actually stored in the file.
-// `data` is a contiguous array of `num_elements` attribute values.
+// `data` is a contiguous array of `num_values` attribute values.
 // `by_index` maps each mesh index into a value in the `data` array.
 // _If_ the vertex element is specified uniquely per logical vertex you can 
 // get the per-vertex value through `by_vertex[vertex_index]`.
-typedef struct ufbx_vertex_void {
-	void *data;
+typedef struct ufbx_vertex_attrib {
+	ufbx_real *data;
 	int32_t *by_index;
 	int32_t *by_vertex;
-	size_t num_elements;
-} ufbx_vertex_void;
+	size_t num_values;
+	size_t value_reals;
+} ufbx_vertex_attrib;
 
 // 1D vertex attribute, see `ufbx_vertex_void` for information
 typedef struct ufbx_vertex_real {
 	ufbx_real *data;
 	int32_t *by_index;
 	int32_t *by_vertex;
-	size_t num_elements;
+	size_t num_values;
+	size_t value_reals;
 } ufbx_vertex_real;
 
 // 2D vertex attribute, see `ufbx_vertex_void` for information
@@ -463,7 +465,8 @@ typedef struct ufbx_vertex_vec2 {
 	ufbx_vec2 *data;
 	int32_t *by_index;
 	int32_t *by_vertex;
-	size_t num_elements;
+	size_t num_values;
+	size_t value_reals;
 } ufbx_vertex_vec2;
 
 // 3D vertex attribute, see `ufbx_vertex_void` for information
@@ -471,7 +474,8 @@ typedef struct ufbx_vertex_vec3 {
 	ufbx_vec3 *data;
 	int32_t *by_index;
 	int32_t *by_vertex;
-	size_t num_elements;
+	size_t num_values;
+	size_t value_reals;
 } ufbx_vertex_vec3;
 
 // 4D vertex attribute, see `ufbx_vertex_void` for information
@@ -479,7 +483,8 @@ typedef struct ufbx_vertex_vec4 {
 	ufbx_vec4 *data;
 	int32_t *by_index;
 	int32_t *by_vertex;
-	size_t num_elements;
+	size_t num_values;
+	size_t value_reals;
 } ufbx_vertex_vec4;
 
 // Vertex UV set/layer
@@ -535,6 +540,20 @@ typedef struct ufbx_mesh_material {
 } ufbx_mesh_material;
 
 UFBX_LIST_TYPE(ufbx_mesh_material_list, ufbx_mesh_material);
+
+typedef enum ufbx_subdivision_display_mode {
+	UFBX_SUBDIVISION_DISPLAY_DISABLED,
+	UFBX_SUBDIVISION_DISPLAY_HULL,
+	UFBX_SUBDIVISION_DISPLAY_HULL_AND_SMOOTH,
+	UFBX_SUBDIVISION_DISPLAY_SMOOTH,
+} ufbx_subdivision_display_mode;
+
+typedef enum ufbx_subdivision_boundary {
+	UFBX_SUBDIVISION_BOUNDARY_DEFAULT,
+	UFBX_SUBDIVISION_BOUNDARY_LEGACY,
+	UFBX_SUBDIVISION_BOUNDARY_CREASE_EDGES,
+	UFBX_SUBDIVISION_BOUNDARY_CREASE_CORNERS,
+} ufbx_subdivision_boundary;
 
 // Polygonal mesh geometry.
 //
@@ -645,6 +664,12 @@ struct ufbx_mesh {
 	ufbx_blend_deformer_list blend_shapes;
 	ufbx_cache_deformer_list geometry_caches;
 	ufbx_element_list all_deformers;
+
+	// Subdivision
+	int32_t subdivision_preview_levels;
+	int32_t subdivision_render_levels;
+	ufbx_subdivision_display_mode subdivision_display_mode;
+	ufbx_subdivision_boundary subdivision_boundary;
 };
 
 typedef enum ufbx_light_type {
@@ -1510,6 +1535,24 @@ typedef struct ufbx_evaluate_opts {
 
 } ufbx_evaluate_opts;
 
+typedef struct ufbx_subdivide_opts {
+
+	ufbx_allocator temp_allocator;   // < Allocator used during evaluation
+	ufbx_allocator result_allocator; // < Allocator used for the final scene
+
+	ufbx_subdivision_boundary boundary;
+
+	// Limits
+	// TODO Move these to `ufbx_allocator`...
+	size_t max_temp_memory;
+	size_t max_result_memory;
+	size_t max_temp_allocs;
+	size_t max_result_allocs;
+	size_t temp_huge_size;
+	size_t result_huge_size;
+
+} ufbx_subdivide_opts;
+
 // -- API
 
 #ifdef __cplusplus
@@ -1646,6 +1689,8 @@ ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_
 
 size_t ufbx_generate_normal_mapping(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo_vertex *vertices, int32_t *normal_indices);
 void ufbx_compute_normals(ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals);
+
+ufbx_mesh *ufbx_subdivide_mesh(ufbx_mesh *mesh, const ufbx_subdivide_opts *opts);
 
 // -- Inline API
 
