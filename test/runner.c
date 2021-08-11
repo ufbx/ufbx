@@ -444,11 +444,18 @@ static void ufbxt_debug_dump_obj(const char *file, ufbx_node *node, ufbx_mesh *m
 		fprintf(f, "v %f %f %f\n", v.x, v.y, v.z);
 	}
 
+	for (size_t i = 0; i < mesh->vertex_uv.num_values; i++) {
+		ufbx_vec2 v = mesh->vertex_uv.data[i];
+		fprintf(f, "vt %f %f\n", v.x, v.y);
+	}
+
 	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
 		ufbx_face face = mesh->faces[fi];
 		fprintf(f, "f");
 		for (size_t ci = 0; ci < face.num_indices; ci++) {
-			fprintf(f, " %d", mesh->vertex_position.by_index[face.index_begin + ci] + 1);
+			int32_t vi = mesh->vertex_position.by_index[face.index_begin + ci];
+			int32_t ti = mesh->vertex_uv.by_index[face.index_begin + ci];
+			fprintf(f, " %d/%d", vi + 1, ti + 1);
 		}
 		fprintf(f, "\n");
 	}
@@ -492,12 +499,19 @@ static void ufbxt_assert_close_vec4(ufbxt_diff_error *p_err, ufbx_vec4 a, ufbx_v
 	ufbxt_assert_close_real(p_err, a.w, b.w);
 }
 
-static int ufbxt_cmp_vec3(const void *va, const void *vb)
+typedef struct {
+	ufbx_vec3 pos;
+	ufbx_vec2 uv;
+} ufbxt_sub_vertex;
+
+static int ufbxt_cmp_sub_vertex(const void *va, const void *vb)
 {
-	const ufbx_vec3 *a = (const ufbx_vec3*)va, *b = (const ufbx_vec3*)vb;
-	if (a->x != b->x) return a->x < b->x ? -1 : +1;
-	if (a->y != b->y) return a->y < b->y ? -1 : +1;
-	if (a->z != b->z) return a->z < b->z ? -1 : +1;
+	const ufbxt_sub_vertex *a = (const ufbxt_sub_vertex*)va, *b = (const ufbxt_sub_vertex*)vb;
+	if (a->pos.x != b->pos.x) return a->pos.x < b->pos.x ? -1 : +1;
+	if (a->pos.y != b->pos.y) return a->pos.y < b->pos.y ? -1 : +1;
+	if (a->pos.z != b->pos.z) return a->pos.z < b->pos.z ? -1 : +1;
+	if (a->uv.x != b->uv.x) return a->uv.x < b->uv.x ? -1 : +1;
+	if (a->uv.y != b->uv.y) return a->uv.y < b->uv.y ? -1 : +1;
 	return 0;
 }
 
@@ -518,36 +532,46 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		if (mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_SMOOTH || mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_HULL_AND_SMOOTH) {
 			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, NULL);
 
+			ufbxt_debug_dump_obj("test.obj", node, sub_mesh);
+
 			ufbxt_assert(sub_mesh->num_faces == obj_mesh->num_faces);
 			ufbxt_assert(sub_mesh->num_indices == obj_mesh->num_indices);
 
 			// Check that all vertices exist, anything more doesn't really make sense
-			ufbx_vec3 *obj_verts = (ufbx_vec3*)malloc(obj_mesh->num_indices * sizeof(ufbx_vec3));
-			ufbx_vec3 *sub_verts = (ufbx_vec3*)malloc(sub_mesh->num_indices * sizeof(ufbx_vec3));
+			ufbxt_sub_vertex *obj_verts = (ufbxt_sub_vertex*)calloc(obj_mesh->num_indices, sizeof(ufbxt_sub_vertex));
+			ufbxt_sub_vertex *sub_verts = (ufbxt_sub_vertex*)calloc(sub_mesh->num_indices, sizeof(ufbxt_sub_vertex));
 			ufbxt_assert(obj_verts && sub_verts);
 
 			for (size_t i = 0; i < obj_mesh->num_indices; i++) {
-				obj_verts[i] = ufbx_get_by_index_vec3(&obj_mesh->vertex_position, i);
+				obj_verts[i].pos = ufbx_get_by_index_vec3(&obj_mesh->vertex_position, i);
+				if (obj_mesh->vertex_uv.data) {
+					obj_verts[i].uv = ufbx_get_by_index_vec2(&obj_mesh->vertex_uv, i);
+				}
 			}
 			for (size_t i = 0; i < sub_mesh->num_indices; i++) {
 				ufbx_vec3 fp = ufbx_get_by_index_vec3(&sub_mesh->vertex_position, i);
 				fp = ufbx_transform_position(mat, fp);
-				sub_verts[i] = fp;
+				sub_verts[i].pos = fp;
+				if (obj_mesh->vertex_uv.data) {
+					sub_verts[i].uv = ufbx_get_by_index_vec2(&sub_mesh->vertex_uv, i);
+				}
 			}
 
-			qsort(obj_verts, obj_mesh->num_indices, sizeof(ufbx_vec3), &ufbxt_cmp_vec3);
-			qsort(sub_verts, sub_mesh->num_indices, sizeof(ufbx_vec3), &ufbxt_cmp_vec3);
+			qsort(obj_verts, obj_mesh->num_indices, sizeof(ufbxt_sub_vertex), &ufbxt_cmp_sub_vertex);
+			qsort(sub_verts, sub_mesh->num_indices, sizeof(ufbxt_sub_vertex), &ufbxt_cmp_sub_vertex);
 
 			for (int32_t i = (int32_t)sub_mesh->num_indices - 1; i >= 0; i--) {
-				ufbx_vec3 v = sub_verts[i];
+				ufbxt_sub_vertex v = sub_verts[i];
 
 				bool found = false;
-				for (int32_t j = i; j >= 0 && obj_verts[j].x >= v.x - 0.002f; j--) {
-					ufbx_real dx = obj_verts[j].x - v.x;
-					ufbx_real dy = obj_verts[j].y - v.y;
-					ufbx_real dz = obj_verts[j].z - v.z;
+				for (int32_t j = i; j >= 0 && obj_verts[j].pos.x >= v.pos.x - 0.002f; j--) {
+					ufbx_real dx = obj_verts[j].pos.x - v.pos.x;
+					ufbx_real dy = obj_verts[j].pos.y - v.pos.y;
+					ufbx_real dz = obj_verts[j].pos.z - v.pos.z;
+					ufbx_real du = obj_verts[j].uv.x - v.uv.x;
+					ufbx_real dv = obj_verts[j].uv.y - v.uv.y;
 					ufbxt_assert(dx <= 0.002f);
-					ufbx_real err = (ufbx_real)sqrt(dx*dx + dy*dy + dz*dz);
+					ufbx_real err = (ufbx_real)sqrt(dx*dx + dy*dy + dz*dz + du*du + dv*dv);
 					if (err < 0.001f) {
 						if (err > p_err->max) p_err->max = err;
 						p_err->sum += err;

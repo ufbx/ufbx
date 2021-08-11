@@ -5674,7 +5674,7 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 		}
 	}
 	if (ufbxi_find_val1(node, ufbxi_BoundaryRule, "I", &boundary)) {
-		if (boundary >= 0 && boundary <= UFBX_SUBDIVISION_BOUNDARY_CREASE_EDGES - 1) {
+		if (boundary >= 0 && boundary <= UFBX_SUBDIVISION_BOUNDARY_SHARP_CORNERS - 1) {
 			mesh->subdivision_boundary = (ufbx_subdivision_boundary)(boundary + 1);
 		}
 	}
@@ -8230,6 +8230,19 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		ufbxi_for_ptr_list(ufbx_mesh, p_mesh, uc->scene.meshes) {
 			ufbx_mesh *mesh = *p_mesh;
 			size_t num_materials = mesh->materials.count;
+
+			ufbx_prop *uv_prop = ufbx_find_prop(&mesh->props, "ufbx:UVBoundary");
+			if (!uv_prop) {
+				ufbxi_for_ptr_list(ufbx_node, p_node, mesh->instances) {
+					uv_prop = ufbx_find_prop(&(*p_node)->props, "ufbx:UVBoundary");
+					if (uv_prop) break;
+				}
+			}
+			if (uv_prop && uv_prop->value_int >= 0 && uv_prop->value_int <= UFBX_SUBDIVISION_BOUNDARY_SHARP_INTERIOR) {
+				mesh->subdivision_uv_boundary = (ufbx_subdivision_boundary)uv_prop->value_int;
+			} else {
+				mesh->subdivision_uv_boundary = UFBX_SUBDIVISION_BOUNDARY_SHARP_BOUNDARY;
+			}
 
 			if (mesh_textures->count > 0 && num_materials > 0) {
 				// TODO: This leaks currently to result, probably doesn't matter..
@@ -13576,9 +13589,10 @@ static bool ufbxi_is_edge_split(const ufbx_vertex_attrib *attrib, ufbx_topo_inde
 	return true;
 }
 
-static ufbx_real ufbxi_edge_crease(ufbx_mesh *mesh, ufbx_topo_index *topo, int32_t index)
+static ufbx_real ufbxi_edge_crease(ufbx_mesh *mesh, bool split, ufbx_topo_index *topo, int32_t index)
 {
 	if (topo[index].twin < 0) return 1.0f;
+	if (split) return 1.0f;
 	if (mesh->edge_crease && topo[index].edge >= 0) return mesh->edge_crease[topo[index].edge] * 10.0f;
 	return 0.0f;
 }
@@ -15049,8 +15063,13 @@ void ufbx_compute_normals(ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, in
 	}
 }
 
-void ufbx_subdivide_layer(ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufbx_vertex_attrib *layer, ufbx_topo_index *topo, ufbx_topo_vertex *topo_vertices, const ufbx_subdivide_opts *opts)
+void ufbx_subdivide_layer(ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufbx_vertex_attrib *layer, ufbx_topo_index *topo, ufbx_topo_vertex *topo_vertices, const ufbx_subdivide_opts *opts, ufbx_subdivision_boundary boundary)
 {
+	if (!layer->data) {
+		*result = *layer;
+		return;
+	}
+
 	int32_t *edge_indices = malloc(mesh->num_indices * sizeof(int32_t));
 
 	size_t num_edge_values = 0;
@@ -15074,6 +15093,28 @@ void ufbx_subdivide_layer(ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufb
 	size_t num_vertex_values = 0;
 
 	int32_t *vertex_indices = malloc(mesh->num_indices * sizeof(int32_t));
+
+	bool sharp_corners = false;
+	bool sharp_splits = false;
+	bool sharp_all = false;
+
+	switch (boundary) {
+	case UFBX_SUBDIVISION_BOUNDARY_DEFAULT:
+	case UFBX_SUBDIVISION_BOUNDARY_LEGACY:
+	case UFBX_SUBDIVISION_BOUNDARY_SHARP_NONE:
+		// All smooth
+		break;
+	case UFBX_SUBDIVISION_BOUNDARY_SHARP_CORNERS:
+		sharp_corners = true;
+		break;
+	case UFBX_SUBDIVISION_BOUNDARY_SHARP_BOUNDARY:
+		sharp_corners = true;
+		sharp_splits = true;
+		break;
+	case UFBX_SUBDIVISION_BOUNDARY_SHARP_INTERIOR:
+		sharp_all = true;
+		break;
+	}
 
 	// Mark unused indices as -1 so we can patch non-manifold
 	for (size_t i = 0; i < mesh->num_indices; i++) {
@@ -15110,6 +15151,7 @@ void ufbx_subdivide_layer(ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufb
 		} else if (topo[ix].edge >= 0 && mesh->edge_crease) {
 			crease = mesh->edge_crease[topo[ix].edge] * 10.0f;
 		}
+		if (sharp_all) crease = 1.0f;
 
 		ufbx_real *v0 = layer->data + layer->by_index[ix] * reals;
 		ufbx_real *v1 = layer->data + layer->by_index[topo[ix].next] * reals;
@@ -15142,12 +15184,13 @@ void ufbx_subdivide_layer(ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufb
 		int32_t start = original_start;
 		for (int32_t cur = start;;) {
 			int32_t prev = ufbx_topo_prev_vertex_edge(topo, cur);
-			if (ufbxi_is_edge_split(layer, topo, cur)) start = cur; // Split edge: Consider as start
 			if (prev < 0) { start = cur; break; } // Topological boundary: Stop and use as start
+			if (ufbxi_is_edge_split(layer, topo, prev)) start = cur; // Split edge: Consider as start
 			if (prev == original_start) break; // Loop: Stop, use original start or split if found
 			cur = prev;
 		}
 
+		original_start = start;
 		while (start >= 0) {
 			int32_t value_index = (int32_t)num_vertex_values++;
 			ufbx_real *dst = vertex_values + value_index * reals;
@@ -15157,6 +15200,8 @@ void ufbx_subdivide_layer(ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufb
 			// does not need the information.
 			ufbx_real total_crease = 0.0f;
 			size_t num_crease = 0;
+			size_t num_split = 0;
+			bool on_boundary = false;
 			int32_t edge_points[2];
 
 			// At start we always have two edges and a single face
@@ -15171,65 +15216,90 @@ void ufbx_subdivide_layer(ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufb
 				const ufbx_real *e1 = layer->data + layer->by_index[start_prev] * reals;
 				const ufbx_real *f0 = face_values + topo[start].face * reals;
 				for (size_t i = 0; i < reals; i++) dst[i] = e0[i] + e1[i] + f0[i];
+			}
 
-				// Either of the first two edges may be creased
-				ufbx_real start_crease = ufbxi_edge_crease(mesh, topo, start);
-				if (start_crease > 0.0f) {
-					total_crease += start_crease;
-					edge_points[num_crease++] = topo[start].next;
+			bool start_split = ufbxi_is_edge_split(layer, topo, start);
+			bool prev_split = end_edge >= 0 && ufbxi_is_edge_split(layer, topo, end_edge);
+
+			// Either of the first two edges may be creased
+			ufbx_real start_crease = ufbxi_edge_crease(mesh, start_split, topo, start);
+			if (start_crease > 0.0f) {
+				total_crease += start_crease;
+				edge_points[num_crease++] = topo[start].next;
+			}
+			ufbx_real prev_crease = ufbxi_edge_crease(mesh, prev_split, topo, start_prev);
+			if (prev_crease > 0.0f) {
+				total_crease += prev_crease;
+				edge_points[num_crease++] = start_prev;
+			}
+
+			if (end_edge >= 0) {
+				if (prev_split) {
+					num_split++;
 				}
-				ufbx_real prev_crease = ufbxi_edge_crease(mesh, topo, start_prev);
-				if (prev_crease > 0.0f) {
-					total_crease += prev_crease;
-					edge_points[num_crease++] = start_prev;
-				}
+			} else {
+				on_boundary = true;
 			}
 
 			vertex_indices[start] = value_index;
 
-			// Follow vertex edges until we either hit a topological/split boundary
-			// or loop back to the left edge we accounted for in `start_prev`
-			int32_t cur = start;
-			for (;;) {
-				cur = ufbx_topo_next_vertex_edge(topo, cur);
+			if (start_split) {
+				// We need to special case if the first edge is split as we have
+				// handled it already in the code above..
+				start = ufbx_topo_next_vertex_edge(topo, start);
+				num_split++;
+			} else {
+				// Follow vertex edges until we either hit a topological/split boundary
+				// or loop back to the left edge we accounted for in `start_prev`
+				int32_t cur = start;
+				for (;;) {
+					cur = ufbx_topo_next_vertex_edge(topo, cur);
 
-				// Topological boundary: Finished
-				if (cur < 0) {
-					start = -1;
-					break;
-				}
+					// Topological boundary: Finished
+					if (cur < 0) {
+						on_boundary = true;
+						start = -1;
+						break;
+					}
 
-				vertex_indices[cur] = value_index;
+					vertex_indices[cur] = value_index;
 
-				// Looped: Add the face from the other side still
-				if (cur == end_edge) {
+					bool split = ufbxi_is_edge_split(layer, topo, cur);
+
+					// Looped: Add the face from the other side still if not split
+					if (cur == end_edge && !split) {
+						const ufbx_real *f0 = face_values + topo[cur].face * reals;
+						for (size_t i = 0; i < reals; i++) dst[i] += f0[i];
+						start = -1;
+						break;
+					}
+
+					// Add the edge crease, this also handles boundaries as they
+					// have an implicit crease of 1.0 using `ufbxi_edge_crease()`
+					ufbx_real cur_crease = ufbxi_edge_crease(mesh, split, topo, cur);
+					if (cur_crease > 0.0f) {
+						total_crease += cur_crease;
+						if (num_crease < 2) edge_points[num_crease] = topo[cur].next;
+						num_crease++;
+					}
+
+					// Add the new edge and face to the sum
+					const ufbx_real *e0 = layer->data + layer->by_index[topo[cur].next] * reals;
 					const ufbx_real *f0 = face_values + topo[cur].face * reals;
-					for (size_t i = 0; i < reals; i++) dst[i] += f0[i];
-					start = -1;
-					break;
-				}
+					for (size_t i = 0; i < reals; i++) dst[i] += e0[i] + f0[i];
+					valence++;
 
-				// Add the edge crease, this also handles boundaries as they
-				// have an implicit crease of 1.0 using `ufbxi_edge_crease()`
-				ufbx_real cur_crease = ufbxi_edge_crease(mesh, topo, cur);
-				if (cur_crease > 0.0f) {
-					total_crease += cur_crease;
-					if (num_crease < 2) edge_points[num_crease] = topo[cur].next;
-					num_crease++;
-				}
-
-				// Add the new edge and face to the sum
-				const ufbx_real *e0 = layer->data + layer->by_index[topo[cur].next] * reals;
-				const ufbx_real *f0 = face_values + topo[cur].face * reals;
-				for (size_t i = 0; i < reals; i++) dst[i] += e0[i] + f0[i];
-				valence++;
-
-				// If we landed at a split edge advance to the next one
-				// and continue from there in the outer loop
-				if (ufbxi_is_edge_split(layer, topo, cur)) {
-					start = ufbx_topo_next_vertex_edge(topo, cur);
+					// If we landed at a split edge advance to the next one
+					// and continue from there in the outer loop
+					if (split) {
+						start = ufbx_topo_next_vertex_edge(topo, cur);
+						num_split++;
+						break;
+					}
 				}
 			}
+
+			if (start == original_start) start = -1;
 
 			// Weights for various subdivision masks
 			ufbx_real fe_weight = 1.0f / (ufbx_real)(valence*valence);
@@ -15237,7 +15307,10 @@ void ufbx_subdivide_layer(ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufb
 
 			// Select the right subdivision mask depending on valence and crease
 			// TODO: Different rules for vertices and UVs
-			if (num_crease > 2 || (valence == 2 && opts->boundary == UFBX_SUBDIVISION_BOUNDARY_CREASE_CORNERS)) {
+			if (num_crease > 2
+				|| (sharp_corners && valence == 2 && (num_split > 0 || on_boundary))
+				|| (sharp_splits && (num_split > 0 || on_boundary))
+				|| sharp_all) {
 				// Corner: Copy as-is
 				for (size_t i = 0; i < reals; i++) dst[i] = v0[i];
 			} else if (num_crease == 2) {
@@ -15312,13 +15385,20 @@ ufbx_mesh *ufbx_subdivide_mesh(ufbx_mesh *mesh, const ufbx_subdivide_opts *user_
 		opts.boundary = mesh->subdivision_boundary;
 	}
 
+	if (opts.uv_boundary == UFBX_SUBDIVISION_BOUNDARY_DEFAULT) {
+		opts.uv_boundary = mesh->subdivision_uv_boundary;
+	}
+
 	ufbx_mesh *result = malloc(sizeof(ufbx_mesh));
 	*result = *mesh;
 
 	ufbx_topo_index *topo = malloc(mesh->num_indices * sizeof(ufbx_topo_index));
 	ufbx_topo_vertex *topo_vertices = malloc(mesh->num_vertices * sizeof(ufbx_topo_vertex));
 	ufbx_get_mesh_topology(mesh, topo, topo_vertices);
-	ufbx_subdivide_layer(mesh, (ufbx_vertex_attrib*)&result->vertex_position, (ufbx_vertex_attrib*)&mesh->vertex_position, topo, topo_vertices, &opts);
+	ufbx_subdivide_layer(mesh, (ufbx_vertex_attrib*)&result->vertex_position, (ufbx_vertex_attrib*)&mesh->vertex_position, topo, topo_vertices, &opts, opts.boundary);
+
+	// TODO: Layers
+	ufbx_subdivide_layer(mesh, (ufbx_vertex_attrib*)&result->vertex_uv, (ufbx_vertex_attrib*)&mesh->vertex_uv, topo, topo_vertices, &opts, opts.uv_boundary);
 
 	mesh->num_vertices = result->vertex_position.num_values;
 

@@ -548,11 +548,18 @@ typedef enum ufbx_subdivision_display_mode {
 	UFBX_SUBDIVISION_DISPLAY_SMOOTH,
 } ufbx_subdivision_display_mode;
 
+// TODO: Relate these to OpenSubdiv modes
 typedef enum ufbx_subdivision_boundary {
 	UFBX_SUBDIVISION_BOUNDARY_DEFAULT,
 	UFBX_SUBDIVISION_BOUNDARY_LEGACY,
-	UFBX_SUBDIVISION_BOUNDARY_CREASE_EDGES,
-	UFBX_SUBDIVISION_BOUNDARY_CREASE_CORNERS,
+	// OpenSubdiv: VTX_BOUNDARY_EDGE_ONLY/FVAR_LINEAR_NONE
+	UFBX_SUBDIVISION_BOUNDARY_SHARP_NONE,
+	// OpenSubdiv: VTX_BOUNDARY_EDGE_AND_CORNER/FVAR_LINEAR_CORNERS_ONLY
+	UFBX_SUBDIVISION_BOUNDARY_SHARP_CORNERS,
+	// OpenSubdiv: FVAR_LINEAR_BOUNDARIES
+	UFBX_SUBDIVISION_BOUNDARY_SHARP_BOUNDARY,
+	// OpenSubdiv: FVAR_LINEAR_ALL
+	UFBX_SUBDIVISION_BOUNDARY_SHARP_INTERIOR,
 } ufbx_subdivision_boundary;
 
 // Polygonal mesh geometry.
@@ -670,6 +677,7 @@ struct ufbx_mesh {
 	int32_t subdivision_render_levels;
 	ufbx_subdivision_display_mode subdivision_display_mode;
 	ufbx_subdivision_boundary subdivision_boundary;
+	ufbx_subdivision_boundary subdivision_uv_boundary;
 };
 
 typedef enum ufbx_light_type {
@@ -1541,6 +1549,7 @@ typedef struct ufbx_subdivide_opts {
 	ufbx_allocator result_allocator; // < Allocator used for the final scene
 
 	ufbx_subdivision_boundary boundary;
+	ufbx_subdivision_boundary uv_boundary;
 
 	// Limits
 	// TODO Move these to `ufbx_allocator`...

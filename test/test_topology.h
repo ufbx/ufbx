@@ -84,3 +84,9 @@ UFBXT_FILE_TEST(blender_293_suzanne_subsurf)
 {
 }
 #endif
+
+UFBXT_FILE_TEST(blender_293_suzanne_subsurf_uv)
+#if UFBXT_IMPL
+{
+}
+#endif
