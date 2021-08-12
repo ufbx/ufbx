@@ -10759,9 +10759,9 @@ static void ufbxi_update_camera(ufbx_camera *camera)
 
 	ufbx_gate_fit effective_fit = camera->gate_fit;
 	if (effective_fit == UFBX_GATE_FIT_FILL) {
-		effective_fit = aspect_ratio < film_ratio ? UFBX_GATE_FIT_HORIZONTAL : UFBX_GATE_FIT_VERTICAL;
-	} else if (effective_fit == UFBX_GATE_FIT_OVERSCAN) {
 		effective_fit = aspect_ratio > film_ratio ? UFBX_GATE_FIT_HORIZONTAL : UFBX_GATE_FIT_VERTICAL;
+	} else if (effective_fit == UFBX_GATE_FIT_OVERSCAN) {
+		effective_fit = aspect_ratio < film_ratio ? UFBX_GATE_FIT_HORIZONTAL : UFBX_GATE_FIT_VERTICAL;
 	}
 
 	switch (effective_fit) {
@@ -10770,11 +10770,11 @@ static void ufbxi_update_camera(ufbx_camera *camera)
 		break;
 	case UFBX_GATE_FIT_VERTICAL:
 		camera->aperture_size_inch.x = camera->film_size_inch.y * aspect_ratio;
-		camera->aperture_size_inch.y = camera->aperture_size_inch.y;
+		camera->aperture_size_inch.y = camera->film_size_inch.y;
 		break;
 	case UFBX_GATE_FIT_HORIZONTAL:
 		camera->aperture_size_inch.x = camera->film_size_inch.x;
-		camera->aperture_size_inch.y = camera->aperture_size_inch.x / aspect_ratio;
+		camera->aperture_size_inch.y = camera->film_size_inch.x / aspect_ratio;
 		break;
 	case UFBX_GATE_FIT_FILL:
 	case UFBX_GATE_FIT_OVERSCAN:

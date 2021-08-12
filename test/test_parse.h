@@ -77,16 +77,24 @@ UFBXT_FILE_TEST(maya_node_attribute_zoo)
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_BONE);
 	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_BONE);
 	ufbxt_assert(&node->bone->element == node->attrib);
+	ufbxt_assert_close_real(err, node->bone->length, 16.666667f); // TODO: /100?
 
 	node = ufbx_find_node(scene, "Camera");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_CAMERA);
 	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_CAMERA);
 	ufbxt_assert(&node->camera->element == node->attrib);
+	ufbxt_assert(node->camera->gate_fit == UFBX_GATE_FIT_FILL);
+	ufbxt_assert_close_real(err, node->camera->field_of_view_deg.x / 10.0f, 54.43f / 10.0f);
+	ufbxt_assert_close_real(err, node->camera->focal_length_mm, 35.0f);
 
 	node = ufbx_find_node(scene, "Light");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_LIGHT);
 	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_LIGHT);
 	ufbxt_assert(&node->light->element == node->attrib);
+	ufbxt_assert_close_real(err, node->light->intensity, 1.0f);
+	ufbxt_assert_close_real(err, node->light->color.x, 1.0f);
+	ufbxt_assert_close_real(err, node->light->color.y, 1.0f);
+	ufbxt_assert_close_real(err, node->light->color.z, 1.0f);
 
 	node = ufbx_find_node(scene, "StereoCamera");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_CAMERA_STEREO);
