@@ -90,3 +90,9 @@ UFBXT_FILE_TEST(blender_293_suzanne_subsurf_uv)
 {
 }
 #endif
+
+UFBXT_FILE_TEST(blender_293x_nonmanifold_subsurf)
+#if UFBXT_IMPL
+{
+}
+#endif

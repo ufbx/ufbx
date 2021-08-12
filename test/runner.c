@@ -532,7 +532,8 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		if (mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_SMOOTH || mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_HULL_AND_SMOOTH) {
 			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, NULL);
 
-			ufbxt_debug_dump_obj("test.obj", node, sub_mesh);
+			// TODO: Remove when not needed anymore
+			// ufbxt_debug_dump_obj("test.obj", node, sub_mesh);
 
 			ufbxt_assert(sub_mesh->num_faces == obj_mesh->num_faces);
 			ufbxt_assert(sub_mesh->num_indices == obj_mesh->num_indices);

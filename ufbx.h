@@ -1397,9 +1397,14 @@ struct ufbx_scene {
 
 // -- Mesh topology
 
+typedef enum ufbx_topo_flags {
+	UFBX_TOPO_NON_MANIFOLD = 0x1,
+} ufbx_topo_flags;
+
 typedef struct ufbx_topo_index {
 	int32_t index, prev, next, twin;
 	int32_t edge, face;
+	ufbx_topo_flags flags;
 } ufbx_topo_index;
 
 typedef struct ufbx_topo_vertex {

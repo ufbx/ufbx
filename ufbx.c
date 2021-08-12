@@ -13484,6 +13484,7 @@ static void ufbxi_get_mesh_topology(ufbx_mesh *mesh, ufbx_topo_index *indices, u
 			ti->prev = va;
 			ti->next = vb;
 			ti->face = fi;
+			ti->flags = 0;
 		}
 	}
 
@@ -13519,6 +13520,10 @@ static void ufbxi_get_mesh_topology(ufbx_mesh *mesh, ufbx_topo_index *indices, u
 		if (i1 == i0 + 1) {
 			indices[i0].twin = indices[i1].index;
 			indices[i1].twin = indices[i0].index;
+		} else if (i1 > i0 + 1) {
+			for (size_t i = i0; i <= i1; i++) {
+				indices[i].flags |= UFBX_TOPO_NON_MANIFOLD;
+			}
 		}
 
 		i0 = i1 + 1;
@@ -15202,12 +15207,16 @@ void ufbx_subdivide_layer(ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufb
 			size_t num_crease = 0;
 			size_t num_split = 0;
 			bool on_boundary = false;
+			bool non_manifold = false;
 			int32_t edge_points[2];
 
 			// At start we always have two edges and a single face
 			int32_t start_prev = topo[start].prev;
 			int32_t end_edge = topo[start_prev].twin;
 			size_t valence = 2;
+
+			non_manifold |= (topo[start].flags & UFBX_TOPO_NON_MANIFOLD) != 0;
+			non_manifold |= (topo[start_prev].flags & UFBX_TOPO_NON_MANIFOLD) != 0;
 
 			const ufbx_real *v0 = layer->data + layer->by_index[start] * reals;
 
@@ -15262,6 +15271,7 @@ void ufbx_subdivide_layer(ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufb
 						break;
 					}
 
+					non_manifold |= (topo[cur].flags & UFBX_TOPO_NON_MANIFOLD) != 0;
 					vertex_indices[cur] = value_index;
 
 					bool split = ufbxi_is_edge_split(layer, topo, cur);
@@ -15310,7 +15320,8 @@ void ufbx_subdivide_layer(ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufb
 			if (num_crease > 2
 				|| (sharp_corners && valence == 2 && (num_split > 0 || on_boundary))
 				|| (sharp_splits && (num_split > 0 || on_boundary))
-				|| sharp_all) {
+				|| sharp_all
+				|| non_manifold) {
 				// Corner: Copy as-is
 				for (size_t i = 0; i < reals; i++) dst[i] = v0[i];
 			} else if (num_crease == 2) {
