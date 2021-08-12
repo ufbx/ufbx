@@ -957,6 +957,7 @@ struct ufbx_cache_deformer {
 
 typedef struct ufbx_material_map {
 	ufbx_vec3 value;
+	int64_t value_int;
 	bool has_value;
 	ufbx_texture *texture;
 } ufbx_material_map;
@@ -1021,11 +1022,14 @@ typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER_ANISOTROPY,
 	UFBX_MATERIAL_PBR_TRANSMISSION_DISPERSION,
 	UFBX_MATERIAL_PBR_TRANSMISSION_ROUGHNESS,
+	UFBX_MATERIAL_PBR_TRANSMISSION_PRIORITY,
+	UFBX_MATERIAL_PBR_TRANSMISSION_ENABLE_IN_AOV,
 	UFBX_MATERIAL_PBR_SUBSURFACE_FACTOR,
 	UFBX_MATERIAL_PBR_SUBSURFACE_COLOR,
 	UFBX_MATERIAL_PBR_SUBSURFACE_RADIUS,
 	UFBX_MATERIAL_PBR_SUBSURFACE_SCALE,
 	UFBX_MATERIAL_PBR_SUBSURFACE_ANISOTROPY,
+	UFBX_MATERIAL_PBR_SUBSURFACE_TYPE,
 	UFBX_MATERIAL_PBR_SHEEN_FACTOR,
 	UFBX_MATERIAL_PBR_SHEEN_COLOR,
 	UFBX_MATERIAL_PBR_SHEEN_ROUGHNESS,
@@ -1044,8 +1048,20 @@ typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_INDIRECT_DIFFUSE,
 	UFBX_MATERIAL_PBR_INDIRECT_SPECULAR,
 	UFBX_MATERIAL_PBR_NORMAL_MAP,
+	UFBX_MATERIAL_PBR_TANGENT_MAP,
+	UFBX_MATERIAL_PBR_MATTE_ENABLED,
+	UFBX_MATERIAL_PBR_MATTE_FACTOR,
+	UFBX_MATERIAL_PBR_MATTE_COLOR,
+	UFBX_MATERIAL_PBR_THIN_WALLED,
+	UFBX_MATERIAL_PBR_CAUSTICS,
+	UFBX_MATERIAL_PBR_EXIT_TO_BACKGROUND,
+	UFBX_MATERIAL_PBR_INTERNAL_REFLECTIONS,
 	UFBX_NUM_MATERIAL_PBR_MAPS,
 } ufbx_material_pbr_map;
+
+typedef enum ufbx_material_pbr_feature {
+
+} ufbx_material_pbr_feature;
 
 typedef struct ufbx_material_fbx_maps {
 	union {
@@ -1097,11 +1113,14 @@ typedef struct ufbx_material_pbr_maps {
 			ufbx_material_map transmission_scatter_anisotropy;
 			ufbx_material_map transmission_dispersion;
 			ufbx_material_map transmission_roughness;
+			ufbx_material_map transmission_priority;
+			ufbx_material_map transmission_enable_in_aov;
 			ufbx_material_map subsurface_factor;
 			ufbx_material_map subsurface_color;
 			ufbx_material_map subsurface_radius;
 			ufbx_material_map subsurface_scale;
 			ufbx_material_map subsurface_anisotropy;
+			ufbx_material_map subsurface_type;
 			ufbx_material_map sheen_factor;
 			ufbx_material_map sheen_color;
 			ufbx_material_map sheen_roughness;
@@ -1120,6 +1139,14 @@ typedef struct ufbx_material_pbr_maps {
 			ufbx_material_map indirect_diffuse;
 			ufbx_material_map indirect_specular;
 			ufbx_material_map normal_map;
+			ufbx_material_map tangent_map;
+			ufbx_material_map matte_enabled;
+			ufbx_material_map matte_factor;
+			ufbx_material_map matte_color;
+			ufbx_material_map thin_walled;
+			ufbx_material_map caustics;
+			ufbx_material_map exit_to_background;
+			ufbx_material_map internal_reflections;
 		};
 	};
 } ufbx_material_pbr_maps;

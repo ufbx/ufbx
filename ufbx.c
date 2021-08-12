@@ -7608,6 +7608,17 @@ static const ufbxi_shader_mapping ufbxi_arnold_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_INDIRECT_SPECULAR, ufbxi_string_literal("indirectSpecular") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, ufbxi_string_literal("NormalMap") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, ufbxi_string_literal("cameraNormal") },
+	{ UFBX_MATERIAL_PBR_TANGENT_MAP, ufbxi_string_literal("tangent") },
+	{ UFBX_MATERIAL_PBR_MATTE_ENABLED, ufbxi_string_literal("aiEnableMatte") },
+	{ UFBX_MATERIAL_PBR_MATTE_COLOR, ufbxi_string_literal("aiMatteColor") },
+	{ UFBX_MATERIAL_PBR_MATTE_FACTOR, ufbxi_string_literal("aiMatteColorA") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_TYPE, ufbxi_string_literal("subsurfaceType") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_PRIORITY, ufbxi_string_literal("dielectricPriority") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_ENABLE_IN_AOV, ufbxi_string_literal("transmitAovs") },
+	{ UFBX_MATERIAL_PBR_THIN_WALLED, ufbxi_string_literal("thinWalled") },
+	{ UFBX_MATERIAL_PBR_CAUSTICS, ufbxi_string_literal("caustics") },
+	{ UFBX_MATERIAL_PBR_INTERNAL_REFLECTIONS, ufbxi_string_literal("internalReflections") },
+	{ UFBX_MATERIAL_PBR_EXIT_TO_BACKGROUND, ufbxi_string_literal("exitToBackground") },
 };
 
 static void ufbxi_mat_transform_blender_opacity(ufbx_vec3 *v) { v->x = 1.0f - v->x; }
@@ -7644,6 +7655,7 @@ static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufbx_material_map 
 
 		if (prop) {
 			map->value = prop->value_vec3;
+			map->value_int = prop->value_int;
 			map->has_value = true;
 			if (mapping->transform_fn) {
 				mapping->transform_fn(&map->value);
