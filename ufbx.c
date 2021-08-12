@@ -13589,9 +13589,10 @@ static bool ufbxi_is_edge_split(const ufbx_vertex_attrib *attrib, ufbx_topo_inde
 		ufbx_real *db0 = (ufbx_real*)attrib->data + b0 * num_reals;
 		ufbx_real *db1 = (ufbx_real*)attrib->data + b1 * num_reals;
 		if (!memcmp(da0, db0, size) && !memcmp(da1, db1, size)) return false;
+		return true;
 	}
 
-	return true;
+	return false;
 }
 
 static ufbx_real ufbxi_edge_crease(ufbx_mesh *mesh, bool split, ufbx_topo_index *topo, int32_t index)
@@ -15151,7 +15152,7 @@ void ufbx_subdivide_layer(ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufb
 		bool split = ufbxi_is_edge_split(layer, topo, ix);
 
 		ufbx_real crease = 0.0f;
-		if (split) {
+		if (split || twin < 0) {
 			crease = 1.0f;
 		} else if (topo[ix].edge >= 0 && mesh->edge_crease) {
 			crease = mesh->edge_crease[topo[ix].edge] * 10.0f;
