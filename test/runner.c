@@ -535,7 +535,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			ufbxt_check_mesh(scene, mesh);
 
 			// TODO: Remove when not needed anymore
-			ufbxt_debug_dump_obj("test.obj", node, sub_mesh);
+			// ufbxt_debug_dump_obj("test.obj", node, sub_mesh);
 
 			ufbxt_assert(sub_mesh->num_faces == obj_mesh->num_faces);
 			ufbxt_assert(sub_mesh->num_indices == obj_mesh->num_indices);

@@ -13098,6 +13098,62 @@ static ufbxi_noinline void ufbxi_combine_anim_layer(ufbxi_anim_layer_combine_ctx
 	}
 }
 
+
+void ufbxi_evaluate_props(ufbx_anim anim, ufbx_element *element, double time, ufbx_prop *props, size_t num_props)
+{
+	ufbxi_anim_layer_combine_ctx combine_ctx = { anim, element, time };
+
+	ufbxi_for_list(ufbx_anim_layer_desc, layer_desc, anim.layers) {
+		ufbx_anim_layer *layer = layer_desc->layer;
+
+		// Find the weight for the current layer
+		// TODO: Should this be searched from multipler layers?
+		// TODO: USe weight from layer_desc
+		ufbx_real weight = layer->weight;
+		if (layer->weight_is_animated && layer->blended) {
+			ufbx_anim_prop *weight_aprop = ufbxi_find_anim_prop_start(layer, &layer->element);
+			if (weight_aprop) {
+				weight = ufbx_evaluate_anim_value_real(weight_aprop->anim_value, time) * 0.01f;
+				if (weight < 0.0f) weight = 0.0f;
+				if (weight > 0.99999f) weight = 1.0f;
+			}
+		}
+
+		ufbx_anim_prop *aprop = ufbxi_find_anim_prop_start(layer, element);
+		if (!aprop) continue;
+
+		for (size_t i = 0; i < num_props; i++) {
+			ufbx_prop *prop = &props[i];
+
+			// Connections override animation by default
+			if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim.ignore_connections) continue;
+
+			// Skip until we reach `aprop >= prop`
+			while (aprop->element == element && aprop->internal_key < prop->internal_key) aprop++;
+			if (aprop->prop_name.data != prop->name.data) {
+				while (aprop->element == element && strcmp(aprop->prop_name.data, prop->name.data) < 0) aprop++;
+			}
+
+			// TODO: Should we skip the blending for the first layer _per property_
+			// This could be done by having `UFBX_PROP_FLAG_ANIMATION_EVALUATED`
+			// that gets set for the first layer of animation that is applied.
+			if (aprop->prop_name.data == prop->name.data) {
+				ufbx_vec3 v = ufbx_evaluate_anim_value_vec3(aprop->anim_value, time);
+				if (layer_desc == anim.layers.data) {
+					prop->value_vec3 = v;
+				} else {
+					ufbxi_combine_anim_layer(&combine_ctx, layer, weight, prop->name.data, &prop->value_vec3, &v);
+				}
+			}
+		}
+	}
+
+	ufbxi_for(ufbx_prop, prop, props, num_props) {
+		prop->value_int = (int64_t)prop->value_real;
+	}
+}
+
+
 typedef struct {
 	char *src_element;
 	char *dst_element;
@@ -13945,38 +14001,7 @@ ufbx_prop ufbx_evaluate_prop_len(ufbx_anim anim, ufbx_element *element, const ch
 		return result;
 	}
 
-	ufbxi_anim_layer_combine_ctx combine_ctx = { anim, element, time };
-
-	ufbxi_for_list(ufbx_anim_layer_desc, layer_desc, anim.layers) {
-		ufbx_anim_layer *layer = layer_desc->layer;
-
-		// Find the weight for the current layer
-		// TODO: Should this be searched from multipler layers?
-		ufbx_real weight = layer->weight;
-		if (layer->weight_is_animated && layer->blended) {
-			ufbx_anim_prop *weight_eap = ufbxi_find_anim_prop(layer, &layer->element, ufbxi_Weight);
-			if (weight_eap) {
-				weight = ufbx_evaluate_anim_value_real(weight_eap->anim_value, time) * 0.01f;
-				if (weight < 0.0f) weight = 0.0f;
-				if (weight > 0.99999f) weight = 1.0f;
-			}
-		}
-
-		ufbx_anim_prop *eap = ufbxi_find_anim_prop(layer, element, prop->name.data);
-		if (!eap) continue;
-
-		// TODO: Should we skip the blending for the first layer _per property_
-		// This could be done by having `UFBX_PROP_FLAG_ANIMATION_EVALUATED`
-		// that gets set for the first layer of animation that is applied.
-		ufbx_vec3 v = ufbx_evaluate_anim_value_vec3(eap->anim_value, time);
-		if (layer_desc == anim.layers.data) {
-			result.value_vec3 = v;
-		} else {
-			ufbxi_combine_anim_layer(&combine_ctx, layer, weight, prop->name.data, &result.value_vec3, &v);
-		}
-	}
-
-	result.value_int = (int64_t)result.value_real;
+	ufbxi_evaluate_props(anim, element, time, &result, 1);
 
 	return result;
 }
@@ -14008,56 +14033,7 @@ ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double tim
 		}
 	}
 
-	ufbxi_anim_layer_combine_ctx combine_ctx = { anim, element, time };
-
-	ufbxi_for_list(ufbx_anim_layer_desc, layer_desc, anim.layers) {
-		ufbx_anim_layer *layer = layer_desc->layer;
-
-		// Find the weight for the current layer
-		// TODO: Should this be searched from multipler layers?
-		// TODO: USe weight from layer_desc
-		ufbx_real weight = layer->weight;
-		if (layer->weight_is_animated && layer->blended) {
-			ufbx_anim_prop *weight_aprop = ufbxi_find_anim_prop_start(layer, &layer->element);
-			if (weight_aprop) {
-				weight = ufbx_evaluate_anim_value_real(weight_aprop->anim_value, time) * 0.01f;
-				if (weight < 0.0f) weight = 0.0f;
-				if (weight > 0.99999f) weight = 1.0f;
-			}
-		}
-
-		ufbx_anim_prop *aprop = ufbxi_find_anim_prop_start(layer, element);
-		if (!aprop) continue;
-
-		for (size_t i = 0; i < num_anim; i++) {
-			ufbx_prop *prop = &buffer[i];
-
-			// Connections override animation by default
-			if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim.ignore_connections) continue;
-
-			// Skip until we reach `aprop >= prop`
-			while (aprop->element == element && aprop->internal_key < prop->internal_key) aprop++;
-			if (aprop->prop_name.data != prop->name.data) {
-				while (aprop->element == element && strcmp(aprop->prop_name.data, prop->name.data) < 0) aprop++;
-			}
-
-			// TODO: Should we skip the blending for the first layer _per property_
-			// This could be done by having `UFBX_PROP_FLAG_ANIMATION_EVALUATED`
-			// that gets set for the first layer of animation that is applied.
-			if (aprop->prop_name.data == prop->name.data) {
-				ufbx_vec3 v = ufbx_evaluate_anim_value_vec3(aprop->anim_value, time);
-				if (layer_desc == anim.layers.data) {
-					prop->value_vec3 = v;
-				} else {
-					ufbxi_combine_anim_layer(&combine_ctx, layer, weight, prop->name.data, &prop->value_vec3, &v);
-				}
-			}
-		}
-	}
-
-	ufbxi_for(ufbx_prop, prop, buffer, num_anim) {
-		prop->value_int = (int64_t)prop->value_real;
-	}
+	ufbxi_evaluate_props(anim, element, time, buffer, num_anim);
 
 	ret.props = buffer;
 	ret.num_props = ret.num_animated = num_anim;
