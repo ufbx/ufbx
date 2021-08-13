@@ -51,7 +51,7 @@ static void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void 
 	ufbxt_assert(!memcmp((char*)elem->data - elem_size, zero, elem_size));
 }
 
-static void ufbxt_check_props(ufbx_scene *scene, ufbx_props *props, bool top)
+static void ufbxt_check_props(ufbx_scene *scene, const ufbx_props *props, bool top)
 {
 	ufbx_prop *prev = NULL;
 	for (size_t i = 0; i < props->num_props; i++) {

@@ -1676,12 +1676,14 @@ ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, doubl
 ufbx_vec2 ufbx_evaluate_anim_value_vec2(const ufbx_anim_value *anim_value, double time);
 ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, double time);
 
-ufbx_prop ufbx_evaluate_prop_len(ufbx_anim anim, ufbx_element *element, const char *name, size_t name_len, double time);
-ufbx_inline ufbx_prop ufbx_evaluate_prop(ufbx_anim anim, ufbx_element *element, const char *name, double time) {
+ufbx_prop ufbx_evaluate_prop_len(ufbx_anim anim, const ufbx_element *element, const char *name, size_t name_len, double time);
+ufbx_inline ufbx_prop ufbx_evaluate_prop(ufbx_anim anim, const ufbx_element *element, const char *name, double time) {
 	return ufbx_evaluate_prop_len(anim, element, name, strlen(name), time);
 }
 
 ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
+
+ufbx_transform ufbx_evaluate_transform(ufbx_anim anim, const ufbx_node *node, double time);
 
 // Evaluate the whole `scene` at a specific `time` in the animation `anim`.
 // The returned scene behaves as if it had been exported at a specific time

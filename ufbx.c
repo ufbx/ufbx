@@ -7351,7 +7351,7 @@ static ufbxi_forceinline bool ufbxi_prop_connection_less(const ufbx_connection *
 	return a->src_prop.length == 0;
 }
 
-ufbxi_nodiscard static ufbx_connection *ufbxi_find_prop_connection(ufbx_element *element, const char *prop)
+ufbxi_nodiscard static ufbx_connection *ufbxi_find_prop_connection(const ufbx_element *element, const char *prop)
 {
 	if (!prop) prop = ufbxi_empty_char;
 
@@ -7395,20 +7395,11 @@ ufbxi_nodiscard static int ufbxi_sort_material_textures(ufbxi_context *uc, ufbx_
 	return 1;
 }
 
-ufbxi_nodiscard static ufbx_anim_prop *ufbxi_find_anim_prop_start(ufbx_anim_layer *layer, ufbx_element *element)
+ufbxi_nodiscard static ufbx_anim_prop *ufbxi_find_anim_prop_start(ufbx_anim_layer *layer, const ufbx_element *element)
 {
 	size_t index = SIZE_MAX;
 	ufbxi_macro_lower_bound_eq(ufbx_anim_prop, 16, &index, layer->anim_props.data, 0, layer->anim_props.count,
 		(a->element < element), (a->element == element));
-	return index != SIZE_MAX ? &layer->anim_props.data[index] : NULL;
-}
-
-ufbxi_nodiscard static ufbx_anim_prop *ufbxi_find_anim_prop(ufbx_anim_layer *layer, ufbx_element *element, const char *name)
-{
-	size_t index = SIZE_MAX;
-	ufbxi_macro_lower_bound_eq(ufbx_anim_prop, 16, &index, layer->anim_props.data, 0, layer->anim_props.count,
-		( a->element != element ? a->element < element : strcmp(a->prop_name.data, name) < 0 ),
-		( a->element == element && a->prop_name.data == name));
 	return index != SIZE_MAX ? &layer->anim_props.data[index] : NULL;
 }
 
@@ -13034,7 +13025,7 @@ ufbx_inline ufbx_vec3 ufbxi_normalize(ufbx_vec3 a) {
 
 typedef struct ufbxi_anim_layer_combine_ctx {
 	ufbx_anim anim;
-	ufbx_element *element;
+	const ufbx_element *element;
 	double time;
 	ufbx_rotation_order rotation_order;
 	bool has_rotation_order;
@@ -13099,7 +13090,7 @@ static ufbxi_noinline void ufbxi_combine_anim_layer(ufbxi_anim_layer_combine_ctx
 }
 
 
-void ufbxi_evaluate_props(ufbx_anim anim, ufbx_element *element, double time, ufbx_prop *props, size_t num_props)
+void ufbxi_evaluate_props(ufbx_anim anim, const ufbx_element *element, double time, ufbx_prop *props, size_t num_props)
 {
 	ufbxi_anim_layer_combine_ctx combine_ctx = { anim, element, time };
 
@@ -13969,7 +13960,7 @@ ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, doubl
 	return res;
 }
 
-ufbx_prop ufbx_evaluate_prop_len(ufbx_anim anim, ufbx_element *element, const char *name, size_t name_len, double time)
+ufbx_prop ufbx_evaluate_prop_len(ufbx_anim anim, const ufbx_element *element, const char *name, size_t name_len, double time)
 {
 	ufbx_prop result;
 
@@ -14039,6 +14030,60 @@ ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double tim
 	ret.num_props = ret.num_animated = num_anim;
 	ret.defaults = &element->props;
 	return ret;
+}
+
+ufbx_transform ufbx_evaluate_transform(ufbx_anim anim, const ufbx_node *node, double time)
+{
+	const char *prop_names[] = {
+		ufbxi_Lcl_Rotation,
+		ufbxi_Lcl_Scaling,
+		ufbxi_Lcl_Translation,
+		ufbxi_PostRotation,
+		ufbxi_PreRotation,
+		ufbxi_RotationOffset,
+		ufbxi_RotationOrder,
+		ufbxi_RotationPivot,
+		ufbxi_ScalingOffset,
+		ufbxi_ScalingPivot,
+	};
+
+	ufbx_prop props[ufbxi_arraycount(prop_names)];
+	size_t num_props = 0;
+
+	const char *name = prop_names[0];
+	uint32_t key = ufbxi_get_name_key_c(name);
+
+	size_t name_ix = 0;
+	for (size_t i = 0; i < node->props.num_props; i++) {
+		ufbx_prop *prop = &node->props.props[i];
+		while (name_ix < ufbxi_arraycount(prop_names)) {
+			if (key > prop->internal_key) break;
+			if (name == prop->name.data) {
+				if (prop->flags & UFBX_PROP_FLAG_ANIMATED) {
+					props[num_props++] = *prop;
+				}
+				break;
+			} else if (strcmp(name, prop->name.data) < 0) {
+				name_ix++;
+				if (name_ix < ufbxi_arraycount(prop_names)) {
+					name = prop_names[name_ix];
+					key = ufbxi_get_name_key_c(name);
+				}
+			} else {
+				break;
+			}
+		}
+	}
+
+	ufbxi_evaluate_props(anim, &node->element, time, props, num_props);
+
+	ufbx_props prop_list;
+	prop_list.props = props;
+	prop_list.num_props = prop_list.num_animated = num_props;
+	prop_list.defaults = (ufbx_props*)&node->props;
+
+	ufbx_rotation_order order = (ufbx_rotation_order)ufbxi_find_enum(&prop_list, ufbxi_RotationOrder, UFBX_ROTATION_XYZ, UFBX_ROTATION_SPHERIC);
+	return ufbxi_get_transform(&prop_list, order);
 }
 
 ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, ufbx_anim anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error)

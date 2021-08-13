@@ -169,6 +169,13 @@ typedef struct {
 	ufbx_vec3 color;
 } ufbxt_anim_light_ref;
 
+typedef struct {
+	int frame;
+	ufbx_vec3 translation;
+	ufbx_vec3 rotation_euler;
+	ufbx_vec3 scale;
+} ufbxt_anim_transform_ref;
+
 #endif
 
 UFBXT_FILE_TEST(maya_anim_light)
@@ -206,6 +213,45 @@ UFBXT_FILE_TEST(maya_anim_light)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(maya_transform_animation)
+#if UFBXT_IMPL
+{
+	static const ufbxt_anim_transform_ref refs[] = {
+		{  1, {  0.000f,  0.000f,  0.000f }, {   0.000f,   0.000f,   0.000f }, { 1.000f, 1.000f, 1.000f } },
+		{  5, {  0.226f,  0.452f,  0.677f }, {   2.258f,   4.515f,   6.773f }, { 1.023f, 1.045f, 1.068f } },
+		{ 14, {  1.000f,  2.000f,  3.000f }, {  10.000f,  20.000f,  30.000f }, { 1.100f, 1.200f, 1.300f } },
+		{ 20, { -0.296f, -0.592f, -0.888f }, {  -2.960f,  -5.920f,  -8.880f }, { 0.970f, 0.941f, 0.911f } },
+		{ 24, { -1.000f, -2.000f, -3.000f }, { -10.000f, -20.000f, -30.000f }, { 0.900f, 0.800f, 0.700f } },
+	};
+
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+
+	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		const ufbxt_anim_transform_ref *ref = &refs[i];
+		double time = ref->frame * (1.0/24.0);
+
+		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, NULL, NULL);
+		ufbxt_assert(state);
+
+		ufbx_transform t1 = state->nodes.data[node->element.typed_id]->local_transform;
+		ufbx_transform t2 = ufbx_evaluate_transform(scene->anim, node, time);
+
+		ufbx_vec3 t1_euler = ufbx_quat_to_euler(t1.rotation, UFBX_ROTATION_XYZ);
+		ufbx_vec3 t2_euler = ufbx_quat_to_euler(t2.rotation, UFBX_ROTATION_XYZ);
+
+		ufbxt_assert_close_vec3(err, ref->translation, t1.translation);
+		ufbxt_assert_close_vec3(err, ref->translation, t2.translation);
+		ufbxt_assert_close_vec3(err, ref->rotation_euler, t1_euler);
+		ufbxt_assert_close_vec3(err, ref->rotation_euler, t2_euler);
+		ufbxt_assert_close_vec3(err, ref->scale, t1.scale);
+		ufbxt_assert_close_vec3(err, ref->scale, t2.scale);
+
+		ufbx_free_scene(state);
+	}
+}
+#endif
+
 
 #if !defined(_MSC_VER) // TODO
 
