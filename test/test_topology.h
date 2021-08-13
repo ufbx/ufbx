@@ -102,3 +102,9 @@ UFBXT_FILE_TEST(blender_293_ngon_subsurf)
 {
 }
 #endif
+
+UFBXT_FILE_TEST(blender_293x_subsurf_boundary)
+#if UFBXT_IMPL
+{
+}
+#endif
