@@ -20,7 +20,7 @@ size_t do_triangulate_test(ufbx_scene *scene)
 		size_t top_left_ix = 0;
 		ufbx_real best_dot = HUGE_VALF;
 		for (size_t ix = 0; ix < 4; ix++) {
-			ufbx_vec3 v = ufbx_get_by_index_vec3(&mesh->vertex_position, ix);
+			ufbx_vec3 v = ufbx_get_vertex_vec3(&mesh->vertex_position, ix);
 			ufbx_real dot = v.x + v.z;
 			if (dot < best_dot) {
 				top_left_ix = ix;

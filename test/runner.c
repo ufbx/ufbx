@@ -417,9 +417,9 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
 			mesh->vertex_position.data = positions;
 			mesh->vertex_normal.data = normals;
 			mesh->vertex_uv.data = uvs;
-			mesh->vertex_position.by_index = dpi;
-			mesh->vertex_normal.by_index = dni;
-			mesh->vertex_uv.by_index = dui;
+			mesh->vertex_position.indices = dpi;
+			mesh->vertex_normal.indices = dni;
+			mesh->vertex_uv.indices = dui;
 		}
 
 		if (line_end) {
@@ -453,8 +453,8 @@ static void ufbxt_debug_dump_obj(const char *file, ufbx_node *node, ufbx_mesh *m
 		ufbx_face face = mesh->faces[fi];
 		fprintf(f, "f");
 		for (size_t ci = 0; ci < face.num_indices; ci++) {
-			int32_t vi = mesh->vertex_position.by_index[face.index_begin + ci];
-			int32_t ti = mesh->vertex_uv.by_index[face.index_begin + ci];
+			int32_t vi = mesh->vertex_position.indices[face.index_begin + ci];
+			int32_t ti = mesh->vertex_uv.indices[face.index_begin + ci];
 			fprintf(f, " %d/%d", vi + 1, ti + 1);
 		}
 		fprintf(f, "\n");
@@ -532,8 +532,10 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		if (mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_SMOOTH || mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_HULL_AND_SMOOTH) {
 			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, NULL);
 
+			ufbxt_check_mesh(scene, mesh);
+
 			// TODO: Remove when not needed anymore
-			// ufbxt_debug_dump_obj("test.obj", node, sub_mesh);
+			ufbxt_debug_dump_obj("test.obj", node, sub_mesh);
 
 			ufbxt_assert(sub_mesh->num_faces == obj_mesh->num_faces);
 			ufbxt_assert(sub_mesh->num_indices == obj_mesh->num_indices);
@@ -544,17 +546,17 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			ufbxt_assert(obj_verts && sub_verts);
 
 			for (size_t i = 0; i < obj_mesh->num_indices; i++) {
-				obj_verts[i].pos = ufbx_get_by_index_vec3(&obj_mesh->vertex_position, i);
+				obj_verts[i].pos = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, i);
 				if (obj_mesh->vertex_uv.data) {
-					obj_verts[i].uv = ufbx_get_by_index_vec2(&obj_mesh->vertex_uv, i);
+					obj_verts[i].uv = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, i);
 				}
 			}
 			for (size_t i = 0; i < sub_mesh->num_indices; i++) {
-				ufbx_vec3 fp = ufbx_get_by_index_vec3(&sub_mesh->vertex_position, i);
+				ufbx_vec3 fp = ufbx_get_vertex_vec3(&sub_mesh->vertex_position, i);
 				fp = ufbx_transform_position(mat, fp);
 				sub_verts[i].pos = fp;
 				if (obj_mesh->vertex_uv.data) {
-					sub_verts[i].uv = ufbx_get_by_index_vec2(&sub_mesh->vertex_uv, i);
+					sub_verts[i].uv = ufbx_get_vertex_vec2(&sub_mesh->vertex_uv, i);
 				}
 			}
 
@@ -605,10 +607,10 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			ufbxt_assert(obj_face.num_indices == face.num_indices);
 
 			for (size_t ix = face.index_begin; ix < face.index_begin + face.num_indices; ix++) {
-				ufbx_vec3 op = ufbx_get_by_index_vec3(&obj_mesh->vertex_position, ix);
-				ufbx_vec3 fp = ufbx_get_by_index_vec3(&mesh->skinned_position, ix);
-				ufbx_vec3 on = ufbx_get_by_index_vec3(&obj_mesh->vertex_normal, ix);
-				ufbx_vec3 fn = ufbx_get_by_index_vec3(&mesh->skinned_normal, ix);
+				ufbx_vec3 op = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, ix);
+				ufbx_vec3 fp = ufbx_get_vertex_vec3(&mesh->skinned_position, ix);
+				ufbx_vec3 on = ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, ix);
+				ufbx_vec3 fn = ufbx_get_vertex_vec3(&mesh->skinned_normal, ix);
 
 				if (mesh->skinned_is_local) {
 					fp = ufbx_transform_position(mat, fp);
@@ -628,8 +630,8 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 
 				if (mesh->vertex_uv.data) {
 					ufbxt_assert(obj_mesh->vertex_uv.data);
-					ufbx_vec2 ou = ufbx_get_by_index_vec2(&obj_mesh->vertex_uv, ix);
-					ufbx_vec2 fu = ufbx_get_by_index_vec2(&mesh->vertex_uv, ix);
+					ufbx_vec2 ou = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, ix);
+					ufbx_vec2 fu = ufbx_get_vertex_vec2(&mesh->vertex_uv, ix);
 					ufbxt_assert_close_vec2(p_err, ou, fu);
 				}
 			}

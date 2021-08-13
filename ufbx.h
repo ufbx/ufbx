@@ -440,51 +440,55 @@ struct ufbx_node {
 // Vertex attribute: All attributes are stored in a consistent indexed format
 // regardless of how it's actually stored in the file.
 // `data` is a contiguous array of `num_values` attribute values.
-// `by_index` maps each mesh index into a value in the `data` array.
-// _If_ the vertex element is specified uniquely per logical vertex you can 
-// get the per-vertex value through `by_vertex[vertex_index]`.
+// `indices` maps each mesh index into a value in the `data` array.
+//
+// If `unique_per_vertex` is set then the attribute is guaranteed to have a
+// single defined value per vertex accessible via:
+//   `attrib.data[attrib.indices[mesh->vertex_first_index[vertex_ix]]`
+// NOTE: The attribute may be unique per vertex also if `unique_per_vertex`
+// is `false` depending on how it's stored in the FBX file.
 typedef struct ufbx_vertex_attrib {
 	ufbx_real *data;
-	int32_t *by_index;
-	int32_t *by_vertex;
+	int32_t *indices;
 	size_t num_values;
 	size_t value_reals;
+	bool unique_per_vertex;
 } ufbx_vertex_attrib;
 
 // 1D vertex attribute, see `ufbx_vertex_void` for information
 typedef struct ufbx_vertex_real {
 	ufbx_real *data;
-	int32_t *by_index;
-	int32_t *by_vertex;
+	int32_t *indices;
 	size_t num_values;
 	size_t value_reals;
+	bool unique_per_vertex;
 } ufbx_vertex_real;
 
 // 2D vertex attribute, see `ufbx_vertex_void` for information
 typedef struct ufbx_vertex_vec2 {
 	ufbx_vec2 *data;
-	int32_t *by_index;
-	int32_t *by_vertex;
+	int32_t *indices;
 	size_t num_values;
 	size_t value_reals;
+	bool unique_per_vertex;
 } ufbx_vertex_vec2;
 
 // 3D vertex attribute, see `ufbx_vertex_void` for information
 typedef struct ufbx_vertex_vec3 {
 	ufbx_vec3 *data;
-	int32_t *by_index;
-	int32_t *by_vertex;
+	int32_t *indices;
 	size_t num_values;
 	size_t value_reals;
+	bool unique_per_vertex;
 } ufbx_vertex_vec3;
 
 // 4D vertex attribute, see `ufbx_vertex_void` for information
 typedef struct ufbx_vertex_vec4 {
 	ufbx_vec4 *data;
-	int32_t *by_index;
-	int32_t *by_vertex;
+	int32_t *indices;
 	size_t num_values;
 	size_t value_reals;
+	bool unique_per_vertex;
 } ufbx_vertex_vec4;
 
 // Vertex UV set/layer
@@ -576,20 +580,10 @@ typedef enum ufbx_subdivision_boundary {
 //     D-----E---F
 //     v     v   v
 //
-// Some geometry data is specified per logical vertex. Vertex positions are
-// the only element that is guaranteed to be defined _uniquely_ per vertex.
-// Other vertex elements _may_ be defined per vertex if `by_vertex != NULL`.
-//
-//   0 1 2 3 4 5  vertex
-//   A B C D E F  vertices[vertex]
-//
-//   0 0 0 1 1 1  vertex_normal.by_vertex[vertex]
-//   ^ ^ ^ v v v  vertex_normal.data[vertex_normal.by_vertex[vertex]]
-//
 // Attributes may have multiple values within a single vertex, for example a
 // UV seam vertex has two UV coordinates. Thus polygons are defined using
 // an index that counts each corner of each face polygon. If an attribute is
-// defined (even per-vertex) it will always have a valid `by_index` array.
+// defined (even per-vertex) it will always have a valid `indices` array.
 //
 //   {0,3}    {3,4}    {7,3}   faces ({ index_begin, num_indices })
 //   0 1 2   3 4 5 6   7 8 9   index
@@ -597,15 +591,28 @@ typedef enum ufbx_subdivision_boundary {
 //   0 1 3   1 2 4 3   2 4 5   vertex_indices[index]
 //   A B D   B C E D   C E F   vertices[vertex_indices[index]]
 //
-//   0 0 1   0 0 1 1   0 1 1   vertex_normal.by_index[index]
-//   ^ ^ v   ^ ^ v v   ^ v v   vertex_normal.data[vertex_normal.by_index[index]]
+//   0 0 1   0 0 1 1   0 1 1   vertex_normal.indices[index]
+//   ^ ^ v   ^ ^ v v   ^ v v   vertex_normal.data[vertex_normal.indices[index]]
 //
-//   0 0 0   1 1 1 1   2 2 2   vertex_uv.by_index[index]
-//   x x x   y y y y   z z z   vertex_uv.data[vertex_uv.by_index[index]]
+//   0 0 0   1 1 1 1   2 2 2   vertex_uv.indices[index]
+//   x x x   y y y y   z z z   vertex_uv.data[vertex_uv.indices[index]]
 //
 // Vertex position can also be accessed uniformly through an accessor:
-//   0 1 3   1 2 4 3   2 4 5   vertex_position.by_index[index]
-//   A B D   B C E D   C E F   vertex_position.data[vertex_position.by_index[index]]
+//   0 1 3   1 2 4 3   2 4 5   vertex_position.indices[index]
+//   A B D   B C E D   C E F   vertex_position.data[vertex_position.indices[index]]
+//
+// Some geometry data is specified per logical vertex. Vertex positions are
+// the only attribute that is guaranteed to be defined _uniquely_ per vertex.
+// Vertex attributes _may_ be defined per vertex if `unique_per_vertex == true`.
+// You can access the per-vertex values by first finding the first index that
+// refers to the given vertex.
+//
+//   0 1 2 3 4 5  vertex
+//   A B C D E F  vertices[vertex]
+//
+//   0 1 4 2 5 9  vertex_first_index[vertex]
+//   0 0 0 1 1 1  vertex_normal.indices[vertex_first_index[vertex]]
+//   ^ ^ ^ v v v  vertex_normal.data[vertex_normal.indices[vertex_first_index[vertex]]]
 //
 struct ufbx_mesh {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
@@ -635,6 +642,9 @@ struct ufbx_mesh {
 	// `vertex_position` for consistent interface with other attributes.
 	int32_t *vertex_indices;
 	ufbx_vec3 *vertices;
+
+	// First index referring to a given vertex, `-1` if the vertex is unused.
+	int32_t *vertex_first_index;
 
 	// Vertex attributes, see the comment over the struct.
 	//
@@ -1425,18 +1435,19 @@ struct ufbx_scene {
 // -- Mesh topology
 
 typedef enum ufbx_topo_flags {
-	UFBX_TOPO_NON_MANIFOLD = 0x1,
+	UFBX_TOPO_NON_MANIFOLD = 0x1, // < Edge with three or more faces
 } ufbx_topo_flags;
 
-typedef struct ufbx_topo_index {
-	int32_t index, prev, next, twin;
-	int32_t edge, face;
-	ufbx_topo_flags flags;
-} ufbx_topo_index;
+typedef struct ufbx_topo_edge {
+	int32_t index; // < Starting index of the edge
+	int32_t next;  // < Ending index of the edge / next per-face `ufbx_topo_edge`, always defined
+	int32_t prev;  // < Previous per-face `ufbx_topo_edge`, always defined
+	int32_t twin;  // < `ufbx_topo_edge` on the opposite side, `-1` if not found
+	int32_t face;  // < Index into `mesh->faces[]`, always defined
+	int32_t edge;  // < Index into `mesh->edges[]`, `-1` if not found
 
-typedef struct ufbx_topo_vertex {
-	uint32_t first_index;
-} ufbx_topo_vertex;
+	ufbx_topo_flags flags;
+} ufbx_topo_edge;
 
 // -- Memory callbacks
 
@@ -1720,31 +1731,30 @@ void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *
 
 // Mesh Topology
 
-size_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, ufbx_mesh *mesh, ufbx_face face);
+size_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face);
 
-void ufbx_get_mesh_topology(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo_vertex *vertices);
-int32_t ufbx_topo_next_vertex_edge(ufbx_topo_index *indices, int32_t index);
-int32_t ufbx_topo_prev_vertex_edge(ufbx_topo_index *indices, int32_t index);
+// Generate the half-edge representation of `mesh` to `topo[mesh->num_indices]`
+void ufbx_compute_topology(const ufbx_mesh *mesh, ufbx_topo_edge *topo);
+
+// Get the next/previous edge around a vertex
+// NOTE: Does not return the half-edge on the opposite side (ie. `topo[index].twin`)
+int32_t ufbx_topo_next_vertex_edge(const ufbx_topo_edge *topo, int32_t index);
+int32_t ufbx_topo_prev_vertex_edge(const ufbx_topo_edge *topo, int32_t index);
 
 ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_face face);
 
-size_t ufbx_generate_normal_mapping(ufbx_mesh *mesh, ufbx_topo_index *indices, ufbx_topo_vertex *vertices, int32_t *normal_indices);
-void ufbx_compute_normals(ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals);
+size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, ufbx_topo_edge *topo, int32_t *normal_indices);
+void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals);
 
-ufbx_mesh *ufbx_subdivide_mesh(ufbx_mesh *mesh, const ufbx_subdivide_opts *opts);
+ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, const ufbx_subdivide_opts *opts);
 void ufbx_free_mesh(ufbx_mesh *mesh);
 
 // -- Inline API
 
-ufbx_inline ufbx_real ufbx_get_by_vertex_real(const ufbx_vertex_real *v, size_t vertex) { ufbx_assert(v->by_vertex); return v->data[v->by_vertex[vertex]]; }
-ufbx_inline ufbx_vec2 ufbx_get_by_vertex_vec2(const ufbx_vertex_vec2 *v, size_t vertex) { ufbx_assert(v->by_vertex); return v->data[v->by_vertex[vertex]]; }
-ufbx_inline ufbx_vec3 ufbx_get_by_vertex_vec3(const ufbx_vertex_vec3 *v, size_t vertex) { ufbx_assert(v->by_vertex); return v->data[v->by_vertex[vertex]]; }
-ufbx_inline ufbx_vec4 ufbx_get_by_vertex_vec4(const ufbx_vertex_vec4 *v, size_t vertex) { ufbx_assert(v->by_vertex); return v->data[v->by_vertex[vertex]]; }
-
-ufbx_inline ufbx_real ufbx_get_by_index_real(const ufbx_vertex_real *v, size_t index) { return v->data[v->by_index[index]]; }
-ufbx_inline ufbx_vec2 ufbx_get_by_index_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->by_index[index]]; }
-ufbx_inline ufbx_vec3 ufbx_get_by_index_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->by_index[index]]; }
-ufbx_inline ufbx_vec4 ufbx_get_by_index_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->by_index[index]]; }
+ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t index) { return v->data[v->indices[index]]; }
+ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }
+ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }
+ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->indices[index]]; }
 
 #endif
 
