@@ -1732,6 +1732,7 @@ size_t ufbx_generate_normal_mapping(ufbx_mesh *mesh, ufbx_topo_index *indices, u
 void ufbx_compute_normals(ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals);
 
 ufbx_mesh *ufbx_subdivide_mesh(ufbx_mesh *mesh, const ufbx_subdivide_opts *opts);
+void ufbx_free_mesh(ufbx_mesh *mesh);
 
 // -- Inline API
 

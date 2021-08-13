@@ -15481,16 +15481,17 @@ ufbx_mesh *ufbx_subdivide_mesh(ufbx_mesh *mesh, const ufbx_subdivide_opts *user_
 			int32_t offset = edge.indices[0] - face.index_begin;
 			int32_t next = (offset + 1) % (int32_t)face.num_indices;
 
-			int32_t a = (face_ix + offset) * 4;
-			int32_t b = (face_ix + next) * 4;
+			int32_t a = (face.index_begin + offset) * 4;
+			int32_t b = (face.index_begin + next) * 4;
 
 			result->edges[di + 0].indices[0] = a;
 			result->edges[di + 0].indices[1] = a + 1;
-			result->edges[di + 1].indices[2] = b + 3;
-			result->edges[di + 1].indices[3] = b;
+			result->edges[di + 1].indices[0] = b + 3;
+			result->edges[di + 1].indices[1] = b;
 
 			if (mesh->edge_crease) {
-				ufbx_real crease = mesh->edge_crease[i] - 1.0f;
+				ufbx_real crease = mesh->edge_crease[i];
+				if (crease < 0.999f) crease -= 0.1f;
 				if (crease < 0.0f) crease = 0.0f;
 				result->edge_crease[di + 0] = crease;
 				result->edge_crease[di + 1] = crease;
@@ -15501,11 +15502,30 @@ ufbx_mesh *ufbx_subdivide_mesh(ufbx_mesh *mesh, const ufbx_subdivide_opts *user_
 				result->edge_smoothing[di + 1] = mesh->edge_smoothing[i];
 			}
 
+			di += 2;
+		}
+
+		for (size_t fi = 0; fi < result->num_faces; fi++) {
+			result->edges[di].indices[0] = (int32_t)(fi * 4 + 1);
+			result->edges[di].indices[1] = (int32_t)(fi * 4 + 2);
+
+			if (result->edge_crease) {
+				result->edge_crease[di] = 0.0f;
+			}
+
+			if (result->edge_smoothing) {
+				result->edge_smoothing[di + 0] = true;
+			}
+
 			di++;
 		}
 	}
 
 	return result;
+}
+
+void ufbx_free_mesh(ufbx_mesh *mesh)
+{
 }
 
 #if 0
