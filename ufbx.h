@@ -1179,10 +1179,21 @@ struct ufbx_texture {
 
 	ufbx_string filename;
 	ufbx_string relative_filename;
+
+	const void *content;
+	size_t content_size;
+
+	ufbx_video *video;
 };
 
 struct ufbx_video {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_string filename;
+	ufbx_string relative_filename;
+
+	const void *content;
+	size_t content_size;
 };
 
 struct ufbx_shader {
@@ -1489,9 +1500,19 @@ typedef struct ufbx_error_frame {
 	const char *description;
 } ufbx_error_frame;
 
+typedef enum ufbx_error_type {
+	UFBX_ERROR_NONE,
+	UFBX_ERROR_UNKNOWN,
+	UFBX_ERROR_FILE_NOT_FOUND,
+	UFBX_ERROR_OUT_OF_MEMORY,
+	UFBX_ERROR_TRUNCATED_FILE,
+	UFBX_ERROR_IO,
+} ufbx_error_type;
+
 // Error description with detailed stack trace
 // HINT: You can use `ufbx_format_error()` for formatting the error
 typedef struct ufbx_error {
+	ufbx_error_type type;
 	const char *description;
 	uint32_t stack_size;
 	ufbx_error_frame stack[UFBX_ERROR_STACK_MAX_DEPTH];
@@ -1536,6 +1557,7 @@ typedef struct ufbx_load_opts {
 	// Preferences
 	bool ignore_geometry;   // < Do not load geometry datsa (vertices, indices, etc)
 	bool ignore_animation;  // < Do not load animation curves
+	bool ignore_embedded;   // < Do not load embedded content
 	bool evaluate_skinning; // < Evaluate skinning (see ufbx_mesh.skinned_vertices)
 
 	// Don't compute `ufbx_skin_deformer` `vertices` and `weights` arrays saving

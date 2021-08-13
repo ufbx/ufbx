@@ -1335,9 +1335,10 @@ void ufbxt_do_fuzz(ufbx_scene *scene, const char *base_name, void *data, size_t 
 	}
 }
 
+const uint32_t ufbxt_file_versions[] = { 6100, 7100, 7400, 7500, 7700 };
+
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err), const char *suffix, ufbx_load_opts user_opts)
 {
-	const uint32_t file_versions[] = { 6100, 7100, 7400, 7500, 7700 };
 
 	char buf[512];
 	snprintf(buf, sizeof(buf), "%s%s.obj", data_root, name);
@@ -1356,9 +1357,9 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 	uint32_t num_opened = 0;
 
-	for (uint32_t vi = 0; vi < ufbxt_arraycount(file_versions); vi++) {
+	for (uint32_t vi = 0; vi < ufbxt_arraycount(ufbxt_file_versions); vi++) {
 		for (uint32_t fi = 0; fi < 2; fi++) {
-			uint32_t version = file_versions[vi];
+			uint32_t version = ufbxt_file_versions[vi];
 			const char *format = fi == 1 ? "ascii" : "binary";
 			if (suffix) {
 				snprintf(buf, sizeof(buf), "%s%s_%u_%s_%s.fbx", data_root, name, version, format, suffix);

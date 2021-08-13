@@ -1,4 +1,46 @@
 
+#if UFBXT_IMPL
+
+void ufbxt_check_texture_content(ufbx_scene *scene, ufbx_texture *texture, const char *filename)
+{
+	char buf[512];
+
+	ufbxt_assert(texture->content_size > 0);
+	ufbxt_assert(texture->content);
+
+	snprintf(buf, sizeof(buf), "%stextures/%s", data_root, filename);
+	void *ref = malloc(texture->content_size);
+	ufbxt_assert(ref);
+
+	FILE *f = fopen(buf, "rb");
+	ufbxt_assert(f);
+	size_t num_read = fread(ref, 1, texture->content_size, f);
+	fclose(f);
+
+	ufbxt_assert(num_read == texture->content_size);
+	ufbxt_assert(!memcmp(ref, texture->content, texture->content_size));
+
+	free(ref);
+}
+
+void ufbxt_check_material_texture(ufbx_scene *scene, ufbx_texture *texture, const char *filename, bool require_content)
+{
+	char buf[512];
+
+	snprintf(buf, sizeof(buf), "textures\\%s", filename);
+	ufbxt_assert(!strcmp(texture->relative_filename.data, buf));
+
+	if (require_content && (scene->metadata.version >= 7000 || !scene->metadata.ascii)) {
+		ufbxt_assert(texture->content);
+	}
+
+	if (texture->content) {
+		ufbxt_check_texture_content(scene, texture, filename);
+	}
+}
+
+#endif
+
 UFBXT_FILE_TEST(maya_slime)
 #if UFBXT_IMPL
 {
@@ -16,12 +58,49 @@ UFBXT_FILE_TEST(maya_textured_cube)
 	ufbxt_assert(material);
 	ufbxt_assert(material->textures.count == 6);
 
-	ufbxt_assert(!strcmp(material->fbx.diffuse_color.texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
-	ufbxt_assert(!strcmp(material->fbx.specular_color.texture->relative_filename.data, "textures\\checkerboard_specular.png"));
-	ufbxt_assert(!strcmp(material->fbx.reflection_color.texture->relative_filename.data, "textures\\checkerboard_reflection.png"));
-	ufbxt_assert(!strcmp(material->fbx.transparency_color.texture->relative_filename.data, "textures\\checkerboard_transparency.png"));
-	ufbxt_assert(!strcmp(material->fbx.emission_color.texture->relative_filename.data, "textures\\checkerboard_emissive.png"));
-	ufbxt_assert(!strcmp(material->fbx.ambient_color.texture->relative_filename.data, "textures\\checkerboard_ambient.png"));
+	ufbxt_check_material_texture(scene, material->fbx.diffuse_color.texture, "checkerboard_diffuse.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.specular_color.texture, "checkerboard_specular.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.reflection_color.texture, "checkerboard_reflection.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.transparency_color.texture, "checkerboard_transparency.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.emission_color.texture, "checkerboard_emissive.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.ambient_color.texture, "checkerboard_ambient.png", true);
+}
+#endif
+
+UFBXT_TEST(ignore_embedded)
+#if UFBXT_IMPL
+{
+	const char *name = "maya_textured_cube";
+
+	char buf[512];
+	for (uint32_t vi = 0; vi < ufbxt_arraycount(ufbxt_file_versions); vi++) {
+		for (uint32_t fi = 0; fi < 2; fi++) {
+			uint32_t version = ufbxt_file_versions[vi];
+			const char *format = fi == 1 ? "ascii" : "binary";
+			snprintf(buf, sizeof(buf), "%s%s_%u_%s.fbx", data_root, name, version, format);
+		}
+
+		ufbx_error error;
+		ufbx_load_opts opts = { 0 };
+		opts.ignore_embedded = true;
+		ufbx_scene *scene = ufbx_load_file(buf, &opts, &error);
+		if (error.type == UFBX_ERROR_FILE_NOT_FOUND) continue;
+
+		ufbxt_assert(scene);
+		ufbxt_check_scene(scene);
+		
+		for (size_t i = 0; i < scene->videos.count; i++) {
+			ufbxt_assert(scene->videos.data[i]->content == NULL);
+			ufbxt_assert(scene->videos.data[i]->content_size == 0);
+		}
+		
+		for (size_t i = 0; i < scene->textures.count; i++) {
+			ufbxt_assert(scene->textures.data[i]->content == NULL);
+			ufbxt_assert(scene->textures.data[i]->content_size == 0);
+		}
+
+		ufbx_free_scene(scene);
+	}
 }
 #endif
 
@@ -35,12 +114,12 @@ UFBXT_FILE_TEST(maya_shared_textures)
 	ufbxt_assert(material->textures.count == 6);
 
 	ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_LAMBERT);
-	ufbxt_assert(!strcmp(material->fbx.diffuse_color.texture->relative_filename.data, "textures\\checkerboard_ambient.png")); // sic: test has wrong texture
-	ufbxt_assert(!strcmp(material->fbx.diffuse_factor.texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
-	ufbxt_assert(!strcmp(material->fbx.emission_color.texture->relative_filename.data, "textures\\checkerboard_emissive.png"));
-	ufbxt_assert(!strcmp(material->fbx.ambient_color.texture->relative_filename.data, "textures\\checkerboard_ambient.png"));
-	ufbxt_assert(!strcmp(material->fbx.transparency_color.texture->relative_filename.data, "textures\\checkerboard_transparency.png"));
-	ufbxt_assert(!strcmp(material->fbx.bump.texture->relative_filename.data, "textures\\checkerboard_bump.png"));
+	ufbxt_check_material_texture(scene, material->fbx.diffuse_color.texture, "checkerboard_ambient.png", true); // sic: test has wrong texture
+	ufbxt_check_material_texture(scene, material->fbx.diffuse_factor.texture, "checkerboard_diffuse.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.emission_color.texture, "checkerboard_emissive.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.ambient_color.texture, "checkerboard_ambient.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.transparency_color.texture, "checkerboard_transparency.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.bump.texture, "checkerboard_bump.png", true);
 
 	material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Special");
 	ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_PHONG);
@@ -59,11 +138,11 @@ UFBXT_FILE_TEST(maya_arnold_textures)
 	ufbxt_assert(material->textures.count == 5);
 
 	ufbxt_assert(material->shader_type == UFBX_SHADER_ARNOLD);
-	ufbxt_assert(!strcmp(material->pbr.base_color.texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
-	ufbxt_assert(!strcmp(material->pbr.specular_color.texture->relative_filename.data, "textures\\checkerboard_specular.png"));
-	ufbxt_assert(!strcmp(material->pbr.roughness.texture->relative_filename.data, "textures\\checkerboard_roughness.png"));
-	ufbxt_assert(!strcmp(material->pbr.metallic.texture->relative_filename.data, "textures\\checkerboard_metallic.png"));
-	ufbxt_assert(!strcmp(material->pbr.diffuse_roughness.texture->relative_filename.data, "textures\\checkerboard_roughness.png"));
+	ufbxt_check_material_texture(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.specular_color.texture, "checkerboard_specular.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.roughness.texture, "checkerboard_roughness.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.metallic.texture, "checkerboard_metallic.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.diffuse_roughness.texture, "checkerboard_roughness.png", true);
 }
 #endif
 
@@ -96,6 +175,22 @@ UFBXT_FILE_TEST(blender_293_textures)
 	ufbxt_assert(!strcmp(material->pbr.metallic.texture->relative_filename.data, "textures\\checkerboard_metallic.png"));
 	ufbxt_assert(!strcmp(material->pbr.emission_color.texture->relative_filename.data, "textures\\checkerboard_emissive.png"));
 	ufbxt_assert(!strcmp(material->pbr.opacity.texture->relative_filename.data, "textures\\checkerboard_weight.png"));
+}
+#endif
+
+UFBXT_FILE_TEST(blender_293_embedded_textures)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Material.001");
+	ufbxt_assert(material);
+	ufbxt_assert(material->textures.count == 5);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_BLENDER_PHONG);
+	ufbxt_check_texture_content(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png");
+	ufbxt_check_texture_content(scene, material->pbr.roughness.texture, "checkerboard_roughness.png");
+	ufbxt_check_texture_content(scene, material->pbr.metallic.texture, "checkerboard_metallic.png");
+	ufbxt_check_texture_content(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png");
+	ufbxt_check_texture_content(scene, material->pbr.opacity.texture, "checkerboard_weight.png");
 }
 #endif
 

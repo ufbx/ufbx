@@ -358,25 +358,18 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 #endif
 }
 
-#if 0
 static void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
 {
-	ufbxt_check_string(material->name);
-	ufbxt_check_props(scene, &material->props, true);
-}
-
-static void ufbxt_check_anim_stack(ufbx_scene *scene, ufbx_anim_stack *anim_stack)
-{
-	ufbxt_check_string(anim_stack->name);
-	ufbxt_check_props(scene, &anim_stack->props, true);
-	for (size_t i = 0; i < anim_stack->layers.count; i++) {
-		ufbx_anim_layer *layer = anim_stack->layers.data[i];
-		ptrdiff_t layer_i = scene->anim_layers.data - layer;
-		ufbxt_assert(layer >= scene->anim_layers.data);
-		ufbxt_assert(layer < scene->anim_layers.data + scene->anim_layers.count);
+	for (size_t i = 0; i < material->textures.count; i++) {
+		ufbxt_check_string(material->textures.data[i].prop_name);
+		ufbxt_check_element_ptr(scene, &material->textures.data[i].texture->element);
 	}
 }
-#endif
+
+static void ufbxt_check_texture(ufbx_scene *scene, ufbx_texture *texture)
+{
+	ufbxt_check_element_ptr(scene, &texture->video->element);
+}
 
 static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_layer)
 {
@@ -411,23 +404,13 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 		ufbxt_check_anim_layer(scene, scene->anim_layers.data[i]);
 	}
 
-#if 0
 	for (size_t i = 0; i < scene->materials.count; i++) {
-		ufbxt_check_material(scene, &scene->materials.data[i]);
+		ufbxt_check_material(scene, scene->materials.data[i]);
 	}
 
-	for (size_t i = 0; i < scene->anim_stacks.count; i++) {
-		ufbxt_check_anim_stack(scene, &scene->anim_stacks.data[i]);
+	for (size_t i = 0; i < scene->textures.count; i++) {
+		ufbxt_check_texture(scene, scene->textures.data[i]);
 	}
-
-	for (size_t i = 0; i < scene->anim_layers.count; i++) {
-		ufbxt_check_anim_layer(scene, &scene->anim_layers.data[i]);
-	}
-
-	for (size_t i = 0; i < scene->anim_props.count; i++) {
-		ufbxt_check_anim_prop(scene, &scene->anim_props.data[i]);
-	}
-#endif
 }
 
 #endif

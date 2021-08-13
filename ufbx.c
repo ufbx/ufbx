@@ -2011,6 +2011,7 @@ static const char ufbxi_PreviewDivisionLevels[] = "PreviewDivisionLevels";
 static const char ufbxi_RenderDivisionLevels[] = "RenderDivisionLevels";
 static const char ufbxi_Smoothness[] = "Smoothness";
 static const char ufbxi_BoundaryRule[] = "BoundaryRule";
+static const char ufbxi_Content[] = "Content";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, sizeof(ufbxi_AllSame) - 1 },
@@ -2216,6 +2217,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_RenderDivisionLevels, sizeof(ufbxi_RenderDivisionLevels) - 1 },
 	{ ufbxi_Smoothness, sizeof(ufbxi_Smoothness) - 1 },
 	{ ufbxi_BoundaryRule, sizeof(ufbxi_BoundaryRule) - 1 },
+	{ ufbxi_Content, sizeof(ufbxi_Content) - 1 },
 };
 
 // -- Type definitions
@@ -2581,10 +2583,11 @@ static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size)
 	// Fill the rest of the buffer with user data
 	size_t to_read = uc->read_buffer_size - num_read;
 	size_t read_result = uc->read_fn(uc->read_user, uc->read_buffer + num_read, to_read);
+	ufbxi_check_return_msg(read_result != SIZE_MAX, NULL, "IO error");
 	ufbxi_check_return(read_result <= to_read, NULL);
 
 	num_read += read_result;
-	ufbxi_check_return(num_read >= size, NULL);
+	ufbxi_check_return_msg(num_read >= size, NULL, "Truncated file");
 
 	uc->data_offset += uc->data - uc->data_begin;
 	uc->data_begin = uc->data = uc->read_buffer;
@@ -2832,6 +2835,7 @@ typedef enum {
 	UFBXI_PARSE_DEFORMER,
 	UFBXI_PARSE_POSE,
 	UFBXI_PARSE_POSE_NODE,
+	UFBXI_PARSE_VIDEO,
 	UFBXI_PARSE_LAYER_ELEMENT_NORMAL,
 	UFBXI_PARSE_LAYER_ELEMENT_BINORMAL,
 	UFBXI_PARSE_LAYER_ELEMENT_TANGENT,
@@ -2850,7 +2854,7 @@ typedef enum {
 } ufbxi_parse_state;
 
 typedef struct {
-	char type;      // < FBX type code of the array: b,i,l,f,d (or 'r' meaning ufbx_real)
+	char type;      // < FBX type code of the array: b,i,l,f,d (or 'r' meaning ufbx_real '-' ignore)
 	bool result;    // < Alloacte the array from the result buffer
 	bool tmp_buf;   // < Alloacte the array from the global temporary buffer
 	bool pad_begin; // < Pad the begin of the array with 4 zero elements to guard from invalid -1 index accesses
@@ -2877,6 +2881,7 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 		if (name == ufbxi_AnimationCurve) return UFBXI_PARSE_ANIMATION_CURVE;
 		if (name == ufbxi_Deformer) return UFBXI_PARSE_DEFORMER;
 		if (name == ufbxi_Pose) return UFBXI_PARSE_POSE;
+		if (name == ufbxi_Video) return UFBXI_PARSE_VIDEO;
 		break;
 
 	case UFBXI_PARSE_MODEL:
@@ -2982,6 +2987,13 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			return true;
 		} else if (name == ufbxi_KeyAttrRefCount && !uc->opts.ignore_animation) {
 			info->type = 'i';
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_VIDEO:
+		if (name == ufbxi_Content && uc->opts.ignore_embedded) {
+			info->type = '-';
 			return true;
 		}
 		break;
@@ -3469,6 +3481,11 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 			arr->data = arr_data;
 			arr->size = size;
 
+		} else if (c == '0') {
+			// Ignore the array
+			arr->type = '-';
+			arr->data = 0;
+			arr->size = 0;
 		} else {
 			// Allocate `num_values` elements for the array and parse single values into it.
 			ufbxi_check(num_values <= uc->opts.max_array_size);
@@ -3773,6 +3790,36 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_ascii_push_token_char(ufbxi_c
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_ascii_try_ignore_string(ufbxi_context *uc, ufbxi_ascii_token *token)
+{
+	ufbxi_ascii *ua = &uc->ascii;
+
+	char c = ufbxi_ascii_skip_whitespace(uc);
+	token->str_len = 0;
+
+	if (c == '"') {
+		// Replace `prev_token` with `token` but swap the buffers so `token` uses
+		// the now-unused string buffer of the old `prev_token`.
+		char *swap_data = ua->prev_token.str_data;
+		size_t swap_cap = ua->prev_token.str_cap;
+		ua->prev_token = ua->token;
+		ua->token.str_data = swap_data;
+		ua->token.str_cap = swap_cap;
+
+		token->type = UFBXI_ASCII_STRING;
+		c = ufbxi_ascii_next(uc);
+		while (c != '"') {
+			c = ufbxi_ascii_next(uc);
+			ufbxi_check(c != '\0');
+		}
+		// Skip closing quote
+		ufbxi_ascii_next(uc);
+		return true;
+	}
+
+	return false;
+}
+
 ufbxi_nodiscard static int ufbxi_ascii_next_token(ufbxi_context *uc, ufbxi_ascii_token *token)
 {
 	ufbxi_ascii *ua = &uc->ascii;
@@ -3883,11 +3930,6 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 	const char *name = ufbxi_push_string(uc, ua->prev_token.str_data, ua->prev_token.str_len);
 	ufbxi_check(name);
 
-	// Some fields in ASCII may have leading commas eg. `Content: , "base64-string"`
-	if (ua->token.type == ',') {
-		ufbxi_check(ufbxi_ascii_next_token(uc, &ua->token));
-	}
-
 	// Push the parsed node into the `tmp_stack` buffer, the nodes will be popped by
 	// calling code after its done parsing all of it's children.
 	ufbxi_node *node = ufbxi_push_zero(&uc->tmp_stack, ufbxi_node, 1);
@@ -3935,6 +3977,18 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 		}
 	}
 
+	// Some fields in ASCII may have leading commas eg. `Content: , "base64-string"`
+	if (ua->token.type == ',') {
+		// HACK: If we are parsing an "array" that should be ignored, ie. `Content` when
+		// `opts.ignore_embedded == true` try to skip the next token string if possible.
+		if (arr_type == '-') {
+			if (!ufbxi_ascii_try_ignore_string(uc, &ua->token)) {
+				ufbxi_check(ufbxi_ascii_next_token(uc, &ua->token));
+			}
+		} else {
+			ufbxi_check(ufbxi_ascii_next_token(uc, &ua->token));
+		}
+	}
 
 	ufbxi_parse_state parse_state = ufbxi_update_parse_state(parent_state, node->name);
 	ufbxi_value vals[UFBXI_MAX_NON_ARRAY_VALUES];
@@ -4070,14 +4124,19 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 	ua->parse_as_f32 = false;
 
 	if (arr_type) {
-		void *arr_data = ufbxi_make_array_size(arr_buf, arr_elem_size, num_values);
-		ufbxi_check(arr_data);
-		if (arr_info.pad_begin) {
-			node->array->data = (char*)arr_data + 4*arr_elem_size;
-			node->array->size = num_values - 4;
+		if (arr_type == '-') {
+			node->array->data = NULL;
+			node->array->size = 0;
 		} else {
-			node->array->data = arr_data;
-			node->array->size = num_values;
+			void *arr_data = ufbxi_make_array_size(arr_buf, arr_elem_size, num_values);
+			ufbxi_check(arr_data);
+			if (arr_info.pad_begin) {
+				node->array->data = (char*)arr_data + 4*arr_elem_size;
+				node->array->size = num_values - 4;
+			} else {
+				node->array->data = arr_data;
+				node->array->size = num_values;
+			}
 		}
 	} else {
 		num_values = ufbxi_min32(num_values, UFBXI_MAX_NON_ARRAY_VALUES);
@@ -6077,6 +6136,65 @@ ufbxi_nodiscard static int ufbxi_read_texture(ufbxi_context *uc, ufbxi_node *nod
 	return 1;
 }
 
+static void ufbxi_decode_base64(char *dst, const char *src, size_t src_length)
+{
+	uint8_t table[256] = { 0 };
+	for (char c = 'A'; c <= 'Z'; c++) table[c] = (uint8_t)(c - 'A');
+	for (char c = 'a'; c <= 'z'; c++) table[c] = (uint8_t)(26 + (c - 'a'));
+	for (char c = '0'; c <= '9'; c++) table[c] = (uint8_t)(52 + (c - '0'));
+	table['+'] = 62;
+	table['/'] = 63;
+
+	for (size_t i = 0; i + 4 <= src_length; i += 4) {
+		uint32_t a = table[src[i + 0]];
+		uint32_t b = table[src[i + 1]];
+		uint32_t c = table[src[i + 2]];
+		uint32_t d = table[src[i + 3]];
+
+		dst[0] = (char)(uint8_t)(a << 2 | b >> 4);
+		dst[1] = (char)(uint8_t)(b << 4 | c >> 2);
+		dst[2] = (char)(uint8_t)(c << 6 | d);
+		dst += 3;
+	}
+}
+
+ufbxi_nodiscard static int ufbxi_read_video(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_video *video = ufbxi_push_element(uc, info, ufbx_video, UFBX_ELEMENT_VIDEO);
+	ufbxi_check(video);
+
+	video->filename = ufbx_empty_string;
+	video->relative_filename = ufbx_empty_string;
+
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_FileName, "S", &video->filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Filename, "S", &video->filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFileName, "S", &video->relative_filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFilename, "S", &video->relative_filename));
+
+	ufbx_string content;
+	if (ufbxi_find_val1(node, ufbxi_Content, "s", &content)) {
+		if (uc->from_ascii) {
+			if (content.length % 4 == 0) {
+				size_t padding = 0;
+				while (padding < 2 && padding < content.length && content.data[content.length - 1 - padding] == '=') {
+					padding++;
+				}
+
+				video->content_size = content.length / 4 * 3 - padding;
+				video->content = ufbxi_push(&uc->result, char, video->content_size + 3);
+				ufbxi_check(video->content);
+
+				ufbxi_decode_base64((char*)video->content, content.data, content.length);
+			}
+		} else {
+			video->content = content.data;
+			video->content_size = content.length;
+		}
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_read_pose(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type)
 {
 	ufbx_pose *pose = ufbxi_push_element(uc, info, ufbx_pose, UFBX_ELEMENT_POSE);
@@ -6255,6 +6373,9 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 {
 	ufbxi_element_info info = { 0 };
 	for (;;) {
+		static int serial = 0;
+		++serial;
+
 		ufbxi_node *node;
 		ufbxi_check(ufbxi_parse_toplevel_child(uc, &node));
 		if (!node) break;
@@ -6343,7 +6464,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 		} else if (name == ufbxi_Texture) {
 			ufbxi_check(ufbxi_read_texture(uc, node, &info));
 		} else if (name == ufbxi_Video) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_video), UFBX_ELEMENT_VIDEO));
+			ufbxi_check(ufbxi_read_video(uc, node, &info));
 		} else if (name == ufbxi_AnimationStack) {
 			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_stack), UFBX_ELEMENT_ANIM_STACK));
 		} else if (name == ufbxi_AnimationLayer) {
@@ -7395,6 +7516,13 @@ ufbxi_nodiscard static int ufbxi_sort_material_textures(ufbxi_context *uc, ufbx_
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_sort_videos_by_filename(ufbxi_context *uc, ufbx_video **videos, size_t count)
+{
+	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_video*)));
+	ufbxi_macro_stable_sort(ufbx_video*, 32, videos, uc->tmp_arr, count, ( ufbxi_str_less((*a)->filename, (*b)->filename) ));
+	return 1;
+}
+
 ufbxi_nodiscard static ufbx_anim_prop *ufbxi_find_anim_prop_start(ufbx_anim_layer *layer, const ufbx_element *element)
 {
 	size_t index = SIZE_MAX;
@@ -8348,6 +8476,47 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 
 		ufbxi_check(ufbxi_sort_material_textures(uc, material->textures.data, material->textures.count));
 		ufbxi_fetch_maps(&uc->scene, material);
+	}
+
+	// HACK: If there are multiple textures in an FBX file that use the same embedded
+	// texture they get duplicated Video elements instead of a shared one _and only one
+	// of them has the content?!_ So let's gather all Video instances with content and
+	// sort them by filename so we can patch the other ones..
+	ufbx_video **content_videos = ufbxi_push(&uc->tmp, ufbx_video*, uc->scene.videos.count);
+	ufbxi_check(content_videos);
+
+	size_t num_content_videos = 0;
+	ufbxi_for_ptr_list(ufbx_video, p_video, uc->scene.videos) {
+		ufbx_video *video = *p_video;
+		if (video->content_size > 0) {
+			content_videos[num_content_videos++] = video;
+		}
+	}
+
+	if (num_content_videos > 0) {
+		ufbxi_check(ufbxi_sort_videos_by_filename(uc, content_videos, num_content_videos));
+
+		ufbxi_for_ptr_list(ufbx_video, p_video, uc->scene.videos) {
+			ufbx_video *video = *p_video;
+			if (video->content_size > 0) continue;
+
+			size_t index = SIZE_MAX;
+			ufbxi_macro_lower_bound_eq(ufbx_video*, 16, &index, content_videos, 0, num_content_videos,
+				( ufbxi_str_less((*a)->filename, video->filename) ), ( (*a)->filename.data == video->filename.data ));
+			if (!index != SIZE_MAX) {
+				video->content = content_videos[index]->content;
+				video->content_size = content_videos[index]->content_size;
+			}
+		}
+	}
+
+	ufbxi_for_ptr_list(ufbx_texture, p_texture, uc->scene.textures) {
+		ufbx_texture *texture = *p_texture;
+		texture->video = (ufbx_video*)ufbxi_fetch_dst_element(&texture->element, false, NULL, UFBX_ELEMENT_VIDEO);
+		if (texture->video) {
+			texture->content = texture->video->content;
+			texture->content_size = texture->video->content_size;
+		}
 	}
 
 
@@ -12299,6 +12468,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 
 	if (ufbxi_load_imp(uc)) {
 		if (p_error) {
+			p_error->type = UFBX_ERROR_NONE;
 			p_error->description = NULL;
 			p_error->stack_size = 0;
 		}
@@ -12306,6 +12476,14 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 		return &uc->scene_imp->scene;
 	} else {
 		if (!uc->error.description) uc->error.description = "Failed to load";
+		uc->error.type = UFBX_ERROR_UNKNOWN;
+		if (!strcmp(uc->error.description, "Out of memory")) {
+			uc->error.type = UFBX_ERROR_OUT_OF_MEMORY;
+		} else if (!strcmp(uc->error.description, "Truncated file")) {
+			uc->error.type = UFBX_ERROR_TRUNCATED_FILE;
+		} else if (!strcmp(uc->error.description, "IO error")) {
+			uc->error.type = UFBX_ERROR_IO;
+		}
 		if (p_error) *p_error = uc->error;
 		ufbxi_free_temp(uc);
 		ufbxi_free_result(uc);
@@ -13343,6 +13521,11 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &material->textures));
 	}
 
+	ufbxi_for_ptr_list(ufbx_texture, p_texture, ec->scene.textures) {
+		ufbx_texture *texture = *p_texture;
+		texture->video = (ufbx_video*)ufbxi_translate_element(ec, &texture->video->element);
+	}
+
 	ufbxi_for_ptr_list(ufbx_shader, p_shader, ec->scene.shaders) {
 		ufbx_shader *shader = *p_shader;
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &shader->bindings));
@@ -13722,6 +13905,8 @@ ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufb
 	if (!file) {
 		if (error) {
 			error->stack_size = 1;
+			error->type = UFBX_ERROR_FILE_NOT_FOUND;
+			error->description = "File not found";
 			error->stack[0].description = "File not found";
 			error->stack[0].function = __FUNCTION__;
 			error->stack[0].source_line = __LINE__;
