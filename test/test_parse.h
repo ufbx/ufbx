@@ -188,13 +188,18 @@ UFBXT_TEST(unicode_filename)
 	{
 		ufbx_scene *scene = ufbx_load_file(buf, NULL, NULL);
 		ufbxt_assert(scene);
+		ufbxt_assert(ufbx_find_node(scene, "pCube1"));
 		ufbxt_check_scene(scene);
 		ufbx_free_scene(scene);
 	}
 
+	// Remove terminating \0 for explicit length test
+	buf[len] = 'x';
+
 	{
 		ufbx_scene *scene = ufbx_load_file_len(buf, (size_t)len, NULL, NULL);
 		ufbxt_assert(scene);
+		ufbxt_assert(ufbx_find_node(scene, "pCube1"));
 		ufbxt_check_scene(scene);
 		ufbx_free_scene(scene);
 	}
