@@ -14929,8 +14929,37 @@ ufbx_transform ufbx_get_matrix_transform(const ufbx_matrix *m)
 	t.scale.y = ufbx_vec3_length(m->cols[1]);
 	t.scale.z = ufbx_vec3_length(m->cols[2]);
 
-	// TODO TODO
-
+	ufbx_vec3 x = ufbxi_mul3(m->cols[0], 1.0f / t.scale.x);
+	ufbx_vec3 y = ufbxi_mul3(m->cols[1], 1.0f / t.scale.y);
+	ufbx_vec3 z = ufbxi_mul3(m->cols[2], 1.0f / t.scale.z);
+	ufbx_real trace = x.x + y.y + z.z;
+	if (trace > 0.0f) {
+		ufbx_real a = (ufbx_real)sqrt(fmax(0.0, trace + 1.0)), b = 0.5f / a;
+		t.rotation.x = (y.z - z.y) * b;
+		t.rotation.y = (z.x - x.z) * b;
+		t.rotation.z = (x.y - y.x) * b;
+		t.rotation.w = 0.5f * a;
+	} else if (x.x > y.y && x.x > z.z) {
+		ufbx_real a = (ufbx_real)sqrt(fmax(0.0, 1.0 + x.x - y.y - z.z)), b = 0.5f / a;
+		t.rotation.x = 0.5f * a;
+		t.rotation.y = (y.x + x.y) * b;
+		t.rotation.z = (z.x + x.z) * b;
+		t.rotation.w = (y.z - z.y) * b;
+	}
+	else if (y.y > z.z) {
+		ufbx_real a = (ufbx_real)sqrt(fmax(0.0, 1.0 - x.x + y.y - z.z)), b = 0.5f / a;
+		t.rotation.x = (y.x + x.y) * b;
+		t.rotation.y = 0.5f * a;
+		t.rotation.z = (z.y + y.z) * b;
+		t.rotation.w = (z.x - x.z) * b;
+	}
+	else {
+		ufbx_real a = (ufbx_real)sqrt(fmax(0.0, 1.0 - x.x - y.y + z.z)), b = 0.5f / a;
+		t.rotation.x = (z.x + x.z) * b;
+		t.rotation.y = (z.y + y.z) * b;
+		t.rotation.z = 0.5f * a;
+		t.rotation.w = (x.y - y.x) * b;
+	}
 	return t;
 }
 

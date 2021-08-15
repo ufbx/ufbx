@@ -1,5 +1,6 @@
 
 #include "test_deflate.h"
+#include "test_math.h"
 #include "test_parse.h"
 #include "test_mesh.h"
 #include "test_transform.h"
