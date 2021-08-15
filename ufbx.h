@@ -1652,6 +1652,9 @@ ufbx_scene *ufbx_load_memory(
 ufbx_scene *ufbx_load_file(
 	const char *filename,
 	const ufbx_load_opts *opts, ufbx_error *error);
+ufbx_scene *ufbx_load_file_len(
+	const char *filename, size_t filename_len,
+	const ufbx_load_opts *opts, ufbx_error *error);
 
 // Load a scene by reading from an `FILE *file` stream
 // NOTE: Uses a void pointer to not include <stdio.h>

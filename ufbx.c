@@ -13830,6 +13830,96 @@ static ufbx_real ufbxi_edge_crease(const ufbx_mesh *mesh, bool split, ufbx_topo_
 
 // -- File IO
 
+static FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp_ator)
+{
+#if defined(_WIN32)
+	wchar_t wpath_buf[256];
+	wchar_t *wpath = NULL;
+
+	if (path_len == SIZE_MAX) {
+		path_len = strlen(path);
+	}
+	if (path_len < ufbxi_arraycount(wpath_buf) - 1) {
+		wpath = wpath_buf;
+	} else {
+		wpath = ufbxi_alloc(tmp_ator, wchar_t, path_len + 1);
+		if (!wpath) return NULL;
+	}
+
+	// Convert UTF-8 to UTF-16 but allow stray surrogate pairs as the Windows
+	// file system encoding allows them as well..
+	size_t wlen = 0;
+	for (size_t i = 0; i < path_len; ) {
+		uint32_t code = UINT32_MAX;
+		char c = path[i++];
+		if ((c & 0x80) == 0) {
+			code = (uint32_t)c;
+		} else if ((c & 0xe0) == 0xc0) {
+			code = (uint32_t)(c & 0x1f);
+			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+		} else if ((c & 0xf0) == 0xe0) {
+			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+		} else if ((c & 0xf8) == 0xf0) {
+			code = (uint32_t)(c & 0x07);
+			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+		}
+		if (code < 0x10000) {
+			wpath[wlen++] = (wchar_t)code;
+		} else {
+			code -= 0x10000;
+			wpath[wlen++] = (wchar_t)(0xd800 + (code >> 10));
+			wpath[wlen++] = (wchar_t)(0xdc00 + (code & 0x3ff));
+		}
+	}
+	wpath[wlen] = 0;
+
+	FILE *file = NULL;
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+	if (_wfopen_s(&file, wpath, L"rb") != 0) {
+		file = NULL;
+	}
+#else
+	file = _wfopen(wpath, L"rb");
+#endif
+
+	if (wpath != wpath_buf) {
+		ufbxi_free(tmp_ator, wchar_t, wpath, path_len + 1);
+	}
+
+	return file;
+#else
+	if (path_len == SIZE_MAX) {
+		return fopen(path, "rb");
+	}
+
+	char copy_buf[256];
+	char *copy = NULL;
+
+	if (path_len == SIZE_MAX) {
+		path_len = strlen(path);
+	}
+	if (path_len < ufbxi_arraycount(copy_buf) - 1) {
+		copy = copy_buf;
+	} else {
+		copy = ufbxi_alloc(tmp_ator, char, path_len + 1);
+		if (!copy) return NULL;
+	}
+	memcpy(copy, path, path_len);
+	path[path_len] = '\0';
+
+	FILE *file = fopen(copy, "rb");
+
+	if (wpath != wpath_buf) {
+		ufbxi_free(tmp_ator, wchar_t, wpath, path_len + 1);
+	}
+
+	return file;
+#endif
+}
+
 static size_t ufbxi_file_read(void *user, void *data, size_t max_size)
 {
 	FILE *file = (FILE*)user;
@@ -13896,12 +13986,22 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts
 
 ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error)
 {
-	FILE *file;
-	#ifdef _MSC_VER
-		if (fopen_s(&file, filename, "rb")) file = NULL;
-	#else
-		file = fopen(filename, "rb");
-	#endif
+	return ufbx_load_file_len(filename, SIZE_MAX, opts, error);
+}
+
+ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_len, const ufbx_load_opts *opts, ufbx_error *error)
+{
+	ufbxi_allocator tmp_ator = { 0 };
+	ufbx_error tmp_error = { 0 };
+	tmp_ator.error = &tmp_error;
+	tmp_ator.allocs_left = 1;
+	if (opts) {
+		tmp_ator.ator = opts->temp_allocator;
+		tmp_ator.max_size = opts->max_temp_memory;
+		tmp_ator.allocs_left = opts->max_temp_allocs;
+	}
+
+	FILE *file = ufbxi_fopen(filename, filename_len, &tmp_ator);
 	if (!file) {
 		if (error) {
 			error->stack_size = 1;
@@ -15018,6 +15118,7 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 		if (skin_vertex.dq_weight > 0.0f) {
 			q0.x *= rcp_weight; q0.y *= rcp_weight; q0.z *= rcp_weight; q0.w *= rcp_weight;
 			qe.x *= rcp_weight; qe.y *= rcp_weight; qe.z *= rcp_weight; qe.w *= rcp_weight;
+			qs.x *= rcp_weight; qs.y *= rcp_weight; qs.z *= rcp_weight;
 		}
 		if (skin_vertex.dq_weight < 1.0f) {
 			mat.m00 *= rcp_weight; mat.m01 *= rcp_weight; mat.m02 *= rcp_weight; mat.m03 *= rcp_weight;
@@ -15033,9 +15134,9 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 		dqt.rotation.y = q0.y * rcp_len;
 		dqt.rotation.z = q0.z * rcp_len;
 		dqt.rotation.w = q0.w * rcp_len;
-		dqt.scale.x = 1.0f;
-		dqt.scale.y = 1.0f;
-		dqt.scale.z = 1.0f;
+		dqt.scale.x = qs.x;
+		dqt.scale.y = qs.y;
+		dqt.scale.z = qs.z;
 		dqt.translation.x = (2.0f * rcp_len) * (- qe.w*q0.x + qe.x*q0.w - qe.y*q0.z + qe.z*q0.y);
 		dqt.translation.y = (2.0f * rcp_len) * (- qe.w*q0.y + qe.x*q0.z + qe.y*q0.w - qe.z*q0.x);
 		dqt.translation.z = (2.0f * rcp_len) * (- qe.w*q0.z - qe.x*q0.y + qe.y*q0.x + qe.z*q0.w);
