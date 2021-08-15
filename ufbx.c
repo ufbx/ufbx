@@ -13858,6 +13858,7 @@ static FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp
 			code = (uint32_t)(c & 0x1f);
 			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
 		} else if ((c & 0xf0) == 0xe0) {
+			code = (uint32_t)(c & 0x0f);
 			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
 			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
 		} else if ((c & 0xf8) == 0xf0) {

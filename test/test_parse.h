@@ -177,3 +177,26 @@ UFBXT_FILE_TEST(blender_272_cube)
 	ufbxt_assert(scene->metadata.exporter_version == ufbx_pack_version(2, 72, 0));
 }
 #endif
+
+UFBXT_TEST(unicode_filename)
+#if UFBXT_IMPL
+{
+	char buf[1024];
+	int len = snprintf(buf, sizeof(buf), "%ssynthetic_\x61\xce\xb2\xe3\x82\xab\xf0\x9f\x98\x82_7500_ascii.fbx", data_root);
+	ufbxt_assert(len > 0 && len < sizeof(buf));
+
+	{
+		ufbx_scene *scene = ufbx_load_file(buf, NULL, NULL);
+		ufbxt_assert(scene);
+		ufbxt_check_scene(scene);
+		ufbx_free_scene(scene);
+	}
+
+	{
+		ufbx_scene *scene = ufbx_load_file_len(buf, (size_t)len, NULL, NULL);
+		ufbxt_assert(scene);
+		ufbxt_check_scene(scene);
+		ufbx_free_scene(scene);
+	}
+}
+#endif
