@@ -15072,7 +15072,7 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 	ufbx_matrix mat = { 0.0f };
 	ufbx_quat q0 = { 0.0f }, qe = { 0.0f };
 	ufbx_quat first_q0 = { 0.0f };
-	ufbx_vec3 qs = { 1.0f, 1.0f, 1.0f };
+	ufbx_vec3 qs = { 0.0f, 0.0f, 0.0f };
 	ufbx_real total_weight = 0.0f;
 
 	for (uint32_t i = 0; i < skin_vertex.num_weights; i++) {
@@ -15095,7 +15095,7 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 			}
 
 			ufbx_quat vqt = { 0.5f * t.translation.x, 0.5f * t.translation.y, 0.5f * t.translation.z };
-			ufbx_quat vqe = ufbxi_mul_quat(vq0, vqt);
+			ufbx_quat vqe = ufbxi_mul_quat(vqt, vq0);
 			ufbxi_add_weighted_quat(&q0, vq0, weight.weight);
 			ufbxi_add_weighted_quat(&qe, vqe, weight.weight);
 			ufbxi_add_weighted_vec3(&qs, t.scale, weight.weight);

@@ -314,3 +314,15 @@ UFBXT_FILE_TEST(blender_293_half_skinned)
 	ufbxt_assert(skin->vertices.data[3].num_weights == 0);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_dual_quaternion)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->skins.count == 1);
+	ufbx_skin_deformer *skin = mesh->skins.data[0];
+	ufbxt_assert(skin->skinning_method == UFBX_SKINNING_DUAL_QUATERNION);
+}
+#endif
