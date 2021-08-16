@@ -2012,6 +2012,27 @@ static const char ufbxi_RenderDivisionLevels[] = "RenderDivisionLevels";
 static const char ufbxi_Smoothness[] = "Smoothness";
 static const char ufbxi_BoundaryRule[] = "BoundaryRule";
 static const char ufbxi_Content[] = "Content";
+static const char ufbxi_UpAxis[] = "UpAxis";
+static const char ufbxi_UpAxisSign[] = "UpAxisSign";
+static const char ufbxi_FrontAxis[] = "FrontAxis";
+static const char ufbxi_FrontAxisSign[] = "FrontAxisSign";
+static const char ufbxi_CoordAxis[] = "CoordAxis";
+static const char ufbxi_CoordAxisSign[] = "CoordAxisSign";
+static const char ufbxi_OriginalUpAxis[] = "OriginalUpAxis";
+static const char ufbxi_OriginalUpAxisSign[] = "OriginalUpAxisSign";
+static const char ufbxi_UnitScaleFactor[] = "UnitScaleFactor";
+static const char ufbxi_OriginalUnitScaleFactor[] = "OriginalUnitScaleFactor";
+static const char ufbxi_AmbientColor[] = "AmbientColor";
+static const char ufbxi_DefaultCamera[] = "DefaultCamera";
+static const char ufbxi_TimeMode[] = "TimeMode";
+static const char ufbxi_TimeProtocol[] = "TimeProtocol";
+static const char ufbxi_SnapOnFrameMode[] = "SnapOnFrameMode";
+static const char ufbxi_TimeSpanStart[] = "TimeSpanStart";
+static const char ufbxi_TimeSpanStop[] = "TimeSpanStop";
+static const char ufbxi_CustomFrameRate[] = "CustomFrameRate";
+static const char ufbxi_TimeMarker[] = "TimeMarker";
+static const char ufbxi_CurrentTimeMarker[] = "CurrentTimeMarker";
+static const char ufbxi_GlobalSettings[] = "GlobalSettings";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, sizeof(ufbxi_AllSame) - 1 },
@@ -2218,6 +2239,27 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Smoothness, sizeof(ufbxi_Smoothness) - 1 },
 	{ ufbxi_BoundaryRule, sizeof(ufbxi_BoundaryRule) - 1 },
 	{ ufbxi_Content, sizeof(ufbxi_Content) - 1 },
+	{ ufbxi_UpAxis, sizeof(ufbxi_UpAxis) - 1 },
+	{ ufbxi_UpAxisSign, sizeof(ufbxi_UpAxisSign) - 1 },
+	{ ufbxi_FrontAxis, sizeof(ufbxi_FrontAxis) - 1 },
+	{ ufbxi_FrontAxisSign, sizeof(ufbxi_FrontAxisSign) - 1 },
+	{ ufbxi_CoordAxis, sizeof(ufbxi_CoordAxis) - 1 },
+	{ ufbxi_CoordAxisSign, sizeof(ufbxi_CoordAxisSign) - 1 },
+	{ ufbxi_OriginalUpAxis, sizeof(ufbxi_OriginalUpAxis) - 1 },
+	{ ufbxi_OriginalUpAxisSign, sizeof(ufbxi_OriginalUpAxisSign) - 1 },
+	{ ufbxi_UnitScaleFactor, sizeof(ufbxi_UnitScaleFactor) - 1 },
+	{ ufbxi_OriginalUnitScaleFactor, sizeof(ufbxi_OriginalUnitScaleFactor) - 1 },
+	{ ufbxi_AmbientColor, sizeof(ufbxi_AmbientColor) - 1 },
+	{ ufbxi_DefaultCamera, sizeof(ufbxi_DefaultCamera) - 1 },
+	{ ufbxi_TimeMode, sizeof(ufbxi_TimeMode) - 1 },
+	{ ufbxi_TimeProtocol, sizeof(ufbxi_TimeProtocol) - 1 },
+	{ ufbxi_SnapOnFrameMode, sizeof(ufbxi_SnapOnFrameMode) - 1 },
+	{ ufbxi_TimeSpanStart, sizeof(ufbxi_TimeSpanStart) - 1 },
+	{ ufbxi_TimeSpanStop, sizeof(ufbxi_TimeSpanStop) - 1 },
+	{ ufbxi_CustomFrameRate, sizeof(ufbxi_CustomFrameRate) - 1 },
+	{ ufbxi_TimeMarker, sizeof(ufbxi_TimeMarker) - 1 },
+	{ ufbxi_CurrentTimeMarker, sizeof(ufbxi_CurrentTimeMarker) - 1 },
+	{ ufbxi_GlobalSettings, sizeof(ufbxi_GlobalSettings) - 1 },
 };
 
 // -- Type definitions
@@ -3416,7 +3458,6 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 			// If the source and destination types are equal and our build is binary-compatible
 			// with the FBX format we can read the decoded data directly into the array buffer.
 			// Otherwise we need a temporary buffer to decode the array into before conversion.
-			// TODO: Streaming array conversion?
 			void *decoded_data = arr_data;
 			if (src_type != dst_type || uc->big_endian) {
 				ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, decoded_data_size));
@@ -4775,7 +4816,6 @@ ufbxi_nodiscard static int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *
 	ufbxi_check(ufbxi_sort_properties(uc, props->props, props->num_props));
 
 	// Remove duplicates, the last one wins
-	// TODO: Does this match the actual FBX importer behavior?
 	if (props->num_props >= 2) {
 		ufbx_prop *ps = props->props;
 		size_t dst = 0, src = 0, end = props->num_props;
@@ -6369,16 +6409,24 @@ ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_context *uc, ufb
 	return 1;
 }
 
+ufbxi_nodiscard static int ufbxi_read_global_settings(ufbxi_context *uc, ufbxi_node *node)
+{
+	ufbxi_check(ufbxi_read_properties(uc, node, &uc->scene.settings.props));
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 {
 	ufbxi_element_info info = { 0 };
 	for (;;) {
-		static int serial = 0;
-		++serial;
-
 		ufbxi_node *node;
 		ufbxi_check(ufbxi_parse_toplevel_child(uc, &node));
 		if (!node) break;
+
+		if (node->name == ufbxi_GlobalSettings) {
+			ufbxi_check(ufbxi_read_global_settings(uc, node));
+			continue;
+		}
 
 		ufbx_string type_and_name, sub_type_str;
 
@@ -6914,6 +6962,12 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 	if (uc->version < 7000) {
 		ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_Takes));
 		ufbxi_check(ufbxi_read_takes(uc));
+	}
+
+	// Check if there's a top-level GlobalSettings that we skimmed over
+	ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_GlobalSettings));
+	if (uc->top_node) {
+		ufbxi_check(ufbxi_read_global_settings(uc, uc->top_node));
 	}
 
 	return 1;
@@ -11055,6 +11109,40 @@ static void ufbxi_update_anim_stack(ufbx_scene *scene, ufbx_anim_stack *stack)
 	}
 }
 
+ufbx_coordinate_axis ufbxi_find_axis(const ufbx_props *props, const char *axis_name, const char *sign_name)
+{
+	int64_t axis = ufbxi_find_int(props, axis_name, 3);
+	int64_t sign = ufbxi_find_int(props, sign_name, 2);
+
+	switch (axis) {
+	case 0: return sign > 0 ? UFBX_COORDINATE_AXIS_POSITIVE_X : UFBX_COORDINATE_AXIS_NEGATIVE_X;
+	case 1: return sign > 0 ? UFBX_COORDINATE_AXIS_POSITIVE_Y : UFBX_COORDINATE_AXIS_NEGATIVE_Y;
+	case 2: return sign > 0 ? UFBX_COORDINATE_AXIS_POSITIVE_Z : UFBX_COORDINATE_AXIS_NEGATIVE_Z;
+	default: return UFBX_COORDINATE_AXIS_UNKNOWN;
+	}
+}
+
+static const ufbx_real ufbxi_time_mode_fps[] = {
+	24.0f,   // UFBX_TIME_MODE_DEFAULT
+	120.0f,  // UFBX_TIME_MODE_120_FPS
+	100.0f,  // UFBX_TIME_MODE_100_FPS
+	60.0f,   // UFBX_TIME_MODE_60_FPS
+	50.0f,   // UFBX_TIME_MODE_50_FPS
+	48.0f,   // UFBX_TIME_MODE_48_FPS
+	30.0f,   // UFBX_TIME_MODE_30_FPS
+	30.0f,   // UFBX_TIME_MODE_30_FPS_DROP
+	29.97f,  // UFBX_TIME_MODE_NTSC_DROP_FRAME
+	29.97f,  // UFBX_TIME_MODE_NTSC_FULL_FRAME
+	25.0f,   // UFBX_TIME_MODE_PAL
+	24.0f,   // UFBX_TIME_MODE_24_FPS
+	1000.0f, // UFBX_TIME_MODE_1000_FPS
+	23.976f, // UFBX_TIME_MODE_FILM_FULL_FRAME
+	24.0f,   // UFBX_TIME_MODE_CUSTOM
+	96.0f,   // UFBX_TIME_MODE_96_FPS
+	72.0f,   // UFBX_TIME_MODE_72_FPS
+	59.94f,  // UFBX_TIME_MODE_59_94_FPS
+};
+
 static void ufbxi_update_scene(ufbx_scene *scene)
 {
 	ufbxi_for_ptr_list(ufbx_node, p_node, scene->nodes) {
@@ -11087,6 +11175,33 @@ static void ufbxi_update_scene(ufbx_scene *scene)
 
 	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, scene->anim_stacks) {
 		ufbxi_update_anim_stack(scene, *p_stack);
+	}
+}
+
+static void ufbxi_update_scene_settings(ufbx_scene_settings *settings)
+{
+	settings->axis_up = ufbxi_find_axis(&settings->props, ufbxi_UpAxis, ufbxi_UpAxisSign);
+	settings->axis_front = ufbxi_find_axis(&settings->props, ufbxi_FrontAxis, ufbxi_FrontAxisSign);
+	settings->axis_right = ufbxi_find_axis(&settings->props, ufbxi_CoordAxis, ufbxi_CoordAxisSign);
+	settings->original_axis_up = ufbxi_find_axis(&settings->props, ufbxi_OriginalUpAxis, ufbxi_OriginalUpAxisSign);
+	settings->unit_scale_factor = ufbxi_find_real(&settings->props, ufbxi_UnitScaleFactor, 1.0f);
+	settings->original_unit_scale_factor = ufbxi_find_real(&settings->props, ufbxi_OriginalUnitScaleFactor, settings->unit_scale_factor);
+	settings->frames_per_second = ufbxi_find_real(&settings->props, ufbxi_CustomFrameRate, 24.0f);
+	settings->ambient_color = ufbxi_find_vec3(&settings->props, ufbxi_AmbientColor, 0.0f, 0.0f, 0.0f);
+
+	ufbx_prop *default_camera = ufbxi_find_prop(&settings->props, ufbxi_DefaultCamera);
+	if (default_camera) {
+		settings->default_camera = default_camera->value_str;
+	} else {
+		settings->default_camera = ufbx_empty_string;
+	}
+
+	settings->time_mode = ufbxi_find_enum(&settings->props, ufbxi_TimeMode, UFBX_TIME_MODE_24_FPS, UFBX_TIME_MODE_59_94_FPS);
+	settings->time_protocol = ufbxi_find_enum(&settings->props, ufbxi_TimeProtocol, UFBX_TIME_PROTOCOL_DEFAULT, UFBX_TIME_PROTOCOL_DEFAULT);
+	settings->snap_mode = ufbxi_find_enum(&settings->props, ufbxi_SnapOnFrameMode, UFBX_SNAP_MODE_NONE, UFBX_SNAP_MODE_SNAP_AND_PLAY);
+
+	if (settings->time_mode != UFBX_TIME_MODE_CUSTOM) {
+		settings->frames_per_second = ufbxi_time_mode_fps[settings->time_mode];
 	}
 }
 
@@ -12305,6 +12420,7 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	uc->scene.metadata.ktime_to_sec = uc->ktime_to_sec;
 
 	ufbxi_update_scene(&uc->scene);
+	ufbxi_update_scene_settings(&uc->scene.settings);
 	ufbxi_patch_cluster_binding(&uc->scene);
 
 	// Evaluate skinning if requested
@@ -13277,7 +13393,7 @@ void ufbxi_evaluate_props(ufbx_anim anim, const ufbx_element *element, double ti
 
 		// Find the weight for the current layer
 		// TODO: Should this be searched from multipler layers?
-		// TODO: USe weight from layer_desc
+		// TODO: Use weight from layer_desc
 		ufbx_real weight = layer->weight;
 		if (layer->weight_is_animated && layer->blended) {
 			ufbx_anim_prop *weight_aprop = ufbxi_find_anim_prop_start(layer, &layer->element);
@@ -15661,7 +15777,6 @@ void ufbx_subdivide_layer(const ufbx_mesh *mesh, ufbx_vertex_attrib *result, con
 			ufbx_real v_weight = (ufbx_real)(valence - 2) / (ufbx_real)valence;
 
 			// Select the right subdivision mask depending on valence and crease
-			// TODO: Different rules for vertices and UVs
 			if (num_crease > 2
 				|| (sharp_corners && valence == 2 && (num_split > 0 || on_boundary))
 				|| (sharp_splits && (num_split > 0 || on_boundary))

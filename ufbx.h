@@ -1369,8 +1369,78 @@ typedef struct ufbx_metadata {
 	double ktime_to_sec;
 } ufbx_metadata;
 
+typedef enum ufbx_coordinate_axis {
+	UFBX_COORDINATE_AXIS_POSITIVE_X,
+	UFBX_COORDINATE_AXIS_NEGATIVE_X,
+	UFBX_COORDINATE_AXIS_POSITIVE_Y,
+	UFBX_COORDINATE_AXIS_NEGATIVE_Y,
+	UFBX_COORDINATE_AXIS_POSITIVE_Z,
+	UFBX_COORDINATE_AXIS_NEGATIVE_Z,
+	UFBX_COORDINATE_AXIS_UNKNOWN,
+} ufbx_coordinate_axis;
+
+typedef enum ufbx_time_mode {
+	UFBX_TIME_MODE_DEFAULT,
+	UFBX_TIME_MODE_120_FPS,
+	UFBX_TIME_MODE_100_FPS,
+	UFBX_TIME_MODE_60_FPS,
+	UFBX_TIME_MODE_50_FPS,
+	UFBX_TIME_MODE_48_FPS,
+	UFBX_TIME_MODE_30_FPS,
+	UFBX_TIME_MODE_30_FPS_DROP,
+	UFBX_TIME_MODE_NTSC_DROP_FRAME,
+	UFBX_TIME_MODE_NTSC_FULL_FRAME,
+	UFBX_TIME_MODE_PAL,
+	UFBX_TIME_MODE_24_FPS,
+	UFBX_TIME_MODE_1000_FPS,
+	UFBX_TIME_MODE_FILM_FULL_FRAME,
+	UFBX_TIME_MODE_CUSTOM,
+	UFBX_TIME_MODE_96_FPS,
+	UFBX_TIME_MODE_72_FPS,
+	UFBX_TIME_MODE_59_94_FPS,
+} ufbx_time_mode;
+
+typedef enum ufbx_time_protocol {
+	UFBX_TIME_PROTOCOL_SMPTE,
+	UFBX_TIME_PROTOCOL_FRAME_COUNT,
+	UFBX_TIME_PROTOCOL_DEFAULT,
+} ufbx_time_protocol;
+
+typedef enum ufbx_snap_mode {
+	UFBX_SNAP_MODE_NONE,
+	UFBX_SNAP_MODE_SNAP,
+	UFBX_SNAP_MODE_PLAY,
+	UFBX_SNAP_MODE_SNAP_AND_PLAY,
+} ufbx_snap_mode;
+
+// Global settings: Axes and time/unit scales
+typedef struct ufbx_scene_settings {
+	ufbx_props props;
+
+	ufbx_coordinate_axis axis_right;
+	ufbx_coordinate_axis axis_up;
+	ufbx_coordinate_axis axis_front;
+
+	ufbx_real unit_scale_factor;
+	ufbx_real frames_per_second;
+
+	ufbx_vec3 ambient_color;
+	ufbx_string default_camera;
+
+	ufbx_time_mode time_mode;
+	ufbx_time_protocol time_protocol;
+	ufbx_snap_mode snap_mode;
+
+	// Original settings (?)
+	ufbx_coordinate_axis original_axis_up;
+	ufbx_real original_unit_scale_factor;
+} ufbx_scene_settings;
+
 struct ufbx_scene {
 	ufbx_metadata metadata;
+
+	// Global settings
+	ufbx_scene_settings settings;
 
 	// Node instances in the scene
 	ufbx_node *root_node;
