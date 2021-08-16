@@ -15131,6 +15131,7 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 	if (skin_vertex.dq_weight > 0.0f) {
 		ufbx_transform dqt;
 		ufbx_real rcp_len = (ufbx_real)(1.0 / sqrt(q0.x*q0.x + q0.y*q0.y + q0.z*q0.z + q0.w*q0.w));
+		ufbx_real rcp_len2x2 = 2.0f * rcp_len * rcp_len;
 		dqt.rotation.x = q0.x * rcp_len;
 		dqt.rotation.y = q0.y * rcp_len;
 		dqt.rotation.z = q0.z * rcp_len;
@@ -15138,9 +15139,9 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 		dqt.scale.x = qs.x;
 		dqt.scale.y = qs.y;
 		dqt.scale.z = qs.z;
-		dqt.translation.x = (2.0f * rcp_len) * (- qe.w*q0.x + qe.x*q0.w - qe.y*q0.z + qe.z*q0.y);
-		dqt.translation.y = (2.0f * rcp_len) * (- qe.w*q0.y + qe.x*q0.z + qe.y*q0.w - qe.z*q0.x);
-		dqt.translation.z = (2.0f * rcp_len) * (- qe.w*q0.z - qe.x*q0.y + qe.y*q0.x + qe.z*q0.w);
+		dqt.translation.x = rcp_len2x2 * (- qe.w*q0.x + qe.x*q0.w - qe.y*q0.z + qe.z*q0.y);
+		dqt.translation.y = rcp_len2x2 * (- qe.w*q0.y + qe.x*q0.z + qe.y*q0.w - qe.z*q0.x);
+		dqt.translation.z = rcp_len2x2 * (- qe.w*q0.z - qe.x*q0.y + qe.y*q0.x + qe.z*q0.w);
 		ufbx_matrix dqm = ufbx_get_transform_matrix(&dqt);
 		if (skin_vertex.dq_weight < 1.0f) {
 			ufbxi_add_weighted_mat(&mat, &dqm, skin_vertex.dq_weight);

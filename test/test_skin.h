@@ -326,3 +326,23 @@ UFBXT_FILE_TEST(maya_dual_quaternion)
 	ufbxt_assert(skin->skinning_method == UFBX_SKINNING_DUAL_QUATERNION);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_dual_quaternion_scale)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->skins.count == 1);
+	ufbx_skin_deformer *skin = mesh->skins.data[0];
+	ufbxt_assert(skin->skinning_method == UFBX_SKINNING_DUAL_QUATERNION);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_dq_weights)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, false, "maya_dq_weights_10", NULL, 10.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_dq_weights_18", NULL, 18.0/24.0);
+}
+#endif
