@@ -255,6 +255,7 @@ class GCCCompiler(Compiler):
         if config.get("ubsan"):
             args.append("-fsanitize=undefined")
             args.append("-fno-sanitize=float-cast-overflow")
+            args.append("-DUFBX_UBSAN")
 
         if "mingw" in self.arch:
             args.append("-D__USE_MINGW_ANSI_STDIO=1")

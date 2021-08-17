@@ -1533,9 +1533,6 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			// Evaluate all the default animation and all stacks
 
-#ifdef _MSC_VER
-#else
-			#error "ENABLE THIS"
 			{
 				uint64_t eval_begin = cputime_cpu_tick();
 				ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, 1.0, NULL, NULL);
@@ -1562,7 +1559,6 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbxt_check_scene(state);
 				ufbx_free_scene(state);
 			}
-#endif
 
 			ufbxt_diff_error err = { 0 };
 

@@ -253,13 +253,11 @@ UFBXT_FILE_TEST(maya_transform_animation)
 #endif
 
 
-#if !defined(_MSC_VER) // TODO
-
 UFBXT_FILE_TEST(maya_anim_layers)
 #if UFBXT_IMPL
 {
-	ufbx_anim_layer *x = ufbx_find_anim_layer(scene, "X");
-	ufbx_anim_layer *y = ufbx_find_anim_layer(scene, "Y");
+	ufbx_anim_layer *x = (ufbx_anim_layer*)ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "X");
+	ufbx_anim_layer *y = (ufbx_anim_layer*)ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "Y");
 	ufbxt_assert(x && y);
 	ufbxt_assert(y->compose_rotation == false);
 	ufbxt_assert(y->compose_scale == false);
@@ -269,8 +267,8 @@ UFBXT_FILE_TEST(maya_anim_layers)
 UFBXT_FILE_TEST(maya_anim_layers_acc)
 #if UFBXT_IMPL
 {
-	ufbx_anim_layer *x = ufbx_find_anim_layer(scene, "X");
-	ufbx_anim_layer *y = ufbx_find_anim_layer(scene, "Y");
+	ufbx_anim_layer *x = (ufbx_anim_layer*)ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "X");
+	ufbx_anim_layer *y = (ufbx_anim_layer*)ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "Y");
 	ufbxt_assert(x && y);
 	ufbxt_assert(y->compose_rotation == true);
 	ufbxt_assert(y->compose_scale == true);
@@ -280,8 +278,8 @@ UFBXT_FILE_TEST(maya_anim_layers_acc)
 UFBXT_FILE_TEST(maya_anim_layers_over)
 #if UFBXT_IMPL
 {
-	ufbx_anim_layer *x = ufbx_find_anim_layer(scene, "X");
-	ufbx_anim_layer *y = ufbx_find_anim_layer(scene, "Y");
+	ufbx_anim_layer *x = (ufbx_anim_layer*)ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "X");
+	ufbx_anim_layer *y = (ufbx_anim_layer*)ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "Y");
 	ufbxt_assert(x && y);
 	ufbxt_assert(y->compose_rotation == false);
 	ufbxt_assert(y->compose_scale == false);
@@ -291,13 +289,11 @@ UFBXT_FILE_TEST(maya_anim_layers_over)
 UFBXT_FILE_TEST(maya_anim_layers_over_acc)
 #if UFBXT_IMPL
 {
-	ufbx_anim_layer *x = ufbx_find_anim_layer(scene, "X");
-	ufbx_anim_layer *y = ufbx_find_anim_layer(scene, "Y");
+	ufbx_anim_layer *x = (ufbx_anim_layer*)ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "X");
+	ufbx_anim_layer *y = (ufbx_anim_layer*)ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "Y");
 	ufbxt_assert(x && y);
 	ufbxt_assert(y->compose_rotation == true);
 	ufbxt_assert(y->compose_scale == true);
 }
-#endif
-
 #endif
 

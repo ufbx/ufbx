@@ -142,8 +142,6 @@ typedef struct ufbx_matrix {
 
 typedef struct ufbx_prop ufbx_prop;
 typedef struct ufbx_props ufbx_props;
-typedef struct ufbx_element ufbx_element;
-
 // Data type contained within the property. All the data fields are always
 // populated regardless of type, so there's no need to switch by type usually
 // eg. `prop->value_real` and `prop->value_int` have the same value (well, close)

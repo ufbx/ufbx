@@ -74,6 +74,10 @@
 	#endif
 #endif
 
+#if defined(__SANITIZE_UNDEFINED__)  && !defined(UFBX_UBSAN)
+	#define UFBX_UBSAN 1
+#endif
+
 // Don't use unaligned loads with UB-sanitizer
 #if defined(UFBX_UBSAN) && !defined(UFBX_NO_UNALIGNED_LOADS)
 	#define UFBX_NO_UNALIGNED_LOADS
@@ -6176,17 +6180,17 @@ ufbxi_nodiscard static int ufbxi_read_texture(ufbxi_context *uc, ufbxi_node *nod
 static void ufbxi_decode_base64(char *dst, const char *src, size_t src_length)
 {
 	uint8_t table[256] = { 0 };
-	for (char c = 'A'; c <= 'Z'; c++) table[c] = (uint8_t)(c - 'A');
-	for (char c = 'a'; c <= 'z'; c++) table[c] = (uint8_t)(26 + (c - 'a'));
-	for (char c = '0'; c <= '9'; c++) table[c] = (uint8_t)(52 + (c - '0'));
-	table['+'] = 62;
-	table['/'] = 63;
+	for (char c = 'A'; c <= 'Z'; c++) table[(size_t)c] = (uint8_t)(c - 'A');
+	for (char c = 'a'; c <= 'z'; c++) table[(size_t)c] = (uint8_t)(26 + (c - 'a'));
+	for (char c = '0'; c <= '9'; c++) table[(size_t)c] = (uint8_t)(52 + (c - '0'));
+	table[(size_t)'+'] = 62;
+	table[(size_t)'/'] = 63;
 
 	for (size_t i = 0; i + 4 <= src_length; i += 4) {
-		uint32_t a = table[src[i + 0]];
-		uint32_t b = table[src[i + 1]];
-		uint32_t c = table[src[i + 2]];
-		uint32_t d = table[src[i + 3]];
+		uint32_t a = table[(size_t)src[i + 0]];
+		uint32_t b = table[(size_t)src[i + 1]];
+		uint32_t c = table[(size_t)src[i + 2]];
+		uint32_t d = table[(size_t)src[i + 3]];
 
 		dst[0] = (char)(uint8_t)(a << 2 | b >> 4);
 		dst[1] = (char)(uint8_t)(b << 4 | c >> 2);
@@ -7023,13 +7027,6 @@ ufbxi_nodiscard static int ufbxi_sort_node_ptrs(ufbxi_context *uc, ufbx_node **n
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_node*)));
 	ufbxi_macro_stable_sort(ufbx_node*, 32, nodes, uc->tmp_arr, count,
 		( ufbxi_cmp_node_less(*a, *b) ) );
-	return 1;
-}
-
-ufbxi_nodiscard static int ufbxi_sort_node_ptrs_by_parent(ufbxi_context *uc, ufbx_node **nodes, size_t count)
-{
-	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_node*)));
-	ufbxi_macro_stable_sort(ufbx_node*, 32, nodes, uc->tmp_arr, count, ( (*a)->parent < (*b)->parent ));
 	return 1;
 }
 
@@ -9812,12 +9809,19 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 			ufbx_material_map *map = &material->pbr.maps[i];
 			map->texture = (ufbx_texture*)ufbxi_translate_element(ec, map->texture);
 		}
-		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &material->textures));
+
+		ufbx_material_texture *textures = ufbxi_push(&ec->result, ufbx_material_texture, material->textures.count);
+		ufbxi_check_err(&ec->error, textures);
+		for (size_t i = 0; i < material->textures.count; i++) {
+			textures[i] = material->textures.data[i];
+			textures[i].texture = (ufbx_texture*)ufbxi_translate_element(ec, textures[i].texture);
+		}
+		material->textures.data = textures;
 	}
 
 	ufbxi_for_ptr_list(ufbx_texture, p_texture, ec->scene.textures) {
 		ufbx_texture *texture = *p_texture;
-		texture->video = (ufbx_video*)ufbxi_translate_element(ec, &texture->video);
+		texture->video = (ufbx_video*)ufbxi_translate_element(ec, texture->video);
 	}
 
 	ufbxi_for_ptr_list(ufbx_shader, p_shader, ec->scene.shaders) {
@@ -9912,9 +9916,6 @@ static ufbxi_nodiscard ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 	} else {
 		memset(&ec->opts, 0, sizeof(ec->opts));
 	}
-
-	ufbx_inflate_retain inflate_retain;
-	inflate_retain.initialized = false;
 
 	ec->src_scene = *scene;
 	ec->anim = anim;
@@ -10180,9 +10181,6 @@ static FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp
 	char copy_buf[256];
 	char *copy = NULL;
 
-	if (path_len == SIZE_MAX) {
-		path_len = strlen(path);
-	}
 	if (path_len < ufbxi_arraycount(copy_buf) - 1) {
 		copy = copy_buf;
 	} else {
@@ -10190,12 +10188,12 @@ static FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp
 		if (!copy) return NULL;
 	}
 	memcpy(copy, path, path_len);
-	path[path_len] = '\0';
+	copy[path_len] = '\0';
 
 	FILE *file = fopen(copy, "rb");
 
-	if (wpath != wpath_buf) {
-		ufbxi_free(tmp_ator, wchar_t, wpath, path_len + 1);
+	if (copy != copy_buf) {
+		ufbxi_free(tmp_ator, char, copy, path_len + 1);
 	}
 
 	return file;
@@ -10274,7 +10272,7 @@ ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufb
 ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_len, const ufbx_load_opts *opts, ufbx_error *error)
 {
 	ufbxi_allocator tmp_ator = { 0 };
-	ufbx_error tmp_error = { 0 };
+	ufbx_error tmp_error = { UFBX_ERROR_NONE };
 	ufbxi_init_ator(&tmp_error, &tmp_ator, opts ? &opts->temp_allocator : NULL);
 
 	FILE *file = ufbxi_fopen(filename, filename_len, &tmp_ator);
