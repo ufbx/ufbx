@@ -5,9 +5,8 @@
 
 // -- Configuration
 
-#define UFBXI_MAX_ALLOCATION_SIZE 0x10000000
-
 #define UFBXI_MAX_NON_ARRAY_VALUES 7
+#define UFBXI_MAX_NODE_DEPTH 64
 
 // -- Headers
 
@@ -1072,7 +1071,8 @@ typedef struct {
 	ufbx_error *error;
 	size_t current_size;
 	size_t max_size;
-	size_t allocs_left;
+	size_t num_allocs;
+	size_t max_allocs;
 	size_t huge_size;
 	ufbx_allocator ator;
 } ufbxi_allocator;
@@ -1094,10 +1094,9 @@ static void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size, size_t n)
 
 	size_t total = size * n;
 	ufbxi_check_return_err(ator->error, !ufbxi_does_overflow(total, size, n), NULL);
-	ufbxi_check_return_err_msg(ator->error, total <= UFBXI_MAX_ALLOCATION_SIZE, NULL, "Allocation too big");
 	ufbxi_check_return_err_msg(ator->error, total <= ator->max_size - ator->current_size, NULL, "Memory limit exceeded");
-	ufbxi_check_return_err(ator->error, ator->allocs_left > 1, NULL);
-	ator->allocs_left--;
+	ufbxi_check_return_err_msg(ator->error, ator->num_allocs < ator->max_allocs, NULL, "Allocation limit exceeded");
+	ator->num_allocs++;
 
 	ator->current_size += total;
 
@@ -1127,14 +1126,12 @@ static void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t size, void *old_pt
 
 	// The old values have been checked by a previous allocate call
 	ufbx_assert(!ufbxi_does_overflow(old_total, size, old_n));
-	ufbx_assert(old_total <= UFBXI_MAX_ALLOCATION_SIZE);
 	ufbx_assert(old_total <= ator->current_size);
 
 	ufbxi_check_return_err(ator->error, !ufbxi_does_overflow(total, size, n), NULL);
-	ufbxi_check_return_err_msg(ator->error, total <= UFBXI_MAX_ALLOCATION_SIZE, NULL, "Allocation too big");
 	ufbxi_check_return_err_msg(ator->error, total <= ator->max_size - ator->current_size, NULL, "Memory limit exceeded");
-	ufbxi_check_return_err(ator->error, ator->allocs_left > 1, NULL);
-	ator->allocs_left--;
+	ufbxi_check_return_err_msg(ator->error, ator->num_allocs < ator->max_allocs, NULL, "Allocation limit exceeded");
+	ator->num_allocs++;
 
 	ator->current_size += total;
 	ator->current_size -= old_total;
@@ -1167,7 +1164,6 @@ static void ufbxi_free_size(ufbxi_allocator *ator, size_t size, void *ptr, size_
 
 	// The old values have been checked by a previous allocate call
 	ufbx_assert(!ufbxi_does_overflow(total, size, n));
-	ufbx_assert(total <= UFBXI_MAX_ALLOCATION_SIZE);
 	ufbx_assert(total <= ator->current_size);
 
 	ator->current_size -= total;
@@ -1237,11 +1233,11 @@ struct ufbxi_buf_chunk {
 
 	void *align_0; // < Align to 4x pointer size (16/32 bytes)
 
-	uint32_t size;       // < Size of the chunk `data`, excluding this header
-	uint32_t pushed_pos; // < Size of valid data when pushed to the list
-	uint32_t next_size;  // < Next geometrically growing chunk size to allocate
+	size_t size;       // < Size of the chunk `data`, excluding this header
+	size_t pushed_pos; // < Size of valid data when pushed to the list
+	size_t next_size;  // < Next geometrically growing chunk size to allocate
 
-	uint32_t align_1; // < Align to 4x uint32_t (16 bytes)
+	size_t align_1;    // < Align to 4x size_t (16/32 bytes)
 
 	char data[]; // < Must be aligned to 8 bytes
 };
@@ -1252,23 +1248,23 @@ typedef struct {
 	ufbxi_allocator *ator;
 	ufbxi_buf_chunk *chunk;
 
-	uint32_t pos;     // < Next offset to allocate from
-	uint32_t size;    // < Size of the current chunk ie. `chunk->size` (or 0 if `chunk == NULL`)
+	size_t pos;       // < Next offset to allocate from
+	size_t size;      // < Size of the current chunk ie. `chunk->size` (or 0 if `chunk == NULL`)
 	size_t num_items; // < Number of individual items pushed to the buffer
 } ufbxi_buf;
 
 typedef struct {
 	ufbxi_buf_chunk *chunk;
-	uint32_t pos;
+	size_t pos;
 	size_t num_items;
 } ufbxi_buf_state;
 
-static ufbxi_forceinline uint32_t ufbxi_align_to_mask(uint32_t value, uint32_t align_mask)
+static ufbxi_forceinline size_t ufbxi_align_to_mask(size_t value, size_t align_mask)
 {
-	return value + ((uint32_t)-(int32_t)value & align_mask);
+	return value + (((size_t)0 - value) & align_mask);
 }
 
-static ufbxi_forceinline uint32_t ufbxi_size_align_mask(size_t size)
+static ufbxi_forceinline size_t ufbxi_size_align_mask(size_t size)
 {
 	// Align to the all bits below the lowest set one in `size`
 	// up to a maximum of 0x7 (align to 8 bytes).
@@ -1278,8 +1274,6 @@ static ufbxi_forceinline uint32_t ufbxi_size_align_mask(size_t size)
 static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 {
 	// TODO: Huge allocations that don't invalidate current block?
-
-	ufbxi_check_return_err(b->ator->error, size <= UFBXI_MAX_ALLOCATION_SIZE, NULL);
 
 	ufbxi_buf_chunk *chunk = b->chunk;
 	if (chunk) {
@@ -1305,17 +1299,17 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 
 	// Allocate a new chunk, grow `next_size` geometrically but don't double
 	// the current or previous user sizes if they are larger.
-	uint32_t chunk_size, next_size;
+	size_t chunk_size, next_size;
 
 	// If `size` is larger than `huge_size` don't grow `next_size` geometrically,
 	// but use a dedicated allocation.
-	if (size < b->ator->huge_size) {
+	if (size >= b->ator->huge_size) {
 		 next_size = chunk ? chunk->next_size : 4096;
-		 chunk_size = (uint32_t)size;
+		 chunk_size = size;
 	} else {
 		next_size = chunk ? chunk->next_size * 2 : 4096;
 		chunk_size = next_size - sizeof(ufbxi_buf_chunk);
-		if (chunk_size < size) chunk_size = (uint32_t)size;
+		if (chunk_size < size) chunk_size = size;
 	}
 
 	// Align chunk sizes to 16 bytes
@@ -1354,17 +1348,15 @@ static void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
 
 	size_t total = size * n;
 	if (ufbxi_does_overflow(total, size, n)) return NULL;
-	if (b->ator->allocs_left <= 1) return NULL;
-	b->ator->allocs_left--;
 
 	// Align to the natural alignment based on the size
-	uint32_t align_mask = ufbxi_size_align_mask(size);
-	uint32_t pos = ufbxi_align_to_mask(b->pos, align_mask);
+	size_t align_mask = ufbxi_size_align_mask(size);
+	size_t pos = ufbxi_align_to_mask(b->pos, align_mask);
 
 	// Try to push to the current block. Allocate a new block
 	// if the aligned size doesn't fit.
-	if (total <= (size_t)(b->size - pos)) {
-		b->pos = (uint32_t)(pos + total);
+	if (total <= b->size - pos) {
+		b->pos = pos + total;
 		return b->chunk->data + pos;
 	} else {
 		return ufbxi_push_size_new_block(b, total);
@@ -1395,12 +1387,12 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 	if (!ufbxi_does_overflow(bytes_left, size, n)) {
 		if (ptr) {
 			ptr += bytes_left;
-			uint32_t pos = b->pos;
+			size_t pos = b->pos;
 			for (;;) {
 				ufbxi_buf_chunk *chunk = b->chunk;
 				if (bytes_left <= pos) {
 					// Rest of the data is in this single chunk
-					pos -= (uint32_t)bytes_left;
+					pos -= bytes_left;
 					b->pos = pos;
 					ptr -= bytes_left;
 					memcpy(ptr, chunk->data + pos, bytes_left);
@@ -1417,12 +1409,12 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 				}
 			}
 		} else {
-			uint32_t pos = b->pos;
+			size_t pos = b->pos;
 			for (;;) {
 				ufbxi_buf_chunk *chunk = b->chunk;
 				if (bytes_left <= pos) {
 					// Rest of the data is in this single chunk
-					pos -= (uint32_t)bytes_left;
+					pos -= bytes_left;
 					b->pos = pos;
 					return;
 				} else {
@@ -1474,10 +1466,10 @@ static void *ufbxi_make_array_size(ufbxi_buf *b, size_t size, size_t n)
 
 	size_t total = size * n;
 	if (ufbxi_does_overflow(total, size, n)) return NULL;
-	if (b->ator->allocs_left <= 1) return NULL;
-	b->ator->allocs_left--;
 
-	if (total <= b->pos) {
+	// Force a real allocation if `huge_size == 1` as that's a mode where
+	// each allocation should be isolated (eg. for address sanitizer)
+	if (total <= b->pos && b->ator->huge_size > 1) {
 		return b->chunk->data + b->pos - total;
 	} else {
 		// Make a local copy of the current buffer state, push the
@@ -1602,9 +1594,6 @@ typedef struct {
 
 static ufbxi_noinline bool ufbxi_map_grow_size_imp(ufbxi_map *map, size_t item_size, size_t min_size)
 {
-	if (map->ator->allocs_left <= 1) return false;
-	map->ator->allocs_left--;
-
 	const double load_factor = 0.8;
 
 	// Find the lowest power of two size that fits `min_size` within `load_factor`
@@ -1617,7 +1606,7 @@ static ufbxi_noinline bool ufbxi_map_grow_size_imp(ufbxi_map *map, size_t item_s
 	}
 
 	// Check for overflow
-	ufbxi_check_return_err(map->ator->error, UFBXI_MAX_ALLOCATION_SIZE / num_entries > sizeof(uint64_t), false);
+	ufbxi_check_return_err(map->ator->error, SIZE_MAX / num_entries > sizeof(uint64_t), false);
 	size_t alloc_size = num_entries * sizeof(uint64_t);
 
 	// Allocate a combined entry/item memory block
@@ -2545,10 +2534,8 @@ const char ufbxi_empty_char[1] = { '\0' };
 ufbxi_nodiscard static const char *ufbxi_push_string_imp(ufbxi_context *uc, const char *str, size_t length, bool copy)
 {
 	if (length == 0) return ufbxi_empty_char;
-	ufbxi_check_return(length <= uc->opts.max_string_length, NULL);
 
 	ufbxi_check_return(ufbxi_map_grow(&uc->string_map, ufbx_string, ufbxi_arraycount(ufbxi_strings) * 2), NULL);
-	ufbxi_check_return(uc->string_map.size <= uc->opts.max_strings, NULL);
 
 	uint32_t hash = ufbxi_hash_string(str, length);
 	uint32_t scan = 0;
@@ -3336,8 +3323,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 
 ufbxi_nodiscard static void *ufbxi_push_array_data(ufbxi_context *uc, const ufbxi_array_info *info, size_t size, ufbxi_buf *tmp_buf)
 {
-	ufbxi_check_return_msg(size <= uc->opts.max_array_size, NULL, "Maximum array size exceeded");
-
 	char type = ufbxi_normalize_array_type(info->type);
 	size_t elem_size = ufbxi_array_type_size(type);
 	if (info->pad_begin) size += 4;
@@ -3363,7 +3348,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 	// https://code.blender.org/2013/08/fbx-binary-file-format-specification
 	// Parse an FBX document node in the binary format
 
-	ufbxi_check(depth < uc->opts.max_node_depth);
+	ufbxi_check(depth < UFBXI_MAX_NODE_DEPTH);
 
 	// Parse the node header, post-7500 versions use 64-bit values for most
 	// header fields. 
@@ -3384,8 +3369,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 		name_len = ufbxi_read_u8(header + 12);
 	}
 
-	// We support at most UINT32_MAX values (`max_node_values` is `uint32_t`)
-	ufbxi_check(num_values64 <= (uint64_t)uc->opts.max_node_values);
+	ufbxi_check(num_values64 <= UINT32_MAX);
 	uint32_t num_values = (uint32_t)num_values64;
 
 	// If `end_offset` and `name_len` is zero we treat as the node as a NULL-sentinel
@@ -3443,8 +3427,6 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 			uint32_t encoding = ufbxi_read_u32(data + 5); 
 			uint32_t encoded_size = ufbxi_read_u32(data + 9); 
 			ufbxi_consume_bytes(uc, 13);
-
-			ufbxi_check(size <= uc->opts.max_array_size);
 
 			// Normalize the source type as well, but don't convert UFBX-specific
 			// 'r' to 'f'/'d', but fail later instead.
@@ -3530,7 +3512,6 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 			arr->size = 0;
 		} else {
 			// Allocate `num_values` elements for the array and parse single values into it.
-			ufbxi_check(num_values <= uc->opts.max_array_size);
 			char *arr_data = (char*)ufbxi_push_array_data(uc, &arr_info, num_values, tmp_buf);
 			ufbxi_check(arr_data);
 			ufbxi_check(ufbxi_binary_parse_multivalue_array(uc, dst_type, arr_data, num_values));
@@ -3635,8 +3616,6 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 		ufbxi_parse_state parse_state = ufbxi_update_parse_state(parent_state, node->name);
 		uint32_t num_children = 0;
 		for (;;) {
-			ufbxi_check(num_children < uc->opts.max_node_children);
-
 			// Stop at end offset
 			uint64_t current_offset = ufbxi_get_read_offset(uc);
 			if (current_offset >= end_offset) {
@@ -3823,7 +3802,6 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_ascii_push_token_char(ufbxi_c
 	// Grow the string data buffer if necessary
 	if (token->str_len == token->str_cap) {
 		size_t len = ufbxi_max_sz(token->str_len + 1, 256);
-		ufbxi_check(len <= uc->opts.max_ascii_token_length);
 		ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &token->str_data, &token->str_cap, len));
 	}
 
@@ -3965,7 +3943,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 	}
 
 	// Parse the name eg. "Node:" token and intern the name
-	ufbxi_check(depth < uc->opts.max_node_depth);
+	ufbxi_check(depth < UFBXI_MAX_NODE_DEPTH);
 	ufbxi_check(ufbxi_ascii_accept(uc, UFBXI_ASCII_NAME));
 	size_t name_len = ua->prev_token.value.name_len;
 	ufbxi_check(name_len <= 0xff);
@@ -4037,8 +4015,6 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 
 	// NOTE: Infinite loop to allow skipping the comma parsing via `continue`.
 	for (;;) {
-		ufbxi_check(num_values <= (arr_type ? uc->opts.max_array_size : uc->opts.max_node_values));
-
 		ufbxi_ascii_token *tok = &ua->prev_token;
 		if (ufbxi_ascii_accept(uc, UFBXI_ASCII_STRING)) {
 
@@ -4195,8 +4171,6 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 
 			size_t num_children = 0;
 			for (;;) {
-				ufbxi_check(num_children < uc->opts.max_node_children);
-
 				bool end = false;
 				ufbxi_check(ufbxi_ascii_parse_node(uc, depth + 1, parse_state, &end, tmp_buf, recursive));
 				if (end) break;
@@ -4315,7 +4289,6 @@ ufbxi_nodiscard static int ufbxi_parse_toplevel(ufbxi_context *uc, const char *n
 		ufbxi_parse_state state = ufbxi_update_parse_state(UFBXI_PARSE_ROOT, node->name);
 		if (uc->has_next_child) {
 			for (;;) {
-				ufbxi_check(num_children < uc->opts.max_node_children);
 				ufbxi_check(ufbxi_parse_toplevel_child_imp(uc, state, &uc->tmp, &end));
 				if (end) break;
 				num_children++;
@@ -4812,7 +4785,6 @@ ufbxi_nodiscard static int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *
 		version = 60;
 	}
 
-	ufbxi_check(node->num_children < uc->opts.max_properties);
 	props->props = ufbxi_push_zero(&uc->result, ufbx_prop, node->num_children);
 	props->num_props = node->num_children;
 	ufbxi_check(props->props);
@@ -8052,7 +8024,6 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 			total_weights += cluster->num_weights;
 		}
 
-		ufbxi_check((uint32_t)max_vertex < uc->opts.max_array_size);
 		size_t num_vertices = (size_t)max_vertex + 1;
 
 		// Iterate through meshes so we can pad the vertices to the largest one
@@ -8139,6 +8110,8 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 	}
 
 	ufbx_real_list *full_weights = ufbxi_make_array_all(&uc->tmp_full_weights, ufbx_real_list);
+	ufbxi_check(full_weights);
+
 	ufbxi_for_ptr_list(ufbx_blend_channel, p_channel, uc->scene.blend_channels) {
 		ufbx_blend_channel *channel = *p_channel;
 
@@ -9331,8 +9304,8 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 
 	imp->scene.metadata.result_memory_used = imp->ator.current_size;
 	imp->scene.metadata.temp_memory_used = uc->ator_tmp.current_size;
-	imp->scene.metadata.result_allocs = uc->opts.max_result_allocs - imp->ator.allocs_left;
-	imp->scene.metadata.temp_allocs = uc->opts.max_temp_allocs - uc->ator_tmp.allocs_left;
+	imp->scene.metadata.result_allocs = imp->ator.num_allocs;
+	imp->scene.metadata.temp_allocs = uc->ator_tmp.num_allocs;
 
 	uc->scene_imp = imp;
 
@@ -9370,6 +9343,10 @@ static void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_free(&uc->ator_tmp, char, uc->tmp_arr, uc->tmp_arr_size);
 
 	ufbx_assert(uc->ator_tmp.current_size == 0);
+
+	if (uc->ator_tmp.ator.free_allocator_fn) {
+		uc->ator_tmp.ator.free_allocator_fn(uc->ator_tmp.ator.user);
+	}
 }
 
 static void ufbxi_free_result(ufbxi_context *uc)
@@ -9378,28 +9355,25 @@ static void ufbxi_free_result(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->string_buf);
 
 	ufbx_assert(uc->ator_result.current_size == 0);
+
+	if (uc->ator_result.ator.free_allocator_fn) {
+		uc->ator_result.ator.free_allocator_fn(uc->ator_result.ator.user);
+	}
 }
 
-#define ufbxi_default_opt(name, value) if (!opts->name) opts->name = value
-
-static void ufbxi_expand_defaults(ufbx_load_opts *opts)
+static void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *ator, const ufbx_allocator *desc)
 {
-	ufbxi_default_opt(max_temp_memory, 0xf0000000);
-	ufbxi_default_opt(max_result_memory, 0xf0000000);
-	ufbxi_default_opt(max_temp_allocs, 0x10000000);
-	ufbxi_default_opt(max_result_allocs, 0x10000000);
-	ufbxi_default_opt(temp_huge_size, 0x100000);
-	ufbxi_default_opt(result_huge_size, 0x100000);
-	ufbxi_default_opt(max_ascii_token_length, 0x10000000);
-	ufbxi_default_opt(read_buffer_size, 4096);
-	ufbxi_default_opt(max_properties, 0x10000000);
-	ufbxi_default_opt(max_string_length, 0x10000000);
-	ufbxi_default_opt(max_strings, 0x10000000);
-	ufbxi_default_opt(max_node_depth, 0x10000000);
-	ufbxi_default_opt(max_node_values, 0x10000000);
-	ufbxi_default_opt(max_node_children, 0x10000000);
-	ufbxi_default_opt(max_array_size, 0x10000000);
-	ufbxi_default_opt(max_child_depth, 200);
+	ufbx_allocator zero_ator;
+	if (!desc) {
+		memset(&zero_ator, 0, sizeof(zero_ator));
+		desc = &zero_ator;
+	}
+
+	ator->error = error;
+	ator->ator = *desc;
+	ator->max_size = desc->memory_limit ? desc->memory_limit : SIZE_MAX;
+	ator->max_allocs = desc->allocation_limit ? desc->allocation_limit : SIZE_MAX;
+	ator->huge_size = desc->huge_threshold ? desc->huge_threshold : 0x100000;
 }
 
 static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts, ufbx_error *p_error)
@@ -9417,22 +9391,16 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	} else {
 		memset(&uc->opts, 0, sizeof(uc->opts));
 	}
-	ufbxi_expand_defaults(&uc->opts);
 
 	ufbx_inflate_retain inflate_retain;
 	inflate_retain.initialized = false;
 
-	// Setup allocators
-	uc->ator_tmp.error = &uc->error;
-	uc->ator_tmp.ator = uc->opts.temp_allocator;
-	uc->ator_tmp.max_size = uc->opts.max_temp_memory;
-	uc->ator_tmp.allocs_left = uc->opts.max_temp_allocs;
-	uc->ator_tmp.huge_size = uc->opts.temp_huge_size;
-	uc->ator_result.error = &uc->error;
-	uc->ator_result.ator = uc->opts.result_allocator;
-	uc->ator_result.max_size = uc->opts.max_result_memory;
-	uc->ator_result.allocs_left = uc->opts.max_result_allocs;
-	uc->ator_result.huge_size = uc->opts.result_huge_size;
+	ufbxi_init_ator(&uc->error, &uc->ator_tmp, &uc->opts.temp_allocator);
+	ufbxi_init_ator(&uc->error, &uc->ator_result, &uc->opts.result_allocator);
+
+	if (uc->opts.read_buffer_size == 0) {
+		uc->opts.read_buffer_size = 0x4000;
+	}
 
 	uc->string_map.ator = &uc->ator_tmp;
 	uc->prop_type_map.ator = &uc->ator_tmp;
@@ -9472,6 +9440,10 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 		uc->error.type = UFBX_ERROR_UNKNOWN;
 		if (!strcmp(uc->error.description, "Out of memory")) {
 			uc->error.type = UFBX_ERROR_OUT_OF_MEMORY;
+		} else if (!strcmp(uc->error.description, "Memory limit exceeded")) {
+			uc->error.type = UFBX_ERROR_MEMORY_LIMIT;
+		} else if (!strcmp(uc->error.description, "Allocation limit exceeded")) {
+			uc->error.type = UFBX_ERROR_ALLOCATION_LIMIT;
 		} else if (!strcmp(uc->error.description, "Truncated file")) {
 			uc->error.type = UFBX_ERROR_TRUNCATED_FILE;
 		} else if (!strcmp(uc->error.description, "IO error")) {
@@ -9923,23 +9895,13 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 
 	imp->scene.metadata.result_memory_used = imp->ator.current_size;
 	imp->scene.metadata.temp_memory_used = ec->ator_tmp.current_size;
-	imp->scene.metadata.result_allocs = ec->opts.max_result_allocs - imp->ator.allocs_left;
-	imp->scene.metadata.temp_allocs = ec->opts.max_temp_allocs - ec->ator_tmp.allocs_left;
+	imp->scene.metadata.result_allocs = imp->ator.num_allocs;
+	imp->scene.metadata.temp_allocs = ec->ator_tmp.num_allocs;
 
 	ec->scene_imp = imp;
 	ec->result.ator = &ec->ator_result;
 
 	return 1;
-}
-
-static void ufbxi_expand_evaluate_defaults(ufbx_evaluate_opts *opts)
-{
-	ufbxi_default_opt(max_temp_memory, 0xf0000000);
-	ufbxi_default_opt(max_result_memory, 0xf0000000);
-	ufbxi_default_opt(max_temp_allocs, 0x10000000);
-	ufbxi_default_opt(max_result_allocs, 0x10000000);
-	ufbxi_default_opt(temp_huge_size, 0x100000);
-	ufbxi_default_opt(result_huge_size, 0x100000);
 }
 
 static ufbxi_nodiscard ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, ufbx_scene *scene, ufbx_anim anim, double time, const ufbx_evaluate_opts *user_opts, ufbx_error *p_error)
@@ -9950,8 +9912,6 @@ static ufbxi_nodiscard ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 		memset(&ec->opts, 0, sizeof(ec->opts));
 	}
 
-	ufbxi_expand_evaluate_defaults(&ec->opts);
-
 	ufbx_inflate_retain inflate_retain;
 	inflate_retain.initialized = false;
 
@@ -9959,23 +9919,17 @@ static ufbxi_nodiscard ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 	ec->anim = anim;
 	ec->time = time;
 
-	// Setup allocators
-	ec->ator_tmp.error = &ec->error;
-	ec->ator_tmp.ator = ec->opts.temp_allocator;
-	ec->ator_tmp.max_size = ec->opts.max_temp_memory;
-	ec->ator_tmp.allocs_left = ec->opts.max_temp_allocs;
-	ec->ator_tmp.huge_size = ec->opts.temp_huge_size;
-	ec->ator_result.error = &ec->error;
-	ec->ator_result.ator = ec->opts.result_allocator;
-	ec->ator_result.max_size = ec->opts.max_result_memory;
-	ec->ator_result.allocs_left = ec->opts.max_result_allocs;
-	ec->ator_result.huge_size = ec->opts.result_huge_size;
+	ufbxi_init_ator(&ec->error, &ec->ator_tmp, &ec->opts.temp_allocator);
+	ufbxi_init_ator(&ec->error, &ec->ator_result, &ec->opts.result_allocator);
 
 	ec->result.ator = &ec->ator_result;
 	ec->tmp.ator = &ec->ator_tmp;
 
 	if (ufbxi_evaluate_imp(ec)) {
 		ufbxi_buf_free(&ec->tmp);
+		if (ec->ator_tmp.ator.free_allocator_fn) {
+			ec->ator_tmp.ator.free_allocator_fn(ec->ator_tmp.ator.user);
+		}
 		if (p_error) {
 			p_error->description = NULL;
 			p_error->stack_size = 0;
@@ -9986,6 +9940,12 @@ static ufbxi_nodiscard ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 		if (p_error) *p_error = ec->error;
 		ufbxi_buf_free(&ec->tmp);
 		ufbxi_buf_free(&ec->result);
+		if (ec->ator_tmp.ator.free_allocator_fn) {
+			ec->ator_tmp.ator.free_allocator_fn(ec->ator_tmp.ator.user);
+		}
+		if (ec->ator_result.ator.free_allocator_fn) {
+			ec->ator_result.ator.free_allocator_fn(ec->ator_result.ator.user);
+		}
 		return NULL;
 	}
 }
@@ -10315,13 +10275,7 @@ ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_len, const 
 {
 	ufbxi_allocator tmp_ator = { 0 };
 	ufbx_error tmp_error = { 0 };
-	tmp_ator.error = &tmp_error;
-	tmp_ator.allocs_left = 1;
-	if (opts) {
-		tmp_ator.ator = opts->temp_allocator;
-		tmp_ator.max_size = opts->max_temp_memory;
-		tmp_ator.allocs_left = opts->max_temp_allocs;
-	}
+	ufbxi_init_ator(&tmp_error, &tmp_ator, &opts->temp_allocator);
 
 	FILE *file = ufbxi_fopen(filename, filename_len, &tmp_ator);
 	if (!file) {
@@ -10391,6 +10345,10 @@ void ufbx_free_scene(ufbx_scene *scene)
 	ufbxi_free(&ator, char, memory_block, memory_block_size);
 
 	ufbx_assert(ator.current_size == 0);
+
+	if (ator.ator.free_allocator_fn) {
+		ator.ator.free_allocator_fn(ator.ator.user);
+	}
 }
 
 ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len)

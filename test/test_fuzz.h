@@ -17,9 +17,12 @@ UFBXT_TEST(fuzz_files)
 		ufbx_error error;
 
 		ufbx_load_opts load_opts = { 0 };
+		load_opts.temp_allocator.memory_limit = 0x4000000; // 64MB
+		load_opts.result_allocator.memory_limit = 0x4000000; // 64MB
+
 		if (g_dedicated_allocs) {
-			load_opts.temp_huge_size = 1;
-			load_opts.result_huge_size = 1;
+			load_opts.temp_allocator.huge_threshold = 1;
+			load_opts.result_allocator.huge_threshold = 1;
 		}
 
 		ufbx_scene *scene = ufbx_load_memory(data, size, &load_opts, &error);

@@ -1547,6 +1547,9 @@ typedef void *ufbx_realloc_fn(void *user, void *old_ptr, size_t old_size, size_t
 // Free pointer `ptr` (of `size` bytes) returned by `alloc_fn` or `realloc_fn`
 typedef void ufbx_free_fn(void *user, void *ptr, size_t size);
 
+// Free the allocator itself
+typedef void ufbx_free_allocator_fn(void *user);
+
 // Allocator callbacks and user context
 // NOTE: The allocator will be stored to the loaded scene and will be called
 // again from `ufbx_free_scene()` so make sure `user` outlives that!
@@ -1554,7 +1557,13 @@ typedef struct ufbx_allocator {
 	ufbx_alloc_fn *alloc_fn;
 	ufbx_realloc_fn *realloc_fn;
 	ufbx_free_fn *free_fn;
+	ufbx_free_allocator_fn *free_allocator_fn;
 	void *user;
+
+	size_t memory_limit;
+	size_t allocation_limit;
+	size_t huge_threshold;
+
 } ufbx_allocator;
 
 // -- IO callbacks
@@ -1575,6 +1584,8 @@ typedef enum ufbx_error_type {
 	UFBX_ERROR_UNKNOWN,
 	UFBX_ERROR_FILE_NOT_FOUND,
 	UFBX_ERROR_OUT_OF_MEMORY,
+	UFBX_ERROR_MEMORY_LIMIT,
+	UFBX_ERROR_ALLOCATION_LIMIT,
 	UFBX_ERROR_TRUNCATED_FILE,
 	UFBX_ERROR_IO,
 } ufbx_error_type;
@@ -1642,23 +1653,8 @@ typedef struct ufbx_load_opts {
 	// do bounds checking.
 	bool allow_out_of_bounds_vertex_indices;
 
-	// Limits
-	size_t max_temp_memory;
-	size_t max_result_memory;
-	size_t max_temp_allocs;
-	size_t max_result_allocs;
-	size_t temp_huge_size;
-	size_t result_huge_size;
-	size_t max_ascii_token_length;
+	// Buffer size in bytes to use for reading from files or IO callbacks
 	size_t read_buffer_size;
-	size_t max_properties;
-	uint32_t max_string_length;
-	uint32_t max_strings;
-	uint32_t max_node_depth;
-	uint32_t max_node_values;
-	uint32_t max_node_children;
-	uint32_t max_array_size;
-	uint32_t max_child_depth;
 
 } ufbx_load_opts;
 
@@ -1667,14 +1663,6 @@ typedef struct ufbx_evaluate_opts {
 	ufbx_allocator temp_allocator;   // < Allocator used during evaluation
 	ufbx_allocator result_allocator; // < Allocator used for the final scene
 	bool evaluate_skinning; // < Evaluate skinning (see ufbx_mesh.skinned_vertices)
-
-	// Limits
-	size_t max_temp_memory;
-	size_t max_result_memory;
-	size_t max_temp_allocs;
-	size_t max_result_allocs;
-	size_t temp_huge_size;
-	size_t result_huge_size;
 
 } ufbx_evaluate_opts;
 

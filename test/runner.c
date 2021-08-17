@@ -238,6 +238,51 @@ double ufbxt_bechmark_end()
 	return sec;
 }
 
+// -- Test allocator
+
+typedef struct {
+	size_t offset;
+
+	size_t bytes_allocated;
+
+	union {
+		uint64_t align;
+		char data[1024 * 1024];
+	} local;
+} ufbxt_allocator;
+
+static void *ufbxt_alloc(void *user, size_t size)
+{
+	ufbxt_allocator *ator = (ufbxt_allocator*)user;
+	ator->bytes_allocated += size;
+	if (size < 1024 && sizeof(ator->local.data) - ator->offset >= size) {
+		void *ptr = ator->local.data + ator->offset;
+		ator->offset = (ator->offset + size + 7) & ~(size_t)0x7;
+		return ptr;
+	} else {
+		return malloc(size);
+	}
+}
+
+static void ufbxt_free(void *user, void *ptr, size_t size)
+{
+	ufbxt_allocator *ator = (ufbxt_allocator*)user;
+	ator->bytes_allocated -= size;
+	if ((uintptr_t)ptr >= (uintptr_t)ator->local.data
+		&& (uintptr_t)ptr < (uintptr_t)(ator->local.data + sizeof(ator->local.data))) {
+		// Nop
+	} else {
+		free(ptr);
+	}
+}
+
+static void ufbxt_free_allocator(void *user)
+{
+	ufbxt_allocator *ator = (ufbxt_allocator*)user;
+	ufbxt_assert(ator->bytes_allocated == 0);
+	free(ator);
+}
+
 char data_root[256];
 
 static void *ufbxt_read_file(const char *name, size_t *p_size)
@@ -650,6 +695,23 @@ static size_t g_fuzz_step = SIZE_MAX;
 
 const char *g_fuzz_test_name = NULL;
 
+void ufbxt_init_allocator(ufbx_allocator *ator)
+{
+	ator->memory_limit = 0x4000000; // 64MB
+
+	if (g_dedicated_allocs) return;
+
+	ufbxt_allocator *at = (ufbxt_allocator*)malloc(sizeof(ufbxt_allocator));
+	ufbxt_assert(at);
+	at->offset = 0;
+	at->bytes_allocated = 0;
+
+	ator->user = at;
+	ator->alloc_fn = &ufbxt_alloc;
+	ator->free_fn = &ufbxt_free;
+	ator->free_allocator_fn = &ufbxt_free_allocator;
+}
+
 static bool ufbxt_begin_fuzz()
 {
 	if (g_fuzz) {
@@ -672,12 +734,24 @@ int ufbxt_test_fuzz(void *data, size_t size, size_t step, int offset, size_t tem
 	if (!setjmp(*t_jmp_buf)) {
 
 		ufbx_load_opts opts = { 0 };
-		opts.max_temp_allocs = temp_limit;
-		opts.max_result_allocs = result_limit;
+
+		ufbxt_init_allocator(&opts.temp_allocator);
+		ufbxt_init_allocator(&opts.result_allocator);
+
+		opts.temp_allocator.allocation_limit = temp_limit;
+		opts.result_allocator.allocation_limit = result_limit;
+
+		if (temp_limit > 0) {
+			opts.temp_allocator.huge_threshold = 1;
+		}
+
+		if (result_limit > 0) {
+			opts.result_allocator.huge_threshold = 1;
+		}
 
 		if (g_dedicated_allocs) {
-			opts.temp_huge_size = 1;
-			opts.result_huge_size = 1;
+			opts.temp_allocator.huge_threshold = 1;
+			opts.result_allocator.huge_threshold = 1;
 		}
 
 		if (truncate_length > 0) size = truncate_length;
@@ -1305,14 +1379,19 @@ void ufbxt_do_fuzz(ufbx_scene *scene, const char *base_name, void *data, size_t 
 
 			ufbx_load_opts opts = { 0 };
 
+			ufbxt_init_allocator(&opts.temp_allocator);
+			ufbxt_init_allocator(&opts.result_allocator);
+
 			if (check->temp_limit > 0) {
 				ufbxt_logf(".. Temp limit %u: %s", check->temp_limit, check->description);
-				opts.max_temp_allocs = check->temp_limit;
+				opts.temp_allocator.allocation_limit = check->temp_limit;
+				opts.temp_allocator.huge_threshold = 1;
 			}
 
 			if (check->result_limit > 0) {
 				ufbxt_logf(".. Result limit %u: %s", check->result_limit, check->description);
-				opts.max_result_allocs = check->result_limit;
+				opts.result_allocator.allocation_limit = check->temp_limit;
+				opts.result_allocator.huge_threshold = 1;
 			}
 
 			size_t truncated_size = size;
@@ -1383,8 +1462,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			ufbx_load_opts load_opts = user_opts;
 			if (g_dedicated_allocs) {
-				load_opts.temp_huge_size = 1;
-				load_opts.result_huge_size = 1;
+				load_opts.temp_allocator.huge_threshold = 1;
+				load_opts.result_allocator.huge_threshold = 1;
 			}
 
 			load_opts.evaluate_skinning = true;
