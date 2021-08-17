@@ -2469,6 +2469,7 @@ typedef struct {
 	// Top-level state
 	ufbxi_node *top_nodes;
 	size_t top_nodes_len, top_nodes_cap;
+	bool parsed_to_end;
 
 	// "Focused" top-level node and child index, if `top_child_index == SIZE_MAX`
 	// the children are parsed on demand.
@@ -4273,6 +4274,13 @@ ufbxi_nodiscard static int ufbxi_parse_toplevel(ufbxi_context *uc, const char *n
 		}
 	}
 
+	// Reached end and not found in cache
+	if (uc->parsed_to_end) {
+		uc->top_node = NULL;
+		uc->top_child_index = 0;
+		return 1;
+	}
+
 	for (;;) {
 		// Parse the next top-level node
 		bool end = false;
@@ -4286,6 +4294,7 @@ ufbxi_nodiscard static int ufbxi_parse_toplevel(ufbxi_context *uc, const char *n
 		if (end) {
 			uc->top_node = NULL;
 			uc->top_child_index = 0;
+			uc->parsed_to_end = true;
 			return 1;
 		}
 
