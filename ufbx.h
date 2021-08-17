@@ -182,6 +182,7 @@ typedef enum ufbx_prop_flags {
 	UFBX_PROP_FLAG_ANIMATED = 0x2000,
 	UFBX_PROP_FLAG_NOT_FOUND = 0x4000,
 	UFBX_PROP_FLAG_CONNECTED = 0x8000,
+	UFBX_PROP_FLAG_NO_VALUE = 0x10000,
 } ufbx_prop_flags;
 
 // Single property with name/type/value.
@@ -1068,10 +1069,6 @@ typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_INTERNAL_REFLECTIONS,
 	UFBX_NUM_MATERIAL_PBR_MAPS,
 } ufbx_material_pbr_map;
-
-typedef enum ufbx_material_pbr_feature {
-
-} ufbx_material_pbr_feature;
 
 typedef struct ufbx_material_fbx_maps {
 	union {

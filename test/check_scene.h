@@ -42,7 +42,7 @@ static void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void 
 	// Check that the indices are in range
 	for (size_t i = 0; i < mesh->num_indices; i++) {
 		int32_t ix = elem->indices[i];
-		ufbxt_assert(ix >= -1 && ix < elem->num_values);
+		ufbxt_assert(ix >= -1 && (size_t)ix < elem->num_values);
 	}
 
 	// Check that the data at invalid index is valid and zero
@@ -141,7 +141,7 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 
 static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 {
-	ufbxt_check_element_ptr(scene, &node->parent->element);
+	ufbxt_check_element_ptr(scene, (ufbx_element*)node->parent);
 	if (node->parent) {
 		bool found = false;
 		for (size_t i = 0; i < node->parent->children.count; i++) {
@@ -182,6 +182,7 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	case UFBX_ELEMENT_LIGHT: ufbxt_assert(node->light); break;
 	case UFBX_ELEMENT_CAMERA: ufbxt_assert(node->camera); break;
 	case UFBX_ELEMENT_BONE: ufbxt_assert(node->bone); break;
+	default: /* No shorthand */ break;
 	}
 }
 
@@ -318,7 +319,7 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	if (mesh->face_material) {
 		for (size_t i = 0; i < mesh->num_faces; i++) {
 			int32_t material = mesh->face_material[i];
-			ufbxt_assert(material >= 0 && material < mesh->materials.count);
+			ufbxt_assert(material >= 0 && (size_t)material < mesh->materials.count);
 		}
 	}
 

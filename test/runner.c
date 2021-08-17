@@ -1373,7 +1373,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, const char *base_name, void *data, size_t 
 			if (check->patch_offset >= 0) {
 				original = data_u8[check->patch_offset];
 				ufbxt_logf(".. Patch byte %u from 0x%02x to 0x%02x: %s", check->patch_offset, original, check->patch_value, check->description);
-				ufbxt_assert(check->patch_offset < size);
+				ufbxt_assert((size_t)check->patch_offset < size);
 				data_u8[check->patch_offset] = check->patch_value;
 			}
 
