@@ -5873,6 +5873,7 @@ static void ufbxi_read_transform_matrix(ufbx_matrix *m, ufbx_real *data)
 ufbxi_nodiscard static int ufbxi_read_skin(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_skin_deformer *skin = ufbxi_push_element(uc, info, ufbx_skin_deformer, UFBX_ELEMENT_SKIN_DEFORMER);
+	ufbxi_check(skin);
 
 	const char *skinning_type = NULL;
 	if (ufbxi_find_val1(node, ufbxi_SkinningType, "C", (char**)&skinning_type)) {
