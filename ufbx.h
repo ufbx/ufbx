@@ -1346,6 +1346,10 @@ typedef struct ufbx_metadata {
 	ufbx_exporter exporter;
 	uint32_t exporter_version;
 
+	bool geometry_ignored;
+	bool animation_ignored;
+	bool embedded_ignored;
+
 	size_t result_memory_used;
 	size_t temp_memory_used;
 	size_t result_allocs;

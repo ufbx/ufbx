@@ -763,10 +763,6 @@ int ufbxt_test_fuzz(void *data, size_t size, size_t step, int offset, size_t tem
 		if (scene) {
 			ufbxt_check_scene(scene);
 			ufbx_free_scene(scene);
-
-			ufbxt_assert(temp_limit == 0);
-			ufbxt_assert(result_limit == 0);
-
 		} else {
 
 			// Collect hit checks
@@ -1232,7 +1228,7 @@ static const ufbxt_fuzz_check g_fuzz_checks[] = {
 	{ "maya_interpolation_modes_7500_binary", 25023, 0, 0, 0, 0, "refs_left >= 0" },
 };
 
-void ufbxt_do_fuzz(ufbx_scene *scene, const char *base_name, void *data, size_t size)
+void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *base_name, void *data, size_t size)
 {
 	if (g_fuzz) {
 		size_t step = 0;
@@ -1243,9 +1239,9 @@ void ufbxt_do_fuzz(ufbx_scene *scene, const char *base_name, void *data, size_t 
 
 		size_t temp_allocs = 1000;
 		size_t result_allocs = 500;
-		if (scene) {
-			temp_allocs = scene->metadata.temp_allocs;
-			result_allocs = scene->metadata.result_allocs;
+		if (streamed_scene) {
+			temp_allocs = streamed_scene->metadata.temp_allocs + 10;
+			result_allocs = streamed_scene->metadata.result_allocs + 10;
 		}
 
 		#pragma omp parallel for schedule(static, 16)
@@ -1482,7 +1478,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			}
 
 			ufbx_load_opts stream_opts = load_opts;
+			ufbxt_init_allocator(&stream_opts.temp_allocator);
+			ufbxt_init_allocator(&stream_opts.result_allocator);
 			stream_opts.read_buffer_size = 1;
+			stream_opts.temp_allocator.huge_threshold = 1;
+			stream_opts.result_allocator.huge_threshold = 1;
 			ufbx_scene *streamed_scene = ufbx_load_file(buf, &stream_opts, &error);
 			if (streamed_scene) {
 				ufbxt_check_scene(streamed_scene);
@@ -1490,7 +1490,6 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbxt_log_error(&error);
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse streamed file");
 			}
-			ufbx_free_scene(streamed_scene);
 
 			// Ignore geometry, animations, and both
 
@@ -1506,7 +1505,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbx_load_opts opts = load_opts;
 				opts.ignore_animation = true;
 				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, NULL);
-				ufbxt_check_scene(scene);
+				ufbxt_check_scene(ignore_scene);
 				ufbx_free_scene(ignore_scene);
 			}
 
@@ -1515,7 +1514,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				opts.ignore_geometry = true;
 				opts.ignore_animation = true;
 				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, NULL);
-				ufbxt_check_scene(scene);
+				ufbxt_check_scene(ignore_scene);
 				ufbx_free_scene(ignore_scene);
 			}
 
@@ -1575,9 +1574,10 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 			}
 
-			ufbxt_do_fuzz(scene, base_name, data, size);
+			ufbxt_do_fuzz(scene, streamed_scene, base_name, data, size);
 
 			ufbx_free_scene(scene);
+			ufbx_free_scene(streamed_scene);
 
 			free(data);
 		}

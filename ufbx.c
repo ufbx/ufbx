@@ -5429,6 +5429,16 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 		ufbxi_check(ufbxi_read_synthetic_blend_shapes(uc, node, info));
 	}
 
+	mesh->vertex_position.value_reals = 3;
+	mesh->vertex_normal.value_reals = 3;
+	mesh->vertex_uv.value_reals = 2;
+	mesh->vertex_tangent.value_reals = 3;
+	mesh->vertex_bitangent.value_reals = 3;
+	mesh->vertex_color.value_reals = 4;
+	mesh->vertex_crease.value_reals = 1;
+	mesh->skinned_position.value_reals = 3;
+	mesh->skinned_normal.value_reals = 3;
+
 	if (uc->opts.ignore_geometry) return 1;
 
 	ufbxi_value_array *vertices = ufbxi_get_array(node_vertices, 'r');
@@ -5563,14 +5573,6 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 	mesh->color_sets.data = ufbxi_push_zero(&uc->result, ufbx_color_set, num_color);
 	ufbxi_check(mesh->uv_sets.data);
 	ufbxi_check(mesh->color_sets.data);
-
-	mesh->vertex_position.value_reals = 3;
-	mesh->vertex_normal.value_reals = 3;
-	mesh->vertex_uv.value_reals = 2;
-	mesh->vertex_tangent.value_reals = 3;
-	mesh->vertex_bitangent.value_reals = 3;
-	mesh->vertex_color.value_reals = 4;
-	mesh->vertex_crease.value_reals = 1;
 
 	size_t num_bitangents_read = 0, num_tangents_read = 0;
 	ufbxi_for (ufbxi_node, n, node->children, node->num_children) {
@@ -9213,6 +9215,7 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 	ufbxi_for_ptr_list(ufbx_mesh, p_mesh, scene->meshes) {
 		ufbx_mesh *mesh = *p_mesh;
 		if (mesh->blend_shapes.count == 0 && mesh->skins.count == 0) continue;
+		if (mesh->num_vertices == 0) continue;
 
 		size_t num_vertices = mesh->num_vertices;
 		ufbx_vec3 *result_pos = ufbxi_push(buf_result, ufbx_vec3, num_vertices + 1);
@@ -9287,6 +9290,9 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	// Copy local data to the scene
 	uc->scene.metadata.version = uc->version;
 	uc->scene.metadata.ascii = uc->from_ascii;
+	uc->scene.metadata.geometry_ignored = uc->opts.ignore_geometry;
+	uc->scene.metadata.animation_ignored = uc->opts.ignore_animation;
+	uc->scene.metadata.embedded_ignored = uc->opts.ignore_embedded;
 
 	// Retain the scene, this must be the final allocation as we copy
 	// `ator_result` to `ufbx_scene_imp`.
