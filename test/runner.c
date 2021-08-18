@@ -1318,7 +1318,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *ba
 				}
 				uint8_t *data_u8 = *p_data_copy;
 
-				size_t step = i * 1000;
+				size_t step = i * 10;
 
 				uint8_t original = data_u8[i];
 

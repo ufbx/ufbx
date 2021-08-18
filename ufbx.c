@@ -5662,6 +5662,10 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 				}
 			}
 		} else if (!strncmp(n->name, "LayerElement", 12)) {
+
+			// Make sure the name has no internal zero bytes
+			ufbxi_check(!memchr(n->name, '\0', n->name_len));
+
 			// What?! 6x00 stores textures in mesh geometry, eg. "LayerElementTexture",
 			// "LayerElementDiffuseFactorTextures", "LayerElementEmissive_Textures"...
 			ufbx_string prop_name = ufbx_empty_string;
@@ -8444,11 +8448,11 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 				size_t num_material_textures = 0;
 				ufbxi_for(ufbxi_tmp_mesh_texture, tex, mesh_textures->data, mesh_textures->count) {
 					if (tex->all_same) {
-						ufbxi_tmp_material_texture *mat_texs = ufbxi_push(&uc->tmp_stack, ufbxi_tmp_material_texture, num_materials);
-						ufbxi_check(mat_texs);
-						num_material_textures += num_materials;
 						int32_t texture_id = tex->num_faces > 0 ? tex->face_texture[0] : 0;
 						if (texture_id >= 0 && (size_t)texture_id < textures.count) {
+							ufbxi_tmp_material_texture *mat_texs = ufbxi_push(&uc->tmp_stack, ufbxi_tmp_material_texture, num_materials);
+							ufbxi_check(mat_texs);
+							num_material_textures += num_materials;
 							for (size_t i = 0; i < num_materials; i++) {
 								mat_texs[i].material_id = (int32_t)i;
 								mat_texs[i].texture_id = texture_id;
@@ -8485,6 +8489,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 					ufbxi_check(mat_tex);
 					mat_tex->material_id = -1;
 					mat_tex->texture_id = -1;
+					mat_tex->prop_name = ufbx_empty_string;
 				}
 
 				ufbxi_tmp_material_texture *mat_texs = ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_tmp_material_texture, num_material_textures + 1);
