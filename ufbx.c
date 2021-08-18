@@ -2307,6 +2307,7 @@ struct ufbxi_node {
 };
 
 #define UFBXI_SCENE_IMP_MAGIC 0x58424655
+#define UFBXI_MESH_IMP_MAGIC 0x4853454d
 
 typedef struct {
 	ufbx_scene scene;
@@ -2315,10 +2316,15 @@ typedef struct {
 	ufbxi_allocator ator;
 	ufbxi_buf result_buf;
 	ufbxi_buf string_buf;
-
-	char *memory_block;
-	size_t memory_block_size;
 } ufbxi_scene_imp;
+
+typedef struct {
+	ufbx_mesh mesh;
+	uint32_t magic;
+
+	ufbxi_allocator ator;
+	ufbxi_buf result_buf;
+} ufbxi_mesh_imp;
 
 typedef struct {
 	// Semantic string data and length eg. for a string token
@@ -5512,9 +5518,6 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 	mesh->vertex_position.indices = index_data;
 	mesh->num_faces = dst_face - mesh->faces;
 	mesh->num_triangles = num_triangles;
-
-	mesh->triangles = ufbxi_push(&uc->result, ufbx_triangle, num_triangles);
-	ufbxi_check(mesh->triangles);
 
 	mesh->vertex_first_index = ufbxi_push(&uc->result, int32_t, mesh->num_vertices);
 	ufbxi_check(mesh->vertex_first_index);
@@ -9297,9 +9300,6 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	imp->string_buf = uc->string_buf;
 	imp->string_buf.ator = &imp->ator;
 
-	imp->memory_block = NULL;
-	imp->memory_block_size = 0;
-
 	imp->scene.metadata.result_memory_used = imp->ator.current_size;
 	imp->scene.metadata.temp_memory_used = uc->ator_tmp.current_size;
 	imp->scene.metadata.result_allocs = imp->ator.num_allocs;
@@ -9374,6 +9374,23 @@ static void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *ator, const ufbx
 	ator->huge_size = desc->huge_threshold ? desc->huge_threshold : 0x100000;
 }
 
+static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
+{
+	if (!error->description) error->description = default_desc;
+	error->type = UFBX_ERROR_UNKNOWN;
+	if (!strcmp(error->description, "Out of memory")) {
+		error->type = UFBX_ERROR_OUT_OF_MEMORY;
+	} else if (!strcmp(error->description, "Memory limit exceeded")) {
+		error->type = UFBX_ERROR_MEMORY_LIMIT;
+	} else if (!strcmp(error->description, "Allocation limit exceeded")) {
+		error->type = UFBX_ERROR_ALLOCATION_LIMIT;
+	} else if (!strcmp(error->description, "Truncated file")) {
+		error->type = UFBX_ERROR_TRUNCATED_FILE;
+	} else if (!strcmp(error->description, "IO error")) {
+		error->type = UFBX_ERROR_IO;
+	}
+}
+
 static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts, ufbx_error *p_error)
 {
 	// Test endianness
@@ -9434,19 +9451,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 		ufbxi_free_temp(uc);
 		return &uc->scene_imp->scene;
 	} else {
-		if (!uc->error.description) uc->error.description = "Failed to load";
-		uc->error.type = UFBX_ERROR_UNKNOWN;
-		if (!strcmp(uc->error.description, "Out of memory")) {
-			uc->error.type = UFBX_ERROR_OUT_OF_MEMORY;
-		} else if (!strcmp(uc->error.description, "Memory limit exceeded")) {
-			uc->error.type = UFBX_ERROR_MEMORY_LIMIT;
-		} else if (!strcmp(uc->error.description, "Allocation limit exceeded")) {
-			uc->error.type = UFBX_ERROR_ALLOCATION_LIMIT;
-		} else if (!strcmp(uc->error.description, "Truncated file")) {
-			uc->error.type = UFBX_ERROR_TRUNCATED_FILE;
-		} else if (!strcmp(uc->error.description, "IO error")) {
-			uc->error.type = UFBX_ERROR_IO;
-		}
+		ufbxi_fix_error_type(&uc->error, "Failed to load");
 		if (p_error) *p_error = uc->error;
 		ufbxi_free_temp(uc);
 		ufbxi_free_result(uc);
@@ -9895,9 +9900,6 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 	imp->result_buf = ec->result;
 	imp->result_buf.ator = &imp->ator;
 
-	imp->memory_block = NULL;
-	imp->memory_block_size = 0;
-
 	imp->scene.metadata.result_memory_used = imp->ator.current_size;
 	imp->scene.metadata.temp_memory_used = ec->ator_tmp.current_size;
 	imp->scene.metadata.result_allocs = imp->ator.num_allocs;
@@ -9933,12 +9935,13 @@ static ufbxi_nodiscard ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 			ec->ator_tmp.ator.free_allocator_fn(ec->ator_tmp.ator.user);
 		}
 		if (p_error) {
+			p_error->type = UFBX_ERROR_NONE;
 			p_error->description = NULL;
 			p_error->stack_size = 0;
 		}
 		return &ec->scene_imp->scene;
 	} else {
-		if (!ec->error.description) ec->error.description = "Failed to evaluate";
+		ufbxi_fix_error_type(&ec->error, "Failed to evaluate");
 		if (p_error) *p_error = ec->error;
 		ufbxi_buf_free(&ec->tmp);
 		ufbxi_buf_free(&ec->result);
@@ -10067,7 +10070,7 @@ static bool ufbxi_is_edge_smooth(const ufbx_mesh *mesh, ufbx_topo_edge *indices,
 
 	if (!mesh->edge_smoothing && !mesh->face_smoothing && mesh->vertex_normal.data) {
 		int32_t twin = indices[index].twin;
-		if (twin >= 0) {
+		if (twin >= 0 && mesh->vertex_normal.data) {
 			ufbx_vec3 a0 = ufbx_get_vertex_vec3(&mesh->vertex_normal, index);
 			ufbx_vec3 a1 = ufbx_get_vertex_vec3(&mesh->vertex_normal, indices[index].next);
 			ufbx_vec3 b0 = ufbx_get_vertex_vec3(&mesh->vertex_normal, indices[twin].next);
@@ -10080,7 +10083,7 @@ static bool ufbxi_is_edge_smooth(const ufbx_mesh *mesh, ufbx_topo_edge *indices,
 	return false;
 }
 
-static bool ufbxi_is_edge_split(const ufbx_vertex_attrib *attrib, ufbx_topo_edge *topo, int32_t index)
+static bool ufbxi_is_edge_split(const ufbx_vertex_attrib *attrib, const ufbx_topo_edge *topo, int32_t index)
 {		  
 	int32_t twin = topo[index].twin;
 	if (twin >= 0) {
@@ -10102,13 +10105,714 @@ static bool ufbxi_is_edge_split(const ufbx_vertex_attrib *attrib, ufbx_topo_edge
 	return false;
 }
 
-static ufbx_real ufbxi_edge_crease(const ufbx_mesh *mesh, bool split, ufbx_topo_edge *topo, int32_t index)
+static ufbx_real ufbxi_edge_crease(const ufbx_mesh *mesh, bool split, const ufbx_topo_edge *topo, int32_t index)
 {
 	if (topo[index].twin < 0) return 1.0f;
 	if (split) return 1.0f;
 	if (mesh->edge_crease && topo[index].edge >= 0) return mesh->edge_crease[topo[index].edge] * 10.0f;
 	return 0.0f;
 }
+
+typedef struct {
+	ufbxi_mesh_imp *imp;
+
+	ufbx_error error;
+
+	ufbx_mesh src_mesh;
+	ufbx_mesh dst_mesh;
+	ufbx_topo_edge *topo;
+
+	ufbx_subdivide_opts opts;
+
+	ufbxi_allocator ator_result;
+	ufbxi_allocator ator_tmp;
+
+	ufbxi_buf result;
+	ufbxi_buf tmp;
+	ufbxi_buf source;
+
+} ufbxi_subdivide_context;
+
+static int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufbx_vertex_attrib *layer, ufbx_subdivision_boundary boundary)
+{
+	if (!layer->data) return 1;
+
+	const ufbx_mesh *mesh = &sc->src_mesh;
+	const ufbx_topo_edge *topo = sc->topo;
+
+	int32_t *edge_indices = ufbxi_push(&sc->result, int32_t, mesh->num_indices);
+	ufbxi_check_err(&sc->error, edge_indices);
+
+	size_t num_edge_values = 0;
+	for (int32_t ix = 0; ix < (int32_t)mesh->num_indices; ix++) {
+		int32_t twin = topo[ix].twin;
+		if (twin >= 0 && twin < ix && !ufbxi_is_edge_split(layer, topo, ix)) {
+			edge_indices[ix] = edge_indices[twin];
+		} else {
+			edge_indices[ix] = (int32_t)num_edge_values++;
+		}
+	}
+
+	size_t reals = layer->value_reals;
+
+	size_t num_initial_values = (num_edge_values + mesh->num_faces + mesh->num_indices) * reals;
+	ufbx_real *values = ufbxi_push(&sc->tmp, ufbx_real, num_initial_values);
+	ufbxi_check_err(&sc->error, values);
+
+	ufbx_real *face_values = values;
+	ufbx_real *edge_values = face_values + mesh->num_faces * reals;
+	ufbx_real *vertex_values = edge_values + num_edge_values * reals;
+
+	size_t num_vertex_values = 0;
+
+	int32_t *vertex_indices = ufbxi_push(&sc->result, int32_t, mesh->num_indices);
+	ufbxi_check_err(&sc->error, vertex_indices);
+
+	// Assume initially unique per vertex, remove if not the case
+	layer->unique_per_vertex = true;
+
+	bool sharp_corners = false;
+	bool sharp_splits = false;
+	bool sharp_all = false;
+
+	switch (boundary) {
+	case UFBX_SUBDIVISION_BOUNDARY_DEFAULT:
+	case UFBX_SUBDIVISION_BOUNDARY_LEGACY:
+	case UFBX_SUBDIVISION_BOUNDARY_SHARP_NONE:
+		// All smooth
+		break;
+	case UFBX_SUBDIVISION_BOUNDARY_SHARP_CORNERS:
+		sharp_corners = true;
+		break;
+	case UFBX_SUBDIVISION_BOUNDARY_SHARP_BOUNDARY:
+		sharp_corners = true;
+		sharp_splits = true;
+		break;
+	case UFBX_SUBDIVISION_BOUNDARY_SHARP_INTERIOR:
+		sharp_all = true;
+		break;
+	}
+
+	// Mark unused indices as -1 so we can patch non-manifold
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		vertex_indices[i] = -1;
+	}
+
+	// Face points
+	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
+		ufbx_face face = mesh->faces[fi];
+		ufbx_real *dst = face_values + fi * reals;
+
+		for (size_t i = 0; i < reals; i++) dst[i] = 0.0f;
+
+		for (uint32_t ci = 0; ci < face.num_indices; ci++) {
+			int32_t ix = (int32_t)(face.index_begin + ci);
+			ufbx_real *value = layer->data + layer->indices[ix] * reals;
+			for (size_t i = 0; i < reals; i++) dst[i] += value[i];
+		}
+
+		ufbx_real weight = 1.0f / face.num_indices;
+		for (size_t i = 0; i < reals; i++) dst[i] *= weight;
+	}
+
+	// Edge points
+	for (int32_t ix = 0; ix < (int32_t)mesh->num_indices; ix++) {
+		ufbx_real *dst = edge_values + edge_indices[ix] * reals;
+
+		int32_t twin = topo[ix].twin;
+		bool split = ufbxi_is_edge_split(layer, topo, ix);
+
+		if (split || (topo[ix].flags & UFBX_TOPO_NON_MANIFOLD) != 0) {
+			layer->unique_per_vertex = false;
+		}
+
+		ufbx_real crease = 0.0f;
+		if (split || twin < 0) {
+			crease = 1.0f;
+		} else if (topo[ix].edge >= 0 && mesh->edge_crease) {
+			crease = mesh->edge_crease[topo[ix].edge] * 10.0f;
+		}
+		if (sharp_all) crease = 1.0f;
+
+		ufbx_real *v0 = layer->data + layer->indices[ix] * reals;
+		ufbx_real *v1 = layer->data + layer->indices[topo[ix].next] * reals;
+
+		if (twin >= 0 && topo[ix].twin < ix && !split) {
+			// Already calculated
+		} else if (crease <= 0.0f) {
+			ufbx_real *f0 = face_values + topo[ix].face * reals;
+			ufbx_real *f1 = face_values + topo[twin].face * reals;
+			for (size_t i = 0; i < reals; i++) dst[i] = (v0[i] + v1[i] + f0[i] + f1[i]) * 0.25f;
+		} else if (crease >= 1.0f) {
+			for (size_t i = 0; i < reals; i++) dst[i] = (v0[i] + v1[i]) * 0.5f;
+		} else if (crease < 1.0f) {
+			ufbx_real *f0 = face_values + topo[ix].face * reals;
+			ufbx_real *f1 = face_values + topo[twin].face * reals;
+			for (size_t i = 0; i < reals; i++) {
+				ufbx_real smooth = (v0[i] + v1[i] + f0[i] + f1[i]) * 0.25f;
+				ufbx_real hard = (v0[i] + v1[i]) * 0.5f;
+				dst[i] = smooth * (1.0f - crease) + hard * crease;
+			}
+		}
+	}
+
+	// Vertex points
+	for (size_t vi = 0; vi < mesh->num_vertices; vi++) {
+		int32_t original_start = mesh->vertex_first_index[vi];
+		if (original_start < 0) continue;
+
+		// Find a topological boundary, or if not found a split edge
+		int32_t start = original_start;
+		for (int32_t cur = start;;) {
+			int32_t prev = ufbx_topo_prev_vertex_edge(topo, cur);
+			if (prev < 0) { start = cur; break; } // Topological boundary: Stop and use as start
+			if (ufbxi_is_edge_split(layer, topo, prev)) start = cur; // Split edge: Consider as start
+			if (prev == original_start) break; // Loop: Stop, use original start or split if found
+			cur = prev;
+		}
+
+		original_start = start;
+		while (start >= 0) {
+			if (start != original_start) {
+				layer->unique_per_vertex = false;
+			}
+
+			int32_t value_index = (int32_t)num_vertex_values++;
+			ufbx_real *dst = vertex_values + value_index * reals;
+
+			// We need to compute the average crease value and keep track of
+			// two creased edges, if there's more we use the corner rule that
+			// does not need the information.
+			ufbx_real total_crease = 0.0f;
+			size_t num_crease = 0;
+			size_t num_split = 0;
+			bool on_boundary = false;
+			bool non_manifold = false;
+			int32_t edge_points[2];
+
+			// At start we always have two edges and a single face
+			int32_t start_prev = topo[start].prev;
+			int32_t end_edge = topo[start_prev].twin;
+			size_t valence = 2;
+
+			non_manifold |= (topo[start].flags & UFBX_TOPO_NON_MANIFOLD) != 0;
+			non_manifold |= (topo[start_prev].flags & UFBX_TOPO_NON_MANIFOLD) != 0;
+
+			const ufbx_real *v0 = layer->data + layer->indices[start] * reals;
+
+			{
+				const ufbx_real *e0 = layer->data + layer->indices[topo[start].next] * reals;
+				const ufbx_real *e1 = layer->data + layer->indices[start_prev] * reals;
+				const ufbx_real *f0 = face_values + topo[start].face * reals;
+				for (size_t i = 0; i < reals; i++) dst[i] = e0[i] + e1[i] + f0[i];
+			}
+
+			bool start_split = ufbxi_is_edge_split(layer, topo, start);
+			bool prev_split = end_edge >= 0 && ufbxi_is_edge_split(layer, topo, end_edge);
+
+			// Either of the first two edges may be creased
+			ufbx_real start_crease = ufbxi_edge_crease(mesh, start_split, topo, start);
+			if (start_crease > 0.0f) {
+				total_crease += start_crease;
+				edge_points[num_crease++] = topo[start].next;
+			}
+			ufbx_real prev_crease = ufbxi_edge_crease(mesh, prev_split, topo, start_prev);
+			if (prev_crease > 0.0f) {
+				total_crease += prev_crease;
+				edge_points[num_crease++] = start_prev;
+			}
+
+			if (end_edge >= 0) {
+				if (prev_split) {
+					num_split++;
+				}
+			} else {
+				on_boundary = true;
+			}
+
+			vertex_indices[start] = value_index;
+
+			if (start_split) {
+				// We need to special case if the first edge is split as we have
+				// handled it already in the code above..
+				start = ufbx_topo_next_vertex_edge(topo, start);
+				num_split++;
+			} else {
+				// Follow vertex edges until we either hit a topological/split boundary
+				// or loop back to the left edge we accounted for in `start_prev`
+				int32_t cur = start;
+				for (;;) {
+					cur = ufbx_topo_next_vertex_edge(topo, cur);
+
+					// Topological boundary: Finished
+					if (cur < 0) {
+						on_boundary = true;
+						start = -1;
+						break;
+					}
+
+					non_manifold |= (topo[cur].flags & UFBX_TOPO_NON_MANIFOLD) != 0;
+					vertex_indices[cur] = value_index;
+
+					bool split = ufbxi_is_edge_split(layer, topo, cur);
+
+					// Looped: Add the face from the other side still if not split
+					if (cur == end_edge && !split) {
+						const ufbx_real *f0 = face_values + topo[cur].face * reals;
+						for (size_t i = 0; i < reals; i++) dst[i] += f0[i];
+						start = -1;
+						break;
+					}
+
+					// Add the edge crease, this also handles boundaries as they
+					// have an implicit crease of 1.0 using `ufbxi_edge_crease()`
+					ufbx_real cur_crease = ufbxi_edge_crease(mesh, split, topo, cur);
+					if (cur_crease > 0.0f) {
+						total_crease += cur_crease;
+						if (num_crease < 2) edge_points[num_crease] = topo[cur].next;
+						num_crease++;
+					}
+
+					// Add the new edge and face to the sum
+					const ufbx_real *e0 = layer->data + layer->indices[topo[cur].next] * reals;
+					const ufbx_real *f0 = face_values + topo[cur].face * reals;
+					for (size_t i = 0; i < reals; i++) dst[i] += e0[i] + f0[i];
+					valence++;
+
+					// If we landed at a split edge advance to the next one
+					// and continue from there in the outer loop
+					if (split) {
+						start = ufbx_topo_next_vertex_edge(topo, cur);
+						num_split++;
+						break;
+					}
+				}
+			}
+
+			if (start == original_start) start = -1;
+
+			// Weights for various subdivision masks
+			ufbx_real fe_weight = 1.0f / (ufbx_real)(valence*valence);
+			ufbx_real v_weight = (ufbx_real)(valence - 2) / (ufbx_real)valence;
+
+			// Select the right subdivision mask depending on valence and crease
+			if (num_crease > 2
+				|| (sharp_corners && valence == 2 && (num_split > 0 || on_boundary))
+				|| (sharp_splits && (num_split > 0 || on_boundary))
+				|| sharp_all
+				|| non_manifold) {
+				// Corner: Copy as-is
+				for (size_t i = 0; i < reals; i++) dst[i] = v0[i];
+			} else if (num_crease == 2) {
+				// Boundary: Interpolate edge
+				ufbx_real *e0 = layer->data + layer->indices[edge_points[0]] * reals;
+				ufbx_real *e1 = layer->data + layer->indices[edge_points[1]] * reals;
+
+				total_crease *= 0.5f;
+				if (total_crease < 0.0f) total_crease = 0.0f;
+				if (total_crease > 1.0f) total_crease = 1.0f;
+
+				for (size_t i = 0; i < reals; i++) {
+					ufbx_real smooth = dst[i] * fe_weight + v0[i] * v_weight;
+					ufbx_real hard = (e0[i] + e1[i]) * 0.125f + v0[i] * 0.75f;
+					dst[i] = smooth * (1.0f - total_crease) + hard * total_crease;
+				}
+			} else {
+				// Regular: Weighted sum with the accumulated edge/face points
+				for (size_t i = 0; i < reals; i++) {
+					dst[i] = dst[i] * fe_weight + v0[i] * v_weight;
+				}
+			}
+
+		}
+	}
+
+	// Copy non-manifold vertex values as-is
+	for (size_t old_ix = 0; old_ix < mesh->num_indices; old_ix++) {
+		int32_t ix = vertex_indices[old_ix];
+		if (ix < 0) {
+			ix = (int32_t)num_vertex_values++;
+			vertex_indices[old_ix] = ix;
+			const ufbx_real *src = layer->data + layer->indices[old_ix] * reals;
+			ufbx_real *dst = vertex_values + ix * reals;
+			for (size_t i = 0; i < reals; i++) dst[i] = src[i];
+		}
+	}
+
+	int32_t *new_indices = ufbxi_push(&sc->result, int32_t, mesh->num_indices * 4);
+	ufbxi_check_err(&sc->error, new_indices);
+
+	int32_t face_start = 0;
+	int32_t edge_start = (int32_t)(face_start + mesh->num_faces);
+	int32_t vert_start = (int32_t)(edge_start + num_edge_values);
+	int32_t *p_ix = new_indices;
+	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
+		p_ix[0] = vert_start + vertex_indices[ix];
+		p_ix[1] = edge_start + edge_indices[ix];
+		p_ix[2] = face_start + topo[ix].face;
+		p_ix[3] = edge_start + edge_indices[topo[ix].prev];
+		p_ix += 4;
+	}
+
+	size_t num_values = num_edge_values + mesh->num_faces + num_vertex_values;
+	ufbx_real *new_values = ufbxi_push(&sc->result, ufbx_real, num_values * reals);
+	ufbxi_check_err(&sc->error, new_values);
+
+	memcpy(new_values, values, num_values * reals * sizeof(ufbx_real));
+
+	// Nothing has been pushed since
+	ufbxi_pop(&sc->tmp, ufbx_real, num_initial_values, NULL);
+
+	layer->data = new_values;
+	layer->indices = new_indices;
+	layer->num_values = num_values;
+	layer->value_reals = layer->value_reals;
+
+	return 1;
+}
+
+static ufbxi_nodiscard int ufbxi_subdivide_mesh_level(ufbxi_subdivide_context *sc)
+{
+	const ufbx_mesh *mesh = &sc->src_mesh;
+	ufbx_mesh *result = &sc->dst_mesh;
+
+	*result = *mesh;
+
+	ufbx_topo_edge *topo = ufbxi_push(&sc->tmp, ufbx_topo_edge, mesh->num_indices);
+	ufbxi_check_err(&sc->error, topo);
+	ufbx_compute_topology(mesh, topo);
+	sc->topo = topo;
+
+	ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&result->vertex_position, sc->opts.boundary));
+
+	memset(&result->vertex_uv, 0, sizeof(result->vertex_uv));
+	memset(&result->vertex_tangent, 0, sizeof(result->vertex_tangent));
+	memset(&result->vertex_bitangent, 0, sizeof(result->vertex_bitangent));
+	memset(&result->vertex_color, 0, sizeof(result->vertex_color));
+
+	result->uv_sets.data = ufbxi_push_copy(&sc->result, ufbx_uv_set, result->uv_sets.count, result->uv_sets.data);
+	ufbxi_check_err(&sc->error,	result->uv_sets.data);
+
+	result->color_sets.data = ufbxi_push_copy(&sc->result, ufbx_color_set, result->color_sets.count, result->color_sets.data);
+	ufbxi_check_err(&sc->error,	result->color_sets.data);
+
+	ufbxi_for_list(ufbx_uv_set, set, result->uv_sets) {
+		ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&set->vertex_uv, sc->opts.uv_boundary));
+		if (sc->opts.interpolate_tangents) {
+			ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&set->vertex_tangent, sc->opts.uv_boundary));
+			ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&set->vertex_bitangent, sc->opts.uv_boundary));
+		} else {
+			memset(&set->vertex_tangent, 0, sizeof(set->vertex_tangent));
+			memset(&set->vertex_bitangent, 0, sizeof(set->vertex_bitangent));
+		}
+	}
+
+	ufbxi_for_list(ufbx_color_set, set, result->color_sets) {
+		ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&set->vertex_color, sc->opts.uv_boundary));
+	}
+
+	if (result->uv_sets.count > 0) {
+		result->vertex_uv = result->uv_sets.data[0].vertex_uv;
+		result->vertex_bitangent = result->uv_sets.data[0].vertex_bitangent;
+		result->vertex_tangent = result->uv_sets.data[0].vertex_tangent;
+	}
+	if (result->color_sets.count > 0) {
+		result->vertex_color = result->color_sets.data[0].vertex_color;
+	}
+
+	if (sc->opts.interpolate_normals && !sc->opts.ignore_normals) {
+		ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&mesh->vertex_normal, sc->opts.boundary));
+		ufbxi_for(ufbx_vec3, normal, result->vertex_normal.data, result->vertex_normal.num_values) {
+			*normal = ufbxi_normalize(*normal);
+		}
+		if (result->skinned_normal.data != mesh->skinned_normal.data) {
+			ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&result->skinned_normal, sc->opts.boundary));
+			ufbxi_for(ufbx_vec3, normal, result->skinned_normal.data, result->skinned_normal.num_values) {
+				*normal = ufbxi_normalize(*normal);
+			}
+		}
+	}
+
+	// TODO: Vertex crease, we should probably use it?
+	ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&mesh->vertex_crease, sc->opts.boundary);
+
+	if (result->skinned_position.data == mesh->skinned_position.data) {
+		result->skinned_position = result->vertex_position;
+	} else {
+		ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&result->skinned_position, sc->opts.boundary));
+	}
+
+	result->num_vertices = result->vertex_position.num_values;
+	result->vertex_indices = result->vertex_position.indices;
+	result->vertices = result->vertex_position.data;
+
+	result->num_indices = mesh->num_indices * 4;
+	result->num_faces = mesh->num_indices;
+	result->faces = ufbxi_push(&sc->result, ufbx_face, result->num_faces);
+	ufbxi_check_err(&sc->error, result->faces);
+
+	for (size_t i = 0; i < result->num_faces; i++) {
+		result->faces[i].index_begin = (uint32_t)(i * 4);
+		result->faces[i].num_indices = 4;
+	}
+
+	if (mesh->edges) {
+		result->num_edges = mesh->num_edges*2 + result->num_faces;
+		result->edges = ufbxi_push(&sc->result, ufbx_edge, result->num_edges);
+		ufbxi_check_err(&sc->error, result->edges);
+
+		if (mesh->edge_crease) {
+			result->edge_crease = ufbxi_push(&sc->result, ufbx_real, result->num_edges);
+			ufbxi_check_err(&sc->error, result->edge_crease);
+		}
+		if (mesh->edge_smoothing) {
+			result->edge_smoothing = ufbxi_push(&sc->result, bool, result->num_edges);
+			ufbxi_check_err(&sc->error, result->edge_smoothing);
+		}
+
+		size_t di = 0;
+		for (size_t i = 0; i < mesh->num_edges; i++) {
+			ufbx_edge edge = mesh->edges[i];
+			int32_t face_ix = topo[edge.indices[0]].face;
+			ufbx_face face = mesh->faces[face_ix];
+			int32_t offset = edge.indices[0] - face.index_begin;
+			int32_t next = (offset + 1) % (int32_t)face.num_indices;
+
+			int32_t a = (face.index_begin + offset) * 4;
+			int32_t b = (face.index_begin + next) * 4;
+
+			result->edges[di + 0].indices[0] = a;
+			result->edges[di + 0].indices[1] = a + 1;
+			result->edges[di + 1].indices[0] = b + 3;
+			result->edges[di + 1].indices[1] = b;
+
+			if (mesh->edge_crease) {
+				ufbx_real crease = mesh->edge_crease[i];
+				if (crease < 0.999f) crease -= 0.1f;
+				if (crease < 0.0f) crease = 0.0f;
+				result->edge_crease[di + 0] = crease;
+				result->edge_crease[di + 1] = crease;
+			}
+
+			if (mesh->edge_smoothing) {
+				result->edge_smoothing[di + 0] = mesh->edge_smoothing[i];
+				result->edge_smoothing[di + 1] = mesh->edge_smoothing[i];
+			}
+
+			di += 2;
+		}
+
+		for (size_t fi = 0; fi < result->num_faces; fi++) {
+			result->edges[di].indices[0] = (int32_t)(fi * 4 + 1);
+			result->edges[di].indices[1] = (int32_t)(fi * 4 + 2);
+
+			if (result->edge_crease) {
+				result->edge_crease[di] = 0.0f;
+			}
+
+			if (result->edge_smoothing) {
+				result->edge_smoothing[di + 0] = true;
+			}
+
+			di++;
+		}
+	}
+
+	result->vertex_first_index = ufbxi_push(&sc->result, int32_t, result->num_vertices);
+	ufbxi_check_err(&sc->error, result->vertex_first_index);
+
+	ufbxi_for(int32_t, p_vx_ix, result->vertex_first_index, result->num_vertices) {
+		*p_vx_ix = -1;
+	}
+	for (size_t ix = 0; ix < result->num_indices; ix++) {
+		int32_t vx = result->vertex_indices[ix];
+		if (result->vertex_first_index[vx] < 0) {
+			result->vertex_first_index[vx] = (int32_t)ix;
+		}
+	}
+
+	return 1;
+}
+
+static ufbxi_nodiscard int ufbxi_subdivide_mesh_imp(ufbxi_subdivide_context *sc, size_t level)
+{
+	if (sc->opts.boundary == UFBX_SUBDIVISION_BOUNDARY_DEFAULT) {
+		sc->opts.boundary = sc->src_mesh.subdivision_boundary;
+	}
+
+	if (sc->opts.uv_boundary == UFBX_SUBDIVISION_BOUNDARY_DEFAULT) {
+		sc->opts.uv_boundary = sc->src_mesh.subdivision_uv_boundary;
+	}
+
+	ufbxi_init_ator(&sc->error, &sc->ator_tmp, &sc->opts.temp_allocator);
+	ufbxi_init_ator(&sc->error, &sc->ator_result, &sc->opts.result_allocator);
+
+	sc->source.ator = &sc->ator_tmp;
+	sc->tmp.ator = &sc->ator_tmp;
+
+	for (size_t i = 1; i < level; i++) {
+		sc->result.ator = &sc->ator_tmp;
+
+		ufbxi_check_err(&sc->error, ufbxi_subdivide_mesh_level(sc));
+
+		sc->src_mesh = sc->dst_mesh;
+
+		ufbxi_buf_free(&sc->source);
+		ufbxi_buf_free(&sc->tmp);
+		sc->source = sc->result;
+		memset(&sc->result, 0, sizeof(sc->result));
+	}
+
+	sc->result.ator = &sc->ator_result;
+	ufbxi_check_err(&sc->error, ufbxi_subdivide_mesh_level(sc));
+	ufbxi_buf_free(&sc->tmp);
+
+	{
+		ufbx_mesh *src = &sc->src_mesh;
+		ufbx_mesh *mesh = &sc->dst_mesh;
+
+		if (mesh->face_material) {
+			mesh->face_material = ufbxi_push(&sc->result, int32_t, mesh->num_faces);
+			ufbxi_check_err(&sc->error, mesh->face_material);
+		}
+		if (mesh->face_smoothing) {
+			mesh->face_smoothing = ufbxi_push(&sc->result, bool, mesh->num_faces);
+			ufbxi_check_err(&sc->error, mesh->face_smoothing);
+		}
+
+		size_t num_materials = mesh->materials.count;
+		mesh->materials.data = ufbxi_push_copy(&sc->result, ufbx_mesh_material, num_materials, mesh->materials.data);
+		ufbxi_check_err(&sc->error, mesh->materials.data);
+		ufbxi_for_list(ufbx_mesh_material, mat, mesh->materials) {
+			mat->num_faces = 0;
+			mat->num_triangles = 0;
+		}
+
+		size_t index_offset = 0;
+		size_t num_triangles = 0;
+		for (size_t i = 0; i < mesh->num_faces; i++) {
+			ufbx_face face = mesh->faces[i];
+			size_t tris = face.num_indices >= 3 ? face.num_indices - 2 : 0;
+
+			int32_t mat = 0;
+			if (mesh->face_material) {
+				mat = src->face_material[i];
+				for (size_t ci = 0; ci < face.num_indices; ci++) {
+					mesh->face_material[index_offset + ci] = mat;
+				}
+			}
+			if (mat >= 0 && (size_t)mat < num_materials) {
+				mesh->materials.data[mat].num_faces++;
+				mesh->materials.data[mat].num_triangles += tris;
+			}
+			if (mesh->face_smoothing) {
+				bool flag = src->face_smoothing[i];
+				for (size_t ci = 0; ci < face.num_indices; ci++) {
+					mesh->face_smoothing[index_offset + ci] = flag;
+				}
+			}
+			index_offset += face.num_indices;
+
+			num_triangles += tris;
+		}
+		mesh->num_triangles = num_triangles;
+
+		// See `ufbxi_finalize_scene()`
+		ufbxi_for_list(ufbx_mesh_material, mat, mesh->materials) {
+			mat->faces = ufbxi_push(&sc->result, int32_t, mat->num_faces);
+			ufbxi_check_err(&sc->error, mat->faces);
+			mat->num_faces = 0;
+		}
+
+		for (size_t i = 0; i < mesh->num_faces; i++) {
+			int32_t mat_ix = mesh->face_material ? mesh->face_material[i] : 0;
+			if (mat_ix >= 0 && (size_t)mat_ix < num_materials) {
+				ufbx_mesh_material *mat = &mesh->materials.data[mat_ix];
+				mat->faces[mat->num_faces++] = (int32_t)i;
+			}
+		}
+	}
+
+	ufbx_mesh *mesh = &sc->dst_mesh;
+	memset(&mesh->vertex_normal, 0, sizeof(mesh->vertex_normal));
+	memset(&mesh->skinned_normal, 0, sizeof(mesh->skinned_normal));
+
+	if (!sc->opts.interpolate_normals && !sc->opts.ignore_normals) {
+
+		ufbx_topo_edge *topo = ufbxi_push(&sc->tmp, ufbx_topo_edge, mesh->num_indices);
+		ufbxi_check_err(&sc->error, topo);
+		ufbx_compute_topology(mesh, topo);
+
+		int32_t *normal_indices = ufbxi_push(&sc->result, int32_t, mesh->num_indices);
+		ufbxi_check_err(&sc->error, normal_indices);
+
+		size_t num_normals = ufbx_generate_normal_mapping(mesh, topo, normal_indices);
+		if (num_normals == mesh->num_vertices) {
+			mesh->skinned_normal.unique_per_vertex = true;
+		}
+
+		ufbx_vec3 *normal_data = ufbxi_push(&sc->result, ufbx_vec3, num_normals + 1);
+		ufbxi_check_err(&sc->error, normal_data);
+		normal_data[0] = ufbx_zero_vec3;
+		normal_data++;
+
+		ufbx_compute_normals(mesh, &mesh->skinned_position, normal_indices, normal_data, num_normals);
+
+		mesh->vertex_normal.data = normal_data;
+		mesh->vertex_normal.indices = normal_indices;
+		mesh->vertex_normal.num_values = num_normals;
+
+		mesh->skinned_normal = mesh->vertex_normal;
+	}
+
+	sc->imp = ufbxi_push(&sc->result, ufbxi_mesh_imp, 1);
+	ufbxi_check_err(&sc->error, sc->imp);
+	sc->imp->magic = UFBXI_MESH_IMP_MAGIC;
+	sc->imp->mesh = sc->dst_mesh;
+	sc->imp->ator = sc->ator_result;
+	sc->imp->result_buf = sc->result;
+	sc->imp->mesh.subdivision_evaluated = true;
+
+	return 1;
+}
+
+static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *user_opts, ufbx_error *p_error)
+{
+	ufbxi_subdivide_context sc = { 0 };
+	if (user_opts) {
+		sc.opts = *user_opts;
+	}
+
+	sc.src_mesh = *mesh;
+
+	if (ufbxi_subdivide_mesh_imp(&sc, level)) {
+		ufbxi_buf_free(&sc.tmp);
+		ufbxi_buf_free(&sc.source);
+		if (p_error) {
+			p_error->type = UFBX_ERROR_NONE;
+			p_error->description = NULL;
+			p_error->stack_size = 0;
+		}
+		if (sc.ator_tmp.ator.free_allocator_fn) {
+			sc.ator_tmp.ator.free_allocator_fn(sc.ator_tmp.ator.user);
+		}
+		return &sc.imp->mesh;
+	} else {
+		ufbxi_fix_error_type(&sc.error, "Failed to subdivide");
+		if (p_error) *p_error = sc.error;
+		ufbxi_buf_free(&sc.tmp);
+		ufbxi_buf_free(&sc.source);
+		ufbxi_buf_free(&sc.result);
+		if (sc.ator_tmp.ator.free_allocator_fn) {
+			sc.ator_tmp.ator.free_allocator_fn(sc.ator_tmp.ator.user);
+		}
+		if (sc.ator_result.ator.free_allocator_fn) {
+			sc.ator_result.ator.free_allocator_fn(sc.ator_result.ator.user);
+		}
+		return NULL;
+	}
+}
+
 
 // -- File IO
 
@@ -10330,9 +11034,6 @@ void ufbx_free_scene(ufbx_scene *scene)
 
 	ufbxi_buf_free(&imp->string_buf);
 
-	char *memory_block = imp->memory_block;
-	size_t memory_block_size = imp->memory_block_size;
-
 	// We need to free `result_buf` last and be careful to copy it to
 	// the stack since the `ufbxi_scene_imp` that contains it is allocated
 	// from the same result buffer!
@@ -10340,7 +11041,6 @@ void ufbx_free_scene(ufbx_scene *scene)
 	ufbxi_buf result = imp->result_buf;
 	result.ator = &ator;
 	ufbxi_buf_free(&result);
-	ufbxi_free(&ator, char, memory_block, memory_block_size);
 
 	ufbx_assert(ator.current_size == 0);
 
@@ -11434,464 +12134,31 @@ void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positio
 	}
 }
 
-void ufbx_subdivide_layer(const ufbx_mesh *mesh, ufbx_vertex_attrib *result, const ufbx_vertex_attrib *layer, ufbx_topo_edge *topo, const ufbx_subdivide_opts *opts, ufbx_subdivision_boundary boundary)
+ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error)
 {
-	(void)opts;
-
-	if (!layer->data) {
-		*result = *layer;
-		return;
-	}
-
-	int32_t *edge_indices = (int32_t*)malloc(mesh->num_indices * sizeof(int32_t));
-
-	size_t num_edge_values = 0;
-	for (int32_t ix = 0; ix < (int32_t)mesh->num_indices; ix++) {
-		int32_t twin = topo[ix].twin;
-		if (twin >= 0 && twin < ix && !ufbxi_is_edge_split(layer, topo, ix)) {
-			edge_indices[ix] = edge_indices[twin];
-		} else {
-			edge_indices[ix] = (int32_t)num_edge_values++;
-		}
-	}
-
-	size_t reals = layer->value_reals;
-
-	ufbx_real *values = (ufbx_real*)malloc((num_edge_values + mesh->num_faces + mesh->num_indices) * reals * sizeof(ufbx_real));
-
-	ufbx_real *face_values = values;
-	ufbx_real *edge_values = face_values + mesh->num_faces * reals;
-	ufbx_real *vertex_values = edge_values + num_edge_values * reals;
-
-	size_t num_vertex_values = 0;
-
-	int32_t *vertex_indices = (int32_t*)malloc(mesh->num_indices * sizeof(int32_t));
-
-	// Assume initially unique per vertex, remove if not the case
-	result->unique_per_vertex = true;
-
-	bool sharp_corners = false;
-	bool sharp_splits = false;
-	bool sharp_all = false;
-
-	switch (boundary) {
-	case UFBX_SUBDIVISION_BOUNDARY_DEFAULT:
-	case UFBX_SUBDIVISION_BOUNDARY_LEGACY:
-	case UFBX_SUBDIVISION_BOUNDARY_SHARP_NONE:
-		// All smooth
-		break;
-	case UFBX_SUBDIVISION_BOUNDARY_SHARP_CORNERS:
-		sharp_corners = true;
-		break;
-	case UFBX_SUBDIVISION_BOUNDARY_SHARP_BOUNDARY:
-		sharp_corners = true;
-		sharp_splits = true;
-		break;
-	case UFBX_SUBDIVISION_BOUNDARY_SHARP_INTERIOR:
-		sharp_all = true;
-		break;
-	}
-
-	// Mark unused indices as -1 so we can patch non-manifold
-	for (size_t i = 0; i < mesh->num_indices; i++) {
-		vertex_indices[i] = -1;
-	}
-
-	// Face points
-	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
-		ufbx_face face = mesh->faces[fi];
-		ufbx_real *dst = face_values + fi * reals;
-
-		for (size_t i = 0; i < reals; i++) dst[i] = 0.0f;
-
-		for (uint32_t ci = 0; ci < face.num_indices; ci++) {
-			int32_t ix = (int32_t)(face.index_begin + ci);
-			ufbx_real *value = layer->data + layer->indices[ix] * reals;
-			for (size_t i = 0; i < reals; i++) dst[i] += value[i];
-		}
-
-		ufbx_real weight = 1.0f / face.num_indices;
-		for (size_t i = 0; i < reals; i++) dst[i] *= weight;
-	}
-
-	// Edge points
-	for (int32_t ix = 0; ix < (int32_t)mesh->num_indices; ix++) {
-		ufbx_real *dst = edge_values + edge_indices[ix] * reals;
-
-		int32_t twin = topo[ix].twin;
-		bool split = ufbxi_is_edge_split(layer, topo, ix);
-
-		if (split || (topo[ix].flags & UFBX_TOPO_NON_MANIFOLD) != 0) {
-			result->unique_per_vertex = false;
-		}
-
-		ufbx_real crease = 0.0f;
-		if (split || twin < 0) {
-			crease = 1.0f;
-		} else if (topo[ix].edge >= 0 && mesh->edge_crease) {
-			crease = mesh->edge_crease[topo[ix].edge] * 10.0f;
-		}
-		if (sharp_all) crease = 1.0f;
-
-		ufbx_real *v0 = layer->data + layer->indices[ix] * reals;
-		ufbx_real *v1 = layer->data + layer->indices[topo[ix].next] * reals;
-
-		if (twin >= 0 && topo[ix].twin < ix && !split) {
-			// Already calculated
-		} else if (crease <= 0.0f) {
-			ufbx_real *f0 = face_values + topo[ix].face * reals;
-			ufbx_real *f1 = face_values + topo[twin].face * reals;
-			for (size_t i = 0; i < reals; i++) dst[i] = (v0[i] + v1[i] + f0[i] + f1[i]) * 0.25f;
-		} else if (crease >= 1.0f) {
-			for (size_t i = 0; i < reals; i++) dst[i] = (v0[i] + v1[i]) * 0.5f;
-		} else if (crease < 1.0f) {
-			ufbx_real *f0 = face_values + topo[ix].face * reals;
-			ufbx_real *f1 = face_values + topo[twin].face * reals;
-			for (size_t i = 0; i < reals; i++) {
-				ufbx_real smooth = (v0[i] + v1[i] + f0[i] + f1[i]) * 0.25f;
-				ufbx_real hard = (v0[i] + v1[i]) * 0.5f;
-				dst[i] = smooth * (1.0f - crease) + hard * crease;
-			}
-		}
-	}
-
-	// Vertex points
-	for (size_t vi = 0; vi < mesh->num_vertices; vi++) {
-		int32_t original_start = mesh->vertex_first_index[vi];
-		if (original_start < 0) continue;
-
-		// Find a topological boundary, or if not found a split edge
-		int32_t start = original_start;
-		for (int32_t cur = start;;) {
-			int32_t prev = ufbx_topo_prev_vertex_edge(topo, cur);
-			if (prev < 0) { start = cur; break; } // Topological boundary: Stop and use as start
-			if (ufbxi_is_edge_split(layer, topo, prev)) start = cur; // Split edge: Consider as start
-			if (prev == original_start) break; // Loop: Stop, use original start or split if found
-			cur = prev;
-		}
-
-		original_start = start;
-		while (start >= 0) {
-			if (start != original_start) {
-				result->unique_per_vertex = false;
-			}
-
-			int32_t value_index = (int32_t)num_vertex_values++;
-			ufbx_real *dst = vertex_values + value_index * reals;
-
-			// We need to compute the average crease value and keep track of
-			// two creased edges, if there's more we use the corner rule that
-			// does not need the information.
-			ufbx_real total_crease = 0.0f;
-			size_t num_crease = 0;
-			size_t num_split = 0;
-			bool on_boundary = false;
-			bool non_manifold = false;
-			int32_t edge_points[2];
-
-			// At start we always have two edges and a single face
-			int32_t start_prev = topo[start].prev;
-			int32_t end_edge = topo[start_prev].twin;
-			size_t valence = 2;
-
-			non_manifold |= (topo[start].flags & UFBX_TOPO_NON_MANIFOLD) != 0;
-			non_manifold |= (topo[start_prev].flags & UFBX_TOPO_NON_MANIFOLD) != 0;
-
-			const ufbx_real *v0 = layer->data + layer->indices[start] * reals;
-
-			{
-				const ufbx_real *e0 = layer->data + layer->indices[topo[start].next] * reals;
-				const ufbx_real *e1 = layer->data + layer->indices[start_prev] * reals;
-				const ufbx_real *f0 = face_values + topo[start].face * reals;
-				for (size_t i = 0; i < reals; i++) dst[i] = e0[i] + e1[i] + f0[i];
-			}
-
-			bool start_split = ufbxi_is_edge_split(layer, topo, start);
-			bool prev_split = end_edge >= 0 && ufbxi_is_edge_split(layer, topo, end_edge);
-
-			// Either of the first two edges may be creased
-			ufbx_real start_crease = ufbxi_edge_crease(mesh, start_split, topo, start);
-			if (start_crease > 0.0f) {
-				total_crease += start_crease;
-				edge_points[num_crease++] = topo[start].next;
-			}
-			ufbx_real prev_crease = ufbxi_edge_crease(mesh, prev_split, topo, start_prev);
-			if (prev_crease > 0.0f) {
-				total_crease += prev_crease;
-				edge_points[num_crease++] = start_prev;
-			}
-
-			if (end_edge >= 0) {
-				if (prev_split) {
-					num_split++;
-				}
-			} else {
-				on_boundary = true;
-			}
-
-			vertex_indices[start] = value_index;
-
-			if (start_split) {
-				// We need to special case if the first edge is split as we have
-				// handled it already in the code above..
-				start = ufbx_topo_next_vertex_edge(topo, start);
-				num_split++;
-			} else {
-				// Follow vertex edges until we either hit a topological/split boundary
-				// or loop back to the left edge we accounted for in `start_prev`
-				int32_t cur = start;
-				for (;;) {
-					cur = ufbx_topo_next_vertex_edge(topo, cur);
-
-					// Topological boundary: Finished
-					if (cur < 0) {
-						on_boundary = true;
-						start = -1;
-						break;
-					}
-
-					non_manifold |= (topo[cur].flags & UFBX_TOPO_NON_MANIFOLD) != 0;
-					vertex_indices[cur] = value_index;
-
-					bool split = ufbxi_is_edge_split(layer, topo, cur);
-
-					// Looped: Add the face from the other side still if not split
-					if (cur == end_edge && !split) {
-						const ufbx_real *f0 = face_values + topo[cur].face * reals;
-						for (size_t i = 0; i < reals; i++) dst[i] += f0[i];
-						start = -1;
-						break;
-					}
-
-					// Add the edge crease, this also handles boundaries as they
-					// have an implicit crease of 1.0 using `ufbxi_edge_crease()`
-					ufbx_real cur_crease = ufbxi_edge_crease(mesh, split, topo, cur);
-					if (cur_crease > 0.0f) {
-						total_crease += cur_crease;
-						if (num_crease < 2) edge_points[num_crease] = topo[cur].next;
-						num_crease++;
-					}
-
-					// Add the new edge and face to the sum
-					const ufbx_real *e0 = layer->data + layer->indices[topo[cur].next] * reals;
-					const ufbx_real *f0 = face_values + topo[cur].face * reals;
-					for (size_t i = 0; i < reals; i++) dst[i] += e0[i] + f0[i];
-					valence++;
-
-					// If we landed at a split edge advance to the next one
-					// and continue from there in the outer loop
-					if (split) {
-						start = ufbx_topo_next_vertex_edge(topo, cur);
-						num_split++;
-						break;
-					}
-				}
-			}
-
-			if (start == original_start) start = -1;
-
-			// Weights for various subdivision masks
-			ufbx_real fe_weight = 1.0f / (ufbx_real)(valence*valence);
-			ufbx_real v_weight = (ufbx_real)(valence - 2) / (ufbx_real)valence;
-
-			// Select the right subdivision mask depending on valence and crease
-			if (num_crease > 2
-				|| (sharp_corners && valence == 2 && (num_split > 0 || on_boundary))
-				|| (sharp_splits && (num_split > 0 || on_boundary))
-				|| sharp_all
-				|| non_manifold) {
-				// Corner: Copy as-is
-				for (size_t i = 0; i < reals; i++) dst[i] = v0[i];
-			} else if (num_crease == 2) {
-				// Boundary: Interpolate edge
-				ufbx_real *e0 = layer->data + layer->indices[edge_points[0]] * reals;
-				ufbx_real *e1 = layer->data + layer->indices[edge_points[1]] * reals;
-
-				total_crease *= 0.5f;
-				if (total_crease < 0.0f) total_crease = 0.0f;
-				if (total_crease > 1.0f) total_crease = 1.0f;
-
-				for (size_t i = 0; i < reals; i++) {
-					ufbx_real smooth = dst[i] * fe_weight + v0[i] * v_weight;
-					ufbx_real hard = (e0[i] + e1[i]) * 0.125f + v0[i] * 0.75f;
-					dst[i] = smooth * (1.0f - total_crease) + hard * total_crease;
-				}
-			} else {
-				// Regular: Weighted sum with the accumulated edge/face points
-				for (size_t i = 0; i < reals; i++) {
-					dst[i] = dst[i] * fe_weight + v0[i] * v_weight;
-				}
-			}
-
-		}
-	}
-
-	// Copy non-manifold vertex values as-is
-	for (size_t old_ix = 0; old_ix < mesh->num_indices; old_ix++) {
-		int32_t ix = vertex_indices[old_ix];
-		if (ix < 0) {
-			ix = (int32_t)num_vertex_values++;
-			vertex_indices[old_ix] = ix;
-			const ufbx_real *src = layer->data + layer->indices[old_ix] * reals;
-			ufbx_real *dst = vertex_values + ix * reals;
-			for (size_t i = 0; i < reals; i++) dst[i] = src[i];
-		}
-	}
-
-	int32_t *new_indices = (int32_t*)malloc(mesh->num_indices * 4 * sizeof(int32_t));
-
-	int32_t face_start = 0;
-	int32_t edge_start = (int32_t)(face_start + mesh->num_faces);
-	int32_t vert_start = (int32_t)(edge_start + num_edge_values);
-	int32_t *p_ix = new_indices;
-	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
-		p_ix[0] = vert_start + vertex_indices[ix];
-		p_ix[1] = edge_start + edge_indices[ix];
-		p_ix[2] = face_start + topo[ix].face;
-		p_ix[3] = edge_start + edge_indices[topo[ix].prev];
-		p_ix += 4;
-	}
-
-	size_t num_values = num_edge_values + mesh->num_faces + num_vertex_values;
-	ufbx_real *new_values = (ufbx_real*)malloc(num_values * reals * sizeof(ufbx_real));
-	memcpy(new_values, values, num_values * reals * sizeof(ufbx_real));
-	free(values);
-
-	result->data = new_values;
-	result->indices = new_indices;
-	result->num_values = num_values;
-	result->value_reals = layer->value_reals;
-}
-
-ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, const ufbx_subdivide_opts *user_opts)
-{
-	ufbx_subdivide_opts opts = { 0 };
-	if (user_opts) {
-		opts = *user_opts;
-	}
-
-	if (opts.boundary == UFBX_SUBDIVISION_BOUNDARY_DEFAULT) {
-		opts.boundary = mesh->subdivision_boundary;
-	}
-
-	if (opts.uv_boundary == UFBX_SUBDIVISION_BOUNDARY_DEFAULT) {
-		opts.uv_boundary = mesh->subdivision_uv_boundary;
-	}
-
-	ufbx_mesh *result = (ufbx_mesh*)malloc(sizeof(ufbx_mesh));
-	*result = *mesh;
-
-	ufbx_topo_edge *topo = (ufbx_topo_edge*)malloc(mesh->num_indices * sizeof(ufbx_topo_edge));
-	ufbx_compute_topology(mesh, topo);
-	ufbx_subdivide_layer(mesh, (ufbx_vertex_attrib*)&result->vertex_position, (ufbx_vertex_attrib*)&mesh->vertex_position, topo, &opts, opts.boundary);
-
-	// TODO: Layers
-	ufbx_subdivide_layer(mesh, (ufbx_vertex_attrib*)&result->vertex_uv, (ufbx_vertex_attrib*)&mesh->vertex_uv, topo, &opts, opts.uv_boundary);
-
-	result->num_vertices = result->vertex_position.num_values;
-
-	result->num_indices = mesh->num_indices * 4;
-	result->num_faces = mesh->num_indices;
-	result->faces = (ufbx_face*)malloc(result->num_faces * sizeof(ufbx_face));
-
-	// TODO: Calculate normals
-
-	if (mesh->face_material) {
-		result->face_material = (int32_t*)malloc(result->num_faces * sizeof(int32_t));
-	}
-	if (mesh->face_smoothing) {
-		result->face_smoothing = (bool*)malloc(result->num_faces * sizeof(bool));
-	}
-
-	size_t index_offset = 0;
-	for (size_t i = 0; i < mesh->num_faces; i++) {
-		ufbx_face face = mesh->faces[i];
-		if (mesh->face_material) {
-			int32_t mat = mesh->face_material[i];
-			for (size_t ci = 0; ci < face.num_indices; ci++) {
-				result->face_material[index_offset + ci] = mat;
-			}
-		}
-		if (mesh->face_smoothing) {
-			bool flag = mesh->face_smoothing[i];
-			for (size_t ci = 0; ci < face.num_indices; ci++) {
-				result->face_smoothing[index_offset + ci] = flag;
-			}
-		}
-		index_offset += face.num_indices;
-	}
-
-	for (size_t i = 0; i < result->num_faces; i++) {
-		result->faces[i].index_begin = (uint32_t)(i * 4);
-		result->faces[i].num_indices = 4;
-	}
-
-	if (mesh->edges) {
-		result->num_edges = mesh->num_edges*2 + result->num_faces;
-		result->edges = (ufbx_edge*)malloc(result->num_edges * sizeof(ufbx_edge));
-
-		if (mesh->edge_crease) {
-			result->edge_crease = (ufbx_real*)malloc(result->num_edges * sizeof(ufbx_real));
-		}
-		if (mesh->edge_smoothing) {
-			result->edge_smoothing = (bool*)malloc(result->num_edges * sizeof(bool));
-		}
-
-		size_t di = 0;
-		for (size_t i = 0; i < mesh->num_edges; i++) {
-			ufbx_edge edge = mesh->edges[i];
-			int32_t face_ix = topo[edge.indices[0]].face;
-			ufbx_face face = mesh->faces[face_ix];
-			int32_t offset = edge.indices[0] - face.index_begin;
-			int32_t next = (offset + 1) % (int32_t)face.num_indices;
-
-			int32_t a = (face.index_begin + offset) * 4;
-			int32_t b = (face.index_begin + next) * 4;
-
-			result->edges[di + 0].indices[0] = a;
-			result->edges[di + 0].indices[1] = a + 1;
-			result->edges[di + 1].indices[0] = b + 3;
-			result->edges[di + 1].indices[1] = b;
-
-			if (mesh->edge_crease) {
-				ufbx_real crease = mesh->edge_crease[i];
-				if (crease < 0.999f) crease -= 0.1f;
-				if (crease < 0.0f) crease = 0.0f;
-				result->edge_crease[di + 0] = crease;
-				result->edge_crease[di + 1] = crease;
-			}
-
-			if (mesh->edge_smoothing) {
-				result->edge_smoothing[di + 0] = mesh->edge_smoothing[i];
-				result->edge_smoothing[di + 1] = mesh->edge_smoothing[i];
-			}
-
-			di += 2;
-		}
-
-		for (size_t fi = 0; fi < result->num_faces; fi++) {
-			result->edges[di].indices[0] = (int32_t)(fi * 4 + 1);
-			result->edges[di].indices[1] = (int32_t)(fi * 4 + 2);
-
-			if (result->edge_crease) {
-				result->edge_crease[di] = 0.0f;
-			}
-
-			if (result->edge_smoothing) {
-				result->edge_smoothing[di + 0] = true;
-			}
-
-			di++;
-		}
-	}
-
-	return result;
+	if (!mesh) return NULL;
+	return ufbxi_subdivide_mesh(mesh, level, opts, error);
 }
 
 void ufbx_free_mesh(ufbx_mesh *mesh)
 {
-	(void)mesh;
-	// TODO
+	if (!mesh) return;
+	if (!mesh->subdivision_evaluated) return;
+
+	ufbxi_mesh_imp *imp = (ufbxi_mesh_imp*)mesh;
+	ufbx_assert(imp->magic == UFBXI_MESH_IMP_MAGIC);
+	if (imp->magic != UFBXI_MESH_IMP_MAGIC) return;
+
+	// See `ufbx_free_scene()` for more information
+	ufbxi_allocator ator = imp->ator;
+	ufbxi_buf result = imp->result_buf;
+	result.ator = &ator;
+	ufbxi_buf_free(&result);
+
+	ufbx_assert(ator.current_size == 0);
+	if (ator.ator.free_allocator_fn) {
+		ator.ator.free_allocator_fn(ator.ator.user);
+	}
 }
 
 #ifdef __cplusplus

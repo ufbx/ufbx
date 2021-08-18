@@ -111,7 +111,7 @@ UFBXT_FILE_TEST(blender_293x_subsurf_max_crease)
 #if UFBXT_IMPL
 {
 	ufbx_mesh *mesh = (ufbx_mesh*)ufbx_find_element(scene, UFBX_ELEMENT_MESH, "Plane");
-	ufbx_mesh *subdivided = ufbx_subdivide_mesh(mesh, NULL);
+	ufbx_mesh *subdivided = ufbx_subdivide_mesh(mesh, 1, NULL, NULL);
 
 	for (size_t i = 0; i < mesh->num_edges; i++) {
 		ufbxt_assert_close_real(err, mesh->edge_crease[i], 1.0f);
@@ -147,7 +147,7 @@ UFBXT_FILE_TEST(maya_subsurf_max_crease)
 {
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node && node->mesh);
-	ufbx_mesh *subdivided = ufbx_subdivide_mesh(node->mesh, NULL);
+	ufbx_mesh *subdivided = ufbx_subdivide_mesh(node->mesh, 1, NULL, NULL);
 	ufbxt_assert(subdivided);
 
 	size_t num_top = 0;

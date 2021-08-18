@@ -575,7 +575,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		ufbx_matrix norm_mat = ufbx_get_compatible_normal_matrix(node);
 
 		if (mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_SMOOTH || mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_HULL_AND_SMOOTH) {
-			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, NULL);
+			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, mesh->subdivision_preview_levels, NULL, NULL);
 
 			ufbxt_check_mesh(scene, mesh);
 
@@ -636,6 +636,8 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 
 			free(obj_verts);
 			free(sub_verts);
+
+			ufbx_free_mesh(sub_mesh);
 
 			continue;
 		}

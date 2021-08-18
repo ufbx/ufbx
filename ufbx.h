@@ -518,12 +518,6 @@ typedef struct ufbx_edge {
 	uint32_t indices[2];
 } ufbx_edge;
 
-// Triangle face
-typedef struct ufbx_triangle {
-	uint32_t indices[3];
-	uint32_t face_index;
-} ufbx_triangle;
-
 // Polygonal face with arbitrary number vertices, a single face contains a 
 // contiguous range of mesh indices, eg. `{5,3}` would have indices 5, 6, 7
 //
@@ -628,9 +622,6 @@ struct ufbx_mesh {
 	bool *face_smoothing;   // < Should the face have soft normals
 	int32_t *face_material; // < Indices to `ufbx_mesh.materials`
 
-	// Triangles, refer to `face_material[tri.face_index]` for materials
-	ufbx_triangle *triangles;
-
 	// Edges and optional per-edge extra data
 	size_t num_edges;
 	ufbx_edge *edges;       // < Edge index range
@@ -687,6 +678,7 @@ struct ufbx_mesh {
 	ufbx_subdivision_display_mode subdivision_display_mode;
 	ufbx_subdivision_boundary subdivision_boundary;
 	ufbx_subdivision_boundary subdivision_uv_boundary;
+	bool subdivision_evaluated;
 };
 
 typedef enum ufbx_light_type {
@@ -1669,14 +1661,15 @@ typedef struct ufbx_subdivide_opts {
 	ufbx_subdivision_boundary boundary;
 	ufbx_subdivision_boundary uv_boundary;
 
-	// Limits
-	// TODO Move these to `ufbx_allocator`...
-	size_t max_temp_memory;
-	size_t max_result_memory;
-	size_t max_temp_allocs;
-	size_t max_result_allocs;
-	size_t temp_huge_size;
-	size_t result_huge_size;
+	// Do not generate normals
+	bool ignore_normals;
+
+	// Interpolate existing normals using the subdivision rules
+	// instead of generating new normals
+	bool interpolate_normals;
+
+	// Subdivide also tangent attributes
+	bool interpolate_tangents;
 
 } ufbx_subdivide_opts;
 
@@ -1826,7 +1819,7 @@ ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_
 size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, ufbx_topo_edge *topo, int32_t *normal_indices);
 void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals);
 
-ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, const ufbx_subdivide_opts *opts);
+ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error);
 void ufbx_free_mesh(ufbx_mesh *mesh);
 
 // -- Inline API
