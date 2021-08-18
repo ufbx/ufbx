@@ -8229,6 +8229,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 					int32_t mat_ix = mesh->face_material[i];
 					if (!(mat_ix >= 0 && (size_t)mat_ix < num_materials)) {
 						mesh->face_material[i] = 0;
+						mat_ix = 0;
 					}
 					mesh->materials.data[mat_ix].num_faces++;
 					if (face.num_indices >= 3) {
