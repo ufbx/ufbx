@@ -8075,7 +8075,9 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 				ufbx_skin_cluster *cluster = *p_cluster;
 				for (size_t i = 0; i < cluster->num_weights; i++) {
 					int32_t vertex = cluster->vertices[i];
-					skin->vertices.data[vertex].num_weights++;
+					if (vertex >= 0 && (size_t)vertex < num_vertices) {
+						skin->vertices.data[vertex].num_weights++;
+					}
 				}
 			}
 
@@ -8110,10 +8112,12 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 				ufbx_skin_cluster *cluster = *p_cluster;
 				for (size_t i = 0; i < cluster->num_weights; i++) {
 					int32_t vertex = cluster->vertices[i];
-					uint32_t local_index = skin->vertices.data[vertex].num_weights++;
-					uint32_t index = skin->vertices.data[vertex].weight_begin + local_index;
-					skin->weights.data[index].cluster_index = cluster_index;
-					skin->weights.data[index].weight = cluster->weights[i];
+					if (vertex >= 0 && (size_t)vertex < num_vertices) {
+						uint32_t local_index = skin->vertices.data[vertex].num_weights++;
+						uint32_t index = skin->vertices.data[vertex].weight_begin + local_index;
+						skin->weights.data[index].cluster_index = cluster_index;
+						skin->weights.data[index].weight = cluster->weights[i];
+					}
 				}
 				cluster_index++;
 			}
