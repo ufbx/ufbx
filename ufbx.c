@@ -8228,6 +8228,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 
 			ufbxi_check(ufbxi_fetch_mesh_materials(uc, &mesh->materials, &mesh->element, true));
 
+			// Search for a non-standard `ufbx:UVBoundary` property in both the mesh and node
 			ufbx_prop *uv_prop = ufbx_find_prop(&mesh->props, "ufbx:UVBoundary");
 			if (!uv_prop) {
 				ufbxi_for_ptr_list(ufbx_node, p_node, mesh->instances) {

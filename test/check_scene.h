@@ -370,7 +370,7 @@ static void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
 
 static void ufbxt_check_texture(ufbx_scene *scene, ufbx_texture *texture)
 {
-	ufbxt_check_element_ptr(scene, &texture->video->element);
+	ufbxt_check_element_ptr(scene, texture->video);
 }
 
 static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_layer)
