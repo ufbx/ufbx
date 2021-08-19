@@ -1387,6 +1387,11 @@ static ufbxi_forceinline void *ufbxi_push_size_zero(ufbxi_buf *b, size_t size, s
 
 ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_push_size_copy(ufbxi_buf *b, size_t size, size_t n, const void *data)
 {
+	// Always succeed with an emtpy non-NULL buffer for empty allocations, even if `data == NULL`
+	ufbx_assert(size > 0);
+	if (n == 0) return ufbxi_zero_size_buffer;
+
+	ufbx_assert(data);
 	void *ptr = ufbxi_push_size(b, size, n);
 	if (ptr) memcpy(ptr, data, size * n);
 	return ptr;
