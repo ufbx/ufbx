@@ -7194,7 +7194,7 @@ ufbxi_nodiscard static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
 				num_animated++;
 
 				uint32_t flags = 0;
-				for (; conn_dst->dst_prop.data == name.data; conn_dst++) {
+				for (; conn_dst < dst_end && conn_dst->dst_prop.data == name.data; conn_dst++) {
 					if (conn_dst->src_prop.length > 0) {
 						flags |= UFBX_PROP_FLAG_CONNECTED;
 					} else if (conn_dst->src->type == UFBX_ELEMENT_ANIM_VALUE) {
