@@ -10565,6 +10565,7 @@ static ufbxi_nodiscard int ufbxi_subdivide_mesh_level(ufbxi_subdivide_context *s
 
 	result->num_indices = mesh->num_indices * 4;
 	result->num_faces = mesh->num_indices;
+	result->num_triangles = mesh->num_indices * 2;
 	result->faces = ufbxi_push(&sc->result, ufbx_face, result->num_faces);
 	ufbxi_check_err(&sc->error, result->faces);
 
@@ -10706,13 +10707,11 @@ static ufbxi_nodiscard int ufbxi_subdivide_mesh_imp(ufbxi_subdivide_context *sc,
 		}
 
 		size_t index_offset = 0;
-		size_t num_triangles = 0;
-		for (size_t i = 0; i < mesh->num_faces; i++) {
-			ufbx_face face = mesh->faces[i];
-			size_t tris = face.num_indices >= 3 ? face.num_indices - 2 : 0;
+		for (size_t i = 0; i < src->num_faces; i++) {
+			ufbx_face face = src->faces[i];
 
 			int32_t mat = 0;
-			if (mesh->face_material) {
+			if (src->face_material) {
 				mat = src->face_material[i];
 				for (size_t ci = 0; ci < face.num_indices; ci++) {
 					mesh->face_material[index_offset + ci] = mat;
@@ -10720,19 +10719,15 @@ static ufbxi_nodiscard int ufbxi_subdivide_mesh_imp(ufbxi_subdivide_context *sc,
 			}
 			if (mat >= 0 && (size_t)mat < num_materials) {
 				mesh->materials.data[mat].num_faces++;
-				mesh->materials.data[mat].num_triangles += tris;
 			}
-			if (mesh->face_smoothing) {
+			if (src->face_smoothing) {
 				bool flag = src->face_smoothing[i];
 				for (size_t ci = 0; ci < face.num_indices; ci++) {
 					mesh->face_smoothing[index_offset + ci] = flag;
 				}
 			}
 			index_offset += face.num_indices;
-
-			num_triangles += tris;
 		}
-		mesh->num_triangles = num_triangles;
 
 		// See `ufbxi_finalize_scene()`
 		ufbxi_for_list(ufbx_mesh_material, mat, mesh->materials) {
