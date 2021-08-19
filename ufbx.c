@@ -6010,7 +6010,7 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_n
 	ufbx_real *p_value = (ufbx_real*)values->data;
 	int32_t *p_flag = (int32_t*)attr_flags->data;
 	float *p_attr = (float*)attrs->data;
-	int32_t *p_ref = (int32_t*)refs->data;
+	int32_t *p_ref = (int32_t*)refs->data, *p_ref_end = p_ref + refs->size;
 
 	// The previous key defines the weight/slope of the left tangent
 	float slope_left = 0.0f;
@@ -6270,6 +6270,7 @@ ufbxi_nodiscard static int ufbxi_read_pose(ufbxi_context *uc, ufbxi_node *node, 
 
 		ufbxi_value_array *matrix = ufbxi_find_array(n, ufbxi_Matrix, 'r');
 		if (!matrix) continue;
+		ufbxi_check(matrix->size >= 16);
 
 		ufbxi_tmp_bone_pose *tmp_pose = ufbxi_push(&uc->tmp_stack, ufbxi_tmp_bone_pose, 1);
 		ufbxi_check(tmp_pose);
