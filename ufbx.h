@@ -1267,8 +1267,8 @@ typedef enum ufbx_interpolation {
 
 // Tangent vector at a keyframe, may be split into left/right
 typedef struct ufbx_tangent {
-	ufbx_real dx; // < Derivative in the time axis
-	ufbx_real dy; // < Derivative in the (curve specific) value axis
+	float dx; // < Derivative in the time axis
+	float dy; // < Derivative in the (curve specific) value axis
 } ufbx_tangent;
 
 // Single real `value` at a specified `time`, interpolation between two keyframes

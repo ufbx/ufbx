@@ -1638,7 +1638,9 @@ static ufbxi_noinline bool ufbxi_map_grow_size_imp(ufbxi_map *map, size_t item_s
 	uint64_t *old_entries = map->entries;
 	uint64_t *new_entries = (uint64_t*)data;
 	void *new_items = data + alloc_size;
-	memcpy(new_items, map->items, item_size * map->size);
+	if (map->size > 0) {
+		memcpy(new_items, map->items, item_size * map->size);
+	}
 
 	// Re-hash the entries
 	uint32_t old_mask = map->mask;
@@ -2630,7 +2632,9 @@ static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size)
 
 	// Copy the remains of the previous buffer to the beginning of the new one
 	size_t num_read = uc->data_size;
-	memmove(uc->read_buffer, uc->data, num_read);
+	if (num_read > 0) {
+		memmove(uc->read_buffer, uc->data, num_read);
+	}
 
 	if (size_to_free) {
 		ufbxi_free(&uc->ator_tmp, char, data_to_free, size_to_free);
@@ -4458,7 +4462,8 @@ static ufbxi_forceinline uint32_t ufbxi_get_name_key(const char *name, size_t le
 {
 	uint32_t key = 0;
 	if (len >= 4) {
-		key = (uint8_t)name[0]<<24 | (uint8_t)name[1]<<16 | (uint8_t)name[2]<<8 | (uint8_t)name[3];
+		key = (uint32_t)(uint8_t)name[0]<<24 | (uint32_t)(uint8_t)name[1]<<16
+			| (uint32_t)(uint8_t)name[2]<<8 | (uint32_t)(uint8_t)name[3];
 	} else {
 		for (size_t i = 0; i < 4; i++) {
 			key <<= 8;
@@ -4471,9 +4476,10 @@ static ufbxi_forceinline uint32_t ufbxi_get_name_key(const char *name, size_t le
 static ufbxi_forceinline uint32_t ufbxi_get_name_key_c(const char *name)
 {
 	if (name[0] == '\0') return 0;
-	if (name[1] == '\0') return (uint8_t)name[0]<<24;
-	if (name[2] == '\0') return (uint8_t)name[0]<<24 | (uint8_t)name[1]<<16;
-	return (uint8_t)name[0]<<24 | (uint8_t)name[1]<<16 | (uint8_t)name[2]<<8 | (uint8_t)name[3];
+	if (name[1] == '\0') return (uint32_t)(uint8_t)name[0]<<24;
+	if (name[2] == '\0') return (uint32_t)(uint8_t)name[0]<<24 | (uint8_t)name[1]<<16;
+	return (uint32_t)(uint8_t)name[0]<<24 | (uint32_t)(uint8_t)name[1]<<16
+		| (uint32_t)(uint8_t)name[2]<<8 | (uint32_t)(uint8_t)name[3];
 }
 
 static ufbxi_forceinline bool ufbxi_name_key_less(ufbx_prop *prop, const char *data, size_t name_len, uint32_t key)
@@ -6118,8 +6124,13 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_n
 			next_weight_left = 0.333333f;
 
 			if (next_time > key->time) {
-				double slope = (p_value[1] - key->value) / (next_time - key->time);
-				slope_right = next_slope_left = (float)slope;
+				double delta_time = next_time - key->time;
+				if (delta_time > 0.0) {
+					double slope = (p_value[1] - key->value) / delta_time;
+					slope_right = next_slope_left = (float)slope;
+				} else {
+					slope_right = next_slope_left = 0.0f;
+				}
 			} else {
 				slope_right = next_slope_left = 0.0f;
 			}
@@ -6203,10 +6214,10 @@ static void ufbxi_decode_base64(char *dst, const char *src, size_t src_length)
 	table[(size_t)'/'] = 63;
 
 	for (size_t i = 0; i + 4 <= src_length; i += 4) {
-		uint32_t a = table[(size_t)src[i + 0]];
-		uint32_t b = table[(size_t)src[i + 1]];
-		uint32_t c = table[(size_t)src[i + 2]];
-		uint32_t d = table[(size_t)src[i + 3]];
+		uint32_t a = table[(size_t)(uint8_t)src[i + 0]];
+		uint32_t b = table[(size_t)(uint8_t)src[i + 1]];
+		uint32_t c = table[(size_t)(uint8_t)src[i + 2]];
+		uint32_t d = table[(size_t)(uint8_t)src[i + 3]];
 
 		dst[0] = (char)(uint8_t)(a << 2 | b >> 4);
 		dst[1] = (char)(uint8_t)(b << 4 | c >> 2);
@@ -9022,8 +9033,9 @@ static void ufbxi_update_blend_channel(ufbx_blend_channel *channel)
 		}
 
 		// Linearly interpolate between the endpoints with the weight
-		ufbx_real t = (weight - prev->target_weight) / (next->target_weight - prev->target_weight);
-		if (isfinite(t)) {
+		ufbx_real delta = next->target_weight - prev->target_weight;
+		if (delta != 0.0) {
+			ufbx_real t = (weight - prev->target_weight) / delta;
 			prev->effective_weight = 1.0f - t;
 			next->effective_weight = t;
 		}
