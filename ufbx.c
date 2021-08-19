@@ -6025,6 +6025,7 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_n
 
 	for (size_t i = 0; i < num_keys; i++) {
 		ufbx_keyframe *key = &keys[i];
+		ufbxi_check(p_ref < p_ref_end);
 
 		key->time = next_time;
 		key->value = *p_value;
