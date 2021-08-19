@@ -8102,7 +8102,7 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 
 				if (num_weights > max_weights) max_weights = num_weights;
 			}
-			ufbx_assert(offset == total_weights);
+			ufbx_assert(offset <= total_weights);
 			skin->max_weights_per_vertex = max_weights;
 
 			// Copy the DQ weights to vertices
