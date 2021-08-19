@@ -1374,7 +1374,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *ba
 
 			if (check->result_limit > 0) {
 				ufbxt_logf(".. Result limit %u: %s", check->result_limit, check->description);
-				opts.result_allocator.allocation_limit = check->temp_limit;
+				opts.result_allocator.allocation_limit = check->result_limit;
 				opts.result_allocator.huge_threshold = 1;
 			}
 
