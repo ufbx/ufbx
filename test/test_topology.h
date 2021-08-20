@@ -177,3 +177,15 @@ UFBXT_FILE_TEST(maya_subsurf_max_crease)
 	ufbx_free_mesh(subdivided);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_subsurf_3x_cube)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST(maya_subsurf_3x_cube_crease)
+#if UFBXT_IMPL
+{
+}
+#endif
