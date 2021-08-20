@@ -217,6 +217,7 @@ void ufbxt_log_flush()
 void ufbxt_log_error(ufbx_error *err)
 {
 	if (!err) return;
+	ufbxt_logf("Error: %s", err->description);
 	for (size_t i = 0; i < err->stack_size; i++) {
 		ufbx_error_frame *f = &err->stack[i];
 		ufbxt_logf("Line %u %s: %s", f->source_line, f->function, f->description);
