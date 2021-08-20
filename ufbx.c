@@ -7073,13 +7073,6 @@ ufbxi_nodiscard static int ufbxi_sort_tmp_material_textures(ufbxi_context *uc, u
 	return 1;
 }
 
-ufbxi_forceinline static bool ufbxi_cmp_element_less(ufbx_element *a, ufbx_element *b)
-{
-	int name_cmp = strcmp(a->name.data, b->name.data);
-	if (name_cmp != 0) return name_cmp < 0;
-	return a->type < b->type;
-}
-
 // We need to be able to assume no padding!
 ufbx_static_assert(connection_size, sizeof(ufbx_connection) == sizeof(ufbx_element*)*2 + sizeof(ufbx_string)*2);
 
@@ -9347,6 +9340,17 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	return 1;
 }
 
+static void ufbxi_free_ator(ufbxi_allocator *ator)
+{
+	ufbx_assert(ator->current_size == 0);
+
+	ufbx_free_allocator_fn *free_fn = ator->ator.free_allocator_fn;
+	if (free_fn) {
+		void *user = ator->ator.user;
+		free_fn(user);
+	}
+}
+
 static void ufbxi_free_temp(ufbxi_context *uc)
 {
 	ufbxi_map_free(&uc->string_map);
@@ -9377,11 +9381,7 @@ static void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_free(&uc->ator_tmp, char, uc->read_buffer, uc->read_buffer_size);
 	ufbxi_free(&uc->ator_tmp, char, uc->tmp_arr, uc->tmp_arr_size);
 
-	ufbx_assert(uc->ator_tmp.current_size == 0);
-
-	if (uc->ator_tmp.ator.free_allocator_fn) {
-		uc->ator_tmp.ator.free_allocator_fn(uc->ator_tmp.ator.user);
-	}
+	ufbxi_free_ator(&uc->ator_tmp);
 }
 
 static void ufbxi_free_result(ufbxi_context *uc)
@@ -9389,11 +9389,7 @@ static void ufbxi_free_result(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->result);
 	ufbxi_buf_free(&uc->string_buf);
 
-	ufbx_assert(uc->ator_result.current_size == 0);
-
-	if (uc->ator_result.ator.free_allocator_fn) {
-		uc->ator_result.ator.free_allocator_fn(uc->ator_result.ator.user);
-	}
+	ufbxi_free_ator(&uc->ator_result);
 }
 
 static void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *ator, const ufbx_allocator *desc)
@@ -9968,9 +9964,7 @@ static ufbxi_nodiscard ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 
 	if (ufbxi_evaluate_imp(ec)) {
 		ufbxi_buf_free(&ec->tmp);
-		if (ec->ator_tmp.ator.free_allocator_fn) {
-			ec->ator_tmp.ator.free_allocator_fn(ec->ator_tmp.ator.user);
-		}
+		ufbxi_free_ator(&ec->ator_tmp);
 		if (p_error) {
 			p_error->type = UFBX_ERROR_NONE;
 			p_error->description = NULL;
@@ -9982,12 +9976,8 @@ static ufbxi_nodiscard ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 		if (p_error) *p_error = ec->error;
 		ufbxi_buf_free(&ec->tmp);
 		ufbxi_buf_free(&ec->result);
-		if (ec->ator_tmp.ator.free_allocator_fn) {
-			ec->ator_tmp.ator.free_allocator_fn(ec->ator_tmp.ator.user);
-		}
-		if (ec->ator_result.ator.free_allocator_fn) {
-			ec->ator_result.ator.free_allocator_fn(ec->ator_result.ator.user);
-		}
+		ufbxi_free_ator(&ec->ator_tmp);
+		ufbxi_free_ator(&ec->ator_result);
 		return NULL;
 	}
 }
@@ -10825,9 +10815,7 @@ static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, size_t level, cons
 			p_error->description = NULL;
 			p_error->stack_size = 0;
 		}
-		if (sc.ator_tmp.ator.free_allocator_fn) {
-			sc.ator_tmp.ator.free_allocator_fn(sc.ator_tmp.ator.user);
-		}
+		ufbxi_free_ator(&sc.ator_tmp);
 		return &sc.imp->mesh;
 	} else {
 		ufbxi_fix_error_type(&sc.error, "Failed to subdivide");
@@ -10835,12 +10823,8 @@ static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, size_t level, cons
 		ufbxi_buf_free(&sc.tmp);
 		ufbxi_buf_free(&sc.source);
 		ufbxi_buf_free(&sc.result);
-		if (sc.ator_tmp.ator.free_allocator_fn) {
-			sc.ator_tmp.ator.free_allocator_fn(sc.ator_tmp.ator.user);
-		}
-		if (sc.ator_result.ator.free_allocator_fn) {
-			sc.ator_result.ator.free_allocator_fn(sc.ator_result.ator.user);
-		}
+		ufbxi_free_ator(&sc.ator_tmp);
+		ufbxi_free_ator(&sc.ator_result);
 		return NULL;
 	}
 }
@@ -11073,12 +11057,7 @@ void ufbx_free_scene(ufbx_scene *scene)
 	ufbxi_buf result = imp->result_buf;
 	result.ator = &ator;
 	ufbxi_buf_free(&result);
-
-	ufbx_assert(ator.current_size == 0);
-
-	if (ator.ator.free_allocator_fn) {
-		ator.ator.free_allocator_fn(ator.ator.user);
-	}
+	ufbxi_free_ator(&ator);
 }
 
 ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len)
@@ -12186,11 +12165,7 @@ void ufbx_free_mesh(ufbx_mesh *mesh)
 	ufbxi_buf result = imp->result_buf;
 	result.ator = &ator;
 	ufbxi_buf_free(&result);
-
-	ufbx_assert(ator.current_size == 0);
-	if (ator.ator.free_allocator_fn) {
-		ator.ator.free_allocator_fn(ator.ator.user);
-	}
+	ufbxi_free_ator(&ator);
 }
 
 #ifdef __cplusplus
