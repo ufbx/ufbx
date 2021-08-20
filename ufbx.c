@@ -5097,7 +5097,7 @@ static ufbx_real ufbxi_zero_element[8] = { 0 };
 static const int32_t ufbxi_sentinel_index_zero[1] = { 100000000 };
 static const int32_t ufbxi_sentinel_index_consecutive[1] = { 123456789 };
 
-ufbxi_nodiscard static int ufbxi_check_indices(ufbxi_context *uc, int32_t **p_dst, int32_t *indices, bool owns_indices, size_t num_indices, size_t num_indexers, size_t num_elems)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_check_indices(ufbxi_context *uc, int32_t **p_dst, int32_t *indices, bool owns_indices, size_t num_indices, size_t num_indexers, size_t num_elems)
 {
 	ufbxi_check(num_elems > 0 && num_elems < INT32_MAX);
 
@@ -5140,7 +5140,7 @@ ufbxi_nodiscard static int ufbxi_check_indices(ufbxi_context *uc, int32_t **p_ds
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mesh *mesh, ufbxi_node *node,
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mesh *mesh, ufbxi_node *node,
 	void *p_dst_data_void, int32_t **p_dst_index, bool *p_dst_unique_per_vertex, size_t *p_num_elems,
 	const char *data_name, const char *index_name, char data_type, size_t num_components)
 {
@@ -5257,7 +5257,7 @@ ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mes
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_truncated_array(ufbxi_context *uc, void *p_data, ufbxi_node *node, const char *name, char fmt, size_t size)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_truncated_array(ufbxi_context *uc, void *p_data, ufbxi_node *node, const char *name, char fmt, size_t size)
 {
 	ufbxi_value_array *arr = ufbxi_find_array(node, name, fmt);
 	ufbxi_check(arr);
@@ -8722,7 +8722,7 @@ static void ufbxi_mul_inv_rotate(ufbx_transform *t, ufbx_vec3 v, ufbx_rotation_o
 
 // -- Updating state from properties
 
-static ufbx_transform ufbxi_get_transform(const ufbx_props *props, ufbx_rotation_order order)
+ufbxi_noinline static ufbx_transform ufbxi_get_transform(const ufbx_props *props, ufbx_rotation_order order)
 {
 	ufbx_vec3 scale_pivot = ufbxi_find_vec3(props, ufbxi_ScalingPivot, 0.0f, 0.0f, 0.0f);
 	ufbx_vec3 rot_pivot = ufbxi_find_vec3(props, ufbxi_RotationPivot, 0.0f, 0.0f, 0.0f);
@@ -8777,7 +8777,7 @@ static ufbx_transform ufbxi_get_geometry_transform(const ufbx_props *props)
 	return t;
 }
 
-static void ufbxi_update_node(ufbx_node *node)
+ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 {
 	node->rotation_order = (ufbx_rotation_order)ufbxi_find_enum(&node->props, ufbxi_RotationOrder, UFBX_ROTATION_XYZ, UFBX_ROTATION_SPHERIC);
 	node->euler_rotation = ufbxi_find_vec3(&node->props, ufbxi_Lcl_Rotation, 0.0f, 0.0f, 0.0f);
@@ -8819,7 +8819,7 @@ static void ufbxi_update_node(ufbx_node *node)
 	}
 }
 
-static void ufbxi_update_light(ufbx_light *light)
+ufbxi_noinline static void ufbxi_update_light(ufbx_light *light)
 {
 	// NOTE: FBX seems to store intensities 100x of what's specified in at least
 	// Maya and Blender, should there be a quirks mode to not do this for specific
@@ -8856,7 +8856,7 @@ static const ufbxi_aperture_format ufbxi_aperture_formats[] = {
 	{ (ufbx_real)2.772, (ufbx_real)2.072, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_IMAX
 };
 
-static void ufbxi_update_camera(ufbx_camera *camera)
+ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 {
 	camera->aspect_mode = (ufbx_aspect_mode) ufbxi_find_enum(&camera->props, ufbxi_AspectRatioMode, 0, UFBX_ASPECT_MODE_FIXED_HEIGHT);
 	camera->aperture_mode = (ufbx_aperture_mode)ufbxi_find_enum(&camera->props, ufbxi_ApertureMode, UFBX_APERTURE_MODE_VERTICAL, UFBX_APERTURE_MODE_FOCAL_LENGTH);
@@ -8973,12 +8973,12 @@ static void ufbxi_update_camera(ufbx_camera *camera)
 	}
 }
 
-static void ufbxi_update_bone(ufbx_bone *bone)
+ufbxi_noinline static void ufbxi_update_bone(ufbx_bone *bone)
 {
 	bone->length = ufbxi_find_real(&bone->props, ufbxi_Size, 0.0f);
 }
 
-static void ufbxi_update_skin_cluster(ufbx_skin_cluster *cluster)
+ufbxi_noinline static void ufbxi_update_skin_cluster(ufbx_skin_cluster *cluster)
 {
 	if (cluster->bone) {
 		ufbx_matrix_mul(&cluster->geometry_to_world, &cluster->bone->node_to_world, &cluster->geometry_to_bone);
@@ -8988,7 +8988,7 @@ static void ufbxi_update_skin_cluster(ufbx_skin_cluster *cluster)
 	cluster->geometry_to_world_transform = ufbx_get_matrix_transform(&cluster->geometry_to_world);
 }
 
-static void ufbxi_update_blend_channel(ufbx_blend_channel *channel)
+ufbxi_noinline static void ufbxi_update_blend_channel(ufbx_blend_channel *channel)
 {
 	ufbx_real weight = ufbxi_find_real(&channel->props, ufbxi_DeformPercent, 0.0f) * (ufbx_real)0.01;
 	channel->weight = weight;
@@ -9033,14 +9033,14 @@ static void ufbxi_update_blend_channel(ufbx_blend_channel *channel)
 	}
 }
 
-static void ufbxi_update_material(ufbx_scene *scene, ufbx_material *material)
+ufbxi_noinline static void ufbxi_update_material(ufbx_scene *scene, ufbx_material *material)
 {
 	if (material->props.num_animated > 0) {
 		ufbxi_fetch_maps(scene, material);
 	}
 }
 
-static void ufbxi_update_anim_stack(ufbx_scene *scene, ufbx_anim_stack *stack)
+ufbxi_noinline static void ufbxi_update_anim_stack(ufbx_scene *scene, ufbx_anim_stack *stack)
 {
 	ufbx_prop *begin, *end;
 	begin = ufbxi_find_prop(&stack->props, ufbxi_LocalStart);
@@ -10107,7 +10107,7 @@ static bool ufbxi_is_edge_smooth(const ufbx_mesh *mesh, ufbx_topo_edge *indices,
 	return false;
 }
 
-static bool ufbxi_is_edge_split(const ufbx_vertex_attrib *attrib, const ufbx_topo_edge *topo, int32_t index)
+ufbxi_noinline static bool ufbxi_is_edge_split(const ufbx_vertex_attrib *attrib, const ufbx_topo_edge *topo, int32_t index)
 {		  
 	int32_t twin = topo[index].twin;
 	if (twin >= 0) {
