@@ -116,10 +116,8 @@ async def run_cmd(*args, realtime_output=False, env=None):
 
 def config_fmt_arch(config):
     arch = config["arch"]
-    if config.get("asan"):
-        arch += "-asan"
-    if config.get("ubsan"):
-        arch += "-ubsan"
+    if config.get("san"):
+        arch += "-san"
     return arch
 
 async def run_fail(message):
@@ -219,8 +217,7 @@ class GCCCompiler(Compiler):
     def supported_archs(self):
         raw_archs = self.supported_archs_raw()
         archs = [*raw_archs]
-        archs += (a + "-asan" for a in raw_archs)
-        archs += (a + "-ubsan" for a in raw_archs)
+        archs += (a + "-san" for a in raw_archs)
         return archs
 
     def compile(self, config):
@@ -249,10 +246,9 @@ class GCCCompiler(Compiler):
         else:
             args.append("-std=gnu99")
 
-        if config.get("asan"):
+        if config.get("san"):
             args.append("-fsanitize=address")
-
-        if config.get("ubsan"):
+            args.append("-fsanitize=leak")
             args.append("-fsanitize=undefined")
             args.append("-fno-sanitize=float-cast-overflow")
             args.append("-DUFBX_UBSAN")
@@ -468,8 +464,7 @@ async def main():
         },
         "sanitize": {
             "": { },
-            "asan": { "asan": True },
-            "ubsan": { "ubsan": True },
+            "sanitize": { "san": True },
         },
     }
 
