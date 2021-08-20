@@ -168,7 +168,7 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 
 // -- Debug
 
-#if defined(UFBX_DEBUG_BINARY_SEARCH)
+#if defined(UFBX_DEBUG_BINARY_SEARCH) || defined(UFBX_REGRESSION)
 	#define ufbxi_clamp_linear_threshold(v) (2)
 #else
 	#define ufbxi_clamp_linear_threshold(v) (v)
