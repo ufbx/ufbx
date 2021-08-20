@@ -2618,7 +2618,8 @@ static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size)
 	void *data_to_free = NULL;
 	size_t size_to_free = 0;
 
-	// Grow the read buffer if necessary
+	// Grow the read buffer if necessary, data is copied over below with the
+	// usual path so the free is deferred (`size_to_free`, `data_to_free`)
 	if (size > uc->read_buffer_size) {
 		size_t new_size = ufbxi_max_sz(size, uc->opts.read_buffer_size);
 		new_size = ufbxi_max_sz(new_size, uc->read_buffer_size * 2);
@@ -2692,9 +2693,10 @@ static ufbxi_forceinline void ufbxi_consume_bytes(ufbxi_context *uc, size_t size
 
 ufbxi_nodiscard static int ufbxi_skip_bytes(ufbxi_context *uc, uint64_t size)
 {
-	// Read nd discard bytes in reasonable chunks
+	// Read and discard bytes in reasonable chunks
+	uint64_t skip_size = ufbxi_max64(uc->read_buffer_size, uc->opts.read_buffer_size);
 	while (size > 0) {
-		uint64_t to_skip = ufbxi_min64(size, uc->opts.read_buffer_size);
+		uint64_t to_skip = ufbxi_min64(size, skip_size);
 		ufbxi_check(ufbxi_read_bytes(uc, (size_t)to_skip));
 		size -= to_skip;
 	}
@@ -3377,7 +3379,6 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 {
 	// https://code.blender.org/2013/08/fbx-binary-file-format-specification
 	// Parse an FBX document node in the binary format
-
 	ufbxi_check(depth < UFBXI_MAX_NODE_DEPTH);
 
 	// Parse the node header, post-7500 versions use 64-bit values for most
@@ -3493,30 +3494,39 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 			} else if (encoding == 1) {
 				// Encoding 1: DEFLATE
 
-				// We re-use the internal read buffer for inflating the data, so make sure it's large enough.
-				ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->read_buffer, &uc->read_buffer_size, uc->opts.read_buffer_size));
-
 				// Inflate the data from the user-provided IO buffer / read callbacks
 				ufbx_inflate_input input;
 				input.total_size = encoded_size;
 				input.data = uc->data;
 				input.data_size = uc->data_size;
-				input.buffer = uc->read_buffer;
-				input.buffer_size = uc->read_buffer_size;
-				input.read_fn = uc->read_fn;
-				input.read_user = uc->read_user;
-				ptrdiff_t res = ufbx_inflate(decoded_data, decoded_data_size, &input, uc->inflate_retain);
-				ufbxi_check_msg(res == (ptrdiff_t)decoded_data_size, "Bad DEFLATE data");
 
-				// Consume the IO buffer / advance offset as necessary
+				// If the encoded array is larger than the data we have currently buffered
+				// we need to allow `ufbxi_inflate()` to read from the IO callback. We can
+				// let `ufbxi_inflate()` freely clobber our `read_buffer` as all the data
+				// in the buffer will be consumed. `ufbxi_inflate()` always reads exactly
+				// the amount of bytes needed so we can continue reading from `read_fn` as
+				// usual (given that we clear the `uc->data/_size` buffer below).
+				// NOTE: We _cannot_ share `read_buffer` if we plan to read later from it
+				// as `ufbxi_inflate()` overwrites parts of it with zeroes.
 				if (encoded_size > input.data_size) {
+					input.buffer = uc->read_buffer;
+					input.buffer_size = uc->read_buffer_size;
+					input.read_fn = uc->read_fn;
+					input.read_user = uc->read_user;
 					uc->data_offset += encoded_size - input.data_size;
 					uc->data += input.data_size;
 					uc->data_size = 0;
 				} else {
+					input.buffer = NULL;
+					input.buffer_size = 0;
+					input.read_fn = NULL;
+					input.read_user = 0;
 					uc->data += encoded_size;
 					uc->data_size -= encoded_size;
 				}
+
+				ptrdiff_t res = ufbx_inflate(decoded_data, decoded_data_size, &input, uc->inflate_retain);
+				ufbxi_check_msg(res == (ptrdiff_t)decoded_data_size, "Bad DEFLATE data");
 
 			} else {
 				ufbxi_fail("Bad array encoding");
@@ -3661,10 +3671,11 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 
 		// Pop children from `tmp_stack` to a contiguous array
 		node->num_children = num_children;
-		node->children = ufbxi_push_pop(tmp_buf, &uc->tmp_stack, ufbxi_node, num_children);
-		ufbxi_check(node->children);
-
-		ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
+		if (num_children > 0) {
+			node->children = ufbxi_push_pop(tmp_buf, &uc->tmp_stack, ufbxi_node, num_children);
+			ufbxi_check(node->children);
+			ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
+		}
 	} else {
 		uint64_t current_offset = ufbxi_get_read_offset(uc);
 		uc->has_next_child = (current_offset < end_offset);
