@@ -8041,17 +8041,6 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		ufbx_skin_cluster *cluster = *p_cluster;
 		cluster->bone = (ufbx_node*)ufbxi_fetch_dst_element(&cluster->element, false, NULL, UFBX_ELEMENT_NODE);
 
-		int32_t min_vertex = INT32_MAX, max_vertex = INT32_MIN;
-		for (size_t i = 0; i < cluster->num_weights; i++) {
-			int32_t vertex = cluster->vertices[i];
-			if (vertex < min_vertex) min_vertex = vertex;
-			if (vertex > max_vertex) max_vertex = vertex;
-		}
-		if (min_vertex < INT32_MAX && max_vertex > INT32_MIN) {
-			cluster->min_vertex = min_vertex;
-			cluster->max_vertex = max_vertex;
-		}
-
 		if (cluster->bone) {
 			// TODO: ufbxi_check() with `allow_missing_references` / strict mode
 		}
@@ -8062,17 +8051,14 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		ufbx_skin_deformer *skin = *p_skin;
 		ufbxi_check(ufbxi_fetch_dst_elements(uc, &skin->clusters, &skin->element, false, NULL, UFBX_ELEMENT_SKIN_CLUSTER));
 
-		int32_t max_vertex = 0;
 		size_t total_weights = 0;
 		ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, skin->clusters) {
 			ufbx_skin_cluster *cluster = *p_cluster;
-			int32_t vertex = cluster->max_vertex;
-			if (vertex > max_vertex) max_vertex = vertex;
 			ufbxi_check(SIZE_MAX - total_weights > cluster->num_weights);
 			total_weights += cluster->num_weights;
 		}
 
-		size_t num_vertices = (size_t)max_vertex + 1;
+		size_t num_vertices = 0;
 
 		// Iterate through meshes so we can pad the vertices to the largest one
 		{

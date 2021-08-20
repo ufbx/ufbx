@@ -908,10 +908,6 @@ struct ufbx_skin_cluster {
 	size_t num_weights;
 	int32_t *vertices;
 	ufbx_real *weights;
-
-	// Range of vertices this cluster effects
-	int32_t min_vertex;
-	int32_t max_vertex;
 };
 
 struct ufbx_blend_deformer {
