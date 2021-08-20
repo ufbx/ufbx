@@ -1820,6 +1820,7 @@ static ufbxi_forceinline uint32_t ufbxi_hash_uptr(uintptr_t ptr)
 // Keep the list alphabetically sorted!
 
 static const char ufbxi_AllSame[] = "AllSame";
+static const char ufbxi_AmbientColor[] = "AmbientColor";
 static const char ufbxi_AnimationCurveNode[] = "AnimationCurveNode";
 static const char ufbxi_AnimationCurve[] = "AnimationCurve";
 static const char ufbxi_AnimationLayer[] = "AnimationLayer";
@@ -1841,6 +1842,7 @@ static const char ufbxi_BlendMode[] = "BlendMode";
 static const char ufbxi_BlendShapeChannel[] = "BlendShapeChannel";
 static const char ufbxi_BlendShape[] = "BlendShape";
 static const char ufbxi_BlendWeights[] = "BlendWeights";
+static const char ufbxi_BoundaryRule[] = "BoundaryRule";
 static const char ufbxi_Boundary[] = "Boundary";
 static const char ufbxi_ByEdge[] = "ByEdge";
 static const char ufbxi_ByPolygonVertex[] = "ByPolygonVertex";
@@ -1859,12 +1861,18 @@ static const char ufbxi_ColorIndex[] = "ColorIndex";
 static const char ufbxi_Color[] = "Color";
 static const char ufbxi_Colors[] = "Colors";
 static const char ufbxi_Connections[] = "Connections";
+static const char ufbxi_Content[] = "Content";
+static const char ufbxi_CoordAxisSign[] = "CoordAxisSign";
+static const char ufbxi_CoordAxis[] = "CoordAxis";
 static const char ufbxi_Count[] = "Count";
 static const char ufbxi_Creator[] = "Creator";
+static const char ufbxi_CurrentTimeMarker[] = "CurrentTimeMarker";
+static const char ufbxi_CustomFrameRate[] = "CustomFrameRate";
 static const char ufbxi_D_X[] = "d|X";
 static const char ufbxi_D_Y[] = "d|Y";
 static const char ufbxi_D_Z[] = "d|Z";
 static const char ufbxi_DecayType[] = "DecayType";
+static const char ufbxi_DefaultCamera[] = "DefaultCamera";
 static const char ufbxi_Default[] = "Default";
 static const char ufbxi_Definitions[] = "Definitions";
 static const char ufbxi_DeformPercent[] = "DeformPercent";
@@ -1891,12 +1899,15 @@ static const char ufbxi_FilmSqueezeRatio[] = "FilmSqueezeRatio";
 static const char ufbxi_FilmWidth[] = "FilmWidth";
 static const char ufbxi_FocalLength[] = "FocalLength";
 static const char ufbxi_Form[] = "Form";
+static const char ufbxi_FrontAxisSign[] = "FrontAxisSign";
+static const char ufbxi_FrontAxis[] = "FrontAxis";
 static const char ufbxi_FullWeights[] = "FullWeights";
 static const char ufbxi_GateFit[] = "GateFit";
 static const char ufbxi_GeometricRotation[] = "GeometricRotation";
 static const char ufbxi_GeometricScaling[] = "GeometricScaling";
 static const char ufbxi_GeometricTranslation[] = "GeometricTranslation";
 static const char ufbxi_Geometry[] = "Geometry";
+static const char ufbxi_GlobalSettings[] = "GlobalSettings";
 static const char ufbxi_Implementation[] = "Implementation";
 static const char ufbxi_Indexes[] = "Indexes";
 static const char ufbxi_InheritType[] = "InheritType";
@@ -1958,6 +1969,9 @@ static const char ufbxi_ObjectType[] = "ObjectType";
 static const char ufbxi_Objects[] = "Objects";
 static const char ufbxi_Open[] = "Open";
 static const char ufbxi_Order[] = "Order";
+static const char ufbxi_OriginalUnitScaleFactor[] = "OriginalUnitScaleFactor";
+static const char ufbxi_OriginalUpAxisSign[] = "OriginalUpAxisSign";
+static const char ufbxi_OriginalUpAxis[] = "OriginalUpAxis";
 static const char ufbxi_OuterAngle[] = "OuterAngle";
 static const char ufbxi_PO[] = "PO\0";
 static const char ufbxi_PP[] = "PP\0";
@@ -1968,6 +1982,7 @@ static const char ufbxi_PoseNode[] = "PoseNode";
 static const char ufbxi_Pose[] = "Pose";
 static const char ufbxi_PostRotation[] = "PostRotation";
 static const char ufbxi_PreRotation[] = "PreRotation";
+static const char ufbxi_PreviewDivisionLevels[] = "PreviewDivisionLevels";
 static const char ufbxi_Properties60[] = "Properties60";
 static const char ufbxi_Properties70[] = "Properties70";
 static const char ufbxi_PropertyTemplate[] = "PropertyTemplate";
@@ -1977,6 +1992,7 @@ static const char ufbxi_ReferenceStop[] = "ReferenceStop";
 static const char ufbxi_ReferenceTime[] = "ReferenceTime";
 static const char ufbxi_RelativeFileName[] = "RelativeFileName";
 static const char ufbxi_RelativeFilename[] = "RelativeFilename";
+static const char ufbxi_RenderDivisionLevels[] = "RenderDivisionLevels";
 static const char ufbxi_RightCamera[] = "RightCamera";
 static const char ufbxi_RootNode[] = "RootNode";
 static const char ufbxi_RotationAccumulationMode[] = "RotationAccumulationMode";
@@ -1993,6 +2009,8 @@ static const char ufbxi_Size[] = "Size";
 static const char ufbxi_Skin[] = "Skin";
 static const char ufbxi_SkinningType[] = "SkinningType";
 static const char ufbxi_Smoothing[] = "Smoothing";
+static const char ufbxi_Smoothness[] = "Smoothness";
+static const char ufbxi_SnapOnFrameMode[] = "SnapOnFrameMode";
 static const char ufbxi_SpecularColor[] = "SpecularColor";
 static const char ufbxi_SubDeformer[] = "SubDeformer";
 static const char ufbxi_T[] = "T\0\0";
@@ -2002,6 +2020,11 @@ static const char ufbxi_TangentsIndex[] = "TangentsIndex";
 static const char ufbxi_Tangents[] = "Tangents";
 static const char ufbxi_TextureId[] = "TextureId";
 static const char ufbxi_Texture[] = "Texture";
+static const char ufbxi_TimeMarker[] = "TimeMarker";
+static const char ufbxi_TimeMode[] = "TimeMode";
+static const char ufbxi_TimeProtocol[] = "TimeProtocol";
+static const char ufbxi_TimeSpanStart[] = "TimeSpanStart";
+static const char ufbxi_TimeSpanStop[] = "TimeSpanStop";
 static const char ufbxi_TransformLink[] = "TransformLink";
 static const char ufbxi_Transform[] = "Transform";
 static const char ufbxi_TrimNurbsSurface[] = "TrimNurbsSurface";
@@ -2009,6 +2032,9 @@ static const char ufbxi_Type[] = "Type";
 static const char ufbxi_TypedIndex[] = "TypedIndex";
 static const char ufbxi_UVIndex[] = "UVIndex";
 static const char ufbxi_UV[] = "UV";
+static const char ufbxi_UnitScaleFactor[] = "UnitScaleFactor";
+static const char ufbxi_UpAxisSign[] = "UpAxisSign";
+static const char ufbxi_UpAxis[] = "UpAxis";
 static const char ufbxi_VertexCreaseIndex[] = "VertexCreaseIndex";
 static const char ufbxi_VertexCrease[] = "VertexCrease";
 static const char ufbxi_Vertices[] = "Vertices";
@@ -2018,35 +2044,10 @@ static const char ufbxi_Weights[] = "Weights";
 static const char ufbxi_X[] = "X\0\0";
 static const char ufbxi_Y[] = "Y\0\0";
 static const char ufbxi_Z[] = "Z\0\0";
-static const char ufbxi_PreviewDivisionLevels[] = "PreviewDivisionLevels";
-static const char ufbxi_RenderDivisionLevels[] = "RenderDivisionLevels";
-static const char ufbxi_Smoothness[] = "Smoothness";
-static const char ufbxi_BoundaryRule[] = "BoundaryRule";
-static const char ufbxi_Content[] = "Content";
-static const char ufbxi_UpAxis[] = "UpAxis";
-static const char ufbxi_UpAxisSign[] = "UpAxisSign";
-static const char ufbxi_FrontAxis[] = "FrontAxis";
-static const char ufbxi_FrontAxisSign[] = "FrontAxisSign";
-static const char ufbxi_CoordAxis[] = "CoordAxis";
-static const char ufbxi_CoordAxisSign[] = "CoordAxisSign";
-static const char ufbxi_OriginalUpAxis[] = "OriginalUpAxis";
-static const char ufbxi_OriginalUpAxisSign[] = "OriginalUpAxisSign";
-static const char ufbxi_UnitScaleFactor[] = "UnitScaleFactor";
-static const char ufbxi_OriginalUnitScaleFactor[] = "OriginalUnitScaleFactor";
-static const char ufbxi_AmbientColor[] = "AmbientColor";
-static const char ufbxi_DefaultCamera[] = "DefaultCamera";
-static const char ufbxi_TimeMode[] = "TimeMode";
-static const char ufbxi_TimeProtocol[] = "TimeProtocol";
-static const char ufbxi_SnapOnFrameMode[] = "SnapOnFrameMode";
-static const char ufbxi_TimeSpanStart[] = "TimeSpanStart";
-static const char ufbxi_TimeSpanStop[] = "TimeSpanStop";
-static const char ufbxi_CustomFrameRate[] = "CustomFrameRate";
-static const char ufbxi_TimeMarker[] = "TimeMarker";
-static const char ufbxi_CurrentTimeMarker[] = "CurrentTimeMarker";
-static const char ufbxi_GlobalSettings[] = "GlobalSettings";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, sizeof(ufbxi_AllSame) - 1 },
+	{ ufbxi_AmbientColor, sizeof(ufbxi_AmbientColor) - 1 },
 	{ ufbxi_AnimationCurve, sizeof(ufbxi_AnimationCurve) - 1 },
 	{ ufbxi_AnimationCurveNode, sizeof(ufbxi_AnimationCurveNode) - 1 },
 	{ ufbxi_AnimationLayer, sizeof(ufbxi_AnimationLayer) - 1 },
@@ -2069,6 +2070,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_BlendShapeChannel, sizeof(ufbxi_BlendShapeChannel) - 1 },
 	{ ufbxi_BlendWeights, sizeof(ufbxi_BlendWeights) - 1 },
 	{ ufbxi_Boundary, sizeof(ufbxi_Boundary) - 1 },
+	{ ufbxi_BoundaryRule, sizeof(ufbxi_BoundaryRule) - 1 },
 	{ ufbxi_ByEdge, sizeof(ufbxi_ByEdge) - 1 },
 	{ ufbxi_ByPolygon, sizeof(ufbxi_ByPolygon) - 1 },
 	{ ufbxi_ByPolygonVertex, sizeof(ufbxi_ByPolygonVertex) - 1 },
@@ -2086,13 +2088,19 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_ColorIndex, sizeof(ufbxi_ColorIndex) - 1 },
 	{ ufbxi_Colors, sizeof(ufbxi_Colors) - 1 },
 	{ ufbxi_Connections, sizeof(ufbxi_Connections) - 1 },
+	{ ufbxi_Content, sizeof(ufbxi_Content) - 1 },
+	{ ufbxi_CoordAxis, sizeof(ufbxi_CoordAxis) - 1 },
+	{ ufbxi_CoordAxisSign, sizeof(ufbxi_CoordAxisSign) - 1 },
 	{ ufbxi_Count, sizeof(ufbxi_Count) - 1 },
 	{ ufbxi_Creator, sizeof(ufbxi_Creator) - 1 },
+	{ ufbxi_CurrentTimeMarker, sizeof(ufbxi_CurrentTimeMarker) - 1 },
+	{ ufbxi_CustomFrameRate, sizeof(ufbxi_CustomFrameRate) - 1 },
 	{ ufbxi_D_X, sizeof(ufbxi_D_X) - 1 },
 	{ ufbxi_D_Y, sizeof(ufbxi_D_Y) - 1 },
 	{ ufbxi_D_Z, sizeof(ufbxi_D_Z) - 1 },
 	{ ufbxi_DecayType, sizeof(ufbxi_DecayType) - 1 },
 	{ ufbxi_Default, sizeof(ufbxi_Default) - 1 },
+	{ ufbxi_DefaultCamera, sizeof(ufbxi_DefaultCamera) - 1 },
 	{ ufbxi_Definitions, sizeof(ufbxi_Definitions) - 1 },
 	{ ufbxi_DeformPercent, sizeof(ufbxi_DeformPercent) - 1 },
 	{ ufbxi_Deformer, sizeof(ufbxi_Deformer) - 1 },
@@ -2118,12 +2126,15 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FilmWidth, sizeof(ufbxi_FilmWidth) - 1 },
 	{ ufbxi_FocalLength, sizeof(ufbxi_FocalLength) - 1 },
 	{ ufbxi_Form, sizeof(ufbxi_Form) - 1 },
+	{ ufbxi_FrontAxis, sizeof(ufbxi_FrontAxis) - 1 },
+	{ ufbxi_FrontAxisSign, sizeof(ufbxi_FrontAxisSign) - 1 },
 	{ ufbxi_FullWeights, sizeof(ufbxi_FullWeights) - 1 },
 	{ ufbxi_GateFit, sizeof(ufbxi_GateFit) - 1 },
 	{ ufbxi_GeometricRotation, sizeof(ufbxi_GeometricRotation) - 1 },
 	{ ufbxi_GeometricScaling, sizeof(ufbxi_GeometricScaling) - 1 },
 	{ ufbxi_GeometricTranslation, sizeof(ufbxi_GeometricTranslation) - 1 },
 	{ ufbxi_Geometry, sizeof(ufbxi_Geometry) - 1 },
+	{ ufbxi_GlobalSettings, sizeof(ufbxi_GlobalSettings) - 1 },
 	{ ufbxi_Implementation, sizeof(ufbxi_Implementation) - 1 },
 	{ ufbxi_Indexes, sizeof(ufbxi_Indexes) - 1 },
 	{ ufbxi_InheritType, sizeof(ufbxi_InheritType) - 1 },
@@ -2185,6 +2196,9 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Objects, sizeof(ufbxi_Objects) - 1 },
 	{ ufbxi_Open, sizeof(ufbxi_Open) - 1 },
 	{ ufbxi_Order, sizeof(ufbxi_Order) - 1 },
+	{ ufbxi_OriginalUnitScaleFactor, sizeof(ufbxi_OriginalUnitScaleFactor) - 1 },
+	{ ufbxi_OriginalUpAxis, sizeof(ufbxi_OriginalUpAxis) - 1 },
+	{ ufbxi_OriginalUpAxisSign, sizeof(ufbxi_OriginalUpAxisSign) - 1 },
 	{ ufbxi_OuterAngle, sizeof(ufbxi_OuterAngle) - 1 },
 	{ ufbxi_PO, 2 },
 	{ ufbxi_PP, 2 },
@@ -2195,6 +2209,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_PoseNode, sizeof(ufbxi_PoseNode) - 1 },
 	{ ufbxi_PostRotation, sizeof(ufbxi_PostRotation) - 1 },
 	{ ufbxi_PreRotation, sizeof(ufbxi_PreRotation) - 1 },
+	{ ufbxi_PreviewDivisionLevels, sizeof(ufbxi_PreviewDivisionLevels) - 1 },
 	{ ufbxi_Properties60, sizeof(ufbxi_Properties60) - 1 },
 	{ ufbxi_Properties70, sizeof(ufbxi_Properties70) - 1 },
 	{ ufbxi_PropertyTemplate, sizeof(ufbxi_PropertyTemplate) - 1 },
@@ -2204,6 +2219,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_ReferenceTime, sizeof(ufbxi_ReferenceTime) - 1 },
 	{ ufbxi_RelativeFileName, sizeof(ufbxi_RelativeFileName) - 1 },
 	{ ufbxi_RelativeFilename, sizeof(ufbxi_RelativeFilename) - 1 },
+	{ ufbxi_RenderDivisionLevels, sizeof(ufbxi_RenderDivisionLevels) - 1 },
 	{ ufbxi_RightCamera, sizeof(ufbxi_RightCamera) - 1 },
 	{ ufbxi_RootNode, sizeof(ufbxi_RootNode) - 1 },
 	{ ufbxi_RotationAccumulationMode, sizeof(ufbxi_RotationAccumulationMode) - 1 },
@@ -2220,6 +2236,8 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Skin, sizeof(ufbxi_Skin) - 1 },
 	{ ufbxi_SkinningType, sizeof(ufbxi_SkinningType) - 1 },
 	{ ufbxi_Smoothing, sizeof(ufbxi_Smoothing) - 1 },
+	{ ufbxi_Smoothness, sizeof(ufbxi_Smoothness) - 1 },
+	{ ufbxi_SnapOnFrameMode, sizeof(ufbxi_SnapOnFrameMode) - 1 },
 	{ ufbxi_SpecularColor, sizeof(ufbxi_SpecularColor) - 1 },
 	{ ufbxi_SubDeformer, sizeof(ufbxi_SubDeformer) - 1 },
 	{ ufbxi_T, 1 },
@@ -2229,6 +2247,11 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_TangentsIndex, sizeof(ufbxi_TangentsIndex) - 1 },
 	{ ufbxi_Texture, sizeof(ufbxi_Texture) - 1 },
 	{ ufbxi_TextureId, sizeof(ufbxi_TextureId) - 1 },
+	{ ufbxi_TimeMarker, sizeof(ufbxi_TimeMarker) - 1 },
+	{ ufbxi_TimeMode, sizeof(ufbxi_TimeMode) - 1 },
+	{ ufbxi_TimeProtocol, sizeof(ufbxi_TimeProtocol) - 1 },
+	{ ufbxi_TimeSpanStart, sizeof(ufbxi_TimeSpanStart) - 1 },
+	{ ufbxi_TimeSpanStop, sizeof(ufbxi_TimeSpanStop) - 1 },
 	{ ufbxi_Transform, sizeof(ufbxi_Transform) - 1 },
 	{ ufbxi_TransformLink, sizeof(ufbxi_TransformLink) - 1 },
 	{ ufbxi_TrimNurbsSurface, sizeof(ufbxi_TrimNurbsSurface) - 1 },
@@ -2236,6 +2259,9 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_TypedIndex, sizeof(ufbxi_TypedIndex) - 1 },
 	{ ufbxi_UV, sizeof(ufbxi_UV) - 1 },
 	{ ufbxi_UVIndex, sizeof(ufbxi_UVIndex) - 1 },
+	{ ufbxi_UnitScaleFactor, sizeof(ufbxi_UnitScaleFactor) - 1 },
+	{ ufbxi_UpAxis, sizeof(ufbxi_UpAxis) - 1 },
+	{ ufbxi_UpAxisSign, sizeof(ufbxi_UpAxisSign) - 1 },
 	{ ufbxi_VertexCrease, sizeof(ufbxi_VertexCrease) - 1 },
 	{ ufbxi_VertexCreaseIndex, sizeof(ufbxi_VertexCreaseIndex) - 1 },
 	{ ufbxi_Vertices, sizeof(ufbxi_Vertices) - 1 },
@@ -2245,32 +2271,6 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_X, 1 },
 	{ ufbxi_Y, 1 },
 	{ ufbxi_Z, 1 },
-	{ ufbxi_PreviewDivisionLevels, sizeof(ufbxi_PreviewDivisionLevels) - 1 },
-	{ ufbxi_RenderDivisionLevels, sizeof(ufbxi_RenderDivisionLevels) - 1 },
-	{ ufbxi_Smoothness, sizeof(ufbxi_Smoothness) - 1 },
-	{ ufbxi_BoundaryRule, sizeof(ufbxi_BoundaryRule) - 1 },
-	{ ufbxi_Content, sizeof(ufbxi_Content) - 1 },
-	{ ufbxi_UpAxis, sizeof(ufbxi_UpAxis) - 1 },
-	{ ufbxi_UpAxisSign, sizeof(ufbxi_UpAxisSign) - 1 },
-	{ ufbxi_FrontAxis, sizeof(ufbxi_FrontAxis) - 1 },
-	{ ufbxi_FrontAxisSign, sizeof(ufbxi_FrontAxisSign) - 1 },
-	{ ufbxi_CoordAxis, sizeof(ufbxi_CoordAxis) - 1 },
-	{ ufbxi_CoordAxisSign, sizeof(ufbxi_CoordAxisSign) - 1 },
-	{ ufbxi_OriginalUpAxis, sizeof(ufbxi_OriginalUpAxis) - 1 },
-	{ ufbxi_OriginalUpAxisSign, sizeof(ufbxi_OriginalUpAxisSign) - 1 },
-	{ ufbxi_UnitScaleFactor, sizeof(ufbxi_UnitScaleFactor) - 1 },
-	{ ufbxi_OriginalUnitScaleFactor, sizeof(ufbxi_OriginalUnitScaleFactor) - 1 },
-	{ ufbxi_AmbientColor, sizeof(ufbxi_AmbientColor) - 1 },
-	{ ufbxi_DefaultCamera, sizeof(ufbxi_DefaultCamera) - 1 },
-	{ ufbxi_TimeMode, sizeof(ufbxi_TimeMode) - 1 },
-	{ ufbxi_TimeProtocol, sizeof(ufbxi_TimeProtocol) - 1 },
-	{ ufbxi_SnapOnFrameMode, sizeof(ufbxi_SnapOnFrameMode) - 1 },
-	{ ufbxi_TimeSpanStart, sizeof(ufbxi_TimeSpanStart) - 1 },
-	{ ufbxi_TimeSpanStop, sizeof(ufbxi_TimeSpanStop) - 1 },
-	{ ufbxi_CustomFrameRate, sizeof(ufbxi_CustomFrameRate) - 1 },
-	{ ufbxi_TimeMarker, sizeof(ufbxi_TimeMarker) - 1 },
-	{ ufbxi_CurrentTimeMarker, sizeof(ufbxi_CurrentTimeMarker) - 1 },
-	{ ufbxi_GlobalSettings, sizeof(ufbxi_GlobalSettings) - 1 },
 };
 
 // -- Type definitions
