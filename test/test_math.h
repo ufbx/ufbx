@@ -62,8 +62,9 @@ UFBXT_TEST(quat_to_euler_random)
 
 		uint32_t state = 1;
 
-		// TODO: More in fuzz mode
 		for (size_t i = 0; i < steps; i++) {
+			if (g_fuzz && ufbxt_fuzz_should_skip((int)i >> 8)) continue;
+
 			ufbx_quat q;
 			q.x = ufbxt_xorshift32_real(&state) * 2.0f - 1.0f;
 			q.y = ufbxt_xorshift32_real(&state) * 2.0f - 1.0f;
@@ -140,6 +141,8 @@ UFBXT_TEST(matrix_to_transform_random)
 	size_t steps = ufbxt_begin_fuzz() ? 1000000 : 100000;
 
 	for (size_t i = 0; i < steps; i++) {
+		if (g_fuzz && ufbxt_fuzz_should_skip((int)i >> 4)) continue;
+
 		ufbx_transform t;
 
 		ufbx_quat q;

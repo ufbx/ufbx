@@ -142,7 +142,7 @@ ufbxt_threadlocal jmp_buf *t_jmp_buf;
 void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
 {
 	if (t_jmp_buf) {
-		longjmp(g_test_jmp, 1);
+		longjmp(*t_jmp_buf, 1);
 	}
 
 	printf("FAIL\n");
@@ -692,8 +692,11 @@ static const char *g_file_type = NULL;
 static bool g_fuzz = false;
 static bool g_all_byte_values = false;
 static bool g_dedicated_allocs = false;
-static bool g_no_patch = false;
+static bool g_fuzz_no_patch = false;
+static bool g_fuzz_no_truncate = false;
+static bool g_fuzz_no_buffer = false;
 static int g_patch_start = 0;
+static int g_fuzz_quality = 16;
 static size_t g_fuzz_step = SIZE_MAX;
 
 const char *g_fuzz_test_name = NULL;
@@ -1215,6 +1218,32 @@ static const ufbxt_fuzz_check g_fuzz_checks[] = {
 	{ "maya_leading_comma_7500_ascii", -1, 0, 0, 323, 0, "imp" },
 };
 
+typedef struct {
+	const char *name;
+	size_t read_buffer_size;
+} ufbxt_buffer_check;
+
+static const ufbxt_buffer_check g_buffer_checks[] = {
+	{ "blender_272_cube_7400_binary", 9484 },
+	{ "blender_279_color_sets_7400_binary", 10255 },
+	{ "blender_279_ball_7400_binary", 14303 },
+	{ "blender_279_internal_textures_7400_binary", 13711 },
+	{ "blender_293_textures_7400_binary", 13695 },
+	{ "blender_293_embedded_textures_7400_binary", 13695 },
+	{ "blender_293_material_mapping_7400_binary", 11388 },
+	{ "blender_293x_nonmanifold_subsurf_7400_binary", 10447 },
+	{ "blender_293_ngon_subsurf_7400_binary", 10223 },
+};
+
+static bool ufbxt_fuzz_should_skip(int iter)
+{
+	if ((iter >> g_fuzz_quality >> g_fuzz_quality) != 0) {
+		return (iter & (iter - 1)) != 0;
+	} else {
+		return (iter & ((1 << g_fuzz_quality) - 1)) % ((iter >> g_fuzz_quality) + 1) != 0;
+	}
+}
+
 void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *base_name, void *data, size_t size)
 {
 	if (g_fuzz) {
@@ -1233,6 +1262,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *ba
 
 		#pragma omp parallel for schedule(static, 16)
 		for (i = 0; i < (int)temp_allocs; i++) {
+			if (ufbxt_fuzz_should_skip(i)) continue;
 			if (omp_get_thread_num() == 0) {
 				if (i % 16 == 0) {
 					fprintf(stderr, "\rFuzzing temp limit %s: %d/%d", base_name, i, (int)temp_allocs);
@@ -1249,6 +1279,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *ba
 
 		#pragma omp parallel for schedule(static, 16)
 		for (i = 0; i < (int)result_allocs; i++) {
+			if (ufbxt_fuzz_should_skip(i)) continue;
 			if (omp_get_thread_num() == 0) {
 				if (i % 16 == 0) {
 					fprintf(stderr, "\rFuzzing result limit %s: %d/%d", base_name, i, (int)result_allocs);
@@ -1263,23 +1294,26 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *ba
 
 		fprintf(stderr, "\rFuzzing result limit %s: %d/%d\n", base_name, (int)result_allocs, (int)result_allocs);
 
-		#pragma omp parallel for schedule(static, 16)
-		for (i = 1; i < (int)size; i++) {
-			if (omp_get_thread_num() == 0) {
-				if (i % 16 == 0) {
-					fprintf(stderr, "\rFuzzing truncate %s: %d/%d", base_name, i, (int)size);
-					fflush(stderr);
+		if (!g_fuzz_no_truncate) {
+			#pragma omp parallel for schedule(static, 16)
+			for (i = 1; i < (int)size; i++) {
+				if (ufbxt_fuzz_should_skip(i)) continue;
+				if (omp_get_thread_num() == 0) {
+					if (i % 16 == 0) {
+						fprintf(stderr, "\rFuzzing truncate %s: %d/%d", base_name, i, (int)size);
+						fflush(stderr);
+					}
 				}
+
+				size_t step = 30000000 + (size_t)i;
+
+				if (!ufbxt_test_fuzz(data, size, step, -1, 0, 0, (size_t)i)) fail_step = step;
 			}
 
-			size_t step = 30000000 + (size_t)i;
-
-			if (!ufbxt_test_fuzz(data, size, step, -1, 0, 0, (size_t)i)) fail_step = step;
+			fprintf(stderr, "\rFuzzing truncate %s: %d/%d\n", base_name, (int)size, (int)size);
 		}
 
-		fprintf(stderr, "\rFuzzing truncate %s: %d/%d\n", base_name, (int)size, (int)size);
-
-		if (!g_no_patch) {
+		if (!g_fuzz_no_patch) {
 
 			uint8_t *data_copy[256] = { 0 };
 
@@ -1290,6 +1324,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *ba
 
 			#pragma omp parallel for schedule(static, 16)
 			for (i = patch_start; i < (int)size; i++) {
+				if (ufbxt_fuzz_should_skip(i)) continue;
 
 				if (omp_get_thread_num() == 0) {
 					if (i % 16 == 0) {
@@ -1478,6 +1513,55 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse streamed file");
 			}
 
+			// Try a couple of read buffer sizes
+			if (g_fuzz && !g_fuzz_no_buffer) {
+				ufbxt_begin_fuzz();
+
+				int fail_sz = -1;
+
+				int buf_sz = 0;
+				#pragma omp parallel for schedule(static, 16)
+				for (buf_sz = 0; buf_sz < (int)size; buf_sz++) {
+					if (ufbxt_fuzz_should_skip(buf_sz)) continue;
+
+					if (omp_get_thread_num() == 0) {
+						if (buf_sz % 16 == 0) {
+							fprintf(stderr, "\rFuzzing read buffer size %s: %d/%d", base_name, buf_sz, (int)size);
+							fflush(stderr);
+						}
+					}
+					t_jmp_buf = (jmp_buf*)calloc(1, sizeof(jmp_buf));
+					if (!setjmp(*t_jmp_buf)) {
+						ufbx_load_opts load_opts = { 0 };
+						load_opts.read_buffer_size = (size_t)buf_sz;
+						ufbx_scene *buf_scene = ufbx_load_file(buf, &load_opts, NULL);
+						ufbxt_assert(buf_scene);
+						ufbxt_check_scene(buf_scene);
+						ufbx_free_scene(buf_scene);
+					} else {
+						#pragma omp critical(fail_sz)
+						{
+							fail_sz = buf_sz;
+						}
+					}
+					free(t_jmp_buf);
+					t_jmp_buf = NULL;
+				}
+
+				if (fail_sz >= 0) {
+					size_t error_size = 256;
+					char *error = (char*)malloc(error_size);
+					ufbxt_assert(error);
+					snprintf(error, error_size, "Failed to parse with: read_buffer_size = %d", fail_sz);
+					printf("%s: %s\n", base_name, error);
+					ufbxt_assert_fail(__FILE__, __LINE__, error);
+				} else {
+					fprintf(stderr, "\rFuzzing read buffer size %s: %d/%d\n", base_name, (int)size, (int)size);
+				}
+
+			} else {
+			}
+
 			// Ignore geometry, animations, and both
 
 			{
@@ -1562,6 +1646,24 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			}
 
 			ufbxt_do_fuzz(scene, streamed_scene, base_name, data, size);
+
+			// Run known buffer size checks
+			for (size_t i = 0; i < ufbxt_arraycount(g_buffer_checks); i++) {
+				const ufbxt_buffer_check *check = &g_buffer_checks[i];
+				if (strcmp(check->name, base_name)) continue;
+
+				ufbxt_logf(".. Read buffer limit %zu");
+
+				ufbx_load_opts load_opts = { 0 };
+				load_opts.read_buffer_size = check->read_buffer_size;
+				ufbx_scene *buf_scene = ufbx_load_file(buf, &load_opts, &error);
+				if (!buf_scene) {
+					ufbxt_log_error(&error);
+				}
+				ufbxt_assert(buf_scene);
+				ufbxt_check_scene(buf_scene);
+				ufbx_free_scene(buf_scene);
+			}
 
 			ufbx_free_scene(scene);
 			ufbx_free_scene(streamed_scene);
@@ -1698,8 +1800,22 @@ int main(int argc, char **argv)
 			g_dedicated_allocs = true;
 		}
 
-		if (!strcmp(argv[i], "--no-patch")) {
-			g_no_patch = true;
+		if (!strcmp(argv[i], "--fuzz-no-patch")) {
+			g_fuzz_no_patch = true;
+		}
+
+		if (!strcmp(argv[i], "--fuzz-no-truncate")) {
+			g_fuzz_no_truncate = true;
+		}
+
+		if (!strcmp(argv[i], "--fuzz-no-buffer")) {
+			g_fuzz_no_buffer = true;
+		}
+
+		if (!strcmp(argv[i], "--fuzz-quality")) {
+			if (++i < argc) g_fuzz_quality = atoi(argv[i]);
+			if (g_fuzz_quality < 1) g_fuzz_quality = 1;
+			if (g_fuzz_quality > 31) g_fuzz_quality = 31;
 		}
 
 		if (!strcmp(argv[i], "--threads")) {

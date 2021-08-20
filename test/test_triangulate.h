@@ -34,7 +34,7 @@ size_t do_triangulate_test(ufbx_scene *scene)
 		}
 
 		if (should_be_top_left != (top_left_count == 2)) {
-			ufbxt_logf("Fail: %s", mesh->name.data);
+			ufbxt_logf("Fail: %s", mesh->instances.data[0]->name.data);
 			num_fail++;
 		}
 	}

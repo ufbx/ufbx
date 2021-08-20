@@ -181,6 +181,9 @@ class CLCompiler(Compiler):
             args.append("/Ox")
         else:
             args.append("/DDEBUG=1")
+        
+        if config.get("regression", False):
+            args.append("/DUFBX_REGRESSION=1")
 
         if config.get("openmp", False):
             args.append("/openmp")
@@ -234,6 +237,9 @@ class GCCCompiler(Compiler):
         if config.get("optimize", False):
             args.append("-O2")
             args.append("-DNDEBUG=1")
+
+        if config.get("regression", False):
+            args.append("-DUFBX_REGRESSION=1")
 
         if config.get("openmp", False):
             args.append("-openmp")
@@ -455,7 +461,7 @@ async def main():
 
     all_configs = {
         "optimize": {
-            "debug": { "optimize": False },
+            "debug": { "optimize": False, "regression": True },
             "release": { "optimize": True },
         },
         "arch": {
