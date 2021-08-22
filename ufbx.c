@@ -10656,6 +10656,61 @@ static ufbxi_nodiscard int ufbxi_subdivide_mesh_level(ufbxi_subdivide_context *s
 		}
 	}
 
+	if (result->face_material) {
+		result->face_material = ufbxi_push(&sc->result, int32_t, result->num_faces);
+		ufbxi_check_err(&sc->error, result->face_material);
+	}
+	if (result->face_smoothing) {
+		result->face_smoothing = ufbxi_push(&sc->result, bool, result->num_faces);
+		ufbxi_check_err(&sc->error, result->face_smoothing);
+	}
+
+	size_t num_materials = result->materials.count;
+	result->materials.data = ufbxi_push_copy(&sc->result, ufbx_mesh_material, num_materials, result->materials.data);
+	ufbxi_check_err(&sc->error, result->materials.data);
+	ufbxi_for_list(ufbx_mesh_material, mat, result->materials) {
+		mat->num_faces = 0;
+		mat->num_triangles = 0;
+	}
+
+	size_t index_offset = 0;
+	for (size_t i = 0; i < mesh->num_faces; i++) {
+		ufbx_face face = mesh->faces[i];
+
+		int32_t mat = 0;
+		if (mesh->face_material) {
+			mat = mesh->face_material[i];
+			for (size_t ci = 0; ci < face.num_indices; ci++) {
+				result->face_material[index_offset + ci] = mat;
+			}
+		}
+		if (mat >= 0 && (size_t)mat < num_materials) {
+			result->materials.data[mat].num_faces += face.num_indices;
+		}
+		if (mesh->face_smoothing) {
+			bool flag = mesh->face_smoothing[i];
+			for (size_t ci = 0; ci < face.num_indices; ci++) {
+				result->face_smoothing[index_offset + ci] = flag;
+			}
+		}
+		index_offset += face.num_indices;
+	}
+
+	// See `ufbxi_finalize_scene()`
+	ufbxi_for_list(ufbx_mesh_material, mat, result->materials) {
+		mat->faces = ufbxi_push(&sc->result, int32_t, mat->num_faces);
+		ufbxi_check_err(&sc->error, mat->faces);
+		mat->num_faces = 0;
+	}
+
+	for (size_t i = 0; i < result->num_faces; i++) {
+		int32_t mat_ix = result->face_material ? result->face_material[i] : 0;
+		if (mat_ix >= 0 && (size_t)mat_ix < num_materials) {
+			ufbx_mesh_material *mat = &result->materials.data[mat_ix];
+			mat->faces[mat->num_faces++] = (int32_t)i;
+		}
+	}
+
 	return 1;
 }
 
@@ -10691,66 +10746,6 @@ static ufbxi_nodiscard int ufbxi_subdivide_mesh_imp(ufbxi_subdivide_context *sc,
 	sc->result.ator = &sc->ator_result;
 	ufbxi_check_err(&sc->error, ufbxi_subdivide_mesh_level(sc));
 	ufbxi_buf_free(&sc->tmp);
-
-	{
-		ufbx_mesh *src = &sc->src_mesh;
-		ufbx_mesh *mesh = &sc->dst_mesh;
-
-		if (mesh->face_material) {
-			mesh->face_material = ufbxi_push(&sc->result, int32_t, mesh->num_faces);
-			ufbxi_check_err(&sc->error, mesh->face_material);
-		}
-		if (mesh->face_smoothing) {
-			mesh->face_smoothing = ufbxi_push(&sc->result, bool, mesh->num_faces);
-			ufbxi_check_err(&sc->error, mesh->face_smoothing);
-		}
-
-		size_t num_materials = mesh->materials.count;
-		mesh->materials.data = ufbxi_push_copy(&sc->result, ufbx_mesh_material, num_materials, mesh->materials.data);
-		ufbxi_check_err(&sc->error, mesh->materials.data);
-		ufbxi_for_list(ufbx_mesh_material, mat, mesh->materials) {
-			mat->num_faces = 0;
-			mat->num_triangles = 0;
-		}
-
-		size_t index_offset = 0;
-		for (size_t i = 0; i < src->num_faces; i++) {
-			ufbx_face face = src->faces[i];
-
-			int32_t mat = 0;
-			if (src->face_material) {
-				mat = src->face_material[i];
-				for (size_t ci = 0; ci < face.num_indices; ci++) {
-					mesh->face_material[index_offset + ci] = mat;
-				}
-			}
-			if (mat >= 0 && (size_t)mat < num_materials) {
-				mesh->materials.data[mat].num_faces++;
-			}
-			if (src->face_smoothing) {
-				bool flag = src->face_smoothing[i];
-				for (size_t ci = 0; ci < face.num_indices; ci++) {
-					mesh->face_smoothing[index_offset + ci] = flag;
-				}
-			}
-			index_offset += face.num_indices;
-		}
-
-		// See `ufbxi_finalize_scene()`
-		ufbxi_for_list(ufbx_mesh_material, mat, mesh->materials) {
-			mat->faces = ufbxi_push(&sc->result, int32_t, mat->num_faces);
-			ufbxi_check_err(&sc->error, mat->faces);
-			mat->num_faces = 0;
-		}
-
-		for (size_t i = 0; i < mesh->num_faces; i++) {
-			int32_t mat_ix = mesh->face_material ? mesh->face_material[i] : 0;
-			if (mat_ix >= 0 && (size_t)mat_ix < num_materials) {
-				ufbx_mesh_material *mat = &mesh->materials.data[mat_ix];
-				mat->faces[mat->num_faces++] = (int32_t)i;
-			}
-		}
-	}
 
 	ufbx_mesh *mesh = &sc->dst_mesh;
 	memset(&mesh->vertex_normal, 0, sizeof(mesh->vertex_normal));
@@ -12145,6 +12140,7 @@ void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positio
 ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error)
 {
 	if (!mesh) return NULL;
+	if (level == 0) return (ufbx_mesh*)mesh;
 	return ufbxi_subdivide_mesh(mesh, level, opts, error);
 }
 
