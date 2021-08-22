@@ -7772,6 +7772,50 @@ static const ufbxi_shader_mapping ufbxi_fbx_phong_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, ufbxi_string_literal("NormalMap") },
 };
 
+static const ufbxi_shader_mapping ufbxi_osl_standard_shader_pbr_mapping[] = {
+	{ UFBX_MATERIAL_PBR_BASE_FACTOR, ufbxi_string_literal("base") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, ufbxi_string_literal("base_color") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, ufbxi_string_literal("specular_roughness") },
+	{ UFBX_MATERIAL_PBR_DIFFUSE_ROUGHNESS, ufbxi_string_literal("diffuse_roughness") },
+	{ UFBX_MATERIAL_PBR_METALLIC, ufbxi_string_literal("metalness") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_FACTOR, ufbxi_string_literal("specular") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, ufbxi_string_literal("specular_color") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_IOR, ufbxi_string_literal("specular_IOR") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_ANISOTROPY, ufbxi_string_literal("specular_anisotropy") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_ROTATION, ufbxi_string_literal("specular_rotation") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_FACTOR, ufbxi_string_literal("transmission") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, ufbxi_string_literal("transmission_color") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_DEPTH, ufbxi_string_literal("transmission_depth") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER, ufbxi_string_literal("transmission_scatter") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER_ANISOTROPY, ufbxi_string_literal("transmission_scatter_anisotropy") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_DISPERSION, ufbxi_string_literal("transmission_dispersion") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_ROUGHNESS, ufbxi_string_literal("transmission_extra_roughness") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_FACTOR, ufbxi_string_literal("subsurface") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_COLOR, ufbxi_string_literal("subsurface_color") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_RADIUS, ufbxi_string_literal("subsurface_radius") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_SCALE, ufbxi_string_literal("subsurface_scale") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_ANISOTROPY, ufbxi_string_literal("subsurface_anisotropy") },
+	{ UFBX_MATERIAL_PBR_SHEEN_FACTOR, ufbxi_string_literal("sheen") },
+	{ UFBX_MATERIAL_PBR_SHEEN_COLOR, ufbxi_string_literal("sheen_color") },
+	{ UFBX_MATERIAL_PBR_SHEEN_ROUGHNESS, ufbxi_string_literal("sheen_roughness") },
+	{ UFBX_MATERIAL_PBR_COAT_FACTOR, ufbxi_string_literal("coat") },
+	{ UFBX_MATERIAL_PBR_COAT_COLOR, ufbxi_string_literal("coat_color") },
+	{ UFBX_MATERIAL_PBR_COAT_ROUGHNESS, ufbxi_string_literal("coat_roughness") },
+	{ UFBX_MATERIAL_PBR_COAT_IOR, ufbxi_string_literal("coat_IOR") },
+	{ UFBX_MATERIAL_PBR_COAT_ANISOTROPY, ufbxi_string_literal("coat_anisotropy") },
+	{ UFBX_MATERIAL_PBR_COAT_ROTATION, ufbxi_string_literal("coat_rotation") },
+	{ UFBX_MATERIAL_PBR_COAT_NORMAL, ufbxi_string_literal("coat_normal") },
+	{ UFBX_MATERIAL_PBR_THIN_FILM_THICKNESS, ufbxi_string_literal("thin_film_thickness") },
+	{ UFBX_MATERIAL_PBR_THIN_FILM_IOR, ufbxi_string_literal("thin_film_IOR") },
+	{ UFBX_MATERIAL_PBR_EMISSION_FACTOR, ufbxi_string_literal("emission") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, ufbxi_string_literal("emission_color") },
+	{ UFBX_MATERIAL_PBR_OPACITY, ufbxi_string_literal("opacity") },
+	{ UFBX_MATERIAL_PBR_NORMAL_MAP, ufbxi_string_literal("NormalMap") },
+	{ UFBX_MATERIAL_PBR_NORMAL_MAP, ufbxi_string_literal("normalCamera") },
+	{ UFBX_MATERIAL_PBR_TANGENT_MAP, ufbxi_string_literal("tangent") },
+	{ UFBX_MATERIAL_PBR_THIN_WALLED, ufbxi_string_literal("thin_walled") },
+};
+
 static const ufbxi_shader_mapping ufbxi_arnold_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_BASE_FACTOR, ufbxi_string_literal("base") },
 	{ UFBX_MATERIAL_PBR_BASE_COLOR, ufbxi_string_literal("baseColor") },
@@ -7780,7 +7824,6 @@ static const ufbxi_shader_mapping ufbxi_arnold_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_METALLIC, ufbxi_string_literal("metalness") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_FACTOR, ufbxi_string_literal("specular") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, ufbxi_string_literal("specularColor") },
-	{ UFBX_MATERIAL_PBR_SPECULAR_ROUGHNESS, ufbxi_string_literal("specularRoughness") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_IOR, ufbxi_string_literal("specularIOR") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_ANISOTROPY, ufbxi_string_literal("specularAnisotropy") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_ROTATION, ufbxi_string_literal("specularRotation") },
@@ -7814,7 +7857,7 @@ static const ufbxi_shader_mapping ufbxi_arnold_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_INDIRECT_DIFFUSE, ufbxi_string_literal("indirectDiffuse") },
 	{ UFBX_MATERIAL_PBR_INDIRECT_SPECULAR, ufbxi_string_literal("indirectSpecular") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, ufbxi_string_literal("NormalMap") },
-	{ UFBX_MATERIAL_PBR_NORMAL_MAP, ufbxi_string_literal("cameraNormal") },
+	{ UFBX_MATERIAL_PBR_NORMAL_MAP, ufbxi_string_literal("normalCamera") },
 	{ UFBX_MATERIAL_PBR_TANGENT_MAP, ufbxi_string_literal("tangent") },
 	{ UFBX_MATERIAL_PBR_MATTE_ENABLED, ufbxi_string_literal("aiEnableMatte") },
 	{ UFBX_MATERIAL_PBR_MATTE_COLOR, ufbxi_string_literal("aiMatteColor") },
@@ -7846,6 +7889,7 @@ static const ufbxi_shader_mapping_list ufbxi_shader_pbr_mappings[] = {
 	{ ufbxi_fbx_phong_shader_pbr_mapping, ufbxi_arraycount(ufbxi_fbx_phong_shader_pbr_mapping) }, // UFBX_SHADER_UNKNOWN
 	{ ufbxi_fbx_lambert_shader_pbr_mapping, ufbxi_arraycount(ufbxi_fbx_lambert_shader_pbr_mapping) }, // UFBX_SHADER_FBX_LAMBERT
 	{ ufbxi_fbx_phong_shader_pbr_mapping, ufbxi_arraycount(ufbxi_fbx_phong_shader_pbr_mapping) }, // UFBX_SHADER_FBX_PHONG
+	{ ufbxi_osl_standard_shader_pbr_mapping, ufbxi_arraycount(ufbxi_osl_standard_shader_pbr_mapping) }, // UFBX_SHADER_OSL_STANDARD
 	{ ufbxi_arnold_shader_pbr_mapping, ufbxi_arraycount(ufbxi_arnold_shader_pbr_mapping) }, // UFBX_SHADER_ARNOLD
 	{ ufbxi_blender_phong_shader_pbr_mapping, ufbxi_arraycount(ufbxi_blender_phong_shader_pbr_mapping) }, // UFBX_SHADER_BLENDER_PHONG
 };
@@ -8414,6 +8458,8 @@ ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 		if (api) {
 			if (!strcmp(api->value_str.data, "ARNOLD_SHADER_ID")) {
 				shader->type = UFBX_SHADER_ARNOLD;
+			} else if (!strcmp(api->value_str.data, "OSL")) {
+				shader->type = UFBX_SHADER_OSL_STANDARD;
 			}
 		}
 	}

@@ -970,6 +970,7 @@ typedef enum ufbx_shader_type {
 	UFBX_SHADER_UNKNOWN,
 	UFBX_SHADER_FBX_LAMBERT,
 	UFBX_SHADER_FBX_PHONG,
+	UFBX_SHADER_OSL_STANDARD,
 	UFBX_SHADER_ARNOLD,
 	UFBX_SHADER_BLENDER_PHONG,
 
@@ -1008,7 +1009,6 @@ typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_DIFFUSE_ROUGHNESS,
 	UFBX_MATERIAL_PBR_SPECULAR_FACTOR,
 	UFBX_MATERIAL_PBR_SPECULAR_COLOR,
-	UFBX_MATERIAL_PBR_SPECULAR_ROUGHNESS,
 	UFBX_MATERIAL_PBR_SPECULAR_IOR,
 	UFBX_MATERIAL_PBR_SPECULAR_ANISOTROPY,
 	UFBX_MATERIAL_PBR_SPECULAR_ROTATION,
@@ -1095,7 +1095,6 @@ typedef struct ufbx_material_pbr_maps {
 			ufbx_material_map diffuse_roughness;
 			ufbx_material_map specular_factor;
 			ufbx_material_map specular_color;
-			ufbx_material_map specular_roughness;
 			ufbx_material_map specular_ior;
 			ufbx_material_map specular_anisotropy;
 			ufbx_material_map specular_rotation;
