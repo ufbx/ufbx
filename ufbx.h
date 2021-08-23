@@ -841,6 +841,7 @@ struct ufbx_bone {
 	ufbx_real relative_length;
 };
 
+// Empty/NULL/locator connected to a node, actual details in `ufbx_node`
 struct ufbx_empty {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 };
@@ -917,36 +918,59 @@ struct ufbx_lod_group {
 
 // Method to evaluate the skinning on a per-vertex level
 typedef enum ufbx_skinning_method {
+	// Linear blend skinning: Blend transformation matrices by vertex weights
 	UFBX_SKINNING_LINEAR,
+	// One vertex should have only one bone attached
 	UFBX_SKINNING_RIGID,
+	// Convert the transformations to dual quaternions and blend in that space
 	UFBX_SKINNING_DUAL_QUATERNION,
+	// Blend between `UFBX_SKINNING_LINEAR` and `UFBX_SKINNING_BLENDED_DQ_LINEAR`
+	// The blend weight can be found either per-vertex in `ufbx_skin_vertex.dq_weight`
+	// or in `ufbx_skin_deformer.dq_vertices/dq_weights` (indexed by vertex).
 	UFBX_SKINNING_BLENDED_DQ_LINEAR,
 } ufbx_skinning_method;
 
+// Skin weight information for a single mesh vertex
 typedef struct ufbx_skin_vertex {
-	uint32_t weight_begin;
-	uint32_t num_weights;
+
+	// Each vertex is influenced by weights from `ufbx_skin_deformer.weights[]`
+	// The weights are sorted by decreasing weight so you can take the first N
+	// weights to get a cheaper approximation of the vertex.
+	// NOTE: The weights are not guaranteed to be normalized!
+	uint32_t weight_begin; // < Index to start from in the `weights[]` array
+	uint32_t num_weights; // < Number of weights influencing the vertex
+
+	// Blend weight between Linear Blend Skinning (0.0) and Dual Quaternion (1.0)
 	ufbx_real dq_weight;
+
 } ufbx_skin_vertex;
 
 UFBX_LIST_TYPE(ufbx_skin_vertex_list, ufbx_skin_vertex);
 
+// Single per-vertex per-cluster weight, see `ufbx_skin_vertex`
 typedef struct ufbx_skin_weight {
-	uint32_t cluster_index;
-	ufbx_real weight;
+	uint32_t cluster_index; // < Index into `ufbx_skin_deformer.clusters[]`
+	ufbx_real weight;       // < Amount this bone influence the vertex
 } ufbx_skin_weight;
 
 UFBX_LIST_TYPE(ufbx_skin_weight_list, ufbx_skin_weight);
 
+// Skin deformer specifies a binding between a logical set of bones (a skeleton)
+// and a mesh. Each bone is represented by a `ufbx_skin_cluster` that contains
+// the binding matrix and a `ufbx_node *bone` that has the current transformation.
 struct ufbx_skin_deformer {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	ufbx_skinning_method skinning_method;
+
+	// Clusters (bones) in the skin
 	ufbx_skin_cluster_list clusters;
 
+	// Per-vertex weight information
 	ufbx_skin_vertex_list vertices;
 	ufbx_skin_weight_list weights;
 
+	// Largest amount of weights a single vertex can have
 	size_t max_weights_per_vertex;
 
 	// Blend weights between Linear Blend Skinning (0.0) and Dual Quaternion (1.0)
@@ -956,29 +980,44 @@ struct ufbx_skin_deformer {
 	ufbx_real *dq_weights;
 };
 
+// Cluster of vertices bound to a single bone.
 struct ufbx_skin_cluster {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
+	// The bone node the cluster is attached to (may be `NULL`!)
+	// TODO: Strict mode where `bone` cannot be `NULL`!
 	ufbx_node *bone;
 
-	ufbx_matrix geometry_to_bone;
+	// Binding matrix from local mesh vertices to the bone
+	ufbx_matrix geometry_to_bone; 
+
+	// Matrix that specifies the rest/bind pose transform of the node,
+	// not generally needed for skinning, use `geometry_to_bone` instead.
 	ufbx_matrix bind_to_world;
 
+	// Precomputed matrix/transform that accounts for the current bbone transform
+	// ie. `ufbx_matrix_mul(&cluster->bone->node_to_world, &cluster->geometry_to_bone)`
 	ufbx_matrix geometry_to_world;
 	ufbx_transform geometry_to_world_transform;
 
-	size_t num_weights;
-	int32_t *vertices;
-	ufbx_real *weights;
+	// Raw weights indexed by each _vertex_ of a mesh (not index!)
+	// HINT: It may be simpler to use `ufbx_skin_deformer.vertices[]/weights[]` instead!
+	size_t num_weights; // < Number of vertices in the cluster
+	int32_t *vertices;  // < Vertex indices in `ufbx_mesh.vertices[]`
+	ufbx_real *weights; // < Per-vertex weight values
 };
 
+// Blend shape deformer can contain multiple channels (think of sliders between morphs)
+// that may optionally have in-between keyframes.
 struct ufbx_blend_deformer {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	ufbx_blend_channel_list channels;
 };
 
+// Blend shape associated with a target weight in a series of morphs
 typedef struct ufbx_blend_keyframe {
+	// May be NULL! TODO: Strict mode...
 	ufbx_blend_shape *shape;
 
 	// Weight value at which to apply the keyframe at full strength
@@ -990,22 +1029,26 @@ typedef struct ufbx_blend_keyframe {
 
 UFBX_LIST_TYPE(ufbx_blend_keyframe_list, ufbx_blend_keyframe);
 
+// Blend channel consists of multiple morph-key targets that are interpolated.
+// In simple cases there will be only one keyframe that is the target shape.
 struct ufbx_blend_channel {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
+	// Current weight of the channel
 	ufbx_real weight;
 
 	ufbx_blend_keyframe_list keyframes;
 };
 
+// Blend shape target containing the actual vertex offsets
 struct ufbx_blend_shape {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	// Vertex offsets to apply over the base mesh
-	size_t num_offsets;
-	int32_t *offset_vertices;
-	ufbx_vec3 *position_offsets;
-	ufbx_vec3 *normal_offsets;
+	size_t num_offsets;          // < Number of vertex offsets in the following arrays
+	int32_t *offset_vertices;    // < Indices to `ufbx_mesh.vertices[]`
+	ufbx_vec3 *position_offsets; // < Always specified per-vertex offsets
+	ufbx_vec3 *normal_offsets;   // < `NULL` if not specified
 };
 
 struct ufbx_cache_deformer {
