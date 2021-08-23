@@ -5029,7 +5029,7 @@ ufbxi_noinline ufbxi_nodiscard static ufbx_element *ufbxi_push_synthetic_element
 #define ufbxi_push_element(uc, info, type_name, type_enum) (type_name*)ufbxi_push_element_size((uc), (info), sizeof(type_name), (type_enum))
 #define ufbxi_push_synthetic_element(uc, p_fbx_id, name, type_name, type_enum) (type_name*)ufbxi_push_synthetic_element_size((uc), (p_fbx_id), (name), sizeof(type_name), (type_enum))
 
-ufbxi_nodiscard static int ufbxi_read_model(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_model(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	(void)node;
 	ufbx_node *elem_node = ufbxi_push_element(uc, info, ufbx_node, UFBX_ELEMENT_NODE);
@@ -5038,7 +5038,7 @@ ufbxi_nodiscard static int ufbxi_read_model(ufbxi_context *uc, ufbxi_node *node,
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_element(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, size_t size, ufbx_element_type type)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_element(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, size_t size, ufbx_element_type type)
 {
 	(void)node;
 	ufbx_element *elem = ufbxi_push_element_size(uc, info, size, type);
@@ -5046,7 +5046,7 @@ ufbxi_nodiscard static int ufbxi_read_element(ufbxi_context *uc, ufbxi_node *nod
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_connect_oo(ufbxi_context *uc, uint64_t src, uint64_t dst)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_connect_oo(ufbxi_context *uc, uint64_t src, uint64_t dst)
 {
 	ufbxi_tmp_connection *conn = ufbxi_push(&uc->tmp_connections, ufbxi_tmp_connection, 1);
 	ufbxi_check(conn);
@@ -5056,7 +5056,7 @@ ufbxi_nodiscard static int ufbxi_connect_oo(ufbxi_context *uc, uint64_t src, uin
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_connect_op(ufbxi_context *uc, uint64_t src, uint64_t dst, ufbx_string prop)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_connect_op(ufbxi_context *uc, uint64_t src, uint64_t dst, ufbx_string prop)
 {
 	ufbxi_tmp_connection *conn = ufbxi_push(&uc->tmp_connections, ufbxi_tmp_connection, 1);
 	ufbxi_check(conn);
@@ -5067,7 +5067,7 @@ ufbxi_nodiscard static int ufbxi_connect_op(ufbxi_context *uc, uint64_t src, uin
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_connect_pp(ufbxi_context *uc, uint64_t src, uint64_t dst, ufbx_string src_prop, ufbx_string dst_prop)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_connect_pp(ufbxi_context *uc, uint64_t src, uint64_t dst, ufbx_string src_prop, ufbx_string dst_prop)
 {
 	ufbxi_tmp_connection *conn = ufbxi_push(&uc->tmp_connections, ufbxi_tmp_connection, 1);
 	ufbxi_check(conn);
@@ -5078,7 +5078,7 @@ ufbxi_nodiscard static int ufbxi_connect_pp(ufbxi_context *uc, uint64_t src, uin
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_unknown(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *element, ufbx_string type, ufbx_string sub_type)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_unknown(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *element, ufbx_string type, ufbx_string sub_type)
 {
 	(void)node;
 	ufbx_unknown *unknown = ufbxi_push_element(uc, element, ufbx_unknown, UFBX_ELEMENT_UNKNOWN);
