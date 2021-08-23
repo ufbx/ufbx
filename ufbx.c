@@ -1764,7 +1764,7 @@ static void ufbxi_map_free(ufbxi_map *map)
 static uint32_t ufbxi_hash_string(const char *str, size_t length)
 {
 	uint32_t hash = 0;
-	uint32_t seed = UINT32_C(0x9e3779b9) + length;
+	uint32_t seed = UINT32_C(0x9e3779b9) + (uint32_t)length;
 	if (length >= 4) {
 		do {
 			uint32_t word = ufbxi_read_u32(str);
