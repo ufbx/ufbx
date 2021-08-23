@@ -120,8 +120,8 @@ UFBXT_TEST(matrix_to_transform_structured)
 		t.scale.y = (ufbx_real)sy / 2.0f;
 		t.scale.z = (ufbx_real)sz / 2.0f;
 
-		ufbx_matrix m = ufbx_get_transform_matrix(&t);
-		ufbx_transform t2 = ufbx_get_matrix_transform(&m);
+		ufbx_matrix m = ufbx_transform_to_matrix(&t);
+		ufbx_transform t2 = ufbx_matrix_to_transform(&m);
 
 		ufbxt_assert_close_vec3(&err, t.translation, t2.translation);
 		ufbxt_assert_close_vec3(&err, t.scale, t2.scale);
@@ -163,8 +163,8 @@ UFBXT_TEST(matrix_to_transform_random)
 		t.scale.y = ufbxt_xorshift32_real(&state) * 10.0f + 0.01f;
 		t.scale.z = ufbxt_xorshift32_real(&state) * 10.0f + 0.01f;
 
-		ufbx_matrix m = ufbx_get_transform_matrix(&t);
-		ufbx_transform t2 = ufbx_get_matrix_transform(&m);
+		ufbx_matrix m = ufbx_transform_to_matrix(&t);
+		ufbx_transform t2 = ufbx_matrix_to_transform(&m);
 
 		ufbxt_assert_close_vec3(&err, t.translation, t2.translation);
 		ufbxt_assert_close_vec3(&err, t.scale, t2.scale);

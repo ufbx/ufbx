@@ -573,7 +573,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		ufbxt_assert(mesh);
 
 		ufbx_matrix *mat = &node->geometry_to_world;
-		ufbx_matrix norm_mat = ufbx_get_compatible_normal_matrix(node);
+		ufbx_matrix norm_mat = ufbx_get_compatible_matrix_for_normals(node);
 
 		if (mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_SMOOTH || mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_HULL_AND_SMOOTH) {
 			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, mesh->subdivision_preview_levels, NULL, NULL);

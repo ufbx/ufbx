@@ -8745,7 +8745,7 @@ static void ufbxi_mul_rotate(ufbx_transform *t, ufbx_vec3 v, ufbx_rotation_order
 	}
 
 	if (!ufbxi_is_vec3_zero(t->translation)) {
-		t->translation = ufbx_rotate_vector(q, t->translation);
+		t->translation = ufbx_quat_rotate_vec3(q, t->translation);
 	}
 }
 
@@ -8762,7 +8762,7 @@ static void ufbxi_mul_inv_rotate(ufbx_transform *t, ufbx_vec3 v, ufbx_rotation_o
 	}
 
 	if (!ufbxi_is_vec3_zero(t->translation)) {
-		t->translation = ufbx_rotate_vector(q, t->translation);
+		t->translation = ufbx_quat_rotate_vec3(q, t->translation);
 	}
 }
 
@@ -8832,7 +8832,7 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 	node->local_transform = ufbxi_get_transform(&node->props, node->rotation_order);
 	node->geometry_transform = ufbxi_get_geometry_transform(&node->props);
 
-	node->node_to_parent = ufbx_get_transform_matrix(&node->local_transform); 
+	node->node_to_parent = ufbx_transform_to_matrix(&node->local_transform); 
 
 	ufbx_node *parent = node->parent;
 	if (parent) {
@@ -8847,18 +8847,18 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 		}
 
 		if (node->inherit_type == UFBX_INHERIT_NORMAL) {
-			ufbx_matrix_mul(&node->node_to_world, &parent->node_to_world, &node->node_to_parent);
+			node->node_to_world = ufbx_matrix_mul(&parent->node_to_world, &node->node_to_parent);
 		} else {
-			node->node_to_world = ufbx_get_transform_matrix(&node->world_transform);
+			node->node_to_world = ufbx_transform_to_matrix(&node->world_transform);
 		}
 	} else {
 		node->world_transform = node->local_transform;
-		node->node_to_world = ufbx_get_transform_matrix(&node->world_transform);
+		node->node_to_world = ufbx_transform_to_matrix(&node->world_transform);
 	}
 
 	if (!ufbxi_is_transform_zero(node->geometry_transform)) {
-		node->geometry_to_node = ufbx_get_transform_matrix(&node->geometry_transform); 
-		ufbx_matrix_mul(&node->geometry_to_world, &node->node_to_world, &node->geometry_to_node);
+		node->geometry_to_node = ufbx_transform_to_matrix(&node->geometry_transform); 
+		node->geometry_to_world = ufbx_matrix_mul(&node->node_to_world, &node->geometry_to_node);
 	} else {
 		node->geometry_to_node = ufbx_identity_matrix;
 		node->geometry_to_world = node->node_to_world;
@@ -8880,6 +8880,11 @@ ufbxi_noinline static void ufbxi_update_light(ufbx_light *light)
 	light->outer_angle = ufbxi_find_real(&light->props, ufbxi_OuterAngle, 0.0f);
 	light->cast_light = ufbxi_find_int(&light->props, ufbxi_CastLight, 1) != 0;
 	light->cast_shadows = ufbxi_find_int(&light->props, ufbxi_CastShadows, 0) != 0;
+
+	// TODO: Can this vary
+	light->local_direction.x = 0.0f;
+	light->local_direction.y = -1.0f;
+	light->local_direction.z = 0.0f;
 }
 
 typedef struct {
@@ -9027,11 +9032,11 @@ ufbxi_noinline static void ufbxi_update_bone(ufbx_bone *bone)
 ufbxi_noinline static void ufbxi_update_skin_cluster(ufbx_skin_cluster *cluster)
 {
 	if (cluster->bone) {
-		ufbx_matrix_mul(&cluster->geometry_to_world, &cluster->bone->node_to_world, &cluster->geometry_to_bone);
+		cluster->geometry_to_world = ufbx_matrix_mul(&cluster->bone->node_to_world, &cluster->geometry_to_bone);
 	} else {
-		ufbx_matrix_mul(&cluster->geometry_to_world, &cluster->bind_to_world, &cluster->geometry_to_bone);
+		cluster->geometry_to_world = ufbx_matrix_mul(&cluster->bind_to_world, &cluster->geometry_to_bone);
 	}
-	cluster->geometry_to_world_transform = ufbx_get_matrix_transform(&cluster->geometry_to_world);
+	cluster->geometry_to_world_transform = ufbx_matrix_to_transform(&cluster->geometry_to_world);
 }
 
 ufbxi_noinline static void ufbxi_update_blend_channel(ufbx_blend_channel *channel)
@@ -9218,8 +9223,8 @@ static void ufbxi_patch_cluster_binding(ufbx_scene *scene)
 		}
 		if (!node) continue;
 
-		ufbx_matrix world_to_bind = ufbx_get_inverse_matrix(&cluster->bind_to_world);
-		ufbx_matrix_mul(&cluster->geometry_to_bone, &world_to_bind, &node->node_to_world);
+		ufbx_matrix world_to_bind = ufbx_matrix_invert(&cluster->bind_to_world);
+		cluster->geometry_to_bone = ufbx_matrix_mul(&world_to_bind, &node->node_to_world);
 	}
 }
 
@@ -9556,6 +9561,11 @@ ufbx_inline ufbx_real ufbxi_dot3(ufbx_vec3 a, ufbx_vec3 b) {
 	return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
+ufbx_inline ufbx_real ufbxi_length3(ufbx_vec3 v)
+{
+	return (ufbx_real)sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+}
+
 ufbx_inline ufbx_vec3 ufbxi_cross3(ufbx_vec3 a, ufbx_vec3 b) {
 	ufbx_vec3 v = { a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x };
 	return v;
@@ -9610,8 +9620,8 @@ static ufbxi_noinline void ufbxi_combine_anim_layer(ufbxi_anim_layer_combine_ctx
 		} else if (layer->compose_rotation && prop_name == ufbxi_Lcl_Rotation) {
 			ufbx_quat a = ufbx_euler_to_quat(*result, ctx->rotation_order);
 			ufbx_quat b = ufbx_euler_to_quat(*value, ctx->rotation_order);
-			b = ufbx_slerp(ufbx_identity_quat, b, weight);
-			ufbx_quat res = ufbx_mul_quat(a, b);
+			b = ufbx_quat_slerp(ufbx_identity_quat, b, weight);
+			ufbx_quat res = ufbx_quat_mul(a, b);
 			*result = ufbx_quat_to_euler(res, ctx->rotation_order);
 		} else {
 			result->x += value->x * weight;
@@ -9627,7 +9637,7 @@ static ufbxi_noinline void ufbxi_combine_anim_layer(ufbxi_anim_layer_combine_ctx
 		} else if (layer->compose_rotation && prop_name == ufbxi_Lcl_Rotation) {
 			ufbx_quat a = ufbx_euler_to_quat(*result, ctx->rotation_order);
 			ufbx_quat b = ufbx_euler_to_quat(*value, ctx->rotation_order);
-			ufbx_quat res = ufbx_slerp(a, b, weight);
+			ufbx_quat res = ufbx_quat_slerp(a, b, weight);
 			*result = ufbx_quat_to_euler(res, ctx->rotation_order);
 		} else {
 			result->x = result->x * res_weight + value->x * weight;
@@ -11149,17 +11159,16 @@ ufbx_node *ufbx_find_node_len(ufbx_scene *scene, const char *name, size_t name_l
 	return (ufbx_node*)ufbx_find_element_len(scene, UFBX_ELEMENT_NODE, name, name_len);
 }
 
-ufbx_matrix ufbx_get_compatible_normal_matrix(ufbx_node *node)
+ufbx_matrix ufbx_get_compatible_matrix_for_normals(ufbx_node *node)
 {
 	if (!node) return ufbx_identity_matrix;
 
 	ufbx_transform geom_rot = ufbx_identity_transform;
 	geom_rot.rotation = node->geometry_transform.rotation;
-	ufbx_matrix geom_rot_mat = ufbx_get_transform_matrix(&geom_rot);
+	ufbx_matrix geom_rot_mat = ufbx_transform_to_matrix(&geom_rot);
 
-	ufbx_matrix norm_mat;
-	ufbx_matrix_mul(&norm_mat, &node->node_to_world, &geom_rot_mat);
-	norm_mat = ufbx_get_normal_matrix(&norm_mat);
+	ufbx_matrix norm_mat = ufbx_matrix_mul(&node->node_to_world, &geom_rot_mat);
+	norm_mat = ufbx_matrix_for_normals(&norm_mat);
 	return norm_mat;
 }
 
@@ -11434,17 +11443,36 @@ ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *nam
 	return name_str;
 }
 
-ufbx_quat ufbx_mul_quat(ufbx_quat a, ufbx_quat b)
+ufbx_quat ufbx_quat_mul(ufbx_quat a, ufbx_quat b)
 {
 	return ufbxi_mul_quat(a, b);
 }
 
-ufbx_real ufbx_dot_quat(ufbx_quat a, ufbx_quat b)
+ufbx_real ufbx_quat_dot(ufbx_quat a, ufbx_quat b)
 {
 	return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
 }
 
-ufbx_quat ufbx_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t)
+ufbx_quat ufbx_quat_normalize(ufbx_quat q)
+{
+	ufbx_real norm = ufbx_quat_dot(q, q);
+	if (norm == 0.0) return ufbx_identity_quat;
+	q.x /= norm;
+	q.y /= norm;
+	q.z /= norm;
+	q.w /= norm;
+	return q;
+}
+
+ufbx_quat ufbx_quat_fix_antipodal(ufbx_quat q, ufbx_quat reference)
+{
+	if (ufbx_quat_dot(q, reference) < 0.0f) {
+		q.x = -q.x; q.y = -q.y; q.z = -q.z; q.w = -q.w;
+	}
+	return q;
+}
+
+ufbx_quat ufbx_quat_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t)
 {
 	double dot = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
 	double omega = acos(fmin(fmax(dot, 0.0), 1.0));
@@ -11471,7 +11499,7 @@ ufbx_quat ufbx_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t)
 	return ret;
 }
 
-ufbx_vec3 ufbx_rotate_vector(ufbx_quat q, ufbx_vec3 v)
+ufbx_vec3 ufbx_quat_rotate_vec3(ufbx_quat q, ufbx_vec3 v)
 {
 	ufbx_real xy = q.x*v.y - q.y*v.x;
 	ufbx_real xz = q.x*v.z - q.z*v.x;
@@ -11631,11 +11659,6 @@ ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order)
 	return v;
 }
 
-ufbx_real ufbx_vec3_length(ufbx_vec3 v)
-{
-	return (ufbx_real)sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
-}
-
 size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error)
 {
 	if (!dst || !dst_size) return 0;
@@ -11668,98 +11691,30 @@ size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error)
 	return offset;
 }
 
-ufbx_matrix ufbx_get_transform_matrix(const ufbx_transform *t)
+ufbx_matrix ufbx_matrix_mul(const ufbx_matrix *a, const ufbx_matrix *b)
 {
-	ufbx_quat q = t->rotation;
-	ufbx_real sx = 2.0 * t->scale.x, sy = 2.0 * t->scale.y, sz = 2.0 * t->scale.z;
-	ufbx_real xx = q.x*q.x, xy = q.x*q.y, xz = q.x*q.z, xw = q.x*q.w;
-	ufbx_real yy = q.y*q.y, yz = q.y*q.z, yw = q.y*q.w;
-	ufbx_real zz = q.z*q.z, zw = q.z*q.w;
-	ufbx_matrix m;
-	m.m00 = sx * (- yy - zz + 0.5);
-	m.m10 = sx * (+ xy + zw);
-	m.m20 = sx * (- yw + xz);
-	m.m01 = sy * (- zw + xy);
-	m.m11 = sy * (- xx - zz + 0.5);
-	m.m21 = sy * (+ xw + yz);
-	m.m02 = sz * (+ xz + yw);
-	m.m12 = sz * (- xw + yz);
-	m.m22 = sz * (- xx - yy + 0.5);
-	m.m03 = t->translation.x;
-	m.m13 = t->translation.y;
-	m.m23 = t->translation.z;
-	return m;
+	ufbx_matrix dst;
+
+	dst.m03 = a->m00*b->m03 + a->m01*b->m13 + a->m02*b->m23 + a->m03;
+	dst.m13 = a->m10*b->m03 + a->m11*b->m13 + a->m12*b->m23 + a->m13;
+	dst.m23 = a->m20*b->m03 + a->m21*b->m13 + a->m22*b->m23 + a->m23;
+
+	dst.m00 = a->m00*b->m00 + a->m01*b->m10 + a->m02*b->m20;
+	dst.m10 = a->m10*b->m00 + a->m11*b->m10 + a->m12*b->m20;
+	dst.m20 = a->m20*b->m00 + a->m21*b->m10 + a->m22*b->m20;
+
+	dst.m01 = a->m00*b->m01 + a->m01*b->m11 + a->m02*b->m21;
+	dst.m11 = a->m10*b->m01 + a->m11*b->m11 + a->m12*b->m21;
+	dst.m21 = a->m20*b->m01 + a->m21*b->m11 + a->m22*b->m21;
+
+	dst.m02 = a->m00*b->m02 + a->m01*b->m12 + a->m02*b->m22;
+	dst.m12 = a->m10*b->m02 + a->m11*b->m12 + a->m12*b->m22;
+	dst.m22 = a->m20*b->m02 + a->m21*b->m12 + a->m22*b->m22;
+
+	return dst;
 }
 
-void ufbx_matrix_mul(ufbx_matrix *dst, const ufbx_matrix *p_l, const ufbx_matrix *p_r)
-{
-	ufbx_matrix l = *p_l;
-	ufbx_matrix r = *p_r;
-
-	dst->m03 = l.m00*r.m03 + l.m01*r.m13 + l.m02*r.m23 + l.m03;
-	dst->m13 = l.m10*r.m03 + l.m11*r.m13 + l.m12*r.m23 + l.m13;
-	dst->m23 = l.m20*r.m03 + l.m21*r.m13 + l.m22*r.m23 + l.m23;
-
-	dst->m00 = l.m00*r.m00 + l.m01*r.m10 + l.m02*r.m20;
-	dst->m10 = l.m10*r.m00 + l.m11*r.m10 + l.m12*r.m20;
-	dst->m20 = l.m20*r.m00 + l.m21*r.m10 + l.m22*r.m20;
-
-	dst->m01 = l.m00*r.m01 + l.m01*r.m11 + l.m02*r.m21;
-	dst->m11 = l.m10*r.m01 + l.m11*r.m11 + l.m12*r.m21;
-	dst->m21 = l.m20*r.m01 + l.m21*r.m11 + l.m22*r.m21;
-
-	dst->m02 = l.m00*r.m02 + l.m01*r.m12 + l.m02*r.m22;
-	dst->m12 = l.m10*r.m02 + l.m11*r.m12 + l.m12*r.m22;
-	dst->m22 = l.m20*r.m02 + l.m21*r.m12 + l.m22*r.m22;
-}
-
-ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v)
-{
-	ufbx_vec3 r;
-	r.x = m->m00*v.x + m->m01*v.y + m->m02*v.z + m->m03;
-	r.y = m->m10*v.x + m->m11*v.y + m->m12*v.z + m->m13;
-	r.z = m->m20*v.x + m->m21*v.y + m->m22*v.z + m->m23;
-	return r;
-}
-
-ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v)
-{
-	ufbx_vec3 r;
-	r.x = m->m00*v.x + m->m01*v.y + m->m02*v.z;
-	r.y = m->m10*v.x + m->m11*v.y + m->m12*v.z;
-	r.z = m->m20*v.x + m->m21*v.y + m->m22*v.z;
-	return r;
-}
-
-ufbx_matrix ufbx_get_normal_matrix(const ufbx_matrix *m)
-{
-	ufbx_real det = 
-		- m->m02*m->m11*m->m20 + m->m01*m->m12*m->m20 + m->m02*m->m10*m->m21
-		- m->m00*m->m12*m->m21 - m->m01*m->m10*m->m22 + m->m00*m->m11*m->m22;
-
-	ufbx_matrix r;
-	if (det == 0.0) {
-		memset(&r, 0, sizeof(r));
-		return r;
-	}
-
-	ufbx_real rcp_det = 1.0 / det;
-
-	r.m00 = ( - m->m12*m->m21 + m->m11*m->m22) * rcp_det;
-	r.m01 = ( + m->m12*m->m20 - m->m10*m->m22) * rcp_det;
-	r.m02 = ( - m->m11*m->m20 + m->m10*m->m21) * rcp_det;
-	r.m10 = ( + m->m02*m->m21 - m->m01*m->m22) * rcp_det;
-	r.m11 = ( - m->m02*m->m20 + m->m00*m->m22) * rcp_det;
-	r.m12 = ( + m->m01*m->m20 - m->m00*m->m21) * rcp_det;
-	r.m20 = ( - m->m02*m->m11 + m->m01*m->m12) * rcp_det;
-	r.m21 = ( + m->m02*m->m10 - m->m00*m->m12) * rcp_det;
-	r.m22 = ( - m->m01*m->m10 + m->m00*m->m11) * rcp_det;
-	r.m03 = r.m13 = r.m23 = 0.0;
-
-	return r;
-}
-
-ufbx_matrix ufbx_get_inverse_matrix(const ufbx_matrix *m)
+ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m)
 {
 	ufbx_real det = 
 		- m->m02*m->m11*m->m20 + m->m01*m->m12*m->m20 + m->m02*m->m10*m->m21
@@ -11789,13 +11744,82 @@ ufbx_matrix ufbx_get_inverse_matrix(const ufbx_matrix *m)
 	return r;
 }
 
-ufbx_transform ufbx_get_matrix_transform(const ufbx_matrix *m)
+ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m)
+{
+	ufbx_real det = 
+		- m->m02*m->m11*m->m20 + m->m01*m->m12*m->m20 + m->m02*m->m10*m->m21
+		- m->m00*m->m12*m->m21 - m->m01*m->m10*m->m22 + m->m00*m->m11*m->m22;
+
+	ufbx_matrix r;
+	if (det == 0.0) {
+		memset(&r, 0, sizeof(r));
+		return r;
+	}
+
+	ufbx_real rcp_det = 1.0 / det;
+
+	r.m00 = ( - m->m12*m->m21 + m->m11*m->m22) * rcp_det;
+	r.m01 = ( + m->m12*m->m20 - m->m10*m->m22) * rcp_det;
+	r.m02 = ( - m->m11*m->m20 + m->m10*m->m21) * rcp_det;
+	r.m10 = ( + m->m02*m->m21 - m->m01*m->m22) * rcp_det;
+	r.m11 = ( - m->m02*m->m20 + m->m00*m->m22) * rcp_det;
+	r.m12 = ( + m->m01*m->m20 - m->m00*m->m21) * rcp_det;
+	r.m20 = ( - m->m02*m->m11 + m->m01*m->m12) * rcp_det;
+	r.m21 = ( + m->m02*m->m10 - m->m00*m->m12) * rcp_det;
+	r.m22 = ( - m->m01*m->m10 + m->m00*m->m11) * rcp_det;
+	r.m03 = r.m13 = r.m23 = 0.0;
+
+	return r;
+}
+
+ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v)
+{
+	ufbx_vec3 r;
+	r.x = m->m00*v.x + m->m01*v.y + m->m02*v.z + m->m03;
+	r.y = m->m10*v.x + m->m11*v.y + m->m12*v.z + m->m13;
+	r.z = m->m20*v.x + m->m21*v.y + m->m22*v.z + m->m23;
+	return r;
+}
+
+ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v)
+{
+	ufbx_vec3 r;
+	r.x = m->m00*v.x + m->m01*v.y + m->m02*v.z;
+	r.y = m->m10*v.x + m->m11*v.y + m->m12*v.z;
+	r.z = m->m20*v.x + m->m21*v.y + m->m22*v.z;
+	return r;
+}
+
+ufbx_matrix ufbx_transform_to_matrix(const ufbx_transform *t)
+{
+	ufbx_quat q = t->rotation;
+	ufbx_real sx = 2.0 * t->scale.x, sy = 2.0 * t->scale.y, sz = 2.0 * t->scale.z;
+	ufbx_real xx = q.x*q.x, xy = q.x*q.y, xz = q.x*q.z, xw = q.x*q.w;
+	ufbx_real yy = q.y*q.y, yz = q.y*q.z, yw = q.y*q.w;
+	ufbx_real zz = q.z*q.z, zw = q.z*q.w;
+	ufbx_matrix m;
+	m.m00 = sx * (- yy - zz + 0.5);
+	m.m10 = sx * (+ xy + zw);
+	m.m20 = sx * (- yw + xz);
+	m.m01 = sy * (- zw + xy);
+	m.m11 = sy * (- xx - zz + 0.5);
+	m.m21 = sy * (+ xw + yz);
+	m.m02 = sz * (+ xz + yw);
+	m.m12 = sz * (- xw + yz);
+	m.m22 = sz * (- xx - yy + 0.5);
+	m.m03 = t->translation.x;
+	m.m13 = t->translation.y;
+	m.m23 = t->translation.z;
+	return m;
+}
+
+ufbx_transform ufbx_matrix_to_transform(const ufbx_matrix *m)
 {
 	ufbx_transform t;
 	t.translation = m->cols[3];
-	t.scale.x = ufbx_vec3_length(m->cols[0]);
-	t.scale.y = ufbx_vec3_length(m->cols[1]);
-	t.scale.z = ufbx_vec3_length(m->cols[2]);
+	t.scale.x = ufbxi_length3(m->cols[0]);
+	t.scale.y = ufbxi_length3(m->cols[1]);
+	t.scale.z = ufbxi_length3(m->cols[2]);
 
 	// TODO: Mirroring?
 	ufbx_vec3 x = ufbxi_mul3(m->cols[0], t.scale.x > 0.0f ? 1.0f / t.scale.x : 0.0f);
@@ -11868,7 +11892,7 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 			ufbx_quat vq0 = t.rotation;
 			if (i == 0) first_q0 = vq0;
 
-			if (ufbx_dot_quat(first_q0, vq0) < 0.0f) {
+			if (ufbx_quat_dot(first_q0, vq0) < 0.0f) {
 				vq0.x = -vq0.x;
 				vq0.y = -vq0.y;
 				vq0.z = -vq0.z;
@@ -11923,7 +11947,7 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 		dqt.translation.x = rcp_len2x2 * (- qe.w*q0.x + qe.x*q0.w - qe.y*q0.z + qe.z*q0.y);
 		dqt.translation.y = rcp_len2x2 * (- qe.w*q0.y + qe.x*q0.z + qe.y*q0.w - qe.z*q0.x);
 		dqt.translation.z = rcp_len2x2 * (- qe.w*q0.z - qe.x*q0.y + qe.y*q0.x + qe.z*q0.w);
-		ufbx_matrix dqm = ufbx_get_transform_matrix(&dqt);
+		ufbx_matrix dqm = ufbx_transform_to_matrix(&dqt);
 		if (skin_vertex.dq_weight < 1.0f) {
 			ufbxi_add_weighted_mat(&mat, &dqm, skin_vertex.dq_weight);
 		} else {
@@ -12174,7 +12198,7 @@ void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positio
 	}
 
 	for (size_t i = 0; i < num_normals; i++) {
-		ufbx_real len = ufbx_vec3_length(normals[i]);
+		ufbx_real len = ufbxi_length3(normals[i]);
 		if (len > 0.0f) {
 			normals[i].x /= len;
 			normals[i].y /= len;

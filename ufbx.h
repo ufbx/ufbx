@@ -142,6 +142,7 @@ typedef struct ufbx_matrix {
 
 typedef struct ufbx_prop ufbx_prop;
 typedef struct ufbx_props ufbx_props;
+
 // Data type contained within the property. All the data fields are always
 // populated regardless of type, so there's no need to switch by type usually
 // eg. `prop->value_real` and `prop->value_int` have the same value (well, close)
@@ -454,7 +455,7 @@ typedef struct ufbx_vertex_attrib {
 	bool unique_per_vertex;
 } ufbx_vertex_attrib;
 
-// 1D vertex attribute, see `ufbx_vertex_void` for information
+// 1D vertex attribute, see `ufbx_vertex_attrib` for information
 typedef struct ufbx_vertex_real {
 	ufbx_real *data;
 	int32_t *indices;
@@ -463,7 +464,7 @@ typedef struct ufbx_vertex_real {
 	bool unique_per_vertex;
 } ufbx_vertex_real;
 
-// 2D vertex attribute, see `ufbx_vertex_void` for information
+// 2D vertex attribute, see `ufbx_vertex_attrib` for information
 typedef struct ufbx_vertex_vec2 {
 	ufbx_vec2 *data;
 	int32_t *indices;
@@ -472,7 +473,7 @@ typedef struct ufbx_vertex_vec2 {
 	bool unique_per_vertex;
 } ufbx_vertex_vec2;
 
-// 3D vertex attribute, see `ufbx_vertex_void` for information
+// 3D vertex attribute, see `ufbx_vertex_attrib` for information
 typedef struct ufbx_vertex_vec3 {
 	ufbx_vec3 *data;
 	int32_t *indices;
@@ -481,7 +482,7 @@ typedef struct ufbx_vertex_vec3 {
 	bool unique_per_vertex;
 } ufbx_vertex_vec3;
 
-// 4D vertex attribute, see `ufbx_vertex_void` for information
+// 4D vertex attribute, see `ufbx_vertex_attrib` for information
 typedef struct ufbx_vertex_vec4 {
 	ufbx_vec4 *data;
 	int32_t *indices;
@@ -638,7 +639,7 @@ struct ufbx_mesh {
 
 	// Vertex attributes, see the comment over the struct.
 	//
-	// NOTE: Not all meshes have all attributes, in that case `data == NULL`!
+	// NOTE: Not all meshes have all attributes, in that case `indices/data == NULL`!
 	//
 	// NOTE: UV/tangent/bitangent and color are the from first sets,
 	// use `uv_sets/color_sets` to access the other layers.
@@ -706,6 +707,7 @@ struct ufbx_light {
 
 	ufbx_vec3 color;
 	ufbx_real intensity;
+	ufbx_vec3 local_direction;
 
 	ufbx_light_type type;
 	ufbx_light_decay decay;
@@ -1732,7 +1734,7 @@ ufbx_inline ufbx_element *ufbx_find_element(ufbx_scene *scene, ufbx_element_type
 ufbx_node *ufbx_find_node_len(ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_inline ufbx_node *ufbx_find_node(ufbx_scene *scene, const char *name) { return ufbx_find_node_len(scene, name, strlen(name));}
 
-ufbx_matrix ufbx_get_compatible_normal_matrix(ufbx_node *node);
+ufbx_matrix ufbx_get_compatible_matrix_for_normals(ufbx_node *node);
 
 // Utility
 
@@ -1771,25 +1773,21 @@ ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *nam
 
 // Math
 
-ufbx_quat ufbx_mul_quat(ufbx_quat a, ufbx_quat b);
-ufbx_real ufbx_dot_quat(ufbx_quat a, ufbx_quat b);
-ufbx_quat ufbx_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t);
-ufbx_vec3 ufbx_rotate_vector(ufbx_quat q, ufbx_vec3 v);
-ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order);
+ufbx_quat ufbx_quat_mul(ufbx_quat a, ufbx_quat b);
+ufbx_quat ufbx_quat_normalize(ufbx_quat q);
+ufbx_quat ufbx_quat_fix_antipodal(ufbx_quat q, ufbx_quat reference);
+ufbx_quat ufbx_quat_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t);
+ufbx_vec3 ufbx_quat_rotate_vec3(ufbx_quat q, ufbx_vec3 v);
 ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order);
-ufbx_real ufbx_vec3_length(ufbx_vec3 v);
+ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order);
 
-ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v);
-
-ufbx_matrix ufbx_get_transform_matrix(const ufbx_transform *t);
-void ufbx_matrix_mul(ufbx_matrix *dst, const ufbx_matrix *p_l, const ufbx_matrix *p_r);
-
+ufbx_matrix ufbx_matrix_mul(const ufbx_matrix *a, const ufbx_matrix *b);
+ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m);
+ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m);
 ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v);
 ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v);
-ufbx_matrix ufbx_get_normal_matrix(const ufbx_matrix *m);
-ufbx_matrix ufbx_get_inverse_matrix(const ufbx_matrix *m);
-
-ufbx_transform ufbx_get_matrix_transform(const ufbx_matrix *m);
+ufbx_matrix ufbx_transform_to_matrix(const ufbx_transform *t);
+ufbx_transform ufbx_matrix_to_transform(const ufbx_matrix *m);
 
 // Skinning
 
