@@ -1614,7 +1614,7 @@ typedef struct {
 
 static ufbxi_noinline bool ufbxi_map_grow_size_imp(ufbxi_map *map, size_t item_size, size_t min_size)
 {
-	const double load_factor = 0.8;
+	const double load_factor = 0.7;
 
 	// Find the lowest power of two size that fits `min_size` within `load_factor`
 	size_t num_entries = map->mask + 1;
@@ -1764,7 +1764,7 @@ static void ufbxi_map_free(ufbxi_map *map)
 static uint32_t ufbxi_hash_string(const char *str, size_t length)
 {
 	uint32_t hash = 0;
-	uint32_t seed = UINT32_C(0x9e3779b9);
+	uint32_t seed = UINT32_C(0x9e3779b9) + length;
 	if (length >= 4) {
 		do {
 			uint32_t word = ufbxi_read_u32(str);
