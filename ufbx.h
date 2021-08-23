@@ -682,19 +682,30 @@ struct ufbx_mesh {
 	bool subdivision_evaluated;
 };
 
+// The kind of light source
 typedef enum ufbx_light_type {
+	// Single point at local origin, at `node->world_transform.position`
 	UFBX_LIGHT_POINT,
+	// Infinite directional light pointing locally towards `light->local_direction`
+	// For global: `ufbx_transform_direction(&node->node_to_world, light->local_direction)`
 	UFBX_LIGHT_DIRECTIONAL,
+	// Cone shaped light towards `light->local_direction`, between `light->inner/outer_angle`.
+	// For global: `ufbx_transform_direction(&node->node_to_world, light->local_direction)`
 	UFBX_LIGHT_SPOT,
+	// Area light, shape specified by `light->area_shape`
+	// TODO: Units?
 	UFBX_LIGHT_AREA,
+	// Volumetric light source
+	// TODO: How does this work
 	UFBX_LIGHT_VOLUME,
 } ufbx_light_type;
 
+// How fast does the light intensity decay at a distance
 typedef enum ufbx_light_decay {
-	UFBX_LIGHT_DECAY_NONE,
-	UFBX_LIGHT_DECAY_LINEAR,
-	UFBX_LIGHT_DECAY_QUADRATIC,
-	UFBX_LIGHT_DECAY_CUBIC,
+	UFBX_LIGHT_DECAY_NONE,      // < 1 (no decay)
+	UFBX_LIGHT_DECAY_LINEAR,    // < 1 / d
+	UFBX_LIGHT_DECAY_QUADRATIC, // < 1 / d^2 (physically accurate)
+	UFBX_LIGHT_DECAY_CUBIC,     // < 1 / d^3
 } ufbx_light_decay;
 
 typedef enum ufbx_light_area_shape {
@@ -702,18 +713,26 @@ typedef enum ufbx_light_area_shape {
 	UFBX_LIGHT_AREA_SPHERE,
 } ufbx_light_area_shape;
 
+// Light source attached to a `ufbx_node`
 struct ufbx_light {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 
+	// Color and intensity of the light, usually you want to use `color * intensity` 
+	// NOTE: `intensity` is 0.01x of the property `"Intensity"` as that matches
+	// matches values in DCC programs before exporting.
 	ufbx_vec3 color;
 	ufbx_real intensity;
+
+	// Direction the light is aimed at in node's local space, usually -Y
 	ufbx_vec3 local_direction;
 
+	// Type of the light and shape parameters
 	ufbx_light_type type;
 	ufbx_light_decay decay;
 	ufbx_light_area_shape area_shape;
 	ufbx_real inner_angle;
 	ufbx_real outer_angle;
+
 	bool cast_light;
 	bool cast_shadows;
 };
