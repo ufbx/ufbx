@@ -737,61 +737,96 @@ struct ufbx_light {
 	bool cast_shadows;
 };
 
+// Method of specifying the rendering resolution from properties
+// NOTE: Handled internally by ufbx, ignore unless you interpret `ufbx_props` directly!
 typedef enum ufbx_aspect_mode {
+	// No defined resolution
 	UFBX_ASPECT_MODE_WINDOW_SIZE,
+	// `"AspectWidth"` and `"AspectHeight"` are relative to each other
 	UFBX_ASPECT_MODE_FIXED_RATIO,
+	// `"AspectWidth"` and `"AspectHeight"` are both pixels
 	UFBX_ASPECT_MODE_FIXED_RESOLUTION,
+	// `"AspectWidth"` is pixels, `"AspectHeight"` is relative to width
 	UFBX_ASPECT_MODE_FIXED_WIDTH,
+	// < `"AspectHeight"` is pixels, `"AspectWidth"` is relative to height
 	UFBX_ASPECT_MODE_FIXED_HEIGHT,
 } ufbx_aspect_mode;
 
+// Method of specifying the field of view from properties
+// NOTE: Handled internally by ufbx, ignore unless you interpret `ufbx_props` directly!
 typedef enum ufbx_aperture_mode {
+	// Use separate `"FieldOfViewX"` and `"FieldOfViewY"` as horizontal/vertical FOV angles
 	UFBX_APERTURE_MODE_HORIZONTAL_AND_VERTICAL,
+	// Use `"FieldOfView"` as horizontal FOV angle, derive vertical angle via aspect ratio
 	UFBX_APERTURE_MODE_HORIZONTAL,
+	// Use `"FieldOfView"` as vertical FOV angle, derive horizontal angle via aspect ratio
 	UFBX_APERTURE_MODE_VERTICAL,
+	// Compute the field of view from the render gate size and focal length
 	UFBX_APERTURE_MODE_FOCAL_LENGTH,
 } ufbx_aperture_mode;
 
-typedef enum ufbx_aperture_format {
-	UFBX_APERTURE_FORMAT_CUSTOM,
-	UFBX_APERTURE_FORMAT_16MM_THEATRICAL,
-	UFBX_APERTURE_FORMAT_SUPER_16MM,
-	UFBX_APERTURE_FORMAT_35MM_ACADEMY,
-	UFBX_APERTURE_FORMAT_35MM_TV_PROJECTION,
-	UFBX_APERTURE_FORMAT_35MM_FULL_APERTURE,
-	UFBX_APERTURE_FORMAT_35MM_185_PROJECTION,
-	UFBX_APERTURE_FORMAT_35MM_ANAMORPHIC,
-	UFBX_APERTURE_FORMAT_70MM_PROJECTION,
-	UFBX_APERTURE_FORMAT_VISTAVISION,
-	UFBX_APERTURE_FORMAT_DYNAVISION,
-	UFBX_APERTURE_FORMAT_IMAX,
-} ufbx_aperture_format;
-
+// Method of specifying the render gate size from properties
+// NOTE: Handled internally by ufbx, ignore unless you interpret `ufbx_props` directly!
 typedef enum ufbx_gate_fit {
+	// Use the film/aperture size directly as the render gate
 	UFBX_GATE_FIT_NONE,
+	// Fit the render gate to the height of the film, derive width from aspect ratio
 	UFBX_GATE_FIT_VERTICAL,
+	// Fit the render gate to the width of the film, derive height from aspect ratio
 	UFBX_GATE_FIT_HORIZONTAL,
+	// Fit the render gate so that it is fully contained within the film gate
 	UFBX_GATE_FIT_FILL,
+	// Fit the render gate so that it fully contains the film gate
 	UFBX_GATE_FIT_OVERSCAN,
+	// Stretch the render gate to match the film gate
+	// TODO: Does this differ from `UFBX_GATE_FIT_NONE`?
 	UFBX_GATE_FIT_STRETCH,
 } ufbx_gate_fit;
 
+// Camera film/aperture size defaults
+// NOTE: Handled internally by ufbx, ignore unless you interpret `ufbx_props` directly!
+typedef enum ufbx_aperture_format {
+	UFBX_APERTURE_FORMAT_CUSTOM,              // < Use `"FilmWidth"` and `"FilmHeight"`
+	UFBX_APERTURE_FORMAT_16MM_THEATRICAL,     // < 0.404 x 0.295 inches
+	UFBX_APERTURE_FORMAT_SUPER_16MM,          // < 0.493 x 0.292 inches
+	UFBX_APERTURE_FORMAT_35MM_ACADEMY,        // < 0.864 x 0.630 inches
+	UFBX_APERTURE_FORMAT_35MM_TV_PROJECTION,  // < 0.816 x 0.612 inches
+	UFBX_APERTURE_FORMAT_35MM_FULL_APERTURE,  // < 0.980 x 0.735 inches
+	UFBX_APERTURE_FORMAT_35MM_185_PROJECTION, // < 0.825 x 0.446 inches
+	UFBX_APERTURE_FORMAT_35MM_ANAMORPHIC,     // < 0.864 x 0.732 inches (squeeze ratio: 2)
+	UFBX_APERTURE_FORMAT_70MM_PROJECTION,     // < 2.066 x 0.906 inches
+	UFBX_APERTURE_FORMAT_VISTAVISION,         // < 1.485 x 0.991 inches
+	UFBX_APERTURE_FORMAT_DYNAVISION,          // < 2.080 x 1.480 inches
+	UFBX_APERTURE_FORMAT_IMAX,                // < 2.772 x 2.072 inches
+} ufbx_aperture_format;
+
+// Camera attached to a `ufbx_node`
 struct ufbx_camera {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 
+	// If set to `true`, `resolution` reprensents actual pixel values, otherwise
+	// it's only useful for its aspect ratio.
 	bool resolution_is_pixels;
+
+	// Render resolution, either in pixels or arbitrary units, depending on above
 	ufbx_vec2 resolution;
+
+	// Horizontal/vertical field of view in degrees
 	ufbx_vec2 field_of_view_deg;
+
+	// Component-wise `tan(field_of_view_deg)`, also represents the size of the
+	// proection frustum slice at distance of 1.
 	ufbx_vec2 field_of_view_tan;
 
+	// Advanced properties used to compute the above
 	ufbx_aspect_mode aspect_mode;
-	ufbx_aperture_format aperture_format;
 	ufbx_aperture_mode aperture_mode;
 	ufbx_gate_fit gate_fit;
-	ufbx_real focal_length_mm;
-	ufbx_vec2 film_size_inch;
-	ufbx_vec2 aperture_size_inch;
-	ufbx_real squeeze_ratio;
+	ufbx_aperture_format aperture_format;
+	ufbx_real focal_length_mm;     // < Focal length in millimeters
+	ufbx_vec2 film_size_inch;      // < Film size in inches
+	ufbx_vec2 aperture_size_inch;  // < Aperture/film gate size in inches
+	ufbx_real squeeze_ratio;       // < Anamoprhic stretch ratio
 };
 
 struct ufbx_bone {
