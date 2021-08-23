@@ -1940,6 +1940,7 @@ static const char ufbxi_Lcl_Translation[] = "Lcl Translation";
 static const char ufbxi_LeftCamera[] = "LeftCamera";
 static const char ufbxi_LightType[] = "LightType";
 static const char ufbxi_Light[] = "Light";
+static const char ufbxi_LimbLength[] = "LimbLength";
 static const char ufbxi_LimbNode[] = "LimbNode";
 static const char ufbxi_Limb[] = "Limb";
 static const char ufbxi_LocalStart[] = "LocalStart";
@@ -2168,6 +2169,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Light, sizeof(ufbxi_Light) - 1 },
 	{ ufbxi_LightType, sizeof(ufbxi_LightType) - 1 },
 	{ ufbxi_Limb, sizeof(ufbxi_Limb) - 1 },
+	{ ufbxi_LimbLength, sizeof(ufbxi_LimbLength) - 1 },
 	{ ufbxi_LimbNode, sizeof(ufbxi_LimbNode) - 1 },
 	{ ufbxi_LocalStart, sizeof(ufbxi_LocalStart) - 1 },
 	{ ufbxi_LocalStop, sizeof(ufbxi_LocalStop) - 1 },
@@ -4992,7 +4994,7 @@ ufbxi_nodiscard static ufbx_element *ufbxi_push_element_size(ufbxi_context *uc, 
 	return elem;
 }
 
-ufbxi_nodiscard static ufbx_element *ufbxi_push_synthetic_element_size(ufbxi_context *uc, uint64_t *p_fbx_id, const char *name, size_t size, ufbx_element_type type)
+ufbxi_noinline ufbxi_nodiscard static ufbx_element *ufbxi_push_synthetic_element_size(ufbxi_context *uc, uint64_t *p_fbx_id, const char *name, size_t size, ufbx_element_type type)
 {
 	size_t aligned_size = (size + 7) & ~0x7;
 
@@ -6420,7 +6422,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_c
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_light), UFBX_ELEMENT_LIGHT));
 	} else if (sub_type == ufbxi_Camera) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera), UFBX_ELEMENT_CAMERA));
-	} else if (sub_type == ufbxi_LimbNode) {
+	} else if (sub_type == ufbxi_LimbNode || sub_type == ufbxi_Limb) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_bone), UFBX_ELEMENT_BONE));
 	} else if (sub_type == ufbxi_Null) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_empty), UFBX_ELEMENT_EMPTY));
@@ -6506,7 +6508,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_light), UFBX_ELEMENT_LIGHT));
 			} else if (sub_type == ufbxi_Camera) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera), UFBX_ELEMENT_CAMERA));
-			} else if (sub_type == ufbxi_LimbNode) {
+			} else if (sub_type == ufbxi_LimbNode || sub_type == ufbxi_Limb) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_bone), UFBX_ELEMENT_BONE));
 			} else if (sub_type == ufbxi_Null) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_empty), UFBX_ELEMENT_EMPTY));
@@ -8651,6 +8653,22 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 		uc->scene.anim = uc->scene.anim_stacks.data[0]->anim;
 	}
 
+	uc->scene.metadata.ktime_to_sec = uc->ktime_to_sec;
+
+	// Maya seems to use scale of 100/3, Blender binary uses exactly 33, ASCII has always value of 1.0
+	if (uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
+		uc->scene.metadata.bone_prop_size_unit = 33.0f;
+	} else if (uc->exporter == UFBX_EXPORTER_BLENDER_ASCII) {
+		uc->scene.metadata.bone_prop_size_unit = 1.0f;
+	} else {
+		uc->scene.metadata.bone_prop_size_unit = (ufbx_real)(100.0/3.0);
+	}
+	if (uc->exporter == UFBX_EXPORTER_BLENDER_ASCII) {
+		uc->scene.metadata.bone_prop_limb_length_relative = false;
+	} else {
+		uc->scene.metadata.bone_prop_limb_length_relative = true;
+	}
+
 	return 1;
 }
 
@@ -9024,9 +9042,16 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 	}
 }
 
-ufbxi_noinline static void ufbxi_update_bone(ufbx_bone *bone)
+ufbxi_noinline static void ufbxi_update_bone(ufbx_scene *scene, ufbx_bone *bone)
 {
-	bone->length = ufbxi_find_real(&bone->props, ufbxi_Size, 0.0f);
+	ufbx_real unit = scene->metadata.bone_prop_size_unit;
+
+	bone->radius = ufbxi_find_real(&bone->props, ufbxi_Size, unit) / unit;
+	if (scene->metadata.bone_prop_limb_length_relative) {
+		bone->relative_length = ufbxi_find_real(&bone->props, ufbxi_LimbLength, 1.0f);
+	} else {
+		bone->relative_length = 1.0f;
+	}
 }
 
 ufbxi_noinline static void ufbxi_update_skin_cluster(ufbx_skin_cluster *cluster)
@@ -9158,7 +9183,7 @@ static void ufbxi_update_scene(ufbx_scene *scene)
 	}
 
 	ufbxi_for_ptr_list(ufbx_bone, p_bone, scene->bones) {
-		ufbxi_update_bone(*p_bone);
+		ufbxi_update_bone(scene, *p_bone);
 	}
 
 	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
@@ -9343,7 +9368,6 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_check(ufbxi_begin_parse(uc));
 	ufbxi_check(ufbxi_read_root(uc));
 	ufbxi_check(ufbxi_finalize_scene(uc));
-	uc->scene.metadata.ktime_to_sec = uc->ktime_to_sec;
 
 	ufbxi_update_scene(&uc->scene);
 	ufbxi_update_scene_settings(&uc->scene.settings);

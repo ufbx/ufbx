@@ -346,3 +346,42 @@ UFBXT_FILE_TEST(maya_dq_weights)
 	ufbxt_check_frame(scene, err, false, "maya_dq_weights_18", NULL, 18.0/24.0);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_bone_radius)
+#if UFBXT_IMPL
+{
+	for (size_t i = 1; i < scene->nodes.count; i++) {
+		ufbx_node *node = scene->nodes.data[i];
+		ufbxt_assert(strstr(node->name.data, "joint"));
+		ufbxt_assert(node->bone);
+		ufbxt_assert_close_real(err, node->bone->radius, (ufbx_real)i * 0.2f);
+		ufbxt_assert_close_real(err, node->bone->relative_length, 1.0f);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(blender_279_bone_radius)
+#if UFBXT_IMPL
+{
+	ufbx_node *armature = ufbx_find_node(scene, "Armature");
+	ufbx_node *node = armature;
+
+	for (size_t i = 0; node->children.count > 0; i++) {
+		node = node->children.data[0];
+
+		ufbxt_assert(strstr(node->name.data, "Bone"));
+		ufbxt_assert(node->bone);
+
+		// Blender end bones have some weird scaling factor
+		// TODO: Add quirks mode for this?
+		if (strstr(node->name.data, "end")) continue;
+
+		if (scene->metadata.ascii) {
+			ufbxt_assert_close_real(err, node->bone->radius, 1.0f);
+		} else {
+			ufbxt_assert_close_real(err, node->bone->radius, (ufbx_real)(i + 1) * 0.1f);
+		}
+		ufbxt_assert_close_real(err, node->bone->relative_length, 1.0f);
+	}
+}
+#endif

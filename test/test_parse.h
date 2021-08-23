@@ -84,7 +84,8 @@ UFBXT_FILE_TEST(maya_node_attribute_zoo)
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_BONE);
 	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_BONE);
 	ufbxt_assert(&node->bone->element == node->attrib);
-	ufbxt_assert_close_real(err, node->bone->length, 16.666667f); // TODO: /100?
+	ufbxt_assert_close_real(err, node->bone->radius, 0.5f);
+	ufbxt_assert_close_real(err, node->bone->relative_length, 1.0f);
 
 	node = ufbx_find_node(scene, "Camera");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_CAMERA);

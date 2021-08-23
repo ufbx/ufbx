@@ -829,10 +829,16 @@ struct ufbx_camera {
 	ufbx_real squeeze_ratio;       // < Anamoprhic stretch ratio
 };
 
+// Bone attached to a `ufbx_node`, provides the logical length of the bone
+// but most interesting information is directly in `ufbx_node`.
 struct ufbx_bone {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 
-	ufbx_real length;
+	// Visual radius of the bone
+	ufbx_real radius;
+
+	// Length of the bone relative to the distance between two nodes
+	ufbx_real relative_length;
 };
 
 struct ufbx_empty {
@@ -1408,6 +1414,8 @@ typedef struct ufbx_metadata {
 
 	size_t element_buffer_size;
 
+	ufbx_real bone_prop_size_unit;
+	bool bone_prop_limb_length_relative;
 	double ktime_to_sec;
 } ufbx_metadata;
 
