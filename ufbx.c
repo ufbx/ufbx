@@ -5284,14 +5284,14 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_truncated_array(ufbxi_conte
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_uv_sets(ufbxi_context *uc, ufbx_uv_set *sets, size_t count)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_uv_sets(ufbxi_context *uc, ufbx_uv_set *sets, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_uv_set)));
 	ufbxi_macro_stable_sort(ufbx_uv_set, 32, sets, uc->tmp_arr, count, ( a->index < b->index ));
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_color_sets(ufbxi_context *uc, ufbx_color_set *sets, size_t count)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_color_sets(ufbxi_context *uc, ufbx_color_set *sets, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_color_set)));
 	ufbxi_macro_stable_sort(ufbx_color_set, 32, sets, uc->tmp_arr, count, ( a->index < b->index ));
@@ -5304,14 +5304,14 @@ typedef struct ufbxi_blend_offset {
 	ufbx_vec3 normal_offset;
 } ufbxi_blend_offset;
 
-ufbxi_nodiscard static int ufbxi_sort_blend_offsets(ufbxi_context *uc, ufbxi_blend_offset *offsets, size_t count)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_blend_offsets(ufbxi_context *uc, ufbxi_blend_offset *offsets, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbxi_blend_offset)));
 	ufbxi_macro_stable_sort(ufbxi_blend_offset, 16, offsets, uc->tmp_arr, count, ( a->vertex < b->vertex ));
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_shape(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_shape(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbxi_node *node_vertices = ufbxi_find_child(node, ufbxi_Vertices);
 	ufbxi_node *node_indices = ufbxi_find_child(node, ufbxi_Indexes);
@@ -5370,7 +5370,7 @@ ufbxi_nodiscard static int ufbxi_read_shape(ufbxi_context *uc, ufbxi_node *node,
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_synthetic_blend_shapes(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_synthetic_blend_shapes(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_blend_deformer *deformer = NULL;
 	uint64_t deformer_fbx_id = 0;
@@ -5433,7 +5433,7 @@ ufbxi_nodiscard static int ufbxi_read_synthetic_blend_shapes(ufbxi_context *uc, 
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	// Only read polygon meshes, ignore eg. NURBS without error
 	ufbxi_node *node_vertices = ufbxi_find_child(node, ufbxi_Vertices);
@@ -5817,7 +5817,7 @@ ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, 
 	return 1;
 }
 
-static ufbx_nurbs_edges ufbxi_read_nurbs_edges(const char *form)
+ufbxi_noinline static ufbx_nurbs_edges ufbxi_read_nurbs_edges(const char *form)
 {
 	if (form == ufbxi_Open) {
 		return UFBX_NURBS_OPEN;
@@ -5829,7 +5829,7 @@ static ufbx_nurbs_edges ufbxi_read_nurbs_edges(const char *form)
 	return UFBX_NURBS_OPEN;
 }
 
-ufbxi_nodiscard static int ufbxi_read_nurbs_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_nurbs_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_nurbs_curve *nurbs = ufbxi_push_element(uc, info, ufbx_nurbs_curve, UFBX_ELEMENT_NURBS_CURVE);
 	ufbxi_check(nurbs);
@@ -5856,7 +5856,7 @@ ufbxi_nodiscard static int ufbxi_read_nurbs_curve(ufbxi_context *uc, ufbxi_node 
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_nurbs_surface(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_nurbs_surface(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_nurbs_surface *nurbs = ufbxi_push_element(uc, info, ufbx_nurbs_surface, UFBX_ELEMENT_NURBS_SURFACE);
 	ufbxi_check(nurbs);
@@ -5888,7 +5888,7 @@ ufbxi_nodiscard static int ufbxi_read_nurbs_surface(ufbxi_context *uc, ufbxi_nod
 	return 1;
 }
 
-static void ufbxi_read_transform_matrix(ufbx_matrix *m, ufbx_real *data)
+ufbxi_noinline static void ufbxi_read_transform_matrix(ufbx_matrix *m, ufbx_real *data)
 {
 	m->m00 = data[ 0]; m->m10 = data[ 1]; m->m20 = data[ 2];
 	m->m01 = data[ 4]; m->m11 = data[ 5]; m->m21 = data[ 6];
@@ -5896,7 +5896,7 @@ static void ufbxi_read_transform_matrix(ufbx_matrix *m, ufbx_real *data)
 	m->m03 = data[12]; m->m13 = data[13]; m->m23 = data[14];
 }
 
-ufbxi_nodiscard static int ufbxi_read_skin(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_skin(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_skin_deformer *skin = ufbxi_push_element(uc, info, ufbx_skin_deformer, UFBX_ELEMENT_SKIN_DEFORMER);
 	ufbxi_check(skin);
@@ -5926,7 +5926,7 @@ ufbxi_nodiscard static int ufbxi_read_skin(ufbxi_context *uc, ufbxi_node *node, 
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_skin_cluster(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_skin_cluster(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_skin_cluster *cluster = ufbxi_push_element(uc, info, ufbx_skin_cluster, UFBX_ELEMENT_SKIN_CLUSTER);
 	ufbxi_check(cluster);
@@ -5954,7 +5954,7 @@ ufbxi_nodiscard static int ufbxi_read_skin_cluster(ufbxi_context *uc, ufbxi_node
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_blend_channel(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_blend_channel(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_blend_channel *channel = ufbxi_push_element(uc, info, ufbx_blend_channel, UFBX_ELEMENT_BLEND_CHANNEL);
 	ufbxi_check(channel);
@@ -5970,7 +5970,7 @@ ufbxi_nodiscard static int ufbxi_read_blend_channel(ufbxi_context *uc, ufbxi_nod
 	return 1;
 }
 
-static ufbxi_forceinline float ufbxi_solve_auto_tangent(double prev_time, double time, double next_time, ufbx_real prev_value, ufbx_real value, ufbx_real next_value, float weight_left, float weight_right)
+ufbxi_noinline static ufbxi_forceinline float ufbxi_solve_auto_tangent(double prev_time, double time, double next_time, ufbx_real prev_value, ufbx_real value, ufbx_real next_value, float weight_left, float weight_right)
 {
 	// In between two keyframes: Set the initial slope to be the difference between
 	// the two keyframes. Prevent overshooting by clamping the slope in case either
@@ -5998,7 +5998,7 @@ static ufbxi_forceinline float ufbxi_solve_auto_tangent(double prev_time, double
 	return (float)(slope_sign * abs_slope);
 }
 
-ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_anim_curve *curve = ufbxi_push_element(uc, info, ufbx_anim_curve, UFBX_ELEMENT_ANIM_CURVE);
 	ufbxi_check(curve);
@@ -6187,7 +6187,7 @@ ufbxi_nodiscard static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_n
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_material(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_material(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_material *material = ufbxi_push_element(uc, info, ufbx_material, UFBX_ELEMENT_MATERIAL);
 	ufbxi_check(material);
@@ -6199,7 +6199,7 @@ ufbxi_nodiscard static int ufbxi_read_material(ufbxi_context *uc, ufbxi_node *no
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_texture(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_texture(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_texture *texture = ufbxi_push_element(uc, info, ufbx_texture, UFBX_ELEMENT_TEXTURE);
 	ufbxi_check(texture);
@@ -6215,7 +6215,7 @@ ufbxi_nodiscard static int ufbxi_read_texture(ufbxi_context *uc, ufbxi_node *nod
 	return 1;
 }
 
-static void ufbxi_decode_base64(char *dst, const char *src, size_t src_length)
+ufbxi_noinline static void ufbxi_decode_base64(char *dst, const char *src, size_t src_length)
 {
 	uint8_t table[256] = { 0 };
 	for (char c = 'A'; c <= 'Z'; c++) table[(size_t)c] = (uint8_t)(c - 'A');
@@ -6237,7 +6237,7 @@ static void ufbxi_decode_base64(char *dst, const char *src, size_t src_length)
 	}
 }
 
-ufbxi_nodiscard static int ufbxi_read_video(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_video(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_video *video = ufbxi_push_element(uc, info, ufbx_video, UFBX_ELEMENT_VIDEO);
 	ufbxi_check(video);
@@ -6274,7 +6274,7 @@ ufbxi_nodiscard static int ufbxi_read_video(ufbxi_context *uc, ufbxi_node *node,
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_pose(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_pose(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type)
 {
 	ufbx_pose *pose = ufbxi_push_element(uc, info, ufbx_pose, UFBX_ELEMENT_POSE);
 	ufbxi_check(pose);
@@ -6316,7 +6316,7 @@ ufbxi_nodiscard static int ufbxi_read_pose(ufbxi_context *uc, ufbxi_node *node, 
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_shader_prop_bindings(ufbxi_context *uc, ufbx_shader_prop_binding *bindings, size_t count)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_shader_prop_bindings(ufbxi_context *uc, ufbx_shader_prop_binding *bindings, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_shader_prop_binding)));
 	ufbxi_macro_stable_sort(ufbx_shader_prop_binding, 32, bindings, uc->tmp_arr, count,
@@ -6325,7 +6325,7 @@ ufbxi_nodiscard static int ufbxi_sort_shader_prop_bindings(ufbxi_context *uc, uf
 }
 
 
-ufbxi_nodiscard static int ufbxi_read_binding_table(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_binding_table(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_shader_binding *bindings = ufbxi_push_element(uc, info, ufbx_shader_binding, UFBX_ELEMENT_SHADER_BINDING);
 	ufbxi_check(bindings);
@@ -6364,7 +6364,7 @@ ufbxi_nodiscard static int ufbxi_read_binding_table(ufbxi_context *uc, ufbxi_nod
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type)
 {
 	ufbxi_element_info attrib_info = *info;
 
@@ -7041,7 +7041,7 @@ ufbxi_forceinline static bool ufbxi_cmp_name_element_less_ref(const ufbx_name_el
 	return a->type < type;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_name_elements(ufbxi_context *uc, ufbx_name_element *name_elems, size_t count)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_name_elements(ufbxi_context *uc, ufbx_name_element *name_elems, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_name_element)));
 	ufbxi_macro_stable_sort(ufbx_name_element, 32, name_elems, uc->tmp_arr, count,
@@ -7061,7 +7061,7 @@ ufbxi_forceinline static bool ufbxi_cmp_node_less(ufbx_node *a, ufbx_node *b)
 	return a->element.id < b->element.id;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_node_ptrs(ufbxi_context *uc, ufbx_node **nodes, size_t count)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_node_ptrs(ufbxi_context *uc, ufbx_node **nodes, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_node*)));
 	ufbxi_macro_stable_sort(ufbx_node*, 32, nodes, uc->tmp_arr, count,
@@ -7069,14 +7069,14 @@ ufbxi_nodiscard static int ufbxi_sort_node_ptrs(ufbxi_context *uc, ufbx_node **n
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_cmp_tmp_material_texture_less(const ufbxi_tmp_material_texture *a, const ufbxi_tmp_material_texture *b)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_cmp_tmp_material_texture_less(const ufbxi_tmp_material_texture *a, const ufbxi_tmp_material_texture *b)
 {
 	if (a->material_id != b->material_id) return a->material_id < b->material_id;
 	if (a->texture_id != b->texture_id) return a->texture_id < b->texture_id;
 	return ufbxi_str_less(a->prop_name, b->prop_name);
 }
 
-ufbxi_nodiscard static int ufbxi_sort_tmp_material_textures(ufbxi_context *uc, ufbxi_tmp_material_texture *mat_texs, size_t count)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_tmp_material_textures(ufbxi_context *uc, ufbxi_tmp_material_texture *mat_texs, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbxi_tmp_material_texture)));
 	ufbxi_macro_stable_sort(ufbxi_tmp_material_texture, 32, mat_texs, uc->tmp_arr, count,
@@ -7097,7 +7097,7 @@ ufbxi_forceinline static bool ufbxi_cmp_connection_less(ufbx_connection *a, ufbx
 	return cmp < 0;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_connections(ufbxi_context *uc, ufbx_connection *connections, size_t count, size_t index)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_connections(ufbxi_context *uc, ufbx_connection *connections, size_t count, size_t index)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_connection)));
 	ufbxi_macro_stable_sort(ufbx_connection, 32, connections, uc->tmp_arr, count, ( ufbxi_cmp_connection_less(a, b, index) ));
@@ -7116,7 +7116,7 @@ static uint64_t ufbxi_find_attribute_fbx_id(ufbxi_context *uc, uint64_t node_fbx
 	return node_fbx_id;
 }
 
-ufbxi_nodiscard static int ufbxi_resolve_connections(ufbxi_context *uc)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_resolve_connections(ufbxi_context *uc)
 {
 	size_t num_connections = uc->tmp_connections.num_items;
 	ufbxi_tmp_connection *tmp_connections = ufbxi_make_array(&uc->tmp_connections, ufbxi_tmp_connection, num_connections);
@@ -7165,7 +7165,7 @@ ufbxi_nodiscard static int ufbxi_resolve_connections(ufbxi_context *uc)
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
 {
 	ufbx_connection *conn_src = uc->scene.connections_src.data;
 	ufbx_connection *conn_src_end = conn_src + uc->scene.connections_src.count;
@@ -7275,7 +7275,7 @@ ufbxi_nodiscard static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *uc)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *uc)
 {
 	size_t num_nodes = uc->tmp_node_ids.num_items;
 	uint32_t *node_ids = ufbxi_make_array(&uc->tmp_node_ids, uint32_t, num_nodes);
@@ -7344,7 +7344,7 @@ ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *uc)
 }
 
 
-ufbxi_nodiscard static ufbx_connection_list ufbxi_find_dst_connections(ufbx_element *element, const char *prop)
+ufbxi_noinline ufbxi_nodiscard static ufbx_connection_list ufbxi_find_dst_connections(ufbx_element *element, const char *prop)
 {
 	if (!prop) prop = ufbxi_empty_char;
 
@@ -7363,7 +7363,7 @@ ufbxi_nodiscard static ufbx_connection_list ufbxi_find_dst_connections(ufbx_elem
 	return result;
 }
 
-ufbxi_nodiscard static ufbx_connection_list ufbxi_find_src_connections(ufbx_element *element, const char *prop)
+ufbxi_noinline ufbxi_nodiscard static ufbx_connection_list ufbxi_find_src_connections(ufbx_element *element, const char *prop)
 {
 	if (!prop) prop = ufbxi_empty_char;
 
@@ -7387,7 +7387,7 @@ ufbxi_nodiscard static ufbx_element *ufbxi_get_element_node(ufbx_element *elemen
 	return element && element->instances.count > 0 ? &element->instances.data[0]->element : NULL;
 }
 
-ufbxi_nodiscard static int ufbxi_fetch_dst_elements(ufbxi_context *uc, void *p_dst_list, ufbx_element *element, bool search_node, const char *prop, ufbx_element_type src_type)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_fetch_dst_elements(ufbxi_context *uc, void *p_dst_list, ufbx_element *element, bool search_node, const char *prop, ufbx_element_type src_type)
 {
 	size_t num_elements = 0;
 
@@ -7409,7 +7409,7 @@ ufbxi_nodiscard static int ufbxi_fetch_dst_elements(ufbxi_context *uc, void *p_d
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_fetch_src_elements(ufbxi_context *uc, void *p_dst_list, ufbx_element *element, bool search_node, const char *prop, ufbx_element_type dst_type)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_fetch_src_elements(ufbxi_context *uc, void *p_dst_list, ufbx_element *element, bool search_node, const char *prop, ufbx_element_type dst_type)
 {
 	size_t num_elements = 0;
 
@@ -7431,7 +7431,7 @@ ufbxi_nodiscard static int ufbxi_fetch_src_elements(ufbxi_context *uc, void *p_d
 	return 1;
 }
 
-ufbxi_nodiscard static ufbx_element *ufbxi_fetch_dst_element(ufbx_element *element, bool search_node, const char *prop, ufbx_element_type src_type)
+ufbxi_noinline ufbxi_nodiscard static ufbx_element *ufbxi_fetch_dst_element(ufbx_element *element, bool search_node, const char *prop, ufbx_element_type src_type)
 {
 	do {
 		ufbx_connection_list conns = ufbxi_find_dst_connections(element, prop);
@@ -7445,7 +7445,7 @@ ufbxi_nodiscard static ufbx_element *ufbxi_fetch_dst_element(ufbx_element *eleme
 	return NULL;
 }
 
-ufbxi_nodiscard static ufbx_element *ufbxi_fetch_src_element(ufbx_element *element, bool search_node, const char *prop, ufbx_element_type dst_type)
+ufbxi_noinline ufbxi_nodiscard static ufbx_element *ufbxi_fetch_src_element(ufbx_element *element, bool search_node, const char *prop, ufbx_element_type dst_type)
 {
 	do {
 		ufbx_connection_list conns = ufbxi_find_src_connections(element, prop);
@@ -7459,7 +7459,7 @@ ufbxi_nodiscard static ufbx_element *ufbxi_fetch_src_element(ufbx_element *eleme
 	return NULL;
 }
 
-ufbxi_nodiscard static int ufbxi_fetch_textures(ufbxi_context *uc, ufbx_material_texture_list *list, ufbx_element *element, bool search_node)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_fetch_textures(ufbxi_context *uc, ufbx_material_texture_list *list, ufbx_element *element, bool search_node)
 {
 	size_t num_textures = 0;
 
@@ -7483,7 +7483,7 @@ ufbxi_nodiscard static int ufbxi_fetch_textures(ufbxi_context *uc, ufbx_material
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_fetch_mesh_materials(ufbxi_context *uc, ufbx_mesh_material_list *list, ufbx_element *element, bool search_node)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_fetch_mesh_materials(ufbxi_context *uc, ufbx_mesh_material_list *list, ufbx_element *element, bool search_node)
 {
 	size_t num_materials = 0;
 
@@ -7505,7 +7505,7 @@ ufbxi_nodiscard static int ufbxi_fetch_mesh_materials(ufbxi_context *uc, ufbx_me
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_fetch_deformers(ufbxi_context *uc,  ufbx_element_list *list, ufbx_element *element, bool search_node)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_fetch_deformers(ufbxi_context *uc,  ufbx_element_list *list, ufbx_element *element, bool search_node)
 {
 	size_t num_deformers = 0;
 
@@ -7527,7 +7527,7 @@ ufbxi_nodiscard static int ufbxi_fetch_deformers(ufbxi_context *uc,  ufbx_elemen
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_fetch_blend_keyframes(ufbxi_context *uc, ufbx_blend_keyframe_list *list, ufbx_element *element)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_fetch_blend_keyframes(ufbxi_context *uc, ufbx_blend_keyframe_list *list, ufbx_element *element)
 {
 	size_t num_keyframes = 0;
 
@@ -7554,7 +7554,7 @@ static ufbxi_forceinline bool ufbxi_prop_connection_less(const ufbx_connection *
 	return a->src_prop.length == 0;
 }
 
-ufbxi_nodiscard static ufbx_connection *ufbxi_find_prop_connection(const ufbx_element *element, const char *prop)
+ufbxi_noinline ufbxi_nodiscard static ufbx_connection *ufbxi_find_prop_connection(const ufbx_element *element, const char *prop)
 {
 	if (!prop) prop = ufbxi_empty_char;
 
@@ -7584,28 +7584,28 @@ ufbxi_nodiscard static bool ufbxi_cmp_anim_prop_less(const ufbx_anim_prop *a, co
 	return ufbxi_str_less(a->prop_name, b->prop_name);
 }
 
-ufbxi_nodiscard static int ufbxi_sort_anim_props(ufbxi_context *uc, ufbx_anim_prop *aprops, size_t count)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_anim_props(ufbxi_context *uc, ufbx_anim_prop *aprops, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_anim_prop)));
 	ufbxi_macro_stable_sort(ufbx_anim_prop, 32, aprops, uc->tmp_arr, count, ( ufbxi_cmp_anim_prop_less(a, b) ));
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_material_textures(ufbxi_context *uc, ufbx_material_texture *textures, size_t count)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_material_textures(ufbxi_context *uc, ufbx_material_texture *textures, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_material_texture)));
 	ufbxi_macro_stable_sort(ufbx_material_texture, 32, textures, uc->tmp_arr, count, ( ufbxi_str_less(a->prop_name, b->prop_name) ));
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_videos_by_filename(ufbxi_context *uc, ufbx_video **videos, size_t count)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_videos_by_filename(ufbxi_context *uc, ufbx_video **videos, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_video*)));
 	ufbxi_macro_stable_sort(ufbx_video*, 32, videos, uc->tmp_arr, count, ( ufbxi_str_less((*a)->filename, (*b)->filename) ));
 	return 1;
 }
 
-ufbxi_nodiscard static ufbx_anim_prop *ufbxi_find_anim_prop_start(ufbx_anim_layer *layer, const ufbx_element *element)
+ufbxi_noinline ufbxi_nodiscard static ufbx_anim_prop *ufbxi_find_anim_prop_start(ufbx_anim_layer *layer, const ufbx_element *element)
 {
 	size_t index = SIZE_MAX;
 	ufbxi_macro_lower_bound_eq(ufbx_anim_prop, 16, &index, layer->anim_props.data, 0, layer->anim_props.count,
@@ -7613,7 +7613,7 @@ ufbxi_nodiscard static ufbx_anim_prop *ufbxi_find_anim_prop_start(ufbx_anim_laye
 	return index != SIZE_MAX ? &layer->anim_props.data[index] : NULL;
 }
 
-ufbxi_nodiscard static int ufbxi_sort_skin_weights(ufbxi_context *uc, ufbx_skin_deformer *skin)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_skin_weights(ufbxi_context *uc, ufbx_skin_deformer *skin)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, skin->max_weights_per_vertex * sizeof(ufbx_skin_weight)));
 
@@ -7683,7 +7683,7 @@ static ufbxi_forceinline int64_t ufbxi_find_enum(const ufbx_props *props, const 
 	}
 }
 
-static bool ufbxi_matrix_all_zero(const ufbx_matrix *matrix)
+ufbxi_noinline static bool ufbxi_matrix_all_zero(const ufbx_matrix *matrix)
 {
 	for (size_t i = 0; i < 12; i++) {
 		if (matrix->v[i] != 0.0f) return false;
@@ -7896,7 +7896,7 @@ static const ufbxi_shader_mapping_list ufbxi_shader_pbr_mappings[] = {
 
 ufbx_static_assert(shader_pbr_mapping_list, ufbxi_arraycount(ufbxi_shader_pbr_mappings) == UFBX_NUM_SHADER_TYPES);
 
-static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufbx_material_map *maps, ufbx_shader *shader, const ufbxi_shader_mapping *mappings, size_t count)
+ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufbx_material_map *maps, ufbx_shader *shader, const ufbxi_shader_mapping *mappings, size_t count)
 {
 	ufbxi_for(const ufbxi_shader_mapping, mapping, mappings, count) {
 		ufbx_string name = ufbx_find_shader_prop_len(shader, mapping->prop.data, mapping->prop.length);
@@ -7918,7 +7918,7 @@ static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufbx_material_map 
 	}
 }
 
-static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *material)
+ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *material)
 {
 	(void)scene;
 
@@ -7934,7 +7934,7 @@ static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *material)
 	ufbxi_fetch_mapping_maps(material, material->pbr.maps, shader, list.data, list.count);
 }
 
-ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	size_t num_elements = uc->num_elements;
 
@@ -10213,7 +10213,7 @@ typedef struct {
 
 } ufbxi_subdivide_context;
 
-static int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufbx_vertex_attrib *layer, ufbx_subdivision_boundary boundary)
+ufbxi_noinline static int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufbx_vertex_attrib *layer, ufbx_subdivision_boundary boundary)
 {
 	if (!layer->data) return 1;
 
@@ -10551,7 +10551,7 @@ static int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufbx_vertex_attrib
 	return 1;
 }
 
-static ufbxi_nodiscard int ufbxi_subdivide_mesh_level(ufbxi_subdivide_context *sc)
+ufbxi_noinline static ufbxi_nodiscard int ufbxi_subdivide_mesh_level(ufbxi_subdivide_context *sc)
 {
 	const ufbx_mesh *mesh = &sc->src_mesh;
 	ufbx_mesh *result = &sc->dst_mesh;
@@ -10770,7 +10770,7 @@ static ufbxi_nodiscard int ufbxi_subdivide_mesh_level(ufbxi_subdivide_context *s
 	return 1;
 }
 
-static ufbxi_nodiscard int ufbxi_subdivide_mesh_imp(ufbxi_subdivide_context *sc, size_t level)
+ufbxi_noinline static ufbxi_nodiscard int ufbxi_subdivide_mesh_imp(ufbxi_subdivide_context *sc, size_t level)
 {
 	if (sc->opts.boundary == UFBX_SUBDIVISION_BOUNDARY_DEFAULT) {
 		sc->opts.boundary = sc->src_mesh.subdivision_boundary;
@@ -10846,7 +10846,7 @@ static ufbxi_nodiscard int ufbxi_subdivide_mesh_imp(ufbxi_subdivide_context *sc,
 	return 1;
 }
 
-static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *user_opts, ufbx_error *p_error)
+ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *user_opts, ufbx_error *p_error)
 {
 	ufbxi_subdivide_context sc = { 0 };
 	if (user_opts) {
