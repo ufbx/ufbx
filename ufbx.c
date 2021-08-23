@@ -5970,7 +5970,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_blend_channel(ufbxi_context
 	return 1;
 }
 
-ufbxi_noinline static ufbxi_forceinline float ufbxi_solve_auto_tangent(double prev_time, double time, double next_time, ufbx_real prev_value, ufbx_real value, ufbx_real next_value, float weight_left, float weight_right)
+static ufbxi_forceinline float ufbxi_solve_auto_tangent(double prev_time, double time, double next_time, ufbx_real prev_value, ufbx_real value, ufbx_real next_value, float weight_left, float weight_right)
 {
 	// In between two keyframes: Set the initial slope to be the difference between
 	// the two keyframes. Prevent overshooting by clamping the slope in case either
