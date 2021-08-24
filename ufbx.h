@@ -1783,6 +1783,7 @@ struct ufbx_inflate_input {
 	// (optional) Progress reporting
 	ufbx_progress_fn *progress_fn;
 	void *progress_user;
+	uint64_t progress_interval_hint; // < Bytes between progress report calls
 
 	// (optional) Change the progress scope
 	uint64_t progress_size_before;
@@ -1829,6 +1830,7 @@ typedef struct ufbx_load_opts {
 	// Progress reporting
 	ufbx_progress_fn *progress_fn;
 	void *progress_user;
+	uint64_t progress_interval_hint; // < Bytes between progress report calls
 
 } ufbx_load_opts;
 
@@ -2018,9 +2020,9 @@ ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t ind
 ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }
 ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->indices[index]]; }
 
-#endif
-
 #ifdef __cplusplus
 }
+#endif
+
 #endif
 
