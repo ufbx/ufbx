@@ -342,8 +342,8 @@ typedef struct {
 
 	// Amount of bytes read before the current chunk
 	size_t num_read_before_chunk;
-	size_t progress_bias;
-	size_t progress_total;
+	uint64_t progress_bias;
+	uint64_t progress_total;
 	size_t progress_interval;
 
 	uint64_t bits; // < Buffered bits
@@ -2598,7 +2598,7 @@ typedef struct {
 
 	// Call progress function periodically
 	ptrdiff_t progress_timer;
-	size_t progress_bytes_total;
+	uint64_t progress_bytes_total;
 	size_t progress_interval;
 
 	ufbxi_ascii ascii;
@@ -11341,8 +11341,10 @@ ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_len, const 
 	return scene;
 }
 
-ufbx_scene *ufbx_load_stdio(void *file, const ufbx_load_opts *opts, ufbx_error *error)
+ufbx_scene *ufbx_load_stdio(void *file_void, const ufbx_load_opts *opts, ufbx_error *error)
 {
+	FILE *file = (FILE*)file_void;
+
 	ufbxi_context uc = { 0 };
 	uc.read_fn = &ufbxi_file_read;
 	uc.read_user = file;
