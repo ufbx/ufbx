@@ -363,9 +363,20 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 static void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
 {
 	for (size_t i = 0; i < material->textures.count; i++) {
-		ufbxt_check_string(material->textures.data[i].prop_name);
+		ufbxt_check_string(material->textures.data[i].material_prop);
+		ufbxt_check_string(material->textures.data[i].shader_prop);
 		ufbxt_check_element_ptr(scene, material->textures.data[i].texture);
 	}
+
+	for (size_t i = 0; i < UFBX_NUM_MATERIAL_FBX_MAPS; i++) {
+		ufbxt_check_element_ptr(scene, material->fbx.maps[i].texture);
+	}
+
+	for (size_t i = 0; i < UFBX_NUM_MATERIAL_PBR_MAPS; i++) {
+		ufbxt_check_element_ptr(scene, material->pbr.maps[i].texture);
+	}
+
+	ufbxt_check_element_ptr(scene, material->shader);
 }
 
 static void ufbxt_check_texture(ufbx_scene *scene, ufbx_texture *texture)

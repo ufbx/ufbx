@@ -1057,31 +1057,48 @@ struct ufbx_cache_deformer {
 
 // -- Materials
 
+// Material property, either specified with a constant value or a mapped texture
 typedef struct ufbx_material_map {
+	// Constant value, defined if `has_value == true`, for scalar values use `value.x`
+	bool has_value;
 	ufbx_vec3 value;
 	int64_t value_int;
-	bool has_value;
+
+	// Texture if connected, otherwise `NULL`
 	ufbx_texture *texture;
 } ufbx_material_map;
 
+// Texture attached to an FBX property
 typedef struct ufbx_material_texture {
-	ufbx_string prop_name;
-	ufbx_texture *texture;
+	ufbx_string material_prop; // < Name of the property in `ufbx_material.props`
+	ufbx_string shader_prop;   // < Shader-specific property mapping name
+	ufbx_texture *texture;     // < The attached texture
 } ufbx_material_texture;
 
 UFBX_LIST_TYPE(ufbx_material_texture_list, ufbx_material_texture);
 
+// Shading model type
 typedef enum ufbx_shader_type {
+	// Unknown shading model
 	UFBX_SHADER_UNKNOWN,
+	// FBX builtin diffuse material
 	UFBX_SHADER_FBX_LAMBERT,
+	// FBX builtin diffuse+specular material
 	UFBX_SHADER_FBX_PHONG,
+	// Open Shading Language standard surface
+	// https://github.com/Autodesk/standard-surface
 	UFBX_SHADER_OSL_STANDARD,
+	// Arnold standard surface
+	// https://docs.arnoldrenderer.com/display/A5AFMUG/Standard+Surface
 	UFBX_SHADER_ARNOLD,
+	// Variation of the FBX phong shader that can recover PBR properties like
+	// `metallic` or `roughness` from the FBX non-physical values.
 	UFBX_SHADER_BLENDER_PHONG,
 
 	UFBX_NUM_SHADER_TYPES,
 } ufbx_shader_type;
 
+// FBX builtin material properties, matches maps in `ufbx_material_fbx_maps`
 typedef enum ufbx_material_fbx_map {
 	UFBX_MATERIAL_FBX_DIFFUSE_FACTOR,
 	UFBX_MATERIAL_FBX_DIFFUSE_COLOR,
@@ -1106,6 +1123,7 @@ typedef enum ufbx_material_fbx_map {
 	UFBX_NUM_MATERIAL_FBX_MAPS,
 } ufbx_material_fbx_map;
 
+// Known PBR material properties, matches maps in `ufbx_material_pbr_maps`
 typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_BASE_FACTOR,
 	UFBX_MATERIAL_PBR_BASE_COLOR,
@@ -1248,55 +1266,82 @@ typedef struct ufbx_material_pbr_maps {
 	};
 } ufbx_material_pbr_maps;
 
+// Surface material properties such as color, roughness, etc. Each property may
+// be optionally bound to an `ufbx_texture`.
 struct ufbx_material {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
-	ufbx_shader *shader;
-	ufbx_shader_type shader_type;
-	ufbx_string shading_model_name;
-
+	// FBX builtin properties
+	// NOTE: These may be empty if the material is using a custom shader
 	ufbx_material_fbx_maps fbx;
+
+	// PBR material properties, defined for all shading models but may be
+	// somewhat approximate if `shader == NULL`.
 	ufbx_material_pbr_maps pbr;
 
-	ufbx_material_texture_list textures; // < Sorted by `prop_name`
+	// Shading information
+	ufbx_shader_type shader_type;   // < Always defined
+	ufbx_shader *shader;            // < Optional extended shader information
+	ufbx_string shading_model_name; // < Often one of `{ "lambert", "phong", "unknown" }`
+
+	// All textures attached to the material, if you want specific maps if might be
+	// more convenient to use eg. `fbx.diffuse_color.texture` or `pbr.base_color.texture`
+	ufbx_material_texture_list textures; // < Sorted by `material_prop`
 };
 
+// Texture that controls material appearance
 struct ufbx_texture {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
+	// Paths to the resource
 	ufbx_string filename;
 	ufbx_string relative_filename;
 
+	// Optional embedded content blob, eg. raw .png format data
 	const void *content;
 	size_t content_size;
 
+	// Optional video texture
 	ufbx_video *video;
 };
 
+// TODO: Video textures
 struct ufbx_video {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
+	// Paths to the resource
 	ufbx_string filename;
 	ufbx_string relative_filename;
 
+	// Optional embedded content blob
 	const void *content;
 	size_t content_size;
 };
 
+// Shader specifies a shading model and contains `ufbx_shader_binding` elements
+// that define how to interpret FBX properties in the shader.
 struct ufbx_shader {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
+	// Known shading model
 	ufbx_shader_type type;
+
+	// TODO: Expose actual properties here
+
+	// Bindings from FBX properties to the shader
+	// HINT: `ufbx_find_shader_prop()` translates shader properties to FBX properties
 	ufbx_shader_binding_list bindings;
 };
 
+// Binding from a material property to shader implementation
 typedef struct ufbx_shader_prop_binding {
-	ufbx_string shader_prop;
-	ufbx_string material_prop;
+	ufbx_string shader_prop;   // < Property name used by the shader implementation
+	ufbx_string material_prop; // < Property name inside `ufbx_material.props`
 } ufbx_shader_prop_binding;
 
 UFBX_LIST_TYPE(ufbx_shader_prop_binding_list, ufbx_shader_prop_binding);
 
+// Shader binding table
 struct ufbx_shader_binding {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
@@ -1378,10 +1423,10 @@ typedef struct ufbx_tangent {
 //
 //   (prev->time, prev->value)
 //   (prev->time + prev->dx, prev->value + prev->dy)
-//   (next->time - prev->dx, next->value - prev->dy)
+//   (next->time - next->dx, next->value - next->dy)
 //   (next->time, next->value)
 //
-// PROTIP: Use `ufbx_evaluate_curve(ufbx_anim_curve *curve, double time)` rather
+// HINT: Use `ufbx_evaluate_curve(ufbx_anim_curve *curve, double time)` rather
 // than trying to manually handle all the interpolation modes.
 typedef struct ufbx_keyframe {
 	double time;
@@ -1647,14 +1692,23 @@ typedef void ufbx_free_allocator_fn(void *user);
 // NOTE: The allocator will be stored to the loaded scene and will be called
 // again from `ufbx_free_scene()` so make sure `user` outlives that!
 typedef struct ufbx_allocator {
+
+	// Callback functions, see `typedef`s above for information
 	ufbx_alloc_fn *alloc_fn;
 	ufbx_realloc_fn *realloc_fn;
 	ufbx_free_fn *free_fn;
 	ufbx_free_allocator_fn *free_allocator_fn;
 	void *user;
 
+	// Maximum number of bytes to allocate before failing
 	size_t memory_limit;
+
+	// Maximum number of allocations to attempt before failing
 	size_t allocation_limit;
+
+	// Threshold to swap from batched allocations to individual ones
+	// NOTE: If set to `1` ufbx will allocate everything in the smallest
+	// possible chunks which may be useful for debugging (eg. ASAN)
 	size_t huge_threshold;
 
 } ufbx_allocator;
@@ -1874,7 +1928,13 @@ ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, ufbx_anim anim, double time, 
 // Materials
 
 ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const char *name, size_t name_len);
+ufbx_inline ufbx_texture *ufbx_find_prop_texture(const ufbx_material *material, const char *name) {
+	return ufbx_find_prop_texture_len(material, name, strlen(name));
+}
 ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *name, size_t name_len);
+ufbx_inline ufbx_string ufbx_find_shader_prop(const ufbx_shader *shader, const char *name) {
+	return ufbx_find_shader_prop_len(shader, name, strlen(name));
+}
 
 // Math
 

@@ -7471,7 +7471,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_fetch_textures(ufbxi_context *uc
 			if (conn->src->type == UFBX_ELEMENT_TEXTURE) {
 				ufbx_material_texture *tex = ufbxi_push(&uc->tmp_stack, ufbx_material_texture, 1);
 				ufbxi_check(tex);
-				tex->prop_name = conn->dst_prop;
+				tex->shader_prop = tex->material_prop = conn->dst_prop;
 				tex->texture = (ufbx_texture*)conn->src;
 				num_textures++;
 			}
@@ -7596,7 +7596,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_anim_props(ufbxi_context *u
 ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_material_textures(ufbxi_context *uc, ufbx_material_texture *textures, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_material_texture)));
-	ufbxi_macro_stable_sort(ufbx_material_texture, 32, textures, uc->tmp_arr, count, ( ufbxi_str_less(a->prop_name, b->prop_name) ));
+	ufbxi_macro_stable_sort(ufbx_material_texture, 32, textures, uc->tmp_arr, count, ( ufbxi_str_less(a->material_prop, b->material_prop) ));
 	return 1;
 }
 
@@ -8586,7 +8586,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 					ufbxi_check(tex);
 					ufbx_assert(prev_texture >= 0 && (size_t)prev_texture < textures.count);
 					tex->texture = textures.data[prev_texture];
-					tex->prop_name = mat_tex.prop_name;
+					tex->shader_prop = tex->material_prop = mat_tex.prop_name;
 					num_textures_in_material++;
 				}
 			}
@@ -8605,6 +8605,24 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 
 		ufbxi_check(ufbxi_sort_material_textures(uc, material->textures.data, material->textures.count));
 		ufbxi_fetch_maps(&uc->scene, material);
+
+		// Fetch `ufbx_material_texture.shader_prop` names
+		if (material->shader) {
+			ufbxi_for_ptr_list(ufbx_shader_binding, p_binding, material->shader->bindings) {
+				ufbx_shader_binding *binding = *p_binding;
+
+				ufbxi_for_list(ufbx_shader_prop_binding, prop, binding->prop_bindings) {
+					ufbx_string name = prop->material_prop;
+
+					size_t index = SIZE_MAX;
+					ufbxi_macro_lower_bound_eq(ufbx_material_texture, 4, &index, material->textures.data, 0, material->textures.count, 
+						( ufbxi_str_less(a->material_prop, name) ), ( a->material_prop.data == name.data ));
+					for (; index < material->textures.count && material->textures.data[index].shader_prop.data == name.data; index++) {
+						material->textures.data[index].shader_prop = prop->shader_prop;
+					}
+				}
+			}
+		}
 	}
 
 	// HACK: If there are multiple textures in an FBX file that use the same embedded
@@ -11444,7 +11462,7 @@ ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const ch
 
 	size_t index = SIZE_MAX;
 	ufbxi_macro_lower_bound_eq(ufbx_material_texture, 4, &index, material->textures.data, 0, material->textures.count, 
-		( ufbxi_str_less(a->prop_name, name_str) ), ( ufbxi_str_equal(a->prop_name, name_str) ));
+		( ufbxi_str_less(a->material_prop, name_str) ), ( ufbxi_str_equal(a->material_prop, name_str) ));
 	return index < SIZE_MAX ? material->textures.data[index].texture : NULL;
 }
 
