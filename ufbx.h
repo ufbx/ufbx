@@ -1735,6 +1735,7 @@ typedef enum ufbx_error_type {
 	UFBX_ERROR_ALLOCATION_LIMIT,
 	UFBX_ERROR_TRUNCATED_FILE,
 	UFBX_ERROR_IO,
+	UFBX_ERROR_CANCELLED,
 } ufbx_error_type;
 
 // Error description with detailed stack trace
@@ -1745,6 +1746,17 @@ typedef struct ufbx_error {
 	uint32_t stack_size;
 	ufbx_error_frame stack[UFBX_ERROR_STACK_MAX_DEPTH];
 } ufbx_error;
+
+// -- Progress callbacks
+
+typedef struct ufbx_progress {
+	uint64_t bytes_read;
+	uint64_t bytes_total;
+} ufbx_progress;
+
+// Called periodically with the current progress
+// Return `false` to cancel further processing
+typedef bool ufbx_progress_fn(void *user, const ufbx_progress *progress);
 
 // -- Inflate
 
@@ -1767,6 +1779,14 @@ struct ufbx_inflate_input {
 	// (optional) Streaming read function, concatenated after `data`
 	ufbx_read_fn *read_fn;
 	void *read_user;
+
+	// (optional) Progress reporting
+	ufbx_progress_fn *progress_fn;
+	void *progress_user;
+
+	// (optional) Change the progress scope
+	uint64_t progress_size_before;
+	uint64_t progress_size_after;
 };
 
 // Persistent data between `ufbx_inflate()` calls
@@ -1800,8 +1820,15 @@ typedef struct ufbx_load_opts {
 	// do bounds checking.
 	bool allow_out_of_bounds_vertex_indices;
 
+	// Estimated file size for progress reporting
+	uint64_t file_size_estimate;
+
 	// Buffer size in bytes to use for reading from files or IO callbacks
 	size_t read_buffer_size;
+
+	// Progress reporting
+	ufbx_progress_fn *progress_fn;
+	void *progress_user;
 
 } ufbx_load_opts;
 

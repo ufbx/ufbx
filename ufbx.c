@@ -10,6 +10,8 @@
 
 // -- Headers
 
+#define _FILE_OFFSET_BITS 64
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -309,6 +311,8 @@ static const uint8_t ufbxi_deflate_code_length_permutation[] = {
 	16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15,
 };
 
+#define UFBXI_DEFLATE_PROGRESS_CHUNK 4096
+
 #define UFBXI_HUFF_MAX_BITS 16
 #define UFBXI_HUFF_MAX_VALUE 288
 #define UFBXI_HUFF_FAST_BITS 9
@@ -333,22 +337,38 @@ typedef struct {
 	// or part of `buffer`.
 	const char *chunk_begin;    // < Begin of the buffer
 	const char *chunk_ptr;      // < Next bytes to read to `bits`
+	const char *chunk_yield;    // < End of data before needing to call `ufbxi_bit_yield()`
 	const char *chunk_end;      // < End of data before needing to call `ufbxi_bit_refill()`
 	const char *chunk_real_end; // < Actual end of the data buffer
 
+	// Amount of bytes read before the current chunk
+	size_t num_read_before_chunk;
+	size_t progress_bias;
+	size_t progress_total;
+
 	uint64_t bits; // < Buffered bits
 	size_t left;   // < Number of valid low bits in `bits`
+
+	// Progress tracking, maybe `NULL` it not requested
+	ufbx_progress_fn *progress_fn;
+	void *progress_user;
+
+	// When `progress_fn()` returns `false` set the `cancelled` flag and
+	// set the buffered bits to `cancel_bits`.
+	uint64_t cancel_bits;
+	bool cancelled;
 
 	char local_buffer[256];
 } ufbxi_bit_stream;
 
 typedef struct {
 	uint32_t num_symbols;
-
 	uint16_t sorted_to_sym[UFBXI_HUFF_MAX_VALUE]; // < Sorted symbol index to symbol
 	uint16_t past_max_code[UFBXI_HUFF_MAX_BITS];  // < One past maximum code value per bit length
 	int16_t code_to_sorted[UFBXI_HUFF_MAX_BITS];  // < Code to sorted symbol index per bit length
 	uint16_t fast_sym[UFBXI_HUFF_FAST_SIZE];      // < Fast symbol lookup [0:12] symbol [12:16] bits
+
+	uint32_t end_of_block_bits;
 } ufbxi_huff_tree;
 
 typedef struct {
@@ -391,6 +411,8 @@ ufbxi_bit_chunk_refill(ufbxi_bit_stream *s, const char *ptr)
 	ufbx_assert(left < 64);
 	memmove(s->buffer, ptr, left);
 
+	s->num_read_before_chunk += ptr - s->chunk_begin;
+
 	// Read more user data if the user supplied a `read_fn()`, otherwise
 	// we assume the initial data chunk is the whole input buffer.
 	if (s->read_fn) {
@@ -426,6 +448,8 @@ static void ufbxi_bit_stream_init(ufbxi_bit_stream *s, const ufbx_inflate_input 
 
 	s->read_fn = input->read_fn;
 	s->read_user = input->read_user;
+	s->progress_fn = input->progress_fn;
+	s->progress_user = input->progress_user;
 	s->chunk_begin = (const char*)input->data;
 	s->chunk_ptr = (const char*)input->data;
 	s->chunk_end = (const char*)input->data + data_size - 8;
@@ -440,6 +464,10 @@ static void ufbxi_bit_stream_init(ufbxi_bit_stream *s, const ufbx_inflate_input 
 		s->buffer = s->local_buffer;
 		s->buffer_size = sizeof(s->local_buffer);
 	}
+	s->num_read_before_chunk = 0;
+	s->progress_bias = input->progress_size_before;
+	s->progress_total = input->total_size + input->progress_size_after + input->progress_size_after;
+	s->cancelled = false;
 
 	// Clear the initial bit buffer
 	s->bits = 0;
@@ -450,12 +478,48 @@ static void ufbxi_bit_stream_init(ufbxi_bit_stream *s, const ufbx_inflate_input 
 	if (data_size < 64) {
 		ufbxi_bit_chunk_refill(s, s->chunk_begin);
 	}
+
+	if (s->progress_fn && s->chunk_end - s->chunk_ptr > UFBXI_DEFLATE_PROGRESS_CHUNK + 8) {
+		s->chunk_yield = s->chunk_ptr + UFBXI_DEFLATE_PROGRESS_CHUNK;
+	} else {
+		s->chunk_yield = s->chunk_end;
+	}
+}
+
+static ufbxi_noinline const char *
+ufbxi_bit_yield(ufbxi_bit_stream *s, const char *ptr)
+{
+	if (ptr > s->chunk_end) {
+		ptr = ufbxi_bit_chunk_refill(s, ptr);
+	}
+
+	if (s->progress_fn && s->chunk_end - s->chunk_ptr > UFBXI_DEFLATE_PROGRESS_CHUNK + 8) {
+		s->chunk_yield = s->chunk_ptr + UFBXI_DEFLATE_PROGRESS_CHUNK;
+	} else {
+		s->chunk_yield = s->chunk_end;
+	}
+
+	if (s->progress_fn) {
+		size_t num_read = s->num_read_before_chunk + (size_t)(ptr - s->chunk_begin);
+
+		ufbx_progress progress = { s->progress_bias + num_read, s->progress_total };
+		if (!s->progress_fn(s->progress_user, &progress)) {
+			// Force an end-of-block symbol when cancelled so we don't need an
+			// extra branch in the chunk decoding loop.
+			s->cancelled = true;
+			s->bits = s->cancel_bits;
+			ptr = s->local_buffer;
+			memset(s->local_buffer, 0, sizeof(s->local_buffer));
+		}
+	}
+
+	return ptr;
 }
 
 static ufbxi_forceinline void
 ufbxi_bit_refill(uint64_t *p_bits, size_t *p_left, const char **p_data, ufbxi_bit_stream *s)
 {
-	if (*p_data > s->chunk_end) {
+	if (*p_data > s->chunk_yield) {
 		*p_data = ufbxi_bit_chunk_refill(s, *p_data);
 	}
 
@@ -569,6 +633,8 @@ ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 		}
 	}
 
+	tree->end_of_block_bits = 0;
+
 	// Generate per-length sorted-to-symbol and fast lookup tables
 	uint32_t bits_index[UFBXI_HUFF_MAX_BITS] = { 0 };
 	memset(tree->sorted_to_sym, 0xff, sizeof(tree->sorted_to_sym));
@@ -591,6 +657,11 @@ ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 				ufbx_assert(tree->fast_sym[rev_code | hi << bits] == 0);
 				tree->fast_sym[rev_code | hi << bits] = fast_sym;
 			}
+		}
+
+		// Store the end-of-block code so we can interrupt decoding
+		if (i == 256) {
+			tree->end_of_block_bits = rev_code;
 		}
 	}
 
@@ -659,6 +730,7 @@ static void ufbxi_init_static_huff(ufbxi_trees *trees)
 // -4: Code 17 repeat overflow
 // -5: Code 18 repeat overflow
 // -6: Bad length code
+// -7: Cancelled
 static ufbxi_noinline ptrdiff_t
 ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *huff_code_length,
 	ufbxi_huff_tree *tree, uint32_t num_symbols)
@@ -674,6 +746,7 @@ ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *h
 	uint8_t prev = 0;
 	while (symbol_index < num_symbols) {
 		ufbxi_bit_refill(&bits, &left, &data, &dc->stream);
+		if (dc->stream.cancelled) return -7;
 
 		uint32_t inst = ufbxi_huff_decode_bits(huff_code_length, &bits, &left);
 		if (inst <= 15) {
@@ -728,6 +801,7 @@ ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	size_t left = dc->stream.left;
 	const char *data = dc->stream.chunk_ptr;
 	ufbxi_bit_refill(&bits, &left, &data, &dc->stream);
+	if (dc->stream.cancelled) return -28;
 
 	// The header contains the number of Huffman codes in each of the three trees.
 	uint32_t num_lit_lengths = 257 + (bits & 0x1f);
@@ -742,7 +816,10 @@ ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	uint8_t code_lengths[19];
 	memset(code_lengths, 0, sizeof(code_lengths));
 	for (size_t len_i = 0; len_i < num_code_lengths; len_i++) {
-		if (len_i == 14) ufbxi_bit_refill(&bits, &left, &data, &dc->stream);
+		if (len_i == 14) {
+			ufbxi_bit_refill(&bits, &left, &data, &dc->stream);
+			if (dc->stream.cancelled) return -28;
+		}
 		code_lengths[ufbxi_deflate_code_length_permutation[len_i]] = (uint32_t)bits & 0x7;
 		bits >>= 3;
 		left -= 3;
@@ -761,9 +838,9 @@ ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	err = ufbxi_huff_build(&huff_code_length, code_lengths, ufbxi_arraycount(code_lengths));
 	if (err) return -14 + 1 + err;
 	err = ufbxi_init_dynamic_huff_tree(dc, &huff_code_length, &trees->lit_length, num_lit_lengths);
-	if (err) return -16 + 1 + err;
+	if (err) return err == -7 ? -28 : -16 + 1 + err;
 	err = ufbxi_init_dynamic_huff_tree(dc, &huff_code_length, &trees->dist, num_dists);
-	if (err) return -22 + 1 + err;
+	if (err) return err == -7 ? -28 : -22 + 1 + err;
 
 	return 0;
 }
@@ -821,6 +898,7 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	const char *data = dc->stream.chunk_ptr;
 
 	for (;;) {
+		// NOTE: Cancellation handled implicitly by forcing an end-of-chunk symbol
 		ufbxi_bit_refill(&bits, &left, &data, &dc->stream);
 
 		// Decode literal/length value from input stream
@@ -922,6 +1000,7 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 // -15: Codelen Huffman Underfull
 // -16 - -21: Litlen Huffman: Overfull / Underfull / Repeat 16/17/18 overflow / Bad length code
 // -22 - -27: Distance Huffman: Overfull / Underfull / Repeat 16/17/18 overflow / Bad length code
+// -28: Cancelled
 ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain)
 {
 	ufbxi_inflate_retain_imp *ret_imp = (ufbxi_inflate_retain_imp*)retain;
@@ -938,6 +1017,7 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 	const char *data = dc.stream.chunk_ptr;
 
 	ufbxi_bit_refill(&bits, &left, &data, &dc.stream);
+	if (dc.stream.cancelled) return -28;
 
 	// Zlib header
 	{
@@ -953,6 +1033,7 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 
 	for (;;) { 
 		ufbxi_bit_refill(&bits, &left, &data, &dc.stream);
+		if (dc.stream.cancelled) return -28;
 
 		// Block header: [0:1] BFINAL [1:3] BTYPE
 		size_t header = (size_t)bits & 0x7;
@@ -1008,6 +1089,9 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 			err = ufbxi_inflate_block(&dc, trees);
 			if (err) return err;
 
+			// `ufbxi_inflate_block()` returns normally on cancel so check it here
+			if (dc.stream.cancelled) return -28;
+
 		} else {
 			// 0b11 - reserved (error)
 			return -7;
@@ -1028,6 +1112,7 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 		bits >>= align_bits;
 		left -= align_bits;
 		ufbxi_bit_refill(&bits, &left, &data, &dc.stream);
+		if (dc.stream.cancelled) return -28;
 
 		uint32_t ref = (uint32_t)bits;
 		ref = (ref>>24) | ((ref>>8)&0xff00) | ((ref<<8)&0xff0000) | (ref<<24);
@@ -2501,6 +2586,10 @@ typedef struct {
 	int32_t *zero_indices;
 	int32_t *consecutive_indices;
 
+	// Call progress function periodically
+	ptrdiff_t progress_timer;
+	size_t progress_bytes_total;
+
 	ufbxi_ascii ascii;
 
 	ufbxi_node root;
@@ -2608,6 +2697,31 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place_str(ufbxi_c
 {
 	ufbxi_check(p_str);
 	return ufbxi_push_string_place(uc, &p_str->data, p_str->length);
+}
+
+// -- Progress
+
+static ufbxi_forceinline uint64_t ufbxi_get_read_offset(ufbxi_context *uc)
+{
+	return uc->data_offset + (uc->data - uc->data_begin);
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_report_progress(ufbxi_context *uc)
+{
+	ufbx_progress progress;
+	progress.bytes_read = ufbxi_get_read_offset(uc);
+	progress.bytes_total = uc->progress_bytes_total;
+
+	uc->progress_timer = 1024;
+	ufbxi_check_msg(uc->opts.progress_fn(uc->opts.progress_user, &progress), "Cancelled");
+	return 0;
+}
+
+ufbxi_nodiscard static ufbxi_forceinline int ufbxi_progress(ufbxi_context *uc, size_t work_units)
+{
+	if (!uc->opts.progress_fn) return 0;
+	if (uc->progress_timer - (ptrdiff_t)work_units > 0) return 0;
+	return ufbxi_report_progress(uc);
 }
 
 // -- IO
@@ -2732,11 +2846,6 @@ static int ufbxi_read_to(ufbxi_context *uc, void *dst, size_t size)
 	}
 
 	return 1;
-}
-
-static ufbxi_forceinline uint64_t ufbxi_get_read_offset(ufbxi_context *uc)
-{
-	return uc->data_offset + (uc->data - uc->data_begin);
 }
 
 // -- FBX value type information
@@ -3502,6 +3611,23 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 				input.data = uc->data;
 				input.data_size = uc->data_size;
 
+				if (uc->opts.progress_fn) {
+					input.progress_fn = uc->opts.progress_fn;
+					input.progress_user = uc->opts.progress_user;
+					input.progress_size_before = ufbxi_get_read_offset(uc);
+					if (uc->progress_bytes_total >= input.progress_size_before
+						&& uc->progress_bytes_total - input.progress_size_before >= encoded_size) {
+						input.progress_size_after = uc->progress_bytes_total - input.progress_size_before - encoded_size;
+					} else {
+						input.progress_size_after = 0;
+					}
+				} else {
+					input.progress_fn = NULL;
+					input.progress_user = NULL;
+					input.progress_size_before = 0;
+					input.progress_size_after = 0;
+				}
+
 				// If the encoded array is larger than the data we have currently buffered
 				// we need to allow `ufbxi_inflate()` to read from the IO callback. We can
 				// let `ufbxi_inflate()` freely clobber our `read_buffer` as all the data
@@ -3528,6 +3654,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 				}
 
 				ptrdiff_t res = ufbx_inflate(decoded_data, decoded_data_size, &input, uc->inflate_retain);
+				ufbxi_check_msg(res != -28, "Cancelled");
 				ufbxi_check_msg(res == (ptrdiff_t)decoded_data_size, "Bad DEFLATE data");
 
 			} else {
@@ -9511,6 +9638,8 @@ static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
 		error->type = UFBX_ERROR_TRUNCATED_FILE;
 	} else if (!strcmp(error->description, "IO error")) {
 		error->type = UFBX_ERROR_IO;
+	} else if (!strcmp(error->description, "Cancelled")) {
+		error->type = UFBX_ERROR_CANCELLED;
 	}
 }
 
@@ -9528,6 +9657,10 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 		uc->opts = *user_opts;
 	} else {
 		memset(&uc->opts, 0, sizeof(uc->opts));
+	}
+
+	if (uc->opts.file_size_estimate) {
+		uc->progress_bytes_total = uc->opts.file_size_estimate;
 	}
 
 	ufbx_inflate_retain inflate_retain;
@@ -11010,6 +11143,21 @@ static FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp
 #endif
 }
 
+static uint64_t ufbxi_ftell(FILE *file)
+{
+#if defined(_POSIX_VERSION)
+	off_t result = ftello(file);
+	if (result > 0) return (uint64_t)result;
+#elif defined(_MSC_VER)
+	int64_t result = _ftelli64(file);
+	if (result > 0) return (uint64_t)result;
+#else
+	long result = ftell(file);
+	if (result > 0) return (uint64_t)result;
+#endif
+	return UINT64_MAX;
+}
+
 static size_t ufbxi_file_read(void *user, void *data, size_t max_size)
 {
 	FILE *file = (FILE*)user;
@@ -11071,6 +11219,7 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts
 	ufbxi_context uc = { 0 };
 	uc.data_begin = uc.data = (const char *)data;
 	uc.data_size = size;
+	uc.progress_bytes_total = size;
 	return ufbxi_load(&uc, opts, error);
 }
 
@@ -11098,10 +11247,7 @@ ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_len, const 
 		return NULL;
 	}
 
-	ufbxi_context uc = { 0 };
-	uc.read_fn = &ufbxi_file_read;
-	uc.read_user = file;
-	ufbx_scene *scene = ufbxi_load(&uc, opts, error);
+	ufbx_scene *scene = ufbx_load_stdio(file, opts, error);
 
 	fclose(file);
 
@@ -11113,8 +11259,27 @@ ufbx_scene *ufbx_load_stdio(void *file, const ufbx_load_opts *opts, ufbx_error *
 	ufbxi_context uc = { 0 };
 	uc.read_fn = &ufbxi_file_read;
 	uc.read_user = file;
-	ufbx_scene *scene = ufbxi_load(&uc, opts, error);
 
+	if (opts && opts->progress_fn && opts->file_size_estimate == 0) {
+		uint64_t begin = ufbxi_ftell(file);
+		if (begin < UINT64_MAX) {
+			fpos_t pos;
+			if (fgetpos(file, &pos) == 0) {
+				if (fseek(file, 0, SEEK_END) == 0) {
+					uint64_t end = ufbxi_ftell(file);
+					if (end != UINT64_MAX && begin < end) {
+						uc.progress_bytes_total = end - begin;
+					}
+
+					// Both `rewind()` and `fsetpos()` to reset error and EOF
+					rewind(file);
+					fsetpos(file, &pos);
+				}
+			}
+		}
+	}
+
+	ufbx_scene *scene = ufbxi_load(&uc, opts, error);
 	return scene;
 }
 
@@ -11126,7 +11291,6 @@ ufbx_scene *ufbx_load_stream(const void *prefix, size_t prefix_size, ufbx_read_f
 	uc.read_fn = read_fn;
 	uc.read_user = read_user;
 	ufbx_scene *scene = ufbxi_load(&uc, opts, error);
-
 	return scene;
 }
 
