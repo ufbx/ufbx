@@ -413,6 +413,10 @@ async def run_target(t, args):
     if config_fmt_arch(t.config) not in t.compiler.run_archs and not arch_test:
         return
 
+    args = args[:]
+    if t.config.get("dedicated-allocs", False):
+        args += ["--dedicated-allocs"]
+
     ok, out, err, cmdline, time = await run_cmd(t.config["output"], args)
 
     t.log.append("$ " + cmdline)
@@ -470,7 +474,7 @@ async def main():
         },
         "sanitize": {
             "": { },
-            "sanitize": { "san": True },
+            "sanitize": { "san": True, "dedicated-allocs": True },
         },
     }
 
