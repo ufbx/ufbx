@@ -385,3 +385,53 @@ UFBXT_FILE_TEST(blender_279_bone_radius)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_broken_cluster)
+#if UFBXT_IMPL
+{
+	ufbx_node *cube = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(cube && cube->mesh);
+	ufbx_mesh *mesh = cube->mesh;
+	ufbxt_assert(mesh->skins.count == 1);
+	ufbx_skin_deformer *skin = mesh->skins.data[0];
+	ufbxt_assert(skin->clusters.count == 2);
+	ufbxt_assert(!strcmp(skin->clusters.data[0]->bone->name.data, "joint3"));
+	ufbxt_assert(!strcmp(skin->clusters.data[1]->bone->name.data, "joint1"));
+}
+#endif
+
+UFBXT_TEST(synthetic_broken_cluster_connect)
+#if UFBXT_IMPL
+{
+	const char *name = "synthetic_broken_cluster";
+
+	char buf[512];
+	for (uint32_t vi = 0; vi < ufbxt_arraycount(ufbxt_file_versions); vi++) {
+		for (uint32_t fi = 0; fi < 2; fi++) {
+			uint32_t version = ufbxt_file_versions[vi];
+			const char *format = fi == 1 ? "ascii" : "binary";
+			snprintf(buf, sizeof(buf), "%s%s_%u_%s.fbx", data_root, name, version, format);
+		}
+
+		ufbx_error error;
+		ufbx_load_opts opts = { 0 };
+		opts.connect_broken_elements = true;
+		ufbx_scene *scene = ufbx_load_file(buf, &opts, &error);
+		if (error.type == UFBX_ERROR_FILE_NOT_FOUND) continue;
+		ufbxt_assert(scene);
+		ufbxt_check_scene(scene);
+
+		ufbx_node *cube = ufbx_find_node(scene, "pCube1");
+		ufbxt_assert(cube && cube->mesh);
+		ufbx_mesh *mesh = cube->mesh;
+		ufbxt_assert(mesh->skins.count == 1);
+		ufbx_skin_deformer *skin = mesh->skins.data[0];
+		ufbxt_assert(skin->clusters.count == 3);
+		ufbxt_assert(!strcmp(skin->clusters.data[0]->bone->name.data, "joint3"));
+		ufbxt_assert(skin->clusters.data[1]->bone == NULL);
+		ufbxt_assert(!strcmp(skin->clusters.data[2]->bone->name.data, "joint1"));
+
+		ufbx_free_scene(scene);
+	}
+}
+#endif

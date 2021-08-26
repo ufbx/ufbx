@@ -953,8 +953,7 @@ typedef struct ufbx_skin_weight {
 	ufbx_real weight;       // < Amount this bone influence the vertex
 } ufbx_skin_weight;
 
-UFBX_LIST_TYPE(ufbx_skin_weight_list, ufbx_skin_weight);
-
+UFBX_LIST_TYPE(ufbx_skin_weight_list, ufbx_skin_weight); 
 // Skin deformer specifies a binding between a logical set of bones (a skeleton)
 // and a mesh. Each bone is represented by a `ufbx_skin_cluster` that contains
 // the binding matrix and a `ufbx_node *bone` that has the current transformation.
@@ -984,8 +983,9 @@ struct ufbx_skin_deformer {
 struct ufbx_skin_cluster {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
-	// The bone node the cluster is attached to (may be `NULL`!)
-	// TODO: Strict mode where `bone` cannot be `NULL`!
+	// The bone node the cluster is attached to
+	// NOTE: Always valid if found from `ufbx_skin_deformer.clusters[]` unless
+	// `ufbx_load_opts.connect_broken_elements` is `true`.
 	ufbx_node *bone;
 
 	// Binding matrix from local mesh vertices to the bone
@@ -1017,7 +1017,6 @@ struct ufbx_blend_deformer {
 
 // Blend shape associated with a target weight in a series of morphs
 typedef struct ufbx_blend_keyframe {
-	// May be NULL! TODO: Strict mode...
 	ufbx_blend_shape *shape;
 
 	// Weight value at which to apply the keyframe at full strength
@@ -1820,6 +1819,11 @@ typedef struct ufbx_load_opts {
 	// array. Enabling this makes `ufbx_get_vertex_TYPE()` unsafe as they don't
 	// do bounds checking.
 	bool allow_out_of_bounds_vertex_indices;
+
+	// Connect related elements even if they are broken. If `false` (default)
+	// `ufbx_skin_cluster` with a missing `bone` field are _not_ included in
+	// the `ufbx_skin_deformer.clusters[]` array for example.
+	bool connect_broken_elements;
 
 	// Estimated file size for progress reporting
 	uint64_t file_size_estimate;

@@ -8190,6 +8190,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 	ufbxi_check(uc->scene.elements_by_name.data);
 
 	for (size_t i = 0; i < num_elements; i++) {
+
 		ufbx_element *elem = uc->scene.elements.data[i];
 		ufbx_name_element *name_elem = &uc->scene.elements_by_name.data[i];
 
@@ -8279,6 +8280,8 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 		}
 	}
 
+	// Fetch pointers that may break elements
+
 	// Setup node attribute instances
 	for (int type = UFBX_ELEMENT_TYPE_FIRST_ATTRIB; type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB; type++) {
 		ufbxi_for_ptr_list(ufbx_element, p_elem, uc->scene.elements_by_type[type]) {
@@ -8292,16 +8295,24 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, uc->scene.skin_clusters) {
 		ufbx_skin_cluster *cluster = *p_cluster;
 		cluster->bone = (ufbx_node*)ufbxi_fetch_dst_element(&cluster->element, false, NULL, UFBX_ELEMENT_NODE);
-
-		if (cluster->bone) {
-			// TODO: ufbxi_check() with `allow_missing_references` / strict mode
-		}
-
 	}
 
 	ufbxi_for_ptr_list(ufbx_skin_deformer, p_skin, uc->scene.skin_deformers) {
 		ufbx_skin_deformer *skin = *p_skin;
 		ufbxi_check(ufbxi_fetch_dst_elements(uc, &skin->clusters, &skin->element, false, NULL, UFBX_ELEMENT_SKIN_CLUSTER));
+
+		// Remove clusters without a valid `bone`
+		if (!uc->opts.connect_broken_elements) {
+			size_t num_broken = 0;
+			for (size_t i = 0; i < skin->clusters.count; i++) {
+				if (!skin->clusters.data[i]->bone) {
+					num_broken++;
+				} else if (num_broken > 0) {
+					skin->clusters.data[i - num_broken] = skin->clusters.data[i];
+				}
+			}
+			skin->clusters.count -= num_broken;
+		}
 
 		size_t total_weights = 0;
 		ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, skin->clusters) {
