@@ -6903,6 +6903,7 @@ ufbxi_nodiscard static int ufbxi_read_take_anim_channel(ufbxi_context *uc, ufbxi
 
 	if (num_keys > 0) {
 		ufbxi_check(data_end - data >= 2);
+		// TODO: This could break with large times...
 		next_time = data[0] * uc->ktime_to_sec;
 		next_value = data[1];
 	}
