@@ -1,6 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#endif
+
 static void ufbxt_assert_fail(const char *func, const char *file, size_t line, const char *msg)
 {
 	fprintf(stderr, "%s:%zu: %s(\"%s\") failed\n", file, line, func, msg);
@@ -13,10 +19,20 @@ static void ufbxt_assert_fail(const char *func, const char *file, size_t line, c
 #include "../ufbx.h"
 #include "check_scene.h"
 
+#ifdef _WIN32
+int wmain(int argc, wchar_t **argv)
+#else
 int main(int argc, char **argv)
+#endif
 {
 	ufbxt_assert(argc == 2);
+#if _WIN32
+	char path[1024];
+	int res = WideCharToMultiByte(CP_UTF8, 0, argv[1], -1, path, sizeof(path), NULL, NULL);
+	ufbxt_assert(res > 0 && res < sizeof(path));
+#else
 	const char *path = argv[1];
+#endif
 
 	ufbx_error error;
 	ufbx_scene *scene = ufbx_load_file(path, NULL, &error);

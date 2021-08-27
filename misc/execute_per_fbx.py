@@ -15,5 +15,5 @@ for root, dirs, files in os.walk(argv.root):
         display = os.path.relpath(path, argv.root)
         print(f"-- {display}")
 
-        args = [argv.exe, path]
+        args = [argv.exe, path.encode("utf-8")]
         subprocess.check_call(args)
