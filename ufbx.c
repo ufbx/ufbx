@@ -4135,19 +4135,39 @@ ufbxi_nodiscard static int ufbxi_ascii_next_token(ufbxi_context *uc, ufbxi_ascii
 			ufbxi_check(ufbxi_ascii_push_token_char(uc, token, c));
 			c = ufbxi_ascii_next(uc);
 		}
-		ufbxi_check(ufbxi_ascii_push_token_char(uc, token, '\0'));
 
-		char *end;
-		if (token->type == UFBXI_ASCII_INT) {
-			token->value.i64 = strtoll(token->str_data, &end, 10);
-			ufbxi_check(end == token->str_data + token->str_len - 1);
-		} else if (token->type == UFBXI_ASCII_FLOAT) {
-			if (ua->parse_as_f32) {
-				token->value.f64 = strtof(token->str_data, &end);
-			} else {
-				token->value.f64 = strtod(token->str_data, &end);
+		if (c == '#') {
+			ufbxi_check(token->type == UFBXI_ASCII_FLOAT);
+			ufbxi_check(ufbxi_ascii_push_token_char(uc, token, c));
+			c = ufbxi_ascii_next(uc);
+
+			bool is_inf = c == 'I' || c == 'i';
+			while ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+				ufbxi_check(ufbxi_ascii_push_token_char(uc, token, c));
+				c = ufbxi_ascii_next(uc);
 			}
-			ufbxi_check(end == token->str_data + token->str_len - 1);
+			ufbxi_check(ufbxi_ascii_push_token_char(uc, token, '\0'));
+
+			if (is_inf) {
+				token->value.f64 = token->str_data[0] == '-' ? -INFINITY : INFINITY;
+			} else {
+				token->value.f64 = NAN;
+			}
+
+		} else {
+			ufbxi_check(ufbxi_ascii_push_token_char(uc, token, '\0'));
+			char *end;
+			if (token->type == UFBXI_ASCII_INT) {
+				token->value.i64 = strtoll(token->str_data, &end, 10);
+				ufbxi_check(end == token->str_data + token->str_len - 1);
+			} else if (token->type == UFBXI_ASCII_FLOAT) {
+				if (ua->parse_as_f32) {
+					token->value.f64 = strtof(token->str_data, &end);
+				} else {
+					token->value.f64 = strtod(token->str_data, &end);
+				}
+				ufbxi_check(end == token->str_data + token->str_len - 1);
+			}
 		}
 	} else if (c == '"') {
 		token->type = UFBXI_ASCII_STRING;
