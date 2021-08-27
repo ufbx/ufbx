@@ -5747,7 +5747,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 		int32_t *edge_data = (int32_t*)edge_indices->data;
 		for (size_t i = 0; i < num_edges; i++) {
 			int32_t index_ix = edge_data[i];
-			if (index_ix < 0 || index_ix >= mesh->num_indices) {
+			if (index_ix < 0 || (size_t)index_ix >= mesh->num_indices) {
 				if (uc->opts.strict) ufbxi_fail("Edge index out of bounds");
 				continue;
 			}
