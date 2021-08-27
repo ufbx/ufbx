@@ -3605,6 +3605,12 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 		// Otherwise we form the array by concatenating all the normal values of the
 		// node (pre-7000)
 		char c = data[0];
+
+		// HACK: Override the "type" if either the array is empty or we want to
+		// specifically ignore the contents.
+		if (num_values == 0) c = '0';
+		if (dst_type == '-') c = '-';
+
 		if (c=='c' || c=='b' || c=='i' || c=='l' || c =='f' || c=='d') {
 
 			// Parse the array header from the prefix we already peeked above.
@@ -3727,9 +3733,9 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 			arr->data = arr_data;
 			arr->size = size;
 
-		} else if (c == '0') {
+		} else if (c == '0' || c == '-') {
 			// Ignore the array
-			arr->type = '-';
+			arr->type = c == '-' ? '-' : dst_type;
 			arr->data = 0;
 			arr->size = 0;
 		} else {
