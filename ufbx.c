@@ -5356,6 +5356,11 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_contex
 
 	ufbxi_value_array *data = ufbxi_find_array(node, data_name, data_type);
 	ufbxi_value_array *indices = ufbxi_find_array(node, index_name, 'i');
+
+	if (!uc->opts.strict) {
+		if (!data) return 1;
+	}
+
 	ufbxi_check(data);
 	ufbxi_check(data->size % num_components == 0);
 
@@ -5817,8 +5822,9 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 			layer->elem.value_reals = 3;
 
 			ufbxi_ignore(ufbxi_get_val1(n, "I", &layer->index));
-			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &layer->elem.data ,&layer->elem.indices,
+			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &layer->elem.data, &layer->elem.indices,
 				&layer->elem.unique_per_vertex, &layer->elem.num_values, ufbxi_Binormals, ufbxi_BinormalsIndex, 'r', 3));
+			if (!layer->elem.data) num_bitangents_read--;
 
 		} else if (n->name == ufbxi_LayerElementTangent) {
 			ufbxi_tangent_layer *layer = &tangents[num_tangents_read++];
@@ -5827,6 +5833,8 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 			ufbxi_ignore(ufbxi_get_val1(n, "I", &layer->index));
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &layer->elem.data, &layer->elem.indices,
 				&layer->elem.unique_per_vertex, &layer->elem.num_values, ufbxi_Tangents, ufbxi_TangentsIndex, 'r', 3));
+			if (!layer->elem.data) num_tangents_read--;
+
 		} else if (n->name == ufbxi_LayerElementUV) {
 			ufbx_uv_set *set = &mesh->uv_sets.data[mesh->uv_sets.count++];
 			set->vertex_uv.value_reals = 2;
@@ -5840,6 +5848,8 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &set->vertex_uv.data, &set->vertex_uv.indices,
 				&set->vertex_uv.unique_per_vertex, &set->vertex_uv.num_values, ufbxi_UV, ufbxi_UVIndex, 'r', 2));
+			if (!set->vertex_uv.data) mesh->uv_sets.count--;
+
 		} else if (n->name == ufbxi_LayerElementColor) {
 			ufbx_color_set *set = &mesh->color_sets.data[mesh->color_sets.count++];
 			set->vertex_color.value_reals = 4;
@@ -5851,6 +5861,8 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &set->vertex_color.data, &set->vertex_color.indices,
 				&set->vertex_color.unique_per_vertex, &set->vertex_color.num_values, ufbxi_Colors, ufbxi_ColorIndex, 'r', 4));
+			if (!set->vertex_color.data) mesh->color_sets.count--;
+
 		} else if (n->name == ufbxi_LayerElementVertexCrease) {
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, &mesh->vertex_crease.data, &mesh->vertex_crease.indices,
 				&mesh->vertex_crease.unique_per_vertex, &mesh->vertex_crease.num_values, ufbxi_VertexCrease, ufbxi_VertexCreaseIndex, 'r', 1));
@@ -5936,10 +5948,12 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 		mesh->face_material = (int32_t*)ufbxi_sentinel_index_zero;
 	}
 
-	ufbx_assert(mesh->uv_sets.count == num_uv);
-	ufbx_assert(mesh->color_sets.count == num_color);
-	ufbx_assert(num_bitangents_read == num_bitangents);
-	ufbx_assert(num_tangents_read == num_tangents);
+	if (uc->opts.strict) {
+		ufbxi_check(mesh->uv_sets.count == num_uv);
+		ufbxi_check(mesh->color_sets.count == num_color);
+		ufbxi_check(num_bitangents_read == num_bitangents);
+		ufbxi_check(num_tangents_read == num_tangents);
+	}
 
 	// Connect bitangents/tangents to UV sets
 	ufbxi_for (ufbxi_node, n, node->children, node->num_children) {
@@ -5963,14 +5977,14 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 					}
 				}
 			} else if (type == ufbxi_LayerElementBinormal) {
-				ufbxi_for(ufbxi_tangent_layer, layer, bitangents, num_bitangents) {
+				ufbxi_for(ufbxi_tangent_layer, layer, bitangents, num_bitangents_read) {
 					if (layer->index == index) {
 						bitangent_layer = layer;
 						break;
 					}
 				}
 			} else if (type == ufbxi_LayerElementTangent) {
-				ufbxi_for(ufbxi_tangent_layer, layer, tangents, num_tangents) {
+				ufbxi_for(ufbxi_tangent_layer, layer, tangents, num_tangents_read) {
 					if (layer->index == index) {
 						tangent_layer = layer;
 						break;

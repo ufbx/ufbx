@@ -498,8 +498,8 @@ typedef struct ufbx_uv_set {
 
 	// Vertex attributes, see `ufbx_mesh` attributes for more information
 	ufbx_vertex_vec2 vertex_uv;        // < UV / texture coordinates
-	ufbx_vertex_vec3 vertex_tangent;   // < Tangent vector in UV.x direction
-	ufbx_vertex_vec3 vertex_bitangent; // < Tangent vector in UV.y direction
+	ufbx_vertex_vec3 vertex_tangent;   // < (optional) Tangent vector in UV.x direction
+	ufbx_vertex_vec3 vertex_bitangent; // < (optional) Tangent vector in UV.y direction
 } ufbx_uv_set;
 
 // Vertex color set/layer
@@ -644,12 +644,12 @@ struct ufbx_mesh {
 	// NOTE: UV/tangent/bitangent and color are the from first sets,
 	// use `uv_sets/color_sets` to access the other layers.
 	ufbx_vertex_vec3 vertex_position;  // < Vertex positions
-	ufbx_vertex_vec3 vertex_normal;    // < Normal vectors
-	ufbx_vertex_vec2 vertex_uv;        // < UV / texture coordinates
-	ufbx_vertex_vec3 vertex_tangent;   // < Tangent vector in UV.x direction
-	ufbx_vertex_vec3 vertex_bitangent; // < Tangent vector in UV.y direction
-	ufbx_vertex_vec4 vertex_color;     // < Per-vertex RGBA color
-	ufbx_vertex_real vertex_crease;    // < Crease value for subdivision surfaces
+	ufbx_vertex_vec3 vertex_normal;    // < (optional) Normal vectors (TODO: Generate?)
+	ufbx_vertex_vec2 vertex_uv;        // < (optional) UV / texture coordinates
+	ufbx_vertex_vec3 vertex_tangent;   // < (optional) Tangent vector in UV.x direction
+	ufbx_vertex_vec3 vertex_bitangent; // < (optional) Tangent vector in UV.y direction
+	ufbx_vertex_vec4 vertex_color;     // < (optional) Per-vertex RGBA color
+	ufbx_vertex_real vertex_crease;    // < (optional) Crease value for subdivision surfaces
 
 	// Multiple named UV/color sets
 	// NOTE: The first set contains the same data as `vertex_uv/color`!
@@ -1814,6 +1814,9 @@ typedef struct ufbx_load_opts {
 
 	// Don't adjust reading the FBX file depending on the detected exporter
 	bool disable_quirks;
+
+	// Don't allow partially broken FBX files to load
+	bool strict;
 
 	// Allow indices in `ufbx_vertex_TYPE` arrays that area larger than the data
 	// array. Enabling this makes `ufbx_get_vertex_TYPE()` unsafe as they don't
