@@ -5818,13 +5818,15 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 		*p_vx_ix = -1;
 	}
 
-	// TODO: Clean up bad indices?
 	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
 		int32_t vx = mesh->vertex_indices[ix];
 		if (vx >= 0 && (size_t)vx < mesh->num_vertices) {
 			if (mesh->vertex_first_index[vx] < 0) {
 				mesh->vertex_first_index[vx] = (int32_t)ix;
 			}
+		} else if (!uc->opts.allow_out_of_bounds_vertex_indices) {
+			if (uc->opts.strict) ufbxi_fail("Index out of range");
+			mesh->vertex_indices[ix] = 0;
 		}
 	}
 
