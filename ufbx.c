@@ -2521,6 +2521,7 @@ typedef struct {
 	uint32_t exporter_version;
 	bool from_ascii;
 	bool big_endian;
+	bool sure_fbx;
 
 	ufbx_load_opts opts;
 
@@ -4460,6 +4461,7 @@ ufbxi_nodiscard static int ufbxi_begin_parse(ufbxi_context *uc)
 
 		// Read the version directly from the header
 		uc->version = ufbxi_read_u32(header + UFBXI_BINARY_MAGIC_SIZE);
+		uc->sure_fbx = true;
 		ufbxi_consume_bytes(uc, UFBXI_BINARY_HEADER_SIZE);
 
 	} else {
@@ -4471,11 +4473,16 @@ ufbxi_nodiscard static int ufbxi_begin_parse(ufbxi_context *uc)
 		uc->ascii.src_yield = uc->data + uc->yield_size;
 		uc->ascii.src_end = uc->data + uc->data_size + uc->yield_size;
 
-		// Default to version 7400 if not found in header
-		uc->version = 7400;
-
 		// Initialize the first token
 		ufbxi_check(ufbxi_ascii_next_token(uc, &uc->ascii.token));
+
+		// Default to version 7400 if not found in header
+		if (uc->version > 0) {
+			uc->sure_fbx = true;
+		} else {
+			if (!uc->opts.strict) uc->version = 7400;
+			ufbxi_check_msg(uc->version > 0, "Not an FBX file");
+		}
 	}
 
 	ufbxi_check_msg(uc->version >= 6000, "Unsupported version");
@@ -7230,11 +7237,16 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 	ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_Definitions));
 	ufbxi_check(ufbxi_read_definitions(uc));
 
-	// Objects: Actual scene data (required)
+	// Objects: Actual scene data
 	ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_Objects));
+	if (!uc->sure_fbx) {
+		// If the file is a bit iffy about being a real FBX file reject it if
+		// even the objects are not found.
+		ufbxi_check_msg(uc->top_node, "Not an FBX file");
+	}
 	ufbxi_check(ufbxi_read_objects(uc));
 
-	// Connections: Relationships between nodes (required)
+	// Connections: Relationships between nodes
 	ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_Connections));
 	ufbxi_check(ufbxi_read_connections(uc));
 
@@ -9765,6 +9777,8 @@ static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
 		error->type = UFBX_ERROR_CANCELLED;
 	} else if (!strcmp(error->description, "Unsupported version")) {
 		error->type = UFBX_ERROR_UNSUPPORTED_VERSION;
+	} else if (!strcmp(error->description, "Not an FBX file")) {
+		error->type = UFBX_ERROR_NOT_FBX;
 	}
 }
 

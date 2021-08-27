@@ -1736,6 +1736,7 @@ typedef enum ufbx_error_type {
 	UFBX_ERROR_IO,
 	UFBX_ERROR_CANCELLED,
 	UFBX_ERROR_UNSUPPORTED_VERSION,
+	UFBX_ERROR_NOT_FBX,
 } ufbx_error_type;
 
 // Error description with detailed stack trace
