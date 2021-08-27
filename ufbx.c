@@ -5732,9 +5732,12 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	mesh->vertex_position.indices = index_data;
 	mesh->vertex_position.num_values = mesh->num_vertices;
 
-	// Check that the last index is negated (last of polygon)
+	// Check/make sure that the last index is negated (last of polygon)
 	if (mesh->num_indices > 0) {
-		ufbxi_check(index_data[mesh->num_indices - 1] < 0);
+		if (index_data[mesh->num_indices - 1] > 0) {
+			if (uc->opts.strict) ufbxi_fail("Non-negated last index");
+			index_data[mesh->num_indices - 1] = ~index_data[mesh->num_indices - 1];
+		}
 	}
 
 	// Read edges before un-negating the indices
