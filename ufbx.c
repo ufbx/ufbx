@@ -4219,6 +4219,9 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 
 	// Parse the name eg. "Node:" token and intern the name
 	ufbxi_check(depth < UFBXI_MAX_NODE_DEPTH);
+	if (!uc->sure_fbx && depth == 0 && ua->token.type != UFBXI_ASCII_NAME) {
+		ufbxi_fail_msg("Expected a 'Name:' token", "Not an FBX file");
+	}
 	ufbxi_check(ufbxi_ascii_accept(uc, UFBXI_ASCII_NAME));
 	size_t name_len = ua->prev_token.value.name_len;
 	ufbxi_check(name_len <= 0xff);
