@@ -11,6 +11,8 @@ argv = parser.parse_args()
 for root, dirs, files in os.walk(argv.root):
     for file in files:
         if not file.lower().endswith(".fbx"): continue
+        if file.lower().endswith(".ufbx-fail.fbx"): continue
+        if file.lower().endswith(".ufbx-old.fbx"): continue
         path = os.path.join(root, file)
         display = os.path.relpath(path, argv.root)
         print(f"-- {display}")

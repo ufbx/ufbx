@@ -36,10 +36,6 @@ int main(int argc, char **argv)
 
 	ufbx_error error;
 	ufbx_scene *scene = ufbx_load_file(path, NULL, &error);
-	if (error.type == UFBX_ERROR_UNSUPPORTED_VERSION) {
-		printf("Unsupported version\n");
-		return 0;
-	}
 
 	if (!scene) {
 		char buf[1024];
