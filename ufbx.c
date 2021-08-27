@@ -4478,6 +4478,8 @@ ufbxi_nodiscard static int ufbxi_begin_parse(ufbxi_context *uc)
 		ufbxi_check(ufbxi_ascii_next_token(uc, &uc->ascii.token));
 	}
 
+	ufbxi_check_msg(uc->version >= 6000, "Unsupported version");
+
 	return 1;
 }
 
@@ -9760,6 +9762,8 @@ static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
 		error->type = UFBX_ERROR_IO;
 	} else if (!strcmp(error->description, "Cancelled")) {
 		error->type = UFBX_ERROR_CANCELLED;
+	} else if (!strcmp(error->description, "Unsupported version")) {
+		error->type = UFBX_ERROR_UNSUPPORTED_VERSION;
 	}
 }
 
