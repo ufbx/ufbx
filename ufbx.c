@@ -6975,6 +6975,7 @@ ufbxi_nodiscard static int ufbxi_read_take_anim_channel(ufbxi_context *uc, ufbxi
 
 			if (slope_mode == 's' || slope_mode == 'b') {
 				// Slope mode 's'/'b' (standard? broken?) always have two explicit slopes
+				// TODO: `b` might actually be some kind of TCB curve
 				ufbxi_check(data_end - data >= 2);
 				slope_right = (float)data[0];
 				next_slope_left = (float)data[1];
@@ -6986,6 +6987,11 @@ ufbxi_nodiscard static int ufbxi_read_take_anim_channel(ufbxi_context *uc, ufbxi
 				// until we have read the next time/value.
 				// TODO: Solve what this is more throroughly
 				auto_slope = true;
+			} else if (slope_mode == 'p') {
+				// TODO: What is this mode? It seems to have an extra 'n' following??
+				// Ignore unknown values for now
+				ufbxi_check(data_end - data >= 3);
+				data += 3;
 			} else {
 				ufbxi_fail("Unknown slope mode");
 			}
