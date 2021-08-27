@@ -6958,6 +6958,16 @@ ufbxi_nodiscard static int ufbxi_read_take_anim_channel(ufbxi_context *uc, ufbxi
 				weight_right = (float)data[0];
 				next_weight_left = (float)data[1];
 				data += 2;
+			} else if (weight_mode == 'l') {
+				// Next left tangent is weighted
+				ufbxi_check(data_end - data >= 1);
+				next_weight_left = (float)data[0];
+				data += 1;
+			} else if (weight_mode == 'r') {
+				// Right tangent is weighted
+				ufbxi_check(data_end - data >= 1);
+				weight_right = (float)data[0];
+				data += 1;
 			} else {
 				ufbxi_fail("Unknown weight mode");
 			}
