@@ -5720,13 +5720,18 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 		ufbx_edge *edges = ufbxi_push(&uc->result, ufbx_edge, num_edges);
 		ufbxi_check(edges);
 
+		size_t dst_ix = 0;
+
 		// Edges are represented using a single index into PolygonVertexIndex.
 		// The edge is between two consecutive vertices in the polygon.
 		int32_t *edge_data = (int32_t*)edge_indices->data;
 		for (size_t i = 0; i < num_edges; i++) {
 			int32_t index_ix = edge_data[i];
-			ufbxi_check(index_ix >= 0 && (size_t)index_ix < mesh->num_indices);
-			edges[i].indices[0] = index_ix;
+			if (index_ix < 0 || index_ix >= mesh->num_indices) {
+				if (uc->opts.strict) ufbxi_fail("Edge index out of bounds");
+				continue;
+			}
+			edges[dst_ix].indices[0] = index_ix;
 			if (index_data[index_ix] < 0) {
 				// Previous index is the last one of this polygon, rewind to first index.
 				while (index_ix > 0 && index_data[index_ix - 1] >= 0) {
@@ -5737,11 +5742,12 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 				index_ix++;
 			}
 			ufbxi_check(index_ix >= 0 && (size_t)index_ix < mesh->num_indices);
-			edges[i].indices[1] = index_ix;
+			edges[dst_ix].indices[1] = index_ix;
+			dst_ix++;
 		}
 
 		mesh->edges = edges;
-		mesh->num_edges = num_edges;
+		mesh->num_edges = dst_ix;
 	}
 
 	// Count the number of faces and allocate the index list
