@@ -4212,7 +4212,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 	}
 
 	if (ua->token.type == UFBXI_ASCII_END) {
-		ufbxi_check(depth == 0);
+		ufbxi_check_msg(depth == 0, "Truncated file");
 		*p_end = true;
 		return 1;
 	}
