@@ -7528,7 +7528,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *u
 		// Second pass to cache the depths to avoid O(n^2)
 		for (ufbx_node *p = node->parent; p; p = p->parent) {
 			if (--depth <= p->node_depth) break;
-			p->node_depth = --depth;
+			p->node_depth = depth;
 		}
 	}
 
