@@ -5108,6 +5108,9 @@ ufbxi_nodiscard static int ufbxi_match_exporter(ufbxi_context *uc)
 	} else if (ufbxi_match_version_string("motionbuilder version ?.?", creator, version)) {
 		uc->exporter = UFBX_EXPORTER_MOTION_BUILDER;
 		uc->exporter_version = ufbx_pack_version(version[0], version[1], 0);
+	} else if (ufbxi_match_version_string("motionbuilder/mocap/online version ?.?", creator, version)) {
+		uc->exporter = UFBX_EXPORTER_MOTION_BUILDER;
+		uc->exporter_version = ufbx_pack_version(version[0], version[1], 0);
 	}
 
 	uc->scene.metadata.exporter = uc->exporter;
