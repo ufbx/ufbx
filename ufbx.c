@@ -3555,7 +3555,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 				val = ufbxi_swap_endian_type(uc, val, 1, type); \
 				ufbxi_check(val); \
 			} \
-			switch (*val++) {
+			switch (type) {
 				case 'C':
 				case 'B': ufbxi_convert_parse(char, 1, *val != 0); break;
 				case 'Y': ufbxi_convert_parse(char, 2, ufbxi_read_i16(val) != 0); break;
