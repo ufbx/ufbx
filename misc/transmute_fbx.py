@@ -255,7 +255,7 @@ if __name__ == "__main__":
     if not version:
         version = fbx.version
     
-    with open(argv.output, "wb") as f:
+    with open(argv.output, "wt" if format == "ascii" else "wb") as f:
         if format == "ascii":
             ascii_dump_root(f, fbx.root, version)
         else:
