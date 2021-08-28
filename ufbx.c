@@ -7119,6 +7119,7 @@ ufbxi_nodiscard static int ufbxi_read_take_anim_channel(ufbxi_context *uc, ufbxi
 			char slope_mode = (char)data[0];
 			data += 1;
 
+			size_t num_weights = 1;
 			if (slope_mode == 's' || slope_mode == 'b') {
 				// Slope mode 's'/'b' (standard? broken?) always have two explicit slopes
 				// TODO: `b` might actually be some kind of TCB curve
@@ -7134,38 +7135,49 @@ ufbxi_nodiscard static int ufbxi_read_take_anim_channel(ufbxi_context *uc, ufbxi
 				// TODO: Solve what this is more throroughly
 				auto_slope = true;
 			} else if (slope_mode == 'p') {
-				// TODO: What is this mode? It seems to have an extra 'n' following??
+				// TODO: What is this mode? It seems to have negative values sometimes?
+				// Also it seems to have _two_ trailing weights values, currently observed:
+				// `n,n` and `a,X,Y,n`...
 				// Ignore unknown values for now
+				ufbxi_check(data_end - data >= 2);
+				data += 2;
+				num_weights = 2;
+			} else if (slope_mode == 't') {
+				// TODO: What is this mode? It seems that it does not have any weights and the
+				// third value seems _tiny_ (around 1e-30?)
 				ufbxi_check(data_end - data >= 3);
 				data += 3;
+				num_weights = 0;
 			} else {
 				ufbxi_fail("Unknown slope mode");
 			}
 
-			ufbxi_check(data_end - data >= 1);
-			char weight_mode = (char)data[0];
-			data += 1;
+			for (; num_weights > 0; num_weights--) {
+				ufbxi_check(data_end - data >= 1);
+				char weight_mode = (char)data[0];
+				data += 1;
 
-			if (weight_mode == 'n') {
-				// Automatic weights (0.3333...)
-			} else if (weight_mode == 'a') {
-				// Manual weights: RightWeight, NextLeftWeight
-				ufbxi_check(data_end - data >= 2);
-				weight_right = (float)data[0];
-				next_weight_left = (float)data[1];
-				data += 2;
-			} else if (weight_mode == 'l') {
-				// Next left tangent is weighted
-				ufbxi_check(data_end - data >= 1);
-				next_weight_left = (float)data[0];
-				data += 1;
-			} else if (weight_mode == 'r') {
-				// Right tangent is weighted
-				ufbxi_check(data_end - data >= 1);
-				weight_right = (float)data[0];
-				data += 1;
-			} else {
-				ufbxi_fail("Unknown weight mode");
+				if (weight_mode == 'n') {
+					// Automatic weights (0.3333...)
+				} else if (weight_mode == 'a') {
+					// Manual weights: RightWeight, NextLeftWeight
+					ufbxi_check(data_end - data >= 2);
+					weight_right = (float)data[0];
+					next_weight_left = (float)data[1];
+					data += 2;
+				} else if (weight_mode == 'l') {
+					// Next left tangent is weighted
+					ufbxi_check(data_end - data >= 1);
+					next_weight_left = (float)data[0];
+					data += 1;
+				} else if (weight_mode == 'r') {
+					// Right tangent is weighted
+					ufbxi_check(data_end - data >= 1);
+					weight_right = (float)data[0];
+					data += 1;
+				} else {
+					ufbxi_fail("Unknown weight mode");
+				}
 			}
 
 		} else if (mode == 'L') {
