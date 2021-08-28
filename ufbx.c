@@ -9817,6 +9817,7 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	// Copy local data to the scene
 	uc->scene.metadata.version = uc->version;
 	uc->scene.metadata.ascii = uc->from_ascii;
+	uc->scene.metadata.big_endian = uc->file_big_endian;
 	uc->scene.metadata.geometry_ignored = uc->opts.ignore_geometry;
 	uc->scene.metadata.animation_ignored = uc->opts.ignore_animation;
 	uc->scene.metadata.embedded_ignored = uc->opts.ignore_embedded;

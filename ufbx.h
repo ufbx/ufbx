@@ -1486,6 +1486,7 @@ typedef struct ufbx_metadata {
 	bool ascii;
 	uint32_t version;
 	ufbx_string creator;
+	bool big_endian;
 
 	ufbx_exporter exporter;
 	uint32_t exporter_version;
