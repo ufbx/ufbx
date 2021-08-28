@@ -49,6 +49,7 @@ int main(int argc, char **argv)
 		"FBX SDK",
 		"Blender Binary",
 		"Blender ASCII",
+		"MotionBuilder",
 	};
 
 	printf("FBX %u via %s %u.%u.%u\n", scene->metadata.version,

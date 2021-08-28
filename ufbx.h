@@ -1484,6 +1484,7 @@ typedef enum ufbx_exporter {
 	UFBX_EXPORTER_FBX_SDK,
 	UFBX_EXPORTER_BLENDER_BINARY,
 	UFBX_EXPORTER_BLENDER_ASCII,
+	UFBX_EXPORTER_MOTION_BUILDER,
 } ufbx_exporter;
 
 // Miscellaneous data related to the loaded file

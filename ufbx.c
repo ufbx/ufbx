@@ -5105,6 +5105,9 @@ ufbxi_nodiscard static int ufbxi_match_exporter(ufbxi_context *uc)
 	} else if (ufbxi_match_version_string("fbx sdk/fbx plugins build ?", creator, version)) {
 		uc->exporter = UFBX_EXPORTER_FBX_SDK;
 		uc->exporter_version = ufbx_pack_version(version[0]/10000u, version[0]/100u%100u, version[0]%100u);
+	} else if (ufbxi_match_version_string("motionbuilder version ?.?", creator, version)) {
+		uc->exporter = UFBX_EXPORTER_MOTION_BUILDER;
+		uc->exporter_version = ufbx_pack_version(version[0], version[1], 0);
 	}
 
 	uc->scene.metadata.exporter = uc->exporter;
@@ -7175,6 +7178,9 @@ ufbxi_nodiscard static int ufbxi_read_take_anim_channel(ufbxi_context *uc, ufbxi
 					ufbxi_check(data_end - data >= 1);
 					weight_right = (float)data[0];
 					data += 1;
+				} else if (weight_mode == 'c') {
+					// TODO: What is this mode? At least it has no parameters so let's
+					// just assume automatic weights for the time being (0.3333...)
 				} else {
 					ufbxi_fail("Unknown weight mode");
 				}
