@@ -220,3 +220,19 @@ UFBXT_FILE_TEST(maya_cube_big_endian)
 	ufbxt_assert(scene->metadata.big_endian);
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_cube_nan)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->num_vertices >= 2);
+	ufbxt_assert(isnan(mesh->vertices[0].x));
+	ufbxt_assert(isinf(mesh->vertices[0].y) && mesh->vertices[0].y < 0.0f);
+	ufbxt_assert(isinf(mesh->vertices[0].z) && mesh->vertices[0].z > 0.0f);
+	ufbxt_assert_close_real(err, mesh->vertices[1].x, 0.5f);
+	ufbxt_assert_close_real(err, mesh->vertices[1].y, -0.5f);
+	ufbxt_assert_close_real(err, mesh->vertices[1].z, 0.5f);
+}
+#endif
