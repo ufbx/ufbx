@@ -39,6 +39,7 @@ for root, dirs, files in os.walk(argv.root):
 end = time.time()
 dur = end - begin
 print()
-print(f"Tested {num_tested} in {int(dur//60)}min {int(dur%60)}s total.")
+print("Success!")
+print(f"Loaded {num_tested} files in {int(dur//60)}min {int(dur%60)}s.")
 print(f"Processed {total_size/1e9:.2f}GB at {total_size/1e6/dur:.2f}MB/s.")
 print(f"Ignored {num_old} old files and {num_fail} invalid files.")
