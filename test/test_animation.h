@@ -297,3 +297,44 @@ UFBXT_FILE_TEST(maya_anim_layers_over_acc)
 }
 #endif
 
+#if UFBXT_IMPL
+typedef struct {
+	double time;
+	bool visible;
+} ufbxt_visibility_ref;
+#endif
+
+UFBXT_FILE_TEST(maya_cube_blinky)
+#if UFBXT_IMPL
+{
+	ufbxt_visibility_ref refs[] = {
+		{ 1.0, false },
+		{ 9.5, false },
+		{ 10.5, true },
+		{ 11.5, false },
+		{ 15.0, false },
+		{ 19.5, false },
+		{ 20.5, false },
+		{ 25.0, false },
+		{ 29.5, false },
+		{ 30.5, true },
+		{ 40.0, true },
+		{ 50.0, true },
+	};
+
+	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		double time = refs[i].time / 24.0;
+		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, NULL, NULL);
+		ufbxt_assert(state);
+
+		ufbxt_check_scene(state);
+
+		ufbx_node *node = ufbx_find_node(state, "pCube1");
+		ufbxt_assert(node);
+		ufbxt_assert(node->visible == refs[i].visible);
+
+		ufbx_free_scene(state);
+	}
+}
+#endif
+

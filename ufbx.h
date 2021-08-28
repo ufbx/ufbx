@@ -435,6 +435,9 @@ struct ufbx_node {
 	ufbx_matrix node_to_world;
 	ufbx_matrix geometry_to_node;
 	ufbx_matrix geometry_to_world;
+
+	// Visibility
+	bool visible;
 };
 
 // Vertex attribute: All attributes are stored in a consistent indexed format
@@ -1036,6 +1039,8 @@ struct ufbx_blend_channel {
 	// Current weight of the channel
 	ufbx_real weight;
 
+	// Key morph targets to blend between depending on `weight`
+	// In usual cases there's only one target per channel
 	ufbx_blend_keyframe_list keyframes;
 };
 

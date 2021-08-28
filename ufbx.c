@@ -2133,6 +2133,7 @@ static const char ufbxi_VertexCreaseIndex[] = "VertexCreaseIndex";
 static const char ufbxi_VertexCrease[] = "VertexCrease";
 static const char ufbxi_Vertices[] = "Vertices";
 static const char ufbxi_Video[] = "Video";
+static const char ufbxi_Visibility[] = "Visibility";
 static const char ufbxi_Weight[] = "Weight";
 static const char ufbxi_Weights[] = "Weights";
 static const char ufbxi_X[] = "X\0\0";
@@ -2361,6 +2362,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_VertexCreaseIndex, sizeof(ufbxi_VertexCreaseIndex) - 1 },
 	{ ufbxi_Vertices, sizeof(ufbxi_Vertices) - 1 },
 	{ ufbxi_Video, sizeof(ufbxi_Video) - 1 },
+	{ ufbxi_Visibility, sizeof(ufbxi_Visibility) - 1 },
 	{ ufbxi_Weight, sizeof(ufbxi_Weight) - 1 },
 	{ ufbxi_Weights, sizeof(ufbxi_Weights) - 1 },
 	{ ufbxi_X, 1 },
@@ -9317,6 +9319,8 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 		node->geometry_to_node = ufbx_identity_matrix;
 		node->geometry_to_world = node->node_to_world;
 	}
+
+	node->visible = ufbxi_find_int(&node->props, ufbxi_Visibility, 1) != 0;
 }
 
 ufbxi_noinline static void ufbxi_update_light(ufbx_light *light)

@@ -81,3 +81,12 @@ UFBXT_FILE_TEST(synthetic_geometric_transform)
 	ufbxt_assert_close_real(err, node->geometry_transform.scale.z, 4.0f);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_cube_hidden)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+	ufbxt_assert(!node->visible);
+}
+#endif
