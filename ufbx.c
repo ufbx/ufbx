@@ -3521,6 +3521,34 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 	const char *val;
 	size_t val_size;
 
+	bool file_big_endian = uc->file_big_endian;
+
+	#define ufbxi_convert_parse_fast(m_dst, m_type, m_expr) { \
+		m_dst *d = (m_dst*)dst; \
+		for (; base < size; base++) { \
+			val = ufbxi_peek_bytes(uc, 13); \
+			ufbxi_check(val); \
+			if (*val != m_type) break; \
+			val++; \
+			*d++ = (m_dst)(m_expr); \
+			ufbxi_consume_bytes(uc, 1 + sizeof(m_dst)); \
+		} \
+	}
+
+	// Optimize a couple of common cases
+	size_t base = 0;
+	if (!file_big_endian) {
+		switch (dst_type) {
+		case 'i': ufbxi_convert_parse_fast(int32_t, 'I', ufbxi_read_i32(val)); break;
+		case 'l': ufbxi_convert_parse_fast(int64_t, 'L', ufbxi_read_i64(val)); break;
+		case 'f': ufbxi_convert_parse_fast(float, 'F', ufbxi_read_f32(val)); break;
+		case 'd': ufbxi_convert_parse_fast(double, 'D', ufbxi_read_f64(val)); break;
+		}
+
+		// Early return if we handled everything
+		if (base == size) return 1;
+	}
+
 	switch (dst_type)
 	{
 
@@ -3528,12 +3556,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 		*d++ = (m_dst)(m_expr); val_size = m_size + 1; \
 
 	#define ufbxi_convert_parse_switch(m_dst) { \
-		m_dst *d = (m_dst*)dst; \
-		for (size_t i = 0; i < size; i++) { \
+		m_dst *d = (m_dst*)dst + base; \
+		for (size_t i = base; i < size; i++) { \
 			val = ufbxi_peek_bytes(uc, 13); \
 			ufbxi_check(val); \
 			char type = *val++; \
-			if (uc->file_big_endian) { \
+			if (file_big_endian) { \
 				val = ufbxi_swap_endian_value(uc, val, type); \
 				ufbxi_check(val); \
 			} \
@@ -3554,11 +3582,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 	case 'b':
 	{
 		char *d = (char*)dst;
-		for (size_t i = 0; i < size; i++) {
+		for (size_t i = base; i < size; i++) {
 			val = ufbxi_peek_bytes(uc, 13);
 			ufbxi_check(val);
 			char type = *val++; \
-			if (uc->file_big_endian) { \
+			if (file_big_endian) { \
 				val = ufbxi_swap_endian_value(uc, val, type); \
 				ufbxi_check(val); \
 			} \
