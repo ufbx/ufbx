@@ -52,7 +52,14 @@ int main(int argc, char **argv)
 		"MotionBuilder",
 	};
 
-	printf("FBX %u via %s %u.%u.%u\n", scene->metadata.version,
+	const char *formats[2][2] = {
+		{ "binary", "binary (big-endian)" },
+		{ "ascii", "!?!?ascii (big-endian)!?!?" },
+	};
+
+	printf("FBX %u %s via %s %u.%u.%u\n",
+		scene->metadata.version,
+		formats[scene->metadata.ascii][scene->metadata.big_endian],
 		exporters[scene->metadata.exporter],
 		ufbx_version_major(scene->metadata.exporter_version),
 		ufbx_version_minor(scene->metadata.exporter_version),
