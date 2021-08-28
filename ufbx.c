@@ -3396,7 +3396,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 
 // -- Binary parsing
 
-ufbxi_nodiscard static ufbxi_noinline void *ufbxi_swap_endian(ufbxi_context *uc, const void *src, size_t count, size_t elem_size)
+ufbxi_nodiscard static ufbxi_noinline char *ufbxi_swap_endian(ufbxi_context *uc, const void *src, size_t count, size_t elem_size)
 {
 	size_t total_size = count * elem_size;
 	ufbxi_check_return(!ufbxi_does_overflow(total_size, count, elem_size), NULL);
@@ -3408,6 +3408,10 @@ ufbxi_nodiscard static ufbxi_noinline void *ufbxi_swap_endian(ufbxi_context *uc,
 	const char *s = (const char*)src;
 	switch (elem_size) {
 	case 1:
+		for (size_t i = 0; i < count; i++) {
+			d[0] = s[0];
+			d += 1; s += 1;
+		}
 		break;
 	case 2:
 		for (size_t i = 0; i < count; i++) {
@@ -3435,17 +3439,18 @@ ufbxi_nodiscard static ufbxi_noinline void *ufbxi_swap_endian(ufbxi_context *uc,
 	return dst;
 }
 
-ufbxi_nodiscard static ufbxi_noinline void *ufbxi_swap_endian_type(ufbxi_context *uc, const void *src, size_t count, char type)
+// Swap the endianness of an array typed with a lowercase letter
+ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_swap_endian_array(ufbxi_context *uc, const void *src, size_t count, char type)
 {
 	switch (type) {
-	case 'Y': return ufbxi_swap_endian(uc, src, count, 2); break;
-	case 'I': case 'F': case 'i': case 'f': return ufbxi_swap_endian(uc, src, count, 4); break;
-	case 'L': case 'D': case 'l': case 'd': return ufbxi_swap_endian(uc, src, count, 8); break;
-	default: return (void*)src;
+	case 'i': case 'f': return ufbxi_swap_endian(uc, src, count, 4); break;
+	case 'l': case 'd': return ufbxi_swap_endian(uc, src, count, 8); break;
+	default: return (const char*)src;
 	}
 }
 
-ufbxi_nodiscard static ufbxi_noinline void *ufbxi_swap_endian_value(ufbxi_context *uc, const void *src, char type)
+// Swap the endianness of a single value (shallow, swaps string/array header words)
+ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_swap_endian_value(ufbxi_context *uc, const void *src, char type)
 {
 	switch (type) {
 	case 'Y': return ufbxi_swap_endian(uc, src, 1, 2); break;
@@ -3453,7 +3458,7 @@ ufbxi_nodiscard static ufbxi_noinline void *ufbxi_swap_endian_value(ufbxi_contex
 	case 'L': case 'D': return ufbxi_swap_endian(uc, src, 1, 8); break;
 	case 'S': case 'R': return ufbxi_swap_endian(uc, src, 1, 4); break;
 	case 'i': case 'l': case 'f': case 'd': case 'b': return ufbxi_swap_endian(uc, src, 3, 4); break;
-	default: return (void*)src;
+	default: return (const char*)src;
 	}
 }
 
@@ -3462,7 +3467,7 @@ ufbxi_nodiscard static ufbxi_noinline void *ufbxi_swap_endian_value(ufbxi_contex
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_context *uc, char src_type, char dst_type, const void *src, void *dst, size_t size)
 {
 	if (uc->file_big_endian) {
-		src = ufbxi_swap_endian_type(uc, src, size, src_type);
+		src = ufbxi_swap_endian_array(uc, src, size, src_type);
 		ufbxi_check(src);
 	}
 
@@ -3527,7 +3532,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 			ufbxi_check(val); \
 			char type = *val++; \
 			if (uc->file_big_endian) { \
-				val = ufbxi_swap_endian_type(uc, val, 1, type); \
+				val = ufbxi_swap_endian_value(uc, val, type); \
 				ufbxi_check(val); \
 			} \
 			switch (type) { \
@@ -3552,7 +3557,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 			ufbxi_check(val);
 			char type = *val++; \
 			if (uc->file_big_endian) { \
-				val = ufbxi_swap_endian_type(uc, val, 1, type); \
+				val = ufbxi_swap_endian_value(uc, val, type); \
 				ufbxi_check(val); \
 			} \
 			switch (type) {
