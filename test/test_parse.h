@@ -213,3 +213,10 @@ UFBXT_TEST(unicode_filename)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(maya_cube_big_endian)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->metadata.big_endian);
+}
+#endif
