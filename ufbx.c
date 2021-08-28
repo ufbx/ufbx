@@ -2520,7 +2520,8 @@ typedef struct {
 	ufbx_exporter exporter;
 	uint32_t exporter_version;
 	bool from_ascii;
-	bool big_endian;
+	bool local_big_endian;
+	bool file_big_endian;
 	bool sure_fbx;
 
 	ufbx_load_opts opts;
@@ -2555,6 +2556,8 @@ typedef struct {
 	// Temporary array
 	char *tmp_arr;
 	size_t tmp_arr_size;
+	char *swap_arr;
+	size_t swap_arr_size;
 
 	// Generated index buffers
 	size_t max_zero_indices;
@@ -3393,13 +3396,78 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 
 // -- Binary parsing
 
+ufbxi_nodiscard static ufbxi_noinline void *ufbxi_swap_endian(ufbxi_context *uc, const void *src, size_t count, size_t elem_size)
+{
+	size_t total_size = count * elem_size;
+	ufbxi_check_return(!ufbxi_does_overflow(total_size, count, elem_size), NULL);
+	if (uc->swap_arr_size < total_size) {
+		ufbxi_check_return(ufbxi_grow_array(&uc->ator_tmp, &uc->swap_arr, &uc->swap_arr_size, total_size), NULL);
+	}
+	char *dst = uc->swap_arr, *d = dst;
+
+	const char *s = (const char*)src;
+	switch (elem_size) {
+	case 1:
+		break;
+	case 2:
+		for (size_t i = 0; i < count; i++) {
+			d[0] = s[1]; d[1] = s[0];
+			d += 2; s += 2;
+		}
+		break;
+	case 4:
+		for (size_t i = 0; i < count; i++) {
+			d[0] = s[3]; d[1] = s[2]; d[2] = s[1]; d[3] = s[0];
+			d += 4; s += 4;
+		}
+		break;
+	case 8:
+		for (size_t i = 0; i < count; i++) {
+			d[0] = s[7]; d[1] = s[6]; d[2] = s[5]; d[3] = s[4];
+			d[4] = s[3]; d[5] = s[2]; d[6] = s[1]; d[7] = s[0];
+			d += 8; s += 8;
+		}
+		break;
+	default:
+		ufbx_assert(0 && "Bad endian swap size");
+	}
+
+	return dst;
+}
+
+ufbxi_nodiscard static ufbxi_noinline void *ufbxi_swap_endian_type(ufbxi_context *uc, const void *src, size_t count, char type)
+{
+	switch (type) {
+	case 'Y': return ufbxi_swap_endian(uc, src, count, 2); break;
+	case 'I': case 'F': case 'i': case 'f': return ufbxi_swap_endian(uc, src, count, 4); break;
+	case 'L': case 'D': case 'l': case 'd': return ufbxi_swap_endian(uc, src, count, 8); break;
+	default: return (void*)src;
+	}
+}
+
+ufbxi_nodiscard static ufbxi_noinline void *ufbxi_swap_endian_value(ufbxi_context *uc, const void *src, char type)
+{
+	switch (type) {
+	case 'Y': return ufbxi_swap_endian(uc, src, 1, 2); break;
+	case 'I': case 'F': return ufbxi_swap_endian(uc, src, 1, 4); break;
+	case 'L': case 'D': return ufbxi_swap_endian(uc, src, 1, 8); break;
+	case 'S': case 'R': return ufbxi_swap_endian(uc, src, 1, 4); break;
+	case 'i': case 'l': case 'f': case 'd': case 'b': return ufbxi_swap_endian(uc, src, 3, 4); break;
+	default: return (void*)src;
+	}
+}
+
 // Read and convert a post-7000 FBX data array into a different format. `src_type` may be equal to `dst_type`
 // if the platform is not binary compatible with the FBX data representation.
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_context *uc, char src_type, char dst_type, const void *src, void *dst, size_t size)
 {
+	if (uc->file_big_endian) {
+		src = ufbxi_swap_endian_type(uc, src, size, src_type);
+		ufbxi_check(src);
+	}
+
 	switch (dst_type)
 	{
-
 	#define ufbxi_convert_loop(m_dst, m_size, m_expr) { \
 		const char *val = (const char*)src, *val_end = val + size*m_size; \
 		m_dst *d = (m_dst*)dst; \
@@ -3457,7 +3525,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 		for (size_t i = 0; i < size; i++) { \
 			val = ufbxi_peek_bytes(uc, 13); \
 			ufbxi_check(val); \
-			switch (*val++) { \
+			char type = *val++; \
+			if (uc->file_big_endian) { \
+				val = ufbxi_swap_endian_type(uc, val, 1, type); \
+				ufbxi_check(val); \
+			} \
+			switch (type) { \
 				case 'C': \
 				case 'B': ufbxi_convert_parse(m_dst, 1, *val); break; \
 				case 'Y': ufbxi_convert_parse(m_dst, 2, ufbxi_read_i16(val)); break; \
@@ -3477,6 +3550,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 		for (size_t i = 0; i < size; i++) {
 			val = ufbxi_peek_bytes(uc, 13);
 			ufbxi_check(val);
+			char type = *val++; \
+			if (uc->file_big_endian) { \
+				val = ufbxi_swap_endian_type(uc, val, 1, type); \
+				ufbxi_check(val); \
+			} \
 			switch (*val++) {
 				case 'C':
 				case 'B': ufbxi_convert_parse(char, 1, *val != 0); break;
@@ -3537,17 +3615,25 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 	uint64_t end_offset, num_values64, values_len;
 	uint8_t name_len;
 	size_t header_size = (uc->version >= 7500) ? 25 : 13;
-	const char *header = ufbxi_read_bytes(uc, header_size);
+	const char *header = ufbxi_read_bytes(uc, header_size), *header_words = header;
 	ufbxi_check(header);
 	if (uc->version >= 7500) {
-		end_offset = ufbxi_read_u64(header + 0);
-		num_values64 = ufbxi_read_u64(header + 8);
-		values_len = ufbxi_read_u64(header + 16);
+		if (uc->file_big_endian) {
+			header_words = ufbxi_swap_endian(uc, header_words, 3, 8);
+			ufbxi_check(header_words);
+		}
+		end_offset = ufbxi_read_u64(header_words + 0);
+		num_values64 = ufbxi_read_u64(header_words + 8);
+		values_len = ufbxi_read_u64(header_words + 16);
 		name_len = ufbxi_read_u8(header + 24);
 	} else {
-		end_offset = ufbxi_read_u32(header + 0);
-		num_values64 = ufbxi_read_u32(header + 4);
-		values_len = ufbxi_read_u32(header + 8);
+		if (uc->file_big_endian) {
+			header_words = ufbxi_swap_endian(uc, header_words, 3, 4);
+			ufbxi_check(header_words);
+		}
+		end_offset = ufbxi_read_u32(header_words + 0);
+		num_values64 = ufbxi_read_u32(header_words + 4);
+		values_len = ufbxi_read_u32(header_words + 8);
 		name_len = ufbxi_read_u8(header + 12);
 	}
 
@@ -3614,11 +3700,17 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 
 		if (c=='c' || c=='b' || c=='i' || c=='l' || c =='f' || c=='d') {
 
+			const char *arr_words = data + 1;
+			if (uc->file_big_endian) {
+				arr_words = ufbxi_swap_endian(uc, arr_words, 3, 4);
+				ufbxi_check(arr_words);
+			}
+
 			// Parse the array header from the prefix we already peeked above.
 			char src_type = data[0];
-			uint32_t size = ufbxi_read_u32(data + 1); 
-			uint32_t encoding = ufbxi_read_u32(data + 5); 
-			uint32_t encoded_size = ufbxi_read_u32(data + 9); 
+			uint32_t size = ufbxi_read_u32(arr_words + 0); 
+			uint32_t encoding = ufbxi_read_u32(arr_words + 4); 
+			uint32_t encoded_size = ufbxi_read_u32(arr_words + 8); 
 			ufbxi_consume_bytes(uc, 13);
 
 			// Normalize the source type as well, but don't convert UFBX-specific
@@ -3635,7 +3727,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 			// with the FBX format we can read the decoded data directly into the array buffer.
 			// Otherwise we need a temporary buffer to decode the array into before conversion.
 			void *decoded_data = arr_data;
-			if (src_type != dst_type || uc->big_endian) {
+			if (src_type != dst_type || uc->local_big_endian != uc->file_big_endian) {
 				ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, decoded_data_size));
 				decoded_data = uc->tmp_arr;
 			}
@@ -3762,47 +3854,55 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 			const char *data = ufbxi_peek_bytes(uc, 13);
 			ufbxi_check(data);
 
-			switch (data[0]) {
+			const char *value = data + 1;
+
+			char type = data[0];
+			if (uc->file_big_endian) {
+				value = ufbxi_swap_endian_value(uc, value, type);
+				ufbxi_check(value);
+			}
+
+			switch (type) {
 
 			case 'C': case 'B':
 				type_mask |= UFBXI_VALUE_NUMBER << (i*2);
-				vals[i].f = (double)(vals[i].i = (int64_t)data[1]);
+				vals[i].f = (double)(vals[i].i = (int64_t)value[0]);
 				ufbxi_consume_bytes(uc, 2);
 				break;
 
 			case 'Y':
 				type_mask |= UFBXI_VALUE_NUMBER << (i*2);
-				vals[i].f = (double)(vals[i].i = ufbxi_read_i16(data + 1));
+				vals[i].f = (double)(vals[i].i = ufbxi_read_i16(value));
 				ufbxi_consume_bytes(uc, 3);
 				break;
 
 			case 'I':
 				type_mask |= UFBXI_VALUE_NUMBER << (i*2);
-				vals[i].f = (double)(vals[i].i = ufbxi_read_i32(data + 1));
+				vals[i].f = (double)(vals[i].i = ufbxi_read_i32(value));
 				ufbxi_consume_bytes(uc, 5);
 				break;
 
 			case 'L':
 				type_mask |= UFBXI_VALUE_NUMBER << (i*2);
-				vals[i].f = (double)(vals[i].i = ufbxi_read_i64(data + 1));
+				vals[i].f = (double)(vals[i].i = ufbxi_read_i64(value));
 				ufbxi_consume_bytes(uc, 9);
 				break;
 
 			case 'F':
 				type_mask |= UFBXI_VALUE_NUMBER << (i*2);
-				vals[i].i = (int64_t)(vals[i].f = ufbxi_read_f32(data + 1));
+				vals[i].i = (int64_t)(vals[i].f = ufbxi_read_f32(value));
 				ufbxi_consume_bytes(uc, 5);
 				break;
 
 			case 'D':
 				type_mask |= UFBXI_VALUE_NUMBER << (i*2);
-				vals[i].i = (int64_t)(vals[i].f = ufbxi_read_f64(data + 1));
+				vals[i].i = (int64_t)(vals[i].f = ufbxi_read_f64(value));
 				ufbxi_consume_bytes(uc, 9);
 				break;
 
 			case 'S': case 'R':
 			{
-				size_t len = ufbxi_read_u32(data + 1);
+				size_t len = ufbxi_read_u32(value);
 				ufbxi_consume_bytes(uc, 5);
 				vals[i].s.data = ufbxi_read_bytes(uc, len);
 				vals[i].s.length = len;
@@ -3814,7 +3914,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 			// Treat arrays as non-values and skip them
 			case 'c': case 'b': case 'i': case 'l': case 'f': case 'd':
 			{
-				uint32_t encoded_size = ufbxi_read_u32(data + 9);
+				uint32_t encoded_size = ufbxi_read_u32(value + 8);
 				ufbxi_consume_bytes(uc, 13);
 				ufbxi_check(ufbxi_skip_bytes(uc, encoded_size));
 			}
@@ -3873,9 +3973,9 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 	return 1;
 }
 
-#define UFBXI_BINARY_MAGIC_SIZE 23
+#define UFBXI_BINARY_MAGIC_SIZE 22
 #define UFBXI_BINARY_HEADER_SIZE 27
-static const char ufbxi_binary_magic[] = "Kaydara FBX Binary  \x00\x1a\x00";
+static const char ufbxi_binary_magic[] = "Kaydara FBX Binary  \x00\x1a";
 
 // -- ASCII parsing
 
@@ -4482,8 +4582,19 @@ ufbxi_nodiscard static int ufbxi_begin_parse(ufbxi_context *uc)
 	// treat it as an ASCII file.
 	if (!memcmp(header, ufbxi_binary_magic, UFBXI_BINARY_MAGIC_SIZE)) {
 
+		// The byte after the magic indicates endianness
+		char endian = header[UFBXI_BINARY_MAGIC_SIZE + 0];
+		uc->file_big_endian = endian != 0;
+
 		// Read the version directly from the header
-		uc->version = ufbxi_read_u32(header + UFBXI_BINARY_MAGIC_SIZE);
+		const char *version_word = header + UFBXI_BINARY_MAGIC_SIZE + 1;
+		if (uc->file_big_endian) {
+			version_word = ufbxi_swap_endian(uc, version_word, 1, 4);
+			ufbxi_check(version_word);
+		}
+		uc->version = ufbxi_read_u32(version_word);
+
+		// This is quite probably an FBX file..
 		uc->sure_fbx = true;
 		ufbxi_consume_bytes(uc, UFBXI_BINARY_HEADER_SIZE);
 
@@ -9772,6 +9883,7 @@ static void ufbxi_free_temp(ufbxi_context *uc)
 
 	ufbxi_free(&uc->ator_tmp, char, uc->read_buffer, uc->read_buffer_size);
 	ufbxi_free(&uc->ator_tmp, char, uc->tmp_arr, uc->tmp_arr_size);
+	ufbxi_free(&uc->ator_tmp, char, uc->swap_arr, uc->swap_arr_size);
 
 	ufbxi_free_ator(&uc->ator_tmp);
 }
@@ -9829,7 +9941,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 		uint8_t buf[2];
 		uint16_t val = 0xbbaa;
 		memcpy(buf, &val, 2);
-		uc->big_endian = buf[0] == 0xbb;
+		uc->local_big_endian = buf[0] == 0xbb;
 	}
 
 	if (user_opts) {
