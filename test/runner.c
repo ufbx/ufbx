@@ -485,7 +485,7 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
 	return obj;
 }
 
-static void ufbxt_debug_dump_obj(const char *file, ufbx_node *node, ufbx_mesh *mesh)
+static void ufbxt_debug_dump_obj_mesh(const char *file, ufbx_node *node, ufbx_mesh *mesh)
 {
 	FILE *f = fopen(file, "wb");
 	ufbxt_assert(f);
@@ -510,6 +510,70 @@ static void ufbxt_debug_dump_obj(const char *file, ufbx_node *node, ufbx_mesh *m
 			fprintf(f, " %d/%d", vi + 1, ti + 1);
 		}
 		fprintf(f, "\n");
+	}
+
+	fclose(f);
+}
+
+static void ufbxt_debug_dump_obj_scene(const char *file, ufbx_scene *scene)
+{
+	FILE *f = fopen(file, "wb");
+	ufbxt_assert(f);
+
+	for (size_t mi = 0; mi < scene->meshes.count; mi++) {
+		ufbx_mesh *mesh = scene->meshes.data[mi];
+		for (size_t ni = 0; ni < mesh->instances.count; ni++) {
+			ufbx_node *node = mesh->instances.data[ni];
+
+			for (size_t i = 0; i < mesh->vertex_position.num_values; i++) {
+				ufbx_vec3 v = mesh->vertex_position.data[i];
+				v = ufbx_transform_position(&node->geometry_to_world, v);
+				fprintf(f, "v %f %f %f\n", v.x, v.y, v.z);
+			}
+
+			for (size_t i = 0; i < mesh->vertex_uv.num_values; i++) {
+				ufbx_vec2 v = mesh->vertex_uv.data[i];
+				fprintf(f, "vt %f %f\n", v.x, v.y);
+			}
+
+			for (size_t i = 0; i < mesh->vertex_normal.num_values; i++) {
+				ufbx_vec3 v = mesh->vertex_normal.data[i];
+				fprintf(f, "vn %f %f %f\n", v.x, v.y, v.z);
+			}
+
+			printf("\n");
+		}
+	}
+
+	int32_t v_off = 0, t_off = 0, n_off = 0;
+	for (size_t mi = 0; mi < scene->meshes.count; mi++) {
+		ufbx_mesh *mesh = scene->meshes.data[mi];
+		for (size_t ni = 0; ni < mesh->instances.count; ni++) {
+			ufbx_node *node = mesh->instances.data[ni];
+			fprintf(f, "g %s\n", node->name.data);
+
+			for (size_t fi = 0; fi < mesh->num_faces; fi++) {
+				ufbx_face face = mesh->faces[fi];
+				fprintf(f, "f");
+				for (size_t ci = 0; ci < face.num_indices; ci++) {
+					int32_t vi = v_off + mesh->vertex_position.indices[face.index_begin + ci];
+					int32_t ni = n_off + mesh->vertex_normal.indices[face.index_begin + ci];
+					if (mesh->vertex_uv.indices) {
+						int32_t ti = t_off + mesh->vertex_uv.indices[face.index_begin + ci];
+						fprintf(f, " %d/%d/%d", vi + 1, ti + 1, ni + 1);
+					} else {
+						fprintf(f, " %d//%d", vi + 1, ni + 1);
+					}
+				}
+				fprintf(f, "\n");
+			}
+
+			printf("\n");
+
+			v_off += (int32_t)mesh->vertex_position.num_values;
+			t_off += (int32_t)mesh->vertex_uv.num_values;
+			n_off += (int32_t)mesh->vertex_normal.num_values;
+		}
 	}
 
 	fclose(f);
