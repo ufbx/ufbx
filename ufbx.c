@@ -2000,6 +2000,7 @@ static const char ufbxi_GateFit[] = "GateFit";
 static const char ufbxi_GeometricRotation[] = "GeometricRotation";
 static const char ufbxi_GeometricScaling[] = "GeometricScaling";
 static const char ufbxi_GeometricTranslation[] = "GeometricTranslation";
+static const char ufbxi_GeometryUVInfo[] = "GeometryUVInfo";
 static const char ufbxi_Geometry[] = "Geometry";
 static const char ufbxi_GlobalSettings[] = "GlobalSettings";
 static const char ufbxi_Implementation[] = "Implementation";
@@ -2042,6 +2043,7 @@ static const char ufbxi_LocalStop[] = "LocalStop";
 static const char ufbxi_LocalTime[] = "LocalTime";
 static const char ufbxi_LodGroup[] = "LodGroup";
 static const char ufbxi_MappingInformationType[] = "MappingInformationType";
+static const char ufbxi_MaterialAssignation[] = "MaterialAssignation";
 static const char ufbxi_Material[] = "Material";
 static const char ufbxi_Materials[] = "Materials";
 static const char ufbxi_Matrix[] = "Matrix";
@@ -2114,6 +2116,8 @@ static const char ufbxi_Takes[] = "Takes";
 static const char ufbxi_TangentsIndex[] = "TangentsIndex";
 static const char ufbxi_Tangents[] = "Tangents";
 static const char ufbxi_TextureId[] = "TextureId";
+static const char ufbxi_TextureUVVerticeIndex[] = "TextureUVVerticeIndex";
+static const char ufbxi_TextureUV[] = "TextureUV";
 static const char ufbxi_Texture[] = "Texture";
 static const char ufbxi_TimeMarker[] = "TimeMarker";
 static const char ufbxi_TimeMode[] = "TimeMode";
@@ -2231,6 +2235,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_GeometricScaling, sizeof(ufbxi_GeometricScaling) - 1 },
 	{ ufbxi_GeometricTranslation, sizeof(ufbxi_GeometricTranslation) - 1 },
 	{ ufbxi_Geometry, sizeof(ufbxi_Geometry) - 1 },
+	{ ufbxi_GeometryUVInfo, sizeof(ufbxi_GeometryUVInfo) - 1 },
 	{ ufbxi_GlobalSettings, sizeof(ufbxi_GlobalSettings) - 1 },
 	{ ufbxi_Implementation, sizeof(ufbxi_Implementation) - 1 },
 	{ ufbxi_Indexes, sizeof(ufbxi_Indexes) - 1 },
@@ -2273,6 +2278,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_LodGroup, sizeof(ufbxi_LodGroup) - 1 },
 	{ ufbxi_MappingInformationType, sizeof(ufbxi_MappingInformationType) - 1 },
 	{ ufbxi_Material, sizeof(ufbxi_Material) - 1 },
+	{ ufbxi_MaterialAssignation, sizeof(ufbxi_MaterialAssignation) - 1 },
 	{ ufbxi_Materials, sizeof(ufbxi_Materials) - 1 },
 	{ ufbxi_Matrix, sizeof(ufbxi_Matrix) - 1 },
 	{ ufbxi_Mesh, sizeof(ufbxi_Mesh) - 1 },
@@ -2345,6 +2351,8 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_TangentsIndex, sizeof(ufbxi_TangentsIndex) - 1 },
 	{ ufbxi_Texture, sizeof(ufbxi_Texture) - 1 },
 	{ ufbxi_TextureId, sizeof(ufbxi_TextureId) - 1 },
+	{ ufbxi_TextureUV, sizeof(ufbxi_TextureUV) - 1 },
+	{ ufbxi_TextureUVVerticeIndex, sizeof(ufbxi_TextureUVVerticeIndex) - 1 },
 	{ ufbxi_TimeMarker, sizeof(ufbxi_TimeMarker) - 1 },
 	{ ufbxi_TimeMode, sizeof(ufbxi_TimeMode) - 1 },
 	{ ufbxi_TimeProtocol, sizeof(ufbxi_TimeProtocol) - 1 },
@@ -3200,6 +3208,15 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			info->type = 'r';
 			info->result = true;
 			info->pad_begin = true;
+			return true;
+		} else if (name == ufbxi_Normals && !uc->opts.ignore_geometry) {
+			info->type = 'r';
+			info->result = true;
+			info->pad_begin = true;
+			return true;
+		} else if (name == ufbxi_Materials && !uc->opts.ignore_geometry) {
+			info->type = 'i';
+			info->result = true;
 			return true;
 		} else if (name == ufbxi_PolygonVertexIndex && !uc->opts.ignore_geometry) {
 			info->type = 'i';
@@ -5674,7 +5691,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_contex
 		size_t num_indices = indices->size;
 		int32_t *index_data = (int32_t*)indices->data;
 
-		if (mapping == ufbxi_ByPolygonVertex) {
+		if (mapping == ufbxi_ByPolygonVertex || mapping == ufbxi_ByPolygon) {
 
 			// Indexed by polygon vertex: We can use the provided indices directly.
 			ufbxi_check(ufbxi_check_indices(uc, p_dst_index, index_data, true, num_indices, mesh->num_indices, num_elems));
@@ -5714,7 +5731,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_vertex_element(ufbxi_contex
 
 	} else {
 
-		if (mapping == ufbxi_ByPolygonVertex) {
+		if (mapping == ufbxi_ByPolygonVertex || mapping == ufbxi_ByPolygon) {
 
 			// Direct by polygon index: Use shared consecutive array if there's enough
 			// elements, otherwise use a unique truncated consecutive index array.
@@ -7682,6 +7699,57 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_mesh(ufbxi_context *
 	// index buffer for face materials..
 	uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, mesh->num_faces);
 	uc->max_consecutive_indices = ufbxi_max_sz(uc->max_consecutive_indices, mesh->num_faces);
+
+	// Normals are always per-index in legacy FBX files
+	ufbxi_value_array *normals = ufbxi_find_array(node, ufbxi_Normals, 'r');
+	if (normals) {
+		ufbxi_check(normals->size / 3 == mesh->num_indices);
+		uc->max_consecutive_indices = ufbxi_max_sz(uc->max_consecutive_indices, mesh->num_indices);
+		mesh->vertex_normal.num_values = mesh->num_indices;
+		mesh->vertex_normal.unique_per_vertex = false;
+		mesh->vertex_normal.data = (ufbx_vec3*)normals->data;
+		mesh->vertex_normal.indices = ufbxi_sentinel_index_consecutive;
+	}
+
+	// Optional UV values are stored pretty much like a modern vertex element
+	ufbxi_node *uv_info = ufbxi_find_child(node, ufbxi_GeometryUVInfo);
+	if (uv_info) {
+		ufbx_uv_set *set = ufbxi_push_zero(&uc->result, ufbx_uv_set, 1);
+		ufbxi_check(set);
+		set->index = 0;
+		set->name = ufbx_empty_string;
+		set->vertex_uv.value_reals = 2;
+		set->vertex_tangent.value_reals = 3;
+		set->vertex_bitangent.value_reals = 3;
+		ufbxi_check(ufbxi_read_vertex_element(uc, mesh, uv_info, &set->vertex_uv.data, &set->vertex_uv.indices,
+			&set->vertex_uv.unique_per_vertex, &set->vertex_uv.num_values, ufbxi_TextureUV, ufbxi_TextureUVVerticeIndex, 'r', 2));
+
+		mesh->vertex_uv = set->vertex_uv;
+	}
+
+	// Material indices
+	{
+		const char *mapping;
+		ufbxi_check(ufbxi_find_val1(node, ufbxi_MaterialAssignation, "C", (char**)&mapping));
+		if (mapping == ufbxi_ByPolygon) {
+			ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->face_material, node, ufbxi_Materials, 'i', mesh->num_faces));
+		} else if (mapping == ufbxi_AllSame) {
+			ufbxi_value_array *arr = ufbxi_find_array(node, ufbxi_Materials, 'i');
+			int32_t material = 0;
+			if (arr && arr->size >= 1) {
+				material = ((int32_t*)arr->data)[0];
+			}
+			if (material == 0) {
+				mesh->face_material = (int32_t*)ufbxi_sentinel_index_zero;
+			} else {
+				mesh->face_material = ufbxi_push(&uc->result, int32_t, mesh->num_faces);
+				ufbxi_check(mesh->face_material);
+				ufbxi_for(int32_t, p_mat, mesh->face_material, mesh->num_faces) {
+					*p_mat = material;
+				}
+			}
+		}
+	}
 
 	mesh->skinned_is_local = true;
 	mesh->skinned_position = mesh->vertex_position;
