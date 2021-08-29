@@ -429,9 +429,15 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
 				char *end = strchr(begin, ' ');
 				if (end) *end++ = '\0';
 
+				if (begin[strspn(begin, " \t\r\n")] == '\0') {
+					begin = end;
+					continue;
+				}
+
 				int pi = 0, ui = 0, ni = 0;
 				if (sscanf(begin, "%d/%d/%d", &pi, &ui, &ni) == 3) {
 				} else if (sscanf(begin, "%d//%d", &pi, &ni) == 2) {
+				} else if (sscanf(begin, "%d/%d", &pi, &ui) == 2) {
 				} else {
 					ufbxt_assert(0 && "Failed to parse face indices");
 				}
