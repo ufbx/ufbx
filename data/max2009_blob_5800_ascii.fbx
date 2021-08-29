@@ -11,17 +11,17 @@ FBXHeaderExtension:  {
         Year: 2021
         Month: 8
         Day: 29
-        Hour: 4
-        Minute: 54
-        Second: 47
-        Millisecond: 957
+        Hour: 11
+        Minute: 37
+        Second: 14
+        Millisecond: 227
     }
     Creator: "FBX SDK/FBX Plugins build 20080212"
     OtherFlags:  {
         FlagPLE: 0
     }
 }
-CreationTime: "2021-08-29 04:54:47:957"
+CreationTime: "2021-08-29 11:37:14:227"
 Creator: "FBX SDK/FBX Plugins build 20080212"
 Media:  {
     Video:  {
