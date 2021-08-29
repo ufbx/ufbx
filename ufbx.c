@@ -5417,7 +5417,7 @@ ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_str
 	// or Name\x00\x01Type (in binary)
 	const char *sep = uc->from_ascii ? "::" : "\x00\x01";
 	size_t type_end = 2;
-	for (; type_end < type_and_name.length; type_end++) {
+	for (; type_end <= type_and_name.length; type_end++) {
 		const char *ch = type_and_name.data + type_end - 2;
 		if (ch[0] == sep[0] && ch[1] == sep[1]) break;
 	}
@@ -5435,10 +5435,14 @@ ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_str
 			type->data = type_and_name.data + type_end;
 			type->length = type_and_name.length - type_end;
 		}
-	} else {
+	} else if (type_end == type_and_name.length) {
 		*type = type_and_name;
 		name->data = ufbxi_empty_char;
 		name->length = 0;
+	} else {
+		*name = type_and_name;
+		type->data = ufbxi_empty_char;
+		type->length = 0;
 	}
 
 	ufbxi_check(ufbxi_push_string_place_str(uc, type));
@@ -7688,16 +7692,9 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_mesh(ufbxi_context *
 
 ufbxi_nodiscard static int ufbxi_read_legacy_model(ufbxi_context *uc, ufbxi_node *node)
 {
-	ufbx_string type_and_name;
+	ufbx_string type_and_name, type, name;
 	ufbxi_check(ufbxi_get_val1(node, "s", &type_and_name));
-	ufbx_string type, name;
-
-	if (uc->version >= 5800) {
-		ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type, &name));
-	} else {
-		name = type_and_name;
-		type = ufbx_empty_string;
-	}
+	ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type, &name));
 
 	ufbxi_element_info info = { 0 };
 	info.fbx_id = (uintptr_t)type_and_name.data;
