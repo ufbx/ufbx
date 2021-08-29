@@ -4500,6 +4500,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 					ufbxi_check(v);
 					v->data = tok->str_data;
 					v->length = tok->str_len;
+					ufbxi_check(ufbxi_push_string_place_str(uc, v));
 				} else {
 					// Ignore strings in non-string arrays, decrement `num_values` as it will be
 					// incremented after the loop iteration is done to ignore it.
