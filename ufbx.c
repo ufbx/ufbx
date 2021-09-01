@@ -3078,6 +3078,7 @@ typedef enum {
 	UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING,
 	UFBXI_PARSE_LAYER_ELEMENT_MATERIAL,
 	UFBXI_PARSE_LAYER_ELEMENT_OTHER,
+	UFBXI_PARSE_GEOMETRY_UV_INFO,
 	UFBXI_PARSE_SHAPE,
 	UFBXI_PARSE_TAKE,
 	UFBXI_PARSE_TAKE_OBJECT,
@@ -3130,6 +3131,10 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 		if (name == ufbxi_LayerElementMaterial) return UFBXI_PARSE_LAYER_ELEMENT_MATERIAL;
 		if (!strncmp(name, "LayerElement", 12)) return UFBXI_PARSE_LAYER_ELEMENT_OTHER;
 		if (name == ufbxi_Shape) return UFBXI_PARSE_SHAPE;
+		break;
+
+	case UFBXI_PARSE_LEGACY_MODEL:
+		if (name == ufbxi_GeometryUVInfo) return UFBXI_PARSE_GEOMETRY_UV_INFO;
 		break;
 
 	case UFBXI_PARSE_POSE:
@@ -3362,6 +3367,20 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 		if (name == ufbxi_TextureId && !uc->opts.ignore_geometry) {
 			info->type = 'i';
 			info->tmp_buf = true;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_GEOMETRY_UV_INFO:
+		if (name == ufbxi_TextureUV && !uc->opts.ignore_geometry) {
+			info->type = 'r';
+			info->result = true;
+			info->pad_begin = true;
+			return true;
+		} else if (name == ufbxi_TextureUVVerticeIndex && !uc->opts.ignore_geometry) {
+			info->type = 'i';
+			info->result = true;
+			info->pad_begin = true;
 			return true;
 		}
 		break;

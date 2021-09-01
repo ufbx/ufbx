@@ -328,6 +328,9 @@ typedef struct {
 	ufbxt_obj_mesh *meshes;
 	size_t num_meshes;
 
+	bool bad_normals;
+	bool bad_order;
+
 } ufbxt_obj_file;
 
 static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
@@ -385,6 +388,8 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
 	ufbxt_obj_mesh *meshes = (ufbxt_obj_mesh*)(uv_indices + num_faces * 4);
 	void *data_end = meshes + num_meshes;
 	ufbxt_assert((char*)data_end - (char*)data == alloc_size);
+
+	memset(obj, 0, sizeof(ufbxt_obj_file));
 
 	ufbx_vec3 *dp = positions;
 	ufbx_vec3 *dn = normals;
@@ -474,6 +479,22 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
 			mesh->vertex_uv.indices = dui;
 		}
 
+		if (line[0] == '#') {
+			line += 1;
+			while (line < line_end && (line[0] == ' ' || line[0] == '\t')) {
+				line++;
+			}
+			while (line_end > line && (line_end[-1] == ' ' || line_end[-1] == '\t')) {
+				*--line_end = '\0';
+			}
+			if (!strcmp(line, "ufbx:bad_normals")) {
+				obj->bad_normals = true;
+			}
+			if (!strcmp(line, "ufbx:bad_order")) {
+				obj->bad_order = true;
+			}
+		}
+
 		if (line_end) {
 			*line_end = prev;
 			line = line_end + 1;
@@ -541,7 +562,7 @@ static void ufbxt_debug_dump_obj_scene(const char *file, ufbx_scene *scene)
 				fprintf(f, "vn %f %f %f\n", v.x, v.y, v.z);
 			}
 
-			printf("\n");
+			fprintf(f, "\n");
 		}
 	}
 
@@ -568,7 +589,7 @@ static void ufbxt_debug_dump_obj_scene(const char *file, ufbx_scene *scene)
 				fprintf(f, "\n");
 			}
 
-			printf("\n");
+			fprintf(f, "\n");
 
 			v_off += (int32_t)mesh->vertex_position.num_values;
 			t_off += (int32_t)mesh->vertex_uv.num_values;
@@ -618,17 +639,79 @@ static void ufbxt_assert_close_vec4(ufbxt_diff_error *p_err, ufbx_vec4 a, ufbx_v
 typedef struct {
 	ufbx_vec3 pos;
 	ufbx_vec2 uv;
-} ufbxt_sub_vertex;
+} ufbxt_match_vertex;
 
 static int ufbxt_cmp_sub_vertex(const void *va, const void *vb)
 {
-	const ufbxt_sub_vertex *a = (const ufbxt_sub_vertex*)va, *b = (const ufbxt_sub_vertex*)vb;
+	const ufbxt_match_vertex *a = (const ufbxt_match_vertex*)va, *b = (const ufbxt_match_vertex*)vb;
 	if (a->pos.x != b->pos.x) return a->pos.x < b->pos.x ? -1 : +1;
 	if (a->pos.y != b->pos.y) return a->pos.y < b->pos.y ? -1 : +1;
 	if (a->pos.z != b->pos.z) return a->pos.z < b->pos.z ? -1 : +1;
 	if (a->uv.x != b->uv.x) return a->uv.x < b->uv.x ? -1 : +1;
 	if (a->uv.y != b->uv.y) return a->uv.y < b->uv.y ? -1 : +1;
 	return 0;
+}
+
+static void ufbxt_match_obj_mesh(ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt_obj_mesh *obj_mesh, ufbxt_diff_error *p_err)
+{
+	ufbxt_assert(fbx_mesh->num_faces == obj_mesh->num_faces);
+	ufbxt_assert(fbx_mesh->num_indices == obj_mesh->num_indices);
+
+	// Check that all vertices exist, anything more doesn't really make sense
+	ufbxt_match_vertex *obj_verts = (ufbxt_match_vertex*)calloc(obj_mesh->num_indices, sizeof(ufbxt_match_vertex));
+	ufbxt_match_vertex *sub_verts = (ufbxt_match_vertex*)calloc(fbx_mesh->num_indices, sizeof(ufbxt_match_vertex));
+	ufbxt_assert(obj_verts && sub_verts);
+
+	for (size_t i = 0; i < obj_mesh->num_indices; i++) {
+		obj_verts[i].pos = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, i);
+		if (obj_mesh->vertex_uv.data) {
+			obj_verts[i].uv = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, i);
+		}
+	}
+	for (size_t i = 0; i < fbx_mesh->num_indices; i++) {
+		ufbx_vec3 fp = ufbx_get_vertex_vec3(&fbx_mesh->skinned_position, i);
+		if (fbx_mesh->skinned_is_local) {
+			fp = ufbx_transform_position(&fbx_node->geometry_to_world, fp);
+		}
+		sub_verts[i].pos = fp;
+		if (obj_mesh->vertex_uv.data) {
+			ufbxt_assert(fbx_mesh->vertex_uv.data);
+			sub_verts[i].uv = ufbx_get_vertex_vec2(&fbx_mesh->vertex_uv, i);
+		}
+	}
+
+	qsort(obj_verts, obj_mesh->num_indices, sizeof(ufbxt_match_vertex), &ufbxt_cmp_sub_vertex);
+	qsort(sub_verts, fbx_mesh->num_indices, sizeof(ufbxt_match_vertex), &ufbxt_cmp_sub_vertex);
+
+	for (int32_t i = (int32_t)fbx_mesh->num_indices - 1; i >= 0; i--) {
+		ufbxt_match_vertex v = sub_verts[i];
+
+		bool found = false;
+		for (int32_t j = i; j >= 0 && obj_verts[j].pos.x >= v.pos.x - 0.002f; j--) {
+			ufbx_real dx = obj_verts[j].pos.x - v.pos.x;
+			ufbx_real dy = obj_verts[j].pos.y - v.pos.y;
+			ufbx_real dz = obj_verts[j].pos.z - v.pos.z;
+			ufbx_real du = obj_verts[j].uv.x - v.uv.x;
+			ufbx_real dv = obj_verts[j].uv.y - v.uv.y;
+			ufbxt_assert(dx <= 0.002f);
+			ufbx_real err = (ufbx_real)sqrt(dx*dx + dy*dy + dz*dz + du*du + dv*dv);
+			if (err < 0.001f) {
+				if (err > p_err->max) p_err->max = err;
+				p_err->sum += err;
+				p_err->num++;
+
+				obj_verts[j] = obj_verts[i];
+				found = true;
+				break;
+			}
+		}
+
+		ufbxt_assert(found);
+	}
+
+	free(obj_verts);
+	free(sub_verts);
+
 }
 
 static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, bool check_deformed_normals)
@@ -649,65 +732,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, mesh->subdivision_preview_levels, NULL, NULL);
 
 			ufbxt_check_mesh(scene, mesh);
-
-			// TODO: Remove when not needed anymore
-			// ufbxt_debug_dump_obj("test.obj", node, sub_mesh);
-
-			ufbxt_assert(sub_mesh->num_faces == obj_mesh->num_faces);
-			ufbxt_assert(sub_mesh->num_indices == obj_mesh->num_indices);
-
-			// Check that all vertices exist, anything more doesn't really make sense
-			ufbxt_sub_vertex *obj_verts = (ufbxt_sub_vertex*)calloc(obj_mesh->num_indices, sizeof(ufbxt_sub_vertex));
-			ufbxt_sub_vertex *sub_verts = (ufbxt_sub_vertex*)calloc(sub_mesh->num_indices, sizeof(ufbxt_sub_vertex));
-			ufbxt_assert(obj_verts && sub_verts);
-
-			for (size_t i = 0; i < obj_mesh->num_indices; i++) {
-				obj_verts[i].pos = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, i);
-				if (obj_mesh->vertex_uv.data) {
-					obj_verts[i].uv = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, i);
-				}
-			}
-			for (size_t i = 0; i < sub_mesh->num_indices; i++) {
-				ufbx_vec3 fp = ufbx_get_vertex_vec3(&sub_mesh->vertex_position, i);
-				fp = ufbx_transform_position(mat, fp);
-				sub_verts[i].pos = fp;
-				if (obj_mesh->vertex_uv.data) {
-					sub_verts[i].uv = ufbx_get_vertex_vec2(&sub_mesh->vertex_uv, i);
-				}
-			}
-
-			qsort(obj_verts, obj_mesh->num_indices, sizeof(ufbxt_sub_vertex), &ufbxt_cmp_sub_vertex);
-			qsort(sub_verts, sub_mesh->num_indices, sizeof(ufbxt_sub_vertex), &ufbxt_cmp_sub_vertex);
-
-			for (int32_t i = (int32_t)sub_mesh->num_indices - 1; i >= 0; i--) {
-				ufbxt_sub_vertex v = sub_verts[i];
-
-				bool found = false;
-				for (int32_t j = i; j >= 0 && obj_verts[j].pos.x >= v.pos.x - 0.002f; j--) {
-					ufbx_real dx = obj_verts[j].pos.x - v.pos.x;
-					ufbx_real dy = obj_verts[j].pos.y - v.pos.y;
-					ufbx_real dz = obj_verts[j].pos.z - v.pos.z;
-					ufbx_real du = obj_verts[j].uv.x - v.uv.x;
-					ufbx_real dv = obj_verts[j].uv.y - v.uv.y;
-					ufbxt_assert(dx <= 0.002f);
-					ufbx_real err = (ufbx_real)sqrt(dx*dx + dy*dy + dz*dz + du*du + dv*dv);
-					if (err < 0.001f) {
-						if (err > p_err->max) p_err->max = err;
-						p_err->sum += err;
-						p_err->num++;
-
-						obj_verts[j] = obj_verts[i];
-						found = true;
-						break;
-					}
-				}
-
-				ufbxt_assert(found);
-			}
-
-			free(obj_verts);
-			free(sub_verts);
-
+			ufbxt_match_obj_mesh(node, sub_mesh, obj_mesh, p_err);
 			ufbx_free_mesh(sub_mesh);
 
 			continue;
@@ -716,41 +741,48 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		ufbxt_assert(obj_mesh->num_faces == mesh->num_faces);
 		ufbxt_assert(obj_mesh->num_indices == mesh->num_indices);
 
+		bool check_normals = true;
+		if (obj->bad_normals) check_normals = false;
+		if (!check_deformed_normals && mesh->all_deformers.count > 0) check_normals = false;
 
-		// Assume that the indices are in the same order!
-		for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
-			ufbx_face obj_face = obj_mesh->faces[face_ix];
-			ufbx_face face = mesh->faces[face_ix];
-			ufbxt_assert(obj_face.index_begin == face.index_begin);
-			ufbxt_assert(obj_face.num_indices == face.num_indices);
+		if (obj->bad_order) {
+			ufbxt_match_obj_mesh(node, mesh, obj_mesh, p_err);
+		} else {
+			// Assume that the indices are in the same order!
+			for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
+				ufbx_face obj_face = obj_mesh->faces[face_ix];
+				ufbx_face face = mesh->faces[face_ix];
+				ufbxt_assert(obj_face.index_begin == face.index_begin);
+				ufbxt_assert(obj_face.num_indices == face.num_indices);
 
-			for (size_t ix = face.index_begin; ix < face.index_begin + face.num_indices; ix++) {
-				ufbx_vec3 op = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, ix);
-				ufbx_vec3 fp = ufbx_get_vertex_vec3(&mesh->skinned_position, ix);
-				ufbx_vec3 on = ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, ix);
-				ufbx_vec3 fn = ufbx_get_vertex_vec3(&mesh->skinned_normal, ix);
+				for (size_t ix = face.index_begin; ix < face.index_begin + face.num_indices; ix++) {
+					ufbx_vec3 op = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, ix);
+					ufbx_vec3 fp = ufbx_get_vertex_vec3(&mesh->skinned_position, ix);
+					ufbx_vec3 on = ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, ix);
+					ufbx_vec3 fn = ufbx_get_vertex_vec3(&mesh->skinned_normal, ix);
 
-				if (mesh->skinned_is_local) {
-					fp = ufbx_transform_position(mat, fp);
-					fn = ufbx_transform_direction(&norm_mat, fn);
+					if (mesh->skinned_is_local) {
+						fp = ufbx_transform_position(mat, fp);
+						fn = ufbx_transform_direction(&norm_mat, fn);
 
-					ufbx_real fn_len = (ufbx_real)sqrt(fn.x*fn.x + fn.y*fn.y + fn.z*fn.z);
-					fn.x /= fn_len;
-					fn.y /= fn_len;
-					fn.z /= fn_len;
-				}
+						ufbx_real fn_len = (ufbx_real)sqrt(fn.x*fn.x + fn.y*fn.y + fn.z*fn.z);
+						fn.x /= fn_len;
+						fn.y /= fn_len;
+						fn.z /= fn_len;
+					}
 
-				ufbxt_assert_close_vec3(p_err, op, fp);
+					ufbxt_assert_close_vec3(p_err, op, fp);
 
-				if (check_deformed_normals || mesh->all_deformers.count == 0) {
-					ufbxt_assert_close_vec3(p_err, on, fn);
-				}
+					if (check_normals) {
+						ufbxt_assert_close_vec3(p_err, on, fn);
+					}
 
-				if (mesh->vertex_uv.data) {
-					ufbxt_assert(obj_mesh->vertex_uv.data);
-					ufbx_vec2 ou = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, ix);
-					ufbx_vec2 fu = ufbx_get_vertex_vec2(&mesh->vertex_uv, ix);
-					ufbxt_assert_close_vec2(p_err, ou, fu);
+					if (obj_mesh->vertex_uv.data) {
+						ufbxt_assert(mesh->vertex_uv.data);
+						ufbx_vec2 ou = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, ix);
+						ufbx_vec2 fu = ufbx_get_vertex_vec2(&mesh->vertex_uv, ix);
+						ufbxt_assert_close_vec2(p_err, ou, fu);
+					}
 				}
 			}
 		}
@@ -1508,7 +1540,6 @@ const uint32_t ufbxt_file_versions[] = { 5000, 5800, 6100, 7100, 7400, 7500, 770
 
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err), const char *suffix, ufbx_load_opts user_opts)
 {
-
 	char buf[512];
 	snprintf(buf, sizeof(buf), "%s%s.obj", data_root, name);
 	size_t obj_size = 0;
