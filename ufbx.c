@@ -4726,6 +4726,9 @@ ufbxi_nodiscard static int ufbxi_begin_parse(ufbxi_context *uc)
 		}
 	}
 
+	// Initialize the scene
+	uc->scene.metadata.creator = ufbx_empty_string;
+
 	return 1;
 }
 
@@ -7504,11 +7507,6 @@ ufbxi_nodiscard static int ufbxi_read_takes(ufbxi_context *uc)
 
 ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 {
-	// Initialize the scene
-	{
-		uc->scene.metadata.creator = ufbx_empty_string;
-	}
-
 	// FBXHeaderExtension: Some metadata (optional)
 	ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_FBXHeaderExtension));
 	ufbxi_check(ufbxi_read_header_extension(uc));
