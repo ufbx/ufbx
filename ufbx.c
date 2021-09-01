@@ -5170,7 +5170,7 @@ static bool ufbxi_match_version_string(const char *fmt, ufbx_string str, uint32_
 			}
 			if (pos >= str.length) return false;
 			pos++;
-		} else if (c == '/' || c == '.') {
+		} else if (c == '/' || c == '.' || c == '(' || c == ')') {
 			if (pos >= str.length) return false;
 			if (str.data[pos] != c) return false;
 			pos++;
