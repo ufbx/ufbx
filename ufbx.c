@@ -5958,8 +5958,8 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	ufbxi_tmp_mesh_texture_list *tex_list = ufbxi_push_zero(&uc->tmp_mesh_texture_lists, ufbxi_tmp_mesh_texture_list, 1);
 	ufbxi_check(tex_list);
 
-	// Legacy pre-7000 blend shapes are contained within the same geometry node
-	if (uc->version < 7000) {
+	// In up to version 7100 FBX files blend shapes are contained within the same geometry node
+	if (uc->version <= 7100) {
 		ufbxi_check(ufbxi_read_synthetic_blend_shapes(uc, node, info));
 	}
 
