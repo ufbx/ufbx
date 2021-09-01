@@ -7252,6 +7252,9 @@ ufbxi_nodiscard static int ufbxi_read_take_anim_channel(ufbxi_context *uc, ufbxi
 				// until we have read the next time/value.
 				// TODO: Solve what this is more throroughly
 				auto_slope = true;
+				if (uc->version == 5000) {
+					num_weights = 0;
+				}
 			} else if (slope_mode == 'p') {
 				// TODO: What is this mode? It seems to have negative values sometimes?
 				// Also it seems to have _two_ trailing weights values, currently observed:
