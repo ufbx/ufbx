@@ -65,7 +65,11 @@ int main(int argc, char **argv)
 		ufbx_version_minor(scene->metadata.exporter_version),
 		ufbx_version_patch(scene->metadata.exporter_version));
 
-	ufbxt_assert(scene->metadata.exporter != UFBX_EXPORTER_UNKNOWN);
+	bool known_unknown = false;
+	if (strstr(scene->metadata.creator.data, "kenney")) known_unknown = true;
+	if (strstr(scene->metadata.creator.data, "assetforge")) known_unknown = true;
+	if (scene->metadata.version < 5800) known_unknown = true;
+	ufbxt_assert(scene->metadata.exporter != UFBX_EXPORTER_UNKNOWN || known_unknown);
 
 	ufbxt_check_scene(scene);
 
