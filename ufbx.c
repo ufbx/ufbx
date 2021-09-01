@@ -7702,15 +7702,25 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_mesh(ufbxi_context *
 	uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, mesh->num_faces);
 	uc->max_consecutive_indices = ufbxi_max_sz(uc->max_consecutive_indices, mesh->num_faces);
 
-	// Normals are always per-index in legacy FBX files
+	// Normals are either per-vertex or per-index in legacy FBX files?
+	// If the version is 5000 prefer per-vertex, otherwise per-index...
 	ufbxi_value_array *normals = ufbxi_find_array(node, ufbxi_Normals, 'r');
 	if (normals) {
-		ufbxi_check(normals->size / 3 == mesh->num_indices);
-		uc->max_consecutive_indices = ufbxi_max_sz(uc->max_consecutive_indices, mesh->num_indices);
-		mesh->vertex_normal.num_values = mesh->num_indices;
-		mesh->vertex_normal.unique_per_vertex = false;
-		mesh->vertex_normal.data = (ufbx_vec3*)normals->data;
-		mesh->vertex_normal.indices = ufbxi_sentinel_index_consecutive;
+		size_t num_normals = normals->size / 3;
+		bool per_vertex = num_normals == mesh->num_vertices;
+		bool per_index = num_normals == mesh->num_indices;
+		if (per_vertex && (!per_index || uc->version == 5000)) {
+			mesh->vertex_normal.num_values = num_normals;
+			mesh->vertex_normal.unique_per_vertex = true;
+			mesh->vertex_normal.data = (ufbx_vec3*)normals->data;
+			mesh->vertex_normal.indices = mesh->vertex_indices;
+		} else if (per_index) {
+			uc->max_consecutive_indices = ufbxi_max_sz(uc->max_consecutive_indices, mesh->num_indices);
+			mesh->vertex_normal.num_values = num_normals;
+			mesh->vertex_normal.unique_per_vertex = false;
+			mesh->vertex_normal.data = (ufbx_vec3*)normals->data;
+			mesh->vertex_normal.indices = (int32_t*)ufbxi_sentinel_index_consecutive;
+		}
 	}
 
 	// Optional UV values are stored pretty much like a modern vertex element
