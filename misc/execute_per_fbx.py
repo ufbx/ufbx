@@ -13,7 +13,6 @@ begin = time.time()
 
 num_tested = 0
 num_fail = 0
-num_old = 0
 total_size = 0
 
 for root, dirs, files in os.walk(argv.root):
@@ -21,9 +20,6 @@ for root, dirs, files in os.walk(argv.root):
         if not file.lower().endswith(".fbx"): continue
         if file.lower().endswith(".ufbx-fail.fbx"):
             num_fail += 1
-            continue
-        if file.lower().endswith(".ufbx-old.fbx"):
-            num_old += 1
             continue
         path = os.path.join(root, file)
         size = os.stat(path).st_size
@@ -42,4 +38,4 @@ print()
 print("Success!")
 print(f"Loaded {num_tested} files in {int(dur//60)}min {int(dur%60)}s.")
 print(f"Processed {total_size/1e9:.2f}GB at {total_size/1e6/dur:.2f}MB/s.")
-print(f"Ignored {num_old} old files and {num_fail} invalid files.")
+print(f"Ignored {num_fail} invalid files.")
