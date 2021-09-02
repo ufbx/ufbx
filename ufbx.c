@@ -8110,7 +8110,7 @@ ufbxi_nodiscard static int ufbxi_read_legacy_model(ufbxi_context *uc, ufbxi_node
 	}
 
 	// Mark the node as having an attribute so property connections can be forwarded
-	{
+	if (has_attrib) {
 		ufbxi_check(ufbxi_map_grow(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, 64));
 		uint32_t hash = ufbxi_hash64(info.fbx_id);
 		ufbxi_fbx_attr_entry *entry = ufbxi_map_insert(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, 0, hash);
