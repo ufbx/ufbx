@@ -8453,12 +8453,22 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_linearize_nodes(ufbxi_context *u
 		ufbx_assert(node_ptrs[i]->element.type == UFBX_ELEMENT_NODE);
 	}
 
+	uc->scene.root_node = node_ptrs[0];
+
 	size_t *node_offsets = ufbxi_push_pop(&uc->tmp_stack, &uc->tmp_typed_element_offsets[UFBX_ELEMENT_NODE], size_t, num_nodes);
 	ufbxi_check(node_offsets);
 
 	// Hook up the parent nodes, we'll assume that there's no cycles at this point
 	ufbxi_for_ptr(ufbx_node, p_node, node_ptrs, num_nodes) {
 		ufbx_node *node = *p_node;
+
+		// Pre-6000 files don't have any explicit root connections so they must always
+		// be connected to ther root..
+		if (node->parent == NULL && !(uc->opts.allow_nodes_out_of_root && uc->version >= 6000)) {
+			if (node != uc->scene.root_node) {
+				node->parent = uc->scene.root_node;
+			}
+		}
 
 		ufbxi_for_list(ufbx_connection, conn, node->element.connections_dst) {
 			if (conn->src_prop.length > 0 || conn->dst_prop.length > 0) continue;

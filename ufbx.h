@@ -1837,6 +1837,10 @@ typedef struct ufbx_load_opts {
 	// the `ufbx_skin_deformer.clusters[]` array for example.
 	bool connect_broken_elements;
 
+	// Allow nodes that are not connected in any way to the root. Conversely if
+	// disabled, all lone nodes will be parented under `ufbx_scene.root_node`.
+	bool allow_nodes_out_of_root;
+
 	// Estimated file size for progress reporting
 	uint64_t file_size_estimate;
 
