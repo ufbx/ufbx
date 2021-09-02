@@ -672,7 +672,7 @@ struct ufbx_mesh {
 
 	// Deformers
 	ufbx_skin_deformer_list skins;
-	ufbx_blend_deformer_list blend_shapes;
+	ufbx_blend_deformer_list blend_deformers;
 	ufbx_cache_deformer_list geometry_caches;
 	ufbx_element_list all_deformers;
 

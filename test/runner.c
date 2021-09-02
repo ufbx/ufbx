@@ -593,8 +593,8 @@ static void ufbxt_debug_dump_obj_scene(const char *file, ufbx_scene *scene)
 				ufbx_face face = mesh->faces[fi];
 				fprintf(f, "f");
 				for (size_t ci = 0; ci < face.num_indices; ci++) {
-					int32_t vi = v_off + mesh->vertex_position.indices[face.index_begin + ci];
-					int32_t ni = n_off + mesh->vertex_normal.indices[face.index_begin + ci];
+					int32_t vi = v_off + mesh->skinned_position.indices[face.index_begin + ci];
+					int32_t ni = n_off + mesh->skinned_normal.indices[face.index_begin + ci];
 					if (mesh->vertex_uv.indices) {
 						int32_t ti = t_off + mesh->vertex_uv.indices[face.index_begin + ci];
 						fprintf(f, " %d/%d/%d", vi + 1, ti + 1, ni + 1);
@@ -607,9 +607,9 @@ static void ufbxt_debug_dump_obj_scene(const char *file, ufbx_scene *scene)
 
 			fprintf(f, "\n");
 
-			v_off += (int32_t)mesh->vertex_position.num_values;
+			v_off += (int32_t)mesh->skinned_position.num_values;
 			t_off += (int32_t)mesh->vertex_uv.num_values;
-			n_off += (int32_t)mesh->vertex_normal.num_values;
+			n_off += (int32_t)mesh->skinned_normal.num_values;
 		}
 	}
 
@@ -732,6 +732,8 @@ static void ufbxt_match_obj_mesh(ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt
 
 static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, bool check_deformed_normals)
 {
+	ufbxt_debug_dump_obj_scene("test.obj", scene);
+
 	for (size_t mesh_i = 0; mesh_i < obj->num_meshes; mesh_i++) {
 		ufbxt_obj_mesh *obj_mesh = &obj->meshes[mesh_i];
 		if (obj_mesh->num_indices == 0) continue;

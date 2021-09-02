@@ -203,3 +203,19 @@ UFBXT_FILE_TEST(max7_skin)
 	ufbxt_check_frame(scene, err, false, "max7_skin_15", NULL, 15.0/30.0);
 }
 #endif
+
+UFBXT_FILE_TEST(max7_blend_cube)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Box01");
+	ufbxt_assert(node);
+	ufbxt_assert(node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->blend_deformers.count == 1);
+	ufbx_blend_deformer *blend = mesh->blend_deformers.data[0];
+	ufbxt_assert(blend->channels.count == 2);
+
+	ufbxt_check_frame(scene, err, false, "max7_blend_cube_8", NULL, 8.0/30.0);
+	ufbxt_check_frame(scene, err, false, "max7_blend_cube_24", NULL, 24.0/30.0);
+}
+#endif

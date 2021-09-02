@@ -170,8 +170,8 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
 
-	ufbxt_assert(mesh->blend_shapes.count == 1);
-	ufbx_blend_deformer *deformer = mesh->blend_shapes.data[0];
+	ufbxt_assert(mesh->blend_deformers.count == 1);
+	ufbx_blend_deformer *deformer = mesh->blend_deformers.data[0];
 	ufbxt_assert(deformer);
 
 	ufbx_blend_channel *top[2] = { NULL, NULL };

@@ -3158,6 +3158,7 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 		if (name == ufbxi_GeometryUVInfo) return UFBXI_PARSE_GEOMETRY_UV_INFO;
 		if (name == ufbxi_Link) return UFBXI_PARSE_LEGACY_LINK;
 		if (name == ufbxi_Channel) return UFBXI_PARSE_CHANNEL;
+		if (name == ufbxi_Shape) return UFBXI_PARSE_SHAPE;
 		break;
 
 	case UFBXI_PARSE_POSE:
@@ -5985,13 +5986,13 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_synthetic_blend_shapes(ufbx
 		if (self_prop && (self_prop->type == UFBX_PROP_NUMBER || self_prop->type == UFBX_PROP_INTEGER)) {
 			shape_props[0].value_real = self_prop->value_real;
 			ufbxi_check(ufbxi_connect_pp(uc, info->fbx_id, channel_fbx_id, name, shape_props[0].name));
+		} else if (uc->version < 6000) {
+			ufbxi_check(ufbxi_connect_pp(uc, info->fbx_id, channel_fbx_id, name, shape_props[0].name));
 		}
 
 		channel->name = name;
 		channel->props.props = shape_props;
 		channel->props.num_props = num_shape_props;
-
-		ufbxi_check(ufbxi_connect_oo(uc, channel_fbx_id, deformer_fbx_id));
 
 		ufbxi_element_info shape_info = { 0 };
 
@@ -7462,6 +7463,16 @@ ufbxi_nodiscard static int ufbxi_read_take_prop_channel(ufbxi_context *uc, ufbxi
 
 	} else {
 
+		// Pre-6000 FBX files store blend shape keys with a " (Shape)" suffix
+		if (uc->version < 6000) {
+			const char *const suffix = " (Shape)";
+			size_t suffix_len = strlen(suffix);
+			if (name.length > suffix_len && !memcmp(name.data + name.length - suffix_len, suffix, suffix_len)) {
+				name.length -= suffix_len;
+				ufbxi_check(ufbxi_push_string_place_str(uc, &name));
+			}
+		}
+
 		// Find 1-3 channel nodes thast contain a `Key:` node
 		ufbxi_node *channel_nodes[3] = { 0 };
 		const char *channel_names[3] = { 0 };
@@ -7862,6 +7873,8 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_mesh(ufbxi_context *
 	ufbx_mesh *ufbxi_restrict mesh = ufbxi_push_element(uc, info, ufbx_mesh, UFBX_ELEMENT_MESH);
 	ufbxi_check(mesh);
 
+	ufbxi_check(ufbxi_read_synthetic_blend_shapes(uc, node, info));
+
 	ufbxi_tmp_mesh_texture_list *tex_list = ufbxi_push_zero(&uc->tmp_mesh_texture_lists, ufbxi_tmp_mesh_texture_list, 1);
 	ufbxi_check(tex_list);
 
@@ -8083,6 +8096,7 @@ ufbxi_nodiscard static int ufbxi_read_legacy_model(ufbxi_context *uc, ufbxi_node
 	const char *attrib_type = ufbxi_empty_char;
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Type, "C", (char**)&attrib_type));
 
+	bool has_attrib = true;
 	if (attrib_type == ufbxi_Light) {
 		ufbxi_check(ufbxi_read_legacy_light(uc, node, &attrib_info));
 	} else if (attrib_type == ufbxi_Camera) {
@@ -8091,6 +8105,17 @@ ufbxi_nodiscard static int ufbxi_read_legacy_model(ufbxi_context *uc, ufbxi_node
 		ufbxi_check(ufbxi_read_legacy_limb_node(uc, node, &attrib_info));
 	} else if (ufbxi_find_child(node, ufbxi_Vertices)) {
 		ufbxi_check(ufbxi_read_legacy_mesh(uc, node, &attrib_info));
+	} else {
+		has_attrib = false;
+	}
+
+	// Mark the node as having an attribute so property connections can be forwarded
+	{
+		ufbxi_check(ufbxi_map_grow(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, 64));
+		uint32_t hash = ufbxi_hash64(info.fbx_id);
+		ufbxi_fbx_attr_entry *entry = ufbxi_map_insert(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, 0, hash);
+		entry->node_fbx_id = info.fbx_id;
+		entry->attr_fbx_id = attrib_info.fbx_id;
 	}
 
 	// Children are represented as an array of strings
@@ -9557,7 +9582,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 
 			// Fetch deformers
 			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->skins, &mesh->element, search_node, NULL, UFBX_ELEMENT_SKIN_DEFORMER));
-			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->blend_shapes, &mesh->element, search_node, NULL, UFBX_ELEMENT_BLEND_DEFORMER));
+			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->blend_deformers, &mesh->element, search_node, NULL, UFBX_ELEMENT_BLEND_DEFORMER));
 			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->geometry_caches, &mesh->element, search_node, NULL, UFBX_ELEMENT_CACHE_DEFORMER));
 			ufbxi_check(ufbxi_fetch_deformers(uc, &mesh->all_deformers, &mesh->element, search_node));
 		}
@@ -10553,7 +10578,7 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 
 	ufbxi_for_ptr_list(ufbx_mesh, p_mesh, scene->meshes) {
 		ufbx_mesh *mesh = *p_mesh;
-		if (mesh->blend_shapes.count == 0 && mesh->skins.count == 0) continue;
+		if (mesh->blend_deformers.count == 0 && mesh->skins.count == 0) continue;
 		max_skinned_indices = ufbxi_max_sz(max_skinned_indices, mesh->num_indices);
 		max_skinned_vertices = ufbxi_max_sz(max_skinned_vertices, mesh->num_vertices);
 	}
@@ -10563,7 +10588,7 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 
 	ufbxi_for_ptr_list(ufbx_mesh, p_mesh, scene->meshes) {
 		ufbx_mesh *mesh = *p_mesh;
-		if (mesh->blend_shapes.count == 0 && mesh->skins.count == 0) continue;
+		if (mesh->blend_deformers.count == 0 && mesh->skins.count == 0) continue;
 		if (mesh->num_vertices == 0) continue;
 
 		size_t num_vertices = mesh->num_vertices;
@@ -10574,7 +10599,7 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 		result_pos++;
 		memcpy(result_pos, mesh->vertices, num_vertices * sizeof(ufbx_vec3));
 
-		ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, mesh->blend_shapes) {
+		ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, mesh->blend_deformers) {
 			ufbx_add_blend_vertex_offsets(*p_blend, result_pos, num_vertices, 1.0f);
 		}
 
@@ -11155,7 +11180,7 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 		mesh->materials.data = materials;
 
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->skins));
-		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->blend_shapes));
+		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->blend_deformers));
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->geometry_caches));
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->all_deformers));
 	}

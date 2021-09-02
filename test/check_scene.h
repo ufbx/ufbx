@@ -336,8 +336,8 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_assert(mesh->skins.data[i]->vertices.count >= mesh->num_vertices);
 		ufbxt_check_element_ptr(scene, mesh->skins.data[i]);
 	}
-	for (size_t i = 0; i < mesh->blend_shapes.count; i++) {
-		ufbxt_check_element_ptr(scene, mesh->blend_shapes.data[i]);
+	for (size_t i = 0; i < mesh->blend_deformers.count; i++) {
+		ufbxt_check_element_ptr(scene, mesh->blend_deformers.data[i]);
 	}
 	for (size_t i = 0; i < mesh->geometry_caches.count; i++) {
 		ufbxt_check_element_ptr(scene, mesh->geometry_caches.data[i]);
