@@ -8131,13 +8131,13 @@ ufbxi_nodiscard static int ufbxi_read_legacy_model(ufbxi_context *uc, ufbxi_node
 	// Non-take animation channels
 	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
 		if (child->name == ufbxi_Channel) {
-			ufbx_string name;
-			if (ufbxi_get_val1(child, "S", &name)) {
+			ufbx_string channel_name;
+			if (ufbxi_get_val1(child, "S", &channel_name)) {
 				if (uc->legacy_implicit_anim_layer_id == 0) {
 					// Defer creation so we won't be the first animation stack..
 					uc->legacy_implicit_anim_layer_id = (uintptr_t)uc + 1;
 				}
-				ufbxi_check(ufbxi_read_take_prop_channel(uc, child, info.fbx_id, uc->legacy_implicit_anim_layer_id, name));
+				ufbxi_check(ufbxi_read_take_prop_channel(uc, child, info.fbx_id, uc->legacy_implicit_anim_layer_id, channel_name));
 			}
 		}
 	}

@@ -732,7 +732,7 @@ static void ufbxt_match_obj_mesh(ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt
 
 static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, bool check_deformed_normals)
 {
-	ufbxt_debug_dump_obj_scene("test.obj", scene);
+	// ufbxt_debug_dump_obj_scene("test.obj", scene);
 
 	for (size_t mesh_i = 0; mesh_i < obj->num_meshes; mesh_i++) {
 		ufbxt_obj_mesh *obj_mesh = &obj->meshes[mesh_i];
