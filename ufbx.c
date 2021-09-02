@@ -2112,6 +2112,8 @@ static const char ufbxi_Smoothing[] = "Smoothing";
 static const char ufbxi_Smoothness[] = "Smoothness";
 static const char ufbxi_SnapOnFrameMode[] = "SnapOnFrameMode";
 static const char ufbxi_SpecularColor[] = "SpecularColor";
+static const char ufbxi_EmissiveColor[] = "EmissiveColor";
+static const char ufbxi_Shininess[] = "Shininess";
 static const char ufbxi_SubDeformer[] = "SubDeformer";
 static const char ufbxi_T[] = "T\0\0";
 static const char ufbxi_Take[] = "Take";
@@ -2349,6 +2351,8 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Smoothness, sizeof(ufbxi_Smoothness) - 1 },
 	{ ufbxi_SnapOnFrameMode, sizeof(ufbxi_SnapOnFrameMode) - 1 },
 	{ ufbxi_SpecularColor, sizeof(ufbxi_SpecularColor) - 1 },
+	{ ufbxi_EmissiveColor, sizeof(ufbxi_EmissiveColor) - 1 },
+	{ ufbxi_Shininess, sizeof(ufbxi_Shininess) - 1 },
 	{ ufbxi_SubDeformer, sizeof(ufbxi_SubDeformer) - 1 },
 	{ ufbxi_T, 1 },
 	{ ufbxi_Take, sizeof(ufbxi_Take) - 1 },
@@ -7648,6 +7652,16 @@ static const ufbxi_legacy_prop ufbxi_legacy_camera_props[] = {
 	{ ufbxi_FocalLength, UFBX_PROP_NUMBER, ufbxi_FocalLength, "R" },
 };
 
+// Must be alphabetically sorted!
+static const ufbxi_legacy_prop ufbxi_legacy_material_props[] = {
+	{ ufbxi_AmbientColor, UFBX_PROP_COLOR, "Ambient", "RRR" },
+	{ ufbxi_DiffuseColor, UFBX_PROP_COLOR, "Diffuse", "RRR" },
+	{ ufbxi_EmissiveColor, UFBX_PROP_COLOR, "Emissive", "RRR" },
+	{ ufbxi_ShadingModel, UFBX_PROP_COLOR, ufbxi_ShadingModel, "S" },
+	{ ufbxi_Shininess, UFBX_PROP_NUMBER, "Shininess", "R" },
+	{ ufbxi_SpecularColor, UFBX_PROP_COLOR, "Specular", "RRR" },
+};
+
 ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_prop(ufbxi_node *node, ufbx_prop *prop, const ufbxi_legacy_prop *legacy_prop)
 {
 	size_t value_ix = 0;
@@ -7670,6 +7684,13 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_prop(ufbxi_node *nod
 				prop->value_int = (int64_t)prop->value_real;
 				prop->value_str = ufbx_empty_string;
 			}
+			value_ix++;
+			break;
+		case 'S':
+			ufbx_assert(value_ix == 0);
+			if (!ufbxi_get_val_at(node, fmt_ix, 'S', &prop->value_str)) return 0;
+			prop->value_real = 0.0f;
+			prop->value_int = 0;
 			value_ix++;
 			break;
 		case '_':
@@ -7703,6 +7724,22 @@ ufbxi_noinline ufbxi_nodiscard static size_t ufbxi_read_legacy_props(ufbxi_node 
 	}
 
 	return num_props;
+}
+
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_material(ufbxi_context *uc, ufbxi_node *node, uint64_t *p_fbx_id, const char *name)
+{
+	ufbx_material *ufbxi_restrict material = ufbxi_push_synthetic_element(uc, p_fbx_id, name, ufbx_material, UFBX_ELEMENT_MATERIAL);
+	ufbxi_check(material);
+
+	ufbx_prop tmp_props[ufbxi_arraycount(ufbxi_legacy_material_props)];
+	size_t num_props = ufbxi_read_legacy_props(node, tmp_props, ufbxi_legacy_material_props, ufbxi_arraycount(ufbxi_legacy_material_props));
+
+	material->shading_model_name = ufbx_empty_string;
+	material->props.num_props = num_props;
+	material->props.props = ufbxi_push_copy(&uc->result, ufbx_prop, num_props, tmp_props);
+	ufbxi_check(material->props.props);
+
+	return 1;
 }
 
 ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_light(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
@@ -7903,6 +7940,17 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_mesh(ufbxi_context *
 				}
 			}
 		}
+	}
+
+	// Materials
+	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
+		if (child->name != ufbxi_Material) continue;
+		uint64_t fbx_id = 0;
+		ufbx_string type_and_name, type, name;
+		ufbxi_check(ufbxi_get_val1(child, "s", &type_and_name));
+		ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type, &name));
+		ufbxi_check(ufbxi_read_legacy_material(uc, child, &fbx_id, name.data));
+		ufbxi_check(ufbxi_connect_oo(uc, fbx_id, info->fbx_id));
 	}
 
 	mesh->skinned_is_local = true;
@@ -8673,6 +8721,21 @@ ufbxi_noinline static bool ufbxi_matrix_all_zero(const ufbx_matrix *matrix)
 	return true;
 }
 
+static ufbxi_forceinline bool ufbxi_is_vec3_zero(ufbx_vec3 v)
+{
+	return (v.x == 0.0) & (v.y == 0.0) & (v.z == 0.0);
+}
+
+static ufbxi_forceinline bool ufbxi_is_quat_zero(ufbx_quat v)
+{
+	return (v.x == 0.0) & (v.y == 0.0) & (v.z == 0.0) & (v.w == 0.0);
+}
+
+static ufbxi_forceinline bool ufbxi_is_transform_zero(ufbx_transform t)
+{
+	return (bool)((int)ufbxi_is_vec3_zero(t.translation) & (int)ufbxi_is_quat_zero(t.rotation) & (int)ufbxi_is_vec3_zero(t.scale));
+}
+
 // Material tables
 
 typedef void (*ufbxi_mat_transform_fn)(ufbx_vec3 *a);
@@ -8900,6 +8963,19 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 	}
 }
 
+ufbxi_noinline static void ufbxi_update_factor(ufbx_material_map *factor_map, ufbx_material_map *color_map)
+{
+	if (!factor_map->has_value) {
+		if (color_map->has_value && !ufbxi_is_vec3_zero(color_map->value)) {
+			factor_map->value.x = 1.0f;
+			factor_map->value_int = 1;
+		} else {
+			factor_map->value.x = 0.0f;
+			factor_map->value_int = 0;
+		}
+	}
+}
+
 ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *material)
 {
 	(void)scene;
@@ -8914,6 +8990,16 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 
 	ufbxi_shader_mapping_list list = ufbxi_shader_pbr_mappings[material->shader_type];
 	ufbxi_fetch_mapping_maps(material, material->pbr.maps, shader, list.data, list.count);
+
+	ufbxi_update_factor(&material->fbx.diffuse_factor, &material->fbx.diffuse_color);
+	ufbxi_update_factor(&material->fbx.specular_factor, &material->fbx.specular_color);
+	ufbxi_update_factor(&material->fbx.reflection_factor, &material->fbx.reflection_color);
+	ufbxi_update_factor(&material->fbx.emission_factor, &material->fbx.emission_color);
+	ufbxi_update_factor(&material->fbx.ambient_factor, &material->fbx.ambient_color);
+
+	ufbxi_update_factor(&material->pbr.base_factor, &material->pbr.base_color);
+	ufbxi_update_factor(&material->fbx.specular_factor, &material->fbx.specular_color);
+	ufbxi_update_factor(&material->fbx.emission_factor, &material->fbx.emission_color);
 }
 
 ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
@@ -9743,21 +9829,6 @@ static ufbxi_forceinline void ufbxi_add_weighted_mat(ufbx_matrix *r, const ufbx_
 	ufbxi_add_weighted_vec3(&r->cols[1], b->cols[1], w);
 	ufbxi_add_weighted_vec3(&r->cols[2], b->cols[2], w);
 	ufbxi_add_weighted_vec3(&r->cols[3], b->cols[3], w);
-}
-
-static ufbxi_forceinline bool ufbxi_is_vec3_zero(ufbx_vec3 v)
-{
-	return (v.x == 0.0) & (v.y == 0.0) & (v.z == 0.0);
-}
-
-static ufbxi_forceinline bool ufbxi_is_quat_zero(ufbx_quat v)
-{
-	return (v.x == 0.0) & (v.y == 0.0) & (v.z == 0.0) & (v.w == 0.0);
-}
-
-static ufbxi_forceinline bool ufbxi_is_transform_zero(ufbx_transform t)
-{
-	return (bool)((int)ufbxi_is_vec3_zero(t.translation) & (int)ufbxi_is_quat_zero(t.rotation) & (int)ufbxi_is_vec3_zero(t.scale));
 }
 
 static void ufbxi_mul_rotate(ufbx_transform *t, ufbx_vec3 v, ufbx_rotation_order order)

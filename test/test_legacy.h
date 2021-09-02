@@ -1,4 +1,13 @@
 
+#if UFBXT_IMPL
+static void ufbxt_diff_material_value(ufbxt_diff_error *err, const ufbx_material_map *color, const ufbx_material_map *factor, ufbx_vec3 value)
+{
+	ufbxt_assert_close_real(err, color->value.x * factor->value.x, value.x);
+	ufbxt_assert_close_real(err, color->value.y * factor->value.x, value.y);
+	ufbxt_assert_close_real(err, color->value.z * factor->value.x, value.z);
+}
+#endif
+
 UFBXT_FILE_TEST(max2009_blob)
 #if UFBXT_IMPL
 {
@@ -10,6 +19,52 @@ UFBXT_FILE_TEST(max2009_blob)
 		ufbxt_assert(node);
 		ufbxt_assert(node->mesh);
 		ufbxt_assert(node->children.count == 16);
+		ufbx_mesh *mesh = node->mesh;
+
+		size_t num_top = 0;
+		size_t num_left = 0;
+		size_t num_right = 0;
+		size_t num_front = 0;
+
+		for (size_t fi = 0; fi < mesh->num_faces; fi++) {
+			ufbx_face face = mesh->faces[fi];
+			ufbx_vec3 center = ufbx_zero_vec3;
+			for (size_t i = 0; i < face.num_indices; i++) {
+				ufbx_vec3 v = ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + i);
+				center.x += v.x;
+				center.y += v.y;
+				center.z += v.z;
+			}
+			center.x /= (ufbx_real)face.num_indices;
+			center.y /= (ufbx_real)face.num_indices;
+			center.z /= (ufbx_real)face.num_indices;
+
+			if (center.z >= 14.0f) {
+				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material[fi]];
+				ufbxt_assert(!strcmp(mat->material->name.data, "Top"));
+				num_top++;
+			}
+			if (center.y <= -10.0f) {
+				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material[fi]];
+				ufbxt_assert(!strcmp(mat->material->name.data, "Right"));
+				num_right++;
+			}
+			if (center.y >= 10.0f) {
+				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material[fi]];
+				ufbxt_assert(!strcmp(mat->material->name.data, "Left"));
+				num_left++;
+			}
+			if (center.x >= 9.0f) {
+				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material[fi]];
+				ufbxt_assert(!strcmp(mat->material->name.data, "Front"));
+				num_front++;
+			}
+		}
+
+		ufbxt_assert(num_top >= 80);
+		ufbxt_assert(num_left >= 80);
+		ufbxt_assert(num_right >= 80);
+		ufbxt_assert(num_front >= 80);
 	}
 
 	{
@@ -62,6 +117,66 @@ UFBXT_FILE_TEST(max2009_blob)
 		ufbxt_assert_close_real(err, camera->focal_length_mm, 43.4558439883016f);
 		ufbxt_assert_close_vec2(err, camera->film_size_inch, aperture);
 		ufbxt_assert_close_vec2(err, camera->aperture_size_inch, aperture);
+	}
+
+	{
+		ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Left");
+		ufbxt_assert(material);
+		ufbx_vec3 ambient = { 0.588235318660736f, 0.588235318660736f, 0.588235318660736f };
+		ufbx_vec3 diffuse = { 0.588235318660736f, 0.588235318660736f, 0.588235318660736f };
+		ufbx_vec3 specular = { 0.179999984502793f, 0.179999984502793f, 0.179999984502793f };
+		ufbx_vec3 emission = { 0.823529481887817f, 0.0f, 0.0f };
+		ufbx_real shininess = 1.99999991737042f;
+		ufbxt_diff_material_value(err, &material->fbx.ambient_color, &material->fbx.ambient_factor, ambient);
+		ufbxt_diff_material_value(err, &material->fbx.diffuse_color, &material->fbx.diffuse_factor, diffuse);
+		ufbxt_diff_material_value(err, &material->fbx.specular_color, &material->fbx.specular_factor, specular);
+		ufbxt_diff_material_value(err, &material->fbx.emission_color, &material->fbx.emission_factor, emission);
+		ufbxt_assert_close_real(err, material->fbx.specular_exponent.value.x, shininess);
+	}
+
+	{
+		ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Front");
+		ufbxt_assert(material);
+		ufbx_vec3 ambient = { 0.588235318660736f, 0.921568691730499f, 0.925490260124207f };
+		ufbx_vec3 diffuse = { 0.588235318660736f, 0.921568691730499f, 0.925490260124207f };
+		ufbx_vec3 specular = { 0.0f, 0.0f, 0.0f };
+		ufbx_vec3 emission = { 0.0f, 0.0f, 0.0f };
+		ufbx_real shininess = 1.99999991737042f;
+		ufbxt_diff_material_value(err, &material->fbx.ambient_color, &material->fbx.ambient_factor, ambient);
+		ufbxt_diff_material_value(err, &material->fbx.diffuse_color, &material->fbx.diffuse_factor, diffuse);
+		ufbxt_diff_material_value(err, &material->fbx.specular_color, &material->fbx.specular_factor, specular);
+		ufbxt_diff_material_value(err, &material->fbx.emission_color, &material->fbx.emission_factor, emission);
+		ufbxt_assert_close_real(err, material->fbx.specular_exponent.value.x, shininess);
+	}
+
+	{
+		ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Right");
+		ufbxt_assert(material);
+		ufbx_vec3 ambient = { 0.588235318660736f, 0.588235318660736f, 0.588235318660736f };
+		ufbx_vec3 diffuse = { 0.588235318660736f, 0.588235318660736f, 0.588235318660736f };
+		ufbx_vec3 specular = { 0.0f, 0.0f, 0.0f };
+		ufbx_vec3 emission = { 0.0f, 0.803921639919281f, 0.0f };
+		ufbx_real shininess = 7.99999900844507f;
+		ufbxt_diff_material_value(err, &material->fbx.ambient_color, &material->fbx.ambient_factor, ambient);
+		ufbxt_diff_material_value(err, &material->fbx.diffuse_color, &material->fbx.diffuse_factor, diffuse);
+		ufbxt_diff_material_value(err, &material->fbx.specular_color, &material->fbx.specular_factor, specular);
+		ufbxt_diff_material_value(err, &material->fbx.emission_color, &material->fbx.emission_factor, emission);
+		ufbxt_assert_close_real(err, material->fbx.specular_exponent.value.x, shininess);
+	}
+
+	{
+		ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Top");
+		ufbxt_assert(material);
+		ufbx_vec3 ambient = { 0.564705908298492f, 0.603921592235565f, 0.890196144580841f };
+		ufbx_vec3 diffuse = { 0.564705908298492f, 0.603921592235565f, 0.890196144580841f };
+		ufbx_vec3 specular = { 0.0f, 0.0f, 0.0f };
+		ufbx_vec3 emission = { 0.0f, 0.0f, 0.0f };
+		ufbx_real shininess = 1.99999991737042f;
+		ufbxt_diff_material_value(err, &material->fbx.ambient_color, &material->fbx.ambient_factor, ambient);
+		ufbxt_diff_material_value(err, &material->fbx.diffuse_color, &material->fbx.diffuse_factor, diffuse);
+		ufbxt_diff_material_value(err, &material->fbx.specular_color, &material->fbx.specular_factor, specular);
+		ufbxt_diff_material_value(err, &material->fbx.emission_color, &material->fbx.emission_factor, emission);
+		ufbxt_assert_close_real(err, material->fbx.specular_exponent.value.x, shininess);
 	}
 
 	ufbxt_check_frame(scene, err, false, "max2009_blob_8", NULL, 8.0/30.0);
