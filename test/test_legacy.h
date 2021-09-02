@@ -8,6 +8,18 @@ static void ufbxt_diff_material_value(ufbxt_diff_error *err, const ufbx_material
 }
 #endif
 
+UFBXT_FILE_TEST(max7_cube)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST(max7_cube_normals)
+#if UFBXT_IMPL
+{
+}
+#endif
+
 UFBXT_FILE_TEST(max2009_blob)
 #if UFBXT_IMPL
 {
