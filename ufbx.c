@@ -1954,6 +1954,7 @@ static const char ufbxi_Cluster[] = "Cluster";
 static const char ufbxi_ColorIndex[] = "ColorIndex";
 static const char ufbxi_Color[] = "Color";
 static const char ufbxi_Colors[] = "Colors";
+static const char ufbxi_ConeAngle[] = "ConeAngle";
 static const char ufbxi_Connections[] = "Connections";
 static const char ufbxi_Content[] = "Content";
 static const char ufbxi_CoordAxisSign[] = "CoordAxisSign";
@@ -2003,6 +2004,7 @@ static const char ufbxi_GeometricTranslation[] = "GeometricTranslation";
 static const char ufbxi_GeometryUVInfo[] = "GeometryUVInfo";
 static const char ufbxi_Geometry[] = "Geometry";
 static const char ufbxi_GlobalSettings[] = "GlobalSettings";
+static const char ufbxi_HotSpot[] = "HotSpot";
 static const char ufbxi_Implementation[] = "Implementation";
 static const char ufbxi_Indexes[] = "Indexes";
 static const char ufbxi_InheritType[] = "InheritType";
@@ -2188,6 +2190,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Color, sizeof(ufbxi_Color) - 1 },
 	{ ufbxi_ColorIndex, sizeof(ufbxi_ColorIndex) - 1 },
 	{ ufbxi_Colors, sizeof(ufbxi_Colors) - 1 },
+	{ ufbxi_ConeAngle, sizeof(ufbxi_ConeAngle) - 1 },
 	{ ufbxi_Connections, sizeof(ufbxi_Connections) - 1 },
 	{ ufbxi_Content, sizeof(ufbxi_Content) - 1 },
 	{ ufbxi_CoordAxis, sizeof(ufbxi_CoordAxis) - 1 },
@@ -2237,6 +2240,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Geometry, sizeof(ufbxi_Geometry) - 1 },
 	{ ufbxi_GeometryUVInfo, sizeof(ufbxi_GeometryUVInfo) - 1 },
 	{ ufbxi_GlobalSettings, sizeof(ufbxi_GlobalSettings) - 1 },
+	{ ufbxi_HotSpot, sizeof(ufbxi_HotSpot) - 1 },
 	{ ufbxi_Implementation, sizeof(ufbxi_Implementation) - 1 },
 	{ ufbxi_Indexes, sizeof(ufbxi_Indexes) - 1 },
 	{ ufbxi_InheritType, sizeof(ufbxi_InheritType) - 1 },
@@ -3046,6 +3050,13 @@ ufbxi_nodiscard static ufbxi_forceinline ufbxi_value_array *ufbxi_find_array(ufb
 	return ufbxi_get_array(child, fmt);
 }
 
+static ufbxi_node *ufbxi_find_child_strcmp(ufbxi_node *node, const char *name)
+{
+	ufbxi_for(ufbxi_node, c, node->children, node->num_children) {
+		if (!strcmp(c->name, name)) return c;
+	}
+	return NULL;
+}
 
 // -- Parsing state machine
 //
@@ -7602,13 +7613,123 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 	return 1;
 }
 
+typedef struct {
+	const char *prop_name;
+	ufbx_prop_type prop_type;
+	const char *node_name;
+	const char *node_fmt;
+} ufbxi_legacy_prop;
+
+// Must be alphabetically sorted!
+static const ufbxi_legacy_prop ufbxi_legacy_light_props[] = {
+	{ ufbxi_CastLight, UFBX_PROP_BOOLEAN, ufbxi_CastLight, "L" },
+	{ ufbxi_CastShadows, UFBX_PROP_BOOLEAN, ufbxi_CastShadows, "L" },
+	{ ufbxi_Color, UFBX_PROP_COLOR, ufbxi_Color, "RRR" },
+	{ ufbxi_ConeAngle, UFBX_PROP_NUMBER, ufbxi_ConeAngle, "R" },
+	{ ufbxi_HotSpot, UFBX_PROP_NUMBER, ufbxi_HotSpot, "R" },
+	{ ufbxi_Intensity, UFBX_PROP_NUMBER, ufbxi_Intensity, "R" },
+	{ ufbxi_LightType, UFBX_PROP_INTEGER, ufbxi_LightType, "L" },
+};
+
+// Must be alphabetically sorted!
+static const ufbxi_legacy_prop ufbxi_legacy_camera_props[] = {
+	{ ufbxi_ApertureMode, UFBX_PROP_INTEGER, ufbxi_ApertureMode, "L" },
+	{ ufbxi_AspectH, UFBX_PROP_NUMBER, ufbxi_AspectH, "R" },
+	{ ufbxi_AspectRatioMode, UFBX_PROP_INTEGER, "AspectType", "L" },
+	{ ufbxi_AspectW, UFBX_PROP_NUMBER, ufbxi_AspectW, "R" },
+	{ ufbxi_FieldOfView, UFBX_PROP_NUMBER, "Aperture", "R" },
+	{ ufbxi_FieldOfViewX, UFBX_PROP_NUMBER, "FieldOfViewXProperty", "R" },
+	{ ufbxi_FieldOfViewY, UFBX_PROP_NUMBER, "FieldOfViewYProperty", "R" },
+	{ ufbxi_FilmHeight, UFBX_PROP_NUMBER, "CameraAperture", "_R" },
+	{ ufbxi_FilmSqueezeRatio, UFBX_PROP_NUMBER, "SqueezeRatio", "R" },
+	{ ufbxi_FilmWidth, UFBX_PROP_NUMBER, "CameraAperture", "R_" },
+	{ ufbxi_FocalLength, UFBX_PROP_NUMBER, ufbxi_FocalLength, "R" },
+};
+
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_prop(ufbxi_context *uc, ufbxi_node *node, ufbx_prop *prop, const ufbxi_legacy_prop *legacy_prop)
+{
+	size_t value_ix = 0;
+
+	const char *fmt = legacy_prop->node_fmt;
+	for (size_t fmt_ix = 0; fmt[fmt_ix]; fmt_ix++) {
+		char c = fmt[fmt_ix];
+		switch (c) {
+		case 'L':
+			ufbx_assert(value_ix == 0);
+			if (!ufbxi_get_val_at(node, fmt_ix, 'L', &prop->value_int)) return 0;
+			prop->value_real = (ufbx_real)prop->value_int;
+			prop->value_str = ufbx_empty_string;
+			value_ix++;
+			break;
+		case 'R':
+			ufbx_assert(value_ix < 3);
+			if (!ufbxi_get_val_at(node, fmt_ix, 'R', &prop->value_real_arr[value_ix])) return 0;
+			if (value_ix == 0) {
+				prop->value_int = (int64_t)prop->value_real;
+				prop->value_str = ufbx_empty_string;
+			}
+			value_ix++;
+			break;
+		case '_':
+			break;
+		default:
+			ufbx_assert(0 && "Unhandled legacy fmt");
+			break;
+		}
+	}
+
+	return 1;
+}
+
+ufbxi_noinline ufbxi_nodiscard static size_t ufbxi_read_legacy_props(ufbxi_context *uc, ufbxi_node *node, ufbx_prop *props, const ufbxi_legacy_prop *legacy_props, size_t num_legacy)
+{
+	size_t num_props = 0;
+	for (size_t legacy_ix = 0; legacy_ix < num_legacy; legacy_ix++) {
+		const ufbxi_legacy_prop *legacy_prop = &legacy_props[legacy_ix];
+		ufbx_prop *prop = &props[num_props];
+
+		ufbxi_node *n = ufbxi_find_child_strcmp(node, legacy_prop->node_name);
+		if (!n) continue;
+		if (!ufbxi_read_legacy_prop(uc, n, prop, legacy_prop)) continue;
+
+		prop->name.data = legacy_prop->prop_name;
+		prop->name.length = strlen(legacy_prop->prop_name);
+		prop->internal_key = ufbxi_get_name_key(prop->name.data, prop->name.length);
+		prop->flags = (ufbx_prop_flags)0;
+		prop->type = legacy_prop->prop_type;
+		num_props++;
+	}
+
+	return num_props;
+}
+
 ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_light(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
+	ufbx_light *ufbxi_restrict light = ufbxi_push_element(uc, info, ufbx_light, UFBX_ELEMENT_LIGHT);
+	ufbxi_check(light);
+
+	ufbx_prop tmp_props[ufbxi_arraycount(ufbxi_legacy_light_props)];
+	size_t num_props = ufbxi_read_legacy_props(uc, node, tmp_props, ufbxi_legacy_light_props, ufbxi_arraycount(ufbxi_legacy_light_props));
+
+	light->props.num_props = num_props;
+	light->props.props = ufbxi_push_copy(&uc->result, ufbx_prop, num_props, tmp_props);
+	ufbxi_check(light->props.props);
+
 	return 1;
 }
 
 ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_camera(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
+	ufbx_camera *ufbxi_restrict camera = ufbxi_push_element(uc, info, ufbx_camera, UFBX_ELEMENT_CAMERA);
+	ufbxi_check(camera);
+
+	ufbx_prop tmp_props[ufbxi_arraycount(ufbxi_legacy_camera_props)];
+	size_t num_props = ufbxi_read_legacy_props(uc, node, tmp_props, ufbxi_legacy_camera_props, ufbxi_arraycount(ufbxi_legacy_camera_props));
+
+	camera->props.num_props = num_props;
+	camera->props.props = ufbxi_push_copy(&uc->result, ufbx_prop, num_props, tmp_props);
+	ufbxi_check(camera->props.props);
+
 	return 1;
 }
 
@@ -9780,10 +9901,13 @@ ufbxi_noinline static void ufbxi_update_light(ufbx_light *light)
 
 	light->color = ufbxi_find_vec3(&light->props, ufbxi_Color, 1.0f, 1.0f, 1.0f);
 	light->type = (ufbx_light_type)ufbxi_find_enum(&light->props, ufbxi_LightType, 0, UFBX_LIGHT_VOLUME);
-	light->decay = (ufbx_light_decay)ufbxi_find_enum(&light->props, ufbxi_DecayType, 0, UFBX_LIGHT_DECAY_CUBIC);
+	int64_t default_decay = light->type == UFBX_LIGHT_DIRECTIONAL ? UFBX_LIGHT_DECAY_NONE : UFBX_LIGHT_DECAY_QUADRATIC;
+	light->decay = (ufbx_light_decay)ufbxi_find_enum(&light->props, ufbxi_DecayType, default_decay, UFBX_LIGHT_DECAY_CUBIC);
 	light->area_shape = (ufbx_light_area_shape)ufbxi_find_enum(&light->props, ufbxi_AreaLightShape, 0, UFBX_LIGHT_AREA_SPHERE);
-	light->inner_angle = ufbxi_find_real(&light->props, ufbxi_InnerAngle, 0.0f);
-	light->outer_angle = ufbxi_find_real(&light->props, ufbxi_OuterAngle, 0.0f);
+	light->inner_angle = ufbxi_find_real(&light->props, ufbxi_HotSpot, 0.0f);
+	light->inner_angle = ufbxi_find_real(&light->props, ufbxi_InnerAngle, light->inner_angle);
+	light->outer_angle = ufbxi_find_real(&light->props, ufbxi_ConeAngle, 0.0f);
+	light->outer_angle = ufbxi_find_real(&light->props, ufbxi_OuterAngle, light->outer_angle);
 	light->cast_light = ufbxi_find_int(&light->props, ufbxi_CastLight, 1) != 0;
 	light->cast_shadows = ufbxi_find_int(&light->props, ufbxi_CastShadows, 0) != 0;
 
@@ -9838,6 +9962,23 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 	film_size.x = ufbxi_find_real(&camera->props, ufbxi_FilmWidth, film_size.x);
 	film_size.y = ufbxi_find_real(&camera->props, ufbxi_FilmHeight, film_size.y);
 	squeeze_ratio = ufbxi_find_real(&camera->props, ufbxi_FilmSqueezeRatio, squeeze_ratio);
+
+	if (aspect_x <= 0.0f && aspect_y <= 0.0f) {
+		aspect_x = film_size.x > 0.0f ? film_size.x : 1.0f;
+		aspect_y = film_size.y > 0.0f ? film_size.y : 1.0f;
+	} else if (aspect_x <= 0.0f) {
+		if (film_size.x > 0.0f && film_size.y > 0.0f) {
+			aspect_x = aspect_y / film_size.y * film_size.x;
+		} else {
+			aspect_x = aspect_y;
+		}
+	} else if (aspect_y <= 0.0f) {
+		if (film_size.x > 0.0f && film_size.y > 0.0f) {
+			aspect_y = aspect_x / film_size.x * film_size.y;
+		} else {
+			aspect_y = aspect_x;
+		}
+	}
 
 	film_size.y *= squeeze_ratio;
 

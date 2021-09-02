@@ -659,8 +659,8 @@ static void ufbxt_match_obj_mesh(ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt
 
 	// Check that all vertices exist, anything more doesn't really make sense
 	ufbxt_match_vertex *obj_verts = (ufbxt_match_vertex*)calloc(obj_mesh->num_indices, sizeof(ufbxt_match_vertex));
-	ufbxt_match_vertex *sub_verts = (ufbxt_match_vertex*)calloc(fbx_mesh->num_indices, sizeof(ufbxt_match_vertex));
-	ufbxt_assert(obj_verts && sub_verts);
+	ufbxt_match_vertex *fbx_verts = (ufbxt_match_vertex*)calloc(fbx_mesh->num_indices, sizeof(ufbxt_match_vertex));
+	ufbxt_assert(obj_verts && fbx_verts);
 
 	for (size_t i = 0; i < obj_mesh->num_indices; i++) {
 		obj_verts[i].pos = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, i);
@@ -673,18 +673,18 @@ static void ufbxt_match_obj_mesh(ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt
 		if (fbx_mesh->skinned_is_local) {
 			fp = ufbx_transform_position(&fbx_node->geometry_to_world, fp);
 		}
-		sub_verts[i].pos = fp;
+		fbx_verts[i].pos = fp;
 		if (obj_mesh->vertex_uv.data) {
 			ufbxt_assert(fbx_mesh->vertex_uv.data);
-			sub_verts[i].uv = ufbx_get_vertex_vec2(&fbx_mesh->vertex_uv, i);
+			fbx_verts[i].uv = ufbx_get_vertex_vec2(&fbx_mesh->vertex_uv, i);
 		}
 	}
 
 	qsort(obj_verts, obj_mesh->num_indices, sizeof(ufbxt_match_vertex), &ufbxt_cmp_sub_vertex);
-	qsort(sub_verts, fbx_mesh->num_indices, sizeof(ufbxt_match_vertex), &ufbxt_cmp_sub_vertex);
+	qsort(fbx_verts, fbx_mesh->num_indices, sizeof(ufbxt_match_vertex), &ufbxt_cmp_sub_vertex);
 
 	for (int32_t i = (int32_t)fbx_mesh->num_indices - 1; i >= 0; i--) {
-		ufbxt_match_vertex v = sub_verts[i];
+		ufbxt_match_vertex v = fbx_verts[i];
 
 		bool found = false;
 		for (int32_t j = i; j >= 0 && obj_verts[j].pos.x >= v.pos.x - 0.002f; j--) {
@@ -710,7 +710,7 @@ static void ufbxt_match_obj_mesh(ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt
 	}
 
 	free(obj_verts);
-	free(sub_verts);
+	free(fbx_verts);
 
 }
 
