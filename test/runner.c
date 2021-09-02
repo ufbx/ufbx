@@ -330,6 +330,8 @@ typedef struct {
 
 	bool bad_normals;
 	bool bad_order;
+	bool bad_uvs;
+	ufbx_real tolerance;
 
 } ufbxt_obj_file;
 
@@ -404,6 +406,7 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
 
 	obj->meshes = meshes;
 	obj->num_meshes = num_meshes;
+	obj->tolerance = 0.001f;
 
 	line = (char*)obj_data;
 	for (;;) {
@@ -493,6 +496,13 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
 			if (!strcmp(line, "ufbx:bad_order")) {
 				obj->bad_order = true;
 			}
+			if (!strcmp(line, "ufbx:bad_uvs")) {
+				obj->bad_uvs = true;
+			}
+			double tolerance = 0.0;
+			if (sscanf(line, "ufbx:tolerance=%lf", &tolerance) == 1) {
+				obj->tolerance = (ufbx_real)tolerance;
+			}
 		}
 
 		if (line_end) {
@@ -557,8 +567,10 @@ static void ufbxt_debug_dump_obj_scene(const char *file, ufbx_scene *scene)
 				fprintf(f, "vt %f %f\n", v.x, v.y);
 			}
 
+			ufbx_matrix mat = ufbx_matrix_for_normals(&node->geometry_to_world);
 			for (size_t i = 0; i < mesh->vertex_normal.num_values; i++) {
 				ufbx_vec3 v = mesh->vertex_normal.data[i];
+				v = ufbx_transform_direction(&mat, v);
 				fprintf(f, "vn %f %f %f\n", v.x, v.y, v.z);
 			}
 
@@ -652,7 +664,7 @@ static int ufbxt_cmp_sub_vertex(const void *va, const void *vb)
 	return 0;
 }
 
-static void ufbxt_match_obj_mesh(ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt_obj_mesh *obj_mesh, ufbxt_diff_error *p_err)
+static void ufbxt_match_obj_mesh(ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt_obj_mesh *obj_mesh, ufbxt_diff_error *p_err, ufbx_real tolerance)
 {
 	ufbxt_assert(fbx_mesh->num_faces == obj_mesh->num_faces);
 	ufbxt_assert(fbx_mesh->num_indices == obj_mesh->num_indices);
@@ -687,15 +699,15 @@ static void ufbxt_match_obj_mesh(ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt
 		ufbxt_match_vertex v = fbx_verts[i];
 
 		bool found = false;
-		for (int32_t j = i; j >= 0 && obj_verts[j].pos.x >= v.pos.x - 0.002f; j--) {
+		for (int32_t j = i; j >= 0 && obj_verts[j].pos.x >= v.pos.x - tolerance; j--) {
 			ufbx_real dx = obj_verts[j].pos.x - v.pos.x;
 			ufbx_real dy = obj_verts[j].pos.y - v.pos.y;
 			ufbx_real dz = obj_verts[j].pos.z - v.pos.z;
 			ufbx_real du = obj_verts[j].uv.x - v.uv.x;
 			ufbx_real dv = obj_verts[j].uv.y - v.uv.y;
-			ufbxt_assert(dx <= 0.002f);
+			ufbxt_assert(dx <= tolerance);
 			ufbx_real err = (ufbx_real)sqrt(dx*dx + dy*dy + dz*dz + du*du + dv*dv);
-			if (err < 0.001f) {
+			if (err < tolerance) {
 				if (err > p_err->max) p_err->max = err;
 				p_err->sum += err;
 				p_err->num++;
@@ -732,7 +744,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, mesh->subdivision_preview_levels, NULL, NULL);
 
 			ufbxt_check_mesh(scene, mesh);
-			ufbxt_match_obj_mesh(node, sub_mesh, obj_mesh, p_err);
+			ufbxt_match_obj_mesh(node, sub_mesh, obj_mesh, p_err, obj->tolerance);
 			ufbx_free_mesh(sub_mesh);
 
 			continue;
@@ -746,7 +758,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		if (!check_deformed_normals && mesh->all_deformers.count > 0) check_normals = false;
 
 		if (obj->bad_order) {
-			ufbxt_match_obj_mesh(node, mesh, obj_mesh, p_err);
+			ufbxt_match_obj_mesh(node, mesh, obj_mesh, p_err, obj->tolerance);
 		} else {
 			// Assume that the indices are in the same order!
 			for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
@@ -777,7 +789,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 						ufbxt_assert_close_vec3(p_err, on, fn);
 					}
 
-					if (obj_mesh->vertex_uv.data) {
+					if (obj_mesh->vertex_uv.data && !obj->bad_uvs) {
 						ufbxt_assert(mesh->vertex_uv.data);
 						ufbx_vec2 ou = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, ix);
 						ufbx_vec2 fu = ufbx_get_vertex_vec2(&mesh->vertex_uv, ix);

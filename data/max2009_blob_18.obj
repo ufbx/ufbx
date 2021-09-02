@@ -1,5 +1,6 @@
 # ufbx:bad_normals
 # ufbx:bad_order
+# ufbx:tolerance=0.01
 # 3ds Max Wavefront OBJ Exporter v0.94b - (c)2007 guruware
 # File Created: 01.09.2021 09:39:20
 
