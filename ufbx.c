@@ -8125,6 +8125,15 @@ ufbxi_nodiscard static int ufbxi_read_legacy_root(ufbxi_context *uc)
 {
 	ufbxi_check(ufbxi_init_node_prop_names(uc));
 
+	// Some legacy FBX files have an `Fbx_Root` node that could be used as the
+	// root node. However no other formats have root node with transforms so it
+	// might be better to leave it as-is and create an empty one.
+	{
+		ufbx_node *root = ufbxi_push_synthetic_element(uc, &uc->root_id, ufbxi_empty_char, ufbx_node, UFBX_ELEMENT_NODE);
+		ufbxi_check(root);
+		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &root->element.id));
+	}
+
 	for (;;) {
 		ufbxi_check(ufbxi_parse_legacy_toplevel(uc));
 		if (!uc->top_node) break;
