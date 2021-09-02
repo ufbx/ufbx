@@ -219,3 +219,15 @@ UFBXT_FILE_TEST(max7_blend_cube)
 	ufbxt_check_frame(scene, err, false, "max7_blend_cube_24", NULL, 24.0/30.0);
 }
 #endif
+
+UFBXT_FILE_TEST(max6_teapot)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Teapot01");
+	ufbxt_assert(node);
+	ufbxt_assert(node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->vertex_normal.data);
+	ufbxt_assert(mesh->vertex_uv.data);
+}
+#endif

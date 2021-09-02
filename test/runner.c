@@ -1554,7 +1554,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *ba
 	}
 }
 
-const uint32_t ufbxt_file_versions[] = { 5000, 5800, 6100, 7100, 7400, 7500, 7700 };
+const uint32_t ufbxt_file_versions[] = { 3000, 5000, 5800, 6100, 7100, 7400, 7500, 7700 };
 
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err), const char *suffix, ufbx_load_opts user_opts)
 {
