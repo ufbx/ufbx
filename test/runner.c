@@ -557,8 +557,10 @@ static void ufbxt_debug_dump_obj_scene(const char *file, ufbx_scene *scene)
 			ufbx_node *node = mesh->instances.data[ni];
 
 			for (size_t i = 0; i < mesh->vertex_position.num_values; i++) {
-				ufbx_vec3 v = mesh->vertex_position.data[i];
-				v = ufbx_transform_position(&node->geometry_to_world, v);
+				ufbx_vec3 v = mesh->skinned_position.data[i];
+				if (mesh->skinned_is_local) {
+					v = ufbx_transform_position(&node->geometry_to_world, v);
+				}
 				fprintf(f, "v %f %f %f\n", v.x, v.y, v.z);
 			}
 
@@ -568,9 +570,11 @@ static void ufbxt_debug_dump_obj_scene(const char *file, ufbx_scene *scene)
 			}
 
 			ufbx_matrix mat = ufbx_matrix_for_normals(&node->geometry_to_world);
-			for (size_t i = 0; i < mesh->vertex_normal.num_values; i++) {
-				ufbx_vec3 v = mesh->vertex_normal.data[i];
-				v = ufbx_transform_direction(&mat, v);
+			for (size_t i = 0; i < mesh->skinned_normal.num_values; i++) {
+				ufbx_vec3 v = mesh->skinned_normal.data[i];
+				if (mesh->skinned_is_local) {
+					v = ufbx_transform_direction(&mat, v);
+				}
 				fprintf(f, "vn %f %f %f\n", v.x, v.y, v.z);
 			}
 

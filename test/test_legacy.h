@@ -184,8 +184,10 @@ UFBXT_FILE_TEST(max2009_blob)
 }
 #endif
 
-UFBXT_FILE_TEST(max2009_sausage)
+UFBXT_FILE_TEST(max7_skin)
 #if UFBXT_IMPL
 {
+	ufbxt_check_frame(scene, err, false, "max7_skin_5", NULL, 5.0/30.0);
+	ufbxt_check_frame(scene, err, false, "max7_skin_15", NULL, 15.0/30.0);
 }
 #endif

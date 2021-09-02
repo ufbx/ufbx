@@ -1980,6 +1980,7 @@ static const char ufbxi_Document[] = "Document";
 static const char ufbxi_Documents[] = "Documents";
 static const char ufbxi_EdgeCrease[] = "EdgeCrease";
 static const char ufbxi_Edges[] = "Edges";
+static const char ufbxi_EmissiveColor[] = "EmissiveColor";
 static const char ufbxi_Entry[] = "Entry";
 static const char ufbxi_FBXHeaderExtension[] = "FBXHeaderExtension";
 static const char ufbxi_FBXVersion[] = "FBXVersion";
@@ -2041,6 +2042,7 @@ static const char ufbxi_Light[] = "Light";
 static const char ufbxi_LimbLength[] = "LimbLength";
 static const char ufbxi_LimbNode[] = "LimbNode";
 static const char ufbxi_Limb[] = "Limb";
+static const char ufbxi_Link[] = "Link";
 static const char ufbxi_LocalStart[] = "LocalStart";
 static const char ufbxi_LocalStop[] = "LocalStop";
 static const char ufbxi_LocalTime[] = "LocalTime";
@@ -2105,6 +2107,7 @@ static const char ufbxi_ScalingOffset[] = "ScalingOffset";
 static const char ufbxi_ScalingPivot[] = "ScalingPivot";
 static const char ufbxi_ShadingModel[] = "ShadingModel";
 static const char ufbxi_Shape[] = "Shape";
+static const char ufbxi_Shininess[] = "Shininess";
 static const char ufbxi_Size[] = "Size";
 static const char ufbxi_Skin[] = "Skin";
 static const char ufbxi_SkinningType[] = "SkinningType";
@@ -2112,8 +2115,6 @@ static const char ufbxi_Smoothing[] = "Smoothing";
 static const char ufbxi_Smoothness[] = "Smoothness";
 static const char ufbxi_SnapOnFrameMode[] = "SnapOnFrameMode";
 static const char ufbxi_SpecularColor[] = "SpecularColor";
-static const char ufbxi_EmissiveColor[] = "EmissiveColor";
-static const char ufbxi_Shininess[] = "Shininess";
 static const char ufbxi_SubDeformer[] = "SubDeformer";
 static const char ufbxi_T[] = "T\0\0";
 static const char ufbxi_Take[] = "Take";
@@ -2219,6 +2220,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Documents, sizeof(ufbxi_Documents) - 1 },
 	{ ufbxi_EdgeCrease, sizeof(ufbxi_EdgeCrease) - 1 },
 	{ ufbxi_Edges, sizeof(ufbxi_Edges) - 1 },
+	{ ufbxi_EmissiveColor, sizeof(ufbxi_EmissiveColor) - 1 },
 	{ ufbxi_Entry, sizeof(ufbxi_Entry) - 1 },
 	{ ufbxi_FBXHeaderExtension, sizeof(ufbxi_FBXHeaderExtension) - 1 },
 	{ ufbxi_FBXVersion, sizeof(ufbxi_FBXVersion) - 1 },
@@ -2280,6 +2282,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Limb, sizeof(ufbxi_Limb) - 1 },
 	{ ufbxi_LimbLength, sizeof(ufbxi_LimbLength) - 1 },
 	{ ufbxi_LimbNode, sizeof(ufbxi_LimbNode) - 1 },
+	{ ufbxi_Link, sizeof(ufbxi_Link) - 1 },
 	{ ufbxi_LocalStart, sizeof(ufbxi_LocalStart) - 1 },
 	{ ufbxi_LocalStop, sizeof(ufbxi_LocalStop) - 1 },
 	{ ufbxi_LocalTime, sizeof(ufbxi_LocalTime) - 1 },
@@ -2344,6 +2347,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_ScalingPivot, sizeof(ufbxi_ScalingPivot) - 1 },
 	{ ufbxi_ShadingModel, sizeof(ufbxi_ShadingModel) - 1 },
 	{ ufbxi_Shape, sizeof(ufbxi_Shape) - 1 },
+	{ ufbxi_Shininess, sizeof(ufbxi_Shininess) - 1 },
 	{ ufbxi_Size, sizeof(ufbxi_Size) - 1 },
 	{ ufbxi_Skin, sizeof(ufbxi_Skin) - 1 },
 	{ ufbxi_SkinningType, sizeof(ufbxi_SkinningType) - 1 },
@@ -2351,8 +2355,6 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Smoothness, sizeof(ufbxi_Smoothness) - 1 },
 	{ ufbxi_SnapOnFrameMode, sizeof(ufbxi_SnapOnFrameMode) - 1 },
 	{ ufbxi_SpecularColor, sizeof(ufbxi_SpecularColor) - 1 },
-	{ ufbxi_EmissiveColor, sizeof(ufbxi_EmissiveColor) - 1 },
-	{ ufbxi_Shininess, sizeof(ufbxi_Shininess) - 1 },
 	{ ufbxi_SubDeformer, sizeof(ufbxi_SubDeformer) - 1 },
 	{ ufbxi_T, 1 },
 	{ ufbxi_Take, sizeof(ufbxi_Take) - 1 },
@@ -2641,6 +2643,7 @@ typedef struct {
 	uint32_t num_elements;
 
 	ufbxi_node legacy_node;
+	uint64_t legacy_implicit_anim_layer_id;
 
 	double ktime_to_sec;
 
@@ -3082,6 +3085,7 @@ typedef enum {
 	UFBXI_PARSE_LEGACY_MODEL,
 	UFBXI_PARSE_ANIMATION_CURVE,
 	UFBXI_PARSE_DEFORMER,
+	UFBXI_PARSE_LEGACY_LINK,
 	UFBXI_PARSE_POSE,
 	UFBXI_PARSE_POSE_NODE,
 	UFBXI_PARSE_VIDEO,
@@ -3152,6 +3156,8 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 
 	case UFBXI_PARSE_LEGACY_MODEL:
 		if (name == ufbxi_GeometryUVInfo) return UFBXI_PARSE_GEOMETRY_UV_INFO;
+		if (name == ufbxi_Link) return UFBXI_PARSE_LEGACY_LINK;
+		if (name == ufbxi_Channel) return UFBXI_PARSE_CHANNEL;
 		break;
 
 	case UFBXI_PARSE_POSE:
@@ -3446,6 +3452,26 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			}
 			info->type = 'd';
 			info->tmp_buf = true;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_LEGACY_LINK:
+		if (name == ufbxi_Transform) {
+			info->type = 'r';
+			info->result = false;
+			return true;
+		} else if (name == ufbxi_TransformLink) {
+			info->type = 'r';
+			info->result = false;
+			return true;
+		} else if (name == ufbxi_Indexes && !uc->opts.ignore_geometry) {
+			info->type = 'i';
+			info->result = true;
+			return true;
+		} else if (name == ufbxi_Weights && !uc->opts.ignore_geometry) {
+			info->type = 'r';
+			info->result = true;
 			return true;
 		}
 		break;
@@ -7653,6 +7679,11 @@ static const ufbxi_legacy_prop ufbxi_legacy_camera_props[] = {
 };
 
 // Must be alphabetically sorted!
+static const ufbxi_legacy_prop ufbxi_legacy_bone_props[] = {
+	{ ufbxi_Size, UFBX_PROP_NUMBER, ufbxi_Size, "R" },
+};
+
+// Must be alphabetically sorted!
 static const ufbxi_legacy_prop ufbxi_legacy_material_props[] = {
 	{ ufbxi_AmbientColor, UFBX_PROP_COLOR, "Ambient", "RRR" },
 	{ ufbxi_DiffuseColor, UFBX_PROP_COLOR, "Diffuse", "RRR" },
@@ -7742,6 +7773,35 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_material(ufbxi_conte
 	return 1;
 }
 
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_link(ufbxi_context *uc, ufbxi_node *node, uint64_t *p_fbx_id, const char *name)
+{
+	ufbx_skin_cluster *ufbxi_restrict cluster = ufbxi_push_synthetic_element(uc, p_fbx_id, name, ufbx_skin_cluster, UFBX_ELEMENT_SKIN_CLUSTER);
+	ufbxi_check(cluster);
+
+	// TODO: Merge with ufbxi_read_skin_cluster(), at least partially?
+	ufbxi_value_array *indices = ufbxi_find_array(node, ufbxi_Indexes, 'i');
+	ufbxi_value_array *weights = ufbxi_find_array(node, ufbxi_Weights, 'r');
+
+	if (indices && weights) {
+		ufbxi_check(indices->size == weights->size);
+		cluster->num_weights = indices->size;
+		cluster->vertices = (int32_t*)indices->data;
+		cluster->weights = (ufbx_real*)weights->data;
+	}
+
+	ufbxi_value_array *transform = ufbxi_find_array(node, ufbxi_Transform, 'r');
+	ufbxi_value_array *transform_link = ufbxi_find_array(node, ufbxi_TransformLink, 'r');
+	if (transform && transform_link) {
+		ufbxi_check(transform->size >= 16);
+		ufbxi_check(transform_link->size >= 16);
+
+		ufbxi_read_transform_matrix(&cluster->geometry_to_bone, (ufbx_real*)transform->data);
+		ufbxi_read_transform_matrix(&cluster->bind_to_world, (ufbx_real*)transform_link->data);
+	}
+
+	return 1;
+}
+
 ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_light(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_light *ufbxi_restrict light = ufbxi_push_element(uc, info, ufbx_light, UFBX_ELEMENT_LIGHT);
@@ -7768,6 +7828,26 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_camera(ufbxi_context
 	camera->props.num_props = num_props;
 	camera->props.props = ufbxi_push_copy(&uc->result, ufbx_prop, num_props, tmp_props);
 	ufbxi_check(camera->props.props);
+
+	return 1;
+}
+
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_limb_node(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_bone *ufbxi_restrict bone = ufbxi_push_element(uc, info, ufbx_bone, UFBX_ELEMENT_BONE);
+	ufbxi_check(bone);
+
+	ufbx_prop tmp_props[ufbxi_arraycount(ufbxi_legacy_bone_props)];
+	size_t num_props = 0;
+
+	ufbxi_node *prop_node = ufbxi_find_child_strcmp(node, "Properties");
+	if (prop_node) {
+		num_props = ufbxi_read_legacy_props(prop_node, tmp_props, ufbxi_legacy_bone_props, ufbxi_arraycount(ufbxi_legacy_bone_props));
+	}
+
+	bone->props.num_props = num_props;
+	bone->props.props = ufbxi_push_copy(&uc->result, ufbx_prop, num_props, tmp_props);
+	ufbxi_check(bone->props.props);
 
 	return 1;
 }
@@ -7942,15 +8022,34 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_mesh(ufbxi_context *
 		}
 	}
 
-	// Materials
+	uint64_t skin_fbx_id = 0;
+	ufbx_skin_deformer *skin = NULL;
+
+	// Materials, Skin Clusters
 	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
-		if (child->name != ufbxi_Material) continue;
-		uint64_t fbx_id = 0;
-		ufbx_string type_and_name, type, name;
-		ufbxi_check(ufbxi_get_val1(child, "s", &type_and_name));
-		ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type, &name));
-		ufbxi_check(ufbxi_read_legacy_material(uc, child, &fbx_id, name.data));
-		ufbxi_check(ufbxi_connect_oo(uc, fbx_id, info->fbx_id));
+		if (child->name == ufbxi_Material) {
+			uint64_t fbx_id = 0;
+			ufbx_string type_and_name, type, name;
+			ufbxi_check(ufbxi_get_val1(child, "s", &type_and_name));
+			ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type, &name));
+			ufbxi_check(ufbxi_read_legacy_material(uc, child, &fbx_id, name.data));
+			ufbxi_check(ufbxi_connect_oo(uc, fbx_id, info->fbx_id));
+		} else if (child->name == ufbxi_Link) {
+			uint64_t fbx_id = 0;
+			ufbx_string type_and_name, type, name;
+			ufbxi_check(ufbxi_get_val1(child, "s", &type_and_name));
+			ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type, &name));
+			ufbxi_check(ufbxi_read_legacy_link(uc, child, &fbx_id, name.data));
+
+			uint64_t node_fbx_id = (uintptr_t)type_and_name.data;
+			ufbxi_check(ufbxi_connect_oo(uc, node_fbx_id, fbx_id));
+			if (!skin) {
+				skin = ufbxi_push_synthetic_element(uc, &skin_fbx_id, info->name.data, ufbx_skin_deformer, UFBX_ELEMENT_SKIN_DEFORMER);
+				ufbxi_check(skin);
+				ufbxi_check(ufbxi_connect_oo(uc, skin_fbx_id, info->fbx_id));
+			}
+			ufbxi_check(ufbxi_connect_oo(uc, fbx_id, skin_fbx_id));
+		}
 	}
 
 	mesh->skinned_is_local = true;
@@ -7988,6 +8087,8 @@ ufbxi_nodiscard static int ufbxi_read_legacy_model(ufbxi_context *uc, ufbxi_node
 		ufbxi_check(ufbxi_read_legacy_light(uc, node, &attrib_info));
 	} else if (attrib_type == ufbxi_Camera) {
 		ufbxi_check(ufbxi_read_legacy_camera(uc, node, &attrib_info));
+	} else if (attrib_type == ufbxi_LimbNode) {
+		ufbxi_check(ufbxi_read_legacy_limb_node(uc, node, &attrib_info));
 	} else if (ufbxi_find_child(node, ufbxi_Vertices)) {
 		ufbxi_check(ufbxi_read_legacy_mesh(uc, node, &attrib_info));
 	}
@@ -7999,6 +8100,20 @@ ufbxi_nodiscard static int ufbxi_read_legacy_model(ufbxi_context *uc, ufbxi_node
 		for (size_t i = 0; i < children->size; i++) {
 			uint64_t child_fbx_id = (uintptr_t)names[i].data;
 			ufbxi_check(ufbxi_connect_oo(uc, child_fbx_id, info.fbx_id));
+		}
+	}
+
+	// Non-take animation channels
+	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
+		if (child->name == ufbxi_Channel) {
+			ufbx_string name;
+			if (ufbxi_get_val1(child, "S", &name)) {
+				if (uc->legacy_implicit_anim_layer_id == 0) {
+					// Defer creation so we won't be the first animation stack..
+					uc->legacy_implicit_anim_layer_id = (uintptr_t)uc + 1;
+				}
+				ufbxi_check(ufbxi_read_take_prop_channel(uc, child, info.fbx_id, uc->legacy_implicit_anim_layer_id, name));
+			}
 		}
 	}
 
@@ -8024,6 +8139,24 @@ ufbxi_nodiscard static int ufbxi_read_legacy_root(ufbxi_context *uc)
 		} else if (node->name == ufbxi_Model) {
 			ufbxi_check(ufbxi_read_legacy_model(uc, node));
 		}
+	}
+
+	// Create the implicit animation stack if necessary
+	if (uc->legacy_implicit_anim_layer_id) {
+		ufbxi_element_info layer_info = { 0 };
+		layer_info.fbx_id = uc->legacy_implicit_anim_layer_id;
+		layer_info.name.data = "(internal)";
+		layer_info.name.length = strlen(layer_info.name.data);
+		ufbxi_check(ufbxi_push_string_place_str(uc, &layer_info.name));
+		ufbx_anim_layer *layer = ufbxi_push_element(uc, &layer_info, ufbx_anim_layer, UFBX_ELEMENT_ANIM_LAYER);
+		ufbxi_check(layer);
+
+		ufbxi_element_info stack_info = layer_info;
+		stack_info.fbx_id = uc->legacy_implicit_anim_layer_id + 1;
+		ufbx_anim_stack *stack = ufbxi_push_element(uc, &stack_info, ufbx_anim_stack, UFBX_ELEMENT_ANIM_STACK);
+		ufbxi_check(stack);
+
+		ufbxi_check(ufbxi_connect_oo(uc, layer_info.fbx_id, stack_info.fbx_id));
 	}
 
 	return 1;
@@ -9751,7 +9884,9 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 	uc->scene.metadata.ktime_to_sec = uc->ktime_to_sec;
 
 	// Maya seems to use scale of 100/3, Blender binary uses exactly 33, ASCII has always value of 1.0
-	if (uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
+	if (uc->version < 6000) {
+		uc->scene.metadata.bone_prop_size_unit = 1.0f;
+	} else if (uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
 		uc->scene.metadata.bone_prop_size_unit = 33.0f;
 	} else if (uc->exporter == UFBX_EXPORTER_BLENDER_ASCII) {
 		uc->scene.metadata.bone_prop_size_unit = 1.0f;
