@@ -17,7 +17,9 @@ UFBXT_FILE_TEST(max2009_blob)
 		ufbxt_assert(node && node->light);
 		ufbx_light *light = node->light;
 		ufbxt_assert(light->type == UFBX_LIGHT_POINT);
-		ufbxt_assert(light->decay == UFBX_LIGHT_DECAY_QUADRATIC);
+		if (scene->metadata.version < 6000) {
+			ufbxt_assert(light->decay == UFBX_LIGHT_DECAY_QUADRATIC);
+		}
 		ufbx_vec3 color = { 0.172549024224281f, 0.364705890417099f, 1.0f };
 		ufbxt_assert_close_vec3(err, light->color, color);
 		ufbxt_assert_close_real(err, light->intensity, 1.0f);
@@ -28,7 +30,9 @@ UFBXT_FILE_TEST(max2009_blob)
 		ufbxt_assert(node && node->light);
 		ufbx_light *light = node->light;
 		ufbxt_assert(light->type == UFBX_LIGHT_SPOT);
-		ufbxt_assert(light->decay == UFBX_LIGHT_DECAY_QUADRATIC);
+		if (scene->metadata.version < 6000) {
+			ufbxt_assert(light->decay == UFBX_LIGHT_DECAY_QUADRATIC);
+		}
 		ufbx_vec3 color = { 0.972549080848694f ,0.0705882385373116f, 0.0705882385373116f };
 		ufbxt_assert_close_vec3(err, light->color, color);
 		ufbxt_assert_close_real(err, light->intensity, 1.0f);
@@ -40,7 +44,9 @@ UFBXT_FILE_TEST(max2009_blob)
 		ufbxt_assert(node && node->light);
 		ufbx_light *light = node->light;
 		ufbxt_assert(light->type == UFBX_LIGHT_DIRECTIONAL);
-		ufbxt_assert(light->decay == UFBX_LIGHT_DECAY_NONE);
+		if (scene->metadata.version < 6000) {
+			ufbxt_assert(light->decay == UFBX_LIGHT_DECAY_NONE);
+		}
 		ufbx_vec3 color = { 0.533333361148834f ,0.858823597431183f, 0.647058844566345f };
 		ufbxt_assert_close_vec3(err, light->color, color);
 		ufbxt_assert_close_real(err, light->intensity, 1.0f);

@@ -1955,6 +1955,7 @@ static const char ufbxi_ColorIndex[] = "ColorIndex";
 static const char ufbxi_Color[] = "Color";
 static const char ufbxi_Colors[] = "Colors";
 static const char ufbxi_ConeAngle[] = "ConeAngle";
+static const char ufbxi_Cone_angle[] = "Cone angle";
 static const char ufbxi_Connections[] = "Connections";
 static const char ufbxi_Content[] = "Content";
 static const char ufbxi_CoordAxisSign[] = "CoordAxisSign";
@@ -2191,6 +2192,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_ColorIndex, sizeof(ufbxi_ColorIndex) - 1 },
 	{ ufbxi_Colors, sizeof(ufbxi_Colors) - 1 },
 	{ ufbxi_ConeAngle, sizeof(ufbxi_ConeAngle) - 1 },
+	{ ufbxi_Cone_angle, sizeof(ufbxi_Cone_angle) - 1 },
 	{ ufbxi_Connections, sizeof(ufbxi_Connections) - 1 },
 	{ ufbxi_Content, sizeof(ufbxi_Content) - 1 },
 	{ ufbxi_CoordAxis, sizeof(ufbxi_CoordAxis) - 1 },
@@ -7646,7 +7648,7 @@ static const ufbxi_legacy_prop ufbxi_legacy_camera_props[] = {
 	{ ufbxi_FocalLength, UFBX_PROP_NUMBER, ufbxi_FocalLength, "R" },
 };
 
-ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_prop(ufbxi_context *uc, ufbxi_node *node, ufbx_prop *prop, const ufbxi_legacy_prop *legacy_prop)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_prop(ufbxi_node *node, ufbx_prop *prop, const ufbxi_legacy_prop *legacy_prop)
 {
 	size_t value_ix = 0;
 
@@ -7681,7 +7683,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_prop(ufbxi_context *
 	return 1;
 }
 
-ufbxi_noinline ufbxi_nodiscard static size_t ufbxi_read_legacy_props(ufbxi_context *uc, ufbxi_node *node, ufbx_prop *props, const ufbxi_legacy_prop *legacy_props, size_t num_legacy)
+ufbxi_noinline ufbxi_nodiscard static size_t ufbxi_read_legacy_props(ufbxi_node *node, ufbx_prop *props, const ufbxi_legacy_prop *legacy_props, size_t num_legacy)
 {
 	size_t num_props = 0;
 	for (size_t legacy_ix = 0; legacy_ix < num_legacy; legacy_ix++) {
@@ -7690,7 +7692,7 @@ ufbxi_noinline ufbxi_nodiscard static size_t ufbxi_read_legacy_props(ufbxi_conte
 
 		ufbxi_node *n = ufbxi_find_child_strcmp(node, legacy_prop->node_name);
 		if (!n) continue;
-		if (!ufbxi_read_legacy_prop(uc, n, prop, legacy_prop)) continue;
+		if (!ufbxi_read_legacy_prop(n, prop, legacy_prop)) continue;
 
 		prop->name.data = legacy_prop->prop_name;
 		prop->name.length = strlen(legacy_prop->prop_name);
@@ -7709,7 +7711,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_light(ufbxi_context 
 	ufbxi_check(light);
 
 	ufbx_prop tmp_props[ufbxi_arraycount(ufbxi_legacy_light_props)];
-	size_t num_props = ufbxi_read_legacy_props(uc, node, tmp_props, ufbxi_legacy_light_props, ufbxi_arraycount(ufbxi_legacy_light_props));
+	size_t num_props = ufbxi_read_legacy_props(node, tmp_props, ufbxi_legacy_light_props, ufbxi_arraycount(ufbxi_legacy_light_props));
 
 	light->props.num_props = num_props;
 	light->props.props = ufbxi_push_copy(&uc->result, ufbx_prop, num_props, tmp_props);
@@ -7724,7 +7726,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_camera(ufbxi_context
 	ufbxi_check(camera);
 
 	ufbx_prop tmp_props[ufbxi_arraycount(ufbxi_legacy_camera_props)];
-	size_t num_props = ufbxi_read_legacy_props(uc, node, tmp_props, ufbxi_legacy_camera_props, ufbxi_arraycount(ufbxi_legacy_camera_props));
+	size_t num_props = ufbxi_read_legacy_props(node, tmp_props, ufbxi_legacy_camera_props, ufbxi_arraycount(ufbxi_legacy_camera_props));
 
 	camera->props.num_props = num_props;
 	camera->props.props = ufbxi_push_copy(&uc->result, ufbx_prop, num_props, tmp_props);
@@ -9906,7 +9908,8 @@ ufbxi_noinline static void ufbxi_update_light(ufbx_light *light)
 	light->area_shape = (ufbx_light_area_shape)ufbxi_find_enum(&light->props, ufbxi_AreaLightShape, 0, UFBX_LIGHT_AREA_SPHERE);
 	light->inner_angle = ufbxi_find_real(&light->props, ufbxi_HotSpot, 0.0f);
 	light->inner_angle = ufbxi_find_real(&light->props, ufbxi_InnerAngle, light->inner_angle);
-	light->outer_angle = ufbxi_find_real(&light->props, ufbxi_ConeAngle, 0.0f);
+	light->outer_angle = ufbxi_find_real(&light->props, ufbxi_Cone_angle, 0.0f);
+	light->outer_angle = ufbxi_find_real(&light->props, ufbxi_ConeAngle, light->outer_angle);
 	light->outer_angle = ufbxi_find_real(&light->props, ufbxi_OuterAngle, light->outer_angle);
 	light->cast_light = ufbxi_find_int(&light->props, ufbxi_CastLight, 1) != 0;
 	light->cast_shadows = ufbxi_find_int(&light->props, ufbxi_CastShadows, 0) != 0;
