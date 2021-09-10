@@ -65,6 +65,14 @@ int main(int argc, char **argv)
 		ufbx_version_minor(scene->metadata.exporter_version),
 		ufbx_version_patch(scene->metadata.exporter_version));
 
+	int result = 0;
+
+	for (size_t i = 0; i < scene->unknowns.count; i++) {
+		ufbx_unknown *unknown = scene->unknowns.data[i];
+		fprintf(stderr, "Unknown element: %s/%s : %s\n", unknown->type.data, unknown->sub_type.data, unknown->name.data);
+		result = 3;
+	}
+
 	bool known_unknown = false;
 	if (strstr(scene->metadata.creator.data, "kenney")) known_unknown = true;
 	if (strstr(scene->metadata.creator.data, "assetforge")) known_unknown = true;
@@ -75,7 +83,7 @@ int main(int argc, char **argv)
 
 	ufbx_free_scene(scene);
 
-	return 0;
+	return result;
 }
 
 
