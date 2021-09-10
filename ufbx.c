@@ -5019,7 +5019,7 @@ ufbxi_nodiscard static int ufbxi_load_strings(ufbxi_context *uc)
 	// This allows us to compare name pointers to the global values
 	ufbxi_for(ufbx_string, str, ufbxi_strings, ufbxi_arraycount(ufbxi_strings)) {
 #if UFBX_REGRESSION
-		ufbx_assert(strlen(str.data) == str.length);
+		ufbx_assert(strlen(str->data) == str->length);
 #endif
 		ufbxi_check(ufbxi_push_string_imp(uc, str->data, str->length, false));
 	}
@@ -10600,8 +10600,8 @@ ufbxi_noinline static void ufbxi_update_texture(ufbx_texture *texture)
 		texture->texture_to_uv = ufbx_identity_matrix;
 		texture->uv_to_texture = ufbx_identity_matrix;
 	}
-	texture->wrap_u = ufbxi_find_enum(&texture->props, ufbxi_WrapModeU, 0, UFBX_WRAP_CLAMP);
-	texture->wrap_v = ufbxi_find_enum(&texture->props, ufbxi_WrapModeV, 0, UFBX_WRAP_CLAMP);
+	texture->wrap_u = (ufbx_wrap_mode)ufbxi_find_enum(&texture->props, ufbxi_WrapModeU, 0, UFBX_WRAP_CLAMP);
+	texture->wrap_v = (ufbx_wrap_mode)ufbxi_find_enum(&texture->props, ufbxi_WrapModeV, 0, UFBX_WRAP_CLAMP);
 }
 
 ufbxi_noinline static void ufbxi_update_anim_stack(ufbx_scene *scene, ufbx_anim_stack *stack)
