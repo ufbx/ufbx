@@ -1293,20 +1293,107 @@ struct ufbx_material {
 	ufbx_material_texture_list textures; // < Sorted by `material_prop`
 };
 
+typedef enum ufbx_texture_type {
+
+	// Texture associated with an image file/sequence. `texture->filename` and
+	// and `texture->relative_filename` contain the texture's path. If the file
+	// has embedded content `texture->content` may hold `texture->content_size`
+	// bytes of raw image data.
+	UFBX_TEXTURE_FILE,
+
+	// The texture consists of multiple texture layers blended together.
+	UFBX_TEXTURE_LAYERED,
+
+
+	UFBX_TEXTURE_PROCEDURAL,
+
+} ufbx_texture_type;
+
+// Blend modes to combine layered textures with, compatible with common blend
+// mode definitions in many art programs. Simpler blend modes have equations
+// specified below where `src` is the layer to compososite over `dst`.
+// See eg. https://www.w3.org/TR/2013/WD-compositing-1-20131010/#blendingseparable
+typedef enum ufbx_blend_mode {
+	UFBX_BLEND_TRANSLUCENT,   // < `src` effects result alpha
+	UFBX_BLEND_ADDITIVE,      // < `src + dst`
+	UFBX_BLEND_MULTIPLY,      // < `src * dst`
+	UFBX_BLEND_MULTIPLY_2X,   // < `2 * src * dst`
+	UFBX_BLEND_OVER,          // < `src * src_alpha + dst * (1-src_alpha)`
+	UFBX_BLEND_REPLACE,       // < `src` Replace the contents
+	UFBX_BLEND_DISSOLVE,      // < `random() + src_alpha >= 1.0 ? src : dst`
+	UFBX_BLEND_DARKEN,        // < `min(src, dst)`
+	UFBX_BLEND_COLOR_BURN,    // < `src > 0 ? 1 - min(1, (1-dst) / src) : 0`
+	UFBX_BLEND_LINEAR_BURN,   // < `src + dst - 1`
+	UFBX_BLEND_DARKER_COLOR,  // < `value(src) < value(dst) ? src : dst`
+	UFBX_BLEND_LIGHTEN,       // < `max(src, dst)`
+	UFBX_BLEND_SCREEN,        // < `1 - (1-src)*(1-dst)`
+	UFBX_BLEND_COLOR_DODGE,   // < `src < 1 ? dst / (1 - src)` : (dst>0?1:0)`
+	UFBX_BLEND_LINEAR_DODGE,  // < `src + dst`
+	UFBX_BLEND_LIGHTER_COLOR, // < `value(src) > value(dst) ? src : dst`
+	UFBX_BLEND_SOFT_LIGHT,    // < https://www.w3.org/TR/2013/WD-compositing-1-20131010/#blendingsoftlight
+	UFBX_BLEND_HARD_LIGHT,    // < https://www.w3.org/TR/2013/WD-compositing-1-20131010/#blendinghardlight
+	UFBX_BLEND_VIVID_LIGHT,   // < Combination of `COLOR_DODGE` and `COLOR_BURN`
+	UFBX_BLEND_LINEAR_LIGHT,  // < Combination of `LINEAR_DODGE` and `LINEAR_BURN`
+	UFBX_BLEND_PIN_LIGHT,     // < Combination of `DARKEN` and `LIGHTEN`
+	UFBX_BLEND_HARD_MIX,      // < Produces primary colors depending on similarity
+	UFBX_BLEND_DIFFERENCE,    // < `abs(src - dst)`
+	UFBX_BLEND_EXCLUSION,     // < `dst + src - 2 * src * dst`
+	UFBX_BLEND_SUBTRACT,      // < `dst - src`
+	UFBX_BLEND_DIVIDE,        // < `dst / src`
+	UFBX_BLEND_HUE,           // < Replace hue
+	UFBX_BLEND_SATURATION,    // < Replace saturation
+	UFBX_BLEND_COLOR,         // < Replace hue and saturatio 
+	UFBX_BLEND_LUMINOSITY,    // < Replace value
+	UFBX_BLEND_OVERLAY,       // < Same as `HARD_LIGHT` but with `src` and `dst` swapped
+} ufbx_blend_mode;
+
+// Blend modes to combine layered textures with, compatible with common blend
+typedef enum ufbx_wrap_mode {
+	UFBX_WRAP_REPEAT, // < Repeat the texture past the [0,1] range
+	UFBX_WRAP_CLAMP,  // < Clamp the normalized texture coordinates to [0,1]
+} ufbx_wrap_mode;
+
+// Single layer in a layered texture
+typedef struct ufbx_texture_layer {
+	ufbx_texture *texture;      // < The inner texture to evaluate, never `NULL`
+	ufbx_blend_mode blend_mode; // < Equation to combine the layer to the background
+	ufbx_real alpha;            // < Blend weight of this layer
+} ufbx_texture_layer;
+
+UFBX_LIST_TYPE(ufbx_texture_layer_list, ufbx_texture_layer);
+
 // Texture that controls material appearance
 struct ufbx_texture {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
-	// Paths to the resource
+	// Texture type (file / layered / procedural)
+	ufbx_texture_type type;
+
+	// FILE: Paths to the resource
 	ufbx_string filename;
 	ufbx_string relative_filename;
 
-	// Optional embedded content blob, eg. raw .png format data
+	// FILE: Optional embedded content blob, eg. raw .png format data
 	const void *content;
 	size_t content_size;
 
-	// Optional video texture
+	// FILE: Optional video texture
 	ufbx_video *video;
+
+	// LAYERED: Inner texture layers, ordered from _bottom_ to _top_
+	ufbx_texture_layer_list layers;
+
+	// Name of the UV set to use
+	ufbx_string uv_set;
+
+	// Wrapping mode
+	ufbx_wrap_mode wrap_u;
+	ufbx_wrap_mode wrap_v;
+
+	// UV transform
+	ufbx_transform transform;  // < Texture transformation in UV space
+	ufbx_matrix texture_to_uv; // < Matrix representation of `transform`
+	ufbx_matrix uv_to_texture; // < UV coordinate to normalized texture coordinate matrix
 };
 
 // TODO: Video textures

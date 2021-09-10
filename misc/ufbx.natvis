@@ -66,5 +66,6 @@
   <Type Name="ufbx_pose_list"><DisplayString>{{ count={count} }}</DisplayString><Expand><ArrayItems><Size>count</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_shader_prop_binding_list"><DisplayString>{{ count={count} }}</DisplayString><Expand><ArrayItems><Size>count</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
   <Type Name="ufbx_material_texture_list"><DisplayString>{{ count={count} }}</DisplayString><Expand><ArrayItems><Size>count</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
+  <Type Name="ufbx_texture_layer_list"><DisplayString>{{ count={count} }}</DisplayString><Expand><ArrayItems><Size>count</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
 
 </AutoVisualizer>

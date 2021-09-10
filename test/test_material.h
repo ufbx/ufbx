@@ -425,3 +425,73 @@ UFBXT_FILE_TEST(maya_osl_properties)
 	ufbxt_assert(material->pbr.thin_walled.value_int != 0);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_texture_layers)
+#if UFBXT_IMPL
+{
+	// TODO: Recover layered textures from <7000.....
+	if (scene->metadata.version < 7000) return;
+
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh && node->mesh->materials.count == 1);
+	ufbx_material *material = node->mesh->materials.data[0].material;
+
+	ufbx_texture *layered = material->fbx.diffuse_color.texture;
+	ufbxt_assert(layered);
+	ufbxt_assert(layered->type == UFBX_TEXTURE_LAYERED);
+	ufbxt_assert(layered->layers.count == 3);
+	ufbxt_assert(layered->layers.data[0].blend_mode == UFBX_BLEND_MULTIPLY);
+	ufbxt_assert_close_real(err, layered->layers.data[0].alpha, 0.75f);
+	ufbxt_assert(!strcmp(layered->layers.data[0].texture->relative_filename.data, "textures\\checkerboard_weight.png"));
+	ufbxt_assert(layered->layers.data[1].blend_mode == UFBX_BLEND_OVER);
+	ufbxt_assert_close_real(err, layered->layers.data[1].alpha, 0.5f);
+	ufbxt_assert(!strcmp(layered->layers.data[1].texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
+	ufbxt_assert(layered->layers.data[2].blend_mode == UFBX_BLEND_ADDITIVE);
+	ufbxt_assert_close_real(err, layered->layers.data[2].alpha, 1.0f);
+	ufbxt_assert(!strcmp(layered->layers.data[2].texture->relative_filename.data, "textures\\checkerboard_ambient.png"));
+
+	{
+		ufbx_texture *texture = material->fbx.emission_color.texture;
+		ufbxt_assert(texture);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_emissive.png"));
+		ufbxt_assert_close_real(err, texture->transform.translation.x, 1.0f);
+		ufbxt_assert_close_real(err, texture->transform.translation.y, 2.0f);
+		ufbxt_assert_close_real(err, texture->transform.translation.z, 0.0f);
+
+		ufbx_vec3 uv = { 0.5f, 0.5f, 0.0f };
+		uv = ufbx_transform_position(&texture->uv_to_texture, uv);
+		ufbxt_assert_close_real(err, uv.x, -0.5f);
+		ufbxt_assert_close_real(err, uv.y, -1.5f);
+		ufbxt_assert_close_real(err, uv.z, 0.0f);
+	}
+
+	{
+		ufbx_texture *texture = material->fbx.transparency_color.texture;
+		ufbxt_assert(texture);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_transparency.png"));
+		ufbxt_assert_close_real(err, texture->transform.translation.x, 0.5f);
+		ufbxt_assert_close_real(err, texture->transform.translation.y, -0.20710678f);
+		ufbxt_assert_close_real(err, texture->transform.translation.z, 0.0f);
+		ufbx_vec3 euler = ufbx_quat_to_euler(texture->transform.rotation, UFBX_ROTATION_XYZ);
+		ufbxt_assert_close_real(err, euler.x, 0.0f);
+		ufbxt_assert_close_real(err, euler.y, 0.0f);
+		ufbxt_assert_close_real(err, euler.z, 45.0f);
+
+		{
+			ufbx_vec3 uv = { 0.5f, 0.5f, 0.0f };
+			uv = ufbx_transform_position(&texture->uv_to_texture, uv);
+			ufbxt_assert_close_real(err, uv.x, 0.5f);
+			ufbxt_assert_close_real(err, uv.y, 0.5f);
+			ufbxt_assert_close_real(err, uv.z, 0.0f);
+		}
+
+		{
+			ufbx_vec3 uv = { 1.0f, 0.5f, 0.0f };
+			uv = ufbx_transform_position(&texture->uv_to_texture, uv);
+			ufbxt_assert_close_real(err, uv.x, 0.853553f);
+			ufbxt_assert_close_real(err, uv.y, 0.146447f);
+			ufbxt_assert_close_real(err, uv.z, 0.0f);
+		}
+	}
+}
+#endif

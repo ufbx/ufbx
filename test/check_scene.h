@@ -381,7 +381,13 @@ static void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
 
 static void ufbxt_check_texture(ufbx_scene *scene, ufbx_texture *texture)
 {
+	ufbxt_check_string(texture->filename);
+	ufbxt_check_string(texture->relative_filename);
 	ufbxt_check_element_ptr(scene, texture->video);
+	for (size_t i = 0; i < texture->layers.count; i++) {
+		ufbxt_assert(texture->layers.data[i].texture);
+		ufbxt_check_element_ptr(scene, texture->layers.data[i].texture);
+	}
 }
 
 static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_layer)
