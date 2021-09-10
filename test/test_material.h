@@ -495,3 +495,41 @@ UFBXT_FILE_TEST(maya_texture_layers)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(maya_texture_blend_modes)
+#if UFBXT_IMPL
+{
+	// TODO: Recover layered textures from <7000.....
+	if (scene->metadata.version < 7000) return;
+
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh && node->mesh->materials.count == 1);
+	ufbx_material *material = node->mesh->materials.data[0].material;
+
+	ufbx_texture *layered = material->fbx.diffuse_color.texture;
+	ufbxt_assert(layered);
+	ufbxt_assert(layered->type == UFBX_TEXTURE_LAYERED);
+	ufbxt_assert(layered->layers.count == 14);
+
+	for (size_t i = 0; i < layered->layers.count; i++) {
+		ufbx_real alpha = i < 10 ? (ufbx_real)(i + 1) * 0.1f : 1.0f;
+		size_t ix = layered->layers.count - i - 1;
+		ufbxt_assert_close_real(err, layered->layers.data[ix].alpha, alpha);
+	}
+
+	ufbxt_assert(layered->layers.data[ 0].blend_mode == UFBX_BLEND_REPLACE);    // "CPV Modulate" (unsupported)
+	ufbxt_assert(layered->layers.data[ 1].blend_mode == UFBX_BLEND_LUMINOSITY); // "Illuminate"
+	ufbxt_assert(layered->layers.data[ 2].blend_mode == UFBX_BLEND_REPLACE);    // "Desaturate" (unsupported)
+	ufbxt_assert(layered->layers.data[ 3].blend_mode == UFBX_BLEND_SATURATION); // "Saturate"
+	ufbxt_assert(layered->layers.data[ 4].blend_mode == UFBX_BLEND_DARKEN);     // "Darken"
+	ufbxt_assert(layered->layers.data[ 5].blend_mode == UFBX_BLEND_LIGHTEN);    // "Lighten"
+	ufbxt_assert(layered->layers.data[ 6].blend_mode == UFBX_BLEND_DIFFERENCE); // "Difference"
+	ufbxt_assert(layered->layers.data[ 7].blend_mode == UFBX_BLEND_MULTIPLY);   // "Multiply"
+	ufbxt_assert(layered->layers.data[ 8].blend_mode == UFBX_BLEND_SUBTRACT);   // "Subtract"
+	ufbxt_assert(layered->layers.data[ 9].blend_mode == UFBX_BLEND_ADDITIVE);   // "Add"
+	ufbxt_assert(layered->layers.data[10].blend_mode == UFBX_BLEND_REPLACE);    // "Out" (unsupported)
+	ufbxt_assert(layered->layers.data[11].blend_mode == UFBX_BLEND_REPLACE);    // "In" (unsupported)
+	ufbxt_assert(layered->layers.data[12].blend_mode == UFBX_BLEND_OVER);       // "Over"
+	ufbxt_assert(layered->layers.data[13].blend_mode == UFBX_BLEND_REPLACE);    // "None"
+}
+#endif
