@@ -156,3 +156,35 @@ UFBXT_FILE_TEST(max_selection_sets)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(maya_display_layers)
+#if UFBXT_IMPL
+{
+	ufbx_vec3 colors[] = { { 1,0,0 }, { 0,1,0 }, { 0,0,1 } };
+
+	ufbxt_assert(scene->display_layers.count == 3);
+	ufbxt_assert(scene->nodes.count == 5);
+
+	{
+		ufbx_display_layer *layer = (ufbx_display_layer*)ufbx_find_element(scene, UFBX_ELEMENT_DISPLAY_LAYER, "LayerA");
+		ufbxt_assert(layer && layer->nodes.count == 1 && !strcmp(layer->nodes.data[0]->name.data, "NodeA"));
+		ufbxt_assert(layer->visible && !layer->frozen);
+		ufbxt_assert_close_vec3(err, layer->ui_color, colors[0]);
+	}
+
+	{
+		ufbx_display_layer *layer = (ufbx_display_layer*)ufbx_find_element(scene, UFBX_ELEMENT_DISPLAY_LAYER, "LayerB");
+		ufbxt_assert(layer && layer->nodes.count == 1 && !strcmp(layer->nodes.data[0]->name.data, "NodeB"));
+		ufbxt_assert(layer->visible && layer->frozen);
+		ufbxt_assert_close_vec3(err, layer->ui_color, colors[1]);
+	}
+
+	{
+		ufbx_display_layer *layer = (ufbx_display_layer*)ufbx_find_element(scene, UFBX_ELEMENT_DISPLAY_LAYER, "LayerC");
+		ufbxt_assert(layer && layer->nodes.count == 1 && !strcmp(layer->nodes.data[0]->name.data, "NodeC"));
+		ufbxt_assert(!layer->visible && !layer->frozen);
+		ufbxt_assert_close_vec3(err, layer->ui_color, colors[2]);
+	}
+
+}
+#endif

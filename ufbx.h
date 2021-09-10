@@ -270,6 +270,7 @@ typedef struct ufbx_anim_value ufbx_anim_value;
 typedef struct ufbx_anim_curve ufbx_anim_curve;
 
 // Collections
+typedef struct ufbx_display_layer ufbx_display_layer;
 typedef struct ufbx_selection_set ufbx_selection_set;
 typedef struct ufbx_selection_node ufbx_selection_node;
 
@@ -309,6 +310,7 @@ UFBX_LIST_TYPE(ufbx_anim_stack_list, ufbx_anim_stack*);
 UFBX_LIST_TYPE(ufbx_anim_layer_list, ufbx_anim_layer*);
 UFBX_LIST_TYPE(ufbx_anim_value_list, ufbx_anim_value*);
 UFBX_LIST_TYPE(ufbx_anim_curve_list, ufbx_anim_curve*);
+UFBX_LIST_TYPE(ufbx_display_layer_list, ufbx_display_layer*);
 UFBX_LIST_TYPE(ufbx_selection_set_list, ufbx_selection_set*);
 UFBX_LIST_TYPE(ufbx_selection_node_list, ufbx_selection_node*);
 UFBX_LIST_TYPE(ufbx_pose_list, ufbx_pose*);
@@ -346,6 +348,7 @@ typedef enum ufbx_element_type {
 	UFBX_ELEMENT_ANIM_LAYER,          // < `ufbx_anim_layer`
 	UFBX_ELEMENT_ANIM_VALUE,          // < `ufbx_anim_value`
 	UFBX_ELEMENT_ANIM_CURVE,          // < `ufbx_anim_curve`
+	UFBX_ELEMENT_DISPLAY_LAYER,       // < `ufbx_display_layer`
 	UFBX_ELEMENT_SELECTION_SET,       // < `ufbx_selection_set`
 	UFBX_ELEMENT_SELECTION_NODE,      // < `ufbx_selection_node`
 	UFBX_ELEMENT_POSE,                // < `ufbx_pose`
@@ -1546,6 +1549,20 @@ struct ufbx_anim_curve {
 
 // -- Collections
 
+// Collection of nodes to hide/freeze
+struct ufbx_display_layer {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	// Nodes included in the layer (exclusively at most one layer per node)
+	ufbx_node_list nodes;
+
+	// Layer state
+	bool visible; // < Contained nodes are visible
+	bool frozen;  // < Contained nodes cannot be edited
+
+	ufbx_vec3 ui_color; // < Visual color for UI
+};
+
 // Named set of nodes/geometry features to select.
 struct ufbx_selection_set {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
@@ -1763,6 +1780,7 @@ struct ufbx_scene {
 			ufbx_anim_curve_list anim_curves;
 
 			// Collections
+			ufbx_display_layer_list display_layers;
 			ufbx_selection_set_list selection_sets;
 			ufbx_selection_node_list selection_nodes;
 
