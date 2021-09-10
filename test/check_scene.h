@@ -403,6 +403,20 @@ static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_laye
 	}
 }
 
+static void ufbxt_check_selection_set(ufbx_scene *scene, ufbx_selection_set *set)
+{
+	for (size_t i = 0; i < set->nodes.count; i++) {
+		ufbxt_assert(set->nodes.data[i]);
+		ufbxt_check_element_ptr(scene, set->nodes.data[i]);
+	}
+}
+
+static void ufbxt_check_selection_node(ufbx_scene *scene, ufbx_selection_node *node)
+{
+	ufbxt_check_element_ptr(scene, node->target_node);
+	ufbxt_check_element_ptr(scene, node->target_mesh);
+}
+
 static void ufbxt_check_scene(ufbx_scene *scene)
 {
 	ufbxt_check_string(scene->metadata.creator);
@@ -429,6 +443,14 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 
 	for (size_t i = 0; i < scene->textures.count; i++) {
 		ufbxt_check_texture(scene, scene->textures.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->selection_sets.count; i++) {
+		ufbxt_check_selection_set(scene, scene->selection_sets.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->selection_nodes.count; i++) {
+		ufbxt_check_selection_node(scene, scene->selection_nodes.data[i]);
 	}
 }
 

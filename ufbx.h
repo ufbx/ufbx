@@ -92,6 +92,7 @@ typedef struct ufbx_quat {
 	};
 } ufbx_quat;
 
+UFBX_LIST_TYPE(ufbx_int32_list, int32_t);
 UFBX_LIST_TYPE(ufbx_real_list, ufbx_real);
 UFBX_LIST_TYPE(ufbx_vec4_list, ufbx_vec4);
 
@@ -268,6 +269,10 @@ typedef struct ufbx_anim_layer ufbx_anim_layer;
 typedef struct ufbx_anim_value ufbx_anim_value;
 typedef struct ufbx_anim_curve ufbx_anim_curve;
 
+// Collections
+typedef struct ufbx_selection_set ufbx_selection_set;
+typedef struct ufbx_selection_node ufbx_selection_node;
+
 // Miscellaneous
 typedef struct ufbx_pose ufbx_pose;
 
@@ -304,6 +309,8 @@ UFBX_LIST_TYPE(ufbx_anim_stack_list, ufbx_anim_stack*);
 UFBX_LIST_TYPE(ufbx_anim_layer_list, ufbx_anim_layer*);
 UFBX_LIST_TYPE(ufbx_anim_value_list, ufbx_anim_value*);
 UFBX_LIST_TYPE(ufbx_anim_curve_list, ufbx_anim_curve*);
+UFBX_LIST_TYPE(ufbx_selection_set_list, ufbx_selection_set*);
+UFBX_LIST_TYPE(ufbx_selection_node_list, ufbx_selection_node*);
 UFBX_LIST_TYPE(ufbx_pose_list, ufbx_pose*);
 
 typedef enum ufbx_element_type {
@@ -339,6 +346,8 @@ typedef enum ufbx_element_type {
 	UFBX_ELEMENT_ANIM_LAYER,          // < `ufbx_anim_layer`
 	UFBX_ELEMENT_ANIM_VALUE,          // < `ufbx_anim_value`
 	UFBX_ELEMENT_ANIM_CURVE,          // < `ufbx_anim_curve`
+	UFBX_ELEMENT_SELECTION_SET,       // < `ufbx_selection_set`
+	UFBX_ELEMENT_SELECTION_NODE,      // < `ufbx_selection_node`
 	UFBX_ELEMENT_POSE,                // < `ufbx_pose`
 
 	UFBX_NUM_ELEMENT_TYPES,
@@ -1535,6 +1544,31 @@ struct ufbx_anim_curve {
 	ufbx_keyframe_list keyframes;
 };
 
+// -- Collections
+
+// Named set of nodes/geometry features to select.
+struct ufbx_selection_set {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	// Included nodes and geomtery features
+	ufbx_selection_node_list nodes;
+};
+
+// Selection state of a node, potentially contains vertex/edge/face selection as well.
+struct ufbx_selection_node {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	// Selection targets, possibly `NULL`
+	ufbx_node *target_node;
+	ufbx_mesh *target_mesh;
+	bool include_node; // < Is `target_node` included in the selection
+
+	// Indices to selected components, may be out-of-bounds!
+	ufbx_int32_list vertices; // < Indices to `ufbx_mesh.vertices`
+	ufbx_int32_list edges;    // < Indices to `ufbx_mesh.edges`
+	ufbx_int32_list faces;    // < Indices to `ufbx_mesh.faces`
+};
+
 // -- Miscellaneous
 
 typedef struct ufbx_bone_pose {
@@ -1727,6 +1761,10 @@ struct ufbx_scene {
 			ufbx_anim_layer_list anim_layers;
 			ufbx_anim_value_list anim_values;
 			ufbx_anim_curve_list anim_curves;
+
+			// Collections
+			ufbx_selection_set_list selection_sets;
+			ufbx_selection_node_list selection_nodes;
 
 			// Miscellaneous
 			ufbx_pose_list poses;

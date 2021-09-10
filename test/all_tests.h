@@ -10,5 +10,6 @@
 #include "test_triangulate.h"
 #include "test_topology.h"
 #include "test_legacy.h"
+#include "test_collections.h"
 #include "test_fuzz.h"
 

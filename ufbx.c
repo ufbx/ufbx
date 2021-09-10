@@ -1953,6 +1953,7 @@ static const char ufbxi_Channel[] = "Channel";
 static const char ufbxi_Children[] = "Children";
 static const char ufbxi_Closed[] = "Closed";
 static const char ufbxi_Cluster[] = "Cluster";
+static const char ufbxi_Collection[] = "Collection";
 static const char ufbxi_ColorIndex[] = "ColorIndex";
 static const char ufbxi_Color[] = "Color";
 static const char ufbxi_Colors[] = "Colors";
@@ -1982,6 +1983,7 @@ static const char ufbxi_Dimensions[] = "Dimensions";
 static const char ufbxi_Document[] = "Document";
 static const char ufbxi_Documents[] = "Documents";
 static const char ufbxi_EdgeCrease[] = "EdgeCrease";
+static const char ufbxi_EdgeIndexArray[] = "EdgeIndexArray";
 static const char ufbxi_Edges[] = "Edges";
 static const char ufbxi_EmissiveColor[] = "EmissiveColor";
 static const char ufbxi_Entry[] = "Entry";
@@ -2015,6 +2017,7 @@ static const char ufbxi_Indexes[] = "Indexes";
 static const char ufbxi_InheritType[] = "InheritType";
 static const char ufbxi_InnerAngle[] = "InnerAngle";
 static const char ufbxi_Intensity[] = "Intensity";
+static const char ufbxi_IsTheNodeInSet[] = "IsTheNodeInSet";
 static const char ufbxi_KeyAttrDataFloat[] = "KeyAttrDataFloat";
 static const char ufbxi_KeyAttrFlags[] = "KeyAttrFlags";
 static const char ufbxi_KeyAttrRefCount[] = "KeyAttrRefCount";
@@ -2083,6 +2086,7 @@ static const char ufbxi_PO[] = "PO\0";
 static const char ufbxi_PP[] = "PP\0";
 static const char ufbxi_Periodic[] = "Periodic";
 static const char ufbxi_Points[] = "Points";
+static const char ufbxi_PolygonIndexArray[] = "PolygonIndexArray";
 static const char ufbxi_PolygonVertexIndex[] = "PolygonVertexIndex";
 static const char ufbxi_PoseNode[] = "PoseNode";
 static const char ufbxi_Pose[] = "Pose";
@@ -2111,6 +2115,8 @@ static const char ufbxi_ScaleAccumulationMode[] = "ScaleAccumulationMode";
 static const char ufbxi_ScalingOffset[] = "ScalingOffset";
 static const char ufbxi_ScalingPivot[] = "ScalingPivot";
 static const char ufbxi_Scaling[] = "Scaling";
+static const char ufbxi_SelectionNode[] = "SelectionNode";
+static const char ufbxi_SelectionSet[] = "SelectionSet";
 static const char ufbxi_ShadingModel[] = "ShadingModel";
 static const char ufbxi_Shape[] = "Shape";
 static const char ufbxi_Shininess[] = "Shininess";
@@ -2148,12 +2154,13 @@ static const char ufbxi_TypedIndex[] = "TypedIndex";
 static const char ufbxi_UVIndex[] = "UVIndex";
 static const char ufbxi_UVSet[] = "UVSet";
 static const char ufbxi_UVSwap[] = "UVSwap";
-static const char ufbxi_UV[] = "UV";
+static const char ufbxi_UV[] = "UV\0";
 static const char ufbxi_UnitScaleFactor[] = "UnitScaleFactor";
 static const char ufbxi_UpAxisSign[] = "UpAxisSign";
 static const char ufbxi_UpAxis[] = "UpAxis";
 static const char ufbxi_VertexCreaseIndex[] = "VertexCreaseIndex";
 static const char ufbxi_VertexCrease[] = "VertexCrease";
+static const char ufbxi_VertexIndexArray[] = "VertexIndexArray";
 static const char ufbxi_Vertices[] = "Vertices";
 static const char ufbxi_Video[] = "Video";
 static const char ufbxi_Visibility[] = "Visibility";
@@ -2169,8 +2176,8 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, 7 },
 	{ ufbxi_Alphas, 6 },
 	{ ufbxi_AmbientColor, 12 },
-	{ ufbxi_AnimationCurveNode, 18 },
 	{ ufbxi_AnimationCurve, 14 },
+	{ ufbxi_AnimationCurveNode, 18 },
 	{ ufbxi_AnimationLayer, 14 },
 	{ ufbxi_AnimationStack, 14 },
 	{ ufbxi_ApertureFormat, 14 },
@@ -2184,38 +2191,39 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_BaseLayer, 9 },
 	{ ufbxi_BindPose, 8 },
 	{ ufbxi_BindingTable, 12 },
-	{ ufbxi_BinormalsIndex, 14 },
 	{ ufbxi_Binormals, 9 },
+	{ ufbxi_BinormalsIndex, 14 },
 	{ ufbxi_BlendMode, 9 },
 	{ ufbxi_BlendModes, 10 },
-	{ ufbxi_BlendShapeChannel, 17 },
 	{ ufbxi_BlendShape, 10 },
+	{ ufbxi_BlendShapeChannel, 17 },
 	{ ufbxi_BlendWeights, 12 },
-	{ ufbxi_BoundaryRule, 12 },
 	{ ufbxi_Boundary, 8 },
+	{ ufbxi_BoundaryRule, 12 },
 	{ ufbxi_ByEdge, 6 },
-	{ ufbxi_ByPolygonVertex, 15 },
 	{ ufbxi_ByPolygon, 9 },
+	{ ufbxi_ByPolygonVertex, 15 },
 	{ ufbxi_ByVertex, 8 },
 	{ ufbxi_ByVertice, 9 },
+	{ ufbxi_Camera, 6 },
 	{ ufbxi_CameraStereo, 12 },
 	{ ufbxi_CameraSwitcher, 14 },
-	{ ufbxi_Camera, 6 },
 	{ ufbxi_CastLight, 9 },
 	{ ufbxi_CastShadows, 11 },
 	{ ufbxi_Channel, 7 },
 	{ ufbxi_Children, 8 },
 	{ ufbxi_Closed, 6 },
 	{ ufbxi_Cluster, 7 },
-	{ ufbxi_ColorIndex, 10 },
+	{ ufbxi_Collection, sizeof(ufbxi_Collection) - 1 },
 	{ ufbxi_Color, 5 },
+	{ ufbxi_ColorIndex, 10 },
 	{ ufbxi_Colors, 6 },
 	{ ufbxi_ConeAngle, 9 },
 	{ ufbxi_Cone_angle, 10 },
 	{ ufbxi_Connections, 11 },
 	{ ufbxi_Content, 7 },
-	{ ufbxi_CoordAxisSign, 13 },
 	{ ufbxi_CoordAxis, 9 },
+	{ ufbxi_CoordAxisSign, 13 },
 	{ ufbxi_Count, 5 },
 	{ ufbxi_Creator, 7 },
 	{ ufbxi_CurrentTextureBlendMode, 23 },
@@ -2225,8 +2233,8 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_D_Y, 3 },
 	{ ufbxi_D_Z, 3 },
 	{ ufbxi_DecayType, 9 },
-	{ ufbxi_DefaultCamera, 13 },
 	{ ufbxi_Default, 7 },
+	{ ufbxi_DefaultCamera, 13 },
 	{ ufbxi_Definitions, 11 },
 	{ ufbxi_DeformPercent, 13 },
 	{ ufbxi_Deformer, 8 },
@@ -2236,6 +2244,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Document, 8 },
 	{ ufbxi_Documents, 9 },
 	{ ufbxi_EdgeCrease, 10 },
+	{ ufbxi_EdgeIndexArray, sizeof(ufbxi_EdgeIndexArray) - 1 },
 	{ ufbxi_Edges, 5 },
 	{ ufbxi_EmissiveColor, 13 },
 	{ ufbxi_Entry, 5 },
@@ -2243,9 +2252,9 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FBXVersion, 10 },
 	{ ufbxi_FbxPropertyEntry, 16 },
 	{ ufbxi_FbxSemanticEntry, 16 },
+	{ ufbxi_FieldOfView, 11 },
 	{ ufbxi_FieldOfViewX, 12 },
 	{ ufbxi_FieldOfViewY, 12 },
-	{ ufbxi_FieldOfView, 11 },
 	{ ufbxi_FileName, 8 },
 	{ ufbxi_Filename, 8 },
 	{ ufbxi_FilmHeight, 10 },
@@ -2253,15 +2262,15 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FilmWidth, 9 },
 	{ ufbxi_FocalLength, 11 },
 	{ ufbxi_Form, 4 },
-	{ ufbxi_FrontAxisSign, 13 },
 	{ ufbxi_FrontAxis, 9 },
+	{ ufbxi_FrontAxisSign, 13 },
 	{ ufbxi_FullWeights, 11 },
 	{ ufbxi_GateFit, 7 },
 	{ ufbxi_GeometricRotation, 17 },
 	{ ufbxi_GeometricScaling, 16 },
 	{ ufbxi_GeometricTranslation, 20 },
-	{ ufbxi_GeometryUVInfo, 14 },
 	{ ufbxi_Geometry, 8 },
+	{ ufbxi_GeometryUVInfo, 14 },
 	{ ufbxi_GlobalSettings, 14 },
 	{ ufbxi_HotSpot, 7 },
 	{ ufbxi_Implementation, 14 },
@@ -2269,16 +2278,19 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_InheritType, 11 },
 	{ ufbxi_InnerAngle, 10 },
 	{ ufbxi_Intensity, 9 },
+	{ ufbxi_IsTheNodeInSet, sizeof(ufbxi_IsTheNodeInSet) - 1 },
+	{ ufbxi_Key, 3 },
 	{ ufbxi_KeyAttrDataFloat, 16 },
 	{ ufbxi_KeyAttrFlags, 12 },
 	{ ufbxi_KeyAttrRefCount, 15 },
 	{ ufbxi_KeyCount, 8 },
 	{ ufbxi_KeyTime, 7 },
 	{ ufbxi_KeyValueFloat, 13 },
-	{ ufbxi_Key, 3 },
+	{ ufbxi_KnotVector, 10 },
 	{ ufbxi_KnotVectorU, 11 },
 	{ ufbxi_KnotVectorV, 11 },
-	{ ufbxi_KnotVector, 10 },
+	{ ufbxi_Layer, 5 },
+	{ ufbxi_LayerElement, 12 },
 	{ ufbxi_LayerElementBinormal, 20 },
 	{ ufbxi_LayerElementColor, 17 },
 	{ ufbxi_LayerElementEdgeCrease, 22 },
@@ -2288,41 +2300,39 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_LayerElementTangent, 19 },
 	{ ufbxi_LayerElementUV, 14 },
 	{ ufbxi_LayerElementVertexCrease, 24 },
-	{ ufbxi_LayerElement, 12 },
-	{ ufbxi_Layer, 5 },
 	{ ufbxi_LayeredTexture, 14 },
 	{ ufbxi_Lcl_Rotation, 12 },
 	{ ufbxi_Lcl_Scaling, 11 },
 	{ ufbxi_Lcl_Translation, 15 },
 	{ ufbxi_LeftCamera, 10 },
-	{ ufbxi_LightType, 9 },
 	{ ufbxi_Light, 5 },
+	{ ufbxi_LightType, 9 },
+	{ ufbxi_Limb, 4 },
 	{ ufbxi_LimbLength, 10 },
 	{ ufbxi_LimbNode, 8 },
-	{ ufbxi_Limb, 4 },
 	{ ufbxi_Link, 4 },
 	{ ufbxi_LocalStart, 10 },
 	{ ufbxi_LocalStop, 9 },
 	{ ufbxi_LocalTime, 9 },
 	{ ufbxi_LodGroup, 8 },
 	{ ufbxi_MappingInformationType, 22 },
-	{ ufbxi_MaterialAssignation, 19 },
 	{ ufbxi_Material, 8 },
+	{ ufbxi_MaterialAssignation, 19 },
 	{ ufbxi_Materials, 9 },
 	{ ufbxi_Matrix, 6 },
 	{ ufbxi_Mesh, 4 },
 	{ ufbxi_Model, 5 },
 	{ ufbxi_Name, 4 },
-	{ ufbxi_NodeAttributeName, 17 },
-	{ ufbxi_NodeAttribute, 13 },
 	{ ufbxi_Node, 4 },
-	{ ufbxi_NormalsIndex, 12 },
+	{ ufbxi_NodeAttribute, 13 },
+	{ ufbxi_NodeAttributeName, 17 },
 	{ ufbxi_Normals, 7 },
+	{ ufbxi_NormalsIndex, 12 },
 	{ ufbxi_Null, 4 },
-	{ ufbxi_NurbsCurve, 10 },
-	{ ufbxi_NurbsSurfaceOrder, 17 },
-	{ ufbxi_NurbsSurface, 12 },
 	{ ufbxi_Nurbs, 5 },
+	{ ufbxi_NurbsCurve, 10 },
+	{ ufbxi_NurbsSurface, 12 },
+	{ ufbxi_NurbsSurfaceOrder, 17 },
 	{ ufbxi_OO, 2 },
 	{ ufbxi_OP, 2 },
 	{ ufbxi_ObjectType, 10 },
@@ -2330,16 +2340,17 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Open, 4 },
 	{ ufbxi_Order, 5 },
 	{ ufbxi_OriginalUnitScaleFactor, 23 },
-	{ ufbxi_OriginalUpAxisSign, 18 },
 	{ ufbxi_OriginalUpAxis, 14 },
+	{ ufbxi_OriginalUpAxisSign, 18 },
 	{ ufbxi_OuterAngle, 10 },
 	{ ufbxi_PO, 2 },
 	{ ufbxi_PP, 2 },
 	{ ufbxi_Periodic, 8 },
 	{ ufbxi_Points, 6 },
+	{ ufbxi_PolygonIndexArray, sizeof(ufbxi_PolygonIndexArray) - 1 },
 	{ ufbxi_PolygonVertexIndex, 18 },
-	{ ufbxi_PoseNode, 8 },
 	{ ufbxi_Pose, 4 },
+	{ ufbxi_PoseNode, 8 },
 	{ ufbxi_PostRotation, 12 },
 	{ ufbxi_PreRotation, 11 },
 	{ ufbxi_PreviewDivisionLevels, 21 },
@@ -2355,16 +2366,18 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_RenderDivisionLevels, 20 },
 	{ ufbxi_RightCamera, 11 },
 	{ ufbxi_RootNode, 8 },
+	{ ufbxi_Rotation, 8 },
 	{ ufbxi_RotationAccumulationMode, 24 },
 	{ ufbxi_RotationOffset, 14 },
 	{ ufbxi_RotationOrder, 13 },
 	{ ufbxi_RotationPivot, 13 },
-	{ ufbxi_Rotation, 8 },
 	{ ufbxi_S, 1 },
 	{ ufbxi_ScaleAccumulationMode, 21 },
+	{ ufbxi_Scaling, 7 },
 	{ ufbxi_ScalingOffset, 13 },
 	{ ufbxi_ScalingPivot, 12 },
-	{ ufbxi_Scaling, 7 },
+	{ ufbxi_SelectionNode, sizeof(ufbxi_SelectionNode) - 1 },
+	{ ufbxi_SelectionSet, sizeof(ufbxi_SelectionSet) - 1 },
 	{ ufbxi_ShadingModel, 12 },
 	{ ufbxi_Shape, 5 },
 	{ ufbxi_Shininess, 9 },
@@ -2379,35 +2392,36 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_T, 1 },
 	{ ufbxi_Take, 4 },
 	{ ufbxi_Takes, 5 },
-	{ ufbxi_TangentsIndex, 13 },
 	{ ufbxi_Tangents, 8 },
+	{ ufbxi_TangentsIndex, 13 },
+	{ ufbxi_Texture, 7 },
 	{ ufbxi_TextureId, 9 },
 	{ ufbxi_TextureRotationPivot, 20 },
 	{ ufbxi_TextureScalingPivot, 19 },
-	{ ufbxi_TextureUVVerticeIndex, 21 },
 	{ ufbxi_TextureUV, 9 },
-	{ ufbxi_Texture, 7 },
+	{ ufbxi_TextureUVVerticeIndex, 21 },
 	{ ufbxi_Texture_alpha, 13 },
 	{ ufbxi_TimeMarker, 10 },
 	{ ufbxi_TimeMode, 8 },
 	{ ufbxi_TimeProtocol, 12 },
 	{ ufbxi_TimeSpanStart, 13 },
 	{ ufbxi_TimeSpanStop, 12 },
-	{ ufbxi_TransformLink, 13 },
 	{ ufbxi_Transform, 9 },
+	{ ufbxi_TransformLink, 13 },
 	{ ufbxi_Translation, 11 },
 	{ ufbxi_TrimNurbsSurface, 16 },
 	{ ufbxi_Type, 4 },
 	{ ufbxi_TypedIndex, 10 },
+	{ ufbxi_UV, 2 },
 	{ ufbxi_UVIndex, 7 },
 	{ ufbxi_UVSet, 5 },
 	{ ufbxi_UVSwap, 6 },
-	{ ufbxi_UV, 2 },
 	{ ufbxi_UnitScaleFactor, 15 },
-	{ ufbxi_UpAxisSign, 10 },
 	{ ufbxi_UpAxis, 6 },
-	{ ufbxi_VertexCreaseIndex, 17 },
+	{ ufbxi_UpAxisSign, 10 },
 	{ ufbxi_VertexCrease, 12 },
+	{ ufbxi_VertexCreaseIndex, 17 },
+	{ ufbxi_VertexIndexArray, sizeof(ufbxi_VertexIndexArray) - 1 },
 	{ ufbxi_Vertices, 8 },
 	{ ufbxi_Video, 5 },
 	{ ufbxi_Visibility, 10 },
@@ -3158,6 +3172,7 @@ typedef enum {
 	UFBXI_PARSE_POSE_NODE,
 	UFBXI_PARSE_VIDEO,
 	UFBXI_PARSE_LAYERED_TEXTURE,
+	UFBXI_PARSE_SELECTION_NODE,
 	UFBXI_PARSE_LAYER_ELEMENT_NORMAL,
 	UFBXI_PARSE_LAYER_ELEMENT_BINORMAL,
 	UFBXI_PARSE_LAYER_ELEMENT_TANGENT,
@@ -3207,6 +3222,7 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 		if (name == ufbxi_Pose) return UFBXI_PARSE_POSE;
 		if (name == ufbxi_Video) return UFBXI_PARSE_VIDEO;
 		if (name == ufbxi_LayeredTexture) return UFBXI_PARSE_LAYERED_TEXTURE;
+		if (name == ufbxi_SelectionNode) return UFBXI_PARSE_SELECTION_NODE;
 		break;
 
 	case UFBXI_PARSE_MODEL:
@@ -3364,6 +3380,22 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 		} else if (name == ufbxi_Alphas) {
 			info->type = 'r';
 			info->tmp_buf = true;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_SELECTION_NODE:
+		if (name == ufbxi_VertexIndexArray) {
+			info->type = 'i';
+			info->result = true;
+			return true;
+		} else if (name == ufbxi_EdgeIndexArray) {
+			info->type = 'i';
+			info->result = true;
+			return true;
+		} else if (name == ufbxi_PolygonIndexArray) {
+			info->type = 'i';
+			info->result = true;
 			return true;
 		}
 		break;
@@ -7077,6 +7109,42 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_binding_table(ufbxi_context
 	return 1;
 }
 
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_selection_set(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	(void)node;
+
+	ufbx_selection_set *set = ufbxi_push_element(uc, info, ufbx_selection_set, UFBX_ELEMENT_SELECTION_SET);
+	ufbxi_check(set);
+
+	return 1;
+}
+
+ufbxi_noinline static void ufbxi_find_int32_list(ufbx_int32_list *dst, ufbxi_node *node, const char *name)
+{
+	ufbxi_value_array *arr = ufbxi_find_array(node, name, 'i');
+	if (arr) {
+		dst->data = (int32_t*)arr->data;
+		dst->count = arr->size;
+	}
+}
+
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_selection_node(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_selection_node *sel = ufbxi_push_element(uc, info, ufbx_selection_node, UFBX_ELEMENT_SELECTION_NODE);
+	ufbxi_check(sel);
+
+	int32_t in_set = 0;
+	if (ufbxi_find_val1(node, ufbxi_IsTheNodeInSet, "I", &in_set) && in_set) {
+		sel->include_node = true;
+	}
+
+	ufbxi_find_int32_list(&sel->vertices, node, ufbxi_VertexIndexArray);
+	ufbxi_find_int32_list(&sel->edges, node, ufbxi_EdgeIndexArray);
+	ufbxi_find_int32_list(&sel->faces, node, ufbxi_PolygonIndexArray);
+
+	return 1;
+}
+
 ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type)
 {
 	ufbxi_element_info attrib_info = *info;
@@ -7282,6 +7350,12 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_shader), UFBX_ELEMENT_SHADER));
 		} else if (name == ufbxi_BindingTable) {
 			ufbxi_check(ufbxi_read_binding_table(uc, node, &info));
+		} else if (name == ufbxi_Collection) {
+			if (sub_type == ufbxi_SelectionSet) {
+				ufbxi_check(ufbxi_read_selection_set(uc, node, &info));
+			}
+		} else if (name == ufbxi_SelectionNode) {
+			ufbxi_check(ufbxi_read_selection_node(uc, node, &info));
 		} else {
 			ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str));
 		}
@@ -10081,6 +10155,21 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 		}
 	}
 
+	ufbxi_for_ptr_list(ufbx_selection_set, p_set, uc->scene.selection_sets) {
+		ufbx_selection_set *set = *p_set;
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &set->nodes, &set->element, false, NULL, UFBX_ELEMENT_SELECTION_NODE));
+	}
+
+	ufbxi_for_ptr_list(ufbx_selection_node, p_node, uc->scene.selection_nodes) {
+		ufbx_selection_node *node = *p_node;
+		node->target_node = (ufbx_node*)ufbxi_fetch_dst_element(&node->element, false, NULL, UFBX_ELEMENT_NODE);
+		node->target_mesh = (ufbx_mesh*)ufbxi_fetch_dst_element(&node->element, false, NULL, UFBX_ELEMENT_MESH);
+		if (!node->target_mesh && node->target_node) {
+			node->target_mesh = node->target_node->mesh;
+		} else if (!node->target_node && node->target_mesh && node->target_mesh->instances.count > 0) {
+			node->target_node = node->target_mesh->instances.data[0];
+		}
+	}
 
 	if (uc->scene.anim_stacks.count > 0) {
 		uc->scene.anim = uc->scene.anim_stacks.data[0]->anim;
@@ -11343,6 +11432,7 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 		ufbx_element *src = ec->src_scene.elements.data[i];
 		ufbx_element *dst = ufbxi_translate_element(ec, src);
 		size_t size = ufbx_element_type_size[src->type];
+		ufbx_assert(size > 0);
 		memcpy(dst, src, size);
 
 		ec->scene.elements.data[i] = dst;
@@ -11465,6 +11555,19 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 	ufbxi_for_ptr_list(ufbx_shader, p_shader, ec->scene.shaders) {
 		ufbx_shader *shader = *p_shader;
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &shader->bindings));
+	}
+
+	ufbxi_for_ptr_list(ufbx_selection_set, p_set, ec->scene.selection_sets) {
+		ufbx_selection_set *set = *p_set;
+
+		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &set->nodes));
+	}
+
+	ufbxi_for_ptr_list(ufbx_selection_node, p_node, ec->scene.selection_nodes) {
+		ufbx_selection_node *node = *p_node;
+
+		node->target_node = (ufbx_node*)ufbxi_translate_element(ec, node->target_node);
+		node->target_mesh = (ufbx_mesh*)ufbxi_translate_element(ec, node->target_mesh);
 	}
 
 	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, ec->scene.anim_stacks) {
@@ -12583,6 +12686,8 @@ const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES] = {
 	sizeof(ufbx_anim_layer),
 	sizeof(ufbx_anim_value),
 	sizeof(ufbx_anim_curve),
+	sizeof(ufbx_selection_set),
+	sizeof(ufbx_selection_node),
 	sizeof(ufbx_pose),
 };
 
