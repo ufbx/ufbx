@@ -2172,6 +2172,8 @@ static const char ufbxi_Weight[] = "Weight";
 static const char ufbxi_Weights[] = "Weights";
 static const char ufbxi_WrapModeU[] = "WrapModeU";
 static const char ufbxi_WrapModeV[] = "WrapModeV";
+static const char ufbxi_Constraint[] = "Constraint";
+static const char ufbxi_Character[] = "Character";
 static const char ufbxi_X[] = "X\0\0";
 static const char ufbxi_Y[] = "Y\0\0";
 static const char ufbxi_Z[] = "Z\0\0";
@@ -2180,8 +2182,8 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, 7 },
 	{ ufbxi_Alphas, 6 },
 	{ ufbxi_AmbientColor, 12 },
-	{ ufbxi_AnimationCurveNode, 18 },
 	{ ufbxi_AnimationCurve, 14 },
+	{ ufbxi_AnimationCurveNode, 18 },
 	{ ufbxi_AnimationLayer, 14 },
 	{ ufbxi_AnimationStack, 14 },
 	{ ufbxi_ApertureFormat, 14 },
@@ -2195,40 +2197,42 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_BaseLayer, 9 },
 	{ ufbxi_BindPose, 8 },
 	{ ufbxi_BindingTable, 12 },
-	{ ufbxi_BinormalsIndex, 14 },
 	{ ufbxi_Binormals, 9 },
+	{ ufbxi_BinormalsIndex, 14 },
 	{ ufbxi_BlendMode, 9 },
 	{ ufbxi_BlendModes, 10 },
-	{ ufbxi_BlendShapeChannel, 17 },
 	{ ufbxi_BlendShape, 10 },
+	{ ufbxi_BlendShapeChannel, 17 },
 	{ ufbxi_BlendWeights, 12 },
-	{ ufbxi_BoundaryRule, 12 },
 	{ ufbxi_Boundary, 8 },
+	{ ufbxi_BoundaryRule, 12 },
 	{ ufbxi_ByEdge, 6 },
-	{ ufbxi_ByPolygonVertex, 15 },
 	{ ufbxi_ByPolygon, 9 },
+	{ ufbxi_ByPolygonVertex, 15 },
 	{ ufbxi_ByVertex, 8 },
 	{ ufbxi_ByVertice, 9 },
+	{ ufbxi_Camera, 6 },
 	{ ufbxi_CameraStereo, 12 },
 	{ ufbxi_CameraSwitcher, 14 },
-	{ ufbxi_Camera, 6 },
 	{ ufbxi_CastLight, 9 },
 	{ ufbxi_CastShadows, 11 },
 	{ ufbxi_Channel, 7 },
+	{ ufbxi_Character, sizeof(ufbxi_Character) - 1 },
 	{ ufbxi_Children, 8 },
 	{ ufbxi_Closed, 6 },
 	{ ufbxi_Cluster, 7 },
-	{ ufbxi_CollectionExclusive, 19 },
 	{ ufbxi_Collection, 10 },
-	{ ufbxi_ColorIndex, 10 },
+	{ ufbxi_CollectionExclusive, 19 },
 	{ ufbxi_Color, 5 },
+	{ ufbxi_ColorIndex, 10 },
 	{ ufbxi_Colors, 6 },
 	{ ufbxi_ConeAngle, 9 },
 	{ ufbxi_Cone_angle, 10 },
 	{ ufbxi_Connections, 11 },
+	{ ufbxi_Constraint, sizeof(ufbxi_Constraint) - 1 },
 	{ ufbxi_Content, 7 },
-	{ ufbxi_CoordAxisSign, 13 },
 	{ ufbxi_CoordAxis, 9 },
+	{ ufbxi_CoordAxisSign, 13 },
 	{ ufbxi_Count, 5 },
 	{ ufbxi_Creator, 7 },
 	{ ufbxi_CurrentTextureBlendMode, 23 },
@@ -2238,8 +2242,8 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_D_Y, 3 },
 	{ ufbxi_D_Z, 3 },
 	{ ufbxi_DecayType, 9 },
-	{ ufbxi_DefaultCamera, 13 },
 	{ ufbxi_Default, 7 },
+	{ ufbxi_DefaultCamera, 13 },
 	{ ufbxi_Definitions, 11 },
 	{ ufbxi_DeformPercent, 13 },
 	{ ufbxi_Deformer, 8 },
@@ -2258,9 +2262,9 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FBXVersion, 10 },
 	{ ufbxi_FbxPropertyEntry, 16 },
 	{ ufbxi_FbxSemanticEntry, 16 },
+	{ ufbxi_FieldOfView, 11 },
 	{ ufbxi_FieldOfViewX, 12 },
 	{ ufbxi_FieldOfViewY, 12 },
-	{ ufbxi_FieldOfView, 11 },
 	{ ufbxi_FileName, 8 },
 	{ ufbxi_Filename, 8 },
 	{ ufbxi_FilmHeight, 10 },
@@ -2269,15 +2273,15 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FocalLength, 11 },
 	{ ufbxi_Form, 4 },
 	{ ufbxi_Freeze, 6 },
-	{ ufbxi_FrontAxisSign, 13 },
 	{ ufbxi_FrontAxis, 9 },
+	{ ufbxi_FrontAxisSign, 13 },
 	{ ufbxi_FullWeights, 11 },
 	{ ufbxi_GateFit, 7 },
 	{ ufbxi_GeometricRotation, 17 },
 	{ ufbxi_GeometricScaling, 16 },
 	{ ufbxi_GeometricTranslation, 20 },
-	{ ufbxi_GeometryUVInfo, 14 },
 	{ ufbxi_Geometry, 8 },
+	{ ufbxi_GeometryUVInfo, 14 },
 	{ ufbxi_GlobalSettings, 14 },
 	{ ufbxi_HotSpot, 7 },
 	{ ufbxi_Implementation, 14 },
@@ -2286,16 +2290,18 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_InnerAngle, 10 },
 	{ ufbxi_Intensity, 9 },
 	{ ufbxi_IsTheNodeInSet, 14 },
+	{ ufbxi_Key, 3 },
 	{ ufbxi_KeyAttrDataFloat, 16 },
 	{ ufbxi_KeyAttrFlags, 12 },
 	{ ufbxi_KeyAttrRefCount, 15 },
 	{ ufbxi_KeyCount, 8 },
 	{ ufbxi_KeyTime, 7 },
 	{ ufbxi_KeyValueFloat, 13 },
-	{ ufbxi_Key, 3 },
+	{ ufbxi_KnotVector, 10 },
 	{ ufbxi_KnotVectorU, 11 },
 	{ ufbxi_KnotVectorV, 11 },
-	{ ufbxi_KnotVector, 10 },
+	{ ufbxi_Layer, 5 },
+	{ ufbxi_LayerElement, 12 },
 	{ ufbxi_LayerElementBinormal, 20 },
 	{ ufbxi_LayerElementColor, 17 },
 	{ ufbxi_LayerElementEdgeCrease, 22 },
@@ -2305,41 +2311,39 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_LayerElementTangent, 19 },
 	{ ufbxi_LayerElementUV, 14 },
 	{ ufbxi_LayerElementVertexCrease, 24 },
-	{ ufbxi_LayerElement, 12 },
-	{ ufbxi_Layer, 5 },
 	{ ufbxi_LayeredTexture, 14 },
 	{ ufbxi_Lcl_Rotation, 12 },
 	{ ufbxi_Lcl_Scaling, 11 },
 	{ ufbxi_Lcl_Translation, 15 },
 	{ ufbxi_LeftCamera, 10 },
-	{ ufbxi_LightType, 9 },
 	{ ufbxi_Light, 5 },
+	{ ufbxi_LightType, 9 },
+	{ ufbxi_Limb, 4 },
 	{ ufbxi_LimbLength, 10 },
 	{ ufbxi_LimbNode, 8 },
-	{ ufbxi_Limb, 4 },
 	{ ufbxi_Link, 4 },
 	{ ufbxi_LocalStart, 10 },
 	{ ufbxi_LocalStop, 9 },
 	{ ufbxi_LocalTime, 9 },
 	{ ufbxi_LodGroup, 8 },
 	{ ufbxi_MappingInformationType, 22 },
-	{ ufbxi_MaterialAssignation, 19 },
 	{ ufbxi_Material, 8 },
+	{ ufbxi_MaterialAssignation, 19 },
 	{ ufbxi_Materials, 9 },
 	{ ufbxi_Matrix, 6 },
 	{ ufbxi_Mesh, 4 },
 	{ ufbxi_Model, 5 },
 	{ ufbxi_Name, 4 },
-	{ ufbxi_NodeAttributeName, 17 },
-	{ ufbxi_NodeAttribute, 13 },
 	{ ufbxi_Node, 4 },
-	{ ufbxi_NormalsIndex, 12 },
+	{ ufbxi_NodeAttribute, 13 },
+	{ ufbxi_NodeAttributeName, 17 },
 	{ ufbxi_Normals, 7 },
+	{ ufbxi_NormalsIndex, 12 },
 	{ ufbxi_Null, 4 },
-	{ ufbxi_NurbsCurve, 10 },
-	{ ufbxi_NurbsSurfaceOrder, 17 },
-	{ ufbxi_NurbsSurface, 12 },
 	{ ufbxi_Nurbs, 5 },
+	{ ufbxi_NurbsCurve, 10 },
+	{ ufbxi_NurbsSurface, 12 },
+	{ ufbxi_NurbsSurfaceOrder, 17 },
 	{ ufbxi_OO, 2 },
 	{ ufbxi_OP, 2 },
 	{ ufbxi_ObjectType, 10 },
@@ -2347,8 +2351,8 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Open, 4 },
 	{ ufbxi_Order, 5 },
 	{ ufbxi_OriginalUnitScaleFactor, 23 },
-	{ ufbxi_OriginalUpAxisSign, 18 },
 	{ ufbxi_OriginalUpAxis, 14 },
+	{ ufbxi_OriginalUpAxisSign, 18 },
 	{ ufbxi_OuterAngle, 10 },
 	{ ufbxi_PO, 2 },
 	{ ufbxi_PP, 2 },
@@ -2356,8 +2360,8 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Points, 6 },
 	{ ufbxi_PolygonIndexArray, 17 },
 	{ ufbxi_PolygonVertexIndex, 18 },
-	{ ufbxi_PoseNode, 8 },
 	{ ufbxi_Pose, 4 },
+	{ ufbxi_PoseNode, 8 },
 	{ ufbxi_PostRotation, 12 },
 	{ ufbxi_PreRotation, 11 },
 	{ ufbxi_PreviewDivisionLevels, 21 },
@@ -2373,16 +2377,16 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_RenderDivisionLevels, 20 },
 	{ ufbxi_RightCamera, 11 },
 	{ ufbxi_RootNode, 8 },
+	{ ufbxi_Rotation, 8 },
 	{ ufbxi_RotationAccumulationMode, 24 },
 	{ ufbxi_RotationOffset, 14 },
 	{ ufbxi_RotationOrder, 13 },
 	{ ufbxi_RotationPivot, 13 },
-	{ ufbxi_Rotation, 8 },
 	{ ufbxi_S, 1 },
 	{ ufbxi_ScaleAccumulationMode, 21 },
+	{ ufbxi_Scaling, 7 },
 	{ ufbxi_ScalingOffset, 13 },
 	{ ufbxi_ScalingPivot, 12 },
-	{ ufbxi_Scaling, 7 },
 	{ ufbxi_SelectionNode, 13 },
 	{ ufbxi_SelectionSet, 12 },
 	{ ufbxi_ShadingModel, 12 },
@@ -2400,35 +2404,35 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_T, 1 },
 	{ ufbxi_Take, 4 },
 	{ ufbxi_Takes, 5 },
-	{ ufbxi_TangentsIndex, 13 },
 	{ ufbxi_Tangents, 8 },
+	{ ufbxi_TangentsIndex, 13 },
+	{ ufbxi_Texture, 7 },
 	{ ufbxi_TextureId, 9 },
 	{ ufbxi_TextureRotationPivot, 20 },
 	{ ufbxi_TextureScalingPivot, 19 },
-	{ ufbxi_TextureUVVerticeIndex, 21 },
 	{ ufbxi_TextureUV, 9 },
-	{ ufbxi_Texture, 7 },
+	{ ufbxi_TextureUVVerticeIndex, 21 },
 	{ ufbxi_Texture_alpha, 13 },
 	{ ufbxi_TimeMarker, 10 },
 	{ ufbxi_TimeMode, 8 },
 	{ ufbxi_TimeProtocol, 12 },
 	{ ufbxi_TimeSpanStart, 13 },
 	{ ufbxi_TimeSpanStop, 12 },
-	{ ufbxi_TransformLink, 13 },
 	{ ufbxi_Transform, 9 },
+	{ ufbxi_TransformLink, 13 },
 	{ ufbxi_Translation, 11 },
 	{ ufbxi_TrimNurbsSurface, 16 },
 	{ ufbxi_Type, 4 },
 	{ ufbxi_TypedIndex, 10 },
+	{ ufbxi_UV, 2 },
 	{ ufbxi_UVIndex, 7 },
 	{ ufbxi_UVSet, 5 },
 	{ ufbxi_UVSwap, 6 },
-	{ ufbxi_UV, 2 },
 	{ ufbxi_UnitScaleFactor, 15 },
-	{ ufbxi_UpAxisSign, 10 },
 	{ ufbxi_UpAxis, 6 },
-	{ ufbxi_VertexCreaseIndex, 17 },
+	{ ufbxi_UpAxisSign, 10 },
 	{ ufbxi_VertexCrease, 12 },
+	{ ufbxi_VertexCreaseIndex, 17 },
 	{ ufbxi_VertexIndexArray, 16 },
 	{ ufbxi_Vertices, 8 },
 	{ ufbxi_Video, 5 },
@@ -7153,6 +7157,55 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_selection_node(ufbxi_contex
 	return 1;
 }
 
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_character(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	(void)node;
+
+	ufbx_character *character = ufbxi_push_element(uc, info, ufbx_character, UFBX_ELEMENT_CHARACTER);
+	ufbxi_check(character);
+
+	// TODO: There's some extremely cursed all-caps data in characters
+
+	return 1;
+}
+
+typedef struct {
+	ufbx_constraint_type type;
+	const char *name;
+} ufbxi_constraint_type;
+
+static const ufbxi_constraint_type ufbxi_constraint_types[] = {
+	{ UFBX_CONSTRAINT_AIM, "Aim" },
+	{ UFBX_CONSTRAINT_PARENT, "Parent-Child" },
+	{ UFBX_CONSTRAINT_POSITION, "Position From Positions" },
+	{ UFBX_CONSTRAINT_ROTATION, "Rotation From Rotations" },
+	{ UFBX_CONSTRAINT_SCALE, "Scale From Scales" },
+	{ UFBX_CONSTRAINT_SINGLE_CHAIN_IK, "Single Chain IK" },
+};
+
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_constraint(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	(void)node;
+
+	ufbx_constraint *constraint = ufbxi_push_element(uc, info, ufbx_constraint, UFBX_ELEMENT_CONSTRAINT);
+	ufbxi_check(constraint);
+
+	if (!ufbxi_find_val1(node, ufbxi_Type, "S", &constraint->type_name)) {
+		constraint->type_name = ufbx_empty_string;
+	}
+
+	ufbxi_for(const ufbxi_constraint_type, ctype, ufbxi_constraint_types, ufbxi_arraycount(ufbxi_constraint_types)) {
+		if (!strcmp(constraint->type_name.data, ctype->name)) {
+			constraint->type = ctype->type;
+			break;
+		}
+	}
+
+	// TODO: There's some extremely cursed all-caps data in characters
+
+	return 1;
+}
+
 ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type)
 {
 	ufbxi_element_info attrib_info = *info;
@@ -7368,6 +7421,12 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			}
 		} else if (name == ufbxi_SelectionNode) {
 			ufbxi_check(ufbxi_read_selection_node(uc, node, &info));
+		} else if (name == ufbxi_Constraint) {
+			if (sub_type == ufbxi_Character) {
+				ufbxi_check(ufbxi_read_character(uc, node, &info));
+			} else {
+				ufbxi_check(ufbxi_read_constraint(uc, node, &info));
+			}
 		} else {
 			ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str));
 		}
@@ -9406,6 +9465,54 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 	ufbxi_update_factor(&material->fbx.emission_factor, &material->fbx.emission_color);
 }
 
+typedef enum {
+	UFBXI_CONSTRAINT_PROP_NODE,
+	UFBXI_CONSTRAINT_PROP_IK_EFFECTOR,
+	UFBXI_CONSTRAINT_PROP_IK_END_NODE,
+	UFBXI_CONSTRAINT_PROP_AIM_UP,
+	UFBXI_CONSTRAINT_PROP_TARGET,
+} ufbxi_constraint_prop_type;
+
+typedef struct {
+	ufbxi_constraint_prop_type type;
+	const char *name;
+} ufbxi_constraint_prop;
+
+static const ufbxi_constraint_prop ufbxi_constraint_props[] = {
+	{ UFBXI_CONSTRAINT_PROP_NODE, "Constrained Object" },
+	{ UFBXI_CONSTRAINT_PROP_NODE, "Constrained object (Child)" },
+	{ UFBXI_CONSTRAINT_PROP_NODE, "First Joint" },
+	{ UFBXI_CONSTRAINT_PROP_TARGET, "Source" },
+	{ UFBXI_CONSTRAINT_PROP_TARGET, "Source (Parent)" },
+	{ UFBXI_CONSTRAINT_PROP_TARGET, "Aim At Object" },
+	{ UFBXI_CONSTRAINT_PROP_TARGET, "Pole Vector Object" },
+	{ UFBXI_CONSTRAINT_PROP_IK_EFFECTOR, "Effector" },
+	{ UFBXI_CONSTRAINT_PROP_IK_END_NODE, "End Joint" },
+	{ UFBXI_CONSTRAINT_PROP_AIM_UP, "World Up Object" },
+};
+
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_add_constraint_prop(ufbxi_context *uc, ufbx_constraint *constraint, ufbx_node *node, const char *prop)
+{
+	ufbxi_for(const ufbxi_constraint_prop, cprop, ufbxi_constraint_props, ufbxi_arraycount(ufbxi_constraint_props)) {
+		if (strcmp(cprop->name, prop) != 0) continue;
+		switch (cprop->type) {
+		case UFBXI_CONSTRAINT_PROP_NODE: constraint->node = node; break;
+		case UFBXI_CONSTRAINT_PROP_IK_EFFECTOR: constraint->ik_effector = node; break;
+		case UFBXI_CONSTRAINT_PROP_IK_END_NODE: constraint->ik_end_node = node; break;
+		case UFBXI_CONSTRAINT_PROP_AIM_UP: constraint->aim_up_node = node; break;
+		case UFBXI_CONSTRAINT_PROP_TARGET: {
+			ufbx_constraint_target *target = ufbxi_push_zero(&uc->tmp_stack, ufbx_constraint_target, 1);
+			ufbxi_check(target);
+			target->node = node;
+			target->weight = 1.0f;
+			target->transform = ufbx_identity_transform;
+		} break;
+		}
+	}
+
+	return 1;
+}
+
 ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	size_t num_elements = uc->num_elements;
@@ -9686,7 +9793,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 		for (size_t i = 0; i < channel->keyframes.count; i++) {
 			ufbx_blend_keyframe *key = &channel->keyframes.data[i];
 			if (i < full_weights->count) {
-				key->target_weight = full_weights->data[i] * 0.01f;
+				key->target_weight = full_weights->data[i] / (ufbx_real)100.0;
 			} else {
 				key->target_weight = 1.0f;
 			}
@@ -9880,7 +9987,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 
 		ufbx_prop *weight_prop = ufbxi_find_prop(&layer->props, ufbxi_Weight);
 		if (weight_prop) {
-			layer->weight = weight_prop->value_real * 0.01f;
+			layer->weight = weight_prop->value_real / (ufbx_real)100.0;
 			if (layer->weight < 0.0f) layer->weight = 0.0f;
 			if (layer->weight > 0.99999f) layer->weight = 1.0f;
 			layer->weight_is_animated = (weight_prop->flags & UFBX_PROP_FLAG_ANIMATED) != 0;
@@ -10188,6 +10295,28 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 		}
 	}
 
+	ufbxi_for_ptr_list(ufbx_constraint, p_constraint, uc->scene.constraints) {
+		ufbx_constraint *constraint = *p_constraint;
+
+		size_t tmp_base = uc->tmp_stack.num_items;
+
+		// Find property connections in _both_ src and dst connections as they are inconsistent
+		// in pre-7000 files. For example "Constrained Object" is a "PO" connection in 6100.
+		ufbxi_for_list(ufbx_connection, conn, constraint->element.connections_src) {
+			if (conn->src_prop.length == 0 || conn->dst->type != UFBX_ELEMENT_NODE) continue;
+			ufbxi_check(ufbxi_add_constraint_prop(uc, constraint, (ufbx_node*)conn->dst, conn->src_prop.data));
+		}
+		ufbxi_for_list(ufbx_connection, conn, constraint->element.connections_dst) {
+			if (conn->dst_prop.length == 0 || conn->src->type != UFBX_ELEMENT_NODE) continue;
+			ufbxi_check(ufbxi_add_constraint_prop(uc, constraint, (ufbx_node*)conn->src, conn->dst_prop.data));
+		}
+
+		size_t num_targets = uc->tmp_stack.num_items - tmp_base;
+		constraint->targets.count = num_targets;
+		constraint->targets.data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_constraint_target, num_targets);
+		ufbxi_check(constraint->targets.data);
+	}
+
 	if (uc->scene.anim_stacks.count > 0) {
 		uc->scene.anim = uc->scene.anim_stacks.data[0]->anim;
 	}
@@ -10398,6 +10527,23 @@ ufbxi_noinline static ufbx_transform ufbxi_get_texture_transform(const ufbx_prop
 	return t;
 }
 
+ufbxi_noinline static ufbx_transform ufbxi_get_constraint_transform(const ufbx_props *props)
+{
+	ufbx_vec3 translation = ufbxi_find_vec3(props, ufbxi_Translation, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 rotation = ufbxi_find_vec3(props, ufbxi_Rotation, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 rotation_offset = ufbxi_find_vec3(props, ufbxi_RotationOffset, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 scaling = ufbxi_find_vec3(props, ufbxi_Scaling, 1.0f, 1.0f, 1.0f);
+
+	ufbx_transform t = { { 0,0,0 }, { 0,0,0,1 }, { 1,1,1 }};
+
+	ufbxi_mul_scale(&t, scaling);
+	ufbxi_mul_rotate(&t, rotation, UFBX_ROTATION_XYZ);
+	ufbxi_mul_rotate(&t, rotation_offset, UFBX_ROTATION_XYZ);
+	ufbxi_add_translate(&t, translation);
+
+	return t;
+}
+
 ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 {
 	node->rotation_order = (ufbx_rotation_order)ufbxi_find_enum(&node->props, ufbxi_RotationOrder, UFBX_ROTATION_XYZ, UFBX_ROTATION_SPHERIC);
@@ -10447,7 +10593,7 @@ ufbxi_noinline static void ufbxi_update_light(ufbx_light *light)
 	// NOTE: FBX seems to store intensities 100x of what's specified in at least
 	// Maya and Blender, should there be a quirks mode to not do this for specific
 	// exporters. Does the FBX SDK do this transparently as well?
-	light->intensity = ufbxi_find_real(&light->props, ufbxi_Intensity, 100.0f) * 0.01f;
+	light->intensity = ufbxi_find_real(&light->props, ufbxi_Intensity, 100.0f) / (ufbx_real)100.0;
 
 	light->color = ufbxi_find_vec3(&light->props, ufbxi_Color, 1.0f, 1.0f, 1.0f);
 	light->type = (ufbx_light_type)ufbxi_find_enum(&light->props, ufbxi_LightType, 0, UFBX_LIGHT_VOLUME);
@@ -10735,6 +10881,89 @@ ufbxi_noinline static void ufbxi_update_display_layer(ufbx_display_layer *layer)
 	layer->ui_color = ufbxi_find_vec3(&layer->props, ufbxi_Color, 0.8f, 0.8f, 0.8f);
 }
 
+static const ufbx_vec3 ufbxi_one_vec3 = { 1.0f, 1.0f, 1.0f };
+
+ufbxi_noinline static void ufbxi_update_constraint(ufbx_constraint *constraint)
+{
+	ufbx_props *props = &constraint->props;
+	ufbx_constraint_type constraint_type = constraint->type;
+
+	constraint->transform_offset = ufbxi_get_constraint_transform(props);
+
+	constraint->weight = ufbxi_find_real(props, ufbxi_Weight, 100.0f) / (ufbx_real)100.0;
+
+	ufbxi_for_list(ufbx_constraint_target, target, constraint->targets) {
+		ufbx_node *node = target->node;
+
+		// Node names are at most 255 bytes so the suffixed names are bounded
+		char name_buf[256 + 8];
+		size_t name_len = node->name.length;
+		ufbx_assert(name_len < 256);
+		memcpy(name_buf, node->name.data, name_len);
+
+		memcpy(name_buf + name_len, ".Weight", 7 + 1);
+		target->weight = ufbx_find_real_len(props, name_buf, name_len + 7, 100.0f) / (ufbx_real)100.0;
+
+		if (constraint_type == UFBX_CONSTRAINT_PARENT) {
+			memcpy(name_buf + name_len, ".Offset T", 9 + 1);
+			ufbx_vec3 t = ufbx_find_vec3_len(props, name_buf, name_len + 9, ufbx_zero_vec3);
+			name_buf[name_len + 8] = 'R';
+			ufbx_vec3 r = ufbx_find_vec3_len(props, name_buf, name_len + 9, ufbx_zero_vec3);
+			name_buf[name_len + 8] = 'S';
+			ufbx_vec3 s = ufbx_find_vec3_len(props, name_buf, name_len + 9, ufbxi_one_vec3);
+
+			target->transform.translation = t;
+			target->transform.rotation = ufbx_euler_to_quat(r, UFBX_ROTATION_XYZ);
+			target->transform.scale = s;
+		}
+	}
+
+	constraint->active = ufbx_find_int(props, "Active", 1) != 0;
+	if (constraint_type == UFBX_CONSTRAINT_AIM) {
+		constraint->constrain_rotation[0] = ufbx_find_int(props, "AffectX", 1) != 0;
+		constraint->constrain_rotation[1] = ufbx_find_int(props, "AffectY", 1) != 0;
+		constraint->constrain_rotation[2] = ufbx_find_int(props, "AffectZ", 1) != 0;
+
+		const ufbx_vec3 default_aim = { 1.0f, 0.0f, 0.0f };
+		const ufbx_vec3 default_up = { 0.0f, 1.0f, 0.0f };
+
+		int64_t up_type = ufbx_find_int(props, "WorldUpType", 0);
+		if (up_type >= 0 && up_type < UFBX_CONSTRAINT_AIM_UP_NONE) {
+			constraint->aim_up_type = (ufbx_constraint_aim_up_type)up_type;
+		}
+		constraint->aim_vector = ufbx_find_vec3(props, "AimVector", default_aim);
+		constraint->aim_up_vector = ufbx_find_vec3(props, "UpVector", default_up);
+
+	} else if (constraint_type == UFBX_CONSTRAINT_PARENT) {
+		constraint->constrain_translation[0] = ufbx_find_int(props, "AffectTranslationX", 1) != 0;
+		constraint->constrain_translation[1] = ufbx_find_int(props, "AffectTranslationY", 1) != 0;
+		constraint->constrain_translation[2] = ufbx_find_int(props, "AffectTranslationZ", 1) != 0;
+		constraint->constrain_rotation[0] = ufbx_find_int(props, "AffectRotationX", 1) != 0;
+		constraint->constrain_rotation[1] = ufbx_find_int(props, "AffectRotationY", 1) != 0;
+		constraint->constrain_rotation[2] = ufbx_find_int(props, "AffectRotationZ", 1) != 0;
+		constraint->constrain_scale[0] = ufbx_find_int(props, "AffectScalingX", 0) != 0;
+		constraint->constrain_scale[1] = ufbx_find_int(props, "AffectScalingY", 0) != 0;
+		constraint->constrain_scale[2] = ufbx_find_int(props, "AffectScalingZ", 0) != 0;
+	} else if (constraint_type == UFBX_CONSTRAINT_POSITION) {
+		constraint->constrain_translation[0] = ufbx_find_int(props, "AffectX", 1) != 0;
+		constraint->constrain_translation[1] = ufbx_find_int(props, "AffectY", 1) != 0;
+		constraint->constrain_translation[2] = ufbx_find_int(props, "AffectZ", 1) != 0;
+	} else if (constraint_type == UFBX_CONSTRAINT_ROTATION) {
+		constraint->constrain_rotation[0] = ufbx_find_int(props, "AffectX", 1) != 0;
+		constraint->constrain_rotation[1] = ufbx_find_int(props, "AffectY", 1) != 0;
+		constraint->constrain_rotation[2] = ufbx_find_int(props, "AffectZ", 1) != 0;
+	} else if (constraint_type == UFBX_CONSTRAINT_SCALE) {
+		constraint->constrain_scale[0] = ufbx_find_int(props, "AffectX", 1) != 0;
+		constraint->constrain_scale[1] = ufbx_find_int(props, "AffectY", 1) != 0;
+		constraint->constrain_scale[2] = ufbx_find_int(props, "AffectZ", 1) != 0;
+	} else if (constraint_type == UFBX_CONSTRAINT_SINGLE_CHAIN_IK) {
+		constraint->constrain_rotation[0] = true;
+		constraint->constrain_rotation[1] = true;
+		constraint->constrain_rotation[2] = true;
+		constraint->ik_pole_vector = ufbx_find_vec3(props, "PoleVectorType", ufbx_zero_vec3);
+	}
+}
+
 ufbx_coordinate_axis ufbxi_find_axis(const ufbx_props *props, const char *axis_name, const char *sign_name)
 {
 	int64_t axis = ufbxi_find_int(props, axis_name, 3);
@@ -10809,6 +11038,10 @@ static void ufbxi_update_scene(ufbx_scene *scene)
 
 	ufbxi_for_ptr_list(ufbx_display_layer, p_layer, scene->display_layers) {
 		ufbxi_update_display_layer(*p_layer);
+	}
+
+	ufbxi_for_ptr_list(ufbx_constraint, p_constraint, scene->constraints) {
+		ufbxi_update_constraint(*p_constraint);
 	}
 }
 
@@ -11320,7 +11553,7 @@ void ufbxi_evaluate_props(ufbx_anim anim, const ufbx_element *element, double ti
 		if (layer->weight_is_animated && layer->blended) {
 			ufbx_anim_prop *weight_aprop = ufbxi_find_anim_prop_start(layer, &layer->element);
 			if (weight_aprop) {
-				weight = ufbx_evaluate_anim_value_real(weight_aprop->anim_value, time) * 0.01f;
+				weight = ufbx_evaluate_anim_value_real(weight_aprop->anim_value, time) / (ufbx_real)100.0;
 				if (weight < 0.0f) weight = 0.0f;
 				if (weight > 0.99999f) weight = 1.0f;
 			}
@@ -12723,6 +12956,8 @@ const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES] = {
 	sizeof(ufbx_display_layer),
 	sizeof(ufbx_selection_set),
 	sizeof(ufbx_selection_node),
+	sizeof(ufbx_character),
+	sizeof(ufbx_constraint),
 	sizeof(ufbx_pose),
 };
 
@@ -12859,6 +13094,36 @@ ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t 
 	} while (props);
 
 	return NULL;
+}
+
+ufbx_real ufbx_find_real_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_real def)
+{
+	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
+	if (prop) {
+		return prop->value_real;
+	} else {
+		return def;
+	}
+}
+
+ufbx_vec3 ufbx_find_vec3_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_vec3 def)
+{
+	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
+	if (prop) {
+		return prop->value_vec3;
+	} else {
+		return def;
+	}
+}
+
+int64_t ufbx_find_int_len(const ufbx_props *props, const char *name, size_t name_len, int64_t def)
+{
+	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
+	if (prop) {
+		return prop->value_int;
+	} else {
+		return def;
+	}
 }
 
 ufbx_element *ufbx_find_element_len(ufbx_scene *scene, ufbx_element_type type, const char *name, size_t name_len)

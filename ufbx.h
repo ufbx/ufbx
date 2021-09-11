@@ -274,6 +274,10 @@ typedef struct ufbx_display_layer ufbx_display_layer;
 typedef struct ufbx_selection_set ufbx_selection_set;
 typedef struct ufbx_selection_node ufbx_selection_node;
 
+// Constraints
+typedef struct ufbx_character ufbx_character;
+typedef struct ufbx_constraint ufbx_constraint;
+
 // Miscellaneous
 typedef struct ufbx_pose ufbx_pose;
 
@@ -313,6 +317,8 @@ UFBX_LIST_TYPE(ufbx_anim_curve_list, ufbx_anim_curve*);
 UFBX_LIST_TYPE(ufbx_display_layer_list, ufbx_display_layer*);
 UFBX_LIST_TYPE(ufbx_selection_set_list, ufbx_selection_set*);
 UFBX_LIST_TYPE(ufbx_selection_node_list, ufbx_selection_node*);
+UFBX_LIST_TYPE(ufbx_character_list, ufbx_character*);
+UFBX_LIST_TYPE(ufbx_constraint_list, ufbx_constraint*);
 UFBX_LIST_TYPE(ufbx_pose_list, ufbx_pose*);
 
 typedef enum ufbx_element_type {
@@ -351,6 +357,8 @@ typedef enum ufbx_element_type {
 	UFBX_ELEMENT_DISPLAY_LAYER,       // < `ufbx_display_layer`
 	UFBX_ELEMENT_SELECTION_SET,       // < `ufbx_selection_set`
 	UFBX_ELEMENT_SELECTION_NODE,      // < `ufbx_selection_node`
+	UFBX_ELEMENT_CHARACTER,           // < `ufbx_character`
+	UFBX_ELEMENT_CONSTRAINT,          // < `ufbx_constraint`
 	UFBX_ELEMENT_POSE,                // < `ufbx_pose`
 
 	UFBX_NUM_ELEMENT_TYPES,
@@ -1586,6 +1594,86 @@ struct ufbx_selection_node {
 	ufbx_int32_list faces;    // < Indices to `ufbx_mesh.faces`
 };
 
+// -- Constraints
+
+struct ufbx_character {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+// Type of property constrain eg. position or look-at
+typedef enum ufbx_constraint_type {
+	UFBX_CONSTRAINT_UNKNOWN,
+	UFBX_CONSTRAINT_AIM,
+	UFBX_CONSTRAINT_PARENT,
+	UFBX_CONSTRAINT_POSITION,
+	UFBX_CONSTRAINT_ROTATION,
+	UFBX_CONSTRAINT_SCALE,
+	// Inverse kinematic chain to a single effector `ufbx_constraint.ik_effector`
+	// `targets` optionally contains a list of pole targets!
+	UFBX_CONSTRAINT_SINGLE_CHAIN_IK,
+} ufbx_constraint_type;
+
+// Target to follow with a constraint
+typedef struct ufbx_constraint_target {
+	ufbx_node *node;          // < Target node reference
+	ufbx_real weight;         // < Relative weight to other targets (does not always sum to 1)
+	ufbx_transform transform; // < Offset from the actual target
+} ufbx_constraint_target;
+
+UFBX_LIST_TYPE(ufbx_constraint_target_list, ufbx_constraint_target);
+
+// Method to determine the up vector in aim constraints
+typedef enum ufbx_constraint_aim_up_type {
+	UFBX_CONSTRAINT_AIM_UP_SCENE,      // < Align the up vector to the scene global up vector
+	UFBX_CONSTRAINT_AIM_UP_TO_NODE,    // < Aim the up vector at `ufbx_constraint.aim_up_node`
+	UFBX_CONSTRAINT_AIM_UP_ALIGN_NODE, // < Copy the up vector from `ufbx_constraint.aim_up_node`
+	UFBX_CONSTRAINT_AIM_UP_VECTOR,     // < Use `ufbx_constraint.aim_up_vector` as the up vector
+	UFBX_CONSTRAINT_AIM_UP_NONE,       // < Don't align the up vector to anything
+} ufbx_constraint_aim_up_type;
+
+// Method to determine the up vector in aim constraints
+typedef enum ufbx_constraint_ik_pole_type {
+	UFBX_CONSTRAINT_IK_POLE_VECTOR, // < Use towards calculated from `ufbx_constraint.targets`
+	UFBX_CONSTRAINT_IK_POLE_NODE,   // < Use `ufbx_constraint.ik_pole_vector` directly
+} ufbx_constraint_ik_pole_type;
+
+struct ufbx_constraint {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	// Type of constraint to use
+	ufbx_constraint_type type;
+	ufbx_string type_name;
+
+	// Node to be constrained
+	ufbx_node *node;
+
+	// List of weighted targets for the constraint (pole vectors for IK)
+	ufbx_constraint_target_list targets;
+
+	// State of the constraint
+	ufbx_real weight;
+	bool active;
+
+	// Translation/rotation/scale axes the constraint is applied to
+	bool constrain_translation[3];
+	bool constrain_rotation[3];
+	bool constrain_scale[3];
+
+	// Offset from the constrained position
+	ufbx_transform transform_offset;
+
+	// AIM: Target and up vectors
+	ufbx_vec3 aim_vector;
+	ufbx_constraint_aim_up_type aim_up_type;
+	ufbx_node *aim_up_node;
+	ufbx_vec3 aim_up_vector;
+
+	// SINGLE_CHAIN_IK: Target for the IK, `targets` contains pole vectors!
+	ufbx_node *ik_effector;
+	ufbx_node *ik_end_node;
+	ufbx_vec3 ik_pole_vector;
+};
+
 // -- Miscellaneous
 
 typedef struct ufbx_bone_pose {
@@ -1783,6 +1871,10 @@ struct ufbx_scene {
 			ufbx_display_layer_list display_layers;
 			ufbx_selection_set_list selection_sets;
 			ufbx_selection_node_list selection_nodes;
+
+			// Constraints
+			ufbx_character_list characters;
+			ufbx_constraint_list constraints;
 
 			// Miscellaneous
 			ufbx_pose_list poses;
@@ -2078,6 +2170,13 @@ size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error);
 
 ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len);
 ufbx_inline ufbx_prop *ufbx_find_prop(const ufbx_props *props, const char *name) { return ufbx_find_prop_len(props, name, strlen(name));}
+
+ufbx_real ufbx_find_real_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_real def);
+ufbx_inline ufbx_real ufbx_find_real(const ufbx_props *props, const char *name, ufbx_real def) { return ufbx_find_real_len(props, name, strlen(name), def); }
+ufbx_vec3 ufbx_find_vec3_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_vec3 def);
+ufbx_inline ufbx_vec3 ufbx_find_vec3(const ufbx_props *props, const char *name, ufbx_vec3 def) { return ufbx_find_vec3_len(props, name, strlen(name), def); }
+int64_t ufbx_find_int_len(const ufbx_props *props, const char *name, size_t name_len, int64_t def);
+ufbx_inline int64_t ufbx_find_int(const ufbx_props *props, const char *name, int64_t def) { return ufbx_find_int_len(props, name, strlen(name), def); }
 
 ufbx_element *ufbx_find_element_len(ufbx_scene *scene, ufbx_element_type type, const char *name, size_t name_len);
 ufbx_inline ufbx_element *ufbx_find_element(ufbx_scene *scene, ufbx_element_type type, const char *name) { return ufbx_find_element_len(scene, type, name, strlen(name));}

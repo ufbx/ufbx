@@ -11,5 +11,6 @@
 #include "test_topology.h"
 #include "test_legacy.h"
 #include "test_collections.h"
+#include "test_constraints.h"
 #include "test_fuzz.h"
 
