@@ -183,6 +183,13 @@ UFBXT_FILE_TEST(blender_272_cube)
 	ufbxt_assert(scene->metadata.version == 7400);
 	ufbxt_assert(scene->metadata.exporter == UFBX_EXPORTER_BLENDER_BINARY);
 	ufbxt_assert(scene->metadata.exporter_version == ufbx_pack_version(2, 72, 0));
+
+	ufbxt_assert(!strcmp(scene->metadata.original_application.vendor.data, "Blender Foundation"));
+	ufbxt_assert(!strcmp(scene->metadata.original_application.name.data, "Blender (stable FBX IO)"));
+	ufbxt_assert(!strcmp(scene->metadata.original_application.version.data, "2.72 (sub 0)"));
+	ufbxt_assert(!strcmp(scene->metadata.latest_application.vendor.data, "Blender Foundation"));
+	ufbxt_assert(!strcmp(scene->metadata.latest_application.name.data, "Blender (stable FBX IO)"));
+	ufbxt_assert(!strcmp(scene->metadata.latest_application.version.data, "2.72 (sub 0)"));
 }
 #endif
 

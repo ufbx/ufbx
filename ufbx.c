@@ -2177,6 +2177,7 @@ static const char ufbxi_Weights[] = "Weights";
 static const char ufbxi_WrapModeU[] = "WrapModeU";
 static const char ufbxi_WrapModeV[] = "WrapModeV";
 static const char ufbxi_Line[] = "Line";
+static const char ufbxi_SceneInfo[] = "SceneInfo";
 static const char ufbxi_X[] = "X\0\0";
 static const char ufbxi_Y[] = "Y\0\0";
 static const char ufbxi_Z[] = "Z\0\0";
@@ -2447,6 +2448,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_WrapModeU, 9 },
 	{ ufbxi_WrapModeV, 9 },
 	{ ufbxi_Line, 4 },
+	{ ufbxi_SceneInfo, 9 },
 	{ ufbxi_X, 1 },
 	{ ufbxi_Y, 1 },
 	{ ufbxi_Z, 1 },
@@ -5320,6 +5322,123 @@ ufbxi_nodiscard static int ufbxi_load_maps(ufbxi_context *uc)
 
 // -- Reading the parsed data
 
+ufbxi_nodiscard static int ufbxi_read_property(ufbxi_context *uc, ufbxi_node *node, ufbx_prop *prop, int version)
+{
+	const char *type_str = NULL, *subtype_str = NULL;
+	ufbxi_check(ufbxi_get_val2(node, "SC", &prop->name, (char**)&type_str));
+	uint32_t val_ix = 2;
+	if (version == 70) {
+		ufbxi_check(ufbxi_get_val_at(node, val_ix++, 'C', (char**)&subtype_str));
+	}
+
+	prop->internal_key = ufbxi_get_name_key(prop->name.data, prop->name.length);
+
+	ufbx_string flags_str;
+	if (ufbxi_get_val_at(node, val_ix++, 'S', &flags_str)) {
+		uint32_t flags = 0;
+		for (size_t i = 0; i < flags_str.length; i++) {
+			char next = i + 1 < flags_str.length ? flags_str.data[i + 1] : '0';
+			switch (flags_str.data[i]) {
+			case 'A': flags |= UFBX_PROP_FLAG_ANIMATABLE; break;
+			case 'U': flags |= UFBX_PROP_FLAG_USER_DEFINED; break;
+			case 'H': flags |= UFBX_PROP_FLAG_HIDDEN; break;
+			case 'L': flags |= ((uint32_t)(next - '0') & 0xf) << 4; break; // UFBX_PROP_FLAG_LOCK_*
+			case 'M': flags |= ((uint32_t)(next - '0') & 0xf) << 8; break; // UFBX_PROP_FLAG_MUTE_*
+			}
+		}
+		prop->flags = (ufbx_prop_flags)flags;
+	}
+
+	prop->type = ufbxi_get_prop_type(uc, type_str);
+	if (prop->type == UFBX_PROP_UNKNOWN && subtype_str) {
+		prop->type = ufbxi_get_prop_type(uc, subtype_str);
+	}
+
+	ufbxi_ignore(ufbxi_get_val_at(node, val_ix, 'L', &prop->value_int));
+	for (size_t i = 0; i < 3; i++) {
+		if (!ufbxi_get_val_at(node, val_ix + i, 'R', &prop->value_real_arr[i])) break;
+	}
+
+	// Distance properties have a string unit _after_ the real value, eg. `10, "cm"`
+	if (prop->type == UFBX_PROP_DISTANCE) {
+		val_ix++;
+	}
+
+	if (!ufbxi_get_val_at(node, val_ix, 'S', &prop->value_str)) {
+		prop->value_str = ufbx_empty_string;
+	}
+	
+	return 1;
+}
+
+static ufbxi_forceinline bool ufbxi_prop_less(ufbx_prop *a, ufbx_prop *b)
+{
+	if (a->internal_key < b->internal_key) return true;
+	if (a->internal_key > b->internal_key) return false;
+	return strcmp(a->name.data, b->name.data) < 0;
+}
+
+ufbxi_nodiscard static int ufbxi_sort_properties(ufbxi_context *uc, ufbx_prop *props, size_t count)
+{
+	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_prop)));
+	ufbxi_macro_stable_sort(ufbx_prop, 32, props, uc->tmp_arr, count, ( ufbxi_prop_less(a, b) ));
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *parent, ufbx_props *props)
+{
+	props->defaults = NULL;
+
+	int version = 70;
+	ufbxi_node *node = ufbxi_find_child(parent, ufbxi_Properties70);
+	if (!node) {
+		node = ufbxi_find_child(parent, ufbxi_Properties60);
+		if (!node) {
+			// No properties found, not an error
+			props->props = NULL;
+			props->num_props = 0;
+			return 1;
+		}
+		version = 60;
+	}
+
+	props->props = ufbxi_push_zero(&uc->result, ufbx_prop, node->num_children);
+	props->num_props = node->num_children;
+	ufbxi_check(props->props);
+
+	for (size_t i = 0; i < props->num_props; i++) {
+		ufbxi_check(ufbxi_read_property(uc, &node->children[i], &props->props[i], version));
+	}
+
+	// Sort the properties
+	ufbxi_check(ufbxi_sort_properties(uc, props->props, props->num_props));
+
+	// Remove duplicates, the last one wins
+	if (props->num_props >= 2) {
+		ufbx_prop *ps = props->props;
+		size_t dst = 0, src = 0, end = props->num_props;
+		while (src < end) {
+			if (src + 1 < end && ps[src].name.data == ps[src + 1].name.data) {
+				src++;
+			} else if (dst != src) {
+				ps[dst++] = ps[src++];
+			} else {
+				dst++; src++;
+			}
+		}
+		props->num_props = dst;
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static int ufbxi_read_scene_info(ufbxi_context *uc, ufbxi_node *node)
+{
+	ufbxi_check(ufbxi_read_properties(uc, node, &uc->scene.metadata.scene_props));
+
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_read_header_extension(ufbxi_context *uc)
 {
 	// TODO: Read TCDefinition and adjust timestamps
@@ -5341,6 +5460,10 @@ ufbxi_nodiscard static int ufbxi_read_header_extension(ufbxi_context *uc)
 					uc->version = (uint32_t)version;
 				}
 			}
+		}
+
+		if (child->name == ufbxi_SceneInfo) {
+			ufbxi_check(ufbxi_read_scene_info(uc, child));
 		}
 
 	}
@@ -5452,116 +5575,6 @@ ufbxi_nodiscard static int ufbxi_read_document(ufbxi_context *uc)
 				found_root_id = true;
 			}
 		}
-	}
-
-	return 1;
-}
-
-ufbxi_nodiscard static int ufbxi_read_property(ufbxi_context *uc, ufbxi_node *node, ufbx_prop *prop, int version)
-{
-	const char *type_str = NULL, *subtype_str = NULL;
-	ufbxi_check(ufbxi_get_val2(node, "SC", &prop->name, (char**)&type_str));
-	uint32_t val_ix = 2;
-	if (version == 70) {
-		ufbxi_check(ufbxi_get_val_at(node, val_ix++, 'C', (char**)&subtype_str));
-	}
-
-	prop->internal_key = ufbxi_get_name_key(prop->name.data, prop->name.length);
-
-	ufbx_string flags_str;
-	if (ufbxi_get_val_at(node, val_ix++, 'S', &flags_str)) {
-		uint32_t flags = 0;
-		for (size_t i = 0; i < flags_str.length; i++) {
-			char next = i + 1 < flags_str.length ? flags_str.data[i + 1] : '0';
-			switch (flags_str.data[i]) {
-			case 'A': flags |= UFBX_PROP_FLAG_ANIMATABLE; break;
-			case 'U': flags |= UFBX_PROP_FLAG_USER_DEFINED; break;
-			case 'H': flags |= UFBX_PROP_FLAG_HIDDEN; break;
-			case 'L': flags |= ((uint32_t)(next - '0') & 0xf) << 4; break; // UFBX_PROP_FLAG_LOCK_*
-			case 'M': flags |= ((uint32_t)(next - '0') & 0xf) << 8; break; // UFBX_PROP_FLAG_MUTE_*
-			}
-		}
-		prop->flags = (ufbx_prop_flags)flags;
-	}
-
-	prop->type = ufbxi_get_prop_type(uc, type_str);
-	if (prop->type == UFBX_PROP_UNKNOWN && subtype_str) {
-		prop->type = ufbxi_get_prop_type(uc, subtype_str);
-	}
-
-	ufbxi_ignore(ufbxi_get_val_at(node, val_ix, 'L', &prop->value_int));
-	for (size_t i = 0; i < 3; i++) {
-		if (!ufbxi_get_val_at(node, val_ix + i, 'R', &prop->value_real_arr[i])) break;
-	}
-
-	// Distance properties have a string unit _after_ the real value, eg. `10, "cm"`
-	if (prop->type == UFBX_PROP_DISTANCE) {
-		val_ix++;
-	}
-
-	if (!ufbxi_get_val_at(node, val_ix, 'S', &prop->value_str)) {
-		prop->value_str = ufbx_empty_string;
-	}
-	
-	return 1;
-}
-
-static ufbxi_forceinline bool ufbxi_prop_less(ufbx_prop *a, ufbx_prop *b)
-{
-	if (a->internal_key < b->internal_key) return true;
-	if (a->internal_key > b->internal_key) return false;
-	return strcmp(a->name.data, b->name.data) < 0;
-}
-
-ufbxi_nodiscard static int ufbxi_sort_properties(ufbxi_context *uc, ufbx_prop *props, size_t count)
-{
-	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_prop)));
-	ufbxi_macro_stable_sort(ufbx_prop, 32, props, uc->tmp_arr, count, ( ufbxi_prop_less(a, b) ));
-	return 1;
-}
-
-ufbxi_nodiscard static int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *parent, ufbx_props *props)
-{
-	props->defaults = NULL;
-
-	int version = 70;
-	ufbxi_node *node = ufbxi_find_child(parent, ufbxi_Properties70);
-	if (!node) {
-		node = ufbxi_find_child(parent, ufbxi_Properties60);
-		if (!node) {
-			// No properties found, not an error
-			props->props = NULL;
-			props->num_props = 0;
-			return 1;
-		}
-		version = 60;
-	}
-
-	props->props = ufbxi_push_zero(&uc->result, ufbx_prop, node->num_children);
-	props->num_props = node->num_children;
-	ufbxi_check(props->props);
-
-	for (size_t i = 0; i < props->num_props; i++) {
-		ufbxi_check(ufbxi_read_property(uc, &node->children[i], &props->props[i], version));
-	}
-
-	// Sort the properties
-	ufbxi_check(ufbxi_sort_properties(uc, props->props, props->num_props));
-
-	// Remove duplicates, the last one wins
-	if (props->num_props >= 2) {
-		ufbx_prop *ps = props->props;
-		size_t dst = 0, src = 0, end = props->num_props;
-		while (src < end) {
-			if (src + 1 < end && ps[src].name.data == ps[src + 1].name.data) {
-				src++;
-			} else if (dst != src) {
-				ps[dst++] = ps[src++];
-			} else {
-				dst++; src++;
-			}
-		}
-		props->num_props = dst;
 	}
 
 	return 1;
@@ -7514,6 +7527,8 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			} else {
 				ufbxi_check(ufbxi_read_constraint(uc, node, &info));
 			}
+		} else if (name == ufbxi_SceneInfo) {
+			ufbxi_check(ufbxi_read_scene_info(uc, node));
 		} else {
 			ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str));
 		}
@@ -11147,7 +11162,18 @@ static void ufbxi_update_scene(ufbx_scene *scene)
 	}
 }
 
-static void ufbxi_update_scene_settings(ufbx_scene_settings *settings)
+static ufbxi_noinline void ufbxi_update_scene_metadata(ufbx_metadata *metadata)
+{
+	ufbx_props *props = &metadata->scene_props;
+	metadata->original_application.vendor = ufbx_find_string(props, "Original|ApplicationVendor", ufbx_empty_string);
+	metadata->original_application.name = ufbx_find_string(props, "Original|ApplicationName", ufbx_empty_string);
+	metadata->original_application.version = ufbx_find_string(props, "Original|ApplicationVersion", ufbx_empty_string);
+	metadata->latest_application.vendor = ufbx_find_string(props, "LastSaved|ApplicationVendor", ufbx_empty_string);
+	metadata->latest_application.name = ufbx_find_string(props, "LastSaved|ApplicationName", ufbx_empty_string);
+	metadata->latest_application.version = ufbx_find_string(props, "LastSaved|ApplicationVersion", ufbx_empty_string);
+}
+
+static ufbxi_noinline void ufbxi_update_scene_settings(ufbx_scene_settings *settings)
 {
 	settings->axis_up = ufbxi_find_axis(&settings->props, ufbxi_UpAxis, ufbxi_UpAxisSign);
 	settings->axis_front = ufbxi_find_axis(&settings->props, ufbxi_FrontAxis, ufbxi_FrontAxisSign);
@@ -11315,6 +11341,8 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	} else {
 		ufbxi_check(ufbxi_read_root(uc));
 	}
+
+	ufbxi_update_scene_metadata(&uc->scene.metadata);
 	ufbxi_check(ufbxi_finalize_scene(uc));
 
 	ufbxi_update_scene(&uc->scene);
@@ -13240,6 +13268,16 @@ int64_t ufbx_find_int_len(const ufbx_props *props, const char *name, size_t name
 	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
 	if (prop) {
 		return prop->value_int;
+	} else {
+		return def;
+	}
+}
+
+ufbx_string ufbx_find_string_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_string def)
+{
+	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
+	if (prop) {
+		return prop->value_str;
 	} else {
 		return def;
 	}

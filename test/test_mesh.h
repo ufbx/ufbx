@@ -57,6 +57,13 @@ UFBXT_FILE_TEST(maya_cube)
 	ufbxt_assert(scene->metadata.exporter == UFBX_EXPORTER_FBX_SDK);
 	ufbxt_assert(scene->metadata.exporter_version == ufbx_pack_version(2019, 2, 0));
 
+	ufbxt_assert(!strcmp(scene->metadata.original_application.vendor.data, "Autodesk"));
+	ufbxt_assert(!strcmp(scene->metadata.original_application.name.data, "Maya"));
+	ufbxt_assert(!strcmp(scene->metadata.original_application.version.data, "201900"));
+	ufbxt_assert(!strcmp(scene->metadata.latest_application.vendor.data, "Autodesk"));
+	ufbxt_assert(!strcmp(scene->metadata.latest_application.name.data, "Maya"));
+	ufbxt_assert(!strcmp(scene->metadata.latest_application.version.data, "201900"));
+
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;

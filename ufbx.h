@@ -1732,6 +1732,12 @@ typedef enum ufbx_exporter {
 	UFBX_EXPORTER_MOTION_BUILDER,
 } ufbx_exporter;
 
+typedef struct ufbx_application {
+	ufbx_string vendor;
+	ufbx_string name;
+	ufbx_string version;
+} ufbx_application;
+
 // Miscellaneous data related to the loaded file
 typedef struct ufbx_metadata {
 	bool ascii;
@@ -1741,6 +1747,11 @@ typedef struct ufbx_metadata {
 
 	ufbx_exporter exporter;
 	uint32_t exporter_version;
+
+	ufbx_props scene_props;
+
+	ufbx_application original_application;
+	ufbx_application latest_application;
 
 	bool geometry_ignored;
 	bool animation_ignored;
@@ -2196,6 +2207,8 @@ ufbx_vec3 ufbx_find_vec3_len(const ufbx_props *props, const char *name, size_t n
 ufbx_inline ufbx_vec3 ufbx_find_vec3(const ufbx_props *props, const char *name, ufbx_vec3 def) { return ufbx_find_vec3_len(props, name, strlen(name), def); }
 int64_t ufbx_find_int_len(const ufbx_props *props, const char *name, size_t name_len, int64_t def);
 ufbx_inline int64_t ufbx_find_int(const ufbx_props *props, const char *name, int64_t def) { return ufbx_find_int_len(props, name, strlen(name), def); }
+ufbx_string ufbx_find_string_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_string def);
+ufbx_inline ufbx_string ufbx_find_string(const ufbx_props *props, const char *name, ufbx_string def) { return ufbx_find_string_len(props, name, strlen(name), def); }
 
 ufbx_element *ufbx_find_element_len(ufbx_scene *scene, ufbx_element_type type, const char *name, size_t name_len);
 ufbx_inline ufbx_element *ufbx_find_element(ufbx_scene *scene, ufbx_element_type type, const char *name) { return ufbx_find_element_len(scene, type, name, strlen(name));}
