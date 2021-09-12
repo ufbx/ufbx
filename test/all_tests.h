@@ -12,5 +12,6 @@
 #include "test_legacy.h"
 #include "test_collections.h"
 #include "test_constraints.h"
+#include "test_curves.h"
 #include "test_fuzz.h"
 

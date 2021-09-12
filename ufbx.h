@@ -94,6 +94,7 @@ typedef struct ufbx_quat {
 
 UFBX_LIST_TYPE(ufbx_int32_list, int32_t);
 UFBX_LIST_TYPE(ufbx_real_list, ufbx_real);
+UFBX_LIST_TYPE(ufbx_vec3_list, ufbx_vec3);
 UFBX_LIST_TYPE(ufbx_vec4_list, ufbx_vec4);
 
 // Order in which Euler-angle rotation axes are applied for a transform
@@ -862,6 +863,9 @@ struct ufbx_bone {
 
 	// Length of the bone relative to the distance between two nodes
 	ufbx_real relative_length;
+
+	// Is the bone a root bone
+	bool is_root;
 };
 
 // Empty/NULL/locator connected to a node, actual details in `ufbx_node`
@@ -884,8 +888,21 @@ typedef struct ufbx_nurbs_topology {
 	ufbx_real_list knot_vector;
 } ufbx_nurbs_topology;
 
+// Segment of a `ufbx_line_curve`, indices refer to `ufbx_line_curve.point_indces[]`
+typedef struct ufbx_line_segment {
+	uint32_t index_begin;
+	uint32_t num_indices;
+} ufbx_line_segment;
+
+UFBX_LIST_TYPE(ufbx_line_segment_list, ufbx_line_segment);
+
 struct ufbx_line_curve {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+
+	ufbx_vec3_list control_points; // < List of possible values the line passes through
+	ufbx_int32_list point_indices; // < Indices to `control_points[]` the line goes through
+
+	ufbx_line_segment_list segments;
 };
 
 struct ufbx_nurbs_curve {

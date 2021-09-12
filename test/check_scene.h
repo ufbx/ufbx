@@ -360,6 +360,19 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 #endif
 }
 
+static void ufbx_check_line_curve(ufbx_scene *scene, ufbx_line_curve *line)
+{
+	for (size_t i = 0; i < line->point_indices.count; i++) {
+		int32_t ix = line->point_indices.data[i];
+		ufbxt_assert(ix >= 0 && ix < line->control_points.count);
+	}
+	for (size_t i = 0; i < line->segments.count; i++) {
+		ufbx_line_segment seg = line->segments.data[i];
+		ufbxt_assert(seg.num_indices <= line->point_indices.count);
+		ufbxt_assert(seg.index_begin <= line->point_indices.count - seg.num_indices);
+	}
+}
+
 static void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
 {
 	for (size_t i = 0; i < material->textures.count; i++) {
@@ -450,6 +463,10 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 
 	for (size_t i = 0; i < scene->meshes.count; i++) {
 		ufbxt_check_mesh(scene, scene->meshes.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->line_curves.count; i++) {
+		ufbx_check_line_curve(scene, scene->line_curves.data[i]);
 	}
 
 	for (size_t i = 0; i < scene->anim_layers.count; i++) {

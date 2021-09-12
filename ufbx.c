@@ -1950,6 +1950,7 @@ static const char ufbxi_Camera[] = "Camera";
 static const char ufbxi_CastLight[] = "CastLight";
 static const char ufbxi_CastShadows[] = "CastShadows";
 static const char ufbxi_Channel[] = "Channel";
+static const char ufbxi_Character[] = "Character";
 static const char ufbxi_Children[] = "Children";
 static const char ufbxi_Closed[] = "Closed";
 static const char ufbxi_Cluster[] = "Cluster";
@@ -1961,6 +1962,7 @@ static const char ufbxi_Colors[] = "Colors";
 static const char ufbxi_ConeAngle[] = "ConeAngle";
 static const char ufbxi_Cone_angle[] = "Cone angle";
 static const char ufbxi_Connections[] = "Connections";
+static const char ufbxi_Constraint[] = "Constraint";
 static const char ufbxi_Content[] = "Content";
 static const char ufbxi_CoordAxisSign[] = "CoordAxisSign";
 static const char ufbxi_CoordAxis[] = "CoordAxis";
@@ -2089,6 +2091,7 @@ static const char ufbxi_PO[] = "PO\0";
 static const char ufbxi_PP[] = "PP\0";
 static const char ufbxi_Periodic[] = "Periodic";
 static const char ufbxi_Points[] = "Points";
+static const char ufbxi_PointsIndex[] = "PointsIndex";
 static const char ufbxi_PolygonIndexArray[] = "PolygonIndexArray";
 static const char ufbxi_PolygonVertexIndex[] = "PolygonVertexIndex";
 static const char ufbxi_PoseNode[] = "PoseNode";
@@ -2108,6 +2111,7 @@ static const char ufbxi_RelativeFilename[] = "RelativeFilename";
 static const char ufbxi_RenderDivisionLevels[] = "RenderDivisionLevels";
 static const char ufbxi_RightCamera[] = "RightCamera";
 static const char ufbxi_RootNode[] = "RootNode";
+static const char ufbxi_Root[] = "Root";
 static const char ufbxi_RotationAccumulationMode[] = "RotationAccumulationMode";
 static const char ufbxi_RotationOffset[] = "RotationOffset";
 static const char ufbxi_RotationOrder[] = "RotationOrder";
@@ -2172,8 +2176,7 @@ static const char ufbxi_Weight[] = "Weight";
 static const char ufbxi_Weights[] = "Weights";
 static const char ufbxi_WrapModeU[] = "WrapModeU";
 static const char ufbxi_WrapModeV[] = "WrapModeV";
-static const char ufbxi_Constraint[] = "Constraint";
-static const char ufbxi_Character[] = "Character";
+static const char ufbxi_Line[] = "Line";
 static const char ufbxi_X[] = "X\0\0";
 static const char ufbxi_Y[] = "Y\0\0";
 static const char ufbxi_Z[] = "Z\0\0";
@@ -2358,6 +2361,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_PP, 2 },
 	{ ufbxi_Periodic, 8 },
 	{ ufbxi_Points, 6 },
+	{ ufbxi_PointsIndex, 11 },
 	{ ufbxi_PolygonIndexArray, 17 },
 	{ ufbxi_PolygonVertexIndex, 18 },
 	{ ufbxi_Pose, 4 },
@@ -2376,6 +2380,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_RelativeFilename, 16 },
 	{ ufbxi_RenderDivisionLevels, 20 },
 	{ ufbxi_RightCamera, 11 },
+	{ ufbxi_Root, 4 },
 	{ ufbxi_RootNode, 8 },
 	{ ufbxi_Rotation, 8 },
 	{ ufbxi_RotationAccumulationMode, 24 },
@@ -2441,6 +2446,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Weights, 7 },
 	{ ufbxi_WrapModeU, 9 },
 	{ ufbxi_WrapModeV, 9 },
+	{ ufbxi_Line, 4 },
 	{ ufbxi_X, 1 },
 	{ ufbxi_Y, 1 },
 	{ ufbxi_Z, 1 },
@@ -3325,6 +3331,10 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			return true;
 		} else if (name == ufbxi_KnotVectorV && !uc->opts.ignore_geometry) {
 			info->type = 'r';
+			info->result = true;
+			return true;
+		} else if (name == ufbxi_PointsIndex && !uc->opts.ignore_geometry) {
+			info->type = 'i';
 			info->result = true;
 			return true;
 		}
@@ -6615,12 +6625,83 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_nurbs_surface(ufbxi_context
 	return 1;
 }
 
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_line(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_line_curve *line = ufbxi_push_element(uc, info, ufbx_line_curve, UFBX_ELEMENT_LINE_CURVE);
+	ufbxi_check(line);
+
+	if (!uc->opts.ignore_geometry) {
+		ufbxi_value_array *points = ufbxi_find_array(node, ufbxi_Points, 'r');
+		ufbxi_value_array *points_index = ufbxi_find_array(node, ufbxi_PointsIndex, 'i');
+		ufbxi_check(points);
+		ufbxi_check(points_index);
+		ufbxi_check(points->size % 3 == 0);
+
+		if (points->size > 0) {
+			line->control_points.count = points->size / 3;
+			line->control_points.data = (ufbx_vec3*)points->data;
+			line->point_indices.count = points_index->size;
+			line->point_indices.data = (int32_t*)points_index->data;
+
+			// Count end points
+			size_t num_segments = 1;
+			for (size_t i = 0; i < line->point_indices.count - 1; i++) {
+				int32_t ix = line->point_indices.data[i];
+				num_segments += ix < 0 ? 1 : 0;
+			}
+
+			size_t prev_end = 0;
+			line->segments.data = ufbxi_push(&uc->result, ufbx_line_segment, num_segments);
+			ufbxi_check(line->segments.data);
+			for (size_t i = 0; i < line->point_indices.count; i++) {
+				int32_t ix = line->point_indices.data[i];
+				if (ix < 0) {
+					ix = ~ix;
+					if (i + 1 < line->point_indices.count) {
+						ufbx_line_segment *segment = &line->segments.data[line->segments.count++];
+						segment->index_begin = (uint32_t)prev_end;
+						segment->num_indices = (uint32_t)(i - prev_end);
+						prev_end = i;
+					}
+				}
+
+				if (!uc->opts.allow_out_of_bounds_vertex_indices && (size_t)ix >= line->control_points.count) {
+					ix = (int32_t)line->control_points.count - 1;
+				}
+
+				line->point_indices.data[i] = ix;
+			}
+
+			ufbx_line_segment *segment = &line->segments.data[line->segments.count++];
+			segment->index_begin = (uint32_t)prev_end;
+			segment->num_indices = (uint32_t)(line->point_indices.count - prev_end);
+			ufbx_assert(line->segments.count == num_segments);
+		}
+	}
+
+	return 1;
+}
+
 ufbxi_noinline static void ufbxi_read_transform_matrix(ufbx_matrix *m, ufbx_real *data)
 {
 	m->m00 = data[ 0]; m->m10 = data[ 1]; m->m20 = data[ 2];
 	m->m01 = data[ 4]; m->m11 = data[ 5]; m->m21 = data[ 6];
 	m->m02 = data[ 8]; m->m12 = data[ 9]; m->m22 = data[10];
 	m->m03 = data[12]; m->m13 = data[13]; m->m23 = data[14];
+}
+
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_bone(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type)
+{
+	(void)node;
+
+	ufbx_bone *bone = ufbxi_push_element(uc, info, ufbx_bone, UFBX_ELEMENT_BONE);
+	ufbxi_check(bone);
+
+	if (sub_type == ufbxi_Root) {
+		bone->is_root = true;
+	}
+
+	return 1;
 }
 
 ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_skin(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
@@ -7263,7 +7344,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_c
 	} else if (sub_type == ufbxi_Camera) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera), UFBX_ELEMENT_CAMERA));
 	} else if (sub_type == ufbxi_LimbNode || sub_type == ufbxi_Limb) {
-		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_bone), UFBX_ELEMENT_BONE));
+		ufbxi_check(ufbxi_read_bone(uc, node, &attrib_info, sub_type));
 	} else if (sub_type == ufbxi_Null) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_empty), UFBX_ELEMENT_EMPTY));
 	} else if (sub_type == ufbxi_NurbsCurve) {
@@ -7273,6 +7354,10 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_c
 		if (!ufbxi_find_child(node, ufbxi_KnotVectorU)) return 1;
 		if (!ufbxi_find_child(node, ufbxi_KnotVectorV)) return 1;
 		ufbxi_check(ufbxi_read_nurbs_surface(uc, node, &attrib_info));
+	} else if (sub_type == ufbxi_Line) {
+		if (!ufbxi_find_child(node, ufbxi_Points)) return 1;
+		if (!ufbxi_find_child(node, ufbxi_PointsIndex)) return 1;
+		ufbxi_check(ufbxi_read_line(uc, node, &attrib_info));
 	} else if (sub_type == ufbxi_TrimNurbsSurface) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_nurbs_trim_surface), UFBX_ELEMENT_NURBS_TRIM_SURFACE));
 	} else if (sub_type == ufbxi_Boundary) {
@@ -7348,8 +7433,8 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_light), UFBX_ELEMENT_LIGHT));
 			} else if (sub_type == ufbxi_Camera) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera), UFBX_ELEMENT_CAMERA));
-			} else if (sub_type == ufbxi_LimbNode || sub_type == ufbxi_Limb) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_bone), UFBX_ELEMENT_BONE));
+			} else if (sub_type == ufbxi_LimbNode || sub_type == ufbxi_Limb || sub_type == ufbxi_Root) {
+				ufbxi_check(ufbxi_read_bone(uc, node, &info, sub_type));
 			} else if (sub_type == ufbxi_Null) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_empty), UFBX_ELEMENT_EMPTY));
 			} else if (sub_type == ufbxi_CameraStereo) {
@@ -7370,6 +7455,8 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 				ufbxi_check(ufbxi_read_nurbs_curve(uc, node, &info));
 			} else if (sub_type == ufbxi_NurbsSurface) {
 				ufbxi_check(ufbxi_read_nurbs_surface(uc, node, &info));
+			} else if (sub_type == ufbxi_Line) {
+				ufbxi_check(ufbxi_read_line(uc, node, &info));
 			} else if (sub_type == ufbxi_TrimNurbsSurface) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_trim_surface), UFBX_ELEMENT_NURBS_TRIM_SURFACE));
 			} else if (sub_type == ufbxi_Boundary) {
