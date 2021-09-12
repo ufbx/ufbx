@@ -11843,6 +11843,23 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 		node->target_mesh = (ufbx_mesh*)ufbxi_translate_element(ec, node->target_mesh);
 	}
 
+	ufbxi_for_ptr_list(ufbx_constraint, p_constraint, ec->scene.constraints) {
+		ufbx_constraint *constraint = *p_constraint;
+
+		constraint->node = (ufbx_node*)ufbxi_translate_element(ec, constraint->node);
+		constraint->aim_up_node = (ufbx_node*)ufbxi_translate_element(ec, constraint->aim_up_node);
+		constraint->ik_effector = (ufbx_node*)ufbxi_translate_element(ec, constraint->ik_effector);
+		constraint->ik_end_node = (ufbx_node*)ufbxi_translate_element(ec, constraint->ik_end_node);
+
+		ufbx_constraint_target *targets = ufbxi_push(&ec->result, ufbx_constraint_target, constraint->targets.count);
+		ufbxi_check_err(&ec->error, targets);
+		for (size_t i = 0; i < constraint->targets.count; i++) {
+			targets[i] = constraint->targets.data[i];
+			targets[i].node = (ufbx_node*)ufbxi_translate_element(ec, targets[i].node);
+		}
+		constraint->targets.data = targets;
+	}
+
 	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, ec->scene.anim_stacks) {
 		ufbx_anim_stack *stack = *p_stack;
 

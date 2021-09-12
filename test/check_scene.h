@@ -425,6 +425,17 @@ static void ufbxt_check_selection_node(ufbx_scene *scene, ufbx_selection_node *n
 	ufbxt_check_element_ptr(scene, node->target_mesh);
 }
 
+static void ufbxt_check_constraint(ufbx_scene *scene, ufbx_constraint *constraint)
+{
+	ufbxt_check_element_ptr(scene, constraint->node);
+	ufbxt_check_element_ptr(scene, constraint->aim_up_node);
+	ufbxt_check_element_ptr(scene, constraint->ik_effector);
+	ufbxt_check_element_ptr(scene, constraint->ik_end_node);
+	for (size_t i = 0; i < constraint->targets.count; i++) {
+		ufbxt_check_element_ptr(scene, constraint->targets.data[i].node);
+	}
+}
+
 static void ufbxt_check_scene(ufbx_scene *scene)
 {
 	ufbxt_check_string(scene->metadata.creator);
@@ -463,6 +474,10 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 
 	for (size_t i = 0; i < scene->selection_nodes.count; i++) {
 		ufbxt_check_selection_node(scene, scene->selection_nodes.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->constraints.count; i++) {
+		ufbxt_check_constraint(scene, scene->constraints.data[i]);
 	}
 }
 
