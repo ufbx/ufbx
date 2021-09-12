@@ -3142,7 +3142,7 @@ static ufbxi_nodiscard ufbxi_noinline void *ufbxi_push_element_extra_size(ufbxi_
 	if (uc->element_extra_cap <= id) {
 		size_t old_cap = uc->element_extra_cap;
 		ufbxi_check_return(ufbxi_grow_array(&uc->ator_tmp, &uc->element_extra_arr, &uc->element_extra_cap, id + 1), NULL);
-		memset(uc->element_extra_arr + old_cap, 0, (id + 1 - old_cap) * sizeof(void*));
+		memset(uc->element_extra_arr + old_cap, 0, (uc->element_extra_cap - old_cap) * sizeof(void*));
 	}
 	ufbx_assert(uc->element_extra_arr[id] == NULL);
 	uc->element_extra_arr[id] = extra;
