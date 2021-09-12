@@ -899,6 +899,8 @@ UFBX_LIST_TYPE(ufbx_line_segment_list, ufbx_line_segment);
 struct ufbx_line_curve {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
 
+	ufbx_vec3 color;
+
 	ufbx_vec3_list control_points; // < List of possible values the line passes through
 	ufbx_int32_list point_indices; // < Indices to `control_points[]` the line goes through
 

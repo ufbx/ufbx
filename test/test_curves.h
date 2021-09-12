@@ -35,6 +35,9 @@ UFBXT_FILE_TEST(max_curve_line)
 		ufbxt_assert_close_vec3(err, p, ref_points[i]);
 	}
 
+	ufbx_vec3 polyline_color = { 0.223529411764706f ,0.0313725490196078f, 0.533333333333333f };
+	ufbxt_assert_close_vec3(err, polyline->color, polyline_color);
+
 	ufbx_line_curve *bezier = (ufbx_line_curve*)bezier_node->attrib;
 	ufbxt_assert(bezier->point_indices.count == 15);
 	ufbxt_assert(bezier->segments.count == 1);
@@ -49,5 +52,8 @@ UFBXT_FILE_TEST(max_curve_line)
 		ufbxt_assert(p.y >= -0.0001f);
 		ufbxt_assert_close_real(err, p.z, 0.0f);
 	}
+
+	ufbx_vec3 bezier_color = { 0.603921568627451f ,0.725490196078431f, 0.898039215686275f };
+	ufbxt_assert_close_vec3(err, bezier->color, bezier_color);
 }
 #endif

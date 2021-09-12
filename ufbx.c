@@ -10455,6 +10455,8 @@ static ufbxi_forceinline void ufbxi_mul_scale(ufbx_transform *t, ufbx_vec3 v)
 	t->scale.z *= v.z;
 }
 
+static const ufbx_vec3 ufbxi_one_vec3 = { 1.0f, 1.0f, 1.0f };
+
 #define UFBXI_PI ((ufbx_real)3.14159265358979323846)
 #define UFBXI_DEG_TO_RAD ((ufbx_real)(UFBXI_PI / 180.0))
 #define UFBXI_RAD_TO_DEG ((ufbx_real)(180.0 / UFBXI_PI))
@@ -10867,6 +10869,11 @@ ufbxi_noinline static void ufbxi_update_bone(ufbx_scene *scene, ufbx_bone *bone)
 	}
 }
 
+ufbxi_noinline static void ufbxi_update_line_curve(ufbx_line_curve *line)
+{
+	line->color = ufbxi_find_vec3(&line->props, ufbxi_Color, 1.0f, 1.0f, 1.0f);
+}
+
 ufbxi_noinline static void ufbxi_update_skin_cluster(ufbx_skin_cluster *cluster)
 {
 	if (cluster->bone) {
@@ -10967,8 +10974,6 @@ ufbxi_noinline static void ufbxi_update_display_layer(ufbx_display_layer *layer)
 	layer->frozen = ufbxi_find_int(&layer->props, ufbxi_Freeze, 1) != 0;
 	layer->ui_color = ufbxi_find_vec3(&layer->props, ufbxi_Color, 0.8f, 0.8f, 0.8f);
 }
-
-static const ufbx_vec3 ufbxi_one_vec3 = { 1.0f, 1.0f, 1.0f };
 
 ufbxi_noinline static void ufbxi_update_constraint(ufbx_constraint *constraint)
 {
@@ -11107,6 +11112,10 @@ static void ufbxi_update_scene(ufbx_scene *scene)
 
 	ufbxi_for_ptr_list(ufbx_bone, p_bone, scene->bones) {
 		ufbxi_update_bone(scene, *p_bone);
+	}
+
+	ufbxi_for_ptr_list(ufbx_line_curve, p_line, scene->line_curves) {
+		ufbxi_update_line_curve(*p_line);
 	}
 
 	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
