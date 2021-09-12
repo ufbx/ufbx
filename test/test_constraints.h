@@ -85,3 +85,26 @@ UFBXT_FILE_TEST(maya_character)
 	// TODO: Test things
 }
 #endif
+
+UFBXT_FILE_TEST(maya_constraint_multi)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->constraints.count == 1);
+	ufbx_constraint *constraint = scene->constraints.data[0];
+	ufbxt_assert(constraint->type == UFBX_CONSTRAINT_POSITION);
+	ufbxt_assert(constraint->constrain_translation[0] && constraint->constrain_translation[1] && constraint->constrain_translation[2]);
+	ufbxt_assert(!constraint->constrain_rotation[0] && !constraint->constrain_rotation[1] && !constraint->constrain_rotation[2]);
+	ufbxt_assert(!constraint->constrain_scale[0] && !constraint->constrain_scale[1] && !constraint->constrain_scale[2]);
+	ufbxt_assert(constraint->targets.count == 2);
+	for (size_t i = 0; i < constraint->targets.count; i++) {
+		const ufbx_constraint_target *target = &constraint->targets.data[i];
+		if (!strcmp(target->node->name.data, "TargetA")) {
+			ufbxt_assert_close_real(err, target->weight, 1.0f);
+		} else if (!strcmp(target->node->name.data, "TargetB")) {
+			ufbxt_assert_close_real(err, target->weight, 2.0f);
+		} else {
+			ufbxt_assert(false && "Unexpected target");
+		}
+	}
+}
+#endif
