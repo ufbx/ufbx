@@ -10901,8 +10901,14 @@ ufbxi_noinline static void ufbxi_update_constraint(ufbx_constraint *constraint)
 		ufbx_assert(name_len < 256);
 		memcpy(name_buf, node->name.data, name_len);
 
+		ufbx_real weight_scale = (ufbx_real)100.0;
+		if (constraint_type == UFBX_CONSTRAINT_SINGLE_CHAIN_IK) {
+			// IK weights seem to be not scaled 100x?
+			weight_scale = (ufbx_real)1.0;
+		}
+
 		memcpy(name_buf + name_len, ".Weight", 7 + 1);
-		target->weight = ufbx_find_real_len(props, name_buf, name_len + 7, 100.0f) / (ufbx_real)100.0;
+		target->weight = ufbx_find_real_len(props, name_buf, name_len + 7, weight_scale) / weight_scale;
 
 		if (constraint_type == UFBX_CONSTRAINT_PARENT) {
 			memcpy(name_buf + name_len, ".Offset T", 9 + 1);
