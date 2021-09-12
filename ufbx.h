@@ -399,7 +399,9 @@ struct ufbx_unknown {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	// FBX format specific type information
+	// ASCII FBX `<super_type>: ID, "<type>::<name>", "<sub_type>"`
 	ufbx_string type;
+	ufbx_string super_type;
 	ufbx_string sub_type;
 };
 

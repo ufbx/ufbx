@@ -2073,6 +2073,7 @@ static const char ufbxi_Node[] = "Node";
 static const char ufbxi_NormalsIndex[] = "NormalsIndex";
 static const char ufbxi_Normals[] = "Normals";
 static const char ufbxi_Null[] = "Null";
+static const char ufbxi_Marker[] = "Marker";
 static const char ufbxi_NurbsCurve[] = "NurbsCurve";
 static const char ufbxi_NurbsSurfaceOrder[] = "NurbsSurfaceOrder";
 static const char ufbxi_NurbsSurface[] = "NurbsSurface";
@@ -2344,6 +2345,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Normals, 7 },
 	{ ufbxi_NormalsIndex, 12 },
 	{ ufbxi_Null, 4 },
+	{ ufbxi_Marker, 6 },
 	{ ufbxi_Nurbs, 5 },
 	{ ufbxi_NurbsCurve, 10 },
 	{ ufbxi_NurbsSurface, 12 },
@@ -5660,7 +5662,7 @@ ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_str
 	}
 
 	// ???: ASCII and binary store type and name in different order
-	if (type_end < type_and_name.length) {
+	if (type_end <= type_and_name.length) {
 		if (uc->from_ascii) {
 			name->data = type_and_name.data + type_end;
 			name->length = type_and_name.length - type_end;
@@ -5672,10 +5674,6 @@ ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_str
 			type->data = type_and_name.data + type_end;
 			type->length = type_and_name.length - type_end;
 		}
-	} else if (type_end == type_and_name.length) {
-		*type = type_and_name;
-		name->data = ufbxi_empty_char;
-		name->length = 0;
 	} else {
 		*name = type_and_name;
 		type->data = ufbxi_empty_char;
@@ -5802,13 +5800,15 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_connect_pp(ufbxi_context *uc, ui
 	return 1;
 }
 
-ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_unknown(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *element, ufbx_string type, ufbx_string sub_type)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_unknown(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *element, ufbx_string type, ufbx_string sub_type, const char *node_name)
 {
 	(void)node;
 	ufbx_unknown *unknown = ufbxi_push_element(uc, element, ufbx_unknown, UFBX_ELEMENT_UNKNOWN);
 	ufbxi_check(unknown);
 	unknown->type = type;
 	unknown->sub_type = sub_type;
+	unknown->super_type.data = node_name;
+	unknown->super_type.length = strlen(node_name);
 	return 1;
 }
 
@@ -7300,8 +7300,13 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_constraint(ufbxi_context *u
 	return 1;
 }
 
-ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type)
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, ufbx_string type_str, const char *sub_type, const char *super_type)
 {
+	if ((sub_type == ufbxi_empty_char || sub_type == ufbxi_Model) && type_str.data == ufbxi_Model) {
+		// Plain model
+		return 1;
+	}
+
 	ufbxi_element_info attrib_info = *info;
 
 	// HACK: We can create an unique FBX ID from the existing node ID as the
@@ -7356,9 +7361,9 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_c
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_light), UFBX_ELEMENT_LIGHT));
 	} else if (sub_type == ufbxi_Camera) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera), UFBX_ELEMENT_CAMERA));
-	} else if (sub_type == ufbxi_LimbNode || sub_type == ufbxi_Limb) {
+	} else if (sub_type == ufbxi_LimbNode || sub_type == ufbxi_Limb || sub_type == ufbxi_Root) {
 		ufbxi_check(ufbxi_read_bone(uc, node, &attrib_info, sub_type));
-	} else if (sub_type == ufbxi_Null) {
+	} else if (sub_type == ufbxi_Null || sub_type == ufbxi_Marker) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_empty), UFBX_ELEMENT_EMPTY));
 	} else if (sub_type == ufbxi_NurbsCurve) {
 		if (!ufbxi_find_child(node, ufbxi_KnotVector)) return 1;
@@ -7382,7 +7387,8 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_c
 	} else if (sub_type == ufbxi_LodGroup) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_LOD_GROUP));
 	} else {
-		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_unknown), UFBX_ELEMENT_UNKNOWN));
+		ufbx_string sub_type_str = { sub_type, strlen(sub_type) };
+		ufbxi_check(ufbxi_read_unknown(uc, node, &attrib_info, type_str, sub_type_str, super_type));
 	}
 
 	ufbxi_check(ufbxi_connect_oo(uc, attrib_info.fbx_id, info->fbx_id));
@@ -7438,7 +7444,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 
 		if (name == ufbxi_Model) {
 			if (uc->version < 7000) {
-				ufbxi_check(ufbxi_read_synthetic_attribute(uc, node, &info, sub_type));
+				ufbxi_check(ufbxi_read_synthetic_attribute(uc, node, &info, type_str, sub_type, name));
 			}
 			ufbxi_check(ufbxi_read_model(uc, node, &info));
 		} else if (name == ufbxi_NodeAttribute) {
@@ -7448,7 +7454,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera), UFBX_ELEMENT_CAMERA));
 			} else if (sub_type == ufbxi_LimbNode || sub_type == ufbxi_Limb || sub_type == ufbxi_Root) {
 				ufbxi_check(ufbxi_read_bone(uc, node, &info, sub_type));
-			} else if (sub_type == ufbxi_Null) {
+			} else if (sub_type == ufbxi_Null || sub_type == ufbxi_Marker) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_empty), UFBX_ELEMENT_EMPTY));
 			} else if (sub_type == ufbxi_CameraStereo) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera_stereo), UFBX_ELEMENT_CAMERA_STEREO));
@@ -7457,7 +7463,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			} else if (sub_type == ufbxi_LodGroup) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_LOD_GROUP));
 			} else {
-				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str));
+				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
 			}
 		} else if (name == ufbxi_Geometry) {
 			if (sub_type == ufbxi_Mesh) {
@@ -7475,7 +7481,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			} else if (sub_type == ufbxi_Boundary) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_trim_boundary), UFBX_ELEMENT_NURBS_TRIM_BOUNDARY));
 			} else {
-				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str));
+				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
 			}
 		} else if (name == ufbxi_Deformer) {
 			if (sub_type == ufbxi_Skin) {
@@ -7487,7 +7493,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			} else if (sub_type == ufbxi_BlendShapeChannel) {
 				ufbxi_check(ufbxi_read_blend_channel(uc, node, &info));
 			} else {
-				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str));
+				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
 			}
 		} else if (name == ufbxi_Material) {
 			ufbxi_check(ufbxi_read_material(uc, node, &info));
@@ -7530,7 +7536,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 		} else if (name == ufbxi_SceneInfo) {
 			ufbxi_check(ufbxi_read_scene_info(uc, node));
 		} else {
-			ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str));
+			ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
 		}
 	}
 
