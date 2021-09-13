@@ -7317,10 +7317,10 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_synthetic_attribute(ufbxi_c
 	// Use type and name from NodeAttributeName if it exists
 	ufbx_string type_and_name;
 	if (ufbxi_find_val1(node, ufbxi_NodeAttributeName, "s", &type_and_name)) {
-		ufbx_string type_str, name_str;
-		ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type_str, &name_str));
-		if (name_str.length > 0) {
-			attrib_info.name = name_str;
+		ufbx_string attrib_type_str, attrib_name_str;
+		ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &attrib_type_str, &attrib_name_str));
+		if (attrib_name_str.length > 0) {
+			attrib_info.name = attrib_name_str;
 			if (info->fbx_id != (uintptr_t)type_and_name.data) {
 				attrib_info.fbx_id = (uintptr_t)type_and_name.data;
 			}
