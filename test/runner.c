@@ -1606,6 +1606,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			}
 
 			load_opts.evaluate_skinning = true;
+			load_opts.load_external_files = true;
 
 			uint64_t load_begin = cputime_cpu_tick();
 			ufbx_scene *scene = ufbx_load_memory(data, size, &load_opts, &error);

@@ -256,6 +256,7 @@ typedef struct ufbx_blend_deformer ufbx_blend_deformer;
 typedef struct ufbx_blend_channel ufbx_blend_channel;
 typedef struct ufbx_blend_shape ufbx_blend_shape;
 typedef struct ufbx_cache_deformer ufbx_cache_deformer;
+typedef struct ufbx_cache_file ufbx_cache_file;
 
 // Materials
 typedef struct ufbx_material ufbx_material;
@@ -306,6 +307,7 @@ UFBX_LIST_TYPE(ufbx_blend_deformer_list, ufbx_blend_deformer*);
 UFBX_LIST_TYPE(ufbx_blend_channel_list, ufbx_blend_channel*);
 UFBX_LIST_TYPE(ufbx_blend_shape_list, ufbx_blend_shape*);
 UFBX_LIST_TYPE(ufbx_cache_deformer_list, ufbx_cache_deformer*);
+UFBX_LIST_TYPE(ufbx_cache_file_list, ufbx_cache_file*);
 UFBX_LIST_TYPE(ufbx_material_list, ufbx_material*);
 UFBX_LIST_TYPE(ufbx_texture_list, ufbx_texture*);
 UFBX_LIST_TYPE(ufbx_video_list, ufbx_video*);
@@ -346,6 +348,7 @@ typedef enum ufbx_element_type {
 	UFBX_ELEMENT_BLEND_CHANNEL,       // < `ufbx_blend_channel`
 	UFBX_ELEMENT_BLEND_SHAPE,         // < `ufbx_blend_shape`
 	UFBX_ELEMENT_CACHE_DEFORMER,      // < `ufbx_cache_deformer`
+	UFBX_ELEMENT_CACHE_FILE,          // < `ufbx_cache_file`
 	UFBX_ELEMENT_MATERIAL,            // < `ufbx_material`
 	UFBX_ELEMENT_TEXTURE,             // < `ufbx_texture`
 	UFBX_ELEMENT_VIDEO,               // < `ufbx_video`
@@ -1102,6 +1105,57 @@ struct ufbx_blend_shape {
 
 struct ufbx_cache_deformer {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_string channel;
+
+	ufbx_cache_file *file;
+};
+
+typedef enum ufbx_cache_file_format {
+	UFBX_CACHE_FILE_FORMAT_UNKNOWN,
+	UFBX_CACHE_FILE_FORMAT_PC2, // .pc2 Point cache file
+	UFBX_CACHE_FILE_FORMAT_MC,  // .mc/.mcx Maya cache file
+} ufbx_cache_file_format;
+
+typedef struct ufbx_cache_frame {
+	ufbx_string channel;
+	double time;
+
+	ufbx_string absolute_filename;
+
+	bool has_raw_data;           // < If `true` you can interpret the following data (TODO)
+	uint64_t raw_data_offset;    // < Offset into the file
+	size_t raw_data_components;  // < Number of vector components per single value
+	size_t raw_data_bytes;       // < 4 or 8 bytes per component
+
+	ufbx_cache_file_format format;
+} ufbx_cache_frame;
+
+UFBX_LIST_TYPE(ufbx_cache_frame_list, ufbx_cache_frame);
+
+typedef struct ufbx_cache_channel {
+	ufbx_string name;
+	ufbx_string interpretation;
+	ufbx_cache_frame_list frames;
+} ufbx_cache_channel;
+
+UFBX_LIST_TYPE(ufbx_cache_channel_list, ufbx_cache_channel);
+
+typedef struct ufbx_geometry_cache {
+	ufbx_string root_filename;
+	ufbx_cache_channel_list channels;
+	ufbx_cache_frame_list frames;
+} ufbx_geometry_cache;
+
+struct ufbx_cache_file {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_string absolute_filename;
+	ufbx_string relative_filename;
+	ufbx_cache_file_format format;
+
+	// Loaded only if `ufbx_load_opts.load_external_files` is set!
+	ufbx_geometry_cache *geometry_cache;
 };
 
 // -- Materials
@@ -1446,7 +1500,7 @@ struct ufbx_video {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	// Paths to the resource
-	ufbx_string filename;
+	ufbx_string absolute_filename;
 	ufbx_string relative_filename;
 
 	// Optional embedded content blob
@@ -1889,6 +1943,7 @@ struct ufbx_scene {
 			ufbx_blend_channel_list blend_channels;
 			ufbx_blend_shape_list blend_shapes;
 			ufbx_cache_deformer_list cache_deformers;
+			ufbx_cache_file_list cache_files;
 
 			// Materials
 			ufbx_material_list materials;
@@ -1996,6 +2051,25 @@ typedef struct ufbx_allocator {
 // Return `SIZE_MAX` to indicate an IO error.
 typedef size_t ufbx_read_fn(void *user, void *data, size_t size);
 
+// Skip `size` bytes in the file.
+typedef bool ufbx_skip_fn(void *user, size_t size);
+
+// Close the file
+typedef void ufbx_close_fn(void *user);
+
+typedef struct ufbx_stream {
+
+	// Context passed to other functions
+	void *user;
+
+	ufbx_read_fn *read_fn;   // < Required
+	ufbx_skip_fn *skip_fn;   // < Optional: Will use `read_fn()` if missing
+	ufbx_close_fn *close_fn; // < Optional
+} ufbx_stream;
+
+// Callback for opening an external file from the filesystem
+typedef bool ufbx_open_file_fn(void *user, ufbx_stream *stream, const char *path, size_t path_len);
+
 // Detailed error stack frame
 typedef struct ufbx_error_frame {
 	uint32_t source_line;
@@ -2087,6 +2161,10 @@ typedef struct ufbx_load_opts {
 	bool ignore_animation;  // < Do not load animation curves
 	bool ignore_embedded;   // < Do not load embedded content
 	bool evaluate_skinning; // < Evaluate skinning (see ufbx_mesh.skinned_vertices)
+	bool evaluate_caches;   // < Evaluate vertex caches (see ufbx_mesh.skinned_vertices)
+
+	// WARNING: Potentially unsafe! Try to open external files such as geometry caches
+	bool load_external_files;
 
 	// Don't compute `ufbx_skin_deformer` `vertices` and `weights` arrays saving
 	// a bit of memory and time if not needed
@@ -2123,13 +2201,19 @@ typedef struct ufbx_load_opts {
 	void *progress_user;
 	uint64_t progress_interval_hint; // < Bytes between progress report calls
 
+	// External file callbacks (defaults to stdio.h)
+	ufbx_open_file_fn *open_file_fn;
+	void *open_file_user;
+
 } ufbx_load_opts;
 
 typedef struct ufbx_evaluate_opts {
 
 	ufbx_allocator temp_allocator;   // < Allocator used during evaluation
 	ufbx_allocator result_allocator; // < Allocator used for the final scene
+
 	bool evaluate_skinning; // < Evaluate skinning (see ufbx_mesh.skinned_vertices)
+	bool evaluate_caches;   // < Evaluate vertex caches (see ufbx_mesh.skinned_vertices)
 
 } ufbx_evaluate_opts;
 
@@ -2152,6 +2236,17 @@ typedef struct ufbx_subdivide_opts {
 	bool interpolate_tangents;
 
 } ufbx_subdivide_opts;
+
+typedef struct ufbx_geometry_cache_opts {
+
+	ufbx_allocator temp_allocator;   // < Allocator used during loading
+	ufbx_allocator result_allocator; // < Allocator used for the final scene
+
+	// External file callbacks (defaults to stdio.h)
+	ufbx_open_file_fn *open_file_fn;
+	void *open_file_user;
+
+} ufbx_geometry_cache_opts;
 
 // -- API
 
@@ -2191,7 +2286,7 @@ ufbx_scene *ufbx_load_stdio(
 // Load a scene from a user-specified stream with an optional prefix
 ufbx_scene *ufbx_load_stream(
 	const void *prefix, size_t prefix_size,
-	ufbx_read_fn *read_fn, void *read_user,
+	const ufbx_stream *stream,
 	const ufbx_load_opts *opts, ufbx_error *error);
 
 // Free a previously loaded or evaluated scene
@@ -2312,6 +2407,15 @@ void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positio
 
 ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error);
 void ufbx_free_mesh(ufbx_mesh *mesh);
+
+// Geometry caches
+
+ufbx_geometry_cache *ufbx_load_geometry_cache(
+	const char *filename,
+	const ufbx_geometry_cache_opts *opts, ufbx_error *error);
+ufbx_geometry_cache *ufbx_load_geometry_cache_len(
+	const char *filename, size_t filename_len,
+	const ufbx_geometry_cache_opts *opts, ufbx_error *error);
 
 // -- Inline API
 

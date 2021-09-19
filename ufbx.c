@@ -1166,7 +1166,7 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 #define ufbxi_check_return_err(err, cond, ret) do { if (!(cond)) { ufbxi_fail_imp_err((err), #cond, __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail_err(err, desc) return ufbxi_fail_imp_err(err, desc, __FUNCTION__, __LINE__)
 
-#define ufbxi_check_err_msg(err, cond, msg) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__); return ret; } } while (0)
+#define ufbxi_check_err_msg(err, cond, msg) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__); return 0; } } while (0)
 #define ufbxi_check_return_err_msg(err, cond, ret, msg) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail_err_msg(err, desc, msg) return ufbxi_fail_imp_err(err, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
 
@@ -1906,6 +1906,92 @@ static ufbxi_forceinline uint32_t ufbxi_hash_uptr(uintptr_t ptr)
 
 #define ufbxi_hash_ptr(ptr) ufbxi_hash_uptr((uintptr_t)(ptr))
 
+
+// -- String pool
+
+// All strings found in FBX files are interned for deduplication and fast
+// comparison. Our fixed internal strings (`ufbxi_String`) are considered the
+// canonical pointers for said strings so we can compare them by address.
+
+typedef struct {
+	ufbx_error *error;
+	ufbxi_buf buf; // < Buffer for the actual string data
+	ufbxi_map map; // < Map of `ufbxi_string`
+} ufbxi_string_pool;
+
+static ufbxi_forceinline bool ufbxi_str_equal(ufbx_string a, ufbx_string b)
+{
+	return a.length == b.length && !memcmp(a.data, b.data, a.length);
+}
+
+static ufbxi_forceinline bool ufbxi_str_less(ufbx_string a, ufbx_string b)
+{
+	size_t len = ufbxi_min_sz(a.length, b.length);
+	int cmp = memcmp(a.data, b.data, len);
+	if (cmp != 0) return cmp < 0;
+	return a.length < b.length;
+}
+
+static ufbxi_forceinline int ufbxi_str_cmp(ufbx_string a, ufbx_string b)
+{
+	size_t len = ufbxi_min_sz(a.length, b.length);
+	int cmp = memcmp(a.data, b.data, len);
+	if (cmp != 0) return cmp;
+	if (a.length != b.length) return a.length < b.length ? -1 : 1;
+	return 0;
+}
+
+const char ufbxi_empty_char[1] = { '\0' };
+
+ufbxi_nodiscard static const char *ufbxi_push_string_imp(ufbxi_string_pool *pool, const char *str, size_t length, bool copy)
+{
+	if (length == 0) return ufbxi_empty_char;
+
+	ufbxi_check_return_err(pool->error, ufbxi_map_grow(&pool->map, ufbx_string, 1024), NULL);
+
+	uint32_t hash = ufbxi_hash_string(str, length);
+	uint32_t scan = 0;
+	ufbx_string *entry;
+	while ((entry = ufbxi_map_find(&pool->map, ufbx_string, &scan, hash)) != NULL) {
+		if (entry->length == length && !memcmp(entry->data, str, length)) {
+			return entry->data;
+		}
+	}
+	entry = ufbxi_map_insert(&pool->map, ufbx_string, scan, hash);
+	entry->length = length;
+	if (copy) {
+		char *dst = ufbxi_push(&pool->buf, char, length + 1);
+		ufbxi_check_return_err(pool->error, dst, NULL);
+		memcpy(dst, str, length);
+		dst[length] = '\0';
+		entry->data = dst;
+	} else {
+		entry->data = str;
+	}
+	return entry->data;
+}
+
+ufbxi_nodiscard static ufbxi_forceinline const char *ufbxi_push_string(ufbxi_string_pool *pool, const char *str, size_t length)
+{
+	return ufbxi_push_string_imp(pool, str, length, true);
+}
+
+ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place(ufbxi_string_pool *pool, const char **p_str, size_t length)
+{
+	const char *str = *p_str;
+	ufbxi_check_err(pool->error, str || length == 0);
+	str = ufbxi_push_string(pool, str, length);
+	ufbxi_check_err(pool->error, str);
+	*p_str = str;
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place_str(ufbxi_string_pool *pool, ufbx_string *p_str)
+{
+	ufbxi_check_err(pool->error, p_str);
+	return ufbxi_push_string_place(pool, &p_str->data, p_str->length);
+}
+
 // -- String constants
 //
 // All strings in FBX files are pooled so by having canonical string constant
@@ -2179,6 +2265,7 @@ static const char ufbxi_WrapModeU[] = "WrapModeU";
 static const char ufbxi_WrapModeV[] = "WrapModeV";
 static const char ufbxi_Line[] = "Line";
 static const char ufbxi_SceneInfo[] = "SceneInfo";
+static const char ufbxi_Cache[] = "Cache";
 static const char ufbxi_X[] = "X\0\0";
 static const char ufbxi_Y[] = "Y\0\0";
 static const char ufbxi_Z[] = "Z\0\0";
@@ -2451,6 +2538,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_WrapModeV, 9 },
 	{ ufbxi_Line, 4 },
 	{ ufbxi_SceneInfo, 9 },
+	{ ufbxi_Cache, 5 },
 	{ ufbxi_X, 1 },
 	{ ufbxi_Y, 1 },
 	{ ufbxi_Z, 1 },
@@ -2626,6 +2714,8 @@ typedef struct {
 	uint64_t data_offset;
 
 	ufbx_read_fn *read_fn;
+	ufbx_skip_fn *skip_fn;
+	ufbx_close_fn *close_fn;
 	void *read_user;
 
 	char *read_buffer;
@@ -2641,7 +2731,6 @@ typedef struct {
 	ufbxi_allocator ator_tmp;
 
 	// Temporary maps
-	ufbxi_map string_map;     // < `ufbx_string` Global string pool
 	ufbxi_map prop_type_map;  // < `ufbxi_prop_type_name` Property type to enum
 	ufbxi_map fbx_id_map;     // < `ufbxi_fbx_id_entry` FBX ID to local ID
 
@@ -2675,9 +2764,11 @@ typedef struct {
 	ufbxi_template *templates;
 	size_t num_templates;
 
+	// String pool
+	ufbxi_string_pool string_pool;
+
 	// Result buffers, these are retained in `ufbx_scene` returned to user.
 	ufbxi_buf result;
-	ufbxi_buf string_buf;
 
 	// Top-level state
 	ufbxi_node *top_nodes;
@@ -2736,85 +2827,6 @@ static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, co
 #define ufbxi_check_msg(cond, msg) if (!(cond)) return ufbxi_fail_imp(uc, ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__)
 #define ufbxi_check_return_msg(cond, ret, msg) do { if (!(cond)) { ufbxi_fail_imp(uc, ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail_msg(desc, msg) return ufbxi_fail_imp(uc, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
-
-// -- String pool
-
-// All strings found in FBX files are interned for deduplication and fast
-// comparison. Our fixed internal strings (`ufbxi_String`) are considered the
-// canonical pointers for said strings so we can compare them by address.
-
-static ufbxi_forceinline bool ufbxi_str_equal(ufbx_string a, ufbx_string b)
-{
-	return a.length == b.length && !memcmp(a.data, b.data, a.length);
-}
-
-static ufbxi_forceinline bool ufbxi_str_less(ufbx_string a, ufbx_string b)
-{
-	size_t len = ufbxi_min_sz(a.length, b.length);
-	int cmp = memcmp(a.data, b.data, len);
-	if (cmp != 0) return cmp < 0;
-	return a.length < b.length;
-}
-
-static ufbxi_forceinline int ufbxi_str_cmp(ufbx_string a, ufbx_string b)
-{
-	size_t len = ufbxi_min_sz(a.length, b.length);
-	int cmp = memcmp(a.data, b.data, len);
-	if (cmp != 0) return cmp;
-	if (a.length != b.length) return a.length < b.length ? -1 : 1;
-	return 0;
-}
-
-const char ufbxi_empty_char[1] = { '\0' };
-
-ufbxi_nodiscard static const char *ufbxi_push_string_imp(ufbxi_context *uc, const char *str, size_t length, bool copy)
-{
-	if (length == 0) return ufbxi_empty_char;
-
-	ufbxi_check_return(ufbxi_map_grow(&uc->string_map, ufbx_string, ufbxi_arraycount(ufbxi_strings) * 2), NULL);
-
-	uint32_t hash = ufbxi_hash_string(str, length);
-	uint32_t scan = 0;
-	ufbx_string *entry;
-	while ((entry = ufbxi_map_find(&uc->string_map, ufbx_string, &scan, hash)) != NULL) {
-		if (entry->length == length && !memcmp(entry->data, str, length)) {
-			return entry->data;
-		}
-	}
-	entry = ufbxi_map_insert(&uc->string_map, ufbx_string, scan, hash);
-	entry->length = length;
-	if (copy) {
-		char *dst = ufbxi_push(&uc->string_buf, char, length + 1);
-		ufbxi_check_return(dst, NULL);
-		memcpy(dst, str, length);
-		dst[length] = '\0';
-		entry->data = dst;
-	} else {
-		entry->data = str;
-	}
-	return entry->data;
-}
-
-ufbxi_nodiscard static ufbxi_forceinline const char *ufbxi_push_string(ufbxi_context *uc, const char *str, size_t length)
-{
-	return ufbxi_push_string_imp(uc, str, length, true);
-}
-
-ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place(ufbxi_context *uc, const char **p_str, size_t length)
-{
-	const char *str = *p_str;
-	ufbxi_check(str || length == 0);
-	str = ufbxi_push_string(uc, str, length);
-	ufbxi_check(str);
-	*p_str = str;
-	return 1;
-}
-
-ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place_str(ufbxi_context *uc, ufbx_string *p_str)
-{
-	ufbxi_check(p_str);
-	return ufbxi_push_string_place(uc, &p_str->data, p_str->length);
-}
 
 // -- Progress
 
@@ -2945,13 +2957,40 @@ static ufbxi_forceinline void ufbxi_consume_bytes(ufbxi_context *uc, size_t size
 
 ufbxi_nodiscard static int ufbxi_skip_bytes(ufbxi_context *uc, uint64_t size)
 {
-	// Read and discard bytes in reasonable chunks
-	// TODO: Support fseek() here?
-	uint64_t skip_size = ufbxi_max64(uc->read_buffer_size, uc->opts.read_buffer_size);
-	while (size > 0) {
-		uint64_t to_skip = ufbxi_min64(size, skip_size);
-		ufbxi_check(ufbxi_read_bytes(uc, (size_t)to_skip));
-		size -= to_skip;
+	if (uc->skip_fn) {
+		uc->data_size += uc->yield_size;
+		uc->yield_size = 0;
+
+		if (size > uc->data_size) {
+			size -= uc->data_size;
+			uc->data += uc->data_size;
+			uc->data_size = 0;
+
+			uc->data_offset += size;
+			while (size >= SIZE_MAX) {
+				size -= SIZE_MAX;
+				ufbxi_check(uc->skip_fn(uc->read_user, SIZE_MAX));
+			}
+
+			if (size > 0) {
+				ufbxi_check(uc->skip_fn(uc->read_user, (size_t)size));
+			}
+
+		} else {
+			uc->data += (size_t)size;
+			uc->data_size -= (size_t)size;
+		}
+
+		uc->yield_size = ufbxi_min_sz(uc->data_size, uc->progress_interval);
+		uc->data_size -= uc->yield_size;
+	} else {
+		// Read and discard bytes in reasonable chunks
+		uint64_t skip_size = ufbxi_max64(uc->read_buffer_size, uc->opts.read_buffer_size);
+		while (size > 0) {
+			uint64_t to_skip = ufbxi_min64(size, skip_size);
+			ufbxi_check(ufbxi_read_bytes(uc, (size_t)to_skip));
+			size -= to_skip;
+		}
 	}
 
 	return 1;
@@ -2991,6 +3030,585 @@ static int ufbxi_read_to(ufbxi_context *uc, void *dst, size_t size)
 	uc->data_size -= uc->yield_size;
 
 	return 1;
+}
+
+// -- File IO
+
+static void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *ator, const ufbx_allocator *desc)
+{
+	ufbx_allocator zero_ator;
+	if (!desc) {
+		memset(&zero_ator, 0, sizeof(zero_ator));
+		desc = &zero_ator;
+	}
+
+	ator->error = error;
+	ator->ator = *desc;
+	ator->max_size = desc->memory_limit ? desc->memory_limit : SIZE_MAX;
+	ator->max_allocs = desc->allocation_limit ? desc->allocation_limit : SIZE_MAX;
+	ator->huge_size = desc->huge_threshold ? desc->huge_threshold : 0x100000;
+}
+
+static FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp_ator)
+{
+#if defined(_WIN32)
+	wchar_t wpath_buf[256];
+	wchar_t *wpath = NULL;
+
+	if (path_len == SIZE_MAX) {
+		path_len = strlen(path);
+	}
+	if (path_len < ufbxi_arraycount(wpath_buf) - 1) {
+		wpath = wpath_buf;
+	} else {
+		wpath = ufbxi_alloc(tmp_ator, wchar_t, path_len + 1);
+		if (!wpath) return NULL;
+	}
+
+	// Convert UTF-8 to UTF-16 but allow stray surrogate pairs as the Windows
+	// file system encoding allows them as well..
+	size_t wlen = 0;
+	for (size_t i = 0; i < path_len; ) {
+		uint32_t code = UINT32_MAX;
+		char c = path[i++];
+		if ((c & 0x80) == 0) {
+			code = (uint32_t)c;
+		} else if ((c & 0xe0) == 0xc0) {
+			code = (uint32_t)(c & 0x1f);
+			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+		} else if ((c & 0xf0) == 0xe0) {
+			code = (uint32_t)(c & 0x0f);
+			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+		} else if ((c & 0xf8) == 0xf0) {
+			code = (uint32_t)(c & 0x07);
+			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+		}
+		if (code < 0x10000) {
+			wpath[wlen++] = (wchar_t)code;
+		} else {
+			code -= 0x10000;
+			wpath[wlen++] = (wchar_t)(0xd800 + (code >> 10));
+			wpath[wlen++] = (wchar_t)(0xdc00 + (code & 0x3ff));
+		}
+	}
+	wpath[wlen] = 0;
+
+	FILE *file = NULL;
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+	if (_wfopen_s(&file, wpath, L"rb") != 0) {
+		file = NULL;
+	}
+#else
+	file = _wfopen(wpath, L"rb");
+#endif
+
+	if (wpath != wpath_buf) {
+		ufbxi_free(tmp_ator, wchar_t, wpath, path_len + 1);
+	}
+
+	return file;
+#else
+	if (path_len == SIZE_MAX) {
+		return fopen(path, "rb");
+	}
+
+	char copy_buf[256];
+	char *copy = NULL;
+
+	if (path_len < ufbxi_arraycount(copy_buf) - 1) {
+		copy = copy_buf;
+	} else {
+		copy = ufbxi_alloc(tmp_ator, char, path_len + 1);
+		if (!copy) return NULL;
+	}
+	memcpy(copy, path, path_len);
+	copy[path_len] = '\0';
+
+	FILE *file = fopen(copy, "rb");
+
+	if (copy != copy_buf) {
+		ufbxi_free(tmp_ator, char, copy, path_len + 1);
+	}
+
+	return file;
+#endif
+}
+
+static uint64_t ufbxi_ftell(FILE *file)
+{
+#if defined(_POSIX_VERSION)
+	off_t result = ftello(file);
+	if (result >= 0) return (uint64_t)result;
+#elif defined(_MSC_VER)
+	int64_t result = _ftelli64(file);
+	if (result >= 0) return (uint64_t)result;
+#else
+	long result = ftell(file);
+	if (result >= 0) return (uint64_t)result;
+#endif
+	return UINT64_MAX;
+}
+
+static size_t ufbxi_file_read(void *user, void *data, size_t max_size)
+{
+	FILE *file = (FILE*)user;
+	if (ferror(file)) return SIZE_MAX;
+	return fread(data, 1, max_size, file);
+}
+
+static bool ufbxi_file_skip(void *user, size_t size)
+{
+	FILE *file = (FILE*)user;
+
+	const size_t max_skip = 0x20000000;
+
+	size_t left = size;
+	while (left > max_skip) {
+		if (fseek(file, (long)max_skip, SEEK_CUR) != 0) return false;
+		left -= max_skip;
+	}
+
+	if (left > 0) {
+		if (fseek(file, (long)left, SEEK_CUR) != 0) return false;
+	}
+
+	if (ferror(file)) return false;
+	return true;
+}
+
+static void ufbxi_file_close(void *user)
+{
+	FILE *file = (FILE*)user;
+	fclose(file);
+}
+
+static bool ufbxi_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len)
+{
+	ufbxi_allocator tmp_ator = { 0 };
+	ufbx_error tmp_error = { UFBX_ERROR_NONE };
+	ufbxi_init_ator(&tmp_error, &tmp_ator, NULL);
+	FILE *f = ufbxi_fopen(path, path_len, &tmp_ator);
+	if (!f) return false;
+
+	stream->read_fn = &ufbxi_file_read;
+	stream->skip_fn = &ufbxi_file_skip;
+	stream->close_fn = &ufbxi_file_close;
+	stream->user = f;
+	return true;
+}
+
+// -- XML
+
+typedef struct ufbxi_xml_tag ufbxi_xml_tag;
+typedef struct ufbxi_xml_attrib ufbxi_xml_attrib;
+typedef struct ufbxi_xml_document ufbxi_xml_document;
+
+struct ufbxi_xml_attrib {
+	ufbx_string name;
+	ufbx_string value;
+};
+
+struct ufbxi_xml_tag {
+	ufbx_string name;
+	ufbx_string text;
+
+	ufbxi_xml_attrib *attribs;
+	size_t num_attribs;
+
+	ufbxi_xml_tag *children;
+	size_t num_children;
+};
+
+struct ufbxi_xml_document {
+	ufbxi_xml_tag *root;
+	ufbxi_buf buf;
+};
+
+typedef struct {
+	ufbx_error error;
+
+	ufbxi_allocator *ator;
+
+	ufbxi_buf tmp_stack;
+	ufbxi_buf result;
+
+	ufbxi_xml_document *doc;
+
+	ufbx_read_fn *read_fn;
+	void *read_user;
+
+	char *tok;
+	size_t tok_cap;
+	size_t tok_len;
+
+	char *pos;
+	char data[4096];
+
+	bool io_error;
+
+	size_t depth;
+} ufbxi_xml_context;
+
+enum {
+	UFBXI_XML_CTYPE_WHITESPACE = 0x1,
+	UFBXI_XML_CTYPE_SINGLE_QUOTE = 0x2,
+	UFBXI_XML_CTYPE_DOUBLE_QUOTE = 0x4,
+	UFBXI_XML_CTYPE_NAME_END = 0x8,
+	UFBXI_XML_CTYPE_TAG_START = 0x10,
+};
+
+static const uint8_t ufbxi_xml_ctype[256] = {
+	255,0,0,0,0,0,0,0,0,9,9,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	9,0,12,0,0,0,0,10,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,16,8,24,8,
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+};
+
+static ufbxi_noinline void ufbxi_xml_refill(ufbxi_xml_context *xc)
+{
+	size_t num = xc->read_fn(xc->read_user, xc->data, sizeof(xc->data));
+	if (num == SIZE_MAX || num < sizeof(xc->data)) xc->io_error = true;
+	if (num < sizeof(xc->data)) {
+		memset(xc->data + num, 0, sizeof(xc->data) - num);
+	}
+	xc->pos = xc->data;
+}
+
+static ufbxi_forceinline void ufbxi_xml_advance(ufbxi_xml_context *xc)
+{
+	if (++xc->pos == xc->data + sizeof(xc->data)) ufbxi_xml_refill(xc);
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_xml_push_token_char(ufbxi_xml_context *xc, char c)
+{
+	if (xc->tok_len == xc->tok_cap) {
+		ufbxi_check_err(&xc->error, ufbxi_grow_array(xc->ator, &xc->tok, &xc->tok_cap, xc->tok_len + 1));
+	}
+	xc->tok[xc->tok_len++] = c;
+	return 1;
+}
+
+static ufbxi_noinline int ufbxi_xml_accept(ufbxi_xml_context *xc, char ch)
+{
+	if (*xc->pos == ch) {
+		ufbxi_xml_advance(xc);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+static ufbxi_noinline void ufbxi_xml_skip_while(ufbxi_xml_context *xc, uint32_t ctypes)
+{
+	while (ufbxi_xml_ctype[(uint8_t)*xc->pos] & ctypes) {
+		ufbxi_xml_advance(xc);
+	}
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_xml_skip_until_string(ufbxi_xml_context *xc, ufbx_string *dst, const char *suffix)
+{
+	xc->tok_len = 0;
+	size_t ix = 0, len = strlen(suffix);
+	while (ix < len) {
+		char c = *xc->pos;
+		if (c == '\0') break;
+		ufbxi_xml_advance(xc);
+		if (suffix[ix++] != c) ix = 0;
+		ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, c));
+	}
+
+	ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, '\0'));
+	if (dst) {
+		dst->length = xc->tok_len - 1;
+		dst->data = ufbxi_push_copy(&xc->result, char, xc->tok_len, xc->tok);
+		ufbxi_check_err(&xc->error, dst->data);
+	}
+
+	return 1;
+}
+
+static ufbxi_noinline int ufbxi_xml_read_until(ufbxi_xml_context *xc, ufbx_string *dst, uint32_t ctypes)
+{
+	xc->tok_len = 0;
+	for (;;) {
+		char c = *xc->pos;
+
+		if (c == '&') {
+			size_t entity_begin = xc->tok_len;
+			for (;;) {
+				ufbxi_xml_advance(xc);
+				c = *xc->pos;
+				ufbxi_check_err(&xc->error, c != '\0');
+				if (c == ';') break;
+				ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, c));
+			}
+			ufbxi_xml_advance(xc);
+			size_t entity_len = xc->tok_len - entity_begin;
+			ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, '\0'));
+
+			char *entity = xc->tok + entity_begin;
+			xc->tok_len = entity_begin;
+
+			if (entity[0] == '#') {
+				unsigned long code;
+				if (entity[1] == 'x') {
+					code = strtoul(entity + 2, NULL, 16);
+				} else {
+					code = strtoul(entity + 1, NULL, 10);
+				}
+
+				char bytes[5] = { 0 };
+				if (code < 0x80) {
+					bytes[0] = (char)code;
+				} else if (code < 0x800) {
+					bytes[0] = (char)(0xc0 | (code>>6));
+					bytes[1] = (char)(0x80 | (code & 0x3f));
+				} else if (code < 0x10000) {
+					bytes[0] = (char)(0xe0 | (code>>12));
+					bytes[1] = (char)(0x80 | ((code>>6) & 0x3f));
+					bytes[2] = (char)(0x80 | (code & 0x3f));
+				} else {
+					bytes[0] = (char)(0xe0 | (code>>18));
+					bytes[1] = (char)(0x80 | ((code>>12) & 0x3f));
+					bytes[2] = (char)(0x80 | ((code>>6) & 0x3f));
+					bytes[3] = (char)(0x80 | (code & 0x3f));
+				}
+				for (char *c = bytes; *c; c++) {
+					ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, *c));
+				}
+			} else {
+				char ch = '\0';
+				if (!strcmp(entity, "lt")) ch = '<';
+				else if (!strcmp(entity, "quot")) ch = '"';
+				else if (!strcmp(entity, "amp")) ch = '&';
+				else if (!strcmp(entity, "apos")) ch = '\'';
+				else if (!strcmp(entity, "gt")) ch = '>';
+				if (ch) {
+					ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, ch));
+				}
+			}
+		} else {
+			if ((ufbxi_xml_ctype[(uint8_t)c] & ctypes) != 0) break;
+			ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, c));
+			ufbxi_xml_advance(xc);
+		}
+	}
+
+	ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, '\0'));
+	if (dst) {
+		dst->length = xc->tok_len - 1;
+		dst->data = ufbxi_push_copy(&xc->result, char, xc->tok_len, xc->tok);
+		ufbxi_check_err(&xc->error, dst->data);
+	}
+
+	return 1;
+}
+
+static ufbxi_noinline int ufbxi_xml_parse_tag(ufbxi_xml_context *xc, bool *p_closing, const char *opening)
+{
+	if (!ufbxi_xml_accept(xc, '<')) {
+		if (*xc->pos == '\0') {
+			*p_closing = true;
+		} else {
+			ufbx_string text;
+			ufbxi_check_err(&xc->error, ufbxi_xml_read_until(xc, &text, UFBXI_XML_CTYPE_TAG_START));
+			bool has_text = false;
+			for (size_t i = 0; i < xc->tok_len; i++) {
+				if ((ufbxi_xml_ctype[xc->tok[i]] & UFBXI_XML_CTYPE_WHITESPACE) == 0) {
+					has_text = true;
+					break;
+				}
+			}
+
+			if (has_text) {
+				ufbxi_xml_tag *tag = ufbxi_push_zero(&xc->tmp_stack, ufbxi_xml_tag, 1);
+				ufbxi_check_err(&xc->error, tag);
+				tag->name.data = ufbxi_empty_char;
+
+				ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, '\0'));
+				tag->text.length = xc->tok_len - 1;
+				tag->text.data = ufbxi_push_copy(&xc->result, char, xc->tok_len, xc->tok);
+				ufbxi_check_err(&xc->error, tag->text.data);
+			}
+		}
+		return 1;
+	}
+
+	if (ufbxi_xml_accept(xc, '/')) {
+		ufbxi_check_err(&xc->error, ufbxi_xml_read_until(xc, NULL, UFBXI_XML_CTYPE_NAME_END));
+		ufbxi_check_err(&xc->error, opening && !strcmp(xc->tok, opening));
+		ufbxi_xml_skip_while(xc, UFBXI_XML_CTYPE_WHITESPACE);
+		if (!ufbxi_xml_accept(xc, '>')) return 0;
+		*p_closing = true;
+		return 1;
+	} else if (ufbxi_xml_accept(xc, '!')) {
+		if (ufbxi_xml_accept(xc, '[')) {
+			for (char *ch = "CDATA["; *ch; ch++) {
+				if (!ufbxi_xml_accept(xc, *ch)) return 0;
+			}
+
+			ufbxi_xml_tag *tag = ufbxi_push_zero(&xc->tmp_stack, ufbxi_xml_tag, 1);
+			ufbxi_check_err(&xc->error, tag);
+			ufbxi_check_err(&xc->error, ufbxi_xml_skip_until_string(xc, &tag->text, "]]>"));
+			tag->name.data = ufbxi_empty_char;
+
+		} else if (ufbxi_xml_accept(xc, '-')) {
+			if (!ufbxi_xml_accept(xc, '-')) return 0;
+			ufbxi_check_err(&xc->error, ufbxi_xml_skip_until_string(xc, NULL, "-->"));
+		} else {
+			// TODO: !DOCTYPE
+			ufbxi_check_err(&xc->error, ufbxi_xml_skip_until_string(xc, NULL, ">"));
+		}
+		return 1;
+	} else if (ufbxi_xml_accept(xc, '?')) {
+		ufbxi_check_err(&xc->error, ufbxi_xml_skip_until_string(xc, NULL, "?>"));
+		return 1;
+	}
+
+	ufbxi_xml_tag *tag = ufbxi_push_zero(&xc->tmp_stack, ufbxi_xml_tag, 1);
+	ufbxi_check_err(&xc->error, tag);
+	ufbxi_check_err(&xc->error, ufbxi_xml_read_until(xc, &tag->name, UFBXI_XML_CTYPE_NAME_END));
+	tag->text.data = ufbxi_empty_char;
+
+	bool has_children = false;
+
+	size_t num_attribs = 0;
+	for (;;) {
+		ufbxi_xml_skip_while(xc, UFBXI_XML_CTYPE_WHITESPACE);
+		if (ufbxi_xml_accept(xc, '/')) {
+			if (!ufbxi_xml_accept(xc, '>')) return 0;
+			break;
+		} else if (ufbxi_xml_accept(xc, '>')) {
+			has_children = true;
+			break;
+		} else {
+			ufbxi_xml_attrib *attrib = ufbxi_push_zero(&xc->tmp_stack, ufbxi_xml_attrib, 1);
+			ufbxi_check_err(&xc->error, attrib);
+			ufbxi_check_err(&xc->error, ufbxi_xml_read_until(xc, &attrib->name, UFBXI_XML_CTYPE_NAME_END));
+			ufbxi_xml_skip_while(xc, UFBXI_XML_CTYPE_WHITESPACE);
+			if (!ufbxi_xml_accept(xc, '=')) return 0;
+			ufbxi_xml_skip_while(xc, UFBXI_XML_CTYPE_WHITESPACE);
+			uint32_t quote_ctype = 0;
+			if (ufbxi_xml_accept(xc, '"')) {
+				quote_ctype = UFBXI_XML_CTYPE_DOUBLE_QUOTE;
+			} else if (ufbxi_xml_accept(xc, '\'')) {
+				quote_ctype = UFBXI_XML_CTYPE_SINGLE_QUOTE;
+			} else {
+				ufbxi_fail_err(&xc->error, "Bad attrib value");
+			}
+			ufbxi_check_err(&xc->error, ufbxi_xml_read_until(xc, &attrib->value, quote_ctype));
+			ufbxi_xml_advance(xc);
+			num_attribs++;
+		}
+	}
+
+	tag->num_attribs = num_attribs;
+	tag->attribs = ufbxi_push_pop(&xc->result, &xc->tmp_stack, ufbxi_xml_attrib, num_attribs);
+	ufbxi_check_err(&xc->error, tag->attribs);
+
+	if (has_children) {
+		size_t children_begin = xc->tmp_stack.num_items;
+		for (;;) {
+			bool closing = false;
+			ufbxi_check_err(&xc->error, ufbxi_xml_parse_tag(xc, &closing, tag->name.data));
+			if (closing) break;
+		}
+
+		tag->num_children = xc->tmp_stack.num_items - children_begin;
+		tag->children = ufbxi_push_pop(&xc->result, &xc->tmp_stack, ufbxi_xml_tag, tag->num_children);
+		ufbxi_check_err(&xc->error, tag->children);
+	}
+
+	return 1;
+}
+
+static ufbxi_noinline int ufbxi_xml_parse_root(ufbxi_xml_context *xc)
+{
+	ufbxi_xml_tag *tag = ufbxi_push_zero(&xc->result, ufbxi_xml_tag, 1);
+	tag->name.data = ufbxi_empty_char;
+	tag->text.data = ufbxi_empty_char;
+
+	for (;;) {
+		bool closing = false;
+		ufbxi_check_err(&xc->error, ufbxi_xml_parse_tag(xc, &closing, NULL));
+		if (closing) break;
+	}
+
+	tag->num_children = xc->tmp_stack.num_items;
+	tag->children = ufbxi_push_pop(&xc->result, &xc->tmp_stack, ufbxi_xml_tag, tag->num_children);
+	ufbxi_check_err(&xc->error, tag->children);
+
+	xc->doc = ufbxi_push(&xc->result, ufbxi_xml_document, 1);
+	ufbxi_check_err(&xc->error, xc->doc);
+
+	xc->doc->root = tag;
+	xc->doc->buf = xc->result;
+
+	return 1;
+}
+
+typedef struct {
+	ufbxi_allocator *ator;
+	ufbx_read_fn *read_fn;
+	void *read_user;
+} ufbxi_xml_load_opts;
+
+static ufbxi_noinline ufbxi_xml_document *ufbxi_load_xml(ufbxi_xml_load_opts *opts, ufbx_error *error)
+{
+	ufbxi_xml_context xc = { 0 };
+	xc.ator = opts->ator;
+	xc.read_fn = opts->read_fn;
+	xc.read_user = opts->read_user;
+
+	xc.tmp_stack.ator = xc.ator;
+	xc.result.ator = xc.ator;
+
+	ufbxi_xml_refill(&xc);
+
+	int ok = ufbxi_xml_parse_root(&xc);
+
+	ufbxi_buf_free(&xc.tmp_stack);
+	ufbxi_free(xc.ator, char, xc.tok, xc.tok_len);
+
+	if (ok) {
+		return xc.doc;
+	} else {
+		ufbxi_buf_free(&xc.result);
+		if (error) {
+			*error = xc.error;
+		}
+
+		return NULL;
+	}
+}
+
+static ufbxi_noinline void ufbxi_free_xml(ufbxi_xml_document *doc)
+{
+	ufbxi_buf buf = doc->buf;
+	ufbxi_buf_free(&buf);
+}
+
+static ufbxi_noinline ufbxi_xml_tag *ufbxi_xml_find_child(ufbxi_xml_tag *tag, const char *name)
+{
+	ufbxi_for(ufbxi_xml_tag, child, tag->children, tag->num_children) {
+		if (!strcmp(child->name.data, name)) {
+			return child;
+		}
+	}
+	return NULL;
+}
+
+static ufbxi_noinline ufbxi_xml_attrib *ufbxi_xml_find_attrib(ufbxi_xml_tag *tag, const char *name)
+{
+	ufbxi_for(ufbxi_xml_attrib, attrib, tag->attribs, tag->num_attribs) {
+		if (!strcmp(attrib->name.data, name)) {
+			return attrib;
+		}
+	}
+	return NULL;
 }
 
 // -- FBX value type information
@@ -3795,7 +4413,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 			ufbxi_consume_bytes(uc, 5);
 			d->data = ufbxi_read_bytes(uc, len);
 			d->length = len;
-			ufbxi_check(ufbxi_push_string_place_str(uc, d));
+			ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, d));
 			d++;
 		}
 		return 1;
@@ -3961,7 +4579,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 	// Parse and intern the name to the string pool.
 	const char *name = ufbxi_read_bytes(uc, name_len);
 	ufbxi_check(name);
-	name = ufbxi_push_string(uc, name, name_len);
+	name = ufbxi_push_string(&uc->string_pool, name, name_len);
 	ufbxi_check(name);
 	node->name_len = name_len;
 	node->name = name;
@@ -4207,7 +4825,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 				ufbxi_consume_bytes(uc, 5);
 				vals[i].s.data = ufbxi_read_bytes(uc, len);
 				vals[i].s.length = len;
-				ufbxi_check(ufbxi_push_string_place_str(uc, &vals[i].s));
+				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &vals[i].s));
 				type_mask |= UFBXI_VALUE_STRING << (i*2);
 			}
 			break;
@@ -4626,7 +5244,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 	ufbxi_check(ufbxi_ascii_accept(uc, UFBXI_ASCII_NAME));
 	size_t name_len = ua->prev_token.value.name_len;
 	ufbxi_check(name_len <= 0xff);
-	const char *name = ufbxi_push_string(uc, ua->prev_token.str_data, ua->prev_token.str_len);
+	const char *name = ufbxi_push_string(&uc->string_pool, ua->prev_token.str_data, ua->prev_token.str_len);
 	ufbxi_check(name);
 
 	// Push the parsed node into the `tmp_stack` buffer, the nodes will be popped by
@@ -4704,7 +5322,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 					ufbxi_check(v);
 					v->data = tok->str_data;
 					v->length = tok->str_len;
-					ufbxi_check(ufbxi_push_string_place_str(uc, v));
+					ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, v));
 				} else {
 					// Ignore strings in non-string arrays, decrement `num_values` as it will be
 					// incremented after the loop iteration is done to ignore it.
@@ -4716,7 +5334,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 				ufbxi_value *v = &vals[num_values];
 				v->s.data = tok->str_data;
 				v->s.length = tok->str_len;
-				ufbxi_check(ufbxi_push_string_place_str(uc, &v->s));
+				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &v->s));
 			}
 
 		} else if (ufbxi_ascii_accept(uc, UFBXI_ASCII_INT)) {
@@ -5079,7 +5697,7 @@ ufbxi_nodiscard static int ufbxi_load_strings(ufbxi_context *uc)
 #if UFBX_REGRESSION
 		ufbx_assert(strlen(str->data) == str->length);
 #endif
-		ufbxi_check(ufbxi_push_string_imp(uc, str->data, str->length, false));
+		ufbxi_check(ufbxi_push_string_imp(&uc->string_pool, str->data, str->length, false));
 	}
 
 	return 1;
@@ -5282,7 +5900,7 @@ ufbxi_nodiscard static int ufbxi_init_node_prop_names(ufbxi_context *uc)
 	ufbxi_check(ufbxi_map_grow(&uc->node_prop_set, const char*, ufbxi_arraycount(ufbxi_node_prop_names)));
 	ufbxi_for_ptr(const char, p_name, ufbxi_node_prop_names, ufbxi_arraycount(ufbxi_node_prop_names)) {
 		const char *name = *p_name;
-		const char *pooled = ufbxi_push_string_imp(uc, name, strlen(name), false);
+		const char *pooled = ufbxi_push_string_imp(&uc->string_pool, name, strlen(name), false);
 		ufbxi_check(pooled);
 		uint32_t hash = ufbxi_hash_ptr(pooled);
 		const char **entry = ufbxi_map_insert(&uc->node_prop_set, const char*, 0, hash);
@@ -5311,7 +5929,7 @@ ufbxi_nodiscard static int ufbxi_load_maps(ufbxi_context *uc)
 {
 	ufbxi_check(ufbxi_map_grow(&uc->prop_type_map, ufbxi_prop_type_name, ufbxi_arraycount(ufbxi_prop_type_names)));
 	ufbxi_for(const ufbxi_prop_type_name, name, ufbxi_prop_type_names, ufbxi_arraycount(ufbxi_prop_type_names)) {
-		const char *pooled = ufbxi_push_string_imp(uc, name->name, strlen(name->name), false);
+		const char *pooled = ufbxi_push_string_imp(&uc->string_pool, name->name, strlen(name->name), false);
 		ufbxi_check(pooled);
 		uint32_t hash = ufbxi_hash_ptr(pooled);
 		ufbxi_prop_type_name *entry = ufbxi_map_insert(&uc->prop_type_map, ufbxi_prop_type_name, 0, hash);
@@ -5606,7 +6224,7 @@ ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc)
 			if (tmpl->sub_type.length > 3 && !strncmp(tmpl->sub_type.data, "Fbx", 3)) {
 				tmpl->sub_type.data += 3;
 				tmpl->sub_type.length -= 3;
-				ufbxi_check(ufbxi_push_string_place_str(uc, &tmpl->sub_type));
+				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &tmpl->sub_type));
 			}
 
 			ufbxi_check(ufbxi_read_properties(uc, props, &tmpl->props));
@@ -5680,8 +6298,8 @@ ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_str
 		type->length = 0;
 	}
 
-	ufbxi_check(ufbxi_push_string_place_str(uc, type));
-	ufbxi_check(ufbxi_push_string_place_str(uc, name));
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, type));
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, name));
 	ufbxi_check(ufbxi_check_string(*type));
 	ufbxi_check(ufbxi_check_string(*name));
 
@@ -6449,7 +7067,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 			}
 
 			if (prop_name.length > 0) {
-				ufbxi_check(ufbxi_push_string_place_str(uc, &prop_name));
+				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &prop_name));
 				const char *mapping;
 				if (ufbxi_find_val1(n, ufbxi_MappingInformationType, "C", (char**)&mapping)) {
 					ufbxi_value_array *arr = ufbxi_find_array(n, ufbxi_TextureId, 'i');
@@ -7093,11 +7711,11 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_video(ufbxi_context *uc, uf
 	ufbx_video *video = ufbxi_push_element(uc, info, ufbx_video, UFBX_ELEMENT_VIDEO);
 	ufbxi_check(video);
 
-	video->filename = ufbx_empty_string;
+	video->absolute_filename = ufbx_empty_string;
 	video->relative_filename = ufbx_empty_string;
 
-	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_FileName, "S", &video->filename));
-	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Filename, "S", &video->filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_FileName, "S", &video->absolute_filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Filename, "S", &video->absolute_filename));
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFileName, "S", &video->relative_filename));
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFilename, "S", &video->relative_filename));
 
@@ -7432,7 +8050,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 		if (sub_type_str.length > 3 && !memcmp(sub_type_str.data, "Fbx", 3)) {
 			sub_type_str.data += 3;
 			sub_type_str.length -= 3;
-			ufbxi_check(ufbxi_push_string_place_str(uc, &sub_type_str));
+			ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &sub_type_str));
 		}
 
 		ufbx_string type_str;
@@ -7535,6 +8153,8 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			}
 		} else if (name == ufbxi_SceneInfo) {
 			ufbxi_check(ufbxi_read_scene_info(uc, node));
+		} else if (name == ufbxi_Cache) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_cache_file), UFBX_ELEMENT_CACHE_FILE));
 		} else {
 			ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
 		}
@@ -7839,7 +8459,7 @@ ufbxi_nodiscard static int ufbxi_read_take_prop_channel(ufbxi_context *uc, ufbxi
 			size_t suffix_len = strlen(suffix);
 			if (name.length > suffix_len && !memcmp(name.data + name.length - suffix_len, suffix, suffix_len)) {
 				name.length -= suffix_len;
-				ufbxi_check(ufbxi_push_string_place_str(uc, &name));
+				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &name));
 			}
 		}
 
@@ -7979,7 +8599,7 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 		// Pre-7000: Root node has a specific type-name pair "Model::Scene"
 		// (or reversed in binary). Use the interned name as ID as usual.
 		const char *root_name = uc->from_ascii ? "Model::Scene" : "Scene\x00\x01Model";
-		root_name = ufbxi_push_string_imp(uc, root_name, 12, false);
+		root_name = ufbxi_push_string_imp(&uc->string_pool, root_name, 12, false);
 		ufbxi_check(root_name);
 		uc->root_id = (uintptr_t)root_name;
 	}
@@ -8548,7 +9168,7 @@ ufbxi_nodiscard static int ufbxi_read_legacy_root(ufbxi_context *uc)
 		layer_info.fbx_id = uc->legacy_implicit_anim_layer_id;
 		layer_info.name.data = "(internal)";
 		layer_info.name.length = strlen(layer_info.name.data);
-		ufbxi_check(ufbxi_push_string_place_str(uc, &layer_info.name));
+		ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &layer_info.name));
 		ufbx_anim_layer *layer = ufbxi_push_element(uc, &layer_info, ufbx_anim_layer, UFBX_ELEMENT_ANIM_LAYER);
 		ufbxi_check(layer);
 
@@ -9244,7 +9864,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_material_textures(ufbxi_con
 ufbxi_noinline ufbxi_nodiscard static int ufbxi_sort_videos_by_filename(ufbxi_context *uc, ufbx_video **videos, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_video*)));
-	ufbxi_macro_stable_sort(ufbx_video*, 32, videos, uc->tmp_arr, count, ( ufbxi_str_less((*a)->filename, (*b)->filename) ));
+	ufbxi_macro_stable_sort(ufbx_video*, 32, videos, uc->tmp_arr, count, ( ufbxi_str_less((*a)->absolute_filename, (*b)->absolute_filename) ));
 	return 1;
 }
 
@@ -9889,6 +10509,36 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbxi_check(ufbxi_fetch_dst_elements(uc, &blend->channels, &blend->element, false, NULL, UFBX_ELEMENT_BLEND_CHANNEL));
 	}
 
+	ufbxi_for_ptr_list(ufbx_cache_file, p_cache, uc->scene.cache_files) {
+		ufbx_cache_file *cache = *p_cache;
+
+		cache->absolute_filename = ufbx_find_string(&cache->props, "CacheAbsoluteFileName", ufbx_empty_string);
+		cache->relative_filename = ufbx_find_string(&cache->props, "CacheFileName", ufbx_empty_string);
+		int64_t type = ufbx_find_int(&cache->props, "CacheFileType", 0);
+		if (type >= 0 && type <= UFBX_CACHE_FILE_FORMAT_MC) {
+			cache->format = (ufbx_cache_file_format)type;
+		}
+
+		if (uc->opts.load_external_files) {
+			ufbx_stream stream;
+			if (uc->opts.open_file_fn(uc->opts.open_file_user, &stream, cache->absolute_filename.data, cache->absolute_filename.length)) {
+
+				ufbxi_xml_load_opts opts;
+				opts.ator = &uc->ator_tmp;
+				opts.read_fn = stream.read_fn;
+				opts.read_user = stream.user;
+				ufbxi_xml_document *doc = ufbxi_load_xml(&opts, &uc->error);
+
+				ufbxi_buf_free(&doc->buf);
+
+				if (stream.close_fn) {
+					stream.close_fn(stream.user);
+				}
+				break;
+			}
+		}
+	}
+
 	ufbx_assert(uc->tmp_full_weights.num_items == uc->scene.blend_channels.count);
 	ufbx_real_list *full_weights = ufbxi_make_array_all(&uc->tmp_full_weights, ufbx_real_list);
 	ufbxi_check(full_weights);
@@ -10340,7 +10990,8 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 
 			size_t index = SIZE_MAX;
 			ufbxi_macro_lower_bound_eq(ufbx_video*, 16, &index, content_videos, 0, num_content_videos,
-				( ufbxi_str_less((*a)->filename, video->filename) ), ( (*a)->filename.data == video->filename.data ));
+				( ufbxi_str_less((*a)->absolute_filename, video->absolute_filename) ),
+				( (*a)->absolute_filename.data == video->absolute_filename.data ));
 			if (index != SIZE_MAX) {
 				video->content = content_videos[index]->content;
 				video->content_size = content_videos[index]->content_size;
@@ -11394,7 +12045,7 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	// contained within `ufbxi_scene_imp`
 	imp->result_buf = uc->result;
 	imp->result_buf.ator = &imp->ator;
-	imp->string_buf = uc->string_buf;
+	imp->string_buf = uc->string_pool.buf;
 	imp->string_buf.ator = &imp->ator;
 
 	imp->scene.metadata.result_memory_used = imp->ator.current_size;
@@ -11418,9 +12069,9 @@ static void ufbxi_free_ator(ufbxi_allocator *ator)
 	}
 }
 
-static void ufbxi_free_temp(ufbxi_context *uc)
+static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 {
-	ufbxi_map_free(&uc->string_map);
+	ufbxi_map_free(&uc->string_pool.map);
 	ufbxi_map_free(&uc->prop_type_map);
 	ufbxi_map_free(&uc->fbx_id_map);
 	ufbxi_map_free(&uc->fbx_attr_map);
@@ -11452,27 +12103,12 @@ static void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_free_ator(&uc->ator_tmp);
 }
 
-static void ufbxi_free_result(ufbxi_context *uc)
+static ufbxi_noinline void ufbxi_free_result(ufbxi_context *uc)
 {
 	ufbxi_buf_free(&uc->result);
-	ufbxi_buf_free(&uc->string_buf);
+	ufbxi_buf_free(&uc->string_pool.buf);
 
 	ufbxi_free_ator(&uc->ator_result);
-}
-
-static void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *ator, const ufbx_allocator *desc)
-{
-	ufbx_allocator zero_ator;
-	if (!desc) {
-		memset(&zero_ator, 0, sizeof(zero_ator));
-		desc = &zero_ator;
-	}
-
-	ator->error = error;
-	ator->ator = *desc;
-	ator->max_size = desc->memory_limit ? desc->memory_limit : SIZE_MAX;
-	ator->max_allocs = desc->allocation_limit ? desc->allocation_limit : SIZE_MAX;
-	ator->huge_size = desc->huge_threshold ? desc->huge_threshold : 0x100000;
 }
 
 static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
@@ -11536,7 +12172,14 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 		uc->progress_interval = 0x4000;
 	}
 
-	uc->string_map.ator = &uc->ator_tmp;
+	if (!uc->opts.open_file_fn) {
+		uc->opts.open_file_fn = &ufbxi_open_file;
+	}
+
+	uc->string_pool.error = &uc->error;
+	uc->string_pool.map.ator = &uc->ator_tmp;
+	uc->string_pool.buf.ator = &uc->ator_result;
+
 	uc->prop_type_map.ator = &uc->ator_tmp;
 	uc->fbx_id_map.ator = &uc->ator_tmp;
 	uc->fbx_attr_map.ator = &uc->ator_tmp;
@@ -11556,22 +12199,27 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->tmp_full_weights.ator = &uc->ator_tmp;
 
 	uc->result.ator = &uc->ator_result;
-	uc->string_buf.ator = &uc->ator_result;
 
 	uc->inflate_retain = &inflate_retain;
 
-	if (ufbxi_load_imp(uc)) {
+	int ok = ufbxi_load_imp(uc);
+
+	ufbxi_free_temp(uc);
+
+	if (uc->close_fn) {
+		uc->close_fn(uc->read_user);
+	}
+
+	if (ok) {
 		if (p_error) {
 			p_error->type = UFBX_ERROR_NONE;
 			p_error->description = NULL;
 			p_error->stack_size = 0;
 		}
-		ufbxi_free_temp(uc);
 		return &uc->scene_imp->scene;
 	} else {
 		ufbxi_fix_error_type(&uc->error, "Failed to load");
 		if (p_error) *p_error = uc->error;
-		ufbxi_free_temp(uc);
 		ufbxi_free_result(uc);
 		return NULL;
 	}
@@ -12959,119 +13607,6 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 	}
 }
 
-
-// -- File IO
-
-static FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp_ator)
-{
-#if defined(_WIN32)
-	wchar_t wpath_buf[256];
-	wchar_t *wpath = NULL;
-
-	if (path_len == SIZE_MAX) {
-		path_len = strlen(path);
-	}
-	if (path_len < ufbxi_arraycount(wpath_buf) - 1) {
-		wpath = wpath_buf;
-	} else {
-		wpath = ufbxi_alloc(tmp_ator, wchar_t, path_len + 1);
-		if (!wpath) return NULL;
-	}
-
-	// Convert UTF-8 to UTF-16 but allow stray surrogate pairs as the Windows
-	// file system encoding allows them as well..
-	size_t wlen = 0;
-	for (size_t i = 0; i < path_len; ) {
-		uint32_t code = UINT32_MAX;
-		char c = path[i++];
-		if ((c & 0x80) == 0) {
-			code = (uint32_t)c;
-		} else if ((c & 0xe0) == 0xc0) {
-			code = (uint32_t)(c & 0x1f);
-			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
-		} else if ((c & 0xf0) == 0xe0) {
-			code = (uint32_t)(c & 0x0f);
-			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
-			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
-		} else if ((c & 0xf8) == 0xf0) {
-			code = (uint32_t)(c & 0x07);
-			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
-			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
-			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
-		}
-		if (code < 0x10000) {
-			wpath[wlen++] = (wchar_t)code;
-		} else {
-			code -= 0x10000;
-			wpath[wlen++] = (wchar_t)(0xd800 + (code >> 10));
-			wpath[wlen++] = (wchar_t)(0xdc00 + (code & 0x3ff));
-		}
-	}
-	wpath[wlen] = 0;
-
-	FILE *file = NULL;
-#if defined(_MSC_VER) && _MSC_VER >= 1400
-	if (_wfopen_s(&file, wpath, L"rb") != 0) {
-		file = NULL;
-	}
-#else
-	file = _wfopen(wpath, L"rb");
-#endif
-
-	if (wpath != wpath_buf) {
-		ufbxi_free(tmp_ator, wchar_t, wpath, path_len + 1);
-	}
-
-	return file;
-#else
-	if (path_len == SIZE_MAX) {
-		return fopen(path, "rb");
-	}
-
-	char copy_buf[256];
-	char *copy = NULL;
-
-	if (path_len < ufbxi_arraycount(copy_buf) - 1) {
-		copy = copy_buf;
-	} else {
-		copy = ufbxi_alloc(tmp_ator, char, path_len + 1);
-		if (!copy) return NULL;
-	}
-	memcpy(copy, path, path_len);
-	copy[path_len] = '\0';
-
-	FILE *file = fopen(copy, "rb");
-
-	if (copy != copy_buf) {
-		ufbxi_free(tmp_ator, char, copy, path_len + 1);
-	}
-
-	return file;
-#endif
-}
-
-static uint64_t ufbxi_ftell(FILE *file)
-{
-#if defined(_POSIX_VERSION)
-	off_t result = ftello(file);
-	if (result >= 0) return (uint64_t)result;
-#elif defined(_MSC_VER)
-	int64_t result = _ftelli64(file);
-	if (result >= 0) return (uint64_t)result;
-#else
-	long result = ftell(file);
-	if (result >= 0) return (uint64_t)result;
-#endif
-	return UINT64_MAX;
-}
-
-static size_t ufbxi_file_read(void *user, void *data, size_t max_size)
-{
-	FILE *file = (FILE*)user;
-	if (ferror(file)) return SIZE_MAX;
-	return fread(data, 1, max_size, file);
-}
-
 // -- API
 
 #ifdef __cplusplus
@@ -13109,6 +13644,7 @@ const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES] = {
 	sizeof(ufbx_blend_channel),
 	sizeof(ufbx_blend_shape),
 	sizeof(ufbx_cache_deformer),
+	sizeof(ufbx_cache_file),
 	sizeof(ufbx_material),
 	sizeof(ufbx_texture),
 	sizeof(ufbx_video),
@@ -13172,6 +13708,7 @@ ufbx_scene *ufbx_load_stdio(void *file_void, const ufbx_load_opts *opts, ufbx_er
 
 	ufbxi_context uc = { 0 };
 	uc.read_fn = &ufbxi_file_read;
+	uc.skip_fn = &ufbxi_file_skip;
 	uc.read_user = file;
 
 	if (opts && opts->progress_fn && opts->file_size_estimate == 0) {
@@ -13197,13 +13734,15 @@ ufbx_scene *ufbx_load_stdio(void *file_void, const ufbx_load_opts *opts, ufbx_er
 	return scene;
 }
 
-ufbx_scene *ufbx_load_stream(const void *prefix, size_t prefix_size, ufbx_read_fn *read_fn, void *read_user, const ufbx_load_opts *opts, ufbx_error *error)
+ufbx_scene *ufbx_load_stream(const void *prefix, size_t prefix_size, const ufbx_stream *stream, const ufbx_load_opts *opts, ufbx_error *error)
 {
 	ufbxi_context uc = { 0 };
 	uc.data_begin = uc.data = (const char *)prefix;
 	uc.data_size = prefix_size;
-	uc.read_fn = read_fn;
-	uc.read_user = read_user;
+	uc.read_fn = stream->read_fn;
+	uc.skip_fn = stream->skip_fn;
+	uc.close_fn = stream->close_fn;
+	uc.read_user = stream->user;
 	ufbx_scene *scene = ufbxi_load(&uc, opts, error);
 	return scene;
 }

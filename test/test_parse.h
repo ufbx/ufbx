@@ -201,7 +201,10 @@ UFBXT_TEST(unicode_filename)
 	ufbxt_assert(len > 0 && len < sizeof(buf));
 
 	{
-		ufbx_scene *scene = ufbx_load_file(buf, NULL, NULL);
+		ufbx_load_opts opts = { 0 };
+		opts.ignore_geometry = true;
+
+		ufbx_scene *scene = ufbx_load_file(buf, &opts, NULL);
 		ufbxt_assert(scene);
 		ufbxt_assert(ufbx_find_node(scene, "pCube1"));
 		ufbxt_check_scene(scene);
