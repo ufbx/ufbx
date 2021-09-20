@@ -6768,7 +6768,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_skin_cluster(ufbxi_context 
 		ufbxi_check(transform->size >= 16);
 		ufbxi_check(transform_link->size >= 16);
 
-		ufbxi_read_transform_matrix(&cluster->geometry_to_bone, (ufbx_real*)transform->data);
+		ufbxi_read_transform_matrix(&cluster->mesh_node_to_bone, (ufbx_real*)transform->data);
 		ufbxi_read_transform_matrix(&cluster->bind_to_world, (ufbx_real*)transform_link->data);
 	}
 
@@ -8176,7 +8176,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_legacy_link(ufbxi_context *
 		ufbxi_check(transform->size >= 16);
 		ufbxi_check(transform_link->size >= 16);
 
-		ufbxi_read_transform_matrix(&cluster->geometry_to_bone, (ufbx_real*)transform->data);
+		ufbxi_read_transform_matrix(&cluster->mesh_node_to_bone, (ufbx_real*)transform->data);
 		ufbxi_read_transform_matrix(&cluster->bind_to_world, (ufbx_real*)transform_link->data);
 	}
 
@@ -11083,6 +11083,38 @@ ufbxi_noinline static void ufbxi_update_constraint(ufbx_constraint *constraint)
 	}
 }
 
+ufbxi_noinline static void ufbxi_update_initial_clusters(ufbx_scene *scene)
+{
+	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
+		ufbx_skin_cluster *cluster = *p_cluster;
+		cluster->geometry_to_bone = cluster->mesh_node_to_bone;
+	}
+
+	// Patch initial `node_to_bind`
+	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
+		ufbx_skin_cluster *cluster = *p_cluster;
+
+		ufbx_skin_deformer *skin = (ufbx_skin_deformer*)ufbxi_fetch_src_element(&cluster->element, false, NULL, UFBX_ELEMENT_SKIN_DEFORMER);
+		if (!skin) continue;
+
+		ufbx_node *node = (ufbx_node*)ufbxi_fetch_src_element(&skin->element, false, NULL, UFBX_ELEMENT_NODE);
+		if (!node) {
+			ufbx_mesh *mesh = (ufbx_mesh*)ufbxi_fetch_src_element(&skin->element, false, NULL, UFBX_ELEMENT_MESH);
+			if (mesh && mesh->instances.count > 0) {
+				node = mesh->instances.data[0];
+			}
+		}
+		if (!node) continue;
+
+		if (ufbxi_matrix_all_zero(&cluster->mesh_node_to_bone)) {
+			ufbx_matrix world_to_bind = ufbx_matrix_invert(&cluster->bind_to_world);
+			cluster->mesh_node_to_bone = ufbx_matrix_mul(&world_to_bind, &node->node_to_world);
+		}
+
+		cluster->geometry_to_bone = ufbx_matrix_mul(&cluster->mesh_node_to_bone, &node->geometry_to_node);
+	}
+}
+
 ufbx_coordinate_axis ufbxi_find_axis(const ufbx_props *props, const char *axis_name, const char *sign_name)
 {
 	int64_t axis = ufbxi_find_int(props, axis_name, 3);
@@ -11117,7 +11149,7 @@ static const ufbx_real ufbxi_time_mode_fps[] = {
 	59.94f,  // UFBX_TIME_MODE_59_94_FPS
 };
 
-static void ufbxi_update_scene(ufbx_scene *scene)
+static void ufbxi_update_scene(ufbx_scene *scene, bool initial)
 {
 	ufbxi_for_ptr_list(ufbx_node, p_node, scene->nodes) {
 		ufbxi_update_node(*p_node);
@@ -11137,6 +11169,10 @@ static void ufbxi_update_scene(ufbx_scene *scene)
 
 	ufbxi_for_ptr_list(ufbx_line_curve, p_line, scene->line_curves) {
 		ufbxi_update_line_curve(*p_line);
+	}
+
+	if (initial) {
+		ufbxi_update_initial_clusters(scene);
 	}
 
 	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
@@ -11203,29 +11239,6 @@ static ufbxi_noinline void ufbxi_update_scene_settings(ufbx_scene_settings *sett
 
 	if (settings->time_mode != UFBX_TIME_MODE_CUSTOM) {
 		settings->frames_per_second = ufbxi_time_mode_fps[settings->time_mode];
-	}
-}
-
-static void ufbxi_patch_cluster_binding(ufbx_scene *scene)
-{
-	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
-		ufbx_skin_cluster *cluster = *p_cluster;
-		if (!ufbxi_matrix_all_zero(&cluster->geometry_to_bone)) continue;
-
-		ufbx_skin_deformer *skin = (ufbx_skin_deformer*)ufbxi_fetch_src_element(&cluster->element, false, NULL, UFBX_ELEMENT_SKIN_DEFORMER);
-		if (!skin) continue;
-
-		ufbx_node *node = (ufbx_node*)ufbxi_fetch_src_element(&skin->element, false, NULL, UFBX_ELEMENT_NODE);
-		if (!node) {
-			ufbx_mesh *mesh = (ufbx_mesh*)ufbxi_fetch_src_element(&skin->element, false, NULL, UFBX_ELEMENT_MESH);
-			if (mesh && mesh->instances.count > 0) {
-				node = mesh->instances.data[0];
-			}
-		}
-		if (!node) continue;
-
-		ufbx_matrix world_to_bind = ufbx_matrix_invert(&cluster->bind_to_world);
-		cluster->geometry_to_bone = ufbx_matrix_mul(&world_to_bind, &node->node_to_world);
 	}
 }
 
@@ -11351,9 +11364,8 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_update_scene_metadata(&uc->scene.metadata);
 	ufbxi_check(ufbxi_finalize_scene(uc));
 
-	ufbxi_update_scene(&uc->scene);
+	ufbxi_update_scene(&uc->scene, true);
 	ufbxi_update_scene_settings(&uc->scene.settings);
-	ufbxi_patch_cluster_binding(&uc->scene);
 
 	// Evaluate skinning if requested
 	if (uc->opts.evaluate_skinning) {
@@ -12034,7 +12046,7 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 	}
 
 	// Update all derived values
-	ufbxi_update_scene(&ec->scene);
+	ufbxi_update_scene(&ec->scene, false);
 
 	// Evaluate skinning if requested
 	if (ec->opts.evaluate_skinning) {

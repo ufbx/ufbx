@@ -1035,6 +1035,10 @@ struct ufbx_skin_cluster {
 	// Binding matrix from local mesh vertices to the bone
 	ufbx_matrix geometry_to_bone; 
 
+	// Binding matrix from local mesh _node_ to the bone.
+	// NOTE: Prefer `geometry_to_bone` in most use cases!
+	ufbx_matrix mesh_node_to_bone;
+
 	// Matrix that specifies the rest/bind pose transform of the node,
 	// not generally needed for skinning, use `geometry_to_bone` instead.
 	ufbx_matrix bind_to_world;
