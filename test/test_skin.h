@@ -435,3 +435,11 @@ UFBXT_TEST(synthetic_broken_cluster_connect)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(max_transformed_skin)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, false, "max_transformed_skin_5", NULL, 5.0/30.0);
+	ufbxt_check_frame(scene, err, false, "max_transformed_skin_15", NULL, 15.0/30.0);
+}
+#endif
