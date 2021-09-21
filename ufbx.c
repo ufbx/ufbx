@@ -13617,6 +13617,8 @@ typedef struct {
 	ufbx_open_file_fn *open_file_fn;
 	void *open_file_user;
 
+	double frames_per_second;
+
 	ufbx_string stream_filename;
 	ufbx_stream stream;
 
@@ -13824,6 +13826,41 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 	return 1;
 }
 
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_context *cc)
+{
+	char header[32];
+	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, header, sizeof(header), false));
+
+	uint32_t version = ufbxi_read_u32(header + 12);
+	uint32_t num_points = ufbxi_read_u32(header + 16);
+	double start_frame = ufbxi_read_f32(header + 20);
+	double frames_per_sample = ufbxi_read_f32(header + 24);
+	uint32_t num_samples = ufbxi_read_u32(header + 28);
+
+	ufbx_cache_frame *frames = ufbxi_push_zero(&cc->tmp_frames, ufbx_cache_frame, num_samples);
+	ufbxi_check_err(&cc->error, frames);
+
+	uint64_t offset = cc->file_offset;
+
+	for (uint32_t i = 0; i < num_samples; i++) {
+		ufbx_cache_frame *frame = &frames[i];
+
+		double sample_frame = start_frame + (double)i * frames_per_sample;
+		frame->channel = cc->channel_name;
+		frame->time = sample_frame / cc->frames_per_second;
+		frame->filename = cc->stream_filename;
+		frame->data_format = UFBX_CACHE_DATA_VEC3_FLOAT;
+		frame->data_offset = offset;
+		frame->data_count = num_points;
+		frame->data_element_bytes = 12;
+		frame->data_total_bytes = num_points * 12;
+		frame->file_format = UFBX_CACHE_FILE_FORMAT_PC2;
+		offset += num_points * 12;
+	}
+
+	return 1;
+}
+
 static ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_context *cc, ufbx_string filename)
 {
 	cc->stream_filename = filename;
@@ -13837,6 +13874,7 @@ static ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_context *cc, ufbx_st
 	cc->pos_end = cc->buffer + 16;
 
 	if (!memcmp(cc->buffer, "POINTCACHE2", 11)) {
+		ufbxi_check_err(&cc->error, ufbxi_cache_load_pc2(cc));
 	} else if (!memcmp(cc->buffer, "FOR4", 4) || !memcmp(cc->buffer, "FOR8", 4)) {
 		ufbxi_check_err(&cc->error, ufbxi_cache_load_mc(cc));
 	} else {
@@ -13872,6 +13910,8 @@ static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_str
 
 	cc->tmp_frames.ator = &cc->ator_tmp;
 	cc->result.ator = &cc->ator_result;
+
+	cc->channel_name.data = ufbxi_empty_char;
 
 	if (!cc->open_file_fn) {
 		cc->open_file_fn = ufbxi_open_file;
@@ -13940,6 +13980,8 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 	ufbxi_init_ator(&cc.error, &cc.ator_result, &opts.result_allocator);
 	cc.open_file_fn = opts.open_file_fn;
 	cc.open_file_user = opts.open_file_user;
+
+	cc.frames_per_second = opts.frames_per_second > 0.0 ? opts.frames_per_second : 30.0;
 
 	ufbx_geometry_cache *cache = ufbxi_cache_load(&cc, filename);
 	if (p_error) {

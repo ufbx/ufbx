@@ -1134,8 +1134,8 @@ typedef struct ufbx_cache_frame {
 
 	ufbx_cache_data_format data_format; // < Format of the data in the file
 	uint64_t data_offset;               // < Byte offset into the file
-	uint64_t data_count;                // < Number of data elements
-	uint64_t data_element_bytes;        // < Size of a single data element in bytes
+	uint32_t data_count;                // < Number of data elements
+	uint32_t data_element_bytes;        // < Size of a single data element in bytes
 	uint64_t data_total_bytes;          // < Size of the whole data blob in bytes
 } ufbx_cache_frame;
 
@@ -2253,6 +2253,9 @@ typedef struct ufbx_geometry_cache_opts {
 	// External file callbacks (defaults to stdio.h)
 	ufbx_open_file_fn *open_file_fn;
 	void *open_file_user;
+
+	// FPS value for converting frame times to seconds
+	double frames_per_second;
 
 } ufbx_geometry_cache_opts;
 
