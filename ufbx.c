@@ -7,6 +7,7 @@
 
 #define UFBXI_MAX_NON_ARRAY_VALUES 7
 #define UFBXI_MAX_NODE_DEPTH 64
+#define UFBXI_MAX_SKIP_SIZE 0x40000000
 
 // -- Headers
 
@@ -175,6 +176,11 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 	#define ufbxi_clamp_linear_threshold(v) (2)
 #else
 	#define ufbxi_clamp_linear_threshold(v) (v)
+#endif
+
+#if defined(UFBX_REGRESSION)
+	#undef UFBXI_MAX_SKIP_SIZE
+	#define UFBXI_MAX_SKIP_SIZE 128
 #endif
 
 // -- Utility
@@ -2585,7 +2591,8 @@ struct ufbxi_node {
 };
 
 #define UFBXI_SCENE_IMP_MAGIC 0x58424655
-#define UFBXI_MESH_IMP_MAGIC 0x4853454d
+#define UFBXI_MESH_IMP_MAGIC 0x48534d55
+#define UFBXI_CACHE_IMP_MAGIC 0x48434355
 
 typedef struct {
 	ufbx_scene scene;
@@ -2967,13 +2974,13 @@ ufbxi_nodiscard static int ufbxi_skip_bytes(ufbxi_context *uc, uint64_t size)
 			uc->data_size = 0;
 
 			uc->data_offset += size;
-			while (size >= SIZE_MAX) {
-				size -= SIZE_MAX;
-				ufbxi_check(uc->skip_fn(uc->read_user, SIZE_MAX));
+			while (size >= UFBXI_MAX_SKIP_SIZE) {
+				size -= UFBXI_MAX_SKIP_SIZE;
+				ufbxi_check_msg(uc->skip_fn(uc->read_user, UFBXI_MAX_SKIP_SIZE), "Truncated file");
 			}
 
 			if (size > 0) {
-				ufbxi_check(uc->skip_fn(uc->read_user, (size_t)size));
+				ufbxi_check_msg(uc->skip_fn(uc->read_user, (size_t)size), "Truncated file");
 			}
 
 		} else {
@@ -3162,19 +3169,8 @@ static size_t ufbxi_file_read(void *user, void *data, size_t max_size)
 static bool ufbxi_file_skip(void *user, size_t size)
 {
 	FILE *file = (FILE*)user;
-
-	const size_t max_skip = 0x20000000;
-
-	size_t left = size;
-	while (left > max_skip) {
-		if (fseek(file, (long)max_skip, SEEK_CUR) != 0) return false;
-		left -= max_skip;
-	}
-
-	if (left > 0) {
-		if (fseek(file, (long)left, SEEK_CUR) != 0) return false;
-	}
-
+	ufbx_assert(size <= UFBXI_MAX_SKIP_SIZE);
+	if (fseek(file, (long)size, SEEK_CUR) != 0) return false;
 	if (ferror(file)) return false;
 	return true;
 }
@@ -10520,22 +10516,6 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 		}
 
 		if (uc->opts.load_external_files) {
-			ufbx_stream stream;
-			if (uc->opts.open_file_fn(uc->opts.open_file_user, &stream, cache->absolute_filename.data, cache->absolute_filename.length)) {
-
-				ufbxi_xml_load_opts opts;
-				opts.ator = &uc->ator_tmp;
-				opts.read_fn = stream.read_fn;
-				opts.read_user = stream.user;
-				ufbxi_xml_document *doc = ufbxi_load_xml(&opts, &uc->error);
-
-				ufbxi_buf_free(&doc->buf);
-
-				if (stream.close_fn) {
-					stream.close_fn(stream.user);
-				}
-				break;
-			}
 		}
 	}
 
@@ -12131,6 +12111,8 @@ static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
 		error->type = UFBX_ERROR_UNSUPPORTED_VERSION;
 	} else if (!strcmp(error->description, "Not an FBX file")) {
 		error->type = UFBX_ERROR_NOT_FBX;
+	} else if (!strcmp(error->description, "File not found")) {
+		error->type = UFBX_ERROR_FILE_NOT_FOUND;
 	}
 }
 
@@ -13585,26 +13567,391 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 
 	sc.src_mesh = *mesh;
 
-	if (ufbxi_subdivide_mesh_imp(&sc, level)) {
-		ufbxi_buf_free(&sc.tmp);
-		ufbxi_buf_free(&sc.source);
+	int ok = ufbxi_subdivide_mesh_imp(&sc, level);
+
+	ufbxi_buf_free(&sc.tmp);
+	ufbxi_buf_free(&sc.source);
+	ufbxi_free_ator(&sc.ator_tmp);
+
+	if (ok) {
 		if (p_error) {
 			p_error->type = UFBX_ERROR_NONE;
 			p_error->description = NULL;
 			p_error->stack_size = 0;
 		}
-		ufbxi_free_ator(&sc.ator_tmp);
 		return &sc.imp->mesh;
 	} else {
 		ufbxi_fix_error_type(&sc.error, "Failed to subdivide");
 		if (p_error) *p_error = sc.error;
-		ufbxi_buf_free(&sc.tmp);
-		ufbxi_buf_free(&sc.source);
 		ufbxi_buf_free(&sc.result);
-		ufbxi_free_ator(&sc.ator_tmp);
 		ufbxi_free_ator(&sc.ator_result);
 		return NULL;
 	}
+}
+
+// -- Geometry caches
+
+typedef struct {
+	ufbx_geometry_cache cache;
+	uint32_t magic;
+	bool owned_by_scene;
+
+	ufbxi_allocator ator;
+	ufbxi_buf result_buf;
+	ufbxi_buf string_buf;
+} ufbxi_geometry_cache_imp;
+
+typedef struct {
+	ufbx_error error;
+	ufbx_string filename;
+	bool owned_by_scene;
+
+	ufbxi_allocator ator_tmp;
+	ufbxi_allocator ator_result;
+
+	ufbxi_buf result;
+	ufbxi_buf tmp_frames;
+
+	ufbxi_string_pool string_pool;
+
+	ufbx_open_file_fn *open_file_fn;
+	void *open_file_user;
+
+	ufbx_string stream_filename;
+	ufbx_stream stream;
+
+	bool mc_for8;
+
+	ufbx_string channel_name;
+
+	char *name_buf;
+	size_t name_cap;
+
+	uint64_t file_offset;
+	char *pos, *pos_end;
+	char buffer[64];
+
+	ufbx_geometry_cache cache;
+	ufbxi_geometry_cache_imp *imp;
+} ufbxi_cache_context;
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_read(ufbxi_cache_context *cc, void *dst, size_t size, bool allow_eof)
+{
+	size_t buffered = ufbxi_min_sz((size_t)(cc->pos_end - cc->pos), size);
+	memcpy(dst, cc->pos, size);
+	cc->pos += size;
+	size -= buffered;
+	cc->file_offset += buffered;
+	if (size == 0) return 1;
+	dst = (char*)dst + buffered;
+
+	if (size >= sizeof(cc->buffer)) {
+		size_t num_read = cc->stream.read_fn(cc->stream.user, dst, size);
+		ufbxi_check_err_msg(&cc->error, num_read <= size, "IO error");
+		if (!allow_eof) {
+			ufbxi_check_err_msg(&cc->error, num_read == size, "Truncated file");
+		}
+		cc->file_offset += num_read;
+		size -= num_read;
+		dst = (char*)dst + num_read;
+	} else {
+		size_t num_read = cc->stream.read_fn(cc->stream.user, cc->buffer, sizeof(cc->buffer));
+		ufbxi_check_err_msg(&cc->error, num_read <= sizeof(cc->buffer), "IO error");
+		if (!allow_eof) {
+			ufbxi_check_err_msg(&cc->error, num_read >= size, "Truncated file");
+		}
+		cc->pos = cc->buffer;
+		cc->pos_end = cc->buffer + sizeof(cc->buffer);
+
+		memcpy(dst, cc->pos, size);
+		cc->pos += size;
+		cc->file_offset += size;
+
+		size_t num_written = ufbxi_min_sz(size, num_read);
+		size -= num_written;
+		dst = (char*)dst + num_written;
+	}
+
+	if (size > 0) {
+		memset(dst, 0, size);
+	}
+
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_skip(ufbxi_cache_context *cc, uint64_t size)
+{
+	uint64_t buffered = ufbxi_min_sz((uint64_t)(cc->pos_end - cc->pos), size);
+	cc->pos += buffered;
+	size -= buffered;
+
+	if (cc->stream.skip_fn) {
+		while (size > 0) {
+			size_t to_skip = (size_t)ufbxi_min64(size, UFBXI_MAX_SKIP_SIZE);
+			size -= to_skip;
+			ufbxi_check_err_msg(&cc->error, cc->stream.skip_fn(cc->stream.user, to_skip), "Truncated file");
+		}
+	} else {
+		char skip_buf[2048];
+		while (size > 0) {
+			size_t to_skip = (size_t)ufbxi_min64(size, sizeof(skip_buf));
+			size -= to_skip;
+			ufbxi_check_err_msg(&cc->error, cc->stream.read_fn(cc->stream.user, skip_buf, to_skip), "Truncated file");
+		}
+	}
+
+	cc->file_offset += size;
+	return 1;
+}
+
+#define ufbxi_cache_mc_tag(a,b,c,d) ((uint32_t)(a)<<24u | (uint32_t)(b)<<16 | (uint32_t)(c)<<8u | (uint32_t)(d))
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_u32(ufbxi_cache_context *cc, uint32_t *p_value, bool allow_eof)
+{
+	char buf[4];
+	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, allow_eof));
+	*p_value = (uint32_t)(uint8_t)buf[0]<<24u | (uint32_t)(uint8_t)buf[1]<<16 | (uint32_t)(uint8_t)buf[2]<<8u | (uint32_t)(uint8_t)buf[3];
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_u64(ufbxi_cache_context *cc, uint64_t *p_value)
+{
+	if (!cc->mc_for8) {
+		uint32_t v32;
+		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &v32, false));
+		*p_value = v32;
+	} else {
+		char buf[8];
+		ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 8, false));
+		uint32_t hi = (uint32_t)(uint8_t)buf[0]<<24u | (uint32_t)(uint8_t)buf[1]<<16 | (uint32_t)(uint8_t)buf[2]<<8u | (uint32_t)(uint8_t)buf[3];
+		uint32_t lo = (uint32_t)(uint8_t)buf[4]<<24u | (uint32_t)(uint8_t)buf[5]<<16 | (uint32_t)(uint8_t)buf[6]<<8u | (uint32_t)(uint8_t)buf[7];
+		*p_value = (uint64_t)hi << 32u | (uint64_t)lo;
+	}
+	return 1;
+}
+
+static const uint8_t ufbxi_cache_data_format_size[] = {
+	0, 4, 12, 8, 24,
+};
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_context *cc)
+{
+	uint64_t version = 0, start = 0, end = 0;
+	uint32_t count = 0, time = 0;
+	char skip_buf[8];
+
+	for (;;) {
+		uint32_t tag;
+		uint64_t size;
+		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &tag, true));
+		if (tag == 0) break;
+
+		if (tag == ufbxi_cache_mc_tag('C','A','C','H') || tag == ufbxi_cache_mc_tag('M','Y','C','H')) {
+			continue;
+		}
+
+		if (tag == ufbxi_cache_mc_tag('F','O','R','8')) {
+			cc->mc_for8 = true;
+		}
+
+		if (cc->mc_for8) ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, skip_buf, 4, false));
+
+		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u64(cc, &size));
+		uint64_t begin = cc->file_offset;
+
+		bool do_skip = false;
+
+		size_t alignment = cc->mc_for8 ? 8 : 4;
+
+		ufbx_cache_data_format format = UFBX_CACHE_DATA_UNKNOWN;
+		switch (tag) {
+		case ufbxi_cache_mc_tag('F','O','R','4'): cc->mc_for8 = false; break;
+		case ufbxi_cache_mc_tag('F','O','R','8'): cc->mc_for8 = true; break;
+		case ufbxi_cache_mc_tag('V','R','S','N'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u64(cc, &version)); break;
+		case ufbxi_cache_mc_tag('S','T','I','M'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u64(cc, &start)); break;
+		case ufbxi_cache_mc_tag('E','T','I','M'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u64(cc, &end)); break;
+		case ufbxi_cache_mc_tag('T','I','M','E'):
+			ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &time, false));
+			if (cc->mc_for8) ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, skip_buf, 4, false));
+			break;
+		case ufbxi_cache_mc_tag('C','H','N','M'): {
+			ufbxi_check_err(&cc->error, size > 0 && size < SIZE_MAX);
+			size_t length = (size_t)size - 1;
+			size_t padded_length = ((size_t)size + alignment - 1) & ~(alignment - 1);
+			ufbxi_check_err(&cc->error, ufbxi_grow_array(&cc->ator_tmp, &cc->name_buf, &cc->name_cap, padded_length));
+			ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, cc->name_buf, padded_length, false));
+			cc->channel_name.data = cc->name_buf;
+			cc->channel_name.length = length;
+			ufbxi_check_err(&cc->error, ufbxi_push_string_place_str(&cc->string_pool, &cc->channel_name));
+		} break;
+		case ufbxi_cache_mc_tag('S','I','Z','E'):
+			ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &count, false));
+			if (cc->mc_for8) ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, skip_buf, 4, false));
+			break;
+		case ufbxi_cache_mc_tag('F','V','C','A'): format = UFBX_CACHE_DATA_VEC3_FLOAT; break;
+		case ufbxi_cache_mc_tag('D','V','C','A'): format = UFBX_CACHE_DATA_VEC3_DOUBLE; break;
+		case ufbxi_cache_mc_tag('F','B','C','A'): format = UFBX_CACHE_DATA_REAL_FLOAT; break;
+		case ufbxi_cache_mc_tag('D','B','C','A'): format = UFBX_CACHE_DATA_REAL_DOUBLE; break;
+		default: ufbxi_fail_err(&cc->error, "Unknown tag");
+		}
+
+		if (format != UFBX_CACHE_DATA_UNKNOWN) {
+			ufbx_cache_frame *frame = ufbxi_push_zero(&cc->tmp_frames, ufbx_cache_frame, 1);
+			ufbxi_check_err(&cc->error, frame);
+
+			uint64_t elem_size = ufbxi_cache_data_format_size[format];
+			uint64_t total_size = elem_size * count;
+			ufbxi_check_err(&cc->error, total_size / elem_size == count);
+			ufbxi_check_err(&cc->error, size >= elem_size * count);
+
+			frame->channel = cc->channel_name;
+			frame->time = (double)time * (1.0/6000.0);
+			frame->filename = cc->stream_filename;
+			frame->data_format = format;
+			frame->data_offset = cc->file_offset;
+			frame->data_count = count;
+			frame->data_element_bytes = elem_size;
+			frame->data_total_bytes = total_size;
+			frame->file_format = UFBX_CACHE_FILE_FORMAT_MC;
+
+			uint64_t end = begin + ((size + alignment - 1) & ~(uint64_t)(alignment - 1));
+			ufbxi_check_err(&cc->error, end >= cc->file_offset);
+			uint64_t left = end - cc->file_offset;
+			ufbxi_check_err(&cc->error, ufbxi_cache_skip(cc, left));
+		}
+	}
+
+	return 1;
+}
+
+static ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_context *cc, ufbx_string filename)
+{
+	cc->stream_filename = filename;
+	ufbxi_check_err(&cc->error, ufbxi_push_string_place_str(&cc->string_pool, &cc->stream_filename));
+
+	// Assume all files have at least 16 bytes of header
+	size_t magic_len = cc->stream.read_fn(cc->stream.user, cc->buffer, 16);
+	ufbxi_check_err_msg(&cc->error, magic_len <= 16, "IO error");
+	ufbxi_check_err_msg(&cc->error, magic_len == 16, "Truncated file");
+	cc->pos = cc->buffer;
+	cc->pos_end = cc->buffer + 16;
+
+	if (!memcmp(cc->buffer, "POINTCACHE2", 11)) {
+	} else if (!memcmp(cc->buffer, "FOR4", 4) || !memcmp(cc->buffer, "FOR8", 4)) {
+		ufbxi_check_err(&cc->error, ufbxi_cache_load_mc(cc));
+	} else {
+		// ufbxi_check_err(&cc->error, ufbxi_geometry_cache_load_xml(cc, magic));
+	}
+
+	return 1;
+}
+
+static ufbxi_noinline int ufbxi_cache_try_open_file(ufbxi_cache_context *cc, ufbx_string filename, bool *p_found)
+{
+	memset(&cc->stream, 0, sizeof(cc->stream));
+	// TODO: Zero termination!
+	if (!cc->open_file_fn(cc->open_file_fn, &cc->stream, filename.data, filename.length)) {
+		return 1;
+	}
+
+	int ok = ufbxi_cache_load_file(cc, filename);
+	*p_found = true;
+
+	if (cc->stream.close_fn) {
+		cc->stream.close_fn(cc->stream.user);
+	}
+
+	return ok;
+}
+
+static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_string filename)
+{
+	cc->string_pool.error = &cc->error;
+	cc->string_pool.map.ator = &cc->ator_tmp;
+	cc->string_pool.buf.ator = &cc->ator_result;
+
+	cc->tmp_frames.ator = &cc->ator_tmp;
+	cc->result.ator = &cc->ator_result;
+
+	if (!cc->open_file_fn) {
+		cc->open_file_fn = ufbxi_open_file;
+	}
+
+	bool found = false;
+	ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, &found));
+	if (!found) {
+		// TODO: Search
+		ufbxi_fail_err_msg(&cc->error, "open_file_fn()", "File not found");
+	}
+
+	size_t num_frames = cc->tmp_frames.num_items;
+	cc->cache.frames.count = num_frames;
+	cc->cache.frames.data = ufbxi_push_pop(&cc->result, &cc->tmp_frames, ufbx_cache_frame, num_frames);
+	ufbxi_check_err(&cc->error, cc->cache.frames.data);
+
+	// Must be last allocation!
+	cc->imp = ufbxi_push(&cc->result, ufbxi_geometry_cache_imp, 1);
+	ufbxi_check_err(&cc->error, cc->imp);
+
+	cc->imp->cache = cc->cache;
+	cc->imp->magic = UFBXI_CACHE_IMP_MAGIC;
+	cc->imp->owned_by_scene = cc->owned_by_scene;
+	cc->imp->ator = cc->ator_result;
+	cc->imp->result_buf = cc->result;
+	cc->imp->string_buf = cc->string_pool.buf;
+
+	return 1;
+}
+
+ufbxi_noinline static ufbx_geometry_cache *ufbxi_cache_load(ufbxi_cache_context *cc, ufbx_string filename)
+{
+	int ok = ufbxi_cache_load_imp(cc, filename);
+
+	ufbxi_buf_free(&cc->tmp_frames);
+	if (!cc->owned_by_scene) {
+		ufbxi_map_free(&cc->string_pool.map);
+		ufbxi_free(&cc->ator_tmp, char, cc->name_buf, cc->name_cap);
+		ufbxi_free_ator(&cc->ator_tmp);
+	}
+
+	if (ok) {
+		return &cc->imp->cache;
+	} else {
+		ufbxi_fix_error_type(&cc->error, "Failed to load geometry cache");
+		if (!cc->owned_by_scene) {
+			ufbxi_buf_free(&cc->string_pool.buf);
+			ufbxi_free_ator(&cc->ator_result);
+		}
+		return NULL;
+	}
+}
+
+ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string filename, const ufbx_geometry_cache_opts *user_opts, ufbx_error *p_error)
+{
+	ufbx_geometry_cache_opts opts;
+	if (user_opts) {
+		opts = *user_opts;
+	} else {
+		memset(&opts, 0, sizeof(opts));
+	}
+
+	ufbxi_cache_context cc = { 0 };
+	ufbxi_init_ator(&cc.error, &cc.ator_tmp, &opts.temp_allocator);
+	ufbxi_init_ator(&cc.error, &cc.ator_result, &opts.result_allocator);
+	cc.open_file_fn = opts.open_file_fn;
+	cc.open_file_user = opts.open_file_user;
+
+	ufbx_geometry_cache *cache = ufbxi_cache_load(&cc, filename);
+	if (p_error) {
+		if (cache) {
+			p_error->type = UFBX_ERROR_NONE;
+			p_error->description = NULL;
+			p_error->stack_size = 0;
+		} else {
+			*p_error = cc.error;
+		}
+	}
+	return cache;
 }
 
 // -- API
@@ -14929,6 +15276,23 @@ void ufbx_free_mesh(ufbx_mesh *mesh)
 	ufbxi_buf_free(&result);
 	ufbxi_free_ator(&ator);
 }
+
+ufbx_geometry_cache *ufbx_load_geometry_cache(
+	const char *filename,
+	const ufbx_geometry_cache_opts *opts, ufbx_error *error)
+{
+	return ufbx_load_geometry_cache_len(filename, strlen(filename),
+		opts, error);
+}
+
+ufbx_geometry_cache *ufbx_load_geometry_cache_len(
+	const char *filename, size_t filename_len,
+	const ufbx_geometry_cache_opts *opts, ufbx_error *error)
+{
+	ufbx_string str = { filename, filename_len };
+	return ufbxi_load_geometry_cache(str, opts, error);
+}
+
 
 #ifdef __cplusplus
 }

@@ -1117,18 +1117,26 @@ typedef enum ufbx_cache_file_format {
 	UFBX_CACHE_FILE_FORMAT_MC,  // .mc/.mcx Maya cache file
 } ufbx_cache_file_format;
 
+typedef enum ufbx_cache_data_format {
+	UFBX_CACHE_DATA_UNKNOWN,
+	UFBX_CACHE_DATA_REAL_FLOAT,  // < Contiguous `float data[]`
+	UFBX_CACHE_DATA_VEC3_FLOAT,  // < Contiguous `struct { float x, y, z; } data[]`
+	UFBX_CACHE_DATA_REAL_DOUBLE, // < Contiguous `double data[]`
+	UFBX_CACHE_DATA_VEC3_DOUBLE, // < Contiguous `struct { double x, y, z; } data[]`
+} ufbx_cache_data_format;
+
 typedef struct ufbx_cache_frame {
 	ufbx_string channel;
 	double time;
 
-	ufbx_string absolute_filename;
+	ufbx_string filename;
+	ufbx_cache_file_format file_format;
 
-	bool has_raw_data;           // < If `true` you can interpret the following data (TODO)
-	uint64_t raw_data_offset;    // < Offset into the file
-	size_t raw_data_components;  // < Number of vector components per single value
-	size_t raw_data_bytes;       // < 4 or 8 bytes per component
-
-	ufbx_cache_file_format format;
+	ufbx_cache_data_format data_format; // < Format of the data in the file
+	uint64_t data_offset;               // < Byte offset into the file
+	uint64_t data_count;                // < Number of data elements
+	uint64_t data_element_bytes;        // < Size of a single data element in bytes
+	uint64_t data_total_bytes;          // < Size of the whole data blob in bytes
 } ufbx_cache_frame;
 
 UFBX_LIST_TYPE(ufbx_cache_frame_list, ufbx_cache_frame);
