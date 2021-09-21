@@ -3409,8 +3409,7 @@ static ufbxi_noinline int ufbxi_xml_parse_tag(ufbxi_xml_context *xc, bool *p_clo
 		if (*xc->pos == '\0') {
 			*p_closing = true;
 		} else {
-			ufbx_string text;
-			ufbxi_check_err(&xc->error, ufbxi_xml_read_until(xc, &text, UFBXI_XML_CTYPE_TAG_START));
+			ufbxi_check_err(&xc->error, ufbxi_xml_read_until(xc, NULL, UFBXI_XML_CTYPE_TAG_START));
 			bool has_text = false;
 			for (size_t i = 0; i < xc->tok_len; i++) {
 				if ((ufbxi_xml_ctype[xc->tok[i]] & UFBXI_XML_CTYPE_WHITESPACE) == 0) {
@@ -13631,7 +13630,7 @@ typedef struct {
 
 	uint64_t file_offset;
 	char *pos, *pos_end;
-	char buffer[64];
+	char buffer[128];
 
 	ufbx_geometry_cache cache;
 	ufbxi_geometry_cache_imp *imp;
@@ -13708,11 +13707,28 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_skip(ufbxi_cache_context *
 
 #define ufbxi_cache_mc_tag(a,b,c,d) ((uint32_t)(a)<<24u | (uint32_t)(b)<<16 | (uint32_t)(c)<<8u | (uint32_t)(d))
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_u32(ufbxi_cache_context *cc, uint32_t *p_value, bool allow_eof)
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_tag(ufbxi_cache_context *cc, uint32_t *p_tag)
 {
 	char buf[4];
-	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, allow_eof));
+	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, true));
+	*p_tag = (uint32_t)(uint8_t)buf[0]<<24u | (uint32_t)(uint8_t)buf[1]<<16 | (uint32_t)(uint8_t)buf[2]<<8u | (uint32_t)(uint8_t)buf[3];
+	if (*p_tag == ufbxi_cache_mc_tag('F','O','R','8')) {
+		cc->mc_for8 = true;
+	}
+	if (cc->mc_for8) {
+		ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, false));
+	}
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_u32(ufbxi_cache_context *cc, uint32_t *p_value)
+{
+	char buf[4];
+	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, false));
 	*p_value = (uint32_t)(uint8_t)buf[0]<<24u | (uint32_t)(uint8_t)buf[1]<<16 | (uint32_t)(uint8_t)buf[2]<<8u | (uint32_t)(uint8_t)buf[3];
+	if (cc->mc_for8) {
+		ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, false));
+	}
 	return 1;
 }
 
@@ -13720,7 +13736,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_u64(ufbxi_cache_co
 {
 	if (!cc->mc_for8) {
 		uint32_t v32;
-		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &v32, false));
+		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &v32));
 		*p_value = v32;
 	} else {
 		char buf[8];
@@ -13738,23 +13754,20 @@ static const uint8_t ufbxi_cache_data_format_size[] = {
 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_context *cc)
 {
-	uint64_t version = 0, start = 0, end = 0;
+	uint32_t version = 0, start = 0, end = 0;
 	uint32_t count = 0, time = 0;
 	char skip_buf[8];
 
 	for (;;) {
 		uint32_t tag;
 		uint64_t size;
-		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &tag, true));
+		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_tag(cc, &tag));
 		if (tag == 0) break;
 
 		if (tag == ufbxi_cache_mc_tag('C','A','C','H') || tag == ufbxi_cache_mc_tag('M','Y','C','H')) {
 			continue;
 		}
 
-		if (tag == ufbxi_cache_mc_tag('F','O','R','8')) {
-			cc->mc_for8 = true;
-		}
 
 		if (cc->mc_for8) ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, skip_buf, 4, false));
 
@@ -13769,13 +13782,13 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 		switch (tag) {
 		case ufbxi_cache_mc_tag('F','O','R','4'): cc->mc_for8 = false; break;
 		case ufbxi_cache_mc_tag('F','O','R','8'): cc->mc_for8 = true; break;
-		case ufbxi_cache_mc_tag('V','R','S','N'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u64(cc, &version)); break;
-		case ufbxi_cache_mc_tag('S','T','I','M'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u64(cc, &start)); break;
-		case ufbxi_cache_mc_tag('E','T','I','M'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u64(cc, &end)); break;
-		case ufbxi_cache_mc_tag('T','I','M','E'):
-			ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &time, false));
-			if (cc->mc_for8) ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, skip_buf, 4, false));
+		case ufbxi_cache_mc_tag('V','R','S','N'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &version)); break;
+		case ufbxi_cache_mc_tag('S','T','I','M'):
+			ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &start));
+			time = start;
 			break;
+		case ufbxi_cache_mc_tag('E','T','I','M'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &end)); break;
+		case ufbxi_cache_mc_tag('T','I','M','E'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &time)); break;
 		case ufbxi_cache_mc_tag('C','H','N','M'): {
 			ufbxi_check_err(&cc->error, size > 0 && size < SIZE_MAX);
 			size_t length = (size_t)size - 1;
@@ -13786,10 +13799,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 			cc->channel_name.length = length;
 			ufbxi_check_err(&cc->error, ufbxi_push_string_place_str(&cc->string_pool, &cc->channel_name));
 		} break;
-		case ufbxi_cache_mc_tag('S','I','Z','E'):
-			ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &count, false));
-			if (cc->mc_for8) ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, skip_buf, 4, false));
-			break;
+		case ufbxi_cache_mc_tag('S','I','Z','E'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &count)); break;
 		case ufbxi_cache_mc_tag('F','V','C','A'): format = UFBX_CACHE_DATA_VEC3_FLOAT; break;
 		case ufbxi_cache_mc_tag('D','V','C','A'): format = UFBX_CACHE_DATA_VEC3_DOUBLE; break;
 		case ufbxi_cache_mc_tag('F','B','C','A'): format = UFBX_CACHE_DATA_REAL_FLOAT; break;
@@ -13801,9 +13811,8 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 			ufbx_cache_frame *frame = ufbxi_push_zero(&cc->tmp_frames, ufbx_cache_frame, 1);
 			ufbxi_check_err(&cc->error, frame);
 
-			uint64_t elem_size = ufbxi_cache_data_format_size[format];
-			uint64_t total_size = elem_size * count;
-			ufbxi_check_err(&cc->error, total_size / elem_size == count);
+			uint32_t elem_size = ufbxi_cache_data_format_size[format];
+			uint64_t total_size = (uint64_t)elem_size * (uint64_t)count;
 			ufbxi_check_err(&cc->error, size >= elem_size * count);
 
 			frame->channel = cc->channel_name;
@@ -13861,6 +13870,18 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_conte
 	return 1;
 }
 
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_context *cc)
+{
+	ufbxi_xml_load_opts opts = { 0 };
+	opts.ator = &cc->ator_tmp;
+	opts.read_fn = cc->stream.read_fn;
+	opts.read_user = cc->stream.user;
+	ufbxi_xml_document *doc = ufbxi_load_xml(&opts, &cc->error);
+	ufbxi_check_err(&cc->error, doc);
+
+	return 1;
+}
+
 static ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_context *cc, ufbx_string filename)
 {
 	cc->stream_filename = filename;
@@ -13878,7 +13899,7 @@ static ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_context *cc, ufbx_st
 	} else if (!memcmp(cc->buffer, "FOR4", 4) || !memcmp(cc->buffer, "FOR8", 4)) {
 		ufbxi_check_err(&cc->error, ufbxi_cache_load_mc(cc));
 	} else {
-		// ufbxi_check_err(&cc->error, ufbxi_geometry_cache_load_xml(cc, magic));
+		ufbxi_check_err(&cc->error, ufbxi_cache_load_xml(cc));
 	}
 
 	return 1;
