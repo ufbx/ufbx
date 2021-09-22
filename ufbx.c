@@ -13849,6 +13849,17 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_conte
 	ufbx_cache_frame *frames = ufbxi_push_zero(&cc->tmp_frames, ufbx_cache_frame, num_samples);
 	ufbxi_check_err(&cc->error, frames);
 
+	uint64_t total_points = (uint64_t)num_points * (uint64_t)num_samples;
+	ufbxi_check_err(&cc->error, total_points < UINT64_MAX / 12);
+
+	// Skip almost to the end of the data and try to read one byte as there's
+	// nothing after the data so we can't detect EOF..
+	if (total_points > 0) {
+		char last_byte[1];
+		ufbxi_check_err(&cc->error, ufbxi_cache_skip(cc, total_points * 12 - 1));
+		ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, last_byte, 1, false));
+	}
+
 	uint64_t offset = cc->file_offset;
 
 	for (uint32_t i = 0; i < num_samples; i++) {
