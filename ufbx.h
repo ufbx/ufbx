@@ -1562,7 +1562,7 @@ typedef struct ufbx_prop_override {
 	uint32_t element_id;
 
 	// Property name to override.
-	// Use `prop_namel.length = SIZE_MAX` for NULL-terminated strings.
+	// Use `prop_name.length = SIZE_MAX` for NULL-terminated strings.
 	ufbx_string prop_name;
 
 	// Override value, use `value.x` for scalars. `value_int` is initialized
