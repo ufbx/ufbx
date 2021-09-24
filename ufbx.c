@@ -1167,13 +1167,14 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 	return 0;
 }
 
+#define ufbxi_cond_str(cond) #cond
 
-#define ufbxi_check_err(err, cond) do { if (!(cond)) { ufbxi_fail_imp_err((err), #cond, __FUNCTION__, __LINE__); return 0; } } while (0)
-#define ufbxi_check_return_err(err, cond, ret) do { if (!(cond)) { ufbxi_fail_imp_err((err), #cond, __FUNCTION__, __LINE__); return ret; } } while (0)
+#define ufbxi_check_err(err, cond) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return 0; } } while (0)
+#define ufbxi_check_return_err(err, cond, ret) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail_err(err, desc) return ufbxi_fail_imp_err(err, desc, __FUNCTION__, __LINE__)
 
-#define ufbxi_check_err_msg(err, cond, msg) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__); return 0; } } while (0)
-#define ufbxi_check_return_err_msg(err, cond, ret, msg) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__); return ret; } } while (0)
+#define ufbxi_check_err_msg(err, cond, msg) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return 0; } } while (0)
+#define ufbxi_check_return_err_msg(err, cond, ret, msg) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail_err_msg(err, desc, msg) return ufbxi_fail_imp_err(err, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
 
 // -- Allocator
@@ -2722,6 +2723,7 @@ typedef struct {
 
 typedef struct {
 
+	ufbx_error error;
 	uint32_t version;
 	ufbx_exporter exporter;
 	uint32_t exporter_version;
@@ -2824,7 +2826,6 @@ typedef struct {
 	ufbx_scene scene;
 	ufbxi_scene_imp *scene_imp;
 
-	ufbx_error error;
 	ufbx_inflate_retain *inflate_retain;
 
 	uint64_t root_id;
@@ -2842,12 +2843,12 @@ static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, co
 	return ufbxi_fail_imp_err(&uc->error, cond, func, line);
 }
 
-#define ufbxi_check(cond) if (!(cond)) return ufbxi_fail_imp(uc, #cond, __FUNCTION__, __LINE__)
-#define ufbxi_check_return(cond, ret) do { if (!(cond)) { ufbxi_fail_imp(uc, #cond, __FUNCTION__, __LINE__); return ret; } } while (0)
+#define ufbxi_check(cond) if (!(cond)) return ufbxi_fail_imp(uc, ufbxi_cond_str(cond), __FUNCTION__, __LINE__)
+#define ufbxi_check_return(cond, ret) do { if (!(cond)) { ufbxi_fail_imp(uc, ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail(desc) return ufbxi_fail_imp(uc, desc, __FUNCTION__, __LINE__)
 
-#define ufbxi_check_msg(cond, msg) if (!(cond)) return ufbxi_fail_imp(uc, ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__)
-#define ufbxi_check_return_msg(cond, ret, msg) do { if (!(cond)) { ufbxi_fail_imp(uc, ufbxi_error_msg(#cond, msg), __FUNCTION__, __LINE__); return ret; } } while (0)
+#define ufbxi_check_msg(cond, msg) if (!(cond)) return ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__)
+#define ufbxi_check_return_msg(cond, ret, msg) do { if (!(cond)) { ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail_msg(desc, msg) return ufbxi_fail_imp(uc, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
 
 // -- Progress
@@ -2991,7 +2992,15 @@ ufbxi_nodiscard static int ufbxi_skip_bytes(ufbxi_context *uc, uint64_t size)
 			uc->data_offset += size;
 			while (size >= UFBXI_MAX_SKIP_SIZE) {
 				size -= UFBXI_MAX_SKIP_SIZE;
-				ufbxi_check_msg(uc->skip_fn(uc->read_user, UFBXI_MAX_SKIP_SIZE), "Truncated file");
+				ufbxi_check_msg(uc->skip_fn(uc->read_user, UFBXI_MAX_SKIP_SIZE - 1), "Truncated file");
+
+				// Check that we can read at least one byte in case the file is broken
+				// and causes us to seek indefinitely forwards as `fseek()` does not
+				// report if we hit EOF...
+				char single_byte[1];
+				size_t num_read = uc->read_fn(uc->read_user, single_byte, 1);
+				ufbxi_check_msg(num_read <= 1, "IO error");
+				ufbxi_check_msg(num_read == 1, "Truncated file");
 			}
 
 			if (size > 0) {
@@ -3198,6 +3207,8 @@ static void ufbxi_file_close(void *user)
 
 static bool ufbxi_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len)
 {
+	(void)user;
+
 	ufbxi_allocator tmp_ator = { 0 };
 	ufbx_error tmp_error = { UFBX_ERROR_NONE };
 	ufbxi_init_ator(&tmp_error, &tmp_ator, NULL);
@@ -3358,7 +3369,6 @@ static ufbxi_noinline int ufbxi_xml_read_until(ufbxi_xml_context *xc, ufbx_strin
 				ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, c));
 			}
 			ufbxi_xml_advance(xc);
-			size_t entity_len = xc->tok_len - entity_begin;
 			ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, '\0'));
 
 			char *entity = xc->tok + entity_begin;
@@ -3388,8 +3398,8 @@ static ufbxi_noinline int ufbxi_xml_read_until(ufbxi_xml_context *xc, ufbx_strin
 					bytes[2] = (char)(0x80 | ((code>>6) & 0x3f));
 					bytes[3] = (char)(0x80 | (code & 0x3f));
 				}
-				for (char *c = bytes; *c; c++) {
-					ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, *c));
+				for (char *b = bytes; *b; b++) {
+					ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, *b));
 				}
 			} else {
 				char ch = '\0';
@@ -3428,7 +3438,7 @@ static ufbxi_noinline int ufbxi_xml_parse_tag(ufbxi_xml_context *xc, bool *p_clo
 			ufbxi_check_err(&xc->error, ufbxi_xml_read_until(xc, NULL, UFBXI_XML_CTYPE_TAG_START));
 			bool has_text = false;
 			for (size_t i = 0; i < xc->tok_len; i++) {
-				if ((ufbxi_xml_ctype[xc->tok[i]] & UFBXI_XML_CTYPE_WHITESPACE) == 0) {
+				if ((ufbxi_xml_ctype[(uint8_t)xc->tok[i]] & UFBXI_XML_CTYPE_WHITESPACE) == 0) {
 					has_text = true;
 					break;
 				}
@@ -3456,7 +3466,7 @@ static ufbxi_noinline int ufbxi_xml_parse_tag(ufbxi_xml_context *xc, bool *p_clo
 		return 1;
 	} else if (ufbxi_xml_accept(xc, '!')) {
 		if (ufbxi_xml_accept(xc, '[')) {
-			for (char *ch = "CDATA["; *ch; ch++) {
+			for (const char *ch = "CDATA["; *ch; ch++) {
 				if (!ufbxi_xml_accept(xc, *ch)) return 0;
 			}
 
@@ -3570,7 +3580,7 @@ typedef struct {
 
 static ufbxi_noinline ufbxi_xml_document *ufbxi_load_xml(ufbxi_xml_load_opts *opts, ufbx_error *error)
 {
-	ufbxi_xml_context xc = { 0 };
+	ufbxi_xml_context xc = { UFBX_ERROR_NONE };
 	xc.ator = opts->ator;
 	xc.read_fn = opts->read_fn;
 	xc.read_user = opts->read_user;
@@ -12321,7 +12331,7 @@ static ufbxi_noinline bool ufbxi_find_prop_override(const ufbx_const_prop_overri
 	if (ix != SIZE_MAX) {
 		const ufbx_prop_override *over = &overrides->data[ix];
 		const uint32_t clear_flags = UFBX_PROP_FLAG_NO_VALUE | UFBX_PROP_FLAG_NOT_FOUND;
-		prop->flags = (ufbx_prop_flags)(prop->flags & ~clear_flags | UFBX_PROP_FLAG_OVERRIDDEN);
+		prop->flags = (ufbx_prop_flags)((prop->flags & ~clear_flags) | UFBX_PROP_FLAG_OVERRIDDEN);
 		prop->value_vec3 = over->value;
 		prop->value_int = over->value_int;
 		prop->value_str = over->value_str;
@@ -13832,16 +13842,28 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_read(ufbxi_cache_context *
 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_skip(ufbxi_cache_context *cc, uint64_t size)
 {
-	uint64_t buffered = ufbxi_min_sz((uint64_t)(cc->pos_end - cc->pos), size);
+	uint64_t buffered = ufbxi_min64((uint64_t)(cc->pos_end - cc->pos), size);
 	cc->pos += buffered;
 	size -= buffered;
 
 	if (cc->stream.skip_fn) {
-		while (size > 0) {
-			size_t to_skip = (size_t)ufbxi_min64(size, UFBXI_MAX_SKIP_SIZE);
-			size -= to_skip;
-			ufbxi_check_err_msg(&cc->error, cc->stream.skip_fn(cc->stream.user, to_skip), "Truncated file");
+		while (size >= UFBXI_MAX_SKIP_SIZE) {
+			size -= UFBXI_MAX_SKIP_SIZE;
+			ufbxi_check_err_msg(&cc->error, cc->stream.skip_fn(cc->stream.user, UFBXI_MAX_SKIP_SIZE - 1), "Truncated file");
+
+			// Check that we can read at least one byte in case the file is broken
+			// and causes us to seek indefinitely forwards as `fseek()` does not
+			// report if we hit EOF...
+			char single_byte[1];
+			size_t num_read = cc->stream.read_fn(cc->stream.user, single_byte, 1);
+			ufbxi_check_err_msg(&cc->error, num_read <= 1, "IO error");
+			ufbxi_check_err_msg(&cc->error, num_read == 1, "Truncated file");
 		}
+
+		if (size > 0) {
+			ufbxi_check_err_msg(&cc->error, cc->stream.skip_fn(cc->stream.user, (size_t)size), "Truncated file");
+		}
+
 	} else {
 		char skip_buf[2048];
 		while (size > 0) {
@@ -13904,7 +13926,7 @@ static const uint8_t ufbxi_cache_data_format_size[] = {
 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_context *cc)
 {
-	uint32_t version = 0, start = 0, end = 0;
+	uint32_t version = 0, time_start = 0, time_end = 0;
 	uint32_t count = 0, time = 0;
 	char skip_buf[8];
 
@@ -13924,8 +13946,6 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u64(cc, &size));
 		uint64_t begin = cc->file_offset;
 
-		bool do_skip = false;
-
 		size_t alignment = cc->mc_for8 ? 8 : 4;
 
 		ufbx_cache_data_format format = UFBX_CACHE_DATA_UNKNOWN;
@@ -13934,10 +13954,10 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 		case ufbxi_cache_mc_tag('F','O','R','8'): cc->mc_for8 = true; break;
 		case ufbxi_cache_mc_tag('V','R','S','N'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &version)); break;
 		case ufbxi_cache_mc_tag('S','T','I','M'):
-			ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &start));
-			time = start;
+			ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &time_start));
+			time = time_start;
 			break;
-		case ufbxi_cache_mc_tag('E','T','I','M'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &end)); break;
+		case ufbxi_cache_mc_tag('E','T','I','M'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &time_end)); break;
 		case ufbxi_cache_mc_tag('T','I','M','E'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &time)); break;
 		case ufbxi_cache_mc_tag('C','H','N','M'): {
 			ufbxi_check_err(&cc->error, size > 0 && size < SIZE_MAX);
@@ -13995,6 +14015,8 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_conte
 	double start_frame = ufbxi_read_f32(header + 20);
 	double frames_per_sample = ufbxi_read_f32(header + 24);
 	uint32_t num_samples = ufbxi_read_u32(header + 28);
+
+	(void)version;
 
 	ufbx_cache_frame *frames = ufbxi_push_zero(&cc->tmp_frames, ufbx_cache_frame, num_samples);
 	ufbxi_check_err(&cc->error, frames);
@@ -14137,7 +14159,7 @@ static ufbxi_noinline int ufbxi_cache_try_open_file(ufbxi_cache_context *cc, ufb
 {
 	memset(&cc->stream, 0, sizeof(cc->stream));
 	// TODO: Zero termination!
-	if (!cc->open_file_fn(cc->open_file_fn, &cc->stream, filename.data, filename.length)) {
+	if (!cc->open_file_fn(cc->open_file_user, &cc->stream, filename.data, filename.length)) {
 		return 1;
 	}
 
@@ -14226,7 +14248,7 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 		memset(&opts, 0, sizeof(opts));
 	}
 
-	ufbxi_cache_context cc = { 0 };
+	ufbxi_cache_context cc = { UFBX_ERROR_NONE };
 	ufbxi_init_ator(&cc.error, &cc.ator_tmp, &opts.temp_allocator);
 	ufbxi_init_ator(&cc.error, &cc.ator_result, &opts.result_allocator);
 	cc.open_file_fn = opts.open_file_fn;
@@ -14304,7 +14326,7 @@ const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES] = {
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)
 {
-	ufbxi_context uc = { 0 };
+	ufbxi_context uc = { UFBX_ERROR_NONE };
 	uc.data_begin = uc.data = (const char *)data;
 	uc.data_size = size;
 	uc.progress_bytes_total = size;
@@ -14346,7 +14368,7 @@ ufbx_scene *ufbx_load_stdio(void *file_void, const ufbx_load_opts *opts, ufbx_er
 {
 	FILE *file = (FILE*)file_void;
 
-	ufbxi_context uc = { 0 };
+	ufbxi_context uc = { UFBX_ERROR_NONE };
 	uc.read_fn = &ufbxi_file_read;
 	uc.skip_fn = &ufbxi_file_skip;
 	uc.read_user = file;
@@ -14376,7 +14398,7 @@ ufbx_scene *ufbx_load_stdio(void *file_void, const ufbx_load_opts *opts, ufbx_er
 
 ufbx_scene *ufbx_load_stream(const void *prefix, size_t prefix_size, const ufbx_stream *stream, const ufbx_load_opts *opts, ufbx_error *error)
 {
-	ufbxi_context uc = { 0 };
+	ufbxi_context uc = { UFBX_ERROR_NONE };
 	uc.data_begin = uc.data = (const char *)prefix;
 	uc.data_size = prefix_size;
 	uc.read_fn = stream->read_fn;
