@@ -3424,7 +3424,6 @@ static ufbxi_noinline int ufbxi_xml_parse_tag(ufbxi_xml_context *xc, bool *p_clo
 				ufbxi_check_err(&xc->error, tag);
 				tag->name.data = ufbxi_empty_char;
 
-				ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, '\0'));
 				tag->text.length = xc->tok_len - 1;
 				tag->text.data = ufbxi_push_copy(&xc->result, char, xc->tok_len, xc->tok);
 				ufbxi_check_err(&xc->error, tag->text.data);
