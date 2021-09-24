@@ -211,6 +211,78 @@ UFBXT_FILE_TEST(maya_anim_light)
 
 		ufbx_free_scene(state);
 	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "pointLight1");
+		ufbxt_assert(node && node->light);
+		uint32_t element_id = node->light->element.id;
+
+		ufbx_prop_override overrides[] = {
+			{ element_id, { "Intensity", SIZE_MAX }, { (ufbx_real)10.0 } },
+			{ element_id, { "Color", SIZE_MAX }, { (ufbx_real)0.3, (ufbx_real)0.6, (ufbx_real)0.9 } },
+			{ element_id, { "|NewProp", SIZE_MAX }, { 10, 20, 30 }, { "Test", SIZE_MAX } },
+			{ element_id, { "IntProp", SIZE_MAX }, { 0, 0, 0 }, { NULL, 0 }, 15 },
+		};
+
+		ufbx_anim anim = scene->anim;
+		anim.prop_overrides = ufbx_prepare_prop_overrides(overrides, ufbxt_arraycount(overrides));
+
+		ufbx_scene *state = ufbx_evaluate_scene(scene, &anim, 1.0f, NULL, NULL);
+		ufbxt_assert(state);
+
+		ufbxt_check_scene(state);
+
+		ufbx_node *light_node = ufbx_find_node(state, "pointLight1");
+		ufbxt_assert(light_node);
+		ufbx_light *light = light_node->light;
+		ufbxt_assert(light);
+
+		ufbx_vec3 ref_color = { (ufbx_real)0.3, (ufbx_real)0.6, (ufbx_real)0.9 };
+		ufbxt_assert_close_real(err, light->intensity, 0.1f);
+		ufbxt_assert_close_vec3(err, light->color, ref_color);
+
+		{
+			ufbx_vec3 ref_new = { 10, 20, 30 };
+			ufbx_prop *new_prop = ufbx_find_prop(&light->props, "|NewProp");
+			ufbxt_assert(new_prop);
+			ufbxt_assert((new_prop->flags & UFBX_PROP_FLAG_OVERRIDDEN) != 0);
+			ufbxt_assert(!strcmp(new_prop->value_str.data, "Test"));
+			ufbxt_assert(new_prop->value_int == 10);
+			ufbxt_assert_close_vec3(err, new_prop->value_vec3, ref_new);
+
+			ufbx_prop *int_prop = ufbx_find_prop(&light->props, "IntProp");
+			ufbxt_assert(int_prop);
+			ufbxt_assert((int_prop->flags & UFBX_PROP_FLAG_OVERRIDDEN) != 0);
+			ufbxt_assert_close_real(err, int_prop->value_real, 15.0f);
+			ufbxt_assert(int_prop->value_int == 15);
+		}
+
+		{
+			ufbx_element *original_light = &node->light->element;
+
+			ufbx_prop color = ufbx_evaluate_prop(&anim, original_light, "Color", 1.0);
+			ufbxt_assert((color.flags & UFBX_PROP_FLAG_OVERRIDDEN) != 0);
+			ufbxt_assert_close_vec3(err, color.value_vec3, ref_color);
+
+			ufbx_prop intensity = ufbx_evaluate_prop(&anim, original_light, "Intensity", 1.0);
+			ufbxt_assert((intensity.flags & UFBX_PROP_FLAG_OVERRIDDEN) != 0);
+			ufbxt_assert_close_real(err, intensity.value_real, 10.0f);
+
+			ufbx_vec3 ref_new = { 10, 20, 30 };
+			ufbx_prop new_prop = ufbx_evaluate_prop(&anim, original_light, "|NewProp", 1.0);
+			ufbxt_assert((new_prop.flags & UFBX_PROP_FLAG_OVERRIDDEN) != 0);
+			ufbxt_assert(!strcmp(new_prop.value_str.data, "Test"));
+			ufbxt_assert(new_prop.value_int == 10);
+			ufbxt_assert_close_vec3(err, new_prop.value_vec3, ref_new);
+
+			ufbx_prop int_prop = ufbx_evaluate_prop(&anim, original_light, "IntProp", 1.0);
+			ufbxt_assert((int_prop.flags & UFBX_PROP_FLAG_OVERRIDDEN) != 0);
+			ufbxt_assert_close_real(err, int_prop.value_real, 15.0f);
+			ufbxt_assert(int_prop.value_int == 15);
+		}
+
+		ufbx_free_scene(state);
+	}
 }
 #endif
 
