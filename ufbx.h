@@ -184,6 +184,7 @@ typedef enum ufbx_prop_flags {
 	UFBX_PROP_FLAG_NOT_FOUND = 0x4000,
 	UFBX_PROP_FLAG_CONNECTED = 0x8000,
 	UFBX_PROP_FLAG_NO_VALUE = 0x10000,
+	UFBX_PROP_FLAG_OVERRIDDEN = 0x20000,
 } ufbx_prop_flags;
 
 // Single property with name/type/value.
@@ -1553,10 +1554,28 @@ typedef struct ufbx_anim_layer_desc {
 	ufbx_real weight;
 } ufbx_anim_layer_desc;
 
-UFBX_LIST_TYPE(ufbx_anim_layer_desc_list, ufbx_anim_layer_desc);
+UFBX_LIST_TYPE(ufbx_const_anim_layer_desc_list, const ufbx_anim_layer_desc);
+
+typedef struct ufbx_prop_override {
+	uint32_t element_id;
+	ufbx_string prop_name;
+
+	ufbx_vec3 value;
+	ufbx_string value_str;
+	int64_t value_int;
+
+	uint32_t internal_key;
+} ufbx_prop_override;
+
+UFBX_LIST_TYPE(ufbx_const_prop_override_list, const ufbx_prop_override);
 
 typedef struct ufbx_anim {
-	ufbx_anim_layer_desc_list layers;
+	ufbx_const_anim_layer_desc_list layers;
+
+	// Override individual `ufbx_prop` values from elements
+	// NOTE: Call `ufbx_prepare_prop_overrides()` to obtain this!
+	ufbx_const_prop_override_list prop_overrides;
+
 	bool ignore_connections;
 } ufbx_anim;
 
@@ -2342,14 +2361,16 @@ ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, doubl
 ufbx_vec2 ufbx_evaluate_anim_value_vec2(const ufbx_anim_value *anim_value, double time);
 ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, double time);
 
-ufbx_prop ufbx_evaluate_prop_len(ufbx_anim anim, const ufbx_element *element, const char *name, size_t name_len, double time);
-ufbx_inline ufbx_prop ufbx_evaluate_prop(ufbx_anim anim, const ufbx_element *element, const char *name, double time) {
+ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time);
+ufbx_inline ufbx_prop ufbx_evaluate_prop(const ufbx_anim *anim, const ufbx_element *element, const char *name, double time) {
 	return ufbx_evaluate_prop_len(anim, element, name, strlen(name), time);
 }
 
-ufbx_props ufbx_evaluate_props(ufbx_anim anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
+ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
 
-ufbx_transform ufbx_evaluate_transform(ufbx_anim anim, const ufbx_node *node, double time);
+ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *node, double time);
+
+ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *overrides, size_t num_overrides);
 
 // Evaluate the whole `scene` at a specific `time` in the animation `anim`.
 // The returned scene behaves as if it had been exported at a specific time
@@ -2358,7 +2379,7 @@ ufbx_transform ufbx_evaluate_transform(ufbx_anim anim, const ufbx_node *node, do
 //
 // NOTE: The returned scene refers to the original `scene` so it cannot be
 // freed until all evaluated scenes are freed.
-ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, ufbx_anim anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error);
+ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error);
 
 // Materials
 

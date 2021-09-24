@@ -196,7 +196,7 @@ UFBXT_FILE_TEST(maya_anim_light)
 		const ufbxt_anim_light_ref *ref = &refs[i];
 
 		double time = ref->frame * (1.0/24.0);
-		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, NULL, NULL);
+		ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, time, NULL, NULL);
 		ufbxt_assert(state);
 
 		ufbxt_check_scene(state);
@@ -231,11 +231,11 @@ UFBXT_FILE_TEST(maya_transform_animation)
 		const ufbxt_anim_transform_ref *ref = &refs[i];
 		double time = ref->frame * (1.0/24.0);
 
-		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, NULL, NULL);
+		ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, time, NULL, NULL);
 		ufbxt_assert(state);
 
 		ufbx_transform t1 = state->nodes.data[node->element.typed_id]->local_transform;
-		ufbx_transform t2 = ufbx_evaluate_transform(scene->anim, node, time);
+		ufbx_transform t2 = ufbx_evaluate_transform(&scene->anim, node, time);
 
 		ufbx_vec3 t1_euler = ufbx_quat_to_euler(t1.rotation, UFBX_ROTATION_XYZ);
 		ufbx_vec3 t2_euler = ufbx_quat_to_euler(t2.rotation, UFBX_ROTATION_XYZ);
@@ -324,7 +324,7 @@ UFBXT_FILE_TEST(maya_cube_blinky)
 
 	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
 		double time = refs[i].time / 24.0;
-		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, NULL, NULL);
+		ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, time, NULL, NULL);
 		ufbxt_assert(state);
 
 		ufbxt_check_scene(state);

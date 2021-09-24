@@ -110,8 +110,8 @@ UFBXT_FILE_TEST(maya_node_attribute_zoo)
 	ufbx_camera_stereo *stereo = (ufbx_camera_stereo*)node->attrib;
 	ufbxt_assert(stereo->left && stereo->left->element.type == UFBX_ELEMENT_CAMERA);
 	ufbxt_assert(stereo->right && stereo->right->element.type == UFBX_ELEMENT_CAMERA);
-	ufbx_prop left_focal_prop = ufbx_evaluate_prop(scene->anim, &stereo->left->element, "FocalLength", 0.5);
-	ufbx_prop right_focal_prop = ufbx_evaluate_prop(scene->anim, &stereo->right->element, "FocalLength", 0.5);
+	ufbx_prop left_focal_prop = ufbx_evaluate_prop(&scene->anim, &stereo->left->element, "FocalLength", 0.5);
+	ufbx_prop right_focal_prop = ufbx_evaluate_prop(&scene->anim, &stereo->right->element, "FocalLength", 0.5);
 	ufbxt_assert_close_real(err, left_focal_prop.value_real, 42.011f);
 	ufbxt_assert_close_real(err, right_focal_prop.value_real, 42.011f);
 

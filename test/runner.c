@@ -1727,7 +1727,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			{
 				uint64_t eval_begin = cputime_cpu_tick();
-				ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, 1.0, NULL, NULL);
+				ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, 1.0, NULL, NULL);
 				uint64_t eval_end = cputime_cpu_tick();
 
 				ufbxt_assert(state);
@@ -1746,7 +1746,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			}
 
 			for (size_t i = 1; i < scene->anim_stacks.count; i++) {
-				ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim_stacks.data[i]->anim, 1.0, NULL, NULL);
+				ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim_stacks.data[i]->anim, 1.0, NULL, NULL);
 				ufbxt_assert(state);
 				ufbxt_check_scene(state);
 				ufbx_free_scene(state);

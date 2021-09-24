@@ -40,7 +40,7 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_norm
 		}
 	}
 
-	ufbx_scene *eval = ufbx_evaluate_scene(scene, anim, time, &opts, NULL);
+	ufbx_scene *eval = ufbx_evaluate_scene(scene, &anim, time, &opts, NULL);
 	ufbxt_assert(eval);
 
 	ufbxt_check_scene(eval);
@@ -204,7 +204,7 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 			double time = frame[0];
 
 			ufbx_real ref = (ufbx_real)frame[1 + chan_ix];
-			ufbx_prop prop = ufbx_evaluate_prop(scene->anim, &chan->element, "DeformPercent", time);
+			ufbx_prop prop = ufbx_evaluate_prop(&scene->anim, &chan->element, "DeformPercent", time);
 			ufbxt_assert_close_real(err, prop.value_real / 100.0f, ref);
 		}
 	}
@@ -218,7 +218,7 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 
 			opts.evaluate_skinning = eval_skin != 0;
 
-			ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, &opts, NULL);
+			ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, time, &opts, NULL);
 			ufbxt_assert(state);
 
 			for (size_t chan_ix = 0; chan_ix < 2; chan_ix++) {
@@ -227,7 +227,7 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 				ufbx_blend_channel *chan = state->blend_channels.data[top[chan_ix]->element.typed_id];
 				ufbxt_assert(chan);
 
-				ufbx_prop prop = ufbx_evaluate_prop(scene->anim, &chan->element, "DeformPercent", time);
+				ufbx_prop prop = ufbx_evaluate_prop(&scene->anim, &chan->element, "DeformPercent", time);
 
 				ufbxt_assert_close_real(err, prop.value_real / 100.0, ref);
 				ufbxt_assert_close_real(err, chan->weight, ref);
