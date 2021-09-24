@@ -3240,7 +3240,7 @@ typedef struct {
 	size_t tok_cap;
 	size_t tok_len;
 
-	char *pos;
+	const char *pos, *pos_end;
 	char data[4096];
 
 	bool io_error;
@@ -3258,7 +3258,7 @@ enum {
 
 static const uint8_t ufbxi_xml_ctype[256] = {
 	255,0,0,0,0,0,0,0,0,9,9,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	9,0,12,0,0,0,0,10,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,16,8,24,8,
+	9,0,12,0,0,0,0,10,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,16,8,8,8,
 	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
@@ -3268,14 +3268,15 @@ static ufbxi_noinline void ufbxi_xml_refill(ufbxi_xml_context *xc)
 	size_t num = xc->read_fn(xc->read_user, xc->data, sizeof(xc->data));
 	if (num == SIZE_MAX || num < sizeof(xc->data)) xc->io_error = true;
 	if (num < sizeof(xc->data)) {
-		memset(xc->data + num, 0, sizeof(xc->data) - num);
+		xc->data[num++] = '\0';
 	}
 	xc->pos = xc->data;
+	xc->pos_end = xc->data + num;
 }
 
 static ufbxi_forceinline void ufbxi_xml_advance(ufbxi_xml_context *xc)
 {
-	if (++xc->pos == xc->data + sizeof(xc->data)) ufbxi_xml_refill(xc);
+	if (++xc->pos == xc->pos_end) ufbxi_xml_refill(xc);
 }
 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_xml_push_token_char(ufbxi_xml_context *xc, char c)
@@ -3549,6 +3550,8 @@ typedef struct {
 	ufbxi_allocator *ator;
 	ufbx_read_fn *read_fn;
 	void *read_user;
+	const char *prefix;
+	size_t prefix_length;
 } ufbxi_xml_load_opts;
 
 static ufbxi_noinline ufbxi_xml_document *ufbxi_load_xml(ufbxi_xml_load_opts *opts, ufbx_error *error)
@@ -3561,7 +3564,12 @@ static ufbxi_noinline ufbxi_xml_document *ufbxi_load_xml(ufbxi_xml_load_opts *op
 	xc.tmp_stack.ator = xc.ator;
 	xc.result.ator = xc.ator;
 
-	ufbxi_xml_refill(&xc);
+	if (opts->prefix_length > 0) {
+		xc.pos = opts->prefix;
+		xc.pos_end = opts->prefix + opts->prefix_length;
+	} else {
+		ufbxi_xml_refill(&xc);
+	}
 
 	int ok = ufbxi_xml_parse_root(&xc);
 
@@ -10674,7 +10682,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbxi_check(stack->anim.layers.data);
 
 		for (size_t i = 0; i < stack->layers.count; i++) {
-			ufbx_anim_layer_desc *desc = &stack->anim.layers.data[i];
+			ufbx_anim_layer_desc *desc = (ufbx_anim_layer_desc*)&stack->anim.layers.data[i];
 			desc->layer = stack->layers.data[i];
 			desc->weight = 1.0f;
 		}
@@ -13601,6 +13609,27 @@ typedef struct {
 } ufbxi_geometry_cache_imp;
 
 typedef struct {
+	ufbx_string name;
+	ufbx_string interpretation;
+	uint32_t sample_rate;
+	uint32_t start_time;
+	uint32_t end_time;
+	uint32_t current_time;
+} ufbxi_cache_tmp_channel;
+
+typedef enum {
+	UFBXI_CACHE_XML_TYPE_NONE,
+	UFBXI_CACHE_XML_TYPE_FILE_PER_FRAME,
+	UFBXI_CACHE_XML_TYPE_SINGLE_FILE,
+} ufbxi_cache_xml_type;
+
+typedef enum {
+	UFBXI_CACHE_XML_FORMAT_NONE,
+	UFBXI_CACHE_XML_FORMAT_MCC,
+	UFBXI_CACHE_XML_FORMAT_MCX,
+} ufbxi_cache_xml_format;
+
+typedef struct {
 	ufbx_error error;
 	ufbx_string filename;
 	bool owned_by_scene;
@@ -13609,7 +13638,11 @@ typedef struct {
 	ufbxi_allocator ator_result;
 
 	ufbxi_buf result;
+	ufbxi_buf tmp;
 	ufbxi_buf tmp_frames;
+
+	ufbxi_cache_tmp_channel *channels;
+	size_t num_channels;
 
 	ufbxi_string_pool string_pool;
 
@@ -13623,13 +13656,17 @@ typedef struct {
 
 	bool mc_for8;
 
+	uint32_t xml_ticks_per_frame;
+	ufbxi_cache_xml_type xml_type;
+	ufbxi_cache_xml_format xml_format;
+
 	ufbx_string channel_name;
 
 	char *name_buf;
 	size_t name_cap;
 
 	uint64_t file_offset;
-	char *pos, *pos_end;
+	const char *pos, *pos_end;
 	char buffer[128];
 
 	ufbx_geometry_cache cache;
@@ -13887,8 +13924,75 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_conte
 	opts.ator = &cc->ator_tmp;
 	opts.read_fn = cc->stream.read_fn;
 	opts.read_user = cc->stream.user;
+	opts.prefix = cc->pos;
+	opts.prefix_length = cc->pos_end - cc->pos;
 	ufbxi_xml_document *doc = ufbxi_load_xml(&opts, &cc->error);
 	ufbxi_check_err(&cc->error, doc);
+
+	cc->xml_ticks_per_frame = 250;
+
+	ufbxi_xml_tag *tag_root = ufbxi_xml_find_child(doc->root, "Autodesk_Cache_File");
+	if (tag_root) {
+		ufbxi_xml_tag *tag_type = ufbxi_xml_find_child(tag_root, "cacheType");
+		ufbxi_xml_tag *tag_fps = ufbxi_xml_find_child(tag_root, "cacheTimePerFrame");
+		ufbxi_xml_tag *tag_channels = ufbxi_xml_find_child(tag_root, "Channels");
+
+		if (tag_type) {
+			ufbxi_xml_attrib *type = ufbxi_xml_find_attrib(tag_type, "Type");
+			ufbxi_xml_attrib *format = ufbxi_xml_find_attrib(tag_type, "Format");
+			if (type) {
+				if (!strcmp(type->value.data, "OneFilePerFrame")) {
+					cc->xml_type = UFBXI_CACHE_XML_TYPE_FILE_PER_FRAME;
+				} else if (!strcmp(type->value.data, "OneFile")) {
+					cc->xml_type = UFBXI_CACHE_XML_TYPE_SINGLE_FILE;
+				}
+			}
+			if (format) {
+				if (!strcmp(format->value.data, "mcc")) {
+					cc->xml_format = UFBXI_CACHE_XML_FORMAT_MCC;
+				} else if (!strcmp(format->value.data, "mcx")) {
+					cc->xml_format = UFBXI_CACHE_XML_FORMAT_MCX;
+				}
+			}
+		}
+
+		if (tag_fps) {
+			ufbxi_xml_attrib *fps = ufbxi_xml_find_attrib(tag_fps, "TimePerFrame");
+			if (fps) {
+				cc->xml_ticks_per_frame = (uint32_t)atoi(fps->value.data);
+			}
+		}
+
+		if (tag_channels) {
+			cc->channels = ufbxi_push_zero(&cc->tmp, ufbxi_cache_tmp_channel, tag_channels->num_children);
+			ufbxi_check_err(&cc->error, cc->channels);
+
+			ufbxi_for(ufbxi_xml_tag, tag, tag_channels->children, tag_channels->num_children) {
+				ufbxi_xml_attrib *name = ufbxi_xml_find_attrib(tag, "ChannelName");
+				ufbxi_xml_attrib *type = ufbxi_xml_find_attrib(tag, "ChannelType");
+				ufbxi_xml_attrib *interpretation = ufbxi_xml_find_attrib(tag, "ChannelInterpretation");
+				if (!(name && type && interpretation)) continue;
+
+				ufbxi_cache_tmp_channel *channel = &cc->channels[cc->num_channels++];
+				channel->name = name->value;
+				channel->interpretation = interpretation->value;
+				ufbxi_check_err(&cc->error, ufbxi_push_string_place_str(&cc->string_pool, &channel->name));
+				ufbxi_check_err(&cc->error, ufbxi_push_string_place_str(&cc->string_pool, &channel->interpretation));
+
+				ufbxi_xml_attrib *sampling_rate = ufbxi_xml_find_attrib(tag, "SamplingRate");
+				ufbxi_xml_attrib *start_time = ufbxi_xml_find_attrib(tag, "StartTime");
+				ufbxi_xml_attrib *end_time = ufbxi_xml_find_attrib(tag, "EndTime");
+				if (sampling_rate && start_time && end_time) {
+					channel->sample_rate = (uint32_t)atoi(sampling_rate->value.data);
+					channel->start_time = (uint32_t)atoi(start_time->value.data);
+					channel->end_time = (uint32_t)atoi(end_time->value.data);
+					channel->current_time = channel->start_time;
+				}
+			}
+		}
+	}
+
+	ufbxi_free_xml(doc);
 
 	return 1;
 }
@@ -13940,6 +14044,7 @@ static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_str
 	cc->string_pool.map.ator = &cc->ator_tmp;
 	cc->string_pool.buf.ator = &cc->ator_result;
 
+	cc->tmp.ator = &cc->ator_tmp;
 	cc->tmp_frames.ator = &cc->ator_tmp;
 	cc->result.ator = &cc->ator_result;
 
@@ -13979,6 +14084,7 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_cache_load(ufbxi_cache_context 
 {
 	int ok = ufbxi_cache_load_imp(cc, filename);
 
+	ufbxi_buf_free(&cc->tmp);
 	ufbxi_buf_free(&cc->tmp_frames);
 	if (!cc->owned_by_scene) {
 		ufbxi_map_free(&cc->string_pool.map);
