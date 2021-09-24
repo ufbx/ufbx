@@ -12278,8 +12278,20 @@ static ufbxi_forceinline bool ufbxi_prop_equals_to_override(uint32_t element_id,
 	return ufbxi_str_equal(prop->name, over->prop_name);
 }
 
+static ufbxi_forceinline bool ufbxi_prop_override_is_prepared(const ufbx_prop_override *over)
+{
+	if (over->internal_key != ufbxi_get_name_key(over->prop_name.data, over->prop_name.length)) return false;
+	if (over->value_str.data == NULL) return false;
+	return true;
+}
+
 static ufbxi_noinline bool ufbxi_find_prop_override(const ufbx_const_prop_override_list *overrides, uint32_t element_id, ufbx_prop *prop)
 {
+	if (overrides->count > 0) {
+		// If this assert fails make sure to call `ufbx_prepare_prop_overrides()` first!
+		ufbx_assert(ufbxi_prop_override_is_prepared(&overrides->data[0]));
+	}
+
 	size_t ix = SIZE_MAX;
 	ufbxi_macro_lower_bound_eq(ufbx_prop_override, 16, &ix, overrides->data, 0, overrides->count,
 		( ufbxi_prop_less_than_override(element_id, prop, a) ),
@@ -12299,6 +12311,11 @@ static ufbxi_noinline bool ufbxi_find_prop_override(const ufbx_const_prop_overri
 
 static ufbxi_noinline ufbx_const_prop_override_list ufbxi_find_element_prop_overrides(const ufbx_const_prop_override_list *overrides, uint32_t element_id)
 {
+	if (overrides->count > 0) {
+		// If this assert fails make sure to call `ufbx_prepare_prop_overrides()` first!
+		ufbx_assert(ufbxi_prop_override_is_prepared(&overrides->data[0]));
+	}
+
 	size_t begin = overrides->count, end = begin;
 
 	ufbxi_macro_lower_bound_eq(ufbx_prop_override, 32, &begin, overrides->data, 0, overrides->count,
@@ -12745,6 +12762,7 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 				anim.prop_overrides = ufbxi_find_element_prop_overrides(&overrides_left, elem->id);
 				overrides_left.data = anim.prop_overrides.data + anim.prop_overrides.count;
 				overrides_left.count = ec->anim.prop_overrides.data + ec->anim.prop_overrides.count - overrides_left.data;
+				num_animated += anim.prop_overrides.count;
 			}
 		}
 
@@ -14639,7 +14657,8 @@ ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, dou
 
 	size_t num_anim = 0;
 	ufbxi_for(ufbx_prop, prop, element->props.props, element->props.num_props) {
-		for (; over != over_end; over++) {
+		bool found_override = false;
+		for (; over != over_end && num_anim < buffer_size; over++) {
 			ufbx_prop *dst = &buffer[num_anim];
 			if (over->internal_key < prop->internal_key
 				|| (over->internal_key == prop->internal_key && ufbxi_str_less(over->prop_name, prop->name))) {
@@ -14656,10 +14675,12 @@ ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, dou
 			dst->value_int = over->value_int;
 			dst->value_vec3 = over->value;
 			num_anim++;
+			found_override = true;
 		}
 
-		if (!(prop->flags & (UFBX_PROP_FLAG_ANIMATED|UFBX_PROP_FLAG_CONNECTED|UFBX_PROP_FLAG_OVERRIDDEN))) continue;
+		if (!(prop->flags & (UFBX_PROP_FLAG_ANIMATED|UFBX_PROP_FLAG_CONNECTED))) continue;
 		if (num_anim >= buffer_size) break;
+		if (found_override) continue;
 
 		ufbx_prop *dst = &buffer[num_anim++];
 		*dst = *prop;
@@ -14678,7 +14699,7 @@ ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, dou
 		}
 	}
 
-	for (; over != over_end; over++) {
+	for (; over != over_end && num_anim < buffer_size; over++) {
 		ufbx_prop *dst = &buffer[num_anim++];
 		dst->name = over->prop_name;
 		dst->internal_key = over->internal_key;
@@ -14756,11 +14777,17 @@ ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *n
 ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *overrides, size_t num_overrides)
 {
 	ufbxi_for(ufbx_prop_override, over, overrides, num_overrides) {
+		if (over->prop_name.data == NULL) {
+			over->prop_name.data = ufbxi_empty_char;
+		}
 		if (over->prop_name.length == SIZE_MAX) {
 			over->prop_name.length = strlen(over->prop_name.data);
 		}
+		if (over->value_str.data == NULL) {
+			over->value_str.data = ufbxi_empty_char;
+		}
 		if (over->value_str.length == SIZE_MAX) {
-			over->value_str.length = over->value_str.data ? strlen(over->value_str.data) : 0;
+			over->value_str.length = strlen(over->value_str.data);
 		}
 		if (over->value_int == 0) {
 			over->value_int = (int64_t)over->value.x;

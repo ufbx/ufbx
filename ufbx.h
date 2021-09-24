@@ -1557,13 +1557,22 @@ typedef struct ufbx_anim_layer_desc {
 UFBX_LIST_TYPE(ufbx_const_anim_layer_desc_list, const ufbx_anim_layer_desc);
 
 typedef struct ufbx_prop_override {
+	// Element (`ufbx_element.id`) to override the property from
+	// NOTE: You can get this from typed structs eg. `my_node->element.id`
 	uint32_t element_id;
+
+	// Property name to override.
+	// Use `prop_namel.length = SIZE_MAX` for NULL-terminated strings.
 	ufbx_string prop_name;
 
+	// Override value, use `value.x` for scalars. `value_int` is initialized
+	// from `value.x` if zero so keep `value` zeroed even if you don't need it!
+	// Use `value_str.length = SIZE_MAX` for NULL-terminated strings.
 	ufbx_vec3 value;
 	ufbx_string value_str;
 	int64_t value_int;
 
+	// Internal: Gets filled automatically by `ufbx_prepare_prop_overrides()`
 	uint32_t internal_key;
 } ufbx_prop_override;
 
