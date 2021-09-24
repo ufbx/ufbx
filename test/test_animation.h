@@ -305,6 +305,7 @@ UFBXT_FILE_TEST(maya_transform_animation)
 
 		ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, time, NULL, NULL);
 		ufbxt_assert(state);
+		ufbxt_check_scene(state);
 
 		ufbx_transform t1 = state->nodes.data[node->element.typed_id]->local_transform;
 		ufbx_transform t2 = ufbx_evaluate_transform(&scene->anim, node, time);
@@ -318,6 +319,46 @@ UFBXT_FILE_TEST(maya_transform_animation)
 		ufbxt_assert_close_vec3(err, ref->rotation_euler, t2_euler);
 		ufbxt_assert_close_vec3(err, ref->scale, t1.scale);
 		ufbxt_assert_close_vec3(err, ref->scale, t2.scale);
+
+		ufbx_free_scene(state);
+	}
+
+	{
+		uint32_t element_id = node->element.id;
+		ufbxt_anim_transform_ref ref = refs[2];
+		ref.translation.x -= 0.1f;
+		ref.translation.y -= 0.2f;
+		ref.translation.z -= 0.3f;
+		ref.scale.x = 2.0f;
+		ref.scale.y = 3.0f;
+		ref.scale.z = 4.0f;
+
+		ufbx_prop_override overrides[] = {
+			{ element_id, { "Color", SIZE_MAX }, { (ufbx_real)0.3, (ufbx_real)0.6, (ufbx_real)0.9 } },
+			{ element_id, { "|NewProp", 8 }, { 10, 20, 30 }, { "Test", 4 } },
+			{ element_id, { "Lcl Scaling", SIZE_MAX }, { 2.0f, 3.0f, 4.0f } },
+			{ element_id, { "RotationOffset", SIZE_MAX }, { -0.1f, -0.2f, -0.3f } },
+		};
+
+		double time = 14.0/24.0;
+		ufbx_anim anim = scene->anim;
+		anim.prop_overrides = ufbx_prepare_prop_overrides(overrides, ufbxt_arraycount(overrides));
+		ufbx_scene *state = ufbx_evaluate_scene(scene, &anim, time, NULL, NULL);
+		ufbxt_assert(state);
+		ufbxt_check_scene(state);
+
+		ufbx_transform t1 = state->nodes.data[node->element.typed_id]->local_transform;
+		ufbx_transform t2 = ufbx_evaluate_transform(&anim, node, time);
+
+		ufbx_vec3 t1_euler = ufbx_quat_to_euler(t1.rotation, UFBX_ROTATION_XYZ);
+		ufbx_vec3 t2_euler = ufbx_quat_to_euler(t2.rotation, UFBX_ROTATION_XYZ);
+
+		ufbxt_assert_close_vec3(err, ref.translation, t1.translation);
+		ufbxt_assert_close_vec3(err, ref.translation, t2.translation);
+		ufbxt_assert_close_vec3(err, ref.rotation_euler, t1_euler);
+		ufbxt_assert_close_vec3(err, ref.rotation_euler, t2_euler);
+		ufbxt_assert_close_vec3(err, ref.scale, t1.scale);
+		ufbxt_assert_close_vec3(err, ref.scale, t2.scale);
 
 		ufbx_free_scene(state);
 	}

@@ -2036,6 +2036,7 @@ static const char ufbxi_ByPolygonVertex[] = "ByPolygonVertex";
 static const char ufbxi_ByPolygon[] = "ByPolygon";
 static const char ufbxi_ByVertex[] = "ByVertex";
 static const char ufbxi_ByVertice[] = "ByVertice";
+static const char ufbxi_Cache[] = "Cache";
 static const char ufbxi_CameraStereo[] = "CameraStereo";
 static const char ufbxi_CameraSwitcher[] = "CameraSwitcher";
 static const char ufbxi_Camera[] = "Camera";
@@ -2051,8 +2052,8 @@ static const char ufbxi_Collection[] = "Collection";
 static const char ufbxi_ColorIndex[] = "ColorIndex";
 static const char ufbxi_Color[] = "Color";
 static const char ufbxi_Colors[] = "Colors";
-static const char ufbxi_ConeAngle[] = "ConeAngle";
 static const char ufbxi_Cone_angle[] = "Cone angle";
+static const char ufbxi_ConeAngle[] = "ConeAngle";
 static const char ufbxi_Connections[] = "Connections";
 static const char ufbxi_Constraint[] = "Constraint";
 static const char ufbxi_Content[] = "Content";
@@ -2063,9 +2064,6 @@ static const char ufbxi_Creator[] = "Creator";
 static const char ufbxi_CurrentTextureBlendMode[] = "CurrentTextureBlendMode";
 static const char ufbxi_CurrentTimeMarker[] = "CurrentTimeMarker";
 static const char ufbxi_CustomFrameRate[] = "CustomFrameRate";
-static const char ufbxi_D_X[] = "d|X";
-static const char ufbxi_D_Y[] = "d|Y";
-static const char ufbxi_D_Z[] = "d|Z";
 static const char ufbxi_DecayType[] = "DecayType";
 static const char ufbxi_DefaultCamera[] = "DefaultCamera";
 static const char ufbxi_Default[] = "Default";
@@ -2146,12 +2144,14 @@ static const char ufbxi_Light[] = "Light";
 static const char ufbxi_LimbLength[] = "LimbLength";
 static const char ufbxi_LimbNode[] = "LimbNode";
 static const char ufbxi_Limb[] = "Limb";
+static const char ufbxi_Line[] = "Line";
 static const char ufbxi_Link[] = "Link";
 static const char ufbxi_LocalStart[] = "LocalStart";
 static const char ufbxi_LocalStop[] = "LocalStop";
 static const char ufbxi_LocalTime[] = "LocalTime";
 static const char ufbxi_LodGroup[] = "LodGroup";
 static const char ufbxi_MappingInformationType[] = "MappingInformationType";
+static const char ufbxi_Marker[] = "Marker";
 static const char ufbxi_MaterialAssignation[] = "MaterialAssignation";
 static const char ufbxi_Material[] = "Material";
 static const char ufbxi_Materials[] = "Materials";
@@ -2165,7 +2165,6 @@ static const char ufbxi_Node[] = "Node";
 static const char ufbxi_NormalsIndex[] = "NormalsIndex";
 static const char ufbxi_Normals[] = "Normals";
 static const char ufbxi_Null[] = "Null";
-static const char ufbxi_Marker[] = "Marker";
 static const char ufbxi_NurbsCurve[] = "NurbsCurve";
 static const char ufbxi_NurbsSurfaceOrder[] = "NurbsSurfaceOrder";
 static const char ufbxi_NurbsSurface[] = "NurbsSurface";
@@ -2183,8 +2182,8 @@ static const char ufbxi_OuterAngle[] = "OuterAngle";
 static const char ufbxi_PO[] = "PO\0";
 static const char ufbxi_PP[] = "PP\0";
 static const char ufbxi_Periodic[] = "Periodic";
-static const char ufbxi_Points[] = "Points";
 static const char ufbxi_PointsIndex[] = "PointsIndex";
+static const char ufbxi_Points[] = "Points";
 static const char ufbxi_PolygonIndexArray[] = "PolygonIndexArray";
 static const char ufbxi_PolygonVertexIndex[] = "PolygonVertexIndex";
 static const char ufbxi_PoseNode[] = "PoseNode";
@@ -2215,6 +2214,7 @@ static const char ufbxi_ScaleAccumulationMode[] = "ScaleAccumulationMode";
 static const char ufbxi_ScalingOffset[] = "ScalingOffset";
 static const char ufbxi_ScalingPivot[] = "ScalingPivot";
 static const char ufbxi_Scaling[] = "Scaling";
+static const char ufbxi_SceneInfo[] = "SceneInfo";
 static const char ufbxi_SelectionNode[] = "SelectionNode";
 static const char ufbxi_SelectionSet[] = "SelectionSet";
 static const char ufbxi_ShadingModel[] = "ShadingModel";
@@ -2234,13 +2234,13 @@ static const char ufbxi_Take[] = "Take";
 static const char ufbxi_Takes[] = "Takes";
 static const char ufbxi_TangentsIndex[] = "TangentsIndex";
 static const char ufbxi_Tangents[] = "Tangents";
+static const char ufbxi_Texture[] = "Texture";
+static const char ufbxi_Texture_alpha[] = "Texture alpha";
 static const char ufbxi_TextureId[] = "TextureId";
 static const char ufbxi_TextureRotationPivot[] = "TextureRotationPivot";
 static const char ufbxi_TextureScalingPivot[] = "TextureScalingPivot";
-static const char ufbxi_TextureUVVerticeIndex[] = "TextureUVVerticeIndex";
 static const char ufbxi_TextureUV[] = "TextureUV";
-static const char ufbxi_Texture[] = "Texture";
-static const char ufbxi_Texture_alpha[] = "Texture alpha";
+static const char ufbxi_TextureUVVerticeIndex[] = "TextureUVVerticeIndex";
 static const char ufbxi_TimeMarker[] = "TimeMarker";
 static const char ufbxi_TimeMode[] = "TimeMode";
 static const char ufbxi_TimeProtocol[] = "TimeProtocol";
@@ -2269,12 +2269,12 @@ static const char ufbxi_Weight[] = "Weight";
 static const char ufbxi_Weights[] = "Weights";
 static const char ufbxi_WrapModeU[] = "WrapModeU";
 static const char ufbxi_WrapModeV[] = "WrapModeV";
-static const char ufbxi_Line[] = "Line";
-static const char ufbxi_SceneInfo[] = "SceneInfo";
-static const char ufbxi_Cache[] = "Cache";
 static const char ufbxi_X[] = "X\0\0";
 static const char ufbxi_Y[] = "Y\0\0";
 static const char ufbxi_Z[] = "Z\0\0";
+static const char ufbxi_d_X[] = "d|X";
+static const char ufbxi_d_Y[] = "d|Y";
+static const char ufbxi_d_Z[] = "d|Z";
 
 static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, 7 },
@@ -2309,6 +2309,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_ByPolygonVertex, 15 },
 	{ ufbxi_ByVertex, 8 },
 	{ ufbxi_ByVertice, 9 },
+	{ ufbxi_Cache, 5 },
 	{ ufbxi_Camera, 6 },
 	{ ufbxi_CameraStereo, 12 },
 	{ ufbxi_CameraSwitcher, 14 },
@@ -2324,8 +2325,8 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Color, 5 },
 	{ ufbxi_ColorIndex, 10 },
 	{ ufbxi_Colors, 6 },
-	{ ufbxi_ConeAngle, 9 },
 	{ ufbxi_Cone_angle, 10 },
+	{ ufbxi_ConeAngle, 9 },
 	{ ufbxi_Connections, 11 },
 	{ ufbxi_Constraint, sizeof(ufbxi_Constraint) - 1 },
 	{ ufbxi_Content, 7 },
@@ -2336,9 +2337,6 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_CurrentTextureBlendMode, 23 },
 	{ ufbxi_CurrentTimeMarker, 17 },
 	{ ufbxi_CustomFrameRate, 15 },
-	{ ufbxi_D_X, 3 },
-	{ ufbxi_D_Y, 3 },
-	{ ufbxi_D_Z, 3 },
 	{ ufbxi_DecayType, 9 },
 	{ ufbxi_Default, 7 },
 	{ ufbxi_DefaultCamera, 13 },
@@ -2419,12 +2417,14 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Limb, 4 },
 	{ ufbxi_LimbLength, 10 },
 	{ ufbxi_LimbNode, 8 },
+	{ ufbxi_Line, 4 },
 	{ ufbxi_Link, 4 },
 	{ ufbxi_LocalStart, 10 },
 	{ ufbxi_LocalStop, 9 },
 	{ ufbxi_LocalTime, 9 },
 	{ ufbxi_LodGroup, 8 },
 	{ ufbxi_MappingInformationType, 22 },
+	{ ufbxi_Marker, 6 },
 	{ ufbxi_Material, 8 },
 	{ ufbxi_MaterialAssignation, 19 },
 	{ ufbxi_Materials, 9 },
@@ -2438,7 +2438,6 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Normals, 7 },
 	{ ufbxi_NormalsIndex, 12 },
 	{ ufbxi_Null, 4 },
-	{ ufbxi_Marker, 6 },
 	{ ufbxi_Nurbs, 5 },
 	{ ufbxi_NurbsCurve, 10 },
 	{ ufbxi_NurbsSurface, 12 },
@@ -2488,6 +2487,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Scaling, 7 },
 	{ ufbxi_ScalingOffset, 13 },
 	{ ufbxi_ScalingPivot, 12 },
+	{ ufbxi_SceneInfo, 9 },
 	{ ufbxi_SelectionNode, 13 },
 	{ ufbxi_SelectionSet, 12 },
 	{ ufbxi_ShadingModel, 12 },
@@ -2508,12 +2508,12 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Tangents, 8 },
 	{ ufbxi_TangentsIndex, 13 },
 	{ ufbxi_Texture, 7 },
+	{ ufbxi_Texture_alpha, 13 },
 	{ ufbxi_TextureId, 9 },
 	{ ufbxi_TextureRotationPivot, 20 },
 	{ ufbxi_TextureScalingPivot, 19 },
 	{ ufbxi_TextureUV, 9 },
 	{ ufbxi_TextureUVVerticeIndex, 21 },
-	{ ufbxi_Texture_alpha, 13 },
 	{ ufbxi_TimeMarker, 10 },
 	{ ufbxi_TimeMode, 8 },
 	{ ufbxi_TimeProtocol, 12 },
@@ -2542,13 +2542,28 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Weights, 7 },
 	{ ufbxi_WrapModeU, 9 },
 	{ ufbxi_WrapModeV, 9 },
-	{ ufbxi_Line, 4 },
-	{ ufbxi_SceneInfo, 9 },
-	{ ufbxi_Cache, 5 },
 	{ ufbxi_X, 1 },
 	{ ufbxi_Y, 1 },
 	{ ufbxi_Z, 1 },
+	{ ufbxi_d_X, 3 },
+	{ ufbxi_d_Y, 3 },
+	{ ufbxi_d_Z, 3 },
 };
+
+static ufbxi_noinline const char *ufbxi_find_canonical_string(const char *data, size_t length)
+{
+	ufbx_string str = { data, length };
+
+	size_t ix = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbx_string, 8, &ix, ufbxi_strings, 0, ufbxi_arraycount(ufbxi_strings),
+		( ufbxi_str_less(*a, str) ), ( ufbxi_str_equal(*a, str) ));
+
+	if (ix < SIZE_MAX) {
+		return ufbxi_strings[ix].data;
+	} else {
+		return data;
+	}
+}
 
 // -- Type definitions
 
@@ -5693,11 +5708,17 @@ ufbxi_nodiscard static int ufbxi_parse_legacy_toplevel(ufbxi_context *uc)
 
 ufbxi_nodiscard static int ufbxi_load_strings(ufbxi_context *uc)
 {
+#if UFBX_REGRESSION
+	ufbx_string reg_prev = ufbx_empty_string;
+#endif
+
 	// Push all the global 'ufbxi_*' strings into the pool without copying them
 	// This allows us to compare name pointers to the global values
 	ufbxi_for(ufbx_string, str, ufbxi_strings, ufbxi_arraycount(ufbxi_strings)) {
 #if UFBX_REGRESSION
 		ufbx_assert(strlen(str->data) == str->length);
+		ufbx_assert(ufbxi_str_less(reg_prev, *str));
+		reg_prev = *str;
 #endif
 		ufbxi_check(ufbxi_push_string_imp(&uc->string_pool, str->data, str->length, false));
 	}
@@ -10760,11 +10781,11 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 
 		// TODO: Search for things like d|Visibility with a constructed name
 		value->default_value.x = ufbxi_find_real(&value->props, ufbxi_X, value->default_value.x);
-		value->default_value.x = ufbxi_find_real(&value->props, ufbxi_D_X, value->default_value.x);
+		value->default_value.x = ufbxi_find_real(&value->props, ufbxi_d_X, value->default_value.x);
 		value->default_value.y = ufbxi_find_real(&value->props, ufbxi_Y, value->default_value.y);
-		value->default_value.y = ufbxi_find_real(&value->props, ufbxi_D_Y, value->default_value.y);
+		value->default_value.y = ufbxi_find_real(&value->props, ufbxi_d_Y, value->default_value.y);
 		value->default_value.z = ufbxi_find_real(&value->props, ufbxi_Z, value->default_value.z);
-		value->default_value.z = ufbxi_find_real(&value->props, ufbxi_D_Z, value->default_value.z);
+		value->default_value.z = ufbxi_find_real(&value->props, ufbxi_d_Z, value->default_value.z);
 
 		ufbxi_for_list(ufbx_connection, conn, value->element.connections_dst) {
 			if (conn->src->type == UFBX_ELEMENT_ANIM_CURVE && conn->src_prop.length == 0) {
@@ -10772,8 +10793,8 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 
 				uint32_t index = 0;
 				const char *name = conn->dst_prop.data;
-				if (name == ufbxi_Y || name == ufbxi_D_Y) index = 1;
-				if (name == ufbxi_Z || name == ufbxi_D_Z) index = 2;
+				if (name == ufbxi_Y || name == ufbxi_d_Y) index = 1;
+				if (name == ufbxi_Z || name == ufbxi_d_Z) index = 2;
 
 				ufbx_prop *prop = ufbx_find_prop_len(&value->props, conn->dst_prop.data, conn->dst_prop.length);
 				if (prop) {
@@ -14849,6 +14870,8 @@ ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *ov
 		} else if (over->value.x == 0.0) {
 			over->value.x = (ufbx_real)over->value_int;
 		}
+
+		over->prop_name.data = ufbxi_find_canonical_string(over->prop_name.data, over->prop_name.length);
 		over->internal_key = ufbxi_get_name_key(over->prop_name.data, over->prop_name.length);
 	}
 
