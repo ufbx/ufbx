@@ -1714,6 +1714,7 @@ typedef struct {
 
 static ufbxi_noinline bool ufbxi_map_grow_size_imp(ufbxi_map *map, size_t item_size, size_t min_size)
 {
+	ufbx_assert(min_size > 0);
 	const double load_factor = 0.7;
 
 	// Find the lowest power of two size that fits `min_size` within `load_factor`
@@ -1924,6 +1925,7 @@ typedef struct {
 	ufbx_error *error;
 	ufbxi_buf buf; // < Buffer for the actual string data
 	ufbxi_map map; // < Map of `ufbxi_string`
+	size_t initial_size; // < Number of initial entries
 } ufbxi_string_pool;
 
 static ufbxi_forceinline bool ufbxi_str_equal(ufbx_string a, ufbx_string b)
@@ -1954,7 +1956,7 @@ ufbxi_nodiscard static const char *ufbxi_push_string_imp(ufbxi_string_pool *pool
 {
 	if (length == 0) return ufbxi_empty_char;
 
-	ufbxi_check_return_err(pool->error, ufbxi_map_grow(&pool->map, ufbx_string, 1024), NULL);
+	ufbxi_check_return_err(pool->error, ufbxi_map_grow(&pool->map, ufbx_string, pool->initial_size), NULL);
 
 	uint32_t hash = ufbxi_hash_string(str, length);
 	uint32_t scan = 0;
@@ -3598,7 +3600,7 @@ static ufbxi_noinline ufbxi_xml_document *ufbxi_load_xml(ufbxi_xml_load_opts *op
 	int ok = ufbxi_xml_parse_root(&xc);
 
 	ufbxi_buf_free(&xc.tmp_stack);
-	ufbxi_free(xc.ator, char, xc.tok, xc.tok_len);
+	ufbxi_free(xc.ator, char, xc.tok, xc.tok_cap);
 
 	if (ok) {
 		return xc.doc;
@@ -12198,6 +12200,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->string_pool.error = &uc->error;
 	uc->string_pool.map.ator = &uc->ator_tmp;
 	uc->string_pool.buf.ator = &uc->ator_result;
+	uc->string_pool.initial_size = 1024;
 
 	uc->prop_type_map.ator = &uc->ator_tmp;
 	uc->fbx_id_map.ator = &uc->ator_tmp;
@@ -13738,6 +13741,8 @@ typedef struct {
 	uint32_t start_time;
 	uint32_t end_time;
 	uint32_t current_time;
+	uint32_t conescutive_fails;
+	bool try_load;
 } ufbxi_cache_tmp_channel;
 
 typedef enum {
@@ -13779,6 +13784,7 @@ typedef struct {
 
 	bool mc_for8;
 
+	ufbx_string xml_filename;
 	uint32_t xml_ticks_per_frame;
 	ufbxi_cache_xml_type xml_type;
 	ufbxi_cache_xml_format xml_format;
@@ -13887,9 +13893,6 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_tag(ufbxi_cache_co
 	if (*p_tag == ufbxi_cache_mc_tag('F','O','R','8')) {
 		cc->mc_for8 = true;
 	}
-	if (cc->mc_for8) {
-		ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, false));
-	}
 	return 1;
 }
 
@@ -13939,9 +13942,9 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 		if (tag == ufbxi_cache_mc_tag('C','A','C','H') || tag == ufbxi_cache_mc_tag('M','Y','C','H')) {
 			continue;
 		}
-
-
-		if (cc->mc_for8) ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, skip_buf, 4, false));
+		if (cc->mc_for8) {
+			ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, skip_buf, 4, false));
+		}
 
 		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u64(cc, &size));
 		uint64_t begin = cc->file_offset;
@@ -14065,6 +14068,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_conte
 	ufbxi_check_err(&cc->error, doc);
 
 	cc->xml_ticks_per_frame = 250;
+	cc->xml_filename = cc->stream_filename;
 
 	ufbxi_xml_tag *tag_root = ufbxi_xml_find_child(doc->root, "Autodesk_Cache_File");
 	if (tag_root) {
@@ -14094,7 +14098,10 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_conte
 		if (tag_fps) {
 			ufbxi_xml_attrib *fps = ufbxi_xml_find_attrib(tag_fps, "TimePerFrame");
 			if (fps) {
-				cc->xml_ticks_per_frame = (uint32_t)atoi(fps->value.data);
+				int value = atoi(fps->value.data);
+				if (value > 0) {
+					cc->xml_ticks_per_frame = (uint32_t)value;
+				}
 			}
 		}
 
@@ -14122,6 +14129,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_conte
 					channel->start_time = (uint32_t)atoi(start_time->value.data);
 					channel->end_time = (uint32_t)atoi(end_time->value.data);
 					channel->current_time = channel->start_time;
+					channel->try_load = true;
 				}
 			}
 		}
@@ -14132,7 +14140,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_conte
 	return 1;
 }
 
-static ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_context *cc, ufbx_string filename)
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_context *cc, ufbx_string filename)
 {
 	cc->stream_filename = filename;
 	ufbxi_check_err(&cc->error, ufbxi_push_string_place_str(&cc->string_pool, &cc->stream_filename));
@@ -14155,10 +14163,12 @@ static ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_context *cc, ufbx_st
 	return 1;
 }
 
-static ufbxi_noinline int ufbxi_cache_try_open_file(ufbxi_cache_context *cc, ufbx_string filename, bool *p_found)
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_try_open_file(ufbxi_cache_context *cc, ufbx_string filename, bool *p_found)
 {
 	memset(&cc->stream, 0, sizeof(cc->stream));
-	// TODO: Zero termination!
+#if UFBX_REGRESSION
+	ufbx_assert(strlen(filename.data) == filename.length);
+#endif
 	if (!cc->open_file_fn(cc->open_file_user, &cc->stream, filename.data, filename.length)) {
 		return 1;
 	}
@@ -14173,11 +14183,97 @@ static ufbxi_noinline int ufbxi_cache_try_open_file(ufbxi_cache_context *cc, ufb
 	return ok;
 }
 
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cache_context *cc)
+{
+	if (cc->xml_filename.length == 0) return 1;
+
+	const char *extension = NULL;
+	switch (cc->xml_format) {
+	case UFBXI_CACHE_XML_FORMAT_MCC: extension = "mc"; break;
+	case UFBXI_CACHE_XML_FORMAT_MCX: extension = "mcx"; break;
+	default: return 1;
+	}
+
+	// Ensure worst case space for `path/filenameFrame123Tick456.mcx`
+	size_t name_buf_len = cc->xml_filename.length + 64;
+	char *name_buf = ufbxi_push(&cc->tmp, char, name_buf_len);
+	ufbxi_check_err(&cc->error, name_buf);
+
+	// Find the prefix before `.xml`
+	size_t prefix_len = cc->xml_filename.length;
+	for (size_t i = prefix_len; i > 0; --i) {
+		if (cc->xml_filename.data[i - 1] == '.') {
+			prefix_len = i - 1;
+			break;
+		}
+	}
+	memcpy(name_buf, cc->xml_filename.data, prefix_len);
+
+	char *suffix_data = name_buf + prefix_len;
+	size_t suffix_len = name_buf_len - prefix_len;
+
+	ufbx_string filename;
+	filename.data = name_buf;
+
+	if (cc->xml_type == UFBXI_CACHE_XML_TYPE_SINGLE_FILE) {
+		filename.length = prefix_len + (size_t)snprintf(suffix_data, suffix_len, ".%s", extension);
+		bool found = false;
+		ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, &found));
+	} else if (cc->xml_type == UFBXI_CACHE_XML_TYPE_FILE_PER_FRAME) {
+		uint32_t lowest_time = 0;
+		for (;;) {
+			// Find the first `time >= lowest_time` value that has data in some channel
+			uint32_t time = UINT32_MAX;
+			ufbxi_for(ufbxi_cache_tmp_channel, chan, cc->channels, cc->num_channels) {
+				if (!chan->try_load || chan->conescutive_fails > 10) continue;
+				uint32_t sample_rate = chan->sample_rate ? chan->sample_rate : cc->xml_ticks_per_frame;
+				if (chan->current_time < lowest_time) {
+					uint32_t delta = (lowest_time - chan->current_time - 1) / sample_rate;
+					chan->current_time += delta * sample_rate;
+					if (UINT32_MAX - chan->current_time >= sample_rate) {
+						chan->current_time += sample_rate;
+					} else {
+						chan->try_load = false;
+						continue;
+					}
+				}
+				if (chan->current_time <= chan->end_time) {
+					time = ufbxi_min32(time, chan->current_time);
+				}
+			}
+			if (time == UINT32_MAX) break;
+
+			// Try to load a file at the specified frame/tick
+			uint32_t frame = time / cc->xml_ticks_per_frame;
+			uint32_t tick = time % cc->xml_ticks_per_frame;
+			if (tick == 0) {
+				filename.length = prefix_len + (size_t)snprintf(suffix_data, suffix_len, "Frame%u.%s", frame, extension);
+			} else {
+				filename.length = prefix_len + (size_t)snprintf(suffix_data, suffix_len, "Frame%uTick%u.%s", frame, tick, extension);
+			}
+			bool found = false;
+			ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, &found));
+
+			// Update channel status
+			ufbxi_for(ufbxi_cache_tmp_channel, chan, cc->channels, cc->num_channels) {
+				if (chan->current_time == time) {
+					chan->conescutive_fails = found ? 0 : chan->conescutive_fails + 1;
+				}
+			}
+
+			lowest_time = time + 1;
+		}
+	}
+
+	return 1;
+}
+
 static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_string filename)
 {
 	cc->string_pool.error = &cc->error;
 	cc->string_pool.map.ator = &cc->ator_tmp;
 	cc->string_pool.buf.ator = &cc->ator_result;
+	cc->string_pool.initial_size = 64;
 
 	cc->tmp.ator = &cc->ator_tmp;
 	cc->tmp_frames.ator = &cc->ator_tmp;
@@ -14189,12 +14285,17 @@ static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_str
 		cc->open_file_fn = ufbxi_open_file;
 	}
 
+	// TODO: NULL termination!
 	bool found = false;
 	ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, &found));
 	if (!found) {
 		// TODO: Search
 		ufbxi_fail_err_msg(&cc->error, "open_file_fn()", "File not found");
 	}
+
+	cc->cache.root_filename = cc->stream_filename;
+
+	ufbxi_check_err(&cc->error, ufbxi_cache_load_frame_files(cc));
 
 	size_t num_frames = cc->tmp_frames.num_items;
 	cc->cache.frames.count = num_frames;
@@ -14221,9 +14322,9 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_cache_load(ufbxi_cache_context 
 
 	ufbxi_buf_free(&cc->tmp);
 	ufbxi_buf_free(&cc->tmp_frames);
+	ufbxi_free(&cc->ator_tmp, char, cc->name_buf, cc->name_cap);
 	if (!cc->owned_by_scene) {
 		ufbxi_map_free(&cc->string_pool.map);
-		ufbxi_free(&cc->ator_tmp, char, cc->name_buf, cc->name_cap);
 		ufbxi_free_ator(&cc->ator_tmp);
 	}
 
