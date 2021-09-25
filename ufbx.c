@@ -5720,14 +5720,14 @@ ufbxi_nodiscard static int ufbxi_parse_legacy_toplevel(ufbxi_context *uc)
 
 ufbxi_nodiscard static int ufbxi_load_strings(ufbxi_context *uc)
 {
-#if UFBX_REGRESSION
+#if defined(UFBX_REGRESSION)
 	ufbx_string reg_prev = ufbx_empty_string;
 #endif
 
 	// Push all the global 'ufbxi_*' strings into the pool without copying them
 	// This allows us to compare name pointers to the global values
 	ufbxi_for(ufbx_string, str, ufbxi_strings, ufbxi_arraycount(ufbxi_strings)) {
-#if UFBX_REGRESSION
+#if defined(UFBX_REGRESSION)
 		ufbx_assert(strlen(str->data) == str->length);
 		ufbx_assert(ufbxi_str_less(reg_prev, *str));
 		reg_prev = *str;
@@ -13767,10 +13767,14 @@ typedef struct {
 
 	ufbxi_buf result;
 	ufbxi_buf tmp;
-	ufbxi_buf tmp_frames;
+	ufbxi_buf tmp_stack;
 
 	ufbxi_cache_tmp_channel *channels;
 	size_t num_channels;
+
+	// Temporary array
+	char *tmp_arr;
+	size_t tmp_arr_size;
 
 	ufbxi_string_pool string_pool;
 
@@ -13981,7 +13985,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 		}
 
 		if (format != UFBX_CACHE_DATA_UNKNOWN) {
-			ufbx_cache_frame *frame = ufbxi_push_zero(&cc->tmp_frames, ufbx_cache_frame, 1);
+			ufbx_cache_frame *frame = ufbxi_push_zero(&cc->tmp_stack, ufbx_cache_frame, 1);
 			ufbxi_check_err(&cc->error, frame);
 
 			uint32_t elem_size = ufbxi_cache_data_format_size[format];
@@ -14021,7 +14025,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_conte
 
 	(void)version;
 
-	ufbx_cache_frame *frames = ufbxi_push_zero(&cc->tmp_frames, ufbx_cache_frame, num_samples);
+	ufbx_cache_frame *frames = ufbxi_push_zero(&cc->tmp_stack, ufbx_cache_frame, num_samples);
 	ufbxi_check_err(&cc->error, frames);
 
 	uint64_t total_points = (uint64_t)num_points * (uint64_t)num_samples;
@@ -14056,6 +14060,14 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_conte
 	return 1;
 }
 
+static ufbxi_noinline int ufbxi_cache_sort_tmp_channels(ufbxi_cache_context *cc, ufbxi_cache_tmp_channel *channels, size_t count)
+{
+	ufbxi_check_err(&cc->error, ufbxi_grow_array(&cc->ator_tmp, &cc->tmp_arr, &cc->tmp_arr_size, count * sizeof(ufbxi_cache_tmp_channel)));
+	ufbxi_macro_stable_sort(ufbxi_cache_tmp_channel, 16, channels, cc->tmp_arr, count,
+		( ufbxi_str_less(a->name, b->name) ));
+	return 1;
+}
+
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_context *cc)
 {
 	ufbxi_xml_load_opts opts = { 0 };
@@ -14075,6 +14087,20 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_conte
 		ufbxi_xml_tag *tag_type = ufbxi_xml_find_child(tag_root, "cacheType");
 		ufbxi_xml_tag *tag_fps = ufbxi_xml_find_child(tag_root, "cacheTimePerFrame");
 		ufbxi_xml_tag *tag_channels = ufbxi_xml_find_child(tag_root, "Channels");
+
+		size_t num_extra = 0;
+		ufbxi_for(ufbxi_xml_tag, tag, tag_root->children, tag_root->num_children) {
+			if (tag->num_children != 1) continue;
+			if (strcmp(tag->name.data, "extra") != 0) continue;
+			ufbx_string *extra = ufbxi_push(&cc->tmp_stack, ufbx_string, 1);
+			ufbxi_check_err(&cc->error, extra);
+			*extra = tag->children[0].text;
+			ufbxi_check_err(&cc->error, ufbxi_push_string_place_str(&cc->string_pool, extra));
+			num_extra++;
+		}
+		cc->cache.extra_info.count = num_extra;
+		cc->cache.extra_info.data = ufbxi_push_pop(&cc->result, &cc->tmp_stack, ufbx_string, num_extra);
+		ufbxi_check_err(&cc->error, cc->cache.extra_info.data);
 
 		if (tag_type) {
 			ufbxi_xml_attrib *type = ufbxi_xml_find_attrib(tag_type, "Type");
@@ -14135,6 +14161,8 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_conte
 		}
 	}
 
+	ufbxi_check_err(&cc->error, ufbxi_cache_sort_tmp_channels(cc, cc->channels, cc->num_channels));
+
 	ufbxi_free_xml(doc);
 
 	return 1;
@@ -14166,7 +14194,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_cont
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_try_open_file(ufbxi_cache_context *cc, ufbx_string filename, bool *p_found)
 {
 	memset(&cc->stream, 0, sizeof(cc->stream));
-#if UFBX_REGRESSION
+#if defined(UFBX_REGRESSION)
 	ufbx_assert(strlen(filename.data) == filename.length);
 #endif
 	if (!cc->open_file_fn(cc->open_file_user, &cc->stream, filename.data, filename.length)) {
@@ -14268,6 +14296,64 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cac
 	return 1;
 }
 
+static ufbxi_forceinline bool ufbxi_cmp_cache_frame_less(const ufbx_cache_frame *a, const ufbx_cache_frame *b)
+{
+	if (a->channel.data != b->channel.data) {
+#if defined(UFBX_REGRESSION)
+		// Channel names should be interned
+		ufbx_assert(!ufbxi_str_equal(a->channel, b->channel));
+#endif
+		return ufbxi_str_less(a->channel, b->channel);
+	}
+	return a->time < b->time;
+}
+
+static ufbxi_noinline int ufbxi_cache_sort_frames(ufbxi_cache_context *cc, ufbx_cache_frame *frames, size_t count)
+{
+	ufbxi_check_err(&cc->error, ufbxi_grow_array(&cc->ator_tmp, &cc->tmp_arr, &cc->tmp_arr_size, count * sizeof(ufbx_cache_frame)));
+	ufbxi_macro_stable_sort(ufbx_cache_frame, 16, frames, cc->tmp_arr, count,
+		( ufbxi_cmp_cache_frame_less(a, b) ));
+	return 1;
+}
+
+static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
+{
+	ufbxi_cache_tmp_channel *tmp_chan = cc->channels, *tmp_end = tmp_chan + cc->num_channels;
+
+	size_t begin = 0, num_channels = 0;
+	while (begin < cc->cache.frames.count) {
+		ufbx_cache_frame *frame = &cc->cache.frames.data[begin];
+		size_t end = begin + 1;
+		while (end < cc->cache.frames.count && cc->cache.frames.data[end].channel.data == frame->channel.data) {
+			end++;
+		}
+
+		ufbx_cache_channel *chan = ufbxi_push_zero(&cc->tmp_stack, ufbx_cache_channel, 1);
+		ufbxi_check_err(&cc->error, chan);
+
+		chan->name = frame->channel;
+		chan->interpretation = ufbx_empty_string;
+		chan->frames.data = frame;
+		chan->frames.count = end - begin;
+
+		while (tmp_chan < tmp_end && ufbxi_str_less(tmp_chan->name, chan->name)) {
+			tmp_chan++;
+		}
+		if (tmp_chan < tmp_end && ufbxi_str_equal(tmp_chan->name, chan->name)) {
+			chan->interpretation = tmp_chan->interpretation;
+		}
+
+		num_channels++;
+		begin = end;
+	}
+
+	cc->cache.channels.data = ufbxi_push_pop(&cc->result, &cc->tmp_stack, ufbx_cache_channel, num_channels);
+	ufbxi_check_err(&cc->error, cc->cache.channels.data);
+	cc->cache.channels.count = num_channels;
+
+	return 1;
+}
+
 static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_string filename)
 {
 	cc->string_pool.error = &cc->error;
@@ -14276,7 +14362,7 @@ static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_str
 	cc->string_pool.initial_size = 64;
 
 	cc->tmp.ator = &cc->ator_tmp;
-	cc->tmp_frames.ator = &cc->ator_tmp;
+	cc->tmp_stack.ator = &cc->ator_tmp;
 	cc->result.ator = &cc->ator_result;
 
 	cc->channel_name.data = ufbxi_empty_char;
@@ -14297,10 +14383,13 @@ static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_str
 
 	ufbxi_check_err(&cc->error, ufbxi_cache_load_frame_files(cc));
 
-	size_t num_frames = cc->tmp_frames.num_items;
+	size_t num_frames = cc->tmp_stack.num_items;
 	cc->cache.frames.count = num_frames;
-	cc->cache.frames.data = ufbxi_push_pop(&cc->result, &cc->tmp_frames, ufbx_cache_frame, num_frames);
+	cc->cache.frames.data = ufbxi_push_pop(&cc->result, &cc->tmp_stack, ufbx_cache_frame, num_frames);
 	ufbxi_check_err(&cc->error, cc->cache.frames.data);
+
+	ufbxi_check_err(&cc->error, ufbxi_cache_sort_frames(cc, cc->cache.frames.data, cc->cache.frames.count));
+	ufbxi_check_err(&cc->error, ufbxi_cache_setup_channels(cc));
 
 	// Must be last allocation!
 	cc->imp = ufbxi_push(&cc->result, ufbxi_geometry_cache_imp, 1);
@@ -14321,8 +14410,9 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_cache_load(ufbxi_cache_context 
 	int ok = ufbxi_cache_load_imp(cc, filename);
 
 	ufbxi_buf_free(&cc->tmp);
-	ufbxi_buf_free(&cc->tmp_frames);
+	ufbxi_buf_free(&cc->tmp_stack);
 	ufbxi_free(&cc->ator_tmp, char, cc->name_buf, cc->name_cap);
+	ufbxi_free(&cc->ator_tmp, char, cc->tmp_arr, cc->tmp_arr_size);
 	if (!cc->owned_by_scene) {
 		ufbxi_map_free(&cc->string_pool.map);
 		ufbxi_free_ator(&cc->ator_tmp);

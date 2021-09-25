@@ -96,6 +96,7 @@ UFBX_LIST_TYPE(ufbx_int32_list, int32_t);
 UFBX_LIST_TYPE(ufbx_real_list, ufbx_real);
 UFBX_LIST_TYPE(ufbx_vec3_list, ufbx_vec3);
 UFBX_LIST_TYPE(ufbx_vec4_list, ufbx_vec4);
+UFBX_LIST_TYPE(ufbx_string_list, ufbx_string);
 
 // Order in which Euler-angle rotation axes are applied for a transform
 // NOTE: The order in the name refers to the order of axes *applied*,
@@ -1154,6 +1155,7 @@ typedef struct ufbx_geometry_cache {
 	ufbx_string root_filename;
 	ufbx_cache_channel_list channels;
 	ufbx_cache_frame_list frames;
+	ufbx_string_list extra_info;
 } ufbx_geometry_cache;
 
 struct ufbx_cache_file {
