@@ -12724,11 +12724,17 @@ static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_str
 		cc->open_file_fn = ufbxi_open_file;
 	}
 
+	// Make sure the filename we pass to `open_file_fn()` is NULL-terminated
+	char *filename_data = ufbxi_push(&cc->tmp, char, filename.length + 1);
+	ufbxi_check_err(&cc->error, filename_data);
+	memcpy(filename_data, filename.data, filename.length);
+	filename_data[filename.length] = '\0';
+	ufbx_string filename_copy = { filename_data, filename.length };
+
 	// TODO: NULL termination!
 	bool found = false;
-	ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, &found));
+	ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename_copy, &found));
 	if (!found) {
-		// TODO: Search
 		ufbxi_fail_err_msg(&cc->error, "open_file_fn()", "File not found");
 	}
 
