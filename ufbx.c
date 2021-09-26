@@ -14892,6 +14892,7 @@ void ufbx_free_scene(ufbx_scene *scene)
 	ufbxi_scene_imp *imp = (ufbxi_scene_imp*)scene;
 	ufbx_assert(imp->magic == UFBXI_SCENE_IMP_MAGIC);
 	if (imp->magic != UFBXI_SCENE_IMP_MAGIC) return;
+	imp->magic = 0;
 
 	ufbxi_buf_free(&imp->string_buf);
 
@@ -16197,6 +16198,7 @@ void ufbx_free_mesh(ufbx_mesh *mesh)
 	ufbxi_mesh_imp *imp = (ufbxi_mesh_imp*)mesh;
 	ufbx_assert(imp->magic == UFBXI_MESH_IMP_MAGIC);
 	if (imp->magic != UFBXI_MESH_IMP_MAGIC) return;
+	imp->magic = 0;
 
 	// See `ufbx_free_scene()` for more information
 	ufbxi_allocator ator = imp->ator;
@@ -16230,6 +16232,7 @@ void ufbx_free_geometry_cache(ufbx_geometry_cache *cache)
 	ufbx_assert(imp->magic == UFBXI_CACHE_IMP_MAGIC);
 	if (imp->magic != UFBXI_CACHE_IMP_MAGIC) return;
 	if (imp->owned_by_scene) return;
+	imp->magic = 0;
 
 	ufbxi_buf_free(&imp->string_buf);
 
