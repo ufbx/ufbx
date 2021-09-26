@@ -13133,31 +13133,6 @@ static ufbxi_noinline void ufbxi_free_result(ufbxi_context *uc)
 	ufbxi_free_ator(&uc->ator_result);
 }
 
-static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
-{
-	if (!error->description) error->description = default_desc;
-	error->type = UFBX_ERROR_UNKNOWN;
-	if (!strcmp(error->description, "Out of memory")) {
-		error->type = UFBX_ERROR_OUT_OF_MEMORY;
-	} else if (!strcmp(error->description, "Memory limit exceeded")) {
-		error->type = UFBX_ERROR_MEMORY_LIMIT;
-	} else if (!strcmp(error->description, "Allocation limit exceeded")) {
-		error->type = UFBX_ERROR_ALLOCATION_LIMIT;
-	} else if (!strcmp(error->description, "Truncated file")) {
-		error->type = UFBX_ERROR_TRUNCATED_FILE;
-	} else if (!strcmp(error->description, "IO error")) {
-		error->type = UFBX_ERROR_IO;
-	} else if (!strcmp(error->description, "Cancelled")) {
-		error->type = UFBX_ERROR_CANCELLED;
-	} else if (!strcmp(error->description, "Unsupported version")) {
-		error->type = UFBX_ERROR_UNSUPPORTED_VERSION;
-	} else if (!strcmp(error->description, "Not an FBX file")) {
-		error->type = UFBX_ERROR_NOT_FBX;
-	} else if (!strcmp(error->description, "File not found")) {
-		error->type = UFBX_ERROR_FILE_NOT_FOUND;
-	}
-}
-
 static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts, ufbx_error *p_error)
 {
 	// Test endianness
