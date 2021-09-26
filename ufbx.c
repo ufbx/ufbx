@@ -12031,6 +12031,765 @@ static ufbxi_noinline void ufbxi_patch_cluster_binding(ufbx_scene *scene)
 	}
 }
 
+// -- Geometry caches
+
+typedef struct {
+	ufbx_geometry_cache cache;
+	uint32_t magic;
+	bool owned_by_scene;
+
+	ufbxi_allocator ator;
+	ufbxi_buf result_buf;
+	ufbxi_buf string_buf;
+} ufbxi_geometry_cache_imp;
+
+typedef struct {
+	ufbx_string name;
+	ufbx_string interpretation;
+	uint32_t sample_rate;
+	uint32_t start_time;
+	uint32_t end_time;
+	uint32_t current_time;
+	uint32_t conescutive_fails;
+	bool try_load;
+} ufbxi_cache_tmp_channel;
+
+typedef enum {
+	UFBXI_CACHE_XML_TYPE_NONE,
+	UFBXI_CACHE_XML_TYPE_FILE_PER_FRAME,
+	UFBXI_CACHE_XML_TYPE_SINGLE_FILE,
+} ufbxi_cache_xml_type;
+
+typedef enum {
+	UFBXI_CACHE_XML_FORMAT_NONE,
+	UFBXI_CACHE_XML_FORMAT_MCC,
+	UFBXI_CACHE_XML_FORMAT_MCX,
+} ufbxi_cache_xml_format;
+
+typedef struct {
+	ufbx_error error;
+	ufbx_string filename;
+	bool owned_by_scene;
+
+	ufbxi_allocator ator_tmp;
+	ufbxi_allocator ator_result;
+
+	ufbxi_buf result;
+	ufbxi_buf tmp;
+	ufbxi_buf tmp_stack;
+
+	ufbxi_cache_tmp_channel *channels;
+	size_t num_channels;
+
+	// Temporary array
+	char *tmp_arr;
+	size_t tmp_arr_size;
+
+	ufbxi_string_pool string_pool;
+
+	ufbx_open_file_fn *open_file_fn;
+	void *open_file_user;
+
+	double frames_per_second;
+
+	ufbx_string stream_filename;
+	ufbx_stream stream;
+
+	bool mc_for8;
+
+	ufbx_string xml_filename;
+	uint32_t xml_ticks_per_frame;
+	ufbxi_cache_xml_type xml_type;
+	ufbxi_cache_xml_format xml_format;
+
+	ufbx_string channel_name;
+
+	char *name_buf;
+	size_t name_cap;
+
+	uint64_t file_offset;
+	const char *pos, *pos_end;
+	char buffer[128];
+
+	ufbx_geometry_cache cache;
+	ufbxi_geometry_cache_imp *imp;
+} ufbxi_cache_context;
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_read(ufbxi_cache_context *cc, void *dst, size_t size, bool allow_eof)
+{
+	size_t buffered = ufbxi_min_sz((size_t)(cc->pos_end - cc->pos), size);
+	memcpy(dst, cc->pos, size);
+	cc->pos += size;
+	size -= buffered;
+	cc->file_offset += buffered;
+	if (size == 0) return 1;
+	dst = (char*)dst + buffered;
+
+	if (size >= sizeof(cc->buffer)) {
+		size_t num_read = cc->stream.read_fn(cc->stream.user, dst, size);
+		ufbxi_check_err_msg(&cc->error, num_read <= size, "IO error");
+		if (!allow_eof) {
+			ufbxi_check_err_msg(&cc->error, num_read == size, "Truncated file");
+		}
+		cc->file_offset += num_read;
+		size -= num_read;
+		dst = (char*)dst + num_read;
+	} else {
+		size_t num_read = cc->stream.read_fn(cc->stream.user, cc->buffer, sizeof(cc->buffer));
+		ufbxi_check_err_msg(&cc->error, num_read <= sizeof(cc->buffer), "IO error");
+		if (!allow_eof) {
+			ufbxi_check_err_msg(&cc->error, num_read >= size, "Truncated file");
+		}
+		cc->pos = cc->buffer;
+		cc->pos_end = cc->buffer + sizeof(cc->buffer);
+
+		memcpy(dst, cc->pos, size);
+		cc->pos += size;
+		cc->file_offset += size;
+
+		size_t num_written = ufbxi_min_sz(size, num_read);
+		size -= num_written;
+		dst = (char*)dst + num_written;
+	}
+
+	if (size > 0) {
+		memset(dst, 0, size);
+	}
+
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_skip(ufbxi_cache_context *cc, uint64_t size)
+{
+	uint64_t buffered = ufbxi_min64((uint64_t)(cc->pos_end - cc->pos), size);
+	cc->pos += buffered;
+	size -= buffered;
+
+	if (cc->stream.skip_fn) {
+		while (size >= UFBXI_MAX_SKIP_SIZE) {
+			size -= UFBXI_MAX_SKIP_SIZE;
+			ufbxi_check_err_msg(&cc->error, cc->stream.skip_fn(cc->stream.user, UFBXI_MAX_SKIP_SIZE - 1), "Truncated file");
+
+			// Check that we can read at least one byte in case the file is broken
+			// and causes us to seek indefinitely forwards as `fseek()` does not
+			// report if we hit EOF...
+			char single_byte[1];
+			size_t num_read = cc->stream.read_fn(cc->stream.user, single_byte, 1);
+			ufbxi_check_err_msg(&cc->error, num_read <= 1, "IO error");
+			ufbxi_check_err_msg(&cc->error, num_read == 1, "Truncated file");
+		}
+
+		if (size > 0) {
+			ufbxi_check_err_msg(&cc->error, cc->stream.skip_fn(cc->stream.user, (size_t)size), "Truncated file");
+		}
+
+	} else {
+		char skip_buf[2048];
+		while (size > 0) {
+			size_t to_skip = (size_t)ufbxi_min64(size, sizeof(skip_buf));
+			size -= to_skip;
+			ufbxi_check_err_msg(&cc->error, cc->stream.read_fn(cc->stream.user, skip_buf, to_skip), "Truncated file");
+		}
+	}
+
+	cc->file_offset += size;
+	return 1;
+}
+
+#define ufbxi_cache_mc_tag(a,b,c,d) ((uint32_t)(a)<<24u | (uint32_t)(b)<<16 | (uint32_t)(c)<<8u | (uint32_t)(d))
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_tag(ufbxi_cache_context *cc, uint32_t *p_tag)
+{
+	char buf[4];
+	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, true));
+	*p_tag = (uint32_t)(uint8_t)buf[0]<<24u | (uint32_t)(uint8_t)buf[1]<<16 | (uint32_t)(uint8_t)buf[2]<<8u | (uint32_t)(uint8_t)buf[3];
+	if (*p_tag == ufbxi_cache_mc_tag('F','O','R','8')) {
+		cc->mc_for8 = true;
+	}
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_u32(ufbxi_cache_context *cc, uint32_t *p_value)
+{
+	char buf[4];
+	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, false));
+	*p_value = (uint32_t)(uint8_t)buf[0]<<24u | (uint32_t)(uint8_t)buf[1]<<16 | (uint32_t)(uint8_t)buf[2]<<8u | (uint32_t)(uint8_t)buf[3];
+	if (cc->mc_for8) {
+		ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, false));
+	}
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_u64(ufbxi_cache_context *cc, uint64_t *p_value)
+{
+	if (!cc->mc_for8) {
+		uint32_t v32;
+		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &v32));
+		*p_value = v32;
+	} else {
+		char buf[8];
+		ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 8, false));
+		uint32_t hi = (uint32_t)(uint8_t)buf[0]<<24u | (uint32_t)(uint8_t)buf[1]<<16 | (uint32_t)(uint8_t)buf[2]<<8u | (uint32_t)(uint8_t)buf[3];
+		uint32_t lo = (uint32_t)(uint8_t)buf[4]<<24u | (uint32_t)(uint8_t)buf[5]<<16 | (uint32_t)(uint8_t)buf[6]<<8u | (uint32_t)(uint8_t)buf[7];
+		*p_value = (uint64_t)hi << 32u | (uint64_t)lo;
+	}
+	return 1;
+}
+
+static const uint8_t ufbxi_cache_data_format_size[] = {
+	0, 4, 12, 8, 24,
+};
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_context *cc)
+{
+	uint32_t version = 0, time_start = 0, time_end = 0;
+	uint32_t count = 0, time = 0;
+	char skip_buf[8];
+
+	for (;;) {
+		uint32_t tag;
+		uint64_t size;
+		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_tag(cc, &tag));
+		if (tag == 0) break;
+
+		if (tag == ufbxi_cache_mc_tag('C','A','C','H') || tag == ufbxi_cache_mc_tag('M','Y','C','H')) {
+			continue;
+		}
+		if (cc->mc_for8) {
+			ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, skip_buf, 4, false));
+		}
+
+		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u64(cc, &size));
+		uint64_t begin = cc->file_offset;
+
+		size_t alignment = cc->mc_for8 ? 8 : 4;
+
+		ufbx_cache_data_format format = UFBX_CACHE_DATA_UNKNOWN;
+		switch (tag) {
+		case ufbxi_cache_mc_tag('F','O','R','4'): cc->mc_for8 = false; break;
+		case ufbxi_cache_mc_tag('F','O','R','8'): cc->mc_for8 = true; break;
+		case ufbxi_cache_mc_tag('V','R','S','N'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &version)); break;
+		case ufbxi_cache_mc_tag('S','T','I','M'):
+			ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &time_start));
+			time = time_start;
+			break;
+		case ufbxi_cache_mc_tag('E','T','I','M'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &time_end)); break;
+		case ufbxi_cache_mc_tag('T','I','M','E'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &time)); break;
+		case ufbxi_cache_mc_tag('C','H','N','M'): {
+			ufbxi_check_err(&cc->error, size > 0 && size < SIZE_MAX);
+			size_t length = (size_t)size - 1;
+			size_t padded_length = ((size_t)size + alignment - 1) & ~(alignment - 1);
+			ufbxi_check_err(&cc->error, ufbxi_grow_array(&cc->ator_tmp, &cc->name_buf, &cc->name_cap, padded_length));
+			ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, cc->name_buf, padded_length, false));
+			cc->channel_name.data = cc->name_buf;
+			cc->channel_name.length = length;
+			ufbxi_check_err(&cc->error, ufbxi_push_string_place_str(&cc->string_pool, &cc->channel_name));
+		} break;
+		case ufbxi_cache_mc_tag('S','I','Z','E'): ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &count)); break;
+		case ufbxi_cache_mc_tag('F','V','C','A'): format = UFBX_CACHE_DATA_VEC3_FLOAT; break;
+		case ufbxi_cache_mc_tag('D','V','C','A'): format = UFBX_CACHE_DATA_VEC3_DOUBLE; break;
+		case ufbxi_cache_mc_tag('F','B','C','A'): format = UFBX_CACHE_DATA_REAL_FLOAT; break;
+		case ufbxi_cache_mc_tag('D','B','C','A'): format = UFBX_CACHE_DATA_REAL_DOUBLE; break;
+		default: ufbxi_fail_err(&cc->error, "Unknown tag");
+		}
+
+		if (format != UFBX_CACHE_DATA_UNKNOWN) {
+			ufbx_cache_frame *frame = ufbxi_push_zero(&cc->tmp_stack, ufbx_cache_frame, 1);
+			ufbxi_check_err(&cc->error, frame);
+
+			uint32_t elem_size = ufbxi_cache_data_format_size[format];
+			uint64_t total_size = (uint64_t)elem_size * (uint64_t)count;
+			ufbxi_check_err(&cc->error, size >= elem_size * count);
+
+			frame->channel = cc->channel_name;
+			frame->time = (double)time * (1.0/6000.0);
+			frame->filename = cc->stream_filename;
+			frame->data_format = format;
+			frame->data_offset = cc->file_offset;
+			frame->data_count = count;
+			frame->data_element_bytes = elem_size;
+			frame->data_total_bytes = total_size;
+			frame->file_format = UFBX_CACHE_FILE_FORMAT_MC;
+
+			uint64_t end = begin + ((size + alignment - 1) & ~(uint64_t)(alignment - 1));
+			ufbxi_check_err(&cc->error, end >= cc->file_offset);
+			uint64_t left = end - cc->file_offset;
+			ufbxi_check_err(&cc->error, ufbxi_cache_skip(cc, left));
+		}
+	}
+
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_context *cc)
+{
+	char header[32];
+	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, header, sizeof(header), false));
+
+	uint32_t version = ufbxi_read_u32(header + 12);
+	uint32_t num_points = ufbxi_read_u32(header + 16);
+	double start_frame = ufbxi_read_f32(header + 20);
+	double frames_per_sample = ufbxi_read_f32(header + 24);
+	uint32_t num_samples = ufbxi_read_u32(header + 28);
+
+	(void)version;
+
+	ufbx_cache_frame *frames = ufbxi_push_zero(&cc->tmp_stack, ufbx_cache_frame, num_samples);
+	ufbxi_check_err(&cc->error, frames);
+
+	uint64_t total_points = (uint64_t)num_points * (uint64_t)num_samples;
+	ufbxi_check_err(&cc->error, total_points < UINT64_MAX / 12);
+
+	// Skip almost to the end of the data and try to read one byte as there's
+	// nothing after the data so we can't detect EOF..
+	if (total_points > 0) {
+		char last_byte[1];
+		ufbxi_check_err(&cc->error, ufbxi_cache_skip(cc, total_points * 12 - 1));
+		ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, last_byte, 1, false));
+	}
+
+	uint64_t offset = cc->file_offset;
+
+	for (uint32_t i = 0; i < num_samples; i++) {
+		ufbx_cache_frame *frame = &frames[i];
+
+		double sample_frame = start_frame + (double)i * frames_per_sample;
+		frame->channel = cc->channel_name;
+		frame->time = sample_frame / cc->frames_per_second;
+		frame->filename = cc->stream_filename;
+		frame->data_format = UFBX_CACHE_DATA_VEC3_FLOAT;
+		frame->data_offset = offset;
+		frame->data_count = num_points;
+		frame->data_element_bytes = 12;
+		frame->data_total_bytes = num_points * 12;
+		frame->file_format = UFBX_CACHE_FILE_FORMAT_PC2;
+		offset += num_points * 12;
+	}
+
+	return 1;
+}
+
+static ufbxi_noinline int ufbxi_cache_sort_tmp_channels(ufbxi_cache_context *cc, ufbxi_cache_tmp_channel *channels, size_t count)
+{
+	ufbxi_check_err(&cc->error, ufbxi_grow_array(&cc->ator_tmp, &cc->tmp_arr, &cc->tmp_arr_size, count * sizeof(ufbxi_cache_tmp_channel)));
+	ufbxi_macro_stable_sort(ufbxi_cache_tmp_channel, 16, channels, cc->tmp_arr, count,
+		( ufbxi_str_less(a->name, b->name) ));
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_context *cc)
+{
+	ufbxi_xml_load_opts opts = { 0 };
+	opts.ator = &cc->ator_tmp;
+	opts.read_fn = cc->stream.read_fn;
+	opts.read_user = cc->stream.user;
+	opts.prefix = cc->pos;
+	opts.prefix_length = cc->pos_end - cc->pos;
+	ufbxi_xml_document *doc = ufbxi_load_xml(&opts, &cc->error);
+	ufbxi_check_err(&cc->error, doc);
+
+	cc->xml_ticks_per_frame = 250;
+	cc->xml_filename = cc->stream_filename;
+
+	ufbxi_xml_tag *tag_root = ufbxi_xml_find_child(doc->root, "Autodesk_Cache_File");
+	if (tag_root) {
+		ufbxi_xml_tag *tag_type = ufbxi_xml_find_child(tag_root, "cacheType");
+		ufbxi_xml_tag *tag_fps = ufbxi_xml_find_child(tag_root, "cacheTimePerFrame");
+		ufbxi_xml_tag *tag_channels = ufbxi_xml_find_child(tag_root, "Channels");
+
+		size_t num_extra = 0;
+		ufbxi_for(ufbxi_xml_tag, tag, tag_root->children, tag_root->num_children) {
+			if (tag->num_children != 1) continue;
+			if (strcmp(tag->name.data, "extra") != 0) continue;
+			ufbx_string *extra = ufbxi_push(&cc->tmp_stack, ufbx_string, 1);
+			ufbxi_check_err(&cc->error, extra);
+			*extra = tag->children[0].text;
+			ufbxi_check_err(&cc->error, ufbxi_push_string_place_str(&cc->string_pool, extra));
+			num_extra++;
+		}
+		cc->cache.extra_info.count = num_extra;
+		cc->cache.extra_info.data = ufbxi_push_pop(&cc->result, &cc->tmp_stack, ufbx_string, num_extra);
+		ufbxi_check_err(&cc->error, cc->cache.extra_info.data);
+
+		if (tag_type) {
+			ufbxi_xml_attrib *type = ufbxi_xml_find_attrib(tag_type, "Type");
+			ufbxi_xml_attrib *format = ufbxi_xml_find_attrib(tag_type, "Format");
+			if (type) {
+				if (!strcmp(type->value.data, "OneFilePerFrame")) {
+					cc->xml_type = UFBXI_CACHE_XML_TYPE_FILE_PER_FRAME;
+				} else if (!strcmp(type->value.data, "OneFile")) {
+					cc->xml_type = UFBXI_CACHE_XML_TYPE_SINGLE_FILE;
+				}
+			}
+			if (format) {
+				if (!strcmp(format->value.data, "mcc")) {
+					cc->xml_format = UFBXI_CACHE_XML_FORMAT_MCC;
+				} else if (!strcmp(format->value.data, "mcx")) {
+					cc->xml_format = UFBXI_CACHE_XML_FORMAT_MCX;
+				}
+			}
+		}
+
+		if (tag_fps) {
+			ufbxi_xml_attrib *fps = ufbxi_xml_find_attrib(tag_fps, "TimePerFrame");
+			if (fps) {
+				int value = atoi(fps->value.data);
+				if (value > 0) {
+					cc->xml_ticks_per_frame = (uint32_t)value;
+				}
+			}
+		}
+
+		if (tag_channels) {
+			cc->channels = ufbxi_push_zero(&cc->tmp, ufbxi_cache_tmp_channel, tag_channels->num_children);
+			ufbxi_check_err(&cc->error, cc->channels);
+
+			ufbxi_for(ufbxi_xml_tag, tag, tag_channels->children, tag_channels->num_children) {
+				ufbxi_xml_attrib *name = ufbxi_xml_find_attrib(tag, "ChannelName");
+				ufbxi_xml_attrib *type = ufbxi_xml_find_attrib(tag, "ChannelType");
+				ufbxi_xml_attrib *interpretation = ufbxi_xml_find_attrib(tag, "ChannelInterpretation");
+				if (!(name && type && interpretation)) continue;
+
+				ufbxi_cache_tmp_channel *channel = &cc->channels[cc->num_channels++];
+				channel->name = name->value;
+				channel->interpretation = interpretation->value;
+				ufbxi_check_err(&cc->error, ufbxi_push_string_place_str(&cc->string_pool, &channel->name));
+				ufbxi_check_err(&cc->error, ufbxi_push_string_place_str(&cc->string_pool, &channel->interpretation));
+
+				ufbxi_xml_attrib *sampling_rate = ufbxi_xml_find_attrib(tag, "SamplingRate");
+				ufbxi_xml_attrib *start_time = ufbxi_xml_find_attrib(tag, "StartTime");
+				ufbxi_xml_attrib *end_time = ufbxi_xml_find_attrib(tag, "EndTime");
+				if (sampling_rate && start_time && end_time) {
+					channel->sample_rate = (uint32_t)atoi(sampling_rate->value.data);
+					channel->start_time = (uint32_t)atoi(start_time->value.data);
+					channel->end_time = (uint32_t)atoi(end_time->value.data);
+					channel->current_time = channel->start_time;
+					channel->try_load = true;
+				}
+			}
+		}
+	}
+
+	ufbxi_check_err(&cc->error, ufbxi_cache_sort_tmp_channels(cc, cc->channels, cc->num_channels));
+
+	ufbxi_free_xml(doc);
+
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_context *cc, ufbx_string filename)
+{
+	cc->stream_filename = filename;
+	ufbxi_check_err(&cc->error, ufbxi_push_string_place_str(&cc->string_pool, &cc->stream_filename));
+
+	// Assume all files have at least 16 bytes of header
+	size_t magic_len = cc->stream.read_fn(cc->stream.user, cc->buffer, 16);
+	ufbxi_check_err_msg(&cc->error, magic_len <= 16, "IO error");
+	ufbxi_check_err_msg(&cc->error, magic_len == 16, "Truncated file");
+	cc->pos = cc->buffer;
+	cc->pos_end = cc->buffer + 16;
+
+	if (!memcmp(cc->buffer, "POINTCACHE2", 11)) {
+		ufbxi_check_err(&cc->error, ufbxi_cache_load_pc2(cc));
+	} else if (!memcmp(cc->buffer, "FOR4", 4) || !memcmp(cc->buffer, "FOR8", 4)) {
+		ufbxi_check_err(&cc->error, ufbxi_cache_load_mc(cc));
+	} else {
+		ufbxi_check_err(&cc->error, ufbxi_cache_load_xml(cc));
+	}
+
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_try_open_file(ufbxi_cache_context *cc, ufbx_string filename, bool *p_found)
+{
+	memset(&cc->stream, 0, sizeof(cc->stream));
+#if defined(UFBX_REGRESSION)
+	ufbx_assert(strlen(filename.data) == filename.length);
+#endif
+	if (!cc->open_file_fn(cc->open_file_user, &cc->stream, filename.data, filename.length)) {
+		return 1;
+	}
+
+	int ok = ufbxi_cache_load_file(cc, filename);
+	*p_found = true;
+
+	if (cc->stream.close_fn) {
+		cc->stream.close_fn(cc->stream.user);
+	}
+
+	return ok;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cache_context *cc)
+{
+	if (cc->xml_filename.length == 0) return 1;
+
+	const char *extension = NULL;
+	switch (cc->xml_format) {
+	case UFBXI_CACHE_XML_FORMAT_MCC: extension = "mc"; break;
+	case UFBXI_CACHE_XML_FORMAT_MCX: extension = "mcx"; break;
+	default: return 1;
+	}
+
+	// Ensure worst case space for `path/filenameFrame123Tick456.mcx`
+	size_t name_buf_len = cc->xml_filename.length + 64;
+	char *name_buf = ufbxi_push(&cc->tmp, char, name_buf_len);
+	ufbxi_check_err(&cc->error, name_buf);
+
+	// Find the prefix before `.xml`
+	size_t prefix_len = cc->xml_filename.length;
+	for (size_t i = prefix_len; i > 0; --i) {
+		if (cc->xml_filename.data[i - 1] == '.') {
+			prefix_len = i - 1;
+			break;
+		}
+	}
+	memcpy(name_buf, cc->xml_filename.data, prefix_len);
+
+	char *suffix_data = name_buf + prefix_len;
+	size_t suffix_len = name_buf_len - prefix_len;
+
+	ufbx_string filename;
+	filename.data = name_buf;
+
+	if (cc->xml_type == UFBXI_CACHE_XML_TYPE_SINGLE_FILE) {
+		filename.length = prefix_len + (size_t)snprintf(suffix_data, suffix_len, ".%s", extension);
+		bool found = false;
+		ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, &found));
+	} else if (cc->xml_type == UFBXI_CACHE_XML_TYPE_FILE_PER_FRAME) {
+		uint32_t lowest_time = 0;
+		for (;;) {
+			// Find the first `time >= lowest_time` value that has data in some channel
+			uint32_t time = UINT32_MAX;
+			ufbxi_for(ufbxi_cache_tmp_channel, chan, cc->channels, cc->num_channels) {
+				if (!chan->try_load || chan->conescutive_fails > 10) continue;
+				uint32_t sample_rate = chan->sample_rate ? chan->sample_rate : cc->xml_ticks_per_frame;
+				if (chan->current_time < lowest_time) {
+					uint32_t delta = (lowest_time - chan->current_time - 1) / sample_rate;
+					chan->current_time += delta * sample_rate;
+					if (UINT32_MAX - chan->current_time >= sample_rate) {
+						chan->current_time += sample_rate;
+					} else {
+						chan->try_load = false;
+						continue;
+					}
+				}
+				if (chan->current_time <= chan->end_time) {
+					time = ufbxi_min32(time, chan->current_time);
+				}
+			}
+			if (time == UINT32_MAX) break;
+
+			// Try to load a file at the specified frame/tick
+			uint32_t frame = time / cc->xml_ticks_per_frame;
+			uint32_t tick = time % cc->xml_ticks_per_frame;
+			if (tick == 0) {
+				filename.length = prefix_len + (size_t)snprintf(suffix_data, suffix_len, "Frame%u.%s", frame, extension);
+			} else {
+				filename.length = prefix_len + (size_t)snprintf(suffix_data, suffix_len, "Frame%uTick%u.%s", frame, tick, extension);
+			}
+			bool found = false;
+			ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, &found));
+
+			// Update channel status
+			ufbxi_for(ufbxi_cache_tmp_channel, chan, cc->channels, cc->num_channels) {
+				if (chan->current_time == time) {
+					chan->conescutive_fails = found ? 0 : chan->conescutive_fails + 1;
+				}
+			}
+
+			lowest_time = time + 1;
+		}
+	}
+
+	return 1;
+}
+
+static ufbxi_forceinline bool ufbxi_cmp_cache_frame_less(const ufbx_cache_frame *a, const ufbx_cache_frame *b)
+{
+	if (a->channel.data != b->channel.data) {
+#if defined(UFBX_REGRESSION)
+		// Channel names should be interned
+		ufbx_assert(!ufbxi_str_equal(a->channel, b->channel));
+#endif
+		return ufbxi_str_less(a->channel, b->channel);
+	}
+	return a->time < b->time;
+}
+
+static ufbxi_noinline int ufbxi_cache_sort_frames(ufbxi_cache_context *cc, ufbx_cache_frame *frames, size_t count)
+{
+	ufbxi_check_err(&cc->error, ufbxi_grow_array(&cc->ator_tmp, &cc->tmp_arr, &cc->tmp_arr_size, count * sizeof(ufbx_cache_frame)));
+	ufbxi_macro_stable_sort(ufbx_cache_frame, 16, frames, cc->tmp_arr, count,
+		( ufbxi_cmp_cache_frame_less(a, b) ));
+	return 1;
+}
+
+typedef struct {
+	ufbx_cache_interpretation interpretation;
+	const char *name;
+} ufbxi_cache_interpretation_name;
+
+static const ufbxi_cache_interpretation_name ufbxi_cache_interpretation_names[] = {
+	{ UFBX_CACHE_INTERPRETATION_VERTEX_POSITION, "positions" },
+	{ UFBX_CACHE_INTERPRETATION_VERTEX_NORMAL, "normals" },
+};
+
+static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
+{
+	ufbxi_cache_tmp_channel *tmp_chan = cc->channels, *tmp_end = tmp_chan + cc->num_channels;
+
+	size_t begin = 0, num_channels = 0;
+	while (begin < cc->cache.frames.count) {
+		ufbx_cache_frame *frame = &cc->cache.frames.data[begin];
+		size_t end = begin + 1;
+		while (end < cc->cache.frames.count && cc->cache.frames.data[end].channel.data == frame->channel.data) {
+			end++;
+		}
+
+		ufbx_cache_channel *chan = ufbxi_push_zero(&cc->tmp_stack, ufbx_cache_channel, 1);
+		ufbxi_check_err(&cc->error, chan);
+
+		chan->name = frame->channel;
+		chan->interpretation_name = ufbx_empty_string;
+		chan->frames.data = frame;
+		chan->frames.count = end - begin;
+
+		while (tmp_chan < tmp_end && ufbxi_str_less(tmp_chan->name, chan->name)) {
+			tmp_chan++;
+		}
+		if (tmp_chan < tmp_end && ufbxi_str_equal(tmp_chan->name, chan->name)) {
+			chan->interpretation_name = tmp_chan->interpretation;
+		}
+
+		if (frame->file_format == UFBX_CACHE_FILE_FORMAT_PC2) {
+			chan->interpretation = UFBX_CACHE_INTERPRETATION_VERTEX_POSITION;
+		} else {
+			ufbxi_for(const ufbxi_cache_interpretation_name, name, ufbxi_cache_interpretation_names, ufbxi_arraycount(ufbxi_cache_interpretation_names)) {
+				if (!strcmp(chan->interpretation_name.data, name->name)) {
+					chan->interpretation = name->interpretation;
+					break;
+				}
+			}
+		}
+
+		num_channels++;
+		begin = end;
+	}
+
+	cc->cache.channels.data = ufbxi_push_pop(&cc->result, &cc->tmp_stack, ufbx_cache_channel, num_channels);
+	ufbxi_check_err(&cc->error, cc->cache.channels.data);
+	cc->cache.channels.count = num_channels;
+
+	return 1;
+}
+
+static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_string filename)
+{
+	cc->tmp.ator = &cc->ator_tmp;
+	cc->tmp_stack.ator = &cc->ator_tmp;
+
+	cc->channel_name.data = ufbxi_empty_char;
+
+	if (!cc->open_file_fn) {
+		cc->open_file_fn = ufbxi_open_file;
+	}
+
+	// TODO: NULL termination!
+	bool found = false;
+	ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, &found));
+	if (!found) {
+		// TODO: Search
+		ufbxi_fail_err_msg(&cc->error, "open_file_fn()", "File not found");
+	}
+
+	cc->cache.root_filename = cc->stream_filename;
+
+	ufbxi_check_err(&cc->error, ufbxi_cache_load_frame_files(cc));
+
+	size_t num_frames = cc->tmp_stack.num_items;
+	cc->cache.frames.count = num_frames;
+	cc->cache.frames.data = ufbxi_push_pop(&cc->result, &cc->tmp_stack, ufbx_cache_frame, num_frames);
+	ufbxi_check_err(&cc->error, cc->cache.frames.data);
+
+	ufbxi_check_err(&cc->error, ufbxi_cache_sort_frames(cc, cc->cache.frames.data, cc->cache.frames.count));
+	ufbxi_check_err(&cc->error, ufbxi_cache_setup_channels(cc));
+
+	// Must be last allocation!
+	cc->imp = ufbxi_push(&cc->result, ufbxi_geometry_cache_imp, 1);
+	ufbxi_check_err(&cc->error, cc->imp);
+
+	cc->imp->cache = cc->cache;
+	cc->imp->magic = UFBXI_CACHE_IMP_MAGIC;
+	cc->imp->owned_by_scene = cc->owned_by_scene;
+	cc->imp->ator = cc->ator_result;
+	cc->imp->result_buf = cc->result;
+	cc->imp->string_buf = cc->string_pool.buf;
+
+	return 1;
+}
+
+ufbxi_noinline static ufbx_geometry_cache *ufbxi_cache_load(ufbxi_cache_context *cc, ufbx_string filename)
+{
+	int ok = ufbxi_cache_load_imp(cc, filename);
+
+	ufbxi_buf_free(&cc->tmp);
+	ufbxi_buf_free(&cc->tmp_stack);
+	ufbxi_free(&cc->ator_tmp, char, cc->name_buf, cc->name_cap);
+	ufbxi_free(&cc->ator_tmp, char, cc->tmp_arr, cc->tmp_arr_size);
+	if (!cc->owned_by_scene) {
+		ufbxi_map_free(&cc->string_pool.map);
+		ufbxi_free_ator(&cc->ator_tmp);
+	}
+
+	if (ok) {
+		return &cc->imp->cache;
+	} else {
+		ufbxi_fix_error_type(&cc->error, "Failed to load geometry cache");
+		if (!cc->owned_by_scene) {
+			ufbxi_buf_free(&cc->string_pool.buf);
+			ufbxi_free_ator(&cc->ator_result);
+		}
+		return NULL;
+	}
+}
+
+ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string filename, const ufbx_geometry_cache_opts *user_opts, ufbx_error *p_error)
+{
+	ufbx_geometry_cache_opts opts;
+	if (user_opts) {
+		opts = *user_opts;
+	} else {
+		memset(&opts, 0, sizeof(opts));
+	}
+
+	ufbxi_cache_context cc = { UFBX_ERROR_NONE };
+	ufbxi_init_ator(&cc.error, &cc.ator_tmp, &opts.temp_allocator);
+	ufbxi_init_ator(&cc.error, &cc.ator_result, &opts.result_allocator);
+	cc.open_file_fn = opts.open_file_fn;
+	cc.open_file_user = opts.open_file_user;
+
+	cc.string_pool.error = &cc.error;
+	cc.string_pool.map.ator = &cc.ator_tmp;
+	cc.string_pool.buf.ator = &cc.ator_result;
+	cc.string_pool.initial_size = 64;
+	cc.result.ator = &cc.ator_result;
+
+	cc.frames_per_second = opts.frames_per_second > 0.0 ? opts.frames_per_second : 30.0;
+
+	ufbx_geometry_cache *cache = ufbxi_cache_load(&cc, filename);
+	if (p_error) {
+		if (cache) {
+			p_error->type = UFBX_ERROR_NONE;
+			p_error->description = NULL;
+			p_error->stack_size = 0;
+		} else {
+			*p_error = cc.error;
+		}
+	}
+	return cache;
+}
+
 // -- External files
 
 typedef enum {
