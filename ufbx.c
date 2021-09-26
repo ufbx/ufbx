@@ -12186,6 +12186,8 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_read(ufbxi_cache_context *
 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_skip(ufbxi_cache_context *cc, uint64_t size)
 {
+	cc->file_offset += size;
+
 	uint64_t buffered = ufbxi_min64((uint64_t)(cc->pos_end - cc->pos), size);
 	cc->pos += buffered;
 	size -= buffered;
@@ -12217,7 +12219,6 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_skip(ufbxi_cache_context *
 		}
 	}
 
-	cc->file_offset += size;
 	return 1;
 }
 
@@ -12315,6 +12316,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 		case ufbxi_cache_mc_tag('D','V','C','A'): format = UFBX_CACHE_DATA_VEC3_DOUBLE; break;
 		case ufbxi_cache_mc_tag('F','B','C','A'): format = UFBX_CACHE_DATA_REAL_FLOAT; break;
 		case ufbxi_cache_mc_tag('D','B','C','A'): format = UFBX_CACHE_DATA_REAL_DOUBLE; break;
+		case ufbxi_cache_mc_tag('D','B','L','A'): format = UFBX_CACHE_DATA_REAL_DOUBLE; break;
 		default: ufbxi_fail_err(&cc->error, "Unknown tag");
 		}
 
@@ -12330,6 +12332,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 			frame->time = (double)time * (1.0/6000.0);
 			frame->filename = cc->stream_filename;
 			frame->data_format = format;
+			frame->data_encoding = UFBX_CACHE_DATA_ENCODING_BIG_ENDIAN;
 			frame->data_offset = cc->file_offset;
 			frame->data_count = count;
 			frame->data_element_bytes = elem_size;
@@ -12383,6 +12386,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_conte
 		frame->time = sample_frame / cc->frames_per_second;
 		frame->filename = cc->stream_filename;
 		frame->data_format = UFBX_CACHE_DATA_VEC3_FLOAT;
+		frame->data_encoding = UFBX_CACHE_DATA_ENCODING_LITTLE_ENDIAN;
 		frame->data_offset = offset;
 		frame->data_count = num_points;
 		frame->data_element_bytes = 12;
@@ -12924,22 +12928,22 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_load_external_files(ufbxi_contex
 		ufbxi_external_file *file = ufbxi_find_external_file(uc, files, num_files,
 			UFBXI_EXTERNAL_FILE_GEOMETRY_CACHE, cache->filename.data);
 		if (file && file->data) {
-			cache->geometry_cache = (ufbx_geometry_cache*)file->data;
+			cache->external_cache = (ufbx_geometry_cache*)file->data;
 		}
 	}
 
 	// Patch the geometry deformers
 	ufbxi_for_ptr_list(ufbx_cache_deformer, p_deformer, uc->scene.cache_deformers) {
 		ufbx_cache_deformer *deformer = *p_deformer;
-		if (!deformer->file || !deformer->file->geometry_cache) continue;
-		ufbx_geometry_cache *cache = deformer->file->geometry_cache;
+		if (!deformer->file || !deformer->file->external_cache) continue;
+		ufbx_geometry_cache *cache = deformer->file->external_cache;
 		ufbx_string channel = deformer->channel;
-		deformer->geometry_cache = cache;
+		deformer->external_cache = cache;
 		size_t ix = SIZE_MAX;
 		ufbxi_macro_lower_bound_eq(ufbx_cache_channel, 16, &ix, cache->channels.data, 0, cache->channels.count,
 			( ufbxi_str_less(a->name, channel) ), ( a->name.data == channel.data ));
 		if (ix != SIZE_MAX) {
-			deformer->geometry_channel = &cache->channels.data[ix];
+			deformer->external_channel = &cache->channels.data[ix];
 		}
 	}
 
@@ -12982,16 +12986,15 @@ static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, 
 	return t;
 }
 
-ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error *error, ufbxi_buf *buf_result, ufbxi_buf *buf_tmp)
+ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error *error, ufbxi_buf *buf_result, ufbxi_buf *buf_tmp,
+	double time, bool load_caches, ufbx_geometry_cache_data_opts *cache_opts)
 {
 	size_t max_skinned_indices = 0;
-	size_t max_skinned_vertices = 0;
 
 	ufbxi_for_ptr_list(ufbx_mesh, p_mesh, scene->meshes) {
 		ufbx_mesh *mesh = *p_mesh;
-		if (mesh->blend_deformers.count == 0 && mesh->skins.count == 0) continue;
+		if (mesh->blend_deformers.count == 0 && mesh->skins.count == 0 && (mesh->geometry_caches.count == 0 || !load_caches)) continue;
 		max_skinned_indices = ufbxi_max_sz(max_skinned_indices, mesh->num_indices);
-		max_skinned_vertices = ufbxi_max_sz(max_skinned_vertices, mesh->num_vertices);
 	}
 
 	ufbx_topo_edge *topo = ufbxi_push(buf_tmp, ufbx_topo_edge, max_skinned_indices);
@@ -12999,7 +13002,7 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 
 	ufbxi_for_ptr_list(ufbx_mesh, p_mesh, scene->meshes) {
 		ufbx_mesh *mesh = *p_mesh;
-		if (mesh->blend_deformers.count == 0 && mesh->skins.count == 0) continue;
+		if (mesh->blend_deformers.count == 0 && mesh->skins.count == 0 && (mesh->geometry_caches.count == 0 || !load_caches)) continue;
 		if (mesh->num_vertices == 0) continue;
 
 		size_t num_vertices = mesh->num_vertices;
@@ -13008,47 +13011,83 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 
 		result_pos[0] = ufbx_zero_vec3;
 		result_pos++;
-		memcpy(result_pos, mesh->vertices, num_vertices * sizeof(ufbx_vec3));
 
-		ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, mesh->blend_deformers) {
-			ufbx_add_blend_vertex_offsets(*p_blend, result_pos, num_vertices, 1.0f);
+		bool cached_position = false, cached_normals = false;
+		if (load_caches && mesh->geometry_caches.count > 0) {
+			ufbxi_for_ptr_list(ufbx_cache_deformer, p_cache, mesh->geometry_caches) {
+				ufbx_cache_channel *channel = (*p_cache)->external_channel;
+				if (!channel) continue;
+
+				if (channel->interpretation == UFBX_CACHE_INTERPRETATION_VERTEX_POSITION && !cached_position) {
+					size_t num_read = ufbx_sample_geometry_cache_vec3(channel, time, result_pos, num_vertices, cache_opts);
+					if (num_read == num_vertices) {
+						mesh->skinned_is_local = true;
+						cached_position = true;
+					}
+				} else if (channel->interpretation == UFBX_CACHE_INTERPRETATION_VERTEX_NORMAL && !cached_normals) {
+					// TODO: Is this right at all?
+					size_t num_normals = mesh->skinned_normal.num_values;
+					ufbx_vec3 *normal_data = ufbxi_push(buf_result, ufbx_vec3, num_normals + 1);
+					ufbxi_check_err(error, normal_data);
+					normal_data[0] = ufbx_zero_vec3;
+					normal_data++;
+
+					size_t num_read = ufbx_sample_geometry_cache_vec3(channel, time, normal_data, num_normals, cache_opts);
+					if (num_read == num_normals) {
+						cached_normals = true;
+						mesh->skinned_normal.data = normal_data;
+					} else {
+						ufbxi_pop(buf_result, ufbx_vec3, num_normals + 1, NULL);
+					}
+				}
+			}
 		}
 
-		// TODO: What should we do about multiple skins??
-		if (mesh->skins.count > 0) {
-			ufbx_matrix *fallback = mesh->instances.count > 0 ? &mesh->instances.data[0]->geometry_to_world : NULL;
-			ufbx_skin_deformer *skin = mesh->skins.data[0];
-			for (size_t i = 0; i < num_vertices; i++) {
-				ufbx_matrix mat = ufbx_get_skin_vertex_matrix(skin, i, fallback);
-				result_pos[i] = ufbx_transform_position(&mat, result_pos[i]);
+		if (!cached_position) {
+			memcpy(result_pos, mesh->vertices, num_vertices * sizeof(ufbx_vec3));
+
+			ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, mesh->blend_deformers) {
+				ufbx_add_blend_vertex_offsets(*p_blend, result_pos, num_vertices, 1.0f);
 			}
 
-			mesh->skinned_is_local = false;
+			// TODO: What should we do about multiple skins??
+			if (mesh->skins.count > 0) {
+				ufbx_matrix *fallback = mesh->instances.count > 0 ? &mesh->instances.data[0]->geometry_to_world : NULL;
+				ufbx_skin_deformer *skin = mesh->skins.data[0];
+				for (size_t i = 0; i < num_vertices; i++) {
+					ufbx_matrix mat = ufbx_get_skin_vertex_matrix(skin, i, fallback);
+					result_pos[i] = ufbx_transform_position(&mat, result_pos[i]);
+				}
+
+				mesh->skinned_is_local = false;
+			}
 		}
 
 		mesh->skinned_position.data = result_pos;
 
-		int32_t *normal_indices = ufbxi_push(buf_result, int32_t, mesh->num_indices);
-		ufbxi_check_err(error, normal_indices);
+		if (!cached_normals) {
+			int32_t *normal_indices = ufbxi_push(buf_result, int32_t, mesh->num_indices);
+			ufbxi_check_err(error, normal_indices);
 
-		ufbx_compute_topology(mesh, topo);
-		size_t num_normals = ufbx_generate_normal_mapping(mesh, topo, normal_indices);
+			ufbx_compute_topology(mesh, topo);
+			size_t num_normals = ufbx_generate_normal_mapping(mesh, topo, normal_indices);
 
-		if (num_normals == mesh->num_vertices) {
-			mesh->skinned_normal.unique_per_vertex = true;
+			if (num_normals == mesh->num_vertices) {
+				mesh->skinned_normal.unique_per_vertex = true;
+			}
+
+			ufbx_vec3 *normal_data = ufbxi_push(buf_result, ufbx_vec3, num_normals + 1);
+			ufbxi_check_err(error, normal_data);
+
+			normal_data[0] = ufbx_zero_vec3;
+			normal_data++;
+
+			ufbx_compute_normals(mesh, &mesh->skinned_position, normal_indices, normal_data, num_normals);
+
+			mesh->skinned_normal.data = normal_data;
+			mesh->skinned_normal.indices = normal_indices;
+			mesh->skinned_normal.num_values = num_normals;
 		}
-
-		ufbx_vec3 *normal_data = ufbxi_push(buf_result, ufbx_vec3, num_normals + 1);
-		ufbxi_check_err(error, normal_data);
-
-		normal_data[0] = ufbx_zero_vec3;
-		normal_data++;
-
-		ufbx_compute_normals(mesh, &mesh->skinned_position, normal_indices, normal_data, num_normals);
-
-		mesh->skinned_normal.data = normal_data;
-		mesh->skinned_normal.indices = normal_indices;
-		mesh->skinned_normal.num_values = num_normals;
 	}
 
 	return 1;
@@ -13078,7 +13117,11 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 
 	// Evaluate skinning if requested
 	if (uc->opts.evaluate_skinning) {
-		ufbxi_check(ufbxi_evaluate_skinning(&uc->scene, &uc->error, &uc->result, &uc->tmp));
+		ufbx_geometry_cache_data_opts cache_opts = { 0 };
+		cache_opts.open_file_fn = uc->opts.open_file_fn;
+		cache_opts.open_file_user = uc->opts.open_file_user;
+		ufbxi_check(ufbxi_evaluate_skinning(&uc->scene, &uc->error, &uc->result, &uc->tmp,
+			0.0, uc->opts.load_external_files, &cache_opts));
 	}
 
 	// Copy local data to the scene
@@ -13825,7 +13868,11 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 
 	// Evaluate skinning if requested
 	if (ec->opts.evaluate_skinning) {
-		ufbxi_check_err(&ec->error, ufbxi_evaluate_skinning(&ec->scene, &ec->error, &ec->result, &ec->tmp));
+		ufbx_geometry_cache_data_opts cache_opts = { 0 };
+		cache_opts.open_file_fn = ec->opts.open_file_fn;
+		cache_opts.open_file_user = ec->opts.open_file_user;
+		ufbxi_check_err(&ec->error, ufbxi_evaluate_skinning(&ec->scene, &ec->error, &ec->result, &ec->tmp,
+			ec->time, ec->opts.load_external_files, &cache_opts));
 	}
 
 	// Retain the scene, this must be the final allocation as we copy
@@ -16244,6 +16291,258 @@ void ufbx_free_geometry_cache(ufbx_geometry_cache *cache)
 	result.ator = &ator;
 	ufbxi_buf_free(&result);
 	ufbxi_free_ator(&ator);
+}
+
+ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *frame, ufbx_real *data, size_t count, ufbx_geometry_cache_data_opts *user_opts)
+{
+	if (!frame || count == 0) return 0;
+	ufbx_assert(data);
+	if (!data) return 0;
+
+	ufbx_geometry_cache_data_opts opts;
+	if (user_opts) {
+		opts = *user_opts;
+	} else {
+		memset(&opts, 0, sizeof(opts));
+	}
+
+	if (!opts.open_file_fn) {
+		opts.open_file_fn = ufbxi_open_file;
+	}
+
+	bool use_double = false;
+
+	size_t src_count = 0;
+
+	switch (frame->data_format) {
+	case UFBX_CACHE_DATA_UNKNOWN: src_count = 0; break;
+	case UFBX_CACHE_DATA_REAL_FLOAT: src_count = frame->data_count; break;
+	case UFBX_CACHE_DATA_VEC3_FLOAT: src_count = frame->data_count * 3; break;
+	case UFBX_CACHE_DATA_REAL_DOUBLE: src_count = frame->data_count; use_double = true; break;
+	case UFBX_CACHE_DATA_VEC3_DOUBLE: src_count = frame->data_count * 3; use_double = true; break;
+	}
+
+	bool src_big_endian = false;
+	switch (frame->data_encoding) {
+	case UFBX_CACHE_DATA_ENCODING_UNKNOWN: return 0;
+	case UFBX_CACHE_DATA_ENCODING_LITTLE_ENDIAN: src_big_endian = false; break;
+	case UFBX_CACHE_DATA_ENCODING_BIG_ENDIAN: src_big_endian = true; break;
+	}
+
+	// Test endianness
+	bool dst_big_endian;
+	{
+		uint8_t buf[2];
+		uint16_t val = 0xbbaa;
+		memcpy(buf, &val, 2);
+		dst_big_endian = buf[0] == 0xbb;
+	}
+
+	if (src_count == 0) return 0;
+	src_count = ufbxi_min_sz(src_count, count);
+
+	ufbx_stream stream;
+	if (!opts.open_file_fn(opts.open_file_user, &stream, frame->filename.data, frame->filename.length)) {
+		return 0;
+	}
+
+	// Skip to the correct point in the file
+	uint64_t offset = frame->data_offset;
+	if (stream.skip_fn) {
+		while (offset > 0) {
+			size_t to_skip = (size_t)ufbxi_min64(offset, UFBXI_MAX_SKIP_SIZE);
+			if (!stream.skip_fn(stream.user, to_skip)) break;
+			offset -= to_skip;
+		}
+	} else {
+		char buffer[4096];
+		while (offset > 0) {
+			size_t to_skip = (size_t)ufbxi_min64(offset, sizeof(buffer));
+			size_t num_read = stream.read_fn(stream.user, buffer, to_skip);
+			if (num_read != to_skip) break;
+			offset -= to_skip;
+		}
+	}
+
+	// Failed to skip all the way
+	if (offset > 0) {
+		if (stream.close_fn) {
+			stream.close_fn(stream.user);
+		}
+		return 0;
+	}
+
+	ufbx_real *dst = data;
+	if (use_double) {
+		double buffer[512];
+		while (src_count > 0) {
+			size_t to_read = ufbxi_min_sz(src_count, ufbxi_arraycount(buffer));
+			src_count -= to_read;
+			size_t bytes_read = stream.read_fn(stream.user, buffer, to_read * sizeof(double));
+			if (bytes_read == SIZE_MAX) bytes_read = 0;
+			size_t num_read = bytes_read / sizeof(double);
+
+			if (src_big_endian != dst_big_endian) {
+				for (size_t i = 0; i < num_read; i++) {
+					char t, *v = (char*)&buffer[i];
+					t = v[0]; v[0] = v[7]; v[7] = t;
+					t = v[1]; v[1] = v[6]; v[6] = t;
+					t = v[2]; v[2] = v[5]; v[5] = t;
+					t = v[3]; v[3] = v[4]; v[4] = t;
+				}
+			}
+
+			ufbx_real weight = opts.weight;
+			if (opts.additive && opts.use_weight) {
+				for (size_t i = 0; i < num_read; i++) {
+					dst[i] += (ufbx_real)buffer[i] * weight;
+				}
+			} else if (opts.additive) {
+				for (size_t i = 0; i < num_read; i++) {
+					dst[i] += (ufbx_real)buffer[i];
+				}
+			} else if (opts.use_weight) {
+				for (size_t i = 0; i < num_read; i++) {
+					dst[i] = (ufbx_real)buffer[i] * weight;
+				}
+			} else {
+				for (size_t i = 0; i < num_read; i++) {
+					dst[i] = (ufbx_real)buffer[i];
+				}
+			}
+
+			dst += num_read;
+			if (num_read != to_read) break;
+		}
+	} else {
+		float buffer[1024];
+		while (src_count > 0) {
+			size_t to_read = ufbxi_min_sz(src_count, ufbxi_arraycount(buffer));
+			src_count -= to_read;
+			size_t bytes_read = stream.read_fn(stream.user, buffer, to_read * sizeof(float));
+			if (bytes_read == SIZE_MAX) bytes_read = 0;
+			size_t num_read = bytes_read / sizeof(float);
+
+			if (src_big_endian != dst_big_endian) {
+				for (size_t i = 0; i < num_read; i++) {
+					char t, *v = (char*)&buffer[i];
+					t = v[0]; v[0] = v[3]; v[3] = t;
+					t = v[1]; v[1] = v[2]; v[2] = t;
+				}
+			}
+
+			ufbx_real weight = opts.weight;
+			if (opts.additive && opts.use_weight) {
+				for (size_t i = 0; i < num_read; i++) {
+					dst[i] += (ufbx_real)buffer[i] * weight;
+				}
+			} else if (opts.additive) {
+				for (size_t i = 0; i < num_read; i++) {
+					dst[i] += (ufbx_real)buffer[i];
+				}
+			} else if (opts.use_weight) {
+				for (size_t i = 0; i < num_read; i++) {
+					dst[i] = (ufbx_real)buffer[i] * weight;
+				}
+			} else {
+				for (size_t i = 0; i < num_read; i++) {
+					dst[i] = (ufbx_real)buffer[i];
+				}
+			}
+
+			dst += num_read;
+			if (num_read != to_read) break;
+		}
+	}
+
+	if (stream.close_fn) {
+		stream.close_fn(stream.user);
+	}
+
+	return (size_t)(dst - data);
+}
+
+ufbxi_noinline size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *channel, double time, ufbx_real *data, size_t count, ufbx_geometry_cache_data_opts *user_opts)
+{
+	if (!channel || count == 0) return 0;
+	ufbx_assert(data);
+	if (!data) return 0;
+	if (channel->frames.count == 0) return 0;
+
+	ufbx_geometry_cache_data_opts opts;
+	if (user_opts) {
+		opts = *user_opts;
+	} else {
+		memset(&opts, 0, sizeof(opts));
+	}
+
+	size_t begin = 0;
+	size_t end = channel->frames.count;
+	const ufbx_cache_frame *frames = channel->frames.data;
+	while (end - begin >= 8) {
+		size_t mid = (begin + end) >> 1;
+		if (frames[mid].time < time) {
+			begin = mid + 1;
+		} else { 
+			end = mid;
+		}
+	}
+
+	const double eps = 0.00000001;
+
+	end = channel->frames.count;
+	for (; begin < end; begin++) {
+		const ufbx_cache_frame *next = &frames[begin];
+		if (next->time < time) continue;
+
+		// First keyframe
+		if (begin == 0) {
+			return ufbx_read_geometry_cache_real(next, data, count, &opts);
+		}
+
+		const ufbx_cache_frame *prev = next - 1;
+
+		// Snap to exact frames if near
+		if (fabs(next->time) - time < eps) {
+			return ufbx_read_geometry_cache_real(next, data, count, &opts);
+		}
+		if (fabs(prev->time) - time < eps) {
+			return ufbx_read_geometry_cache_real(prev, data, count, &opts);
+		}
+
+		double rcp_delta = 1.0 / (next->time - prev->time);
+		double t = (time - prev->time) * rcp_delta;
+
+		ufbx_real original_weight = opts.use_weight ? opts.weight : 1.0f;
+
+		opts.use_weight = true;
+		opts.weight = (ufbx_real)(original_weight * (1.0 - t));
+		size_t num_prev = ufbx_read_geometry_cache_real(prev, data, count, &opts);
+
+		opts.additive = true;
+		opts.weight = (ufbx_real)(original_weight * t);
+		return ufbx_read_geometry_cache_real(next, data, num_prev, &opts);
+	}
+
+	// Last frame
+	const ufbx_cache_frame *last = &frames[end - 1];
+	return ufbx_read_geometry_cache_real(last, data, count, &opts);
+}
+
+ufbxi_noinline size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_frame *frame, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts)
+{
+	if (!frame || count == 0) return 0;
+	ufbx_assert(data);
+	if (!data) return 0;
+	return ufbx_read_geometry_cache_real(frame, (ufbx_real*)data, count * 3, opts) / 3;
+}
+
+ufbxi_noinline size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *channel, double time, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts)
+{
+	if (!channel || count == 0) return 0;
+	ufbx_assert(data);
+	if (!data) return 0;
+	return ufbx_sample_geometry_cache_real(channel, time, (ufbx_real*)data, count * 3, opts) / 3;
 }
 
 #ifdef __cplusplus

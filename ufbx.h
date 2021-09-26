@@ -1113,11 +1113,17 @@ typedef enum ufbx_cache_file_format {
 
 typedef enum ufbx_cache_data_format {
 	UFBX_CACHE_DATA_UNKNOWN,
-	UFBX_CACHE_DATA_REAL_FLOAT,  // < Contiguous `float data[]`
-	UFBX_CACHE_DATA_VEC3_FLOAT,  // < Contiguous `struct { float x, y, z; } data[]`
-	UFBX_CACHE_DATA_REAL_DOUBLE, // < Contiguous `double data[]`
-	UFBX_CACHE_DATA_VEC3_DOUBLE, // < Contiguous `struct { double x, y, z; } data[]`
+	UFBX_CACHE_DATA_REAL_FLOAT,  // < `float data[]`
+	UFBX_CACHE_DATA_VEC3_FLOAT,  // < `struct { float x, y, z; } data[]`
+	UFBX_CACHE_DATA_REAL_DOUBLE, // < `double data[]`
+	UFBX_CACHE_DATA_VEC3_DOUBLE, // < `struct { double x, y, z; } data[]`
 } ufbx_cache_data_format;
+
+typedef enum ufbx_cache_data_encoding {
+	UFBX_CACHE_DATA_ENCODING_UNKNOWN,
+	UFBX_CACHE_DATA_ENCODING_LITTLE_ENDIAN, // < Contiguous little-endian array
+	UFBX_CACHE_DATA_ENCODING_BIG_ENDIAN,    // < Contiguous big-endian array
+} ufbx_cache_data_encoding;
 
 typedef enum ufbx_cache_interpretation {
 	UFBX_CACHE_INTERPRETATION_UNKNOWN,
@@ -1132,11 +1138,12 @@ typedef struct ufbx_cache_frame {
 	ufbx_string filename;
 	ufbx_cache_file_format file_format;
 
-	ufbx_cache_data_format data_format; // < Format of the data in the file
-	uint64_t data_offset;               // < Byte offset into the file
-	uint32_t data_count;                // < Number of data elements
-	uint32_t data_element_bytes;        // < Size of a single data element in bytes
-	uint64_t data_total_bytes;          // < Size of the whole data blob in bytes
+	ufbx_cache_data_format data_format;     // < Format of the data in the file
+	ufbx_cache_data_encoding data_encoding; // < Binary encoding of the data
+	uint64_t data_offset;                   // < Byte offset into the file
+	uint32_t data_count;                    // < Number of data elements
+	uint32_t data_element_bytes;            // < Size of a single data element in bytes
+	uint64_t data_total_bytes;              // < Size of the whole data blob in bytes
 } ufbx_cache_frame;
 
 UFBX_LIST_TYPE(ufbx_cache_frame_list, ufbx_cache_frame);
@@ -1164,8 +1171,8 @@ struct ufbx_cache_deformer {
 	ufbx_cache_file *file;
 
 	// Only valid if `ufbx_load_opts.load_external_files` is set!
-	ufbx_cache_channel *geometry_channel;
-	ufbx_geometry_cache *geometry_cache;
+	ufbx_geometry_cache *external_cache;
+	ufbx_cache_channel *external_channel;
 };
 
 struct ufbx_cache_file {
@@ -1177,7 +1184,7 @@ struct ufbx_cache_file {
 	ufbx_cache_file_format format;
 
 	// Only valid if `ufbx_load_opts.load_external_files` is set!
-	ufbx_geometry_cache *geometry_cache;
+	ufbx_geometry_cache *external_cache;
 };
 
 // -- Materials
@@ -2273,6 +2280,13 @@ typedef struct ufbx_evaluate_opts {
 	bool evaluate_skinning; // < Evaluate skinning (see ufbx_mesh.skinned_vertices)
 	bool evaluate_caches;   // < Evaluate vertex caches (see ufbx_mesh.skinned_vertices)
 
+	// WARNING: Potentially unsafe! Try to open external files such as geometry caches
+	bool load_external_files;
+
+	// External file callbacks (defaults to stdio.h)
+	ufbx_open_file_fn *open_file_fn;
+	void *open_file_user;
+
 } ufbx_evaluate_opts;
 
 typedef struct ufbx_subdivide_opts {
@@ -2308,6 +2322,18 @@ typedef struct ufbx_geometry_cache_opts {
 	double frames_per_second;
 
 } ufbx_geometry_cache_opts;
+
+typedef struct ufbx_geometry_cache_data_opts {
+
+	// External file callbacks (defaults to stdio.h)
+	ufbx_open_file_fn *open_file_fn;
+	void *open_file_user;
+
+	bool additive;
+	bool use_weight;
+	ufbx_real weight;
+
+} ufbx_geometry_cache_data_opts;
 
 // -- API
 
@@ -2481,6 +2507,11 @@ ufbx_geometry_cache *ufbx_load_geometry_cache_len(
 	const ufbx_geometry_cache_opts *opts, ufbx_error *error);
 
 void ufbx_free_geometry_cache(ufbx_geometry_cache *cache);
+
+size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *frame, ufbx_real *data, size_t count, ufbx_geometry_cache_data_opts *opts);
+size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *channel, double time, ufbx_real *data, size_t count, ufbx_geometry_cache_data_opts *opts);
+size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_frame *frame, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts);
+size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *channel, double time, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts);
 
 // -- Inline API
 
