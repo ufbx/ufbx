@@ -1323,6 +1323,17 @@ ufbxi_nodiscard static bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t 
 	return true;
 }
 
+static ufbxi_noinline void ufbxi_free_ator(ufbxi_allocator *ator)
+{
+	ufbx_assert(ator->current_size == 0);
+
+	ufbx_free_allocator_fn *free_fn = ator->ator.free_allocator_fn;
+	if (free_fn) {
+		void *user = ator->ator.user;
+		free_fn(user);
+	}
+}
+
 #define ufbxi_alloc(ator, type, n) (type*)ufbxi_alloc_size((ator), sizeof(type), (n))
 #define ufbxi_alloc_zero(ator, type, n) (type*)ufbxi_alloc_zero_size((ator), sizeof(type), (n))
 #define ufbxi_realloc(ator, type, old_ptr, old_n, n) (type*)ufbxi_realloc_size((ator), sizeof(type), (old_ptr), (old_n), (n))
@@ -1437,6 +1448,8 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 	new_chunk->next = NULL;
 	new_chunk->size = chunk_size;
 	new_chunk->next_size = next_size;
+	new_chunk->align_0 = NULL;
+	new_chunk->align_1 = 0;
 
 	// Link the chunk to the list and set it as the active one
 	if (chunk) {
@@ -2262,8 +2275,9 @@ static const char ufbxi_UV[] = "UV\0";
 static const char ufbxi_UnitScaleFactor[] = "UnitScaleFactor";
 static const char ufbxi_UpAxisSign[] = "UpAxisSign";
 static const char ufbxi_UpAxis[] = "UpAxis";
-static const char ufbxi_VertexCreaseIndex[] = "VertexCreaseIndex";
+static const char ufbxi_VertexCacheDeformer[] = "VertexCacheDeformer";
 static const char ufbxi_VertexCrease[] = "VertexCrease";
+static const char ufbxi_VertexCreaseIndex[] = "VertexCreaseIndex";
 static const char ufbxi_VertexIndexArray[] = "VertexIndexArray";
 static const char ufbxi_Vertices[] = "Vertices";
 static const char ufbxi_Video[] = "Video";
@@ -2535,6 +2549,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_UnitScaleFactor, 15 },
 	{ ufbxi_UpAxis, 6 },
 	{ ufbxi_UpAxisSign, 10 },
+	{ ufbxi_VertexCacheDeformer, 19 },
 	{ ufbxi_VertexCrease, 12 },
 	{ ufbxi_VertexCreaseIndex, 17 },
 	{ ufbxi_VertexIndexArray, 16 },
@@ -7683,8 +7698,8 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_read_texture(ufbxi_context *uc, 
 	texture->filename = ufbx_empty_string;
 	texture->relative_filename = ufbx_empty_string;
 
-	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_FileName, "S", &texture->filename));
-	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Filename, "S", &texture->filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_FileName, "S", &texture->absolute_filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Filename, "S", &texture->absolute_filename));
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFileName, "S", &texture->relative_filename));
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFilename, "S", &texture->relative_filename));
 
@@ -8145,6 +8160,8 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_blend_deformer), UFBX_ELEMENT_BLEND_DEFORMER));
 			} else if (sub_type == ufbxi_BlendShapeChannel) {
 				ufbxi_check(ufbxi_read_blend_channel(uc, node, &info));
+			} else if (sub_type == ufbxi_VertexCacheDeformer) {
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_cache_deformer), UFBX_ELEMENT_CACHE_DEFORMER));
 			} else {
 				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
 			}
@@ -10276,6 +10293,77 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_add_constraint_prop(ufbxi_contex
 	return 1;
 }
 
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_init_file_paths(ufbxi_context *uc)
+{
+	uc->scene.metadata.filename = uc->opts.filename;
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->scene.metadata.filename));
+
+	ufbx_string root = uc->opts.filename;
+	for (; root.length > 0; root.length--) {
+		char c = root.data[root.length - 1];
+		bool is_separator = c == '/';
+#if defined(_WIN32)
+		if (c == '\\') is_separator = true;
+#endif
+		if (is_separator) {
+			root.length--;
+			break;
+		}
+	}
+	uc->scene.metadata.relative_root = root;
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->scene.metadata.relative_root));
+
+	return 1;
+}
+
+ufbxi_noinline ufbxi_nodiscard static int ufbxi_resolve_relative_filename(ufbxi_context *uc, ufbx_string *dst, ufbx_string relative)
+{
+	// Skip leading directory separators and early return if the relative path is empty
+	while (relative.length > 0 && (relative.data[0] == '/' || relative.data[0] == '\\')) {
+		relative.data++;
+		relative.length--;
+	}
+	if (relative.length == 0) {
+		*dst = ufbx_empty_string;
+		return 1;
+	}
+
+#if defined(_WIN32)
+	char separator = '\\';
+#else
+	char separator = '/';
+#endif
+
+	ufbx_string prefix = uc->scene.metadata.relative_root;
+	size_t result_cap = prefix.length + relative.length + 1;
+	char *result = ufbxi_push(&uc->tmp_stack, char, result_cap);
+	ufbxi_check(result);
+	char *ptr = result;
+
+	// Copy prefix and suffix converting separators in the process
+	if (prefix.length > 0) {
+		memcpy(ptr, prefix.data, prefix.length);
+		ptr[prefix.length] = separator;
+		ptr += prefix.length + 1;
+	}
+	for (size_t i = 0; i < relative.length; i++) {
+		char c = relative.data[i];
+		if (c == '/' || c == '\\') {
+			c = separator;
+		}
+		*ptr++ = c;
+	}
+
+	// Intern the string and pop the temporary buffef
+	dst->data = result;
+	dst->length = (size_t)(ptr - result);
+	ufbx_assert(dst->length <= result_cap);
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, dst));
+	ufbxi_pop(&uc->tmp_stack, char, result_cap, NULL);
+
+	return 1;
+}
+
 ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	size_t num_elements = uc->num_elements;
@@ -10544,6 +10632,12 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbxi_check(ufbxi_fetch_dst_elements(uc, &blend->channels, &blend->element, false, NULL, UFBX_ELEMENT_BLEND_CHANNEL));
 	}
 
+	ufbxi_for_ptr_list(ufbx_cache_deformer, p_deformer, uc->scene.cache_deformers) {
+		ufbx_cache_deformer *deformer = *p_deformer;
+		deformer->channel = ufbx_find_string(&deformer->props, "ChannelName", ufbx_empty_string);
+		deformer->file = (ufbx_cache_file*)ufbxi_fetch_dst_element(&deformer->element, false, NULL, UFBX_ELEMENT_CACHE_FILE);
+	}
+
 	ufbxi_for_ptr_list(ufbx_cache_file, p_cache, uc->scene.cache_files) {
 		ufbx_cache_file *cache = *p_cache;
 
@@ -10554,8 +10648,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 			cache->format = (ufbx_cache_file_format)type;
 		}
 
-		if (uc->opts.load_external_files) {
-		}
+		ufbxi_check(ufbxi_resolve_relative_filename(uc, &cache->filename, cache->relative_filename));
 	}
 
 	ufbx_assert(uc->tmp_full_weights.num_items == uc->scene.blend_channels.count);
@@ -10995,6 +11088,7 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 	size_t num_content_videos = 0;
 	ufbxi_for_ptr_list(ufbx_video, p_video, uc->scene.videos) {
 		ufbx_video *video = *p_video;
+		ufbxi_check(ufbxi_resolve_relative_filename(uc, &video->filename, video->relative_filename));
 		if (video->content_size > 0) {
 			content_videos[num_content_videos++] = video;
 		}
@@ -11021,6 +11115,8 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 	ufbxi_for_ptr_list(ufbx_texture, p_texture, uc->scene.textures) {
 		ufbx_texture *texture = *p_texture;
 		ufbxi_texture_extra *extra = (ufbxi_texture_extra*)ufbxi_get_element_extra(uc, texture->element.id);
+
+		ufbxi_check(ufbxi_resolve_relative_filename(uc, &texture->filename, texture->relative_filename));
 
 		ufbx_prop *uv_set = ufbxi_find_prop(&texture->props, ufbxi_UVSet);
 		if (uv_set) {
@@ -11912,6 +12008,160 @@ static ufbxi_noinline void ufbxi_update_scene_settings(ufbx_scene_settings *sett
 	}
 }
 
+static ufbxi_noinline void ufbxi_patch_cluster_binding(ufbx_scene *scene)
+{
+	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
+		ufbx_skin_cluster *cluster = *p_cluster;
+		if (!ufbxi_matrix_all_zero(&cluster->geometry_to_bone)) continue;
+
+		ufbx_skin_deformer *skin = (ufbx_skin_deformer*)ufbxi_fetch_src_element(&cluster->element, false, NULL, UFBX_ELEMENT_SKIN_DEFORMER);
+		if (!skin) continue;
+
+		ufbx_node *node = (ufbx_node*)ufbxi_fetch_src_element(&skin->element, false, NULL, UFBX_ELEMENT_NODE);
+		if (!node) {
+			ufbx_mesh *mesh = (ufbx_mesh*)ufbxi_fetch_src_element(&skin->element, false, NULL, UFBX_ELEMENT_MESH);
+			if (mesh && mesh->instances.count > 0) {
+				node = mesh->instances.data[0];
+			}
+		}
+		if (!node) continue;
+
+		ufbx_matrix world_to_bind = ufbx_matrix_invert(&cluster->bind_to_world);
+		cluster->geometry_to_bone = ufbx_matrix_mul(&world_to_bind, &node->node_to_world);
+	}
+}
+
+// -- External files
+
+typedef enum {
+	UFBXI_EXTERNAL_FILE_GEOMETRY_CACHE,
+} ufbxi_external_file_type;
+
+typedef struct {
+	ufbxi_external_file_type type;
+	ufbx_string filename;
+	ufbx_string absolute_filename;
+	size_t index;
+	void *data;
+	size_t data_size;
+} ufbxi_external_file;
+
+static int ufbxi_cmp_external_file(const void *va, const void *vb)
+{
+	const ufbxi_external_file *a = (const ufbxi_external_file*)va, *b = (const ufbxi_external_file*)vb;
+	if (a->type != b->type) return a->type < b->type ? -1 : 1;
+	int cmp = ufbxi_str_cmp(a->filename, b->filename);
+	if (cmp != 0) return cmp;
+	if (a->index != b->index) a->index < b->index ? -1 : 1;
+	return 0;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_load_external_cache(ufbxi_context *uc, ufbxi_external_file *file)
+{
+	ufbx_geometry_cache_opts opts = { 0 };
+	opts.open_file_fn = uc->opts.open_file_fn;
+	opts.open_file_user = uc->opts.open_file_user;
+	opts.frames_per_second = uc->scene.settings.frames_per_second;
+
+	ufbxi_cache_context cc = { UFBX_ERROR_NONE };
+	cc.owned_by_scene = true;
+
+	// Temporarily "borrow" allocators for the geometry cache
+	cc.ator_tmp = uc->ator_tmp;
+	cc.string_pool = uc->string_pool;
+	cc.result = uc->result;
+
+	ufbx_geometry_cache *cache = ufbxi_cache_load(&cc, file->filename);
+	if (!cache) {
+		if (cc.error.type == UFBX_ERROR_FILE_NOT_FOUND) {
+			memset(&cc.error, 0, sizeof(cc.error));
+			ufbxi_cache_load(&cc, file->absolute_filename);
+		}
+	}
+
+	// Return the "borrowed" allocators
+	uc->ator_tmp = cc.ator_tmp;
+	uc->string_pool = cc.string_pool;
+	uc->result = cc.result;
+
+	if (!cache) {
+		uc->error = cc.error;
+		return 0;
+	}
+
+	file->data = cache;
+	return 1;
+}
+
+static ufbxi_noinline ufbxi_external_file *ufbxi_find_external_file(ufbxi_context *uc, ufbxi_external_file *files, size_t num_files, ufbxi_external_file_type type, const char *name)
+{
+	size_t ix = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbxi_external_file, 32, &ix, files, 0, num_files,
+		( strcmp(a->filename.data, name) < 0 ), ( a->filename.data == name ));
+	return ix != SIZE_MAX ? &files[ix] : NULL;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_load_external_files(ufbxi_context *uc)
+{
+	size_t num_files = 0;
+
+	// Gather external files to deduplicate them
+	ufbxi_for_ptr_list(ufbx_cache_file, p_cache, uc->scene.cache_files) {
+		ufbx_cache_file *cache = *p_cache;
+		if (cache->filename.length > 0) {
+			ufbxi_external_file *file = ufbxi_push_zero(&uc->tmp_stack, ufbxi_external_file, 1);
+			ufbxi_check(file);
+			file->index = num_files++;
+			file->type = UFBXI_EXTERNAL_FILE_GEOMETRY_CACHE;
+			file->filename = cache->filename;
+			file->absolute_filename = cache->absolute_filename;
+		}
+	}
+
+	// Sort and load the external files
+	ufbxi_external_file *files = ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_external_file, num_files);
+	ufbxi_check(files);
+	qsort(files, num_files, sizeof(ufbxi_external_file), &ufbxi_cmp_external_file);
+
+	ufbxi_external_file_type prev_type = UFBXI_EXTERNAL_FILE_GEOMETRY_CACHE;
+	const char *prev_name = NULL;
+	ufbxi_for(ufbxi_external_file, file, files, num_files) {
+		if (file->filename.data == prev_name && file->type == prev_type) continue;
+		if (file->type == UFBXI_EXTERNAL_FILE_GEOMETRY_CACHE) {
+			ufbxi_check(ufbxi_load_external_cache(uc, file));
+		}
+		prev_name = file->filename.data;
+		prev_type = file->type;
+	}
+
+	// Patch the loaded files
+	ufbxi_for_ptr_list(ufbx_cache_file, p_cache, uc->scene.cache_files) {
+		ufbx_cache_file *cache = *p_cache;
+		ufbxi_external_file *file = ufbxi_find_external_file(uc, files, num_files,
+			UFBXI_EXTERNAL_FILE_GEOMETRY_CACHE, cache->filename.data);
+		if (file && file->data) {
+			cache->geometry_cache = (ufbx_geometry_cache*)file->data;
+		}
+	}
+
+	// Patch the geometry deformers
+	ufbxi_for_ptr_list(ufbx_cache_deformer, p_deformer, uc->scene.cache_deformers) {
+		ufbx_cache_deformer *deformer = *p_deformer;
+		if (!deformer->file || !deformer->file->geometry_cache) continue;
+		ufbx_geometry_cache *cache = deformer->file->geometry_cache;
+		ufbx_string channel = deformer->channel;
+		deformer->geometry_cache = cache;
+		size_t ix = SIZE_MAX;
+		ufbxi_macro_lower_bound_eq(ufbx_cache_channel, 16, &ix, cache->channels.data, 0, cache->channels.count,
+			( ufbxi_str_less(a->name, channel) ), ( a->name.data == channel.data ));
+		if (ix != SIZE_MAX) {
+			deformer->geometry_channel = &cache->channels.data[ix];
+		}
+	}
+
+	return 1;
+}
+
 // -- Curve evaluation
 
 static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, double x0)
@@ -12032,10 +12282,15 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	}
 
 	ufbxi_update_scene_metadata(&uc->scene.metadata);
+	ufbxi_check(ufbxi_init_file_paths(uc));
 	ufbxi_check(ufbxi_finalize_scene(uc));
 
 	ufbxi_update_scene(&uc->scene, true);
 	ufbxi_update_scene_settings(&uc->scene.settings);
+
+	if (uc->opts.load_external_files) {
+		ufbxi_load_external_files(uc);
+	}
 
 	// Evaluate skinning if requested
 	if (uc->opts.evaluate_skinning) {
@@ -12075,17 +12330,6 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	uc->scene_imp = imp;
 
 	return 1;
-}
-
-static void ufbxi_free_ator(ufbxi_allocator *ator)
-{
-	ufbx_assert(ator->current_size == 0);
-
-	ufbx_free_allocator_fn *free_fn = ator->ator.free_allocator_fn;
-	if (free_fn) {
-		void *user = ator->ator.user;
-		free_fn(user);
-	}
 }
 
 static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
@@ -12173,6 +12417,10 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 
 	if (uc->opts.file_size_estimate) {
 		uc->progress_bytes_total = uc->opts.file_size_estimate;
+	}
+
+	if (uc->opts.filename.length == SIZE_MAX) {
+		uc->opts.filename.length = uc->opts.filename.data ? strlen(uc->opts.filename.data) : 0;
 	}
 
 	ufbx_inflate_retain inflate_retain;
@@ -12671,6 +12919,11 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 			keys[i].shape = (ufbx_blend_shape*)ufbxi_translate_element(ec, keys[i].shape);
 		}
 		chan->keyframes.data = keys;
+	}
+
+	ufbxi_for_ptr_list(ufbx_cache_deformer, p_deformer, ec->scene.cache_deformers) {
+		ufbx_cache_deformer *deformer = *p_deformer;
+		deformer->file = (ufbx_cache_file*)ufbxi_translate_element(ec, deformer->file);
 	}
 
 	ufbxi_for_ptr_list(ufbx_material, p_material, ec->scene.materials) {
@@ -14316,6 +14569,16 @@ static ufbxi_noinline int ufbxi_cache_sort_frames(ufbxi_cache_context *cc, ufbx_
 	return 1;
 }
 
+typedef struct {
+	ufbx_cache_interpretation interpretation;
+	const char *name;
+} ufbxi_cache_interpretation_name;
+
+static const ufbxi_cache_interpretation_name ufbxi_cache_interpretation_names[] = {
+	{ UFBX_CACHE_INTERPRETATION_VERTEX_POSITION, "positions" },
+	{ UFBX_CACHE_INTERPRETATION_VERTEX_NORMAL, "normals" },
+};
+
 static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 {
 	ufbxi_cache_tmp_channel *tmp_chan = cc->channels, *tmp_end = tmp_chan + cc->num_channels;
@@ -14332,7 +14595,7 @@ static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 		ufbxi_check_err(&cc->error, chan);
 
 		chan->name = frame->channel;
-		chan->interpretation = ufbx_empty_string;
+		chan->interpretation_name = ufbx_empty_string;
 		chan->frames.data = frame;
 		chan->frames.count = end - begin;
 
@@ -14340,7 +14603,18 @@ static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 			tmp_chan++;
 		}
 		if (tmp_chan < tmp_end && ufbxi_str_equal(tmp_chan->name, chan->name)) {
-			chan->interpretation = tmp_chan->interpretation;
+			chan->interpretation_name = tmp_chan->interpretation;
+		}
+
+		if (frame->file_format == UFBX_CACHE_FILE_FORMAT_PC2) {
+			chan->interpretation = UFBX_CACHE_INTERPRETATION_VERTEX_POSITION;
+		} else {
+			ufbxi_for(const ufbxi_cache_interpretation_name, name, ufbxi_cache_interpretation_names, ufbxi_arraycount(ufbxi_cache_interpretation_names)) {
+				if (!strcmp(chan->interpretation_name.data, name->name)) {
+					chan->interpretation = name->interpretation;
+					break;
+				}
+			}
 		}
 
 		num_channels++;
@@ -14356,14 +14630,8 @@ static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 
 static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_string filename)
 {
-	cc->string_pool.error = &cc->error;
-	cc->string_pool.map.ator = &cc->ator_tmp;
-	cc->string_pool.buf.ator = &cc->ator_result;
-	cc->string_pool.initial_size = 64;
-
 	cc->tmp.ator = &cc->ator_tmp;
 	cc->tmp_stack.ator = &cc->ator_tmp;
-	cc->result.ator = &cc->ator_result;
 
 	cc->channel_name.data = ufbxi_empty_char;
 
@@ -14444,6 +14712,12 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 	ufbxi_init_ator(&cc.error, &cc.ator_result, &opts.result_allocator);
 	cc.open_file_fn = opts.open_file_fn;
 	cc.open_file_user = opts.open_file_user;
+
+	cc.string_pool.error = &cc.error;
+	cc.string_pool.map.ator = &cc.ator_tmp;
+	cc.string_pool.buf.ator = &cc.ator_result;
+	cc.string_pool.initial_size = 64;
+	cc.result.ator = &cc.ator_result;
 
 	cc.frames_per_second = opts.frames_per_second > 0.0 ? opts.frames_per_second : 30.0;
 
@@ -14548,7 +14822,18 @@ ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_len, const 
 		return NULL;
 	}
 
-	ufbx_scene *scene = ufbx_load_stdio(file, opts, error);
+	ufbx_load_opts opts_copy;
+	if (opts) {
+		opts_copy = *opts;
+	} else {
+		memset(&opts_copy, 0, sizeof(opts_copy));
+	}
+	if (opts_copy.filename.length == 0 || opts_copy.filename.data == NULL) {
+		opts_copy.filename.data = filename;
+		opts_copy.filename.length = filename_len;
+	}
+
+	ufbx_scene *scene = ufbx_load_stdio(file, &opts_copy, error);
 
 	fclose(file);
 
@@ -15937,6 +16222,26 @@ ufbx_geometry_cache *ufbx_load_geometry_cache_len(
 	return ufbxi_load_geometry_cache(str, opts, error);
 }
 
+void ufbx_free_geometry_cache(ufbx_geometry_cache *cache)
+{
+	if (!cache) return;
+
+	ufbxi_geometry_cache_imp *imp = (ufbxi_geometry_cache_imp*)cache;
+	ufbx_assert(imp->magic == UFBXI_CACHE_IMP_MAGIC);
+	if (imp->magic != UFBXI_CACHE_IMP_MAGIC) return;
+	if (imp->owned_by_scene) return;
+
+	ufbxi_buf_free(&imp->string_buf);
+
+	// We need to free `result_buf` last and be careful to copy it to
+	// the stack since the `ufbxi_scene_imp` that contains it is allocated
+	// from the same result buffer!
+	ufbxi_allocator ator = imp->ator;
+	ufbxi_buf result = imp->result_buf;
+	result.ator = &ator;
+	ufbxi_buf_free(&result);
+	ufbxi_free_ator(&ator);
+}
 
 #ifdef __cplusplus
 }

@@ -1105,14 +1105,6 @@ struct ufbx_blend_shape {
 	ufbx_vec3 *normal_offsets;   // < `NULL` if not specified
 };
 
-struct ufbx_cache_deformer {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
-
-	ufbx_string channel;
-
-	ufbx_cache_file *file;
-};
-
 typedef enum ufbx_cache_file_format {
 	UFBX_CACHE_FILE_FORMAT_UNKNOWN,
 	UFBX_CACHE_FILE_FORMAT_PC2, // .pc2 Point cache file
@@ -1126,6 +1118,12 @@ typedef enum ufbx_cache_data_format {
 	UFBX_CACHE_DATA_REAL_DOUBLE, // < Contiguous `double data[]`
 	UFBX_CACHE_DATA_VEC3_DOUBLE, // < Contiguous `struct { double x, y, z; } data[]`
 } ufbx_cache_data_format;
+
+typedef enum ufbx_cache_interpretation {
+	UFBX_CACHE_INTERPRETATION_UNKNOWN,
+	UFBX_CACHE_INTERPRETATION_VERTEX_POSITION,
+	UFBX_CACHE_INTERPRETATION_VERTEX_NORMAL,
+} ufbx_cache_interpretation;
 
 typedef struct ufbx_cache_frame {
 	ufbx_string channel;
@@ -1145,7 +1143,8 @@ UFBX_LIST_TYPE(ufbx_cache_frame_list, ufbx_cache_frame);
 
 typedef struct ufbx_cache_channel {
 	ufbx_string name;
-	ufbx_string interpretation;
+	ufbx_cache_interpretation interpretation;
+	ufbx_string interpretation_name;
 	ufbx_cache_frame_list frames;
 } ufbx_cache_channel;
 
@@ -1158,14 +1157,26 @@ typedef struct ufbx_geometry_cache {
 	ufbx_string_list extra_info;
 } ufbx_geometry_cache;
 
+struct ufbx_cache_deformer {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+
+	ufbx_string channel;
+	ufbx_cache_file *file;
+
+	// Only valid if `ufbx_load_opts.load_external_files` is set!
+	ufbx_cache_channel *geometry_channel;
+	ufbx_geometry_cache *geometry_cache;
+};
+
 struct ufbx_cache_file {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
+	ufbx_string filename;
 	ufbx_string absolute_filename;
 	ufbx_string relative_filename;
 	ufbx_cache_file_format format;
 
-	// Loaded only if `ufbx_load_opts.load_external_files` is set!
+	// Only valid if `ufbx_load_opts.load_external_files` is set!
 	ufbx_geometry_cache *geometry_cache;
 };
 
@@ -1481,6 +1492,7 @@ struct ufbx_texture {
 
 	// FILE: Paths to the resource
 	ufbx_string filename;
+	ufbx_string absolute_filename;
 	ufbx_string relative_filename;
 
 	// FILE: Optional embedded content blob, eg. raw .png format data
@@ -1511,6 +1523,7 @@ struct ufbx_video {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	// Paths to the resource
+	ufbx_string filename;
 	ufbx_string absolute_filename;
 	ufbx_string relative_filename;
 
@@ -1842,6 +1855,9 @@ typedef struct ufbx_metadata {
 	uint32_t version;
 	ufbx_string creator;
 	bool big_endian;
+
+	ufbx_string filename;
+	ufbx_string relative_root;
 
 	ufbx_exporter exporter;
 	uint32_t exporter_version;
@@ -2234,6 +2250,10 @@ typedef struct ufbx_load_opts {
 	// Buffer size in bytes to use for reading from files or IO callbacks
 	size_t read_buffer_size;
 
+	// Filename to use as a base for relative file paths if not specified using
+	// `ufbx_load_file()`. Use `length = SIZE_MAX` for NULL-terminated strings.
+	ufbx_string filename;
+
 	// Progress reporting
 	ufbx_progress_fn *progress_fn;
 	void *progress_user;
@@ -2459,6 +2479,8 @@ ufbx_geometry_cache *ufbx_load_geometry_cache(
 ufbx_geometry_cache *ufbx_load_geometry_cache_len(
 	const char *filename, size_t filename_len,
 	const ufbx_geometry_cache_opts *opts, ufbx_error *error);
+
+void ufbx_free_geometry_cache(ufbx_geometry_cache *cache);
 
 // -- Inline API
 
