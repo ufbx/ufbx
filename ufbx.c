@@ -1177,6 +1177,31 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 #define ufbxi_check_return_err_msg(err, cond, ret, msg) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail_err_msg(err, desc, msg) return ufbxi_fail_imp_err(err, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
 
+static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
+{
+	if (!error->description) error->description = default_desc;
+	error->type = UFBX_ERROR_UNKNOWN;
+	if (!strcmp(error->description, "Out of memory")) {
+		error->type = UFBX_ERROR_OUT_OF_MEMORY;
+	} else if (!strcmp(error->description, "Memory limit exceeded")) {
+		error->type = UFBX_ERROR_MEMORY_LIMIT;
+	} else if (!strcmp(error->description, "Allocation limit exceeded")) {
+		error->type = UFBX_ERROR_ALLOCATION_LIMIT;
+	} else if (!strcmp(error->description, "Truncated file")) {
+		error->type = UFBX_ERROR_TRUNCATED_FILE;
+	} else if (!strcmp(error->description, "IO error")) {
+		error->type = UFBX_ERROR_IO;
+	} else if (!strcmp(error->description, "Cancelled")) {
+		error->type = UFBX_ERROR_CANCELLED;
+	} else if (!strcmp(error->description, "Unsupported version")) {
+		error->type = UFBX_ERROR_UNSUPPORTED_VERSION;
+	} else if (!strcmp(error->description, "Not an FBX file")) {
+		error->type = UFBX_ERROR_NOT_FBX;
+	} else if (!strcmp(error->description, "File not found")) {
+		error->type = UFBX_ERROR_FILE_NOT_FOUND;
+	}
+}
+
 // -- Allocator
 
 // Returned for zero size allocations
