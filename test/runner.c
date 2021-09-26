@@ -1607,6 +1607,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			load_opts.evaluate_skinning = true;
 			load_opts.load_external_files = true;
+			load_opts.filename.data = buf;
+			load_opts.filename.length = SIZE_MAX;
 
 			uint64_t load_begin = cputime_cpu_tick();
 			ufbx_scene *scene = ufbx_load_memory(data, size, &load_opts, &error);
@@ -1625,6 +1627,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			stream_opts.read_buffer_size = 1;
 			stream_opts.temp_allocator.huge_threshold = 1;
 			stream_opts.result_allocator.huge_threshold = 1;
+			stream_opts.filename.data = NULL;
+			stream_opts.filename.length = 0;
 			ufbx_scene *streamed_scene = ufbx_load_file(buf, &stream_opts, &error);
 			if (streamed_scene) {
 				ufbxt_check_scene(streamed_scene);
