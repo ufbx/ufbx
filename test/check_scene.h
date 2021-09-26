@@ -360,6 +360,64 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 #endif
 }
 
+static void ufbxt_check_skin_deformer(ufbx_scene *scene, ufbx_skin_deformer *deformer)
+{
+	for (size_t i = 0; i < deformer->clusters.count; i++) {
+		ufbxt_check_element_ptr(scene, deformer->clusters.data[i]);
+		ufbxt_assert(deformer->clusters.data[i]->bone);
+	}
+	for (size_t i = 0; i < deformer->vertices.count; i++) {
+		ufbx_skin_vertex vertex = deformer->vertices.data[i];
+		ufbxt_assert(vertex.weight_begin < deformer->weights.count);
+		ufbxt_assert(deformer->weights.count - vertex.weight_begin >= vertex.num_weights);
+	}
+	for (size_t i = 0; i < deformer->weights.count; i++) {
+		if (i > 0) {
+			ufbxt_assert(deformer->weights.data[i - 1].weight >= deformer->weights.data[i].weight);
+		}
+		ufbxt_assert(deformer->weights.data[i].cluster_index < deformer->clusters.count);
+	}
+}
+
+static void ufbxt_check_skin_cluster(ufbx_scene *scene, ufbx_skin_cluster *cluster)
+{
+	ufbxt_check_element_ptr(scene, cluster->bone);
+}
+
+static void ufbxt_check_blend_deformer(ufbx_scene *scene, ufbx_blend_deformer *deformer)
+{
+	for (size_t i = 0; i < deformer->channels.count; i++) {
+		ufbxt_check_element_ptr(scene, deformer->channels.data[i]);
+	}
+}
+
+static void ufbxt_check_blend_channel(ufbx_scene *scene, ufbx_blend_channel *channel)
+{
+	for (size_t i = 0; i < channel->keyframes.count; i++) {
+		if (i > 0) {
+			ufbxt_assert(channel->keyframes.data[i - 1].target_weight <= channel->keyframes.data[i].target_weight);
+		}
+		ufbxt_check_element_ptr(scene, channel->keyframes.data[i].shape);
+	}
+}
+
+static void ufbxt_check_blend_shape(ufbx_scene *scene, ufbx_blend_shape *shape)
+{
+}
+
+static void ufbxt_check_cache_deformer(ufbx_scene *scene, ufbx_cache_deformer *deformer)
+{
+	ufbxt_check_string(deformer->channel);
+	ufbxt_check_element_ptr(scene, deformer->file);
+}
+
+static void ufbxt_check_cache_file(ufbx_scene *scene, ufbx_cache_file *file)
+{
+	ufbxt_check_string(file->filename);
+	ufbxt_check_string(file->absolute_filename);
+	ufbxt_check_string(file->relative_filename);
+}
+
 static void ufbx_check_line_curve(ufbx_scene *scene, ufbx_line_curve *line)
 {
 	for (size_t i = 0; i < line->point_indices.count; i++) {
@@ -463,6 +521,34 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 
 	for (size_t i = 0; i < scene->meshes.count; i++) {
 		ufbxt_check_mesh(scene, scene->meshes.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->skin_deformers.count; i++) {
+		ufbxt_check_mesh(scene, scene->meshes.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->skin_clusters.count; i++) {
+		ufbxt_check_skin_cluster(scene, scene->skin_clusters.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->blend_deformers.count; i++) {
+		ufbxt_check_blend_deformer(scene, scene->blend_deformers.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->blend_channels.count; i++) {
+		ufbxt_check_blend_channel(scene, scene->blend_channels.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->blend_shapes.count; i++) {
+		ufbxt_check_blend_shape(scene, scene->blend_shapes.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->cache_deformers.count; i++) {
+		ufbxt_check_cache_deformer(scene, scene->cache_deformers.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->cache_files.count; i++) {
+		ufbxt_check_cache_file(scene, scene->cache_files.data[i]);
 	}
 
 	for (size_t i = 0; i < scene->line_curves.count; i++) {
