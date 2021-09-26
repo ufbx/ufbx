@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<Autodesk_Cache_File>
+  <cacheType Type="OneFilePerFrame" Format="mcc"/>
+  <time Range="250-7250"/>
+  <cacheTimePerFrame TimePerFrame="250"/>
+  <cacheVersion Version="2.0"/>
+  <extra>W:/Temp/ufbx_test_source/sine_cube.mb</extra>
+  <extra>maya 2022</extra>
+  <extra>Datacube</extra>
+  <Channels>
+    <channel0 ChannelName="pCubeShape2" ChannelType="FloatVectorArray" ChannelInterpretation="positions" SamplingType="Regular" SamplingRate="500" StartTime="250" EndTime="7250"/>
+    <channel1 ChannelName="pCubeShape1" ChannelType="FloatVectorArray" ChannelInterpretation="positions" SamplingType="Regular" SamplingRate="500" StartTime="250" EndTime="7250"/>
+  </Channels>
+</Autodesk_Cache_File>
