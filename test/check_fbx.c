@@ -57,13 +57,17 @@ int main(int argc, char **argv)
 		{ "ascii", "!?!?ascii (big-endian)!?!?" },
 	};
 
-	printf("FBX %u %s via %s %u.%u.%u\n",
+	const char *application = scene->metadata.latest_application.name.data;
+	if (!application[0]) application = "unknown";
+
+	printf("FBX %u %s via %s %u.%u.%u (%s)\n",
 		scene->metadata.version,
 		formats[scene->metadata.ascii][scene->metadata.big_endian],
 		exporters[scene->metadata.exporter],
 		ufbx_version_major(scene->metadata.exporter_version),
 		ufbx_version_minor(scene->metadata.exporter_version),
-		ufbx_version_patch(scene->metadata.exporter_version));
+		ufbx_version_patch(scene->metadata.exporter_version),
+		application);
 
 	int result = 0;
 
@@ -77,6 +81,8 @@ int main(int argc, char **argv)
 			if (strstr(unknown->type.data, "Container")) continue;
 			if (!strcmp(unknown->super_type.data, "Object") && unknown->type.length == 0 && unknown->sub_type.length == 0) continue;
 			if (!strcmp(unknown->super_type.data, "PluginParameters")) continue;
+			if (!strcmp(unknown->super_type.data, "TimelineXTrack")) continue;
+			if (!strcmp(unknown->super_type.data, "GlobalShading")) continue;
 			if (!strcmp(unknown->type.data, "GroupSelection")) continue;
 			if (!strcmp(unknown->name.data, "ADSKAssetReferencesVersion3.0")) {
 				ignore_unknowns = true;
