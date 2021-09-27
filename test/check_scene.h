@@ -368,7 +368,7 @@ static void ufbxt_check_skin_deformer(ufbx_scene *scene, ufbx_skin_deformer *def
 	}
 	for (size_t i = 0; i < deformer->vertices.count; i++) {
 		ufbx_skin_vertex vertex = deformer->vertices.data[i];
-		ufbxt_assert(vertex.weight_begin < deformer->weights.count);
+		ufbxt_assert(vertex.weight_begin <= deformer->weights.count);
 		ufbxt_assert(deformer->weights.count - vertex.weight_begin >= vertex.num_weights);
 
 		for (size_t i = 1; i < vertex.num_weights; i++) {
