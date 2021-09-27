@@ -370,11 +370,13 @@ static void ufbxt_check_skin_deformer(ufbx_scene *scene, ufbx_skin_deformer *def
 		ufbx_skin_vertex vertex = deformer->vertices.data[i];
 		ufbxt_assert(vertex.weight_begin < deformer->weights.count);
 		ufbxt_assert(deformer->weights.count - vertex.weight_begin >= vertex.num_weights);
+
+		for (size_t i = 1; i < vertex.num_weights; i++) {
+			size_t ix = vertex.weight_begin + i;
+			ufbxt_assert(deformer->weights.data[ix - 1].weight >= deformer->weights.data[ix].weight);
+		}
 	}
 	for (size_t i = 0; i < deformer->weights.count; i++) {
-		if (i > 0) {
-			ufbxt_assert(deformer->weights.data[i - 1].weight >= deformer->weights.data[i].weight);
-		}
 		ufbxt_assert(deformer->weights.data[i].cluster_index < deformer->clusters.count);
 	}
 }
@@ -524,7 +526,7 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 	}
 
 	for (size_t i = 0; i < scene->skin_deformers.count; i++) {
-		ufbxt_check_mesh(scene, scene->meshes.data[i]);
+		ufbxt_check_skin_deformer(scene, scene->skin_deformers.data[i]);
 	}
 
 	for (size_t i = 0; i < scene->skin_clusters.count; i++) {
