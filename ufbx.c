@@ -2212,6 +2212,7 @@ static const char ufbxi_NurbsSurface[] = "NurbsSurface";
 static const char ufbxi_Nurbs[] = "Nurbs";
 static const char ufbxi_OO[] = "OO\0";
 static const char ufbxi_OP[] = "OP\0";
+static const char ufbxi_ObjectMetaData[] = "ObjectMetaData";
 static const char ufbxi_ObjectType[] = "ObjectType";
 static const char ufbxi_Objects[] = "Objects";
 static const char ufbxi_Open[] = "Open";
@@ -2486,6 +2487,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_NurbsSurfaceOrder, 17 },
 	{ ufbxi_OO, 2 },
 	{ ufbxi_OP, 2 },
+	{ ufbxi_ObjectMetaData, 14 },
 	{ ufbxi_ObjectType, 10 },
 	{ ufbxi_Objects, 7 },
 	{ ufbxi_Open, 4 },
@@ -8232,6 +8234,8 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			ufbxi_check(ufbxi_read_scene_info(uc, node));
 		} else if (name == ufbxi_Cache) {
 			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_cache_file), UFBX_ELEMENT_CACHE_FILE));
+		} else if (name == ufbxi_ObjectMetaData) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_metadata_object), UFBX_ELEMENT_METADATA_OBJECT));
 		} else {
 			ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
 		}
@@ -14840,6 +14844,7 @@ const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES] = {
 	sizeof(ufbx_character),
 	sizeof(ufbx_constraint),
 	sizeof(ufbx_pose),
+	sizeof(ufbx_metadata_object),
 };
 
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)

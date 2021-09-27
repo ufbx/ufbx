@@ -284,6 +284,7 @@ typedef struct ufbx_constraint ufbx_constraint;
 
 // Miscellaneous
 typedef struct ufbx_pose ufbx_pose;
+typedef struct ufbx_metadata_object ufbx_metadata_object;
 
 UFBX_LIST_TYPE(ufbx_element_list, ufbx_element*);
 UFBX_LIST_TYPE(ufbx_unknown_list, ufbx_unknown*);
@@ -325,6 +326,7 @@ UFBX_LIST_TYPE(ufbx_selection_node_list, ufbx_selection_node*);
 UFBX_LIST_TYPE(ufbx_character_list, ufbx_character*);
 UFBX_LIST_TYPE(ufbx_constraint_list, ufbx_constraint*);
 UFBX_LIST_TYPE(ufbx_pose_list, ufbx_pose*);
+UFBX_LIST_TYPE(ufbx_metadata_object_list, ufbx_metadata_object*);
 
 typedef enum ufbx_element_type {
 	UFBX_ELEMENT_UNKNOWN,             // < `ufbx_unknown`
@@ -366,6 +368,7 @@ typedef enum ufbx_element_type {
 	UFBX_ELEMENT_CHARACTER,           // < `ufbx_character`
 	UFBX_ELEMENT_CONSTRAINT,          // < `ufbx_constraint`
 	UFBX_ELEMENT_POSE,                // < `ufbx_pose`
+	UFBX_ELEMENT_METADATA_OBJECT,     // < `ufbx_metadata_object`
 
 	UFBX_NUM_ELEMENT_TYPES,
 	UFBX_ELEMENT_TYPE_FIRST_ATTRIB = UFBX_ELEMENT_MESH,
@@ -1827,6 +1830,12 @@ struct ufbx_pose {
 	ufbx_bone_pose_list bone_poses;
 };
 
+struct ufbx_metadata_object {
+	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+};
+
+// -- Named elements
+
 typedef struct ufbx_name_element {
 	ufbx_string name;
 	ufbx_element_type type;
@@ -2030,6 +2039,7 @@ struct ufbx_scene {
 
 			// Miscellaneous
 			ufbx_pose_list poses;
+			ufbx_metadata_object_list metadata_objects;
 		};
 
 		ufbx_element_list elements_by_type[UFBX_NUM_ELEMENT_TYPES];
