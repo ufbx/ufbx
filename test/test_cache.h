@@ -28,7 +28,6 @@ static void ufbxt_test_sine_cache(ufbxt_diff_error *err, const char *path, doubl
 
 				for (size_t i = 0; i < num_verts; i++) {
 					ufbx_vec3 v = pos[i];
-					// 0.138
 					double sx = sin((v.y + t * 0.5f)*pi2) * 0.25;
 					double vx = v.x;
 					vx += vx > 0.0 ? -0.5 : 0.5;
