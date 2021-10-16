@@ -12371,6 +12371,8 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_conte
 	uint64_t total_points = (uint64_t)num_points * (uint64_t)num_samples;
 	ufbxi_check_err(&cc->error, total_points < UINT64_MAX / 12);
 
+	uint64_t offset = cc->file_offset;
+
 	// Skip almost to the end of the data and try to read one byte as there's
 	// nothing after the data so we can't detect EOF..
 	if (total_points > 0) {
@@ -12378,8 +12380,6 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_conte
 		ufbxi_check_err(&cc->error, ufbxi_cache_skip(cc, total_points * 12 - 1));
 		ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, last_byte, 1, false));
 	}
-
-	uint64_t offset = cc->file_offset;
 
 	for (uint32_t i = 0; i < num_samples; i++) {
 		ufbx_cache_frame *frame = &frames[i];
@@ -12859,13 +12859,12 @@ static int ufbxi_cmp_external_file(const void *va, const void *vb)
 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_load_external_cache(ufbxi_context *uc, ufbxi_external_file *file)
 {
-	ufbx_geometry_cache_opts opts = { 0 };
-	opts.open_file_fn = uc->opts.open_file_fn;
-	opts.open_file_user = uc->opts.open_file_user;
-	opts.frames_per_second = uc->scene.settings.frames_per_second;
-
 	ufbxi_cache_context cc = { UFBX_ERROR_NONE };
 	cc.owned_by_scene = true;
+
+	cc.open_file_fn = uc->opts.open_file_fn;
+	cc.open_file_user = uc->opts.open_file_user;
+	cc.frames_per_second = uc->scene.settings.frames_per_second;
 
 	// Temporarily "borrow" allocators for the geometry cache
 	cc.ator_tmp = uc->ator_tmp;

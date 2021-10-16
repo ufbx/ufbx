@@ -46,6 +46,16 @@ static void ufbxt_test_sine_cache(ufbxt_diff_error *err, const char *path, doubl
 UFBXT_FILE_TEST(maya_cache_sine)
 #if UFBXT_IMPL
 {
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->geometry_caches.count == 2);
+	for (size_t i = 0; i < 2; i++) {
+		ufbx_cache_deformer *deformer = mesh->geometry_caches.data[i];
+		ufbxt_assert(deformer->file);
+		ufbxt_assert(deformer->file->format == UFBX_CACHE_FILE_FORMAT_MC);
+	}
+
 	ufbxt_check_frame(scene, err, false, "maya_cache_sine_12", NULL, 12.0/24.0);
 	ufbxt_check_frame(scene, err, false, "maya_cache_sine_18", NULL, 18.0/24.0);
 }
@@ -64,3 +74,27 @@ UFBXT_TEST(maya_cache_sine_caches)
 	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
 }
 #endif
+
+UFBXT_FILE_TEST(max_cache_box)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Box001");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->geometry_caches.count == 1);
+	ufbx_cache_deformer *deformer = mesh->geometry_caches.data[0];
+	ufbxt_assert(deformer->file);
+	ufbxt_assert(deformer->file->format == UFBX_CACHE_FILE_FORMAT_PC2);
+	ufbxt_assert(deformer->external_cache);
+	ufbxt_assert(deformer->external_channel);
+	ufbxt_assert(deformer->external_channel->frames.count == 11);
+	for (size_t i = 0; i < deformer->external_channel->frames.count; i++) {
+		ufbx_cache_frame *frame = &deformer->external_channel->frames.data[i];
+		ufbxt_assert(frame->file_format == UFBX_CACHE_FILE_FORMAT_PC2);
+	}
+
+	ufbxt_check_frame(scene, err, false, "max_cache_box_44", NULL, 44.0/30.0);
+	ufbxt_check_frame(scene, err, false, "max_cache_box_48", NULL, 48.0/30.0);
+}
+#endif
+
