@@ -1320,21 +1320,21 @@ static void ufbxi_free_size(ufbxi_allocator *ator, size_t size, void *ptr, size_
 	}
 }
 
-ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_alloc_zero_size(ufbxi_allocator *ator, size_t size, size_t n)
+static ufbxi_nodiscard ufbxi_forceinline void *ufbxi_alloc_zero_size(ufbxi_allocator *ator, size_t size, size_t n)
 {
 	void *ptr = ufbxi_alloc_size(ator, size, n);
 	if (ptr) memset(ptr, 0, size * n);
 	return ptr;
 }
 
-ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_realloc_zero_size(ufbxi_allocator *ator, size_t size, void *old_ptr, size_t old_n, size_t n)
+static ufbxi_nodiscard ufbxi_forceinline void *ufbxi_realloc_zero_size(ufbxi_allocator *ator, size_t size, void *old_ptr, size_t old_n, size_t n)
 {
 	void *ptr = ufbxi_realloc_size(ator, size, old_ptr, old_n, n);
 	if (ptr && n > old_n) memset((char*)ptr + size*old_n, 0, size*(n - old_n));
 	return ptr;
 }
 
-ufbxi_nodiscard static bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t size, void *p_ptr, size_t *p_cap, size_t n)
+static ufbxi_nodiscard bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t size, void *p_ptr, size_t *p_cap, size_t n)
 {
 	if (n <= *p_cap) return true;
 	void *ptr = *(void**)p_ptr;
@@ -1523,7 +1523,7 @@ static ufbxi_forceinline void *ufbxi_push_size_zero(ufbxi_buf *b, size_t size, s
 	return ptr;
 }
 
-ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_push_size_copy(ufbxi_buf *b, size_t size, size_t n, const void *data)
+static ufbxi_nodiscard ufbxi_forceinline void *ufbxi_push_size_copy(ufbxi_buf *b, size_t size, size_t n, const void *data)
 {
 	// Always succeed with an emtpy non-NULL buffer for empty allocations, even if `data == NULL`
 	ufbx_assert(size > 0);
@@ -1990,7 +1990,7 @@ static ufbxi_forceinline int ufbxi_str_cmp(ufbx_string a, ufbx_string b)
 
 const char ufbxi_empty_char[1] = { '\0' };
 
-ufbxi_nodiscard static const char *ufbxi_push_string_imp(ufbxi_string_pool *pool, const char *str, size_t length, bool copy)
+static ufbxi_nodiscard const char *ufbxi_push_string_imp(ufbxi_string_pool *pool, const char *str, size_t length, bool copy)
 {
 	if (length == 0) return ufbxi_empty_char;
 
@@ -2018,12 +2018,12 @@ ufbxi_nodiscard static const char *ufbxi_push_string_imp(ufbxi_string_pool *pool
 	return entry->data;
 }
 
-ufbxi_nodiscard static ufbxi_forceinline const char *ufbxi_push_string(ufbxi_string_pool *pool, const char *str, size_t length)
+static ufbxi_nodiscard ufbxi_forceinline const char *ufbxi_push_string(ufbxi_string_pool *pool, const char *str, size_t length)
 {
 	return ufbxi_push_string_imp(pool, str, length, true);
 }
 
-ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place(ufbxi_string_pool *pool, const char **p_str, size_t length)
+static ufbxi_nodiscard ufbxi_forceinline int ufbxi_push_string_place(ufbxi_string_pool *pool, const char **p_str, size_t length)
 {
 	const char *str = *p_str;
 	ufbxi_check_err(pool->error, str || length == 0);
@@ -2033,7 +2033,7 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place(ufbxi_strin
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place_str(ufbxi_string_pool *pool, ufbx_string *p_str)
+static ufbxi_nodiscard ufbxi_forceinline int ufbxi_push_string_place_str(ufbxi_string_pool *pool, ufbx_string *p_str)
 {
 	ufbxi_check_err(pool->error, p_str);
 	return ufbxi_push_string_place(pool, &p_str->data, p_str->length);
@@ -2902,7 +2902,7 @@ static ufbxi_forceinline uint64_t ufbxi_get_read_offset(ufbxi_context *uc)
 	return uc->data_offset + (uc->data - uc->data_begin);
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_report_progress(ufbxi_context *uc)
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_report_progress(ufbxi_context *uc)
 {
 	if (!uc->opts.progress_fn) return 1;
 	ufbx_progress progress;
@@ -2914,7 +2914,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_report_progress(ufbxi_context *u
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_forceinline int ufbxi_progress(ufbxi_context *uc, size_t work_units)
+static ufbxi_nodiscard ufbxi_forceinline int ufbxi_progress(ufbxi_context *uc, size_t work_units)
 {
 	if (!uc->opts.progress_fn) return 1;
 	ptrdiff_t left = uc->progress_timer - (ptrdiff_t)work_units;
@@ -3022,7 +3022,7 @@ static ufbxi_forceinline void ufbxi_consume_bytes(ufbxi_context *uc, size_t size
 	uc->data += size;
 }
 
-ufbxi_nodiscard static int ufbxi_skip_bytes(ufbxi_context *uc, uint64_t size)
+static ufbxi_nodiscard int ufbxi_skip_bytes(ufbxi_context *uc, uint64_t size)
 {
 	if (uc->skip_fn) {
 		uc->data_size += uc->yield_size;
@@ -10845,15 +10845,20 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbx_anim_layer *layer = *p_layer;
 		ufbxi_check(ufbxi_fetch_dst_elements(uc, &layer->anim_values, &layer->element, false, NULL, UFBX_ELEMENT_ANIM_VALUE));
 
+		uint32_t min_id = UINT32_MAX, max_id = 0;
+
 		// Combine the animated properties with elements (potentially duplicates!)
 		size_t num_anim_props = 0;
-		ufbx_connection_list layer_conns = ufbxi_find_dst_connections(&layer->element, NULL);
-		ufbxi_for_list(ufbx_connection, lc, layer_conns) {
-			if (lc->src->type != UFBX_ELEMENT_ANIM_VALUE) continue;
-			ufbx_anim_value *value = (ufbx_anim_value*)lc->src;
+		ufbxi_for_ptr_list(ufbx_anim_value, p_value, layer->anim_values) {
+			ufbx_anim_value *value = *p_value;
 			ufbxi_for_list(ufbx_connection, ac, value->element.connections_src) {
 				if (ac->src_prop.length == 0 && ac->dst_prop.length > 0) {
 					ufbx_anim_prop *aprop = ufbxi_push(&uc->tmp_stack, ufbx_anim_prop, 1);
+					uint32_t id = ac->dst->id;
+					min_id = ufbxi_min32(min_id, id);
+					max_id = ufbxi_max32(max_id, id);
+					uint32_t id_mask = ufbxi_arraycount(layer->element_id_bitmask) - 1;
+					layer->element_id_bitmask[(id >> 5) & id_mask] |= 1u << (id & 31);
 					ufbxi_check(aprop);
 					aprop->anim_value = value;
 					aprop->element = ac->dst;
@@ -10862,6 +10867,11 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 					num_anim_props++;
 				}
 			}
+		}
+
+		if (min_id != UINT32_MAX) {
+			layer->min_element_id = min_id;
+			layer->max_element_id = max_id;
 		}
 
 		switch (ufbxi_find_int(&layer->props, ufbxi_BlendMode, 0)) {
@@ -11221,7 +11231,28 @@ ufbxi_noinline ufbxi_nodiscard static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	if (uc->scene.anim_stacks.count > 0) {
 		uc->scene.anim = uc->scene.anim_stacks.data[0]->anim;
+
+		// Combine all animation stacks into one
+		size_t num_layers = 0;
+		ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
+			num_layers += (*p_stack)->layers.count;
+		}
+
+		ufbx_anim_layer_desc *descs = ufbxi_push_zero(&uc->result, ufbx_anim_layer_desc, num_layers);
+		ufbxi_check(descs);
+		uc->scene.combined_anim.layers.data = descs;
+		uc->scene.combined_anim.layers.count = num_layers;
+
+		ufbx_anim_layer_desc *desc = descs;
+		ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
+			ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, (*p_stack)->layers) {
+				desc->layer = *p_layer;
+				desc->weight = 1.0f;
+				desc++;
+			}
+		}
 	}
+
 
 	uc->scene.metadata.ktime_to_sec = uc->ktime_to_sec;
 
@@ -11884,7 +11915,7 @@ ufbxi_noinline static void ufbxi_update_initial_clusters(ufbx_scene *scene)
 		cluster->geometry_to_bone = cluster->mesh_node_to_bone;
 	}
 
-	// Patch initial `node_to_bind`
+	// Patch initial `mesh_node_to_bone`
 	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
 		ufbx_skin_cluster *cluster = *p_cluster;
 
@@ -12033,29 +12064,6 @@ static ufbxi_noinline void ufbxi_update_scene_settings(ufbx_scene_settings *sett
 
 	if (settings->time_mode != UFBX_TIME_MODE_CUSTOM) {
 		settings->frames_per_second = ufbxi_time_mode_fps[settings->time_mode];
-	}
-}
-
-static ufbxi_noinline void ufbxi_patch_cluster_binding(ufbx_scene *scene)
-{
-	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
-		ufbx_skin_cluster *cluster = *p_cluster;
-		if (!ufbxi_matrix_all_zero(&cluster->geometry_to_bone)) continue;
-
-		ufbx_skin_deformer *skin = (ufbx_skin_deformer*)ufbxi_fetch_src_element(&cluster->element, false, NULL, UFBX_ELEMENT_SKIN_DEFORMER);
-		if (!skin) continue;
-
-		ufbx_node *node = (ufbx_node*)ufbxi_fetch_src_element(&skin->element, false, NULL, UFBX_ELEMENT_NODE);
-		if (!node) {
-			ufbx_mesh *mesh = (ufbx_mesh*)ufbxi_fetch_src_element(&skin->element, false, NULL, UFBX_ELEMENT_MESH);
-			if (mesh && mesh->instances.count > 0) {
-				node = mesh->instances.data[0];
-			}
-		}
-		if (!node) continue;
-
-		ufbx_matrix world_to_bind = ufbx_matrix_invert(&cluster->bind_to_world);
-		cluster->geometry_to_bone = ufbx_matrix_mul(&world_to_bind, &node->node_to_world);
 	}
 }
 
@@ -12853,7 +12861,7 @@ static int ufbxi_cmp_external_file(const void *va, const void *vb)
 	if (a->type != b->type) return a->type < b->type ? -1 : 1;
 	int cmp = ufbxi_str_cmp(a->filename, b->filename);
 	if (cmp != 0) return cmp;
-	if (a->index != b->index) a->index < b->index ? -1 : 1;
+	if (a->index != b->index) return a->index < b->index ? -1 : 1;
 	return 0;
 }
 
@@ -12893,11 +12901,12 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_load_external_cache(ufbxi_contex
 	return 1;
 }
 
-static ufbxi_noinline ufbxi_external_file *ufbxi_find_external_file(ufbxi_context *uc, ufbxi_external_file *files, size_t num_files, ufbxi_external_file_type type, const char *name)
+static ufbxi_noinline ufbxi_external_file *ufbxi_find_external_file(ufbxi_external_file *files, size_t num_files, ufbxi_external_file_type type, const char *name)
 {
 	size_t ix = SIZE_MAX;
 	ufbxi_macro_lower_bound_eq(ufbxi_external_file, 32, &ix, files, 0, num_files,
-		( strcmp(a->filename.data, name) < 0 ), ( a->filename.data == name ));
+		( type != a->type ? type < a->type : strcmp(a->filename.data, name) < 0 ),
+		( a->type == type && a->filename.data == name ));
 	return ix != SIZE_MAX ? &files[ix] : NULL;
 }
 
@@ -12937,7 +12946,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_load_external_files(ufbxi_contex
 	// Patch the loaded files
 	ufbxi_for_ptr_list(ufbx_cache_file, p_cache, uc->scene.cache_files) {
 		ufbx_cache_file *cache = *p_cache;
-		ufbxi_external_file *file = ufbxi_find_external_file(uc, files, num_files,
+		ufbxi_external_file *file = ufbxi_find_external_file(files, num_files,
 			UFBXI_EXTERNAL_FILE_GEOMETRY_CACHE, cache->filename.data);
 		if (file && file->data) {
 			cache->external_cache = (ufbx_geometry_cache*)file->data;
@@ -13124,7 +13133,7 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_update_scene_settings(&uc->scene.settings);
 
 	if (uc->opts.load_external_files) {
-		ufbxi_load_external_files(uc);
+		ufbxi_check(ufbxi_load_external_files(uc));
 	}
 
 	// Evaluate skinning if requested
@@ -13492,13 +13501,22 @@ static ufbxi_noinline void ufbxi_combine_anim_layer(ufbxi_anim_layer_combine_ctx
 	}
 }
 
+static ufbxi_forceinline bool ufbxi_anim_layer_might_contain_id(const ufbx_anim_layer *layer, uint32_t id)
+{
+	uint32_t id_mask = ufbxi_arraycount(layer->element_id_bitmask) - 1;
+	bool ok = id - layer->min_element_id <= (layer->max_element_id - layer->min_element_id);
+	ok &= (layer->element_id_bitmask[(id >> 5) & id_mask] & (1u << (id & 31))) != 0;
+	return ok;
+}
 
 static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *props, size_t num_props)
 {
 	ufbxi_anim_layer_combine_ctx combine_ctx = { *anim, element, time };
 
+	uint32_t element_id = element->id;
 	ufbxi_for_list(const ufbx_anim_layer_desc, layer_desc, anim->layers) {
 		ufbx_anim_layer *layer = layer_desc->layer;
+		if (!ufbxi_anim_layer_might_contain_id(layer, element_id)) continue;
 
 		// Find the weight for the current layer
 		// TODO: Should this be searched from multipler layers?
@@ -13645,6 +13663,7 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 
 	ec->scene.root_node = (ufbx_node*)ufbxi_translate_element(ec, ec->scene.root_node);
 	ufbxi_check_err(&ec->error, ufbxi_translate_anim(ec, &ec->scene.anim));
+	ufbxi_check_err(&ec->error, ufbxi_translate_anim(ec, &ec->scene.combined_anim));
 
 	for (size_t i = 0; i < num_elements; i++) {
 		ufbx_element *src = ec->src_scene.elements.data[i];

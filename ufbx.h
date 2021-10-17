@@ -1644,6 +1644,10 @@ struct ufbx_anim_layer {
 
 	ufbx_anim_value_list anim_values;
 	ufbx_anim_prop_list anim_props; // < Sorted by `element,prop_name`
+
+	uint32_t min_element_id;
+	uint32_t max_element_id;
+	uint32_t element_id_bitmask[4];
 };
 
 struct ufbx_anim_value {
@@ -1952,7 +1956,7 @@ typedef struct ufbx_scene_settings {
 	ufbx_coordinate_axis axis_front;
 
 	ufbx_real unit_scale_factor;
-	ufbx_real frames_per_second;
+	double frames_per_second;
 
 	ufbx_vec3 ambient_color;
 	ufbx_string default_camera;
@@ -1977,6 +1981,9 @@ struct ufbx_scene {
 
 	// Default animation descriptor
 	ufbx_anim anim;
+
+	// All animation stacks combined
+	ufbx_anim combined_anim;
 
 	union {
 		struct {
