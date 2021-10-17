@@ -1320,21 +1320,21 @@ static void ufbxi_free_size(ufbxi_allocator *ator, size_t size, void *ptr, size_
 	}
 }
 
-static ufbxi_nodiscard ufbxi_forceinline void *ufbxi_alloc_zero_size(ufbxi_allocator *ator, size_t size, size_t n)
+ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_alloc_zero_size(ufbxi_allocator *ator, size_t size, size_t n)
 {
 	void *ptr = ufbxi_alloc_size(ator, size, n);
 	if (ptr) memset(ptr, 0, size * n);
 	return ptr;
 }
 
-static ufbxi_nodiscard ufbxi_forceinline void *ufbxi_realloc_zero_size(ufbxi_allocator *ator, size_t size, void *old_ptr, size_t old_n, size_t n)
+ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_realloc_zero_size(ufbxi_allocator *ator, size_t size, void *old_ptr, size_t old_n, size_t n)
 {
 	void *ptr = ufbxi_realloc_size(ator, size, old_ptr, old_n, n);
 	if (ptr && n > old_n) memset((char*)ptr + size*old_n, 0, size*(n - old_n));
 	return ptr;
 }
 
-static ufbxi_nodiscard bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t size, void *p_ptr, size_t *p_cap, size_t n)
+ufbxi_nodiscard static bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t size, void *p_ptr, size_t *p_cap, size_t n)
 {
 	if (n <= *p_cap) return true;
 	void *ptr = *(void**)p_ptr;
@@ -1523,7 +1523,7 @@ static ufbxi_forceinline void *ufbxi_push_size_zero(ufbxi_buf *b, size_t size, s
 	return ptr;
 }
 
-static ufbxi_nodiscard ufbxi_forceinline void *ufbxi_push_size_copy(ufbxi_buf *b, size_t size, size_t n, const void *data)
+ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_push_size_copy(ufbxi_buf *b, size_t size, size_t n, const void *data)
 {
 	// Always succeed with an emtpy non-NULL buffer for empty allocations, even if `data == NULL`
 	ufbx_assert(size > 0);
@@ -1990,7 +1990,7 @@ static ufbxi_forceinline int ufbxi_str_cmp(ufbx_string a, ufbx_string b)
 
 const char ufbxi_empty_char[1] = { '\0' };
 
-static ufbxi_nodiscard const char *ufbxi_push_string_imp(ufbxi_string_pool *pool, const char *str, size_t length, bool copy)
+ufbxi_nodiscard static const char *ufbxi_push_string_imp(ufbxi_string_pool *pool, const char *str, size_t length, bool copy)
 {
 	if (length == 0) return ufbxi_empty_char;
 
@@ -2018,7 +2018,7 @@ static ufbxi_nodiscard const char *ufbxi_push_string_imp(ufbxi_string_pool *pool
 	return entry->data;
 }
 
-static ufbxi_nodiscard ufbxi_forceinline const char *ufbxi_push_string(ufbxi_string_pool *pool, const char *str, size_t length)
+ufbxi_nodiscard static ufbxi_forceinline const char *ufbxi_push_string(ufbxi_string_pool *pool, const char *str, size_t length)
 {
 	return ufbxi_push_string_imp(pool, str, length, true);
 }
@@ -2902,7 +2902,7 @@ static ufbxi_forceinline uint64_t ufbxi_get_read_offset(ufbxi_context *uc)
 	return uc->data_offset + (uc->data - uc->data_begin);
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_report_progress(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_report_progress(ufbxi_context *uc)
 {
 	if (!uc->opts.progress_fn) return 1;
 	ufbx_progress progress;
@@ -2914,7 +2914,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_report_progress(ufbxi_context *u
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_forceinline int ufbxi_progress(ufbxi_context *uc, size_t work_units)
+ufbxi_nodiscard static ufbxi_forceinline int ufbxi_progress(ufbxi_context *uc, size_t work_units)
 {
 	if (!uc->opts.progress_fn) return 1;
 	ptrdiff_t left = uc->progress_timer - (ptrdiff_t)work_units;
@@ -3022,7 +3022,7 @@ static ufbxi_forceinline void ufbxi_consume_bytes(ufbxi_context *uc, size_t size
 	uc->data += size;
 }
 
-static ufbxi_nodiscard int ufbxi_skip_bytes(ufbxi_context *uc, uint64_t size)
+ufbxi_nodiscard static int ufbxi_skip_bytes(ufbxi_context *uc, uint64_t size)
 {
 	if (uc->skip_fn) {
 		uc->data_size += uc->yield_size;
@@ -3348,7 +3348,7 @@ static ufbxi_forceinline void ufbxi_xml_advance(ufbxi_xml_context *xc)
 	if (++xc->pos == xc->pos_end) ufbxi_xml_refill(xc);
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_xml_push_token_char(ufbxi_xml_context *xc, char c)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_xml_push_token_char(ufbxi_xml_context *xc, char c)
 {
 	if (xc->tok_len == xc->tok_cap) {
 		ufbxi_check_err(&xc->error, ufbxi_grow_array(xc->ator, &xc->tok, &xc->tok_cap, xc->tok_len + 1));
@@ -3374,7 +3374,7 @@ static ufbxi_noinline void ufbxi_xml_skip_while(ufbxi_xml_context *xc, uint32_t 
 	}
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_xml_skip_until_string(ufbxi_xml_context *xc, ufbx_string *dst, const char *suffix)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_xml_skip_until_string(ufbxi_xml_context *xc, ufbx_string *dst, const char *suffix)
 {
 	xc->tok_len = 0;
 	size_t ix = 0, len = strlen(suffix);
@@ -3832,7 +3832,7 @@ static ufbxi_node *ufbxi_find_child_strcmp(ufbxi_node *node, const char *name)
 
 // -- Element extra data allocation
 
-static ufbxi_nodiscard ufbxi_noinline void *ufbxi_push_element_extra_size(ufbxi_context *uc, uint32_t id, size_t size)
+ufbxi_nodiscard static ufbxi_noinline void *ufbxi_push_element_extra_size(ufbxi_context *uc, uint32_t id, size_t size)
 {
 	void *extra = ufbxi_push_size_zero(&uc->tmp, size, 1);
 	ufbxi_check_return(extra, NULL);
@@ -12151,7 +12151,7 @@ typedef struct {
 	ufbxi_geometry_cache_imp *imp;
 } ufbxi_cache_context;
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_read(ufbxi_cache_context *cc, void *dst, size_t size, bool allow_eof)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_read(ufbxi_cache_context *cc, void *dst, size_t size, bool allow_eof)
 {
 	size_t buffered = ufbxi_min_sz((size_t)(cc->pos_end - cc->pos), size);
 	memcpy(dst, cc->pos, size);
@@ -12195,7 +12195,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_read(ufbxi_cache_context *
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_skip(ufbxi_cache_context *cc, uint64_t size)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_skip(ufbxi_cache_context *cc, uint64_t size)
 {
 	cc->file_offset += size;
 
@@ -12235,7 +12235,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_skip(ufbxi_cache_context *
 
 #define ufbxi_cache_mc_tag(a,b,c,d) ((uint32_t)(a)<<24u | (uint32_t)(b)<<16 | (uint32_t)(c)<<8u | (uint32_t)(d))
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_tag(ufbxi_cache_context *cc, uint32_t *p_tag)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_mc_read_tag(ufbxi_cache_context *cc, uint32_t *p_tag)
 {
 	char buf[4];
 	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, true));
@@ -12246,7 +12246,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_tag(ufbxi_cache_co
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_u32(ufbxi_cache_context *cc, uint32_t *p_value)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_mc_read_u32(ufbxi_cache_context *cc, uint32_t *p_value)
 {
 	char buf[4];
 	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, false));
@@ -12257,7 +12257,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_u32(ufbxi_cache_co
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_mc_read_u64(ufbxi_cache_context *cc, uint64_t *p_value)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_mc_read_u64(ufbxi_cache_context *cc, uint64_t *p_value)
 {
 	if (!cc->mc_for8) {
 		uint32_t v32;
@@ -12277,7 +12277,7 @@ static const uint8_t ufbxi_cache_data_format_size[] = {
 	0, 4, 12, 8, 24,
 };
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_context *cc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_context *cc)
 {
 	uint32_t version = 0, time_start = 0, time_end = 0;
 	uint32_t count = 0, time = 0;
@@ -12360,7 +12360,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_context *cc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_context *cc)
 {
 	char header[32];
 	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, header, sizeof(header), false));
@@ -12517,7 +12517,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_conte
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_context *cc, ufbx_string filename)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_context *cc, ufbx_string filename)
 {
 	cc->stream_filename = filename;
 	ufbxi_check_err(&cc->error, ufbxi_push_string_place_str(&cc->string_pool, &cc->stream_filename));
@@ -12542,7 +12542,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_cont
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_try_open_file(ufbxi_cache_context *cc, ufbx_string filename, bool *p_found)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_try_open_file(ufbxi_cache_context *cc, ufbx_string filename, bool *p_found)
 {
 	memset(&cc->stream, 0, sizeof(cc->stream));
 #if defined(UFBX_REGRESSION)
@@ -12562,7 +12562,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_try_open_file(ufbxi_cache_
 	return ok;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cache_context *cc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cache_context *cc)
 {
 	if (cc->xml_filename.length == 0) return 1;
 
@@ -12865,7 +12865,7 @@ static int ufbxi_cmp_external_file(const void *va, const void *vb)
 	return 0;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_load_external_cache(ufbxi_context *uc, ufbxi_external_file *file)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_context *uc, ufbxi_external_file *file)
 {
 	ufbxi_cache_context cc = { UFBX_ERROR_NONE };
 	cc.owned_by_scene = true;
@@ -12910,7 +12910,7 @@ static ufbxi_noinline ufbxi_external_file *ufbxi_find_external_file(ufbxi_extern
 	return ix != SIZE_MAX ? &files[ix] : NULL;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_load_external_files(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_files(ufbxi_context *uc)
 {
 	size_t num_files = 0;
 
@@ -13597,7 +13597,7 @@ static ufbxi_forceinline ufbx_element *ufbxi_translate_element(ufbxi_eval_contex
 	return elem ? (ufbx_element*)(ec->dst_element + ((char*)elem - ec->src_element)) : NULL;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_translate_element_list(ufbxi_eval_context *ec, void *p_list)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_translate_element_list(ufbxi_eval_context *ec, void *p_list)
 {
 	ufbx_element_list *list = (ufbx_element_list*)p_list;
 	size_t count = list->count;
@@ -13611,7 +13611,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_translate_element_list(ufbxi_eva
 	return 1;
 }
 
-static ufbxi_nodiscard int ufbxi_translate_anim(ufbxi_eval_context *ec, ufbx_anim *anim)
+ufbxi_nodiscard static int ufbxi_translate_anim(ufbxi_eval_context *ec, ufbx_anim *anim)
 {
 	ufbx_anim_layer_desc *layers = ufbxi_push(&ec->result, ufbx_anim_layer_desc, anim->layers.count);
 	ufbxi_check_err(&ec->error, layers);
@@ -13623,7 +13623,7 @@ static ufbxi_nodiscard int ufbxi_translate_anim(ufbxi_eval_context *ec, ufbx_ani
 	return 1;
 }
 
-static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
+ufbxi_nodiscard static int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 {
 	ec->scene = ec->src_scene;
 	size_t num_elements = ec->scene.elements.count;
@@ -13932,7 +13932,7 @@ static ufbxi_nodiscard int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 	return 1;
 }
 
-static ufbxi_nodiscard ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *user_opts, ufbx_error *p_error)
+ufbxi_nodiscard static ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *user_opts, ufbx_error *p_error)
 {
 	if (user_opts) {
 		ec->opts = *user_opts;
@@ -14486,7 +14486,7 @@ ufbxi_noinline static int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 	return 1;
 }
 
-ufbxi_noinline static ufbxi_nodiscard int ufbxi_subdivide_mesh_level(ufbxi_subdivide_context *sc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdivide_context *sc)
 {
 	const ufbx_mesh *mesh = &sc->src_mesh;
 	ufbx_mesh *result = &sc->dst_mesh;
@@ -14705,7 +14705,7 @@ ufbxi_noinline static ufbxi_nodiscard int ufbxi_subdivide_mesh_level(ufbxi_subdi
 	return 1;
 }
 
-ufbxi_noinline static ufbxi_nodiscard int ufbxi_subdivide_mesh_imp(ufbxi_subdivide_context *sc, size_t level)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivide_context *sc, size_t level)
 {
 	if (sc->opts.boundary == UFBX_SUBDIVISION_BOUNDARY_DEFAULT) {
 		sc->opts.boundary = sc->src_mesh.subdivision_boundary;
