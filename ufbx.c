@@ -1218,6 +1218,7 @@ typedef struct {
 	size_t num_allocs;
 	size_t max_allocs;
 	size_t huge_size;
+	size_t chunk_max;
 	ufbx_allocator ator;
 } ufbxi_allocator;
 
@@ -1460,9 +1461,11 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 	// but use a dedicated allocation.
 	if (size >= b->ator->huge_size) {
 		 next_size = chunk ? chunk->next_size : 4096;
+		if (next_size > b->ator->chunk_max) next_size = b->ator->chunk_max;
 		 chunk_size = size;
 	} else {
 		next_size = chunk ? chunk->next_size * 2 : 4096;
+		if (next_size > b->ator->chunk_max) next_size = b->ator->chunk_max;
 		chunk_size = next_size - sizeof(ufbxi_buf_chunk);
 		if (chunk_size < size) chunk_size = size;
 	}
@@ -3126,6 +3129,7 @@ static void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *ator, const ufbx
 	ator->max_size = desc->memory_limit ? desc->memory_limit : SIZE_MAX;
 	ator->max_allocs = desc->allocation_limit ? desc->allocation_limit : SIZE_MAX;
 	ator->huge_size = desc->huge_threshold ? desc->huge_threshold : 0x100000;
+	ator->chunk_max = desc->max_chunk_size ? desc->max_chunk_size : 0x1000000;
 }
 
 static FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp_ator)

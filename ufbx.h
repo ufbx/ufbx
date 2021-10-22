@@ -2117,9 +2117,22 @@ typedef struct ufbx_allocator {
 	size_t allocation_limit;
 
 	// Threshold to swap from batched allocations to individual ones
+	// Defaults to 1MB if set to zero
 	// NOTE: If set to `1` ufbx will allocate everything in the smallest
 	// possible chunks which may be useful for debugging (eg. ASAN)
 	size_t huge_threshold;
+
+	// Maximum size of a single allocation containing sub-allocations.
+	// Defaults to 16MB if set to zero
+	// The maximum amount of wasted memory depends on `max_chunk_size` and
+	// `huge_threshold`: each chunk can waste up to `huge_threshold` bytes
+	// internally and the last chunk might be incomplete. So for example
+	// with the defaults we can waste around 1MB/16MB = 6.25% overall plus
+	// up to 32MB due to the two incomplete blocks. The actual amounts differ
+	// slightly as the chunks start out at 4kB and double in size each time,
+	// meaning that the maximum fixed overhead (up to 32MB with defaults) is
+	// at most ~30% of the total allocation size.
+	size_t max_chunk_size;
 
 } ufbx_allocator;
 
