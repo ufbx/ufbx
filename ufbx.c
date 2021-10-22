@@ -1921,9 +1921,9 @@ static ufbxi_forceinline void *ufbxi_map_find_size(ufbxi_map *map, size_t size, 
 		scan += 1;
 		if ((uint32_t)entry == ref + scan) {
 			uint32_t index = (uint32_t)(entry >> 32u);
-			void *entry = (char*)map->items + size * index;
-			int cmp = map->cmp_fn(map->cmp_user, value, entry);
-			if (cmp == 0) return entry;
+			void *data = (char*)map->items + size * index;
+			int cmp = map->cmp_fn(map->cmp_user, value, data);
+			if (cmp == 0) return data;
 		} else if ((entry & mask) < scan) {
 			if (map->aa_root) {
 				return ufbxi_aa_tree_find(map, value, size);
@@ -1959,8 +1959,9 @@ static ufbxi_forceinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size
 		slot = (slot + 1) & mask;
 
 		if (scan > UFBXI_MAP_MAX_SCAN) {
-			uint32_t index = (uint32_t)(new_entry >> 32u);
-			map->aa_root = ufbxi_aa_tree_insert(map, map->aa_root, value, index, size);
+			uint32_t new_index = (uint32_t)(new_entry >> 32u);
+			const void *new_value = new_index == index ? value : (const void*)((char*)map->items + size * new_index);
+			map->aa_root = ufbxi_aa_tree_insert(map, map->aa_root, new_value, new_index, size);
 			return (char*)map->items + size * index;
 		}
 	}
@@ -1975,6 +1976,7 @@ static ufbxi_forceinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size
 
 static int ufbxi_map_cmp_uint64(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	uint64_t a = *(const uint64_t*)va, b = *(const uint64_t*)vb;
 	if (a < b) return -1;
 	if (a > b) return +1;
@@ -1983,6 +1985,7 @@ static int ufbxi_map_cmp_uint64(void *user, const void *va, const void *vb)
 
 static int ufbxi_map_cmp_const_char_ptr(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const char *a = *(const char **)va, *b = *(const char **)vb;
 	if (a < b) return -1;
 	if (a > b) return +1;
@@ -2082,6 +2085,7 @@ static ufbxi_forceinline int ufbxi_str_cmp(ufbx_string a, ufbx_string b)
 
 static int ufbxi_map_cmp_string(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbx_string *a = (const ufbx_string*)va, *b = (const ufbx_string*)vb;
 	return ufbxi_str_cmp(*a, *b);
 }
@@ -5877,53 +5881,43 @@ ufbxi_nodiscard static int ufbxi_load_strings(ufbxi_context *uc)
 }
 
 typedef struct {
-	ufbx_prop_type type;
 	const char *name;
+	ufbx_prop_type type;
 } ufbxi_prop_type_name;
 
-static int ufbxi_map_cmp_prop_type_name(void *user, const void *va, const void *vb)
-{
-	const char *a = *(const char**)va;
-	const ufbxi_prop_type_name *b = (const ufbxi_prop_type_name*)vb;
-	if (a < b->name) return -1;
-	if (a > b->name) return -1;
-	return 0;
-}
-
 const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
-	{ UFBX_PROP_BOOLEAN, "Boolean" },
-	{ UFBX_PROP_BOOLEAN, "bool" },
-	{ UFBX_PROP_BOOLEAN, "Bool" },
-	{ UFBX_PROP_INTEGER, "Integer" },
-	{ UFBX_PROP_INTEGER, "int" },
-	{ UFBX_PROP_INTEGER, "enum" },
-	{ UFBX_PROP_INTEGER, "Visibility" },
-	{ UFBX_PROP_INTEGER, "Visibility Inheritance" },
-	{ UFBX_PROP_INTEGER, "KTime" },
-	{ UFBX_PROP_NUMBER, "Number" },
-	{ UFBX_PROP_NUMBER, "double" },
-	{ UFBX_PROP_NUMBER, "Real" },
-	{ UFBX_PROP_NUMBER, "Float" },
-	{ UFBX_PROP_NUMBER, "Intensity" },
-	{ UFBX_PROP_VECTOR, "Vector" },
-	{ UFBX_PROP_VECTOR, "Vector3D" },
-	{ UFBX_PROP_COLOR, "Color" },
-	{ UFBX_PROP_COLOR, "ColorRGB" },
-	{ UFBX_PROP_STRING, "String" },
-	{ UFBX_PROP_STRING, "KString" },
-	{ UFBX_PROP_STRING, "object" },
-	{ UFBX_PROP_DATE_TIME, "DateTime" },
-	{ UFBX_PROP_TRANSLATION, "Lcl Translation" },
-	{ UFBX_PROP_ROTATION, "Lcl Rotation" },
-	{ UFBX_PROP_SCALING, "Lcl Scaling" },
-	{ UFBX_PROP_DISTANCE, "Distance" },
-	{ UFBX_PROP_COMPOUND, "Compound" },
+	{ "Boolean", UFBX_PROP_BOOLEAN },
+	{ "bool", UFBX_PROP_BOOLEAN },
+	{ "Bool", UFBX_PROP_BOOLEAN },
+	{ "Integer", UFBX_PROP_INTEGER },
+	{ "int", UFBX_PROP_INTEGER },
+	{ "enum", UFBX_PROP_INTEGER },
+	{ "Visibility", UFBX_PROP_INTEGER },
+	{ "Visibility Inheritance", UFBX_PROP_INTEGER },
+	{ "KTime", UFBX_PROP_INTEGER },
+	{ "Number", UFBX_PROP_NUMBER },
+	{ "double", UFBX_PROP_NUMBER },
+	{ "Real", UFBX_PROP_NUMBER },
+	{ "Float", UFBX_PROP_NUMBER },
+	{ "Intensity", UFBX_PROP_NUMBER },
+	{ "Vector", UFBX_PROP_VECTOR },
+	{ "Vector3D", UFBX_PROP_VECTOR },
+	{ "Color", UFBX_PROP_COLOR },
+	{ "ColorRGB", UFBX_PROP_COLOR },
+	{ "String", UFBX_PROP_STRING },
+	{ "KString", UFBX_PROP_STRING },
+	{ "object", UFBX_PROP_STRING },
+	{ "DateTime", UFBX_PROP_DATE_TIME },
+	{ "Lcl Translation", UFBX_PROP_TRANSLATION },
+	{ "Lcl Rotation", UFBX_PROP_ROTATION },
+	{ "Lcl Scaling", UFBX_PROP_SCALING },
+	{ "Distance", UFBX_PROP_DISTANCE },
+	{ "Compound", UFBX_PROP_COMPOUND },
 };
 
 static ufbx_prop_type ufbxi_get_prop_type(ufbxi_context *uc, const char *name)
 {
 	uint32_t hash = ufbxi_hash_ptr(name);
-	uint32_t scan = 0;
 	ufbxi_prop_type_name *entry = ufbxi_map_find(&uc->prop_type_map, ufbxi_prop_type_name, hash, &name);
 	if (entry) {
 		return entry->type;
@@ -6441,9 +6435,7 @@ ufbxi_nodiscard static ufbx_props *ufbxi_find_template(ufbxi_context *uc, const 
 }
 
 // Name ID categories
-#define UFBXI_NAME_ID_NAME UINT64_C(100000000000000)
-#define UFBXI_NAME_ID_ATTRIB UINT64_C(200000000000000)
-#define UFBXI_NAME_ID_SYNTHETIC UINT64_C(300000000000000)
+#define UFBXI_SYNTHETIC_ID_BIT UINT64_C(0x8000000000000000)
 
 ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_string type_and_name, ufbx_string *type, ufbx_string *name)
 {
@@ -6530,7 +6522,7 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 		elem->name.length = strlen(name);
 	}
 
-	uint64_t fbx_id = (uintptr_t)elem;
+	uint64_t fbx_id = (uintptr_t)elem | UFBXI_SYNTHETIC_ID_BIT;
 	*p_fbx_id = fbx_id;
 	uint32_t hash = ufbxi_hash64(fbx_id);
 	ufbxi_fbx_id_entry *entry = ufbxi_map_insert(&uc->fbx_id_map, ufbxi_fbx_id_entry, hash, &fbx_id);
@@ -7935,7 +7927,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_pose(ufbxi_context *uc, ufb
 		if (uc->version < 7000) {
 			char *name = NULL;
 			if (!ufbxi_find_val1(n, ufbxi_Node, "c", &name)) continue;
-			fbx_id = (uintptr_t)name;
+			fbx_id = (uintptr_t)name | UFBXI_SYNTHETIC_ID_BIT;
 		} else {
 			if (!ufbxi_find_val1(n, ufbxi_Node, "L", &fbx_id)) continue;
 		}
@@ -8114,8 +8106,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_c
 		ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &attrib_type_str, &attrib_name_str));
 		if (attrib_name_str.length > 0) {
 			attrib_info.name = attrib_name_str;
-			if (info->fbx_id != (uintptr_t)type_and_name.data) {
-				attrib_info.fbx_id = (uintptr_t)type_and_name.data;
+			uint64_t attrib_id = (uintptr_t)type_and_name.data | UFBXI_SYNTHETIC_ID_BIT;
+			if (info->fbx_id != attrib_id) {
+				attrib_info.fbx_id = attrib_id;
 			}
 		}
 	}
@@ -8216,9 +8209,10 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 		// use as IDs since all strings are interned into a string pool.
 		if (uc->version >= 7000) {
 			if (!ufbxi_get_val3(node, "LsS", &info.fbx_id, &type_and_name, &sub_type_str)) continue;
+			ufbxi_check((info.fbx_id & UFBXI_SYNTHETIC_ID_BIT) == 0);
 		} else {
 			if (!ufbxi_get_val2(node, "sS", &type_and_name, &sub_type_str)) continue;
-			info.fbx_id = (uintptr_t)type_and_name.data;
+			info.fbx_id = (uintptr_t)type_and_name.data | UFBXI_SYNTHETIC_ID_BIT;
 		}
 
 		// Remove the "Fbx" prefix from sub-types, remember to re-intern!
@@ -8373,8 +8367,8 @@ ufbxi_nodiscard static int ufbxi_read_connections(ufbxi_context *uc)
 				continue;
 			}
 
-			src_id = (uintptr_t)src_name;
-			dst_id = (uintptr_t)dst_name;
+			src_id = (uintptr_t)src_name | UFBXI_SYNTHETIC_ID_BIT;
+			dst_id = (uintptr_t)dst_name | UFBXI_SYNTHETIC_ID_BIT;
 
 		} else {
 			// Post-7000 versions use proper unique 64-bit IDs
@@ -8688,7 +8682,7 @@ ufbxi_nodiscard static int ufbxi_read_take_object(ufbxi_context *uc, ufbxi_node 
 	// pooled interned string pointers.
 	const char *type_and_name;
 	ufbxi_check(ufbxi_get_val1(node, "c", (char**)&type_and_name));
-	uint64_t target_fbx_id = (uintptr_t)type_and_name;
+	uint64_t target_fbx_id = (uintptr_t)type_and_name | UFBXI_SYNTHETIC_ID_BIT;
 
 	// Add all suitable Channels as animated properties
 	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
@@ -8780,7 +8774,7 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 		const char *root_name = uc->from_ascii ? "Model::Scene" : "Scene\x00\x01Model";
 		root_name = ufbxi_push_string_imp(&uc->string_pool, root_name, 12, false);
 		ufbxi_check(root_name);
-		uc->root_id = (uintptr_t)root_name;
+		uc->root_id = (uintptr_t)root_name | UFBXI_SYNTHETIC_ID_BIT;
 	}
 
 	// Add a nameless root node with the root ID
@@ -9220,7 +9214,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 			ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type, &name));
 			ufbxi_check(ufbxi_read_legacy_link(uc, child, &fbx_id, name.data));
 
-			uint64_t node_fbx_id = (uintptr_t)type_and_name.data;
+			uint64_t node_fbx_id = (uintptr_t)type_and_name.data | UFBXI_SYNTHETIC_ID_BIT;
 			ufbxi_check(ufbxi_connect_oo(uc, node_fbx_id, fbx_id));
 			if (!skin) {
 				skin = ufbxi_push_synthetic_element(uc, &skin_fbx_id, info->name.data, ufbx_skin_deformer, UFBX_ELEMENT_SKIN_DEFORMER);
@@ -9245,7 +9239,7 @@ ufbxi_nodiscard static int ufbxi_read_legacy_model(ufbxi_context *uc, ufbxi_node
 	ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type, &name));
 
 	ufbxi_element_info info = { 0 };
-	info.fbx_id = (uintptr_t)type_and_name.data;
+	info.fbx_id = (uintptr_t)type_and_name.data | UFBXI_SYNTHETIC_ID_BIT;
 	info.name = name;
 
 	ufbx_node *elem_node = ufbxi_push_element(uc, &info, ufbx_node, UFBX_ELEMENT_NODE);
@@ -9289,7 +9283,7 @@ ufbxi_nodiscard static int ufbxi_read_legacy_model(ufbxi_context *uc, ufbxi_node
 	if (children) {
 		ufbx_string *names = (ufbx_string*)children->data;
 		for (size_t i = 0; i < children->size; i++) {
-			uint64_t child_fbx_id = (uintptr_t)names[i].data;
+			uint64_t child_fbx_id = (uintptr_t)names[i].data | UFBXI_SYNTHETIC_ID_BIT;
 			ufbxi_check(ufbxi_connect_oo(uc, child_fbx_id, info.fbx_id));
 		}
 	}
@@ -9301,7 +9295,7 @@ ufbxi_nodiscard static int ufbxi_read_legacy_model(ufbxi_context *uc, ufbxi_node
 			if (ufbxi_get_val1(child, "S", &channel_name)) {
 				if (uc->legacy_implicit_anim_layer_id == 0) {
 					// Defer creation so we won't be the first animation stack..
-					uc->legacy_implicit_anim_layer_id = (uintptr_t)uc + 1;
+					uc->legacy_implicit_anim_layer_id = ((uintptr_t)uc + 1) | UFBXI_SYNTHETIC_ID_BIT;
 				}
 				ufbxi_check(ufbxi_read_take_prop_channel(uc, child, info.fbx_id, uc->legacy_implicit_anim_layer_id, channel_name));
 			}
@@ -12202,7 +12196,7 @@ typedef struct {
 	ufbx_string filename;
 	bool owned_by_scene;
 
-	ufbxi_allocator ator_tmp;
+	ufbxi_allocator *ator_tmp;
 	ufbxi_allocator ator_result;
 
 	ufbxi_buf result;
@@ -12411,7 +12405,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 			ufbxi_check_err(&cc->error, size > 0 && size < SIZE_MAX);
 			size_t length = (size_t)size - 1;
 			size_t padded_length = ((size_t)size + alignment - 1) & ~(alignment - 1);
-			ufbxi_check_err(&cc->error, ufbxi_grow_array(&cc->ator_tmp, &cc->name_buf, &cc->name_cap, padded_length));
+			ufbxi_check_err(&cc->error, ufbxi_grow_array(cc->ator_tmp, &cc->name_buf, &cc->name_cap, padded_length));
 			ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, cc->name_buf, padded_length, false));
 			cc->channel_name.data = cc->name_buf;
 			cc->channel_name.length = length;
@@ -12506,7 +12500,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_conte
 
 static ufbxi_noinline int ufbxi_cache_sort_tmp_channels(ufbxi_cache_context *cc, ufbxi_cache_tmp_channel *channels, size_t count)
 {
-	ufbxi_check_err(&cc->error, ufbxi_grow_array(&cc->ator_tmp, &cc->tmp_arr, &cc->tmp_arr_size, count * sizeof(ufbxi_cache_tmp_channel)));
+	ufbxi_check_err(&cc->error, ufbxi_grow_array(cc->ator_tmp, &cc->tmp_arr, &cc->tmp_arr_size, count * sizeof(ufbxi_cache_tmp_channel)));
 	ufbxi_macro_stable_sort(ufbxi_cache_tmp_channel, 16, channels, cc->tmp_arr, count,
 		( ufbxi_str_less(a->name, b->name) ));
 	return 1;
@@ -12515,7 +12509,7 @@ static ufbxi_noinline int ufbxi_cache_sort_tmp_channels(ufbxi_cache_context *cc,
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_context *cc)
 {
 	ufbxi_xml_load_opts opts = { 0 };
-	opts.ator = &cc->ator_tmp;
+	opts.ator = cc->ator_tmp;
 	opts.read_fn = cc->stream.read_fn;
 	opts.read_user = cc->stream.user;
 	opts.prefix = cc->pos;
@@ -12756,7 +12750,7 @@ static ufbxi_forceinline bool ufbxi_cmp_cache_frame_less(const ufbx_cache_frame 
 
 static ufbxi_noinline int ufbxi_cache_sort_frames(ufbxi_cache_context *cc, ufbx_cache_frame *frames, size_t count)
 {
-	ufbxi_check_err(&cc->error, ufbxi_grow_array(&cc->ator_tmp, &cc->tmp_arr, &cc->tmp_arr_size, count * sizeof(ufbx_cache_frame)));
+	ufbxi_check_err(&cc->error, ufbxi_grow_array(cc->ator_tmp, &cc->tmp_arr, &cc->tmp_arr_size, count * sizeof(ufbx_cache_frame)));
 	ufbxi_macro_stable_sort(ufbx_cache_frame, 16, frames, cc->tmp_arr, count,
 		( ufbxi_cmp_cache_frame_less(a, b) ));
 	return 1;
@@ -12823,8 +12817,8 @@ static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 
 static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_string filename)
 {
-	cc->tmp.ator = &cc->ator_tmp;
-	cc->tmp_stack.ator = &cc->ator_tmp;
+	cc->tmp.ator = cc->ator_tmp;
+	cc->tmp_stack.ator = cc->ator_tmp;
 
 	cc->channel_name.data = ufbxi_empty_char;
 
@@ -12880,11 +12874,11 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_cache_load(ufbxi_cache_context 
 
 	ufbxi_buf_free(&cc->tmp);
 	ufbxi_buf_free(&cc->tmp_stack);
-	ufbxi_free(&cc->ator_tmp, char, cc->name_buf, cc->name_cap);
-	ufbxi_free(&cc->ator_tmp, char, cc->tmp_arr, cc->tmp_arr_size);
+	ufbxi_free(cc->ator_tmp, char, cc->name_buf, cc->name_cap);
+	ufbxi_free(cc->ator_tmp, char, cc->tmp_arr, cc->tmp_arr_size);
 	if (!cc->owned_by_scene) {
 		ufbxi_map_free(&cc->string_pool.map);
-		ufbxi_free_ator(&cc->ator_tmp);
+		ufbxi_free_ator(cc->ator_tmp);
 	}
 
 	if (ok) {
@@ -12909,13 +12903,16 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 	}
 
 	ufbxi_cache_context cc = { UFBX_ERROR_NONE };
-	ufbxi_init_ator(&cc.error, &cc.ator_tmp, &opts.temp_allocator);
+	ufbxi_allocator ator_tmp = { 0 };
+	ufbxi_init_ator(&cc.error, &ator_tmp, &opts.temp_allocator);
 	ufbxi_init_ator(&cc.error, &cc.ator_result, &opts.result_allocator);
+	cc.ator_tmp = &ator_tmp;
+
 	cc.open_file_fn = opts.open_file_fn;
 	cc.open_file_user = opts.open_file_user;
 
 	cc.string_pool.error = &cc.error;
-	ufbxi_map_init(&cc.string_pool.map, &cc.ator_tmp, &ufbxi_map_cmp_string, NULL);
+	ufbxi_map_init(&cc.string_pool.map, cc.ator_tmp, &ufbxi_map_cmp_string, NULL);
 	cc.string_pool.buf.ator = &cc.ator_result;
 	cc.string_pool.initial_size = 64;
 	cc.result.ator = &cc.ator_result;
@@ -12970,7 +12967,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_contex
 	cc.frames_per_second = uc->scene.settings.frames_per_second;
 
 	// Temporarily "borrow" allocators for the geometry cache
-	cc.ator_tmp = uc->ator_tmp;
+	cc.ator_tmp = &uc->ator_tmp;
 	cc.string_pool = uc->string_pool;
 	cc.result = uc->result;
 
@@ -12983,7 +12980,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_contex
 	}
 
 	// Return the "borrowed" allocators
-	uc->ator_tmp = cc.ator_tmp;
 	uc->string_pool = cc.string_pool;
 	uc->result = cc.result;
 
@@ -13278,6 +13274,7 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 {
 	ufbxi_map_free(&uc->string_pool.map);
+
 	ufbxi_map_free(&uc->prop_type_map);
 	ufbxi_map_free(&uc->fbx_id_map);
 	ufbxi_map_free(&uc->fbx_attr_map);
@@ -13368,7 +13365,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->string_pool.buf.ator = &uc->ator_result;
 	uc->string_pool.initial_size = 1024;
 
-	ufbxi_map_init(&uc->prop_type_map, &uc->ator_tmp, &ufbxi_map_cmp_prop_type_name, NULL);
+	ufbxi_map_init(&uc->prop_type_map, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
 	ufbxi_map_init(&uc->fbx_id_map, &uc->ator_tmp, &ufbxi_map_cmp_uint64, NULL);
 	ufbxi_map_init(&uc->fbx_attr_map, &uc->ator_tmp, &ufbxi_map_cmp_uint64, NULL);
 	ufbxi_map_init(&uc->node_prop_set, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
