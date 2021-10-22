@@ -1,4 +1,5 @@
 #include "../ufbx.c"
+#include <inttypes.h>
 
 typedef struct {
 	uint32_t begin;
@@ -98,6 +99,29 @@ ufbxi_noinline void hash_string(hash_info info)
 	}
 }
 
+ufbxi_noinline void print_uint64(uint64_t v)
+{
+#if _OPENMP
+	#pragma omp critical
+#endif
+	{
+		printf("%" PRIu64 "\n", v);
+	}
+}
+
+
+ufbxi_noinline void hash_uint64(hash_info info)
+{
+	size_t mask = info.num_slots - 1;
+	uint64_t increment = info.increment;
+	uint64_t end = info.attempts;
+	for (uint64_t i = info.begin; i < end; i += increment) {
+		uint32_t hash = ufbxi_hash64(i);
+		if ((hash & mask) == info.target_slot) print_uint64(i);
+		info.slots[hash & mask]++;
+	}
+}
+
 ufbxi_noinline void run_test(hash_info info, hash_fn *fn, uint32_t *accumulator)
 {
 	info.slots = malloc(sizeof(uint32_t) * info.num_slots);
@@ -121,6 +145,7 @@ typedef struct {
 
 hash_test tests[] = {
 	"string", &hash_string,
+	"uint64", &hash_uint64,
 };
 
 int main(int argc, char **argv)

@@ -1923,7 +1923,7 @@ static ufbxi_forceinline void *ufbxi_map_find_size(ufbxi_map *map, size_t size, 
 			uint32_t index = (uint32_t)(entry >> 32u);
 			void *entry = (char*)map->items + size * index;
 			int cmp = map->cmp_fn(map->cmp_user, value, entry);
-			return cmp == 0 ? entry : NULL;
+			if (cmp == 0) return entry;
 		} else if ((entry & mask) < scan) {
 			if (map->aa_root) {
 				return ufbxi_aa_tree_find(map, value, size);

@@ -267,3 +267,17 @@ UFBXT_FILE_TEST(synthetic_string_collision)
 	ufbxt_assert(!strcmp(prop->value_str.data, "APGAmLj"));
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_id_collision)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->nodes.count == 10002);
+	ufbx_node *node = ufbx_find_node(scene, "First");
+	for (int32_t depth = 10000; depth >= 0; depth--) {
+		ufbxt_assert(node);
+		ufbxt_assert(node->node_depth == depth);
+		node = node->parent;
+	}
+	ufbxt_assert(!node);
+}
+#endif
