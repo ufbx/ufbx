@@ -8,6 +8,7 @@
 #define UFBXI_MAX_NON_ARRAY_VALUES 7
 #define UFBXI_MAX_NODE_DEPTH 64
 #define UFBXI_MAX_SKIP_SIZE 0x40000000
+#define UFBXI_MAP_MAX_SCAN 32
 
 // -- Headers
 
@@ -185,6 +186,9 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 #if defined(UFBX_REGRESSION)
 	#undef UFBXI_MAX_SKIP_SIZE
 	#define UFBXI_MAX_SKIP_SIZE 128
+
+	#undef UFBXI_MAP_MAX_SCAN
+	#define UFBXI_MAP_MAX_SCAN 2
 #endif
 
 // -- Utility
@@ -1718,32 +1722,17 @@ static void ufbxi_buf_pop_state(ufbxi_buf *buf, const ufbxi_buf_state *state)
 // The actual element comparison is left to the user of `ufbxi_map`, see usage below.
 //
 // NOTES:
-//   You must call ufbxi_map_grow() before calling ufbxi_map_insert()
-//   ufbxi_map_insert() inserts duplicates, use ufbxi_map_find() before if necessary
-//
-// void my_insert_or_set(ufbxi_map *map, my_key key, my_value value) {
-//     my_item *result;
-//     uint32_t scan = 0, hash = my_hash(key);
-//     ufbxi_map_grow(map, my_type, 16);
-//     while ((my_result = ufbxi_map_find(map, my_type, &scan, hash)) != NULL) {
-//         if (my_equal(key, result->key)) {
-//             result->value = value;
-//             return;
-//         }
-//     }
-//     result = ufbxi_map_insert(map, m_type, scan, hash);
-//     result->key = key;
-//     result->value = value;
-// }
-//
-// void my_find(ufbxi_map *map, my_key key) {
-//     my_item *result;
-//     uint32_t scan = 0, hash = my_hash(key);
-//     while ((my_result = ufbxi_map_find(map, my_type, &scan, hash)) != NULL) {
-//         if (my_equal(key, result->key)) return result;
-//     }
-//     return NULL;
-// }
+//   ufbxi_map_insert() inserts duplicates, use ufbxi_map_find() before if necessary!
+
+typedef struct ufbxi_aa_node ufbxi_aa_node;
+
+struct ufbxi_aa_node {
+	ufbxi_aa_node *left, *right;
+	uint32_t level;
+	uint32_t index;
+};
+
+typedef int ufbxi_cmp_fn(void *user, const void *a, const void *b);
 
 typedef struct {
 	ufbxi_allocator *ator;
@@ -1755,7 +1744,87 @@ typedef struct {
 
 	uint32_t capacity;
 	uint32_t size;
+
+	ufbxi_cmp_fn *cmp_fn;
+	void *cmp_user;
+
+	ufbxi_buf aa_buf;
+	ufbxi_aa_node *aa_root;
 } ufbxi_map;
+
+static ufbxi_noinline void ufbxi_map_init(ufbxi_map *map, ufbxi_allocator *ator, ufbxi_cmp_fn *cmp_fn, void *cmp_user)
+{
+	map->ator = ator;
+	map->aa_buf.ator = ator;
+	map->cmp_fn = cmp_fn;
+	map->cmp_user = cmp_user;
+}
+
+static void ufbxi_map_free(ufbxi_map *map)
+{
+	ufbxi_buf_free(&map->aa_buf);
+	ufbxi_free(map->ator, char, map->entries, map->data_size);
+	map->entries = NULL;
+	map->items = NULL;
+	map->aa_root = NULL;
+	map->mask = map->capacity = map->size = 0;
+}
+
+
+static ufbxi_noinline ufbxi_aa_node *ufbxi_aa_insert(ufbxi_map *map, ufbxi_aa_node *node, const void *value, uint32_t index, size_t item_size)
+{
+	if (!node) {
+		ufbxi_aa_node *new_node = ufbxi_push(&map->aa_buf, ufbxi_aa_node, 1);
+		if (!new_node) return NULL;
+		new_node->left = NULL;
+		new_node->right = NULL;
+		new_node->level = 1;
+		new_node->index = index;
+		return new_node;
+	}
+
+	void *entry = (char*)map->items + node->index * item_size;
+	int cmp = map->cmp_fn(map->cmp_user, value, entry);
+	if (cmp < 0) {
+		node->left = ufbxi_aa_insert(map, node->left, value, index, item_size);
+	} else if (cmp >= 0) {
+		node->right = ufbxi_aa_insert(map, node->right, value, index, item_size);
+	}
+
+	if (node->left && node->left->level == node->level) {
+		ufbxi_aa_node *left = node->left;
+		node->left = left->right;
+		left->right = node;
+		node = left;
+	}
+
+	if (node->right && node->right->right && node->right->right->level == node->level) {
+		ufbxi_aa_node *right = node->right;
+		node->right = right->left;
+		right->left = node;
+		right->level += 1;
+		node = right;
+	}
+
+	return node;
+}
+
+static ufbxi_noinline void *ufbxi_aa_tree_find(ufbxi_map *map, const void *value, size_t item_size)
+{
+	ufbxi_aa_node *node = map->aa_root;
+	while (node) {
+		void *entry = (char*)map->items + node->index * item_size;
+		int cmp = map->cmp_fn(map->cmp_user, value, entry);
+		if (cmp < 0) {
+			node = node->left;
+		} else if (cmp > 0) {
+			node = node->right;
+		} else {
+			return entry;
+		}
+	}
+	return NULL;
+}
 
 static ufbxi_noinline bool ufbxi_map_grow_size_imp(ufbxi_map *map, size_t item_size, size_t min_size)
 {
@@ -1837,13 +1906,13 @@ static ufbxi_forceinline bool ufbxi_map_grow_size(ufbxi_map *map, size_t size, s
 	return ufbxi_map_grow_size_imp(map, size, min_size);
 }
 
-static ufbxi_forceinline void *ufbxi_map_find_size(ufbxi_map *map, size_t size, uint32_t *p_scan, uint32_t hash)
+static ufbxi_forceinline void *ufbxi_map_find_size(ufbxi_map *map, size_t size, uint32_t hash, const void *value)
 {
 	uint64_t *entries = map->entries;
-	uint32_t mask = map->mask, scan = *p_scan;
+	uint32_t mask = map->mask, scan = 0;
 
 	uint32_t ref = hash & ~mask;
-	if (!mask) return 0;
+	if (!mask || scan == UINT32_MAX) return 0;
 
 	// Scan entries until we find an exact match of the hash or until we hit
 	// an element that has lower scan distance than our search (Robin Hood).
@@ -1852,31 +1921,34 @@ static ufbxi_forceinline void *ufbxi_map_find_size(ufbxi_map *map, size_t size, 
 		uint64_t entry = entries[(hash + scan) & mask];
 		scan += 1;
 		if ((uint32_t)entry == ref + scan) {
-			*p_scan = scan;
 			uint32_t index = (uint32_t)(entry >> 32u);
-			return (char*)map->items + size * index;
+			void *entry = (char*)map->items + size * index;
+			int cmp = map->cmp_fn(map->cmp_user, value, entry);
+			return cmp == 0 ? entry : NULL;
 		} else if ((entry & mask) < scan) {
-			*p_scan = scan - 1;
-			return NULL;
+			if (map->aa_root) {
+				return ufbxi_aa_tree_find(map, value, size);
+			} else {
+				return NULL;
+			}
 		}
 	}
 }
 
-static ufbxi_forceinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size, uint32_t scan, uint32_t hash)
+static ufbxi_forceinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size, uint32_t hash, const void *value)
 {
-	// ufbxi_map_grow() must always be called before insert!
-	ufbx_assert(map->size < map->capacity);
+	if (!ufbxi_map_grow_size(map, size, 64)) return NULL;
 
-	uint32_t index = map->size;
+	uint32_t index = map->size++;
 
 	uint64_t *entries = map->entries;
 	uint32_t mask = map->mask;
 
 	// Scan forward until we find an empty slot, potentially swapping
 	// `new_element` if it has a shorter scan distance (Robin Hood).
-	uint32_t slot = (hash + scan) & mask;
+	uint32_t slot = hash & mask;
 	uint64_t entry, new_entry = (uint64_t)index << 32u | (hash & ~mask);
-	scan += 1;
+	uint32_t scan = 1;
 	while ((entry = entries[slot]) != 0) {
 		uint32_t entry_scan = (entry & mask);
 		if (entry_scan < scan) {
@@ -1886,31 +1958,44 @@ static ufbxi_forceinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size
 		}
 		scan += 1;
 		slot = (slot + 1) & mask;
+
+		if (scan > UFBXI_MAP_MAX_SCAN) {
+			uint32_t index = (uint32_t)(new_entry >> 32u);
+			map->aa_root = ufbxi_aa_insert(map, map->aa_root, value, index, size);
+			return (char*)map->items + size * index;
+		}
 	}
 	entries[slot] = new_entry + scan;
-	map->size++;
 
 	return (char*)map->items + size * index;
 }
 
-static void ufbxi_map_free(ufbxi_map *map)
+#define ufbxi_map_grow(map, type, min_size) ufbxi_map_grow_size((map), sizeof(type), (min_size))
+#define ufbxi_map_find(map, type, hash, value) (type*)ufbxi_map_find_size((map), sizeof(type), (hash), (value))
+#define ufbxi_map_insert(map, type, hash, value) (type*)ufbxi_map_insert_size((map), sizeof(type), (hash), (value))
+
+static int ufbxi_map_cmp_uint64(void *user, const void *va, const void *vb)
 {
-	ufbxi_free(map->ator, char, map->entries, map->data_size);
-	map->entries = NULL;
-	map->items = NULL;
-	map->mask = map->capacity = map->size = 0;
+	uint64_t a = *(const uint64_t*)va, b = *(const uint64_t*)vb;
+	if (a < b) return -1;
+	if (a > b) return +1;
+	return 0;
 }
 
-#define ufbxi_map_grow(map, type, min_size) ufbxi_map_grow_size((map), sizeof(type), (min_size))
-#define ufbxi_map_find(map, type, p_scan, hash) (type*)ufbxi_map_find_size((map), sizeof(type), (p_scan), (hash))
-#define ufbxi_map_insert(map, type, scan, hash) (type*)ufbxi_map_insert_size((map), sizeof(type), (scan), (hash))
+static int ufbxi_map_cmp_const_char_ptr(void *user, const void *va, const void *vb)
+{
+	const char *a = *(const char **)va, *b = *(const char **)vb;
+	if (a < b) return -1;
+	if (a > b) return +1;
+	return 0;
+}
 
 // -- Hash functions
 
 static uint32_t ufbxi_hash_string(const char *str, size_t length)
 {
-	uint32_t hash = 0;
-	uint32_t seed = UINT32_C(0x9e3779b9) + (uint32_t)length;
+	uint32_t hash = (uint32_t)length;
+	uint32_t seed = UINT32_C(0x9e3779b9);
 	if (length >= 4) {
 		do {
 			uint32_t word = ufbxi_read_u32(str);
@@ -1921,15 +2006,17 @@ static uint32_t ufbxi_hash_string(const char *str, size_t length)
 
 		uint32_t word = ufbxi_read_u32(str + length - 4);
 		hash = ((hash << 5u | hash >> 27u) ^ word) * seed;
-		return hash;
 	} else {
 		uint32_t word = 0;
 		if (length >= 1) word |= (uint32_t)(uint8_t)str[0] << 0;
 		if (length >= 2) word |= (uint32_t)(uint8_t)str[1] << 8;
 		if (length >= 3) word |= (uint32_t)(uint8_t)str[2] << 16;
 		hash = ((hash << 5u | hash >> 27u) ^ word) * seed;
-		return hash;
 	}
+	hash ^= hash >> 16;
+	hash *= UINT32_C(0x7feb352d);
+	hash ^= hash >> 15;
+	return hash;
 }
 
 static ufbxi_forceinline uint32_t ufbxi_hash32(uint32_t x)
@@ -1958,7 +2045,6 @@ static ufbxi_forceinline uint32_t ufbxi_hash_uptr(uintptr_t ptr)
 }
 
 #define ufbxi_hash_ptr(ptr) ufbxi_hash_uptr((uintptr_t)(ptr))
-
 
 // -- String pool
 
@@ -1995,6 +2081,12 @@ static ufbxi_forceinline int ufbxi_str_cmp(ufbx_string a, ufbx_string b)
 	return 0;
 }
 
+static int ufbxi_map_cmp_string(void *user, const void *va, const void *vb)
+{
+	const ufbx_string *a = (const ufbx_string*)va, *b = (const ufbx_string*)vb;
+	return ufbxi_str_cmp(*a, *b);
+}
+
 const char ufbxi_empty_char[1] = { '\0' };
 
 ufbxi_nodiscard static const char *ufbxi_push_string_imp(ufbxi_string_pool *pool, const char *str, size_t length, bool copy)
@@ -2003,15 +2095,13 @@ ufbxi_nodiscard static const char *ufbxi_push_string_imp(ufbxi_string_pool *pool
 
 	ufbxi_check_return_err(pool->error, ufbxi_map_grow(&pool->map, ufbx_string, pool->initial_size), NULL);
 
+	ufbx_string ref = { str, length };
+
 	uint32_t hash = ufbxi_hash_string(str, length);
-	uint32_t scan = 0;
-	ufbx_string *entry;
-	while ((entry = ufbxi_map_find(&pool->map, ufbx_string, &scan, hash)) != NULL) {
-		if (entry->length == length && !memcmp(entry->data, str, length)) {
-			return entry->data;
-		}
-	}
-	entry = ufbxi_map_insert(&pool->map, ufbx_string, scan, hash);
+	ufbx_string *entry = ufbxi_map_find(&pool->map, ufbx_string, hash, &ref);
+	if (entry) return entry->data;
+	entry = ufbxi_map_insert(&pool->map, ufbx_string, hash, &ref);
+	ufbxi_check_return_err(pool->error, entry, NULL);
 	entry->length = length;
 	if (copy) {
 		char *dst = ufbxi_push(&pool->buf, char, length + 1);
@@ -5792,6 +5882,15 @@ typedef struct {
 	const char *name;
 } ufbxi_prop_type_name;
 
+static int ufbxi_map_cmp_prop_type_name(void *user, const void *va, const void *vb)
+{
+	const char *a = *(const char**)va;
+	const ufbxi_prop_type_name *b = (const ufbxi_prop_type_name*)vb;
+	if (a < b->name) return -1;
+	if (a > b->name) return -1;
+	return 0;
+}
+
 const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
 	{ UFBX_PROP_BOOLEAN, "Boolean" },
 	{ UFBX_PROP_BOOLEAN, "bool" },
@@ -5826,11 +5925,9 @@ static ufbx_prop_type ufbxi_get_prop_type(ufbxi_context *uc, const char *name)
 {
 	uint32_t hash = ufbxi_hash_ptr(name);
 	uint32_t scan = 0;
-	ufbxi_prop_type_name *entry;
-	while ((entry = ufbxi_map_find(&uc->prop_type_map, ufbxi_prop_type_name, &scan, hash)) != NULL) {
-		if (entry->name == name) {
-			return entry->type;
-		}
+	ufbxi_prop_type_name *entry = ufbxi_map_find(&uc->prop_type_map, ufbxi_prop_type_name, hash, &name);
+	if (entry) {
+		return entry->type;
 	}
 	return UFBX_PROP_UNKNOWN;
 }
@@ -5987,7 +6084,8 @@ ufbxi_nodiscard static int ufbxi_init_node_prop_names(ufbxi_context *uc)
 		const char *pooled = ufbxi_push_string_imp(&uc->string_pool, name, strlen(name), false);
 		ufbxi_check(pooled);
 		uint32_t hash = ufbxi_hash_ptr(pooled);
-		const char **entry = ufbxi_map_insert(&uc->node_prop_set, const char*, 0, hash);
+		const char **entry = ufbxi_map_insert(&uc->node_prop_set, const char*, hash, &pooled);
+		ufbxi_check(entry);
 		*entry = pooled;
 	}
 
@@ -5999,14 +6097,9 @@ static bool ufbxi_is_node_property(ufbxi_context *uc, const char *name)
 	// You need to call `ufbxi_init_node_prop_names()` before calling this
 	ufbx_assert(uc->node_prop_set.size > 0);
 
-	const char **entry;
-	uint32_t scan = 0, hash = ufbxi_hash_ptr(name);
-	while ((entry = ufbxi_map_find(&uc->node_prop_set, const char*, &scan, hash)) != NULL) {
-		if (*entry == name) {
-			return true;
-		}
-	}
-	return false;
+	uint32_t hash = ufbxi_hash_ptr(name);
+	const char **entry = ufbxi_map_find(&uc->node_prop_set, const char*, hash, &name);
+	return entry != NULL;
 }
 
 ufbxi_nodiscard static int ufbxi_load_maps(ufbxi_context *uc)
@@ -6016,7 +6109,8 @@ ufbxi_nodiscard static int ufbxi_load_maps(ufbxi_context *uc)
 		const char *pooled = ufbxi_push_string_imp(&uc->string_pool, name->name, strlen(name->name), false);
 		ufbxi_check(pooled);
 		uint32_t hash = ufbxi_hash_ptr(pooled);
-		ufbxi_prop_type_name *entry = ufbxi_map_insert(&uc->prop_type_map, ufbxi_prop_type_name, 0, hash);
+		ufbxi_prop_type_name *entry = ufbxi_map_insert(&uc->prop_type_map, ufbxi_prop_type_name, hash, &pooled);
+		ufbxi_check(entry);
 		entry->type = name->type;
 		entry->name = pooled;
 	}
@@ -6408,10 +6502,9 @@ ufbxi_nodiscard static ufbx_element *ufbxi_push_element_size(ufbxi_context *uc, 
 	elem->name = info->name;
 	elem->props = info->props;
 
-	ufbxi_check_return(ufbxi_map_grow(&uc->fbx_id_map, ufbxi_fbx_id_entry, 64), NULL);
-
 	uint32_t hash = ufbxi_hash64(info->fbx_id);
-	ufbxi_fbx_id_entry *entry = ufbxi_map_insert(&uc->fbx_id_map, ufbxi_fbx_id_entry, 0, hash);
+	ufbxi_fbx_id_entry *entry = ufbxi_map_insert(&uc->fbx_id_map, ufbxi_fbx_id_entry, hash, &info->fbx_id);
+	ufbxi_check_return(entry, NULL);
 	entry->fbx_id = info->fbx_id;
 	entry->element_id = elem->id;
 
@@ -6438,12 +6531,11 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 		elem->name.length = strlen(name);
 	}
 
-	ufbxi_check_return(ufbxi_map_grow(&uc->fbx_id_map, ufbxi_fbx_id_entry, 64), NULL);
-
 	uint64_t fbx_id = (uintptr_t)elem;
 	*p_fbx_id = fbx_id;
 	uint32_t hash = ufbxi_hash64(fbx_id);
-	ufbxi_fbx_id_entry *entry = ufbxi_map_insert(&uc->fbx_id_map, ufbxi_fbx_id_entry, 0, hash);
+	ufbxi_fbx_id_entry *entry = ufbxi_map_insert(&uc->fbx_id_map, ufbxi_fbx_id_entry, hash, &fbx_id);
+	ufbxi_check_return(entry, NULL);
 	entry->fbx_id = fbx_id;
 	entry->element_id = elem->id;
 
@@ -8032,9 +8124,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_c
 	// 6x00: Link the node to the node attribute so property connections can be
 	// redirected from connections if necessary.
 	if (uc->version < 7000) {
-		ufbxi_check(ufbxi_map_grow(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, 64));
 		uint32_t hash = ufbxi_hash64(info->fbx_id);
-		ufbxi_fbx_attr_entry *entry = ufbxi_map_insert(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, 0, hash);
+		ufbxi_fbx_attr_entry *entry = ufbxi_map_insert(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, hash, &info->fbx_id);
+		ufbxi_check(entry);
 		entry->node_fbx_id = info->fbx_id;
 		entry->attr_fbx_id = attrib_info.fbx_id;
 
@@ -9186,9 +9278,9 @@ ufbxi_nodiscard static int ufbxi_read_legacy_model(ufbxi_context *uc, ufbxi_node
 
 	// Mark the node as having an attribute so property connections can be forwarded
 	if (has_attrib) {
-		ufbxi_check(ufbxi_map_grow(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, 64));
 		uint32_t hash = ufbxi_hash64(info.fbx_id);
-		ufbxi_fbx_attr_entry *entry = ufbxi_map_insert(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, 0, hash);
+		ufbxi_fbx_attr_entry *entry = ufbxi_map_insert(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, hash, &info.fbx_id);
+		ufbxi_check(entry);
 		entry->node_fbx_id = info.fbx_id;
 		entry->attr_fbx_id = attrib_info.fbx_id;
 	}
@@ -9273,12 +9365,10 @@ ufbxi_nodiscard static int ufbxi_read_legacy_root(ufbxi_context *uc)
 
 static ufbx_element *ufbxi_find_element_by_fbx_id(ufbxi_context *uc, uint64_t fbx_id)
 {
-	ufbxi_fbx_id_entry *entry;
-	uint32_t scan = 0, hash = ufbxi_hash64(fbx_id);
-	while ((entry = ufbxi_map_find(&uc->fbx_id_map, ufbxi_fbx_id_entry, &scan, hash)) != NULL) {
-		if (entry->fbx_id == fbx_id) {
-			return uc->scene.elements.data[entry->element_id];
-		}
+	uint32_t hash = ufbxi_hash64(fbx_id);
+	ufbxi_fbx_id_entry *entry = ufbxi_map_find(&uc->fbx_id_map, ufbxi_fbx_id_entry, hash, &fbx_id);
+	if (entry) {
+		return uc->scene.elements.data[entry->element_id];
 	}
 	return NULL;
 }
@@ -9364,12 +9454,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_connections(ufbxi_context *
 
 static uint64_t ufbxi_find_attribute_fbx_id(ufbxi_context *uc, uint64_t node_fbx_id)
 {
-	ufbxi_fbx_attr_entry *entry;
-	uint32_t scan = 0, hash = ufbxi_hash64(node_fbx_id);
-	while ((entry = ufbxi_map_find(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, &scan, hash)) != NULL) {
-		if (entry->node_fbx_id == node_fbx_id) {
-			return entry->attr_fbx_id;
-		}
+	uint32_t hash = ufbxi_hash64(node_fbx_id);
+	ufbxi_fbx_attr_entry *entry = ufbxi_map_find(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, hash, &node_fbx_id);
+	if (entry) {
+		return entry->attr_fbx_id;
 	}
 	return node_fbx_id;
 }
@@ -12828,7 +12916,7 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 	cc.open_file_user = opts.open_file_user;
 
 	cc.string_pool.error = &cc.error;
-	cc.string_pool.map.ator = &cc.ator_tmp;
+	ufbxi_map_init(&cc.string_pool.map, &cc.ator_tmp, &ufbxi_map_cmp_string, NULL);
 	cc.string_pool.buf.ator = &cc.ator_result;
 	cc.string_pool.initial_size = 64;
 	cc.result.ator = &cc.ator_result;
@@ -13277,14 +13365,14 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	}
 
 	uc->string_pool.error = &uc->error;
-	uc->string_pool.map.ator = &uc->ator_tmp;
+	ufbxi_map_init(&uc->string_pool.map, &uc->ator_tmp, &ufbxi_map_cmp_string, NULL);
 	uc->string_pool.buf.ator = &uc->ator_result;
 	uc->string_pool.initial_size = 1024;
 
-	uc->prop_type_map.ator = &uc->ator_tmp;
-	uc->fbx_id_map.ator = &uc->ator_tmp;
-	uc->fbx_attr_map.ator = &uc->ator_tmp;
-	uc->node_prop_set.ator = &uc->ator_tmp;
+	ufbxi_map_init(&uc->prop_type_map, &uc->ator_tmp, &ufbxi_map_cmp_prop_type_name, NULL);
+	ufbxi_map_init(&uc->fbx_id_map, &uc->ator_tmp, &ufbxi_map_cmp_uint64, NULL);
+	ufbxi_map_init(&uc->fbx_attr_map, &uc->ator_tmp, &ufbxi_map_cmp_uint64, NULL);
+	ufbxi_map_init(&uc->node_prop_set, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
 
 	uc->tmp.ator = &uc->ator_tmp;
 	uc->tmp_parse.ator = &uc->ator_tmp;

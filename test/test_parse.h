@@ -246,3 +246,24 @@ UFBXT_FILE_TEST(synthetic_cube_nan)
 	ufbxt_assert_close_real(err, mesh->vertices[1].z, 0.5f);
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_string_collision)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+	ufbx_prop *prop;
+
+	prop = ufbx_find_prop(&node->props, "BIiMTNT");
+	ufbxt_assert(prop);
+	ufbxt_assert(!strcmp(prop->value_str.data, "BJKKUfZ"));
+
+	prop = ufbx_find_prop(&node->props, "BbAJerP");
+	ufbxt_assert(prop);
+	ufbxt_assert(!strcmp(prop->value_str.data, "AAAJKop"));
+
+	prop = ufbx_find_prop(&node->props, "BpgrcZR");
+	ufbxt_assert(prop);
+	ufbxt_assert(!strcmp(prop->value_str.data, "APGAmLj"));
+}
+#endif
