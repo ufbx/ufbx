@@ -1770,8 +1770,7 @@ static void ufbxi_map_free(ufbxi_map *map)
 	map->mask = map->capacity = map->size = 0;
 }
 
-
-static ufbxi_noinline ufbxi_aa_node *ufbxi_aa_insert(ufbxi_map *map, ufbxi_aa_node *node, const void *value, uint32_t index, size_t item_size)
+static ufbxi_noinline ufbxi_aa_node *ufbxi_aa_tree_insert(ufbxi_map *map, ufbxi_aa_node *node, const void *value, uint32_t index, size_t item_size)
 {
 	if (!node) {
 		ufbxi_aa_node *new_node = ufbxi_push(&map->aa_buf, ufbxi_aa_node, 1);
@@ -1786,9 +1785,9 @@ static ufbxi_noinline ufbxi_aa_node *ufbxi_aa_insert(ufbxi_map *map, ufbxi_aa_no
 	void *entry = (char*)map->items + node->index * item_size;
 	int cmp = map->cmp_fn(map->cmp_user, value, entry);
 	if (cmp < 0) {
-		node->left = ufbxi_aa_insert(map, node->left, value, index, item_size);
+		node->left = ufbxi_aa_tree_insert(map, node->left, value, index, item_size);
 	} else if (cmp >= 0) {
-		node->right = ufbxi_aa_insert(map, node->right, value, index, item_size);
+		node->right = ufbxi_aa_tree_insert(map, node->right, value, index, item_size);
 	}
 
 	if (node->left && node->left->level == node->level) {
@@ -1961,7 +1960,7 @@ static ufbxi_forceinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size
 
 		if (scan > UFBXI_MAP_MAX_SCAN) {
 			uint32_t index = (uint32_t)(new_entry >> 32u);
-			map->aa_root = ufbxi_aa_insert(map, map->aa_root, value, index, size);
+			map->aa_root = ufbxi_aa_tree_insert(map, map->aa_root, value, index, size);
 			return (char*)map->items + size * index;
 		}
 	}
