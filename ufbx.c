@@ -2083,6 +2083,12 @@ static ufbxi_forceinline int ufbxi_str_cmp(ufbx_string a, ufbx_string b)
 	return 0;
 }
 
+static ufbxi_forceinline ufbx_string ufbxi_str_c(const char *str)
+{
+	ufbx_string s = { str, strlen(str) };
+	return s;
+}
+
 static int ufbxi_map_cmp_string(void *user, const void *va, const void *vb)
 {
 	(void)user;
@@ -13458,27 +13464,27 @@ static int ufbxi_cmp_prop_override(const void *va, const void *vb)
 	const ufbx_prop_override *a = (const ufbx_prop_override*)va, *b = (const ufbx_prop_override*)vb;
 	if (a->element_id != b->element_id) return a->element_id < b->element_id ? -1 : 1;
 	if (a->internal_key != b->internal_key) return a->internal_key < b->internal_key ? -1 : 1;
-	return ufbxi_str_cmp(a->prop_name, b->prop_name);
+	return strcmp(a->prop_name, b->prop_name);
 }
 
 static ufbxi_forceinline bool ufbxi_override_less_than_prop(const ufbx_prop_override *over, uint32_t element_id, const ufbx_prop *prop)
 {
 	if (over->element_id != element_id) return over->element_id < element_id;
 	if (over->internal_key != prop->internal_key) return over->internal_key < prop->internal_key;
-	return ufbxi_str_less(over->prop_name, prop->name);
+	return strcmp(over->prop_name, prop->name.data);
 }
 
 static ufbxi_forceinline bool ufbxi_override_equals_to_prop(const ufbx_prop_override *over, uint32_t element_id, const ufbx_prop *prop)
 {
 	if (over->element_id != element_id) return false;
 	if (over->internal_key != prop->internal_key) return false;
-	return ufbxi_str_equal(over->prop_name, prop->name);
+	return strcmp(over->prop_name, prop->name.data) == 0;
 }
 
 static ufbxi_forceinline bool ufbxi_prop_override_is_prepared(const ufbx_prop_override *over)
 {
-	if (over->internal_key != ufbxi_get_name_key(over->prop_name.data, over->prop_name.length)) return false;
-	if (over->value_str.data == NULL) return false;
+	if (over->internal_key != ufbxi_get_name_key_c(over->prop_name)) return false;
+	if (over->value_str == NULL) return false;
 	return true;
 }
 
@@ -13500,7 +13506,7 @@ static ufbxi_noinline bool ufbxi_find_prop_override(const ufbx_const_prop_overri
 		prop->flags = (ufbx_prop_flags)((prop->flags & ~clear_flags) | UFBX_PROP_FLAG_OVERRIDDEN);
 		prop->value_vec3 = over->value;
 		prop->value_int = over->value_int;
-		prop->value_str = over->value_str;
+		prop->value_str = ufbxi_str_c(over->value_str);
 		return true;
 	} else {
 		return false;
@@ -15425,18 +15431,18 @@ ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, dou
 		for (; over != over_end && num_anim < buffer_size; over++) {
 			ufbx_prop *dst = &buffer[num_anim];
 			if (over->internal_key < prop->internal_key
-				|| (over->internal_key == prop->internal_key && ufbxi_str_less(over->prop_name, prop->name))) {
-				dst->name = over->prop_name;
+				|| (over->internal_key == prop->internal_key && strcmp(over->prop_name, prop->name.data) < 0)) {
+				dst->name = ufbxi_str_c(over->prop_name);
 				dst->internal_key = over->internal_key;
 				dst->type = UFBX_PROP_UNKNOWN;
 				dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
-			} else if (over->internal_key == prop->internal_key && ufbxi_str_equal(over->prop_name, prop->name)) {
+			} else if (over->internal_key == prop->internal_key && strcmp(over->prop_name, prop->name.data) == 0) {
 				*dst = *prop;
 				dst->flags = (ufbx_prop_flags)(dst->flags | UFBX_PROP_FLAG_OVERRIDDEN);
 			} else {
 				break;
 			}
-			dst->value_str = over->value_str;
+			dst->value_str = ufbxi_str_c(over->value_str);
 			dst->value_int = over->value_int;
 			dst->value_vec3 = over->value;
 			num_anim++;
@@ -15466,11 +15472,11 @@ ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, dou
 
 	for (; over != over_end && num_anim < buffer_size; over++) {
 		ufbx_prop *dst = &buffer[num_anim++];
-		dst->name = over->prop_name;
+		dst->name = ufbxi_str_c(over->prop_name);
 		dst->internal_key = over->internal_key;
 		dst->type = UFBX_PROP_UNKNOWN;
 		dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
-		dst->value_str = over->value_str;
+		dst->value_str = ufbxi_str_c(over->value_str);
 		dst->value_int = over->value_int;
 		dst->value_vec3 = over->value;
 	}
@@ -15520,21 +15526,20 @@ ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *n
 			if (key > prop->internal_key) break;
 
 			if (over) {
-				ufbx_string name_str = { name, strlen(name) };
 				bool found_override = false;
 				for (; over != over_end; over++) {
 					ufbx_prop *dst = &props[num_props];
-					if (over->internal_key < key || ufbxi_str_less(over->prop_name, name_str)) {
+					if (over->internal_key < key || strcmp(over->prop_name, name) < 0) {
 						continue;
-					} else if (over->internal_key == key && ufbxi_str_equal(over->prop_name, name_str)) {
-						dst->name = name_str;
+					} else if (over->internal_key == key && strcmp(over->prop_name, name) == 0) {
+						dst->name = ufbxi_str_c(name);
 						dst->internal_key = key;
 						dst->type = UFBX_PROP_UNKNOWN;
 						dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
 					} else {
 						break;
 					}
-					dst->value_str = over->value_str;
+					dst->value_str = ufbxi_str_c(over->value_str);
 					dst->value_int = over->value_int;
 					dst->value_vec3 = over->value;
 					num_props++;
@@ -15561,13 +15566,12 @@ ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *n
 	}
 
 	if (over) {
-		ufbx_string name_str = { name, strlen(name) };
 		for (; over != over_end && name_ix < ufbxi_arraycount(prop_names); over++) {
 			ufbx_prop *dst = &props[num_props];
-			if (over->internal_key < key || ufbxi_str_less(over->prop_name, name_str)) {
+			if (over->internal_key < key || strcmp(over->prop_name, name) < 0) {
 				continue;
-			} else if (over->internal_key == key && ufbxi_str_equal(over->prop_name, name_str)) {
-				dst->name = name_str;
+			} else if (over->internal_key == key && strcmp(over->prop_name, name) == 0) {
+				dst->name = ufbxi_str_c(name);
 				dst->internal_key = key;
 				dst->type = UFBX_PROP_UNKNOWN;
 				dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
@@ -15578,7 +15582,7 @@ ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *n
 					key = ufbxi_get_name_key_c(name);
 				}
 			}
-			dst->value_str = over->value_str;
+			dst->value_str = ufbxi_str_c(over->value_str);
 			dst->value_int = over->value_int;
 			dst->value_vec3 = over->value;
 			num_props++;
@@ -15599,17 +15603,11 @@ ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *n
 ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *overrides, size_t num_overrides)
 {
 	ufbxi_for(ufbx_prop_override, over, overrides, num_overrides) {
-		if (over->prop_name.data == NULL) {
-			over->prop_name.data = ufbxi_empty_char;
+		if (over->prop_name == NULL) {
+			over->prop_name = ufbxi_empty_char;
 		}
-		if (over->prop_name.length == SIZE_MAX) {
-			over->prop_name.length = strlen(over->prop_name.data);
-		}
-		if (over->value_str.data == NULL) {
-			over->value_str.data = ufbxi_empty_char;
-		}
-		if (over->value_str.length == SIZE_MAX) {
-			over->value_str.length = strlen(over->value_str.data);
+		if (over->value_str == NULL) {
+			over->value_str = ufbxi_empty_char;
 		}
 		if (over->value_int == 0) {
 			over->value_int = (int64_t)over->value.x;
@@ -15617,8 +15615,9 @@ ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *ov
 			over->value.x = (ufbx_real)over->value_int;
 		}
 
-		over->prop_name.data = ufbxi_find_canonical_string(over->prop_name.data, over->prop_name.length);
-		over->internal_key = ufbxi_get_name_key(over->prop_name.data, over->prop_name.length);
+		size_t len = strlen(over->prop_name);
+		over->prop_name = ufbxi_find_canonical_string(over->prop_name, len);
+		over->internal_key = ufbxi_get_name_key(over->prop_name, len);
 	}
 
 	// TODO: Macro for non-stable sort

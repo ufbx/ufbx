@@ -218,10 +218,10 @@ UFBXT_FILE_TEST(maya_anim_light)
 		uint32_t element_id = node->light->element.id;
 
 		ufbx_prop_override overrides[] = {
-			{ element_id, { "Intensity", SIZE_MAX }, { (ufbx_real)10.0 } },
-			{ element_id, { "Color", SIZE_MAX }, { (ufbx_real)0.3, (ufbx_real)0.6, (ufbx_real)0.9 } },
-			{ element_id, { "|NewProp", SIZE_MAX }, { 10, 20, 30 }, { "Test", SIZE_MAX } },
-			{ element_id, { "IntProp", SIZE_MAX }, { 0, 0, 0 }, { NULL, 0 }, 15 },
+			{ element_id, "Intensity", { (ufbx_real)10.0 } },
+			{ element_id, "Color", { (ufbx_real)0.3, (ufbx_real)0.6, (ufbx_real)0.9 } },
+			{ element_id, "|NewProp", { 10, 20, 30 }, "Test" },
+			{ element_id, "IntProp", { 0, 0, 0 }, "", 15 },
 		};
 
 		ufbx_anim anim = scene->anim;
@@ -334,10 +334,10 @@ UFBXT_FILE_TEST(maya_transform_animation)
 		ref.scale.z = 4.0f;
 
 		ufbx_prop_override overrides[] = {
-			{ element_id, { "Color", SIZE_MAX }, { (ufbx_real)0.3, (ufbx_real)0.6, (ufbx_real)0.9 } },
-			{ element_id, { "|NewProp", 8 }, { 10, 20, 30 }, { "Test", 4 } },
-			{ element_id, { "Lcl Scaling", SIZE_MAX }, { 2.0f, 3.0f, 4.0f } },
-			{ element_id, { "RotationOffset", SIZE_MAX }, { -0.1f, -0.2f, -0.3f } },
+			{ element_id, "Color", { (ufbx_real)0.3, (ufbx_real)0.6, (ufbx_real)0.9 } },
+			{ element_id, "|NewProp", { 10, 20, 30 }, "Test", },
+			{ element_id, "Lcl Scaling", { 2.0f, 3.0f, 4.0f } },
+			{ element_id, "RotationOffset", { -0.1f, -0.2f, -0.3f } },
 		};
 
 		double time = 14.0/24.0;

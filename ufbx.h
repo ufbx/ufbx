@@ -1587,14 +1587,12 @@ typedef struct ufbx_prop_override {
 	uint32_t element_id;
 
 	// Property name to override.
-	// Use `prop_name.length = SIZE_MAX` for NULL-terminated strings.
-	ufbx_string prop_name;
+	const char *prop_name;
 
 	// Override value, use `value.x` for scalars. `value_int` is initialized
 	// from `value.x` if zero so keep `value` zeroed even if you don't need it!
-	// Use `value_str.length = SIZE_MAX` for NULL-terminated strings.
 	ufbx_vec3 value;
-	ufbx_string value_str;
+	const char *value_str;
 	int64_t value_int;
 
 	// Internal: Gets filled automatically by `ufbx_prepare_prop_overrides()`
