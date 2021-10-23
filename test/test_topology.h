@@ -189,3 +189,39 @@ UFBXT_FILE_TEST(maya_subsurf_3x_cube_crease)
 {
 }
 #endif
+
+#if UFBXT_IMPL
+typedef struct {
+	ufbx_vec3 position;
+	ufbx_vec3 normal;
+} ufbxt_vertex_pn;
+#endif
+
+UFBXT_FILE_TEST(blender_293_half_smooth_cube)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->num_indices == 6*4);
+	ufbxt_assert(mesh->num_triangles == 6*2);
+
+	ufbxt_vertex_pn vertices[36];
+	uint32_t indices[36];
+	size_t num_indices = 0;
+
+	uint32_t tri[64];
+	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
+		size_t num_tris = ufbx_triangulate_face(tri, 64, mesh, mesh->faces[fi]);
+		for (size_t ti = 0; ti < num_tris * 3; ti++) {
+			vertices[num_indices].position = ufbx_get_vertex_vec3(&mesh->vertex_position, tri[ti]);
+			vertices[num_indices].normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, tri[ti]);
+			num_indices++;
+		}
+	}
+
+	size_t num_vertices = ufbx_generate_indices(vertices, indices, sizeof(ufbxt_vertex_pn), num_indices, NULL, NULL);
+	ufbxt_assert(num_vertices == 12);
+
+}
+#endif

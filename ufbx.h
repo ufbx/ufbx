@@ -2543,6 +2543,10 @@ size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *channel, double
 size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_frame *frame, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts);
 size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *channel, double time, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts);
 
+// Utility
+
+size_t ufbx_generate_indices(void *vertices, uint32_t *indices, size_t vertex_size, size_t num_indices, const ufbx_allocator *allocator, ufbx_error *error);
+
 // -- Inline API
 
 ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t index) { return v->data[v->indices[index]]; }

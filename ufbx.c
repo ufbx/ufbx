@@ -14904,6 +14904,82 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 	}
 }
 
+// -- Utility
+
+static int ufbxi_map_cmp_vertex_1(void *user, const void *va, const void *vb)
+{
+	size_t size = *(size_t*)user;
+	return memcmp(va, vb, size);
+}
+
+
+static int ufbxi_map_cmp_vertex_4(void *user, const void *va, const void *vb)
+{
+	size_t size = *(size_t*)user;
+	for (size_t i = 0; i < size; i += 4) {
+		uint32_t a = *(const uint32_t*)((const char*)va + i);
+		uint32_t b = *(const uint32_t*)((const char*)vb + i);
+		if (a != b) return a < b ? -1 : +1;
+	}
+	return 0;
+}
+
+static ufbxi_noinline size_t ufbxi_generate_indices(void *vertices, uint32_t *indices, size_t vertex_size, size_t num_indices, const ufbx_allocator *allocator, ufbx_error *error)
+{
+	bool fail = false;
+
+	ufbxi_allocator ator = { 0 };
+	ufbxi_init_ator(error, &ator, allocator);
+
+	size_t vertex_size_ptr = vertex_size;
+	ufbxi_map map = { 0 };
+	if (vertex_size % 4 == 0 && (uintptr_t)vertices % 4 == 0) {
+		ufbxi_map_init(&map, &ator, &ufbxi_map_cmp_vertex_4, &vertex_size_ptr);
+	} else {
+		ufbxi_map_init(&map, &ator, &ufbxi_map_cmp_vertex_1, &vertex_size_ptr);
+	}
+
+	if (!ufbxi_map_grow_size(&map, vertex_size, num_indices)) {
+		fail = true;
+	}
+
+	if (!fail) {
+		for (size_t i = 0; i < num_indices; i++) {
+			char *vertex = (char*)vertices + i * vertex_size;
+			uint32_t hash = ufbxi_hash_string(vertex, vertex_size);
+			void *entry = ufbxi_map_find_size(&map, vertex_size, hash, vertex);
+			if (!entry) {
+				entry = ufbxi_map_insert_size(&map, vertex_size, hash, vertex);
+				memcpy(entry, vertex, vertex_size);
+				if (!entry) {
+					fail = true;
+					break;
+				}
+			}
+			uint32_t index = (uint32_t)(((char*)entry - (char*)map.items) / vertex_size);
+			indices[i] = index;
+		}
+	}
+
+
+	size_t result_vertices = 0;
+	if (!fail) {
+		result_vertices = map.size;
+		memcpy(vertices, map.items, result_vertices * vertex_size);
+		error->stack_size = 0;
+		error->description = NULL;
+		error->type = UFBX_ERROR_NONE;
+	} else {
+		ufbxi_fix_error_type(error, "Failed to generate indices");
+	}
+
+	ufbxi_map_free(&map);
+	ufbxi_free_ator(&ator);
+
+	return result_vertices;
+
+}
+
 // -- API
 
 #ifdef __cplusplus
@@ -16667,6 +16743,12 @@ ufbxi_noinline size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *
 	ufbx_assert(data);
 	if (!data) return 0;
 	return ufbx_sample_geometry_cache_real(channel, time, (ufbx_real*)data, count * 3, opts) / 3;
+}
+
+size_t ufbx_generate_indices(void *vertices, uint32_t *indices, size_t vertex_size, size_t num_indices, const ufbx_allocator *allocator, ufbx_error *error)
+{
+	ufbx_error local_error;
+	return ufbxi_generate_indices(vertices, indices, vertex_size, num_indices, allocator, error ? error : &local_error);
 }
 
 #ifdef __cplusplus
