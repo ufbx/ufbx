@@ -43,6 +43,7 @@ jobs:
       - name: Upload result images
         env:
           BUNNY_API_TOKEN: ${{ secrets.BUNNY_API_TOKEN }}
+        if: always()
         run: |
           HASH="$(git rev-parse --short=16 head)"
           URL="https://storage.bunnycdn.com/ufbx-images/$HASH"
