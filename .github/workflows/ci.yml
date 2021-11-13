@@ -17,7 +17,7 @@ jobs:
       - name: Install apt dependencies
         run: sudo apt install -y gcc-multilib g++-multilib lcov llvm-11
       - name: Run tests
-        run: python3 misc/run_tests.py
+        run: python3 misc/run_tests.py tests
       - name: Verbose test info
         run: build/runner_clang_release_x64/runner -d data -v
       - name: Generate coverage
@@ -30,6 +30,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Run tests
-        run: python misc/run_tests.py
+        run: python misc/run_tests.py tests
       - name: Verbose test info
         run: build\runner_vs_cl64_release_x64\runner.exe -d data -v
+
+  ci_picort:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run picort
+        run: python misc/run_tests.py picort

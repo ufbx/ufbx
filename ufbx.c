@@ -6342,6 +6342,19 @@ ufbxi_nodiscard static int ufbxi_match_exporter(ufbxi_context *uc)
 	} else if (ufbxi_match_version_string("motionbuilder/mocap/online version ?.?", creator, version)) {
 		uc->exporter = UFBX_EXPORTER_MOTION_BUILDER;
 		uc->exporter_version = ufbx_pack_version(version[0], version[1], 0);
+	} else if (ufbxi_match_version_string("fbx unity export version ?.?", creator, version)) {
+		uc->exporter = UFBX_EXPORTER_BC_UNITY_EXPORTER;
+		uc->exporter_version = ufbx_pack_version(version[0], version[1], 0);
+	} else if (ufbxi_match_version_string("fbx unity export version ?.?.?", creator, version)) {
+		uc->exporter = UFBX_EXPORTER_BC_UNITY_EXPORTER;
+		uc->exporter_version = ufbx_pack_version(version[0], version[1], version[2]);
+	} else if (ufbxi_match_version_string("fbx unity export version ?.?", creator, version)) {
+		uc->exporter = UFBX_EXPORTER_BC_UNITY_EXPORTER;
+		uc->exporter_version = ufbx_pack_version(version[0], version[1], 0);
+	} else if (ufbxi_match_version_string("made using asset forge", creator, version)) {
+		uc->exporter = UFBX_EXPORTER_BC_UNITY_EXPORTER;
+	} else if (ufbxi_match_version_string("model created by kenney", creator, version)) {
+		uc->exporter = UFBX_EXPORTER_BC_UNITY_EXPORTER;
 	}
 
 	uc->scene.metadata.exporter = uc->exporter;
@@ -8790,6 +8803,13 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 		ufbx_node *root = ufbxi_push_element(uc, &root_info, ufbx_node, UFBX_ELEMENT_NODE);
 		ufbxi_check(root);
 		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &root->element.id));
+
+		if (uc->opts.use_root_transform) {
+			root->local_transform = uc->opts.root_transform;
+		} else {
+			root->local_transform = ufbx_identity_transform;
+		}
+		root->is_root = true;
 	}
 
 	// Definitions: Object type counts and property templates (optional)
@@ -11580,7 +11600,9 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 	node->euler_rotation = ufbxi_find_vec3(&node->props, ufbxi_Lcl_Rotation, 0.0f, 0.0f, 0.0f);
 
 	node->inherit_type = (ufbx_inherit_type)ufbxi_find_enum(&node->props, ufbxi_InheritType, UFBX_INHERIT_NORMAL, UFBX_INHERIT_NO_SCALE);
-	node->local_transform = ufbxi_get_transform(&node->props, node->rotation_order);
+	if (!node->is_root) {
+		node->local_transform = ufbxi_get_transform(&node->props, node->rotation_order);
+	}
 	node->geometry_transform = ufbxi_get_geometry_transform(&node->props);
 
 	node->node_to_parent = ufbx_transform_to_matrix(&node->local_transform); 
@@ -13188,7 +13210,7 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 			ufbxi_check_err(error, normal_indices);
 
 			ufbx_compute_topology(mesh, topo);
-			size_t num_normals = ufbx_generate_normal_mapping(mesh, topo, normal_indices);
+			size_t num_normals = ufbx_generate_normal_mapping(mesh, topo, normal_indices, false);
 
 			if (num_normals == mesh->num_vertices) {
 				mesh->skinned_normal.unique_per_vertex = true;
@@ -14166,7 +14188,7 @@ static void ufbxi_compute_topology(const ufbx_mesh *mesh, ufbx_topo_edge *topo)
 	}
 }
 
-static bool ufbxi_is_edge_smooth(const ufbx_mesh *mesh, ufbx_topo_edge *indices, int32_t index)
+static bool ufbxi_is_edge_smooth(const ufbx_mesh *mesh, ufbx_topo_edge *indices, int32_t index, bool assume_smooth)
 {
 	if (mesh->edge_smoothing) {
 		int32_t edge = indices[index].edge;
@@ -14191,6 +14213,8 @@ static bool ufbxi_is_edge_smooth(const ufbx_mesh *mesh, ufbx_topo_edge *indices,
 			if (a0.x == b0.x && a0.y == b0.y && a0.z == b0.z) return true;
 			if (a1.x == b1.x && a1.y == b1.y && a1.z == b1.z) return true;
 		}
+	} else if (assume_smooth) {
+		return true;
 	}
 
 	return false;
@@ -14638,7 +14662,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 		ufbxi_for(ufbx_vec3, normal, result->vertex_normal.data, result->vertex_normal.num_values) {
 			*normal = ufbxi_normalize(*normal);
 		}
-		if (result->skinned_normal.data != mesh->skinned_normal.data) {
+		if (mesh->skinned_normal.data == mesh->vertex_normal.data) {
+			result->skinned_normal = result->vertex_normal;
+		} else {
 			ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&result->skinned_normal, sc->opts.boundary));
 			ufbxi_for(ufbx_vec3, normal, result->skinned_normal.data, result->skinned_normal.num_values) {
 				*normal = ufbxi_normalize(*normal);
@@ -14649,7 +14675,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 	// TODO: Vertex crease, we should probably use it?
 	ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&mesh->vertex_crease, sc->opts.boundary);
 
-	if (result->skinned_position.data == mesh->skinned_position.data) {
+	if (mesh->skinned_position.data == mesh->vertex_position.data) {
 		result->skinned_position = result->vertex_position;
 	} else {
 		ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&result->skinned_position, sc->opts.boundary));
@@ -14849,7 +14875,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivi
 		int32_t *normal_indices = ufbxi_push(&sc->result, int32_t, mesh->num_indices);
 		ufbxi_check_err(&sc->error, normal_indices);
 
-		size_t num_normals = ufbx_generate_normal_mapping(mesh, topo, normal_indices);
+		size_t num_normals = ufbx_generate_normal_mapping(mesh, topo, normal_indices, true);
 		if (num_normals == mesh->num_vertices) {
 			mesh->skinned_normal.unique_per_vertex = true;
 		}
@@ -16361,7 +16387,7 @@ ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_
 	}
 }
 
-size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, ufbx_topo_edge *topo, int32_t *normal_indices)
+size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, ufbx_topo_edge *topo, int32_t *normal_indices, bool assume_smooth)
 {
 	int32_t next_index = 0;
 
@@ -16377,7 +16403,7 @@ size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, ufbx_topo_edge *topo,
 
 		for (;;) {
 			int32_t prev = ufbx_topo_next_vertex_edge(topo, cur);
-			if (!ufbxi_is_edge_smooth(mesh, topo, cur)) start = cur;
+			if (!ufbxi_is_edge_smooth(mesh, topo, cur, assume_smooth)) start = cur;
 			if (prev < 0) { start = cur; break; }
 			if (prev == original_start) break;
 			cur = prev;
@@ -16389,7 +16415,7 @@ size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, ufbx_topo_edge *topo,
 			next = ufbx_topo_prev_vertex_edge(topo, next);
 			if (next == -1 || next == start) break;
 
-			if (!ufbxi_is_edge_smooth(mesh, topo, next)) {
+			if (!ufbxi_is_edge_smooth(mesh, topo, next, assume_smooth)) {
 				++next_index;
 			}
 			normal_indices[next] = next_index - 1;

@@ -469,6 +469,8 @@ struct ufbx_node {
 
 	// Visibility
 	bool visible;
+
+	bool is_root;
 };
 
 // Vertex attribute: All attributes are stored in a consistent indexed format
@@ -1859,6 +1861,7 @@ typedef enum ufbx_exporter {
 	UFBX_EXPORTER_BLENDER_BINARY,
 	UFBX_EXPORTER_BLENDER_ASCII,
 	UFBX_EXPORTER_MOTION_BUILDER,
+	UFBX_EXPORTER_BC_UNITY_EXPORTER,
 } ufbx_exporter;
 
 typedef struct ufbx_application {
@@ -2298,6 +2301,10 @@ typedef struct ufbx_load_opts {
 	ufbx_open_file_fn *open_file_fn;
 	void *open_file_user;
 
+	// Override for the root transform
+	bool use_root_transform;
+	ufbx_transform root_transform;
+
 } ufbx_load_opts;
 
 typedef struct ufbx_evaluate_opts {
@@ -2519,7 +2526,7 @@ int32_t ufbx_topo_prev_vertex_edge(const ufbx_topo_edge *topo, int32_t index);
 
 ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_face face);
 
-size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, ufbx_topo_edge *topo, int32_t *normal_indices);
+size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, ufbx_topo_edge *topo, int32_t *normal_indices, bool assume_smooth);
 void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals);
 
 ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error);

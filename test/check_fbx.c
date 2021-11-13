@@ -50,6 +50,7 @@ int main(int argc, char **argv)
 		"Blender Binary",
 		"Blender ASCII",
 		"MotionBuilder",
+		"Unity Exporter (from Building Crafter)",
 	};
 
 	const char *formats[2][2] = {
@@ -83,6 +84,7 @@ int main(int argc, char **argv)
 			if (!strcmp(unknown->super_type.data, "PluginParameters")) continue;
 			if (!strcmp(unknown->super_type.data, "TimelineXTrack")) continue;
 			if (!strcmp(unknown->super_type.data, "GlobalShading")) continue;
+			if (!strcmp(unknown->sub_type.data, "NodeAttribute")) continue;
 			if (!strcmp(unknown->type.data, "GroupSelection")) continue;
 			if (!strcmp(unknown->name.data, "ADSKAssetReferencesVersion3.0")) {
 				ignore_unknowns = true;

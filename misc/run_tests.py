@@ -10,6 +10,11 @@ import sys
 import shutil
 import functools
 import platform
+import argparse
+
+parser = argparse.ArgumentParser(description="Run ufbx tests")
+parser.add_argument("tests", type=str, nargs="*", help="Names of tests to run")
+argv = parser.parse_args()
 
 color_out = sys.stdout
 
@@ -187,6 +192,12 @@ class CLCompiler(Compiler):
 
         if config.get("openmp", False):
             args.append("/openmp")
+        
+        if config.get("cpp", False):
+            args.append("/EHsc")
+
+        if config.get("sse", False):
+            args.append("/DSSE=1")
 
         args.append("/link")
 
@@ -248,9 +259,18 @@ class GCCCompiler(Compiler):
             args.append("-m32")
 
         if self.has_cpp:
-            args.append("-std=c++11")
+            std = "c++11"
         else:
-            args.append("-std=gnu99")
+            std = "gnu99"
+        std = config.get("std", std)
+        args.append(f"-std={std}")
+
+        if config.get("sse", False):
+            args.append("-DSSE=1")
+            args += ["-mbmi", "-msse3", "-msse4.1", "-msse4.2"]
+
+        if config.get("threads", False):
+            args.append("-pthread")
 
         if config.get("san"):
             args.append("-fsanitize=address")
@@ -437,7 +457,8 @@ async def run_target(t, args):
 
 async def compile_and_run_target(t, args):
     await compile_target(t)
-    await run_target(t, args)
+    if args is not None:
+        await run_target(t, args)
     return t
 
 def copy_file(src, dst):
@@ -455,6 +476,10 @@ def decorate_arch(compiler, arch):
     if arch not in compiler.run_archs:
         return arch + " (compile only)"
     return arch
+
+tests = set(argv.tests)
+if not tests:
+    tests = ["tests", "picort"]
 
 async def main():
     global exit_code
@@ -565,28 +590,101 @@ async def main():
         archs = ", ".join(decorate_arch(compiler, arch) for arch in compiler.supported_archs())
         log_comment(f"  {compiler.exe}: {compiler.arch} {compiler.version} [{archs}]")
 
-    log_comment("-- Compiling and running tests --")
-
-    target_tasks = []
-
-    runner_config = {
-        "sources": ["test/runner.c", "ufbx.c"],
-        "output": "runner" + exe_suffix,
-    }
-    target_tasks += compile_permutations("runner", runner_config, all_configs, ["-d", "data"])
-
-    cpp_config = {
-        "sources": ["misc/test_build.cpp"],
-        "output": "cpp" + exe_suffix,
-        "cpp": True,
-        "warnings": True,
-    }
-    target_tasks += compile_permutations("cpp", cpp_config, arch_configs, [])
-
-    targets = await gather(target_tasks)
-
     num_fail = 0
-    for target in targets:
+    all_targets = []
+
+    if "tests" in tests:
+        log_comment("-- Compiling and running tests --")
+
+        target_tasks = []
+
+        runner_config = {
+            "sources": ["test/runner.c", "ufbx.c"],
+            "output": "runner" + exe_suffix,
+        }
+        target_tasks += compile_permutations("runner", runner_config, all_configs, ["-d", "data"])
+
+        cpp_config = {
+            "sources": ["misc/test_build.cpp"],
+            "output": "cpp" + exe_suffix,
+            "cpp": True,
+            "warnings": True,
+        }
+        target_tasks += compile_permutations("cpp", cpp_config, arch_configs, [])
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+    if "picort" in tests:
+        log_comment("-- Compiling and running picort --")
+    
+        best_compiler = (0, None)
+        for compiler in compilers:
+            score = 1
+            if not compiler.has_cpp:
+                continue
+            if "clang" in compiler.name:
+                score += 3
+            if "x64" in compiler.supported_archs():
+                score += 10
+
+        if not best_compiler:
+            print("ERROR: Could not find compiler")
+            exit_code = 2
+            return
+
+        target_tasks = []
+
+        picort_config = {
+            "sources": ["ufbx.c", "examples/picort/picort.cpp"],
+            "output": "picort" + exe_suffix,
+            "cpp": True,
+            "optimize": True,
+            "std": "c++14",
+            "sse": True,
+            "threads": True,
+        }
+        target_tasks += compile_permutations("picort", picort_config, arch_configs, None)
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+        def target_score(target):
+            compiler = target.compiler
+            config = target.config
+            if not target.compiled:
+                return 0
+            score = 1
+            if config["arch"] == "x64":
+                score += 10
+            if "clang" in compiler.name:
+                score += 10
+            if "msvc" in compiler.name:
+                score += 5
+            return score
+
+        best_target = max(targets, key=target_score)
+        log_comment(f"-- Rendering scenes with {best_target.name} --")
+
+        image_path = os.path.join("build", "images")
+        if not os.path.exists(image_path):
+            os.makedirs(image_path, exist_ok=True)
+            log_mkdir(image_path)
+
+        if best_target.compiled:
+            scenes = [
+                "data/picort/barbarian.picort.txt",
+            ]
+
+            for scene in scenes:
+                best_target.log.clear()
+                best_target.ran = False
+                await run_target(best_target, [scene])
+                if not best_target.ran:
+                    break
+                log_comment(best_target.log[1])
+
+    for target in all_targets:
         if target.ok: continue
         print()
         log(f"-- FAIL: {target.name}", style=STYLE_FAIL)
@@ -598,7 +696,7 @@ async def main():
         print(f"WARNING: {bad_compiles} pre-test configurations failed to compile")
     if bad_runs > 0:
         print(f"WARNING: {bad_runs} pre-test configurations failed to run")
-    print(f"{len(targets) - num_fail}/{len(targets)} targets succeeded")
+    print(f"{len(all_targets) - num_fail}/{len(all_targets)} targets succeeded")
     if num_fail > 0:
         exit_code = 1
 
