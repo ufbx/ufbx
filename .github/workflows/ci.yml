@@ -48,7 +48,8 @@ jobs:
         run: |
           HASH="$(git rev-parse --short=16 HEAD)"
           URL="https://storage.bunnycdn.com/ufbx-images/$HASH"
-          DST_URL="https://ufbx-images.bunny.net/$HASH"
-          curl --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian.png --data-binary @build/images/barbarian.png
+          DST_URL="https://ufbx-images.b-cdn.net/$HASH"
+          curl -sS -w "\n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian.png --data-binary @build/images/barbarian.png
+          echo == Result images ==
           echo $DST_URL/barbarian.png
 
