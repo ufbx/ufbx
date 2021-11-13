@@ -44,8 +44,9 @@ jobs:
         env:
           BUNNY_API_TOKEN: ${{ secrets.BUNNY_API_TOKEN }}
         if: always()
+        continue-on-error: true
         run: |
-          HASH="$(git rev-parse --short=16 head)"
+          HASH="$(git rev-parse --short=16 HEAD)"
           URL="https://storage.bunnycdn.com/ufbx-images/$HASH"
           DST_URL="https://ufbx-images.bunny.net/$HASH"
           curl --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian.png --data-binary @build/images/barbarian.png
