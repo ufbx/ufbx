@@ -713,7 +713,8 @@ async def main():
             ]
             await run_target(scalar_target, args)
             if scalar_target.ran:
-                log_comment(scalar_target.log[1])
+                for line in scalar_target.log[1].splitlines(keepends=False):
+                    log_comment(line)
         
         if sse_target.compiled:
             log_comment(f"-- Rendering scenes with {sse_target.name} --")
@@ -729,7 +730,8 @@ async def main():
                 await run_target(sse_target, [scene])
                 if not sse_target.ran:
                     break
-                log_comment(sse_target.log[1])
+                for line in sse_target.log[1].splitlines(keepends=False):
+                    log_comment(line)
 
     for target in all_targets:
         if target.ok: continue
