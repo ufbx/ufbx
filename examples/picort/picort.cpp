@@ -2763,6 +2763,7 @@ struct alignas(8) OptBase
 		: name(name), desc(desc), alias(alias), num_args(num_args), size(size) { }
 
 	virtual void parse(const char **args) = 0;
+	virtual int print(char *buf, size_t size) = 0;
 };
 
 template <typename T>
@@ -2771,21 +2772,25 @@ struct OptTraits { };
 template <> struct OptTraits<bool> {
 	enum { num_args = 0 };
 	static bool parse(const char **args) { return true; }
+	static int print(bool v, char *buf, size_t size) { return snprintf(buf, size, "%s", v ? "true" : "false"); }
 };
 
 template <> struct OptTraits<Real> {
 	enum { num_args = 1 };
 	static Real parse(const char **args) { return (Real)strtod(args[0], NULL); }
+	static int print(Real v, char *buf, size_t size) { return snprintf(buf, size, "%g", v); }
 };
 
 template <> struct OptTraits<int> {
 	enum { num_args = 1 };
 	static int parse(const char **args) { return atoi(args[0]); }
+	static int print(int v, char *buf, size_t size) { return snprintf(buf, size, "%d", v); }
 };
 
 template <> struct OptTraits<double> {
 	enum { num_args = 1 };
 	static double parse(const char **args) { return (double)strtod(args[0], NULL); }
+	static int print(double v, char *buf, size_t size) { return snprintf(buf, size, "%g", v); }
 };
 
 template <> struct OptTraits<Vec2> {
@@ -2793,6 +2798,7 @@ template <> struct OptTraits<Vec2> {
 	static Vec2 parse(const char **args) {
 		return { (Real)strtod(args[0], NULL), (Real)strtod(args[1], NULL) };
 	}
+	static int print(const Vec2 &v, char *buf, size_t size) { return snprintf(buf, size, "(%g, %g)", v.x, v.y); }
 };
 
 template <> struct OptTraits<Vec3> {
@@ -2800,11 +2806,13 @@ template <> struct OptTraits<Vec3> {
 	static Vec3 parse(const char **args) {
 		return { (Real)strtod(args[0], NULL), (Real)strtod(args[1], NULL), (Real)strtod(args[2], NULL) };
 	}
+	static int print(const Vec3 &v, char *buf, size_t size) { return snprintf(buf, size, "(%g, %g, %g)", v.x, v.y, v.z); }
 };
 
 template <> struct OptTraits<std::string> {
 	enum { num_args = 1 };
 	static std::string parse(const char **args) { return { args[0] }; }
+	static int print(const std::string &v, char *buf, size_t size) { return snprintf(buf, size, "%s", v.c_str()); }
 };
 
 struct StringPair { std::string v[2]; };
@@ -2812,6 +2820,7 @@ struct StringPair { std::string v[2]; };
 template <> struct OptTraits<StringPair> {
 	enum { num_args = 2 };
 	static StringPair parse(const char **args) { return { { { args[0] }, { args[1] } } }; }
+	static int print(const StringPair &v, char *buf, size_t size) { return snprintf(buf, size, "(%s, %s)", v.v[0].c_str(), v.v[1].c_str()); }
 };
 
 template <typename T, typename Traits=OptTraits<T>>
@@ -2821,6 +2830,9 @@ struct Opt : OptBase
 	Opt(const char *name, const char *desc, T def = T{}, const char *alias=nullptr) : OptBase(name, desc, alias, Traits::num_args, sizeof(*this)), value(def) { }
 	virtual void parse(const char **args) override {
 		value = Traits::parse(args);
+	}
+	virtual int print(char *buf, size_t size) override {
+		return Traits::print(value, buf, size);
 	}
 };
 
@@ -3422,6 +3434,20 @@ int main(int argc, char **argv)
 		opts = Opts{};
 		parse_file(opts, path.c_str());
 		parse_args(opts, argc, argv, true);
+	}
+
+	if (opts.verbose.defined) {
+		char buf[512];
+		for (OptBase &opt : opts) {
+			if (opt.defined) {
+				opt.print(buf, sizeof(buf));
+				if (opt.from_arg) {
+					printf("%s: %s (--)\n", opt.name, buf);
+				} else {
+					printf("%s: %s\n", opt.name, buf);
+				}
+			}
+		}
 	}
 
 	if (opts.num_frames.defined) {

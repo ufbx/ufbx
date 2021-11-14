@@ -679,7 +679,7 @@ async def main():
             for scene in scenes:
                 best_target.log.clear()
                 best_target.ran = False
-                await run_target(best_target, [scene])
+                await run_target(best_target, [scene, "-v"])
                 if not best_target.ran:
                     break
                 log_comment(best_target.log[1])
