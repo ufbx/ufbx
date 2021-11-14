@@ -3150,8 +3150,10 @@ void render_frame(ufbx_scene *original_scene, const Opts &opts, int frame_offset
 	init_sky_grid(tracer.scene);
 
 	size_t num_threads = std::thread::hardware_concurrency() - 1;
-	if (opts.threads.value > 0) num_threads = (size_t)opts.threads.value;
+	if (opts.threads.value > 0) num_threads = (size_t)opts.threads.value - 1;
 	std::unique_ptr<std::thread[]> threads = std::make_unique<std::thread[]>(num_threads);
+
+	verbosef("Using %zu threads\n", num_threads + 1);
 
 	auto time_begin = std::chrono::high_resolution_clock::now();
 
