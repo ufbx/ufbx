@@ -720,6 +720,7 @@ async def main():
 
             scenes = [
                 "data/picort/barbarian.picort.txt",
+                "data/picort/barbarian-big.picort.txt",
             ]
 
             for scene in scenes:

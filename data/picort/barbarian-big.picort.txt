@@ -1,0 +1,9 @@
+input ../blender_293_barbarian_7400_binary.fbx
+output ../../build/images/barbarian-big.png
+
+samples 64
+resolution 512 512
+bounces 0
+sky-exposure 3.5
+exposure 1.6
+time 0.05

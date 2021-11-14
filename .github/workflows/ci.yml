@@ -50,5 +50,6 @@ jobs:
           URL="https://storage.bunnycdn.com/ufbx-images/$HASH"
           DST_URL="https://ufbx-images.b-cdn.net/$HASH"
           curl -sS -w " -> $DST_URL/barbarian.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian.png --data-binary @build/images/barbarian.png
+          curl -sS -w " -> $DST_URL/barbarian-big.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian-big.png --data-binary @build/images/barbarian-big.png
           curl -sS -w " -> $DST_URL/barbarian-scalar.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian-scalar.png --data-binary @build/images/barbarian-scalar.png
 
