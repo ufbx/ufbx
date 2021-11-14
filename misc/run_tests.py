@@ -14,6 +14,8 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Run ufbx tests")
 parser.add_argument("tests", type=str, nargs="*", help="Names of tests to run")
+parser.add_argument("--compiler", default=[], action="append", help="Additional compiler(s) to use")
+parser.add_argument("--no-sse", action="store_true", help="Don't make SSE builds when possible")
 argv = parser.parse_args()
 
 color_out = sys.stdout
@@ -373,10 +375,26 @@ all_compilers = [
     # EmscriptenCompiler("emcc", emcc++", True),
 ]
 
+ichain = itertools.chain.from_iterable
+
+for desc in argv.compiler:
+    name = re.sub(r"[^A-Za-z0-9\-]", "", desc)
+    if "clang" in desc:
+        cpp = re.sub(r"clang", "clang++", desc, 1)
+        all_compilers += [
+            ClangCompiler(name, desc, False),
+            ClangCompiler(name, cpp, True),
+        ]
+    elif "gcc" in desc:
+        cpp = re.sub(r"gcc", "g++", desc, 1)
+        all_compilers += [
+            GCCCompiler(name, desc, False),
+            GCCCompiler(name, cpp, True),
+        ]
+
 def gather(aws):
     return asyncio.gather(*aws)
 
-ichain = itertools.chain.from_iterable
 
 async def check_compiler(compiler):
     if await compiler.check_version():
@@ -635,54 +653,82 @@ async def main():
 
         target_tasks = []
 
+        picort_configs = {
+            "arch": arch_configs["arch"],
+            "sse": {
+                "scalar": { "sse": False },
+                "sse": { "sse": True },
+            },
+        }
+
         picort_config = {
             "sources": ["ufbx.c", "examples/picort/picort.cpp"],
             "output": "picort" + exe_suffix,
             "cpp": True,
             "optimize": True,
             "std": "c++14",
-            "sse": True,
             "threads": True,
         }
-        target_tasks += compile_permutations("picort", picort_config, arch_configs, None)
+        target_tasks += compile_permutations("picort", picort_config, picort_configs, None)
 
         targets = await gather(target_tasks)
         all_targets += targets
 
-        def target_score(target):
+        def target_score(target, want_sse):
             compiler = target.compiler
             config = target.config
             if not target.compiled:
-                return 0
+                return (0, 0)
             score = 1
+            if config.get("sse", False) == want_sse:
+                score += 100
             if config["arch"] == "x64":
                 score += 10
             if "clang" in compiler.name:
                 score += 10
             if "msvc" in compiler.name:
                 score += 5
-            return score
-
-        best_target = max(targets, key=target_score)
-        log_comment(f"-- Rendering scenes with {best_target.name} --")
+            version = re.search(r"\d+", compiler.version)
+            version = int(version.group(0)) if version else 0
+            return (score, version)
 
         image_path = os.path.join("build", "images")
         if not os.path.exists(image_path):
             os.makedirs(image_path, exist_ok=True)
             log_mkdir(image_path)
 
-        if best_target.compiled:
+        scalar_target = max(targets, key=lambda t: target_score(t, False))
+        sse_target = max(targets, key=lambda t: target_score(t, True))
+
+        if scalar_target.compiled and scalar_target != sse_target:
+            log_comment(f"-- Rendering scenes with {scalar_target.name} --")
+
+            scalar_target.log.clear()
+            scalar_target.ran = False
+            args = [
+                "data/picort/barbarian.picort.txt",
+                "-o", "build/images/barbarian-scalar.png",
+                "--samples", "64",
+                "--error-threshold", "0.02",
+            ]
+            await run_target(scalar_target, args)
+            if scalar_target.ran:
+                log_comment(scalar_target.log[1])
+        
+        if sse_target.compiled:
+            log_comment(f"-- Rendering scenes with {sse_target.name} --")
+
             scenes = [
                 "data/picort/barbarian.picort.txt",
             ]
 
             for scene in scenes:
-                best_target.log.clear()
-                best_target.ran = False
-                await run_target(best_target, [scene, "-v"])
-                if not best_target.ran:
+                sse_target.log.clear()
+                sse_target.ran = False
+                await run_target(sse_target, [scene])
+                if not sse_target.ran:
                     break
-                log_comment(best_target.log[1])
+                log_comment(sse_target.log[1])
 
     for target in all_targets:
         if target.ok: continue

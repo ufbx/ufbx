@@ -21,6 +21,10 @@
 #define GUI 0
 #endif
 
+#ifndef SSE
+#define SSE 0
+#endif
+
 #if GUI
 	#define NOMINMAX
 	#include <Windows.h>
@@ -31,10 +35,12 @@
 #include <tmmintrin.h>
 #include <immintrin.h>
 
-#ifdef _MSC_VER
-#include <intrin.h>
-#else
-#include <x86intrin.h>
+#if SSE
+	#ifdef _MSC_VER
+	#include <intrin.h>
+	#else
+	#include <x86intrin.h>
+	#endif
 #endif
 
 #if defined(_MSC_VER)
@@ -105,16 +111,16 @@ struct Vec3
 	picort_forceinline bool operator!=(const Vec3 &rhs) const { return x != rhs.x || y != rhs.y || z != rhs.z; }
 };
 
-#if 0
-picort_forceinline Real min(Real a, Real b) { return a < b ? a : b; }
-picort_forceinline Real max(Real a, Real b) { return b < a ? a : b; }
-#else
+#if SSE
 picort_forceinline Real min(Real a, Real b) { return _mm_cvtss_f32(_mm_min_ss(_mm_set_ss(a), _mm_set_ss(b))); }
 picort_forceinline Real max(Real a, Real b) { return _mm_cvtss_f32(_mm_max_ss(_mm_set_ss(a), _mm_set_ss(b))); }
-
 picort_forceinline Real floor_real(Real a) { return _mm_cvtss_f32(_mm_floor_ss(_mm_setzero_ps(), _mm_set_ss(a))); }
 picort_forceinline Real ceil_real(Real a) { return _mm_cvtss_f32(_mm_ceil_ss(_mm_setzero_ps(), _mm_set_ss(a))); }
-
+#else
+picort_forceinline Real min(Real a, Real b) { return a < b ? a : b; }
+picort_forceinline Real max(Real a, Real b) { return b < a ? a : b; }
+picort_forceinline Real floor_real(Real a) { return std::floor(a); }
+picort_forceinline Real ceil_real(Real a) { return std::ceil(a); }
 #endif
 
 picort_forceinline Vec2 min(const Vec2 &a, const Vec2 &b) { return { min(a.x, b.x), min(a.y, b.y) }; }
@@ -161,89 +167,7 @@ picort_forceinline Real clamp(Real a, Real min_v, Real max_v) { return min(max(a
 
 // -- SIMD
 
-namespace ref {
-
-struct Real4
-{
-	Real x_, y_, z_, w_;
-
-	struct Mask {
-		int x_, y_, z_, w_;
-
-		int mask() const { return (int)x_ | (int)y_<<1 | (int)z_<<2 | (int)w_<<3; }
-		int count() const { return (int)x_ + (int)y_ + (int)z_ + (int)w_; }
-		bool any() const { return x_ | y_ | z_ | w_; }
-		bool all() const { return x_ & y_ & z_ & w_; }
-
-		Mask operator&(const Mask &rhs) const { return { x_&rhs.x_, y_&rhs.y_, z_&rhs.z_, w_&rhs.w_ }; }
-		Mask operator|(const Mask &rhs) const { return { x_|rhs.x_, y_|rhs.y_, z_|rhs.z_, w_|rhs.w_}; }
-		Mask operator^(const Mask &rhs) const { return { x_^rhs.x_, y_^rhs.y_, z_^rhs.z_, w_^rhs.w_ }; }
-		Mask operator~() const { return { !x_, !y_, !z_, !w_ }; }
-	};
-
-	struct Index {
-		uint8_t x_, y_, z_, w_;
-
-		Index() { }
-		Index(uint32_t x, uint32_t y, uint32_t z, uint32_t w)
-			: x_((uint8_t)x), y_((uint8_t)y), z_((uint8_t)z), w_((uint8_t)w) { }
-	};
-
-	Real4() { }
-	Real4(Real v) : x_(v), y_(v), z_(v), w_(v) { }
-	Real4(Real x, Real y, Real z, Real w) : x_(x), y_(y), z_(z), w_(w) { }
-
-	picort_forceinline Real4 operator+(const Real4 &rhs) const { return { x_+rhs.x_, y_+rhs.y_, z_+rhs.z_, w_+rhs.w_ }; }
-	picort_forceinline Real4 operator-(const Real4 &rhs) const { return { x_-rhs.x_, y_-rhs.y_, z_-rhs.z_, w_-rhs.w_ }; }
-	picort_forceinline Real4 operator*(const Real4 &rhs) const { return { x_*rhs.x_, y_*rhs.y_, z_*rhs.z_, w_*rhs.w_ }; }
-
-	picort_forceinline Mask operator==(const Real4 &rhs) const { return { x_==rhs.x_, y_==rhs.y_, z_==rhs.z_, w_==rhs.w_ }; }
-	picort_forceinline Mask operator!=(const Real4 &rhs) const { return { x_!=rhs.x_, y_!=rhs.y_, z_!=rhs.z_, w_!=rhs.w_ }; }
-	picort_forceinline Mask operator<(const Real4 &rhs) const { return { x_<rhs.x_, y_<rhs.y_, z_<rhs.z_, w_<rhs.w_ }; }
-	picort_forceinline Mask operator<=(const Real4 &rhs) const { return { x_<=rhs.x_, y_<=rhs.y_, z_<=rhs.z_, w_<=rhs.w_ }; }
-	picort_forceinline Mask operator>=(const Real4 &rhs) const { return { x_>=rhs.x_, y_>=rhs.y_, z_>=rhs.z_, w_>=rhs.w_ }; }
-	picort_forceinline Mask operator>(const Real4 &rhs) const { return { x_>rhs.x_, y_>rhs.y_, z_>rhs.z_, w_>rhs.w_ }; }
-
-	static picort_forceinline Real4 min(const Real4 &a, const Real4 &b) { return { ::min(a.x_, b.x_), ::min(a.y_, b.y_), ::min(a.z_, b.z_), ::min(a.w_, b.w_) }; }
-	static picort_forceinline Real4 max(const Real4 &a, const Real4 &b) { return { ::max(a.x_, b.x_), ::max(a.y_, b.y_), ::max(a.z_, b.z_), ::max(a.w_, b.w_) }; }
-
-	static picort_forceinline Real4 load(const Real *ptr) { return { ptr[0], ptr[1], ptr[2], ptr[3] }; }
-	static picort_forceinline Real4 load_u16(const uint16_t *ptr) { return { (Real)ptr[0], (Real)ptr[1], (Real)ptr[2], (Real)ptr[3] }; }
-	static picort_forceinline Real4 load_i16(const int16_t *ptr) { return { (Real)ptr[0], (Real)ptr[1], (Real)ptr[2], (Real)ptr[3] }; }
-	static picort_forceinline Real4 load_shuffle(const Real *ptr, const Index &index) { return { ptr[index.x_], ptr[index.y_], ptr[index.z_], ptr[index.w_] }; }
-	static picort_forceinline void store(Real *ptr, const Real4 &a) { ptr[0] = a.x_; ptr[1] = a.y_; ptr[2] = a.z_; ptr[3] = a.w_; }
-
-	static picort_forceinline Real4 select(const Mask &mask, const Real4 &a, const Real4 &b) {
-		return { mask.x_ ? a.x_ : b.x_, mask.y_ ? a.y_ : b.y_, mask.z_ ? a.z_ : b.z_, mask.w_ ? a.w_ : b.w_ };
-	}
-
-	static picort_forceinline Real4 shuffle(const Real4 &a, const Index &index) {
-		Real arr[4] = { a.x_, a.y_, a.z_, a.w_ };
-		return { arr[index.x_], arr[index.y_], arr[index.z_], arr[index.w_] };
-	}
-
-	static picort_forceinline void transpose(Real4 &a, Real4 &b, Real4 &c, Real4 &d) {
-		Real t;
-		t = a.y_; a.y_ = b.x_; b.x_ = t;
-		t = a.z_; a.z_ = c.x_; c.x_ = t;
-		t = a.w_; a.w_ = d.x_; d.x_ = t;
-		t = b.z_; b.z_ = c.y_; c.y_ = t;
-		t = b.w_; b.w_ = d.y_; d.y_ = t;
-		t = c.w_; c.w_ = d.z_; d.z_ = t;
-	}
-
-	static picort_forceinline int min_component_index(Real4 a) {
-		if (::min(a.x_, a.y_) < ::min(a.z_, a.w_)) {
-			return a.x_ < a.y_ ? 0 : 1;
-		} else {
-			return 2 + (a.z_ < a.w_ ? 0 : 1);
-		}
-	}
-};
-
-}
-
-namespace sse {
+#if SSE
 
 struct Real4
 {
@@ -299,10 +223,10 @@ struct Real4
 	picort_forceinline Real z() const { return _mm_cvtss_f32(_mm_shuffle_ps(v, v, _MM_SHUFFLE(3,2,1,2))); }
 	picort_forceinline Real w() const { return _mm_cvtss_f32(_mm_shuffle_ps(v, v, _MM_SHUFFLE(3,2,1,3))); }
 
-	picort_forceinline Real xs() const { return _mm_cvtss_f32(_mm_shuffle_ps(v, v, _MM_SHUFFLE(0,0,0,0))); }
-	picort_forceinline Real ys() const { return _mm_cvtss_f32(_mm_shuffle_ps(v, v, _MM_SHUFFLE(1,1,1,1))); }
-	picort_forceinline Real zs() const { return _mm_cvtss_f32(_mm_shuffle_ps(v, v, _MM_SHUFFLE(2,2,2,2))); }
-	picort_forceinline Real ws() const { return _mm_cvtss_f32(_mm_shuffle_ps(v, v, _MM_SHUFFLE(3,3,3,3))); }
+	picort_forceinline Real4 xs() const { return _mm_cvtss_f32(_mm_shuffle_ps(v, v, _MM_SHUFFLE(0,0,0,0))); }
+	picort_forceinline Real4 ys() const { return _mm_cvtss_f32(_mm_shuffle_ps(v, v, _MM_SHUFFLE(1,1,1,1))); }
+	picort_forceinline Real4 zs() const { return _mm_cvtss_f32(_mm_shuffle_ps(v, v, _MM_SHUFFLE(2,2,2,2))); }
+	picort_forceinline Real4 ws() const { return _mm_cvtss_f32(_mm_shuffle_ps(v, v, _MM_SHUFFLE(3,3,3,3))); }
 
 	picort_forceinline Real min() const {
 		__m128 t = _mm_min_ps(v, _mm_shuffle_ps(v, v, _MM_SHUFFLE(1,0,3,2)));
@@ -327,7 +251,117 @@ struct Real4
 	static picort_forceinline void transpose(Real4 &a, Real4 &b, Real4 &c, Real4 &d) { _MM_TRANSPOSE4_PS(a.v, b.v, c.v, d.v); }
 };
 
-}
+#else
+
+struct Real4
+{
+	Real x_, y_, z_, w_;
+
+	struct Mask {
+		int x_, y_, z_, w_;
+
+		int mask() const { return (int)x_ | (int)y_<<1 | (int)z_<<2 | (int)w_<<3; }
+		int count() const { return (int)x_ + (int)y_ + (int)z_ + (int)w_; }
+		bool any() const { return x_ | y_ | z_ | w_; }
+		bool all() const { return x_ & y_ & z_ & w_; }
+
+		Mask operator&(const Mask &rhs) const { return { x_&rhs.x_, y_&rhs.y_, z_&rhs.z_, w_&rhs.w_ }; }
+		Mask operator|(const Mask &rhs) const { return { x_|rhs.x_, y_|rhs.y_, z_|rhs.z_, w_|rhs.w_}; }
+		Mask operator^(const Mask &rhs) const { return { x_^rhs.x_, y_^rhs.y_, z_^rhs.z_, w_^rhs.w_ }; }
+		Mask operator~() const { return { !x_, !y_, !z_, !w_ }; }
+	};
+
+	struct Index {
+		uint8_t x_, y_, z_, w_;
+
+		Index() { }
+		Index(uint32_t x, uint32_t y, uint32_t z, uint32_t w)
+			: x_((uint8_t)x), y_((uint8_t)y), z_((uint8_t)z), w_((uint8_t)w) { }
+	};
+
+	Real4() { }
+	Real4(Real v) : x_(v), y_(v), z_(v), w_(v) { }
+	Real4(Real x, Real y, Real z, Real w) : x_(x), y_(y), z_(z), w_(w) { }
+
+	picort_forceinline Real4 operator+(const Real4 &rhs) const { return { x_+rhs.x_, y_+rhs.y_, z_+rhs.z_, w_+rhs.w_ }; }
+	picort_forceinline Real4 operator-(const Real4 &rhs) const { return { x_-rhs.x_, y_-rhs.y_, z_-rhs.z_, w_-rhs.w_ }; }
+	picort_forceinline Real4 operator*(const Real4 &rhs) const { return { x_*rhs.x_, y_*rhs.y_, z_*rhs.z_, w_*rhs.w_ }; }
+
+	picort_forceinline Mask operator==(const Real4 &rhs) const { return { x_==rhs.x_, y_==rhs.y_, z_==rhs.z_, w_==rhs.w_ }; }
+	picort_forceinline Mask operator!=(const Real4 &rhs) const { return { x_!=rhs.x_, y_!=rhs.y_, z_!=rhs.z_, w_!=rhs.w_ }; }
+	picort_forceinline Mask operator<(const Real4 &rhs) const { return { x_<rhs.x_, y_<rhs.y_, z_<rhs.z_, w_<rhs.w_ }; }
+	picort_forceinline Mask operator<=(const Real4 &rhs) const { return { x_<=rhs.x_, y_<=rhs.y_, z_<=rhs.z_, w_<=rhs.w_ }; }
+	picort_forceinline Mask operator>=(const Real4 &rhs) const { return { x_>=rhs.x_, y_>=rhs.y_, z_>=rhs.z_, w_>=rhs.w_ }; }
+	picort_forceinline Mask operator>(const Real4 &rhs) const { return { x_>rhs.x_, y_>rhs.y_, z_>rhs.z_, w_>rhs.w_ }; }
+
+	picort_forceinline Real get(uint32_t ix) const {
+		Real v[] = { x_, y_, z_, w_ };
+		return v[ix];
+	};
+
+	picort_forceinline Real x() const { return x_; }
+	picort_forceinline Real y() const { return y_; }
+	picort_forceinline Real z() const { return z_; }
+	picort_forceinline Real w() const { return w_; }
+
+	picort_forceinline Real4 xs() const { return { x_, x_, x_, x_ }; }
+	picort_forceinline Real4 ys() const { return { y_, y_, y_, y_ }; }
+	picort_forceinline Real4 zs() const { return { z_, z_, z_, z_ }; }
+	picort_forceinline Real4 ws() const { return { w_, w_, w_, w_ }; }
+
+	picort_forceinline Real min() const { return ::min(::min(x_, y_), ::min(z_, w_)); }
+	picort_forceinline Real max() const { return ::max(::max(x_, y_), ::max(z_, w_)); }
+
+	static picort_forceinline Real4 min(const Real4 &a, const Real4 &b) { return { ::min(a.x_, b.x_), ::min(a.y_, b.y_), ::min(a.z_, b.z_), ::min(a.w_, b.w_) }; }
+	static picort_forceinline Real4 max(const Real4 &a, const Real4 &b) { return { ::max(a.x_, b.x_), ::max(a.y_, b.y_), ::max(a.z_, b.z_), ::max(a.w_, b.w_) }; }
+
+	static picort_forceinline Real4 load(const Real *ptr) { return { ptr[0], ptr[1], ptr[2], ptr[3] }; }
+	static picort_forceinline Real4 load_u16(const uint16_t *ptr) { return { (Real)ptr[0], (Real)ptr[1], (Real)ptr[2], (Real)ptr[3] }; }
+	static picort_forceinline Real4 load_i16(const int16_t *ptr) { return { (Real)ptr[0], (Real)ptr[1], (Real)ptr[2], (Real)ptr[3] }; }
+	static picort_forceinline Real4 load_shuffle(const Real *ptr, const Index &index) { return { ptr[index.x_], ptr[index.y_], ptr[index.z_], ptr[index.w_] }; }
+	static picort_forceinline void store(Real *ptr, const Real4 &a) { ptr[0] = a.x_; ptr[1] = a.y_; ptr[2] = a.z_; ptr[3] = a.w_; }
+
+	static picort_forceinline Real4 select(const Mask &mask, const Real4 &a, const Real4 &b) {
+		return { mask.x_ ? a.x_ : b.x_, mask.y_ ? a.y_ : b.y_, mask.z_ ? a.z_ : b.z_, mask.w_ ? a.w_ : b.w_ };
+	}
+
+	static picort_forceinline Real4 shuffle(const Real4 &a, const Index &index) {
+		Real arr[4] = { a.x_, a.y_, a.z_, a.w_ };
+		return { arr[index.x_], arr[index.y_], arr[index.z_], arr[index.w_] };
+	}
+
+	static picort_forceinline void transpose(Real4 &a, Real4 &b, Real4 &c, Real4 &d) {
+		Real t;
+		t = a.y_; a.y_ = b.x_; b.x_ = t;
+		t = a.z_; a.z_ = c.x_; c.x_ = t;
+		t = a.w_; a.w_ = d.x_; d.x_ = t;
+		t = b.z_; b.z_ = c.y_; c.y_ = t;
+		t = b.w_; b.w_ = d.y_; d.y_ = t;
+		t = c.w_; c.w_ = d.z_; d.z_ = t;
+	}
+
+	static picort_forceinline int min_component_index(Real4 a) {
+		if (::min(a.x_, a.y_) < ::min(a.z_, a.w_)) {
+			return a.x_ < a.y_ ? 0 : 1;
+		} else {
+			return 2 + (a.z_ < a.w_ ? 0 : 1);
+		}
+	}
+};
+
+#endif
+
+// -- Some mask utilities
+
+#if SSE
+picort_forceinline uint32_t popcount4(uint32_t v) { return _mm_popcnt_u32(v); }
+picort_forceinline uint32_t first_set4(uint32_t v) { return _tzcnt_u32(v); }
+#else
+static uint8_t pop4_table[16] = { 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4 };
+static uint8_t ffs4_table[16] = { 0, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0 };
+picort_forceinline uint32_t popcount4(uint32_t v) { return pop4_table[v]; }
+picort_forceinline uint32_t first_set4(uint32_t v) { return ffs4_table[v]; }
+#endif
 
 // -- Random series
 
@@ -372,8 +406,6 @@ struct Image
 	std::vector<Pixel16> pixels;
 	bool srgb = false;
 };
-
-using namespace sse;
 
 picort_forceinline Real4 lerp(const Real4 &a, const Real4 &b, Real t)
 {
@@ -1566,22 +1598,22 @@ struct Trace4
 	Real max_t;
 	const BVH4 *bvhs;
 
-	sse::Real4 ray_origin;
-	sse::Real4 ray_rcp_dir;
+	Real4 ray_origin;
+	Real4 ray_rcp_dir;
 
-	sse::Real4::Index triangle_shuffle;
-	sse::Real4 shear;
+	Real4::Index triangle_shuffle;
+	Real4 shear;
 
 	RayHit hit;
 
 	bool shadow;
 };
 
-static const sse::Real4::Index sort_indices[] = { 
+static const Real4::Index sort_indices[] = { 
 	{ 1, 2, 3, 1 }, { 2, 3, 0, 2 }, { 3, 0, 1, 3 }, { 0, 1, 2, 0 },
 };
 
-sse::Real4 to_real4(const Vec3 &v)
+Real4 to_real4(const Vec3 &v)
 {
 	return { v.x, v.y, v.z, 0.0f };
 }
@@ -1597,8 +1629,6 @@ static std::atomic_uint64_t a_count[5];
 
 RayHit intersect4(const Scene4 &scene, const Ray &ray, Real ray_max_t=Inf, bool shadow=false)
 {
-	using namespace sse;
-
 	RayHit hit;
 
 	int kz = largest_axis(abs(ray.direction));
@@ -1648,11 +1678,11 @@ RayHit intersect4(const Scene4 &scene, const Ray &ray, Real ray_max_t=Inf, bool 
 			Real4::Mask hit_mask = t < ray_max_t;
 			if (hit_mask.any()) {
 				int mask = hit_mask.mask();
-				int count = (int)_mm_popcnt_u32((unsigned)mask);
+				int count = (int)popcount4((unsigned)mask);
 				const BVH4 *children = (const BVH4*)bvh->node.children;
 
 				if (count > 1) {
-					int closest = (int)_tzcnt_u32((unsigned)(t == t.min()).mask());
+					int closest = (int)first_set4((unsigned)(t == t.min()).mask());
 					bvh = children + closest;
 					_mm_prefetch((const char*)bvh->common.data + 0*64, _MM_HINT_T0);
 					_mm_prefetch((const char*)bvh->common.data + 1*64, _MM_HINT_T0);
@@ -1685,7 +1715,7 @@ RayHit intersect4(const Scene4 &scene, const Ray &ray, Real ray_max_t=Inf, bool 
 
 					continue;
 				} else {
-					int closest = (int)_tzcnt_u32((unsigned)(mask));
+					int closest = (int)first_set4((unsigned)(mask));
 					bvh = children + closest;
 					_mm_prefetch((const char*)bvh->common.data + 0*64, _MM_HINT_T0);
 					_mm_prefetch((const char*)bvh->common.data + 1*64, _MM_HINT_T0);
@@ -1760,7 +1790,7 @@ RayHit intersect4(const Scene4 &scene, const Ray &ray, Real ray_max_t=Inf, bool 
 					uint32_t good_mask = (bad_mask ^ 0xf) & valid_mask;
 					do {
 						assert(good_mask);
-						uint32_t i = _tzcnt_u32(good_mask);
+						uint32_t i = first_set4(good_mask);
 						good_mask &= good_mask - 1;
 
 						Real ui = u.get(i), vi = v.get(i), wi = w.get(i), ti = t.get(i);
@@ -2449,8 +2479,8 @@ struct ImagerTracer
 	uint32_t width, height;
 	size_t num_samples;
 	uint64_t seed;
-	std::atomic_uint32_t a_counter;
-	std::atomic_uint32_t a_workers;
+	std::atomic_uint32_t a_counter { 0 };
+	std::atomic_uint32_t a_workers { 0 };
 };
 
 Ray camera_ray(Camera &camera, Vec2 uv)

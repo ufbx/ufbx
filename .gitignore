@@ -8,8 +8,12 @@ build/
 # Python cache files
 __pycache__/
 
+# Editor files
+.vscode/
+
 # Coverage files
 *.lcov
 *.gcov
 *.gcda
 *.gcno
+
