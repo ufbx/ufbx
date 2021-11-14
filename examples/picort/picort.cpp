@@ -2132,10 +2132,8 @@ Surface eval_surface(const Material &material, const Vec2 &uv)
 	Real metallic = eval_texture(material.metallic, uv).x;
 	Surface s;
 	s.diffuse = lerp(base_color, Vec3{}, metallic);
-	// MEGAHACK
-	// s.specular = lerp(Vec3{0.04f,0.04f,0.04f}, base_color, metallic);
-	s.specular = lerp(Vec3{0.0f,0.0f,0.0f}, base_color, metallic);
-	s.emission = emission * 0.0f;
+	s.specular = lerp(Vec3{0.04f,0.04f,0.04f}, base_color, metallic);
+	s.emission = emission;
 	s.roughness = max(0.05f, eval_texture(material.roughness, uv).x); // TODO??
 	return s;
 }
