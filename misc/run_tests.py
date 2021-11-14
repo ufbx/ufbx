@@ -722,6 +722,9 @@ async def main():
             scenes = [
                 "data/picort/barbarian.picort.txt",
                 "data/picort/barbarian-big.picort.txt",
+                "data/picort/slime-binary.picort.txt",
+                "data/picort/slime-ascii.picort.txt",
+                "data/picort/slime-big.picort.txt",
             ]
 
             for scene in scenes:

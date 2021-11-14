@@ -3016,6 +3016,8 @@ void render_frame(ufbx_scene *original_scene, const Opts &opts, int frame_offset
 
 		// Iterate over all instances of the mesh
 		for (ufbx_node *node : mesh->instances) {
+			if (!node->visible) continue;
+
 			verbosef("%s: %zu triangles\n", node->name.data, mesh->num_triangles);
 
 			ufbx_matrix normal_to_world = ufbx_matrix_for_normals(&node->geometry_to_world);
@@ -3269,6 +3271,7 @@ void render_file(const Opts &opts)
 	ufbx_real scale = (ufbx_real)opts.scene_scale.value;
 
 	load_opts.use_root_transform = true;
+	load_opts.root_transform.rotation = ufbx_identity_quat;
 	load_opts.root_transform.scale = ufbx_vec3{ scale, scale, scale };
 
 	std::string path = get_path(opts, opts.input);
