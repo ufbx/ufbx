@@ -657,7 +657,7 @@ async def main():
             score = 1
             if config["arch"] == "x64":
                 score += 10
-            if "gcc" in compiler.name:
+            if "clang" in compiler.name:
                 score += 10
             if "msvc" in compiler.name:
                 score += 5
