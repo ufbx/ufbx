@@ -1411,6 +1411,8 @@ typedef struct {
 	size_t pos;       // < Next offset to allocate from
 	size_t size;      // < Size of the current chunk ie. `chunk->size` (or 0 if `chunk == NULL`)
 	size_t num_items; // < Number of individual items pushed to the buffer
+
+	bool unordered;  // < Does not support popping from the buffer
 } ufbxi_buf;
 
 typedef struct {
@@ -1433,26 +1435,38 @@ static ufbxi_forceinline size_t ufbxi_size_align_mask(size_t size)
 
 static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 {
-	// TODO: Huge allocations that don't invalidate current block?
+	bool huge = size >= b->ator->huge_size;
 
 	ufbxi_buf_chunk *chunk = b->chunk;
 	if (chunk) {
-		// Store the final position for the retired chunk
-		chunk->pushed_pos = b->pos;
+		if (b->unordered) {
+			// As unordered buffers don't support popping `chunk->next` can only point
+			// to a (full) huge allocation, if we want to push a non-huge allocation we
+			// need to scan the list until we get to the end.
+			if (!huge) {
+				ufbxi_buf_chunk *next;
+				while ((next = chunk->next) != NULL) {
+					chunk = next;
+				}
+			}
+		} else {
+			// Store the final position for the retired chunk
+			chunk->pushed_pos = b->pos;
 
-		// Try to re-use old chunks first _unless_ `huge_size` is 1 meaning we want
-		// to do dedicated allocations for everything for debug purposes.
-		ufbxi_buf_chunk *next;
-		while ((next = chunk->next) != NULL) {
-			chunk = next;
-			if (size <= chunk->size && b->ator->huge_size > 1) {
-				b->chunk = chunk;
-				b->pos = (uint32_t)size;
-				b->size = chunk->size;
-				return chunk->data;
-			} else {
-				// Didn't fit, skip the whole chunk
-				chunk->pushed_pos = 0;
+			// Try to re-use old chunks first _unless_ `huge_size` is 1 meaning we want
+			// to do dedicated allocations for everything for debug purposes.
+			ufbxi_buf_chunk *next;
+			while ((next = chunk->next) != NULL) {
+				chunk = next;
+				if (size <= chunk->size && b->ator->huge_size > 1) {
+					b->chunk = chunk;
+					b->pos = (uint32_t)size;
+					b->size = chunk->size;
+					return chunk->data;
+				} else {
+					// Didn't fit, skip the whole chunk
+					chunk->pushed_pos = 0;
+				}
 			}
 		}
 	}
@@ -1463,7 +1477,7 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 
 	// If `size` is larger than `huge_size` don't grow `next_size` geometrically,
 	// but use a dedicated allocation.
-	if (size >= b->ator->huge_size) {
+	if (huge) {
 		 next_size = chunk ? chunk->next_size : 4096;
 		if (next_size > b->ator->chunk_max) next_size = b->ator->chunk_max;
 		 chunk_size = size;
@@ -1481,23 +1495,32 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 	if (!new_chunk) return NULL;
 
 	new_chunk->prev = chunk;
-	new_chunk->next = NULL;
 	new_chunk->size = chunk_size;
 	new_chunk->next_size = next_size;
 	new_chunk->align_0 = NULL;
 	new_chunk->align_1 = 0;
 
-	// Link the chunk to the list and set it as the active one
-	if (chunk) {
-		chunk->next = new_chunk;
+	if (b->unordered && huge && chunk) {
+		// If the buffer is unordered and we pushed a huge chunk keep using the current one
+		new_chunk->next = chunk->next;
 		new_chunk->root = chunk->root;
+		if (chunk->next) chunk->next->prev = new_chunk;
+		chunk->next = new_chunk;
 	} else {
-		new_chunk->root = new_chunk;
-	}
+		new_chunk->next = NULL;
 
-	b->chunk = new_chunk;
-	b->pos = (uint32_t)size;
-	b->size = chunk_size;
+		// Link the chunk to the list and set it as the active one
+		if (chunk) {
+			chunk->next = new_chunk;
+			new_chunk->root = chunk->root;
+		} else {
+			new_chunk->root = new_chunk;
+		}
+
+		b->chunk = new_chunk;
+		b->pos = (uint32_t)size;
+		b->size = chunk_size;
+	}
 
 	return new_chunk->data;
 }
@@ -1548,7 +1571,9 @@ ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_push_size_copy(ufbxi_buf *b
 
 static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 {
+	ufbx_assert(!b->unordered);
 	ufbx_assert(size > 0);
+	ufbx_assert(b->num_items >= n);
 	b->num_items -= n;
 
 	char *ptr = (char*)dst;
@@ -5455,7 +5480,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 		node->array = arr;
 		arr->type = (char)arr_type;
 
-		// HACK: Parse array values using strtof() if the array destination is 32-bit float
+		// Parse array values using strtof() if the array destination is 32-bit float
 		// since KeyAttrDataFloat packs integer data (!) into floating point values so we
 		// should try to be as exact as possible.
 		if (arr->type == 'f') {
@@ -5466,7 +5491,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 
 		// Pad with 4 zero elements to make indexing with `-1` safe.
 		if (arr_info.pad_begin) {
-			ufbxi_push_size_zero(arr_buf, arr_elem_size, 4);
+			ufbxi_push_size_zero(&uc->tmp_stack, arr_elem_size, 4);
 			num_values += 4;
 		}
 	}
@@ -5495,7 +5520,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 			if (arr_type) {
 
 				if (arr_type == 's') {
-					ufbx_string *v = ufbxi_push(arr_buf, ufbx_string, 1);
+					ufbx_string *v = ufbxi_push(&uc->tmp_stack, ufbx_string, 1);
 					ufbxi_check(v);
 					v->data = tok->str_data;
 					v->length = tok->str_len;
@@ -5535,11 +5560,11 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 				}
 				break;
 
-			case 'b': { bool *v = ufbxi_push(arr_buf, bool, 1); ufbxi_check(v); *v = val != 0; } break;
-			case 'i': { int32_t *v = ufbxi_push(arr_buf, int32_t, 1); ufbxi_check(v); *v = (int32_t)val; } break;
-			case 'l': { int64_t *v = ufbxi_push(arr_buf, int64_t, 1); ufbxi_check(v); *v = (int64_t)val; } break;
-			case 'f': { float *v = ufbxi_push(arr_buf, float, 1); ufbxi_check(v); *v = (float)val; } break;
-			case 'd': { double *v = ufbxi_push(arr_buf, double, 1); ufbxi_check(v); *v = (double)val; } break;
+			case 'b': { bool *v = ufbxi_push(&uc->tmp_stack, bool, 1); ufbxi_check(v); *v = val != 0; } break;
+			case 'i': { int32_t *v = ufbxi_push(&uc->tmp_stack, int32_t, 1); ufbxi_check(v); *v = (int32_t)val; } break;
+			case 'l': { int64_t *v = ufbxi_push(&uc->tmp_stack, int64_t, 1); ufbxi_check(v); *v = (int64_t)val; } break;
+			case 'f': { float *v = ufbxi_push(&uc->tmp_stack, float, 1); ufbxi_check(v); *v = (float)val; } break;
+			case 'd': { double *v = ufbxi_push(&uc->tmp_stack, double, 1); ufbxi_check(v); *v = (double)val; } break;
 
 			default:
 				ufbxi_fail("Bad array dst type");
@@ -5559,11 +5584,11 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 				}
 				break;
 
-			case 'b': { bool *v = ufbxi_push(arr_buf, bool, 1); ufbxi_check(v); *v = val != 0; } break;
-			case 'i': { int32_t *v = ufbxi_push(arr_buf, int32_t, 1); ufbxi_check(v); *v = (int32_t)val; } break;
-			case 'l': { int64_t *v = ufbxi_push(arr_buf, int64_t, 1); ufbxi_check(v); *v = (int64_t)val; } break;
-			case 'f': { float *v = ufbxi_push(arr_buf, float, 1); ufbxi_check(v); *v = (float)val; } break;
-			case 'd': { double *v = ufbxi_push(arr_buf, double, 1); ufbxi_check(v); *v = (double)val; } break;
+			case 'b': { bool *v = ufbxi_push(&uc->tmp_stack, bool, 1); ufbxi_check(v); *v = val != 0; } break;
+			case 'i': { int32_t *v = ufbxi_push(&uc->tmp_stack, int32_t, 1); ufbxi_check(v); *v = (int32_t)val; } break;
+			case 'l': { int64_t *v = ufbxi_push(&uc->tmp_stack, int64_t, 1); ufbxi_check(v); *v = (int64_t)val; } break;
+			case 'f': { float *v = ufbxi_push(&uc->tmp_stack, float, 1); ufbxi_check(v); *v = (float)val; } break;
+			case 'd': { double *v = ufbxi_push(&uc->tmp_stack, double, 1); ufbxi_check(v); *v = (double)val; } break;
 
 			default:
 				ufbxi_fail("Bad array dst type");
@@ -5587,11 +5612,11 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 				}
 				break;
 
-			case 'b': { bool *v = ufbxi_push(arr_buf, bool, 1); ufbxi_check(v); *v = val != 0; } break;
-			case 'i': { int32_t *v = ufbxi_push(arr_buf, int32_t, 1); ufbxi_check(v); *v = (int32_t)val; } break;
-			case 'l': { int64_t *v = ufbxi_push(arr_buf, int64_t, 1); ufbxi_check(v); *v = (int64_t)val; } break;
-			case 'f': { float *v = ufbxi_push(arr_buf, float, 1); ufbxi_check(v); *v = (float)val; } break;
-			case 'd': { double *v = ufbxi_push(arr_buf, double, 1); ufbxi_check(v); *v = (double)val; } break;
+			case 'b': { bool *v = ufbxi_push(&uc->tmp_stack, bool, 1); ufbxi_check(v); *v = val != 0; } break;
+			case 'i': { int32_t *v = ufbxi_push(&uc->tmp_stack, int32_t, 1); ufbxi_check(v); *v = (int32_t)val; } break;
+			case 'l': { int64_t *v = ufbxi_push(&uc->tmp_stack, int64_t, 1); ufbxi_check(v); *v = (int64_t)val; } break;
+			case 'f': { float *v = ufbxi_push(&uc->tmp_stack, float, 1); ufbxi_check(v); *v = (float)val; } break;
+			case 'd': { double *v = ufbxi_push(&uc->tmp_stack, double, 1); ufbxi_check(v); *v = (double)val; } break;
 
 			}
 
@@ -5630,7 +5655,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 			node->array->data = NULL;
 			node->array->size = 0;
 		} else {
-			void *arr_data = ufbxi_make_array_size(arr_buf, arr_elem_size, num_values);
+			void *arr_data = ufbxi_push_pop_size(arr_buf, &uc->tmp_stack, arr_elem_size, num_values);
 			ufbxi_check(arr_data);
 			if (arr_info.pad_begin) {
 				node->array->data = (char*)arr_data + 4*arr_elem_size;
@@ -13412,6 +13437,9 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->tmp_full_weights.ator = &uc->ator_tmp;
 
 	uc->result.ator = &uc->ator_result;
+
+	uc->tmp.unordered = true;
+	uc->result.unordered = true;
 
 	uc->inflate_retain = &inflate_retain;
 
