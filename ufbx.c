@@ -1569,6 +1569,40 @@ ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_push_size_copy(ufbxi_buf *b
 	return ptr;
 }
 
+static ufbxi_noinline void ufbxi_buf_free_unused(ufbxi_buf *b)
+{
+	ufbx_assert(!b->unordered);
+
+	ufbxi_buf_chunk *chunk = b->chunk;
+	if (!chunk) return;
+
+	// TODO: Fix this
+#if 0
+	ufbxi_buf_chunk *next = chunk->next;
+	while (next) {
+		ufbxi_buf_chunk *to_free = next;
+		next = next->next;
+		ufbxi_free_size(b->ator, 1, to_free, sizeof(ufbxi_buf_chunk) + to_free->size);
+	}
+	chunk->next = NULL;
+
+	while (b->pos == 0 && chunk) {
+		ufbxi_buf_chunk *prev = chunk->prev;
+		ufbxi_free_size(b->ator, 1, chunk, sizeof(ufbxi_buf_chunk) + chunk->size);
+		chunk = prev;
+		b->chunk = prev;
+		if (prev) {
+			prev->next = NULL;
+			b->pos = prev->pushed_pos;
+			b->size = prev->size;
+		} else {
+			b->pos = 0;
+			b->size = 0;
+		}
+	}
+#endif
+}
+
 static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 {
 	ufbx_assert(!b->unordered);
@@ -1576,14 +1610,9 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 	ufbx_assert(b->num_items >= n);
 	b->num_items -= n;
 
-	// Immediately free popped items if all the allocations are huge
-	// as it means we want to have dedicated allocations for each push.
-	bool free_popped = b->ator->huge_size <= 1;
-
 	char *ptr = (char*)dst;
 	size_t bytes_left = size * n;
 	if (!ufbxi_does_overflow(bytes_left, size, n)) {
-		ufbxi_buf_chunk *popped = NULL;
 		if (ptr) {
 			ptr += bytes_left;
 			size_t pos = b->pos;
@@ -1595,13 +1624,12 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 					b->pos = pos;
 					ptr -= bytes_left;
 					memcpy(ptr, chunk->data + pos, bytes_left);
-					return;
+					break;
 				} else {
 					// Pop the whole chunk
 					ptr -= pos;
 					bytes_left -= pos;
 					memcpy(ptr, chunk->data, pos);
-					popped = chunk;
 					chunk = chunk->prev;
 					b->chunk = chunk;
 					b->size = chunk->size;
@@ -1616,22 +1644,16 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 					// Rest of the data is in this single chunk
 					pos -= bytes_left;
 					b->pos = pos;
-					return;
+					break;
 				} else {
 					// Pop the whole chunk
 					bytes_left -= pos;
-					popped = chunk;
 					chunk = chunk->prev;
 					b->chunk = chunk;
 					b->size = chunk->size;
 					pos = chunk->pushed_pos;
 				}
 			}
-		}
-
-		if (free_popped && popped) {
-			b->chunk->next = NULL;
-			ufbxi_free_size(b->ator, 1, popped, sizeof(ufbxi_buf_chunk) + popped->size);
 		}
 
 	} else {
@@ -1643,16 +1665,9 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 			ufbx_assert(b->chunk);
 			while (b->pos == 0) {
 				ufbx_assert(b->chunk->prev);
-				ufbxi_buf_chunk *popped = b->chunk;
-
 				b->chunk = b->chunk->prev;
 				b->pos = b->chunk->pushed_pos;
 				b->size = b->chunk->size;
-
-				if (free_popped && popped) {
-					b->chunk->next = NULL;
-					ufbxi_free_size(b->ator, 1, popped, sizeof(ufbxi_buf_chunk) + popped->size);
-				}
 			}
 			ufbx_assert(b->pos >= size);
 			b->pos -= (uint32_t)size;
@@ -1661,6 +1676,12 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 				memcpy(ptr, b->chunk->data + b->pos, size);
 			}
 		}
+	}
+
+	// Immediately free popped items if all the allocations are huge
+	// as it means we want to have dedicated allocations for each push.
+	if (b->ator->huge_size <= 1) {
+		ufbxi_buf_free_unused(b);
 	}
 }
 
@@ -1733,6 +1754,11 @@ static void ufbxi_buf_clear(ufbxi_buf *buf)
 
 static ufbxi_forceinline ufbxi_buf_state ufbxi_buf_push_state(ufbxi_buf *buf)
 {
+	if (buf->ator->huge_size <= 1) {
+		// TODO: Enable this when `ufbxi_buf_free_unused()` works
+		// ufbx_assert(buf->chunk == NULL || buf->pos > 0);
+	}
+
 	ufbxi_buf_state s;
 	s.chunk = buf->chunk;
 	s.pos = buf->pos;
@@ -1742,6 +1768,8 @@ static ufbxi_forceinline ufbxi_buf_state ufbxi_buf_push_state(ufbxi_buf *buf)
 
 static void ufbxi_buf_pop_state(ufbxi_buf *buf, const ufbxi_buf_state *state)
 {
+	ufbx_assert(!buf->unordered);
+
 	if (state->chunk) {
 		buf->chunk = state->chunk;
 	} else if (buf->chunk) {
@@ -1752,6 +1780,10 @@ static void ufbxi_buf_pop_state(ufbxi_buf *buf, const ufbxi_buf_state *state)
 	}
 	buf->num_items = state->num_items;
 	buf->pos = state->pos;
+
+	if (buf->ator->huge_size <= 1) {
+		ufbxi_buf_free_unused(buf);
+	}
 }
 
 #define ufbxi_push(b, type, n) (type*)ufbxi_push_size((b), sizeof(type), (n))
