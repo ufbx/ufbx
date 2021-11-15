@@ -5465,6 +5465,8 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 	ufbxi_buf *arr_buf = NULL;
 	size_t arr_elem_size = 0;
 
+	ufbxi_buf_state arr_stack_state;
+
 	// Check if the values of the node we're parsing currently should be
 	// treated as an array.
 	ufbxi_array_info arr_info;
@@ -5473,6 +5475,8 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 		arr_buf = tmp_buf;
 		if (arr_info.result) arr_buf = &uc->result;
 		else if (arr_info.tmp_buf) arr_buf = &uc->tmp;
+
+		 arr_stack_state = ufbxi_buf_push_state(&uc->tmp_stack);
 
 		ufbxi_value_array *arr = ufbxi_push(tmp_buf, ufbxi_value_array, 1);
 		ufbxi_check(arr);
@@ -5491,7 +5495,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 
 		// Pad with 4 zero elements to make indexing with `-1` safe.
 		if (arr_info.pad_begin) {
-			ufbxi_push_size_zero(&uc->tmp_stack, arr_elem_size, 4);
+			ufbxi_check(ufbxi_push_size_zero(&uc->tmp_stack, arr_elem_size, 4));
 			num_values += 4;
 		}
 	}
@@ -5664,6 +5668,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 				node->array->data = arr_data;
 				node->array->size = num_values;
 			}
+			ufbxi_buf_pop_state(&uc->tmp_stack, &arr_stack_state);
 		}
 	} else {
 		num_values = ufbxi_min32(num_values, UFBXI_MAX_NON_ARRAY_VALUES);
