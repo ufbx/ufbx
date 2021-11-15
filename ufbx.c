@@ -1458,7 +1458,7 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 			ufbxi_buf_chunk *next;
 			while ((next = chunk->next) != NULL) {
 				chunk = next;
-				if (size <= chunk->size && b->ator->huge_size > 1) {
+				if (size <= chunk->size) {
 					b->chunk = chunk;
 					b->pos = (uint32_t)size;
 					b->size = chunk->size;
@@ -1576,9 +1576,14 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 	ufbx_assert(b->num_items >= n);
 	b->num_items -= n;
 
+	// Immediately free popped items if all the allocations are huge
+	// as it means we want to have dedicated allocations for each push.
+	bool free_popped = b->ator->huge_size <= 1;
+
 	char *ptr = (char*)dst;
 	size_t bytes_left = size * n;
 	if (!ufbxi_does_overflow(bytes_left, size, n)) {
+		ufbxi_buf_chunk *popped = NULL;
 		if (ptr) {
 			ptr += bytes_left;
 			size_t pos = b->pos;
@@ -1596,6 +1601,7 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 					ptr -= pos;
 					bytes_left -= pos;
 					memcpy(ptr, chunk->data, pos);
+					popped = chunk;
 					chunk = chunk->prev;
 					b->chunk = chunk;
 					b->size = chunk->size;
@@ -1614,6 +1620,7 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 				} else {
 					// Pop the whole chunk
 					bytes_left -= pos;
+					popped = chunk;
 					chunk = chunk->prev;
 					b->chunk = chunk;
 					b->size = chunk->size;
@@ -1621,6 +1628,12 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 				}
 			}
 		}
+
+		if (free_popped && popped) {
+			b->chunk->next = NULL;
+			ufbxi_free_size(b->ator, 1, popped, sizeof(ufbxi_buf_chunk) + popped->size);
+		}
+
 	} else {
 		// Slow path, equivalent to the branch above
 		if (ptr) {
@@ -1630,9 +1643,16 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 			ufbx_assert(b->chunk);
 			while (b->pos == 0) {
 				ufbx_assert(b->chunk->prev);
+				ufbxi_buf_chunk *popped = b->chunk;
+
 				b->chunk = b->chunk->prev;
 				b->pos = b->chunk->pushed_pos;
 				b->size = b->chunk->size;
+
+				if (free_popped && popped) {
+					b->chunk->next = NULL;
+					ufbxi_free_size(b->ator, 1, popped, sizeof(ufbxi_buf_chunk) + popped->size);
+				}
 			}
 			ufbx_assert(b->pos >= size);
 			b->pos -= (uint32_t)size;
