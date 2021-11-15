@@ -13024,6 +13024,7 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 	cc.string_pool.error = &cc.error;
 	ufbxi_map_init(&cc.string_pool.map, cc.ator_tmp, &ufbxi_map_cmp_string, NULL);
 	cc.string_pool.buf.ator = &cc.ator_result;
+	cc.string_pool.buf.unordered = true;
 	cc.string_pool.initial_size = 64;
 	cc.result.ator = &cc.ator_result;
 
@@ -13473,6 +13474,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->string_pool.error = &uc->error;
 	ufbxi_map_init(&uc->string_pool.map, &uc->ator_tmp, &ufbxi_map_cmp_string, NULL);
 	uc->string_pool.buf.ator = &uc->ator_result;
+	uc->string_pool.buf.unordered = true;
 	uc->string_pool.initial_size = 1024;
 
 	ufbxi_map_init(&uc->prop_type_map, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
