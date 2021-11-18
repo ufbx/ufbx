@@ -9577,6 +9577,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_contex
 {
 	size_t num_connections = uc->tmp_connections.num_items;
 	ufbxi_tmp_connection *tmp_connections = ufbxi_push_pop(&uc->tmp, &uc->tmp_connections, ufbxi_tmp_connection, num_connections);
+	ufbxi_buf_free(&uc->tmp_connections);
 	ufbxi_check(tmp_connections);
 
 	// NOTE: We truncate this array in case not all connections are resolved
@@ -9750,6 +9751,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_linearize_nodes(ufbxi_context *u
 {
 	size_t num_nodes = uc->tmp_node_ids.num_items;
 	uint32_t *node_ids = ufbxi_push_pop(&uc->tmp, &uc->tmp_node_ids, uint32_t, num_nodes);
+	ufbxi_buf_free(&uc->tmp_node_ids);
 	ufbxi_check(node_ids);
 
 	ufbx_node **node_ptrs = ufbxi_push(&uc->tmp_stack, ufbx_node*, num_nodes);
@@ -10563,9 +10565,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	uc->scene.metadata.element_buffer_size = uc->tmp_element_byte_offset;
 	char *element_data = (char*)ufbxi_push_pop(&uc->result, &uc->tmp_elements, uint64_t, uc->tmp_element_byte_offset/8);
+	ufbxi_buf_free(&uc->tmp_elements);
 	ufbxi_check(element_data);
 
 	size_t *element_offsets = ufbxi_push_pop(&uc->tmp, &uc->tmp_element_offsets, size_t, uc->tmp_element_offsets.num_items);
+	ufbxi_buf_free(&uc->tmp_element_offsets);
 	ufbxi_check(element_offsets);
 	for (size_t i = 0; i < num_elements; i++) {
 		uc->scene.elements.data[i] = (ufbx_element*)(element_data + element_offsets[i]);
@@ -10581,6 +10585,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	for (size_t type = 0; type < UFBX_NUM_ELEMENT_TYPES; type++) {
 		size_t num_typed = uc->tmp_typed_element_offsets[type].num_items;
 		size_t *typed_offsets = ufbxi_push_pop(&uc->tmp, &uc->tmp_typed_element_offsets[type], size_t, num_typed);
+		ufbxi_buf_free(&uc->tmp_typed_element_offsets[type]);
 		ufbxi_check(typed_offsets);
 
 		ufbx_element_list *typed_elems = &uc->scene.elements_by_type[type];
@@ -10842,6 +10847,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	ufbx_assert(uc->tmp_full_weights.num_items == uc->scene.blend_channels.count);
 	ufbx_real_list *full_weights = ufbxi_push_pop(&uc->tmp, &uc->tmp_full_weights, ufbx_real_list, uc->tmp_full_weights.num_items);
+	ufbxi_buf_free(&uc->tmp_full_weights);
 	ufbxi_check(full_weights);
 
 	ufbxi_for_ptr_list(ufbx_blend_channel, p_channel, uc->scene.blend_channels) {
