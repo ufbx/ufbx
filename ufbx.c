@@ -1576,8 +1576,6 @@ static ufbxi_noinline void ufbxi_buf_free_unused(ufbxi_buf *b)
 	ufbxi_buf_chunk *chunk = b->chunk;
 	if (!chunk) return;
 
-	// TODO: Fix this
-#if 0
 	ufbxi_buf_chunk *next = chunk->next;
 	while (next) {
 		ufbxi_buf_chunk *to_free = next;
@@ -1600,7 +1598,6 @@ static ufbxi_noinline void ufbxi_buf_free_unused(ufbxi_buf *b)
 			b->size = 0;
 		}
 	}
-#endif
 }
 
 static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
@@ -1693,39 +1690,13 @@ static void *ufbxi_push_pop_size(ufbxi_buf *dst, ufbxi_buf *src, size_t size, si
 	return data;
 }
 
-static void *ufbxi_make_array_size(ufbxi_buf *b, size_t size, size_t n)
-{
-	// Always succeed with an emtpy non-NULL buffer for empty allocations
-	ufbx_assert(size > 0);
-	if (n == 0) return ufbxi_zero_size_buffer;
-
-	size_t total = size * n;
-	if (ufbxi_does_overflow(total, size, n)) return NULL;
-
-	// Force a real allocation if `huge_size == 1` as that's a mode where
-	// each allocation should be isolated (eg. for address sanitizer)
-	if (total <= b->pos && b->ator->huge_size > 1) {
-		return b->chunk->data + b->pos - total;
-	} else {
-		// Make a local copy of the current buffer state, push the
-		// whole array contiguously to the buffer, and pop the values
-		// from the local copy.
-		ufbxi_buf tmp = *b;
-		void *dst = ufbxi_push_size(b, size, n);
-		if (dst) {
-			ufbxi_pop_size(&tmp, size, n, dst);
-		}
-		return dst;
-	}
-}
-
-static void *ufbxi_make_array_all_size(ufbxi_buf *b, size_t size)
-{
-	return ufbxi_make_array_size(b, size, b->num_items);
-}
-
 static void ufbxi_buf_free(ufbxi_buf *buf)
 {
+	static int serial; serial++;
+	if (serial == 1) {
+		printf("HERE\n");
+	}
+
 	ufbxi_buf_chunk *chunk = buf->chunk;
 	if (chunk) {
 		chunk = chunk->root;
@@ -1791,8 +1762,6 @@ static void ufbxi_buf_pop_state(ufbxi_buf *buf, const ufbxi_buf_state *state)
 #define ufbxi_push_copy(b, type, n, data) (type*)ufbxi_push_size_copy((b), sizeof(type), (n), (data))
 #define ufbxi_pop(b, type, n, dst) ufbxi_pop_size((b), sizeof(type), (n), (dst))
 #define ufbxi_push_pop(dst, src, type, n) (type*)ufbxi_push_pop_size((dst), (src), sizeof(type), (n))
-#define ufbxi_make_array(b, type, n) (type*)ufbxi_make_array_size((b), sizeof(type), (n))
-#define ufbxi_make_array_all(b, type) (type*)ufbxi_make_array_all_size((b), sizeof(type))
 
 // -- Hash map
 //
@@ -7429,7 +7398,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 		ufbxi_mesh_extra *extra = ufbxi_push_element_extra(uc, mesh->element.id, ufbxi_mesh_extra);
 		ufbxi_check(extra);
 		extra->texture_count = num_textures;
-		extra->texture_arr = ufbxi_make_array(&uc->tmp_mesh_textures, ufbxi_tmp_mesh_texture, num_textures);
+		extra->texture_arr = ufbxi_push_pop(&uc->tmp, &uc->tmp_mesh_textures, ufbxi_tmp_mesh_texture, num_textures);
 		ufbxi_check(extra->texture_arr);
 	}
 
@@ -9612,7 +9581,7 @@ static ufbxi_forceinline int64_t ufbxi_find_enum(const ufbx_props *props, const 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_context *uc)
 {
 	size_t num_connections = uc->tmp_connections.num_items;
-	ufbxi_tmp_connection *tmp_connections = ufbxi_make_array(&uc->tmp_connections, ufbxi_tmp_connection, num_connections);
+	ufbxi_tmp_connection *tmp_connections = ufbxi_push_pop(&uc->tmp, &uc->tmp_connections, ufbxi_tmp_connection, num_connections);
 	ufbxi_check(tmp_connections);
 
 	// NOTE: We truncate this array in case not all connections are resolved
@@ -9785,7 +9754,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_connections_to_elements(ufbx
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_linearize_nodes(ufbxi_context *uc)
 {
 	size_t num_nodes = uc->tmp_node_ids.num_items;
-	uint32_t *node_ids = ufbxi_make_array(&uc->tmp_node_ids, uint32_t, num_nodes);
+	uint32_t *node_ids = ufbxi_push_pop(&uc->tmp, &uc->tmp_node_ids, uint32_t, num_nodes);
 	ufbxi_check(node_ids);
 
 	ufbx_node **node_ptrs = ufbxi_push(&uc->tmp_stack, ufbx_node*, num_nodes);
@@ -10601,7 +10570,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	char *element_data = (char*)ufbxi_push_pop(&uc->result, &uc->tmp_elements, uint64_t, uc->tmp_element_byte_offset/8);
 	ufbxi_check(element_data);
 
-	size_t *element_offsets = ufbxi_make_array_all(&uc->tmp_element_offsets, size_t);
+	size_t *element_offsets = ufbxi_push_pop(&uc->tmp, &uc->tmp_element_offsets, size_t, uc->tmp_element_offsets.num_items);
 	ufbxi_check(element_offsets);
 	for (size_t i = 0; i < num_elements; i++) {
 		uc->scene.elements.data[i] = (ufbx_element*)(element_data + element_offsets[i]);
@@ -10616,7 +10585,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	for (size_t type = 0; type < UFBX_NUM_ELEMENT_TYPES; type++) {
 		size_t num_typed = uc->tmp_typed_element_offsets[type].num_items;
-		size_t *typed_offsets = ufbxi_make_array_all(&uc->tmp_typed_element_offsets[type], size_t);
+		size_t *typed_offsets = ufbxi_push_pop(&uc->tmp, &uc->tmp_typed_element_offsets[type], size_t, num_typed);
 		ufbxi_check(typed_offsets);
 
 		ufbx_element_list *typed_elems = &uc->scene.elements_by_type[type];
@@ -10877,7 +10846,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	}
 
 	ufbx_assert(uc->tmp_full_weights.num_items == uc->scene.blend_channels.count);
-	ufbx_real_list *full_weights = ufbxi_make_array_all(&uc->tmp_full_weights, ufbx_real_list);
+	ufbx_real_list *full_weights = ufbxi_push_pop(&uc->tmp, &uc->tmp_full_weights, ufbx_real_list, uc->tmp_full_weights.num_items);
 	ufbxi_check(full_weights);
 
 	ufbxi_for_ptr_list(ufbx_blend_channel, p_channel, uc->scene.blend_channels) {
@@ -11282,9 +11251,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				num_textures_in_material++;
 			}
 		}
-
-		// Not needed anymore!
-		ufbxi_buf_free(&uc->tmp_mesh_textures);
 	}
 
 	// Second pass to fetch material maps
