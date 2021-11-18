@@ -1692,11 +1692,6 @@ static void *ufbxi_push_pop_size(ufbxi_buf *dst, ufbxi_buf *src, size_t size, si
 
 static void ufbxi_buf_free(ufbxi_buf *buf)
 {
-	static int serial; serial++;
-	if (serial == 1) {
-		printf("HERE\n");
-	}
-
 	ufbxi_buf_chunk *chunk = buf->chunk;
 	if (chunk) {
 		chunk = chunk->root;
