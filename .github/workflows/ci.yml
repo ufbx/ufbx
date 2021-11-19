@@ -66,10 +66,10 @@ jobs:
           export WASI_VERSION=14
           export WASI_VERSION_FULL=${WASI_VERSION}.0
           curl -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_VERSION}/wasi-sdk-${WASI_VERSION_FULL}-linux.tar.gz -o build/wasi-sdk.gz
-          tar xvf build/wasi-sdk.gz
+          tar xf build/wasi-sdk.gz
       - name: Install wasmtime
         run: |
           curl https://wasmtime.dev/install.sh -sSf | bash
           source ~/.bashrc
       - name: Run tests
-        run: python3 misc/run_tests.py tests --wasm-sdk build/wasi-sdk --compiler wasi_clang
+        run: python3 misc/run_tests.py tests --wasi-sdk build/wasi-sdk --compiler wasi_clang
