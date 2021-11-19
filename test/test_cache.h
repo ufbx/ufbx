@@ -98,3 +98,37 @@ UFBXT_FILE_TEST(max_cache_box)
 }
 #endif
 
+UFBXT_TEST(cache_xml_parse)
+#if UFBXT_IMPL
+{
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s", data_root, "caches/sine_xml_parse/cache.xml");
+
+	ufbx_geometry_cache *cache = ufbx_load_geometry_cache(buf, NULL, NULL);
+	ufbxt_assert(cache);
+
+	ufbxt_assert(cache->extra_info.count == 2);
+	ufbxt_check_string(cache->extra_info.data[0]);
+	ufbxt_check_string(cache->extra_info.data[1]);
+
+	const char *ex0 = "cdata! \"'&<><--&lt;&#x61;<tag></tag>-->!CDATA[]>\x61\xce\xb2\xe3\x82\xab\xf0\x9f\x98\x82]]";
+	ufbxt_assert(!strcmp(cache->extra_info.data[0].data, ex0));
+
+	const char *ex1 = "\"'&<>\x61\x61\x61\xce\xb2\xce\xb2\xce\xb2\xe3\x82\xab\xe3\x82\xab\xe3\x82\xab\xf0\x9f\x98\x82\xf0\x9f\x98\x82\xf0\x9f\x98\x82";
+	ufbxt_assert(!strcmp(cache->extra_info.data[1].data, ex1));
+
+	ufbxt_assert(cache->channels.count == 2);
+	ufbxt_check_string(cache->channels.data[0].name);
+	ufbxt_check_string(cache->channels.data[1].name);
+	ufbxt_check_string(cache->channels.data[0].interpretation_name);
+	ufbxt_check_string(cache->channels.data[1].interpretation_name);
+	ufbxt_assert(cache->channels.data[0].interpretation == UFBX_CACHE_INTERPRETATION_UNKNOWN);
+	ufbxt_assert(cache->channels.data[1].interpretation == UFBX_CACHE_INTERPRETATION_UNKNOWN);
+
+	ufbxt_assert(!strcmp(cache->channels.data[0].interpretation_name.data, "<!--\"positions\"-->"));
+	ufbxt_assert(!strcmp(cache->channels.data[1].interpretation_name.data, "<![CDATA[<positions>]]>"));
+
+	ufbx_free_geometry_cache(cache);
+}
+#endif
+

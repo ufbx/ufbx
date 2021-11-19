@@ -3532,13 +3532,25 @@ static ufbxi_noinline void ufbxi_xml_skip_while(ufbxi_xml_context *xc, uint32_t 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_xml_skip_until_string(ufbxi_xml_context *xc, ufbx_string *dst, const char *suffix)
 {
 	xc->tok_len = 0;
-	size_t ix = 0, len = strlen(suffix);
-	while (ix < len) {
+	size_t match_len = 0, ix = 0, suffix_len = strlen(suffix);
+	char buf[16] = { 0 };
+	size_t wrap_mask = sizeof(buf) - 1;
+	ufbx_assert(suffix_len < sizeof(buf));
+	for (;;) {
 		char c = *xc->pos;
-		if (c == '\0') break;
+		ufbxi_check_err_msg(&xc->error, c != 0, "Truncated file");
 		ufbxi_xml_advance(xc);
-		if (suffix[ix++] != c) ix = 0;
-		ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, c));
+		if (ix >= suffix_len) {
+			ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, buf[(ix - suffix_len) & wrap_mask]));
+		}
+
+		buf[ix++ & wrap_mask] = c;
+		for (match_len = 0; match_len < suffix_len; match_len++) {
+			if (buf[(ix - suffix_len + match_len) & wrap_mask] != suffix[match_len]) {
+				break;
+			}
+		}
+		if (match_len == suffix_len) break;
 	}
 
 	ufbxi_check_err(&xc->error, ufbxi_xml_push_token_char(xc, '\0'));
@@ -3573,7 +3585,7 @@ static ufbxi_noinline int ufbxi_xml_read_until(ufbxi_xml_context *xc, ufbx_strin
 			xc->tok_len = entity_begin;
 
 			if (entity[0] == '#') {
-				unsigned long code;
+				unsigned long code = 0;
 				if (entity[1] == 'x') {
 					code = strtoul(entity + 2, NULL, 16);
 				} else {
@@ -3591,7 +3603,7 @@ static ufbxi_noinline int ufbxi_xml_read_until(ufbxi_xml_context *xc, ufbx_strin
 					bytes[1] = (char)(0x80 | ((code>>6) & 0x3f));
 					bytes[2] = (char)(0x80 | (code & 0x3f));
 				} else {
-					bytes[0] = (char)(0xe0 | (code>>18));
+					bytes[0] = (char)(0xf0 | (code>>18));
 					bytes[1] = (char)(0x80 | ((code>>12) & 0x3f));
 					bytes[2] = (char)(0x80 | ((code>>6) & 0x3f));
 					bytes[3] = (char)(0x80 | (code & 0x3f));
