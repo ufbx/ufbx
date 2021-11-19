@@ -10,9 +10,37 @@ void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr);
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <setjmp.h>
 #include <stdarg.h>
 #include <math.h>
+
+#ifndef USE_SETJMP
+#if !defined(__wasm__)
+	#define USE_SETJMP 1
+#else
+	#define USE_SETJMP 0
+#endif
+#endif
+
+#if USE_SETJMP
+
+#include <setjmp.h>
+
+#define ufbxt_jmp_buf jmp_buf
+#define ufbxt_setjmp(env) setjmp(env)
+#define ufbxt_longjmp(env, status, file, line, expr) longjmp(env, status)
+
+#else
+
+#define ufbxt_jmp_buf int
+#define ufbxt_setjmp(env) (0)
+
+static void ufbxt_longjmp(int env, int value, const char *file, uint32_t line, const char *expr)
+{
+	fprintf(stderr, "\nAssertion failed: %s:%u: %s\n", file, line, expr);
+	exit(1);
+}
+
+#endif
 
 #define CPUTIME_IMPLEMENTATION
 #include "cputime.h"
@@ -115,7 +143,7 @@ ufbxt_test *g_current_test;
 uint64_t g_bechmark_begin_tick;
 
 ufbx_error g_error;
-jmp_buf g_test_jmp;
+ufbxt_jmp_buf g_test_jmp;
 int g_verbose;
 
 char g_log_buf[16*1024];
@@ -137,12 +165,12 @@ typedef struct {
 
 static ufbxt_check_line g_checks[16384];
 
-ufbxt_threadlocal jmp_buf *t_jmp_buf;
+ufbxt_threadlocal ufbxt_jmp_buf *t_jmp_buf;
 
 void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
 {
 	if (t_jmp_buf) {
-		longjmp(*t_jmp_buf, 1);
+		ufbxt_longjmp(*t_jmp_buf, 1, file, line, expr);
 	}
 
 	printf("FAIL\n");
@@ -153,7 +181,7 @@ void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
 	g_current_test->fail.line = line;
 	g_current_test->fail.expr = expr;
 
-	longjmp(g_test_jmp, 1);
+	ufbxt_longjmp(g_test_jmp, 1, file, line, expr);
 }
 
 void ufbxt_logf(const char *fmt, ...)
@@ -855,9 +883,9 @@ int ufbxt_test_fuzz(void *data, size_t size, size_t step, int offset, size_t tem
 {
 	if (g_fuzz_step < SIZE_MAX && step != g_fuzz_step) return 1;
 
-	t_jmp_buf = (jmp_buf*)calloc(1, sizeof(jmp_buf));
+	t_jmp_buf = (ufbxt_jmp_buf*)calloc(1, sizeof(ufbxt_jmp_buf));
 	int ret = 1;
-	if (!setjmp(*t_jmp_buf)) {
+	if (!ufbxt_setjmp(*t_jmp_buf)) {
 
 		ufbx_load_opts opts = { 0 };
 
@@ -1654,8 +1682,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 							fflush(stderr);
 						}
 					}
-					t_jmp_buf = (jmp_buf*)calloc(1, sizeof(jmp_buf));
-					if (!setjmp(*t_jmp_buf)) {
+					t_jmp_buf = (ufbxt_jmp_buf*)calloc(1, sizeof(ufbxt_jmp_buf));
+					if (!ufbxt_setjmp(*t_jmp_buf)) {
 						ufbx_load_opts load_opts = { 0 };
 						load_opts.read_buffer_size = (size_t)buf_sz;
 						ufbx_scene *buf_scene = ufbx_load_file(buf, &load_opts, NULL);
@@ -1851,7 +1879,7 @@ int ufbxt_run_test(ufbxt_test *test)
 	g_hint[0] = '\0';
 
 	g_current_test = test;
-	if (!setjmp(g_test_jmp)) {
+	if (!ufbxt_setjmp(g_test_jmp)) {
 		g_skip_print_ok = false;
 		test->func();
 		if (!g_skip_print_ok) {

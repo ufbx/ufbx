@@ -105,11 +105,18 @@
 	#define ufbxi_read_f32(ptr) (*(const float*)(ptr))
 	#define ufbxi_read_f64(ptr) (*(const double*)(ptr))
 #elif defined(__wasm__) || defined(__EMSCRIPTEN__)
-	#define ufbxi_read_u16(ptr) ((uint16_t)*(const unsigned short ((aligned(1)))*)(ptr))
-	#define ufbxi_read_u32(ptr) ((uint32_t)*(const unsigned int ((aligned(1)))*)(ptr))
-	#define ufbxi_read_u64(ptr) ((uint64_t)*(const unsigned long long ((aligned(1)))*)(ptr))
-	#define ufbxi_read_f32(ptr) ((float)*(const float ((aligned(1)))*)(ptr))
-	#define ufbxi_read_f64(ptr) ((double)*(const double ((aligned(1)))*)(ptr))
+
+	typedef uint16_t __attribute__((aligned(1))) ufbxi_wasm_unaligned_u16;
+	typedef uint32_t __attribute__((aligned(1))) ufbxi_wasm_unaligned_u32;
+	typedef uint64_t __attribute__((aligned(1))) ufbxi_wasm_unaligned_u64;
+	typedef float __attribute__((aligned(1))) ufbxi_wasm_unaligned_f32;
+	typedef double __attribute__((aligned(1))) ufbxi_wasm_unaligned_f64;
+
+	#define ufbxi_read_u16(ptr) ((uint16_t)*(const ufbxi_wasm_unaligned_u16*)(ptr))
+	#define ufbxi_read_u32(ptr) ((uint32_t)*(const ufbxi_wasm_unaligned_u32*)(ptr))
+	#define ufbxi_read_u64(ptr) ((uint64_t)*(const ufbxi_wasm_unaligned_u64*)(ptr))
+	#define ufbxi_read_f32(ptr) ((float)*(const ufbxi_wasm_unaligned_f32*)(ptr))
+	#define ufbxi_read_f64(ptr) ((double)*(const ufbxi_wasm_unaligned_f64*)(ptr))
 #else
 	static ufbxi_forceinline uint16_t ufbxi_read_u16(const void *ptr) {
 		const char *p = ptr;

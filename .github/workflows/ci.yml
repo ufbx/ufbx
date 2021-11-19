@@ -56,3 +56,20 @@ jobs:
           curl -sS -w " -> $DST_URL/slime-ascii.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-ascii.png --data-binary @build/images/slime-ascii.png
           curl -sS -w " -> $DST_URL/slime-big.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-big.png --data-binary @build/images/slime-big.png
 
+  ci_wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install wasi-sdk
+        run: |
+          mkdir build
+          export WASI_VERSION=14
+          export WASI_VERSION_FULL=${WASI_VERSION}.0
+          curl -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_VERSION}/wasi-sdk-${WASI_VERSION_FULL}-linux.tar.gz -o build/wasi-sdk.gz
+          tar xvf build/wasi-sdk.gz
+      - name: Install wasmtime
+        run: |
+          curl https://wasmtime.dev/install.sh -sSf | bash
+          source ~/.bashrc
+      - name: Run tests
+        run: python3 misc/run_tests.py tests --wasm-sdk build/wasi-sdk --compiler wasi_clang

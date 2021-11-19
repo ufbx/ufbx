@@ -99,8 +99,18 @@ static void cputime_os_wait()
 #else
 
 #include <time.h>
-// TODO: Other architectures
-#include <x86intrin.h>
+
+#if defined(__i386__) || defined(__x86_64__)
+	#include <x86intrin.h>
+	#define cputime_imp_timestamp() (uint64_t)(__rdtsc())
+#else
+	static uint64_t cputime_imp_timestamp()
+	{
+		struct timespec time;
+		clock_gettime(CLOCK_THREAD_CPUTIME_ID, &time);
+		return (uint64_t)time.tv_sec*UINT64_C(1000000000) + (uint64_t)time.tv_nsec;
+	}
+#endif
 
 void cputime_sync_now(cputime_sync_point *sync, int accuracy)
 {
@@ -112,7 +122,7 @@ void cputime_sync_now(cputime_sync_point *sync, int accuracy)
 	int runs = accuracy ? accuracy : 100;
 	for (int i = 0; i < runs; i++) {
 		clock_gettime(CLOCK_REALTIME, &begin);
-		uint64_t cycle = (uint64_t)__rdtsc();
+		uint64_t cycle = cputime_imp_timestamp();
 		clock_gettime(CLOCK_REALTIME, &end);
 
 		uint64_t begin_ns = (uint64_t)begin.tv_sec*UINT64_C(1000000000) + (uint64_t)begin.tv_nsec;
@@ -133,7 +143,7 @@ void cputime_sync_now(cputime_sync_point *sync, int accuracy)
 
 uint64_t cputime_cpu_tick()
 {
-	return (uint64_t)__rdtsc();
+	return cputime_imp_timestamp();
 }
 
 uint64_t cputime_os_tick()

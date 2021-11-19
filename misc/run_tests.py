@@ -14,8 +14,11 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Run ufbx tests")
 parser.add_argument("tests", type=str, nargs="*", help="Names of tests to run")
-parser.add_argument("--compiler", default=[], action="append", help="Additional compiler(s) to use")
+parser.add_argument("--additional-compiler", default=[], action="append", help="Additional compiler(s) to use")
+parser.add_argument("--compiler", default=[], action="append", help="Specify exact compiler(s) to use")
 parser.add_argument("--no-sse", action="store_true", help="Don't make SSE builds when possible")
+parser.add_argument("--wasi-sdk", default=[], action="append", help="WASI SDK path")
+parser.add_argument("--wasm-runtime", default="wasmtime", type=str, help="WASM runtime command")
 argv = parser.parse_args()
 
 color_out = sys.stdout
@@ -214,6 +217,7 @@ class GCCCompiler(Compiler):
         self.has_c = not cpp
         self.has_cpp = cpp
         self.has_m32 = has_m32
+        self.sysroot = ""
 
     async def check_version(self):
         _, vout, _, _, _ = await self.run("-dumpversion")
@@ -228,12 +232,14 @@ class GCCCompiler(Compiler):
             return ["x86", "x64"] if self.has_m32 else ["x64"]
         if "i686" in self.arch:
             return ["x86"]
+        if "wasm32" in self.arch:
+            return ["wasm32"]
         return []
 
     def supported_archs(self):
         raw_archs = self.supported_archs_raw()
         archs = [*raw_archs]
-        archs += (a + "-san" for a in raw_archs)
+        archs += (a + "-san" for a in raw_archs if a != "wasm32")
         return archs
 
     def compile(self, config):
@@ -242,9 +248,12 @@ class GCCCompiler(Compiler):
 
         args = []
 
+        if self.sysroot:
+            args += ["--sysroot", self.sysroot]
+
         if config.get("warnings", False):
             args += ["-Wall", "-Wextra", "-Werror"]
-        
+
         args.append("-g")
 
         if config.get("optimize", False):
@@ -300,6 +309,11 @@ class ClangCompiler(GCCCompiler):
 class EmscriptenCompiler(ClangCompiler):
     def __init__(self, name, exe, cpp):
         super().__init__(name, exe, cpp)
+
+class WasiCompiler(ClangCompiler):
+    def __init__(self, name, exe, cpp, sysroot):
+        super().__init__(name, exe, cpp)
+        self.sysroot = sysroot
 
 class ZigCompiler(ClangCompiler):
     def __init__(self, name, exe, cpp):
@@ -377,7 +391,14 @@ all_compilers = [
 
 ichain = itertools.chain.from_iterable
 
-for desc in argv.compiler:
+for sdk in argv.wasi_sdk:
+    path = os.path.join(sdk, "bin", "clang")
+    sysroot = os.path.join(sdk, "share", "wasi-sysroot")
+    all_compilers += [
+        WasiCompiler("wasi_clang", path, False, sysroot)
+    ]
+
+for desc in argv.additional_compiler:
     name = re.sub(r"[^A-Za-z0-9\-]", "", desc)
     if "clang" in desc:
         cpp = re.sub(r"clang", "clang++", desc, 1)
@@ -391,6 +412,10 @@ for desc in argv.compiler:
             GCCCompiler(name, desc, False),
             GCCCompiler(name, cpp, True),
         ]
+
+if argv.compiler:
+    compilers = set(argv.compiler)
+    all_compilers = [c for c in all_compilers if c.name in compilers]
 
 def gather(aws):
     return asyncio.gather(*aws)
@@ -455,7 +480,12 @@ async def run_target(t, args):
     if t.config.get("dedicated-allocs", False):
         args += ["--dedicated-allocs"]
 
-    ok, out, err, cmdline, time = await run_cmd(t.config["output"], args)
+    if t.config.get("arch") == "wasm32":
+        wasm_args = [argv.wasm_runtime, "run", "--dir", ".", t.config["output"], "--"]
+        wasm_args += args
+        ok, out, err, cmdline, time = await run_cmd(wasm_args)
+    else:
+        ok, out, err, cmdline, time = await run_cmd(t.config["output"], args)
 
     t.log.append("$ " + cmdline)
     t.log.append(out)
@@ -514,6 +544,7 @@ async def main():
         "arch": {
             "x86": { "arch": "x86" },
             "x64": { "arch": "x64" },
+            "wasm32": { "arch": "wasm32" },
         },
         "sanitize": {
             "": { },
