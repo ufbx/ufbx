@@ -67,6 +67,11 @@ UFBXT_TEST(fuzz_cache_xml)
 		cache_opts.temp_allocator.memory_limit = 0x4000000; // 64MB
 		cache_opts.result_allocator.memory_limit = 0x4000000; // 64MB
 
+		if (g_dedicated_allocs) {
+			cache_opts.temp_allocator.huge_threshold = 1;
+			cache_opts.result_allocator.huge_threshold = 1;
+		}
+
 		size_t size;
 		void *data = ufbxt_read_file(buf, &size);
 		if (!data) break;
@@ -102,6 +107,11 @@ UFBXT_TEST(fuzz_cache_mcx)
 		ufbx_geometry_cache_opts cache_opts = { 0 };
 		cache_opts.temp_allocator.memory_limit = 0x4000000; // 64MB
 		cache_opts.result_allocator.memory_limit = 0x4000000; // 64MB
+
+		if (g_dedicated_allocs) {
+			cache_opts.temp_allocator.huge_threshold = 1;
+			cache_opts.result_allocator.huge_threshold = 1;
+		}
 
 		size_t size;
 		void *data = ufbxt_read_file(buf, &size);

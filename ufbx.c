@@ -12331,17 +12331,18 @@ typedef struct {
 
 	uint64_t file_offset;
 	const char *pos, *pos_end;
-	char buffer[128];
 
 	ufbx_geometry_cache cache;
 	ufbxi_geometry_cache_imp *imp;
+
+	char buffer[128];
 } ufbxi_cache_context;
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_read(ufbxi_cache_context *cc, void *dst, size_t size, bool allow_eof)
 {
 	size_t buffered = ufbxi_min_sz((size_t)(cc->pos_end - cc->pos), size);
 	memcpy(dst, cc->pos, buffered);
-	cc->pos += size;
+	cc->pos += buffered;
 	size -= buffered;
 	cc->file_offset += buffered;
 	if (size == 0) return 1;

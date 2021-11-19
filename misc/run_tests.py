@@ -282,6 +282,8 @@ class GCCCompiler(Compiler):
         if config.get("sse", False):
             args.append("-DSSE=1")
             args += ["-mbmi", "-msse3", "-msse4.1", "-msse4.2"]
+            if config.get("arch", "") == "x86":
+                args += ["-msse", "-msse2"]
 
         if config.get("threads", False):
             args.append("-pthread")
