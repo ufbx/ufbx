@@ -363,6 +363,14 @@ picort_forceinline uint32_t popcount4(uint32_t v) { return pop4_table[v]; }
 picort_forceinline uint32_t first_set4(uint32_t v) { return ffs4_table[v]; }
 #endif
 
+// -- Prefetch
+
+#if SSE
+	#define picort_prefetch(ptr) _mm_prefetch((const char*)(ptr), _MM_HINT_T0)
+#else
+	#define picort_prefetch(ptr) (void)0
+#endif
+
 // -- Random series
 
 // *Really* minimal PCG32 code / (c) 2014 M.E. O'Neill / pcg-random.org
@@ -1405,7 +1413,7 @@ struct Ray
 	Vec3 direction;
 };
 
-struct RayHit { Real t = Inf, u = 0.0f, v = 0.0f; size_t index = SIZE_MAX; };
+struct RayHit { Real t = Inf, u = 0.0f, v = 0.0f; size_t index = SIZE_MAX; size_t steps = 0; };
 
 struct RayTrace
 {
@@ -1488,7 +1496,7 @@ void intersect_triangle(RayTrace &trace, const Triangle &triangle)
 
 	Real rcp_det = 1.0f / det;
 	trace.max_t = t * rcp_det;
-	trace.hit = { t * rcp_det, u * rcp_det, v * rcp_det, triangle.index };
+	trace.hit = { t * rcp_det, u * rcp_det, v * rcp_det, triangle.index, trace.hit.steps };
 }
 
 struct BVHHit
@@ -1511,9 +1519,10 @@ void intersect_bvh(RayTrace &trace, const BVH &root)
 		const BVH *bvh = stack[depth].bvh;
 
 		while (bvh && bvh->num_triangles == 0) {
+			trace.hit.steps++;
 			const BVH *child0 = &bvh->child_nodes[0], *child1 = &bvh->child_nodes[1];
-			_mm_prefetch((const char*)&child0->child_bounds, _MM_HINT_T0);
-			_mm_prefetch((const char*)&child1->child_bounds, _MM_HINT_T0);
+			picort_prefetch(&child0->child_bounds);
+			picort_prefetch(&child1->child_bounds);
 			Real t0 = intersect_bounds(trace, bvh->child_bounds[0]);
 			Real t1 = intersect_bounds(trace, bvh->child_bounds[1]);
 			bvh = NULL;
@@ -1539,6 +1548,7 @@ void intersect_bvh(RayTrace &trace, const BVH &root)
 		}
 
 		if (bvh && bvh->num_triangles > 0) {
+			trace.hit.steps++;
 			for (size_t i = 0; i < bvh->num_triangles; i++) {
 				intersect_triangle(trace, bvh->triangles[i]);
 			}
@@ -1546,14 +1556,11 @@ void intersect_bvh(RayTrace &trace, const BVH &root)
 	}
 }
 
+#if SSE
+
 picort_forceinline Real scale_to_real(uint8_t scale)
 {
 	return _mm_cvtss_f32(_mm_castsi128_ps(_mm_set1_epi32((int)scale << 23)));
-}
-
-picort_forceinline uint8_t rcp_scale(uint8_t v)
-{
-	return 254 - v;
 }
 
 uint8_t real_to_scale(Real v)
@@ -1562,6 +1569,44 @@ uint8_t real_to_scale(Real v)
 	if (exp < 1) exp = 1;
 	if (exp > 254) exp = 254;
 	return exp;
+}
+
+#else
+
+struct ScaleTable
+{
+	Real v[256];
+
+	ScaleTable() {
+		for (int i = 0; i < 256; i++) {
+			v[i] = ldexp((Real)1.0, i - 127);
+		}
+	}
+};
+
+ScaleTable g_scale_table;
+
+picort_forceinline Real scale_to_real(uint8_t scale)
+{
+	return g_scale_table.v[(uint32_t)scale];
+}
+
+uint8_t real_to_scale(Real v)
+{
+	int exp;
+	float frac = frexp(v * 2.125f, &exp);
+	exp += 127;
+	if (exp < 1) exp = 1;
+	if (exp > 254) exp = 254;
+	return (uint8_t)exp;
+}
+
+
+#endif
+
+picort_forceinline uint8_t rcp_scale(uint8_t v)
+{
+	return 254 - v;
 }
 
 union alignas(64) BVH4
@@ -1647,16 +1692,18 @@ RayHit intersect4(const Scene4 &scene, const Ray &ray, Real ray_max_t=Inf, bool 
 	int sz = ray.direction.z < 0.0f ? 8 : 0;
 
 	const BVH4 *bvh = scene.bvhs.data();
-	_mm_prefetch((const char*)bvh->common.data + 0*64, _MM_HINT_T0);
-	_mm_prefetch((const char*)bvh->common.data + 1*64, _MM_HINT_T0);
-	_mm_prefetch((const char*)bvh->common.data + 2*64, _MM_HINT_T0);
-	_mm_prefetch((const char*)bvh->common.data + 3*64, _MM_HINT_T0);
+	picort_prefetch((const char*)bvh->common.data + 0*64);
+	picort_prefetch((const char*)bvh->common.data + 1*64);
+	picort_prefetch((const char*)bvh->common.data + 2*64);
+	picort_prefetch((const char*)bvh->common.data + 3*64);
 
 	const BVH4 *stack_bvh[64];
 	Real stack_t[64];
 	int stack_top = 0;
 
 	for (;;) {
+		hit.steps++;
+
 		if (bvh->common.tag_node) {
 			Real origin_scale = scale_to_real(bvh->node.origin_scale);
 			Real bounds_scale = scale_to_real(bvh->node.bounds_scale);
@@ -1684,10 +1731,10 @@ RayHit intersect4(const Scene4 &scene, const Ray &ray, Real ray_max_t=Inf, bool 
 				if (count > 1) {
 					int closest = (int)first_set4((unsigned)(t == t.min()).mask());
 					bvh = children + closest;
-					_mm_prefetch((const char*)bvh->common.data + 0*64, _MM_HINT_T0);
-					_mm_prefetch((const char*)bvh->common.data + 1*64, _MM_HINT_T0);
-					_mm_prefetch((const char*)bvh->common.data + 2*64, _MM_HINT_T0);
-					_mm_prefetch((const char*)bvh->common.data + 3*64, _MM_HINT_T0);
+					picort_prefetch((const char*)bvh->common.data + 0*64);
+					picort_prefetch((const char*)bvh->common.data + 1*64);
+					picort_prefetch((const char*)bvh->common.data + 2*64);
+					picort_prefetch((const char*)bvh->common.data + 3*64);
 
 					Real4 rest = Real4::shuffle(t, sort_indices[closest]);
 
@@ -1717,10 +1764,10 @@ RayHit intersect4(const Scene4 &scene, const Ray &ray, Real ray_max_t=Inf, bool 
 				} else {
 					int closest = (int)first_set4((unsigned)(mask));
 					bvh = children + closest;
-					_mm_prefetch((const char*)bvh->common.data + 0*64, _MM_HINT_T0);
-					_mm_prefetch((const char*)bvh->common.data + 1*64, _MM_HINT_T0);
-					_mm_prefetch((const char*)bvh->common.data + 2*64, _MM_HINT_T0);
-					_mm_prefetch((const char*)bvh->common.data + 3*64, _MM_HINT_T0);
+					picort_prefetch((const char*)bvh->common.data + 0*64);
+					picort_prefetch((const char*)bvh->common.data + 1*64);
+					picort_prefetch((const char*)bvh->common.data + 2*64);
+					picort_prefetch((const char*)bvh->common.data + 3*64);
 					continue;
 				}
 
@@ -1804,7 +1851,7 @@ RayHit intersect4(const Scene4 &scene, const Ray &ray, Real ray_max_t=Inf, bool 
 
 						Real rcp_det = 1.0f / det;
 						ray_max_t = ti * rcp_det;
-						hit = { ti * rcp_det, ui * rcp_det, vi * rcp_det, index };
+						hit = { ti * rcp_det, ui * rcp_det, vi * rcp_det, index, hit.steps };
 
 						if (shadow) return hit;
 					} while (good_mask);
@@ -1819,10 +1866,10 @@ RayHit intersect4(const Scene4 &scene, const Ray &ray, Real ray_max_t=Inf, bool 
 			stack_top--;
 			if (stack_t[stack_top] < ray_max_t) {
 				bvh = stack_bvh[stack_top];
-				_mm_prefetch((const char*)bvh->common.data + 0*64, _MM_HINT_T0);
-				_mm_prefetch((const char*)bvh->common.data + 1*64, _MM_HINT_T0);
-				_mm_prefetch((const char*)bvh->common.data + 2*64, _MM_HINT_T0);
-				_mm_prefetch((const char*)bvh->common.data + 3*64, _MM_HINT_T0);
+				picort_prefetch((const char*)bvh->common.data + 0*64);
+				picort_prefetch((const char*)bvh->common.data + 1*64);
+				picort_prefetch((const char*)bvh->common.data + 2*64);
+				picort_prefetch((const char*)bvh->common.data + 3*64);
 				break;
 			}
 		}
@@ -1902,7 +1949,7 @@ void create_node4(Scene4 &scene, size_t dst_ix, const BVH &src)
 
 
 		Vec3 origin = bounds.center();
-		uint8_t origin_scale_ix = real_to_scale(max_component(abs(origin)) * INT16_MAX);
+		uint8_t origin_scale_ix = real_to_scale(max_component(abs(origin)) / INT16_MAX);
 		Real origin_scale = scale_to_real(origin_scale_ix);
 
 		dst.node.origin_scale = origin_scale_ix;
@@ -2225,6 +2272,7 @@ struct Scene
 	Real exposure;
 	Vec3 indirect_clamp;
 	int indirect_depth;
+	bool bvh_heatmap;
 
 	Scene4 scene4;
 };
@@ -2358,6 +2406,9 @@ Vec3 trace_path(Random &rng, Scene &scene, const Ray &ray, const Vec3 &uvw, int 
 	if (depth > scene.indirect_depth) return { };
 
 	RayHit hit = trace_ray(rng, scene, ray);
+	if (scene.bvh_heatmap) {
+		return Vec3{ 0.005f, 0.003f, 0.1f } * (Real)hit.steps / scene.exposure;
+	}
 
 	if (hit.t >= Inf) {
 		return depth == 0 ? shade_sky(scene, ray) : Vec3{ };
@@ -2911,6 +2962,7 @@ struct Opts
 	Opt<StringPair> compare { "compare", "Compare two result images" };
 	Opt<std::string> reference { "reference", "Compare the resulting image to a reference" };
 	Opt<double> error_threshold { "error-threshold", "Error threshold (MSE) for comparison", 0.05 };
+	Opt<bool> bvh_heatmap { "bvh-heatmap", "Visualize BVH heatmap" };
 
 	OptIter begin() { return this; }
 	OptIter end() { return this + 1; }
@@ -3169,6 +3221,7 @@ void render_frame(ufbx_scene *original_scene, const Opts &opts, int frame_offset
 	tracer.scene.exposure = pow((Real)2.0, opts.exposure.value);
 	tracer.scene.indirect_clamp = Vec3{ 1.0f, 1.0f, 1.0f } * opts.indirect_clamp.value / tracer.scene.exposure;
 	tracer.scene.indirect_depth = opts.bounces.value;
+	tracer.scene.bvh_heatmap = opts.bvh_heatmap.value;
 	tracer.width = width;
 	tracer.height = height;
 	tracer.pixels = framebuffer.pixels.data();
