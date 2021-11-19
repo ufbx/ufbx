@@ -79,6 +79,7 @@ jobs:
           curl https://wasmtime.dev/install.sh -sSf | bash
           echo Sourcing $HOME/.bashrc
           source $HOME/.bashrc
+          echo $PATH
           wasmtime --version
       - name: Run tests
         run: python3 misc/run_tests.py tests --wasi-sdk build/wasi-sdk --compiler wasi_clang
