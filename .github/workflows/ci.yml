@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ master ]
 
+# Cancel any in-flight jobs for the same PR/branch so there's only one active
+# at a time
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
 
   ci_ubuntu:
@@ -71,7 +77,8 @@ jobs:
       - name: Install wasmtime
         run: |
           curl https://wasmtime.dev/install.sh -sSf | bash
-          source ~/.bashrc
+          echo Sourcing $HOME/.bashrc
+          source $HOME/.bashrc
           wasmtime --version
       - name: Run tests
         run: python3 misc/run_tests.py tests --wasi-sdk build/wasi-sdk --compiler wasi_clang
