@@ -1584,6 +1584,17 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *ba
 
 const uint32_t ufbxt_file_versions[] = { 3000, 5000, 5800, 6100, 7100, 7400, 7500, 7700 };
 
+typedef struct {
+	uint64_t calls;
+} ufbxt_progress_ctx;
+
+bool ufbxt_measure_progress(void *user, const ufbx_progress *progress)
+{
+	ufbxt_progress_ctx *ctx = (ufbxt_progress_ctx*)user;
+	ctx->calls++;
+	return true;
+}
+
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err), const char *suffix, ufbx_load_opts user_opts)
 {
 	char buf[512];
@@ -1638,8 +1649,14 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			load_opts.filename.data = buf;
 			load_opts.filename.length = SIZE_MAX;
 
+			ufbxt_progress_ctx progress_ctx = { 0 };
+
+			ufbx_load_opts memory_opts = load_opts;
+			memory_opts.progress_fn = &ufbxt_measure_progress;
+			memory_opts.progress_user = &progress_ctx;
+
 			uint64_t load_begin = cputime_cpu_tick();
-			ufbx_scene *scene = ufbx_load_memory(data, size, &load_opts, &error);
+			ufbx_scene *scene = ufbx_load_memory(data, size, &memory_opts, &error);
 			uint64_t load_end = cputime_cpu_tick();
 
 			if (!scene) {
@@ -1647,7 +1664,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file");
 			} else {
 				ufbxt_check_scene(scene);
+
+				ufbxt_assert(progress_ctx.calls >= size / 0x4000 / 2);
 			}
+
+			ufbxt_progress_ctx stream_progress_ctx = { 0 };
 
 			ufbx_load_opts stream_opts = load_opts;
 			ufbxt_init_allocator(&stream_opts.temp_allocator);
@@ -1657,6 +1678,9 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			stream_opts.result_allocator.huge_threshold = 1;
 			stream_opts.filename.data = NULL;
 			stream_opts.filename.length = 0;
+			stream_opts.progress_fn = &ufbxt_measure_progress;
+			stream_opts.progress_user = &stream_progress_ctx;
+			stream_opts.progress_interval_hint = 1;
 			ufbx_scene *streamed_scene = ufbx_load_file(buf, &stream_opts, &error);
 			if (streamed_scene) {
 				ufbxt_check_scene(streamed_scene);

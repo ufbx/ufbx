@@ -4889,7 +4889,14 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 				// If the array is contained in the current read buffer and we need to convert
 				// the data anyway we can use the read buffer as the decoded array source, otherwise
 				// do a plain byte copy to the array/conversion buffer.
-				if (uc->data_size >= encoded_size && decoded_data != arr_data) {
+				if (uc->yield_size + uc->data_size >= encoded_size && decoded_data != arr_data) {
+					// Yield right after this if we crossed the yield threshold
+					if (encoded_size > uc->yield_size) {
+						uc->data_size += uc->yield_size;
+						uc->yield_size = encoded_size;
+						uc->data_size -= uc->yield_size;
+					}
+
 					decoded_data = (void*)uc->data;
 					ufbxi_consume_bytes(uc, encoded_size);
 				} else {
