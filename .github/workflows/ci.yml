@@ -79,6 +79,7 @@ jobs:
           curl https://wasmtime.dev/install.sh -sSf | bash
           echo Sourcing $HOME/.bashrc
           source $HOME/.bashrc
+          cat $HOME/.bashrc
           echo $PATH
           wasmtime --version
       - name: Run tests
