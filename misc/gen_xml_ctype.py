@@ -5,6 +5,7 @@ categories = [
     "\"",              # UFBXI_XML_CTYPE_DOUBLE_QUOTE
     " \r\n\t?/>\'\"=", # UFBXI_XML_CTYPE_NAME_END
     "<",               # UFBXI_XML_CTYPE_TAG_START
+    "\0",              # UFBXI_XML_CTYPE_END_OF_FILE
 ]
 
 def generate_bits(categories):
@@ -12,8 +13,7 @@ def generate_bits(categories):
         ch = chr(ix)
         bits = 0
         for bit, cat in enumerate(categories):
-            # Include NULL byte in all categories
-            if ch in cat or ix == 0:
+            if ch in cat:
                 bits |= 1 << bit
         yield bits
 
