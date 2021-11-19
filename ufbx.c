@@ -105,7 +105,6 @@
 	#define ufbxi_read_f32(ptr) (*(const float*)(ptr))
 	#define ufbxi_read_f64(ptr) (*(const double*)(ptr))
 #elif defined(__wasm__) || defined(__EMSCRIPTEN__)
-
 	typedef uint16_t __attribute__((aligned(1))) ufbxi_wasm_unaligned_u16;
 	typedef uint32_t __attribute__((aligned(1))) ufbxi_wasm_unaligned_u32;
 	typedef uint64_t __attribute__((aligned(1))) ufbxi_wasm_unaligned_u64;
