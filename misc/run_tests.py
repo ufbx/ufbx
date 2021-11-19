@@ -257,7 +257,10 @@ class GCCCompiler(Compiler):
         args.append("-g")
 
         if config.get("optimize", False):
-            args.append("-O2")
+            if config.get("san", False):
+                args.append("-O0")
+            else:
+                args.append("-O2")
             args.append("-DNDEBUG=1")
 
         if config.get("regression", False):
