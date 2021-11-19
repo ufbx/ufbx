@@ -1388,7 +1388,13 @@ static ufbxi_noinline void ufbxi_free_ator(ufbxi_allocator *ator)
 // allocator or a non-contiguous stack. You can convert the contents of `ufbxi_buf`
 // to a contiguous range of memory by calling `ufbxi_make_array[_all]()`
 
+typedef struct ufbxi_buf_padding ufbxi_buf_padding;
 typedef struct ufbxi_buf_chunk ufbxi_buf_chunk;
+
+struct ufbxi_buf_padding {
+	size_t original_pos; // < Original position before aligning
+	size_t prev_padding; // < Starting offset of the previous `ufbxi_buf_padding`
+};
 
 struct ufbxi_buf_chunk {
 
@@ -1399,11 +1405,10 @@ struct ufbxi_buf_chunk {
 
 	void *align_0; // < Align to 4x pointer size (16/32 bytes)
 
-	size_t size;       // < Size of the chunk `data`, excluding this header
-	size_t pushed_pos; // < Size of valid data when pushed to the list
-	size_t next_size;  // < Next geometrically growing chunk size to allocate
-
-	size_t align_1;    // < Align to 4x size_t (16/32 bytes)
+	size_t size;         // < Size of the chunk `data`, excluding this header
+	size_t pushed_pos;   // < Size of valid data when pushed to the list
+	size_t next_size;    // < Next geometrically growing chunk size to allocate
+	size_t padding_pos;  // < One past the offset of the most recent `ufbxi_buf_padding`
 
 	char data[]; // < Must be aligned to 8 bytes
 };
@@ -1445,34 +1450,20 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 
 	ufbxi_buf_chunk *chunk = b->chunk;
 	if (chunk) {
-		if (b->unordered) {
-			// As unordered buffers don't support popping `chunk->next` can only point
-			// to a (full) huge allocation, if we want to push a non-huge allocation we
-			// need to scan the list until we get to the end.
-			if (!huge) {
-				ufbxi_buf_chunk *next;
-				while ((next = chunk->next) != NULL) {
-					chunk = next;
-				}
-			}
-		} else {
-			// Store the final position for the retired chunk
-			chunk->pushed_pos = b->pos;
+		// Store the final position for the retired chunk
+		chunk->pushed_pos = b->pos;
 
-			// Try to re-use old chunks first _unless_ `huge_size` is 1 meaning we want
-			// to do dedicated allocations for everything for debug purposes.
-			ufbxi_buf_chunk *next;
-			while ((next = chunk->next) != NULL) {
-				chunk = next;
-				if (size <= chunk->size) {
-					b->chunk = chunk;
-					b->pos = (uint32_t)size;
-					b->size = chunk->size;
-					return chunk->data;
-				} else {
-					// Didn't fit, skip the whole chunk
-					chunk->pushed_pos = 0;
-				}
+		size_t align_mask = ufbxi_size_align_mask(size);
+
+		ufbxi_buf_chunk *next;
+		while ((next = chunk->next) != NULL) {
+			chunk = next;
+			size_t pos = ufbxi_align_to_mask(chunk->pushed_pos, align_mask);
+			if (size <= chunk->size - pos) {
+				b->chunk = chunk;
+				b->pos = pos + (uint32_t)size;
+				b->size = chunk->size;
+				return chunk->data + pos;
 			}
 		}
 	}
@@ -1484,9 +1475,9 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 	// If `size` is larger than `huge_size` don't grow `next_size` geometrically,
 	// but use a dedicated allocation.
 	if (huge) {
-		 next_size = chunk ? chunk->next_size : 4096;
+		next_size = chunk ? chunk->next_size : 4096;
 		if (next_size > b->ator->chunk_max) next_size = b->ator->chunk_max;
-		 chunk_size = size;
+		chunk_size = size;
 	} else {
 		next_size = chunk ? chunk->next_size * 2 : 4096;
 		if (next_size > b->ator->chunk_max) next_size = b->ator->chunk_max;
@@ -1504,12 +1495,14 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 	new_chunk->size = chunk_size;
 	new_chunk->next_size = next_size;
 	new_chunk->align_0 = NULL;
-	new_chunk->align_1 = 0;
+	new_chunk->padding_pos = 0;
+	new_chunk->pushed_pos = 0;
 
 	if (b->unordered && huge && chunk) {
 		// If the buffer is unordered and we pushed a huge chunk keep using the current one
 		new_chunk->next = chunk->next;
 		new_chunk->root = chunk->root;
+		new_chunk->pushed_pos = size;
 		if (chunk->next) chunk->next->prev = new_chunk;
 		chunk->next = new_chunk;
 	} else {
@@ -1524,7 +1517,7 @@ static void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 		}
 
 		b->chunk = new_chunk;
-		b->pos = (uint32_t)size;
+		b->pos = size;
 		b->size = chunk_size;
 	}
 
@@ -1546,13 +1539,31 @@ static void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
 	size_t align_mask = ufbxi_size_align_mask(size);
 	size_t pos = ufbxi_align_to_mask(b->pos, align_mask);
 
-	// Try to push to the current block. Allocate a new block
-	// if the aligned size doesn't fit.
-	if (total <= b->size - pos) {
-		b->pos = pos + total;
-		return b->chunk->data + pos;
+	if (!b->unordered && pos != b->pos) {
+		// Alignment mismatch in an unordered block. Align to 16 bytes to guarantee
+		// sufficient alignment for anything afterwards and mark the padding.
+		// If we overflow the current block we don't need to care as the block
+		// boundaries are not contiguous.
+		pos = ufbxi_align_to_mask(b->pos, 0xf);
+		if (total < SIZE_MAX - 16 && total + 16 <= b->size - pos) {
+			ufbxi_buf_padding *padding = (ufbxi_buf_padding*)(b->chunk->data + pos);
+			padding->original_pos = b->pos;
+			padding->prev_padding = b->chunk->padding_pos;
+			b->chunk->padding_pos = pos + 16 + 1;
+			b->pos = pos + 16 + total;
+			return (char*)padding + 16;
+		} else {
+			return ufbxi_push_size_new_block(b, total);
+		}
 	} else {
-		return ufbxi_push_size_new_block(b, total);
+		// Try to push to the current block. Allocate a new block
+		// if the aligned size doesn't fit.
+		if (total <= b->size - pos) {
+			b->pos = pos + total;
+			return b->chunk->data + pos;
+		} else {
+			return ufbxi_push_size_new_block(b, total);
+		}
 	}
 }
 
@@ -1615,69 +1626,63 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 
 	char *ptr = (char*)dst;
 	size_t bytes_left = size * n;
-	if (!ufbxi_does_overflow(bytes_left, size, n)) {
-		if (ptr) {
-			ptr += bytes_left;
-			size_t pos = b->pos;
-			for (;;) {
-				ufbxi_buf_chunk *chunk = b->chunk;
-				if (bytes_left <= pos) {
-					// Rest of the data is in this single chunk
-					pos -= bytes_left;
-					b->pos = pos;
-					ptr -= bytes_left;
-					memcpy(ptr, chunk->data + pos, bytes_left);
-					break;
-				} else {
-					// Pop the whole chunk
-					ptr -= pos;
-					bytes_left -= pos;
-					memcpy(ptr, chunk->data, pos);
-					chunk = chunk->prev;
-					b->chunk = chunk;
-					b->size = chunk->size;
-					pos = chunk->pushed_pos;
-				}
-			}
-		} else {
-			size_t pos = b->pos;
-			for (;;) {
-				ufbxi_buf_chunk *chunk = b->chunk;
-				if (bytes_left <= pos) {
-					// Rest of the data is in this single chunk
-					pos -= bytes_left;
-					b->pos = pos;
-					break;
-				} else {
-					// Pop the whole chunk
-					bytes_left -= pos;
-					chunk = chunk->prev;
-					b->chunk = chunk;
-					b->size = chunk->size;
-					pos = chunk->pushed_pos;
-				}
-			}
-		}
 
-	} else {
-		// Slow path, equivalent to the branch above
-		if (ptr) {
-			for (size_t i = 0; i < n; i++) ptr += size;
+	// We've already pushed this, it better not overflow
+	ufbx_assert(!ufbxi_does_overflow(bytes_left, size, n));
+
+	if (ptr) {
+		ptr += bytes_left;
+		size_t pos = b->pos;
+		for (;;) {
+			ufbxi_buf_chunk *chunk = b->chunk;
+			if (bytes_left <= pos) {
+				// Rest of the data is in this single chunk
+				pos -= bytes_left;
+				b->pos = pos;
+				ptr -= bytes_left;
+				memcpy(ptr, chunk->data + pos, bytes_left);
+				break;
+			} else {
+				// Pop the whole chunk
+				ptr -= pos;
+				bytes_left -= pos;
+				memcpy(ptr, chunk->data, pos);
+				chunk->pushed_pos = 0;
+				chunk = chunk->prev;
+				b->chunk = chunk;
+				b->size = chunk->size;
+				pos = chunk->pushed_pos;
+			}
 		}
-		while (n > 0) {
-			ufbx_assert(b->chunk);
-			while (b->pos == 0) {
-				ufbx_assert(b->chunk->prev);
-				b->chunk = b->chunk->prev;
-				b->pos = b->chunk->pushed_pos;
-				b->size = b->chunk->size;
+	} else {
+		size_t pos = b->pos;
+		for (;;) {
+			ufbxi_buf_chunk *chunk = b->chunk;
+			if (bytes_left <= pos) {
+				// Rest of the data is in this single chunk
+				pos -= bytes_left;
+				b->pos = pos;
+				break;
+			} else {
+				// Pop the whole chunk
+				bytes_left -= pos;
+				chunk->pushed_pos = 0;
+				chunk = chunk->prev;
+				b->chunk = chunk;
+				b->size = chunk->size;
+				pos = chunk->pushed_pos;
 			}
-			ufbx_assert(b->pos >= size);
-			b->pos -= (uint32_t)size;
-			if (ptr) {
-				ptr -= size;
-				memcpy(ptr, b->chunk->data + b->pos, size);
-			}
+		}
+	}
+
+	// Check if we need to rewind past some alignment padding
+	if (b->chunk) {
+		size_t pos = b->pos, padding_pos = b->chunk->padding_pos;
+		if (pos < padding_pos) {
+			ufbx_assert(pos + 1 == padding_pos);
+			ufbxi_buf_padding *padding = (ufbxi_buf_padding*)(b->chunk->data + padding_pos - 1 - 16);
+			b->pos = padding->original_pos;
+			b->chunk->padding_pos = padding->prev_padding;
 		}
 	}
 
@@ -1715,46 +1720,25 @@ static void ufbxi_buf_free(ufbxi_buf *buf)
 
 static void ufbxi_buf_clear(ufbxi_buf *buf)
 {
+	// Free the memory if using ASAN
+	if (buf->ator->huge_size <= 1) {
+		ufbxi_buf_free(buf);
+		return;
+	}
+
 	ufbxi_buf_chunk *chunk = buf->chunk;
 	if (chunk) {
 		buf->chunk = chunk->root;
 		buf->pos = 0;
 		buf->size = buf->chunk->size;
 		buf->num_items = 0;
-	}
-}
 
-static ufbxi_forceinline ufbxi_buf_state ufbxi_buf_push_state(ufbxi_buf *buf)
-{
-	if (buf->ator->huge_size <= 1) {
-		// TODO: Enable this when `ufbxi_buf_free_unused()` works
-		// ufbx_assert(buf->chunk == NULL || buf->pos > 0);
-	}
-
-	ufbxi_buf_state s;
-	s.chunk = buf->chunk;
-	s.pos = buf->pos;
-	s.num_items = buf->num_items;
-	return s;
-}
-
-static void ufbxi_buf_pop_state(ufbxi_buf *buf, const ufbxi_buf_state *state)
-{
-	ufbx_assert(!buf->unordered);
-
-	if (state->chunk) {
-		buf->chunk = state->chunk;
-	} else if (buf->chunk) {
-		buf->chunk = buf->chunk->root;
-	}
-	if (buf->chunk) {
-		buf->size = buf->chunk->size;
-	}
-	buf->num_items = state->num_items;
-	buf->pos = state->pos;
-
-	if (buf->ator->huge_size <= 1) {
-		ufbxi_buf_free_unused(buf);
+		// Reset all the chunks
+		while (chunk) {
+			chunk->pushed_pos = 0;
+			chunk->padding_pos = 0;
+			chunk = chunk->next;
+		}
 	}
 }
 
@@ -3799,6 +3783,8 @@ static ufbxi_noinline ufbxi_xml_document *ufbxi_load_xml(ufbxi_xml_load_opts *op
 	xc.tmp_stack.ator = xc.ator;
 	xc.result.ator = xc.ator;
 
+	xc.result.unordered = true;
+
 	if (opts->prefix_length > 0) {
 		xc.pos = opts->prefix;
 		xc.pos_end = opts->prefix + opts->prefix_length;
@@ -5095,8 +5081,6 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 	}
 
 	if (recursive) {
-		ufbxi_buf_state stack_state = ufbxi_buf_push_state(&uc->tmp_stack);
-
 		// Recursively parse the children of this node. Update the parse state
 		// to provide context for child node parsing.
 		ufbxi_parse_state parse_state = ufbxi_update_parse_state(parent_state, node->name);
@@ -5120,7 +5104,6 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 		if (num_children > 0) {
 			node->children = ufbxi_push_pop(tmp_buf, &uc->tmp_stack, ufbxi_node, num_children);
 			ufbxi_check(node->children);
-			ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
 		}
 	} else {
 		uint64_t current_offset = ufbxi_get_read_offset(uc);
@@ -5501,8 +5484,6 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 	ufbxi_buf *arr_buf = NULL;
 	size_t arr_elem_size = 0;
 
-	ufbxi_buf_state arr_stack_state;
-
 	// Check if the values of the node we're parsing currently should be
 	// treated as an array.
 	ufbxi_array_info arr_info;
@@ -5511,8 +5492,6 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 		arr_buf = tmp_buf;
 		if (arr_info.result) arr_buf = &uc->result;
 		else if (arr_info.tmp_buf) arr_buf = &uc->tmp;
-
-		 arr_stack_state = ufbxi_buf_push_state(&uc->tmp_stack);
 
 		ufbxi_value_array *arr = ufbxi_push(tmp_buf, ufbxi_value_array, 1);
 		ufbxi_check(arr);
@@ -5704,7 +5683,6 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 				node->array->data = arr_data;
 				node->array->size = num_values;
 			}
-			ufbxi_buf_pop_state(&uc->tmp_stack, &arr_stack_state);
 		}
 	} else {
 		num_values = ufbxi_min32(num_values, UFBXI_MAX_NON_ARRAY_VALUES);
@@ -5717,8 +5695,6 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 	// to provide context for child node parsing.
 	if (ufbxi_ascii_accept(uc, '{')) {
 		if (recursive) {
-			ufbxi_buf_state stack_state = ufbxi_buf_push_state(&uc->tmp_stack);
-
 			size_t num_children = 0;
 			for (;;) {
 				bool end = false;
@@ -5731,8 +5707,6 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 			node->children = ufbxi_push_pop(tmp_buf, &uc->tmp_stack, ufbxi_node, num_children);
 			ufbxi_check(node->children);
 			node->num_children = (uint32_t)num_children;
-
-			ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
 		}
 
 		uc->has_next_child = true;
@@ -7193,8 +7167,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 
 	size_t num_textures = 0;
 
-	ufbxi_buf_state stack_state = ufbxi_buf_push_state(&uc->tmp_stack);
-
 	ufbxi_tangent_layer *bitangents = ufbxi_push_zero(&uc->tmp_stack, ufbxi_tangent_layer, num_bitangents);
 	ufbxi_tangent_layer *tangents = ufbxi_push_zero(&uc->tmp_stack, ufbxi_tangent_layer, num_tangents);
 	ufbxi_check(bitangents);
@@ -7406,8 +7378,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	// Sort UV and color sets by set index
 	ufbxi_check(ufbxi_sort_uv_sets(uc, mesh->uv_sets.data, mesh->uv_sets.count));
 	ufbxi_check(ufbxi_sort_color_sets(uc, mesh->color_sets.data, mesh->color_sets.count));
-
-	ufbxi_buf_pop_state(&uc->tmp_stack, &stack_state);
 
 	if (num_textures > 0) {
 		ufbxi_mesh_extra *extra = ufbxi_push_element_extra(uc, mesh->element.id, ufbxi_mesh_extra);
@@ -13486,6 +13456,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->result.ator = &uc->ator_result;
 
 	uc->tmp.unordered = true;
+	uc->tmp_parse.unordered = true;
 	uc->result.unordered = true;
 
 	uc->inflate_retain = &inflate_retain;
@@ -14145,6 +14116,9 @@ ufbxi_nodiscard static ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 	ec->result.ator = &ec->ator_result;
 	ec->tmp.ator = &ec->ator_tmp;
 
+	ec->result.unordered = true;
+	ec->tmp.unordered = true;
+
 	if (ufbxi_evaluate_imp(ec)) {
 		ufbxi_buf_free(&ec->tmp);
 		ufbxi_free_ator(&ec->ator_tmp);
@@ -14672,9 +14646,6 @@ ufbxi_noinline static int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 
 	memcpy(new_values, values, num_values * reals * sizeof(ufbx_real));
 
-	// Nothing has been pushed since
-	ufbxi_pop(&sc->tmp, ufbx_real, num_initial_values, NULL);
-
 	layer->data = new_values;
 	layer->indices = new_indices;
 	layer->num_values = num_values;
@@ -14916,6 +14887,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivi
 
 	ufbxi_init_ator(&sc->error, &sc->ator_tmp, &sc->opts.temp_allocator);
 	ufbxi_init_ator(&sc->error, &sc->ator_result, &sc->opts.result_allocator);
+
+	sc->result.unordered = true;
+	sc->source.unordered = true;
+	sc->tmp.unordered = true;
 
 	sc->source.ator = &sc->ator_tmp;
 	sc->tmp.ator = &sc->ator_tmp;
