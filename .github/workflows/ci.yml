@@ -77,10 +77,8 @@ jobs:
       - name: Install wasmtime
         run: |
           curl https://wasmtime.dev/install.sh -sSf | bash
-          echo Sourcing $HOME/.bashrc
-          source $HOME/.bashrc
-          cat $HOME/.bashrc
-          echo $PATH
-          wasmtime --version
+          echo "$HOME/.wasmtime/bin" >> $GITHUB_PATH
+      - name: Test wasmtime
+        run: wasmtime --version
       - name: Run tests
         run: python3 misc/run_tests.py tests --wasi-sdk build/wasi-sdk --compiler wasi_clang
