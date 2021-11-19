@@ -65,8 +65,8 @@ jobs:
           mkdir build
           export WASI_VERSION=14
           export WASI_VERSION_FULL=${WASI_VERSION}.0
-          curl -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_VERSION}/wasi-sdk-${WASI_VERSION_FULL}-linux.tar.gz -o build/wasi-sdk.gz
-          tar xf build/wasi-sdk.gz
+          curl -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_VERSION}/wasi-sdk-${WASI_VERSION_FULL}-linux.tar.gz -o build/wasi-sdk.tar.gz
+          tar xzf build/wasi-sdk.tar.gz -C build
           mv build/wasi-sdk-${WASI_VERSION_FULL} build/wasi-sdk
       - name: Install wasmtime
         run: |
