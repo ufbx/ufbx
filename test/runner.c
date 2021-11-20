@@ -1417,7 +1417,6 @@ static bool ufbxt_fuzz_should_skip(int iter)
 void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progress_calls, const char *base_name, void *data, size_t size)
 {
 	if (g_fuzz) {
-		size_t step = 0;
 		size_t fail_step = 0;
 		int i;
 
@@ -1568,7 +1567,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 		}
 
-		ufbxt_hintf("Fuzz failed on step: %zu", step);
+		ufbxt_hintf("Fuzz failed on step: %zu", fail_step);
 		ufbxt_assert(fail_step == 0);
 	} else {
 		uint8_t *data_u8 = (uint8_t*)data;
@@ -1731,7 +1730,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			}
 
 			// Try a couple of read buffer sizes
-			if (g_fuzz && !g_fuzz_no_buffer) {
+			if (g_fuzz && !g_fuzz_no_buffer && g_fuzz_step == SIZE_MAX) {
 				ufbxt_begin_fuzz();
 
 				int fail_sz = -1;

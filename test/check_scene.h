@@ -38,7 +38,9 @@ static void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void 
 	}
 
 	ufbxt_assert(elem->num_values >= 0);
-	ufbxt_assert(elem->indices != NULL);
+	if (mesh->num_indices > 0) {
+		ufbxt_assert(elem->indices != NULL);
+	}
 
 	// Check that the indices are in range
 	for (size_t i = 0; i < mesh->num_indices; i++) {
