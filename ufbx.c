@@ -532,10 +532,7 @@ ufbxi_bit_yield(ufbxi_bit_stream *s, const char *ptr)
 
 		ufbx_progress progress = { s->progress_bias + num_read, s->progress_total };
 		if (!s->progress_fn(s->progress_user, &progress)) {
-			// Force an end-of-block symbol when cancelled so we don't need an
-			// extra branch in the chunk decoding loop.
 			s->cancelled = true;
-			s->bits = s->cancel_bits;
 			ptr = s->local_buffer;
 			memset(s->local_buffer, 0, sizeof(s->local_buffer));
 		}
@@ -549,6 +546,11 @@ ufbxi_bit_refill(uint64_t *p_bits, size_t *p_left, const char **p_data, ufbxi_bi
 {
 	if (*p_data > s->chunk_yield) {
 		*p_data = ufbxi_bit_yield(s, *p_data);
+		if (s->cancelled) {
+			// Force an end-of-block symbol when cancelled so we don't need an
+			// extra branch in the chunk decoding loop.
+			*p_bits = s->cancel_bits;
+		}
 	}
 
 	// See https://fgiesen.wordpress.com/2018/02/20/reading-bits-in-far-too-many-ways-part-2/
@@ -873,7 +875,6 @@ ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	return 0;
 }
 
-
 static uint32_t ufbxi_adler32(const void *data, size_t size)
 {
 	size_t a = 1, b = 0;
@@ -924,6 +925,9 @@ ufbxi_inflate_block(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	uint64_t bits = dc->stream.bits;
 	size_t left = dc->stream.left;
 	const char *data = dc->stream.chunk_ptr;
+
+	// Make the stream return the lit/len end of block Huffman code on cancellation
+	dc->stream.cancel_bits = trees->lit_length.end_of_block_bits;
 
 	for (;;) {
 		// NOTE: Cancellation handled implicitly by forcing an end-of-chunk symbol
