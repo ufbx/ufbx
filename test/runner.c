@@ -160,6 +160,7 @@ typedef struct {
 	uint32_t temp_limit;
 	uint32_t result_limit;
 	uint32_t truncate_length;
+	uint32_t cancel_step;
 	const char *description;
 } ufbxt_check_line;
 
@@ -842,6 +843,7 @@ static bool g_all_byte_values = false;
 static bool g_dedicated_allocs = false;
 static bool g_fuzz_no_patch = false;
 static bool g_fuzz_no_truncate = false;
+static bool g_fuzz_no_cancel = false;
 static bool g_fuzz_no_buffer = false;
 static int g_patch_start = 0;
 static int g_fuzz_quality = 16;
@@ -879,7 +881,17 @@ static bool ufbxt_begin_fuzz()
 	}
 }
 
-int ufbxt_test_fuzz(void *data, size_t size, size_t step, int offset, size_t temp_limit, size_t result_limit, size_t truncate_length)
+typedef struct {
+	size_t calls_left;
+} ufbxt_cancel_ctx;
+
+bool ufbxt_cancel_progress(void *user, const ufbx_progress *progress)
+{
+	ufbxt_cancel_ctx *ctx = (ufbxt_cancel_ctx*)user;
+	return --ctx->calls_left > 0;
+}
+
+int ufbxt_test_fuzz(void *data, size_t size, size_t step, int offset, size_t temp_limit, size_t result_limit, size_t truncate_length, size_t cancel_step)
 {
 	if (g_fuzz_step < SIZE_MAX && step != g_fuzz_step) return 1;
 
@@ -888,6 +900,7 @@ int ufbxt_test_fuzz(void *data, size_t size, size_t step, int offset, size_t tem
 	if (!ufbxt_setjmp(*t_jmp_buf)) {
 
 		ufbx_load_opts opts = { 0 };
+		ufbxt_cancel_ctx cancel_ctx = { 0 };
 
 		ufbxt_init_allocator(&opts.temp_allocator);
 		ufbxt_init_allocator(&opts.result_allocator);
@@ -901,6 +914,13 @@ int ufbxt_test_fuzz(void *data, size_t size, size_t step, int offset, size_t tem
 
 		if (result_limit > 0) {
 			opts.result_allocator.huge_threshold = 1;
+		}
+
+		if (cancel_step > 0) {
+			cancel_ctx.calls_left = cancel_step;
+			opts.progress_fn = &ufbxt_cancel_progress;
+			opts.progress_user = &cancel_ctx;
+			opts.progress_interval_hint = 1;
 		}
 
 		if (g_dedicated_allocs) {
@@ -947,6 +967,7 @@ int ufbxt_test_fuzz(void *data, size_t size, size_t step, int offset, size_t tem
 						check->temp_limit = (uint32_t)temp_limit;
 						check->result_limit = (uint32_t)result_limit;
 						check->truncate_length = (uint32_t)truncate_length;
+						check->cancel_step = (uint32_t)cancel_step;
 						check->description = frame.description;
 					}
 				}
@@ -971,6 +992,7 @@ typedef struct {
 	uint32_t temp_limit;
 	uint32_t result_limit;
 	uint32_t truncate_length;
+	// uint32_t cancel_step;
 	const char *description;
 } ufbxt_fuzz_check;
 
@@ -1392,7 +1414,7 @@ static bool ufbxt_fuzz_should_skip(int iter)
 	}
 }
 
-void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *base_name, void *data, size_t size)
+void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progress_calls, const char *base_name, void *data, size_t size)
 {
 	if (g_fuzz) {
 		size_t step = 0;
@@ -1420,7 +1442,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *ba
 
 			size_t step = 10000000 + (size_t)i;
 
-			if (!ufbxt_test_fuzz(data, size, step, -1, (size_t)i, 0, 0)) fail_step = step;
+			if (!ufbxt_test_fuzz(data, size, step, -1, (size_t)i, 0, 0, 0)) fail_step = step;
 		}
 
 		fprintf(stderr, "\rFuzzing temp limit %s: %d/%d\n", base_name, (int)temp_allocs, (int)temp_allocs);
@@ -1437,7 +1459,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *ba
 
 			size_t step = 20000000 + (size_t)i;
 
-			if (!ufbxt_test_fuzz(data, size, step, -1, 0, (size_t)i, 0)) fail_step = step;
+			if (!ufbxt_test_fuzz(data, size, step, -1, 0, (size_t)i, 0, 0)) fail_step = step;
 		}
 
 		fprintf(stderr, "\rFuzzing result limit %s: %d/%d\n", base_name, (int)result_allocs, (int)result_allocs);
@@ -1455,10 +1477,29 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *ba
 
 				size_t step = 30000000 + (size_t)i;
 
-				if (!ufbxt_test_fuzz(data, size, step, -1, 0, 0, (size_t)i)) fail_step = step;
+				if (!ufbxt_test_fuzz(data, size, step, -1, 0, 0, (size_t)i, 0)) fail_step = step;
 			}
 
 			fprintf(stderr, "\rFuzzing truncate %s: %d/%d\n", base_name, (int)size, (int)size);
+		}
+
+		if (!g_fuzz_no_cancel) {
+			#pragma omp parallel for schedule(static, 16)
+			for (i = 0; i < (int)progress_calls; i++) {
+				if (ufbxt_fuzz_should_skip(i)) continue;
+				if (omp_get_thread_num() == 0) {
+					if (i % 16 == 0) {
+						fprintf(stderr, "\rFuzzing cancel %s: %d/%d", base_name, i, (int)size);
+						fflush(stderr);
+					}
+				}
+
+				size_t step = 40000000 + (size_t)i;
+
+				if (!ufbxt_test_fuzz(data, size, step, -1, 0, 0, 0, (size_t)i+1)) fail_step = step;
+			}
+
+			fprintf(stderr, "\rFuzzing cancel %s: %d/%d\n", base_name, (int)size, (int)size);
 		}
 
 		if (!g_fuzz_no_patch) {
@@ -1495,23 +1536,23 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, const char *ba
 				if (g_all_byte_values) {
 					for (uint32_t v = 0; v < 256; v++) {
 						data_u8[i] = (uint8_t)v;
-						if (!ufbxt_test_fuzz(data_u8, size, step + v, i, 0, 0, 0)) fail_step = step + v;
+						if (!ufbxt_test_fuzz(data_u8, size, step + v, i, 0, 0, 0, 0)) fail_step = step + v;
 					}
 				} else {
 					data_u8[i] = original + 1;
-					if (!ufbxt_test_fuzz(data_u8, size, step + 1, i, 0, 0, 0)) fail_step = step + 1;
+					if (!ufbxt_test_fuzz(data_u8, size, step + 1, i, 0, 0, 0, 0)) fail_step = step + 1;
 
 					data_u8[i] = original - 1;
-					if (!ufbxt_test_fuzz(data_u8, size, step + 2, i, 0, 0, 0)) fail_step = step + 2;
+					if (!ufbxt_test_fuzz(data_u8, size, step + 2, i, 0, 0, 0, 0)) fail_step = step + 2;
 
 					if (original != 0) {
 						data_u8[i] = 0;
-						if (!ufbxt_test_fuzz(data_u8, size, step + 3, i, 0, 0, 0)) fail_step = step + 3;
+						if (!ufbxt_test_fuzz(data_u8, size, step + 3, i, 0, 0, 0, 0)) fail_step = step + 3;
 					}
 
 					if (original != 0xff) {
 						data_u8[i] = 0xff;
-						if (!ufbxt_test_fuzz(data_u8, size, step + 4, i, 0, 0, 0)) fail_step = step + 4;
+						if (!ufbxt_test_fuzz(data_u8, size, step + 4, i, 0, 0, 0, 0)) fail_step = step + 4;
 					}
 				}
 
@@ -1821,7 +1862,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 			}
 
-			ufbxt_do_fuzz(scene, streamed_scene, base_name, data, size);
+			ufbxt_do_fuzz(scene, streamed_scene, stream_progress_ctx.calls, base_name, data, size);
 
 			// Run known buffer size checks
 			for (size_t i = 0; i < ufbxt_arraycount(g_buffer_checks); i++) {
@@ -1984,6 +2025,10 @@ int main(int argc, char **argv)
 			g_fuzz_no_truncate = true;
 		}
 
+		if (!strcmp(argv[i], "--fuzz-no-cancel")) {
+			g_fuzz_no_cancel = true;
+		}
+
 		if (!strcmp(argv[i], "--fuzz-no-buffer")) {
 			g_fuzz_no_buffer = true;
 		}
@@ -2073,8 +2118,9 @@ int main(int argc, char **argv)
 
 			int32_t patch_offset = check->patch_offset != UINT32_MAX ? (int32_t)(check->patch_offset - 1) : -1;
 
-			printf("\t{ \"%s\", %d, %u, %u, %u, %u, \"%s\" },\n", check->test_name,
-				patch_offset, (uint32_t)check->patch_value, (uint32_t)check->temp_limit, (uint32_t)check->result_limit, (uint32_t)check->truncate_length, safe_desc);
+			printf("\t{ \"%s\", %d, %u, %u, %u, %u, %u, \"%s\" },\n", check->test_name,
+				patch_offset, (uint32_t)check->patch_value, (uint32_t)check->temp_limit, (uint32_t)check->result_limit, (uint32_t)check->truncate_length,
+				(uint32_t)check->cancel_step, safe_desc);
 
 			free(check->test_name);
 		}
