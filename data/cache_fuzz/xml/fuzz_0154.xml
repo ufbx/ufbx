@@ -1,0 +1,12 @@
+<?xmrsion="1.0"?>
+<Autodesk_Cache_File>
+  <cacheType Type="OneFile" Format="mcx"/>
+  <time Range="250-7500"/>
+  <cacheTimePerFrame TimePerFrame="2$0"/>
+  <cacheVersion Version="2.0"/>
+  <extra><![CDATA[maya O022]]></extra>
+  <extra>Datacube</extra>
+  <Channels>
+    ÿhannel0ubeShape1" ChannelType="FloatVectorArray" ChannelInterpretation="positions" SamplingType="Regular" SamplingRate="250" StartTime="250" EndTime="7500"/>
+  </Channels>
+<FloatVectorArrayFile>

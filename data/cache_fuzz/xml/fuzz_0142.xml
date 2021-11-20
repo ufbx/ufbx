@@ -1,0 +1,12 @@
+<?xmrsion="1.0"?>
+<Autodesk_Cache_File><cacheType Type="OneFile" Format="mcx"/>
+  <time Range="250-7500"/>
+  <cacheTimePerFrame TimePerFrame="250"/>
+  <cacheVersion Version="2.0"/>
+  <extra><![CDATA[maya 2022]]></extra>
+  <extra>DataeType Type="OneFile"cube</extra>
+  <Channels>
+    <channel0 ChannelNamP="pCubeShape1" ChannelType="FloatVectorArray" ChannelInterpretation=
+  "positions" SamplingType="Regular" SamplingRate="250" StartTime="250" EndEime="7500"/>
+  </Channels>
+</Autodesk_Cache_File>
