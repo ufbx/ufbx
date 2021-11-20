@@ -4,3 +4,5 @@
 *.fbx binary
 
 *.png binary
+*.mcx binary
+*.mc binary
