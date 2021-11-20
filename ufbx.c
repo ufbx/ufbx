@@ -1222,8 +1222,13 @@ static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
 
 // -- Allocator
 
-// Returned for zero size allocations
-static char ufbxi_zero_size_buffer[1];
+// Returned for zero size allocations, place in the constant data
+// to catch writes to bad allocations.
+#if defined(UFBX_REGRESSION)
+static const char ufbxi_zero_size_buffer[4096] = { 0 };
+#else
+static const char ufbxi_zero_size_buffer[64] = { 0 };
+#endif
 
 typedef struct {
 	ufbx_error *error;
@@ -1249,7 +1254,7 @@ static void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size, size_t n)
 {
 	// Always succeed with an emtpy non-NULL buffer for empty allocations
 	ufbx_assert(size > 0);
-	if (n == 0) return ufbxi_zero_size_buffer;
+	if (n == 0) return (void*)ufbxi_zero_size_buffer;
 
 	size_t total = size * n;
 	ufbxi_check_return_err(ator->error, !ufbxi_does_overflow(total, size, n), NULL);
@@ -1532,7 +1537,7 @@ static void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
 {
 	// Always succeed with an emtpy non-NULL buffer for empty allocations
 	ufbx_assert(size > 0);
-	if (n == 0) return ufbxi_zero_size_buffer;
+	if (n == 0) return (void*)ufbxi_zero_size_buffer;
 
 	b->num_items += n;
 
@@ -1582,7 +1587,7 @@ ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_push_size_copy(ufbxi_buf *b
 {
 	// Always succeed with an emtpy non-NULL buffer for empty allocations, even if `data == NULL`
 	ufbx_assert(size > 0);
-	if (n == 0) return ufbxi_zero_size_buffer;
+	if (n == 0) return (void*)ufbxi_zero_size_buffer;
 
 	ufbx_assert(data);
 	void *ptr = ufbxi_push_size(b, size, n);
@@ -11338,10 +11343,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		if (texture->type == UFBX_TEXTURE_LAYERED) {
 			ufbxi_check(ufbxi_fetch_texture_layers(uc, &texture->layers, &texture->element));
 			if (extra) {
-				for (size_t i = 0; i < extra->num_alphas; i++) {
+				for (size_t i = 0, num = ufbxi_min_sz(extra->num_alphas, texture->layers.count); i < num; i++) {
 					texture->layers.data[i].alpha = extra->alphas[i];
 				}
-				for (size_t i = 0; i < extra->num_blend_modes; i++) {
+				for (size_t i = 0, num = ufbxi_min_sz(extra->num_blend_modes, texture->layers.count); i < num; i++) {
 					int32_t mode = extra->blend_modes[i];
 					if (mode >= 0 && mode < UFBX_BLEND_OVERLAY) {
 						texture->layers.data[i].blend_mode = (ufbx_blend_mode)mode;
