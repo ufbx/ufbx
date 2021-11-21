@@ -7514,9 +7514,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_line(ufbxi_context *uc, ufb
 
 			// Count end points
 			size_t num_segments = 1;
-			for (size_t i = 0; i < line->point_indices.count - 1; i++) {
-				int32_t ix = line->point_indices.data[i];
-				num_segments += ix < 0 ? 1 : 0;
+			if (line->point_indices.count > 0) {
+				for (size_t i = 0; i < line->point_indices.count - 1; i++) {
+					int32_t ix = line->point_indices.data[i];
+					num_segments += ix < 0 ? 1 : 0;
+				}
 			}
 
 			size_t prev_end = 0;
