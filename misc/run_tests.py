@@ -233,6 +233,10 @@ class GCCCompiler(Compiler):
             return ["x86", "x64"] if self.has_m32 else ["x64"]
         if "i686" in self.arch:
             return ["x86"]
+        if "arm-" in self.arch:
+            return ["arm32"]
+        if "aarch64" in self.arch:
+            return ["arm64"]
         if "wasm32" in self.arch:
             return ["wasm32"]
         return []
@@ -556,6 +560,8 @@ async def main():
         "arch": {
             "x86": { "arch": "x86" },
             "x64": { "arch": "x64" },
+            "arm32": { "arch": "arm32" },
+            "arm64": { "arch": "arm64" },
             "wasm32": { "arch": "wasm32" },
         },
         "sanitize": {
