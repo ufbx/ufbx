@@ -20,6 +20,7 @@ parser.add_argument("--no-sse", action="store_true", help="Don't make SSE builds
 parser.add_argument("--wasi-sdk", default=[], action="append", help="WASI SDK path")
 parser.add_argument("--wasm-runtime", default="wasmtime", type=str, help="WASM runtime command")
 parser.add_argument("--no-sanitize", action="store_true", help="Don't compile builds with ASAN/UBSAN")
+parser.add_argument("--threads", type=int, default=0, help="Number of threads to use (0 to autodetect)")
 argv = parser.parse_args()
 
 color_out = sys.stdout
@@ -77,8 +78,10 @@ def flatten_str_list(str_list):
     inner(result, str_list)
     return result
 
-# TODO: Argument parser
-num_threads = os.cpu_count()
+if argv.threads > 0:
+    num_threads = argv.threads
+else:
+    num_threads = os.cpu_count()
 
 if sys.version_info < (3,8):
     cmd_sema = asyncio.Semaphore(num_threads, loop=loop)
