@@ -118,13 +118,13 @@
 	#define ufbxi_read_f64(ptr) ((double)*(const ufbxi_wasm_unaligned_f64*)(ptr))
 #else
 	static ufbxi_forceinline uint16_t ufbxi_read_u16(const void *ptr) {
-		const char *p = ptr;
+		const char *p = (const char*)ptr;
 		return (uint16_t)(
 			(unsigned)(uint8_t)p[0] << 0u |
 			(unsigned)(uint8_t)p[1] << 8u );
 	}
 	static ufbxi_forceinline uint32_t ufbxi_read_u32(const void *ptr) {
-		const char *p = ptr;
+		const char *p = (const char*)ptr;
 		return (uint32_t)(
 			(unsigned)(uint8_t)p[0] <<  0u |
 			(unsigned)(uint8_t)p[1] <<  8u |
@@ -132,7 +132,7 @@
 			(unsigned)(uint8_t)p[3] << 24u );
 	}
 	static ufbxi_forceinline uint64_t ufbxi_read_u64(const void *ptr) {
-		const char *p = ptr;
+		const char *p = (const char*)ptr;
 		return (uint64_t)(
 			(uint64_t)(uint8_t)p[0] <<  0u |
 			(uint64_t)(uint8_t)p[1] <<  8u |
