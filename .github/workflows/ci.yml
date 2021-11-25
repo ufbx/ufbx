@@ -82,3 +82,11 @@ jobs:
         run: wasmtime --version
       - name: Run tests
         run: python3 misc/run_tests.py tests --wasi-sdk build/wasi-sdk --compiler wasi_clang
+
+  ci_arm64:
+    runs-on: [self-hosted, ARM64]
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      - name: Run tests
+        run: python3 misc/run_tests.py tests --no-sanitize

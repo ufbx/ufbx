@@ -19,6 +19,7 @@ parser.add_argument("--compiler", default=[], action="append", help="Specify exa
 parser.add_argument("--no-sse", action="store_true", help="Don't make SSE builds when possible")
 parser.add_argument("--wasi-sdk", default=[], action="append", help="WASI SDK path")
 parser.add_argument("--wasm-runtime", default="wasmtime", type=str, help="WASM runtime command")
+parser.add_argument("--no-sanitize", action="store_true", help="Don't compile builds with ASAN/UBSAN")
 argv = parser.parse_args()
 
 color_out = sys.stdout
@@ -378,6 +379,12 @@ class VsCompiler(Compiler):
     def compile(self, config):
         return self.inner.compile(config)
 
+def supported_archs(compiler):
+    archs = compiler.supported_archs()
+    if argv.no_sanitize:
+        archs = [a for a in archs if not a.endswith("-san")]
+    return archs
+
 all_compilers = [
     CLCompiler("cl", "cl.exe"),
     GCCCompiler("gcc", "gcc", False),
@@ -579,7 +586,7 @@ async def main():
         is_c = not is_cpp
 
         for compiler in compilers:
-            archs = set(compiler.supported_archs())
+            archs = set(supported_archs(compiler))
 
             if is_c and not compiler.has_c: continue
             if is_cpp and not compiler.has_cpp: continue
@@ -641,7 +648,7 @@ async def main():
     log_comment("-- Detected the following compilers --")
 
     for compiler in compilers:
-        archs = ", ".join(decorate_arch(compiler, arch) for arch in compiler.supported_archs())
+        archs = ", ".join(decorate_arch(compiler, arch) for arch in supported_archs(compiler))
         log_comment(f"  {compiler.exe}: {compiler.arch} {compiler.version} [{archs}]")
 
     num_fail = 0
@@ -679,6 +686,7 @@ async def main():
                 continue
             if "clang" in compiler.name:
                 score += 3
+            # TODO: ARM? Native?
             if "x64" in compiler.supported_archs():
                 score += 10
 
