@@ -236,7 +236,7 @@ class GCCCompiler(Compiler):
             return ["x86", "x64"] if self.has_m32 else ["x64"]
         if "i686" in self.arch:
             return ["x86"]
-        if "arm-" in self.arch or "armv71-" in self.arch:
+        if "arm-" in self.arch or "armv7l-" in self.arch or "armv7b-" in self.arch:
             return ["arm32"]
         if "aarch64" in self.arch:
             return ["arm64"]
