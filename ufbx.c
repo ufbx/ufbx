@@ -6563,7 +6563,7 @@ ufbxi_nodiscard static ufbx_element *ufbxi_push_element_size(ufbxi_context *uc, 
 	ufbx_element *elem = (ufbx_element*)ufbxi_push_zero(&uc->tmp_elements, uint64_t, aligned_size/8);
 	ufbxi_check_return(elem, NULL);
 	elem->type = type;
-	elem->id = uc->num_elements++;
+	elem->element_id = uc->num_elements++;
 	elem->typed_id = typed_id;
 	elem->name = info->name;
 	elem->props = info->props;
@@ -6572,7 +6572,7 @@ ufbxi_nodiscard static ufbx_element *ufbxi_push_element_size(ufbxi_context *uc, 
 	ufbxi_fbx_id_entry *entry = ufbxi_map_insert(&uc->fbx_id_map, ufbxi_fbx_id_entry, hash, &info->fbx_id);
 	ufbxi_check_return(entry, NULL);
 	entry->fbx_id = info->fbx_id;
-	entry->element_id = elem->id;
+	entry->element_id = elem->element_id;
 
 	return elem;
 }
@@ -6590,7 +6590,7 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 	ufbx_element *elem = (ufbx_element*)ufbxi_push_zero(&uc->tmp_elements, uint64_t, aligned_size/8);
 	ufbxi_check_return(elem, NULL);
 	elem->type = type;
-	elem->id = uc->num_elements++;
+	elem->element_id = uc->num_elements++;
 	elem->typed_id = typed_id;
 	if (name) {
 		elem->name.data = name;
@@ -6603,7 +6603,7 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 	ufbxi_fbx_id_entry *entry = ufbxi_map_insert(&uc->fbx_id_map, ufbxi_fbx_id_entry, hash, &fbx_id);
 	ufbxi_check_return(entry, NULL);
 	entry->fbx_id = fbx_id;
-	entry->element_id = elem->id;
+	entry->element_id = elem->element_id;
 
 	return elem;
 }
@@ -6616,7 +6616,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_model(ufbxi_context *uc, uf
 	(void)node;
 	ufbx_node *elem_node = ufbxi_push_element(uc, info, ufbx_node, UFBX_ELEMENT_NODE);
 	ufbxi_check(elem_node);
-	ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &elem_node->element.id));
+	ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &elem_node->element.element_id));
 	return 1;
 }
 
@@ -7123,6 +7123,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	ufbxi_check(mesh->faces);
 
 	size_t num_triangles = 0;
+	size_t max_face_triangles = 0;
 
 	ufbx_face *dst_face = mesh->faces;
 	int32_t *p_face_begin = index_data;
@@ -7137,6 +7138,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 			dst_face->num_indices = num_indices;
 			if (num_indices >= 3) {
 				num_triangles += num_indices - 2;
+				max_face_triangles = ufbxi_max_sz(max_face_triangles, num_indices - 2);
 			}
 			dst_face++;
 			p_face_begin = p_ix + 1;
@@ -7147,6 +7149,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	mesh->vertex_position.indices = index_data;
 	mesh->num_faces = dst_face - mesh->faces;
 	mesh->num_triangles = num_triangles;
+	mesh->max_face_triangles = max_face_triangles;
 
 	mesh->vertex_first_index = ufbxi_push(&uc->result, int32_t, mesh->num_vertices);
 	ufbxi_check(mesh->vertex_first_index);
@@ -7396,7 +7399,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	ufbxi_check(ufbxi_sort_color_sets(uc, mesh->color_sets.data, mesh->color_sets.count));
 
 	if (num_textures > 0) {
-		ufbxi_mesh_extra *extra = ufbxi_push_element_extra(uc, mesh->element.id, ufbxi_mesh_extra);
+		ufbxi_mesh_extra *extra = ufbxi_push_element_extra(uc, mesh->element.element_id, ufbxi_mesh_extra);
 		ufbxi_check(extra);
 		extra->texture_count = num_textures;
 		extra->texture_arr = ufbxi_push_pop(&uc->tmp, &uc->tmp_mesh_textures, ufbxi_tmp_mesh_texture, num_textures);
@@ -7906,7 +7909,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_layered_texture(ufbxi_conte
 	texture->filename = ufbx_empty_string;
 	texture->relative_filename = ufbx_empty_string;
 
-	ufbxi_texture_extra *extra = ufbxi_push_element_extra(uc, texture->element.id, ufbxi_texture_extra);
+	ufbxi_texture_extra *extra = ufbxi_push_element_extra(uc, texture->element.element_id, ufbxi_texture_extra);
 	ufbxi_check(extra);
 
 	ufbxi_value_array *alphas = ufbxi_find_array(node, ufbxi_Alphas, 'r');
@@ -8856,7 +8859,7 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 		root_info.name = ufbx_empty_string;
 		ufbx_node *root = ufbxi_push_element(uc, &root_info, ufbx_node, UFBX_ELEMENT_NODE);
 		ufbxi_check(root);
-		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &root->element.id));
+		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &root->element.element_id));
 
 		if (uc->opts.use_root_transform) {
 			root->local_transform = uc->opts.root_transform;
@@ -9324,7 +9327,7 @@ ufbxi_nodiscard static int ufbxi_read_legacy_model(ufbxi_context *uc, ufbxi_node
 
 	ufbx_node *elem_node = ufbxi_push_element(uc, &info, ufbx_node, UFBX_ELEMENT_NODE);
 	ufbxi_check(elem_node);
-	ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &elem_node->element.id));
+	ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &elem_node->element.element_id));
 
 	ufbxi_element_info attrib_info = { 0 };
 	attrib_info.fbx_id = info.fbx_id + 1;
@@ -9396,7 +9399,7 @@ ufbxi_nodiscard static int ufbxi_read_legacy_root(ufbxi_context *uc)
 	{
 		ufbx_node *root = ufbxi_push_synthetic_element(uc, &uc->root_id, ufbxi_empty_char, ufbx_node, UFBX_ELEMENT_NODE);
 		ufbxi_check(root);
-		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &root->element.id));
+		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &root->element.element_id));
 	}
 
 	for (;;) {
@@ -9474,12 +9477,12 @@ ufbxi_forceinline static bool ufbxi_cmp_node_less(ufbx_node *a, ufbx_node *b)
 {
 	if (a->node_depth != b->node_depth) return a->node_depth < b->node_depth;
 	if (a->parent && b->parent) {
-		uint32_t a_pid = a->parent->element.id, b_pid = b->parent->element.id;
+		uint32_t a_pid = a->parent->element.element_id, b_pid = b->parent->element.element_id;
 		if (a_pid != b_pid) return a_pid < b_pid;
 	} else {
 		ufbx_assert(a->parent == NULL && b->parent == NULL);
 	}
-	return a->element.id < b->element.id;
+	return a->element.element_id < b->element.element_id;
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_node_ptrs(ufbxi_context *uc, ufbx_node **nodes, size_t count)
@@ -9640,14 +9643,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_connections_to_elements(ufbx
 
 	ufbxi_for_ptr(ufbx_element, p_elem, uc->scene.elements.data, uc->scene.elements.count) {
 		ufbx_element *elem = *p_elem;
-		uint32_t id = elem->id;
+		uint32_t id = elem->element_id;
 
-		while (conn_src < conn_src_end && conn_src->src->id < id) conn_src++;
-		while (conn_dst < conn_dst_end && conn_dst->dst->id < id) conn_dst++;
+		while (conn_src < conn_src_end && conn_src->src->element_id < id) conn_src++;
+		while (conn_dst < conn_dst_end && conn_dst->dst->element_id < id) conn_dst++;
 		ufbx_connection *src_end = conn_src, *dst_end = conn_dst;
 
-		while (src_end < conn_src_end && src_end->src->id == id) src_end++;
-		while (dst_end < conn_dst_end && dst_end->dst->id == id) dst_end++;
+		while (src_end < conn_src_end && src_end->src->element_id == id) src_end++;
+		while (dst_end < conn_dst_end && dst_end->dst->element_id == id) dst_end++;
 
 		elem->connections_src.data = conn_src;
 		elem->connections_src.count = (size_t)(src_end - conn_src);
@@ -10688,7 +10691,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			if (!elem || elem->type != UFBX_ELEMENT_NODE) continue;
 
 			ufbx_bone_pose *bone = &pose->bone_poses.data[pose->bone_poses.count++];
-			bone->bone = (ufbx_node*)elem;
+			bone->bone_node = (ufbx_node*)elem;
 			bone->bone_to_world = tmp_poses[i].bone_to_world;
 
 			if (pose->bind_pose) {
@@ -10718,7 +10721,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, uc->scene.skin_clusters) {
 		ufbx_skin_cluster *cluster = *p_cluster;
-		cluster->bone = (ufbx_node*)ufbxi_fetch_dst_element(&cluster->element, false, NULL, UFBX_ELEMENT_NODE);
+		cluster->bone_node = (ufbx_node*)ufbxi_fetch_dst_element(&cluster->element, false, NULL, UFBX_ELEMENT_NODE);
 	}
 
 	ufbxi_for_ptr_list(ufbx_skin_deformer, p_skin, uc->scene.skin_deformers) {
@@ -10729,7 +10732,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		if (!uc->opts.connect_broken_elements) {
 			size_t num_broken = 0;
 			for (size_t i = 0; i < skin->clusters.count; i++) {
-				if (!skin->clusters.data[i]->bone) {
+				if (!skin->clusters.data[i]->bone_node) {
 					num_broken++;
 				} else if (num_broken > 0) {
 					skin->clusters.data[i - num_broken] = skin->clusters.data[i];
@@ -10939,13 +10942,20 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				mesh->subdivision_uv_boundary = UFBX_SUBDIVISION_BOUNDARY_SHARP_BOUNDARY;
 			}
 
+			// Push a NULL material if necessary if requested
+			if (mesh->materials.count == 0 && uc->opts.allow_null_material) {
+				mesh->materials.data = ufbxi_push_zero(&uc->result, ufbx_mesh_material, 1);
+				ufbxi_check(mesh->materials.data);
+				mesh->materials.count = 1;
+			}
+
 			if (mesh->materials.count == 1) {
 				// Use the shared consecutive index buffer for mesh faces if there's only one material
 				// See HACK(consecutive-faces) in `ufbxi_read_mesh()`.
 				ufbx_mesh_material *mat = &mesh->materials.data[0];
 				mat->num_faces = mesh->num_faces;
 				mat->num_triangles = mesh->num_triangles;
-				mat->faces = uc->consecutive_indices;
+				mat->face_indices = uc->consecutive_indices;
 				mesh->face_material = uc->zero_indices;
 			} else if (mesh->materials.count > 0 && mesh->face_material) {
 				size_t num_materials = mesh->materials.count;
@@ -10967,8 +10977,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				// Allocate per-material buffers (clear `num_faces` to 0 to re-use it as
 				// an index when fetching the face indices).
 				ufbxi_for_list(ufbx_mesh_material, mat, mesh->materials) {
-					mat->faces = ufbxi_push(&uc->result, int32_t, mat->num_faces);
-					ufbxi_check(mat->faces);
+					mat->face_indices = ufbxi_push(&uc->result, int32_t, mat->num_faces);
+					ufbxi_check(mat->face_indices);
 					mat->num_faces = 0;
 				}
 
@@ -10977,7 +10987,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 					int32_t mat_ix = mesh->face_material[i];
 					if (mat_ix >= 0 && (size_t)mat_ix < num_materials) {
 						ufbx_mesh_material *mat = &mesh->materials.data[mat_ix];
-						mat->faces[mat->num_faces++] = (int32_t)i;
+						mat->face_indices[mat->num_faces++] = (int32_t)i;
 					}
 				}
 			} else {
@@ -10988,10 +10998,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			// TODO: Should per-instance materials be supported?
 
 			// Fetch deformers
-			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->skins, &mesh->element, search_node, NULL, UFBX_ELEMENT_SKIN_DEFORMER));
+			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->skin_deformers, &mesh->element, search_node, NULL, UFBX_ELEMENT_SKIN_DEFORMER));
 			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->blend_deformers, &mesh->element, search_node, NULL, UFBX_ELEMENT_BLEND_DEFORMER));
-			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->geometry_caches, &mesh->element, search_node, NULL, UFBX_ELEMENT_CACHE_DEFORMER));
+			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->cache_deformers, &mesh->element, search_node, NULL, UFBX_ELEMENT_CACHE_DEFORMER));
 			ufbxi_check(ufbxi_fetch_deformers(uc, &mesh->all_deformers, &mesh->element, search_node));
+
+			// Update metadata
+			if (mesh->max_face_triangles > uc->scene.metadata.max_face_triangles) {
+				uc->scene.metadata.max_face_triangles = mesh->max_face_triangles;
+			}
 		}
 	}
 
@@ -11029,7 +11044,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			ufbxi_for_list(ufbx_connection, ac, value->element.connections_src) {
 				if (ac->src_prop.length == 0 && ac->dst_prop.length > 0) {
 					ufbx_anim_prop *aprop = ufbxi_push(&uc->tmp_stack, ufbx_anim_prop, 1);
-					uint32_t id = ac->dst->id;
+					uint32_t id = ac->dst->element_id;
 					min_id = ufbxi_min32(min_id, id);
 					max_id = ufbxi_max32(max_id, id);
 					uint32_t id_mask = ufbxi_arraycount(layer->element_id_bitmask) - 1;
@@ -11164,7 +11179,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			ufbx_mesh *mesh = *p_mesh;
 			size_t num_materials = mesh->materials.count;
 
-			ufbxi_mesh_extra *extra = (ufbxi_mesh_extra*)ufbxi_get_element_extra(uc, mesh->element.id);
+			ufbxi_mesh_extra *extra = (ufbxi_mesh_extra*)ufbxi_get_element_extra(uc, mesh->element.element_id);
 			if (!extra) continue;
 			if (num_materials == 0) continue;
 
@@ -11324,7 +11339,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	ufbxi_for_ptr_list(ufbx_texture, p_texture, uc->scene.textures) {
 		ufbx_texture *texture = *p_texture;
-		ufbxi_texture_extra *extra = (ufbxi_texture_extra*)ufbxi_get_element_extra(uc, texture->element.id);
+		ufbxi_texture_extra *extra = (ufbxi_texture_extra*)ufbxi_get_element_extra(uc, texture->element.element_id);
 
 		ufbxi_check(ufbxi_resolve_relative_filename(uc, &texture->filename, texture->relative_filename));
 
@@ -11896,8 +11911,8 @@ ufbxi_noinline static void ufbxi_update_line_curve(ufbx_line_curve *line)
 
 ufbxi_noinline static void ufbxi_update_skin_cluster(ufbx_skin_cluster *cluster)
 {
-	if (cluster->bone) {
-		cluster->geometry_to_world = ufbx_matrix_mul(&cluster->bone->node_to_world, &cluster->geometry_to_bone);
+	if (cluster->bone_node) {
+		cluster->geometry_to_world = ufbx_matrix_mul(&cluster->bone_node->node_to_world, &cluster->geometry_to_bone);
 	} else {
 		cluster->geometry_to_world = ufbx_matrix_mul(&cluster->bind_to_world, &cluster->geometry_to_bone);
 	}
@@ -13192,7 +13207,7 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 
 	ufbxi_for_ptr_list(ufbx_mesh, p_mesh, scene->meshes) {
 		ufbx_mesh *mesh = *p_mesh;
-		if (mesh->blend_deformers.count == 0 && mesh->skins.count == 0 && (mesh->geometry_caches.count == 0 || !load_caches)) continue;
+		if (mesh->blend_deformers.count == 0 && mesh->skin_deformers.count == 0 && (mesh->cache_deformers.count == 0 || !load_caches)) continue;
 		max_skinned_indices = ufbxi_max_sz(max_skinned_indices, mesh->num_indices);
 	}
 
@@ -13201,7 +13216,7 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 
 	ufbxi_for_ptr_list(ufbx_mesh, p_mesh, scene->meshes) {
 		ufbx_mesh *mesh = *p_mesh;
-		if (mesh->blend_deformers.count == 0 && mesh->skins.count == 0 && (mesh->geometry_caches.count == 0 || !load_caches)) continue;
+		if (mesh->blend_deformers.count == 0 && mesh->skin_deformers.count == 0 && (mesh->cache_deformers.count == 0 || !load_caches)) continue;
 		if (mesh->num_vertices == 0) continue;
 
 		size_t num_vertices = mesh->num_vertices;
@@ -13212,8 +13227,8 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 		result_pos++;
 
 		bool cached_position = false, cached_normals = false;
-		if (load_caches && mesh->geometry_caches.count > 0) {
-			ufbxi_for_ptr_list(ufbx_cache_deformer, p_cache, mesh->geometry_caches) {
+		if (load_caches && mesh->cache_deformers.count > 0) {
+			ufbxi_for_ptr_list(ufbx_cache_deformer, p_cache, mesh->cache_deformers) {
 				ufbx_cache_channel *channel = (*p_cache)->external_channel;
 				if (!channel) continue;
 
@@ -13250,9 +13265,9 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 			}
 
 			// TODO: What should we do about multiple skins??
-			if (mesh->skins.count > 0) {
+			if (mesh->skin_deformers.count > 0) {
 				ufbx_matrix *fallback = mesh->instances.count > 0 ? &mesh->instances.data[0]->geometry_to_world : NULL;
-				ufbx_skin_deformer *skin = mesh->skins.data[0];
+				ufbx_skin_deformer *skin = mesh->skin_deformers.data[0];
 				for (size_t i = 0; i < num_vertices; i++) {
 					ufbx_matrix mat = ufbx_get_skin_vertex_matrix(skin, i, fallback);
 					result_pos[i] = ufbx_transform_position(&mat, result_pos[i]);
@@ -13697,7 +13712,7 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 {
 	ufbxi_anim_layer_combine_ctx combine_ctx = { *anim, element, time };
 
-	uint32_t element_id = element->id;
+	uint32_t element_id = element->element_id;
 	ufbxi_for_list(const ufbx_anim_layer_desc, layer_desc, anim->layers) {
 		ufbx_anim_layer *layer = layer_desc->layer;
 		if (!ufbxi_anim_layer_might_contain_id(layer, element_id)) continue;
@@ -13750,6 +13765,105 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 	ufbxi_for(ufbx_prop, prop, props, num_props) {
 		prop->value_int = (int64_t)prop->value_real;
 	}
+}
+
+static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *props, const char **prop_names, size_t max_props)
+{
+	const char *name = prop_names[0];
+	uint32_t key = ufbxi_get_name_key_c(name);
+	size_t num_props = 0;
+
+	const ufbx_prop_override *over = NULL, *over_end = NULL;
+	if (anim->prop_overrides.count > 0) {
+		ufbx_const_prop_override_list list = ufbxi_find_element_prop_overrides(&anim->prop_overrides, element->element_id);
+		over = list.data;
+		over_end = over + list.count;
+	}
+
+#if defined(UFBX_REGRESSION)
+	for (size_t i = 1; i < max_props; i++) {
+		ufbx_assert(strcmp(prop_names[i - 1], prop_names[i]) < 0);
+	}
+#endif
+
+	size_t name_ix = 0;
+	for (size_t i = 0; i < element->props.num_props; i++) {
+		ufbx_prop *prop = &element->props.props[i];
+
+		while (name_ix < max_props) {
+			if (key > prop->internal_key) break;
+
+			if (over) {
+				bool found_override = false;
+				for (; over != over_end; over++) {
+					ufbx_prop *dst = &props[num_props];
+					if (over->internal_key < key || strcmp(over->prop_name, name) < 0) {
+						continue;
+					} else if (over->internal_key == key && strcmp(over->prop_name, name) == 0) {
+						dst->name = ufbxi_str_c(name);
+						dst->internal_key = key;
+						dst->type = UFBX_PROP_UNKNOWN;
+						dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
+					} else {
+						break;
+					}
+					dst->value_str = ufbxi_str_c(over->value_str);
+					dst->value_int = over->value_int;
+					dst->value_vec3 = over->value;
+					num_props++;
+					found_override = true;
+				}
+				if (found_override) break;
+			}
+
+			if (name == prop->name.data) {
+				if (prop->flags & UFBX_PROP_FLAG_ANIMATED) {
+					props[num_props++] = *prop;
+				}
+				break;
+			} else if (strcmp(name, prop->name.data) < 0) {
+				name_ix++;
+				if (name_ix < max_props) {
+					name = prop_names[name_ix];
+					key = ufbxi_get_name_key_c(name);
+				}
+			} else {
+				break;
+			}
+		}
+	}
+
+	if (over) {
+		for (; over != over_end && name_ix < max_props; over++) {
+			ufbx_prop *dst = &props[num_props];
+			if (over->internal_key < key || strcmp(over->prop_name, name) < 0) {
+				continue;
+			} else if (over->internal_key == key && strcmp(over->prop_name, name) == 0) {
+				dst->name = ufbxi_str_c(name);
+				dst->internal_key = key;
+				dst->type = UFBX_PROP_UNKNOWN;
+				dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
+			} else {
+				name_ix++;
+				if (name_ix < max_props) {
+					name = prop_names[name_ix];
+					key = ufbxi_get_name_key_c(name);
+				}
+			}
+			dst->value_str = ufbxi_str_c(over->value_str);
+			dst->value_int = over->value_int;
+			dst->value_vec3 = over->value;
+			num_props++;
+		}
+	}
+
+	ufbxi_evaluate_props(anim, element, time, props, num_props);
+
+	ufbx_props prop_list;
+	prop_list.props = props;
+	prop_list.num_props = prop_list.num_animated = num_props;
+	prop_list.defaults = (ufbx_props*)&element->props;
+	return prop_list;
 }
 
 
@@ -13899,9 +14013,9 @@ ufbxi_nodiscard static int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 		}
 		mesh->materials.data = materials;
 
-		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->skins));
+		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->skin_deformers));
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->blend_deformers));
-		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->geometry_caches));
+		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->cache_deformers));
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->all_deformers));
 	}
 
@@ -13918,7 +14032,7 @@ ufbxi_nodiscard static int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 
 	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, ec->scene.skin_clusters) {
 		ufbx_skin_cluster *cluster = *p_cluster;
-		cluster->bone = (ufbx_node*)ufbxi_translate_element(ec, cluster->bone);
+		cluster->bone_node = (ufbx_node*)ufbxi_translate_element(ec, cluster->bone_node);
 	}
 
 	ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, ec->scene.blend_deformers) {
@@ -14059,8 +14173,8 @@ ufbxi_nodiscard static int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 
 		// Setup the overrides for this element if found
 		if (overrides_left.count > 0) {
-			if (overrides_left.data[0].element_id <= elem->id) {
-				anim.prop_overrides = ufbxi_find_element_prop_overrides(&overrides_left, elem->id);
+			if (overrides_left.data[0].element_id <= elem->element_id) {
+				anim.prop_overrides = ufbxi_find_element_prop_overrides(&overrides_left, elem->element_id);
 				overrides_left.data = anim.prop_overrides.data + anim.prop_overrides.count;
 				overrides_left.count = ec->anim.prop_overrides.data + ec->anim.prop_overrides.count - overrides_left.data;
 				num_animated += anim.prop_overrides.count;
@@ -14073,7 +14187,7 @@ ufbxi_nodiscard static int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 		ufbxi_check_err(&ec->error, props);
 
 		elem->props = ufbx_evaluate_props(&anim, elem, ec->time, props, num_animated);
-		elem->props.defaults = &ec->src_scene.elements.data[elem->id]->props;
+		elem->props.defaults = &ec->src_scene.elements.data[elem->element_id]->props;
 
 		anim.prop_overrides.count = 0;
 	}
@@ -14877,8 +14991,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 
 	// See `ufbxi_finalize_scene()`
 	ufbxi_for_list(ufbx_mesh_material, mat, result->materials) {
-		mat->faces = ufbxi_push(&sc->result, int32_t, mat->num_faces);
-		ufbxi_check_err(&sc->error, mat->faces);
+		mat->face_indices = ufbxi_push(&sc->result, int32_t, mat->num_faces);
+		ufbxi_check_err(&sc->error, mat->face_indices);
 		mat->num_faces = 0;
 	}
 
@@ -14886,7 +15000,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 		int32_t mat_ix = result->face_material ? result->face_material[i] : 0;
 		if (mat_ix >= 0 && (size_t)mat_ix < num_materials) {
 			ufbx_mesh_material *mat = &result->materials.data[mat_ix];
-			mat->faces[mat->num_faces++] = (int32_t)i;
+			mat->face_indices[mat->num_faces++] = (int32_t)i;
 		}
 	}
 
@@ -15006,71 +15120,129 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 
 // -- Utility
 
-static int ufbxi_map_cmp_vertex_1(void *user, const void *va, const void *vb)
+static int ufbxi_map_cmp_vertex(void *user, const void *va, const void *vb)
 {
 	size_t size = *(size_t*)user;
-	return memcmp(va, vb, size);
-}
-
-
-static int ufbxi_map_cmp_vertex_4(void *user, const void *va, const void *vb)
-{
-	size_t size = *(size_t*)user;
-	for (size_t i = 0; i < size; i += 4) {
-		uint32_t a = *(const uint32_t*)((const char*)va + i);
-		uint32_t b = *(const uint32_t*)((const char*)vb + i);
+#if defined(UFBX_REGRESSION)
+	ufbx_assert(size % 8 == 0);
+#endif
+	for (size_t i = 0; i < size; i += 8) {
+		uint64_t a = *(const uint64_t*)((const char*)va + i);
+		uint64_t b = *(const uint64_t*)((const char*)vb + i);
 		if (a != b) return a < b ? -1 : +1;
 	}
 	return 0;
 }
 
-static ufbxi_noinline size_t ufbxi_generate_indices(void *vertices, uint32_t *indices, size_t vertex_size, size_t num_indices, const ufbx_allocator *allocator, ufbx_error *error)
+typedef struct {
+	char *begin, *ptr;
+	size_t vertex_size;
+	size_t packed_offset;
+} ufbxi_vertex_stream;
+
+static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *user_streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator *allocator, ufbx_error *error)
 {
 	bool fail = false;
 
 	ufbxi_allocator ator = { 0 };
 	ufbxi_init_ator(error, &ator, allocator);
 
-	size_t vertex_size_ptr = vertex_size;
-	ufbxi_map map = { 0 };
-	if (vertex_size % 4 == 0 && (uintptr_t)vertices % 4 == 0) {
-		ufbxi_map_init(&map, &ator, &ufbxi_map_cmp_vertex_4, &vertex_size_ptr);
+	ufbxi_vertex_stream local_streams[16];
+	uint64_t local_packed_vertex[64];
+
+	ufbxi_vertex_stream *streams = NULL;
+	if (num_streams > ufbxi_arraycount(local_streams)) {
+		streams = ufbxi_alloc(&ator, ufbxi_vertex_stream, num_streams);
+		if (!streams) fail = true;
 	} else {
-		ufbxi_map_init(&map, &ator, &ufbxi_map_cmp_vertex_1, &vertex_size_ptr);
+		streams = local_streams;
 	}
 
-	if (!ufbxi_map_grow_size(&map, vertex_size, num_indices)) {
+	size_t packed_size = 0;
+	if (!fail) {
+		for (size_t i = 0; i < num_streams; i++) {
+			size_t vertex_size = user_streams[i].vertex_size;
+			size_t align = ufbxi_size_align_mask(vertex_size);
+			packed_size = ufbxi_align_to_mask(packed_size, align);
+			streams[i].ptr = streams[i].begin = (char*)user_streams[i].data;
+			streams[i].vertex_size = vertex_size;
+			streams[i].packed_offset = packed_size;
+			packed_size += vertex_size;
+		}
+		packed_size = ufbxi_align_to_mask(packed_size, 7);
+	}
+
+	char *packed_vertex = NULL;
+	if (!fail) {
+		if (packed_size > sizeof(local_packed_vertex)) {
+			ufbx_assert(packed_size % 8 == 0);
+			packed_vertex = (char*)ufbxi_alloc(&ator, uint64_t, packed_size / 8);
+			if (!packed_vertex) fail = true;
+		} else {
+			packed_vertex = (char*)local_packed_vertex;
+		}
+	}
+
+	ufbxi_map map = { 0 };
+	ufbxi_map_init(&map, &ator, &ufbxi_map_cmp_vertex, &packed_size);
+
+	if (num_indices > 0 && !ufbxi_map_grow_size(&map, packed_size, num_indices)) {
 		fail = true;
 	}
 
 	if (!fail) {
+		memset(packed_vertex, 0, packed_size);
+
 		for (size_t i = 0; i < num_indices; i++) {
-			char *vertex = (char*)vertices + i * vertex_size;
-			uint32_t hash = ufbxi_hash_string(vertex, vertex_size);
-			void *entry = ufbxi_map_find_size(&map, vertex_size, hash, vertex);
+			for (size_t si = 0; si < num_streams; si++) {
+				size_t size = streams[si].vertex_size, offset = streams[si].packed_offset;
+				char *ptr = streams[si].ptr;
+				memcpy(packed_vertex + offset, ptr, size);
+				streams[si].ptr = ptr + size;
+			}
+
+			uint32_t hash = ufbxi_hash_string(packed_vertex, packed_size);
+			void *entry = ufbxi_map_find_size(&map, packed_size, hash, packed_vertex);
 			if (!entry) {
-				entry = ufbxi_map_insert_size(&map, vertex_size, hash, vertex);
-				memcpy(entry, vertex, vertex_size);
+				entry = ufbxi_map_insert_size(&map, packed_size, hash, packed_vertex);
 				if (!entry) {
 					fail = true;
 					break;
 				}
+				memcpy(entry, packed_vertex, packed_size);
 			}
-			uint32_t index = (uint32_t)(((char*)entry - (char*)map.items) / vertex_size);
+			uint32_t index = (uint32_t)(((char*)entry - (char*)map.items) / packed_size);
 			indices[i] = index;
 		}
 	}
 
-
 	size_t result_vertices = 0;
 	if (!fail) {
 		result_vertices = map.size;
-		memcpy(vertices, map.items, result_vertices * vertex_size);
+
+		for (size_t si = 0; si < num_streams; si++) {
+			size_t vertex_size = streams[si].vertex_size;
+			char *dst = streams[si].begin;
+			char *src = (char*)map.items + streams[si].packed_offset;
+			for (size_t i = 0; i < result_vertices; i++) {
+				memcpy(dst, src, vertex_size);
+				dst += vertex_size;
+				src += packed_size;
+			}
+		}
+
 		error->stack_size = 0;
 		error->description = NULL;
 		error->type = UFBX_ERROR_NONE;
 	} else {
 		ufbxi_fix_error_type(error, "Failed to generate indices");
+	}
+
+	if (streams && streams != local_streams) {
+		ufbxi_free(&ator, ufbxi_vertex_stream, streams, num_streams);
+	}
+	if (packed_vertex && packed_vertex != (char*)local_packed_vertex) {
+		ufbxi_free(&ator, uint64_t, packed_vertex, packed_size / 8);
 	}
 
 	ufbxi_map_free(&map);
@@ -15482,7 +15654,7 @@ ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, const ufbx_element *elem
 	}
 
 	if (anim->prop_overrides.count > 0) {
-		ufbxi_find_prop_override(&anim->prop_overrides, element->id, &result);
+		ufbxi_find_prop_override(&anim->prop_overrides, element->element_id, &result);
 		return result;
 	}
 
@@ -15514,7 +15686,7 @@ ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, dou
 
 	const ufbx_prop_override *over = NULL, *over_end = NULL;
 	if (anim->prop_overrides.count > 0) {
-		ufbx_const_prop_override_list list = ufbxi_find_element_prop_overrides(&anim->prop_overrides, element->id);
+		ufbx_const_prop_override_list list = ufbxi_find_element_prop_overrides(&anim->prop_overrides, element->element_id);
 		over = list.data;
 		over_end = over + list.count;
 	}
@@ -15598,100 +15770,21 @@ ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *n
 		ufbxi_ScalingPivot,
 	};
 
-	ufbx_prop props[ufbxi_arraycount(prop_names)];
-	size_t num_props = 0;
+	ufbx_prop buf[ufbxi_arraycount(prop_names)];
+	ufbx_props props = ufbxi_evaluate_selected_props(anim, &node->element, time, buf, prop_names, ufbxi_arraycount(prop_names));
+	ufbx_rotation_order order = (ufbx_rotation_order)ufbxi_find_enum(&props, ufbxi_RotationOrder, UFBX_ROTATION_XYZ, UFBX_ROTATION_SPHERIC);
+	return ufbxi_get_transform(&props, order);
+}
 
-	const char *name = prop_names[0];
-	uint32_t key = ufbxi_get_name_key_c(name);
+ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time)
+{
+	const char *prop_names[] = {
+		ufbxi_DeformPercent,
+	};
 
-	const ufbx_prop_override *over = NULL, *over_end = NULL;
-	if (anim->prop_overrides.count > 0) {
-		ufbx_const_prop_override_list list = ufbxi_find_element_prop_overrides(&anim->prop_overrides, node->element.id);
-		over = list.data;
-		over_end = over + list.count;
-	}
-
-	// TODO: Factor this out if needed anywhere else
-	size_t name_ix = 0;
-	for (size_t i = 0; i < node->props.num_props; i++) {
-		ufbx_prop *prop = &node->props.props[i];
-
-		while (name_ix < ufbxi_arraycount(prop_names)) {
-			if (key > prop->internal_key) break;
-
-			if (over) {
-				bool found_override = false;
-				for (; over != over_end; over++) {
-					ufbx_prop *dst = &props[num_props];
-					if (over->internal_key < key || strcmp(over->prop_name, name) < 0) {
-						continue;
-					} else if (over->internal_key == key && strcmp(over->prop_name, name) == 0) {
-						dst->name = ufbxi_str_c(name);
-						dst->internal_key = key;
-						dst->type = UFBX_PROP_UNKNOWN;
-						dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
-					} else {
-						break;
-					}
-					dst->value_str = ufbxi_str_c(over->value_str);
-					dst->value_int = over->value_int;
-					dst->value_vec3 = over->value;
-					num_props++;
-					found_override = true;
-				}
-				if (found_override) break;
-			}
-
-			if (name == prop->name.data) {
-				if (prop->flags & UFBX_PROP_FLAG_ANIMATED) {
-					props[num_props++] = *prop;
-				}
-				break;
-			} else if (strcmp(name, prop->name.data) < 0) {
-				name_ix++;
-				if (name_ix < ufbxi_arraycount(prop_names)) {
-					name = prop_names[name_ix];
-					key = ufbxi_get_name_key_c(name);
-				}
-			} else {
-				break;
-			}
-		}
-	}
-
-	if (over) {
-		for (; over != over_end && name_ix < ufbxi_arraycount(prop_names); over++) {
-			ufbx_prop *dst = &props[num_props];
-			if (over->internal_key < key || strcmp(over->prop_name, name) < 0) {
-				continue;
-			} else if (over->internal_key == key && strcmp(over->prop_name, name) == 0) {
-				dst->name = ufbxi_str_c(name);
-				dst->internal_key = key;
-				dst->type = UFBX_PROP_UNKNOWN;
-				dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
-			} else {
-				name_ix++;
-				if (name_ix < ufbxi_arraycount(prop_names)) {
-					name = prop_names[name_ix];
-					key = ufbxi_get_name_key_c(name);
-				}
-			}
-			dst->value_str = ufbxi_str_c(over->value_str);
-			dst->value_int = over->value_int;
-			dst->value_vec3 = over->value;
-			num_props++;
-		}
-	}
-
-	ufbxi_evaluate_props(anim, &node->element, time, props, num_props);
-
-	ufbx_props prop_list;
-	prop_list.props = props;
-	prop_list.num_props = prop_list.num_animated = num_props;
-	prop_list.defaults = (ufbx_props*)&node->props;
-
-	ufbx_rotation_order order = (ufbx_rotation_order)ufbxi_find_enum(&prop_list, ufbxi_RotationOrder, UFBX_ROTATION_XYZ, UFBX_ROTATION_SPHERIC);
-	return ufbxi_get_transform(&prop_list, order);
+	ufbx_prop buf[ufbxi_arraycount(prop_names)];
+	ufbx_props props = ufbxi_evaluate_selected_props(anim, &channel->element, time, buf, prop_names, ufbxi_arraycount(prop_names));
+	return ufbxi_find_real(&props, ufbxi_DeformPercent, channel->weight * (ufbx_real)100.0) * (ufbx_real)0.01;
 }
 
 ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *overrides, size_t num_overrides)
@@ -15791,12 +15884,12 @@ ufbx_quat ufbx_quat_fix_antipodal(ufbx_quat q, ufbx_quat reference)
 ufbx_quat ufbx_quat_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t)
 {
 	double dot = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
-	double omega = acos(fmin(fmax(dot, 0.0), 1.0));
 	if (dot < 0.0) {
+		dot = -dot;
 		b.x = -b.x; b.y = -b.y; b.z = -b.z; b.w = -b.w;
 	}
-	if (omega <= 0.0) return a;
-
+	double omega = acos(fmin(fmax(dot, 0.0), 1.0));
+	if (omega <= 1.175494351e-38f) return a;
 	double rcp_so = 1.0 / sin(omega);
 	double af = sin((1.0 - t) * omega) * rcp_so;
 	double bf = sin(t * omega) * rcp_so;
@@ -16199,7 +16292,7 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 	for (uint32_t i = 0; i < skin_vertex.num_weights; i++) {
 		ufbx_skin_weight weight = skin->weights.data[skin_vertex.weight_begin + i];
 		ufbx_skin_cluster *cluster = skin->clusters.data[weight.cluster_index];
-		const ufbx_node *node = cluster->bone;
+		const ufbx_node *node = cluster->bone_node;
 		if (!node) continue;
 
 		total_weight += weight.weight;
@@ -16840,8 +16933,14 @@ ufbxi_noinline size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *
 
 size_t ufbx_generate_indices(void *vertices, uint32_t *indices, size_t vertex_size, size_t num_indices, const ufbx_allocator *allocator, ufbx_error *error)
 {
+	ufbx_vertex_stream stream = { vertices, vertex_size };
+	return ufbx_generate_indices_multi(&stream, 1, indices, num_indices, allocator, error);
+}
+
+size_t ufbx_generate_indices_multi(const ufbx_vertex_stream *streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator *allocator, ufbx_error *error)
+{
 	ufbx_error local_error;
-	return ufbxi_generate_indices(vertices, indices, vertex_size, num_indices, allocator, error ? error : &local_error);
+	return ufbxi_generate_indices(streams, num_streams, indices, num_indices, allocator, error ? error : &local_error);
 }
 
 #ifdef __cplusplus

@@ -393,10 +393,10 @@ UFBX_LIST_TYPE(ufbx_connection_list, ufbx_connection);
 struct ufbx_element {
 	ufbx_string name;
 	ufbx_props props;
+	uint32_t element_id;
+	uint32_t typed_id;
 	ufbx_node_list instances;
 	ufbx_element_type type;
-	uint32_t id;
-	uint32_t typed_id;
 	ufbx_connection_list connections_src;
 	ufbx_connection_list connections_dst;
 };
@@ -404,7 +404,12 @@ struct ufbx_element {
 // -- Unknown
 
 struct ufbx_unknown {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	// FBX format specific type information
 	// ASCII FBX `<super_type>: ID, "<type>::<name>", "<sub_type>"`
@@ -429,7 +434,12 @@ typedef enum ufbx_inherit_type {
 // elements such as meshes or lights. In normal cases a single `ufbx_node`
 // contains only a single attached element, so using `type/mesh/...` is safe.
 struct ufbx_node {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	// Node hierarchy
 	ufbx_node *parent;
@@ -570,7 +580,7 @@ typedef struct ufbx_mesh_material {
 
 	size_t num_faces;
 	size_t num_triangles;
-	int32_t *faces;
+	int32_t *face_indices;
 } ufbx_mesh_material;
 
 UFBX_LIST_TYPE(ufbx_mesh_material_list, ufbx_mesh_material);
@@ -645,7 +655,13 @@ typedef enum ufbx_subdivision_boundary {
 //   ^ ^ ^ v v v  vertex_normal.data[vertex_normal.indices[vertex_first_index[vertex]]]
 //
 struct ufbx_mesh {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 
 	// Number of "logical" vertices that would be treated as a single point,
 	// one vertex may be split to multiple indices for split attributes, eg. UVs
@@ -653,11 +669,13 @@ struct ufbx_mesh {
 	size_t num_indices;   // < Number of combiend vertex/attribute tuples
 	size_t num_triangles; // < Number of triangles
 
+
 	// Faces and optional per-face extra data
 	size_t num_faces;
-	ufbx_face *faces;       // < Face index range
-	bool *face_smoothing;   // < Should the face have soft normals
-	int32_t *face_material; // < Indices to `ufbx_mesh.materials`
+	ufbx_face *faces;          // < Face index range
+	bool *face_smoothing;      // < Should the face have soft normals
+	int32_t *face_material;    // < Indices to `ufbx_mesh.materials`
+	size_t max_face_triangles; // < Maximum number of triangles per face in this mesh
 
 	// Edges and optional per-edge extra data
 	size_t num_edges;
@@ -704,9 +722,9 @@ struct ufbx_mesh {
 	ufbx_vertex_vec3 skinned_normal;
 
 	// Deformers
-	ufbx_skin_deformer_list skins;
+	ufbx_skin_deformer_list skin_deformers;
 	ufbx_blend_deformer_list blend_deformers;
-	ufbx_cache_deformer_list geometry_caches;
+	ufbx_cache_deformer_list cache_deformers;
 	ufbx_element_list all_deformers;
 
 	// Subdivision
@@ -751,7 +769,13 @@ typedef enum ufbx_light_area_shape {
 
 // Light source attached to a `ufbx_node`
 struct ufbx_light {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 
 	// Color and intensity of the light, usually you want to use `color * intensity` 
 	// NOTE: `intensity` is 0.01x of the property `"Intensity"` as that matches
@@ -909,7 +933,13 @@ typedef struct ufbx_line_segment {
 UFBX_LIST_TYPE(ufbx_line_segment_list, ufbx_line_segment);
 
 struct ufbx_line_curve {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 
 	ufbx_vec3 color;
 
@@ -920,18 +950,36 @@ struct ufbx_line_curve {
 };
 
 struct ufbx_nurbs_curve {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 
 	ufbx_nurbs_topology topology;
 	ufbx_vec4_list control_points;
 };
 
 struct ufbx_patch_surface {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 };
 
 struct ufbx_nurbs_surface {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 
 	ufbx_nurbs_topology topology[2];
 	ufbx_vec4_list control_points;
@@ -940,32 +988,68 @@ struct ufbx_nurbs_surface {
 };
 
 struct ufbx_nurbs_trim_surface {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 };
 
 struct ufbx_nurbs_trim_boundary {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 };
 
 // -- Node attributes (advanced)
 
 struct ufbx_procedural_geometry {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 };
 
 struct ufbx_camera_stereo {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 
 	ufbx_camera *left;
 	ufbx_camera *right;
 };
 
 struct ufbx_camera_switcher {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 };
 
 struct ufbx_lod_group {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 };
 
 // -- Deformers
@@ -1008,11 +1092,17 @@ typedef struct ufbx_skin_weight {
 } ufbx_skin_weight;
 
 UFBX_LIST_TYPE(ufbx_skin_weight_list, ufbx_skin_weight); 
+
 // Skin deformer specifies a binding between a logical set of bones (a skeleton)
 // and a mesh. Each bone is represented by a `ufbx_skin_cluster` that contains
 // the binding matrix and a `ufbx_node *bone` that has the current transformation.
 struct ufbx_skin_deformer {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	ufbx_skinning_method skinning_method;
 
@@ -1035,12 +1125,17 @@ struct ufbx_skin_deformer {
 
 // Cluster of vertices bound to a single bone.
 struct ufbx_skin_cluster {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	// The bone node the cluster is attached to
 	// NOTE: Always valid if found from `ufbx_skin_deformer.clusters[]` unless
 	// `ufbx_load_opts.connect_broken_elements` is `true`.
-	ufbx_node *bone;
+	ufbx_node *bone_node;
 
 	// Binding matrix from local mesh vertices to the bone
 	ufbx_matrix geometry_to_bone; 
@@ -1068,7 +1163,12 @@ struct ufbx_skin_cluster {
 // Blend shape deformer can contain multiple channels (think of sliders between morphs)
 // that may optionally have in-between keyframes.
 struct ufbx_blend_deformer {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	ufbx_blend_channel_list channels;
 };
@@ -1089,7 +1189,12 @@ UFBX_LIST_TYPE(ufbx_blend_keyframe_list, ufbx_blend_keyframe);
 // Blend channel consists of multiple morph-key targets that are interpolated.
 // In simple cases there will be only one keyframe that is the target shape.
 struct ufbx_blend_channel {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	// Current weight of the channel
 	ufbx_real weight;
@@ -1101,7 +1206,12 @@ struct ufbx_blend_channel {
 
 // Blend shape target containing the actual vertex offsets
 struct ufbx_blend_shape {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	// Vertex offsets to apply over the base mesh
 	size_t num_offsets;          // < Number of vertex offsets in the following arrays
@@ -1170,7 +1280,12 @@ typedef struct ufbx_geometry_cache {
 } ufbx_geometry_cache;
 
 struct ufbx_cache_deformer {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	ufbx_string channel;
 	ufbx_cache_file *file;
@@ -1181,7 +1296,12 @@ struct ufbx_cache_deformer {
 };
 
 struct ufbx_cache_file {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	ufbx_string filename;
 	ufbx_string absolute_filename;
@@ -1406,7 +1526,12 @@ typedef struct ufbx_material_pbr_maps {
 // Surface material properties such as color, roughness, etc. Each property may
 // be optionally bound to an `ufbx_texture`.
 struct ufbx_material {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	// FBX builtin properties
 	// NOTE: These may be empty if the material is using a custom shader
@@ -1497,7 +1622,12 @@ UFBX_LIST_TYPE(ufbx_texture_layer_list, ufbx_texture_layer);
 
 // Texture that controls material appearance
 struct ufbx_texture {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	// Texture type (file / layered / procedural)
 	ufbx_texture_type type;
@@ -1532,7 +1662,12 @@ struct ufbx_texture {
 
 // TODO: Video textures
 struct ufbx_video {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	// Paths to the resource
 	ufbx_string filename;
@@ -1547,7 +1682,12 @@ struct ufbx_video {
 // Shader specifies a shading model and contains `ufbx_shader_binding` elements
 // that define how to interpret FBX properties in the shader.
 struct ufbx_shader {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	// Known shading model
 	ufbx_shader_type type;
@@ -1569,7 +1709,12 @@ UFBX_LIST_TYPE(ufbx_shader_prop_binding_list, ufbx_shader_prop_binding);
 
 // Shader binding table
 struct ufbx_shader_binding {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	ufbx_shader_prop_binding_list prop_bindings; // < Sorted by `shader_prop`
 };
@@ -1614,7 +1759,12 @@ typedef struct ufbx_anim {
 } ufbx_anim;
 
 struct ufbx_anim_stack {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	double time_begin;
 	double time_end;
@@ -1633,7 +1783,12 @@ typedef struct ufbx_anim_prop {
 UFBX_LIST_TYPE(ufbx_anim_prop_list, ufbx_anim_prop);
 
 struct ufbx_anim_layer {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	ufbx_real weight;
 	bool weight_is_animated;
@@ -1694,7 +1849,12 @@ typedef struct ufbx_keyframe {
 UFBX_LIST_TYPE(ufbx_keyframe_list, ufbx_keyframe);
 
 struct ufbx_anim_curve {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	ufbx_keyframe_list keyframes;
 };
@@ -1703,7 +1863,12 @@ struct ufbx_anim_curve {
 
 // Collection of nodes to hide/freeze
 struct ufbx_display_layer {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	// Nodes included in the layer (exclusively at most one layer per node)
 	ufbx_node_list nodes;
@@ -1717,7 +1882,12 @@ struct ufbx_display_layer {
 
 // Named set of nodes/geometry features to select.
 struct ufbx_selection_set {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	// Included nodes and geomtery features
 	ufbx_selection_node_list nodes;
@@ -1725,7 +1895,12 @@ struct ufbx_selection_set {
 
 // Selection state of a node, potentially contains vertex/edge/face selection as well.
 struct ufbx_selection_node {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	// Selection targets, possibly `NULL`
 	ufbx_node *target_node;
@@ -1741,7 +1916,12 @@ struct ufbx_selection_node {
 // -- Constraints
 
 struct ufbx_character {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 };
 
 // Type of property constrain eg. position or look-at
@@ -1782,7 +1962,12 @@ typedef enum ufbx_constraint_ik_pole_type {
 } ufbx_constraint_ik_pole_type;
 
 struct ufbx_constraint {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	// Type of constraint to use
 	ufbx_constraint_type type;
@@ -1821,21 +2006,31 @@ struct ufbx_constraint {
 // -- Miscellaneous
 
 typedef struct ufbx_bone_pose {
-	ufbx_node *bone;
+	ufbx_node *bone_node;
 	ufbx_matrix bone_to_world;
 } ufbx_bone_pose;
 
 UFBX_LIST_TYPE(ufbx_bone_pose_list, ufbx_bone_pose);
 
 struct ufbx_pose {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 
 	bool bind_pose;
 	ufbx_bone_pose_list bone_poses;
 };
 
 struct ufbx_metadata_object {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+	}; };
 };
 
 // -- Named elements
@@ -1891,6 +2086,8 @@ typedef struct ufbx_metadata {
 	bool geometry_ignored;
 	bool animation_ignored;
 	bool embedded_ignored;
+
+	size_t max_face_triangles;
 
 	size_t result_memory_used;
 	size_t temp_memory_used;
@@ -2078,6 +2275,11 @@ typedef struct ufbx_topo_edge {
 
 	ufbx_topo_flags flags;
 } ufbx_topo_edge;
+
+typedef struct ufbx_vertex_stream {
+	const void *data;
+	size_t vertex_size;
+} ufbx_vertex_stream;
 
 // -- Memory callbacks
 
@@ -2282,6 +2484,11 @@ typedef struct ufbx_load_opts {
 	// disabled, all lone nodes will be parented under `ufbx_scene.root_node`.
 	bool allow_nodes_out_of_root;
 
+	// If a mesh does not have a material create a `ufbx_mesh_material` part
+	// with a `NULL` material pointer. This can be more convenient if you need
+	// to split models into parts per material.
+	bool allow_null_material;
+
 	// Estimated file size for progress reporting
 	uint64_t file_size_estimate;
 
@@ -2461,6 +2668,7 @@ ufbx_inline ufbx_prop ufbx_evaluate_prop(const ufbx_anim *anim, const ufbx_eleme
 ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
 
 ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *node, double time);
+ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time);
 
 ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *overrides, size_t num_overrides);
 
@@ -2551,6 +2759,7 @@ size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *channel, double
 // Utility
 
 size_t ufbx_generate_indices(void *vertices, uint32_t *indices, size_t vertex_size, size_t num_indices, const ufbx_allocator *allocator, ufbx_error *error);
+size_t ufbx_generate_indices_multi(const ufbx_vertex_stream *streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator *allocator, ufbx_error *error);
 
 // -- Inline API
 
