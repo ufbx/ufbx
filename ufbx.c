@@ -15166,6 +15166,7 @@ typedef struct {
 	size_t num_indices;
 	size_t num_triangles;
 	size_t num_bad_faces;
+	bool bad_segment;
 } ufbxi_segment;
 
 typedef struct {
@@ -15523,6 +15524,7 @@ static ufbxi_noinline int ufbxi_segment_flush(ufbxi_segment_context *sc, ufbxi_s
 	dst->num_triangles = segment->num_triangles;
 	dst->num_indices = segment->num_indices;
 	dst->num_bad_faces = segment->num_bad_faces;
+	dst->bad_segment = segment->bad_segment;
 
 	size_t *seg_faces = segment->faces;
 	size_t num_seg_faces = segment->num_faces;
@@ -15583,6 +15585,7 @@ static ufbxi_noinline int ufbxi_segment_add_faces(ufbxi_segment_context *sc, ufb
 	}
 	if (sc->opts.include_bad_segments) {
 		ufbxi_segment_reset(sc, &sc->bad_segment);
+		sc->bad_segment.bad_segment = true;
 	}
 
 	for (size_t face_ix = 0; face_ix < num_faces; face_ix++) {
@@ -15717,8 +15720,14 @@ static ufbxi_noinline int ufbxi_segment_faces_imp(ufbxi_segment_context *sc, ufb
 	ufbx_mesh_segment *segments = ufbxi_push_pop(&sc->result, &sc->tmp_segments, ufbx_mesh_segment, num_segments);
 	ufbxi_check_err(&sc->error, segments);
 
-	sc->imp = ufbxi_push(&sc->result, ufbxi_segmented_mesh_imp, 1);
+	sc->imp = ufbxi_push_zero(&sc->result, ufbxi_segmented_mesh_imp, 1);
 	ufbxi_check_err(&sc->error, sc->imp);
+
+	for (size_t i = 0; i < num_segments; i++) {
+		if (segments[i].bad_segment) {
+			sc->imp->mesh.num_bad_segments++;
+		}
+	}
 
 	sc->imp->mesh.segments.data = segments;
 	sc->imp->mesh.segments.count = num_segments;
