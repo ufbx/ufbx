@@ -24,7 +24,7 @@ static void ufbxt_check_element_ptr(ufbx_scene *scene, void *v_element)
 {
 	if (!v_element) return;
 	ufbx_element *element = (ufbx_element*)v_element;
-	ufbxt_assert(scene->elements.data[element->id] == element);
+	ufbxt_assert(scene->elements.data[element->element_id] == element);
 	ufbxt_assert(scene->elements_by_type[element->type].data[element->typed_id] == element);
 }
 
@@ -89,9 +89,9 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 {
 	ufbxt_check_props(scene, &element->props, true);
 	ufbxt_check_string(element->name);
-	ufbxt_assert(scene->elements.data[element->id] == element);
+	ufbxt_assert(scene->elements.data[element->element_id] == element);
 
-	ufbxt_assert(scene->elements.data[element->id] == element);
+	ufbxt_assert(scene->elements.data[element->element_id] == element);
 	ufbxt_assert(scene->elements_by_type[element->type].data[element->typed_id] == element);
 
 	for (size_t i = 0; i < element->connections_src.count; i++) {
@@ -331,18 +331,18 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_check_element_ptr(scene, mat->material);
 
 		for (size_t j = 0; j < mat->num_faces; j++) {
-			ufbxt_assert(mesh->face_material[mat->faces[j]] == (int32_t)i);
+			ufbxt_assert(mesh->face_material[mat->face_indices[j]] == (int32_t)i);
 		}
 	}
-	for (size_t i = 0; i < mesh->skins.count; i++) {
-		ufbxt_assert(mesh->skins.data[i]->vertices.count >= mesh->num_vertices);
-		ufbxt_check_element_ptr(scene, mesh->skins.data[i]);
+	for (size_t i = 0; i < mesh->skin_deformers.count; i++) {
+		ufbxt_assert(mesh->skin_deformers.data[i]->vertices.count >= mesh->num_vertices);
+		ufbxt_check_element_ptr(scene, mesh->skin_deformers.data[i]);
 	}
 	for (size_t i = 0; i < mesh->blend_deformers.count; i++) {
 		ufbxt_check_element_ptr(scene, mesh->blend_deformers.data[i]);
 	}
-	for (size_t i = 0; i < mesh->geometry_caches.count; i++) {
-		ufbxt_check_element_ptr(scene, mesh->geometry_caches.data[i]);
+	for (size_t i = 0; i < mesh->cache_deformers.count; i++) {
+		ufbxt_check_element_ptr(scene, mesh->cache_deformers.data[i]);
 	}
 	for (size_t i = 0; i < mesh->all_deformers.count; i++) {
 		ufbxt_check_element_ptr(scene, mesh->all_deformers.data[i]);
@@ -366,7 +366,7 @@ static void ufbxt_check_skin_deformer(ufbx_scene *scene, ufbx_skin_deformer *def
 {
 	for (size_t i = 0; i < deformer->clusters.count; i++) {
 		ufbxt_check_element_ptr(scene, deformer->clusters.data[i]);
-		ufbxt_assert(deformer->clusters.data[i]->bone);
+		ufbxt_assert(deformer->clusters.data[i]->bone_node);
 	}
 	for (size_t i = 0; i < deformer->vertices.count; i++) {
 		ufbx_skin_vertex vertex = deformer->vertices.data[i];
@@ -385,7 +385,7 @@ static void ufbxt_check_skin_deformer(ufbx_scene *scene, ufbx_skin_deformer *def
 
 static void ufbxt_check_skin_cluster(ufbx_scene *scene, ufbx_skin_cluster *cluster)
 {
-	ufbxt_check_element_ptr(scene, cluster->bone);
+	ufbxt_check_element_ptr(scene, cluster->bone_node);
 }
 
 static void ufbxt_check_blend_deformer(ufbx_scene *scene, ufbx_blend_deformer *deformer)

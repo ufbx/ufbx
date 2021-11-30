@@ -220,7 +220,8 @@ UFBXT_FILE_TEST(blender_293_half_smooth_cube)
 		}
 	}
 
-	size_t num_vertices = ufbx_generate_indices(vertices, indices, sizeof(ufbxt_vertex_pn), num_indices, NULL, NULL);
+	ufbx_vertex_stream stream = { vertices, sizeof(ufbxt_vertex_pn) };
+	size_t num_vertices = ufbx_generate_indices(&stream, 1, indices, num_indices, NULL, NULL);
 	ufbxt_assert(num_vertices == 12);
 
 }

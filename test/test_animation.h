@@ -215,7 +215,7 @@ UFBXT_FILE_TEST(maya_anim_light)
 	{
 		ufbx_node *node = ufbx_find_node(scene, "pointLight1");
 		ufbxt_assert(node && node->light);
-		uint32_t element_id = node->light->element.id;
+		uint32_t element_id = node->light->element.element_id;
 
 		ufbx_prop_override overrides[] = {
 			{ element_id, "Intensity", { (ufbx_real)10.0 } },
@@ -324,7 +324,7 @@ UFBXT_FILE_TEST(maya_transform_animation)
 	}
 
 	{
-		uint32_t element_id = node->element.id;
+		uint32_t element_id = node->element.element_id;
 		ufbxt_anim_transform_ref ref = refs[2];
 		ref.translation.x -= 0.1f;
 		ref.translation.y -= 0.2f;

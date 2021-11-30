@@ -49,9 +49,9 @@ UFBXT_FILE_TEST(maya_cache_sine)
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
-	ufbxt_assert(mesh->geometry_caches.count == 2);
+	ufbxt_assert(mesh->cache_deformers.count == 2);
 	for (size_t i = 0; i < 2; i++) {
-		ufbx_cache_deformer *deformer = mesh->geometry_caches.data[i];
+		ufbx_cache_deformer *deformer = mesh->cache_deformers.data[i];
 		ufbxt_assert(deformer->file);
 		ufbxt_assert(deformer->file->format == UFBX_CACHE_FILE_FORMAT_MC);
 	}
@@ -81,8 +81,8 @@ UFBXT_FILE_TEST(max_cache_box)
 	ufbx_node *node = ufbx_find_node(scene, "Box001");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
-	ufbxt_assert(mesh->geometry_caches.count == 1);
-	ufbx_cache_deformer *deformer = mesh->geometry_caches.data[0];
+	ufbxt_assert(mesh->cache_deformers.count == 1);
+	ufbx_cache_deformer *deformer = mesh->cache_deformers.data[0];
 	ufbxt_assert(deformer->file);
 	ufbxt_assert(deformer->file->format == UFBX_CACHE_FILE_FORMAT_PC2);
 	ufbxt_assert(deformer->external_cache);

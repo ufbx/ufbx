@@ -304,8 +304,8 @@ UFBXT_FILE_TEST(blender_293_half_skinned)
 	ufbx_mesh *mesh = node->mesh;
 	ufbxt_assert(mesh);
 	ufbxt_assert(mesh->num_vertices == 4);
-	ufbxt_assert(mesh->skins.count == 1);
-	ufbx_skin_deformer *skin = mesh->skins.data[0];
+	ufbxt_assert(mesh->skin_deformers.count == 1);
+	ufbx_skin_deformer *skin = mesh->skin_deformers.data[0];
 	ufbxt_assert(skin->vertices.count == 4);
 	ufbxt_assert(skin->vertices.data[0].num_weights == 1);
 	ufbxt_assert(skin->vertices.data[0].weight_begin == 0);
@@ -322,8 +322,8 @@ UFBXT_FILE_TEST(maya_dual_quaternion)
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
-	ufbxt_assert(mesh->skins.count == 1);
-	ufbx_skin_deformer *skin = mesh->skins.data[0];
+	ufbxt_assert(mesh->skin_deformers.count == 1);
+	ufbx_skin_deformer *skin = mesh->skin_deformers.data[0];
 	ufbxt_assert(skin->skinning_method == UFBX_SKINNING_DUAL_QUATERNION);
 }
 #endif
@@ -334,8 +334,8 @@ UFBXT_FILE_TEST(maya_dual_quaternion_scale)
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
-	ufbxt_assert(mesh->skins.count == 1);
-	ufbx_skin_deformer *skin = mesh->skins.data[0];
+	ufbxt_assert(mesh->skin_deformers.count == 1);
+	ufbx_skin_deformer *skin = mesh->skin_deformers.data[0];
 	ufbxt_assert(skin->skinning_method == UFBX_SKINNING_DUAL_QUATERNION);
 }
 #endif
@@ -393,11 +393,11 @@ UFBXT_FILE_TEST(synthetic_broken_cluster)
 	ufbx_node *cube = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(cube && cube->mesh);
 	ufbx_mesh *mesh = cube->mesh;
-	ufbxt_assert(mesh->skins.count == 1);
-	ufbx_skin_deformer *skin = mesh->skins.data[0];
+	ufbxt_assert(mesh->skin_deformers.count == 1);
+	ufbx_skin_deformer *skin = mesh->skin_deformers.data[0];
 	ufbxt_assert(skin->clusters.count == 2);
-	ufbxt_assert(!strcmp(skin->clusters.data[0]->bone->name.data, "joint3"));
-	ufbxt_assert(!strcmp(skin->clusters.data[1]->bone->name.data, "joint1"));
+	ufbxt_assert(!strcmp(skin->clusters.data[0]->bone_node->name.data, "joint3"));
+	ufbxt_assert(!strcmp(skin->clusters.data[1]->bone_node->name.data, "joint1"));
 }
 #endif
 
@@ -424,15 +424,15 @@ UFBXT_TEST(synthetic_broken_cluster_connect)
 		ufbx_node *cube = ufbx_find_node(scene, "pCube1");
 		ufbxt_assert(cube && cube->mesh);
 		ufbx_mesh *mesh = cube->mesh;
-		ufbxt_assert(mesh->skins.count == 1);
-		ufbx_skin_deformer *skin = mesh->skins.data[0];
+		ufbxt_assert(mesh->skin_deformers.count == 1);
+		ufbx_skin_deformer *skin = mesh->skin_deformers.data[0];
 		ufbxt_assert(skin->clusters.count == 3);
-		ufbxt_assert(!strcmp(skin->clusters.data[0]->bone->name.data, "joint3"));
-		ufbxt_assert(skin->clusters.data[1]->bone == NULL);
-		ufbxt_assert(!strcmp(skin->clusters.data[2]->bone->name.data, "joint1"));
+		ufbxt_assert(!strcmp(skin->clusters.data[0]->bone_node->name.data, "joint3"));
+		ufbxt_assert(skin->clusters.data[1]->bone_node == NULL);
+		ufbxt_assert(!strcmp(skin->clusters.data[2]->bone_node->name.data, "joint1"));
 
 		// HACK: Patch the bone of `clusters.data[1]` to be valid for `ufbxt_check_scene()`...
-		skin->clusters.data[1]->bone = skin->clusters.data[0]->bone;
+		skin->clusters.data[1]->bone_node = skin->clusters.data[0]->bone_node;
 
 		ufbxt_check_scene(scene);
 
