@@ -15162,6 +15162,10 @@ typedef struct {
 	uint32_t materials_left;
 	uint32_t clusters_left;
 	uint32_t shapes_left;
+
+	size_t num_indices;
+	size_t num_triangles;
+	size_t num_bad_faces;
 } ufbxi_segment;
 
 typedef struct {
@@ -15205,6 +15209,7 @@ typedef struct {
 	int32_t zero_material_remap[1];
 
 	ufbxi_segment segments[4];
+	ufbxi_segment bad_segment;
 } ufbxi_segment_context;
 
 static ufbxi_forceinline bool ufbxi_get_bit(const uint32_t *bits, int32_t index)
@@ -15234,7 +15239,7 @@ static ufbxi_noinline int32_t ufbxi_segment_get_ptr(ufbxi_map *map, void *ptr)
 	uint32_t hash = ufbxi_hash_ptr(ptr);
 	void **p_ptr = ufbxi_map_find(map, void*, hash, &ptr);
 	ufbx_assert(p_ptr);
-	return (int32_t)(p_ptr - (void**)map->entries);
+	return (int32_t)(p_ptr - (void**)map->items);
 }
 
 static ufbxi_noinline int ufbxi_segment_collect_vertex_info(ufbxi_segment_context *sc, ufbxi_segment_face *faces, size_t num_faces, int pass)
@@ -15279,7 +15284,7 @@ static ufbxi_noinline int ufbxi_segment_collect_vertex_info(ufbxi_segment_contex
 
 		size_t offset = 0;
 		for (size_t i = 0; i < sc->mesh_set.size; i++) {
-			ufbx_mesh *mesh = ((ufbx_mesh**)sc->mesh_set.entries)[i];
+			ufbx_mesh *mesh = ((ufbx_mesh**)sc->mesh_set.items)[i];
 			ufbxi_for(ufbxi_vertex_faces, vfaces, vertex_faces[i], mesh->num_vertices) {
 				vfaces->offset = offset;
 				offset += vfaces->num_faces;
@@ -15299,7 +15304,7 @@ static ufbxi_noinline int ufbxi_segment_collect_face_info(ufbxi_segment_context 
 	size_t total_clusters = 0;
 	size_t total_shapes = 0;
 	int32_t mesh_ix = 0;
-	ufbxi_for_ptr(ufbx_mesh, p_mesh, (ufbx_mesh**)sc->mesh_set.entries, sc->mesh_set.size) {
+	ufbxi_for_ptr(ufbx_mesh, p_mesh, (ufbx_mesh**)sc->mesh_set.items, sc->mesh_set.size) {
 		ufbx_mesh *mesh = *p_mesh;
 		size_t num_vertices = mesh->num_vertices;
 
@@ -15427,10 +15432,10 @@ static ufbxi_noinline double ufbxi_segment_face_cost(ufbxi_segment_context *sc, 
 	}
 
 	double cost = 0.0f;
-	cost += (double)new_materials / (double)segment->materials_left;
-	cost += (double)new_clusters / (double)segment->clusters_left;
-	cost += (double)new_shapes / (double)segment->shapes_left;
-	cost += 0.1 / ((double)face->num_indices * 0.01);
+	if (new_materials) cost += (double)new_materials / (double)(segment->materials_left);
+	if (new_clusters) cost += (double)new_clusters / (double)(segment->clusters_left);
+	if (new_shapes) cost += (double)new_shapes / (double)(segment->shapes_left);
+	cost += 0.1 / ((double)(segment->num_faces + 64) * 0.01);
 	return cost;
 }
 
@@ -15440,7 +15445,11 @@ static ufbxi_noinline int ufbxi_segment_add_face(ufbxi_segment_context *sc, ufbx
 	segment->triangles_left -= num_triangles;
 	segment->indices_left -= face->num_indices;
 
-	ufbxi_check_err(&sc->error, ufbxi_grow_array(&sc->ator_tmp, &segment->faces, &segment->cap_faces, segment->num_faces));
+	segment->num_triangles += num_triangles;
+	segment->num_indices += face->num_indices;
+	segment->num_bad_faces += face->num_indices < 3 ? 1 : 0;
+
+	ufbxi_check_err(&sc->error, ufbxi_grow_array(&sc->ator_tmp, &segment->faces, &segment->cap_faces, segment->num_faces + 1));
 	segment->faces[segment->num_faces++] = index;
 
 	int32_t mat_ix = face->material;
@@ -15493,7 +15502,7 @@ static ufbxi_noinline int ufbxi_segment_push_ptrs(ufbxi_segment_context *sc, voi
 		dst->data = ufbxi_push(&sc->result, void*, src_list.count);
 		ufbxi_check_err(&sc->error, dst->data);
 		for (size_t i = 0; i < src_list.count; i++) {
-			dst->data[i] = ((void**)map->entries[src_list.data[i]]);
+			dst->data[i] = ((void**)map->items)[src_list.data[i]];
 		}
 	}
 
@@ -15504,17 +15513,22 @@ static ufbxi_noinline int ufbxi_segment_flush(ufbxi_segment_context *sc, ufbxi_s
 {
 	if (segment->num_faces == 0) return 1;
 
-	ufbx_mesh_segment *dst = ufbxi_push_zero(&sc->result, ufbx_mesh_segment, 1);
+	ufbx_mesh_segment *dst = ufbxi_push_zero(&sc->tmp_segments, ufbx_mesh_segment, 1);
 	ufbxi_check_err(&sc->error, dst);
 
 	ufbxi_check_err(&sc->error, ufbxi_segment_push_ptrs(sc, &dst->materials, &sc->material_set, segment->materials));
 	ufbxi_check_err(&sc->error, ufbxi_segment_push_ptrs(sc, &dst->clusters, &sc->cluster_set, segment->clusters));
 	ufbxi_check_err(&sc->error, ufbxi_segment_push_ptrs(sc, &dst->blend_shapes, &sc->shape_set, segment->shapes));
 
+	dst->num_triangles = segment->num_triangles;
+	dst->num_indices = segment->num_indices;
+	dst->num_bad_faces = segment->num_bad_faces;
+
 	size_t *seg_faces = segment->faces;
 	size_t num_seg_faces = segment->num_faces;
 	ufbx_segment_face *result_faces = sc->result_faces;
 	dst->faces.data = result_faces;
+	dst->faces.count = num_seg_faces;
 
 	sc->result_faces = result_faces + num_seg_faces;
 
@@ -15544,6 +15558,7 @@ static ufbxi_noinline int ufbxi_segment_reset(ufbxi_segment_context *sc, ufbxi_s
 	}
 
 	segment->num_faces = 0;
+	segment->materials.count = 0;
 	segment->clusters.count = 0;
 	segment->shapes.count = 0;
 	segment->triangles_left = (uint32_t)sc->opts.max_triangles;
@@ -15551,6 +15566,9 @@ static ufbxi_noinline int ufbxi_segment_reset(ufbxi_segment_context *sc, ufbxi_s
 	segment->materials_left = (uint32_t)sc->opts.max_materials;
 	segment->clusters_left = (uint32_t)sc->opts.max_blend_shapes;
 	segment->shapes_left = (uint32_t)sc->opts.max_blend_shapes;
+	segment->num_indices = 0;
+	segment->num_triangles = 0;
+	segment->num_bad_faces = 0;
 
 	return 1;
 }
@@ -15560,21 +15578,66 @@ static ufbxi_noinline int ufbxi_segment_add_faces(ufbxi_segment_context *sc, ufb
 {
 	// Dumb greedy algorithm for now
 
-	ufbxi_segment_reset(sc, &sc->segments[0]);
+	for (size_t seg_ix = 0; seg_ix < ufbxi_arraycount(sc->segments); seg_ix++) {
+		ufbxi_segment_reset(sc, &sc->segments[seg_ix]);
+	}
+	if (sc->opts.include_bad_segments) {
+		ufbxi_segment_reset(sc, &sc->bad_segment);
+	}
 
-	for (size_t i = 0; i < num_faces; i++) {
-		ufbxi_segment_face *face = &faces[i];
-		double cost = ufbxi_segment_face_cost(sc, &sc->segments[0], face);
-		if (cost >= UFBXI_COST_IMPOSSIBLE) {
-			ufbxi_segment_reset(sc, &sc->segments[0]);
-			cost = ufbxi_segment_face_cost(sc, &sc->segments[0], face);
-			if (cost >= UFBXI_COST_IMPOSSIBLE) {
-				ufbxi_fail_err_msg(&sc->error, "Cannot add face", "Impossible segmentation");
+	for (size_t face_ix = 0; face_ix < num_faces; face_ix++) {
+		ufbxi_segment_face *face = &faces[face_ix];
+		double best_cost = UFBXI_COST_IMPOSSIBLE;
+		size_t best_index = SIZE_MAX;
+
+		for (size_t seg_ix = 0; seg_ix < ufbxi_arraycount(sc->segments); seg_ix++) {
+			ufbxi_segment *segment = &sc->segments[seg_ix];
+
+			double cost = ufbxi_segment_face_cost(sc, segment, face);
+			if (cost < best_cost) {
+				best_cost = cost;
+				best_index = seg_ix;
 			}
 		}
 
-		ufbxi_check_err(&sc->error, ufbxi_segment_add_face(sc, &sc->segments[0], face, i));
+		if (best_index >= SIZE_MAX) {
+			// Find the segment with the most faces to remove
+			size_t most_faces = 0;
+			best_index = 0;
+			for (size_t seg_ix = 0; seg_ix < ufbxi_arraycount(sc->segments); seg_ix++) {
+				if (sc->segments[seg_ix].num_faces > most_faces) {
+					most_faces = sc->segments[seg_ix].num_faces;
+					best_index = seg_ix;
+				}
+			}
+
+			ufbxi_segment *segment = &sc->segments[best_index];
+			ufbxi_segment_flush(sc, segment, faces, num_faces);
+			ufbxi_segment_reset(sc, segment);
+			double cost = ufbxi_segment_face_cost(sc, segment, face);
+			if (cost >= UFBXI_COST_IMPOSSIBLE) {
+				if (sc->opts.include_bad_segments) {
+					ufbxi_check_err(&sc->error, ufbxi_segment_add_face(sc, &sc->bad_segment, face, face_ix));
+				} else if (!sc->opts.ignore_bad_segments) {
+					ufbxi_fail_err_msg(&sc->error, "Cannot add face", "Impossible segmentation");
+				}
+				best_index = SIZE_MAX;
+			}
+		}
+
+		if (best_index < SIZE_MAX) {
+			ufbxi_segment *segment = &sc->segments[best_index];
+			ufbxi_check_err(&sc->error, ufbxi_segment_add_face(sc, segment, face, face_ix));
+		}
+
 	}
+
+	for (size_t seg_ix = 0; seg_ix < ufbxi_arraycount(sc->segments); seg_ix++) {
+		ufbxi_segment_flush(sc, &sc->segments[seg_ix], faces, num_faces);
+	}
+	ufbxi_segment_flush(sc, &sc->bad_segment, faces, num_faces);
+
+	return 1;
 }
 
 static ufbxi_noinline int ufbxi_segment_faces_imp(ufbxi_segment_context *sc, ufbxi_segment_face *faces, size_t num_faces)
@@ -15596,7 +15659,7 @@ static ufbxi_noinline int ufbxi_segment_faces_imp(ufbxi_segment_context *sc, ufb
 		}
 	}
 
-	ufbxi_for_ptr(ufbx_mesh, p_mesh, (ufbx_mesh**)sc->mesh_set.entries, sc->mesh_set.size) {
+	ufbxi_for_ptr(ufbx_mesh, p_mesh, (ufbx_mesh**)sc->mesh_set.items, sc->mesh_set.size) {
 		ufbx_mesh *mesh = *p_mesh;
 		ufbxi_for_ptr_list(ufbx_skin_deformer, p_skin, mesh->skin_deformers) {
 			ufbx_skin_deformer *skin = *p_skin;
@@ -15626,7 +15689,7 @@ static ufbxi_noinline int ufbxi_segment_faces_imp(ufbxi_segment_context *sc, ufb
 	ufbxi_check_err(&sc->error, sc->cluster_remap);
 
 	for (size_t i = 0; i < sc->mesh_set.size; i++) {
-		ufbx_mesh *mesh = ((ufbx_mesh**)sc->mesh_set.entries)[i];
+		ufbx_mesh *mesh = ((ufbx_mesh**)sc->mesh_set.items)[i];
 		sc->vertex_faces[i] = ufbxi_push_zero(&sc->tmp, ufbxi_vertex_faces, mesh->num_vertices);
 		ufbxi_check_err(&sc->error, sc->vertex_faces[i]);
 
@@ -15654,8 +15717,8 @@ static ufbxi_noinline int ufbxi_segment_faces_imp(ufbxi_segment_context *sc, ufb
 	ufbx_mesh_segment *segments = ufbxi_push_pop(&sc->result, &sc->tmp_segments, ufbx_mesh_segment, num_segments);
 	ufbxi_check_err(&sc->error, segments);
 
-	ufbxi_segmented_mesh_imp *imp = ufbxi_push(&sc->result, ufbxi_segmented_mesh_imp, 1);
-	ufbxi_check_err(&sc->error, imp);
+	sc->imp = ufbxi_push(&sc->result, ufbxi_segmented_mesh_imp, 1);
+	ufbxi_check_err(&sc->error, sc->imp);
 
 	sc->imp->mesh.segments.data = segments;
 	sc->imp->mesh.segments.count = num_segments;
@@ -15763,7 +15826,7 @@ static ufbxi_noinline int ufbxi_segment_meshes(ufbxi_segment_context *sc, const 
 	return 1;
 }
 
-static ufbxi_noinline ufbx_segmented_mesh *ufbxi_segment_init(ufbxi_segment_context *sc, const ufbx_segment_opts *user_opts)
+static ufbxi_noinline void ufbxi_segment_init(ufbxi_segment_context *sc, const ufbx_segment_opts *user_opts)
 {
 	if (user_opts) {
 		sc->opts = *user_opts;
@@ -15781,7 +15844,6 @@ static ufbxi_noinline ufbx_segmented_mesh *ufbxi_segment_init(ufbxi_segment_cont
 
 	sc->result.unordered = true;
 	sc->tmp.unordered = true;
-	sc->tmp_segments.unordered = true;
 
 	sc->result.ator = &sc->ator_result;
 	sc->tmp.ator = &sc->ator_tmp;
@@ -15811,10 +15873,10 @@ static ufbxi_noinline ufbx_segmented_mesh *ufbxi_segment_cleanup(ufbxi_segment_c
 	for (size_t i = 0; i < ufbxi_arraycount(sc->segments); i++) {
 		ufbxi_segment_free(sc, &sc->segments[i]);
 	}
+	ufbxi_segment_free(sc, &sc->bad_segment);
 
 	ufbxi_buf_free(&sc->tmp);
 	ufbxi_buf_free(&sc->tmp_segments);
-	ufbxi_buf_free(&sc->result);
 	ufbxi_free_ator(&sc->ator_tmp);
 
 	if (ok) {

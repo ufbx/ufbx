@@ -2294,15 +2294,26 @@ UFBX_LIST_TYPE(ufbx_segment_face_list, ufbx_segment_face);
 
 typedef struct ufbx_mesh_segment {
 	ufbx_segment_face_list faces;
+	size_t num_indices;
+	size_t num_triangles;
+	size_t num_bad_faces;
+
 	ufbx_material_list materials;
 	ufbx_skin_cluster_list clusters;
 	ufbx_blend_shape_list blend_shapes;
+
+	// If `true` this segment breaks the limits specified in `ufbx_segment_opts`.
+	// By default the function fails if any segment breaks the limits, but you can
+	// specify `ufbx_segment_opts.allow_bad_segments` to include bad segments.
+	bool bad_segment;
+
 } ufbx_mesh_segment;
 
 UFBX_LIST_TYPE(ufbx_mesh_segment_list, ufbx_mesh_segment);
 
 typedef struct ufbx_segmented_mesh {
 	ufbx_mesh_segment_list segments;
+	size_t num_bad_segments;
 } ufbx_segmented_mesh;
 
 // -- Memory callbacks
@@ -2641,6 +2652,13 @@ typedef struct ufbx_segment_opts {
 
 	// Include faces with less than three vertices in the result
 	bool include_bad_faces;
+
+	// If there are faces that cannot fit into a single segment just ignore them
+	bool ignore_bad_segments;
+
+	// Return segments that don't meet the limits with the valid ones
+	// The bad ones have `ufbx_mesh_segment.bad_segment` set to `true`
+	bool include_bad_segments;
 
 } ufbx_segment_opts;
 
