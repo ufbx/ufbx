@@ -10,6 +10,7 @@ UFBXT_FILE_TEST_ALT(blender_279_ball_segmentation, blender_279_ball)
 	ufbxt_init_allocator(&opts.result_allocator);
 	ufbxt_init_allocator(&opts.temp_allocator);
 	opts.max_materials = 1;
+	opts.max_triangles = 20;
 
 	ufbx_error error;
 	ufbx_segmented_mesh *seg_mesh = ufbx_segment_mesh(mesh, &opts, &error);
