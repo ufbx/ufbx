@@ -578,9 +578,11 @@ typedef struct ufbx_face {
 typedef struct ufbx_mesh_material {
 	ufbx_material *material;
 
-	size_t num_faces;
-	size_t num_triangles;
-	int32_t *face_indices;
+	// Sub-set of the geometry that uses this specific material
+	size_t num_faces;      // < Number of faces (polygons) using this material
+	size_t num_triangles;  // < Number of triangles using this material if triangulated
+	int32_t *face_indices; // < Indices to `ufbx_mesh.faces[]` that use this material
+
 } ufbx_mesh_material;
 
 UFBX_LIST_TYPE(ufbx_mesh_material_list, ufbx_mesh_material);
@@ -667,10 +669,10 @@ struct ufbx_mesh {
 	// one vertex may be split to multiple indices for split attributes, eg. UVs
 	size_t num_vertices;  // < Number of logical "vertex" points
 	size_t num_indices;   // < Number of combiend vertex/attribute tuples
-	size_t num_triangles; // < Number of triangles
+	size_t num_triangles; // < Number of triangles if triangulated
 
 	// Faces and optional per-face extra data
-	size_t num_faces;
+	size_t num_faces;          // < Number of faces (polygons) in the mesh
 	ufbx_face *faces;          // < Face index range
 	bool *face_smoothing;      // < Should the face have soft normals
 	int32_t *face_material;    // < Indices to `ufbx_mesh.materials`
@@ -710,7 +712,13 @@ struct ufbx_mesh {
 	ufbx_uv_set_list uv_sets;
 	ufbx_color_set_list color_sets;
 
-	// List of materials used by the mesh
+	// List of materials used by the mesh. This is a list of structures that contains
+	// compact lists of face indices that use a specific material which can be more
+	// useful convenient `face_material`. Use `materials[index].material` for the
+	// actual material pointers.
+	// HINT: If this mesh has no material then `materials[]` will be empty, but if
+	// you enable `ufbx_load_opts.allow_null_material` there will be a single
+	// `ufbx_mesh_material` with `material == NULL` with all the faces in it.
 	ufbx_mesh_material_list materials;
 
 	// Skinned vertex positions, for efficiency the skinned positions are the
