@@ -870,7 +870,13 @@ typedef enum ufbx_aperture_format {
 
 // Camera attached to a `ufbx_node`
 struct ufbx_camera {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 
 	// If set to `true`, `resolution` reprensents actual pixel values, otherwise
 	// it's only useful for its aspect ratio.
@@ -900,7 +906,13 @@ struct ufbx_camera {
 // Bone attached to a `ufbx_node`, provides the logical length of the bone
 // but most interesting information is directly in `ufbx_node`.
 struct ufbx_bone {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 
 	// Visual radius of the bone
 	ufbx_real radius;
@@ -914,7 +926,13 @@ struct ufbx_bone {
 
 // Empty/NULL/locator connected to a node, actual details in `ufbx_node`
 struct ufbx_empty {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; ufbx_node_list instances; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t id;
+		ufbx_node_list instances;
+	}; };
 };
 
 // -- Node attributes (curves/surfaces)
