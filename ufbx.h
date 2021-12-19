@@ -1826,6 +1826,8 @@ struct ufbx_anim_layer {
 	ufbx_anim_value_list anim_values;
 	ufbx_anim_prop_list anim_props; // < Sorted by `element,prop_name`
 
+	ufbx_anim anim;
+
 	uint32_t min_element_id;
 	uint32_t max_element_id;
 	uint32_t element_id_bitmask[4];
@@ -2671,6 +2673,9 @@ ufbx_inline ufbx_element *ufbx_find_element(ufbx_scene *scene, ufbx_element_type
 
 ufbx_node *ufbx_find_node_len(ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_inline ufbx_node *ufbx_find_node(ufbx_scene *scene, const char *name) { return ufbx_find_node_len(scene, name, strlen(name));}
+
+ufbx_anim_stack *ufbx_find_anim_stack_len(ufbx_scene *scene, const char *name, size_t name_len);
+ufbx_inline ufbx_anim_stack *ufbx_find_anim_stack(ufbx_scene *scene, const char *name) { return ufbx_find_anim_stack_len(scene, name, strlen(name));}
 
 ufbx_matrix ufbx_get_compatible_matrix_for_normals(ufbx_node *node);
 

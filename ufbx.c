@@ -11040,6 +11040,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbx_anim_layer *layer = *p_layer;
 		ufbxi_check(ufbxi_fetch_dst_elements(uc, &layer->anim_values, &layer->element, false, NULL, UFBX_ELEMENT_ANIM_VALUE));
 
+		ufbx_anim_layer_desc *layer_desc = ufbxi_push_zero(&uc->result, ufbx_anim_layer_desc, 1);;
+		ufbxi_check(layer_desc);
+		layer_desc->layer = layer;
+		layer_desc->weight = 1.0f;
+
+		layer->anim.layers.data = layer_desc;
+		layer->anim.layers.count = 1;
+
 		uint32_t min_id = UINT32_MAX, max_id = 0;
 
 		// Combine the animated properties with elements (potentially duplicates!)
@@ -15523,6 +15531,11 @@ ufbx_element *ufbx_find_element_len(ufbx_scene *scene, ufbx_element_type type, c
 ufbx_node *ufbx_find_node_len(ufbx_scene *scene, const char *name, size_t name_len)
 {
 	return (ufbx_node*)ufbx_find_element_len(scene, UFBX_ELEMENT_NODE, name, name_len);
+}
+
+ufbx_anim_stack *ufbx_find_anim_stack_len(ufbx_scene *scene, const char *name, size_t name_len)
+{
+	return (ufbx_anim_stack*)ufbx_find_element_len(scene, UFBX_ELEMENT_ANIM_STACK, name, name_len);
 }
 
 ufbx_matrix ufbx_get_compatible_matrix_for_normals(ufbx_node *node)
