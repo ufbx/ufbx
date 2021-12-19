@@ -438,7 +438,7 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 		// Optimize the flat vertex buffer into an indexed one. `ufbx_generate_indices()`
 		// compacts the vertex buffer and returns the number of used vertices.
 		ufbx_error error;
-		size_t num_vertices = ufbx_generate_indices_multi(streams, num_streams, indices, num_indices, NULL, &error);
+		size_t num_vertices = ufbx_generate_indices(streams, num_streams, indices, num_indices, NULL, &error);
 		if (error.type != UFBX_ERROR_NONE) {
 			print_error(&error, "Failed to generate index buffer");
 			exit(1);

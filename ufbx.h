@@ -2289,41 +2289,6 @@ typedef struct ufbx_vertex_stream {
 	size_t vertex_size;
 } ufbx_vertex_stream;
 
-// -- Mesh segmentation
-
-typedef struct ufbx_segment_face {
-	ufbx_mesh *mesh;
-	uint32_t *indices;
-	uint32_t num_indices;
-	uint32_t material_index;
-} ufbx_segment_face;
-
-UFBX_LIST_TYPE(ufbx_segment_face_list, ufbx_segment_face);
-
-typedef struct ufbx_mesh_segment {
-	ufbx_segment_face_list faces;
-	size_t num_indices;
-	size_t num_triangles;
-	size_t num_bad_faces;
-
-	ufbx_material_list materials;
-	ufbx_skin_cluster_list clusters;
-	ufbx_blend_shape_list blend_shapes;
-
-	// If `true` this segment breaks the limits specified in `ufbx_segment_opts`.
-	// By default the function fails if any segment breaks the limits, but you can
-	// specify `ufbx_segment_opts.allow_bad_segments` to include bad segments.
-	bool bad_segment;
-
-} ufbx_mesh_segment;
-
-UFBX_LIST_TYPE(ufbx_mesh_segment_list, ufbx_mesh_segment);
-
-typedef struct ufbx_segmented_mesh {
-	ufbx_mesh_segment_list segments;
-	size_t num_bad_segments;
-} ufbx_segmented_mesh;
-
 // -- Memory callbacks
 
 // You can optionally provide an allocator to ufbx, the default is to use the
@@ -2426,7 +2391,6 @@ typedef enum ufbx_error_type {
 	UFBX_ERROR_CANCELLED,
 	UFBX_ERROR_UNSUPPORTED_VERSION,
 	UFBX_ERROR_NOT_FBX,
-	UFBX_ERROR_IMPOSSIBLE_SEGMENTATION,
 } ufbx_error_type;
 
 // Error description with detailed stack trace
@@ -2621,55 +2585,6 @@ typedef struct ufbx_geometry_cache_data_opts {
 
 } ufbx_geometry_cache_data_opts;
 
-typedef struct ufbx_segment_opts {
-	ufbx_allocator temp_allocator;   // < Allocator used during segmenting
-	ufbx_allocator result_allocator; // < Allocator used for the final mesh
-
-	// Triangulate the faces before segmentation.
-	// NOTE: This is ignored when using `ufbx_segment_faces()`, you can use
-	// `ufbx_triangulate_face()` or some other triangulation method beforehand.
-	bool triangulate;
-
-	// Maximum number of indices per segment
-	// NOTE: This is counted _after_ triangulation if requested.
-	size_t max_indices;
-
-	// Maximum number of triangles per segment. This works even if `triangulate`
-	// is not enabled by counting the number of potential result triangles.
-	size_t max_triangles;
-
-	// Maximum number of materials per segment
-	size_t max_materials;
-
-	// Don't place both skinned and non-skinned geometry to the same segments
-	bool separate_skinned;
-
-	// Maximum number of skin clusters (aka bones) per segment
-	size_t max_skin_clusters;
-
-	// Maximum number of weights to consider per vertex. This is not strictly
-	// necessary even if you use less weights but the segmentation will be more
-	// conservative in that case.
-	size_t max_skin_weights;
-
-	// Don't place faces that have blend shapes to same segments with ones that don't
-	bool separate_blend_shapes;
-
-	// Maximum number of blend shapes per segment
-	size_t max_blend_shapes;
-
-	// Include faces with less than three vertices in the result
-	bool include_bad_faces;
-
-	// If there are faces that cannot fit into a single segment just ignore them
-	bool ignore_bad_segments;
-
-	// Return segments that don't meet the limits with the valid ones
-	// The bad ones have `ufbx_mesh_segment.bad_segment` set to `true`
-	bool include_bad_segments;
-
-} ufbx_segment_opts;
-
 // -- API
 
 #ifdef __cplusplus
@@ -2848,13 +2763,6 @@ size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *frame, ufbx_real *d
 size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *channel, double time, ufbx_real *data, size_t count, ufbx_geometry_cache_data_opts *opts);
 size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_frame *frame, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts);
 size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *channel, double time, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts);
-
-// Mesh segmentation
-
-ufbx_segmented_mesh *ufbx_segment_mesh(const ufbx_mesh *mesh, const ufbx_segment_opts *opts, ufbx_error *error);
-ufbx_segmented_mesh *ufbx_segment_meshes(const ufbx_mesh **meshes, size_t num_meshes, const ufbx_segment_opts *opts, ufbx_error *error);
-ufbx_segmented_mesh *ufbx_segment_faces(const ufbx_segment_face *faces, size_t num_faces, const ufbx_segment_opts *opts, ufbx_error *error);
-void ufbx_free_segmented_mesh(ufbx_segmented_mesh *mesh);
 
 // Utility
 
