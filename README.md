@@ -1,4 +1,4 @@
-# ufbx [![Build Status](https://travis-ci.org/bqqbarbhg/ufbx.svg?branch=master)](https://travis-ci.org/bqqbarbhg/ufbx) [![codecov](https://codecov.io/gh/bqqbarbhg/ufbx/branch/master/graph/badge.svg)](https://codecov.io/gh/bqqbarbhg/ufbx)
+# ufbx [![CI](https://github.com/bqqbarbhg/ufbx/actions/workflows/ci.yml/badge.svg)](https://github.com/bqqbarbhg/ufbx/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/bqqbarbhg/ufbx/branch/master/graph/badge.svg)](https://codecov.io/gh/bqqbarbhg/ufbx)
 
 Single source file FBX reader.
 
@@ -38,10 +38,9 @@ ufbx_free_scene(scene);
 
 ## WIP
 
-This library is still a work in progress, but most of the implemented features are quite
-usable as the library is heavily tested and fuzzed.
-
-The API might change in the future, especially materials and evaluating animations.
+The library is nearing first proper version so most of the API should be relatively
+stable now for `1.0`. The header file contains some documentation but proper guide
+is still on the way.
 
 ## License
 
