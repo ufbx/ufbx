@@ -89,7 +89,6 @@ static ufbx_vec3 ufbxt_add3(ufbx_vec3 a, ufbx_vec3 b)
 	return v;
 }
 
-
 static ufbx_vec2 ufbxt_sub2(ufbx_vec2 a, ufbx_vec2 b)
 {
 	ufbx_vec2 v;
@@ -104,6 +103,23 @@ static ufbx_vec3 ufbxt_sub3(ufbx_vec3 a, ufbx_vec3 b)
 	v.x = a.x - b.x;
 	v.y = a.y - b.y;
 	v.z = a.z - b.z;
+	return v;
+}
+
+static ufbx_vec2 ufbxt_mul2(ufbx_vec2 a, ufbx_real b)
+{
+	ufbx_vec2 v;
+	v.x = a.x * b;
+	v.y = a.y * b;
+	return v;
+}
+
+static ufbx_vec3 ufbxt_mul3(ufbx_vec3 a, ufbx_real b)
+{
+	ufbx_vec3 v;
+	v.x = a.x * b;
+	v.y = a.y * b;
+	v.z = a.z * b;
 	return v;
 }
 

@@ -13780,6 +13780,20 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 	}
 }
 
+static ufbxi_noinline ufbx_vec3 ufbxi_evaluate_connected_prop(const ufbx_anim *anim, const ufbx_element *element, const char *name, double time)
+{
+	ufbx_connection *conn = ufbxi_find_prop_connection(element, name);
+
+	for (size_t i = 0; i < 1000 && conn; i++) {
+		ufbx_connection *next_conn = ufbxi_find_prop_connection(conn->src, conn->src_prop.data);
+		if (!next_conn) break;
+		conn = next_conn;
+	}
+
+	ufbx_prop ep = ufbx_evaluate_prop_len(anim, conn->src, conn->src_prop.data, conn->src_prop.length, time);
+	return ep.value_vec3;
+}
+
 static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *props, const char **prop_names, size_t max_props)
 {
 	const char *name = prop_names[0];
@@ -13832,6 +13846,10 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 			if (name == prop->name.data) {
 				if (prop->flags & UFBX_PROP_FLAG_ANIMATED) {
 					props[num_props++] = *prop;
+				} else if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim->ignore_connections) {
+					ufbx_prop *dst = &props[num_props++];
+					*dst = *prop;
+					dst->value_vec3 = ufbxi_evaluate_connected_prop(anim, element, name, time);
 				}
 				break;
 			} else if (strcmp(name, prop->name.data) < 0) {
@@ -13878,7 +13896,6 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 	prop_list.defaults = (ufbx_props*)&element->props;
 	return prop_list;
 }
-
 
 typedef struct {
 	char *src_element;
@@ -15683,17 +15700,7 @@ ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, const ufbx_element *elem
 	if ((result.flags & (UFBX_PROP_FLAG_ANIMATED|UFBX_PROP_FLAG_CONNECTED)) == 0) return result;
 
 	if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim->ignore_connections) {
-		ufbx_connection *conn = ufbxi_find_prop_connection(element, prop->name.data);
-
-		for (size_t i = 0; i < 1000 && conn; i++) {
-			ufbx_connection *next_conn = ufbxi_find_prop_connection(conn->src, conn->src_prop.data);
-			if (!next_conn) break;
-			conn = next_conn;
-		}
-
-		ufbx_prop ep = ufbx_evaluate_prop_len(anim, conn->src, conn->src_prop.data, conn->src_prop.length, time);
-		result.value_vec3 = ep.value_vec3;
-		result.value_int = (int64_t)result.value_real;
+		result.value_vec3 = ufbxi_evaluate_connected_prop(anim, element, prop->name.data, time);
 	}
 
 	ufbxi_evaluate_props(anim, element, time, &result, 1);
@@ -15745,16 +15752,7 @@ ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, dou
 		*dst = *prop;
 
 		if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim->ignore_connections) {
-			ufbx_connection *conn = ufbxi_find_prop_connection(element, prop->name.data);
-
-			for (size_t i = 0; i < 1000 && conn; i++) {
-				ufbx_connection *next_conn = ufbxi_find_prop_connection(conn->src, conn->src_prop.data);
-				if (!next_conn) break;
-				conn = next_conn;
-			}
-
-			ufbx_prop ep = ufbx_evaluate_prop_len(anim, conn->src, conn->src_prop.data, conn->src_prop.length, time);
-			dst->value_vec3 = ep.value_vec3;
+			dst->value_vec3 = ufbxi_evaluate_connected_prop(anim, element, prop->name.data, time);
 		}
 	}
 

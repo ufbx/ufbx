@@ -192,6 +192,10 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 		{ 53.0/24.0, 0.901, 0.168 },
 		{ 120.0/24.0, 1.0, 1.0 },
 	};
+	ufbx_vec3 ref_offsets[2][8] = {
+		{ {0,0,0},{0,0,0},{0.317,0,0},{-0.317,0,0},{0.317,0,0},{-0.317,0,0},{0,0,0},{0,0,0}, },
+		{ {0,0,0},{0,0,0},{0,0,-0.284},{0,0,-0.284},{0,0,0.284},{0,0,0.284},{0,0,0},{0,0,0}, },
+	};
 
 	for (size_t chan_ix = 0; chan_ix < 2; chan_ix++) {
 		ufbx_blend_channel *chan = top[chan_ix];
@@ -200,13 +204,35 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 		ufbxt_assert_close_real(err, chan->keyframes.data[0].target_weight, 1.0);
 		ufbx_blend_shape *shape = chan->keyframes.data[0].shape;
 
+		ufbx_vec3 offsets[8] = { 0 };
+		ufbx_add_blend_shape_vertex_offsets(shape, offsets, 8, 1.0f);
+		for (size_t i = 0; i < 8; i++) {
+			ufbx_vec3 ref = ref_offsets[chan_ix][i];
+			ufbx_vec3 off_a = offsets[i];
+			ufbx_vec3 off_b = ufbx_get_blend_shape_vertex_offset(shape, i);
+			ufbxt_assert_close_vec3(err, ref, off_a);
+			ufbxt_assert_close_vec3(err, ref, off_b);
+		}
+
 		for (size_t key_ix = 0; key_ix < ufbxt_arraycount(keyframes); key_ix++) {
 			double *frame = keyframes[key_ix];
 			double time = frame[0];
-
 			ufbx_real ref = (ufbx_real)frame[1 + chan_ix];
+
+			ufbx_real weight = ufbx_evaluate_blend_weight(&scene->anim, chan, time);
+			ufbxt_assert_close_real(err, weight, ref);
+
 			ufbx_prop prop = ufbx_evaluate_prop(&scene->anim, &chan->element, "DeformPercent", time);
 			ufbxt_assert_close_real(err, prop.value_real / 100.0f, ref);
+		}
+	}
+
+	{
+		ufbx_vec3 offsets[8] = { 0 };
+		ufbx_add_blend_vertex_offsets(deformer, offsets, 8, 1.0f);
+		for (size_t i = 0; i < 8; i++) {
+			ufbx_vec3 ref = ufbxt_add3(ref_offsets[0][i], ref_offsets[1][i]);
+			ufbxt_assert_close_vec3(err, ref, offsets[i]);
 		}
 	}
 
@@ -222,16 +248,34 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 			ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, time, &opts, NULL);
 			ufbxt_assert(state);
 
+			ufbx_real weights[2];
 			for (size_t chan_ix = 0; chan_ix < 2; chan_ix++) {
 				ufbx_real ref = (ufbx_real)frame[1 + chan_ix];
 
-				ufbx_blend_channel *chan = state->blend_channels.data[top[chan_ix]->element.typed_id];
+				ufbx_blend_channel *chan = state->blend_channels.data[top[chan_ix]->id];
 				ufbxt_assert(chan);
 
 				ufbx_prop prop = ufbx_evaluate_prop(&scene->anim, &chan->element, "DeformPercent", time);
 
 				ufbxt_assert_close_real(err, prop.value_real / 100.0, ref);
 				ufbxt_assert_close_real(err, chan->weight, ref);
+				weights[chan_ix] = chan->weight;
+			}
+
+			if (eval_skin) {
+				ufbx_blend_deformer *eval_deformer = state->blend_deformers.data[deformer->id];
+				ufbx_mesh *eval_mesh = state->meshes.data[mesh->id];
+				for (size_t i = 0; i < 8; i++) {
+					ufbx_vec3 original_pos = eval_mesh->vertex_position.data[i];
+					ufbx_vec3 skinned_pos = eval_mesh->skinned_position.data[i];
+					ufbx_vec3 ref = original_pos;
+					ufbx_vec3 blend_pos = ufbx_get_blend_vertex_offset(eval_deformer, i);
+					ref = ufbxt_add3(ref, ufbxt_mul3(ref_offsets[0][i], weights[0]));
+					ref = ufbxt_add3(ref, ufbxt_mul3(ref_offsets[1][i], weights[1]));
+					blend_pos = ufbxt_add3(original_pos, blend_pos);
+					ufbxt_assert_close_vec3(err, ref, skinned_pos);
+					ufbxt_assert_close_vec3(err, ref, blend_pos);
+				}
 			}
 
 			ufbxt_check_scene(state);
