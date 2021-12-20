@@ -1761,7 +1761,7 @@ bool ufbxt_measure_progress(void *user, const ufbx_progress *progress)
 	return true;
 }
 
-void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err), const char *suffix, ufbx_load_opts user_opts, bool alternative)
+void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err, ufbx_error *load_error), const char *suffix, ufbx_load_opts user_opts, bool alternative, bool allow_error)
 {
 	char buf[512];
 	snprintf(buf, sizeof(buf), "%s%s.obj", data_root, name);
@@ -1825,13 +1825,12 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbx_scene *scene = ufbx_load_memory(data, size, &memory_opts, &error);
 			uint64_t load_end = cputime_cpu_tick();
 
-			if (!scene) {
+			if (scene) {
+				ufbxt_check_scene(scene);
+				ufbxt_assert(progress_ctx.calls >= size / 0x4000 / 2);
+			} else if (!allow_error) {
 				ufbxt_log_error(&error);
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file");
-			} else {
-				ufbxt_check_scene(scene);
-
-				ufbxt_assert(progress_ctx.calls >= size / 0x4000 / 2);
 			}
 
 			ufbxt_progress_ctx stream_progress_ctx = { 0 };
@@ -1850,7 +1849,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbx_scene *streamed_scene = ufbx_load_file(buf, &stream_opts, &error);
 			if (streamed_scene) {
 				ufbxt_check_scene(streamed_scene);
-			} else {
+			} else if (!allow_error) {
 				ufbxt_log_error(&error);
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse streamed file");
 			}
@@ -1907,47 +1906,82 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			// Ignore geometry, animations, and both
 
 			{
+				ufbx_error ignore_error;
 				ufbx_load_opts opts = load_opts;
 				opts.ignore_geometry = true;
-				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, NULL);
+				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, &ignore_error);
+				if (ignore_scene) {
+					ufbxt_check_scene(ignore_scene);
+					ufbx_free_scene(ignore_scene);
+				} else if (!allow_error) {
+					ufbxt_log_error(&ignore_error);
+					ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file ignoring geometry");
+				}
+			}
+
+			{
+				ufbx_error ignore_error;
+				ufbx_load_opts opts = load_opts;
+				opts.ignore_animation = true;
+				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, &ignore_error);
+				if (ignore_scene) {
+					ufbxt_check_scene(ignore_scene);
+					ufbx_free_scene(ignore_scene);
+				} else if (!allow_error) {
+					ufbxt_log_error(&ignore_error);
+					ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file ignoring animation");
+				}
+			}
+
+			{
+				ufbx_error ignore_error;
+				ufbx_load_opts opts = load_opts;
+				opts.ignore_embedded = true;
+				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, &ignore_error);
+				if (ignore_scene) {
+					ufbxt_check_scene(ignore_scene);
+					ufbx_free_scene(ignore_scene);
+				} else if (!allow_error) {
+					ufbxt_log_error(&ignore_error);
+					ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file ignoring embedded files");
+				}
+			}
+
+			{
+				ufbx_error ignore_error;
+				ufbx_load_opts opts = load_opts;
+				opts.ignore_geometry = true;
+				opts.ignore_animation = true;
+				opts.ignore_embedded = true;
+				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, &ignore_error);
+				if (ignore_scene) {
+					ufbxt_check_scene(ignore_scene);
+					ufbx_free_scene(ignore_scene);
+				} else if (!allow_error) {
+					ufbxt_log_error(&ignore_error);
+					ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file ignoring everything");
+				}
+			}
+
+			if (scene) {
+				ufbxt_logf(".. Loaded in %.2fms: File %.1fkB, temp %.1fkB (%zu allocs), result %.1fkB (%zu allocs)",
+					cputime_cpu_delta_to_sec(NULL, load_end - load_begin) * 1e3,
+					(double)size * 1e-3,
+					(double)scene->metadata.temp_memory_used * 1e-3,
+					scene->metadata.temp_allocs,
+					(double)scene->metadata.result_memory_used * 1e-3,
+					scene->metadata.result_allocs
+				);
+
+				ufbxt_assert(scene->metadata.ascii == ((fi == 1) ? 1 : 0));
+				ufbxt_assert(scene->metadata.version == version);
+
 				ufbxt_check_scene(scene);
-				ufbx_free_scene(ignore_scene);
 			}
-
-			{
-				ufbx_load_opts opts = load_opts;
-				opts.ignore_animation = true;
-				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, NULL);
-				ufbxt_check_scene(ignore_scene);
-				ufbx_free_scene(ignore_scene);
-			}
-
-			{
-				ufbx_load_opts opts = load_opts;
-				opts.ignore_geometry = true;
-				opts.ignore_animation = true;
-				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, NULL);
-				ufbxt_check_scene(ignore_scene);
-				ufbx_free_scene(ignore_scene);
-			}
-
-			ufbxt_logf(".. Loaded in %.2fms: File %.1fkB, temp %.1fkB (%zu allocs), result %.1fkB (%zu allocs)",
-				cputime_cpu_delta_to_sec(NULL, load_end - load_begin) * 1e3,
-				(double)size * 1e-3,
-				(double)scene->metadata.temp_memory_used * 1e-3,
-				scene->metadata.temp_allocs,
-				(double)scene->metadata.result_memory_used * 1e-3,
-				scene->metadata.result_allocs
-			);
-
-			ufbxt_assert(scene->metadata.ascii == ((fi == 1) ? 1 : 0));
-			ufbxt_assert(scene->metadata.version == version);
-
-			ufbxt_check_scene(scene);
 
 			// Evaluate all the default animation and all stacks
 
-			{
+			if (scene) {
 				uint64_t eval_begin = cputime_cpu_tick();
 				ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, 1.0, NULL, NULL);
 				uint64_t eval_end = cputime_cpu_tick();
@@ -1967,27 +2001,29 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbx_free_scene(state);
 			}
 
-			for (size_t i = 1; i < scene->anim_stacks.count; i++) {
-				ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim_stacks.data[i]->anim, 1.0, NULL, NULL);
-				ufbxt_assert(state);
-				ufbxt_check_scene(state);
-				ufbx_free_scene(state);
+			if (scene) {
+				for (size_t i = 1; i < scene->anim_stacks.count; i++) {
+					ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim_stacks.data[i]->anim, 1.0, NULL, NULL);
+					ufbxt_assert(state);
+					ufbxt_check_scene(state);
+					ufbx_free_scene(state);
+				}
 			}
 
 			ufbxt_diff_error err = { 0 };
 
-			if (obj_file) {
+			if (scene && obj_file) {
 				ufbxt_diff_to_obj(scene, obj_file, &err, false);
 			}
 
-			test_fn(scene, &err);
+			test_fn(scene, &err, &error);
 
 			if (err.num > 0) {
 				ufbx_real avg = err.sum / (ufbx_real)err.num;
 				ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 			}
 
-			if (!alternative) {
+			if (!alternative && scene) {
 				ufbxt_do_fuzz(scene, streamed_scene, stream_progress_ctx.calls, base_name, data, size);
 
 				// Run known buffer size checks
@@ -2025,29 +2061,34 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 #define UFBXT_IMPL 1
 #define UFBXT_TEST(name) void ufbxt_test_fn_##name(void)
-#define UFBXT_FILE_TEST(name) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err); \
+#define UFBXT_FILE_TEST(name) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
 	void ufbxt_test_fn_file_##name(void) { \
 	ufbx_load_opts user_opts = { 0 }; \
-	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL, user_opts, false); } \
-	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err)
-#define UFBXT_FILE_TEST_OPTS(name, get_opts) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err); \
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL, user_opts, false, false); } \
+	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
+#define UFBXT_FILE_TEST_OPTS(name, get_opts) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
 	void ufbxt_test_fn_file_##name(void) { \
-	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL, get_opts, false); } \
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL, get_opts, false, false); } \
 	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err)
-#define UFBXT_FILE_TEST_SUFFIX(name, suffix) void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err); \
+#define UFBXT_FILE_TEST_SUFFIX(name, suffix) void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
 	void ufbxt_test_fn_file_##name##_##suffix(void) { \
 	ufbx_load_opts user_opts = { 0 }; \
-	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name##_##suffix, #suffix, user_opts, false); } \
-	void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err)
-#define UFBXT_FILE_TEST_SUFFIX_OPTS(name, suffix, get_opts) void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err); \
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name##_##suffix, #suffix, user_opts, false, false); } \
+	void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
+#define UFBXT_FILE_TEST_SUFFIX_OPTS(name, suffix, get_opts) void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
 	void ufbxt_test_fn_file_##name##_##suffix(void) { \
-	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name##_##suffix, #suffix, get_opts, false); } \
-	void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err)
-#define UFBXT_FILE_TEST_ALT(name, file) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err); \
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name##_##suffix, #suffix, get_opts, false, false); } \
+	void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
+#define UFBXT_FILE_TEST_ALT(name, file) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
 	void ufbxt_test_fn_file_##name(void) { \
 	ufbx_load_opts user_opts = { 0 }; \
-	ufbxt_do_file_test(#file, &ufbxt_test_fn_imp_file_##name, NULL, user_opts, true); } \
-	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err)
+	ufbxt_do_file_test(#file, &ufbxt_test_fn_imp_file_##name, NULL, user_opts, true, false); } \
+	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
+#define UFBXT_FILE_TEST_ALLOW_ERROR(name) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
+	void ufbxt_test_fn_file_##name(void) { \
+	ufbx_load_opts user_opts = { 0 }; \
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL, user_opts, false, true); } \
+	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
 
 #include "all_tests.h"
 
@@ -2058,6 +2099,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 #undef UFBXT_FILE_TEST_SUFFIX
 #undef UFBXT_FILE_TEST_SUFFIX_OPTS
 #undef UFBXT_FILE_TEST_ALT
+#undef UFBXT_FILE_TEST_ALLOW_ERROR
 #define UFBXT_IMPL 0
 #define UFBXT_TEST(name) { #name, &ufbxt_test_fn_##name },
 #define UFBXT_FILE_TEST(name) { #name, &ufbxt_test_fn_file_##name },
@@ -2065,6 +2107,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 #define UFBXT_FILE_TEST_SUFFIX(name, suffix) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
 #define UFBXT_FILE_TEST_SUFFIX_OPTS(name, suffix, get_opts) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
 #define UFBXT_FILE_TEST_ALT(name, file) { #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST_ALLOW_ERROR(name) { #name, &ufbxt_test_fn_file_##name },
 ufbxt_test g_tests[] = {
 	#include "all_tests.h"
 };

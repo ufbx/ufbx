@@ -281,3 +281,9 @@ UFBXT_FILE_TEST(synthetic_id_collision)
 	ufbxt_assert(!node);
 }
 #endif
+
+UFBXT_FILE_TEST_ALLOW_ERROR(synthetic_node_depth)
+#if UFBXT_IMPL
+{
+}
+#endif
