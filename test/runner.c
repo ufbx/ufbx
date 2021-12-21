@@ -1986,7 +1986,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 					t_jmp_buf = NULL;
 				}
 
-				if (fail_sz >= 0) {
+				if (fail_sz >= 0 && !allow_error) {
 					size_t error_size = 256;
 					char *error = (char*)malloc(error_size);
 					ufbxt_assert(error);
@@ -1997,7 +1997,6 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 					fprintf(stderr, "\rFuzzing read buffer size %s: %d/%d\n", base_name, (int)size, (int)size);
 				}
 
-			} else {
 			}
 
 			// Ignore geometry, animations, and both
