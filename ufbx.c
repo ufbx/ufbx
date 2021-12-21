@@ -13090,7 +13090,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_contex
 	if (!cache) {
 		if (cc.error.type == UFBX_ERROR_FILE_NOT_FOUND) {
 			memset(&cc.error, 0, sizeof(cc.error));
-			ufbxi_cache_load(&cc, file->absolute_filename);
+			cache = ufbxi_cache_load(&cc, file->absolute_filename);
 		}
 	}
 
