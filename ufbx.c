@@ -3753,6 +3753,7 @@ static ufbxi_noinline int ufbxi_xml_parse_tag(ufbxi_xml_context *xc, bool *p_clo
 static ufbxi_noinline int ufbxi_xml_parse_root(ufbxi_xml_context *xc)
 {
 	ufbxi_xml_tag *tag = ufbxi_push_zero(&xc->result, ufbxi_xml_tag, 1);
+	ufbxi_check_err(&xc->error, tag);
 	tag->name.data = ufbxi_empty_char;
 	tag->text.data = ufbxi_empty_char;
 
