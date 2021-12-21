@@ -908,7 +908,7 @@ bool ufbxt_cancel_progress(void *user, const ufbx_progress *progress)
 	return --ctx->calls_left > 0;
 }
 
-int ufbxt_test_fuzz(void *data, size_t size, size_t step, int offset, size_t temp_limit, size_t result_limit, size_t truncate_length, size_t cancel_step)
+int ufbxt_test_fuzz(const char *filename, void *data, size_t size, size_t step, int offset, size_t temp_limit, size_t result_limit, size_t truncate_length, size_t cancel_step)
 {
 	if (g_fuzz_step < SIZE_MAX && step != g_fuzz_step) return 1;
 
@@ -918,6 +918,10 @@ int ufbxt_test_fuzz(void *data, size_t size, size_t step, int offset, size_t tem
 
 		ufbx_load_opts opts = { 0 };
 		ufbxt_cancel_ctx cancel_ctx = { 0 };
+
+		opts.load_external_files = true;
+		opts.filename.data = filename;
+		opts.filename.length = SIZE_MAX;
 
 		ufbxt_init_allocator(&opts.temp_allocator);
 		ufbxt_init_allocator(&opts.result_allocator);
@@ -1565,7 +1569,7 @@ static bool ufbxt_fuzz_should_skip(int iter)
 	}
 }
 
-void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progress_calls, const char *base_name, void *data, size_t size)
+void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progress_calls, const char *base_name, void *data, size_t size, const char *filename)
 {
 	if (g_fuzz) {
 		size_t fail_step = 0;
@@ -1592,7 +1596,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 			size_t step = 10000000 + (size_t)i;
 
-			if (!ufbxt_test_fuzz(data, size, step, -1, (size_t)i, 0, 0, 0)) fail_step = step;
+			if (!ufbxt_test_fuzz(filename, data, size, step, -1, (size_t)i, 0, 0, 0)) fail_step = step;
 		}
 
 		fprintf(stderr, "\rFuzzing temp limit %s: %d/%d\n", base_name, (int)temp_allocs, (int)temp_allocs);
@@ -1609,7 +1613,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 			size_t step = 20000000 + (size_t)i;
 
-			if (!ufbxt_test_fuzz(data, size, step, -1, 0, (size_t)i, 0, 0)) fail_step = step;
+			if (!ufbxt_test_fuzz(filename, data, size, step, -1, 0, (size_t)i, 0, 0)) fail_step = step;
 		}
 
 		fprintf(stderr, "\rFuzzing result limit %s: %d/%d\n", base_name, (int)result_allocs, (int)result_allocs);
@@ -1627,7 +1631,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 				size_t step = 30000000 + (size_t)i;
 
-				if (!ufbxt_test_fuzz(data, size, step, -1, 0, 0, (size_t)i, 0)) fail_step = step;
+				if (!ufbxt_test_fuzz(filename, data, size, step, -1, 0, 0, (size_t)i, 0)) fail_step = step;
 			}
 
 			fprintf(stderr, "\rFuzzing truncate %s: %d/%d\n", base_name, (int)size, (int)size);
@@ -1646,7 +1650,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 				size_t step = 40000000 + (size_t)i;
 
-				if (!ufbxt_test_fuzz(data, size, step, -1, 0, 0, 0, (size_t)i+1)) fail_step = step;
+				if (!ufbxt_test_fuzz(filename, data, size, step, -1, 0, 0, 0, (size_t)i+1)) fail_step = step;
 			}
 
 			fprintf(stderr, "\rFuzzing cancel %s: %d/%d\n", base_name, (int)size, (int)size);
@@ -1686,23 +1690,23 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 				if (g_all_byte_values) {
 					for (uint32_t v = 0; v < 256; v++) {
 						data_u8[i] = (uint8_t)v;
-						if (!ufbxt_test_fuzz(data_u8, size, step + v, i, 0, 0, 0, 0)) fail_step = step + v;
+						if (!ufbxt_test_fuzz(filename, data_u8, size, step + v, i, 0, 0, 0, 0)) fail_step = step + v;
 					}
 				} else {
 					data_u8[i] = original + 1;
-					if (!ufbxt_test_fuzz(data_u8, size, step + 1, i, 0, 0, 0, 0)) fail_step = step + 1;
+					if (!ufbxt_test_fuzz(filename, data_u8, size, step + 1, i, 0, 0, 0, 0)) fail_step = step + 1;
 
 					data_u8[i] = original - 1;
-					if (!ufbxt_test_fuzz(data_u8, size, step + 2, i, 0, 0, 0, 0)) fail_step = step + 2;
+					if (!ufbxt_test_fuzz(filename, data_u8, size, step + 2, i, 0, 0, 0, 0)) fail_step = step + 2;
 
 					if (original != 0) {
 						data_u8[i] = 0;
-						if (!ufbxt_test_fuzz(data_u8, size, step + 3, i, 0, 0, 0, 0)) fail_step = step + 3;
+						if (!ufbxt_test_fuzz(filename, data_u8, size, step + 3, i, 0, 0, 0, 0)) fail_step = step + 3;
 					}
 
 					if (original != 0xff) {
 						data_u8[i] = 0xff;
-						if (!ufbxt_test_fuzz(data_u8, size, step + 4, i, 0, 0, 0, 0)) fail_step = step + 4;
+						if (!ufbxt_test_fuzz(filename, data_u8, size, step + 4, i, 0, 0, 0, 0)) fail_step = step + 4;
 					}
 				}
 
@@ -1737,6 +1741,11 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 			}
 
 			ufbx_load_opts opts = { 0 };
+			ufbxt_cancel_ctx cancel_ctx = { 0 };
+
+			opts.load_external_files = true;
+			opts.filename.data = filename;
+			opts.filename.length = SIZE_MAX;
 
 			ufbxt_init_allocator(&opts.temp_allocator);
 			ufbxt_init_allocator(&opts.result_allocator);
@@ -1757,6 +1766,13 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 			if (check->truncate_length > 0) {
 				ufbxt_logf(".. Truncated length %u: %s", check->truncate_length, check->description);
 				truncated_size = check->truncate_length;
+			}
+
+			if (check->cancel_step > 0) {
+				cancel_ctx.calls_left = check->cancel_step;
+				opts.progress_fn = &ufbxt_cancel_progress;
+				opts.progress_user = &cancel_ctx;
+				opts.progress_interval_hint = 1;
 			}
 
 			ufbx_error error;
@@ -2049,7 +2065,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			}
 
 			if (!alternative && scene) {
-				ufbxt_do_fuzz(scene, streamed_scene, stream_progress_ctx.calls, base_name, data, size);
+				ufbxt_do_fuzz(scene, streamed_scene, stream_progress_ctx.calls, base_name, data, size, buf);
 
 				// Run known buffer size checks
 				for (size_t i = 0; i < ufbxt_arraycount(g_buffer_checks); i++) {
