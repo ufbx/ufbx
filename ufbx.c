@@ -12621,17 +12621,8 @@ static ufbxi_noinline int ufbxi_cache_sort_tmp_channels(ufbxi_cache_context *cc,
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_context *cc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_xml_imp(ufbxi_cache_context *cc, ufbxi_xml_document *doc)
 {
-	ufbxi_xml_load_opts opts = { 0 };
-	opts.ator = cc->ator_tmp;
-	opts.read_fn = cc->stream.read_fn;
-	opts.read_user = cc->stream.user;
-	opts.prefix = cc->pos;
-	opts.prefix_length = cc->pos_end - cc->pos;
-	ufbxi_xml_document *doc = ufbxi_load_xml(&opts, &cc->error);
-	ufbxi_check_err(&cc->error, doc);
-
 	cc->xml_ticks_per_frame = 250;
 	cc->xml_filename = cc->stream_filename;
 
@@ -12715,8 +12706,23 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_conte
 	}
 
 	ufbxi_check_err(&cc->error, ufbxi_cache_sort_tmp_channels(cc, cc->channels, cc->num_channels));
+	return 1;
+}
 
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_xml(ufbxi_cache_context *cc)
+{
+	ufbxi_xml_load_opts opts = { 0 };
+	opts.ator = cc->ator_tmp;
+	opts.read_fn = cc->stream.read_fn;
+	opts.read_user = cc->stream.user;
+	opts.prefix = cc->pos;
+	opts.prefix_length = cc->pos_end - cc->pos;
+	ufbxi_xml_document *doc = ufbxi_load_xml(&opts, &cc->error);
+	ufbxi_check_err(&cc->error, doc);
+
+	int xml_ok = ufbxi_cache_load_xml_imp(cc, doc);
 	ufbxi_free_xml(doc);
+	ufbxi_check_err(&cc->error, xml_ok);
 
 	return 1;
 }
