@@ -28,6 +28,7 @@
 
 // -- Configuration
 
+// TODO: Support overriding `ufbx_real` with `float` or anything else.
 typedef double ufbx_real;
 
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
@@ -168,23 +169,52 @@ typedef enum ufbx_prop_type {
 	UFBX_NUM_PROP_TYPES,
 } ufbx_prop_type;
 
+// Property flags: Advanced information about properties, not usually needed.
 typedef enum ufbx_prop_flags {
+	// Supports animation.
+	// NOTE: ufbx ignores this and allows animations on non-animatable properties.
 	UFBX_PROP_FLAG_ANIMATABLE = 0x1,
+
+	// User defined (custom) property.
 	UFBX_PROP_FLAG_USER_DEFINED = 0x2,
+
+	// Hidden in UI.
 	UFBX_PROP_FLAG_HIDDEN = 0x4,
+
+	// Disallow modification from UI for components.
 	UFBX_PROP_FLAG_LOCK_X = 0x10,
 	UFBX_PROP_FLAG_LOCK_Y = 0x20,
 	UFBX_PROP_FLAG_LOCK_Z = 0x40,
 	UFBX_PROP_FLAG_LOCK_W = 0x80,
+
+	// Disable animation from components.
 	UFBX_PROP_FLAG_MUTE_X = 0x100,
 	UFBX_PROP_FLAG_MUTE_Y = 0x200,
 	UFBX_PROP_FLAG_MUTE_Z = 0x400,
 	UFBX_PROP_FLAG_MUTE_W = 0x800,
+
+	// Property created by ufbx when an element has a connected `ufbx_anim_prop`
+	// but doesn't contain the `ufbx_prop` it's referring to.
+	// NOTE: The property may have been found in the templated defaults.
 	UFBX_PROP_FLAG_SYNTHETIC = 0x1000,
+
+	// The property has at least one `ufbx_anim_prop` in some layer.
 	UFBX_PROP_FLAG_ANIMATED = 0x2000,
+
+	// Used by `ufbx_evaluate_prop()` to indicate the the property was not found.
 	UFBX_PROP_FLAG_NOT_FOUND = 0x4000,
+
+	// The property is connected to another one.
+	// This use case is relatively rare so `ufbx_prop` does not track connections
+	// directly. You can find connections from `ufbx_element.connections_dst` where
+	// `ufbx_connection.dst_prop` is this property and `ufbx_connection.src_prop` is defined.
 	UFBX_PROP_FLAG_CONNECTED = 0x8000,
+
+	// The value of this property is undefined (represented as zero).
 	UFBX_PROP_FLAG_NO_VALUE = 0x10000,
+
+	// This property has been overridden by the user.
+	// See `ufbx_anim.prop_overrides` for more information.
 	UFBX_PROP_FLAG_OVERRIDDEN = 0x20000,
 } ufbx_prop_flags;
 
@@ -375,9 +405,9 @@ typedef enum ufbx_element_type {
 	UFBX_ELEMENT_TYPE_LAST_ATTRIB = UFBX_ELEMENT_LOD_GROUP,
 } ufbx_element_type;
 
-// Connection between two elements source and destination are somewhat
-// arbitrary but the destination is often the "container" eg. parent node
-// and source is the object conneted to it eg. child node.
+// Connection between two elements.
+// Source and destination are somewhat arbitrary but the destination is
+// often the "container" like a parent node or mesh containing a deformer.
 typedef struct ufbx_connection {
 	ufbx_element *src;
 	ufbx_element *dst;
@@ -387,9 +417,11 @@ typedef struct ufbx_connection {
 
 UFBX_LIST_TYPE(ufbx_connection_list, ufbx_connection);
 
-// Element "base class" found in the head of every element object
+// Element "base-class" common to each element.
+// Some fields (like `connections_src`) are advanced and not visible
+// in the specialized element structs.
 // NOTE: The `element_id` value is consistent when loading the
-// _same_ file, but re-exporting the file will invalidate them.
+// _same_ file, but re-exporting the file will invalidate them. (TOMOVE)
 struct ufbx_element {
 	ufbx_string name;
 	ufbx_props props;
@@ -404,6 +436,7 @@ struct ufbx_element {
 // -- Unknown
 
 struct ufbx_unknown {
+	// Shared "base-class" header, see `ufbx_element`.
 	union { ufbx_element element; struct {
 		ufbx_string name;
 		ufbx_props props;
@@ -411,8 +444,9 @@ struct ufbx_unknown {
 		uint32_t id;
 	}; };
 
-	// FBX format specific type information
-	// ASCII FBX `<super_type>: ID, "<type>::<name>", "<sub_type>"`
+	// FBX format specific type information.
+	// In ASCII FBX format:
+	//   super_type: ID, "type::name", "sub_type" { ... }
 	ufbx_string type;
 	ufbx_string super_type;
 	ufbx_string sub_type;
@@ -442,18 +476,37 @@ struct ufbx_node {
 	}; };
 
 	// Node hierarchy
-	ufbx_node *parent;
-	ufbx_node_list children;
-	uint32_t node_depth;
 
-	// Attached element type and typed pointers. Nonexistent attributes are `NULL`
-	// so checking `type` is not necessary if acccessing eg. `node->mesh`.
-	ufbx_element_type attrib_type;
-	ufbx_element *attrib;
+	// Parent node containing this one if not root.
+	//
+	// Always non-`NULL` for non-root nodes unless
+	// `ufbx_load_opts.allow_nodes_out_of_root` is enabled.
+	ufbx_node *parent;
+
+	// List of child nodes parented to this node.
+	ufbx_node_list children;
+
+	// Attached element type and typed pointers.
+	//
+	// Set to `NULL` if not in use, so checking `attrib_type` is not required.
 	ufbx_mesh *mesh;
 	ufbx_light *light;
 	ufbx_camera *camera;
 	ufbx_bone *bone;
+
+	// Less common attributes use these fields.
+	//
+	// Defined even if it is one of the above, eg. `ufbx_mesh`. In case there
+	// is multiple attributes this will be the first one.
+	ufbx_element *attrib;
+
+	// `attrib->type` if `attrib` is defined, otherwise `UFBX_ELEMENT_UNKNOWN`.
+	ufbx_element_type attrib_type;
+
+	// List of _all_ attached attribute elements.
+	//
+	// In most cases there is only zero or one attributes per node, but if you
+	// have a very exotic FBX file nodes may have multiple attributes.
 	ufbx_element_list all_attribs;
 
 	// Local transform in parent, geometry transform is a non-inherited
@@ -463,7 +516,11 @@ struct ufbx_node {
 	ufbx_transform geometry_transform;
 
 	// Raw Euler angles in degrees for those who want them
+
+	// Specifies the axis order `euler_rotation` is applied in.
 	ufbx_rotation_order rotation_order;
+	// Rotation around the local X/Y/Z axes in `rotation_order`.
+	// The angles are specified in degrees.
 	ufbx_vec3 euler_rotation;
 
 	// Transform to the global "world" space, may be incorrect if the node
@@ -472,15 +529,32 @@ struct ufbx_node {
 
 	// Matrices derived from the transformations, for transforming geometry
 	// prefer using `geometry_to_world` as that supports geometric transforms.
+
+	// Transform from this node to `parent` space.
+	// Equivalent to `ufbx_transform_to_matrix(&local_transform)`.
 	ufbx_matrix node_to_parent;
+	// Transform from this node to the world space, ie. multiplying all the
+	// `node_to_parent` matrices of the parent chain together.
+	// NOTE: Not the same as `ufbx_transform_to_matrix(&world_transform)`
+	// as this matrix will account for potential shear (if `inherit_type == UFBX_INHERIT_NORMAL`).
 	ufbx_matrix node_to_world;
+	// Transform from the attribute to this node. Does not affect the transforms
+	// of `children`!
+	// Equivalent to `ufbx_transform_to_matrix(&geometry_transform)`.
 	ufbx_matrix geometry_to_node;
+	// Transform from attribute space to world space.
+	// Equivalent to `ufbx_matrix_mul(&node_to_world, &geometry_to_node)`.
 	ufbx_matrix geometry_to_world;
 
-	// Visibility
+	// Visibility state.
 	bool visible;
 
+	// True if this node is the implicit root node of the scene.
 	bool is_root;
+
+	// How deep is this node in the parent hierarchy. Root node is at depth `0`
+	// and the immediate children of root at `1`.
+	uint32_t node_depth;
 };
 
 // Vertex attribute: All attributes are stored in a consistent indexed format
@@ -594,17 +668,16 @@ typedef enum ufbx_subdivision_display_mode {
 	UFBX_SUBDIVISION_DISPLAY_SMOOTH,
 } ufbx_subdivision_display_mode;
 
-// TODO: Relate these to OpenSubdiv modes
 typedef enum ufbx_subdivision_boundary {
 	UFBX_SUBDIVISION_BOUNDARY_DEFAULT,
 	UFBX_SUBDIVISION_BOUNDARY_LEGACY,
-	// OpenSubdiv: VTX_BOUNDARY_EDGE_ONLY/FVAR_LINEAR_NONE
+	// OpenSubdiv: `VTX_BOUNDARY_EDGE_ONLY` / `FVAR_LINEAR_NONE`
 	UFBX_SUBDIVISION_BOUNDARY_SHARP_NONE,
-	// OpenSubdiv: VTX_BOUNDARY_EDGE_AND_CORNER/FVAR_LINEAR_CORNERS_ONLY
+	// OpenSubdiv: `VTX_BOUNDARY_EDGE_AND_CORNER` / `FVAR_LINEAR_CORNERS_ONLY`
 	UFBX_SUBDIVISION_BOUNDARY_SHARP_CORNERS,
-	// OpenSubdiv: FVAR_LINEAR_BOUNDARIES
+	// OpenSubdiv: `FVAR_LINEAR_BOUNDARIES`
 	UFBX_SUBDIVISION_BOUNDARY_SHARP_BOUNDARY,
-	// OpenSubdiv: FVAR_LINEAR_ALL
+	// OpenSubdiv: `FVAR_LINEAR_ALL`
 	UFBX_SUBDIVISION_BOUNDARY_SHARP_INTERIOR,
 } ufbx_subdivision_boundary;
 
@@ -629,13 +702,13 @@ typedef enum ufbx_subdivision_boundary {
 //
 //   {0,3}    {3,4}    {7,3}   faces ({ index_begin, num_indices })
 //   0 1 2   3 4 5 6   7 8 9   index
-//
+//   
 //   0 1 3   1 2 4 3   2 4 5   vertex_indices[index]
 //   A B D   B C E D   C E F   vertices[vertex_indices[index]]
-//
+//   
 //   0 0 1   0 0 1 1   0 1 1   vertex_normal.indices[index]
 //   ^ ^ v   ^ ^ v v   ^ v v   vertex_normal.data[vertex_normal.indices[index]]
-//
+//   
 //   0 0 0   1 1 1 1   2 2 2   vertex_uv.indices[index]
 //   x x x   y y y y   z z z   vertex_uv.data[vertex_uv.indices[index]]
 //
@@ -651,7 +724,7 @@ typedef enum ufbx_subdivision_boundary {
 //
 //   0 1 2 3 4 5  vertex
 //   A B C D E F  vertices[vertex]
-//
+//   
 //   0 1 4 2 5 9  vertex_first_index[vertex]
 //   0 0 0 1 1 1  vertex_normal.indices[vertex_first_index[vertex]]
 //   ^ ^ ^ v v v  vertex_normal.data[vertex_normal.indices[vertex_first_index[vertex]]]
@@ -1174,7 +1247,7 @@ struct ufbx_skin_cluster {
 	// not generally needed for skinning, use `geometry_to_bone` instead.
 	ufbx_matrix bind_to_world;
 
-	// Precomputed matrix/transform that accounts for the current bbone transform
+	// Precomputed matrix/transform that accounts for the current bone transform
 	// ie. `ufbx_matrix_mul(&cluster->bone->node_to_world, &cluster->geometry_to_bone)`
 	ufbx_matrix geometry_to_world;
 	ufbx_transform geometry_to_world_transform;
@@ -1860,12 +1933,12 @@ typedef struct ufbx_tangent {
 // cubic bezier curve through the following points:
 //
 //   (prev->time, prev->value)
-//   (prev->time + prev->dx, prev->value + prev->dy)
-//   (next->time - next->dx, next->value - next->dy)
+//   (prev->time + prev->right.dx, prev->value + prev->right.dy)
+//   (next->time - next->left.dx, next->value - next->left.dy)
 //   (next->time, next->value)
 //
-// HINT: Use `ufbx_evaluate_curve(ufbx_anim_curve *curve, double time)` rather
-// than trying to manually handle all the interpolation modes.
+// HINT: You can use `ufbx_evaluate_curve(ufbx_anim_curve *curve, double time)`
+// rather than trying to manually handle all the interpolation modes.
 typedef struct ufbx_keyframe {
 	double time;
 	ufbx_real value;
@@ -2611,6 +2684,7 @@ typedef struct ufbx_geometry_cache_data_opts {
 extern "C" {
 #endif
 
+// Various zero/empty/identity values
 extern const ufbx_string ufbx_empty_string;
 extern const ufbx_matrix ufbx_identity_matrix;
 extern const ufbx_transform ufbx_identity_transform;
@@ -2618,7 +2692,11 @@ extern const ufbx_vec2 ufbx_zero_vec2;
 extern const ufbx_vec3 ufbx_zero_vec3;
 extern const ufbx_vec4 ufbx_zero_vec4;
 extern const ufbx_quat ufbx_identity_quat;
+
+// Sizes of element types. eg `sizeof(ufbx_node)`
 extern const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES];
+
+// Version of the source file, comparable to `UFBX_HEADER_VERSION`
 extern const uint32_t ufbx_source_version;
 
 // Load a scene from a `size` byte memory buffer at `data`
@@ -2635,7 +2713,7 @@ ufbx_scene *ufbx_load_file_len(
 	const ufbx_load_opts *opts, ufbx_error *error);
 
 // Load a scene by reading from an `FILE *file` stream
-// NOTE: Uses a void pointer to not include <stdio.h>
+// NOTE: `file` is passed as a `void` pointer to avoid including <stdio.h>
 ufbx_scene *ufbx_load_stdio(
 	void *file,
 	const ufbx_load_opts *opts, ufbx_error *error);
@@ -2649,16 +2727,21 @@ ufbx_scene *ufbx_load_stream(
 // Free a previously loaded or evaluated scene
 void ufbx_free_scene(ufbx_scene *scene);
 
-// Format a textual description of `error`. Always produces a NULL-terminated string
-// to `char dst[dst_size]`, truncating if necessary. Returns the number of characters
-// written not including the NULL terminator.
+// Format a textual description of `error`.
+// Always produces a NULL-terminated string to `char dst[dst_size]`, truncating if
+// necessary. Returns the number of characters written not including the NULL terminator.
 size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error);
 
 // Query
 
+// Find a property `name` from `props`, returns `NULL` if not found.
+// Searches through `ufbx_props.defaults` as well.
 ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len);
 ufbx_inline ufbx_prop *ufbx_find_prop(const ufbx_props *props, const char *name) { return ufbx_find_prop_len(props, name, strlen(name));}
 
+// Utility functions for finding the value of a property, returns `def` if not found.
+// NOTE: For `ufbx_string` you need to ensure the lifetime of the default is
+// sufficient as no copy is made.
 ufbx_real ufbx_find_real_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_real def);
 ufbx_inline ufbx_real ufbx_find_real(const ufbx_props *props, const char *name, ufbx_real def) { return ufbx_find_real_len(props, name, strlen(name), def); }
 ufbx_vec3 ufbx_find_vec3_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_vec3 def);
@@ -2668,34 +2751,55 @@ ufbx_inline int64_t ufbx_find_int(const ufbx_props *props, const char *name, int
 ufbx_string ufbx_find_string_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_string def);
 ufbx_inline ufbx_string ufbx_find_string(const ufbx_props *props, const char *name, ufbx_string def) { return ufbx_find_string_len(props, name, strlen(name), def); }
 
+// Find any element of type `type` in `scene` by `name`.
+// For example if you want to find `ufbx_material` named `Mat`:
+//   (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Mat");
 ufbx_element *ufbx_find_element_len(ufbx_scene *scene, ufbx_element_type type, const char *name, size_t name_len);
 ufbx_inline ufbx_element *ufbx_find_element(ufbx_scene *scene, ufbx_element_type type, const char *name) { return ufbx_find_element_len(scene, type, name, strlen(name));}
 
+// Find node in `scene` by `name` (shorthand for `ufbx_find_element(UFBX_ELEMENT_NODE)`).
 ufbx_node *ufbx_find_node_len(ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_inline ufbx_node *ufbx_find_node(ufbx_scene *scene, const char *name) { return ufbx_find_node_len(scene, name, strlen(name));}
 
+// Find an animation stack in `scene` by `name` (shorthand for `ufbx_find_element(UFBX_ELEMENT_ANIM_STACK)`)
 ufbx_anim_stack *ufbx_find_anim_stack_len(ufbx_scene *scene, const char *name, size_t name_len);
-ufbx_inline ufbx_anim_stack *ufbx_find_anim_stack(ufbx_scene *scene, const char *name) { return ufbx_find_anim_stack_len(scene, name, strlen(name));}
+ufbx_inline ufbx_anim_stack *ufbx_find_anim_stack(ufbx_scene *scene, const char *name) { return ufbx_find_anim_stack_len(scene, name, strlen(name)); }
 
+// Get a matrix that transforms normals in the same way as Autodesk software.
+// NOTE: The resulting normals are slightly incorrect as this function deliberately
+// inverts geometric transformation wrong. For better results use
+// `ufbx_matrix_for_normals(&node->geometry_to_world)`.
 ufbx_matrix ufbx_get_compatible_matrix_for_normals(ufbx_node *node);
 
 // Utility
 
+// Decompress a DEFLATE compressed buffer.
+// Returns the decompressed size or a negative error code (see source for details).
+// NOTE: You must supply a valid `retain` with `ufbx_inflate_retain.initialized == false`
+// but the rest can be uninitialized.
 ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);
 
 // Animation evaluation
 
+// Evaluate a single animation `curve` at a `time`.
+// Returns `default_value` only if `curve == NULL` or it has no keyframes.
 ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_real default_value);
 
+// Evaluate a value from bundled animation curves.
 ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, double time);
 ufbx_vec2 ufbx_evaluate_anim_value_vec2(const ufbx_anim_value *anim_value, double time);
 ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, double time);
 
+// Evaluate an animated property `name` from `element` at `time`.
+// NOTE: If the property is not found it will have the flag `UFBX_PROP_FLAG_NOT_FOUND`.
 ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time);
 ufbx_inline ufbx_prop ufbx_evaluate_prop(const ufbx_anim *anim, const ufbx_element *element, const char *name, double time) {
 	return ufbx_evaluate_prop_len(anim, element, name, strlen(name), time);
 }
 
+// Evaluate all _animated_ properties of `element`.
+// HINT: This function returns an `ufbx_props` structure with the original properties as
+// `ufbx_props.defaults`. This lets you use `ufbx_find_prop/value()` for the results.
 ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
 
 ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *node, double time);
@@ -2708,8 +2812,8 @@ ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *ov
 // in the specified animation, except that animated elements' properties contain
 // only the animated values, the original ones are in `props->defaults`.
 //
-// NOTE: The returned scene refers to the original `scene` so it cannot be
-// freed until all evaluated scenes are freed.
+// NOTE: The returned scene refers to the original `scene` so the original
+// scene cannot be freed until all evaluated scenes are freed.
 ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error);
 
 // Materials

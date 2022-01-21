@@ -31,16 +31,19 @@
 	#else
 		#define ufbxi_nodiscard _Check_return_
 	#endif
+	#define ufbxi_unused
 #elif defined(__GNUC__) || defined(__clang__)
 	#define ufbxi_noinline __attribute__((noinline))
 	#define ufbxi_forceinline inline __attribute__((always_inline))
 	#define ufbxi_restrict __restrict
 	#define ufbxi_nodiscard __attribute__((warn_unused_result))
+	#define ufbxi_unused __attribute__((unused))
 #else
 	#define ufbxi_noinline
 	#define ufbxi_forceinline
 	#define ufbxi_nodiscard
 	#define ufbxi_restrict
+	#define ufbxi_unused
 #endif
 
 #if defined(__GNUC__) && !defined(__clang__)
@@ -1342,20 +1345,6 @@ static void ufbxi_free_size(ufbxi_allocator *ator, size_t size, void *ptr, size_
 	} else {
 		free(ptr);
 	}
-}
-
-ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_alloc_zero_size(ufbxi_allocator *ator, size_t size, size_t n)
-{
-	void *ptr = ufbxi_alloc_size(ator, size, n);
-	if (ptr) memset(ptr, 0, size * n);
-	return ptr;
-}
-
-ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_realloc_zero_size(ufbxi_allocator *ator, size_t size, void *old_ptr, size_t old_n, size_t n)
-{
-	void *ptr = ufbxi_realloc_size(ator, size, old_ptr, old_n, n);
-	if (ptr && n > old_n) memset((char*)ptr + size*old_n, 0, size*(n - old_n));
-	return ptr;
 }
 
 ufbxi_nodiscard static bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t size, void *p_ptr, size_t *p_cap, size_t n)
@@ -3061,7 +3050,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_report_progress(ufbxi_context *u
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_forceinline int ufbxi_progress(ufbxi_context *uc, size_t work_units)
+// TODO: Remove `ufbxi_unused` when it's not needed anymore
+ufbxi_unused ufbxi_nodiscard static ufbxi_forceinline int ufbxi_progress(ufbxi_context *uc, size_t work_units)
 {
 	if (!uc->opts.progress_fn) return 1;
 	ptrdiff_t left = uc->progress_timer - (ptrdiff_t)work_units;
@@ -13602,7 +13592,7 @@ static ufbxi_forceinline bool ufbxi_override_equals_to_prop(const ufbx_prop_over
 	return strcmp(over->prop_name, prop->name.data) == 0;
 }
 
-static ufbxi_forceinline bool ufbxi_prop_override_is_prepared(const ufbx_prop_override *over)
+static ufbxi_forceinline ufbxi_unused bool ufbxi_prop_override_is_prepared(const ufbx_prop_override *over)
 {
 	if (over->internal_key != ufbxi_get_name_key_c(over->prop_name)) return false;
 	if (over->value_str == NULL) return false;
