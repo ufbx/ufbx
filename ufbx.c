@@ -10,6 +10,10 @@
 #define UFBXI_MAX_SKIP_SIZE 0x40000000
 #define UFBXI_MAP_MAX_SCAN 32
 
+#ifndef UFBXI_MAX_NURBS_ORDER
+#define UFBXI_MAX_NURBS_ORDER 128
+#endif
+
 // -- Headers
 
 #define _FILE_OFFSET_BITS 64
@@ -7422,7 +7426,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	return 1;
 }
 
-ufbxi_noinline static ufbx_nurbs_edges ufbxi_read_nurbs_edges(const char *form)
+ufbxi_noinline static ufbx_nurbs_topology ufbxi_read_nurbs_topology(const char *form)
 {
 	if (form == ufbxi_Open) {
 		return UFBX_NURBS_OPEN;
@@ -7440,10 +7444,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_nurbs_curve(ufbxi_context *
 	ufbxi_check(nurbs);
 
 	const char *form = NULL;
-	ufbxi_check(ufbxi_find_val1(node, ufbxi_Order, "I", &nurbs->topology.order));
-	ufbxi_check(ufbxi_find_val1(node, ufbxi_Dimension, "I", &nurbs->topology.dimension));
+	ufbxi_check(ufbxi_find_val1(node, ufbxi_Order, "I", &nurbs->basis.order));
+	ufbxi_check(ufbxi_find_val1(node, ufbxi_Dimension, "I", &nurbs->basis.dimension));
 	ufbxi_check(ufbxi_find_val1(node, ufbxi_Form, "C", (char**)&form));
-	nurbs->topology.edges = ufbxi_read_nurbs_edges(form);
+	nurbs->basis.topology = ufbxi_read_nurbs_topology(form);
 
 	if (!uc->opts.ignore_geometry) {
 		ufbxi_value_array *points = ufbxi_find_array(node, ufbxi_Points, 'r');
@@ -7454,8 +7458,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_nurbs_curve(ufbxi_context *
 
 		nurbs->control_points.count = points->size / 4;
 		nurbs->control_points.data = (ufbx_vec4*)points->data;
-		nurbs->topology.knot_vector.data = (ufbx_real*)knot->data;
-		nurbs->topology.knot_vector.count = knot->size;
+		nurbs->basis.knot_vector.data = (ufbx_real*)knot->data;
+		nurbs->basis.knot_vector.count = knot->size;
 	}
 
 	return 1;
@@ -7467,11 +7471,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_nurbs_surface(ufbxi_context
 	ufbxi_check(nurbs);
 
 	const char *form_u = NULL, *form_v = NULL;
-	ufbxi_check(ufbxi_find_val2(node, ufbxi_NurbsSurfaceOrder, "II", &nurbs->topology[0].order, &nurbs->topology[1].order));
-	ufbxi_check(ufbxi_find_val2(node, ufbxi_Dimensions, "II", &nurbs->topology[0].dimension, &nurbs->topology[1].dimension));
+	ufbxi_check(ufbxi_find_val2(node, ufbxi_NurbsSurfaceOrder, "II", &nurbs->basis[0].order, &nurbs->basis[1].order));
+	ufbxi_check(ufbxi_find_val2(node, ufbxi_Dimensions, "II", &nurbs->basis[0].dimension, &nurbs->basis[1].dimension));
 	ufbxi_check(ufbxi_find_val2(node, ufbxi_Form, "CC", (char**)&form_u, (char**)&form_v));
-	nurbs->topology[0].edges = ufbxi_read_nurbs_edges(form_u);
-	nurbs->topology[1].edges = ufbxi_read_nurbs_edges(form_v);
+	nurbs->basis[0].topology = ufbxi_read_nurbs_topology(form_u);
+	nurbs->basis[1].topology = ufbxi_read_nurbs_topology(form_v);
 
 	if (!uc->opts.ignore_geometry) {
 		ufbxi_value_array *points = ufbxi_find_array(node, ufbxi_Points, 'r');
@@ -7484,10 +7488,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_nurbs_surface(ufbxi_context
 
 		nurbs->control_points.count = points->size / 4;
 		nurbs->control_points.data = (ufbx_vec4*)points->data;
-		nurbs->topology[0].knot_vector.data = (ufbx_real*)knot_u->data;
-		nurbs->topology[0].knot_vector.count = knot_u->size;
-		nurbs->topology[1].knot_vector.data = (ufbx_real*)knot_v->data;
-		nurbs->topology[1].knot_vector.count = knot_v->size;
+		nurbs->basis[0].knot_vector.data = (ufbx_real*)knot_u->data;
+		nurbs->basis[0].knot_vector.count = knot_u->size;
+		nurbs->basis[1].knot_vector.data = (ufbx_real*)knot_v->data;
+		nurbs->basis[1].knot_vector.count = knot_v->size;
 	}
 
 	return 1;
@@ -14298,6 +14302,26 @@ ufbxi_nodiscard static ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 	}
 }
 
+// -- NURBS
+
+static ufbxi_forceinline ufbx_real ufbxi_nurbs_weight(const ufbx_real_list *knots, size_t knot, size_t degree, ufbx_real u)
+{
+	if (knot >= knots->count) return 0.0f;
+	if (knots->count - knot < knots->count) return 0.0f;
+	ufbx_real prev_u = knots->data[knot], next_u = knots->data[knot + degree];
+	if (prev_u >= next_u) return 0.0f;
+	return (u - prev_u) / (next_u - prev_u);
+}
+
+static ufbxi_forceinline ufbx_real ufbxi_nurbs_deriv(const ufbx_real_list *knots, size_t knot, size_t degree)
+{
+	if (knot >= knots->count) return 0.0f;
+	if (knots->count - knot < knots->count) return 0.0f;
+	ufbx_real prev_u = knots->data[knot], next_u = knots->data[knot + degree];
+	if (prev_u >= next_u) return 0.0f;
+	return 1.0f / (next_u - prev_u);
+}
+
 // -- Topology
 
 static int ufbxi_cmp_topo_index_prev_next(const void *va, const void *vb)
@@ -16440,6 +16464,168 @@ void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *
 			ufbx_add_blend_shape_vertex_offsets(key->shape, vertices, num_vertices, weight * key->effective_weight);
 		}
 	}
+}
+
+size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_real u, size_t num_weights, ufbx_real *weights, ufbx_real *derivatives)
+{
+	ufbx_assert(basis);
+	if (!basis) return SIZE_MAX;
+	if (basis->order == 0) return SIZE_MAX;
+	size_t degree = basis->order - 1;
+
+	ufbx_real_list knots = basis->knot_vector;
+	size_t knot = SIZE_MAX;
+	{
+		ufbxi_macro_lower_bound_eq(ufbx_real, 8, &knot, knots.data, 0, knots.count - 1,
+			( a[1] <= u ), ( a[0] >= u && a[1] < u ));
+	}
+	if (knot == SIZE_MAX) return SIZE_MAX;
+	if (knot > basis->dimension) return SIZE_MAX;
+	if (knot <= degree) return SIZE_MAX;
+	if (!weights) return knot;
+
+	knot -= degree;
+
+	weights[0] = 1.0f;
+	for (size_t p = 1; p <= degree; p++) {
+
+		ufbx_real prev = 0.0f;
+		ufbx_real g = 1.0f - ufbxi_nurbs_weight(&knots, knot + p + 1, p, u);
+		ufbx_real dg = 0.0f;
+		if (derivatives && p == degree) {
+			dg = ufbxi_nurbs_deriv(&knots, knot + p + 1, p);
+		}
+
+		for (size_t i = p; i > 0; i--) {
+			ufbx_real f = ufbxi_nurbs_weight(&knots, knot + i, p, u);
+			ufbx_real weight = weights[i - 1];
+			weights[i] = f*weight + g*prev;
+
+			if (derivatives && p == degree) {
+				ufbx_real df = ufbxi_nurbs_deriv(&knots, knot + i, p);
+				derivatives[i] = df*weight - dg*prev;
+				dg = df;
+			}
+			
+			prev = weight;
+			g = 1.0f - f;
+		}
+
+		weights[0] = g*prev;
+		if (derivatives && p == degree) {
+			derivatives[0] = -dg*prev;
+		}
+	}
+
+	return knot;
+}
+
+ufbx_curve_point ufbx_evaluate_nurbs_curve_point(const ufbx_nurbs_curve *curve, ufbx_real u)
+{
+	ufbx_curve_point result = { false };
+
+	ufbx_assert(curve);
+	if (!curve) return result;
+
+	ufbx_real weights[UFBXI_MAX_NURBS_ORDER];
+	ufbx_real derivs[UFBXI_MAX_NURBS_ORDER];
+	size_t base = ufbx_evaluate_nurbs_basis(&curve->basis, u, UFBXI_MAX_NURBS_ORDER, weights, derivs);
+	if (base == SIZE_MAX) return result;
+
+	ufbx_vec4 p = { 0 };
+	ufbx_vec4 d = { 0 };
+
+	size_t order = curve->basis.order;
+	for (size_t i = 0; i < order; i++) {
+		size_t ix = (base + i) % curve->basis.dimension;
+		ufbx_real weight = weights[i], deriv = derivs[i];
+		ufbx_vec4 cp = curve->control_points.data[ix];
+
+		p.x += cp.x * weight;
+		p.y += cp.y * weight;
+		p.z += cp.z * weight;
+		p.w += cp.w * weight;
+
+		d.x += cp.x * deriv;
+		d.y += cp.y * deriv;
+		d.z += cp.z * deriv;
+		d.w += cp.w * deriv;
+	}
+
+	ufbx_real rcp_w = 1.0f / p.w;
+	result.valid = true;
+	result.position.x = p.x * rcp_w;
+	result.position.y = p.y * rcp_w;
+	result.position.z = p.z * rcp_w;
+	result.derivative.x = (d.x - result.position.x) * rcp_w;
+	result.derivative.y = (d.y - result.position.y) * rcp_w;
+	result.derivative.z = (d.z - result.position.z) * rcp_w;
+	return result;
+}
+
+ufbx_surface_point ufbx_evaluate_nurbs_surface_point(const ufbx_nurbs_surface *surface, ufbx_real u, ufbx_real v)
+{
+	ufbx_surface_point result = { false };
+
+	ufbx_assert(surface);
+	if (!surface) return result;
+
+	ufbx_real weights_u[UFBXI_MAX_NURBS_ORDER], weights_v[UFBXI_MAX_NURBS_ORDER];
+	ufbx_real derivs_u[UFBXI_MAX_NURBS_ORDER], derivs_v[UFBXI_MAX_NURBS_ORDER];
+	size_t base_u = ufbx_evaluate_nurbs_basis(&surface->basis[0], u, UFBXI_MAX_NURBS_ORDER, weights_u, derivs_u);
+	size_t base_v = ufbx_evaluate_nurbs_basis(&surface->basis[1], v, UFBXI_MAX_NURBS_ORDER, weights_v, derivs_v);
+	if (base_u == SIZE_MAX || base_v == SIZE_MAX) return result;
+
+	ufbx_vec4 p = { 0 };
+	ufbx_vec4 du = { 0 };
+	ufbx_vec4 dv = { 0 };
+
+	size_t dim_u = surface->basis[0].dimension;
+	size_t dim_v = surface->basis[1].dimension;
+	size_t order_u = surface->basis[0].order;
+	size_t order_v = surface->basis[1].order;
+	for (size_t ui = 0; ui < order_u; ui++) {
+		size_t uix = (base_u + ui) % dim_u;
+		ufbx_real weight_u = weights_u[ui], deriv_u = derivs_u[ui];
+
+		for (size_t vi = 0; vi < order_v; vi++) {
+			size_t vix = (base_v + vi) % dim_v;
+			ufbx_real weight_v = weights_u[ui], deriv_v = derivs_u[ui];
+			ufbx_vec4 cp = surface->control_points.data[uix * dim_v + vix];
+
+			ufbx_real weight = weight_u * weight_v;
+			ufbx_real wderiv_u = deriv_u * weight_v;
+			ufbx_real wderiv_v = deriv_v * weight_u;
+
+			p.x += cp.x * weight;
+			p.y += cp.y * weight;
+			p.z += cp.z * weight;
+			p.w += cp.w * weight;
+
+			du.x += cp.x * wderiv_u;
+			du.y += cp.y * wderiv_u;
+			du.z += cp.z * wderiv_u;
+			du.w += cp.w * wderiv_u;
+
+			dv.x += cp.x * wderiv_v;
+			dv.y += cp.y * wderiv_v;
+			dv.z += cp.z * wderiv_v;
+			dv.w += cp.w * wderiv_v;
+		}
+	}
+
+	ufbx_real rcp_w = 1.0f / p.w;
+	result.valid = true;
+	result.position.x = p.x * rcp_w;
+	result.position.y = p.y * rcp_w;
+	result.position.z = p.z * rcp_w;
+	result.derivative_u.x = (du.x - result.position.x) * rcp_w;
+	result.derivative_u.y = (du.y - result.position.y) * rcp_w;
+	result.derivative_u.z = (du.z - result.position.z) * rcp_w;
+	result.derivative_v.x = (dv.x - result.position.x) * rcp_w;
+	result.derivative_v.y = (dv.y - result.position.y) * rcp_w;
+	result.derivative_v.z = (dv.z - result.position.z) * rcp_w;
+	return result;
 }
 
 size_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face)

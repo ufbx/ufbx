@@ -1010,18 +1010,32 @@ struct ufbx_empty {
 
 // -- Node attributes (curves/surfaces)
 
-typedef enum ufbx_nurbs_edges {
+typedef enum ufbx_nurbs_topology {
+	// Repeats first `ufbx_nurbs_basis.order` control points after the end.
 	UFBX_NURBS_PERIODIC,
+	// Repeats the first control point after the end.
 	UFBX_NURBS_CLOSED,
+	// The endpoints are not connected.
 	UFBX_NURBS_OPEN,
-} ufbx_nurbs_edges;
-
-typedef struct ufbx_nurbs_topology {
-	uint32_t dimension;
-	uint32_t order;
-	ufbx_nurbs_edges edges;
-	ufbx_real_list knot_vector;
 } ufbx_nurbs_topology;
+
+// NURBS basis functions for an axis
+typedef struct ufbx_nurbs_basis {
+
+	// Number of control points in this dimension.
+	uint32_t dimension;
+
+	// Number of control points influencing a point on the curve/surface.
+	// Equal to the degree plus one.
+	uint32_t order;
+
+	// Topology (periodicity) of the dimension.
+	ufbx_nurbs_topology topology;
+
+	// Subdivision of the parameter range to control points.
+	ufbx_real_list knot_vector;
+
+} ufbx_nurbs_basis;
 
 // Segment of a `ufbx_line_curve`, indices refer to `ufbx_line_curve.point_indces[]`
 typedef struct ufbx_line_segment {
@@ -1057,7 +1071,10 @@ struct ufbx_nurbs_curve {
 		ufbx_node_list instances;
 	}; };
 
-	ufbx_nurbs_topology topology;
+	// Basis in the U axis
+	ufbx_nurbs_basis basis;
+
+	// Linear array of control points
 	ufbx_vec4_list control_points;
 };
 
@@ -1080,7 +1097,11 @@ struct ufbx_nurbs_surface {
 		ufbx_node_list instances;
 	}; };
 
-	ufbx_nurbs_topology topology[2];
+	// Basis in the U/V axes
+	ufbx_nurbs_basis basis[2];
+
+	// 2D array of control points.
+	// Memory layout: `V * basis[0].dimension + U`
 	ufbx_vec4_list control_points;
 
 	// TODO: Materials
@@ -2360,6 +2381,21 @@ struct ufbx_scene {
 	ufbx_name_element_list elements_by_name;
 };
 
+// -- Curves
+
+typedef struct ufbx_curve_point {
+	bool valid;
+	ufbx_vec3 position;
+	ufbx_vec3 derivative;
+} ufbx_curve_point;
+
+typedef struct ufbx_surface_point {
+	bool valid;
+	ufbx_vec3 position;
+	ufbx_vec3 derivative_u;
+	ufbx_vec3 derivative_v;
+} ufbx_surface_point;
+
 // -- Mesh topology
 
 typedef enum ufbx_topo_flags {
@@ -2854,6 +2890,14 @@ ufbx_vec3 ufbx_get_blend_vertex_offset(const ufbx_blend_deformer *blend, size_t 
 
 void ufbx_add_blend_shape_vertex_offsets(const ufbx_blend_shape *shape, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
 void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
+
+// Curves/surfaces
+
+size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_real u, size_t num_weights, ufbx_real *weights, ufbx_real *derivatives);
+
+ufbx_curve_point ufbx_evaluate_nurbs_curve_point(const ufbx_nurbs_curve *curve, ufbx_real u);
+
+ufbx_surface_point ufbx_evaluate_nurbs_surface_point(const ufbx_nurbs_surface *surface, ufbx_real u, ufbx_real v);
 
 // Mesh Topology
 
