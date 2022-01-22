@@ -270,7 +270,6 @@ typedef struct ufbx_empty ufbx_empty;
 // Node attributes (curves/surfaces)
 typedef struct ufbx_line_curve ufbx_line_curve;
 typedef struct ufbx_nurbs_curve ufbx_nurbs_curve;
-typedef struct ufbx_patch_surface ufbx_patch_surface;
 typedef struct ufbx_nurbs_surface ufbx_nurbs_surface;
 typedef struct ufbx_nurbs_trim_surface ufbx_nurbs_trim_surface;
 typedef struct ufbx_nurbs_trim_boundary ufbx_nurbs_trim_boundary;
@@ -326,7 +325,6 @@ UFBX_LIST_TYPE(ufbx_bone_list, ufbx_bone*);
 UFBX_LIST_TYPE(ufbx_empty_list, ufbx_empty*);
 UFBX_LIST_TYPE(ufbx_line_curve_list, ufbx_line_curve*);
 UFBX_LIST_TYPE(ufbx_nurbs_curve_list, ufbx_nurbs_curve*);
-UFBX_LIST_TYPE(ufbx_patch_surface_list, ufbx_patch_surface*);
 UFBX_LIST_TYPE(ufbx_nurbs_surface_list, ufbx_nurbs_surface*);
 UFBX_LIST_TYPE(ufbx_nurbs_trim_surface_list, ufbx_nurbs_trim_surface*);
 UFBX_LIST_TYPE(ufbx_nurbs_trim_boundary_list, ufbx_nurbs_trim_boundary*);
@@ -368,7 +366,6 @@ typedef enum ufbx_element_type {
 	UFBX_ELEMENT_EMPTY,               // < `ufbx_empty`
 	UFBX_ELEMENT_LINE_CURVE,          // < `ufbx_line_curve`
 	UFBX_ELEMENT_NURBS_CURVE,         // < `ufbx_nurbs_curve`
-	UFBX_ELEMENT_PATCH_SURFACE,       // < `ufbx_patch_surface`
 	UFBX_ELEMENT_NURBS_SURFACE,       // < `ufbx_nurbs_surface`
 	UFBX_ELEMENT_NURBS_TRIM_SURFACE,  // < `ufbx_nurbs_trim_surface`
 	UFBX_ELEMENT_NURBS_TRIM_BOUNDARY, // < `ufbx_nurbs_trim_boundary`
@@ -1076,16 +1073,6 @@ struct ufbx_nurbs_curve {
 
 	// Linear array of control points
 	ufbx_vec4_list control_points;
-};
-
-struct ufbx_patch_surface {
-	union { ufbx_element element; struct {
-		ufbx_string name;
-		ufbx_props props;
-		uint32_t element_id;
-		uint32_t id;
-		ufbx_node_list instances;
-	}; };
 };
 
 struct ufbx_nurbs_surface {
@@ -2322,7 +2309,6 @@ struct ufbx_scene {
 			// Node attributes (curves/surfaces)
 			ufbx_line_curve_list line_curves;
 			ufbx_nurbs_curve_list nurbs_curves;
-			ufbx_patch_surface_list patch_surfaces;
 			ufbx_nurbs_surface_list nurbs_surfaces;
 			ufbx_nurbs_trim_surface_list nurbs_trim_surfaces;
 			ufbx_nurbs_trim_boundary_list nurbs_trim_boundaries;

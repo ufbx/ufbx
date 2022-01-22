@@ -15330,7 +15330,6 @@ const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES] = {
 	sizeof(ufbx_empty),
 	sizeof(ufbx_line_curve),
 	sizeof(ufbx_nurbs_curve),
-	sizeof(ufbx_patch_surface),
 	sizeof(ufbx_nurbs_surface),
 	sizeof(ufbx_nurbs_trim_surface),
 	sizeof(ufbx_nurbs_trim_boundary),
