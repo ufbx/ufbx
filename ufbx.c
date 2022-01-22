@@ -2273,6 +2273,7 @@ static const char ufbxi_Filename[] = "Filename";
 static const char ufbxi_FilmHeight[] = "FilmHeight";
 static const char ufbxi_FilmSqueezeRatio[] = "FilmSqueezeRatio";
 static const char ufbxi_FilmWidth[] = "FilmWidth";
+static const char ufbxi_FlipNormals[] = "FlipNormals";
 static const char ufbxi_FocalLength[] = "FocalLength";
 static const char ufbxi_Form[] = "Form";
 static const char ufbxi_Freeze[] = "Freeze";
@@ -2548,6 +2549,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FilmHeight, 10 },
 	{ ufbxi_FilmSqueezeRatio, 16 },
 	{ ufbxi_FilmWidth, 9 },
+	{ ufbxi_FlipNormals, 11 },
 	{ ufbxi_FocalLength, 11 },
 	{ ufbxi_Form, 4 },
 	{ ufbxi_Freeze, 6 },
@@ -7474,14 +7476,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_nurbs_surface(ufbxi_context
 	ufbxi_check(nurbs);
 
 	const char *form_u = NULL, *form_v = NULL;
-	int32_t dimension_u = 3, dimension_v = 3;
-	ufbxi_check(ufbxi_find_val2(node, ufbxi_NurbsSurfaceOrder, "II", &nurbs->basis[0].order, &nurbs->basis[1].order));
-	ufbxi_ignore(ufbxi_find_val2(node, ufbxi_Dimensions, "II", &dimension_u, &dimension_v));
+	size_t dimension_u = 0, dimension_v = 0;
+	ufbxi_check(ufbxi_find_val2(node, ufbxi_NurbsSurfaceOrder, "II", &nurbs->basis_u.order, &nurbs->basis_v.order));
+	ufbxi_check(ufbxi_find_val2(node, ufbxi_Dimensions, "ZZ", &dimension_u, &dimension_v));
 	ufbxi_check(ufbxi_find_val2(node, ufbxi_Form, "CC", (char**)&form_u, (char**)&form_v));
-	nurbs->basis[0].topology = ufbxi_read_nurbs_topology(form_u);
-	nurbs->basis[1].topology = ufbxi_read_nurbs_topology(form_v);
-	nurbs->basis[0].is_2d = dimension_u == 2;
-	nurbs->basis[1].is_2d = dimension_v == 2;
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_FlipNormals, "B", &nurbs->flip_normals));
+	nurbs->basis_u.topology = ufbxi_read_nurbs_topology(form_u);
+	nurbs->basis_v.topology = ufbxi_read_nurbs_topology(form_v);
+	nurbs->num_control_points_u = dimension_u;
+	nurbs->num_control_points_v = dimension_v;
 
 	if (!uc->opts.ignore_geometry) {
 		ufbxi_value_array *points = ufbxi_find_array(node, ufbxi_Points, 'r');
@@ -7491,13 +7494,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_nurbs_surface(ufbxi_context
 		ufbxi_check(knot_u);
 		ufbxi_check(knot_v);
 		ufbxi_check(points->size % 4 == 0);
+		ufbxi_check(points->size / 4 == (size_t)dimension_u * (size_t)dimension_v);
 
 		nurbs->control_points.count = points->size / 4;
 		nurbs->control_points.data = (ufbx_vec4*)points->data;
-		nurbs->basis[0].knot_vector.data = (ufbx_real*)knot_u->data;
-		nurbs->basis[0].knot_vector.count = knot_u->size;
-		nurbs->basis[1].knot_vector.data = (ufbx_real*)knot_v->data;
-		nurbs->basis[1].knot_vector.count = knot_v->size;
+		nurbs->basis_u.knot_vector.data = (ufbx_real*)knot_u->data;
+		nurbs->basis_u.knot_vector.count = knot_u->size;
+		nurbs->basis_v.knot_vector.data = (ufbx_real*)knot_v->data;
+		nurbs->basis_v.knot_vector.count = knot_v->size;
 	}
 
 	return 1;
@@ -11075,8 +11079,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	ufbxi_for_ptr_list(ufbx_nurbs_surface, p_surface, uc->scene.nurbs_surfaces) {
 		ufbx_nurbs_surface *surface = *p_surface;
-		ufbxi_check(ufbxi_finalize_nurbs_basis(uc, &surface->basis[0]));
-		ufbxi_check(ufbxi_finalize_nurbs_basis(uc, &surface->basis[1]));
+		ufbxi_check(ufbxi_finalize_nurbs_basis(uc, &surface->basis_u));
+		ufbxi_check(ufbxi_finalize_nurbs_basis(uc, &surface->basis_v));
+
+		surface->material = (ufbx_material*)ufbxi_fetch_dst_element(&surface->element, search_node, NULL, UFBX_ELEMENT_MATERIAL);
 	}
 
 	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
@@ -13625,7 +13631,7 @@ ufbx_inline ufbx_vec3 ufbxi_cross3(ufbx_vec3 a, ufbx_vec3 b) {
 	return v;
 }
 
-ufbx_inline ufbx_vec3 ufbxi_normalize(ufbx_vec3 a) {
+ufbx_inline ufbx_vec3 ufbxi_normalize3(ufbx_vec3 a) {
 	ufbx_real len = (ufbx_real)sqrt(ufbxi_dot3(a, a));
 	if (len != 0.0) {
 		return ufbxi_mul3(a, (ufbx_real)1.0 / len);
@@ -14952,14 +14958,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 	if (sc->opts.interpolate_normals && !sc->opts.ignore_normals) {
 		ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&mesh->vertex_normal, sc->opts.boundary));
 		ufbxi_for(ufbx_vec3, normal, result->vertex_normal.data, result->vertex_normal.num_values) {
-			*normal = ufbxi_normalize(*normal);
+			*normal = ufbxi_normalize3(*normal);
 		}
 		if (mesh->skinned_normal.data == mesh->vertex_normal.data) {
 			result->skinned_normal = result->vertex_normal;
 		} else {
 			ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&result->skinned_normal, sc->opts.boundary));
 			ufbxi_for(ufbx_vec3, normal, result->skinned_normal.data, result->skinned_normal.num_values) {
-				*normal = ufbxi_normalize(*normal);
+				*normal = ufbxi_normalize3(*normal);
 			}
 		}
 	}
@@ -16533,6 +16539,7 @@ size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_real u, siz
 	ufbx_assert(basis);
 	if (!basis) return SIZE_MAX;
 	if (basis->order == 0) return SIZE_MAX;
+	if (!basis->valid) return SIZE_MAX;
 
 	size_t degree = basis->order - 1;
 
@@ -16646,61 +16653,59 @@ ufbx_surface_point ufbx_evaluate_nurbs_surface_point(const ufbx_nurbs_surface *s
 
 	ufbx_real weights_u[UFBXI_MAX_NURBS_ORDER], weights_v[UFBXI_MAX_NURBS_ORDER];
 	ufbx_real derivs_u[UFBXI_MAX_NURBS_ORDER], derivs_v[UFBXI_MAX_NURBS_ORDER];
-	size_t base_u = ufbx_evaluate_nurbs_basis(&surface->basis[0], u, UFBXI_MAX_NURBS_ORDER, weights_u, derivs_u);
-	size_t base_v = ufbx_evaluate_nurbs_basis(&surface->basis[1], v, UFBXI_MAX_NURBS_ORDER, weights_v, derivs_v);
+	size_t base_u = ufbx_evaluate_nurbs_basis(&surface->basis_u, u, UFBXI_MAX_NURBS_ORDER, weights_u, derivs_u);
+	size_t base_v = ufbx_evaluate_nurbs_basis(&surface->basis_v, v, UFBXI_MAX_NURBS_ORDER, weights_v, derivs_v);
 	if (base_u == SIZE_MAX || base_v == SIZE_MAX) return result;
 
 	ufbx_vec4 p = { 0 };
 	ufbx_vec4 du = { 0 };
 	ufbx_vec4 dv = { 0 };
 
-#if 0
-	size_t dim_u = surface->basis[0].dimension;
-	size_t dim_v = surface->basis[1].dimension;
-	size_t order_u = surface->basis[0].order;
-	size_t order_v = surface->basis[1].order;
-	for (size_t ui = 0; ui < order_u; ui++) {
-		size_t uix = (base_u + ui) % dim_u;
-		ufbx_real weight_u = weights_u[ui], deriv_u = derivs_u[ui];
+	size_t num_u = surface->num_control_points_u;
+	size_t num_v = surface->num_control_points_v;
+	size_t order_u = surface->basis_u.order;
+	size_t order_v = surface->basis_v.order;
+	for (size_t vi = 0; vi < order_v; vi++) {
+		size_t vix = (base_v + vi) % num_v;
+		ufbx_real weight_v = weights_v[vi], deriv_v = derivs_v[vi];
 
-		for (size_t vi = 0; vi < order_v; vi++) {
-			size_t vix = (base_v + vi) % dim_v;
-			ufbx_real weight_v = weights_u[ui], deriv_v = derivs_u[ui];
-			ufbx_vec4 cp = surface->control_points.data[uix * dim_v + vix];
+		for (size_t ui = 0; ui < order_u; ui++) {
+			size_t uix = (base_u + ui) % num_u;
+			ufbx_real weight_u = weights_u[ui], deriv_u = derivs_u[ui];
+			ufbx_vec4 cp = surface->control_points.data[vix * num_u + uix];
 
-			ufbx_real weight = weight_u * weight_v;
-			ufbx_real wderiv_u = deriv_u * weight_v;
-			ufbx_real wderiv_v = deriv_v * weight_u;
+			ufbx_real weight = weight_u * weight_v * cp.w;
+			ufbx_real wderiv_u = deriv_u * weight_v * cp.w;
+			ufbx_real wderiv_v = deriv_v * weight_u * cp.w;
 
 			p.x += cp.x * weight;
 			p.y += cp.y * weight;
 			p.z += cp.z * weight;
-			p.w += cp.w * weight;
+			p.w += weight;
 
 			du.x += cp.x * wderiv_u;
 			du.y += cp.y * wderiv_u;
 			du.z += cp.z * wderiv_u;
-			du.w += cp.w * wderiv_u;
+			du.w += wderiv_u;
 
 			dv.x += cp.x * wderiv_v;
 			dv.y += cp.y * wderiv_v;
 			dv.z += cp.z * wderiv_v;
-			dv.w += cp.w * wderiv_v;
+			dv.w += wderiv_v;
 		}
 	}
-#endif
 
 	ufbx_real rcp_w = 1.0f / p.w;
 	result.valid = true;
 	result.position.x = p.x * rcp_w;
 	result.position.y = p.y * rcp_w;
 	result.position.z = p.z * rcp_w;
-	result.derivative_u.x = (du.x - result.position.x) * rcp_w;
-	result.derivative_u.y = (du.y - result.position.y) * rcp_w;
-	result.derivative_u.z = (du.z - result.position.z) * rcp_w;
-	result.derivative_v.x = (dv.x - result.position.x) * rcp_w;
-	result.derivative_v.y = (dv.y - result.position.y) * rcp_w;
-	result.derivative_v.z = (dv.z - result.position.z) * rcp_w;
+	result.derivative_u.x = (du.x - du.w*result.position.x) * rcp_w;
+	result.derivative_u.y = (du.y - du.w*result.position.y) * rcp_w;
+	result.derivative_u.z = (du.z - du.w*result.position.z) * rcp_w;
+	result.derivative_v.x = (dv.x - dv.w*result.position.x) * rcp_w;
+	result.derivative_v.y = (dv.y - dv.w*result.position.y) * rcp_w;
+	result.derivative_v.z = (dv.z - dv.w*result.position.z) * rcp_w;
 	return result;
 }
 
@@ -16728,10 +16733,10 @@ size_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_m
 		ufbx_vec3 a = ufbxi_sub3(v2, v0);
 		ufbx_vec3 b = ufbxi_sub3(v3, v1);
 
-		ufbx_vec3 na1 = ufbxi_normalize(ufbxi_cross3(a, ufbxi_sub3(v1, v0)));
-		ufbx_vec3 na3 = ufbxi_normalize(ufbxi_cross3(a, ufbxi_sub3(v0, v3)));
-		ufbx_vec3 nb0 = ufbxi_normalize(ufbxi_cross3(b, ufbxi_sub3(v1, v0)));
-		ufbx_vec3 nb2 = ufbxi_normalize(ufbxi_cross3(b, ufbxi_sub3(v2, v1)));
+		ufbx_vec3 na1 = ufbxi_normalize3(ufbxi_cross3(a, ufbxi_sub3(v1, v0)));
+		ufbx_vec3 na3 = ufbxi_normalize3(ufbxi_cross3(a, ufbxi_sub3(v0, v3)));
+		ufbx_vec3 nb0 = ufbxi_normalize3(ufbxi_cross3(b, ufbxi_sub3(v1, v0)));
+		ufbx_vec3 nb2 = ufbxi_normalize3(ufbxi_cross3(b, ufbxi_sub3(v2, v1)));
 
 		ufbx_real dot_aa = ufbxi_dot3(a, a);
 		ufbx_real dot_bb = ufbxi_dot3(b, b);

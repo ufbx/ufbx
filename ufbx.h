@@ -1091,6 +1091,8 @@ struct ufbx_nurbs_curve {
 	ufbx_nurbs_basis basis;
 
 	// Linear array of control points
+	// NOTE: The control points are _not_ homogenous, meaning you have to multiply
+	// them by `w` before evaluating the surface.
 	ufbx_vec4_list control_points;
 };
 
@@ -1104,13 +1106,25 @@ struct ufbx_nurbs_surface {
 	}; };
 
 	// Basis in the U/V axes
-	ufbx_nurbs_basis basis[2];
+	ufbx_nurbs_basis basis_u;
+	ufbx_nurbs_basis basis_v;
+
+	// Number of control points for the U/V axes
+	size_t num_control_points_u;
+	size_t num_control_points_v;
 
 	// 2D array of control points.
-	// Memory layout: `V * basis[0].dimension + U`
+	// Memory layout: `V * num_control_points_u + U`
+	// NOTE: The control points are _not_ homogenous, meaning you have to multiply
+	// them by `w` before evaluating the surface.
 	ufbx_vec4_list control_points;
 
-	// TODO: Materials
+	// If `true` the resulting normals should be flipped when evaluated.
+	bool flip_normals;
+
+	// Material for the whole surface.
+	// NOTE: May be `NULL`!	
+	ufbx_material *material;
 };
 
 struct ufbx_nurbs_trim_surface {

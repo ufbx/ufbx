@@ -123,6 +123,22 @@ static ufbx_vec3 ufbxt_mul3(ufbx_vec3 a, ufbx_real b)
 	return v;
 }
 
+static ufbx_vec3 ufbxt_cross3(ufbx_vec3 a, ufbx_vec3 b)
+{
+	ufbx_vec3 v = { a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x };
+	return v;
+}
+
+static ufbx_vec3 ufbxt_normalize(ufbx_vec3 a) {
+	ufbx_real len = (ufbx_real)sqrt(ufbxt_dot3(a, a));
+	if (len != 0.0) {
+		return ufbxt_mul3(a, (ufbx_real)1.0 / len);
+	} else {
+		ufbx_vec3 zero = { (ufbx_real)0 };
+		return zero;
+	}
+}
+
 // -- Test framework
 
 #define ufbxt_memory_context(data) \
