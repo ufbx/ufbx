@@ -7429,13 +7429,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 ufbxi_noinline static ufbx_nurbs_topology ufbxi_read_nurbs_topology(const char *form)
 {
 	if (form == ufbxi_Open) {
-		return UFBX_NURBS_OPEN;
+		return UFBX_NURBS_TOPOLOGY_OPEN;
 	} else if (form == ufbxi_Closed) {
-		return UFBX_NURBS_CLOSED;
+		return UFBX_NURBS_TOPOLOGY_CLOSED;
 	} else if (form == ufbxi_Periodic) {
-		return UFBX_NURBS_PERIODIC;
+		return UFBX_NURBS_TOPOLOGY_PERIODIC;
 	}
-	return UFBX_NURBS_OPEN;
+	return UFBX_NURBS_TOPOLOGY_OPEN;
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_nurbs_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
@@ -7443,11 +7443,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_nurbs_curve(ufbxi_context *
 	ufbx_nurbs_curve *nurbs = ufbxi_push_element(uc, info, ufbx_nurbs_curve, UFBX_ELEMENT_NURBS_CURVE);
 	ufbxi_check(nurbs);
 
+	int32_t dimension = 3;
+
 	const char *form = NULL;
 	ufbxi_check(ufbxi_find_val1(node, ufbxi_Order, "I", &nurbs->basis.order));
-	ufbxi_check(ufbxi_find_val1(node, ufbxi_Dimension, "I", &nurbs->basis.dimension));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Dimension, "I", &dimension));
 	ufbxi_check(ufbxi_find_val1(node, ufbxi_Form, "C", (char**)&form));
 	nurbs->basis.topology = ufbxi_read_nurbs_topology(form);
+	nurbs->basis.is_2d = dimension == 2;
 
 	if (!uc->opts.ignore_geometry) {
 		ufbxi_value_array *points = ufbxi_find_array(node, ufbxi_Points, 'r');
@@ -7471,11 +7474,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_nurbs_surface(ufbxi_context
 	ufbxi_check(nurbs);
 
 	const char *form_u = NULL, *form_v = NULL;
+	int32_t dimension_u = 3, dimension_v = 3;
 	ufbxi_check(ufbxi_find_val2(node, ufbxi_NurbsSurfaceOrder, "II", &nurbs->basis[0].order, &nurbs->basis[1].order));
-	ufbxi_check(ufbxi_find_val2(node, ufbxi_Dimensions, "II", &nurbs->basis[0].dimension, &nurbs->basis[1].dimension));
+	ufbxi_ignore(ufbxi_find_val2(node, ufbxi_Dimensions, "II", &dimension_u, &dimension_v));
 	ufbxi_check(ufbxi_find_val2(node, ufbxi_Form, "CC", (char**)&form_u, (char**)&form_v));
 	nurbs->basis[0].topology = ufbxi_read_nurbs_topology(form_u);
 	nurbs->basis[1].topology = ufbxi_read_nurbs_topology(form_v);
+	nurbs->basis[0].is_2d = dimension_u == 2;
+	nurbs->basis[1].is_2d = dimension_v == 2;
 
 	if (!uc->opts.ignore_geometry) {
 		ufbxi_value_array *points = ufbxi_find_array(node, ufbxi_Points, 'r');
@@ -10566,6 +10572,29 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_
 	return 1;
 }
 
+ufbxi_noinline static void ufbxi_finalize_nurbs_basis(ufbx_nurbs_basis *basis)
+{
+	if (basis->order > 0) {
+		size_t degree = basis->order - 1;
+		ufbx_real_list knots = basis->knot_vector;
+		if (knots.count >= 2*degree + 1) {
+			basis->spans.data = knots.data + degree;
+			basis->spans.count = knots.count - 2*degree;
+
+			basis->t_min = basis->spans.data[0];
+			basis->t_max = basis->spans.data[basis->spans.count - 1];
+
+			basis->valid = true;
+			for (size_t i = 1; i < knots.count; i++) {
+				if (knots.data[i - 1] > knots.data[i]) {
+					basis->valid = false;
+					break;
+				}
+			}
+		}
+	}
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	size_t num_elements = uc->num_elements;
@@ -11014,6 +11043,17 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbx_camera_stereo *stereo = *p_stereo;
 		stereo->left = (ufbx_camera*)ufbxi_fetch_dst_element(&stereo->element, search_node, ufbxi_LeftCamera, UFBX_ELEMENT_CAMERA);
 		stereo->right = (ufbx_camera*)ufbxi_fetch_dst_element(&stereo->element, search_node, ufbxi_RightCamera, UFBX_ELEMENT_CAMERA);
+	}
+
+	ufbxi_for_ptr_list(ufbx_nurbs_curve, p_curve, uc->scene.nurbs_curves) {
+		ufbx_nurbs_curve *curve = *p_curve;
+		ufbxi_finalize_nurbs_basis(&curve->basis);
+	}
+
+	ufbxi_for_ptr_list(ufbx_nurbs_surface, p_surface, uc->scene.nurbs_surfaces) {
+		ufbx_nurbs_surface *surface = *p_surface;
+		ufbxi_finalize_nurbs_basis(&surface->basis[0]);
+		ufbxi_finalize_nurbs_basis(&surface->basis[1]);
 	}
 
 	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
@@ -14307,7 +14347,7 @@ ufbxi_nodiscard static ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 static ufbxi_forceinline ufbx_real ufbxi_nurbs_weight(const ufbx_real_list *knots, size_t knot, size_t degree, ufbx_real u)
 {
 	if (knot >= knots->count) return 0.0f;
-	if (knots->count - knot < knots->count) return 0.0f;
+	if (knots->count - knot < degree) return 0.0f;
 	ufbx_real prev_u = knots->data[knot], next_u = knots->data[knot + degree];
 	if (prev_u >= next_u) return 0.0f;
 	return (u - prev_u) / (next_u - prev_u);
@@ -14316,10 +14356,10 @@ static ufbxi_forceinline ufbx_real ufbxi_nurbs_weight(const ufbx_real_list *knot
 static ufbxi_forceinline ufbx_real ufbxi_nurbs_deriv(const ufbx_real_list *knots, size_t knot, size_t degree)
 {
 	if (knot >= knots->count) return 0.0f;
-	if (knots->count - knot < knots->count) return 0.0f;
+	if (knots->count - knot < degree) return 0.0f;
 	ufbx_real prev_u = knots->data[knot], next_u = knots->data[knot + degree];
 	if (prev_u >= next_u) return 0.0f;
-	return 1.0f / (next_u - prev_u);
+	return (ufbx_real)degree / (next_u - prev_u);
 }
 
 // -- Topology
@@ -16470,38 +16510,50 @@ size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_real u, siz
 	ufbx_assert(basis);
 	if (!basis) return SIZE_MAX;
 	if (basis->order == 0) return SIZE_MAX;
+
 	size_t degree = basis->order - 1;
 
+	// Binary search for the knot span `[min_u, max_u]` where `min_u <= u < max_u`
 	ufbx_real_list knots = basis->knot_vector;
 	size_t knot = SIZE_MAX;
-	{
-		ufbxi_macro_lower_bound_eq(ufbx_real, 8, &knot, knots.data, 0, knots.count - 1,
-			( a[1] <= u ), ( a[0] >= u && a[1] < u ));
-	}
-	if (knot == SIZE_MAX) return SIZE_MAX;
-	if (knot > basis->dimension) return SIZE_MAX;
-	if (knot <= degree) return SIZE_MAX;
-	if (!weights) return knot;
 
-	knot -= degree;
+	if (u <= basis->t_min) {
+		knot = degree;
+		u = basis->t_min;
+	} else if (u >= basis->t_max) {
+		knot = basis->knot_vector.count - degree - 2;
+		u = basis->t_max;
+	} else {
+		ufbxi_macro_lower_bound_eq(ufbx_real, 8, &knot, knots.data, 0, knots.count - 1,
+			( a[1] <= u ), ( a[0] <= u && u < a[1] ));
+	}
+
+	// The found effective control points are found left from `knot`, locally
+	// we use `knot - ix` here as it's more convenient for the following algorithm
+	// but we return it as `knot - degree` so that users can find the control points
+	// at `points[knot], points[knot+1], ..., points[knot+degree]`
+	if (knot < degree) return SIZE_MAX;
+
+	if (num_weights < basis->order) return knot - degree;
+	if (!weights) return knot - degree;
 
 	weights[0] = 1.0f;
 	for (size_t p = 1; p <= degree; p++) {
 
 		ufbx_real prev = 0.0f;
-		ufbx_real g = 1.0f - ufbxi_nurbs_weight(&knots, knot + p + 1, p, u);
+		ufbx_real g = 1.0f - ufbxi_nurbs_weight(&knots, knot - p + 1, p, u);
 		ufbx_real dg = 0.0f;
 		if (derivatives && p == degree) {
-			dg = ufbxi_nurbs_deriv(&knots, knot + p + 1, p);
+			dg = ufbxi_nurbs_deriv(&knots, knot - p + 1, p);
 		}
 
 		for (size_t i = p; i > 0; i--) {
-			ufbx_real f = ufbxi_nurbs_weight(&knots, knot + i, p, u);
+			ufbx_real f = ufbxi_nurbs_weight(&knots, knot - p + i, p, u);
 			ufbx_real weight = weights[i - 1];
 			weights[i] = f*weight + g*prev;
 
 			if (derivatives && p == degree) {
-				ufbx_real df = ufbxi_nurbs_deriv(&knots, knot + i, p);
+				ufbx_real df = ufbxi_nurbs_deriv(&knots, knot - p + i, p);
 				derivatives[i] = df*weight - dg*prev;
 				dg = df;
 			}
@@ -16516,7 +16568,7 @@ size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_real u, siz
 		}
 	}
 
-	return knot;
+	return knot - degree;
 }
 
 ufbx_curve_point ufbx_evaluate_nurbs_curve_point(const ufbx_nurbs_curve *curve, ufbx_real u)
@@ -16536,7 +16588,7 @@ ufbx_curve_point ufbx_evaluate_nurbs_curve_point(const ufbx_nurbs_curve *curve, 
 
 	size_t order = curve->basis.order;
 	for (size_t i = 0; i < order; i++) {
-		size_t ix = (base + i) % curve->basis.dimension;
+		size_t ix = (base + i) % curve->control_points.count;
 		ufbx_real weight = weights[i], deriv = derivs[i];
 		ufbx_vec4 cp = curve->control_points.data[ix];
 
@@ -16556,9 +16608,9 @@ ufbx_curve_point ufbx_evaluate_nurbs_curve_point(const ufbx_nurbs_curve *curve, 
 	result.position.x = p.x * rcp_w;
 	result.position.y = p.y * rcp_w;
 	result.position.z = p.z * rcp_w;
-	result.derivative.x = (d.x - result.position.x) * rcp_w;
-	result.derivative.y = (d.y - result.position.y) * rcp_w;
-	result.derivative.z = (d.z - result.position.z) * rcp_w;
+	result.derivative.x = (d.x - d.w*result.position.x) * rcp_w;
+	result.derivative.y = (d.y - d.w*result.position.y) * rcp_w;
+	result.derivative.z = (d.z - d.w*result.position.z) * rcp_w;
 	return result;
 }
 
@@ -16579,6 +16631,7 @@ ufbx_surface_point ufbx_evaluate_nurbs_surface_point(const ufbx_nurbs_surface *s
 	ufbx_vec4 du = { 0 };
 	ufbx_vec4 dv = { 0 };
 
+#if 0
 	size_t dim_u = surface->basis[0].dimension;
 	size_t dim_v = surface->basis[1].dimension;
 	size_t order_u = surface->basis[0].order;
@@ -16612,6 +16665,7 @@ ufbx_surface_point ufbx_evaluate_nurbs_surface_point(const ufbx_nurbs_surface *s
 			dv.w += cp.w * wderiv_v;
 		}
 	}
+#endif
 
 	ufbx_real rcp_w = 1.0f / p.w;
 	result.valid = true;

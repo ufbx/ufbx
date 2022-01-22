@@ -14,6 +14,7 @@
 #include "test_constraints.h"
 #include "test_curves.h"
 #include "test_cache.h"
+#include "test_nurbs.h"
 #include "test_scenes.h"
 #include "test_fuzz.h"
 

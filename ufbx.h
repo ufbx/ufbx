@@ -1008,19 +1008,16 @@ struct ufbx_empty {
 // -- Node attributes (curves/surfaces)
 
 typedef enum ufbx_nurbs_topology {
-	// Repeats first `ufbx_nurbs_basis.order` control points after the end.
-	UFBX_NURBS_PERIODIC,
-	// Repeats the first control point after the end.
-	UFBX_NURBS_CLOSED,
 	// The endpoints are not connected.
-	UFBX_NURBS_OPEN,
+	UFBX_NURBS_TOPOLOGY_OPEN,
+	// Repeats first `ufbx_nurbs_basis.order` control points after the end.
+	UFBX_NURBS_TOPOLOGY_PERIODIC,
+	// Repeats the first control point after the end.
+	UFBX_NURBS_TOPOLOGY_CLOSED,
 } ufbx_nurbs_topology;
 
 // NURBS basis functions for an axis
 typedef struct ufbx_nurbs_basis {
-
-	// Number of control points in this dimension.
-	uint32_t dimension;
 
 	// Number of control points influencing a point on the curve/surface.
 	// Equal to the degree plus one.
@@ -1031,6 +1028,20 @@ typedef struct ufbx_nurbs_basis {
 
 	// Subdivision of the parameter range to control points.
 	ufbx_real_list knot_vector;
+
+	// Range for the parameter value.
+	ufbx_real t_min;
+	ufbx_real t_max;
+
+	// Parameter values of control points.
+	ufbx_real_list spans;
+
+	// `true` if this axis is two-dimensional.
+	bool is_2d;
+
+	// `true` if the parametrization is well defined.
+	//   knot_vector.count == dimension + order + 1
+	bool valid;
 
 } ufbx_nurbs_basis;
 
