@@ -10574,6 +10574,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_nurbs_basis(ufbxi_context *uc, ufbx_nurbs_basis *basis)
 {
+	if (basis->topology == UFBX_NURBS_TOPOLOGY_CLOSED) {
+		basis->num_wrap_control_points = 1;
+	} else if (basis->topology == UFBX_NURBS_TOPOLOGY_PERIODIC) {
+		basis->num_wrap_control_points = basis->order - 1;
+	} else {
+		basis->num_wrap_control_points = 0;
+	}
+
 	if (basis->order > 0) {
 		size_t degree = basis->order - 1;
 		ufbx_real_list knots = basis->knot_vector;

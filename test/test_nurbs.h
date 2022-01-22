@@ -250,6 +250,8 @@ UFBXT_FILE_TEST(maya_nurbs_curve_multiplicity)
 	ufbx_nurbs_curve *curve = (ufbx_nurbs_curve*)node->attrib;
 
 	{
+		ufbxt_assert(curve->basis.order == 6);
+
 		ufbxt_assert_close_real(err, curve->basis.t_min, 0.0f);
 		ufbxt_assert_close_real(err, curve->basis.t_max, 43.257f);
 
@@ -299,6 +301,40 @@ UFBXT_FILE_TEST(maya_nurbs_curve_multiplicity)
 			{ 41.094012f, { 0.552930f, 0.000000f, 3.783813f }, { -1.959784f, 0.000000f, 0.211471f } },
 			{ 42.175433f, { -1.250738f, 0.000000f, 3.642614f }, { -1.058494f, 0.000000f, -0.348306f } },
 			{ 43.256854f, { -1.669232f, 0.000000f, 3.251459f }, { 0.154248f, 0.000000f, -0.305748f } },
+		};
+
+		for (size_t i = 0; i < ufbxt_arraycount(samples); i++) {
+			ufbxt_hintf("i: %zu", i);
+			const ufbxt_curve_sample *sample = &samples[i];
+			ufbx_curve_point p = ufbx_evaluate_nurbs_curve_point(curve, sample->u);
+			ufbxt_assert_close_vec3(err, p.position, sample->position);
+			ufbxt_assert_close_vec3(err, p.derivative, sample->derivative);
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(maya_nurbs_curve_linear)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "curve1");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_NURBS_CURVE);
+	ufbx_nurbs_curve *curve = (ufbx_nurbs_curve*)node->attrib;
+
+	{
+		ufbxt_assert(curve->basis.order == 2);
+
+		ufbxt_curve_sample samples[] = {
+			{ 0.000000f, { 0.000000f, 0.000000f, -1.000000f }, { 1.000000f, 0.000000f, 0.000000f } },
+			{ 1.400000f, { 1.000000f, 0.000000f, -1.400000f }, { 0.000000f, 0.000000f, -1.000000f } },
+			{ 2.800000f, { 1.800000f, 0.000000f, -2.000000f }, { 1.000000f, 0.000000f, 0.000000f } },
+			{ 4.200000f, { 1.800000f, 0.000000f, 1.000000f }, { -1.000000f, 0.000000f, 0.000000f } },
+			{ 5.600000f, { 1.000000f, 0.000000f, 1.600000f }, { 0.000000f, 0.000000f, 1.000000f } },
+			{ 7.000000f, { -1.000000f, 0.000000f, 2.000000f }, { 0.000000f, 0.000000f, -1.000000f } },
+			{ 8.400000f, { -1.400000f, 0.000000f, 1.000000f }, { -1.000000f, 0.000000f, 0.000000f } },
+			{ 9.800000f, { -2.000000f, 0.000000f, -1.400000f }, { 0.000000f, 0.000000f, -3.000000f } },
+			{ 11.200000f, { -1.000000f, 0.000000f, -1.800000f }, { 0.000000f, 0.000000f, 1.000000f } },
+			{ 12.600000f, { -0.400000f, 0.000000f, -1.000000f }, { 1.000000f, 0.000000f, 0.000000f } },
 		};
 
 		for (size_t i = 0; i < ufbxt_arraycount(samples); i++) {

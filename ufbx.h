@@ -1010,7 +1010,7 @@ struct ufbx_empty {
 typedef enum ufbx_nurbs_topology {
 	// The endpoints are not connected.
 	UFBX_NURBS_TOPOLOGY_OPEN,
-	// Repeats first `ufbx_nurbs_basis.order` control points after the end.
+	// Repeats first `ufbx_nurbs_basis.order - 1` control points after the end.
 	UFBX_NURBS_TOPOLOGY_PERIODIC,
 	// Repeats the first control point after the end.
 	UFBX_NURBS_TOPOLOGY_CLOSED,
@@ -1038,6 +1038,14 @@ typedef struct ufbx_nurbs_basis {
 
 	// `true` if this axis is two-dimensional.
 	bool is_2d;
+
+	// Number of control points that need to be copied to the end.
+	// This is just for convenience as it could be derived from `topology` and
+	// `order`. If for example `num_wrap_control_points == 3` you should repeat
+	// the first 3 control points after the end.
+	// HINT: You don't need to worry about this if you use ufbx functions
+	// like `ufbx_evaluate_nurbs_curve_point()` as they handle this internally.
+	size_t num_wrap_control_points;
 
 	// `true` if the parametrization is well defined.
 	//   knot_vector.count == dimension + order + 1
