@@ -2396,6 +2396,14 @@ typedef struct ufbx_surface_point {
 	ufbx_vec3 derivative_v;
 } ufbx_surface_point;
 
+typedef struct ufbx_tessellate_opts {
+	ufbx_allocator temp_allocator;   // < Allocator used during tessellation
+	ufbx_allocator result_allocator; // < Allocator used for the final mesh
+
+	size_t resolution_u;
+	size_t resolution_v;
+} ufbx_tessellate_opts;
+
 // -- Mesh topology
 
 typedef enum ufbx_topo_flags {
@@ -2670,8 +2678,8 @@ typedef struct ufbx_evaluate_opts {
 
 typedef struct ufbx_subdivide_opts {
 
-	ufbx_allocator temp_allocator;   // < Allocator used during evaluation
-	ufbx_allocator result_allocator; // < Allocator used for the final scene
+	ufbx_allocator temp_allocator;   // < Allocator used during subdivision
+	ufbx_allocator result_allocator; // < Allocator used for the final mesh
 
 	ufbx_subdivision_boundary boundary;
 	ufbx_subdivision_boundary uv_boundary;
@@ -2896,8 +2904,9 @@ void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *
 size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_real u, size_t num_weights, ufbx_real *weights, ufbx_real *derivatives);
 
 ufbx_curve_point ufbx_evaluate_nurbs_curve_point(const ufbx_nurbs_curve *curve, ufbx_real u);
-
 ufbx_surface_point ufbx_evaluate_nurbs_surface_point(const ufbx_nurbs_surface *surface, ufbx_real u, ufbx_real v);
+
+ufbx_mesh *ufbx_tessellate_surface(const ufbx_nurbs_surface *surface, const ufbx_tessellate_opts *opts, ufbx_error *error);
 
 // Mesh Topology
 
