@@ -10572,18 +10572,31 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_
 	return 1;
 }
 
-ufbxi_noinline static void ufbxi_finalize_nurbs_basis(ufbx_nurbs_basis *basis)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_nurbs_basis(ufbxi_context *uc, ufbx_nurbs_basis *basis)
 {
 	if (basis->order > 0) {
 		size_t degree = basis->order - 1;
 		ufbx_real_list knots = basis->knot_vector;
 		if (knots.count >= 2*degree + 1) {
-			basis->spans.data = knots.data + degree;
-			basis->spans.count = knots.count - 2*degree;
+			basis->t_min = knots.data[degree];
+			basis->t_max = knots.data[knots.count - degree - 1];
 
-			basis->t_min = basis->spans.data[0];
-			basis->t_max = basis->spans.data[basis->spans.count - 1];
+			size_t max_spans = knots.count - 2*degree;
+			ufbx_real *spans = ufbxi_push(&uc->result, ufbx_real, max_spans);
+			ufbxi_check(spans);
 
+			ufbx_real prev = -INFINITY;
+			size_t num_spans = 0;
+			for (size_t i = 0; i < knots.count - degree; i++) {
+				ufbx_real t = knots.data[degree + i];
+				if (t != prev) {
+					spans[num_spans++] = t;
+					prev = t;
+				}
+			}
+
+			basis->spans.data = spans;
+			basis->spans.count = num_spans;
 			basis->valid = true;
 			for (size_t i = 1; i < knots.count; i++) {
 				if (knots.data[i - 1] > knots.data[i]) {
@@ -10593,6 +10606,8 @@ ufbxi_noinline static void ufbxi_finalize_nurbs_basis(ufbx_nurbs_basis *basis)
 			}
 		}
 	}
+
+	return 1;
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc)
@@ -11047,13 +11062,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	ufbxi_for_ptr_list(ufbx_nurbs_curve, p_curve, uc->scene.nurbs_curves) {
 		ufbx_nurbs_curve *curve = *p_curve;
-		ufbxi_finalize_nurbs_basis(&curve->basis);
+		ufbxi_check(ufbxi_finalize_nurbs_basis(uc, &curve->basis));
 	}
 
 	ufbxi_for_ptr_list(ufbx_nurbs_surface, p_surface, uc->scene.nurbs_surfaces) {
 		ufbx_nurbs_surface *surface = *p_surface;
-		ufbxi_finalize_nurbs_basis(&surface->basis[0]);
-		ufbxi_finalize_nurbs_basis(&surface->basis[1]);
+		ufbxi_check(ufbxi_finalize_nurbs_basis(uc, &surface->basis[0]));
+		ufbxi_check(ufbxi_finalize_nurbs_basis(uc, &surface->basis[1]));
 	}
 
 	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
