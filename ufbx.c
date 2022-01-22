@@ -16589,18 +16589,18 @@ ufbx_curve_point ufbx_evaluate_nurbs_curve_point(const ufbx_nurbs_curve *curve, 
 	size_t order = curve->basis.order;
 	for (size_t i = 0; i < order; i++) {
 		size_t ix = (base + i) % curve->control_points.count;
-		ufbx_real weight = weights[i], deriv = derivs[i];
 		ufbx_vec4 cp = curve->control_points.data[ix];
+		ufbx_real weight = weights[i] * cp.w, deriv = derivs[i] * cp.w;
 
 		p.x += cp.x * weight;
 		p.y += cp.y * weight;
 		p.z += cp.z * weight;
-		p.w += cp.w * weight;
+		p.w += weight;
 
 		d.x += cp.x * deriv;
 		d.y += cp.y * deriv;
 		d.z += cp.z * deriv;
-		d.w += cp.w * deriv;
+		d.w += deriv;
 	}
 
 	ufbx_real rcp_w = 1.0f / p.w;
