@@ -2382,14 +2382,6 @@ typedef struct ufbx_surface_point {
 	ufbx_vec3 derivative_v;
 } ufbx_surface_point;
 
-typedef struct ufbx_tessellate_opts {
-	ufbx_allocator temp_allocator;   // < Allocator used during tessellation
-	ufbx_allocator result_allocator; // < Allocator used for the final mesh
-
-	size_t resolution_u;
-	size_t resolution_v;
-} ufbx_tessellate_opts;
-
 // -- Mesh topology
 
 typedef enum ufbx_topo_flags {
@@ -2661,6 +2653,14 @@ typedef struct ufbx_evaluate_opts {
 	void *open_file_user;
 
 } ufbx_evaluate_opts;
+
+typedef struct ufbx_tessellate_opts {
+	ufbx_allocator temp_allocator;   // < Allocator used during tessellation
+	ufbx_allocator result_allocator; // < Allocator used for the final mesh
+
+	size_t resolution_u;
+	size_t resolution_v;
+} ufbx_tessellate_opts;
 
 typedef struct ufbx_subdivide_opts {
 
