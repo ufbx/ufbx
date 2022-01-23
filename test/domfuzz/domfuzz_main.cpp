@@ -9,6 +9,8 @@
 #include "../../ufbx.h"
 #include "../check_scene.h"
 
+bool g_verbose = false;
+
 std::vector<char> read_file(const char *path)
 {
 	FILE *f = fopen(path, "rb");
@@ -84,6 +86,8 @@ static const mutator mutators[] = {
 	{ "reverse values", &mutate_reverse_values },
 };
 
+static const size_t num_mutators = sizeof(mutators) / sizeof(*mutators);
+
 struct mutable_result
 {
 	fbxdom::node_ptr self;
@@ -119,7 +123,9 @@ fbxdom::node_ptr mutate_path(fbxdom::node_ptr &node, const std::vector<uint32_t>
 	fbxdom::node_ptr copy = node->copy();
 	if (depth < path.size()) {
 		fbxdom::node_ptr &child_ref = copy->children[path[depth]];
-		return mutate_path(child_ref, path, depth + 1);
+		fbxdom::node_ptr child = mutate_path(child_ref, path, depth + 1);
+		node = copy;
+		return child;
 	} else {
 		node = copy;
 		return copy;
@@ -168,7 +174,7 @@ fbxdom::node_ptr next_mutation(fbxdom::node_ptr root, mutation_iterator &iter)
 		}
 
 		iter.mutator_internal_index = 0;
-		if (iter.mutator_index + 1 < std::size(mutators)) {
+		if (iter.mutator_index + 1 < num_mutators) {
 			iter.mutator_index++;
 			continue;
 		}
@@ -182,11 +188,39 @@ fbxdom::node_ptr next_mutation(fbxdom::node_ptr root, mutation_iterator &iter)
 	}
 }
 
-static char dump_buffer[1024*1024];
+static char dump_buffer[16*1024*1024];
 
 int main(int argc, char **argv)
 {
-	std::vector<char> data = read_file(argv[1]);
+	int selected_step = -1;
+	int start_step = -1;
+	const char *input_file = NULL;
+
+	for (int i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "-v")) {
+			g_verbose = 1;
+		} else if (!strcmp(argv[i], "--step")) {
+			if (++i < argc) selected_step = atoi(argv[i]);
+		} else if (!strcmp(argv[i], "--start")) {
+			if (++i < argc) start_step = atoi(argv[i]);
+		} else {
+			input_file = argv[i];
+		}
+	}
+
+
+	std::vector<char> data = read_file(input_file);
+
+	{
+		ufbx_scene *scene = ufbx_load_memory(data.data(), data.size(), NULL, NULL);
+		if (!scene) return 0;
+		if (scene->metadata.ascii || scene->metadata.big_endian) {
+			ufbx_free_scene(scene);
+			return 0;
+		}
+		ufbx_free_scene(scene);
+	}
+
 	fbxdom::node_ptr root = fbxdom::parse(data.data(), data.size());
 	ufbx_error error = { };
 
@@ -204,9 +238,23 @@ int main(int argc, char **argv)
 
 	mutation_iterator iter;
 	fbxdom::node_ptr mut_root;
-	while (mut_root = next_mutation(root, iter)) {
+	int current_step = 0;
+	while ((mut_root = next_mutation(root, iter)) != nullptr) {
+		if (selected_step >= 0) {
+			if (current_step != selected_step) {
+				current_step++;
+				continue;
+			}
+		}
+		if (start_step >= 0) {
+			if (current_step < start_step) {
+				current_step++;
+				continue;
+			}
+		}
+
 		format_path(path_str, sizeof(path_str), root, iter.path);
-		printf("%s/ %s %u: ", path_str, mutators[iter.mutator_index].name, iter.mutator_internal_index);
+		printf("%d: %s/ %s %u: ", current_step, path_str, mutators[iter.mutator_index].name, iter.mutator_internal_index);
 
 		size_t dump_size = fbxdom::dump(dump_buffer, sizeof(dump_buffer), mut_root);
 		ufbx_scene *scene = ufbx_load_memory(dump_buffer, dump_size, NULL, &error);
@@ -219,6 +267,7 @@ int main(int argc, char **argv)
 		}
 
 		ufbx_free_scene(scene);
+		current_step++;
 	}
 
 	return 0;

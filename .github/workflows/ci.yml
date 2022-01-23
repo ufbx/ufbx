@@ -62,6 +62,13 @@ jobs:
           curl -sS -w " -> $DST_URL/slime-ascii.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-ascii.png --data-binary @build/images/slime-ascii.png
           curl -sS -w " -> $DST_URL/slime-big.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-big.png --data-binary @build/images/slime-big.png
 
+  ci_domfuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run domfuzz
+        run: python misc/run_tests.py domfuzz
+
   ci_wasm:
     runs-on: ubuntu-latest
     steps:

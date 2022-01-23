@@ -4988,7 +4988,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 		} else if (c == '0' || c == '-') {
 			// Ignore the array
 			arr->type = c == '-' ? '-' : dst_type;
-			arr->data = 0;
+			arr->data = (char*)ufbxi_zero_size_buffer + 32;
 			arr->size = 0;
 		} else {
 			// Allocate `num_values` elements for the array and parse single values into it.
@@ -7026,11 +7026,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_blend_shapes(ufbx
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
-	// Only read polygon meshes, ignore eg. NURBS without error
-	ufbxi_node *node_vertices = ufbxi_find_child(node, ufbxi_Vertices);
-	ufbxi_node *node_indices = ufbxi_find_child(node, ufbxi_PolygonVertexIndex);
-	if (!node_vertices || !node_indices) return 1;
-
 	ufbx_mesh *ufbxi_restrict mesh = ufbxi_push_element(uc, info, ufbx_mesh, UFBX_ELEMENT_MESH);
 	ufbxi_check(mesh);
 
@@ -7051,6 +7046,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 
 	if (uc->opts.ignore_geometry) return 1;
 
+	ufbxi_node *node_vertices = ufbxi_find_child(node, ufbxi_Vertices);
+	ufbxi_node *node_indices = ufbxi_find_child(node, ufbxi_PolygonVertexIndex);
+
+	ufbxi_check(node_vertices);
+	ufbxi_check(node_indices);
+
 	ufbxi_value_array *vertices = ufbxi_get_array(node_vertices, 'r');
 	ufbxi_value_array *indices = ufbxi_get_array(node_indices, 'i');
 	ufbxi_value_array *edge_indices = ufbxi_find_array(node, ufbxi_Edges, 'i');
@@ -7068,6 +7069,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	mesh->vertex_position.data = (ufbx_vec3*)vertices->data;
 	mesh->vertex_position.indices = index_data;
 	mesh->vertex_position.num_values = mesh->num_vertices;
+
 
 	// Check/make sure that the last index is negated (last of polygon)
 	if (mesh->num_indices > 0) {

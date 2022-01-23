@@ -548,7 +548,7 @@ def decorate_arch(compiler, arch):
 
 tests = set(argv.tests)
 if not tests:
-    tests = ["tests", "picort"]
+    tests = ["tests", "picort", "domfuzz"]
 
 async def main():
     global exit_code
@@ -690,22 +690,6 @@ async def main():
     if "picort" in tests:
         log_comment("-- Compiling and running picort --")
     
-        best_compiler = (0, None)
-        for compiler in compilers:
-            score = 1
-            if not compiler.has_cpp:
-                continue
-            if "clang" in compiler.name:
-                score += 3
-            # TODO: ARM? Native?
-            if "x64" in compiler.supported_archs():
-                score += 10
-
-        if not best_compiler:
-            print("ERROR: Could not find compiler")
-            exit_code = 2
-            return
-
         target_tasks = []
 
         picort_configs = {
@@ -790,6 +774,74 @@ async def main():
                     break
                 for line in sse_target.log[1].splitlines(keepends=False):
                     log_comment(line)
+
+    if "domfuzz" in tests:
+        log_comment("-- Compiling and running domfuzz --")
+    
+        target_tasks = []
+
+        domfuzz_configs = {
+            "arch": arch_configs["arch"],
+        }
+
+        domfuzz_config = {
+            "sources": ["ufbx.c", "test/domfuzz/fbxdom.cpp", "test/domfuzz/domfuzz_main.cpp"],
+            "output": "domfuzz" + exe_suffix,
+            "cpp": True,
+            "optimize": True,
+            "std": "c++14",
+        }
+        target_tasks += compile_permutations("domfuzz", domfuzz_config, domfuzz_configs, None)
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+        def target_score(target):
+            compiler = target.compiler
+            config = target.config
+            if not target.compiled:
+                return (0, 0)
+            score = 1
+            if config["arch"] == "x64":
+                score += 10
+            if "clang" in compiler.name:
+                score += 10
+            if "msvc" in compiler.name:
+                score += 5
+            version = re.search(r"\d+", compiler.version)
+            version = int(version.group(0)) if version else 0
+            return (score, version)
+
+        image_path = os.path.join("build", "images")
+        if not os.path.exists(image_path):
+            os.makedirs(image_path, exist_ok=True)
+            log_mkdir(image_path)
+
+        target = max(targets, key=target_score)
+
+        if target.compiled:
+            log_comment(f"-- Running domfuzz with {target.name} --")
+
+            too_heavy_files = [
+                "blender_293_barbarian_7400_binary",
+                "maya_slime_7500_binary",
+                "maya_character_6100_binary",
+                "maya_character_7500_binary",
+                "max2009_blob_6100_binary",
+            ]
+
+            for root, _, files in os.walk("data"):
+                for file in files:
+                    if "_ascii" in file: continue
+                    if any(f in file for f in too_heavy_files): continue
+                    path = os.path.join(root, file)
+                    if "fuzz" in path: continue
+                    if path.endswith(".fbx"):
+                        target.log.clear()
+                        target.ran = False
+                        await run_target(target, [path])
+                        if not target.ran:
+                            break
 
     for target in all_targets:
         if target.ok: continue

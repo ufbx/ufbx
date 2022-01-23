@@ -484,7 +484,8 @@ static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_laye
 		ufbxt_check_element_ptr(scene, anim_prop->anim_value);
 
 		ufbx_anim_prop *ref = ufbx_find_anim_prop(anim_layer, anim_prop->element, anim_prop->prop_name.data);
-		ufbxt_assert(ref == anim_prop);
+		ufbxt_assert(ref);
+		ufbxt_assert(!strcmp(ref->prop_name.data, anim_prop->prop_name.data));
 
 		if (props_left > 0) {
 			ufbxt_assert(anim_prop->element == prev_element);
