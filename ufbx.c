@@ -10605,7 +10605,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_nurbs_basis(ufbxi_conte
 
 			ufbx_real prev = -INFINITY;
 			size_t num_spans = 0;
-			for (size_t i = 0; i < knots.count - degree; i++) {
+			for (size_t i = 0; i < max_spans; i++) {
 				ufbx_real t = knots.data[degree + i];
 				if (t != prev) {
 					spans[num_spans++] = t;
@@ -14380,6 +14380,15 @@ ufbxi_nodiscard static ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 // -- NURBS
 
 typedef struct {
+	int32_t x, y, z;
+} ufbxi_spatial_key;
+
+typedef struct {
+	ufbxi_spatial_key key;
+	ufbx_vec3 position;
+} ufbxi_spatial_bucket;
+
+typedef struct {
 	ufbx_error error;
 
 	ufbx_tessellate_opts opts;
@@ -14400,12 +14409,98 @@ typedef struct {
 
 } ufbxi_tessellate_context;
 
+static ufbxi_forceinline uint32_t ufbxi_hash_spatial_key(ufbxi_spatial_key key)
+{
+	uint32_t h = 0;
+	h = (h<<6) + (h>>2) + 0x9e3779b9 + ufbxi_hash32((uint32_t)key.x);
+	h = (h<<6) + (h>>2) + 0x9e3779b9 + ufbxi_hash32((uint32_t)key.y);
+	h = (h<<6) + (h>>2) + 0x9e3779b9 + ufbxi_hash32((uint32_t)key.z);
+	return h;
+}
+
+static int ufbxi_map_cmp_spatial_key(void *user, const void *va, const void *vb)
+{
+	(void)user;
+	ufbxi_spatial_key a = *(const ufbxi_spatial_key*)va, b = *(const ufbxi_spatial_key*)vb;
+	if (a.x != b.x) return a.x < b.x ? -1 : +1;
+	if (a.y != b.y) return a.y < b.y ? -1 : +1;
+	if (a.z != b.z) return a.z < b.z ? -1 : +1;
+	return 0;
+}
+
+static int32_t ufbxi_spatial_coord(ufbx_real v)
+{
+	bool negative = false;
+	if (v < 0.0f) {
+		v = -v;
+		negative = true;
+	}
+	int exponent = 0;
+	double mantissa = frexp(v, &exponent);
+	if (exponent < -80) {
+		return 0;
+	} else {
+		int32_t biased = (int32_t)(exponent + 80);
+		int32_t value = (biased << 18) + (int32_t)(mantissa * 262144.0);
+		return negative ? -value : value;
+	}
+}
+
+static uint32_t ufbxi_noinline ufbxi_insert_spatial_imp(ufbxi_map *map, const ufbx_vec3 *pos, int32_t kx, int32_t ky, int32_t kz)
+{
+	ufbxi_spatial_key key = { kx, ky, kz };
+	uint32_t hash = ufbxi_hash_spatial_key(key);
+	ufbxi_spatial_bucket *bucket = ufbxi_map_find(map, ufbxi_spatial_bucket, hash, &key);
+	if (bucket) {
+		return (uint32_t)(bucket - (ufbxi_spatial_bucket*)map->items);
+	} else {
+		return UINT32_MAX;
+	}
+}
+
+static uint32_t ufbxi_noinline ufbxi_insert_spatial(ufbxi_map *map, const ufbx_vec3 *pos)
+{
+	int32_t kx = ufbxi_spatial_coord(pos->x);
+	int32_t ky = ufbxi_spatial_coord(pos->y);
+	int32_t kz = ufbxi_spatial_coord(pos->z);
+
+	uint32_t best_ix = UINT32_MAX;
+	int32_t best_delta = INT32_MAX;
+
+	for (int32_t dx = -1; dx <= 1; dx++)
+	for (int32_t dy = -1; dy <= 1; dy++)
+	for (int32_t dz = -1; dz <= 1; dz++) {
+		int32_t delta = (dx&1) + (dy&1) + (dz&1);
+		if (delta >= INT32_MAX) continue;
+
+		uint32_t ix = ufbxi_insert_spatial_imp(map, pos, kx+dx, ky+dy, kz+dz);
+		if (ix != UINT32_MAX) {
+			best_ix = ix;
+			best_delta = delta;
+		}
+	}
+
+	if (best_ix == UINT32_MAX) {
+		best_ix = map->size;
+		ufbxi_spatial_key key = { kx, ky, kz };
+		uint32_t hash = ufbxi_hash_spatial_key(key);
+		ufbxi_spatial_bucket *bucket = ufbxi_map_insert(map, ufbxi_spatial_bucket, hash, &key);
+		ufbxi_check_return_err(map->ator->error, bucket, UINT32_MAX);
+		bucket->key = key;
+		bucket->position = *pos;
+	}
+
+	return best_ix;
+}
+
 static ufbxi_forceinline ufbx_real ufbxi_nurbs_weight(const ufbx_real_list *knots, size_t knot, size_t degree, ufbx_real u)
 {
 	if (knot >= knots->count) return 0.0f;
 	if (knots->count - knot < degree) return 0.0f;
 	ufbx_real prev_u = knots->data[knot], next_u = knots->data[knot + degree];
 	if (prev_u >= next_u) return 0.0f;
+	if (u <= prev_u) return 0.0f;
+	if (u >= next_u) return 1.0f;
 	return (u - prev_u) / (next_u - prev_u);
 }
 
@@ -14508,7 +14603,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 		ufbxi_check_err(&tc->error, !ufbxi_does_overflow(over_uv, over_u, over_v));
 	}
 
-	ufbxi_map_init(&tc->position_map, &tc->ator_tmp, &ufbxi_map_cmp_vec3, NULL);
+	ufbxi_map_init(&tc->position_map, &tc->ator_tmp, &ufbxi_map_cmp_spatial_key, NULL);
 
 	size_t faces_u = (spans_u - 1) * sub_u;
 	size_t faces_v = (spans_v - 1) * sub_v;
@@ -14541,7 +14636,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 			if (split_v > 0) {
 				ufbx_real t = (ufbx_real)split_v / splits_v;
 				v = v * (1.0f - t) + t * surface->basis_v.spans.data[span_v + 1];
-			} else if (span_v + 1 == spans_v && !open_v) {
+			}
+			ufbx_real original_v = v;
+			if (span_v + 1 == spans_v && !open_v) {
 				v = surface->basis_v.spans.data[0];
 			}
 
@@ -14554,7 +14651,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 					if (split_u > 0) {
 						ufbx_real t = (ufbx_real)split_u / splits_u;
 						u = u * (1.0f - t) + t * surface->basis_u.spans.data[span_u + 1];
-					} else if (span_u + 1 == spans_u && !open_u) {
+					}
+					ufbx_real original_u = u;
+					if (span_u + 1 == spans_u && !open_u) {
 						u = surface->basis_u.spans.data[0];
 					}
 
@@ -14562,23 +14661,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 					ufbx_surface_point point = ufbx_evaluate_nurbs_surface(surface, pu, pv);
 					ufbx_vec3 pos = point.position;
 
-					uint32_t hash = ufbxi_hash_string((const char*)&pos, sizeof(ufbx_vec3));
-					ufbx_vec3 *found_pos = ufbxi_map_find(&tc->position_map, ufbx_vec3, hash, &pos);
-
-					if (!found_pos) {
-						found_pos = ufbxi_map_insert(&tc->position_map, ufbx_vec3, hash, &pos);
-						ufbxi_check_err(&tc->error, found_pos);
-						*found_pos = pos;
-					}
-					int32_t pos_ix = (int32_t)(found_pos - (ufbx_vec3*)tc->position_map.items);;
+					uint32_t pos_ix = ufbxi_insert_spatial(&tc->position_map, &pos);
+					ufbxi_check_err(&tc->error, pos_ix != UINT32_MAX);
 
 					const ufbx_real fudge_eps = 1e-10f;
 					bool fudged = false;
-					if (ufbxi_dot3(point.derivative_u, point.derivative_u) < 1e-20f) {
+					if (ufbxi_dot3(point.derivative_u, point.derivative_u) < 1e-20f || ufbxi_dot3(point.derivative_v, point.derivative_v) < 1e-20f) {
 						pu += pu + fudge_eps >= surface->basis_u.t_max ? -fudge_eps : fudge_eps;
-						fudged = true;
-					}
-					if (ufbxi_dot3(point.derivative_v, point.derivative_v) < 1e-20f) {
 						pv += pv + fudge_eps >= surface->basis_v.t_max ? -fudge_eps : fudge_eps;
 						fudged = true;
 					}
@@ -14596,9 +14685,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 					}
 
 					size_t ix = ix_v * indices_u + ix_u;
-					position_ix[ix] = pos_ix;
-					uvs[ix].x = u;
-					uvs[ix].y = v;
+					position_ix[ix] = (int32_t)pos_ix;
+					uvs[ix].x = original_u;
+					uvs[ix].y = original_v;
 					normals[ix] = normal;
 					tangents[ix] = tangent_u;
 					bitangents[ix] = tangent_v;
@@ -14613,14 +14702,40 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 	ufbxi_check_err(&tc->error, faces && vertex_ix && attrib_ix);
 
 	size_t face_ix = 0;
+	size_t dst_index = 0;
+
+	size_t num_triangles = 0;
+
 	for (size_t face_v = 0; face_v < faces_v; face_v++) {
 		for (size_t face_u = 0; face_u < faces_u; face_u++) {
-			faces[face_ix].index_begin = (uint32_t)(face_ix * 4);
-			faces[face_ix].num_indices = 4;
-			attrib_ix[face_ix*4 + 0] = (int32_t)((face_v + 0) * indices_u + (face_u + 0));
-			attrib_ix[face_ix*4 + 1] = (int32_t)((face_v + 0) * indices_u + (face_u + 1));
-			attrib_ix[face_ix*4 + 2] = (int32_t)((face_v + 1) * indices_u + (face_u + 1));
-			attrib_ix[face_ix*4 + 3] = (int32_t)((face_v + 1) * indices_u + (face_u + 0));
+
+			attrib_ix[dst_index + 0] = (int32_t)((face_v + 0) * indices_u + (face_u + 0));
+			attrib_ix[dst_index + 1] = (int32_t)((face_v + 0) * indices_u + (face_u + 1));
+			attrib_ix[dst_index + 2] = (int32_t)((face_v + 1) * indices_u + (face_u + 1));
+			attrib_ix[dst_index + 3] = (int32_t)((face_v + 1) * indices_u + (face_u + 0));
+
+			vertex_ix[dst_index + 0] = position_ix[attrib_ix[dst_index + 0]];
+			vertex_ix[dst_index + 1] = position_ix[attrib_ix[dst_index + 1]];
+			vertex_ix[dst_index + 2] = position_ix[attrib_ix[dst_index + 2]];
+			vertex_ix[dst_index + 3] = position_ix[attrib_ix[dst_index + 3]];
+
+			bool is_triangle = false;
+			for (size_t prev_ix = 0; prev_ix < 4; prev_ix++) {
+				size_t next_ix = (prev_ix + 1) % 4;
+				if (vertex_ix[dst_index + prev_ix] == vertex_ix[dst_index + next_ix]) {
+					for (size_t i = next_ix; i < 3; i++) {
+						attrib_ix[dst_index + i] = attrib_ix[dst_index + i + 1];
+						vertex_ix[dst_index + i] = vertex_ix[dst_index + i + 1];
+					}
+					is_triangle = true;
+					break;
+				}
+			}
+
+			faces[face_ix].index_begin = (uint32_t)dst_index;
+			faces[face_ix].num_indices = is_triangle ? 3 : 4;
+			dst_index += is_triangle ? 3 : 4;
+			num_triangles += is_triangle ? 1 : 2;
 			face_ix++;
 		}
 	}
@@ -14630,10 +14745,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 	ufbxi_check_err(&tc->error, positions);
 
 	*positions++ = ufbx_zero_vec3;
-	memcpy(positions, tc->position_map.items, num_positions * sizeof(ufbx_vec3));
 
-	for (size_t i = 0; i < num_faces * 4; i++) {
-		vertex_ix[i] = position_ix[attrib_ix[i]];
+	ufbxi_spatial_bucket *buckets = (ufbxi_spatial_bucket*)tc->position_map.items;
+	for (size_t i = 0; i < num_positions; i++) {
+		positions[i] = buckets[i].position;
 	}
 
 	mesh->element.type = UFBX_ELEMENT_MESH;
@@ -14688,8 +14803,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 	mesh->uv_sets.count = 1;
 
 	mesh->num_faces = num_faces;
-	mesh->num_triangles = num_faces * 2;
-	mesh->num_indices = num_faces * 4;
+	mesh->num_triangles = num_triangles;
+	mesh->num_indices = dst_index;
 	mesh->max_face_triangles = 2;
 
 	if (surface->material) {
@@ -14700,7 +14815,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 		ufbxi_check_err(&tc->error, mat);
 
 		mat->material = surface->material;
-		mat->num_triangles = num_faces * 2;
+		mat->num_triangles = num_triangles;
 		mat->num_faces = num_faces;
 
 		mesh->materials.data = mat;
@@ -14709,7 +14824,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 
 	mesh->skinned_is_local = true;
 	mesh->skinned_position = mesh->vertex_position;
-	mesh->skinned_normal = mesh->skinned_normal;
+	mesh->skinned_normal = mesh->vertex_normal;
 
 	ufbxi_check_err(&tc->error, ufbxi_finalize_mesh(&tc->result, &tc->error, mesh));
 
@@ -14720,7 +14835,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 	tc->imp->ator = tc->ator_result;
 	tc->imp->result_buf = tc->result;
 	tc->imp->mesh.subdivision_evaluated = true;
-
 
 	return 1;
 }
@@ -15227,15 +15341,18 @@ ufbxi_noinline static int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 	}
 
 	size_t num_values = num_edge_values + mesh->num_faces + num_vertex_values;
-	ufbx_real *new_values = ufbxi_push(&sc->result, ufbx_real, num_values * reals);
+	ufbx_real *new_values = ufbxi_push(&sc->result, ufbx_real, (num_values+1) * reals);
 	ufbxi_check_err(&sc->error, new_values);
+
+	memset(new_values, 0, reals * sizeof(ufbx_real));
+	new_values += reals;
 
 	memcpy(new_values, values, num_values * reals * sizeof(ufbx_real));
 
 	layer->data = new_values;
 	layer->indices = new_indices;
 	layer->num_values = num_values;
-	layer->value_reals = layer->value_reals;
+	layer->value_reals = reals;
 
 	return 1;
 }
@@ -15273,6 +15390,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 		} else {
 			memset(&set->vertex_tangent, 0, sizeof(set->vertex_tangent));
 			memset(&set->vertex_bitangent, 0, sizeof(set->vertex_bitangent));
+			set->vertex_uv.value_reals = 2;
+			set->vertex_tangent.value_reals = 3;
+			set->vertex_bitangent.value_reals = 3;
 		}
 	}
 
@@ -15480,6 +15600,17 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivi
 	mesh->max_face_triangles = 2;
 	mesh->num_bad_faces = 0;
 
+	// TODO: Move this to an utility?
+	mesh->vertex_position.value_reals = 3;
+	mesh->vertex_normal.value_reals = 3;
+	mesh->vertex_uv.value_reals = 2;
+	mesh->vertex_tangent.value_reals = 3;
+	mesh->vertex_bitangent.value_reals = 3;
+	mesh->vertex_color.value_reals = 4;
+	mesh->vertex_crease.value_reals = 1;
+	mesh->skinned_position.value_reals = 3;
+	mesh->skinned_normal.value_reals = 3;
+
 	if (!sc->opts.interpolate_normals && !sc->opts.ignore_normals) {
 
 		ufbx_topo_edge *topo = ufbxi_push(&sc->tmp, ufbx_topo_edge, mesh->num_indices);
@@ -15504,6 +15635,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivi
 		mesh->vertex_normal.data = normal_data;
 		mesh->vertex_normal.indices = normal_indices;
 		mesh->vertex_normal.num_values = num_normals;
+		mesh->vertex_normal.value_reals = 3;
 
 		mesh->skinned_normal = mesh->vertex_normal;
 	}

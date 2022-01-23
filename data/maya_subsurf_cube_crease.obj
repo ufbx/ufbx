@@ -1,3 +1,4 @@
+# ufbx:bad_normals
 # This file uses centimeters as units for non-parametric coordinates.
 
 mtllib maya_subsurf_cube.mtl

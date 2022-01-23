@@ -442,3 +442,9 @@ UFBXT_FILE_TEST(maya_nurbs_surface_sphere)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(maya_nurbs_low_sphere)
+#if UFBXT_IMPL
+{
+}
+#endif

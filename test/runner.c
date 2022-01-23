@@ -583,16 +583,25 @@ static void ufbxt_debug_dump_obj_mesh(const char *file, ufbx_node *node, ufbx_me
 	FILE *f = fopen(file, "wb");
 	ufbxt_assert(f);
 
+	fprintf(f, "s 1\n");
+
 	for (size_t i = 0; i < mesh->vertex_position.num_values; i++) {
 		ufbx_vec3 v = mesh->vertex_position.data[i];
 		v = ufbx_transform_position(&node->geometry_to_world, v);
 		fprintf(f, "v %f %f %f\n", v.x, v.y, v.z);
 	}
-
 	for (size_t i = 0; i < mesh->vertex_uv.num_values; i++) {
 		ufbx_vec2 v = mesh->vertex_uv.data[i];
 		fprintf(f, "vt %f %f\n", v.x, v.y);
 	}
+
+	ufbx_matrix mat = ufbx_matrix_for_normals(&node->geometry_to_world);
+	for (size_t i = 0; i < mesh->vertex_normal.num_values; i++) {
+		ufbx_vec3 v = mesh->vertex_normal.data[i];
+		v = ufbx_transform_direction(&mat, v);
+		fprintf(f, "vn %f %f %f\n", v.x, v.y, v.z);
+	}
+
 
 	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
 		ufbx_face face = mesh->faces[fi];
@@ -600,7 +609,8 @@ static void ufbxt_debug_dump_obj_mesh(const char *file, ufbx_node *node, ufbx_me
 		for (size_t ci = 0; ci < face.num_indices; ci++) {
 			int32_t vi = mesh->vertex_position.indices[face.index_begin + ci];
 			int32_t ti = mesh->vertex_uv.indices[face.index_begin + ci];
-			fprintf(f, " %d/%d", vi + 1, ti + 1);
+			int32_t ni = mesh->vertex_normal.indices[face.index_begin + ci];
+			fprintf(f, " %d/%d/%d", vi + 1, ti + 1, ni + 1);
 		}
 		fprintf(f, "\n");
 	}
@@ -716,6 +726,7 @@ static void ufbxt_assert_close_vec4(ufbxt_diff_error *p_err, ufbx_vec4 a, ufbx_v
 
 typedef struct {
 	ufbx_vec3 pos;
+	ufbx_vec3 normal;
 	ufbx_vec2 uv;
 } ufbxt_match_vertex;
 
@@ -725,13 +736,18 @@ static int ufbxt_cmp_sub_vertex(const void *va, const void *vb)
 	if (a->pos.x != b->pos.x) return a->pos.x < b->pos.x ? -1 : +1;
 	if (a->pos.y != b->pos.y) return a->pos.y < b->pos.y ? -1 : +1;
 	if (a->pos.z != b->pos.z) return a->pos.z < b->pos.z ? -1 : +1;
+	if (a->normal.x != b->normal.x) return a->normal.x < b->normal.x ? -1 : +1;
+	if (a->normal.y != b->normal.y) return a->normal.y < b->normal.y ? -1 : +1;
+	if (a->normal.z != b->normal.z) return a->normal.z < b->normal.z ? -1 : +1;
 	if (a->uv.x != b->uv.x) return a->uv.x < b->uv.x ? -1 : +1;
 	if (a->uv.y != b->uv.y) return a->uv.y < b->uv.y ? -1 : +1;
 	return 0;
 }
 
-static void ufbxt_match_obj_mesh(ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt_obj_mesh *obj_mesh, ufbxt_diff_error *p_err, ufbx_real tolerance)
+static void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt_obj_mesh *obj_mesh, ufbxt_diff_error *p_err)
 {
+	ufbx_real tolerance = obj->tolerance;
+
 	ufbxt_assert(fbx_mesh->num_faces == obj_mesh->num_faces);
 	ufbxt_assert(fbx_mesh->num_indices == obj_mesh->num_indices);
 
@@ -740,18 +756,24 @@ static void ufbxt_match_obj_mesh(ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt
 	ufbxt_match_vertex *fbx_verts = (ufbxt_match_vertex*)calloc(fbx_mesh->num_indices, sizeof(ufbxt_match_vertex));
 	ufbxt_assert(obj_verts && fbx_verts);
 
+	ufbx_matrix norm_mat = ufbx_get_compatible_matrix_for_normals(fbx_node);
+
 	for (size_t i = 0; i < obj_mesh->num_indices; i++) {
 		obj_verts[i].pos = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, i);
+		obj_verts[i].normal = ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, i);
 		if (obj_mesh->vertex_uv.data) {
 			obj_verts[i].uv = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, i);
 		}
 	}
 	for (size_t i = 0; i < fbx_mesh->num_indices; i++) {
 		ufbx_vec3 fp = ufbx_get_vertex_vec3(&fbx_mesh->skinned_position, i);
+		ufbx_vec3 fn = ufbx_get_vertex_vec3(&fbx_mesh->skinned_normal, i);
 		if (fbx_mesh->skinned_is_local) {
 			fp = ufbx_transform_position(&fbx_node->geometry_to_world, fp);
+			fn = ufbx_transform_direction(&norm_mat, fn);
 		}
 		fbx_verts[i].pos = fp;
+		fbx_verts[i].normal = fn;
 		if (obj_mesh->vertex_uv.data) {
 			ufbxt_assert(fbx_mesh->vertex_uv.data);
 			fbx_verts[i].uv = ufbx_get_vertex_vec2(&fbx_mesh->vertex_uv, i);
@@ -769,10 +791,25 @@ static void ufbxt_match_obj_mesh(ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt
 			ufbx_real dx = obj_verts[j].pos.x - v.pos.x;
 			ufbx_real dy = obj_verts[j].pos.y - v.pos.y;
 			ufbx_real dz = obj_verts[j].pos.z - v.pos.z;
+			ufbx_real dnx = obj_verts[j].normal.x - v.normal.x;
+			ufbx_real dny = obj_verts[j].normal.y - v.normal.y;
+			ufbx_real dnz = obj_verts[j].normal.z - v.normal.z;
 			ufbx_real du = obj_verts[j].uv.x - v.uv.x;
 			ufbx_real dv = obj_verts[j].uv.y - v.uv.y;
+
+			if (obj->bad_normals) {
+				dnx = 0.0f;
+				dny = 0.0f;
+				dnz = 0.0f;
+			}
+
+			if (obj->bad_uvs) {
+				du = 0.0f;
+				dv = 0.0f;
+			}
+
 			ufbxt_assert(dx <= tolerance);
-			ufbx_real err = (ufbx_real)sqrt(dx*dx + dy*dy + dz*dz + du*du + dv*dv);
+			ufbx_real err = (ufbx_real)sqrt(dx*dx + dy*dy + dz*dz + dnx*dnx + dny*dny + dnz*dnz + du*du + dv*dv);
 			if (err < tolerance) {
 				if (err > p_err->max) p_err->max = err;
 				p_err->sum += err;
@@ -815,7 +852,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			// ufbxt_debug_dump_obj_mesh("test.obj", node, tess_mesh);
 
 			ufbxt_check_mesh(scene, tess_mesh);
-			ufbxt_match_obj_mesh(node, tess_mesh, obj_mesh, p_err, obj->tolerance);
+			ufbxt_match_obj_mesh(obj, node, tess_mesh, obj_mesh, p_err);
 			ufbx_free_mesh(tess_mesh);
 
 			continue;
@@ -831,7 +868,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			ufbxt_assert(sub_mesh);
 
 			ufbxt_check_mesh(scene, sub_mesh);
-			ufbxt_match_obj_mesh(node, sub_mesh, obj_mesh, p_err, obj->tolerance);
+			ufbxt_match_obj_mesh(obj, node, sub_mesh, obj_mesh, p_err);
 			ufbx_free_mesh(sub_mesh);
 
 			continue;
@@ -845,7 +882,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		if (!check_deformed_normals && mesh->all_deformers.count > 0) check_normals = false;
 
 		if (obj->bad_order) {
-			ufbxt_match_obj_mesh(node, mesh, obj_mesh, p_err, obj->tolerance);
+			ufbxt_match_obj_mesh(obj, node, mesh, obj_mesh, p_err);
 		} else {
 			// Assume that the indices are in the same order!
 			for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
