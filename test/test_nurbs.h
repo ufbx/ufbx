@@ -358,6 +358,9 @@ UFBXT_FILE_TEST(maya_nurbs_surface_plane)
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_NURBS_SURFACE);
 	ufbx_nurbs_surface *surface = (ufbx_nurbs_surface*)node->attrib;
 
+	ufbxt_assert(surface->material);
+	ufbxt_assert(!strcmp(surface->material->name.data, "lambert1"));
+
 	ufbxt_assert(surface->num_control_points_u == 5);
 	ufbxt_assert(surface->num_control_points_v == 6);
 	ufbxt_assert(!surface->flip_normals);
@@ -418,6 +421,9 @@ UFBXT_FILE_TEST(maya_nurbs_surface_sphere)
 	ufbx_node *node = ufbx_find_node(scene, "nurbsSphere1");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_NURBS_SURFACE);
 	ufbx_nurbs_surface *surface = (ufbx_nurbs_surface*)node->attrib;
+
+	ufbxt_assert(surface->material);
+	ufbxt_assert(!strcmp(surface->material->name.data, "lambert1"));
 
 	ufbxt_assert_close_real(err, surface->basis_u.t_min, 0.0f);
 	ufbxt_assert_close_real(err, surface->basis_u.t_max, 8.0f);

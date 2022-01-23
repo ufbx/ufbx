@@ -11082,7 +11082,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbxi_check(ufbxi_finalize_nurbs_basis(uc, &surface->basis_u));
 		ufbxi_check(ufbxi_finalize_nurbs_basis(uc, &surface->basis_v));
 
-		surface->material = (ufbx_material*)ufbxi_fetch_dst_element(&surface->element, search_node, NULL, UFBX_ELEMENT_MATERIAL);
+		surface->material = (ufbx_material*)ufbxi_fetch_dst_element(&surface->element, true, NULL, UFBX_ELEMENT_MATERIAL);
 	}
 
 	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
