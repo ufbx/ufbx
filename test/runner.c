@@ -803,6 +803,24 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		ufbx_node *node = ufbx_find_node(scene, obj_mesh->name);
 		ufbxt_assert(node);
 		ufbx_mesh *mesh = node->mesh;
+
+		if (!mesh && node->attrib_type == UFBX_ELEMENT_NURBS_SURFACE) {
+			ufbx_nurbs_surface *surface = (ufbx_nurbs_surface*)node->attrib;
+			ufbx_tessellate_opts opts = { 0 };
+			opts.span_subdivision_u = surface->span_subdivision_u;
+			opts.span_subdivision_v = surface->span_subdivision_v;
+			ufbx_mesh *tess_mesh = ufbx_tessellate_nurbs_surface(surface, &opts, NULL);
+			ufbxt_assert(tess_mesh);
+
+			// ufbxt_debug_dump_obj_mesh("test.obj", node, tess_mesh);
+
+			ufbxt_check_mesh(scene, tess_mesh);
+			ufbxt_match_obj_mesh(node, tess_mesh, obj_mesh, p_err, obj->tolerance);
+			ufbx_free_mesh(tess_mesh);
+
+			continue;
+		}
+
 		ufbxt_assert(mesh);
 
 		ufbx_matrix *mat = &node->geometry_to_world;
@@ -810,8 +828,9 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 
 		if (mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_SMOOTH || mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_HULL_AND_SMOOTH) {
 			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, mesh->subdivision_preview_levels, NULL, NULL);
+			ufbxt_assert(sub_mesh);
 
-			ufbxt_check_mesh(scene, mesh);
+			ufbxt_check_mesh(scene, sub_mesh);
 			ufbxt_match_obj_mesh(node, sub_mesh, obj_mesh, p_err, obj->tolerance);
 			ufbx_free_mesh(sub_mesh);
 

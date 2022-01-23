@@ -102,7 +102,7 @@ UFBXT_FILE_TEST(maya_nurbs_curve_form)
 			for (size_t i = 0; i < ufbxt_arraycount(samples); i++) {
 				ufbxt_hintf("i: %zu", i);
 				const ufbxt_curve_sample *sample = &samples[i];
-				ufbx_curve_point p = ufbx_evaluate_nurbs_curve_point(open, sample->u);
+				ufbx_curve_point p = ufbx_evaluate_nurbs_curve(open, sample->u);
 				ufbxt_assert_close_vec3(err, p.position, sample->position);
 				ufbxt_assert_close_vec3(err, p.derivative, sample->derivative);
 			}
@@ -147,7 +147,7 @@ UFBXT_FILE_TEST(maya_nurbs_curve_form)
 			for (size_t i = 0; i < ufbxt_arraycount(samples); i++) {
 				ufbxt_hintf("i: %zu", i);
 				const ufbxt_curve_sample *sample = &samples[i];
-				ufbx_curve_point p = ufbx_evaluate_nurbs_curve_point(closed, sample->u);
+				ufbx_curve_point p = ufbx_evaluate_nurbs_curve(closed, sample->u);
 				ufbxt_assert_close_vec3(err, p.position, sample->position);
 				ufbxt_assert_close_vec3(err, p.derivative, sample->derivative);
 			}
@@ -189,7 +189,7 @@ UFBXT_FILE_TEST(maya_nurbs_curve_form)
 			for (size_t i = 0; i < ufbxt_arraycount(samples); i++) {
 				ufbxt_hintf("i: %zu", i);
 				const ufbxt_curve_sample *sample = &samples[i];
-				ufbx_curve_point p = ufbx_evaluate_nurbs_curve_point(periodic, sample->u);
+				ufbx_curve_point p = ufbx_evaluate_nurbs_curve(periodic, sample->u);
 				ufbxt_assert_close_vec3(err, p.position, sample->position);
 				ufbxt_assert_close_vec3(err, p.derivative, sample->derivative);
 			}
@@ -242,7 +242,7 @@ UFBXT_FILE_TEST(max_nurbs_curve_rational)
 	for (size_t i = 0; i < ufbxt_arraycount(samples); i++) {
 		ufbxt_hintf("i: %zu", i);
 		const ufbxt_curve_sample *sample = &samples[i];
-		ufbx_curve_point p = ufbx_evaluate_nurbs_curve_point(curve, sample->u);
+		ufbx_curve_point p = ufbx_evaluate_nurbs_curve(curve, sample->u);
 		ufbxt_assert_close_vec3(err, p.position, sample->position);
 		ufbxt_assert_close_vec3(err, p.derivative, sample->derivative);
 	}
@@ -312,7 +312,7 @@ UFBXT_FILE_TEST(maya_nurbs_curve_multiplicity)
 	for (size_t i = 0; i < ufbxt_arraycount(samples); i++) {
 		ufbxt_hintf("i: %zu", i);
 		const ufbxt_curve_sample *sample = &samples[i];
-		ufbx_curve_point p = ufbx_evaluate_nurbs_curve_point(curve, sample->u);
+		ufbx_curve_point p = ufbx_evaluate_nurbs_curve(curve, sample->u);
 		ufbxt_assert_close_vec3(err, p.position, sample->position);
 		ufbxt_assert_close_vec3(err, p.derivative, sample->derivative);
 	}
@@ -344,7 +344,7 @@ UFBXT_FILE_TEST(maya_nurbs_curve_linear)
 	for (size_t i = 0; i < ufbxt_arraycount(samples); i++) {
 		ufbxt_hintf("i: %zu", i);
 		const ufbxt_curve_sample *sample = &samples[i];
-		ufbx_curve_point p = ufbx_evaluate_nurbs_curve_point(curve, sample->u);
+		ufbx_curve_point p = ufbx_evaluate_nurbs_curve(curve, sample->u);
 		ufbxt_assert_close_vec3(err, p.position, sample->position);
 		ufbxt_assert_close_vec3(err, p.derivative, sample->derivative);
 	}
@@ -357,6 +357,9 @@ UFBXT_FILE_TEST(maya_nurbs_surface_plane)
 	ufbx_node *node = ufbx_find_node(scene, "nurbsPlane1");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_NURBS_SURFACE);
 	ufbx_nurbs_surface *surface = (ufbx_nurbs_surface*)node->attrib;
+
+	ufbxt_assert(surface->span_subdivision_u == 4);
+	ufbxt_assert(surface->span_subdivision_v == 4);
 
 	ufbxt_assert(surface->material);
 	ufbxt_assert(!strcmp(surface->material->name.data, "lambert1"));
@@ -407,7 +410,7 @@ UFBXT_FILE_TEST(maya_nurbs_surface_plane)
 	for (size_t i = 0; i < ufbxt_arraycount(samples); i++) {
 		ufbxt_hintf("i: %zu", i);
 		const ufbxt_surface_sample *sample = &samples[i];
-		ufbx_surface_point p = ufbx_evaluate_nurbs_surface_point(surface, sample->u, sample->v);
+		ufbx_surface_point p = ufbx_evaluate_nurbs_surface(surface, sample->u, sample->v);
 		ufbxt_assert_close_vec3(err, p.position, sample->position);
 		ufbxt_assert_close_vec3(err, p.derivative_u, sample->derivative_u);
 		ufbxt_assert_close_vec3(err, p.derivative_v, sample->derivative_v);
@@ -432,7 +435,7 @@ UFBXT_FILE_TEST(maya_nurbs_surface_sphere)
 
 	for (ufbx_real u = 0.1f; u <= 7.9f; u += 0.05f) {
 		for (ufbx_real v = 0.0f; v <= 10.0f; v += 0.05f) {
-			ufbx_surface_point point = ufbx_evaluate_nurbs_surface_point(surface, u, v);
+			ufbx_surface_point point = ufbx_evaluate_nurbs_surface(surface, u, v);
 			ufbx_vec3 normal = ufbxt_normalize(ufbxt_cross3(point.derivative_u, point.derivative_v));
 			ufbxt_assert_close_vec3(err, ufbxt_mul3(point.position, 0.1f), ufbxt_mul3(normal, 0.1f));
 		}

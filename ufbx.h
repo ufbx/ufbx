@@ -812,6 +812,9 @@ struct ufbx_mesh {
 	ufbx_subdivision_boundary subdivision_boundary;
 	ufbx_subdivision_boundary subdivision_uv_boundary;
 	bool subdivision_evaluated;
+
+	// Tessellation
+	bool from_tessellated_nurbs;
 };
 
 // The kind of light source
@@ -1118,6 +1121,10 @@ struct ufbx_nurbs_surface {
 	// NOTE: The control points are _not_ homogenous, meaning you have to multiply
 	// them by `w` before evaluating the surface.
 	ufbx_vec4_list control_points;
+
+	// How many segments tessellate each step in `ufbx_nurbs_basis.steps`.
+	int32_t span_subdivision_u;
+	int32_t span_subdivision_v;
 
 	// If `true` the resulting normals should be flipped when evaluated.
 	bool flip_normals;
@@ -2691,8 +2698,14 @@ typedef struct ufbx_tessellate_opts {
 	ufbx_allocator temp_allocator;   // < Allocator used during tessellation
 	ufbx_allocator result_allocator; // < Allocator used for the final mesh
 
-	size_t resolution_u;
-	size_t resolution_v;
+	// How many segments tessellate each step in `ufbx_nurbs_basis.steps`.
+	// NOTE: Default is `4`, _not_ `ufbx_nurbs_surface.span_subdivision_u/v` as that
+	// would make it easy to create an FBX file with an absurdly high subdivision
+	// rate (similar to mesh subdivision). Please enforce copy the value yourself
+	// enforcing whatever limits you deem reasonable.
+	int32_t span_subdivision_u;
+	int32_t span_subdivision_v;
+
 } ufbx_tessellate_opts;
 
 typedef struct ufbx_subdivide_opts {
@@ -2922,10 +2935,10 @@ void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *
 
 size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_real u, size_t num_weights, ufbx_real *weights, ufbx_real *derivatives);
 
-ufbx_curve_point ufbx_evaluate_nurbs_curve_point(const ufbx_nurbs_curve *curve, ufbx_real u);
-ufbx_surface_point ufbx_evaluate_nurbs_surface_point(const ufbx_nurbs_surface *surface, ufbx_real u, ufbx_real v);
+ufbx_curve_point ufbx_evaluate_nurbs_curve(const ufbx_nurbs_curve *curve, ufbx_real u);
+ufbx_surface_point ufbx_evaluate_nurbs_surface(const ufbx_nurbs_surface *surface, ufbx_real u, ufbx_real v);
 
-ufbx_mesh *ufbx_tessellate_surface(const ufbx_nurbs_surface *surface, const ufbx_tessellate_opts *opts, ufbx_error *error);
+ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, const ufbx_tessellate_opts *opts, ufbx_error *error);
 
 // Mesh Topology
 
