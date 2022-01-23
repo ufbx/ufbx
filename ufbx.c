@@ -14455,7 +14455,7 @@ static int32_t ufbxi_noinline ufbxi_spatial_coord(ufbx_real v)
 	}
 }
 
-static uint32_t ufbxi_noinline ufbxi_insert_spatial_imp(ufbxi_map *map, const ufbx_vec3 *pos, int32_t kx, int32_t ky, int32_t kz)
+static uint32_t ufbxi_noinline ufbxi_insert_spatial_imp(ufbxi_map *map, int32_t kx, int32_t ky, int32_t kz)
 {
 	ufbxi_spatial_key key = { kx, ky, kz };
 	uint32_t hash = ufbxi_hash_spatial_key(key);
@@ -14490,20 +14490,20 @@ static uint32_t ufbxi_noinline ufbxi_insert_spatial(ufbxi_map *map, const ufbx_v
 		ky >>= low_bits;
 		kz >>= low_bits;
 
-		ix = ufbxi_insert_spatial_imp(map, pos, kx, ky, kz);
+		ix = ufbxi_insert_spatial_imp(map, kx, ky, kz);
 
 		if (dnum >= 1 && ix == UINT32_MAX) {
-			if (dx) ix = ufbxi_insert_spatial_imp(map, pos, kx+dx, ky, kz);
-			if (dy) ix = ufbxi_insert_spatial_imp(map, pos, kx, ky+dy, kz);
-			if (dz) ix = ufbxi_insert_spatial_imp(map, pos, kx, ky, kz+dz);
+			if (dx) ix = ufbxi_insert_spatial_imp(map, kx+dx, ky, kz);
+			if (dy) ix = ufbxi_insert_spatial_imp(map, kx, ky+dy, kz);
+			if (dz) ix = ufbxi_insert_spatial_imp(map, kx, ky, kz+dz);
 
 			if (dnum >= 2 && ix == UINT32_MAX) {
-				if (dx && dy) ix = ufbxi_insert_spatial_imp(map, pos, kx+dx, ky+dy, kz);
-				if (dy && dz) ix = ufbxi_insert_spatial_imp(map, pos, kx, ky+dy, kz+dz);
-				if (dx && dz) ix = ufbxi_insert_spatial_imp(map, pos, kx+dx, ky, kz+dz);
+				if (dx && dy) ix = ufbxi_insert_spatial_imp(map, kx+dx, ky+dy, kz);
+				if (dy && dz) ix = ufbxi_insert_spatial_imp(map, kx, ky+dy, kz+dz);
+				if (dx && dz) ix = ufbxi_insert_spatial_imp(map, kx+dx, ky, kz+dz);
 
 				if (dnum >= 3 && ix == UINT32_MAX) {
-					ix = ufbxi_insert_spatial_imp(map, pos, kx+dx, ky+dy, kz+dz);
+					ix = ufbxi_insert_spatial_imp(map, kx+dx, ky+dy, kz+dz);
 				}
 			}
 		}
@@ -14540,19 +14540,6 @@ static ufbxi_forceinline ufbx_real ufbxi_nurbs_deriv(const ufbx_real_list *knots
 	ufbx_real prev_u = knots->data[knot], next_u = knots->data[knot + degree];
 	if (prev_u >= next_u) return 0.0f;
 	return (ufbx_real)degree / (next_u - prev_u);
-}
-
-static int ufbxi_map_cmp_vec3(void *user, const void *va, const void *vb)
-{
-	(void)user;
-	ufbx_vec3 a = *(const ufbx_vec3*)va, b = *(const ufbx_vec3*)vb;
-	if (a.x < b.x) return -1;
-	if (a.x > b.x) return +1;
-	if (a.y < b.y) return -1;
-	if (a.y > b.y) return +1;
-	if (a.z < b.z) return -1;
-	if (a.z > b.z) return +1;
-	return 0;
 }
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, ufbx_error *error, ufbx_mesh *mesh)
@@ -17222,7 +17209,7 @@ ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, cons
 	ufbx_assert(surface);
 	if (!surface) return NULL;
 
-	ufbxi_tessellate_context tc = { 0 };
+	ufbxi_tessellate_context tc = { UFBX_ERROR_NONE };
 	if (opts) {
 		tc.opts = *opts;
 	}
