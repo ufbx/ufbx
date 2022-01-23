@@ -14428,20 +14428,29 @@ static int ufbxi_map_cmp_spatial_key(void *user, const void *va, const void *vb)
 	return 0;
 }
 
-static int32_t ufbxi_spatial_coord(ufbx_real v)
+static int32_t ufbxi_noinline ufbxi_spatial_coord(ufbx_real v)
 {
 	bool negative = false;
 	if (v < 0.0f) {
 		v = -v;
 		negative = true;
 	}
+	if (!(v < 1.27605887595e+38f)) {
+		return INT32_MIN;
+	}
+
+	const int32_t min_exponent = -20;
+	const int32_t mantissa_bits = 21;
+	const int32_t mantissa_max = 1 << mantissa_bits;
+
 	int exponent = 0;
 	double mantissa = frexp(v, &exponent);
-	if (exponent < -80) {
+	if (exponent < min_exponent) {
 		return 0;
 	} else {
-		int32_t biased = (int32_t)(exponent + 80);
-		int32_t value = (biased << 18) + (int32_t)(mantissa * 262144.0);
+		int32_t biased = (int32_t)(exponent - min_exponent);
+		int32_t truncated_mantissa = (int32_t)(mantissa * (double)(mantissa_max*2)) - mantissa_max;
+		int32_t value = (biased << mantissa_bits) + truncated_mantissa;
 		return negative ? -value : value;
 	}
 }
@@ -14464,24 +14473,44 @@ static uint32_t ufbxi_noinline ufbxi_insert_spatial(ufbxi_map *map, const ufbx_v
 	int32_t ky = ufbxi_spatial_coord(pos->y);
 	int32_t kz = ufbxi_spatial_coord(pos->z);
 
-	uint32_t best_ix = UINT32_MAX;
-	int32_t best_delta = INT32_MAX;
+	uint32_t ix = UINT32_MAX;
+	if (kx != INT32_MIN && ky != INT32_MIN && kz != INT32_MIN) {
+		const int32_t low_bits = 2, low_mask = (1 << low_bits) - 1;
 
-	for (int32_t dx = -1; dx <= 1; dx++)
-	for (int32_t dy = -1; dy <= 1; dy++)
-	for (int32_t dz = -1; dz <= 1; dz++) {
-		int32_t delta = (dx&1) + (dy&1) + (dz&1);
-		if (delta >= INT32_MAX) continue;
+		kx += low_mask/2;
+		ky += low_mask/2;
+		kz += low_mask/2;
 
-		uint32_t ix = ufbxi_insert_spatial_imp(map, pos, kx+dx, ky+dy, kz+dz);
-		if (ix != UINT32_MAX) {
-			best_ix = ix;
-			best_delta = delta;
+		int32_t dx = (((kx+1) & low_mask) < 2) ? (((kx >> (low_bits-1)) & 1) ? +1 : -1) : 0;
+		int32_t dy = (((ky+1) & low_mask) < 2) ? (((ky >> (low_bits-1)) & 1) ? +1 : -1) : 0;
+		int32_t dz = (((kz+1) & low_mask) < 2) ? (((kz >> (low_bits-1)) & 1) ? +1 : -1) : 0;
+		int32_t dnum = (dx&1) + (dy&1) + (dz&1);
+
+		kx >>= low_bits;
+		ky >>= low_bits;
+		kz >>= low_bits;
+
+		ix = ufbxi_insert_spatial_imp(map, pos, kx, ky, kz);
+
+		if (dnum >= 1 && ix == UINT32_MAX) {
+			if (dx) ix = ufbxi_insert_spatial_imp(map, pos, kx+dx, ky, kz);
+			if (dy) ix = ufbxi_insert_spatial_imp(map, pos, kx, ky+dy, kz);
+			if (dz) ix = ufbxi_insert_spatial_imp(map, pos, kx, ky, kz+dz);
+
+			if (dnum >= 2 && ix == UINT32_MAX) {
+				if (dx && dy) ix = ufbxi_insert_spatial_imp(map, pos, kx+dx, ky+dy, kz);
+				if (dy && dz) ix = ufbxi_insert_spatial_imp(map, pos, kx, ky+dy, kz+dz);
+				if (dx && dz) ix = ufbxi_insert_spatial_imp(map, pos, kx+dx, ky, kz+dz);
+
+				if (dnum >= 3 && ix == UINT32_MAX) {
+					ix = ufbxi_insert_spatial_imp(map, pos, kx+dx, ky+dy, kz+dz);
+				}
+			}
 		}
 	}
 
-	if (best_ix == UINT32_MAX) {
-		best_ix = map->size;
+	if (ix == UINT32_MAX) {
+		ix = map->size;
 		ufbxi_spatial_key key = { kx, ky, kz };
 		uint32_t hash = ufbxi_hash_spatial_key(key);
 		ufbxi_spatial_bucket *bucket = ufbxi_map_insert(map, ufbxi_spatial_bucket, hash, &key);
@@ -14490,7 +14519,7 @@ static uint32_t ufbxi_noinline ufbxi_insert_spatial(ufbxi_map *map, const ufbx_v
 		bucket->position = *pos;
 	}
 
-	return best_ix;
+	return ix;
 }
 
 static ufbxi_forceinline ufbx_real ufbxi_nurbs_weight(const ufbx_real_list *knots, size_t knot, size_t degree, ufbx_real u)
