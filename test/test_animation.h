@@ -283,6 +283,53 @@ UFBXT_FILE_TEST(maya_anim_light)
 
 		ufbx_free_scene(state);
 	}
+
+	{
+		ufbx_anim_layer *layer = scene->anim_layers.data[0];
+		ufbx_node *node = ufbx_find_node(scene, "pointLight1");
+		ufbxt_assert(node && node->light);
+		ufbx_light *light = node->light;
+
+		{
+			ufbx_anim_prop_list props = ufbx_find_anim_props(layer, &node->element);
+			ufbxt_assert(props.count == 3);
+			ufbxt_assert(!strcmp(props.data[0].prop_name.data, "Lcl Rotation"));
+			ufbxt_assert(!strcmp(props.data[1].prop_name.data, "Lcl Scaling"));
+			ufbxt_assert(!strcmp(props.data[2].prop_name.data, "Lcl Translation"));
+
+			ufbx_anim_prop *prop;
+			prop = ufbx_find_anim_prop(layer, &node->element, "Lcl Rotation");
+			ufbxt_assert(prop && !strcmp(prop->prop_name.data, "Lcl Rotation"));
+			prop = ufbx_find_anim_prop(layer, &node->element, "Lcl Scaling");
+			ufbxt_assert(prop && !strcmp(prop->prop_name.data, "Lcl Scaling"));
+			prop = ufbx_find_anim_prop(layer, &node->element, "Lcl Translation");
+			ufbxt_assert(prop && !strcmp(prop->prop_name.data, "Lcl Translation"));
+		}
+
+		{
+			ufbx_anim_prop_list props = ufbx_find_anim_props(layer, &light->element);
+			ufbxt_assert(props.count == 2);
+			ufbxt_assert(!strcmp(props.data[0].prop_name.data, "Color"));
+			ufbxt_assert(!strcmp(props.data[1].prop_name.data, "Intensity"));
+
+			ufbx_anim_prop *prop;
+			prop = ufbx_find_anim_prop(layer, &light->element, "Color");
+			ufbxt_assert(prop && !strcmp(prop->prop_name.data, "Color"));
+			prop = ufbx_find_anim_prop(layer, &light->element, "Intensity");
+			ufbxt_assert(prop && !strcmp(prop->prop_name.data, "Intensity"));
+
+			prop = ufbx_find_anim_prop(layer, &light->element, "Nonexistent");
+			ufbxt_assert(prop == NULL);
+		}
+
+		{
+			ufbx_anim_prop_list props = ufbx_find_anim_props(layer, &layer->element);
+			ufbxt_assert(props.count == 0);
+
+			ufbx_anim_prop *prop = ufbx_find_anim_prop(layer, &layer->element, "Weight");
+			ufbxt_assert(prop == NULL);
+		}
+	}
 }
 #endif
 

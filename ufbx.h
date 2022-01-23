@@ -2841,6 +2841,14 @@ ufbx_inline ufbx_node *ufbx_find_node(ufbx_scene *scene, const char *name) { ret
 ufbx_anim_stack *ufbx_find_anim_stack_len(ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_inline ufbx_anim_stack *ufbx_find_anim_stack(ufbx_scene *scene, const char *name) { return ufbx_find_anim_stack_len(scene, name, strlen(name)); }
 
+// Find a single animated property `prop` of `element` in `layer`.
+// Returns `NULL` if not found.
+ufbx_anim_prop *ufbx_find_anim_prop_len(ufbx_anim_layer *layer, ufbx_element *element, const char *prop, size_t prop_len);
+ufbx_inline ufbx_anim_prop *ufbx_find_anim_prop(ufbx_anim_layer *layer, ufbx_element *element, const char *prop) { return ufbx_find_anim_prop_len(layer, element, prop, strlen(prop)); }
+
+// Find all animated properties of `element` in `layer`.
+ufbx_anim_prop_list ufbx_find_anim_props(ufbx_anim_layer *layer, ufbx_element *element);
+
 // Get a matrix that transforms normals in the same way as Autodesk software.
 // NOTE: The resulting normals are slightly incorrect as this function deliberately
 // inverts geometric transformation wrong. For better results use

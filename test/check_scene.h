@@ -472,10 +472,32 @@ static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_laye
 	for (size_t i = 0; i < anim_layer->anim_values.count; i++) {
 		ufbxt_check_element_ptr(scene, anim_layer->anim_values.data[i]);
 	}
+
+	size_t props_left = 0;
+	ufbx_element *prev_element = NULL;
+
 	for (size_t i = 0; i < anim_layer->anim_props.count; i++) {
-		ufbxt_check_element_ptr(scene, anim_layer->anim_props.data[i].element);
-		ufbxt_check_element_ptr(scene, anim_layer->anim_props.data[i].anim_value);
+		ufbx_anim_prop *anim_prop = &anim_layer->anim_props.data[i];
+
+		ufbxt_check_string(anim_prop->prop_name);
+		ufbxt_check_element_ptr(scene, anim_prop->element);
+		ufbxt_check_element_ptr(scene, anim_prop->anim_value);
+
+		ufbx_anim_prop *ref = ufbx_find_anim_prop(anim_layer, anim_prop->element, anim_prop->prop_name.data);
+		ufbxt_assert(ref == anim_prop);
+
+		if (props_left > 0) {
+			ufbxt_assert(anim_prop->element == prev_element);
+			props_left--;
+		} else {
+			ufbx_anim_prop_list list = ufbx_find_anim_props(anim_layer, anim_prop->element);
+			ufbxt_assert(list.count > 0);
+			prev_element = anim_prop->element;
+			props_left = list.count - 1;
+		}
 	}
+
+	ufbxt_assert(props_left == 0);
 }
 
 static void ufbxt_check_display_layer(ufbx_scene *scene, ufbx_display_layer *layer)

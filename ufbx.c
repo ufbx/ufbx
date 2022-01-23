@@ -16113,6 +16113,45 @@ ufbx_anim_stack *ufbx_find_anim_stack_len(ufbx_scene *scene, const char *name, s
 	return (ufbx_anim_stack*)ufbx_find_element_len(scene, UFBX_ELEMENT_ANIM_STACK, name, name_len);
 }
 
+ufbx_anim_prop *ufbx_find_anim_prop_len(ufbx_anim_layer *layer, ufbx_element *element, const char *prop, size_t prop_len)
+{
+	ufbx_assert(layer);
+	ufbx_assert(element);
+	if (!layer || !element) return NULL;
+
+	ufbx_string prop_str = { prop, prop_len };
+
+	size_t index = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbx_anim_prop, 16, &index, layer->anim_props.data, 0, layer->anim_props.count,
+		( a->element != element ? a->element < element : ufbxi_str_less(a->prop_name, prop_str) ),
+		( a->element == element && ufbxi_str_equal(a->prop_name, prop_str) ));
+
+	if (index == SIZE_MAX) return NULL;
+	return &layer->anim_props.data[index];
+}
+
+ufbx_anim_prop_list ufbx_find_anim_props(ufbx_anim_layer *layer, ufbx_element *element)
+{
+	ufbx_anim_prop_list result = { 0 };
+	ufbx_assert(layer);
+	ufbx_assert(element);
+	if (!layer || !element) return result;
+
+	size_t begin = layer->anim_props.count, end = begin;
+	ufbxi_macro_lower_bound_eq(ufbx_anim_prop, 16, &begin, layer->anim_props.data, 0, layer->anim_props.count,
+		( a->element < element ), ( a->element == element ));
+
+	ufbxi_macro_upper_bound_eq(ufbx_anim_prop, 16, &end, layer->anim_props.data, begin, layer->anim_props.count,
+		( a->element == element ));
+
+	if (begin != end) {
+		result.data = layer->anim_props.data + begin;
+		result.count = end - begin;
+	}
+
+	return result;
+}
+
 ufbx_matrix ufbx_get_compatible_matrix_for_normals(ufbx_node *node)
 {
 	if (!node) return ufbx_identity_matrix;
