@@ -412,9 +412,11 @@ ichain = itertools.chain.from_iterable
 
 for sdk in argv.wasi_sdk:
     path = os.path.join(sdk, "bin", "clang")
+    cpp_path = os.path.join(sdk, "bin", "clang++")
     sysroot = os.path.join(sdk, "share", "wasi-sysroot")
     all_compilers += [
-        WasiCompiler("wasi_clang", path, False, sysroot)
+        WasiCompiler("wasi_clang", path, False, sysroot),
+        WasiCompiler("wasi_clang", cpp_path, True, sysroot),
     ]
 
 for desc in argv.additional_compiler:
