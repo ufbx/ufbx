@@ -101,28 +101,55 @@
 
 // Unaligned little-endian load functions
 // On platforms that support unaligned access natively (x86, x64, ARM64) just use normal loads,
-// WASM uses unaligned compiler attribute otherwise do manual byte-wise load.
+// with unaligned attributes, otherwise do manual byte-wise load.
 
 #define ufbxi_read_u8(ptr) (*(const uint8_t*)(ptr))
 
-#if (defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__)) && !defined(UFBX_NO_UNALIGNED_LOADS) || defined(UFBX_USE_UNALIGNED_LOADS)
-	#define ufbxi_read_u16(ptr) (*(const uint16_t*)(ptr))
-	#define ufbxi_read_u32(ptr) (*(const uint32_t*)(ptr))
-	#define ufbxi_read_u64(ptr) (*(const uint64_t*)(ptr))
-	#define ufbxi_read_f32(ptr) (*(const float*)(ptr))
-	#define ufbxi_read_f64(ptr) (*(const double*)(ptr))
-#elif defined(__wasm__) || defined(__EMSCRIPTEN__)
-	typedef uint16_t __attribute__((aligned(1))) ufbxi_wasm_unaligned_u16;
-	typedef uint32_t __attribute__((aligned(1))) ufbxi_wasm_unaligned_u32;
-	typedef uint64_t __attribute__((aligned(1))) ufbxi_wasm_unaligned_u64;
-	typedef float __attribute__((aligned(1))) ufbxi_wasm_unaligned_f32;
-	typedef double __attribute__((aligned(1))) ufbxi_wasm_unaligned_f64;
+// Detect support for `__attribute__((aligned(1)))`
+#if defined(__clang__) && defined(__APPLE__)
+	// Apple overrides Clang versioning, 5.0 here maps to 3.3
+	#if __clang_major__ >= 5
+		#define UFBXI_HAS_ATTRIBUTE_ALIGNED 1
+	#endif
+#elif defined(__clang__)
+	#if (__clang_major__ >= 4) || (__clang_major__ == 3 && __clang_minor__ >= 3)
+		#define UFBXI_HAS_ATTRIBUTE_ALIGNED 1
+	#endif
+#elif defined(__GNUC__)
+	#if __GNUC__ >= 5
+		#define UFBXI_HAS_ATTRIBUTE_ALIGNED 1
+	#endif
+#endif
 
-	#define ufbxi_read_u16(ptr) ((uint16_t)*(const ufbxi_wasm_unaligned_u16*)(ptr))
-	#define ufbxi_read_u32(ptr) ((uint32_t)*(const ufbxi_wasm_unaligned_u32*)(ptr))
-	#define ufbxi_read_u64(ptr) ((uint64_t)*(const ufbxi_wasm_unaligned_u64*)(ptr))
-	#define ufbxi_read_f32(ptr) ((float)*(const ufbxi_wasm_unaligned_f32*)(ptr))
-	#define ufbxi_read_f64(ptr) ((double)*(const ufbxi_wasm_unaligned_f64*)(ptr))
+#if defined(UFBXI_HAS_ATTRIBUTE_ALIGNED)
+	#define UFBXI_HAS_UNALIGNED 1
+	#define ufbxi_unaligned
+	typedef uint16_t __attribute__((aligned(1))) ufbxi_unaligned_u16;
+	typedef uint32_t __attribute__((aligned(1))) ufbxi_unaligned_u32;
+	typedef uint64_t __attribute__((aligned(1))) ufbxi_unaligned_u64;
+	typedef float __attribute__((aligned(1))) ufbxi_unaligned_f32;
+	typedef double __attribute__((aligned(1))) ufbxi_unaligned_f64;
+#elif defined(_MSC_VER)
+	#define UFBXI_HAS_UNALIGNED 1
+	#if defined(_M_IX86)
+		// MSVC seems to assume all pointers are unaligned for x86
+		#define ufbxi_unaligned
+	#else
+		#define ufbxi_unaligned __unaligned
+	#endif
+	typedef uint16_t ufbxi_unaligned_u16;
+	typedef uint32_t ufbxi_unaligned_u32;
+	typedef uint64_t ufbxi_unaligned_u64;
+	typedef float ufbxi_unaligned_f32;
+	typedef double ufbxi_unaligned_f64;
+#endif
+
+#if defined(UFBXI_HAS_UNALIGNED) && (defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__) || defined(__wasm__) || defined(__EMSCRIPTEN__)) && !defined(UFBX_NO_UNALIGNED_LOADS) || defined(UFBX_USE_UNALIGNED_LOADS)
+	#define ufbxi_read_u16(ptr) (*(const ufbxi_unaligned ufbxi_unaligned_u16*)(ptr))
+	#define ufbxi_read_u32(ptr) (*(const ufbxi_unaligned ufbxi_unaligned_u32*)(ptr))
+	#define ufbxi_read_u64(ptr) (*(const ufbxi_unaligned ufbxi_unaligned_u64*)(ptr))
+	#define ufbxi_read_f32(ptr) (*(const ufbxi_unaligned ufbxi_unaligned_f32*)(ptr))
+	#define ufbxi_read_f64(ptr) (*(const ufbxi_unaligned ufbxi_unaligned_f64*)(ptr))
 #else
 	static ufbxi_forceinline uint16_t ufbxi_read_u16(const void *ptr) {
 		const char *p = (const char*)ptr;
