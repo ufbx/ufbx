@@ -14939,8 +14939,8 @@ ufbxi_forceinline static bool ufbxi_kd_check_point(ufbxi_ngon_context *nc, const
 	ufbx_real v = ufbxi_orient2d(p, tri->points[1], tri->points[2]);
 	ufbx_real w = ufbxi_orient2d(p, tri->points[2], tri->points[0]);
 
-	if (u < 0.0f && v < 0.0f && w < 0.0f) return true;
-	if (u > 0.0f && v > 0.0f && w > 0.0f) return true;
+	if (u <= 0.0f && v <= 0.0f && w <= 0.0f) return true;
+	if (u >= 0.0f && v >= 0.0f && w >= 0.0f) return true;
 	return false;
 }
 
@@ -15226,6 +15226,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 
 			// If we have walked around the entire polygon it is irregular and
 			// ear cutting won't find any more triangles.
+			// TODO: This could be stricter?
 			if (num_steps >= face.num_indices*2) break;
 		}
 
