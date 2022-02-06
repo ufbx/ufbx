@@ -5701,8 +5701,8 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 
 		// Add value and keep parsing if there's a comma. This part may be
 		// skipped if we enter an array block.
-		ufbxi_check(num_values < UINT32_MAX);
 		num_values++;
+		ufbxi_check(num_values < UINT32_MAX);
 		if (!ufbxi_ascii_accept(uc, ',')) break;
 	}
 
