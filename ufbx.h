@@ -2950,7 +2950,7 @@ ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, cons
 
 // Mesh Topology
 
-size_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face);
+uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face);
 
 // Generate the half-edge representation of `mesh` to `topo[mesh->num_indices]`
 void ufbx_compute_topology(const ufbx_mesh *mesh, ufbx_topo_edge *topo);

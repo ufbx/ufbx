@@ -75,11 +75,105 @@ UFBXT_FILE_TEST(maya_tri_cone)
 
 		size_t num_tris = face.num_indices - 2;
 		for (size_t i = 0; i < 32; i++) {
-			bool ok = ufbx_triangulate_face(tris, i, mesh, face);
+			bool ok = ufbx_triangulate_face(tris, i, mesh, face) != 0;
 			ufbxt_assert(ok == (i >= num_tris * 3));
 		}
 
 		ufbxt_assert(ufbx_triangulate_face(tris, ufbxt_arraycount(tris), mesh, face));
 	}
+}
+#endif
+
+#if UFBXT_IMPL
+
+static void ufbxt_ngon_write_obj(const char *path, ufbx_mesh *mesh, const uint32_t *indices, size_t num_triangles)
+{
+	FILE *f = fopen(path, "w");
+
+	for (size_t i = 0; i < mesh->num_vertices; i++) {
+		ufbx_vec3 v = mesh->vertices[i];
+		fprintf(f, "v %f %f %f\n", v.x, v.y, v.z);
+	}
+
+	fprintf(f, "\n");
+	for (size_t i = 0; i < num_triangles; i++) {
+		const uint32_t *tri = indices + i * 3;
+		fprintf(f, "f %u %u %u\n",
+			mesh->vertex_indices[tri[0]] + 1,
+			mesh->vertex_indices[tri[1]] + 1,
+			mesh->vertex_indices[tri[2]] + 1);
+	}
+
+	fclose(f);
+}
+
+static void ufbxt_check_ngon_triangulation(ufbx_mesh *mesh, uint32_t *indices)
+{
+}
+
+#endif
+
+UFBXT_FILE_TEST(blender_300_ngon_intersection)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Plane");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 1);
+
+	uint32_t indices[3*3];
+	size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, mesh->faces[0]);
+	ufbxt_assert(num_tris == 3);
+}
+#endif
+
+UFBXT_FILE_TEST(blender_300_ngon_e)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Plane");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 1);
+
+	uint32_t indices[10*3];
+	size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, mesh->faces[0]);
+	ufbxt_assert(num_tris == 10);
+}
+#endif
+
+UFBXT_FILE_TEST(blender_300_ngon_abstract)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Plane");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 1);
+
+	uint32_t indices[144*3];
+	size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, mesh->faces[0]);
+	ufbxt_assert(num_tris == 144);
+}
+#endif
+
+UFBXT_FILE_TEST(blender_300_ngon_big)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Plane");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 1);
+
+	uint32_t expected_tris = 8028;
+	uint32_t *indices = malloc(expected_tris * 3 * sizeof(uint32_t));
+	ufbxt_assert(indices);
+
+	size_t num_tris = ufbx_triangulate_face(indices, expected_tris * 3, mesh, mesh->faces[0]);
+	ufbxt_assert(num_tris == expected_tris);
+
+	free(indices);
 }
 #endif

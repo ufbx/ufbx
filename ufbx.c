@@ -9,6 +9,7 @@
 #define UFBXI_MAX_NODE_DEPTH 64
 #define UFBXI_MAX_SKIP_SIZE 0x40000000
 #define UFBXI_MAP_MAX_SCAN 32
+#define UFBXI_KD_FAST_DEPTH 6
 
 #ifndef UFBXI_MAX_NURBS_ORDER
 #define UFBXI_MAX_NURBS_ORDER 128
@@ -229,6 +230,9 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 
 	#undef UFBXI_MAP_MAX_SCAN
 	#define UFBXI_MAP_MAX_SCAN 2
+
+	#undef UFBXI_KD_FAST_DEPTH
+	#define UFBXI_KD_FAST_DEPTH 2
 #endif
 
 // -- Utility
@@ -249,6 +253,8 @@ static ufbxi_forceinline uint64_t ufbxi_min64(uint64_t a, uint64_t b) { return a
 static ufbxi_forceinline uint64_t ufbxi_max64(uint64_t a, uint64_t b) { return a < b ? b : a; }
 static ufbxi_forceinline size_t ufbxi_min_sz(size_t a, size_t b) { return a < b ? a : b; }
 static ufbxi_forceinline size_t ufbxi_max_sz(size_t a, size_t b) { return a < b ? b : a; }
+static ufbxi_forceinline ufbx_real ufbxi_min_real(ufbx_real a, ufbx_real b) { return a < b ? a : b; }
+static ufbxi_forceinline ufbx_real ufbxi_max_real(ufbx_real a, ufbx_real b) { return a < b ? b : a; }
 
 // Stable sort array `m_type m_data[m_size]` using the predicate `m_cmp_lambda(a, b)`
 // `m_linear_size` is a hint for how large blocks handle initially do with insertion sort
@@ -14887,6 +14893,397 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 
 // -- Topology
 
+typedef struct {
+	ufbx_real split;
+	uint32_t index;
+	uint32_t slow_left;
+	uint32_t slow_right;
+	uint32_t slow_end;
+} ufbxi_kd_node;
+
+typedef struct {
+	const ufbx_mesh *mesh;
+	ufbx_face face;
+	ufbx_vertex_vec3 positions;
+	ufbx_vec3 axes[3];
+	ufbxi_kd_node kd_nodes[1 << (UFBXI_KD_FAST_DEPTH + 1)];
+	uint32_t *kd_indices;
+} ufbxi_ngon_context;
+
+typedef struct {
+	ufbx_real min_t[2];
+	ufbx_real max_t[2];
+	ufbx_vec2 points[3];
+	uint32_t indices[3];
+} ufbxi_kd_triangle;
+
+ufbxi_forceinline static ufbx_vec2 ufbxi_ngon_project(ufbxi_ngon_context *nc, ufbx_vec3 point)
+{
+	ufbx_vec2 p;
+	p.x = ufbxi_dot3(nc->axes[0], point);
+	p.y = ufbxi_dot3(nc->axes[1], point);
+	return p;
+}
+
+ufbxi_forceinline static ufbx_real ufbxi_orient2d(ufbx_vec2 a, ufbx_vec2 b, ufbx_vec2 c)
+{
+	return (b.x - a.x)*(c.y - a.y) - (b.y - a.y)*(c.x - a.x);
+}
+
+ufbxi_forceinline static bool ufbxi_kd_check_point(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t index, ufbx_vec3 point)
+{
+	if (index == tri->indices[0] || index == tri->indices[1] || index == tri->indices[2]) return false;
+	ufbx_vec2 p = ufbxi_ngon_project(nc, point);
+
+	ufbx_real u = ufbxi_orient2d(p, tri->points[0], tri->points[1]);
+	ufbx_real v = ufbxi_orient2d(p, tri->points[1], tri->points[2]);
+	ufbx_real w = ufbxi_orient2d(p, tri->points[2], tri->points[0]);
+
+	if (u < 0.0f && v < 0.0f && w < 0.0f) return true;
+	if (u > 0.0f && v > 0.0f && w > 0.0f) return true;
+	return false;
+}
+
+ufbxi_noinline static bool ufbxi_kd_check_slow(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t begin, uint32_t count, uint32_t axis)
+{
+	ufbx_vertex_vec3 pos = nc->mesh->vertex_position;
+	uint32_t *kd_indices = nc->kd_indices;
+
+	while (count > 0) {
+		uint32_t num_left = count / 2;
+		uint32_t begin_right = begin + num_left + 1;
+		uint32_t num_right = count - (num_left + 1);
+
+		uint32_t index = kd_indices[begin + num_left];
+		ufbx_vec3 point = pos.data[pos.indices[nc->face.index_begin + index]];
+		ufbx_real split = ufbxi_dot3(point, nc->axes[axis]);
+		bool hit_left = tri->min_t[axis] <= split;
+		bool hit_right = tri->max_t[axis] >= split;
+
+		if (hit_left && hit_right) {
+			if (ufbxi_kd_check_point(nc, tri, index, point)) {
+				return true;
+			}
+
+			if (ufbxi_kd_check_slow(nc, tri, begin_right, num_right, axis ^ 1)) {
+				return true;
+			}
+		}
+
+		axis ^= 1;
+		if (hit_left) {
+			count = num_left;
+		} else {
+			begin = begin_right;
+			count = num_right;
+		}
+	}
+
+	return false;
+}
+
+ufbxi_noinline static bool ufbxi_kd_check_fast(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t kd_index, uint32_t axis, uint32_t depth)
+{
+	ufbx_vertex_vec3 pos = nc->mesh->vertex_position;
+
+	for (;;) {
+		ufbxi_kd_node node = nc->kd_nodes[kd_index];
+		if (node.slow_end == 0) return false;
+
+		bool hit_left = tri->min_t[axis] <= node.split;
+		bool hit_right = tri->max_t[axis] >= node.split;
+
+		uint32_t side = hit_left ? 0 : 1;
+		uint32_t child_kd_index = kd_index * 2 + 1 + side;
+		if (hit_left && hit_right) {
+
+			// Check for the point on the split plane
+			ufbx_vec3 point = pos.data[pos.indices[nc->face.index_begin + node.index]];
+			if(ufbxi_kd_check_point(nc, tri, node.index, point)) {
+				return true;
+			}
+
+			// Recurse always to the right if we hit both sides
+			if (depth + 1 == UFBXI_KD_FAST_DEPTH) {
+				if (ufbxi_kd_check_slow(nc, tri, node.slow_right, node.slow_end - node.slow_right, axis ^ 1)) {
+					return true;
+				}
+			} else {
+				if (ufbxi_kd_check_fast(nc, tri, child_kd_index + 1, axis ^ 1, depth + 1)) {
+					return true;
+				}
+			}
+		}
+
+		depth++;
+		axis ^= 1;
+		kd_index = child_kd_index;
+
+		if (depth == UFBXI_KD_FAST_DEPTH) {
+			if (hit_left) {
+				return ufbxi_kd_check_slow(nc, tri, node.slow_left, node.slow_right - node.slow_left, axis);
+			} else {
+				return ufbxi_kd_check_slow(nc, tri, node.slow_right, node.slow_end - node.slow_right, axis);
+			}
+		}
+	}
+}
+
+ufbxi_noinline static void ufbxi_kd_build(ufbxi_ngon_context *nc, uint32_t *indices, uint32_t *tmp, uint32_t num, uint32_t axis, uint32_t fast_index, uint32_t depth)
+{
+	if (num == 0) return;
+
+	ufbx_vertex_vec3 pos = nc->mesh->vertex_position;
+	ufbx_vec3 axis_dir = nc->axes[axis];
+	ufbx_face face = nc->face;
+
+	// Sort the remaining indices based on the axis
+	ufbxi_macro_stable_sort(uint32_t, 16, indices, tmp, num,
+		( ufbxi_dot3(axis_dir, pos.data[pos.indices[face.index_begin + *a]])
+			< ufbxi_dot3(axis_dir, pos.data[pos.indices[face.index_begin + *b]]) ));
+
+	uint32_t num_left = num / 2;
+	uint32_t begin_right = num_left + 1;
+	uint32_t num_right = num - begin_right;
+	uint32_t dst_right = num_left + 1;
+	if (depth < UFBXI_KD_FAST_DEPTH) {
+		uint32_t skip_left = 1u << (UFBXI_KD_FAST_DEPTH - depth - 1);
+		dst_right = dst_right > skip_left ? dst_right - skip_left : 0;
+
+		uint32_t index = indices[num_left];
+		ufbxi_kd_node *kd = &nc->kd_nodes[fast_index];
+
+		kd->split = ufbxi_dot3(axis_dir, pos.data[pos.indices[face.index_begin + index]]);
+		kd->index = index;
+
+		if (depth + 1 == UFBXI_KD_FAST_DEPTH) {
+			kd->slow_left = (uint32_t)(indices - nc->kd_indices);
+			kd->slow_right = kd->slow_left + num_left;
+			kd->slow_end = kd->slow_right + num_right;
+		} else {
+			kd->slow_left = UINT32_MAX;
+			kd->slow_right = UINT32_MAX;
+			kd->slow_end = UINT32_MAX;
+		}
+	}
+
+	uint32_t child_fast = fast_index * 2 + 1;
+	ufbxi_kd_build(nc, indices, tmp, num_left, axis ^ 1, child_fast + 0, depth + 1);
+
+	if (dst_right != begin_right) {
+		memmove(indices + dst_right, indices + begin_right, num_right * sizeof(uint32_t));
+	}
+
+	ufbxi_kd_build(nc, indices + dst_right, tmp, num_right, axis ^ 1, child_fast + 1, depth + 1);
+}
+
+ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, uint32_t *indices, uint32_t num_indices)
+{
+	ufbx_face face = nc->face;
+
+	// Form an orthonormal basis to project the polygon into a 2D plane
+	ufbx_vec3 normal = ufbx_get_weighted_face_normal(&nc->mesh->vertex_position, face);
+	ufbx_real len = ufbxi_length3(normal);
+	if (len > 1e-20f) {
+		normal = ufbxi_mul3(normal, 1.0f / len);
+	} else {
+		normal.x = 1.0f;
+		normal.y = 0.0f;
+		normal.z = 0.0f;
+	}
+
+	ufbx_vec3 axis;
+	if (normal.x*normal.x < 0.5f) {
+		axis.x = 1.0f;
+		axis.y = 0.0f;
+		axis.z = 0.0f;
+	} else {
+		axis.x = 0.0f;
+		axis.y = 1.0f;
+		axis.z = 0.0f;
+	}
+	nc->axes[0] = ufbxi_normalize3(ufbxi_cross3(axis, normal));
+	nc->axes[1] = ufbxi_normalize3(ufbxi_cross3(normal, nc->axes[0]));
+	nc->axes[2] = normal;
+
+	uint32_t *kd_indices = indices;
+	nc->kd_indices = kd_indices;
+
+	uint32_t *kd_tmp = indices + face.num_indices;
+	ufbx_vertex_vec3 pos = nc->mesh->vertex_position;
+
+	// Collect all the reflex corners for intersection testing.
+	uint32_t num_kd_indices = 0;
+	{
+		ufbx_vec2 a = ufbxi_ngon_project(nc, pos.data[pos.indices[face.index_begin + face.num_indices - 1]]);
+		ufbx_vec2 b = ufbxi_ngon_project(nc, pos.data[pos.indices[face.index_begin + 0]]);
+		for (uint32_t i = 0; i < face.num_indices; i++) {
+			uint32_t next = i + 1 < face.num_indices ? i + 1 : 0;
+			ufbx_vec2 c = ufbxi_ngon_project(nc, pos.data[pos.indices[face.index_begin + next]]);
+
+			if (ufbxi_orient2d(a, b, c) < 0.0f) {
+				kd_indices[num_kd_indices++] = i;
+			}
+
+			a = b;
+			b = c;
+		}
+	}
+
+	// Build a KD-tree out of the collected reflex vertices.
+	uint32_t num_skip_indices = (1u << (UFBXI_KD_FAST_DEPTH + 1)) - 1;
+	uint32_t kd_slow_indices = num_kd_indices > num_skip_indices ? num_kd_indices - num_skip_indices : 0;
+	ufbx_assert(kd_slow_indices + face.num_indices * 2 <= num_indices);
+	ufbxi_kd_build(nc, kd_indices, kd_tmp, num_kd_indices, 0, 0, 0);
+
+	uint32_t *edges = indices + num_indices - face.num_indices * 2;
+
+	// Initialize `edges` to be a connectivity structure where:
+	//  `edges[2*i + 0]` is the prevous vertex of `i`
+	//  `edges[2*i + 1]` is the next vertex of `i`
+	// When clipped we mark indices with the high bit (0x80000000)
+	for (uint32_t i = 0; i < face.num_indices; i++) {
+		edges[i*2 + 0] = i > 0 ? i - 1 : face.num_indices - 1;
+		edges[i*2 + 1] = i + 1 < face.num_indices ? i + 1 : 0;
+	}
+
+	// Core of the ear clipping algorithm.
+	// Iterate through the polygon corners looking for potential ears satisfying:
+	//   - Angle must be less than 180deg
+	//   - The triangle formed by the two edges must be contained within the polygon
+	// As these properties change only locally between modifications we only need
+	// to iterate the polygon once if we move backwards one step every time we clip an ear.
+	uint32_t indices_left = face.num_indices;
+	{
+		ufbxi_kd_triangle tri;
+
+		uint32_t ix = 1;
+		ufbx_vec2 a = ufbxi_ngon_project(nc, pos.data[pos.indices[face.index_begin + 0]]);
+		ufbx_vec2 b = ufbxi_ngon_project(nc, pos.data[pos.indices[face.index_begin + 1]]);
+		ufbx_vec2 c = ufbxi_ngon_project(nc, pos.data[pos.indices[face.index_begin + 2]]);
+		bool prev_was_reflex = false;
+
+		uint32_t num_steps = 0;
+
+		while (indices_left > 3) {
+			uint32_t prev = edges[ix*2 + 0];
+			uint32_t next = edges[ix*2 + 1];
+			if (ufbxi_orient2d(a, b, c) > 0.0f) {
+
+				tri.points[0] = a;
+				tri.points[1] = b;
+				tri.points[2] = c;
+				tri.indices[0] = prev;
+				tri.indices[1] = ix;
+				tri.indices[2] = next;
+				tri.min_t[0] = ufbxi_min_real(ufbxi_min_real(a.x, b.x), c.x);
+				tri.min_t[1] = ufbxi_min_real(ufbxi_min_real(a.y, b.y), c.y);
+				tri.max_t[0] = ufbxi_max_real(ufbxi_max_real(a.x, b.x), c.x);
+				tri.max_t[1] = ufbxi_max_real(ufbxi_max_real(a.y, b.y), c.y);
+
+				// If there is no reflex angle contained within the triangle formed
+				// by `{ a, b, c }` connect the vertices `a - c` (prev, next) directly.
+				if (!ufbxi_kd_check_fast(nc, &tri, 0, 0, 0)) {
+
+					// Mark as clipped
+					edges[ix*2 + 0] |= 0x80000000;
+					edges[ix*2 + 1] |= 0x80000000;
+
+					edges[next*2 + 0] = prev;
+					edges[prev*2 + 1] = next;
+
+					indices_left -= 1;
+
+					// Move backwards only if the previous was reflex as now it would
+					// cover a superset of the previous area, failing the intersection test.
+					if (prev_was_reflex) {
+						prev_was_reflex = false;
+						ix = prev;
+						b = a;
+						uint32_t prev_prev = edges[prev*2 + 0];
+						a = ufbxi_ngon_project(nc, pos.data[pos.indices[face.index_begin + prev_prev]]);
+					} else {
+						ix = next;
+						b = c;
+						uint32_t next_next = edges[next*2 + 1];
+						c = ufbxi_ngon_project(nc, pos.data[pos.indices[face.index_begin + next_next]]);
+					}
+					continue;
+				}
+
+				prev_was_reflex = false;
+			} else {
+				prev_was_reflex = true;
+			}
+
+			// Continue forward
+			ix = next;
+			a = b;
+			b = c;
+			next = edges[next*2 + 1];
+			c = ufbxi_ngon_project(nc, pos.data[pos.indices[face.index_begin + next]]);
+			num_steps++;
+
+			// If we have walked around the entire polygon it is irregular and
+			// ear cutting won't find any more triangles.
+			if (num_steps >= face.num_indices*2) break;
+		}
+
+		// Fallback: Cut non-ears until the polygon is completed.
+		// TODO: Could do something better here..
+		while (indices_left > 3) {
+			uint32_t prev = edges[ix*2 + 0];
+			uint32_t next = edges[ix*2 + 1];
+
+			// Mark as clipped
+			edges[ix*2 + 0] |= 0x80000000;
+			edges[ix*2 + 1] |= 0x80000000;
+
+			edges[prev*2 + 1] = next;
+			edges[next*2 + 0] = prev;
+
+			indices_left -= 1;
+			ix = next;
+		}
+
+		// Now we have a single triangle left at `ix`.
+		edges[ix*2 + 0] |= 0x80000000;
+		edges[ix*2 + 1] |= 0x80000000;
+	}
+
+	// Expand the adjacency information `edges` into proper triangles.
+	// Care needs to be taken here as both refer to the same memory area:
+	// The last 4 triangles may overlap in source and destination so we write
+	// them to a stack buffer and copy them over in the end.
+	uint32_t max_triangles = face.num_indices - 2;
+	uint32_t num_triangles = 0, num_last_triangles = 0;
+	uint32_t last_triangles[4*3];
+
+	uint32_t index_begin = face.index_begin;
+	for (uint32_t ix = 0; ix < face.num_indices; ix++) {
+		uint32_t prev = edges[ix*2 + 0];
+		uint32_t next = edges[ix*2 + 1];
+		if (!(prev & 0x80000000)) continue;
+
+		uint32_t *dst = indices + num_triangles * 3;
+		if (num_triangles + 4 >= max_triangles) {
+			dst = last_triangles + num_last_triangles * 3;
+			num_last_triangles++;
+		}
+
+		dst[0] = index_begin + (prev & 0x7fffffff);
+		dst[1] = index_begin + ix;
+		dst[2] = index_begin + (next & 0x7fffffff);
+		num_triangles++;
+	}
+
+	// Copy over the last triangles
+	ufbx_assert(num_triangles == max_triangles);
+	memcpy(indices + (max_triangles - num_last_triangles) * 3, last_triangles, num_last_triangles * 3 * sizeof(uint32_t));
+
+	return num_triangles;
+}
+
 static int ufbxi_cmp_topo_index_prev_next(const void *va, const void *vb)
 {
 	const ufbx_topo_edge *a = (const ufbx_topo_edge*)va, *b = (const ufbx_topo_edge*)vb;
@@ -17268,7 +17665,7 @@ ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, cons
 	}
 }
 
-size_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face)
+uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face)
 {
 	if (face.num_indices < 3 || num_indices < ((size_t)face.num_indices - 2) * 3) return 0;
 
@@ -17326,15 +17723,20 @@ size_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_m
 
 		return 2;
 	} else {
-		// N-Gon: TODO something reasonable
-		uint32_t *dst = indices;
-		for (uint32_t i = 1; i + 2 <= face.num_indices; i++) {
-			dst[0] = face.index_begin;
-			dst[1] = face.index_begin + i;
-			dst[2] = face.index_begin + i + 1;
-			dst += 3;
+		ufbxi_ngon_context nc = { 0 };
+		nc.mesh = mesh;
+		nc.face = face;
+
+		uint32_t num_indices_u32 = num_indices < UINT32_MAX ? (uint32_t)num_indices : UINT32_MAX;
+
+		uint32_t local_indices[12];
+		if (num_indices_u32 < 12) {
+			uint32_t num_tris = ufbxi_triangulate_ngon(&nc, local_indices, 12);
+			memcpy(indices, local_indices, num_tris * 3 * sizeof(uint32_t));
+			return num_tris;
+		} else {
+			return ufbxi_triangulate_ngon(&nc, indices, num_indices_u32);
 		}
-		return (dst - indices) / 3;
 	}
 }
 
@@ -17373,19 +17775,15 @@ ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_
 		ufbx_vec3 d = ufbx_get_vertex_vec3(positions, face.index_begin + 3);
 		return ufbxi_cross3(ufbxi_sub3(c, a), ufbxi_sub3(d, b));
 	} else {
-		// Assumes that the N-gon is convex!
-		ufbx_vec3 mid = ufbx_zero_vec3;
-		for (size_t i = 0; i < face.num_indices; i++) {
-			mid = ufbxi_add3(mid, ufbx_get_vertex_vec3(positions, face.index_begin + i));
-		}
-		mid = ufbxi_mul3(mid, 1.0f / (ufbx_real)face.num_indices);
-
+		// Newell's Method
 		ufbx_vec3 result = ufbx_zero_vec3;
 		for (size_t i = 0; i < face.num_indices; i++) {
+			size_t next = i + 1 < face.num_indices ? i + 1 : 0;
 			ufbx_vec3 a = ufbx_get_vertex_vec3(positions, face.index_begin + i);
-			ufbx_vec3 b = ufbx_get_vertex_vec3(positions, face.index_begin + (i+1)%face.num_indices);
-			ufbx_vec3 n = ufbxi_cross3(ufbxi_sub3(mid, a), ufbxi_sub3(mid, b));
-			result = ufbxi_add3(result, n);
+			ufbx_vec3 b = ufbx_get_vertex_vec3(positions, face.index_begin + next);
+			result.x += (a.y - b.y) * (a.z + b.z);
+			result.y += (a.z - b.z) * (a.x + b.x);
+			result.z += (a.x - b.x) * (a.y + b.y);
 		}
 		return result;
 	}
