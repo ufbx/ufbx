@@ -724,6 +724,14 @@ static void ufbxt_assert_close_vec4(ufbxt_diff_error *p_err, ufbx_vec4 a, ufbx_v
 	ufbxt_assert_close_real(p_err, a.w, b.w);
 }
 
+static void ufbxt_assert_close_quat(ufbxt_diff_error *p_err, ufbx_quat a, ufbx_quat b)
+{
+	ufbxt_assert_close_real(p_err, a.x, b.x);
+	ufbxt_assert_close_real(p_err, a.y, b.y);
+	ufbxt_assert_close_real(p_err, a.z, b.z);
+	ufbxt_assert_close_real(p_err, a.w, b.w);
+}
+
 typedef struct {
 	ufbx_vec3 pos;
 	ufbx_vec3 normal;
