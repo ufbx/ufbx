@@ -448,3 +448,46 @@ UFBXT_FILE_TEST(maya_nurbs_low_sphere)
 {
 }
 #endif
+
+UFBXT_FILE_TEST_ALT(nurbs_alloc_fail, maya_nurbs_surface_plane)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "nurbsPlane1");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_NURBS_SURFACE);
+	ufbx_nurbs_surface *surface = (ufbx_nurbs_surface*)node->attrib;
+
+	for (size_t max_temp = 1; max_temp < 10000; max_temp++) {
+		ufbx_tessellate_opts opts = { 0 };
+		opts.temp_allocator.huge_threshold = 1;
+		opts.temp_allocator.allocation_limit = max_temp;
+
+		ufbxt_hintf("Temp limit: %zu", max_temp);
+
+		ufbx_error error;
+		ufbx_mesh *tess_mesh = ufbx_tessellate_nurbs_surface(surface, &opts, &error);
+		if (tess_mesh) {
+			ufbxt_logf(".. Tested up to %zu temporary allocations", max_temp);
+			ufbx_free_mesh(tess_mesh);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+
+	for (size_t max_result = 1; max_result < 10000; max_result++) {
+		ufbx_tessellate_opts opts = { 0 };
+		opts.result_allocator.huge_threshold = 1;
+		opts.result_allocator.allocation_limit = max_result;
+
+		ufbxt_hintf("Result limit: %zu", max_result);
+
+		ufbx_error error;
+		ufbx_mesh *tess_mesh = ufbx_tessellate_nurbs_surface(surface, &opts, &error);
+		if (tess_mesh) {
+			ufbxt_logf(".. Tested up to %zu result allocations", max_result);
+			ufbx_free_mesh(tess_mesh);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+}
+#endif
