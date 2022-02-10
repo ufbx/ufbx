@@ -6484,6 +6484,12 @@ ufbxi_nodiscard static int ufbxi_read_definitions(ufbxi_context *uc)
 			if (tmpl->sub_type.length > 3 && !strncmp(tmpl->sub_type.data, "Fbx", 3)) {
 				tmpl->sub_type.data += 3;
 				tmpl->sub_type.length -= 3;
+
+				// HACK: LOD groups use LODGroup for Template, LodGroup for Object?
+				if (tmpl->sub_type.length == 8 && !memcmp(tmpl->sub_type.data, "LODGroup", 8)) {
+					tmpl->sub_type.data = "LodGroup";
+				}
+
 				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &tmpl->sub_type));
 			}
 
@@ -6504,8 +6510,8 @@ ufbxi_nodiscard static ufbx_props *ufbxi_find_template(ufbxi_context *uc, const 
 	ufbxi_for(ufbxi_template, tmpl, uc->templates, uc->num_templates) {
 		if (tmpl->type == name) {
 
-			// Check that sub_type matches unless the type is Material, Model, AnimationStack, AnimationLayer
-			// those match to all sub-types.
+			// Check that sub_type matches unless the type is Material, Model, AnimationStack, AnimationLayer.
+			// Those match to all sub-types.
 			if (tmpl->type != ufbxi_Material && tmpl->type != ufbxi_Model
 				&& tmpl->type != ufbxi_AnimationStack && tmpl->type != ufbxi_AnimationLayer) {
 				if (tmpl->sub_type.data != sub_type) {
@@ -8356,7 +8362,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			} else if (sub_type == ufbxi_CameraSwitcher) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_CAMERA_SWITCHER));
 			} else if (sub_type == ufbxi_LodGroup) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_LOD_GROUP));
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_lod_group), UFBX_ELEMENT_LOD_GROUP));
 			} else {
 				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
 			}
@@ -10644,6 +10650,56 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_nurbs_basis(ufbxi_conte
 	return 1;
 }
 
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_lod_group(ufbxi_context *uc, ufbx_lod_group *lod)
+{
+	size_t num_levels = 0;
+	for (size_t i = 0; i < lod->instances.count; i++) {
+		num_levels = ufbxi_max_sz(num_levels, lod->instances.data[0]->children.count);
+	}
+
+	char prop_name[64];
+	for (size_t i = 0; ; i++) {
+		int len = snprintf(prop_name, sizeof(prop_name), "Thresholds|Level%zu", i);
+		ufbx_prop *prop = ufbx_find_prop_len(&lod->props, prop_name, (size_t)len);
+		if (!prop) break;
+		num_levels = ufbxi_max_sz(num_levels, i + 1);
+	}
+
+	ufbx_lod_level *levels = ufbxi_push_zero(&uc->result, ufbx_lod_level, num_levels);
+	ufbxi_check(levels);
+
+	lod->relative_distances = ufbx_find_bool(&lod->props, "ThresholdsUsedAsPercentage", false);
+	lod->ignore_parent_transform = !ufbx_find_bool(&lod->props, "WorldSpace", true);
+
+	lod->use_distance_limit = ufbx_find_bool(&lod->props, "MinMaxDistance", false);
+	lod->distance_limit_min = ufbx_find_real(&lod->props, "MinDistance", (ufbx_real)-100.0);
+	lod->distance_limit_max = ufbx_find_real(&lod->props, "MaxDistance", (ufbx_real)100.0);
+
+	lod->lod_levels.data = levels;
+	lod->lod_levels.count = num_levels;
+
+	for (size_t i = 0; i < num_levels; i++) {
+		ufbx_lod_level *level = &levels[i];
+
+		if (i > 0) {
+			int len = snprintf(prop_name, sizeof(prop_name), "Thresholds|Level%zu", i - 1);
+			level->distance = ufbx_find_real_len(&lod->props, prop_name, (size_t)len, 0.0f);
+		} else if (lod->relative_distances) {
+			level->distance = (ufbx_real)100.0;
+		}
+
+		{
+			int len = snprintf(prop_name, sizeof(prop_name), "DisplayLevels|Level%zu", i);
+			int64_t display = ufbx_find_int_len(&lod->props, prop_name, (size_t)len, 0);
+			if (display >= 0 && display <= 2) {
+				level->display = (ufbx_lod_display)display;
+			}
+		}
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	size_t num_elements = uc->num_elements;
@@ -11539,6 +11595,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		}
 	}
 
+	ufbxi_for_ptr_list(ufbx_lod_group, p_lod, uc->scene.lod_groups) {
+		ufbxi_check(ufbxi_finalize_lod_group(uc, *p_lod));
+	}
 
 	uc->scene.metadata.ktime_to_sec = uc->ktime_to_sec;
 
@@ -16488,6 +16547,16 @@ int64_t ufbx_find_int_len(const ufbx_props *props, const char *name, size_t name
 	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
 	if (prop) {
 		return prop->value_int;
+	} else {
+		return def;
+	}
+}
+
+bool ufbx_find_bool_len(const ufbx_props *props, const char *name, size_t name_len, bool def)
+{
+	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
+	if (prop) {
+		return prop->value_int != 0;
 	} else {
 		return def;
 	}

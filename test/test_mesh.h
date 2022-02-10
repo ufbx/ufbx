@@ -523,3 +523,59 @@ UFBXT_FILE_TEST(synthetic_indexed_by_vertex)
 
 }
 #endif
+
+UFBXT_FILE_TEST(maya_lod_group)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "LOD_Group_1");
+		ufbxt_assert(node);
+		ufbxt_assert(node->attrib_type == UFBX_ELEMENT_LOD_GROUP);
+		ufbx_lod_group *lod_group = (ufbx_lod_group*)node->attrib;
+		ufbxt_assert(lod_group->element.type == UFBX_ELEMENT_LOD_GROUP);
+
+		ufbxt_assert(node->children.count == 3);
+		ufbxt_assert(lod_group->lod_levels.count == 3);
+
+		ufbxt_assert(lod_group->relative_distances);
+		ufbxt_assert(!lod_group->use_distance_limit);
+		ufbxt_assert(!lod_group->ignore_parent_transform);
+
+		ufbxt_assert(lod_group->lod_levels.data[0].display == UFBX_LOD_DISPLAY_USE_LOD);
+		ufbxt_assert(lod_group->lod_levels.data[1].display == UFBX_LOD_DISPLAY_USE_LOD);
+		ufbxt_assert(lod_group->lod_levels.data[2].display == UFBX_LOD_DISPLAY_USE_LOD);
+
+		if (scene->metadata.version >= 7000) {
+			ufbxt_assert_close_real(err, lod_group->lod_levels.data[0].distance, 100.0f);
+			ufbxt_assert_close_real(err, lod_group->lod_levels.data[1].distance, 64.0f);
+			ufbxt_assert_close_real(err, lod_group->lod_levels.data[2].distance, 32.0f);
+		}
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "LOD_Group_2");
+		ufbxt_assert(node);
+		ufbxt_assert(node->attrib_type == UFBX_ELEMENT_LOD_GROUP);
+		ufbx_lod_group *lod_group = (ufbx_lod_group*)node->attrib;
+		ufbxt_assert(lod_group->element.type == UFBX_ELEMENT_LOD_GROUP);
+
+		ufbxt_assert(node->children.count == 3);
+		ufbxt_assert(lod_group->lod_levels.count == 3);
+
+		ufbxt_assert(!lod_group->relative_distances);
+		ufbxt_assert(!lod_group->use_distance_limit);
+		ufbxt_assert(lod_group->ignore_parent_transform);
+
+		ufbxt_assert(lod_group->lod_levels.data[0].display == UFBX_LOD_DISPLAY_USE_LOD);
+		ufbxt_assert(lod_group->lod_levels.data[1].display == UFBX_LOD_DISPLAY_SHOW);
+		ufbxt_assert(lod_group->lod_levels.data[2].display == UFBX_LOD_DISPLAY_HIDE);
+
+		if (scene->metadata.version >= 7000) {
+			ufbxt_assert_close_real(err, lod_group->lod_levels.data[0].distance, 0.0f);
+			ufbxt_assert_close_real(err, lod_group->lod_levels.data[1].distance, 4.520276f);
+			ufbxt_assert_close_real(err, lod_group->lod_levels.data[2].distance, 18.081102f);
+		}
+	}
+}
+#endif
+

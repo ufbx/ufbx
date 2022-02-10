@@ -1189,6 +1189,33 @@ struct ufbx_camera_switcher {
 	}; };
 };
 
+// LOD level display mode.
+typedef enum ufbx_lod_display {
+	UFBX_LOD_DISPLAY_USE_LOD, // < Display the LOD level if the distance is appropriate.
+	UFBX_LOD_DISPLAY_SHOW,    // < Always display the LOD level.
+	UFBX_LOD_DISPLAY_HIDE,    // < Never display the LOD level.
+} ufbx_lod_display;
+
+// Single LOD level within an LOD group.
+// Specifies properties of the Nth child of the _node_ containing the LOD group.
+typedef struct ufbx_lod_level {
+
+	// Minimum distance to show this LOD level.
+	// NOTE: In world units by default, or in screen percentage if
+	// `ufbx_lod_group.relative_thresholds` is set.
+	ufbx_real distance;
+
+	// LOD display mode.
+	// NOTE: Mostly for editing, you should probably ignore this
+	// unless making a modeling program.
+	ufbx_lod_display display;
+
+} ufbx_lod_level;
+
+UFBX_LIST_TYPE(ufbx_lod_level_list, ufbx_lod_level);
+
+// Group of LOD (Level of Detail) levels for an object.
+// The actual LOD models are defined in the parent `ufbx_node.children`.
 struct ufbx_lod_group {
 	union { ufbx_element element; struct {
 		ufbx_string name;
@@ -1197,6 +1224,21 @@ struct ufbx_lod_group {
 		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
+
+	// If set to `true`, `ufbx_lod_level.distance` represents a screen size percentage.
+	bool relative_distances;
+
+	// LOD levels matching in order to `ufbx_node.children`.
+	ufbx_lod_level_list lod_levels;
+
+	// If set to `true` don't account for parent transform when computing the distance.
+	bool ignore_parent_transform;
+
+	// If `use_distance_limit` is enabled hide the group if the distance is not between
+	// `distance_limit_min` and `distance_limit_max`.
+	bool use_distance_limit;
+	ufbx_real distance_limit_min;
+	ufbx_real distance_limit_max;
 };
 
 // -- Deformers
@@ -2216,8 +2258,13 @@ typedef struct ufbx_application {
 
 // Miscellaneous data related to the loaded file
 typedef struct ufbx_metadata {
+
+	// FBX ASCII file format.
 	bool ascii;
+
+	// FBX version in integer format, eg. 7400 for 7.4.
 	uint32_t version;
+
 	ufbx_string creator;
 	bool big_endian;
 
@@ -2824,6 +2871,8 @@ ufbx_vec3 ufbx_find_vec3_len(const ufbx_props *props, const char *name, size_t n
 ufbx_inline ufbx_vec3 ufbx_find_vec3(const ufbx_props *props, const char *name, ufbx_vec3 def) { return ufbx_find_vec3_len(props, name, strlen(name), def); }
 int64_t ufbx_find_int_len(const ufbx_props *props, const char *name, size_t name_len, int64_t def);
 ufbx_inline int64_t ufbx_find_int(const ufbx_props *props, const char *name, int64_t def) { return ufbx_find_int_len(props, name, strlen(name), def); }
+bool ufbx_find_bool_len(const ufbx_props *props, const char *name, size_t name_len, bool def);
+ufbx_inline bool ufbx_find_bool(const ufbx_props *props, const char *name, bool def) { return ufbx_find_bool_len(props, name, strlen(name), def); }
 ufbx_string ufbx_find_string_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_string def);
 ufbx_inline ufbx_string ufbx_find_string(const ufbx_props *props, const char *name, ufbx_string def) { return ufbx_find_string_len(props, name, strlen(name), def); }
 
