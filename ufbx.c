@@ -8279,7 +8279,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_c
 	} else if (sub_type == ufbxi_CameraSwitcher) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_CAMERA_SWITCHER));
 	} else if (sub_type == ufbxi_LodGroup) {
-		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_LOD_GROUP));
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_lod_group), UFBX_ELEMENT_LOD_GROUP));
 	} else {
 		ufbx_string sub_type_str = { sub_type, strlen(sub_type) };
 		ufbxi_check(ufbxi_read_unknown(uc, node, &attrib_info, type_str, sub_type_str, super_type));
