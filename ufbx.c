@@ -8275,7 +8275,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_c
 	} else if (sub_type == ufbxi_Boundary) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_nurbs_trim_boundary), UFBX_ELEMENT_NURBS_TRIM_BOUNDARY));
 	} else if (sub_type == ufbxi_CameraStereo) {
-		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera_stereo), UFBX_ELEMENT_CAMERA_STEREO));
+		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_stereo_camera), UFBX_ELEMENT_STEREO_CAMERA));
 	} else if (sub_type == ufbxi_CameraSwitcher) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_CAMERA_SWITCHER));
 	} else if (sub_type == ufbxi_LodGroup) {
@@ -8352,7 +8352,7 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 			} else if (sub_type == ufbxi_Null || sub_type == ufbxi_Marker) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_empty), UFBX_ELEMENT_EMPTY));
 			} else if (sub_type == ufbxi_CameraStereo) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera_stereo), UFBX_ELEMENT_CAMERA_STEREO));
+				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_stereo_camera), UFBX_ELEMENT_STEREO_CAMERA));
 			} else if (sub_type == ufbxi_CameraSwitcher) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_CAMERA_SWITCHER));
 			} else if (sub_type == ufbxi_LodGroup) {
@@ -11088,8 +11088,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		}
 	}
 
-	ufbxi_for_ptr_list(ufbx_camera_stereo, p_stereo, uc->scene.camera_stereos) {
-		ufbx_camera_stereo *stereo = *p_stereo;
+	ufbxi_for_ptr_list(ufbx_stereo_camera, p_stereo, uc->scene.stereo_cameras) {
+		ufbx_stereo_camera *stereo = *p_stereo;
 		stereo->left = (ufbx_camera*)ufbxi_fetch_dst_element(&stereo->element, search_node, ufbxi_LeftCamera, UFBX_ELEMENT_CAMERA);
 		stereo->right = (ufbx_camera*)ufbxi_fetch_dst_element(&stereo->element, search_node, ufbxi_RightCamera, UFBX_ELEMENT_CAMERA);
 	}
@@ -14141,8 +14141,8 @@ ufbxi_nodiscard static int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &mesh->all_deformers));
 	}
 
-	ufbxi_for_ptr_list(ufbx_camera_stereo, p_stereo, ec->scene.camera_stereos) {
-		ufbx_camera_stereo *stereo = *p_stereo;
+	ufbxi_for_ptr_list(ufbx_stereo_camera, p_stereo, ec->scene.stereo_cameras) {
+		ufbx_stereo_camera *stereo = *p_stereo;
 		stereo->left = (ufbx_camera*)ufbxi_translate_element(ec, stereo->left);
 		stereo->right = (ufbx_camera*)ufbxi_translate_element(ec, stereo->right);
 	}
@@ -16268,7 +16268,7 @@ const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES] = {
 	sizeof(ufbx_nurbs_trim_surface),
 	sizeof(ufbx_nurbs_trim_boundary),
 	sizeof(ufbx_procedural_geometry),
-	sizeof(ufbx_camera_stereo),
+	sizeof(ufbx_stereo_camera),
 	sizeof(ufbx_camera_switcher),
 	sizeof(ufbx_lod_group),
 	sizeof(ufbx_skin_deformer),

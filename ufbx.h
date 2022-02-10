@@ -276,7 +276,7 @@ typedef struct ufbx_nurbs_trim_boundary ufbx_nurbs_trim_boundary;
 
 // Node attributes (advanced)
 typedef struct ufbx_procedural_geometry ufbx_procedural_geometry;
-typedef struct ufbx_camera_stereo ufbx_camera_stereo;
+typedef struct ufbx_stereo_camera ufbx_stereo_camera;
 typedef struct ufbx_camera_switcher ufbx_camera_switcher;
 typedef struct ufbx_lod_group ufbx_lod_group;
 
@@ -329,7 +329,7 @@ UFBX_LIST_TYPE(ufbx_nurbs_surface_list, ufbx_nurbs_surface*);
 UFBX_LIST_TYPE(ufbx_nurbs_trim_surface_list, ufbx_nurbs_trim_surface*);
 UFBX_LIST_TYPE(ufbx_nurbs_trim_boundary_list, ufbx_nurbs_trim_boundary*);
 UFBX_LIST_TYPE(ufbx_procedural_geometry_list, ufbx_procedural_geometry*);
-UFBX_LIST_TYPE(ufbx_camera_stereo_list, ufbx_camera_stereo*);
+UFBX_LIST_TYPE(ufbx_stereo_camera_list, ufbx_stereo_camera*);
 UFBX_LIST_TYPE(ufbx_camera_switcher_list, ufbx_camera_switcher*);
 UFBX_LIST_TYPE(ufbx_lod_group_list, ufbx_lod_group*);
 UFBX_LIST_TYPE(ufbx_skin_deformer_list, ufbx_skin_deformer*);
@@ -370,7 +370,7 @@ typedef enum ufbx_element_type {
 	UFBX_ELEMENT_NURBS_TRIM_SURFACE,  // < `ufbx_nurbs_trim_surface`
 	UFBX_ELEMENT_NURBS_TRIM_BOUNDARY, // < `ufbx_nurbs_trim_boundary`
 	UFBX_ELEMENT_PROCEDURAL_GEOMETRY, // < `ufbx_procedural_geometry`
-	UFBX_ELEMENT_CAMERA_STEREO,       // < `ufbx_camera_stereo`
+	UFBX_ELEMENT_STEREO_CAMERA,       // < `ufbx_stereo_camera`
 	UFBX_ELEMENT_CAMERA_SWITCHER,     // < `ufbx_camera_switcher`
 	UFBX_ELEMENT_LOD_GROUP,           // < `ufbx_lod_group`
 	UFBX_ELEMENT_SKIN_DEFORMER,       // < `ufbx_skin_deformer`
@@ -1166,7 +1166,7 @@ struct ufbx_procedural_geometry {
 	}; };
 };
 
-struct ufbx_camera_stereo {
+struct ufbx_stereo_camera {
 	union { ufbx_element element; struct {
 		ufbx_string name;
 		ufbx_props props;
@@ -2355,7 +2355,7 @@ struct ufbx_scene {
 
 			// Node attributes (advanced)
 			ufbx_procedural_geometry_list procedural_geometries;
-			ufbx_camera_stereo_list camera_stereos;
+			ufbx_stereo_camera_list stereo_cameras;
 			ufbx_camera_switcher_list camera_switchers;
 			ufbx_lod_group_list lod_groups;
 
