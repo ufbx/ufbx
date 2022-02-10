@@ -83,6 +83,49 @@ UFBXT_FILE_TEST(blender_293_suzanne_subsurf)
 }
 #endif
 
+UFBXT_FILE_TEST_ALT(subsurf_alloc_fail, maya_subsurf_cube)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	for (size_t max_temp = 1; max_temp < 10000; max_temp++) {
+		ufbx_subdivide_opts opts = { 0 };
+		opts.temp_allocator.huge_threshold = 1;
+		opts.temp_allocator.allocation_limit = max_temp;
+
+		ufbxt_hintf("Temp limit: %zu", max_temp);
+
+		ufbx_error error;
+		ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 2, &opts, &error);
+		if (sub_mesh) {
+			ufbxt_logf(".. Tested up to %zu temporary allocations", max_temp);
+			ufbx_free_mesh(sub_mesh);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+
+	for (size_t max_result = 1; max_result < 10000; max_result++) {
+		ufbx_subdivide_opts opts = { 0 };
+		opts.result_allocator.huge_threshold = 1;
+		opts.result_allocator.allocation_limit = max_result;
+
+		ufbxt_hintf("Result limit: %zu", max_result);
+
+		ufbx_error error;
+		ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 2, &opts, &error);
+		if (sub_mesh) {
+			ufbxt_logf(".. Tested up to %zu result allocations", max_result);
+			ufbx_free_mesh(sub_mesh);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+}
+#endif
+
 UFBXT_FILE_TEST(blender_293_suzanne_subsurf_uv)
 #if UFBXT_IMPL
 {
@@ -226,3 +269,4 @@ UFBXT_FILE_TEST(blender_293_half_smooth_cube)
 
 }
 #endif
+

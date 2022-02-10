@@ -2468,7 +2468,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			ufbxt_diff_error err = { 0 };
 
-			if (scene && obj_file) {
+			if (scene && obj_file && !alternative) {
 				ufbxt_diff_to_obj(scene, obj_file, &err, false);
 			}
 

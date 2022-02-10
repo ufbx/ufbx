@@ -16105,9 +16105,9 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 
 	ufbxi_buf_free(&sc.tmp);
 	ufbxi_buf_free(&sc.source);
-	ufbxi_free_ator(&sc.ator_tmp);
 
 	if (ok) {
+		ufbxi_free_ator(&sc.ator_tmp);
 		if (p_error) {
 			p_error->type = UFBX_ERROR_NONE;
 			p_error->description = NULL;
@@ -16118,6 +16118,7 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 		ufbxi_fix_error_type(&sc.error, "Failed to subdivide");
 		if (p_error) *p_error = sc.error;
 		ufbxi_buf_free(&sc.result);
+		ufbxi_free_ator(&sc.ator_tmp);
 		ufbxi_free_ator(&sc.ator_result);
 		return NULL;
 	}
