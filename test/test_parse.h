@@ -287,3 +287,33 @@ UFBXT_FILE_TEST_ALLOW_ERROR(synthetic_node_depth)
 {
 }
 #endif
+
+UFBXT_TEST(open_file)
+#if UFBXT_IMPL
+{
+	const char *name = "maya_cube_7500_ascii.fbx";
+
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s", data_root, name);
+
+	for (size_t i = 0; i < 2; i++) {
+		ufbx_stream stream = { 0 };
+		bool ok = ufbx_open_file(NULL, &stream, buf, i == 0 ? SIZE_MAX : strlen(buf));
+		ufbxt_assert(ok);
+		ufbxt_assert(stream.skip_fn);
+		ufbxt_assert(stream.read_fn);
+		ufbxt_assert(stream.close_fn);
+
+		ufbxt_assert(stream.skip_fn(stream.user, 2));
+
+		char result[3];
+		size_t num_read = stream.read_fn(stream.user, result, 3);
+		ufbxt_assert(num_read == 3);
+
+		ufbxt_assert(!memcmp(result, "FBX", 3));
+
+		stream.close_fn(stream.user);
+	}
+
+}
+#endif

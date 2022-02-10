@@ -3428,23 +3428,6 @@ static void ufbxi_file_close(void *user)
 	fclose(file);
 }
 
-static bool ufbxi_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len)
-{
-	(void)user;
-
-	ufbxi_allocator tmp_ator = { 0 };
-	ufbx_error tmp_error = { UFBX_ERROR_NONE };
-	ufbxi_init_ator(&tmp_error, &tmp_ator, NULL);
-	FILE *f = ufbxi_fopen(path, path_len, &tmp_ator);
-	if (!f) return false;
-
-	stream->read_fn = &ufbxi_file_read;
-	stream->skip_fn = &ufbxi_file_skip;
-	stream->close_fn = &ufbxi_file_close;
-	stream->user = f;
-	return true;
-}
-
 // -- XML
 
 typedef struct ufbxi_xml_tag ufbxi_xml_tag;
@@ -13046,7 +13029,7 @@ static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_str
 	cc->channel_name.data = ufbxi_empty_char;
 
 	if (!cc->open_file_fn) {
-		cc->open_file_fn = ufbxi_open_file;
+		cc->open_file_fn = ufbx_open_file;
 	}
 
 	// Make sure the filename we pass to `open_file_fn()` is NULL-terminated
@@ -13581,7 +13564,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	}
 
 	if (!uc->opts.open_file_fn) {
-		uc->opts.open_file_fn = &ufbxi_open_file;
+		uc->opts.open_file_fn = &ufbx_open_file;
 	}
 
 	uc->string_pool.error = &uc->error;
@@ -16313,6 +16296,23 @@ const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES] = {
 	sizeof(ufbx_metadata_object),
 };
 
+bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len)
+{
+	(void)user;
+
+	ufbxi_allocator tmp_ator = { 0 };
+	ufbx_error tmp_error = { UFBX_ERROR_NONE };
+	ufbxi_init_ator(&tmp_error, &tmp_ator, NULL);
+	FILE *f = ufbxi_fopen(path, path_len, &tmp_ator);
+	if (!f) return false;
+
+	stream->read_fn = &ufbxi_file_read;
+	stream->skip_fn = &ufbxi_file_skip;
+	stream->close_fn = &ufbxi_file_close;
+	stream->user = f;
+	return true;
+}
+
 ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)
 {
 	ufbxi_context uc = { UFBX_ERROR_NONE };
@@ -17933,7 +17933,7 @@ ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *fram
 	}
 
 	if (!opts.open_file_fn) {
-		opts.open_file_fn = ufbxi_open_file;
+		opts.open_file_fn = ufbx_open_file;
 	}
 
 	bool use_double = false;

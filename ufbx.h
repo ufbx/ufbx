@@ -2863,6 +2863,11 @@ ufbx_matrix ufbx_get_compatible_matrix_for_normals(ufbx_node *node);
 // but the rest can be uninitialized.
 ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);
 
+// Open a `ufbx_stream` from a file.
+// Use `path_len == SIZE_MAX` for NULL terminated string.
+// NOTE: `user` is not used, it exists only for compatability to `ufbx_open_file_fn`
+bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len);
+
 // Animation evaluation
 
 // Evaluate a single animation `curve` at a `time`.
