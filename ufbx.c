@@ -11972,7 +11972,7 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 	case UFBX_GATE_FIT_FILL:
 	case UFBX_GATE_FIT_OVERSCAN:
 		camera->aperture_size_inch = camera->film_size_inch;
-		ufbx_assert(0 && "Unreachable, set to vertical/horizontal above"); break;
+		ufbx_assert(0 && "Unreachable, set to vertical/horizontal above");
 		break;
 	case UFBX_GATE_FIT_STRETCH:
 		camera->aperture_size_inch = camera->film_size_inch;
