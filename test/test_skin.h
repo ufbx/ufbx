@@ -252,7 +252,7 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 			for (size_t chan_ix = 0; chan_ix < 2; chan_ix++) {
 				ufbx_real ref = (ufbx_real)frame[1 + chan_ix];
 
-				ufbx_blend_channel *chan = state->blend_channels.data[top[chan_ix]->id];
+				ufbx_blend_channel *chan = state->blend_channels.data[top[chan_ix]->typed_id];
 				ufbxt_assert(chan);
 
 				ufbx_prop prop = ufbx_evaluate_prop(&scene->anim, &chan->element, "DeformPercent", time);
@@ -263,8 +263,8 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 			}
 
 			if (eval_skin) {
-				ufbx_blend_deformer *eval_deformer = state->blend_deformers.data[deformer->id];
-				ufbx_mesh *eval_mesh = state->meshes.data[mesh->id];
+				ufbx_blend_deformer *eval_deformer = state->blend_deformers.data[deformer->typed_id];
+				ufbx_mesh *eval_mesh = state->meshes.data[mesh->typed_id];
 				for (size_t i = 0; i < 8; i++) {
 					ufbx_vec3 original_pos = eval_mesh->vertex_position.data[i];
 					ufbx_vec3 skinned_pos = eval_mesh->skinned_position.data[i];

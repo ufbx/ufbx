@@ -201,7 +201,7 @@ typedef struct viewer {
 
 void read_node(viewer_node *vnode, ufbx_node *node)
 {
-	vnode->parent_index = node->parent ? node->parent->id : -1;
+	vnode->parent_index = node->parent ? node->parent->typed_id : -1;
 	vnode->node_to_parent = ufbx_to_um_mat(node->node_to_parent);
 	vnode->geometry_to_node = ufbx_to_um_mat(node->geometry_to_node);
 }
@@ -293,7 +293,7 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 	vmesh->num_instances = mesh->instances.count;
 	vmesh->instance_node_indices = alloc(int32_t, mesh->instances.count);
 	for (size_t i = 0; i < mesh->instances.count; i++) {
-		vmesh->instance_node_indices[i] = (int32_t)mesh->instances.data[i]->id;
+		vmesh->instance_node_indices[i] = (int32_t)mesh->instances.data[i]->typed_id;
 	}
 
 	// Create the vertex buffers
@@ -314,7 +314,7 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 		for (size_t ci = 0; ci < skin->clusters.count; ci++) {
 			ufbx_skin_cluster *cluster = skin->clusters.data[ci];
 			if (num_bones < MAX_BONES) {
-				vmesh->bone_indices[num_bones] = (int32_t)cluster->bone_node->id;
+				vmesh->bone_indices[num_bones] = (int32_t)cluster->bone_node->typed_id;
 				vmesh->bone_matrices[num_bones] = ufbx_to_um_mat(cluster->geometry_to_bone);
 				num_bones++;
 			}
@@ -371,7 +371,7 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 			if (chan->keyframes.count == 0) continue;
 			if (num_blend_shapes < MAX_BLEND_SHAPES) {
 				blend_channels[num_blend_shapes] = chan;
-				vmesh->blend_channel_indices[num_blend_shapes] = (int32_t)chan->id;
+				vmesh->blend_channel_indices[num_blend_shapes] = (int32_t)chan->typed_id;
 				num_blend_shapes++;
 			}
 		}
@@ -448,7 +448,7 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 		// `ufbx_mesh_material` even if there are no materials, so it might be `NULL` here.
 		part->num_indices = num_indices;
 		if (mesh_mat->material) {
-			part->material_index = (int32_t)mesh_mat->material->id;
+			part->material_index = (int32_t)mesh_mat->material->typed_id;
 		} else {
 			part->material_index = -1;
 		}

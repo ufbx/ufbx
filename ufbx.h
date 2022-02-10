@@ -438,7 +438,7 @@ struct ufbx_unknown {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	// FBX format specific type information.
@@ -469,7 +469,7 @@ struct ufbx_node {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	// Node hierarchy
@@ -731,7 +731,7 @@ struct ufbx_mesh {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 
@@ -854,7 +854,7 @@ struct ufbx_light {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 
@@ -947,7 +947,7 @@ struct ufbx_camera {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 
@@ -983,7 +983,7 @@ struct ufbx_bone {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 
@@ -1003,7 +1003,7 @@ struct ufbx_empty {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 };
@@ -1069,7 +1069,7 @@ struct ufbx_line_curve {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 
@@ -1086,7 +1086,7 @@ struct ufbx_nurbs_curve {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 
@@ -1104,7 +1104,7 @@ struct ufbx_nurbs_surface {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 
@@ -1139,7 +1139,7 @@ struct ufbx_nurbs_trim_surface {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 };
@@ -1149,7 +1149,7 @@ struct ufbx_nurbs_trim_boundary {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 };
@@ -1161,7 +1161,7 @@ struct ufbx_procedural_geometry {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 };
@@ -1171,7 +1171,7 @@ struct ufbx_stereo_camera {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 
@@ -1184,7 +1184,7 @@ struct ufbx_camera_switcher {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 };
@@ -1194,7 +1194,7 @@ struct ufbx_lod_group {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 		ufbx_node_list instances;
 	}; };
 };
@@ -1248,7 +1248,7 @@ struct ufbx_skin_deformer {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	ufbx_skinning_method skinning_method;
@@ -1276,7 +1276,7 @@ struct ufbx_skin_cluster {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	// The bone node the cluster is attached to
@@ -1314,7 +1314,7 @@ struct ufbx_blend_deformer {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	ufbx_blend_channel_list channels;
@@ -1340,7 +1340,7 @@ struct ufbx_blend_channel {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	// Current weight of the channel
@@ -1357,7 +1357,7 @@ struct ufbx_blend_shape {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	// Vertex offsets to apply over the base mesh
@@ -1431,7 +1431,7 @@ struct ufbx_cache_deformer {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	ufbx_string channel;
@@ -1447,7 +1447,7 @@ struct ufbx_cache_file {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	ufbx_string filename;
@@ -1677,7 +1677,7 @@ struct ufbx_material {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	// FBX builtin properties
@@ -1773,7 +1773,7 @@ struct ufbx_texture {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	// Texture type (file / layered / procedural)
@@ -1813,7 +1813,7 @@ struct ufbx_video {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	// Paths to the resource
@@ -1833,7 +1833,7 @@ struct ufbx_shader {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	// Known shading model
@@ -1860,7 +1860,7 @@ struct ufbx_shader_binding {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	ufbx_shader_prop_binding_list prop_bindings; // < Sorted by `shader_prop`
@@ -1910,7 +1910,7 @@ struct ufbx_anim_stack {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	double time_begin;
@@ -1934,7 +1934,7 @@ struct ufbx_anim_layer {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	ufbx_real weight;
@@ -2002,7 +2002,7 @@ struct ufbx_anim_curve {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	ufbx_keyframe_list keyframes;
@@ -2016,7 +2016,7 @@ struct ufbx_display_layer {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	// Nodes included in the layer (exclusively at most one layer per node)
@@ -2035,7 +2035,7 @@ struct ufbx_selection_set {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	// Included nodes and geomtery features
@@ -2048,7 +2048,7 @@ struct ufbx_selection_node {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	// Selection targets, possibly `NULL`
@@ -2069,7 +2069,7 @@ struct ufbx_character {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 };
 
@@ -2115,7 +2115,7 @@ struct ufbx_constraint {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	// Type of constraint to use
@@ -2166,7 +2166,7 @@ struct ufbx_pose {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 
 	bool bind_pose;
@@ -2178,7 +2178,7 @@ struct ufbx_metadata_object {
 		ufbx_string name;
 		ufbx_props props;
 		uint32_t element_id;
-		uint32_t id;
+		uint32_t typed_id;
 	}; };
 };
 
