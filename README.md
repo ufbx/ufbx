@@ -1,6 +1,6 @@
-# ufbx [![Build Status](https://travis-ci.org/bqqbarbhg/ufbx.svg?branch=master)](https://travis-ci.org/bqqbarbhg/ufbx) [![codecov](https://codecov.io/gh/bqqbarbhg/ufbx/branch/master/graph/badge.svg)](https://codecov.io/gh/bqqbarbhg/ufbx)
+# ufbx [![CI](https://github.com/bqqbarbhg/ufbx/actions/workflows/ci.yml/badge.svg)](https://github.com/bqqbarbhg/ufbx/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/bqqbarbhg/ufbx/branch/master/graph/badge.svg)](https://codecov.io/gh/bqqbarbhg/ufbx)
 
-Single source file FBX reader. Supports both ASCII and binary files starting from version 6100.
+Single source file FBX reader.
 
 ## Usage
 
@@ -13,21 +13,21 @@ if (!scene) { do_fail(&error); exit(1); }
 // Use and inspect `scene`, it's just plain data!
 
 // Geometry is always stored in a consistent indexed format:
-ufbx_mesh *cube = ufbx_find_mesh(scene, "Cube");
-for (size_t face_ix = 0; face_ix < cube->num_faces; face_ix++) {
-    ufbx_face face = cube->faces[face_ix];
+ufbx_node *cube = ufbx_find_node(scene, "Cube");
+ufbx_mesh *mesh = cube->mesh;
+for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
+    ufbx_face face = mesh->faces[face_ix];
     for (size_t vertex_ix = 0; vertex_ix < face.num_indices; vertex_ix++) {
         size_t index = face.index_begin + vertex_ix;
-        ufbx_vec3 position = cube->vertex_position.data[cube->vertex_position.indices[index]];
-        ufbx_vec3 normal = ufbx_get_vertex_vec3(&cube->vertex_normal, index); // Equivalent utility function
+        ufbx_vec3 position = mesh->vertex_position.data[mesh->vertex_position.indices[index]];
+        ufbx_vec3 normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, index); // Equivalent utility function
         push_vertex(&position, &normal);
     }
 }
 
 // There's also helper functions for evaluating animations:
-ufbx_anim_stack *anim = ufbx_find_anim_stack(scene, "Animation");
 for (double time = 0.0; time <= 1.0; time += 1.0/60.0) {
-    ufbx_transform transform = ufbx_evaluate_transform(scene, cube, anim, time);
+    ufbx_transform transform = ufbx_evaluate_transform(&scene->anim, cube, time);
     ufbx_matrix matrix = ufbx_get_transform_matrix(&transform);
     push_pose(&matrix);
 }
@@ -38,10 +38,9 @@ ufbx_free_scene(scene);
 
 ## WIP
 
-This library is still a work in progress, but most of the implemented features are quite
-usable as the library is heavily tested and fuzzed.
-
-The API might change in the future, especially materials and evaluating animations.
+The library is nearing first proper version so most of the API should be relatively
+stable now for `1.0`. The header file contains some documentation but proper guide
+is still on the way.
 
 ## License
 

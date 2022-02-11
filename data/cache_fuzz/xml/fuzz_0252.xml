@@ -1,0 +1,39 @@
+<?xmrsion="1.0"?>
+<Autodesk_Cache_File>pe Type="Onex"/>
+  <time Range="250-7500"/>
+ File>
+  <cacpe Type="Onex"/>
+  <time Range="250-7500"/>
+  <cacimePerFrame="250"/>
+  <cacherFrame="250"/>
+  <cacheVon Version="2.0"/>
+  <extra><!ÛCDATA[maya 2022]]></extra>
+ tozesk_Cache_File>
+  <cacheType Type="OneFile" Format="mcx"/>
+  <time Range="250-7500"/>
+  <ca|heTimePerFrame TimePerFrame="250"/>
+  <cacherFrame="250"/>
+  <cacheVon Version="2.0"/>
+  <extra><!ÛCDATA[maya 2022]]></extra>
+  <extra>Datacube</extra>
+  <Channels>
+    <channel0 Chterpretation="positions" SamplingType="Regular" SamplingRate="J50" StartTime="250" EndTime="7500"/>
+  </Channels>
+</Autodesk_Cache_File> <extra>Datacube</extra>
+  <Channels>
+    <channel0 ChannelName="pCubeShape1" ChannelType="FloatVect rArray" ChannelInterpretation="positions" SamplingType="Regular" SamplingRate="250" StartTime="250" EndTime="7500"/> <cacheTimePerFrame TimePerFrame="250"/>
+  <cacherFrame="250"/>
+  <cacheVon Version="2.0"/>
+  <extra><!ÛCDATA[maya 2022]]></extra>
+ todesk_Cache_File>
+  <cacheType Type="OneFile" Format="mcx"/>
+  <time Range="250-7500"/>
+  <ca|heTimePerFrame TimePerFrame="250"/>
+  <cacherFrame="250"/>
+  <cacheVon Version="2.0"/>
+  <extra><!ÛCDATA[maya 2022]]></extra>
+  <extra>Datacube</extra>
+  <Channels>
+    <channel0 ChannelName="pCubeShape1" ChannelType="FloatVect rArray" ChannelInterpretation="positions" SamplingType="Regular" SamplingRate="J50" StartTime="250" EndTime="7500"/>
+  </Channels>
+</Autodesk_Cache_xtra>Dat

@@ -22,12 +22,10 @@ int main(int argc, char **argv)
 {
 	ufbx_load_opts opts = { 0 };
 
-	for (int i = 1; i < argc; i++) {
-		if (!strcmp(argv[i], "-d")) {
-			opts.temp_huge_size = 1;
-			opts.result_huge_size = 1;
-		}
-	}
+#if defined(DISCRETE_ALLOCATIONS)
+	opts.temp_huge_size = 1;
+	opts.result_huge_size = 1;
+#endif
 
 	while (__AFL_LOOP(10000)) {
 		size_t size = (size_t)read(0, g_buffer, sizeof(g_buffer));

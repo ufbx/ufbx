@@ -1,0 +1,3811 @@
+; FBX 7.5.0 project file
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 7500
+	CreationTimeStamp:  {
+		Version: 1000
+		Year: 2021
+		Month: 9
+		Day: 11
+		Hour: 1
+		Minute: 10
+		Second: 48
+		Millisecond: 992
+	}
+	Creator: "FBX SDK/FBX Plugins version 2020.1"
+	SceneInfo: "SceneInfo::GlobalInfo", "UserData" {
+		Type: "UserData"
+		Version: 100
+		MetaData:  {
+			Version: 100
+			Title: ""
+			Subject: ""
+			Author: ""
+			Keywords: ""
+			Revision: ""
+			Comment: ""
+		}
+		Properties70:  {
+			P: "DocumentUrl", "KString", "Url", "", "D:\Dev\clean\ufbx\data\maya_skeleton_7500_ascii.fbx"
+			P: "SrcDocumentUrl", "KString", "Url", "", "D:\Dev\clean\ufbx\data\maya_skeleton_7500_ascii.fbx"
+			P: "Original", "Compound", "", ""
+			P: "Original|ApplicationVendor", "KString", "", "", "Autodesk"
+			P: "Original|ApplicationName", "KString", "", "", "Maya"
+			P: "Original|ApplicationVersion", "KString", "", "", "2022"
+			P: "Original|DateTime_GMT", "DateTime", "", "", "10/09/2021 22:10:48.991"
+			P: "Original|FileName", "KString", "", "", "D:\Dev\clean\ufbx\data\maya_skeleton_7500_ascii.fbx"
+			P: "LastSaved", "Compound", "", ""
+			P: "LastSaved|ApplicationVendor", "KString", "", "", "Autodesk"
+			P: "LastSaved|ApplicationName", "KString", "", "", "Maya"
+			P: "LastSaved|ApplicationVersion", "KString", "", "", "2022"
+			P: "LastSaved|DateTime_GMT", "DateTime", "", "", "10/09/2021 22:10:48.991"
+			P: "Original|ApplicationActiveProject", "KString", "", "", "D:\Dev\clean\ufbx\data"
+		}
+	}
+}
+GlobalSettings:  {
+	Version: 1000
+	Properties70:  {
+		P: "UpAxis", "int", "Integer", "",1
+		P: "UpAxisSign", "int", "Integer", "",1
+		P: "FrontAxis", "int", "Integer", "",2
+		P: "FrontAxisSign", "int", "Integer", "",1
+		P: "CoordAxis", "int", "Integer", "",0
+		P: "CoordAxisSign", "int", "Integer", "",1
+		P: "OriginalUpAxis", "int", "Integer", "",1
+		P: "OriginalUpAxisSign", "int", "Integer", "",1
+		P: "UnitScaleFactor", "double", "Number", "",1
+		P: "OriginalUnitScaleFactor", "double", "Number", "",1
+		P: "AmbientColor", "ColorRGB", "Color", "",0,0,0
+		P: "DefaultCamera", "KString", "", "", "Producer Perspective"
+		P: "TimeMode", "enum", "", "",11
+		P: "TimeProtocol", "enum", "", "",2
+		P: "SnapOnFrameMode", "enum", "", "",0
+		P: "TimeSpanStart", "KTime", "Time", "",1924423250
+		P: "TimeSpanStop", "KTime", "Time", "",384884650000
+		P: "CustomFrameRate", "double", "Number", "",-1
+		P: "TimeMarker", "Compound", "", ""
+		P: "CurrentTimeMarker", "int", "Integer", "",-1
+	}
+}
+
+; Documents Description
+;------------------------------------------------------------------
+
+Documents:  {
+	Count: 1
+	Document: 2888737970400, "", "Scene" {
+		Properties70:  {
+			P: "SourceObject", "object", "", ""
+			P: "ActiveAnimStackName", "KString", "", "", "Take 001"
+		}
+		RootNode: 0
+	}
+}
+
+; Document References
+;------------------------------------------------------------------
+
+References:  {
+}
+
+; Object definitions
+;------------------------------------------------------------------
+
+Definitions:  {
+	Version: 100
+	Count: 130
+	ObjectType: "GlobalSettings" {
+		Count: 1
+	}
+	ObjectType: "AnimationStack" {
+		Count: 1
+		PropertyTemplate: "FbxAnimStack" {
+			Properties70:  {
+				P: "Description", "KString", "", "", ""
+				P: "LocalStart", "KTime", "Time", "",0
+				P: "LocalStop", "KTime", "Time", "",0
+				P: "ReferenceStart", "KTime", "Time", "",0
+				P: "ReferenceStop", "KTime", "Time", "",0
+			}
+		}
+	}
+	ObjectType: "AnimationLayer" {
+		Count: 1
+		PropertyTemplate: "FbxAnimLayer" {
+			Properties70:  {
+				P: "Weight", "Number", "", "A",100
+				P: "Mute", "bool", "", "",0
+				P: "Solo", "bool", "", "",0
+				P: "Lock", "bool", "", "",0
+				P: "Color", "ColorRGB", "Color", "",0.8,0.8,0.8
+				P: "BlendMode", "enum", "", "",0
+				P: "RotationAccumulationMode", "enum", "", "",0
+				P: "ScaleAccumulationMode", "enum", "", "",0
+				P: "BlendModeBypass", "ULongLong", "", "",0
+			}
+		}
+	}
+	ObjectType: "NodeAttribute" {
+		Count: 63
+		PropertyTemplate: "FbxNull" {
+			Properties70:  {
+				P: "Color", "ColorRGB", "Color", "",0.8,0.8,0.8
+				P: "Size", "double", "Number", "",100
+				P: "Look", "enum", "", "",1
+			}
+		}
+	}
+	ObjectType: "Model" {
+		Count: 63
+		PropertyTemplate: "FbxNode" {
+			Properties70:  {
+				P: "QuaternionInterpolate", "enum", "", "",0
+				P: "RotationOffset", "Vector3D", "Vector", "",0,0,0
+				P: "RotationPivot", "Vector3D", "Vector", "",0,0,0
+				P: "ScalingOffset", "Vector3D", "Vector", "",0,0,0
+				P: "ScalingPivot", "Vector3D", "Vector", "",0,0,0
+				P: "TranslationActive", "bool", "", "",0
+				P: "TranslationMin", "Vector3D", "Vector", "",0,0,0
+				P: "TranslationMax", "Vector3D", "Vector", "",0,0,0
+				P: "TranslationMinX", "bool", "", "",0
+				P: "TranslationMinY", "bool", "", "",0
+				P: "TranslationMinZ", "bool", "", "",0
+				P: "TranslationMaxX", "bool", "", "",0
+				P: "TranslationMaxY", "bool", "", "",0
+				P: "TranslationMaxZ", "bool", "", "",0
+				P: "RotationOrder", "enum", "", "",0
+				P: "RotationSpaceForLimitOnly", "bool", "", "",0
+				P: "RotationStiffnessX", "double", "Number", "",0
+				P: "RotationStiffnessY", "double", "Number", "",0
+				P: "RotationStiffnessZ", "double", "Number", "",0
+				P: "AxisLen", "double", "Number", "",10
+				P: "PreRotation", "Vector3D", "Vector", "",0,0,0
+				P: "PostRotation", "Vector3D", "Vector", "",0,0,0
+				P: "RotationActive", "bool", "", "",0
+				P: "RotationMin", "Vector3D", "Vector", "",0,0,0
+				P: "RotationMax", "Vector3D", "Vector", "",0,0,0
+				P: "RotationMinX", "bool", "", "",0
+				P: "RotationMinY", "bool", "", "",0
+				P: "RotationMinZ", "bool", "", "",0
+				P: "RotationMaxX", "bool", "", "",0
+				P: "RotationMaxY", "bool", "", "",0
+				P: "RotationMaxZ", "bool", "", "",0
+				P: "InheritType", "enum", "", "",0
+				P: "ScalingActive", "bool", "", "",0
+				P: "ScalingMin", "Vector3D", "Vector", "",0,0,0
+				P: "ScalingMax", "Vector3D", "Vector", "",1,1,1
+				P: "ScalingMinX", "bool", "", "",0
+				P: "ScalingMinY", "bool", "", "",0
+				P: "ScalingMinZ", "bool", "", "",0
+				P: "ScalingMaxX", "bool", "", "",0
+				P: "ScalingMaxY", "bool", "", "",0
+				P: "ScalingMaxZ", "bool", "", "",0
+				P: "GeometricTranslation", "Vector3D", "Vector", "",0,0,0
+				P: "GeometricRotation", "Vector3D", "Vector", "",0,0,0
+				P: "GeometricScaling", "Vector3D", "Vector", "",1,1,1
+				P: "MinDampRangeX", "double", "Number", "",0
+				P: "MinDampRangeY", "double", "Number", "",0
+				P: "MinDampRangeZ", "double", "Number", "",0
+				P: "MaxDampRangeX", "double", "Number", "",0
+				P: "MaxDampRangeY", "double", "Number", "",0
+				P: "MaxDampRangeZ", "double", "Number", "",0
+				P: "MinDampStrengthX", "double", "Number", "",0
+				P: "MinDampStrengthY", "double", "Number", "",0
+				P: "MinDampStrengthZ", "double", "Number", "",0
+				P: "MaxDampStrengthX", "double", "Number", "",0
+				P: "MaxDampStrengthY", "double", "Number", "",0
+				P: "MaxDampStrengthZ", "double", "Number", "",0
+				P: "PreferedAngleX", "double", "Number", "",0
+				P: "PreferedAngleY", "double", "Number", "",0
+				P: "PreferedAngleZ", "double", "Number", "",0
+				P: "LookAtProperty", "object", "", ""
+				P: "UpVectorProperty", "object", "", ""
+				P: "Show", "bool", "", "",1
+				P: "NegativePercentShapeSupport", "bool", "", "",1
+				P: "DefaultAttributeIndex", "int", "Integer", "",-1
+				P: "Freeze", "bool", "", "",0
+				P: "LODBox", "bool", "", "",0
+				P: "Lcl Translation", "Lcl Translation", "", "A",0,0,0
+				P: "Lcl Rotation", "Lcl Rotation", "", "A",0,0,0
+				P: "Lcl Scaling", "Lcl Scaling", "", "A",1,1,1
+				P: "Visibility", "Visibility", "", "A",1
+				P: "Visibility Inheritance", "Visibility Inheritance", "", "",1
+			}
+		}
+	}
+	ObjectType: "Character" {
+		Count: 1
+		PropertyTemplate: "FbxCharacter" {
+			Properties70:  {
+				P: "Active", "bool", "", "",1
+				P: "Lock", "bool", "", "",0
+				P: "Weight", "Weight", "", "A",100
+				P: "SourceObject", "object", "", ""
+				P: "DestinationObject", "object", "", ""
+				P: "Actor", "object", "", ""
+				P: "Character", "object", "", ""
+				P: "ControlSet", "object", "", ""
+				P: "PullIterationCount", "int", "Integer", "",10
+				P: "Posture", "enum", "", "",0
+				P: "ForceActorSpace", "bool", "", "",0
+				P: "ScaleCompensation", "Number", "", "A",100
+				P: "ScaleCompensationMode", "enum", "", "",1
+				P: "HipsHeightCompensation", "Number", "", "A",0
+				P: "HipsHeightCompensationMode", "enum", "", "",1
+				P: "AnkleHeightCompensation", "Number", "", "A",0
+				P: "AnkleHeightCompensationMode", "enum", "", "",1
+				P: "AnkleProximityCompensation", "Number", "", "A",0
+				P: "AnkleProximityCompensationMode", "enum", "", "",1
+				P: "MassCenterCompensation", "Number", "", "A",80
+				P: "ApplyLimits", "bool", "", "",0
+				P: "ChestReduction", "Number", "", "A",0
+				P: "CollarReduction", "Number", "", "A",0
+				P: "NeckReduction", "Number", "", "A",0
+				P: "HeadReduction", "Number", "", "A",0
+				P: "ReachActorLeftAnkle", "Number", "", "A",100
+				P: "ReachActorRightAnkle", "Number", "", "A",100
+				P: "ReachActorLeftKnee", "Number", "", "A",0
+				P: "ReachActorRightKnee", "Number", "", "A",0
+				P: "ReachActorChest", "Number", "", "A",0
+				P: "ReachActorHead", "Number", "", "A",0
+				P: "ReachActorLeftWrist", "Number", "", "A",0
+				P: "ReachActorRightWrist", "Number", "", "A",0
+				P: "ReachActorLeftElbow", "Number", "", "A",0
+				P: "ReachActorRightElbow", "Number", "", "A",0
+				P: "ReachActorLeftFingerBase", "Number", "", "A",0
+				P: "ReachActorRightFingerBase", "Number", "", "A",0
+				P: "ReachActorLeftToesBase", "Number", "", "A",0
+				P: "ReachActorRightToesBase", "Number", "", "A",0
+				P: "ReachActorLeftFingerBaseRotation", "Number", "", "A",0
+				P: "ReachActorRightFingerBaseRotation", "Number", "", "A",0
+				P: "ReachActorLeftToesBaseRotation", "Number", "", "A",0
+				P: "ReachActorRightToesBaseRotation", "Number", "", "A",0
+				P: "ReachActorLeftAnkleRotation", "Number", "", "A",100
+				P: "ReachActorRightAnkleRotation", "Number", "", "A",100
+				P: "ReachActorHeadRotation", "Number", "", "A",0
+				P: "ReachActorLeftWristRotation", "Number", "", "A",0
+				P: "ReachActorRightWristRotation", "Number", "", "A",0
+				P: "ReachActorChestRotation", "Number", "", "A",0
+				P: "ReachActorLowerChestRotation", "Number", "", "A",0
+				P: "HipsTOffset", "Vector", "", "A",0,0,0
+				P: "ChestTOffset", "Vector", "", "A",0,0,0
+				P: "LeftUpLegRoll", "Number", "", "A",0
+				P: "LeftUpLegRollMode", "bool", "", "",1
+				P: "LeftLegRoll", "Number", "", "A",60
+				P: "LeftLegRollMode", "bool", "", "",1
+				P: "RightUpLegRoll", "Number", "", "A",0
+				P: "RightUpLegRollMode", "bool", "", "",1
+				P: "RightLegRoll", "Number", "", "A",60
+				P: "RightLegRollMode", "bool", "", "",1
+				P: "LeftArmRoll", "Number", "", "A",0
+				P: "LeftArmRollMode", "bool", "", "",1
+				P: "LeftForeArmRoll", "Number", "", "A",0
+				P: "LeftForeArmRollMode", "bool", "", "",1
+				P: "RightArmRoll", "Number", "", "A",0
+				P: "RightArmRollMode", "bool", "", "",1
+				P: "RightForeArmRoll", "Number", "", "A",0
+				P: "RightForeArmRollMode", "bool", "", "",1
+				P: "LeftUpLegRollEx", "Number", "", "A",40
+				P: "LeftUpLegRollExMode", "bool", "", "",1
+				P: "LeftLegRollEx", "Number", "", "A",80
+				P: "LeftLegRollExMode", "bool", "", "",1
+				P: "RightUpLegRollEx", "Number", "", "A",40
+				P: "RightUpLegRollExMode", "bool", "", "",1
+				P: "RightLegRollEx", "Number", "", "A",80
+				P: "RightLegRollExMode", "bool", "", "",1
+				P: "LeftArmRollEx", "Number", "", "A",40
+				P: "LeftArmRollExMode", "bool", "", "",1
+				P: "LeftForeArmRollEx", "Number", "", "A",40
+				P: "LeftForeArmRollExMode", "bool", "", "",1
+				P: "RightArmRollEx", "Number", "", "A",40
+				P: "RightArmRollExMode", "bool", "", "",1
+				P: "RightForeArmRollEx", "Number", "", "A",40
+				P: "RightForeArmRollExMode", "bool", "", "",1
+				P: "LeafLeftUpLegRoll1", "Number", "", "A",50
+				P: "LeafLeftUpLegRoll1Mode", "bool", "", "",1
+				P: "LeafLeftLegRoll1", "Number", "", "A",50
+				P: "LeafLeftLegRoll1Mode", "bool", "", "",1
+				P: "LeafRightUpLegRoll1", "Number", "", "A",50
+				P: "LeafRightUpLegRoll1Mode", "bool", "", "",1
+				P: "LeafRightLegRoll1", "Number", "", "A",50
+				P: "LeafRightLegRoll1Mode", "bool", "", "",1
+				P: "LeafLeftArmRoll1", "Number", "", "A",50
+				P: "LeafLeftArmRoll1Mode", "bool", "", "",1
+				P: "LeafLeftForeArmRoll1", "Number", "", "A",50
+				P: "LeafLeftForeArmRoll1Mode", "bool", "", "",1
+				P: "LeafRightArmRoll1", "Number", "", "A",50
+				P: "LeafRightArmRoll1Mode", "bool", "", "",1
+				P: "LeafRightForeArmRoll1", "Number", "", "A",50
+				P: "LeafRightForeArmRoll1Mode", "bool", "", "",1
+				P: "LeafLeftUpLegRoll2", "Number", "", "A",50
+				P: "LeafLeftUpLegRoll2Mode", "bool", "", "",1
+				P: "LeafLeftLegRoll2", "Number", "", "A",50
+				P: "LeafLeftLegRoll2Mode", "bool", "", "",1
+				P: "LeafRightUpLegRoll2", "Number", "", "A",50
+				P: "LeafRightUpLegRoll2Mode", "bool", "", "",1
+				P: "LeafRightLegRoll2", "Number", "", "A",50
+				P: "LeafRightLegRoll2Mode", "bool", "", "",1
+				P: "LeafLeftArmRoll2", "Number", "", "A",50
+				P: "LeafLeftArmRoll2Mode", "bool", "", "",1
+				P: "LeafLeftForeArmRoll2", "Number", "", "A",50
+				P: "LeafLeftForeArmRoll2Mode", "bool", "", "",1
+				P: "LeafRightArmRoll2", "Number", "", "A",50
+				P: "LeafRightArmRoll2Mode", "bool", "", "",1
+				P: "LeafRightForeArmRoll2", "Number", "", "A",50
+				P: "LeafRightForeArmRoll2Mode", "bool", "", "",1
+				P: "LeafLeftUpLegRoll3", "Number", "", "A",50
+				P: "LeafLeftUpLegRoll3Mode", "bool", "", "",1
+				P: "LeafLeftLegRoll3", "Number", "", "A",50
+				P: "LeafLeftLegRoll3Mode", "bool", "", "",1
+				P: "LeafRightUpLegRoll3", "Number", "", "A",50
+				P: "LeafRightUpLegRoll3Mode", "bool", "", "",1
+				P: "LeafRightLegRoll3", "Number", "", "A",50
+				P: "LeafRightLegRoll3Mode", "bool", "", "",1
+				P: "LeafLeftArmRoll3", "Number", "", "A",50
+				P: "LeafLeftArmRoll3Mode", "bool", "", "",1
+				P: "LeafLeftForeArmRoll3", "Number", "", "A",50
+				P: "LeafLeftForeArmRoll3Mode", "bool", "", "",1
+				P: "LeafRightArmRoll3", "Number", "", "A",50
+				P: "LeafRightArmRoll3Mode", "bool", "", "",1
+				P: "LeafRightForeArmRoll3", "Number", "", "A",50
+				P: "LeafRightForeArmRoll3Mode", "bool", "", "",1
+				P: "LeafLeftUpLegRoll4", "Number", "", "A",50
+				P: "LeafLeftUpLegRoll4Mode", "bool", "", "",1
+				P: "LeafLeftLegRoll4", "Number", "", "A",50
+				P: "LeafLeftLegRoll4Mode", "bool", "", "",1
+				P: "LeafRightUpLegRoll4", "Number", "", "A",50
+				P: "LeafRightUpLegRoll4Mode", "bool", "", "",1
+				P: "LeafRightLegRoll4", "Number", "", "A",50
+				P: "LeafRightLegRoll4Mode", "bool", "", "",1
+				P: "LeafLeftArmRoll4", "Number", "", "A",50
+				P: "LeafLeftArmRoll4Mode", "bool", "", "",1
+				P: "LeafLeftForeArmRoll4", "Number", "", "A",50
+				P: "LeafLeftForeArmRoll4Mode", "bool", "", "",1
+				P: "LeafRightArmRoll4", "Number", "", "A",50
+				P: "LeafRightArmRoll4Mode", "bool", "", "",1
+				P: "LeafRightForeArmRoll4", "Number", "", "A",50
+				P: "LeafRightForeArmRoll4Mode", "bool", "", "",1
+				P: "LeafLeftUpLegRoll5", "Number", "", "A",50
+				P: "LeafLeftUpLegRoll5Mode", "bool", "", "",1
+				P: "LeafLeftLegRoll5", "Number", "", "A",50
+				P: "LeafLeftLegRoll5Mode", "bool", "", "",1
+				P: "LeafRightUpLegRoll5", "Number", "", "A",50
+				P: "LeafRightUpLegRoll5Mode", "bool", "", "",1
+				P: "LeafRightLegRoll5", "Number", "", "A",50
+				P: "LeafRightLegRoll5Mode", "bool", "", "",1
+				P: "LeafLeftArmRoll5", "Number", "", "A",50
+				P: "LeafLeftArmRoll5Mode", "bool", "", "",1
+				P: "LeafLeftForeArmRoll5", "Number", "", "A",50
+				P: "LeafLeftForeArmRoll5Mode", "bool", "", "",1
+				P: "LeafRightArmRoll5", "Number", "", "A",50
+				P: "LeafRightArmRoll5Mode", "bool", "", "",1
+				P: "LeafRightForeArmRoll5", "Number", "", "A",50
+				P: "LeafRightForeArmRoll5Mode", "bool", "", "",1
+				P: "LeftLegFullRollExtraction", "Number", "", "A",0
+				P: "RightLegFullRollExtraction", "Number", "", "A",0
+				P: "LeftArmFullRollExtraction", "Number", "", "A",0
+				P: "RightArmFullRollExtraction", "Number", "", "A",0
+				P: "RollExtractionMode", "enum", "", "",0
+				P: "FootFloorContact", "bool", "", "",0
+				P: "FootAutomaticToes", "bool", "", "",0
+				P: "FootFloorPivot", "enum", "", "",0
+				P: "FootBottomToAnkle", "double", "Number", "",0
+				P: "FootBackToAnkle", "double", "Number", "",4.5
+				P: "FootMiddleToAnkle", "double", "Number", "",13
+				P: "FootFrontToMiddle", "double", "Number", "",7
+				P: "FootInToAnkle", "double", "Number", "",5
+				P: "FootOutToAnkle", "double", "Number", "",5
+				P: "FootContactSize", "double", "Number", "",100
+				P: "FootContactStiffness", "Number", "", "A",0
+				P: "FootFingerContactRollStiffness", "Number", "", "A",0
+				P: "HandFloorContact", "bool", "", "",0
+				P: "HandAutomaticFingers", "bool", "", "",0
+				P: "HandFloorPivot", "enum", "", "",0
+				P: "HandBottomToWrist", "double", "Number", "",0
+				P: "HandBackToWrist", "double", "Number", "",4.5
+				P: "HandMiddleToWrist", "double", "Number", "",13
+				P: "HandFrontToMiddle", "double", "Number", "",7
+				P: "HandInToWrist", "double", "Number", "",5
+				P: "HandOutToWrist", "double", "Number", "",5
+				P: "HandContactSize", "double", "Number", "",100
+				P: "HandContactStiffness", "Number", "", "A",0
+				P: "HandFingerContactRollStiffness", "Number", "", "A",0
+				P: "CtrlPullLeftToeBase", "Number", "", "A",0
+				P: "CtrlPullLeftFoot", "Number", "", "A",0
+				P: "CtrlPullLeftKnee", "Number", "", "A",0
+				P: "CtrlPullRightToeBase", "Number", "", "A",0
+				P: "CtrlPullRightFoot", "Number", "", "A",0
+				P: "CtrlPullRightKnee", "Number", "", "A",0
+				P: "CtrlPullLeftFingerBase", "Number", "", "A",0
+				P: "CtrlPullLeftHand", "Number", "", "A",100
+				P: "CtrlPullLeftElbow", "Number", "", "A",0
+				P: "CtrlPullRightFingerBase", "Number", "", "A",0
+				P: "CtrlPullRightHand", "Number", "", "A",100
+				P: "CtrlPullRightElbow", "Number", "", "A",0
+				P: "CtrlChestPullLeftHand", "Number", "", "A",0
+				P: "CtrlChestPullRightHand", "Number", "", "A",0
+				P: "CtrlPullHead", "Number", "", "A",0
+				P: "CtrlResistHipsPosition", "Number", "", "A",0
+				P: "CtrlEnforceGravity", "Number", "", "A",60
+				P: "CtrlResistHipsOrientation", "Number", "", "A",0
+				P: "CtrlResistChestPosition", "Number", "", "A",0
+				P: "CtrlResistChestOrientation", "Number", "", "A",0
+				P: "CtrlResistLeftCollar", "Number", "", "A",50
+				P: "CtrlResistRightCollar", "Number", "", "A",50
+				P: "CtrlResistLeftKnee", "Number", "", "A",50
+				P: "CtrlResistMaximumExtensionLeftKnee", "Number", "", "A",50
+				P: "CtrlResistCompressionFactorLeftKnee", "Number", "", "A",50
+				P: "CtrlResistRightKnee", "Number", "", "A",50
+				P: "CtrlResistMaximumExtensionRightKnee", "Number", "", "A",50
+				P: "CtrlResistCompressionFactorRightKnee", "Number", "", "A",50
+				P: "CtrlResistLeftElbow", "Number", "", "A",50
+				P: "CtrlResistMaximumExtensionLeftElbow", "Number", "", "A",50
+				P: "CtrlResistCompressionFactorLeftElbow", "Number", "", "A",50
+				P: "CtrlResistRightElbow", "Number", "", "A",50
+				P: "CtrlResistMaximumExtensionRightElbow", "Number", "", "A",50
+				P: "CtrlResistCompressionFactorRightElbow", "Number", "", "A",50
+				P: "CtrlSpineStiffness", "Number", "", "A",0
+				P: "CtrlNeckStiffness", "Number", "", "A",0
+				P: "MirrorMode", "bool", "", "",0
+				P: "ShoulderCorrection", "Number", "", "A",0
+				P: "LeftKneeKillPitch", "bool", "", "",0
+				P: "RightKneeKillPitch", "bool", "", "",0
+				P: "LeftElbowKillPitch", "bool", "", "",0
+				P: "RightElbowKillPitch", "bool", "", "",0
+				P: "HipsTranslationMode", "enum", "", "",0
+				P: "WriteReference", "bool", "", "",0
+				P: "SyncMode", "bool", "", "H",0
+				P: "Damping", "Number", "", "A",0
+				P: "OrientationDamping", "Number", "", "A",0
+				P: "OrientationDampingMode", "enum", "", "",1
+				P: "DisplacementDamping", "Number", "", "A",0
+				P: "DisplacementDampingMode", "enum", "", "",1
+				P: "DisplacementMemory", "Number", "", "A",0
+				P: "DisplacementMemoryMode", "enum", "", "",0
+				P: "HipsDisplacementDamping", "Number", "", "A",0
+				P: "HipsDisplacementDampingMode", "enum", "", "",0
+				P: "AnkleDisplacementDamping", "Number", "", "A",0
+				P: "AnkleDisplacementDampingMode", "enum", "", "",0
+				P: "WristDisplacementDamping", "Number", "", "A",0
+				P: "WristDisplacementDampingMode", "enum", "", "",0
+				P: "Stabilization", "Number", "", "A",0
+				P: "AnkleStabilizationTime", "Number", "", "A",0
+				P: "AnkleStabilizationTimeMode", "enum", "", "",0
+				P: "AnkleStabilizationPerimeter", "Number", "", "A",0
+				P: "AnkleStabilizationPerimeterMode", "enum", "", "",0
+				P: "AnkleStabilizationAngularPerimeter", "Number", "", "A",0
+				P: "AnkleStabilizationAngularPerimeterMode", "enum", "", "",1
+				P: "AnkleStabilizationFloorProximity", "Number", "", "A",0
+				P: "AnkleStabilizationFloorProximityMode", "enum", "", "",1
+				P: "AnkleStabilizationDamping", "Number", "", "A",0
+				P: "AnkleStabilizationDampingMode", "enum", "", "",0
+				P: "AnkleStabilizationRecoveryTime", "Number", "", "A",0
+				P: "AnkleStabilizationRecoveryTimeMode", "enum", "", "",1
+				P: "LeftHandThumbTip", "double", "Number", "",0.5
+				P: "LeftHandIndexTip", "double", "Number", "",0.5
+				P: "LeftHandMiddleTip", "double", "Number", "",0.5
+				P: "LeftHandRingTip", "double", "Number", "",0.5
+				P: "LeftHandPinkyTip", "double", "Number", "",0.5
+				P: "LeftHandExtraFingerTip", "double", "Number", "",0.5
+				P: "RightHandThumbTip", "double", "Number", "",0.5
+				P: "RightHandIndexTip", "double", "Number", "",0.5
+				P: "RightHandMiddleTip", "double", "Number", "",0.5
+				P: "RightHandRingTip", "double", "Number", "",0.5
+				P: "RightHandPinkyTip", "double", "Number", "",0.5
+				P: "RightHandExtraFingerTip", "double", "Number", "",0.5
+				P: "LeftFootThumbTip", "double", "Number", "",0.5
+				P: "LeftFootIndexTip", "double", "Number", "",0.5
+				P: "LeftFootMiddleTip", "double", "Number", "",0.5
+				P: "LeftFootRingTip", "double", "Number", "",0.5
+				P: "LeftFootPinkyTip", "double", "Number", "",0.5
+				P: "LeftFootExtraFingerTip", "double", "Number", "",0.5
+				P: "RightFootThumbTip", "double", "Number", "",0.5
+				P: "RightFootIndexTip", "double", "Number", "",0.5
+				P: "RightFootMiddleTip", "double", "Number", "",0.5
+				P: "RightFootRingTip", "double", "Number", "",0.5
+				P: "RightFootPinkyTip", "double", "Number", "",0.5
+				P: "RightFootExtraFingerTip", "double", "Number", "",0.5
+				P: "FingerSolving", "bool", "", "",1
+				P: "FootFingerContact", "bool", "", "",0
+				P: "FootContactType", "enum", "", "",0
+				P: "FootFingerContactMode", "enum", "", "",1
+				P: "HandFingerContact", "bool", "", "",0
+				P: "HandContactType", "enum", "", "",0
+				P: "HandFingerContactMode", "enum", "", "",1
+				P: "ContactBehaviour", "enum", "", "",0
+				P: "HikVersion", "double", "Number", "",1
+				P: "Characterize", "bool", "", "",1
+				P: "RealisticShoulder", "Number", "", "A",0
+				P: "CollarStiffnessX", "Number", "", "A",0
+				P: "CollarStiffnessY", "Number", "", "A",0
+				P: "CollarStiffnessZ", "Number", "", "A",0
+				P: "ExtraCollarRatio", "Number", "", "A",50
+				P: "LeftLegMaxExtensionAngle", "Number", "", "A",180
+				P: "RightLegMaxExtensionAngle", "Number", "", "A",180
+				P: "LeftArmMaxExtensionAngle", "Number", "", "A",180
+				P: "RightArmMaxExtensionAngle", "Number", "", "A",180
+				P: "StretchStartArmsAndLegs", "Number", "", "A",90
+				P: "StretchStopArmsAndLegs", "Number", "", "A",110
+				P: "SnSScaleArmsAndLegs", "Number", "", "A",0
+				P: "SnSReachLeftWrist", "Number", "", "A",0
+				P: "SnSReachRightWrist", "Number", "", "A",0
+				P: "SnSReachLeftAnkle", "Number", "", "A",0
+				P: "SnSReachRightAnkle", "Number", "", "A",0
+				P: "SnSScaleSpine", "Number", "", "A",0
+				P: "SnSScaleSpineChildren", "Number", "", "A",0
+				P: "SnSSpineFreedom", "Number", "", "A",10
+				P: "SnSReachChestEnd", "Number", "", "A",0
+				P: "SnSScaleNeck", "Number", "", "A",0
+				P: "SnSNeckFreedom", "Number", "", "A",10
+				P: "SnSReachHead", "Number", "", "A",0
+			}
+		}
+	}
+}
+
+; Object properties
+;------------------------------------------------------------------
+
+Objects:  {
+	NodeAttribute: 2888760502960, "NodeAttribute::", "Null" {
+		TypeFlags: "Null"
+	}
+	NodeAttribute: 2888740181248, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740179712, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740181440, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740184512, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740181824, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740182784, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740163584, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740183936, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740163008, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740165312, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740161088, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740163776, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740165696, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740164928, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740159936, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740165888, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740157824, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740158208, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740164160, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740154176, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740157248, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740162048, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740161472, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740154560, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740165504, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740153792, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740160320, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740161664, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740157440, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740155520, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740164544, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740160128, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740153984, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740155136, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740161280, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740160512, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740163200, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740162624, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740162816, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740154752, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740159552, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740163392, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740159360, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740156096, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740154944, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740155328, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740164736, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740155904, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740163968, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740155712, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740160704, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740160896, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740159168, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740158976, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740159744, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740161856, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740165120, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740156288, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740156480, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740156672, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",33.3333333333333
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740162240, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	NodeAttribute: 2888740156864, "NodeAttribute::", "LimbNode" {
+		Properties70:  {
+			P: "Size", "double", "Number", "",50
+		}
+		TypeFlags: "Skeleton"
+	}
+	Model: 2888573868528, "Model::Character1_Reference", "Null" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",1
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573866208, "Model::Character1_Hips", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",1
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",0,100,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573884768, "Model::Character1_LeftUpLeg", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",8.910000801,-6.27000046000001,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573880128, "Model::Character1_LeftLeg", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",0,-44.87864494,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573875488, "Model::Character1_LeftFoot", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",0,-40.700958253,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573873168, "Model::Character1_LeftToeBase", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",8.42699999914487e-06,-6.262317193,12.9547209
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573870848, "Model::Character1_RightUpLeg", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-8.910000801,-6.27000046000001,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573877808, "Model::Character1_RightLeg", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-2.71599999912553e-06,-44.87864494,0.000439024
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573882448, "Model::Character1_RightFoot", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",9.18999999655057e-07,-40.700958249,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573854608, "Model::Character1_RightToeBase", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,0.004800386,0
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-0.00108538100000111,-6.26231718,12.954749066
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573887088, "Model::Character1_Spine", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",0,7,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573856928, "Model::Character1_Spine1", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",0,12.6666666666667,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573859248, "Model::Character1_Spine2", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",0,12.6666666666667,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573891728, "Model::Character1_LeftShoulder", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",7.000000477,14.2552134666666,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573889408, "Model::Character1_LeftArm", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-0.000735282
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",10.707250593,0.000137399999971421,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573861568, "Model::Character1_LeftForeArm", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,0.001470564
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",27.3054656977515,0.00035041354882992,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573894048, "Model::Character1_LeftHand", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-0.000735282000000001
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",26.6971473678016,-0.000342606943803503,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573863888, "Model::Character1_LeftHandThumb1", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,9.70628259723974e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",4.34875684999999,-0.798502499999984,4.282433967
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573896368, "Model::Character1_LeftHandThumb2", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,9.70628259723974e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",2.51258994000001,-0.536099400000012,0.707454324
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573901008, "Model::Character1_LeftHandThumb3", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,0.000297862
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",2.54314040999998,-1.31999999837262e-05,9.34200000024532e-06
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573898688, "Model::Character1_LeftHandThumb4", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-0.000595724
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",2.66674613997908,-1.0963540148623e-05,-8.21100000170105e-06
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573903328, "Model::Character1_LeftHandIndex1", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,9.70628259723974e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",8.82197671999999,0.199729200000007,3.471669416
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573907968, "Model::Character1_LeftHandIndex2", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",1.04532179819187e-05,1.99999998497269,0.000299523461597212
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",4.22275459999999,-2.20999999953619e-05,0.147199018999999
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573914928, "Model::Character1_LeftHandIndex3", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",-6.07012437898178e-21,-1.999999985,-0.000299341
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",2.6474830577704,-2.76317382201796e-05,0.184964480918186
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573905648, "Model::Character1_LeftHandIndex4", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",-6.06642662327484e-21,7.95138670365879e-16,9.73662968835331e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",1.95703422999998,-1.02000000197222e-05,0.0682189000000015
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573910288, "Model::Character1_LeftHandMiddle1", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,9.70628259723974e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",8.80987936,0.500890499999997,1.304684381
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573912608, "Model::Character1_LeftHandMiddle2", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,0.003563334,9.70628259723974e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",4.86325168,0,0.000302455000000146
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573938128, "Model::Character1_LeftHandMiddle3", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",-6.03652260792567e-24,-0.003563334,9.70628261601088e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",2.76523659396877,0,0.000343758347727263
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573947408, "Model::Character1_LeftHandMiddle4", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",1.3154465848357e-39,7.76502607779179e-19,9.70628259723974e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",2.00563215999999,2.8421709430404e-14,0.000123596000000337
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573928848, "Model::Character1_LeftHandRing1", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,9.70628259723974e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",8.89375978999999,0.379919600000022,-0.793158909
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573931168, "Model::Character1_LeftHandRing2", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,0.003563529,9.70628259723974e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",4.53775882999999,0,8.89999999253988e-08
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573933488, "Model::Character1_LeftHandRing3", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",-6.03685295077637e-24,-0.003563529,9.70628261601294e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",2.30452585555004,0,0.000143213709484669
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573921888, "Model::Character1_LeftHandRing4", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",-1.3154465848357e-39,-7.76502607779179e-19,9.70628259723974e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",1.92334735999999,0,-8.17000000208346e-07
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573940448, "Model::Character1_LeftHandPinky1", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,9.70628259723974e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",8.88227468999999,-0.313026999999977,-2.490356465
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573917248, "Model::Character1_LeftHandPinky2", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-0.000763025999999999
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",3.04409933000001,4.06000000054973e-05,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573935808, "Model::Character1_LeftHandPinky3", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,0.000763025999999999
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",1.97450148947465,5.25950601399927e-05,-1.42999999841464e-07
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573949728, "Model::Character1_LeftHandPinky4", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,9.70628259723974e-20
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",1.66661465000001,2.2200000103112e-05,7.9099999972243e-07
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573942768, "Model::Character1_RightShoulder", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-6.999999523,14.2552134666666,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573945088, "Model::Character1_RightArm", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,0.002318361
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-10.707275387,0.000433200000031775,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573924208, "Model::Character1_RightForeArm", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-0.004636722
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-27.3055982276469,0.00110486731455239,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573919568, "Model::Character1_RightHand", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,0.002318361
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-26.6969880880925,-0.00108154110256464,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573952048, "Model::Character1_RightHandThumb1", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-3.88251303889589e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-4.34838078999999,-0.798498100000018,4.282814738
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573954368, "Model::Character1_RightHandThumb2", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-3.88251303889589e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-2.51252751,-0.536098899999985,0.70767665
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573956688, "Model::Character1_RightHandThumb3", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,0.000602085999999999
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-2.54158935999999,2.68000000005486e-05,0.0888203150000004
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573926528, "Model::Character1_RightHandThumb4", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-0.000812677999999999
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-2.66511975966058,4.63060993638464e-05,0.0931373170000009
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573982208, "Model::Character1_RightHandIndex1", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-3.88251303889589e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-8.82167265999999,0.199733699999996,3.472444296
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573975248, "Model::Character1_RightHandIndex2", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,2.000064658,-3.88251303889589e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-4.22275022000001,-3.00000010611257e-07,-0.147351788
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573977568, "Model::Character1_RightHandIndex3", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",1.35584729619604e-20,-2.000064658,-3.88487975568133e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-2.64747684463245,-3.00000095876385e-07,-0.185063479213413
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573965968, "Model::Character1_RightHandIndex4", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-3.88251303889589e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-1.95703222,-9.99999372197635e-08,-0.0682901520000003
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573984528, "Model::Character1_RightHandMiddle1", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-3.88251303889589e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-8.80976602999999,0.500893099999985,1.305458427
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573959008, "Model::Character1_RightHandMiddle2", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,2.000064658,-3.88251303889589e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-4.86029449000002,-4.00000033096148e-07,-0.169598752
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573963648, "Model::Character1_RightHandMiddle3", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",1.35584729619604e-20,-2.000064658,-3.88487975568133e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-2.75850591652296,-2.00000016548074e-07,-0.19282461233943
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573986848, "Model::Character1_RightHandMiddle4", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-3.88251303889589e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-2.00441268,-1.99999988126365e-07,-0.0699434750000005
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573989168, "Model::Character1_RightHandRing1", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-3.88251303889589e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-8.89383242999999,0.379920299999981,-0.792376756
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573979888, "Model::Character1_RightHandRing2", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,2.000064658,-3.88251303889589e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-4.53499961000001,-4.00000033096148e-07,-0.158247672
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573991488, "Model::Character1_RightHandRing3", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",1.35584729619604e-20,-2.000064658,-3.88487975568133e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-2.29891662121804,-1.99999959704655e-07,-0.160698477276434
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573970608, "Model::Character1_RightHandRing4", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-3.88251303889589e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-1.92217792,-9.9999965641473e-08,-0.0670739159999998
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573972928, "Model::Character1_RightHandPinky1", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",0,-0,-3.88251303889589e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-8.8824961,-0.313027800000015,-2.489574194
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573968288, "Model::Character1_RightHandPinky2", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",-4.33455853143664e-05,2.0000646575305,-0.00124197162447093
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-3.04594261999999,-6.60000000038963e-05,-0.106287401000001
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573961328, "Model::Character1_RightHandPinky3", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",-2.42804984730083e-20,-2.000064658,0.001241215
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-1.97208741982242,-8.5521898654406e-05,-0.137852514044825
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888573993808, "Model::Character1_RightHandPinky4", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "PreRotation", "Vector3D", "Vector", "",-3.33671942990681e-20,-2.25825461155437e-40,-3.87771465434942e-19
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",-1.66762384999998,-3.62000000109219e-05,-0.0581913190000005
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888574014688, "Model::Character1_Neck", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",0,12.6666666666667,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2888574023968, "Model::Character1_Head", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "RotationActive", "bool", "", "",1
+			P: "InheritType", "enum", "", "",2
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "Lcl Translation", "Lcl Translation", "", "A",0,20,0
+		}
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Constraint: 2888547746720, "Constraint::Character1", "Character" {
+		Type: "Character"
+		MultiLayer: 0
+		Version: 201650
+		Properties70:  {
+			P: "Active", "bool", "", "",0
+			P: "Lock", "bool", "", "",0
+			P: "Weight", "Weight", "", "A",100
+			P: "SourceObject", "object", "", ""
+			P: "DestinationObject", "object", "", ""
+			P: "Actor", "object", "", ""
+			P: "Character", "object", "", ""
+			P: "ControlSet", "object", "", ""
+			P: "PullIterationCount", "int", "Integer", "",10
+			P: "Posture", "enum", "", "",0
+			P: "ForceActorSpace", "bool", "", "",0
+			P: "ScaleCompensation", "Number", "", "A",100
+			P: "ScaleCompensationMode", "enum", "", "",1
+			P: "HipsHeightCompensation", "Number", "", "A",0
+			P: "HipsHeightCompensationMode", "enum", "", "",1
+			P: "AnkleHeightCompensation", "Number", "", "A",0
+			P: "AnkleHeightCompensationMode", "enum", "", "",1
+			P: "AnkleProximityCompensation", "Number", "", "A",0
+			P: "AnkleProximityCompensationMode", "enum", "", "",1
+			P: "MassCenterCompensation", "Number", "", "A",80
+			P: "ApplyLimits", "bool", "", "",0
+			P: "ChestReduction", "Number", "", "A",0
+			P: "CollarReduction", "Number", "", "A",0
+			P: "NeckReduction", "Number", "", "A",0
+			P: "HeadReduction", "Number", "", "A",0
+			P: "ReachActorLeftAnkle", "Number", "", "A",100
+			P: "ReachActorRightAnkle", "Number", "", "A",100
+			P: "ReachActorLeftKnee", "Number", "", "A",0
+			P: "ReachActorRightKnee", "Number", "", "A",0
+			P: "ReachActorChest", "Number", "", "A",0
+			P: "ReachActorHead", "Number", "", "A",0
+			P: "ReachActorLeftWrist", "Number", "", "A",0
+			P: "ReachActorRightWrist", "Number", "", "A",0
+			P: "ReachActorLeftElbow", "Number", "", "A",0
+			P: "ReachActorRightElbow", "Number", "", "A",0
+			P: "ReachActorLeftFingerBase", "Number", "", "A",0
+			P: "ReachActorRightFingerBase", "Number", "", "A",0
+			P: "ReachActorLeftToesBase", "Number", "", "A",0
+			P: "ReachActorRightToesBase", "Number", "", "A",0
+			P: "ReachActorLeftFingerBaseRotation", "Number", "", "A",0
+			P: "ReachActorRightFingerBaseRotation", "Number", "", "A",0
+			P: "ReachActorLeftToesBaseRotation", "Number", "", "A",0
+			P: "ReachActorRightToesBaseRotation", "Number", "", "A",0
+			P: "ReachActorLeftAnkleRotation", "Number", "", "A",100
+			P: "ReachActorRightAnkleRotation", "Number", "", "A",100
+			P: "ReachActorHeadRotation", "Number", "", "A",0
+			P: "ReachActorLeftWristRotation", "Number", "", "A",0
+			P: "ReachActorRightWristRotation", "Number", "", "A",0
+			P: "ReachActorChestRotation", "Number", "", "A",0
+			P: "ReachActorLowerChestRotation", "Number", "", "A",0
+			P: "HipsTOffset", "Vector", "", "A",0,0,0
+			P: "ChestTOffset", "Vector", "", "A",0,0,0
+			P: "LeftUpLegRoll", "Number", "", "A",0
+			P: "LeftUpLegRollMode", "bool", "", "",0
+			P: "LeftLegRoll", "Number", "", "A",0
+			P: "LeftLegRollMode", "bool", "", "",0
+			P: "RightUpLegRoll", "Number", "", "A",0
+			P: "RightUpLegRollMode", "bool", "", "",0
+			P: "RightLegRoll", "Number", "", "A",0
+			P: "RightLegRollMode", "bool", "", "",0
+			P: "LeftArmRoll", "Number", "", "A",0
+			P: "LeftArmRollMode", "bool", "", "",0
+			P: "LeftForeArmRoll", "Number", "", "A",0
+			P: "LeftForeArmRollMode", "bool", "", "",0
+			P: "RightArmRoll", "Number", "", "A",0
+			P: "RightArmRollMode", "bool", "", "",0
+			P: "RightForeArmRoll", "Number", "", "A",0
+			P: "RightForeArmRollMode", "bool", "", "",0
+			P: "LeftUpLegRollEx", "Number", "", "A",0
+			P: "LeftUpLegRollExMode", "bool", "", "",1
+			P: "LeftLegRollEx", "Number", "", "A",0
+			P: "LeftLegRollExMode", "bool", "", "",1
+			P: "RightUpLegRollEx", "Number", "", "A",0
+			P: "RightUpLegRollExMode", "bool", "", "",1
+			P: "RightLegRollEx", "Number", "", "A",0
+			P: "RightLegRollExMode", "bool", "", "",1
+			P: "LeftArmRollEx", "Number", "", "A",0
+			P: "LeftArmRollExMode", "bool", "", "",1
+			P: "LeftForeArmRollEx", "Number", "", "A",0
+			P: "LeftForeArmRollExMode", "bool", "", "",1
+			P: "RightArmRollEx", "Number", "", "A",0
+			P: "RightArmRollExMode", "bool", "", "",1
+			P: "RightForeArmRollEx", "Number", "", "A",0
+			P: "RightForeArmRollExMode", "bool", "", "",1
+			P: "LeafLeftUpLegRoll1", "Number", "", "A",50
+			P: "LeafLeftUpLegRoll1Mode", "bool", "", "",1
+			P: "LeafLeftLegRoll1", "Number", "", "A",50
+			P: "LeafLeftLegRoll1Mode", "bool", "", "",1
+			P: "LeafRightUpLegRoll1", "Number", "", "A",50
+			P: "LeafRightUpLegRoll1Mode", "bool", "", "",1
+			P: "LeafRightLegRoll1", "Number", "", "A",50
+			P: "LeafRightLegRoll1Mode", "bool", "", "",1
+			P: "LeafLeftArmRoll1", "Number", "", "A",50
+			P: "LeafLeftArmRoll1Mode", "bool", "", "",1
+			P: "LeafLeftForeArmRoll1", "Number", "", "A",50
+			P: "LeafLeftForeArmRoll1Mode", "bool", "", "",1
+			P: "LeafRightArmRoll1", "Number", "", "A",50
+			P: "LeafRightArmRoll1Mode", "bool", "", "",1
+			P: "LeafRightForeArmRoll1", "Number", "", "A",50
+			P: "LeafRightForeArmRoll1Mode", "bool", "", "",1
+			P: "LeafLeftUpLegRoll2", "Number", "", "A",50
+			P: "LeafLeftUpLegRoll2Mode", "bool", "", "",1
+			P: "LeafLeftLegRoll2", "Number", "", "A",50
+			P: "LeafLeftLegRoll2Mode", "bool", "", "",1
+			P: "LeafRightUpLegRoll2", "Number", "", "A",50
+			P: "LeafRightUpLegRoll2Mode", "bool", "", "",1
+			P: "LeafRightLegRoll2", "Number", "", "A",50
+			P: "LeafRightLegRoll2Mode", "bool", "", "",1
+			P: "LeafLeftArmRoll2", "Number", "", "A",50
+			P: "LeafLeftArmRoll2Mode", "bool", "", "",1
+			P: "LeafLeftForeArmRoll2", "Number", "", "A",50
+			P: "LeafLeftForeArmRoll2Mode", "bool", "", "",1
+			P: "LeafRightArmRoll2", "Number", "", "A",50
+			P: "LeafRightArmRoll2Mode", "bool", "", "",1
+			P: "LeafRightForeArmRoll2", "Number", "", "A",50
+			P: "LeafRightForeArmRoll2Mode", "bool", "", "",1
+			P: "LeafLeftUpLegRoll3", "Number", "", "A",50
+			P: "LeafLeftUpLegRoll3Mode", "bool", "", "",1
+			P: "LeafLeftLegRoll3", "Number", "", "A",50
+			P: "LeafLeftLegRoll3Mode", "bool", "", "",1
+			P: "LeafRightUpLegRoll3", "Number", "", "A",50
+			P: "LeafRightUpLegRoll3Mode", "bool", "", "",1
+			P: "LeafRightLegRoll3", "Number", "", "A",50
+			P: "LeafRightLegRoll3Mode", "bool", "", "",1
+			P: "LeafLeftArmRoll3", "Number", "", "A",50
+			P: "LeafLeftArmRoll3Mode", "bool", "", "",1
+			P: "LeafLeftForeArmRoll3", "Number", "", "A",50
+			P: "LeafLeftForeArmRoll3Mode", "bool", "", "",1
+			P: "LeafRightArmRoll3", "Number", "", "A",50
+			P: "LeafRightArmRoll3Mode", "bool", "", "",1
+			P: "LeafRightForeArmRoll3", "Number", "", "A",50
+			P: "LeafRightForeArmRoll3Mode", "bool", "", "",1
+			P: "LeafLeftUpLegRoll4", "Number", "", "A",50
+			P: "LeafLeftUpLegRoll4Mode", "bool", "", "",1
+			P: "LeafLeftLegRoll4", "Number", "", "A",50
+			P: "LeafLeftLegRoll4Mode", "bool", "", "",1
+			P: "LeafRightUpLegRoll4", "Number", "", "A",50
+			P: "LeafRightUpLegRoll4Mode", "bool", "", "",1
+			P: "LeafRightLegRoll4", "Number", "", "A",50
+			P: "LeafRightLegRoll4Mode", "bool", "", "",1
+			P: "LeafLeftArmRoll4", "Number", "", "A",50
+			P: "LeafLeftArmRoll4Mode", "bool", "", "",1
+			P: "LeafLeftForeArmRoll4", "Number", "", "A",50
+			P: "LeafLeftForeArmRoll4Mode", "bool", "", "",1
+			P: "LeafRightArmRoll4", "Number", "", "A",50
+			P: "LeafRightArmRoll4Mode", "bool", "", "",1
+			P: "LeafRightForeArmRoll4", "Number", "", "A",50
+			P: "LeafRightForeArmRoll4Mode", "bool", "", "",1
+			P: "LeafLeftUpLegRoll5", "Number", "", "A",50
+			P: "LeafLeftUpLegRoll5Mode", "bool", "", "",1
+			P: "LeafLeftLegRoll5", "Number", "", "A",50
+			P: "LeafLeftLegRoll5Mode", "bool", "", "",1
+			P: "LeafRightUpLegRoll5", "Number", "", "A",50
+			P: "LeafRightUpLegRoll5Mode", "bool", "", "",1
+			P: "LeafRightLegRoll5", "Number", "", "A",50
+			P: "LeafRightLegRoll5Mode", "bool", "", "",1
+			P: "LeafLeftArmRoll5", "Number", "", "A",50
+			P: "LeafLeftArmRoll5Mode", "bool", "", "",1
+			P: "LeafLeftForeArmRoll5", "Number", "", "A",50
+			P: "LeafLeftForeArmRoll5Mode", "bool", "", "",1
+			P: "LeafRightArmRoll5", "Number", "", "A",50
+			P: "LeafRightArmRoll5Mode", "bool", "", "",1
+			P: "LeafRightForeArmRoll5", "Number", "", "A",50
+			P: "LeafRightForeArmRoll5Mode", "bool", "", "",1
+			P: "LeftLegFullRollExtraction", "Number", "", "A",0
+			P: "RightLegFullRollExtraction", "Number", "", "A",0
+			P: "LeftArmFullRollExtraction", "Number", "", "A",0
+			P: "RightArmFullRollExtraction", "Number", "", "A",0
+			P: "RollExtractionMode", "enum", "", "",0
+			P: "FootFloorContact", "bool", "", "",0
+			P: "FootAutomaticToes", "bool", "", "",0
+			P: "FootFloorPivot", "enum", "", "",0
+			P: "FootBottomToAnkle", "double", "Number", "",0
+			P: "FootBackToAnkle", "double", "Number", "",4.5
+			P: "FootMiddleToAnkle", "double", "Number", "",13
+			P: "FootFrontToMiddle", "double", "Number", "",7
+			P: "FootInToAnkle", "double", "Number", "",5
+			P: "FootOutToAnkle", "double", "Number", "",5
+			P: "FootContactSize", "double", "Number", "",100
+			P: "FootContactStiffness", "Number", "", "A",0
+			P: "FootFingerContactRollStiffness", "Number", "", "A",0
+			P: "HandFloorContact", "bool", "", "",0
+			P: "HandAutomaticFingers", "bool", "", "",0
+			P: "HandFloorPivot", "enum", "", "",0
+			P: "HandBottomToWrist", "double", "Number", "",0
+			P: "HandBackToWrist", "double", "Number", "",4.5
+			P: "HandMiddleToWrist", "double", "Number", "",13
+			P: "HandFrontToMiddle", "double", "Number", "",7
+			P: "HandInToWrist", "double", "Number", "",5
+			P: "HandOutToWrist", "double", "Number", "",5
+			P: "HandContactSize", "double", "Number", "",100
+			P: "HandContactStiffness", "Number", "", "A",0
+			P: "HandFingerContactRollStiffness", "Number", "", "A",0
+			P: "CtrlPullLeftToeBase", "Number", "", "A",0
+			P: "CtrlPullLeftFoot", "Number", "", "A",100
+			P: "CtrlPullLeftKnee", "Number", "", "A",0
+			P: "CtrlPullRightToeBase", "Number", "", "A",0
+			P: "CtrlPullRightFoot", "Number", "", "A",100
+			P: "CtrlPullRightKnee", "Number", "", "A",0
+			P: "CtrlPullLeftFingerBase", "Number", "", "A",0
+			P: "CtrlPullLeftHand", "Number", "", "A",100
+			P: "CtrlPullLeftElbow", "Number", "", "A",0
+			P: "CtrlPullRightFingerBase", "Number", "", "A",0
+			P: "CtrlPullRightHand", "Number", "", "A",100
+			P: "CtrlPullRightElbow", "Number", "", "A",0
+			P: "CtrlChestPullLeftHand", "Number", "", "A",100
+			P: "CtrlChestPullRightHand", "Number", "", "A",100
+			P: "CtrlPullHead", "Number", "", "A",0
+			P: "CtrlResistHipsPosition", "Number", "", "A",0
+			P: "CtrlEnforceGravity", "Number", "", "A",60.0000023841858
+			P: "CtrlResistHipsOrientation", "Number", "", "A",0
+			P: "CtrlResistChestPosition", "Number", "", "A",0
+			P: "CtrlResistChestOrientation", "Number", "", "A",0
+			P: "CtrlResistLeftCollar", "Number", "", "A",50
+			P: "CtrlResistRightCollar", "Number", "", "A",50
+			P: "CtrlResistLeftKnee", "Number", "", "A",50
+			P: "CtrlResistMaximumExtensionLeftKnee", "Number", "", "A",50
+			P: "CtrlResistCompressionFactorLeftKnee", "Number", "", "A",50
+			P: "CtrlResistRightKnee", "Number", "", "A",50
+			P: "CtrlResistMaximumExtensionRightKnee", "Number", "", "A",50
+			P: "CtrlResistCompressionFactorRightKnee", "Number", "", "A",50
+			P: "CtrlResistLeftElbow", "Number", "", "A",50
+			P: "CtrlResistMaximumExtensionLeftElbow", "Number", "", "A",50
+			P: "CtrlResistCompressionFactorLeftElbow", "Number", "", "A",50
+			P: "CtrlResistRightElbow", "Number", "", "A",50
+			P: "CtrlResistMaximumExtensionRightElbow", "Number", "", "A",50
+			P: "CtrlResistCompressionFactorRightElbow", "Number", "", "A",50
+			P: "CtrlSpineStiffness", "Number", "", "A",0
+			P: "CtrlNeckStiffness", "Number", "", "A",0
+			P: "MirrorMode", "bool", "", "",0
+			P: "ShoulderCorrection", "Number", "", "A",0
+			P: "LeftKneeKillPitch", "bool", "", "",0
+			P: "RightKneeKillPitch", "bool", "", "",0
+			P: "LeftElbowKillPitch", "bool", "", "",0
+			P: "RightElbowKillPitch", "bool", "", "",0
+			P: "HipsTranslationMode", "enum", "", "",0
+			P: "WriteReference", "bool", "", "",0
+			P: "SyncMode", "bool", "", "H",1
+			P: "Damping", "Number", "", "A",0
+			P: "OrientationDamping", "Number", "", "A",0
+			P: "OrientationDampingMode", "enum", "", "",1
+			P: "DisplacementDamping", "Number", "", "A",0
+			P: "DisplacementDampingMode", "enum", "", "",1
+			P: "DisplacementMemory", "Number", "", "A",0
+			P: "DisplacementMemoryMode", "enum", "", "",0
+			P: "HipsDisplacementDamping", "Number", "", "A",0
+			P: "HipsDisplacementDampingMode", "enum", "", "",0
+			P: "AnkleDisplacementDamping", "Number", "", "A",0
+			P: "AnkleDisplacementDampingMode", "enum", "", "",0
+			P: "WristDisplacementDamping", "Number", "", "A",0
+			P: "WristDisplacementDampingMode", "enum", "", "",0
+			P: "Stabilization", "Number", "", "A",0
+			P: "AnkleStabilizationTime", "Number", "", "A",0
+			P: "AnkleStabilizationTimeMode", "enum", "", "",0
+			P: "AnkleStabilizationPerimeter", "Number", "", "A",0
+			P: "AnkleStabilizationPerimeterMode", "enum", "", "",0
+			P: "AnkleStabilizationAngularPerimeter", "Number", "", "A",0
+			P: "AnkleStabilizationAngularPerimeterMode", "enum", "", "",1
+			P: "AnkleStabilizationFloorProximity", "Number", "", "A",0
+			P: "AnkleStabilizationFloorProximityMode", "enum", "", "",1
+			P: "AnkleStabilizationDamping", "Number", "", "A",0
+			P: "AnkleStabilizationDampingMode", "enum", "", "",0
+			P: "AnkleStabilizationRecoveryTime", "Number", "", "A",0
+			P: "AnkleStabilizationRecoveryTimeMode", "enum", "", "",1
+			P: "LeftHandThumbTip", "double", "Number", "",0.5
+			P: "LeftHandIndexTip", "double", "Number", "",0.5
+			P: "LeftHandMiddleTip", "double", "Number", "",0.5
+			P: "LeftHandRingTip", "double", "Number", "",0.5
+			P: "LeftHandPinkyTip", "double", "Number", "",0.5
+			P: "LeftHandExtraFingerTip", "double", "Number", "",0.5
+			P: "RightHandThumbTip", "double", "Number", "",0.5
+			P: "RightHandIndexTip", "double", "Number", "",0.5
+			P: "RightHandMiddleTip", "double", "Number", "",0.5
+			P: "RightHandRingTip", "double", "Number", "",0.5
+			P: "RightHandPinkyTip", "double", "Number", "",0.5
+			P: "RightHandExtraFingerTip", "double", "Number", "",0.5
+			P: "LeftFootThumbTip", "double", "Number", "",0.5
+			P: "LeftFootIndexTip", "double", "Number", "",0.5
+			P: "LeftFootMiddleTip", "double", "Number", "",0.5
+			P: "LeftFootRingTip", "double", "Number", "",0.5
+			P: "LeftFootPinkyTip", "double", "Number", "",0.5
+			P: "LeftFootExtraFingerTip", "double", "Number", "",0.5
+			P: "RightFootThumbTip", "double", "Number", "",0.5
+			P: "RightFootIndexTip", "double", "Number", "",0.5
+			P: "RightFootMiddleTip", "double", "Number", "",0.5
+			P: "RightFootRingTip", "double", "Number", "",0.5
+			P: "RightFootPinkyTip", "double", "Number", "",0.5
+			P: "RightFootExtraFingerTip", "double", "Number", "",0.5
+			P: "FingerSolving", "bool", "", "",1
+			P: "FootFingerContact", "bool", "", "",0
+			P: "FootContactType", "enum", "", "",0
+			P: "FootFingerContactMode", "enum", "", "",1
+			P: "HandFingerContact", "bool", "", "",0
+			P: "HandContactType", "enum", "", "",0
+			P: "HandFingerContactMode", "enum", "", "",1
+			P: "ContactBehaviour", "enum", "", "",0
+			P: "HikVersion", "double", "Number", "",2016.5
+			P: "Characterize", "bool", "", "",0
+			P: "RealisticShoulder", "Number", "", "A",0
+			P: "CollarStiffnessX", "Number", "", "A",0
+			P: "CollarStiffnessY", "Number", "", "A",0
+			P: "CollarStiffnessZ", "Number", "", "A",0
+			P: "ExtraCollarRatio", "Number", "", "A",0
+			P: "LeftLegMaxExtensionAngle", "Number", "", "A",180
+			P: "RightLegMaxExtensionAngle", "Number", "", "A",180
+			P: "LeftArmMaxExtensionAngle", "Number", "", "A",180
+			P: "RightArmMaxExtensionAngle", "Number", "", "A",180
+			P: "StretchStartArmsAndLegs", "Number", "", "A",90
+			P: "StretchStopArmsAndLegs", "Number", "", "A",110
+			P: "SnSScaleArmsAndLegs", "Number", "", "A",0
+			P: "SnSReachLeftWrist", "Number", "", "A",0
+			P: "SnSReachRightWrist", "Number", "", "A",0
+			P: "SnSReachLeftAnkle", "Number", "", "A",0
+			P: "SnSReachRightAnkle", "Number", "", "A",0
+			P: "SnSScaleSpine", "Number", "", "A",0
+			P: "SnSScaleSpineChildren", "Number", "", "A",0
+			P: "SnSSpineFreedom", "Number", "", "A",10
+			P: "SnSReachChestEnd", "Number", "", "A",0
+			P: "SnSScaleNeck", "Number", "", "A",0
+			P: "SnSNeckFreedom", "Number", "", "A",10
+			P: "SnSReachHead", "Number", "", "A",0
+			P: "HipsLink", "object", "", ""
+			P: "LeftUpLegLink", "object", "", ""
+			P: "LeftLegLink", "object", "", ""
+			P: "LeftFootLink", "object", "", ""
+			P: "LeftToeBaseLink", "object", "", ""
+			P: "RightUpLegLink", "object", "", ""
+			P: "RightLegLink", "object", "", ""
+			P: "RightFootLink", "object", "", ""
+			P: "RightToeBaseLink", "object", "", ""
+			P: "SpineLink", "object", "", ""
+			P: "Spine1Link", "object", "", ""
+			P: "LeftShoulderLink", "object", "", ""
+			P: "LeftArmLink", "object", "", ""
+			P: "LeftForeArmLink", "object", "", ""
+			P: "LeftHandLink", "object", "", ""
+			P: "RightShoulderLink", "object", "", ""
+			P: "RightArmLink", "object", "", ""
+			P: "RightForeArmLink", "object", "", ""
+			P: "RightHandLink", "object", "", ""
+			P: "NeckLink", "object", "", ""
+			P: "HeadLink", "object", "", ""
+			P: "LeftUpLegRollLink", "object", "", ""
+			P: "LeftLegRollLink", "object", "", ""
+			P: "RightUpLegRollLink", "object", "", ""
+			P: "RightLegRollLink", "object", "", ""
+			P: "LeftArmRollLink", "object", "", ""
+			P: "LeftForeArmRollLink", "object", "", ""
+			P: "RightArmRollLink", "object", "", ""
+			P: "RightForeArmRollLink", "object", "", ""
+			P: "Spine2Link", "object", "", ""
+			P: "Spine3Link", "object", "", ""
+			P: "Spine4Link", "object", "", ""
+			P: "Spine5Link", "object", "", ""
+			P: "Spine6Link", "object", "", ""
+			P: "Spine7Link", "object", "", ""
+			P: "Spine8Link", "object", "", ""
+			P: "Spine9Link", "object", "", ""
+			P: "LeftHandThumb1Link", "object", "", ""
+			P: "LeftHandThumb2Link", "object", "", ""
+			P: "LeftHandThumb3Link", "object", "", ""
+			P: "LeftHandIndex1Link", "object", "", ""
+			P: "LeftHandIndex2Link", "object", "", ""
+			P: "LeftHandIndex3Link", "object", "", ""
+			P: "LeftHandMiddle1Link", "object", "", ""
+			P: "LeftHandMiddle2Link", "object", "", ""
+			P: "LeftHandMiddle3Link", "object", "", ""
+			P: "LeftHandRing1Link", "object", "", ""
+			P: "LeftHandRing2Link", "object", "", ""
+			P: "LeftHandRing3Link", "object", "", ""
+			P: "LeftHandPinky1Link", "object", "", ""
+			P: "LeftHandPinky2Link", "object", "", ""
+			P: "LeftHandPinky3Link", "object", "", ""
+			P: "RightHandThumb1Link", "object", "", ""
+			P: "RightHandThumb2Link", "object", "", ""
+			P: "RightHandThumb3Link", "object", "", ""
+			P: "RightHandIndex1Link", "object", "", ""
+			P: "RightHandIndex2Link", "object", "", ""
+			P: "RightHandIndex3Link", "object", "", ""
+			P: "RightHandMiddle1Link", "object", "", ""
+			P: "RightHandMiddle2Link", "object", "", ""
+			P: "RightHandMiddle3Link", "object", "", ""
+			P: "RightHandRing1Link", "object", "", ""
+			P: "RightHandRing2Link", "object", "", ""
+			P: "RightHandRing3Link", "object", "", ""
+			P: "RightHandPinky1Link", "object", "", ""
+			P: "RightHandPinky2Link", "object", "", ""
+			P: "RightHandPinky3Link", "object", "", ""
+			P: "ReferenceLink", "object", "", ""
+			P: "LeftFloorContactLink", "object", "", ""
+			P: "RightFloorContactLink", "object", "", ""
+			P: "HipsTranslationLink", "object", "", ""
+			P: "Props0Link", "object", "", ""
+			P: "Props1Link", "object", "", ""
+			P: "Props2Link", "object", "", ""
+			P: "Props3Link", "object", "", ""
+			P: "Props4Link", "object", "", ""
+			P: "GameModeParentLeftHipRollLink", "object", "", ""
+			P: "GameModeParentLeftKneeLink", "object", "", ""
+			P: "GameModeParentLeftKneeRollLink", "object", "", ""
+			P: "GameModeParentRightHipRollLink", "object", "", ""
+			P: "GameModeParentRightKneeLink", "object", "", ""
+			P: "GameModeParentRightKneeRollLink", "object", "", ""
+			P: "GameModeParentLeftShoulderRollLink", "object", "", ""
+			P: "GameModeParentLeftElbowLink", "object", "", ""
+			P: "GameModeParentLeftElbowRollLink", "object", "", ""
+			P: "GameModeParentRightShoulderRollLink", "object", "", ""
+			P: "GameModeParentRightElbowLink", "object", "", ""
+			P: "GameModeParentRightElbowRollLink", "object", "", ""
+			P: "LeftUpLegRollExLink", "object", "", ""
+			P: "LeftLegRollExLink", "object", "", ""
+			P: "RightUpLegRollExLink", "object", "", ""
+			P: "RightLegRollExLink", "object", "", ""
+			P: "LeftArmRollExLink", "object", "", ""
+			P: "LeftForeArmRollExLink", "object", "", ""
+			P: "RightArmRollExLink", "object", "", ""
+			P: "RightForeArmRollExLink", "object", "", ""
+			P: "LeftHandFloorContactLink", "object", "", ""
+			P: "RightHandFloorContactLink", "object", "", ""
+			P: "LeftFingerBaseLink", "object", "", ""
+			P: "RightFingerBaseLink", "object", "", ""
+			P: "Neck1Link", "object", "", ""
+			P: "Neck2Link", "object", "", ""
+			P: "Neck3Link", "object", "", ""
+			P: "Neck4Link", "object", "", ""
+			P: "Neck5Link", "object", "", ""
+			P: "Neck6Link", "object", "", ""
+			P: "Neck7Link", "object", "", ""
+			P: "Neck8Link", "object", "", ""
+			P: "Neck9Link", "object", "", ""
+			P: "LeftInHandThumbLink", "object", "", ""
+			P: "LeftHandThumb4Link", "object", "", ""
+			P: "LeftInHandIndexLink", "object", "", ""
+			P: "LeftHandIndex4Link", "object", "", ""
+			P: "LeftInHandMiddleLink", "object", "", ""
+			P: "LeftHandMiddle4Link", "object", "", ""
+			P: "LeftInHandRingLink", "object", "", ""
+			P: "LeftHandRing4Link", "object", "", ""
+			P: "LeftInHandPinkyLink", "object", "", ""
+			P: "LeftHandPinky4Link", "object", "", ""
+			P: "LeftInHandExtraFingerLink", "object", "", ""
+			P: "LeftHandExtraFinger1Link", "object", "", ""
+			P: "LeftHandExtraFinger2Link", "object", "", ""
+			P: "LeftHandExtraFinger3Link", "object", "", ""
+			P: "LeftHandExtraFinger4Link", "object", "", ""
+			P: "RightInHandThumbLink", "object", "", ""
+			P: "RightHandThumb4Link", "object", "", ""
+			P: "RightInHandIndexLink", "object", "", ""
+			P: "RightHandIndex4Link", "object", "", ""
+			P: "RightInHandMiddleLink", "object", "", ""
+			P: "RightHandMiddle4Link", "object", "", ""
+			P: "RightInHandRingLink", "object", "", ""
+			P: "RightHandRing4Link", "object", "", ""
+			P: "RightInHandPinkyLink", "object", "", ""
+			P: "RightHandPinky4Link", "object", "", ""
+			P: "RightInHandExtraFingerLink", "object", "", ""
+			P: "RightHandExtraFinger1Link", "object", "", ""
+			P: "RightHandExtraFinger2Link", "object", "", ""
+			P: "RightHandExtraFinger3Link", "object", "", ""
+			P: "RightHandExtraFinger4Link", "object", "", ""
+			P: "LeftInFootThumbLink", "object", "", ""
+			P: "LeftFootThumb1Link", "object", "", ""
+			P: "LeftFootThumb2Link", "object", "", ""
+			P: "LeftFootThumb3Link", "object", "", ""
+			P: "LeftFootThumb4Link", "object", "", ""
+			P: "LeftInFootIndexLink", "object", "", ""
+			P: "LeftFootIndex1Link", "object", "", ""
+			P: "LeftFootIndex2Link", "object", "", ""
+			P: "LeftFootIndex3Link", "object", "", ""
+			P: "LeftFootIndex4Link", "object", "", ""
+			P: "LeftInFootMiddleLink", "object", "", ""
+			P: "LeftFootMiddle1Link", "object", "", ""
+			P: "LeftFootMiddle2Link", "object", "", ""
+			P: "LeftFootMiddle3Link", "object", "", ""
+			P: "LeftFootMiddle4Link", "object", "", ""
+			P: "LeftInFootRingLink", "object", "", ""
+			P: "LeftFootRing1Link", "object", "", ""
+			P: "LeftFootRing2Link", "object", "", ""
+			P: "LeftFootRing3Link", "object", "", ""
+			P: "LeftFootRing4Link", "object", "", ""
+			P: "LeftInFootPinkyLink", "object", "", ""
+			P: "LeftFootPinky1Link", "object", "", ""
+			P: "LeftFootPinky2Link", "object", "", ""
+			P: "LeftFootPinky3Link", "object", "", ""
+			P: "LeftFootPinky4Link", "object", "", ""
+			P: "LeftInFootExtraFingerLink", "object", "", ""
+			P: "LeftFootExtraFinger1Link", "object", "", ""
+			P: "LeftFootExtraFinger2Link", "object", "", ""
+			P: "LeftFootExtraFinger3Link", "object", "", ""
+			P: "LeftFootExtraFinger4Link", "object", "", ""
+			P: "RightInFootThumbLink", "object", "", ""
+			P: "RightFootThumb1Link", "object", "", ""
+			P: "RightFootThumb2Link", "object", "", ""
+			P: "RightFootThumb3Link", "object", "", ""
+			P: "RightFootThumb4Link", "object", "", ""
+			P: "RightInFootIndexLink", "object", "", ""
+			P: "RightFootIndex1Link", "object", "", ""
+			P: "RightFootIndex2Link", "object", "", ""
+			P: "RightFootIndex3Link", "object", "", ""
+			P: "RightFootIndex4Link", "object", "", ""
+			P: "RightInFootMiddleLink", "object", "", ""
+			P: "RightFootMiddle1Link", "object", "", ""
+			P: "RightFootMiddle2Link", "object", "", ""
+			P: "RightFootMiddle3Link", "object", "", ""
+			P: "RightFootMiddle4Link", "object", "", ""
+			P: "RightInFootRingLink", "object", "", ""
+			P: "RightFootRing1Link", "object", "", ""
+			P: "RightFootRing2Link", "object", "", ""
+			P: "RightFootRing3Link", "object", "", ""
+			P: "RightFootRing4Link", "object", "", ""
+			P: "RightInFootPinkyLink", "object", "", ""
+			P: "RightFootPinky1Link", "object", "", ""
+			P: "RightFootPinky2Link", "object", "", ""
+			P: "RightFootPinky3Link", "object", "", ""
+			P: "RightFootPinky4Link", "object", "", ""
+			P: "RightInFootExtraFingerLink", "object", "", ""
+			P: "RightFootExtraFinger1Link", "object", "", ""
+			P: "RightFootExtraFinger2Link", "object", "", ""
+			P: "RightFootExtraFinger3Link", "object", "", ""
+			P: "RightFootExtraFinger4Link", "object", "", ""
+			P: "LeftShoulderExtraLink", "object", "", ""
+			P: "RightShoulderExtraLink", "object", "", ""
+			P: "LeafLeftUpLegRoll1Link", "object", "", ""
+			P: "LeafLeftLegRoll1Link", "object", "", ""
+			P: "LeafRightUpLegRoll1Link", "object", "", ""
+			P: "LeafRightLegRoll1Link", "object", "", ""
+			P: "LeafLeftArmRoll1Link", "object", "", ""
+			P: "LeafLeftForeArmRoll1Link", "object", "", ""
+			P: "LeafRightArmRoll1Link", "object", "", ""
+			P: "LeafRightForeArmRoll1Link", "object", "", ""
+			P: "LeafLeftUpLegRoll2Link", "object", "", ""
+			P: "LeafLeftLegRoll2Link", "object", "", ""
+			P: "LeafRightUpLegRoll2Link", "object", "", ""
+			P: "LeafRightLegRoll2Link", "object", "", ""
+			P: "LeafLeftArmRoll2Link", "object", "", ""
+			P: "LeafLeftForeArmRoll2Link", "object", "", ""
+			P: "LeafRightArmRoll2Link", "object", "", ""
+			P: "LeafRightForeArmRoll2Link", "object", "", ""
+			P: "LeafLeftUpLegRoll3Link", "object", "", ""
+			P: "LeafLeftLegRoll3Link", "object", "", ""
+			P: "LeafRightUpLegRoll3Link", "object", "", ""
+			P: "LeafRightLegRoll3Link", "object", "", ""
+			P: "LeafLeftArmRoll3Link", "object", "", ""
+			P: "LeafLeftForeArmRoll3Link", "object", "", ""
+			P: "LeafRightArmRoll3Link", "object", "", ""
+			P: "LeafRightForeArmRoll3Link", "object", "", ""
+			P: "LeafLeftUpLegRoll4Link", "object", "", ""
+			P: "LeafLeftLegRoll4Link", "object", "", ""
+			P: "LeafRightUpLegRoll4Link", "object", "", ""
+			P: "LeafRightLegRoll4Link", "object", "", ""
+			P: "LeafLeftArmRoll4Link", "object", "", ""
+			P: "LeafLeftForeArmRoll4Link", "object", "", ""
+			P: "LeafRightArmRoll4Link", "object", "", ""
+			P: "LeafRightForeArmRoll4Link", "object", "", ""
+			P: "LeafLeftUpLegRoll5Link", "object", "", ""
+			P: "LeafLeftLegRoll5Link", "object", "", ""
+			P: "LeafRightUpLegRoll5Link", "object", "", ""
+			P: "LeafRightLegRoll5Link", "object", "", ""
+			P: "LeafLeftArmRoll5Link", "object", "", ""
+			P: "LeafLeftForeArmRoll5Link", "object", "", ""
+			P: "LeafRightArmRoll5Link", "object", "", ""
+			P: "LeafRightForeArmRoll5Link", "object", "", ""
+		}
+		CHARACTERIZE: 1
+		LOCK_XFORM: 0
+		LOCK_PICK: 0
+		REFERENCE:  {
+			TOFFSETX: 0
+			TOFFSETY: 0
+			TOFFSETZ: 0
+			ROFFSETX: 0
+			ROFFSETY: -0
+			ROFFSETZ: 0
+			SOFFSETX: 1
+			SOFFSETY: 1
+			SOFFSETZ: 1
+			PARENTROFFSETX: 0
+			PARENTROFFSETY: 0
+			PARENTROFFSETZ: 0
+		}
+		LEFT_FLOOR:  {
+		}
+		RIGHT_FLOOR:  {
+		}
+		LEFT_HANDFLOOR:  {
+		}
+		RIGHT_HANDFLOOR:  {
+		}
+		BASE:  {
+			LINK: "Hips" {
+				TOFFSETX: 0
+				TOFFSETY: 100
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftUpLeg" {
+				TOFFSETX: 8.910000801
+				TOFFSETY: 93.72999954
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftLeg" {
+				TOFFSETX: 8.910000801
+				TOFFSETY: 48.8513546
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftFoot" {
+				TOFFSETX: 8.910000801
+				TOFFSETY: 8.150396347
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightUpLeg" {
+				TOFFSETX: -8.910000801
+				TOFFSETY: 93.72999954
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightLeg" {
+				TOFFSETX: -8.910003517
+				TOFFSETY: 48.8513546
+				TOFFSETZ: 0.000439024
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightFoot" {
+				TOFFSETX: -8.910002598
+				TOFFSETY: 8.150396351
+				TOFFSETZ: 0.000439024
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "Spine" {
+				TOFFSETX: 0
+				TOFFSETY: 107
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftArm" {
+				TOFFSETX: 17.70725107
+				TOFFSETY: 146.5886842
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: -0.000735282
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftForeArm" {
+				TOFFSETX: 45.01271677
+				TOFFSETY: 146.5886842
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0.000735282000000001
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHand" {
+				TOFFSETX: 71.70986414
+				TOFFSETY: 146.5886842
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightArm" {
+				TOFFSETX: -17.70727491
+				TOFFSETY: 146.58898
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0.002318361
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightForeArm" {
+				TOFFSETX: -45.01287316
+				TOFFSETY: 146.58898
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: -0.002318361
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHand" {
+				TOFFSETX: -71.70986127
+				TOFFSETY: 146.5889787
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "Head" {
+				TOFFSETX: 0
+				TOFFSETY: 165
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+		}
+		AUXILIARY:  {
+			LINK: "LeftToeBase" {
+				TOFFSETX: 8.910009228
+				TOFFSETY: 1.888079154
+				TOFFSETZ: 12.9547209
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightToeBase" {
+				TOFFSETX: -8.911087979
+				TOFFSETY: 1.888079171
+				TOFFSETZ: 12.95518809
+				ROFFSETX: 0
+				ROFFSETY: 0.004800386
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftShoulder" {
+				TOFFSETX: 7.000000477
+				TOFFSETY: 146.5885468
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightShoulder" {
+				TOFFSETX: -6.999999523
+				TOFFSETY: 146.5885468
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "Neck" {
+				TOFFSETX: 0
+				TOFFSETY: 145
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+		}
+		SPINE:  {
+			LINK: "Spine1" {
+				TOFFSETX: 0
+				TOFFSETY: 119.666666666667
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "Spine2" {
+				TOFFSETX: 0
+				TOFFSETY: 132.333333333333
+				TOFFSETZ: 0
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+		}
+		NECK:  {
+		}
+		ROLL:  {
+		}
+		SPECIAL:  {
+		}
+		LEFTHAND:  {
+			LINK: "LeftHandThumb1" {
+				TOFFSETX: 76.05862099
+				TOFFSETY: 145.7901817
+				TOFFSETZ: 4.282433967
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandThumb2" {
+				TOFFSETX: 78.57121093
+				TOFFSETY: 145.2540823
+				TOFFSETZ: 4.989888291
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandThumb3" {
+				TOFFSETX: 81.11435134
+				TOFFSETY: 145.2540691
+				TOFFSETZ: 4.989897633
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0.000297862
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandIndex1" {
+				TOFFSETX: 80.53184086
+				TOFFSETY: 146.7884134
+				TOFFSETZ: 3.471669416
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandIndex2" {
+				TOFFSETX: 84.75459546
+				TOFFSETY: 146.7883913
+				TOFFSETZ: 3.618868435
+				ROFFSETX: 0
+				ROFFSETY: 1.99999998497269
+				ROFFSETZ: 0.000299523461597212
+				SOFFSETX: 1
+				SOFFSETY: 0.999999999999983
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandIndex3" {
+				TOFFSETX: 87.40692091
+				TOFFSETY: 146.7883775
+				TOFFSETZ: 3.711324415
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandMiddle1" {
+				TOFFSETX: 80.5197435
+				TOFFSETY: 147.0895747
+				TOFFSETZ: 1.304684381
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandMiddle2" {
+				TOFFSETX: 85.38299518
+				TOFFSETY: 147.0895747
+				TOFFSETZ: 1.304986836
+				ROFFSETX: 0
+				ROFFSETY: 0.003563334
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandMiddle3" {
+				TOFFSETX: 88.14823179
+				TOFFSETY: 147.0895747
+				TOFFSETZ: 1.305158619
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandRing1" {
+				TOFFSETX: 80.60362393
+				TOFFSETY: 146.9686038
+				TOFFSETZ: -0.793158909
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandRing2" {
+				TOFFSETX: 85.14138276
+				TOFFSETY: 146.9686038
+				TOFFSETZ: -0.79315882
+				ROFFSETX: 0
+				ROFFSETY: 0.003563529
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandRing3" {
+				TOFFSETX: 87.44590862
+				TOFFSETY: 146.9686038
+				TOFFSETZ: -0.793158937
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandPinky1" {
+				TOFFSETX: 80.59213883
+				TOFFSETY: 146.2756572
+				TOFFSETZ: -2.490356465
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandPinky2" {
+				TOFFSETX: 83.63623816
+				TOFFSETY: 146.2756978
+				TOFFSETZ: -2.490356465
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: -0.000763025999999999
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandPinky3" {
+				TOFFSETX: 85.61073965
+				TOFFSETY: 146.2757241
+				TOFFSETZ: -2.490356608
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandThumb4" {
+				TOFFSETX: 83.78109748
+				TOFFSETY: 145.254072
+				TOFFSETZ: 4.989889422
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: -0.000297862
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandIndex4" {
+				TOFFSETX: 89.36395514
+				TOFFSETY: 146.7883673
+				TOFFSETZ: 3.779543315
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandMiddle4" {
+				TOFFSETX: 90.15386395
+				TOFFSETY: 147.0895747
+				TOFFSETZ: 1.305282215
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandRing4" {
+				TOFFSETX: 89.36925598
+				TOFFSETY: 146.9686038
+				TOFFSETZ: -0.793159754
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "LeftHandPinky4" {
+				TOFFSETX: 87.2773543
+				TOFFSETY: 146.2757463
+				TOFFSETZ: -2.490355817
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+		}
+		RIGHTHAND:  {
+			LINK: "RightHandThumb1" {
+				TOFFSETX: -76.05824206
+				TOFFSETY: 145.7904806
+				TOFFSETZ: 4.282814738
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandThumb2" {
+				TOFFSETX: -78.57076957
+				TOFFSETY: 145.2543817
+				TOFFSETZ: 4.990491388
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandThumb3" {
+				TOFFSETX: -81.11235893
+				TOFFSETY: 145.2544085
+				TOFFSETZ: 5.079311703
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0.000602086
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandIndex1" {
+				TOFFSETX: -80.53153393
+				TOFFSETY: 146.7887124
+				TOFFSETZ: 3.472444296
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandIndex2" {
+				TOFFSETX: -84.75428415
+				TOFFSETY: 146.7887121
+				TOFFSETZ: 3.325092508
+				ROFFSETX: 0
+				ROFFSETY: 2.000064658
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandIndex3" {
+				TOFFSETX: -87.40660695
+				TOFFSETY: 146.7887118
+				TOFFSETZ: 3.232540367
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandMiddle1" {
+				TOFFSETX: -80.5196273
+				TOFFSETY: 147.0898718
+				TOFFSETZ: 1.305458427
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandMiddle2" {
+				TOFFSETX: -85.37992179
+				TOFFSETY: 147.0898714
+				TOFFSETZ: 1.135859675
+				ROFFSETX: 0
+				ROFFSETY: 2.000064658
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandMiddle3" {
+				TOFFSETX: -88.14347689
+				TOFFSETY: 147.0898712
+				TOFFSETZ: 1.039426113
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandRing1" {
+				TOFFSETX: -80.6036937
+				TOFFSETY: 146.968899
+				TOFFSETZ: -0.792376756
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandRing2" {
+				TOFFSETX: -85.13869331
+				TOFFSETY: 146.9688986
+				TOFFSETZ: -0.950624428
+				ROFFSETX: 0
+				ROFFSETY: 2.000064658
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandRing3" {
+				TOFFSETX: -87.44181788
+				TOFFSETY: 146.9688984
+				TOFFSETZ: -1.03099138
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandPinky1" {
+				TOFFSETX: -80.59235737
+				TOFFSETY: 146.2759509
+				TOFFSETZ: -2.489574194
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandPinky2" {
+				TOFFSETX: -83.63829999
+				TOFFSETY: 146.2758849
+				TOFFSETZ: -2.595861595
+				ROFFSETX: 0
+				ROFFSETY: 2.0000646575305
+				ROFFSETZ: -0.00124197162447093
+				SOFFSETX: 1
+				SOFFSETY: 0.999999999999714
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandPinky3" {
+				TOFFSETX: -85.61399713
+				TOFFSETY: 146.2758421
+				TOFFSETZ: -2.664803045
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandThumb4" {
+				TOFFSETX: -83.77747869
+				TOFFSETY: 145.2544268
+				TOFFSETZ: 5.17244902
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: -0.000210591999999999
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandIndex4" {
+				TOFFSETX: -89.36363917
+				TOFFSETY: 146.7887117
+				TOFFSETZ: 3.164250215
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandMiddle4" {
+				TOFFSETX: -90.14788957
+				TOFFSETY: 147.089871
+				TOFFSETZ: 0.969482638
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandRing4" {
+				TOFFSETX: -89.3639958
+				TOFFSETY: 146.9688983
+				TOFFSETZ: -1.098065296
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+			LINK: "RightHandPinky4" {
+				TOFFSETX: -87.28162098
+				TOFFSETY: 146.2758059
+				TOFFSETZ: -2.722994364
+				ROFFSETX: 0
+				ROFFSETY: -0
+				ROFFSETZ: 0
+				SOFFSETX: 1
+				SOFFSETY: 1
+				SOFFSETZ: 1
+				PARENTROFFSETX: 0
+				PARENTROFFSETY: 0
+				PARENTROFFSETZ: 0
+			}
+		}
+		LEFTFOOT:  {
+		}
+		RIGHTFOOT:  {
+		}
+		PROPS:  {
+		}
+	}
+	AnimationStack: 2888581200544, "AnimStack::Take 001", "" {
+		Properties70:  {
+			P: "LocalStart", "KTime", "Time", "",1924423250
+			P: "LocalStop", "KTime", "Time", "",230930790000
+			P: "ReferenceStart", "KTime", "Time", "",1924423250
+			P: "ReferenceStop", "KTime", "Time", "",230930790000
+		}
+	}
+	AnimationLayer: 2888571478112, "AnimLayer::BaseLayer", "" {
+	}
+}
+
+; Object connections
+;------------------------------------------------------------------
+
+Connections:  {
+	
+	;Model::Character1_Hips, Constraint::Character1
+	C: "OP",2888573866208,2888547746720, "HipsLink"
+	
+	;Model::Character1_LeftUpLeg, Constraint::Character1
+	C: "OP",2888573884768,2888547746720, "LeftUpLegLink"
+	
+	;Model::Character1_LeftLeg, Constraint::Character1
+	C: "OP",2888573880128,2888547746720, "LeftLegLink"
+	
+	;Model::Character1_LeftFoot, Constraint::Character1
+	C: "OP",2888573875488,2888547746720, "LeftFootLink"
+	
+	;Model::Character1_LeftToeBase, Constraint::Character1
+	C: "OP",2888573873168,2888547746720, "LeftToeBaseLink"
+	
+	;Model::Character1_RightUpLeg, Constraint::Character1
+	C: "OP",2888573870848,2888547746720, "RightUpLegLink"
+	
+	;Model::Character1_RightLeg, Constraint::Character1
+	C: "OP",2888573877808,2888547746720, "RightLegLink"
+	
+	;Model::Character1_RightFoot, Constraint::Character1
+	C: "OP",2888573882448,2888547746720, "RightFootLink"
+	
+	;Model::Character1_RightToeBase, Constraint::Character1
+	C: "OP",2888573854608,2888547746720, "RightToeBaseLink"
+	
+	;Model::Character1_Spine, Constraint::Character1
+	C: "OP",2888573887088,2888547746720, "SpineLink"
+	
+	;Model::Character1_Spine1, Constraint::Character1
+	C: "OP",2888573856928,2888547746720, "Spine1Link"
+	
+	;Model::Character1_LeftShoulder, Constraint::Character1
+	C: "OP",2888573891728,2888547746720, "LeftShoulderLink"
+	
+	;Model::Character1_LeftArm, Constraint::Character1
+	C: "OP",2888573889408,2888547746720, "LeftArmLink"
+	
+	;Model::Character1_LeftForeArm, Constraint::Character1
+	C: "OP",2888573861568,2888547746720, "LeftForeArmLink"
+	
+	;Model::Character1_LeftHand, Constraint::Character1
+	C: "OP",2888573894048,2888547746720, "LeftHandLink"
+	
+	;Model::Character1_RightShoulder, Constraint::Character1
+	C: "OP",2888573942768,2888547746720, "RightShoulderLink"
+	
+	;Model::Character1_RightArm, Constraint::Character1
+	C: "OP",2888573945088,2888547746720, "RightArmLink"
+	
+	;Model::Character1_RightForeArm, Constraint::Character1
+	C: "OP",2888573924208,2888547746720, "RightForeArmLink"
+	
+	;Model::Character1_RightHand, Constraint::Character1
+	C: "OP",2888573919568,2888547746720, "RightHandLink"
+	
+	;Model::Character1_Neck, Constraint::Character1
+	C: "OP",2888574014688,2888547746720, "NeckLink"
+	
+	;Model::Character1_Head, Constraint::Character1
+	C: "OP",2888574023968,2888547746720, "HeadLink"
+	
+	;Model::Character1_Spine2, Constraint::Character1
+	C: "OP",2888573859248,2888547746720, "Spine2Link"
+	
+	;Model::Character1_LeftHandThumb1, Constraint::Character1
+	C: "OP",2888573863888,2888547746720, "LeftHandThumb1Link"
+	
+	;Model::Character1_LeftHandThumb2, Constraint::Character1
+	C: "OP",2888573896368,2888547746720, "LeftHandThumb2Link"
+	
+	;Model::Character1_LeftHandThumb3, Constraint::Character1
+	C: "OP",2888573901008,2888547746720, "LeftHandThumb3Link"
+	
+	;Model::Character1_LeftHandIndex1, Constraint::Character1
+	C: "OP",2888573903328,2888547746720, "LeftHandIndex1Link"
+	
+	;Model::Character1_LeftHandIndex2, Constraint::Character1
+	C: "OP",2888573907968,2888547746720, "LeftHandIndex2Link"
+	
+	;Model::Character1_LeftHandIndex3, Constraint::Character1
+	C: "OP",2888573914928,2888547746720, "LeftHandIndex3Link"
+	
+	;Model::Character1_LeftHandMiddle1, Constraint::Character1
+	C: "OP",2888573910288,2888547746720, "LeftHandMiddle1Link"
+	
+	;Model::Character1_LeftHandMiddle2, Constraint::Character1
+	C: "OP",2888573912608,2888547746720, "LeftHandMiddle2Link"
+	
+	;Model::Character1_LeftHandMiddle3, Constraint::Character1
+	C: "OP",2888573938128,2888547746720, "LeftHandMiddle3Link"
+	
+	;Model::Character1_LeftHandRing1, Constraint::Character1
+	C: "OP",2888573928848,2888547746720, "LeftHandRing1Link"
+	
+	;Model::Character1_LeftHandRing2, Constraint::Character1
+	C: "OP",2888573931168,2888547746720, "LeftHandRing2Link"
+	
+	;Model::Character1_LeftHandRing3, Constraint::Character1
+	C: "OP",2888573933488,2888547746720, "LeftHandRing3Link"
+	
+	;Model::Character1_LeftHandPinky1, Constraint::Character1
+	C: "OP",2888573940448,2888547746720, "LeftHandPinky1Link"
+	
+	;Model::Character1_LeftHandPinky2, Constraint::Character1
+	C: "OP",2888573917248,2888547746720, "LeftHandPinky2Link"
+	
+	;Model::Character1_LeftHandPinky3, Constraint::Character1
+	C: "OP",2888573935808,2888547746720, "LeftHandPinky3Link"
+	
+	;Model::Character1_RightHandThumb1, Constraint::Character1
+	C: "OP",2888573952048,2888547746720, "RightHandThumb1Link"
+	
+	;Model::Character1_RightHandThumb2, Constraint::Character1
+	C: "OP",2888573954368,2888547746720, "RightHandThumb2Link"
+	
+	;Model::Character1_RightHandThumb3, Constraint::Character1
+	C: "OP",2888573956688,2888547746720, "RightHandThumb3Link"
+	
+	;Model::Character1_RightHandIndex1, Constraint::Character1
+	C: "OP",2888573982208,2888547746720, "RightHandIndex1Link"
+	
+	;Model::Character1_RightHandIndex2, Constraint::Character1
+	C: "OP",2888573975248,2888547746720, "RightHandIndex2Link"
+	
+	;Model::Character1_RightHandIndex3, Constraint::Character1
+	C: "OP",2888573977568,2888547746720, "RightHandIndex3Link"
+	
+	;Model::Character1_RightHandMiddle1, Constraint::Character1
+	C: "OP",2888573984528,2888547746720, "RightHandMiddle1Link"
+	
+	;Model::Character1_RightHandMiddle2, Constraint::Character1
+	C: "OP",2888573959008,2888547746720, "RightHandMiddle2Link"
+	
+	;Model::Character1_RightHandMiddle3, Constraint::Character1
+	C: "OP",2888573963648,2888547746720, "RightHandMiddle3Link"
+	
+	;Model::Character1_RightHandRing1, Constraint::Character1
+	C: "OP",2888573989168,2888547746720, "RightHandRing1Link"
+	
+	;Model::Character1_RightHandRing2, Constraint::Character1
+	C: "OP",2888573979888,2888547746720, "RightHandRing2Link"
+	
+	;Model::Character1_RightHandRing3, Constraint::Character1
+	C: "OP",2888573991488,2888547746720, "RightHandRing3Link"
+	
+	;Model::Character1_RightHandPinky1, Constraint::Character1
+	C: "OP",2888573972928,2888547746720, "RightHandPinky1Link"
+	
+	;Model::Character1_RightHandPinky2, Constraint::Character1
+	C: "OP",2888573968288,2888547746720, "RightHandPinky2Link"
+	
+	;Model::Character1_RightHandPinky3, Constraint::Character1
+	C: "OP",2888573961328,2888547746720, "RightHandPinky3Link"
+	
+	;Model::Character1_Reference, Constraint::Character1
+	C: "OP",2888573868528,2888547746720, "ReferenceLink"
+	
+	;Model::Character1_LeftHandThumb4, Constraint::Character1
+	C: "OP",2888573898688,2888547746720, "LeftHandThumb4Link"
+	
+	;Model::Character1_LeftHandIndex4, Constraint::Character1
+	C: "OP",2888573905648,2888547746720, "LeftHandIndex4Link"
+	
+	;Model::Character1_LeftHandMiddle4, Constraint::Character1
+	C: "OP",2888573947408,2888547746720, "LeftHandMiddle4Link"
+	
+	;Model::Character1_LeftHandRing4, Constraint::Character1
+	C: "OP",2888573921888,2888547746720, "LeftHandRing4Link"
+	
+	;Model::Character1_LeftHandPinky4, Constraint::Character1
+	C: "OP",2888573949728,2888547746720, "LeftHandPinky4Link"
+	
+	;Model::Character1_RightHandThumb4, Constraint::Character1
+	C: "OP",2888573926528,2888547746720, "RightHandThumb4Link"
+	
+	;Model::Character1_RightHandIndex4, Constraint::Character1
+	C: "OP",2888573965968,2888547746720, "RightHandIndex4Link"
+	
+	;Model::Character1_RightHandMiddle4, Constraint::Character1
+	C: "OP",2888573986848,2888547746720, "RightHandMiddle4Link"
+	
+	;Model::Character1_RightHandRing4, Constraint::Character1
+	C: "OP",2888573970608,2888547746720, "RightHandRing4Link"
+	
+	;Model::Character1_RightHandPinky4, Constraint::Character1
+	C: "OP",2888573993808,2888547746720, "RightHandPinky4Link"
+	
+	;Model::Character1_Reference, Model::RootNode
+	C: "OO",2888573868528,0
+	
+	;AnimLayer::BaseLayer, AnimStack::Take 001
+	C: "OO",2888571478112,2888581200544
+	
+	;NodeAttribute::, Model::Character1_Reference
+	C: "OO",2888760502960,2888573868528
+	
+	;Model::Character1_Hips, Model::Character1_Reference
+	C: "OO",2888573866208,2888573868528
+	
+	;NodeAttribute::, Model::Character1_Hips
+	C: "OO",2888740181248,2888573866208
+	
+	;Model::Character1_LeftUpLeg, Model::Character1_Hips
+	C: "OO",2888573884768,2888573866208
+	
+	;Model::Character1_RightUpLeg, Model::Character1_Hips
+	C: "OO",2888573870848,2888573866208
+	
+	;Model::Character1_Spine, Model::Character1_Hips
+	C: "OO",2888573887088,2888573866208
+	
+	;NodeAttribute::, Model::Character1_LeftUpLeg
+	C: "OO",2888740179712,2888573884768
+	
+	;Model::Character1_LeftLeg, Model::Character1_LeftUpLeg
+	C: "OO",2888573880128,2888573884768
+	
+	;NodeAttribute::, Model::Character1_LeftLeg
+	C: "OO",2888740181440,2888573880128
+	
+	;Model::Character1_LeftFoot, Model::Character1_LeftLeg
+	C: "OO",2888573875488,2888573880128
+	
+	;NodeAttribute::, Model::Character1_LeftFoot
+	C: "OO",2888740184512,2888573875488
+	
+	;Model::Character1_LeftToeBase, Model::Character1_LeftFoot
+	C: "OO",2888573873168,2888573875488
+	
+	;NodeAttribute::, Model::Character1_LeftToeBase
+	C: "OO",2888740181824,2888573873168
+	
+	;NodeAttribute::, Model::Character1_RightUpLeg
+	C: "OO",2888740182784,2888573870848
+	
+	;Model::Character1_RightLeg, Model::Character1_RightUpLeg
+	C: "OO",2888573877808,2888573870848
+	
+	;NodeAttribute::, Model::Character1_RightLeg
+	C: "OO",2888740163584,2888573877808
+	
+	;Model::Character1_RightFoot, Model::Character1_RightLeg
+	C: "OO",2888573882448,2888573877808
+	
+	;NodeAttribute::, Model::Character1_RightFoot
+	C: "OO",2888740183936,2888573882448
+	
+	;Model::Character1_RightToeBase, Model::Character1_RightFoot
+	C: "OO",2888573854608,2888573882448
+	
+	;NodeAttribute::, Model::Character1_RightToeBase
+	C: "OO",2888740163008,2888573854608
+	
+	;NodeAttribute::, Model::Character1_Spine
+	C: "OO",2888740165312,2888573887088
+	
+	;Model::Character1_Spine1, Model::Character1_Spine
+	C: "OO",2888573856928,2888573887088
+	
+	;NodeAttribute::, Model::Character1_Spine1
+	C: "OO",2888740161088,2888573856928
+	
+	;Model::Character1_Spine2, Model::Character1_Spine1
+	C: "OO",2888573859248,2888573856928
+	
+	;NodeAttribute::, Model::Character1_Spine2
+	C: "OO",2888740163776,2888573859248
+	
+	;Model::Character1_LeftShoulder, Model::Character1_Spine2
+	C: "OO",2888573891728,2888573859248
+	
+	;Model::Character1_RightShoulder, Model::Character1_Spine2
+	C: "OO",2888573942768,2888573859248
+	
+	;Model::Character1_Neck, Model::Character1_Spine2
+	C: "OO",2888574014688,2888573859248
+	
+	;NodeAttribute::, Model::Character1_LeftShoulder
+	C: "OO",2888740165696,2888573891728
+	
+	;Model::Character1_LeftArm, Model::Character1_LeftShoulder
+	C: "OO",2888573889408,2888573891728
+	
+	;NodeAttribute::, Model::Character1_LeftArm
+	C: "OO",2888740164928,2888573889408
+	
+	;Model::Character1_LeftForeArm, Model::Character1_LeftArm
+	C: "OO",2888573861568,2888573889408
+	
+	;NodeAttribute::, Model::Character1_LeftForeArm
+	C: "OO",2888740159936,2888573861568
+	
+	;Model::Character1_LeftHand, Model::Character1_LeftForeArm
+	C: "OO",2888573894048,2888573861568
+	
+	;NodeAttribute::, Model::Character1_LeftHand
+	C: "OO",2888740165888,2888573894048
+	
+	;Model::Character1_LeftHandThumb1, Model::Character1_LeftHand
+	C: "OO",2888573863888,2888573894048
+	
+	;Model::Character1_LeftHandIndex1, Model::Character1_LeftHand
+	C: "OO",2888573903328,2888573894048
+	
+	;Model::Character1_LeftHandMiddle1, Model::Character1_LeftHand
+	C: "OO",2888573910288,2888573894048
+	
+	;Model::Character1_LeftHandRing1, Model::Character1_LeftHand
+	C: "OO",2888573928848,2888573894048
+	
+	;Model::Character1_LeftHandPinky1, Model::Character1_LeftHand
+	C: "OO",2888573940448,2888573894048
+	
+	;NodeAttribute::, Model::Character1_LeftHandThumb1
+	C: "OO",2888740157824,2888573863888
+	
+	;Model::Character1_LeftHandThumb2, Model::Character1_LeftHandThumb1
+	C: "OO",2888573896368,2888573863888
+	
+	;NodeAttribute::, Model::Character1_LeftHandThumb2
+	C: "OO",2888740158208,2888573896368
+	
+	;Model::Character1_LeftHandThumb3, Model::Character1_LeftHandThumb2
+	C: "OO",2888573901008,2888573896368
+	
+	;NodeAttribute::, Model::Character1_LeftHandThumb3
+	C: "OO",2888740164160,2888573901008
+	
+	;Model::Character1_LeftHandThumb4, Model::Character1_LeftHandThumb3
+	C: "OO",2888573898688,2888573901008
+	
+	;NodeAttribute::, Model::Character1_LeftHandThumb4
+	C: "OO",2888740154176,2888573898688
+	
+	;NodeAttribute::, Model::Character1_LeftHandIndex1
+	C: "OO",2888740157248,2888573903328
+	
+	;Model::Character1_LeftHandIndex2, Model::Character1_LeftHandIndex1
+	C: "OO",2888573907968,2888573903328
+	
+	;NodeAttribute::, Model::Character1_LeftHandIndex2
+	C: "OO",2888740162048,2888573907968
+	
+	;Model::Character1_LeftHandIndex3, Model::Character1_LeftHandIndex2
+	C: "OO",2888573914928,2888573907968
+	
+	;NodeAttribute::, Model::Character1_LeftHandIndex3
+	C: "OO",2888740161472,2888573914928
+	
+	;Model::Character1_LeftHandIndex4, Model::Character1_LeftHandIndex3
+	C: "OO",2888573905648,2888573914928
+	
+	;NodeAttribute::, Model::Character1_LeftHandIndex4
+	C: "OO",2888740154560,2888573905648
+	
+	;NodeAttribute::, Model::Character1_LeftHandMiddle1
+	C: "OO",2888740165504,2888573910288
+	
+	;Model::Character1_LeftHandMiddle2, Model::Character1_LeftHandMiddle1
+	C: "OO",2888573912608,2888573910288
+	
+	;NodeAttribute::, Model::Character1_LeftHandMiddle2
+	C: "OO",2888740153792,2888573912608
+	
+	;Model::Character1_LeftHandMiddle3, Model::Character1_LeftHandMiddle2
+	C: "OO",2888573938128,2888573912608
+	
+	;NodeAttribute::, Model::Character1_LeftHandMiddle3
+	C: "OO",2888740160320,2888573938128
+	
+	;Model::Character1_LeftHandMiddle4, Model::Character1_LeftHandMiddle3
+	C: "OO",2888573947408,2888573938128
+	
+	;NodeAttribute::, Model::Character1_LeftHandMiddle4
+	C: "OO",2888740161664,2888573947408
+	
+	;NodeAttribute::, Model::Character1_LeftHandRing1
+	C: "OO",2888740157440,2888573928848
+	
+	;Model::Character1_LeftHandRing2, Model::Character1_LeftHandRing1
+	C: "OO",2888573931168,2888573928848
+	
+	;NodeAttribute::, Model::Character1_LeftHandRing2
+	C: "OO",2888740155520,2888573931168
+	
+	;Model::Character1_LeftHandRing3, Model::Character1_LeftHandRing2
+	C: "OO",2888573933488,2888573931168
+	
+	;NodeAttribute::, Model::Character1_LeftHandRing3
+	C: "OO",2888740164544,2888573933488
+	
+	;Model::Character1_LeftHandRing4, Model::Character1_LeftHandRing3
+	C: "OO",2888573921888,2888573933488
+	
+	;NodeAttribute::, Model::Character1_LeftHandRing4
+	C: "OO",2888740160128,2888573921888
+	
+	;NodeAttribute::, Model::Character1_LeftHandPinky1
+	C: "OO",2888740153984,2888573940448
+	
+	;Model::Character1_LeftHandPinky2, Model::Character1_LeftHandPinky1
+	C: "OO",2888573917248,2888573940448
+	
+	;NodeAttribute::, Model::Character1_LeftHandPinky2
+	C: "OO",2888740155136,2888573917248
+	
+	;Model::Character1_LeftHandPinky3, Model::Character1_LeftHandPinky2
+	C: "OO",2888573935808,2888573917248
+	
+	;NodeAttribute::, Model::Character1_LeftHandPinky3
+	C: "OO",2888740161280,2888573935808
+	
+	;Model::Character1_LeftHandPinky4, Model::Character1_LeftHandPinky3
+	C: "OO",2888573949728,2888573935808
+	
+	;NodeAttribute::, Model::Character1_LeftHandPinky4
+	C: "OO",2888740160512,2888573949728
+	
+	;NodeAttribute::, Model::Character1_RightShoulder
+	C: "OO",2888740163200,2888573942768
+	
+	;Model::Character1_RightArm, Model::Character1_RightShoulder
+	C: "OO",2888573945088,2888573942768
+	
+	;NodeAttribute::, Model::Character1_RightArm
+	C: "OO",2888740162624,2888573945088
+	
+	;Model::Character1_RightForeArm, Model::Character1_RightArm
+	C: "OO",2888573924208,2888573945088
+	
+	;NodeAttribute::, Model::Character1_RightForeArm
+	C: "OO",2888740162816,2888573924208
+	
+	;Model::Character1_RightHand, Model::Character1_RightForeArm
+	C: "OO",2888573919568,2888573924208
+	
+	;NodeAttribute::, Model::Character1_RightHand
+	C: "OO",2888740154752,2888573919568
+	
+	;Model::Character1_RightHandThumb1, Model::Character1_RightHand
+	C: "OO",2888573952048,2888573919568
+	
+	;Model::Character1_RightHandIndex1, Model::Character1_RightHand
+	C: "OO",2888573982208,2888573919568
+	
+	;Model::Character1_RightHandMiddle1, Model::Character1_RightHand
+	C: "OO",2888573984528,2888573919568
+	
+	;Model::Character1_RightHandRing1, Model::Character1_RightHand
+	C: "OO",2888573989168,2888573919568
+	
+	;Model::Character1_RightHandPinky1, Model::Character1_RightHand
+	C: "OO",2888573972928,2888573919568
+	
+	;NodeAttribute::, Model::Character1_RightHandThumb1
+	C: "OO",2888740159552,2888573952048
+	
+	;Model::Character1_RightHandThumb2, Model::Character1_RightHandThumb1
+	C: "OO",2888573954368,2888573952048
+	
+	;NodeAttribute::, Model::Character1_RightHandThumb2
+	C: "OO",2888740163392,2888573954368
+	
+	;Model::Character1_RightHandThumb3, Model::Character1_RightHandThumb2
+	C: "OO",2888573956688,2888573954368
+	
+	;NodeAttribute::, Model::Character1_RightHandThumb3
+	C: "OO",2888740159360,2888573956688
+	
+	;Model::Character1_RightHandThumb4, Model::Character1_RightHandThumb3
+	C: "OO",2888573926528,2888573956688
+	
+	;NodeAttribute::, Model::Character1_RightHandThumb4
+	C: "OO",2888740156096,2888573926528
+	
+	;NodeAttribute::, Model::Character1_RightHandIndex1
+	C: "OO",2888740154944,2888573982208
+	
+	;Model::Character1_RightHandIndex2, Model::Character1_RightHandIndex1
+	C: "OO",2888573975248,2888573982208
+	
+	;NodeAttribute::, Model::Character1_RightHandIndex2
+	C: "OO",2888740155328,2888573975248
+	
+	;Model::Character1_RightHandIndex3, Model::Character1_RightHandIndex2
+	C: "OO",2888573977568,2888573975248
+	
+	;NodeAttribute::, Model::Character1_RightHandIndex3
+	C: "OO",2888740164736,2888573977568
+	
+	;Model::Character1_RightHandIndex4, Model::Character1_RightHandIndex3
+	C: "OO",2888573965968,2888573977568
+	
+	;NodeAttribute::, Model::Character1_RightHandIndex4
+	C: "OO",2888740155904,2888573965968
+	
+	;NodeAttribute::, Model::Character1_RightHandMiddle1
+	C: "OO",2888740163968,2888573984528
+	
+	;Model::Character1_RightHandMiddle2, Model::Character1_RightHandMiddle1
+	C: "OO",2888573959008,2888573984528
+	
+	;NodeAttribute::, Model::Character1_RightHandMiddle2
+	C: "OO",2888740155712,2888573959008
+	
+	;Model::Character1_RightHandMiddle3, Model::Character1_RightHandMiddle2
+	C: "OO",2888573963648,2888573959008
+	
+	;NodeAttribute::, Model::Character1_RightHandMiddle3
+	C: "OO",2888740160704,2888573963648
+	
+	;Model::Character1_RightHandMiddle4, Model::Character1_RightHandMiddle3
+	C: "OO",2888573986848,2888573963648
+	
+	;NodeAttribute::, Model::Character1_RightHandMiddle4
+	C: "OO",2888740160896,2888573986848
+	
+	;NodeAttribute::, Model::Character1_RightHandRing1
+	C: "OO",2888740159168,2888573989168
+	
+	;Model::Character1_RightHandRing2, Model::Character1_RightHandRing1
+	C: "OO",2888573979888,2888573989168
+	
+	;NodeAttribute::, Model::Character1_RightHandRing2
+	C: "OO",2888740158976,2888573979888
+	
+	;Model::Character1_RightHandRing3, Model::Character1_RightHandRing2
+	C: "OO",2888573991488,2888573979888
+	
+	;NodeAttribute::, Model::Character1_RightHandRing3
+	C: "OO",2888740159744,2888573991488
+	
+	;Model::Character1_RightHandRing4, Model::Character1_RightHandRing3
+	C: "OO",2888573970608,2888573991488
+	
+	;NodeAttribute::, Model::Character1_RightHandRing4
+	C: "OO",2888740161856,2888573970608
+	
+	;NodeAttribute::, Model::Character1_RightHandPinky1
+	C: "OO",2888740165120,2888573972928
+	
+	;Model::Character1_RightHandPinky2, Model::Character1_RightHandPinky1
+	C: "OO",2888573968288,2888573972928
+	
+	;NodeAttribute::, Model::Character1_RightHandPinky2
+	C: "OO",2888740156288,2888573968288
+	
+	;Model::Character1_RightHandPinky3, Model::Character1_RightHandPinky2
+	C: "OO",2888573961328,2888573968288
+	
+	;NodeAttribute::, Model::Character1_RightHandPinky3
+	C: "OO",2888740156480,2888573961328
+	
+	;Model::Character1_RightHandPinky4, Model::Character1_RightHandPinky3
+	C: "OO",2888573993808,2888573961328
+	
+	;NodeAttribute::, Model::Character1_RightHandPinky4
+	C: "OO",2888740156672,2888573993808
+	
+	;NodeAttribute::, Model::Character1_Neck
+	C: "OO",2888740162240,2888574014688
+	
+	;Model::Character1_Head, Model::Character1_Neck
+	C: "OO",2888574023968,2888574014688
+	
+	;NodeAttribute::, Model::Character1_Head
+	C: "OO",2888740156864,2888574023968
+}
+;Takes section
+;----------------------------------------------------
+
+Takes:  {
+	Current: "Take 001"
+	Take: "Take 001" {
+		FileName: "Take_001.tak"
+		LocalTime: 1924423250,230930790000
+		ReferenceTime: 1924423250,230930790000
+	}
+}

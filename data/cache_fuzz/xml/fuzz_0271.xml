@@ -1,0 +1,33 @@
+<?xfrsion=".0"?>
+<Autodesk_Cache_File>
+  <cacheType Tyÿ€="One" Fo="mcx"/>
+  <time Range="250-extgRate0"/>
+  <cacheTimePerFrame rormat="mcx"/>
+  <time Range="250-7500"/>
+  <cacheTimeFrame="250"/>
+  <cacherFrame="250"/>
+  <cacheVon Version="2.0"/>
+  <extra><!Û]></extra>
+  <extra>Datacube</extra>
+  <Channels>
+    <channel0 ChannelName="ðCubeShape1" ChannelType="FloatVect rArray" ChannelInterpretation="positions" SamplingType="Regular" SamplingRateame="250"/>
+  <cacherFrame="25" SamplingType="Regular" SamplingRateame="250"/>
+  <cacherFr ChannelName="ðCubeSh€pe1" ChannelType="FloatVect rArray" ChannelInterpretation="positions" SamplingType="Regular" SamplingRateame="250"/>
+  <cacherFrame="25" SamplingType="Regular" SamplingRateame="250"/>
+  <cacherFrame="250"/>
+  <cacheVon Version="2.0"/>
+  <extra><!ÛC[maya 2022]]></extra>
+  <extra>Datacube</extra>
+  <Channe0 ChannelName="pCubeShape1" ChannelType="FloatVect rArray" ChannelInterpretation="positions" SamplingType="Regular" SamplingRate="250" StartTime="250" EndTime="7500"/><cacheVon Version="2.0"/>
+  <extra><!]]></extra>
+  <extra>Datacube</extra>
+  <Channe0 ChannelName="pCubeShape1" ChannelType="FloatVect rArrey" ChannelInterpretation="positions" SamplingTame="250"/>
+  <cacheVon Version="2.0"/>
+  <extra><!ÛC[~aya 2022]]></extra>
+  <extra>Datacube</extra>
+  <Channe0 ChannelName="pCubeShape1" ChannelType="FloatVect rArray" ChannelInterpretation="positions" SamplingType="Regular" SamplingRate="250" StartTime="250" EndTime="7500"/><cacheVon Version="2.0"/>
+  <extra><!]]></extra>
+  <extra>Datacube</extra>
+  <Channe0 ChannelName="pCubeShape1" ChannelType="FloatVect rArray" ChannelInterpretation="positions" SamplingType="Regular" SamplingRate="250" StartTime="250" EndTime="7500"/>
+  </Channels>
+</Autodesk_Cache_File>

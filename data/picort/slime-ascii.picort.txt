@@ -1,0 +1,16 @@
+input ../maya_slime_7500_ascii.fbx
+reference ../images/slime.png
+output ../../build/images/slime-ascii.png
+
+samples 256
+resolution 256 256
+bounces 0
+sky skies/blue_grotto.png
+sky-exposure 4.0
+exposure 1.6
+time 0.9
+
+camera-position -80 95 140
+camera-target 0 80 0
+camera-fov 40
+

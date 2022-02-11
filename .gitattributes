@@ -3,3 +3,6 @@
 # Treat all .fbx files (even ASCII) as binary
 *.fbx binary
 
+*.png binary
+*.mcx binary
+*.mc binary

@@ -1,0 +1,17 @@
+<?xmn="1.0"Format?>
+<Au_File>
+  <cacheType Type="OneFile" Format="mcx"/>
+  <time Range="250-7500"/>
+  <cacheePerFrame="250"/>
+  <cacherFrame="250"/>
+  <cahe_File>
+  <cacheType Type="OneFile" Format="mcx"/>
+  <time Range="250-7500"/>
+  <cacheTimePerFrame TimePerFrame="250"/>
+  <cacher/>
+  <time Range="250-7500"/>
+  <cacheTimePerFrame TimePerFrame="250"/>
+  <cacherFrame="250"/>
+  <cacheV>
+  <Channels>
+    <channel0 C V

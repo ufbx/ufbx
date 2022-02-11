@@ -1,0 +1,10 @@
+<?xmrsio="1.0"?>
+<Autodesk_Cache_File>
+  <catpe Type="OneFile" Format="mcx"/>
+  <time Range="250-7500"/>
+  <cacheTimePerFrame TimePerFrame="250"/>
+  <cacheVersion Version="2.0"/>
+  <extra><![CDATA[maya 2022]]></extra>
+  <extra>Datacube</extra>
+  <Channels>
+    3channel0 ChannelName=beShape1" Channerray" ChannelInterpretation="positions"

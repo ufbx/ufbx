@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+# Cancel any in-flight jobs for the same PR/branch so there's only one active
+# at a time
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  ci_ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      - name: Install apt dependencies
+        run: sudo apt install -y gcc-multilib g++-multilib lcov llvm-11
+      - name: Run tests
+        run: python3 misc/run_tests.py tests
+      - name: Verbose test info
+        run: build/runner_clang_release_x64/runner -d data -v
+      - name: Generate coverage
+        run: LLVM_COV=llvm-cov-11 bash misc/generate_coverage.sh
+      - name: Upload coverage
+        run: bash <(curl -s https://codecov.io/bash) -f coverage.lcov -y .github/codecov.yml
+
+  ci_windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run tests
+        run: python misc/run_tests.py tests
+      - name: Verbose test info
+        run: build\runner_vs_cl64_release_x64\runner.exe -d data -v
+
+  ci_picort:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run picort
+        run: python misc/run_tests.py picort
+      - name: Upload result images
+        env:
+          BUNNY_API_TOKEN: ${{ secrets.BUNNY_API_TOKEN }}
+        if: ${{ always() && !cancelled() }}
+        continue-on-error: true
+        run: |
+          HASH="$(git rev-parse --short=16 HEAD)"
+          URL="https://storage.bunnycdn.com/ufbx-images/$HASH"
+          DST_URL="https://ufbx-images.b-cdn.net/$HASH"
+          curl -sS -w " -> $DST_URL/barbarian.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian.png --data-binary @build/images/barbarian.png
+          curl -sS -w " -> $DST_URL/barbarian-scalar.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian-scalar.png --data-binary @build/images/barbarian-scalar.png
+          curl -sS -w " -> $DST_URL/barbarian-big.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian-big.png --data-binary @build/images/barbarian-big.png
+          curl -sS -w " -> $DST_URL/slime-binary.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-binary.png --data-binary @build/images/slime-binary.png
+          curl -sS -w " -> $DST_URL/slime-ascii.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-ascii.png --data-binary @build/images/slime-ascii.png
+          curl -sS -w " -> $DST_URL/slime-big.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-big.png --data-binary @build/images/slime-big.png
+
+  ci_domfuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run domfuzz
+        run: python misc/run_tests.py domfuzz
+
+  ci_wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install wasi-sdk
+        run: |
+          mkdir build
+          export WASI_VERSION=14
+          export WASI_VERSION_FULL=${WASI_VERSION}.0
+          curl -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_VERSION}/wasi-sdk-${WASI_VERSION_FULL}-linux.tar.gz -o build/wasi-sdk.tar.gz
+          tar xzf build/wasi-sdk.tar.gz -C build
+          mv build/wasi-sdk-${WASI_VERSION_FULL} build/wasi-sdk
+      - name: Install wasmtime
+        run: |
+          curl https://wasmtime.dev/install.sh -sSf | bash
+          echo "$HOME/.wasmtime/bin" >> $GITHUB_PATH
+      - name: Test wasmtime
+        run: wasmtime --version
+      - name: Run tests
+        run: python3 misc/run_tests.py tests --wasi-sdk build/wasi-sdk --compiler wasi_clang
+
+  ci_arm32:
+    runs-on: [self-hosted, ARM]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      - name: Run tests
+        run: python3 misc/run_tests.py tests --no-sanitize --threads 2
+
+
+  ci_arm64:
+    runs-on: [self-hosted, ARM64]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      - name: Run tests
+        run: python3 misc/run_tests.py tests --no-sanitize --threads 2

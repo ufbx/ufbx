@@ -81,4 +81,38 @@
     </Expand>
   </Type>
 
+  <Type Name="ufbxi_xml_tag">
+
+    <DisplayString Condition="name.length > 0">&lt;{name.data,sb}&gt;</DisplayString>
+    <DisplayString Condition="text.length > 0">{text.data,s}</DisplayString>
+    <DisplayString Condition="name.length == 0 &amp;&amp; text.length == 0">(XML root)</DisplayString>
+
+    <Expand>
+
+      <Item Name="name" Condition="name.length > 0">name,s</Item>
+      <Item Name="text" Condition="text.length > 0">text,s</Item>
+
+      <Synthetic Name="attribs" Condition="num_attribs">
+        <DisplayString>{{ count={num_attribs} }}</DisplayString>
+        <Expand>
+          <ArrayItems>
+            <Size>num_attribs</Size>
+            <ValuePointer>attribs</ValuePointer>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+
+      <Synthetic Name="children" Condition="num_children">
+        <DisplayString>{{ count={num_children} }}</DisplayString>
+        <Expand>
+          <ArrayItems>
+            <Size>num_children</Size>
+            <ValuePointer>children</ValuePointer>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+
+    </Expand>
+  </Type>
+
 </AutoVisualizer>

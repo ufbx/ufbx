@@ -1,0 +1,10 @@
+<?xmrsion="1.0"?>
+<Autodesk_Cache_File><cacheType Type="Ïne" Format="mcx"/>
+  <timnge="2500"/>
+  <cacheTimePerFrame TimePerFrame="250"/>
+  <cach="2.0"/> <extra>Datacube</extra> <extra><![CDATA[maya 2022]]></extra>
+  <extra>Datacube</extra>
+  <Channels>
+    < ChannelName="pCubeShape1" ChannelType="torArray" ChannelInterpretation="positions" SamplingType="Regular"gRate="250" StartTime="250" EndTime="7500"/>
+  </Channels>
+</Autodesk_Cache_File>
