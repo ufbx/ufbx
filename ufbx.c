@@ -1257,6 +1257,8 @@ static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
 		error->type = UFBX_ERROR_NOT_FBX;
 	} else if (!strcmp(error->description, "File not found")) {
 		error->type = UFBX_ERROR_FILE_NOT_FOUND;
+	} else if (!strcmp(error->description, "Uninitialized options")) {
+		error->type = UFBX_ERROR_FILE_NOT_FOUND;
 	}
 }
 
@@ -12454,6 +12456,8 @@ typedef struct {
 	ufbx_string filename;
 	bool owned_by_scene;
 
+	ufbx_geometry_cache_opts opts;
+
 	ufbxi_allocator *ator_tmp;
 	ufbxi_allocator ator_result;
 
@@ -13082,6 +13086,10 @@ static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 
 static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_string filename)
 {
+	// `ufbx_geometry_cache_opts` must be cleared to zero first!
+	ufbx_assert(cc->opts._begin_zero == 0 && cc->opts._end_zero == 0);
+	ufbxi_check_err_msg(&cc->error, cc->opts._begin_zero == 0 && cc->opts._end_zero == 0, "Uninitialized options");
+
 	cc->tmp.ator = cc->ator_tmp;
 	cc->tmp_stack.ator = cc->ator_tmp;
 
@@ -13172,6 +13180,8 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 	ufbxi_init_ator(&cc.error, &ator_tmp, &opts.temp_allocator);
 	ufbxi_init_ator(&cc.error, &cc.ator_result, &opts.result_allocator);
 	cc.ator_tmp = &ator_tmp;
+
+	cc.opts = opts;
 
 	cc.open_file_fn = opts.open_file_fn;
 	cc.open_file_user = opts.open_file_user;
@@ -13473,6 +13483,10 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 
 ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 {
+	// `ufbx_load_opts` must be cleared to zero first!
+	ufbx_assert(uc->opts._begin_zero == 0 && uc->opts._end_zero == 0);
+	ufbxi_check_msg(uc->opts._begin_zero == 0 && uc->opts._end_zero == 0, "Uninitialized options");
+
 	ufbxi_check(ufbxi_load_strings(uc));
 	ufbxi_check(ufbxi_load_maps(uc));
 	ufbxi_check(ufbxi_begin_parse(uc));
@@ -14104,6 +14118,10 @@ ufbxi_nodiscard static int ufbxi_translate_anim(ufbxi_eval_context *ec, ufbx_ani
 
 ufbxi_nodiscard static int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 {
+	// `ufbx_evaluate_opts` must be cleared to zero first!
+	ufbx_assert(ec->opts._begin_zero == 0 && ec->opts._end_zero == 0);
+	ufbxi_check_err_msg(&ec->error, ec->opts._begin_zero == 0 && ec->opts._end_zero == 0, "Uninitialized options");
+
 	ec->scene = ec->src_scene;
 	size_t num_elements = ec->scene.elements.count;
 
@@ -14654,6 +14672,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, uf
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufbxi_tessellate_context *tc)
 {
+	// `ufbx_tessellate_opts` must be cleared to zero first!
+	ufbx_assert(tc->opts._begin_zero == 0 && tc->opts._end_zero == 0);
+	ufbxi_check_err_msg(&tc->error, tc->opts._begin_zero == 0 && tc->opts._end_zero == 0, "Uninitialized options");
+
 	if (tc->opts.span_subdivision_u <= 0) {
 		tc->opts.span_subdivision_u = 4;
 	}
@@ -16040,6 +16062,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivide_context *sc, size_t level)
 {
+	// `ufbx_subdivide_opts` must be cleared to zero first!
+	ufbx_assert(sc->opts._begin_zero == 0 && sc->opts._end_zero == 0);
+	ufbxi_check_err_msg(&sc->error, sc->opts._begin_zero == 0 && sc->opts._end_zero == 0, "Uninitialized options");
+
 	if (sc->opts.boundary == UFBX_SUBDIVISION_BOUNDARY_DEFAULT) {
 		sc->opts.boundary = sc->src_mesh.subdivision_boundary;
 	}
@@ -18005,6 +18031,10 @@ ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *fram
 		opts.open_file_fn = ufbx_open_file;
 	}
 
+	// `ufbx_geometry_cache_data_opts` must be cleared to zero first!
+	ufbx_assert(opts._begin_zero == 0 && opts._end_zero == 0);
+	if (!(opts._begin_zero == 0 && opts._end_zero == 0)) return 0;
+
 	bool use_double = false;
 
 	size_t src_count = 0;
@@ -18170,6 +18200,10 @@ ufbxi_noinline size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *
 	} else {
 		memset(&opts, 0, sizeof(opts));
 	}
+
+	// `ufbx_geometry_cache_data_opts` must be cleared to zero first!
+	ufbx_assert(opts._begin_zero == 0 && opts._end_zero == 0);
+	if (!(opts._begin_zero == 0 && opts._end_zero == 0)) return 0;
 
 	size_t begin = 0;
 	size_t end = channel->frames.count;
