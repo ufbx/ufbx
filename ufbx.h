@@ -2593,6 +2593,7 @@ typedef enum ufbx_error_type {
 	UFBX_ERROR_CANCELLED,
 	UFBX_ERROR_UNSUPPORTED_VERSION,
 	UFBX_ERROR_NOT_FBX,
+	UFBX_ERROR_UNINITIALIZED_OPTIONS,
 } ufbx_error_type;
 
 // Error description with detailed stack trace
@@ -2656,7 +2657,11 @@ struct ufbx_inflate_retain {
 
 // -- Main API
 
+// Options for `ufbx_load_file/memory/stream/stdio()`
+// NOTE: Initialize to zero with `{ 0 }` (C) or `{ }` (C++)
 typedef struct ufbx_load_opts {
+	uint32_t _begin_zero; 
+
 	ufbx_allocator temp_allocator;   // < Allocator used during loading
 	ufbx_allocator result_allocator; // < Allocator used for the final scene
 
@@ -2722,9 +2727,13 @@ typedef struct ufbx_load_opts {
 	bool use_root_transform;
 	ufbx_transform root_transform;
 
+	uint32_t _end_zero; 
 } ufbx_load_opts;
 
+// Options for `ufbx_evaluate_scene()`
+// NOTE: Initialize to zero with `{ 0 }` (C) or `{ }` (C++)
 typedef struct ufbx_evaluate_opts {
+	uint32_t _begin_zero;
 
 	ufbx_allocator temp_allocator;   // < Allocator used during evaluation
 	ufbx_allocator result_allocator; // < Allocator used for the final scene
@@ -2739,9 +2748,14 @@ typedef struct ufbx_evaluate_opts {
 	ufbx_open_file_fn *open_file_fn;
 	void *open_file_user;
 
+	uint32_t _end_zero;
 } ufbx_evaluate_opts;
 
+// Options for `ufbx_tessellate_nurbs_surface()`
+// NOTE: Initialize to zero with `{ 0 }` (C) or `{ }` (C++)
 typedef struct ufbx_tessellate_opts {
+	uint32_t _begin_zero;
+
 	ufbx_allocator temp_allocator;   // < Allocator used during tessellation
 	ufbx_allocator result_allocator; // < Allocator used for the final mesh
 
@@ -2753,9 +2767,13 @@ typedef struct ufbx_tessellate_opts {
 	int32_t span_subdivision_u;
 	int32_t span_subdivision_v;
 
+	uint32_t _end_zero;
 } ufbx_tessellate_opts;
 
+// Options for `ufbx_subdivide_mesh()`
+// NOTE: Initialize to zero with `{ 0 }` (C) or `{ }` (C++)
 typedef struct ufbx_subdivide_opts {
+	uint32_t _begin_zero;
 
 	ufbx_allocator temp_allocator;   // < Allocator used during subdivision
 	ufbx_allocator result_allocator; // < Allocator used for the final mesh
@@ -2773,9 +2791,13 @@ typedef struct ufbx_subdivide_opts {
 	// Subdivide also tangent attributes
 	bool interpolate_tangents;
 
+	uint32_t _end_zero;
 } ufbx_subdivide_opts;
 
+// Options for `ufbx_load_geometry_cache()`
+// NOTE: Initialize to zero with `{ 0 }` (C) or `{ }` (C++)
 typedef struct ufbx_geometry_cache_opts {
+	uint32_t _begin_zero;
 
 	ufbx_allocator temp_allocator;   // < Allocator used during loading
 	ufbx_allocator result_allocator; // < Allocator used for the final scene
@@ -2787,9 +2809,13 @@ typedef struct ufbx_geometry_cache_opts {
 	// FPS value for converting frame times to seconds
 	double frames_per_second;
 
+	uint32_t _end_zero;
 } ufbx_geometry_cache_opts;
 
+// Options for `ufbx_read_geometry_cache_*()`
+// NOTE: Initialize to zero with `{ 0 }` (C) or `{ }` (C++)
 typedef struct ufbx_geometry_cache_data_opts {
+	uint32_t _begin_zero;
 
 	// External file callbacks (defaults to stdio.h)
 	ufbx_open_file_fn *open_file_fn;
@@ -2799,6 +2825,7 @@ typedef struct ufbx_geometry_cache_data_opts {
 	bool use_weight;
 	ufbx_real weight;
 
+	uint32_t _end_zero;
 } ufbx_geometry_cache_data_opts;
 
 // -- API
