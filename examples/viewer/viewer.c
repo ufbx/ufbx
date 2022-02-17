@@ -498,9 +498,6 @@ void read_node_anim(viewer_anim *va, viewer_node_anim *vna, ufbx_anim_stack *sta
 
 	bool const_rot = true, const_pos = true, const_scale = true;
 
-	// DEBUG
-	const_rot = const_pos = const_scale = false;
-
 	// Sample the node's transform evenly for the whole animation stack duration
 	for (size_t i = 0; i < va->num_frames; i++) {
 		double time = stack->time_begin + (double)i / va->framerate;
