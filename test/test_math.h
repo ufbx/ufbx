@@ -174,3 +174,118 @@ UFBXT_TEST(matrix_to_transform_random)
 	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
 }
 #endif
+
+UFBXT_TEST(matrix_inverse_simple)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	{
+		ufbx_matrix m = { 0 };
+		m.m00 = 2.0f;
+		m.m11 = 0.5f;
+		m.m22 = 0.25f;
+		m.m03 = 1.0f;
+		m.m13 = 2.0f;
+		m.m23 = 3.0f;
+
+		ufbx_matrix im = ufbx_matrix_invert(&m);
+		ufbxt_assert_close_real(&err, im.m00, 0.5f);
+		ufbxt_assert_close_real(&err, im.m10, 0.0f);
+		ufbxt_assert_close_real(&err, im.m20, 0.0f);
+		ufbxt_assert_close_real(&err, im.m01, 0.0f);
+		ufbxt_assert_close_real(&err, im.m11, 2.0f);
+		ufbxt_assert_close_real(&err, im.m21, 0.0f);
+		ufbxt_assert_close_real(&err, im.m02, 0.0f);
+		ufbxt_assert_close_real(&err, im.m12, 0.0f);
+		ufbxt_assert_close_real(&err, im.m22, 4.0f);
+		ufbxt_assert_close_real(&err, im.m03, -0.5f);
+		ufbxt_assert_close_real(&err, im.m13, -4.0f);
+		ufbxt_assert_close_real(&err, im.m23, -12.0f);
+	}
+
+	{
+		ufbx_matrix m = { 0 };
+		m.m00 = 1.0f;
+		m.m12 = -1.0f;
+		m.m21 = 1.0f;
+		m.m13 = 1.0f;
+		m.m23 = 2.0f;
+
+		ufbx_matrix im = ufbx_matrix_invert(&m);
+		ufbxt_assert_close_real(&err, im.m00, 1.0f);
+		ufbxt_assert_close_real(&err, im.m10, 0.0f);
+		ufbxt_assert_close_real(&err, im.m20, 0.0f);
+		ufbxt_assert_close_real(&err, im.m01, 0.0f);
+		ufbxt_assert_close_real(&err, im.m11, 0.0f);
+		ufbxt_assert_close_real(&err, im.m21, -1.0f);
+		ufbxt_assert_close_real(&err, im.m02, 0.0f);
+		ufbxt_assert_close_real(&err, im.m12, 1.0f);
+		ufbxt_assert_close_real(&err, im.m22, 0.0f);
+		ufbxt_assert_close_real(&err, im.m03, 0.0f);
+		ufbxt_assert_close_real(&err, im.m13, -2.0f);
+		ufbxt_assert_close_real(&err, im.m23, 1.0f);
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
+UFBXT_TEST(matrix_inverse_random)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	size_t steps = ufbxt_begin_fuzz() ? 1000000 : 10000;
+
+	uint32_t state = 1;
+
+	for (size_t i = 0; i < steps; i++) {
+		if (g_fuzz && ufbxt_fuzz_should_skip((int)i >> 4)) continue;
+
+		ufbx_transform t;
+
+		ufbx_quat q;
+		q.x = ufbxt_xorshift32_real(&state) * 2.0f - 1.0f;
+		q.y = ufbxt_xorshift32_real(&state) * 2.0f - 1.0f;
+		q.z = ufbxt_xorshift32_real(&state) * 2.0f - 1.0f;
+		q.w = ufbxt_xorshift32_real(&state) * 2.0f - 1.0f;
+		ufbx_real qm = (ufbx_real)sqrt(q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w);
+		t.rotation.x = q.x / qm;
+		t.rotation.y = q.y / qm;
+		t.rotation.z = q.z / qm;
+		t.rotation.w = q.w / qm;
+
+		t.translation.x = ufbxt_xorshift32_real(&state) * 20.0f - 10.0f;
+		t.translation.y = ufbxt_xorshift32_real(&state) * 20.0f - 10.0f;
+		t.translation.z = ufbxt_xorshift32_real(&state) * 20.0f - 10.0f;
+		t.scale.x = ufbxt_xorshift32_real(&state) * 10.0f + 0.1f;
+		t.scale.y = ufbxt_xorshift32_real(&state) * 10.0f + 0.1f;
+		t.scale.z = ufbxt_xorshift32_real(&state) * 10.0f + 0.1f;
+
+		uint32_t flip = ufbxt_xorshift32(&state);
+		if (flip & 1) t.scale.x *= -1.0f;
+		if (flip & 2) t.scale.y *= -1.0f;
+		if (flip & 4) t.scale.z *= -1.0f;
+
+		ufbx_matrix m = ufbx_transform_to_matrix(&t);
+		ufbx_matrix im = ufbx_matrix_invert(&m);
+		ufbx_matrix identity = ufbx_matrix_mul(&m, &im);
+
+		ufbxt_assert_close_real(&err, identity.m00, 1.0f);
+		ufbxt_assert_close_real(&err, identity.m10, 0.0f);
+		ufbxt_assert_close_real(&err, identity.m20, 0.0f);
+		ufbxt_assert_close_real(&err, identity.m01, 0.0f);
+		ufbxt_assert_close_real(&err, identity.m11, 1.0f);
+		ufbxt_assert_close_real(&err, identity.m21, 0.0f);
+		ufbxt_assert_close_real(&err, identity.m02, 0.0f);
+		ufbxt_assert_close_real(&err, identity.m12, 0.0f);
+		ufbxt_assert_close_real(&err, identity.m22, 1.0f);
+		ufbxt_assert_close_real(&err, identity.m03, 0.0f);
+		ufbxt_assert_close_real(&err, identity.m13, 0.0f);
+		ufbxt_assert_close_real(&err, identity.m23, 0.0f);
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
