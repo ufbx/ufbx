@@ -427,7 +427,7 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 				vert->uv = ufbx_to_um_vec2(uv);
 				vert->f_vertex_index = (float)mesh->vertex_indices[ix];
 
-				// The skinniing vertex stream is pre-calculated above so we just need to
+				// The skinning vertex stream is pre-calculated above so we just need to
 				// copy the right one by the vertex index.
 				if (skin) {
 					skin_vertices[num_indices] = mesh_skin_vertices[mesh->vertex_indices[ix]];
