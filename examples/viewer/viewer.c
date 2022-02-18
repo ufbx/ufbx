@@ -153,6 +153,10 @@ typedef struct viewer_mesh {
 	viewer_mesh_part *parts;
 	size_t num_parts;
 
+	bool aabb_is_local;
+	um_vec3 aabb_min;
+	um_vec3 aabb_max;
+
 	// Skinning (optional)
 	bool skinned;
 	size_t num_bones;
@@ -180,6 +184,9 @@ typedef struct viewer_scene {
 	viewer_anim *animations;
 	size_t num_animations;
 
+	um_vec3 aabb_min;
+	um_vec3 aabb_max;
+
 } viewer_scene;
 
 typedef struct viewer {
@@ -197,13 +204,20 @@ typedef struct viewer {
 	um_mat view_to_clip;
 	um_mat world_to_clip;
 
+	float camera_yaw;
+	float camera_pitch;
+	float camera_distance;
+	uint32_t mouse_buttons;
 } viewer;
 
 void read_node(viewer_node *vnode, ufbx_node *node)
 {
 	vnode->parent_index = node->parent ? node->parent->typed_id : -1;
 	vnode->node_to_parent = ufbx_to_um_mat(node->node_to_parent);
+	vnode->node_to_world = ufbx_to_um_mat(node->node_to_world);
 	vnode->geometry_to_node = ufbx_to_um_mat(node->geometry_to_node);
+	vnode->geometry_to_world = ufbx_to_um_mat(node->geometry_to_world);
+	vnode->normal_to_world = ufbx_to_um_mat(ufbx_matrix_for_normals(&node->geometry_to_world));
 }
 
 sg_image pack_blend_channels_to_image(ufbx_mesh *mesh, ufbx_blend_channel **channels, size_t num_channels)
@@ -481,6 +495,16 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 	free(mesh_skin_vertices);
 	free(indices);
 
+	// Compute bounds from the vertices
+	vmesh->aabb_is_local = mesh->skinned_is_local;
+	vmesh->aabb_min = um_dup3(+INFINITY);
+	vmesh->aabb_max = um_dup3(-INFINITY);
+	for (size_t i = 0; i < mesh->num_vertices; i++) {
+		um_vec3 pos = ufbx_to_um_vec3(mesh->skinned_position.data[i]);
+		vmesh->aabb_min = um_min3(vmesh->aabb_min, pos);
+		vmesh->aabb_max = um_max3(vmesh->aabb_max, pos);
+	}
+
 	vmesh->parts = parts;
 	vmesh->num_parts = num_parts;
 }
@@ -691,6 +715,11 @@ void load_scene(viewer_scene *vs, const char *filename)
 	ufbx_load_opts opts = {
 		.load_external_files = true,
 		.allow_null_material = true,
+
+		// NOTE: We use this _only_ for computing the bounds of the scene!
+		// The viewer contains a proper implementation of skinning as well.
+		// You probably don't need this.
+		.evaluate_skinning = true,
 	};
 	ufbx_error error;
 	ufbx_scene *scene = ufbx_load_file(filename, &opts, &error);
@@ -700,6 +729,27 @@ void load_scene(viewer_scene *vs, const char *filename)
 	}
 
 	read_scene(vs, scene);
+
+	// Compute the world-space bounding box
+	vs->aabb_min = um_dup3(+INFINITY);
+	vs->aabb_max = um_dup3(-INFINITY);
+	for (size_t mesh_ix = 0; mesh_ix < vs->num_meshes; mesh_ix++) {
+		viewer_mesh *mesh = &vs->meshes[mesh_ix];
+		um_vec3 aabb_origin = um_mul3(um_add3(mesh->aabb_max, mesh->aabb_min), 0.5f);
+		um_vec3 aabb_extent = um_mul3(um_sub3(mesh->aabb_max, mesh->aabb_min), 0.5f);
+		if (mesh->aabb_is_local) {
+			for (size_t inst_ix = 0; inst_ix < vs->num_meshes; inst_ix++) {
+				viewer_node *node = &vs->nodes[mesh->instance_node_indices[inst_ix]];
+				um_vec3 world_origin = um_transform_point(&node->geometry_to_world, aabb_origin);
+				um_vec3 world_extent = um_transform_extent(&node->geometry_to_world, aabb_extent);
+				vs->aabb_min = um_min3(vs->aabb_min, um_sub3(world_origin, world_extent));
+				vs->aabb_max = um_max3(vs->aabb_max, um_add3(world_origin, world_extent));
+			}
+		} else {
+			vs->aabb_min = um_min3(vs->aabb_min, mesh->aabb_min);
+			vs->aabb_max = um_max3(vs->aabb_max, mesh->aabb_max);
+		}
+	}
 
 	ufbx_free_scene(scene);
 }
@@ -722,12 +772,26 @@ bool backend_uses_d3d_perspective(sg_backend backend)
 
 void update_camera(viewer *view)
 {
-	view->world_to_view = um_mat_look_at(um_v3(-8,8,15), um_v3(0,4,0), um_v3(0,1,0));
+	viewer_scene *vs = &view->scene;
 
-	float fov = 30.0f * UM_DEG_TO_RAD;
+	um_vec3 aabb_origin = um_mul3(um_add3(vs->aabb_max, vs->aabb_min), 0.5f);
+	um_vec3 aabb_extent = um_mul3(um_sub3(vs->aabb_max, vs->aabb_min), 0.5f);
+	float distance = 2.5f * powf(2.0f, view->camera_distance) * um_max(um_max(aabb_extent.x, aabb_extent.y), aabb_extent.z);
+
+	um_quat camera_rot = um_quat_mul(
+		um_quat_axis_angle(um_v3(0,1,0), view->camera_yaw * UM_DEG_TO_RAD),
+		um_quat_axis_angle(um_v3(1,0,0), view->camera_pitch * UM_DEG_TO_RAD));
+
+	um_vec3 camera_target = aabb_origin;
+	um_vec3 camera_direction = um_quat_rotate(camera_rot, um_v3(0,0,1));
+	um_vec3 camera_pos = um_add3(camera_target, um_mul3(camera_direction, distance));
+
+	view->world_to_view = um_mat_look_at(camera_pos, camera_target, um_v3(0,1,0));
+
+	float fov = 50.0f * UM_DEG_TO_RAD;
 	float aspect = (float)sapp_width() / (float)sapp_height();
-	float near_plane = 0.1f;
-	float far_plane = 100.0f;
+	float near_plane = um_min(distance * 0.001f, 0.1f);
+	float far_plane = um_max(distance * 2.0f, 100.0f);
 
 	if (backend_uses_d3d_perspective(sg_query_backend())) {
 		view->view_to_clip = um_mat_perspective_d3d(fov, aspect, near_plane, far_plane);
@@ -810,6 +874,37 @@ void init(void)
 	load_scene(&g_viewer.scene, g_filename);
 }
 
+void onevent(const sapp_event *e)
+{
+	viewer *view = &g_viewer;
+
+	switch (e->type) {
+	case SAPP_EVENTTYPE_MOUSE_DOWN:
+		view->mouse_buttons |= 1u << (uint32_t)e->mouse_button;
+		break;
+	case SAPP_EVENTTYPE_MOUSE_UP:
+		view->mouse_buttons &= ~(1u << (uint32_t)e->mouse_button);
+		break;
+	case SAPP_EVENTTYPE_UNFOCUSED:
+		view->mouse_buttons = 0;
+		break;
+	case SAPP_EVENTTYPE_MOUSE_MOVE:
+		if (view->mouse_buttons & 1) {
+			float scale = um_min((float)sapp_width(), (float)sapp_height());
+			view->camera_yaw -= e->mouse_dx / scale * 180.0f;
+			view->camera_pitch -= e->mouse_dy / scale * 180.0f;
+			view->camera_pitch = um_clamp(view->camera_pitch, -89.0f, 89.0f);
+		}
+		break;
+	case SAPP_EVENTTYPE_MOUSE_SCROLL:
+		view->camera_distance += e->scroll_y * -0.02f;
+		view->camera_distance = um_clamp(view->camera_distance, -5.0f, 5.0f);
+		break;
+	default:
+		break;
+	}
+}
+
 void frame(void)
 {
 	static uint64_t last_time;
@@ -847,14 +942,21 @@ void cleanup(void)
 
 sapp_desc sokol_main(int argc, char* argv[]) {
 
+	if (argc <= 1) {
+		fprintf(stderr, "Usage: viewer file.fbx\n");
+		exit(1);
+	}
+
 	g_filename = argv[1];
 
     return (sapp_desc){
         .init_cb = &init,
+        .event_cb = &onevent,
         .frame_cb = &frame,
         .cleanup_cb = &cleanup,
         .width = 800,
         .height = 600,
+		.sample_count = 4,
         .window_title = "ufbx viewer",
     };
 }

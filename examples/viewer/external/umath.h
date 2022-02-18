@@ -99,8 +99,10 @@ typedef struct um_mat {
 extern const um_mat um_mat_identity;
 
 um_inline float um_sqrt(float a) { return sqrtf(a); }
+um_inline float um_abs(float a) { return fabsf(a); }
 um_inline float um_min(float a, float b) { return a < b ? a : b; }
 um_inline float um_max(float a, float b) { return b < a ? a : b; }
+um_inline float um_clamp(float a, float minv, float maxv) { return um_min(um_max(a, minv), maxv); }
 um_inline float um_lerp(float a, float b, float t) { return a*(1.0f-t) + b*t; }
 
 um_inline float um_smoothstep(float a) { return a * a * (3.0f - 2.0f * a); }
@@ -119,6 +121,7 @@ um_inline float um_dot2(um_vec2 a, um_vec2 b) { return a.x*b.x + a.y*b.y; }
 um_inline float um_length2(um_vec2 a) { return um_sqrt(a.x*a.x + a.y*a.y); }
 um_inline um_vec2 um_min2(um_vec2 a, um_vec2 b) { return um_v2(um_min(a.x, b.x), um_min(a.y, b.y)); }
 um_inline um_vec2 um_max2(um_vec2 a, um_vec2 b) { return um_v2(um_max(a.x, b.x), um_max(a.y, b.y)); }
+um_inline um_vec2 um_clamp2(um_vec2 a, um_vec2 minv, um_vec2 maxv) { return um_v2(um_clamp(a.x, minv.x, maxv.x), um_clamp(a.y, minv.y, maxv.y)); }
 um_inline um_vec2 um_lerp2(um_vec2 a, um_vec2 b, float t) { return um_v2(um_lerp(a.x, b.x, t), um_lerp(a.y, b.y, t)); }
 um_inline um_vec2 um_normalize2(um_vec2 a) { float v = um_length2(a); v = v >= FLT_MIN ? 1.0f / v : 0.0f; return um_v2(a.x * v, a.y * v); }
 um_inline bool um_equal2(um_vec2 a, um_vec2 b) { return (a.x == b.x) & (a.y == b.y); }
@@ -137,6 +140,7 @@ um_inline float um_dot3(um_vec3 a, um_vec3 b) { return a.x*b.x + a.y*b.y + a.z*b
 um_inline float um_length3(um_vec3 a) { return um_sqrt(a.x*a.x + a.y*a.y + a.z*a.z); }
 um_inline um_vec3 um_min3(um_vec3 a, um_vec3 b) { return um_v3(um_min(a.x, b.x), um_min(a.y, b.y), um_min(a.z, b.z)); }
 um_inline um_vec3 um_max3(um_vec3 a, um_vec3 b) { return um_v3(um_max(a.x, b.x), um_max(a.y, b.y), um_max(a.z, b.z)); }
+um_inline um_vec3 um_clamp3(um_vec3 a, um_vec3 minv, um_vec3 maxv) { return um_v3(um_clamp(a.x, minv.x, maxv.x), um_clamp(a.y, minv.y, maxv.y), um_clamp(a.z, minv.z, maxv.z)); }
 um_inline um_vec3 um_lerp3(um_vec3 a, um_vec3 b, float t) { return um_v3(um_lerp(a.x, b.x, t), um_lerp(a.y, b.y, t), um_lerp(a.z, b.z, t)); }
 um_inline um_vec3 um_normalize3(um_vec3 a) { float v = um_length3(a); v = v >= FLT_MIN ? 1.0f / v : 0.0f; return um_v3(a.x * v, a.y * v, a.z * v); }
 um_inline um_vec3 um_cross3(um_vec3 a, um_vec3 b) { return um_v3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
@@ -156,6 +160,7 @@ um_inline float um_dot4(um_vec4 a, um_vec4 b) { return a.x*b.x + a.y*b.y + a.z*b
 um_inline float um_length4(um_vec4 a) { return um_sqrt(a.x*a.x + a.y*a.y + a.z*a.z + a.w*a.w); }
 um_inline um_vec4 um_min4(um_vec4 a, um_vec4 b) { return um_v4(um_min(a.x, b.x), um_min(a.y, b.y), um_min(a.z, b.z), um_min(a.w, b.w)); }
 um_inline um_vec4 um_max4(um_vec4 a, um_vec4 b) { return um_v4(um_max(a.x, b.x), um_max(a.y, b.y), um_max(a.z, b.z), um_max(a.w, b.w)); }
+um_inline um_vec4 um_clamp4(um_vec4 a, um_vec4 minv, um_vec4 maxv) { return um_v4(um_clamp(a.x, minv.x, maxv.x), um_clamp(a.y, minv.y, maxv.y), um_clamp(a.z, minv.z, maxv.z), um_clamp(a.w, minv.w, maxv.w)); }
 um_inline um_vec4 um_lerp4(um_vec4 a, um_vec4 b, float t) { return um_v4(um_lerp(a.x, b.x, t), um_lerp(a.y, b.y, t), um_lerp(a.z, b.z, t), um_lerp(a.w, b.w, t)); }
 um_inline um_vec4 um_normalize4(um_vec4 a) { float v = um_length4(a); v = v >= FLT_MIN ? 1.0f / v : 0.0f; return um_v4(a.x * v, a.y * v, a.z * v, a.w * v); }
 um_inline bool um_equal4(um_vec4 a, um_vec4 b) { return (a.x == b.x) & (a.y == b.y) & (a.z == b.z) & (a.w == b.w); }
@@ -171,6 +176,8 @@ um_inline float um_quat_dot(um_quat a, um_quat b) { return a.x*b.x + a.y*b.y + a
 um_inline float um_quat_length(um_quat a) { return um_sqrt(a.x*a.x + a.y*a.y + a.z*a.z + a.w*a.w); }
 um_inline um_quat um_quat_normalize(um_quat a) { float v = um_quat_length(a); v = v >= FLT_MIN ? 1.0f / v : 0.0f; return um_quat_xyzw(a.x * v, a.y * v, a.z * v, a.w * v); }
 um_inline bool um_quat_equal(um_quat a, um_quat b) { return (a.x == b.x) & (a.y == b.y) & (a.z == b.z) & (a.w == b.w); }
+
+um_abi um_quat um_quat_axis_angle(um_vec3 axis, float radians);
 
 um_abi um_quat um_quat_mul(um_quat a, um_quat b);
 um_abi um_vec3 um_quat_rotate(um_quat a, um_vec3 b);
@@ -208,6 +215,7 @@ um_abi um_mat um_mat_muls(um_mat a, float b);
 
 um_abi um_vec3 um_transform_point(const um_mat *a, um_vec3 b);
 um_abi um_vec3 um_transform_direction(const um_mat *a, um_vec3 b);
+um_abi um_vec3 um_transform_extent(const um_mat *a, um_vec3 b);
 
 #endif
 
@@ -221,6 +229,12 @@ const um_mat um_mat_identity = {
 	0.0f, 0.0f, 1.0f, 0.0f,
 	0.0f, 0.0f, 0.0f, 1.0f,
 };
+
+um_abi um_quat um_quat_axis_angle(um_vec3 axis, float radians)
+{
+	float c = cosf(radians * 0.5f), s = sinf(radians * 0.5f);
+	return um_quat_xyzw(axis.x*s, axis.y*s, axis.z*s, c);
+}
 
 um_abi um_quat um_quat_mul(um_quat a, um_quat b)
 {
@@ -583,6 +597,14 @@ um_abi um_vec3 um_transform_direction(const um_mat *a, um_vec3 b)
 		a->m11*b.x + a->m12*b.y + a->m13*b.z,
 		a->m21*b.x + a->m22*b.y + a->m23*b.z,
 		a->m31*b.x + a->m32*b.y + a->m23*b.z);
+}
+
+um_abi um_vec3 um_transform_extent(const um_mat *a, um_vec3 b)
+{
+	return um_v3(
+		um_abs(a->m11)*b.x + um_abs(a->m12)*b.y + um_abs(a->m13)*b.z,
+		um_abs(a->m21)*b.x + um_abs(a->m22)*b.y + um_abs(a->m23)*b.z,
+		um_abs(a->m31)*b.x + um_abs(a->m32)*b.y + um_abs(a->m23)*b.z);
 }
 
 #endif
