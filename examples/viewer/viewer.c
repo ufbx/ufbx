@@ -738,7 +738,7 @@ void load_scene(viewer_scene *vs, const char *filename)
 		um_vec3 aabb_origin = um_mul3(um_add3(mesh->aabb_max, mesh->aabb_min), 0.5f);
 		um_vec3 aabb_extent = um_mul3(um_sub3(mesh->aabb_max, mesh->aabb_min), 0.5f);
 		if (mesh->aabb_is_local) {
-			for (size_t inst_ix = 0; inst_ix < vs->num_meshes; inst_ix++) {
+			for (size_t inst_ix = 0; inst_ix < mesh->num_instances; inst_ix++) {
 				viewer_node *node = &vs->nodes[mesh->instance_node_indices[inst_ix]];
 				um_vec3 world_origin = um_transform_point(&node->geometry_to_world, aabb_origin);
 				um_vec3 world_extent = um_transform_extent(&node->geometry_to_world, aabb_extent);
