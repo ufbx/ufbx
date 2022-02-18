@@ -588,7 +588,7 @@ um_abi um_vec3 um_transform_point(const um_mat *a, um_vec3 b)
 	return um_v3(
 		a->m11*b.x + a->m12*b.y + a->m13*b.z + a->m14,
 		a->m21*b.x + a->m22*b.y + a->m23*b.z + a->m24,
-		a->m31*b.x + a->m32*b.y + a->m23*b.z + a->m34);
+		a->m31*b.x + a->m32*b.y + a->m33*b.z + a->m34);
 }
 
 um_abi um_vec3 um_transform_direction(const um_mat *a, um_vec3 b)
@@ -596,7 +596,7 @@ um_abi um_vec3 um_transform_direction(const um_mat *a, um_vec3 b)
 	return um_v3(
 		a->m11*b.x + a->m12*b.y + a->m13*b.z,
 		a->m21*b.x + a->m22*b.y + a->m23*b.z,
-		a->m31*b.x + a->m32*b.y + a->m23*b.z);
+		a->m31*b.x + a->m32*b.y + a->m33*b.z);
 }
 
 um_abi um_vec3 um_transform_extent(const um_mat *a, um_vec3 b)

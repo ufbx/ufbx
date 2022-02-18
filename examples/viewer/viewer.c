@@ -12,7 +12,7 @@
 #include <assert.h>
 
 #define MAX_BONES 64
-#define MAX_BLEND_SHAPES 16
+#define MAX_BLEND_SHAPES 64
 
 um_vec2 ufbx_to_um_vec2(ufbx_vec2 v) { return um_v2((float)v.x, (float)v.y); }
 um_vec3 ufbx_to_um_vec3(ufbx_vec3 v) { return um_v3((float)v.x, (float)v.y, (float)v.z); }
@@ -53,7 +53,7 @@ static const sg_layout_desc skinned_mesh_vertex_layout = {
 		{ .buffer_index = 0, .format = SG_VERTEXFORMAT_FLOAT3 },
 		{ .buffer_index = 0, .format = SG_VERTEXFORMAT_FLOAT2 },
 		{ .buffer_index = 0, .format = SG_VERTEXFORMAT_FLOAT },
-		{ .buffer_index = 1, .format = SG_VERTEXFORMAT_UBYTE4 },
+		{ .buffer_index = 1, .format = SG_VERTEXFORMAT_BYTE4 },
 		{ .buffer_index = 1, .format = SG_VERTEXFORMAT_UBYTE4N },
 	},
 };
@@ -682,6 +682,8 @@ void init_pipelines(viewer *view)
 		.shader = view->shader_mesh_lit_static,
 		.layout = mesh_vertex_layout,
 		.index_type = SG_INDEXTYPE_UINT32,
+		.face_winding = SG_FACEWINDING_CCW,
+		.cull_mode = SG_CULLMODE_BACK,
 		.depth = {
 			.compare = SG_COMPAREFUNC_LESS_EQUAL,
 			.write_enabled = true,
@@ -693,6 +695,8 @@ void init_pipelines(viewer *view)
 		.shader = view->shader_mesh_lit_skinned,
 		.layout = skinned_mesh_vertex_layout,
 		.index_type = SG_INDEXTYPE_UINT32,
+		.face_winding = SG_FACEWINDING_CCW,
+		.cull_mode = SG_CULLMODE_BACK,
 		.depth = {
 			.compare = SG_COMPAREFUNC_LESS_EQUAL,
 			.write_enabled = true,
@@ -827,8 +831,10 @@ void draw_mesh(viewer *view, viewer_node *node, viewer_mesh *mesh)
 		.f_num_blend_shapes = (float)mesh->num_blend_shapes,
 	};
 
+	// sokol-shdc only supports vec4 arrays so reinterpret this `um_vec4` array as `float`
+	float *blend_weights = (float*)mesh_ubo.blend_weights;
 	for (size_t i = 0; i < mesh->num_blend_shapes; i++) {
-		mesh_ubo.blend_weights[i] = view->scene.blend_channels[mesh->blend_channel_indices[i]].weight;
+		blend_weights[i] = view->scene.blend_channels[mesh->blend_channel_indices[i]].weight;
 	}
 
 	sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_mesh_vertex_ubo, SG_RANGE_REF(mesh_ubo));
