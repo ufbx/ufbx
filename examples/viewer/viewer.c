@@ -580,8 +580,8 @@ void read_anim_stack(viewer_anim *va, ufbx_anim_stack *stack, ufbx_scene *scene)
 	// Sample the animation evenly at `target_framerate` if possible while limiting the maximum
 	// number of frames to `max_frames` by potentially dropping FPS.
 	float duration = (float)stack->time_end - (float)stack->time_begin;
-	size_t num_frames = clamp_sz((size_t)(duration * target_framerate + 1.0f), 1, max_frames);
-	float framerate = (float)num_frames / duration;
+	size_t num_frames = clamp_sz((size_t)(duration * target_framerate), 2, max_frames);
+	float framerate = (float)(num_frames - 1) / duration;
 
 	va->name = alloc_dup(char, stack->name.length + 1, stack->name.data);
 	va->time_begin = (float)stack->time_begin;
@@ -633,8 +633,8 @@ void read_scene(viewer_scene *vs, ufbx_scene *scene)
 void update_animation(viewer_scene *vs, viewer_anim *va, float time)
 {
 	float frame_time = (time - va->time_begin) * va->framerate;
-	size_t f0 = min_sz((size_t)frame_time, va->num_frames - 1);
-	size_t f1 = (f0 + 1) % va->num_frames;
+	size_t f0 = min_sz((size_t)frame_time + 0, va->num_frames - 1);
+	size_t f1 = min_sz((size_t)frame_time + 1, va->num_frames - 1);
 	float t = um_min(frame_time - (float)f0, 1.0f);
 
 	for (size_t i = 0; i < vs->num_nodes; i++) {
@@ -919,7 +919,7 @@ void frame(void)
 
 	g_viewer.anim_time += dt;
 	viewer_anim *anim = &g_viewer.scene.animations[0];
-	if (g_viewer.anim_time > anim->time_end) {
+	if (g_viewer.anim_time >= anim->time_end) {
 		g_viewer.anim_time -= anim->time_end - anim->time_begin;
 	}
 
