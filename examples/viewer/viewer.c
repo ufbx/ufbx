@@ -724,6 +724,12 @@ void load_scene(viewer_scene *vs, const char *filename)
 		// The viewer contains a proper implementation of skinning as well.
 		// You probably don't need this.
 		.evaluate_skinning = true,
+
+		.transform_to_axes = {
+			.right = UFBX_COORDINATE_AXIS_POSITIVE_X,
+			.up = UFBX_COORDINATE_AXIS_POSITIVE_Y,
+			.front = UFBX_COORDINATE_AXIS_POSITIVE_Z,
+		},
 	};
 	ufbx_error error;
 	ufbx_scene *scene = ufbx_load_file(filename, &opts, &error);
@@ -917,14 +923,17 @@ void frame(void)
 	float dt = (float)stm_sec(stm_laptime(&last_time));
 	dt = um_min(dt, 0.1f);
 
-	g_viewer.anim_time += dt;
-	viewer_anim *anim = &g_viewer.scene.animations[0];
-	if (g_viewer.anim_time >= anim->time_end) {
-		g_viewer.anim_time -= anim->time_end - anim->time_begin;
+	viewer_anim *anim = g_viewer.scene.num_animations > 0 ? &g_viewer.scene.animations[0] : NULL;
+
+	if (anim) {
+		g_viewer.anim_time += dt;
+		if (g_viewer.anim_time >= anim->time_end) {
+			g_viewer.anim_time -= anim->time_end - anim->time_begin;
+		}
+		update_animation(&g_viewer.scene, anim, g_viewer.anim_time);
 	}
 
 	update_camera(&g_viewer);
-	update_animation(&g_viewer.scene, anim, g_viewer.anim_time);
 	update_hierarchy(&g_viewer.scene);
 
 	sg_pass_action action = {
