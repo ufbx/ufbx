@@ -669,7 +669,7 @@ void update_hierarchy(viewer_scene *vs)
 			vn->node_to_world = vn->node_to_parent;
 		}
 		vn->geometry_to_world = um_mat_mul(vn->node_to_world, vn->geometry_to_node);
-		vn->normal_to_world = um_mat_tranpose(um_mat_inverse(vn->geometry_to_world));
+		vn->normal_to_world = um_mat_transpose(um_mat_inverse(vn->geometry_to_world));
 	}
 }
 

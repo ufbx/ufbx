@@ -3,6 +3,12 @@
 
 #include <math.h>
 #include <float.h>
+#include <stdbool.h>
+
+#if defined(_MSC_VER)
+	#pragma warning(push)
+	#pragma warning(disable: 4201)
+#endif
 
 #define um_inline static inline
 
@@ -66,25 +72,25 @@ typedef struct um_mat {
 	#define um_new(type) (type)
 #endif
 
-#define um_v2(x, y) (um_new(um_vec2){ (x), (y) })
-#define um_v3(x, y, z) (um_new(um_vec3){ (x), (y), (z) })
-#define um_v4(x, y, z, w) (um_new(um_vec4){ (x), (y), (z), (w) })
+#define um_v2(x, y) (um_new(um_vec2){{{ (x), (y) }}})
+#define um_v3(x, y, z) (um_new(um_vec3){{{ (x), (y), (z) }}})
+#define um_v4(x, y, z, w) (um_new(um_vec4){{{ (x), (y), (z), (w) }}})
 
-#define um_quat_xyzw(x, y, z, w) (um_new(um_quat){ (x), (y), (z), (w) })
+#define um_quat_xyzw(x, y, z, w) (um_new(um_quat){{{ (x), (y), (z), (w) }}})
 
 #define um_mat_rows(m11, m12, m13, m14, m21, m22, m23, m24, m31, m32, m33, m34, m41, m42, m43, m44, ...) \
-	(um_new(um_mat){{ \
+	(um_new(um_mat){{{ \
 	(m11), (m21), (m31), (m41), \
 	(m12), (m22), (m32), (m42), \
 	(m13), (m23), (m33), (m43), \
-	(m14), (m24), (m34), (m44), } __VA_ARGS__ })
+	(m14), (m24), (m34), (m44), }} __VA_ARGS__ })
 
 #define um_mat_cols(m11, m21, m31, m41, m12, m22, m32, m42, m13, m23, m33, m43, m14, m24, m34, m44, ...) \
-	(um_new(um_mat){{ \
+	(um_new(um_mat){{{ \
 	(m11), (m21), (m31), (m41), \
 	(m12), (m22), (m32), (m42), \
 	(m13), (m23), (m33), (m43), \
-	(m14), (m24), (m34), (m44), } __VA_ARGS__ })
+	(m14), (m24), (m34), (m44), }} __VA_ARGS__ })
 
 #define um_zero2 (um_v2(0, 0))
 #define um_zero3 (um_v3(0, 0, 0))
@@ -177,13 +183,14 @@ um_inline float um_quat_length(um_quat a) { return um_sqrt(a.x*a.x + a.y*a.y + a
 um_inline um_quat um_quat_normalize(um_quat a) { float v = um_quat_length(a); v = v >= FLT_MIN ? 1.0f / v : 0.0f; return um_quat_xyzw(a.x * v, a.y * v, a.z * v, a.w * v); }
 um_inline bool um_quat_equal(um_quat a, um_quat b) { return (a.x == b.x) & (a.y == b.y) & (a.z == b.z) & (a.w == b.w); }
 
-um_abi um_quat um_quat_axis_angle(um_vec3 axis, float radians);
-
 um_abi um_quat um_quat_mul(um_quat a, um_quat b);
 um_abi um_vec3 um_quat_rotate(um_quat a, um_vec3 b);
+#define um_quat_mulrev(a, b) um_quat_mul((b), (a))
 
 um_abi um_quat um_quat_lerp(um_quat a, um_quat b, float t);
 um_abi um_quat um_quat_slerp(um_quat a, um_quat b, float t);
+
+um_abi um_quat um_quat_axis_angle(um_vec3 axis, float radians);
 
 #define um_mat_is_affine(a) um_equal4((a).cols[3], um_v4(0, 0, 0, 1))
 
@@ -202,11 +209,12 @@ um_abi um_mat um_mat_perspective_d3d(float fov, float aspect, float near_plane, 
 
 um_abi float um_mat_determinant(um_mat a);
 um_abi um_mat um_mat_inverse(um_mat a);
-um_abi um_mat um_mat_tranpose(um_mat a);
+um_abi um_mat um_mat_transpose(um_mat a);
 
 um_abi um_mat um_mat_mul(um_mat a, um_mat b);
 um_abi um_vec4 um_mat_mull(um_vec4 a, um_mat b);
 um_abi um_vec4 um_mat_mulr(um_mat a, um_vec4 b);
+#define um_mat_mulrev(a, b) um_mat_mul((b), (a))
 
 um_abi um_mat um_mat_add(um_mat a, um_mat b);
 um_abi um_mat um_mat_sub(um_mat a, um_mat b);
@@ -217,24 +225,56 @@ um_abi um_vec3 um_transform_point(const um_mat *a, um_vec3 b);
 um_abi um_vec3 um_transform_direction(const um_mat *a, um_vec3 b);
 um_abi um_vec3 um_transform_extent(const um_mat *a, um_vec3 b);
 
+#if defined(__cplusplus)
+um_inline um_vec2 operator+(const um_vec2 &a, const um_vec2 &b) { return um_add2(a, b); }
+um_inline um_vec2 operator-(const um_vec2 &a, const um_vec2 &b) { return um_sub2(a, b); }
+um_inline um_vec2 operator*(const um_vec2 &a, const um_vec2 &b) { return um_mulv2(a, b); }
+um_inline um_vec2 operator/(const um_vec2 &a, const um_vec2 &b) { return um_divv2(a, b); }
+um_inline um_vec2 operator*(const um_vec2 &a, float b) { return um_mul2(a, b); }
+um_inline um_vec2 operator/(const um_vec2 &a, float b) { return um_div2(a, b); }
+um_inline um_vec2 operator-(const um_vec2 &a) { return um_neg2(a); }
+
+um_inline um_vec3 operator+(const um_vec3 &a, const um_vec3 &b) { return um_add3(a, b); }
+um_inline um_vec3 operator-(const um_vec3 &a, const um_vec3 &b) { return um_sub3(a, b); }
+um_inline um_vec3 operator*(const um_vec3 &a, const um_vec3 &b) { return um_mulv3(a, b); }
+um_inline um_vec3 operator/(const um_vec3 &a, const um_vec3 &b) { return um_divv3(a, b); }
+um_inline um_vec3 operator*(const um_vec3 &a, float b) { return um_mul3(a, b); }
+um_inline um_vec3 operator/(const um_vec3 &a, float b) { return um_div3(a, b); }
+um_inline um_vec3 operator-(const um_vec3 &a) { return um_neg3(a); }
+
+um_inline um_vec4 operator+(const um_vec4 &a, const um_vec4 &b) { return um_add4(a, b); }
+um_inline um_vec4 operator-(const um_vec4 &a, const um_vec4 &b) { return um_sub4(a, b); }
+um_inline um_vec4 operator*(const um_vec4 &a, const um_vec4 &b) { return um_mulv4(a, b); }
+um_inline um_vec4 operator/(const um_vec4 &a, const um_vec4 &b) { return um_divv4(a, b); }
+um_inline um_vec4 operator*(const um_vec4 &a, float b) { return um_mul4(a, b); }
+um_inline um_vec4 operator/(const um_vec4 &a, float b) { return um_div4(a, b); }
+um_inline um_vec4 operator-(const um_vec4 &a) { return um_neg4(a); }
+
+um_inline um_quat operator+(const um_quat &a, const um_quat &b) { return um_quat_add(a, b); }
+um_inline um_quat operator-(const um_quat &a, const um_quat &b) { return um_quat_sub(a, b); }
+um_inline um_quat operator*(const um_quat &a, const um_quat &b) { return um_quat_mul(a, b); }
+
+um_inline um_mat operator+(const um_mat &a, const um_mat &b) { return um_mat_add(a, b); }
+um_inline um_mat operator-(const um_mat &a, const um_mat &b) { return um_mat_sub(a, b); }
+um_inline um_mat operator*(const um_mat &a, const um_mat &b) { return um_mat_mul(a, b); }
+#endif
+
+#if defined(_MSC_VER)
+	#pragma warning(pop)
+#endif
+
 #endif
 
 #if defined(UMATH_IMPLEMENTATION) || defined(__INTELLISENSE__)
 #ifndef UMATH_H_IMPLEMENTED
 #define UMATH_H_IMPLEMENTED
 
-const um_mat um_mat_identity = {
+const um_mat um_mat_identity = {{{
 	1.0f, 0.0f, 0.0f, 0.0f,
 	0.0f, 1.0f, 0.0f, 0.0f,
 	0.0f, 0.0f, 1.0f, 0.0f,
 	0.0f, 0.0f, 0.0f, 1.0f,
-};
-
-um_abi um_quat um_quat_axis_angle(um_vec3 axis, float radians)
-{
-	float c = cosf(radians * 0.5f), s = sinf(radians * 0.5f);
-	return um_quat_xyzw(axis.x*s, axis.y*s, axis.z*s, c);
-}
+}}};
 
 um_abi um_quat um_quat_mul(um_quat a, um_quat b)
 {
@@ -285,6 +325,13 @@ um_abi um_quat um_quat_slerp(um_quat a, um_quat b, float t)
 	float z = af*a.z + bf*b.z;
 	float w = af*a.w + bf*b.w;
 	return um_quat_normalize(um_quat_xyzw(x, y, z, w));
+}
+
+um_abi um_quat um_quat_axis_angle(um_vec3 axis, float radians)
+{
+	axis = um_normalize3(axis);
+	float c = cosf(radians * 0.5f), s = sinf(radians * 0.5f);
+	return um_quat_xyzw(axis.x * s, axis.y * s, axis.z * s, c);
 }
 
 um_abi um_mat um_mat_basis(um_vec3 x, um_vec3 y, um_vec3 z, um_vec3 origin)
@@ -437,8 +484,8 @@ um_abi um_mat um_mat_inverse(um_mat a)
 {
 	if (um_mat_is_affine(a)) {
 		float det =
-			- a.m14*a.m22*a.m41 + a.m12*a.m24*a.m41 + a.m14*a.m21*a.m42
-			- a.m11*a.m24*a.m42 - a.m12*a.m21*a.m44 + a.m11*a.m22*a.m44;
+			- a.m13*a.m22*a.m31 + a.m12*a.m23*a.m31 + a.m13*a.m21*a.m32
+			- a.m11*a.m23*a.m32 - a.m12*a.m21*a.m33 + a.m11*a.m22*a.m33;
 		float rcp_det = 1.0f / det;
 
 		return um_mat_rows(
@@ -493,7 +540,7 @@ um_abi um_mat um_mat_inverse(um_mat a)
 	}
 }
 
-um_abi um_mat um_mat_tranpose(um_mat a)
+um_abi um_mat um_mat_transpose(um_mat a)
 {
 	return um_mat_rows(
 		a.m11, a.m21, a.m31, a.m41,
@@ -579,7 +626,7 @@ um_abi um_vec4 um_mat_mulr(um_mat a, um_vec4 b)
 	return um_v4(
 		a.m11*b.x + a.m12*b.y + a.m13*b.z + a.m14*b.w,
 		a.m21*b.x + a.m22*b.y + a.m23*b.z + a.m24*b.w,
-		a.m31*b.x + a.m32*b.y + a.m23*b.z + a.m34*b.w,
+		a.m31*b.x + a.m32*b.y + a.m33*b.z + a.m34*b.w,
 		a.m41*b.x + a.m42*b.y + a.m43*b.z + a.m44*b.w);
 }
 
