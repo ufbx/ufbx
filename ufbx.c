@@ -13355,6 +13355,7 @@ static ufbxi_noinline void ufbxi_transform_to_axes(ufbxi_context *uc, ufbx_coord
 
 	ufbx_matrix axis_mat = { 0 };
 
+	// Remap axes (axis enum divided by 2) potentially flipping if the signs (enum parity) doesn't match
 	axis_mat.cols[src_x >> 1].v[dst_x >> 1] = ((src_x ^ dst_x) & 1) == 0 ? 1.0f : -1.0f;
 	axis_mat.cols[src_y >> 1].v[dst_y >> 1] = ((src_y ^ dst_y) & 1) == 0 ? 1.0f : -1.0f;
 	axis_mat.cols[src_z >> 1].v[dst_z >> 1] = ((src_z ^ dst_z) & 1) == 0 ? 1.0f : -1.0f;
