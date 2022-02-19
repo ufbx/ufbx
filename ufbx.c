@@ -17417,6 +17417,7 @@ ufbx_transform ufbx_matrix_to_transform(const ufbx_matrix *m)
 	t.scale.y = ufbxi_length3(m->cols[1]);
 	t.scale.z = ufbxi_length3(m->cols[2]);
 
+	// Flip a single non-zero axis if negative determinant
 	ufbx_real sign_x = 1.0f;
 	ufbx_real sign_y = 1.0f;
 	ufbx_real sign_z = 1.0f;
@@ -17426,7 +17427,6 @@ ufbx_transform ufbx_matrix_to_transform(const ufbx_matrix *m)
 		else if (t.scale.z > 0.0f) sign_z = -1.0f;
 	}
 
-	// TODO: Mirroring?
 	ufbx_vec3 x = ufbxi_mul3(m->cols[0], t.scale.x > 0.0f ? sign_x / t.scale.x : 0.0f);
 	ufbx_vec3 y = ufbxi_mul3(m->cols[1], t.scale.y > 0.0f ? sign_y / t.scale.y : 0.0f);
 	ufbx_vec3 z = ufbxi_mul3(m->cols[2], t.scale.z > 0.0f ? sign_z / t.scale.z : 0.0f);
