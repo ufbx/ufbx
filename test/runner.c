@@ -732,6 +732,14 @@ static void ufbxt_assert_close_quat(ufbxt_diff_error *p_err, ufbx_quat a, ufbx_q
 	ufbxt_assert_close_real(p_err, a.w, b.w);
 }
 
+static void ufbxt_assert_close_matrix(ufbxt_diff_error *p_err, ufbx_matrix a, ufbx_matrix b)
+{
+	ufbxt_assert_close_vec3(p_err, a.cols[0], b.cols[0]);
+	ufbxt_assert_close_vec3(p_err, a.cols[1], b.cols[1]);
+	ufbxt_assert_close_vec3(p_err, a.cols[2], b.cols[2]);
+	ufbxt_assert_close_vec3(p_err, a.cols[3], b.cols[3]);
+}
+
 typedef struct {
 	ufbx_vec3 pos;
 	ufbx_vec3 normal;
