@@ -16882,6 +16882,12 @@ ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, dou
 
 ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *node, double time)
 {
+	ufbx_assert(anim);
+	ufbx_assert(node);
+	if (!node) return ufbx_identity_transform;
+	if (!anim) return node->local_transform;
+	if (node->is_root) return node->local_transform;
+
 	const char *prop_names[] = {
 		ufbxi_Lcl_Rotation,
 		ufbxi_Lcl_Scaling,

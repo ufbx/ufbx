@@ -131,7 +131,20 @@ UFBXT_TEST(root_transform)
 		ufbxt_assert_close_vec3(&err, scene->root_node->local_transform.translation, opts.root_transform.translation);
 		ufbxt_assert_close_quat(&err, scene->root_node->local_transform.rotation, opts.root_transform.rotation);
 		ufbxt_assert_close_vec3(&err, scene->root_node->local_transform.scale, opts.root_transform.scale);
+
+		ufbx_transform eval = ufbx_evaluate_transform(&scene->anim, scene->root_node, 0.1);
+		ufbxt_assert_close_vec3(&err, eval.translation, opts.root_transform.translation);
+		ufbxt_assert_close_quat(&err, eval.rotation, opts.root_transform.rotation);
+		ufbxt_assert_close_vec3(&err, eval.scale, opts.root_transform.scale);
+
+		ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, 0.1, NULL, NULL);
+		ufbxt_assert(state);
+
+		ufbxt_assert_close_vec3(&err, state->root_node->local_transform.translation, opts.root_transform.translation);
+		ufbxt_assert_close_quat(&err, state->root_node->local_transform.rotation, opts.root_transform.rotation);
+		ufbxt_assert_close_vec3(&err, state->root_node->local_transform.scale, opts.root_transform.scale);
 		
+		ufbx_free_scene(state);
 		ufbx_free_scene(scene);
 	}
 
