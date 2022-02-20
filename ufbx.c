@@ -12390,16 +12390,42 @@ static ufbxi_noinline void ufbxi_update_scene_metadata(ufbx_metadata *metadata)
 	metadata->latest_application.version = ufbx_find_string(props, "LastSaved|ApplicationVersion", ufbx_empty_string);
 }
 
+static const ufbx_real ufbxi_pow10_targets[] = {
+	0.0f,
+	(ufbx_real)1e-8, (ufbx_real)1e-7, (ufbx_real)1e-6, (ufbx_real)1e-5,
+	(ufbx_real)1e-4, (ufbx_real)1e-3, (ufbx_real)1e-2, (ufbx_real)1e-1,
+	(ufbx_real)1e+0, (ufbx_real)1e+1, (ufbx_real)1e+2, (ufbx_real)1e+3,
+	(ufbx_real)1e+4, (ufbx_real)1e+5, (ufbx_real)1e+6, (ufbx_real)1e+7,
+	(ufbx_real)1e+8, (ufbx_real)1e+9,
+};
+
+static ufbxi_noinline ufbx_real ufbxi_round_if_near(const ufbx_real *targets, size_t num_targets, ufbx_real value)
+{
+	for (size_t i = 0; i < num_targets; i++) {
+		double target = targets[i];
+		double error = target * 9.5367431640625e-7;
+		if (error < 0.0) error = -error;
+		if (error < 7.52316384526264005e-37) error = 7.52316384526264005e-37;
+		if (value >= target - error && value <= target + error) {
+			return (ufbx_real)target;
+		}
+	}
+	return value;
+}
+
 static ufbxi_noinline void ufbxi_update_scene_settings(ufbx_scene_settings *settings)
 {
+	ufbx_real unit_scale_factor = ufbxi_find_real(&settings->props, ufbxi_UnitScaleFactor, 1.0f);
+	ufbx_real original_unit_scale_factor = ufbxi_find_real(&settings->props, ufbxi_OriginalUnitScaleFactor, unit_scale_factor);
+
 	settings->axes.up = ufbxi_find_axis(&settings->props, ufbxi_UpAxis, ufbxi_UpAxisSign);
 	settings->axes.front = ufbxi_find_axis(&settings->props, ufbxi_FrontAxis, ufbxi_FrontAxisSign);
 	settings->axes.right = ufbxi_find_axis(&settings->props, ufbxi_CoordAxis, ufbxi_CoordAxisSign);
-	settings->original_axis_up = ufbxi_find_axis(&settings->props, ufbxi_OriginalUpAxis, ufbxi_OriginalUpAxisSign);
-	settings->unit_scale_factor = ufbxi_find_real(&settings->props, ufbxi_UnitScaleFactor, 1.0f);
-	settings->original_unit_scale_factor = ufbxi_find_real(&settings->props, ufbxi_OriginalUnitScaleFactor, settings->unit_scale_factor);
+	settings->unit_meters = ufbxi_round_if_near(ufbxi_pow10_targets, ufbxi_arraycount(ufbxi_pow10_targets), unit_scale_factor * (ufbx_real)0.01);
+	settings->original_unit_meters = ufbxi_round_if_near(ufbxi_pow10_targets, ufbxi_arraycount(ufbxi_pow10_targets), original_unit_scale_factor * (ufbx_real)0.01);
 	settings->frames_per_second = ufbxi_find_real(&settings->props, ufbxi_CustomFrameRate, 24.0f);
 	settings->ambient_color = ufbxi_find_vec3(&settings->props, ufbxi_AmbientColor, 0.0f, 0.0f, 0.0f);
+	settings->original_axis_up = ufbxi_find_axis(&settings->props, ufbxi_OriginalUpAxis, ufbxi_OriginalUpAxisSign);
 
 	ufbx_prop *default_camera = ufbxi_find_prop(&settings->props, ufbxi_DefaultCamera);
 	if (default_camera) {
@@ -13369,6 +13395,78 @@ static ufbxi_noinline void ufbxi_transform_to_axes(ufbxi_context *uc, ufbx_coord
 	uc->scene.root_node->node_to_parent = axis_mat;
 }
 
+static ufbxi_noinline void ufbxi_scale_anim_curve(ufbx_anim_curve *curve, ufbx_real scale)
+{
+	if (!curve) return;
+	ufbxi_for_list(ufbx_keyframe, key, curve->keyframes) {
+		key->value *= scale;
+	}
+}
+
+static ufbxi_noinline void ufbxi_scale_anim_value(ufbx_anim_value *value, ufbx_real scale)
+{
+	if (!value) return;
+	ufbxi_scale_anim_curve(value->curves[0], scale);
+	ufbxi_scale_anim_curve(value->curves[1], scale);
+	ufbxi_scale_anim_curve(value->curves[2], scale);
+}
+
+static ufbxi_noinline void ufbxi_scale_units(ufbxi_context *uc, ufbx_real target_meters)
+{
+	if (uc->scene.settings.unit_meters <= 0.0f) return;
+	target_meters = ufbxi_round_if_near(ufbxi_pow10_targets, ufbxi_arraycount(ufbxi_pow10_targets), target_meters);
+
+	ufbx_real ratio = uc->scene.settings.unit_meters / target_meters;
+	ratio = ufbxi_round_if_near(ufbxi_pow10_targets, ufbxi_arraycount(ufbxi_pow10_targets), ratio);
+	if (ratio == 1.0f) return;
+
+	uc->scene.root_node->local_transform.scale.x *= ratio;
+	uc->scene.root_node->local_transform.scale.y *= ratio;
+	uc->scene.root_node->local_transform.scale.z *= ratio;
+	uc->scene.root_node->node_to_parent.m00 *= ratio;
+	uc->scene.root_node->node_to_parent.m01 *= ratio;
+	uc->scene.root_node->node_to_parent.m02 *= ratio;
+	uc->scene.root_node->node_to_parent.m10 *= ratio;
+	uc->scene.root_node->node_to_parent.m11 *= ratio;
+	uc->scene.root_node->node_to_parent.m12 *= ratio;
+	uc->scene.root_node->node_to_parent.m20 *= ratio;
+	uc->scene.root_node->node_to_parent.m21 *= ratio;
+	uc->scene.root_node->node_to_parent.m22 *= ratio;
+
+	if (!uc->opts.no_prop_unit_scaling) {
+		ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
+			ufbx_node *node = *p_node;
+			if (node->inherit_type != UFBX_INHERIT_NO_SCALE) continue;
+
+			// Find only in own properties
+			ufbx_props own_props = node->props;
+			own_props.defaults = NULL;
+			ufbx_prop *prop = ufbxi_find_prop(&own_props, ufbxi_Lcl_Scaling);
+			if (prop) {
+				prop->value_vec3.x *= ratio;
+				prop->value_vec3.y *= ratio;
+				prop->value_vec3.z *= ratio;
+				prop->value_int = (int64_t)prop->value_vec3.x;
+			}
+		}
+	}
+
+	if (!uc->opts.no_anim_curve_unit_scaling) {
+		ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, uc->scene.anim_layers) {
+			ufbx_anim_layer *layer = *p_layer;
+			ufbxi_for_list(ufbx_anim_prop, aprop, layer->anim_props) {
+				if (aprop->prop_name.data == ufbxi_Lcl_Scaling) {
+					ufbx_element *elem = aprop->element;
+					if (elem->type != UFBX_ELEMENT_NODE) continue;
+					ufbx_node *node = (ufbx_node*)elem;
+					if (node->inherit_type != UFBX_INHERIT_NO_SCALE) continue;
+					ufbxi_scale_anim_value(aprop->anim_value, ratio);
+				}
+			}
+		}
+	}
+}
+
 // -- Curve evaluation
 
 static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, double x0)
@@ -13534,8 +13632,13 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_update_scene_settings(&uc->scene.settings);
 
 	// Axis conversion
-	if (ufbx_coordinate_axes_valid(uc->opts.transform_to_axes)) {
-		ufbxi_transform_to_axes(uc, uc->opts.transform_to_axes);
+	if (ufbx_coordinate_axes_valid(uc->opts.target_axes)) {
+		ufbxi_transform_to_axes(uc, uc->opts.target_axes);
+	}
+
+	// Unit conversion
+	if (uc->opts.target_unit_meters > 0.0f) {
+		ufbxi_scale_units(uc, uc->opts.target_unit_meters);
 	}
 
 	ufbxi_update_scene(&uc->scene, true);

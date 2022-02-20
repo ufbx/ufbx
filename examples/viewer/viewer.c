@@ -725,11 +725,12 @@ void load_scene(viewer_scene *vs, const char *filename)
 		// You probably don't need this.
 		.evaluate_skinning = true,
 
-		.transform_to_axes = {
+		.target_axes = {
 			.right = UFBX_COORDINATE_AXIS_POSITIVE_X,
 			.up = UFBX_COORDINATE_AXIS_POSITIVE_Y,
 			.front = UFBX_COORDINATE_AXIS_POSITIVE_Z,
 		},
+		.target_unit_meters = 1.0f,
 	};
 	ufbx_error error;
 	ufbx_scene *scene = ufbx_load_file(filename, &opts, &error);

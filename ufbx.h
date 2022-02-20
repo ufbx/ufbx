@@ -2353,9 +2353,15 @@ typedef enum ufbx_snap_mode {
 typedef struct ufbx_scene_settings {
 	ufbx_props props;
 
+	// Mapping of X/Y/Z axes to world-space directions.
+	// HINT: Use `ufbx_load_opts.target_axes` to normalize this.
 	ufbx_coordinate_axes axes;
 
-	ufbx_real unit_scale_factor;
+	// How many meters does a single world-space unit represent.
+	// FBX files usually default to centimeters, reported as `0.01` here.
+	// HINT: Use `ufbx_load_opts.target_unit_meters` to normalize this.
+	ufbx_real unit_meters;
+
 	double frames_per_second;
 
 	ufbx_vec3 ambient_color;
@@ -2367,7 +2373,7 @@ typedef struct ufbx_scene_settings {
 
 	// Original settings (?)
 	ufbx_coordinate_axis original_axis_up;
-	ufbx_real original_unit_scale_factor;
+	ufbx_real original_unit_meters;
 } ufbx_scene_settings;
 
 struct ufbx_scene {
@@ -2730,8 +2736,18 @@ typedef struct ufbx_load_opts {
 	void *open_file_user;
 
 	// Apply an implicit root transformation to match axes.
-	// Used if `ufbx_coordinate_axes_valid(transform_to_axes)`.
-	ufbx_coordinate_axes transform_to_axes;
+	// Used if `ufbx_coordinate_axes_valid(target_axes)`.
+	ufbx_coordinate_axes target_axes;
+
+	// Scale the scene so that one world-space unit is `target_unit_meters` meters.
+	// By default units are not scaled.
+	ufbx_real target_unit_meters;
+
+	// Do not scale necessary properties curves with `target_unit_meters`.
+	bool no_prop_unit_scaling;
+
+	// Do not scale necessary animation curves with `target_unit_meters`.
+	bool no_anim_curve_unit_scaling;
 
 	// Override for the root transform
 	bool use_root_transform;
