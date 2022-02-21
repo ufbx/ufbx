@@ -31,34 +31,37 @@ static void ufbxt_check_element_ptr(ufbx_scene *scene, void *v_element)
 static void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void *void_elem, size_t elem_size)
 {
 	ufbx_vertex_attrib *elem = (ufbx_vertex_attrib*)void_elem;
-	if (elem->data == NULL) {
-		ufbxt_assert(elem->indices == NULL);
-		ufbxt_assert(elem->num_values == 0);
+	if (!elem->exists) {
+		ufbxt_assert(elem->values.data == NULL);
+		ufbxt_assert(elem->values.count == 0);
+		ufbxt_assert(elem->indices.data == NULL);
+		ufbxt_assert(elem->indices.count == 0);
 		return;
 	}
 
-	ufbxt_assert(elem->num_values >= 0);
+	ufbxt_assert(elem->values.count >= 0);
 	if (mesh->num_indices > 0) {
-		ufbxt_assert(elem->indices != NULL);
+		ufbxt_assert(elem->indices.count != NULL);
 	}
 
 	// Check that the indices are in range
+	ufbxt_assert(elem->indices.count == mesh->num_indices);
 	for (size_t i = 0; i < mesh->num_indices; i++) {
-		int32_t ix = elem->indices[i];
-		ufbxt_assert(ix >= -1 && (size_t)ix < elem->num_values);
+		int32_t ix = elem->indices.data[i];
+		ufbxt_assert(ix >= -1 && (size_t)ix < elem->values.count);
 	}
 
 	// Check that the data at invalid index is valid and zero
 	char zero[32] = { 0 };
 	ufbxt_assert(elem_size <= 32);
-	ufbxt_assert(!memcmp((char*)elem->data - elem_size, zero, elem_size));
+	ufbxt_assert(!memcmp((char*)elem->values.data - elem_size, zero, elem_size));
 }
 
 static void ufbxt_check_props(ufbx_scene *scene, const ufbx_props *props, bool top)
 {
 	ufbx_prop *prev = NULL;
-	for (size_t i = 0; i < props->num_props; i++) {
-		ufbx_prop *prop = &props->props[i];
+	for (size_t i = 0; i < props->props.count; i++) {
+		ufbx_prop *prop = &props->props.data[i];
 
 		ufbxt_assert(prop->type < UFBX_NUM_PROP_TYPES);
 		ufbxt_check_string(prop->name);

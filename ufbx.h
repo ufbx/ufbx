@@ -95,6 +95,11 @@ typedef struct ufbx_quat {
 	};
 } ufbx_quat;
 
+typedef struct ufbx_void_list {
+	void *data;
+	size_t count;
+} ufbx_void_list;
+
 UFBX_LIST_TYPE(ufbx_bool_list, bool);
 UFBX_LIST_TYPE(ufbx_int32_list, int32_t);
 UFBX_LIST_TYPE(ufbx_real_list, ufbx_real);
@@ -561,16 +566,16 @@ struct ufbx_node {
 
 // Vertex attribute: All attributes are stored in a consistent indexed format
 // regardless of how it's actually stored in the file.
-// `data` is a contiguous array of `num_values` attribute values.
-// `indices` maps each mesh index into a value in the `data` array.
+//
+// `values` is a contiguous array of attribute values.
+// `indices` maps each mesh index into a value in the `values` array.
 //
 // If `unique_per_vertex` is set then the attribute is guaranteed to have a
 // single defined value per vertex accessible via:
-//   `attrib.data[attrib.indices[mesh->vertex_first_index[vertex_ix]]`
-// NOTE: The attribute may be unique per vertex also if `unique_per_vertex`
-// is `false` depending on how it's stored in the FBX file.
+//   `attrib.values.data[attrib.indices.data[mesh->vertex_first_index[vertex_ix]]`
 typedef struct ufbx_vertex_attrib {
-	ufbx_real_list values;
+	bool exists;
+	ufbx_void_list values;
 	ufbx_int32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
@@ -578,34 +583,58 @@ typedef struct ufbx_vertex_attrib {
 
 // 1D vertex attribute, see `ufbx_vertex_attrib` for information
 typedef struct ufbx_vertex_real {
+	bool exists;
 	ufbx_real_list values;
 	ufbx_int32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
+
+#if defined(__cplusplus)
+	ufbx_real &operator[](size_t index) const { ufbx_assert(index < indices.count); return values.data[indices.data[index]]; }
+#endif
+
 } ufbx_vertex_real;
 
 // 2D vertex attribute, see `ufbx_vertex_attrib` for information
 typedef struct ufbx_vertex_vec2 {
+	bool exists;
 	ufbx_vec2_list values;
 	ufbx_int32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
+
+#if defined(__cplusplus)
+	ufbx_vec2 &operator[](size_t index) const { ufbx_assert(index < indices.count); return values.data[indices.data[index]]; }
+#endif
+
 } ufbx_vertex_vec2;
 
 // 3D vertex attribute, see `ufbx_vertex_attrib` for information
 typedef struct ufbx_vertex_vec3 {
+	bool exists;
 	ufbx_vec3_list values;
 	ufbx_int32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
+
+#if defined(__cplusplus)
+	ufbx_vec3 &operator[](size_t index) const { ufbx_assert(index < indices.count); return values.data[indices.data[index]]; }
+#endif
+
 } ufbx_vertex_vec3;
 
 // 4D vertex attribute, see `ufbx_vertex_attrib` for information
 typedef struct ufbx_vertex_vec4 {
+	bool exists;
 	ufbx_vec4_list values;
 	ufbx_int32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
+
+#if defined(__cplusplus)
+	ufbx_vec4 &operator[](size_t index) const { ufbx_assert(index < indices.count); return values.data[indices.data[index]]; }
+#endif
+
 } ufbx_vertex_vec4;
 
 // Vertex UV set/layer
@@ -749,6 +778,10 @@ struct ufbx_mesh {
 	size_t num_faces;     // < Number of faces (polygons) in the mesh
 	size_t num_triangles; // < Number of triangles if triangulated
 
+	// Number of edges in the mesh.
+	// NOTE: May be zero in valid meshes if the file doesn't contain edge adjacency data!
+	size_t num_edges;
+
 	// Faces and optional per-face extra data
 	ufbx_face_list faces;          // < Face index range
 	ufbx_bool_list face_smoothing; // < Should the face have soft normals
@@ -763,7 +796,7 @@ struct ufbx_mesh {
 
 	// Logical vertices and positions, alternatively you can use
 	// `vertex_position` for consistent interface with other attributes.
-	ufbx_int32_list ertex_indices;
+	ufbx_int32_list vertex_indices;
 	ufbx_vec3_list vertices;
 
 	// First index referring to a given vertex, `-1` if the vertex is unused.
