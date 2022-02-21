@@ -40,12 +40,12 @@ static void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void 
 	}
 
 	ufbxt_assert(elem->values.count >= 0);
+	ufbxt_assert(elem->indices.count == mesh->num_indices);
 	if (mesh->num_indices > 0) {
-		ufbxt_assert(elem->indices.count != NULL);
+		ufbxt_assert(elem->indices.data != NULL);
 	}
 
 	// Check that the indices are in range
-	ufbxt_assert(elem->indices.count == mesh->num_indices);
 	for (size_t i = 0; i < mesh->num_indices; i++) {
 		int32_t ix = elem->indices.data[i];
 		ufbxt_assert(ix >= -1 && (size_t)ix < elem->values.count);
@@ -197,13 +197,16 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	// ufbx_mesh *found = ufbx_find_mesh(scene, mesh->node.name.data);
 	// ufbxt_assert(found && !strcmp(found->node.name.data, mesh->node.name.data));
 
-	ufbxt_assert(mesh->vertices == mesh->vertex_position.data);
-	ufbxt_assert(mesh->vertex_indices == mesh->vertex_position.indices);
+	ufbxt_assert(mesh->vertices.data == mesh->vertex_position.values.data);
+	ufbxt_assert(mesh->vertices.count == mesh->num_vertices);
+	ufbxt_assert(mesh->vertex_indices.data == mesh->vertex_position.indices.data);
+	ufbxt_assert(mesh->vertex_indices.count == mesh->num_indices);
+	ufbxt_assert(mesh->vertex_first_index.count == mesh->num_vertices);
 
 	for (size_t vi = 0; vi < mesh->num_vertices; vi++) {
-		int32_t ii = mesh->vertex_first_index[vi];
+		int32_t ii = mesh->vertex_first_index.data[vi];
 		if (ii >= 0) {
-			ufbxt_assert(mesh->vertex_indices[ii] == vi);
+			ufbxt_assert(mesh->vertex_indices.data[ii] == vi);
 		} else {
 			ufbxt_assert(ii == -1);
 		}
@@ -218,7 +221,7 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_check_vertex_element(scene, mesh, &mesh->skinned_position, sizeof(ufbx_vec3));
 	ufbxt_check_vertex_element(scene, mesh, &mesh->skinned_normal, sizeof(ufbx_vec3));
 
-	ufbxt_assert(mesh->num_vertices == mesh->vertex_position.num_values);
+	ufbxt_assert(mesh->num_vertices == mesh->vertex_position.values.count);
 	ufbxt_assert(mesh->num_triangles <= mesh->num_indices);
 
 	ufbxt_assert(mesh->vertex_position.value_reals == 3);
@@ -230,8 +233,9 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_assert(mesh->vertex_crease.value_reals == 1);
 
 	uint32_t prev_end = 0;
+	ufbxt_assert(mesh->faces.count == mesh->num_faces);
 	for (size_t i = 0; i < mesh->num_faces; i++) {
-		ufbx_face face = mesh->faces[i];
+		ufbx_face face = mesh->faces.data[i];
 		ufbxt_assert(face.index_begin == prev_end);
 		prev_end = face.index_begin + face.num_indices;
 		ufbxt_assert(prev_end <= mesh->num_indices);
@@ -276,8 +280,9 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 #endif
 	}
 
+	ufbxt_assert(mesh->edges.count == mesh->num_edges);
 	for (size_t i = 0; i < mesh->num_edges; i++) {
-		ufbx_edge edge = mesh->edges[i];
+		ufbx_edge edge = mesh->edges.data[i];
 		ufbxt_assert(edge.indices[0] < mesh->num_indices);
 		ufbxt_assert(edge.indices[1] < mesh->num_indices);
 	}
@@ -289,9 +294,10 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_assert(set->vertex_bitangent.value_reals == 3);
 
 		if (i == 0) {
-			ufbxt_assert(mesh->vertex_uv.data == set->vertex_uv.data);
-			ufbxt_assert(mesh->vertex_uv.indices == set->vertex_uv.indices);
-			ufbxt_assert(mesh->vertex_uv.num_values == set->vertex_uv.num_values);
+			ufbxt_assert(mesh->vertex_uv.values.data == set->vertex_uv.values.data);
+			ufbxt_assert(mesh->vertex_uv.values.count == set->vertex_uv.values.count);
+			ufbxt_assert(mesh->vertex_uv.indices.data == set->vertex_uv.indices.data);
+			ufbxt_assert(mesh->vertex_uv.indices.count == set->vertex_uv.indices.count);
 		}
 		ufbxt_check_string(set->name);
 		ufbxt_check_vertex_element(scene, mesh, &set->vertex_uv, sizeof(ufbx_vec2));
@@ -302,16 +308,17 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_assert(set->vertex_color.value_reals == 4);
 
 		if (i == 0) {
-			ufbxt_assert(mesh->vertex_color.data == set->vertex_color.data);
-			ufbxt_assert(mesh->vertex_color.indices == set->vertex_color.indices);
-			ufbxt_assert(mesh->vertex_color.num_values == set->vertex_color.num_values);
+			ufbxt_assert(mesh->vertex_color.values.data == set->vertex_color.values.data);
+			ufbxt_assert(mesh->vertex_color.values.count == set->vertex_color.values.count);
+			ufbxt_assert(mesh->vertex_color.indices.data == set->vertex_color.indices.data);
+			ufbxt_assert(mesh->vertex_color.indices.count == set->vertex_color.indices.count);
 		}
 		ufbxt_check_string(set->name);
 		ufbxt_check_vertex_element(scene, mesh, &set->vertex_color, sizeof(ufbx_vec4));
 	}
 
 	for (size_t i = 0; i < mesh->num_edges; i++) {
-		ufbx_edge edge = mesh->edges[i];
+		ufbx_edge edge = mesh->edges.data[i];
 		ufbxt_assert(edge.indices[0] < mesh->num_indices);
 		ufbxt_assert(edge.indices[1] < mesh->num_indices);
 		// TODO: Do we want find face?
@@ -322,11 +329,14 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 #endif
 	}
 
-	if (mesh->face_material) {
+	if (mesh->face_material.count) {
+		ufbxt_assert(mesh->face_material.count == mesh->num_faces);
 		for (size_t i = 0; i < mesh->num_faces; i++) {
-			int32_t material = mesh->face_material[i];
+			int32_t material = mesh->face_material.data[i];
 			ufbxt_assert(material >= 0 && (size_t)material < mesh->materials.count);
 		}
+	} else {
+		ufbxt_assert(mesh->face_material.count == 0);
 	}
 
 	for (size_t i = 0; i < mesh->materials.count; i++) {
@@ -334,7 +344,7 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_check_element_ptr(scene, mat->material);
 
 		for (size_t j = 0; j < mat->num_faces; j++) {
-			ufbxt_assert(mesh->face_material[mat->face_indices[j]] == (int32_t)i);
+			ufbxt_assert(mesh->face_material.data[mat->face_indices.data[j]] == (int32_t)i);
 		}
 	}
 	for (size_t i = 0; i < mesh->skin_deformers.count; i++) {

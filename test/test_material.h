@@ -5,20 +5,20 @@ void ufbxt_check_texture_content(ufbx_scene *scene, ufbx_texture *texture, const
 {
 	char buf[512];
 
-	ufbxt_assert(texture->content_size > 0);
-	ufbxt_assert(texture->content);
+	ufbxt_assert(texture->content.size > 0);
+	ufbxt_assert(texture->content.data);
 
 	snprintf(buf, sizeof(buf), "%stextures/%s", data_root, filename);
-	void *ref = malloc(texture->content_size);
+	void *ref = malloc(texture->content.size);
 	ufbxt_assert(ref);
 
 	FILE *f = fopen(buf, "rb");
 	ufbxt_assert(f);
-	size_t num_read = fread(ref, 1, texture->content_size, f);
+	size_t num_read = fread(ref, 1, texture->content.size, f);
 	fclose(f);
 
-	ufbxt_assert(num_read == texture->content_size);
-	ufbxt_assert(!memcmp(ref, texture->content, texture->content_size));
+	ufbxt_assert(num_read == texture->content.size);
+	ufbxt_assert(!memcmp(ref, texture->content.data, texture->content.size));
 
 	free(ref);
 }
@@ -31,10 +31,10 @@ void ufbxt_check_material_texture(ufbx_scene *scene, ufbx_texture *texture, cons
 	ufbxt_assert(!strcmp(texture->relative_filename.data, buf));
 
 	if (require_content && (scene->metadata.version >= 7000 || !scene->metadata.ascii)) {
-		ufbxt_assert(texture->content);
+		ufbxt_assert(texture->content.size);
 	}
 
-	if (texture->content) {
+	if (texture->content.size) {
 		ufbxt_check_texture_content(scene, texture, filename);
 	}
 }
@@ -80,13 +80,13 @@ UFBXT_TEST(ignore_embedded)
 		ufbxt_check_scene(scene);
 		
 		for (size_t i = 0; i < scene->videos.count; i++) {
-			ufbxt_assert(scene->videos.data[i]->content == NULL);
-			ufbxt_assert(scene->videos.data[i]->content_size == 0);
+			ufbxt_assert(scene->videos.data[i]->content.data == NULL);
+			ufbxt_assert(scene->videos.data[i]->content.size == 0);
 		}
 		
 		for (size_t i = 0; i < scene->textures.count; i++) {
-			ufbxt_assert(scene->textures.data[i]->content == NULL);
-			ufbxt_assert(scene->textures.data[i]->content_size == 0);
+			ufbxt_assert(scene->textures.data[i]->content.data == NULL);
+			ufbxt_assert(scene->textures.data[i]->content.size == 0);
 		}
 
 		ufbx_free_scene(scene);

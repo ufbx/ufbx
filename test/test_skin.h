@@ -266,8 +266,8 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 				ufbx_blend_deformer *eval_deformer = state->blend_deformers.data[deformer->typed_id];
 				ufbx_mesh *eval_mesh = state->meshes.data[mesh->typed_id];
 				for (size_t i = 0; i < 8; i++) {
-					ufbx_vec3 original_pos = eval_mesh->vertex_position.data[i];
-					ufbx_vec3 skinned_pos = eval_mesh->skinned_position.data[i];
+					ufbx_vec3 original_pos = eval_mesh->vertex_position.values.data[i];
+					ufbx_vec3 skinned_pos = eval_mesh->skinned_position.values.data[i];
 					ufbx_vec3 ref = original_pos;
 					ufbx_vec3 blend_pos = ufbx_get_blend_vertex_offset(eval_deformer, i);
 					ref = ufbxt_add3(ref, ufbxt_mul3(ref_offsets[0][i], weights[0]));
@@ -327,11 +327,11 @@ UFBXT_FILE_TEST(synthetic_blend_shape_order)
 	ufbxt_assert(shape);
 
 	ufbx_vec3 pos[12];
-	memcpy(pos, mesh->vertices, sizeof(pos));
+	memcpy(pos, mesh->vertices.data, sizeof(pos));
 	ufbx_add_blend_shape_vertex_offsets(shape, pos, 12, 0.5f);
 
 	for (size_t i = 0; i < mesh->num_vertices; i++) {
-		ufbx_vec3 vert = mesh->vertices[i];
+		ufbx_vec3 vert = mesh->vertices.data[i];
 		ufbx_vec3 off = ufbx_get_blend_shape_vertex_offset(shape, i);
 		ufbx_vec3 res = { vert.x+off.x*0.5f, vert.y+off.y*0.5f, vert.z+off.z*0.5f };
 		ufbxt_assert_close_vec3(err, res, ref[i]);

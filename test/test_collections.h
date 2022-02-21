@@ -28,7 +28,7 @@ UFBXT_FILE_TEST(max_selection_sets)
 		ufbxt_assert(sel->faces.count == 2);
 
 		for (size_t i = 0; i < sel->faces.count; i++) {
-			ufbx_face face = mesh->faces[sel->faces.data[i]];
+			ufbx_face face = mesh->faces.data[sel->faces.data[i]];
 			for (size_t j = 0; j < face.num_indices; j++) {
 				ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + j);
 				pos = ufbx_transform_position(&node->geometry_to_world, pos);
@@ -48,7 +48,7 @@ UFBXT_FILE_TEST(max_selection_sets)
 		ufbxt_assert(sel->faces.count == 2);
 
 		for (size_t i = 0; i < sel->faces.count; i++) {
-			ufbx_face face = mesh->faces[sel->faces.data[i]];
+			ufbx_face face = mesh->faces.data[sel->faces.data[i]];
 			for (size_t j = 0; j < face.num_indices; j++) {
 				ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + j);
 				pos = ufbx_transform_position(&node->geometry_to_world, pos);
@@ -68,7 +68,7 @@ UFBXT_FILE_TEST(max_selection_sets)
 		ufbxt_assert(sel->faces.count == 8);
 
 		for (size_t i = 0; i < sel->faces.count; i++) {
-			ufbx_face face = mesh->faces[sel->faces.data[i]];
+			ufbx_face face = mesh->faces.data[sel->faces.data[i]];
 			ufbx_real avg = 0.0f;
 			for (size_t j = 0; j < face.num_indices; j++) {
 				ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + j);
@@ -91,7 +91,7 @@ UFBXT_FILE_TEST(max_selection_sets)
 		ufbxt_assert(sel->faces.count == 0);
 
 		for (size_t i = 0; i < sel->edges.count; i++) {
-			ufbx_edge edge = mesh->edges[sel->edges.data[i]];
+			ufbx_edge edge = mesh->edges.data[sel->edges.data[i]];
 			for (size_t j = 0; j < 2; j++) {
 				ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[j]);
 				pos = ufbx_transform_position(&node->geometry_to_world, pos);
@@ -112,7 +112,7 @@ UFBXT_FILE_TEST(max_selection_sets)
 
 		ufbx_mesh *mesh = sel->target_mesh;
 		for (size_t i = 0; i < sel->edges.count; i++) {
-			ufbx_edge edge = mesh->edges[sel->edges.data[i]];
+			ufbx_edge edge = mesh->edges.data[sel->edges.data[i]];
 			for (size_t j = 0; j < 2; j++) {
 				ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[j]);
 				pos = ufbx_transform_position(&node->geometry_to_world, pos);
@@ -132,7 +132,7 @@ UFBXT_FILE_TEST(max_selection_sets)
 		ufbxt_assert(sel->faces.count == 0);
 
 		for (size_t i = 0; i < sel->vertices.count; i++) {
-			ufbx_vec3 pos = mesh->vertices[sel->vertices.data[i]];
+			ufbx_vec3 pos = mesh->vertices.data[sel->vertices.data[i]];
 			pos = ufbx_transform_position(&sel->target_node->geometry_to_world, pos);
 			ufbxt_assert_close_real(err, pos.y / 10.0f, 2.0f);
 		}
@@ -149,7 +149,7 @@ UFBXT_FILE_TEST(max_selection_sets)
 		ufbxt_assert(sel->faces.count == 0);
 
 		for (size_t i = 0; i < sel->vertices.count; i++) {
-			ufbx_vec3 pos = mesh->vertices[sel->vertices.data[i]];
+			ufbx_vec3 pos = mesh->vertices.data[sel->vertices.data[i]];
 			pos = ufbx_transform_position(&sel->target_node->geometry_to_world, pos);
 			ufbxt_assert_close_real(err, pos.y / 10.0f, 0.0f);
 		}

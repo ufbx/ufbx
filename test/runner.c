@@ -512,6 +512,14 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
 					ufbxt_assert(0 && "Failed to parse face indices");
 				}
 
+				mesh->vertex_position.indices.count++;
+				mesh->vertex_normal.indices.count++;
+				mesh->vertex_uv.indices.count++;
+
+				mesh->vertex_position.values.count = (size_t)(dp - positions);
+				mesh->vertex_normal.values.count = (size_t)(dn - normals);
+				mesh->vertex_uv.values.count = (size_t)(du - uvs);
+
 				*dpi++ = pi - 1;
 				*dni++ = ni - 1;
 				*dui++ = ui - 1;
@@ -536,12 +544,12 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size)
 			ufbxt_assert(len < sizeof(mesh->name));
 			memcpy(mesh->name, line + 2, len);
 			mesh->faces = df;
-			mesh->vertex_position.data = positions;
-			mesh->vertex_normal.data = normals;
-			mesh->vertex_uv.data = uvs;
-			mesh->vertex_position.indices = dpi;
-			mesh->vertex_normal.indices = dni;
-			mesh->vertex_uv.indices = dui;
+			mesh->vertex_position.values.data = positions;
+			mesh->vertex_normal.values.data = normals;
+			mesh->vertex_uv.values.data = uvs;
+			mesh->vertex_position.indices.data = dpi;
+			mesh->vertex_normal.indices.data = dni;
+			mesh->vertex_uv.indices.data = dui;
 		}
 
 		if (line[0] == '#') {
@@ -585,31 +593,31 @@ static void ufbxt_debug_dump_obj_mesh(const char *file, ufbx_node *node, ufbx_me
 
 	fprintf(f, "s 1\n");
 
-	for (size_t i = 0; i < mesh->vertex_position.num_values; i++) {
-		ufbx_vec3 v = mesh->vertex_position.data[i];
+	for (size_t i = 0; i < mesh->vertex_position.values.count; i++) {
+		ufbx_vec3 v = mesh->vertex_position.values.data[i];
 		v = ufbx_transform_position(&node->geometry_to_world, v);
 		fprintf(f, "v %f %f %f\n", v.x, v.y, v.z);
 	}
-	for (size_t i = 0; i < mesh->vertex_uv.num_values; i++) {
-		ufbx_vec2 v = mesh->vertex_uv.data[i];
+	for (size_t i = 0; i < mesh->vertex_uv.values.count; i++) {
+		ufbx_vec2 v = mesh->vertex_uv.values.data[i];
 		fprintf(f, "vt %f %f\n", v.x, v.y);
 	}
 
 	ufbx_matrix mat = ufbx_matrix_for_normals(&node->geometry_to_world);
-	for (size_t i = 0; i < mesh->vertex_normal.num_values; i++) {
-		ufbx_vec3 v = mesh->vertex_normal.data[i];
+	for (size_t i = 0; i < mesh->vertex_normal.values.count; i++) {
+		ufbx_vec3 v = mesh->vertex_normal.values.data[i];
 		v = ufbx_transform_direction(&mat, v);
 		fprintf(f, "vn %f %f %f\n", v.x, v.y, v.z);
 	}
 
 
 	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
-		ufbx_face face = mesh->faces[fi];
+		ufbx_face face = mesh->faces.data[fi];
 		fprintf(f, "f");
 		for (size_t ci = 0; ci < face.num_indices; ci++) {
-			int32_t vi = mesh->vertex_position.indices[face.index_begin + ci];
-			int32_t ti = mesh->vertex_uv.indices[face.index_begin + ci];
-			int32_t ni = mesh->vertex_normal.indices[face.index_begin + ci];
+			int32_t vi = mesh->vertex_position.indices.data[face.index_begin + ci];
+			int32_t ti = mesh->vertex_uv.indices.data[face.index_begin + ci];
+			int32_t ni = mesh->vertex_normal.indices.data[face.index_begin + ci];
 			fprintf(f, " %d/%d/%d", vi + 1, ti + 1, ni + 1);
 		}
 		fprintf(f, "\n");
@@ -628,22 +636,22 @@ static void ufbxt_debug_dump_obj_scene(const char *file, ufbx_scene *scene)
 		for (size_t ni = 0; ni < mesh->instances.count; ni++) {
 			ufbx_node *node = mesh->instances.data[ni];
 
-			for (size_t i = 0; i < mesh->vertex_position.num_values; i++) {
-				ufbx_vec3 v = mesh->skinned_position.data[i];
+			for (size_t i = 0; i < mesh->vertex_position.values.count; i++) {
+				ufbx_vec3 v = mesh->skinned_position.values.data[i];
 				if (mesh->skinned_is_local) {
 					v = ufbx_transform_position(&node->geometry_to_world, v);
 				}
 				fprintf(f, "v %f %f %f\n", v.x, v.y, v.z);
 			}
 
-			for (size_t i = 0; i < mesh->vertex_uv.num_values; i++) {
-				ufbx_vec2 v = mesh->vertex_uv.data[i];
+			for (size_t i = 0; i < mesh->vertex_uv.values.count; i++) {
+				ufbx_vec2 v = mesh->vertex_uv.values.data[i];
 				fprintf(f, "vt %f %f\n", v.x, v.y);
 			}
 
 			ufbx_matrix mat = ufbx_matrix_for_normals(&node->geometry_to_world);
-			for (size_t i = 0; i < mesh->skinned_normal.num_values; i++) {
-				ufbx_vec3 v = mesh->skinned_normal.data[i];
+			for (size_t i = 0; i < mesh->skinned_normal.values.count; i++) {
+				ufbx_vec3 v = mesh->skinned_normal.values.data[i];
 				if (mesh->skinned_is_local) {
 					v = ufbx_transform_direction(&mat, v);
 				}
@@ -662,13 +670,13 @@ static void ufbxt_debug_dump_obj_scene(const char *file, ufbx_scene *scene)
 			fprintf(f, "g %s\n", node->name.data);
 
 			for (size_t fi = 0; fi < mesh->num_faces; fi++) {
-				ufbx_face face = mesh->faces[fi];
+				ufbx_face face = mesh->faces.data[fi];
 				fprintf(f, "f");
 				for (size_t ci = 0; ci < face.num_indices; ci++) {
-					int32_t vi = v_off + mesh->skinned_position.indices[face.index_begin + ci];
-					int32_t ni = n_off + mesh->skinned_normal.indices[face.index_begin + ci];
-					if (mesh->vertex_uv.indices) {
-						int32_t ti = t_off + mesh->vertex_uv.indices[face.index_begin + ci];
+					int32_t vi = v_off + mesh->skinned_position.indices.data[face.index_begin + ci];
+					int32_t ni = n_off + mesh->skinned_normal.indices.data[face.index_begin + ci];
+					if (mesh->vertex_uv.exists) {
+						int32_t ti = t_off + mesh->vertex_uv.indices.data[face.index_begin + ci];
 						fprintf(f, " %d/%d/%d", vi + 1, ti + 1, ni + 1);
 					} else {
 						fprintf(f, " %d//%d", vi + 1, ni + 1);
@@ -679,9 +687,9 @@ static void ufbxt_debug_dump_obj_scene(const char *file, ufbx_scene *scene)
 
 			fprintf(f, "\n");
 
-			v_off += (int32_t)mesh->skinned_position.num_values;
-			t_off += (int32_t)mesh->vertex_uv.num_values;
-			n_off += (int32_t)mesh->skinned_normal.num_values;
+			v_off += (int32_t)mesh->skinned_position.values.count;
+			t_off += (int32_t)mesh->vertex_uv.values.count;
+			n_off += (int32_t)mesh->skinned_normal.values.count;
 		}
 	}
 
@@ -769,7 +777,7 @@ static void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *fbx_node, ufbx_
 	for (size_t i = 0; i < obj_mesh->num_indices; i++) {
 		obj_verts[i].pos = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, i);
 		obj_verts[i].normal = ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, i);
-		if (obj_mesh->vertex_uv.data) {
+		if (obj_mesh->vertex_uv.exists) {
 			obj_verts[i].uv = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, i);
 		}
 	}
@@ -782,8 +790,8 @@ static void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *fbx_node, ufbx_
 		}
 		fbx_verts[i].pos = fp;
 		fbx_verts[i].normal = fn;
-		if (obj_mesh->vertex_uv.data) {
-			ufbxt_assert(fbx_mesh->vertex_uv.data);
+		if (obj_mesh->vertex_uv.exists) {
+			ufbxt_assert(fbx_mesh->vertex_uv.exists);
 			fbx_verts[i].uv = ufbx_get_vertex_vec2(&fbx_mesh->vertex_uv, i);
 		}
 	}
@@ -895,7 +903,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			// Assume that the indices are in the same order!
 			for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
 				ufbx_face obj_face = obj_mesh->faces[face_ix];
-				ufbx_face face = mesh->faces[face_ix];
+				ufbx_face face = mesh->faces.data[face_ix];
 				ufbxt_assert(obj_face.index_begin == face.index_begin);
 				ufbxt_assert(obj_face.num_indices == face.num_indices);
 
@@ -921,8 +929,8 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 						ufbxt_assert_close_vec3(p_err, on, fn);
 					}
 
-					if (obj_mesh->vertex_uv.data && !obj->bad_uvs) {
-						ufbxt_assert(mesh->vertex_uv.data);
+					if (obj_mesh->vertex_uv.exists && !obj->bad_uvs) {
+						ufbxt_assert(mesh->vertex_uv.exists);
 						ufbx_vec2 ou = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, ix);
 						ufbx_vec2 fu = ufbx_get_vertex_vec2(&mesh->vertex_uv, ix);
 						ufbxt_assert_close_vec2(p_err, ou, fu);

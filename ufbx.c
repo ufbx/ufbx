@@ -6751,7 +6751,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_check_indices(ufbxi_context *uc,
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mesh *mesh, ufbxi_node *node,
 	ufbx_vertex_attrib *attrib, const char *data_name, const char *index_name, char data_type, size_t num_components)
 {
-	ufbx_real **p_dst_data = (ufbx_real**)attrib->values.data;
+	ufbx_real **p_dst_data = (ufbx_real**)&attrib->values.data;
 
 	ufbxi_value_array *data = ufbxi_find_array(node, data_name, data_type);
 	ufbxi_value_array *indices = ufbxi_find_array(node, index_name, 'i');
@@ -6763,9 +6763,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 	ufbxi_check(data);
 	ufbxi_check(data->size % num_components == 0);
 
-	attrib->exists = true;
-	attrib->indices.count = mesh->num_indices;
-
 	size_t num_elems = data->size / num_components;
 
 	// HACK: If there's no elements at all keep the attribute as NULL
@@ -6773,6 +6770,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 	if (num_elems == 0) {
 		return 1;
 	}
+
+	attrib->exists = true;
+	attrib->indices.count = mesh->num_indices;
 
 	const char *mapping;
 	ufbxi_check(ufbxi_find_val1(node, ufbxi_MappingInformationType, "C", (char**)&mapping));
@@ -7090,7 +7090,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	mesh->vertices.data = (ufbx_vec3*)vertices->data;
 	mesh->vertices.count = mesh->num_vertices;
 	mesh->vertex_indices.data = index_data;
-	mesh->vertices.count = mesh->num_indices;
+	mesh->vertex_indices.count = mesh->num_indices;
 
 	mesh->vertex_position.exists = true;
 	mesh->vertex_position.values.data = (ufbx_vec3*)vertices->data;
@@ -14668,6 +14668,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, uf
 {
 	size_t num_materials = mesh->materials.count;
 
+	mesh->vertex_first_index.count = mesh->num_vertices;
 	mesh->vertex_first_index.data = ufbxi_push(buf, int32_t, mesh->num_vertices);
 	ufbxi_check_err(error, mesh->vertex_first_index.data);
 
@@ -14901,7 +14902,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 	mesh->vertices.count = num_positions;
 	mesh->num_vertices = num_positions;
 	mesh->vertex_indices.data = vertex_ix;
-	mesh->vertex_indices.count = num_indices;
+	mesh->vertex_indices.count = dst_index;
 
 	mesh->faces.data = faces;
 	mesh->faces.count = num_faces;
@@ -14910,36 +14911,36 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 	mesh->vertex_position.values.data = positions;
 	mesh->vertex_position.values.count = num_positions;
 	mesh->vertex_position.indices.data = vertex_ix;
-	mesh->vertex_position.indices.count = num_indices;
+	mesh->vertex_position.indices.count = dst_index;
 	mesh->vertex_position.value_reals = 3;
 	mesh->vertex_position.unique_per_vertex = true;
 
 	mesh->vertex_uv.exists = true;
 	mesh->vertex_uv.values.data = uvs;
-	mesh->vertex_uv.values.count = num_indices;
+	mesh->vertex_uv.values.count = dst_index;
 	mesh->vertex_uv.indices.data = attrib_ix;
-	mesh->vertex_uv.indices.count = num_indices;
+	mesh->vertex_uv.indices.count = dst_index;
 	mesh->vertex_uv.value_reals = 2;
 
 	mesh->vertex_normal.exists = true;
 	mesh->vertex_normal.values.data = normals;
-	mesh->vertex_normal.values.count = num_indices;
+	mesh->vertex_normal.values.count = dst_index;
 	mesh->vertex_normal.indices.data = attrib_ix;
-	mesh->vertex_normal.indices.count = num_indices;
+	mesh->vertex_normal.indices.count = dst_index;
 	mesh->vertex_normal.value_reals = 3;
 
 	mesh->vertex_tangent.exists = true;
 	mesh->vertex_tangent.values.data = tangents;
-	mesh->vertex_tangent.values.count = num_indices;
+	mesh->vertex_tangent.values.count = dst_index;
 	mesh->vertex_tangent.indices.data = attrib_ix;
-	mesh->vertex_tangent.indices.count = num_indices;
+	mesh->vertex_tangent.indices.count = dst_index;
 	mesh->vertex_tangent.value_reals = 3;
 
 	mesh->vertex_bitangent.exists = true;
 	mesh->vertex_bitangent.values.data = bitangents;
-	mesh->vertex_bitangent.values.count = num_indices;
+	mesh->vertex_bitangent.values.count = dst_index;
 	mesh->vertex_bitangent.indices.data = attrib_ix;
-	mesh->vertex_bitangent.indices.count = num_indices;
+	mesh->vertex_bitangent.indices.count = dst_index;
 	mesh->vertex_bitangent.value_reals = 3;
 
 	mesh->vertex_crease.value_reals = 1;
@@ -15900,7 +15901,7 @@ ufbxi_noinline static int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 	layer->values.data = new_values;
 	layer->indices.data = new_indices;
 	layer->values.count = num_values;
-	layer->indices.count = mesh->num_indices;
+	layer->indices.count = mesh->num_indices * 4;
 	layer->value_reals = reals;
 
 	return 1;
@@ -16194,6 +16195,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivi
 
 		ufbx_compute_normals(mesh, &mesh->skinned_position, normal_indices, normal_data, num_normals);
 
+		mesh->vertex_normal.exists = true;
 		mesh->vertex_normal.values.data = normal_data;
 		mesh->vertex_normal.values.count = num_normals;
 		mesh->vertex_normal.indices.data = normal_indices;
