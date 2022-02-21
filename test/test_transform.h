@@ -153,4 +153,72 @@ UFBXT_TEST(root_transform)
 }
 #endif
 
+UFBXT_TEST(blender_axes)
+#if UFBXT_IMPL
+{
+	const char *name = "maya_cube";
+	char buf[512];
+
+	ufbxt_diff_error err = { 0 };
+	bool any_found = false;
+
+	static const char *axis_names = {
+		"px", "nx", "py", "ny", "pz", "nz",
+	};
+
+	TODO
+
+	for (uint32_t vi = 0; vi < ufbxt_arraycount(ufbxt_file_versions); vi++) {
+		for (uint32_t fi = 0; fi < 2; fi++) {
+			uint32_t version = ufbxt_file_versions[vi];
+			const char *format = fi == 1 ? "ascii" : "binary";
+			snprintf(buf, sizeof(buf), "%s%s_%u_%s.fbx", data_root, name, version, format);
+		}
+
+		ufbx_error error;
+		ufbx_load_opts opts = { 0 };
+
+		ufbx_vec3 euler = { { 90.0f, 0.0f, 0.0f } };
+
+		opts.use_root_transform = true;
+		opts.root_transform.translation.x = -1.0f;
+		opts.root_transform.translation.y = -2.0f;
+		opts.root_transform.translation.z = -3.0f;
+		opts.root_transform.rotation = ufbx_euler_to_quat(euler, UFBX_ROTATION_XYZ);
+		opts.root_transform.scale.x = 2.0f;
+		opts.root_transform.scale.y = 3.0f;
+		opts.root_transform.scale.z = 4.0f;
+
+		ufbx_scene *scene = ufbx_load_file(buf, &opts, &error);
+		if (error.type == UFBX_ERROR_FILE_NOT_FOUND) continue;
+		ufbxt_assert(scene);
+		any_found = true;
+
+		ufbxt_check_scene(scene);
+
+		ufbxt_assert_close_vec3(&err, scene->root_node->local_transform.translation, opts.root_transform.translation);
+		ufbxt_assert_close_quat(&err, scene->root_node->local_transform.rotation, opts.root_transform.rotation);
+		ufbxt_assert_close_vec3(&err, scene->root_node->local_transform.scale, opts.root_transform.scale);
+
+		ufbx_transform eval = ufbx_evaluate_transform(&scene->anim, scene->root_node, 0.1);
+		ufbxt_assert_close_vec3(&err, eval.translation, opts.root_transform.translation);
+		ufbxt_assert_close_quat(&err, eval.rotation, opts.root_transform.rotation);
+		ufbxt_assert_close_vec3(&err, eval.scale, opts.root_transform.scale);
+
+		ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, 0.1, NULL, NULL);
+		ufbxt_assert(state);
+
+		ufbxt_assert_close_vec3(&err, state->root_node->local_transform.translation, opts.root_transform.translation);
+		ufbxt_assert_close_quat(&err, state->root_node->local_transform.rotation, opts.root_transform.rotation);
+		ufbxt_assert_close_vec3(&err, state->root_node->local_transform.scale, opts.root_transform.scale);
+		
+		ufbx_free_scene(state);
+		ufbx_free_scene(scene);
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	ufbxt_assert(any_found);
+}
+#endif
+
 
