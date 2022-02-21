@@ -26,6 +26,8 @@
 	#define ufbx_assert(cond) assert(cond)
 #endif
 
+#define ufbx_nullable
+
 // -- Configuration
 
 // TODO: Support overriding `ufbx_real` with `float` or anything else.
@@ -93,8 +95,10 @@ typedef struct ufbx_quat {
 	};
 } ufbx_quat;
 
+UFBX_LIST_TYPE(ufbx_bool_list, bool);
 UFBX_LIST_TYPE(ufbx_int32_list, int32_t);
 UFBX_LIST_TYPE(ufbx_real_list, ufbx_real);
+UFBX_LIST_TYPE(ufbx_vec2_list, ufbx_vec2);
 UFBX_LIST_TYPE(ufbx_vec3_list, ufbx_vec3);
 UFBX_LIST_TYPE(ufbx_vec4_list, ufbx_vec4);
 UFBX_LIST_TYPE(ufbx_string_list, ufbx_string);
@@ -235,15 +239,16 @@ struct ufbx_prop {
 	};
 };
 
+UFBX_LIST_TYPE(ufbx_prop_list, ufbx_prop);
+
 // List of alphabetically sorted properties with potential defaults.
 // For animated objects in as scene from `ufbx_evaluate_scene()` this list
 // only has the animated properties, the originals are stored under `defaults`.
 struct ufbx_props {
-	ufbx_prop *props;
-	size_t num_props;
+	ufbx_prop_list props;
 	size_t num_animated;
 
-	ufbx_props *defaults;
+	ufbx_nullable ufbx_props *defaults;
 };
 
 // -- Elements
@@ -478,7 +483,7 @@ struct ufbx_node {
 	//
 	// Always non-`NULL` for non-root nodes unless
 	// `ufbx_load_opts.allow_nodes_out_of_root` is enabled.
-	ufbx_node *parent;
+	ufbx_nullable ufbx_node *parent;
 
 	// List of child nodes parented to this node.
 	ufbx_node_list children;
@@ -486,16 +491,16 @@ struct ufbx_node {
 	// Attached element type and typed pointers.
 	//
 	// Set to `NULL` if not in use, so checking `attrib_type` is not required.
-	ufbx_mesh *mesh;
-	ufbx_light *light;
-	ufbx_camera *camera;
-	ufbx_bone *bone;
+	ufbx_nullable ufbx_mesh *mesh;
+	ufbx_nullable ufbx_light *light;
+	ufbx_nullable ufbx_camera *camera;
+	ufbx_nullable ufbx_bone *bone;
 
 	// Less common attributes use these fields.
 	//
 	// Defined even if it is one of the above, eg. `ufbx_mesh`. In case there
 	// is multiple attributes this will be the first one.
-	ufbx_element *attrib;
+	ufbx_nullable ufbx_element *attrib;
 
 	// `attrib->type` if `attrib` is defined, otherwise `UFBX_ELEMENT_UNKNOWN`.
 	ufbx_element_type attrib_type;
@@ -565,45 +570,40 @@ struct ufbx_node {
 // NOTE: The attribute may be unique per vertex also if `unique_per_vertex`
 // is `false` depending on how it's stored in the FBX file.
 typedef struct ufbx_vertex_attrib {
-	ufbx_real *data;
-	int32_t *indices;
-	size_t num_values;
+	ufbx_real_list values;
+	ufbx_int32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
 } ufbx_vertex_attrib;
 
 // 1D vertex attribute, see `ufbx_vertex_attrib` for information
 typedef struct ufbx_vertex_real {
-	ufbx_real *data;
-	int32_t *indices;
-	size_t num_values;
+	ufbx_real_list values;
+	ufbx_int32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
 } ufbx_vertex_real;
 
 // 2D vertex attribute, see `ufbx_vertex_attrib` for information
 typedef struct ufbx_vertex_vec2 {
-	ufbx_vec2 *data;
-	int32_t *indices;
-	size_t num_values;
+	ufbx_vec2_list values;
+	ufbx_int32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
 } ufbx_vertex_vec2;
 
 // 3D vertex attribute, see `ufbx_vertex_attrib` for information
 typedef struct ufbx_vertex_vec3 {
-	ufbx_vec3 *data;
-	int32_t *indices;
-	size_t num_values;
+	ufbx_vec3_list values;
+	ufbx_int32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
 } ufbx_vertex_vec3;
 
 // 4D vertex attribute, see `ufbx_vertex_attrib` for information
 typedef struct ufbx_vertex_vec4 {
-	ufbx_vec4 *data;
-	int32_t *indices;
-	size_t num_values;
+	ufbx_vec4_list values;
+	ufbx_int32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
 } ufbx_vertex_vec4;
@@ -636,6 +636,8 @@ typedef struct ufbx_edge {
 	uint32_t indices[2];
 } ufbx_edge;
 
+UFBX_LIST_TYPE(ufbx_edge_list, ufbx_edge);
+
 // Polygonal face with arbitrary number vertices, a single face contains a 
 // contiguous range of mesh indices, eg. `{5,3}` would have indices 5, 6, 7
 //
@@ -646,13 +648,18 @@ typedef struct ufbx_face {
 	uint32_t num_indices;
 } ufbx_face;
 
+UFBX_LIST_TYPE(ufbx_face_list, ufbx_face);
+
 typedef struct ufbx_mesh_material {
-	ufbx_material *material;
+	ufbx_nullable ufbx_material *material;
 
 	// Sub-set of the geometry that uses this specific material
-	size_t num_faces;      // < Number of faces (polygons) using this material
-	size_t num_triangles;  // < Number of triangles using this material if triangulated
-	int32_t *face_indices; // < Indices to `ufbx_mesh.faces[]` that use this material
+	size_t num_faces;     // < Number of faces (polygons) using this material
+	size_t num_triangles; // < Number of triangles using this material if triangulated
+
+	// Indices to `ufbx_mesh.faces[]` that use this material.
+	// Always contains `num_faces` elements.
+	ufbx_int32_list face_indices; 
 
 } ufbx_mesh_material;
 
@@ -739,29 +746,28 @@ struct ufbx_mesh {
 	// one vertex may be split to multiple indices for split attributes, eg. UVs
 	size_t num_vertices;  // < Number of logical "vertex" points
 	size_t num_indices;   // < Number of combiend vertex/attribute tuples
+	size_t num_faces;     // < Number of faces (polygons) in the mesh
 	size_t num_triangles; // < Number of triangles if triangulated
 
 	// Faces and optional per-face extra data
-	size_t num_faces;          // < Number of faces (polygons) in the mesh
-	ufbx_face *faces;          // < Face index range
-	bool *face_smoothing;      // < Should the face have soft normals
-	int32_t *face_material;    // < Indices to `ufbx_mesh.materials`
-	size_t max_face_triangles; // < Maximum number of triangles per face in this mesh
-	size_t num_bad_faces;      // < Number of faces with less than 3 vertices
+	ufbx_face_list faces;          // < Face index range
+	ufbx_bool_list face_smoothing; // < Should the face have soft normals
+	ufbx_int32_list face_material; // < Indices to `ufbx_mesh.materials`
+	size_t max_face_triangles;     // < Maximum number of triangles per face in this mesh
+	size_t num_bad_faces;          // < Number of faces with less than 3 vertices
 
 	// Edges and optional per-edge extra data
-	size_t num_edges;
-	ufbx_edge *edges;       // < Edge index range
-	bool *edge_smoothing;   // < Should the edge have soft normals
-	ufbx_real *edge_crease; // < Crease value for subdivision surfaces
+	ufbx_edge_list edges;          // < Edge index range
+	ufbx_bool_list edge_smoothing; // < Should the edge have soft normals
+	ufbx_real_list edge_crease;    // < Crease value for subdivision surfaces
 
 	// Logical vertices and positions, alternatively you can use
 	// `vertex_position` for consistent interface with other attributes.
-	int32_t *vertex_indices;
-	ufbx_vec3 *vertices;
+	ufbx_int32_list ertex_indices;
+	ufbx_vec3_list vertices;
 
 	// First index referring to a given vertex, `-1` if the vertex is unused.
-	int32_t *vertex_first_index;
+	ufbx_int32_list vertex_first_index;
 
 	// Vertex attributes, see the comment over the struct.
 	//
@@ -1131,7 +1137,7 @@ struct ufbx_nurbs_surface {
 
 	// Material for the whole surface.
 	// NOTE: May be `NULL`!	
-	ufbx_material *material;
+	ufbx_nullable ufbx_material *material;
 };
 
 struct ufbx_nurbs_trim_surface {
@@ -1267,7 +1273,8 @@ typedef struct ufbx_skin_vertex {
 	uint32_t weight_begin; // < Index to start from in the `weights[]` array
 	uint32_t num_weights; // < Number of weights influencing the vertex
 
-	// Blend weight between Linear Blend Skinning (0.0) and Dual Quaternion (1.0)
+	// Blend weight between Linear Blend Skinning (0.0) and Dual Quaternion (1.0).
+	// Should be used if `skinning_method == UFBX_SKINNING_BLENDED_DQ_LINEAR`
 	ufbx_real dq_weight;
 
 } ufbx_skin_vertex;
@@ -1305,11 +1312,11 @@ struct ufbx_skin_deformer {
 	// Largest amount of weights a single vertex can have
 	size_t max_weights_per_vertex;
 
-	// Blend weights between Linear Blend Skinning (0.0) and Dual Quaternion (1.0)
-	// Should be used if `skinning_method == UFBX_SKINNING_BLENDED_DQ_LINEAR`
+	// Blend weights between Linear Blend Skinning (0.0) and Dual Quaternion (1.0).
+	// HINT: You probably want to use `vertices` and `ufbx_skin_vertex.dq_weight` instead!
 	size_t num_dq_weights;
-	int32_t *dq_vertices;
-	ufbx_real *dq_weights;
+	ufbx_int32_list dq_vertices;
+	ufbx_real_list dq_weights;
 };
 
 // Cluster of vertices bound to a single bone.
@@ -1344,9 +1351,9 @@ struct ufbx_skin_cluster {
 
 	// Raw weights indexed by each _vertex_ of a mesh (not index!)
 	// HINT: It may be simpler to use `ufbx_skin_deformer.vertices[]/weights[]` instead!
-	size_t num_weights; // < Number of vertices in the cluster
-	int32_t *vertices;  // < Vertex indices in `ufbx_mesh.vertices[]`
-	ufbx_real *weights; // < Per-vertex weight values
+	size_t num_weights;       // < Number of vertices in the cluster
+	ufbx_int32_list vertices; // < Vertex indices in `ufbx_mesh.vertices[]`
+	ufbx_real_list weights;   // < Per-vertex weight values
 };
 
 // Blend shape deformer can contain multiple channels (think of sliders between morphs)
@@ -1403,10 +1410,10 @@ struct ufbx_blend_shape {
 	}; };
 
 	// Vertex offsets to apply over the base mesh
-	size_t num_offsets;          // < Number of vertex offsets in the following arrays
-	int32_t *offset_vertices;    // < Indices to `ufbx_mesh.vertices[]`
-	ufbx_vec3 *position_offsets; // < Always specified per-vertex offsets
-	ufbx_vec3 *normal_offsets;   // < `NULL` if not specified
+	size_t num_offsets;              // < Number of vertex offsets in the following arrays
+	ufbx_int32_list offset_vertices; // < Indices to `ufbx_mesh.vertices[]`
+	ufbx_vec3_list position_offsets; // < Always specified per-vertex offsets
+	ufbx_vec3_list normal_offsets;   // < `NULL` if not specified
 };
 
 typedef enum ufbx_cache_file_format {
@@ -1477,11 +1484,11 @@ struct ufbx_cache_deformer {
 	}; };
 
 	ufbx_string channel;
-	ufbx_cache_file *file;
+	ufbx_nullable ufbx_cache_file *file;
 
 	// Only valid if `ufbx_load_opts.load_external_files` is set!
-	ufbx_geometry_cache *external_cache;
-	ufbx_cache_channel *external_channel;
+	ufbx_nullable ufbx_geometry_cache *external_cache;
+	ufbx_nullable ufbx_cache_channel *external_channel;
 };
 
 struct ufbx_cache_file {
@@ -1498,7 +1505,7 @@ struct ufbx_cache_file {
 	ufbx_cache_file_format format;
 
 	// Only valid if `ufbx_load_opts.load_external_files` is set!
-	ufbx_geometry_cache *external_cache;
+	ufbx_nullable ufbx_geometry_cache *external_cache;
 };
 
 // -- Materials
@@ -1511,7 +1518,7 @@ typedef struct ufbx_material_map {
 	int64_t value_int;
 
 	// Texture if connected, otherwise `NULL`
-	ufbx_texture *texture;
+	ufbx_nullable ufbx_texture *texture;
 } ufbx_material_map;
 
 // Texture attached to an FBX property
@@ -1731,9 +1738,9 @@ struct ufbx_material {
 	ufbx_material_pbr_maps pbr;
 
 	// Shading information
-	ufbx_shader_type shader_type;   // < Always defined
-	ufbx_shader *shader;            // < Optional extended shader information
-	ufbx_string shading_model_name; // < Often one of `{ "lambert", "phong", "unknown" }`
+	ufbx_shader_type shader_type;      // < Always defined
+	ufbx_nullable ufbx_shader *shader; // < Optional extended shader information
+	ufbx_string shading_model_name;    // < Often one of `{ "lambert", "phong", "unknown" }`
 
 	// All textures attached to the material, if you want specific maps if might be
 	// more convenient to use eg. `fbx.diffuse_color.texture` or `pbr.base_color.texture`
@@ -1750,7 +1757,6 @@ typedef enum ufbx_texture_type {
 
 	// The texture consists of multiple texture layers blended together.
 	UFBX_TEXTURE_LAYERED,
-
 
 	UFBX_TEXTURE_PROCEDURAL,
 
@@ -1809,6 +1815,12 @@ typedef struct ufbx_texture_layer {
 
 UFBX_LIST_TYPE(ufbx_texture_layer_list, ufbx_texture_layer);
 
+// Opaque byte buffer blob
+typedef struct ufbx_blob {
+	const void *data;
+	size_t size;
+} ufbx_blob;
+
 // Texture that controls material appearance
 struct ufbx_texture {
 	union { ufbx_element element; struct {
@@ -1827,11 +1839,10 @@ struct ufbx_texture {
 	ufbx_string relative_filename;
 
 	// FILE: Optional embedded content blob, eg. raw .png format data
-	const void *content;
-	size_t content_size;
+	ufbx_blob content;
 
 	// FILE: Optional video texture
-	ufbx_video *video;
+	ufbx_nullable ufbx_video *video;
 
 	// LAYERED: Inner texture layers, ordered from _bottom_ to _top_
 	ufbx_texture_layer_list layers;
@@ -1864,8 +1875,7 @@ struct ufbx_video {
 	ufbx_string relative_filename;
 
 	// Optional embedded content blob
-	const void *content;
-	size_t content_size;
+	ufbx_blob content;
 };
 
 // Shader specifies a shading model and contains `ufbx_shader_binding` elements
@@ -2000,7 +2010,7 @@ struct ufbx_anim_value {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	ufbx_vec3 default_value;
-	ufbx_anim_curve *curves[3];
+	ufbx_nullable ufbx_anim_curve *curves[3];
 };
 
 // Animation curve segment interpolation mode between two keyframes
@@ -2094,8 +2104,8 @@ struct ufbx_selection_node {
 	}; };
 
 	// Selection targets, possibly `NULL`
-	ufbx_node *target_node;
-	ufbx_mesh *target_mesh;
+	ufbx_nullable ufbx_node *target_node;
+	ufbx_nullable ufbx_mesh *target_mesh;
 	bool include_node; // < Is `target_node` included in the selection
 
 	// Indices to selected components, may be out-of-bounds!
@@ -2165,7 +2175,7 @@ struct ufbx_constraint {
 	ufbx_string type_name;
 
 	// Node to be constrained
-	ufbx_node *node;
+	ufbx_nullable ufbx_node *node;
 
 	// List of weighted targets for the constraint (pole vectors for IK)
 	ufbx_constraint_target_list targets;
@@ -2189,9 +2199,9 @@ struct ufbx_constraint {
 	ufbx_vec3 aim_up_vector;
 
 	// SINGLE_CHAIN_IK: Target for the IK, `targets` contains pole vectors!
-	ufbx_node *ik_effector;
-	ufbx_node *ik_end_node;
-	ufbx_vec3 ik_pole_vector;
+	ufbx_nullable ufbx_node *ik_effector;
+	ufbx_nullable ufbx_node *ik_end_node;
+	ufbx_nullable ufbx_vec3 ik_pole_vector;
 };
 
 // -- Miscellaneous
@@ -3071,10 +3081,10 @@ size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t num_strea
 
 // -- Inline API
 
-ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t index) { return v->data[v->indices[index]]; }
-ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { return v->data[v->indices[index]]; }
-ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { return v->data[v->indices[index]]; }
-ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { return v->data[v->indices[index]]; }
+ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
+ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
+ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
+ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
 
 #ifdef __cplusplus
 }
