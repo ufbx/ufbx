@@ -1361,7 +1361,7 @@ struct ufbx_skin_cluster {
 	// The bone node the cluster is attached to
 	// NOTE: Always valid if found from `ufbx_skin_deformer.clusters[]` unless
 	// `ufbx_load_opts.connect_broken_elements` is `true`.
-	ufbx_node *bone_node;
+	ufbx_nullable ufbx_node *bone_node;
 
 	// Binding matrix from local mesh vertices to the bone
 	ufbx_matrix geometry_to_bone; 
