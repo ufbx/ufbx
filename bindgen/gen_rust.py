@@ -1,6 +1,9 @@
 import json
 import argparse
 import os
+import itertools
+
+ichain = itertools.chain.from_iterable
 
 from sympy import E
 
@@ -252,6 +255,18 @@ impl<'a> Index<usize> for VertexVec4<'a> {
     }
 }
 
+impl<'a> Prop<'a> {
+    pub fn value_real(&self) -> Real {
+        self.value_vec3.x
+    }
+
+    pub fn value_vec2(&self) -> Vec2 {
+        let v = self.value_vec3;
+        Vec2 { x: v.x, y: v.y }
+    }
+}
+
+
 }
 """.strip()
 
@@ -410,11 +425,19 @@ def emit_enum(decl, parent_name):
             element_types.append(new_name)
         emit(f"\t{new_name},")
 
+def flatten(decl):
+    kind = decl["kind"]
+    if kind == "group":
+        for inner in decl["decls"]:
+            yield from flatten(inner)
+    else:
+        yield decl
+
 def choose_variant(union):
-    decls = union["decls"]
+    decls = list(ichain((flatten(inner) for inner in union["decls"])))
     first = decls[0]
     last = decls[-1]
-    if first["decls"][0]["name"] == "element" or last["decls"][0]["name"] == "elements_by_type":
+    if first["name"] == "element" or last["name"] == "elements_by_type":
         return first
     else:
         return last
