@@ -28,6 +28,8 @@
 
 #define ufbx_nullable
 
+#define ufbx_abi
+
 // -- Configuration
 
 // TODO: Support overriding `ufbx_real` with `float` or anything else.
@@ -581,6 +583,13 @@ typedef struct ufbx_vertex_attrib {
 	bool unique_per_vertex;
 } ufbx_vertex_attrib;
 
+#if defined(__cplusplus)
+	#define UFBX_VERTEX_ACCESSOR(p_type) \
+		p_type &operator[](size_t index) const { ufbx_assert(index < indices.count); return values.data[indices.data[index]]; }
+#else
+	#define UFBX_VERTEX_ACCESSOR(p_type)
+#endif
+
 // 1D vertex attribute, see `ufbx_vertex_attrib` for information
 typedef struct ufbx_vertex_real {
 	bool exists;
@@ -589,10 +598,7 @@ typedef struct ufbx_vertex_real {
 	size_t value_reals;
 	bool unique_per_vertex;
 
-#if defined(__cplusplus)
-	ufbx_real &operator[](size_t index) const { ufbx_assert(index < indices.count); return values.data[indices.data[index]]; }
-#endif
-
+	UFBX_VERTEX_ACCESSOR(ufbx_real)
 } ufbx_vertex_real;
 
 // 2D vertex attribute, see `ufbx_vertex_attrib` for information
@@ -603,10 +609,7 @@ typedef struct ufbx_vertex_vec2 {
 	size_t value_reals;
 	bool unique_per_vertex;
 
-#if defined(__cplusplus)
-	ufbx_vec2 &operator[](size_t index) const { ufbx_assert(index < indices.count); return values.data[indices.data[index]]; }
-#endif
-
+	UFBX_VERTEX_ACCESSOR(ufbx_vec2)
 } ufbx_vertex_vec2;
 
 // 3D vertex attribute, see `ufbx_vertex_attrib` for information
@@ -617,10 +620,7 @@ typedef struct ufbx_vertex_vec3 {
 	size_t value_reals;
 	bool unique_per_vertex;
 
-#if defined(__cplusplus)
-	ufbx_vec3 &operator[](size_t index) const { ufbx_assert(index < indices.count); return values.data[indices.data[index]]; }
-#endif
-
+	UFBX_VERTEX_ACCESSOR(ufbx_vec3)
 } ufbx_vertex_vec3;
 
 // 4D vertex attribute, see `ufbx_vertex_attrib` for information
@@ -631,10 +631,7 @@ typedef struct ufbx_vertex_vec4 {
 	size_t value_reals;
 	bool unique_per_vertex;
 
-#if defined(__cplusplus)
-	ufbx_vec4 &operator[](size_t index) const { ufbx_assert(index < indices.count); return values.data[indices.data[index]]; }
-#endif
-
+	UFBX_VERTEX_ACCESSOR(ufbx_vec4)
 } ufbx_vertex_vec4;
 
 // Vertex UV set/layer
@@ -2234,7 +2231,7 @@ struct ufbx_constraint {
 	// SINGLE_CHAIN_IK: Target for the IK, `targets` contains pole vectors!
 	ufbx_nullable ufbx_node *ik_effector;
 	ufbx_nullable ufbx_node *ik_end_node;
-	ufbx_nullable ufbx_vec3 ik_pole_vector;
+	ufbx_vec3 ik_pole_vector;
 };
 
 // -- Miscellaneous
@@ -2620,8 +2617,8 @@ typedef bool ufbx_open_file_fn(void *user, ufbx_stream *stream, const char *path
 // Detailed error stack frame
 typedef struct ufbx_error_frame {
 	uint32_t source_line;
-	const char *function;
-	const char *description;
+	ufbx_string function;
+	ufbx_string description;
 } ufbx_error_frame;
 
 typedef enum ufbx_error_type {
@@ -2643,7 +2640,7 @@ typedef enum ufbx_error_type {
 // HINT: You can use `ufbx_format_error()` for formatting the error
 typedef struct ufbx_error {
 	ufbx_error_type type;
-	const char *description;
+	ufbx_string description;
 	uint32_t stack_size;
 	ufbx_error_frame stack[UFBX_ERROR_STACK_MAX_DEPTH];
 } ufbx_error;
@@ -2893,86 +2890,86 @@ extern const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES];
 extern const uint32_t ufbx_source_version;
 
 // Load a scene from a `size` byte memory buffer at `data`
-ufbx_scene *ufbx_load_memory(
+ufbx_abi ufbx_scene *ufbx_load_memory(
 	const void *data, size_t size,
 	const ufbx_load_opts *opts, ufbx_error *error);
 
 // Load a scene by opening a file named `filename`
-ufbx_scene *ufbx_load_file(
+ufbx_abi ufbx_scene *ufbx_load_file(
 	const char *filename,
 	const ufbx_load_opts *opts, ufbx_error *error);
-ufbx_scene *ufbx_load_file_len(
+ufbx_abi ufbx_scene *ufbx_load_file_len(
 	const char *filename, size_t filename_len,
 	const ufbx_load_opts *opts, ufbx_error *error);
 
 // Load a scene by reading from an `FILE *file` stream
 // NOTE: `file` is passed as a `void` pointer to avoid including <stdio.h>
-ufbx_scene *ufbx_load_stdio(
+ufbx_abi ufbx_scene *ufbx_load_stdio(
 	void *file,
 	const ufbx_load_opts *opts, ufbx_error *error);
 
 // Load a scene from a user-specified stream with an optional prefix
-ufbx_scene *ufbx_load_stream(
+ufbx_abi ufbx_scene *ufbx_load_stream(
 	const void *prefix, size_t prefix_size,
 	const ufbx_stream *stream,
 	const ufbx_load_opts *opts, ufbx_error *error);
 
 // Free a previously loaded or evaluated scene
-void ufbx_free_scene(ufbx_scene *scene);
+ufbx_abi void ufbx_free_scene(ufbx_scene *scene);
 
 // Format a textual description of `error`.
 // Always produces a NULL-terminated string to `char dst[dst_size]`, truncating if
 // necessary. Returns the number of characters written not including the NULL terminator.
-size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error);
+ufbx_abi size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error);
 
 // Query
 
 // Find a property `name` from `props`, returns `NULL` if not found.
 // Searches through `ufbx_props.defaults` as well.
-ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len);
+ufbx_abi ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len);
 ufbx_inline ufbx_prop *ufbx_find_prop(const ufbx_props *props, const char *name) { return ufbx_find_prop_len(props, name, strlen(name));}
 
 // Utility functions for finding the value of a property, returns `def` if not found.
 // NOTE: For `ufbx_string` you need to ensure the lifetime of the default is
 // sufficient as no copy is made.
-ufbx_real ufbx_find_real_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_real def);
+ufbx_abi ufbx_real ufbx_find_real_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_real def);
 ufbx_inline ufbx_real ufbx_find_real(const ufbx_props *props, const char *name, ufbx_real def) { return ufbx_find_real_len(props, name, strlen(name), def); }
-ufbx_vec3 ufbx_find_vec3_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_vec3 def);
+ufbx_abi ufbx_vec3 ufbx_find_vec3_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_vec3 def);
 ufbx_inline ufbx_vec3 ufbx_find_vec3(const ufbx_props *props, const char *name, ufbx_vec3 def) { return ufbx_find_vec3_len(props, name, strlen(name), def); }
-int64_t ufbx_find_int_len(const ufbx_props *props, const char *name, size_t name_len, int64_t def);
+ufbx_abi int64_t ufbx_find_int_len(const ufbx_props *props, const char *name, size_t name_len, int64_t def);
 ufbx_inline int64_t ufbx_find_int(const ufbx_props *props, const char *name, int64_t def) { return ufbx_find_int_len(props, name, strlen(name), def); }
-bool ufbx_find_bool_len(const ufbx_props *props, const char *name, size_t name_len, bool def);
+ufbx_abi bool ufbx_find_bool_len(const ufbx_props *props, const char *name, size_t name_len, bool def);
 ufbx_inline bool ufbx_find_bool(const ufbx_props *props, const char *name, bool def) { return ufbx_find_bool_len(props, name, strlen(name), def); }
-ufbx_string ufbx_find_string_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_string def);
+ufbx_abi ufbx_string ufbx_find_string_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_string def);
 ufbx_inline ufbx_string ufbx_find_string(const ufbx_props *props, const char *name, ufbx_string def) { return ufbx_find_string_len(props, name, strlen(name), def); }
 
 // Find any element of type `type` in `scene` by `name`.
 // For example if you want to find `ufbx_material` named `Mat`:
 //   (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Mat");
-ufbx_element *ufbx_find_element_len(ufbx_scene *scene, ufbx_element_type type, const char *name, size_t name_len);
+ufbx_abi ufbx_element *ufbx_find_element_len(ufbx_scene *scene, ufbx_element_type type, const char *name, size_t name_len);
 ufbx_inline ufbx_element *ufbx_find_element(ufbx_scene *scene, ufbx_element_type type, const char *name) { return ufbx_find_element_len(scene, type, name, strlen(name));}
 
 // Find node in `scene` by `name` (shorthand for `ufbx_find_element(UFBX_ELEMENT_NODE)`).
-ufbx_node *ufbx_find_node_len(ufbx_scene *scene, const char *name, size_t name_len);
+ufbx_abi ufbx_node *ufbx_find_node_len(ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_inline ufbx_node *ufbx_find_node(ufbx_scene *scene, const char *name) { return ufbx_find_node_len(scene, name, strlen(name));}
 
 // Find an animation stack in `scene` by `name` (shorthand for `ufbx_find_element(UFBX_ELEMENT_ANIM_STACK)`)
-ufbx_anim_stack *ufbx_find_anim_stack_len(ufbx_scene *scene, const char *name, size_t name_len);
+ufbx_abi ufbx_anim_stack *ufbx_find_anim_stack_len(ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_inline ufbx_anim_stack *ufbx_find_anim_stack(ufbx_scene *scene, const char *name) { return ufbx_find_anim_stack_len(scene, name, strlen(name)); }
 
 // Find a single animated property `prop` of `element` in `layer`.
 // Returns `NULL` if not found.
-ufbx_anim_prop *ufbx_find_anim_prop_len(ufbx_anim_layer *layer, ufbx_element *element, const char *prop, size_t prop_len);
+ufbx_abi ufbx_anim_prop *ufbx_find_anim_prop_len(ufbx_anim_layer *layer, ufbx_element *element, const char *prop, size_t prop_len);
 ufbx_inline ufbx_anim_prop *ufbx_find_anim_prop(ufbx_anim_layer *layer, ufbx_element *element, const char *prop) { return ufbx_find_anim_prop_len(layer, element, prop, strlen(prop)); }
 
 // Find all animated properties of `element` in `layer`.
-ufbx_anim_prop_list ufbx_find_anim_props(ufbx_anim_layer *layer, ufbx_element *element);
+ufbx_abi ufbx_anim_prop_list ufbx_find_anim_props(ufbx_anim_layer *layer, ufbx_element *element);
 
 // Get a matrix that transforms normals in the same way as Autodesk software.
 // NOTE: The resulting normals are slightly incorrect as this function deliberately
 // inverts geometric transformation wrong. For better results use
 // `ufbx_matrix_for_normals(&node->geometry_to_world)`.
-ufbx_matrix ufbx_get_compatible_matrix_for_normals(ufbx_node *node);
+ufbx_abi ufbx_matrix ufbx_get_compatible_matrix_for_normals(ufbx_node *node);
 
 // Utility
 
@@ -2980,27 +2977,27 @@ ufbx_matrix ufbx_get_compatible_matrix_for_normals(ufbx_node *node);
 // Returns the decompressed size or a negative error code (see source for details).
 // NOTE: You must supply a valid `retain` with `ufbx_inflate_retain.initialized == false`
 // but the rest can be uninitialized.
-ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);
+ufbx_abi ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);
 
 // Open a `ufbx_stream` from a file.
 // Use `path_len == SIZE_MAX` for NULL terminated string.
 // NOTE: `user` is not used, it exists only for compatability to `ufbx_open_file_fn`
-bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len);
+ufbx_abi bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len);
 
 // Animation evaluation
 
 // Evaluate a single animation `curve` at a `time`.
 // Returns `default_value` only if `curve == NULL` or it has no keyframes.
-ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_real default_value);
+ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_real default_value);
 
 // Evaluate a value from bundled animation curves.
-ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, double time);
-ufbx_vec2 ufbx_evaluate_anim_value_vec2(const ufbx_anim_value *anim_value, double time);
-ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, double time);
+ufbx_abi ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, double time);
+ufbx_abi ufbx_vec2 ufbx_evaluate_anim_value_vec2(const ufbx_anim_value *anim_value, double time);
+ufbx_abi ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, double time);
 
 // Evaluate an animated property `name` from `element` at `time`.
 // NOTE: If the property is not found it will have the flag `UFBX_PROP_FLAG_NOT_FOUND`.
-ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time);
+ufbx_abi ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time);
 ufbx_inline ufbx_prop ufbx_evaluate_prop(const ufbx_anim *anim, const ufbx_element *element, const char *name, double time) {
 	return ufbx_evaluate_prop_len(anim, element, name, strlen(name), time);
 }
@@ -3008,12 +3005,12 @@ ufbx_inline ufbx_prop ufbx_evaluate_prop(const ufbx_anim *anim, const ufbx_eleme
 // Evaluate all _animated_ properties of `element`.
 // HINT: This function returns an `ufbx_props` structure with the original properties as
 // `ufbx_props.defaults`. This lets you use `ufbx_find_prop/value()` for the results.
-ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
+ufbx_abi ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
 
-ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *node, double time);
-ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time);
+ufbx_abi ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *node, double time);
+ufbx_abi ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time);
 
-ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *overrides, size_t num_overrides);
+ufbx_abi ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *overrides, size_t num_overrides);
 
 // Evaluate the whole `scene` at a specific `time` in the animation `anim`.
 // The returned scene behaves as if it had been exported at a specific time
@@ -3022,95 +3019,95 @@ ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *ov
 //
 // NOTE: The returned scene refers to the original `scene` so the original
 // scene cannot be freed until all evaluated scenes are freed.
-ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error);
+ufbx_abi ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error);
 
 // Materials
 
-ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const char *name, size_t name_len);
+ufbx_abi ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const char *name, size_t name_len);
 ufbx_inline ufbx_texture *ufbx_find_prop_texture(const ufbx_material *material, const char *name) {
 	return ufbx_find_prop_texture_len(material, name, strlen(name));
 }
-ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *name, size_t name_len);
+ufbx_abi ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *name, size_t name_len);
 ufbx_inline ufbx_string ufbx_find_shader_prop(const ufbx_shader *shader, const char *name) {
 	return ufbx_find_shader_prop_len(shader, name, strlen(name));
 }
 
 // Math
 
-ufbx_quat ufbx_quat_mul(ufbx_quat a, ufbx_quat b);
-ufbx_quat ufbx_quat_normalize(ufbx_quat q);
-ufbx_quat ufbx_quat_fix_antipodal(ufbx_quat q, ufbx_quat reference);
-ufbx_quat ufbx_quat_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t);
-ufbx_vec3 ufbx_quat_rotate_vec3(ufbx_quat q, ufbx_vec3 v);
-ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order);
-ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order);
+ufbx_abi ufbx_quat ufbx_quat_mul(ufbx_quat a, ufbx_quat b);
+ufbx_abi ufbx_quat ufbx_quat_normalize(ufbx_quat q);
+ufbx_abi ufbx_quat ufbx_quat_fix_antipodal(ufbx_quat q, ufbx_quat reference);
+ufbx_abi ufbx_quat ufbx_quat_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t);
+ufbx_abi ufbx_vec3 ufbx_quat_rotate_vec3(ufbx_quat q, ufbx_vec3 v);
+ufbx_abi ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order);
+ufbx_abi ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order);
 
-ufbx_matrix ufbx_matrix_mul(const ufbx_matrix *a, const ufbx_matrix *b);
-ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m);
-ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m);
-ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v);
-ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v);
-ufbx_matrix ufbx_transform_to_matrix(const ufbx_transform *t);
-ufbx_transform ufbx_matrix_to_transform(const ufbx_matrix *m);
+ufbx_abi ufbx_matrix ufbx_matrix_mul(const ufbx_matrix *a, const ufbx_matrix *b);
+ufbx_abi ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m);
+ufbx_abi ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m);
+ufbx_abi ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v);
+ufbx_abi ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v);
+ufbx_abi ufbx_matrix ufbx_transform_to_matrix(const ufbx_transform *t);
+ufbx_abi ufbx_transform ufbx_matrix_to_transform(const ufbx_matrix *m);
 
 // Skinning
 
-ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback);
+ufbx_abi ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback);
 
-ufbx_vec3 ufbx_get_blend_shape_vertex_offset(const ufbx_blend_shape *shape, size_t vertex);
-ufbx_vec3 ufbx_get_blend_vertex_offset(const ufbx_blend_deformer *blend, size_t vertex);
+ufbx_abi ufbx_vec3 ufbx_get_blend_shape_vertex_offset(const ufbx_blend_shape *shape, size_t vertex);
+ufbx_abi ufbx_vec3 ufbx_get_blend_vertex_offset(const ufbx_blend_deformer *blend, size_t vertex);
 
-void ufbx_add_blend_shape_vertex_offsets(const ufbx_blend_shape *shape, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
-void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
+ufbx_abi void ufbx_add_blend_shape_vertex_offsets(const ufbx_blend_shape *shape, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
+ufbx_abi void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
 
 // Curves/surfaces
 
-size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_real u, size_t num_weights, ufbx_real *weights, ufbx_real *derivatives);
+ufbx_abi size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_real u, size_t num_weights, ufbx_real *weights, ufbx_real *derivatives);
 
-ufbx_curve_point ufbx_evaluate_nurbs_curve(const ufbx_nurbs_curve *curve, ufbx_real u);
-ufbx_surface_point ufbx_evaluate_nurbs_surface(const ufbx_nurbs_surface *surface, ufbx_real u, ufbx_real v);
+ufbx_abi ufbx_curve_point ufbx_evaluate_nurbs_curve(const ufbx_nurbs_curve *curve, ufbx_real u);
+ufbx_abi ufbx_surface_point ufbx_evaluate_nurbs_surface(const ufbx_nurbs_surface *surface, ufbx_real u, ufbx_real v);
 
-ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, const ufbx_tessellate_opts *opts, ufbx_error *error);
+ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, const ufbx_tessellate_opts *opts, ufbx_error *error);
 
 // Mesh Topology
 
-uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face);
+ufbx_abi uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face);
 
 // Generate the half-edge representation of `mesh` to `topo[mesh->num_indices]`
-void ufbx_compute_topology(const ufbx_mesh *mesh, ufbx_topo_edge *topo);
+ufbx_abi void ufbx_compute_topology(const ufbx_mesh *mesh, ufbx_topo_edge *topo);
 
 // Get the next/previous edge around a vertex
 // NOTE: Does not return the half-edge on the opposite side (ie. `topo[index].twin`)
-int32_t ufbx_topo_next_vertex_edge(const ufbx_topo_edge *topo, int32_t index);
-int32_t ufbx_topo_prev_vertex_edge(const ufbx_topo_edge *topo, int32_t index);
+ufbx_abi int32_t ufbx_topo_next_vertex_edge(const ufbx_topo_edge *topo, int32_t index);
+ufbx_abi int32_t ufbx_topo_prev_vertex_edge(const ufbx_topo_edge *topo, int32_t index);
 
-ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_face face);
+ufbx_abi ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_face face);
 
-size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, ufbx_topo_edge *topo, int32_t *normal_indices, bool assume_smooth);
-void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals);
+ufbx_abi size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, ufbx_topo_edge *topo, int32_t *normal_indices, bool assume_smooth);
+ufbx_abi void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals);
 
-ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error);
-void ufbx_free_mesh(ufbx_mesh *mesh);
+ufbx_abi ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error);
+ufbx_abi void ufbx_free_mesh(ufbx_mesh *mesh);
 
 // Geometry caches
 
-ufbx_geometry_cache *ufbx_load_geometry_cache(
+ufbx_abi ufbx_geometry_cache *ufbx_load_geometry_cache(
 	const char *filename,
 	const ufbx_geometry_cache_opts *opts, ufbx_error *error);
-ufbx_geometry_cache *ufbx_load_geometry_cache_len(
+ufbx_abi ufbx_geometry_cache *ufbx_load_geometry_cache_len(
 	const char *filename, size_t filename_len,
 	const ufbx_geometry_cache_opts *opts, ufbx_error *error);
 
-void ufbx_free_geometry_cache(ufbx_geometry_cache *cache);
+ufbx_abi void ufbx_free_geometry_cache(ufbx_geometry_cache *cache);
 
-size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *frame, ufbx_real *data, size_t count, ufbx_geometry_cache_data_opts *opts);
-size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *channel, double time, ufbx_real *data, size_t count, ufbx_geometry_cache_data_opts *opts);
-size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_frame *frame, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts);
-size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *channel, double time, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts);
+ufbx_abi size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *frame, ufbx_real *data, size_t count, ufbx_geometry_cache_data_opts *opts);
+ufbx_abi size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *channel, double time, ufbx_real *data, size_t count, ufbx_geometry_cache_data_opts *opts);
+ufbx_abi size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_frame *frame, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts);
+ufbx_abi size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *channel, double time, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts);
 
 // Utility
 
-size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator *allocator, ufbx_error *error);
+ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator *allocator, ufbx_error *error);
 
 // -- Inline API
 

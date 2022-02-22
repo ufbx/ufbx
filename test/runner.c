@@ -1078,7 +1078,7 @@ int ufbxt_test_fuzz(const char *filename, void *data, size_t size, size_t step, 
 						check->result_limit = (uint32_t)result_limit;
 						check->truncate_length = (uint32_t)truncate_length;
 						check->cancel_step = (uint32_t)cancel_step;
-						check->description = frame.description;
+						check->description = frame.description.data;
 					}
 				}
 			}

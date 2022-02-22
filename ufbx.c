@@ -1208,8 +1208,9 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, const char *func, uint32_t line)
 {
 	if (cond[0] == '$') {
-		if (!err->description) {
-			err->description = cond + 1;
+		if (!err->description.data) {
+			err->description.data = cond + 1;
+			err->description.length = strlen(err->description.data);
 		}
 		cond = cond + strlen(cond) + 1;
 	}
@@ -1218,8 +1219,10 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 	// break at the first error
 	if (err->stack_size < UFBX_ERROR_STACK_MAX_DEPTH) {
 		ufbx_error_frame *frame = &err->stack[err->stack_size++];
-		frame->description = cond;
-		frame->function = func;
+		frame->description.data = cond;
+		frame->description.length = strlen(cond);
+		frame->function.data = func;
+		frame->function.length = strlen(func);
 		frame->source_line = line;
 	}
 	return 0;
@@ -1237,29 +1240,32 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 
 static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
 {
-	if (!error->description) error->description = default_desc;
+	const char *desc = error->description.data;
+	if (!desc) desc = default_desc;
 	error->type = UFBX_ERROR_UNKNOWN;
-	if (!strcmp(error->description, "Out of memory")) {
+	if (!strcmp(desc, "Out of memory")) {
 		error->type = UFBX_ERROR_OUT_OF_MEMORY;
-	} else if (!strcmp(error->description, "Memory limit exceeded")) {
+	} else if (!strcmp(desc, "Memory limit exceeded")) {
 		error->type = UFBX_ERROR_MEMORY_LIMIT;
-	} else if (!strcmp(error->description, "Allocation limit exceeded")) {
+	} else if (!strcmp(desc, "Allocation limit exceeded")) {
 		error->type = UFBX_ERROR_ALLOCATION_LIMIT;
-	} else if (!strcmp(error->description, "Truncated file")) {
+	} else if (!strcmp(desc, "Truncated file")) {
 		error->type = UFBX_ERROR_TRUNCATED_FILE;
-	} else if (!strcmp(error->description, "IO error")) {
+	} else if (!strcmp(desc, "IO error")) {
 		error->type = UFBX_ERROR_IO;
-	} else if (!strcmp(error->description, "Cancelled")) {
+	} else if (!strcmp(desc, "Cancelled")) {
 		error->type = UFBX_ERROR_CANCELLED;
-	} else if (!strcmp(error->description, "Unsupported version")) {
+	} else if (!strcmp(desc, "Unsupported version")) {
 		error->type = UFBX_ERROR_UNSUPPORTED_VERSION;
-	} else if (!strcmp(error->description, "Not an FBX file")) {
+	} else if (!strcmp(desc, "Not an FBX file")) {
 		error->type = UFBX_ERROR_NOT_FBX;
-	} else if (!strcmp(error->description, "File not found")) {
+	} else if (!strcmp(desc, "File not found")) {
 		error->type = UFBX_ERROR_FILE_NOT_FOUND;
-	} else if (!strcmp(error->description, "Uninitialized options")) {
+	} else if (!strcmp(desc, "Uninitialized options")) {
 		error->type = UFBX_ERROR_FILE_NOT_FOUND;
 	}
+	error->description.data = desc;
+	error->description.length = strlen(desc);
 }
 
 // -- Allocator
@@ -13228,7 +13234,8 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 	if (p_error) {
 		if (cache) {
 			p_error->type = UFBX_ERROR_NONE;
-			p_error->description = NULL;
+			p_error->description.data = ufbxi_empty_char;
+			p_error->description.length = 0;
 			p_error->stack_size = 0;
 		} else {
 			*p_error = cc.error;
@@ -13712,7 +13719,8 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	if (ok) {
 		if (p_error) {
 			p_error->type = UFBX_ERROR_NONE;
-			p_error->description = NULL;
+			p_error->description.data = ufbxi_empty_char;
+			p_error->description.length = 0;
 			p_error->stack_size = 0;
 		}
 		return &uc->scene_imp->scene;
@@ -14484,7 +14492,8 @@ ufbxi_nodiscard static ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, 
 		ufbxi_free_ator(&ec->ator_tmp);
 		if (p_error) {
 			p_error->type = UFBX_ERROR_NONE;
-			p_error->description = NULL;
+			p_error->description.data = ufbxi_empty_char;
+			p_error->description.length = 0;
 			p_error->stack_size = 0;
 		}
 		return &ec->scene_imp->scene;
@@ -16234,7 +16243,8 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 		ufbxi_free_ator(&sc.ator_tmp);
 		if (p_error) {
 			p_error->type = UFBX_ERROR_NONE;
-			p_error->description = NULL;
+			p_error->description.data = ufbxi_empty_char;
+			p_error->description.length = 0;
 			p_error->stack_size = 0;
 		}
 		return &sc.imp->mesh;
@@ -16362,7 +16372,8 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 		}
 
 		error->stack_size = 0;
-		error->description = NULL;
+		error->description.data = ufbxi_empty_char;
+		error->description.length = 0;
 		error->type = UFBX_ERROR_NONE;
 	} else {
 		ufbxi_fix_error_type(error, "Failed to generate indices");
@@ -16437,7 +16448,7 @@ const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES] = {
 	sizeof(ufbx_metadata_object),
 };
 
-bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len)
+ufbx_abi bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len)
 {
 	(void)user;
 
@@ -16454,7 +16465,7 @@ bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, size_t pa
 	return true;
 }
 
-ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)
+ufbx_abi ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)
 {
 	ufbxi_context uc = { UFBX_ERROR_NONE };
 	uc.data_begin = uc.data = (const char *)data;
@@ -16463,12 +16474,12 @@ ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts
 	return ufbxi_load(&uc, opts, error);
 }
 
-ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error)
+ufbx_abi ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *opts, ufbx_error *error)
 {
 	return ufbx_load_file_len(filename, SIZE_MAX, opts, error);
 }
 
-ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_len, const ufbx_load_opts *opts, ufbx_error *error)
+ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_len, const ufbx_load_opts *opts, ufbx_error *error)
 {
 	ufbxi_allocator tmp_ator = { 0 };
 	ufbx_error tmp_error = { UFBX_ERROR_NONE };
@@ -16479,9 +16490,12 @@ ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_len, const 
 		if (error) {
 			error->stack_size = 1;
 			error->type = UFBX_ERROR_FILE_NOT_FOUND;
-			error->description = "File not found";
-			error->stack[0].description = "File not found";
-			error->stack[0].function = __FUNCTION__;
+			error->description.data = "File not found";
+			error->description.length = strlen(error->description.data);
+			error->stack[0].description.data = "File not found";
+			error->stack[0].description.length = strlen(error->stack[0].description.data);
+			error->stack[0].function.data = __FUNCTION__;
+			error->stack[0].function.length = strlen(__FUNCTION__);
 			error->stack[0].source_line = __LINE__;
 		}
 		return NULL;
@@ -16505,7 +16519,7 @@ ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_len, const 
 	return scene;
 }
 
-ufbx_scene *ufbx_load_stdio(void *file_void, const ufbx_load_opts *opts, ufbx_error *error)
+ufbx_abi ufbx_scene *ufbx_load_stdio(void *file_void, const ufbx_load_opts *opts, ufbx_error *error)
 {
 	FILE *file = (FILE*)file_void;
 
@@ -16537,7 +16551,7 @@ ufbx_scene *ufbx_load_stdio(void *file_void, const ufbx_load_opts *opts, ufbx_er
 	return scene;
 }
 
-ufbx_scene *ufbx_load_stream(const void *prefix, size_t prefix_size, const ufbx_stream *stream, const ufbx_load_opts *opts, ufbx_error *error)
+ufbx_abi ufbx_scene *ufbx_load_stream(const void *prefix, size_t prefix_size, const ufbx_stream *stream, const ufbx_load_opts *opts, ufbx_error *error)
 {
 	ufbxi_context uc = { UFBX_ERROR_NONE };
 	uc.data_begin = uc.data = (const char *)prefix;
@@ -16550,7 +16564,7 @@ ufbx_scene *ufbx_load_stream(const void *prefix, size_t prefix_size, const ufbx_
 	return scene;
 }
 
-void ufbx_free_scene(ufbx_scene *scene)
+ufbx_abi void ufbx_free_scene(ufbx_scene *scene)
 {
 	if (!scene) return;
 
@@ -16571,7 +16585,7 @@ void ufbx_free_scene(ufbx_scene *scene)
 	ufbxi_free_ator(&ator);
 }
 
-ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len)
+ufbx_abi ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len)
 {
 	uint32_t key = ufbxi_get_name_key(name, name_len);
 
@@ -16604,7 +16618,7 @@ ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t 
 	return NULL;
 }
 
-ufbx_real ufbx_find_real_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_real def)
+ufbx_abi ufbx_real ufbx_find_real_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_real def)
 {
 	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
 	if (prop) {
@@ -16614,7 +16628,7 @@ ufbx_real ufbx_find_real_len(const ufbx_props *props, const char *name, size_t n
 	}
 }
 
-ufbx_vec3 ufbx_find_vec3_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_vec3 def)
+ufbx_abi ufbx_vec3 ufbx_find_vec3_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_vec3 def)
 {
 	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
 	if (prop) {
@@ -16624,7 +16638,7 @@ ufbx_vec3 ufbx_find_vec3_len(const ufbx_props *props, const char *name, size_t n
 	}
 }
 
-int64_t ufbx_find_int_len(const ufbx_props *props, const char *name, size_t name_len, int64_t def)
+ufbx_abi int64_t ufbx_find_int_len(const ufbx_props *props, const char *name, size_t name_len, int64_t def)
 {
 	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
 	if (prop) {
@@ -16634,7 +16648,7 @@ int64_t ufbx_find_int_len(const ufbx_props *props, const char *name, size_t name
 	}
 }
 
-bool ufbx_find_bool_len(const ufbx_props *props, const char *name, size_t name_len, bool def)
+ufbx_abi bool ufbx_find_bool_len(const ufbx_props *props, const char *name, size_t name_len, bool def)
 {
 	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
 	if (prop) {
@@ -16644,7 +16658,7 @@ bool ufbx_find_bool_len(const ufbx_props *props, const char *name, size_t name_l
 	}
 }
 
-ufbx_string ufbx_find_string_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_string def)
+ufbx_abi ufbx_string ufbx_find_string_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_string def)
 {
 	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
 	if (prop) {
@@ -16654,7 +16668,7 @@ ufbx_string ufbx_find_string_len(const ufbx_props *props, const char *name, size
 	}
 }
 
-ufbx_element *ufbx_find_element_len(ufbx_scene *scene, ufbx_element_type type, const char *name, size_t name_len)
+ufbx_abi ufbx_element *ufbx_find_element_len(ufbx_scene *scene, ufbx_element_type type, const char *name, size_t name_len)
 {
 	if (!scene) return NULL;
 	ufbx_string name_str = { name, name_len };
@@ -16667,17 +16681,17 @@ ufbx_element *ufbx_find_element_len(ufbx_scene *scene, ufbx_element_type type, c
 	return index < SIZE_MAX ? scene->elements_by_name.data[index].element : NULL;
 }
 
-ufbx_node *ufbx_find_node_len(ufbx_scene *scene, const char *name, size_t name_len)
+ufbx_abi ufbx_node *ufbx_find_node_len(ufbx_scene *scene, const char *name, size_t name_len)
 {
 	return (ufbx_node*)ufbx_find_element_len(scene, UFBX_ELEMENT_NODE, name, name_len);
 }
 
-ufbx_anim_stack *ufbx_find_anim_stack_len(ufbx_scene *scene, const char *name, size_t name_len)
+ufbx_abi ufbx_anim_stack *ufbx_find_anim_stack_len(ufbx_scene *scene, const char *name, size_t name_len)
 {
 	return (ufbx_anim_stack*)ufbx_find_element_len(scene, UFBX_ELEMENT_ANIM_STACK, name, name_len);
 }
 
-ufbx_anim_prop *ufbx_find_anim_prop_len(ufbx_anim_layer *layer, ufbx_element *element, const char *prop, size_t prop_len)
+ufbx_abi ufbx_anim_prop *ufbx_find_anim_prop_len(ufbx_anim_layer *layer, ufbx_element *element, const char *prop, size_t prop_len)
 {
 	ufbx_assert(layer);
 	ufbx_assert(element);
@@ -16694,7 +16708,7 @@ ufbx_anim_prop *ufbx_find_anim_prop_len(ufbx_anim_layer *layer, ufbx_element *el
 	return &layer->anim_props.data[index];
 }
 
-ufbx_anim_prop_list ufbx_find_anim_props(ufbx_anim_layer *layer, ufbx_element *element)
+ufbx_abi ufbx_anim_prop_list ufbx_find_anim_props(ufbx_anim_layer *layer, ufbx_element *element)
 {
 	ufbx_anim_prop_list result = { 0 };
 	ufbx_assert(layer);
@@ -16716,7 +16730,7 @@ ufbx_anim_prop_list ufbx_find_anim_props(ufbx_anim_layer *layer, ufbx_element *e
 	return result;
 }
 
-ufbx_matrix ufbx_get_compatible_matrix_for_normals(ufbx_node *node)
+ufbx_abi ufbx_matrix ufbx_get_compatible_matrix_for_normals(ufbx_node *node)
 {
 	if (!node) return ufbx_identity_matrix;
 
@@ -16729,7 +16743,7 @@ ufbx_matrix ufbx_get_compatible_matrix_for_normals(ufbx_node *node)
 	return norm_mat;
 }
 
-ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_real default_value)
+ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_real default_value)
 {
 	if (!curve) return default_value;
 	if (curve->keyframes.count <= 1) {
@@ -16800,7 +16814,7 @@ ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_re
 	return curve->keyframes.data[curve->keyframes.count - 1].value;
 }
 
-ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, double time)
+ufbx_abi ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, double time)
 {
 	if (!anim_value) {
 		return 0.0f;
@@ -16811,7 +16825,7 @@ ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, doubl
 	return res;
 }
 
-ufbx_vec2 ufbx_evaluate_anim_value_vec2(const ufbx_anim_value *anim_value, double time)
+ufbx_abi ufbx_vec2 ufbx_evaluate_anim_value_vec2(const ufbx_anim_value *anim_value, double time)
 {
 	if (!anim_value) {
 		ufbx_vec2 zero = { 0.0f };
@@ -16824,7 +16838,7 @@ ufbx_vec2 ufbx_evaluate_anim_value_vec2(const ufbx_anim_value *anim_value, doubl
 	return res;
 }
 
-ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, double time)
+ufbx_abi ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, double time)
 {
 	if (!anim_value) {
 		ufbx_vec3 zero = { 0.0f };
@@ -16838,7 +16852,7 @@ ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, doubl
 	return res;
 }
 
-ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time)
+ufbx_abi ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time)
 {
 	ufbx_prop result;
 
@@ -16869,7 +16883,7 @@ ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, const ufbx_element *elem
 	return result;
 }
 
-ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size)
+ufbx_abi ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size)
 {
 	ufbx_props ret = { NULL };
 	if (!element) return ret;
@@ -16936,7 +16950,7 @@ ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *element, dou
 	return ret;
 }
 
-ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *node, double time)
+ufbx_abi ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *node, double time)
 {
 	ufbx_assert(anim);
 	ufbx_assert(node);
@@ -16963,7 +16977,7 @@ ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *n
 	return ufbxi_get_transform(&props, order);
 }
 
-ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time)
+ufbx_abi ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time)
 {
 	const char *prop_names[] = {
 		ufbxi_DeformPercent,
@@ -16974,7 +16988,7 @@ ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_cha
 	return ufbxi_find_real(&props, ufbxi_DeformPercent, channel->weight * (ufbx_real)100.0) * (ufbx_real)0.01;
 }
 
-ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *overrides, size_t num_overrides)
+ufbx_abi ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *overrides, size_t num_overrides)
 {
 	ufbxi_for(ufbx_prop_override, over, overrides, num_overrides) {
 		if (over->prop_name == NULL) {
@@ -17003,13 +17017,13 @@ ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *ov
 	return result;
 }
 
-ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error)
+ufbx_abi ufbx_scene *ufbx_evaluate_scene(ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error)
 {
 	ufbxi_eval_context ec = { 0 };
 	return ufbxi_evaluate_scene(&ec, scene, anim, time, opts, error);
 }
 
-ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const char *name, size_t name_len)
+ufbx_abi ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const char *name, size_t name_len)
 {
 	ufbx_string name_str = { name, name_len };
 	if (!material) return NULL;
@@ -17020,7 +17034,7 @@ ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const ch
 	return index < SIZE_MAX ? material->textures.data[index].texture : NULL;
 }
 
-ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *name, size_t name_len)
+ufbx_abi ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *name, size_t name_len)
 {
 	ufbx_string name_str = { name, name_len };
 	if (!shader) return name_str;
@@ -17039,17 +17053,17 @@ ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *nam
 	return name_str;
 }
 
-ufbx_quat ufbx_quat_mul(ufbx_quat a, ufbx_quat b)
+ufbx_abi ufbx_quat ufbx_quat_mul(ufbx_quat a, ufbx_quat b)
 {
 	return ufbxi_mul_quat(a, b);
 }
 
-ufbx_real ufbx_quat_dot(ufbx_quat a, ufbx_quat b)
+ufbx_abi ufbx_real ufbx_quat_dot(ufbx_quat a, ufbx_quat b)
 {
 	return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
 }
 
-ufbx_quat ufbx_quat_normalize(ufbx_quat q)
+ufbx_abi ufbx_quat ufbx_quat_normalize(ufbx_quat q)
 {
 	ufbx_real norm = ufbx_quat_dot(q, q);
 	if (norm == 0.0) return ufbx_identity_quat;
@@ -17060,7 +17074,7 @@ ufbx_quat ufbx_quat_normalize(ufbx_quat q)
 	return q;
 }
 
-ufbx_quat ufbx_quat_fix_antipodal(ufbx_quat q, ufbx_quat reference)
+ufbx_abi ufbx_quat ufbx_quat_fix_antipodal(ufbx_quat q, ufbx_quat reference)
 {
 	if (ufbx_quat_dot(q, reference) < 0.0f) {
 		q.x = -q.x; q.y = -q.y; q.z = -q.z; q.w = -q.w;
@@ -17068,7 +17082,7 @@ ufbx_quat ufbx_quat_fix_antipodal(ufbx_quat q, ufbx_quat reference)
 	return q;
 }
 
-ufbx_quat ufbx_quat_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t)
+ufbx_abi ufbx_quat ufbx_quat_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t)
 {
 	double dot = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
 	if (dot < 0.0) {
@@ -17095,7 +17109,7 @@ ufbx_quat ufbx_quat_slerp(ufbx_quat a, ufbx_quat b, ufbx_real t)
 	return ret;
 }
 
-ufbx_vec3 ufbx_quat_rotate_vec3(ufbx_quat q, ufbx_vec3 v)
+ufbx_abi ufbx_vec3 ufbx_quat_rotate_vec3(ufbx_quat q, ufbx_vec3 v)
 {
 	ufbx_real xy = q.x*v.y - q.y*v.x;
 	ufbx_real xz = q.x*v.z - q.z*v.x;
@@ -17107,7 +17121,7 @@ ufbx_vec3 ufbx_quat_rotate_vec3(ufbx_quat q, ufbx_vec3 v)
 	return r;
 }
 
-ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order)
+ufbx_abi ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order)
 {
 	v.x *= UFBXI_DEG_TO_RAD * 0.5;
 	v.y *= UFBXI_DEG_TO_RAD * 0.5;
@@ -17163,7 +17177,7 @@ ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order)
 	return q;
 }
 
-ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order)
+ufbx_abi ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order)
 {
 	const double eps = 0.999999999;
 
@@ -17255,7 +17269,7 @@ ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order)
 	return v;
 }
 
-size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error)
+ufbx_abi size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error)
 {
 	if (!dst || !dst_size) return 0;
 	if (!error) {
@@ -17268,14 +17282,14 @@ size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error)
 	{
 		int num = snprintf(dst + offset, dst_size - offset, "ufbx v%u.%u.%u error: %s\n",
 			UFBX_SOURCE_VERSION/1000000, UFBX_SOURCE_VERSION/1000%1000, UFBX_SOURCE_VERSION%1000,
-			error->description ? error->description : "Unknown error");
+			error->description.data ? error->description.data : "Unknown error");
 		if (num > 0) offset = ufbxi_min_sz(offset + (size_t)num, dst_size - 1);
 	}
 
 	size_t stack_size = ufbxi_min_sz(error->stack_size, UFBX_ERROR_STACK_MAX_DEPTH);
 	for (size_t i = 0; i < stack_size; i++) {
 		const ufbx_error_frame *frame = &error->stack[i];
-		int num = snprintf(dst + offset, dst_size - offset, "%6u:%s: %s\n", frame->source_line, frame->function, frame->description);
+		int num = snprintf(dst + offset, dst_size - offset, "%6u:%s: %s\n", frame->source_line, frame->function.data, frame->description.data);
 		if (num > 0) offset = ufbxi_min_sz(offset + (size_t)num, dst_size - 1);
 	}
 
@@ -17287,7 +17301,7 @@ size_t ufbx_format_error(char *dst, size_t dst_size, const ufbx_error *error)
 	return offset;
 }
 
-ufbx_matrix ufbx_matrix_mul(const ufbx_matrix *a, const ufbx_matrix *b)
+ufbx_abi ufbx_matrix ufbx_matrix_mul(const ufbx_matrix *a, const ufbx_matrix *b)
 {
 	ufbx_matrix dst;
 
@@ -17310,7 +17324,7 @@ ufbx_matrix ufbx_matrix_mul(const ufbx_matrix *a, const ufbx_matrix *b)
 	return dst;
 }
 
-ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m)
+ufbx_abi ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m)
 {
 	ufbx_real det = 
 		- m->m02*m->m11*m->m20 + m->m01*m->m12*m->m20 + m->m02*m->m10*m->m21
@@ -17340,7 +17354,7 @@ ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m)
 	return r;
 }
 
-ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m)
+ufbx_abi ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m)
 {
 	ufbx_real det = 
 		- m->m02*m->m11*m->m20 + m->m01*m->m12*m->m20 + m->m02*m->m10*m->m21
@@ -17368,7 +17382,7 @@ ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m)
 	return r;
 }
 
-ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v)
+ufbx_abi ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v)
 {
 	ufbx_vec3 r;
 	r.x = m->m00*v.x + m->m01*v.y + m->m02*v.z + m->m03;
@@ -17377,7 +17391,7 @@ ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v)
 	return r;
 }
 
-ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v)
+ufbx_abi ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v)
 {
 	ufbx_vec3 r;
 	r.x = m->m00*v.x + m->m01*v.y + m->m02*v.z;
@@ -17386,7 +17400,7 @@ ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v)
 	return r;
 }
 
-ufbx_matrix ufbx_transform_to_matrix(const ufbx_transform *t)
+ufbx_abi ufbx_matrix ufbx_transform_to_matrix(const ufbx_transform *t)
 {
 	ufbx_quat q = t->rotation;
 	ufbx_real sx = 2.0 * t->scale.x, sy = 2.0 * t->scale.y, sz = 2.0 * t->scale.z;
@@ -17409,7 +17423,7 @@ ufbx_matrix ufbx_transform_to_matrix(const ufbx_transform *t)
 	return m;
 }
 
-ufbx_transform ufbx_matrix_to_transform(const ufbx_matrix *m)
+ufbx_abi ufbx_transform ufbx_matrix_to_transform(const ufbx_matrix *m)
 {
 	ufbx_transform t;
 	t.translation = m->cols[3];
@@ -17465,7 +17479,7 @@ ufbx_transform ufbx_matrix_to_transform(const ufbx_matrix *m)
 	return t;
 }
 
-ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback)
+ufbx_abi ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback)
 {
 	if (!skin || vertex >= skin->vertices.count) return ufbx_identity_matrix;
 	ufbx_skin_vertex skin_vertex = skin->vertices.data[vertex];
@@ -17554,7 +17568,7 @@ ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t v
 	return mat;
 }
 
-ufbx_vec3 ufbx_get_blend_shape_vertex_offset(const ufbx_blend_shape *shape, size_t vertex)
+ufbx_abi ufbx_vec3 ufbx_get_blend_shape_vertex_offset(const ufbx_blend_shape *shape, size_t vertex)
 {
 	if (!shape) return ufbx_zero_vec3;
 
@@ -17568,7 +17582,7 @@ ufbx_vec3 ufbx_get_blend_shape_vertex_offset(const ufbx_blend_shape *shape, size
 	return shape->position_offsets.data[index];
 }
 
-ufbx_vec3 ufbx_get_blend_vertex_offset(const ufbx_blend_deformer *blend, size_t vertex)
+ufbx_abi ufbx_vec3 ufbx_get_blend_vertex_offset(const ufbx_blend_deformer *blend, size_t vertex)
 {
 	ufbx_vec3 offset = ufbx_zero_vec3;
 
@@ -17585,7 +17599,7 @@ ufbx_vec3 ufbx_get_blend_vertex_offset(const ufbx_blend_deformer *blend, size_t 
 	return offset;
 }
 
-void ufbx_add_blend_shape_vertex_offsets(const ufbx_blend_shape *shape, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight)
+ufbx_abi void ufbx_add_blend_shape_vertex_offsets(const ufbx_blend_shape *shape, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight)
 {
 	if (weight == 0.0f) return;
 	if (!vertices) return;
@@ -17601,7 +17615,7 @@ void ufbx_add_blend_shape_vertex_offsets(const ufbx_blend_shape *shape, ufbx_vec
 	}
 }
 
-void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight)
+ufbx_abi void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight)
 {
 	ufbxi_for_ptr_list(ufbx_blend_channel, p_chan, blend->channels) {
 		ufbx_blend_channel *chan = *p_chan;
@@ -17612,7 +17626,7 @@ void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *
 	}
 }
 
-size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_real u, size_t num_weights, ufbx_real *weights, ufbx_real *derivatives)
+ufbx_abi size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_real u, size_t num_weights, ufbx_real *weights, ufbx_real *derivatives)
 {
 	ufbx_assert(basis);
 	if (!basis) return SIZE_MAX;
@@ -17679,7 +17693,7 @@ size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_real u, siz
 	return knot - degree;
 }
 
-ufbx_curve_point ufbx_evaluate_nurbs_curve(const ufbx_nurbs_curve *curve, ufbx_real u)
+ufbx_abi ufbx_curve_point ufbx_evaluate_nurbs_curve(const ufbx_nurbs_curve *curve, ufbx_real u)
 {
 	ufbx_curve_point result = { false };
 
@@ -17722,7 +17736,7 @@ ufbx_curve_point ufbx_evaluate_nurbs_curve(const ufbx_nurbs_curve *curve, ufbx_r
 	return result;
 }
 
-ufbx_surface_point ufbx_evaluate_nurbs_surface(const ufbx_nurbs_surface *surface, ufbx_real u, ufbx_real v)
+ufbx_abi ufbx_surface_point ufbx_evaluate_nurbs_surface(const ufbx_nurbs_surface *surface, ufbx_real u, ufbx_real v)
 {
 	ufbx_surface_point result = { false };
 
@@ -17787,7 +17801,7 @@ ufbx_surface_point ufbx_evaluate_nurbs_surface(const ufbx_nurbs_surface *surface
 	return result;
 }
 
-ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, const ufbx_tessellate_opts *opts, ufbx_error *error)
+ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, const ufbx_tessellate_opts *opts, ufbx_error *error)
 {
 	ufbx_assert(surface);
 	if (!surface) return NULL;
@@ -17808,7 +17822,8 @@ ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, cons
 	if (ok) {
 		if (error) {
 			error->type = UFBX_ERROR_NONE;
-			error->description = NULL;
+			error->description.data = ufbxi_empty_char;
+			error->description.length = 0;
 			error->stack_size = 0;
 		}
 		return &tc.imp->mesh;
@@ -17821,7 +17836,7 @@ ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, cons
 	}
 }
 
-uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face)
+ufbx_abi uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face)
 {
 	if (face.num_indices < 3 || num_indices < ((size_t)face.num_indices - 2) * 3) return 0;
 
@@ -17896,12 +17911,12 @@ uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx
 	}
 }
 
-void ufbx_compute_topology(const ufbx_mesh *mesh, ufbx_topo_edge *indices)
+ufbx_abi void ufbx_compute_topology(const ufbx_mesh *mesh, ufbx_topo_edge *indices)
 {
 	ufbxi_compute_topology(mesh, indices);
 }
 
-int32_t ufbx_topo_next_vertex_edge(const ufbx_topo_edge *indices, int32_t index)
+ufbx_abi int32_t ufbx_topo_next_vertex_edge(const ufbx_topo_edge *indices, int32_t index)
 {
 	if (index < 0) return -1;
 	int32_t twin = indices[index].twin;
@@ -17909,13 +17924,13 @@ int32_t ufbx_topo_next_vertex_edge(const ufbx_topo_edge *indices, int32_t index)
 	return indices[twin].next;
 }
 
-int32_t ufbx_topo_prev_vertex_edge(const ufbx_topo_edge *indices, int32_t index)
+ufbx_abi int32_t ufbx_topo_prev_vertex_edge(const ufbx_topo_edge *indices, int32_t index)
 {
 	if (index < 0) return -1;
 	return indices[indices[index].prev].twin;
 }
 
-ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_face face)
+ufbx_abi ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_face face)
 {
 	if (face.num_indices < 3) {
 		return ufbx_zero_vec3;
@@ -17990,7 +18005,7 @@ size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, ufbx_topo_edge *topo,
 	return (size_t)next_index;
 }
 
-void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals)
+ufbx_abi void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, int32_t *normal_indices, ufbx_vec3 *normals, size_t num_normals)
 {
 	memset(normals, 0, sizeof(ufbx_vec3)*num_normals);
 
@@ -18013,14 +18028,14 @@ void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positio
 	}
 }
 
-ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error)
+ufbx_abi ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error)
 {
 	if (!mesh) return NULL;
 	if (level == 0) return (ufbx_mesh*)mesh;
 	return ufbxi_subdivide_mesh(mesh, level, opts, error);
 }
 
-void ufbx_free_mesh(ufbx_mesh *mesh)
+ufbx_abi void ufbx_free_mesh(ufbx_mesh *mesh)
 {
 	if (!mesh) return;
 	if (!mesh->subdivision_evaluated && !mesh->from_tessellated_nurbs) return;
@@ -18038,7 +18053,7 @@ void ufbx_free_mesh(ufbx_mesh *mesh)
 	ufbxi_free_ator(&ator);
 }
 
-ufbx_geometry_cache *ufbx_load_geometry_cache(
+ufbx_abi ufbx_geometry_cache *ufbx_load_geometry_cache(
 	const char *filename,
 	const ufbx_geometry_cache_opts *opts, ufbx_error *error)
 {
@@ -18046,7 +18061,7 @@ ufbx_geometry_cache *ufbx_load_geometry_cache(
 		opts, error);
 }
 
-ufbx_geometry_cache *ufbx_load_geometry_cache_len(
+ufbx_abi ufbx_geometry_cache *ufbx_load_geometry_cache_len(
 	const char *filename, size_t filename_len,
 	const ufbx_geometry_cache_opts *opts, ufbx_error *error)
 {
@@ -18054,7 +18069,7 @@ ufbx_geometry_cache *ufbx_load_geometry_cache_len(
 	return ufbxi_load_geometry_cache(str, opts, error);
 }
 
-void ufbx_free_geometry_cache(ufbx_geometry_cache *cache)
+ufbx_abi void ufbx_free_geometry_cache(ufbx_geometry_cache *cache)
 {
 	if (!cache) return;
 
@@ -18076,7 +18091,7 @@ void ufbx_free_geometry_cache(ufbx_geometry_cache *cache)
 	ufbxi_free_ator(&ator);
 }
 
-ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *frame, ufbx_real *data, size_t count, ufbx_geometry_cache_data_opts *user_opts)
+ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *frame, ufbx_real *data, size_t count, ufbx_geometry_cache_data_opts *user_opts)
 {
 	if (!frame || count == 0) return 0;
 	ufbx_assert(data);
@@ -18249,7 +18264,7 @@ ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *fram
 	return (size_t)(dst - data);
 }
 
-ufbxi_noinline size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *channel, double time, ufbx_real *data, size_t count, ufbx_geometry_cache_data_opts *user_opts)
+ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *channel, double time, ufbx_real *data, size_t count, ufbx_geometry_cache_data_opts *user_opts)
 {
 	if (!channel || count == 0) return 0;
 	ufbx_assert(data);
@@ -18320,7 +18335,7 @@ ufbxi_noinline size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *
 	return ufbx_read_geometry_cache_real(last, data, count, &opts);
 }
 
-ufbxi_noinline size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_frame *frame, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts)
+ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_frame *frame, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts)
 {
 	if (!frame || count == 0) return 0;
 	ufbx_assert(data);
@@ -18328,7 +18343,7 @@ ufbxi_noinline size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_frame *fram
 	return ufbx_read_geometry_cache_real(frame, (ufbx_real*)data, count * 3, opts) / 3;
 }
 
-ufbxi_noinline size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *channel, double time, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts)
+ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *channel, double time, ufbx_vec3 *data, size_t count, ufbx_geometry_cache_data_opts *opts)
 {
 	if (!channel || count == 0) return 0;
 	ufbx_assert(data);
@@ -18336,7 +18351,7 @@ ufbxi_noinline size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *
 	return ufbx_sample_geometry_cache_real(channel, time, (ufbx_real*)data, count * 3, opts) / 3;
 }
 
-size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator *allocator, ufbx_error *error)
+ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator *allocator, ufbx_error *error)
 {
 	ufbx_error local_error;
 	return ufbxi_generate_indices(streams, num_streams, indices, num_indices, allocator, error ? error : &local_error);
