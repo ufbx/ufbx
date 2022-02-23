@@ -97,19 +97,6 @@ typedef struct ufbx_quat {
 	};
 } ufbx_quat;
 
-typedef struct ufbx_void_list {
-	void *data;
-	size_t count;
-} ufbx_void_list;
-
-UFBX_LIST_TYPE(ufbx_bool_list, bool);
-UFBX_LIST_TYPE(ufbx_int32_list, int32_t);
-UFBX_LIST_TYPE(ufbx_real_list, ufbx_real);
-UFBX_LIST_TYPE(ufbx_vec2_list, ufbx_vec2);
-UFBX_LIST_TYPE(ufbx_vec3_list, ufbx_vec3);
-UFBX_LIST_TYPE(ufbx_vec4_list, ufbx_vec4);
-UFBX_LIST_TYPE(ufbx_string_list, ufbx_string);
-
 // Order in which Euler-angle rotation axes are applied for a transform
 // NOTE: The order in the name refers to the order of axes *applied*,
 // not the multiplication order: eg. `UFBX_ROTATION_XYZ` is `Z*Y*X`
@@ -146,6 +133,19 @@ typedef struct ufbx_matrix {
 		ufbx_real v[12];
 	};
 } ufbx_matrix;
+
+typedef struct ufbx_void_list {
+	void *data;
+	size_t count;
+} ufbx_void_list;
+
+UFBX_LIST_TYPE(ufbx_bool_list, bool);
+UFBX_LIST_TYPE(ufbx_int32_list, int32_t);
+UFBX_LIST_TYPE(ufbx_real_list, ufbx_real);
+UFBX_LIST_TYPE(ufbx_vec2_list, ufbx_vec2);
+UFBX_LIST_TYPE(ufbx_vec3_list, ufbx_vec3);
+UFBX_LIST_TYPE(ufbx_vec4_list, ufbx_vec4);
+UFBX_LIST_TYPE(ufbx_string_list, ufbx_string);
 
 // -- Properties
 
@@ -232,7 +232,7 @@ typedef enum ufbx_prop_flags {
 // Single property with name/type/value.
 struct ufbx_prop {
 	ufbx_string name;
-	uint32_t internal_key;
+	uint32_t _internal_key;
 	ufbx_prop_type type;
 	ufbx_prop_flags flags;
 
@@ -1972,7 +1972,7 @@ typedef struct ufbx_prop_override {
 	int64_t value_int;
 
 	// Internal: Gets filled automatically by `ufbx_prepare_prop_overrides()`
-	uint32_t internal_key;
+	uint32_t _internal_key;
 } ufbx_prop_override;
 
 UFBX_LIST_TYPE(ufbx_const_prop_override_list, const ufbx_prop_override);
@@ -2004,7 +2004,7 @@ struct ufbx_anim_stack {
 
 typedef struct ufbx_anim_prop {
 	ufbx_element *element;
-	uint32_t internal_key;
+	uint32_t _internal_key;
 	ufbx_string prop_name;
 	ufbx_anim_value *anim_value;
 } ufbx_anim_prop;
@@ -2031,9 +2031,9 @@ struct ufbx_anim_layer {
 
 	ufbx_anim anim;
 
-	uint32_t min_element_id;
-	uint32_t max_element_id;
-	uint32_t element_id_bitmask[4];
+	uint32_t _min_element_id;
+	uint32_t _max_element_id;
+	uint32_t _element_id_bitmask[4];
 };
 
 struct ufbx_anim_value {
@@ -2269,7 +2269,7 @@ struct ufbx_metadata_object {
 typedef struct ufbx_name_element {
 	ufbx_string name;
 	ufbx_element_type type;
-	uint32_t internal_key;
+	uint32_t _internal_key;
 	ufbx_element *element;
 } ufbx_name_element;
 
@@ -3115,6 +3115,10 @@ ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t ind
 ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
 ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
 ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
+
+// -- FFI API
+
+ufbx_abi uint32_t ufbx_ffi_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, uint32_t face_index_begin, uint32_t face_num_indices);
 
 #ifdef __cplusplus
 }

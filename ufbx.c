@@ -6021,7 +6021,7 @@ static ufbxi_noinline ufbx_prop *ufbxi_find_prop_with_key(const ufbx_props *prop
 		while (end - begin >= 16) {
 			size_t mid = (begin + end) >> 1;
 			const ufbx_prop *p = &prop_data[mid];
-			if (p->internal_key < key) {
+			if (p->_internal_key < key) {
 				begin = mid + 1;
 			} else { 
 				end = mid;
@@ -6031,7 +6031,7 @@ static ufbxi_noinline ufbx_prop *ufbxi_find_prop_with_key(const ufbx_props *prop
 		end = props->props.count;
 		for (; begin < end; begin++) {
 			const ufbx_prop *p = &prop_data[begin];
-			if (p->internal_key > key) break;
+			if (p->_internal_key > key) break;
 			if (p->name.data == name && (p->flags & UFBX_PROP_FLAG_NO_VALUE) == 0) {
 				return (ufbx_prop*)p;
 			}
@@ -6072,8 +6072,8 @@ static ufbxi_forceinline uint32_t ufbxi_get_name_key_c(const char *name)
 
 static ufbxi_forceinline bool ufbxi_name_key_less(ufbx_prop *prop, const char *data, size_t name_len, uint32_t key)
 {
-	if (prop->internal_key < key) return true;
-	if (prop->internal_key > key) return false;
+	if (prop->_internal_key < key) return true;
+	if (prop->_internal_key > key) return false;
 
 	size_t prop_len = prop->name.length;
 	size_t len = ufbxi_min_sz(prop_len, name_len);
@@ -6209,7 +6209,7 @@ ufbxi_nodiscard static int ufbxi_read_property(ufbxi_context *uc, ufbxi_node *no
 		ufbxi_check(ufbxi_get_val_at(node, val_ix++, 'C', (char**)&subtype_str));
 	}
 
-	prop->internal_key = ufbxi_get_name_key(prop->name.data, prop->name.length);
+	prop->_internal_key = ufbxi_get_name_key(prop->name.data, prop->name.length);
 
 	ufbx_string flags_str;
 	if (ufbxi_get_val_at(node, val_ix++, 'S', &flags_str)) {
@@ -6251,8 +6251,8 @@ ufbxi_nodiscard static int ufbxi_read_property(ufbxi_context *uc, ufbxi_node *no
 
 static ufbxi_forceinline bool ufbxi_prop_less(ufbx_prop *a, ufbx_prop *b)
 {
-	if (a->internal_key < b->internal_key) return true;
-	if (a->internal_key > b->internal_key) return false;
+	if (a->_internal_key < b->_internal_key) return true;
+	if (a->_internal_key > b->_internal_key) return false;
 	return strcmp(a->name.data, b->name.data) < 0;
 }
 
@@ -7020,7 +7020,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_blend_shapes(ufbx
 		ufbxi_check(shape_props);
 		shape_props[0].name.data = ufbxi_DeformPercent;
 		shape_props[0].name.length = sizeof(ufbxi_DeformPercent) - 1;
-		shape_props[0].internal_key = ufbxi_get_name_key_c(ufbxi_DeformPercent);
+		shape_props[0]._internal_key = ufbxi_get_name_key_c(ufbxi_DeformPercent);
 		shape_props[0].type = UFBX_PROP_NUMBER;
 		shape_props[0].value_real = (ufbx_real)0.0;
 		shape_props[0].value_str = ufbx_empty_string;
@@ -9065,7 +9065,7 @@ ufbxi_nodiscard ufbxi_noinline static size_t ufbxi_read_legacy_props(ufbxi_node 
 
 		prop->name.data = legacy_prop->prop_name;
 		prop->name.length = strlen(legacy_prop->prop_name);
-		prop->internal_key = ufbxi_get_name_key(prop->name.data, prop->name.length);
+		prop->_internal_key = ufbxi_get_name_key(prop->name.data, prop->name.length);
 		prop->flags = (ufbx_prop_flags)0;
 		prop->type = legacy_prop->prop_type;
 		num_props++;
@@ -9525,7 +9525,7 @@ static ufbx_element *ufbxi_find_element_by_fbx_id(ufbxi_context *uc, uint64_t fb
 
 ufbxi_forceinline static bool ufbxi_cmp_name_element_less(const ufbx_name_element *a, const ufbx_name_element *b)
 {
-	if (a->internal_key != b->internal_key) return a->internal_key < b->internal_key;
+	if (a->_internal_key != b->_internal_key) return a->_internal_key < b->_internal_key;
 	int cmp = strcmp(a->name.data, b->name.data);
 	if (cmp != 0) return cmp < 0;
 	return a->type < b->type;
@@ -9533,7 +9533,7 @@ ufbxi_forceinline static bool ufbxi_cmp_name_element_less(const ufbx_name_elemen
 
 ufbxi_forceinline static bool ufbxi_cmp_name_element_less_ref(const ufbx_name_element *a, ufbx_string name, ufbx_element_type type, uint32_t key)
 {
-	if (a->internal_key != key) return a->internal_key < key;
+	if (a->_internal_key != key) return a->_internal_key < key;
 	int cmp = ufbxi_str_cmp(a->name, name);
 	if (cmp != 0) return cmp < 0;
 	return a->type < type;
@@ -9808,7 +9808,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_connections_to_elements(ufbx
 					flags |= new_prop->flags;
 					new_prop->flags = (ufbx_prop_flags)(UFBX_PROP_FLAG_ANIMATABLE | UFBX_PROP_FLAG_SYNTHETIC | flags);
 					new_prop->name = name;
-					new_prop->internal_key = key;
+					new_prop->_internal_key = key;
 					new_prop->value_str = ufbx_empty_string;
 					num_synthetic++;
 				}
@@ -10171,7 +10171,7 @@ ufbxi_forceinline static void ufbxi_patch_index_pointer(ufbxi_context *uc, int32
 ufbxi_nodiscard static bool ufbxi_cmp_anim_prop_less(const ufbx_anim_prop *a, const ufbx_anim_prop *b)
 {
 	if (a->element != b->element) return a->element < b->element;
-	if (a->internal_key != b->internal_key) return a->internal_key < b->internal_key;
+	if (a->_internal_key != b->_internal_key) return a->_internal_key < b->_internal_key;
 	return ufbxi_str_less(a->prop_name, b->prop_name);
 }
 
@@ -10793,7 +10793,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 		name_elem->name = elem->name;
 		name_elem->type = elem->type;
-		name_elem->internal_key = ufbxi_get_name_key(elem->name.data, elem->name.length);
+		name_elem->_internal_key = ufbxi_get_name_key(elem->name.data, elem->name.length);
 		name_elem->element = elem;
 	}
 
@@ -11241,12 +11241,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 					uint32_t id = ac->dst->element_id;
 					min_id = ufbxi_min32(min_id, id);
 					max_id = ufbxi_max32(max_id, id);
-					uint32_t id_mask = ufbxi_arraycount(layer->element_id_bitmask) - 1;
-					layer->element_id_bitmask[(id >> 5) & id_mask] |= 1u << (id & 31);
+					uint32_t id_mask = ufbxi_arraycount(layer->_element_id_bitmask) - 1;
+					layer->_element_id_bitmask[(id >> 5) & id_mask] |= 1u << (id & 31);
 					ufbxi_check(aprop);
 					aprop->anim_value = value;
 					aprop->element = ac->dst;
-					aprop->internal_key = ufbxi_get_name_key(ac->dst_prop.data, ac->dst_prop.length);
+					aprop->_internal_key = ufbxi_get_name_key(ac->dst_prop.data, ac->dst_prop.length);
 					aprop->prop_name = ac->dst_prop;
 					num_anim_props++;
 				}
@@ -11254,8 +11254,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		}
 
 		if (min_id != UINT32_MAX) {
-			layer->min_element_id = min_id;
-			layer->max_element_id = max_id;
+			layer->_min_element_id = min_id;
+			layer->_max_element_id = max_id;
 		}
 
 		switch (ufbxi_find_int(&layer->props, ufbxi_BlendMode, 0)) {
@@ -13779,27 +13779,27 @@ static int ufbxi_cmp_prop_override(const void *va, const void *vb)
 {
 	const ufbx_prop_override *a = (const ufbx_prop_override*)va, *b = (const ufbx_prop_override*)vb;
 	if (a->element_id != b->element_id) return a->element_id < b->element_id ? -1 : 1;
-	if (a->internal_key != b->internal_key) return a->internal_key < b->internal_key ? -1 : 1;
+	if (a->_internal_key != b->_internal_key) return a->_internal_key < b->_internal_key ? -1 : 1;
 	return strcmp(a->prop_name, b->prop_name);
 }
 
 static ufbxi_forceinline bool ufbxi_override_less_than_prop(const ufbx_prop_override *over, uint32_t element_id, const ufbx_prop *prop)
 {
 	if (over->element_id != element_id) return over->element_id < element_id;
-	if (over->internal_key != prop->internal_key) return over->internal_key < prop->internal_key;
+	if (over->_internal_key != prop->_internal_key) return over->_internal_key < prop->_internal_key;
 	return strcmp(over->prop_name, prop->name.data);
 }
 
 static ufbxi_forceinline bool ufbxi_override_equals_to_prop(const ufbx_prop_override *over, uint32_t element_id, const ufbx_prop *prop)
 {
 	if (over->element_id != element_id) return false;
-	if (over->internal_key != prop->internal_key) return false;
+	if (over->_internal_key != prop->_internal_key) return false;
 	return strcmp(over->prop_name, prop->name.data) == 0;
 }
 
 static ufbxi_forceinline ufbxi_unused bool ufbxi_prop_override_is_prepared(const ufbx_prop_override *over)
 {
-	if (over->internal_key != ufbxi_get_name_key_c(over->prop_name)) return false;
+	if (over->_internal_key != ufbxi_get_name_key_c(over->prop_name)) return false;
 	if (over->value_str == NULL) return false;
 	return true;
 }
@@ -13917,9 +13917,9 @@ static ufbxi_noinline void ufbxi_combine_anim_layer(ufbxi_anim_layer_combine_ctx
 
 static ufbxi_forceinline bool ufbxi_anim_layer_might_contain_id(const ufbx_anim_layer *layer, uint32_t id)
 {
-	uint32_t id_mask = ufbxi_arraycount(layer->element_id_bitmask) - 1;
-	bool ok = id - layer->min_element_id <= (layer->max_element_id - layer->min_element_id);
-	ok &= (layer->element_id_bitmask[(id >> 5) & id_mask] & (1u << (id & 31))) != 0;
+	uint32_t id_mask = ufbxi_arraycount(layer->_element_id_bitmask) - 1;
+	bool ok = id - layer->_min_element_id <= (layer->_max_element_id - layer->_min_element_id);
+	ok &= (layer->_element_id_bitmask[(id >> 5) & id_mask] & (1u << (id & 31))) != 0;
 	return ok;
 }
 
@@ -13958,7 +13958,7 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 			if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim->ignore_connections) continue;
 
 			// Skip until we reach `aprop >= prop`
-			while (aprop->element == element && aprop->internal_key < prop->internal_key) aprop++;
+			while (aprop->element == element && aprop->_internal_key < prop->_internal_key) aprop++;
 			if (aprop->prop_name.data != prop->name.data) {
 				while (aprop->element == element && strcmp(aprop->prop_name.data, prop->name.data) < 0) aprop++;
 			}
@@ -14020,17 +14020,17 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 		ufbx_prop *prop = &element->props.props.data[i];
 
 		while (name_ix < max_props) {
-			if (key > prop->internal_key) break;
+			if (key > prop->_internal_key) break;
 
 			if (over) {
 				bool found_override = false;
 				for (; over != over_end; over++) {
 					ufbx_prop *dst = &props[num_props];
-					if (over->internal_key < key || strcmp(over->prop_name, name) < 0) {
+					if (over->_internal_key < key || strcmp(over->prop_name, name) < 0) {
 						continue;
-					} else if (over->internal_key == key && strcmp(over->prop_name, name) == 0) {
+					} else if (over->_internal_key == key && strcmp(over->prop_name, name) == 0) {
 						dst->name = ufbxi_str_c(name);
-						dst->internal_key = key;
+						dst->_internal_key = key;
 						dst->type = UFBX_PROP_UNKNOWN;
 						dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
 					} else {
@@ -14069,11 +14069,11 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 	if (over) {
 		for (; over != over_end && name_ix < max_props; over++) {
 			ufbx_prop *dst = &props[num_props];
-			if (over->internal_key < key || strcmp(over->prop_name, name) < 0) {
+			if (over->_internal_key < key || strcmp(over->prop_name, name) < 0) {
 				continue;
-			} else if (over->internal_key == key && strcmp(over->prop_name, name) == 0) {
+			} else if (over->_internal_key == key && strcmp(over->prop_name, name) == 0) {
 				dst->name = ufbxi_str_c(name);
-				dst->internal_key = key;
+				dst->_internal_key = key;
 				dst->type = UFBX_PROP_UNKNOWN;
 				dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
 			} else {
@@ -16596,7 +16596,7 @@ ufbx_abi ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name
 		while (end - begin >= 16) {
 			size_t mid = (begin + end) >> 1;
 			const ufbx_prop *p = &prop_data[mid];
-			if (p->internal_key < key) {
+			if (p->_internal_key < key) {
 				begin = mid + 1;
 			} else { 
 				end = mid;
@@ -16606,8 +16606,8 @@ ufbx_abi ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name
 		end = props->props.count;
 		for (; begin < end; begin++) {
 			const ufbx_prop *p = &prop_data[begin];
-			if (p->internal_key > key) break;
-			if (p->internal_key == key && p->name.length == name_len && !memcmp(p->name.data, name, name_len)) {
+			if (p->_internal_key > key) break;
+			if (p->_internal_key == key && p->name.length == name_len && !memcmp(p->name.data, name, name_len)) {
 				return (ufbx_prop*)p;
 			}
 		}
@@ -16863,7 +16863,7 @@ ufbx_abi ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, const ufbx_elem
 		memset(&result, 0, sizeof(result));
 		result.name.data = name;
 		result.name.length = name_len;
-		result.internal_key = ufbxi_get_name_key(name, name_len);
+		result._internal_key = ufbxi_get_name_key(name, name_len);
 		result.flags = UFBX_PROP_FLAG_NOT_FOUND;
 	}
 
@@ -16900,13 +16900,13 @@ ufbx_abi ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *ele
 		bool found_override = false;
 		for (; over != over_end && num_anim < buffer_size; over++) {
 			ufbx_prop *dst = &buffer[num_anim];
-			if (over->internal_key < prop->internal_key
-				|| (over->internal_key == prop->internal_key && strcmp(over->prop_name, prop->name.data) < 0)) {
+			if (over->_internal_key < prop->_internal_key
+				|| (over->_internal_key == prop->_internal_key && strcmp(over->prop_name, prop->name.data) < 0)) {
 				dst->name = ufbxi_str_c(over->prop_name);
-				dst->internal_key = over->internal_key;
+				dst->_internal_key = over->_internal_key;
 				dst->type = UFBX_PROP_UNKNOWN;
 				dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
-			} else if (over->internal_key == prop->internal_key && strcmp(over->prop_name, prop->name.data) == 0) {
+			} else if (over->_internal_key == prop->_internal_key && strcmp(over->prop_name, prop->name.data) == 0) {
 				*dst = *prop;
 				dst->flags = (ufbx_prop_flags)(dst->flags | UFBX_PROP_FLAG_OVERRIDDEN);
 			} else {
@@ -16934,7 +16934,7 @@ ufbx_abi ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, ufbx_element *ele
 	for (; over != over_end && num_anim < buffer_size; over++) {
 		ufbx_prop *dst = &buffer[num_anim++];
 		dst->name = ufbxi_str_c(over->prop_name);
-		dst->internal_key = over->internal_key;
+		dst->_internal_key = over->_internal_key;
 		dst->type = UFBX_PROP_UNKNOWN;
 		dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
 		dst->value_str = ufbxi_str_c(over->value_str);
@@ -17005,7 +17005,7 @@ ufbx_abi ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_ove
 
 		size_t len = strlen(over->prop_name);
 		over->prop_name = ufbxi_find_canonical_string(over->prop_name, len);
-		over->internal_key = ufbxi_get_name_key(over->prop_name, len);
+		over->_internal_key = ufbxi_get_name_key(over->prop_name, len);
 	}
 
 	// TODO: Macro for non-stable sort
@@ -17836,7 +17836,7 @@ ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surf
 	}
 }
 
-ufbx_abi uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face)
+ufbx_abi ufbxi_noinline uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face)
 {
 	if (face.num_indices < 3 || num_indices < ((size_t)face.num_indices - 2) * 3) return 0;
 
@@ -18356,6 +18356,13 @@ ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t 
 	ufbx_error local_error;
 	return ufbxi_generate_indices(streams, num_streams, indices, num_indices, allocator, error ? error : &local_error);
 }
+
+ufbx_abi uint32_t ufbx_ffi_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, uint32_t face_index_begin, uint32_t face_num_indices)
+{
+	ufbx_face face = { face_index_begin, face_num_indices };
+	return ufbx_triangulate_face(indices, num_indices, mesh, face);
+}
+
 
 #ifdef __cplusplus
 }

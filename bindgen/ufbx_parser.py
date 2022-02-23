@@ -200,19 +200,23 @@ class Parser(parsette.Parser):
         else:
             self.fail_got("expected a type")
 
-    def parse_name(self, ctx, allow_anonymous=False) -> AName:
+    def parse_name_non_array(self, ctx, allow_anonymous=False) -> AName:
         if self.accept("*"):
-            inner = self.parse_name(ctx, allow_anonymous)
+            inner = self.parse_name_non_array(ctx, allow_anonymous)
             return ANamePointer(inner)
         if allow_anonymous and not self.peek(TIdent):
-            ast = ANameAnonymous()
+            return ANameAnonymous()
         else:
             name = self.require(TIdent, f"for {ctx} name")
-            ast = ANameIdent(name)
+            return ANameIdent(name)
+
+    def parse_name(self, ctx, allow_anonymous=False) -> AName:
+        ast = self.parse_name_non_array(ctx, allow_anonymous)
+
         while True:
             if self.accept("["):
                 length = self.accept([TIdent, TNumber])
-                self.require("]", f"for '{name.text()}' opening [")
+                self.require("]", f"for opening [")
                 ast = ANameArray(ast, length)
             elif self.accept("("):
                 args = []
@@ -343,6 +347,7 @@ class SDecl(NamedTuple):
     comment: Optional[SComment] = None
     comment_inline: bool = False
     is_function: bool = False
+    value: Optional[str] = None
 
 class SDeclGroup(NamedTuple):
     line: int
@@ -492,6 +497,7 @@ def to_senum(enum: ATypeEnum) -> SEnum:
                 line_begin=line,
                 line_end=line,
                 kind="enumValue",
+                value=decl.value.text() if decl.value else None,
                 names=[
                     SName(
                         name=decl.name.text(),
@@ -675,6 +681,7 @@ def format_decls(decls: List[SCommentDecl], allow_groups: bool):
                         "comment": decl.comment.text if decl.comment else [],
                         "commentInline": decl.comment_inline,
                         "isFunction": decl.is_function,
+                        "value": decl.value,
                         "type": format_type(name.type),
                     }
         elif isinstance(decl, SDeclGroup):
