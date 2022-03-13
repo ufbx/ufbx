@@ -56,7 +56,7 @@ UFBXT_FILE_TEST(maya_nurbs_curve_form)
 
 		{
 			ufbx_real weights[16];
-			size_t knot = ufbx_evaluate_nurbs_basis(&open->basis, 0.0f, 16, weights, NULL);
+			size_t knot = ufbx_evaluate_nurbs_basis(&open->basis, 0.0f, weights, 16, NULL, 0);
 			ufbxt_assert(knot == 0);
 			ufbxt_assert_close_real(err, weights[0], 1.0f);
 			ufbxt_assert_close_real(err, weights[1], 0.0f);
@@ -66,7 +66,7 @@ UFBXT_FILE_TEST(maya_nurbs_curve_form)
 
 		{
 			ufbx_real weights[16];
-			size_t knot = ufbx_evaluate_nurbs_basis(&open->basis, 0.5f, 16, weights, NULL);
+			size_t knot = ufbx_evaluate_nurbs_basis(&open->basis, 0.5f, weights, 16, NULL, 0);
 			ufbxt_assert(knot == 0);
 			ufbxt_assert_close_real(err, weights[0], 0.125f);
 			ufbxt_assert_close_real(err, weights[1], 0.375f);
@@ -76,7 +76,7 @@ UFBXT_FILE_TEST(maya_nurbs_curve_form)
 
 		{
 			ufbx_real weights[16];
-			size_t knot = ufbx_evaluate_nurbs_basis(&open->basis, 1.0f, 16, weights, NULL);
+			size_t knot = ufbx_evaluate_nurbs_basis(&open->basis, 1.0f, weights, 16, NULL, 0);
 			ufbxt_assert(knot == 0);
 			ufbxt_assert_close_real(err, weights[0], 0.0f);
 			ufbxt_assert_close_real(err, weights[1], 0.0f);
@@ -118,7 +118,7 @@ UFBXT_FILE_TEST(maya_nurbs_curve_form)
 
 		{
 			ufbx_real weights[16];
-			size_t knot = ufbx_evaluate_nurbs_basis(&closed->basis, 3.14f, 16, weights, NULL);
+			size_t knot = ufbx_evaluate_nurbs_basis(&closed->basis, 3.14f, weights, 16, NULL, 0);
 			ufbxt_assert(knot == 2);
 			ufbxt_assert_close_real(err, weights[0], 0.106009f);
 			ufbxt_assert_close_real(err, weights[1], 0.648438f);

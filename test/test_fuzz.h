@@ -36,8 +36,8 @@ UFBXT_TEST(fuzz_files)
 		stream_opts.read_buffer_size = 1;
 		stream_opts.temp_allocator.huge_threshold = 1;
 		stream_opts.result_allocator.huge_threshold = 1;
-		stream_opts.progress_fn = &ufbxt_measure_progress;
-		stream_opts.progress_user = &stream_progress_ctx;
+		stream_opts.progress_cb.fn = &ufbxt_measure_progress;
+		stream_opts.progress_cb.user = &stream_progress_ctx;
 		stream_opts.progress_interval_hint = 1;
 		ufbx_scene *streamed_scene = ufbx_load_file(buf, &stream_opts, &error);
 		if (streamed_scene) {

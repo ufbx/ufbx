@@ -69,7 +69,7 @@ static void ufbxt_check_props(ufbx_scene *scene, const ufbx_props *props, bool t
 
 		// Properties should be sorted by name
 		if (prev) {
-			ufbxt_assert(prop->internal_key >= prev->internal_key);
+			ufbxt_assert(prop->_internal_key >= prev->_internal_key);
 			ufbxt_assert(strcmp(prop->name.data, prev->name.data) >= 0);
 		}
 
@@ -126,7 +126,7 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 	}
 
 	ufbxt_assert(element->type >= 0);
-	ufbxt_assert(element->type < UFBX_NUM_ELEMENT_TYPES);
+	ufbxt_assert(element->type < UFBX_ELEMENT_TYPE_COUNT);
 	if (element->type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && element->type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB) {
 		for (size_t i = 0; i < element->instances.count; i++) {
 			ufbx_node *node = element->instances.data[i];
@@ -456,11 +456,11 @@ static void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
 		ufbxt_check_element_ptr(scene, material->textures.data[i].texture);
 	}
 
-	for (size_t i = 0; i < UFBX_NUM_MATERIAL_FBX_MAPS; i++) {
+	for (size_t i = 0; i < UFBX_MATERIAL_FBX_MAP_COUNT; i++) {
 		ufbxt_check_element_ptr(scene, material->fbx.maps[i].texture);
 	}
 
-	for (size_t i = 0; i < UFBX_NUM_MATERIAL_PBR_MAPS; i++) {
+	for (size_t i = 0; i < UFBX_MATERIAL_PBR_MAP_COUNT; i++) {
 		ufbxt_check_element_ptr(scene, material->pbr.maps[i].texture);
 	}
 

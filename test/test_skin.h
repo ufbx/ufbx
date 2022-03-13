@@ -368,7 +368,7 @@ UFBXT_FILE_TEST(maya_dual_quaternion)
 	ufbx_mesh *mesh = node->mesh;
 	ufbxt_assert(mesh->skin_deformers.count == 1);
 	ufbx_skin_deformer *skin = mesh->skin_deformers.data[0];
-	ufbxt_assert(skin->skinning_method == UFBX_SKINNING_DUAL_QUATERNION);
+	ufbxt_assert(skin->skinning_method == UFBX_SKINNING_METHOD_DUAL_QUATERNION);
 }
 #endif
 
@@ -380,7 +380,7 @@ UFBXT_FILE_TEST(maya_dual_quaternion_scale)
 	ufbx_mesh *mesh = node->mesh;
 	ufbxt_assert(mesh->skin_deformers.count == 1);
 	ufbx_skin_deformer *skin = mesh->skin_deformers.data[0];
-	ufbxt_assert(skin->skinning_method == UFBX_SKINNING_DUAL_QUATERNION);
+	ufbxt_assert(skin->skinning_method == UFBX_SKINNING_METHOD_DUAL_QUATERNION);
 }
 #endif
 

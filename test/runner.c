@@ -956,7 +956,7 @@ static size_t g_fuzz_step = SIZE_MAX;
 
 const char *g_fuzz_test_name = NULL;
 
-void ufbxt_init_allocator(ufbx_allocator *ator)
+void ufbxt_init_allocator(ufbx_allocator_opts *ator)
 {
 	ator->memory_limit = 0x4000000; // 64MB
 
@@ -967,10 +967,10 @@ void ufbxt_init_allocator(ufbx_allocator *ator)
 	at->offset = 0;
 	at->bytes_allocated = 0;
 
-	ator->user = at;
-	ator->alloc_fn = &ufbxt_alloc;
-	ator->free_fn = &ufbxt_free;
-	ator->free_allocator_fn = &ufbxt_free_allocator;
+	ator->allocator.user = at;
+	ator->allocator.alloc_fn = &ufbxt_alloc;
+	ator->allocator.free_fn = &ufbxt_free;
+	ator->allocator.free_allocator_fn = &ufbxt_free_allocator;
 }
 
 static bool ufbxt_begin_fuzz()
@@ -990,10 +990,10 @@ typedef struct {
 	size_t calls_left;
 } ufbxt_cancel_ctx;
 
-bool ufbxt_cancel_progress(void *user, const ufbx_progress *progress)
+ufbx_progress_result ufbxt_cancel_progress(void *user, const ufbx_progress *progress)
 {
 	ufbxt_cancel_ctx *ctx = (ufbxt_cancel_ctx*)user;
-	return --ctx->calls_left > 0;
+	return --ctx->calls_left > 0 ? UFBX_PROGRESS_CONTINUE : UFBX_PROGRESS_CANCEL;
 }
 
 int ufbxt_test_fuzz(const char *filename, void *data, size_t size, size_t step, int offset, size_t temp_limit, size_t result_limit, size_t truncate_length, size_t cancel_step)
@@ -1027,8 +1027,8 @@ int ufbxt_test_fuzz(const char *filename, void *data, size_t size, size_t step, 
 
 		if (cancel_step > 0) {
 			cancel_ctx.calls_left = cancel_step;
-			opts.progress_fn = &ufbxt_cancel_progress;
-			opts.progress_user = &cancel_ctx;
+			opts.progress_cb.fn = &ufbxt_cancel_progress;
+			opts.progress_cb.user = &cancel_ctx;
 			opts.progress_interval_hint = 1;
 		}
 
@@ -2204,8 +2204,8 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 			if (check->cancel_step > 0) {
 				cancel_ctx.calls_left = check->cancel_step;
-				opts.progress_fn = &ufbxt_cancel_progress;
-				opts.progress_user = &cancel_ctx;
+				opts.progress_cb.fn = &ufbxt_cancel_progress;
+				opts.progress_cb.user = &cancel_ctx;
 				opts.progress_interval_hint = 1;
 			}
 
@@ -2229,11 +2229,11 @@ typedef struct {
 	uint64_t calls;
 } ufbxt_progress_ctx;
 
-bool ufbxt_measure_progress(void *user, const ufbx_progress *progress)
+ufbx_progress_result ufbxt_measure_progress(void *user, const ufbx_progress *progress)
 {
 	ufbxt_progress_ctx *ctx = (ufbxt_progress_ctx*)user;
 	ctx->calls++;
-	return true;
+	return UFBX_PROGRESS_CONTINUE;
 }
 
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err, ufbx_error *load_error), const char *suffix, ufbx_load_opts user_opts, bool alternative, bool allow_error)
@@ -2293,8 +2293,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbxt_progress_ctx progress_ctx = { 0 };
 
 			ufbx_load_opts memory_opts = load_opts;
-			memory_opts.progress_fn = &ufbxt_measure_progress;
-			memory_opts.progress_user = &progress_ctx;
+			memory_opts.progress_cb.fn = &ufbxt_measure_progress;
+			memory_opts.progress_cb.user = &progress_ctx;
 
 			uint64_t load_begin = cputime_cpu_tick();
 			ufbx_scene *scene = ufbx_load_memory(data, size, &memory_opts, &error);
@@ -2318,8 +2318,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			stream_opts.result_allocator.huge_threshold = 1;
 			stream_opts.filename.data = NULL;
 			stream_opts.filename.length = 0;
-			stream_opts.progress_fn = &ufbxt_measure_progress;
-			stream_opts.progress_user = &stream_progress_ctx;
+			stream_opts.progress_cb.fn = &ufbxt_measure_progress;
+			stream_opts.progress_cb.user = &stream_progress_ctx;
 			stream_opts.progress_interval_hint = 1;
 			ufbx_scene *streamed_scene = ufbx_load_file(buf, &stream_opts, &error);
 			if (streamed_scene) {

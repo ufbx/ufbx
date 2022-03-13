@@ -5,17 +5,17 @@ void ufbxt_check_generated_normals(ufbx_mesh *mesh, ufbxt_diff_error *err, size_
 	ufbx_topo_edge *topo = calloc(mesh->num_indices, sizeof(ufbx_topo_edge));
 	ufbxt_assert(topo);
 
-	ufbx_compute_topology(mesh, topo);
+	ufbx_compute_topology(mesh, topo, mesh->num_indices);
 
 	int32_t *normal_indices = calloc(mesh->num_indices, sizeof(int32_t));
-	size_t num_normals = ufbx_generate_normal_mapping(mesh, topo, normal_indices, false);
+	size_t num_normals = ufbx_generate_normal_mapping(mesh, topo, mesh->num_indices, normal_indices, mesh->num_indices, false);
 
 	if (expected_normals > 0) {
 		ufbxt_assert(num_normals == expected_normals);
 	}
 
 	ufbx_vec3 *normals = calloc(num_normals, sizeof(ufbx_vec3));
-	ufbx_compute_normals(mesh, &mesh->vertex_position, normal_indices, normals, num_normals);
+	ufbx_compute_normals(mesh, &mesh->vertex_position, normal_indices, mesh->num_indices, normals, num_normals);
 
 	ufbx_vertex_vec3 new_normals = { 0 };
 	new_normals.exists = true;
