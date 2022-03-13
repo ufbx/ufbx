@@ -5,8 +5,6 @@ import itertools
 
 ichain = itertools.chain.from_iterable
 
-from sympy import E
-
 prelude = """
 pub mod ufbx {
 

@@ -1,5 +1,4 @@
 import os
-from re import I
 from typing import NamedTuple, Optional, List
 import ufbx_ir as ir
 import json
@@ -9,8 +8,9 @@ g_outfile = None
 
 prologue = """
 import ctypes as ct
-from typing import Iterator, NamedTuple, Optional, Union, List, Tuple
+from typing import Iterator, NamedTuple, Optional, Union, List, Tuple, BinaryIO
 from enum import IntEnum, IntFlag
+from array import array
 
 p_size_t = ct.POINTER(ct.c_size_t)
 p_bool = ct.POINTER(ct.c_bool)
@@ -32,23 +32,23 @@ p_ptr = ct.POINTER(p_void)
 
 cast = ct.cast
 
-def load_string(ptr):
+def _load_string(ptr):
     addr = cast(ptr, p_ptr)[0]
     size = cast(ptr + 8, p_size_t)[0]
     return ct.string_at(addr, size).decode("utf-8")
 
-def store_string(retain, ptr, val):
+def _store_string(retain, ptr, val):
     encoded = val.encode("utf-8")
     retain.append(encoded)
     cast(ptr, p_ptr)[0] = cast(ct.create_string_buffer(encoded), p_void)
     cast(ptr + 8, p_size_t)[0] = len(encoded)
 
-def load_bytes(ptr):
+def _load_bytes(ptr):
     addr = cast(ptr, p_ptr)[0]
     size = cast(ptr + 8, p_size_t)[0]
     return ct.string_at(addr, size)
 
-def check_index(index, count):
+def _check_index(index, count):
     if not isinstance(index, int): raise TypeError(f"Index must be int or slice, not {type(index)}")
     if index < 0: index += count
     if index < 0 or index >= count: raise IndexError(f"Index {index} out of range, maximum {count}")
@@ -115,11 +115,71 @@ class _Base:
         if not self._ctx.flag.valid:
             raise RuntimeError("Operating on closed file")
 
+class UintArray:
+    def __init__(self, arr):
+        self._arr = arr
+
+    def __getitem__(self, index: Union[int, slice]):
+        if isinstance(index, slice):
+            return UintArray(self._arr[index])
+        elif isinstance(index, int):
+            return self._arr(index)
+        else:
+            raise TypeError(f"Bad index type {type(index).__name__}")
+
+    def __iter__(self):
+        return iter(self._arr)
+
+def _make_UintArray(retain, num):
+    # TODO: BAD
+    arr = UintArray(array("I", bytearray(4 * num)))
+    return arr._arr.buffer_info()[0], arr
+
+class DoubleArray:
+    def __init__(self, arr):
+        self._arr = arr
+
+    def __getitem__(self, index: Union[int, slice]):
+        if isinstance(index, slice):
+            return DoubleArray(self._arr[index])
+        elif isinstance(index, int):
+            return self._arr(index)
+        else:
+            raise TypeError(f"Bad index type {type(index).__name__}")
+
+def _make_DoubleArray(retain, num):
+    # TODO: BAD
+    arr = DoubleArray(array("d", bytearray(8 * num)))
+    return arr._arr.buffer_info()[0], arr
+
+class Vec3Array:
+    def __init__(self, arr):
+        self._arr = arr
+
+    def __getitem__(self, index: Union[int, slice]):
+        if isinstance(index, slice):
+            start = slice.start * 3 if slice.start else None
+            stop = slice.stop * 3 if slice.stop else None
+            step = slice.step * 3 if slice.step else None
+            return Vec3Array(self._arr[slice(start, stop, step)])
+        elif isinstance(index, int):
+            x = self._arr(index*3 + 0)
+            y = self._arr(index*3 + 1)
+            z = self._arr(index*3 + 2)
+            return Vec3(x, y, z)
+        else:
+            raise TypeError(f"Bad index type {type(index).__name__}")
+
+def _make_Vec3Array(retain, num):
+    # TODO: BAD
+    arr = Vec3Array(array("d", bytearray(24 * num)))
+    return arr._arr.buffer_info()[0], arr
+
 """.strip()
 
 epilogue = """
 
-cufbx = ct.cdll.LoadLibrary("ufbx.dll")
+cufbx = ct.cdll.LoadLibrary(".\\\\ufbx.dll")
 
 setup_ffi(cufbx)
 
@@ -129,27 +189,6 @@ def _alloc(retain, size):
     retain.append(arr)
     return cast(ct.pointer(arr), p_void)
 
-def _alloc_str(retain, val, name=None):
-    if isinstance(val, str):
-        buf = val.encode("utf-8")
-    elif isinstance(val, bytes):
-        buf = val
-    else:
-        ctx = f"for '{name}'" if name else None
-        raise TypeError(f"Expected str or bytes{ctx}, got {type(val).__name__}")
-    val = ct.create_string_buffer(buf)
-    retain.append(val)
-    return val, len(buf)
-
-def _alloc_obj(retain, typ, val=None, name=None):
-    data = _alloc(retain, typ._size)
-    if val:
-        if not isinstance(val, typ):
-            ctx = f"for '{name}'" if name else None
-            raise TypeError(f"Expected {typ.__name__}{ctx}, got {type(val).__name__}")
-        val._store(retain, data.value)
-    return data
-
 def _raise_error(err):
     raise error_types[err.type](err.description)
 
@@ -158,82 +197,59 @@ def _raise_error_ptr(p_error):
     err = _Error(err_ctx, p_error.value)
     _raise_error(err)
 
-def _check_type(obj, typ, name):
-    if not isinstance(obj, typ):
-        raise TypeError(f"Expected {typ.__name__} for '{name}', got {type(obj).__name__}")
+def _make_pod(retain, typ):
+    return _alloc(retain, typ._size)
 
-def load_file(path: Union[str, bytes], opts: Optional[LoadOpts]=None) -> Scene:
-    r = []
+def _check_ref(val, typ, name):
+    if not isinstance(val, typ):
+        raise TypeError(f"Expected '{name}' to be {typ.__name__}, got {type(val).__name__}")
+    return val.ptr
 
-    p_path, p_path_len = _alloc_str(r, path, "path")
-    p_opts = _alloc_obj(r, LoadOpts, opts, "opts")
-    p_error = _alloc_obj(r, _Error)
+def _check_string(retain, val, name):
+    if isinstance(val, str):
+        buf = val.encode("utf-8")
+    elif isinstance(val, bytes):
+        buf = val
+    else:
+        raise TypeError(f"Expected '{name}' to be str or bytes, got {type(val).__name__}")
+    ptr = ct.create_string_buffer(buf)
+    retain.append(ptr)
+    return ptr, len(buf)
 
-    ptr = cufbx.ufbx_load_file_len(p_path, p_path_len, p_opts, p_error)
-    if not ptr: _raise_error_ptr(p_error)
+def _check_pod(retain, val, typ, name):
+    if not isinstance(val, typ):
+        raise TypeError(f"Expected {name} to be {typ.__name__}, got {type(val).__name__}")
+    data = _alloc(retain, typ._size)
+    typ._store(retain, data.value, val)
+    return data
 
-    ctx = _SceneContext(None, cufbx, ptr)
-    return Scene(ctx, ptr)
+def _check_input(retain, val, typ, name):
+    data = _alloc(retain, typ._size)
+    if val:
+        if not isinstance(val, typ):
+            raise TypeError(f"Expected {name} to be {typ.__name__}, got {type(val).__name__}")
+        typ._store(retain, data.value, val)
+    return data
 
-def evaluate_scene(scene: Scene, anim: Anim, time: float, opts: Optional[EvaluateOpts]=None) -> Scene:
-    r = []
+def _check_enum(val, typ, name):
+    if not isinstance(val, typ):
+        raise TypeError(f"Expected '{name}' to be {typ.__name__}, got {type(val).__name__}")
+    return val.value
 
-    _check_type(scene, Scene, "scene")
-    _check_type(anim, Anim, "anim")
-    p_opts = _alloc_obj(r, EvaluateOpts, opts, "opts")
-    p_error = _alloc_obj(r, _Error)
+def _check_int(val, name):
+    if not isinstance(val, int):
+        raise TypeError(f"Expected {name} to be int, got {type(val).__name__}")
+    return val
 
-    ptr = cufbx.ufbx_evaluate_scene(p_void(scene.ptr), p_void(anim.ptr), time, p_opts, p_error)
-    if not ptr: _raise_error_ptr(p_error)
+def _check_float(val, name):
+    if not isinstance(val, float):
+        raise TypeError(f"Expected {name} to be float, got {type(val).__name__}")
+    return val
 
-    ctx = _SceneContext(scene._ctx, cufbx, ptr)
-    return Scene(ctx, ptr)
-
-def find_node(scene: Scene, name: Union[str, bytes]) -> Optional[Node]:
-    r = []
-
-    _check_type(scene, Scene, "scene")
-    p_name, p_name_len = _alloc_str(r, name, "name")
-
-    p_node = scene._ctx.cufbx.ufbx_find_node_len(p_void(scene.ptr), p_name, p_name_len)
-    if not p_node: return None
-
-    return Node(scene._ctx, p_node)
-
-def triangulate_face(mesh: Mesh, face: Face) -> List[Tuple[int, int, int]]:
-    num_tris = face.num_indices - 2
-    if num_tris <= 0: return []
-
-    _check_type(mesh, Mesh, "mesh")
-
-    indices = (ct.c_uint32 * (num_tris * 3))()
-    p_indices = cast(ct.pointer(indices), p_void)
-
-    num_tris = cufbx.ufbx_ffi_triangulate_face(p_indices, num_tris * 3, p_void(mesh.ptr), face.index_begin, face.num_indices)
-
-    result = [None] * num_tris
-    for n in range(num_tris):
-        result[n] = (indices[3*n+0], indices[3*n+1], indices[3*n+2])
-    return result
-
-def subdivide_mesh(mesh: Mesh, level: int = 1, opts: Optional[SubdivideOpts] = None) -> Mesh:
-    r = []
-
-    _check_type(mesh, Mesh, "mesh")
-    p_opts = _alloc_obj(r, SubdivideOpts, opts, "opts")
-    p_error = _alloc_obj(r, _Error)
-
-    ptr = cufbx.ufbx_subdivide_mesh(p_void(mesh.ptr), level, p_opts, p_error)
-    if not ptr: _raise_error_ptr(p_error)
-
-    ctx = _MeshContext(mesh._ctx, cufbx, ptr)
-    return Mesh(ctx, ptr)
-
-def evaluate_curve(curve: AnimCurve, time: float, default: float=0.0) -> float:
-    _check_type(curve, AnimCurve, "curve")
-    _check_type(time, float, "time")
-    _check_type(default, float, "default")
-    return cufbx.ufbx_evaluate_curve(p_void(curve.ptr), time, default)
+def _check_bool(val, name):
+    if not isinstance(val, bool):
+        raise TypeError(f"Expected {name} to be bool, got {type(val).__name__}")
+    return bool(val)
 
 """.strip()
 
@@ -251,21 +267,20 @@ def __exit__(self, *exc):
 def release(self):
     self._ctx.release()
 
-def evaluate(self, anim: Anim, time: float, opts: Optional["EvaluateOpts"]=None) -> "Scene":
-    return evaluate_scene(self, anim, time, opts)
-
-def find_node(self, name: Union[str, bytes]) -> Optional[Node]:
-    return find_node(self, name)
-
 """.strip()
 
 extras["ufbx_mesh"] = """
 
-def triangulate_face(self, face: Face) -> List[Tuple[int, int, int]]:
-    return triangulate_face(self, face)
+def __enter__(self):
+    return self
 
-def subdivide(self, level: int = 1, opts: Optional["SubdivideOpts"] = None) -> "Mesh":
-    return subdivide_mesh(self, level, opts)
+def __exit__(self, *exc):
+    self.release()
+    return False
+
+def release(self):
+    if self._ctx is MeshContext:
+        self._ctx.release()
 
 """.strip()
 
@@ -334,12 +349,18 @@ ignore_decls = {
 }
 
 load_funcs = {
-    "str": "load_string",
-    "bytes": "load_bytes",
+    "str": "_load_string",
+    "bytes": "_load_bytes",
 }
 
 store_funcs = {
-    "str": "store_string",
+    "str": "_store_string",
+}
+
+array_types = {
+    "uint32_t": "UintArray",
+    "double": "DoubleArray",
+    "ufbx_vec3": "Vec3Array",
 }
 
 py_defined = set()
@@ -394,7 +415,7 @@ def emit_load(addr: str, res: ResolvedType, prefix="return ", check_null=False):
             emit(f"{prefix}{res.py_type}(cast({addr}, p_uint32_t)[0]){suffix}")
     elif res.type.kind == "struct":
         if res.type.base_name == "ufbx_element":
-            emit(f"{prefix}load_element(self._ctx, {addr}){suffix}")
+            emit(f"{prefix}_load_element(self._ctx, {addr}){suffix}")
         else:
             emit(f"{prefix}{res.py_type}(self._ctx, {addr}){suffix}")
     else:
@@ -508,7 +529,7 @@ def emit_list(file: ir.File, st: ir.Struct):
     emit(f"def __getitem__(self, index: int) -> {fmt_type(res.py_type)}:")
     indent()
     emit("self._check()")
-    emit("check_index(index, self.count)")
+    emit("_check_index(index, self.count)")
     addr = f"self.data + index * {elem_sz}"
     emit_load(addr, res)
     outdent()
@@ -561,7 +582,7 @@ def emit_pod(file: ir.File, st: ir.Struct):
     outdent()
 
     emit()
-    emit(f"def load_{name}(addr):")
+    emit(f"def _load_{name}(addr):")
     indent()
 
     for uf in used_fields:
@@ -578,7 +599,7 @@ def emit_pod(file: ir.File, st: ir.Struct):
     outdent()
 
     emit()
-    emit(f"def store_{name}(retain, addr, val):")
+    emit(f"def _store_{name}(retain, addr, val):")
     indent()
 
     for uf in used_fields:
@@ -591,8 +612,15 @@ def emit_pod(file: ir.File, st: ir.Struct):
 
     outdent()
 
-    load_funcs[name] = f"load_{name}"
-    store_funcs[name] = f"store_{name}"
+    typ = file.types[st.name]
+    size = typ.size["x64"]
+    emit()
+    emit(f"{name}._size = {size}")
+    emit(f"{name}._load = _load_{name}")
+    emit(f"{name}._store = _store_{name}")
+
+    load_funcs[name] = f"_load_{name}"
+    store_funcs[name] = f"_store_{name}"
     py_defined.add(name)
 
 def emit_input_field(file: ir.File, field: ir.Field, used_fields: List[UsedField], base: int = 0):
@@ -760,6 +788,202 @@ def emit_ffi_prototype(file: ir.File, func: ir.Function):
     emit(f"cufbx.{func.name}.argtypes = [{args_str}]")
     emit(f"cufbx.{func.name}.restype = {ret}")
 
+class FuncArg(NamedTuple):
+    name: str
+    py_name: str
+    kind: str
+    py_type: str
+    py_hint: str
+    py_default: Optional[str]
+
+def safe_name(name: str):
+    if name == "def":
+        return "default"
+    else:
+        return name
+
+non_ffi_functions = {
+    "ufbx_find_int_len",
+}
+
+def get_function_args(file: ir.File, func: ir.Function):
+    args = []
+    ret_py = "None"
+
+    typ = file.types[func.return_type]
+    ret_res = resolve_py_type(file, typ)
+    if ret_res:
+        ret_py = ret_res.py_type
+    has_retval = False
+
+    for arg in func.arguments:
+        py_name = safe_name(arg.name)
+        if arg.is_return:
+            inner = file.types[file.types[arg.type].inner]
+            ret_res = resolve_py_type(file, inner)
+            if ret_res:
+                ret_py = ret_res.py_type
+            has_retval = True
+        else:
+            atyp = file.types[arg.type]
+            if arg.by_ref:
+                atyp = file.types[atyp.inner]
+            ares = resolve_py_type(file, atyp)
+            if arg.kind == "stringPointer":
+                args.append(FuncArg(arg.name, py_name, "string", "str", "Union[str, bytes]", None))
+            elif arg.kind == "stringLength":
+                pass
+            elif arg.kind == "arrayPointer":
+                pass
+            elif arg.kind == "arrayLength":
+                pass
+            elif arg.kind == "blobPointer":
+                args.append(FuncArg(arg.name, py_name, "blob", "bytes", "bytes", None))
+                pass
+            elif arg.kind == "blobSize":
+                pass
+            elif arg.kind == "error":
+                pass
+            elif arg.kind == "stream":
+                args.append(FuncArg(arg.name, py_name, "stream", "BinaryIO", "BinaryIO", None))
+            elif arg.kind == "pod":
+                args.append(FuncArg(arg.name, py_name, "pod", ares.py_type, ares.py_type, None))
+            elif arg.kind == "input":
+                args.append(FuncArg(arg.name, py_name, "input", ares.py_type, f"Optional[{ares.py_type}]", "None"))
+            elif arg.kind == "prim":
+                args.append(FuncArg(arg.name, py_name, "prim", ares.py_type, ares.py_type, None))
+            elif arg.kind == "ref":
+                args.append(FuncArg(arg.name, py_name, "ref", ares.py_type, ares.py_type, None))
+            elif arg.kind == "enum":
+                args.append(FuncArg(arg.name, py_name, "enum", ares.py_type, ares.py_type, None))
+            else:
+                raise RuntimeError(f"Unhandled arg kind {arg.kind}")
+
+    return args, ret_py, has_retval
+
+def emit_function(file: ir.File, func: ir.Function):
+    name = func.pretty_name
+    if func.is_inline: return
+    if func.is_ffi: return
+    if any(not a.kind for a in func.arguments): return
+    if func.ffi_name and func.name not in non_ffi_functions:
+        func = file.functions[func.ffi_name]
+    if not func.return_kind: return
+
+    args, ret_py, has_retval = get_function_args(file, func)
+
+    emit()
+
+    def fmt_arg(arg: FuncArg):
+        if arg.py_default:
+            return f"{arg.py_name}: {arg.py_hint} = {arg.py_default}"
+        else:
+            return f"{arg.py_name}: {arg.py_hint}"
+
+    arg_str = ", ".join(fmt_arg(a) for a in args)
+
+    ret_py_hint = ret_py
+    arr_py_type = None
+
+    if func.return_array_scale:
+        ptr_arg = func.arguments[func.array_arguments[0].pointer_index]
+        arr_type = file.types[file.types[ptr_arg.type].inner]
+        if arr_type.kind == "typedef":
+            arr_type = file.types[arr_type.inner]
+        arr_py_type = array_types[arr_type.key]
+        ret_py_hint = arr_py_type
+    elif func.return_kind == "ref":
+        ret_py_hint = f"Optional[{ret_py}]"
+
+    emit(f"def {name}({arg_str}) -> {ret_py_hint}:")
+    indent()
+    emit("retain = []")
+    for arg in args:
+        if arg.kind == "string":
+            emit(f"c_{arg.name}, c_{arg.name}_len = _check_string(retain, {arg.py_name}, \"{arg.py_name}\")")
+        elif arg.kind == "pod":
+            emit(f"c_{arg.name} = _check_pod(retain, {arg.py_name}, {arg.py_type}, \"{arg.py_name}\")")
+        elif arg.kind == "input":
+            emit(f"c_{arg.name} = _check_input(retain, {arg.py_name}, {arg.py_type}, \"{arg.py_name}\")")
+        elif arg.kind == "ref":
+            emit(f"c_{arg.name} = _check_ref({arg.py_name}, {arg.py_type}, \"{arg.py_name}\")")
+        elif arg.kind == "enum":
+            emit(f"c_{arg.name} = _check_enum({arg.py_name}, {arg.py_type}, \"{arg.py_name}\")")
+        elif arg.kind == "prim":
+            emit(f"c_{arg.name} = _check_{arg.py_type}({arg.py_name}, \"{arg.py_name}\")")
+    if has_retval:
+        if func.return_kind == "pod":
+            emit(f"c_retval = _make_pod(retain, {ret_py})")
+    if func.has_error:
+        emit(f"c_error = _make_pod(retain, _Error)")
+
+    for aa in func.array_arguments:
+        arg_ptr = func.arguments[aa.pointer_index]
+        arg_num = func.arguments[aa.num_index]
+        
+        len_getter_name = func.name.replace("_ffi_", "_").replace("ufbx_", "ufbx_get_") + "_" + arg_num.name
+        len_getter = file.functions.get(len_getter_name)
+        if len_getter:
+            if func.is_ffi and len_getter.ffi_name:
+                len_getter = file.functions[len_getter.ffi_name]
+            len_c_args = ", ".join(f"c_{a.name}" for a in len_getter.arguments)
+            emit(f"c_{arg_num.name} = cufbx.{len_getter.name}({len_c_args})")
+            emit(f"c_{arg_ptr.name}, ret_arr = _make_{arr_py_type}(retain, c_{arg_num.name})")
+
+    for ba in func.blob_arguments:
+        arg_ptr = func.arguments[ba.pointer_index]
+        arg_size = func.arguments[ba.size_index]
+        emit(f"c_{arg_size.name} = len({ba.name})")
+        emit(f"c_{arg_ptr.name} = ct.create_string_buffer({ba.name})")
+
+    c_args = ", ".join(f"c_{a.name}" for a in func.arguments)
+    if has_retval:
+        emit(f"cufbx.{func.name}({c_args})")
+    else:
+        emit(f"ret = cufbx.{func.name}({c_args})")
+
+    if func.return_array_scale:
+        if func.return_array_scale != 1:
+            emit(f"return ret_arr[:ret * {func.return_array_scale}]")
+        else:
+            emit(f"return ret_arr[:ret]")
+    elif func.return_kind == "prim":
+        assert not has_retval
+        emit(f"return ret")
+    elif func.return_kind == "pod":
+        assert has_retval
+        emit(f"return _load_{ret_py}(c_retval)")
+    elif func.return_kind == "ref":
+        emit("if not ret:")
+        indent()
+        if func.has_error:
+            emit("_raise_error_ptr(c_error)")
+        else:
+            emit("return None")
+        outdent()
+        ctx_name = "None"
+        for arg in args:
+            if arg.kind == "ref":
+                ctx_name = f"{arg.py_name}._ctx"
+                break
+        if func.alloc_type:
+            if func.alloc_type == "scene":
+                emit(f"ctx = _SceneContext({ctx_name}, cufbx, ret)")
+            elif func.alloc_type == "mesh":
+                emit(f"ctx = _MeshContext({ctx_name}, cufbx, ret)")
+            else:
+                raise RuntimeError(f"Unhandled alloc_type {func.alloc_type}")
+            ctx_name = "ctx"
+        assert not has_retval
+        emit(f"return {ret_py}({ctx_name}, ret)")
+    elif func.return_kind == "enum":
+        assert not has_retval
+        emit(f"return {ret_py}(ret)")
+    else:
+        raise RuntimeError(f"Unhandled return_kind {func.return_kind}")
+
+    outdent()
+
 def emit_file(file: ir.File):
     emit(prologue)
     emit()
@@ -819,7 +1043,7 @@ def emit_file(file: ir.File):
     type_offset = type_field.offset["x64"]
 
     emit()
-    emit("def load_element(ctx, ptr):")
+    emit("def _load_element(ctx, ptr):")
     indent()
     emit(f"etype = cast(ptr + {type_offset}, p_uint32_t)[0]")
     emit(f"return element_types[etype](ctx, ptr)")
@@ -836,6 +1060,13 @@ def emit_file(file: ir.File):
     emit()
     emit(epilogue)
     emit()
+
+    emit()
+    for decl in file.declarations:
+        if decl.kind != "function": continue
+        func = file.functions[decl.name]
+        emit_function(file, func)
+
 
 if __name__ == "__main__":
     src_path = os.path.dirname(os.path.realpath(__file__))

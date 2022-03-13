@@ -22,10 +22,10 @@ def make_field(name, base):
         base = args[args.index(type(None)) ^ 1]
         optional = True
         origin, args = get_origin(base), get_args(base)
-    if origin == List:
+    if origin in (List, list):
         base = args[0]
         list_ = True
-    if origin == Dict and len(args) == 2 and args[0] == str:
+    if origin in (Dict, dict) and len(args) == 2 and args[0] == str:
         base = args[1]
         dict_ = True
     return BaseField(name, json_name, base, optional, list_, dict_)
@@ -125,6 +125,8 @@ class Type(Base):
     kind: str
     is_nullable: bool
     is_const: bool
+    is_pod: bool
+    is_function: bool
     array_length: Optional[int]
     func_args: List["Argument"]
     inner: Optional[str]
@@ -143,13 +145,15 @@ class Struct(Base):
     short_name: str
     fields: List[Field]
     comment: Optional[str]
+    vertex_attrib_type: Optional[str]
     is_union: bool
     is_anonymous: bool
     is_list: bool
     is_element: bool
-    is_vertex_attrib: bool
     is_pod: bool
     is_input: bool
+    is_callback: bool
+    is_interface: bool
 
 class EnumValue(Base):
     name: str    
@@ -158,6 +162,7 @@ class EnumValue(Base):
     value: int
     comment: Optional[str]
     flag: bool
+    auxiliary: bool
 
 class Enum(Base):
     name: str    
@@ -168,13 +173,44 @@ class Enum(Base):
 class Argument(Base):
     name: str
     type: str
+    kind: str
+    is_return: bool
+    by_ref: bool
+    return_ref: bool
+
+class StringArgument(Base):
+    name: str
+    pointer_index: int
+    length_index: int
+
+class ArrayArgument(Base):
+    name: str
+    pointer_index: int
+    num_index: int
+
+class BlobArgument(Base):
+    name: str
+    pointer_index: int
+    size_index: int
 
 class Function(Base):
     name: str
     short_name: str
+    pretty_name: str
     return_type: str
+    return_kind: str
+    kind: str
     arguments: List[Argument]
+    string_arguments: List[StringArgument]
+    array_arguments: List[ArrayArgument]
+    blob_arguments: List[BlobArgument]
     is_inline: bool
+    member_name: Optional[str]
+    ffi_name: Optional[str]
+    is_ffi: bool
+    has_error: bool
+    alloc_type: str
+    return_array_scale: int
 
 class Global(Base):
     name: str
@@ -336,6 +372,7 @@ def shorten_global(name: str):
 class EnumCtx:
     def __init__(self):
         self.next_value = 0
+        self.hit_aux = False
 
 def parse_enum(file: File, en: Enum, decl, ctx):
     kind, name = decl["kind"], decl.get("name")
@@ -343,9 +380,12 @@ def parse_enum(file: File, en: Enum, decl, ctx):
         for inner in decl["decls"]:
             parse_enum(file, en, inner, ctx)
     elif kind == "decl":
+        if name == en.name.upper() + "_COUNT":
+            ctx.hit_aux = True
         ev = EnumValue(name=name, flag=en.flag)
         ev.short_name_raw = shorten_name(name, en.name)
         ev.short_name = ev.short_name_raw
+        ev.auxiliary = ctx.hit_aux
         if ev.short_name[0].isdigit():
             ev.short_name = "E" + ev.short_name
         val = decl.get("value")
@@ -360,7 +400,7 @@ def parse_enum(file: File, en: Enum, decl, ctx):
 def parse_argument(file: File, arg):
     name = arg["name"]
     typ = parse_type(file, arg["type"])
-    return Argument(name=name, type=typ)
+    return Argument(name=name, type=typ, kind="")
 
 def parse_func(file: File, decl):
     name = decl["name"]
@@ -369,6 +409,9 @@ def parse_func(file: File, decl):
 
     fn = Function(name=name)
     fn.short_name = shorten_global(name)
+    fn.pretty_name = fn.short_name
+    if fn.pretty_name.endswith("_len"):
+        fn.pretty_name = fn.pretty_name[:-4]
     fn.return_type = parse_type(file, decl["type"], in_func=True)
     fn.is_inline = any(m for m in mods if m["type"] == "inline")
     fn.arguments = [parse_argument(file, arg) for arg in func_mod["args"]]
@@ -396,6 +439,7 @@ def parse_typedef(file: File, decl):
 
     t = Type(name=name, base_name=name)
     t.kind = "typedef"
+    t.key = name
     t.inner = td.type
     file.types[name] = t
 
@@ -574,16 +618,49 @@ def layout_file(arch: Arch, file: File):
         layout_type(arch, file, typ)
 
 def to_pascal(name_snake):
-    parts = name_snake.split("_")
+    parts = name_snake.lower().split("_")
     for n in range(0, len(parts)):
         parts[n] = parts[n].title()
     return "".join(parts)
 
 def to_camel(name_snake):
-    parts = name_snake.split("_")
+    parts = name_snake.lower().split("_")
     for n in range(1, len(parts)):
         parts[n] = parts[n].title()
     return "".join(parts)
+
+prim_types = {
+    "bool",
+    "int8_t",
+    "uint8_t",
+    "int16_t",
+    "uint16_t",
+    "int32_t",
+    "uint32_t",
+    "int64_t",
+    "uint64_t",
+    "size_t",
+    "float",
+    "double",
+}
+
+pod_types = {
+    *prim_types,
+}
+
+ref_types = {
+    "ufbx_scene",
+    "ufbx_element",
+    "ufbx_anim",
+    "ufbx_props",
+    "ufbx_vertex_real",
+    "ufbx_vertex_vec2",
+    "ufbx_vertex_vec3",
+    "ufbx_vertex_vec4",
+    "ufbx_geometry_cache",
+    "ufbx_cache_channel",
+    "ufbx_cache_frame",
+}
 
 pod_structs = [
     "ufbx_vec2",
@@ -599,10 +676,13 @@ pod_structs = [
     "ufbx_skin_weight",
     "ufbx_tangent",
     "ufbx_keyframe",
+    "ufbx_curve_point",
+    "ufbx_surface_point",
+    "ufbx_topo_edge",
 ]
 
 input_structs = [
-    "ufbx_allocator",
+    "ufbx_allocator_opts",
     "ufbx_load_opts",
     "ufbx_evaluate_opts",
     "ufbx_tessellate_opts",
@@ -611,13 +691,25 @@ input_structs = [
     "ufbx_geometry_cache_data_opts",
 ]
 
+interface_structs = [
+    "ufbx_allocator",
+    "ufbx_stream",
+]
+
 union_prefer = {
     "ufbx_vec2.0": 0,
     "ufbx_vec3.0": 0,
     "ufbx_vec4.0": 0,
     "ufbx_quat.0": 0,
     "ufbx_matrix.0": 0,
+    "ufbx_scene.0": 0,
 }
+
+def find_index(list, predicate):
+    for i,v in enumerate(list):
+        if predicate(v):
+            return i
+    return -1
 
 if __name__ == "__main__":
     src_path = os.path.dirname(os.path.realpath(__file__))
@@ -627,22 +719,31 @@ if __name__ == "__main__":
     file = parse_file(js)
 
     for name in file.enums["ufbx_element_type"].values:
-        if name in ("UFBX_NUM_ELEMENT_TYPES", "UFBX_ELEMENT_TYPE_FIRST_ATTRIB", "UFBX_ELEMENT_TYPE_LAST_ATTRIB"):
-            continue
+        ev = file.enum_values[name]
+        if ev.auxiliary: continue
         name = name.lower().replace("ufbx_element_", "ufbx_")
         st = file.structs[name]
         st.is_element = True
         file.element_types.append(name)
+        ref_types.add(name)
 
-    file.structs["ufbx_vertex_vec2"].is_vertex_attrib = True
-    file.structs["ufbx_vertex_vec3"].is_vertex_attrib = True
-    file.structs["ufbx_vertex_vec4"].is_vertex_attrib = True
+    file.structs["ufbx_vertex_real"].vertex_attrib_type = "ufbx_real"
+    file.structs["ufbx_vertex_vec2"].vertex_attrib_type = "ufbx_vec2"
+    file.structs["ufbx_vertex_vec3"].vertex_attrib_type = "ufbx_vec3"
+    file.structs["ufbx_vertex_vec4"].vertex_attrib_type = "ufbx_vec4"
 
     for pod in pod_structs:
         file.structs[pod].is_pod = True
 
     for inp in input_structs:
         file.structs[inp].is_input = True
+
+    for inp in interface_structs:
+        file.structs[inp].is_interface = True
+
+    for st in file.structs.values():
+        if st.name.endswith("_cb"):
+            st.is_callback = True
 
     for name, index in union_prefer.items():
         st = file.structs[name]
@@ -652,6 +753,152 @@ if __name__ == "__main__":
         if not st.is_union: continue
         if any(f.union_preferred for f in st.fields): continue
         st.fields[-1].union_preferred = True
+
+    for typ in file.types.values():
+        if typ.kind == "struct":
+            st = file.structs[typ.base_name]
+            if st.is_pod:
+                typ.is_pod = True
+        elif typ.kind == "":
+            if typ.base_name in pod_types:
+                typ.is_pod = True
+
+    for typ in file.types.values():
+        if typ.kind == "function":
+            typ.is_function = True
+
+    for typ in file.types.values():
+        if typ.kind == "typedef":
+            inner = file.types[typ.inner]
+            if inner.is_pod:
+                typ.is_pod = True
+            if inner.is_function:
+                typ.is_function = True
+
+    for typ in file.types.values():
+        if typ.kind == "pointer":
+            inner = file.types[typ.inner]
+            if inner.is_function:
+                typ.is_function = True
+
+    for func in file.functions.values():
+        for index, arg in enumerate(func.arguments):
+            if arg.kind: continue
+            if arg.type == "char const*":
+                len_name = arg.name + "_len"
+                len_index = find_index(func.arguments, lambda a: a.name == len_name)
+                if len_index >= 0:
+                    arg.kind = "stringPointer"
+                    func.arguments[len_index].kind = "stringLength"
+                    sa = StringArgument(name=arg.name, pointer_index=index, len_index=len_index)
+                    func.string_arguments.append(sa)
+                    continue
+
+            typ = file.types[arg.type]
+            if arg.name == "retval":
+                arg.is_return = True
+                assert typ.kind == "pointer"
+                inner = file.types[typ.inner]
+                if inner.is_pod:
+                    arg.kind = "pod"
+                    func.return_kind = "pod"
+            elif typ.kind == "pointer":
+                inner = file.types[typ.inner]
+
+                num_name = "num_" + arg.name
+                num_index = find_index(func.arguments, lambda a: a.name == num_name)
+
+                size_name = arg.name + "_size"
+                size_index = find_index(func.arguments, lambda a: a.name == size_name)
+
+                if num_index < 0 and inner.key == "char":
+                    num_index = size_index
+
+                if num_index >= 0:
+                    arg.kind = "arrayPointer"
+                    func.arguments[num_index].kind = "arrayLength"
+                    aa = ArrayArgument(name=arg.name, pointer_index=index, num_index=num_index)
+                    func.array_arguments.append(aa)
+                elif size_index >= 0 and inner.key == "void":
+                    arg.kind = "blobPointer"
+                    func.arguments[size_index].kind = "blobSize"
+                    ba = BlobArgument(name=arg.name, pointer_index=index, size_index=size_index)
+                    func.blob_arguments.append(ba)
+                elif typ.is_const and inner.is_pod:
+                    arg.by_ref = True
+                    arg.kind = "pod"
+                elif typ.is_const and inner.key in input_structs:
+                    arg.by_ref = True
+                    arg.kind = "input"
+                elif not typ.is_const and inner.key == "ufbx_error":
+                    arg.by_ref = True
+                    arg.kind = "error"
+                    func.has_error = True
+                elif typ.is_const and inner.key == "ufbx_stream":
+                    arg.by_ref = True
+                    arg.kind = "stream"
+                elif typ.is_const and inner.key in ref_types:
+                    arg.kind = "ref"
+            elif typ.is_pod:
+                if arg.type in prim_types:
+                    arg.kind = "prim"
+                else:
+                    arg.kind = "pod"
+            elif typ.kind == "enum":
+                arg.kind = "enum"
+        
+        rtyp = file.types[func.return_type]
+        if rtyp.kind == "enum":
+            func.return_kind = "enum"
+        elif func.return_type in prim_types:
+            func.return_kind = "prim"
+        elif rtyp.kind == "pointer":
+            inner = file.types[rtyp.inner]
+            if inner.key in ref_types:
+                func.return_kind = "ref"
+
+    for func in file.functions.values():
+        for index, arg in enumerate(func.arguments):
+            if arg.name == "retval": continue
+            typ = file.types[arg.type]
+            if typ.base_name in file.element_types:
+                arg.return_ref = True
+            if typ.base_name in { "ufbx_scene", "ufbx_anim", "ufbx_element", "ufbx_geometry_cache" }:
+                arg.return_ref = True
+
+    for func in file.functions.values():
+        if func.name.startswith("ufbx_ffi_"):
+            func.is_ffi = True
+            non_ffi = func.name.replace("ufbx_ffi_", "ufbx_", 1)
+            file.functions[non_ffi].ffi_name = func.name
+
+    file.functions["ufbx_load_file"].alloc_type = "scene"
+    file.functions["ufbx_load_file_len"].alloc_type = "scene"
+    file.functions["ufbx_load_memory"].alloc_type = "scene"
+    file.functions["ufbx_load_stream"].alloc_type = "scene"
+    file.functions["ufbx_load_stream_prefix"].alloc_type = "scene"
+    file.functions["ufbx_load_stdio"].alloc_type = "scene"
+    file.functions["ufbx_load_stdio_prefix"].alloc_type = "scene"
+    file.functions["ufbx_evaluate_scene"].alloc_type = "scene"
+    file.functions["ufbx_subdivide_mesh"].alloc_type = "mesh"
+    file.functions["ufbx_tessellate_nurbs_surface"].alloc_type = "mesh"
+    file.functions["ufbx_load_geometry_cache"].alloc_type = "geometryCache"
+    file.functions["ufbx_load_geometry_cache_len"].alloc_type = "geometryCache"
+
+    file.functions["ufbx_free_scene"].kind = "free"
+    file.functions["ufbx_free_mesh"].kind = "free"
+    file.functions["ufbx_free_geometry_cache"].kind = "free"
+
+    file.functions["ufbx_retain_scene"].kind = "retain"
+    file.functions["ufbx_retain_mesh"].kind = "retain"
+    file.functions["ufbx_retain_geometry_cache"].kind = "retain"
+
+    file.functions["ufbx_triangulate_face"].return_array_scale = 3
+    file.functions["ufbx_ffi_triangulate_face"].return_array_scale = 3
+    file.functions["ufbx_read_geometry_cache_real"].return_array_scale = 1
+    file.functions["ufbx_sample_geometry_cache_real"].return_array_scale = 1
+    file.functions["ufbx_read_geometry_cache_vec3"].return_array_scale = 1
+    file.functions["ufbx_sample_geometry_cache_vec3"].return_array_scale = 1
 
     for arch in archs:
         layout_file(arch, file)

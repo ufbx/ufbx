@@ -17,7 +17,7 @@ TNumber = lexer.rule("number", r"(0[Xx][0-9A-Fa-f]+)|([0-9]+)", prefix=string.di
 TComment = lexer.rule("comment", r"//[^\r\n]*", prefix="/")
 TPreproc = lexer.rule("preproc", r"#[^\n\\]*(\\\r?\n[^\n\\]*?)*\n", prefix="#")
 TString = lexer.rule("string", r"\"[^\"]*\"", prefix="\"")
-lexer.literals(*"const typedef struct union enum extern ufbx_abi ufbx_inline ufbx_nullable UFBX_LIST_TYPE UFBX_VERTEX_ACCESSOR".split())
+lexer.literals(*"const typedef struct union enum extern ufbx_abi ufbx_inline ufbx_nullable UFBX_LIST_TYPE".split())
 lexer.literals(*",.*[]{}()<>=-;")
 
 Token = parsette.Token
@@ -132,6 +132,14 @@ class Parser(parsette.Parser):
             line += 1
         return comment_type(comments)
 
+    def accept_impl(self) -> bool:
+        if self.token.rule != TIdent: return False
+        text = self.token.text()
+        if not text.startswith("UFBX_"): return False
+        if not text.endswith("_IMPL"): return False
+        self.scan()
+        return True
+
     def finish_struct(self, kind) -> ATypeStruct:
         kn = kind.text()
         name = self.accept(TIdent)
@@ -142,8 +150,9 @@ class Parser(parsette.Parser):
                 while not self.accept("}"):
                     if self.accept(TComment):
                         fields.append(self.finish_comment(AStructComment, self.prev_token))
-                    elif self.accept("UFBX_VERTEX_ACCESSOR"):
-                        self.finish_vertex_accessor()
+                    elif self.accept_impl():
+                        self.require("(", "for macro parameters")
+                        self.finish_macro_params()
                     else:
                         decl = self.parse_decl(f"{kn} field")
                         field = AStructField(decl)
@@ -247,10 +256,13 @@ class Parser(parsette.Parser):
         self.require(")", "for macro parameters")
         return ATopList(name, decl)
 
-    def finish_vertex_accessor(self):
-        self.require("(", "for macro parameters")
-        self.require(TIdent, "for vertex type name")
-        self.require(")", "for macro parameters")
+    def finish_macro_params(self):
+        while not self.accept(")"):
+            if self.accept(TEnd): self.fail("Unclosed macro parameters")
+            if self.accept("("):
+                self.finish_macro_params()
+            else:
+                self.scan()
 
     def parse_top(self) -> List[ATop]:
         if self.accept(TPreproc):
