@@ -196,6 +196,8 @@ UFBXT_TEST(blender_axes)
 
 						ufbxt_assert(scene->settings.axes.front == axis_front);
 						ufbxt_assert(scene->settings.axes.up == axis_up);
+
+						ufbx_free_scene(scene);
 					}
 
 					// Axis conversion
@@ -242,6 +244,8 @@ UFBXT_TEST(blender_axes)
 
 							ufbxt_assert_close_vec3(&err, pos, ref);
 						}
+
+						ufbx_free_scene(scene);
 					}
 				}
 			}
