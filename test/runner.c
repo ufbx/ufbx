@@ -2225,6 +2225,47 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 const uint32_t ufbxt_file_versions[] = { 3000, 5000, 5800, 6100, 7100, 7400, 7500, 7700 };
 
+typedef struct ufbxt_file_iterator {
+	// Input
+	const char *path;
+	const char *root;
+	bool allow_not_found;
+
+	// State (clear to zero)
+	uint32_t version_ix;
+	uint32_t format_ix;
+	uint32_t num_found;
+} ufbxt_file_iterator;
+
+bool ufbxt_next_file(ufbxt_file_iterator *iter, char *buffer, size_t buffer_size)
+{
+	for (;;) {
+		if (iter->version_ix >= ufbxt_arraycount(ufbxt_file_versions)) {
+			ufbxt_assert(iter->num_found > 0 || iter->allow_not_found);
+			return false;
+		}
+
+		uint32_t version = ufbxt_file_versions[iter->version_ix];
+		const char *format = iter->format_ix == 1 ? "ascii" : "binary";
+		snprintf(buffer, buffer_size, "%s%s_%u_%s.fbx", iter->root ? iter->root : data_root, iter->path, version, format);
+
+		iter->format_ix++;
+		if (iter->format_ix >= 2) {
+			iter->format_ix = 0;
+			iter->version_ix++;
+		}
+
+		ufbx_stream stream = { 0 };
+		if (ufbx_open_file(NULL, &stream, buffer, SIZE_MAX)) {
+			if (stream.close_fn) {
+				stream.close_fn(stream.user);
+			}
+			iter->num_found++;
+			return true;
+		}
+	}
+}
+
 typedef struct {
 	uint64_t calls;
 } ufbxt_progress_ctx;
