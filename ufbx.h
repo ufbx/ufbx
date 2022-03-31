@@ -1514,8 +1514,8 @@ typedef enum ufbx_cache_data_format {
 	UFBX_CACHE_DATA_FORMAT_REAL_DOUBLE, // < `double data[]`
 	UFBX_CACHE_DATA_FORMAT_VEC3_DOUBLE, // < `struct { double x, y, z; } data[]`
 
-	UFBX_CACHE_DATA_COUNT,
-	UFBX_CACHE_DATA_FORCE_32BIT = 0x7fffffff,
+	UFBX_CACHE_DATA_FORMAT_COUNT,
+	UFBX_CACHE_DATA_FORMAT_FORCE_32BIT = 0x7fffffff,
 } ufbx_cache_data_format;
 
 typedef enum ufbx_cache_data_encoding {
