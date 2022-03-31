@@ -2355,6 +2355,7 @@ typedef struct ufbx_scene_settings {
 
 	// Mapping of X/Y/Z axes to world-space directions.
 	// HINT: Use `ufbx_load_opts.target_axes` to normalize this.
+	// NOTE: This contains the _original_ axes even if you supply `ufbx_load_opts.target_axes`.
 	ufbx_coordinate_axes axes;
 
 	// How many meters does a single world-space unit represent.
@@ -2868,6 +2869,13 @@ extern const ufbx_vec2 ufbx_zero_vec2;
 extern const ufbx_vec3 ufbx_zero_vec3;
 extern const ufbx_vec4 ufbx_zero_vec4;
 extern const ufbx_quat ufbx_identity_quat;
+
+// Commonly used coordinate axes
+
+extern const ufbx_coordinate_axes ufbx_axes_right_handed_y_up;
+extern const ufbx_coordinate_axes ufbx_axes_right_handed_z_up;
+extern const ufbx_coordinate_axes ufbx_axes_left_handed_y_up;
+extern const ufbx_coordinate_axes ufbx_axes_left_handed_z_up;
 
 // Sizes of element types. eg `sizeof(ufbx_node)`
 extern const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES];
