@@ -34,7 +34,9 @@
 
 #define ufbx_nullable
 
-#define ufbx_abi
+#ifndef ufbx_abi
+	#define ufbx_abi
+#endif
 
 // -- Configuration
 
