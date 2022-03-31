@@ -2994,6 +2994,11 @@ typedef struct ufbx_geometry_cache_data_opts {
 	uint32_t _end_zero;
 } ufbx_geometry_cache_data_opts;
 
+typedef struct ufbx_panic {
+	bool did_panic;
+	char message[64];
+} ufbx_panic;
+
 // -- API
 
 #ifdef __cplusplus
@@ -3194,9 +3199,13 @@ ufbx_abi ufbx_transform ufbx_matrix_to_transform(const ufbx_matrix *m);
 // Skinning
 
 ufbx_abi ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback);
+ufbx_abi ufbx_matrix ufbx_catch_get_skin_vertex_matrix(ufbx_panic *panic, const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback);
 
 ufbx_abi ufbx_vec3 ufbx_get_blend_shape_vertex_offset(const ufbx_blend_shape *shape, size_t vertex);
+ufbx_abi ufbx_vec3 ufbx_catch_get_blend_shape_vertex_offset(ufbx_panic *panic, const ufbx_blend_shape *shape, size_t vertex);
+
 ufbx_abi ufbx_vec3 ufbx_get_blend_vertex_offset(const ufbx_blend_deformer *blend, size_t vertex);
+ufbx_abi ufbx_vec3 ufbx_catch_get_blend_vertex_offset(ufbx_panic *panic, const ufbx_blend_deformer *blend, size_t vertex);
 
 ufbx_abi void ufbx_add_blend_shape_vertex_offsets(const ufbx_blend_shape *shape, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
 ufbx_abi void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
@@ -3213,22 +3222,34 @@ ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surf
 // Mesh Topology
 
 ufbx_abi uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face);
+ufbx_abi uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face);
 
 // Generate the half-edge representation of `mesh` to `topo[mesh->num_indices]`
 ufbx_abi void ufbx_compute_topology(const ufbx_mesh *mesh, ufbx_topo_edge *topo, size_t num_topo);
+ufbx_abi void ufbx_catch_compute_topology(ufbx_panic *panic, const ufbx_mesh *mesh, ufbx_topo_edge *topo, size_t num_topo);
 
 // Get the next/previous edge around a vertex
 // NOTE: Does not return the half-edge on the opposite side (ie. `topo[index].twin`)
 ufbx_abi int32_t ufbx_topo_next_vertex_edge(const ufbx_topo_edge *topo, size_t num_topo, int32_t index);
 ufbx_abi int32_t ufbx_topo_prev_vertex_edge(const ufbx_topo_edge *topo, size_t num_topo, int32_t index);
 
+ufbx_abi int32_t ufbx_catch_topo_next_vertex_edge(ufbx_panic *panic, const ufbx_topo_edge *topo, size_t num_topo, int32_t index);
+ufbx_abi int32_t ufbx_catch_topo_prev_vertex_edge(ufbx_panic *panic, const ufbx_topo_edge *topo, size_t num_topo, int32_t index);
+
 ufbx_abi ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_face face);
+ufbx_abi ufbx_vec3 ufbx_catch_get_weighted_face_normal(ufbx_panic *panic, const ufbx_vertex_vec3 *positions, ufbx_face face);
 
 ufbx_abi size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh,
 	const ufbx_topo_edge *topo, size_t num_topo,
 	int32_t *normal_indices, size_t num_normal_indices, bool assume_smooth);
+ufbx_abi size_t ufbx_catch_generate_normal_mapping(ufbx_panic *panic, const ufbx_mesh *mesh,
+	const ufbx_topo_edge *topo, size_t num_topo,
+	int32_t *normal_indices, size_t num_normal_indices, bool assume_smooth);
 
 ufbx_abi void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions,
+	const int32_t *normal_indices, size_t num_normal_indices,
+	ufbx_vec3 *normals, size_t num_normals);
+ufbx_abi void ufbx_catch_compute_normals(ufbx_panic *panic, const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions,
 	const int32_t *normal_indices, size_t num_normal_indices,
 	ufbx_vec3 *normals, size_t num_normals);
 
