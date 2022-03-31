@@ -448,24 +448,14 @@ UFBXT_FILE_TEST(synthetic_broken_cluster)
 UFBXT_TEST(synthetic_broken_cluster_connect)
 #if UFBXT_IMPL
 {
-	const char *name = "synthetic_broken_cluster";
-	bool any_found = false;
+	char path[512];
 
-	char buf[512];
-	for (uint32_t vi = 0; vi < ufbxt_arraycount(ufbxt_file_versions); vi++) {
-		for (uint32_t fi = 0; fi < 2; fi++) {
-			uint32_t version = ufbxt_file_versions[vi];
-			const char *format = fi == 1 ? "ascii" : "binary";
-			snprintf(buf, sizeof(buf), "%s%s_%u_%s.fbx", data_root, name, version, format);
-		}
-
-		ufbx_error error;
+	ufbxt_file_iterator iter = { "synthetic_broken_cluster" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
 		ufbx_load_opts opts = { 0 };
 		opts.connect_broken_elements = true;
-		ufbx_scene *scene = ufbx_load_file(buf, &opts, &error);
-		if (error.type == UFBX_ERROR_FILE_NOT_FOUND) continue;
+		ufbx_scene *scene = ufbx_load_file(path, &opts, NULL);
 		ufbxt_assert(scene);
-		any_found = true;
 
 		ufbx_node *cube = ufbx_find_node(scene, "pCube1");
 		ufbxt_assert(cube && cube->mesh);
@@ -484,8 +474,6 @@ UFBXT_TEST(synthetic_broken_cluster_connect)
 
 		ufbx_free_scene(scene);
 	}
-
-	ufbxt_assert(any_found);
 }
 #endif
 
