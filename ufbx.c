@@ -13479,7 +13479,7 @@ static ufbxi_noinline int ufbxi_scale_units(ufbxi_context *uc, ufbx_real target_
 				new_prop.flags = UFBX_PROP_FLAG_SYNTHETIC;
 				new_prop.value_str = ufbx_empty_string;
 				new_prop.value_vec3 = scale;
-				prop->value_int = (int64_t)prop->value_vec3.x;
+				new_prop.value_int = (int64_t)new_prop.value_vec3.x;
 
 				size_t new_num_props = node->props.num_props + 1;
 				ufbx_prop *props_copy = ufbxi_push(&uc->result, ufbx_prop, new_num_props);
