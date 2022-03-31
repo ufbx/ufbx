@@ -317,3 +317,18 @@ UFBXT_TEST(open_file)
 
 }
 #endif
+
+UFBXT_TEST(file_not_found)
+#if UFBXT_IMPL
+{
+	const char *name = "maya_cube_9999_emoji.fbx";
+
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s", data_root, name);
+
+	ufbx_error error;
+	ufbx_scene *scene = ufbx_load_file(buf, NULL, &error);
+	ufbxt_assert(!scene);
+	ufbxt_assert(error.type == UFBX_ERROR_FILE_NOT_FOUND);
+}
+#endif
