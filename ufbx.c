@@ -8903,8 +8903,10 @@ ufbxi_nodiscard static int ufbxi_read_root(ufbxi_context *uc)
 
 		if (uc->opts.use_root_transform) {
 			root->local_transform = uc->opts.root_transform;
+			root->node_to_parent = ufbx_transform_to_matrix(&uc->opts.root_transform);
 		} else {
 			root->local_transform = ufbx_identity_transform;
+			root->node_to_parent = ufbx_identity_matrix;
 		}
 		root->is_root = true;
 	}
@@ -11834,10 +11836,9 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 	node->inherit_type = (ufbx_inherit_type)ufbxi_find_enum(&node->props, ufbxi_InheritType, UFBX_INHERIT_NORMAL, UFBX_INHERIT_NO_SCALE);
 	if (!node->is_root) {
 		node->local_transform = ufbxi_get_transform(&node->props, node->rotation_order);
+		node->geometry_transform = ufbxi_get_geometry_transform(&node->props);
+		node->node_to_parent = ufbx_transform_to_matrix(&node->local_transform); 
 	}
-	node->geometry_transform = ufbxi_get_geometry_transform(&node->props);
-
-	node->node_to_parent = ufbx_transform_to_matrix(&node->local_transform); 
 
 	ufbx_node *parent = node->parent;
 	if (parent) {
@@ -11858,7 +11859,7 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 		}
 	} else {
 		node->world_transform = node->local_transform;
-		node->node_to_world = ufbx_transform_to_matrix(&node->world_transform);
+		node->node_to_world = node->node_to_parent;
 	}
 
 	if (!ufbxi_is_transform_identity(node->geometry_transform)) {
@@ -12389,16 +12390,42 @@ static ufbxi_noinline void ufbxi_update_scene_metadata(ufbx_metadata *metadata)
 	metadata->latest_application.version = ufbx_find_string(props, "LastSaved|ApplicationVersion", ufbx_empty_string);
 }
 
+static const ufbx_real ufbxi_pow10_targets[] = {
+	0.0f,
+	(ufbx_real)1e-8, (ufbx_real)1e-7, (ufbx_real)1e-6, (ufbx_real)1e-5,
+	(ufbx_real)1e-4, (ufbx_real)1e-3, (ufbx_real)1e-2, (ufbx_real)1e-1,
+	(ufbx_real)1e+0, (ufbx_real)1e+1, (ufbx_real)1e+2, (ufbx_real)1e+3,
+	(ufbx_real)1e+4, (ufbx_real)1e+5, (ufbx_real)1e+6, (ufbx_real)1e+7,
+	(ufbx_real)1e+8, (ufbx_real)1e+9,
+};
+
+static ufbxi_noinline ufbx_real ufbxi_round_if_near(const ufbx_real *targets, size_t num_targets, ufbx_real value)
+{
+	for (size_t i = 0; i < num_targets; i++) {
+		double target = targets[i];
+		double error = target * 9.5367431640625e-7;
+		if (error < 0.0) error = -error;
+		if (error < 7.52316384526264005e-37) error = 7.52316384526264005e-37;
+		if (value >= target - error && value <= target + error) {
+			return (ufbx_real)target;
+		}
+	}
+	return value;
+}
+
 static ufbxi_noinline void ufbxi_update_scene_settings(ufbx_scene_settings *settings)
 {
-	settings->axis_up = ufbxi_find_axis(&settings->props, ufbxi_UpAxis, ufbxi_UpAxisSign);
-	settings->axis_front = ufbxi_find_axis(&settings->props, ufbxi_FrontAxis, ufbxi_FrontAxisSign);
-	settings->axis_right = ufbxi_find_axis(&settings->props, ufbxi_CoordAxis, ufbxi_CoordAxisSign);
-	settings->original_axis_up = ufbxi_find_axis(&settings->props, ufbxi_OriginalUpAxis, ufbxi_OriginalUpAxisSign);
-	settings->unit_scale_factor = ufbxi_find_real(&settings->props, ufbxi_UnitScaleFactor, 1.0f);
-	settings->original_unit_scale_factor = ufbxi_find_real(&settings->props, ufbxi_OriginalUnitScaleFactor, settings->unit_scale_factor);
+	ufbx_real unit_scale_factor = ufbxi_find_real(&settings->props, ufbxi_UnitScaleFactor, 1.0f);
+	ufbx_real original_unit_scale_factor = ufbxi_find_real(&settings->props, ufbxi_OriginalUnitScaleFactor, unit_scale_factor);
+
+	settings->axes.up = ufbxi_find_axis(&settings->props, ufbxi_UpAxis, ufbxi_UpAxisSign);
+	settings->axes.front = ufbxi_find_axis(&settings->props, ufbxi_FrontAxis, ufbxi_FrontAxisSign);
+	settings->axes.right = ufbxi_find_axis(&settings->props, ufbxi_CoordAxis, ufbxi_CoordAxisSign);
+	settings->unit_meters = ufbxi_round_if_near(ufbxi_pow10_targets, ufbxi_arraycount(ufbxi_pow10_targets), unit_scale_factor * (ufbx_real)0.01);
+	settings->original_unit_meters = ufbxi_round_if_near(ufbxi_pow10_targets, ufbxi_arraycount(ufbxi_pow10_targets), original_unit_scale_factor * (ufbx_real)0.01);
 	settings->frames_per_second = ufbxi_find_real(&settings->props, ufbxi_CustomFrameRate, 24.0f);
 	settings->ambient_color = ufbxi_find_vec3(&settings->props, ufbxi_AmbientColor, 0.0f, 0.0f, 0.0f);
+	settings->original_axis_up = ufbxi_find_axis(&settings->props, ufbxi_OriginalUpAxis, ufbxi_OriginalUpAxisSign);
 
 	ufbx_prop *default_camera = ufbxi_find_prop(&settings->props, ufbxi_DefaultCamera);
 	if (default_camera) {
@@ -13338,6 +13365,155 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_files(ufbxi_contex
 	return 1;
 }
 
+static ufbxi_noinline void ufbxi_transform_to_axes(ufbxi_context *uc, ufbx_coordinate_axes dst_axes)
+{
+	if (!ufbx_coordinate_axes_valid(uc->scene.settings.axes)) return;
+	ufbx_coordinate_axes src_axes = uc->scene.settings.axes;
+
+	uint32_t src_x = (uint32_t)src_axes.right;
+	uint32_t dst_x = (uint32_t)dst_axes.right;
+	uint32_t src_y = (uint32_t)src_axes.up;
+	uint32_t dst_y = (uint32_t)dst_axes.up;
+	uint32_t src_z = (uint32_t)src_axes.front;
+	uint32_t dst_z = (uint32_t)dst_axes.front;
+
+	if (src_x == dst_x && src_y == dst_y && src_z == dst_z) return;
+
+	ufbx_matrix axis_mat = { 0 };
+
+	// Remap axes (axis enum divided by 2) potentially flipping if the signs (enum parity) doesn't match
+	axis_mat.cols[src_x >> 1].v[dst_x >> 1] = ((src_x ^ dst_x) & 1) == 0 ? 1.0f : -1.0f;
+	axis_mat.cols[src_y >> 1].v[dst_y >> 1] = ((src_y ^ dst_y) & 1) == 0 ? 1.0f : -1.0f;
+	axis_mat.cols[src_z >> 1].v[dst_z >> 1] = ((src_z ^ dst_z) & 1) == 0 ? 1.0f : -1.0f;
+
+	if (!ufbxi_is_transform_identity(uc->scene.root_node->local_transform)) {
+		ufbx_matrix root_mat = ufbx_transform_to_matrix(&uc->scene.root_node->local_transform);
+		axis_mat = ufbx_matrix_mul(&root_mat, &axis_mat);
+	}
+
+	uc->scene.root_node->local_transform = ufbx_matrix_to_transform(&axis_mat);
+	uc->scene.root_node->node_to_parent = axis_mat;
+}
+
+static ufbxi_noinline void ufbxi_scale_anim_curve(ufbx_anim_curve *curve, ufbx_real scale)
+{
+	if (!curve) return;
+	ufbxi_for_list(ufbx_keyframe, key, curve->keyframes) {
+		key->value *= scale;
+	}
+}
+
+static ufbxi_noinline void ufbxi_scale_anim_value(ufbx_anim_value *value, ufbx_real scale)
+{
+	if (!value) return;
+	ufbxi_scale_anim_curve(value->curves[0], scale);
+	ufbxi_scale_anim_curve(value->curves[1], scale);
+	ufbxi_scale_anim_curve(value->curves[2], scale);
+}
+
+static ufbxi_noinline int ufbxi_scale_units(ufbxi_context *uc, ufbx_real target_meters)
+{
+	if (uc->scene.settings.unit_meters <= 0.0f) return 1;
+	target_meters = ufbxi_round_if_near(ufbxi_pow10_targets, ufbxi_arraycount(ufbxi_pow10_targets), target_meters);
+
+	ufbx_real ratio = uc->scene.settings.unit_meters / target_meters;
+	ratio = ufbxi_round_if_near(ufbxi_pow10_targets, ufbxi_arraycount(ufbxi_pow10_targets), ratio);
+	if (ratio == 1.0f) return 1;
+
+	uc->scene.root_node->local_transform.scale.x *= ratio;
+	uc->scene.root_node->local_transform.scale.y *= ratio;
+	uc->scene.root_node->local_transform.scale.z *= ratio;
+	uc->scene.root_node->node_to_parent.m00 *= ratio;
+	uc->scene.root_node->node_to_parent.m01 *= ratio;
+	uc->scene.root_node->node_to_parent.m02 *= ratio;
+	uc->scene.root_node->node_to_parent.m10 *= ratio;
+	uc->scene.root_node->node_to_parent.m11 *= ratio;
+	uc->scene.root_node->node_to_parent.m12 *= ratio;
+	uc->scene.root_node->node_to_parent.m20 *= ratio;
+	uc->scene.root_node->node_to_parent.m21 *= ratio;
+	uc->scene.root_node->node_to_parent.m22 *= ratio;
+
+	// HACK: Pre-fetch `ufbx_node.inherit_type` as we need it multiple times below.
+	// This is a bit inconsistent but will get overwritten in `ufbxi_update_node()`.
+	if (!uc->opts.no_prop_unit_scaling || !uc->opts.no_anim_curve_unit_scaling) {
+		ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
+			ufbx_node *node = *p_node;
+			node->inherit_type = (ufbx_inherit_type)ufbxi_find_enum(&node->props, ufbxi_InheritType, UFBX_INHERIT_NORMAL, UFBX_INHERIT_NO_SCALE);
+		}
+	}
+
+	if (!uc->opts.no_prop_unit_scaling) {
+		ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
+			ufbx_node *node = *p_node;
+			if (node->inherit_type != UFBX_INHERIT_NO_SCALE) continue;
+
+			// Find only in own properties
+			ufbx_props own_props = node->props;
+			own_props.defaults = NULL;
+			ufbx_prop *prop = ufbxi_find_prop(&own_props, ufbxi_Lcl_Scaling);
+			if (prop) {
+				prop->value_vec3.x *= ratio;
+				prop->value_vec3.y *= ratio;
+				prop->value_vec3.z *= ratio;
+				prop->value_int = (int64_t)prop->value_vec3.x;
+			} else {
+				// We need to add a new Lcl Scaling property based on the defaults
+				ufbx_props *defaults = node->props.defaults;
+				ufbx_vec3 scale = { 1.0f, 1.0f, 1.0f };
+				if (defaults) {
+					prop = ufbxi_find_prop(defaults, ufbxi_Lcl_Scaling);
+					if (prop) {
+						scale = prop->value_vec3;
+					}
+				}
+
+				scale.x *= ratio;
+				scale.y *= ratio;
+				scale.z *= ratio;
+
+				ufbx_prop new_prop = { 0 };
+				new_prop.name.data = ufbxi_Lcl_Scaling;
+				new_prop.name.length = sizeof(ufbxi_Lcl_Scaling) - 1;
+				new_prop.internal_key = ufbxi_get_name_key(ufbxi_Lcl_Scaling, sizeof(ufbxi_Lcl_Scaling) - 1);
+				new_prop.type = UFBX_PROP_SCALING;
+				new_prop.flags = UFBX_PROP_FLAG_SYNTHETIC;
+				new_prop.value_str = ufbx_empty_string;
+				new_prop.value_vec3 = scale;
+				new_prop.value_int = (int64_t)new_prop.value_vec3.x;
+
+				size_t new_num_props = node->props.num_props + 1;
+				ufbx_prop *props_copy = ufbxi_push(&uc->result, ufbx_prop, new_num_props);
+				ufbxi_check(props_copy);
+
+				memcpy(props_copy, node->props.props, node->props.num_props * sizeof(ufbx_prop));
+				props_copy[node->props.num_props] = new_prop;
+
+				ufbxi_check(ufbxi_sort_properties(uc, props_copy, new_num_props));
+
+				node->props.props = props_copy;
+				node->props.num_props = new_num_props;
+			}
+		}
+	}
+
+	if (!uc->opts.no_anim_curve_unit_scaling) {
+		ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, uc->scene.anim_layers) {
+			ufbx_anim_layer *layer = *p_layer;
+			ufbxi_for_list(ufbx_anim_prop, aprop, layer->anim_props) {
+				if (aprop->prop_name.data == ufbxi_Lcl_Scaling) {
+					ufbx_element *elem = aprop->element;
+					if (elem->type != UFBX_ELEMENT_NODE) continue;
+					ufbx_node *node = (ufbx_node*)elem;
+					if (node->inherit_type != UFBX_INHERIT_NO_SCALE) continue;
+					ufbxi_scale_anim_value(aprop->anim_value, ratio);
+				}
+			}
+		}
+	}
+
+	return 1;
+}
+
 // -- Curve evaluation
 
 static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, double x0)
@@ -13500,8 +13676,19 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_check(ufbxi_init_file_paths(uc));
 	ufbxi_check(ufbxi_finalize_scene(uc));
 
-	ufbxi_update_scene(&uc->scene, true);
 	ufbxi_update_scene_settings(&uc->scene.settings);
+
+	// Axis conversion
+	if (ufbx_coordinate_axes_valid(uc->opts.target_axes)) {
+		ufbxi_transform_to_axes(uc, uc->opts.target_axes);
+	}
+
+	// Unit conversion
+	if (uc->opts.target_unit_meters > 0.0f) {
+		ufbxi_check(ufbxi_scale_units(uc, uc->opts.target_unit_meters));
+	}
+
+	ufbxi_update_scene(&uc->scene, true);
 
 	if (uc->opts.load_external_files) {
 		ufbxi_check(ufbxi_load_external_files(uc));
@@ -16339,6 +16526,20 @@ const ufbx_vec2 ufbx_zero_vec2 = { 0,0 };
 const ufbx_vec3 ufbx_zero_vec3 = { 0,0,0 };
 const ufbx_vec4 ufbx_zero_vec4 = { 0,0,0,0 };
 const ufbx_quat ufbx_identity_quat = { 0,0,0,1 };
+
+const ufbx_coordinate_axes ufbx_axes_right_handed_y_up = {
+	UFBX_COORDINATE_AXIS_POSITIVE_X, UFBX_COORDINATE_AXIS_POSITIVE_Y, UFBX_COORDINATE_AXIS_POSITIVE_Z,
+};
+const ufbx_coordinate_axes ufbx_axes_right_handed_z_up = {
+	UFBX_COORDINATE_AXIS_POSITIVE_X, UFBX_COORDINATE_AXIS_POSITIVE_Z, UFBX_COORDINATE_AXIS_NEGATIVE_Y,
+};
+const ufbx_coordinate_axes ufbx_axes_left_handed_y_up = {
+	UFBX_COORDINATE_AXIS_POSITIVE_X, UFBX_COORDINATE_AXIS_POSITIVE_Y, UFBX_COORDINATE_AXIS_NEGATIVE_Z,
+};
+const ufbx_coordinate_axes ufbx_axes_left_handed_z_up = {
+	UFBX_COORDINATE_AXIS_POSITIVE_X, UFBX_COORDINATE_AXIS_POSITIVE_Z, UFBX_COORDINATE_AXIS_POSITIVE_Y,
+};
+
 const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES] = {
 	sizeof(ufbx_unknown),
 	sizeof(ufbx_node),
@@ -16983,6 +17184,20 @@ ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *nam
 	return name_str;
 }
 
+bool ufbx_coordinate_axes_valid(ufbx_coordinate_axes axes)
+{
+	if (axes.right < UFBX_COORDINATE_AXIS_POSITIVE_X || axes.right > UFBX_COORDINATE_AXIS_NEGATIVE_Z) return false;
+	if (axes.up < UFBX_COORDINATE_AXIS_POSITIVE_X || axes.up > UFBX_COORDINATE_AXIS_NEGATIVE_Z) return false;
+	if (axes.front < UFBX_COORDINATE_AXIS_POSITIVE_X || axes.front > UFBX_COORDINATE_AXIS_NEGATIVE_Z) return false;
+
+	// Check that all the positive/negative axes are used
+	uint32_t mask = 0;
+	mask |= 1u << ((uint32_t)axes.right >> 1);
+	mask |= 1u << ((uint32_t)axes.up >> 1);
+	mask |= 1u << ((uint32_t)axes.front >> 1);
+	return (mask & 0x7u) == 0x7u;
+}
+
 ufbx_quat ufbx_quat_mul(ufbx_quat a, ufbx_quat b)
 {
 	return ufbxi_mul_quat(a, b);
@@ -17254,11 +17469,16 @@ ufbx_matrix ufbx_matrix_mul(const ufbx_matrix *a, const ufbx_matrix *b)
 	return dst;
 }
 
-ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m)
+ufbx_real ufbx_matrix_determinant(const ufbx_matrix *m)
 {
-	ufbx_real det = 
+	return
 		- m->m02*m->m11*m->m20 + m->m01*m->m12*m->m20 + m->m02*m->m10*m->m21
 		- m->m00*m->m12*m->m21 - m->m01*m->m10*m->m22 + m->m00*m->m11*m->m22;
+}
+
+ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m)
+{
+	ufbx_real det = ufbx_matrix_determinant(m);
 
 	ufbx_matrix r;
 	if (det == 0.0) {
@@ -17286,9 +17506,7 @@ ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m)
 
 ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m)
 {
-	ufbx_real det = 
-		- m->m02*m->m11*m->m20 + m->m01*m->m12*m->m20 + m->m02*m->m10*m->m21
-		- m->m00*m->m12*m->m21 - m->m01*m->m10*m->m22 + m->m00*m->m11*m->m22;
+	ufbx_real det = ufbx_matrix_determinant(m);
 
 	ufbx_matrix r;
 	if (det == 0.0) {
@@ -17355,16 +17573,27 @@ ufbx_matrix ufbx_transform_to_matrix(const ufbx_transform *t)
 
 ufbx_transform ufbx_matrix_to_transform(const ufbx_matrix *m)
 {
+	ufbx_real det = ufbx_matrix_determinant(m);
+
 	ufbx_transform t;
 	t.translation = m->cols[3];
 	t.scale.x = ufbxi_length3(m->cols[0]);
 	t.scale.y = ufbxi_length3(m->cols[1]);
 	t.scale.z = ufbxi_length3(m->cols[2]);
 
-	// TODO: Mirroring?
-	ufbx_vec3 x = ufbxi_mul3(m->cols[0], t.scale.x > 0.0f ? 1.0f / t.scale.x : 0.0f);
-	ufbx_vec3 y = ufbxi_mul3(m->cols[1], t.scale.y > 0.0f ? 1.0f / t.scale.y : 0.0f);
-	ufbx_vec3 z = ufbxi_mul3(m->cols[2], t.scale.z > 0.0f ? 1.0f / t.scale.z : 0.0f);
+	// Flip a single non-zero axis if negative determinant
+	ufbx_real sign_x = 1.0f;
+	ufbx_real sign_y = 1.0f;
+	ufbx_real sign_z = 1.0f;
+	if (det < 0.0f) {
+		if (t.scale.x > 0.0f) sign_x = -1.0f;
+		else if (t.scale.y > 0.0f) sign_y = -1.0f;
+		else if (t.scale.z > 0.0f) sign_z = -1.0f;
+	}
+
+	ufbx_vec3 x = ufbxi_mul3(m->cols[0], t.scale.x > 0.0f ? sign_x / t.scale.x : 0.0f);
+	ufbx_vec3 y = ufbxi_mul3(m->cols[1], t.scale.y > 0.0f ? sign_y / t.scale.y : 0.0f);
+	ufbx_vec3 z = ufbxi_mul3(m->cols[2], t.scale.z > 0.0f ? sign_z / t.scale.z : 0.0f);
 	ufbx_real trace = x.x + y.y + z.z;
 	if (trace > 0.0f) {
 		ufbx_real a = (ufbx_real)sqrt(fmax(0.0, trace + 1.0)), b = (a != 0.0f) ? 0.5f / a : 0.0f;
@@ -17405,6 +17634,10 @@ ufbx_transform ufbx_matrix_to_transform(const ufbx_matrix *m)
 			t.rotation.w /= len;
 		}
 	}
+
+	t.scale.x *= sign_x;
+	t.scale.y *= sign_y;
+	t.scale.z *= sign_z;
 
 	return t;
 }

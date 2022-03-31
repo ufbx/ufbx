@@ -2307,6 +2307,14 @@ typedef enum ufbx_coordinate_axis {
 	UFBX_COORDINATE_AXIS_UNKNOWN,
 } ufbx_coordinate_axis;
 
+// Coordinate axes the scene is represented in.
+// NOTE: `front` is the _opposite_ from forward!
+typedef struct ufbx_coordinate_axes {
+	ufbx_coordinate_axis right;
+	ufbx_coordinate_axis up;
+	ufbx_coordinate_axis front;
+} ufbx_coordinate_axes;
+
 typedef enum ufbx_time_mode {
 	UFBX_TIME_MODE_DEFAULT,
 	UFBX_TIME_MODE_120_FPS,
@@ -2345,11 +2353,16 @@ typedef enum ufbx_snap_mode {
 typedef struct ufbx_scene_settings {
 	ufbx_props props;
 
-	ufbx_coordinate_axis axis_right;
-	ufbx_coordinate_axis axis_up;
-	ufbx_coordinate_axis axis_front;
+	// Mapping of X/Y/Z axes to world-space directions.
+	// HINT: Use `ufbx_load_opts.target_axes` to normalize this.
+	// NOTE: This contains the _original_ axes even if you supply `ufbx_load_opts.target_axes`.
+	ufbx_coordinate_axes axes;
 
-	ufbx_real unit_scale_factor;
+	// How many meters does a single world-space unit represent.
+	// FBX files usually default to centimeters, reported as `0.01` here.
+	// HINT: Use `ufbx_load_opts.target_unit_meters` to normalize this.
+	ufbx_real unit_meters;
+
 	double frames_per_second;
 
 	ufbx_vec3 ambient_color;
@@ -2361,7 +2374,7 @@ typedef struct ufbx_scene_settings {
 
 	// Original settings (?)
 	ufbx_coordinate_axis original_axis_up;
-	ufbx_real original_unit_scale_factor;
+	ufbx_real original_unit_meters;
 } ufbx_scene_settings;
 
 struct ufbx_scene {
@@ -2723,6 +2736,20 @@ typedef struct ufbx_load_opts {
 	ufbx_open_file_fn *open_file_fn;
 	void *open_file_user;
 
+	// Apply an implicit root transformation to match axes.
+	// Used if `ufbx_coordinate_axes_valid(target_axes)`.
+	ufbx_coordinate_axes target_axes;
+
+	// Scale the scene so that one world-space unit is `target_unit_meters` meters.
+	// By default units are not scaled.
+	ufbx_real target_unit_meters;
+
+	// Do not scale necessary properties curves with `target_unit_meters`.
+	bool no_prop_unit_scaling;
+
+	// Do not scale necessary animation curves with `target_unit_meters`.
+	bool no_anim_curve_unit_scaling;
+
 	// Override for the root transform
 	bool use_root_transform;
 	ufbx_transform root_transform;
@@ -2842,6 +2869,13 @@ extern const ufbx_vec2 ufbx_zero_vec2;
 extern const ufbx_vec3 ufbx_zero_vec3;
 extern const ufbx_vec4 ufbx_zero_vec4;
 extern const ufbx_quat ufbx_identity_quat;
+
+// Commonly used coordinate axes
+
+extern const ufbx_coordinate_axes ufbx_axes_right_handed_y_up;
+extern const ufbx_coordinate_axes ufbx_axes_right_handed_z_up;
+extern const ufbx_coordinate_axes ufbx_axes_left_handed_y_up;
+extern const ufbx_coordinate_axes ufbx_axes_left_handed_z_up;
 
 // Sizes of element types. eg `sizeof(ufbx_node)`
 extern const size_t ufbx_element_type_size[UFBX_NUM_ELEMENT_TYPES];
@@ -2994,6 +3028,8 @@ ufbx_inline ufbx_string ufbx_find_shader_prop(const ufbx_shader *shader, const c
 
 // Math
 
+bool ufbx_coordinate_axes_valid(ufbx_coordinate_axes axes);
+
 ufbx_quat ufbx_quat_mul(ufbx_quat a, ufbx_quat b);
 ufbx_quat ufbx_quat_normalize(ufbx_quat q);
 ufbx_quat ufbx_quat_fix_antipodal(ufbx_quat q, ufbx_quat reference);
@@ -3003,6 +3039,7 @@ ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_order order);
 ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order);
 
 ufbx_matrix ufbx_matrix_mul(const ufbx_matrix *a, const ufbx_matrix *b);
+ufbx_real ufbx_matrix_determinant(const ufbx_matrix *m);
 ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m);
 ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m);
 ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v);
