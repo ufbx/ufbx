@@ -477,6 +477,25 @@ UFBXT_TEST(synthetic_broken_cluster_connect)
 }
 #endif
 
+UFBXT_TEST(synthetic_broken_cluster_safe)
+#if UFBXT_IMPL
+{
+	char path[512];
+
+	// Same test as above but check that the scene is valid if we don't
+	// pass `connect_broken_elements`.
+	ufbxt_file_iterator iter = { "synthetic_broken_cluster" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbx_load_opts opts = { 0 };
+		ufbx_scene *scene = ufbx_load_file(path, &opts, NULL);
+		ufbxt_assert(scene);
+		ufbxt_check_scene(scene);
+
+		ufbx_free_scene(scene);
+	}
+}
+#endif
+
 UFBXT_FILE_TEST(max_transformed_skin)
 #if UFBXT_IMPL
 {
