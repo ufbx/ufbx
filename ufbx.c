@@ -13388,7 +13388,7 @@ static ufbxi_noinline void ufbxi_transform_to_axes(ufbxi_context *uc, ufbx_coord
 
 	if (!ufbxi_is_transform_identity(uc->scene.root_node->local_transform)) {
 		ufbx_matrix root_mat = ufbx_transform_to_matrix(&uc->scene.root_node->local_transform);
-		axis_mat = ufbx_matrix_mul(&axis_mat, &root_mat);
+		axis_mat = ufbx_matrix_mul(&root_mat, &axis_mat);
 	}
 
 	uc->scene.root_node->local_transform = ufbx_matrix_to_transform(&axis_mat);
@@ -13411,14 +13411,14 @@ static ufbxi_noinline void ufbxi_scale_anim_value(ufbx_anim_value *value, ufbx_r
 	ufbxi_scale_anim_curve(value->curves[2], scale);
 }
 
-static ufbxi_noinline void ufbxi_scale_units(ufbxi_context *uc, ufbx_real target_meters)
+static ufbxi_noinline int ufbxi_scale_units(ufbxi_context *uc, ufbx_real target_meters)
 {
-	if (uc->scene.settings.unit_meters <= 0.0f) return;
+	if (uc->scene.settings.unit_meters <= 0.0f) return 1;
 	target_meters = ufbxi_round_if_near(ufbxi_pow10_targets, ufbxi_arraycount(ufbxi_pow10_targets), target_meters);
 
 	ufbx_real ratio = uc->scene.settings.unit_meters / target_meters;
 	ratio = ufbxi_round_if_near(ufbxi_pow10_targets, ufbxi_arraycount(ufbxi_pow10_targets), ratio);
-	if (ratio == 1.0f) return;
+	if (ratio == 1.0f) return 1;
 
 	uc->scene.root_node->local_transform.scale.x *= ratio;
 	uc->scene.root_node->local_transform.scale.y *= ratio;
@@ -13432,6 +13432,15 @@ static ufbxi_noinline void ufbxi_scale_units(ufbxi_context *uc, ufbx_real target
 	uc->scene.root_node->node_to_parent.m20 *= ratio;
 	uc->scene.root_node->node_to_parent.m21 *= ratio;
 	uc->scene.root_node->node_to_parent.m22 *= ratio;
+
+	// HACK: Pre-fetch `ufbx_node.inherit_type` as we need it multiple times below.
+	// This is a bit inconsistent but will get overwritten in `ufbxi_update_node()`.
+	if (!uc->opts.no_prop_unit_scaling || !uc->opts.no_anim_curve_unit_scaling) {
+		ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
+			ufbx_node *node = *p_node;
+			node->inherit_type = (ufbx_inherit_type)ufbxi_find_enum(&node->props, ufbxi_InheritType, UFBX_INHERIT_NORMAL, UFBX_INHERIT_NO_SCALE);
+		}
+	}
 
 	if (!uc->opts.no_prop_unit_scaling) {
 		ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
@@ -13447,6 +13456,42 @@ static ufbxi_noinline void ufbxi_scale_units(ufbxi_context *uc, ufbx_real target
 				prop->value_vec3.y *= ratio;
 				prop->value_vec3.z *= ratio;
 				prop->value_int = (int64_t)prop->value_vec3.x;
+			} else {
+				// We need to add a new Lcl Scaling property based on the defaults
+				ufbx_props *defaults = node->props.defaults;
+				ufbx_vec3 scale = { 1.0f, 1.0f, 1.0f };
+				if (defaults) {
+					prop = ufbxi_find_prop(defaults, ufbxi_Lcl_Scaling);
+					if (prop) {
+						scale = prop->value_vec3;
+					}
+				}
+
+				scale.x *= ratio;
+				scale.y *= ratio;
+				scale.z *= ratio;
+
+				ufbx_prop new_prop = { 0 };
+				new_prop.name.data = ufbxi_Lcl_Scaling;
+				new_prop.name.length = sizeof(ufbxi_Lcl_Scaling) - 1;
+				new_prop.internal_key = ufbxi_get_name_key(ufbxi_Lcl_Scaling, sizeof(ufbxi_Lcl_Scaling) - 1);
+				new_prop.type = UFBX_PROP_SCALING;
+				new_prop.flags = UFBX_PROP_FLAG_SYNTHETIC;
+				new_prop.value_str = ufbx_empty_string;
+				new_prop.value_vec3 = scale;
+				prop->value_int = (int64_t)prop->value_vec3.x;
+
+				size_t new_num_props = node->props.num_props + 1;
+				ufbx_prop *props_copy = ufbxi_push(&uc->result, ufbx_prop, new_num_props);
+				ufbxi_check(props_copy);
+
+				memcpy(props_copy, node->props.props, node->props.num_props * sizeof(ufbx_prop));
+				props_copy[node->props.num_props] = new_prop;
+
+				ufbxi_check(ufbxi_sort_properties(uc, props_copy, new_num_props));
+
+				node->props.props = props_copy;
+				node->props.num_props = new_num_props;
 			}
 		}
 	}
@@ -13465,6 +13510,8 @@ static ufbxi_noinline void ufbxi_scale_units(ufbxi_context *uc, ufbx_real target
 			}
 		}
 	}
+
+	return 1;
 }
 
 // -- Curve evaluation
@@ -13638,7 +13685,7 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 
 	// Unit conversion
 	if (uc->opts.target_unit_meters > 0.0f) {
-		ufbxi_scale_units(uc, uc->opts.target_unit_meters);
+		ufbxi_check(ufbxi_scale_units(uc, uc->opts.target_unit_meters));
 	}
 
 	ufbxi_update_scene(&uc->scene, true);
