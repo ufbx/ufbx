@@ -3054,6 +3054,21 @@ extern const size_t ufbx_element_type_size[UFBX_ELEMENT_TYPE_COUNT];
 // Version of the source file, comparable to `UFBX_HEADER_VERSION`
 extern const uint32_t ufbx_source_version;
 
+// Practically always `true` (see below), if not you need to be careful with threads.
+//
+// Guaranteed to be `true` in _any_ of the following conditions:
+// - ufbx.c has been compiled using: GCC / Clang / MSVC / ICC / EMCC
+// - ufbx.c has been compiled as C++11 or later
+// - ufbx.c has been compiled as C11 or later with `<stdatomic.h>` support
+//
+// If `false` you can't call the following functions concurrently:
+//   ufbx_evaluate_scene()
+//   ufbx_free_scene()
+//   ufbx_subdivide_mesh()
+//   ufbx_tessellate_nurbs_surface()
+//   ufbx_free_mesh()
+bool ufbx_abi ufbx_is_thread_safe();
+
 // Load a scene from a `size` byte memory buffer at `data`
 ufbx_abi ufbx_scene *ufbx_load_memory(
 	const void *data, size_t data_size,
