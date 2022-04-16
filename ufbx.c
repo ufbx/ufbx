@@ -218,8 +218,8 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
     typedef size_t ufbxi_atomic_counter;
     #define ufbxi_atomic_counter_init(ptr) (void)0
     #define ufbxi_atomic_counter_free(ptr)(void)0
-    #define ufbxi_atomic_counter_inc(ptr) __sync_fetch_and_add(&ptr, 1)
-    #define ufbxi_atomic_counter_dec(ptr) __sync_fetch_and_sub(&ptr, 1)
+    #define ufbxi_atomic_counter_inc(ptr) __sync_fetch_and_add((ptr), 1)
+    #define ufbxi_atomic_counter_dec(ptr) __sync_fetch_and_sub((ptr), 1)
 #elif defined(_MSC_VER)
     #if defined(_M_X64)  || defined(_M_ARM64)
         __int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
@@ -17288,6 +17288,10 @@ ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time
 			return u3*y0 + 3.0 * (u2*t*y1 + u*t2*y2) + t3*y3;
 		}
 
+		default:
+			ufbx_assert(0 && "Bad interpolation mode");
+			return 0.0f;
+
 		}
 	}
 
@@ -18812,6 +18816,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 	case UFBX_CACHE_DATA_FORMAT_VEC3_FLOAT: src_count = frame->data_count * 3; break;
 	case UFBX_CACHE_DATA_FORMAT_REAL_DOUBLE: src_count = frame->data_count; use_double = true; break;
 	case UFBX_CACHE_DATA_FORMAT_VEC3_DOUBLE: src_count = frame->data_count * 3; use_double = true; break;
+	default: ufbx_assert(0 && "Bad data_format"); break;
 	}
 
 	bool src_big_endian = false;
@@ -18819,6 +18824,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 	case UFBX_CACHE_DATA_ENCODING_UNKNOWN: return 0;
 	case UFBX_CACHE_DATA_ENCODING_LITTLE_ENDIAN: src_big_endian = false; break;
 	case UFBX_CACHE_DATA_ENCODING_BIG_ENDIAN: src_big_endian = true; break;
+	default: ufbx_assert(0 && "Bad data_encoding"); break;
 	}
 
 	// Test endianness
