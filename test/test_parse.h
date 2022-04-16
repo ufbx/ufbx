@@ -354,6 +354,10 @@ UFBXT_TEST(retain_scene)
 		ufbxt_assert(node);
 		ufbxt_assert(!strcmp(node->name.data, "pCube1"));
 
+		// No-op retain and release
+		ufbx_retain_scene(eval_scene);
+		ufbx_free_scene(eval_scene);
+
 		ufbx_free_scene(eval_scene);
 	}
 }
