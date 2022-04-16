@@ -225,16 +225,16 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
         __int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
         __int64 _InterlockedDecrement64(__int64 volatile * lpAddend);
         typedef volatile __int64 ufbxi_atomic_counter;
-        #define ufbxi_atomic_counter_init(ptr) (void)0
-        #define ufbxi_atomic_counter_free(ptr) (void)0
+        #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+        #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
         #define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement64(ptr) - 1)
         #define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement64(ptr) + 1)
     #else
         long _InterlockedIncrement(long volatile * lpAddend);
         long _InterlockedDecrement(long volatile * lpAddend);
         typedef volatile long ufbxi_atomic_counter;
-        #define ufbxi_atomic_counter_init(ptr) (void)0
-        #define ufbxi_atomic_counter_free(ptr) (void)0
+        #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+        #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
         #define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement(ptr) - 1)
         #define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement(ptr) + 1)
     #endif
@@ -255,8 +255,8 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
     #define ufbxi_atomic_counter_dec(ptr) atomic_fetch_sub((ptr), 1)
 #else
     typedef volatile size_t ufbxi_atomic_counter;
-    #define ufbxi_atomic_counter_init(ptr) (void)0
-    #define ufbxi_atomic_counter_free(ptr) (void)0
+    #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+    #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
     #define ufbxi_atomic_counter_inc(ptr) ((*(ptr))++)
     #define ufbxi_atomic_counter_dec(ptr) ((*(ptr))--)
     #undef UFBXI_THREAD_SAFE
@@ -16803,19 +16803,22 @@ static ufbxi_noinline void ufbxi_release_ref(ufbxi_refcount *refcount)
 {
 	while (refcount) {
 		ufbx_assert(refcount->self_magic == UFBXI_REFCOUNT_IMP_MAGIC);
-		if (ufbxi_atomic_counter_dec(&refcount->refcount) >= 0) return;
+		if (ufbxi_atomic_counter_dec(&refcount->refcount) > 0) return;
 
-		switch (refcount->type_magic) {
+		ufbxi_refcount *parent = refcount->parent;
+		uint32_t type_magic = refcount->type_magic;
+	
+		refcount->self_magic = 0;
+		refcount->type_magic = 0;
+
+		switch (type_magic) {
 		case UFBXI_SCENE_IMP_MAGIC: ufbxi_free_scene_imp((ufbxi_scene_imp*)refcount); break;
 		case UFBXI_MESH_IMP_MAGIC: ufbxi_free_mesh_imp((ufbxi_mesh_imp*)refcount); break;
 		case UFBXI_CACHE_IMP_MAGIC: ufbxi_free_geometry_cache_imp((ufbxi_geometry_cache_imp*)refcount); break;
 		default: ufbx_assert(0 && "Bad refcount type_magic"); break;
 		}
 
-		ufbxi_atomic_counter_dec(&refcount->refcount);
-		refcount->self_magic = 0;
-		refcount->type_magic = 0;
-		refcount = refcount->parent;
+		refcount = parent;
 	}
 }
 

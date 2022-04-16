@@ -205,7 +205,7 @@ UFBXT_TEST(blender_axes)
 					ufbx_mesh *mesh = plane->mesh;
 
 					ufbxt_assert(mesh->num_faces == 1);
-					ufbx_face face = mesh->faces[0];
+					ufbx_face face = mesh->faces.data[0];
 					ufbxt_assert(face.num_indices == 3);
 
 					for (uint32_t i = 0; i < face.num_indices; i++) {
