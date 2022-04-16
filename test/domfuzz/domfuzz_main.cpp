@@ -263,7 +263,7 @@ int main(int argc, char **argv)
 			ufbxt_check_scene(scene);
 			printf("OK!\n");
 		} else {
-			printf("%s\n", error.description);
+			printf("%s\n", error.description.data);
 		}
 
 		ufbx_free_scene(scene);
