@@ -740,6 +740,14 @@ static void ufbxt_assert_close_quat(ufbxt_diff_error *p_err, ufbx_quat a, ufbx_q
 	ufbxt_assert_close_real(p_err, a.w, b.w);
 }
 
+static void ufbxt_assert_close_matrix(ufbxt_diff_error *p_err, ufbx_matrix a, ufbx_matrix b)
+{
+	ufbxt_assert_close_vec3(p_err, a.cols[0], b.cols[0]);
+	ufbxt_assert_close_vec3(p_err, a.cols[1], b.cols[1]);
+	ufbxt_assert_close_vec3(p_err, a.cols[2], b.cols[2]);
+	ufbxt_assert_close_vec3(p_err, a.cols[3], b.cols[3]);
+}
+
 typedef struct {
 	ufbx_vec3 pos;
 	ufbx_vec3 normal;
@@ -2225,6 +2233,47 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 const uint32_t ufbxt_file_versions[] = { 3000, 5000, 5800, 6100, 7100, 7400, 7500, 7700 };
 
+typedef struct ufbxt_file_iterator {
+	// Input
+	const char *path;
+	const char *root;
+	bool allow_not_found;
+
+	// State (clear to zero)
+	uint32_t version_ix;
+	uint32_t format_ix;
+	uint32_t num_found;
+} ufbxt_file_iterator;
+
+bool ufbxt_next_file(ufbxt_file_iterator *iter, char *buffer, size_t buffer_size)
+{
+	for (;;) {
+		if (iter->version_ix >= ufbxt_arraycount(ufbxt_file_versions)) {
+			ufbxt_assert(iter->num_found > 0 || iter->allow_not_found);
+			return false;
+		}
+
+		uint32_t version = ufbxt_file_versions[iter->version_ix];
+		const char *format = iter->format_ix == 1 ? "ascii" : "binary";
+		snprintf(buffer, buffer_size, "%s%s_%u_%s.fbx", iter->root ? iter->root : data_root, iter->path, version, format);
+
+		iter->format_ix++;
+		if (iter->format_ix >= 2) {
+			iter->format_ix = 0;
+			iter->version_ix++;
+		}
+
+		ufbx_stream stream = { 0 };
+		if (ufbx_open_file(NULL, &stream, buffer, SIZE_MAX)) {
+			if (stream.close_fn) {
+				stream.close_fn(stream.user);
+			}
+			iter->num_found++;
+			return true;
+		}
+	}
+}
+
 typedef struct {
 	uint64_t calls;
 } ufbxt_progress_ctx;
@@ -2542,8 +2591,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
 #define UFBXT_FILE_TEST_OPTS(name, get_opts) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
 	void ufbxt_test_fn_file_##name(void) { \
-	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL, get_opts, false, false); } \
-	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err)
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL, get_opts(), false, false); } \
+	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
 #define UFBXT_FILE_TEST_SUFFIX(name, suffix) void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
 	void ufbxt_test_fn_file_##name##_##suffix(void) { \
 	ufbx_load_opts user_opts = { 0 }; \
@@ -2551,7 +2600,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
 #define UFBXT_FILE_TEST_SUFFIX_OPTS(name, suffix, get_opts) void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
 	void ufbxt_test_fn_file_##name##_##suffix(void) { \
-	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name##_##suffix, #suffix, get_opts, false, false); } \
+	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name##_##suffix, #suffix, get_opts(), false, false); } \
 	void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
 #define UFBXT_FILE_TEST_ALT(name, file) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
 	void ufbxt_test_fn_file_##name(void) { \

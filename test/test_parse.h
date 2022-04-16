@@ -64,11 +64,11 @@ UFBXT_FILE_TEST(maya_node_attribute_zoo)
 {
 	ufbx_node *node;
 
-	ufbxt_assert(scene->settings.axis_right == UFBX_COORDINATE_AXIS_POSITIVE_X);
-	ufbxt_assert(scene->settings.axis_up == UFBX_COORDINATE_AXIS_POSITIVE_Y);
-	ufbxt_assert(scene->settings.axis_front == UFBX_COORDINATE_AXIS_POSITIVE_Z);
+	ufbxt_assert(scene->settings.axes.right == UFBX_COORDINATE_AXIS_POSITIVE_X);
+	ufbxt_assert(scene->settings.axes.up == UFBX_COORDINATE_AXIS_POSITIVE_Y);
+	ufbxt_assert(scene->settings.axes.front == UFBX_COORDINATE_AXIS_POSITIVE_Z);
 	ufbxt_assert(scene->settings.time_mode == UFBX_TIME_MODE_24_FPS);
-	ufbxt_assert_close_real(err, scene->settings.unit_scale_factor, 1.0f);
+	ufbxt_assert_close_real(err, scene->settings.unit_meters, 0.01f);
 	ufbxt_assert_close_real(err, scene->settings.frames_per_second, 24.0f);
 
 	node = ufbx_find_node(scene, "Null");
@@ -315,5 +315,20 @@ UFBXT_TEST(open_file)
 		stream.close_fn(stream.user);
 	}
 
+}
+#endif
+
+UFBXT_TEST(file_not_found)
+#if UFBXT_IMPL
+{
+	const char *name = "maya_cube_9999_emoji.fbx";
+
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s", data_root, name);
+
+	ufbx_error error;
+	ufbx_scene *scene = ufbx_load_file(buf, NULL, &error);
+	ufbxt_assert(!scene);
+	ufbxt_assert(error.type == UFBX_ERROR_FILE_NOT_FOUND);
 }
 #endif

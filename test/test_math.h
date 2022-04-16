@@ -92,9 +92,9 @@ UFBXT_TEST(matrix_to_transform_structured)
 {
 	ufbxt_diff_error err = { 0 };
 
-	for (int sx = 1; sx <= 2; sx++)
-	for (int sy = 1; sy <= 2; sy++)
-	for (int sz = 1; sz <= 2; sz++)
+	for (int sx = -2; sx <= 2; sx++)
+	for (int sy = -2; sy <= 2; sy++)
+	for (int sz = -2; sz <= 2; sz++)
 	for (int rx = -2; rx <= 2; rx++)
 	for (int ry = -2; ry <= 2; ry++)
 	for (int rz = -2; rz <= 2; rz++)
@@ -123,9 +123,15 @@ UFBXT_TEST(matrix_to_transform_structured)
 		ufbx_matrix m = ufbx_transform_to_matrix(&t);
 		ufbx_transform t2 = ufbx_matrix_to_transform(&m);
 
-		ufbxt_assert_close_vec3(&err, t.translation, t2.translation);
-		ufbxt_assert_close_vec3(&err, t.scale, t2.scale);
-		ufbxt_assert_close_real(&err, ufbxt_quat_error(t.rotation, t2.rotation), 0.0f);
+		if (sx < 0 || sy < 0 || sz < 0) {
+			// Flipped signs cannot be uniquely recovered, check that the transforms are identical
+			ufbx_matrix m2 = ufbx_transform_to_matrix(&t2);
+			ufbxt_assert_close_matrix(&err, m, m2);
+		} else {
+			ufbxt_assert_close_vec3(&err, t.translation, t2.translation);
+			ufbxt_assert_close_vec3(&err, t.scale, t2.scale);
+			ufbxt_assert_close_real(&err, ufbxt_quat_error(t.rotation, t2.rotation), 0.0f);
+		}
 	}
 
 	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
@@ -163,12 +169,27 @@ UFBXT_TEST(matrix_to_transform_random)
 		t.scale.y = ufbxt_xorshift32_real(&state) * 10.0f + 0.01f;
 		t.scale.z = ufbxt_xorshift32_real(&state) * 10.0f + 0.01f;
 
+		uint32_t flip = ufbxt_xorshift32(&state);
+
+		// Prevent most of the inputs being flips
+		if (flip & 8) flip = 0;
+
+		if (flip & 1) t.scale.x *= -1.0f;
+		if (flip & 2) t.scale.y *= -1.0f;
+		if (flip & 4) t.scale.z *= -1.0f;
+
 		ufbx_matrix m = ufbx_transform_to_matrix(&t);
 		ufbx_transform t2 = ufbx_matrix_to_transform(&m);
 
-		ufbxt_assert_close_vec3(&err, t.translation, t2.translation);
-		ufbxt_assert_close_vec3(&err, t.scale, t2.scale);
-		ufbxt_assert_close_real(&err, ufbxt_quat_error(t.rotation, t2.rotation), 0.0f);
+		if (flip) {
+			// Flipped signs cannot be uniquely recovered, check that the transforms are identical
+			ufbx_matrix m2 = ufbx_transform_to_matrix(&t2);
+			ufbxt_assert_close_matrix(&err, m, m2);
+		} else {
+			ufbxt_assert_close_vec3(&err, t.translation, t2.translation);
+			ufbxt_assert_close_vec3(&err, t.scale, t2.scale);
+			ufbxt_assert_close_real(&err, ufbxt_quat_error(t.rotation, t2.rotation), 0.0f);
+		}
 	}
 
 	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
@@ -264,6 +285,10 @@ UFBXT_TEST(matrix_inverse_random)
 		t.scale.z = ufbxt_xorshift32_real(&state) * 10.0f + 0.1f;
 
 		uint32_t flip = ufbxt_xorshift32(&state);
+
+		// Prevent most of the inputs being flips
+		if (flip & 8) flip = 0;
+
 		if (flip & 1) t.scale.x *= -1.0f;
 		if (flip & 2) t.scale.y *= -1.0f;
 		if (flip & 4) t.scale.z *= -1.0f;
