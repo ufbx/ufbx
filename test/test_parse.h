@@ -332,3 +332,29 @@ UFBXT_TEST(file_not_found)
 	ufbxt_assert(error.type == UFBX_ERROR_FILE_NOT_FOUND);
 }
 #endif
+
+UFBXT_TEST(retain_scene)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbx_load_opts opts = { 0 };
+
+		ufbx_scene *scene = ufbx_load_file(path, &opts, NULL);
+		ufbxt_assert(scene);
+
+		ufbxt_check_scene(scene);
+
+		ufbx_scene *eval_scene = ufbx_evaluate_scene(scene, NULL, 0.1, NULL, NULL);
+		ufbx_free_scene(scene);
+
+		// eval_scene should retain references
+		ufbx_node *node = ufbx_find_node(eval_scene, "pCube1");
+		ufbxt_assert(node);
+		ufbxt_assert(!strcmp(node->name.data, "pCube1"));
+
+		ufbx_free_scene(eval_scene);
+	}
+}
+#endif
