@@ -222,16 +222,26 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
     #define ufbxi_atomic_counter_dec(ptr) __sync_fetch_and_sub((ptr), 1)
 #elif defined(_MSC_VER)
     #if defined(_M_X64)  || defined(_M_ARM64)
-        __int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
-        __int64 _InterlockedDecrement64(__int64 volatile * lpAddend);
+		#if defined(__cplusplus)
+			extern "C" __int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
+			extern "C" __int64 _InterlockedDecrement64(__int64 volatile * lpAddend);
+		#else
+			__int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
+			__int64 _InterlockedDecrement64(__int64 volatile * lpAddend);
+		#endif
         typedef volatile __int64 ufbxi_atomic_counter;
         #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
         #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
         #define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement64(ptr) - 1)
         #define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement64(ptr) + 1)
     #else
-        long _InterlockedIncrement(long volatile * lpAddend);
-        long _InterlockedDecrement(long volatile * lpAddend);
+		#if defined(__cplusplus)
+			extern "C" long _InterlockedIncrement(long volatile * lpAddend);
+			extern "C" long _InterlockedDecrement(long volatile * lpAddend);
+		#else
+			long _InterlockedIncrement(long volatile * lpAddend);
+			long _InterlockedDecrement(long volatile * lpAddend);
+		#endif
         typedef volatile long ufbxi_atomic_counter;
         #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
         #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
