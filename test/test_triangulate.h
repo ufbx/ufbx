@@ -75,8 +75,16 @@ UFBXT_FILE_TEST(maya_tri_cone)
 
 		size_t num_tris = face.num_indices - 2;
 		for (size_t i = 0; i < 32; i++) {
-			bool ok = ufbx_triangulate_face(tris, i, mesh, face) != 0;
-			ufbxt_assert(ok == (i >= num_tris * 3));
+			ufbx_panic panic;
+			panic.did_panic = false;
+			size_t num_tris_returned = ufbx_catch_triangulate_face(&panic, tris, i, mesh, face);
+			if (i >= num_tris * 3) {
+				ufbxt_assert(!panic.did_panic);
+				ufbxt_assert(num_tris_returned == num_tris);
+			} else {
+				ufbxt_assert(panic.did_panic);
+				ufbxt_assert(num_tris_returned == 0);
+			}
 		}
 
 		ufbxt_assert(ufbx_triangulate_face(tris, ufbxt_arraycount(tris), mesh, face));

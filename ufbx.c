@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <math.h>
 #include <locale.h>
 
@@ -1254,6 +1255,39 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 #endif // !defined(ufbx_inflate)
 
 // -- Errors
+
+static ufbxi_noinline void ufbxi_panicf_imp(ufbx_panic *panic, const char *fmt, ...)
+{
+	if (panic && panic->did_panic) return;
+
+	va_list args;
+	va_start(args, fmt);
+
+	if (panic) {
+		panic->did_panic = true;
+		int result = snprintf(panic->message, sizeof(panic->message), fmt, args);
+		if (result < 0) result = 0;
+		size_t length = ufbxi_min_sz((size_t)result, sizeof(panic->message) - 1);
+
+		// HACK: On some MSYS/MinGW implementations `snprintf` is broken and does
+		// not write the null terminator on trunctation, it's always safe to do so
+		// let's just do it unconditionally here...
+		panic->message[length] = '\0';
+	} else {
+		fprintf(stderr, "ufbx panic: ");
+		vfprintf(stderr, fmt, args);
+		fprintf(stderr, "\n");
+	}
+
+	va_end(args);
+
+	if (!panic) {
+		ufbx_assert(false && "ufbx panic: See stderr for more information");
+	}
+}
+
+#define ufbxi_panicf(panic, cond, ...) \
+	((cond) ? false : (ufbxi_panicf_imp((panic), __VA_ARGS__), true))
 
 // Prefix the error condition with $Description\0 for a human readable description
 #define ufbxi_error_msg(cond, msg) "$" msg "\0" cond
@@ -17713,10 +17747,11 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_matrix_to_transform(const ufbx_matri
 	return t;
 }
 
-ufbx_abi ufbxi_noinline ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback)
+ufbx_abi ufbxi_noinline ufbx_matrix ufbx_catch_get_skin_vertex_matrix(ufbx_panic *panic, const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback)
 {
 	ufbx_assert(skin);
-	ufbx_assert(vertex < skin->vertices.count);
+	if (ufbxi_panicf(panic, vertex < skin->vertices.count, "vertex (%zu) out of bounds (%zu)", vertex, skin->vertices.count)) return ufbx_identity_matrix;
+
 	if (!skin || vertex >= skin->vertices.count) return ufbx_identity_matrix;
 	ufbx_skin_vertex skin_vertex = skin->vertices.data[vertex];
 
@@ -18082,11 +18117,14 @@ ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surf
 	}
 }
 
-ufbx_abi ufbxi_noinline uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face)
+ufbx_abi ufbxi_noinline uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face)
 {
-	if (face.num_indices < 3 || num_indices < ((size_t)face.num_indices - 2) * 3) return 0;
-	ufbx_assert(face.index_begin < mesh->num_indices);
-	ufbx_assert(mesh->num_indices - face.index_begin >= face.num_indices);
+	if (face.num_indices < 3) return 0;
+
+	size_t required_indices = ((size_t)face.num_indices - 2) * 3;
+	if (ufbxi_panicf(panic, num_indices >= required_indices, "Face needs at least %zu indices for triangles, got space for %zu", required_indices, num_indices)) return 0;
+	if (ufbxi_panicf(panic, face.index_begin < mesh->num_indices, "Face index begin (%u) out of bounds (%zu)", face.index_begin, mesh->num_indices)) return 0;
+	if (ufbxi_panicf(panic, mesh->num_indices - face.index_begin >= face.num_indices, "Face index end (%u + %u) out of bounds (%zu)", face.index_begin, face.num_indices, mesh->num_indices)) return 0;
 
 	if (face.num_indices == 3) {
 		// Fast case: Already a triangle
@@ -18159,51 +18197,77 @@ ufbx_abi ufbxi_noinline uint32_t ufbx_triangulate_face(uint32_t *indices, size_t
 	}
 }
 
-ufbx_abi void ufbx_compute_topology(const ufbx_mesh *mesh, ufbx_topo_edge *indices, size_t num_indices)
+ufbx_abi void ufbx_catch_compute_topology(ufbx_panic *panic, const ufbx_mesh *mesh, ufbx_topo_edge *indices, size_t num_indices)
 {
-	ufbx_assert(num_indices >= mesh->num_indices);
+	if (ufbxi_panicf(panic, num_indices >= mesh->num_indices, "Required mesh.num_indices (%zu) indices, got %zu", mesh->num_indices, num_indices)) return;
+
 	ufbxi_compute_topology(mesh, indices);
 }
 
-ufbx_abi int32_t ufbx_topo_next_vertex_edge(const ufbx_topo_edge *topo, size_t num_topo, int32_t index)
+ufbx_abi int32_t ufbx_catch_topo_next_vertex_edge(ufbx_panic *panic, const ufbx_topo_edge *topo, size_t num_topo, int32_t index)
 {
 	if (index < 0) return -1;
-	ufbx_assert((size_t)index < num_topo);
+	if (ufbxi_panicf(panic, (size_t)index < num_topo, "index (%d) out of bounds (%zu)", index, num_topo)) return -1;
 	int32_t twin = topo[index].twin;
 	if (twin < 0) return -1;
-	ufbx_assert((size_t)twin < num_topo);
+	if (ufbxi_panicf(panic, (size_t)twin < num_topo, "Corrupted topology structure")) return -1;
 	return topo[twin].next;
 }
 
-ufbx_abi int32_t ufbx_topo_prev_vertex_edge(const ufbx_topo_edge *topo, size_t num_topo, int32_t index)
+ufbx_abi int32_t ufbx_catch_topo_prev_vertex_edge(ufbx_panic *panic, const ufbx_topo_edge *topo, size_t num_topo, int32_t index)
 {
 	if (index < 0) return -1;
-	ufbx_assert((size_t)index < num_topo);
+	if (ufbxi_panicf(panic, (size_t)index < num_topo, "index (%d) out of bounds (%zu)", index, num_topo)) return -1;
 	return topo[topo[index].prev].twin;
 }
 
-ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_face face)
+ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_catch_get_weighted_face_normal(ufbx_panic *panic, const ufbx_vertex_vec3 *positions, ufbx_face face)
 {
+	if (ufbxi_panicf(panic, face.index_begin < positions->indices.count, "Face index begin (%u) out of bounds (%zu)", face.index_begin, positions->indices.count)) return ufbx_zero_vec3;
+	if (ufbxi_panicf(panic, positions->indices.count - face.index_begin >= face.num_indices, "Face index end (%u + %u) out of bounds (%zu)", face.index_begin, face.num_indices, positions->indices.count)) return ufbx_zero_vec3;
+
 	if (face.num_indices < 3) {
 		return ufbx_zero_vec3;
 	} else if (face.num_indices == 3) {
-		ufbx_vec3 a = ufbx_get_vertex_vec3(positions, face.index_begin + 0);
-		ufbx_vec3 b = ufbx_get_vertex_vec3(positions, face.index_begin + 1);
-		ufbx_vec3 c = ufbx_get_vertex_vec3(positions, face.index_begin + 2);
+		ufbx_vec3 a, b, c;
+		if (panic) {
+			a = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 0);
+			b = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 1);
+			c = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 2);
+		} else {
+			a = ufbx_get_vertex_vec3(positions, face.index_begin + 0);
+			b = ufbx_get_vertex_vec3(positions, face.index_begin + 1);
+			c = ufbx_get_vertex_vec3(positions, face.index_begin + 2);
+		}
 		return ufbxi_cross3(ufbxi_sub3(b, a), ufbxi_sub3(c, a));
 	} else if (face.num_indices == 4) {
-		ufbx_vec3 a = ufbx_get_vertex_vec3(positions, face.index_begin + 0);
-		ufbx_vec3 b = ufbx_get_vertex_vec3(positions, face.index_begin + 1);
-		ufbx_vec3 c = ufbx_get_vertex_vec3(positions, face.index_begin + 2);
-		ufbx_vec3 d = ufbx_get_vertex_vec3(positions, face.index_begin + 3);
+		ufbx_vec3 a, b, c, d;
+		if (panic) {
+			a = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 0);
+			b = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 1);
+			c = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 2);
+			d = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 3);
+		} else {
+			a = ufbx_get_vertex_vec3(positions, face.index_begin + 0);
+			b = ufbx_get_vertex_vec3(positions, face.index_begin + 1);
+			c = ufbx_get_vertex_vec3(positions, face.index_begin + 2);
+			d = ufbx_get_vertex_vec3(positions, face.index_begin + 3);
+		}
 		return ufbxi_cross3(ufbxi_sub3(c, a), ufbxi_sub3(d, b));
 	} else {
+		ufbx_vec3 a, b;
+
 		// Newell's Method
 		ufbx_vec3 result = ufbx_zero_vec3;
 		for (size_t i = 0; i < face.num_indices; i++) {
 			size_t next = i + 1 < face.num_indices ? i + 1 : 0;
-			ufbx_vec3 a = ufbx_get_vertex_vec3(positions, face.index_begin + i);
-			ufbx_vec3 b = ufbx_get_vertex_vec3(positions, face.index_begin + next);
+			if (panic) {
+				a = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + i);
+				b = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + next);
+			} else {
+				a = ufbx_get_vertex_vec3(positions, face.index_begin + i);
+				b = ufbx_get_vertex_vec3(positions, face.index_begin + next);
+			}
 			result.x += (a.y - b.y) * (a.z + b.z);
 			result.y += (a.z - b.z) * (a.x + b.x);
 			result.z += (a.x - b.x) * (a.y + b.y);
@@ -18212,10 +18276,10 @@ ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_verte
 	}
 }
 
-size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, const ufbx_topo_edge *topo, size_t num_topo, int32_t *normal_indices, size_t num_normal_indices, bool assume_smooth)
+size_t ufbx_catch_generate_normal_mapping(ufbx_panic *panic, const ufbx_mesh *mesh, const ufbx_topo_edge *topo, size_t num_topo, int32_t *normal_indices, size_t num_normal_indices, bool assume_smooth)
 {
 	int32_t next_index = 0;
-	ufbx_assert(num_normal_indices >= mesh->num_indices);
+	if (ufbxi_panicf(panic, num_normal_indices >= mesh->num_indices, "Expected at least mesh.num_indices (%zu), got %zu", mesh->num_indices, num_normal_indices)) return 0;
 
 	for (size_t i = 0; i < mesh->num_indices; i++) {
 		normal_indices[i] = -1;
@@ -18258,9 +18322,15 @@ size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, const ufbx_topo_edge 
 	return (size_t)next_index;
 }
 
-ufbx_abi void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, const int32_t *normal_indices, size_t num_normal_indices, ufbx_vec3 *normals, size_t num_normals)
+size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, const ufbx_topo_edge *topo, size_t num_topo, int32_t *normal_indices, size_t num_normal_indices, bool assume_smooth)
 {
-	ufbx_assert(num_normal_indices >= mesh->num_faces);
+	return ufbx_catch_generate_normal_mapping(NULL, mesh, topo, num_topo, normal_indices, num_normal_indices, assume_smooth);
+}
+
+ufbx_abi void ufbx_catch_compute_normals(ufbx_panic *panic, const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, const int32_t *normal_indices, size_t num_normal_indices, ufbx_vec3 *normals, size_t num_normals)
+{
+	if (ufbxi_panicf(panic, num_normal_indices >= mesh->num_indices, "Expected at least mesh.num_indices (%zu), got %zu", mesh->num_indices, num_normal_indices)) return;
+
 	memset(normals, 0, sizeof(ufbx_vec3)*num_normals);
 
 	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
@@ -18268,7 +18338,10 @@ ufbx_abi void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3
 		ufbx_vec3 normal = ufbx_get_weighted_face_normal(positions, face);
 		for (size_t ix = 0; ix < face.num_indices; ix++) {
 			int32_t index = normal_indices[face.index_begin + ix];
-			ufbx_assert(index >= 0 && index < num_normals);
+
+			if (ufbxi_panicf(panic, index >= 0, "Negative normal index (%d) at %zu", index, ix)) return;
+			if (ufbxi_panicf(panic, index < num_normals, "Negative normal index (%d) out of bounds (%zu) at %zu", index, num_normals, ix)) return;
+
 			ufbx_vec3 *n = &normals[index];
 			*n = ufbxi_add3(*n, normal);
 		}
@@ -18282,6 +18355,11 @@ ufbx_abi void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3
 			normals[i].z /= len;
 		}
 	}
+}
+
+ufbx_abi void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions, const int32_t *normal_indices, size_t num_normal_indices, ufbx_vec3 *normals, size_t num_normals)
+{
+	ufbx_catch_compute_normals(NULL, mesh, positions, normal_indices, num_normal_indices, normals, num_normals);
 }
 
 ufbx_abi ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error)
@@ -18739,6 +18817,38 @@ ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t 
 {
 	ufbx_error local_error;
 	return ufbxi_generate_indices(streams, num_streams, indices, num_indices, allocator, error ? error : &local_error);
+}
+
+ufbx_abi ufbx_real ufbx_catch_get_vertex_real(ufbx_panic *panic, const ufbx_vertex_real *v, size_t index)
+{
+	if (ufbxi_panicf(panic, index < v->indices.count, "index (%zu) out of range (%zu)", index, v->indices.count)) return 0.0f;
+	int32_t ix = v->indices.data[index];
+	if (ufbxi_panicf(panic, (size_t)ix < v->values.count, "Corrupted or missing vertex attribute")) return 0.0f;
+	return v->values.data[ix];
+}
+
+ufbx_abi ufbx_vec2 ufbx_catch_get_vertex_vec2(ufbx_panic *panic, const ufbx_vertex_vec2 *v, size_t index)
+{
+	if (ufbxi_panicf(panic, index < v->indices.count, "index (%zu) out of range (%zu)", index, v->indices.count)) return ufbx_zero_vec2;
+	int32_t ix = v->indices.data[index];
+	if (ufbxi_panicf(panic, (size_t)ix < v->values.count, "Corrupted or missing vertex attribute")) return ufbx_zero_vec2;
+	return v->values.data[ix];
+}
+
+ufbx_abi ufbx_vec3 ufbx_catch_get_vertex_vec3(ufbx_panic *panic, const ufbx_vertex_vec3 *v, size_t index)
+{
+	if (ufbxi_panicf(panic, index < v->indices.count, "index (%zu) out of range (%zu)", index, v->indices.count)) return ufbx_zero_vec3;
+	int32_t ix = v->indices.data[index];
+	if (ufbxi_panicf(panic, (size_t)ix < v->values.count, "Corrupted or missing vertex attribute")) return ufbx_zero_vec3;
+	return v->values.data[ix];
+}
+
+ufbx_abi ufbx_vec4 ufbx_catch_get_vertex_vec4(ufbx_panic *panic, const ufbx_vertex_vec4 *v, size_t index)
+{
+	if (ufbxi_panicf(panic, index < v->indices.count, "index (%zu) out of range (%zu)", index, v->indices.count)) return ufbx_zero_vec4;
+	int32_t ix = v->indices.data[index];
+	if (ufbxi_panicf(panic, (size_t)ix < v->values.count, "Corrupted or missing vertex attribute")) return ufbx_zero_vec4;
+	return v->values.data[ix];
 }
 
 ufbx_abi size_t ufbx_get_triangulate_face_num_indices(ufbx_face face)

@@ -2996,7 +2996,7 @@ typedef struct ufbx_geometry_cache_data_opts {
 
 typedef struct ufbx_panic {
 	bool did_panic;
-	char message[64];
+	char message[128];
 } ufbx_panic;
 
 // -- API
@@ -3198,14 +3198,13 @@ ufbx_abi ufbx_transform ufbx_matrix_to_transform(const ufbx_matrix *m);
 
 // Skinning
 
-ufbx_abi ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback);
 ufbx_abi ufbx_matrix ufbx_catch_get_skin_vertex_matrix(ufbx_panic *panic, const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback);
+ufbx_inline ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback) {
+	return ufbx_catch_get_skin_vertex_matrix(NULL, skin, vertex, fallback);
+}
 
 ufbx_abi ufbx_vec3 ufbx_get_blend_shape_vertex_offset(const ufbx_blend_shape *shape, size_t vertex);
-ufbx_abi ufbx_vec3 ufbx_catch_get_blend_shape_vertex_offset(ufbx_panic *panic, const ufbx_blend_shape *shape, size_t vertex);
-
 ufbx_abi ufbx_vec3 ufbx_get_blend_vertex_offset(const ufbx_blend_deformer *blend, size_t vertex);
-ufbx_abi ufbx_vec3 ufbx_catch_get_blend_vertex_offset(ufbx_panic *panic, const ufbx_blend_deformer *blend, size_t vertex);
 
 ufbx_abi void ufbx_add_blend_shape_vertex_offsets(const ufbx_blend_shape *shape, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
 ufbx_abi void ufbx_add_blend_vertex_offsets(const ufbx_blend_deformer *blend, ufbx_vec3 *vertices, size_t num_vertices, ufbx_real weight);
@@ -3221,39 +3220,51 @@ ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surf
 
 // Mesh Topology
 
-ufbx_abi uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face);
 ufbx_abi uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face);
+ufbx_inline uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face) {
+	return ufbx_catch_triangulate_face(NULL, indices, num_indices, mesh, face);
+}
 
 // Generate the half-edge representation of `mesh` to `topo[mesh->num_indices]`
-ufbx_abi void ufbx_compute_topology(const ufbx_mesh *mesh, ufbx_topo_edge *topo, size_t num_topo);
 ufbx_abi void ufbx_catch_compute_topology(ufbx_panic *panic, const ufbx_mesh *mesh, ufbx_topo_edge *topo, size_t num_topo);
+ufbx_inline void ufbx_compute_topology(const ufbx_mesh *mesh, ufbx_topo_edge *topo, size_t num_topo) {
+	ufbx_catch_compute_topology(NULL, mesh, topo, num_topo);
+}
 
 // Get the next/previous edge around a vertex
 // NOTE: Does not return the half-edge on the opposite side (ie. `topo[index].twin`)
-ufbx_abi int32_t ufbx_topo_next_vertex_edge(const ufbx_topo_edge *topo, size_t num_topo, int32_t index);
-ufbx_abi int32_t ufbx_topo_prev_vertex_edge(const ufbx_topo_edge *topo, size_t num_topo, int32_t index);
 
 ufbx_abi int32_t ufbx_catch_topo_next_vertex_edge(ufbx_panic *panic, const ufbx_topo_edge *topo, size_t num_topo, int32_t index);
+ufbx_inline int32_t ufbx_topo_next_vertex_edge(const ufbx_topo_edge *topo, size_t num_topo, int32_t index) {
+	return ufbx_catch_topo_next_vertex_edge(NULL, topo, num_topo, index);
+}
+
 ufbx_abi int32_t ufbx_catch_topo_prev_vertex_edge(ufbx_panic *panic, const ufbx_topo_edge *topo, size_t num_topo, int32_t index);
+ufbx_inline int32_t ufbx_topo_prev_vertex_edge(const ufbx_topo_edge *topo, size_t num_topo, int32_t index) {
+	return ufbx_catch_topo_prev_vertex_edge(NULL, topo, num_topo, index);
+}
 
-ufbx_abi ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_face face);
 ufbx_abi ufbx_vec3 ufbx_catch_get_weighted_face_normal(ufbx_panic *panic, const ufbx_vertex_vec3 *positions, ufbx_face face);
+ufbx_inline ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positions, ufbx_face face) {
+	return ufbx_catch_get_weighted_face_normal(NULL, positions, face);
+}
 
-ufbx_abi size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh,
-	const ufbx_topo_edge *topo, size_t num_topo,
-	int32_t *normal_indices, size_t num_normal_indices, bool assume_smooth);
 ufbx_abi size_t ufbx_catch_generate_normal_mapping(ufbx_panic *panic, const ufbx_mesh *mesh,
 	const ufbx_topo_edge *topo, size_t num_topo,
 	int32_t *normal_indices, size_t num_normal_indices, bool assume_smooth);
+ufbx_abi size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh,
+	const ufbx_topo_edge *topo, size_t num_topo,
+	int32_t *normal_indices, size_t num_normal_indices, bool assume_smooth);
 
-ufbx_abi void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions,
+ufbx_abi void ufbx_catch_compute_normals(ufbx_panic *panic, const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions,
 	const int32_t *normal_indices, size_t num_normal_indices,
 	ufbx_vec3 *normals, size_t num_normals);
-ufbx_abi void ufbx_catch_compute_normals(ufbx_panic *panic, const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions,
+ufbx_abi void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions,
 	const int32_t *normal_indices, size_t num_normal_indices,
 	ufbx_vec3 *normals, size_t num_normals);
 
 ufbx_abi ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error);
+
 ufbx_abi void ufbx_free_mesh(ufbx_mesh *mesh);
 ufbx_abi void ufbx_retain_mesh(ufbx_mesh *mesh);
 
@@ -3284,6 +3295,11 @@ ufbx_abi size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *channe
 ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator_opts *allocator, ufbx_error *error);
 
 // -- Inline API
+
+ufbx_abi ufbx_real ufbx_catch_get_vertex_real(ufbx_panic *panic, const ufbx_vertex_real *v, size_t index);
+ufbx_abi ufbx_vec2 ufbx_catch_get_vertex_vec2(ufbx_panic *panic, const ufbx_vertex_vec2 *v, size_t index);
+ufbx_abi ufbx_vec3 ufbx_catch_get_vertex_vec3(ufbx_panic *panic, const ufbx_vertex_vec3 *v, size_t index);
+ufbx_abi ufbx_vec4 ufbx_catch_get_vertex_vec4(ufbx_panic *panic, const ufbx_vertex_vec4 *v, size_t index);
 
 ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
 ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
