@@ -15956,6 +15956,9 @@ ufbxi_noinline static int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 	case UFBX_SUBDIVISION_BOUNDARY_SHARP_INTERIOR:
 		sharp_all = true;
 		break;
+	default:
+		ufbx_assert(0 && "Bad boundary mode");
+		break;
 	}
 
 	// Mark unused indices as -1 so we can patch non-manifold
@@ -16786,7 +16789,7 @@ static ufbxi_noinline void ufbxi_init_ref(ufbxi_refcount *refcount, uint32_t mag
 
 	ufbxi_atomic_counter_init(&refcount->refcount);
 	refcount->self_magic = UFBXI_REFCOUNT_IMP_MAGIC;
-	refcount->type_magic = UFBXI_REFCOUNT_IMP_MAGIC;
+	refcount->type_magic = magic;
 	refcount->parent = parent;
 }
 
@@ -18572,7 +18575,7 @@ ufbx_abi void ufbx_catch_compute_normals(ufbx_panic *panic, const ufbx_mesh *mes
 			int32_t index = normal_indices[face.index_begin + ix];
 
 			if (ufbxi_panicf(panic, index >= 0, "Negative normal index (%d) at %zu", index, ix)) return;
-			if (ufbxi_panicf(panic, index < num_normals, "Negative normal index (%d) out of bounds (%zu) at %zu", index, num_normals, ix)) return;
+			if (ufbxi_panicf(panic, (size_t)index < num_normals, "Negative normal index (%d) out of bounds (%zu) at %zu", index, num_normals, ix)) return;
 
 			ufbx_vec3 *n = &normals[index];
 			*n = ufbxi_add3(*n, normal);
