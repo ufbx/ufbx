@@ -216,8 +216,8 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 
 #if defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
     typedef size_t ufbxi_atomic_counter;
-    #define ufbxi_atomic_counter_init(ptr) (void)0
-    #define ufbxi_atomic_counter_free(ptr)(void)0
+    #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+    #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
     #define ufbxi_atomic_counter_inc(ptr) __sync_fetch_and_add((ptr), 1)
     #define ufbxi_atomic_counter_dec(ptr) __sync_fetch_and_sub((ptr), 1)
 #elif defined(_MSC_VER)
