@@ -9357,6 +9357,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 	ufbxi_check(mesh->faces.data);
 
 	size_t num_triangles = 0;
+	size_t num_bad_faces = 0;
+	size_t max_face_triangles = 0;
 
 	ufbx_face *dst_face = mesh->faces.data;
 	int32_t *p_face_begin = index_data;
@@ -9371,6 +9373,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 			dst_face->num_indices = num_indices;
 			if (num_indices >= 3) {
 				num_triangles += num_indices - 2;
+				max_face_triangles = ufbxi_max_sz(max_face_triangles, num_indices - 2);
+			} else {
+				num_bad_faces++;
 			}
 			dst_face++;
 			p_face_begin = p_ix + 1;
@@ -9382,6 +9387,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 	mesh->num_faces = dst_face - mesh->faces.data;
 	mesh->faces.count = mesh->num_faces;
 	mesh->num_triangles = num_triangles;
+	mesh->max_face_triangles = max_face_triangles;
+	mesh->num_bad_faces = num_bad_faces;
 
 	mesh->vertex_first_index.data = ufbxi_push(&uc->result, int32_t, mesh->num_vertices);
 	ufbxi_check(mesh->vertex_first_index.data);
