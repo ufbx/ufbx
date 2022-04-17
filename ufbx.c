@@ -13815,9 +13815,12 @@ ufbxi_nodiscard static int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error
 
 			ufbx_compute_normals(mesh, &mesh->skinned_position, normal_indices, num_indices, normal_data, num_normals);
 
+			mesh->skinned_normal.exists = true;
 			mesh->skinned_normal.values.data = normal_data;
-			mesh->skinned_normal.indices.data = normal_indices;
 			mesh->skinned_normal.values.count = num_normals;
+			mesh->skinned_normal.indices.data = normal_indices;
+			mesh->skinned_normal.indices.count = num_indices;
+			mesh->skinned_normal.value_reals = 3;
 		}
 	}
 
