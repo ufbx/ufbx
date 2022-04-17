@@ -12,8 +12,16 @@
 
 #define UMATH_IMPLEMENTATION
 
-#include "external/sokol_app.h"
-#include "external/sokol_gfx.h"
-#include "external/sokol_time.h"
+#if defined(TEST_VIEWER)
+	#define DUMMY_SAPP_MAX_FRAMES 64
+	#include "external/dummy_sokol_app.h"
+	#include "external/dummy_sokol_time.h"
+	#include "external/dummy_sokol_gfx.h"
+#else
+	#include "external/sokol_app.h"
+	#include "external/sokol_time.h"
+	#include "external/sokol_gfx.h"
+#endif
+
 #include "external/sokol_glue.h"
 #include "external/umath.h"
