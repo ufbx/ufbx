@@ -2888,6 +2888,9 @@ typedef struct ufbx_load_opts {
 	// to split models into parts per material.
 	bool allow_null_material;
 
+	// Generate vertex normals for a meshes that are missing normals.
+	bool generate_missing_normals;
+
 	// Estimated file size for progress reporting
 	uint64_t file_size_estimate;
 

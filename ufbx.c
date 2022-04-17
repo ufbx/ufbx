@@ -10866,6 +10866,45 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_lod_group(ufbxi_context
 	return 1;
 }
 
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_generate_normals(ufbxi_context *uc, ufbx_mesh *mesh)
+{
+	size_t num_indices = mesh->num_indices;
+
+	ufbx_topo_edge *topo = ufbxi_push(&uc->tmp_stack, ufbx_topo_edge, num_indices);
+	ufbxi_check(topo);
+
+	int32_t *normal_indices = ufbxi_push(&uc->result, int32_t, num_indices);
+	ufbxi_check(normal_indices);
+
+	ufbx_compute_topology(mesh, topo, num_indices);
+	size_t num_normals = ufbx_generate_normal_mapping(mesh, topo, num_indices, normal_indices, num_indices, false);
+
+	if (num_normals == mesh->num_vertices) {
+		mesh->vertex_normal.unique_per_vertex = true;
+	}
+
+	ufbx_vec3 *normal_data = ufbxi_push(&uc->result, ufbx_vec3, num_normals + 1);
+	ufbxi_check(normal_data);
+
+	normal_data[0] = ufbx_zero_vec3;
+	normal_data++;
+
+	ufbx_compute_normals(mesh, &mesh->vertex_position, normal_indices, num_indices, normal_data, num_normals);
+
+	mesh->vertex_normal.exists = true;
+	mesh->vertex_normal.values.data = normal_data;
+	mesh->vertex_normal.values.count = num_normals;
+	mesh->vertex_normal.indices.data = normal_indices;
+	mesh->vertex_normal.indices.count = num_indices;
+	mesh->vertex_normal.value_reals = 3;
+
+	mesh->skinned_normal = mesh->vertex_normal;
+
+	ufbxi_pop(&uc->tmp_stack, ufbx_topo_edge, num_indices, NULL);
+
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	size_t num_elements = uc->num_elements;
@@ -11214,6 +11253,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 			ufbxi_for_list(ufbx_color_set, set, mesh->color_sets) {
 				ufbxi_patch_index_pointer(uc, &set->vertex_color.indices.data);
+			}
+
+			// Generate normals if necessary
+			if (!mesh->vertex_normal.exists && uc->opts.generate_missing_normals) {
+				ufbxi_check(ufbxi_generate_normals(uc, mesh));
 			}
 
 			// Assign first UV and color sets as the "canonical" ones
