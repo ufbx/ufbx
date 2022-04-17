@@ -199,6 +199,12 @@ class CLCompiler(Compiler):
         if config.get("regression", False):
             args.append("/DUFBX_REGRESSION=1")
 
+        for key, val in config.get("defines", {}).items():
+            if not val:
+                args.append(f"/D{key}")
+            else:
+                args.append(f"/D{key}={val}")
+
         if config.get("openmp", False):
             args.append("/openmp")
         
@@ -305,6 +311,12 @@ class GCCCompiler(Compiler):
 
         if "mingw" in self.arch:
             args.append("-D__USE_MINGW_ANSI_STDIO=1")
+
+        for key, val in config.get("defines", {}).items():
+            if not val:
+                args.append(f"-D{key}")
+            else:
+                args.append(f"-D{key}={val}")
 
         args += sources
 
@@ -441,7 +453,6 @@ if argv.compiler:
 def gather(aws):
     return asyncio.gather(*aws)
 
-
 async def check_compiler(compiler):
     if await compiler.check_version():
         return [compiler]
@@ -530,6 +541,22 @@ async def compile_and_run_target(t, args):
         await run_target(t, args)
     return t
 
+async def run_viewer_target(target):
+    log_comment(f"-- Running viewer with {target.name} --")
+
+    for root, _, files in os.walk("data"):
+        for file in files:
+            if "_fail_" in file: continue
+            if "\U0001F602" in file: continue
+            path = os.path.join(root, file)
+            if "fuzz" in path: continue
+            if path.endswith(".fbx"):
+                target.log.clear()
+                target.ran = False
+                await run_target(target, [path])
+                if not target.ran:
+                    return
+
 def copy_file(src, dst):
     shutil.copy(src, dst)
     if sys.platform == "win32":
@@ -548,7 +575,7 @@ def decorate_arch(compiler, arch):
 
 tests = set(argv.tests)
 if not tests:
-    tests = ["tests", "picort", "domfuzz"]
+    tests = ["tests", "picort", "viewer", "domfuzz"]
 
 async def main():
     global exit_code
@@ -775,6 +802,38 @@ async def main():
                 for line in sse_target.log[1].splitlines(keepends=False):
                     log_comment(line)
 
+    if "viewer" in tests:
+        log_comment("-- Compiling and running viewer --")
+    
+        target_tasks = []
+
+        viewer_configs = {
+            "arch": arch_configs["arch"],
+            "sanitize": {
+                "": { },
+                "sanitize": { "san": True },
+            }
+        }
+
+        viewer_config = {
+            "sources": ["ufbx.c", "examples/viewer/viewer.c", "examples/viewer/external.c"],
+            "output": "viewer" + exe_suffix,
+            "optimize": True,
+            "defines": {
+                "TEST_VIEWER": "",
+            },
+        }
+        target_tasks += compile_permutations("viewer", viewer_config, viewer_configs, None)
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+        running_viewers = []
+        for target in targets:
+            if target.compiled:
+                running_viewers.append(run_viewer_target(target))
+        await gather(running_viewers)
+
     if "domfuzz" in tests:
         log_comment("-- Compiling and running domfuzz --")
     
@@ -812,11 +871,6 @@ async def main():
             version = int(version.group(0)) if version else 0
             return (score, version)
 
-        image_path = os.path.join("build", "images")
-        if not os.path.exists(image_path):
-            os.makedirs(image_path, exist_ok=True)
-            log_mkdir(image_path)
-
         target = max(targets, key=target_score)
 
         if target.compiled:
@@ -830,7 +884,9 @@ async def main():
                 "max2009_blob_6100_binary",
             ]
 
+            failed = False
             for root, _, files in os.walk("data"):
+                if failed: break
                 for file in files:
                     if "_ascii" in file: continue
                     if any(f in file for f in too_heavy_files): continue
@@ -841,6 +897,7 @@ async def main():
                         target.ran = False
                         await run_target(target, [path])
                         if not target.ran:
+                            failed = True
                             break
 
     for target in all_targets:

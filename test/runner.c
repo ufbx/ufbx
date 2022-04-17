@@ -2607,6 +2607,10 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	ufbx_load_opts user_opts = { 0 }; \
 	ufbxt_do_file_test(#file, &ufbxt_test_fn_imp_file_##name, NULL, user_opts, true, false); } \
 	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
+#define UFBXT_FILE_TEST_OPTS_ALT(name, file, get_opts) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
+	void ufbxt_test_fn_file_##name(void) { \
+	ufbxt_do_file_test(#file, &ufbxt_test_fn_imp_file_##name, NULL, get_opts(), false, false); } \
+	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
 #define UFBXT_FILE_TEST_ALLOW_ERROR(name) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
 	void ufbxt_test_fn_file_##name(void) { \
 	ufbx_load_opts user_opts = { 0 }; \
@@ -2622,6 +2626,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 #undef UFBXT_FILE_TEST_SUFFIX
 #undef UFBXT_FILE_TEST_SUFFIX_OPTS
 #undef UFBXT_FILE_TEST_ALT
+#undef UFBXT_FILE_TEST_OPTS_ALT
 #undef UFBXT_FILE_TEST_ALLOW_ERROR
 #define UFBXT_IMPL 0
 #define UFBXT_TEST(name) { #name, &ufbxt_test_fn_##name },
@@ -2630,6 +2635,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 #define UFBXT_FILE_TEST_SUFFIX(name, suffix) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
 #define UFBXT_FILE_TEST_SUFFIX_OPTS(name, suffix, get_opts) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
 #define UFBXT_FILE_TEST_ALT(name, file) { #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST_OPTS_ALT(name, file, get_opts) { #name, &ufbxt_test_fn_file_##name },
 #define UFBXT_FILE_TEST_ALLOW_ERROR(name) { #name, &ufbxt_test_fn_file_##name },
 ufbxt_test g_tests[] = {
 	#include "all_tests.h"
