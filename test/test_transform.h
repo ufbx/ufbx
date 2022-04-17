@@ -257,7 +257,6 @@ static ufbx_load_opts ufbxt_scale_to_cm_opts()
 }
 #endif
 
-
 UFBXT_FILE_TEST_OPTS(maya_scale_no_inherit, ufbxt_scale_to_cm_opts)
 #if UFBXT_IMPL
 {
