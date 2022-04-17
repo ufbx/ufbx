@@ -207,8 +207,11 @@ class Function(Base):
     is_inline: bool
     member_name: Optional[str]
     ffi_name: Optional[str]
+    catch_name: Optional[str]
     is_ffi: bool
+    is_catch: bool
     has_error: bool
+    has_panic: bool
     alloc_type: str
     return_array_scale: int
 
@@ -489,6 +492,7 @@ def parse_file(decls):
 
     # HACK
     file.constants["UFBX_ERROR_STACK_MAX_DEPTH"] = Constant(name="UFBX_ERROR_STACK_MAX_DEPTH", value_int=8)
+    file.constants["UFBX_PANIC_MESSAGE_LENGTH"] = Constant(name="UFBX_PANIC_MESSAGE_LENGTH", value_int=128)
 
     for decl in decls:
         parse_decl(file, decl)
@@ -679,6 +683,7 @@ pod_structs = [
     "ufbx_curve_point",
     "ufbx_surface_point",
     "ufbx_topo_edge",
+    "ufbx_coordinate_axes",
 ]
 
 input_structs = [
@@ -834,6 +839,10 @@ if __name__ == "__main__":
                     arg.by_ref = True
                     arg.kind = "error"
                     func.has_error = True
+                elif not typ.is_const and inner.key == "ufbx_panic":
+                    arg.by_ref = True
+                    arg.kind = "panic"
+                    func.has_panic = True
                 elif typ.is_const and inner.key == "ufbx_stream":
                     arg.by_ref = True
                     arg.kind = "stream"
@@ -867,10 +876,14 @@ if __name__ == "__main__":
                 arg.return_ref = True
 
     for func in file.functions.values():
-        if func.name.startswith("ufbx_ffi_"):
+        if "_ffi_" in func.name:
             func.is_ffi = True
-            non_ffi = func.name.replace("ufbx_ffi_", "ufbx_", 1)
+            non_ffi = func.name.replace("_ffi_", "_", 1)
             file.functions[non_ffi].ffi_name = func.name
+        elif "_catch_" in func.name:
+            func.is_catch = True
+            non_catch = func.name.replace("_catch_", "_", 1)
+            file.functions[non_catch].catch_name = func.name
 
     file.functions["ufbx_load_file"].alloc_type = "scene"
     file.functions["ufbx_load_file_len"].alloc_type = "scene"
