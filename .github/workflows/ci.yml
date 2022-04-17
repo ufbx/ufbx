@@ -71,6 +71,13 @@ jobs:
       - name: Run domfuzz
         run: python misc/run_tests.py domfuzz
 
+  ci_viewer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run viewer
+        run: python misc/run_tests.py viewer
+
   ci_wasm:
     runs-on: ubuntu-latest
     steps:
