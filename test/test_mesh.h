@@ -579,3 +579,47 @@ UFBXT_FILE_TEST(maya_lod_group)
 }
 #endif
 
+UFBXT_FILE_TEST(synthetic_missing_normals)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(!mesh->vertex_normal.exists);
+	ufbxt_assert(!mesh->skinned_normal.exists);
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_generate_normals_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.generate_missing_normals = true;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(synthetic_missing_normals_generated, synthetic_missing_normals, ufbxt_generate_normals_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->vertex_normal.exists);
+	ufbxt_assert(mesh->skinned_normal.exists);
+
+	for (size_t face_ix = 0; face_ix < mesh->faces.count; face_ix++) {
+		ufbx_face face = mesh->faces.data[face_ix];
+		ufbx_vec3 normal = ufbx_get_weighted_face_normal(&mesh->vertex_position, face);
+		normal = ufbxt_normalize(normal);
+		for (size_t i = 0; i < face.num_indices; i++) {
+			ufbx_vec3 mesh_normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, face.index_begin + i);
+			ufbx_vec3 skinned_normal = ufbx_get_vertex_vec3(&mesh->skinned_normal, face.index_begin + i);
+			ufbxt_assert_close_vec3(err, normal, mesh_normal);
+			ufbxt_assert_close_vec3(err, normal, skinned_normal);
+		}
+	}
+}
+#endif
+
+
