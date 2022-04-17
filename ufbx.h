@@ -3070,7 +3070,7 @@ extern const uint32_t ufbx_source_version;
 //   ufbx_subdivide_mesh()
 //   ufbx_tessellate_nurbs_surface()
 //   ufbx_free_mesh()
-bool ufbx_abi ufbx_is_thread_safe();
+ufbx_abi bool ufbx_is_thread_safe();
 
 // Load a scene from a `size` byte memory buffer at `data`
 ufbx_abi ufbx_scene *ufbx_load_memory(

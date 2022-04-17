@@ -16973,7 +16973,7 @@ ufbx_abi bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, 
 	return true;
 }
 
-ufbx_abi bool ufbx_abi ufbx_is_thread_safe()
+bool ufbx_abi ufbx_abi ufbx_is_thread_safe()
 {
 	return UFBXI_THREAD_SAFE != 0;
 }
