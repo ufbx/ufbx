@@ -44,6 +44,7 @@
 typedef double ufbx_real;
 
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
+#define UFBX_PANIC_MESSAGE_LENGTH 128
 
 // -- Language
 
@@ -3026,7 +3027,8 @@ typedef struct ufbx_geometry_cache_data_opts {
 
 typedef struct ufbx_panic {
 	bool did_panic;
-	char message[128];
+	size_t message_length;
+	char message[UFBX_PANIC_MESSAGE_LENGTH];
 } ufbx_panic;
 
 // -- API

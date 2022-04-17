@@ -1275,7 +1275,7 @@ static ufbxi_noinline void ufbxi_panicf_imp(ufbx_panic *panic, const char *fmt, 
 
 	if (panic) {
 		panic->did_panic = true;
-		int result = snprintf(panic->message, sizeof(panic->message), fmt, args);
+		int result = vsnprintf(panic->message, sizeof(panic->message), fmt, args);
 		if (result < 0) result = 0;
 		size_t length = ufbxi_min_sz((size_t)result, sizeof(panic->message) - 1);
 
@@ -1283,6 +1283,7 @@ static ufbxi_noinline void ufbxi_panicf_imp(ufbx_panic *panic, const char *fmt, 
 		// not write the null terminator on trunctation, it's always safe to do so
 		// let's just do it unconditionally here...
 		panic->message[length] = '\0';
+		panic->message_length = length;
 	} else {
 		fprintf(stderr, "ufbx panic: ");
 		vfprintf(stderr, fmt, args);
