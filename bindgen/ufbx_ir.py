@@ -208,8 +208,10 @@ class Function(Base):
     member_name: Optional[str]
     ffi_name: Optional[str]
     catch_name: Optional[str]
+    len_name: Optional[str]
     is_ffi: bool
     is_catch: bool
+    is_len: bool
     has_error: bool
     has_panic: bool
     alloc_type: str
@@ -884,6 +886,10 @@ if __name__ == "__main__":
             func.is_catch = True
             non_catch = func.name.replace("_catch_", "_", 1)
             file.functions[non_catch].catch_name = func.name
+        elif func.name.endswith("_len"):
+            func.is_len = True
+            non_len = func.name[:-4]
+            file.functions[non_len].len_name = func.name
 
     file.functions["ufbx_load_file"].alloc_type = "scene"
     file.functions["ufbx_load_file_len"].alloc_type = "scene"
