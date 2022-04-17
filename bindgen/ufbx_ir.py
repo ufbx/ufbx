@@ -154,6 +154,7 @@ class Struct(Base):
     is_input: bool
     is_callback: bool
     is_interface: bool
+    member_functions: List[str]
 
 class EnumValue(Base):
     name: str    
@@ -216,6 +217,7 @@ class Function(Base):
     has_panic: bool
     alloc_type: str
     return_array_scale: int
+    nullable_return: bool
 
 class Global(Base):
     name: str
@@ -231,6 +233,12 @@ class Declaration(Base):
     kind: str
     name: str
 
+class MemberFunction(Base):
+    func: str
+    self_type: str
+    member_name: str
+    self_index: int
+
 class File(Base):
     constants: Dict[str, Constant]
     types: Dict[str, Type]
@@ -240,6 +248,7 @@ class File(Base):
     functions: Dict[str, Function]
     globals: Dict[str, Global]
     typedefs: Dict[str, Typedef]
+    member_functions: Dict[str, MemberFunction]
     declarations: List[Declaration]
     element_types: List[str]
 
@@ -712,6 +721,59 @@ union_prefer = {
     "ufbx_scene.0": 0,
 }
 
+member_functions = [
+    MemberFunction(func="ufbx_find_prop_len", self_type="ufbx_props"),
+    MemberFunction(func="ufbx_find_prop", self_type="ufbx_props"),
+    MemberFunction(func="ufbx_find_real_len", self_type="ufbx_props"),
+    MemberFunction(func="ufbx_find_real", self_type="ufbx_props"),
+    MemberFunction(func="ufbx_find_vec3_len", self_type="ufbx_props"),
+    MemberFunction(func="ufbx_find_vec3", self_type="ufbx_props"),
+    MemberFunction(func="ufbx_find_int_len", self_type="ufbx_props"),
+    MemberFunction(func="ufbx_find_int", self_type="ufbx_props"),
+    MemberFunction(func="ufbx_find_bool_len", self_type="ufbx_props"),
+    MemberFunction(func="ufbx_find_bool", self_type="ufbx_props"),
+    MemberFunction(func="ufbx_find_string_len", self_type="ufbx_props"),
+    MemberFunction(func="ufbx_find_string", self_type="ufbx_props"),
+    MemberFunction(func="ufbx_find_element_len", self_type="ufbx_scene"),
+    MemberFunction(func="ufbx_find_element", self_type="ufbx_scene"),
+    MemberFunction(func="ufbx_find_node_len", self_type="ufbx_scene"),
+    MemberFunction(func="ufbx_find_node", self_type="ufbx_scene"),
+    MemberFunction(func="ufbx_find_anim_stack_len", self_type="ufbx_scene"),
+    MemberFunction(func="ufbx_find_anim_stack", self_type="ufbx_scene"),
+    MemberFunction(func="ufbx_find_anim_prop_len", self_type="ufbx_anim_layer"),
+    MemberFunction(func="ufbx_find_anim_prop", self_type="ufbx_anim_layer"),
+    MemberFunction(func="ufbx_find_anim_props", self_type="ufbx_anim_layer"),
+    MemberFunction(func="ufbx_get_compatible_matrix_for_normals", self_type="ufbx_node"),
+    MemberFunction(func="ufbx_evaluate_curve", self_type="ufbx_anim_curve", member_name="evaluate"),
+    MemberFunction(func="ufbx_evaluate_anim_value_real", self_type="ufbx_anim_value", member_name="evaluate_real"),
+    MemberFunction(func="ufbx_evaluate_anim_value_vec2", self_type="ufbx_anim_value", member_name="evaluate_vec2"),
+    MemberFunction(func="ufbx_evaluate_anim_value_vec3", self_type="ufbx_anim_value", member_name="evaluate_vec3"),
+    MemberFunction(func="ufbx_evaluate_transform", self_type="ufbx_node"),
+    MemberFunction(func="ufbx_evaluate_blend_weight", self_type="ufbx_blend_channel"),
+    MemberFunction(func="ufbx_evaluate_scene", self_type="ufbx_scene", member_name="evaluate"),
+    MemberFunction(func="ufbx_find_prop_texture_len", self_type="ufbx_material"),
+    MemberFunction(func="ufbx_find_prop_texture", self_type="ufbx_material"),
+    MemberFunction(func="ufbx_find_shader_prop_len", self_type="ufbx_shader"),
+    MemberFunction(func="ufbx_find_shader_prop", self_type="ufbx_shader"),
+    MemberFunction(func="ufbx_catch_get_skin_vertex_matrix", self_type="ufbx_skin_deformer"),
+    MemberFunction(func="ufbx_get_skin_vertex_matrix", self_type="ufbx_skin_deformer"),
+    MemberFunction(func="ufbx_get_blend_shape_vertex_offset", self_type="ufbx_blend_shape", member_name="get_vertex_offset"),
+    MemberFunction(func="ufbx_get_blend_vertex_offset", self_type="ufbx_blend_deformer", member_name="get_vertex_offset"),
+    MemberFunction(func="ufbx_add_blend_shape_vertex_offsets", self_type="ufbx_blend_shape", member_name="add_vertex_offsets"),
+    MemberFunction(func="ufbx_add_blend_vertex_offsets", self_type="ufbx_blend_deformer", member_name="add_vertex_offsets"),
+    MemberFunction(func="ufbx_evaluate_nurbs_basis", self_type="ufbx_nurbs_basis", member_name="evaluate"),
+    MemberFunction(func="ufbx_evaluate_nurbs_curve", self_type="ufbx_nurbs_curve", member_name="evaluate"),
+    MemberFunction(func="ufbx_evaluate_nurbs_surface", self_type="ufbx_nurbs_surface", member_name="evaluate"),
+    MemberFunction(func="ufbx_tessellate_nurbs_surface", self_type="ufbx_nurbs_surface", member_name="tessellate"),
+    MemberFunction(func="ufbx_catch_triangulate_face", self_type="ufbx_mesh"),
+    MemberFunction(func="ufbx_triangulate_face", self_type="ufbx_mesh"),
+    MemberFunction(func="ufbx_subdivide_mesh", self_type="ufbx_mesh", member_name="subdivide"),
+    MemberFunction(func="ufbx_read_geometry_cache_real", self_type="ufbx_cache_frame", member_name="read_real"),
+    MemberFunction(func="ufbx_sample_geometry_cache_real", self_type="ufbx_cache_channel", member_name="sample_real"),
+    MemberFunction(func="ufbx_read_geometry_cache_vec3", self_type="ufbx_cache_frame", member_name="read_vec3"),
+    MemberFunction(func="ufbx_sample_geometry_cache_vec3", self_type="ufbx_cache_channel", member_name="sample_vec3"),
+]
+
 def find_index(list, predicate):
     for i,v in enumerate(list):
         if predicate(v):
@@ -874,7 +936,7 @@ if __name__ == "__main__":
             typ = file.types[arg.type]
             if typ.base_name in file.element_types:
                 arg.return_ref = True
-            if typ.base_name in { "ufbx_scene", "ufbx_anim", "ufbx_element", "ufbx_geometry_cache" }:
+            if typ.base_name in { "ufbx_scene", "ufbx_anim", "ufbx_element", "ufbx_geometry_cache", "ufbx_props" }:
                 arg.return_ref = True
 
     for func in file.functions.values():
@@ -918,6 +980,31 @@ if __name__ == "__main__":
     file.functions["ufbx_sample_geometry_cache_real"].return_array_scale = 1
     file.functions["ufbx_read_geometry_cache_vec3"].return_array_scale = 1
     file.functions["ufbx_sample_geometry_cache_vec3"].return_array_scale = 1
+
+    for func in file.functions.values():
+        t = file.types[func.return_type]
+        if t.kind == "pointer" and not func.alloc_type:
+            func.nullable_return = True
+
+    for mf in member_functions:
+        if not mf.member_name:
+            mf.member_name = mf.func.replace("ufbx_", "")
+        fn = file.functions[mf.func]
+
+        self_index = -1
+        for ix, arg in enumerate(fn.arguments):
+            t = file.types[arg.type]
+            while t.inner:
+                t = file.types[t.inner]
+            if t.base_name == mf.self_type:
+                self_index = ix
+        if self_index < 0:
+            raise RuntimeError(f"Could not find self ({mf.self_type}) for member {mf.func}")
+        mf.self_index = self_index
+
+        file.structs[mf.self_type].member_functions.append(mf.func)
+
+        file.member_functions[mf.func] = mf
 
     for arch in archs:
         layout_file(arch, file)
