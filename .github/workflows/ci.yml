@@ -130,4 +130,4 @@ jobs:
       - name: Compile check_fbx.c
         run: clang -O2 test/check_fbx.c -lm -o build/check_fbx
       - name: Run dataset tests
-        run: python3 misc/check_dataset.py --exe build/check_fbx --root /mnt/fbx-files --host-url https://localhost
+        run: python3 misc/check_dataset.py --exe build/check_fbx --root /mnt/fbx-files --host-url https://ufbx-dataset.b-cdn.net
