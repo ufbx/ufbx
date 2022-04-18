@@ -148,8 +148,6 @@ int main(int argc, char **argv)
 
 	ufbxt_check_scene(scene);
 
-	ufbxt_assert(scene->markers.count == 0);
-
 	if (obj_path) {
 		size_t obj_size;
 		void *obj_data = ufbxt_read_file(obj_path, &obj_size);
