@@ -7763,6 +7763,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_bone(ufbxi_context *uc, ufb
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_marker(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type, ufbx_marker_type type)
 {
 	(void)node;
+	(void)sub_type;
 
 	ufbx_marker *marker = ufbxi_push_element(uc, info, ufbx_marker, UFBX_ELEMENT_MARKER);
 	ufbxi_check(marker);
