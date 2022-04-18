@@ -11821,9 +11821,17 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		uc->scene.combined_anim.layers.data = descs;
 		uc->scene.combined_anim.layers.count = num_layers;
 
+		uc->scene.combined_anim.time_begin = uc->scene.anim.time_begin;
+		uc->scene.combined_anim.time_end = uc->scene.anim.time_end;
+
 		ufbx_anim_layer_desc *desc = descs;
 		ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
-			ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, (*p_stack)->layers) {
+			ufbx_anim_stack *stack = *p_stack;
+
+			if (stack->time_begin < uc->scene.combined_anim.time_begin) uc->scene.combined_anim.time_begin = stack->time_begin;
+			if (stack->time_end > uc->scene.combined_anim.time_end) uc->scene.combined_anim.time_end = stack->time_end;
+
+			ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, stack->layers) {
 				desc->layer = *p_layer;
 				desc->weight = 1.0f;
 				desc++;

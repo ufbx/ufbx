@@ -25,6 +25,7 @@ bool g_verbose = false;
 #include "../ufbx.h"
 #include "check_scene.h"
 #include "testing_utils.h"
+#include "cputime.h"
 
 #ifdef _WIN32
 int wmain(int argc, wchar_t **wide_argv)
@@ -47,9 +48,12 @@ int main(int argc, char **argv)
 	}
 #endif
 
+	cputime_begin_init();
+
 	const char *path = NULL;
 	const char *obj_path = NULL;
 	const char *dump_obj_path = NULL;
+	int profile_runs = 1;
 
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-v")) {
@@ -58,6 +62,8 @@ int main(int argc, char **argv)
 			if (++i < argc) obj_path = argv[i];
 		} else if (!strcmp(argv[i], "--dump-obj")) {
 			if (++i < argc) dump_obj_path = argv[i];
+		} else if (!strcmp(argv[i], "--profile-runs")) {
+			if (++i < argc) profile_runs = atoi(argv[i]);
 		} else {
 			path = argv[i];
 		}
@@ -109,6 +115,35 @@ int main(int argc, char **argv)
 		ufbx_version_minor(scene->metadata.exporter_version),
 		ufbx_version_patch(scene->metadata.exporter_version),
 		application);
+
+	{
+		size_t fbx_size = 0;
+		void *fbx_data = ufbxt_read_file(path, &fbx_size);
+		ufbxt_assert(fbx_data);
+
+		cputime_end_init();
+
+		for (int i = 0; i < profile_runs; i++) {
+			uint64_t load_begin = cputime_cpu_tick();
+			ufbx_scene *memory_scene = ufbx_load_memory(fbx_data, fbx_size, NULL, NULL);
+			uint64_t load_end = cputime_cpu_tick();
+
+			printf("Loaded in %.2fms: File %.1fkB, temp %.1fkB (%zu allocs), result %.1fkB (%zu allocs)\n",
+				cputime_cpu_delta_to_sec(NULL, load_end - load_begin) * 1e3,
+				(double)fbx_size * 1e-3,
+				(double)scene->metadata.temp_memory_used * 1e-3,
+				scene->metadata.temp_allocs,
+				(double)scene->metadata.result_memory_used * 1e-3,
+				scene->metadata.result_allocs
+			);
+
+			ufbxt_assert(memory_scene);
+			ufbx_free_scene(memory_scene);
+		}
+
+
+		free(fbx_data);
+	}
 
 	int result = 0;
 
@@ -164,7 +199,7 @@ int main(int argc, char **argv)
 
 		ufbx_scene *state;
 		if (obj_file->animation_frame >= 0) {
-			double time = (double)obj_file->animation_frame / (double)scene->settings.frames_per_second;
+			double time = scene->anim.time_begin + (double)obj_file->animation_frame / (double)scene->settings.frames_per_second;
 			ufbx_evaluate_opts eval_opts = { 0 };
 			eval_opts.evaluate_skinning = true;
 			eval_opts.evaluate_caches = true;
@@ -203,5 +238,7 @@ int main(int argc, char **argv)
 	return result;
 }
 
+#define CPUTIME_IMPLEMENTATION
 
+#include "cputime.h"
 #include "../ufbx.c"

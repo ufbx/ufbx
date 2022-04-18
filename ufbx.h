@@ -2089,6 +2089,10 @@ typedef struct ufbx_anim {
 	ufbx_const_prop_override_list prop_overrides;
 
 	bool ignore_connections;
+
+	// Not used by evaluation
+	double time_begin;
+	double time_end;
 } ufbx_anim;
 
 struct ufbx_anim_stack {

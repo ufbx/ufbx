@@ -53,6 +53,7 @@ if __name__ == "__main__":
     parser.add_argument("--root", help="Root directory to search for .json files")
     parser.add_argument("--host-url", help="URL where the files are hosted")
     parser.add_argument("--exe", help="check_fbx.c executable")
+    parser.add_argument("--verbose", action="store_true", help="Print verbose information")
     argv = parser.parse_args()
 
     cases = list(gather_dataset_tasks(root_dir=argv.root))
@@ -78,14 +79,19 @@ if __name__ == "__main__":
         args.append(case.fbx_path)
         if case.obj_path:
             args += ["--obj", case.obj_path]
-        print("$ " + " ".join(args))
+        if argv.verbose:
+            print("$ " + " ".join(args))
+        print()
 
         try:
             subprocess.check_call(args)
-            print("SUCCESS")
+            print()
+            print("-- SUCCESS --")
             ok_count += 1
         except subprocess.CalledProcessError:
-            print("FAIL")
+            print()
+            print("-- FAIL --")
+        print()
     print(f"{ok_count}/{len(cases)}")
 
     if ok_count < len(cases):

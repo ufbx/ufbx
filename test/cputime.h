@@ -33,7 +33,11 @@ double cputime_os_delta_to_sec(const cputime_sync_span *span, uint64_t os_delta)
 double cputime_cpu_tick_to_sec(const cputime_sync_span *span, uint64_t cpu_tick);
 double cputime_os_tick_to_sec(const cputime_sync_span *span, uint64_t os_tick);
 
+#endif
+
 #if defined(CPUTIME_IMPLEMENTATION)
+#ifndef CPUTIME_IMEPLEMENTED
+#define CPUTIME_IMEPLEMENTED
 
 #if defined(_WIN32)
 
@@ -239,5 +243,4 @@ double cputime_os_tick_to_sec(const cputime_sync_span *span, uint64_t os_tick)
 }
 
 #endif
-
 #endif
