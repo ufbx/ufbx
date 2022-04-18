@@ -125,6 +125,8 @@ typedef struct {
 
 	ufbxt_obj_exporter exporter;
 
+	double position_scale;
+
 } ufbxt_obj_file;
 
 typedef struct {
@@ -249,6 +251,7 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 	obj->normalize_units = false;
 	obj->animation_frame = -1;
 	obj->exporter = UFBXT_OBJ_EXPORTER_UNKNOWN;
+	obj->position_scale = 1.0;
 
 	line = (char*)obj_data;
 	for (;;) {
@@ -383,6 +386,10 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 			double tolerance = 0.0;
 			if (sscanf(line, "ufbx:tolerance=%lf", &tolerance) == 1) {
 				obj->tolerance = (ufbx_real)tolerance;
+			}
+			double position_scale = 0.0;
+			if (sscanf(line, "ufbx:position_scale=%lf", &position_scale) == 1) {
+				obj->position_scale = (ufbx_real)position_scale;
 			}
 			int frame = 0;
 			if (sscanf(line, "ufbx:frame=%d", &frame) == 1) {
@@ -776,13 +783,23 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 						fn.z /= fn_len;
 					}
 
-					if (obj->normalize_units) {
-						fp.x *= scene->settings.unit_meters;
-						fp.y *= scene->settings.unit_meters;
-						fp.z *= scene->settings.unit_meters;
-						op.x *= scene->settings.unit_meters;
-						op.y *= scene->settings.unit_meters;
-						op.z *= scene->settings.unit_meters;
+					double scale = 1.0;
+
+					if (obj->normalize_units && scene->settings.unit_meters != 1.0) {
+						scale *= scene->settings.unit_meters;
+					}
+
+					if (obj->position_scale != 1.0) {
+						scale *= obj->position_scale;
+					}
+
+					if (scale != 1.0) {
+						fp.x *= (ufbx_real)scale;
+						fp.y *= (ufbx_real)scale;
+						fp.z *= (ufbx_real)scale;
+						op.x *= (ufbx_real)scale;
+						op.y *= (ufbx_real)scale;
+						op.z *= (ufbx_real)scale;
 					}
 
 					ufbxt_assert_close_vec3(p_err, op, fp);
