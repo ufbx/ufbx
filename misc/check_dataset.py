@@ -13,6 +13,9 @@ class TestCase(NamedTuple):
     license: str
     url: str
 
+def log(message=""):
+    print(message, flush=True)
+
 def gather_dataset_tasks(root_dir):
     for root, _, files in os.walk(root_dir):
         for filename in files:
@@ -66,33 +69,33 @@ if __name__ == "__main__":
 
     ok_count = 0
     for case in cases:
-        print(f"-- '{case.title}' by '{case.author}' ({case.license}) --")
-        print(f"  source url: {case.url}")
+        log(f"-- '{case.title}' by '{case.author}' ({case.license}) --")
+        log(f"  source url: {case.url}")
         if argv.host_url:
-            print(f"    .fbx url: {fmt_url(case.fbx_path, case.root)}")
+            log(f"    .fbx url: {fmt_url(case.fbx_path, case.root)}")
             if case.obj_path:
-                print(f"    .obj url: {fmt_url(case.obj_path, case.root)}")
+                log(f"    .obj url: {fmt_url(case.obj_path, case.root)}")
             if case.mtl_path:
-                print(f"    .mtl url: {fmt_url(case.mtl_path, case.root)}")
+                log(f"    .mtl url: {fmt_url(case.mtl_path, case.root)}")
 
         args = [argv.exe]
         args.append(case.fbx_path)
         if case.obj_path:
             args += ["--obj", case.obj_path]
         if argv.verbose:
-            print("$ " + " ".join(args))
-        print()
+            log("$ " + " ".join(args))
+        log()
 
         try:
             subprocess.check_call(args)
-            print()
-            print("-- SUCCESS --")
+            log()
+            log("-- SUCCESS --")
             ok_count += 1
         except subprocess.CalledProcessError:
-            print()
-            print("-- FAIL --")
-        print()
-    print(f"{ok_count}/{len(cases)}")
+            log()
+            log("-- FAIL --")
+        log()
+    log(f"{ok_count}/{len(cases)}")
 
     if ok_count < len(cases):
         exit(1)
