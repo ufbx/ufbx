@@ -881,6 +881,8 @@ async def main():
                 "maya_slime_7500_binary",
                 "maya_character_6100_binary",
                 "maya_character_7500_binary",
+                "maya_human_ik_6100_binary",
+                "maya_human_ik_7400_binary",
                 "max2009_blob_6100_binary",
             ]
 
