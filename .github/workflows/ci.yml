@@ -118,3 +118,16 @@ jobs:
           fetch-depth: 2
       - name: Run tests
         run: python3 misc/run_tests.py tests --no-sanitize --threads 2
+
+  ci_dataset:
+    runs-on: [self-hosted, ARM64]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      - name: Create build directory
+        run: mkdir build
+      - name: Compile check_fbx.c
+        run: clang -O2 test/check_fbx.c -lm -o build/check_fbx
+      - name: Run datase tests
+        run: python3 misc/check_dataset.py --exe build/check_fbx --root /mnt/fbx-files --url https://localhost
