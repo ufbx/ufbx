@@ -129,5 +129,5 @@ jobs:
         run: mkdir build
       - name: Compile check_fbx.c
         run: clang -O2 test/check_fbx.c -lm -o build/check_fbx
-      - name: Run datase tests
-        run: python3 misc/check_dataset.py --exe build/check_fbx --root /mnt/fbx-files --url https://localhost
+      - name: Run dataset tests
+        run: python3 misc/check_dataset.py --exe build/check_fbx --root /mnt/fbx-files --host-url https://localhost
