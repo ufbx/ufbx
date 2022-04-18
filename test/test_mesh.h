@@ -622,4 +622,9 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_missing_normals_generated, synthetic_missing_
 }
 #endif
 
-
+UFBXT_FILE_TEST(blender_279_nested_meshes)
+#if UFBXT_IMPL
+{
+	// Diff to .obj file with nested objects and FBXASC escaped names
+}
+#endif
