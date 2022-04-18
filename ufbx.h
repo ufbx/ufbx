@@ -318,6 +318,7 @@ typedef struct ufbx_nurbs_trim_boundary ufbx_nurbs_trim_boundary;
 typedef struct ufbx_procedural_geometry ufbx_procedural_geometry;
 typedef struct ufbx_stereo_camera ufbx_stereo_camera;
 typedef struct ufbx_camera_switcher ufbx_camera_switcher;
+typedef struct ufbx_marker ufbx_marker;
 typedef struct ufbx_lod_group ufbx_lod_group;
 
 // Deformers
@@ -371,6 +372,7 @@ UFBX_LIST_TYPE(ufbx_nurbs_trim_boundary_list, ufbx_nurbs_trim_boundary*);
 UFBX_LIST_TYPE(ufbx_procedural_geometry_list, ufbx_procedural_geometry*);
 UFBX_LIST_TYPE(ufbx_stereo_camera_list, ufbx_stereo_camera*);
 UFBX_LIST_TYPE(ufbx_camera_switcher_list, ufbx_camera_switcher*);
+UFBX_LIST_TYPE(ufbx_marker_list, ufbx_marker*);
 UFBX_LIST_TYPE(ufbx_lod_group_list, ufbx_lod_group*);
 UFBX_LIST_TYPE(ufbx_skin_deformer_list, ufbx_skin_deformer*);
 UFBX_LIST_TYPE(ufbx_skin_cluster_list, ufbx_skin_cluster*);
@@ -412,6 +414,7 @@ typedef enum ufbx_element_type {
 	UFBX_ELEMENT_PROCEDURAL_GEOMETRY, // < `ufbx_procedural_geometry`
 	UFBX_ELEMENT_STEREO_CAMERA,       // < `ufbx_stereo_camera`
 	UFBX_ELEMENT_CAMERA_SWITCHER,     // < `ufbx_camera_switcher`
+	UFBX_ELEMENT_MARKER,              // < `ufbx_marker`
 	UFBX_ELEMENT_LOD_GROUP,           // < `ufbx_lod_group`
 	UFBX_ELEMENT_SKIN_DEFORMER,       // < `ufbx_skin_deformer`
 	UFBX_ELEMENT_SKIN_CLUSTER,        // < `ufbx_skin_cluster`
@@ -1299,6 +1302,29 @@ typedef struct ufbx_lod_level {
 } ufbx_lod_level;
 
 UFBX_LIST_TYPE(ufbx_lod_level_list, ufbx_lod_level);
+
+typedef enum ufbx_marker_type {
+	UFBX_MARKER_UNKNOWN,     // < Unknown marker type
+	UFBX_MARKER_FK_EFFECTOR, // < FK (Forward Kinematics) effector
+	UFBX_MARKER_IK_EFFECTOR, // < IK (Inverse Kinematics) effector
+
+	UFBX_MARKER_TYPE_COUNT,
+	UFBX_MARKER_TYPE_FORCE_32BIT = 0x7fffffff,
+} ufbx_marker_type;
+
+// Tracking marker for effectors
+struct ufbx_marker {
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t typed_id;
+		ufbx_node_list instances;
+	}; };
+
+	// Type of the marker
+	ufbx_marker_type type;
+};
 
 // Group of LOD (Level of Detail) levels for an object.
 // The actual LOD models are defined in the parent `ufbx_node.children`.
@@ -2560,6 +2586,7 @@ struct ufbx_scene {
 			ufbx_procedural_geometry_list procedural_geometries;
 			ufbx_stereo_camera_list stereo_cameras;
 			ufbx_camera_switcher_list camera_switchers;
+			ufbx_marker_list markers;
 			ufbx_lod_group_list lod_groups;
 
 			// Deformers

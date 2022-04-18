@@ -2402,6 +2402,7 @@ static const char ufbxi_EmissiveColor[] = "EmissiveColor";
 static const char ufbxi_Entry[] = "Entry";
 static const char ufbxi_FBXHeaderExtension[] = "FBXHeaderExtension";
 static const char ufbxi_FBXVersion[] = "FBXVersion";
+static const char ufbxi_FKEffector[] = "FKEffector";
 static const char ufbxi_FbxPropertyEntry[] = "FbxPropertyEntry";
 static const char ufbxi_FbxSemanticEntry[] = "FbxSemanticEntry";
 static const char ufbxi_FieldOfViewX[] = "FieldOfViewX";
@@ -2427,6 +2428,7 @@ static const char ufbxi_GeometryUVInfo[] = "GeometryUVInfo";
 static const char ufbxi_Geometry[] = "Geometry";
 static const char ufbxi_GlobalSettings[] = "GlobalSettings";
 static const char ufbxi_HotSpot[] = "HotSpot";
+static const char ufbxi_IKEffector[] = "IKEffector";
 static const char ufbxi_Implementation[] = "Implementation";
 static const char ufbxi_Indexes[] = "Indexes";
 static const char ufbxi_InheritType[] = "InheritType";
@@ -2679,6 +2681,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Entry, 5 },
 	{ ufbxi_FBXHeaderExtension, 18 },
 	{ ufbxi_FBXVersion, 10 },
+	{ ufbxi_FKEffector, 10 },
 	{ ufbxi_FbxPropertyEntry, 16 },
 	{ ufbxi_FbxSemanticEntry, 16 },
 	{ ufbxi_FieldOfView, 11 },
@@ -2704,6 +2707,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_GeometryUVInfo, 14 },
 	{ ufbxi_GlobalSettings, 14 },
 	{ ufbxi_HotSpot, 7 },
+	{ ufbxi_IKEffector, 10 },
 	{ ufbxi_Implementation, 14 },
 	{ ufbxi_Indexes, 7 },
 	{ ufbxi_InheritType, 11 },
@@ -7756,6 +7760,18 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_bone(ufbxi_context *uc, ufb
 	return 1;
 }
 
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_marker(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type, ufbx_marker_type type)
+{
+	(void)node;
+
+	ufbx_marker *marker = ufbxi_push_element(uc, info, ufbx_marker, UFBX_ELEMENT_MARKER);
+	ufbxi_check(marker);
+
+	marker->type = type;
+
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_skin(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_skin_deformer *skin = ufbxi_push_element(uc, info, ufbx_skin_deformer, UFBX_ELEMENT_SKIN_DEFORMER);
@@ -8428,6 +8444,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_c
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_stereo_camera), UFBX_ELEMENT_STEREO_CAMERA));
 	} else if (sub_type == ufbxi_CameraSwitcher) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_CAMERA_SWITCHER));
+	} else if (sub_type == ufbxi_FKEffector) {
+		ufbxi_check(ufbxi_read_marker(uc, node, &attrib_info, sub_type, UFBX_MARKER_FK_EFFECTOR));
+	} else if (sub_type == ufbxi_IKEffector) {
+		ufbxi_check(ufbxi_read_marker(uc, node, &attrib_info, sub_type, UFBX_MARKER_IK_EFFECTOR));
 	} else if (sub_type == ufbxi_LodGroup) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_lod_group), UFBX_ELEMENT_LOD_GROUP));
 	} else {
@@ -8505,6 +8525,10 @@ ufbxi_nodiscard static int ufbxi_read_objects(ufbxi_context *uc)
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_stereo_camera), UFBX_ELEMENT_STEREO_CAMERA));
 			} else if (sub_type == ufbxi_CameraSwitcher) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_CAMERA_SWITCHER));
+			} else if (sub_type == ufbxi_FKEffector) {
+				ufbxi_check(ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKER_FK_EFFECTOR));
+			} else if (sub_type == ufbxi_IKEffector) {
+				ufbxi_check(ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKER_IK_EFFECTOR));
 			} else if (sub_type == ufbxi_LodGroup) {
 				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_lod_group), UFBX_ELEMENT_LOD_GROUP));
 			} else {
@@ -16931,6 +16955,7 @@ const size_t ufbx_element_type_size[UFBX_ELEMENT_TYPE_COUNT] = {
 	sizeof(ufbx_procedural_geometry),
 	sizeof(ufbx_stereo_camera),
 	sizeof(ufbx_camera_switcher),
+	sizeof(ufbx_marker),
 	sizeof(ufbx_lod_group),
 	sizeof(ufbx_skin_deformer),
 	sizeof(ufbx_skin_cluster),

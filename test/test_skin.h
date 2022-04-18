@@ -20,7 +20,7 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_norm
 
 	size_t obj_size = 0;
 	void *obj_data = ufbxt_read_file(buf, &obj_size);
-	ufbxt_obj_file *obj_file = obj_data ? ufbxt_load_obj(obj_data, obj_size) : NULL;
+	ufbxt_obj_file *obj_file = obj_data ? ufbxt_load_obj(obj_data, obj_size, NULL) : NULL;
 	ufbxt_assert(obj_file);
 	free(obj_data);
 
