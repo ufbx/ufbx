@@ -12119,7 +12119,7 @@ ufbxi_noinline static void ufbxi_update_light(ufbx_light *light)
 	// NOTE: FBX seems to store intensities 100x of what's specified in at least
 	// Maya and Blender, should there be a quirks mode to not do this for specific
 	// exporters. Does the FBX SDK do this transparently as well?
-	light->intensity = ufbxi_find_real(&light->props, ufbxi_Intensity, 100.0f) / (ufbx_real)100.0;
+	light->intensity = ufbxi_find_real(&light->props, ufbxi_Intensity, (ufbx_real)100.0) / (ufbx_real)100.0;
 
 	light->color = ufbxi_find_vec3(&light->props, ufbxi_Color, 1.0f, 1.0f, 1.0f);
 	light->type = (ufbx_light_type)ufbxi_find_enum(&light->props, ufbxi_LightType, 0, UFBX_LIGHT_VOLUME);
@@ -12419,7 +12419,7 @@ ufbxi_noinline static void ufbxi_update_constraint(ufbx_constraint *constraint)
 
 	constraint->transform_offset = ufbxi_get_constraint_transform(props);
 
-	constraint->weight = ufbxi_find_real(props, ufbxi_Weight, 100.0f) / (ufbx_real)100.0;
+	constraint->weight = ufbxi_find_real(props, ufbxi_Weight, (ufbx_real)100.0) / (ufbx_real)100.0;
 
 	ufbxi_for_list(ufbx_constraint_target, target, constraint->targets) {
 		ufbx_node *node = target->node;
