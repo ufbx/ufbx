@@ -106,6 +106,8 @@ if __name__ == "__main__":
             extra_str = " [" + ", ".join(extra) + "]"
 
         log(f"-- '{case.title}' by '{case.author}' ({case.license}){extra_str} --")
+
+        log()
         log(f"  source url: {case.url}")
         if argv.host_url:
             log(f"    .fbx url: {fmt_url(case.fbx_path, case.root)}")
@@ -114,7 +116,8 @@ if __name__ == "__main__":
             if case.mtl_path:
                 log(f"    .mtl url: {fmt_url(case.mtl_path, case.root)}")
 
-        log("$ " + " ".join(shlex.quote(a) for a in args))
+        log()
+        log("$ " + " ".join(args))
         log()
 
         try:
