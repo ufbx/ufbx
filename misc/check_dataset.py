@@ -1,7 +1,11 @@
+from asyncio.format_helpers import extract_stack
 import os
 import json
 from typing import NamedTuple, Optional
 import subprocess
+import glob
+import re
+import shlex
 
 class TestCase(NamedTuple):
     root: str
@@ -12,6 +16,7 @@ class TestCase(NamedTuple):
     author: str
     license: str
     url: str
+    frame: Optional[int]
 
 def log(message=""):
     print(message, flush=True)
@@ -33,21 +38,36 @@ def gather_dataset_tasks(root_dir):
             if not os.path.exists(obj_path):
                 obj_path = None
 
-            mtl_path = path.replace(".json", ".mtl")
-            if not os.path.exists(mtl_path):
-                mtl_path = None
+            obj_prefix = obj_path[:-4] + "_"
+            obj_glob = f"{obj_prefix}*.obj"
+            obj_paths = [obj_path] + glob.glob(obj_glob)
 
-            case = TestCase(
-                root=root_dir,
-                fbx_path=fbx_path,
-                obj_path=obj_path,
-                mtl_path=mtl_path,
-                title=desc["title"],
-                author=desc["author"],
-                license=desc["license"],
-                url=desc["url"])
+            for obj_path in obj_paths:
+                mtl_path = obj_path.replace(".obj", ".mtl")
+                if not os.path.exists(mtl_path):
+                    mtl_path = None
 
-            yield case
+                frame = None
+
+                flags = obj_path[len(obj_prefix):-4].split("_")
+                for flag in flags:
+                    m = re.match(r"frame(\d+)", flag)
+                    if m:
+                        frame = int(m.group(1))
+
+                case = TestCase(
+                    root=root_dir,
+                    fbx_path=fbx_path,
+                    obj_path=obj_path,
+                    mtl_path=mtl_path,
+                    title=desc["title"],
+                    author=desc["author"],
+                    license=desc["license"],
+                    url=desc["url"],
+                    frame=frame,
+                )
+
+                yield case
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -69,7 +89,23 @@ if __name__ == "__main__":
 
     ok_count = 0
     for case in cases:
-        log(f"-- '{case.title}' by '{case.author}' ({case.license}) --")
+        extra = []
+
+        args = [argv.exe]
+        args.append(case.fbx_path)
+
+        if case.obj_path:
+            args += ["--obj", case.obj_path]
+
+        if case.frame is not None:
+            extra.append(f"frame {case.frame}")
+            args += ["--frame", str(case.frame)]
+
+        extra_str = ""
+        if extra:
+            extra_str = " [" + ", ".join(extra) + "]"
+
+        log(f"-- '{case.title}' by '{case.author}' ({case.license}){extra_str} --")
         log(f"  source url: {case.url}")
         if argv.host_url:
             log(f"    .fbx url: {fmt_url(case.fbx_path, case.root)}")
@@ -78,24 +114,20 @@ if __name__ == "__main__":
             if case.mtl_path:
                 log(f"    .mtl url: {fmt_url(case.mtl_path, case.root)}")
 
-        args = [argv.exe]
-        args.append(case.fbx_path)
-        if case.obj_path:
-            args += ["--obj", case.obj_path]
-        if argv.verbose:
-            log("$ " + " ".join(args))
+        log("$ " + " ".join(shlex.quote(a) for a in args))
         log()
 
         try:
             subprocess.check_call(args)
             log()
-            log("-- SUCCESS --")
+            log("-- PASS --")
             ok_count += 1
         except subprocess.CalledProcessError:
             log()
             log("-- FAIL --")
         log()
-    log(f"{ok_count}/{len(cases)}")
+
+    log(f"{ok_count}/{len(cases)} tests passed")
 
     if ok_count < len(cases):
         exit(1)

@@ -54,6 +54,7 @@ int main(int argc, char **argv)
 	const char *obj_path = NULL;
 	const char *dump_obj_path = NULL;
 	int profile_runs = 1;
+	int frame = INT_MIN;
 
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-v")) {
@@ -64,6 +65,11 @@ int main(int argc, char **argv)
 			if (++i < argc) dump_obj_path = argv[i];
 		} else if (!strcmp(argv[i], "--profile-runs")) {
 			if (++i < argc) profile_runs = atoi(argv[i]);
+		} else if (!strcmp(argv[i], "--frame")) {
+			if (++i < argc) frame = atoi(argv[i]);
+		} else if (argv[i][0] == '-') {
+			fprintf(stderr, "Unrecognized flag: %s\n", argv[i]);
+			exit(1);
 		} else {
 			path = argv[i];
 		}
@@ -198,8 +204,13 @@ int main(int argc, char **argv)
 		obj_file->normalize_units = true;
 
 		ufbx_scene *state;
-		if (obj_file->animation_frame >= 0) {
+		if (obj_file->animation_frame >= 0 || frame != INT_MIN) {
 			double time = scene->anim.time_begin + (double)obj_file->animation_frame / (double)scene->settings.frames_per_second;
+
+			if (frame != INT_MIN) {
+				time = (double)frame / (double)scene->settings.frames_per_second;
+			}
+
 			ufbx_evaluate_opts eval_opts = { 0 };
 			eval_opts.evaluate_skinning = true;
 			eval_opts.evaluate_caches = true;
