@@ -677,6 +677,40 @@ static void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *fbx_node, ufbx_
 
 }
 
+typedef struct {
+	const char *cat_name;
+	ufbx_node *node;
+} ufbxt_obj_node;
+
+static int ufbxt_cmp_string(const void *va, const void *vb)
+{
+	const char **a = (const char**)va, **b = (const char**)vb;
+	return strcmp(*a, *b);
+}
+
+static int ufbxt_cmp_obj_node(const void *va, const void *vb)
+{
+	const ufbxt_obj_node *a = (const ufbxt_obj_node*)va, *b = (const ufbxt_obj_node*)vb;
+	return strcmp(a->cat_name, b->cat_name);
+}
+
+static size_t ufbxt_obj_group_key(char *cat_buf, size_t cat_cap, const char **groups, size_t num_groups)
+{
+	ufbxt_assert(num_groups > 0);
+	qsort((void*)groups, num_groups, sizeof(const char*), &ufbxt_cmp_string);
+
+	char *cat_ptr = cat_buf, *cat_end = cat_buf + cat_cap;
+	for (size_t i = 0; i < num_groups; i++) {
+		size_t space = (size_t)(cat_end - cat_ptr);
+		int res = snprintf(cat_ptr, space, "%s\n", groups[i]);
+		ufbxt_assert(res >= 0 && res < space);
+		cat_ptr += res;
+	}
+
+	*--cat_ptr = '\0';
+	return cat_ptr - cat_buf;
+}
+
 static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, bool check_deformed_normals)
 {
 	ufbx_node **used_nodes = (ufbx_node**)malloc(obj->num_meshes * sizeof(ufbx_node*));
@@ -684,31 +718,100 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 
 	size_t num_used_nodes = 0;
 
+	char cat_name[4096];
+	const char *groups[64];
+
+	char *cat_name_data = NULL;
+	size_t cat_name_offset = 0;
+
+	ufbxt_obj_node *obj_nodes = (ufbxt_obj_node*)calloc(scene->nodes.count, sizeof(ufbxt_obj_node));
+	ufbxt_assert(obj_nodes);
+
+	size_t num_obj_nodes = 0;
+
+	for (int step = 0; step < 2; step++) {
+		for (size_t node_i = 0; node_i < scene->nodes.count; node_i++) {
+			ufbx_node *node = scene->nodes.data[node_i];
+
+			size_t num_groups = 0;
+			ufbx_node *parent = node;
+			while (parent && !parent->is_root) {
+				ufbxt_assert(num_groups < ufbxt_arraycount(groups));
+				groups[num_groups++] = parent->name.data;
+				parent = parent->parent;
+			}
+
+			if (num_groups == 0) continue;
+
+			size_t cat_len = ufbxt_obj_group_key(cat_name, sizeof(cat_name), groups, num_groups);
+			if (cat_name_data) {
+				char *dst = cat_name_data + cat_name_offset;
+				memcpy(dst, cat_name, cat_len + 1);
+
+				ufbxt_obj_node *obj_node = &obj_nodes[num_obj_nodes++];
+				obj_node->cat_name = dst;
+				obj_node->node = node;
+			}
+			cat_name_offset += cat_len + 1;
+		}
+
+		cat_name_data = (char*)malloc(cat_name_offset);
+		ufbxt_assert(cat_name_data);
+		cat_name_offset = 0;
+	}
+
+	qsort(obj_nodes, num_obj_nodes, sizeof(ufbxt_obj_node), &ufbxt_cmp_obj_node);
+
 	for (size_t mesh_i = 0; mesh_i < obj->num_meshes; mesh_i++) {
 		ufbxt_obj_mesh *obj_mesh = &obj->meshes[mesh_i];
 		if (obj_mesh->num_indices == 0) continue;
 
 		ufbx_node *node = NULL;
 
-		for (size_t group_i = 0; group_i < obj_mesh->num_groups; group_i++) {
-			const char *name = obj_mesh->groups[group_i];
+		// Search for a node containing all the groups
+		{
+			ufbxt_obj_group_key(cat_name, sizeof(cat_name), obj_mesh->groups, obj_mesh->num_groups);
+			ufbxt_obj_node key = { cat_name };
+			ufbxt_obj_node *found = (ufbxt_obj_node*)bsearch(&key, obj_nodes, num_obj_nodes,
+				sizeof(ufbxt_obj_node), &ufbxt_cmp_obj_node);
 
-			node = ufbx_find_node(scene, name);
-			if (!node && obj->exporter == UFBXT_OBJ_EXPORTER_BLENDER) {
-				// Blender concatenates _Material to names
-				size_t name_len = strcspn(name, "_");
-				node = ufbx_find_node_len(scene, name, name_len);
-			}
-
-			if (node && node->mesh) {
-				bool seen = false;
-				for (size_t i = 0; i < num_used_nodes; i++) {
-					if (used_nodes[i] == node) {
-						seen = true;
-						break;
+			if (found) {
+				if (found->node && found->node->mesh) {
+					bool seen = false;
+					for (size_t i = 0; i < num_used_nodes; i++) {
+						if (used_nodes[i] == found->node) {
+							seen = true;
+							break;
+						}
+					}
+					if (!seen) {
+						node = found->node;
 					}
 				}
-				if (!seen) break;
+			}
+		}
+
+		if (!node) {
+			for (size_t group_i = 0; group_i < obj_mesh->num_groups; group_i++) {
+				const char *name = obj_mesh->groups[group_i];
+
+				node = ufbx_find_node(scene, name);
+				if (!node && obj->exporter == UFBXT_OBJ_EXPORTER_BLENDER) {
+					// Blender concatenates _Material to names
+					size_t name_len = strcspn(name, "_");
+					node = ufbx_find_node_len(scene, name, name_len);
+				}
+
+				if (node && node->mesh) {
+					bool seen = false;
+					for (size_t i = 0; i < num_used_nodes; i++) {
+						if (used_nodes[i] == node) {
+							seen = true;
+							break;
+						}
+					}
+					if (!seen) break;
+				}
 			}
 		}
 
@@ -778,9 +881,11 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 						fn = ufbx_transform_direction(&norm_mat, fn);
 
 						ufbx_real fn_len = (ufbx_real)sqrt(fn.x*fn.x + fn.y*fn.y + fn.z*fn.z);
-						fn.x /= fn_len;
-						fn.y /= fn_len;
-						fn.z /= fn_len;
+						if (fn_len > 0.00001f) {
+							fn.x /= fn_len;
+							fn.y /= fn_len;
+							fn.z /= fn_len;
+						}
 					}
 
 					double scale = 1.0;
@@ -806,7 +911,8 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 
 					if (check_normals) {
 						ufbx_real on2 = on.x*on.x + on.y*on.y + on.z*on.z;
-						if (on2 > 0.01f) {
+						ufbx_real fn2 = fn.x*fn.x + fn.y*fn.y + fn.z*fn.z;
+						if (on2 > 0.01f && fn2 > 0.01f) {
 							ufbxt_assert_close_vec3(p_err, on, fn);
 						}
 					}
@@ -822,6 +928,8 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		}
 	}
 
+	free(obj_nodes);
+	free(cat_name_data);
 	free(used_nodes);
 }
 
