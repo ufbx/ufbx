@@ -755,6 +755,8 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			cat_name_offset += cat_len + 1;
 		}
 
+		if (cat_name_data) break;
+
 		cat_name_data = (char*)malloc(cat_name_offset);
 		ufbxt_assert(cat_name_data);
 		cat_name_offset = 0;
