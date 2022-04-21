@@ -820,6 +820,9 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		ufbxt_assert(node);
 		ufbx_mesh *mesh = node->mesh;
 
+		// Multiple skin deformers are not supported
+		if (mesh->skin_deformers.count > 1) continue;
+
 		used_nodes[num_used_nodes++] = node;
 
 		if (!mesh && node->attrib_type == UFBX_ELEMENT_NURBS_SURFACE) {
