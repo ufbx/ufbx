@@ -34,40 +34,46 @@ def gather_dataset_tasks(root_dir):
             fbx_path = path.replace(".json", ".fbx")
             assert os.path.exists(fbx_path)
 
-            obj_path = path.replace(".json", ".obj")
-            if not os.path.exists(obj_path):
-                obj_path = None
+            seen_objs = set()
+            for obj_ext in (".obj", ".obj.gz"):
+                obj_path = path.replace(".json", obj_ext)
+                obj_prefix = obj_path[:-len(obj_ext)] + "_"
+                obj_glob = f"{obj_prefix}*.{obj_ext}"
+                obj_paths = [obj_path] + glob.glob(obj_glob)
 
-            obj_prefix = obj_path[:-4] + "_"
-            obj_glob = f"{obj_prefix}*.obj"
-            obj_paths = [obj_path] + glob.glob(obj_glob)
+                for obj_path in obj_paths:
+                    if not os.path.exists(obj_path): continue
 
-            for obj_path in obj_paths:
-                mtl_path = obj_path.replace(".obj", ".mtl")
-                if not os.path.exists(mtl_path):
-                    mtl_path = None
+                    mtl_path = obj_path.replace(obj_ext, ".mtl")
+                    if not os.path.exists(mtl_path):
+                        mtl_path = None
 
-                frame = None
+                    frame = None
 
-                flags = obj_path[len(obj_prefix):-4].split("_")
-                for flag in flags:
-                    m = re.match(r"frame(\d+)", flag)
-                    if m:
-                        frame = int(m.group(1))
+                    base_name = obj_path[:-len(obj_ext)]
+                    if base_name in seen_objs:
+                        continue
+                    seen_objs.add(base_name)
 
-                case = TestCase(
-                    root=root_dir,
-                    fbx_path=fbx_path,
-                    obj_path=obj_path,
-                    mtl_path=mtl_path,
-                    title=desc["title"],
-                    author=desc["author"],
-                    license=desc["license"],
-                    url=desc["url"],
-                    frame=frame,
-                )
+                    flags = obj_path[len(obj_prefix):-len(obj_ext)].split("_")
+                    for flag in flags:
+                        m = re.match(r"frame(\d+)", flag)
+                        if m:
+                            frame = int(m.group(1))
 
-                yield case
+                    case = TestCase(
+                        root=root_dir,
+                        fbx_path=fbx_path,
+                        obj_path=obj_path,
+                        mtl_path=mtl_path,
+                        title=desc["title"],
+                        author=desc["author"],
+                        license=desc["license"],
+                        url=desc["url"],
+                        frame=frame,
+                    )
+
+                    yield case
 
 if __name__ == "__main__":
     from argparse import ArgumentParser

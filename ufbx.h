@@ -2862,6 +2862,12 @@ struct ufbx_inflate_input {
 	// (optional) Change the progress scope
 	uint64_t progress_size_before;
 	uint64_t progress_size_after;
+
+	// (optional) No the DEFLATE header
+	bool no_header;
+
+	// (optional) No the Adler32 checksum
+	bool no_checksum;
 };
 
 // Persistent data between `ufbx_inflate()` calls

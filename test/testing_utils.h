@@ -143,6 +143,224 @@ static int ufbxt_cmp_obj_mesh(const void *va, const void *vb)
 	return 0;
 }
 
+static uint16_t ufbxt_read_u16(const void *ptr) {
+	const char *p = (const char*)ptr;
+	return (uint16_t)(
+		(unsigned)(uint8_t)p[0] << 0u |
+		(unsigned)(uint8_t)p[1] << 8u );
+}
+
+static uint32_t ufbxt_read_u32(const void *ptr) {
+	const char *p = (const char*)ptr;
+	return (uint32_t)(
+		(unsigned)(uint8_t)p[0] <<  0u |
+		(unsigned)(uint8_t)p[1] <<  8u |
+		(unsigned)(uint8_t)p[2] << 16u |
+		(unsigned)(uint8_t)p[3] << 24u );
+}
+
+static void *ufbxt_decompress_gzip(const void *gz_data, size_t gz_size, size_t *p_size)
+{
+	const uint8_t *gz = (const uint8_t*)gz_data;
+	if (gz_size < 10) return NULL;
+	if (gz[0] != 0x1f || gz[1] != 0x8b || gz[2] != 0x08) return NULL;
+	uint8_t flags = gz[3];
+
+	size_t offset = 10;
+
+	if (flags & 0x4) {
+		// FEXTRA
+		if (gz_size - offset < 2) return NULL;
+		uint16_t xlen = ufbxt_read_u16(gz + offset);
+		offset += 2;
+		if (gz_size - offset < xlen) return NULL;
+		offset += xlen;
+	}
+
+	if (flags & 0x8) {
+		// FNAME
+		const uint8_t *end = (const uint8_t*)memchr(gz + offset, 0, gz_size - offset);
+		if (!end) return NULL;
+		offset = (size_t)(end - gz) + 1;
+	}
+
+	if (flags & 0x10) {
+		// FCOMMENT
+		const uint8_t *end = (const uint8_t*)memchr(gz + offset, 0, gz_size - offset);
+		if (!end) return NULL;
+		offset = (size_t)(end - gz) + 1;
+	}
+
+	if (flags & 0x2) {
+		// FHCRC
+		if (gz_size - offset < 2) return NULL;
+		offset += 2;
+	}
+
+	uint32_t isize = ufbxt_read_u32(gz + gz_size - 4);
+
+	void *dst = malloc(isize + 1);
+	if (!dst) return NULL;
+
+	ufbx_inflate_retain retain;
+	retain.initialized = false;
+
+	ufbx_inflate_input input = { 0 };
+
+	input.data = gz + offset;
+	input.data_size = gz_size - offset;
+
+	input.total_size = input.data_size;
+
+	input.no_header = true;
+	input.no_checksum = true;
+
+	ptrdiff_t result = ufbx_inflate(dst, isize, &input, &retain);
+	if (result != isize) {
+		free(dst);
+		return NULL;
+	}
+
+	((char*)dst)[isize] = '\0';
+
+	*p_size = isize;
+	return dst;
+}
+
+#define UFBXT_MAX_PARSED_INT 
+#define UFBXT_MAX_EXPONENT 325
+
+static double ufbxt_pow10_table[UFBXT_MAX_EXPONENT*2 + 1];
+static volatile bool ufbxt_parsing_init_done = false;
+
+static void ufbxt_init_parsing()
+{
+	if (ufbxt_parsing_init_done) return;
+
+	for (int32_t i = 0; i <= UFBXT_MAX_EXPONENT*2; i++) {
+		ufbxt_pow10_table[i] = pow(10.0, (double)(i - UFBXT_MAX_EXPONENT));
+	}
+
+	ufbxt_parsing_init_done = true;
+}
+
+static size_t ufbxt_parse_ints(int32_t *p_result, size_t max_count, const char **str)
+{
+	const char *c = *str;
+
+	size_t num;
+	for (num = 0; num < max_count; num++) {
+		if (*c == '/') {
+			c++;
+			p_result[num] = 0;
+			continue;
+		}
+
+		int32_t sign = 1;
+		if (*c == '+') {
+			c++;
+		} else if (*c == '-') {
+			sign = -1;
+			c++;
+		}
+
+		if (!(*c >= '0' && *c <= '9')) return num;
+
+		const uint32_t max_value = UINT64_C(100000000);
+		uint32_t value = 0;
+
+		do {
+			if (value < max_value) {
+				value = value * 10 + (uint64_t)(*c++ - '0');
+			} else {
+				return num;
+			}
+		} while (*c >= '0' && *c <= '9');
+
+		p_result[num] = (int32_t)value * sign;
+
+		if (*c != '/') return num;
+		c++;
+	}
+
+	*str = c;
+	return num;
+}
+
+static bool ufbxt_parse_reals(ufbx_real *p_result, size_t count, const char *str)
+{
+	const char *c = str;
+
+	for (size_t i = 0; i < count; i++) {
+		// Skip separator
+		while (*c == ' ') c++;
+
+		const uint64_t max_value = UINT64_C(1000000000000000000);
+		uint64_t value = 0;
+
+		double sign = 1.0;
+		if (*c == '-') {
+			sign = -1.0;
+			c++;
+		} else if (*c == '+') {
+			c++;
+		}
+
+		int32_t exponent = 0;
+
+		if (!(*c >= '0' && *c <= '9')) return false;
+
+		do {
+			if (value < max_value) {
+				value = value * 10 + (uint64_t)(*c++ - '0');
+			} else {
+				exponent--;
+			}
+		} while (*c >= '0' && *c <= '9');
+
+		if (*c == '.') {
+			c++;
+
+			while (*c >= '0' && *c <= '9') {
+				if (value < max_value) {
+					value = value * 10 + (uint64_t)(*c++ - '0');
+					exponent--;
+				}
+			}
+
+			if ((*c | 0x20) == 'e') {
+				c++;
+				int32_t expsign = 1;
+				if (*c == '+') {
+					c++;
+				} else if (*c == '-') {
+					expsign = -1;
+					c++;
+				}
+
+				int32_t exp = 0;
+				while (*c >= '0' && *c <= '9') {
+					if (exp < 4096) {
+						exp = exp * 10 + (int32_t)(*c++ - '0');
+					}
+				}
+
+				exponent += expsign * exp;
+			}
+		}
+
+		if (exponent >= -UFBXT_MAX_EXPONENT && exponent <= UFBXT_MAX_EXPONENT) {
+			p_result[i] = (ufbx_real)(sign * ufbxt_pow10_table[exponent + UFBXT_MAX_EXPONENT] * (double)value);
+		} else if (exponent < 0) {
+			p_result[i] = 0.0f;
+		} else {
+			p_result[i] = (ufbx_real)INFINITY;
+		}
+	}
+
+	return true;
+}
+
 static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufbxt_load_obj_opts *opts)
 {
 	ufbxt_load_obj_opts zero_opts;
@@ -150,6 +368,8 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 		memset(&zero_opts, 0, sizeof(zero_opts));
 		opts = &zero_opts;
 	}
+
+	ufbxt_init_parsing();
 
 	size_t num_positions = 0;
 	size_t num_normals = 0;
@@ -253,6 +473,8 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 	obj->exporter = UFBXT_OBJ_EXPORTER_UNKNOWN;
 	obj->position_scale = 1.0;
 
+	static int HACKLINE;
+
 	line = (char*)obj_data;
 	for (;;) {
 		char *line_end = strpbrk(line, "\r\n");
@@ -262,14 +484,19 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 			*line_end = '\0';
 		}
 
+		HACKLINE++;
+
 		if (!strncmp(line, "v ", 2)) {
-			ufbxt_assert(sscanf(line, "v %lf %lf %lf", &dp->x, &dp->y, &dp->z) == 3);
+			line += 2;
+			ufbxt_assert(ufbxt_parse_reals(dp->v, 3, line));
 			dp++;
 		} else if (!strncmp(line, "vt ", 3)) {
-			ufbxt_assert(sscanf(line, "vt %lf %lf", &du->x, &du->y) == 2);
+			line += 3;
+			ufbxt_assert(ufbxt_parse_reals(du->v, 2, line));
 			du++;
 		} else if (!strncmp(line, "vn ", 3)) {
-			ufbxt_assert(sscanf(line, "vn %lf %lf %lf", &dn->x, &dn->y, &dn->z) == 3);
+			line += 3;
+			ufbxt_assert(ufbxt_parse_reals(dn->v, 3, line));
 			dn++;
 		} else if (!strncmp(line, "f ", 2)) {
 			ufbxt_assert(mesh);
@@ -287,13 +514,8 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 					continue;
 				}
 
-				int pi = 0, ui = 0, ni = 0;
-				if (sscanf(begin, "%d/%d/%d", &pi, &ui, &ni) == 3) {
-				} else if (sscanf(begin, "%d//%d", &pi, &ni) == 2) {
-				} else if (sscanf(begin, "%d/%d", &pi, &ui) == 2) {
-				} else {
-					ufbxt_assert(0 && "Failed to parse face indices");
-				}
+				int32_t indices[3] = { 0, 0, 0 };
+				ufbxt_parse_ints(indices, 3, &begin);
 
 				mesh->vertex_position.indices.count++;
 				mesh->vertex_normal.indices.count++;
@@ -303,9 +525,9 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 				mesh->vertex_normal.values.count = (size_t)(dn - normals);
 				mesh->vertex_uv.values.count = (size_t)(du - uvs);
 
-				*dpi++ = pi - 1;
-				*dni++ = ni - 1;
-				*dui++ = ui - 1;
+				*dpi++ = indices[0] - 1;
+				*dni++ = indices[2] - 1;
+				*dui++ = indices[1] - 1;
 				mesh->num_indices++;
 				df->num_indices++;
 
@@ -962,6 +1184,23 @@ static void *ufbxt_read_file(const char *name, size_t *p_size)
 
 	*p_size = size;
 	return data;
+}
+
+static void *ufbxt_read_file_ex(const char *name, size_t *p_size)
+{
+	size_t name_len = strlen(name);
+	if (name_len >= 3 && !memcmp(name + name_len - 3, ".gz", 3)) {
+		size_t gz_size = 0;
+		void *gz_data = ufbxt_read_file(name, &gz_size);
+		if (!gz_data) return NULL;
+
+		void *result = ufbxt_decompress_gzip(gz_data, gz_size, p_size);
+		free(gz_data);
+
+		return result;
+	} else {
+		return ufbxt_read_file(name, p_size);
+	}
 }
 
 #endif

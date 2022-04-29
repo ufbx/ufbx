@@ -1156,7 +1156,7 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 	if (dc.stream.cancelled) return -28;
 
 	// Zlib header
-	{
+	if (!input->no_header) {
 		size_t cmf = (size_t)(bits & 0xff);
 		size_t flg = (size_t)(bits >> 8) & 0xff;
 		bits >>= 16;
@@ -1250,12 +1250,14 @@ ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *inp
 		ufbxi_bit_refill(&bits, &left, &data, &dc.stream);
 		if (dc.stream.cancelled) return -28;
 
-		uint32_t ref = (uint32_t)bits;
-		ref = (ref>>24) | ((ref>>8)&0xff00) | ((ref<<8)&0xff0000) | (ref<<24);
+		if (!input->no_checksum) {
+			uint32_t ref = (uint32_t)bits;
+			ref = (ref>>24) | ((ref>>8)&0xff00) | ((ref<<8)&0xff0000) | (ref<<24);
 
-		uint32_t checksum = ufbxi_adler32(dc.out_begin, dc.out_ptr - dc.out_begin);
-		if (ref != checksum) {
-			return -9;
+			uint32_t checksum = ufbxi_adler32(dc.out_begin, dc.out_ptr - dc.out_begin);
+			if (ref != checksum) {
+				return -9;
+			}
 		}
 	}
 
@@ -5073,6 +5075,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 				input.total_size = encoded_size;
 				input.data = uc->data;
 				input.data_size = uc->data_size;
+				input.no_header = false;
 
 				if (uc->opts.progress_cb.fn) {
 					input.progress_cb = uc->opts.progress_cb;

@@ -192,7 +192,7 @@ int main(int argc, char **argv)
 
 	if (obj_path) {
 		size_t obj_size;
-		void *obj_data = ufbxt_read_file(obj_path, &obj_size);
+		void *obj_data = ufbxt_read_file_ex(obj_path, &obj_size);
 		if (!obj_data) {
 			fprintf(stderr, "Failed to read .obj file: %s\n", obj_path);
 			return 1;
