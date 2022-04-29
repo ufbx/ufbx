@@ -35,7 +35,7 @@ def gather_dataset_tasks(root_dir):
             assert os.path.exists(fbx_path)
 
             seen_objs = set()
-            for obj_ext in (".obj", ".obj.gz"):
+            for obj_ext in (".obj.gz", ".obj"):
                 obj_path = path.replace(".json", obj_ext)
                 obj_prefix = obj_path[:-len(obj_ext)] + "_"
                 obj_glob = f"{obj_prefix}*.{obj_ext}"
