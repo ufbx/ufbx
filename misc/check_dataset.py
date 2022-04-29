@@ -1,25 +1,90 @@
-from asyncio.format_helpers import extract_stack
 import os
 import json
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, List
 import subprocess
 import glob
 import re
-import shlex
 
-class TestCase(NamedTuple):
-    root: str
+class TestModel(NamedTuple):
     fbx_path: str
     obj_path: Optional[str]
     mtl_path: Optional[str]
+    frame: Optional[int]
+
+class TestCase(NamedTuple):
+    root: str
+    json_path: str
     title: str
     author: str
     license: str
     url: str
-    frame: Optional[int]
+    models: List[TestModel]
 
 def log(message=""):
     print(message, flush=True)
+
+def single_file(path):
+    if os.path.exists(path):
+        return [path]
+    else:
+        return []
+
+def strip_ext(path):
+    if path.endswith(".gz"):
+        path = path[:-3]
+    base, _ = os.path.splitext(path)
+    return base
+
+def get_fbx_files(json_path):
+    base_path = strip_ext(json_path)
+    yield from single_file(f"{base_path}.fbx")
+    yield from glob.glob(f"{glob.escape(base_path)}/*.fbx")
+
+def get_obj_files(fbx_path):
+    base_path = strip_ext(fbx_path)
+    yield from single_file(f"{base_path}.obj")
+    yield from single_file(f"{base_path}.obj.gz")
+    yield from glob.glob(f"{glob.escape(base_path)}_*.obj")
+    yield from glob.glob(f"{glob.escape(base_path)}_*.obj.gz")
+
+def get_mtl_files(obj_path):
+    base_path = strip_ext(obj_path)
+    yield from single_file(f"{base_path}.mtl")
+
+def remove_duplicate_files(paths):
+    seen = set()
+    for path in paths:
+        base = strip_ext(path)
+        if base in seen: continue
+        seen.add(base)
+        yield path
+
+def gather_case_models(json_path):
+    for fbx_path in get_fbx_files(json_path):
+        for obj_path in remove_duplicate_files(get_obj_files(fbx_path)):
+            mtl_path = next(get_mtl_files(obj_path), None)
+
+            fbx_base = strip_ext(fbx_path)
+            obj_base = strip_ext(obj_path)
+
+            flags = obj_base[len(fbx_base):].split("_")
+
+            # Parse flags
+            frame = None
+            for flag in flags:
+                m = re.match(r"frame(\d+)", flag)
+                if m:
+                    frame = int(m.group(1))
+
+            yield TestModel(
+                fbx_path=fbx_path,
+                obj_path=obj_path,
+                mtl_path=mtl_path,
+                frame=frame)
+
+        else:
+            # TODO: Handle objless fbx
+            pass
 
 def gather_dataset_tasks(root_dir):
     for root, _, files in os.walk(root_dir):
@@ -30,50 +95,19 @@ def gather_dataset_tasks(root_dir):
             path = os.path.join(root, filename)
             with open(path, "rt", encoding="utf-8") as f:
                 desc = json.load(f)
-            
-            fbx_path = path.replace(".json", ".fbx")
-            assert os.path.exists(fbx_path)
 
-            seen_objs = set()
-            for obj_ext in (".obj.gz", ".obj"):
-                obj_path = path.replace(".json", obj_ext)
-                obj_prefix = obj_path[:-len(obj_ext)] + "_"
-                obj_glob = f"{obj_prefix}*.{obj_ext}"
-                obj_paths = [obj_path] + glob.glob(obj_glob)
+            models = list(gather_case_models(path))
+            assert models
 
-                for obj_path in obj_paths:
-                    if not os.path.exists(obj_path): continue
-
-                    mtl_path = obj_path.replace(obj_ext, ".mtl")
-                    if not os.path.exists(mtl_path):
-                        mtl_path = None
-
-                    frame = None
-
-                    base_name = obj_path[:-len(obj_ext)]
-                    if base_name in seen_objs:
-                        continue
-                    seen_objs.add(base_name)
-
-                    flags = obj_path[len(obj_prefix):-len(obj_ext)].split("_")
-                    for flag in flags:
-                        m = re.match(r"frame(\d+)", flag)
-                        if m:
-                            frame = int(m.group(1))
-
-                    case = TestCase(
-                        root=root_dir,
-                        fbx_path=fbx_path,
-                        obj_path=obj_path,
-                        mtl_path=mtl_path,
-                        title=desc["title"],
-                        author=desc["author"],
-                        license=desc["license"],
-                        url=desc["url"],
-                        frame=frame,
-                    )
-
-                    yield case
+            yield TestCase(
+                root=root_dir,
+                json_path=path,
+                title=desc["title"],
+                author=desc["author"],
+                license=desc["license"],
+                url=desc["url"],
+                models=models,
+            )
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -93,50 +127,68 @@ if __name__ == "__main__":
         path = path.replace("\\", "/")
         return f"{argv.host_url}/{path}"
 
+    def fmt_rel(path, root=""):
+        if root:
+            path = os.path.relpath(path, root)
+        path = path.replace("\\", "/")
+        return f"{path}"
+
     ok_count = 0
+    test_count = 0
     for case in cases:
-        extra = []
 
-        args = [argv.exe]
-        args.append(case.fbx_path)
-
-        if case.obj_path:
-            args += ["--obj", case.obj_path]
-
-        if case.frame is not None:
-            extra.append(f"frame {case.frame}")
-            args += ["--frame", str(case.frame)]
-
-        extra_str = ""
-        if extra:
-            extra_str = " [" + ", ".join(extra) + "]"
-
-        log(f"-- '{case.title}' by '{case.author}' ({case.license}){extra_str} --")
-
+        log(f"== '{case.title}' by '{case.author}' ({case.license}) ==")
         log()
+
         log(f"  source url: {case.url}")
-        if argv.host_url:
-            log(f"    .fbx url: {fmt_url(case.fbx_path, case.root)}")
-            if case.obj_path:
-                log(f"    .obj url: {fmt_url(case.obj_path, case.root)}")
-            if case.mtl_path:
-                log(f"    .mtl url: {fmt_url(case.mtl_path, case.root)}")
-
-        log()
-        log("$ " + " ".join(args))
+        log(f"   .json url: {fmt_url(case.json_path, case.root)}")
         log()
 
-        try:
-            subprocess.check_call(args)
+        for model in case.models:
+            test_count += 1
+
+            args = [argv.exe]
+            args.append(model.fbx_path)
+
+            extra = []
+
+            if model.obj_path:
+                args += ["--obj", model.obj_path]
+
+            if model.frame is not None:
+                extra.append(f"frame {model.frame}")
+                args += ["--frame", str(model.frame)]
+
+            name = fmt_rel(model.fbx_path, case.root)
+
+            extra_str = ""
+            if extra:
+                extra_str = " [" + ", ".join(extra) + "]"
+
+            log(f"-- {name}{extra_str} --")
             log()
-            log("-- PASS --")
-            ok_count += 1
-        except subprocess.CalledProcessError:
+            if argv.host_url:
+                log(f"    .fbx url: {fmt_url(model.fbx_path, case.root)}")
+                if model.obj_path:
+                    log(f"    .obj url: {fmt_url(model.obj_path, case.root)}")
+                if model.mtl_path:
+                    log(f"    .mtl url: {fmt_url(model.mtl_path, case.root)}")
+
             log()
-            log("-- FAIL --")
-        log()
+            log("$ " + " ".join(args))
+            log()
 
-    log(f"{ok_count}/{len(cases)} tests passed")
+            try:
+                subprocess.check_call(args)
+                log()
+                log("-- PASS --")
+                ok_count += 1
+            except subprocess.CalledProcessError:
+                log()
+                log("-- FAIL --")
+            log()
 
-    if ok_count < len(cases):
+    log(f"{ok_count}/{test_count} tests passed")
+
+    if ok_count < test_count:
         exit(1)
