@@ -515,7 +515,7 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 				}
 
 				int32_t indices[3] = { 0, 0, 0 };
-				ufbxt_parse_ints(indices, 3, &begin);
+				ufbxt_parse_ints(indices, 3, (const char**)&begin);
 
 				mesh->vertex_position.indices.count++;
 				mesh->vertex_normal.indices.count++;
