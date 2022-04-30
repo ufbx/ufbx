@@ -42,10 +42,10 @@ def get_fbx_files(json_path):
 
 def get_obj_files(fbx_path):
     base_path = strip_ext(fbx_path)
-    yield from single_file(f"{base_path}.obj")
     yield from single_file(f"{base_path}.obj.gz")
-    yield from glob.glob(f"{glob.escape(base_path)}_*.obj")
+    yield from single_file(f"{base_path}.obj")
     yield from glob.glob(f"{glob.escape(base_path)}_*.obj.gz")
+    yield from glob.glob(f"{glob.escape(base_path)}_*.obj")
 
 def get_mtl_files(obj_path):
     base_path = strip_ext(obj_path)
