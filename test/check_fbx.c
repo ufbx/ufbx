@@ -206,7 +206,15 @@ int main(int argc, char **argv)
 
 		ufbx_scene *state;
 		if (obj_file->animation_frame >= 0 || frame != INT_MIN) {
-			double time = scene->anim.time_begin + (double)obj_file->animation_frame / (double)scene->settings.frames_per_second;
+			ufbx_anim anim = scene->anim;
+
+			if (obj_file->animation_name[0]) {
+				ufbx_anim_stack *stack = ufbx_find_anim_stack(scene, obj_file->animation_name);
+				ufbxt_assert(stack);
+				anim = stack->anim;
+			}
+
+			double time = anim.time_begin + (double)obj_file->animation_frame / (double)scene->settings.frames_per_second;
 
 			if (frame != INT_MIN) {
 				time = (double)frame / (double)scene->settings.frames_per_second;
@@ -215,7 +223,7 @@ int main(int argc, char **argv)
 			ufbx_evaluate_opts eval_opts = { 0 };
 			eval_opts.evaluate_skinning = true;
 			eval_opts.evaluate_caches = true;
-			state = ufbx_evaluate_scene(scene, &scene->anim, time, &eval_opts, NULL);
+			state = ufbx_evaluate_scene(scene, &anim, time, &eval_opts, NULL);
 			ufbxt_assert(state);
 		} else {
 			state = scene;

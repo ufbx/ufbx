@@ -127,6 +127,8 @@ typedef struct {
 
 	double position_scale;
 
+	char animation_name[128];
+
 } ufbxt_obj_file;
 
 typedef struct {
@@ -604,6 +606,12 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 			}
 			if (!strcmp(line, "ufbx:bad_uvs")) {
 				obj->bad_uvs = true;
+			}
+			if (!strncmp(line, "ufbx:animation=", 15)) {
+				line += 15;
+				size_t len = strcspn(line, "\r\n");
+				ufbxt_assert(len + 1 < sizeof(obj->animation_name));
+				memcpy(obj->animation_name, line, len);
 			}
 			double tolerance = 0.0;
 			if (sscanf(line, "ufbx:tolerance=%lf", &tolerance) == 1) {
