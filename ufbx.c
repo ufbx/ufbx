@@ -11812,8 +11812,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	}
 
 	if (uc->scene.anim_stacks.count > 0) {
-		uc->scene.anim = uc->scene.anim_stacks.data[0]->anim;
-
 		// Combine all animation stacks into one
 		size_t num_layers = 0;
 		ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
@@ -11825,15 +11823,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		uc->scene.combined_anim.layers.data = descs;
 		uc->scene.combined_anim.layers.count = num_layers;
 
-		uc->scene.combined_anim.time_begin = uc->scene.anim.time_begin;
-		uc->scene.combined_anim.time_end = uc->scene.anim.time_end;
-
 		ufbx_anim_layer_desc *desc = descs;
 		ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
 			ufbx_anim_stack *stack = *p_stack;
-
-			if (stack->time_begin < uc->scene.combined_anim.time_begin) uc->scene.combined_anim.time_begin = stack->time_begin;
-			if (stack->time_end > uc->scene.combined_anim.time_end) uc->scene.combined_anim.time_end = stack->time_end;
 
 			ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, stack->layers) {
 				desc->layer = *p_layer;
@@ -12406,6 +12398,9 @@ ufbxi_noinline static void ufbxi_update_anim_stack(ufbx_scene *scene, ufbx_anim_
 			stack->time_end = (double)end->value_int * scene->metadata.ktime_to_sec;
 		}
 	}
+
+	stack->anim.time_begin = stack->time_begin;
+	stack->anim.time_end = stack->time_end;
 }
 
 ufbxi_noinline static void ufbxi_update_display_layer(ufbx_display_layer *layer)
@@ -12499,6 +12494,23 @@ ufbxi_noinline static void ufbxi_update_constraint(ufbx_constraint *constraint)
 		constraint->constrain_rotation[1] = true;
 		constraint->constrain_rotation[2] = true;
 		constraint->ik_pole_vector = ufbx_find_vec3(props, "PoleVectorType", ufbx_zero_vec3);
+	}
+}
+
+ufbxi_noinline static void ufbxi_update_anim(ufbx_scene *scene)
+{
+	if (scene->anim_stacks.count > 0) {
+		scene->anim = scene->anim_stacks.data[0]->anim;
+
+		scene->combined_anim.time_begin = scene->anim.time_begin;
+		scene->combined_anim.time_end = scene->anim.time_end;
+
+		ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, scene->anim_stacks) {
+			ufbx_anim_stack *stack = *p_stack;
+
+			if (stack->time_begin < scene->combined_anim.time_begin) scene->combined_anim.time_begin = stack->time_begin;
+			if (stack->time_end > scene->combined_anim.time_end) scene->combined_anim.time_end = stack->time_end;
+		}
 	}
 }
 
@@ -12621,6 +12633,8 @@ static void ufbxi_update_scene(ufbx_scene *scene, bool initial)
 	ufbxi_for_ptr_list(ufbx_constraint, p_constraint, scene->constraints) {
 		ufbxi_update_constraint(*p_constraint);
 	}
+
+	ufbxi_update_anim(scene);
 }
 
 static ufbxi_noinline void ufbxi_update_scene_metadata(ufbx_metadata *metadata)
