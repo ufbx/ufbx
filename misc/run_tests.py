@@ -548,7 +548,7 @@ def decorate_arch(compiler, arch):
 
 tests = set(argv.tests)
 if not tests:
-    tests = ["tests", "picort", "domfuzz"]
+    tests = ["tests", "picort", "domfuzz", "readme"]
 
 async def main():
     global exit_code
@@ -842,6 +842,64 @@ async def main():
                         await run_target(target, [path])
                         if not target.ran:
                             break
+
+    if "readme" in tests:
+        log_comment("-- Compiling and running README.md --")
+
+        prologue = """
+            #include <stdio.h>
+            #include <stdlib.h>
+            #include "../ufbx.h"
+
+            void push_vertex(const ufbx_vec3 *position, const ufbx_vec3 *normal) { }
+            void push_pose(const ufbx_matrix *matrix) { }
+
+            int main(int argc, char **argv) {
+        """
+
+        epilogue = """
+            return 0;
+            }
+        """
+
+        readme_dst = os.path.join(build_path, "readme.c")
+        with open(readme_dst, "wt") as outf:
+            for line in prologue.strip().splitlines():
+                print(line.strip(), file=outf)
+
+            in_c = False
+            with open("README.md", "rt") as inf:
+                for line in inf:
+                    if line.strip() == "```c":
+                        in_c = True
+                    elif line.strip() == "```":
+                        in_c = False
+                    elif in_c:
+                        print(line.rstrip(), file=outf)
+
+            for line in epilogue.strip().splitlines():
+                print(line.strip(), file=outf)
+        
+        readme_cpp_dst = os.path.join(build_path, "readme.cpp")
+        shutil.copyfile(readme_dst, readme_cpp_dst)
+
+        target_tasks = []
+
+        readme_config = {
+            "sources": ["build/readme.c", "ufbx.c"],
+            "output": "readme" + exe_suffix,
+        }
+        target_tasks += compile_permutations("readme", readme_config, arch_configs, None)
+
+        readme_cpp_config = {
+            "sources": ["build/readme.cpp", "ufbx.c"],
+            "output": "readme_cpp" + exe_suffix,
+            "cpp": True,
+        }
+        target_tasks += compile_permutations("readme_cpp", readme_cpp_config, arch_configs, None)
+
+        targets = await gather(target_tasks)
+        all_targets += targets
 
     for target in all_targets:
         if target.ok: continue
