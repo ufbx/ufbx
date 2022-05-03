@@ -109,8 +109,10 @@ async def run_cmd(*args, realtime_output=False, env=None, cwd=None):
     out = err = ""
     ok = False
 
+    exec_cmd = cmd
     if cwd:
-        log_cmdline = subprocess.list2cmdline([os.path.relpath(cmd, cwd)] + cmd_args)
+        exec_cmd = os.path.abspath(cmd)
+        log_cmdline = subprocess.list2cmdline([cmd] + cmd_args)
         log_cmd(log_cmdline, cwd=cwd)
     else:
         log_cmd(cmdline)
@@ -118,7 +120,7 @@ async def run_cmd(*args, realtime_output=False, env=None, cwd=None):
     begin = time.time()
 
     try:
-        proc = await asyncio.create_subprocess_exec(cmd, *cmd_args,
+        proc = await asyncio.create_subprocess_exec(exec_cmd, *cmd_args,
             stdout=pipe, stderr=pipe, env=env, cwd=cwd)
 
         if not realtime_output:
