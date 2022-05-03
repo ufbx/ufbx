@@ -46,13 +46,7 @@ def log(line, *, style=""):
         line = style + line + "\x1b[39m"
     print(line, file=color_out, flush=True)
 
-def log_cmd(line, cwd=None):
-    if cwd:
-        if sys.platform == "win32":
-            line = f"pushd {cwd} & {line} & popd"
-        else:
-            line = f"pushd {cwd} ; {line} ; popd"
-
+def log_cmd(line):
     log(line, style=STYLE_CMD)
 
 def log_mkdir(path):
@@ -103,19 +97,25 @@ async def run_cmd(*args, realtime_output=False, env=None, cwd=None):
     cmd = cmd_args[0]
     cmd_args = cmd_args[1:]
 
+    exec_cmd = cmd
+    if cwd:
+        line_cmd = os.path.relpath(cmd, cwd)
+        exec_cmd = os.path.abspath(cmd)
+
+        cmdline = subprocess.list2cmdline([line_cmd] + cmd_args)
+        if sys.platform == "win32":
+            cmdline = f"pushd {cwd} & {cmdline} & popd"
+        else:
+            cmdline = f"pushd {cwd} ; {cmdline} ; popd"
+    else:
+        cmdline = subprocess.list2cmdline([cmd] + cmd_args)
+
     pipe = None if realtime_output else asyncio.subprocess.PIPE
-    cmdline = subprocess.list2cmdline([cmd] + cmd_args)
 
     out = err = ""
     ok = False
 
-    exec_cmd = cmd
-    if cwd:
-        exec_cmd = os.path.abspath(cmd)
-        log_cmdline = subprocess.list2cmdline([cmd] + cmd_args)
-        log_cmd(log_cmdline, cwd=cwd)
-    else:
-        log_cmd(cmdline)
+    log_cmd(cmdline)
 
     begin = time.time()
 
