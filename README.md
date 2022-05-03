@@ -8,7 +8,6 @@ Single source file FBX reader.
 ufbx_load_opts opts = { 0 }; // Optional, pass NULL for defaults
 ufbx_error error; // Optional, pass NULL if you don't care about errors
 ufbx_scene *scene = ufbx_load_file("thing.fbx", &opts, &error);
-
 if (!scene) {
     fprintf(stderr, "Failed to load: %s\n", error.description);
     exit(1);
