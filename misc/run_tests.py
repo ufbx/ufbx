@@ -46,7 +46,13 @@ def log(line, *, style=""):
         line = style + line + "\x1b[39m"
     print(line, file=color_out, flush=True)
 
-def log_cmd(line):
+def log_cmd(line, cwd=None):
+    if cwd:
+        if sys.platform == "win32":
+            line = f"pushd {cwd} & {line} & popd"
+        else:
+            line = f"pushd {cwd} ; {line} ; popd"
+
     log(line, style=STYLE_CMD)
 
 def log_mkdir(path):
@@ -88,7 +94,7 @@ if sys.version_info < (3,8):
 else:
     cmd_sema = asyncio.Semaphore(num_threads)
 
-async def run_cmd(*args, realtime_output=False, env=None):
+async def run_cmd(*args, realtime_output=False, env=None, cwd=None):
     """Asynchronously run a command"""
 
     await cmd_sema.acquire()
@@ -103,13 +109,17 @@ async def run_cmd(*args, realtime_output=False, env=None):
     out = err = ""
     ok = False
 
-    log_cmd(cmdline)
+    if cwd:
+        log_cmdline = subprocess.list2cmdline([os.path.relpath(cmd, cwd)] + cmd_args)
+        log_cmd(log_cmdline, cwd=cwd)
+    else:
+        log_cmd(cmdline)
 
     begin = time.time()
 
     try:
         proc = await asyncio.create_subprocess_exec(cmd, *cmd_args,
-            stdout=pipe, stderr=pipe, env=env)
+            stdout=pipe, stderr=pipe, env=env, cwd=cwd)
 
         if not realtime_output:
             out, err = await proc.communicate()
@@ -501,12 +511,14 @@ async def run_target(t, args):
     if t.config.get("dedicated-allocs", False):
         args += ["--dedicated-allocs"]
 
+    cwd = t.config.get("cwd")
+
     if t.config.get("arch") == "wasm32":
         wasm_args = [argv.wasm_runtime, "run", "--dir", ".", t.config["output"], "--"]
         wasm_args += args
-        ok, out, err, cmdline, time = await run_cmd(wasm_args)
+        ok, out, err, cmdline, time = await run_cmd(wasm_args, cwd=cwd)
     else:
-        ok, out, err, cmdline, time = await run_cmd(t.config["output"], args)
+        ok, out, err, cmdline, time = await run_cmd(t.config["output"], args, cwd=cwd)
 
     t.log.append("$ " + cmdline)
     t.log.append(out)
@@ -879,24 +891,30 @@ async def main():
 
             for line in epilogue.strip().splitlines():
                 print(line.strip(), file=outf)
-        
+
         readme_cpp_dst = os.path.join(build_path, "readme.cpp")
         shutil.copyfile(readme_dst, readme_cpp_dst)
+
+        copy_file(
+            os.path.join("data" ,"blender_279_default_7400_binary.fbx"),
+            os.path.join(build_path, "thing.fbx"))
 
         target_tasks = []
 
         readme_config = {
             "sources": ["build/readme.c", "ufbx.c"],
             "output": "readme" + exe_suffix,
+            "cwd": "build",
         }
-        target_tasks += compile_permutations("readme", readme_config, arch_configs, None)
+        target_tasks += compile_permutations("readme", readme_config, arch_configs, [])
 
         readme_cpp_config = {
             "sources": ["build/readme.cpp", "ufbx.c"],
             "output": "readme_cpp" + exe_suffix,
             "cpp": True,
+            "cwd": "build",
         }
-        target_tasks += compile_permutations("readme_cpp", readme_cpp_config, arch_configs, None)
+        target_tasks += compile_permutations("readme_cpp", readme_cpp_config, arch_configs, [])
 
         targets = await gather(target_tasks)
         all_targets += targets
