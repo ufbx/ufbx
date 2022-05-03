@@ -5,10 +5,13 @@ Single source file FBX reader.
 ## Usage
 
 ```c
-ufbx_load_opts opts = { }; // Optional, pass NULL for defaults
+ufbx_load_opts opts = { 0 }; // Optional, pass NULL for defaults
 ufbx_error error; // Optional, pass NULL if you don't care about errors
 ufbx_scene *scene = ufbx_load_file("thing.fbx", &opts, &error);
-if (!scene) { do_fail(&error); exit(1); }
+if (!scene) {
+    fprintf(stderr, "Failed to load: %s\n", error.description);
+    exit(1);
+}
 
 // Use and inspect `scene`, it's just plain data!
 

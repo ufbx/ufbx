@@ -88,7 +88,7 @@ if sys.version_info < (3,8):
 else:
     cmd_sema = asyncio.Semaphore(num_threads)
 
-async def run_cmd(*args, realtime_output=False, env=None):
+async def run_cmd(*args, realtime_output=False, env=None, cwd=None):
     """Asynchronously run a command"""
 
     await cmd_sema.acquire()
@@ -97,8 +97,20 @@ async def run_cmd(*args, realtime_output=False, env=None):
     cmd = cmd_args[0]
     cmd_args = cmd_args[1:]
 
+    exec_cmd = cmd
+    if cwd:
+        line_cmd = os.path.relpath(cmd, cwd)
+        exec_cmd = os.path.abspath(cmd)
+
+        cmdline = subprocess.list2cmdline([line_cmd] + cmd_args)
+        if sys.platform == "win32":
+            cmdline = f"pushd {cwd} & {cmdline} & popd"
+        else:
+            cmdline = f"pushd {cwd} ; {cmdline} ; popd"
+    else:
+        cmdline = subprocess.list2cmdline([cmd] + cmd_args)
+
     pipe = None if realtime_output else asyncio.subprocess.PIPE
-    cmdline = subprocess.list2cmdline([cmd] + cmd_args)
 
     out = err = ""
     ok = False
@@ -108,8 +120,8 @@ async def run_cmd(*args, realtime_output=False, env=None):
     begin = time.time()
 
     try:
-        proc = await asyncio.create_subprocess_exec(cmd, *cmd_args,
-            stdout=pipe, stderr=pipe, env=env)
+        proc = await asyncio.create_subprocess_exec(exec_cmd, *cmd_args,
+            stdout=pipe, stderr=pipe, env=env, cwd=cwd)
 
         if not realtime_output:
             out, err = await proc.communicate()
@@ -501,12 +513,14 @@ async def run_target(t, args):
     if t.config.get("dedicated-allocs", False):
         args += ["--dedicated-allocs"]
 
+    cwd = t.config.get("cwd")
+
     if t.config.get("arch") == "wasm32":
         wasm_args = [argv.wasm_runtime, "run", "--dir", ".", t.config["output"], "--"]
         wasm_args += args
-        ok, out, err, cmdline, time = await run_cmd(wasm_args)
+        ok, out, err, cmdline, time = await run_cmd(wasm_args, cwd=cwd)
     else:
-        ok, out, err, cmdline, time = await run_cmd(t.config["output"], args)
+        ok, out, err, cmdline, time = await run_cmd(t.config["output"], args, cwd=cwd)
 
     t.log.append("$ " + cmdline)
     t.log.append(out)
@@ -548,7 +562,7 @@ def decorate_arch(compiler, arch):
 
 tests = set(argv.tests)
 if not tests:
-    tests = ["tests", "picort", "domfuzz"]
+    tests = ["tests", "picort", "domfuzz", "readme"]
 
 async def main():
     global exit_code
@@ -842,6 +856,70 @@ async def main():
                         await run_target(target, [path])
                         if not target.ran:
                             break
+
+    if "readme" in tests:
+        log_comment("-- Compiling and running README.md --")
+
+        prologue = """
+            #include <stdio.h>
+            #include <stdlib.h>
+            #include "../ufbx.h"
+
+            void push_vertex(const ufbx_vec3 *position, const ufbx_vec3 *normal) { }
+            void push_pose(const ufbx_matrix *matrix) { }
+
+            int main(int argc, char **argv) {
+        """
+
+        epilogue = """
+            return 0;
+            }
+        """
+
+        readme_dst = os.path.join(build_path, "readme.c")
+        with open(readme_dst, "wt") as outf:
+            for line in prologue.strip().splitlines():
+                print(line.strip(), file=outf)
+
+            in_c = False
+            with open("README.md", "rt") as inf:
+                for line in inf:
+                    if line.strip() == "```c":
+                        in_c = True
+                    elif line.strip() == "```":
+                        in_c = False
+                    elif in_c:
+                        print(line.rstrip(), file=outf)
+
+            for line in epilogue.strip().splitlines():
+                print(line.strip(), file=outf)
+
+        readme_cpp_dst = os.path.join(build_path, "readme.cpp")
+        shutil.copyfile(readme_dst, readme_cpp_dst)
+
+        copy_file(
+            os.path.join("data" ,"blender_279_default_7400_binary.fbx"),
+            os.path.join(build_path, "thing.fbx"))
+
+        target_tasks = []
+
+        readme_config = {
+            "sources": ["build/readme.c", "ufbx.c"],
+            "output": "readme" + exe_suffix,
+            "cwd": "build",
+        }
+        target_tasks += compile_permutations("readme", readme_config, arch_configs, [])
+
+        readme_cpp_config = {
+            "sources": ["build/readme.cpp", "ufbx.c"],
+            "output": "readme_cpp" + exe_suffix,
+            "cpp": True,
+            "cwd": "build",
+        }
+        target_tasks += compile_permutations("readme_cpp", readme_cpp_config, arch_configs, [])
+
+        targets = await gather(target_tasks)
+        all_targets += targets
 
     for target in all_targets:
         if target.ok: continue
