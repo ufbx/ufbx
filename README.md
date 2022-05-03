@@ -28,7 +28,7 @@ for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
 // There's also helper functions for evaluating animations:
 for (double time = 0.0; time <= 1.0; time += 1.0/60.0) {
     ufbx_transform transform = ufbx_evaluate_transform(&scene->anim, cube, time);
-    ufbx_matrix matrix = ufbx_get_transform_matrix(&transform);
+    ufbx_matrix matrix = ufbx_transform_to_matrix(&transform);
     push_pose(&matrix);
 }
 
