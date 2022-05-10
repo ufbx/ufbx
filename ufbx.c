@@ -13799,15 +13799,22 @@ static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, 
 	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
 	t -= x1 / (a_3*t2 + b_2*t + c);
 
-	const double eps = 0.00001;
-	if (x1 >= -eps && x1 <= eps) return t;
+	// 4 ULP from 1.0
+	const double eps = 8.881784197001252e-16;
+	if (fabs(x1) <= eps) return t;
 
 	// Perform more iterations until we reach desired accuracy
 	for (size_t i = 0; i < 4; i++) {
+
 		t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
 		t -= x1 / (a_3*t2 + b_2*t + c);
-		if (x1 >= -eps && x1 <= eps) break;
+
+		t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
+		t -= x1 / (a_3*t2 + b_2*t + c);
+
+		if (fabs(x1) <= eps) return t;
 	}
+
 	return t;
 }
 
