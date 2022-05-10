@@ -5,10 +5,13 @@ Single source file FBX reader.
 ## Usage
 
 ```c
-ufbx_load_opts opts = { }; // Optional, pass NULL for defaults
+ufbx_load_opts opts = { 0 }; // Optional, pass NULL for defaults
 ufbx_error error; // Optional, pass NULL if you don't care about errors
 ufbx_scene *scene = ufbx_load_file("thing.fbx", &opts, &error);
-if (!scene) { do_fail(&error); exit(1); }
+if (!scene) {
+    fprintf(stderr, "Failed to load: %s\n", error.description);
+    exit(1);
+}
 
 // Use and inspect `scene`, it's just plain data!
 
@@ -28,7 +31,7 @@ for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
 // There's also helper functions for evaluating animations:
 for (double time = 0.0; time <= 1.0; time += 1.0/60.0) {
     ufbx_transform transform = ufbx_evaluate_transform(&scene->anim, cube, time);
-    ufbx_matrix matrix = ufbx_get_transform_matrix(&transform);
+    ufbx_matrix matrix = ufbx_transform_to_matrix(&transform);
     push_pose(&matrix);
 }
 
