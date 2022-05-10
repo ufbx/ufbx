@@ -19,7 +19,7 @@ if (!scene) {
 ufbx_node *cube = ufbx_find_node(scene, "Cube");
 ufbx_mesh *mesh = cube->mesh;
 for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
-    ufbx_face face = mesh->faces[face_ix];
+    ufbx_face face = mesh->faces.data[face_ix];
     for (size_t vertex_ix = 0; vertex_ix < face.num_indices; vertex_ix++) {
         size_t index = face.index_begin + vertex_ix;
         ufbx_vec3 position = mesh->vertex_position.values.data[mesh->vertex_position.indices.data[index]];
