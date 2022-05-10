@@ -9,7 +9,7 @@ ufbx_load_opts opts = { 0 }; // Optional, pass NULL for defaults
 ufbx_error error; // Optional, pass NULL if you don't care about errors
 ufbx_scene *scene = ufbx_load_file("thing.fbx", &opts, &error);
 if (!scene) {
-    fprintf(stderr, "Failed to load: %s\n", error.description);
+    fprintf(stderr, "Failed to load: %s\n", error.description.data);
     exit(1);
 }
 
@@ -22,7 +22,7 @@ for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
     ufbx_face face = mesh->faces[face_ix];
     for (size_t vertex_ix = 0; vertex_ix < face.num_indices; vertex_ix++) {
         size_t index = face.index_begin + vertex_ix;
-        ufbx_vec3 position = mesh->vertex_position.data[mesh->vertex_position.indices[index]];
+        ufbx_vec3 position = mesh->vertex_position.values.data[mesh->vertex_position.indices.data[index]];
         ufbx_vec3 normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, index); // Equivalent utility function
         push_vertex(&position, &normal);
     }
