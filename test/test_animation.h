@@ -87,6 +87,13 @@ UFBXT_FILE_TEST(maya_interpolation_modes)
 			ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
 			ufbxt_assert_close_real(err, value, values[i]);
 		}
+
+		size_t num_samples = 64 * 1024;
+		for (size_t i = 0; i < num_samples; i++) {
+			double time = (double)i * (5.0 / (double)num_samples);
+			ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
+			ufbxt_assert(value >= -16.0f && value <= 16.0f);
+		}
 	}
 }
 #endif
