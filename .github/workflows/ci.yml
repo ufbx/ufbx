@@ -89,6 +89,7 @@ jobs:
       - name: cppcheck
         run: cppcheck --error-exitcode=1 --inline-suppr --std=c99 ufbx.c -DUFBX_STATIC_ANALYSIS=1
       - name: Clang Analyzer
+        if: ${{ always() && !cancelled() }}
         run: clang --analyze -Xanalyzer -analyzer-werror -Xanalyzer -analyzer-disable-checker=unix.Malloc ufbx.c
 
   ci_wasm:
