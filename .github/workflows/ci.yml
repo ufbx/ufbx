@@ -87,9 +87,9 @@ jobs:
       - name: Install apt dependencies
         run: sudo apt-get install -y cppcheck
       - name: cppcheck
-        run: cppcheck --inline-suppr --std=c99 ufbx.c -DUFBX_STATIC_ANALYSIS=1
+        run: cppcheck --error-exitcode=1 --inline-suppr --std=c99 ufbx.c -DUFBX_STATIC_ANALYSIS=1
       - name: Clang Analyzer
-        run: clang --analyze -Xanalyzer -analyzer-disable-checker=unix.Malloc ufbx.c
+        run: clang --analyze -Xanalyzer -analyzer-werror -Xanalyzer -analyzer-disable-checker=unix.Malloc ufbx.c
 
   ci_wasm:
     runs-on: ubuntu-latest
