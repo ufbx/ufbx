@@ -78,6 +78,19 @@ jobs:
       - name: Run viewer
         run: python misc/run_tests.py viewer
 
+  ci_analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Update apt
+        run: sudo apt-get update
+      - name: Install apt dependencies
+        run: sudo apt-get install -y cppcheck
+      - name: cppcheck
+        run: cppcheck --inline-suppr --std=c99 ufbx.c -DUFBX_STATIC_ANALYSIS=1
+      - name: Clang Analyzer
+        run: clang --analyze -Xanalyzer -analyzer-disable-checker=unix.Malloc ufbx.c
+
   ci_wasm:
     runs-on: ubuntu-latest
     steps:
