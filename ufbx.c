@@ -17519,6 +17519,8 @@ ufbx_abi ufbxi_noinline ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, 
 		result.name.length = name_len;
 		result._internal_key = ufbxi_get_name_key(name, name_len);
 		result.flags = UFBX_PROP_FLAG_NOT_FOUND;
+		result.value_str.data = ufbxi_empty_char;
+		result.value_str.length = 0;
 	}
 
 	if (anim->prop_overrides.count > 0) {
