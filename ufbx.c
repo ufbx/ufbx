@@ -101,6 +101,17 @@
 	#define UFBX_NO_UNALIGNED_LOADS
 #endif
 
+#if defined(__clang_analyzer__) && !defined(UFBX_STATIC_ANALYSIS)
+	#define UFBX_STATIC_ANALYSIS 1
+#endif
+
+#if defined(UFBX_STATIC_ANALYSIS)
+	bool g_analysis_opaque;
+	#define ufbxi_maybe_null(ptr) (g_analysis_opaque ? (ptr) : NULL)
+#else
+	#define ufbxi_maybe_null(ptr) (ptr)
+#endif
+
 // Unaligned little-endian load functions
 // On platforms that support unaligned access natively (x86, x64, ARM64) just use normal loads,
 // with unaligned attributes, otherwise do manual byte-wise load.
@@ -1363,6 +1374,8 @@ static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
 		error->type = UFBX_ERROR_FILE_NOT_FOUND;
 	} else if (!strcmp(desc, "Uninitialized options")) {
 		error->type = UFBX_ERROR_FILE_NOT_FOUND;
+	} else if (!strcmp(desc, "Zero vertex size")) {
+		error->type = UFBX_ERROR_ZERO_VERTEX_SIZE;
 	}
 	error->description.data = desc;
 	error->description.length = strlen(desc);
@@ -1517,10 +1530,10 @@ static ufbxi_noinline void ufbxi_free_ator(ufbxi_allocator *ator)
 	}
 }
 
-#define ufbxi_alloc(ator, type, n) (type*)ufbxi_alloc_size((ator), sizeof(type), (n))
-#define ufbxi_alloc_zero(ator, type, n) (type*)ufbxi_alloc_zero_size((ator), sizeof(type), (n))
-#define ufbxi_realloc(ator, type, old_ptr, old_n, n) (type*)ufbxi_realloc_size((ator), sizeof(type), (old_ptr), (old_n), (n))
-#define ufbxi_realloc_zero(ator, type, old_ptr, old_n, n) (type*)ufbxi_realloc_zero_size((ator), sizeof(type), (old_ptr), (old_n), (n))
+#define ufbxi_alloc(ator, type, n) ufbxi_maybe_null((type*)ufbxi_alloc_size((ator), sizeof(type), (n)))
+#define ufbxi_alloc_zero(ator, type, n) ufbxi_maybe_null((type*)ufbxi_alloc_zero_size((ator), sizeof(type), (n)))
+#define ufbxi_realloc(ator, type, old_ptr, old_n, n) ufbxi_maybe_null((type*)ufbxi_realloc_size((ator), sizeof(type), (old_ptr), (old_n), (n)))
+#define ufbxi_realloc_zero(ator, type, old_ptr, old_n, n) ufbxi_maybe_null((type*)ufbxi_realloc_zero_size((ator), sizeof(type), (old_ptr), (old_n), (n)))
 #define ufbxi_free(ator, type, ptr, n) ufbxi_free_size((ator), sizeof(type), (ptr), (n))
 
 #define ufbxi_grow_array(ator, p_ptr, p_cap, n) ufbxi_grow_array_size((ator), sizeof(**(p_ptr)), (p_ptr), (p_cap), (n))
@@ -1885,11 +1898,11 @@ static void ufbxi_buf_clear(ufbxi_buf *buf)
 	}
 }
 
-#define ufbxi_push(b, type, n) (type*)ufbxi_push_size((b), sizeof(type), (n))
-#define ufbxi_push_zero(b, type, n) (type*)ufbxi_push_size_zero((b), sizeof(type), (n))
-#define ufbxi_push_copy(b, type, n, data) (type*)ufbxi_push_size_copy((b), sizeof(type), (n), (data))
+#define ufbxi_push(b, type, n) ufbxi_maybe_null((type*)ufbxi_push_size((b), sizeof(type), (n)))
+#define ufbxi_push_zero(b, type, n) ufbxi_maybe_null((type*)ufbxi_push_size_zero((b), sizeof(type), (n)))
+#define ufbxi_push_copy(b, type, n, data) ufbxi_maybe_null((type*)ufbxi_push_size_copy((b), sizeof(type), (n), (data)))
 #define ufbxi_pop(b, type, n, dst) ufbxi_pop_size((b), sizeof(type), (n), (dst))
-#define ufbxi_push_pop(dst, src, type, n) (type*)ufbxi_push_pop_size((dst), (src), sizeof(type), (n))
+#define ufbxi_push_pop(dst, src, type, n) ufbxi_maybe_null((type*)ufbxi_push_pop_size((dst), (src), sizeof(type), (n)))
 
 // -- Hash map
 //
@@ -2018,7 +2031,9 @@ static ufbxi_noinline bool ufbxi_map_grow_size_imp(ufbxi_map *map, size_t item_s
 	size_t alloc_size = num_entries * sizeof(uint64_t);
 
 	// Allocate a combined entry/item memory block
+	ufbxi_check_return_err(map->ator->error, (SIZE_MAX - alloc_size) / new_size > item_size, false);
 	size_t data_size = alloc_size + new_size * item_size;
+
 	char *data = ufbxi_alloc(map->ator, char, data_size);
 	ufbxi_check_return_err(map->ator->error, data, false);
 
@@ -5076,6 +5091,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 				input.data = uc->data;
 				input.data_size = uc->data_size;
 				input.no_header = false;
+				input.no_checksum = false;
 
 				if (uc->opts.progress_cb.fn) {
 					input.progress_cb = uc->opts.progress_cb;
@@ -5398,6 +5414,7 @@ static uint32_t ufbxi_ascii_parse_version(ufbxi_context *uc)
 		}
 	}
 
+	if (num_digits != 3) return 0;
 	return 1000*digits[0] + 100*digits[1] + 10*digits[2];
 }
 
@@ -6765,8 +6782,8 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 	return elem;
 }
 
-#define ufbxi_push_element(uc, info, type_name, type_enum) (type_name*)ufbxi_push_element_size((uc), (info), sizeof(type_name), (type_enum))
-#define ufbxi_push_synthetic_element(uc, p_fbx_id, name, type_name, type_enum) (type_name*)ufbxi_push_synthetic_element_size((uc), (p_fbx_id), (name), sizeof(type_name), (type_enum))
+#define ufbxi_push_element(uc, info, type_name, type_enum) ufbxi_maybe_null((type_name*)ufbxi_push_element_size((uc), (info), sizeof(type_name), (type_enum)))
+#define ufbxi_push_synthetic_element(uc, p_fbx_id, name, type_name, type_enum) ufbxi_maybe_null((type_name*)ufbxi_push_synthetic_element_size((uc), (p_fbx_id), (name), sizeof(type_name), (type_enum)))
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_model(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
@@ -10809,7 +10826,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_nurbs_basis(ufbxi_conte
 		basis->num_wrap_control_points = 0;
 	}
 
-	if (basis->order > 0) {
+	if (basis->order > 1) {
 		size_t degree = basis->order - 1;
 		ufbx_real_list knots = basis->knot_vector;
 		if (knots.count >= 2*degree + 1) {
@@ -14134,6 +14151,8 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->tmp_parse.unordered = true;
 	uc->result.unordered = true;
 
+	// NOTE: Though `inflate_retain` leaks out of the scope we don't use it outside this function.
+	// cppcheck-suppress autoVariables
 	uc->inflate_retain = &inflate_retain;
 
 	int ok = ufbxi_load_imp(uc);
@@ -14410,7 +14429,7 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 	}
 }
 
-static ufbxi_noinline ufbx_vec3 ufbxi_evaluate_connected_prop(const ufbx_anim *anim, const ufbx_element *element, const char *name, double time)
+static ufbxi_noinline void ufbxi_evaluate_connected_prop(ufbx_prop *prop, const ufbx_anim *anim, const ufbx_element *element, const char *name, double time)
 {
 	ufbx_connection *conn = ufbxi_find_prop_connection(element, name);
 
@@ -14420,8 +14439,15 @@ static ufbxi_noinline ufbx_vec3 ufbxi_evaluate_connected_prop(const ufbx_anim *a
 		conn = next_conn;
 	}
 
-	ufbx_prop ep = ufbx_evaluate_prop_len(anim, conn->src, conn->src_prop.data, conn->src_prop.length, time);
-	return ep.value_vec3;
+	if (conn) {
+		ufbx_prop ep = ufbx_evaluate_prop_len(anim, conn->src, conn->src_prop.data, conn->src_prop.length, time);
+		prop->value_vec3 = ep.value_vec3;
+		prop->value_int = ep.value_int;
+		prop->value_str = ep.value_str;
+	} else {
+		// Connection not found, maybe it's animated?
+		prop->flags &= ~UFBX_PROP_FLAG_CONNECTED;
+	}
 }
 
 static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *props, const char **prop_names, size_t max_props)
@@ -14474,12 +14500,12 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 			}
 
 			if (name == prop->name.data) {
-				if (prop->flags & UFBX_PROP_FLAG_ANIMATED) {
-					props[num_props++] = *prop;
-				} else if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim->ignore_connections) {
+				if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim->ignore_connections) {
 					ufbx_prop *dst = &props[num_props++];
 					*dst = *prop;
-					dst->value_vec3 = ufbxi_evaluate_connected_prop(anim, element, name, time);
+					ufbxi_evaluate_connected_prop(dst, anim, element, name, time);
+				} else if (prop->flags & UFBX_PROP_FLAG_ANIMATED) {
+					props[num_props++] = *prop;
 				}
 				break;
 			} else if (strcmp(name, prop->name.data) < 0) {
@@ -16706,7 +16732,9 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 			p_error->description.length = 0;
 			p_error->stack_size = 0;
 		}
-		return &sc.imp->mesh;
+
+		ufbxi_mesh_imp *imp = sc.imp;
+		return &imp->mesh;
 	} else {
 		ufbxi_fix_error_type(&sc.error, "Failed to subdivide");
 		if (p_error) *p_error = sc.error;
@@ -16771,6 +16799,11 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 		packed_size = ufbxi_align_to_mask(packed_size, 7);
 	}
 
+	if (!fail && packed_size == 0) {
+		ufbxi_fail_err_msg(error, "packed_size != 0", "Zero vertex size");
+		fail = true;
+	}
+
 	char *packed_vertex = NULL;
 	if (!fail) {
 		if (packed_size > sizeof(local_packed_vertex)) {
@@ -16790,6 +16823,7 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 	}
 
 	if (!fail) {
+		ufbx_assert(packed_vertex != NULL);
 		memset(packed_vertex, 0, packed_size);
 
 		for (size_t i = 0; i < num_indices; i++) {
@@ -17494,7 +17528,7 @@ ufbx_abi ufbxi_noinline ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, 
 	if ((result.flags & (UFBX_PROP_FLAG_ANIMATED|UFBX_PROP_FLAG_CONNECTED)) == 0) return result;
 
 	if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim->ignore_connections) {
-		result.value_vec3 = ufbxi_evaluate_connected_prop(anim, element, prop->name.data, time);
+		ufbxi_evaluate_connected_prop(&result, anim, element, prop->name.data, time);
 	}
 
 	ufbxi_evaluate_props(anim, element, time, &result, 1);
@@ -17546,7 +17580,7 @@ ufbx_abi ufbxi_noinline ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, co
 		*dst = *prop;
 
 		if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim->ignore_connections) {
-			dst->value_vec3 = ufbxi_evaluate_connected_prop(anim, element, prop->name.data, time);
+			ufbxi_evaluate_connected_prop(dst, anim, element, prop->name.data, time);
 		}
 	}
 
@@ -18278,6 +18312,7 @@ ufbx_abi size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_re
 	if (!basis->valid) return SIZE_MAX;
 
 	size_t degree = basis->order - 1;
+	ufbx_assert(degree >= 1);
 
 	// Binary search for the knot span `[min_u, max_u]` where `min_u <= u < max_u`
 	ufbx_real_list knots = basis->knot_vector;
@@ -18356,6 +18391,8 @@ ufbx_abi ufbxi_noinline ufbx_curve_point ufbx_evaluate_nurbs_curve(const ufbx_nu
 	ufbx_vec4 d = { 0 };
 
 	size_t order = curve->basis.order;
+	if (order > UFBXI_MAX_NURBS_ORDER) return result;
+
 	for (size_t i = 0; i < order; i++) {
 		size_t ix = (base + i) % curve->control_points.count;
 		ufbx_vec4 cp = curve->control_points.data[ix];
@@ -18404,6 +18441,8 @@ ufbx_abi ufbxi_noinline ufbx_surface_point ufbx_evaluate_nurbs_surface(const ufb
 	size_t num_v = surface->num_control_points_v;
 	size_t order_u = surface->basis_u.order;
 	size_t order_v = surface->basis_v.order;
+	if (order_u > UFBXI_MAX_NURBS_ORDER || order_v > UFBXI_MAX_NURBS_ORDER) return result;
+
 	for (size_t vi = 0; vi < order_v; vi++) {
 		size_t vix = (base_v + vi) % num_v;
 		ufbx_real weight_v = weights_v[vi], deriv_v = derivs_v[vi];
@@ -18473,7 +18512,8 @@ ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surf
 			error->description.length = 0;
 			error->stack_size = 0;
 		}
-		return &tc.imp->mesh;
+		ufbxi_mesh_imp *imp = tc.imp;
+		return &imp->mesh;
 	} else {
 		ufbxi_fix_error_type(&tc.error, "Failed to tessellate");
 		if (error) *error = tc.error;
@@ -19184,6 +19224,9 @@ ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_
 ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator_opts *allocator, ufbx_error *error)
 {
 	ufbx_error local_error;
+	if (!error) {
+		memset(&local_error, 0, sizeof(local_error));
+	}
 	return ufbxi_generate_indices(streams, num_streams, indices, num_indices, allocator, error ? error : &local_error);
 }
 
