@@ -14446,7 +14446,7 @@ static ufbxi_noinline void ufbxi_evaluate_connected_prop(ufbx_prop *prop, const 
 		prop->value_str = ep.value_str;
 	} else {
 		// Connection not found, maybe it's animated?
-		prop->flags &= ~UFBX_PROP_FLAG_CONNECTED;
+		prop->flags = (ufbx_prop_flags)(prop->flags & ~UFBX_PROP_FLAG_CONNECTED);
 	}
 }
 
