@@ -1348,6 +1348,7 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 #define ufbxi_check_err_msg(err, cond, msg) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return 0; } } while (0)
 #define ufbxi_check_return_err_msg(err, cond, ret, msg) do { if (!(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail_err_msg(err, desc, msg) return ufbxi_fail_imp_err(err, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
+#define ufbxi_report_err_msg(err, desc, msg) (void)ufbxi_fail_imp_err(err, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
 
 static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
 {
@@ -16800,7 +16801,7 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 	}
 
 	if (!fail && packed_size == 0) {
-		ufbxi_fail_err_msg(error, "packed_size != 0", "Zero vertex size");
+		ufbxi_report_err_msg(error, "packed_size != 0", "Zero vertex size");
 		fail = true;
 	}
 
