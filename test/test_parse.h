@@ -362,3 +362,29 @@ UFBXT_TEST(retain_scene)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(maya_unicode)
+#if UFBXT_IMPL
+{
+	// WHAT? Maya turns U+03B2 (Greek Small Letter Beta) into U+00DF (Latin Small Letter Sharp S)
+	// The larger codepoints just get turned into one or two underscores which makes a bit more sense...
+	ufbx_node *node = ufbx_find_node(scene, "\x61\xc3\x9f___");
+	ufbxt_assert(node);
+}
+#endif
+
+UFBXT_FILE_TEST(max_unicode)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "\x61\xce\xb2\xe3\x82\xab\xf0\x9f\x98\x82");
+	ufbxt_assert(node);
+}
+#endif
+
+UFBXT_FILE_TEST(blender_279_unicode)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "\x61\xce\xb2\xe3\x82\xab\xf0\x9f\x98\x82");
+	ufbxt_assert(node);
+}
+#endif
