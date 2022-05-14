@@ -82,6 +82,7 @@
 #if defined(__GNUC__)
 	#pragma GCC diagnostic push
 	#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+	#pragma GCC diagnostic ignored "-Wmissing-braces"
 #endif
 
 #if !defined(ufbx_static_assert)
