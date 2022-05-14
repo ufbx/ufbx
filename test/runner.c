@@ -296,7 +296,10 @@ void ufbxt_init_allocator(ufbx_allocator_opts *ator, bool *freed_ptr)
 {
 	ator->memory_limit = 0x4000000; // 64MB
 
-	if (g_dedicated_allocs) return;
+	if (g_dedicated_allocs) {
+		*freed_ptr = true;
+		return;
+	}
 
 	ufbxt_allocator *at = (ufbxt_allocator*)malloc(sizeof(ufbxt_allocator));
 	ufbxt_assert(at);
@@ -1920,10 +1923,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbx_free_scene(scene);
 			ufbx_free_scene(streamed_scene);
 
+			free(data);
+
 			ufbxt_assert(temp_freed);
 			ufbxt_assert(result_freed);
 
-			free(data);
 		}
 	}
 
