@@ -99,7 +99,7 @@ jobs:
       - name: Update apt
         run: sudo apt-get update
       - name: Install apt dependencies
-        run: sudo apt-get install -y tcc qemu qemu-user
+        run: sudo apt-get install -y tcc qemu qemu-user gcc-multilib
       - name: Install zig cc via PIP
         run: sudo pip3 install ziglang
       - name: Run tests with TCC
