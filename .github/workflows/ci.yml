@@ -103,7 +103,7 @@ jobs:
       - name: Install zig cc via PIP
         run: sudo pip3 install ziglang
       - name: Run tests with TCC
-        run: python3 misc/run_test.py tests --additional-compiler tcc --compiler tcc
+        run: python3 misc/run_tests.py tests --additional-compiler tcc --compiler tcc
       - name: Compile ufbx.c wth x86 TCC
         run: i386-tcc -c ufbx.c -o build/tcc-ufbx-x86.o
       - name: Compile PowerPC tests
