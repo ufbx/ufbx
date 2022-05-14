@@ -3100,7 +3100,7 @@ extern const uint32_t ufbx_source_version;
 // Practically always `true` (see below), if not you need to be careful with threads.
 //
 // Guaranteed to be `true` in _any_ of the following conditions:
-// - ufbx.c has been compiled using: GCC / Clang / MSVC / ICC / EMCC
+// - ufbx.c has been compiled using: GCC / Clang / MSVC / ICC / EMCC / TCC
 // - ufbx.c has been compiled as C++11 or later
 // - ufbx.c has been compiled as C11 or later with `<stdatomic.h>` support
 //
