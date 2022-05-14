@@ -344,6 +344,30 @@ class ClangCompiler(GCCCompiler):
     def __init__(self, name, exe, cpp, **kwargs):
         super().__init__(name, exe, cpp, **kwargs)
 
+class TCCCompiler(GCCCompiler):
+    def __init__(self, name, exe):
+        super().__init__(name, exe, False)
+        self.has_c = True
+        self.has_cpp = False
+        self.has_m32 = True
+        self.sysroot = ""
+
+    async def check_version(self):
+        _, out, err, _, _ = await self.run("-v")
+        print(out + err)
+        m = re.search(r"tcc version ([.0-9]+) \((\w+).*\)", out + err, re.M)
+        if not m: return False
+        self.arch = m.group(2).lower()
+        self.version = m.group(1)
+        return True
+
+    def supported_archs(self):
+        if "x86_64" in self.arch:
+            return ["x86", "x64"] if self.has_m32 else ["x64"]
+        if "i686" in self.arch:
+            return ["x86"]
+        return []
+
 class EmscriptenCompiler(ClangCompiler):
     def __init__(self, name, exe, cpp):
         super().__init__(name, exe, cpp)
@@ -458,6 +482,12 @@ for desc in argv.additional_compiler:
             GCCCompiler(name, desc, False),
             GCCCompiler(name, cpp, True),
         ]
+    elif "tcc" in desc:
+        all_compilers += [
+            TCCCompiler(name, desc),
+        ]
+    else:
+        raise RuntimeError(f"Could not parse compiler for {desc}")
 
 if argv.compiler:
     compilers = set(argv.compiler)
