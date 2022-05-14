@@ -19,6 +19,12 @@
 
 #define _FILE_OFFSET_BITS 64
 
+#if defined(UFBX_STANDARD_C)
+	#ifndef _CRT_SECURE_NO_WARNINGS
+		#define _CRT_SECURE_NO_WARNINGS
+	#endif
+#endif
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -28,7 +34,7 @@
 
 // -- Platform
 
-#if defined(_MSC_VER)
+#if !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
 	#define ufbxi_noinline __declspec(noinline)
 	#define ufbxi_forceinline __forceinline
 	#define ufbxi_restrict __restrict
@@ -38,7 +44,7 @@
 		#define ufbxi_nodiscard _Check_return_
 	#endif
 	#define ufbxi_unused
-#elif defined(__GNUC__) || defined(__clang__)
+#elif !defined(UFBX_STANDARD_C) && (defined(__GNUC__) || defined(__clang__))
 	#define ufbxi_noinline __attribute__((noinline))
 	#define ufbxi_forceinline inline __attribute__((always_inline))
 	#define ufbxi_restrict __restrict
@@ -127,16 +133,16 @@
 #define ufbxi_read_u8(ptr) (*(const uint8_t*)(ptr))
 
 // Detect support for `__attribute__((aligned(1)))`
-#if defined(__clang__) && defined(__APPLE__)
+#if !defined(UFBX_STANDARD_C) && (defined(__clang__) && defined(__APPLE__))
 	// Apple overrides Clang versioning, 5.0 here maps to 3.3
 	#if __clang_major__ >= 5
 		#define UFBXI_HAS_ATTRIBUTE_ALIGNED 1
 	#endif
-#elif defined(__clang__)
+#elif !defined(UFBX_STANDARD_C) && defined(__clang__)
 	#if (__clang_major__ >= 4) || (__clang_major__ == 3 && __clang_minor__ >= 3)
 		#define UFBXI_HAS_ATTRIBUTE_ALIGNED 1
 	#endif
-#elif defined(__GNUC__)
+#elif !defined(UFBX_STANDARD_C) && defined(__GNUC__)
 	#if __GNUC__ >= 5
 		#define UFBXI_HAS_ATTRIBUTE_ALIGNED 1
 	#endif
@@ -150,7 +156,7 @@
 	typedef uint64_t __attribute__((aligned(1))) ufbxi_unaligned_u64;
 	typedef float __attribute__((aligned(1))) ufbxi_unaligned_f32;
 	typedef double __attribute__((aligned(1))) ufbxi_unaligned_f64;
-#elif defined(_MSC_VER)
+#elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
 	#define UFBXI_HAS_UNALIGNED 1
 	#if defined(_M_IX86)
 		// MSVC seems to assume all pointers are unaligned for x86
@@ -165,7 +171,7 @@
 	typedef double ufbxi_unaligned_f64;
 #endif
 
-#if defined(UFBXI_HAS_UNALIGNED) && (defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__) || defined(__wasm__) || defined(__EMSCRIPTEN__)) && !defined(UFBX_NO_UNALIGNED_LOADS) || defined(UFBX_USE_UNALIGNED_LOADS)
+#if defined(UFBXI_HAS_UNALIGNED) && ((defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__) || defined(__wasm__) || defined(__EMSCRIPTEN__)) && !defined(UFBX_NO_UNALIGNED_LOADS) || defined(UFBX_USE_UNALIGNED_LOADS))
 	#define ufbxi_read_u16(ptr) (*(const ufbxi_unaligned ufbxi_unaligned_u16*)(ptr))
 	#define ufbxi_read_u32(ptr) (*(const ufbxi_unaligned ufbxi_unaligned_u32*)(ptr))
 	#define ufbxi_read_u64(ptr) (*(const ufbxi_unaligned ufbxi_unaligned_u64*)(ptr))
@@ -233,13 +239,13 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 
 #define UFBXI_THREAD_SAFE 1
 
-#if defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
+#if !defined(UFBX_STANDARD_C) && (defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER))
     typedef size_t ufbxi_atomic_counter;
     #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
     #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
     #define ufbxi_atomic_counter_inc(ptr) __sync_fetch_and_add((ptr), 1)
     #define ufbxi_atomic_counter_dec(ptr) __sync_fetch_and_sub((ptr), 1)
-#elif defined(_MSC_VER)
+#elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
     #if defined(_M_X64)  || defined(_M_ARM64)
 		#if defined(__cplusplus)
 			extern "C" __int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
@@ -267,22 +273,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
         #define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement(ptr) - 1)
         #define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement(ptr) + 1)
     #endif
-#elif defined(__cplusplus) && (__cplusplus >= 201103L)
-    #include <new>
-    #include <atomic>
-    typedef struct { alignas(std::atomic_size_t) char data[sizeof(std::atomic_size_t)]; } ufbxi_atomic_counter;
-    #define ufbxi_atomic_counter_init(ptr) (new (&(ptr)->data) std::atomic_size_t(0))
-    #define ufbxi_atomic_counter_free(ptr) (((std::atomic_size_t*)(ptr)->data)->~atomic_size_t())
-    #define ufbxi_atomic_counter_inc(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_add(1)
-    #define ufbxi_atomic_counter_dec(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_sub(1)
-#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(__STDC_NO_ATOMICS__)
-    #include <stdatomic>
-    typedef volatile atomic_size_t ufbxi_atomic_counter;
-    #define ufbxi_atomic_counter_init(ptr) atomic_init(ptr, 0)
-    #define ufbxi_atomic_counter_free(ptr) (void)0
-    #define ufbxi_atomic_counter_inc(ptr) atomic_fetch_add((ptr), 1)
-    #define ufbxi_atomic_counter_dec(ptr) atomic_fetch_sub((ptr), 1)
-#elif defined(__TINYC__)
+#elif !defined(UFBX_STANDARD_C) && defined(__TINYC__)
 	#if defined(__x86_64__) || defined(_AMD64_)
 		static size_t ufbxi_tcc_atomic_add(volatile size_t *dst, size_t value) {
 			__asm__ __volatile__("lock; xaddq %0, %1;" : "+r" (value), "=m" (*dst) : "m" (dst));
@@ -301,6 +292,21 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
     #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
     #define ufbxi_atomic_counter_inc(ptr) ufbxi_tcc_atomic_add((ptr), 1)
     #define ufbxi_atomic_counter_dec(ptr) ufbxi_tcc_atomic_add((ptr), SIZE_MAX)
+#elif defined(__cplusplus) && (__cplusplus >= 201103L)
+    #include <new>
+    #include <atomic>
+    typedef struct { alignas(std::atomic_size_t) char data[sizeof(std::atomic_size_t)]; } ufbxi_atomic_counter;
+    #define ufbxi_atomic_counter_init(ptr) (new (&(ptr)->data) std::atomic_size_t(0))
+    #define ufbxi_atomic_counter_free(ptr) (((std::atomic_size_t*)(ptr)->data)->~atomic_size_t())
+    #define ufbxi_atomic_counter_inc(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_add(1)
+    #define ufbxi_atomic_counter_dec(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_sub(1)
+#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(__STDC_NO_ATOMICS__)
+    #include <stdatomic.h>
+    typedef volatile atomic_size_t ufbxi_atomic_counter;
+    #define ufbxi_atomic_counter_init(ptr) atomic_init(ptr, 0)
+    #define ufbxi_atomic_counter_free(ptr) (void)0
+    #define ufbxi_atomic_counter_inc(ptr) atomic_fetch_add((ptr), 1)
+    #define ufbxi_atomic_counter_dec(ptr) atomic_fetch_sub((ptr), 1)
 #else
     typedef volatile size_t ufbxi_atomic_counter;
     #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
@@ -3512,7 +3518,7 @@ static void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *ator, const ufbx
 
 static FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp_ator)
 {
-#if defined(_WIN32)
+#if !defined(UFBX_STANDARD_C) && defined(_WIN32)
 	wchar_t wpath_buf[256];
 	wchar_t *wpath = NULL;
 
@@ -3600,10 +3606,10 @@ static FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp
 
 static uint64_t ufbxi_ftell(FILE *file)
 {
-#if defined(_POSIX_VERSION)
+#if !defined(UFBX_STANDARD_C) && defined(_POSIX_VERSION)
 	off_t result = ftello(file);
 	if (result >= 0) return (uint64_t)result;
-#elif defined(_MSC_VER)
+#elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
 	int64_t result = _ftelli64(file);
 	if (result >= 0) return (uint64_t)result;
 #else

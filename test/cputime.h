@@ -39,7 +39,37 @@ double cputime_os_tick_to_sec(const cputime_sync_span *span, uint64_t os_tick);
 #ifndef CPUTIME_IMEPLEMENTED
 #define CPUTIME_IMEPLEMENTED
 
-#if defined(_WIN32)
+#if defined(CPUTIME_STANDARD_C) || defined(UFBX_STANDARD_C)
+
+#include <time.h>
+
+void cputime_sync_now(cputime_sync_point *sync, int accuracy)
+{
+	uint64_t tick = (uint64_t)clock();
+	sync->cpu_tick = tick;
+	sync->os_tick = tick;
+}
+
+uint64_t cputime_cpu_tick()
+{
+	return (uint64_t)clock();
+}
+
+uint64_t cputime_os_tick()
+{
+	return (uint64_t)clock();
+}
+
+static uint64_t cputime_os_freq()
+{
+	return (uint64_t)CLOCKS_PER_SEC;
+}
+
+static void cputime_os_wait()
+{
+}
+
+#elif defined(_WIN32)
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX

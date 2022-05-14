@@ -1,4 +1,13 @@
 
+UFBXT_TEST(thread_safety)
+#if UFBXT_IMPL
+{
+	if (!g_allow_non_thread_safe) {
+		ufbxt_assert(ufbx_is_thread_safe());
+	}
+}
+#endif
+
 UFBXT_FILE_TEST(maya_leading_comma)
 #if UFBXT_IMPL
 {

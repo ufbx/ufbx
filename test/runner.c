@@ -280,6 +280,7 @@ char data_root[256];
 static uint32_t g_file_version = 0;
 static const char *g_file_type = NULL;
 static bool g_fuzz = false;
+static bool g_allow_non_thread_safe = false;
 static bool g_all_byte_values = false;
 static bool g_dedicated_allocs = false;
 static bool g_fuzz_no_patch = false;
@@ -2061,6 +2062,10 @@ int main(int argc, char **argv)
 		if (!strcmp(argv[i], "-f")) {
 			if (++i < argc) g_file_version = (uint32_t)atoi(argv[i]);
 			if (++i < argc) g_file_type = argv[i];
+		}
+
+		if (!strcmp(argv[i], "--allow-non-thread-safe")) {
+			g_allow_non_thread_safe = true;
 		}
 
 		if (!strcmp(argv[i], "--fuzz")) {
