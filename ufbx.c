@@ -5846,7 +5846,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 				if (num_values < UFBXI_MAX_NON_ARRAY_VALUES) {
 					type_mask |= UFBXI_VALUE_NUMBER << (num_values*2);
 					ufbxi_value *v = &vals[num_values];
-					v->i = (int64_t)(v->f = val);
+					v->i = ufbxi_f64_to_i64(v->f = val);
 				}
 				break;
 
@@ -9259,7 +9259,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 			ufbx_assert(value_ix < 3);
 			if (!ufbxi_get_val_at(node, fmt_ix, 'R', &prop->value_real_arr[value_ix])) return 0;
 			if (value_ix == 0) {
-				prop->value_int = (int64_t)prop->value_real;
+				prop->value_int = ufbxi_f64_to_i64(prop->value_real);
 				prop->value_str = ufbx_empty_string;
 			}
 			value_ix++;
@@ -10033,7 +10033,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_connections_to_elements(ufbx
 						else if (name.data == ufbxi_Lcl_Scaling) type = UFBX_PROP_SCALING;
 						anim_def_prop.type = type;
 						anim_def_prop.value_vec3 = anim_value->default_value;
-						anim_def_prop.value_int = (int64_t)anim_value->default_value.x;
+						anim_def_prop.value_int = ufbxi_f64_to_i64(anim_value->default_value.x);
 						def_prop = &anim_def_prop;
 					} else {
 						flags |= UFBX_PROP_FLAG_NO_VALUE;
