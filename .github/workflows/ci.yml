@@ -114,19 +114,19 @@ jobs:
         run: gcc -c test/runner.c -o build/runner.o
       - name: Build and run standard C99
         run: |
-          gcc -std=c99 -DUFBX_STANDARD_C build/runner.o ufbx.c -o build/runner-c99
+          gcc -std=c99 -DUFBX_STANDARD_C build/runner.o ufbx.c -lm -o build/runner-c99
           build/runner-c99 -d data
       - name: Build and run standard C11
         run: |
-          gcc -std=c11 -DUFBX_STANDARD_C build/runner.o ufbx.c -o build/runner-c11
+          gcc -std=c11 -DUFBX_STANDARD_C build/runner.o ufbx.c -lm -o build/runner-c11
           build/runner-c11 -d data
       - name: Build and run standard C++98
         run: |
-          g++ -std=c++98 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -o build/runner-cpp98
+          g++ -std=c++98 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp98
           build/runner-cpp98 -d data
       - name: Build and run standard C11
         run: |
-          g++ -std=c++11 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -o build/runner-cpp11
+          g++ -std=c++11 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp11
           build/runner-cpp11 -d data
 
   ci_wasm:
