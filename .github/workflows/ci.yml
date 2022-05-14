@@ -105,7 +105,7 @@ jobs:
       - name: Run tests with TCC
         run: python3 misc/run_tests.py tests --additional-compiler tcc --compiler tcc
       - name: Compile ufbx.c wth x86 TCC
-        run: i386-tcc -c ufbx.c -o build/tcc-ufbx-x86.o
+        run: i386-tcc -Wall -Werror -c ufbx.c -o build/tcc-ufbx-x86.o
       - name: Compile PowerPC tests
         run: python3 -m ziglang cc -fno-sanitize=undefined -target powerpc-linux ufbx.c test/runner.c -g -o build/ppc-runner
       - name: Run PowerPC tests
@@ -114,19 +114,19 @@ jobs:
         run: gcc -c test/runner.c -o build/runner.o
       - name: Build and run standard C99
         run: |
-          gcc -std=c99 -DUFBX_STANDARD_C build/runner.o ufbx.c -lm -o build/runner-c99
+          gcc -Wall -Wextra -Werror -std=c99 -DUFBX_STANDARD_C build/runner.o ufbx.c -lm -o build/runner-c99
           build/runner-c99 -d data --allow-non-thread-safe
       - name: Build and run standard C11
         run: |
-          gcc -std=c11 -DUFBX_STANDARD_C build/runner.o ufbx.c -lm -o build/runner-c11
+          gcc -Wall -Wextra -Werror -std=c11 -DUFBX_STANDARD_C build/runner.o ufbx.c -lm -o build/runner-c11
           build/runner-c11 -d data
       - name: Build and run standard C++98
         run: |
-          g++ -std=c++98 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp98
+          g++ -Wall -Wextra -Werror -std=c++98 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp98
           build/runner-cpp98 -d data --allow-non-thread-safe
       - name: Build and run standard C11
         run: |
-          g++ -std=c++11 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp11
+          g++ -Wall -Wextra -Werror -std=c++11 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp11
           build/runner-cpp11 -d data
 
   ci_wasm:
