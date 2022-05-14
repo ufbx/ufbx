@@ -104,7 +104,7 @@ static void cputime_os_wait()
 
 #include <time.h>
 
-#if defined(__i386__) || defined(__x86_64__)
+#if (defined(__i386__) || defined(__x86_64__)) && (defined(__GNUC__) || defined(__clang__))
 	#include <x86intrin.h>
 	#define cputime_imp_timestamp() (uint64_t)(__rdtsc())
 #else
