@@ -30,9 +30,11 @@ UFBXT_TEST(fuzz_files)
 
 		ufbxt_progress_ctx stream_progress_ctx = { 0 };
 
+		bool temp_freed = false, result_freed = false;
+
 		ufbx_load_opts stream_opts = load_opts;
-		ufbxt_init_allocator(&stream_opts.temp_allocator);
-		ufbxt_init_allocator(&stream_opts.result_allocator);
+		ufbxt_init_allocator(&stream_opts.temp_allocator, &temp_freed);
+		ufbxt_init_allocator(&stream_opts.result_allocator, &result_freed);
 		stream_opts.read_buffer_size = 1;
 		stream_opts.temp_allocator.huge_threshold = 1;
 		stream_opts.result_allocator.huge_threshold = 1;
@@ -47,6 +49,9 @@ UFBXT_TEST(fuzz_files)
 			ufbxt_assert(!scene);
 		}
 		ufbx_free_scene(streamed_scene);
+
+		ufbxt_assert(temp_freed);
+		ufbxt_assert(result_freed);
 
 		ufbxt_do_fuzz(scene, streamed_scene, stream_progress_ctx.calls, name, data, size, buf);
 

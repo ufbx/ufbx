@@ -234,6 +234,8 @@ typedef struct {
 
 	size_t bytes_allocated;
 
+	bool *freed_ptr;
+
 	union {
 		uint64_t align;
 		char data[1024 * 1024];
@@ -269,6 +271,7 @@ static void ufbxt_free_allocator(void *user)
 {
 	ufbxt_allocator *ator = (ufbxt_allocator*)user;
 	ufbxt_assert(ator->bytes_allocated == 0);
+	*ator->freed_ptr = true;
 	free(ator);
 }
 
@@ -289,7 +292,7 @@ static size_t g_fuzz_step = SIZE_MAX;
 
 const char *g_fuzz_test_name = NULL;
 
-void ufbxt_init_allocator(ufbx_allocator_opts *ator)
+void ufbxt_init_allocator(ufbx_allocator_opts *ator, bool *freed_ptr)
 {
 	ator->memory_limit = 0x4000000; // 64MB
 
@@ -299,6 +302,8 @@ void ufbxt_init_allocator(ufbx_allocator_opts *ator)
 	ufbxt_assert(at);
 	at->offset = 0;
 	at->bytes_allocated = 0;
+	at->freed_ptr = freed_ptr;
+	*freed_ptr = false;
 
 	ator->allocator.user = at;
 	ator->allocator.alloc_fn = &ufbxt_alloc;
@@ -347,8 +352,9 @@ int ufbxt_test_fuzz(const char *filename, void *data, size_t size, size_t step, 
 		opts.filename.data = filename;
 		opts.filename.length = SIZE_MAX;
 
-		ufbxt_init_allocator(&opts.temp_allocator);
-		ufbxt_init_allocator(&opts.result_allocator);
+		bool temp_freed = false, result_freed = false;
+		ufbxt_init_allocator(&opts.temp_allocator, &temp_freed);
+		ufbxt_init_allocator(&opts.result_allocator, &result_freed);
 
 		opts.temp_allocator.allocation_limit = temp_limit;
 		opts.result_allocator.allocation_limit = result_limit;
@@ -419,6 +425,9 @@ int ufbxt_test_fuzz(const char *filename, void *data, size_t size, size_t step, 
 				}
 			}
 		}
+
+		ufbxt_assert(temp_freed);
+		ufbxt_assert(result_freed);
 
 	} else {
 		ret = 0;
@@ -1519,8 +1528,9 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 			opts.filename.data = filename;
 			opts.filename.length = SIZE_MAX;
 
-			ufbxt_init_allocator(&opts.temp_allocator);
-			ufbxt_init_allocator(&opts.result_allocator);
+			bool temp_freed = false, result_freed = false;
+			ufbxt_init_allocator(&opts.temp_allocator, &temp_freed);
+			ufbxt_init_allocator(&opts.result_allocator, &result_freed);
 
 			if (check->temp_limit > 0) {
 				ufbxt_logf(".. Temp limit %u: %s", check->temp_limit, check->description);
@@ -1553,6 +1563,9 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 				ufbxt_check_scene(scene);
 				ufbx_free_scene(scene);
 			}
+
+			ufbxt_assert(temp_freed);
+			ufbxt_assert(result_freed);
 
 			if (check->patch_offset >= 0) {
 				data_u8[check->patch_offset] = original;
@@ -1689,9 +1702,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			ufbxt_progress_ctx stream_progress_ctx = { 0 };
 
+			bool temp_freed = false, result_freed = false;
+
 			ufbx_load_opts stream_opts = load_opts;
-			ufbxt_init_allocator(&stream_opts.temp_allocator);
-			ufbxt_init_allocator(&stream_opts.result_allocator);
+			ufbxt_init_allocator(&stream_opts.temp_allocator, &temp_freed);
+			ufbxt_init_allocator(&stream_opts.result_allocator, &result_freed);
 			stream_opts.read_buffer_size = 1;
 			stream_opts.temp_allocator.huge_threshold = 1;
 			stream_opts.result_allocator.huge_threshold = 1;
@@ -1904,6 +1919,9 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			ufbx_free_scene(scene);
 			ufbx_free_scene(streamed_scene);
+
+			ufbxt_assert(temp_freed);
+			ufbxt_assert(result_freed);
 
 			free(data);
 		}
