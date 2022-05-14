@@ -8,4 +8,5 @@ int main(int argc, char **argv)
         float val = (float)atof(argv[1]);
         printf("sin(%.2f) = %.2f\n", val, std::sin(val));
     }
+    return 0;
 }
