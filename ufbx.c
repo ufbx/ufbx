@@ -365,10 +365,10 @@ static ufbxi_forceinline size_t ufbxi_max_sz(size_t a, size_t b) { return a < b 
 static ufbxi_forceinline ufbx_real ufbxi_min_real(ufbx_real a, ufbx_real b) { return a < b ? a : b; }
 static ufbxi_forceinline ufbx_real ufbxi_max_real(ufbx_real a, ufbx_real b) { return a < b ? b : a; }
 
-static ufbxi_forceinline int64_t ufbxi_f64_to_i32(double value)
+static ufbxi_forceinline int32_t ufbxi_f64_to_i32(double value)
 {
 	if (fabs(value) <= (double)INT32_MAX) {
-		return (int64_t)value;
+		return (int32_t)value;
 	} else {
 		return value >= 0.0 ? INT32_MAX : INT32_MIN;
 	}
