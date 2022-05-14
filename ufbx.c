@@ -282,6 +282,25 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
     #define ufbxi_atomic_counter_free(ptr) (void)0
     #define ufbxi_atomic_counter_inc(ptr) atomic_fetch_add((ptr), 1)
     #define ufbxi_atomic_counter_dec(ptr) atomic_fetch_sub((ptr), 1)
+#elif defined(__TINYC__)
+	#if defined(__x86_64__) || defined(_AMD64_)
+		static size_t ufbxi_tcc_atomic_add(volatile size_t *dst, size_t value) {
+			__asm__ __volatile__("lock; xaddq %0, %1;" : "+r" (value), "=m" (*dst) : "m" (dst));
+			return value;
+		}
+	#elif defined(__i386__) || defined(_X86_)
+		static size_t ufbxi_tcc_atomic_add(volatile size_t *dst, size_t value) {
+			__asm__ __volatile__("lock; xaddl %0, %1;" : "+r" (value), "=m" (*dst) : "m" (dst));
+			return value;
+		}
+	#else
+		#error Unexpected TCC architecture
+	#endif
+    typedef volatile size_t ufbxi_atomic_counter;
+    #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+    #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
+    #define ufbxi_atomic_counter_inc(ptr) ufbxi_tcc_atomic_add((ptr), 1)
+    #define ufbxi_atomic_counter_dec(ptr) ufbxi_tcc_atomic_add((ptr), SIZE_MAX)
 #else
     typedef volatile size_t ufbxi_atomic_counter;
     #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
