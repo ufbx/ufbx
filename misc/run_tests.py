@@ -319,6 +319,7 @@ class GCCCompiler(Compiler):
             args.append("-fsanitize=leak")
             args.append("-fsanitize=undefined")
             args.append("-fno-sanitize=float-cast-overflow")
+            args.append("-fno-sanitize-recover=undefined")
             args.append("-DUFBX_UBSAN")
 
         if "mingw" in self.arch:
