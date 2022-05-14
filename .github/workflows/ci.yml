@@ -114,7 +114,7 @@ jobs:
         run: gcc -c test/runner.c -o build/runner.o
       - name: Build and run standard C99
         run: |
-          gcc -std=c99 -DUFBX_STANDARD_C build/runner.o ufbx.c -lm -o build/runner-c99
+          gcc -std=c99 -DUFBX_STANDARD_C build/runner.o ufbx.c -lm -o build/runner-c99 --allow-non-thread-safe
           build/runner-c99 -d data
       - name: Build and run standard C11
         run: |
