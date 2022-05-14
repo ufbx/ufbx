@@ -339,13 +339,20 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 
 // -- Utility
 
+#if defined(UFBX_UBSAN)
+	static void ufbxi_assert_zero(size_t offset) { ufbx_assert(offset == 0); }
+	#define ufbxi_add_ptr(ptr, offset) ((ptr) ? (ptr) + (offset) : (ufbxi_assert_zero((size_t)(offset)), (ptr)))
+#else
+	#define ufbxi_add_ptr(ptr, offset) ((ptr) + (offset))
+#endif
+
 #define ufbxi_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
-#define ufbxi_for(m_type, m_name, m_begin, m_num) for (m_type *m_name = m_begin, *m_name##_end = m_name + (m_num); m_name != m_name##_end; m_name++)
-#define ufbxi_for_ptr(m_type, m_name, m_begin, m_num) for (m_type **m_name = m_begin, **m_name##_end = m_name + (m_num); m_name != m_name##_end; m_name++)
+#define ufbxi_for(m_type, m_name, m_begin, m_num) for (m_type *m_name = m_begin, *m_name##_end = ufbxi_add_ptr(m_name, m_num); m_name != m_name##_end; m_name++)
+#define ufbxi_for_ptr(m_type, m_name, m_begin, m_num) for (m_type **m_name = m_begin, **m_name##_end = ufbxi_add_ptr(m_name, m_num); m_name != m_name##_end; m_name++)
 
 // WARNING: Evaluates `m_list` twice!
-#define ufbxi_for_list(m_type, m_name, m_list) for (m_type *m_name = (m_list).data, *m_name##_end = m_name + (m_list).count; m_name != m_name##_end; m_name++)
-#define ufbxi_for_ptr_list(m_type, m_name, m_list) for (m_type **m_name = (m_list).data, **m_name##_end = m_name + (m_list).count; m_name != m_name##_end; m_name++)
+#define ufbxi_for_list(m_type, m_name, m_list) for (m_type *m_name = (m_list).data, *m_name##_end = ufbxi_add_ptr(m_name, (m_list).count); m_name != m_name##_end; m_name++)
+#define ufbxi_for_ptr_list(m_type, m_name, m_list) for (m_type **m_name = (m_list).data, **m_name##_end = ufbxi_add_ptr(m_name, (m_list).count); m_name != m_name##_end; m_name++)
 
 #define ufbxi_string_literal(str) { str, sizeof(str) - 1 }
 
@@ -357,6 +364,24 @@ static ufbxi_forceinline size_t ufbxi_min_sz(size_t a, size_t b) { return a < b 
 static ufbxi_forceinline size_t ufbxi_max_sz(size_t a, size_t b) { return a < b ? b : a; }
 static ufbxi_forceinline ufbx_real ufbxi_min_real(ufbx_real a, ufbx_real b) { return a < b ? a : b; }
 static ufbxi_forceinline ufbx_real ufbxi_max_real(ufbx_real a, ufbx_real b) { return a < b ? b : a; }
+
+static ufbxi_forceinline int64_t ufbxi_f64_to_i32(double value)
+{
+	if (fabs(value) <= (double)INT32_MAX) {
+		return (int64_t)value;
+	} else {
+		return value >= 0.0 ? INT32_MAX : INT32_MIN;
+	}
+}
+
+static ufbxi_forceinline int64_t ufbxi_f64_to_i64(double value)
+{
+	if (fabs(value) <= (double)INT64_MAX) {
+		return (int64_t)value;
+	} else {
+		return value >= 0.0 ? INT64_MAX : INT64_MIN;
+	}
+}
 
 // Stable sort array `m_type m_data[m_size]` using the predicate `m_cmp_lambda(a, b)`
 // `m_linear_size` is a hint for how large blocks handle initially do with insertion sort
@@ -1824,7 +1849,9 @@ static void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
 				pos -= bytes_left;
 				b->pos = pos;
 				ptr -= bytes_left;
-				memcpy(ptr, chunk->data + pos, bytes_left);
+				if (bytes_left > 0) {
+					memcpy(ptr, chunk->data + pos, bytes_left);
+				}
 				break;
 			} else {
 				// Pop the whole chunk
@@ -4766,37 +4793,37 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 
 	switch (dst_type)
 	{
-	#define ufbxi_convert_loop(m_dst, m_size, m_expr) { \
+	#define ufbxi_convert_loop(m_dst, m_cast, m_size, m_expr) { \
 		const char *val = (const char*)src, *val_end = val + size*m_size; \
 		m_dst *d = (m_dst*)dst; \
-		while (val != val_end) { *d++ = (m_dst)(m_expr); val += m_size; } }
+		while (val != val_end) { *d++ = m_cast(m_expr); val += m_size; } }
 
-	#define ufbxi_convert_switch(m_dst) \
+	#define ufbxi_convert_switch(m_dst, m_cast_int, m_cast_float) \
 		switch (src_type) { \
-		case 'b': ufbxi_convert_loop(m_dst, 1, *val != 0); break; \
-		case 'i': ufbxi_convert_loop(m_dst, 4, ufbxi_read_i32(val)); break; \
-		case 'l': ufbxi_convert_loop(m_dst, 8, ufbxi_read_i64(val)); break; \
-		case 'f': ufbxi_convert_loop(m_dst, 4, ufbxi_read_f32(val)); break; \
-		case 'd': ufbxi_convert_loop(m_dst, 8, ufbxi_read_f64(val)); break; \
+		case 'b': ufbxi_convert_loop(m_dst, m_cast_int, 1, *val != 0); break; \
+		case 'i': ufbxi_convert_loop(m_dst, m_cast_int, 4, ufbxi_read_i32(val)); break; \
+		case 'l': ufbxi_convert_loop(m_dst, m_cast_int, 8, ufbxi_read_i64(val)); break; \
+		case 'f': ufbxi_convert_loop(m_dst, m_cast_float, 4, ufbxi_read_f32(val)); break; \
+		case 'd': ufbxi_convert_loop(m_dst, m_cast_float, 8, ufbxi_read_f64(val)); break; \
 		default: ufbxi_fail("Bad array source type"); \
 		} \
 		break; \
 
 	case 'b':
 		switch (src_type) {
-		case 'b': ufbxi_convert_loop(char, 1, *val != 0); break;
-		case 'i': ufbxi_convert_loop(char, 4, ufbxi_read_i32(val) != 0); break;
-		case 'l': ufbxi_convert_loop(char, 8, ufbxi_read_i64(val) != 0); break;
-		case 'f': ufbxi_convert_loop(char, 4, ufbxi_read_f32(val) != 0); break;
-		case 'd': ufbxi_convert_loop(char, 8, ufbxi_read_f64(val) != 0); break;
+		case 'b': ufbxi_convert_loop(char, (char), 1, *val != 0); break;
+		case 'i': ufbxi_convert_loop(char, (char), 4, ufbxi_read_i32(val) != 0); break;
+		case 'l': ufbxi_convert_loop(char, (char), 8, ufbxi_read_i64(val) != 0); break;
+		case 'f': ufbxi_convert_loop(char, (char), 4, ufbxi_read_f32(val) != 0); break;
+		case 'd': ufbxi_convert_loop(char, (char), 8, ufbxi_read_f64(val) != 0); break;
 		default: ufbxi_fail("Bad array source type");
 		}
 		break;
 
-	case 'i': ufbxi_convert_switch(int32_t); break;
-	case 'l': ufbxi_convert_switch(int64_t); break;
-	case 'f': ufbxi_convert_switch(float); break;
-	case 'd': ufbxi_convert_switch(double); break;
+	case 'i': ufbxi_convert_switch(int32_t, (int32_t), ufbxi_f64_to_i32); break;
+	case 'l': ufbxi_convert_switch(int64_t, (int64_t), ufbxi_f64_to_i64); break;
+	case 'f': ufbxi_convert_switch(float, (float), (float)); break;
+	case 'd': ufbxi_convert_switch(double, (double), (double)); break;
 
 	default: return 0;
 
@@ -5246,13 +5273,13 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 
 			case 'F':
 				type_mask |= UFBXI_VALUE_NUMBER << (i*2);
-				vals[i].i = (int64_t)(vals[i].f = ufbxi_read_f32(value));
+				vals[i].i = ufbxi_f64_to_i64(vals[i].f = ufbxi_read_f32(value));
 				ufbxi_consume_bytes(uc, 5);
 				break;
 
 			case 'D':
 				type_mask |= UFBXI_VALUE_NUMBER << (i*2);
-				vals[i].i = (int64_t)(vals[i].f = ufbxi_read_f64(value));
+				vals[i].i = ufbxi_f64_to_i64(vals[i].f = ufbxi_read_f64(value));
 				ufbxi_consume_bytes(uc, 9);
 				break;
 
@@ -9915,9 +9942,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_contex
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_connections_to_elements(ufbxi_context *uc)
 {
 	ufbx_connection *conn_src = uc->scene.connections_src.data;
-	ufbx_connection *conn_src_end = conn_src + uc->scene.connections_src.count;
+	ufbx_connection *conn_src_end = ufbxi_add_ptr(conn_src, uc->scene.connections_src.count);
 	ufbx_connection *conn_dst = uc->scene.connections_dst.data;
-	ufbx_connection *conn_dst_end = conn_dst + uc->scene.connections_dst.count;
+	ufbx_connection *conn_dst_end = ufbxi_add_ptr(conn_dst, uc->scene.connections_dst.count);
 
 	ufbxi_for_ptr(ufbx_element, p_elem, uc->scene.elements.data, uc->scene.elements.count) {
 		ufbx_element *elem = *p_elem;
@@ -9939,7 +9966,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_connections_to_elements(ufbx
 		// TODO: It seems we're invalidating a lot of properties here actually, maybe they
 		// should be initially pushed to `tmp` instead of result if this happens so much..
 		{
-			ufbx_prop *prop = elem->props.props.data, *prop_end = prop + elem->props.props.count;
+			ufbx_prop *prop = elem->props.props.data, *prop_end = ufbxi_add_ptr(prop, elem->props.props.count);
 			ufbx_prop *copy_start = prop;
 			bool needs_copy = false;
 			size_t num_animated = 0, num_synthetic = 0;
@@ -13369,7 +13396,7 @@ static const ufbxi_cache_interpretation_name ufbxi_cache_interpretation_names[] 
 
 static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 {
-	ufbxi_cache_tmp_channel *tmp_chan = cc->channels, *tmp_end = tmp_chan + cc->num_channels;
+	ufbxi_cache_tmp_channel *tmp_chan = cc->channels, *tmp_end = ufbxi_add_ptr(tmp_chan, cc->num_channels);
 
 	size_t begin = 0, num_channels = 0;
 	while (begin < cc->cache.frames.count) {
@@ -13761,7 +13788,7 @@ static ufbxi_noinline int ufbxi_scale_units(ufbxi_context *uc, ufbx_real target_
 				prop->value_vec3.x *= ratio;
 				prop->value_vec3.y *= ratio;
 				prop->value_vec3.z *= ratio;
-				prop->value_int = (int64_t)prop->value_vec3.x;
+				prop->value_int = ufbxi_f64_to_i64(prop->value_vec3.x);
 			} else {
 				// We need to add a new Lcl Scaling property based on the defaults
 				ufbx_props *defaults = node->props.defaults;
@@ -13785,7 +13812,7 @@ static ufbxi_noinline int ufbxi_scale_units(ufbxi_context *uc, ufbx_real target_
 				new_prop.flags = UFBX_PROP_FLAG_SYNTHETIC;
 				new_prop.value_str = ufbx_empty_string;
 				new_prop.value_vec3 = scale;
-				new_prop.value_int = (int64_t)new_prop.value_vec3.x;
+				new_prop.value_int = ufbxi_f64_to_i64(new_prop.value_vec3.x);
 
 				size_t new_num_props = node->props.props.count + 1;
 				ufbx_prop *props_copy = ufbxi_push(&uc->result, ufbx_prop, new_num_props);
@@ -14453,7 +14480,7 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 	}
 
 	ufbxi_for(ufbx_prop, prop, props, num_props) {
-		prop->value_int = (int64_t)prop->value_real;
+		prop->value_int = ufbxi_f64_to_i64(prop->value_real);
 	}
 }
 
@@ -17681,7 +17708,7 @@ ufbx_abi ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_ove
 			over->value_str = ufbxi_empty_char;
 		}
 		if (over->value_int == 0) {
-			over->value_int = (int64_t)over->value.x;
+			over->value_int = ufbxi_f64_to_i64(over->value.x);
 		} else if (over->value.x == 0.0) {
 			over->value.x = (ufbx_real)over->value_int;
 		}
