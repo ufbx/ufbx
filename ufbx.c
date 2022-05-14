@@ -112,6 +112,14 @@
 	#define ufbxi_maybe_null(ptr) (ptr)
 #endif
 
+#if !defined(ufbxi_trace)
+	#if defined(UFBX_TRACE)
+		#define ufbxi_trace(desc) (fprintf(stderr, "ufbx trace: %s:%d: %s\n", __FILE__, __LINE__, #desc), fflush(stderr), desc)
+	#else
+		#define ufbxi_trace(desc) (desc)
+	#endif
+#endif
+
 // Unaligned little-endian load functions
 // On platforms that support unaligned access natively (x86, x64, ARM64) just use normal loads,
 // with unaligned attributes, otherwise do manual byte-wise load.
