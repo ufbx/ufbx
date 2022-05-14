@@ -475,8 +475,6 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 	obj->exporter = UFBXT_OBJ_EXPORTER_UNKNOWN;
 	obj->position_scale = 1.0;
 
-	static int HACKLINE;
-
 	line = (char*)obj_data;
 	for (;;) {
 		char *line_end = strpbrk(line, "\r\n");
@@ -485,8 +483,6 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 			prev = *line_end;
 			*line_end = '\0';
 		}
-
-		HACKLINE++;
 
 		if (!strncmp(line, "v ", 2)) {
 			line += 2;
