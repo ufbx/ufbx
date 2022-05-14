@@ -123,7 +123,7 @@ jobs:
       - name: Build and run standard C++98
         run: |
           g++ -std=c++98 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp98
-          build/runner-cpp98 -d data
+          build/runner-cpp98 -d data --allow-non-thread-safe
       - name: Build and run standard C11
         run: |
           g++ -std=c++11 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp11
