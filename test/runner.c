@@ -11,8 +11,22 @@ void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr);
 #include <stdarg.h>
 #include <math.h>
 
+// -- Thread local
+
+#define UFBXT_HAS_THREADLOCAL 1
+
+#if defined(_MSC_VER)
+	#define ufbxt_threadlocal __declspec(thread)
+#elif defined(__GNUC__) || defined(__clang__)
+	#define ufbxt_threadlocal __thread
+#else
+	#define ufbxt_threadlocal
+	#undef UFBXT_HAS_THREADLOCAL
+	#define UFBXT_HAS_THREADLOCAL 0
+#endif
+
 #ifndef USE_SETJMP
-#if !defined(__wasm__)
+#if !defined(__wasm__) && UFBXT_HAS_THREADLOCAL
 	#define USE_SETJMP 1
 #else
 	#define USE_SETJMP 0
@@ -48,14 +62,6 @@ static void ufbxt_longjmp(int env, int value, const char *file, uint32_t line, c
 #else
 	static int omp_get_thread_num() { return 0; }
 	static int omp_get_num_threads() { return 1; }
-#endif
-
-// -- Thread local
-
-#ifdef _MSC_VER
-	#define ufbxt_threadlocal __declspec(thread)
-#else
-	#define ufbxt_threadlocal __thread
 #endif
 
 // -- Test framework
@@ -327,7 +333,10 @@ int ufbxt_test_fuzz(const char *filename, void *data, size_t size, size_t step, 
 {
 	if (g_fuzz_step < SIZE_MAX && step != g_fuzz_step) return 1;
 
-	t_jmp_buf = (ufbxt_jmp_buf*)calloc(1, sizeof(ufbxt_jmp_buf));
+	#if UFBXT_HAS_THREADLOCAL
+		t_jmp_buf = (ufbxt_jmp_buf*)calloc(1, sizeof(ufbxt_jmp_buf));
+	#endif
+
 	int ret = 1;
 	if (!ufbxt_setjmp(*t_jmp_buf)) {
 
@@ -415,8 +424,10 @@ int ufbxt_test_fuzz(const char *filename, void *data, size_t size, size_t step, 
 		ret = 0;
 	}
 
-	free(t_jmp_buf);
-	t_jmp_buf = NULL;
+	#if UFBXT_HAS_THREADLOCAL
+		free(t_jmp_buf);
+		t_jmp_buf = NULL;
+	#endif
 
 	return ret;
 
@@ -1714,7 +1725,9 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 							fflush(stderr);
 						}
 					}
-					t_jmp_buf = (ufbxt_jmp_buf*)calloc(1, sizeof(ufbxt_jmp_buf));
+					#if UFBXT_HAS_THREADLOCAL
+						t_jmp_buf = (ufbxt_jmp_buf*)calloc(1, sizeof(ufbxt_jmp_buf));
+					#endif
 					if (!ufbxt_setjmp(*t_jmp_buf)) {
 						ufbx_load_opts load_opts = { 0 };
 						load_opts.read_buffer_size = (size_t)buf_sz;
@@ -1728,8 +1741,10 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 							fail_sz = buf_sz;
 						}
 					}
-					free(t_jmp_buf);
-					t_jmp_buf = NULL;
+					#if UFBXT_HAS_THREADLOCAL
+						free(t_jmp_buf);
+						t_jmp_buf = NULL;
+					#endif
 				}
 
 				if (fail_sz >= 0 && !allow_error) {
