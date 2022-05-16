@@ -133,10 +133,19 @@ jobs:
         run: |
           g++ -Wall -Wextra -Werror -std=c++98 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp98
           build/runner-cpp98 -d data --allow-non-thread-safe
-      - name: Build and run standard C11
+      - name: Build and run standard C++11
         run: |
           g++ -Wall -Wextra -Werror -std=c++11 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp11
           build/runner-cpp11 -d data
+      - name: Build and run threadcheck (standard C11)
+        run: |
+          gcc -Wall -Wextra -Werror -std=c11 -DUFBX_STANDARD_C -c ufbx.c -o build/ufbx-c11.o
+          g++ -Wall -Wextra -Werror -std=c++11 build/ufbx-c11.o test/threadcheck.cpp -lm -o build/threadcheck-c11
+          build/threadcheck-c11 data/maya_cube_7500_binary.fbx 2
+      - name: Build and run threadcheck (standard C++11)
+        run: |
+          g++ -Wall -Wextra -Werror -std=c++11 -DUFBX_STANDARD_C -x c++ ufbx.c test/threadcheck.cpp -lm -o build/threadcheck-cpp11
+          build/threadcheck-cpp11 data/maya_cube_7500_binary.fbx 2
 
   ci_wasm:
     runs-on: ubuntu-latest
