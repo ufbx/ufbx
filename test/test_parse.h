@@ -519,3 +519,35 @@ UFBXT_FILE_TEST_ALLOW_ERROR(synthetic_truncated_quot_fail)
 {
 }
 #endif
+
+UFBXT_FILE_TEST_ALLOW_ERROR(synthetic_unicode_error_identity)
+#if UFBXT_IMPL
+{
+	ufbx_node *parent = ufbx_find_node(scene, "Parent");
+	ufbxt_assert(parent);
+	ufbxt_assert(parent->children.count == 2);
+
+	ufbxt_assert(!strcmp(parent->children.data[0]->name.data, parent->children.data[1]->name.data));
+	ufbxt_assert(parent->children.data[0]->name.data == parent->children.data[1]->name.data);
+
+	for (size_t i = 0; i < parent->children.count; i++) {
+		ufbx_node *child = parent->children.data[i];
+		bool left = child->world_transform.translation.x < 0.0f;
+
+		ufbx_mesh *mesh = child->mesh;
+		ufbxt_assert(mesh);
+		ufbxt_assert(mesh->materials.count == 1);
+
+		ufbx_material *material = mesh->materials.data[0].material;
+		ufbxt_assert(!strcmp(material->name.data, "Material_\xef\xbf\xbd"));
+
+		if (left) {
+			ufbx_vec3 ref = { 1.0f, 0.0f, 0.0f };
+			ufbxt_assert_close_vec3(err, material->fbx.diffuse_color.value, ref);
+		} else {
+			ufbx_vec3 ref = { 0.0f, 1.0f, 0.0f };
+			ufbxt_assert_close_vec3(err, material->fbx.diffuse_color.value, ref);
+		}
+	}
+}
+#endif
