@@ -1011,6 +1011,51 @@ async def main():
         targets = await gather(target_tasks)
         all_targets += targets
 
+    if "threadcheck" in tests:
+        log_comment("-- Compiling and running threadcheck --")
+    
+        target_tasks = []
+
+        threadcheck_config = {
+            "sources": ["ufbx.c", "test/threadcheck.cpp"],
+            "output": "threadcheck" + exe_suffix,
+            "cpp": True,
+            "optimize": False,
+            "std": "c++11",
+            "threads": True,
+        }
+        target_tasks += compile_permutations("threadcheck", threadcheck_config, arch_configs, None)
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+        def target_score(target):
+            compiler = target.compiler
+            config = target.config
+            if not target.compiled:
+                return (0, 0)
+            score = 1
+            if config["arch"] == "x64":
+                score += 10
+            if "clang" in compiler.name:
+                score += 10
+            if "msvc" in compiler.name:
+                score += 5
+            version = re.search(r"\d+", compiler.version)
+            version = int(version.group(0)) if version else 0
+            return (score, version)
+
+        best_target = max(targets, key=target_score)
+        if best_target.compiled:
+            log_comment(f"-- Running {best_target.name} --")
+
+            best_target.log.clear()
+            best_target.ran = False
+            await run_target(best_target, ["data/maya_cube_7500_binary.fbx", "4"])
+            for line in best_target.log[1].splitlines(keepends=False):
+                log_comment(line)
+
+
     for target in all_targets:
         if target.ok: continue
         print()
