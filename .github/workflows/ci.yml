@@ -42,7 +42,7 @@ jobs:
       - name: Verbose test info
         run: build\runner_vs_cl64_release_x64\runner.exe -d data -v
 
-  ci_windows:
+  ci_macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
