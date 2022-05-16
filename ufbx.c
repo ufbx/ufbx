@@ -19,12 +19,6 @@
 
 #define _FILE_OFFSET_BITS 64
 
-#if defined(UFBX_STANDARD_C)
-	#ifndef _CRT_SECURE_NO_WARNINGS
-		#define _CRT_SECURE_NO_WARNINGS
-	#endif
-#endif
-
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -71,6 +65,9 @@
 	#pragma warning(disable: 4127) // conditional expression is constant
 	#pragma warning(disable: 4706) // assignment within conditional expression
 	#pragma warning(disable: 4789) // buffer 'type_and_name' of size 8 bytes will be overrun; 16 bytes will be written starting at offset 0
+	#if defined(UFBX_STANDARD_C)
+		#pragma warning(disable: 4996) // 'fopen': This function or variable may be unsafe. Consider using fopen_s instead.
+	#endif
 #endif
 
 #if defined(__clang__)
