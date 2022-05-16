@@ -1021,7 +1021,7 @@ async def main():
             "output": "threadcheck" + exe_suffix,
             "cpp": True,
             "optimize": False,
-            "std": "c++11",
+            "std": "c++14",
             "threads": True,
         }
         target_tasks += compile_permutations("threadcheck", threadcheck_config, arch_configs, None)
