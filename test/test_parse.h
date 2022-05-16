@@ -534,6 +534,8 @@ UFBXT_FILE_TEST_ALLOW_ERROR(synthetic_unicode_error_identity)
 		ufbx_node *child = parent->children.data[i];
 		bool left = child->world_transform.translation.x < 0.0f;
 
+		ufbxt_assert(!strcmp(child->name.data, "Child_\xef\xbf\xbd"));
+
 		ufbx_mesh *mesh = child->mesh;
 		ufbxt_assert(mesh);
 		ufbxt_assert(mesh->materials.count == 1);
