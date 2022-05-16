@@ -47,7 +47,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Run tests
-        run: python3 misc/run_tests.py tests readme threadcheck --verbose
+        run: python3 misc/run_tests.py tests readme threadcheck --verbose --remove-compiler gcc --additional-compiler gcc-11
       - name: Compile ufbx as ObjC
         run: clang -ObjC -c ufbx.c -o build/ufbx-objc.o
 

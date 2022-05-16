@@ -15,6 +15,7 @@ import argparse
 parser = argparse.ArgumentParser(description="Run ufbx tests")
 parser.add_argument("tests", type=str, nargs="*", help="Names of tests to run")
 parser.add_argument("--additional-compiler", default=[], action="append", help="Additional compiler(s) to use")
+parser.add_argument("--remove-compiler", default=[], action="append", help="Remove a compiler from being used")
 parser.add_argument("--compiler", default=[], action="append", help="Specify exact compiler(s) to use")
 parser.add_argument("--no-sse", action="store_true", help="Don't make SSE builds when possible")
 parser.add_argument("--wasi-sdk", default=[], action="append", help="WASI SDK path")
@@ -317,7 +318,8 @@ class GCCCompiler(Compiler):
 
         if config.get("san"):
             args.append("-fsanitize=address")
-            args.append("-fsanitize=leak")
+            if sys.platform != "darwin":
+                args.append("-fsanitize=leak")
             args.append("-fsanitize=undefined")
             args.append("-fno-sanitize=float-cast-overflow")
             args.append("-fno-sanitize-recover=undefined")
@@ -535,7 +537,7 @@ async def compile_target(t):
     t.log.append(err)
 
     if argv.verbose:
-        print("\n".join(["$ " + cmdline, out, err]))
+        log("\n".join(["$ " + cmdline, out, err]))
 
     if ok:
         t.compiled = True
@@ -573,7 +575,7 @@ async def run_target(t, args):
     t.log.append(err)
 
     if argv.verbose:
-        print("\n".join(["$ " + cmdline, out, err]))
+        log("\n".join(["$ " + cmdline, out, err]))
 
     if ok:
         t.ran = True
