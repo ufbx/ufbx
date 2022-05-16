@@ -42,6 +42,13 @@ jobs:
       - name: Verbose test info
         run: build\runner_vs_cl64_release_x64\runner.exe -d data -v
 
+  ci_windows:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run tests
+        run: python3 misc/run_tests.py tests readme threadcheck
+
   ci_picort:
     runs-on: ubuntu-latest
     steps:
