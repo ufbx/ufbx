@@ -1051,7 +1051,7 @@ async def main():
 
             best_target.log.clear()
             best_target.ran = False
-            await run_target(best_target, ["data/maya_cube_7500_binary.fbx", "4"])
+            await run_target(best_target, ["data/maya_cube_7500_binary.fbx", "2"])
             for line in best_target.log[1].splitlines(keepends=False):
                 log_comment(line)
 
