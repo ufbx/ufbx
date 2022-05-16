@@ -243,13 +243,13 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 
 #define UFBXI_THREAD_SAFE 1
 
-#if !defined(UFBX_STANDARD_C) && (defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER))
+#if 0 && !defined(UFBX_STANDARD_C) && (defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER))
     typedef size_t ufbxi_atomic_counter;
     #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
     #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
     #define ufbxi_atomic_counter_inc(ptr) __sync_fetch_and_add((ptr), 1)
     #define ufbxi_atomic_counter_dec(ptr) __sync_fetch_and_sub((ptr), 1)
-#elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
+#elif 0 && !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
     #if defined(_M_X64)  || defined(_M_ARM64)
 		#if defined(__cplusplus)
 			extern "C" __int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
@@ -277,7 +277,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
         #define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement(ptr) - 1)
         #define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement(ptr) + 1)
     #endif
-#elif !defined(UFBX_STANDARD_C) && defined(__TINYC__)
+#elif 0 && !defined(UFBX_STANDARD_C) && defined(__TINYC__)
 	#if defined(__x86_64__) || defined(_AMD64_)
 		static size_t ufbxi_tcc_atomic_add(volatile size_t *dst, size_t value) {
 			__asm__ __volatile__("lock; xaddq %0, %1;" : "+r" (value), "=m" (*dst) : "m" (dst));
@@ -296,7 +296,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
     #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
     #define ufbxi_atomic_counter_inc(ptr) ufbxi_tcc_atomic_add((ptr), 1)
     #define ufbxi_atomic_counter_dec(ptr) ufbxi_tcc_atomic_add((ptr), SIZE_MAX)
-#elif defined(__cplusplus) && (__cplusplus >= 201103L)
+#elif 0 && defined(__cplusplus) && (__cplusplus >= 201103L)
     #include <new>
     #include <atomic>
     typedef struct { alignas(std::atomic_size_t) char data[sizeof(std::atomic_size_t)]; } ufbxi_atomic_counter;
@@ -304,7 +304,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
     #define ufbxi_atomic_counter_free(ptr) (((std::atomic_size_t*)(ptr)->data)->~atomic_size_t())
     #define ufbxi_atomic_counter_inc(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_add(1)
     #define ufbxi_atomic_counter_dec(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_sub(1)
-#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(__STDC_NO_ATOMICS__)
+#elif 0 && defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(__STDC_NO_ATOMICS__)
     #include <stdatomic.h>
     typedef volatile atomic_size_t ufbxi_atomic_counter;
     #define ufbxi_atomic_counter_init(ptr) atomic_init(ptr, 0)
