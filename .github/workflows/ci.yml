@@ -48,6 +48,8 @@ jobs:
       - uses: actions/checkout@v2
       - name: Run tests
         run: python3 misc/run_tests.py tests readme threadcheck
+      - name: Compile ufbx as ObjC
+        run: clang -ObjC -c ufbx.c -o build/ufbx-objc.o
 
   ci_picort:
     runs-on: ubuntu-latest
