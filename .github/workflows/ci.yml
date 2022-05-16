@@ -48,8 +48,8 @@ jobs:
       - uses: actions/checkout@v2
       - name: Run tests
         run: python3 misc/run_tests.py tests readme threadcheck --remove-compiler gcc --additional-compiler gcc-11 --remove-arch x86
-      - name: Compile ufbx as ObjC
-        run: clang -ObjC -c ufbx.c -o build/ufbx-objc.o
+      - name: Compile ufbx as Objective C
+        run: clang -Wall -Wextra -Werror -ObjC -c ufbx.c -o build/ufbx-objc.o
 
   ci_picort:
     runs-on: ubuntu-latest
