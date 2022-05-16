@@ -21,6 +21,7 @@ parser.add_argument("--wasi-sdk", default=[], action="append", help="WASI SDK pa
 parser.add_argument("--wasm-runtime", default="wasmtime", type=str, help="WASM runtime command")
 parser.add_argument("--no-sanitize", action="store_true", help="Don't compile builds with ASAN/UBSAN")
 parser.add_argument("--threads", type=int, default=0, help="Number of threads to use (0 to autodetect)")
+parser.add_argument("--verbose", action="store_true", help="Verbose output")
 argv = parser.parse_args()
 
 color_out = sys.stdout
@@ -533,6 +534,9 @@ async def compile_target(t):
     t.log.append(out)
     t.log.append(err)
 
+    if argv.verbose:
+        print("\n".join(["$ " + cmdline, out, err]))
+
     if ok:
         t.compiled = True
     else:
@@ -567,6 +571,9 @@ async def run_target(t, args):
     t.log.append("$ " + cmdline)
     t.log.append(out)
     t.log.append(err)
+
+    if argv.verbose:
+        print("\n".join(["$ " + cmdline, out, err]))
 
     if ok:
         t.ran = True
