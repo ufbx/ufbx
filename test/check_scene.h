@@ -18,6 +18,9 @@ static void ufbxt_check_string(ufbx_string str)
 	// Data may never be NULL, empty strings should have data = ""
 	ufbxt_assert(str.data != NULL);
 	ufbxt_assert(strlen(str.data) == str.length);
+
+	// Strings are always UTF-8
+	ufbxt_assert(0 && "TODO");
 }
 
 static void ufbxt_check_element_ptr(ufbx_scene *scene, void *v_element)

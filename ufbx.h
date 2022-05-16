@@ -85,7 +85,7 @@ typedef double ufbx_real;
 
 // -- Basic types
 
-// Null-terminated string within an FBX file
+// Null-terminated UTF-8 encoded string within an FBX file
 typedef struct ufbx_string {
 	const char *data;
 	size_t length;
@@ -2878,6 +2878,22 @@ struct ufbx_inflate_retain {
 	uint64_t data[512];
 };
 
+typedef enum ufbx_unicode_error_handling {
+	// Replace errors with U+FFFD "Replacement Character"
+	UFBX_UNICODE_ERROR_HANDLING_REPLACEMENT_CHARACTER,
+	// Replace errors with '_' U+5F "Low Line"
+	UFBX_UNICODE_ERROR_HANDLING_UNDERSCORE,
+	// Replace errors with '?' U+3F "Question Mark"
+	UFBX_UNICODE_ERROR_HANDLING_QUESTION_MARK,
+	// Remove errors from the output
+	UFBX_UNICODE_ERROR_HANDLING_REMOVE,
+	// Replace errors with private use `U+FBAnn`
+	UFBX_UNICODE_ERROR_HANDLING_PRIVATE_USE_ESCAPE,
+
+	UFBX_UNICODE_ERROR_HANDLING_COUNT,
+	UFBX_UNICODE_ERROR_HANDLING_FORCE_32BIT = 0x7fffffff,
+} ufbx_unicode_error_handling;
+
 // -- Main API
 
 // Options for `ufbx_load_file/memory/stream/stdio()`
@@ -2964,6 +2980,12 @@ typedef struct ufbx_load_opts {
 	// Override for the root transform
 	bool use_root_transform;
 	ufbx_transform root_transform;
+
+	// Specify how to handle Unicode errors in strings.
+	// The default loses data on non-UTF-8 encoded files, use
+	// `UFBX_UNICODE_ERROR_HANDLING_PRIVATE_USE_ESCAPE` and `ufbx_expand_private_use_escapes()`
+	// to retrieve the original bytes.
+	ufbx_unicode_error_handling unicode_error_handling;
 
 	uint32_t _end_zero; 
 } ufbx_load_opts;
@@ -3221,6 +3243,16 @@ ufbx_abi ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_i
 // Use `path_len == SIZE_MAX` for NULL terminated string.
 // NOTE: `user` is not used, it exists only for compatability to `ufbx_open_file_fn`
 ufbx_abi bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len);
+
+// Expand `str` UFBX escapes retrieving the original bytes stored in the file to `dst[dst_size]`.
+// Requires loading with `ufbx_load_opts.unicode_error_handling` set to
+// `UFBX_UNICODE_ERROR_HANDLING_PRIVATE_USE_ESCAPE`
+// Returns number of bytes written to `dst`.
+// NOTE: The result is _not_ NULL terminated as there may be NULL bytes in the middle.
+ufbx_abi size_t ufbx_catch_expand_private_use_escapes(ufbx_panic *panic, uint8_t *dst, size_t dst_size, ufbx_string str);
+ufbx_inline size_t ufbx_expand_private_use_escapes(uint8_t *dst, size_t dst_size, ufbx_string str) {
+	return ufbx_catch_expand_private_use_escapes(NULL, dst, dst_size, str);
+}
 
 // Animation evaluation
 

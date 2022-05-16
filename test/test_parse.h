@@ -397,3 +397,125 @@ UFBXT_FILE_TEST(blender_279_unicode)
 	ufbxt_assert(node);
 }
 #endif
+
+#if UFBXT_IMPL
+static uint32_t ufbxt_decode_hex_char(char c)
+{
+	if (c >= '0' && c <= '9') {
+		return (uint32_t)c - '0';
+	} else if (c >= 'a' && c <= 'f') {
+		return (uint32_t)c - 'a' + 10;
+	} else if (c >= 'A' && c <= 'F') {
+		return (uint32_t)c - 'A' + 10;
+	} else {
+		ufbxt_assert(false && "Bad hex character");
+		return 0;
+	}
+}
+
+static size_t ufbxt_decode_hex(uint8_t *dst, size_t dst_len, ufbx_string src)
+{
+	ufbxt_assert(src.length % 2 == 0);
+
+	size_t num = src.length / 2;
+	ufbxt_assert(num <= dst_len);
+
+	for (size_t i = 0; i < num; i++) {
+		dst[i] = (uint8_t)(
+			ufbxt_decode_hex_char(src.data[i * 2 + 0]) << 4u |
+			ufbxt_decode_hex_char(src.data[i * 2 + 1]) << 0u );
+	}
+
+	return num;
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_unicode)
+#if UFBXT_IMPL
+{
+	uint8_t ref[128];
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Good");
+		ufbxt_assert(node);
+
+		for (size_t prop_ix = 0; prop_ix < node->props.props.count; prop_ix++) {
+			ufbx_prop *prop = &node->props.props.data[prop_ix];
+			size_t len = ufbxt_decode_hex(ref, ufbxt_arraycount(ref), prop->name);
+
+			ufbx_string src = prop->value_str;
+
+			size_t src_ix = 0;
+			for (size_t ref_ix = 0; ref_ix < len; ref_ix++) {
+				uint8_t rc = ref[ref_ix];
+				if (rc == 0) {
+					ufbxt_assert(src_ix + 3 <= src.length);
+					ufbxt_assert((uint8_t)src.data[src_ix + 0] == 0xef);
+					ufbxt_assert((uint8_t)src.data[src_ix + 1] == 0xbf);
+					ufbxt_assert((uint8_t)src.data[src_ix + 2] == 0xbd);
+					src_ix += 3;
+				} else {
+					ufbxt_assert(src_ix < src.length);
+					ufbxt_assert((uint8_t)src.data[src_ix] == rc);
+					src_ix += 1;
+				}
+			}
+			ufbxt_assert(src_ix == src.length);
+		}
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Bad");
+		ufbxt_assert(node);
+
+		for (size_t prop_ix = 0; prop_ix < node->props.props.count; prop_ix++) {
+			ufbx_prop *prop = &node->props.props.data[prop_ix];
+			size_t len = ufbxt_decode_hex(ref, ufbxt_arraycount(ref), prop->name);
+
+			ufbx_string src = prop->value_str;
+			const char *replacement = strstr(src.data, "\xef\xbf\xbd");
+			ufbxt_assert(replacement);
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(max_quote)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "\"'&\"");
+		ufbxt_assert(node);
+		ufbxt_assert(node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->materials.count == 1);
+		ufbx_material *material = mesh->materials.data[0].material;
+		if (scene->metadata.ascii) {
+			ufbxt_assert(!strcmp(material->name.data, "&&q&qu&quo&quot\"\""));
+		} else {
+			ufbxt_assert(!strcmp(material->name.data, "&&q&qu&quo&quot&quot;\""));
+		}
+
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "\"");
+		ufbxt_assert(node);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "&quot;");
+		if (scene->metadata.ascii) {
+			ufbxt_assert(!node);
+		} else {
+			ufbxt_assert(node);
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_ALLOW_ERROR(synthetic_truncated_quot_fail)
+#if UFBXT_IMPL
+{
+}
+#endif
