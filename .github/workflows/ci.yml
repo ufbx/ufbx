@@ -25,7 +25,7 @@ jobs:
       - name: Install apt dependencies
         run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm-11
       - name: Run tests
-        run: python3 misc/run_tests.py tests readme threadcheck
+        run: python3 misc/run_tests.py tests readme threadcheck --fail-on-pre-test
       - name: Verbose test info
         run: build/runner_clang_release_x64/runner -d data -v
       - name: Generate coverage
@@ -38,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Run tests
-        run: python misc/run_tests.py tests readme threadcheck
+        run: python misc/run_tests.py tests readme threadcheck --fail-on-pre-test
       - name: Verbose test info
         run: build\runner_vs_cl64_release_x64\runner.exe -d data -v
 
@@ -47,7 +47,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Run tests
-        run: python3 misc/run_tests.py tests readme threadcheck --verbose --remove-compiler gcc --additional-compiler gcc-11 --remove-arch x86
+        run: python3 misc/run_tests.py tests readme threadcheck --remove-compiler gcc --additional-compiler gcc-11 --remove-arch x86 --fail-on-pre-test
       - name: Compile ufbx as ObjC
         run: clang -ObjC -c ufbx.c -o build/ufbx-objc.o
 
@@ -56,7 +56,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Run picort
-        run: python misc/run_tests.py picort
+        run: python misc/run_tests.py picort --fail-on-pre-test
       - name: Upload result images
         env:
           BUNNY_API_TOKEN: ${{ secrets.BUNNY_API_TOKEN }}
@@ -78,14 +78,14 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Run domfuzz
-        run: python misc/run_tests.py domfuzz
+        run: python misc/run_tests.py domfuzz --fail-on-pre-test
 
   ci_viewer:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - name: Run viewer
-        run: python misc/run_tests.py viewer
+        run: python misc/run_tests.py viewer --fail-on-pre-test
 
   ci_analysis:
     runs-on: ubuntu-latest
@@ -112,7 +112,7 @@ jobs:
       - name: Install zig cc via PIP
         run: sudo pip3 install ziglang
       - name: Run tests with TCC
-        run: python3 misc/run_tests.py tests --additional-compiler tcc --compiler tcc
+        run: python3 misc/run_tests.py tests --additional-compiler tcc --compiler tcc --remove-arch x86 --fail-on-pre-test
       - name: Compile ufbx.c wth x86 TCC
         run: i386-tcc -Wall -Werror -c ufbx.c -o build/tcc-ufbx-x86.o
       - name: Compile PowerPC tests
@@ -158,7 +158,7 @@ jobs:
       - name: Test wasmtime
         run: wasmtime --version
       - name: Run tests
-        run: python3 misc/run_tests.py tests --wasi-sdk build/wasi-sdk --compiler wasi_clang
+        run: python3 misc/run_tests.py tests --wasi-sdk build/wasi-sdk --compiler wasi_clang --fail-on-pre-test
 
   ci_arm32:
     runs-on: [self-hosted, ARM]
@@ -167,7 +167,7 @@ jobs:
         with:
           fetch-depth: 2
       - name: Run tests
-        run: python3 misc/run_tests.py tests --no-sanitize --threads 2
+        run: python3 misc/run_tests.py tests --no-sanitize --threads 2 --fail-on-pre-test
 
 
   ci_arm64:
@@ -177,7 +177,7 @@ jobs:
         with:
           fetch-depth: 2
       - name: Run tests
-        run: python3 misc/run_tests.py tests --no-sanitize --threads 2
+        run: python3 misc/run_tests.py tests --no-sanitize --threads 2 --fail-on-pre-test
 
   ci_dataset:
     runs-on: [self-hosted, ARM64]

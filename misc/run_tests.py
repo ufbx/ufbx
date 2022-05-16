@@ -24,6 +24,7 @@ parser.add_argument("--wasm-runtime", default="wasmtime", type=str, help="WASM r
 parser.add_argument("--no-sanitize", action="store_true", help="Don't compile builds with ASAN/UBSAN")
 parser.add_argument("--threads", type=int, default=0, help="Number of threads to use (0 to autodetect)")
 parser.add_argument("--verbose", action="store_true", help="Verbose output")
+parser.add_argument("--fail-on-pre-test", action="store_true", help="Indicate failure if pre-test checks fail")
 argv = parser.parse_args()
 
 color_out = sys.stdout
@@ -662,7 +663,6 @@ async def main():
 
     for arch in argv.remove_arch:
         del all_configs["arch"][arch]
-    print(all_configs)
 
     arch_configs = {
         "arch": all_configs["arch"],
@@ -1084,10 +1084,15 @@ async def main():
         num_fail += 1
 
     print()
+    severity = "ERROR" if argv.fail_on_pre_test else "WARNING"
     if bad_compiles > 0:
-        print(f"WARNING: {bad_compiles} pre-test configurations failed to compile")
+        print(f"{severity}: {bad_compiles} pre-test configurations failed to compile")
+        if argv.fail_on_pre_test:
+            exit_code = 2
     if bad_runs > 0:
-        print(f"WARNING: {bad_runs} pre-test configurations failed to run")
+        print(f"{severity}: {bad_runs} pre-test configurations failed to run")
+        if argv.fail_on_pre_test:
+            exit_code = 2
     print(f"{len(all_targets) - num_fail}/{len(all_targets)} targets succeeded")
     if num_fail > 0:
         exit_code = 1
