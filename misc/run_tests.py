@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser(description="Run ufbx tests")
 parser.add_argument("tests", type=str, nargs="*", help="Names of tests to run")
 parser.add_argument("--additional-compiler", default=[], action="append", help="Additional compiler(s) to use")
 parser.add_argument("--remove-compiler", default=[], action="append", help="Remove a compiler from being used")
+parser.add_argument("--remove-arch", default=[], action="append", help="Remove an architecture")
 parser.add_argument("--compiler", default=[], action="append", help="Specify exact compiler(s) to use")
 parser.add_argument("--no-sse", action="store_true", help="Don't make SSE builds when possible")
 parser.add_argument("--wasi-sdk", default=[], action="append", help="WASI SDK path")
@@ -492,6 +493,9 @@ for desc in argv.additional_compiler:
     else:
         raise RuntimeError(f"Could not parse compiler for {desc}")
 
+if argv.remove_compiler:
+    all_compilers = [c for c in all_compilers if c.name not in argv.remove_compiler]
+
 if argv.compiler:
     compilers = set(argv.compiler)
     all_compilers = [c for c in all_compilers if c.name in compilers]
@@ -656,6 +660,10 @@ async def main():
         },
     }
 
+    for arch in argv.remove_arch:
+        del all_configs["arch"][arch]
+    print(all_configs)
+
     arch_configs = {
         "arch": all_configs["arch"],
     }
@@ -739,8 +747,11 @@ async def main():
 
     log_comment("-- Detected the following compilers --")
 
+    removed_archs = set(argv.remove_arch)
+    removed_archs.update(f"{arch}-san" for arch in argv.remove_arch)
+
     for compiler in compilers:
-        archs = ", ".join(decorate_arch(compiler, arch) for arch in supported_archs(compiler))
+        archs = ", ".join(decorate_arch(compiler, arch) for arch in supported_archs(compiler) if arch not in removed_archs)
         log_comment(f"  {compiler.exe}: {compiler.arch} {compiler.version} [{archs}]")
 
     num_fail = 0
