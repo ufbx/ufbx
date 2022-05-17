@@ -2421,9 +2421,9 @@ ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool
 	switch (pool->error_handling) {
 
 	case UFBX_UNICODE_ERROR_HANDLING_REPLACEMENT_CHARACTER:
-		dst[0] = 0xef;
-		dst[1] = 0xbf;
-		dst[2] = 0xbd;
+		dst[0] = (char)0xef;
+		dst[1] = (char)0xbf;
+		dst[2] = (char)0xbd;
 		return 3;
 
 	case UFBX_UNICODE_ERROR_HANDLING_UNDERSCORE:
@@ -2438,8 +2438,8 @@ ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool
 		return 0;
 
 	case UFBX_UNICODE_ERROR_HANDLING_PRIVATE_USE_ESCAPE:
-		dst[0] = 0xf3;
-		dst[1] = 0xbb;
+		dst[0] = (char)0xf3;
+		dst[1] = (char)0xbb;
 		dst[2] = (char)(0xa8 | (c >> 6));
 		dst[3] = (char)(0x80 | (c & 0x3f));
 		return 4;
