@@ -13,14 +13,68 @@
 #include <string.h>
 #include "../ufbx.h"
 
+static int ufbxt_is_utf8(const char *str, size_t length)
+{
+	// Table of valid UTF-8 byte sequences: {min,max} (inclusive)
+	// Adapted from https://www.w3.org/International/questions/qa-forms-utf-8
+	static const unsigned char utf8_forms[8][4][2] = { 
+		{ {0xc2,0xdf}, {0x80,0xbf},                           }, // Non-overlong 2-byte
+		{ {0xe0,0xe0}, {0xa0,0xbf}, {0x80,0xbf},              }, // Excluding overlongs
+		{ {0xe1,0xec}, {0x80,0xbf}, {0x80,0xbf},              }, // Straight 3-byte
+		{ {0xee,0xef}, {0x80,0xbf}, {0x80,0xbf},              }, // Straight 3-byte
+		{ {0xed,0xed}, {0x80,0x9f}, {0x80,0xbf},              }, // Excluding surrogates
+		{ {0xf0,0xf0}, {0x90,0xbf}, {0x80,0xbf}, {0x80,0xbf}, }, // Planes 1-3
+		{ {0xf1,0xf3}, {0x80,0xbf}, {0x80,0xbf}, {0x80,0xbf}, }, // Planes 4-15
+		{ {0xf4,0xf4}, {0x80,0x8f}, {0x80,0xbf}, {0x80,0xbf}, }, // Plane 16
+	};
+
+	size_t pos = 0, form, len;
+	while (pos < length) {
+		unsigned char c = (unsigned char)str[pos];
+
+		// Fast path for ASCII (U+0000 excluded in ufbx)
+		if (c >= 0x01 && c <= 0x7f) {
+			pos += 1;
+			continue;
+		}
+
+		// All forms can be distinguished from the leading byte
+		for (form = 0; form < 8; form++) {
+			const unsigned char *range = utf8_forms[form][0];
+			// Check that the first byte is within range
+			if (c >= range[0] && c <= range[1]) break;
+		}
+
+		// Invalid starting byte
+		if (form == 8) return 0;
+
+		// Validate the following 1-3 bytes
+		for (len = 1; len < 4; len++) {
+			const unsigned char *range = utf8_forms[form][len];
+			// Forms end with max=0 (zero initialized)
+			if (range[1] == 0) break;
+			// Out of bounds
+			if (pos + len >= length) return 0;
+			// Check that the next byte is within range
+			c = (unsigned char)str[pos + len];
+			if (c < utf8_forms[form][len][0] || c > utf8_forms[form][len][1]) return 0;
+		}
+
+		// Advance to the next codepoint
+		pos += len;
+	}
+
+	return 1;
+}
+
 static void ufbxt_check_string(ufbx_string str)
 {
 	// Data may never be NULL, empty strings should have data = ""
 	ufbxt_assert(str.data != NULL);
 	ufbxt_assert(strlen(str.data) == str.length);
 
-	// Strings are always UTF-8
-	ufbxt_assert(0 && "TODO");
+	// `ufbx_string` is always UTF-8
+	ufbxt_assert(ufbxt_is_utf8(str.data, str.length));
 }
 
 static void ufbxt_check_element_ptr(ufbx_scene *scene, void *v_element)
