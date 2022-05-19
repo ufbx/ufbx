@@ -372,6 +372,35 @@ UFBXT_TEST(retain_scene)
 }
 #endif
 
+UFBXT_FILE_TEST(synthetic_empty_elements)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+}
+#endif
+
+#if UFBXT_IMPL
+static void ufbxt_check_binary_prop(const ufbx_props *props)
+{
+	ufbx_prop *prop = ufbx_find_prop(props, "Binary");
+	ufbxt_assert(prop);
+	ufbxt_assert(prop->type == UFBX_PROP_BLOB);
+	// TODO: Assert value
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_binary_props)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbxt_check_binary_prop(&node->props);
+	ufbxt_check_binary_prop(&node->mesh->props);
+	ufbxt_check_binary_prop(&scene->settings.props);
+}
+#endif
+
 UFBXT_FILE_TEST(maya_unicode)
 #if UFBXT_IMPL
 {

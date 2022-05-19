@@ -56,6 +56,7 @@ int main(int argc, char **argv)
 	const char *dump_obj_path = NULL;
 	int profile_runs = 1;
 	int frame = INT_MIN;
+	bool allow_bad_unicode = false;
 
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-v")) {
@@ -68,6 +69,8 @@ int main(int argc, char **argv)
 			if (++i < argc) profile_runs = atoi(argv[i]);
 		} else if (!strcmp(argv[i], "--frame")) {
 			if (++i < argc) frame = atoi(argv[i]);
+		} else if (!strcmp(argv[i], "--allow-bad-unicode")) {
+			allow_bad_unicode = true;
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "Unrecognized flag: %s\n", argv[i]);
 			exit(1);
@@ -81,11 +84,18 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (strstr(path, "ufbx-bad-unicode")) {
+		allow_bad_unicode = true;
+	}
+
 	ufbx_load_opts opts = { 0 };
 	opts.evaluate_skinning = true;
 	opts.evaluate_caches = true;
 	opts.target_axes = ufbx_axes_right_handed_y_up;
 	opts.target_unit_meters = 0.01;
+	if (!allow_bad_unicode) {
+		opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING;
+	}
 
 	ufbx_error error;
 	ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
@@ -126,30 +136,29 @@ int main(int argc, char **argv)
 	{
 		size_t fbx_size = 0;
 		void *fbx_data = ufbxt_read_file(path, &fbx_size);
-		ufbxt_assert(fbx_data);
+		if (fbx_data) {
+			cputime_end_init();
 
-		cputime_end_init();
+			for (int i = 0; i < profile_runs; i++) {
+				uint64_t load_begin = cputime_cpu_tick();
+				ufbx_scene *memory_scene = ufbx_load_memory(fbx_data, fbx_size, NULL, NULL);
+				uint64_t load_end = cputime_cpu_tick();
 
-		for (int i = 0; i < profile_runs; i++) {
-			uint64_t load_begin = cputime_cpu_tick();
-			ufbx_scene *memory_scene = ufbx_load_memory(fbx_data, fbx_size, NULL, NULL);
-			uint64_t load_end = cputime_cpu_tick();
+				printf("Loaded in %.2fms: File %.1fkB, temp %.1fkB (%zu allocs), result %.1fkB (%zu allocs)\n",
+					cputime_cpu_delta_to_sec(NULL, load_end - load_begin) * 1e3,
+					(double)fbx_size * 1e-3,
+					(double)scene->metadata.temp_memory_used * 1e-3,
+					scene->metadata.temp_allocs,
+					(double)scene->metadata.result_memory_used * 1e-3,
+					scene->metadata.result_allocs
+				);
 
-			printf("Loaded in %.2fms: File %.1fkB, temp %.1fkB (%zu allocs), result %.1fkB (%zu allocs)\n",
-				cputime_cpu_delta_to_sec(NULL, load_end - load_begin) * 1e3,
-				(double)fbx_size * 1e-3,
-				(double)scene->metadata.temp_memory_used * 1e-3,
-				scene->metadata.temp_allocs,
-				(double)scene->metadata.result_memory_used * 1e-3,
-				scene->metadata.result_allocs
-			);
+				ufbxt_assert(memory_scene);
+				ufbx_free_scene(memory_scene);
+			}
 
-			ufbxt_assert(memory_scene);
-			ufbx_free_scene(memory_scene);
+			free(fbx_data);
 		}
-
-
-		free(fbx_data);
 	}
 
 	int result = 0;

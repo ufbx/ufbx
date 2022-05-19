@@ -202,6 +202,7 @@ typedef enum ufbx_prop_type {
 	UFBX_PROP_SCALING,
 	UFBX_PROP_DISTANCE,
 	UFBX_PROP_COMPOUND,
+	UFBX_PROP_BLOB,
 
 	UFBX_NUM_PROP_TYPES,
 } ufbx_prop_type;

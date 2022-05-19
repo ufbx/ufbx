@@ -4490,7 +4490,9 @@ ufbxi_nodiscard static ufbxi_noinline ufbxi_value_array *ufbxi_find_array(ufbxi_
 
 static ufbxi_node *ufbxi_find_child_strcmp(ufbxi_node *node, const char *name)
 {
+	char leading = name[0];
 	ufbxi_for(ufbxi_node, c, node->children, node->num_children) {
+		if (c->name[0] != leading) continue;
 		if (!strcmp(c->name, name)) return c;
 	}
 	return NULL;
@@ -4534,7 +4536,13 @@ static ufbxi_noinline void *ufbxi_get_element_extra(ufbxi_context *uc, uint32_t 
 typedef enum {
 	UFBXI_PARSE_ROOT,
 	UFBXI_PARSE_FBX_HEADER_EXTENSION,
+	UFBXI_PARSE_SCENE_INFO,
+	UFBXI_PARSE_DOCUMENTS,
+	UFBXI_PARSE_DOCUMENT,
 	UFBXI_PARSE_DEFINITIONS,
+	UFBXI_PARSE_OBJECT_TYPE,
+	UFBXI_PARSE_PROPERTY_TEMPLATE,
+	UFBXI_PARSE_GLOBAL_SETTINGS,
 	UFBXI_PARSE_OBJECTS,
 	UFBXI_PARSE_RELATIONS,
 	UFBXI_PARSE_CONNECTIONS,
@@ -4547,6 +4555,7 @@ typedef enum {
 	UFBXI_PARSE_COLLECTION,
 	UFBXI_PARSE_LEGACY_MODEL,
 	UFBXI_PARSE_LEGACY_SWITCHER,
+	UFBXI_PARSE_UNKNOWN_OBJECT,
 	UFBXI_PARSE_SCENE_GENERIC_PERSISTENCE,
 	UFBXI_PARSE_ANIMATION_CURVE,
 	UFBXI_PARSE_DEFORMER,
@@ -4571,6 +4580,8 @@ typedef enum {
 	UFBXI_PARSE_TAKE,
 	UFBXI_PARSE_TAKE_OBJECT,
 	UFBXI_PARSE_CHANNEL,
+	UFBXI_PARSE_PROPERTIES,
+	UFBXI_PARSE_PROPERTY,
 	UFBXI_PARSE_UNKNOWN,
 } ufbxi_parse_state;
 
@@ -4588,10 +4599,13 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_context *uc, ufbxi_parse
 	case UFBXI_PARSE_ROOT:
 		if (name == ufbxi_FBXHeaderExtension) return UFBXI_PARSE_FBX_HEADER_EXTENSION;
 		if (name == ufbxi_Definitions) return UFBXI_PARSE_DEFINITIONS;
+		if (name == ufbxi_Documents) return UFBXI_PARSE_DOCUMENTS;
+		if (name == ufbxi_Document) return UFBXI_PARSE_DOCUMENT;
 		if (name == ufbxi_Objects) return UFBXI_PARSE_OBJECTS;
 		if (name == ufbxi_Connections) return UFBXI_PARSE_CONNECTIONS;
 		if (name == ufbxi_Takes) return UFBXI_PARSE_TAKES;
 		if (name == ufbxi_Model) return UFBXI_PARSE_LEGACY_MODEL;
+		if (name == ufbxi_GlobalSettings) return UFBXI_PARSE_GLOBAL_SETTINGS;
 		// Don't waste time hashing or testing against legacy names
 		if (uc->version < 7000) {
 			if (!strcmp(name, "Relations")) return UFBXI_PARSE_RELATIONS;
@@ -4604,6 +4618,40 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_context *uc, ufbxi_parse
 
 	case UFBXI_PARSE_FBX_HEADER_EXTENSION:
 		if (name == ufbxi_FBXVersion) return UFBXI_PARSE_FBX_VERSION;
+		if (name == ufbxi_SceneInfo) return UFBXI_PARSE_SCENE_INFO;
+		break;
+
+	case UFBXI_PARSE_DOCUMENTS:
+		if (name == ufbxi_Document) return UFBXI_PARSE_DOCUMENT;
+		break;
+
+	case UFBXI_PARSE_DOCUMENT:
+		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
+		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
+		if (name == ufbxi_SceneInfo) return UFBXI_PARSE_SCENE_INFO;
+		break;
+
+	case UFBXI_PARSE_SCENE_INFO:
+		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
+		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
+		break;
+
+	case UFBXI_PARSE_GLOBAL_SETTINGS:
+		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
+		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
+		break;
+
+	case UFBXI_PARSE_DEFINITIONS:
+		if (name == ufbxi_ObjectType) return UFBXI_PARSE_OBJECT_TYPE;
+		break;
+
+	case UFBXI_PARSE_OBJECT_TYPE:
+		if (name == ufbxi_PropertyTemplate) return UFBXI_PARSE_PROPERTY_TEMPLATE;
+		break;
+
+	case UFBXI_PARSE_PROPERTY_TEMPLATE:
+		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
+		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
 		break;
 
 	case UFBXI_PARSE_OBJECTS:
@@ -4618,21 +4666,28 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_context *uc, ufbxi_parse
 		if (name == ufbxi_SelectionNode) return UFBXI_PARSE_SELECTION_NODE;
 		if (name == ufbxi_Collection) return UFBXI_PARSE_COLLECTION;
 		if (name == ufbxi_NodeAttribute) return UFBXI_PARSE_NODE_ATTRIBUTE;
-		break;
+		if (name == ufbxi_SceneInfo) return UFBXI_PARSE_SCENE_INFO;
+		if (name == ufbxi_GlobalSettings) return UFBXI_PARSE_GLOBAL_SETTINGS;
+		return UFBXI_PARSE_UNKNOWN_OBJECT;
 
 	case UFBXI_PARSE_MODEL:
 	case UFBXI_PARSE_GEOMETRY:
-		if (name == ufbxi_LayerElementNormal) return UFBXI_PARSE_LAYER_ELEMENT_NORMAL;
-		if (name == ufbxi_LayerElementBinormal) return UFBXI_PARSE_LAYER_ELEMENT_BINORMAL;
-		if (name == ufbxi_LayerElementTangent) return UFBXI_PARSE_LAYER_ELEMENT_TANGENT;
-		if (name == ufbxi_LayerElementUV) return UFBXI_PARSE_LAYER_ELEMENT_UV;
-		if (name == ufbxi_LayerElementColor) return UFBXI_PARSE_LAYER_ELEMENT_COLOR;
-		if (name == ufbxi_LayerElementVertexCrease) return UFBXI_PARSE_LAYER_ELEMENT_VERTEX_CREASE;
-		if (name == ufbxi_LayerElementEdgeCrease) return UFBXI_PARSE_LAYER_ELEMENT_EDGE_CREASE;
-		if (name == ufbxi_LayerElementSmoothing) return UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING;
-		if (name == ufbxi_LayerElementMaterial) return UFBXI_PARSE_LAYER_ELEMENT_MATERIAL;
-		if (!strncmp(name, "LayerElement", 12)) return UFBXI_PARSE_LAYER_ELEMENT_OTHER;
-		if (name == ufbxi_Shape) return UFBXI_PARSE_SHAPE;
+		if (name[0] == 'L') {
+			if (name == ufbxi_LayerElementNormal) return UFBXI_PARSE_LAYER_ELEMENT_NORMAL;
+			if (name == ufbxi_LayerElementBinormal) return UFBXI_PARSE_LAYER_ELEMENT_BINORMAL;
+			if (name == ufbxi_LayerElementTangent) return UFBXI_PARSE_LAYER_ELEMENT_TANGENT;
+			if (name == ufbxi_LayerElementUV) return UFBXI_PARSE_LAYER_ELEMENT_UV;
+			if (name == ufbxi_LayerElementColor) return UFBXI_PARSE_LAYER_ELEMENT_COLOR;
+			if (name == ufbxi_LayerElementVertexCrease) return UFBXI_PARSE_LAYER_ELEMENT_VERTEX_CREASE;
+			if (name == ufbxi_LayerElementEdgeCrease) return UFBXI_PARSE_LAYER_ELEMENT_EDGE_CREASE;
+			if (name == ufbxi_LayerElementSmoothing) return UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING;
+			if (name == ufbxi_LayerElementMaterial) return UFBXI_PARSE_LAYER_ELEMENT_MATERIAL;
+			if (!strncmp(name, "LayerElement", 12)) return UFBXI_PARSE_LAYER_ELEMENT_OTHER;
+		} else {
+			if (name == ufbxi_Shape) return UFBXI_PARSE_SHAPE;
+			if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
+			if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
+		}
 		break;
 
 	case UFBXI_PARSE_LEGACY_MODEL:
@@ -4640,10 +4695,19 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_context *uc, ufbxi_parse
 		if (name == ufbxi_Link) return UFBXI_PARSE_LEGACY_LINK;
 		if (name == ufbxi_Channel) return UFBXI_PARSE_CHANNEL;
 		if (name == ufbxi_Shape) return UFBXI_PARSE_SHAPE;
+		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
+		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
 		break;
 
 	case UFBXI_PARSE_POSE:
 		if (name == ufbxi_PoseNode) return UFBXI_PARSE_POSE_NODE;
+		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
+		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
+		break;
+
+	case UFBXI_PARSE_UNKNOWN_OBJECT:
+		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
+		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
 		break;
 
 	case UFBXI_PARSE_TAKES:
@@ -4660,6 +4724,9 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_context *uc, ufbxi_parse
 	case UFBXI_PARSE_CHANNEL:
 		if (name == ufbxi_Channel) return UFBXI_PARSE_CHANNEL;
 		break;
+
+	case UFBXI_PARSE_PROPERTIES:
+		return UFBXI_PARSE_PROPERTY;
 
 	default:
 		break;
@@ -5043,6 +5110,7 @@ static bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, con
 
 	case UFBXI_PARSE_MODEL:
 		if (name == ufbxi_NodeAttributeName) return true;
+		if (name == ufbxi_Name) return true;
 		break;
 
 	case UFBXI_PARSE_VIDEO:
@@ -5056,10 +5124,12 @@ static bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, con
 
 	case UFBXI_PARSE_GEOMETRY:
 		if (name == ufbxi_NodeAttributeName) return true;
+		if (name == ufbxi_Name) return true;
 		break;
 
 	case UFBXI_PARSE_NODE_ATTRIBUTE:
 		if (name == ufbxi_NodeAttributeName) return true;
+		if (name == ufbxi_Name) return true;
 		break;
 
 	case UFBXI_PARSE_POSE_NODE:
@@ -5068,6 +5138,11 @@ static bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, con
 
 	case UFBXI_PARSE_SELECTION_NODE:
 		if (name == ufbxi_Node) return true;
+		break;
+
+	case UFBXI_PARSE_UNKNOWN_OBJECT:
+		if (name == ufbxi_NodeAttributeName) return true;
+		if (name == ufbxi_Name) return true;
 		break;
 
 	case UFBXI_PARSE_COLLECTION:
@@ -5090,6 +5165,10 @@ static bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, con
 
 	case UFBXI_PARSE_TAKE:
 		if (name == ufbxi_Model) return true;
+		break;
+
+	case UFBXI_PARSE_PROPERTY:
+		if (!strcmp(name, "BinaryData")) return true;
 		break;
 
 	default:
@@ -6618,6 +6697,7 @@ const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
 	{ "Lcl Scaling", UFBX_PROP_SCALING },
 	{ "Distance", UFBX_PROP_DISTANCE },
 	{ "Compound", UFBX_PROP_COMPOUND },
+	{ "Blob", UFBX_PROP_BLOB },
 };
 
 static ufbx_prop_type ufbxi_get_prop_type(ufbxi_context *uc, const char *name)
@@ -6862,6 +6942,17 @@ ufbxi_nodiscard static int ufbxi_read_property(ufbxi_context *uc, ufbxi_node *no
 
 	if (!ufbxi_get_val_at(node, val_ix, 'S', &prop->value_str)) {
 		prop->value_str = ufbx_empty_string;
+	}
+
+	// Very unlikely, seems to only exist in some "non standard" FBX files
+	if (node->num_children > 0) {
+		ufbxi_node *binary = ufbxi_find_child_strcmp(node, "BinaryData");
+		if (binary) {
+			ufbx_string data;
+			if (ufbxi_get_val1(binary, "s", &data)) {
+				// TODO
+			}
+		}
 	}
 	
 	return 1;
@@ -7678,6 +7769,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_blend_shapes(ufbx
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
+	// Sometimes there are empty meshes in FBX files?
+	// TODO: Should these be included in output? option? strict mode?
+	if (!ufbxi_find_child(node, ufbxi_Vertices)) return 1;
+
 	ufbx_mesh *ufbxi_restrict mesh = ufbxi_push_element(uc, info, ufbx_mesh, UFBX_ELEMENT_MESH);
 	ufbxi_check(mesh);
 
