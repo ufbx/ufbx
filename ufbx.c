@@ -7769,10 +7769,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_blend_shapes(ufbx
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
-	// Sometimes there are empty meshes in FBX files?
-	// TODO: Should these be included in output? option? strict mode?
-	if (!ufbxi_find_child(node, ufbxi_Vertices)) return 1;
-
 	ufbx_mesh *ufbxi_restrict mesh = ufbxi_push_element(uc, info, ufbx_mesh, UFBX_ELEMENT_MESH);
 	ufbxi_check(mesh);
 
@@ -7791,13 +7787,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	mesh->skinned_position.value_reals = 3;
 	mesh->skinned_normal.value_reals = 3;
 
-	if (uc->opts.ignore_geometry) return 1;
-
+	// Sometimes there are empty meshes in FBX files?
+	// TODO: Should these be included in output? option? strict mode?
 	ufbxi_node *node_vertices = ufbxi_find_child(node, ufbxi_Vertices);
 	ufbxi_node *node_indices = ufbxi_find_child(node, ufbxi_PolygonVertexIndex);
+	if (!node_vertices || !node_indices) return 1;
 
-	ufbxi_check(node_vertices);
-	ufbxi_check(node_indices);
+	if (uc->opts.ignore_geometry) return 1;
 
 	ufbxi_value_array *vertices = ufbxi_get_array(node_vertices, 'r');
 	ufbxi_value_array *indices = ufbxi_get_array(node_indices, 'i');
