@@ -291,7 +291,7 @@ UFBXT_FILE_TEST(synthetic_id_collision)
 }
 #endif
 
-UFBXT_FILE_TEST_ALLOW_ERROR(synthetic_node_depth_fail)
+UFBXT_FILE_TEST_FLAGS(synthetic_node_depth_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
 #if UFBXT_IMPL
 {
 }
@@ -430,7 +430,7 @@ static size_t ufbxt_decode_hex(uint8_t *dst, size_t dst_len, ufbx_string src)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_unicode)
+UFBXT_FILE_TEST_FLAGS(synthetic_unicode, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
 #if UFBXT_IMPL
 {
 	uint8_t ref[128];
@@ -514,13 +514,13 @@ UFBXT_FILE_TEST(max_quote)
 }
 #endif
 
-UFBXT_FILE_TEST_ALLOW_ERROR(synthetic_truncated_quot_fail)
+UFBXT_FILE_TEST_FLAGS(synthetic_truncated_quot_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
 #if UFBXT_IMPL
 {
 }
 #endif
 
-UFBXT_FILE_TEST_ALLOW_ERROR(synthetic_unicode_error_identity)
+UFBXT_FILE_TEST_FLAGS(synthetic_unicode_error_identity, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
 #if UFBXT_IMPL
 {
 	ufbx_node *parent = ufbx_find_node(scene, "Parent");

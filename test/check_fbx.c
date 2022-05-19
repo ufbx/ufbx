@@ -259,6 +259,9 @@ int main(int argc, char **argv)
 }
 
 #define CPUTIME_IMPLEMENTATION
+#ifndef UFBX_DEV
+	#define UFBX_DEV
+#endif
 
 #include "cputime.h"
 #include "../ufbx.c"

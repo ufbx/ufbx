@@ -207,6 +207,8 @@ class CLCompiler(Compiler):
         else:
             args.append("/W3")
 
+        args.append("/DUFBX_DEV")
+
         if config.get("optimize", False):
             args.append("/Ox")
         else:
@@ -308,6 +310,8 @@ class GCCCompiler(Compiler):
             std = "gnu99"
         std = config.get("std", std)
         args.append(f"-std={std}")
+
+        args.append("-DUFBX_DEV")
 
         if config.get("sse", False):
             args.append("-DSSE=1")

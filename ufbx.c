@@ -347,6 +347,18 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 	#define UFBXI_KD_FAST_DEPTH 2
 #endif
 
+#if defined(UFBX_REGRESSION)
+	#define ufbxi_regression_assert(cond) ufbx_assert(cond)
+#else
+	#define ufbxi_regression_assert(cond) (void)0
+#endif
+
+#if defined(UFBX_REGRESSION) || defined(UFBX_DEV)
+	#define ufbxi_dev_assert(cond) ufbx_assert(cond)
+#else
+	#define ufbxi_dev_assert(cond) (void)0
+#endif
+
 // -- Utility
 
 #if defined(UFBX_UBSAN)
@@ -590,7 +602,7 @@ typedef struct {
 static ufbxi_forceinline uint32_t
 ufbxi_bit_reverse(uint32_t mask, uint32_t num_bits)
 {
-	ufbx_assert(num_bits <= 16);
+	ufbxi_dev_assert(num_bits <= 16);
 	uint32_t x = mask;
 	x = (((x & 0xaaaa) >> 1) | ((x & 0x5555) << 1));
 	x = (((x & 0xcccc) >> 2) | ((x & 0x3333) << 2));
@@ -604,7 +616,7 @@ ufbxi_bit_chunk_refill(ufbxi_bit_stream *s, const char *ptr)
 {
 	// Copy any left-over data to the beginning of `buffer`
 	size_t left = s->chunk_real_end - ptr;
-	ufbx_assert(left < 64);
+	ufbxi_dev_assert(left < 64);
 	memmove(s->buffer, ptr, left);
 
 	s->num_read_before_chunk += ptr - s->chunk_begin;
@@ -617,7 +629,7 @@ ufbxi_bit_chunk_refill(ufbxi_bit_stream *s, const char *ptr)
 			size_t num_read = s->read_fn(s->read_user, s->buffer + left, to_read);
 			// TOOD: IO error, should unify with (currently broken) cancel logic
 			if (num_read > to_read) num_read = 0;
-			ufbx_assert(s->input_left >= num_read);
+			ufbxi_dev_assert(s->input_left >= num_read);
 			s->input_left -= num_read;
 			left += num_read;
 		}
@@ -861,7 +873,7 @@ ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 			uint16_t fast_sym = (uint16_t)(i | bits << 12);
 			uint32_t hi_max = 1 << (UFBXI_HUFF_FAST_BITS - bits);
 			for (uint32_t hi = 0; hi < hi_max; hi++) {
-				ufbx_assert(tree->fast_sym[rev_code | hi << bits] == 0);
+				ufbxi_dev_assert(tree->fast_sym[rev_code | hi << bits] == 0);
 				tree->fast_sym[rev_code | hi << bits] = fast_sym;
 			}
 		}
@@ -1436,9 +1448,11 @@ static void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
 	} else if (!strcmp(desc, "File not found")) {
 		error->type = UFBX_ERROR_FILE_NOT_FOUND;
 	} else if (!strcmp(desc, "Uninitialized options")) {
-		error->type = UFBX_ERROR_FILE_NOT_FOUND;
+		error->type = UFBX_ERROR_UNINITIALIZED_OPTIONS;
 	} else if (!strcmp(desc, "Zero vertex size")) {
 		error->type = UFBX_ERROR_ZERO_VERTEX_SIZE;
+	} else if (!strcmp(desc, "Invalid UTF-8")) {
+		error->type = UFBX_ERROR_INVALID_UTF8;
 	}
 	error->description.data = desc;
 	error->description.length = strlen(desc);
@@ -2279,7 +2293,9 @@ static ufbxi_noinline uint32_t ufbxi_hash_string(const char *str, size_t length)
 static ufbxi_noinline uint32_t ufbxi_hash_string_check_ascii(const char *str, size_t length, bool *p_non_ascii)
 {
 	uint32_t ascii_mask = 0;
-	uint32_t zero_mask = ~0u;
+	uint32_t zero_mask = 0;
+
+	ufbx_assert(length > 0);
 
 	uint32_t hash = (uint32_t)length;
 	uint32_t seed = UINT32_C(0x9e3779b9);
@@ -2296,14 +2312,7 @@ static ufbxi_noinline uint32_t ufbxi_hash_string_check_ascii(const char *str, si
 
 		uint32_t word = ufbxi_read_u32(str + length - 4);
 		ascii_mask |= word;
-
-		{
-			uint32_t any_bit = word;
-			any_bit = any_bit | any_bit << 4u;
-			any_bit = any_bit | any_bit << 2u;
-			any_bit = any_bit | any_bit << 1u;
-			zero_mask &= any_bit;
-		}
+		zero_mask |= UINT32_C(0x80808080) - word;
 
 		hash = ((hash << 5u | hash >> 27u) ^ word) * seed;
 	} else {
@@ -2499,6 +2508,11 @@ ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_sanitize_string(ufbxi_st
 		ufbx_assert(index == length);
 		*p_length = length;
 		return str;
+	}
+
+	if (pool->error_handling == UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING) {
+		ufbxi_report_err_msg(pool->error, "UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING", "Invalid UTF-8");
+		return NULL;
 	}
 
 	// Copy the initial valid part
@@ -2721,6 +2735,7 @@ static const char ufbxi_FbxSemanticEntry[] = "FbxSemanticEntry";
 static const char ufbxi_FieldOfViewX[] = "FieldOfViewX";
 static const char ufbxi_FieldOfViewY[] = "FieldOfViewY";
 static const char ufbxi_FieldOfView[] = "FieldOfView";
+static const char ufbxi_FileId[] = "FileId";
 static const char ufbxi_FileName[] = "FileName";
 static const char ufbxi_Filename[] = "Filename";
 static const char ufbxi_FilmHeight[] = "FilmHeight";
@@ -2791,6 +2806,7 @@ static const char ufbxi_MaterialAssignation[] = "MaterialAssignation";
 static const char ufbxi_Material[] = "Material";
 static const char ufbxi_Materials[] = "Materials";
 static const char ufbxi_Matrix[] = "Matrix";
+static const char ufbxi_Media[] = "Media";
 static const char ufbxi_Mesh[] = "Mesh";
 static const char ufbxi_Model[] = "Model";
 static const char ufbxi_Name[] = "Name";
@@ -2874,6 +2890,7 @@ static const char ufbxi_Tangents[] = "Tangents";
 static const char ufbxi_Texture[] = "Texture";
 static const char ufbxi_Texture_alpha[] = "Texture alpha";
 static const char ufbxi_TextureId[] = "TextureId";
+static const char ufbxi_TextureName[] = "TextureName";
 static const char ufbxi_TextureRotationPivot[] = "TextureRotationPivot";
 static const char ufbxi_TextureScalingPivot[] = "TextureScalingPivot";
 static const char ufbxi_TextureUV[] = "TextureUV";
@@ -3000,6 +3017,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FieldOfView, 11 },
 	{ ufbxi_FieldOfViewX, 12 },
 	{ ufbxi_FieldOfViewY, 12 },
+	{ ufbxi_FileId, 6 },
 	{ ufbxi_FileName, 8 },
 	{ ufbxi_Filename, 8 },
 	{ ufbxi_FilmHeight, 10 },
@@ -3070,6 +3088,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_MaterialAssignation, 19 },
 	{ ufbxi_Materials, 9 },
 	{ ufbxi_Matrix, 6 },
+	{ ufbxi_Media, 5 },
 	{ ufbxi_Mesh, 4 },
 	{ ufbxi_Model, 5 },
 	{ ufbxi_Name, 4 },
@@ -3153,6 +3172,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Texture, 7 },
 	{ ufbxi_Texture_alpha, 13 },
 	{ ufbxi_TextureId, 9 },
+	{ ufbxi_TextureName, 11 },
 	{ ufbxi_TextureRotationPivot, 20 },
 	{ ufbxi_TextureScalingPivot, 19 },
 	{ ufbxi_TextureUV, 9 },
@@ -4365,25 +4385,25 @@ ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, 
 	case 'Z': if (type == UFBXI_VALUE_NUMBER) { if (node->vals[ix].i < 0) return 0; *(size_t*)v = (size_t)node->vals[ix].i; return 1; } else return 0;
 	case 'S': if (type == UFBXI_VALUE_STRING) {
 		bool ok = ((node->raw_string_mask & (1 << ix)) == 0);
-		ufbx_assert(ok);
+		ufbxi_dev_assert(ok);
 		*(ufbx_string*)v = node->vals[ix].s;
 		return ok ? 1 : 0;
 	} else return 0;
 	case 'C': if (type == UFBXI_VALUE_STRING) {
 		bool ok = ((node->raw_string_mask & (1 << ix)) == 0);
-		ufbx_assert(ok);
+		ufbxi_dev_assert(ok);
 		*(const char**)v = node->vals[ix].s.data;
 		return ok ? 1 : 0;
 	} else return 0;
 	case 's': if (type == UFBXI_VALUE_STRING) {
 		bool ok = ((node->raw_string_mask & (1 << ix)) != 0);
-		ufbx_assert(ok);
+		ufbxi_dev_assert(ok);
 		*(ufbx_string*)v = node->vals[ix].s;
 		return ok ? 1 : 0;
 	} else return 0;
 	case 'c': if (type == UFBXI_VALUE_STRING) {
 		bool ok = ((node->raw_string_mask & (1 << ix)) != 0);
-		ufbx_assert(ok);
+		ufbxi_dev_assert(ok);
 		*(const char**)v = node->vals[ix].s.data;
 		return ok ? 1 : 0;
 	} else return 0;
@@ -4516,20 +4536,26 @@ typedef enum {
 	UFBXI_PARSE_FBX_HEADER_EXTENSION,
 	UFBXI_PARSE_DEFINITIONS,
 	UFBXI_PARSE_OBJECTS,
+	UFBXI_PARSE_RELATIONS,
 	UFBXI_PARSE_CONNECTIONS,
 	UFBXI_PARSE_TAKES,
 	UFBXI_PARSE_FBX_VERSION,
 	UFBXI_PARSE_MODEL,
 	UFBXI_PARSE_GEOMETRY,
+	UFBXI_PARSE_NODE_ATTRIBUTE,
+	UFBXI_PARSE_SELECTION_NODE,
+	UFBXI_PARSE_COLLECTION,
 	UFBXI_PARSE_LEGACY_MODEL,
+	UFBXI_PARSE_LEGACY_SWITCHER,
+	UFBXI_PARSE_SCENE_GENERIC_PERSISTENCE,
 	UFBXI_PARSE_ANIMATION_CURVE,
 	UFBXI_PARSE_DEFORMER,
 	UFBXI_PARSE_LEGACY_LINK,
 	UFBXI_PARSE_POSE,
 	UFBXI_PARSE_POSE_NODE,
 	UFBXI_PARSE_VIDEO,
+	UFBXI_PARSE_TEXTURE,
 	UFBXI_PARSE_LAYERED_TEXTURE,
-	UFBXI_PARSE_SELECTION_NODE,
 	UFBXI_PARSE_LAYER_ELEMENT_NORMAL,
 	UFBXI_PARSE_LAYER_ELEMENT_BINORMAL,
 	UFBXI_PARSE_LAYER_ELEMENT_TANGENT,
@@ -4555,7 +4581,7 @@ typedef struct {
 	bool pad_begin; // < Pad the begin of the array with 4 zero elements to guard from invalid -1 index accesses
 } ufbxi_array_info;
 
-static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, const char *name)
+static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_context *uc, ufbxi_parse_state parent, const char *name)
 {
 	switch (parent) {
 
@@ -4566,6 +4592,14 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 		if (name == ufbxi_Connections) return UFBXI_PARSE_CONNECTIONS;
 		if (name == ufbxi_Takes) return UFBXI_PARSE_TAKES;
 		if (name == ufbxi_Model) return UFBXI_PARSE_LEGACY_MODEL;
+		// Don't waste time hashing or testing against legacy names
+		if (uc->version < 7000) {
+			if (!strcmp(name, "Relations")) return UFBXI_PARSE_RELATIONS;
+			if (uc->version < 6000) {
+				if (!strcmp(name, "Switcher")) return UFBXI_PARSE_LEGACY_SWITCHER;
+				if (!strcmp(name, "SceneGenericPersistence")) return UFBXI_PARSE_SCENE_GENERIC_PERSISTENCE;
+			}
+		}
 		break;
 
 	case UFBXI_PARSE_FBX_HEADER_EXTENSION:
@@ -4579,8 +4613,11 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, cons
 		if (name == ufbxi_Deformer) return UFBXI_PARSE_DEFORMER;
 		if (name == ufbxi_Pose) return UFBXI_PARSE_POSE;
 		if (name == ufbxi_Video) return UFBXI_PARSE_VIDEO;
+		if (name == ufbxi_Texture) return UFBXI_PARSE_TEXTURE;
 		if (name == ufbxi_LayeredTexture) return UFBXI_PARSE_LAYERED_TEXTURE;
 		if (name == ufbxi_SelectionNode) return UFBXI_PARSE_SELECTION_NODE;
+		if (name == ufbxi_Collection) return UFBXI_PARSE_COLLECTION;
+		if (name == ufbxi_NodeAttribute) return UFBXI_PARSE_NODE_ATTRIBUTE;
 		break;
 
 	case UFBXI_PARSE_MODEL:
@@ -4984,12 +5021,22 @@ static bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, con
 
 	case UFBXI_PARSE_ROOT:
 		if (name == ufbxi_Model) return true;
+		if (name == ufbxi_FileId) return true;
+		break;
+
+	case UFBXI_PARSE_FBX_HEADER_EXTENSION:
+		if (name == ufbxi_SceneInfo) return true;
 		break;
 
 	case UFBXI_PARSE_OBJECTS:
 		return true;
 
 	case UFBXI_PARSE_CONNECTIONS:
+		// Pre-7000 needs raw strings for "Name\x00\x01Type" pairs, post-7000 uses it only
+		// for properties that are non-raw by default.
+		return uc->version < 7000;
+
+	case UFBXI_PARSE_RELATIONS:
 		// Pre-7000 needs raw strings for "Name\x00\x01Type" pairs, post-7000 uses it only
 		// for properties that are non-raw by default.
 		return uc->version < 7000;
@@ -5002,13 +5049,43 @@ static bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, con
 		if (name == ufbxi_Content) return true;
 		break;
 
+	case UFBXI_PARSE_TEXTURE:
+		if (name == ufbxi_TextureName) return true;
+		if (name == ufbxi_Media) return true;
+		break;
+
+	case UFBXI_PARSE_GEOMETRY:
+		if (name == ufbxi_NodeAttributeName) return true;
+		break;
+
+	case UFBXI_PARSE_NODE_ATTRIBUTE:
+		if (name == ufbxi_NodeAttributeName) return true;
+		break;
+
 	case UFBXI_PARSE_POSE_NODE:
 		if (name == ufbxi_Node) return true;
+		break;
+
+	case UFBXI_PARSE_SELECTION_NODE:
+		if (name == ufbxi_Node) return true;
+		break;
+
+	case UFBXI_PARSE_COLLECTION:
+		if (!strcmp(name, "Member")) return true;
 		break;
 
 	case UFBXI_PARSE_LEGACY_MODEL:
 		if (name == ufbxi_Material) return true;
 		if (name == ufbxi_Link) return true;
+		if (name == ufbxi_Name) return true;
+		break;
+
+	case UFBXI_PARSE_LEGACY_SWITCHER:
+		if (!strcmp(name, "CameraIndexName")) return true;
+		break;
+
+	case UFBXI_PARSE_SCENE_GENERIC_PERSISTENCE:
+		if (name == ufbxi_SceneInfo) return true;
 		break;
 
 	case UFBXI_PARSE_TAKE:
@@ -5636,7 +5713,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 	if (recursive) {
 		// Recursively parse the children of this node. Update the parse state
 		// to provide context for child node parsing.
-		ufbxi_parse_state parse_state = ufbxi_update_parse_state(parent_state, node->name);
+		ufbxi_parse_state parse_state = ufbxi_update_parse_state(uc, parent_state, node->name);
 		uint32_t num_children = 0;
 		for (;;) {
 			// Stop at end offset
@@ -6105,7 +6182,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 		}
 	}
 
-	ufbxi_parse_state parse_state = ufbxi_update_parse_state(parent_state, node->name);
+	ufbxi_parse_state parse_state = ufbxi_update_parse_state(uc, parent_state, node->name);
 	ufbxi_value vals[UFBXI_MAX_NON_ARRAY_VALUES];
 
 	// NOTE: Infinite loop to allow skipping the comma parsing via `continue`.
@@ -6413,7 +6490,7 @@ ufbxi_nodiscard static int ufbxi_parse_toplevel(ufbxi_context *uc, const char *n
 
 		// If not we need to parse all the children of the node for later
 		uint32_t num_children = 0;
-		ufbxi_parse_state state = ufbxi_update_parse_state(UFBXI_PARSE_ROOT, node->name);
+		ufbxi_parse_state state = ufbxi_update_parse_state(uc, UFBXI_PARSE_ROOT, node->name);
 		if (uc->has_next_child) {
 			for (;;) {
 				ufbxi_check(ufbxi_parse_toplevel_child_imp(uc, state, &uc->tmp, &end));
@@ -6440,7 +6517,7 @@ ufbxi_nodiscard static int ufbxi_parse_toplevel_child(ufbxi_context *uc, ufbxi_n
 		// Parse children on demand
 		ufbxi_buf_clear(&uc->tmp_parse);
 		bool end = false;
-		ufbxi_parse_state state = ufbxi_update_parse_state(UFBXI_PARSE_ROOT, uc->top_node->name);
+		ufbxi_parse_state state = ufbxi_update_parse_state(uc, UFBXI_PARSE_ROOT, uc->top_node->name);
 		ufbxi_check(ufbxi_parse_toplevel_child_imp(uc, state, &uc->tmp_parse, &end));
 		if (end) {
 			*p_node = NULL;
@@ -13617,9 +13694,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_cont
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_try_open_file(ufbxi_cache_context *cc, ufbx_string filename, bool *p_found)
 {
 	memset(&cc->stream, 0, sizeof(cc->stream));
-#if defined(UFBX_REGRESSION)
-	ufbx_assert(strlen(filename.data) == filename.length);
-#endif
+	ufbxi_regression_assert(strlen(filename.data) == filename.length);
 	if (!cc->open_file_cb.fn(cc->open_file_cb.user, &cc->stream, filename.data, filename.length)) {
 		return 1;
 	}
@@ -13722,10 +13797,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cac
 static ufbxi_forceinline bool ufbxi_cmp_cache_frame_less(const ufbx_cache_frame *a, const ufbx_cache_frame *b)
 {
 	if (a->channel.data != b->channel.data) {
-#if defined(UFBX_REGRESSION)
 		// Channel names should be interned
-		ufbx_assert(!ufbxi_str_equal(a->channel, b->channel));
-#endif
+		ufbxi_regression_assert(!ufbxi_str_equal(a->channel, b->channel));
 		return ufbxi_str_less(a->channel, b->channel);
 	}
 	return a->time < b->time;
@@ -14536,6 +14609,7 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 	uc->string_pool.buf.ator = &uc->ator_result;
 	uc->string_pool.buf.unordered = true;
 	uc->string_pool.initial_size = 1024;
+	uc->string_pool.error_handling = uc->opts.unicode_error_handling;
 
 	ufbxi_map_init(&uc->prop_type_map, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
 	ufbxi_map_init(&uc->fbx_id_map, &uc->ator_tmp, &ufbxi_map_cmp_uint64, NULL);
@@ -17806,16 +17880,25 @@ ufbx_abi size_t ufbx_catch_expand_private_use_escapes(ufbx_panic *panic, uint8_t
 {
 	if (ufbxi_panicf(panic, dst_size >= str.length, "dst size (%zu) must be at least str.size (%zu)", dst_size, str.length)) return 0;
 
+	size_t esc_len = str.length >= 4 ? str.length - 4 : 0;
 	size_t dst_len = 0;
-	for (size_t i = 0; i < str.length; i++) {
-		if (str.data[i] == 0xf3 && i + 4 <= str.length && str.data[i + 1] == 0xbb && (str.data[i + 2] & 0xfc) == 0xa8) {
-			uint32_t b = ((uint32_t)(uint8_t)str.data[i + 2] & 0x3) << 6u | ((uint32_t)str.data[i + 3] & 0x3f);
-			dst[dst_len++] = (uint8_t)b;
-			i += 3;
-		} else {
-			dst[dst_len++] = str.data[i];
+
+	for (size_t i = 0; i < esc_len; ) {
+		if ((uint8_t)str.data[i] == 0xf3) {
+			uint8_t t1 = (uint8_t)str.data[i + 1];
+			uint8_t t2 = (uint8_t)str.data[i + 2];
+			uint8_t t3 = (uint8_t)str.data[i + 3];
+
+			if (t1 == 0xbb && (t2 & 0xfc) == 0xa8) {
+				dst[dst_len++] = (uint8_t)((uint32_t)t2 & 0x3) << 6u | ((uint32_t)t3 & 0x3f);
+				i += 4;
+				continue;
+			}
 		}
+		
+		dst[dst_len++] = str.data[i++];
 	}
+
 	return dst_len;
 }
 
