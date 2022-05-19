@@ -4705,6 +4705,12 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_context *uc, ufbxi_parse
 		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
 		break;
 
+	case UFBXI_PARSE_ANIMATION_CURVE:
+	case UFBXI_PARSE_TEXTURE:
+	case UFBXI_PARSE_LAYERED_TEXTURE:
+	case UFBXI_PARSE_DEFORMER:
+	case UFBXI_PARSE_VIDEO:
+	case UFBXI_PARSE_SHAPE:
 	case UFBXI_PARSE_UNKNOWN_OBJECT:
 		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
 		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
