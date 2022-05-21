@@ -1498,6 +1498,7 @@ static void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size, size_t n)
 
 	size_t total = size * n;
 	ufbxi_check_return_err(ator->error, !ufbxi_does_overflow(total, size, n), NULL);
+	ufbxi_check_return_err(ator->error, total <= SIZE_MAX / 2, NULL); // Make sure it's always safe to double allocations
 	ufbxi_check_return_err_msg(ator->error, total <= ator->max_size - ator->current_size, NULL, "Memory limit exceeded");
 	ufbxi_check_return_err_msg(ator->error, ator->num_allocs < ator->max_allocs, NULL, "Allocation limit exceeded");
 	ator->num_allocs++;
@@ -1533,6 +1534,7 @@ static void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t size, void *old_pt
 	ufbx_assert(old_total <= ator->current_size);
 
 	ufbxi_check_return_err(ator->error, !ufbxi_does_overflow(total, size, n), NULL);
+	ufbxi_check_return_err(ator->error, total <= SIZE_MAX / 2, NULL); // Make sure it's always safe to double allocations
 	ufbxi_check_return_err_msg(ator->error, total <= ator->max_size - ator->current_size, NULL, "Memory limit exceeded");
 	ufbxi_check_return_err_msg(ator->error, ator->num_allocs < ator->max_allocs, NULL, "Allocation limit exceeded");
 	ator->num_allocs++;
@@ -2384,6 +2386,12 @@ typedef struct {
 	ufbx_unicode_error_handling error_handling;
 } ufbxi_string_pool;
 
+typedef struct {
+	const char *raw_data; // < UTF-8 data follows at `raw_length+1` if `utf8_length > 0`
+	uint32_t raw_length;  // < Length of the non-sanitized original string
+	uint32_t utf8_length; // < Length of sanitized UTF-8 string (or zero)
+} ufbxi_sanitized_string;
+
 static ufbxi_forceinline bool ufbxi_str_equal(ufbx_string a, ufbx_string b)
 {
 	return a.length == b.length && !memcmp(a.data, b.data, a.length);
@@ -2461,11 +2469,10 @@ ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool
 	}
 }
 
-ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_sanitize_string(ufbxi_string_pool *pool, const char *str, size_t length, size_t *p_length)
+ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(ufbxi_string_pool *pool, const char *str, size_t length)
 {
-	uint32_t escape_base = 0;
-
 	// Double escape `U+FBAnn` escapes to make the roundtrip lossless
+	uint32_t escape_base = 0;
 	if (pool->error_handling == UFBX_UNICODE_ERROR_HANDLING_PRIVATE_USE_ESCAPE) {
 		escape_base = 0xf3bba880;
 	}
@@ -2506,32 +2513,53 @@ ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_sanitize_string(ufbxi_st
 		break;
 	}
 
-	if (index >= length) {
-		ufbx_assert(index == length);
-		*p_length = length;
-		return str;
+	ufbx_assert(index <= length);
+	return index;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_sanitize_string(ufbxi_string_pool *pool, ufbxi_sanitized_string *sanitized, const char *str, size_t length, size_t valid_length, bool push_both)
+{
+	// Double escape `U+FBAnn` escapes to make the roundtrip lossless
+	uint32_t escape_base = 0;
+	if (pool->error_handling == UFBX_UNICODE_ERROR_HANDLING_PRIVATE_USE_ESCAPE) {
+		escape_base = 0xf3bba880;
 	}
+
+	// Handle only invalid cases here
+	ufbx_assert(valid_length < length);
 
 	if (pool->error_handling == UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING) {
-		ufbxi_report_err_msg(pool->error, "UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING", "Invalid UTF-8");
-		return NULL;
+		printf("DONT COMMIT ME!\n");
 	}
 
-	// Copy the initial valid part
-	ufbxi_check_return_err(pool->error, ufbxi_grow_array(pool->map.ator, &pool->temp_str, &pool->temp_cap, length + 64), NULL);
+	ufbxi_check_err_msg(pool->error, pool->error_handling != UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING, "Invalid UTF-8");
+
+	size_t index = valid_length;
+	size_t dst_len = index;
+	if (push_both) {
+		// Copy both the full raw string and the initial valid part
+		ufbxi_check_err(pool->error, length <= SIZE_MAX / 2 - 64);
+		ufbxi_check_err(pool->error, ufbxi_grow_array(pool->map.ator, &pool->temp_str, &pool->temp_cap, length * 2 + 64));
+		memcpy(pool->temp_str, str, length);
+		pool->temp_str[length] = '\0';
+		memcpy(pool->temp_str + length + 1, str, index);
+		dst_len += length + 1;
+	} else {
+
+		// Copy the initial valid part
+		ufbxi_check_err(pool->error, length <= SIZE_MAX - 64);
+		ufbxi_check_err(pool->error, ufbxi_grow_array(pool->map.ator, &pool->temp_str, &pool->temp_cap, length + 64));
+		memcpy(pool->temp_str, str, index);
+	}
 
 	char *dst = pool->temp_str;
-	size_t dst_len = index;
-
-	memcpy(dst, str, index);
-
 	while (index < length) {
 		uint8_t c = (uint8_t)str[index];
 		size_t left = length - index;
 
 		// Not optimal but not the worst thing ever
 		if (pool->temp_cap - dst_len < 16) {
-			ufbxi_check_return_err(pool->error, ufbxi_grow_array(pool->map.ator, &pool->temp_str, &pool->temp_cap, dst_len + 16), NULL);
+			ufbxi_check_err(pool->error, ufbxi_grow_array(pool->map.ator, &pool->temp_str, &pool->temp_cap, dst_len + 16));
 			dst = pool->temp_str;
 		}
 
@@ -2581,8 +2609,68 @@ ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_sanitize_string(ufbxi_st
 		index++;
 	}
 
-	*p_length = dst_len;
-	return dst;
+	// Sanitized strings are packed to 32-bit integers, in practice this should be fine
+	// as strings are limited to 32-bit length in FBX itself.
+	// The only problem case is a massive string that is full of unicode errors, ie.
+	// >1GB binary blob, but these should never be sanitized.
+	ufbxi_check_err(pool->error, length <= UINT32_MAX);
+	sanitized->raw_data = pool->temp_str;
+	if (push_both) {
+		// Reserve `UINT32_MAX` for invalid UTF-8 without sanitization
+		size_t utf8_length = dst_len - (length + 1);
+		ufbxi_check_err(pool->error, utf8_length < UINT32_MAX);
+		sanitized->raw_length = (uint32_t)length;
+		sanitized->utf8_length = (uint32_t)utf8_length;
+	} else {
+		ufbxi_check_err(pool->error, dst_len <= UINT32_MAX);
+		sanitized->raw_length = (uint32_t)dst_len;
+		sanitized->utf8_length = 0;
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_sanitized_string(ufbxi_string_pool *pool, ufbxi_sanitized_string *sanitized, const char *str, size_t length, uint32_t hash, bool raw)
+{
+	ufbxi_regression_assert(hash == ufbxi_hash_string(str, length));
+
+	ufbxi_check_err(pool->error, length <= UINT32_MAX);
+	ufbxi_check_err(pool->error, ufbxi_map_grow(&pool->map, ufbx_string, pool->initial_size));
+
+	const char *total_data = str;
+	size_t total_length = length;
+
+	sanitized->raw_length = (uint32_t)length;
+	sanitized->utf8_length = 0;
+
+	if (!raw) {
+		size_t valid_length = ufbxi_utf8_valid_length(pool, str, length);
+		if (valid_length != length) {
+			ufbxi_check_err(pool->error, ufbxi_sanitize_string(pool, sanitized, str, length, valid_length, true));
+			total_data = sanitized->raw_data;
+			total_length = sanitized->raw_length + sanitized->utf8_length + 1;
+			hash = ufbxi_hash_string(str, length);
+		}
+	}
+
+	ufbx_string ref = { total_data, total_length };
+
+	ufbx_string *entry = ufbxi_map_find(&pool->map, ufbx_string, hash, &ref);
+	if (entry) {
+		sanitized->raw_data = entry->data;
+	} else {
+		entry = ufbxi_map_insert(&pool->map, ufbx_string, hash, &ref);
+		ufbxi_check_err(pool->error, entry);
+		entry->length = total_length;
+		char *dst = ufbxi_push(&pool->buf, char, total_length + 1);
+		ufbxi_check_err(pool->error, dst);
+		memcpy(dst, total_data, total_length);
+		dst[total_length] = '\0';
+		entry->data = dst;
+		sanitized->raw_data = dst;
+	}
+
+	return 1;
 }
 
 ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_push_string_imp(ufbxi_string_pool *pool, const char *str, size_t length, size_t *p_out_length, bool copy, bool raw)
@@ -2598,10 +2686,15 @@ ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_push_string_imp(ufbxi_st
 		bool non_ascii = false;
 		hash = ufbxi_hash_string_check_ascii(str, length, &non_ascii);
 		if (non_ascii) {
-			str = ufbxi_sanitize_string(pool, str, length, &length);
-			ufbxi_check_return_err(pool->error, str, NULL);
-			hash = ufbxi_hash_string(str, length);
-			*p_out_length = length;
+			size_t valid_length = ufbxi_utf8_valid_length(pool, str, length);
+			if (valid_length < length) {
+				ufbxi_sanitized_string sanitized;
+				ufbxi_check_return_err(pool->error, ufbxi_sanitize_string(pool, &sanitized, str, length, valid_length, false), NULL);
+				str = sanitized.raw_data;
+				length = sanitized.raw_length;
+				hash = ufbxi_hash_string(str, length);
+				*p_out_length = length;
+			}
 		}
 	}
 
@@ -2668,6 +2761,7 @@ static const char ufbxi_AspectRatioMode[] = "AspectRatioMode";
 static const char ufbxi_AspectW[] = "AspectW";
 static const char ufbxi_AspectWidth[] = "AspectWidth";
 static const char ufbxi_BaseLayer[] = "BaseLayer";
+static const char ufbxi_BinaryData[] = "BinaryData";
 static const char ufbxi_BindPose[] = "BindPose";
 static const char ufbxi_BindingTable[] = "BindingTable";
 static const char ufbxi_BinormalsIndex[] = "BinormalsIndex";
@@ -2736,7 +2830,6 @@ static const char ufbxi_FbxSemanticEntry[] = "FbxSemanticEntry";
 static const char ufbxi_FieldOfViewX[] = "FieldOfViewX";
 static const char ufbxi_FieldOfViewY[] = "FieldOfViewY";
 static const char ufbxi_FieldOfView[] = "FieldOfView";
-static const char ufbxi_FileId[] = "FileId";
 static const char ufbxi_FileName[] = "FileName";
 static const char ufbxi_Filename[] = "Filename";
 static const char ufbxi_FilmHeight[] = "FilmHeight";
@@ -2807,7 +2900,6 @@ static const char ufbxi_MaterialAssignation[] = "MaterialAssignation";
 static const char ufbxi_Material[] = "Material";
 static const char ufbxi_Materials[] = "Materials";
 static const char ufbxi_Matrix[] = "Matrix";
-static const char ufbxi_Media[] = "Media";
 static const char ufbxi_Mesh[] = "Mesh";
 static const char ufbxi_Model[] = "Model";
 static const char ufbxi_Name[] = "Name";
@@ -2889,7 +2981,6 @@ static const char ufbxi_Tangents[] = "Tangents";
 static const char ufbxi_Texture[] = "Texture";
 static const char ufbxi_Texture_alpha[] = "Texture alpha";
 static const char ufbxi_TextureId[] = "TextureId";
-static const char ufbxi_TextureName[] = "TextureName";
 static const char ufbxi_TextureRotationPivot[] = "TextureRotationPivot";
 static const char ufbxi_TextureScalingPivot[] = "TextureScalingPivot";
 static const char ufbxi_TextureUV[] = "TextureUV";
@@ -2947,6 +3038,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AspectW, 7 },
 	{ ufbxi_AspectWidth, 11 },
 	{ ufbxi_BaseLayer, 9 },
+	{ ufbxi_BinaryData, 10 },
 	{ ufbxi_BindPose, 8 },
 	{ ufbxi_BindingTable, 12 },
 	{ ufbxi_Binormals, 9 },
@@ -3015,7 +3107,6 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_FieldOfView, 11 },
 	{ ufbxi_FieldOfViewX, 12 },
 	{ ufbxi_FieldOfViewY, 12 },
-	{ ufbxi_FileId, 6 },
 	{ ufbxi_FileName, 8 },
 	{ ufbxi_Filename, 8 },
 	{ ufbxi_FilmHeight, 10 },
@@ -3086,7 +3177,6 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_MaterialAssignation, 19 },
 	{ ufbxi_Materials, 9 },
 	{ ufbxi_Matrix, 6 },
-	{ ufbxi_Media, 5 },
 	{ ufbxi_Mesh, 4 },
 	{ ufbxi_Model, 5 },
 	{ ufbxi_Name, 4 },
@@ -3168,7 +3258,6 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Texture, 7 },
 	{ ufbxi_Texture_alpha, 13 },
 	{ ufbxi_TextureId, 9 },
-	{ ufbxi_TextureName, 11 },
 	{ ufbxi_TextureRotationPivot, 20 },
 	{ ufbxi_TextureScalingPivot, 19 },
 	{ ufbxi_TextureUV, 9 },
@@ -3237,8 +3326,8 @@ typedef enum {
 } ufbxi_value_type;
 
 typedef union {
-	struct { double f; int64_t i; }; // if `UFBXI_PROP_NUMBER`
-	ufbx_string s;                   // if `UFBXI_PROP_STRING`
+	struct { double f; int64_t i; }; // < if `UFBXI_PROP_NUMBER`
+	ufbxi_sanitized_string s;        // < if `UFBXI_PROP_STRING`
 } ufbxi_value;
 
 typedef struct {
@@ -3251,10 +3340,6 @@ struct ufbxi_node {
 	const char *name;      // < Name of the node (pooled, comapre with == to ufbxi_* strings)
 	uint32_t num_children; // < Number of child nodes
 	uint8_t name_len;      // < Length of `name` in bytes
-
-	// Bit set per value if the string is not sanitized as NULL-terminated UTF-8.
-	// ie. `vals[ix]` is a raw string if `(raw_string_mask >> ix) & 0x1`
-	uint8_t raw_string_mask;
 
 	// If `value_type_mask == UFBXI_PROP_ARRAY` then the node is an array
 	// (`array` field is valid) otherwise the node has N values in `vals`
@@ -4348,6 +4433,7 @@ size_t ufbxi_array_type_size(char type)
 	case 'f': return sizeof(float);
 	case 'd': return sizeof(double);
 	case 's': return sizeof(ufbx_string);
+	case 'S': return sizeof(ufbx_string);
 	default: return 1;
 	}
 }
@@ -4365,7 +4451,7 @@ static ufbxi_noinline ufbxi_node *ufbxi_find_child(ufbxi_node *node, const char 
 // Retrieve values from nodes with type codes:
 // Any: '_' (ignore)
 // NUMBER: 'I' int32_t 'L' int64_t 'F' float 'D' double 'R' ufbxi_real 'B' bool 'Z' size_t
-// STRING: 'S' ufbx_string 'C' const char* (checked) 's' ufbx_string 'c' const char * (unchecked)
+// STRING: 'S' ufbx_string 'C' const char* (checked) 's' ufbx_string 'c' const char * (unchecked) 'b' ufbx_blob
 
 ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, size_t ix, char fmt, void *v)
 {
@@ -4380,28 +4466,48 @@ ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, 
 	case 'B': if (type == UFBXI_VALUE_NUMBER) { *(bool*)v = node->vals[ix].i != 0; return 1; } else return 0;
 	case 'Z': if (type == UFBXI_VALUE_NUMBER) { if (node->vals[ix].i < 0) return 0; *(size_t*)v = (size_t)node->vals[ix].i; return 1; } else return 0;
 	case 'S': if (type == UFBXI_VALUE_STRING) {
-		bool ok = ((node->raw_string_mask & (1 << ix)) == 0);
-		ufbxi_dev_assert(ok);
-		*(ufbx_string*)v = node->vals[ix].s;
-		return ok ? 1 : 0;
-	} else return 0;
-	case 'C': if (type == UFBXI_VALUE_STRING) {
-		bool ok = ((node->raw_string_mask & (1 << ix)) == 0);
-		ufbxi_dev_assert(ok);
-		*(const char**)v = node->vals[ix].s.data;
-		return ok ? 1 : 0;
+		ufbxi_sanitized_string src = node->vals[ix].s;
+		ufbx_string *dst = (ufbx_string*)v;
+		if (src.utf8_length > 0) {
+			if (src.utf8_length == UINT32_MAX) return 0;
+			dst->data = src.raw_data + src.raw_length + 1;
+			dst->length = src.utf8_length;
+		} else {
+			dst->data = src.raw_data;
+			dst->length = src.raw_length;
+		}
+		return 1;
 	} else return 0;
 	case 's': if (type == UFBXI_VALUE_STRING) {
-		bool ok = ((node->raw_string_mask & (1 << ix)) != 0);
-		ufbxi_dev_assert(ok);
-		*(ufbx_string*)v = node->vals[ix].s;
-		return ok ? 1 : 0;
+		ufbxi_sanitized_string src = node->vals[ix].s;
+		ufbx_string *dst = (ufbx_string*)v;
+		dst->data = src.raw_data;
+		dst->length = src.raw_length;
+		return 1;
+	} else return 0;
+	case 'C': if (type == UFBXI_VALUE_STRING) {
+		ufbxi_sanitized_string src = node->vals[ix].s;
+		const char **dst = (const char **)v;
+		if (src.utf8_length > 0) {
+			if (src.utf8_length == UINT32_MAX) return 0;
+			*dst = src.raw_data + src.raw_length + 1;
+		} else {
+			*dst = src.raw_data;
+		}
+		return 1;
 	} else return 0;
 	case 'c': if (type == UFBXI_VALUE_STRING) {
-		bool ok = ((node->raw_string_mask & (1 << ix)) != 0);
-		ufbxi_dev_assert(ok);
-		*(const char**)v = node->vals[ix].s.data;
-		return ok ? 1 : 0;
+		ufbxi_sanitized_string src = node->vals[ix].s;
+		const char **dst = (const char **)v;
+		*dst = src.raw_data;
+		return 1;
+	} else return 0;
+	case 'b': if (type == UFBXI_VALUE_STRING) {
+		ufbxi_sanitized_string src = node->vals[ix].s;
+		ufbx_blob *dst = (ufbx_blob*)v;
+		dst->data = src.raw_data;
+		dst->size = src.raw_length;
+		return 1;
 	} else return 0;
 	default:
 		ufbx_assert(0 && "Bad format char");
@@ -4532,37 +4638,31 @@ static ufbxi_noinline void *ufbxi_get_element_extra(ufbxi_context *uc, uint32_t 
 typedef enum {
 	UFBXI_PARSE_ROOT,
 	UFBXI_PARSE_FBX_HEADER_EXTENSION,
-	UFBXI_PARSE_SCENE_INFO,
-	UFBXI_PARSE_DOCUMENTS,
-	UFBXI_PARSE_DOCUMENT,
-	UFBXI_PARSE_REFERENCES,
-	UFBXI_PARSE_REFERENCE,
 	UFBXI_PARSE_DEFINITIONS,
-	UFBXI_PARSE_OBJECT_TYPE,
-	UFBXI_PARSE_PROPERTY_TEMPLATE,
-	UFBXI_PARSE_GLOBAL_SETTINGS,
 	UFBXI_PARSE_OBJECTS,
-	UFBXI_PARSE_RELATIONS,
 	UFBXI_PARSE_CONNECTIONS,
+	UFBXI_PARSE_RELATIONS,
 	UFBXI_PARSE_TAKES,
 	UFBXI_PARSE_FBX_VERSION,
 	UFBXI_PARSE_MODEL,
 	UFBXI_PARSE_GEOMETRY,
 	UFBXI_PARSE_NODE_ATTRIBUTE,
-	UFBXI_PARSE_SELECTION_NODE,
-	UFBXI_PARSE_COLLECTION,
 	UFBXI_PARSE_LEGACY_MODEL,
 	UFBXI_PARSE_LEGACY_SWITCHER,
-	UFBXI_PARSE_UNKNOWN_OBJECT,
-	UFBXI_PARSE_SCENE_GENERIC_PERSISTENCE,
+	UFBXI_PARSE_LEGACY_SCENE_PERSISTENCE,
+	UFBXI_PARSE_REFERENCES,
+	UFBXI_PARSE_REFERENCE,
 	UFBXI_PARSE_ANIMATION_CURVE,
 	UFBXI_PARSE_DEFORMER,
 	UFBXI_PARSE_LEGACY_LINK,
 	UFBXI_PARSE_POSE,
 	UFBXI_PARSE_POSE_NODE,
-	UFBXI_PARSE_VIDEO,
 	UFBXI_PARSE_TEXTURE,
+	UFBXI_PARSE_VIDEO,
 	UFBXI_PARSE_LAYERED_TEXTURE,
+	UFBXI_PARSE_SELECTION_NODE,
+	UFBXI_PARSE_COLLECTION,
+	UFBXI_PARSE_UNKNOWN_OBJECT,
 	UFBXI_PARSE_LAYER_ELEMENT_NORMAL,
 	UFBXI_PARSE_LAYER_ELEMENT_BINORMAL,
 	UFBXI_PARSE_LAYER_ELEMENT_TANGENT,
@@ -4578,98 +4678,49 @@ typedef enum {
 	UFBXI_PARSE_TAKE,
 	UFBXI_PARSE_TAKE_OBJECT,
 	UFBXI_PARSE_CHANNEL,
-	UFBXI_PARSE_PROPERTIES,
-	UFBXI_PARSE_PROPERTY,
 	UFBXI_PARSE_UNKNOWN,
 } ufbxi_parse_state;
 
 typedef struct {
-	char type;      // < FBX type code of the array: b,i,l,f,d,S,s (or 'r' meaning ufbx_real '-' ignore, 'S' utf-8 string, 's' raw string)
+	char type;      // < FBX type code of the array: b,i,l,f,d (or 'r' meaning ufbx_real '-' ignore)
 	bool result;    // < Alloacte the array from the result buffer
 	bool tmp_buf;   // < Alloacte the array from the global temporary buffer
 	bool pad_begin; // < Pad the begin of the array with 4 zero elements to guard from invalid -1 index accesses
 } ufbxi_array_info;
 
-static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_context *uc, ufbxi_parse_state parent, const char *name)
+static ufbxi_noinline ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, const char *name)
 {
 	switch (parent) {
 
 	case UFBXI_PARSE_ROOT:
 		if (name == ufbxi_FBXHeaderExtension) return UFBXI_PARSE_FBX_HEADER_EXTENSION;
 		if (name == ufbxi_Definitions) return UFBXI_PARSE_DEFINITIONS;
-		if (name == ufbxi_Documents) return UFBXI_PARSE_DOCUMENTS;
-		if (name == ufbxi_Document) return UFBXI_PARSE_DOCUMENT;
 		if (name == ufbxi_Objects) return UFBXI_PARSE_OBJECTS;
 		if (name == ufbxi_Connections) return UFBXI_PARSE_CONNECTIONS;
 		if (name == ufbxi_Takes) return UFBXI_PARSE_TAKES;
 		if (name == ufbxi_Model) return UFBXI_PARSE_LEGACY_MODEL;
-		if (name == ufbxi_GlobalSettings) return UFBXI_PARSE_GLOBAL_SETTINGS;
-		// Don't waste time hashing or testing against legacy names
-		if (uc->version < 7000) {
-			if (!strcmp(name, "Relations")) return UFBXI_PARSE_RELATIONS;
-			if (uc->version < 6000) {
-				if (!strcmp(name, "Switcher")) return UFBXI_PARSE_LEGACY_SWITCHER;
-				if (!strcmp(name, "SceneGenericPersistence")) return UFBXI_PARSE_SCENE_GENERIC_PERSISTENCE;
-			}
-		}
 		if (!strcmp(name, "References")) return UFBXI_PARSE_REFERENCES;
+		if (!strcmp(name, "Relations")) return UFBXI_PARSE_RELATIONS;
+		if (!strcmp(name, "Switcher")) return UFBXI_PARSE_LEGACY_SWITCHER;
+		if (!strcmp(name, "SceneGenericPersistence")) return UFBXI_PARSE_LEGACY_SCENE_PERSISTENCE;
 		break;
 
 	case UFBXI_PARSE_FBX_HEADER_EXTENSION:
 		if (name == ufbxi_FBXVersion) return UFBXI_PARSE_FBX_VERSION;
-		if (name == ufbxi_SceneInfo) return UFBXI_PARSE_SCENE_INFO;
-		break;
-
-	case UFBXI_PARSE_DOCUMENTS:
-		if (name == ufbxi_Document) return UFBXI_PARSE_DOCUMENT;
-		break;
-
-	case UFBXI_PARSE_DOCUMENT:
-		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
-		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
-		if (name == ufbxi_SceneInfo) return UFBXI_PARSE_SCENE_INFO;
-		break;
-
-	case UFBXI_PARSE_REFERENCES:
-		return UFBXI_PARSE_REFERENCE;
-
-	case UFBXI_PARSE_SCENE_INFO:
-		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
-		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
-		break;
-
-	case UFBXI_PARSE_GLOBAL_SETTINGS:
-		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
-		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
-		break;
-
-	case UFBXI_PARSE_DEFINITIONS:
-		if (name == ufbxi_ObjectType) return UFBXI_PARSE_OBJECT_TYPE;
-		break;
-
-	case UFBXI_PARSE_OBJECT_TYPE:
-		if (name == ufbxi_PropertyTemplate) return UFBXI_PARSE_PROPERTY_TEMPLATE;
-		break;
-
-	case UFBXI_PARSE_PROPERTY_TEMPLATE:
-		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
-		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
 		break;
 
 	case UFBXI_PARSE_OBJECTS:
 		if (name == ufbxi_Model) return UFBXI_PARSE_MODEL;
 		if (name == ufbxi_Geometry) return UFBXI_PARSE_GEOMETRY;
+		if (name == ufbxi_NodeAttribute) return UFBXI_PARSE_NODE_ATTRIBUTE;
 		if (name == ufbxi_AnimationCurve) return UFBXI_PARSE_ANIMATION_CURVE;
 		if (name == ufbxi_Deformer) return UFBXI_PARSE_DEFORMER;
 		if (name == ufbxi_Pose) return UFBXI_PARSE_POSE;
-		if (name == ufbxi_Video) return UFBXI_PARSE_VIDEO;
 		if (name == ufbxi_Texture) return UFBXI_PARSE_TEXTURE;
+		if (name == ufbxi_Video) return UFBXI_PARSE_VIDEO;
 		if (name == ufbxi_LayeredTexture) return UFBXI_PARSE_LAYERED_TEXTURE;
 		if (name == ufbxi_SelectionNode) return UFBXI_PARSE_SELECTION_NODE;
 		if (name == ufbxi_Collection) return UFBXI_PARSE_COLLECTION;
-		if (name == ufbxi_NodeAttribute) return UFBXI_PARSE_NODE_ATTRIBUTE;
-		if (name == ufbxi_SceneInfo) return UFBXI_PARSE_SCENE_INFO;
-		if (name == ufbxi_GlobalSettings) return UFBXI_PARSE_GLOBAL_SETTINGS;
 		return UFBXI_PARSE_UNKNOWN_OBJECT;
 
 	case UFBXI_PARSE_MODEL:
@@ -4685,11 +4736,8 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_context *uc, ufbxi_parse
 			if (name == ufbxi_LayerElementSmoothing) return UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING;
 			if (name == ufbxi_LayerElementMaterial) return UFBXI_PARSE_LAYER_ELEMENT_MATERIAL;
 			if (!strncmp(name, "LayerElement", 12)) return UFBXI_PARSE_LAYER_ELEMENT_OTHER;
-		} else {
-			if (name == ufbxi_Shape) return UFBXI_PARSE_SHAPE;
-			if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
-			if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
 		}
+		if (name == ufbxi_Shape) return UFBXI_PARSE_SHAPE;
 		break;
 
 	case UFBXI_PARSE_LEGACY_MODEL:
@@ -4697,25 +4745,10 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_context *uc, ufbxi_parse
 		if (name == ufbxi_Link) return UFBXI_PARSE_LEGACY_LINK;
 		if (name == ufbxi_Channel) return UFBXI_PARSE_CHANNEL;
 		if (name == ufbxi_Shape) return UFBXI_PARSE_SHAPE;
-		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
-		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
 		break;
 
 	case UFBXI_PARSE_POSE:
 		if (name == ufbxi_PoseNode) return UFBXI_PARSE_POSE_NODE;
-		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
-		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
-		break;
-
-	case UFBXI_PARSE_ANIMATION_CURVE:
-	case UFBXI_PARSE_TEXTURE:
-	case UFBXI_PARSE_LAYERED_TEXTURE:
-	case UFBXI_PARSE_DEFORMER:
-	case UFBXI_PARSE_VIDEO:
-	case UFBXI_PARSE_SHAPE:
-	case UFBXI_PARSE_UNKNOWN_OBJECT:
-		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
-		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
 		break;
 
 	case UFBXI_PARSE_TAKES:
@@ -4733,8 +4766,8 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_context *uc, ufbxi_parse
 		if (name == ufbxi_Channel) return UFBXI_PARSE_CHANNEL;
 		break;
 
-	case UFBXI_PARSE_PROPERTIES:
-		return UFBXI_PARSE_PROPERTY;
+	case UFBXI_PARSE_REFERENCES:
+		return UFBXI_PARSE_REFERENCE;
 
 	default:
 		break;
@@ -5088,32 +5121,23 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	return false;
 }
 
-static bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, const char *name, size_t index)
+static ufbxi_noinline bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, const char *name, size_t index)
 {
-	(void)uc;
-
 	switch (parent) {
 
 	case UFBXI_PARSE_ROOT:
 		if (name == ufbxi_Model) return true;
-		if (name == ufbxi_FileId) return true;
+		if (!strcmp(name, "FileId")) return true;
 		break;
 
 	case UFBXI_PARSE_FBX_HEADER_EXTENSION:
 		if (name == ufbxi_SceneInfo) return true;
 		break;
 
-	case UFBXI_PARSE_REFERENCE:
-		if (!strcmp(name, "Object")) return true;
-
 	case UFBXI_PARSE_OBJECTS:
 		return true;
 
 	case UFBXI_PARSE_CONNECTIONS:
-		// Pre-7000 needs raw strings for "Name\x00\x01Type" pairs, post-7000 uses it only
-		// for properties that are non-raw by default.
-		return uc->version < 7000;
-
 	case UFBXI_PARSE_RELATIONS:
 		// Pre-7000 needs raw strings for "Name\x00\x01Type" pairs, post-7000 uses it only
 		// for properties that are non-raw by default.
@@ -5129,8 +5153,8 @@ static bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, con
 		break;
 
 	case UFBXI_PARSE_TEXTURE:
-		if (name == ufbxi_TextureName) return true;
-		if (name == ufbxi_Media) return true;
+		if (!strcmp(name, "TextureName")) return true;
+		if (!strcmp(name, "Media")) return true;
 		break;
 
 	case UFBXI_PARSE_GEOMETRY:
@@ -5170,23 +5194,22 @@ static bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, con
 		if (!strcmp(name, "CameraIndexName")) return true;
 		break;
 
-	case UFBXI_PARSE_SCENE_GENERIC_PERSISTENCE:
+	case UFBXI_PARSE_LEGACY_SCENE_PERSISTENCE:
 		if (name == ufbxi_SceneInfo) return true;
+		break;
+
+	case UFBXI_PARSE_REFERENCE:
+		if (!strcmp(name, "Object")) return true;
 		break;
 
 	case UFBXI_PARSE_TAKE:
 		if (name == ufbxi_Model) return true;
 		break;
 
-	case UFBXI_PARSE_PROPERTIES:
-		return index == (uc->version < 7000 ? 3 : 4);
-
-	case UFBXI_PARSE_PROPERTY:
-		if (!strcmp(name, "BinaryData")) return true;
-		break;
-
 	default:
+		if (name == ufbxi_BinaryData) return true;
 		break;
+
 	}
 
 	return false;
@@ -5764,15 +5787,25 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 
 			case 'S': case 'R':
 			{
-				size_t len = ufbxi_read_u32(value);
+				uint32_t length = ufbxi_read_u32(value);
 				ufbxi_consume_bytes(uc, 5);
-				vals[i].s.data = ufbxi_read_bytes(uc, len);
-				vals[i].s.length = len;
+				const char *str = ufbxi_read_bytes(uc, length);
+				ufbxi_check(str);
 
-				bool raw = ufbxi_is_raw_string(uc, parent_state, name, i);
-				node->raw_string_mask |= (uint8_t)((raw ? 1u : 0u) << i);
+				if (length == 0) {
+					vals[i].s.raw_data = ufbxi_empty_char;
+					vals[i].s.raw_length = 0;
+					vals[i].s.utf8_length = 0;
+				} else {
+					bool non_ascii = false;
+					uint32_t hash = ufbxi_hash_string_check_ascii(str, length, &non_ascii);
+					bool raw = !non_ascii || ufbxi_is_raw_string(uc, parent_state, name, i);
+					ufbxi_check(ufbxi_push_sanitized_string(&uc->string_pool, &vals[i].s, str, length, hash, raw));
 
-				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &vals[i].s, raw));
+					// Mark the data as invalid UTF-8
+					if (non_ascii && raw) vals[i].s.utf8_length = UINT32_MAX;
+				}
+
 				type_mask |= UFBXI_VALUE_STRING << (i*2);
 			}
 			break;
@@ -5806,7 +5839,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 	if (recursive) {
 		// Recursively parse the children of this node. Update the parse state
 		// to provide context for child node parsing.
-		ufbxi_parse_state parse_state = ufbxi_update_parse_state(uc, parent_state, node->name);
+		ufbxi_parse_state parse_state = ufbxi_update_parse_state(parent_state, node->name);
 		uint32_t num_children = 0;
 		for (;;) {
 			// Stop at end offset
@@ -6275,7 +6308,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 		}
 	}
 
-	ufbxi_parse_state parse_state = ufbxi_update_parse_state(uc, parent_state, node->name);
+	ufbxi_parse_state parse_state = ufbxi_update_parse_state(parent_state, node->name);
 	ufbxi_value vals[UFBXI_MAX_NON_ARRAY_VALUES];
 
 	// NOTE: Infinite loop to allow skipping the comma parsing via `continue`.
@@ -6301,13 +6334,22 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 			} else if (num_values < UFBXI_MAX_NON_ARRAY_VALUES) {
 				type_mask |= UFBXI_VALUE_STRING << (num_values*2);
 				ufbxi_value *v = &vals[num_values];
-				v->s.data = tok->str_data;
-				v->s.length = tok->str_len;
 
-				bool raw = ufbxi_is_raw_string(uc, parent_state, name, num_values);
-				node->raw_string_mask |= (uint8_t)((raw ? 1u : 0u) << num_values);
+				const char *str = tok->str_data;
+				size_t length = tok->str_len;
+				ufbxi_check(str);
 
-				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &v->s, raw));
+				if (length == 0) {
+					v->s.raw_data = ufbxi_empty_char;
+					v->s.raw_length = 0;
+					v->s.utf8_length = 0;
+				} else {
+					bool non_ascii = false;
+					uint32_t hash = ufbxi_hash_string_check_ascii(str, length, &non_ascii);
+					bool raw = !non_ascii || ufbxi_is_raw_string(uc, parent_state, name, num_values);
+					ufbxi_check(ufbxi_push_sanitized_string(&uc->string_pool, &v->s, str, length, hash, raw));
+					if (non_ascii && raw) v->s.utf8_length = UINT32_MAX;
+				}
 			}
 
 		} else if (ufbxi_ascii_accept(uc, UFBXI_ASCII_INT)) {
@@ -6583,7 +6625,7 @@ ufbxi_nodiscard static int ufbxi_parse_toplevel(ufbxi_context *uc, const char *n
 
 		// If not we need to parse all the children of the node for later
 		uint32_t num_children = 0;
-		ufbxi_parse_state state = ufbxi_update_parse_state(uc, UFBXI_PARSE_ROOT, node->name);
+		ufbxi_parse_state state = ufbxi_update_parse_state(UFBXI_PARSE_ROOT, node->name);
 		if (uc->has_next_child) {
 			for (;;) {
 				ufbxi_check(ufbxi_parse_toplevel_child_imp(uc, state, &uc->tmp, &end));
@@ -6610,7 +6652,7 @@ ufbxi_nodiscard static int ufbxi_parse_toplevel_child(ufbxi_context *uc, ufbxi_n
 		// Parse children on demand
 		ufbxi_buf_clear(&uc->tmp_parse);
 		bool end = false;
-		ufbxi_parse_state state = ufbxi_update_parse_state(uc, UFBXI_PARSE_ROOT, uc->top_node->name);
+		ufbxi_parse_state state = ufbxi_update_parse_state(UFBXI_PARSE_ROOT, uc->top_node->name);
 		ufbxi_check(ufbxi_parse_toplevel_child_imp(uc, state, &uc->tmp_parse, &end));
 		if (end) {
 			*p_node = NULL;
@@ -6954,13 +6996,17 @@ ufbxi_nodiscard static int ufbxi_read_property(ufbxi_context *uc, ufbxi_node *no
 		val_ix++;
 	}
 
-	if (!ufbxi_get_val_at(node, val_ix, 'S', &prop->value_str)) {
+	if (ufbxi_get_val_at(node, val_ix, 'S', &prop->value_str)) {
+		if (prop->value_str.length > 0) {
+			ufbxi_get_val_at(node, val_ix, 'b', &prop->value_blob);
+		}
+	} else {
 		prop->value_str = ufbx_empty_string;
 	}
 
 	// Very unlikely, seems to only exist in some "non standard" FBX files
 	if (node->num_children > 0) {
-		ufbxi_node *binary = ufbxi_find_child_strcmp(node, "BinaryData");
+		ufbxi_node *binary = ufbxi_find_child(node, ufbxi_BinaryData);
 		if (binary) {
 			ufbx_string data;
 			if (ufbxi_get_val1(binary, "s", &data)) {
@@ -8025,14 +8071,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 				ufbxi_VertexCrease, ufbxi_VertexCreaseIndex, 'r', 1));
 		} else if (n->name == ufbxi_LayerElementEdgeCrease) {
 			const char *mapping;
-			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "C", (char**)&mapping));
+			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
 			if (mapping == ufbxi_ByEdge) {
 				if (mesh->edge_crease.count) continue;
 				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->edge_crease.data, &mesh->edge_crease.count, n, ufbxi_EdgeCrease, 'r', mesh->num_edges));
 			}
 		} else if (n->name == ufbxi_LayerElementSmoothing) {
 			const char *mapping;
-			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "C", (char**)&mapping));
+			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
 			if (mapping == ufbxi_ByEdge) {
 				if (mesh->edge_smoothing.count) continue;
 				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->edge_smoothing.data, &mesh->edge_smoothing.count, n, ufbxi_Smoothing, 'b', mesh->num_edges));
@@ -8043,7 +8089,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 		} else if (n->name == ufbxi_LayerElementMaterial) {
 			if (mesh->face_material.count) continue;
 			const char *mapping;
-			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "C", (char**)&mapping));
+			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
 			if (mapping == ufbxi_ByPolygon) {
 				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->face_material.data, &mesh->face_material.count, n, ufbxi_Materials, 'i', mesh->num_faces));
 			} else if (mapping == ufbxi_AllSame) {
@@ -8083,7 +8129,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 			if (prop_name.length > 0) {
 				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &prop_name, false));
 				const char *mapping;
-				if (ufbxi_find_val1(n, ufbxi_MappingInformationType, "C", (char**)&mapping)) {
+				if (ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping)) {
 					ufbxi_value_array *arr = ufbxi_find_array(n, ufbxi_TextureId, 'i');
 
 					ufbxi_tmp_mesh_texture *tex = ufbxi_push_zero(&uc->tmp_mesh_textures, ufbxi_tmp_mesh_texture, 1);
@@ -11399,7 +11445,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_
 		*ptr++ = c;
 	}
 
-	// Intern the string and pop the temporary buffef
+	// Intern the string and pop the temporary buffer
 	dst->data = result;
 	dst->length = (size_t)(ptr - result);
 	ufbx_assert(dst->length <= result_cap);
