@@ -91,6 +91,12 @@ typedef struct ufbx_string {
 	size_t length;
 } ufbx_string;
 
+// Opaque byte buffer blob
+typedef struct ufbx_blob {
+	const void *data;
+	size_t size;
+} ufbx_blob;
+
 // 2D vector
 typedef struct ufbx_vec2 {
 	union {
@@ -264,6 +270,7 @@ struct ufbx_prop {
 	ufbx_prop_flags flags;
 
 	ufbx_string value_str;
+	ufbx_blob value_blob;
 	int64_t value_int;
 	union {
 		ufbx_real value_real_arr[3];
@@ -1949,12 +1956,6 @@ typedef struct ufbx_texture_layer {
 } ufbx_texture_layer;
 
 UFBX_LIST_TYPE(ufbx_texture_layer_list, ufbx_texture_layer);
-
-// Opaque byte buffer blob
-typedef struct ufbx_blob {
-	const void *data;
-	size_t size;
-} ufbx_blob;
 
 // Texture that controls material appearance
 struct ufbx_texture {

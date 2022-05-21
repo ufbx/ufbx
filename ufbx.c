@@ -34,8 +34,10 @@
 	#define ufbxi_restrict __restrict
 	#if defined(__cplusplus) && _MSC_VER >= 1900
 		#define ufbxi_nodiscard [[nodiscard]]
-	#else
+	#elif defined(_Check_return_)
 		#define ufbxi_nodiscard _Check_return_
+	#else
+		#define ufbxi_nodiscard
 	#endif
 	#define ufbxi_unused
 #elif !defined(UFBX_STANDARD_C) && (defined(__GNUC__) || defined(__clang__))
@@ -4539,6 +4541,8 @@ typedef enum {
 	UFBXI_PARSE_SCENE_INFO,
 	UFBXI_PARSE_DOCUMENTS,
 	UFBXI_PARSE_DOCUMENT,
+	UFBXI_PARSE_REFERENCES,
+	UFBXI_PARSE_REFERENCE,
 	UFBXI_PARSE_DEFINITIONS,
 	UFBXI_PARSE_OBJECT_TYPE,
 	UFBXI_PARSE_PROPERTY_TEMPLATE,
@@ -4614,6 +4618,7 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_context *uc, ufbxi_parse
 				if (!strcmp(name, "SceneGenericPersistence")) return UFBXI_PARSE_SCENE_GENERIC_PERSISTENCE;
 			}
 		}
+		if (!strcmp(name, "References")) return UFBXI_PARSE_REFERENCES;
 		break;
 
 	case UFBXI_PARSE_FBX_HEADER_EXTENSION:
@@ -4630,6 +4635,9 @@ static ufbxi_parse_state ufbxi_update_parse_state(ufbxi_context *uc, ufbxi_parse
 		if (name == ufbxi_Properties70) return UFBXI_PARSE_PROPERTIES;
 		if (name == ufbxi_SceneInfo) return UFBXI_PARSE_SCENE_INFO;
 		break;
+
+	case UFBXI_PARSE_REFERENCES:
+		return UFBXI_PARSE_REFERENCE;
 
 	case UFBXI_PARSE_SCENE_INFO:
 		if (name == ufbxi_Properties60) return UFBXI_PARSE_PROPERTIES;
@@ -5086,7 +5094,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	return false;
 }
 
-static bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, const char *name)
+static bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, const char *name, size_t index)
 {
 	(void)uc;
 
@@ -5100,6 +5108,9 @@ static bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_FBX_HEADER_EXTENSION:
 		if (name == ufbxi_SceneInfo) return true;
 		break;
+
+	case UFBXI_PARSE_REFERENCE:
+		if (!strcmp(name, "Object")) return true;
 
 	case UFBXI_PARSE_OBJECTS:
 		return true;
@@ -5172,6 +5183,9 @@ static bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_TAKE:
 		if (name == ufbxi_Model) return true;
 		break;
+
+	case UFBXI_PARSE_PROPERTIES:
+		return index == (uc->version < 7000 ? 3 : 4);
 
 	case UFBXI_PARSE_PROPERTY:
 		if (!strcmp(name, "BinaryData")) return true;
@@ -5761,7 +5775,7 @@ ufbxi_nodiscard static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t d
 				vals[i].s.data = ufbxi_read_bytes(uc, len);
 				vals[i].s.length = len;
 
-				bool raw = ufbxi_is_raw_string(uc, parent_state, name);
+				bool raw = ufbxi_is_raw_string(uc, parent_state, name, i);
 				node->raw_string_mask |= (uint8_t)((raw ? 1u : 0u) << i);
 
 				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &vals[i].s, raw));
@@ -6296,7 +6310,7 @@ ufbxi_nodiscard static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t de
 				v->s.data = tok->str_data;
 				v->s.length = tok->str_len;
 
-				bool raw = ufbxi_is_raw_string(uc, parent_state, name);
+				bool raw = ufbxi_is_raw_string(uc, parent_state, name, num_values);
 				node->raw_string_mask |= (uint8_t)((raw ? 1u : 0u) << num_values);
 
 				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &v->s, raw));
@@ -6956,7 +6970,8 @@ ufbxi_nodiscard static int ufbxi_read_property(ufbxi_context *uc, ufbxi_node *no
 		if (binary) {
 			ufbx_string data;
 			if (ufbxi_get_val1(binary, "s", &data)) {
-				// TODO
+				prop->value_blob.data = data.data;
+				prop->value_blob.size = data.length;
 			}
 		}
 	}
@@ -17647,7 +17662,7 @@ ufbx_abi bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, 
 	return true;
 }
 
-bool ufbx_abi ufbx_abi ufbx_is_thread_safe()
+ufbx_abi bool ufbx_is_thread_safe()
 {
 	return UFBXI_THREAD_SAFE != 0;
 }
