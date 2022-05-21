@@ -1172,7 +1172,11 @@ static void *ufbxt_read_file(const char *name, size_t *p_size)
 	if (!file) return NULL;
 
 	fseek(file, 0, SEEK_END);
-	size_t size = ftell(file);
+#if defined(_WIN32)
+	size_t size = (size_t)_ftelli64(file);
+#else
+	size_t size = (size_t)ftell(file);
+#endif
 	fseek(file, 0, SEEK_SET);
 
 	char *data = malloc(size + 1);
