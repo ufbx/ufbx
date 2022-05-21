@@ -5142,6 +5142,8 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 
 static ufbxi_noinline bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_state parent, const char *name, size_t index)
 {
+	(void)index;
+
 	switch (parent) {
 
 	case UFBXI_PARSE_ROOT:
@@ -11431,13 +11433,10 @@ ufbxi_nodiscard ufbxi_noinline static size_t ufbxi_trim_delimiters(ufbxi_context
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_init_file_paths(ufbxi_context *uc)
 {
-	if (uc->opts.raw_filename.size > 0 && uc->opts.filename.length == 0) {
-	}
-
 	if (uc->opts.filename.length > 0) {
 		uc->scene.metadata.filename = uc->opts.filename;
 	} else if (uc->opts.raw_filename.size > 0) {
-		uc->scene.metadata.filename.data = uc->opts.raw_filename.data;
+		uc->scene.metadata.filename.data = (const char*)uc->opts.raw_filename.data;
 		uc->scene.metadata.filename.length = uc->opts.raw_filename.size;
 	}
 
