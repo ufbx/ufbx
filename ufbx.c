@@ -2753,7 +2753,7 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place_blob(ufbxi_
 		p_blob->data = NULL;
 		return 1;
 	}
-	p_blob->data = ufbxi_push_string(pool, p_blob->data, p_blob->size, &p_blob->size, raw);
+	p_blob->data = ufbxi_push_string(pool, (const char*)p_blob->data, p_blob->size, &p_blob->size, raw);
 	ufbxi_check_err(pool->error, p_blob->data);
 	return 1;
 }
@@ -7017,7 +7017,7 @@ ufbxi_nodiscard static int ufbxi_read_property(ufbxi_context *uc, ufbxi_node *no
 
 	if (ufbxi_get_val_at(node, val_ix, 'S', &prop->value_str)) {
 		if (prop->value_str.length > 0) {
-			ufbxi_get_val_at(node, val_ix, 'b', &prop->value_blob);
+			ufbxi_ignore(ufbxi_get_val_at(node, val_ix, 'b', &prop->value_blob));
 		}
 	} else {
 		prop->value_str = ufbx_empty_string;
@@ -11455,7 +11455,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_init_file_paths(ufbxi_context *u
 	uc->scene.metadata.relative_root.length = ufbxi_trim_delimiters(uc, uc->opts.filename.data, uc->opts.filename.length);
 
 	uc->scene.metadata.raw_relative_root.data = uc->opts.raw_filename.data;
-	uc->scene.metadata.raw_relative_root.size = ufbxi_trim_delimiters(uc, uc->opts.raw_filename.data, uc->opts.raw_filename.size);
+	uc->scene.metadata.raw_relative_root.size = ufbxi_trim_delimiters(uc, (const char*)uc->opts.raw_filename.data, uc->opts.raw_filename.size);
 
 	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->scene.metadata.relative_root, false));
 	ufbxi_check(ufbxi_push_string_place_blob(&uc->string_pool, &uc->scene.metadata.raw_relative_root, true));
