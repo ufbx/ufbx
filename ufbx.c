@@ -17,8 +17,6 @@
 
 // -- Headers
 
-#define _FILE_OFFSET_BITS 64
-
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -137,6 +135,14 @@
 		#define UFBX_PATH_SEPARATOR '\\'
 	#else
 		#define UFBX_PATH_SEPARATOR '/'
+	#endif
+#endif
+
+#if !defined(UFBX_STANDARD_C) && defined(_POSIX_C_SOURCE)
+	#if _POSIX_C_SOURCE >= 200112l
+		#ifndef UFBX_HAS_FTELLO
+			#define UFBX_HAS_FTELLO
+		#endif
 	#endif
 #endif
 
@@ -3965,7 +3971,7 @@ static FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp
 
 static uint64_t ufbxi_ftell(FILE *file)
 {
-#if !defined(UFBX_STANDARD_C) && defined(_POSIX_VERSION)
+#if !defined(UFBX_STANDARD_C) && defined(UFBX_HAS_FTELLO)
 	off_t result = ftello(file);
 	if (result >= 0) return (uint64_t)result;
 #elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
