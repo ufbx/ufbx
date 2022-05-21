@@ -2541,11 +2541,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_sanitize_string(ufbxi_string_poo
 
 	// Handle only invalid cases here
 	ufbx_assert(valid_length < length);
-
-	if (pool->error_handling == UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING) {
-		printf("DONT COMMIT ME!\n");
-	}
-
 	ufbxi_check_err_msg(pool->error, pool->error_handling != UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING, "Invalid UTF-8");
 
 	size_t index = valid_length;
