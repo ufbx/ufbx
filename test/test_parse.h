@@ -582,3 +582,9 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unicode_error_identity, UFBXT_FILE_TEST_FLAG_ALL
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(revit_empty)
+#if UFBXT_IMPL
+{
+}
+#endif
