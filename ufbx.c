@@ -2693,7 +2693,6 @@ static const char ufbxi_CastShadows[] = "CastShadows";
 static const char ufbxi_Channel[] = "Channel";
 static const char ufbxi_Character[] = "Character";
 static const char ufbxi_Children[] = "Children";
-static const char ufbxi_Closed[] = "Closed";
 static const char ufbxi_Cluster[] = "Cluster";
 static const char ufbxi_CollectionExclusive[] = "CollectionExclusive";
 static const char ufbxi_Collection[] = "Collection";
@@ -2827,7 +2826,6 @@ static const char ufbxi_OP[] = "OP\0";
 static const char ufbxi_ObjectMetaData[] = "ObjectMetaData";
 static const char ufbxi_ObjectType[] = "ObjectType";
 static const char ufbxi_Objects[] = "Objects";
-static const char ufbxi_Open[] = "Open";
 static const char ufbxi_Order[] = "Order";
 static const char ufbxi_OriginalUnitScaleFactor[] = "OriginalUnitScaleFactor";
 static const char ufbxi_OriginalUpAxisSign[] = "OriginalUpAxisSign";
@@ -2835,7 +2833,6 @@ static const char ufbxi_OriginalUpAxis[] = "OriginalUpAxis";
 static const char ufbxi_OuterAngle[] = "OuterAngle";
 static const char ufbxi_PO[] = "PO\0";
 static const char ufbxi_PP[] = "PP\0";
-static const char ufbxi_Periodic[] = "Periodic";
 static const char ufbxi_PointsIndex[] = "PointsIndex";
 static const char ufbxi_Points[] = "Points";
 static const char ufbxi_PolygonIndexArray[] = "PolygonIndexArray";
@@ -2975,7 +2972,6 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Channel, 7 },
 	{ ufbxi_Character, sizeof(ufbxi_Character) - 1 },
 	{ ufbxi_Children, 8 },
-	{ ufbxi_Closed, 6 },
 	{ ufbxi_Cluster, 7 },
 	{ ufbxi_Collection, 10 },
 	{ ufbxi_CollectionExclusive, 19 },
@@ -3109,7 +3105,6 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_ObjectMetaData, 14 },
 	{ ufbxi_ObjectType, 10 },
 	{ ufbxi_Objects, 7 },
-	{ ufbxi_Open, 4 },
 	{ ufbxi_Order, 5 },
 	{ ufbxi_OriginalUnitScaleFactor, 23 },
 	{ ufbxi_OriginalUpAxis, 14 },
@@ -3117,7 +3112,6 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_OuterAngle, 10 },
 	{ ufbxi_PO, 2 },
 	{ ufbxi_PP, 2 },
-	{ ufbxi_Periodic, 8 },
 	{ ufbxi_Points, 6 },
 	{ ufbxi_PointsIndex, 11 },
 	{ ufbxi_PolygonIndexArray, 17 },
@@ -8206,11 +8200,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 
 ufbxi_noinline static ufbx_nurbs_topology ufbxi_read_nurbs_topology(const char *form)
 {
-	if (form == ufbxi_Open) {
+	if (!strcmp(form, "Open")) {
 		return UFBX_NURBS_TOPOLOGY_OPEN;
-	} else if (form == ufbxi_Closed) {
+	} else if (!strcmp(form, "Closed")) {
 		return UFBX_NURBS_TOPOLOGY_CLOSED;
-	} else if (form == ufbxi_Periodic) {
+	} else if (!strcmp(form, "Periodic")) {
 		return UFBX_NURBS_TOPOLOGY_PERIODIC;
 	}
 	return UFBX_NURBS_TOPOLOGY_OPEN;
