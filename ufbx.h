@@ -3513,5 +3513,9 @@ ufbx_inline size_t ufbx_check_index(size_t index, size_t count) {
 }
 #endif
 
+#if defined(_MSC_VER)
+	#pragma warning(pop)
+#endif
+
 #endif
 
