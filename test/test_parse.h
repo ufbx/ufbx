@@ -583,8 +583,69 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unicode_error_identity, UFBXT_FILE_TEST_FLAG_ALL
 }
 #endif
 
+#if UFBXT_IMPL
+static uint32_t ufbxt_fnv1a(const void *data, size_t size)
+{
+	const char *src = (const char*)data;
+	uint32_t hash = 0x811c9dc5u;
+	for (size_t i = 0; i < size; i++) {
+		hash = (hash ^ (uint32_t)(uint8_t)src[i]) * 0x01000193u;
+	}
+	return hash;
+}
+#endif
+
 UFBXT_FILE_TEST(revit_empty)
 #if UFBXT_IMPL
 {
+	bool found_refs3 = false;
+	bool found_refs = false;
+	for (size_t i = 0; i < scene->unknowns.count; i++) {
+		ufbx_unknown *unknown = scene->unknowns.data[i];
+		if (!strcmp(unknown->name.data, "ADSKAssetReferencesVersion3.0")) {
+			ufbx_prop *prop = ufbx_find_prop(&unknown->props, "ADSKAssetReferencesBlobVersion3.0");
+			uint32_t size = scene->metadata.version == 7700 ? 11228u : 11305u;
+			uint32_t hash = scene->metadata.version == 7700 ? 0x5eee86b6u : 0x7f39429du;
+
+			ufbxt_assert(prop);
+			ufbxt_assert(prop->type == UFBX_PROP_BLOB);
+			ufbxt_assert(prop->value_real == (ufbx_real)size);
+			ufbxt_assert(prop->value_int == size);
+			ufbxt_assert(prop->value_blob.size == size);
+
+			ufbx_blob blob = ufbx_find_blob(&unknown->props, "ADSKAssetReferencesBlobVersion3.0", ufbx_empty_blob);
+			ufbxt_assert(blob.data == prop->value_blob.data);
+			ufbxt_assert(blob.size == prop->value_blob.size);
+
+			uint32_t hash_ref = ufbxt_fnv1a(blob.data, blob.size);
+			ufbxt_assert(hash_ref == hash);
+
+			ufbxt_assert(!found_refs3);
+			found_refs3 = true;
+		} else if (!strcmp(unknown->name.data, "ADSKAssetReferences")) {
+			ufbx_prop *prop = ufbx_find_prop(&unknown->props, "ADSKAssetReferencesBlob");
+			uint32_t size = scene->metadata.version == 7700 ? 7910u : 7885u;
+			uint32_t hash = scene->metadata.version == 7700 ? 0xa081f491u : 0x5aaeae9au;
+
+			ufbxt_assert(prop);
+			ufbxt_assert(prop->type == UFBX_PROP_BLOB);
+			ufbxt_assert(prop->value_real == size);
+			ufbxt_assert(prop->value_int == size);
+			ufbxt_assert(prop->value_blob.size == size);
+
+			ufbx_blob blob = ufbx_find_blob(&unknown->props, "ADSKAssetReferencesBlob", ufbx_empty_blob);
+			ufbxt_assert(blob.data == prop->value_blob.data);
+			ufbxt_assert(blob.size == prop->value_blob.size);
+
+			uint32_t hash_ref = ufbxt_fnv1a(blob.data, blob.size);
+			ufbxt_assert(hash_ref == hash);
+
+			ufbxt_assert(!found_refs);
+			found_refs = true;
+		}
+	}
+
+	ufbxt_assert(found_refs);
+	ufbxt_assert(found_refs3);
 }
 #endif
