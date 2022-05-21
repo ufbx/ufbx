@@ -132,6 +132,14 @@
 	#endif
 #endif
 
+#ifndef UFBX_PATH_SEPARATOR
+	#if defined(_WIN32)
+		#define UFBX_PATH_SEPARATOR '\\'
+	#else
+		#define UFBX_PATH_SEPARATOR '/'
+	#endif
+#endif
+
 // Unaligned little-endian load functions
 // On platforms that support unaligned access natively (x86, x64, ARM64) just use normal loads,
 // with unaligned attributes, otherwise do manual byte-wise load.
@@ -2737,6 +2745,17 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place_str(ufbxi_s
 {
 	ufbxi_check_err(pool->error, p_str);
 	return ufbxi_push_string_place(pool, &p_str->data, &p_str->length, raw);
+}
+
+ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place_blob(ufbxi_string_pool *pool, ufbx_blob *p_blob, bool raw)
+{
+	if (p_blob->size == 0) {
+		p_blob->data = NULL;
+		return 1;
+	}
+	p_blob->data = ufbxi_push_string(pool, p_blob->data, p_blob->size, &p_blob->size, raw);
+	ufbxi_check_err(pool->error, p_blob->data);
+	return 1;
 }
 
 // -- String constants
@@ -8736,12 +8755,18 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_texture(ufbxi_context *uc, 
 	texture->type = UFBX_TEXTURE_FILE;
 
 	texture->filename = ufbx_empty_string;
+	texture->absolute_filename = ufbx_empty_string;
 	texture->relative_filename = ufbx_empty_string;
 
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_FileName, "S", &texture->absolute_filename));
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Filename, "S", &texture->absolute_filename));
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFileName, "S", &texture->relative_filename));
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFilename, "S", &texture->relative_filename));
+
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_FileName, "b", &texture->raw_absolute_filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Filename, "b", &texture->raw_absolute_filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFileName, "b", &texture->raw_relative_filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFilename, "b", &texture->raw_relative_filename));
 
 	return 1;
 }
@@ -8754,6 +8779,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_layered_texture(ufbxi_conte
 	texture->type = UFBX_TEXTURE_LAYERED;
 
 	texture->filename = ufbx_empty_string;
+	texture->absolute_filename = ufbx_empty_string;
 	texture->relative_filename = ufbx_empty_string;
 
 	ufbxi_texture_extra *extra = ufbxi_push_element_extra(uc, texture->element.element_id, ufbxi_texture_extra);
@@ -8801,6 +8827,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_video(ufbxi_context *uc, uf
 	ufbx_video *video = ufbxi_push_element(uc, info, ufbx_video, UFBX_ELEMENT_VIDEO);
 	ufbxi_check(video);
 
+	video->filename = ufbx_empty_string;
 	video->absolute_filename = ufbx_empty_string;
 	video->relative_filename = ufbx_empty_string;
 
@@ -8808,6 +8835,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_video(ufbxi_context *uc, uf
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Filename, "S", &video->absolute_filename));
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFileName, "S", &video->relative_filename));
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFilename, "S", &video->relative_filename));
+
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_FileName, "b", &video->raw_absolute_filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Filename, "b", &video->raw_absolute_filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFileName, "b", &video->raw_relative_filename));
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFilename, "b", &video->raw_relative_filename));
 
 	ufbx_string content;
 	if (ufbxi_find_val1(node, ufbxi_Content, "s", &content)) {
@@ -11384,75 +11416,125 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_constraint_prop(ufbxi_contex
 	return 1;
 }
 
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_init_file_paths(ufbxi_context *uc)
+ufbxi_nodiscard ufbxi_noinline static size_t ufbxi_trim_delimiters(ufbxi_context *uc, const char *data, size_t length)
 {
-	uc->scene.metadata.filename = uc->opts.filename;
-	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->scene.metadata.filename, false));
-
-	ufbx_string root = uc->opts.filename;
-	for (; root.length > 0; root.length--) {
-		char c = root.data[root.length - 1];
-		bool is_separator = c == '/';
-#if defined(_WIN32)
-		if (c == '\\') is_separator = true;
-#endif
+	for (; length > 0; length--) {
+		char c = data[length - 1];
+		bool is_separator = c == '/' || c == uc->opts.path_separator;
 		if (is_separator) {
-			root.length--;
+			length--;
 			break;
 		}
 	}
-	uc->scene.metadata.relative_root = root;
+	return length;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_init_file_paths(ufbxi_context *uc)
+{
+	if (uc->opts.raw_filename.size > 0 && uc->opts.filename.length == 0) {
+	}
+
+	if (uc->opts.filename.length > 0) {
+		uc->scene.metadata.filename = uc->opts.filename;
+	} else if (uc->opts.raw_filename.size > 0) {
+		uc->scene.metadata.filename.data = uc->opts.raw_filename.data;
+		uc->scene.metadata.filename.length = uc->opts.raw_filename.size;
+	}
+
+	if (uc->opts.raw_filename.size > 0) {
+		uc->scene.metadata.raw_filename = uc->opts.raw_filename;
+	} else if (uc->opts.filename.length > 0) {
+		uc->scene.metadata.raw_filename.data = uc->opts.filename.data;
+		uc->scene.metadata.raw_filename.size = uc->opts.filename.length;
+	}
+
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->scene.metadata.filename, false));
+	ufbxi_check(ufbxi_push_string_place_blob(&uc->string_pool, &uc->scene.metadata.raw_filename, true));
+
+	uc->scene.metadata.relative_root.data = uc->opts.filename.data;
+	uc->scene.metadata.relative_root.length = ufbxi_trim_delimiters(uc, uc->opts.filename.data, uc->opts.filename.length);
+
+	uc->scene.metadata.raw_relative_root.data = uc->opts.raw_filename.data;
+	uc->scene.metadata.raw_relative_root.size = ufbxi_trim_delimiters(uc, uc->opts.raw_filename.data, uc->opts.raw_filename.size);
+
 	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->scene.metadata.relative_root, false));
+	ufbxi_check(ufbxi_push_string_place_blob(&uc->string_pool, &uc->scene.metadata.raw_relative_root, true));
 
 	return 1;
 }
 
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_context *uc, ufbx_string *dst, ufbx_string relative)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename_imp(ufbxi_context *uc, void *dst_data, size_t *dst_length, const void *src_data, size_t src_length, bool raw)
 {
+	const char *src = (const char *)src_data;
+
 	// Skip leading directory separators and early return if the relative path is empty
-	while (relative.length > 0 && (relative.data[0] == '/' || relative.data[0] == '\\')) {
-		relative.data++;
-		relative.length--;
+	while (src_length > 0 && (src[0] == '/' || src[0] == '\\')) {
+		src++;
+		src_length--;
 	}
-	if (relative.length == 0) {
-		*dst = ufbx_empty_string;
+	if (src_length == 0) {
+		*dst_length = 0;
+		if (raw) {
+			*(const void**)dst_data = NULL;
+		} else {
+			*(const char**)dst_data = ufbxi_empty_char;
+		}
 		return 1;
 	}
 
-#if defined(_WIN32)
-	char separator = '\\';
-#else
-	char separator = '/';
-#endif
+	const char *prefix_data;
+	size_t prefix_length;
+	if (raw) {
+		prefix_data = (const char*)uc->scene.metadata.raw_relative_root.data;
+		prefix_length = uc->scene.metadata.raw_relative_root.size;
+	} else {
+		prefix_data = (const char*)uc->scene.metadata.relative_root.data;
+		prefix_length = uc->scene.metadata.relative_root.length;
+	}
 
-	ufbx_string prefix = uc->scene.metadata.relative_root;
-	size_t result_cap = prefix.length + relative.length + 1;
+	size_t result_cap = prefix_length + src_length + 1;
 	char *result = ufbxi_push(&uc->tmp_stack, char, result_cap);
 	ufbxi_check(result);
 	char *ptr = result;
 
 	// Copy prefix and suffix converting separators in the process
-	if (prefix.length > 0) {
-		memcpy(ptr, prefix.data, prefix.length);
-		ptr[prefix.length] = separator;
-		ptr += prefix.length + 1;
+	if (prefix_length > 0) {
+		memcpy(ptr, prefix_data, prefix_length);
+		ptr[prefix_length] = uc->opts.path_separator;
+		ptr += prefix_length + 1;
 	}
-	for (size_t i = 0; i < relative.length; i++) {
-		char c = relative.data[i];
+	for (size_t i = 0; i < src_length; i++) {
+		char c = src[i];
 		if (c == '/' || c == '\\') {
-			c = separator;
+			c = uc->opts.path_separator;
 		}
 		*ptr++ = c;
 	}
 
 	// Intern the string and pop the temporary buffer
-	dst->data = result;
-	dst->length = (size_t)(ptr - result);
-	ufbx_assert(dst->length <= result_cap);
-	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, dst, false));
+	ufbx_string dst = { result, (size_t)(ptr - result) };
+	ufbx_assert(dst.length <= result_cap);
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &dst, raw));
 	ufbxi_pop(&uc->tmp_stack, char, result_cap, NULL);
 
+	*dst_length = dst.length;
+	if (raw) {
+		*(const void**)dst_data = dst.data;
+	} else {
+		*(const char**)dst_data = dst.data;
+	}
+
 	return 1;
+}
+
+ufbxi_nodiscard ufbxi_forceinline static int ufbxi_resolve_relative_filename(ufbxi_context *uc, ufbx_string *dst, ufbx_string src)
+{
+	return ufbxi_resolve_relative_filename_imp(uc, (void*)&dst->data, &dst->length, src.data, src.length, false);
+}
+
+ufbxi_nodiscard ufbxi_forceinline static int ufbxi_resolve_relative_filename_raw(ufbxi_context *uc, ufbx_blob *dst, ufbx_blob src)
+{
+	return ufbxi_resolve_relative_filename_imp(uc, (void*)&dst->data, &dst->size, src.data, src.size, true);
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_nurbs_basis(ufbxi_context *uc, ufbx_nurbs_basis *basis)
@@ -11872,12 +11954,17 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 		cache->absolute_filename = ufbx_find_string(&cache->props, "CacheAbsoluteFileName", ufbx_empty_string);
 		cache->relative_filename = ufbx_find_string(&cache->props, "CacheFileName", ufbx_empty_string);
+
+		cache->raw_absolute_filename = ufbx_find_blob(&cache->props, "CacheAbsoluteFileName", ufbx_empty_blob);
+		cache->raw_relative_filename = ufbx_find_blob(&cache->props, "CacheFileName", ufbx_empty_blob);
+
 		int64_t type = ufbx_find_int(&cache->props, "CacheFileType", 0);
 		if (type >= 0 && type <= UFBX_CACHE_FILE_FORMAT_MC) {
 			cache->format = (ufbx_cache_file_format)type;
 		}
 
 		ufbxi_check(ufbxi_resolve_relative_filename(uc, &cache->filename, cache->relative_filename));
+		ufbxi_check(ufbxi_resolve_relative_filename_raw(uc, &cache->raw_filename, cache->raw_relative_filename));
 	}
 
 	ufbx_assert(uc->tmp_full_weights.num_items == uc->scene.blend_channels.count);
@@ -12367,6 +12454,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	ufbxi_for_ptr_list(ufbx_video, p_video, uc->scene.videos) {
 		ufbx_video *video = *p_video;
 		ufbxi_check(ufbxi_resolve_relative_filename(uc, &video->filename, video->relative_filename));
+		ufbxi_check(ufbxi_resolve_relative_filename_raw(uc, &video->raw_filename, video->raw_relative_filename));
 		if (video->content.size > 0) {
 			content_videos[num_content_videos++] = video;
 		}
@@ -12394,6 +12482,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbxi_texture_extra *extra = (ufbxi_texture_extra*)ufbxi_get_element_extra(uc, texture->element.element_id);
 
 		ufbxi_check(ufbxi_resolve_relative_filename(uc, &texture->filename, texture->relative_filename));
+		ufbxi_check(ufbxi_resolve_relative_filename_raw(uc, &texture->raw_filename, texture->raw_relative_filename));
 
 		ufbx_prop *uv_set = ufbxi_find_prop(&texture->props, ufbxi_UVSet);
 		if (uv_set) {
@@ -14742,6 +14831,10 @@ static ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_opts *user_opts
 
 	if (uc->opts.read_buffer_size == 0) {
 		uc->opts.read_buffer_size = 0x4000;
+	}
+
+	if (!uc->opts.path_separator) {
+		uc->opts.path_separator = UFBX_PATH_SEPARATOR;
 	}
 
 	if (!uc->opts.progress_cb.fn || uc->opts.progress_interval_hint >= SIZE_MAX) {
@@ -17621,6 +17714,7 @@ extern "C" {
 #endif
 
 const ufbx_string ufbx_empty_string = { ufbxi_empty_char, 0 };
+const ufbx_blob ufbx_empty_blob = { NULL, 0 };
 const ufbx_matrix ufbx_identity_matrix = { 1,0,0, 0,1,0, 0,0,1, 0,0,0 };
 const ufbx_transform ufbx_identity_transform = { {0,0,0}, {0,0,0,1}, {1,1,1} };
 const ufbx_vec2 ufbx_zero_vec2 = { 0,0 };
@@ -17948,6 +18042,16 @@ ufbx_abi ufbxi_noinline ufbx_string ufbx_find_string_len(const ufbx_props *props
 	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
 	if (prop) {
 		return prop->value_str;
+	} else {
+		return def;
+	}
+}
+
+ufbx_abi ufbx_blob ufbx_find_blob_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_blob def)
+{
+	ufbx_prop *prop = ufbx_find_prop_len(props, name, name_len);
+	if (prop) {
+		return prop->value_blob;
 	} else {
 		return def;
 	}

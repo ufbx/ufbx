@@ -1631,6 +1631,11 @@ struct ufbx_cache_file {
 	ufbx_string filename;
 	ufbx_string absolute_filename;
 	ufbx_string relative_filename;
+
+	ufbx_blob raw_filename;
+	ufbx_blob raw_absolute_filename;
+	ufbx_blob raw_relative_filename;
+
 	ufbx_cache_file_format format;
 
 	// Only valid if `ufbx_load_opts.load_external_files` is set!
@@ -1973,6 +1978,9 @@ struct ufbx_texture {
 	ufbx_string filename;
 	ufbx_string absolute_filename;
 	ufbx_string relative_filename;
+	ufbx_blob raw_filename;
+	ufbx_blob raw_absolute_filename;
+	ufbx_blob raw_relative_filename;
 
 	// FILE: Optional embedded content blob, eg. raw .png format data
 	ufbx_blob content;
@@ -2009,6 +2017,9 @@ struct ufbx_video {
 	ufbx_string filename;
 	ufbx_string absolute_filename;
 	ufbx_string relative_filename;
+	ufbx_blob raw_filename;
+	ufbx_blob raw_absolute_filename;
+	ufbx_blob raw_relative_filename;
 
 	// Optional embedded content blob
 	ufbx_blob content;
@@ -2433,6 +2444,9 @@ typedef struct ufbx_metadata {
 
 	ufbx_string filename;
 	ufbx_string relative_root;
+
+	ufbx_blob raw_filename;
+	ufbx_blob raw_relative_root;
 
 	ufbx_exporter exporter;
 	uint32_t exporter_version;
@@ -2951,6 +2965,9 @@ typedef struct ufbx_load_opts {
 	// Generate vertex normals for a meshes that are missing normals.
 	bool generate_missing_normals;
 
+	// Path separator character, defaults to '\' on Windows and '/' otherwise.
+	char path_separator;
+
 	// Estimated file size for progress reporting
 	uint64_t file_size_estimate;
 
@@ -2959,7 +2976,12 @@ typedef struct ufbx_load_opts {
 
 	// Filename to use as a base for relative file paths if not specified using
 	// `ufbx_load_file()`. Use `length = SIZE_MAX` for NULL-terminated strings.
+	// `raw_filename` will be derived from this if empty.
 	ufbx_string filename;
+
+	// Raw non-UTF8 filename. Does not support NULL termination.
+	// `filename` will be derived from this if empty.
+	ufbx_blob raw_filename;
 
 	// Progress reporting
 	ufbx_progress_cb progress_cb;
@@ -3104,6 +3126,7 @@ extern "C" {
 
 // Various zero/empty/identity values
 extern const ufbx_string ufbx_empty_string;
+extern const ufbx_blob ufbx_empty_blob;
 extern const ufbx_matrix ufbx_identity_matrix;
 extern const ufbx_transform ufbx_identity_transform;
 extern const ufbx_vec2 ufbx_zero_vec2;
@@ -3207,6 +3230,8 @@ ufbx_abi bool ufbx_find_bool_len(const ufbx_props *props, const char *name, size
 ufbx_inline bool ufbx_find_bool(const ufbx_props *props, const char *name, bool def) { return ufbx_find_bool_len(props, name, strlen(name), def); }
 ufbx_abi ufbx_string ufbx_find_string_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_string def);
 ufbx_inline ufbx_string ufbx_find_string(const ufbx_props *props, const char *name, ufbx_string def) { return ufbx_find_string_len(props, name, strlen(name), def); }
+ufbx_abi ufbx_blob ufbx_find_blob_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_blob def);
+ufbx_inline ufbx_blob ufbx_find_blob(const ufbx_props *props, const char *name, ufbx_blob def) { return ufbx_find_blob_len(props, name, strlen(name), def); }
 
 // Find any element of type `type` in `scene` by `name`.
 // For example if you want to find `ufbx_material` named `Mat`:
