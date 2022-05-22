@@ -7820,6 +7820,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_blend_shapes(ufbx
 		shape_props[0].type = UFBX_PROP_NUMBER;
 		shape_props[0].value_real = (ufbx_real)0.0;
 		shape_props[0].value_str = ufbx_empty_string;
+		shape_props[0].value_blob = ufbx_empty_blob;
 
 		ufbx_prop *self_prop = ufbx_find_prop_len(&info->props, name.data, name.length);
 		if (self_prop && (self_prop->type == UFBX_PROP_NUMBER || self_prop->type == UFBX_PROP_INTEGER)) {
@@ -9866,6 +9867,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 			if (!ufbxi_get_val_at(node, fmt_ix, 'L', &prop->value_int)) return 0;
 			prop->value_real = (ufbx_real)prop->value_int;
 			prop->value_str = ufbx_empty_string;
+			prop->value_blob = ufbx_empty_blob;
 			value_ix++;
 			break;
 		case 'R':
@@ -9874,12 +9876,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 			if (value_ix == 0) {
 				prop->value_int = ufbxi_f64_to_i64(prop->value_real);
 				prop->value_str = ufbx_empty_string;
+				prop->value_blob = ufbx_empty_blob;
 			}
 			value_ix++;
 			break;
 		case 'S':
 			ufbx_assert(value_ix == 0);
 			if (!ufbxi_get_val_at(node, fmt_ix, 'S', &prop->value_str)) return 0;
+			ufbx_assert(ufbxi_get_val_at(node, fmt_ix, 'b', &prop->value_blob));
 			prop->value_real = 0.0f;
 			prop->value_int = 0;
 			value_ix++;
@@ -10660,6 +10664,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_connections_to_elements(ufbx
 					new_prop->name = name;
 					new_prop->_internal_key = key;
 					new_prop->value_str = ufbx_empty_string;
+					new_prop->value_blob = ufbx_empty_blob;
 					num_synthetic++;
 				}
 			}
@@ -14480,6 +14485,7 @@ static ufbxi_noinline int ufbxi_scale_units(ufbxi_context *uc, ufbx_real target_
 				new_prop.type = UFBX_PROP_SCALING;
 				new_prop.flags = UFBX_PROP_FLAG_SYNTHETIC;
 				new_prop.value_str = ufbx_empty_string;
+				new_prop.value_blob = ufbx_empty_blob;
 				new_prop.value_vec3 = scale;
 				new_prop.value_int = ufbxi_f64_to_i64(new_prop.value_vec3.x);
 
@@ -14999,6 +15005,8 @@ static ufbxi_noinline bool ufbxi_find_prop_override(const ufbx_const_prop_overri
 		prop->value_vec3 = over->value;
 		prop->value_int = over->value_int;
 		prop->value_str = ufbxi_str_c(over->value_str);
+		prop->value_blob.data = prop->value_str.data;
+		prop->value_blob.size = prop->value_str.length;
 		return true;
 	} else {
 		return false;
@@ -15173,6 +15181,7 @@ static ufbxi_noinline void ufbxi_evaluate_connected_prop(ufbx_prop *prop, const 
 		prop->value_vec3 = ep.value_vec3;
 		prop->value_int = ep.value_int;
 		prop->value_str = ep.value_str;
+		prop->value_blob = ep.value_blob;
 	} else {
 		// Connection not found, maybe it's animated?
 		prop->flags = (ufbx_prop_flags)(prop->flags & ~UFBX_PROP_FLAG_CONNECTED);
@@ -15220,6 +15229,8 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 						break;
 					}
 					dst->value_str = ufbxi_str_c(over->value_str);
+					dst->value_blob.data = dst->value_str.data;
+					dst->value_blob.size = dst->value_str.length;
 					dst->value_int = over->value_int;
 					dst->value_vec3 = over->value;
 					num_props++;
@@ -15267,6 +15278,8 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 				}
 			}
 			dst->value_str = ufbxi_str_c(over->value_str);
+			dst->value_blob.data = dst->value_str.data;
+			dst->value_blob.size = dst->value_str.length;
 			dst->value_int = over->value_int;
 			dst->value_vec3 = over->value;
 			num_props++;
@@ -15572,6 +15585,18 @@ ufbxi_nodiscard static int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 			props[i].anim_value = (ufbx_anim_value*)ufbxi_translate_element(ec, props[i].anim_value);
 		}
 		layer->anim_props.data = props;
+	}
+
+	ufbxi_for_ptr_list(ufbx_pose, p_pose, ec->scene.poses) {
+		ufbx_pose *pose = *p_pose;
+
+		ufbx_bone_pose *bones = ufbxi_push(&ec->result, ufbx_bone_pose, pose->bone_poses.count);
+		ufbxi_check_err(&ec->error, bones);
+		for (size_t i = 0; i < pose->bone_poses.count; i++) {
+			bones[i] = pose->bone_poses.data[i];
+			bones[i].bone_node = (ufbx_node*)ufbxi_translate_element(ec, bones[i].bone_node);
+		}
+		pose->bone_poses.data = bones;
 	}
 
 	ufbxi_check_err(&ec->error, ufbxi_translate_anim(ec, &ec->anim));
@@ -18286,6 +18311,8 @@ ufbx_abi ufbxi_noinline ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, 
 		result.flags = UFBX_PROP_FLAG_NOT_FOUND;
 		result.value_str.data = ufbxi_empty_char;
 		result.value_str.length = 0;
+		result.value_blob.data = NULL;
+		result.value_blob.size = 0;
 	}
 
 	if (anim->prop_overrides.count > 0) {
@@ -18334,6 +18361,8 @@ ufbx_abi ufbxi_noinline ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, co
 				break;
 			}
 			dst->value_str = ufbxi_str_c(over->value_str);
+			dst->value_blob.data = dst->value_str.data;
+			dst->value_blob.size = dst->value_str.length;
 			dst->value_int = over->value_int;
 			dst->value_vec3 = over->value;
 			num_anim++;
@@ -18359,6 +18388,8 @@ ufbx_abi ufbxi_noinline ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, co
 		dst->type = UFBX_PROP_UNKNOWN;
 		dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
 		dst->value_str = ufbxi_str_c(over->value_str);
+		dst->value_blob.data = dst->value_str.data;
+		dst->value_blob.size = dst->value_str.length;
 		dst->value_int = over->value_int;
 		dst->value_vec3 = over->value;
 	}

@@ -280,6 +280,7 @@ char data_root[256];
 static uint32_t g_file_version = 0;
 static const char *g_file_type = NULL;
 static bool g_fuzz = false;
+static bool g_sink = false;
 static bool g_allow_non_thread_safe = false;
 static bool g_all_byte_values = false;
 static bool g_dedicated_allocs = false;
@@ -2092,6 +2093,10 @@ int main(int argc, char **argv)
 			g_fuzz = true;
 		}
 
+		if (!strcmp(argv[i], "--sink")) {
+			g_sink = true;
+		}
+
 		if (!strcmp(argv[i], "--patch-all-byte-values")) {
 			g_all_byte_values = true;
 		}
@@ -2212,6 +2217,10 @@ int main(int argc, char **argv)
 			free(check->test_name);
 		}
 		printf("};\n");
+	}
+
+	if (g_sink) {
+		printf("%u\n", ufbxt_sink);
 	}
 
 	return num_ok == num_ran ? 0 : 1;

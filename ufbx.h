@@ -979,6 +979,9 @@ typedef enum ufbx_aspect_mode {
 	UFBX_ASPECT_MODE_FIXED_WIDTH,
 	// < `"AspectHeight"` is pixels, `"AspectWidth"` is relative to height
 	UFBX_ASPECT_MODE_FIXED_HEIGHT,
+
+	UFBX_ASPECT_MODE_COUNT,
+	UFBX_ASPECT_MODE_FORCE_32BIT,
 } ufbx_aspect_mode;
 
 // Method of specifying the field of view from properties
@@ -992,6 +995,9 @@ typedef enum ufbx_aperture_mode {
 	UFBX_APERTURE_MODE_VERTICAL,
 	// Compute the field of view from the render gate size and focal length
 	UFBX_APERTURE_MODE_FOCAL_LENGTH,
+
+	UFBX_APERTURE_MODE_COUNT,
+	UFBX_APERTURE_MODE_FORCE_32BIT,
 } ufbx_aperture_mode;
 
 // Method of specifying the render gate size from properties
@@ -1010,6 +1016,9 @@ typedef enum ufbx_gate_fit {
 	// Stretch the render gate to match the film gate
 	// TODO: Does this differ from `UFBX_GATE_FIT_NONE`?
 	UFBX_GATE_FIT_STRETCH,
+
+	UFBX_GATE_FIT_COUNT,
+	UFBX_GATE_FIT_FORCE_32BIT,
 } ufbx_gate_fit;
 
 // Camera film/aperture size defaults
@@ -1145,7 +1154,6 @@ typedef struct ufbx_nurbs_basis {
 	size_t num_wrap_control_points;
 
 	// `true` if the parametrization is well defined.
-	//   knot_vector.count == dimension + order + 1
 	bool valid;
 
 } ufbx_nurbs_basis;
