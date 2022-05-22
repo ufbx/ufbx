@@ -12976,6 +12976,9 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 		camera->resolution.x = aspect_y * aspect_x;
 		camera->resolution.y = aspect_y;
 		break;
+	default:
+		ufbx_assert(0 && "Unexpected aspect mode");
+		break;
 	}
 
 	ufbx_real aspect_ratio = camera->resolution.x / camera->resolution.y;
@@ -13009,6 +13012,9 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 		camera->aperture_size_inch = camera->film_size_inch;
 		// TODO: Not sure what to do here...
 		break;
+	default:
+		ufbx_assert(0 && "Unexpected gate fit");
+		break;
 	}
 
 	switch (camera->aperture_mode) {
@@ -13035,6 +13041,9 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 		camera->field_of_view_tan.y = camera->aperture_size_inch.y / (camera->focal_length_mm * UFBXI_MM_TO_INCH) * 0.5f;
 		camera->field_of_view_deg.x = (ufbx_real)atan(camera->field_of_view_tan.x) * UFBXI_RAD_TO_DEG * 2.0f;
 		camera->field_of_view_deg.y = (ufbx_real)atan(camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
+		break;
+	default:
+		ufbx_assert(0 && "Unexpected aperture mode");
 		break;
 	}
 }
