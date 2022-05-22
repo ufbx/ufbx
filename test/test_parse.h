@@ -597,6 +597,90 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unicode_error_identity, UFBXT_FILE_TEST_FLAG_ALL
 #endif
 
 #if UFBXT_IMPL
+ufbx_load_opts ufbxt_unicode_error_question_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_QUESTION_MARK;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_FLAGS(synthetic_broken_filename, ufbxt_unicode_error_question_opts, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->textures.count == 1);
+
+	const char *abs_path_safe = "D:/Dev/clean/ufbx/data/textures/??????_diffuse.png";
+	const char *rel_path_safe = "textures\\??????_diffuse.png";
+	const char *abs_path_raw = "D:/Dev/clean/ufbx/data/textures/\xaa\xbb\xcc\xdd\xee\xff_diffuse.png";
+	const char *rel_path_raw = "textures\\\xaa\xbb\xcc\xdd\xee\xff_diffuse.png";
+	const char *name_path_raw = "\xaa\xbb\xcc\xdd\xee\xff_diffuse.png";
+
+	ufbx_texture *texture = scene->textures.data[0];
+
+	ufbxt_assert(texture->absolute_filename.length == strlen(abs_path_safe));
+	ufbxt_assert(texture->relative_filename.length == strlen(rel_path_safe));
+	ufbxt_assert(!strcmp(texture->absolute_filename.data, abs_path_safe));
+	ufbxt_assert(!strcmp(texture->relative_filename.data, rel_path_safe));
+
+	ufbxt_assert(texture->raw_absolute_filename.size == strlen(abs_path_raw));
+	ufbxt_assert(texture->raw_relative_filename.size == strlen(rel_path_raw));
+	ufbxt_assert(!memcmp(texture->raw_absolute_filename.data, abs_path_raw, texture->raw_absolute_filename.size));
+	ufbxt_assert(!memcmp(texture->raw_relative_filename.data, rel_path_raw, texture->raw_relative_filename.size));
+
+	{
+		ufbxt_assert(strstr(texture->filename.data, "??????_diffuse.png"));
+		const char *begin = memchr((const char*)texture->raw_filename.data, '\xaa', texture->raw_filename.size);
+		ufbxt_assert(begin);
+		size_t offset = begin - texture->raw_filename.data;
+		size_t left = texture->raw_filename.size - offset;
+		ufbxt_assert(left == strlen(name_path_raw));
+		ufbxt_assert(!memcmp(begin, name_path_raw, left));
+	}
+
+	ufbx_video *video = scene->videos.data[0];
+
+	ufbxt_assert(video->absolute_filename.length == strlen(abs_path_safe));
+	ufbxt_assert(video->relative_filename.length == strlen(rel_path_safe));
+	ufbxt_assert(!strcmp(video->absolute_filename.data, abs_path_safe));
+	ufbxt_assert(!strcmp(video->relative_filename.data, rel_path_safe));
+
+	ufbxt_assert(video->raw_absolute_filename.size == strlen(abs_path_raw));
+	ufbxt_assert(video->raw_relative_filename.size == strlen(rel_path_raw));
+	ufbxt_assert(!memcmp(video->raw_absolute_filename.data, abs_path_raw, video->raw_absolute_filename.size));
+	ufbxt_assert(!memcmp(video->raw_relative_filename.data, rel_path_raw, video->raw_relative_filename.size));
+
+	{
+		ufbxt_assert(strstr(video->filename.data, "??????_diffuse.png"));
+		const char *begin = memchr((const char*)video->raw_filename.data, '\xaa', video->raw_filename.size);
+		ufbxt_assert(begin);
+		size_t offset = begin - video->raw_filename.data;
+		size_t left = video->raw_filename.size - offset;
+		ufbxt_assert(left == strlen(name_path_raw));
+		ufbxt_assert(!memcmp(begin, name_path_raw, left));
+	}
+
+	{
+		ufbx_string abs_path = ufbx_find_string(&video->props, "Path", ufbx_empty_string);
+		ufbx_string rel_path = ufbx_find_string(&video->props, "RelPath", ufbx_empty_string);
+		ufbxt_assert(abs_path.length == strlen(abs_path_safe));
+		ufbxt_assert(rel_path.length == strlen(rel_path_safe));
+		ufbxt_assert(!strcmp(abs_path.data, abs_path_safe));
+		ufbxt_assert(!strcmp(rel_path.data, rel_path_safe));
+	}
+
+	{
+		ufbx_blob abs_path = ufbx_find_blob(&video->props, "Path", ufbx_empty_blob);
+		ufbx_blob rel_path = ufbx_find_blob(&video->props, "RelPath", ufbx_empty_blob);
+		ufbxt_assert(abs_path.size == strlen(abs_path_raw));
+		ufbxt_assert(rel_path.size == strlen(rel_path_raw));
+		ufbxt_assert(!memcmp(abs_path.data, abs_path_raw, abs_path.size));
+		ufbxt_assert(!memcmp(rel_path.data, rel_path_raw, rel_path.size));
+	}
+}
+#endif
+
+#if UFBXT_IMPL
 static uint32_t ufbxt_fnv1a(const void *data, size_t size)
 {
 	const char *src = (const char*)data;
