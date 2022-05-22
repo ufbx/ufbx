@@ -4475,6 +4475,7 @@ static ufbxi_noinline ufbxi_node *ufbxi_find_child(ufbxi_node *node, const char 
 
 ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, size_t ix, char fmt, void *v)
 {
+	ufbxi_dev_assert(ix < UFBXI_MAX_NON_ARRAY_VALUES);
 	ufbxi_value_type type = (ufbxi_value_type)((node->value_type_mask >> (ix*2)) & 0x3);
 	switch (fmt) {
 	case '_': return 1;
@@ -9866,6 +9867,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 			ufbx_assert(value_ix == 0);
 			if (!ufbxi_get_val_at(node, fmt_ix, 'L', &prop->value_int)) return 0;
 			prop->value_real = (ufbx_real)prop->value_int;
+			prop->value_real_arr[1] = 0.0f;
+			prop->value_real_arr[2] = 0.0f;
 			prop->value_str = ufbx_empty_string;
 			prop->value_blob = ufbx_empty_blob;
 			value_ix++;
@@ -9875,6 +9878,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 			if (!ufbxi_get_val_at(node, fmt_ix, 'R', &prop->value_real_arr[value_ix])) return 0;
 			if (value_ix == 0) {
 				prop->value_int = ufbxi_f64_to_i64(prop->value_real);
+				prop->value_real_arr[1] = 0.0f;
+				prop->value_real_arr[2] = 0.0f;
 				prop->value_str = ufbx_empty_string;
 				prop->value_blob = ufbx_empty_blob;
 			}
@@ -9883,8 +9888,16 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 		case 'S':
 			ufbx_assert(value_ix == 0);
 			if (!ufbxi_get_val_at(node, fmt_ix, 'S', &prop->value_str)) return 0;
-			ufbx_assert(ufbxi_get_val_at(node, fmt_ix, 'b', &prop->value_blob));
+			if (prop->value_str.length > 0) {
+				int found = ufbxi_get_val_at(node, fmt_ix, 'b', &prop->value_blob);
+				ufbxi_ignore(found);
+				ufbx_assert(found);
+			} else {
+				prop->value_blob = ufbx_empty_blob;
+			}
 			prop->value_real = 0.0f;
+			prop->value_real_arr[1] = 0.0f;
+			prop->value_real_arr[2] = 0.0f;
 			prop->value_int = 0;
 			value_ix++;
 			break;
