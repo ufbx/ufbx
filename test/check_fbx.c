@@ -57,6 +57,7 @@ int main(int argc, char **argv)
 	int profile_runs = 1;
 	int frame = INT_MIN;
 	bool allow_bad_unicode = false;
+	bool sink = false;
 
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-v")) {
@@ -71,6 +72,8 @@ int main(int argc, char **argv)
 			if (++i < argc) frame = atoi(argv[i]);
 		} else if (!strcmp(argv[i], "--allow-bad-unicode")) {
 			allow_bad_unicode = true;
+		} else if (!strcmp(argv[i], "--sink")) {
+			sink = true;
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "Unrecognized flag: %s\n", argv[i]);
 			exit(1);
@@ -263,6 +266,10 @@ int main(int argc, char **argv)
 	}
 
 	ufbx_free_scene(scene);
+
+	if (sink) {
+		printf("%u\n", ufbxt_sink);
+	}
 
 	return result;
 }
