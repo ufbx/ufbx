@@ -543,6 +543,19 @@ UFBXT_FILE_TEST(max_quote)
 }
 #endif
 
+UFBXT_FILE_TEST(max_colon_name)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Cube::Model");
+	ufbxt_assert(node);
+	ufbxt_assert(node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->materials.count == 1);
+	ufbx_material *material = mesh->materials.data[0].material;
+	ufbxt_assert(!strcmp(material->name.data, "Material::Pink"));
+}
+#endif
+
 UFBXT_FILE_TEST_FLAGS(synthetic_truncated_quot_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
 #if UFBXT_IMPL
 {
