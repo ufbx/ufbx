@@ -953,6 +953,10 @@ async def main():
                 "maya_human_ik_6100_binary",
                 "maya_human_ik_7400_binary",
                 "max2009_blob_6100_binary",
+                "synthetic_unicode_7500_binary",
+                "maya_lod_group_6100_binary",
+                "maya_dq_weights_7500_binary",
+                "maya_triangulate_triangulated_7500_binary",
             ]
 
             failed = False
