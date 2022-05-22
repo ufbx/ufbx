@@ -14703,6 +14703,7 @@ ufbxi_nodiscard static int ufbxi_load_imp(ufbxi_context *uc)
 	// `ufbx_load_opts` must be cleared to zero first!
 	ufbx_assert(uc->opts._begin_zero == 0 && uc->opts._end_zero == 0);
 	ufbxi_check_msg(uc->opts._begin_zero == 0 && uc->opts._end_zero == 0, "Uninitialized options");
+	ufbxi_check(uc->opts.path_separator >= 0x20 && uc->opts.path_separator <= 0x7e);
 
 	ufbxi_check(ufbxi_load_strings(uc));
 	ufbxi_check(ufbxi_load_maps(uc));
