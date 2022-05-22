@@ -632,7 +632,7 @@ UFBXT_FILE_TEST_OPTS_FLAGS(synthetic_broken_filename, ufbxt_unicode_error_questi
 		ufbxt_assert(strstr(texture->filename.data, "??????_diffuse.png"));
 		const char *begin = memchr((const char*)texture->raw_filename.data, '\xaa', texture->raw_filename.size);
 		ufbxt_assert(begin);
-		size_t offset = begin - texture->raw_filename.data;
+		size_t offset = begin - (const char*)texture->raw_filename.data;
 		size_t left = texture->raw_filename.size - offset;
 		ufbxt_assert(left == strlen(name_path_raw));
 		ufbxt_assert(!memcmp(begin, name_path_raw, left));
@@ -654,7 +654,7 @@ UFBXT_FILE_TEST_OPTS_FLAGS(synthetic_broken_filename, ufbxt_unicode_error_questi
 		ufbxt_assert(strstr(video->filename.data, "??????_diffuse.png"));
 		const char *begin = memchr((const char*)video->raw_filename.data, '\xaa', video->raw_filename.size);
 		ufbxt_assert(begin);
-		size_t offset = begin - video->raw_filename.data;
+		size_t offset = begin - (const char*)video->raw_filename.data;
 		size_t left = video->raw_filename.size - offset;
 		ufbxt_assert(left == strlen(name_path_raw));
 		ufbxt_assert(!memcmp(begin, name_path_raw, left));
