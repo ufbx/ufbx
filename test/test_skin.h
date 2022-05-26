@@ -9,7 +9,7 @@ void ufbxt_check_stack_times(ufbx_scene *scene, ufbxt_diff_error *err, const cha
 	ufbxt_assert_close_real(err, (ufbx_real)stack->time_end, (ufbx_real)end);
 }
 
-void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_normals, const char *file_name, const char *anim_name, ufbx_real time)
+void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_normals, const char *file_name, const char *anim_name, double time)
 {
 	char buf[512];
 	snprintf(buf, sizeof(buf), "%s%s.obj", data_root, file_name);

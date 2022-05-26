@@ -798,6 +798,69 @@ static void ufbxt_assert_close_matrix(ufbxt_diff_error *p_err, ufbx_matrix a, uf
 	ufbxt_assert_close_vec3(p_err, a.cols[3], b.cols[3]);
 }
 
+static void ufbxt_assert_close_real_threshold(ufbxt_diff_error *p_err, ufbx_real a, ufbx_real b, ufbx_real threshold)
+{
+	ufbx_real err = fabs(a - b);
+	ufbxt_assert(err < threshold);
+	p_err->num++;
+	p_err->sum += err;
+	if (err > p_err->max) p_err->max = err;
+}
+
+static void ufbxt_assert_close_vec2_threshold(ufbxt_diff_error *p_err, ufbx_vec2 a, ufbx_vec2 b, ufbx_real threshold)
+{
+	ufbxt_assert_close_real_threshold(p_err, a.x, b.x, threshold);
+	ufbxt_assert_close_real_threshold(p_err, a.y, b.y, threshold);
+}
+
+static void ufbxt_assert_close_vec3_threshold(ufbxt_diff_error *p_err, ufbx_vec3 a, ufbx_vec3 b, ufbx_real threshold)
+{
+	ufbxt_assert_close_real_threshold(p_err, a.x, b.x, threshold);
+	ufbxt_assert_close_real_threshold(p_err, a.y, b.y, threshold);
+	ufbxt_assert_close_real_threshold(p_err, a.z, b.z, threshold);
+}
+
+static void ufbxt_assert_close_vec4_threshold(ufbxt_diff_error *p_err, ufbx_vec4 a, ufbx_vec4 b, ufbx_real threshold)
+{
+	ufbxt_assert_close_real_threshold(p_err, a.x, b.x, threshold);
+	ufbxt_assert_close_real_threshold(p_err, a.y, b.y, threshold);
+	ufbxt_assert_close_real_threshold(p_err, a.z, b.z, threshold);
+	ufbxt_assert_close_real_threshold(p_err, a.w, b.w, threshold);
+}
+
+static void ufbxt_assert_close_quat_threshold(ufbxt_diff_error *p_err, ufbx_quat a, ufbx_quat b, ufbx_real threshold)
+{
+	ufbxt_assert_close_real_threshold(p_err, a.x, b.x, threshold);
+	ufbxt_assert_close_real_threshold(p_err, a.y, b.y, threshold);
+	ufbxt_assert_close_real_threshold(p_err, a.z, b.z, threshold);
+	ufbxt_assert_close_real_threshold(p_err, a.w, b.w, threshold);
+}
+
+static void ufbxt_check_source_vertices(ufbx_mesh *mesh, ufbx_mesh *src_mesh, ufbxt_diff_error *p_err)
+{
+	ufbx_subdivision_result *sub = mesh->subdivision_result;
+	ufbxt_assert(sub);
+
+	size_t num_vertices = mesh->num_vertices;
+	ufbxt_assert(sub->source_vertex_ranges.count == num_vertices);
+	for (size_t vi = 0; vi < num_vertices; vi++) {
+		ufbx_subdivision_weight_range range = sub->source_vertex_ranges.data[vi];
+
+		ufbx_vec3 sum = ufbx_zero_vec3;
+		for (size_t i = 0; i < range.num_weights; i++) {
+			ufbx_subdivision_weight weight = sub->source_vertex_weights.data[range.weight_begin + i];
+			ufbx_vec3 v = src_mesh->vertices.data[weight.index];
+			sum.x += v.x * weight.weight;
+			sum.y += v.y * weight.weight;
+			sum.z += v.z * weight.weight;
+		}
+
+		ufbx_vec3 ref = mesh->vertices.data[vi];
+		ufbxt_assert_close_vec3(p_err, ref, sum);
+		ref = ref;
+	}
+}
+
 typedef struct {
 	ufbx_vec3 pos;
 	ufbx_vec3 normal;
@@ -1074,8 +1137,14 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		ufbx_matrix norm_mat = ufbx_get_compatible_matrix_for_normals(node);
 
 		if (mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_SMOOTH || mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_HULL_AND_SMOOTH) {
-			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, mesh->subdivision_preview_levels, NULL, NULL);
+			ufbx_subdivide_opts opts = { 0 };
+			opts.evaluate_source_vertices = true;
+			opts.evaluate_skin_weights = true;
+
+			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, mesh->subdivision_preview_levels, &opts, NULL);
 			ufbxt_assert(sub_mesh);
+
+			ufbxt_check_source_vertices(sub_mesh, mesh, p_err);
 
 			ufbxt_check_mesh(scene, sub_mesh);
 			ufbxt_match_obj_mesh(obj, node, sub_mesh, obj_mesh, p_err);

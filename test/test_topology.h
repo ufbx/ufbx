@@ -73,6 +73,12 @@ UFBXT_FILE_TEST(maya_subsurf_cube)
 }
 #endif
 
+UFBXT_FILE_TEST(maya_subsurf_plane)
+#if UFBXT_IMPL
+{
+}
+#endif
+
 UFBXT_FILE_TEST(maya_subsurf_cube_crease)
 #if UFBXT_IMPL
 {
