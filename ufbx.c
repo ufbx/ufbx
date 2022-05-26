@@ -16787,35 +16787,41 @@ static bool ufbxi_is_edge_smooth(const ufbx_mesh *mesh, const ufbx_topo_edge *to
 	return false;
 }
 
-ufbxi_noinline static bool ufbxi_is_edge_split(const ufbx_vertex_attrib *attrib, const ufbx_topo_edge *topo, int32_t index)
-{		  
-	int32_t twin = topo[index].twin;
-	if (twin >= 0) {
-		int32_t a0 = attrib->indices.data[index];
-		int32_t a1 = attrib->indices.data[topo[index].next];
-		int32_t b0 = attrib->indices.data[topo[twin].next];
-		int32_t b1 = attrib->indices.data[twin];
-		if (a0 == b0 && a1 == b1) return false;
-		size_t num_reals = attrib->value_reals;
-		size_t size = sizeof(ufbx_real) * num_reals;
-		ufbx_real *da0 = (ufbx_real*)attrib->values.data + a0 * num_reals;
-		ufbx_real *da1 = (ufbx_real*)attrib->values.data + a1 * num_reals;
-		ufbx_real *db0 = (ufbx_real*)attrib->values.data + b0 * num_reals;
-		ufbx_real *db1 = (ufbx_real*)attrib->values.data + b1 * num_reals;
-		if (!memcmp(da0, db0, size) && !memcmp(da1, db1, size)) return false;
-		return true;
-	}
+typedef struct {
+	const void *data;
+	ufbx_real weight;
+} ufbxi_subdivide_input;
 
-	return false;
-}
+typedef int ufbxi_subdivide_sum_fn(void *user, void *output, const ufbxi_subdivide_input *inputs, size_t num_inputs);
 
-static ufbx_real ufbxi_edge_crease(const ufbx_mesh *mesh, bool split, const ufbx_topo_edge *topo, int32_t index)
-{
-	if (topo[index].twin < 0) return 1.0f;
-	if (split) return 1.0f;
-	if (mesh->edge_crease.data && topo[index].edge >= 0) return mesh->edge_crease.data[topo[index].edge] * 10.0f;
-	return 0.0f;
-}
+typedef struct {
+	ufbxi_subdivide_sum_fn *sum_fn;
+	void *sum_user;
+
+	const void *values;
+	size_t stride;
+
+	const int32_t *indices;
+
+	bool check_split_data;
+	bool ignore_indices;
+
+	ufbx_subdivision_boundary boundary;
+
+} ufbxi_subdivide_layer_input;
+
+typedef struct {
+	void *values;
+	size_t num_values;
+	int32_t *indices;
+	size_t num_indices;
+	bool unique_per_vertex;
+} ufbxi_subdivide_layer_output;
+
+typedef struct {
+	ufbx_subdivision_weight *weights;
+	size_t num_weights;
+} ufbxi_subdivision_vertex_weights;
 
 typedef struct {
 	ufbxi_mesh_imp *imp;
@@ -16837,11 +16843,181 @@ typedef struct {
 	ufbxi_buf tmp;
 	ufbxi_buf source;
 
+	ufbxi_subdivide_input *inputs;
+	size_t inputs_cap;
+
+	ufbx_real *tmp_vertex_weights;
+	ufbx_subdivision_weight *tmp_weights;
+	size_t total_weights;
+	size_t max_vertex_weights;
+
 } ufbxi_subdivide_context;
 
-static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufbx_vertex_attrib *layer, ufbx_subdivision_boundary boundary)
+static int ufbxi_subdivide_sum_real(void *user, void *output, const ufbxi_subdivide_input *inputs, size_t num_inputs)
 {
-	if (!layer->exists) return 1;
+	ufbx_real dst = 0.0f;
+	ufbxi_nounroll for (size_t i = 0; i != num_inputs; i++) {
+		ufbx_real src = *(const ufbx_real*)inputs[i].data;
+		ufbx_real weight = inputs[i].weight;
+		dst += src * weight;
+	}
+	*(ufbx_real*)output = dst;
+
+	return 1;
+}
+
+static int ufbxi_subdivide_sum_vec2(void *user, void *output, const ufbxi_subdivide_input *inputs, size_t num_inputs)
+{
+	ufbx_vec2 dst = { 0 };
+	ufbxi_nounroll for (size_t i = 0; i != num_inputs; i++) {
+		const ufbx_vec2 *src = (const ufbx_vec2*)inputs[i].data;
+		ufbx_real weight = inputs[i].weight;
+		dst.x += src->x * weight;
+		dst.y += src->y * weight;
+	}
+	*(ufbx_vec2*)output = dst;
+
+	return 1;
+}
+
+static int ufbxi_subdivide_sum_vec3(void *user, void *output, const ufbxi_subdivide_input *inputs, size_t num_inputs)
+{
+	ufbx_vec3 dst = { 0 };
+	ufbxi_nounroll for (size_t i = 0; i != num_inputs; i++) {
+		const ufbx_vec3 *src = (const ufbx_vec3*)inputs[i].data;
+		ufbx_real weight = inputs[i].weight;
+		dst.x += src->x * weight;
+		dst.y += src->y * weight;
+		dst.z += src->z * weight;
+	}
+	*(ufbx_vec3*)output = dst;
+
+	return 1;
+}
+
+static int ufbxi_subdivide_sum_vec4(void *user, void *output, const ufbxi_subdivide_input *inputs, size_t num_inputs)
+{
+	ufbx_vec4 dst = { 0 };
+	ufbxi_nounroll for (size_t i = 0; i != num_inputs; i++) {
+		const ufbx_vec4 *src = (const ufbx_vec4*)inputs[i].data;
+		ufbx_real weight = inputs[i].weight;
+		dst.x += src->x * weight;
+		dst.y += src->y * weight;
+		dst.z += src->z * weight;
+		dst.w += src->w * weight;
+	}
+	*(ufbx_vec4*)output = dst;
+
+	return 1;
+}
+
+static ufbxi_noinline int ufbxi_cmp_subdivision_weight(const void *va, const void *vb)
+{
+	ufbx_subdivision_weight a = *(const ufbx_subdivision_weight*)va, b = *(const ufbx_subdivision_weight*)vb;
+	ufbxi_dev_assert(a.index != b.index);
+	if (a.weight != b.weight) return a.weight > b.weight ? -1 : +1;
+	return a.index < b.index ? -1 : +1;
+}
+
+static int ufbxi_subdivide_sum_vertex_weights(void *user, void *output, const ufbxi_subdivide_input *inputs, size_t num_inputs)
+{
+	ufbxi_subdivide_context *sc = (ufbxi_subdivide_context*)user;
+
+	ufbx_real *vertex_weights = sc->tmp_vertex_weights;
+	ufbx_subdivision_weight *tmp_weights = sc->tmp_weights;
+	size_t num_weights = 0;
+
+	ufbxi_nounroll for (size_t input_ix = 0; input_ix != num_inputs; input_ix++) {
+		ufbxi_subdivision_vertex_weights src = *(const ufbxi_subdivision_vertex_weights*)inputs[input_ix].data;
+		ufbx_real input_weight = inputs[input_ix].weight;
+
+		for (size_t weight_ix = 0; weight_ix < src.num_weights; weight_ix++) {
+			ufbx_real weight = input_weight * src.weights[weight_ix].weight;
+			if (weight < 1.175494351e-38f) continue;
+
+			int32_t vx = src.weights[weight_ix].index;
+			ufbxi_dev_assert(vx >= 0 && vx < sc->src_mesh.num_vertices);
+
+			ufbx_real prev = vertex_weights[vx];
+			vertex_weights[vx] = prev + weight;
+			if (prev == 0.0f) {
+				tmp_weights[num_weights++].index = vx;
+			}
+		}
+	}
+
+	ufbxi_nounroll for (size_t i = 0; i != num_weights; i++) {
+		int32_t vx = tmp_weights[i].index;
+		tmp_weights[i].weight = vertex_weights[vx];
+		vertex_weights[vx] = 0.0f;
+	}
+
+	qsort(tmp_weights, num_weights, sizeof(ufbx_subdivision_weight), ufbxi_cmp_subdivision_weight);
+
+	if (num_weights > sc->max_vertex_weights) {
+		num_weights = sc->max_vertex_weights;
+
+		// Normalize weights
+		ufbx_real prefix_weight = 0.0f;
+		ufbxi_nounroll for (size_t i = 0; i != num_weights; i++) {
+			prefix_weight += tmp_weights[i].weight;
+		}
+		ufbxi_nounroll for (size_t i = 0; i != num_weights; i++) {
+			tmp_weights[i].weight /= prefix_weight;
+		}
+	}
+
+	sc->total_weights += num_weights;
+	ufbx_subdivision_weight *weights = ufbxi_push_copy(&sc->tmp, ufbx_subdivision_weight, num_weights, tmp_weights);
+	ufbxi_check_err(&sc->error, weights);
+
+	ufbxi_subdivision_vertex_weights *dst = (ufbxi_subdivision_vertex_weights*)output;
+	dst->weights = weights;
+	dst->num_weights = num_weights;
+
+	return 1;
+}
+
+static ufbxi_subdivide_sum_fn *ufbxi_real_sum_fns[] = {
+	&ufbxi_subdivide_sum_real,
+	&ufbxi_subdivide_sum_vec2,
+	&ufbxi_subdivide_sum_vec3,
+	&ufbxi_subdivide_sum_vec4,
+};
+
+ufbxi_noinline static bool ufbxi_is_edge_split(const ufbxi_subdivide_layer_input *input, const ufbx_topo_edge *topo, int32_t index)
+{		  
+	int32_t twin = topo[index].twin;
+	if (twin >= 0) {
+		int32_t a0 = input->indices[index];
+		int32_t a1 = input->indices[topo[index].next];
+		int32_t b0 = input->indices[topo[twin].next];
+		int32_t b1 = input->indices[twin];
+		if (a0 == b0 && a1 == b1) return false;
+		if (!input->check_split_data) return true;
+		size_t stride = input->stride;
+		char *da0 = (char*)input->values + a0 * stride;
+		char *da1 = (char*)input->values + a1 * stride;
+		char *db0 = (char*)input->values + b0 * stride;
+		char *db1 = (char*)input->values + b1 * stride;
+		if (!memcmp(da0, db0, stride) && !memcmp(da1, db1, stride)) return false;
+		return true;
+	}
+
+	return false;
+}
+
+static ufbx_real ufbxi_edge_crease(const ufbx_mesh *mesh, bool split, const ufbx_topo_edge *topo, int32_t index)
+{
+	if (topo[index].twin < 0) return 1.0f;
+	if (split) return 1.0f;
+	if (mesh->edge_crease.data && topo[index].edge >= 0) return mesh->edge_crease.data[topo[index].edge] * 10.0f;
+	return 0.0f;
+}
+
+static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufbxi_subdivide_layer_output *output, const ufbxi_subdivide_layer_input *input)
+{
+	ufbx_subdivision_boundary boundary = input->boundary;
 
 	const ufbx_mesh *mesh = &sc->src_mesh;
 	const ufbx_topo_edge *topo = sc->topo;
@@ -16853,30 +17029,33 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 	size_t num_edge_values = 0;
 	for (int32_t ix = 0; ix < (int32_t)mesh->num_indices; ix++) {
 		int32_t twin = topo[ix].twin;
-		if (twin >= 0 && twin < ix && !ufbxi_is_edge_split(layer, topo, ix)) {
+		if (twin >= 0 && twin < ix && !ufbxi_is_edge_split(input, topo, ix)) {
 			edge_indices[ix] = edge_indices[twin];
 		} else {
 			edge_indices[ix] = (int32_t)num_edge_values++;
 		}
 	}
 
-	size_t reals = layer->value_reals;
-
-	size_t num_initial_values = (num_edge_values + mesh->num_faces + mesh->num_indices) * reals;
-	ufbx_real *values = ufbxi_push(&sc->tmp, ufbx_real, num_initial_values);
+	size_t stride = input->stride;
+	size_t num_initial_values = (num_edge_values + mesh->num_faces + mesh->num_indices);
+	char *values = (char*)ufbxi_push_size(&sc->tmp, stride, num_initial_values);
 	ufbxi_check_err(&sc->error, values);
 
-	ufbx_real *face_values = values;
-	ufbx_real *edge_values = face_values + mesh->num_faces * reals;
-	ufbx_real *vertex_values = edge_values + num_edge_values * reals;
+	char *face_values = values;
+	char *edge_values = face_values + mesh->num_faces * stride;
+	char *vertex_values = edge_values + num_edge_values * stride;
 
 	size_t num_vertex_values = 0;
 
 	int32_t *vertex_indices = ufbxi_push(&sc->result, int32_t, mesh->num_indices);
 	ufbxi_check_err(&sc->error, vertex_indices);
 
+	size_t min_inputs = ufbxi_max_sz(32, mesh->max_face_triangles + 2);
+	ufbxi_check_err(&sc->error, ufbxi_grow_array(&sc->ator_tmp, &sc->inputs, &sc->inputs_cap, min_inputs));
+	ufbxi_subdivide_input *inputs = sc->inputs;
+
 	// Assume initially unique per vertex, remove if not the case
-	layer->unique_per_vertex = true;
+	output->unique_per_vertex = true;
 
 	bool sharp_corners = false;
 	bool sharp_splits = false;
@@ -16884,8 +17063,8 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 
 	switch (boundary) {
 	case UFBX_SUBDIVISION_BOUNDARY_DEFAULT:
-	case UFBX_SUBDIVISION_BOUNDARY_LEGACY:
 	case UFBX_SUBDIVISION_BOUNDARY_SHARP_NONE:
+	case UFBX_SUBDIVISION_BOUNDARY_LEGACY:
 		// All smooth
 		break;
 	case UFBX_SUBDIVISION_BOUNDARY_SHARP_CORNERS:
@@ -16903,6 +17082,9 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 		break;
 	}
 
+	ufbxi_subdivide_sum_fn *sum_fn = input->sum_fn;
+	void *sum_user = input->sum_user;
+
 	// Mark unused indices as -1 so we can patch non-manifold
 	for (size_t i = 0; i < mesh->num_indices; i++) {
 		vertex_indices[i] = -1;
@@ -16911,29 +17093,27 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 	// Face points
 	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
 		ufbx_face face = mesh->faces.data[fi];
-		ufbx_real *dst = face_values + fi * reals;
+		char *dst = face_values + fi * stride;
 
-		for (size_t i = 0; i < reals; i++) dst[i] = 0.0f;
-
+		ufbx_real weight = 1.0f / (ufbx_real)face.num_indices;
 		for (uint32_t ci = 0; ci < face.num_indices; ci++) {
 			int32_t ix = (int32_t)(face.index_begin + ci);
-			ufbx_real *value = (ufbx_real*)layer->values.data + layer->indices.data[ix] * reals;
-			for (size_t i = 0; i < reals; i++) dst[i] += value[i];
+			inputs[ci].data = (const char*)input->values + input->indices[ix] * stride;
+			inputs[ci].weight = weight;
 		}
 
-		ufbx_real weight = 1.0f / face.num_indices;
-		for (size_t i = 0; i < reals; i++) dst[i] *= weight;
+		ufbxi_check_err(&sc->error, sum_fn(sum_user, dst, inputs, face.num_indices));
 	}
 
 	// Edge points
 	for (int32_t ix = 0; ix < (int32_t)mesh->num_indices; ix++) {
-		ufbx_real *dst = edge_values + edge_indices[ix] * reals;
+		char *dst = edge_values + edge_indices[ix] * stride;
 
 		int32_t twin = topo[ix].twin;
-		bool split = ufbxi_is_edge_split(layer, topo, ix);
+		bool split = ufbxi_is_edge_split(input, topo, ix);
 
 		if (split || (topo[ix].flags & UFBX_TOPO_NON_MANIFOLD) != 0) {
-			layer->unique_per_vertex = false;
+			output->unique_per_vertex = false;
 		}
 
 		ufbx_real crease = 0.0f;
@@ -16944,25 +17124,45 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 		}
 		if (sharp_all) crease = 1.0f;
 
-		ufbx_real *v0 = (ufbx_real*)layer->values.data + layer->indices.data[ix] * reals;
-		ufbx_real *v1 = (ufbx_real*)layer->values.data + layer->indices.data[topo[ix].next] * reals;
+		const char *v0 = (const char*)input->values + input->indices[ix] * stride;
+		const char *v1 = (const char*)input->values + input->indices[topo[ix].next] * stride;
 
+		// TODO: Unify
 		if (twin >= 0 && topo[ix].twin < ix && !split) {
 			// Already calculated
 		} else if (crease <= 0.0f) {
-			ufbx_real *f0 = face_values + topo[ix].face * reals;
-			ufbx_real *f1 = face_values + topo[twin].face * reals;
-			for (size_t i = 0; i < reals; i++) dst[i] = (v0[i] + v1[i] + f0[i] + f1[i]) * 0.25f;
+			const char *f0 = face_values + topo[ix].face * stride;
+			const char *f1 = face_values + topo[twin].face * stride;
+			inputs[0].data = v0;
+			inputs[0].weight = 0.25f;
+			inputs[1].data = v1;
+			inputs[1].weight = 0.25f;
+			inputs[2].data = f0;
+			inputs[2].weight = 0.25f;
+			inputs[3].data = f1;
+			inputs[3].weight = 0.25f;
+			ufbxi_check_err(&sc->error, sum_fn(sum_user, dst, inputs, 4));
 		} else if (crease >= 1.0f) {
-			for (size_t i = 0; i < reals; i++) dst[i] = (v0[i] + v1[i]) * 0.5f;
+			inputs[0].data = v0;
+			inputs[0].weight = 0.5f;
+			inputs[1].data = v1;
+			inputs[1].weight = 0.5f;
+			ufbxi_check_err(&sc->error, sum_fn(sum_user, dst, inputs, 2));
 		} else if (crease < 1.0f) {
-			ufbx_real *f0 = face_values + topo[ix].face * reals;
-			ufbx_real *f1 = face_values + topo[twin].face * reals;
-			for (size_t i = 0; i < reals; i++) {
-				ufbx_real smooth = (v0[i] + v1[i] + f0[i] + f1[i]) * 0.25f;
-				ufbx_real hard = (v0[i] + v1[i]) * 0.5f;
-				dst[i] = smooth * (1.0f - crease) + hard * crease;
-			}
+			const char *f0 = face_values + topo[ix].face * stride;
+			const char *f1 = face_values + topo[twin].face * stride;
+			ufbx_real w0 = 0.25f + 0.25f * crease;
+			ufbx_real w1 = 0.25f - 0.25f * crease;
+
+			inputs[0].data = v0;
+			inputs[0].weight = w0;
+			inputs[1].data = v1;
+			inputs[1].weight = w0;
+			inputs[2].data = f0;
+			inputs[2].weight = w1;
+			inputs[3].data = f1;
+			inputs[3].weight = w1;
+			ufbxi_check_err(&sc->error, sum_fn(sum_user, dst, inputs, 4));
 		}
 	}
 
@@ -16976,7 +17176,7 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 		for (int32_t cur = start;;) {
 			int32_t prev = ufbx_topo_prev_vertex_edge(topo, num_topo, cur);
 			if (prev < 0) { start = cur; break; } // Topological boundary: Stop and use as start
-			if (ufbxi_is_edge_split(layer, topo, prev)) start = cur; // Split edge: Consider as start
+			if (ufbxi_is_edge_split(input, topo, prev)) start = cur; // Split edge: Consider as start
 			if (prev == original_start) break; // Loop: Stop, use original start or split if found
 			cur = prev;
 		}
@@ -16984,11 +17184,11 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 		original_start = start;
 		while (start >= 0) {
 			if (start != original_start) {
-				layer->unique_per_vertex = false;
+				output->unique_per_vertex = false;
 			}
 
 			int32_t value_index = (int32_t)num_vertex_values++;
-			ufbx_real *dst = vertex_values + value_index * reals;
+			char *dst = vertex_values + value_index * stride;
 
 			// We need to compute the average crease value and keep track of
 			// two creased edges, if there's more we use the corner rule that
@@ -16998,7 +17198,7 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 			size_t num_split = 0;
 			bool on_boundary = false;
 			bool non_manifold = false;
-			int32_t edge_points[2];
+			size_t crease_input_indices[2];
 
 			// At start we always have two edges and a single face
 			int32_t start_prev = topo[start].prev;
@@ -17008,28 +17208,33 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 			non_manifold |= (topo[start].flags & UFBX_TOPO_NON_MANIFOLD) != 0;
 			non_manifold |= (topo[start_prev].flags & UFBX_TOPO_NON_MANIFOLD) != 0;
 
-			const ufbx_real *v0 = (ufbx_real*)layer->values.data + layer->indices.data[start] * reals;
+			const char *v0 = (const char*)input->values + input->indices[start] * stride;
+
+			size_t num_inputs = 4;
 
 			{
-				const ufbx_real *e0 = (ufbx_real*)layer->values.data + layer->indices.data[topo[start].next] * reals;
-				const ufbx_real *e1 = (ufbx_real*)layer->values.data + layer->indices.data[start_prev] * reals;
-				const ufbx_real *f0 = face_values + topo[start].face * reals;
-				for (size_t i = 0; i < reals; i++) dst[i] = e0[i] + e1[i] + f0[i];
+				const char *e0 = (const char*)input->values + input->indices[topo[start].next] * stride;
+				const char *e1 = (const char*)input->values + input->indices[start_prev] * stride;
+				const char *f0 = face_values + topo[start].face * stride;
+				inputs[0].data = v0;
+				inputs[1].data = e0;
+				inputs[2].data = e1;
+				inputs[3].data = f0;
 			}
 
-			bool start_split = ufbxi_is_edge_split(layer, topo, start);
-			bool prev_split = end_edge >= 0 && ufbxi_is_edge_split(layer, topo, end_edge);
+			bool start_split = ufbxi_is_edge_split(input, topo, start);
+			bool prev_split = end_edge >= 0 && ufbxi_is_edge_split(input, topo, end_edge);
 
 			// Either of the first two edges may be creased
 			ufbx_real start_crease = ufbxi_edge_crease(mesh, start_split, topo, start);
 			if (start_crease > 0.0f) {
 				total_crease += start_crease;
-				edge_points[num_crease++] = topo[start].next;
+				crease_input_indices[num_crease++] = 1;
 			}
 			ufbx_real prev_crease = ufbxi_edge_crease(mesh, prev_split, topo, start_prev);
 			if (prev_crease > 0.0f) {
 				total_crease += prev_crease;
-				edge_points[num_crease++] = start_prev;
+				crease_input_indices[num_crease++] = 2;
 			}
 
 			if (end_edge >= 0) {
@@ -17064,13 +17269,15 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 					non_manifold |= (topo[cur].flags & UFBX_TOPO_NON_MANIFOLD) != 0;
 					vertex_indices[cur] = value_index;
 
-					bool split = ufbxi_is_edge_split(layer, topo, cur);
+					bool split = ufbxi_is_edge_split(input, topo, cur);
 
 					// Looped: Add the face from the other side still if not split
 					if (cur == end_edge && !split) {
-						const ufbx_real *f0 = face_values + topo[cur].face * reals;
-						for (size_t i = 0; i < reals; i++) dst[i] += f0[i];
+						ufbxi_check_err(&sc->error, ufbxi_grow_array(&sc->ator_tmp, &sc->inputs, &sc->inputs_cap, num_inputs + 1));
+						const char *f0 = face_values + topo[cur].face * stride;
+						inputs[num_inputs].data = f0;
 						start = -1;
+						num_inputs += 1;
 						break;
 					}
 
@@ -17079,14 +17286,21 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 					ufbx_real cur_crease = ufbxi_edge_crease(mesh, split, topo, cur);
 					if (cur_crease > 0.0f) {
 						total_crease += cur_crease;
-						if (num_crease < 2) edge_points[num_crease] = topo[cur].next;
+						if (num_crease < 2) crease_input_indices[num_crease] = num_inputs;
 						num_crease++;
 					}
 
 					// Add the new edge and face to the sum
-					const ufbx_real *e0 = (ufbx_real*)layer->values.data + layer->indices.data[topo[cur].next] * reals;
-					const ufbx_real *f0 = face_values + topo[cur].face * reals;
-					for (size_t i = 0; i < reals; i++) dst[i] += e0[i] + f0[i];
+					{
+						ufbxi_check_err(&sc->error, ufbxi_grow_array(&sc->ator_tmp, &sc->inputs, &sc->inputs_cap, num_inputs + 2));
+						inputs = sc->inputs;
+
+						const char *e0 = (char*)input->values + input->indices[topo[cur].next] * stride;
+						const char *f0 = face_values + topo[cur].face * stride;
+						inputs[num_inputs + 0].data = e0;
+						inputs[num_inputs + 1].data = f0;
+						num_inputs += 2;
+					}
 					valence++;
 
 					// If we landed at a split edge advance to the next one
@@ -17112,28 +17326,44 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 				|| sharp_all
 				|| non_manifold) {
 				// Corner: Copy as-is
-				for (size_t i = 0; i < reals; i++) dst[i] = v0[i];
+				inputs[0].data = v0;
+				inputs[0].weight = 1.0f;
+				num_inputs = 1;
 			} else if (num_crease == 2) {
 				// Boundary: Interpolate edge
-				ufbx_real *e0 = (ufbx_real*)layer->values.data + layer->indices.data[edge_points[0]] * reals;
-				ufbx_real *e1 = (ufbx_real*)layer->values.data + layer->indices.data[edge_points[1]] * reals;
-
 				total_crease *= 0.5f;
 				if (total_crease < 0.0f) total_crease = 0.0f;
 				if (total_crease > 1.0f) total_crease = 1.0f;
 
-				for (size_t i = 0; i < reals; i++) {
-					ufbx_real smooth = dst[i] * fe_weight + v0[i] * v_weight;
-					ufbx_real hard = (e0[i] + e1[i]) * 0.125f + v0[i] * 0.75f;
-					dst[i] = smooth * (1.0f - total_crease) + hard * total_crease;
+				inputs[0].weight = v_weight * (1.0f - total_crease) + 0.75f * total_crease;
+				ufbx_real few = fe_weight * (1.0f - total_crease);
+				for (size_t i = 1; i < num_inputs; i++) {
+					inputs[i].weight = few;
 				}
+
+				// Add weight to the creased edges
+				inputs[crease_input_indices[0]].weight += 0.125f * total_crease;
+				inputs[crease_input_indices[1]].weight += 0.125f * total_crease;
 			} else {
 				// Regular: Weighted sum with the accumulated edge/face points
-				for (size_t i = 0; i < reals; i++) {
-					dst[i] = dst[i] * fe_weight + v0[i] * v_weight;
+				inputs[0].weight = v_weight;
+				for (size_t i = 1; i < num_inputs; i++) {
+					inputs[i].weight = fe_weight;
 				}
+
 			}
 
+#if defined(UFBX_REGRESSION)
+			{
+				ufbx_real total_weight = 0.0f;
+				for (size_t i = 0; i < num_inputs; i++) {
+					total_weight += inputs[i].weight;
+				}
+				ufbx_assert(fabs(total_weight - 1.0f) < 0.001f);
+			}
+#endif
+
+			ufbxi_check_err(&sc->error, sum_fn(sum_user, dst, inputs, num_inputs));
 		}
 	}
 
@@ -17143,42 +17373,180 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 		if (ix < 0) {
 			ix = (int32_t)num_vertex_values++;
 			vertex_indices[old_ix] = ix;
-			const ufbx_real *src = (ufbx_real*)layer->values.data + layer->indices.data[old_ix] * reals;
-			ufbx_real *dst = vertex_values + ix * reals;
-			for (size_t i = 0; i < reals; i++) dst[i] = src[i];
+			const char *src = (const char*)input->values + input->indices[old_ix] * stride;
+			char *dst = vertex_values + ix * stride;
+
+			inputs[0].data = src;
+			inputs[0].weight = 1.0f;
+			ufbxi_check_err(&sc->error, sum_fn(sum_user, dst, inputs, 1));
 		}
 	}
 
-	int32_t *new_indices = ufbxi_push(&sc->result, int32_t, mesh->num_indices * 4);
-	ufbxi_check_err(&sc->error, new_indices);
-
-	int32_t face_start = 0;
-	int32_t edge_start = (int32_t)(face_start + mesh->num_faces);
-	int32_t vert_start = (int32_t)(edge_start + num_edge_values);
-	int32_t *p_ix = new_indices;
-	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
-		p_ix[0] = vert_start + vertex_indices[ix];
-		p_ix[1] = edge_start + edge_indices[ix];
-		p_ix[2] = face_start + topo[ix].face;
-		p_ix[3] = edge_start + edge_indices[topo[ix].prev];
-		p_ix += 4;
-	}
-
 	size_t num_values = num_edge_values + mesh->num_faces + num_vertex_values;
-	ufbx_real *new_values = ufbxi_push(&sc->result, ufbx_real, (num_values+1) * reals);
+	char *new_values = (char*)ufbxi_push_size(&sc->result, stride, (num_values+1));
 	ufbxi_check_err(&sc->error, new_values);
 
-	memset(new_values, 0, reals * sizeof(ufbx_real));
-	new_values += reals;
+	memset(new_values, 0, stride);
+	new_values += stride;
 
-	memcpy(new_values, values, num_values * reals * sizeof(ufbx_real));
+	memcpy(new_values, values, num_values * stride);
 
-	layer->exists = true;
-	layer->values.data = new_values;
-	layer->indices.data = new_indices;
-	layer->values.count = num_values;
-	layer->indices.count = mesh->num_indices * 4;
-	layer->value_reals = reals;
+	output->values = new_values;
+	output->num_values = num_values;
+
+	if (!input->ignore_indices) {
+		int32_t *new_indices = ufbxi_push(&sc->result, int32_t, mesh->num_indices * 4);
+		ufbxi_check_err(&sc->error, new_indices);
+
+		int32_t face_start = 0;
+		int32_t edge_start = (int32_t)(face_start + mesh->num_faces);
+		int32_t vert_start = (int32_t)(edge_start + num_edge_values);
+		int32_t *p_ix = new_indices;
+		for (size_t ix = 0; ix < mesh->num_indices; ix++) {
+			p_ix[0] = vert_start + vertex_indices[ix];
+			p_ix[1] = edge_start + edge_indices[ix];
+			p_ix[2] = face_start + topo[ix].face;
+			p_ix[3] = edge_start + edge_indices[topo[ix].prev];
+			p_ix += 4;
+		}
+		output->indices = new_indices;
+		output->num_indices = mesh->num_indices * 4;
+	} else {
+		output->indices = NULL;
+		output->num_indices = 0;
+	}
+
+	return 1;
+}
+
+static ufbxi_noinline int ufbxi_subdivide_attrib(ufbxi_subdivide_context *sc, ufbx_vertex_attrib *attrib, ufbx_subdivision_boundary boundary, bool check_split_data)
+{
+	if (!attrib->exists) return 1;
+
+	ufbx_assert(attrib->value_reals >= 1 && attrib->value_reals <= 4);
+
+	ufbxi_subdivide_layer_input input;
+	input.sum_fn = ufbxi_real_sum_fns[attrib->value_reals - 1];
+	input.sum_user = NULL;
+	input.values = attrib->values.data;
+	input.indices = attrib->indices.data;
+	input.stride = attrib->value_reals * sizeof(ufbx_real);
+	input.boundary = boundary;
+	input.check_split_data = check_split_data;
+	input.ignore_indices = false;
+
+	ufbxi_subdivide_layer_output output;
+	ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, &output, &input));
+
+	attrib->values.data = output.values;
+	attrib->indices.data = output.indices;
+	attrib->values.count = output.num_values;
+	attrib->indices.count = output.num_indices;
+
+	return 1;
+}
+
+static ufbxi_noinline ufbxi_subdivision_vertex_weights *ufbxi_subdivision_copy_weights(ufbxi_subdivide_context *sc, ufbx_subdivision_weight_range_list ranges, ufbx_subdivision_weight_list weights)
+{
+	ufbxi_subdivision_vertex_weights *dst = ufbxi_push(&sc->tmp, ufbxi_subdivision_vertex_weights, ranges.count);
+	ufbxi_check_return_err(&sc->error, dst, NULL);
+
+	ufbxi_nounroll for (size_t i = 0; i != ranges.count; i++) {
+		ufbx_subdivision_weight_range range = ranges.data[i];
+		dst[i].weights = weights.data + range.weight_begin;
+		dst[i].num_weights = range.num_weights;
+	}
+
+	return dst;
+}
+
+static ufbxi_noinline ufbxi_subdivision_vertex_weights *ufbxi_init_source_vertex_weights(ufbxi_subdivide_context *sc, size_t num_vertices)
+{
+	ufbxi_subdivision_vertex_weights *dst = ufbxi_push(&sc->tmp, ufbxi_subdivision_vertex_weights, num_vertices);
+	ufbx_subdivision_weight *weights = ufbxi_push(&sc->tmp, ufbx_subdivision_weight, num_vertices);
+	ufbxi_check_return_err(&sc->error, dst && weights, NULL);
+
+	ufbxi_nounroll for (size_t i = 0; i != num_vertices; i++) {
+		dst[i].weights = weights + i;
+		dst[i].num_weights = 1;
+		weights[i].index = (int32_t)i;
+		weights[i].weight = 1.0f;
+	}
+
+	return dst;
+}
+
+static ufbxi_noinline ufbxi_subdivision_vertex_weights *ufbxi_init_skin_weights(ufbxi_subdivide_context *sc, size_t num_vertices, const ufbx_skin_deformer *skin)
+{
+	ufbxi_subdivision_vertex_weights *dst = ufbxi_push(&sc->tmp, ufbxi_subdivision_vertex_weights, num_vertices);
+	ufbxi_check_return_err(&sc->error, dst, NULL);
+
+	for (size_t i = 0; i < num_vertices; i++) {
+		ufbxi_dev_assert(i < skin->vertices.count);
+		ufbx_skin_vertex vertex = skin->vertices.data[i];
+		size_t num_weights = ufbxi_min_sz(sc->max_vertex_weights, vertex.num_weights);
+
+		ufbx_subdivision_weight *weights = ufbxi_push(&sc->tmp, ufbx_subdivision_weight, num_weights);
+		ufbxi_check_err(&sc->error, weights);
+
+		const ufbx_skin_weight *skin_weights = skin->weights.data + vertex.weight_begin;
+
+		dst[i].weights = weights;
+		dst[i].num_weights = num_weights;
+		ufbxi_nounroll for (size_t wi = 0; wi != num_weights; wi++) {
+			ufbxi_check_err(&sc->error, skin_weights[wi].cluster_index <= INT32_MAX);
+			weights[wi].index = skin_weights[wi].cluster_index;
+			weights[wi].weight = skin_weights[wi].weight;
+		}
+	}
+
+	return dst;
+}
+
+static ufbxi_noinline int ufbxi_subdivide_weights(ufbxi_subdivide_context *sc, ufbx_subdivision_weight_range_list *ranges,
+	ufbx_subdivision_weight_list *weights, const ufbxi_subdivision_vertex_weights *src)
+{
+	ufbxi_check_err(&sc->error, src);
+
+	ufbxi_subdivide_layer_input input;
+	input.sum_fn = ufbxi_subdivide_sum_vertex_weights;
+	input.sum_user = sc;
+	input.values = src;
+	input.indices = sc->src_mesh.vertex_indices.data;
+	input.stride = sizeof(ufbxi_subdivision_vertex_weights);
+	input.boundary = sc->opts.boundary;
+	input.check_split_data = false;
+	input.ignore_indices = true;
+
+	sc->total_weights = 0;
+
+	ufbxi_subdivide_layer_output output;
+	ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, &output, &input));
+
+	size_t num_vertices = output.num_values;
+	ufbx_assert(num_vertices == sc->dst_mesh.vertex_position.values.count);
+
+	ufbx_subdivision_weight_range *dst_ranges = ufbxi_push(&sc->result, ufbx_subdivision_weight_range, num_vertices);
+	ufbx_subdivision_weight *dst_weights = ufbxi_push(&sc->result, ufbx_subdivision_weight, sc->total_weights);
+	ufbxi_check_err(&sc->error, ranges && weights);
+
+	ufbxi_subdivision_vertex_weights *src_weights = (ufbxi_subdivision_vertex_weights*)output.values;
+
+	size_t weight_offset = 0;
+	for (size_t vi = 0; vi < num_vertices; vi++) {
+		ufbxi_subdivision_vertex_weights ws = src_weights[vi];
+		ufbxi_check_err(&sc->error, (size_t)UINT32_MAX - weight_offset >= ws.num_weights);
+
+		dst_ranges[vi].weight_begin = (uint32_t)weight_offset;
+		dst_ranges[vi].num_weights = (uint32_t)ws.num_weights;
+		memcpy(dst_weights + weight_offset, ws.weights, ws.num_weights * sizeof(ufbx_subdivision_weight));
+		weight_offset += ws.num_weights;
+	}
+
+	ranges->data = dst_ranges;
+	ranges->count = num_vertices;
+	weights->data = dst_weights;
+	weights->count = sc->total_weights;
 
 	return 1;
 }
@@ -17196,7 +17564,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 	sc->topo = topo;
 	sc->num_topo = mesh->num_indices;
 
-	ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&result->vertex_position, sc->opts.boundary));
+	ufbxi_check_err(&sc->error, ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&result->vertex_position, sc->opts.boundary, false));
 
 	memset(&result->vertex_uv, 0, sizeof(result->vertex_uv));
 	memset(&result->vertex_tangent, 0, sizeof(result->vertex_tangent));
@@ -17210,10 +17578,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 	ufbxi_check_err(&sc->error,	result->color_sets.data);
 
 	ufbxi_for_list(ufbx_uv_set, set, result->uv_sets) {
-		ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&set->vertex_uv, sc->opts.uv_boundary));
+		ufbxi_check_err(&sc->error, ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&set->vertex_uv, sc->opts.uv_boundary, true));
 		if (sc->opts.interpolate_tangents) {
-			ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&set->vertex_tangent, sc->opts.uv_boundary));
-			ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&set->vertex_bitangent, sc->opts.uv_boundary));
+			ufbxi_check_err(&sc->error, ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&set->vertex_tangent, sc->opts.uv_boundary, true));
+			ufbxi_check_err(&sc->error, ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&set->vertex_bitangent, sc->opts.uv_boundary, true));
 		} else {
 			memset(&set->vertex_tangent, 0, sizeof(set->vertex_tangent));
 			memset(&set->vertex_bitangent, 0, sizeof(set->vertex_bitangent));
@@ -17224,7 +17592,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 	}
 
 	ufbxi_for_list(ufbx_color_set, set, result->color_sets) {
-		ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&set->vertex_color, sc->opts.uv_boundary));
+		ufbxi_check_err(&sc->error, ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&set->vertex_color, sc->opts.uv_boundary, true));
 	}
 
 	if (result->uv_sets.count > 0) {
@@ -17237,14 +17605,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 	}
 
 	if (sc->opts.interpolate_normals && !sc->opts.ignore_normals) {
-		ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&mesh->vertex_normal, sc->opts.boundary));
+		ufbxi_check_err(&sc->error, ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&mesh->vertex_normal, sc->opts.boundary, true));
 		ufbxi_for_list(ufbx_vec3, normal, result->vertex_normal.values) {
 			*normal = ufbxi_normalize3(*normal);
 		}
 		if (mesh->skinned_normal.values.data == mesh->vertex_normal.values.data) {
 			result->skinned_normal = result->vertex_normal;
 		} else {
-			ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&result->skinned_normal, sc->opts.boundary));
+			ufbxi_check_err(&sc->error, ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&result->skinned_normal, sc->opts.boundary, true));
 			ufbxi_for_list(ufbx_vec3, normal, result->skinned_normal.values) {
 				*normal = ufbxi_normalize3(*normal);
 			}
@@ -17252,12 +17620,67 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 	}
 
 	// TODO: Vertex crease, we should probably use it?
-	ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&mesh->vertex_crease, sc->opts.boundary);
+	ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&mesh->vertex_crease, sc->opts.boundary, true);
 
 	if (mesh->skinned_position.values.data == mesh->vertex_position.values.data) {
 		result->skinned_position = result->vertex_position;
 	} else {
-		ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, (ufbx_vertex_attrib*)&result->skinned_position, sc->opts.boundary));
+		ufbxi_check_err(&sc->error, ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&result->skinned_position, sc->opts.boundary, false));
+	}
+
+	ufbx_subdivision_result *result_sub = ufbxi_push_zero(&sc->result, ufbx_subdivision_result, 1);
+	ufbxi_check_err(&sc->error, result_sub);
+	result->subdivision_result = result_sub;
+
+	if (sc->opts.evaluate_source_vertices || sc->opts.evaluate_skin_weights) {
+		ufbx_subdivision_result *mesh_sub = mesh->subdivision_result;
+
+		ufbx_skin_deformer *skin = NULL;
+		if (sc->opts.evaluate_skin_weights) {
+			if (mesh->skin_deformers.count > 0) {
+				ufbxi_check_err(&sc->error, sc->opts.skin_deformer_index < mesh->skin_deformers.count);
+				skin = mesh->skin_deformers.data[sc->opts.skin_deformer_index];
+			}
+		}
+
+		size_t max_weights = 0;
+		if (sc->opts.evaluate_source_vertices) {
+			max_weights = ufbxi_max_sz(max_weights, mesh->num_vertices);
+		}
+		if (skin) {
+			max_weights = ufbxi_max_sz(max_weights, skin->clusters.count);
+		}
+
+		sc->tmp_vertex_weights = ufbxi_push_zero(&sc->tmp, ufbx_real, mesh->num_vertices);
+		sc->tmp_weights = ufbxi_push(&sc->tmp, ufbx_subdivision_weight, max_weights);
+		ufbxi_check_err(&sc->error, sc->tmp_vertex_weights && sc->tmp_weights);
+
+		if (sc->opts.evaluate_source_vertices) {
+			sc->max_vertex_weights = sc->opts.max_source_vertices ? sc->opts.max_source_vertices : SIZE_MAX;
+
+			ufbxi_subdivision_vertex_weights *weights;
+			if (mesh_sub && mesh_sub->source_vertex_ranges.count > 0) {
+				weights = ufbxi_subdivision_copy_weights(sc, mesh_sub->source_vertex_ranges, mesh_sub->source_vertex_weights);
+			} else {
+				weights = ufbxi_init_source_vertex_weights(sc, mesh->num_vertices);
+			}
+
+			ufbxi_check_err(&sc->error, ufbxi_subdivide_weights(sc, &result_sub->source_vertex_ranges, &result_sub->source_vertex_weights, weights));
+		}
+
+		if (skin) {
+			sc->max_vertex_weights = sc->opts.max_skin_weights ? sc->opts.max_skin_weights : SIZE_MAX;
+
+			ufbxi_subdivision_vertex_weights *weights;
+			if (mesh_sub && mesh_sub->source_vertex_ranges.count > 0) {
+				weights = ufbxi_subdivision_copy_weights(sc, mesh_sub->skin_cluster_ranges, mesh_sub->skin_cluster_weights);
+			} else {
+				weights = ufbxi_init_skin_weights(sc, mesh->num_vertices, skin);
+			}
+
+			ufbxi_check_err(&sc->error, ufbxi_subdivide_weights(sc, &result_sub->skin_cluster_ranges, &result_sub->skin_cluster_weights, weights));
+		}
+
 	}
 
 	result->num_vertices = result->vertex_position.values.count;
@@ -17492,6 +17915,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivi
 	sc->imp = ufbxi_push(&sc->result, ufbxi_mesh_imp, 1);
 	ufbxi_check_err(&sc->error, sc->imp);
 
+	sc->dst_mesh.subdivision_result->result_memory_used = sc->ator_result.current_size;
+	sc->dst_mesh.subdivision_result->temp_memory_used = sc->ator_tmp.current_size;
+	sc->dst_mesh.subdivision_result->result_allocs = sc->ator_result.num_allocs;
+	sc->dst_mesh.subdivision_result->temp_allocs = sc->ator_tmp.num_allocs;
+
 	ufbxi_init_ref(&sc->imp->refcount, UFBXI_MESH_IMP_MAGIC, parent);
 
 	sc->imp->magic = UFBXI_MESH_IMP_MAGIC;
@@ -17515,6 +17943,7 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 
 	int ok = ufbxi_subdivide_mesh_imp(&sc, level);
 
+	ufbxi_free(&sc.ator_tmp, ufbxi_subdivide_input, sc.inputs, sc.inputs_cap);
 	ufbxi_buf_free(&sc.tmp);
 	ufbxi_buf_free(&sc.source);
 

@@ -728,6 +728,38 @@ typedef struct ufbx_mesh_material {
 
 UFBX_LIST_TYPE(ufbx_mesh_material_list, ufbx_mesh_material);
 
+typedef struct ufbx_subdivision_weight_range {
+	uint32_t weight_begin;
+	uint32_t num_weights;
+} ufbx_subdivision_weight_range;
+
+UFBX_LIST_TYPE(ufbx_subdivision_weight_range_list, ufbx_subdivision_weight_range);
+
+typedef struct ufbx_subdivision_weight {
+	ufbx_real weight;
+	int32_t index;
+} ufbx_subdivision_weight;
+
+UFBX_LIST_TYPE(ufbx_subdivision_weight_list, ufbx_subdivision_weight);
+
+typedef struct ufbx_subdivision_result {
+	size_t result_memory_used;
+	size_t temp_memory_used;
+	size_t result_allocs;
+	size_t temp_allocs;
+
+	// Weights of vertices in the source model.
+	// Defined if `ufbx_subdivide_opts.evaluate_source_vertices` is set.
+	ufbx_subdivision_weight_range_list source_vertex_ranges;
+	ufbx_subdivision_weight_list source_vertex_weights;
+
+	// Weights of skin clusters in the source model.
+	// Defined if `ufbx_subdivide_opts.evaluate_source_vertices` is set.
+	ufbx_subdivision_weight_range_list skin_cluster_ranges;
+	ufbx_subdivision_weight_list skin_cluster_weights;
+
+} ufbx_subdivision_result;
+
 typedef enum ufbx_subdivision_display_mode {
 	UFBX_SUBDIVISION_DISPLAY_DISABLED,
 	UFBX_SUBDIVISION_DISPLAY_HULL,
@@ -741,10 +773,10 @@ typedef enum ufbx_subdivision_display_mode {
 typedef enum ufbx_subdivision_boundary {
 	UFBX_SUBDIVISION_BOUNDARY_DEFAULT,
 	UFBX_SUBDIVISION_BOUNDARY_LEGACY,
-	// OpenSubdiv: `VTX_BOUNDARY_EDGE_ONLY` / `FVAR_LINEAR_NONE`
-	UFBX_SUBDIVISION_BOUNDARY_SHARP_NONE,
 	// OpenSubdiv: `VTX_BOUNDARY_EDGE_AND_CORNER` / `FVAR_LINEAR_CORNERS_ONLY`
 	UFBX_SUBDIVISION_BOUNDARY_SHARP_CORNERS,
+	// OpenSubdiv: `VTX_BOUNDARY_EDGE_ONLY` / `FVAR_LINEAR_NONE`
+	UFBX_SUBDIVISION_BOUNDARY_SHARP_NONE,
 	// OpenSubdiv: `FVAR_LINEAR_BOUNDARIES`
 	UFBX_SUBDIVISION_BOUNDARY_SHARP_BOUNDARY,
 	// OpenSubdiv: `FVAR_LINEAR_ALL`
@@ -890,9 +922,12 @@ struct ufbx_mesh {
 	ufbx_subdivision_display_mode subdivision_display_mode;
 	ufbx_subdivision_boundary subdivision_boundary;
 	ufbx_subdivision_boundary subdivision_uv_boundary;
-	bool subdivision_evaluated;
 
-	// Tessellation
+	// Subdivision (result)
+	bool subdivision_evaluated;
+	ufbx_nullable ufbx_subdivision_result *subdivision_result;
+
+	// Tessellation (result)
 	bool from_tessellated_nurbs;
 };
 
@@ -3084,6 +3119,22 @@ typedef struct ufbx_subdivide_opts {
 
 	// Subdivide also tangent attributes
 	bool interpolate_tangents;
+
+	// Map subdivided vertices into weighted original vertices.
+	// NOTE: May be O(n^2) if `max_vertex_sources` is not specified!
+	bool evaluate_source_vertices;
+
+	// Limit source vertices per subdivided vertex.
+	size_t max_source_vertices;
+
+	// Calculate bone influences over subdivided vertices (if applicable).
+	bool evaluate_skin_weights;
+
+	// Limit bone influences per subdivided vertex.
+	size_t max_skin_weights;
+
+	// Index of the skin deformer to use for `evaluate_skin_weights`.
+	size_t skin_deformer_index;
 
 	uint32_t _end_zero;
 } ufbx_subdivide_opts;
