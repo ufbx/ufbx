@@ -52,6 +52,16 @@
 	#define ufbxi_unused
 #endif
 
+#if !defined(UFBX_STANDARD_C) && defined(__clang__)
+	#define ufbxi_nounroll _Pragma("clang loop unroll(disable)") _Pragma("clang loop vectorize(disable)")
+#elif !defined(UFBX_STANDARD_C) && defined(__GNUC__)
+	#define ufbxi_nounroll _Pragma("GCC unroll 0")
+#elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
+	#define ufbxi_nounroll __pragma(loop(no_vector))
+#else
+	#define ufbxi_nounroll
+#endif
+
 #if defined(__GNUC__) && !defined(__clang__)
 	#define ufbxi_ignore(cond) (void)!(cond)
 #else
