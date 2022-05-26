@@ -13193,6 +13193,25 @@ ufbxi_noinline static void ufbxi_update_display_layer(ufbx_display_layer *layer)
 	layer->ui_color = ufbxi_find_vec3(&layer->props, ufbxi_Color, 0.8f, 0.8f, 0.8f);
 }
 
+ufbxi_noinline static void ufbxi_find_bool3(bool *dst, ufbx_props *props, const char *name, bool default_value)
+{
+	size_t name_len = strlen(name);
+	char local[64];
+	ufbx_assert(name_len < sizeof(local) - 2);
+	memcpy(local, name, name_len);
+
+	size_t local_len = name_len + 1;
+	local[local_len] = '\0';
+
+	int64_t def = default_value ? 1 : 0;
+	local[name_len] = 'X';
+	dst[0] = ufbx_find_int_len(props, local, local_len, def) != 0;
+	local[name_len] = 'Y';
+	dst[1] = ufbx_find_int_len(props, local, local_len, def) != 0;
+	local[name_len] = 'Z';
+	dst[2] = ufbx_find_int_len(props, local, local_len, def) != 0;
+}
+
 ufbxi_noinline static void ufbxi_update_constraint(ufbx_constraint *constraint)
 {
 	ufbx_props *props = &constraint->props;
@@ -13236,9 +13255,7 @@ ufbxi_noinline static void ufbxi_update_constraint(ufbx_constraint *constraint)
 
 	constraint->active = ufbx_find_int(props, "Active", 1) != 0;
 	if (constraint_type == UFBX_CONSTRAINT_AIM) {
-		constraint->constrain_rotation[0] = ufbx_find_int(props, "AffectX", 1) != 0;
-		constraint->constrain_rotation[1] = ufbx_find_int(props, "AffectY", 1) != 0;
-		constraint->constrain_rotation[2] = ufbx_find_int(props, "AffectZ", 1) != 0;
+		ufbxi_find_bool3(constraint->constrain_rotation, props, "Affect", 1);
 
 		const ufbx_vec3 default_aim = { 1.0f, 0.0f, 0.0f };
 		const ufbx_vec3 default_up = { 0.0f, 1.0f, 0.0f };
@@ -13251,27 +13268,15 @@ ufbxi_noinline static void ufbxi_update_constraint(ufbx_constraint *constraint)
 		constraint->aim_up_vector = ufbx_find_vec3(props, "UpVector", default_up);
 
 	} else if (constraint_type == UFBX_CONSTRAINT_PARENT) {
-		constraint->constrain_translation[0] = ufbx_find_int(props, "AffectTranslationX", 1) != 0;
-		constraint->constrain_translation[1] = ufbx_find_int(props, "AffectTranslationY", 1) != 0;
-		constraint->constrain_translation[2] = ufbx_find_int(props, "AffectTranslationZ", 1) != 0;
-		constraint->constrain_rotation[0] = ufbx_find_int(props, "AffectRotationX", 1) != 0;
-		constraint->constrain_rotation[1] = ufbx_find_int(props, "AffectRotationY", 1) != 0;
-		constraint->constrain_rotation[2] = ufbx_find_int(props, "AffectRotationZ", 1) != 0;
-		constraint->constrain_scale[0] = ufbx_find_int(props, "AffectScalingX", 0) != 0;
-		constraint->constrain_scale[1] = ufbx_find_int(props, "AffectScalingY", 0) != 0;
-		constraint->constrain_scale[2] = ufbx_find_int(props, "AffectScalingZ", 0) != 0;
+		ufbxi_find_bool3(constraint->constrain_translation, props, "AffectTranslation", 1);
+		ufbxi_find_bool3(constraint->constrain_rotation, props, "AffectRotation", 1);
+		ufbxi_find_bool3(constraint->constrain_scale, props, "AffectScale", 0);
 	} else if (constraint_type == UFBX_CONSTRAINT_POSITION) {
-		constraint->constrain_translation[0] = ufbx_find_int(props, "AffectX", 1) != 0;
-		constraint->constrain_translation[1] = ufbx_find_int(props, "AffectY", 1) != 0;
-		constraint->constrain_translation[2] = ufbx_find_int(props, "AffectZ", 1) != 0;
+		ufbxi_find_bool3(constraint->constrain_translation, props, "Affect", 1);
 	} else if (constraint_type == UFBX_CONSTRAINT_ROTATION) {
-		constraint->constrain_rotation[0] = ufbx_find_int(props, "AffectX", 1) != 0;
-		constraint->constrain_rotation[1] = ufbx_find_int(props, "AffectY", 1) != 0;
-		constraint->constrain_rotation[2] = ufbx_find_int(props, "AffectZ", 1) != 0;
+		ufbxi_find_bool3(constraint->constrain_rotation, props, "Affect", 1);
 	} else if (constraint_type == UFBX_CONSTRAINT_SCALE) {
-		constraint->constrain_scale[0] = ufbx_find_int(props, "AffectX", 1) != 0;
-		constraint->constrain_scale[1] = ufbx_find_int(props, "AffectY", 1) != 0;
-		constraint->constrain_scale[2] = ufbx_find_int(props, "AffectZ", 1) != 0;
+		ufbxi_find_bool3(constraint->constrain_scale, props, "Affect", 1);
 	} else if (constraint_type == UFBX_CONSTRAINT_SINGLE_CHAIN_IK) {
 		constraint->constrain_rotation[0] = true;
 		constraint->constrain_rotation[1] = true;
