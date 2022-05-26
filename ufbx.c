@@ -12909,23 +12909,23 @@ ufbxi_noinline static void ufbxi_update_light(ufbx_light *light)
 }
 
 typedef struct {
-	ufbx_vec2 film_size;
-	ufbx_real squeeze_ratio;
+	// 1/1000 decimal fixed point for size
+	uint16_t film_size_x, film_size_y;
 } ufbxi_aperture_format;
 
 static const ufbxi_aperture_format ufbxi_aperture_formats[] = {
-	{ (ufbx_real)1.000, (ufbx_real)1.000, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_CUSTOM
-	{ (ufbx_real)0.404, (ufbx_real)0.295, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_16MM_THEATRICAL
-	{ (ufbx_real)0.493, (ufbx_real)0.292, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_SUPER_16MM
-	{ (ufbx_real)0.864, (ufbx_real)0.630, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_35MM_ACADEMY
-	{ (ufbx_real)0.816, (ufbx_real)0.612, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_35MM_TV_PROJECTION
-	{ (ufbx_real)0.980, (ufbx_real)0.735, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_35MM_FULL_APERTURE
-	{ (ufbx_real)0.825, (ufbx_real)0.446, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_35MM_185_PROJECTION
-	{ (ufbx_real)0.864, (ufbx_real)0.732, (ufbx_real)2.0 }, // UFBX_APERTURE_FORMAT_35MM_ANAMORPHIC
-	{ (ufbx_real)2.066, (ufbx_real)0.906, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_70MM_PROJECTION
-	{ (ufbx_real)1.485, (ufbx_real)0.991, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_VISTAVISION
-	{ (ufbx_real)2.080, (ufbx_real)1.480, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_DYNAVISION
-	{ (ufbx_real)2.772, (ufbx_real)2.072, (ufbx_real)1.0 }, // UFBX_APERTURE_FORMAT_IMAX
+	{ 1000, 1000, }, // UFBX_APERTURE_FORMAT_CUSTOM
+	{  404,  295, }, // UFBX_APERTURE_FORMAT_16MM_THEATRICAL
+	{  493,  292, }, // UFBX_APERTURE_FORMAT_SUPER_16MM
+	{  864,  630, }, // UFBX_APERTURE_FORMAT_35MM_ACADEMY
+	{  816,  612, }, // UFBX_APERTURE_FORMAT_35MM_TV_PROJECTION
+	{  980,  735, }, // UFBX_APERTURE_FORMAT_35MM_FULL_APERTURE
+	{  825,  446, }, // UFBX_APERTURE_FORMAT_35MM_185_PROJECTION
+	{  864,  732, }, // UFBX_APERTURE_FORMAT_35MM_ANAMORPHIC
+	{ 2066,  906, }, // UFBX_APERTURE_FORMAT_70MM_PROJECTION
+	{ 1485,  991, }, // UFBX_APERTURE_FORMAT_VISTAVISION
+	{ 2080, 1480, }, // UFBX_APERTURE_FORMAT_DYNAVISION
+	{ 2772, 2072, }, // UFBX_APERTURE_FORMAT_IMAX
 };
 
 ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
@@ -12947,8 +12947,9 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 
 	ufbx_real focal_length = ufbxi_find_real(&camera->props, ufbxi_FocalLength, 0.0f);
 
-	ufbx_vec2 film_size = ufbxi_aperture_formats[camera->aperture_format].film_size;
-	ufbx_real squeeze_ratio = ufbxi_aperture_formats[camera->aperture_format].squeeze_ratio;
+	ufbxi_aperture_format format = ufbxi_aperture_formats[camera->aperture_format];
+	ufbx_vec2 film_size = { (ufbx_real)format.film_size_x * (ufbx_real)0.001, (ufbx_real)format.film_size_y * (ufbx_real)0.001 };
+	ufbx_real squeeze_ratio = camera->aperture_format == UFBX_APERTURE_FORMAT_35MM_ANAMORPHIC ? 2.0f : 1.0f;
 
 	film_size.x = ufbxi_find_real(&camera->props, ufbxi_FilmWidth, film_size.x);
 	film_size.y = ufbxi_find_real(&camera->props, ufbxi_FilmHeight, film_size.y);
