@@ -16855,7 +16855,7 @@ typedef struct {
 
 static int ufbxi_subdivide_sum_real(void *user, void *output, const ufbxi_subdivide_input *inputs, size_t num_inputs)
 {
-	(void*)user;
+	(void)user;
 	ufbx_real dst = 0.0f;
 	ufbxi_nounroll for (size_t i = 0; i != num_inputs; i++) {
 		ufbx_real src = *(const ufbx_real*)inputs[i].data;
@@ -16869,7 +16869,7 @@ static int ufbxi_subdivide_sum_real(void *user, void *output, const ufbxi_subdiv
 
 static int ufbxi_subdivide_sum_vec2(void *user, void *output, const ufbxi_subdivide_input *inputs, size_t num_inputs)
 {
-	(void*)user;
+	(void)user;
 	ufbx_vec2 dst = { 0 };
 	ufbxi_nounroll for (size_t i = 0; i != num_inputs; i++) {
 		const ufbx_vec2 *src = (const ufbx_vec2*)inputs[i].data;
@@ -16884,7 +16884,7 @@ static int ufbxi_subdivide_sum_vec2(void *user, void *output, const ufbxi_subdiv
 
 static int ufbxi_subdivide_sum_vec3(void *user, void *output, const ufbxi_subdivide_input *inputs, size_t num_inputs)
 {
-	(void*)user;
+	(void)user;
 	ufbx_vec3 dst = { 0 };
 	ufbxi_nounroll for (size_t i = 0; i != num_inputs; i++) {
 		const ufbx_vec3 *src = (const ufbx_vec3*)inputs[i].data;
@@ -16900,7 +16900,7 @@ static int ufbxi_subdivide_sum_vec3(void *user, void *output, const ufbxi_subdiv
 
 static int ufbxi_subdivide_sum_vec4(void *user, void *output, const ufbxi_subdivide_input *inputs, size_t num_inputs)
 {
-	(void*)user;
+	(void)user;
 	ufbx_vec4 dst = { 0 };
 	ufbxi_nounroll for (size_t i = 0; i != num_inputs; i++) {
 		const ufbx_vec4 *src = (const ufbx_vec4*)inputs[i].data;
