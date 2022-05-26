@@ -1439,6 +1439,7 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 	return 0;
 }
 
+// TODO: Disable if not UFBX_DEV, add __FUNCTION__?
 #define ufbxi_cond_str(cond) #cond
 
 #define ufbxi_check_err(err, cond) do { if (!ufbxi_trace(cond)) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return 0; } } while (0)
