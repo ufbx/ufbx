@@ -8061,7 +8061,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 			edges[dst_ix].indices[0] = index_ix;
 			if (index_data[index_ix] < 0) {
 				// Previous index is the last one of this polygon, rewind to first index.
-				ufbxi_nounroll while (index_ix > 0 && index_data[index_ix - 1] >= 0) {
+				while (index_ix > 0 && index_data[index_ix - 1] >= 0) {
 					index_ix--;
 				}
 			} else {
