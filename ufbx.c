@@ -8016,6 +8016,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 		ufbxi_check(ufbxi_read_synthetic_blend_shapes(uc, node, info));
 	}
 
+	ufbxi_patch_mesh_reals(mesh);
+
 	// Sometimes there are empty meshes in FBX files?
 	// TODO: Should these be included in output? option? strict mode?
 	ufbxi_node *node_vertices = ufbxi_find_child(node, ufbxi_Vertices);
@@ -10116,6 +10118,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 	ufbxi_check(mesh);
 
 	ufbxi_check(ufbxi_read_synthetic_blend_shapes(uc, node, info));
+
+	ufbxi_patch_mesh_reals(mesh);
 
 	if (uc->opts.ignore_geometry) return 1;
 
@@ -17883,6 +17887,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivi
 	} else {
 		parent = &(ufbxi_get_imp(ufbxi_scene_imp, sc->src_mesh_ptr->element.scene))->refcount;
 	}
+
+	ufbxi_patch_mesh_reals(mesh);
 
 	sc->imp = ufbxi_push(&sc->result, ufbxi_mesh_imp, 1);
 	ufbxi_check_err(&sc->error, sc->imp);
