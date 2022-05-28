@@ -38,18 +38,21 @@
 		#define ufbxi_nodiscard
 	#endif
 	#define ufbxi_unused
+	#define ufbxi_unlikely(cond) (cond)
 #elif !defined(UFBX_STANDARD_C) && (defined(__GNUC__) || defined(__clang__))
 	#define ufbxi_noinline __attribute__((noinline))
 	#define ufbxi_forceinline inline __attribute__((always_inline))
 	#define ufbxi_restrict __restrict
 	#define ufbxi_nodiscard __attribute__((warn_unused_result))
 	#define ufbxi_unused __attribute__((unused))
+	#define ufbxi_unlikely(cond) __builtin_expect((cond), 0)
 #else
 	#define ufbxi_noinline
 	#define ufbxi_forceinline
 	#define ufbxi_nodiscard
 	#define ufbxi_restrict
 	#define ufbxi_unused
+	#define ufbxi_unlikely(cond) (cond)
 #endif
 
 #if !defined(UFBX_STANDARD_C) && defined(__clang__)
@@ -674,7 +677,7 @@ ufbxi_bit_chunk_refill(ufbxi_bit_stream *s, const char *ptr)
 	return s->buffer;
 }
 
-static void ufbxi_bit_stream_init(ufbxi_bit_stream *s, const ufbx_inflate_input *input)
+static ufbxi_noinline void ufbxi_bit_stream_init(ufbxi_bit_stream *s, const ufbx_inflate_input *input)
 {
 	size_t data_size = input->data_size;
 	if (data_size > input->total_size) {
@@ -775,7 +778,7 @@ ufbxi_bit_refill(uint64_t *p_bits, size_t *p_left, const char **p_data, ufbxi_bi
 	*p_left |= 56;
 }
 
-static int
+static ufbxi_noinline int
 ufbxi_bit_copy_bytes(void *dst, ufbxi_bit_stream *s, size_t len)
 {
 	ufbx_assert(s->left % 8 == 0);
@@ -947,7 +950,7 @@ ufbxi_huff_decode_bits(const ufbxi_huff_tree *tree, uint64_t *p_bits, size_t *p_
 	return ~0u;
 }
 
-static void ufbxi_init_static_huff(ufbxi_trees *trees)
+static ufbxi_noinline void ufbxi_init_static_huff(ufbxi_trees *trees)
 {
 	ptrdiff_t err = 0;
 
@@ -1039,7 +1042,7 @@ ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *h
 	return 0;
 }
 
-static ptrdiff_t
+static ufbxi_noinline ptrdiff_t
 ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 {
 	uint64_t bits = dc->stream.bits;
@@ -1090,7 +1093,7 @@ ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	return 0;
 }
 
-static uint32_t ufbxi_adler32(const void *data, size_t size)
+static ufbxi_noinline uint32_t ufbxi_adler32(const void *data, size_t size)
 {
 	size_t a = 1, b = 0;
 	const char *p = (const char*)data;
@@ -1130,7 +1133,7 @@ static uint32_t ufbxi_adler32(const void *data, size_t size)
 	return (uint32_t)((b << 16) | (a & 0xffff));
 }
 
-static int
+static ufbxi_noinline int
 ufbxi_inflate_block(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 {
 	char *out_ptr = dc->out_ptr;
@@ -1440,14 +1443,15 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 }
 
 // TODO: Disable if not UFBX_DEV, add __FUNCTION__?
-#define ufbxi_cond_str(cond) #cond
+// #define ufbxi_cond_str(cond) #cond
+#define ufbxi_cond_str(cond) ""
 
-#define ufbxi_check_err(err, cond) do { if (!ufbxi_trace(cond)) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return 0; } } while (0)
-#define ufbxi_check_return_err(err, cond, ret) do { if (!ufbxi_trace(cond)) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return ret; } } while (0)
+#define ufbxi_check_err(err, cond) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return 0; } } while (0)
+#define ufbxi_check_return_err(err, cond, ret) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail_err(err, desc) return ufbxi_fail_imp_err(err, desc, __FUNCTION__, __LINE__)
 
-#define ufbxi_check_err_msg(err, cond, msg) do { if (!ufbxi_trace(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return 0; } } while (0)
-#define ufbxi_check_return_err_msg(err, cond, ret, msg) do { if (!ufbxi_trace(cond)) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return ret; } } while (0)
+#define ufbxi_check_err_msg(err, cond, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return 0; } } while (0)
+#define ufbxi_check_return_err_msg(err, cond, ret, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail_err_msg(err, desc, msg) return ufbxi_fail_imp_err(err, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
 #define ufbxi_report_err_msg(err, desc, msg) (void)ufbxi_fail_imp_err(err, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
 
@@ -3646,12 +3650,12 @@ static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, co
 	return ufbxi_fail_imp_err(&uc->error, cond, func, line);
 }
 
-#define ufbxi_check(cond) if (!ufbxi_trace(cond)) return ufbxi_fail_imp(uc, ufbxi_cond_str(cond), __FUNCTION__, __LINE__)
-#define ufbxi_check_return(cond, ret) do { if (!ufbxi_trace(cond)) { ufbxi_fail_imp(uc, ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return ret; } } while (0)
+#define ufbxi_check(cond) if (ufbxi_unlikely(!ufbxi_trace(cond))) return ufbxi_fail_imp(uc, ufbxi_cond_str(cond), __FUNCTION__, __LINE__)
+#define ufbxi_check_return(cond, ret) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp(uc, ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail(desc) return ufbxi_fail_imp(uc, desc, __FUNCTION__, __LINE__)
 
-#define ufbxi_check_msg(cond, msg) if (!ufbxi_trace(cond)) return ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__)
-#define ufbxi_check_return_msg(cond, ret, msg) do { if (!ufbxi_trace(cond)) { ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return ret; } } while (0)
+#define ufbxi_check_msg(cond, msg) if (ufbxi_unlikely(!ufbxi_trace(cond))) return ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__)
+#define ufbxi_check_return_msg(cond, ret, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return ret; } } while (0)
 #define ufbxi_fail_msg(desc, msg) return ufbxi_fail_imp(uc, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
 
 // -- Progress
@@ -4454,7 +4458,7 @@ static char ufbxi_normalize_array_type(char type) {
 	}
 }
 
-size_t ufbxi_array_type_size(char type)
+static ufbxi_noinline size_t ufbxi_array_type_size(char type)
 {
 	switch (type) {
 	case 'r': return sizeof(ufbx_real);
@@ -5321,6 +5325,15 @@ ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_swap_endian_value(ufbxi_
 // if the platform is not binary compatible with the FBX data representation.
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_context *uc, char src_type, char dst_type, const void *src, void *dst, size_t size)
 {
+	// TODO: We might want to use the slow path if the machine float/double doesn't match IEEE 754!
+	// Convert commented out lines under some `#if UFBX_NON_IEE754` define or something.
+	if (src_type == dst_type) {
+		src = ufbxi_swap_endian_array(uc, src, size, src_type);
+		ufbxi_check(src);
+		memcpy(dst, src, size * ufbxi_array_type_size(dst_type));
+		return 1;
+	}
+
 	if (uc->file_big_endian) {
 		src = ufbxi_swap_endian_array(uc, src, size, src_type);
 		ufbxi_check(src);
@@ -5328,37 +5341,71 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 
 	switch (dst_type)
 	{
-	#define ufbxi_convert_loop(m_dst, m_cast, m_size, m_expr) { \
+
+	#define ufbxi_convert_loop_fast(m_dst, m_cast, m_size, m_expr) { \
 		const char *val = (const char*)src, *val_end = val + size*m_size; \
 		m_dst *d = (m_dst*)dst; \
 		while (val != val_end) { *d++ = m_cast(m_expr); val += m_size; } }
 
-	#define ufbxi_convert_switch(m_dst, m_cast_int, m_cast_float) \
-		switch (src_type) { \
-		case 'b': ufbxi_convert_loop(m_dst, m_cast_int, 1, *val != 0); break; \
-		case 'i': ufbxi_convert_loop(m_dst, m_cast_int, 4, ufbxi_read_i32(val)); break; \
-		case 'l': ufbxi_convert_loop(m_dst, m_cast_int, 8, ufbxi_read_i64(val)); break; \
-		case 'f': ufbxi_convert_loop(m_dst, m_cast_float, 4, ufbxi_read_f32(val)); break; \
-		case 'd': ufbxi_convert_loop(m_dst, m_cast_float, 8, ufbxi_read_f64(val)); break; \
-		default: ufbxi_fail("Bad array source type"); \
-		} \
-		break; \
+	#define ufbxi_convert_loop_slow(m_dst, m_cast, m_size, m_expr) { \
+		const char *val = (const char*)src, *val_end = val + size*m_size; \
+		m_dst *d = (m_dst*)dst; \
+		ufbxi_nounroll while (val != val_end) { *d++ = m_cast(m_expr); val += m_size; } }
 
 	case 'b':
 		switch (src_type) {
-		case 'b': ufbxi_convert_loop(char, (char), 1, *val != 0); break;
-		case 'i': ufbxi_convert_loop(char, (char), 4, ufbxi_read_i32(val) != 0); break;
-		case 'l': ufbxi_convert_loop(char, (char), 8, ufbxi_read_i64(val) != 0); break;
-		case 'f': ufbxi_convert_loop(char, (char), 4, ufbxi_read_f32(val) != 0); break;
-		case 'd': ufbxi_convert_loop(char, (char), 8, ufbxi_read_f64(val) != 0); break;
+		// case 'b': ufbxi_convert_loop_fast(char, (char), 1, *val != 0); break;
+		case 'i': ufbxi_convert_loop_slow(char, (char), 4, ufbxi_read_i32(val) != 0); break;
+		case 'l': ufbxi_convert_loop_slow(char, (char), 8, ufbxi_read_i64(val) != 0); break;
+		case 'f': ufbxi_convert_loop_slow(char, (char), 4, ufbxi_read_f32(val) != 0); break;
+		case 'd': ufbxi_convert_loop_slow(char, (char), 8, ufbxi_read_f64(val) != 0); break;
 		default: ufbxi_fail("Bad array source type");
 		}
 		break;
 
-	case 'i': ufbxi_convert_switch(int32_t, (int32_t), ufbxi_f64_to_i32); break;
-	case 'l': ufbxi_convert_switch(int64_t, (int64_t), ufbxi_f64_to_i64); break;
-	case 'f': ufbxi_convert_switch(float, (float), (float)); break;
-	case 'd': ufbxi_convert_switch(double, (double), (double)); break;
+	case 'i':
+		switch (src_type) {
+		case 'b': ufbxi_convert_loop_slow(int32_t, (int32_t), 1, *val != 0); break;
+		// case 'i': ufbxi_convert_loop_slow(int32_t, (int32_t), 4, ufbxi_read_i32(val)); break;
+		case 'l': ufbxi_convert_loop_fast(int32_t, (int32_t), 8, ufbxi_read_i64(val)); break;
+		case 'f': ufbxi_convert_loop_slow(int32_t, ufbxi_f64_to_i32, 4, ufbxi_read_f32(val)); break;
+		case 'd': ufbxi_convert_loop_slow(int32_t, ufbxi_f64_to_i32, 8, ufbxi_read_f64(val)); break;
+		default: ufbxi_fail("Bad array source type");
+		}
+		break;
+
+	case 'l':
+		switch (src_type) {
+		case 'b': ufbxi_convert_loop_slow(int64_t, (int64_t), 1, *val != 0); break;
+		case 'i': ufbxi_convert_loop_fast(int64_t, (int64_t), 4, ufbxi_read_i32(val)); break;
+		// case 'l': ufbxi_convert_loop_slow(int64_t, (int64_t), 8, ufbxi_read_i64(val)); break;
+		case 'f': ufbxi_convert_loop_slow(int64_t, ufbxi_f64_to_i64, 4, ufbxi_read_f32(val)); break;
+		case 'd': ufbxi_convert_loop_slow(int64_t, ufbxi_f64_to_i64, 8, ufbxi_read_f64(val)); break;
+		default: ufbxi_fail("Bad array source type");
+		}
+		break;
+
+	case 'f':
+		switch (src_type) {
+		case 'b': ufbxi_convert_loop_slow(float, (float), 1, *val != 0); break;
+		case 'i': ufbxi_convert_loop_slow(float, (float), 4, ufbxi_read_i32(val)); break;
+		case 'l': ufbxi_convert_loop_slow(float, (float), 8, ufbxi_read_i64(val)); break;
+		// case 'f': ufbxi_convert_loop_slow(float, (float), 4, ufbxi_read_f32(val)); break;
+		case 'd': ufbxi_convert_loop_fast(float, (float), 8, ufbxi_read_f64(val)); break;
+		default: ufbxi_fail("Bad array source type");
+		}
+		break;
+
+	case 'd':
+		switch (src_type) {
+		case 'b': ufbxi_convert_loop_slow(double, (double), 1, *val != 0); break;
+		case 'i': ufbxi_convert_loop_slow(double, (double), 4, ufbxi_read_i32(val)); break;
+		case 'l': ufbxi_convert_loop_slow(double, (double), 8, ufbxi_read_i64(val)); break;
+		case 'f': ufbxi_convert_loop_fast(double, (double), 4, ufbxi_read_f32(val)); break;
+		// case 'd': ufbxi_convert_loop_slow(double, (double), 8, ufbxi_read_f64(val)); break;
+		default: ufbxi_fail("Bad array source type");
+		}
+		break;
 
 	default: return 0;
 
@@ -7863,6 +7910,79 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_blend_shapes(ufbx
 	return 1;
 }
 
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_process_indices(ufbxi_context *uc, ufbx_mesh *mesh, int32_t *index_data)
+{
+	// Count the number of faces and allocate the index list
+	// Indices less than zero (~actual_index) ends a polygon
+	size_t num_total_faces = 0;
+	ufbxi_for (int32_t, p_ix, index_data, mesh->num_indices) {
+		num_total_faces += (*p_ix < 0) ? 1 : 0;
+	}
+	mesh->faces.data = ufbxi_push(&uc->result, ufbx_face, num_total_faces);
+	ufbxi_check(mesh->faces.data);
+
+	size_t num_triangles = 0;
+	size_t num_bad_faces = 0;
+	size_t max_face_triangles = 0;
+
+	ufbx_face *dst_face = mesh->faces.data;
+	int32_t *p_face_begin = index_data;
+	ufbxi_for (int32_t, p_ix, index_data, mesh->num_indices) {
+		int32_t ix = *p_ix;
+		// Un-negate final indices of polygons
+		if (ix < 0) {
+			ix = ~ix;
+			*p_ix =  ix;
+			uint32_t num_indices = (uint32_t)((p_ix - p_face_begin) + 1);
+			dst_face->index_begin = (uint32_t)(p_face_begin - index_data);
+			dst_face->num_indices = num_indices;
+			if (num_indices >= 3) {
+				num_triangles += num_indices - 2;
+				max_face_triangles = ufbxi_max_sz(max_face_triangles, num_indices - 2);
+			} else {
+				num_bad_faces++;
+			}
+			dst_face++;
+			p_face_begin = p_ix + 1;
+		}
+		ufbxi_check((size_t)ix < mesh->num_vertices);
+	}
+
+	mesh->vertex_position.indices.data = index_data;
+	mesh->num_faces = dst_face - mesh->faces.data;
+	mesh->faces.count = mesh->num_faces;
+	mesh->num_triangles = num_triangles;
+	mesh->max_face_triangles = max_face_triangles;
+	mesh->num_bad_faces = num_bad_faces;
+
+	mesh->vertex_first_index.count = mesh->num_vertices;
+	mesh->vertex_first_index.data = ufbxi_push(&uc->result, int32_t, mesh->num_vertices);
+	ufbxi_check(mesh->vertex_first_index.data);
+
+	ufbxi_for_list(int32_t, p_vx_ix, mesh->vertex_first_index) {
+		*p_vx_ix = -1;
+	}
+
+	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
+		int32_t vx = mesh->vertex_indices.data[ix];
+		if (vx >= 0 && (size_t)vx < mesh->num_vertices) {
+			if (mesh->vertex_first_index.data[vx] < 0) {
+				mesh->vertex_first_index.data[vx] = (int32_t)ix;
+			}
+		} else if (!uc->opts.allow_out_of_bounds_vertex_indices) {
+			if (uc->opts.strict) ufbxi_fail("Index out of range");
+			mesh->vertex_indices.data[ix] = 0;
+		}
+	}
+
+	// HACK(consecutive-faces): Prepare for finalize to re-use a consecutive/zero
+	// index buffer for face materials..
+	uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, mesh->num_faces);
+	uc->max_consecutive_indices = ufbxi_max_sz(uc->max_consecutive_indices, mesh->num_faces);
+
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_mesh *ufbxi_restrict mesh = ufbxi_push_element(uc, info, ufbx_mesh, UFBX_ELEMENT_MESH);
@@ -7941,7 +8061,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 			edges[dst_ix].indices[0] = index_ix;
 			if (index_data[index_ix] < 0) {
 				// Previous index is the last one of this polygon, rewind to first index.
-				while (index_ix > 0 && index_data[index_ix - 1] >= 0) {
+				ufbxi_nounroll while (index_ix > 0 && index_data[index_ix - 1] >= 0) {
 					index_ix--;
 				}
 			} else {
@@ -7958,73 +8078,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 		mesh->num_edges = mesh->edges.count;
 	}
 
-	// Count the number of faces and allocate the index list
-	// Indices less than zero (~actual_index) ends a polygon
-	size_t num_total_faces = 0;
-	ufbxi_for (int32_t, p_ix, index_data, mesh->num_indices) {
-		if (*p_ix < 0) num_total_faces++;
-	}
-	mesh->faces.data = ufbxi_push(&uc->result, ufbx_face, num_total_faces);
-	ufbxi_check(mesh->faces.data);
-
-	size_t num_triangles = 0;
-	size_t num_bad_faces = 0;
-	size_t max_face_triangles = 0;
-
-	ufbx_face *dst_face = mesh->faces.data;
-	int32_t *p_face_begin = index_data;
-	ufbxi_for (int32_t, p_ix, index_data, mesh->num_indices) {
-		int32_t ix = *p_ix;
-		// Un-negate final indices of polygons
-		if (ix < 0) {
-			ix = ~ix;
-			*p_ix =  ix;
-			uint32_t num_indices = (uint32_t)((p_ix - p_face_begin) + 1);
-			dst_face->index_begin = (uint32_t)(p_face_begin - index_data);
-			dst_face->num_indices = num_indices;
-			if (num_indices >= 3) {
-				num_triangles += num_indices - 2;
-				max_face_triangles = ufbxi_max_sz(max_face_triangles, num_indices - 2);
-			} else {
-				num_bad_faces++;
-			}
-			dst_face++;
-			p_face_begin = p_ix + 1;
-		}
-		ufbxi_check((size_t)ix < mesh->num_vertices);
-	}
-
-	mesh->vertex_position.indices.data = index_data;
-	mesh->num_faces = dst_face - mesh->faces.data;
-	mesh->faces.count = mesh->num_faces;
-	mesh->num_triangles = num_triangles;
-	mesh->max_face_triangles = max_face_triangles;
-	mesh->num_bad_faces = num_bad_faces;
-
-	mesh->vertex_first_index.count = mesh->num_vertices;
-	mesh->vertex_first_index.data = ufbxi_push(&uc->result, int32_t, mesh->num_vertices);
-	ufbxi_check(mesh->vertex_first_index.data);
-
-	ufbxi_for_list(int32_t, p_vx_ix, mesh->vertex_first_index) {
-		*p_vx_ix = -1;
-	}
-
-	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
-		int32_t vx = mesh->vertex_indices.data[ix];
-		if (vx >= 0 && (size_t)vx < mesh->num_vertices) {
-			if (mesh->vertex_first_index.data[vx] < 0) {
-				mesh->vertex_first_index.data[vx] = (int32_t)ix;
-			}
-		} else if (!uc->opts.allow_out_of_bounds_vertex_indices) {
-			if (uc->opts.strict) ufbxi_fail("Index out of range");
-			mesh->vertex_indices.data[ix] = 0;
-		}
-	}
-
-	// HACK(consecutive-faces): Prepare for finalize to re-use a consecutive/zero
-	// index buffer for face materials..
-	uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, mesh->num_faces);
-	uc->max_consecutive_indices = ufbxi_max_sz(uc->max_consecutive_indices, mesh->num_faces);
+	ufbxi_check(ufbxi_process_indices(uc, mesh, index_data));
 
 	// Count the number of UV/color sets
 	size_t num_uv = 0, num_color = 0, num_bitangents = 0, num_tangents = 0;
@@ -10095,73 +10149,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 		}
 	}
 
-	// Count the number of faces and allocate the index list
-	// Indices less than zero (~actual_index) ends a polygon
-	size_t num_total_faces = 0;
-	ufbxi_for (int32_t, p_ix, index_data, mesh->num_indices) {
-		if (*p_ix < 0) num_total_faces++;
-	}
-	mesh->faces.data = ufbxi_push(&uc->result, ufbx_face, num_total_faces);
-	ufbxi_check(mesh->faces.data);
-
-	size_t num_triangles = 0;
-	size_t num_bad_faces = 0;
-	size_t max_face_triangles = 0;
-
-	ufbx_face *dst_face = mesh->faces.data;
-	int32_t *p_face_begin = index_data;
-	ufbxi_for (int32_t, p_ix, index_data, mesh->num_indices) {
-		int32_t ix = *p_ix;
-		// Un-negate final indices of polygons
-		if (ix < 0) {
-			ix = ~ix;
-			*p_ix =  ix;
-			uint32_t num_indices = (uint32_t)((p_ix - p_face_begin) + 1);
-			dst_face->index_begin = (uint32_t)(p_face_begin - index_data);
-			dst_face->num_indices = num_indices;
-			if (num_indices >= 3) {
-				num_triangles += num_indices - 2;
-				max_face_triangles = ufbxi_max_sz(max_face_triangles, num_indices - 2);
-			} else {
-				num_bad_faces++;
-			}
-			dst_face++;
-			p_face_begin = p_ix + 1;
-		}
-		ufbxi_check((size_t)ix < mesh->num_vertices);
-	}
-
-	mesh->vertex_position.indices.data = index_data;
-	mesh->num_faces = dst_face - mesh->faces.data;
-	mesh->faces.count = mesh->num_faces;
-	mesh->num_triangles = num_triangles;
-	mesh->max_face_triangles = max_face_triangles;
-	mesh->num_bad_faces = num_bad_faces;
-
-	mesh->vertex_first_index.data = ufbxi_push(&uc->result, int32_t, mesh->num_vertices);
-	ufbxi_check(mesh->vertex_first_index.data);
-	mesh->vertex_first_index.count = mesh->num_vertices;
-
-	ufbxi_for_list(int32_t, p_vx_ix, mesh->vertex_first_index) {
-		*p_vx_ix = -1;
-	}
-
-	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
-		int32_t vx = mesh->vertex_indices.data[ix];
-		if (vx >= 0 && (size_t)vx < mesh->num_vertices) {
-			if (mesh->vertex_first_index.data[vx] < 0) {
-				mesh->vertex_first_index.data[vx] = (int32_t)ix;
-			}
-		} else if (!uc->opts.allow_out_of_bounds_vertex_indices) {
-			if (uc->opts.strict) ufbxi_fail("Index out of range");
-			mesh->vertex_indices.data[ix] = 0;
-		}
-	}
-
-	// HACK(consecutive-faces): Prepare for finalize to re-use a consecutive/zero
-	// index buffer for face materials..
-	uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, mesh->num_faces);
-	uc->max_consecutive_indices = ufbxi_max_sz(uc->max_consecutive_indices, mesh->num_faces);
+	ufbxi_check(ufbxi_process_indices(uc, mesh, index_data));
 
 	// Normals are either per-vertex or per-index in legacy FBX files?
 	// If the version is 5000 prefer per-vertex, otherwise per-index...
