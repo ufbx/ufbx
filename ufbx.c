@@ -14983,6 +14983,14 @@ ufbx_inline ufbx_vec3 ufbxi_normalize3(ufbx_vec3 a) {
 	}
 }
 
+static ufbxi_noinline ufbx_vec3 ufbxi_slow_normalize3(const ufbx_vec3 *a) {
+	return ufbxi_normalize3(*a);
+}
+
+static ufbxi_noinline ufbx_vec3 ufbxi_slow_normalized_cross3(const ufbx_vec3 *a, const ufbx_vec3 *b) {
+	return ufbxi_normalize3(ufbxi_cross3(*a, *b));
+}
+
 // -- Animation evaluation
 
 static int ufbxi_cmp_prop_override(const void *va, const void *vb)
@@ -16012,13 +16020,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 
 	int32_t *position_ix = ufbxi_push(&tc->tmp, int32_t, num_indices);
 	ufbx_vec2 *uvs = ufbxi_push(&tc->result, ufbx_vec2, num_indices + 1);
-	ufbx_vec3 *normals = ufbxi_push(&tc->result, ufbx_vec3, num_indices + 1);
 	ufbx_vec3 *tangents = ufbxi_push(&tc->result, ufbx_vec3, num_indices + 1);
 	ufbx_vec3 *bitangents = ufbxi_push(&tc->result, ufbx_vec3, num_indices + 1);
-	ufbxi_check_err(&tc->error, position_ix && uvs && normals && tangents && bitangents);
+	ufbxi_check_err(&tc->error, position_ix && uvs && tangents && bitangents);
 
 	*uvs++ = ufbx_zero_vec2;
-	*normals++ = ufbx_zero_vec3;
 	*tangents++ = ufbx_zero_vec3;
 	*bitangents++ = ufbx_zero_vec3;
 
@@ -16060,31 +16066,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 					uint32_t pos_ix = ufbxi_insert_spatial(&tc->position_map, &pos);
 					ufbxi_check_err(&tc->error, pos_ix != UINT32_MAX);
 
-					const ufbx_real fudge_eps = 1e-10f;
-					bool fudged = false;
-					if (ufbxi_dot3(point.derivative_u, point.derivative_u) < 1e-20f || ufbxi_dot3(point.derivative_v, point.derivative_v) < 1e-20f) {
-						pu += pu + fudge_eps >= surface->basis_u.t_max ? -fudge_eps : fudge_eps;
-						pv += pv + fudge_eps >= surface->basis_v.t_max ? -fudge_eps : fudge_eps;
-						fudged = true;
-					}
-					if (fudged) {
-						point = ufbx_evaluate_nurbs_surface(surface, pu, pv);
-					}
-
-					ufbx_vec3 tangent_u = ufbxi_normalize3(point.derivative_u);
-					ufbx_vec3 tangent_v = ufbxi_normalize3(point.derivative_v);
-					ufbx_vec3 normal = ufbxi_normalize3(ufbxi_cross3(tangent_u, tangent_v));
-					if (surface->flip_normals) {
-						normal.x = -normal.x;
-						normal.y = -normal.y;
-						normal.z = -normal.z;
-					}
+					ufbx_vec3 tangent_u = ufbxi_slow_normalize3(&point.derivative_u);
+					ufbx_vec3 tangent_v = ufbxi_slow_normalize3(&point.derivative_v);
 
 					size_t ix = ix_v * indices_u + ix_u;
 					position_ix[ix] = (int32_t)pos_ix;
 					uvs[ix].x = original_u;
 					uvs[ix].y = original_v;
-					normals[ix] = normal;
 					tangents[ix] = tangent_u;
 					bitangents[ix] = tangent_v;
 				}
@@ -16138,9 +16126,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 
 	size_t num_positions = tc->position_map.size;
 	ufbx_vec3 *positions = ufbxi_push(&tc->result, ufbx_vec3, num_positions + 1);
-	ufbxi_check_err(&tc->error, positions);
+	ufbx_vec3 *normals = ufbxi_push(&tc->result, ufbx_vec3, num_positions + 1);
+	ufbxi_check_err(&tc->error, positions && normals);
 
 	*positions++ = ufbx_zero_vec3;
+	*normals++ = ufbx_zero_vec3;
 
 	ufbxi_spatial_bucket *buckets = (ufbxi_spatial_bucket*)tc->position_map.items;
 	for (size_t i = 0; i < num_positions; i++) {
@@ -16177,8 +16167,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 
 	mesh->vertex_normal.exists = true;
 	mesh->vertex_normal.values.data = normals;
-	mesh->vertex_normal.values.count = dst_index;
-	mesh->vertex_normal.indices.data = attrib_ix;
+	mesh->vertex_normal.values.count = num_positions;
+	mesh->vertex_normal.indices.data = vertex_ix;
 	mesh->vertex_normal.indices.count = dst_index;
 	mesh->vertex_normal.value_reals = 3;
 
@@ -16236,6 +16226,18 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 	mesh->skinned_normal = mesh->vertex_normal;
 
 	ufbxi_check_err(&tc->error, ufbxi_finalize_mesh(&tc->result, &tc->error, mesh));
+
+	ufbx_compute_normals(mesh, &mesh->vertex_position,
+		mesh->vertex_normal.indices.data, mesh->vertex_normal.indices.count,
+		mesh->vertex_normal.values.data, mesh->vertex_normal.values.count);
+
+	if (surface->flip_normals) {
+		ufbxi_nounroll ufbxi_for_list(ufbx_vec3, normal, mesh->vertex_normal.values) {
+			normal->x *= -1.0f;
+			normal->y *= -1.0f;
+			normal->z *= -1.0f;
+		}
+	}
 
 	tc->imp = ufbxi_push(&tc->result, ufbxi_mesh_imp, 1);
 	ufbxi_check_err(&tc->error, tc->imp);
@@ -16462,8 +16464,8 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 		axis.y = 1.0f;
 		axis.z = 0.0f;
 	}
-	nc->axes[0] = ufbxi_normalize3(ufbxi_cross3(axis, normal));
-	nc->axes[1] = ufbxi_normalize3(ufbxi_cross3(normal, nc->axes[0]));
+	nc->axes[0] = ufbxi_slow_normalized_cross3(&axis, &normal);
+	nc->axes[1] = ufbxi_slow_normalized_cross3(&normal, &nc->axes[0]);
 	nc->axes[2] = normal;
 
 	uint32_t *kd_indices = indices;
@@ -17599,14 +17601,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 	if (sc->opts.interpolate_normals && !sc->opts.ignore_normals) {
 		ufbxi_check_err(&sc->error, ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&mesh->vertex_normal, sc->opts.boundary, true));
 		ufbxi_for_list(ufbx_vec3, normal, result->vertex_normal.values) {
-			*normal = ufbxi_normalize3(*normal);
+			*normal = ufbxi_slow_normalize3(normal);
 		}
 		if (mesh->skinned_normal.values.data == mesh->vertex_normal.values.data) {
 			result->skinned_normal = result->vertex_normal;
 		} else {
 			ufbxi_check_err(&sc->error, ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&result->skinned_normal, sc->opts.boundary, true));
 			ufbxi_for_list(ufbx_vec3, normal, result->skinned_normal.values) {
-				*normal = ufbxi_normalize3(*normal);
+				*normal = ufbxi_slow_normalize3(normal);
 			}
 		}
 	}
@@ -19988,7 +19990,7 @@ size_t ufbx_catch_generate_normal_mapping(ufbx_panic *panic, const ufbx_mesh *me
 	return (size_t)next_index;
 }
 
-size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, const ufbx_topo_edge *topo, size_t num_topo, int32_t *normal_indices, size_t num_normal_indices, bool assume_smooth)
+ufbx_abi size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh, const ufbx_topo_edge *topo, size_t num_topo, int32_t *normal_indices, size_t num_normal_indices, bool assume_smooth)
 {
 	return ufbx_catch_generate_normal_mapping(NULL, mesh, topo, num_topo, normal_indices, num_normal_indices, assume_smooth);
 }
