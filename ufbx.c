@@ -1443,8 +1443,8 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 }
 
 // TODO: Disable if not UFBX_DEV, add __FUNCTION__?
-// #define ufbxi_cond_str(cond) #cond
-#define ufbxi_cond_str(cond) ""
+#define ufbxi_cond_str(cond) #cond
+// #define ufbxi_cond_str(cond) ""
 
 #define ufbxi_check_err(err, cond) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return 0; } } while (0)
 #define ufbxi_check_return_err(err, cond, ret) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return ret; } } while (0)
