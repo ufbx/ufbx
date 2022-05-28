@@ -7983,16 +7983,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_process_indices(ufbxi_context *u
 	return 1;
 }
 
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+ufbxi_noinline static void ufbxi_patch_mesh_reals(ufbx_mesh *mesh)
 {
-	ufbx_mesh *ufbxi_restrict mesh = ufbxi_push_element(uc, info, ufbx_mesh, UFBX_ELEMENT_MESH);
-	ufbxi_check(mesh);
-
-	// In up to version 7100 FBX files blend shapes are contained within the same geometry node
-	if (uc->version <= 7100) {
-		ufbxi_check(ufbxi_read_synthetic_blend_shapes(uc, node, info));
-	}
-
 	mesh->vertex_position.value_reals = 3;
 	mesh->vertex_normal.value_reals = 3;
 	mesh->vertex_uv.value_reals = 2;
@@ -8002,6 +7994,27 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	mesh->vertex_crease.value_reals = 1;
 	mesh->skinned_position.value_reals = 3;
 	mesh->skinned_normal.value_reals = 3;
+
+	ufbxi_nounroll ufbxi_for_list(ufbx_uv_set, set, mesh->uv_sets) {
+		set->vertex_uv.value_reals = 2;
+		set->vertex_tangent.value_reals = 3;
+		set->vertex_bitangent.value_reals = 3;
+	}
+
+	ufbxi_nounroll ufbxi_for_list(ufbx_color_set, set, mesh->color_sets) {
+		set->vertex_color.value_reals = 4;
+	}
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_mesh *ufbxi_restrict mesh = ufbxi_push_element(uc, info, ufbx_mesh, UFBX_ELEMENT_MESH);
+	ufbxi_check(mesh);
+
+	// In up to version 7100 FBX files blend shapes are contained within the same geometry node
+	if (uc->version <= 7100) {
+		ufbxi_check(ufbxi_read_synthetic_blend_shapes(uc, node, info));
+	}
 
 	// Sometimes there are empty meshes in FBX files?
 	// TODO: Should these be included in output? option? strict mode?
@@ -8111,7 +8124,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 				ufbxi_Normals, ufbxi_NormalsIndex, 'r', 3));
 		} else if (n->name == ufbxi_LayerElementBinormal) {
 			ufbxi_tangent_layer *layer = &bitangents[num_bitangents_read++];
-			layer->elem.value_reals = 3;
 
 			ufbxi_ignore(ufbxi_get_val1(n, "I", &layer->index));
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_attrib*)&layer->elem,
@@ -8120,7 +8132,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 
 		} else if (n->name == ufbxi_LayerElementTangent) {
 			ufbxi_tangent_layer *layer = &tangents[num_tangents_read++];
-			layer->elem.value_reals = 3;
 
 			ufbxi_ignore(ufbxi_get_val1(n, "I", &layer->index));
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_attrib*)&layer->elem,
@@ -8129,9 +8140,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 
 		} else if (n->name == ufbxi_LayerElementUV) {
 			ufbx_uv_set *set = &mesh->uv_sets.data[mesh->uv_sets.count++];
-			set->vertex_uv.value_reals = 2;
-			set->vertex_tangent.value_reals = 3;
-			set->vertex_bitangent.value_reals = 3;
 
 			ufbxi_ignore(ufbxi_get_val1(n, "I", &set->index));
 			if (!ufbxi_find_val1(n, ufbxi_Name, "S", &set->name)) {
@@ -8144,7 +8152,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 
 		} else if (n->name == ufbxi_LayerElementColor) {
 			ufbx_color_set *set = &mesh->color_sets.data[mesh->color_sets.count++];
-			set->vertex_color.value_reals = 4;
 
 			ufbxi_ignore(ufbxi_get_val1(n, "I", &set->index));
 			if (!ufbxi_find_val1(n, ufbxi_Name, "S", &set->name)) {
@@ -8300,6 +8307,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	mesh->skinned_is_local = true;
 	mesh->skinned_position = mesh->vertex_position;
 	mesh->skinned_normal = mesh->vertex_normal;
+
+	ufbxi_patch_mesh_reals(mesh);
 
 	// Sort UV and color sets by set index
 	ufbxi_check(ufbxi_sort_uv_sets(uc, mesh->uv_sets.data, mesh->uv_sets.count));
@@ -10108,16 +10117,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 
 	ufbxi_check(ufbxi_read_synthetic_blend_shapes(uc, node, info));
 
-	mesh->vertex_position.value_reals = 3;
-	mesh->vertex_normal.value_reals = 3;
-	mesh->vertex_uv.value_reals = 2;
-	mesh->vertex_tangent.value_reals = 3;
-	mesh->vertex_bitangent.value_reals = 3;
-	mesh->vertex_color.value_reals = 4;
-	mesh->vertex_crease.value_reals = 1;
-	mesh->skinned_position.value_reals = 3;
-	mesh->skinned_normal.value_reals = 3;
-
 	if (uc->opts.ignore_geometry) return 1;
 
 	ufbxi_value_array *vertices = ufbxi_get_array(node_vertices, 'r');
@@ -10183,9 +10182,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 		ufbxi_check(set);
 		set->index = 0;
 		set->name = ufbx_empty_string;
-		set->vertex_uv.value_reals = 2;
-		set->vertex_tangent.value_reals = 3;
-		set->vertex_bitangent.value_reals = 3;
 		ufbxi_check(ufbxi_read_vertex_element(uc, mesh, uv_info, (ufbx_vertex_attrib*)&set->vertex_uv,
 			ufbxi_TextureUV, ufbxi_TextureUVVerticeIndex, 'r', 2));
 
@@ -10251,6 +10247,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 	mesh->skinned_is_local = true;
 	mesh->skinned_position = mesh->vertex_position;
 	mesh->skinned_normal = mesh->vertex_normal;
+
+	ufbxi_patch_mesh_reals(mesh);
 
 	return 1;
 }
@@ -16155,7 +16153,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 	mesh->vertex_position.values.count = num_positions;
 	mesh->vertex_position.indices.data = vertex_ix;
 	mesh->vertex_position.indices.count = dst_index;
-	mesh->vertex_position.value_reals = 3;
 	mesh->vertex_position.unique_per_vertex = true;
 
 	mesh->vertex_uv.exists = true;
@@ -16163,31 +16160,24 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 	mesh->vertex_uv.values.count = dst_index;
 	mesh->vertex_uv.indices.data = attrib_ix;
 	mesh->vertex_uv.indices.count = dst_index;
-	mesh->vertex_uv.value_reals = 2;
 
 	mesh->vertex_normal.exists = true;
 	mesh->vertex_normal.values.data = normals;
 	mesh->vertex_normal.values.count = num_positions;
 	mesh->vertex_normal.indices.data = vertex_ix;
 	mesh->vertex_normal.indices.count = dst_index;
-	mesh->vertex_normal.value_reals = 3;
 
 	mesh->vertex_tangent.exists = true;
 	mesh->vertex_tangent.values.data = tangents;
 	mesh->vertex_tangent.values.count = dst_index;
 	mesh->vertex_tangent.indices.data = attrib_ix;
 	mesh->vertex_tangent.indices.count = dst_index;
-	mesh->vertex_tangent.value_reals = 3;
 
 	mesh->vertex_bitangent.exists = true;
 	mesh->vertex_bitangent.values.data = bitangents;
 	mesh->vertex_bitangent.values.count = dst_index;
 	mesh->vertex_bitangent.indices.data = attrib_ix;
 	mesh->vertex_bitangent.indices.count = dst_index;
-	mesh->vertex_bitangent.value_reals = 3;
-
-	mesh->vertex_crease.value_reals = 1;
-	mesh->vertex_color.value_reals = 4;
 
 	ufbx_uv_set *uv_set = ufbxi_push(&tc->result, ufbx_uv_set, 1);
 	ufbxi_check_err(&tc->error, uv_set);
@@ -16241,6 +16231,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 
 	tc->imp = ufbxi_push(&tc->result, ufbxi_mesh_imp, 1);
 	ufbxi_check_err(&tc->error, tc->imp);
+
+	ufbxi_patch_mesh_reals(mesh);
 
 	ufbxi_init_ref(&tc->imp->refcount, UFBXI_MESH_IMP_MAGIC, &(ufbxi_get_imp(ufbxi_scene_imp, surface->element.scene))->refcount);
 
@@ -17579,9 +17571,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 		} else {
 			memset(&set->vertex_tangent, 0, sizeof(set->vertex_tangent));
 			memset(&set->vertex_bitangent, 0, sizeof(set->vertex_bitangent));
-			set->vertex_uv.value_reals = 2;
-			set->vertex_tangent.value_reals = 3;
-			set->vertex_bitangent.value_reals = 3;
 		}
 	}
 
@@ -17804,6 +17793,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 	}
 
 	ufbxi_check_err(&sc->error, ufbxi_finalize_mesh(&sc->result, &sc->error, result));
+	ufbxi_patch_mesh_reals(result);
 
 	return 1;
 }
@@ -17857,17 +17847,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivi
 	mesh->max_face_triangles = 2;
 	mesh->num_bad_faces = 0;
 
-	// TODO: Move this to an utility?
-	mesh->vertex_position.value_reals = 3;
-	mesh->vertex_normal.value_reals = 3;
-	mesh->vertex_uv.value_reals = 2;
-	mesh->vertex_tangent.value_reals = 3;
-	mesh->vertex_bitangent.value_reals = 3;
-	mesh->vertex_color.value_reals = 4;
-	mesh->vertex_crease.value_reals = 1;
-	mesh->skinned_position.value_reals = 3;
-	mesh->skinned_normal.value_reals = 3;
-
 	if (!sc->opts.interpolate_normals && !sc->opts.ignore_normals) {
 
 		ufbx_topo_edge *topo = ufbxi_push(&sc->tmp, ufbx_topo_edge, mesh->num_indices);
@@ -17894,7 +17873,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivi
 		mesh->vertex_normal.values.count = num_normals;
 		mesh->vertex_normal.indices.data = normal_indices;
 		mesh->vertex_normal.indices.count = mesh->num_indices;
-		mesh->vertex_normal.value_reals = 3;
 
 		mesh->skinned_normal = mesh->vertex_normal;
 	}
