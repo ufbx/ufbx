@@ -15,6 +15,82 @@
 #define UFBXI_MAX_NURBS_ORDER 128
 #endif
 
+// -- Feature exclusion
+
+#if !defined(UFBX_ONLY_LOADING)
+	#if !defined(UFBX_NO_SUBDIVISION)
+		#define UFBXI_FEATURE_SUBDIVISION 1
+	#endif
+	#if !defined(UFBX_NO_TESSELLATION)
+		#define UFBXI_FEATURE_TESSELLATION 1
+	#endif
+	#if !defined(UFBX_NO_GEOMETRY_CACHE)
+		#define UFBXI_FEATURE_GEOMETRY_CACHE 1
+	#endif
+	#if !defined(UFBX_NO_SCENE_EVALUATION)
+		#define UFBXI_FEATURE_SCENE_EVALUATION 1
+	#endif
+	#if !defined(UFBX_NO_TRIANGULATION)
+		#define UFBXI_FEATURE_TRIANGULATION 1
+	#endif
+#endif
+
+#if defined(UFBXI_FEATURE_SUBDIVISION) && defined(UFBX_ENABLE_SUBDIVISION)
+	#define UFBXI_FEATURE_SUBDIVISION 1
+#endif
+#if defined(UFBXI_FEATURE_TESSELLATION) && defined(UFBX_ENABLE_TESSELLATION)
+	#define UFBXI_FEATURE_TESSELLATION 1
+#endif
+#if defined(UFBXI_FEATURE_GEOMETRY_CACHE) && defined(UFBX_ENABLE_GEOMETRY_CACHE)
+	#define UFBXI_FEATURE_GEOMETRY_CACHE 1
+#endif
+#if defined(UFBXI_FEATURE_SCENE_EVALUATION) && defined(UFBX_ENABLE_SCENE_EVALUATION)
+	#define UFBXI_FEATURE_SCENE_EVALUATION 1
+#endif
+#if defined(UFBXI_FEATURE_TRIANGULATION) && defined(UFBX_ENABLE_TRIANGULATION)
+	#define UFBXI_FEATURE_TRIANGULATION 1
+#endif
+
+#if !defined(UFBXI_FEATURE_SUBDIVISION)
+	#define UFBXI_FEATURE_SUBDIVISION 0
+#endif
+#if !defined(UFBXI_FEATURE_TESSELLATION)
+	#define UFBXI_FEATURE_TESSELLATION 0
+#endif
+#if !defined(UFBXI_FEATURE_GEOMETRY_CACHE)
+	#define UFBXI_FEATURE_GEOMETRY_CACHE 0
+#endif
+#if !defined(UFBXI_FEATURE_SCENE_EVALUATION)
+	#define UFBXI_FEATURE_SCENE_EVALUATION 0
+#endif
+#if !defined(UFBXI_FEATURE_TRIANGULATION)
+	#define UFBXI_FEATURE_TRIANGULATION 0
+#endif
+
+// Derived features
+
+#if UFBXI_FEATURE_GEOMETRY_CACHE
+	#define UFBXI_FEATURE_XML 1
+#else
+	#define UFBXI_FEATURE_XML 0
+#endif
+
+#if UFBXI_FEATURE_TESSELLATION
+	#define UFBXI_FEATURE_SPATIAL 1
+#else
+	#define UFBXI_FEATURE_SPATIAL 0
+#endif
+
+#if UFBXI_FEATURE_TRIANGULATION
+	#define UFBXI_FEATURE_KD 1
+#else
+	#define UFBXI_FEATURE_KD 0
+#endif
+
+#if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_SPATIAL || !UFBXI_FEATURE_KD
+	#define UFBXI_PARTIAL_FEATURES 1
+#endif
+
 // -- Headers
 
 #include <string.h>
@@ -90,6 +166,10 @@
 	#if defined(UFBX_STANDARD_C)
 		#pragma clang diagnostic ignored "-Wunused-function"
 	#endif
+	#if defined(UFBXI_PARTIAL_FEATURES)
+		#pragma clang diagnostic ignored "-Wunused-function"
+		#pragma clang diagnostic ignored "-Wunused-parameter"
+	#endif
 #endif
 
 #if defined(__GNUC__)
@@ -98,6 +178,10 @@
 	#pragma GCC diagnostic ignored "-Wmissing-braces"
 	#if defined(UFBX_STANDARD_C)
 		#pragma GCC diagnostic ignored "-Wunused-function"
+	#endif
+	#if defined(UFBXI_PARTIAL_FEATURES)
+		#pragma GCC diagnostic ignored "-Wunused-function"
+		#pragma GCC diagnostic ignored "-Wunused-parameter"
 	#endif
 #endif
 
@@ -1546,6 +1630,8 @@ static ufbxi_noinline void ufbxi_fix_error_type(ufbx_error *error, const char *d
 		error->type = UFBX_ERROR_ZERO_VERTEX_SIZE;
 	} else if (!strcmp(desc, "Invalid UTF-8")) {
 		error->type = UFBX_ERROR_INVALID_UTF8;
+	} else if (!strcmp(desc, "Feature disabled")) {
+		error->type = UFBX_ERROR_FEATURE_DISABLED;
 	}
 	error->description.data = desc;
 	error->description.length = strlen(desc);
@@ -4080,6 +4166,8 @@ static void ufbxi_file_close(void *user)
 
 // -- XML
 
+#if UFBXI_FEATURE_XML
+
 typedef struct ufbxi_xml_tag ufbxi_xml_tag;
 typedef struct ufbxi_xml_attrib ufbxi_xml_attrib;
 typedef struct ufbxi_xml_document ufbxi_xml_document;
@@ -4509,6 +4597,8 @@ static ufbxi_noinline ufbxi_xml_attrib *ufbxi_xml_find_attrib(ufbxi_xml_tag *tag
 	}
 	return NULL;
 }
+
+#endif
 
 // -- FBX value type information
 
@@ -13591,6 +13681,8 @@ static ufbxi_noinline void ufbxi_update_scene_settings(ufbx_scene_settings *sett
 
 // -- Geometry caches
 
+#if UFBXI_FEATURE_GEOMETRY_CACHE
+
 typedef struct {
 	ufbxi_refcount refcount;
 	ufbx_geometry_cache cache;
@@ -14388,6 +14480,48 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 	return cache;
 }
 
+static ufbxi_noinline void ufbxi_free_geometry_cache_imp(ufbxi_geometry_cache_imp *imp)
+{
+	ufbx_assert(imp->magic == UFBXI_CACHE_IMP_MAGIC);
+	if (imp->magic != UFBXI_CACHE_IMP_MAGIC) return;
+	if (imp->owned_by_scene) return;
+	imp->magic = 0;
+
+	ufbxi_buf_free(&imp->string_buf);
+
+	// We need to free `result_buf` last and be careful to copy it to
+	// the stack since the `ufbxi_scene_imp` that contains it is allocated
+	// from the same result buffer!
+	ufbxi_allocator ator = imp->ator;
+	ufbxi_buf result = imp->result_buf;
+	result.ator = &ator;
+	ufbxi_buf_free(&result);
+	ufbxi_free_ator(&ator);
+}
+
+#else
+
+typedef struct {
+	ufbxi_refcount refcount;
+	uint32_t magic;
+	bool owned_by_scene;
+} ufbxi_geometry_cache_imp;
+
+static ufbxi_noinline ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string filename, const ufbx_geometry_cache_opts *user_opts, ufbx_error *p_error)
+{
+	if (p_error) {
+		memset(p_error, 0, sizeof(ufbx_error));
+		ufbxi_report_err_msg(p_error, "UFBXI_FEATURE_GEOMETRY_CACHE", "Feature disabled");
+	}
+	return NULL;
+}
+
+static ufbxi_forceinline void ufbxi_free_geometry_cache_imp(ufbxi_geometry_cache_imp *imp)
+{
+}
+
+#endif
+
 // -- External files
 
 typedef enum {
@@ -14415,6 +14549,7 @@ static int ufbxi_cmp_external_file(const void *va, const void *vb)
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_context *uc, ufbxi_external_file *file)
 {
+#if UFBXI_FEATURE_GEOMETRY_CACHE
 	ufbxi_cache_context cc = { UFBX_ERROR_NONE };
 	cc.owned_by_scene = true;
 
@@ -14445,6 +14580,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_contex
 
 	file->data = cache;
 	return 1;
+#else
+	ufbxi_fail_msg("UFBXI_FEATURE_GEOMETRY_CACHE", "Feature disabled");
+#endif
 }
 
 static ufbxi_noinline ufbxi_external_file *ufbxi_find_external_file(ufbxi_external_file *files, size_t num_files, ufbxi_external_file_type type, const char *name)
@@ -15449,6 +15587,8 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 	return prop_list;
 }
 
+#if UFBXI_FEATURE_SCENE_EVALUATION
+
 typedef struct {
 	char *src_element;
 	char *dst_element;
@@ -15878,7 +16018,11 @@ ufbxi_nodiscard ufbxi_noinline ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_conte
 	}
 }
 
-// -- NURBS
+#endif
+
+// -- Spatial
+
+#if UFBXI_FEATURE_SPATIAL
 
 typedef struct {
 	int32_t x, y, z;
@@ -15888,27 +16032,6 @@ typedef struct {
 	ufbxi_spatial_key key;
 	ufbx_vec3 position;
 } ufbxi_spatial_bucket;
-
-typedef struct {
-	ufbx_error error;
-
-	ufbx_tessellate_opts opts;
-
-	const ufbx_nurbs_surface *surface;
-
-	ufbxi_allocator ator_tmp;
-	ufbxi_allocator ator_result;
-
-	ufbxi_buf tmp;
-	ufbxi_buf result;
-
-	ufbxi_map position_map;
-
-	ufbx_mesh mesh;
-
-	ufbxi_mesh_imp *imp;
-
-} ufbxi_tessellate_context;
 
 static ufbxi_forceinline uint32_t ufbxi_hash_spatial_key(ufbxi_spatial_key key)
 {
@@ -16023,6 +16146,10 @@ static uint32_t ufbxi_noinline ufbxi_insert_spatial(ufbxi_map *map, const ufbx_v
 	return ix;
 }
 
+#endif
+
+// -- NURBS
+
 static ufbxi_forceinline ufbx_real ufbxi_nurbs_weight(const ufbx_real_list *knots, size_t knot, size_t degree, ufbx_real u)
 {
 	if (knot >= knots->count) return 0.0f;
@@ -16078,6 +16205,29 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, uf
 
 	return 1;
 }
+
+#if UFBXI_FEATURE_TESSELLATION
+
+typedef struct {
+	ufbx_error error;
+
+	ufbx_tessellate_opts opts;
+
+	const ufbx_nurbs_surface *surface;
+
+	ufbxi_allocator ator_tmp;
+	ufbxi_allocator ator_result;
+
+	ufbxi_buf tmp;
+	ufbxi_buf result;
+
+	ufbxi_map position_map;
+
+	ufbx_mesh mesh;
+
+	ufbxi_mesh_imp *imp;
+
+} ufbxi_tessellate_context;
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufbxi_tessellate_context *tc)
 {
@@ -16365,7 +16515,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 	return 1;
 }
 
+#endif
+
 // -- Topology
+
+#if UFBXI_FEATURE_KD
 
 typedef struct {
 	ufbx_real split;
@@ -16564,6 +16718,10 @@ ufbxi_noinline static void ufbxi_kd_build(ufbxi_ngon_context *nc, uint32_t *indi
 
 	ufbxi_kd_build(nc, indices + dst_right, tmp, num_right, axis ^ 1, child_fast + 1, depth + 1);
 }
+
+#endif
+
+#if UFBXI_FEATURE_TRIANGULATION
 
 ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, uint32_t *indices, uint32_t num_indices)
 {
@@ -16773,6 +16931,8 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	return num_triangles;
 }
 
+#endif
+
 static int ufbxi_cmp_topo_index_prev_next(const void *va, const void *vb)
 {
 	const ufbx_topo_edge *a = (const ufbx_topo_edge*)va, *b = (const ufbx_topo_edge*)vb;
@@ -16902,6 +17062,10 @@ static bool ufbxi_is_edge_smooth(const ufbx_mesh *mesh, const ufbx_topo_edge *to
 
 	return false;
 }
+
+// -- Subdivision
+
+#if UFBXI_FEATURE_SUBDIVISION
 
 typedef struct {
 	const void *data;
@@ -18076,6 +18240,19 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 	}
 }
 
+#else
+
+ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *user_opts, ufbx_error *p_error)
+{
+	if (p_error) {
+		memset(p_error, 0, sizeof(ufbx_error));
+		ufbxi_report_err_msg(p_error, "UFBXI_FEATURE_SUBDIVISION", "Feature disabled");
+	}
+	return NULL;
+}
+
+#endif
+
 // -- Utility
 
 static int ufbxi_map_cmp_vertex(void *user, const void *va, const void *vb)
@@ -18242,25 +18419,6 @@ static ufbxi_noinline void ufbxi_free_mesh_imp(ufbxi_mesh_imp *imp)
 	imp->magic = 0;
 
 	// See `ufbxi_free_scene()` for more information
-	ufbxi_allocator ator = imp->ator;
-	ufbxi_buf result = imp->result_buf;
-	result.ator = &ator;
-	ufbxi_buf_free(&result);
-	ufbxi_free_ator(&ator);
-}
-
-static ufbxi_noinline void ufbxi_free_geometry_cache_imp(ufbxi_geometry_cache_imp *imp)
-{
-	ufbx_assert(imp->magic == UFBXI_CACHE_IMP_MAGIC);
-	if (imp->magic != UFBXI_CACHE_IMP_MAGIC) return;
-	if (imp->owned_by_scene) return;
-	imp->magic = 0;
-
-	ufbxi_buf_free(&imp->string_buf);
-
-	// We need to free `result_buf` last and be careful to copy it to
-	// the stack since the `ufbxi_scene_imp` that contains it is allocated
-	// from the same result buffer!
 	ufbxi_allocator ator = imp->ator;
 	ufbxi_buf result = imp->result_buf;
 	result.ator = &ator;
@@ -19048,8 +19206,16 @@ ufbx_abi ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_ove
 
 ufbx_abi ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error)
 {
+#if UFBXI_FEATURE_SCENE_EVALUATION
 	ufbxi_eval_context ec = { 0 };
 	return ufbxi_evaluate_scene(&ec, (ufbx_scene*)scene, anim, time, opts, error);
+#else
+	if (error) {
+		memset(error, 0, sizeof(ufbx_error));
+		ufbxi_report_err_msg(error, "UFBXI_FEATURE_SCENE_EVALUATION", "Feature disabled");
+	}
+	return NULL;
+#endif
 }
 
 ufbx_abi ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const char *name, size_t name_len)
@@ -19867,6 +20033,7 @@ ufbx_abi ufbxi_noinline ufbx_surface_point ufbx_evaluate_nurbs_surface(const ufb
 
 ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, const ufbx_tessellate_opts *opts, ufbx_error *error)
 {
+#if UFBXI_FEATURE_TESSELLATION
 	ufbx_assert(surface);
 	if (!surface) return NULL;
 
@@ -19899,10 +20066,18 @@ ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surf
 		ufbxi_free_ator(&tc.ator_result);
 		return NULL;
 	}
+#else
+	if (error) {
+		memset(error, 0, sizeof(ufbx_error));
+		ufbxi_report_err_msg(error, "UFBXI_FEATURE_TESSELLATION", "Feature disabled");
+	}
+	return NULL;
+#endif
 }
 
 ufbx_abi ufbxi_noinline uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face)
 {
+#if UFBXI_FEATURE_TRIANGULATION
 	if (face.num_indices < 3) return 0;
 
 	size_t required_indices = ((size_t)face.num_indices - 2) * 3;
@@ -19979,6 +20154,10 @@ ufbx_abi ufbxi_noinline uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, 
 			return ufbxi_triangulate_ngon(&nc, indices, num_indices_u32);
 		}
 	}
+#else
+	ufbxi_panicf(panic, false, "Triangulation disabled");
+	return 0;
+#endif
 }
 
 ufbx_abi void ufbx_catch_compute_topology(ufbx_panic *panic, const ufbx_mesh *mesh, ufbx_topo_edge *indices, size_t num_indices)
