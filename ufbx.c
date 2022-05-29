@@ -526,6 +526,66 @@ static ufbxi_forceinline int64_t ufbxi_f64_to_i64(double value)
 	*(m_result_ptr) = mi_lo; \
 	} while (0)
 
+typedef bool ufbxi_less_fn(void *user, const void *a, const void *b);
+
+static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, void *in_data, void *in_tmp, size_t size, ufbxi_less_fn *less_fn, void *less_user)
+{
+	char *src = (char*)in_tmp;
+	char *data = (char*)in_data, *dst = (char*)data;
+	size_t block_size = ufbxi_clamp_linear_threshold(linear_size);
+	/* Insertion sort in `linear_size` blocks */
+	for (size_t base = 0; base < size; base += block_size) {
+		size_t i_end = base + block_size;
+		if (i_end > size) i_end = size;
+		for (size_t i = base + 1; i < i_end; i++) {
+
+			{
+				char *a = dst + i * stride, *b = dst + (i - 1) * stride;
+				if (!less_fn(less_user, a, b)) continue;
+			}
+
+			size_t j = i - 1;
+			memcpy(src, dst + i * stride, stride);
+			memcpy(dst + i * stride, dst + j * stride, stride);
+			for (; j != base; --j) {
+				char *a = src, *b = dst + (j - 1) * stride;
+				if (!less_fn(less_user, a, b)) break;
+				memcpy(dst + j * stride, dst + (j - 1) * stride, stride);
+			}
+			memcpy(dst + j * stride, src, stride);
+		}
+	}
+	/* Merge sort ping-ponging between `data` and `tmp` */
+	for (; block_size < size; block_size *= 2) {
+		char *swap = dst; dst = src; src = swap;
+		for (size_t base = 0; base < size; base += block_size * 2) {
+			size_t i = base, i_end = base + block_size;
+			size_t j = i_end, j_end = j + block_size;
+			size_t k = base;
+			if (i_end > size) i_end = size;
+			if (j_end > size) j_end = size;
+			while ((i < i_end) & (j < j_end)) {
+				char *a = src + j * stride, *b = src + i * stride;
+				if (less_fn(less_user, a, b)) {
+					memcpy(dst + k * stride, a, stride);
+					j++;
+				} else {
+					memcpy(dst + k * stride, b, stride);
+					i++;
+				}
+				k++;
+			}
+
+			memcpy(dst + k * stride, src + i * stride, (i_end - i) * stride);
+			if (j < j_end) {
+				memcpy(dst + (k + (i_end - i)) * stride, src + j * stride, (j_end - j) * stride);
+			}
+		}
+	}
+	/* Copy the result to `data` if we ended up in `tmp` */
+	if (dst != data) memcpy((void*)data, dst, size * stride);
+}
+
 // -- DEFLATE implementation
 // Pretty much based on Sean Barrett's `stb_image` deflate
 
@@ -2025,13 +2085,13 @@ static ufbxi_noinline void ufbxi_buf_clear(ufbxi_buf *buf)
 
 typedef struct ufbxi_aa_node ufbxi_aa_node;
 
+typedef int ufbxi_cmp_fn(void *user, const void *a, const void *b);
+
 struct ufbxi_aa_node {
 	ufbxi_aa_node *left, *right;
 	uint32_t level;
 	uint32_t index;
 };
-
-typedef int ufbxi_cmp_fn(void *user, const void *a, const void *b);
 
 typedef struct {
 	ufbxi_allocator *ator;
@@ -7758,17 +7818,29 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_truncated_array(ufbxi_conte
 	return 1;
 }
 
+ufbxi_noinline static bool ufbxi_uv_set_less(void *user, const void *va, const void *vb)
+{
+	const ufbx_uv_set *a = (const ufbx_uv_set *)va, *b = (const ufbx_uv_set *)vb;
+	return a->index < b->index;
+}
+
+ufbxi_noinline static bool ufbxi_color_set_less(void *user, const void *va, const void *vb)
+{
+	const ufbx_color_set *a = (const ufbx_color_set *)va, *b = (const ufbx_color_set *)vb;
+	return a->index < b->index;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_uv_sets(ufbxi_context *uc, ufbx_uv_set *sets, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_uv_set)));
-	ufbxi_macro_stable_sort(ufbx_uv_set, 32, sets, uc->tmp_arr, count, ( a->index < b->index ));
+	ufbxi_stable_sort(sizeof(ufbx_uv_set), 32, sets, uc->tmp_arr, count, &ufbxi_uv_set_less, NULL);
 	return 1;
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_color_sets(ufbxi_context *uc, ufbx_color_set *sets, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_color_set)));
-	ufbxi_macro_stable_sort(ufbx_color_set, 32, sets, uc->tmp_arr, count, ( a->index < b->index ));
+	ufbxi_stable_sort(sizeof(ufbx_color_set), 32, sets, uc->tmp_arr, count, &ufbxi_color_set_less, NULL);
 	return 1;
 }
 
@@ -7778,10 +7850,23 @@ typedef struct ufbxi_blend_offset {
 	ufbx_vec3 normal_offset;
 } ufbxi_blend_offset;
 
+static ufbxi_noinline bool ufbxi_blend_offset_less(void *user, const void *va, const void *vb)
+{
+	const ufbxi_blend_offset *a = (const ufbxi_blend_offset*)va, *b = (const ufbxi_blend_offset*)vb;
+	return a->vertex < b->vertex;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_blend_offsets(ufbxi_context *uc, ufbxi_blend_offset *offsets, size_t count)
 {
+	// Practically always ordered
+	while (count >= 2 && offsets[0].vertex <= offsets[1].vertex) {
+		offsets += 1;
+		count -= 1;
+	}
+	if (count <= 1) return;
+
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbxi_blend_offset)));
-	ufbxi_macro_stable_sort(ufbxi_blend_offset, 16, offsets, uc->tmp_arr, count, ( a->vertex < b->vertex ));
+	ufbxi_stable_sort(sizeof(ufbxi_blend_offset), 16, offsets, uc->tmp_arr, count, &ufbxi_blend_offset_less, NULL);
 	return 1;
 }
 
@@ -10415,7 +10500,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_name_elements(ufbxi_context
 	return 1;
 }
 
-ufbxi_forceinline static bool ufbxi_cmp_node_less(ufbx_node *a, ufbx_node *b)
+ufbxi_noinline static bool ufbxi_cmp_node_less(ufbx_node *a, ufbx_node *b)
 {
 	if (a->node_depth != b->node_depth) return a->node_depth < b->node_depth;
 	if (a->parent && b->parent) {
@@ -11051,17 +11136,29 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_anim_props(ufbxi_context *u
 	return 1;
 }
 
+ufbxi_noinline static bool ufbxi_material_texture_less(void *user, const void *va, const void *vb)
+{
+	const ufbx_material_texture *a = (const ufbx_material_texture*)va, *b = (const ufbx_material_texture*)vb;
+	return ufbxi_str_less(a->material_prop, b->material_prop);
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_material_textures(ufbxi_context *uc, ufbx_material_texture *textures, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_material_texture)));
-	ufbxi_macro_stable_sort(ufbx_material_texture, 32, textures, uc->tmp_arr, count, ( ufbxi_str_less(a->material_prop, b->material_prop) ));
+	ufbxi_stable_sort(sizeof(ufbx_material_texture), 32, textures, uc->tmp_arr, count, &ufbxi_material_texture_less, NULL);
 	return 1;
+}
+
+ufbxi_noinline static bool ufbxi_video_ptr_less(void *user, const void *va, const void *vb)
+{
+	const ufbx_video *a = *(const ufbx_video**)va, *b = *(const ufbx_video**)vb;
+	return ufbxi_str_less(a->absolute_filename, b->absolute_filename);
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_videos_by_filename(ufbxi_context *uc, ufbx_video **videos, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_video*)));
-	ufbxi_macro_stable_sort(ufbx_video*, 32, videos, uc->tmp_arr, count, ( ufbxi_str_less((*a)->absolute_filename, (*b)->absolute_filename) ));
+	ufbxi_stable_sort(sizeof(ufbx_video*), 32, videos, uc->tmp_arr, count, &ufbxi_video_ptr_less, NULL);
 	return 1;
 }
 
@@ -11086,13 +11183,16 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_skin_weights(ufbxi_context 
 	return 1;
 }
 
+ufbxi_noinline static bool ufbxi_blend_keyframe_less(void *user, const void *va, const void *vb)
+{
+	const ufbx_blend_keyframe *a = (const ufbx_blend_keyframe*)va, *b = (const ufbx_blend_keyframe*)vb;
+	return a->target_weight < b->target_weight;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_blend_keyframes(ufbxi_context *uc, ufbx_blend_keyframe *keyframes, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_blend_keyframe)));
-
-	ufbxi_macro_stable_sort(ufbx_blend_keyframe, 32, keyframes, uc->tmp_arr, count,
-		( a->target_weight < b->target_weight ));
-
+	ufbxi_stable_sort(sizeof(ufbx_blend_keyframe), 32, keyframes, uc->tmp_arr, count, &ufbxi_blend_keyframe_less, NULL);
 	return 1;
 }
 
@@ -13827,11 +13927,16 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_conte
 	return 1;
 }
 
+static ufbxi_noinline bool ufbxi_tmp_channel_less(void *user, const void *va, const void *vb)
+{
+	const ufbxi_cache_tmp_channel *a = (const ufbxi_cache_tmp_channel *)va, *b = (const ufbxi_cache_tmp_channel *)vb;
+	return ufbxi_str_less(a->name, b->name);
+}
+
 static ufbxi_noinline int ufbxi_cache_sort_tmp_channels(ufbxi_cache_context *cc, ufbxi_cache_tmp_channel *channels, size_t count)
 {
 	ufbxi_check_err(&cc->error, ufbxi_grow_array(cc->ator_tmp, &cc->tmp_arr, &cc->tmp_arr_size, count * sizeof(ufbxi_cache_tmp_channel)));
-	ufbxi_macro_stable_sort(ufbxi_cache_tmp_channel, 16, channels, cc->tmp_arr, count,
-		( ufbxi_str_less(a->name, b->name) ));
+	ufbxi_stable_sort(sizeof(ufbxi_cache_tmp_channel), 16, channels, cc->tmp_arr, count, &ufbxi_tmp_channel_less, NULL);
 	return 1;
 }
 
@@ -14069,8 +14174,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cac
 	return 1;
 }
 
-static ufbxi_forceinline bool ufbxi_cmp_cache_frame_less(const ufbx_cache_frame *a, const ufbx_cache_frame *b)
+static ufbxi_noinline bool ufbxi_cmp_cache_frame_less(void *user, const void *va, const void *vb)
 {
+	const ufbx_cache_frame *a = (const ufbx_cache_frame *)va, *b = (const ufbx_cache_frame *)vb;
 	if (a->channel.data != b->channel.data) {
 		// Channel names should be interned
 		ufbxi_regression_assert(!ufbxi_str_equal(a->channel, b->channel));
@@ -14082,8 +14188,7 @@ static ufbxi_forceinline bool ufbxi_cmp_cache_frame_less(const ufbx_cache_frame 
 static ufbxi_noinline int ufbxi_cache_sort_frames(ufbxi_cache_context *cc, ufbx_cache_frame *frames, size_t count)
 {
 	ufbxi_check_err(&cc->error, ufbxi_grow_array(cc->ator_tmp, &cc->tmp_arr, &cc->tmp_arr_size, count * sizeof(ufbx_cache_frame)));
-	ufbxi_macro_stable_sort(ufbx_cache_frame, 16, frames, cc->tmp_arr, count,
-		( ufbxi_cmp_cache_frame_less(a, b) ));
+	ufbxi_stable_sort(sizeof(ufbx_cache_frame), 16, frames, cc->tmp_arr, count, &ufbxi_cmp_cache_frame_less, NULL);
 	return 1;
 }
 
@@ -16260,12 +16365,15 @@ typedef struct {
 } ufbxi_kd_node;
 
 typedef struct {
-	const ufbx_mesh *mesh;
 	ufbx_face face;
 	ufbx_vertex_vec3 positions;
 	ufbx_vec3 axes[3];
 	ufbxi_kd_node kd_nodes[1 << (UFBXI_KD_FAST_DEPTH + 1)];
 	uint32_t *kd_indices;
+
+	// Temporary
+	ufbx_vec3 cur_axis_dir;
+	ufbx_face cur_face;
 } ufbxi_ngon_context;
 
 typedef struct {
@@ -16304,7 +16412,7 @@ ufbxi_forceinline static bool ufbxi_kd_check_point(ufbxi_ngon_context *nc, const
 
 ufbxi_noinline static bool ufbxi_kd_check_slow(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t begin, uint32_t count, uint32_t axis)
 {
-	ufbx_vertex_vec3 pos = nc->mesh->vertex_position;
+	ufbx_vertex_vec3 pos = nc->positions;
 	uint32_t *kd_indices = nc->kd_indices;
 
 	while (count > 0) {
@@ -16342,7 +16450,7 @@ ufbxi_noinline static bool ufbxi_kd_check_slow(ufbxi_ngon_context *nc, const ufb
 
 ufbxi_noinline static bool ufbxi_kd_check_fast(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t kd_index, uint32_t axis, uint32_t depth)
 {
-	ufbx_vertex_vec3 pos = nc->mesh->vertex_position;
+	ufbx_vertex_vec3 pos = nc->positions;
 
 	for (;;) {
 		ufbxi_kd_node node = nc->kd_nodes[kd_index];
@@ -16387,18 +16495,29 @@ ufbxi_noinline static bool ufbxi_kd_check_fast(ufbxi_ngon_context *nc, const ufb
 	}
 }
 
+ufbxi_noinline static bool ufbxi_kd_index_less(void *user, const void *va, const void *vb)
+{
+	ufbxi_ngon_context *nc = (ufbxi_ngon_context*)user;
+	ufbx_vertex_vec3 *pos = &nc->positions;
+	const uint32_t a = *(const uint32_t*)va, b = *(const uint32_t*)vb;
+	ufbx_real da = ufbxi_dot3(nc->cur_axis_dir, pos->values.data[pos->indices.data[nc->cur_face.index_begin + a]]);
+	ufbx_real db = ufbxi_dot3(nc->cur_axis_dir, pos->values.data[pos->indices.data[nc->cur_face.index_begin + b]]);
+	return da < db;
+}
+
 ufbxi_noinline static void ufbxi_kd_build(ufbxi_ngon_context *nc, uint32_t *indices, uint32_t *tmp, uint32_t num, uint32_t axis, uint32_t fast_index, uint32_t depth)
 {
 	if (num == 0) return;
 
-	ufbx_vertex_vec3 pos = nc->mesh->vertex_position;
+	ufbx_vertex_vec3 pos = nc->positions;
 	ufbx_vec3 axis_dir = nc->axes[axis];
 	ufbx_face face = nc->face;
 
+	nc->cur_axis_dir = axis_dir;
+	nc->cur_face = face;
+
 	// Sort the remaining indices based on the axis
-	ufbxi_macro_stable_sort(uint32_t, 16, indices, tmp, num,
-		( ufbxi_dot3(axis_dir, pos.values.data[pos.indices.data[face.index_begin + *a]])
-			< ufbxi_dot3(axis_dir, pos.values.data[pos.indices.data[face.index_begin + *b]]) ));
+	ufbxi_stable_sort(sizeof(uint32_t), 16, indices, tmp, num, &ufbxi_kd_index_less, nc);
 
 	uint32_t num_left = num / 2;
 	uint32_t begin_right = num_left + 1;
@@ -16440,7 +16559,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	ufbx_face face = nc->face;
 
 	// Form an orthonormal basis to project the polygon into a 2D plane
-	ufbx_vec3 normal = ufbx_get_weighted_face_normal(&nc->mesh->vertex_position, face);
+	ufbx_vec3 normal = ufbx_get_weighted_face_normal(&nc->positions, face);
 	ufbx_real len = ufbxi_length3(normal);
 	if (len > 1e-20f) {
 		normal = ufbxi_mul3(normal, 1.0f / len);
@@ -16468,7 +16587,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	nc->kd_indices = kd_indices;
 
 	uint32_t *kd_tmp = indices + face.num_indices;
-	ufbx_vertex_vec3 pos = nc->mesh->vertex_position;
+	ufbx_vertex_vec3 pos = nc->positions;
 
 	// Collect all the reflex corners for intersection testing.
 	uint32_t num_kd_indices = 0;
@@ -19833,7 +19952,7 @@ ufbx_abi ufbxi_noinline uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, 
 		return 2;
 	} else {
 		ufbxi_ngon_context nc = { 0 };
-		nc.mesh = mesh;
+		nc.positions = mesh->vertex_position;
 		nc.face = face;
 
 		uint32_t num_indices_u32 = num_indices < UINT32_MAX ? (uint32_t)num_indices : UINT32_MAX;
