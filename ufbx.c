@@ -7820,12 +7820,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_truncated_array(ufbxi_conte
 
 ufbxi_noinline static bool ufbxi_uv_set_less(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbx_uv_set *a = (const ufbx_uv_set *)va, *b = (const ufbx_uv_set *)vb;
 	return a->index < b->index;
 }
 
 ufbxi_noinline static bool ufbxi_color_set_less(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbx_color_set *a = (const ufbx_color_set *)va, *b = (const ufbx_color_set *)vb;
 	return a->index < b->index;
 }
@@ -7852,6 +7854,7 @@ typedef struct ufbxi_blend_offset {
 
 static ufbxi_noinline bool ufbxi_blend_offset_less(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbxi_blend_offset *a = (const ufbxi_blend_offset*)va, *b = (const ufbxi_blend_offset*)vb;
 	return a->vertex < b->vertex;
 }
@@ -11138,6 +11141,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_anim_props(ufbxi_context *u
 
 ufbxi_noinline static bool ufbxi_material_texture_less(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbx_material_texture *a = (const ufbx_material_texture*)va, *b = (const ufbx_material_texture*)vb;
 	return ufbxi_str_less(a->material_prop, b->material_prop);
 }
@@ -11151,6 +11155,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_material_textures(ufbxi_con
 
 ufbxi_noinline static bool ufbxi_video_ptr_less(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbx_video *a = *(const ufbx_video**)va, *b = *(const ufbx_video**)vb;
 	return ufbxi_str_less(a->absolute_filename, b->absolute_filename);
 }
@@ -11185,6 +11190,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_skin_weights(ufbxi_context 
 
 ufbxi_noinline static bool ufbxi_blend_keyframe_less(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbx_blend_keyframe *a = (const ufbx_blend_keyframe*)va, *b = (const ufbx_blend_keyframe*)vb;
 	return a->target_weight < b->target_weight;
 }
@@ -13929,6 +13935,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_conte
 
 static ufbxi_noinline bool ufbxi_tmp_channel_less(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbxi_cache_tmp_channel *a = (const ufbxi_cache_tmp_channel *)va, *b = (const ufbxi_cache_tmp_channel *)vb;
 	return ufbxi_str_less(a->name, b->name);
 }
@@ -14176,6 +14183,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cac
 
 static ufbxi_noinline bool ufbxi_cmp_cache_frame_less(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbx_cache_frame *a = (const ufbx_cache_frame *)va, *b = (const ufbx_cache_frame *)vb;
 	if (a->channel.data != b->channel.data) {
 		// Channel names should be interned
