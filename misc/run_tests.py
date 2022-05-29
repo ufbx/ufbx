@@ -808,11 +808,14 @@ async def main():
         target_tasks = []
 
         for bits in range(1, 1 << len(feature_defines)):
+            defines = { name: 1 for ix, name in enumerate(feature_defines) if (1 << ix) & bits }
+
             feature_config = {
                 "sources": ["ufbx.c"],
                 "output": f"features_{bits}" + obj_suffix,
                 "warnings": True,
                 "compile_only": True,
+                "defines": defines,
             }
             target_tasks += compile_permutations("features", feature_config, arch_configs, None)
 

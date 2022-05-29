@@ -20155,7 +20155,7 @@ ufbx_abi ufbxi_noinline uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, 
 		}
 	}
 #else
-	ufbxi_panicf(panic, false, "Triangulation disabled");
+	ufbxi_panicf_imp(panic, "Triangulation disabled");
 	return 0;
 #endif
 }
