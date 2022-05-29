@@ -530,6 +530,8 @@ typedef bool ufbxi_less_fn(void *user, const void *a, const void *b);
 
 static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, void *in_data, void *in_tmp, size_t size, ufbxi_less_fn *less_fn, void *less_user)
 {
+	(void)linear_size;
+
 	char *src = (char*)in_tmp;
 	char *data = (char*)in_data, *dst = (char*)data;
 	size_t block_size = ufbxi_clamp_linear_threshold(linear_size);
