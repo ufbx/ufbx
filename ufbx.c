@@ -17,6 +17,8 @@
 
 // -- Feature exclusion
 
+#define UFBX_ENABLE_ERROR_STACK
+
 #if !defined(UFBX_ONLY_LOADING)
 	#if !defined(UFBX_NO_SUBDIVISION)
 		#define UFBXI_FEATURE_SUBDIVISION 1
@@ -35,20 +37,29 @@
 	#endif
 #endif
 
-#if defined(UFBXI_FEATURE_SUBDIVISION) && defined(UFBX_ENABLE_SUBDIVISION)
+#if defined(UFBX_DEV)
+	#if !defined(UFBX_NO_ERROR_STACK)
+		#define UFBXI_FEATURE_ERROR_STACK 1
+	#endif
+#endif
+
+#if !defined(UFBXI_FEATURE_SUBDIVISION) && defined(UFBX_ENABLE_SUBDIVISION)
 	#define UFBXI_FEATURE_SUBDIVISION 1
 #endif
-#if defined(UFBXI_FEATURE_TESSELLATION) && defined(UFBX_ENABLE_TESSELLATION)
+#if !defined(UFBXI_FEATURE_TESSELLATION) && defined(UFBX_ENABLE_TESSELLATION)
 	#define UFBXI_FEATURE_TESSELLATION 1
 #endif
-#if defined(UFBXI_FEATURE_GEOMETRY_CACHE) && defined(UFBX_ENABLE_GEOMETRY_CACHE)
+#if !defined(UFBXI_FEATURE_GEOMETRY_CACHE) && defined(UFBX_ENABLE_GEOMETRY_CACHE)
 	#define UFBXI_FEATURE_GEOMETRY_CACHE 1
 #endif
-#if defined(UFBXI_FEATURE_SCENE_EVALUATION) && defined(UFBX_ENABLE_SCENE_EVALUATION)
+#if !defined(UFBXI_FEATURE_SCENE_EVALUATION) && defined(UFBX_ENABLE_SCENE_EVALUATION)
 	#define UFBXI_FEATURE_SCENE_EVALUATION 1
 #endif
-#if defined(UFBXI_FEATURE_TRIANGULATION) && defined(UFBX_ENABLE_TRIANGULATION)
+#if !defined(UFBXI_FEATURE_TRIANGULATION) && defined(UFBX_ENABLE_TRIANGULATION)
 	#define UFBXI_FEATURE_TRIANGULATION 1
+#endif
+#if !defined(UFBXI_FEATURE_ERROR_STACK) && defined(UFBX_ENABLE_ERROR_STACK)
+	#define UFBXI_FEATURE_ERROR_STACK 1
 #endif
 
 #if !defined(UFBXI_FEATURE_SUBDIVISION)
@@ -65,6 +76,9 @@
 #endif
 #if !defined(UFBXI_FEATURE_TRIANGULATION)
 	#define UFBXI_FEATURE_TRIANGULATION 0
+#endif
+#if !defined(UFBXI_FEATURE_ERROR_STACK)
+	#define UFBXI_FEATURE_ERROR_STACK 0
 #endif
 
 // Derived features
@@ -1588,18 +1602,24 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 	return 0;
 }
 
-// TODO: Disable if not UFBX_DEV, add __FUNCTION__?
-#define ufbxi_cond_str(cond) #cond
-// #define ufbxi_cond_str(cond) ""
+#if UFBXI_FEATURE_ERROR_STACK
+	#define ufbxi_function __FUNCTION__
+	#define ufbxi_line __LINE__
+	#define ufbxi_cond_str(cond) #cond
+#else
+	#define ufbxi_function ""
+	#define ufbxi_line 0
+	#define ufbxi_cond_str(cond) ""
+#endif
 
-#define ufbxi_check_err(err, cond) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return 0; } } while (0)
-#define ufbxi_check_return_err(err, cond, ret) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return ret; } } while (0)
-#define ufbxi_fail_err(err, desc) return ufbxi_fail_imp_err(err, desc, __FUNCTION__, __LINE__)
+#define ufbxi_check_err(err, cond) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), ufbxi_function, ufbxi_line); return 0; } } while (0)
+#define ufbxi_check_return_err(err, cond, ret) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), ufbxi_function, ufbxi_line); return ret; } } while (0)
+#define ufbxi_fail_err(err, desc) return ufbxi_fail_imp_err(err, desc, ufbxi_function, ufbxi_line)
 
-#define ufbxi_check_err_msg(err, cond, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return 0; } } while (0)
-#define ufbxi_check_return_err_msg(err, cond, ret, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return ret; } } while (0)
-#define ufbxi_fail_err_msg(err, desc, msg) return ufbxi_fail_imp_err(err, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
-#define ufbxi_report_err_msg(err, desc, msg) (void)ufbxi_fail_imp_err(err, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
+#define ufbxi_check_err_msg(err, cond, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), ufbxi_function, ufbxi_line); return 0; } } while (0)
+#define ufbxi_check_return_err_msg(err, cond, ret, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), ufbxi_function, ufbxi_line); return ret; } } while (0)
+#define ufbxi_fail_err_msg(err, desc, msg) return ufbxi_fail_imp_err(err, ufbxi_error_msg(desc, msg), ufbxi_function, ufbxi_line)
+#define ufbxi_report_err_msg(err, desc, msg) (void)ufbxi_fail_imp_err(err, ufbxi_error_msg(desc, msg), ufbxi_function, ufbxi_line)
 
 static ufbxi_noinline void ufbxi_fix_error_type(ufbx_error *error, const char *default_desc)
 {
@@ -3798,13 +3818,13 @@ static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, co
 	return ufbxi_fail_imp_err(&uc->error, cond, func, line);
 }
 
-#define ufbxi_check(cond) if (ufbxi_unlikely(!ufbxi_trace(cond))) return ufbxi_fail_imp(uc, ufbxi_cond_str(cond), __FUNCTION__, __LINE__)
-#define ufbxi_check_return(cond, ret) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp(uc, ufbxi_cond_str(cond), __FUNCTION__, __LINE__); return ret; } } while (0)
-#define ufbxi_fail(desc) return ufbxi_fail_imp(uc, desc, __FUNCTION__, __LINE__)
+#define ufbxi_check(cond) if (ufbxi_unlikely(!ufbxi_trace(cond))) return ufbxi_fail_imp(uc, ufbxi_cond_str(cond), ufbxi_function, ufbxi_line)
+#define ufbxi_check_return(cond, ret) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp(uc, ufbxi_cond_str(cond), ufbxi_function, ufbxi_line); return ret; } } while (0)
+#define ufbxi_fail(desc) return ufbxi_fail_imp(uc, desc, ufbxi_function, ufbxi_line)
 
-#define ufbxi_check_msg(cond, msg) if (ufbxi_unlikely(!ufbxi_trace(cond))) return ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__)
-#define ufbxi_check_return_msg(cond, ret, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), __FUNCTION__, __LINE__); return ret; } } while (0)
-#define ufbxi_fail_msg(desc, msg) return ufbxi_fail_imp(uc, ufbxi_error_msg(desc, msg), __FUNCTION__, __LINE__)
+#define ufbxi_check_msg(cond, msg) if (ufbxi_unlikely(!ufbxi_trace(cond))) return ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), ufbxi_function, ufbxi_line)
+#define ufbxi_check_return_msg(cond, ret, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), ufbxi_function, ufbxi_line); return ret; } } while (0)
+#define ufbxi_fail_msg(desc, msg) return ufbxi_fail_imp(uc, ufbxi_error_msg(desc, msg), ufbxi_function, ufbxi_line)
 
 // -- Progress
 
@@ -18590,9 +18610,9 @@ ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_le
 			error->description.length = strlen(error->description.data);
 			error->stack[0].description.data = "File not found";
 			error->stack[0].description.length = strlen(error->stack[0].description.data);
-			error->stack[0].function.data = __FUNCTION__;
-			error->stack[0].function.length = strlen(__FUNCTION__);
-			error->stack[0].source_line = __LINE__;
+			error->stack[0].function.data = ufbxi_function;
+			error->stack[0].function.length = strlen(ufbxi_function);
+			error->stack[0].source_line = ufbxi_line;
 		}
 		return NULL;
 	}
