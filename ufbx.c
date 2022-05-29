@@ -9696,7 +9696,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 			if (i > 0) {
 				slope_left = slope_right = ufbxi_solve_auto_tangent(
 					prev_time, key->time, next_time,
-					key[-1].value, key->value, next_value,
+					key[-1].value, key->value, (ufbx_real)next_value,
 					weight_left, weight_right);
 			} else {
 				slope_left = slope_right = 0.0f;
@@ -12759,6 +12759,7 @@ static ufbxi_forceinline void ufbxi_mul_scale(ufbx_transform *t, ufbx_vec3 v)
 static const ufbx_vec3 ufbxi_one_vec3 = { 1.0f, 1.0f, 1.0f };
 
 #define UFBXI_PI ((ufbx_real)3.14159265358979323846)
+#define UFBXI_DPI (3.14159265358979323846)
 #define UFBXI_DEG_TO_RAD ((ufbx_real)(UFBXI_PI / 180.0))
 #define UFBXI_RAD_TO_DEG ((ufbx_real)(180.0 / UFBXI_PI))
 #define UFBXI_MM_TO_INCH ((ufbx_real)0.0393700787)
@@ -13142,26 +13143,26 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 	case UFBX_APERTURE_MODE_HORIZONTAL_AND_VERTICAL:
 		camera->field_of_view_deg.x = fov_x;
 		camera->field_of_view_deg.y = fov_y;
-		camera->field_of_view_tan.x = (ufbx_real)tan(fov_x * (UFBXI_DEG_TO_RAD * 0.5f));
-		camera->field_of_view_tan.y = (ufbx_real)tan(fov_y * (UFBXI_DEG_TO_RAD * 0.5f));
+		camera->field_of_view_tan.x = (ufbx_real)tan((double)(fov_x * (UFBXI_DEG_TO_RAD * 0.5f)));
+		camera->field_of_view_tan.y = (ufbx_real)tan((double)(fov_y * (UFBXI_DEG_TO_RAD * 0.5f)));
 		break;
 	case UFBX_APERTURE_MODE_HORIZONTAL:
 		camera->field_of_view_deg.x = fov;
-		camera->field_of_view_tan.x = (ufbx_real)tan(fov * (UFBXI_DEG_TO_RAD * 0.5f));
+		camera->field_of_view_tan.x = (ufbx_real)tan((double)(fov * (UFBXI_DEG_TO_RAD * 0.5f)));
 		camera->field_of_view_tan.y = camera->field_of_view_tan.x / aspect_ratio;
-		camera->field_of_view_deg.y = (ufbx_real)atan(camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
+		camera->field_of_view_deg.y = (ufbx_real)atan((double)camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
 		break;
 	case UFBX_APERTURE_MODE_VERTICAL:
 		camera->field_of_view_deg.y = fov;
-		camera->field_of_view_tan.y = (ufbx_real)tan(fov * (UFBXI_DEG_TO_RAD * 0.5f));
+		camera->field_of_view_tan.y = (ufbx_real)tan((double)(fov * (UFBXI_DEG_TO_RAD * 0.5f)));
 		camera->field_of_view_tan.x = camera->field_of_view_tan.y * aspect_ratio;
-		camera->field_of_view_deg.x = (ufbx_real)atan(camera->field_of_view_tan.x) * UFBXI_RAD_TO_DEG * 2.0f;
+		camera->field_of_view_deg.x = (ufbx_real)atan((double)camera->field_of_view_tan.x) * UFBXI_RAD_TO_DEG * 2.0f;
 		break;
 	case UFBX_APERTURE_MODE_FOCAL_LENGTH:
 		camera->field_of_view_tan.x = camera->aperture_size_inch.x / (camera->focal_length_mm * UFBXI_MM_TO_INCH) * 0.5f;
 		camera->field_of_view_tan.y = camera->aperture_size_inch.y / (camera->focal_length_mm * UFBXI_MM_TO_INCH) * 0.5f;
-		camera->field_of_view_deg.x = (ufbx_real)atan(camera->field_of_view_tan.x) * UFBXI_RAD_TO_DEG * 2.0f;
-		camera->field_of_view_deg.y = (ufbx_real)atan(camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
+		camera->field_of_view_deg.x = (ufbx_real)atan((double)camera->field_of_view_tan.x) * UFBXI_RAD_TO_DEG * 2.0f;
+		camera->field_of_view_deg.y = (ufbx_real)atan((double)camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
 		break;
 	default:
 		ufbx_assert(0 && "Unexpected aperture mode");
@@ -18802,7 +18803,7 @@ ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time
 			return next->value;
 
 		case UFBX_INTERPOLATION_LINEAR:
-			return prev->value*(1.0 - t) + next->value*t;
+			return (ufbx_real)(prev->value*(1.0 - t) + next->value*t);
 
 		case UFBX_INTERPOLATION_CUBIC:
 		{
@@ -18818,7 +18819,7 @@ ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time
 			double y1 = y0 + prev->right.dy;
 			double y2 = y3 - next->left.dy;
 
-			return u3*y0 + 3.0 * (u2*t*y1 + u*t2*y2) + t3*y3;
+			return (ufbx_real)(u3*y0 + 3.0 * (u2*t*y1 + u*t2*y2) + t3*y3);
 		}
 
 		default:
@@ -19155,9 +19156,9 @@ ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_quat_rotate_vec3(ufbx_quat q, ufbx_vec3 v
 	ufbx_real xz = q.x*v.z - q.z*v.x;
 	ufbx_real yz = q.y*v.z - q.z*v.y;
 	ufbx_vec3 r;
-	r.x = 2.0 * (+ q.w*yz + q.y*xy + q.z*xz) + v.x;
-	r.y = 2.0 * (- q.x*xy - q.w*xz + q.z*yz) + v.y;
-	r.z = 2.0 * (- q.x*xz - q.y*yz + q.w*xy) + v.z;
+	r.x = 2.0f * (+ q.w*yz + q.y*xy + q.z*xz) + v.x;
+	r.y = 2.0f * (- q.x*xy - q.w*xz + q.z*yz) + v.y;
+	r.z = 2.0f * (- q.x*xz - q.y*yz + q.w*xy) + v.z;
 	return r;
 }
 
@@ -19166,51 +19167,51 @@ ufbx_abi ufbxi_noinline ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_
 	v.x *= UFBXI_DEG_TO_RAD * 0.5;
 	v.y *= UFBXI_DEG_TO_RAD * 0.5;
 	v.z *= UFBXI_DEG_TO_RAD * 0.5;
-	ufbx_real cx = (ufbx_real)cos(v.x), sx = (ufbx_real)sin(v.x);
-	ufbx_real cy = (ufbx_real)cos(v.y), sy = (ufbx_real)sin(v.y);
-	ufbx_real cz = (ufbx_real)cos(v.z), sz = (ufbx_real)sin(v.z);
+	double cx = cos((double)v.x), sx = sin((double)v.x);
+	double cy = cos((double)v.y), sy = sin((double)v.y);
+	double cz = cos((double)v.z), sz = sin((double)v.z);
 	ufbx_quat q;
 
 	// Generated by `misc/gen_rotation_order.py`
 	switch (order) {
 	case UFBX_ROTATION_XYZ:
-		q.x = -cx*sy*sz + cy*cz*sx;
-		q.y = cx*cz*sy + cy*sx*sz;
-		q.z = cx*cy*sz - cz*sx*sy;
-		q.w = cx*cy*cz + sx*sy*sz;
+		q.x = (ufbx_real)(-cx*sy*sz + cy*cz*sx);
+		q.y = (ufbx_real)(cx*cz*sy + cy*sx*sz);
+		q.z = (ufbx_real)(cx*cy*sz - cz*sx*sy);
+		q.w = (ufbx_real)(cx*cy*cz + sx*sy*sz);
 		break;
 	case UFBX_ROTATION_XZY:
-		q.x = cx*sy*sz + cy*cz*sx;
-		q.y = cx*cz*sy + cy*sx*sz;
-		q.z = cx*cy*sz - cz*sx*sy;
-		q.w = cx*cy*cz - sx*sy*sz;
+		q.x = (ufbx_real)(cx*sy*sz + cy*cz*sx);
+		q.y = (ufbx_real)(cx*cz*sy + cy*sx*sz);
+		q.z = (ufbx_real)(cx*cy*sz - cz*sx*sy);
+		q.w = (ufbx_real)(cx*cy*cz - sx*sy*sz);
 		break;
 	case UFBX_ROTATION_YZX:
-		q.x = -cx*sy*sz + cy*cz*sx;
-		q.y = cx*cz*sy - cy*sx*sz;
-		q.z = cx*cy*sz + cz*sx*sy;
-		q.w = cx*cy*cz + sx*sy*sz;
+		q.x = (ufbx_real)(-cx*sy*sz + cy*cz*sx);
+		q.y = (ufbx_real)(cx*cz*sy - cy*sx*sz);
+		q.z = (ufbx_real)(cx*cy*sz + cz*sx*sy);
+		q.w = (ufbx_real)(cx*cy*cz + sx*sy*sz);
 		break;
 	case UFBX_ROTATION_YXZ:
-		q.x = -cx*sy*sz + cy*cz*sx;
-		q.y = cx*cz*sy + cy*sx*sz;
-		q.z = cx*cy*sz + cz*sx*sy;
-		q.w = cx*cy*cz - sx*sy*sz;
+		q.x = (ufbx_real)(-cx*sy*sz + cy*cz*sx);
+		q.y = (ufbx_real)(cx*cz*sy + cy*sx*sz);
+		q.z = (ufbx_real)(cx*cy*sz + cz*sx*sy);
+		q.w = (ufbx_real)(cx*cy*cz - sx*sy*sz);
 		break;
 	case UFBX_ROTATION_ZXY:
-		q.x = cx*sy*sz + cy*cz*sx;
-		q.y = cx*cz*sy - cy*sx*sz;
-		q.z = cx*cy*sz - cz*sx*sy;
-		q.w = cx*cy*cz + sx*sy*sz;
+		q.x = (ufbx_real)(cx*sy*sz + cy*cz*sx);
+		q.y = (ufbx_real)(cx*cz*sy - cy*sx*sz);
+		q.z = (ufbx_real)(cx*cy*sz - cz*sx*sy);
+		q.w = (ufbx_real)(cx*cy*cz + sx*sy*sz);
 		break;
 	case UFBX_ROTATION_ZYX:
-		q.x = cx*sy*sz + cy*cz*sx;
-		q.y = cx*cz*sy - cy*sx*sz;
-		q.z = cx*cy*sz + cz*sx*sy;
-		q.w = cx*cy*cz - sx*sy*sz;
+		q.x = (ufbx_real)(cx*sy*sz + cy*cz*sx);
+		q.y = (ufbx_real)(cx*cz*sy - cy*sx*sz);
+		q.z = (ufbx_real)(cx*cy*sz + cz*sx*sy);
+		q.w = (ufbx_real)(cx*cy*cz - sx*sy*sz);
 		break;
 	default:
-		q.x = q.y = q.z = 0.0; q.w = 1.0;
+		q.x = q.y = q.z = 0.0f; q.w = 1.0f;
 		break;
 	}
 
@@ -19224,77 +19225,79 @@ ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_
 	ufbx_vec3 v;
 	double t;
 
+	double qx = q.x, qy = q.y, qz = q.z, qw = q.w;
+
 	// Generated by `misc/gen_quat_to_euler.py`
 	switch (order) {
 	case UFBX_ROTATION_XYZ:
-		t = 2.0f*(q.w*q.y - q.x*q.z);
+		t = 2.0f*(qw*qy - qx*qz);
 		if (fabs(t) < eps) {
 			v.y = (ufbx_real)asin(t);
-			v.z = (ufbx_real)atan2(2.0f*(q.w*q.z + q.x*q.y), 2.0f*(q.w*q.w + q.x*q.x) - 1.0f);
-			v.x = (ufbx_real)-atan2(-2.0f*(q.w*q.x + q.y*q.z), 2.0f*(q.w*q.w + q.z*q.z) - 1.0f);
+			v.z = (ufbx_real)atan2(2.0f*(qw*qz + qx*qy), 2.0f*(qw*qw + qx*qx) - 1.0f);
+			v.x = (ufbx_real)-atan2(-2.0f*(qw*qx + qy*qz), 2.0f*(qw*qw + qz*qz) - 1.0f);
 		} else {
-			v.y = (ufbx_real)copysign(UFBXI_PI*0.5f, t);
-			v.z = (ufbx_real)(atan2(-2.0f*t*(q.w*q.x - q.y*q.z), t*(2.0f*q.w*q.y + 2.0f*q.x*q.z)));
+			v.y = (ufbx_real)copysign(UFBXI_DPI*0.5, t);
+			v.z = (ufbx_real)(atan2(-2.0f*t*(qw*qx - qy*qz), t*(2.0f*qw*qy + 2.0f*qx*qz)));
 			v.x = 0.0f;
 		}
 		break;
 	case UFBX_ROTATION_XZY:
-		t = 2.0f*(q.w*q.z + q.x*q.y);
+		t = 2.0f*(qw*qz + qx*qy);
 		if (fabs(t) < eps) {
 			v.z = (ufbx_real)asin(t);
-			v.y = (ufbx_real)atan2(2.0f*(q.w*q.y - q.x*q.z), 2.0f*(q.w*q.w + q.x*q.x) - 1.0f);
-			v.x = (ufbx_real)-atan2(-2.0f*(q.w*q.x - q.y*q.z), 2.0f*(q.w*q.w + q.y*q.y) - 1.0f);
+			v.y = (ufbx_real)atan2(2.0f*(qw*qy - qx*qz), 2.0f*(qw*qw + qx*qx) - 1.0f);
+			v.x = (ufbx_real)-atan2(-2.0f*(qw*qx - qy*qz), 2.0f*(qw*qw + qy*qy) - 1.0f);
 		} else {
-			v.z = (ufbx_real)copysign(UFBXI_PI*0.5f, t);
-			v.y = (ufbx_real)(atan2(2.0f*t*(q.w*q.x + q.y*q.z), -t*(2.0f*q.x*q.y - 2.0f*q.w*q.z)));
+			v.z = (ufbx_real)copysign(UFBXI_DPI*0.5, t);
+			v.y = (ufbx_real)(atan2(2.0f*t*(qw*qx + qy*qz), -t*(2.0f*qx*qy - 2.0f*qw*qz)));
 			v.x = 0.0f;
 		}
 		break;
 	case UFBX_ROTATION_YZX:
-		t = 2.0f*(q.w*q.z - q.x*q.y);
+		t = 2.0f*(qw*qz - qx*qy);
 		if (fabs(t) < eps) {
 			v.z = (ufbx_real)asin(t);
-			v.x = (ufbx_real)atan2(2.0f*(q.w*q.x + q.y*q.z), 2.0f*(q.w*q.w + q.y*q.y) - 1.0f);
-			v.y = (ufbx_real)-atan2(-2.0f*(q.w*q.y + q.x*q.z), 2.0f*(q.w*q.w + q.x*q.x) - 1.0f);
+			v.x = (ufbx_real)atan2(2.0f*(qw*qx + qy*qz), 2.0f*(qw*qw + qy*qy) - 1.0f);
+			v.y = (ufbx_real)-atan2(-2.0f*(qw*qy + qx*qz), 2.0f*(qw*qw + qx*qx) - 1.0f);
 		} else {
-			v.z = (ufbx_real)copysign(UFBXI_PI*0.5f, t);
-			v.x = (ufbx_real)(atan2(-2.0f*t*(q.w*q.y - q.x*q.z), t*(2.0f*q.w*q.z + 2.0f*q.x*q.y)));
+			v.z = (ufbx_real)copysign(UFBXI_DPI*0.5, t);
+			v.x = (ufbx_real)(atan2(-2.0f*t*(qw*qy - qx*qz), t*(2.0f*qw*qz + 2.0f*qx*qy)));
 			v.y = 0.0f;
 		}
 		break;
 	case UFBX_ROTATION_YXZ:
-		t = 2.0f*(q.w*q.x + q.y*q.z);
+		t = 2.0f*(qw*qx + qy*qz);
 		if (fabs(t) < eps) {
 			v.x = (ufbx_real)asin(t);
-			v.z = (ufbx_real)atan2(2.0f*(q.w*q.z - q.x*q.y), 2.0f*(q.w*q.w + q.y*q.y) - 1.0f);
-			v.y = (ufbx_real)-atan2(-2.0f*(q.w*q.y - q.x*q.z), 2.0f*(q.w*q.w + q.z*q.z) - 1.0f);
+			v.z = (ufbx_real)atan2(2.0f*(qw*qz - qx*qy), 2.0f*(qw*qw + qy*qy) - 1.0f);
+			v.y = (ufbx_real)-atan2(-2.0f*(qw*qy - qx*qz), 2.0f*(qw*qw + qz*qz) - 1.0f);
 		} else {
-			v.x = (ufbx_real)copysign(UFBXI_PI*0.5f, t);
-			v.z = (ufbx_real)(atan2(2.0f*t*(q.w*q.y + q.x*q.z), -t*(2.0f*q.y*q.z - 2.0f*q.w*q.x)));
+			v.x = (ufbx_real)copysign(UFBXI_DPI*0.5, t);
+			v.z = (ufbx_real)(atan2(2.0f*t*(qw*qy + qx*qz), -t*(2.0f*qy*qz - 2.0f*qw*qx)));
 			v.y = 0.0f;
 		}
 		break;
 	case UFBX_ROTATION_ZXY:
-		t = 2.0f*(q.w*q.x - q.y*q.z);
+		t = 2.0f*(qw*qx - qy*qz);
 		if (fabs(t) < eps) {
 			v.x = (ufbx_real)asin(t);
-			v.y = (ufbx_real)atan2(2.0f*(q.w*q.y + q.x*q.z), 2.0f*(q.w*q.w + q.z*q.z) - 1.0f);
-			v.z = (ufbx_real)-atan2(-2.0f*(q.w*q.z + q.x*q.y), 2.0f*(q.w*q.w + q.y*q.y) - 1.0f);
+			v.y = (ufbx_real)atan2(2.0f*(qw*qy + qx*qz), 2.0f*(qw*qw + qz*qz) - 1.0f);
+			v.z = (ufbx_real)-atan2(-2.0f*(qw*qz + qx*qy), 2.0f*(qw*qw + qy*qy) - 1.0f);
 		} else {
-			v.x = (ufbx_real)copysign(UFBXI_PI*0.5f, t);
-			v.y = (ufbx_real)(atan2(-2.0f*t*(q.w*q.z - q.x*q.y), t*(2.0f*q.w*q.x + 2.0f*q.y*q.z)));
+			v.x = (ufbx_real)copysign(UFBXI_DPI*0.5, t);
+			v.y = (ufbx_real)(atan2(-2.0f*t*(qw*qz - qx*qy), t*(2.0f*qw*qx + 2.0f*qy*qz)));
 			v.z = 0.0f;
 		}
 		break;
 	case UFBX_ROTATION_ZYX:
-		t = 2.0f*(q.w*q.y + q.x*q.z);
+		t = 2.0f*(qw*qy + qx*qz);
 		if (fabs(t) < eps) {
 			v.y = (ufbx_real)asin(t);
-			v.x = (ufbx_real)atan2(2.0f*(q.w*q.x - q.y*q.z), 2.0f*(q.w*q.w + q.z*q.z) - 1.0f);
-			v.z = (ufbx_real)-atan2(-2.0f*(q.w*q.z - q.x*q.y), 2.0f*(q.w*q.w + q.x*q.x) - 1.0f);
+			v.x = (ufbx_real)atan2(2.0f*(qw*qx - qy*qz), 2.0f*(qw*qw + qz*qz) - 1.0f);
+			v.z = (ufbx_real)-atan2(-2.0f*(qw*qz - qx*qy), 2.0f*(qw*qw + qx*qx) - 1.0f);
 		} else {
-			v.y = (ufbx_real)copysign(UFBXI_PI*0.5f, t);
-			v.x = (ufbx_real)(atan2(2.0f*t*(q.w*q.z + q.x*q.y), -t*(2.0f*q.x*q.z - 2.0f*q.w*q.y)));
+			v.y = (ufbx_real)copysign(UFBXI_DPI*0.5, t);
+			v.x = (ufbx_real)(atan2(2.0f*t*(qw*qz + qx*qy), -t*(2.0f*qx*qz - 2.0f*qw*qy)));
 			v.z = 0.0f;
 		}
 		break;
@@ -19352,7 +19355,7 @@ ufbx_abi ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m)
 		return r;
 	}
 
-	ufbx_real rcp_det = 1.0 / det;
+	ufbx_real rcp_det = 1.0f / det;
 
 	r.m00 = ( - m->m12*m->m21 + m->m11*m->m22) * rcp_det;
 	r.m10 = ( + m->m12*m->m20 - m->m10*m->m22) * rcp_det;
@@ -19380,7 +19383,7 @@ ufbx_abi ufbxi_noinline ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m
 		return r;
 	}
 
-	ufbx_real rcp_det = 1.0 / det;
+	ufbx_real rcp_det = 1.0f / det;
 
 	r.m00 = ( - m->m12*m->m21 + m->m11*m->m22) * rcp_det;
 	r.m01 = ( + m->m12*m->m20 - m->m10*m->m22) * rcp_det;
@@ -19391,7 +19394,7 @@ ufbx_abi ufbxi_noinline ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m
 	r.m20 = ( - m->m02*m->m11 + m->m01*m->m12) * rcp_det;
 	r.m21 = ( + m->m02*m->m10 - m->m00*m->m12) * rcp_det;
 	r.m22 = ( - m->m01*m->m10 + m->m00*m->m11) * rcp_det;
-	r.m03 = r.m13 = r.m23 = 0.0;
+	r.m03 = r.m13 = r.m23 = 0.0f;
 
 	return r;
 }
@@ -19426,20 +19429,20 @@ ufbx_abi ufbxi_noinline ufbx_matrix ufbx_transform_to_matrix(const ufbx_transfor
 	if (!t) return ufbx_identity_matrix;
 
 	ufbx_quat q = t->rotation;
-	ufbx_real sx = 2.0 * t->scale.x, sy = 2.0 * t->scale.y, sz = 2.0 * t->scale.z;
+	ufbx_real sx = 2.0f * t->scale.x, sy = 2.0f * t->scale.y, sz = 2.0f * t->scale.z;
 	ufbx_real xx = q.x*q.x, xy = q.x*q.y, xz = q.x*q.z, xw = q.x*q.w;
 	ufbx_real yy = q.y*q.y, yz = q.y*q.z, yw = q.y*q.w;
 	ufbx_real zz = q.z*q.z, zw = q.z*q.w;
 	ufbx_matrix m;
-	m.m00 = sx * (- yy - zz + 0.5);
+	m.m00 = sx * (- yy - zz + 0.5f);
 	m.m10 = sx * (+ xy + zw);
 	m.m20 = sx * (- yw + xz);
 	m.m01 = sy * (- zw + xy);
-	m.m11 = sy * (- xx - zz + 0.5);
+	m.m11 = sy * (- xx - zz + 0.5f);
 	m.m21 = sy * (+ xw + yz);
 	m.m02 = sz * (+ xz + yw);
 	m.m12 = sz * (- xw + yz);
-	m.m22 = sz * (- xx - yy + 0.5);
+	m.m22 = sz * (- xx - yy + 0.5f);
 	m.m03 = t->translation.x;
 	m.m13 = t->translation.y;
 	m.m23 = t->translation.z;

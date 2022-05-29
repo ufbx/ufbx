@@ -44,6 +44,7 @@ UFBXT_TEST(quat_to_euler_structured)
 			ufbx_quat q2 = ufbx_euler_to_quat(v2, order);
 
 			ufbxt_assert_close_real(&err, ufbxt_quat_error(q, q2), 0.0f);
+			ufbxt_assert_close_real(&err, ufbxt_quat_error(q, q2), 0.0f);
 		}
 	}
 

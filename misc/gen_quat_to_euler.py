@@ -58,7 +58,7 @@ def solve_euler_t2_fallback(quat, order, t):
 
     return t2
 
-qx,qy,qz,qw = sympy.symbols("q.x q.y q.z q.w")
+qx,qy,qz,qw = sympy.symbols("qx qy qz qw")
 quat = Quaternion(qw,qx,qy,qz)
 
 def format_c(expr, prec=0):
@@ -135,7 +135,7 @@ for order_s in orders:
     print(f"\t\t\tv.{c0} = (ufbx_real){e0};")
     print(f"\t\t\tv.{c2} = (ufbx_real){e2};")
     print("\t\t} else {")
-    print(f"\t\t\tv.{c1} = (ufbx_real)copysign(UFBXI_PI*0.5f, t);")
+    print(f"\t\t\tv.{c1} = (ufbx_real)copysign(UFBXI_DPI*0.5, t);")
     print(f"\t\t\tv.{c0} = (ufbx_real)({f2});")
     print(f"\t\t\tv.{c2} = 0.0f;")
     print("\t\t}")
