@@ -198,14 +198,18 @@ class CLCompiler(Compiler):
         args += sources
         args += ["/MT", "/nologo"]
 
-        obj_dir = os.path.dirname(output)
-        args.append(f"/Fo{obj_dir}\\")
+        if not config.get("compile_only"):
+            obj_dir = os.path.dirname(output)
+            args.append(f"/Fo{obj_dir}\\")
 
         if config.get("warnings", False):
             args.append("/W4")
             args.append("/WX")
         else:
             args.append("/W3")
+
+        if config.get("compile_only"):
+            args.append("/c")
 
         args.append("/DUFBX_DEV")
 
@@ -232,10 +236,12 @@ class CLCompiler(Compiler):
         if config.get("sse", False):
             args.append("/DSSE=1")
 
-        args.append("/link")
-
-        args += ["/opt:ref"]
-        args.append(f"-out:{output}")
+        if config.get("compile_only"):
+            args.append(f"/Fo\"{output}\"")
+        else:
+            args.append("/link")
+            args += ["/opt:ref"]
+            args.append(f"-out:{output}")
 
         return self.run(args)
 
@@ -304,6 +310,9 @@ class GCCCompiler(Compiler):
         if self.has_m32 and config.get("arch", "") == "x86":
             args.append("-m32")
 
+        if config.get("compile_only"):
+            args.append("-c")
+
         if self.has_cpp:
             std = "c++11"
         else:
@@ -342,7 +351,7 @@ class GCCCompiler(Compiler):
 
         args += sources
 
-        if "msvc" not in self.arch:
+        if "msvc" not in self.arch and not config.get("compile_only"):
             args.append("-lm")
 
         args += ["-o", output]
@@ -714,8 +723,10 @@ async def main():
                 yield compile_and_run_target(target, run_args)
 
     exe_suffix = ""
+    obj_suffix = ".o"
     if sys.platform == "win32":
         exe_suffix = ".exe"
+        obj_suffix = ".obj"
 
     ctest_tasks = []
 
@@ -779,6 +790,31 @@ async def main():
             "warnings": True,
         }
         target_tasks += compile_permutations("cpp", cpp_config, arch_configs, [])
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+    if "features" in tests:
+        log_comment("-- Compiling and running partial features --")
+
+        feature_defines = [
+            "UFBX_NO_SUBDIVISION",
+            "UFBX_NO_TESSELLATION",
+            "UFBX_NO_GEOMETRY_CACHE",
+            "UFBX_NO_SCENE_EVALUATION",
+            "UFBX_NO_TRIANGULATION",
+        ]
+
+        target_tasks = []
+
+        for bits in range(1, 1 << len(feature_defines)):
+            feature_config = {
+                "sources": ["ufbx.c"],
+                "output": f"features_{bits}" + obj_suffix,
+                "warnings": True,
+                "compile_only": True,
+            }
+            target_tasks += compile_permutations("features", feature_config, arch_configs, None)
 
         targets = await gather(target_tasks)
         all_targets += targets

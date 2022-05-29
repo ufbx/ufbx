@@ -87,6 +87,13 @@ jobs:
       - name: Run viewer
         run: python misc/run_tests.py viewer
 
+  ci_features:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Compile feature permutaitons
+        run: python misc/run_tests.py features
+
   ci_analysis:
     runs-on: ubuntu-latest
     steps:
@@ -177,7 +184,6 @@ jobs:
           fetch-depth: 2
       - name: Run tests
         run: python3 misc/run_tests.py tests --no-sanitize --threads 2
-
 
   ci_arm64:
     runs-on: [self-hosted, ARM64]
