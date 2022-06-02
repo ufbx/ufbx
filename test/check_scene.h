@@ -165,6 +165,11 @@ static void ufbxt_check_props(ufbx_scene *scene, const ufbx_props *props, bool t
 
 static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 {
+	if (scene->dom_root) {
+		ufbx_node *node = ufbx_as_node(element);
+		ufbxt_assert(element->dom_node || (node && node->is_root));
+	}
+
 	ufbxt_check_props(scene, &element->props, true);
 	ufbxt_check_string(element->name);
 	ufbxt_assert(scene->elements.data[element->element_id] == element);
@@ -177,6 +182,7 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 		ufbxt_check_string(c->src_prop);
 		ufbxt_check_string(c->dst_prop);
 		ufbxt_assert(c->src == element);
+		ufbxt_check_element_ptr(scene, c->dst);
 		if (i > 0) {
 			int cmp = strcmp(c[-1].src_prop.data, c[0].src_prop.data);
 			ufbxt_assert(cmp <= 0);
@@ -191,6 +197,7 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 		ufbxt_check_string(c->src_prop);
 		ufbxt_check_string(c->dst_prop);
 		ufbxt_assert(c->dst == element);
+		ufbxt_check_element_ptr(scene, c->src);
 		if (i > 0) {
 			int cmp = strcmp(c[-1].dst_prop.data, c[0].dst_prop.data);
 			ufbxt_assert(cmp <= 0);
@@ -822,6 +829,24 @@ static void ufbxt_check_metadata(ufbx_scene *scene, ufbx_metadata *metadata)
 	ufbxt_check_application(scene, &metadata->original_application);
 }
 
+static void ufbxt_check_dom_value(ufbx_scene *scene, ufbx_dom_value *value)
+{
+	ufbxt_assert((uint32_t)value->type < UFBX_DOM_VALUE_TYPE_COUNT);
+	ufbxt_check_string(value->value_str);
+	ufbxt_check_blob(value->value_blob);
+}
+
+static void ufbxt_check_dom_node(ufbx_scene *scene, ufbx_dom_node *node)
+{
+	ufbxt_check_string(node->name);
+	for (size_t i = 0; i < node->children.count; i++) {
+		ufbxt_check_dom_node(scene, node->children.data[i]);
+	}
+	for (size_t i = 0; i < node->values.count; i++) {
+		ufbxt_check_dom_value(scene, &node->values.data[i]);
+	}
+}
+
 static void ufbxt_check_scene(ufbx_scene *scene)
 {
 	ufbxt_check_metadata(scene, &scene->metadata);
@@ -988,6 +1013,10 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 
 	for (size_t i = 0; i < scene->metadata_objects.count; i++) {
 		ufbxt_check_metadata_object(scene, scene->metadata_objects.data[i]);
+	}
+
+	if (scene->dom_root) {
+		ufbxt_check_dom_node(scene, scene->dom_root);
 	}
 }
 

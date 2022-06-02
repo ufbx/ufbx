@@ -179,6 +179,41 @@ UFBX_LIST_TYPE(ufbx_vec3_list, ufbx_vec3);
 UFBX_LIST_TYPE(ufbx_vec4_list, ufbx_vec4);
 UFBX_LIST_TYPE(ufbx_string_list, ufbx_string);
 
+// -- Document object model
+
+typedef enum ufbx_dom_value_type {
+	UFBX_DOM_VALUE_NUMBER,
+	UFBX_DOM_VALUE_STRING,
+	UFBX_DOM_VALUE_ARRAY_I8,
+	UFBX_DOM_VALUE_ARRAY_I32,
+	UFBX_DOM_VALUE_ARRAY_I64,
+	UFBX_DOM_VALUE_ARRAY_F32,
+	UFBX_DOM_VALUE_ARRAY_F64,
+	UFBX_DOM_VALUE_ARRAY_IGNORED,
+
+	UFBX_DOM_VALUE_TYPE_COUNT,
+	UFBX_DOM_VALUE_TYPE_FORCE_32BIT = 0x7fffffff,
+} ufbx_dom_value_type;
+
+typedef struct ufbx_dom_node ufbx_dom_node;
+
+typedef struct ufbx_dom_value {
+	ufbx_dom_value_type type;
+	ufbx_string value_str;
+	ufbx_blob value_blob;
+	int64_t value_int;
+	double value_float;
+} ufbx_dom_value;
+
+UFBX_LIST_TYPE(ufbx_dom_node_list, ufbx_dom_node*);
+UFBX_LIST_TYPE(ufbx_dom_value_list, ufbx_dom_value);
+
+struct ufbx_dom_node {
+	ufbx_string name;
+	ufbx_dom_node_list children;
+	ufbx_dom_value_list values;
+};
+
 // -- Properties
 
 // FBX elements have properties which are arbitrary key/value pairs that can
@@ -480,6 +515,7 @@ struct ufbx_element {
 	ufbx_element_type type;
 	ufbx_connection_list connections_src;
 	ufbx_connection_list connections_dst;
+	ufbx_nullable ufbx_dom_node *dom_node;
 	ufbx_scene *scene;
 };
 
@@ -2698,6 +2734,9 @@ struct ufbx_scene {
 
 	// Elements sorted by name, type
 	ufbx_name_element_list elements_by_name;
+
+	// Enabled if `ufbx_load_opts.retain_dom == true`.
+	ufbx_nullable ufbx_dom_node *dom_root;
 };
 
 // -- Curves
@@ -3057,6 +3096,9 @@ typedef struct ufbx_load_opts {
 	// `UFBX_UNICODE_ERROR_HANDLING_PRIVATE_USE_ESCAPE` and `ufbx_expand_private_use_escapes()`
 	// to retrieve the original bytes.
 	ufbx_unicode_error_handling unicode_error_handling;
+
+	// Retain the raw document structure using `ufbx_dom_node`.
+	bool retain_dom;
 
 	uint32_t _end_zero; 
 } ufbx_load_opts;
@@ -3507,6 +3549,11 @@ ufbx_abi size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *channe
 ufbx_abi size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_frame *frame, ufbx_vec3 *data, size_t num_data, const ufbx_geometry_cache_data_opts *opts);
 ufbx_abi size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *channel, double time, ufbx_vec3 *data, size_t num_data, const ufbx_geometry_cache_data_opts *opts);
 
+// DOM
+
+ufbx_abi ufbx_dom_node *ufbx_dom_find_len(const ufbx_dom_node *parent, const char *name, size_t name_len);
+ufbx_inline ufbx_dom_node *ufbx_dom_find(const ufbx_dom_node *parent, const char *name) { return ufbx_dom_find_len(parent, name, strlen(name)); }
+
 // Utility
 
 ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator_opts *allocator, ufbx_error *error);
@@ -3524,6 +3571,47 @@ ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t ind
 ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
 
 ufbx_abi size_t ufbx_get_triangulate_face_num_indices(ufbx_face face);
+
+ufbx_abi ufbx_unknown *ufbx_as_unknown(const ufbx_element *element);
+ufbx_abi ufbx_node *ufbx_as_node(const ufbx_element *element);
+ufbx_abi ufbx_mesh *ufbx_as_mesh(const ufbx_element *element);
+ufbx_abi ufbx_light *ufbx_as_light(const ufbx_element *element);
+ufbx_abi ufbx_camera *ufbx_as_camera(const ufbx_element *element);
+ufbx_abi ufbx_bone *ufbx_as_bone(const ufbx_element *element);
+ufbx_abi ufbx_empty *ufbx_as_empty(const ufbx_element *element);
+ufbx_abi ufbx_line_curve *ufbx_as_line_curve(const ufbx_element *element);
+ufbx_abi ufbx_nurbs_curve *ufbx_as_nurbs_curve(const ufbx_element *element);
+ufbx_abi ufbx_nurbs_surface *ufbx_as_nurbs_surface(const ufbx_element *element);
+ufbx_abi ufbx_nurbs_trim_surface *ufbx_as_nurbs_trim_surface(const ufbx_element *element);
+ufbx_abi ufbx_nurbs_trim_boundary *ufbx_as_nurbs_trim_boundary(const ufbx_element *element);
+ufbx_abi ufbx_procedural_geometry *ufbx_as_procedural_geometry(const ufbx_element *element);
+ufbx_abi ufbx_stereo_camera *ufbx_as_stereo_camera(const ufbx_element *element);
+ufbx_abi ufbx_camera_switcher *ufbx_as_camera_switcher(const ufbx_element *element);
+ufbx_abi ufbx_marker *ufbx_as_marker(const ufbx_element *element);
+ufbx_abi ufbx_lod_group *ufbx_as_lod_group(const ufbx_element *element);
+ufbx_abi ufbx_skin_deformer *ufbx_as_skin_deformer(const ufbx_element *element);
+ufbx_abi ufbx_skin_cluster *ufbx_as_skin_cluster(const ufbx_element *element);
+ufbx_abi ufbx_blend_deformer *ufbx_as_blend_deformer(const ufbx_element *element);
+ufbx_abi ufbx_blend_channel *ufbx_as_blend_channel(const ufbx_element *element);
+ufbx_abi ufbx_blend_shape *ufbx_as_blend_shape(const ufbx_element *element);
+ufbx_abi ufbx_cache_deformer *ufbx_as_cache_deformer(const ufbx_element *element);
+ufbx_abi ufbx_cache_file *ufbx_as_cache_file(const ufbx_element *element);
+ufbx_abi ufbx_material *ufbx_as_material(const ufbx_element *element);
+ufbx_abi ufbx_texture *ufbx_as_texture(const ufbx_element *element);
+ufbx_abi ufbx_video *ufbx_as_video(const ufbx_element *element);
+ufbx_abi ufbx_shader *ufbx_as_shader(const ufbx_element *element);
+ufbx_abi ufbx_shader_binding *ufbx_as_shader_binding(const ufbx_element *element);
+ufbx_abi ufbx_anim_stack *ufbx_as_anim_stack(const ufbx_element *element);
+ufbx_abi ufbx_anim_layer *ufbx_as_anim_layer(const ufbx_element *element);
+ufbx_abi ufbx_anim_value *ufbx_as_anim_value(const ufbx_element *element);
+ufbx_abi ufbx_anim_curve *ufbx_as_anim_curve(const ufbx_element *element);
+ufbx_abi ufbx_display_layer *ufbx_as_display_layer(const ufbx_element *element);
+ufbx_abi ufbx_selection_set *ufbx_as_selection_set(const ufbx_element *element);
+ufbx_abi ufbx_selection_node *ufbx_as_selection_node(const ufbx_element *element);
+ufbx_abi ufbx_character *ufbx_as_character(const ufbx_element *element);
+ufbx_abi ufbx_constraint *ufbx_as_constraint(const ufbx_element *element);
+ufbx_abi ufbx_pose *ufbx_as_pose(const ufbx_element *element);
+ufbx_abi ufbx_metadata_object *ufbx_as_metadata_object(const ufbx_element *element);
 
 // -- FFI API
 

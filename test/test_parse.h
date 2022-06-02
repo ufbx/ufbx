@@ -8,6 +8,61 @@ UFBXT_TEST(thread_safety)
 }
 #endif
 
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_retain_dom_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.retain_dom = true;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_cube_dom, maya_cube, ufbxt_retain_dom_opts)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->dom_root);
+
+	ufbx_dom_node *objects = ufbx_dom_find(scene->dom_root, "Objects");
+	ufbxt_assert(objects);
+
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+	bool found = false;
+	for (size_t i = 0; i < objects->children.count; i++) {
+		if (node->element.dom_node == objects->children.data[i]) {
+			found = true;
+			break;
+		}
+	}
+	ufbxt_assert(found);
+
+	ufbx_mesh *mesh = ufbx_as_mesh(node->attrib);
+	ufbxt_assert(mesh);
+
+	ufbx_dom_node *dom_mesh = mesh->element.dom_node;
+	ufbxt_assert(dom_mesh);
+
+	ufbx_dom_node *dom_indices = ufbx_dom_find(dom_mesh, "PolygonVertexIndex");
+	ufbxt_assert(dom_indices);
+	ufbxt_assert(dom_indices->values.count == 1);
+
+	ufbx_dom_value *dom_indices_value = &dom_indices->values.data[0];
+	ufbxt_assert(dom_indices_value->type == UFBX_DOM_VALUE_ARRAY_I32);
+	ufbxt_assert(dom_indices_value->value_int == 24);
+
+	size_t count = (size_t)dom_indices_value->value_int;
+	int32_t *data = (int32_t*)dom_indices_value->value_blob.data;
+
+	size_t num_negative = 0;
+	for (size_t i = 0; i < count; i++) {
+		if (data[i] < 0) {
+			num_negative++;
+		}
+	}
+	ufbxt_assert(num_negative == 6);
+}
+#endif
+
 UFBXT_FILE_TEST(maya_leading_comma)
 #if UFBXT_IMPL
 {
