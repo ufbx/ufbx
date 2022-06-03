@@ -10252,7 +10252,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_takes(ufbxi_context *uc)
 	return 1;
 }
 
-ufbxi_nodiscard ufbxi_noinline static void ufbxi_setup_root_node(ufbxi_context *uc, ufbx_node *root)
+ufbxi_noinline static void ufbxi_setup_root_node(ufbxi_context *uc, ufbx_node *root)
 {
 	if (uc->opts.use_root_transform) {
 		root->local_transform = uc->opts.root_transform;
