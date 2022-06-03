@@ -166,8 +166,22 @@ static void ufbxt_check_props(ufbx_scene *scene, const ufbx_props *props, bool t
 static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 {
 	if (scene->dom_root) {
-		ufbx_node *node = ufbx_as_node(element);
-		ufbxt_assert(element->dom_node || (node && node->is_root));
+		bool requires_dom = true;
+		uint32_t version = scene->metadata.version;
+
+		if (element->type == UFBX_ELEMENT_NODE && ((ufbx_node*)element)->is_root) {
+			requires_dom = false;
+		} else if (version < 6000 && element->type == UFBX_ELEMENT_ANIM_STACK) {
+			requires_dom = false;
+		} else if (version < 6000 && element->type == UFBX_ELEMENT_ANIM_LAYER) {
+			requires_dom = false;
+		} else if (version < 6000 && element->type == UFBX_ELEMENT_SKIN_DEFORMER) {
+			requires_dom = false;
+		}
+
+		if (requires_dom) {
+			ufbxt_assert(element->dom_node);
+		}
 	}
 
 	ufbxt_check_props(scene, &element->props, true);
@@ -1018,6 +1032,10 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 	if (scene->dom_root) {
 		ufbxt_check_dom_node(scene, scene->dom_root);
 	}
+
+	ufbxt_assert(scene->root_node);
+	ufbxt_check_element_ptr(scene, scene->root_node);
+	ufbxt_assert(scene->root_node->is_root);
 }
 
 #endif

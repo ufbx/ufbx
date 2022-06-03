@@ -2462,10 +2462,10 @@ static int ufbxi_map_cmp_const_char_ptr(void *user, const void *va, const void *
 	return 0;
 }
 
-static int ufbxi_map_cmp_node_ptr(void *user, const void *va, const void *vb)
+static int ufbxi_map_cmp_uintptr(void *user, const void *va, const void *vb)
 {
 	(void)user;
-	struct ufbxi_node *a = *(struct ufbxi_node **)va, *b = *(struct ufbxi_node **)vb;
+	uintptr_t a = *(const uintptr_t*)va, b = *(const uintptr_t*)vb;
 	if (a < b) return -1;
 	if (a > b) return +1;
 	return 0;
@@ -3714,11 +3714,6 @@ typedef struct {
 } ufbxi_texture_extra;
 
 typedef struct {
-	ufbxi_node node;
-	ufbx_dom_node *dom_node;
-} ufbxi_top_node;
-
-typedef struct {
 
 	ufbx_error error;
 	uint32_t version;
@@ -3799,7 +3794,7 @@ typedef struct {
 	ufbxi_buf result;
 
 	// Top-level state
-	ufbxi_top_node *top_nodes;
+	ufbxi_node *top_nodes;
 	size_t top_nodes_len, top_nodes_cap;
 	bool parsed_to_end;
 
@@ -3809,8 +3804,6 @@ typedef struct {
 	size_t top_child_index;
 	ufbxi_node top_child;
 	bool has_next_child;
-	ufbx_dom_node *top_dom_node;
-	ufbx_dom_node *top_dom_child;
 
 	// Shared consecutive and all-zero index buffers
 	int32_t *zero_indices;
@@ -6840,6 +6833,26 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 
 // -- DOM retention
 
+typedef struct {
+	uintptr_t node_ptr;
+	ufbx_dom_node *dom_node;
+} ufbxi_dom_mapping;
+
+ufbxi_nodiscard static ufbxi_noinline ufbx_dom_node *ufbxi_get_dom_node_imp(ufbxi_context *uc, ufbxi_node *node)
+{
+	if (!node) return NULL;
+	ufbxi_dom_mapping mapping = { (uintptr_t)node, NULL };
+	uint32_t hash = ufbxi_hash_uptr(mapping.node_ptr);
+	ufbxi_dom_mapping *result = ufbxi_map_find(&uc->dom_node_map, ufbxi_dom_mapping, hash, &mapping);
+	return result ? result->dom_node : NULL;
+}
+
+ufbxi_nodiscard static ufbxi_forceinline ufbx_dom_node *ufbxi_get_dom_node(ufbxi_context *uc, ufbxi_node *node)
+{
+	if (!uc->opts.retain_dom) return NULL;
+	return ufbxi_get_dom_node_imp(uc, node);
+}
+
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_dom_node(ufbxi_context *uc, ufbxi_node *node, ufbx_dom_node **p_dom_node)
 {
 	ufbx_dom_node *dst = ufbxi_push_zero(&uc->result, ufbx_dom_node, 1);
@@ -6852,6 +6865,18 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_dom_node(ufbxi_context *u
 
 	dst->name.data = node->name;
 	dst->name.length = node->name_len;
+
+	{
+		ufbxi_dom_mapping mapping = { (uintptr_t)node, NULL };
+		uint32_t hash = ufbxi_hash_uptr(mapping.node_ptr);
+		ufbxi_dom_mapping *result = ufbxi_map_find(&uc->dom_node_map, ufbxi_dom_mapping, hash, &mapping);
+		if (!result) {
+			result = ufbxi_map_insert(&uc->dom_node_map, ufbxi_dom_mapping, hash, &mapping);
+			ufbxi_check(result);
+		}
+		result->node_ptr = (uintptr_t)node;
+		result->dom_node = dst;
+	}
 
 	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &dst->name, false));
 
@@ -6875,6 +6900,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_dom_node(ufbxi_context *u
 		case 'l': val->type = UFBX_DOM_VALUE_ARRAY_I64; break;
 		case 'f': val->type = UFBX_DOM_VALUE_ARRAY_F32; break;
 		case 'd': val->type = UFBX_DOM_VALUE_ARRAY_F64; break;
+		case 's': val->type = UFBX_DOM_VALUE_ARRAY_RAW_STRING; break;
 		case '-': val->type = UFBX_DOM_VALUE_ARRAY_IGNORED; break;
 		default: ufbxi_fail("Bad array type"); break;
 		}
@@ -6917,7 +6943,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_dom_node(ufbxi_context *u
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_toplevel(ufbxi_context *uc, ufbxi_node *node, ufbx_dom_node **p_dom_node)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_toplevel(ufbxi_context *uc, ufbxi_node *node)
 {
 	if (uc->dom_parse_num_children > 0) {
 		ufbx_dom_node **children = ufbxi_push_pop(&uc->result, &uc->tmp_dom_nodes, ufbx_dom_node*, uc->dom_parse_num_children);
@@ -6947,17 +6973,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_toplevel(ufbxi_context *u
 		uc->scene.dom_root = dom_root;
 	}
 
-	if (p_dom_node) {
-		*p_dom_node = uc->dom_parse_toplevel;
-	}
-
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_toplevel_child(ufbxi_context *uc, ufbxi_node *child, ufbx_dom_node **p_dom_node)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_toplevel_child(ufbxi_context *uc, ufbxi_node *child)
 {
 	ufbx_assert(uc->dom_parse_toplevel);
-	ufbxi_check(ufbxi_retain_dom_node(uc, child, p_dom_node));
+	ufbxi_check(ufbxi_retain_dom_node(uc, child, NULL));
 	uc->dom_parse_num_children++;
 
 	return 1;
@@ -7030,10 +7052,9 @@ ufbxi_nodiscard static int ufbxi_parse_toplevel_child_imp(ufbxi_context *uc, ufb
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_parse_toplevel(ufbxi_context *uc, const char *name)
 {
-	ufbxi_for(ufbxi_top_node, node, uc->top_nodes, uc->top_nodes_len) {
-		if (node->node.name == name) {
-			uc->top_node = &node->node;
-			uc->top_dom_node = node->dom_node;
+	ufbxi_for(ufbxi_node, node, uc->top_nodes, uc->top_nodes_len) {
+		if (node->name == name) {
+			uc->top_node = node;
 			uc->top_child_index = 0;
 			return 1;
 		}
@@ -7042,7 +7063,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_parse_toplevel(ufbxi_context *uc
 	// Reached end and not found in cache
 	if (uc->parsed_to_end) {
 		uc->top_node = NULL;
-		uc->top_dom_node = NULL;
 		uc->top_child_index = 0;
 		return 1;
 	}
@@ -7059,35 +7079,32 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_parse_toplevel(ufbxi_context *uc
 		// Top-level node not found
 		if (end) {
 			uc->top_node = NULL;
-			uc->top_dom_node = NULL;
 			uc->top_child_index = 0;
 			uc->parsed_to_end = true;
 			if (uc->opts.retain_dom) {
-				ufbxi_check(ufbxi_retain_toplevel(uc, NULL, NULL));
+				ufbxi_check(ufbxi_retain_toplevel(uc, NULL));
 			}
 			return 1;
 		}
 
 		uc->top_nodes_len++;
 		ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->top_nodes, &uc->top_nodes_cap, uc->top_nodes_len));
-		ufbxi_top_node *top_node = &uc->top_nodes[uc->top_nodes_len - 1];
-		ufbxi_pop(&uc->tmp_stack, ufbxi_node, 1, &top_node->node);
-		top_node->dom_node = NULL;
+		ufbxi_node *node = &uc->top_nodes[uc->top_nodes_len - 1];
+		ufbxi_pop(&uc->tmp_stack, ufbxi_node, 1, node);
 		if (uc->opts.retain_dom) {
-			ufbxi_check(ufbxi_retain_toplevel(uc, &top_node->node, &top_node->dom_node));
+			ufbxi_check(ufbxi_retain_toplevel(uc, node));
 		}
 
 		// Return if we parsed the right one
-		if (top_node->node.name == name) {
-			uc->top_node = &top_node->node;
-			uc->top_dom_node = top_node->dom_node;
+		if (node->name == name) {
+			uc->top_node = node;
 			uc->top_child_index = SIZE_MAX;
 			return 1;
 		}
 
 		// If not we need to parse all the children of the node for later
 		uint32_t num_children = 0;
-		ufbxi_parse_state state = ufbxi_update_parse_state(UFBXI_PARSE_ROOT, top_node->node.name);
+		ufbxi_parse_state state = ufbxi_update_parse_state(UFBXI_PARSE_ROOT, node->name);
 		if (uc->has_next_child) {
 			for (;;) {
 				ufbxi_check(ufbxi_parse_toplevel_child_imp(uc, state, &uc->tmp, &end));
@@ -7096,13 +7113,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_parse_toplevel(ufbxi_context *uc
 			}
 		}
 
-		top_node->node.num_children = num_children;
-		top_node->node.children = ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_node, num_children);
-		ufbxi_check(top_node->node.children);
+		node->num_children = num_children;
+		node->children = ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_node, num_children);
+		ufbxi_check(node->children);
 
 		if (uc->opts.retain_dom) {
 			for (size_t i = 0; i < num_children; i++) {
-				ufbxi_check(ufbxi_retain_toplevel_child(uc, &top_node->node.children[i], NULL));
+				ufbxi_check(ufbxi_retain_toplevel_child(uc, &node->children[i]));
 			}
 		}
 	}
@@ -7129,7 +7146,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_parse_toplevel_child(ufbxi_conte
 			*p_node = &uc->top_child;
 
 			if (uc->opts.retain_dom) {
-				ufbxi_check(ufbxi_retain_toplevel_child(uc, &uc->top_child, &uc->top_dom_child));
+				ufbxi_check(ufbxi_retain_toplevel_child(uc, &uc->top_child));
 			}
 		}
 	} else {
@@ -7140,10 +7157,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_parse_toplevel_child(ufbxi_conte
 		} else {
 			uc->top_child_index++;
 			*p_node = &uc->top_node->children[child_index];
-			if (uc->opts.retain_dom) {
-				ufbx_assert(uc->top_dom_node);
-				uc->top_dom_child = uc->top_dom_node->children.data[child_index];
-			}
 		}
 	}
 
@@ -7174,7 +7187,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_parse_legacy_toplevel(ufbxi_cont
 	uc->top_node = &uc->legacy_node;
 
 	if (uc->opts.retain_dom) {
-		ufbxi_check(ufbxi_retain_toplevel(uc, &uc->legacy_node, &uc->top_dom_node));
+		ufbxi_check(ufbxi_retain_toplevel(uc, &uc->legacy_node));
 	}
 
 	return 1;
@@ -7856,7 +7869,7 @@ ufbxi_nodiscard static ufbx_element *ufbxi_push_element_size(ufbxi_context *uc, 
 	return elem;
 }
 
-ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element_size(ufbxi_context *uc, uint64_t *p_fbx_id, const char *name, size_t size, ufbx_element_type type)
+ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element_size(ufbxi_context *uc, uint64_t *p_fbx_id, ufbxi_node *node, const char *name, size_t size, ufbx_element_type type)
 {
 	size_t aligned_size = (size + 7) & ~0x7;
 
@@ -7871,6 +7884,7 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 	elem->type = type;
 	elem->element_id = uc->num_elements++;
 	elem->typed_id = typed_id;
+	elem->dom_node = ufbxi_get_dom_node(uc, node);
 	if (name) {
 		elem->name.data = name;
 		elem->name.length = strlen(name);
@@ -7888,7 +7902,7 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 }
 
 #define ufbxi_push_element(uc, info, type_name, type_enum) ufbxi_maybe_null((type_name*)ufbxi_push_element_size((uc), (info), sizeof(type_name), (type_enum)))
-#define ufbxi_push_synthetic_element(uc, p_fbx_id, name, type_name, type_enum) ufbxi_maybe_null((type_name*)ufbxi_push_synthetic_element_size((uc), (p_fbx_id), (name), sizeof(type_name), (type_enum)))
+#define ufbxi_push_synthetic_element(uc, p_fbx_id, node, name, type_name, type_enum) ufbxi_maybe_null((type_name*)ufbxi_push_synthetic_element_size((uc), (p_fbx_id), (node), (name), sizeof(type_name), (type_enum)))
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_model(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
@@ -8288,13 +8302,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_blend_shapes(ufbx
 		ufbxi_check(ufbxi_get_val1(n, "S", &name));
 
 		if (deformer == NULL) {
-			deformer = ufbxi_push_synthetic_element(uc, &deformer_fbx_id, name.data, ufbx_blend_deformer, UFBX_ELEMENT_BLEND_DEFORMER);
+			deformer = ufbxi_push_synthetic_element(uc, &deformer_fbx_id, n, name.data, ufbx_blend_deformer, UFBX_ELEMENT_BLEND_DEFORMER);
 			ufbxi_check(deformer);
 			ufbxi_check(ufbxi_connect_oo(uc, deformer_fbx_id, info->fbx_id));
 		}
 
 		uint64_t channel_fbx_id = 0;
-		ufbx_blend_channel *channel = ufbxi_push_synthetic_element(uc, &channel_fbx_id, name.data, ufbx_blend_channel, UFBX_ELEMENT_BLEND_CHANNEL);
+		ufbx_blend_channel *channel = ufbxi_push_synthetic_element(uc, &channel_fbx_id, n, name.data, ufbx_blend_channel, UFBX_ELEMENT_BLEND_CHANNEL);
 		ufbxi_check(channel);
 
 		ufbx_real_list weight_list = { NULL, 0 };
@@ -8330,6 +8344,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_blend_shapes(ufbx
 		// it gives us an unique ID (as long as `sizeof(ufbx_blend_channel) > 0`...)
 		shape_info.fbx_id = channel_fbx_id + 1;
 		shape_info.name = name;
+		shape_info.dom_node = ufbxi_get_dom_node(uc, n);
 
 		ufbxi_check(ufbxi_read_shape(uc, n, &shape_info));
 
@@ -9671,7 +9686,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects(ufbxi_context *uc)
 		ufbxi_check(ufbxi_parse_toplevel_child(uc, &node));
 		if (!node) break;
 
-		info.dom_node = uc->top_dom_child;
+		info.dom_node = ufbxi_get_dom_node(uc, node);
 
 		if (node->name == ufbxi_GlobalSettings) {
 			ufbxi_check(ufbxi_read_global_settings(uc, node));
@@ -9901,7 +9916,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 	if (!keys) return 1;
 
 	uint64_t curve_fbx_id = 0;
-	ufbx_anim_curve *curve = ufbxi_push_synthetic_element(uc, &curve_fbx_id, name, ufbx_anim_curve, UFBX_ELEMENT_ANIM_CURVE);
+	ufbx_anim_curve *curve = ufbxi_push_synthetic_element(uc, &curve_fbx_id, node, name, ufbx_anim_curve, UFBX_ELEMENT_ANIM_CURVE);
 	ufbxi_check(curve);
 
 	ufbxi_check(ufbxi_connect_op(uc, curve_fbx_id, value_fbx_id, curve->name));
@@ -10154,7 +10169,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_prop_channel(ufbxi_con
 		if (num_channel_nodes == 0) return 1;
 
 		uint64_t value_fbx_id = 0;
-		ufbx_anim_value *value = ufbxi_push_synthetic_element(uc, &value_fbx_id, name.data, ufbx_anim_value, UFBX_ELEMENT_ANIM_VALUE);
+		ufbx_anim_value *value = ufbxi_push_synthetic_element(uc, &value_fbx_id, node, name.data, ufbx_anim_value, UFBX_ELEMENT_ANIM_VALUE);
 
 		// Add a "virtual" connection between the animated property and the layer/target
 		ufbxi_check(ufbxi_connect_oo(uc, value_fbx_id, layer_fbx_id));
@@ -10194,11 +10209,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take(ufbxi_context *uc, ufb
 	uint64_t stack_fbx_id = 0, layer_fbx_id = 0;
 
 	// Treat the Take as a post-7000 version animation stack and layer.
-	ufbx_anim_stack *stack = ufbxi_push_synthetic_element(uc, &stack_fbx_id, NULL, ufbx_anim_stack, UFBX_ELEMENT_ANIM_STACK);
+	ufbx_anim_stack *stack = ufbxi_push_synthetic_element(uc, &stack_fbx_id, node, NULL, ufbx_anim_stack, UFBX_ELEMENT_ANIM_STACK);
 	ufbxi_check(stack);
 	ufbxi_check(ufbxi_get_val1(node, "S", &stack->name));
 
-	ufbx_anim_layer *layer = ufbxi_push_synthetic_element(uc, &layer_fbx_id, ufbxi_BaseLayer, ufbx_anim_layer, UFBX_ELEMENT_ANIM_LAYER);
+	ufbx_anim_layer *layer = ufbxi_push_synthetic_element(uc, &layer_fbx_id, node, ufbxi_BaseLayer, ufbx_anim_layer, UFBX_ELEMENT_ANIM_LAYER);
 	ufbxi_check(layer);
 
 	ufbxi_check(ufbxi_connect_oo(uc, layer_fbx_id, stack_fbx_id));
@@ -10235,6 +10250,18 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_takes(ufbxi_context *uc)
 	}
 
 	return 1;
+}
+
+ufbxi_nodiscard ufbxi_noinline static void ufbxi_setup_root_node(ufbxi_context *uc, ufbx_node *root)
+{
+	if (uc->opts.use_root_transform) {
+		root->local_transform = uc->opts.root_transform;
+		root->node_to_parent = ufbx_transform_to_matrix(&uc->opts.root_transform);
+	} else {
+		root->local_transform = ufbx_identity_transform;
+		root->node_to_parent = ufbx_identity_matrix;
+	}
+	root->is_root = true;
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_root(ufbxi_context *uc)
@@ -10276,16 +10303,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_root(ufbxi_context *uc)
 		root_info.name = ufbx_empty_string;
 		ufbx_node *root = ufbxi_push_element(uc, &root_info, ufbx_node, UFBX_ELEMENT_NODE);
 		ufbxi_check(root);
+		ufbxi_setup_root_node(uc, root);
 		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &root->element.element_id));
-
-		if (uc->opts.use_root_transform) {
-			root->local_transform = uc->opts.root_transform;
-			root->node_to_parent = ufbx_transform_to_matrix(&uc->opts.root_transform);
-		} else {
-			root->local_transform = ufbx_identity_transform;
-			root->node_to_parent = ufbx_identity_matrix;
-		}
-		root->is_root = true;
 	}
 
 	// Definitions: Object type counts and property templates (optional)
@@ -10455,7 +10474,7 @@ ufbxi_nodiscard ufbxi_noinline static size_t ufbxi_read_legacy_props(ufbxi_node 
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_material(ufbxi_context *uc, ufbxi_node *node, uint64_t *p_fbx_id, const char *name)
 {
-	ufbx_material *ufbxi_restrict material = ufbxi_push_synthetic_element(uc, p_fbx_id, name, ufbx_material, UFBX_ELEMENT_MATERIAL);
+	ufbx_material *ufbxi_restrict material = ufbxi_push_synthetic_element(uc, p_fbx_id, node, name, ufbx_material, UFBX_ELEMENT_MATERIAL);
 	ufbxi_check(material);
 
 	ufbx_prop tmp_props[ufbxi_arraycount(ufbxi_legacy_material_props)];
@@ -10471,7 +10490,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_material(ufbxi_conte
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_link(ufbxi_context *uc, ufbxi_node *node, uint64_t *p_fbx_id, const char *name)
 {
-	ufbx_skin_cluster *ufbxi_restrict cluster = ufbxi_push_synthetic_element(uc, p_fbx_id, name, ufbx_skin_cluster, UFBX_ELEMENT_SKIN_CLUSTER);
+	ufbx_skin_cluster *ufbxi_restrict cluster = ufbxi_push_synthetic_element(uc, p_fbx_id, node, name, ufbx_skin_cluster, UFBX_ELEMENT_SKIN_CLUSTER);
 	ufbxi_check(cluster);
 
 	// TODO: Merge with ufbxi_read_skin_cluster(), at least partially?
@@ -10689,7 +10708,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 			uint64_t node_fbx_id = (uintptr_t)type_and_name.data | UFBXI_SYNTHETIC_ID_BIT;
 			ufbxi_check(ufbxi_connect_oo(uc, node_fbx_id, fbx_id));
 			if (!skin) {
-				skin = ufbxi_push_synthetic_element(uc, &skin_fbx_id, info->name.data, ufbx_skin_deformer, UFBX_ELEMENT_SKIN_DEFORMER);
+				skin = ufbxi_push_synthetic_element(uc, &skin_fbx_id, NULL, info->name.data, ufbx_skin_deformer, UFBX_ELEMENT_SKIN_DEFORMER);
 				ufbxi_check(skin);
 				ufbxi_check(ufbxi_connect_oo(uc, skin_fbx_id, info->fbx_id));
 			}
@@ -10715,7 +10734,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_model(ufbxi_context 
 	ufbxi_element_info info = { 0 };
 	info.fbx_id = (uintptr_t)type_and_name.data | UFBXI_SYNTHETIC_ID_BIT;
 	info.name = name;
-	info.dom_node = uc->top_dom_node;
+	info.dom_node = ufbxi_get_dom_node(uc, node);
 
 	ufbx_node *elem_node = ufbxi_push_element(uc, &info, ufbx_node, UFBX_ELEMENT_NODE);
 	ufbxi_check(elem_node);
@@ -10724,7 +10743,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_model(ufbxi_context 
 	ufbxi_element_info attrib_info = { 0 };
 	attrib_info.fbx_id = info.fbx_id + 1;
 	attrib_info.name = name;
-	attrib_info.dom_node = uc->top_dom_node;
+	attrib_info.dom_node = info.dom_node;
 
 	// If we make unused connections it doesn't matter..
 	ufbxi_check(ufbxi_connect_oo(uc, attrib_info.fbx_id, info.fbx_id));
@@ -10790,8 +10809,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_legacy_root(ufbxi_context *
 	// root node. However no other formats have root node with transforms so it
 	// might be better to leave it as-is and create an empty one.
 	{
-		ufbx_node *root = ufbxi_push_synthetic_element(uc, &uc->root_id, ufbxi_empty_char, ufbx_node, UFBX_ELEMENT_NODE);
+		ufbx_node *root = ufbxi_push_synthetic_element(uc, &uc->root_id, NULL, ufbxi_empty_char, ufbx_node, UFBX_ELEMENT_NODE);
 		ufbxi_check(root);
+		ufbxi_setup_root_node(uc, root);
 		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &root->element.element_id));
 	}
 
@@ -10812,7 +10832,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_legacy_root(ufbxi_context *
 	}
 
 	if (uc->opts.retain_dom) {
-		ufbxi_check(ufbxi_retain_toplevel(uc, NULL, NULL));
+		ufbxi_check(ufbxi_retain_toplevel(uc, NULL));
 	}
 
 	// Create the implicit animation stack if necessary
@@ -15345,7 +15365,7 @@ static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->tmp_full_weights);
 	ufbxi_buf_free(&uc->tmp_dom_nodes);
 
-	ufbxi_free(&uc->ator_tmp, ufbxi_top_node, uc->top_nodes, uc->top_nodes_cap);
+	ufbxi_free(&uc->ator_tmp, ufbxi_node, uc->top_nodes, uc->top_nodes_cap);
 	ufbxi_free(&uc->ator_tmp, void*, uc->element_extra_arr, uc->element_extra_cap);
 
 	ufbxi_free(&uc->ator_tmp, char, uc->ascii.token.str_data, uc->ascii.token.str_cap);
@@ -15427,7 +15447,7 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	ufbxi_map_init(&uc->fbx_id_map, &uc->ator_tmp, &ufbxi_map_cmp_uint64, NULL);
 	ufbxi_map_init(&uc->fbx_attr_map, &uc->ator_tmp, &ufbxi_map_cmp_uint64, NULL);
 	ufbxi_map_init(&uc->node_prop_set, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
-	ufbxi_map_init(&uc->dom_node_map, &uc->ator_tmp, &ufbxi_map_cmp_node_ptr, NULL);
+	ufbxi_map_init(&uc->dom_node_map, &uc->ator_tmp, &ufbxi_map_cmp_uintptr, NULL);
 
 	uc->tmp.ator = &uc->ator_tmp;
 	uc->tmp_parse.ator = &uc->ator_tmp;

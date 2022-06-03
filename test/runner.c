@@ -205,10 +205,10 @@ void ufbxt_log_flush()
 void ufbxt_log_error(ufbx_error *err)
 {
 	if (!err) return;
-	ufbxt_logf("Error: %s", err->description);
+	ufbxt_logf("Error: %s", err->description.data);
 	for (size_t i = 0; i < err->stack_size; i++) {
 		ufbx_error_frame *f = &err->stack[i];
-		ufbxt_logf("Line %u %s: %s", f->source_line, f->function, f->description);
+		ufbxt_logf("Line %u %s: %s", f->source_line, f->function.data, f->description.data);
 	}
 }
 
@@ -1735,6 +1735,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			stream_opts.progress_cb.fn = &ufbxt_measure_progress;
 			stream_opts.progress_cb.user = &stream_progress_ctx;
 			stream_opts.progress_interval_hint = 1;
+			stream_opts.retain_dom = true;
 
 			if ((flags & UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE) == 0) {
 				stream_opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING;
