@@ -140,7 +140,8 @@ if __name__ == "__main__":
         log(f"== '{case.title}' by '{case.author}' ({case.license}) ==")
         log()
 
-        log(f"  source url: {case.url}")
+        if case.url:
+            log(f"  source url: {case.url}")
         log(f"   .json url: {fmt_url(case.json_path, case.root)}")
         log()
 
