@@ -5427,6 +5427,9 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			}
 			info->tmp_buf = true;
 			return true;
+		} else if (!strcmp(name, "TransformAssociateModel")) {
+			info->type = uc->opts.retain_dom ? 'r' : '-';
+			return true;
 		}
 		break;
 
