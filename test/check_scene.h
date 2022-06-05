@@ -631,6 +631,10 @@ static void ufbxt_check_blend_shape(ufbx_scene *scene, ufbx_blend_shape *shape)
 	ufbxt_check_list(shape->offset_vertices);
 	ufbxt_check_list(shape->position_offsets);
 	ufbxt_check_list(shape->normal_offsets);
+	ufbxt_assert(shape->offset_vertices.count == shape->position_offsets.count);
+	if (shape->normal_offsets.count > 0) {
+		ufbxt_assert(shape->normal_offsets.count == shape->offset_vertices.count);
+	}
 }
 
 static void ufbxt_check_cache_deformer(ufbx_scene *scene, ufbx_cache_deformer *deformer)

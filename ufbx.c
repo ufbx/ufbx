@@ -5142,6 +5142,11 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
 			info->result = true;
 			return true;
+		} else if (name == ufbxi_Normals) {
+			info->type = uc->opts.ignore_geometry ? '-' : 'r';
+			info->result = true;
+			info->pad_begin = true;
+			return true;
 		}
 		break;
 
@@ -5385,6 +5390,12 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			info->pad_begin = true;
 			return true;
 		}
+		if (name == ufbxi_Normals) {
+			info->type = uc->opts.ignore_geometry ? '-' : 'r';
+			info->result = true;
+			info->pad_begin = true;
+			return true;
+		}
 		break;
 
 	case UFBXI_PARSE_DEFORMER:
@@ -5410,10 +5421,10 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			// Ignore blend shape FullWeights as it's used in Blender for vertex groups
 			// which we don't currently handle. https://developer.blender.org/T90382
 			// TODO: Should we present this to users anyway somehow?
-			if (!uc->opts.disable_quirks && uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
-				return false;
-			}
 			info->type = 'd';
+			if (!uc->opts.disable_quirks && uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
+				info->type = '-';
+			}
 			info->tmp_buf = true;
 			return true;
 		}
@@ -6108,7 +6119,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 	} else {
 		if (num_values > UFBXI_MAX_NON_ARRAY_VALUES) {
 			if (uc->opts.retain_dom) {
-				printf(">> %s\n", name);
+				// FIXME
+				printf("!!>> %s\n", name);
 			}
 		}
 
@@ -6200,7 +6212,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 			case 'c': case 'b': case 'i': case 'l': case 'f': case 'd':
 			{
 				if (uc->opts.retain_dom) {
-					printf(">> %s\n", name);
+					// FIXME
+					printf("!!>> %s\n", name);
 				}
 				uint32_t encoded_size = ufbxi_read_u32(value + 8);
 				ufbxi_consume_bytes(uc, 13);
@@ -8320,14 +8333,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_shape(ufbxi_context *uc, uf
 {
 	ufbxi_node *node_vertices = ufbxi_find_child(node, ufbxi_Vertices);
 	ufbxi_node *node_indices = ufbxi_find_child(node, ufbxi_Indexes);
+	ufbxi_node *node_normals = ufbxi_find_child(node, ufbxi_Normals);
 	if (!node_vertices || !node_indices) return 1;
 
 	ufbx_blend_shape *shape = ufbxi_push_element(uc, info, ufbx_blend_shape, UFBX_ELEMENT_BLEND_SHAPE);
 	ufbxi_check(shape);
 
 	if (uc->opts.ignore_geometry) return 1;
-
-	// TODO: Normals
 
 	ufbxi_value_array *vertices = ufbxi_get_array(node_vertices, 'r');
 	ufbxi_value_array *indices = ufbxi_get_array(node_indices, 'i');
@@ -8345,6 +8357,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_shape(ufbxi_context *uc, uf
 	shape->position_offsets.count = num_offsets;
 	shape->offset_vertices.count = num_offsets;
 
+	if (node_normals) {
+		ufbxi_value_array *normals = ufbxi_get_array(node_normals, 'r');
+		ufbxi_check(normals && normals->size == vertices->size);
+		shape->normal_offsets.data = (ufbx_vec3*)normals->data;
+		shape->normal_offsets.count = num_offsets;
+	}
+
 	// Sort the blend shape vertices only if absolutely necessary
 	bool sorted = true;
 	for (size_t i = 1; i < num_offsets; i++) {
@@ -8361,7 +8380,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_shape(ufbxi_context *uc, uf
 		for (size_t i = 0; i < num_offsets; i++) {
 			offsets[i].vertex = shape->offset_vertices.data[i];
 			offsets[i].position_offset = shape->position_offsets.data[i];
-			if (shape->normal_offsets.data) offsets[i].normal_offset = shape->normal_offsets.data[i];
+			if (node_normals) offsets[i].normal_offset = shape->normal_offsets.data[i];
 		}
 
 		ufbxi_check(ufbxi_sort_blend_offsets(uc, offsets, num_offsets));
@@ -8369,7 +8388,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_shape(ufbxi_context *uc, uf
 		for (size_t i = 0; i < num_offsets; i++) {
 			shape->offset_vertices.data[i] = offsets[i].vertex;
 			shape->position_offsets.data[i] = offsets[i].position_offset;
-			if (shape->normal_offsets.data) shape->normal_offsets.data[i] = offsets[i].normal_offset;
+			if (node_normals) shape->normal_offsets.data[i] = offsets[i].normal_offset;
 		}
 		ufbxi_pop(&uc->tmp_stack, ufbxi_blend_offset, num_offsets, NULL);
 	}
