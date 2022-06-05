@@ -1859,9 +1859,6 @@ typedef struct {
 	size_t pos;  // < Next offset to allocate from
 	size_t size; // < Size of the current chunk ie. `chunks[0]->size` (or 0 if `chunks[0] == NULL`)
 
-	// Number of chunks in `chunks[1]`.
-	size_t num_secondary_chunks;
-
 	size_t num_items; // < Number of individual items pushed to the buffer
 
 	bool unordered;  // < Does not support popping from the buffer
@@ -1900,10 +1897,11 @@ static ufbxi_noinline void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 			// Store the final position for the retired chunk and scan free
 			// chunks in case we find one the allocation fits in.
 			chunk->pushed_pos = b->pos;
-			ufbxi_buf_chunk *next = chunk;
+			ufbxi_buf_chunk *next = chunk->next;
 			while (next != NULL) {
 				chunk = next;
-				ufbx_assert(chunk->pushed_pos == 0);
+				ufbx_assert(b->unordered || chunk->pushed_pos == 0);
+				chunk->pushed_pos = 0;
 				if (size <= chunk->size) {
 					b->chunks[0] = chunk;
 					b->pos = (uint32_t)size;
@@ -1946,7 +1944,7 @@ static ufbxi_noinline void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 			// Early return if we found a slot.
 			if (best_chunk) {
 				size_t pos = ufbxi_align_to_mask(best_chunk->pushed_pos, align_mask);
-				best_chunk->pushed_pos = pos;
+				best_chunk->pushed_pos = pos + size;
 				return best_chunk->data + pos;
 			}
 		}
@@ -1999,11 +1997,26 @@ static ufbxi_noinline void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 		b->pos = size;
 		b->size = chunk_size;
 	} else {
-		if (!b->chunks[1]) {
+		ufbxi_buf_chunk *root = b->chunks[1];
+		if (!root) {
+			b->chunks[1] = new_chunk;
+		} else if (root->size < chunk_size) {
+			// Swap root and self if necessary, we should have bailed out
+			// in the search loop in the first iteration so `new_chunk` should
+			// directly follow `root`.
+			// HACK: This ends up with `chunks[1]` entries having inconsistent
+			// `ufbxi_buf_chunk.root` pointers but other code only reads `chunks[1].root`
+			// TODO: Move roots out of the chunks?
+			ufbx_assert(root->next == new_chunk);
+			ufbx_assert(new_chunk->prev == root);
+			if (new_chunk->next) new_chunk->next->prev = root;
+			root->next = new_chunk->next;
+			new_chunk->next = root;
+			new_chunk->prev = NULL;
+			new_chunk->root = new_chunk;
 			b->chunks[1] = new_chunk;
 		}
 		new_chunk->pushed_pos = size;
-		b->num_secondary_chunks++;
 	}
 
 	return new_chunk->data;
@@ -2223,9 +2236,10 @@ static ufbxi_noinline void ufbxi_buf_clear(ufbxi_buf *buf)
 	// Reset the non-huge chunks as `chunk->next` is always free.
 	ufbxi_buf_chunk *chunk = buf->chunks[0];
 	if (chunk) {
-		buf->chunks[0] = chunk->root;
+		ufbxi_buf_chunk *root = chunk->root;
+		buf->chunks[0] = root;
 		buf->pos = 0;
-		buf->size = chunk->size;
+		buf->size = root->size;
 	}
 	buf->num_items = 0;
 
@@ -15540,6 +15554,7 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 
 	uc->tmp.unordered = true;
 	uc->tmp_parse.unordered = true;
+	uc->tmp_parse.clearable = true;
 	uc->result.unordered = true;
 
 	// NOTE: Though `inflate_retain` leaks out of the scope we don't use it outside this function.

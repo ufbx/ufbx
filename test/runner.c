@@ -1728,8 +1728,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbxt_init_allocator(&stream_opts.temp_allocator, &temp_freed);
 			ufbxt_init_allocator(&stream_opts.result_allocator, &result_freed);
 			stream_opts.read_buffer_size = 1;
-			stream_opts.temp_allocator.huge_threshold = 1;
-			stream_opts.result_allocator.huge_threshold = 1;
+			stream_opts.temp_allocator.huge_threshold = 2;
+			stream_opts.result_allocator.huge_threshold = 2;
 			stream_opts.filename.data = NULL;
 			stream_opts.filename.length = 0;
 			stream_opts.progress_cb.fn = &ufbxt_measure_progress;
