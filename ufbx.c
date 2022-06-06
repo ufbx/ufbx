@@ -354,6 +354,7 @@
 #define ufbxi_read_i64(ptr) (int64_t)(ufbxi_read_u64(ptr))
 
 ufbx_static_assert(sizeof_bool, sizeof(bool) == 1);
+ufbx_static_assert(sizeof_char, sizeof(char) == 1);
 ufbx_static_assert(sizeof_i8, sizeof(int8_t) == 1);
 ufbx_static_assert(sizeof_i16, sizeof(int16_t) == 2);
 ufbx_static_assert(sizeof_i32, sizeof(int32_t) == 4);
@@ -4746,7 +4747,7 @@ static ufbxi_noinline ufbxi_xml_attrib *ufbxi_xml_find_attrib(ufbxi_xml_tag *tag
 static char ufbxi_normalize_array_type(char type) {
 	switch (type) {
 	case 'r': return sizeof(ufbx_real) == sizeof(float) ? 'f' : 'd';
-	case 'c': return 'b';
+	case 'b': return 'c';
 	default: return type;
 	}
 }
@@ -4756,6 +4757,7 @@ static ufbxi_noinline size_t ufbxi_array_type_size(char type)
 	switch (type) {
 	case 'r': return sizeof(ufbx_real);
 	case 'b': return sizeof(bool);
+	case 'c': return sizeof(uint8_t);
 	case 'i': return sizeof(int32_t);
 	case 'l': return sizeof(int64_t);
 	case 'f': return sizeof(float);
@@ -5698,20 +5700,20 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 		m_dst *d = (m_dst*)dst; \
 		ufbxi_nounroll while (val != val_end) { *d++ = m_cast(m_expr); val += m_size; } }
 
-	case 'b':
+	case 'c':
 		switch (src_type) {
-		// case 'b': ufbxi_convert_loop_fast(char, (char), 1, *val != 0); break;
-		case 'i': ufbxi_convert_loop_slow(char, (char), 4, ufbxi_read_i32(val) != 0); break;
-		case 'l': ufbxi_convert_loop_slow(char, (char), 8, ufbxi_read_i64(val) != 0); break;
-		case 'f': ufbxi_convert_loop_slow(char, (char), 4, ufbxi_read_f32(val) != 0); break;
-		case 'd': ufbxi_convert_loop_slow(char, (char), 8, ufbxi_read_f64(val) != 0); break;
+		// case 'c': ufbxi_convert_loop_fast(char, (char), 1, *val != 0); break;
+		case 'i': ufbxi_convert_loop_slow(uint8_t, (uint8_t), 4, (uint8_t)ufbxi_read_i32(val)); break;
+		case 'l': ufbxi_convert_loop_slow(uint8_t, (uint8_t), 8, (uint8_t)ufbxi_read_i64(val)); break;
+		case 'f': ufbxi_convert_loop_slow(uint8_t, (uint8_t), 4, (uint8_t)ufbxi_read_f32(val)); break;
+		case 'd': ufbxi_convert_loop_slow(uint8_t, (uint8_t), 8, (uint8_t)ufbxi_read_f64(val)); break;
 		default: ufbxi_fail("Bad array source type");
 		}
 		break;
 
 	case 'i':
 		switch (src_type) {
-		case 'b': ufbxi_convert_loop_slow(int32_t, (int32_t), 1, *val != 0); break;
+		case 'c': ufbxi_convert_loop_slow(int32_t, (int32_t), 1, *val); break;
 		// case 'i': ufbxi_convert_loop_slow(int32_t, (int32_t), 4, ufbxi_read_i32(val)); break;
 		case 'l': ufbxi_convert_loop_fast(int32_t, (int32_t), 8, ufbxi_read_i64(val)); break;
 		case 'f': ufbxi_convert_loop_slow(int32_t, ufbxi_f64_to_i32, 4, ufbxi_read_f32(val)); break;
@@ -5722,7 +5724,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 
 	case 'l':
 		switch (src_type) {
-		case 'b': ufbxi_convert_loop_slow(int64_t, (int64_t), 1, *val != 0); break;
+		case 'c': ufbxi_convert_loop_slow(int64_t, (int64_t), 1, *val); break;
 		case 'i': ufbxi_convert_loop_fast(int64_t, (int64_t), 4, ufbxi_read_i32(val)); break;
 		// case 'l': ufbxi_convert_loop_slow(int64_t, (int64_t), 8, ufbxi_read_i64(val)); break;
 		case 'f': ufbxi_convert_loop_slow(int64_t, ufbxi_f64_to_i64, 4, ufbxi_read_f32(val)); break;
@@ -5733,7 +5735,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 
 	case 'f':
 		switch (src_type) {
-		case 'b': ufbxi_convert_loop_slow(float, (float), 1, *val != 0); break;
+		case 'c': ufbxi_convert_loop_slow(float, (float), 1, *val); break;
 		case 'i': ufbxi_convert_loop_slow(float, (float), 4, ufbxi_read_i32(val)); break;
 		case 'l': ufbxi_convert_loop_slow(float, (float), 8, ufbxi_read_i64(val)); break;
 		// case 'f': ufbxi_convert_loop_slow(float, (float), 4, ufbxi_read_f32(val)); break;
@@ -5744,7 +5746,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 
 	case 'd':
 		switch (src_type) {
-		case 'b': ufbxi_convert_loop_slow(double, (double), 1, *val != 0); break;
+		case 'c': ufbxi_convert_loop_slow(double, (double), 1, *val); break;
 		case 'i': ufbxi_convert_loop_slow(double, (double), 4, ufbxi_read_i32(val)); break;
 		case 'l': ufbxi_convert_loop_slow(double, (double), 8, ufbxi_read_i64(val)); break;
 		case 'f': ufbxi_convert_loop_fast(double, (double), 4, ufbxi_read_f32(val)); break;
@@ -5827,10 +5829,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 	switch (dst_type)
 	{
 
-	#define ufbxi_convert_parse(m_dst, m_size, m_expr) \
-		*d++ = (m_dst)(m_expr); val_size = m_size + 1; \
+	#define ufbxi_convert_parse(m_cast, m_size, m_expr) \
+		*d++ = m_cast(m_expr); val_size = m_size + 1; \
 
-	#define ufbxi_convert_parse_switch(m_dst) { \
+	#define ufbxi_convert_parse_switch(m_dst, m_cast_int, m_cast_float) { \
 		m_dst *d = (m_dst*)dst + base; \
 		for (size_t i = base; i < size; i++) { \
 			val = ufbxi_peek_bytes(uc, 13); \
@@ -5842,48 +5844,23 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 			} \
 			switch (type) { \
 				case 'C': \
-				case 'B': ufbxi_convert_parse(m_dst, 1, *val); break; \
-				case 'Y': ufbxi_convert_parse(m_dst, 2, ufbxi_read_i16(val)); break; \
-				case 'I': ufbxi_convert_parse(m_dst, 4, ufbxi_read_i32(val)); break; \
-				case 'L': ufbxi_convert_parse(m_dst, 8, ufbxi_read_i64(val)); break; \
-				case 'F': ufbxi_convert_parse(m_dst, 4, ufbxi_read_f32(val)); break; \
-				case 'D': ufbxi_convert_parse(m_dst, 8, ufbxi_read_f64(val)); break; \
+				case 'B': ufbxi_convert_parse(m_cast_int, 1, *val); break; \
+				case 'Y': ufbxi_convert_parse(m_cast_int, 2, ufbxi_read_i16(val)); break; \
+				case 'I': ufbxi_convert_parse(m_cast_int, 4, ufbxi_read_i32(val)); break; \
+				case 'L': ufbxi_convert_parse(m_cast_int, 8, ufbxi_read_i64(val)); break; \
+				case 'F': ufbxi_convert_parse(m_cast_float, 4, ufbxi_read_f32(val)); break; \
+				case 'D': ufbxi_convert_parse(m_cast_float, 8, ufbxi_read_f64(val)); break; \
 				default: ufbxi_fail("Bad multivalue array type"); \
 			} \
 			ufbxi_consume_bytes(uc, val_size); \
 		} \
 	} \
 
-	case 'b':
-	{
-		char *d = (char*)dst;
-		for (size_t i = base; i < size; i++) {
-			val = ufbxi_peek_bytes(uc, 13);
-			ufbxi_check(val);
-			char type = *val++; \
-			if (file_big_endian) { \
-				val = ufbxi_swap_endian_value(uc, val, type); \
-				ufbxi_check(val); \
-			} \
-			switch (type) {
-				case 'C':
-				case 'B': ufbxi_convert_parse(char, 1, *val != 0); break;
-				case 'Y': ufbxi_convert_parse(char, 2, ufbxi_read_i16(val) != 0); break;
-				case 'I': ufbxi_convert_parse(char, 4, ufbxi_read_i32(val) != 0); break;
-				case 'L': ufbxi_convert_parse(char, 8, ufbxi_read_i64(val) != 0); break;
-				case 'F': ufbxi_convert_parse(char, 4, ufbxi_read_f32(val) != 0); break;
-				case 'D': ufbxi_convert_parse(char, 8, ufbxi_read_f64(val) != 0); break;
-				default: ufbxi_fail("Bad multivalue array type");
-			}
-			ufbxi_consume_bytes(uc, val_size);
-		}
-	}
-	break;
-
-	case 'i': ufbxi_convert_parse_switch(int32_t); break;
-	case 'l': ufbxi_convert_parse_switch(int64_t); break;
-	case 'f': ufbxi_convert_parse_switch(float); break;
-	case 'd': ufbxi_convert_parse_switch(double); break;
+	case 'c': ufbxi_convert_parse_switch(uint8_t, (uint8_t), (uint8_t)); break;
+	case 'i': ufbxi_convert_parse_switch(int32_t, (int32_t), ufbxi_f64_to_i32); break;
+	case 'l': ufbxi_convert_parse_switch(int64_t, (int64_t), ufbxi_f64_to_i64); break;
+	case 'f': ufbxi_convert_parse_switch(float, (float), (float)); break;
+	case 'd': ufbxi_convert_parse_switch(double, (double), (double)); break;
 
 	default: return 0;
 
@@ -6132,14 +6109,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 				ufbxi_fail("Bad array encoding");
 			}
 
-			// Convert the decoded array if necessary. If we didn't perform conversion but use the
-			// "bool" type we need to normalize the array contents afterwards.
+			// Convert the decoded array if necessary.
 			if (decoded_data != arr_data) {
 				ufbxi_check(ufbxi_binary_convert_array(uc, src_type, dst_type, decoded_data, arr_data, size));
-			} else if (dst_type == 'b') {
-				ufbxi_for(char, b, (char*)arr_data, size) {
-					*b = (char)(*b != 0);
-				}
 			}
 
 			arr->data = arr_data;
@@ -6157,6 +6129,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 			ufbxi_check(ufbxi_binary_parse_multivalue_array(uc, dst_type, arr_data, num_values, tmp_buf));
 			arr->data = arr_data;
 			arr->size = num_values;
+		}
+
+		// Post-process boolean arrays
+		if (arr_info.type == 'b') {
+			ufbxi_for(char, b, (char*)arr->data, arr->size) {
+				*b = (char)(*b != 0);
+			}
 		}
 
 	} else {
@@ -6855,6 +6834,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 				break;
 
 			case 'b': { bool *v = ufbxi_push(&uc->tmp_stack, bool, 1); ufbxi_check(v); *v = val != 0; } break;
+			case 'c': { uint8_t *v = ufbxi_push(&uc->tmp_stack, uint8_t, 1); ufbxi_check(v); *v = (uint8_t)val; } break;
 			case 'i': { int32_t *v = ufbxi_push(&uc->tmp_stack, int32_t, 1); ufbxi_check(v); *v = (int32_t)val; } break;
 			case 'l': { int64_t *v = ufbxi_push(&uc->tmp_stack, int64_t, 1); ufbxi_check(v); *v = (int64_t)val; } break;
 			case 'f': { float *v = ufbxi_push(&uc->tmp_stack, float, 1); ufbxi_check(v); *v = (float)val; } break;
@@ -6880,6 +6860,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 				break;
 
 			case 'b': { bool *v = ufbxi_push(&uc->tmp_stack, bool, 1); ufbxi_check(v); *v = val != 0; } break;
+			case 'c': { uint8_t *v = ufbxi_push(&uc->tmp_stack, uint8_t, 1); ufbxi_check(v); *v = (uint8_t)val; } break;
 			case 'i': { int32_t *v = ufbxi_push(&uc->tmp_stack, int32_t, 1); ufbxi_check(v); *v = (int32_t)val; } break;
 			case 'l': { int64_t *v = ufbxi_push(&uc->tmp_stack, int64_t, 1); ufbxi_check(v); *v = (int64_t)val; } break;
 			case 'f': { float *v = ufbxi_push(&uc->tmp_stack, float, 1); ufbxi_check(v); *v = (float)val; } break;
@@ -6909,6 +6890,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 				break;
 
 			case 'b': { bool *v = ufbxi_push(&uc->tmp_stack, bool, 1); ufbxi_check(v); *v = val != 0; } break;
+			case 'c': { uint8_t *v = ufbxi_push(&uc->tmp_stack, uint8_t, 1); ufbxi_check(v); *v = (uint8_t)val; } break;
 			case 'i': { int32_t *v = ufbxi_push(&uc->tmp_stack, int32_t, 1); ufbxi_check(v); *v = (int32_t)val; } break;
 			case 'l': { int64_t *v = ufbxi_push(&uc->tmp_stack, int64_t, 1); ufbxi_check(v); *v = (int64_t)val; } break;
 			case 'f': { float *v = ufbxi_push(&uc->tmp_stack, float, 1); ufbxi_check(v); *v = (float)val; } break;
@@ -7065,7 +7047,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_dom_node(ufbxi_context *u
 		val->value_float = (double)(val->value_int = arr->size);
 
 		switch (arr->type) {
-		case 'b': val->type = UFBX_DOM_VALUE_ARRAY_I8; break;
+		case 'c': val->type = UFBX_DOM_VALUE_ARRAY_I8; break;
 		case 'i': val->type = UFBX_DOM_VALUE_ARRAY_I32; break;
 		case 'l': val->type = UFBX_DOM_VALUE_ARRAY_I64; break;
 		case 'f': val->type = UFBX_DOM_VALUE_ARRAY_F32; break;
