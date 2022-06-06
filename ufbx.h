@@ -899,9 +899,10 @@ struct ufbx_mesh {
 	size_t num_bad_faces;          // < Number of faces with less than 3 vertices
 
 	// Edges and optional per-edge extra data
-	ufbx_edge_list edges;          // < Edge index range
-	ufbx_bool_list edge_smoothing; // < Should the edge have soft normals
-	ufbx_real_list edge_crease;    // < Crease value for subdivision surfaces
+	ufbx_edge_list edges;           // < Edge index range
+	ufbx_bool_list edge_smoothing;  // < Should the edge have soft normals
+	ufbx_real_list edge_crease;     // < Crease value for subdivision surfaces
+	ufbx_bool_list edge_visibility; // < Should the edge be visible
 
 	// Logical vertices and positions, alternatively you can use
 	// `vertex_position` for consistent interface with other attributes.

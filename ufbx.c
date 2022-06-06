@@ -3177,6 +3177,7 @@ static const char ufbxi_LayerElementSmoothing[] = "LayerElementSmoothing";
 static const char ufbxi_LayerElementTangent[] = "LayerElementTangent";
 static const char ufbxi_LayerElementUV[] = "LayerElementUV";
 static const char ufbxi_LayerElementVertexCrease[] = "LayerElementVertexCrease";
+static const char ufbxi_LayerElementVisibility[] = "LayerElementVisibility";
 static const char ufbxi_LayerElement[] = "LayerElement";
 static const char ufbxi_Layer[] = "Layer";
 static const char ufbxi_LayeredTexture[] = "LayeredTexture";
@@ -3459,6 +3460,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_LayerElementTangent, 19 },
 	{ ufbxi_LayerElementUV, 14 },
 	{ ufbxi_LayerElementVertexCrease, 24 },
+	{ ufbxi_LayerElementVisibility, 22 },
 	{ ufbxi_LayeredTexture, 14 },
 	{ ufbxi_Lcl_Rotation, 12 },
 	{ ufbxi_Lcl_Scaling, 11 },
@@ -4991,6 +4993,7 @@ typedef enum {
 	UFBXI_PARSE_LAYER_ELEMENT_VERTEX_CREASE,
 	UFBXI_PARSE_LAYER_ELEMENT_EDGE_CREASE,
 	UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING,
+	UFBXI_PARSE_LAYER_ELEMENT_VISIBILITY,
 	UFBXI_PARSE_LAYER_ELEMENT_MATERIAL,
 	UFBXI_PARSE_LAYER_ELEMENT_OTHER,
 	UFBXI_PARSE_GEOMETRY_UV_INFO,
@@ -5054,6 +5057,7 @@ static ufbxi_noinline ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_sta
 			if (name == ufbxi_LayerElementVertexCrease) return UFBXI_PARSE_LAYER_ELEMENT_VERTEX_CREASE;
 			if (name == ufbxi_LayerElementEdgeCrease) return UFBXI_PARSE_LAYER_ELEMENT_EDGE_CREASE;
 			if (name == ufbxi_LayerElementSmoothing) return UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING;
+			if (name == ufbxi_LayerElementVisibility) return UFBXI_PARSE_LAYER_ELEMENT_VISIBILITY;
 			if (name == ufbxi_LayerElementMaterial) return UFBXI_PARSE_LAYER_ELEMENT_MATERIAL;
 			if (!strncmp(name, "LayerElement", 12)) return UFBXI_PARSE_LAYER_ELEMENT_OTHER;
 		}
@@ -5336,6 +5340,14 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 
 	case UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING:
 		if (name == ufbxi_Smoothing) {
+			info->type = uc->opts.ignore_geometry ? '-' : 'b';
+			info->result = true;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_LAYER_ELEMENT_VISIBILITY:
+		if (name == ufbxi_Visibility) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'b';
 			info->result = true;
 			return true;
@@ -6098,7 +6110,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 				ufbxi_check(ufbxi_binary_convert_array(uc, src_type, dst_type, decoded_data, arr_data, size));
 			} else if (dst_type == 'b') {
 				ufbxi_for(char, b, (char*)arr_data, size) {
-					*b = (char)(b != 0);
+					*b = (char)(*b != 0);
 				}
 			}
 
@@ -8743,6 +8755,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 			} else if (mapping == ufbxi_ByPolygon) {
 				if (mesh->face_smoothing.count) continue;
 				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->face_smoothing.data, &mesh->face_smoothing.count, n, ufbxi_Smoothing, 'b', mesh->num_faces));
+			}
+		} else if (n->name == ufbxi_LayerElementVisibility) {
+			const char *mapping;
+			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
+			if (mapping == ufbxi_ByEdge) {
+				if (mesh->edge_visibility.count) continue;
+				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->edge_visibility.data, &mesh->edge_visibility.count, n, ufbxi_Visibility, 'b', mesh->num_edges));
 			}
 		} else if (n->name == ufbxi_LayerElementMaterial) {
 			if (mesh->face_material.count) continue;

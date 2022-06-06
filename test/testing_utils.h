@@ -21,6 +21,16 @@ static ufbx_real ufbxt_dot3(ufbx_vec3 a, ufbx_vec3 b)
 	return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
+static ufbx_real ufbxt_length2(ufbx_vec2 a)
+{
+	return (ufbx_real)sqrt(ufbxt_dot2(a, a));
+}
+
+static ufbx_real ufbxt_length3(ufbx_vec3 a)
+{
+	return (ufbx_real)sqrt(ufbxt_dot3(a, a));
+}
+
 static ufbx_vec2 ufbxt_add2(ufbx_vec2 a, ufbx_vec2 b)
 {
 	ufbx_vec2 v;

@@ -628,3 +628,58 @@ UFBXT_FILE_TEST(blender_279_nested_meshes)
 	// Diff to .obj file with nested objects and FBXASC escaped names
 }
 #endif
+
+UFBXT_FILE_TEST(max_edge_visibility)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Box001");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->edge_visibility.count > 0);
+		size_t num_visible = 0;
+
+		// Diagonal edges should be hidden
+		for (size_t i = 0; i < mesh->num_edges; i++) {
+			ufbx_edge edge = mesh->edges.data[i];
+			ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[0]);
+			ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[1]);
+			ufbx_real len = ufbxt_length3(ufbxt_sub3(a, b));
+			bool expected = len < 21.0f;
+			bool visible = mesh->edge_visibility.data[i];
+			ufbxt_assert(visible == expected);
+			num_visible += visible ? 1u : 0u;
+		}
+
+		ufbxt_assert(mesh->num_edges == 18);
+		ufbxt_assert(num_visible == 12);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Cylinder001");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->edge_visibility.count > 0);
+		size_t num_visible = 0;
+
+		// Diagonal and edges to the center should be hidden
+		for (size_t i = 0; i < mesh->num_edges; i++) {
+			ufbx_edge edge = mesh->edges.data[i];
+			ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[0]);
+			ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[1]);
+			ufbx_vec2 a2 = { a.x, a.y };
+			ufbx_vec2 b2 = { b.x, b.y };
+			ufbx_real len = ufbxt_length3(ufbxt_sub3(a, b));
+			ufbx_real len_a2 = ufbxt_length2(a2);
+			ufbx_real len_b2 = ufbxt_length2(b2);
+			bool expected = len < 20.7f && len_a2 > 0.1f && len_b2 > 0.1f;
+			bool visible = mesh->edge_visibility.data[i];
+			ufbxt_assert(visible == expected);
+			num_visible += visible ? 1u : 0u;
+		}
+
+		ufbxt_assert(mesh->num_edges == 54);
+		ufbxt_assert(num_visible == 27);
+	}
+}
+#endif
