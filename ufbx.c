@@ -16663,8 +16663,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, uf
 	return 1;
 }
 
-#if UFBXI_FEATURE_TESSELLATION
-
 typedef struct {
 	ufbxi_refcount refcount;
 	ufbx_line_curve curve;
@@ -16675,6 +16673,8 @@ typedef struct {
 } ufbxi_line_curve_imp;
 
 ufbx_static_assert(line_curve_imp_offset, offsetof(ufbxi_line_curve_imp, curve) == sizeof(ufbxi_refcount));
+
+#if UFBXI_FEATURE_TESSELLATION
 
 typedef struct {
 	ufbx_error error;
