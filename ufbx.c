@@ -6481,10 +6481,21 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_ascii_push_token_char(ufbxi_c
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_skip_until(ufbxi_context *uc, char dst)
 {
-	char c = ufbxi_ascii_peek(uc);
-	while (c != dst) {
-		ufbxi_check(c != '\0');
-		c = ufbxi_ascii_next(uc);
+	ufbxi_ascii *ua = &uc->ascii;
+
+	for (;;) {
+		size_t buffered = (size_t)(ua->src_yield - ua->src);
+		const char *match = (const char*)memchr(ua->src, dst, buffered);
+		if (match) {
+			ua->src = match;
+			break;
+		} else {
+			ua->src += buffered;
+		}
+		if (buffered == 0) {
+			char c = ufbxi_ascii_yield(uc);
+			ufbxi_check(c != '\0');
+		}
 	}
 
 	return 1;
