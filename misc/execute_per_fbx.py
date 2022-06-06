@@ -29,7 +29,7 @@ for root, dirs, files in os.walk(argv.root):
         if argv.start and display < argv.start:
             continue
 
-        print(f"-- {display}")
+        print(f"-- {display}", flush=True)
 
         total_size += size
         if argv.exe:
