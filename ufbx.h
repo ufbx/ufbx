@@ -237,6 +237,7 @@ typedef enum ufbx_prop_type {
 	UFBX_PROP_NUMBER,
 	UFBX_PROP_VECTOR,
 	UFBX_PROP_COLOR,
+	UFBX_PROP_COLOR_WITH_ALPHA,
 	UFBX_PROP_STRING,
 	UFBX_PROP_DATE_TIME,
 	UFBX_PROP_TRANSLATION,
@@ -309,10 +310,11 @@ struct ufbx_prop {
 	ufbx_blob value_blob;
 	int64_t value_int;
 	union {
-		ufbx_real value_real_arr[3];
+		ufbx_real value_real_arr[4];
 		ufbx_real value_real;
 		ufbx_vec2 value_vec2;
 		ufbx_vec3 value_vec3;
+		ufbx_vec4 value_vec4;
 	};
 };
 
@@ -895,6 +897,7 @@ struct ufbx_mesh {
 	ufbx_face_list faces;          // < Face index range
 	ufbx_bool_list face_smoothing; // < Should the face have soft normals
 	ufbx_int32_list face_material; // < Indices to `ufbx_mesh.materials`
+	ufbx_int32_list face_group;    // < Face polygon group index
 	size_t max_face_triangles;     // < Maximum number of triangles per face in this mesh
 	size_t num_bad_faces;          // < Number of faces with less than 3 vertices
 

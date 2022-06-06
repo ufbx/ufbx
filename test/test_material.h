@@ -57,6 +57,22 @@ UFBXT_FILE_TEST(maya_textured_cube)
 }
 #endif
 
+UFBXT_FILE_TEST(synthetic_texture_split)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "phong1");
+	ufbxt_assert(material);
+	ufbxt_assert(material->textures.count == 6);
+
+	ufbxt_check_material_texture(scene, material->fbx.diffuse_color.texture, "checkerboard_diffuse.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.specular_color.texture, "checkerboard_specular.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.reflection_color.texture, "checkerboard_reflection.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.transparency_color.texture, "checkerboard_transparency.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.emission_color.texture, "checkerboard_emissive.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.ambient_color.texture, "checkerboard_ambient.png", true);
+}
+#endif
+
 UFBXT_TEST(ignore_embedded)
 #if UFBXT_IMPL
 {

@@ -5,7 +5,7 @@
 
 // -- Configuration
 
-#define UFBXI_MAX_NON_ARRAY_VALUES 7
+#define UFBXI_MAX_NON_ARRAY_VALUES 8
 #define UFBXI_MAX_NODE_DEPTH 64
 #define UFBXI_MAX_SKIP_SIZE 0x40000000
 #define UFBXI_MAP_MAX_SCAN 32
@@ -3175,6 +3175,7 @@ static const char ufbxi_LayerElementColor[] = "LayerElementColor";
 static const char ufbxi_LayerElementEdgeCrease[] = "LayerElementEdgeCrease";
 static const char ufbxi_LayerElementMaterial[] = "LayerElementMaterial";
 static const char ufbxi_LayerElementNormal[] = "LayerElementNormal";
+static const char ufbxi_LayerElementPolygonGroup[] = "LayerElementPolygonGroup";
 static const char ufbxi_LayerElementSmoothing[] = "LayerElementSmoothing";
 static const char ufbxi_LayerElementTangent[] = "LayerElementTangent";
 static const char ufbxi_LayerElementUV[] = "LayerElementUV";
@@ -3232,6 +3233,7 @@ static const char ufbxi_PO[] = "PO\0";
 static const char ufbxi_PP[] = "PP\0";
 static const char ufbxi_PointsIndex[] = "PointsIndex";
 static const char ufbxi_Points[] = "Points";
+static const char ufbxi_PolygonGroup[] = "PolygonGroup";
 static const char ufbxi_PolygonIndexArray[] = "PolygonIndexArray";
 static const char ufbxi_PolygonVertexIndex[] = "PolygonVertexIndex";
 static const char ufbxi_PoseNode[] = "PoseNode";
@@ -3458,6 +3460,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_LayerElementEdgeCrease, 22 },
 	{ ufbxi_LayerElementMaterial, 20 },
 	{ ufbxi_LayerElementNormal, 18 },
+	{ ufbxi_LayerElementPolygonGroup, 24 },
 	{ ufbxi_LayerElementSmoothing, 21 },
 	{ ufbxi_LayerElementTangent, 19 },
 	{ ufbxi_LayerElementUV, 14 },
@@ -3513,6 +3516,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_PP, 2 },
 	{ ufbxi_Points, 6 },
 	{ ufbxi_PointsIndex, 11 },
+	{ ufbxi_PolygonGroup, 12 },
 	{ ufbxi_PolygonIndexArray, 17 },
 	{ ufbxi_PolygonVertexIndex, 18 },
 	{ ufbxi_Pose, 4 },
@@ -4758,6 +4762,7 @@ static ufbxi_noinline size_t ufbxi_array_type_size(char type)
 	case 'd': return sizeof(double);
 	case 's': return sizeof(ufbx_string);
 	case 'S': return sizeof(ufbx_string);
+	case 'C': return sizeof(ufbx_string);
 	default: return 1;
 	}
 }
@@ -4979,6 +4984,7 @@ typedef enum {
 	UFBXI_PARSE_REFERENCE,
 	UFBXI_PARSE_ANIMATION_CURVE,
 	UFBXI_PARSE_DEFORMER,
+	UFBXI_PARSE_ASSOCIATE_MODEL,
 	UFBXI_PARSE_LEGACY_LINK,
 	UFBXI_PARSE_POSE,
 	UFBXI_PARSE_POSE_NODE,
@@ -4997,6 +5003,7 @@ typedef enum {
 	UFBXI_PARSE_LAYER_ELEMENT_EDGE_CREASE,
 	UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING,
 	UFBXI_PARSE_LAYER_ELEMENT_VISIBILITY,
+	UFBXI_PARSE_LAYER_ELEMENT_POLYGON_GROUP,
 	UFBXI_PARSE_LAYER_ELEMENT_MATERIAL,
 	UFBXI_PARSE_LAYER_ELEMENT_OTHER,
 	UFBXI_PARSE_GEOMETRY_UV_INFO,
@@ -5007,11 +5014,15 @@ typedef enum {
 	UFBXI_PARSE_UNKNOWN,
 } ufbxi_parse_state;
 
+typedef enum {
+	UFBXI_ARRAY_FLAG_RESULT    = 0x1, // < Alloacte the array from the result buffer
+	UFBXI_ARRAY_FLAG_TMP_BUF   = 0x2, // < Alloacte the array from the result buffer
+	UFBXI_ARRAY_FLAG_PAD_BEGIN = 0x4, // < Pad the begin of the array with 4 zero elements to guard from invalid -1 index accesses
+} ufbxi_array_flags;
+
 typedef struct {
-	char type;      // < FBX type code of the array: b,i,l,f,d (or 'r' meaning ufbx_real '-' ignore)
-	bool result;    // < Alloacte the array from the result buffer
-	bool tmp_buf;   // < Alloacte the array from the global temporary buffer
-	bool pad_begin; // < Pad the begin of the array with 4 zero elements to guard from invalid -1 index accesses
+	char type;      // < FBX type code of the array: b,i,l,f,d (or 'r' meaning ufbx_real '-' ignore, 's'/'S' for strings, 'C' for content)
+	uint8_t flags;  // < Combination of `ufbxi_array_flags`
 } ufbxi_array_info;
 
 static ufbxi_noinline ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_state parent, const char *name)
@@ -5061,10 +5072,15 @@ static ufbxi_noinline ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_sta
 			if (name == ufbxi_LayerElementEdgeCrease) return UFBXI_PARSE_LAYER_ELEMENT_EDGE_CREASE;
 			if (name == ufbxi_LayerElementSmoothing) return UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING;
 			if (name == ufbxi_LayerElementVisibility) return UFBXI_PARSE_LAYER_ELEMENT_VISIBILITY;
+			if (name == ufbxi_LayerElementPolygonGroup) return UFBXI_PARSE_LAYER_ELEMENT_POLYGON_GROUP;
 			if (name == ufbxi_LayerElementMaterial) return UFBXI_PARSE_LAYER_ELEMENT_MATERIAL;
 			if (!strncmp(name, "LayerElement", 12)) return UFBXI_PARSE_LAYER_ELEMENT_OTHER;
 		}
 		if (name == ufbxi_Shape) return UFBXI_PARSE_SHAPE;
+		break;
+
+	case UFBXI_PARSE_DEFORMER:
+		if (!strcmp(name, "AssociateModel")) return UFBXI_PARSE_ASSOCIATE_MODEL;
 		break;
 
 	case UFBXI_PARSE_LEGACY_MODEL:
@@ -5106,53 +5122,55 @@ static ufbxi_noinline ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_sta
 
 static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, const char *name, ufbxi_array_info *info)
 {
-	info->result = uc->opts.retain_dom;
-	info->tmp_buf = false;
-	info->pad_begin = false;
+	info->flags = 0;
+
+	// Retain all arrays if user wants the DOM representation
+	if (uc->opts.retain_dom) {
+		info->flags |= UFBXI_ARRAY_FLAG_RESULT;
+	}
+
 	switch (parent) {
 
 	case UFBXI_PARSE_GEOMETRY:
 	case UFBXI_PARSE_MODEL:
 		if (name == ufbxi_Vertices) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		} else if (name == ufbxi_PolygonVertexIndex) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_Edges) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
 			return true;
 		} else if (name == ufbxi_Indexes) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_Points) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_KnotVector) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_KnotVectorU) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_KnotVectorV) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_PointsIndex) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_Normals) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		}
 		break;
@@ -5160,21 +5178,19 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LEGACY_MODEL:
 		if (name == ufbxi_Vertices) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		} else if (name == ufbxi_Normals) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		} else if (name == ufbxi_Materials) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_PolygonVertexIndex) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_Children) {
 			info->type = 's';
@@ -5205,8 +5221,8 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 		break;
 
 	case UFBXI_PARSE_VIDEO:
-		if (name == ufbxi_Content && uc->opts.ignore_embedded) {
-			info->type = '-';
+		if (name == ufbxi_Content) {
+			info->type = uc->opts.ignore_embedded ? '-' : 'C';
 			return true;
 		}
 		break;
@@ -5215,11 +5231,11 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYERED_TEXTURE:
 		if (name == ufbxi_BlendModes) {
 			info->type = 'i';
-			info->tmp_buf = true;
+			info->flags = UFBXI_ARRAY_FLAG_TMP_BUF;
 			return true;
 		} else if (name == ufbxi_Alphas) {
 			info->type = 'r';
-			info->tmp_buf = true;
+			info->flags = UFBXI_ARRAY_FLAG_TMP_BUF;
 			return true;
 		}
 		break;
@@ -5227,15 +5243,15 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_SELECTION_NODE:
 		if (name == ufbxi_VertexIndexArray) {
 			info->type = 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_EdgeIndexArray) {
 			info->type = 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_PolygonIndexArray) {
 			info->type = 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		}
 		break;
@@ -5243,17 +5259,15 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_NORMAL:
 		if (name == ufbxi_Normals) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		} else if (name == ufbxi_NormalsIndex) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_NormalsW) {
 			info->type = uc->opts.retain_dom ? 'r' : '-';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		}
 		break;
@@ -5261,17 +5275,15 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_BINORMAL:
 		if (name == ufbxi_Binormals) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		} else if (name == ufbxi_BinormalsIndex) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_BinormalsW) {
 			info->type = uc->opts.retain_dom ? 'r' : '-';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		}
 		break;
@@ -5279,17 +5291,15 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_TANGENT:
 		if (name == ufbxi_Tangents) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		} else if (name == ufbxi_TangentsIndex) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_TangentsW) {
 			info->type = uc->opts.retain_dom ? 'r' : '-';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		}
 		break;
@@ -5297,12 +5307,11 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_UV:
 		if (name == ufbxi_UV) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		} else if (name == ufbxi_UVIndex) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		}
 		break;
@@ -5310,12 +5319,11 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_COLOR:
 		if (name == ufbxi_Colors) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		} else if (name == ufbxi_ColorIndex) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		}
 		break;
@@ -5323,12 +5331,11 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_VERTEX_CREASE:
 		if (name == ufbxi_VertexCrease) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		} else if (name == ufbxi_VertexCreaseIndex) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		}
 		break;
@@ -5336,7 +5343,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_EDGE_CREASE:
 		if (name == ufbxi_EdgeCrease) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		}
 		break;
@@ -5344,7 +5351,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING:
 		if (name == ufbxi_Smoothing) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'b';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		}
 		break;
@@ -5352,7 +5359,15 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_VISIBILITY:
 		if (name == ufbxi_Visibility) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'b';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_LAYER_ELEMENT_POLYGON_GROUP:
+		if (name == ufbxi_PolygonGroup) {
+			info->type = uc->opts.ignore_geometry ? '-' : 'i';
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		}
 		break;
@@ -5360,7 +5375,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_MATERIAL:
 		if (name == ufbxi_Materials) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		}
 		break;
@@ -5368,7 +5383,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_OTHER:
 		if (name == ufbxi_TextureId) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->tmp_buf = true;
+			info->flags = UFBXI_ARRAY_FLAG_TMP_BUF;
 			return true;
 		} else if (name == ufbxi_UV) {
 			info->type = uc->opts.retain_dom ? 'r' : '-';
@@ -5382,13 +5397,11 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_GEOMETRY_UV_INFO:
 		if (name == ufbxi_TextureUV) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		} else if (name == ufbxi_TextureUVVerticeIndex) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		}
 		break;
@@ -5396,19 +5409,17 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_SHAPE:
 		if (name == ufbxi_Indexes) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		}
 		if (name == ufbxi_Vertices) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		}
 		if (name == ufbxi_Normals) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
-			info->pad_begin = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		}
 		break;
@@ -5422,15 +5433,15 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			return true;
 		} else if (name == ufbxi_Indexes) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_Weights) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_BlendWeights) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
-			info->result = true;
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_FullWeights) {
 			// Ignore blend shape FullWeights as it's used in Blender for vertex groups
@@ -5440,9 +5451,16 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			if (!uc->opts.disable_quirks && uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
 				info->type = '-';
 			}
-			info->tmp_buf = true;
+			info->flags = UFBXI_ARRAY_FLAG_TMP_BUF;
 			return true;
 		} else if (!strcmp(name, "TransformAssociateModel")) {
+			info->type = uc->opts.retain_dom ? 'r' : '-';
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_ASSOCIATE_MODEL:
+		if (name == ufbxi_Transform) {
 			info->type = uc->opts.retain_dom ? 'r' : '-';
 			return true;
 		}
@@ -5743,7 +5761,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 }
 
 // Read pre-7000 separate properties as an array.
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(ufbxi_context *uc, char dst_type, void *dst, size_t size)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(ufbxi_context *uc, char dst_type, void *dst, size_t size, ufbxi_buf *tmp_buf)
 {
 	if (size == 0) return 1;
 	const char *val;
@@ -5764,7 +5782,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 	}
 
 	// String array special case
-	if (dst_type == 's' || dst_type == 'S') {
+	if (dst_type == 's' || dst_type == 'S' || dst_type == 'C') {
 		bool raw = dst_type == 's';
 		ufbx_string *d = (ufbx_string*)dst;
 		for (size_t i = 0; i < size; i++) {
@@ -5780,7 +5798,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 			ufbxi_consume_bytes(uc, 5);
 			d->data = ufbxi_read_bytes(uc, len);
 			d->length = len;
-			ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, d, raw));
+			if (dst_type == 'C') {
+				ufbxi_buf *buf = size == 1 ? &uc->result : tmp_buf;
+				d->data = ufbxi_push_copy(buf, char, len, d->data);
+				ufbxi_check(d->data);
+			} else {
+				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, d, raw));
+			}
 			d++;
 		}
 		return 1;
@@ -5872,17 +5896,18 @@ ufbxi_nodiscard ufbxi_noinline static void *ufbxi_push_array_data(ufbxi_context 
 {
 	char type = ufbxi_normalize_array_type(info->type);
 	size_t elem_size = ufbxi_array_type_size(type);
-	if (info->pad_begin) size += 4;
+	uint32_t flags = info->flags;
+	if (flags & UFBXI_ARRAY_FLAG_PAD_BEGIN) size += 4;
 
 	// The array may be pushed either to the result or temporary buffer depending
 	// if it's already in the right format
 	ufbxi_buf *arr_buf = tmp_buf;
-	if (info->result) arr_buf = &uc->result;
-	else if (info->tmp_buf) arr_buf = &uc->tmp;
+	if (flags & UFBXI_ARRAY_FLAG_RESULT) arr_buf = &uc->result;
+	else if (flags & UFBXI_ARRAY_FLAG_TMP_BUF) arr_buf = &uc->tmp;
 	char *data = (char*)ufbxi_push_size(arr_buf, elem_size, size);
 	ufbxi_check_return(data, NULL);
 
-	if (info->pad_begin) {
+	if (flags & UFBXI_ARRAY_FLAG_PAD_BEGIN) {
 		memset(data, 0, elem_size * 4);
 		data += elem_size * 4;
 	}
@@ -6129,7 +6154,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 			// Allocate `num_values` elements for the array and parse single values into it.
 			char *arr_data = (char*)ufbxi_push_array_data(uc, &arr_info, num_values, tmp_buf);
 			ufbxi_check(arr_data);
-			ufbxi_check(ufbxi_binary_parse_multivalue_array(uc, dst_type, arr_data, num_values));
+			ufbxi_check(ufbxi_binary_parse_multivalue_array(uc, dst_type, arr_data, num_values, tmp_buf));
 			arr->data = arr_data;
 			arr->size = num_values;
 		}
@@ -6138,6 +6163,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 		if (num_values > UFBXI_MAX_NON_ARRAY_VALUES) {
 			if (uc->opts.retain_dom) {
 				// FIXME
+				// ufbx_assert(0);
 				printf("!!>> %s\n", name);
 			}
 		}
@@ -6231,6 +6257,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 			{
 				if (uc->opts.retain_dom) {
 					// FIXME
+					// ufbx_assert(0);
 					printf("!!>> %s\n", name);
 				}
 				uint32_t encoded_size = ufbxi_read_u32(value + 8);
@@ -6708,10 +6735,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 	// treated as an array.
 	ufbxi_array_info arr_info;
 	if (ufbxi_is_array_node(uc, parent_state, name, &arr_info)) {
+		uint32_t flags = arr_info.flags;
 		arr_type = ufbxi_normalize_array_type(arr_info.type);
 		arr_buf = tmp_buf;
-		if (arr_info.result) arr_buf = &uc->result;
-		else if (arr_info.tmp_buf) arr_buf = &uc->tmp;
+		if (flags & UFBXI_ARRAY_FLAG_RESULT) arr_buf = &uc->result;
+		else if (flags & UFBXI_ARRAY_FLAG_TMP_BUF) arr_buf = &uc->tmp;
 
 		ufbxi_value_array *arr = ufbxi_push(tmp_buf, ufbxi_value_array, 1);
 		ufbxi_check(arr);
@@ -6729,7 +6757,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 		arr_elem_size = ufbxi_array_type_size((char)arr_type);
 
 		// Pad with 4 zero elements to make indexing with `-1` safe.
-		if (arr_info.pad_begin && arr_type != '-') {
+		if ((flags & UFBXI_ARRAY_FLAG_PAD_BEGIN) != 0 && arr_type != '-') {
 			ufbxi_check(ufbxi_push_size_zero(&uc->tmp_stack, arr_elem_size, 4));
 			num_values += 4;
 		}
@@ -6753,18 +6781,31 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 
 	// NOTE: Infinite loop to allow skipping the comma parsing via `continue`.
 	for (;;) {
+		if (num_values > UFBXI_MAX_NON_ARRAY_VALUES && !arr_type) {
+			if (uc->opts.retain_dom) {
+				// FIXME
+				// ufbx_assert(0);
+				printf("!!>> %s\n", name);
+			}
+		}
+
 		ufbxi_ascii_token *tok = &ua->prev_token;
 		if (ufbxi_ascii_accept(uc, UFBXI_ASCII_STRING)) {
 
 			if (arr_type) {
 
-				if (arr_type == 's' || arr_type == 'S') {
+				if (arr_type == 's' || arr_type == 'S' || arr_type == 'C') {
 					bool raw = arr_type == 's';
 					ufbx_string *v = ufbxi_push(&uc->tmp_stack, ufbx_string, 1);
 					ufbxi_check(v);
 					v->data = tok->str_data;
 					v->length = tok->str_len;
-					ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, v, raw));
+					if (arr_type == 'C') {
+						v->data = ufbxi_push_copy(tmp_buf, char, v->length, v->data);
+						ufbxi_check(v->data);
+					} else {
+						ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, v, raw));
+					}
 				} else {
 					// Ignore strings in non-string arrays, decrement `num_values` as it will be
 					// incremented after the loop iteration is done to ignore it.
@@ -6919,7 +6960,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 		} else {
 			void *arr_data = ufbxi_push_pop_size(arr_buf, &uc->tmp_stack, arr_elem_size, num_values);
 			ufbxi_check(arr_data);
-			if (arr_info.pad_begin) {
+			if (arr_info.flags & UFBXI_ARRAY_FLAG_PAD_BEGIN) {
 				node->array->data = (char*)arr_data + 4*arr_elem_size;
 				node->array->size = num_values - 4;
 			} else {
@@ -7030,6 +7071,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_dom_node(ufbxi_context *u
 		case 'f': val->type = UFBX_DOM_VALUE_ARRAY_F32; break;
 		case 'd': val->type = UFBX_DOM_VALUE_ARRAY_F64; break;
 		case 's': val->type = UFBX_DOM_VALUE_ARRAY_RAW_STRING; break;
+		case 'C': val->type = UFBX_DOM_VALUE_ARRAY_RAW_STRING; break;
 		case '-': val->type = UFBX_DOM_VALUE_ARRAY_IGNORED; break;
 		default: ufbxi_fail("Bad array type"); break;
 		}
@@ -7367,6 +7409,7 @@ const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
 	{ "Vector", UFBX_PROP_VECTOR },
 	{ "Vector3D", UFBX_PROP_VECTOR },
 	{ "Color", UFBX_PROP_COLOR },
+	{ "ColorAndAlpha", UFBX_PROP_COLOR_WITH_ALPHA },
 	{ "ColorRGB", UFBX_PROP_COLOR },
 	{ "String", UFBX_PROP_STRING },
 	{ "KString", UFBX_PROP_STRING },
@@ -7611,7 +7654,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_property(ufbxi_context *uc,
 	}
 
 	ufbxi_ignore(ufbxi_get_val_at(node, val_ix, 'L', &prop->value_int));
-	for (size_t i = 0; i < 3; i++) {
+	for (size_t i = 0; i < 4; i++) {
 		if (!ufbxi_get_val_at(node, val_ix + i, 'R', &prop->value_real_arr[i])) break;
 	}
 
@@ -8798,6 +8841,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 					}
 				}
 			}
+		} else if (n->name == ufbxi_LayerElementPolygonGroup) {
+			if (mesh->face_group.count) continue;
+			const char *mapping;
+			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
+			if (mapping == ufbxi_ByPolygon) {
+				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->face_group.data, &mesh->face_group.count, n, ufbxi_PolygonGroup, 'i', mesh->num_faces));
+			}
 		} else if (!strncmp(n->name, "LayerElement", 12)) {
 
 			// Make sure the name has no internal zero bytes
@@ -9515,8 +9565,30 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_video(ufbxi_context *uc, uf
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFileName, "b", &video->raw_relative_filename));
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFilename, "b", &video->raw_relative_filename));
 
-	ufbx_string content;
-	if (ufbxi_find_val1(node, ufbxi_Content, "s", &content)) {
+	ufbxi_node *content_node = ufbxi_find_child(node, ufbxi_Content);
+	ufbxi_value_array *content_arr = content_node ? ufbxi_get_array(content_node, 'C') : NULL;
+	if (content_arr && content_arr->size > 0) {
+		ufbx_string content;
+		size_t num_parts = content_arr->size;
+		ufbx_string *parts = (ufbx_string*)content_arr->data;
+		if (num_parts == 1) {
+			content = parts[0];
+		} else {
+			size_t total_size = 0;
+			ufbxi_for(ufbx_string, part, parts, num_parts) {
+				total_size += part->length;
+			}
+			ufbxi_buf *dst_buf = uc->from_ascii ? &uc->tmp_parse : &uc->result;
+			char *dst = ufbxi_push(dst_buf, char, total_size);
+			ufbxi_check(dst);
+			content.data = dst;
+			content.length = total_size;
+			ufbxi_for(ufbx_string, part, parts, num_parts) {
+				memcpy(dst, part->data, part->length);
+				dst += part->length;
+			}
+		}
+
 		if (uc->from_ascii) {
 			if (content.length % 4 == 0) {
 				size_t padding = 0;
@@ -10549,17 +10621,19 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 			prop->value_real = (ufbx_real)prop->value_int;
 			prop->value_real_arr[1] = 0.0f;
 			prop->value_real_arr[2] = 0.0f;
+			prop->value_real_arr[3] = 0.0f;
 			prop->value_str = ufbx_empty_string;
 			prop->value_blob = ufbx_empty_blob;
 			value_ix++;
 			break;
 		case 'R':
-			ufbx_assert(value_ix < 3);
+			ufbx_assert(value_ix < 4);
 			if (!ufbxi_get_val_at(node, fmt_ix, 'R', &prop->value_real_arr[value_ix])) return 0;
 			if (value_ix == 0) {
 				prop->value_int = ufbxi_f64_to_i64(prop->value_real);
 				prop->value_real_arr[1] = 0.0f;
 				prop->value_real_arr[2] = 0.0f;
+				prop->value_real_arr[3] = 0.0f;
 				prop->value_str = ufbx_empty_string;
 				prop->value_blob = ufbx_empty_blob;
 			}
@@ -10578,6 +10652,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 			prop->value_real = 0.0f;
 			prop->value_real_arr[1] = 0.0f;
 			prop->value_real_arr[2] = 0.0f;
+			prop->value_real_arr[3] = 0.0f;
 			prop->value_int = 0;
 			value_ix++;
 			break;
@@ -11282,6 +11357,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_connections_to_elements(ufbx
 						anim_def_prop.type = type;
 						anim_def_prop.value_vec3 = anim_value->default_value;
 						anim_def_prop.value_int = ufbxi_f64_to_i64(anim_value->default_value.x);
+						anim_def_prop.value_real_arr[3] = 0.0f;
 						def_prop = &anim_def_prop;
 					} else {
 						flags |= UFBX_PROP_FLAG_NO_VALUE;
@@ -15752,6 +15828,7 @@ static ufbxi_noinline bool ufbxi_find_prop_override(const ufbx_const_prop_overri
 		const uint32_t clear_flags = UFBX_PROP_FLAG_NO_VALUE | UFBX_PROP_FLAG_NOT_FOUND;
 		prop->flags = (ufbx_prop_flags)((prop->flags & ~clear_flags) | UFBX_PROP_FLAG_OVERRIDDEN);
 		prop->value_vec3 = over->value;
+		prop->value_real_arr[3] = 0.0f;
 		prop->value_int = over->value_int;
 		prop->value_str = ufbxi_str_c(over->value_str);
 		prop->value_blob.data = prop->value_str.data;
@@ -15927,7 +16004,7 @@ static ufbxi_noinline void ufbxi_evaluate_connected_prop(ufbx_prop *prop, const 
 
 	if (conn) {
 		ufbx_prop ep = ufbx_evaluate_prop_len(anim, conn->src, conn->src_prop.data, conn->src_prop.length, time);
-		prop->value_vec3 = ep.value_vec3;
+		prop->value_vec4 = ep.value_vec4;
 		prop->value_int = ep.value_int;
 		prop->value_str = ep.value_str;
 		prop->value_blob = ep.value_blob;
@@ -15982,6 +16059,7 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 					dst->value_blob.size = dst->value_str.length;
 					dst->value_int = over->value_int;
 					dst->value_vec3 = over->value;
+					dst->value_real_arr[3] = 0.0f;
 					num_props++;
 					found_override = true;
 				}
@@ -16031,6 +16109,7 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 			dst->value_blob.size = dst->value_str.length;
 			dst->value_int = over->value_int;
 			dst->value_vec3 = over->value;
+			dst->value_real_arr[3] = 0.0f;
 			num_props++;
 		}
 	}
@@ -19701,6 +19780,7 @@ ufbx_abi ufbxi_noinline ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, co
 			dst->value_blob.size = dst->value_str.length;
 			dst->value_int = over->value_int;
 			dst->value_vec3 = over->value;
+			dst->value_real_arr[3] = 0.0f;
 			num_anim++;
 			found_override = true;
 		}
@@ -19728,6 +19808,7 @@ ufbx_abi ufbxi_noinline ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, co
 		dst->value_blob.size = dst->value_str.length;
 		dst->value_int = over->value_int;
 		dst->value_vec3 = over->value;
+		dst->value_real_arr[3] = 0.0f;
 	}
 
 	ufbxi_evaluate_props(anim, element, time, buffer, num_anim);
