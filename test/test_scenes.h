@@ -144,3 +144,42 @@ UFBXT_FILE_TEST(maya_kenney_character)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(zbrush_d20)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->nodes.count == 3);
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "20 Sided");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->num_faces == 20);
+		ufbxt_assert(mesh->face_group.count == 20);
+		for (int32_t i = 0; i < 20; i++) {
+			ufbxt_assert(mesh->face_group.data[i] == 10 + i * 5);
+		}
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "PolyMesh3D1");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->num_faces == 24);
+		ufbxt_assert(mesh->face_group.count == 24);
+		for (size_t i = 0; i < 24; i++) {
+			ufbx_face face = mesh->faces.data[i];
+			ufbx_vec3 normal = ufbx_get_weighted_face_normal(&mesh->vertex_position, face);
+			int32_t group = normal.z < 0.0f ? 9598 : 15349;
+			ufbxt_assert(mesh->face_group.data[i] == group);
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(zbrush_d20_selection_set)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(0 && "TODO");
+}
+#endif

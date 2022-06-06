@@ -735,7 +735,10 @@ UFBX_LIST_TYPE(ufbx_color_set_list, ufbx_color_set);
 
 // Edge between two _indices_ in a mesh
 typedef struct ufbx_edge {
-	uint32_t indices[2];
+	union {
+		struct { uint32_t a, b; };
+		uint32_t indices[2];
+	};
 } ufbx_edge;
 
 UFBX_LIST_TYPE(ufbx_edge_list, ufbx_edge);

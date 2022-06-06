@@ -371,8 +371,8 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_assert(mesh->edges.count == mesh->num_edges);
 	for (size_t i = 0; i < mesh->num_edges; i++) {
 		ufbx_edge edge = mesh->edges.data[i];
-		ufbxt_assert(edge.indices[0] < mesh->num_indices);
-		ufbxt_assert(edge.indices[1] < mesh->num_indices);
+		ufbxt_assert(edge.a < mesh->num_indices);
+		ufbxt_assert(edge.b < mesh->num_indices);
 	}
 
 	for (size_t i = 0; i < mesh->uv_sets.count; i++) {
@@ -409,8 +409,8 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 
 	for (size_t i = 0; i < mesh->num_edges; i++) {
 		ufbx_edge edge = mesh->edges.data[i];
-		ufbxt_assert(edge.indices[0] < mesh->num_indices);
-		ufbxt_assert(edge.indices[1] < mesh->num_indices);
+		ufbxt_assert(edge.a < mesh->num_indices);
+		ufbxt_assert(edge.b < mesh->num_indices);
 	}
 
 	if (mesh->face_material.count) {

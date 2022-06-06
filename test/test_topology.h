@@ -172,8 +172,8 @@ UFBXT_FILE_TEST(blender_293x_subsurf_max_crease)
 	size_t num_center = 0;
 	for (size_t i = 0; i < subdivided->num_edges; i++) {
 		ufbx_edge edge = subdivided->edges.data[i];
-		ufbx_vec3 a = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.indices[0]);
-		ufbx_vec3 b = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.indices[1]);
+		ufbx_vec3 a = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.a);
+		ufbx_vec3 b = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.b);
 		ufbx_real a_len = a.x*a.x + a.y*a.y + a.z*a.z;
 		ufbx_real b_len = b.x*b.x + b.y*b.y + b.z*b.z;
 
@@ -205,8 +205,8 @@ UFBXT_FILE_TEST(maya_subsurf_max_crease)
 	size_t num_bottom = 0;
 	for (size_t i = 0; i < subdivided->num_edges; i++) {
 		ufbx_edge edge = subdivided->edges.data[i];
-		ufbx_vec3 a = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.indices[0]);
-		ufbx_vec3 b = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.indices[1]);
+		ufbx_vec3 a = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.a);
+		ufbx_vec3 b = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.b);
 		ufbx_real a_len = a.x*a.x + a.z*a.z;
 		ufbx_real b_len = b.x*b.x + b.z*b.z;
 

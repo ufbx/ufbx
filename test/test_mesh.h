@@ -299,8 +299,8 @@ UFBXT_FILE_TEST(maya_cone)
 		ufbx_edge edge = mesh->edges.data[i];
 		ufbx_real crease = mesh->edge_crease.data[i];
 		bool smoothing = mesh->edge_smoothing.data[i];
-		ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[0]);
-		ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[1]);
+		ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.a);
+		ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.b);
 
 		if (a.y < 0.0 && b.y < 0.0) {
 			ufbxt_assert_close_real(err, crease, 0.583);
@@ -642,8 +642,8 @@ UFBXT_FILE_TEST(max_edge_visibility)
 		// Diagonal edges should be hidden
 		for (size_t i = 0; i < mesh->num_edges; i++) {
 			ufbx_edge edge = mesh->edges.data[i];
-			ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[0]);
-			ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[1]);
+			ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.a);
+			ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.b);
 			ufbx_real len = ufbxt_length3(ufbxt_sub3(a, b));
 			bool expected = len < 21.0f;
 			bool visible = mesh->edge_visibility.data[i];
@@ -665,8 +665,8 @@ UFBXT_FILE_TEST(max_edge_visibility)
 		// Diagonal and edges to the center should be hidden
 		for (size_t i = 0; i < mesh->num_edges; i++) {
 			ufbx_edge edge = mesh->edges.data[i];
-			ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[0]);
-			ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[1]);
+			ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.a);
+			ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.b);
 			ufbx_vec2 a2 = { a.x, a.y };
 			ufbx_vec2 b2 = { b.x, b.y };
 			ufbx_real len = ufbxt_length3(ufbxt_sub3(a, b));

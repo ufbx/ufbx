@@ -8684,7 +8684,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 				if (uc->opts.strict) ufbxi_fail("Edge index out of bounds");
 				continue;
 			}
-			edges[dst_ix].indices[0] = index_ix;
+			edges[dst_ix].a = index_ix;
 			if (index_data[index_ix] < 0) {
 				// Previous index is the last one of this polygon, rewind to first index.
 				while (index_ix > 0 && index_data[index_ix - 1] >= 0) {
@@ -8695,7 +8695,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 				index_ix++;
 			}
 			ufbxi_check(index_ix >= 0 && (size_t)index_ix < mesh->num_indices);
-			edges[dst_ix].indices[1] = index_ix;
+			edges[dst_ix].b = index_ix;
 			dst_ix++;
 		}
 
@@ -17627,8 +17627,8 @@ ufbxi_noinline static void ufbxi_compute_topology(const ufbx_mesh *mesh, ufbx_to
 	if (mesh->edges.data) {
 		for (uint32_t ei = 0; ei < mesh->num_edges; ei++) {
 			ufbx_edge edge = mesh->edges.data[ei];
-			int32_t va = mesh->vertex_indices.data[edge.indices[0]];
-			int32_t vb = mesh->vertex_indices.data[edge.indices[1]];
+			int32_t va = mesh->vertex_indices.data[edge.a];
+			int32_t vb = mesh->vertex_indices.data[edge.b];
 			if (vb < va) {
 				int32_t vt = va; va = vb; vb = vt;
 			}
@@ -18650,18 +18650,18 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 		size_t di = 0;
 		for (size_t i = 0; i < mesh->num_edges; i++) {
 			ufbx_edge edge = mesh->edges.data[i];
-			int32_t face_ix = topo[edge.indices[0]].face;
+			int32_t face_ix = topo[edge.a].face;
 			ufbx_face face = mesh->faces.data[face_ix];
-			int32_t offset = edge.indices[0] - face.index_begin;
+			int32_t offset = edge.a - face.index_begin;
 			int32_t next = (offset + 1) % (int32_t)face.num_indices;
 
 			int32_t a = (face.index_begin + offset) * 4;
 			int32_t b = (face.index_begin + next) * 4;
 
-			result->edges.data[di + 0].indices[0] = a;
-			result->edges.data[di + 0].indices[1] = a + 1;
-			result->edges.data[di + 1].indices[0] = b + 3;
-			result->edges.data[di + 1].indices[1] = b;
+			result->edges.data[di + 0].a = a;
+			result->edges.data[di + 0].b = a + 1;
+			result->edges.data[di + 1].a = b + 3;
+			result->edges.data[di + 1].b = b;
 
 			if (mesh->edge_crease.data) {
 				ufbx_real crease = mesh->edge_crease.data[i];
@@ -18680,8 +18680,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 		}
 
 		for (size_t fi = 0; fi < result->num_faces; fi++) {
-			result->edges.data[di].indices[0] = (int32_t)(fi * 4 + 1);
-			result->edges.data[di].indices[1] = (int32_t)(fi * 4 + 2);
+			result->edges.data[di].a = (int32_t)(fi * 4 + 1);
+			result->edges.data[di].b = (int32_t)(fi * 4 + 2);
 
 			if (result->edge_crease.data) {
 				result->edge_crease.data[di] = 0.0f;
