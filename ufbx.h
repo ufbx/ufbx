@@ -1254,6 +1254,9 @@ struct ufbx_line_curve {
 	ufbx_int32_list point_indices; // < Indices to `control_points[]` the line goes through
 
 	ufbx_line_segment_list segments;
+
+	// Tessellation (result)
+	bool from_tessellated_nurbs;
 };
 
 struct ufbx_nurbs_curve {
@@ -2897,6 +2900,7 @@ typedef enum ufbx_error_type {
 	UFBX_ERROR_ZERO_VERTEX_SIZE,
 	UFBX_ERROR_INVALID_UTF8,
 	UFBX_ERROR_FEATURE_DISABLED,
+	UFBX_ERROR_BAD_NURBS,
 
 	UFBX_ERROR_TYPE_COUNT,
 	UFBX_ERROR_TYPE_FORCE_32BIT = 0x7fffffff,
@@ -3125,9 +3129,23 @@ typedef struct ufbx_evaluate_opts {
 	uint32_t _end_zero;
 } ufbx_evaluate_opts;
 
+// Options for `ufbx_tessellate_nurbs_curve()`
+// NOTE: Initialize to zero with `{ 0 }` (C) or `{ }` (C++)
+typedef struct ufbx_tessellate_curve_opts {
+	uint32_t _begin_zero;
+
+	ufbx_allocator_opts temp_allocator;   // < Allocator used during tessellation
+	ufbx_allocator_opts result_allocator; // < Allocator used for the final line curve
+
+	// How many segments tessellate each step in `ufbx_nurbs_basis.steps`.
+	int32_t span_subdivision;
+
+	uint32_t _end_zero;
+} ufbx_tessellate_curve_opts;
+
 // Options for `ufbx_tessellate_nurbs_surface()`
 // NOTE: Initialize to zero with `{ 0 }` (C) or `{ }` (C++)
-typedef struct ufbx_tessellate_opts {
+typedef struct ufbx_tessellate_surface_opts {
 	uint32_t _begin_zero;
 
 	ufbx_allocator_opts temp_allocator;   // < Allocator used during tessellation
@@ -3142,7 +3160,7 @@ typedef struct ufbx_tessellate_opts {
 	int32_t span_subdivision_v;
 
 	uint32_t _end_zero;
-} ufbx_tessellate_opts;
+} ufbx_tessellate_surface_opts;
 
 // Options for `ufbx_subdivide_mesh()`
 // NOTE: Initialize to zero with `{ 0 }` (C) or `{ }` (C++)
@@ -3341,11 +3359,11 @@ ufbx_inline ufbx_blob ufbx_find_blob(const ufbx_props *props, const char *name, 
 // For example if you want to find `ufbx_material` named `Mat`:
 //   (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Mat");
 ufbx_abi ufbx_element *ufbx_find_element_len(const ufbx_scene *scene, ufbx_element_type type, const char *name, size_t name_len);
-ufbx_inline ufbx_element *ufbx_find_element(const ufbx_scene *scene, ufbx_element_type type, const char *name) { return ufbx_find_element_len(scene, type, name, strlen(name));}
+ufbx_inline ufbx_element *ufbx_find_element(const ufbx_scene *scene, ufbx_element_type type, const char *name) { return ufbx_find_element_len(scene, type, name, strlen(name)); }
 
 // Find node in `scene` by `name` (shorthand for `ufbx_find_element(UFBX_ELEMENT_NODE)`).
 ufbx_abi ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t name_len);
-ufbx_inline ufbx_node *ufbx_find_node(const ufbx_scene *scene, const char *name) { return ufbx_find_node_len(scene, name, strlen(name));}
+ufbx_inline ufbx_node *ufbx_find_node(const ufbx_scene *scene, const char *name) { return ufbx_find_node_len(scene, name, strlen(name)); }
 
 // Find an animation stack in `scene` by `name` (shorthand for `ufbx_find_element(UFBX_ELEMENT_ANIM_STACK)`)
 ufbx_abi ufbx_anim_stack *ufbx_find_anim_stack_len(const ufbx_scene *scene, const char *name, size_t name_len);
@@ -3477,7 +3495,11 @@ ufbx_abi size_t ufbx_evaluate_nurbs_basis(const ufbx_nurbs_basis *basis, ufbx_re
 ufbx_abi ufbx_curve_point ufbx_evaluate_nurbs_curve(const ufbx_nurbs_curve *curve, ufbx_real u);
 ufbx_abi ufbx_surface_point ufbx_evaluate_nurbs_surface(const ufbx_nurbs_surface *surface, ufbx_real u, ufbx_real v);
 
-ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, const ufbx_tessellate_opts *opts, ufbx_error *error);
+ufbx_abi ufbx_line_curve *ufbx_tessellate_nurbs_curve(const ufbx_nurbs_curve *curve, const ufbx_tessellate_curve_opts *opts, ufbx_error *error);
+ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, const ufbx_tessellate_surface_opts *opts, ufbx_error *error);
+
+ufbx_abi void ufbx_free_line_curve(ufbx_line_curve *curve);
+ufbx_abi void ufbx_retain_line_curve(ufbx_line_curve *curve);
 
 // Mesh Topology
 
@@ -3614,6 +3636,24 @@ ufbx_abi ufbx_character *ufbx_as_character(const ufbx_element *element);
 ufbx_abi ufbx_constraint *ufbx_as_constraint(const ufbx_element *element);
 ufbx_abi ufbx_pose *ufbx_as_pose(const ufbx_element *element);
 ufbx_abi ufbx_metadata_object *ufbx_as_metadata_object(const ufbx_element *element);
+
+ufbx_abi ufbx_element_list ufbx_get_node_attribs(const ufbx_node *node, ufbx_element_type type);
+
+ufbx_abi ufbx_mesh_list ufbx_get_node_meshes(const ufbx_node *node);
+ufbx_abi ufbx_light_list ufbx_get_node_lights(const ufbx_node *node);
+ufbx_abi ufbx_camera_list ufbx_get_node_cameras(const ufbx_node *node);
+ufbx_abi ufbx_bone_list ufbx_get_node_bones(const ufbx_node *node);
+ufbx_abi ufbx_empty_list ufbx_get_node_empties(const ufbx_node *node);
+ufbx_abi ufbx_line_curve_list ufbx_get_node_line_curves(const ufbx_node *node);
+ufbx_abi ufbx_nurbs_curve_list ufbx_get_node_nurbs_curves(const ufbx_node *node);
+ufbx_abi ufbx_nurbs_surface_list ufbx_get_node_nurbs_surfaces(const ufbx_node *node);
+ufbx_abi ufbx_nurbs_trim_surface_list ufbx_get_node_nurbs_trim_surfaces(const ufbx_node *node);
+ufbx_abi ufbx_nurbs_trim_boundary_list ufbx_get_node_nurbs_trim_boundaries(const ufbx_node *node);
+ufbx_abi ufbx_procedural_geometry_list ufbx_get_node_procedural_geometries(const ufbx_node *node);
+ufbx_abi ufbx_stereo_camera_list ufbx_get_node_stereo_cameras(const ufbx_node *node);
+ufbx_abi ufbx_camera_switcher_list ufbx_get_node_camera_switchers(const ufbx_node *node);
+ufbx_abi ufbx_marker_list ufbx_get_node_markers(const ufbx_node *node);
+ufbx_abi ufbx_lod_group_list ufbx_get_node_lod_groups(const ufbx_node *node);
 
 // -- FFI API
 

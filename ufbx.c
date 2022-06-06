@@ -1651,6 +1651,8 @@ static ufbxi_noinline void ufbxi_fix_error_type(ufbx_error *error, const char *d
 		error->type = UFBX_ERROR_INVALID_UTF8;
 	} else if (!strcmp(desc, "Feature disabled")) {
 		error->type = UFBX_ERROR_FEATURE_DISABLED;
+	} else if (!strcmp(desc, "Bad NURBS geometry")) {
+		error->type = UFBX_ERROR_BAD_NURBS;
 	}
 	error->description.data = desc;
 	error->description.length = strlen(desc);
@@ -3664,6 +3666,7 @@ struct ufbxi_node {
 
 #define UFBXI_SCENE_IMP_MAGIC 0x58424655
 #define UFBXI_MESH_IMP_MAGIC 0x48534d55
+#define UFBXI_LINE_CURVE_IMP_MAGIC 0x55434c55
 #define UFBXI_CACHE_IMP_MAGIC 0x48434355
 #define UFBXI_REFCOUNT_IMP_MAGIC 0x46455255
 
@@ -11756,6 +11759,20 @@ static ufbxi_forceinline bool ufbxi_is_transform_identity(ufbx_transform t)
 	return (bool)((int)ufbxi_is_vec3_zero(t.translation) & (int)ufbxi_is_quat_identity(t.rotation) & (int)ufbxi_is_vec3_one(t.scale));
 }
 
+ufbxi_noinline static bool ufbxi_element_type_less(void *user, const void *va, const void *vb)
+{
+	(void)user;
+	ufbx_element *a = *(ufbx_element*const*)va, *b = *(ufbx_element*const*)vb;
+	return a->type < b->type;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_elements_by_type(ufbxi_context *uc, ufbx_element **elements, size_t count)
+{
+	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_element)));
+	ufbxi_stable_sort(sizeof(ufbx_element*), 32, elements, uc->tmp_arr, count, &ufbxi_element_type_less, NULL);
+	return 1;
+}
+
 // Material tables
 
 typedef void (*ufbxi_mat_transform_fn)(ufbx_vec3 *a);
@@ -12426,6 +12443,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		if (node->all_attribs.count > 1) {
 			node->all_attribs.data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_element*, node->all_attribs.count);
 			ufbxi_check(node->all_attribs.data);
+			ufbxi_check(ufbxi_sort_elements_by_type(uc, node->all_attribs.data, node->all_attribs.count));
 		} else if (node->all_attribs.count == 1) {
 			node->all_attribs.data = &node->attrib;
 		}
@@ -16648,9 +16666,38 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, uf
 #if UFBXI_FEATURE_TESSELLATION
 
 typedef struct {
+	ufbxi_refcount refcount;
+	ufbx_line_curve curve;
+	uint32_t magic;
+
+	ufbxi_allocator ator;
+	ufbxi_buf result_buf;
+} ufbxi_line_curve_imp;
+
+ufbx_static_assert(line_curve_imp_offset, offsetof(ufbxi_line_curve_imp, curve) == sizeof(ufbxi_refcount));
+
+typedef struct {
 	ufbx_error error;
 
-	ufbx_tessellate_opts opts;
+	ufbx_tessellate_curve_opts opts;
+
+	const ufbx_nurbs_curve *curve;
+
+	ufbxi_allocator ator_tmp;
+	ufbxi_allocator ator_result;
+
+	ufbxi_buf result;
+
+	ufbx_line_curve line;
+
+	ufbxi_line_curve_imp *imp;
+
+} ufbxi_tessellate_curve_context;
+
+typedef struct {
+	ufbx_error error;
+
+	ufbx_tessellate_surface_opts opts;
 
 	const ufbx_nurbs_surface *surface;
 
@@ -16666,9 +16713,106 @@ typedef struct {
 
 	ufbxi_mesh_imp *imp;
 
-} ufbxi_tessellate_context;
+} ufbxi_tessellate_surface_context;
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufbxi_tessellate_context *tc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_curve_imp(ufbxi_tessellate_curve_context *tc)
+{
+	// `ufbx_tessellate_opts` must be cleared to zero first!
+	ufbx_assert(tc->opts._begin_zero == 0 && tc->opts._end_zero == 0);
+	ufbxi_check_err_msg(&tc->error, tc->opts._begin_zero == 0 && tc->opts._end_zero == 0, "Uninitialized options");
+
+	if (tc->opts.span_subdivision <= 0) {
+		tc->opts.span_subdivision = 4;
+	}
+	size_t num_sub = tc->opts.span_subdivision;
+
+	const ufbx_nurbs_curve *curve = tc->curve;
+	ufbx_line_curve *line = &tc->line;
+	ufbxi_check_err_msg(&tc->error, curve->basis.valid && curve->control_points.count > 0, "Bad NURBS geometry");
+
+	ufbxi_init_ator(&tc->error, &tc->ator_tmp, &tc->opts.temp_allocator);
+	ufbxi_init_ator(&tc->error, &tc->ator_result, &tc->opts.result_allocator);
+
+	tc->result.unordered = true;
+	tc->result.ator = &tc->ator_result;
+
+	size_t num_spans = curve->basis.spans.count;
+
+	// Check conservatively that we don't overflow anything
+	{
+		size_t over_spans = num_spans * 2 * sizeof(ufbx_real);
+		size_t over = over_spans * num_sub;
+		ufbxi_check_err(&tc->error, !ufbxi_does_overflow(over, over_spans, num_sub));
+	}
+
+	bool is_open = curve->basis.topology == UFBX_NURBS_TOPOLOGY_OPEN;
+
+	size_t num_indices = num_spans + (num_spans - 1) * num_sub;
+	size_t num_vertices = num_indices - (is_open ? 1u : 0u);
+	ufbxi_check_err(&tc->error, num_indices <= INT32_MAX);
+
+	int32_t *indices = ufbxi_push(&tc->result, int32_t, num_indices);
+	ufbx_vec3 *vertices = ufbxi_push(&tc->result, ufbx_vec3, num_vertices);
+	ufbx_line_segment *segments = ufbxi_push(&tc->result, ufbx_line_segment, 1);
+	ufbxi_check_err(&tc->error, indices && vertices && segments);
+
+	for (size_t span_ix = 0; span_ix < num_spans; span_ix++) {
+		size_t num_splits = span_ix + 1 == num_spans ? 1 : num_sub;
+
+		for (size_t sub_ix = 0; sub_ix < num_splits; sub_ix++) {
+			size_t ix = span_ix * num_sub + sub_ix;
+
+			if (ix < num_vertices) {
+				ufbx_real u = curve->basis.spans.data[span_ix];
+				if (sub_ix > 0) {
+					ufbx_real t = (ufbx_real)sub_ix / num_sub;
+					u = u * (1.0f - t) + t * curve->basis.spans.data[span_ix + 1];
+				}
+
+				ufbx_curve_point point = ufbx_evaluate_nurbs_curve(curve, u);
+				vertices[ix] = point.position;
+				indices[ix] = (int32_t)ix;
+			} else {
+				indices[ix] = 0;
+			}
+		}
+	}
+
+	segments[0].index_begin = 0;
+	segments[0].num_indices = (uint32_t)num_indices;
+
+	line->element.name.data = ufbxi_empty_char;
+	line->element.type = UFBX_ELEMENT_LINE_CURVE;
+	line->element.typed_id = UINT32_MAX;
+	line->element.element_id = UINT32_MAX;
+
+	line->color.x = 1.0f;
+	line->color.y = 1.0f;
+	line->color.z = 1.0f;
+
+	line->control_points.data = vertices;
+	line->control_points.count = num_vertices;
+	line->point_indices.data = indices;
+	line->point_indices.count = num_indices;
+	line->segments.data = segments;
+	line->segments.count = 1;
+
+	line->from_tessellated_nurbs = true;
+
+	tc->imp = ufbxi_push(&tc->result, ufbxi_line_curve_imp, 1);
+	ufbxi_check_err(&tc->error, tc->imp);
+
+	ufbxi_init_ref(&tc->imp->refcount, UFBXI_LINE_CURVE_IMP_MAGIC, &(ufbxi_get_imp(ufbxi_scene_imp, curve->element.scene))->refcount);
+
+	tc->imp->magic = UFBXI_LINE_CURVE_IMP_MAGIC;
+	tc->imp->curve = tc->line;
+	tc->imp->ator = tc->ator_result;
+	tc->imp->result_buf = tc->result;
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufbxi_tessellate_surface_context *tc)
 {
 	// `ufbx_tessellate_opts` must be cleared to zero first!
 	ufbx_assert(tc->opts._begin_zero == 0 && tc->opts._end_zero == 0);
@@ -16686,6 +16830,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 
 	const ufbx_nurbs_surface *surface = tc->surface;
 	ufbx_mesh *mesh = &tc->mesh;
+	ufbxi_check_err_msg(&tc->error, surface->basis_u.valid && surface->basis_v.valid
+		&& surface->num_control_points_u > 0 && surface->num_control_points_v > 0, "Bad NURBS geometry");
 
 	ufbxi_init_ator(&tc->error, &tc->ator_tmp, &tc->opts.temp_allocator);
 	ufbxi_init_ator(&tc->error, &tc->ator_result, &tc->opts.result_allocator);
@@ -16724,6 +16870,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 
 	size_t num_faces = faces_u * faces_v;
 	size_t num_indices = indices_u * indices_v;
+	ufbxi_check_err(&tc->error, num_indices <= INT32_MAX);
 
 	int32_t *position_ix = ufbxi_push(&tc->tmp, int32_t, num_indices);
 	ufbx_vec2 *uvs = ufbxi_push(&tc->result, ufbx_vec2, num_indices + 1);
@@ -16766,8 +16913,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 						u = surface->basis_u.spans.data[0];
 					}
 
-					ufbx_real pu = u, pv = v;
-					ufbx_surface_point point = ufbx_evaluate_nurbs_surface(surface, pu, pv);
+					ufbx_surface_point point = ufbx_evaluate_nurbs_surface(surface, u, v);
 					ufbx_vec3 pos = point.position;
 
 					uint32_t pos_ix = ufbxi_insert_spatial(&tc->position_map, &pos);
@@ -16844,6 +16990,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 		positions[i] = buckets[i].position;
 	}
 
+	mesh->element.name.data = ufbxi_empty_char;
 	mesh->element.type = UFBX_ELEMENT_MESH;
 	mesh->element.typed_id = UINT32_MAX;
 	mesh->element.element_id = UINT32_MAX;
@@ -18865,6 +19012,20 @@ static ufbxi_noinline void ufbxi_free_mesh_imp(ufbxi_mesh_imp *imp)
 	ufbxi_free_ator(&ator);
 }
 
+static ufbxi_noinline void ufbxi_free_line_curve_imp(ufbxi_line_curve_imp *imp)
+{
+	ufbx_assert(imp->magic == UFBXI_LINE_CURVE_IMP_MAGIC);
+	if (imp->magic != UFBXI_LINE_CURVE_IMP_MAGIC) return;
+	imp->magic = 0;
+
+	// See `ufbxi_free_scene()` for more information
+	ufbxi_allocator ator = imp->ator;
+	ufbxi_buf result = imp->result_buf;
+	result.ator = &ator;
+	ufbxi_buf_free(&result);
+	ufbxi_free_ator(&ator);
+}
+
 static ufbxi_noinline void ufbxi_init_ref(ufbxi_refcount *refcount, uint32_t magic, ufbxi_refcount *parent)
 {
 	if (parent) {
@@ -18898,6 +19059,7 @@ static ufbxi_noinline void ufbxi_release_ref(ufbxi_refcount *refcount)
 		switch (type_magic) {
 		case UFBXI_SCENE_IMP_MAGIC: ufbxi_free_scene_imp((ufbxi_scene_imp*)refcount); break;
 		case UFBXI_MESH_IMP_MAGIC: ufbxi_free_mesh_imp((ufbxi_mesh_imp*)refcount); break;
+		case UFBXI_LINE_CURVE_IMP_MAGIC: ufbxi_free_line_curve_imp((ufbxi_line_curve_imp*)refcount); break;
 		case UFBXI_CACHE_IMP_MAGIC: ufbxi_free_geometry_cache_imp((ufbxi_geometry_cache_imp*)refcount); break;
 		default: ufbx_assert(0 && "Bad refcount type_magic"); break;
 		}
@@ -20375,6 +20537,7 @@ ufbx_abi ufbxi_noinline ufbx_curve_point ufbx_evaluate_nurbs_curve(const ufbx_nu
 
 	size_t order = curve->basis.order;
 	if (order > UFBXI_MAX_NURBS_ORDER) return result;
+	if (curve->control_points.count == 0) return result;
 
 	for (size_t i = 0; i < order; i++) {
 		size_t ix = (base + i) % curve->control_points.count;
@@ -20425,6 +20588,7 @@ ufbx_abi ufbxi_noinline ufbx_surface_point ufbx_evaluate_nurbs_surface(const ufb
 	size_t order_u = surface->basis_u.order;
 	size_t order_v = surface->basis_v.order;
 	if (order_u > UFBXI_MAX_NURBS_ORDER || order_v > UFBXI_MAX_NURBS_ORDER) return result;
+	if (num_u == 0 || num_v == 0) return result;
 
 	for (size_t vi = 0; vi < order_v; vi++) {
 		size_t vix = (base_v + vi) % num_v;
@@ -20470,13 +20634,55 @@ ufbx_abi ufbxi_noinline ufbx_surface_point ufbx_evaluate_nurbs_surface(const ufb
 	return result;
 }
 
-ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, const ufbx_tessellate_opts *opts, ufbx_error *error)
+ufbx_abi ufbx_line_curve *ufbx_tessellate_nurbs_curve(const ufbx_nurbs_curve *curve, const ufbx_tessellate_curve_opts *opts, ufbx_error *error)
+{
+#if UFBXI_FEATURE_TESSELLATION
+	ufbx_assert(curve);
+	if (!curve) return NULL;
+
+	ufbxi_tessellate_curve_context tc = { UFBX_ERROR_NONE };
+	if (opts) {
+		tc.opts = *opts;
+	}
+
+	tc.curve = curve;
+
+	int ok = ufbxi_tessellate_nurbs_curve_imp(&tc);
+
+	ufbxi_free_ator(&tc.ator_tmp);
+
+	if (ok) {
+		if (error) {
+			error->type = UFBX_ERROR_NONE;
+			error->description.data = ufbxi_empty_char;
+			error->description.length = 0;
+			error->stack_size = 0;
+		}
+		ufbxi_line_curve_imp *imp = tc.imp;
+		return &imp->curve;
+	} else {
+		ufbxi_fix_error_type(&tc.error, "Failed to tessellate");
+		if (error) *error = tc.error;
+		ufbxi_buf_free(&tc.result);
+		ufbxi_free_ator(&tc.ator_result);
+		return NULL;
+	}
+#else
+	if (error) {
+		memset(error, 0, sizeof(ufbx_error));
+		ufbxi_report_err_msg(error, "UFBXI_FEATURE_TESSELLATION", "Feature disabled");
+	}
+	return NULL;
+#endif
+}
+
+ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surface, const ufbx_tessellate_surface_opts *opts, ufbx_error *error)
 {
 #if UFBXI_FEATURE_TESSELLATION
 	ufbx_assert(surface);
 	if (!surface) return NULL;
 
-	ufbxi_tessellate_context tc = { UFBX_ERROR_NONE };
+	ufbxi_tessellate_surface_context tc = { UFBX_ERROR_NONE };
 	if (opts) {
 		tc.opts = *opts;
 	}
@@ -20512,6 +20718,28 @@ ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surf
 	}
 	return NULL;
 #endif
+}
+
+ufbx_abi void ufbx_free_line_curve(ufbx_line_curve *line_curve)
+{
+	if (!line_curve) return;
+	if (!line_curve->from_tessellated_nurbs) return;
+
+	ufbxi_line_curve_imp *imp = ufbxi_get_imp(ufbxi_line_curve_imp, line_curve);
+	ufbx_assert(imp->magic == UFBXI_LINE_CURVE_IMP_MAGIC);
+	if (imp->magic != UFBXI_LINE_CURVE_IMP_MAGIC) return;
+	ufbxi_release_ref(&imp->refcount);
+}
+
+ufbx_abi void ufbx_retain_line_curve(ufbx_line_curve *line_curve)
+{
+	if (!line_curve) return;
+	if (!line_curve->from_tessellated_nurbs) return;
+
+	ufbxi_line_curve_imp *imp = ufbxi_get_imp(ufbxi_line_curve_imp, line_curve);
+	ufbx_assert(imp->magic == UFBXI_LINE_CURVE_IMP_MAGIC);
+	if (imp->magic != UFBXI_LINE_CURVE_IMP_MAGIC) return;
+	ufbxi_retain_ref(&imp->refcount);
 }
 
 ufbx_abi ufbxi_noinline uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face)
@@ -21313,6 +21541,68 @@ ufbx_abi ufbx_character *ufbx_as_character(const ufbx_element *element) { return
 ufbx_abi ufbx_constraint *ufbx_as_constraint(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_CONSTRAINT ? (ufbx_constraint*)element : NULL; }
 ufbx_abi ufbx_pose *ufbx_as_pose(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_POSE ? (ufbx_pose*)element : NULL; }
 ufbx_abi ufbx_metadata_object *ufbx_as_metadata_object(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_METADATA_OBJECT ? (ufbx_metadata_object*)element : NULL; }
+
+ufbx_abi size_t ufbx_get_attrib_count(const ufbx_node *node, ufbx_element_type type)
+{
+	if (!node) return 0;
+	size_t count = 0;
+	ufbxi_for_ptr_list(ufbx_element, p_attrib, node->all_attribs) {
+		ufbx_element *attrib = *p_attrib;
+		if (attrib->type == type) {
+			count++;
+		}
+	}
+	return count;
+}
+
+ufbx_abi ufbx_element *ufbx_get_attrib(const ufbx_node *node, ufbx_element_type type, size_t index)
+{
+	if (!node) return NULL;
+	ufbxi_for_ptr_list(ufbx_element, p_attrib, node->all_attribs) {
+		ufbx_element *attrib = *p_attrib;
+		if (attrib->type == type) {
+			if (index-- == 0) return attrib;
+		}
+	}
+	return NULL;
+}
+
+ufbx_abi ufbx_element_list ufbx_get_node_attribs(const ufbx_node *node, ufbx_element_type type)
+{
+	ufbx_element_list result;
+	if (!node) {
+		result.data = NULL;
+		result.count = 0;
+		return result;
+	}
+
+	size_t begin = node->all_attribs.count, end = begin;
+	ufbxi_macro_lower_bound_eq(ufbx_element*, 16, &begin, node->all_attribs.data, 0, node->all_attribs.count,
+		( (*a)->type < type ), ( (*a)->type == type ));
+
+	ufbxi_macro_upper_bound_eq(ufbx_element*, 16, &end, node->all_attribs.data, begin, node->all_attribs.count,
+		( (*a)->type == type ));
+
+	result.data = node->all_attribs.data + begin;
+	result.count = end - begin;
+	return result;
+}
+
+ufbx_abi ufbx_mesh_list ufbx_get_node_meshes(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_MESH); ufbx_mesh_list res = { (ufbx_mesh**)l.data, l.count }; return res; }
+ufbx_abi ufbx_light_list ufbx_get_node_lights(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_LIGHT); ufbx_light_list res = { (ufbx_light**)l.data, l.count }; return res; }
+ufbx_abi ufbx_camera_list ufbx_get_node_cameras(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_CAMERA); ufbx_camera_list res = { (ufbx_camera**)l.data, l.count }; return res; }
+ufbx_abi ufbx_bone_list ufbx_get_node_bones(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_BONE); ufbx_bone_list res = { (ufbx_bone**)l.data, l.count }; return res; }
+ufbx_abi ufbx_empty_list ufbx_get_node_empties(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_EMPTY); ufbx_empty_list res = { (ufbx_empty**)l.data, l.count }; return res; }
+ufbx_abi ufbx_line_curve_list ufbx_get_node_line_curves(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_LINE_CURVE); ufbx_line_curve_list res = { (ufbx_line_curve**)l.data, l.count }; return res; }
+ufbx_abi ufbx_nurbs_curve_list ufbx_get_node_nurbs_curves(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_NURBS_CURVE); ufbx_nurbs_curve_list res = { (ufbx_nurbs_curve**)l.data, l.count }; return res; }
+ufbx_abi ufbx_nurbs_surface_list ufbx_get_node_nurbs_surfaces(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_NURBS_SURFACE); ufbx_nurbs_surface_list res = { (ufbx_nurbs_surface**)l.data, l.count }; return res; }
+ufbx_abi ufbx_nurbs_trim_surface_list ufbx_get_node_nurbs_trim_surfaces(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_NURBS_TRIM_SURFACE); ufbx_nurbs_trim_surface_list res = { (ufbx_nurbs_trim_surface**)l.data, l.count }; return res; }
+ufbx_abi ufbx_nurbs_trim_boundary_list ufbx_get_node_nurbs_trim_boundaries(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_NURBS_TRIM_BOUNDARY); ufbx_nurbs_trim_boundary_list res = { (ufbx_nurbs_trim_boundary**)l.data, l.count }; return res; }
+ufbx_abi ufbx_procedural_geometry_list ufbx_get_node_procedural_geometries(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_PROCEDURAL_GEOMETRY); ufbx_procedural_geometry_list res = { (ufbx_procedural_geometry**)l.data, l.count }; return res; }
+ufbx_abi ufbx_stereo_camera_list ufbx_get_node_stereo_cameras(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_STEREO_CAMERA); ufbx_stereo_camera_list res = { (ufbx_stereo_camera**)l.data, l.count }; return res; }
+ufbx_abi ufbx_camera_switcher_list ufbx_get_node_camera_switchers(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_CAMERA); ufbx_camera_switcher_list res = { (ufbx_camera_switcher**)l.data, l.count }; return res; }
+ufbx_abi ufbx_marker_list ufbx_get_node_markers(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_MARKER); ufbx_marker_list res = { (ufbx_marker**)l.data, l.count }; return res; }
+ufbx_abi ufbx_lod_group_list ufbx_get_node_lod_groups(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_LOD_GROUP); ufbx_lod_group_list res = { (ufbx_lod_group**)l.data, l.count }; return res; }
 
 ufbx_abi void ufbx_ffi_find_int_len(int64_t *retval, const ufbx_props *props, const char *name, size_t name_len, const int64_t *def)
 {

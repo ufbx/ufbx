@@ -457,7 +457,7 @@ UFBXT_FILE_TEST_ALT(nurbs_alloc_fail, maya_nurbs_surface_plane)
 	ufbx_nurbs_surface *surface = (ufbx_nurbs_surface*)node->attrib;
 
 	for (size_t max_temp = 1; max_temp < 10000; max_temp++) {
-		ufbx_tessellate_opts opts = { 0 };
+		ufbx_tessellate_surface_opts opts = { 0 };
 		opts.temp_allocator.huge_threshold = 1;
 		opts.temp_allocator.allocation_limit = max_temp;
 
@@ -474,7 +474,7 @@ UFBXT_FILE_TEST_ALT(nurbs_alloc_fail, maya_nurbs_surface_plane)
 	}
 
 	for (size_t max_result = 1; max_result < 10000; max_result++) {
-		ufbx_tessellate_opts opts = { 0 };
+		ufbx_tessellate_surface_opts opts = { 0 };
 		opts.result_allocator.huge_threshold = 1;
 		opts.result_allocator.allocation_limit = max_result;
 
@@ -488,6 +488,73 @@ UFBXT_FILE_TEST_ALT(nurbs_alloc_fail, maya_nurbs_surface_plane)
 			break;
 		}
 		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_nurbs_invalid)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "curve1");
+		ufbxt_assert(node);
+		ufbx_nurbs_curve_list curves = ufbx_get_node_nurbs_curves(node);
+		ufbxt_assert(curves.count == 1);
+		ufbx_nurbs_curve *curve = curves.data[0];
+		ufbxt_assert(!curve->basis.valid);
+
+		ufbx_error error;
+		ufbx_line_curve *line = ufbx_tessellate_nurbs_curve(curve, NULL, &error);
+		ufbxt_assert(!line);
+		ufbxt_assert(error.type == UFBX_ERROR_BAD_NURBS);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "nurbsPlane1");
+		ufbxt_assert(node);
+		ufbx_nurbs_surface_list surfaces = ufbx_get_node_nurbs_surfaces(node);
+		ufbxt_assert(surfaces.count == 1);
+		ufbx_nurbs_surface *surface = surfaces.data[0];
+		ufbxt_assert(!surface->basis_u.valid);
+		ufbxt_assert(!surface->basis_v.valid);
+
+		ufbx_error error;
+		ufbx_mesh *mesh = ufbx_tessellate_nurbs_surface(surface, NULL, &error);
+		ufbxt_assert(!mesh);
+		ufbxt_assert(error.type == UFBX_ERROR_BAD_NURBS);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_nurbs_truncated)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "curve1");
+		ufbxt_assert(node);
+		ufbx_nurbs_curve_list curves = ufbx_get_node_nurbs_curves(node);
+		ufbxt_assert(curves.count == 1);
+		ufbx_nurbs_curve *curve = curves.data[0];
+		ufbxt_assert(curve->basis.valid);
+
+		ufbx_line_curve *line = ufbx_tessellate_nurbs_curve(curve, NULL, NULL);
+		ufbxt_assert(line);
+		ufbx_free_line_curve(line);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "nurbsPlane1");
+		ufbxt_assert(node);
+		ufbx_nurbs_surface_list surfaces = ufbx_get_node_nurbs_surfaces(node);
+		ufbxt_assert(surfaces.count == 1);
+		ufbx_nurbs_surface *surface = surfaces.data[0];
+		ufbxt_assert(surface->basis_u.valid);
+		ufbxt_assert(surface->basis_v.valid);
+
+		ufbx_error error;
+		ufbx_mesh *mesh = ufbx_tessellate_nurbs_surface(surface, NULL, &error);
+		ufbxt_assert(mesh);
+		ufbx_free_mesh(mesh);
 	}
 }
 #endif

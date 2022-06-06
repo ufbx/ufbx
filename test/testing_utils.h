@@ -1123,7 +1123,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 
 		if (!mesh && node->attrib_type == UFBX_ELEMENT_NURBS_SURFACE) {
 			ufbx_nurbs_surface *surface = (ufbx_nurbs_surface*)node->attrib;
-			ufbx_tessellate_opts opts = { 0 };
+			ufbx_tessellate_surface_opts opts = { 0 };
 			opts.span_subdivision_u = surface->span_subdivision_u;
 			opts.span_subdivision_v = surface->span_subdivision_v;
 			ufbx_mesh *tess_mesh = ufbx_tessellate_nurbs_surface(surface, &opts, NULL);
