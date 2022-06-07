@@ -128,6 +128,7 @@ typedef struct {
 	bool bad_normals;
 	bool bad_order;
 	bool bad_uvs;
+	bool no_subdivision;
 	ufbx_real tolerance;
 	int32_t animation_frame;
 
@@ -604,14 +605,17 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 			if (!strcmp(line, "ufbx:bad_normals")) {
 				obj->bad_normals = true;
 			}
-			if (!strcmp(line, "www.blender.org")) {
-				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
-			}
 			if (!strcmp(line, "ufbx:bad_order")) {
 				obj->bad_order = true;
 			}
 			if (!strcmp(line, "ufbx:bad_uvs")) {
 				obj->bad_uvs = true;
+			}
+			if (!strcmp(line, "ufbx:no_subdivision")) {
+				obj->no_subdivision = true;
+			}
+			if (!strcmp(line, "www.blender.org")) {
+				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
 			}
 			if (!strncmp(line, "ufbx:animation=", 15)) {
 				line += 15;
@@ -1146,7 +1150,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		ufbx_matrix *mat = &node->geometry_to_world;
 		ufbx_matrix norm_mat = ufbx_get_compatible_matrix_for_normals(node);
 
-		if (mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_SMOOTH || mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_HULL_AND_SMOOTH) {
+		if (!obj->no_subdivision && (mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_SMOOTH || mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_HULL_AND_SMOOTH)) {
 			ufbx_subdivide_opts opts = { 0 };
 			opts.evaluate_source_vertices = true;
 			opts.evaluate_skin_weights = true;
