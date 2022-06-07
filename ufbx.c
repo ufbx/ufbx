@@ -6159,14 +6159,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 		}
 
 	} else {
-		if (num_values > UFBXI_MAX_NON_ARRAY_VALUES) {
-			if (uc->opts.retain_dom) {
-				// FIXME
-				// ufbx_assert(0);
-				printf("!!>> %s\n", name);
-			}
-		}
-
 		// Parse up to UFBXI_MAX_NON_ARRAY_VALUES as plain values
 		num_values = ufbxi_min32(num_values, UFBXI_MAX_NON_ARRAY_VALUES);
 		ufbxi_value *vals = ufbxi_push(tmp_buf, ufbxi_value, num_values);
@@ -6254,11 +6246,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 			// Treat arrays as non-values and skip them
 			case 'c': case 'b': case 'i': case 'l': case 'f': case 'd':
 			{
-				if (uc->opts.retain_dom) {
-					// FIXME
-					// ufbx_assert(0);
-					printf("!!>> %s\n", name);
-				}
 				uint32_t encoded_size = ufbxi_read_u32(value + 8);
 				ufbxi_consume_bytes(uc, 13);
 				ufbxi_check(ufbxi_skip_bytes(uc, encoded_size));
@@ -6780,14 +6767,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 
 	// NOTE: Infinite loop to allow skipping the comma parsing via `continue`.
 	for (;;) {
-		if (num_values > UFBXI_MAX_NON_ARRAY_VALUES && !arr_type) {
-			if (uc->opts.retain_dom) {
-				// FIXME
-				// ufbx_assert(0);
-				printf("!!>> %s\n", name);
-			}
-		}
-
 		ufbxi_ascii_token *tok = &ua->prev_token;
 		if (ufbxi_ascii_accept(uc, UFBXI_ASCII_STRING)) {
 
