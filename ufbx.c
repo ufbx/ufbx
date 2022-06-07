@@ -17955,7 +17955,7 @@ static ufbx_real ufbxi_edge_crease(const ufbx_mesh *mesh, bool split, const ufbx
 {
 	if (topo[index].twin < 0) return 1.0f;
 	if (split) return 1.0f;
-	if (mesh->edge_crease.data && topo[index].edge >= 0) return mesh->edge_crease.data[topo[index].edge] * 10.0f;
+	if (mesh->edge_crease.data && topo[index].edge >= 0) return mesh->edge_crease.data[topo[index].edge] * (ufbx_real)10.0;
 	return 0.0f;
 }
 
@@ -18064,7 +18064,7 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 		if (split || twin < 0) {
 			crease = 1.0f;
 		} else if (topo[ix].edge >= 0 && mesh->edge_crease.data) {
-			crease = mesh->edge_crease.data[topo[ix].edge] * 10.0f;
+			crease = mesh->edge_crease.data[topo[ix].edge] * (ufbx_real)10.0;
 		}
 		if (sharp_all) crease = 1.0f;
 
@@ -18297,6 +18297,20 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 
 			}
 
+			if (mesh->vertex_crease.exists) {
+				ufbx_real v = ufbx_get_vertex_real(&mesh->vertex_crease, original_start);
+				v *= (ufbx_real)10.0;
+				if (v > 0.0f) {
+					if (v > 1.0) v = 1.0f;
+
+					ufbx_real iv = 1.0f - v;
+					inputs[0].weight = 1.0f * v + (inputs[0].weight) * iv;
+					for (size_t i = 1; i < num_inputs; i++) {
+						inputs[i].weight *= iv;
+					}
+				}
+			}
+
 #if defined(UFBX_REGRESSION)
 			{
 				ufbx_real total_weight = 0.0f;
@@ -18495,6 +18509,41 @@ static ufbxi_noinline int ufbxi_subdivide_weights(ufbxi_subdivide_context *sc, u
 	return 1;
 }
 
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_vertex_crease(ufbxi_subdivide_context *sc, ufbx_vertex_real *ufbxi_restrict dst, const ufbx_vertex_real *ufbxi_restrict src)
+{
+	size_t src_indices = src->indices.count;
+	size_t src_values = src->values.count;
+
+	dst->values.count = src_values + 1;
+	dst->values.data = ufbxi_push(&sc->result, ufbx_real, dst->values.count);
+	ufbxi_check_err(&sc->error, dst->values.data);
+	dst->values.data[src_values] = 0.0f;
+
+	dst->indices.count = src_indices * 4;
+	dst->indices.data = ufbxi_push(&sc->result, int32_t, dst->indices.count);
+	ufbxi_check_err(&sc->error, dst->indices.data);
+
+	// Reduce the amount of vertex crease on each iteration
+	ufbxi_nounroll for (size_t i = 0; i < src_values; i++) {
+		ufbx_real crease = src->values.data[i];
+		if (crease < 0.999f) crease -= 0.1f;
+		if (crease < 0.0f) crease = 0.0f;
+		dst->values.data[i] = crease;
+	}
+
+	// Write the crease at the vertex corner and zero (at `src_values`) on other ones
+	int32_t zero_index = (int32_t)src_values;
+	ufbxi_nounroll for (size_t i = 0; i < src_indices; i++) {
+		int32_t *quad = dst->indices.data + i * 4;
+		quad[0] = src->indices.data[i];
+		quad[1] = zero_index;
+		quad[2] = zero_index;
+		quad[3] = zero_index;
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdivide_context *sc)
 {
 	const ufbx_mesh *mesh = &sc->src_mesh;
@@ -18546,7 +18595,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 	}
 
 	if (sc->opts.interpolate_normals && !sc->opts.ignore_normals) {
-		ufbxi_check_err(&sc->error, ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&mesh->vertex_normal, sc->opts.boundary, true));
+		ufbxi_check_err(&sc->error, ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&result->vertex_normal, sc->opts.boundary, true));
 		ufbxi_for_list(ufbx_vec3, normal, result->vertex_normal.values) {
 			*normal = ufbxi_slow_normalize3(normal);
 		}
@@ -18560,8 +18609,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 		}
 	}
 
-	// TODO: Vertex crease, we should probably use it?
-	ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&mesh->vertex_crease, sc->opts.boundary, true);
+	if (result->vertex_crease.exists) {
+		ufbxi_check_err(&sc->error, ufbxi_subdivide_vertex_crease(sc, &result->vertex_crease, &mesh->vertex_crease));
+	}
 
 	if (mesh->skinned_position.values.data == mesh->vertex_position.values.data) {
 		result->skinned_position = result->vertex_position;

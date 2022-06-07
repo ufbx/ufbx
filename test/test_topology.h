@@ -278,3 +278,23 @@ UFBXT_FILE_TEST(blender_293_half_smooth_cube)
 }
 #endif
 
+UFBXT_FILE_TEST(maya_vertex_crease_single)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+
+UFBXT_FILE_TEST(maya_vertex_crease)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST(blender_312x_vertex_crease)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+

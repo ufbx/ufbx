@@ -498,9 +498,7 @@ UFBXT_FILE_TEST(synthetic_nurbs_invalid)
 	{
 		ufbx_node *node = ufbx_find_node(scene, "curve1");
 		ufbxt_assert(node);
-		ufbx_nurbs_curve_list curves = ufbx_get_node_nurbs_curves(node);
-		ufbxt_assert(curves.count == 1);
-		ufbx_nurbs_curve *curve = curves.data[0];
+		ufbx_nurbs_curve *curve = ufbx_as_nurbs_curve(node->attrib);
 		ufbxt_assert(!curve->basis.valid);
 
 		ufbx_error error;
@@ -512,9 +510,7 @@ UFBXT_FILE_TEST(synthetic_nurbs_invalid)
 	{
 		ufbx_node *node = ufbx_find_node(scene, "nurbsPlane1");
 		ufbxt_assert(node);
-		ufbx_nurbs_surface_list surfaces = ufbx_get_node_nurbs_surfaces(node);
-		ufbxt_assert(surfaces.count == 1);
-		ufbx_nurbs_surface *surface = surfaces.data[0];
+		ufbx_nurbs_surface *surface = ufbx_as_nurbs_surface(node->attrib);
 		ufbxt_assert(!surface->basis_u.valid);
 		ufbxt_assert(!surface->basis_v.valid);
 
@@ -532,9 +528,7 @@ UFBXT_FILE_TEST(synthetic_nurbs_truncated)
 	{
 		ufbx_node *node = ufbx_find_node(scene, "curve1");
 		ufbxt_assert(node);
-		ufbx_nurbs_curve_list curves = ufbx_get_node_nurbs_curves(node);
-		ufbxt_assert(curves.count == 1);
-		ufbx_nurbs_curve *curve = curves.data[0];
+		ufbx_nurbs_curve *curve = ufbx_as_nurbs_curve(node->attrib);
 		ufbxt_assert(curve->basis.valid);
 
 		ufbx_line_curve *line = ufbx_tessellate_nurbs_curve(curve, NULL, NULL);
@@ -545,9 +539,7 @@ UFBXT_FILE_TEST(synthetic_nurbs_truncated)
 	{
 		ufbx_node *node = ufbx_find_node(scene, "nurbsPlane1");
 		ufbxt_assert(node);
-		ufbx_nurbs_surface_list surfaces = ufbx_get_node_nurbs_surfaces(node);
-		ufbxt_assert(surfaces.count == 1);
-		ufbx_nurbs_surface *surface = surfaces.data[0];
+		ufbx_nurbs_surface *surface = ufbx_as_nurbs_surface(node->attrib);
 		ufbxt_assert(surface->basis_u.valid);
 		ufbxt_assert(surface->basis_v.valid);
 
