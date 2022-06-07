@@ -637,22 +637,41 @@ UFBXT_FILE_TEST(max_edge_visibility)
 		ufbxt_assert(node && node->mesh);
 		ufbx_mesh *mesh = node->mesh;
 		ufbxt_assert(mesh->edge_visibility.count > 0);
-		size_t num_visible = 0;
 
-		// Diagonal edges should be hidden
-		for (size_t i = 0; i < mesh->num_edges; i++) {
-			ufbx_edge edge = mesh->edges.data[i];
-			ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.a);
-			ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.b);
-			ufbx_real len = ufbxt_length3(ufbxt_sub3(a, b));
-			bool expected = len < 21.0f;
-			bool visible = mesh->edge_visibility.data[i];
-			ufbxt_assert(visible == expected);
-			num_visible += visible ? 1u : 0u;
+		{
+			size_t num_visible = 0;
+
+			// Diagonal edges should be hidden
+			for (size_t i = 0; i < mesh->num_edges; i++) {
+				ufbx_edge edge = mesh->edges.data[i];
+				ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.a);
+				ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.b);
+				ufbx_real len = ufbxt_length3(ufbxt_sub3(a, b));
+				bool expected = len < 21.0f;
+				bool visible = mesh->edge_visibility.data[i];
+				ufbxt_assert(visible == expected);
+				num_visible += visible ? 1u : 0u;
+			}
+
+			ufbxt_assert(mesh->num_edges == 18);
+			ufbxt_assert(num_visible == 12);
 		}
 
-		ufbxt_assert(mesh->num_edges == 18);
-		ufbxt_assert(num_visible == 12);
+		ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 2, NULL, NULL);
+		ufbxt_assert(sub_mesh);
+		ufbxt_check_mesh(scene, sub_mesh);
+
+		{
+			size_t num_visible = 0;
+			for (size_t i = 0; i < sub_mesh->num_edges; i++) {
+				if (sub_mesh->edge_visibility.data[i]) {
+					num_visible++;
+				}
+			}
+			ufbxt_assert(num_visible == 12 * 4);
+		}
+
+		ufbx_free_mesh(sub_mesh);
 	}
 
 	{
