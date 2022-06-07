@@ -18646,6 +18646,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 			result->edge_smoothing.data = ufbxi_push(&sc->result, bool, result->num_edges);
 			ufbxi_check_err(&sc->error, result->edge_smoothing.data);
 		}
+		if (mesh->edge_visibility.data) {
+			result->edge_visibility.count = result->num_edges;
+			result->edge_visibility.data = ufbxi_push(&sc->result, bool, result->num_edges);
+			ufbxi_check_err(&sc->error, result->edge_visibility.data);
+		}
 
 		size_t di = 0;
 		for (size_t i = 0; i < mesh->num_edges; i++) {
@@ -18676,6 +18681,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 				result->edge_smoothing.data[di + 1] = mesh->edge_smoothing.data[i];
 			}
 
+			if (mesh->edge_visibility.data) {
+				result->edge_visibility.data[di + 0] = mesh->edge_visibility.data[i];
+				result->edge_visibility.data[di + 1] = mesh->edge_visibility.data[i];
+			}
+
 			di += 2;
 		}
 
@@ -18691,6 +18701,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 				result->edge_smoothing.data[di + 0] = true;
 			}
 
+			if (result->edge_visibility.data) {
+				result->edge_visibility.data[di + 0] = false;
+			}
+
 			di++;
 		}
 	}
@@ -18704,6 +18718,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 		result->face_smoothing.count = result->num_faces;
 		result->face_smoothing.data = ufbxi_push(&sc->result, bool, result->num_faces);
 		ufbxi_check_err(&sc->error, result->face_smoothing.data);
+	}
+	if (mesh->face_group.data) {
+		result->face_group.count = result->num_faces;
+		result->face_group.data = ufbxi_push(&sc->result, int32_t, result->num_faces);
+		ufbxi_check_err(&sc->error, result->face_group.data);
 	}
 
 	size_t num_materials = result->materials.count;
@@ -18732,6 +18751,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 			bool flag = mesh->face_smoothing.data[i];
 			for (size_t ci = 0; ci < face.num_indices; ci++) {
 				result->face_smoothing.data[index_offset + ci] = flag;
+			}
+		}
+		if (mesh->face_group.data) {
+			int32_t group = mesh->face_group.data[i];
+			for (size_t ci = 0; ci < face.num_indices; ci++) {
+				result->face_group.data[index_offset + ci] = group;
 			}
 		}
 		index_offset += face.num_indices;

@@ -167,12 +167,51 @@ UFBXT_FILE_TEST(zbrush_d20)
 		ufbx_mesh *mesh = node->mesh;
 		ufbxt_assert(mesh->num_faces == 24);
 		ufbxt_assert(mesh->face_group.count == 24);
-		for (size_t i = 0; i < 24; i++) {
-			ufbx_face face = mesh->faces.data[i];
-			ufbx_vec3 normal = ufbx_get_weighted_face_normal(&mesh->vertex_position, face);
-			int32_t group = normal.z < 0.0f ? 9598 : 15349;
-			ufbxt_assert(mesh->face_group.data[i] == group);
+
+		{
+			uint32_t num_less = 0;
+			for (size_t i = 0; i < 24; i++) {
+				ufbx_face face = mesh->faces.data[i];
+				ufbx_vec3 normal = ufbx_get_weighted_face_normal(&mesh->vertex_position, face);
+				int32_t group = normal.z < 0.0f ? 9598 : 15349;
+				num_less += normal.z < 0.0f ? 1 : 0;
+				ufbxt_assert(mesh->face_group.data[i] == group);
+			}
+			ufbxt_assert(num_less == mesh->num_faces / 2);
 		}
+
+		ufbxt_assert(mesh->blend_deformers.count > 0);
+		ufbx_blend_deformer *blend = mesh->blend_deformers.data[0];
+
+		// WHAT? The 6100 version has duplicated blend shapes
+		// and 7500 has duplicated blend deformers...
+		if (scene->metadata.version == 6100) {
+			ufbxt_assert(mesh->blend_deformers.count == 1);
+			ufbxt_assert(blend->channels.count == 4);
+		} else {
+			ufbxt_assert(mesh->blend_deformers.count == 2);
+			ufbxt_assert(blend->channels.count == 2);
+		}
+
+		// Check that poly groups work in subdivision
+		ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 2, NULL, NULL);
+		ufbxt_assert(sub_mesh);
+		ufbxt_check_mesh(scene, sub_mesh);
+
+		{
+			uint32_t num_less = 0;
+			ufbxt_assert(sub_mesh->face_group.count == sub_mesh->num_faces);
+			for (size_t i = 0; i < sub_mesh->num_faces; i++) {
+				ufbx_face face = sub_mesh->faces.data[i];
+				ufbx_vec3 normal = ufbx_get_weighted_face_normal(&sub_mesh->vertex_position, face);
+				int32_t group = normal.z < 0.0f ? 9598 : 15349;
+				num_less += normal.z < 0.0f ? 1 : 0;
+				ufbxt_assert(sub_mesh->face_group.data[i] == group);
+			}
+			ufbxt_assert(num_less == sub_mesh->num_faces / 2);
+		}
+
+		ufbx_free_mesh(sub_mesh);
 	}
 }
 #endif
