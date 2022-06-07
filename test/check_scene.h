@@ -358,6 +358,7 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_material, mesh->num_faces, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_smoothing, mesh->num_faces, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_group, mesh->num_faces, true);
+	ufbxt_check_mesh_list(scene, mesh, mesh->face_hole, mesh->num_faces, true);
 
 	uint32_t prev_end = 0;
 	ufbxt_assert(mesh->faces.count == mesh->num_faces);

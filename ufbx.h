@@ -901,6 +901,7 @@ struct ufbx_mesh {
 	ufbx_bool_list face_smoothing; // < Should the face have soft normals
 	ufbx_int32_list face_material; // < Indices to `ufbx_mesh.materials`
 	ufbx_int32_list face_group;    // < Face polygon group index
+	ufbx_bool_list face_hole;      // < Should the face be hidden as a "hole"
 	size_t max_face_triangles;     // < Maximum number of triangles per face in this mesh
 	size_t num_bad_faces;          // < Number of faces with less than 3 vertices
 

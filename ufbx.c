@@ -3153,6 +3153,7 @@ static const char ufbxi_GeometricTranslation[] = "GeometricTranslation";
 static const char ufbxi_GeometryUVInfo[] = "GeometryUVInfo";
 static const char ufbxi_Geometry[] = "Geometry";
 static const char ufbxi_GlobalSettings[] = "GlobalSettings";
+static const char ufbxi_Hole[] = "Hole";
 static const char ufbxi_HotSpot[] = "HotSpot";
 static const char ufbxi_IKEffector[] = "IKEffector";
 static const char ufbxi_Implementation[] = "Implementation";
@@ -3174,6 +3175,7 @@ static const char ufbxi_KnotVector[] = "KnotVector";
 static const char ufbxi_LayerElementBinormal[] = "LayerElementBinormal";
 static const char ufbxi_LayerElementColor[] = "LayerElementColor";
 static const char ufbxi_LayerElementEdgeCrease[] = "LayerElementEdgeCrease";
+static const char ufbxi_LayerElementHole[] = "LayerElementHole";
 static const char ufbxi_LayerElementMaterial[] = "LayerElementMaterial";
 static const char ufbxi_LayerElementNormal[] = "LayerElementNormal";
 static const char ufbxi_LayerElementPolygonGroup[] = "LayerElementPolygonGroup";
@@ -3436,6 +3438,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Geometry, 8 },
 	{ ufbxi_GeometryUVInfo, 14 },
 	{ ufbxi_GlobalSettings, 14 },
+	{ ufbxi_Hole, 4 },
 	{ ufbxi_HotSpot, 7 },
 	{ ufbxi_IKEffector, 10 },
 	{ ufbxi_Implementation, 14 },
@@ -3459,6 +3462,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_LayerElementBinormal, 20 },
 	{ ufbxi_LayerElementColor, 17 },
 	{ ufbxi_LayerElementEdgeCrease, 22 },
+	{ ufbxi_LayerElementHole, 16 },
 	{ ufbxi_LayerElementMaterial, 20 },
 	{ ufbxi_LayerElementNormal, 18 },
 	{ ufbxi_LayerElementPolygonGroup, 24 },
@@ -5006,6 +5010,7 @@ typedef enum {
 	UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING,
 	UFBXI_PARSE_LAYER_ELEMENT_VISIBILITY,
 	UFBXI_PARSE_LAYER_ELEMENT_POLYGON_GROUP,
+	UFBXI_PARSE_LAYER_ELEMENT_HOLE,
 	UFBXI_PARSE_LAYER_ELEMENT_MATERIAL,
 	UFBXI_PARSE_LAYER_ELEMENT_OTHER,
 	UFBXI_PARSE_GEOMETRY_UV_INFO,
@@ -5075,6 +5080,7 @@ static ufbxi_noinline ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_sta
 			if (name == ufbxi_LayerElementSmoothing) return UFBXI_PARSE_LAYER_ELEMENT_SMOOTHING;
 			if (name == ufbxi_LayerElementVisibility) return UFBXI_PARSE_LAYER_ELEMENT_VISIBILITY;
 			if (name == ufbxi_LayerElementPolygonGroup) return UFBXI_PARSE_LAYER_ELEMENT_POLYGON_GROUP;
+			if (name == ufbxi_LayerElementHole) return UFBXI_PARSE_LAYER_ELEMENT_HOLE;
 			if (name == ufbxi_LayerElementMaterial) return UFBXI_PARSE_LAYER_ELEMENT_MATERIAL;
 			if (!strncmp(name, "LayerElement", 12)) return UFBXI_PARSE_LAYER_ELEMENT_OTHER;
 		}
@@ -5369,6 +5375,14 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_POLYGON_GROUP:
 		if (name == ufbxi_PolygonGroup) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_LAYER_ELEMENT_HOLE:
+		if (name == ufbxi_Hole) {
+			info->type = uc->opts.ignore_geometry ? '-' : 'b';
 			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		}
@@ -8829,6 +8843,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
 			if (mapping == ufbxi_ByPolygon) {
 				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->face_group.data, &mesh->face_group.count, n, ufbxi_PolygonGroup, 'i', mesh->num_faces));
+			}
+		} else if (n->name == ufbxi_LayerElementHole) {
+			if (mesh->face_group.count) continue;
+			const char *mapping;
+			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
+			if (mapping == ufbxi_ByPolygon) {
+				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->face_hole.data, &mesh->face_hole.count, n, ufbxi_Hole, 'b', mesh->num_faces));
 			}
 		} else if (!strncmp(n->name, "LayerElement", 12)) {
 
@@ -18724,6 +18745,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 		result->face_group.data = ufbxi_push(&sc->result, int32_t, result->num_faces);
 		ufbxi_check_err(&sc->error, result->face_group.data);
 	}
+	if (mesh->face_hole.data) {
+		result->face_hole.count = result->num_faces;
+		result->face_hole.data = ufbxi_push(&sc->result, bool, result->num_faces);
+		ufbxi_check_err(&sc->error, result->face_hole.data);
+	}
 
 	size_t num_materials = result->materials.count;
 	result->materials.data = ufbxi_push_copy(&sc->result, ufbx_mesh_material, num_materials, result->materials.data);
@@ -18757,6 +18783,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 			int32_t group = mesh->face_group.data[i];
 			for (size_t ci = 0; ci < face.num_indices; ci++) {
 				result->face_group.data[index_offset + ci] = group;
+			}
+		}
+		if (mesh->face_hole.data) {
+			bool flag = mesh->face_hole.data[i];
+			for (size_t ci = 0; ci < face.num_indices; ci++) {
+				result->face_hole.data[index_offset + ci] = flag;
 			}
 		}
 		index_offset += face.num_indices;
