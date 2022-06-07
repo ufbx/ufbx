@@ -861,3 +861,23 @@ UFBXT_FILE_TEST(maya_polygon_hole)
 	ufbx_free_mesh(sub_mesh);
 }
 #endif
+
+UFBXT_FILE_TEST_OPTS(synthetic_cursed_geometry, ufbxt_generate_normals_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pDisc1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	uint32_t indices[64];
+
+	for (size_t i = 0; i < mesh->num_faces; i++) {
+		ufbx_face face = mesh->faces.data[i];
+		size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, face);
+		ufbxt_assert(num_tris == 0 || num_tris == face.num_indices - 2);
+	}
+
+	ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 2, NULL, NULL);
+	ufbx_free_mesh(sub_mesh);
+}
+#endif
