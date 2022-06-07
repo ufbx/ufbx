@@ -5228,13 +5228,19 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 		}
 		break;
 
+	case UFBXI_PARSE_TEXTURE:
+		if (!strcmp(name, "ModelUVTranslation") || !strcmp(name, "ModelUVScaling") || !strcmp(name, "Cropping")) {
+			info->type = uc->opts.retain_dom ? 'r' : '-';
+			return true;
+		}
+		break;
+
 	case UFBXI_PARSE_VIDEO:
 		if (name == ufbxi_Content) {
 			info->type = uc->opts.ignore_embedded ? '-' : 'C';
 			return true;
 		}
 		break;
-
 
 	case UFBXI_PARSE_LAYERED_TEXTURE:
 		if (name == ufbxi_BlendModes) {
