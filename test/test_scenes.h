@@ -169,15 +169,15 @@ UFBXT_FILE_TEST(zbrush_d20)
 		ufbxt_assert(mesh->face_group.count == 24);
 
 		{
-			uint32_t num_less = 0;
+			uint32_t num_front = 0;
 			for (size_t i = 0; i < 24; i++) {
 				ufbx_face face = mesh->faces.data[i];
 				ufbx_vec3 normal = ufbx_get_weighted_face_normal(&mesh->vertex_position, face);
 				int32_t group = normal.z < 0.0f ? 9598 : 15349;
-				num_less += normal.z < 0.0f ? 1 : 0;
+				num_front += normal.z < 0.0f ? 1 : 0;
 				ufbxt_assert(mesh->face_group.data[i] == group);
 			}
-			ufbxt_assert(num_less == mesh->num_faces / 2);
+			ufbxt_assert(num_front == mesh->num_faces / 2);
 		}
 
 		ufbxt_assert(mesh->blend_deformers.count > 0);
@@ -199,16 +199,16 @@ UFBXT_FILE_TEST(zbrush_d20)
 		ufbxt_check_mesh(scene, sub_mesh);
 
 		{
-			uint32_t num_less = 0;
+			uint32_t num_front = 0;
 			ufbxt_assert(sub_mesh->face_group.count == sub_mesh->num_faces);
 			for (size_t i = 0; i < sub_mesh->num_faces; i++) {
 				ufbx_face face = sub_mesh->faces.data[i];
 				ufbx_vec3 normal = ufbx_get_weighted_face_normal(&sub_mesh->vertex_position, face);
 				int32_t group = normal.z < 0.0f ? 9598 : 15349;
-				num_less += normal.z < 0.0f ? 1 : 0;
+				num_front += normal.z < 0.0f ? 1 : 0;
 				ufbxt_assert(sub_mesh->face_group.data[i] == group);
 			}
-			ufbxt_assert(num_less == sub_mesh->num_faces / 2);
+			ufbxt_assert(num_front == sub_mesh->num_faces / 2);
 		}
 
 		ufbx_free_mesh(sub_mesh);
@@ -219,6 +219,32 @@ UFBXT_FILE_TEST(zbrush_d20)
 UFBXT_FILE_TEST(zbrush_d20_selection_set)
 #if UFBXT_IMPL
 {
-	ufbxt_assert(0 && "TODO");
+	{
+		ufbx_node *node = ufbx_find_node(scene, "PolyMesh3D1");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+
+		for (size_t i = 0; i < 2; i++)
+		{
+			bool front = i == 0;
+			const char *name = front ? "PolyMesh3D1_9598" : "PolyMesh3D1_15349";
+			ufbx_selection_set *set = (ufbx_selection_set*)ufbx_find_element(scene, UFBX_ELEMENT_SELECTION_SET, name);
+			ufbxt_assert(set);
+			ufbxt_assert(set->nodes.count == 1);
+			ufbx_selection_node *sel_node = set->nodes.data[0];
+
+			ufbxt_assert(sel_node->target_node == node);
+			ufbxt_assert(sel_node->target_mesh == mesh);
+			ufbxt_assert(sel_node->faces.count == 12);
+
+			for (size_t i = 0; i < sel_node->faces.count; i++) {
+				int32_t index = sel_node->faces.data[i];
+				ufbxt_assert(index < mesh->faces.count);
+				ufbx_face face = mesh->faces.data[index];
+				ufbx_vec3 normal = ufbx_get_weighted_face_normal(&mesh->vertex_position, face);
+				ufbxt_assert((normal.z < 0.0f) == front);
+			}
+		}
+	}
 }
 #endif
