@@ -9873,6 +9873,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_c
 		if (!ufbxi_find_child(node, ufbxi_PointsIndex)) return 1;
 		ufbxi_check(ufbxi_read_line(uc, node, &attrib_info));
 	} else if (sub_type == ufbxi_TrimNurbsSurface) {
+		if (!ufbxi_find_child(node, ufbxi_Layer)) return 1;
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_nurbs_trim_surface), UFBX_ELEMENT_NURBS_TRIM_SURFACE));
 	} else if (sub_type == ufbxi_Boundary) {
 		ufbxi_check(ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_nurbs_trim_boundary), UFBX_ELEMENT_NURBS_TRIM_BOUNDARY));
