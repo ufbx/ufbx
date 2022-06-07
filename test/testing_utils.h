@@ -128,11 +128,13 @@ typedef struct {
 	bool bad_normals;
 	bool bad_order;
 	bool bad_uvs;
+	bool bad_faces;
 	bool no_subdivision;
 	ufbx_real tolerance;
 	int32_t animation_frame;
 
 	bool normalize_units;
+	bool ignore_duplicates;
 
 	ufbxt_obj_exporter exporter;
 
@@ -611,8 +613,14 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 			if (!strcmp(line, "ufbx:bad_uvs")) {
 				obj->bad_uvs = true;
 			}
+			if (!strcmp(line, "ufbx:bad_faces")) {
+				obj->bad_faces = true;
+			}
 			if (!strcmp(line, "ufbx:no_subdivision")) {
 				obj->no_subdivision = true;
+			}
+			if (!strcmp(line, "ufbx:ignore_duplicates")) {
+				obj->ignore_duplicates = true;
 			}
 			if (!strcmp(line, "www.blender.org")) {
 				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
@@ -1014,6 +1022,20 @@ static size_t ufbxt_obj_group_key(char *cat_buf, size_t cat_cap, const char **gr
 	return cat_ptr - cat_buf;
 }
 
+static bool ufbxt_face_has_duplicate_vertex(ufbx_mesh *mesh, ufbx_face face)
+{
+	for (size_t i = 0; i < face.num_indices; i++) {
+		uint32_t ix = mesh->vertex_indices.data[face.index_begin + i];
+		for (size_t j = 0; j < i; j++) {
+			uint32_t jx = mesh->vertex_indices.data[face.index_begin + j];
+			if (ix == jx) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, bool check_deformed_normals)
 {
 	ufbx_node **used_nodes = (ufbx_node**)malloc(obj->num_meshes * sizeof(ufbx_node*));
@@ -1120,6 +1142,33 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			}
 		}
 
+		if (obj->ignore_duplicates) {
+			if (!node) {
+				bool is_ncl = false;
+				for (size_t i = 0; i < obj_mesh->num_groups; i++) {
+					if (strstr(obj_mesh->groups[i], "_ncl1_")) {
+						is_ncl = true;
+						break;
+					}
+				}
+				if (is_ncl) continue;
+			}
+
+			if (node && node->parent) {
+				bool duplicate_name = false;
+				ufbx_node *parent = node->parent;
+				for (size_t i = 0; i < parent->children.count; i++) {
+					ufbx_node *child = parent->children.data[i];
+					if (child == node) continue;
+					if (!strcmp(child->name.data, node->name.data)) {
+						duplicate_name = true;
+						break;
+					}
+				}
+				if (duplicate_name) continue;
+			}
+		}
+
 		ufbxt_assert(node);
 		ufbx_mesh *mesh = node->mesh;
 
@@ -1167,8 +1216,10 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 			continue;
 		}
 
-		ufbxt_assert(obj_mesh->num_faces == mesh->num_faces);
-		ufbxt_assert(obj_mesh->num_indices == mesh->num_indices);
+		if (!obj->bad_faces) {
+			ufbxt_assert(obj_mesh->num_faces == mesh->num_faces);
+			ufbxt_assert(obj_mesh->num_indices == mesh->num_indices);
+		}
 
 		bool check_normals = true;
 		if (obj->bad_normals) check_normals = false;
@@ -1177,18 +1228,32 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 		if (obj->bad_order) {
 			ufbxt_match_obj_mesh(obj, node, mesh, obj_mesh, p_err);
 		} else {
+			size_t obj_face_ix = 0;
+
 			// Assume that the indices are in the same order!
 			for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
-				ufbx_face obj_face = obj_mesh->faces[face_ix];
+				ufbx_face obj_face = obj_mesh->faces[obj_face_ix];
 				ufbx_face face = mesh->faces.data[face_ix];
-				ufbxt_assert(obj_face.index_begin == face.index_begin);
-				ufbxt_assert(obj_face.num_indices == face.num_indices);
 
-				for (size_t ix = face.index_begin; ix < face.index_begin + face.num_indices; ix++) {
-					ufbx_vec3 op = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, ix);
-					ufbx_vec3 fp = ufbx_get_vertex_vec3(&mesh->skinned_position, ix);
-					ufbx_vec3 on = ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, ix);
-					ufbx_vec3 fn = ufbx_get_vertex_vec3(&mesh->skinned_normal, ix);
+				if (obj->bad_faces) {
+					if (ufbxt_face_has_duplicate_vertex(mesh, face)) {
+						continue;
+					}
+				} else {
+					ufbxt_assert(obj_face.index_begin == face.index_begin);
+				}
+
+				ufbxt_assert(obj_face.num_indices == face.num_indices);
+				obj_face_ix++;
+
+				for (size_t i = 0; i < face.num_indices; i++) {
+					size_t oix = obj_face.index_begin + i;
+					size_t fix = face.index_begin + i;
+
+					ufbx_vec3 op = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, oix);
+					ufbx_vec3 fp = ufbx_get_vertex_vec3(&mesh->skinned_position, fix);
+					ufbx_vec3 on = ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, oix);
+					ufbx_vec3 fn = ufbx_get_vertex_vec3(&mesh->skinned_normal, fix);
 
 					if (mesh->skinned_is_local) {
 						fp = ufbx_transform_position(mat, fp);
@@ -1233,8 +1298,8 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 
 					if (obj_mesh->vertex_uv.exists && !obj->bad_uvs) {
 						ufbxt_assert(mesh->vertex_uv.exists);
-						ufbx_vec2 ou = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, ix);
-						ufbx_vec2 fu = ufbx_get_vertex_vec2(&mesh->vertex_uv, ix);
+						ufbx_vec2 ou = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, oix);
+						ufbx_vec2 fu = ufbx_get_vertex_vec2(&mesh->vertex_uv, fix);
 						ufbxt_assert_close_vec2(p_err, ou, fu);
 					}
 				}
