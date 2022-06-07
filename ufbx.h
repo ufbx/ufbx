@@ -3645,24 +3645,6 @@ ufbx_abi ufbx_constraint *ufbx_as_constraint(const ufbx_element *element);
 ufbx_abi ufbx_pose *ufbx_as_pose(const ufbx_element *element);
 ufbx_abi ufbx_metadata_object *ufbx_as_metadata_object(const ufbx_element *element);
 
-ufbx_abi ufbx_element_list ufbx_get_node_attribs(const ufbx_node *node, ufbx_element_type type);
-
-ufbx_abi ufbx_mesh_list ufbx_get_node_meshes(const ufbx_node *node);
-ufbx_abi ufbx_light_list ufbx_get_node_lights(const ufbx_node *node);
-ufbx_abi ufbx_camera_list ufbx_get_node_cameras(const ufbx_node *node);
-ufbx_abi ufbx_bone_list ufbx_get_node_bones(const ufbx_node *node);
-ufbx_abi ufbx_empty_list ufbx_get_node_empties(const ufbx_node *node);
-ufbx_abi ufbx_line_curve_list ufbx_get_node_line_curves(const ufbx_node *node);
-ufbx_abi ufbx_nurbs_curve_list ufbx_get_node_nurbs_curves(const ufbx_node *node);
-ufbx_abi ufbx_nurbs_surface_list ufbx_get_node_nurbs_surfaces(const ufbx_node *node);
-ufbx_abi ufbx_nurbs_trim_surface_list ufbx_get_node_nurbs_trim_surfaces(const ufbx_node *node);
-ufbx_abi ufbx_nurbs_trim_boundary_list ufbx_get_node_nurbs_trim_boundaries(const ufbx_node *node);
-ufbx_abi ufbx_procedural_geometry_list ufbx_get_node_procedural_geometries(const ufbx_node *node);
-ufbx_abi ufbx_stereo_camera_list ufbx_get_node_stereo_cameras(const ufbx_node *node);
-ufbx_abi ufbx_camera_switcher_list ufbx_get_node_camera_switchers(const ufbx_node *node);
-ufbx_abi ufbx_marker_list ufbx_get_node_markers(const ufbx_node *node);
-ufbx_abi ufbx_lod_group_list ufbx_get_node_lod_groups(const ufbx_node *node);
-
 // -- FFI API
 
 ufbx_abi void ufbx_ffi_find_int_len(int64_t *retval, const ufbx_props *props, const char *name, size_t name_len, const int64_t *def);

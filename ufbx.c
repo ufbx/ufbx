@@ -11845,20 +11845,6 @@ static ufbxi_forceinline bool ufbxi_is_transform_identity(ufbx_transform t)
 	return (bool)((int)ufbxi_is_vec3_zero(t.translation) & (int)ufbxi_is_quat_identity(t.rotation) & (int)ufbxi_is_vec3_one(t.scale));
 }
 
-ufbxi_noinline static bool ufbxi_element_type_less(void *user, const void *va, const void *vb)
-{
-	(void)user;
-	ufbx_element *a = *(ufbx_element*const*)va, *b = *(ufbx_element*const*)vb;
-	return a->type < b->type;
-}
-
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_elements_by_type(ufbxi_context *uc, ufbx_element **elements, size_t count)
-{
-	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_element)));
-	ufbxi_stable_sort(sizeof(ufbx_element*), 32, elements, uc->tmp_arr, count, &ufbxi_element_type_less, NULL);
-	return 1;
-}
-
 // Material tables
 
 typedef void (*ufbxi_mat_transform_fn)(ufbx_vec3 *a);
@@ -12529,7 +12515,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		if (node->all_attribs.count > 1) {
 			node->all_attribs.data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_element*, node->all_attribs.count);
 			ufbxi_check(node->all_attribs.data);
-			ufbxi_check(ufbxi_sort_elements_by_type(uc, node->all_attribs.data, node->all_attribs.count));
 		} else if (node->all_attribs.count == 1) {
 			node->all_attribs.data = &node->attrib;
 		}
@@ -21693,43 +21678,6 @@ ufbx_abi ufbx_element *ufbx_get_attrib(const ufbx_node *node, ufbx_element_type 
 	}
 	return NULL;
 }
-
-ufbx_abi ufbx_element_list ufbx_get_node_attribs(const ufbx_node *node, ufbx_element_type type)
-{
-	ufbx_element_list result;
-	if (!node) {
-		result.data = NULL;
-		result.count = 0;
-		return result;
-	}
-
-	size_t begin = node->all_attribs.count, end = begin;
-	ufbxi_macro_lower_bound_eq(ufbx_element*, 16, &begin, node->all_attribs.data, 0, node->all_attribs.count,
-		( (*a)->type < type ), ( (*a)->type == type ));
-
-	ufbxi_macro_upper_bound_eq(ufbx_element*, 16, &end, node->all_attribs.data, begin, node->all_attribs.count,
-		( (*a)->type == type ));
-
-	result.data = node->all_attribs.data + begin;
-	result.count = end - begin;
-	return result;
-}
-
-ufbx_abi ufbx_mesh_list ufbx_get_node_meshes(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_MESH); ufbx_mesh_list res = { (ufbx_mesh**)l.data, l.count }; return res; }
-ufbx_abi ufbx_light_list ufbx_get_node_lights(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_LIGHT); ufbx_light_list res = { (ufbx_light**)l.data, l.count }; return res; }
-ufbx_abi ufbx_camera_list ufbx_get_node_cameras(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_CAMERA); ufbx_camera_list res = { (ufbx_camera**)l.data, l.count }; return res; }
-ufbx_abi ufbx_bone_list ufbx_get_node_bones(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_BONE); ufbx_bone_list res = { (ufbx_bone**)l.data, l.count }; return res; }
-ufbx_abi ufbx_empty_list ufbx_get_node_empties(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_EMPTY); ufbx_empty_list res = { (ufbx_empty**)l.data, l.count }; return res; }
-ufbx_abi ufbx_line_curve_list ufbx_get_node_line_curves(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_LINE_CURVE); ufbx_line_curve_list res = { (ufbx_line_curve**)l.data, l.count }; return res; }
-ufbx_abi ufbx_nurbs_curve_list ufbx_get_node_nurbs_curves(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_NURBS_CURVE); ufbx_nurbs_curve_list res = { (ufbx_nurbs_curve**)l.data, l.count }; return res; }
-ufbx_abi ufbx_nurbs_surface_list ufbx_get_node_nurbs_surfaces(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_NURBS_SURFACE); ufbx_nurbs_surface_list res = { (ufbx_nurbs_surface**)l.data, l.count }; return res; }
-ufbx_abi ufbx_nurbs_trim_surface_list ufbx_get_node_nurbs_trim_surfaces(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_NURBS_TRIM_SURFACE); ufbx_nurbs_trim_surface_list res = { (ufbx_nurbs_trim_surface**)l.data, l.count }; return res; }
-ufbx_abi ufbx_nurbs_trim_boundary_list ufbx_get_node_nurbs_trim_boundaries(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_NURBS_TRIM_BOUNDARY); ufbx_nurbs_trim_boundary_list res = { (ufbx_nurbs_trim_boundary**)l.data, l.count }; return res; }
-ufbx_abi ufbx_procedural_geometry_list ufbx_get_node_procedural_geometries(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_PROCEDURAL_GEOMETRY); ufbx_procedural_geometry_list res = { (ufbx_procedural_geometry**)l.data, l.count }; return res; }
-ufbx_abi ufbx_stereo_camera_list ufbx_get_node_stereo_cameras(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_STEREO_CAMERA); ufbx_stereo_camera_list res = { (ufbx_stereo_camera**)l.data, l.count }; return res; }
-ufbx_abi ufbx_camera_switcher_list ufbx_get_node_camera_switchers(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_CAMERA); ufbx_camera_switcher_list res = { (ufbx_camera_switcher**)l.data, l.count }; return res; }
-ufbx_abi ufbx_marker_list ufbx_get_node_markers(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_MARKER); ufbx_marker_list res = { (ufbx_marker**)l.data, l.count }; return res; }
-ufbx_abi ufbx_lod_group_list ufbx_get_node_lod_groups(const ufbx_node *node) { ufbx_element_list l = ufbx_get_node_attribs(node, UFBX_ELEMENT_LOD_GROUP); ufbx_lod_group_list res = { (ufbx_lod_group**)l.data, l.count }; return res; }
 
 ufbx_abi void ufbx_ffi_find_int_len(int64_t *retval, const ufbx_props *props, const char *name, size_t name_len, const int64_t *def)
 {
