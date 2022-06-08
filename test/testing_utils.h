@@ -1314,6 +1314,20 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 
 // -- IO
 
+static size_t ufbxt_file_size(const char *name)
+{
+	FILE *file = fopen(name, "rb");
+	if (!file) return 0;
+	fseek(file, 0, SEEK_END);
+#if defined(_WIN32)
+	size_t size = (size_t)_ftelli64(file);
+#else
+	size_t size = (size_t)ftell(file);
+#endif
+	fclose(file);
+	return size;
+}
+
 static void *ufbxt_read_file(const char *name, size_t *p_size)
 {
 	FILE *file = fopen(name, "rb");

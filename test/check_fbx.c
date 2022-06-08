@@ -54,7 +54,7 @@ int main(int argc, char **argv)
 	const char *path = NULL;
 	const char *obj_path = NULL;
 	const char *dump_obj_path = NULL;
-	int profile_runs = 1;
+	int profile_runs = 0;
 	int frame = INT_MIN;
 	bool allow_bad_unicode = false;
 	bool sink = false;
@@ -101,13 +101,35 @@ int main(int argc, char **argv)
 	}
 
 	ufbx_error error;
-	ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+	ufbx_scene *scene;
+
+	uint64_t load_delta = 0;
+	{
+		uint64_t load_begin = cputime_cpu_tick();
+		scene = ufbx_load_file(path, &opts, &error);
+		uint64_t load_end = cputime_cpu_tick();
+		load_delta = load_end - load_begin;
+	}
 
 	if (!scene) {
 		char buf[1024];
 		ufbx_format_error(buf, sizeof(buf), &error);
 		fprintf(stderr, "%s\n", buf);
 		return 1;
+	}
+
+	cputime_end_init();
+
+	{
+		size_t fbx_size = ufbxt_file_size(path);
+		printf("Loaded in %.2fms: File %.1fkB, temp %.1fkB (%zu allocs), result %.1fkB (%zu allocs)\n",
+			cputime_cpu_delta_to_sec(NULL, load_delta) * 1e3,
+			(double)fbx_size * 1e-3,
+			(double)scene->metadata.temp_memory_used * 1e-3,
+			scene->metadata.temp_allocs,
+			(double)scene->metadata.result_memory_used * 1e-3,
+			scene->metadata.result_allocs
+		);
 	}
 
 	const char *exporters[] = {
@@ -140,7 +162,6 @@ int main(int argc, char **argv)
 		size_t fbx_size = 0;
 		void *fbx_data = ufbxt_read_file(path, &fbx_size);
 		if (fbx_data) {
-			cputime_end_init();
 
 			for (int i = 0; i < profile_runs; i++) {
 				uint64_t load_begin = cputime_cpu_tick();
