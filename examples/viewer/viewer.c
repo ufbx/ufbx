@@ -879,7 +879,9 @@ const char *g_filename;
 void init(void)
 {
     sg_setup(&(sg_desc){
-		.context = sapp_sgcontext()
+		.context = sapp_sgcontext(),
+		.buffer_pool_size = 4096,
+		.image_pool_size = 4096,
     });
 
 	stm_setup();
