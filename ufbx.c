@@ -18168,6 +18168,7 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 				on_boundary = true;
 			}
 
+			ufbxi_check_err(&sc->error, vertex_indices[start] < 0);
 			vertex_indices[start] = value_index;
 
 			if (start_split) {
@@ -18190,6 +18191,7 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 					}
 
 					non_manifold |= (topo[cur].flags & UFBX_TOPO_NON_MANIFOLD) != 0;
+					ufbxi_check_err(&sc->error, vertex_indices[cur] < 0);
 					vertex_indices[cur] = value_index;
 
 					bool split = ufbxi_is_edge_split(input, topo, cur);
@@ -18319,6 +18321,7 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 		}
 	}
 
+	ufbx_assert(num_vertex_values <= mesh->num_indices);
 	size_t num_values = num_edge_values + mesh->num_faces + num_vertex_values;
 	char *new_values = (char*)ufbxi_push_size(&sc->result, stride, (num_values+1));
 	ufbxi_check_err(&sc->error, new_values);
