@@ -815,9 +815,50 @@ static void ufbxt_check_metadata(ufbx_scene *scene, ufbx_metadata *metadata)
 
 static void ufbxt_check_dom_value(ufbx_scene *scene, ufbx_dom_value *value)
 {
-	ufbxt_assert((uint32_t)value->type < UFBX_DOM_VALUE_TYPE_COUNT);
 	ufbxt_check_string(value->value_str);
 	ufbxt_check_blob(value->value_blob);
+	size_t array_stride = 0;
+	switch (value->type) {
+	case UFBX_DOM_VALUE_NUMBER:
+		break;
+	case UFBX_DOM_VALUE_STRING:
+		break;
+	case UFBX_DOM_VALUE_ARRAY_I8:
+		array_stride = 1;
+		break;
+	case UFBX_DOM_VALUE_ARRAY_I32:
+		array_stride = 4;
+		break;
+	case UFBX_DOM_VALUE_ARRAY_I64:
+		array_stride = 8;
+		break;
+	case UFBX_DOM_VALUE_ARRAY_F32:
+		array_stride = 4;
+		break;
+	case UFBX_DOM_VALUE_ARRAY_F64:
+		array_stride = 8;
+		break;
+	case UFBX_DOM_VALUE_ARRAY_RAW_STRING:
+		array_stride = sizeof(ufbx_blob);
+		break;
+	case UFBX_DOM_VALUE_ARRAY_IGNORED:
+		array_stride = 0;
+		break;
+	default:
+		ufbxt_assert(0 && "Unhandled type");
+		break;
+	}
+
+	if (array_stride) {
+		ufbxt_assert(value->value_blob.size == (size_t)value->value_int * array_stride);
+	}
+
+	if (value->type == UFBX_DOM_VALUE_ARRAY_RAW_STRING) {
+		const ufbx_blob *blobs = (const ufbx_blob*)value->value_blob.data;
+		for (size_t i = 0; i < value->value_int; i++) {
+			ufbxt_check_blob(blobs[i]);
+		}
+	}
 }
 
 static void ufbxt_check_dom_node(ufbx_scene *scene, ufbx_dom_node *node)
