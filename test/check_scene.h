@@ -855,7 +855,7 @@ static void ufbxt_check_dom_value(ufbx_scene *scene, ufbx_dom_value *value)
 
 	if (value->type == UFBX_DOM_VALUE_ARRAY_RAW_STRING) {
 		const ufbx_blob *blobs = (const ufbx_blob*)value->value_blob.data;
-		for (size_t i = 0; i < value->value_int; i++) {
+		for (size_t i = 0; i < (size_t)value->value_int; i++) {
 			ufbxt_check_blob(blobs[i]);
 		}
 	}

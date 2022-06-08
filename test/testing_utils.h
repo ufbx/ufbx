@@ -376,7 +376,7 @@ static bool ufbxt_parse_reals(ufbx_real *p_result, size_t count, const char *str
 	return true;
 }
 
-static const char *ufbxt_find_newline(const char *src)
+static char *ufbxt_find_newline(char *src)
 {
 	for (;;) {
 		char c = *src;
