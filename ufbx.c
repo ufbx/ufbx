@@ -5821,7 +5821,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 			d->data = ufbxi_read_bytes(uc, len);
 			d->length = len;
 			if (dst_type == 'C') {
-				ufbxi_buf *buf = size == 1 ? &uc->result : tmp_buf;
+				ufbxi_buf *buf = size == 1 || uc->opts.retain_dom ? &uc->result : tmp_buf;
 				d->data = ufbxi_push_copy(buf, char, len, d->data);
 				ufbxi_check(d->data);
 			} else {
@@ -6779,7 +6779,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 					v->data = tok->str_data;
 					v->length = tok->str_len;
 					if (arr_type == 'C') {
-						v->data = ufbxi_push_copy(tmp_buf, char, v->length, v->data);
+						ufbxi_buf *buf = uc->opts.retain_dom ? &uc->result : tmp_buf;
+						v->data = ufbxi_push_copy(buf, char, v->length, v->data);
 						ufbxi_check(v->data);
 					} else {
 						ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, v, raw));
