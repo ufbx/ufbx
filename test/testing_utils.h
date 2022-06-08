@@ -376,6 +376,21 @@ static bool ufbxt_parse_reals(ufbx_real *p_result, size_t count, const char *str
 	return true;
 }
 
+static const char *ufbxt_find_newline(const char *src)
+{
+	for (;;) {
+		char c = *src;
+		if (c == '\0') return NULL;
+		if (c == '\r' || c == '\n') return src;
+		src++;
+	}
+}
+
+static bool ufbxt_is_space(char c)
+{
+	return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
+
 static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufbxt_load_obj_opts *opts)
 {
 	ufbxt_load_obj_opts zero_opts;
@@ -397,7 +412,7 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 
 	char *line = (char*)obj_data;
 	for (;;) {
-		char *end = strpbrk(line, "\r\n");
+		char *end = ufbxt_find_newline(line);
 		char prev = '\0';
 		if (end) {
 			prev = *end;
@@ -490,7 +505,7 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 
 	line = (char*)obj_data;
 	for (;;) {
-		char *line_end = strpbrk(line, "\r\n");
+		char *line_end = ufbxt_find_newline(line);
 		char prev = '\0';
 		if (line_end) {
 			prev = *line_end;
@@ -520,7 +535,10 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 				char *end = strchr(begin, ' ');
 				if (end) *end++ = '\0';
 
-				if (begin[strspn(begin, " \t\r\n")] == '\0') {
+				while (ufbxt_is_space(*begin)) {
+					begin++;
+				}
+				if (*begin == '\0') {
 					begin = end;
 					continue;
 				}
