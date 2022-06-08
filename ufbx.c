@@ -5245,11 +5245,11 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYERED_TEXTURE:
 		if (name == ufbxi_BlendModes) {
 			info->type = 'i';
-			info->flags = UFBXI_ARRAY_FLAG_TMP_BUF;
+			info->flags |= UFBXI_ARRAY_FLAG_TMP_BUF;
 			return true;
 		} else if (name == ufbxi_Alphas) {
 			info->type = 'r';
-			info->flags = UFBXI_ARRAY_FLAG_TMP_BUF;
+			info->flags |= UFBXI_ARRAY_FLAG_TMP_BUF;
 			return true;
 		}
 		break;
@@ -5405,7 +5405,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_LAYER_ELEMENT_OTHER:
 		if (name == ufbxi_TextureId) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
-			info->flags = UFBXI_ARRAY_FLAG_TMP_BUF;
+			info->flags |= UFBXI_ARRAY_FLAG_TMP_BUF;
 			return true;
 		} else if (name == ufbxi_UV) {
 			info->type = uc->opts.retain_dom ? 'r' : '-';
@@ -5473,7 +5473,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			if (!uc->opts.disable_quirks && uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
 				info->type = '-';
 			}
-			info->flags = UFBXI_ARRAY_FLAG_TMP_BUF;
+			info->flags |= UFBXI_ARRAY_FLAG_TMP_BUF;
 			return true;
 		} else if (!strcmp(name, "TransformAssociateModel")) {
 			info->type = uc->opts.retain_dom ? 'r' : '-';
