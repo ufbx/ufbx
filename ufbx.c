@@ -16816,8 +16816,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_curve_imp(ufbxi
 
 	bool is_open = curve->basis.topology == UFBX_NURBS_TOPOLOGY_OPEN;
 
-	size_t num_indices = num_spans + (num_spans - 1) * num_sub;
-	size_t num_vertices = num_indices - (is_open ? 1u : 0u);
+	size_t num_indices = num_spans + (num_spans - 1) * (num_sub - 1);
+	size_t num_vertices = num_indices - (is_open ? 0u : 1u);
 	ufbxi_check_err(&tc->error, num_indices <= INT32_MAX);
 
 	int32_t *indices = ufbxi_push(&tc->result, int32_t, num_indices);

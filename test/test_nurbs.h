@@ -550,3 +550,86 @@ UFBXT_FILE_TEST(synthetic_nurbs_truncated)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(max_nurbs_to_line)
+#if UFBXT_IMPL
+{
+	ufbx_node *line_node = ufbx_find_node(scene, "Line");
+	ufbx_node *nurbs_node = ufbx_find_node(scene, "Nurbs");
+	ufbxt_assert(line_node);
+	ufbxt_assert(nurbs_node);
+	ufbx_line_curve *line = ufbx_as_line_curve(line_node->attrib);
+	ufbx_nurbs_curve *nurbs = ufbx_as_nurbs_curve(nurbs_node->attrib);
+	ufbxt_assert(line);
+	ufbxt_assert(nurbs);
+
+	ufbx_tessellate_curve_opts opts = { 0 };
+	opts.span_subdivision = 5;
+	ufbx_line_curve *tess_line = ufbx_tessellate_nurbs_curve(nurbs, &opts, NULL);
+	ufbxt_assert(tess_line);
+
+	size_t num_indices = line->point_indices.count;
+	ufbxt_assert(line->segments.count == 1);
+	ufbxt_assert(tess_line->segments.count == 1);
+	ufbxt_assert(tess_line->point_indices.count == num_indices);
+
+	ufbxt_assert(line->segments.data[0].index_begin == 0);
+	ufbxt_assert(tess_line->segments.data[0].index_begin == 0);
+	ufbxt_assert(line->segments.data[0].num_indices == num_indices);
+	ufbxt_assert(tess_line->segments.data[0].num_indices == num_indices);
+
+	for (size_t i = 0; i < num_indices; i++) {
+		ufbx_vec3 point = line->control_points.data[line->point_indices.data[i]];
+		ufbx_vec3 tess_point = tess_line->control_points.data[tess_line->point_indices.data[i]];
+		ufbxt_assert_close_vec3(err, point, tess_point);
+	}
+
+	ufbx_retain_line_curve(tess_line);
+	ufbx_free_line_curve(tess_line);
+
+	ufbx_free_line_curve(tess_line);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(tessellate_line_alloc_fail, max_nurbs_to_line)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Nurbs");
+	ufbx_nurbs_curve *nurbs = ufbx_as_nurbs_curve(node->attrib);
+	ufbxt_assert(nurbs);
+
+	for (size_t max_temp = 1; max_temp < 10000; max_temp++) {
+		ufbx_tessellate_curve_opts opts = { 0 };
+		opts.temp_allocator.huge_threshold = 1;
+		opts.temp_allocator.allocation_limit = max_temp;
+
+		ufbxt_hintf("Temp limit: %zu", max_temp);
+
+		ufbx_error error;
+		ufbx_line_curve *line = ufbx_tessellate_nurbs_curve(nurbs, &opts, &error);
+		if (line) {
+			ufbxt_logf(".. Tested up to %zu temporary allocations", max_temp);
+			ufbx_free_line_curve(line);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+
+	for (size_t max_result = 1; max_result < 10000; max_result++) {
+		ufbx_tessellate_curve_opts opts = { 0 };
+		opts.result_allocator.huge_threshold = 1;
+		opts.result_allocator.allocation_limit = max_result;
+
+		ufbxt_hintf("Result limit: %zu", max_result);
+
+		ufbx_error error;
+		ufbx_line_curve *line = ufbx_tessellate_nurbs_curve(nurbs, &opts, &error);
+		if (line) {
+			ufbxt_logf(".. Tested up to %zu result allocations", max_result);
+			ufbx_free_line_curve(line);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+}
+#endif
