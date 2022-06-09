@@ -3002,8 +3002,6 @@ typedef enum ufbx_unicode_error_handling {
 	UFBX_UNICODE_ERROR_HANDLING_QUESTION_MARK,
 	// Remove errors from the output
 	UFBX_UNICODE_ERROR_HANDLING_REMOVE,
-	// Replace errors with private use `U+FBAnn`
-	UFBX_UNICODE_ERROR_HANDLING_PRIVATE_USE_ESCAPE,
 	// Fail loading on encountering an Unicode error
 	UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING,
 
