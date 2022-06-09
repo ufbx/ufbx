@@ -881,3 +881,43 @@ UFBXT_FILE_TEST_OPTS(synthetic_cursed_geometry, ufbxt_generate_normals_opts)
 	ufbx_free_mesh(sub_mesh);
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_vertex_gaps)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->vertices.count == 7);
+
+	ufbx_vec3 gap_values[] = {
+		{ -1.0f, -1.1f, -1.2f },
+		{ -2.0f, -2.1f, -2.2f },
+		{ -3.0f, -3.1f, -3.2f },
+		{ -4.0f, -4.1f, -4.2f },
+	};
+
+	ufbxt_assert_close_vec3(err, mesh->vertices.data[0], gap_values[0]);
+	ufbxt_assert_close_vec3(err, mesh->vertices.data[3], gap_values[1]);
+	ufbxt_assert_close_vec3(err, mesh->vertices.data[6], gap_values[2]);
+
+	ufbxt_assert(mesh->vertex_normal.values.count == 8);
+	ufbxt_assert_close_vec3(err, mesh->vertex_normal.values.data[0], gap_values[0]);
+	ufbxt_assert_close_vec3(err, mesh->vertex_normal.values.data[3], gap_values[1]);
+	ufbxt_assert_close_vec3(err, mesh->vertex_normal.values.data[6], gap_values[2]);
+	ufbxt_assert_close_vec3(err, mesh->vertex_normal.values.data[7], gap_values[3]);
+
+	ufbx_vec2 gap_uvs[] = {
+		{ -1.3f, -1.4f },
+		{ -2.3f, -2.4f },
+		{ -3.3f, -3.4f },
+		{ -4.3f, -4.4f },
+	};
+
+	ufbxt_assert(mesh->vertex_uv.values.count == 8);
+	ufbxt_assert_close_vec2(err, mesh->vertex_uv.values.data[0], gap_uvs[0]);
+	ufbxt_assert_close_vec2(err, mesh->vertex_uv.values.data[2], gap_uvs[1]);
+	ufbxt_assert_close_vec2(err, mesh->vertex_uv.values.data[5], gap_uvs[2]);
+	ufbxt_assert_close_vec2(err, mesh->vertex_uv.values.data[7], gap_uvs[3]);
+}
+#endif
