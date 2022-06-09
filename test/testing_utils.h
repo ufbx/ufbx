@@ -335,10 +335,11 @@ static bool ufbxt_parse_reals(ufbx_real *p_result, size_t count, const char *str
 
 		do {
 			if (value < max_value) {
-				value = value * 10 + (uint64_t)(*c++ - '0');
+				value = value * 10 + (uint64_t)(*c - '0');
 			} else {
 				exponent--;
 			}
+			c++;
 		} while (*c >= '0' && *c <= '9');
 
 		if (*c == '.') {
@@ -346,9 +347,10 @@ static bool ufbxt_parse_reals(ufbx_real *p_result, size_t count, const char *str
 
 			while (*c >= '0' && *c <= '9') {
 				if (value < max_value) {
-					value = value * 10 + (uint64_t)(*c++ - '0');
+					value = value * 10 + (uint64_t)(*c - '0');
 					exponent--;
 				}
+				c++;
 			}
 
 			if ((*c | 0x20) == 'e') {
@@ -364,8 +366,9 @@ static bool ufbxt_parse_reals(ufbx_real *p_result, size_t count, const char *str
 				int32_t exp = 0;
 				while (*c >= '0' && *c <= '9') {
 					if (exp < 4096) {
-						exp = exp * 10 + (int32_t)(*c++ - '0');
+						exp = exp * 10 + (int32_t)(*c - '0');
 					}
+					c++;
 				}
 
 				exponent += expsign * exp;
