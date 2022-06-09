@@ -14804,6 +14804,7 @@ typedef struct {
 } ufbxi_cache_interpretation_name;
 
 static const ufbxi_cache_interpretation_name ufbxi_cache_interpretation_names[] = {
+	{ UFBX_CACHE_INTERPRETATION_POINTS, "points" },
 	{ UFBX_CACHE_INTERPRETATION_VERTEX_POSITION, "positions" },
 	{ UFBX_CACHE_INTERPRETATION_VERTEX_NORMAL, "normals" },
 };
@@ -14838,12 +14839,26 @@ static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 		if (frame->file_format == UFBX_CACHE_FILE_FORMAT_PC2) {
 			chan->interpretation = UFBX_CACHE_INTERPRETATION_VERTEX_POSITION;
 		} else {
+			ufbx_string interp = chan->interpretation_name;
+			char *interp_lowercase = ufbxi_push(&cc->tmp_stack, char, interp.length + 1);
+			ufbxi_check_err(&cc->error, interp_lowercase);
+
+			for (size_t i = 0; i < interp.length + 1; i++) {
+				char c = interp.data[i];
+				if (c >= 'A' && c <= 'Z') {
+					c = (char)((int)c + ((int)'a' - (int)'A'));
+				}
+				interp_lowercase[i] = c;
+			}
+
 			ufbxi_for(const ufbxi_cache_interpretation_name, name, ufbxi_cache_interpretation_names, ufbxi_arraycount(ufbxi_cache_interpretation_names)) {
-				if (!strcmp(chan->interpretation_name.data, name->name)) {
+				if (!strcmp(interp_lowercase, name->name)) {
 					chan->interpretation = name->interpretation;
 					break;
 				}
 			}
+
+			ufbxi_pop(&cc->tmp_stack, char, interp.length + 1, NULL);
 		}
 
 		num_channels++;
@@ -15383,7 +15398,7 @@ ufbxi_nodiscard ufbxi_noinline int ufbxi_evaluate_skinning(ufbx_scene *scene, uf
 				ufbx_cache_channel *channel = (*p_cache)->external_channel;
 				if (!channel) continue;
 
-				if (channel->interpretation == UFBX_CACHE_INTERPRETATION_VERTEX_POSITION && !cached_position) {
+				if ((channel->interpretation == UFBX_CACHE_INTERPRETATION_VERTEX_POSITION || channel->interpretation == UFBX_CACHE_INTERPRETATION_POINTS) && !cached_position) {
 					size_t num_read = ufbx_sample_geometry_cache_vec3(channel, time, result_pos, num_vertices, cache_opts);
 					if (num_read == num_vertices) {
 						mesh->skinned_is_local = true;
