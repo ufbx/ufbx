@@ -139,7 +139,7 @@ UFBXT_FILE_TEST(maya_arnold_textures)
 	ufbxt_check_material_texture(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png", true);
 	ufbxt_check_material_texture(scene, material->pbr.specular_color.texture, "checkerboard_specular.png", true);
 	ufbxt_check_material_texture(scene, material->pbr.roughness.texture, "checkerboard_roughness.png", true);
-	ufbxt_check_material_texture(scene, material->pbr.metallic.texture, "checkerboard_metallic.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.metalness.texture, "checkerboard_metallic.png", true);
 	ufbxt_check_material_texture(scene, material->pbr.diffuse_roughness.texture, "checkerboard_roughness.png", true);
 }
 #endif
@@ -170,7 +170,7 @@ UFBXT_FILE_TEST(blender_293_textures)
 	ufbxt_assert(material->shader_type == UFBX_SHADER_BLENDER_PHONG);
 	ufbxt_assert(!strcmp(material->pbr.base_color.texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
 	ufbxt_assert(!strcmp(material->pbr.roughness.texture->relative_filename.data, "textures\\checkerboard_roughness.png"));
-	ufbxt_assert(!strcmp(material->pbr.metallic.texture->relative_filename.data, "textures\\checkerboard_metallic.png"));
+	ufbxt_assert(!strcmp(material->pbr.metalness.texture->relative_filename.data, "textures\\checkerboard_metallic.png"));
 	ufbxt_assert(!strcmp(material->pbr.emission_color.texture->relative_filename.data, "textures\\checkerboard_emissive.png"));
 	ufbxt_assert(!strcmp(material->pbr.opacity.texture->relative_filename.data, "textures\\checkerboard_weight.png"));
 }
@@ -186,7 +186,7 @@ UFBXT_FILE_TEST(blender_293_embedded_textures)
 	ufbxt_assert(material->shader_type == UFBX_SHADER_BLENDER_PHONG);
 	ufbxt_check_texture_content(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png");
 	ufbxt_check_texture_content(scene, material->pbr.roughness.texture, "checkerboard_roughness.png");
-	ufbxt_check_texture_content(scene, material->pbr.metallic.texture, "checkerboard_metallic.png");
+	ufbxt_check_texture_content(scene, material->pbr.metalness.texture, "checkerboard_metallic.png");
 	ufbxt_check_texture_content(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png");
 	ufbxt_check_texture_content(scene, material->pbr.opacity.texture, "checkerboard_weight.png");
 }
@@ -278,7 +278,7 @@ UFBXT_FILE_TEST(maya_arnold_properties)
 	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value.y));
 	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value.z));
 	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.diffuse_roughness.value.x));
-	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.metallic.value.x));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.metalness.value.x));
 	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.specular_factor.value.x));
 	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.specular_color.value.x));
 	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.specular_color.value.y));
@@ -365,7 +365,7 @@ UFBXT_FILE_TEST(maya_osl_properties)
 	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value.y));
 	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value.z));
 	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.diffuse_roughness.value.x));
-	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.metallic.value.x));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.metalness.value.x));
 	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.specular_factor.value.x));
 	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.specular_color.value.x));
 	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.specular_color.value.y));

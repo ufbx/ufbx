@@ -11911,7 +11911,7 @@ static const ufbxi_shader_mapping ufbxi_osl_standard_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_BASE_COLOR, ufbxi_string_literal("base_color") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, ufbxi_string_literal("specular_roughness") },
 	{ UFBX_MATERIAL_PBR_DIFFUSE_ROUGHNESS, ufbxi_string_literal("diffuse_roughness") },
-	{ UFBX_MATERIAL_PBR_METALLIC, ufbxi_string_literal("metalness") },
+	{ UFBX_MATERIAL_PBR_METALNESS, ufbxi_string_literal("metalness") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_FACTOR, ufbxi_string_literal("specular") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, ufbxi_string_literal("specular_color") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_IOR, ufbxi_string_literal("specular_IOR") },
@@ -11955,7 +11955,7 @@ static const ufbxi_shader_mapping ufbxi_arnold_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_BASE_COLOR, ufbxi_string_literal("baseColor") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, ufbxi_string_literal("specularRoughness") },
 	{ UFBX_MATERIAL_PBR_DIFFUSE_ROUGHNESS, ufbxi_string_literal("diffuseRoughness") },
-	{ UFBX_MATERIAL_PBR_METALLIC, ufbxi_string_literal("metalness") },
+	{ UFBX_MATERIAL_PBR_METALNESS, ufbxi_string_literal("metalness") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_FACTOR, ufbxi_string_literal("specular") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, ufbxi_string_literal("specularColor") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_IOR, ufbxi_string_literal("specularIOR") },
@@ -12015,7 +12015,7 @@ static const ufbxi_shader_mapping ufbxi_blender_phong_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, ufbxi_string_literal("EmissiveColor") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, ufbxi_string_literal("Shininess"), &ufbxi_mat_transform_blender_shininess },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, ufbxi_string_literal("ShininessExponent"), &ufbxi_mat_transform_blender_shininess },
-	{ UFBX_MATERIAL_PBR_METALLIC, ufbxi_string_literal("ReflectionFactor") },
+	{ UFBX_MATERIAL_PBR_METALNESS, ufbxi_string_literal("ReflectionFactor") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, ufbxi_string_literal("NormalMap") },
 };
 

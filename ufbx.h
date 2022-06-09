@@ -1771,7 +1771,7 @@ typedef enum ufbx_shader_type {
 	// https://docs.arnoldrenderer.com/display/A5AFMUG/Standard+Surface
 	UFBX_SHADER_ARNOLD,
 	// Variation of the FBX phong shader that can recover PBR properties like
-	// `metallic` or `roughness` from the FBX non-physical values.
+	// `metalness` or `roughness` from the FBX non-physical values.
 	UFBX_SHADER_BLENDER_PHONG,
 
 	UFBX_SHADER_TYPE_COUNT,
@@ -1810,7 +1810,7 @@ typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_BASE_FACTOR,
 	UFBX_MATERIAL_PBR_BASE_COLOR,
 	UFBX_MATERIAL_PBR_ROUGHNESS,
-	UFBX_MATERIAL_PBR_METALLIC,
+	UFBX_MATERIAL_PBR_METALNESS,
 	UFBX_MATERIAL_PBR_DIFFUSE_ROUGHNESS,
 	UFBX_MATERIAL_PBR_SPECULAR_FACTOR,
 	UFBX_MATERIAL_PBR_SPECULAR_COLOR,
@@ -1898,7 +1898,7 @@ typedef struct ufbx_material_pbr_maps {
 			ufbx_material_map base_factor;
 			ufbx_material_map base_color;
 			ufbx_material_map roughness;
-			ufbx_material_map metallic;
+			ufbx_material_map metalness;
 			ufbx_material_map diffuse_roughness;
 			ufbx_material_map specular_factor;
 			ufbx_material_map specular_color;
