@@ -99,9 +99,10 @@ def gather_dataset_tasks(root_dir):
                 desc = json.load(f)
 
             models = list(gather_case_models(path))
-            assert models
+            if not models:
+                raise RuntimeError(f"No models found for {path}")
 
-            extra_files = [os.path.join(root, ex) for ex in desc.get("extraFiles", [])]
+            extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
 
             yield TestCase(
                 root=root_dir,
