@@ -3042,7 +3042,7 @@ void render_frame(ufbx_scene *original_scene, const Opts &opts, int frame_offset
 		setup_texture(dst.base_factor, mat->pbr.base_factor);
 		setup_texture(dst.base_color, mat->pbr.base_color);
 		setup_texture(dst.roughness, mat->pbr.roughness);
-		setup_texture(dst.metallic, mat->pbr.metallic);
+		setup_texture(dst.metallic, mat->pbr.metalness);
 		setup_texture(dst.emission_factor, mat->pbr.emission_factor);
 		setup_texture(dst.emission_color, mat->pbr.emission_color);
 		dst.base_color.image.srgb = true;
