@@ -94,6 +94,8 @@ int main(int argc, char **argv)
 	ufbx_load_opts opts = { 0 };
 	opts.evaluate_skinning = true;
 	opts.evaluate_caches = true;
+	opts.load_external_files = true;
+	opts.generate_missing_normals = true;
 	opts.target_axes = ufbx_axes_right_handed_y_up;
 	opts.target_unit_meters = 0.01;
 	if (!allow_bad_unicode) {
@@ -256,6 +258,7 @@ int main(int argc, char **argv)
 			ufbx_evaluate_opts eval_opts = { 0 };
 			eval_opts.evaluate_skinning = true;
 			eval_opts.evaluate_caches = true;
+			eval_opts.load_external_files = true;
 			state = ufbx_evaluate_scene(scene, &anim, time, &eval_opts, NULL);
 			ufbxt_assert(state);
 		} else {
