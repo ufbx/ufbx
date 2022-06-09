@@ -2732,7 +2732,7 @@ static void ufbxi_string_pool_temp_free(ufbxi_string_pool *pool)
 	ufbxi_map_free(&pool->map);
 }
 
-ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool, char *dst, char c)
+ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool, char *dst)
 {
 	switch (pool->error_handling) {
 
@@ -2753,13 +2753,6 @@ ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool
 	case UFBX_UNICODE_ERROR_HANDLING_REMOVE:
 		return 0;
 
-	case UFBX_UNICODE_ERROR_HANDLING_PRIVATE_USE_ESCAPE:
-		dst[0] = (char)(uint8_t)0xf3u;
-		dst[1] = (char)(uint8_t)0xbbu;
-		dst[2] = (char)(uint8_t)(0xa8u | ((uint32_t)(uint8_t)c >> 6));
-		dst[3] = (char)(uint8_t)(0x80u | ((uint32_t)(uint8_t)c & 0x3fu));
-		return 4;
-
 	default:
 		return 0;
 
@@ -2768,12 +2761,6 @@ ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool
 
 ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(ufbxi_string_pool *pool, const char *str, size_t length)
 {
-	// Double escape `U+FBAnn` escapes to make the roundtrip lossless
-	uint32_t escape_base = 0;
-	if (pool->error_handling == UFBX_UNICODE_ERROR_HANDLING_PRIVATE_USE_ESCAPE) {
-		escape_base = 0xf3bba880;
-	}
-
 	size_t index = 0;
 	while (index < length) {
 		uint8_t c = (uint8_t)str[index];
@@ -2801,7 +2788,7 @@ ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(ufbxi_strin
 		} else if ((c & 0xf8) == 0xf0 && left >= 4) {
 			uint8_t t0 = (uint8_t)str[index + 1], t1 = (uint8_t)str[index + 2], t2 = (uint8_t)str[index + 3];
 			uint32_t code = (uint32_t)c << 24 | (uint32_t)t0 << 16 | (uint32_t)t1 << 8 | (uint32_t)t2;
-			if ((code & 0xc0c0c0) == 0x808080 && code >= 0xf0908080 && (code - escape_base >= 0x400)) {
+			if ((code & 0xc0c0c0) == 0x808080 && code >= 0xf0908080 && code >= 0x400) {
 				index += 4;
 				continue;
 			}
@@ -2816,12 +2803,6 @@ ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(ufbxi_strin
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_sanitize_string(ufbxi_string_pool *pool, ufbxi_sanitized_string *sanitized, const char *str, size_t length, size_t valid_length, bool push_both)
 {
-	// Double escape `U+FBAnn` escapes to make the roundtrip lossless
-	uint32_t escape_base = 0;
-	if (pool->error_handling == UFBX_UNICODE_ERROR_HANDLING_PRIVATE_USE_ESCAPE) {
-		escape_base = 0xf3bba880;
-	}
-
 	// Handle only invalid cases here
 	ufbx_assert(valid_length < length);
 	ufbxi_check_err_msg(pool->error, pool->error_handling != UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING, "Invalid UTF-8");
@@ -2886,7 +2867,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_sanitize_string(ufbxi_string_poo
 		} else if ((c & 0xf8) == 0xf0 && left >= 4) {
 			uint8_t t0 = (uint8_t)str[index + 1], t1 = (uint8_t)str[index + 2], t2 = (uint8_t)str[index + 3];
 			uint32_t code = (uint32_t)c << 24 | (uint32_t)t0 << 16 | (uint32_t)t1 << 8 | (uint32_t)t2;
-			if ((code & 0xc0c0c0) == 0x808080 && code >= 0xf0908080 && (code - escape_base >= 0x400)) {
+			if ((code & 0xc0c0c0) == 0x808080 && code >= 0xf0908080 && code >= 0x400) {
 				dst[dst_len + 0] = c;
 				dst[dst_len + 1] = t0;
 				dst[dst_len + 2] = t1;
@@ -2897,7 +2878,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_sanitize_string(ufbxi_string_poo
 			}
 		}
 
-		dst_len += ufbxi_add_replacement_char(pool, dst + dst_len, c);
+		dst_len += ufbxi_add_replacement_char(pool, dst + dst_len);
 		index++;
 	}
 
@@ -19649,32 +19630,6 @@ ufbx_abi ufbxi_noinline ufbx_matrix ufbx_get_compatible_matrix_for_normals(const
 	ufbx_matrix norm_mat = ufbx_matrix_mul(&node->node_to_world, &geom_rot_mat);
 	norm_mat = ufbx_matrix_for_normals(&norm_mat);
 	return norm_mat;
-}
-
-ufbx_abi size_t ufbx_catch_expand_private_use_escapes(ufbx_panic *panic, uint8_t *dst, size_t dst_size, ufbx_string str)
-{
-	if (ufbxi_panicf(panic, dst_size >= str.length, "dst size (%zu) must be at least str.size (%zu)", dst_size, str.length)) return 0;
-
-	size_t esc_len = str.length >= 4 ? str.length - 4 : 0;
-	size_t dst_len = 0;
-
-	for (size_t i = 0; i < esc_len; ) {
-		if ((uint8_t)str.data[i] == 0xf3) {
-			uint8_t t1 = (uint8_t)str.data[i + 1];
-			uint8_t t2 = (uint8_t)str.data[i + 2];
-			uint8_t t3 = (uint8_t)str.data[i + 3];
-
-			if (t1 == 0xbb && (t2 & 0xfc) == 0xa8) {
-				dst[dst_len++] = (uint8_t)((uint32_t)t2 & 0x3) << 6u | ((uint32_t)t3 & 0x3f);
-				i += 4;
-				continue;
-			}
-		}
-		
-		dst[dst_len++] = str.data[i++];
-	}
-
-	return dst_len;
 }
 
 ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_real default_value)

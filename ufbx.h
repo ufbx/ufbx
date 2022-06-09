@@ -3405,16 +3405,6 @@ ufbx_abi ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_i
 // NOTE: `user` is not used, it exists only for compatability to `ufbx_open_file_fn`
 ufbx_abi bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len);
 
-// Expand `str` UFBX escapes retrieving the original bytes stored in the file to `dst[dst_size]`.
-// Requires loading with `ufbx_load_opts.unicode_error_handling` set to
-// `UFBX_UNICODE_ERROR_HANDLING_PRIVATE_USE_ESCAPE`
-// Returns number of bytes written to `dst`.
-// NOTE: The result is _not_ NULL terminated as there may be NULL bytes in the middle.
-ufbx_abi size_t ufbx_catch_expand_private_use_escapes(ufbx_panic *panic, uint8_t *dst, size_t dst_size, ufbx_string str);
-ufbx_inline size_t ufbx_expand_private_use_escapes(uint8_t *dst, size_t dst_size, ufbx_string str) {
-	return ufbx_catch_expand_private_use_escapes(NULL, dst, dst_size, str);
-}
-
 // Animation evaluation
 
 // Evaluate a single animation `curve` at a `time`.
