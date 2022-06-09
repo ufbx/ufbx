@@ -2759,7 +2759,7 @@ ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool
 	}
 }
 
-ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(ufbxi_string_pool *pool, const char *str, size_t length)
+ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(const char *str, size_t length)
 {
 	size_t index = 0;
 	while (index < length) {
@@ -2917,7 +2917,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_sanitized_string(ufbxi_stri
 	sanitized->utf8_length = 0;
 
 	if (!raw) {
-		size_t valid_length = ufbxi_utf8_valid_length(pool, str, length);
+		size_t valid_length = ufbxi_utf8_valid_length(str, length);
 		if (valid_length != length) {
 			ufbxi_check_err(pool->error, ufbxi_sanitize_string(pool, sanitized, str, length, valid_length, true));
 			total_data = sanitized->raw_data;
@@ -2959,7 +2959,7 @@ ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_push_string_imp(ufbxi_st
 		bool non_ascii = false;
 		hash = ufbxi_hash_string_check_ascii(str, length, &non_ascii);
 		if (non_ascii) {
-			size_t valid_length = ufbxi_utf8_valid_length(pool, str, length);
+			size_t valid_length = ufbxi_utf8_valid_length(str, length);
 			if (valid_length < length) {
 				ufbxi_sanitized_string sanitized;
 				ufbxi_check_return_err(pool->error, ufbxi_sanitize_string(pool, &sanitized, str, length, valid_length, false), NULL);
