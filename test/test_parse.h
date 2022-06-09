@@ -801,3 +801,36 @@ UFBXT_FILE_TEST(revit_empty)
 	ufbxt_assert(found_refs3);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_lock_mute)
+#if UFBXT_IMPL
+{
+	uint32_t any_lock = UFBX_PROP_FLAG_LOCK_X | UFBX_PROP_FLAG_LOCK_Y | UFBX_PROP_FLAG_LOCK_Z | UFBX_PROP_FLAG_LOCK_W;
+	uint32_t any_mute = UFBX_PROP_FLAG_MUTE_X | UFBX_PROP_FLAG_MUTE_Y | UFBX_PROP_FLAG_MUTE_Z | UFBX_PROP_FLAG_MUTE_W;
+	uint32_t any_lock_mute = any_lock | any_mute;
+
+	{
+		ufbx_prop *prop;
+		ufbx_node *node = ufbx_find_node(scene, "pCube1");
+		ufbxt_assert(node);
+		prop = ufbx_find_prop(&node->props, "Lcl Translation");
+		ufbxt_assert(prop && (prop->flags & any_lock_mute) == (UFBX_PROP_FLAG_MUTE_X | UFBX_PROP_FLAG_LOCK_Z));
+		prop = ufbx_find_prop(&node->props, "Lcl Rotation");
+		ufbxt_assert(prop && (prop->flags & any_lock_mute) == (UFBX_PROP_FLAG_MUTE_Y | UFBX_PROP_FLAG_LOCK_Y));
+		prop = ufbx_find_prop(&node->props, "Lcl Scaling");
+		ufbxt_assert(prop && (prop->flags & any_lock_mute) == (UFBX_PROP_FLAG_MUTE_Z | UFBX_PROP_FLAG_LOCK_X));
+	}
+
+	{
+		ufbx_prop *prop;
+		ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+		ufbxt_assert(node);
+		prop = ufbx_find_prop(&node->props, "Lcl Translation");
+		ufbxt_assert(prop && (prop->flags & any_lock_mute) == (UFBX_PROP_FLAG_MUTE_X | UFBX_PROP_FLAG_MUTE_Y | UFBX_PROP_FLAG_MUTE_Z));
+		prop = ufbx_find_prop(&node->props, "Lcl Rotation");
+		ufbxt_assert(prop && (prop->flags & any_lock_mute) == (UFBX_PROP_FLAG_LOCK_X | UFBX_PROP_FLAG_LOCK_Y | UFBX_PROP_FLAG_LOCK_Z));
+		prop = ufbx_find_prop(&node->props, "Lcl Scaling");
+		ufbxt_assert(prop && (prop->flags & any_lock_mute) == (UFBX_PROP_FLAG_MUTE_X | UFBX_PROP_FLAG_MUTE_Y | UFBX_PROP_FLAG_MUTE_Z | UFBX_PROP_FLAG_LOCK_X | UFBX_PROP_FLAG_LOCK_Y | UFBX_PROP_FLAG_LOCK_Z));
+	}
+}
+#endif
