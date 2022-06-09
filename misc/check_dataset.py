@@ -4,6 +4,7 @@ from typing import NamedTuple, Optional, List
 import subprocess
 import glob
 import re
+import urllib.parse
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -18,6 +19,7 @@ class TestCase(NamedTuple):
     author: str
     license: str
     url: str
+    extra_files: List[str]
     models: List[TestModel]
 
 def log(message=""):
@@ -99,6 +101,8 @@ def gather_dataset_tasks(root_dir):
             models = list(gather_case_models(path))
             assert models
 
+            extra_files = [os.path.join(root, ex) for ex in desc.get("extraFiles", [])]
+
             yield TestCase(
                 root=root_dir,
                 json_path=path,
@@ -106,6 +110,7 @@ def gather_dataset_tasks(root_dir):
                 author=desc["author"],
                 license=desc["license"],
                 url=desc["url"],
+                extra_files=extra_files,
                 models=models,
             )
 
@@ -125,7 +130,8 @@ if __name__ == "__main__":
         if root:
             path = os.path.relpath(path, root)
         path = path.replace("\\", "/")
-        return f"{argv.host_url}/{path}"
+        safe_path = urllib.parse.quote(path)
+        return f"{argv.host_url}/{safe_path}"
 
     def fmt_rel(path, root=""):
         if root:
@@ -143,6 +149,8 @@ if __name__ == "__main__":
         if case.url:
             log(f"  source url: {case.url}")
         log(f"   .json url: {fmt_url(case.json_path, case.root)}")
+        for extra in case.extra_files:
+            log(f"   extra url: {fmt_url(extra, case.root)}")
         log()
 
         for model in case.models:
