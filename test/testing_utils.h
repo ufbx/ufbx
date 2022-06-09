@@ -9,6 +9,14 @@
 
 #define ufbxt_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
 
+#if defined(_MSC_VER)
+	#define ufbxt_noinline __declspec(noinline)
+#elif defined(__clang__) || defined(__GNUC__)
+	#define ufbxt_noinline __attribute__((noinline))
+#else
+	#define ufbxt_noinline
+#endif
+
 // -- Vector helpers
 
 static ufbx_real ufbxt_dot2(ufbx_vec2 a, ufbx_vec2 b)
@@ -174,7 +182,7 @@ static uint32_t ufbxt_read_u32(const void *ptr) {
 		(unsigned)(uint8_t)p[3] << 24u );
 }
 
-static void *ufbxt_decompress_gzip(const void *gz_data, size_t gz_size, size_t *p_size)
+static ufbxt_noinline void *ufbxt_decompress_gzip(const void *gz_data, size_t gz_size, size_t *p_size)
 {
 	const uint8_t *gz = (const uint8_t*)gz_data;
 	if (gz_size < 10) return NULL;
@@ -391,7 +399,7 @@ static bool ufbxt_is_space(char c)
 	return c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
-static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufbxt_load_obj_opts *opts)
+static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufbxt_load_obj_opts *opts)
 {
 	ufbxt_load_obj_opts zero_opts;
 	if (!opts) {
@@ -676,7 +684,7 @@ static ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_size, const ufb
 	return obj;
 }
 
-static void ufbxt_debug_dump_obj_mesh(const char *file, ufbx_node *node, ufbx_mesh *mesh)
+static ufbxt_noinline void ufbxt_debug_dump_obj_mesh(const char *file, ufbx_node *node, ufbx_mesh *mesh)
 {
 	FILE *f = fopen(file, "wb");
 	ufbxt_assert(f);
@@ -716,7 +724,7 @@ static void ufbxt_debug_dump_obj_mesh(const char *file, ufbx_node *node, ufbx_me
 	fclose(f);
 }
 
-static void ufbxt_debug_dump_obj_scene(const char *file, ufbx_scene *scene)
+static ufbxt_noinline void ufbxt_debug_dump_obj_scene(const char *file, ufbx_scene *scene)
 {
 	FILE *f = fopen(file, "wb");
 	ufbxt_assert(f);
@@ -876,7 +884,7 @@ static void ufbxt_assert_close_quat_threshold(ufbxt_diff_error *p_err, ufbx_quat
 	ufbxt_assert_close_real_threshold(p_err, a.w, b.w, threshold);
 }
 
-static void ufbxt_check_source_vertices(ufbx_mesh *mesh, ufbx_mesh *src_mesh, ufbxt_diff_error *p_err)
+static ufbxt_noinline void ufbxt_check_source_vertices(ufbx_mesh *mesh, ufbx_mesh *src_mesh, ufbxt_diff_error *p_err)
 {
 	ufbx_subdivision_result *sub = mesh->subdivision_result;
 	ufbxt_assert(sub);
@@ -921,7 +929,7 @@ static int ufbxt_cmp_sub_vertex(const void *va, const void *vb)
 	return 0;
 }
 
-static void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt_obj_mesh *obj_mesh, ufbxt_diff_error *p_err)
+static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt_obj_mesh *obj_mesh, ufbxt_diff_error *p_err)
 {
 	ufbx_real tolerance = obj->tolerance;
 
@@ -1023,7 +1031,7 @@ static int ufbxt_cmp_obj_node(const void *va, const void *vb)
 	return strcmp(a->cat_name, b->cat_name);
 }
 
-static size_t ufbxt_obj_group_key(char *cat_buf, size_t cat_cap, const char **groups, size_t num_groups)
+static ufbxt_noinline size_t ufbxt_obj_group_key(char *cat_buf, size_t cat_cap, const char **groups, size_t num_groups)
 {
 	ufbxt_assert(num_groups > 0);
 	qsort((void*)groups, num_groups, sizeof(const char*), &ufbxt_cmp_string);
@@ -1040,7 +1048,7 @@ static size_t ufbxt_obj_group_key(char *cat_buf, size_t cat_cap, const char **gr
 	return cat_ptr - cat_buf;
 }
 
-static bool ufbxt_face_has_duplicate_vertex(ufbx_mesh *mesh, ufbx_face face)
+static ufbxt_noinline bool ufbxt_face_has_duplicate_vertex(ufbx_mesh *mesh, ufbx_face face)
 {
 	for (size_t i = 0; i < face.num_indices; i++) {
 		uint32_t ix = mesh->vertex_indices.data[face.index_begin + i];
@@ -1054,7 +1062,7 @@ static bool ufbxt_face_has_duplicate_vertex(ufbx_mesh *mesh, ufbx_face face)
 	return false;
 }
 
-static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, bool check_deformed_normals)
+static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, bool check_deformed_normals)
 {
 	ufbx_node **used_nodes = (ufbx_node**)malloc(obj->num_meshes * sizeof(ufbx_node*));
 	ufbxt_assert(used_nodes);
@@ -1332,7 +1340,7 @@ static void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff
 
 // -- IO
 
-static size_t ufbxt_file_size(const char *name)
+static ufbxt_noinline size_t ufbxt_file_size(const char *name)
 {
 	FILE *file = fopen(name, "rb");
 	if (!file) return 0;
@@ -1346,7 +1354,7 @@ static size_t ufbxt_file_size(const char *name)
 	return size;
 }
 
-static void *ufbxt_read_file(const char *name, size_t *p_size)
+static ufbxt_noinline void *ufbxt_read_file(const char *name, size_t *p_size)
 {
 	FILE *file = fopen(name, "rb");
 	if (!file) return NULL;
@@ -1374,7 +1382,7 @@ static void *ufbxt_read_file(const char *name, size_t *p_size)
 	return data;
 }
 
-static void *ufbxt_read_file_ex(const char *name, size_t *p_size)
+static ufbxt_noinline void *ufbxt_read_file_ex(const char *name, size_t *p_size)
 {
 	size_t name_len = strlen(name);
 	if (name_len >= 3 && !memcmp(name + name_len - 3, ".gz", 3)) {
