@@ -3368,6 +3368,10 @@ ufbx_inline ufbx_blob ufbx_find_blob(const ufbx_props *props, const char *name, 
 ufbx_abi ufbx_element *ufbx_find_element_len(const ufbx_scene *scene, ufbx_element_type type, const char *name, size_t name_len);
 ufbx_inline ufbx_element *ufbx_find_element(const ufbx_scene *scene, ufbx_element_type type, const char *name) { return ufbx_find_element_len(scene, type, name, strlen(name)); }
 
+// Find an element connected to a property.
+ufbx_abi ufbx_element *ufbx_find_prop_element_len(ufbx_element *element, const char *name, size_t name_len);
+ufbx_inline ufbx_element *ufbx_find_prop_element(ufbx_element *element, const char *name) { return ufbx_find_prop_element_len(element, name, strlen(name)); }
+
 // Find node in `scene` by `name` (shorthand for `ufbx_find_element(UFBX_ELEMENT_NODE)`).
 ufbx_abi ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_inline ufbx_node *ufbx_find_node(const ufbx_scene *scene, const char *name) { return ufbx_find_node_len(scene, name, strlen(name)); }

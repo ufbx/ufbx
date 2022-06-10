@@ -19570,6 +19570,23 @@ ufbx_abi ufbx_element *ufbx_find_element_len(const ufbx_scene *scene, ufbx_eleme
 	return index < SIZE_MAX ? scene->elements_by_name.data[index].element : NULL;
 }
 
+ufbx_abi ufbx_element *ufbx_find_prop_element_len(ufbx_element *element, const char *name, size_t name_len)
+{
+	ufbx_assert(element);
+	if (!element) return NULL;
+
+	size_t index = SIZE_MAX;
+	ufbx_string name_str = { name, name_len };
+
+	ufbxi_macro_lower_bound_eq(ufbx_connection, 32, &index,
+		element->connections_dst.data, 0, element->connections_dst.count,
+		( ufbxi_str_cmp(a->dst_prop, name_str) < 0 ),
+		( ufbxi_str_equal(a->dst_prop, name_str) ));
+
+	if (index == SIZE_MAX) return NULL;
+	return element->connections_dst.data[index].src;
+}
+
 ufbx_abi ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t name_len)
 {
 	return (ufbx_node*)ufbx_find_element_len(scene, UFBX_ELEMENT_NODE, name, name_len);
