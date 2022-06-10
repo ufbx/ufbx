@@ -997,6 +997,7 @@ async def main():
                 "maya_lod_group_6100_binary",
                 "maya_dq_weights_7500_binary",
                 "maya_triangulate_triangulated_7500_binary",
+                "maya_kenney_character_7700_binary",
             ]
 
             failed = False
