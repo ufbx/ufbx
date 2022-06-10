@@ -138,6 +138,7 @@ typedef struct {
 	bool bad_uvs;
 	bool bad_faces;
 	bool no_subdivision;
+	bool root_groups_at_bone;
 	ufbx_real tolerance;
 	int32_t animation_frame;
 
@@ -651,6 +652,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			if (!strcmp(line, "ufbx:ignore_duplicates")) {
 				obj->ignore_duplicates = true;
 			}
+			if (!strcmp(line, "ufbx:root_groups_at_bone")) {
+				obj->root_groups_at_bone = true;
+			}
 			if (!strcmp(line, "www.blender.org")) {
 				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
 			}
@@ -932,7 +936,7 @@ static int ufbxt_cmp_sub_vertex(const void *va, const void *vb)
 	return 0;
 }
 
-static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt_obj_mesh *obj_mesh, ufbxt_diff_error *p_err)
+static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt_obj_mesh *obj_mesh, ufbxt_diff_error *p_err, double scale)
 {
 	ufbx_real tolerance = obj->tolerance;
 
@@ -952,6 +956,12 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 		if (obj_mesh->vertex_uv.exists) {
 			obj_verts[i].uv = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, i);
 		}
+
+		if (scale != 1.0) {
+			obj_verts[i].pos.x *= scale;
+			obj_verts[i].pos.y *= scale;
+			obj_verts[i].pos.x *= scale;
+		}
 	}
 	for (size_t i = 0; i < fbx_mesh->num_indices; i++) {
 		ufbx_vec3 fp = ufbx_get_vertex_vec3(&fbx_mesh->skinned_position, i);
@@ -959,12 +969,19 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 		if (fbx_mesh->skinned_is_local) {
 			fp = ufbx_transform_position(&fbx_node->geometry_to_world, fp);
 			fn = ufbx_transform_direction(&norm_mat, fn);
+			fn = ufbxt_normalize(fn);
 		}
 		fbx_verts[i].pos = fp;
 		fbx_verts[i].normal = fn;
 		if (obj_mesh->vertex_uv.exists) {
 			ufbxt_assert(fbx_mesh->vertex_uv.exists);
 			fbx_verts[i].uv = ufbx_get_vertex_vec2(&fbx_mesh->vertex_uv, i);
+		}
+
+		if (scale != 1.0) {
+			fbx_verts[i].pos.x *= scale;
+			fbx_verts[i].pos.y *= scale;
+			fbx_verts[i].pos.x *= scale;
 		}
 	}
 
@@ -1090,6 +1107,8 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			size_t num_groups = 0;
 			ufbx_node *parent = node;
 			while (parent && !parent->is_root) {
+				if (obj->root_groups_at_bone && parent->attrib_type == UFBX_ELEMENT_BONE) break;
+
 				ufbxt_assert(num_groups < ufbxt_arraycount(groups));
 				groups[num_groups++] = parent->name.data;
 				parent = parent->parent;
@@ -1201,6 +1220,16 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		ufbxt_assert(node);
 		ufbx_mesh *mesh = node->mesh;
 
+		double scale = 1.0;
+
+		if (obj->normalize_units && scene->settings.unit_meters != 1.0) {
+			scale *= scene->settings.unit_meters;
+		}
+
+		if (obj->position_scale != 1.0) {
+			scale *= obj->position_scale;
+		}
+
 		used_nodes[num_used_nodes++] = node;
 
 		if (!mesh && node->attrib_type == UFBX_ELEMENT_NURBS_SURFACE) {
@@ -1214,7 +1243,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			// ufbxt_debug_dump_obj_mesh("test.obj", node, tess_mesh);
 
 			ufbxt_check_mesh(scene, tess_mesh);
-			ufbxt_match_obj_mesh(obj, node, tess_mesh, obj_mesh, p_err);
+			ufbxt_match_obj_mesh(obj, node, tess_mesh, obj_mesh, p_err, scale);
 			ufbx_free_mesh(tess_mesh);
 
 			continue;
@@ -1239,7 +1268,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			ufbxt_check_source_vertices(sub_mesh, mesh, p_err);
 
 			ufbxt_check_mesh(scene, sub_mesh);
-			ufbxt_match_obj_mesh(obj, node, sub_mesh, obj_mesh, p_err);
+			ufbxt_match_obj_mesh(obj, node, sub_mesh, obj_mesh, p_err, scale);
 			ufbx_free_mesh(sub_mesh);
 
 			continue;
@@ -1255,7 +1284,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		if (!check_deformed_normals && mesh->all_deformers.count > 0) check_normals = false;
 
 		if (obj->bad_order) {
-			ufbxt_match_obj_mesh(obj, node, mesh, obj_mesh, p_err);
+			ufbxt_match_obj_mesh(obj, node, mesh, obj_mesh, p_err, scale);
 		} else {
 			size_t obj_face_ix = 0;
 
@@ -1294,16 +1323,6 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 							fn.y /= fn_len;
 							fn.z /= fn_len;
 						}
-					}
-
-					double scale = 1.0;
-
-					if (obj->normalize_units && scene->settings.unit_meters != 1.0) {
-						scale *= scene->settings.unit_meters;
-					}
-
-					if (obj->position_scale != 1.0) {
-						scale *= obj->position_scale;
 					}
 
 					if (scale != 1.0) {
