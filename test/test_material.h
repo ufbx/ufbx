@@ -149,8 +149,34 @@ UFBXT_FILE_TEST(max_physical_material_textures)
 {
 	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "PhysicalMaterial");
 	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL);
+	ufbxt_check_material_texture(scene, material->pbr.base_factor.texture, "checkerboard_weight.png", true);
 	ufbxt_check_material_texture(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png", true);
-	// TODO: Rest of these, value tests (NOTE: alpha channel!)
+	ufbxt_check_material_texture(scene, material->pbr.specular_factor.texture, "checkerboard_reflection.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.specular_color.texture, "checkerboard_reflection.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.roughness.texture, "checkerboard_roughness.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.metalness.texture, "checkerboard_metallic.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.diffuse_roughness.texture, "checkerboard_roughness.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.specular_anisotropy.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.specular_rotation.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.transmission_factor.texture, "checkerboard_transparency.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.transmission_color.texture, "checkerboard_transparency.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.transmission_roughness.texture, "checkerboard_roughness.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.specular_ior.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.subsurface_factor.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.subsurface_tint_color.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.subsurface_scale.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.emission_factor.texture, "checkerboard_emissive.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.coat_factor.texture, "checkerboard_specular.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.coat_color.texture, "checkerboard_specular.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.coat_roughness.texture, "checkerboard_specular.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.normal_map.texture, "checkerboard_bump.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.coat_normal.texture, "checkerboard_bump.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.displacement_map.texture, "checkerboard_displacement.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.opacity.texture, "checkerboard_transparency.png", true);
+
 }
 #endif
 
