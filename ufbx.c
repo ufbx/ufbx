@@ -12062,8 +12062,14 @@ static const ufbxi_shader_mapping_list ufbxi_shader_pbr_mappings[] = {
 
 ufbx_static_assert(shader_pbr_mapping_list, ufbxi_arraycount(ufbxi_shader_pbr_mappings) == UFBX_SHADER_TYPE_COUNT);
 
+enum {
+	UFBXI_MAPPING_FETCH_VALUE = 0x1,
+	UFBXI_MAPPING_FETCH_TEXTURE = 0x2,
+	UFBXI_MAPPING_FETCH_TEXTURE_ENABLED = 0x4,
+};
+
 ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufbx_material_map *maps, ufbx_shader *shader,
-	const ufbxi_shader_mapping *mappings, size_t count, ufbx_string prefix, ufbx_string suffix)
+	const ufbxi_shader_mapping *mappings, size_t count, ufbx_string prefix, ufbx_string suffix, uint32_t flags)
 {
 	char combined_name[512];
 
@@ -12086,54 +12092,32 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 			}
 		}
 
-		ufbx_texture *texture = ufbx_find_prop_texture_len(material, name.data, name.length);
 		ufbx_prop *prop = ufbx_find_prop_len(&material->props, name.data, name.length);
 		ufbx_material_map *map = &maps[mapping->index];
 
-		if (prop) {
-			map->value_vec4 = prop->value_vec4;
-			map->value_int = prop->value_int;
-			map->has_value = true;
-			if (mapping->transform_fn) {
-				mapping->transform_fn(&map->value_vec4);
-			}
-		}
-		if (texture) {
-			map->texture = texture;
-			map->texture_enabled = true;
-		}
-	}
-}
-
-ufbxi_noinline static void ufbxi_fetch_texture_enabled(ufbx_material *material, ufbx_material_map *maps,
-	const ufbxi_shader_mapping *mappings, size_t count, ufbx_string prefix, ufbx_string suffix)
-{
-	char combined_name[512];
-
-	ufbxi_for(const ufbxi_shader_mapping, mapping, mappings, count) {
-		ufbx_string name = mapping->prop;
-
-		if (prefix.length > 0 || suffix.length > 0) {
-			if (name.length + prefix.length + suffix.length <= sizeof(combined_name)) {
-				char *dst = combined_name;
-
-				memcpy(dst, prefix.data, prefix.length);
-				dst += prefix.length;
-				memcpy(dst, name.data, name.length);
-				dst += name.length;
-				memcpy(dst, suffix.data, suffix.length);
-				dst += suffix.length;
-
-				name.data = combined_name;
-				name.length = (size_t)(dst - combined_name);
+		if (flags & UFBXI_MAPPING_FETCH_VALUE) {
+			if (prop) {
+				map->value_vec4 = prop->value_vec4;
+				map->value_int = prop->value_int;
+				map->has_value = true;
+				if (mapping->transform_fn) {
+					mapping->transform_fn(&map->value_vec4);
+				}
 			}
 		}
 
-		ufbx_prop *prop = ufbx_find_prop_len(&material->props, name.data, name.length);
-		ufbx_material_map *map = &maps[mapping->index];
+		if (flags & UFBXI_MAPPING_FETCH_TEXTURE) {
+			ufbx_texture *texture = ufbx_find_prop_texture_len(material, name.data, name.length);
+			if (texture) {
+				map->texture = texture;
+				map->texture_enabled = true;
+			}
+		}
 
-		if (prop && prop->value_int == 0) {
-			map->texture_enabled = false;
+		if (flags & UFBXI_MAPPING_FETCH_TEXTURE_ENABLED) {
+			if (prop && prop->value_int == 0) {
+				map->texture_enabled = false;
+			}
 		}
 	}
 }
@@ -12162,7 +12146,9 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 	memset(&material->pbr, 0, sizeof(material->pbr));
 
 	ufbxi_fetch_mapping_maps(material, material->fbx.maps, NULL,
-		ufbxi_base_fbx_mapping, ufbxi_arraycount(ufbxi_base_fbx_mapping), ufbx_empty_string, ufbx_empty_string);
+		ufbxi_base_fbx_mapping, ufbxi_arraycount(ufbxi_base_fbx_mapping),
+		ufbx_empty_string, ufbx_empty_string,
+		UFBXI_MAPPING_FETCH_VALUE | UFBXI_MAPPING_FETCH_TEXTURE);
 
 	ufbxi_shader_mapping_list list = ufbxi_shader_pbr_mappings[material->shader_type];
 
@@ -12173,15 +12159,18 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 
 	if (list.map_suffix.length > 0) {
 		ufbxi_fetch_mapping_maps(material, material->pbr.maps, shader,
-			list.data, list.count, prefix, list.map_suffix);
+			list.data, list.count, prefix, list.map_suffix,
+			UFBXI_MAPPING_FETCH_TEXTURE);
 	}
 
 	ufbxi_fetch_mapping_maps(material, material->pbr.maps, shader,
-		list.data, list.count, prefix, ufbx_empty_string);
+		list.data, list.count, prefix, ufbx_empty_string,
+		UFBXI_MAPPING_FETCH_VALUE | UFBXI_MAPPING_FETCH_TEXTURE);
 
 	if (list.texture_enabled_suffix.length > 0) {
-		ufbxi_fetch_texture_enabled(material, material->pbr.maps,
-			list.data, list.count, prefix, list.texture_enabled_suffix);
+		ufbxi_fetch_mapping_maps(material, material->pbr.maps, shader,
+			list.data, list.count, prefix, list.texture_enabled_suffix,
+			UFBXI_MAPPING_FETCH_TEXTURE_ENABLED);
 	}
 
 	ufbxi_update_factor(&material->fbx.diffuse_factor, &material->fbx.diffuse_color);
