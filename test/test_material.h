@@ -531,3 +531,26 @@ UFBXT_FILE_TEST(maya_texture_blend_modes)
 	ufbxt_assert(layered->layers.data[13].blend_mode == UFBX_BLEND_REPLACE);    // "None"
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_missing_material_factor)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "phong1");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_PHONG);
+
+	ufbxt_assert_close_real(err, material->fbx.diffuse_factor.value.x, 1.0f);
+	ufbxt_assert_close_real(err, material->fbx.specular_factor.value.x, 1.0f);
+	ufbxt_assert_close_real(err, material->fbx.reflection_factor.value.x, 1.0f);
+	ufbxt_assert_close_real(err, material->fbx.transparency_factor.value.x, 1.0f);
+	ufbxt_assert_close_real(err, material->fbx.emission_factor.value.x, 1.0f);
+	ufbxt_assert_close_real(err, material->fbx.ambient_factor.value.x, 1.0f);
+
+	// TODO: Figure out how to map transmission/opacity
+	ufbxt_assert_close_real(err, material->pbr.base_factor.value.x, 1.0f);
+	ufbxt_assert_close_real(err, material->pbr.specular_factor.value.x, 1.0f);
+	ufbxt_assert_close_real(err, material->pbr.emission_factor.value.x, 1.0f);
+
+}
+#endif
