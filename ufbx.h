@@ -1927,8 +1927,8 @@ typedef struct ufbx_material_pbr_maps {
 			ufbx_material_map transmission_scatter;
 			ufbx_material_map transmission_scatter_anisotropy;
 			ufbx_material_map transmission_dispersion;
-			ufbx_material_map transmission_ior;
 			ufbx_material_map transmission_roughness;
+			ufbx_material_map transmission_ior;
 			ufbx_material_map transmission_priority;
 			ufbx_material_map transmission_enable_in_aov;
 			ufbx_material_map subsurface_factor;
