@@ -642,10 +642,10 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unicode_error_identity, UFBXT_FILE_TEST_FLAG_ALL
 
 		if (left) {
 			ufbx_vec3 ref = { 1.0f, 0.0f, 0.0f };
-			ufbxt_assert_close_vec3(err, material->fbx.diffuse_color.value, ref);
+			ufbxt_assert_close_vec3(err, material->fbx.diffuse_color.value_vec3, ref);
 		} else {
 			ufbx_vec3 ref = { 0.0f, 1.0f, 0.0f };
-			ufbxt_assert_close_vec3(err, material->fbx.diffuse_color.value, ref);
+			ufbxt_assert_close_vec3(err, material->fbx.diffuse_color.value_vec3, ref);
 		}
 	}
 }

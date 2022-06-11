@@ -1738,13 +1738,23 @@ struct ufbx_cache_file {
 
 // Material property, either specified with a constant value or a mapped texture
 typedef struct ufbx_material_map {
-	// Constant value, defined if `has_value == true`, for scalar values use `value.x`
-	bool has_value;
-	ufbx_vec3 value;
+
+	// Constant value, defined if `has_value == true`
+	union {
+		ufbx_real value_real;
+		ufbx_vec2 value_vec2;
+		ufbx_vec3 value_vec3;
+		ufbx_vec4 value_vec4;
+	};
 	int64_t value_int;
 
-	// Texture if connected, otherwise `NULL`
+	// Texture if connected, otherwise `NULL`.
+	// May be valid but "disabled" (application specific) if `texture_enabled == false`.
 	ufbx_nullable ufbx_texture *texture;
+
+	bool has_value;
+	bool texture_enabled;
+
 } ufbx_material_map;
 
 // Texture attached to an FBX property
@@ -1766,10 +1776,13 @@ typedef enum ufbx_shader_type {
 	UFBX_SHADER_FBX_PHONG,
 	// Open Shading Language standard surface
 	// https://github.com/Autodesk/standard-surface
-	UFBX_SHADER_OSL_STANDARD,
+	UFBX_SHADER_OSL_STANDARD_SURFACE,
 	// Arnold standard surface
 	// https://docs.arnoldrenderer.com/display/A5AFMUG/Standard+Surface
-	UFBX_SHADER_ARNOLD,
+	UFBX_SHADER_ARNOLD_STANDARD_SURFACE,
+	// 3ds Max Physical Material
+	// https://knowledge.autodesk.com/support/3ds-max/learn-explore/caas/CloudHelp/cloudhelp/2022/ENU/3DSMax-Lighting-Shading/files/GUID-C1328905-7783-4917-AB86-FC3CC19E8972-htm.html
+	UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL,
 	// Variation of the FBX phong shader that can recover PBR properties like
 	// `metalness` or `roughness` from the FBX non-physical values.
 	UFBX_SHADER_BLENDER_PHONG,
@@ -1824,6 +1837,7 @@ typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER_ANISOTROPY,
 	UFBX_MATERIAL_PBR_TRANSMISSION_DISPERSION,
 	UFBX_MATERIAL_PBR_TRANSMISSION_ROUGHNESS,
+	UFBX_MATERIAL_PBR_TRANSMISSION_IOR,
 	UFBX_MATERIAL_PBR_TRANSMISSION_PRIORITY,
 	UFBX_MATERIAL_PBR_TRANSMISSION_ENABLE_IN_AOV,
 	UFBX_MATERIAL_PBR_SUBSURFACE_FACTOR,
@@ -1831,6 +1845,7 @@ typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_SUBSURFACE_RADIUS,
 	UFBX_MATERIAL_PBR_SUBSURFACE_SCALE,
 	UFBX_MATERIAL_PBR_SUBSURFACE_ANISOTROPY,
+	UFBX_MATERIAL_PBR_SUBSURFACE_TINT_COLOR,
 	UFBX_MATERIAL_PBR_SUBSURFACE_TYPE,
 	UFBX_MATERIAL_PBR_SHEEN_FACTOR,
 	UFBX_MATERIAL_PBR_SHEEN_COLOR,
@@ -1851,6 +1866,7 @@ typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_INDIRECT_SPECULAR,
 	UFBX_MATERIAL_PBR_NORMAL_MAP,
 	UFBX_MATERIAL_PBR_TANGENT_MAP,
+	UFBX_MATERIAL_PBR_DISPLACEMENT_MAP,
 	UFBX_MATERIAL_PBR_MATTE_ENABLED,
 	UFBX_MATERIAL_PBR_MATTE_FACTOR,
 	UFBX_MATERIAL_PBR_MATTE_COLOR,
@@ -1911,6 +1927,7 @@ typedef struct ufbx_material_pbr_maps {
 			ufbx_material_map transmission_scatter;
 			ufbx_material_map transmission_scatter_anisotropy;
 			ufbx_material_map transmission_dispersion;
+			ufbx_material_map transmission_ior;
 			ufbx_material_map transmission_roughness;
 			ufbx_material_map transmission_priority;
 			ufbx_material_map transmission_enable_in_aov;
@@ -1919,6 +1936,7 @@ typedef struct ufbx_material_pbr_maps {
 			ufbx_material_map subsurface_radius;
 			ufbx_material_map subsurface_scale;
 			ufbx_material_map subsurface_anisotropy;
+			ufbx_material_map subsurface_tint_color;
 			ufbx_material_map subsurface_type;
 			ufbx_material_map sheen_factor;
 			ufbx_material_map sheen_color;
@@ -1939,6 +1957,7 @@ typedef struct ufbx_material_pbr_maps {
 			ufbx_material_map indirect_specular;
 			ufbx_material_map normal_map;
 			ufbx_material_map tangent_map;
+			ufbx_material_map displacement_map;
 			ufbx_material_map matte_enabled;
 			ufbx_material_map matte_factor;
 			ufbx_material_map matte_color;
@@ -1972,6 +1991,12 @@ struct ufbx_material {
 	ufbx_shader_type shader_type;      // < Always defined
 	ufbx_nullable ufbx_shader *shader; // < Optional extended shader information
 	ufbx_string shading_model_name;    // < Often one of `{ "lambert", "phong", "unknown" }`
+
+	// Prefix before shader property names with trailing `|`.
+	// For example `"3dsMax|Parameters|"` where properties would have names like
+	// `"3dsMax|Parameters|base_color"`. You can ignore this if you use the built-in
+	// `ufbx_material_fbx_maps fbx` and `ufbx_material_pbr_maps pbr` structures.
+	ufbx_string shader_prop_prefix;    
 
 	// All textures attached to the material, if you want specific maps if might be
 	// more convenient to use eg. `fbx.diffuse_color.texture` or `pbr.base_color.texture`

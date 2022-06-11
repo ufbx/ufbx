@@ -409,8 +409,8 @@ UFBXT_FILE_TEST(blender_279_ball)
 
 	ufbx_vec3 red_ref = { 0.8, 0.0, 0.0 };
 	ufbx_vec3 white_ref = { 0.8, 0.8, 0.8 };
-	ufbxt_assert_close_vec3(err, red->fbx.diffuse_color.value, red_ref);
-	ufbxt_assert_close_vec3(err, white->fbx.diffuse_color.value, white_ref);
+	ufbxt_assert_close_vec3(err, red->fbx.diffuse_color.value_vec3, red_ref);
+	ufbxt_assert_close_vec3(err, white->fbx.diffuse_color.value_vec3, white_ref);
 
 	ufbx_node *node = ufbx_find_node(scene, "Icosphere");
 	ufbxt_assert(node);
