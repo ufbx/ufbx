@@ -10481,12 +10481,13 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 	ufbxi_update_factor(&material->fbx.diffuse_factor, &material->fbx.diffuse_color);
 	ufbxi_update_factor(&material->fbx.specular_factor, &material->fbx.specular_color);
 	ufbxi_update_factor(&material->fbx.reflection_factor, &material->fbx.reflection_color);
+	ufbxi_update_factor(&material->fbx.transparency_factor, &material->fbx.transparency_color);
 	ufbxi_update_factor(&material->fbx.emission_factor, &material->fbx.emission_color);
 	ufbxi_update_factor(&material->fbx.ambient_factor, &material->fbx.ambient_color);
 
 	ufbxi_update_factor(&material->pbr.base_factor, &material->pbr.base_color);
-	ufbxi_update_factor(&material->fbx.specular_factor, &material->fbx.specular_color);
-	ufbxi_update_factor(&material->fbx.emission_factor, &material->fbx.emission_color);
+	ufbxi_update_factor(&material->pbr.specular_factor, &material->pbr.specular_color);
+	ufbxi_update_factor(&material->pbr.emission_factor, &material->pbr.emission_color);
 }
 
 typedef enum {
