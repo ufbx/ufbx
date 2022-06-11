@@ -2795,7 +2795,7 @@ bool ends_with(const std::string &str, const char *suffix)
 void setup_texture(Texture &texture, const ufbx_material_map &map)
 {
 	if (map.has_value) {
-		texture.value = from_ufbx(map.value);
+		texture.value = from_ufbx(map.value_vec3);
 	}
 	if (map.texture && map.texture->content.size > 0) {
 		verbosef("Loading texture: %s\n", map.texture->relative_filename.data);
