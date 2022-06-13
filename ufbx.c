@@ -7610,7 +7610,7 @@ ufbxi_noinline static void ufbxi_decode_base64(char *dst, const char *src, size_
 	}
 }
 
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_embedded_blob(ufbxi_context *uc, ufbx_blob *dst, ufbxi_node *node)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_embedded_blob(ufbxi_context *uc, ufbx_blob *dst_blob, ufbxi_node *node)
 {
 	if (!node) return 1;
 
@@ -7644,15 +7644,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_embedded_blob(ufbxi_context
 					padding++;
 				}
 
-				dst->size = content.length / 4 * 3 - padding;
-				dst->data = ufbxi_push(&uc->result, char, dst->size + 3);
-				ufbxi_check(dst->data);
+				dst_blob->size = content.length / 4 * 3 - padding;
+				dst_blob->data = ufbxi_push(&uc->result, char, dst_blob->size + 3);
+				ufbxi_check(dst_blob->data);
 
-				ufbxi_decode_base64((char*)dst->data, content.data, content.length);
+				ufbxi_decode_base64((char*)dst_blob->data, content.data, content.length);
 			}
 		} else {
-			dst->data = content.data;
-			dst->size = content.length;
+			dst_blob->data = content.data;
+			dst_blob->size = content.length;
 		}
 	}
 
