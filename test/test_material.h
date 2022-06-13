@@ -144,6 +144,93 @@ UFBXT_FILE_TEST(maya_arnold_textures)
 }
 #endif
 
+UFBXT_FILE_TEST(max_physical_material_properties)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "PhysicalMaterial");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL);
+
+	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_factor.value_real));
+	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value_vec4.x));
+	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value_vec4.y));
+	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value_vec4.z));
+	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.base_color.value_vec4.w));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.roughness.value_real));
+	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.metalness.value_real));
+	ufbxt_assert(80 == (int)round(100.0f * material->pbr.specular_ior.value_real)); // 3ds Max doesn't allow lower than 0.1 IOR
+	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.transmission_factor.value_real));
+	ufbxt_assert(10 == (int)round(100.0f * material->pbr.transmission_color.value_vec4.x));
+	ufbxt_assert(11 == (int)round(100.0f * material->pbr.transmission_color.value_vec4.y));
+	ufbxt_assert(12 == (int)round(100.0f * material->pbr.transmission_color.value_vec4.z));
+	ufbxt_assert(13 == (int)round(100.0f * material->pbr.transmission_color.value_vec4.w));
+	ufbxt_assert(14 == (int)round(100.0f * material->pbr.transmission_roughness.value_real));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.transmission_depth.value_real)); // ??? Unit conversion probably
+	ufbxt_assert(16 == (int)round(100.0f * material->pbr.subsurface_factor.value_real));
+	ufbxt_assert(17 == (int)round(100.0f * material->pbr.subsurface_tint_color.value_vec4.x));
+	ufbxt_assert(18 == (int)round(100.0f * material->pbr.subsurface_tint_color.value_vec4.y));
+	ufbxt_assert(19 == (int)round(100.0f * material->pbr.subsurface_tint_color.value_vec4.z));
+	ufbxt_assert(20 == (int)round(100.0f * material->pbr.subsurface_tint_color.value_vec4.w));
+	ufbxt_assert(21 == (int)round(100.0f * material->pbr.subsurface_color.value_vec4.x));
+	ufbxt_assert(22 == (int)round(100.0f * material->pbr.subsurface_color.value_vec4.y));
+	ufbxt_assert(23 == (int)round(100.0f * material->pbr.subsurface_color.value_vec4.z));
+	ufbxt_assert(24 == (int)round(100.0f * material->pbr.subsurface_color.value_vec4.w));
+	ufbxt_assert(10 == (int)round(100.0f * material->pbr.subsurface_radius.value_real)); // ??? Unit conversion probably
+	ufbxt_assert(26 == (int)round(100.0f * material->pbr.subsurface_scale.value_real));
+	ufbxt_assert(27 == (int)round(100.0f * material->pbr.emission_factor.value_real));
+	ufbxt_assert(28 == (int)round(100.0f * material->pbr.emission_color.value_vec4.x));
+	ufbxt_assert(29 == (int)round(100.0f * material->pbr.emission_color.value_vec4.y));
+	ufbxt_assert(30 == (int)round(100.0f * material->pbr.emission_color.value_vec4.z));
+	ufbxt_assert(31 == (int)round(100.0f * material->pbr.emission_color.value_vec4.w));
+	ufbxt_assert(32 == (int)round(100.0f * material->pbr.specular_anisotropy.value_real));
+	ufbxt_assert(33 == (int)round(100.0f * material->pbr.specular_rotation.value_real));
+	ufbxt_assert(34 == (int)round(100.0f * material->pbr.normal_map.value_real));
+	ufbxt_assert(35 == (int)round(100.0f * material->pbr.coat_normal.value_real));
+	ufbxt_assert(36 == (int)round(100.0f * material->pbr.displacement_map.value_real));
+	ufbxt_assert(37 == (int)round(100.0f * material->pbr.diffuse_roughness.value_real));
+	ufbxt_assert(38 == (int)round(100.0f * material->pbr.coat_factor.value_real));
+	ufbxt_assert(39 == (int)round(100.0f * material->pbr.coat_color.value_vec4.x));
+	ufbxt_assert(40 == (int)round(100.0f * material->pbr.coat_color.value_vec4.y));
+	ufbxt_assert(41 == (int)round(100.0f * material->pbr.coat_color.value_vec4.z));
+	ufbxt_assert(42 == (int)round(100.0f * material->pbr.coat_color.value_vec4.w));
+	ufbxt_assert(43 == (int)round(100.0f * material->pbr.coat_roughness.value_real));
+	ufbxt_assert(44 == (int)round(100.0f * material->pbr.coat_ior.value_real));
+	ufbxt_assert(45 == (int)round(100.0f * material->pbr.coat_affect_base_color.value_real));
+	ufbxt_assert(46 == (int)round(100.0f * material->pbr.coat_affect_base_roughness.value_real));
+
+	ufbxt_assert(material->pbr.base_factor.texture_enabled);
+	ufbxt_assert(material->pbr.base_color.texture_enabled);
+	ufbxt_assert(material->pbr.specular_factor.texture_enabled);
+	ufbxt_assert(material->pbr.specular_color.texture_enabled);
+	ufbxt_assert(material->pbr.roughness.texture_enabled);
+	ufbxt_assert(material->pbr.metalness.texture_enabled);
+	ufbxt_assert(material->pbr.diffuse_roughness.texture_enabled);
+	ufbxt_assert(material->pbr.specular_anisotropy.texture_enabled);
+	ufbxt_assert(material->pbr.specular_rotation.texture_enabled);
+	ufbxt_assert(material->pbr.transmission_factor.texture_enabled);
+	ufbxt_assert(material->pbr.transmission_color.texture_enabled);
+	ufbxt_assert(material->pbr.transmission_roughness.texture_enabled);
+	ufbxt_assert(material->pbr.specular_ior.texture_enabled);
+	ufbxt_assert(material->pbr.subsurface_factor.texture_enabled);
+	ufbxt_assert(material->pbr.subsurface_tint_color.texture_enabled);
+	ufbxt_assert(material->pbr.subsurface_scale.texture_enabled);
+	ufbxt_assert(material->pbr.emission_factor.texture_enabled);
+	ufbxt_assert(material->pbr.emission_color.texture_enabled);
+	ufbxt_assert(material->pbr.coat_factor.texture_enabled);
+	ufbxt_assert(material->pbr.coat_color.texture_enabled);
+	ufbxt_assert(material->pbr.coat_roughness.texture_enabled);
+	ufbxt_assert(material->pbr.normal_map.texture_enabled);
+	ufbxt_assert(material->pbr.coat_normal.texture_enabled);
+	ufbxt_assert(material->pbr.displacement_map.texture_enabled);
+	ufbxt_assert(material->pbr.opacity.texture_enabled);
+
+	ufbxt_assert(!material->pbr.roughness.texture_inverted);
+	ufbxt_assert(!material->pbr.transmission_roughness.texture_inverted);
+	ufbxt_assert(!material->pbr.coat_roughness.texture_inverted);
+}
+#endif
+
 UFBXT_FILE_TEST(max_physical_material_textures)
 #if UFBXT_IMPL
 {

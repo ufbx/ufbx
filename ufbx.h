@@ -1739,7 +1739,9 @@ struct ufbx_cache_file {
 // Material property, either specified with a constant value or a mapped texture
 typedef struct ufbx_material_map {
 
-	// Constant value, defined if `has_value == true`
+	// Constant value or factor for the map.
+	// May be specified simultaneously with a texture, in this case most shading models
+	// use multiplicative tinting of the texture values.
 	union {
 		ufbx_real value_real;
 		ufbx_vec2 value_vec2;
@@ -1752,8 +1754,19 @@ typedef struct ufbx_material_map {
 	// May be valid but "disabled" (application specific) if `texture_enabled == false`.
 	ufbx_nullable ufbx_texture *texture;
 
+	// `true` if the file has specified any of the values above.
+	// NOTE: The value may be set to a non-zero default even if `has_value == false`,
+	// for example missing factors are set to `1.0` if a color is defined.
 	bool has_value;
+
+	// Controls whether shading should use `texture`.
+	// NOTE: Some shading models allow this to be `true` even if `texture == NULL`.
 	bool texture_enabled;
+
+	// Set if the texture values should be interpreted as `1 - x`.
+	// Used on various `roughness` maps when the native software uses smoothness values.
+	// NOTE: Does not apply to `value_real`, ufbx inverts those values internally.
+	bool texture_inverted;
 
 } ufbx_material_map;
 
@@ -1859,6 +1872,8 @@ typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_COAT_ANISOTROPY,
 	UFBX_MATERIAL_PBR_COAT_ROTATION,
 	UFBX_MATERIAL_PBR_COAT_NORMAL,
+	UFBX_MATERIAL_PBR_COAT_AFFECT_BASE_COLOR,
+	UFBX_MATERIAL_PBR_COAT_AFFECT_BASE_ROUGHNESS,
 	UFBX_MATERIAL_PBR_THIN_FILM_THICKNESS,
 	UFBX_MATERIAL_PBR_THIN_FILM_IOR,
 	UFBX_MATERIAL_PBR_EMISSION_FACTOR,
@@ -1950,6 +1965,8 @@ typedef struct ufbx_material_pbr_maps {
 			ufbx_material_map coat_anisotropy;
 			ufbx_material_map coat_rotation;
 			ufbx_material_map coat_normal;
+			ufbx_material_map coat_affect_base_color;
+			ufbx_material_map coat_affect_base_roughness;
 			ufbx_material_map thin_film_thickness;
 			ufbx_material_map thin_film_ior;
 			ufbx_material_map emission_factor;

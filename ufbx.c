@@ -11835,6 +11835,14 @@ typedef enum {
 	UFBXI_MAT_TRANSFORM_COUNT,
 } ufbxi_mat_transform;
 
+typedef enum {
+	// Invert texture
+	UFBXI_SHADER_MAPPING_INVERT_TEXTURE = 0x1,
+	// Property toggles inversion of a value
+	// NOTE: These need to be the last entries in mappings
+	UFBXI_SHADER_MAPPING_TOGGLE_INVERT = 0x2,
+} ufbxi_shader_mapping_flag;
+
 static const ufbxi_mat_transform_fn ufbxi_mat_transform_fns[] = {
 	NULL,
 	&ufbxi_mat_transform_unknown_shininess,
@@ -11844,7 +11852,7 @@ static const ufbxi_mat_transform_fn ufbxi_mat_transform_fns[] = {
 
 typedef struct {
 	uint8_t index;     // < `ufbx_material_(fbx|pbr)_map`
-	uint8_t flags;     // < Unused
+	uint8_t flags;     // < Combination of `ufbxi_shader_mapping_flag`
 	uint8_t transform; // < `ufbxi_mat_transform`
 	uint8_t prop_len;  // < Length of `prop` not including NULL terminator
 	const char *prop;  // < Name of FBX material property or shader mapping
@@ -11915,8 +11923,8 @@ static const ufbxi_shader_mapping ufbxi_fbx_phong_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("Specular") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("SpecularColor") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_FACTOR, 0, 0, ufbxi_mat_string("SpecularFactor") },
-	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS, ufbxi_mat_string("Shininess") },
-	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS, ufbxi_mat_string("ShininessExponent") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, UFBXI_SHADER_MAPPING_INVERT_TEXTURE, UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS, ufbxi_mat_string("Shininess") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, UFBXI_SHADER_MAPPING_INVERT_TEXTURE, UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS, ufbxi_mat_string("ShininessExponent") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, 0, 0, ufbxi_mat_string("Transparent") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, 0, 0, ufbxi_mat_string("TransparentColor") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_FACTOR, 0, 0, ufbxi_mat_string("TransparentFactor") },
@@ -12055,17 +12063,22 @@ static const ufbxi_shader_mapping ufbxi_3ds_max_physical_material_pbr_mapping[] 
 	{ UFBX_MATERIAL_PBR_COAT_ROUGHNESS, 0, 0, ufbxi_mat_string("coat_rough") },
 	{ UFBX_MATERIAL_PBR_COAT_ROUGHNESS, 0, 0, ufbxi_mat_string("coat_roughness") },
 	{ UFBX_MATERIAL_PBR_COAT_IOR, 0, 0, ufbxi_mat_string("coat_ior") },
-	{ UFBX_MATERIAL_PBR_COAT_NORMAL, 0, 0, ufbxi_mat_string("coat_bump_map") },
+	{ UFBX_MATERIAL_PBR_COAT_NORMAL, 0, 0, ufbxi_mat_string("coat_bump") },
 	{ UFBX_MATERIAL_PBR_COAT_NORMAL, 0, 0, ufbxi_mat_string("clearcoat_bump_map_amt") },
+	{ UFBX_MATERIAL_PBR_COAT_AFFECT_BASE_COLOR, 0, 0, ufbxi_mat_string("coat_affect_color") },
+	{ UFBX_MATERIAL_PBR_COAT_AFFECT_BASE_ROUGHNESS, 0, 0, ufbxi_mat_string("coat_affect_roughness") },
 	{ UFBX_MATERIAL_PBR_EMISSION_FACTOR, 0, 0, ufbxi_mat_string("emission") },
 	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("emit_color") },
 	{ UFBX_MATERIAL_PBR_OPACITY, 0, 0, ufbxi_mat_string("cutout") },
-	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("bump_map") },
+	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("bump") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("bump_map_amt") },
-	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement_map") },
+	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement") },
 	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement_map_amt") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_TYPE, 0, 0, ufbxi_mat_string("subsurfaceType") },
 	{ UFBX_MATERIAL_PBR_THIN_WALLED, 0, 0, ufbxi_mat_string("thin_walled") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, UFBXI_SHADER_MAPPING_TOGGLE_INVERT, 0, ufbxi_mat_string("roughness_inv") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_ROUGHNESS, UFBXI_SHADER_MAPPING_TOGGLE_INVERT, 0, ufbxi_mat_string("trans_roughness_inv") },
+	{ UFBX_MATERIAL_PBR_COAT_ROUGHNESS, UFBXI_SHADER_MAPPING_TOGGLE_INVERT, 0, ufbxi_mat_string("coat_roughness_inv") },
 };
 
 // NOTE: These are just the names used by the standard PBS "preset".
@@ -12115,6 +12128,7 @@ enum {
 	UFBXI_MAPPING_FETCH_VALUE = 0x1,
 	UFBXI_MAPPING_FETCH_TEXTURE = 0x2,
 	UFBXI_MAPPING_FETCH_TEXTURE_ENABLED = 0x4,
+	UFBXI_MAPPING_FETCH_INVERT = 0x8,
 };
 
 ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufbx_material_map *maps, ufbx_shader *shader,
@@ -12155,6 +12169,16 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 		ufbx_prop *prop = ufbx_find_prop_len(&material->props, name.data, name.length);
 		ufbx_material_map *map = &maps[mapping->index];
 
+		if (mapping->flags & UFBXI_SHADER_MAPPING_TOGGLE_INVERT) {
+			if ((flags & UFBXI_MAPPING_FETCH_INVERT) != 0 && prop && prop->value_int != 0) {
+				if (map->has_value) {
+					map->value_real = 1.0f - map->value_real;
+				}
+				map->texture_inverted = !map->texture_inverted;
+			}
+			continue;
+		}
+
 		if (flags & UFBXI_MAPPING_FETCH_VALUE) {
 			if (prop) {
 				map->value_vec4 = prop->value_vec4;
@@ -12173,11 +12197,12 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 				map->texture = texture;
 				map->texture_enabled = true;
 			}
+			map->texture_inverted = (mapping->flags & UFBXI_SHADER_MAPPING_INVERT_TEXTURE) != 0;
 		}
 
 		if (flags & UFBXI_MAPPING_FETCH_TEXTURE_ENABLED) {
-			if (prop && prop->value_int == 0) {
-				map->texture_enabled = false;
+			if (prop) {
+				map->texture_enabled = prop->value_int != 0;
 			}
 		}
 	}
@@ -12226,7 +12251,7 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 
 	ufbxi_fetch_mapping_maps(material, material->pbr.maps, shader,
 		list.data, list.count, prefix, ufbx_empty_string, ufbx_empty_string,
-		UFBXI_MAPPING_FETCH_VALUE | UFBXI_MAPPING_FETCH_TEXTURE);
+		UFBXI_MAPPING_FETCH_VALUE | UFBXI_MAPPING_FETCH_TEXTURE | UFBXI_MAPPING_FETCH_INVERT);
 
 	if (list.texture_enabled_prefix.length > 0 || list.texture_enabled_suffix.length > 0) {
 		ufbxi_fetch_mapping_maps(material, material->pbr.maps, shader,
