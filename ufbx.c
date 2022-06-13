@@ -12128,14 +12128,22 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 			if (name.length + prefix.length + prefix2.length + suffix.length <= sizeof(combined_name)) {
 				char *dst = combined_name;
 
-				memcpy(dst, prefix.data, prefix.length);
-				dst += prefix.length;
-				memcpy(dst, prefix2.data, prefix2.length);
-				dst += prefix2.length;
-				memcpy(dst, name.data, name.length);
-				dst += name.length;
-				memcpy(dst, suffix.data, suffix.length);
-				dst += suffix.length;
+				if (prefix.length > 0) {
+					memcpy(dst, prefix.data, prefix.length);
+					dst += prefix.length;
+				}
+				if (prefix2.length > 0) {
+					memcpy(dst, prefix2.data, prefix2.length);
+					dst += prefix2.length;
+				}
+				if (name.length > 0) {
+					memcpy(dst, name.data, name.length);
+					dst += name.length;
+				}
+				if (suffix.length > 0) {
+					memcpy(dst, suffix.data, suffix.length);
+					dst += suffix.length;
+				}
 
 				name.data = combined_name;
 				name.length = (size_t)(dst - combined_name);
