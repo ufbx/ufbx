@@ -5598,6 +5598,9 @@ static ufbxi_noinline bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_st
 		if (name == ufbxi_Model) return true;
 		break;
 
+	default:
+		break;
+
 	}
 
 	return false;
