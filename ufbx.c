@@ -11952,7 +11952,7 @@ static const ufbxi_shader_mapping ufbxi_osl_standard_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER, 0, 0, ufbxi_mat_string("transmission_scatter") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER_ANISOTROPY, 0, 0, ufbxi_mat_string("transmission_scatter_anisotropy") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_DISPERSION, 0, 0, ufbxi_mat_string("transmission_dispersion") },
-	{ UFBX_MATERIAL_PBR_TRANSMISSION_ROUGHNESS, 0, 0, ufbxi_mat_string("transmission_extra_roughness") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_EXTRA_ROUGHNESS, 0, 0, ufbxi_mat_string("transmission_extra_roughness") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_FACTOR, 0, 0, ufbxi_mat_string("subsurface") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_COLOR, 0, 0, ufbxi_mat_string("subsurface_color") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_RADIUS, 0, 0, ufbxi_mat_string("subsurface_radius") },
@@ -11996,7 +11996,7 @@ static const ufbxi_shader_mapping ufbxi_arnold_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER, 0, 0, ufbxi_mat_string("transmissionScatter") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER_ANISOTROPY, 0, 0, ufbxi_mat_string("transmissionScatterAnisotropy") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_DISPERSION, 0, 0, ufbxi_mat_string("transmissionDispersion") },
-	{ UFBX_MATERIAL_PBR_TRANSMISSION_ROUGHNESS, 0, 0, ufbxi_mat_string("transmissionExtraRoughness") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_EXTRA_ROUGHNESS, 0, 0, ufbxi_mat_string("transmissionExtraRoughness") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_FACTOR, 0, 0, ufbxi_mat_string("subsurface") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_COLOR, 0, 0, ufbxi_mat_string("subsurfaceColor") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_RADIUS, 0, 0, ufbxi_mat_string("subsurfaceRadius") },
@@ -12269,6 +12269,11 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 	ufbxi_update_factor(&material->pbr.base_factor, &material->pbr.base_color);
 	ufbxi_update_factor(&material->pbr.specular_factor, &material->pbr.specular_color);
 	ufbxi_update_factor(&material->pbr.emission_factor, &material->pbr.emission_color);
+
+	// Patch transmission roughness if only extra roughness is defined
+	if (!material->pbr.transmission_roughness.has_value && material->pbr.roughness.has_value && material->pbr.transmission_extra_roughness.has_value) {
+		material->pbr.transmission_roughness.value_real = material->pbr.roughness.value_real + material->pbr.transmission_extra_roughness.value_real;
+	}
 }
 
 typedef enum {

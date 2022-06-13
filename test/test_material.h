@@ -486,7 +486,7 @@ UFBXT_FILE_TEST(maya_arnold_properties)
 	ufbxt_assert(22 == (int)round(100.0f * material->pbr.transmission_scatter.value_vec3.z));
 	ufbxt_assert(23 == (int)round(100.0f * material->pbr.transmission_scatter_anisotropy.value_vec3.x));
 	ufbxt_assert(24 == (int)round(100.0f * material->pbr.transmission_dispersion.value_vec3.x));
-	ufbxt_assert(25 == (int)round(100.0f * material->pbr.transmission_roughness.value_vec3.x));
+	ufbxt_assert(25 == (int)round(100.0f * material->pbr.transmission_extra_roughness.value_vec3.x));
 	ufbxt_assert(26 == (int)round(100.0f * material->pbr.subsurface_factor.value_vec3.x));
 	ufbxt_assert(27 == (int)round(100.0f * material->pbr.subsurface_color.value_vec3.x));
 	ufbxt_assert(28 == (int)round(100.0f * material->pbr.subsurface_color.value_vec3.y));
@@ -532,6 +532,9 @@ UFBXT_FILE_TEST(maya_arnold_properties)
 	ufbxt_assert(68 == (int)round(100.0f * material->pbr.matte_factor.value_vec3.x));
 	ufbxt_assert(69 == material->pbr.transmission_priority.value_int);
 
+	// Computed
+	ufbxt_assert_close_real(err, material->pbr.transmission_roughness.value_real, 0.36f); // 11+25
+
 	ufbxt_assert(material->pbr.subsurface_type.value_int == 1);
 	ufbxt_assert(material->pbr.transmission_enable_in_aov.value_int != 0);
 	ufbxt_assert(material->pbr.thin_walled.value_int != 0);
@@ -573,7 +576,7 @@ UFBXT_FILE_TEST(maya_osl_properties)
 	ufbxt_assert(22 == (int)round(100.0f * material->pbr.transmission_scatter.value_vec3.z));
 	ufbxt_assert(23 == (int)round(100.0f * material->pbr.transmission_scatter_anisotropy.value_vec3.x));
 	ufbxt_assert(24 == (int)round(100.0f * material->pbr.transmission_dispersion.value_vec3.x));
-	ufbxt_assert(25 == (int)round(100.0f * material->pbr.transmission_roughness.value_vec3.x));
+	ufbxt_assert(25 == (int)round(100.0f * material->pbr.transmission_extra_roughness.value_vec3.x));
 	ufbxt_assert(26 == (int)round(100.0f * material->pbr.subsurface_factor.value_vec3.x));
 	ufbxt_assert(27 == (int)round(100.0f * material->pbr.subsurface_color.value_vec3.x));
 	ufbxt_assert(28 == (int)round(100.0f * material->pbr.subsurface_color.value_vec3.y));
@@ -608,6 +611,9 @@ UFBXT_FILE_TEST(maya_osl_properties)
 	ufbxt_assert(57 == (int)round(100.0f * material->pbr.opacity.value_vec3.x));
 	ufbxt_assert(58 == (int)round(100.0f * material->pbr.opacity.value_vec3.y));
 	ufbxt_assert(59 == (int)round(100.0f * material->pbr.opacity.value_vec3.z));
+
+	// Computed
+	ufbxt_assert_close_real(err, material->pbr.transmission_roughness.value_real, 0.36f); // 11+25
 
 	ufbxt_assert(material->pbr.thin_walled.value_int != 0);
 }
