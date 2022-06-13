@@ -1783,6 +1783,9 @@ typedef enum ufbx_shader_type {
 	// 3ds Max Physical Material
 	// https://knowledge.autodesk.com/support/3ds-max/learn-explore/caas/CloudHelp/cloudhelp/2022/ENU/3DSMax-Lighting-Shading/files/GUID-C1328905-7783-4917-AB86-FC3CC19E8972-htm.html
 	UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL,
+	// Stingray ShaderFX shader graph.
+	// Contains a serialized `"ShaderGraph"` in `ufbx_props`.
+	UFBX_SHADER_SHADERFX_GRAPH,
 	// Variation of the FBX phong shader that can recover PBR properties like
 	// `metalness` or `roughness` from the FBX non-physical values.
 	UFBX_SHADER_BLENDER_PHONG,
@@ -1869,6 +1872,7 @@ typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_MATTE_ENABLED,
 	UFBX_MATERIAL_PBR_MATTE_FACTOR,
 	UFBX_MATERIAL_PBR_MATTE_COLOR,
+	UFBX_MATERIAL_PBR_AMBIENT_OCCLUSION,
 	UFBX_MATERIAL_PBR_THIN_WALLED,
 	UFBX_MATERIAL_PBR_CAUSTICS,
 	UFBX_MATERIAL_PBR_EXIT_TO_BACKGROUND,
@@ -1959,6 +1963,7 @@ typedef struct ufbx_material_pbr_maps {
 			ufbx_material_map matte_enabled;
 			ufbx_material_map matte_factor;
 			ufbx_material_map matte_color;
+			ufbx_material_map ambient_occlusion;
 			ufbx_material_map thin_walled;
 			ufbx_material_map caustics;
 			ufbx_material_map exit_to_background;

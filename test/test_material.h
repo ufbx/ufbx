@@ -180,6 +180,51 @@ UFBXT_FILE_TEST(max_physical_material_textures)
 }
 #endif
 
+UFBXT_FILE_TEST(maya_shaderfx_pbs_material)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "StingrayPBS1");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_SHADERFX_GRAPH);
+
+	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_color.value_vec3.x));
+	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value_vec3.y));
+	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value_vec3.z));
+	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.metalness.value_vec3.x));
+	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.roughness.value_vec3.x));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.emission_color.value_vec3.x));
+	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.emission_color.value_vec3.y));
+	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.emission_color.value_vec3.z));
+	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.emission_factor.value_real));
+	ufbxt_assert_close_real(err, material->pbr.base_factor.value_real, 1.0f);
+
+	ufbxt_check_material_texture(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.normal_map.texture, "checkerboard_normal.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.metalness.texture, "checkerboard_metallic.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.roughness.texture, "checkerboard_roughness.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.ambient_occlusion.texture, "checkerboard_weight.png", true);
+
+	ufbxt_assert(material->pbr.base_color.texture_enabled == true);
+	ufbxt_assert(material->pbr.normal_map.texture_enabled == false);
+	ufbxt_assert(material->pbr.metalness.texture_enabled == true);
+	ufbxt_assert(material->pbr.roughness.texture_enabled == false);
+	ufbxt_assert(material->pbr.emission_color.texture_enabled == true);
+	ufbxt_assert(material->pbr.ambient_occlusion.texture_enabled == false);
+
+	ufbx_shader *shader = material->shader;
+	ufbxt_assert(shader);
+
+	if (scene->metadata.version >= 7000) {
+		ufbx_blob blob = ufbx_find_blob(&shader->props, "ShaderGraph", ufbx_empty_blob);
+		ufbxt_assert(blob.size == 32918);
+		uint32_t hash_ref = ufbxt_fnv1a(blob.data, blob.size);
+		ufbxt_assert(hash_ref == 0x7be121c5u);
+	}
+}
+#endif
+
 UFBXT_FILE_TEST(blender_279_internal_textures)
 #if UFBXT_IMPL
 {

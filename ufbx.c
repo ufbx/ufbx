@@ -5500,7 +5500,12 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 		break;
 
 	default:
+		if (name == ufbxi_BinaryData) {
+			info->type = uc->opts.ignore_embedded ? '-' : 'C';
+			return true;
+		}
 		break;
+
 	}
 
 	return false;
@@ -5591,10 +5596,6 @@ static ufbxi_noinline bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_st
 
 	case UFBXI_PARSE_TAKE:
 		if (name == ufbxi_Model) return true;
-		break;
-
-	default:
-		if (name == ufbxi_BinaryData) return true;
 		break;
 
 	}
@@ -7584,6 +7585,77 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_maps(ufbxi_context *uc)
 
 // -- Reading the parsed data
 
+ufbxi_noinline static void ufbxi_decode_base64(char *dst, const char *src, size_t src_length)
+{
+	uint8_t table[256] = { 0 };
+	for (char c = 'A'; c <= 'Z'; c++) table[(size_t)c] = (uint8_t)(c - 'A');
+	for (char c = 'a'; c <= 'z'; c++) table[(size_t)c] = (uint8_t)(26 + (c - 'a'));
+	for (char c = '0'; c <= '9'; c++) table[(size_t)c] = (uint8_t)(52 + (c - '0'));
+	table[(size_t)'+'] = 62;
+	table[(size_t)'/'] = 63;
+
+	for (size_t i = 0; i + 4 <= src_length; i += 4) {
+		uint32_t a = table[(size_t)(uint8_t)src[i + 0]];
+		uint32_t b = table[(size_t)(uint8_t)src[i + 1]];
+		uint32_t c = table[(size_t)(uint8_t)src[i + 2]];
+		uint32_t d = table[(size_t)(uint8_t)src[i + 3]];
+
+		dst[0] = (char)(uint8_t)(a << 2 | b >> 4);
+		dst[1] = (char)(uint8_t)(b << 4 | c >> 2);
+		dst[2] = (char)(uint8_t)(c << 6 | d);
+		dst += 3;
+	}
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_embedded_blob(ufbxi_context *uc, ufbx_blob *dst, ufbxi_node *node)
+{
+	if (!node) return 1;
+
+	ufbxi_value_array *content_arr = ufbxi_get_array(node, 'C');
+	if (content_arr && content_arr->size > 0) {
+		ufbx_string content;
+		size_t num_parts = content_arr->size;
+		ufbx_string *parts = (ufbx_string*)content_arr->data;
+		if (num_parts == 1) {
+			content = parts[0];
+		} else {
+			size_t total_size = 0;
+			ufbxi_for(ufbx_string, part, parts, num_parts) {
+				total_size += part->length;
+			}
+			ufbxi_buf *dst_buf = uc->from_ascii ? &uc->tmp_parse : &uc->result;
+			char *dst = ufbxi_push(dst_buf, char, total_size);
+			ufbxi_check(dst);
+			content.data = dst;
+			content.length = total_size;
+			ufbxi_for(ufbx_string, part, parts, num_parts) {
+				memcpy(dst, part->data, part->length);
+				dst += part->length;
+			}
+		}
+
+		if (uc->from_ascii) {
+			if (content.length % 4 == 0) {
+				size_t padding = 0;
+				while (padding < 2 && padding < content.length && content.data[content.length - 1 - padding] == '=') {
+					padding++;
+				}
+
+				dst->size = content.length / 4 * 3 - padding;
+				dst->data = ufbxi_push(&uc->result, char, dst->size + 3);
+				ufbxi_check(dst->data);
+
+				ufbxi_decode_base64((char*)dst->data, content.data, content.length);
+			}
+		} else {
+			dst->data = content.data;
+			dst->size = content.length;
+		}
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_property(ufbxi_context *uc, ufbxi_node *node, ufbx_prop *prop, int version)
 {
 	const char *type_str = NULL, *subtype_str = NULL;
@@ -7637,13 +7709,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_property(ufbxi_context *uc,
 	// Very unlikely, seems to only exist in some "non standard" FBX files
 	if (node->num_children > 0) {
 		ufbxi_node *binary = ufbxi_find_child(node, ufbxi_BinaryData);
-		if (binary) {
-			ufbx_string data;
-			if (ufbxi_get_val1(binary, "s", &data)) {
-				prop->value_blob.data = data.data;
-				prop->value_blob.size = data.length;
-			}
-		}
+		ufbxi_check(ufbxi_read_embedded_blob(uc, &prop->value_blob, binary));
 	}
 	
 	return 1;
@@ -9494,28 +9560,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_layered_texture(ufbxi_conte
 	return 1;
 }
 
-ufbxi_noinline static void ufbxi_decode_base64(char *dst, const char *src, size_t src_length)
-{
-	uint8_t table[256] = { 0 };
-	for (char c = 'A'; c <= 'Z'; c++) table[(size_t)c] = (uint8_t)(c - 'A');
-	for (char c = 'a'; c <= 'z'; c++) table[(size_t)c] = (uint8_t)(26 + (c - 'a'));
-	for (char c = '0'; c <= '9'; c++) table[(size_t)c] = (uint8_t)(52 + (c - '0'));
-	table[(size_t)'+'] = 62;
-	table[(size_t)'/'] = 63;
-
-	for (size_t i = 0; i + 4 <= src_length; i += 4) {
-		uint32_t a = table[(size_t)(uint8_t)src[i + 0]];
-		uint32_t b = table[(size_t)(uint8_t)src[i + 1]];
-		uint32_t c = table[(size_t)(uint8_t)src[i + 2]];
-		uint32_t d = table[(size_t)(uint8_t)src[i + 3]];
-
-		dst[0] = (char)(uint8_t)(a << 2 | b >> 4);
-		dst[1] = (char)(uint8_t)(b << 4 | c >> 2);
-		dst[2] = (char)(uint8_t)(c << 6 | d);
-		dst += 3;
-	}
-}
-
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_video(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_video *video = ufbxi_push_element(uc, info, ufbx_video, UFBX_ELEMENT_VIDEO);
@@ -9536,47 +9580,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_video(ufbxi_context *uc, uf
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_RelativeFilename, "b", &video->raw_relative_filename));
 
 	ufbxi_node *content_node = ufbxi_find_child(node, ufbxi_Content);
-	ufbxi_value_array *content_arr = content_node ? ufbxi_get_array(content_node, 'C') : NULL;
-	if (content_arr && content_arr->size > 0) {
-		ufbx_string content;
-		size_t num_parts = content_arr->size;
-		ufbx_string *parts = (ufbx_string*)content_arr->data;
-		if (num_parts == 1) {
-			content = parts[0];
-		} else {
-			size_t total_size = 0;
-			ufbxi_for(ufbx_string, part, parts, num_parts) {
-				total_size += part->length;
-			}
-			ufbxi_buf *dst_buf = uc->from_ascii ? &uc->tmp_parse : &uc->result;
-			char *dst = ufbxi_push(dst_buf, char, total_size);
-			ufbxi_check(dst);
-			content.data = dst;
-			content.length = total_size;
-			ufbxi_for(ufbx_string, part, parts, num_parts) {
-				memcpy(dst, part->data, part->length);
-				dst += part->length;
-			}
-		}
-
-		if (uc->from_ascii) {
-			if (content.length % 4 == 0) {
-				size_t padding = 0;
-				while (padding < 2 && padding < content.length && content.data[content.length - 1 - padding] == '=') {
-					padding++;
-				}
-
-				video->content.size = content.length / 4 * 3 - padding;
-				video->content.data = ufbxi_push(&uc->result, char, video->content.size + 3);
-				ufbxi_check(video->content.data);
-
-				ufbxi_decode_base64((char*)video->content.data, content.data, content.length);
-			}
-		} else {
-			video->content.data = content.data;
-			video->content.size = content.length;
-		}
-	}
+	ufbxi_check(ufbxi_read_embedded_blob(uc, &video->content, content_node));
 
 	return 1;
 }
@@ -11846,7 +11850,9 @@ typedef struct {
 typedef struct {
 	const ufbxi_shader_mapping *data;
 	size_t count;
-	ufbx_string map_suffix;
+	ufbx_string texture_prefix;
+	ufbx_string texture_suffix;
+	ufbx_string texture_enabled_prefix;
 	ufbx_string texture_enabled_suffix;
 } ufbxi_shader_mapping_list;
 
@@ -12059,6 +12065,19 @@ static const ufbxi_shader_mapping ufbxi_3ds_max_physical_material_pbr_mapping[] 
 	{ UFBX_MATERIAL_PBR_THIN_WALLED, 0, 0, ufbxi_mat_string("thin_walled") },
 };
 
+// NOTE: These are just the names used by the standard PBS "preset".
+// In _theory_ we could walk ShaderGraph but that's a bit out of scope for ufbx.
+static const ufbxi_shader_mapping ufbxi_shaderfx_graph_pbr_mapping[] = {
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("color") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("base_color") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("roughness") },
+	{ UFBX_MATERIAL_PBR_METALNESS, 0, 0, ufbxi_mat_string("metallic") },
+	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("normal") },
+	{ UFBX_MATERIAL_PBR_EMISSION_FACTOR, 0, 0, ufbxi_mat_string("emissive_intensity") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("emissive") },
+	{ UFBX_MATERIAL_PBR_AMBIENT_OCCLUSION, 0, 0, ufbxi_mat_string("ao") },
+};
+
 static const ufbxi_shader_mapping ufbxi_blender_phong_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("DiffuseColor") },
 	{ UFBX_MATERIAL_PBR_OPACITY, 0, UFBXI_MAT_TRANSFORM_BLENDER_OPACITY, ufbxi_mat_string("TransparencyFactor") },
@@ -12077,7 +12096,13 @@ static const ufbxi_shader_mapping_list ufbxi_shader_pbr_mappings[] = {
 	{ ufbxi_osl_standard_shader_pbr_mapping, ufbxi_arraycount(ufbxi_osl_standard_shader_pbr_mapping) }, // UFBX_SHADER_OSL_STANDARD_SURFACE
 	{ ufbxi_arnold_shader_pbr_mapping, ufbxi_arraycount(ufbxi_arnold_shader_pbr_mapping) }, // UFBX_SHADER_ARNOLD_STANDARD_SURFACE
 	{ ufbxi_3ds_max_physical_material_pbr_mapping, ufbxi_arraycount(ufbxi_3ds_max_physical_material_pbr_mapping),
-		ufbxi_string_literal("_map"), ufbxi_string_literal("_map_on") }, // UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL
+		{ NULL, 0 }, ufbxi_string_literal("_map"),    // texture_prefix/suffix
+		{ NULL, 0 }, ufbxi_string_literal("_map_on"), // texture_enabled_prefix/suffix
+	}, // UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL
+	{ ufbxi_shaderfx_graph_pbr_mapping, ufbxi_arraycount(ufbxi_shaderfx_graph_pbr_mapping),
+		ufbxi_string_literal("TEX_"), ufbxi_string_literal("_map"), // texture_prefix/suffix
+		ufbxi_string_literal("use_"), ufbxi_string_literal("_map"), // texture_enabled_prefix/suffix
+	}, // UFBX_SHADER_SHADERFX_GRAPH
 	{ ufbxi_blender_phong_shader_pbr_mapping, ufbxi_arraycount(ufbxi_blender_phong_shader_pbr_mapping) }, // UFBX_SHADER_BLENDER_PHONG
 };
 
@@ -12090,19 +12115,20 @@ enum {
 };
 
 ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufbx_material_map *maps, ufbx_shader *shader,
-	const ufbxi_shader_mapping *mappings, size_t count, ufbx_string prefix, ufbx_string suffix, uint32_t flags)
+	const ufbxi_shader_mapping *mappings, size_t count, ufbx_string prefix, ufbx_string prefix2, ufbx_string suffix, uint32_t flags)
 {
 	char combined_name[512];
 
 	ufbxi_for(const ufbxi_shader_mapping, mapping, mappings, count) {
-		ufbx_string name = ufbx_find_shader_prop_len(shader, mapping->prop, mapping->prop_len);
-
-		if (prefix.length > 0 || suffix.length > 0) {
-			if (name.length + prefix.length + suffix.length <= sizeof(combined_name)) {
+		ufbx_string name = { mapping->prop, mapping->prop_len };
+		if (prefix.length > 0 || prefix2.length > 0 || suffix.length > 0) {
+			if (name.length + prefix.length + prefix2.length + suffix.length <= sizeof(combined_name)) {
 				char *dst = combined_name;
 
 				memcpy(dst, prefix.data, prefix.length);
 				dst += prefix.length;
+				memcpy(dst, prefix2.data, prefix2.length);
+				dst += prefix2.length;
 				memcpy(dst, name.data, name.length);
 				dst += name.length;
 				memcpy(dst, suffix.data, suffix.length);
@@ -12112,6 +12138,8 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 				name.length = (size_t)(dst - combined_name);
 			}
 		}
+
+		name = ufbx_find_shader_prop_len(shader, name.data, name.length);
 
 		ufbx_prop *prop = ufbx_find_prop_len(&material->props, name.data, name.length);
 		ufbx_material_map *map = &maps[mapping->index];
@@ -12169,7 +12197,7 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 
 	ufbxi_fetch_mapping_maps(material, material->fbx.maps, NULL,
 		ufbxi_base_fbx_mapping, ufbxi_arraycount(ufbxi_base_fbx_mapping),
-		ufbx_empty_string, ufbx_empty_string,
+		ufbx_empty_string, ufbx_empty_string, ufbx_empty_string,
 		UFBXI_MAPPING_FETCH_VALUE | UFBXI_MAPPING_FETCH_TEXTURE);
 
 	ufbxi_shader_mapping_list list = ufbxi_shader_pbr_mappings[material->shader_type];
@@ -12179,19 +12207,19 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 		prefix = material->shader_prop_prefix;
 	}
 
-	if (list.map_suffix.length > 0) {
+	if (list.texture_prefix.length > 0 || list.texture_suffix.length > 0) {
 		ufbxi_fetch_mapping_maps(material, material->pbr.maps, shader,
-			list.data, list.count, prefix, list.map_suffix,
+			list.data, list.count, prefix, list.texture_prefix, list.texture_suffix,
 			UFBXI_MAPPING_FETCH_TEXTURE);
 	}
 
 	ufbxi_fetch_mapping_maps(material, material->pbr.maps, shader,
-		list.data, list.count, prefix, ufbx_empty_string,
+		list.data, list.count, prefix, ufbx_empty_string, ufbx_empty_string,
 		UFBXI_MAPPING_FETCH_VALUE | UFBXI_MAPPING_FETCH_TEXTURE);
 
-	if (list.texture_enabled_suffix.length > 0) {
+	if (list.texture_enabled_prefix.length > 0 || list.texture_enabled_suffix.length > 0) {
 		ufbxi_fetch_mapping_maps(material, material->pbr.maps, shader,
-			list.data, list.count, prefix, list.texture_enabled_suffix,
+			list.data, list.count, prefix, list.texture_enabled_prefix, list.texture_enabled_suffix,
 			UFBXI_MAPPING_FETCH_TEXTURE_ENABLED);
 	}
 
@@ -13124,6 +13152,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				shader->type = UFBX_SHADER_ARNOLD_STANDARD_SURFACE;
 			} else if (!strcmp(api->value_str.data, "OSL")) {
 				shader->type = UFBX_SHADER_OSL_STANDARD_SURFACE;
+			} else if (!strcmp(api->value_str.data, "SFX_PBS_SHADER")) {
+				shader->type = UFBX_SHADER_SHADERFX_GRAPH;
 			}
 		}
 	}
