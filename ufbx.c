@@ -19367,7 +19367,9 @@ static ufbxi_noinline void ufbxi_init_ref(ufbxi_refcount *refcount, uint32_t mag
 static ufbxi_noinline void ufbxi_retain_ref(ufbxi_refcount *refcount)
 {
 	ufbx_assert(refcount->self_magic == UFBXI_REFCOUNT_IMP_MAGIC);
-	ufbxi_atomic_counter_inc(&refcount->refcount);
+	size_t count = ufbxi_atomic_counter_inc(&refcount->refcount);
+	ufbxi_ignore(count);
+	ufbx_assert(count < SIZE_MAX / 2);
 }
 
 static ufbxi_noinline void ufbxi_release_ref(ufbxi_refcount *refcount)
