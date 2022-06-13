@@ -371,6 +371,8 @@ UFBXT_FILE_TEST(blender_293_material_mapping)
 	ufbxt_assert_close_real(err, material->fbx.transparency_factor.value_vec3.x, 0.544f);
 	ufbxt_assert_close_real(err, material->pbr.opacity.value_vec3.x, 0.456f);
 	ufbxt_assert_close_real(err, material->pbr.roughness.value_vec3.x, 0.123f);
+
+	ufbxt_assert(material->pbr.roughness.texture_inverted == false);
 }
 #endif
 
@@ -391,12 +393,14 @@ UFBXT_FILE_TEST(maya_different_shaders)
 	ufbxt_assert_close_vec3(err, lambert1->fbx.diffuse_color.value_vec3, g);
 	ufbxt_assert_close_vec3(err, lambert1->pbr.base_color.value_vec3, g);
 	ufbxt_assert_close_real(err, lambert1->pbr.specular_factor.value_vec3.x, 0.0f);
+	ufbxt_assert(lambert1->pbr.roughness.texture_inverted == false);
 
 	ufbxt_assert(phong1->shader_type == UFBX_SHADER_FBX_PHONG);
 	ufbxt_assert(!strcmp(phong1->shading_model_name.data, "phong"));
 	ufbxt_assert_close_vec3(err, phong1->fbx.diffuse_color.value_vec3, b);
 	ufbxt_assert_close_vec3(err, phong1->pbr.base_color.value_vec3, b);
 	ufbxt_assert_close_real(err, phong1->pbr.specular_factor.value_vec3.x, 1.0f);
+	ufbxt_assert(phong1->pbr.roughness.texture_inverted == true);
 
 	ufbxt_assert(arnold->shader_type == UFBX_SHADER_ARNOLD_STANDARD_SURFACE);
 	ufbxt_assert(!strcmp(arnold->shading_model_name.data, "unknown"));
