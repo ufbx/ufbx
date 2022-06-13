@@ -231,6 +231,23 @@ UFBXT_FILE_TEST(max_physical_material_properties)
 }
 #endif
 
+UFBXT_FILE_TEST(max_physical_material_inverted)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "InvertedMaterial");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL);
+
+	ufbxt_assert(material->pbr.roughness.texture_inverted);
+	ufbxt_assert_close_real(err, material->pbr.roughness.value_real, 0.9f);
+	ufbxt_assert(material->pbr.transmission_roughness.texture_inverted);
+	ufbxt_assert_close_real(err, material->pbr.transmission_roughness.value_real, 0.8f);
+	ufbxt_assert(material->pbr.coat_roughness.texture_inverted);
+	ufbxt_assert_close_real(err, material->pbr.coat_roughness.value_real, 0.7f);
+}
+#endif
+
 UFBXT_FILE_TEST(max_physical_material_textures)
 #if UFBXT_IMPL
 {
