@@ -69,6 +69,7 @@ jobs:
 
   ci_windows:
     runs-on: windows-2019
+    needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v2
       - name: Download reference hashes
@@ -92,6 +93,7 @@ jobs:
 
   ci_macos:
     runs-on: macos-latest
+    needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v2
       - name: Download reference hashes
@@ -240,6 +242,7 @@ jobs:
 
   ci_arm32:
     runs-on: [self-hosted, ARM]
+    needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v2
         with:
@@ -263,6 +266,7 @@ jobs:
 
   ci_arm64:
     runs-on: [self-hosted, ARM64]
+    needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v2
         with:
