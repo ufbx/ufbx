@@ -25,6 +25,7 @@ ufbxt_noinline static void ufbxt_hash_init(ufbxt_hash *h, FILE *dump_file)
 		uint16_t val = 0xbbaa;
 		memcpy(buf, &val, 2);
 		h->big_endian = buf[0] == 0xbb;
+		h->big_endian = false;
 	}
 
 	if (dump_file) {
