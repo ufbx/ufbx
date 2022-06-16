@@ -183,8 +183,6 @@ jobs:
         with:
           name: reference-hashes
           path: build
-      - name: Prepare hashdump directory
-        run: mkdir build/hashdumps
       - name: Update apt
         run: sudo apt-get update
       - name: Install apt dependencies
