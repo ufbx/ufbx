@@ -319,7 +319,7 @@ jobs:
   ci_post_hashes:
     runs-on: ubuntu-latest
     if: ${{ always() }}
-    needs: [ci_ubuntu]
+    needs: [ci_ubuntu, ci_windows, ci_macos, ci_wasm, ci_arm32, ci_arm64]
     steps:
       - uses: actions/checkout@v2
         with:
