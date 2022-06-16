@@ -200,9 +200,13 @@ jobs:
       - name: Run PowerPC tests
         run: qemu-ppc build/ppc-runner -d data
       - name: Compile PowerPC hash_scene
-        run: python3 -m ziglang cc -fno-sanitize=undefined -ffp-contract=off -target powerpc-linux misc/fdlibm.c test/hash_scene.c -g -o build/ppc-hasher
+        run: |
+          python3 -m ziglang cc -fno-sanitize=undefined -ffp-contract=off -target powerpc-linux misc/fdlibm.c test/hash_scene.c -g -o build/ppc_hasher_debug
+          python3 -m ziglang cc -fno-sanitize=undefined -ffp-contract=off -O2 -target powerpc-linux misc/fdlibm.c test/hash_scene.c -g -o build/ppc_hasher_release
       - name: Check PowerPC hashes
-        run: qemu-ppc build/ppc-hasher --check build/hashes.txt --dump build/hashdumps/ci_exotic_powerpc.txt --max-dump-errors 3
+        run: |
+          qemu-ppc build/ppc_hasher_debug --check build/hashes.txt --dump build/hashdumps/ci_exotic_powerpc_debug.txt --max-dump-errors 3
+          qemu-ppc build/ppc_hasher_release --check build/hashes.txt --dump build/hashdumps/ci_exotic_powerpc_release.txt --max-dump-errors 3
       - name: Compile runner.c
         run: gcc -c test/runner.c -o build/runner.o
       - name: Build and run standard C99
