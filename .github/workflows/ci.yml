@@ -64,7 +64,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
-          name: hashdumps
+          name: hash-dumps
           path: build/hashdump_ci_linux.txt.gz
 
   ci_windows:
@@ -89,7 +89,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
-          name: hashdumps
+          name: hash-dumps
           path: build/hashdump_ci_windows.txt.gz
 
   ci_macos:
@@ -113,7 +113,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
-          name: hashdumps
+          name: hash-dumps
           path: build/hashdump_ci_macos.txt.gz
 
   ci_picort:
@@ -239,7 +239,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
-          name: hashdumps
+          name: hash-dumps
           path: build/hashdump_ci_exotic.txt.gz
 
   ci_wasm:
@@ -276,7 +276,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
-          name: hashdumps
+          name: hash-dumps
           path: build/hashdump_ci_wasm.txt.gz
 
   ci_arm32:
@@ -300,7 +300,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
-          name: hashdumps
+          name: hash-dumps
           path: build/hashdump_ci_arm32.txt.gz
 
   ci_arm64:
@@ -324,7 +324,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
-          name: hashdumps
+          name: hash-dumps
           path: build/hashdump_ci_arm64.txt.gz
 
   ci_dataset:
@@ -355,7 +355,7 @@ jobs:
       - name: Download combined hashdumps
         uses: actions/download-artifact@v3
         with:
-          name: hashdumps
+          name: hash-dumps
           path: build/ci-hashdumps
       - name: List files to dump
         run: python3 misc/hash_diff.py list build/ci-hashdumps -o build/dumped-files.txt
@@ -371,5 +371,5 @@ jobs:
         uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
-          name: hashdumps
+          name: hash-dumps
           path: build/hashdump_ci_reference.txt.gz
