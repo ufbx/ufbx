@@ -1143,7 +1143,7 @@ async def main():
 
         hash_file = argv.hash_file
         if not hash_file:
-            hash_file = "build/hashes.txt"
+            hash_file = os.path.join(build_path, "hashes.txt")
         if hash_file and os.path.exists(hash_file):
             log_comment("-- Compiling and running hash_scene --")
             target_tasks = []
