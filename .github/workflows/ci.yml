@@ -48,7 +48,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: reference-hashes
-          path: build/hashes.txt
+          path: build
       - name: Run tests
         run: python3 misc/run_tests.py tests readme threadcheck hashes --runner ci_linux
       - name: Verbose test info
@@ -76,8 +76,8 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: reference-hashes
-          path: build\hashes.txt
-      - run: dir build
+          path: build
+      - run: type build\hashes.txt
       - name: Run tests
         run: python misc/run_tests.py tests readme threadcheck hashes --runner ci_windows
       - name: Verbose test info
@@ -101,7 +101,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: reference-hashes
-          path: build/hashes.txt
+          path: build
       - name: Run tests
         run: python3 misc/run_tests.py tests readme threadcheck hashes --remove-compiler gcc --additional-compiler gcc-11 --remove-arch x86 --runner ci_macos
       - name: Compile ufbx as Objective C
@@ -243,7 +243,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: reference-hashes
-          path: build/hashes.txt
+          path: build
       - name: Run tests
         run: python3 misc/run_tests.py tests hashes --wasi-sdk build/wasi-sdk --compiler wasi_clang --runner ci_wasm
       - name: Compress hashdumps
@@ -267,7 +267,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: reference-hashes
-          path: build/hashes.txt
+          path: build
       - name: Run tests
         run: python3 misc/run_tests.py tests hashes --no-sanitize --threads 2 --runner ci_arm64
       - name: Compress hashdumps
@@ -291,7 +291,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: reference-hashes
-          path: build/hashes.txt
+          path: build
       - name: Run tests
         run: python3 misc/run_tests.py tests hashes --no-sanitize --threads 2 --runner ci_arm64
       - name: Compress hashdumps
