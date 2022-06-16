@@ -1,6 +1,7 @@
 import gzip
 import os
 import re
+import sys
 
 def fetch_dumps(file):
     files = { }
@@ -23,6 +24,7 @@ def fetch_dumps(file):
 def diff_dump(dump, ref, file, runner, ref_runner):
     num_lines = max(len(dump), len(ref))
     stack = []
+    has_diff = False
 
     for ix in range(num_lines):
         dline = dump[ix] if ix < len(dump) else ""
@@ -37,6 +39,8 @@ def diff_dump(dump, ref, file, runner, ref_runner):
             span = 2
             start = max(0, ix - span)
             stop = ix + span + 1
+
+            has_diff = True
 
             print(f"== {file}")
             print()
@@ -62,6 +66,7 @@ def diff_dump(dump, ref, file, runner, ref_runner):
 
             print()
             break
+    return has_diff
 
 def do_compress(argv):
     with gzip.open(argv.o, "wt", compresslevel=8) as outf:
@@ -98,6 +103,8 @@ def do_diff(argv):
     if not ref_tuple:
         return
 
+    has_diff = False
+
     ref_runner, ref_file = ref_tuple
     for file in os.listdir(argv.directory):
         path = os.path.join(argv.directory, file)
@@ -106,7 +113,11 @@ def do_diff(argv):
             for runner, files in dumps.items():
                 for file, dump in files.items():
                     ref = ref_file[file]
-                    diff_dump(dump, ref, file, runner, ref_runner)
+                    if diff_dump(dump, ref, file, runner, ref_runner):
+                        has_diff = True
+    
+    if has_diff:
+        sys.exit(1)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
