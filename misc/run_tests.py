@@ -331,9 +331,12 @@ class GCCCompiler(Compiler):
             if config.get("arch", "") == "x86":
                 use_sse = True
 
-        if config.get("arch", "") == "x86" and config.get("ieee754"):
+        if config.get("arch", "") == "x86" and config.get("ieee754", False):
             use_sse = True
             args += ["-mfpmath=sse"]
+
+        if config.get("ieee754", False):
+            args += ["-ffp-contract=off"]
 
         if use_sse:
             args += ["-msse", "-msse2"]
