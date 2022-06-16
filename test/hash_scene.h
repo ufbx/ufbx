@@ -1,6 +1,8 @@
 #ifndef UFBXT_HASH_SCENE_H_INCLUDED
 #define UFBXT_HASH_SCENE_H_INCLUDED
 
+#include "testing_basics.h"
+
 #include <stdio.h>
 #include <assert.h>
 
@@ -14,7 +16,7 @@ typedef struct ufbxt_hash {
 	bool big_endian;
 } ufbxt_hash;
 
-static void ufbxt_hash_init(ufbxt_hash *h, FILE *dump_file)
+ufbxt_noinline static void ufbxt_hash_init(ufbxt_hash *h, FILE *dump_file)
 {
 	memset(h, 0, sizeof(ufbxt_hash));
 	h->state = UINT64_C(0xcbf29ce484222325);
@@ -31,7 +33,7 @@ static void ufbxt_hash_init(ufbxt_hash *h, FILE *dump_file)
 	}
 }
 
-static uint64_t ufbxt_hash_finish(ufbxt_hash *h)
+ufbxt_noinline static uint64_t ufbxt_hash_finish(ufbxt_hash *h)
 {
 	if (h->dump_file) {
 		fflush(h->dump_file);
@@ -39,7 +41,7 @@ static uint64_t ufbxt_hash_finish(ufbxt_hash *h)
 	return h->state;
 }
 
-static void ufbxt_push_tag(ufbxt_hash *h, const char *tag)
+ufbxt_noinline static void ufbxt_push_tag(ufbxt_hash *h, const char *tag)
 {
 	if (!h->dumping) return;
 	if (tag[0] == '&') {
@@ -62,7 +64,7 @@ static void ufbxt_push_tag(ufbxt_hash *h, const char *tag)
 	h->at_tag = true;
 }
 
-static void ufbxt_push_tag_index(ufbxt_hash *h, size_t index)
+ufbxt_noinline static void ufbxt_push_tag_index(ufbxt_hash *h, size_t index)
 {
 	if (!h->dumping) return;
 	char buf[128];
@@ -70,7 +72,7 @@ static void ufbxt_push_tag_index(ufbxt_hash *h, size_t index)
 	ufbxt_push_tag(h, buf);
 }
 
-static void ufbxt_pop_tag(ufbxt_hash *h)
+ufbxt_noinline static void ufbxt_pop_tag(ufbxt_hash *h)
 {
 	if (!h->dumping) return;
 	if (h->at_value || h->at_tag) {
@@ -86,7 +88,7 @@ static void ufbxt_pop_tag(ufbxt_hash *h)
 	}
 }
 
-static void ufbxt_dump_data(ufbxt_hash *h, const void *data, size_t size, bool reverse)
+ufbxt_noinline static void ufbxt_dump_data(ufbxt_hash *h, const void *data, size_t size, bool reverse)
 {
 	assert(h->at_tag && !h->at_value);
 	h->at_tag = false;
@@ -106,7 +108,7 @@ static void ufbxt_dump_data(ufbxt_hash *h, const void *data, size_t size, bool r
 	}
 }
 
-static void ufbxt_hash_data(ufbxt_hash *h, const void *data, size_t size)
+ufbxt_noinline static void ufbxt_hash_data(ufbxt_hash *h, const void *data, size_t size)
 {
 	const char *d = (const char*)data;
 	uint64_t state = h->state;
@@ -120,7 +122,7 @@ static void ufbxt_hash_data(ufbxt_hash *h, const void *data, size_t size)
 	}
 }
 
-static void ufbxt_hash_endian_data(ufbxt_hash *h, const void *data, size_t size)
+ufbxt_noinline static void ufbxt_hash_endian_data(ufbxt_hash *h, const void *data, size_t size)
 {
 	bool reverse = !h->big_endian;
 	assert(size == 1 || size == 2 || size == 4 || size == 8);
@@ -146,7 +148,7 @@ static void ufbxt_hash_endian_data(ufbxt_hash *h, const void *data, size_t size)
 #define ufbxt_hash_pod_imp(h, v) ufbxt_hash_endian_data((h), &(v), sizeof((v)))
 #define ufbxt_hash_pod(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_pod_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_float_imp(ufbxt_hash *h, float v)
+ufbxt_noinline static void ufbxt_hash_float_imp(ufbxt_hash *h, float v)
 {
 	if (v == v) {
 		ufbxt_hash_pod_imp(h, v);
@@ -156,7 +158,7 @@ static void ufbxt_hash_float_imp(ufbxt_hash *h, float v)
 	}
 }
 
-static void ufbxt_hash_double_imp(ufbxt_hash *h, double v)
+ufbxt_noinline static void ufbxt_hash_double_imp(ufbxt_hash *h, double v)
 {
 	if (v == v) {
 		ufbxt_hash_pod_imp(h, v);
@@ -166,7 +168,7 @@ static void ufbxt_hash_double_imp(ufbxt_hash *h, double v)
 	}
 }
 
-static void ufbxt_hash_real_imp(ufbxt_hash *h, ufbx_real v)
+ufbxt_noinline static void ufbxt_hash_real_imp(ufbxt_hash *h, ufbx_real v)
 {
 	if (v == v) {
 		ufbxt_hash_pod_imp(h, v);
@@ -176,7 +178,7 @@ static void ufbxt_hash_real_imp(ufbxt_hash *h, ufbx_real v)
 	}
 }
 
-static void ufbxt_hash_size_t_imp(ufbxt_hash *h, size_t v)
+ufbxt_noinline static void ufbxt_hash_size_t_imp(ufbxt_hash *h, size_t v)
 {
 	uint64_t u = v;
 	ufbxt_hash_pod_imp(h, u);
@@ -187,20 +189,20 @@ static void ufbxt_hash_size_t_imp(ufbxt_hash *h, size_t v)
 #define ufbxt_hash_real(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_real_imp(h, v), ufbxt_pop_tag(h))
 #define ufbxt_hash_size_t(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_size_t_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_vec2_imp(ufbxt_hash *h, ufbx_vec2 v)
+ufbxt_noinline static void ufbxt_hash_vec2_imp(ufbxt_hash *h, ufbx_vec2 v)
 {
 	ufbxt_hash_real(h, v.x);
 	ufbxt_hash_real(h, v.y);
 }
 
-static void ufbxt_hash_vec3_imp(ufbxt_hash *h, ufbx_vec3 v)
+ufbxt_noinline static void ufbxt_hash_vec3_imp(ufbxt_hash *h, ufbx_vec3 v)
 {
 	ufbxt_hash_real(h, v.x);
 	ufbxt_hash_real(h, v.y);
 	ufbxt_hash_real(h, v.z);
 }
 
-static void ufbxt_hash_vec4_imp(ufbxt_hash *h, ufbx_vec4 v)
+ufbxt_noinline static void ufbxt_hash_vec4_imp(ufbxt_hash *h, ufbx_vec4 v)
 {
 	ufbxt_hash_real(h, v.x);
 	ufbxt_hash_real(h, v.y);
@@ -208,7 +210,7 @@ static void ufbxt_hash_vec4_imp(ufbxt_hash *h, ufbx_vec4 v)
 	ufbxt_hash_real(h, v.w);
 }
 
-static void ufbxt_hash_quat_imp(ufbxt_hash *h, ufbx_quat v)
+ufbxt_noinline static void ufbxt_hash_quat_imp(ufbxt_hash *h, ufbx_quat v)
 {
 	ufbxt_hash_real(h, v.x);
 	ufbxt_hash_real(h, v.y);
@@ -221,14 +223,14 @@ static void ufbxt_hash_quat_imp(ufbxt_hash *h, ufbx_quat v)
 #define ufbxt_hash_vec4(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_vec4_imp(h, v), ufbxt_pop_tag(h))
 #define ufbxt_hash_quat(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_quat_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_transform_imp(ufbxt_hash *h, ufbx_transform v)
+ufbxt_noinline static void ufbxt_hash_transform_imp(ufbxt_hash *h, ufbx_transform v)
 {
 	ufbxt_hash_vec3(h, v.translation);
 	ufbxt_hash_quat(h, v.rotation);
 	ufbxt_hash_vec3(h, v.scale);
 }
 
-static void ufbxt_hash_matrix_imp(ufbxt_hash *h, ufbx_matrix v)
+ufbxt_noinline static void ufbxt_hash_matrix_imp(ufbxt_hash *h, ufbx_matrix v)
 {
 	ufbxt_hash_vec3(h, v.cols[0]);
 	ufbxt_hash_vec3(h, v.cols[1]);
@@ -236,7 +238,7 @@ static void ufbxt_hash_matrix_imp(ufbxt_hash *h, ufbx_matrix v)
 	ufbxt_hash_vec3(h, v.cols[3]);
 }
 
-static void ufbxt_hash_string_imp(ufbxt_hash *h, ufbx_string v)
+ufbxt_noinline static void ufbxt_hash_string_imp(ufbxt_hash *h, ufbx_string v)
 {
 	ufbxt_hash_size_t(h, v.length);
 	ufbxt_push_tag(h, "v.data");
@@ -244,7 +246,7 @@ static void ufbxt_hash_string_imp(ufbxt_hash *h, ufbx_string v)
 	ufbxt_pop_tag(h);
 }
 
-static void ufbxt_hash_blob_imp(ufbxt_hash *h, ufbx_blob v)
+ufbxt_noinline static void ufbxt_hash_blob_imp(ufbxt_hash *h, ufbx_blob v)
 {
 	ufbxt_hash_size_t(h, v.size);
 	ufbxt_push_tag(h, "v.data");
@@ -257,7 +259,7 @@ static void ufbxt_hash_blob_imp(ufbxt_hash *h, ufbx_blob v)
 #define ufbxt_hash_string(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_string_imp(h, v), ufbxt_pop_tag(h))
 #define ufbxt_hash_blob(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_blob_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_element_ref_imp(ufbxt_hash *h, const void *v)
+ufbxt_noinline static void ufbxt_hash_element_ref_imp(ufbxt_hash *h, const void *v)
 {
 	const ufbx_element *elem = (const ufbx_element*)v;
 	uint32_t id = elem ? elem->element_id : UINT32_MAX;
@@ -266,7 +268,7 @@ static void ufbxt_hash_element_ref_imp(ufbxt_hash *h, const void *v)
 
 #define ufbxt_hash_element_ref(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_element_ref_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_connection_imp(ufbxt_hash *h, ufbx_connection v)
+ufbxt_noinline static void ufbxt_hash_connection_imp(ufbxt_hash *h, ufbx_connection v)
 {
 	ufbxt_hash_element_ref(h, v.src);
 	ufbxt_hash_element_ref(h, v.dst);
@@ -314,7 +316,7 @@ static void ufbxt_hash_connection_imp(ufbxt_hash *h, ufbx_connection v)
 		ufbxt_pop_tag(h); \
 	} while (0)
 
-static void ufbxt_hash_prop_imp(ufbxt_hash *h, const ufbx_prop *v)
+ufbxt_noinline static void ufbxt_hash_prop_imp(ufbxt_hash *h, const ufbx_prop *v)
 {
 	ufbxt_hash_string(h, v->name);
 	ufbxt_hash_pod(h, v->_internal_key);
@@ -328,7 +330,7 @@ static void ufbxt_hash_prop_imp(ufbxt_hash *h, const ufbx_prop *v)
 
 #define ufbxt_hash_prop(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_prop_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_dom_value_imp(ufbxt_hash *h, const ufbx_dom_value *v)
+ufbxt_noinline static void ufbxt_hash_dom_value_imp(ufbxt_hash *h, const ufbx_dom_value *v)
 {
 	ufbxt_hash_pod(h, v->type);
 	ufbxt_hash_string(h, v->value_str);
@@ -357,7 +359,7 @@ static void ufbxt_hash_dom_value_imp(ufbxt_hash *h, const ufbx_dom_value *v)
 
 #define ufbxt_hash_dom_value(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_dom_value_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_dom_node_imp(ufbxt_hash *h, const ufbx_dom_node *v)
+ufbxt_noinline static void ufbxt_hash_dom_node_imp(ufbxt_hash *h, const ufbx_dom_node *v)
 {
 	ufbxt_hash_string(h, v->name);
 	ufbxt_hash_list(h, v->children, ufbxt_hash_dom_node_imp);
@@ -366,7 +368,7 @@ static void ufbxt_hash_dom_node_imp(ufbxt_hash *h, const ufbx_dom_node *v)
 
 #define ufbxt_hash_dom_node(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_dom_node_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_props_imp(ufbxt_hash *h, const ufbx_props *v)
+ufbxt_noinline static void ufbxt_hash_props_imp(ufbxt_hash *h, const ufbx_props *v)
 {
 	ufbxt_hash_list_ptr(h, v->props, ufbxt_hash_prop_imp);
 	ufbxt_hash_size_t(h, v->num_animated);
@@ -379,7 +381,7 @@ static void ufbxt_hash_props_imp(ufbxt_hash *h, const ufbx_props *v)
 
 #define ufbxt_hash_props(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_props_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_element_imp(ufbxt_hash *h, const ufbx_element *v)
+ufbxt_noinline static void ufbxt_hash_element_imp(ufbxt_hash *h, const ufbx_element *v)
 {
 	ufbxt_hash_string(h, v->name);
 	ufbxt_hash_props(h, &v->props);
@@ -391,14 +393,14 @@ static void ufbxt_hash_element_imp(ufbxt_hash *h, const ufbx_element *v)
 	ufbxt_hash_list(h, v->connections_dst, ufbxt_hash_connection_imp);
 }
 
-static void ufbxt_hash_unknown_imp(ufbxt_hash *h, const ufbx_unknown *v)
+ufbxt_noinline static void ufbxt_hash_unknown_imp(ufbxt_hash *h, const ufbx_unknown *v)
 {
 	ufbxt_hash_string(h, v->type);
 	ufbxt_hash_string(h, v->super_type);
 	ufbxt_hash_string(h, v->sub_type);
 }
 
-static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v)
+ufbxt_noinline static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v)
 {
 	ufbxt_hash_element_ref(h, v->parent);
 	ufbxt_hash_list(h, v->children, ufbxt_hash_element_ref_imp);
@@ -424,7 +426,7 @@ static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v)
 	ufbxt_hash_pod(h, v->node_depth);
 }
 
-static void ufbxt_hash_vertex_real_imp(ufbxt_hash *h, const ufbx_vertex_real *v)
+ufbxt_noinline static void ufbxt_hash_vertex_real_imp(ufbxt_hash *h, const ufbx_vertex_real *v)
 {
 	ufbxt_hash_pod(h, v->exists);
 	ufbxt_hash_list(h, v->values, ufbxt_hash_real_imp);
@@ -433,7 +435,7 @@ static void ufbxt_hash_vertex_real_imp(ufbxt_hash *h, const ufbx_vertex_real *v)
 	ufbxt_hash_pod(h, v->unique_per_vertex);
 }
 
-static void ufbxt_hash_vertex_vec2_imp(ufbxt_hash *h, const ufbx_vertex_vec2 *v)
+ufbxt_noinline static void ufbxt_hash_vertex_vec2_imp(ufbxt_hash *h, const ufbx_vertex_vec2 *v)
 {
 	ufbxt_hash_pod(h, v->exists);
 	ufbxt_hash_list(h, v->values, ufbxt_hash_vec2_imp);
@@ -442,7 +444,7 @@ static void ufbxt_hash_vertex_vec2_imp(ufbxt_hash *h, const ufbx_vertex_vec2 *v)
 	ufbxt_hash_pod(h, v->unique_per_vertex);
 }
 
-static void ufbxt_hash_vertex_vec3_imp(ufbxt_hash *h, const ufbx_vertex_vec3 *v)
+ufbxt_noinline static void ufbxt_hash_vertex_vec3_imp(ufbxt_hash *h, const ufbx_vertex_vec3 *v)
 {
 	ufbxt_hash_pod(h, v->exists);
 	ufbxt_hash_list(h, v->values, ufbxt_hash_vec3_imp);
@@ -451,7 +453,7 @@ static void ufbxt_hash_vertex_vec3_imp(ufbxt_hash *h, const ufbx_vertex_vec3 *v)
 	ufbxt_hash_pod(h, v->unique_per_vertex);
 }
 
-static void ufbxt_hash_vertex_vec4_imp(ufbxt_hash *h, const ufbx_vertex_vec4 *v)
+ufbxt_noinline static void ufbxt_hash_vertex_vec4_imp(ufbxt_hash *h, const ufbx_vertex_vec4 *v)
 {
 	ufbxt_hash_pod(h, v->exists);
 	ufbxt_hash_list(h, v->values, ufbxt_hash_vec4);
@@ -465,7 +467,7 @@ static void ufbxt_hash_vertex_vec4_imp(ufbxt_hash *h, const ufbx_vertex_vec4 *v)
 #define ufbxt_hash_vertex_vec3(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_vertex_vec3_imp(h, v), ufbxt_pop_tag(h))
 #define ufbxt_hash_vertex_vec4(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_vertex_vec4_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_uv_set_imp(ufbxt_hash *h, const ufbx_uv_set *v)
+ufbxt_noinline static void ufbxt_hash_uv_set_imp(ufbxt_hash *h, const ufbx_uv_set *v)
 {
 	ufbxt_hash_string(h, v->name);
 	ufbxt_hash_pod(h, v->index);
@@ -474,14 +476,14 @@ static void ufbxt_hash_uv_set_imp(ufbxt_hash *h, const ufbx_uv_set *v)
 	ufbxt_hash_vertex_vec3(h, &v->vertex_bitangent);
 }
 
-static void ufbxt_hash_color_set_imp(ufbxt_hash *h, const ufbx_color_set *v)
+ufbxt_noinline static void ufbxt_hash_color_set_imp(ufbxt_hash *h, const ufbx_color_set *v)
 {
 	ufbxt_hash_string(h, v->name);
 	ufbxt_hash_pod(h, v->index);
 	ufbxt_hash_vertex_vec4(h, &v->vertex_color);
 }
 
-static void ufbxt_hash_mesh_material_imp(ufbxt_hash *h, const ufbx_mesh_material *v)
+ufbxt_noinline static void ufbxt_hash_mesh_material_imp(ufbxt_hash *h, const ufbx_mesh_material *v)
 {
 	ufbxt_hash_element_ref(h, v->material);
 	ufbxt_hash_size_t(h, v->num_faces);
@@ -489,19 +491,19 @@ static void ufbxt_hash_mesh_material_imp(ufbxt_hash *h, const ufbx_mesh_material
 	ufbxt_hash_list(h, v->face_indices, ufbxt_hash_pod_imp);
 }
 
-static void ufbxt_hash_subdivision_weight_range_imp(ufbxt_hash *h, ufbx_subdivision_weight_range v)
+ufbxt_noinline static void ufbxt_hash_subdivision_weight_range_imp(ufbxt_hash *h, ufbx_subdivision_weight_range v)
 {
 	ufbxt_hash_pod(h, v.weight_begin);
 	ufbxt_hash_pod(h, v.num_weights);
 }
 
-static void ufbxt_hash_subdivision_weight_imp(ufbxt_hash *h, ufbx_subdivision_weight v)
+ufbxt_noinline static void ufbxt_hash_subdivision_weight_imp(ufbxt_hash *h, ufbx_subdivision_weight v)
 {
 	ufbxt_hash_real(h, v.weight);
 	ufbxt_hash_pod(h, v.index);
 }
 
-static void ufbxt_hash_subdivision_result_imp(ufbxt_hash *h, const ufbx_subdivision_result *v)
+ufbxt_noinline static void ufbxt_hash_subdivision_result_imp(ufbxt_hash *h, const ufbx_subdivision_result *v)
 {
 	ufbxt_hash_list(h, v->source_vertex_ranges, ufbxt_hash_subdivision_weight_range_imp);
 	ufbxt_hash_list(h, v->source_vertex_weights, ufbxt_hash_subdivision_weight_imp);
@@ -509,13 +511,13 @@ static void ufbxt_hash_subdivision_result_imp(ufbxt_hash *h, const ufbx_subdivis
 	ufbxt_hash_list(h, v->skin_cluster_weights, ufbxt_hash_subdivision_weight_imp);
 }
 
-static void ufbxt_hash_face_imp(ufbxt_hash *h, ufbx_face v)
+ufbxt_noinline static void ufbxt_hash_face_imp(ufbxt_hash *h, ufbx_face v)
 {
 	ufbxt_hash_pod(h, v.index_begin);
 	ufbxt_hash_pod(h, v.num_indices);
 }
 
-static void ufbxt_hash_edge_imp(ufbxt_hash *h, ufbx_edge v)
+ufbxt_noinline static void ufbxt_hash_edge_imp(ufbxt_hash *h, ufbx_edge v)
 {
 	ufbxt_hash_pod(h, v.a);
 	ufbxt_hash_pod(h, v.b);
@@ -523,7 +525,7 @@ static void ufbxt_hash_edge_imp(ufbxt_hash *h, ufbx_edge v)
 
 #define ufbxt_hash_subdivision_result(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_subdivision_result_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_mesh_imp(ufbxt_hash *h, const ufbx_mesh *v)
+ufbxt_noinline static void ufbxt_hash_mesh_imp(ufbxt_hash *h, const ufbx_mesh *v)
 {
 	ufbxt_hash_size_t(h, v->num_vertices);
 	ufbxt_hash_size_t(h, v->num_indices);
@@ -581,7 +583,7 @@ static void ufbxt_hash_mesh_imp(ufbxt_hash *h, const ufbx_mesh *v)
 	ufbxt_hash_pod(h, v->from_tessellated_nurbs);
 }
 
-static void ufbxt_hash_light_imp(ufbxt_hash *h, const ufbx_light *v)
+ufbxt_noinline static void ufbxt_hash_light_imp(ufbxt_hash *h, const ufbx_light *v)
 {
 	ufbxt_hash_vec3(h, v->color);
 	ufbxt_hash_real(h, v->intensity);
@@ -595,7 +597,7 @@ static void ufbxt_hash_light_imp(ufbxt_hash *h, const ufbx_light *v)
 	ufbxt_hash_pod(h, v->cast_shadows);
 }
 
-static void ufbxt_hash_camera_imp(ufbxt_hash *h, const ufbx_camera *v)
+ufbxt_noinline static void ufbxt_hash_camera_imp(ufbxt_hash *h, const ufbx_camera *v)
 {
 	ufbxt_hash_pod(h, v->resolution_is_pixels);
 	ufbxt_hash_vec2(h, v->resolution);
@@ -611,18 +613,18 @@ static void ufbxt_hash_camera_imp(ufbxt_hash *h, const ufbx_camera *v)
 	ufbxt_hash_real(h, v->squeeze_ratio);
 }
 
-static void ufbxt_hash_bone_imp(ufbxt_hash *h, const ufbx_bone *v)
+ufbxt_noinline static void ufbxt_hash_bone_imp(ufbxt_hash *h, const ufbx_bone *v)
 {
 	ufbxt_hash_real(h, v->radius);
 	ufbxt_hash_real(h, v->relative_length);
 	ufbxt_hash_pod(h, v->is_root);
 }
 
-static void ufbxt_hash_empty_imp(ufbxt_hash *h, const ufbx_empty *v)
+ufbxt_noinline static void ufbxt_hash_empty_imp(ufbxt_hash *h, const ufbx_empty *v)
 {
 }
 
-static void ufbxt_hash_nurbs_basis_imp(ufbxt_hash *h, const ufbx_nurbs_basis *v)
+ufbxt_noinline static void ufbxt_hash_nurbs_basis_imp(ufbxt_hash *h, const ufbx_nurbs_basis *v)
 {
 	ufbxt_hash_pod(h, v->order);
 	ufbxt_hash_pod(h, v->topology);
@@ -637,13 +639,13 @@ static void ufbxt_hash_nurbs_basis_imp(ufbxt_hash *h, const ufbx_nurbs_basis *v)
 
 #define ufbxt_hash_nurbs_basis(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_nurbs_basis_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_line_segment_imp(ufbxt_hash *h, ufbx_line_segment v)
+ufbxt_noinline static void ufbxt_hash_line_segment_imp(ufbxt_hash *h, ufbx_line_segment v)
 {
 	ufbxt_hash_pod(h, v.index_begin);
 	ufbxt_hash_pod(h, v.num_indices);
 }
 
-static void ufbxt_hash_line_curve_imp(ufbxt_hash *h, const ufbx_line_curve *v)
+ufbxt_noinline static void ufbxt_hash_line_curve_imp(ufbxt_hash *h, const ufbx_line_curve *v)
 {
 	ufbxt_hash_vec3(h, v->color);
 	ufbxt_hash_list(h, v->control_points, ufbxt_hash_vec3_imp);
@@ -652,13 +654,13 @@ static void ufbxt_hash_line_curve_imp(ufbxt_hash *h, const ufbx_line_curve *v)
 	ufbxt_hash_pod(h, v->from_tessellated_nurbs);
 }
 
-static void ufbxt_hash_nurbs_curve_imp(ufbxt_hash *h, const ufbx_nurbs_curve *v)
+ufbxt_noinline static void ufbxt_hash_nurbs_curve_imp(ufbxt_hash *h, const ufbx_nurbs_curve *v)
 {
 	ufbxt_hash_nurbs_basis(h, &v->basis);
 	ufbxt_hash_list(h, v->control_points, ufbxt_hash_vec4_imp);
 }
 
-static void ufbxt_hash_nurbs_surface_imp(ufbxt_hash *h, const ufbx_nurbs_surface *v)
+ufbxt_noinline static void ufbxt_hash_nurbs_surface_imp(ufbxt_hash *h, const ufbx_nurbs_surface *v)
 {
 	ufbxt_hash_nurbs_basis(h, &v->basis_u);
 	ufbxt_hash_nurbs_basis(h, &v->basis_v);
@@ -671,40 +673,40 @@ static void ufbxt_hash_nurbs_surface_imp(ufbxt_hash *h, const ufbx_nurbs_surface
 	ufbxt_hash_element_ref(h, v->material);
 }
 
-static void ufbxt_hash_nurbs_trim_surface_imp(ufbxt_hash *h, const ufbx_nurbs_trim_surface *v)
+ufbxt_noinline static void ufbxt_hash_nurbs_trim_surface_imp(ufbxt_hash *h, const ufbx_nurbs_trim_surface *v)
 {
 }
 
-static void ufbxt_hash_nurbs_trim_boundary_imp(ufbxt_hash *h, const ufbx_nurbs_trim_boundary *v)
+ufbxt_noinline static void ufbxt_hash_nurbs_trim_boundary_imp(ufbxt_hash *h, const ufbx_nurbs_trim_boundary *v)
 {
 }
 
-static void ufbxt_hash_procedural_geometry_imp(ufbxt_hash *h, const ufbx_procedural_geometry *v)
+ufbxt_noinline static void ufbxt_hash_procedural_geometry_imp(ufbxt_hash *h, const ufbx_procedural_geometry *v)
 {
 }
 
-static void ufbxt_hash_stereo_camera_imp(ufbxt_hash *h, const ufbx_stereo_camera *v)
+ufbxt_noinline static void ufbxt_hash_stereo_camera_imp(ufbxt_hash *h, const ufbx_stereo_camera *v)
 {
 	ufbxt_hash_element_ref(h, v->left);
 	ufbxt_hash_element_ref(h, v->right);
 }
 
-static void ufbxt_hash_camera_switcher_imp(ufbxt_hash *h, const ufbx_camera_switcher *v)
+ufbxt_noinline static void ufbxt_hash_camera_switcher_imp(ufbxt_hash *h, const ufbx_camera_switcher *v)
 {
 }
 
-static void ufbxt_hash_marker_imp(ufbxt_hash *h, const ufbx_marker *v)
+ufbxt_noinline static void ufbxt_hash_marker_imp(ufbxt_hash *h, const ufbx_marker *v)
 {
 	ufbxt_hash_pod(h, v->type);
 }
 
-static void ufbxt_hash_lod_level_imp(ufbxt_hash *h, ufbx_lod_level v)
+ufbxt_noinline static void ufbxt_hash_lod_level_imp(ufbxt_hash *h, ufbx_lod_level v)
 {
 	ufbxt_hash_real(h, v.distance);
 	ufbxt_hash_pod(h, v.display);
 }
 
-static void ufbxt_hash_lod_group_imp(ufbxt_hash *h, const ufbx_lod_group *v)
+ufbxt_noinline static void ufbxt_hash_lod_group_imp(ufbxt_hash *h, const ufbx_lod_group *v)
 {
 	ufbxt_hash_pod(h, v->relative_distances);
 	ufbxt_hash_list(h, v->lod_levels, ufbxt_hash_lod_level_imp);
@@ -714,20 +716,20 @@ static void ufbxt_hash_lod_group_imp(ufbxt_hash *h, const ufbx_lod_group *v)
 	ufbxt_hash_real(h, v->distance_limit_max);
 }
 
-static void ufbxt_hash_skin_vertex_imp(ufbxt_hash *h, ufbx_skin_vertex v)
+ufbxt_noinline static void ufbxt_hash_skin_vertex_imp(ufbxt_hash *h, ufbx_skin_vertex v)
 {
 	ufbxt_hash_pod(h, v.weight_begin);
 	ufbxt_hash_pod(h, v.num_weights);
 	ufbxt_hash_real(h, v.dq_weight);
 }
 
-static void ufbxt_hash_skin_weight_imp(ufbxt_hash *h, ufbx_skin_weight v)
+ufbxt_noinline static void ufbxt_hash_skin_weight_imp(ufbxt_hash *h, ufbx_skin_weight v)
 {
 	ufbxt_hash_pod(h, v.cluster_index);
 	ufbxt_hash_real(h, v.weight);
 }
 
-static void ufbxt_hash_skin_deformer_imp(ufbxt_hash *h, const ufbx_skin_deformer *v)
+ufbxt_noinline static void ufbxt_hash_skin_deformer_imp(ufbxt_hash *h, const ufbx_skin_deformer *v)
 {
 	ufbxt_hash_pod(h, v->skinning_method);
 	ufbxt_hash_list(h, v->clusters, ufbxt_hash_element_ref_imp);
@@ -739,7 +741,7 @@ static void ufbxt_hash_skin_deformer_imp(ufbxt_hash *h, const ufbx_skin_deformer
 	ufbxt_hash_list(h, v->dq_weights, ufbxt_hash_real_imp);
 }
 
-static void ufbxt_hash_skin_cluster_imp(ufbxt_hash *h, const ufbx_skin_cluster *v)
+ufbxt_noinline static void ufbxt_hash_skin_cluster_imp(ufbxt_hash *h, const ufbx_skin_cluster *v)
 {
 	ufbxt_hash_element_ref(h, v->bone_node);
 	ufbxt_hash_matrix(h, v->geometry_to_bone);
@@ -752,25 +754,25 @@ static void ufbxt_hash_skin_cluster_imp(ufbxt_hash *h, const ufbx_skin_cluster *
 	ufbxt_hash_list(h, v->weights, ufbxt_hash_real_imp);
 }
 
-static void ufbxt_hash_blend_deformer_imp(ufbxt_hash *h, const ufbx_blend_deformer *v)
+ufbxt_noinline static void ufbxt_hash_blend_deformer_imp(ufbxt_hash *h, const ufbx_blend_deformer *v)
 {
 	ufbxt_hash_list(h, v->channels, ufbxt_hash_element_ref_imp);
 }
 
-static void ufbxt_hash_blend_keyframe_imp(ufbxt_hash *h, const ufbx_blend_keyframe *v)
+ufbxt_noinline static void ufbxt_hash_blend_keyframe_imp(ufbxt_hash *h, const ufbx_blend_keyframe *v)
 {
 	ufbxt_hash_element_ref(h, v->shape);
 	ufbxt_hash_real(h, v->target_weight);
 	ufbxt_hash_real(h, v->effective_weight);
 }
 
-static void ufbxt_hash_blend_channel_imp(ufbxt_hash *h, const ufbx_blend_channel *v)
+ufbxt_noinline static void ufbxt_hash_blend_channel_imp(ufbxt_hash *h, const ufbx_blend_channel *v)
 {
 	ufbxt_hash_real(h, v->weight);
 	ufbxt_hash_list_ptr(h, v->keyframes, ufbxt_hash_blend_keyframe_imp);
 }
 
-static void ufbxt_hash_blend_shape_imp(ufbxt_hash *h, const ufbx_blend_shape *v)
+ufbxt_noinline static void ufbxt_hash_blend_shape_imp(ufbxt_hash *h, const ufbx_blend_shape *v)
 {
 	ufbxt_hash_size_t(h, v->num_offsets);
 	ufbxt_hash_list(h, v->offset_vertices, ufbxt_hash_pod_imp);
@@ -778,7 +780,7 @@ static void ufbxt_hash_blend_shape_imp(ufbxt_hash *h, const ufbx_blend_shape *v)
 	ufbxt_hash_list(h, v->normal_offsets, ufbxt_hash_vec3_imp);
 }
 
-static void ufbxt_hash_cache_frame_imp(ufbxt_hash *h, const ufbx_cache_frame *v)
+ufbxt_noinline static void ufbxt_hash_cache_frame_imp(ufbxt_hash *h, const ufbx_cache_frame *v)
 {
 	ufbxt_hash_string(h, v->channel);
 	ufbxt_hash_double(h, v->time);
@@ -791,7 +793,7 @@ static void ufbxt_hash_cache_frame_imp(ufbxt_hash *h, const ufbx_cache_frame *v)
 	ufbxt_hash_pod(h, v->data_total_bytes);
 }
 
-static void ufbxt_hash_cache_channel_imp(ufbxt_hash *h, const ufbx_cache_channel *v)
+ufbxt_noinline static void ufbxt_hash_cache_channel_imp(ufbxt_hash *h, const ufbx_cache_channel *v)
 {
 	ufbxt_hash_string(h, v->name);
 	ufbxt_hash_pod(h, v->interpretation);
@@ -799,7 +801,7 @@ static void ufbxt_hash_cache_channel_imp(ufbxt_hash *h, const ufbx_cache_channel
 	ufbxt_hash_list_ptr(h, v->frames, ufbxt_hash_cache_frame_imp);
 }
 
-static void ufbxt_hash_geometry_cache_imp(ufbxt_hash *h, const ufbx_geometry_cache *v)
+ufbxt_noinline static void ufbxt_hash_geometry_cache_imp(ufbxt_hash *h, const ufbx_geometry_cache *v)
 {
 	ufbxt_hash_list_ptr(h, v->channels, ufbxt_hash_cache_channel_imp);
 	ufbxt_hash_list_ptr(h, v->frames, ufbxt_hash_cache_frame_imp);
@@ -808,13 +810,13 @@ static void ufbxt_hash_geometry_cache_imp(ufbxt_hash *h, const ufbx_geometry_cac
 
 #define ufbxt_hash_geometry_cache(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_geometry_cache_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_cache_deformer_imp(ufbxt_hash *h, const ufbx_cache_deformer *v)
+ufbxt_noinline static void ufbxt_hash_cache_deformer_imp(ufbxt_hash *h, const ufbx_cache_deformer *v)
 {
 	ufbxt_hash_string(h, v->channel);
 	ufbxt_hash_element_ref(h, v->file);
 }
 
-static void ufbxt_hash_cache_file_imp(ufbxt_hash *h, const ufbx_cache_file *v)
+ufbxt_noinline static void ufbxt_hash_cache_file_imp(ufbxt_hash *h, const ufbx_cache_file *v)
 {
 	ufbxt_hash_string(h, v->absolute_filename);
 	ufbxt_hash_string(h, v->relative_filename);
@@ -824,7 +826,7 @@ static void ufbxt_hash_cache_file_imp(ufbxt_hash *h, const ufbx_cache_file *v)
 	if (v->external_cache) ufbxt_hash_geometry_cache(h, v->external_cache);
 }
 
-static void ufbxt_hash_material_map(ufbxt_hash *h, const ufbx_material_map *v)
+ufbxt_noinline static void ufbxt_hash_material_map(ufbxt_hash *h, const ufbx_material_map *v)
 {
 	ufbxt_hash_vec4(h, v->value_vec4);
 	ufbxt_hash_pod(h, v->value_int);
@@ -834,14 +836,14 @@ static void ufbxt_hash_material_map(ufbxt_hash *h, const ufbx_material_map *v)
 	ufbxt_hash_pod(h, v->texture_inverted);
 }
 
-static void ufbxt_hash_material_texture_imp(ufbxt_hash *h, const ufbx_material_texture *v)
+ufbxt_noinline static void ufbxt_hash_material_texture_imp(ufbxt_hash *h, const ufbx_material_texture *v)
 {
 	ufbxt_hash_string(h, v->material_prop);
 	ufbxt_hash_string(h, v->shader_prop);
 	ufbxt_hash_element_ref(h, v->texture);
 }
 
-static void ufbxt_hash_material_imp(ufbxt_hash *h, const ufbx_material *v)
+ufbxt_noinline static void ufbxt_hash_material_imp(ufbxt_hash *h, const ufbx_material *v)
 {
 	ufbxt_push_tag(h, "fbx");
 	for (size_t i = 0; i < UFBX_MATERIAL_FBX_MAP_COUNT; i++) {
@@ -867,14 +869,14 @@ static void ufbxt_hash_material_imp(ufbxt_hash *h, const ufbx_material *v)
 	ufbxt_hash_list_ptr(h, v->textures, ufbxt_hash_material_texture_imp);
 }
 
-static void ufbxt_hash_texture_layer_imp(ufbxt_hash *h, const ufbx_texture_layer v)
+ufbxt_noinline static void ufbxt_hash_texture_layer_imp(ufbxt_hash *h, const ufbx_texture_layer v)
 {
 	ufbxt_hash_element_ref(h, v.texture);
 	ufbxt_hash_pod(h, v.blend_mode);
 	ufbxt_hash_real(h, v.alpha);
 }
 
-static void ufbxt_hash_texture_imp(ufbxt_hash *h, const ufbx_texture *v)
+ufbxt_noinline static void ufbxt_hash_texture_imp(ufbxt_hash *h, const ufbx_texture *v)
 {
 	ufbxt_hash_pod(h, v->type);
 
@@ -896,7 +898,7 @@ static void ufbxt_hash_texture_imp(ufbxt_hash *h, const ufbx_texture *v)
 	ufbxt_hash_matrix(h, v->uv_to_texture);
 }
 
-static void ufbxt_hash_video_imp(ufbxt_hash *h, const ufbx_video *v)
+ufbxt_noinline static void ufbxt_hash_video_imp(ufbxt_hash *h, const ufbx_video *v)
 {
 	ufbxt_hash_string(h, v->absolute_filename);
 	ufbxt_hash_string(h, v->relative_filename);
@@ -906,30 +908,30 @@ static void ufbxt_hash_video_imp(ufbxt_hash *h, const ufbx_video *v)
 	ufbxt_hash_blob(h, v->content);
 }
 
-static void ufbxt_hash_shader_imp(ufbxt_hash *h, const ufbx_shader *v)
+ufbxt_noinline static void ufbxt_hash_shader_imp(ufbxt_hash *h, const ufbx_shader *v)
 {
 	ufbxt_hash_pod(h, v->type);
 	ufbxt_hash_list(h, v->bindings, ufbxt_hash_element_ref_imp);
 }
 
-static void ufbxt_hash_shader_prop_binding_imp(ufbxt_hash *h, ufbx_shader_prop_binding v)
+ufbxt_noinline static void ufbxt_hash_shader_prop_binding_imp(ufbxt_hash *h, ufbx_shader_prop_binding v)
 {
 	ufbxt_hash_string(h, v.shader_prop);
 	ufbxt_hash_string(h, v.material_prop);
 }
 
-static void ufbxt_hash_shader_binding_imp(ufbxt_hash *h, const ufbx_shader_binding *v)
+ufbxt_noinline static void ufbxt_hash_shader_binding_imp(ufbxt_hash *h, const ufbx_shader_binding *v)
 {
 	ufbxt_hash_list(h, v->prop_bindings, ufbxt_hash_shader_prop_binding_imp);
 }
 
-static void ufbxt_hash_anim_layer_desc_imp(ufbxt_hash *h, ufbx_anim_layer_desc v)
+ufbxt_noinline static void ufbxt_hash_anim_layer_desc_imp(ufbxt_hash *h, ufbx_anim_layer_desc v)
 {
 	ufbxt_hash_element_ref(h, v.layer);
 	ufbxt_hash_real(h, v.weight);
 }
 
-static void ufbxt_hash_anim_imp(ufbxt_hash *h, const ufbx_anim *v)
+ufbxt_noinline static void ufbxt_hash_anim_imp(ufbxt_hash *h, const ufbx_anim *v)
 {
 	ufbxt_hash_list(h, v->layers, ufbxt_hash_anim_layer_desc_imp);
 	ufbxt_hash_pod(h, v->ignore_connections);
@@ -939,7 +941,7 @@ static void ufbxt_hash_anim_imp(ufbxt_hash *h, const ufbx_anim *v)
 
 #define ufbxt_hash_anim(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_anim_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_anim_stack_imp(ufbxt_hash *h, const ufbx_anim_stack *v)
+ufbxt_noinline static void ufbxt_hash_anim_stack_imp(ufbxt_hash *h, const ufbx_anim_stack *v)
 {
 	ufbxt_hash_double(h, v->time_begin);
 	ufbxt_hash_double(h, v->time_end);
@@ -948,7 +950,7 @@ static void ufbxt_hash_anim_stack_imp(ufbxt_hash *h, const ufbx_anim_stack *v)
 	ufbxt_hash_anim(h, &v->anim);
 }
 
-static void ufbxt_hash_anim_prop_imp(ufbxt_hash *h, const ufbx_anim_prop *v)
+ufbxt_noinline static void ufbxt_hash_anim_prop_imp(ufbxt_hash *h, const ufbx_anim_prop *v)
 {
 	ufbxt_hash_element_ref(h, v->element);
 	ufbxt_hash_pod(h, v->_internal_key);
@@ -956,7 +958,7 @@ static void ufbxt_hash_anim_prop_imp(ufbxt_hash *h, const ufbx_anim_prop *v)
 	ufbxt_hash_element_ref(h, v->anim_value);
 }
 
-static void ufbxt_hash_anim_layer_imp(ufbxt_hash *h, const ufbx_anim_layer *v)
+ufbxt_noinline static void ufbxt_hash_anim_layer_imp(ufbxt_hash *h, const ufbx_anim_layer *v)
 {
 	ufbxt_hash_real(h, v->weight);
 	ufbxt_hash_pod(h, v->weight_is_animated);
@@ -978,13 +980,13 @@ static void ufbxt_hash_anim_layer_imp(ufbxt_hash *h, const ufbx_anim_layer *v)
 	ufbxt_hash_pod(h, v->_element_id_bitmask[3]);
 }
 
-static void ufbxt_hash_anim_value_imp(ufbxt_hash *h, const ufbx_anim_value *v)
+ufbxt_noinline static void ufbxt_hash_anim_value_imp(ufbxt_hash *h, const ufbx_anim_value *v)
 {
 	ufbxt_hash_vec3(h, v->default_value);
 	ufbxt_hash_array(h, v->curves, ufbxt_hash_element_ref_imp);
 }
 
-static void ufbxt_hash_tangent_imp(ufbxt_hash *h, ufbx_tangent v)
+ufbxt_noinline static void ufbxt_hash_tangent_imp(ufbxt_hash *h, ufbx_tangent v)
 {
 	ufbxt_hash_float(h, v.dx);
 	ufbxt_hash_float(h, v.dy);
@@ -992,7 +994,7 @@ static void ufbxt_hash_tangent_imp(ufbxt_hash *h, ufbx_tangent v)
 
 #define ufbxt_hash_tangent(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_tangent_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_keyframe_imp(ufbxt_hash *h, const ufbx_keyframe *v)
+ufbxt_noinline static void ufbxt_hash_keyframe_imp(ufbxt_hash *h, const ufbx_keyframe *v)
 {
 	ufbxt_hash_double(h, v->time);
 	ufbxt_hash_real(h, v->value);
@@ -1001,12 +1003,12 @@ static void ufbxt_hash_keyframe_imp(ufbxt_hash *h, const ufbx_keyframe *v)
 	ufbxt_hash_tangent(h, v->right);
 }
 
-static void ufbxt_hash_anim_curve_imp(ufbxt_hash *h, const ufbx_anim_curve *v)
+ufbxt_noinline static void ufbxt_hash_anim_curve_imp(ufbxt_hash *h, const ufbx_anim_curve *v)
 {
 	ufbxt_hash_list_ptr(h, v->keyframes, ufbxt_hash_keyframe_imp);
 }
 
-static void ufbxt_hash_display_layer_imp(ufbxt_hash *h, const ufbx_display_layer *v)
+ufbxt_noinline static void ufbxt_hash_display_layer_imp(ufbxt_hash *h, const ufbx_display_layer *v)
 {
 	ufbxt_hash_list(h, v->nodes, ufbxt_hash_element_ref_imp);
 	ufbxt_hash_pod(h, v->visible);
@@ -1014,12 +1016,12 @@ static void ufbxt_hash_display_layer_imp(ufbxt_hash *h, const ufbx_display_layer
 	ufbxt_hash_vec3(h, v->ui_color);
 }
 
-static void ufbxt_hash_selection_set_imp(ufbxt_hash *h, const ufbx_selection_set *v)
+ufbxt_noinline static void ufbxt_hash_selection_set_imp(ufbxt_hash *h, const ufbx_selection_set *v)
 {
 	ufbxt_hash_list(h, v->nodes, ufbxt_hash_element_ref_imp);
 }
 
-static void ufbxt_hash_selection_node_imp(ufbxt_hash *h, const ufbx_selection_node *v)
+ufbxt_noinline static void ufbxt_hash_selection_node_imp(ufbxt_hash *h, const ufbx_selection_node *v)
 {
 	ufbxt_hash_element_ref(h, v->target_node);
 	ufbxt_hash_element_ref(h, v->target_mesh);
@@ -1030,18 +1032,18 @@ static void ufbxt_hash_selection_node_imp(ufbxt_hash *h, const ufbx_selection_no
 	ufbxt_hash_list(h, v->faces, ufbxt_hash_pod_imp);
 }
 
-static void ufbxt_hash_character_imp(ufbxt_hash *h, const ufbx_character *v)
+ufbxt_noinline static void ufbxt_hash_character_imp(ufbxt_hash *h, const ufbx_character *v)
 {
 }
 
-static void ufbxt_hash_constraint_target_imp(ufbxt_hash *h, const ufbx_constraint_target *v)
+ufbxt_noinline static void ufbxt_hash_constraint_target_imp(ufbxt_hash *h, const ufbx_constraint_target *v)
 {
 	ufbxt_hash_element_ref(h, v->node);
 	ufbxt_hash_real(h, v->weight);
 	ufbxt_hash_transform(h, v->transform);
 }
 
-static void ufbxt_hash_constraint_imp(ufbxt_hash *h, const ufbx_constraint *v)
+ufbxt_noinline static void ufbxt_hash_constraint_imp(ufbxt_hash *h, const ufbx_constraint *v)
 {
 	ufbxt_hash_pod(h, v->type);
 	ufbxt_hash_string(h, v->type_name);
@@ -1066,23 +1068,23 @@ static void ufbxt_hash_constraint_imp(ufbxt_hash *h, const ufbx_constraint *v)
 	ufbxt_hash_vec3(h, v->ik_pole_vector);
 }
 
-static void ufbxt_hash_bone_pose_imp(ufbxt_hash *h, const ufbx_bone_pose *v)
+ufbxt_noinline static void ufbxt_hash_bone_pose_imp(ufbxt_hash *h, const ufbx_bone_pose *v)
 {
 	ufbxt_hash_element_ref(h, v->bone_node);
 	ufbxt_hash_matrix(h, v->bone_to_world);
 }
 
-static void ufbxt_hash_pose_imp(ufbxt_hash *h, const ufbx_pose *v)
+ufbxt_noinline static void ufbxt_hash_pose_imp(ufbxt_hash *h, const ufbx_pose *v)
 {
 	ufbxt_hash_pod(h, v->bind_pose);
 	ufbxt_hash_list_ptr(h, v->bone_poses, ufbxt_hash_bone_pose_imp);
 }
 
-static void ufbxt_hash_metadata_object_imp(ufbxt_hash *h, const ufbx_metadata_object *v)
+ufbxt_noinline static void ufbxt_hash_metadata_object_imp(ufbxt_hash *h, const ufbx_metadata_object *v)
 {
 }
 
-static void ufbxt_hash_name_element_imp(ufbxt_hash *h, const ufbx_name_element *v)
+ufbxt_noinline static void ufbxt_hash_name_element_imp(ufbxt_hash *h, const ufbx_name_element *v)
 {
 	ufbxt_hash_string(h, v->name);
 	ufbxt_hash_pod(h, v->type);
@@ -1090,7 +1092,7 @@ static void ufbxt_hash_name_element_imp(ufbxt_hash *h, const ufbx_name_element *
 	ufbxt_hash_element_ref(h, v->element);
 }
 
-static void ufbxt_hash_application_imp(ufbxt_hash *h, const ufbx_application *v)
+ufbxt_noinline static void ufbxt_hash_application_imp(ufbxt_hash *h, const ufbx_application *v)
 {
 	ufbxt_hash_string(h, v->vendor);
 	ufbxt_hash_string(h, v->name);
@@ -1099,7 +1101,7 @@ static void ufbxt_hash_application_imp(ufbxt_hash *h, const ufbx_application *v)
 
 #define ufbxt_hash_application(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_application_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_metadata_imp(ufbxt_hash *h, const ufbx_metadata *v)
+ufbxt_noinline static void ufbxt_hash_metadata_imp(ufbxt_hash *h, const ufbx_metadata *v)
 {
 	ufbxt_hash_pod(h, v->ascii);
 	ufbxt_hash_pod(h, v->version);
@@ -1114,7 +1116,7 @@ static void ufbxt_hash_metadata_imp(ufbxt_hash *h, const ufbx_metadata *v)
 
 #define ufbxt_hash_metadata(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_metadata_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_coordinate_axes_imp(ufbxt_hash *h, ufbx_coordinate_axes v)
+ufbxt_noinline static void ufbxt_hash_coordinate_axes_imp(ufbxt_hash *h, ufbx_coordinate_axes v)
 {
 	ufbxt_hash_pod(h, v.right);
 	ufbxt_hash_pod(h, v.up);
@@ -1123,7 +1125,7 @@ static void ufbxt_hash_coordinate_axes_imp(ufbxt_hash *h, ufbx_coordinate_axes v
 
 #define ufbxt_hash_coordinate_axes(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_coordinate_axes_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_scene_settings_imp(ufbxt_hash *h, const ufbx_scene_settings *v)
+ufbxt_noinline static void ufbxt_hash_scene_settings_imp(ufbxt_hash *h, const ufbx_scene_settings *v)
 {
 	ufbxt_hash_props(h, &v->props);
 	ufbxt_hash_coordinate_axes(h, v->axes);
@@ -1139,7 +1141,7 @@ static void ufbxt_hash_scene_settings_imp(ufbxt_hash *h, const ufbx_scene_settin
 
 #define ufbxt_hash_scene_settings(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_scene_settings_imp(h, v), ufbxt_pop_tag(h))
 
-static void ufbxt_hash_scene_imp(ufbxt_hash *h, const ufbx_scene *v)
+ufbxt_noinline static void ufbxt_hash_scene_imp(ufbxt_hash *h, const ufbx_scene *v)
 {
 	ufbxt_hash_metadata(h, &v->metadata);
 	ufbxt_hash_scene_settings(h, &v->settings);
@@ -1197,7 +1199,7 @@ static void ufbxt_hash_scene_imp(ufbxt_hash *h, const ufbx_scene *v)
 	if (v->dom_root) ufbxt_hash_dom_node(h, v->dom_root);
 }
 
-static uint64_t ufbxt_hash_scene(const ufbx_scene *v, FILE *dump_file)
+ufbxt_noinline static uint64_t ufbxt_hash_scene(const ufbx_scene *v, FILE *dump_file)
 {
 	ufbxt_hash h;
 	ufbxt_hash_init(&h, dump_file);

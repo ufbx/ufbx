@@ -7,15 +7,7 @@
 #include <stdarg.h>
 #include <math.h>
 
-#define ufbxt_arraycount(arr) (sizeof(arr) / sizeof(*(arr)))
-
-#if defined(_MSC_VER)
-	#define ufbxt_noinline __declspec(noinline)
-#elif defined(__clang__) || defined(__GNUC__)
-	#define ufbxt_noinline __attribute__((noinline))
-#else
-	#define ufbxt_noinline
-#endif
+#include "testing_basics.h"
 
 // -- Vector helpers
 
