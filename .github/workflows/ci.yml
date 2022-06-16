@@ -27,7 +27,8 @@ jobs:
       - name: Generate reference hashes
         run: |
           python3 misc/generate_hashses.py --exe build/hash_scene -o build/hashes.txt --verbose
-      - uses: actions/upload-artifact@v3
+      - name: Upload reference hashes
+        uses: actions/upload-artifact@v3
         with:
           name: reference-hashes
           path: build/hashes.txt
@@ -43,7 +44,8 @@ jobs:
         run: sudo apt-get update
       - name: Install apt dependencies
         run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm-11
-      - uses: actions/download-artifact@v3
+      - name: Download reference hashes
+        uses: actions/download-artifact@v3
         with:
           name: reference-hashes
           path: build/hashes.txt
@@ -52,7 +54,8 @@ jobs:
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_linux.txt.gz
-      - uses: actions/upload-artifact@v3
+      - name: Upload hashdumps
+        uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
           name: hashdumps
@@ -250,7 +253,8 @@ jobs:
         run: |
           mkdir build
           clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
-      - uses: actions/download-artifact@v3
+      - name: Download combined hashdumps
+        uses: actions/download-artifact@v3
         with:
           name: hashdumps
           path: build/ci-hashdumps
@@ -264,7 +268,8 @@ jobs:
         run: python3 misc/hash_diff.py compress build/ref-hashdumps -o build/hashdump_ci_reference.txt.gz
       - name: Diff CI and reference dumps
         run: python3 misc/hash_diff.py diff build/ci-hashdumps --ref build/hashdump_ci_reference.txt.gz
-      - uses: actions/upload-artifact@v3
+      - name: Upload reference hashdumps
+        uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
           name: hashdumps
