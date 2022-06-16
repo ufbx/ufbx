@@ -191,6 +191,17 @@ jobs:
         run: python3 -m ziglang cc -fno-sanitize=undefined -target powerpc-linux ufbx.c test/runner.c -g -o build/ppc-runner
       - name: Run PowerPC tests
         run: qemu-ppc build/ppc-runner -d data
+      - name: Compile PowerPC hash_scene
+        run: python3 -m ziglang cc -fno-sanitize=undefined -ffp-contract=off -target powerpc-linux ufbx.c misc/fdlibm.c test/hash_scene.c -g -o build/ppc-hasher
+      - name: Download reference hashes
+        uses: actions/download-artifact@v3
+        with:
+          name: reference-hashes
+          path: build
+      - name: Prepare hashdump directory
+        run: mkdir build/hashdumps
+      - name: Check PowerPC hashes
+        run: qemu-ppc build/ppc-hasher --check build/hashes.txt --dump build/hashdumps/ci_exotic_powerpc.txt --max-dump-errors 3
       - name: Compile runner.c
         run: gcc -c test/runner.c -o build/runner.o
       - name: Build and run standard C99
@@ -218,6 +229,15 @@ jobs:
         run: |
           g++ -Wall -Wextra -Werror -pthread -std=c++11 -DUFBX_STANDARD_C -x c++ ufbx.c test/threadcheck.cpp -lm -o build/threadcheck-cpp11
           build/threadcheck-cpp11 data/maya_cube_7500_binary.fbx 2
+      - name: Compress hashdumps
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_exotic.txt.gz
+      - name: Upload hashdumps
+        uses: actions/upload-artifact@v3
+        if: ${{ always() && !cancelled() }}
+        with:
+          name: hashdumps
+          path: build/hashdump_ci_exotic.txt.gz
 
   ci_wasm:
     runs-on: ubuntu-latest
