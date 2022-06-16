@@ -175,6 +175,7 @@ jobs:
 
   ci_exotic:
     runs-on: ubuntu-latest
+    needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v2
       - name: Update apt
@@ -192,7 +193,7 @@ jobs:
       - name: Run PowerPC tests
         run: qemu-ppc build/ppc-runner -d data
       - name: Compile PowerPC hash_scene
-        run: python3 -m ziglang cc -fno-sanitize=undefined -ffp-contract=off -target powerpc-linux ufbx.c misc/fdlibm.c test/hash_scene.c -g -o build/ppc-hasher
+        run: python3 -m ziglang cc -fno-sanitize=undefined -ffp-contract=off -target powerpc-linux misc/fdlibm.c test/hash_scene.c -g -o build/ppc-hasher
       - name: Download reference hashes
         uses: actions/download-artifact@v3
         with:
@@ -340,7 +341,7 @@ jobs:
   ci_post_hashes:
     runs-on: ubuntu-latest
     if: ${{ always() }}
-    needs: [ci_ubuntu, ci_windows, ci_macos, ci_wasm, ci_arm32, ci_arm64]
+    needs: [ci_ubuntu, ci_windows, ci_macos, ci_wasm, ci_arm32, ci_arm64, ci_exotic]
     steps:
       - uses: actions/checkout@v2
         with:
