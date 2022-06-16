@@ -178,6 +178,13 @@ jobs:
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v2
+      - name: Download reference hashes
+        uses: actions/download-artifact@v3
+        with:
+          name: reference-hashes
+          path: build
+      - name: Prepare hashdump directory
+        run: mkdir build/hashdumps
       - name: Update apt
         run: sudo apt-get update
       - name: Install apt dependencies
@@ -185,7 +192,7 @@ jobs:
       - name: Install zig cc via PIP
         run: sudo pip3 install ziglang
       - name: Run tests with TCC
-        run: python3 misc/run_tests.py tests --additional-compiler tcc --compiler tcc --remove-arch x86
+        run: python3 misc/run_tests.py tests hashes --additional-compiler tcc --compiler tcc --remove-arch x86 --runner ci_exotic
       - name: Compile ufbx.c wth x86 TCC
         run: i386-tcc -Wall -Werror -c ufbx.c -o build/tcc-ufbx-x86.o
       - name: Compile PowerPC tests
@@ -194,13 +201,6 @@ jobs:
         run: qemu-ppc build/ppc-runner -d data
       - name: Compile PowerPC hash_scene
         run: python3 -m ziglang cc -fno-sanitize=undefined -ffp-contract=off -target powerpc-linux misc/fdlibm.c test/hash_scene.c -g -o build/ppc-hasher
-      - name: Download reference hashes
-        uses: actions/download-artifact@v3
-        with:
-          name: reference-hashes
-          path: build
-      - name: Prepare hashdump directory
-        run: mkdir build/hashdumps
       - name: Check PowerPC hashes
         run: qemu-ppc build/ppc-hasher --check build/hashes.txt --dump build/hashdumps/ci_exotic_powerpc.txt --max-dump-errors 3
       - name: Compile runner.c
