@@ -26,7 +26,7 @@ jobs:
           clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
       - name: Generate reference hashes
         run: |
-          python3 misc/generate_hashses.py --exe build/hasher -o build/hashes.txt --verbose
+          python3 misc/generate_hashses.py --exe build/hash_scene -o build/hashes.txt --verbose
       - uses: actions/upload-artifact@v3
         with:
           name: reference-hashes
