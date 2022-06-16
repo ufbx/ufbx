@@ -76,7 +76,8 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: reference-hashes
-          path: build/hashes.txt
+          path: build\hashes.txt
+      - run: dir build
       - name: Run tests
         run: python misc/run_tests.py tests readme threadcheck hashes --runner ci_windows
       - name: Verbose test info
