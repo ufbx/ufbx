@@ -93,8 +93,12 @@ def do_list(argv):
 def do_diff(argv):
     with gzip.open(argv.ref, "rt") as inf:
         ref_dumps = fetch_dumps(inf)
-    ref_runner, ref_file = next(iter(ref_dumps.items()))
 
+    ref_tuple = next(iter(ref_dumps.items()), None)
+    if not ref_tuple:
+        return
+
+    ref_runner, ref_file = ref_tuple
     for file in os.listdir(argv.directory):
         path = os.path.join(argv.directory, file)
         with gzip.open(path, "rt") as inf:
