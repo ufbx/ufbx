@@ -1190,6 +1190,34 @@ struct ufbx_empty {
 
 // -- Node attributes (curves/surfaces)
 
+// Segment of a `ufbx_line_curve`, indices refer to `ufbx_line_curve.point_indces[]`
+typedef struct ufbx_line_segment {
+	uint32_t index_begin;
+	uint32_t num_indices;
+} ufbx_line_segment;
+
+UFBX_LIST_TYPE(ufbx_line_segment_list, ufbx_line_segment);
+
+struct ufbx_line_curve {
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t typed_id;
+		ufbx_node_list instances;
+	}; };
+
+	ufbx_vec3 color;
+
+	ufbx_vec3_list control_points; // < List of possible values the line passes through
+	ufbx_int32_list point_indices; // < Indices to `control_points[]` the line goes through
+
+	ufbx_line_segment_list segments;
+
+	// Tessellation (result)
+	bool from_tessellated_nurbs;
+};
+
 typedef enum ufbx_nurbs_topology {
 	// The endpoints are not connected.
 	UFBX_NURBS_TOPOLOGY_OPEN,
@@ -1237,34 +1265,6 @@ typedef struct ufbx_nurbs_basis {
 	bool valid;
 
 } ufbx_nurbs_basis;
-
-// Segment of a `ufbx_line_curve`, indices refer to `ufbx_line_curve.point_indces[]`
-typedef struct ufbx_line_segment {
-	uint32_t index_begin;
-	uint32_t num_indices;
-} ufbx_line_segment;
-
-UFBX_LIST_TYPE(ufbx_line_segment_list, ufbx_line_segment);
-
-struct ufbx_line_curve {
-	union { ufbx_element element; struct {
-		ufbx_string name;
-		ufbx_props props;
-		uint32_t element_id;
-		uint32_t typed_id;
-		ufbx_node_list instances;
-	}; };
-
-	ufbx_vec3 color;
-
-	ufbx_vec3_list control_points; // < List of possible values the line passes through
-	ufbx_int32_list point_indices; // < Indices to `control_points[]` the line goes through
-
-	ufbx_line_segment_list segments;
-
-	// Tessellation (result)
-	bool from_tessellated_nurbs;
-};
 
 struct ufbx_nurbs_curve {
 	union { ufbx_element element; struct {
@@ -1374,6 +1374,29 @@ struct ufbx_camera_switcher {
 	}; };
 };
 
+typedef enum ufbx_marker_type {
+	UFBX_MARKER_UNKNOWN,     // < Unknown marker type
+	UFBX_MARKER_FK_EFFECTOR, // < FK (Forward Kinematics) effector
+	UFBX_MARKER_IK_EFFECTOR, // < IK (Inverse Kinematics) effector
+
+	UFBX_MARKER_TYPE_COUNT,
+	UFBX_MARKER_TYPE_FORCE_32BIT = 0x7fffffff,
+} ufbx_marker_type;
+
+// Tracking marker for effectors
+struct ufbx_marker {
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t typed_id;
+		ufbx_node_list instances;
+	}; };
+
+	// Type of the marker
+	ufbx_marker_type type;
+};
+
 // LOD level display mode.
 typedef enum ufbx_lod_display {
 	UFBX_LOD_DISPLAY_USE_LOD, // < Display the LOD level if the distance is appropriate.
@@ -1401,29 +1424,6 @@ typedef struct ufbx_lod_level {
 } ufbx_lod_level;
 
 UFBX_LIST_TYPE(ufbx_lod_level_list, ufbx_lod_level);
-
-typedef enum ufbx_marker_type {
-	UFBX_MARKER_UNKNOWN,     // < Unknown marker type
-	UFBX_MARKER_FK_EFFECTOR, // < FK (Forward Kinematics) effector
-	UFBX_MARKER_IK_EFFECTOR, // < IK (Inverse Kinematics) effector
-
-	UFBX_MARKER_TYPE_COUNT,
-	UFBX_MARKER_TYPE_FORCE_32BIT = 0x7fffffff,
-} ufbx_marker_type;
-
-// Tracking marker for effectors
-struct ufbx_marker {
-	union { ufbx_element element; struct {
-		ufbx_string name;
-		ufbx_props props;
-		uint32_t element_id;
-		uint32_t typed_id;
-		ufbx_node_list instances;
-	}; };
-
-	// Type of the marker
-	ufbx_marker_type type;
-};
 
 // Group of LOD (Level of Detail) levels for an object.
 // The actual LOD models are defined in the parent `ufbx_node.children`.
@@ -2498,7 +2498,7 @@ struct ufbx_constraint {
 	// AIM: Target and up vectors
 	ufbx_vec3 aim_vector;
 	ufbx_constraint_aim_up_type aim_up_type;
-	ufbx_node *aim_up_node;
+	ufbx_nullable ufbx_node *aim_up_node;
 	ufbx_vec3 aim_up_vector;
 
 	// SINGLE_CHAIN_IK: Target for the IK, `targets` contains pole vectors!
