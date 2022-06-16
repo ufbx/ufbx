@@ -51,12 +51,12 @@ jobs:
         run: python3 misc/run_tests.py tests readme threadcheck hashes
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
-        run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_linux.gz
+        run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_linux.txt.gz
       - uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
           name: hashdumps
-          path: build/hashdump_ci_linux.gz
+          path: build/hashdump_ci_linux.txt.gz
       - name: Verbose test info
         run: build/runner_clang_release_x64/runner -d data -v
       - name: Generate coverage
@@ -261,11 +261,11 @@ jobs:
           mkdir build/ref-hashdumps
           build/hash_scene --check build/dumped-files.txt --dump build/ref-hashdumps/reference_linux_x64_release.txt --dump-all
       - name: Compress reference hashdumps
-        run: python3 misc/hash_diff.py compress build/ref-hashdumps -o build/hashdump_ci_reference.gz
+        run: python3 misc/hash_diff.py compress build/ref-hashdumps -o build/hashdump_ci_reference.txt.gz
       - name: Diff CI and reference dumps
-        run: python3 misc/hash_diff.py diff build/ci-hashdumps --ref build/hashdump_ci_reference.gz
+        run: python3 misc/hash_diff.py diff build/ci-hashdumps --ref build/hashdump_ci_reference.txt.gz
       - uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
           name: hashdumps
-          path: build/hashdump_ci_reference.gz
+          path: build/hashdump_ci_reference.txt.gz
