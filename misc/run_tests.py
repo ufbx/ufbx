@@ -24,6 +24,8 @@ parser.add_argument("--wasm-runtime", default="wasmtime", type=str, help="WASM r
 parser.add_argument("--no-sanitize", action="store_true", help="Don't compile builds with ASAN/UBSAN")
 parser.add_argument("--threads", type=int, default=0, help="Number of threads to use (0 to autodetect)")
 parser.add_argument("--verbose", action="store_true", help="Verbose output")
+parser.add_argument("--hash-file", help="Hash test input file")
+parser.add_argument("--runner", help="Descriptive name for the runner")
 parser.add_argument("--fail-on-pre-test", action="store_true", help="Indicate failure if pre-test checks fail")
 argv = parser.parse_args()
 
@@ -322,11 +324,19 @@ class GCCCompiler(Compiler):
 
         args.append("-DUFBX_DEV")
 
+        use_sse = False
         if config.get("sse", False):
             args.append("-DSSE=1")
             args += ["-mbmi", "-msse3", "-msse4.1", "-msse4.2"]
             if config.get("arch", "") == "x86":
-                args += ["-msse", "-msse2"]
+                use_sse = True
+
+        if config.get("arch", "") == "x86" and config.get("ieee754"):
+            use_sse = True
+            args += ["-mfpmath=sse"]
+
+        if use_sse:
+            args += ["-msse", "-msse2"]
 
         if config.get("threads", False):
             args.append("-pthread")
@@ -527,8 +537,9 @@ async def find_compilers():
     return list(ichain(await gather(check_compiler(c) for c in all_compilers)))
 
 class Target:
-    def __init__(self, name, compiler, config):
+    def __init__(self, name, suffix, compiler, config):
         self.name = name
+        self.suffix = suffix
         self.compiler = compiler
         self.config = config
         self.skipped = False
@@ -578,6 +589,7 @@ async def run_target(t, args):
     args = args[:]
     if t.config.get("dedicated-allocs", False):
         args += ["--dedicated-allocs"]
+    args = [a.replace("%TARGET_SUFFIX%", t.suffix) for a in args]
 
     cwd = t.config.get("cwd")
 
@@ -646,8 +658,10 @@ def decorate_arch(compiler, arch):
     return arch
 
 tests = set(argv.tests)
+impicit_tests = False
 if not tests:
-    tests = ["tests", "picort", "viewer", "domfuzz", "readme"]
+    tests = ["tests", "picort", "viewer", "domfuzz", "readme", "threadcheck", "hashes"]
+    implicit_tests = True
 
 async def main():
     global exit_code
@@ -707,7 +721,8 @@ async def main():
             for opts in opt_combos:
                 optstring = "_".join(opt for _,opt in opts if opt)
 
-                name = f"{prefix}_{compiler.name}_{optstring}"
+                suffix = f"{compiler.name}_{optstring}"
+                name = f"{prefix}_{suffix}"
 
                 path = os.path.join(build_path, name)
 
@@ -719,7 +734,7 @@ async def main():
                 if config_fmt_arch(conf) not in archs:
                     continue
                 
-                target = Target(name, compiler, conf)
+                target = Target(name, suffix, compiler, conf)
                 yield compile_and_run_target(target, run_args)
 
     exe_suffix = ""
@@ -1123,6 +1138,50 @@ async def main():
             await run_target(best_target, ["data/maya_cube_7500_binary.fbx", "2"])
             for line in best_target.log[1].splitlines(keepends=False):
                 log_comment(line)
+
+    if "hashes" in tests:
+
+        hash_file = argv.hash_file
+        if not hash_file:
+            hash_file = "build/hashes.txt"
+        if hash_file and os.path.exists(hash_file):
+            log_comment("-- Compiling and running hash_scene --")
+            target_tasks = []
+
+            hash_scene_configs = {
+                "arch": all_configs["arch"],
+                "optimize": all_configs["optimize"],
+            }
+
+            hash_scene_config = {
+                "sources": ["test/hash_scene.c", "misc/fdlibm.c"],
+                "output": "hash_scene" + exe_suffix,
+                "ieee754": True,
+            }
+
+            dump_path = os.path.join(build_path, "hashdumps")
+            if not os.path.exists(dump_path):
+                os.makedirs(dump_path, exist_ok=True)
+                log_mkdir(dump_path)
+            else:
+                for dump_file in os.listdir(dump_path):
+                    assert dump_file.endswith(".txt")
+                    os.remove(os.path.join(dump_path, dump_file))
+
+            if argv.runner:
+                dump_file = os.path.join(dump_path, f"{argv.runner}_%TARGET_SUFFIX%.txt")
+            else:
+                dump_file = os.path.join(dump_path, "%TARGET_SUFFIX%.txt")
+
+            args = ["--check", hash_file, "--dump", dump_file, "--max-dump-errors", "3"]
+            target_tasks += compile_permutations("hash_scene", hash_scene_config, hash_scene_configs, args)
+
+            targets = await gather(target_tasks)
+            all_targets += targets
+        else:
+            print("No hash file found, skipping hashes", file=sys.stderr)
+            if not implicit_tests:
+                exit_code = 2
 
 
     for target in all_targets:

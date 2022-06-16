@@ -573,6 +573,8 @@ static void ufbxt_check_skin_deformer(ufbx_scene *scene, ufbx_skin_deformer *def
 static void ufbxt_check_skin_cluster(ufbx_scene *scene, ufbx_skin_cluster *cluster)
 {
 	ufbxt_check_element_ptr(scene, cluster->bone_node);
+	ufbxt_check_list(cluster->vertices);
+	ufbxt_check_list(cluster->weights);
 }
 
 static void ufbxt_check_blend_deformer(ufbx_scene *scene, ufbx_blend_deformer *deformer)
@@ -632,6 +634,7 @@ static void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
 		ufbxt_check_element_ptr(scene, material->pbr.maps[i].texture);
 	}
 
+	ufbxt_check_string(material->shader_prop_prefix);
 	ufbxt_check_element_ptr(scene, material->shader);
 }
 
@@ -779,6 +782,7 @@ static void ufbxt_check_constraint(ufbx_scene *scene, ufbx_constraint *constrain
 	ufbxt_check_element_ptr(scene, constraint->ik_effector);
 	ufbxt_check_element_ptr(scene, constraint->ik_end_node);
 	for (size_t i = 0; i < constraint->targets.count; i++) {
+		ufbxt_assert(constraint->targets.data[i].node);
 		ufbxt_check_element_ptr(scene, constraint->targets.data[i].node);
 	}
 }
@@ -787,6 +791,7 @@ static void ufbxt_check_pose(ufbx_scene *scene, ufbx_pose *pose)
 {
 	for (size_t i = 0; i < pose->bone_poses.count; i++) {
 		ufbx_bone_pose bone_pose = pose->bone_poses.data[i];
+		ufbxt_assert(bone_pose.bone_node);
 		ufbxt_check_element_ptr(scene, bone_pose.bone_node);
 	}
 }

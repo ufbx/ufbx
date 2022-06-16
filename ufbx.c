@@ -110,8 +110,62 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <math.h>
 #include <locale.h>
+
+#if !defined(UFBX_NO_MATH_H)
+	#include <math.h>
+	#define UFBX_INFINITY INFINITY
+	#define UFBX_NAN NAN
+#endif
+
+#if !defined(UFBX_MATH_PREFIX)
+	#define UFBX_MATH_PREFIX
+#endif
+
+#define ufbxi_math_cat2(a, b) a##b
+#define ufbxi_math_cat(a, b) ufbxi_math_cat2(a, b)
+#define ufbxi_math_fn(name) ufbxi_math_cat(UFBX_MATH_PREFIX, name)
+
+#if !defined(UFBX_NO_MATH_DEFINES)
+	#define ufbx_sqrt ufbxi_math_fn(sqrt)
+	#define ufbx_fabs ufbxi_math_fn(fabs)
+	#define ufbx_pow ufbxi_math_fn(pow)
+	#define ufbx_sin ufbxi_math_fn(sin)
+	#define ufbx_cos ufbxi_math_fn(cos)
+	#define ufbx_tan ufbxi_math_fn(tan)
+	#define ufbx_asin ufbxi_math_fn(asin)
+	#define ufbx_acos ufbxi_math_fn(acos)
+	#define ufbx_atan ufbxi_math_fn(atan)
+	#define ufbx_atan2 ufbxi_math_fn(atan2)
+	#define ufbx_copysign ufbxi_math_fn(copysign)
+	#define ufbx_fmin ufbxi_math_fn(fmin)
+	#define ufbx_fmax ufbxi_math_fn(fmax)
+	#define ufbx_frexp ufbxi_math_fn(frexp)
+#endif
+
+#if defined(UFBX_NO_MATH_H) && !defined(UFBX_NO_MATH_DECLARATIONS)
+	double ufbx_sqrt(double x);
+	double ufbx_sin(double x);
+	double ufbx_cos(double x);
+	double ufbx_tan(double x);
+	double ufbx_asin(double x);
+	double ufbx_acos(double x);
+	double ufbx_atan(double x);
+	double ufbx_atan2(double y, double x);
+	double ufbx_pow(double x, double y);
+	double ufbx_fmin(double a, double b);
+	double ufbx_fmax(double a, double b);
+	double ufbx_fabs(double x);
+	double ufbx_frexp(double x, int *eptr);
+	double ufbx_copysign(double x, double y);
+#endif
+
+#if !defined(UFBX_INFINITY)
+	#define UFBX_INFINITY (1e+300 * 1e+300)
+#endif
+#if !defined(UFBX_NAN)
+	#define UFBX_NAN (UFBX_INFINITY * 0.0f)
+#endif
 
 // -- Platform
 
@@ -516,7 +570,7 @@ static ufbxi_forceinline ufbx_real ufbxi_max_real(ufbx_real a, ufbx_real b) { re
 
 static ufbxi_forceinline int32_t ufbxi_f64_to_i32(double value)
 {
-	if (fabs(value) <= (double)INT32_MAX) {
+	if (ufbx_fabs(value) <= (double)INT32_MAX) {
 		return (int32_t)value;
 	} else {
 		return value >= 0.0 ? INT32_MAX : INT32_MIN;
@@ -525,7 +579,7 @@ static ufbxi_forceinline int32_t ufbxi_f64_to_i32(double value)
 
 static ufbxi_forceinline int64_t ufbxi_f64_to_i64(double value)
 {
-	if (fabs(value) <= (double)INT64_MAX) {
+	if (ufbx_fabs(value) <= (double)INT64_MAX) {
 		return (int64_t)value;
 	} else {
 		return value >= 0.0 ? INT64_MAX : INT64_MIN;
@@ -5478,9 +5532,11 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			return true;
 		} else if (name == ufbxi_Indexes) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'i';
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_Weights) {
 			info->type = uc->opts.ignore_geometry ? '-' : 'r';
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		}
 		break;
@@ -6584,9 +6640,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 			ufbxi_check(ufbxi_ascii_push_token_char(uc, token, '\0'));
 
 			if (is_inf) {
-				token->value.f64 = token->str_data[0] == '-' ? -INFINITY : INFINITY;
+				token->value.f64 = token->str_data[0] == '-' ? -UFBX_INFINITY : UFBX_INFINITY;
 			} else {
-				token->value.f64 = NAN;
+				token->value.f64 = UFBX_NAN;
 			}
 
 		} else {
@@ -9507,6 +9563,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_material(ufbxi_context *uc,
 		material->shading_model_name = ufbx_empty_string;
 	}
 
+	material->shader_prop_prefix = ufbx_empty_string;
+
 	return 1;
 }
 
@@ -10680,6 +10738,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_material(ufbxi_conte
 	material->props.props.data = ufbxi_push_copy(&uc->result, ufbx_prop, num_props, tmp_props);
 	ufbxi_check(material->props.props.data);
 
+	material->shader_prop_prefix = ufbx_empty_string;
+
 	return 1;
 }
 
@@ -11822,9 +11882,9 @@ static ufbxi_forceinline bool ufbxi_is_transform_identity(ufbx_transform t)
 
 typedef void (*ufbxi_mat_transform_fn)(ufbx_vec4 *a);
 
-static void ufbxi_mat_transform_unknown_shininess(ufbx_vec4 *v) { if (v->x >= 0.0f) v->x = (ufbx_real)(1.0f - sqrt(v->x) * 0.1f); }
+static void ufbxi_mat_transform_unknown_shininess(ufbx_vec4 *v) { if (v->x >= 0.0f) v->x = (ufbx_real)(1.0f - (v->x) * (ufbx_real)0.1); }
 static void ufbxi_mat_transform_blender_opacity(ufbx_vec4 *v) { v->x = 1.0f - v->x; }
-static void ufbxi_mat_transform_blender_shininess(ufbx_vec4 *v) { if (v->x >= 0.0f) v->x = (ufbx_real)(1.0f - sqrt(v->x) * 0.1f); }
+static void ufbxi_mat_transform_blender_shininess(ufbx_vec4 *v) { if (v->x >= 0.0f) v->x = (ufbx_real)(1.0f - (v->x) * (ufbx_real)0.1); }
 
 typedef enum {
 	UFBXI_MAT_TRANSFORM_IDENTITY,
@@ -12463,7 +12523,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_nurbs_basis(ufbxi_conte
 			ufbx_real *spans = ufbxi_push(&uc->result, ufbx_real, max_spans);
 			ufbxi_check(spans);
 
-			ufbx_real prev = -INFINITY;
+			ufbx_real prev = -UFBX_INFINITY;
 			size_t num_spans = 0;
 			for (size_t i = 0; i < max_spans; i++) {
 				ufbx_real t = knots.data[degree + i];
@@ -13936,26 +13996,26 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 	case UFBX_APERTURE_MODE_HORIZONTAL_AND_VERTICAL:
 		camera->field_of_view_deg.x = fov_x;
 		camera->field_of_view_deg.y = fov_y;
-		camera->field_of_view_tan.x = (ufbx_real)tan((double)(fov_x * (UFBXI_DEG_TO_RAD * 0.5f)));
-		camera->field_of_view_tan.y = (ufbx_real)tan((double)(fov_y * (UFBXI_DEG_TO_RAD * 0.5f)));
+		camera->field_of_view_tan.x = (ufbx_real)ufbx_tan((double)(fov_x * (UFBXI_DEG_TO_RAD * 0.5f)));
+		camera->field_of_view_tan.y = (ufbx_real)ufbx_tan((double)(fov_y * (UFBXI_DEG_TO_RAD * 0.5f)));
 		break;
 	case UFBX_APERTURE_MODE_HORIZONTAL:
 		camera->field_of_view_deg.x = fov;
-		camera->field_of_view_tan.x = (ufbx_real)tan((double)(fov * (UFBXI_DEG_TO_RAD * 0.5f)));
+		camera->field_of_view_tan.x = (ufbx_real)ufbx_tan((double)(fov * (UFBXI_DEG_TO_RAD * 0.5f)));
 		camera->field_of_view_tan.y = camera->field_of_view_tan.x / aspect_ratio;
-		camera->field_of_view_deg.y = (ufbx_real)atan((double)camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
+		camera->field_of_view_deg.y = (ufbx_real)ufbx_atan((double)camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
 		break;
 	case UFBX_APERTURE_MODE_VERTICAL:
 		camera->field_of_view_deg.y = fov;
-		camera->field_of_view_tan.y = (ufbx_real)tan((double)(fov * (UFBXI_DEG_TO_RAD * 0.5f)));
+		camera->field_of_view_tan.y = (ufbx_real)ufbx_tan((double)(fov * (UFBXI_DEG_TO_RAD * 0.5f)));
 		camera->field_of_view_tan.x = camera->field_of_view_tan.y * aspect_ratio;
-		camera->field_of_view_deg.x = (ufbx_real)atan((double)camera->field_of_view_tan.x) * UFBXI_RAD_TO_DEG * 2.0f;
+		camera->field_of_view_deg.x = (ufbx_real)ufbx_atan((double)camera->field_of_view_tan.x) * UFBXI_RAD_TO_DEG * 2.0f;
 		break;
 	case UFBX_APERTURE_MODE_FOCAL_LENGTH:
 		camera->field_of_view_tan.x = camera->aperture_size_inch.x / (camera->focal_length_mm * UFBXI_MM_TO_INCH) * 0.5f;
 		camera->field_of_view_tan.y = camera->aperture_size_inch.y / (camera->focal_length_mm * UFBXI_MM_TO_INCH) * 0.5f;
-		camera->field_of_view_deg.x = (ufbx_real)atan((double)camera->field_of_view_tan.x) * UFBXI_RAD_TO_DEG * 2.0f;
-		camera->field_of_view_deg.y = (ufbx_real)atan((double)camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
+		camera->field_of_view_deg.x = (ufbx_real)ufbx_atan((double)camera->field_of_view_tan.x) * UFBXI_RAD_TO_DEG * 2.0f;
+		camera->field_of_view_deg.y = (ufbx_real)ufbx_atan((double)camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
 		break;
 	default:
 		ufbx_assert(0 && "Unexpected aperture mode");
@@ -15547,7 +15607,7 @@ static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, 
 
 	// 4 ULP from 1.0
 	const double eps = 8.881784197001252e-16;
-	if (fabs(x1) <= eps) return t;
+	if (ufbx_fabs(x1) <= eps) return t;
 
 	// Perform more iterations until we reach desired accuracy
 	for (size_t i = 0; i < 4; i++) {
@@ -15558,7 +15618,7 @@ static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, 
 		t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
 		t -= x1 / (a_3*t2 + b_2*t + c);
 
-		if (fabs(x1) <= eps) return t;
+		if (ufbx_fabs(x1) <= eps) return t;
 	}
 
 	return t;
@@ -15942,7 +16002,7 @@ ufbx_inline ufbx_real ufbxi_dot3(ufbx_vec3 a, ufbx_vec3 b) {
 
 ufbx_inline ufbx_real ufbxi_length3(ufbx_vec3 v)
 {
-	return (ufbx_real)sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+	return (ufbx_real)ufbx_sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
 }
 
 ufbx_inline ufbx_vec3 ufbxi_cross3(ufbx_vec3 a, ufbx_vec3 b) {
@@ -15951,7 +16011,7 @@ ufbx_inline ufbx_vec3 ufbxi_cross3(ufbx_vec3 a, ufbx_vec3 b) {
 }
 
 ufbx_inline ufbx_vec3 ufbxi_normalize3(ufbx_vec3 a) {
-	ufbx_real len = (ufbx_real)sqrt(ufbxi_dot3(a, a));
+	ufbx_real len = (ufbx_real)ufbx_sqrt(ufbxi_dot3(a, a));
 	if (len != 0.0) {
 		return ufbxi_mul3(a, (ufbx_real)1.0 / len);
 	} else {
@@ -16060,7 +16120,7 @@ static double ufbxi_pow_abs(double v, double e)
 	if (e <= 0.0) return 1.0;
 	if (e >= 1.0) return v;
 	double sign = v < 0.0 ? -1.0 : 1.0;
-	return sign * pow(v * sign, e);
+	return sign * ufbx_pow(v * sign, e);
 }
 
 static ufbxi_noinline void ufbxi_combine_anim_layer(ufbxi_anim_layer_combine_ctx *ctx, ufbx_anim_layer *layer, ufbx_real weight, const char *prop_name, ufbx_vec3 *result, const ufbx_vec3 *value)
@@ -16792,7 +16852,7 @@ static int32_t ufbxi_noinline ufbxi_spatial_coord(ufbx_real v)
 	const int32_t mantissa_max = 1 << mantissa_bits;
 
 	int exponent = 0;
-	double mantissa = frexp(v, &exponent);
+	double mantissa = ufbx_frexp(v, &exponent);
 	if (exponent < min_exponent) {
 		return 0;
 	} else {
@@ -18512,7 +18572,7 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 				for (size_t i = 0; i < num_inputs; i++) {
 					total_weight += inputs[i].weight;
 				}
-				ufbx_assert(fabs(total_weight - 1.0f) < 0.001f);
+				ufbx_assert(ufbx_fabs(total_weight - 1.0f) < 0.001f);
 			}
 #endif
 
@@ -20250,17 +20310,17 @@ ufbx_abi ufbxi_noinline ufbx_quat ufbx_quat_slerp(ufbx_quat a, ufbx_quat b, ufbx
 		dot = -dot;
 		b.x = -b.x; b.y = -b.y; b.z = -b.z; b.w = -b.w;
 	}
-	double omega = acos(fmin(fmax(dot, 0.0), 1.0));
+	double omega = ufbx_acos(ufbx_fmin(ufbx_fmax(dot, 0.0), 1.0));
 	if (omega <= 1.175494351e-38f) return a;
-	double rcp_so = 1.0 / sin(omega);
-	double af = sin((1.0 - t) * omega) * rcp_so;
-	double bf = sin(t * omega) * rcp_so;
+	double rcp_so = 1.0 / ufbx_sin(omega);
+	double af = ufbx_sin((1.0 - t) * omega) * rcp_so;
+	double bf = ufbx_sin(t * omega) * rcp_so;
 
 	double x = af*a.x + bf*b.x;
 	double y = af*a.y + bf*b.y;
 	double z = af*a.z + bf*b.z;
 	double w = af*a.w + bf*b.w;
-	double rcp_len = 1.0 / sqrt(x*x + y*y + z*z + w*w);
+	double rcp_len = 1.0 / ufbx_sqrt(x*x + y*y + z*z + w*w);
 
 	ufbx_quat ret;
 	ret.x = (ufbx_real)(x * rcp_len);
@@ -20287,9 +20347,9 @@ ufbx_abi ufbxi_noinline ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_
 	v.x *= UFBXI_DEG_TO_RAD * 0.5;
 	v.y *= UFBXI_DEG_TO_RAD * 0.5;
 	v.z *= UFBXI_DEG_TO_RAD * 0.5;
-	double cx = cos((double)v.x), sx = sin((double)v.x);
-	double cy = cos((double)v.y), sy = sin((double)v.y);
-	double cz = cos((double)v.z), sz = sin((double)v.z);
+	double cx = ufbx_cos((double)v.x), sx = ufbx_sin((double)v.x);
+	double cy = ufbx_cos((double)v.y), sy = ufbx_sin((double)v.y);
+	double cz = ufbx_cos((double)v.z), sz = ufbx_sin((double)v.z);
 	ufbx_quat q;
 
 	// Generated by `misc/gen_rotation_order.py`
@@ -20351,73 +20411,73 @@ ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_
 	switch (order) {
 	case UFBX_ROTATION_XYZ:
 		t = 2.0f*(qw*qy - qx*qz);
-		if (fabs(t) < eps) {
-			v.y = (ufbx_real)asin(t);
-			v.z = (ufbx_real)atan2(2.0f*(qw*qz + qx*qy), 2.0f*(qw*qw + qx*qx) - 1.0f);
-			v.x = (ufbx_real)-atan2(-2.0f*(qw*qx + qy*qz), 2.0f*(qw*qw + qz*qz) - 1.0f);
+		if (ufbx_fabs(t) < eps) {
+			v.y = (ufbx_real)ufbx_asin(t);
+			v.z = (ufbx_real)ufbx_atan2(2.0f*(qw*qz + qx*qy), 2.0f*(qw*qw + qx*qx) - 1.0f);
+			v.x = (ufbx_real)-ufbx_atan2(-2.0f*(qw*qx + qy*qz), 2.0f*(qw*qw + qz*qz) - 1.0f);
 		} else {
-			v.y = (ufbx_real)copysign(UFBXI_DPI*0.5, t);
-			v.z = (ufbx_real)(atan2(-2.0f*t*(qw*qx - qy*qz), t*(2.0f*qw*qy + 2.0f*qx*qz)));
+			v.y = (ufbx_real)ufbx_copysign(UFBXI_DPI*0.5, t);
+			v.z = (ufbx_real)(ufbx_atan2(-2.0f*t*(qw*qx - qy*qz), t*(2.0f*qw*qy + 2.0f*qx*qz)));
 			v.x = 0.0f;
 		}
 		break;
 	case UFBX_ROTATION_XZY:
 		t = 2.0f*(qw*qz + qx*qy);
-		if (fabs(t) < eps) {
-			v.z = (ufbx_real)asin(t);
-			v.y = (ufbx_real)atan2(2.0f*(qw*qy - qx*qz), 2.0f*(qw*qw + qx*qx) - 1.0f);
-			v.x = (ufbx_real)-atan2(-2.0f*(qw*qx - qy*qz), 2.0f*(qw*qw + qy*qy) - 1.0f);
+		if (ufbx_fabs(t) < eps) {
+			v.z = (ufbx_real)ufbx_asin(t);
+			v.y = (ufbx_real)ufbx_atan2(2.0f*(qw*qy - qx*qz), 2.0f*(qw*qw + qx*qx) - 1.0f);
+			v.x = (ufbx_real)-ufbx_atan2(-2.0f*(qw*qx - qy*qz), 2.0f*(qw*qw + qy*qy) - 1.0f);
 		} else {
-			v.z = (ufbx_real)copysign(UFBXI_DPI*0.5, t);
-			v.y = (ufbx_real)(atan2(2.0f*t*(qw*qx + qy*qz), -t*(2.0f*qx*qy - 2.0f*qw*qz)));
+			v.z = (ufbx_real)ufbx_copysign(UFBXI_DPI*0.5, t);
+			v.y = (ufbx_real)(ufbx_atan2(2.0f*t*(qw*qx + qy*qz), -t*(2.0f*qx*qy - 2.0f*qw*qz)));
 			v.x = 0.0f;
 		}
 		break;
 	case UFBX_ROTATION_YZX:
 		t = 2.0f*(qw*qz - qx*qy);
-		if (fabs(t) < eps) {
-			v.z = (ufbx_real)asin(t);
-			v.x = (ufbx_real)atan2(2.0f*(qw*qx + qy*qz), 2.0f*(qw*qw + qy*qy) - 1.0f);
-			v.y = (ufbx_real)-atan2(-2.0f*(qw*qy + qx*qz), 2.0f*(qw*qw + qx*qx) - 1.0f);
+		if (ufbx_fabs(t) < eps) {
+			v.z = (ufbx_real)ufbx_asin(t);
+			v.x = (ufbx_real)ufbx_atan2(2.0f*(qw*qx + qy*qz), 2.0f*(qw*qw + qy*qy) - 1.0f);
+			v.y = (ufbx_real)-ufbx_atan2(-2.0f*(qw*qy + qx*qz), 2.0f*(qw*qw + qx*qx) - 1.0f);
 		} else {
-			v.z = (ufbx_real)copysign(UFBXI_DPI*0.5, t);
-			v.x = (ufbx_real)(atan2(-2.0f*t*(qw*qy - qx*qz), t*(2.0f*qw*qz + 2.0f*qx*qy)));
+			v.z = (ufbx_real)ufbx_copysign(UFBXI_DPI*0.5, t);
+			v.x = (ufbx_real)(ufbx_atan2(-2.0f*t*(qw*qy - qx*qz), t*(2.0f*qw*qz + 2.0f*qx*qy)));
 			v.y = 0.0f;
 		}
 		break;
 	case UFBX_ROTATION_YXZ:
 		t = 2.0f*(qw*qx + qy*qz);
-		if (fabs(t) < eps) {
-			v.x = (ufbx_real)asin(t);
-			v.z = (ufbx_real)atan2(2.0f*(qw*qz - qx*qy), 2.0f*(qw*qw + qy*qy) - 1.0f);
-			v.y = (ufbx_real)-atan2(-2.0f*(qw*qy - qx*qz), 2.0f*(qw*qw + qz*qz) - 1.0f);
+		if (ufbx_fabs(t) < eps) {
+			v.x = (ufbx_real)ufbx_asin(t);
+			v.z = (ufbx_real)ufbx_atan2(2.0f*(qw*qz - qx*qy), 2.0f*(qw*qw + qy*qy) - 1.0f);
+			v.y = (ufbx_real)-ufbx_atan2(-2.0f*(qw*qy - qx*qz), 2.0f*(qw*qw + qz*qz) - 1.0f);
 		} else {
-			v.x = (ufbx_real)copysign(UFBXI_DPI*0.5, t);
-			v.z = (ufbx_real)(atan2(2.0f*t*(qw*qy + qx*qz), -t*(2.0f*qy*qz - 2.0f*qw*qx)));
+			v.x = (ufbx_real)ufbx_copysign(UFBXI_DPI*0.5, t);
+			v.z = (ufbx_real)(ufbx_atan2(2.0f*t*(qw*qy + qx*qz), -t*(2.0f*qy*qz - 2.0f*qw*qx)));
 			v.y = 0.0f;
 		}
 		break;
 	case UFBX_ROTATION_ZXY:
 		t = 2.0f*(qw*qx - qy*qz);
-		if (fabs(t) < eps) {
-			v.x = (ufbx_real)asin(t);
-			v.y = (ufbx_real)atan2(2.0f*(qw*qy + qx*qz), 2.0f*(qw*qw + qz*qz) - 1.0f);
-			v.z = (ufbx_real)-atan2(-2.0f*(qw*qz + qx*qy), 2.0f*(qw*qw + qy*qy) - 1.0f);
+		if (ufbx_fabs(t) < eps) {
+			v.x = (ufbx_real)ufbx_asin(t);
+			v.y = (ufbx_real)ufbx_atan2(2.0f*(qw*qy + qx*qz), 2.0f*(qw*qw + qz*qz) - 1.0f);
+			v.z = (ufbx_real)-ufbx_atan2(-2.0f*(qw*qz + qx*qy), 2.0f*(qw*qw + qy*qy) - 1.0f);
 		} else {
-			v.x = (ufbx_real)copysign(UFBXI_DPI*0.5, t);
-			v.y = (ufbx_real)(atan2(-2.0f*t*(qw*qz - qx*qy), t*(2.0f*qw*qx + 2.0f*qy*qz)));
+			v.x = (ufbx_real)ufbx_copysign(UFBXI_DPI*0.5, t);
+			v.y = (ufbx_real)(ufbx_atan2(-2.0f*t*(qw*qz - qx*qy), t*(2.0f*qw*qx + 2.0f*qy*qz)));
 			v.z = 0.0f;
 		}
 		break;
 	case UFBX_ROTATION_ZYX:
 		t = 2.0f*(qw*qy + qx*qz);
-		if (fabs(t) < eps) {
-			v.y = (ufbx_real)asin(t);
-			v.x = (ufbx_real)atan2(2.0f*(qw*qx - qy*qz), 2.0f*(qw*qw + qz*qz) - 1.0f);
-			v.z = (ufbx_real)-atan2(-2.0f*(qw*qz - qx*qy), 2.0f*(qw*qw + qx*qx) - 1.0f);
+		if (ufbx_fabs(t) < eps) {
+			v.y = (ufbx_real)ufbx_asin(t);
+			v.x = (ufbx_real)ufbx_atan2(2.0f*(qw*qx - qy*qz), 2.0f*(qw*qw + qz*qz) - 1.0f);
+			v.z = (ufbx_real)-ufbx_atan2(-2.0f*(qw*qz - qx*qy), 2.0f*(qw*qw + qx*qx) - 1.0f);
 		} else {
-			v.y = (ufbx_real)copysign(UFBXI_DPI*0.5, t);
-			v.x = (ufbx_real)(atan2(2.0f*t*(qw*qz + qx*qy), -t*(2.0f*qx*qz - 2.0f*qw*qy)));
+			v.y = (ufbx_real)ufbx_copysign(UFBXI_DPI*0.5, t);
+			v.x = (ufbx_real)(ufbx_atan2(2.0f*t*(qw*qz + qx*qy), -t*(2.0f*qx*qz - 2.0f*qw*qy)));
 			v.z = 0.0f;
 		}
 		break;
@@ -20597,27 +20657,27 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_matrix_to_transform(const ufbx_matri
 	ufbx_vec3 z = ufbxi_mul3(m->cols[2], t.scale.z > 0.0f ? sign_z / t.scale.z : 0.0f);
 	ufbx_real trace = x.x + y.y + z.z;
 	if (trace > 0.0f) {
-		ufbx_real a = (ufbx_real)sqrt(fmax(0.0, trace + 1.0)), b = (a != 0.0f) ? 0.5f / a : 0.0f;
+		ufbx_real a = (ufbx_real)ufbx_sqrt(ufbx_fmax(0.0, trace + 1.0)), b = (a != 0.0f) ? 0.5f / a : 0.0f;
 		t.rotation.x = (y.z - z.y) * b;
 		t.rotation.y = (z.x - x.z) * b;
 		t.rotation.z = (x.y - y.x) * b;
 		t.rotation.w = 0.5f * a;
 	} else if (x.x > y.y && x.x > z.z) {
-		ufbx_real a = (ufbx_real)sqrt(fmax(0.0, 1.0 + x.x - y.y - z.z)), b = (a != 0.0f) ? 0.5f / a : 0.0f;
+		ufbx_real a = (ufbx_real)ufbx_sqrt(ufbx_fmax(0.0, 1.0 + x.x - y.y - z.z)), b = (a != 0.0f) ? 0.5f / a : 0.0f;
 		t.rotation.x = 0.5f * a;
 		t.rotation.y = (y.x + x.y) * b;
 		t.rotation.z = (z.x + x.z) * b;
 		t.rotation.w = (y.z - z.y) * b;
 	}
 	else if (y.y > z.z) {
-		ufbx_real a = (ufbx_real)sqrt(fmax(0.0, 1.0 - x.x + y.y - z.z)), b = (a != 0.0f) ? 0.5f / a : 0.0f;
+		ufbx_real a = (ufbx_real)ufbx_sqrt(ufbx_fmax(0.0, 1.0 - x.x + y.y - z.z)), b = (a != 0.0f) ? 0.5f / a : 0.0f;
 		t.rotation.x = (y.x + x.y) * b;
 		t.rotation.y = 0.5f * a;
 		t.rotation.z = (z.y + y.z) * b;
 		t.rotation.w = (z.x - x.z) * b;
 	}
 	else {
-		ufbx_real a = (ufbx_real)sqrt(fmax(0.0, 1.0 - x.x - y.y + z.z)), b = (a != 0.0f) ? 0.5f / a : 0.0f;
+		ufbx_real a = (ufbx_real)ufbx_sqrt(ufbx_fmax(0.0, 1.0 - x.x - y.y + z.z)), b = (a != 0.0f) ? 0.5f / a : 0.0f;
 		t.rotation.x = (z.x + x.z) * b;
 		t.rotation.y = (z.y + y.z) * b;
 		t.rotation.z = 0.5f * a;
@@ -20625,7 +20685,7 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_matrix_to_transform(const ufbx_matri
 	}
 
 	ufbx_real len = t.rotation.x*t.rotation.x + t.rotation.y*t.rotation.y + t.rotation.z*t.rotation.z + t.rotation.w*t.rotation.w;
-	if (fabs(len - 1.0f) > (ufbx_real)1e-20) {
+	if (ufbx_fabs(len - 1.0f) > (ufbx_real)1e-20) {
 		if (len == 0.0f) {
 			t.rotation = ufbx_identity_quat;
 		} else {
@@ -20696,7 +20756,7 @@ ufbx_abi ufbxi_noinline ufbx_matrix ufbx_catch_get_skin_vertex_matrix(ufbx_panic
 		}
 	}
 
-	if (fabs(total_weight - 1.0f) > (ufbx_real)1e-20) {
+	if (ufbx_fabs(total_weight - 1.0f) > (ufbx_real)1e-20) {
 		ufbx_real rcp_weight = 1.0f / total_weight;
 		if (skin_vertex.dq_weight > 0.0f) {
 			q0.x *= rcp_weight; q0.y *= rcp_weight; q0.z *= rcp_weight; q0.w *= rcp_weight;
@@ -20712,7 +20772,7 @@ ufbx_abi ufbxi_noinline ufbx_matrix ufbx_catch_get_skin_vertex_matrix(ufbx_panic
 
 	if (skin_vertex.dq_weight > 0.0f) {
 		ufbx_transform dqt;
-		ufbx_real rcp_len = (ufbx_real)(1.0 / sqrt(q0.x*q0.x + q0.y*q0.y + q0.z*q0.z + q0.w*q0.w));
+		ufbx_real rcp_len = (ufbx_real)(1.0 / ufbx_sqrt(q0.x*q0.x + q0.y*q0.y + q0.z*q0.z + q0.w*q0.w));
 		ufbx_real rcp_len2x2 = 2.0f * rcp_len * rcp_len;
 		dqt.rotation.x = q0.x * rcp_len;
 		dqt.rotation.y = q0.y * rcp_len;
@@ -21455,10 +21515,10 @@ ufbx_abi ufbxi_noinline size_t ufbx_get_sample_geometry_cache_real_num_data(cons
 		const ufbx_cache_frame *prev = next - 1;
 
 		// Snap to exact frames if near
-		if (fabs(next->time - time) < eps) {
+		if (ufbx_fabs(next->time - time) < eps) {
 			return ufbx_get_read_geometry_cache_real_num_data(next);
 		}
-		if (fabs(prev->time - time) < eps) {
+		if (ufbx_fabs(prev->time - time) < eps) {
 			return ufbx_get_read_geometry_cache_real_num_data(prev);
 		}
 
@@ -21517,10 +21577,10 @@ ufbx_abi size_t ufbx_get_sample_geometry_cache_vec3_num_data(const ufbx_cache_ch
 		const ufbx_cache_frame *prev = next - 1;
 
 		// Snap to exact frames if near
-		if (fabs(next->time - time) < eps) {
+		if (ufbx_fabs(next->time - time) < eps) {
 			return ufbx_get_read_geometry_cache_vec3_num_data(next);
 		}
-		if (fabs(prev->time - time) < eps) {
+		if (ufbx_fabs(prev->time - time) < eps) {
 			return ufbx_get_read_geometry_cache_vec3_num_data(prev);
 		}
 
@@ -21754,10 +21814,10 @@ ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_real(const ufbx_cache_
 		const ufbx_cache_frame *prev = next - 1;
 
 		// Snap to exact frames if near
-		if (fabs(next->time - time) < eps) {
+		if (ufbx_fabs(next->time - time) < eps) {
 			return ufbx_read_geometry_cache_real(next, data, count, &opts);
 		}
-		if (fabs(prev->time - time) < eps) {
+		if (ufbx_fabs(prev->time - time) < eps) {
 			return ufbx_read_geometry_cache_real(prev, data, count, &opts);
 		}
 
