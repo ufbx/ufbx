@@ -50,7 +50,13 @@ jobs:
           name: reference-hashes
           path: build/hashes.txt
       - name: Run tests
-        run: python3 misc/run_tests.py tests readme threadcheck hashes
+        run: python3 misc/run_tests.py tests readme threadcheck hashes --runner ci_linux
+      - name: Verbose test info
+        run: build/runner_clang_release_x64/runner -d data -v
+      - name: Generate coverage
+        run: LLVM_COV=llvm-cov-11 bash misc/generate_coverage.sh
+      - name: Upload coverage
+        run: bash <(curl -s https://codecov.io/bash) -f coverage.lcov -y .github/codecov.yml
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_linux.txt.gz
@@ -60,30 +66,52 @@ jobs:
         with:
           name: hashdumps
           path: build/hashdump_ci_linux.txt.gz
-      - name: Verbose test info
-        run: build/runner_clang_release_x64/runner -d data -v
-      - name: Generate coverage
-        run: LLVM_COV=llvm-cov-11 bash misc/generate_coverage.sh
-      - name: Upload coverage
-        run: bash <(curl -s https://codecov.io/bash) -f coverage.lcov -y .github/codecov.yml
 
   ci_windows:
     runs-on: windows-2019
     steps:
       - uses: actions/checkout@v2
+      - name: Download reference hashes
+        uses: actions/download-artifact@v3
+        with:
+          name: reference-hashes
+          path: build/hashes.txt
       - name: Run tests
-        run: python misc/run_tests.py tests readme threadcheck
+        run: python misc/run_tests.py tests readme threadcheck hashes --runner ci_windows
       - name: Verbose test info
         run: build\runner_vs_cl64_release_x64\runner.exe -d data -v
+      - name: Compress hashdumps
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_windows.txt.gz
+      - name: Upload hashdumps
+        uses: actions/upload-artifact@v3
+        if: ${{ always() && !cancelled() }}
+        with:
+          name: hashdumps
+          path: build/hashdump_ci_windows.txt.gz
 
   ci_macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Download reference hashes
+        uses: actions/download-artifact@v3
+        with:
+          name: reference-hashes
+          path: build/hashes.txt
       - name: Run tests
-        run: python3 misc/run_tests.py tests readme threadcheck --remove-compiler gcc --additional-compiler gcc-11 --remove-arch x86
+        run: python3 misc/run_tests.py tests readme threadcheck hashes --remove-compiler gcc --additional-compiler gcc-11 --remove-arch x86 --runner ci_macos
       - name: Compile ufbx as Objective C
         run: clang -Wall -Wextra -Werror -ObjC -c ufbx.c -o build/ufbx-objc.o
+      - name: Compress hashdumps
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_macos.txt.gz
+      - name: Upload hashdumps
+        uses: actions/upload-artifact@v3
+        if: ${{ always() && !cancelled() }}
+        with:
+          name: hashdumps
+          path: build/hashdump_ci_macos.txt.gz
 
   ci_picort:
     runs-on: ubuntu-latest
@@ -216,8 +244,22 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 2
+      - name: Download reference hashes
+        uses: actions/download-artifact@v3
+        with:
+          name: reference-hashes
+          path: build/hashes.txt
       - name: Run tests
-        run: python3 misc/run_tests.py tests --no-sanitize --threads 2
+        run: python3 misc/run_tests.py tests hashes --no-sanitize --threads 2 --runner ci_arm64
+      - name: Compress hashdumps
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_arm32.txt.gz
+      - name: Upload hashdumps
+        uses: actions/upload-artifact@v3
+        if: ${{ always() && !cancelled() }}
+        with:
+          name: hashdumps
+          path: build/hashdump_ci_arm32.txt.gz
 
   ci_arm64:
     runs-on: [self-hosted, ARM64]
@@ -225,8 +267,22 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 2
+      - name: Download reference hashes
+        uses: actions/download-artifact@v3
+        with:
+          name: reference-hashes
+          path: build/hashes.txt
       - name: Run tests
-        run: python3 misc/run_tests.py tests --no-sanitize --threads 2
+        run: python3 misc/run_tests.py tests hashes --no-sanitize --threads 2 --runner ci_arm64
+      - name: Compress hashdumps
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_arm64.txt.gz
+      - name: Upload hashdumps
+        uses: actions/upload-artifact@v3
+        if: ${{ always() && !cancelled() }}
+        with:
+          name: hashdumps
+          path: build/hashdump_ci_arm64.txt.gz
 
   ci_dataset:
     runs-on: [self-hosted, ARM64]
