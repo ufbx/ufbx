@@ -14,8 +14,27 @@ concurrency:
 
 jobs:
 
+  ci_pre_hashes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      - name: Compile hash_scene
+        run: |
+          mkdir build
+          clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+      - name: Generate reference hashes
+        run: |
+          python3 misc/generate_hashses.py --exe build/hasher -o build/hashes.txt --verbose
+      - uses: actions/upload-artifact@v3
+        with:
+          name: reference-hashes
+          path: build/hashes.txt
+
   ci_ubuntu:
     runs-on: ubuntu-latest
+    needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v2
         with:
@@ -24,8 +43,20 @@ jobs:
         run: sudo apt-get update
       - name: Install apt dependencies
         run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm-11
+      - uses: actions/download-artifact@v3
+        with:
+          name: reference-hashes
+          path: build/hashes.txt
       - name: Run tests
-        run: python3 misc/run_tests.py tests readme threadcheck
+        run: python3 misc/run_tests.py tests readme threadcheck hashes
+      - name: Compress hashdumps
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_linux.gz
+      - uses: actions/upload-artifact@v3
+        if: ${{ always() && !cancelled() }}
+        with:
+          name: hashdumps
+          path: build/hashdump_ci_linux.gz
       - name: Verbose test info
         run: build/runner_clang_release_x64/runner -d data -v
       - name: Generate coverage
@@ -206,3 +237,34 @@ jobs:
         run: clang -O2 test/check_fbx.c -lm -o build/check_fbx
       - name: Run dataset tests
         run: python3 misc/check_dataset.py --exe build/check_fbx --root /mnt/fbx-files --host-url https://ufbx-dataset.b-cdn.net
+
+  ci_post_hashes:
+    if: ${{ always() }}
+    needs: [ci_ubuntu]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      - name: Compile hash_scene
+        run: |
+          mkdir build
+          clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+      - uses: actions/download-artifact@v3
+        with:
+          name: hashdumps
+          path: build/ci-hashdumps
+      - name: List files to dump
+        run: python3 misc/hash_diff.py list build/ci-hashdumps -o build/dumped-files.txt
+      - name: Dump reference hashes
+        run: |
+          mkdir build/ref-hashdumps
+          build/hash_scene --check build/dumped-files.txt --dump build/ref-hashdumps/reference_linux_x64_release.txt --dump-all
+      - name: Compress reference hashdumps
+        run: python3 misc/hash_diff.py compress build/ref-hashdumps -o build/hashdump_ci_reference.gz
+      - name: Diff CI and reference dumps
+        run: python3 misc/hash_diff.py diff build/ci-hashdumps --ref build/hashdump_ci_reference.gz
+      - uses: actions/upload-artifact@v3
+        if: ${{ always() && !cancelled() }}
+        with:
+          name: hashdumps
+          path: build/hashdump_ci_reference.gz
