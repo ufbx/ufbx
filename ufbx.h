@@ -246,6 +246,7 @@ typedef enum ufbx_prop_type {
 	UFBX_PROP_DISTANCE,
 	UFBX_PROP_COMPOUND,
 	UFBX_PROP_BLOB,
+	UFBX_PROP_REFERENCE,
 
 	UFBX_NUM_PROP_TYPES,
 } ufbx_prop_type;
@@ -2036,7 +2037,11 @@ typedef enum ufbx_texture_type {
 	// The texture consists of multiple texture layers blended together.
 	UFBX_TEXTURE_LAYERED,
 
+	// Reserved as these _should_ exist in FBX files.
 	UFBX_TEXTURE_PROCEDURAL,
+
+	// Node in a shader graph.
+	UFBX_TEXTURE_SHADER,
 
 	UFBX_TEXTURE_TYPE_COUNT,
 	UFBX_TEXTURE_TYPE_FORCE_32BIT = 0x7fffffff,
@@ -2101,6 +2106,91 @@ typedef struct ufbx_texture_layer {
 
 UFBX_LIST_TYPE(ufbx_texture_layer_list, ufbx_texture_layer);
 
+typedef enum ufbx_texture_shader_type {
+	UFBX_TEXTURE_SHADER_UNKNOWN,
+
+	// Select an output of a multi-output shader.
+	// HINT: If this type is used the `ufbx_texture_shader.main_texture` and
+	// `ufbx_texture_shader.main_texture_output_index` fields are set.
+	UFBX_TEXTURE_SHADER_SELECT_OUTPUT,
+
+	// Open Shading Language (OSL) shader.
+	// https://github.com/AcademySoftwareFoundation/OpenShadingLanguage
+	UFBX_TEXTURE_SHADER_OSL,
+
+	UFBX_TEXTURE_SHADER_TYPE_COUNT,
+	UFBX_TEXTURE_SHADER_TYPE_FORCE_32BIT = 0x7fffffff,
+} ufbx_texture_shader_type;
+
+typedef struct ufbx_texture_shader_input {
+
+	// Name of the input.
+	ufbx_string name;
+
+	// Constant value of the input.
+	union {
+		ufbx_real value_real;
+		ufbx_vec2 value_vec2;
+		ufbx_vec3 value_vec3;
+		ufbx_vec4 value_vec4;
+	};
+	int64_t value_int;
+	ufbx_string value_str;
+	ufbx_blob value_blob;
+
+	// Texture connected to this input.
+	ufbx_nullable ufbx_texture *texture;
+
+	// Controls whether shading should use `texture`.
+	// NOTE: Some shading models allow this to be `true` even if `texture == NULL`.
+	bool texture_enabled;
+
+	// Property representing this input.
+	ufbx_prop *prop;
+
+	// Property representing `texture`.
+	ufbx_nullable ufbx_prop *texture_prop;
+
+	// Property representing `texture_enabled`.
+	ufbx_nullable ufbx_prop *texture_enabled_prop;
+
+} ufbx_texture_shader_input;
+
+UFBX_LIST_TYPE(ufbx_texture_shader_input_list, ufbx_texture_shader_input);
+
+typedef struct ufbx_texture_shader {
+
+	// Type of this shader node.
+	ufbx_texture_shader_type type;
+
+	// Name of the shader to use.
+	ufbx_string shader_name;
+
+	// 64-bit opaque identifier for the shader type.
+	uint64_t shader_type_id;
+
+	// Input values/textures (possibly further shader textures) to the shader.
+	// Sorted by `ufbx_texture_shader_input.name`.
+	ufbx_texture_shader_input_list inputs;
+
+	// Shader source code if found.
+	ufbx_string shader_source;
+	ufbx_blob raw_shader_source;
+
+	// Representative texture for this shader.
+	// NOTE: This may be a further shader, you may traverse this recursively
+	// to find a potential root file texture.
+	ufbx_texture *main_texture;
+
+	// Output index of `main_texture` if it is a multi-output shader.
+	int64_t main_texture_output_index;
+
+	// Prefix for properties related to this shader in `ufbx_texture`.
+	// NOTE: Contains the trailing '|' if not empty.
+	ufbx_string prop_prefix;
+
+} ufbx_texture_shader;
+
 // Texture that controls material appearance
 struct ufbx_texture {
 	union { ufbx_element element; struct {
@@ -2110,7 +2200,7 @@ struct ufbx_texture {
 		uint32_t typed_id;
 	}; };
 
-	// Texture type (file / layered / procedural)
+	// Texture type (file / layered / procedural / shader)
 	ufbx_texture_type type;
 
 	// FILE: Paths to the resource
@@ -2129,6 +2219,11 @@ struct ufbx_texture {
 
 	// LAYERED: Inner texture layers, ordered from _bottom_ to _top_
 	ufbx_texture_layer_list layers;
+
+	// SHADER: Shader information
+	// NOTE: May be specified even if `type == UFBX_TEXTURE_FILE` if `ufbx_load_opts.disable_quirks`
+	// is _not_ specified. Some known shaders that represent files are interpreted as `UFBX_TEXTURE_FILE`.
+	ufbx_nullable ufbx_texture_shader *shader;
 
 	// Name of the UV set to use
 	ufbx_string uv_set;
@@ -2612,6 +2707,10 @@ typedef struct ufbx_metadata {
 	ufbx_real bone_prop_size_unit;
 	bool bone_prop_limb_length_relative;
 	double ktime_to_sec;
+
+	ufbx_string original_file_path;
+	ufbx_blob raw_original_file_path;
+
 } ufbx_metadata;
 
 typedef enum ufbx_coordinate_axis {
@@ -3409,15 +3508,14 @@ ufbx_inline ufbx_string ufbx_find_string(const ufbx_props *props, const char *na
 ufbx_abi ufbx_blob ufbx_find_blob_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_blob def);
 ufbx_inline ufbx_blob ufbx_find_blob(const ufbx_props *props, const char *name, ufbx_blob def) { return ufbx_find_blob_len(props, name, strlen(name), def); }
 
+// Get an element connected to a property.
+ufbx_abi ufbx_element *ufbx_get_prop_element(const ufbx_element *element, const ufbx_prop *prop, ufbx_element_type type);
+
 // Find any element of type `type` in `scene` by `name`.
 // For example if you want to find `ufbx_material` named `Mat`:
 //   (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Mat");
 ufbx_abi ufbx_element *ufbx_find_element_len(const ufbx_scene *scene, ufbx_element_type type, const char *name, size_t name_len);
 ufbx_inline ufbx_element *ufbx_find_element(const ufbx_scene *scene, ufbx_element_type type, const char *name) { return ufbx_find_element_len(scene, type, name, strlen(name)); }
-
-// Find an element connected to a property.
-ufbx_abi ufbx_element *ufbx_find_prop_element_len(ufbx_element *element, const char *name, size_t name_len);
-ufbx_inline ufbx_element *ufbx_find_prop_element(ufbx_element *element, const char *name) { return ufbx_find_prop_element_len(element, name, strlen(name)); }
 
 // Find node in `scene` by `name` (shorthand for `ufbx_find_element(UFBX_ELEMENT_NODE)`).
 ufbx_abi ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t name_len);
@@ -3497,9 +3595,20 @@ ufbx_abi ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material,
 ufbx_inline ufbx_texture *ufbx_find_prop_texture(const ufbx_material *material, const char *name) {
 	return ufbx_find_prop_texture_len(material, name, strlen(name));
 }
+
 ufbx_abi ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *name, size_t name_len);
 ufbx_inline ufbx_string ufbx_find_shader_prop(const ufbx_shader *shader, const char *name) {
 	return ufbx_find_shader_prop_len(shader, name, strlen(name));
+}
+
+ufbx_abi ufbx_shader_prop_binding_list ufbx_find_shader_prop_bindings_len(const ufbx_shader *shader, const char *name, size_t name_len);
+ufbx_inline ufbx_shader_prop_binding_list ufbx_find_shader_prop_bindings(const ufbx_shader *shader, const char *name) {
+	return ufbx_find_shader_prop_bindings_len(shader, name, strlen(name));
+}
+
+ufbx_abi ufbx_texture_shader_input *ufbx_find_texture_shader_input_len(const ufbx_texture_shader *shader, const char *name, size_t name_len);
+ufbx_inline ufbx_texture_shader_input *ufbx_find_texture_shader_input(const ufbx_texture_shader *shader, const char *name) {
+	return ufbx_find_texture_shader_input_len(shader, name, strlen(name));
 }
 
 // Math

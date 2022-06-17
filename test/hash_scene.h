@@ -266,6 +266,17 @@ ufbxt_noinline static void ufbxt_hash_element_ref_imp(ufbxt_hash *h, const void 
 	ufbxt_hash_pod(h, id);
 }
 
+ufbxt_noinline static void ufbxt_hash_prop_ref_imp(ufbxt_hash *h, const ufbx_prop *prop)
+{
+	if (!prop) {
+		uint32_t zero = UINT32_MAX;
+		ufbxt_hash_pod(h, zero);
+	} else {
+		ufbxt_hash_string(h, prop->name);
+	}
+}
+
+#define ufbxt_hash_prop_ref(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_prop_ref_imp(h, v), ufbxt_pop_tag(h))
 #define ufbxt_hash_element_ref(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_element_ref_imp(h, v), ufbxt_pop_tag(h))
 
 ufbxt_noinline static void ufbxt_hash_connection_imp(ufbxt_hash *h, ufbx_connection v)
@@ -876,6 +887,35 @@ ufbxt_noinline static void ufbxt_hash_texture_layer_imp(ufbxt_hash *h, const ufb
 	ufbxt_hash_real(h, v.alpha);
 }
 
+ufbxt_noinline static void ufbxt_hash_texture_shader_input_imp(ufbxt_hash *h, const ufbx_texture_shader_input *v)
+{
+	ufbxt_hash_string(h, v->name);
+	ufbxt_hash_vec4(h, v->value_vec4);
+	ufbxt_hash_pod(h, v->value_int);
+	ufbxt_hash_string(h, v->value_str);
+	ufbxt_hash_blob(h, v->value_blob);
+	ufbxt_hash_element_ref(h, v->texture);
+	ufbxt_hash_pod(h, v->texture_enabled);
+	ufbxt_hash_prop_ref(h, v->prop);
+	ufbxt_hash_prop_ref(h, v->texture_prop);
+	ufbxt_hash_prop_ref(h, v->texture_enabled_prop);
+}
+
+ufbxt_noinline static void ufbxt_hash_texture_shader_imp(ufbxt_hash *h, const ufbx_texture_shader *v)
+{
+	ufbxt_hash_pod(h, v->type);
+	ufbxt_hash_string(h, v->shader_name);
+	ufbxt_hash_pod(h, v->shader_type_id);
+	ufbxt_hash_list_ptr(h, v->inputs, ufbxt_hash_texture_shader_input_imp);
+	ufbxt_hash_string(h, v->shader_source);
+	ufbxt_hash_blob(h, v->raw_shader_source);
+	ufbxt_hash_element_ref(h, v->main_texture);
+	ufbxt_hash_pod(h, v->main_texture_output_index);
+	ufbxt_hash_string(h, v->prop_prefix);
+}
+
+#define ufbxt_hash_texture_shader(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_texture_shader_imp(h, v), ufbxt_pop_tag(h))
+
 ufbxt_noinline static void ufbxt_hash_texture_imp(ufbxt_hash *h, const ufbx_texture *v)
 {
 	ufbxt_hash_pod(h, v->type);
@@ -896,6 +936,10 @@ ufbxt_noinline static void ufbxt_hash_texture_imp(ufbxt_hash *h, const ufbx_text
 	ufbxt_hash_transform(h, v->transform);
 	ufbxt_hash_matrix(h, v->texture_to_uv);
 	ufbxt_hash_matrix(h, v->uv_to_texture);
+
+	if (v->shader) {
+		ufbxt_hash_texture_shader(h, v->shader);
+	}
 }
 
 ufbxt_noinline static void ufbxt_hash_video_imp(ufbxt_hash *h, const ufbx_video *v)

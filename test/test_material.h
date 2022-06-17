@@ -727,6 +727,12 @@ UFBXT_FILE_TEST(maya_texture_blend_modes)
 }
 #endif
 
+UFBXT_FILE_TEST(max_texture_mapping)
+#if UFBXT_IMPL
+{
+}
+#endif
+
 UFBXT_FILE_TEST(synthetic_missing_material_factor)
 #if UFBXT_IMPL
 {

@@ -2771,6 +2771,48 @@ static ufbxi_forceinline ufbx_string ufbxi_str_c(const char *str)
 	return s;
 }
 
+
+static ufbxi_forceinline bool ufbxi_starts_with(ufbx_string str, ufbx_string prefix)
+{
+	return str.length >= prefix.length && !memcmp(str.data, prefix.data, prefix.length);
+}
+
+static ufbxi_forceinline bool ufbxi_ends_with(ufbx_string str, ufbx_string suffix)
+{
+	return str.length >= suffix.length && !memcmp(str.data + str.length - suffix.length, suffix.data, suffix.length);
+}
+
+static ufbxi_noinline bool ufbxi_remove_prefix_len(ufbx_string *str, const char *prefix, size_t prefix_len)
+{
+	ufbx_string prefix_str = { prefix, prefix_len };
+	if (ufbxi_starts_with(*str, prefix_str)) {
+		str->data += prefix_len;
+		str->length -= prefix_len;
+		return true;
+	}
+	return false;
+}
+
+static ufbxi_noinline bool ufbxi_remove_suffix_len(ufbx_string *str, const char *suffix, size_t suffix_len)
+{
+	ufbx_string suffix_str = { suffix, suffix_len };
+	if (ufbxi_ends_with(*str, suffix_str)) {
+		str->length -= suffix_len;
+		return true;
+	}
+	return false;
+}
+
+static ufbxi_forceinline bool ufbxi_remove_prefix_str(ufbx_string *str, ufbx_string prefix)
+{
+	return ufbxi_remove_prefix_len(str, prefix.data, prefix.length);
+}
+
+static ufbxi_forceinline bool ufbxi_remove_suffix_c(ufbx_string *str, const char *suffix)
+{
+	return ufbxi_remove_suffix_len(str, suffix, strlen(suffix));
+}
+
 static int ufbxi_map_cmp_string(void *user, const void *va, const void *vb)
 {
 	(void)user;
@@ -6666,24 +6708,48 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 		c = ufbxi_ascii_next(uc);
 		while (c != '"') {
 
-			// Escape '&quot;' to '"'
-			// NOTE: There is no way to represent '&quot;' itself in ASCII FBX!
+			// Escape XML-like elements, funny enough there is no way to escape '&' itself, there is no `&amp`.
+			// '&quot;' -> '"'
+			// '&cr;' -> '\r'
+			// '&lf;' -> '\n'
 			if (c == '&') {
-				const char *target = "&quot;";
+				const char *entity = NULL;
+				char replacement = '\0';
 
-				size_t step = 0;
-				for (; step < 6; step++) {
-					if (c != target[step]) break;
+				c = ufbxi_ascii_next(uc);
+				switch (c) {
+				case 'q':
+					entity = "&quot;";
+					replacement = '"';
+					break;
+				case 'c':
+					entity = "&cr;";
+					replacement = '\r';
+					break;
+				case 'l':
+					entity = "&lf;";
+					replacement = '\n';
+					break;
+				default:
+					// As '&' is not escaped in any way just map '&' -> '&'
+					entity = "&";
+					replacement = '&';
+					break;
+				}
+
+				size_t step = 1;
+				for (; entity[step]; step++) {
+					if (c != entity[step]) break;
 					c = ufbxi_ascii_next(uc);
 				}
 
-				if (step == 6) {
-					// Full match: Push a single '"'
-					ufbxi_check(ufbxi_ascii_push_token_char(uc, token, '"'));
+				if (entity[step] == '\0') {
+					// Full match: Push the replacement character
+					ufbxi_check(ufbxi_ascii_push_token_char(uc, token, replacement));
 				} else {
 					// Partial match: Push the prefix we have skipped already
 					for (size_t i = 0; i < step; i++) {
-						ufbxi_check(ufbxi_ascii_push_token_char(uc, token, target[i]));
+						ufbxi_check(ufbxi_ascii_push_token_char(uc, token, entity[i]));
 					}
 				}
 				continue;
@@ -7445,6 +7511,7 @@ const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
 	{ "Distance", UFBX_PROP_DISTANCE },
 	{ "Compound", UFBX_PROP_COMPOUND },
 	{ "Blob", UFBX_PROP_BLOB },
+	{ "Reference", UFBX_PROP_REFERENCE },
 };
 
 static ufbx_prop_type ufbxi_get_prop_type(ufbxi_context *uc, const char *name)
@@ -12196,11 +12263,12 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 	const ufbxi_shader_mapping *mappings, size_t count, ufbx_string prefix, ufbx_string prefix2, ufbx_string suffix, uint32_t flags)
 {
 	char combined_name[512];
+	ufbx_shader_prop_binding identity_binding;
 
 	ufbxi_for(const ufbxi_shader_mapping, mapping, mappings, count) {
-		ufbx_string name = { mapping->prop, mapping->prop_len };
+		ufbx_string prop_name = { mapping->prop, mapping->prop_len };
 		if (prefix.length > 0 || prefix2.length > 0 || suffix.length > 0) {
-			if (name.length + prefix.length + prefix2.length + suffix.length <= sizeof(combined_name)) {
+			if (prop_name.length + prefix.length + prefix2.length + suffix.length <= sizeof(combined_name)) {
 				char *dst = combined_name;
 
 				if (prefix.length > 0) {
@@ -12211,59 +12279,69 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 					memcpy(dst, prefix2.data, prefix2.length);
 					dst += prefix2.length;
 				}
-				if (name.length > 0) {
-					memcpy(dst, name.data, name.length);
-					dst += name.length;
+				if (prop_name.length > 0) {
+					memcpy(dst, prop_name.data, prop_name.length);
+					dst += prop_name.length;
 				}
 				if (suffix.length > 0) {
 					memcpy(dst, suffix.data, suffix.length);
 					dst += suffix.length;
 				}
 
-				name.data = combined_name;
-				name.length = (size_t)(dst - combined_name);
+				prop_name.data = combined_name;
+				prop_name.length = (size_t)(dst - combined_name);
 			}
 		}
 
-		name = ufbx_find_shader_prop_len(shader, name.data, name.length);
+		ufbx_shader_prop_binding_list bindings = ufbx_find_shader_prop_bindings_len(shader, prop_name.data, prop_name.length);
+		if (bindings.count == 0) {
+			identity_binding.material_prop = prop_name;
+			identity_binding.shader_prop = ufbx_empty_string;
+			bindings.data = &identity_binding;
+			bindings.count = 1;
+		}
 
-		ufbx_prop *prop = ufbx_find_prop_len(&material->props, name.data, name.length);
-		ufbx_material_map *map = &maps[mapping->index];
+		ufbxi_for_list(ufbx_shader_prop_binding, binding, bindings) {
+			ufbx_string name = binding->material_prop;
 
-		if (mapping->flags & UFBXI_SHADER_MAPPING_TOGGLE_INVERT) {
-			if ((flags & UFBXI_MAPPING_FETCH_INVERT) != 0 && prop && prop->value_int != 0) {
-				if (map->has_value) {
-					map->value_real = 1.0f - map->value_real;
+			ufbx_prop *prop = ufbx_find_prop_len(&material->props, name.data, name.length);
+			ufbx_material_map *map = &maps[mapping->index];
+
+			if (mapping->flags & UFBXI_SHADER_MAPPING_TOGGLE_INVERT) {
+				if ((flags & UFBXI_MAPPING_FETCH_INVERT) != 0 && prop && prop->value_int != 0) {
+					if (map->has_value) {
+						map->value_real = 1.0f - map->value_real;
+					}
+					map->texture_inverted = !map->texture_inverted;
 				}
-				map->texture_inverted = !map->texture_inverted;
+				continue;
 			}
-			continue;
-		}
 
-		if (flags & UFBXI_MAPPING_FETCH_VALUE) {
-			if (prop) {
-				map->value_vec4 = prop->value_vec4;
-				map->value_int = prop->value_int;
-				map->has_value = true;
-				if (mapping->transform) {
-					ufbxi_mat_transform_fn transform_fn = ufbxi_mat_transform_fns[mapping->transform];
-					transform_fn(&map->value_vec4);
+			if (flags & UFBXI_MAPPING_FETCH_VALUE) {
+				if (prop && prop->type != UFBX_PROP_REFERENCE) {
+					map->value_vec4 = prop->value_vec4;
+					map->value_int = prop->value_int;
+					map->has_value = true;
+					if (mapping->transform) {
+						ufbxi_mat_transform_fn transform_fn = ufbxi_mat_transform_fns[mapping->transform];
+						transform_fn(&map->value_vec4);
+					}
 				}
 			}
-		}
 
-		if (flags & UFBXI_MAPPING_FETCH_TEXTURE) {
-			ufbx_texture *texture = ufbx_find_prop_texture_len(material, name.data, name.length);
-			if (texture) {
-				map->texture = texture;
-				map->texture_enabled = true;
+			if (flags & UFBXI_MAPPING_FETCH_TEXTURE) {
+				ufbx_texture *texture = ufbx_find_prop_texture_len(material, name.data, name.length);
+				if (texture) {
+					map->texture = texture;
+					map->texture_enabled = true;
+				}
+				map->texture_inverted = (mapping->flags & UFBXI_SHADER_MAPPING_INVERT_TEXTURE) != 0;
 			}
-			map->texture_inverted = (mapping->flags & UFBXI_SHADER_MAPPING_INVERT_TEXTURE) != 0;
-		}
 
-		if (flags & UFBXI_MAPPING_FETCH_TEXTURE_ENABLED) {
-			if (prop) {
-				map->texture_enabled = prop->value_int != 0;
+			if (flags & UFBXI_MAPPING_FETCH_TEXTURE_ENABLED) {
+				if (prop) {
+					map->texture_enabled = prop->value_int != 0;
+				}
 			}
 		}
 	}
@@ -12429,9 +12507,36 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_init_file_paths(ufbxi_context *u
 	return 1;
 }
 
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename_imp(ufbxi_context *uc, void *dst_data, size_t *dst_length, const void *src_data, size_t src_length, bool raw)
+typedef union {
+	ufbx_string str;
+	ufbx_blob blob;
+} ufbxi_strblob;
+
+static ufbxi_noinline void ufbxi_strblob_set(ufbxi_strblob *dst, const char *data, size_t length, bool raw)
 {
-	const char *src = (const char *)src_data;
+	if (raw) {
+		dst->blob.data = data;
+		dst->blob.size = length;
+	} else {
+		dst->str.data = length == 0 ? ufbxi_empty_char : data;
+		dst->str.length = length;
+	}
+}
+
+static ufbxi_forceinline const char *ufbxi_strblob_data(const ufbxi_strblob *strblob, bool raw)
+{
+	return raw ? (const char*)strblob->blob.data : strblob->str.data;
+}
+
+static ufbxi_forceinline size_t ufbxi_strblob_length(const ufbxi_strblob *strblob, bool raw)
+{
+	return raw ? strblob->blob.size : strblob->str.length;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_context *uc, ufbxi_strblob *p_dst, const ufbxi_strblob *p_src, bool raw)
+{
+	const char *src = ufbxi_strblob_data(p_src, raw);
+	size_t src_length = ufbxi_strblob_length(p_src, raw);
 
 	// Skip leading directory separators and early return if the relative path is empty
 	while (src_length > 0 && (src[0] == '/' || src[0] == '\\')) {
@@ -12439,12 +12544,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename_imp(uf
 		src_length--;
 	}
 	if (src_length == 0) {
-		*dst_length = 0;
-		if (raw) {
-			*(const void**)dst_data = NULL;
-		} else {
-			*(const char**)dst_data = ufbxi_empty_char;
-		}
+		ufbxi_strblob_set(p_dst, NULL, 0, raw);
 		return 1;
 	}
 
@@ -12456,6 +12556,19 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename_imp(uf
 	} else {
 		prefix_data = (const char*)uc->scene.metadata.relative_root.data;
 		prefix_length = uc->scene.metadata.relative_root.length;
+	}
+
+	// Undo directories from `prefix` for every `..`
+	while (prefix_length > 0 && src_length >= 3 && src[0] == '.' && src[1] == '.' && (src[2] == '/' || src[2] == '\\')) {
+		while (prefix_length > 0 && !(prefix_data[prefix_length - 1] == '/' || prefix_data[prefix_length - 1] == '\\')) {
+			prefix_length--;
+		}
+		if (prefix_length > 0) {
+			prefix_length--;
+		}
+
+		src += 3;
+		src_length -= 3;
 	}
 
 	size_t result_cap = prefix_length + src_length + 1;
@@ -12483,24 +12596,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename_imp(uf
 	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &dst, raw));
 	ufbxi_pop(&uc->tmp_stack, char, result_cap, NULL);
 
-	*dst_length = dst.length;
-	if (raw) {
-		*(const void**)dst_data = dst.data;
-	} else {
-		*(const char**)dst_data = dst.data;
-	}
+	ufbxi_strblob_set(p_dst, dst.data, dst.length, raw);
 
 	return 1;
-}
-
-ufbxi_nodiscard ufbxi_forceinline static int ufbxi_resolve_relative_filename(ufbxi_context *uc, ufbx_string *dst, ufbx_string src)
-{
-	return ufbxi_resolve_relative_filename_imp(uc, (void*)&dst->data, &dst->length, src.data, src.length, false);
-}
-
-ufbxi_nodiscard ufbxi_forceinline static int ufbxi_resolve_relative_filename_raw(ufbxi_context *uc, ufbx_blob *dst, ufbx_blob src)
-{
-	return ufbxi_resolve_relative_filename_imp(uc, (void*)&dst->data, &dst->size, src.data, src.size, true);
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_nurbs_basis(ufbxi_context *uc, ufbx_nurbs_basis *basis)
@@ -12638,6 +12736,339 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_generate_normals(ufbxi_context *
 	return 1;
 }
 
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_push_prop_prefix(ufbxi_context *uc, ufbx_string *dst, ufbx_string prefix)
+{
+	size_t stack_size = 0;
+	if (prefix.length > 0 && prefix.data[prefix.length - 1] != '|') {
+		stack_size = prefix.length + 1;
+		char *copy = ufbxi_push(&uc->tmp_stack, char, stack_size);
+		ufbxi_check(copy);
+		memcpy(copy, prefix.data, prefix.length);
+		copy[prefix.length] = '|';
+
+		prefix.data = copy;
+		prefix.length += 1;
+	}
+
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &prefix, false));
+	*dst = prefix;
+
+	if (stack_size > 0) {
+		ufbxi_pop(&uc->tmp_stack, char, stack_size, NULL);
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_texture_shader_find_prefix(ufbxi_context *uc, ufbx_texture *texture, ufbx_texture_shader *shader)
+{
+	ufbx_string suffixes[3];
+	size_t num_suffixes = 0;
+
+	suffixes[num_suffixes++] = ufbxi_str_c(" Parameters/Connections");
+	if (shader->shader_name.length > 0) {
+		suffixes[num_suffixes++] = shader->shader_name;
+	}
+	suffixes[num_suffixes++] = ufbxi_str_c("3dsMax|parameters");
+
+	ufbx_assert(num_suffixes <= ufbxi_arraycount(suffixes));
+
+	ufbxi_for(ufbx_string, p_suffix, suffixes, num_suffixes) {
+		ufbx_string suffix = *p_suffix;
+
+		ufbxi_for_list(ufbx_prop, prop, texture->props.props) {
+			if (prop->type != UFBX_PROP_COMPOUND) continue;
+			if (ufbxi_ends_with(prop->name, suffix)) {
+				ufbxi_check(ufbxi_push_prop_prefix(uc, &shader->prop_prefix, prop->name));
+				return 1;
+			}
+		}
+	}
+
+	// Pre-7000 files don't have explicit Compound properties, so let's look for
+	// any property that has the suffix before the last `|` ...
+	ufbxi_for(ufbx_string, p_suffix, suffixes, num_suffixes) {
+		ufbx_string suffix = *p_suffix;
+
+		ufbxi_for_list(ufbx_prop, prop, texture->props.props) {
+			ufbx_string name = prop->name;
+			while (name.length > 0) {
+				if (name.data[name.length - 1] == '|') {
+					break;
+				}
+				name.length--;
+			}
+			if (name.length <= 1) continue;
+			name.length--;
+
+			if (ufbxi_ends_with(name, suffix)) {
+				ufbxi_check(ufbxi_push_prop_prefix(uc, &shader->prop_prefix, name));
+				return 1;
+			}
+		}
+	}
+
+	return 1;
+}
+
+typedef struct {
+	uint64_t shader_id;
+	const char *shader_name;
+	const char *input_name;
+} ufbxi_file_shader;
+
+// Known shaders that represent sampled images.
+static const ufbxi_file_shader ufbxi_file_shaders[] = {
+	{ UINT64_C(0x7e73161fad53b12a), "ai_image", "filename" },
+	{ 0, "OSLBitmap", ufbxi_Filename },
+	{ 0, "OSLBitmap2", ufbxi_Filename },
+};
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_texture_shader(ufbxi_context *uc, ufbx_texture *texture)
+{
+	uint32_t classid_a = (uint32_t)(uint64_t)ufbx_find_int(&texture->props, "3dsMax|ClassIDa", 0);
+	uint32_t classid_b = (uint32_t)(uint64_t)ufbx_find_int(&texture->props, "3dsMax|ClassIDb", 0);
+	uint64_t classid = (uint64_t)classid_a << 32u | classid_b;
+
+	ufbx_string max_texture = ufbx_find_string(&texture->props, "3dsMax|MaxTexture", ufbx_empty_string);
+
+	// Check first if the texture looks like it could be a shader.
+	ufbx_shader_type type = UFBX_TEXTURE_SHADER_TYPE_COUNT;
+
+	if (!strcmp(max_texture.data, "MULTIOUTPUT_TO_OSLMap") || classid == UINT64_C(0x896ef2fc44bd743f)) {
+		type = UFBX_TEXTURE_SHADER_SELECT_OUTPUT;
+	} else if (!strcmp(max_texture.data, "OSLMap") || classid == UINT64_C(0x7f9a7b9d6fcdf00d)) {
+		type = UFBX_TEXTURE_SHADER_OSL;
+	} else if (texture->type == UFBX_TEXTURE_FILE && texture->relative_filename.length == 0 && texture->absolute_filename.length == 0) {
+		type = UFBX_TEXTURE_SHADER_UNKNOWN;
+	}
+
+	if (type == UFBX_TEXTURE_SHADER_TYPE_COUNT) return 1;
+
+	ufbx_texture_shader *shader = ufbxi_push_zero(&uc->result, ufbx_texture_shader, 1);
+	ufbxi_check(shader);
+
+	shader->type = type;
+
+	static const char *name_props[] = {
+		"3dsMax|params|OSLShaderName",
+	};
+
+	static const char *source_props[] = {
+		"3dsMax|params|OSLCode",
+	};
+
+	shader->shader_source.data = ufbxi_empty_char;
+	shader->shader_name.data = ufbxi_empty_char;
+
+	ufbxi_nounroll for (size_t i = 0; i < ufbxi_arraycount(name_props); i++) {
+		ufbx_prop *prop = ufbx_find_prop(&texture->props, name_props[i]);
+		if (prop) {
+			shader->shader_name = prop->value_str;
+			break;
+		}
+	}
+
+	ufbxi_nounroll for (size_t i = 0; i < ufbxi_arraycount(source_props); i++) {
+		ufbx_prop *prop = ufbx_find_prop(&texture->props, source_props[i]);
+		if (prop) {
+			shader->shader_source = prop->value_str;
+			shader->raw_shader_source = prop->value_blob;
+			break;
+		}
+	}
+
+	ufbxi_check(ufbxi_texture_shader_find_prefix(uc, texture, shader));
+
+	if (shader->shader_name.length == 0) {
+		ufbx_string name = shader->prop_prefix;
+		if (ufbxi_remove_suffix_c(&name, " Parameters/Connections|")) {
+			size_t begin = name.length;
+			while (begin > 0 && name.data[begin - 1] != '|') {
+				begin--;
+			}
+			
+			shader->shader_name.data = name.data + begin;
+			shader->shader_name.length = name.length - begin;
+			ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &shader->shader_name, false));
+		}
+	}
+
+	if (shader->shader_name.length == 0) {
+		if (max_texture.length > 0) {
+			shader->shader_name = max_texture;
+		}
+	}
+
+	if (classid != 0) {
+		shader->shader_type_id = classid;
+	}
+
+	if (shader->prop_prefix.length > 0) {
+		ufbxi_for_list(ufbx_prop, prop, texture->props.props) {
+
+			ufbx_string name = prop->name;
+			if (!ufbxi_remove_prefix_str(&name, shader->prop_prefix)) continue;
+
+			// Check if this property is a modifier to an existing input.
+			ufbx_string base_name = name;
+			if (ufbxi_remove_suffix_c(&base_name, "_map") || ufbxi_remove_suffix_c(&base_name, ".shader")) {
+				ufbx_texture_shader_input *base = ufbx_find_texture_shader_input_len(shader, base_name.data, base_name.length);
+				if (base) {
+					base->texture_prop = prop;
+					continue;
+				}
+			} else if (ufbxi_remove_suffix_c(&base_name, ".connected")) {
+				ufbx_texture_shader_input *base = ufbx_find_texture_shader_input_len(shader, base_name.data, base_name.length);
+				if (base) {
+					base->texture_enabled_prop = prop;
+					continue;
+				}
+			}
+
+			// Use `uc->tmp_arr` to store the texture inputs so we can search them while we insert new ones.
+			ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size,
+				(shader->inputs.count + 1) * sizeof(ufbx_texture_shader_input)));
+			shader->inputs.data = (ufbx_texture_shader_input*)uc->tmp_arr;
+
+			// Add a new property
+			ufbx_texture_shader_input *input = &shader->inputs.data[shader->inputs.count++];
+			memset(input, 0, sizeof(ufbx_texture_shader_input));
+
+			// NOTE: This is a bit hackish, we are using a suffix of an interned string. It won't compare
+			// pointer equal to the same string but that shouldn't matter..
+			input->name = name;
+
+			// Connect the property only, values and textures etc are fetched in `ufbxi_update_texture_shader()`.
+			input->prop = prop;
+		}
+
+		// Retain the shader inputs
+		shader->inputs.data = ufbxi_push_copy(&uc->result, ufbx_texture_shader_input, shader->inputs.count, shader->inputs.data);
+		ufbxi_check(shader->inputs.data);
+
+		texture->shader = shader;
+		texture->type = UFBX_TEXTURE_SHADER;
+
+		if (!uc->opts.disable_quirks) {
+			ufbxi_nounroll for (size_t i = 0; i < ufbxi_arraycount(ufbxi_file_shaders); i++) {
+				const ufbxi_file_shader *fs = &ufbxi_file_shaders[i];
+
+				if ((fs->shader_id && shader->shader_type_id == fs->shader_id) || !strcmp(shader->shader_name.data, fs->shader_name)) {
+					ufbx_texture_shader_input *input = ufbx_find_texture_shader_input(shader, fs->input_name);
+					if (input) {
+						// TODO: Support for specifying relative filename here if ever needed
+						ufbx_prop *prop = input->prop;
+						texture->absolute_filename = prop->value_str;
+						texture->raw_absolute_filename = prop->value_blob;
+						texture->type = UFBX_TEXTURE_FILE;
+						break;
+					}
+				}
+			}
+		}
+	} 
+
+	// If we not find any shader properties so we might have guessed wrong.
+	// We "leak" (freed with scene) the shader in this case but it's negligible.
+
+	return 1;
+}
+
+ufbxi_noinline static size_t ufbxi_next_path_segment(const char *data, size_t begin, size_t length)
+{
+	for (size_t i = begin; i < length; i++) {
+		if (data[i] == '/' || data[i] == '\\') {
+			return i;
+		}
+	}
+	return length;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_absolute_to_relative_path(ufbxi_context *uc, ufbxi_strblob *p_dst, const ufbxi_strblob *p_rel, const ufbxi_strblob *p_src, bool raw)
+{
+	const char *rel = ufbxi_strblob_data(p_rel, raw);
+	const char *src = ufbxi_strblob_data(p_src, raw);
+	size_t rel_length = ufbxi_strblob_length(p_rel, raw);
+	size_t src_length = ufbxi_strblob_length(p_src, raw);
+
+	if (rel_length == 0 || src_length == 0) return 1;
+
+	// Absolute paths must start with the same character (either drive or '/')
+	if (rel[0] != src[0]) return 1;
+
+	// Find the last directory of the path we want to be relative to
+	while (rel_length > 0 && (rel[rel_length - 1] != '/' && rel[rel_length - 1] != '\\')) {
+		rel_length--;
+	}
+
+	if (rel_length == 0) return 1;
+	char separator = rel[rel_length - 1];
+
+	size_t max_length = rel_length * 2 + src_length;
+
+	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, max_length));
+	char *tmp = uc->tmp_arr;
+	size_t tmp_length = 0;
+
+	size_t rel_begin = 0;
+	size_t src_begin = 0;
+	while (rel_begin < rel_length && src_begin < src_length) {
+		size_t rel_end = ufbxi_next_path_segment(rel, rel_begin, rel_length);
+		size_t src_end = ufbxi_next_path_segment(src, src_begin, src_length);
+		if (rel_end != src_end && memcmp(rel + rel_begin, src + src_begin, src_end - src_begin) != 0) break;
+
+		rel_begin = rel_end + 1;
+		src_begin = src_end + 1;
+	}
+
+	while (rel_begin < rel_length) {
+		size_t rel_end = ufbxi_next_path_segment(rel, rel_begin, rel_length);
+		tmp[tmp_length++] = '.';
+		tmp[tmp_length++] = '.';
+		tmp[tmp_length++] = separator;
+		rel_begin = rel_end + 1;
+	}
+
+	while (src_begin < src_length) {
+		size_t src_end = ufbxi_next_path_segment(src, src_begin, src_length);
+		size_t len = src_end - src_begin;
+
+		memcpy(tmp + tmp_length, src + src_begin, len);
+		tmp_length += len;
+
+		if (src_end < src_length) {
+			tmp[tmp_length++] = separator;
+		}
+
+		src_begin = src_end + 1;
+	}
+
+	ufbx_assert(tmp_length <= max_length);
+
+	const char *dst = ufbxi_push_string(&uc->string_pool, tmp, tmp_length, NULL, true);
+	ufbxi_check(dst);
+
+	ufbxi_strblob_set(p_dst, dst, tmp_length, raw);
+
+	return 1;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_filenames(ufbxi_context *uc, ufbxi_strblob *filename, ufbxi_strblob *absolute_filename, ufbxi_strblob *relative_filename, bool raw)
+{
+	if (ufbxi_strblob_length(relative_filename, raw) == 0) {
+		const ufbxi_strblob *original_file_path = raw
+			? (const ufbxi_strblob*)&uc->scene.metadata.raw_original_file_path
+			: (const ufbxi_strblob*)&uc->scene.metadata.original_file_path;
+
+		ufbxi_check(ufbxi_absolute_to_relative_path(uc, relative_filename, original_file_path, absolute_filename, raw));
+	}
+
+	ufbxi_check(ufbxi_resolve_relative_filename(uc, filename, relative_filename, raw));
+
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	size_t num_elements = uc->num_elements;
@@ -12659,6 +13090,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	}
 	uc->scene.elements.count = num_elements;
 	ufbxi_buf_free(&uc->tmp_element_offsets);
+
+	uc->scene.metadata.original_file_path = ufbx_find_string(&uc->scene.metadata.scene_props, "DocumentUrl", ufbx_empty_string);
+	uc->scene.metadata.raw_original_file_path = ufbx_find_blob(&uc->scene.metadata.scene_props, "DocumentUrl", ufbx_empty_blob);
 
 	// Resolve and add the connections to elements
 	ufbxi_check(ufbxi_resolve_connections(uc));
@@ -12929,8 +13363,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			cache->format = (ufbx_cache_file_format)type;
 		}
 
-		ufbxi_check(ufbxi_resolve_relative_filename(uc, &cache->filename, cache->relative_filename));
-		ufbxi_check(ufbxi_resolve_relative_filename_raw(uc, &cache->raw_filename, cache->raw_relative_filename));
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&cache->filename, (ufbxi_strblob*)&cache->absolute_filename, (ufbxi_strblob*)&cache->relative_filename, false));
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&cache->raw_filename, (ufbxi_strblob*)&cache->raw_absolute_filename, (ufbxi_strblob*)&cache->raw_relative_filename, true));
 	}
 
 	ufbx_assert(uc->tmp_full_weights.num_items == uc->scene.blend_channels.count);
@@ -13432,8 +13866,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	size_t num_content_videos = 0;
 	ufbxi_for_ptr_list(ufbx_video, p_video, uc->scene.videos) {
 		ufbx_video *video = *p_video;
-		ufbxi_check(ufbxi_resolve_relative_filename(uc, &video->filename, video->relative_filename));
-		ufbxi_check(ufbxi_resolve_relative_filename_raw(uc, &video->raw_filename, video->raw_relative_filename));
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&video->filename, (ufbxi_strblob*)&video->absolute_filename, (ufbxi_strblob*)&video->relative_filename, false));
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&video->raw_filename, (ufbxi_strblob*)&video->raw_absolute_filename, (ufbxi_strblob*)&video->raw_relative_filename, true));
 		if (video->content.size > 0) {
 			content_videos[num_content_videos++] = video;
 		}
@@ -13460,8 +13894,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbx_texture *texture = *p_texture;
 		ufbxi_texture_extra *extra = (ufbxi_texture_extra*)ufbxi_get_element_extra(uc, texture->element.element_id);
 
-		ufbxi_check(ufbxi_resolve_relative_filename(uc, &texture->filename, texture->relative_filename));
-		ufbxi_check(ufbxi_resolve_relative_filename_raw(uc, &texture->raw_filename, texture->raw_relative_filename));
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&texture->filename, (ufbxi_strblob*)&texture->absolute_filename, (ufbxi_strblob*)&texture->relative_filename, false));
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&texture->raw_filename, (ufbxi_strblob*)&texture->raw_absolute_filename, (ufbxi_strblob*)&texture->raw_relative_filename, true));
 
 		ufbx_prop *uv_set = ufbxi_find_prop(&texture->props, ufbxi_UVSet);
 		if (uv_set) {
@@ -13490,6 +13924,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				}
 			}
 		}
+
+		ufbxi_check(ufbxi_finalize_texture_shader(uc, texture));
 	}
 
 	ufbxi_for_ptr_list(ufbx_display_layer, p_layer, uc->scene.display_layers) {
@@ -14103,6 +14539,50 @@ ufbxi_noinline static void ufbxi_update_material(ufbx_scene *scene, ufbx_materia
 	}
 }
 
+ufbxi_noinline static void ufbxi_update_texture_shader(ufbx_texture *texture, ufbx_texture_shader *shader)
+{
+	ufbxi_for_list(ufbx_texture_shader_input, input, shader->inputs) {
+		ufbx_prop *prop = input->prop;
+		if (prop) {
+			input->prop = prop = ufbx_find_prop_len(&texture->props, prop->name.data, prop->name.length);
+			input->value_vec4 = prop->value_vec4;
+			input->value_int = prop->value_int;
+			input->value_str = prop->value_str;
+			input->value_blob = prop->value_blob;
+			input->texture = (ufbx_texture*)ufbx_get_prop_element(&texture->element, input->prop, UFBX_ELEMENT_TEXTURE);
+		}
+
+		prop = input->texture_prop;
+		if (prop) {
+			input->texture_prop = prop = ufbx_find_prop_len(&texture->props, prop->name.data, prop->name.length);
+			ufbx_texture *tex = (ufbx_texture*)ufbx_get_prop_element(&texture->element, prop, UFBX_ELEMENT_TEXTURE);
+			if (tex) input->texture = tex;
+		}
+
+		input->texture_enabled = input->texture != NULL;
+		prop = input->texture_prop;
+		if (prop) {
+			input->texture_enabled_prop = prop = ufbx_find_prop_len(&texture->props, prop->name.data, prop->name.length);
+			input->texture_enabled = prop->value_int != 0;
+		}
+	}
+
+	if (shader->type == UFBX_TEXTURE_SHADER_SELECT_OUTPUT) {
+		ufbx_texture_shader_input *map = ufbx_find_texture_shader_input(shader, "sourceMap");
+		ufbx_texture_shader_input *index = ufbx_find_texture_shader_input(shader, "outputChannelIndex");
+		if (map) {
+			shader->main_texture = map->texture;
+		}
+		if (index) {
+			shader->main_texture_output_index = index->value_int;
+		}
+	}
+
+	// Check if there is a single texture input to designate as `main`
+	if (!shader->main_texture) {
+	}
+}
+
 ufbxi_noinline static void ufbxi_update_texture(ufbx_texture *texture)
 {
 	texture->transform = ufbxi_get_texture_transform(&texture->props);
@@ -14115,6 +14595,10 @@ ufbxi_noinline static void ufbxi_update_texture(ufbx_texture *texture)
 	}
 	texture->wrap_u = (ufbx_wrap_mode)ufbxi_find_enum(&texture->props, ufbxi_WrapModeU, 0, UFBX_WRAP_CLAMP);
 	texture->wrap_v = (ufbx_wrap_mode)ufbxi_find_enum(&texture->props, ufbxi_WrapModeV, 0, UFBX_WRAP_CLAMP);
+
+	if (texture->shader) {
+		ufbxi_update_texture_shader(texture, texture->shader);
+	}
 }
 
 ufbxi_noinline static void ufbxi_update_anim_stack(ufbx_scene *scene, ufbx_anim_stack *stack)
@@ -16602,6 +17086,17 @@ ufbxi_nodiscard ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 			layers[i].texture = (ufbx_texture*)ufbxi_translate_element(ec, layers[i].texture);
 		}
 		texture->layers.data = layers;
+
+		if (texture->shader) {
+			ufbx_texture_shader *shader = texture->shader;
+			shader = ufbxi_push_copy(&ec->result, ufbx_texture_shader, 1, shader);
+			ufbxi_check_err(&ec->error, shader);
+			texture->shader = shader;
+
+			ufbx_texture_shader_input *inputs = ufbxi_push_copy(&ec->result, ufbx_texture_shader_input, shader->inputs.count, shader->inputs.data);
+			ufbxi_check_err(&ec->error, inputs);
+			shader->inputs.data = inputs;
+		}
 	}
 
 	ufbxi_for_ptr_list(ufbx_shader, p_shader, ec->scene.shaders) {
@@ -19850,21 +20345,11 @@ ufbx_abi ufbx_element *ufbx_find_element_len(const ufbx_scene *scene, ufbx_eleme
 	return index < SIZE_MAX ? scene->elements_by_name.data[index].element : NULL;
 }
 
-ufbx_abi ufbx_element *ufbx_find_prop_element_len(ufbx_element *element, const char *name, size_t name_len)
+ufbx_abi ufbx_element *ufbx_get_prop_element(const ufbx_element *element, const ufbx_prop *prop, ufbx_element_type type)
 {
-	ufbx_assert(element);
-	if (!element) return NULL;
-
-	size_t index = SIZE_MAX;
-	ufbx_string name_str = { name, name_len };
-
-	ufbxi_macro_lower_bound_eq(ufbx_connection, 32, &index,
-		element->connections_dst.data, 0, element->connections_dst.count,
-		( ufbxi_str_cmp(a->dst_prop, name_str) < 0 ),
-		( ufbxi_str_equal(a->dst_prop, name_str) ));
-
-	if (index == SIZE_MAX) return NULL;
-	return element->connections_dst.data[index].src;
+	ufbx_assert(element && prop);
+	if (!element || !prop) return NULL;
+	return ufbxi_fetch_dst_element((ufbx_element*)element, false, prop->name.data, type);
 }
 
 ufbx_abi ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t name_len)
@@ -20259,6 +20744,50 @@ ufbx_abi ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const 
 	}
 
 	return name_str;
+}
+
+ufbx_abi ufbx_shader_prop_binding_list ufbx_find_shader_prop_bindings_len(const ufbx_shader *shader, const char *name, size_t name_len)
+{
+	ufbx_shader_prop_binding_list bindings = { NULL, 0 } ;
+
+	ufbx_string name_str = { name, name_len };
+	if (!shader) return bindings;
+
+	ufbxi_for_ptr_list(ufbx_shader_binding, p_bind, shader->bindings) {
+		ufbx_shader_binding *bind = *p_bind;
+
+		size_t begin = SIZE_MAX;
+		ufbxi_macro_lower_bound_eq(ufbx_shader_prop_binding, 4, &begin, bind->prop_bindings.data, 0, bind->prop_bindings.count, 
+			( ufbxi_str_less(a->shader_prop, name_str) ), ( ufbxi_str_equal(a->shader_prop, name_str) ));
+
+		if (begin != SIZE_MAX) {
+
+			size_t end = begin;
+			ufbxi_macro_upper_bound_eq(ufbx_shader_prop_binding, 4, &end, bind->prop_bindings.data, begin, bind->prop_bindings.count, 
+				( ufbxi_str_equal(a->shader_prop, name_str) ));
+
+			bindings.data = bind->prop_bindings.data + begin;
+			bindings.count = end - begin;
+			break;
+		}
+	}
+
+	return bindings;
+}
+
+ufbx_abi ufbx_texture_shader_input *ufbx_find_texture_shader_input_len(const ufbx_texture_shader *shader, const char *name, size_t name_len)
+{
+	ufbx_string name_str = { name, name_len };
+
+	size_t index = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbx_texture_shader_input, 4, &index, shader->inputs.data, 0, shader->inputs.count, 
+		( ufbxi_str_less(a->name, name_str) ), ( ufbxi_str_equal(a->name, name_str) ));
+
+	if (index != SIZE_MAX) {
+		return &shader->inputs.data[index];
+	}
+
+	return NULL;
 }
 
 ufbx_abi bool ufbx_coordinate_axes_valid(ufbx_coordinate_axes axes)

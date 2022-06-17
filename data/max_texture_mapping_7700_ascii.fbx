@@ -1,0 +1,1211 @@
+; FBX 7.7.0 project file
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1004
+	FBXVersion: 7700
+	CreationTimeStamp:  {
+		Version: 1000
+		Year: 2022
+		Month: 6
+		Day: 17
+		Hour: 15
+		Minute: 25
+		Second: 0
+		Millisecond: 606
+	}
+	Creator: "FBX SDK/FBX Plugins version 2020.3"
+	OtherFlags:  {
+		TCDefinition: 127
+	}
+	SceneInfo: "SceneInfo::GlobalInfo", "UserData" {
+		Type: "UserData"
+		Version: 100
+		MetaData:  {
+			Version: 100
+			Title: ""
+			Subject: ""
+			Author: ""
+			Keywords: ""
+			Revision: ""
+			Comment: ""
+		}
+		Properties70:  {
+			P: "DocumentUrl", "KString", "Url", "", "D:\Dev\clean\ufbx\data\max_texture_mapping_7700_ascii.fbx"
+			P: "SrcDocumentUrl", "KString", "Url", "", "D:\Dev\clean\ufbx\data\max_texture_mapping_7700_ascii.fbx"
+			P: "Original", "Compound", "", ""
+			P: "Original|ApplicationVendor", "KString", "", "", "Autodesk"
+			P: "Original|ApplicationName", "KString", "", "", "3ds Max"
+			P: "Original|ApplicationVersion", "KString", "", "", "2023"
+			P: "Original|DateTime_GMT", "DateTime", "", "", "17/06/2022 12:25:00.604"
+			P: "Original|FileName", "KString", "", "", "D:\Dev\clean\ufbx\data\max_texture_mapping_7700_ascii.fbx"
+			P: "LastSaved", "Compound", "", ""
+			P: "LastSaved|ApplicationVendor", "KString", "", "", "Autodesk"
+			P: "LastSaved|ApplicationName", "KString", "", "", "3ds Max"
+			P: "LastSaved|ApplicationVersion", "KString", "", "", "2023"
+			P: "LastSaved|DateTime_GMT", "DateTime", "", "", "17/06/2022 12:25:00.604"
+			P: "Original|ApplicationActiveProject", "KString", "", "", "C:\Users\Datacube\Documents\3ds Max 2023"
+			P: "Original|ApplicationNativeFile", "KString", "", "", "C:\Users\Datacube\Documents\3ds Max 2023\scenes\maxmaps.max"
+		}
+	}
+}
+GlobalSettings:  {
+	Version: 1000
+	Properties70:  {
+		P: "UpAxis", "int", "Integer", "",2
+		P: "UpAxisSign", "int", "Integer", "",1
+		P: "FrontAxis", "int", "Integer", "",1
+		P: "FrontAxisSign", "int", "Integer", "",-1
+		P: "CoordAxis", "int", "Integer", "",0
+		P: "CoordAxisSign", "int", "Integer", "",1
+		P: "OriginalUpAxis", "int", "Integer", "",2
+		P: "OriginalUpAxisSign", "int", "Integer", "",1
+		P: "UnitScaleFactor", "double", "Number", "",2.54
+		P: "OriginalUnitScaleFactor", "double", "Number", "",2.54
+		P: "AmbientColor", "ColorRGB", "Color", "",0,0,0
+		P: "DefaultCamera", "KString", "", "", "Producer Top"
+		P: "TimeMode", "enum", "", "",6
+		P: "TimeProtocol", "enum", "", "",2
+		P: "SnapOnFrameMode", "enum", "", "",0
+		P: "TimeSpanStart", "KTime", "Time", "",0
+		P: "TimeSpanStop", "KTime", "Time", "",153953860000
+		P: "CustomFrameRate", "double", "Number", "",-1
+		P: "TimeMarker", "Compound", "", ""
+		P: "CurrentTimeMarker", "int", "Integer", "",-1
+	}
+}
+
+; Documents Description
+;------------------------------------------------------------------
+
+Documents:  {
+	Count: 1
+	Document: 2629272558432, "", "Scene" {
+		Properties70:  {
+			P: "SourceObject", "object", "", ""
+			P: "ActiveAnimStackName", "KString", "", "", ""
+		}
+		RootNode: 0
+	}
+}
+
+; Document References
+;------------------------------------------------------------------
+
+References:  {
+}
+
+; Object definitions
+;------------------------------------------------------------------
+
+Definitions:  {
+	Version: 100
+	Count: 23
+	ObjectType: "GlobalSettings" {
+		Count: 1
+	}
+	ObjectType: "AnimationStack" {
+		Count: 1
+		PropertyTemplate: "FbxAnimStack" {
+			Properties70:  {
+				P: "Description", "KString", "", "", ""
+				P: "LocalStart", "KTime", "Time", "",0
+				P: "LocalStop", "KTime", "Time", "",0
+				P: "ReferenceStart", "KTime", "Time", "",0
+				P: "ReferenceStop", "KTime", "Time", "",0
+			}
+		}
+	}
+	ObjectType: "AnimationLayer" {
+		Count: 1
+		PropertyTemplate: "FbxAnimLayer" {
+			Properties70:  {
+				P: "Weight", "Number", "", "A",100
+				P: "Mute", "bool", "", "",0
+				P: "Solo", "bool", "", "",0
+				P: "Lock", "bool", "", "",0
+				P: "Color", "ColorRGB", "Color", "",0.8,0.8,0.8
+				P: "BlendMode", "enum", "", "",0
+				P: "RotationAccumulationMode", "enum", "", "",0
+				P: "ScaleAccumulationMode", "enum", "", "",0
+				P: "BlendModeBypass", "ULongLong", "", "",0
+			}
+		}
+	}
+	ObjectType: "Model" {
+		Count: 1
+		PropertyTemplate: "FbxNode" {
+			Properties70:  {
+				P: "QuaternionInterpolate", "enum", "", "",0
+				P: "RotationOffset", "Vector3D", "Vector", "",0,0,0
+				P: "RotationPivot", "Vector3D", "Vector", "",0,0,0
+				P: "ScalingOffset", "Vector3D", "Vector", "",0,0,0
+				P: "ScalingPivot", "Vector3D", "Vector", "",0,0,0
+				P: "TranslationActive", "bool", "", "",0
+				P: "TranslationMin", "Vector3D", "Vector", "",0,0,0
+				P: "TranslationMax", "Vector3D", "Vector", "",0,0,0
+				P: "TranslationMinX", "bool", "", "",0
+				P: "TranslationMinY", "bool", "", "",0
+				P: "TranslationMinZ", "bool", "", "",0
+				P: "TranslationMaxX", "bool", "", "",0
+				P: "TranslationMaxY", "bool", "", "",0
+				P: "TranslationMaxZ", "bool", "", "",0
+				P: "RotationOrder", "enum", "", "",0
+				P: "RotationSpaceForLimitOnly", "bool", "", "",0
+				P: "RotationStiffnessX", "double", "Number", "",0
+				P: "RotationStiffnessY", "double", "Number", "",0
+				P: "RotationStiffnessZ", "double", "Number", "",0
+				P: "AxisLen", "double", "Number", "",10
+				P: "PreRotation", "Vector3D", "Vector", "",0,0,0
+				P: "PostRotation", "Vector3D", "Vector", "",0,0,0
+				P: "RotationActive", "bool", "", "",0
+				P: "RotationMin", "Vector3D", "Vector", "",0,0,0
+				P: "RotationMax", "Vector3D", "Vector", "",0,0,0
+				P: "RotationMinX", "bool", "", "",0
+				P: "RotationMinY", "bool", "", "",0
+				P: "RotationMinZ", "bool", "", "",0
+				P: "RotationMaxX", "bool", "", "",0
+				P: "RotationMaxY", "bool", "", "",0
+				P: "RotationMaxZ", "bool", "", "",0
+				P: "InheritType", "enum", "", "",0
+				P: "ScalingActive", "bool", "", "",0
+				P: "ScalingMin", "Vector3D", "Vector", "",0,0,0
+				P: "ScalingMax", "Vector3D", "Vector", "",1,1,1
+				P: "ScalingMinX", "bool", "", "",0
+				P: "ScalingMinY", "bool", "", "",0
+				P: "ScalingMinZ", "bool", "", "",0
+				P: "ScalingMaxX", "bool", "", "",0
+				P: "ScalingMaxY", "bool", "", "",0
+				P: "ScalingMaxZ", "bool", "", "",0
+				P: "GeometricTranslation", "Vector3D", "Vector", "",0,0,0
+				P: "GeometricRotation", "Vector3D", "Vector", "",0,0,0
+				P: "GeometricScaling", "Vector3D", "Vector", "",1,1,1
+				P: "MinDampRangeX", "double", "Number", "",0
+				P: "MinDampRangeY", "double", "Number", "",0
+				P: "MinDampRangeZ", "double", "Number", "",0
+				P: "MaxDampRangeX", "double", "Number", "",0
+				P: "MaxDampRangeY", "double", "Number", "",0
+				P: "MaxDampRangeZ", "double", "Number", "",0
+				P: "MinDampStrengthX", "double", "Number", "",0
+				P: "MinDampStrengthY", "double", "Number", "",0
+				P: "MinDampStrengthZ", "double", "Number", "",0
+				P: "MaxDampStrengthX", "double", "Number", "",0
+				P: "MaxDampStrengthY", "double", "Number", "",0
+				P: "MaxDampStrengthZ", "double", "Number", "",0
+				P: "PreferedAngleX", "double", "Number", "",0
+				P: "PreferedAngleY", "double", "Number", "",0
+				P: "PreferedAngleZ", "double", "Number", "",0
+				P: "LookAtProperty", "object", "", ""
+				P: "UpVectorProperty", "object", "", ""
+				P: "Show", "bool", "", "",1
+				P: "NegativePercentShapeSupport", "bool", "", "",1
+				P: "DefaultAttributeIndex", "int", "Integer", "",-1
+				P: "Freeze", "bool", "", "",0
+				P: "LODBox", "bool", "", "",0
+				P: "Lcl Translation", "Lcl Translation", "", "A",0,0,0
+				P: "Lcl Rotation", "Lcl Rotation", "", "A",0,0,0
+				P: "Lcl Scaling", "Lcl Scaling", "", "A",1,1,1
+				P: "Visibility", "Visibility", "", "A",1
+				P: "Visibility Inheritance", "Visibility Inheritance", "", "",1
+			}
+		}
+	}
+	ObjectType: "Geometry" {
+		Count: 1
+		PropertyTemplate: "FbxMesh" {
+			Properties70:  {
+				P: "Color", "ColorRGB", "Color", "",0.8,0.8,0.8
+				P: "BBoxMin", "Vector3D", "Vector", "",0,0,0
+				P: "BBoxMax", "Vector3D", "Vector", "",0,0,0
+				P: "Primary Visibility", "bool", "", "",1
+				P: "Casts Shadows", "bool", "", "",1
+				P: "Receive Shadows", "bool", "", "",1
+			}
+		}
+	}
+	ObjectType: "Material" {
+		Count: 1
+		PropertyTemplate: "FbxSurfaceMaterial" {
+			Properties70:  {
+				P: "ShadingModel", "KString", "", "", "Unknown"
+				P: "MultiLayer", "bool", "", "",0
+			}
+		}
+	}
+	ObjectType: "Texture" {
+		Count: 12
+		PropertyTemplate: "FbxFileTexture" {
+			Properties70:  {
+				P: "TextureTypeUse", "enum", "", "",0
+				P: "Texture alpha", "Number", "", "A",1
+				P: "CurrentMappingType", "enum", "", "",0
+				P: "WrapModeU", "enum", "", "",0
+				P: "WrapModeV", "enum", "", "",0
+				P: "UVSwap", "bool", "", "",0
+				P: "PremultiplyAlpha", "bool", "", "",1
+				P: "Translation", "Vector", "", "A",0,0,0
+				P: "Rotation", "Vector", "", "A",0,0,0
+				P: "Scaling", "Vector", "", "A",1,1,1
+				P: "TextureRotationPivot", "Vector3D", "Vector", "",0,0,0
+				P: "TextureScalingPivot", "Vector3D", "Vector", "",0,0,0
+				P: "CurrentTextureBlendMode", "enum", "", "",1
+				P: "UVSet", "KString", "", "", "default"
+				P: "UseMaterial", "bool", "", "",0
+				P: "UseMipMap", "bool", "", "",0
+			}
+		}
+	}
+	ObjectType: "Implementation" {
+		Count: 1
+		PropertyTemplate: "FbxImplementation" {
+			Properties70:  {
+				P: "ShaderLanguage", "KString", "", "", "MentalRaySL"
+				P: "ShaderLanguageVersion", "KString", "", "", ""
+				P: "RenderAPI", "KString", "", "", "MentalRay"
+				P: "RenderAPIVersion", "KString", "", "", ""
+				P: "RootBindingName", "KString", "", "", ""
+				P: "Constants", "Compound", "", ""
+			}
+		}
+	}
+	ObjectType: "BindingTable" {
+		Count: 1
+		PropertyTemplate: "FbxBindingTable" {
+			Properties70:  {
+				P: "TargetName", "KString", "", "", ""
+				P: "TargetType", "KString", "", "", ""
+				P: "CodeAbsoluteURL", "KString", "XRefUrl", "", ""
+				P: "CodeRelativeURL", "KString", "XRefUrl", "", ""
+				P: "CodeTAG", "KString", "", "", "shader"
+				P: "DescAbsoluteURL", "KString", "XRefUrl", "", ""
+				P: "DescRelativeURL", "KString", "XRefUrl", "", ""
+				P: "DescTAG", "KString", "", "", "shader"
+			}
+		}
+	}
+	ObjectType: "Video" {
+		Count: 3
+		PropertyTemplate: "FbxVideo" {
+			Properties70:  {
+				P: "Path", "KString", "XRefUrl", "", ""
+				P: "RelPath", "KString", "XRefUrl", "", ""
+				P: "Color", "ColorRGB", "Color", "",0.8,0.8,0.8
+				P: "ClipIn", "KTime", "Time", "",0
+				P: "ClipOut", "KTime", "Time", "",0
+				P: "Offset", "KTime", "Time", "",0
+				P: "PlaySpeed", "double", "Number", "",0
+				P: "FreeRunning", "bool", "", "",0
+				P: "Loop", "bool", "", "",0
+				P: "Mute", "bool", "", "",0
+				P: "AccessMode", "enum", "", "",0
+				P: "ImageSequence", "bool", "", "",0
+				P: "ImageSequenceOffset", "int", "Integer", "",0
+				P: "FrameRate", "double", "Number", "",0
+				P: "LastFrame", "int", "Integer", "",0
+				P: "Width", "int", "Integer", "",0
+				P: "Height", "int", "Integer", "",0
+				P: "StartFrame", "int", "Integer", "",0
+				P: "StopFrame", "int", "Integer", "",0
+				P: "InterlaceMode", "enum", "", "",0
+			}
+		}
+	}
+}
+
+; Object properties
+;------------------------------------------------------------------
+
+Objects:  {
+	Geometry: 2629283310640, "Geometry::", "Mesh" {
+		Properties70:  {
+			P: "Color", "ColorRGB", "Color", "",0.443137254901961,0.529411764705882,0.0235294117647059
+		}
+		Vertices: *24 {
+			a: -10.0000047683716,-10.0000047683716,0,10.0000047683716,-10.0000047683716,0,-10.0000047683716,10.0000047683716,0,10.0000047683716,10.0000047683716,0,-10.0000047683716,-10.0000047683716,20.0000095367432,10.0000047683716,-10.0000047683716,20.0000095367432,-10.0000047683716,10.0000047683716,20.0000095367432,10.0000047683716,10.0000047683716,20.0000095367432
+		} 
+		PolygonVertexIndex: *24 {
+			a: 0,2,3,-2,4,5,7,-7,0,1,5,-5,1,3,7,-6,3,2,6,-8,2,0,4,-7
+		} 
+		Edges: *12 {
+			a: 0,1,2,3,4,5,6,7,9,11,13,17
+		} 
+		GeometryVersion: 124
+		LayerElementNormal: 0 {
+			Version: 102
+			Name: ""
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "Direct"
+			Normals: *72 {
+				a: 0,0,-1,0,0,-1,0,0,-1,0,0,-1,0,0,1,0,0,1,0,0,1,0,0,1,0,-1,0,0,-1,0,0,-1,0,0,-1,0,1,0,0,1,0,0,1,0,0,1,0,0,0,1,0,0,1,0,0,1,0,0,1,0,-1,0,0,-1,0,0,-1,0,0,-1,0,0
+			} 
+			NormalsW: *24 {
+				a: 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+			} 
+		}
+		LayerElementUV: 0 {
+			Version: 101
+			Name: "UVChannel_1"
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "IndexToDirect"
+			UV: *48 {
+				a: 1,0,0,0,1,1,0,1,0,0,1,0,0,1,1,1,0,0,1,0,0,1,1,1,0,0,1,0,0,1,1,1,0,0,1,0,0,1,1,1,0,0,1,0,0,1,1,1
+			} 
+			UVIndex: *24 {
+				a: 0,2,3,1,4,5,7,6,8,9,11,10,12,13,15,14,16,17,19,18,20,21,23,22
+			} 
+		}
+		LayerElementMaterial: 0 {
+			Version: 101
+			Name: ""
+			MappingInformationType: "AllSame"
+			ReferenceInformationType: "IndexToDirect"
+			Materials: *1 {
+				a: 0
+			} 
+		}
+		Layer: 0 {
+			Version: 100
+			LayerElement:  {
+				Type: "LayerElementNormal"
+				TypedIndex: 0
+			}
+			LayerElement:  {
+				Type: "LayerElementMaterial"
+				TypedIndex: 0
+			}
+			LayerElement:  {
+				Type: "LayerElementUV"
+				TypedIndex: 0
+			}
+		}
+	}
+	Model: 2629269223296, "Model::Box001", "Mesh" {
+		Version: 232
+		Properties70:  {
+			P: "InheritType", "enum", "", "",1
+			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+			P: "MaxHandle", "int", "Integer", "UH",2
+		}
+		Shading: T
+		Culling: "CullingOff"
+	}
+	Material: 2629355879840, "Material::01 - Default", "" {
+		Version: 102
+		ShadingModel: "unknown"
+		MultiLayer: 0
+		Properties70:  {
+			P: "ShadingModel", "KString", "", "", "unknown"
+			P: "AmbientColor", "ColorRGB", "Color", "",0.5,0.5,0.5
+			P: "DiffuseColor", "ColorRGB", "Color", "",0.5,0.5,0.5
+			P: "SpecularColor", "ColorRGB", "Color", "",1,1,1
+			P: "SpecularFactor", "double", "Number", "",2
+			P: "ShininessExponent", "double", "Number", "",1024
+			P: "TransparencyFactor", "double", "Number", "",0
+			P: "EmissiveColor", "ColorRGB", "Color", "",0,0,0
+			P: "EmissiveFactor", "double", "Number", "",0
+			P: "3dsMax", "Compound", "", ""
+			P: "3dsMax|ClassIDa", "int", "Integer", "",1030429932
+			P: "3dsMax|ClassIDb", "int", "Integer", "",-559038463
+			P: "3dsMax|SuperClassID", "int", "Integer", "",3072
+			P: "3dsMax|Parameters", "Compound", "", ""
+			P: "3dsMax|ORIGINAL_MTL", "KString", "", "", "PHYSICAL_MTL"
+			P: "3dsMax|Parameters|material_mode", "Integer", "", "A",0
+			P: "3dsMax|Parameters|base_weight", "Float", "", "A",1
+			P: "3dsMax|Parameters|base_color", "ColorAndAlpha", "", "A",0.5,0.5,0.5,1
+			P: "3dsMax|Parameters|reflectivity", "Float", "", "A",1
+			P: "3dsMax|Parameters|roughness", "Float", "", "A",0
+			P: "3dsMax|Parameters|roughness_inv", "Bool", "", "A",0
+			P: "3dsMax|Parameters|metalness", "Float", "", "A",0
+			P: "3dsMax|Parameters|refl_color", "ColorAndAlpha", "", "A",1,1,1,1
+			P: "3dsMax|Parameters|diff_roughness", "Float", "", "A",0
+			P: "3dsMax|Parameters|brdf_mode", "Bool", "", "A",1
+			P: "3dsMax|Parameters|brdf_low", "Float", "", "A",0.05
+			P: "3dsMax|Parameters|brdf_high", "Float", "", "A",1
+			P: "3dsMax|Parameters|brdf_curve", "Float", "", "A",5
+			P: "3dsMax|Parameters|anisotropy", "Float", "", "A",0
+			P: "3dsMax|Parameters|anisoangle", "Float", "", "A",0.25
+			P: "3dsMax|Parameters|aniso_mode", "Integer", "", "A",0
+			P: "3dsMax|Parameters|aniso_channel", "Integer", "", "A",0
+			P: "3dsMax|Parameters|transparency", "Float", "", "A",0
+			P: "3dsMax|Parameters|trans_color", "ColorAndAlpha", "", "A",1,1,1,1
+			P: "3dsMax|Parameters|trans_depth", "Float", "", "A",0
+			P: "3dsMax|Parameters|trans_roughness", "Float", "", "A",0
+			P: "3dsMax|Parameters|trans_roughness_inv", "Bool", "", "A",0
+			P: "3dsMax|Parameters|trans_roughness_lock", "Bool", "", "A",1
+			P: "3dsMax|Parameters|trans_ior", "Float", "", "A",1.52
+			P: "3dsMax|Parameters|thin_walled", "Bool", "", "A",0
+			P: "3dsMax|Parameters|dispersion", "Float", "", "A",0
+			P: "3dsMax|Parameters|trans_scatter_color", "ColorAndAlpha", "", "A",0,0,0,1
+			P: "3dsMax|Parameters|trans_scatter_aniso", "Float", "", "A",0
+			P: "3dsMax|Parameters|scattering", "Float", "", "A",0
+			P: "3dsMax|Parameters|sss_color", "ColorAndAlpha", "", "A",1,1,1,1
+			P: "3dsMax|Parameters|sss_depth", "Float", "", "A",10
+			P: "3dsMax|Parameters|sss_scale", "Float", "", "A",1
+			P: "3dsMax|Parameters|sss_scatter_color", "ColorAndAlpha", "", "A",100,50,25,1
+			P: "3dsMax|Parameters|emission", "Float", "", "A",1
+			P: "3dsMax|Parameters|emit_color", "ColorAndAlpha", "", "A",0,0,0,1
+			P: "3dsMax|Parameters|emit_luminance", "Float", "", "A",1500
+			P: "3dsMax|Parameters|emit_kelvin", "Float", "", "A",6500
+			P: "3dsMax|Parameters|coating", "Float", "", "A",0
+			P: "3dsMax|Parameters|coat_color", "ColorAndAlpha", "", "A",1,1,1,1
+			P: "3dsMax|Parameters|coat_roughness", "Float", "", "A",0
+			P: "3dsMax|Parameters|coat_roughness_inv", "Bool", "", "A",0
+			P: "3dsMax|Parameters|coat_affect_color", "Float", "", "A",0.5
+			P: "3dsMax|Parameters|coat_affect_roughness", "Float", "", "A",0.5
+			P: "3dsMax|Parameters|coat_ior", "Float", "", "A",1.52
+			P: "3dsMax|Parameters|coat_anisotropy", "Float", "", "A",0
+			P: "3dsMax|Parameters|coat_anisoangle", "Float", "", "A",0.25
+			P: "3dsMax|Parameters|sheen", "Float", "", "A",0
+			P: "3dsMax|Parameters|sheen_color", "ColorAndAlpha", "", "A",1,1,1,1
+			P: "3dsMax|Parameters|sheen_roughness", "Float", "", "A",0.3
+			P: "3dsMax|Parameters|thin_film", "Float", "", "A",0
+			P: "3dsMax|Parameters|thin_film_thickness", "Float", "", "A",0
+			P: "3dsMax|Parameters|thin_film_ior", "Float", "", "A",1.3
+			P: "3dsMax|Parameters|base_weight_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|base_color_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|reflectivity_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|refl_color_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|roughness_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|metalness_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|diff_rough_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|anisotropy_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|aniso_angle_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|transparency_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|trans_color_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|trans_rough_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|trans_ior_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|scattering_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|sss_color_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|sss_scale_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|emission_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|emit_color_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|coat_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|coat_color_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|coat_rough_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|bump_map", "ReferenceProperty", "Reference", ""
+			P: "3dsMax|Parameters|normalCamera", "Vector3D", "Vector", "",0,0,0
+			P: "3dsMax|Parameters|normalCameraUsedAs", "int", "Integer", "",0
+			P: "3dsMax|Parameters|normalCameraFactor", "double", "Number", "",0.300000011920929
+			P: "3dsMax|Parameters|displacement_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|cutout_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|coat_aniso_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|coat_aniso_angle_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|sheen_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|sheen_color_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|sheen_rough_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|thin_film_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|thin_film_ior_map", "Reference", "", "A"
+			P: "3dsMax|Parameters|base_weight_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|base_color_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|reflectivity_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|refl_color_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|roughness_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|metalness_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|diff_rough_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|anisotropy_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|aniso_angle_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|transparency_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|trans_color_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|trans_rough_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|trans_ior_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|scattering_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|sss_color_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|sss_scale_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|emission_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|emit_color_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|coat_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|coat_color_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|coat_rough_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|coat_aniso_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|coat_aniso_angle_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|sheen_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|sheen_color_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|sheen_rough_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|thin_film_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|thin_film_ior_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|displacement_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|cutout_map_on", "Bool", "", "A",1
+			P: "3dsMax|Parameters|displacement_map_amt", "Float", "", "A",1
+		}
+	}
+	Video: 2629360425328, "Video::Map #8", "Clip" {
+		Type: "Clip"
+		Properties70:  {
+			P: "Path", "KString", "XRefUrl", "", "D:\Dev\clean\ufbx\data\textures\checkerboard_emissive.png"
+			P: "RelPath", "KString", "XRefUrl", "", "textures\checkerboard_emissive.png"
+		}
+		UseMipMap: 0
+		Filename: "D:\Dev\clean\ufbx\data\textures\checkerboard_emissive.png"
+		RelativeFilename: "textures\checkerboard_emissive.png"
+		Content: ,
+ "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"
+	}
+	Video: 2629360426288, "Video::Map #10", "Clip" {
+		Type: "Clip"
+		Properties70:  {
+			P: "Path", "KString", "XRefUrl", "", "D:\Dev\clean\ufbx\data\textures\checkerboard_normal.png"
+			P: "RelPath", "KString", "XRefUrl", "", "textures\checkerboard_normal.png"
+		}
+		UseMipMap: 0
+		Filename: "D:\Dev\clean\ufbx\data\textures\checkerboard_normal.png"
+		RelativeFilename: "textures\checkerboard_normal.png"
+		Content: ,
+ "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"
+	}
+	Video: 2629360428208, "Video::Map #5", "Clip" {
+		Type: "Clip"
+		Properties70:  {
+			P: "Path", "KString", "XRefUrl", "", "D:\Dev\clean\ufbx\data\textures\checkerboard_metallic.png"
+			P: "RelPath", "KString", "XRefUrl", "", "textures\checkerboard_metallic.png"
+		}
+		UseMipMap: 0
+		Filename: "D:\Dev\clean\ufbx\data\textures\checkerboard_metallic.png"
+		RelativeFilename: "textures\checkerboard_metallic.png"
+		Content: ,
+ "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"
+	}
+	Texture: 2629283312560, "Texture::Map #14", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Map #14"
+		Properties70:  {
+			P: "3dsMax", "Compound", "", ""
+			P: "3dsMax|ClassIDa", "int", "Integer", "",-1989217540
+			P: "3dsMax|ClassIDb", "int", "Integer", "",1153266751
+			P: "3dsMax|SuperClassID", "int", "Integer", "",3088
+			P: "3dsMax|parameters", "Compound", "", ""
+			P: "3dsMax|MaxTexture", "KString", "", "", "MULTIOUTPUT_TO_OSLMap"
+			P: "3dsMax|parameters|sourceMap", "Reference", "", "A"
+			P: "3dsMax|parameters|outputChannelIndex", "Integer", "", "A",0
+		}
+		Media: ""
+		FileName: ""
+		RelativeFilename: ""
+		ModelUVTranslation: 0,0
+		ModelUVScaling: 1,1
+		Texture_Alpha_Source: "None"
+		Cropping: 0,0,0,0
+	}
+	Texture: 2629283311120, "Texture::Map #3", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Map #3"
+		Properties70:  {
+			P: "3dsMax", "Compound", "", ""
+			P: "3dsMax|ClassIDa", "int", "Integer", "",2140830621
+			P: "3dsMax|ClassIDb", "int", "Integer", "",1875767309
+			P: "3dsMax|SuperClassID", "int", "Integer", "",3088
+			P: "3dsMax|params", "Compound", "", ""
+			P: "3dsMax|MaxTexture", "KString", "", "", "OSLMap"
+			P: "3dsMax|params|OSLPath", "KString", "", "A", "C:\Program Files\Autodesk\3ds Max 2023\OSL\RandomTilingBitmap.osl"
+			P: "3dsMax|params|OSLCode", "KString", "", "A", "// Lookup a bitmap and make random variations so no tiling is evident&cr;&lf;// RandomTilingBitmap.osl, by Zap Andersson&cr;&lf;// Modified: 2020-06-23&cr;&lf;// Copyright 2020 Autodesk Inc, All rights reserved. This file is licensed under Apache 2.0 license&cr;&lf;//    https://github.com/ADN-DevTech/3dsMax-OSL-Shaders/blob/license/LICENSE.txt&cr;&lf;&cr;&lf;shader RandomTilingBitmap&cr;&lf;[[ string help  = &cr;&lf;    &quot;<h3>Bitmap Random Tiling</h3>&quot;&cr;&lf;	&quot;Look up a bitmap from passed in UV coordinates and modify each &quot;&cr;&lf;	&quot;repetition of the bitmap such that tiling is not evident. Has &quot;&cr;&lf;	&quot;a mode to properly transform normal maps. Outputs the &quot;&cr;&lf;	&quot;modified UV so it can be hooked up to other Bitmap Lookup shaders &quot;&cr;&lf;	&quot;to apply the identical randomness, plus outputs the Random Index &quot;&cr;&lf;	&quot;itself to drive downstream modifications that are in sync with it.&quot;,&cr;&lf;   string label = &quot;Bitmap Random Tiling&quot;,&cr;&lf;   string version = &quot;1.0&quot; ]]&cr;&lf;(  &cr;&lf;  point  Pos   = point(u,v,0) &cr;&lf;  	[[  string label= &quot;UV Coordinate&quot;, &cr;&lf;  		string help = &quot;The 2D coordinate at which the texture is looked up.&quot; ]],&cr;&lf;  float  Scale  = 0.25&cr;&lf;  	[[  string help = &quot;A linear scale factor. For more complex UV manipulation, connect the UVWTransform.&quot; ]], &cr;&lf;  &cr;&lf;  string Filename = &quot;uv-grid.png&quot; &cr;&lf;  	[[ string widget=&quot;filename&quot;, &cr;&lf;  	   string label=&quot;File name&quot;,&cr;&lf;  	   string help=&quot;The name of the texture to look up&quot; ]], &cr;&lf;  int   NormalMap = 0 &cr;&lf;  	[[ string widget=&quot;checkBox&quot;, &cr;&lf;  	   string packName = &quot;Normal Map&quot;,&cr;&lf;  	   string label    = &quot;Normal Map&quot;,&cr;&lf;  	   int    connectable = 0,&cr;&lf;  	   string help=&quot;If the texture is a normal map, special transformations have to be applied to retain the proper orientation upon rotation. Check this box if the texture is a normal map.&quot; ]],&cr;&lf;  int   NormalFlipR = 0 &cr;&lf;  	[[ string widget=&quot;checkBox&quot;, &cr;&lf;		string packName = &quot;Normal Map&quot;,&cr;&lf;		string label    = &quot;Flip Red&quot;,&cr;&lf;		int connectable = 0,&cr;&lf;  	    string help=&quot;Invert red component for rotation of normal maps.&quot; ]],&cr;&lf;  int   NormalFlipG = 0 &cr;&lf;  	[[ string widget=&quot;checkBox&quot;, &cr;&lf;		string packName = &quot;Normal Map&quot;,&cr;&lf;		string label    = &quot;Flip Green&quot;,&cr;&lf;		int connectable = 0,  	&cr;&lf;	  	string help=&quot;Invert green component for rotation of normal maps.&quot; ]],&cr;&lf;  string Filename_UDIMList = &quot;&quot; &cr;&lf;  	[[ string label=&quot;Viewport UDIM List&quot;,&cr;&lf;  	   int    connectable = 0,&cr;&lf;  	   string help=&quot;The list of UDIM items to load into the viewport. If empty, will be deduced from the file system automatically. &quot; ]], &cr;&lf;  string LoadUDIM = &quot;Load UDIM...&quot; &cr;&lf;  	[[ string widget=&quot;max:actionButton&quot;, &cr;&lf;  	   string actionID=&quot;loadUDIM(\&quot;Filename\&quot;)&quot;,&cr;&lf;  	   string help=&quot;Select a set of files to load as an UDIM.&quot;,&cr;&lf;  	   int    connectable = 0 ]],   	   &cr;&lf;  int    UDIM   = 0&cr;&lf;  	[[ string widget=&quot;checkBox&quot;, string label=&quot;UDIM-compatible lookup&quot;,&cr;&lf;  	   int connectable = 0,&cr;&lf;  	   string help  =&quot;Modifies the UV coordinate so that UDIM's are looked up similar to the max MultiTile map&quot; ]],  	   &cr;&lf;  string WrapMode = &quot;periodic&quot;&cr;&lf;  	[[ string widget=&quot;popup&quot;, string options = &quot;default|black|clamp|periodic|mirror&quot;,&cr;&lf;  	   string label=&quot;Wrap Mode&quot;,&cr;&lf;  	   string help=&quot;How the texture wraps: (black, clamp, periodic or mirror).&quot; ]],  	   &cr;&lf;&cr;&lf;  int   Randomize    = 1 &cr;&lf;    [[ string help = &cr;&lf;    	  &quot;Enables all randomization. Can be disabled for debugging purposes. &quot;,&cr;&lf;    	  int connectable=0 ]],&cr;&lf;  int   RandomizePos    = 1 &cr;&lf;    [[ string help = &cr;&lf;    	  &quot;Enables randomization in UV space by making a 'distorted grid' and  &quot;&cr;&lf;    	  &quot;apply one variation in each 'square' of the grid. &quot;&cr;&lf;    	  &quot;If this is OFF, no spatially varying randomness occurs. &quot;&cr;&lf;    	  &quot;There is still variation per Seed value. If Seed is driven from &quot;&cr;&lf;    	  &quot;e.g. a Node Handle map, this gives one random value per object.&quot;,&cr;&lf;    	  int connectable=0 ]],&cr;&lf;  float RandScale    = 1.0&cr;&lf;    [[ string help = &cr;&lf;    	  &quot;Scale of the 'distorted grid' in relation to UV space. &quot;&cr;&lf;    	  &quot;A value of 1.0 means the 'distorted grid' is the same size as a &quot;&cr;&lf;    	  &quot;unit square in UV space, a smaller number makes the grid smaller and &quot;&cr;&lf;    	  &quot;a larger value makes it larger. &quot;&cr;&lf;    	  &quot;A value of zero disables spatially varying randomness &quot;&cr;&lf;    	  &quot;but still makes a variation per Seed value. If Seed is driven from &quot;&cr;&lf;    	  &quot;e.g. a Node Handle map, this gives one random value per object.&quot; ]],&cr;&lf;&cr;&lf;&cr;&lf;  float WiggleScale  = 0.2  [[ string help=&quot;Scale of the 'wiggliness' of edges, in relation to the UV space&quot; ]],&cr;&lf;  float WiggleAmount = 0.25 &cr;&lf;  	[[ float min=0.0, float max=10.0,&cr;&lf;  	   string help=&quot;Amount of 'wiggliness' on the edge of the randomness grid, to obscure the fact that it is a grid.&quot;&cr;&lf;  	]],&cr;&lf;  float EdgeFuzz     = 0.1  &cr;&lf;  	[[ float min=0.0, float max=10.0,&cr;&lf;  	   string help=&quot;Amount of 'crossfade' at the edge of the randomness grid. Note this is computed stochastically and may introduce some noisiness. &quot;&cr;&lf;  	]],&cr;&lf;&cr;&lf;  &cr;&lf;  float RotMin = 0.0     [[ float min=-360.0, float max=360.0 ]],&cr;&lf;  float RotMax   = 360.0 [[ float min=-360.0, float max=360.0 ]],&cr;&lf;  float ScaleMin = 1.0   [[ float min= 0.1, float max=10.0 ]],&cr;&lf;  float ScaleMax = 1.0   [[ float min= 0.1, float max=10.0 ]],&cr;&lf;  float UOffset = 0.0,&cr;&lf;  float VOffset = 0.0,&cr;&lf;  &cr;&lf;  int   Seed = 0 [[ string help = &quot;Random seed. Connect to e.g. Node Handle map to have per-object randomness&quot; ]],&cr;&lf;        &cr;&lf;  vector HSVMin   = vector(0.0,1.0,1.0),&cr;&lf;  vector HSVMax   = vector(0.0,1.0,1.0), &cr;&lf;&cr;&lf;&cr;&lf;  int    AutoGamma   = 1   &cr;&lf;  	[[ string widget=&quot;checkBox&quot;, int connectable=0 ]],&cr;&lf;  float  ManualGamma = 1.0 &cr;&lf;  	[[ string label=&quot;Manual Gamma&quot; ]],&cr;&lf;&cr;&lf; 	  	  	  	&cr;&lf;    &cr;&lf;  output color Col = 0     [[ string label=&quot;Col (RGB)&quot; ]],&cr;&lf;  output float R = 0,&cr;&lf;  output float G = 0,&cr;&lf;  output float B = 0,&cr;&lf;  output float A = 1,&cr;&lf;  output float Luminance = 0,&cr;&lf;  output float Average = 0,&cr;&lf;  output point UV = 0,&cr;&lf;  output int   RandomIndex = 0,&cr;&lf;)&cr;&lf;{&cr;&lf;	// Skip empty files&cr;&lf;	if (Filename == &quot;&quot;)&cr;&lf;		return;&cr;&lf;		&cr;&lf;	point p = Pos  / Scale;&cr;&lf;	&cr;&lf;	point noisepoint = 0; &cr;&lf;	&cr;&lf;	if (RandomizePos) &cr;&lf;	{&cr;&lf;		point wigglepoint = p / WiggleScale;&cr;&lf;		noisepoint = p / RandScale + (noise(wigglepoint, Seed)-point(0.5,0.5,0.0)) * WiggleAmount + noise(&quot;hash&quot;, p) * EdgeFuzz;&cr;&lf;	}&cr;&lf;	&cr;&lf;	point rotscale  = Randomize?noise(&quot;cell&quot;, noisepoint, Seed + 10):0;&cr;&lf;	point position  = Randomize?noise(&quot;cell&quot;, noisepoint, Seed + 11) - point(0.5,0.5,0.0):0;	&cr;&lf;	point hsvchange = Randomize?noise(&quot;cell&quot;, noisepoint, Seed + 12):0;	&cr;&lf;&cr;&lf;	// Output one of the randomizers so people can do external randomization&cr;&lf;	// based on these&cr;&lf;	RandomIndex = int(rotscale[2] * 500000000);&cr;&lf;&cr;&lf;	// Compute the actual rotation (in radians)	&cr;&lf;	float rotation = radians(mix(RotMin, RotMax, rotscale[0]));&cr;&lf;&cr;&lf;	vector hsvTweak = mix(HSVMin, HSVMax, hsvchange);&cr;&lf;		&cr;&lf;	p -= point(0.5,0.5,0.0);&cr;&lf;	&cr;&lf;	p  = rotate(p, rotation, 0.0, vector(0.0,0.0,1.0));&cr;&lf;	p /= mix(ScaleMin, ScaleMax, rotscale[1]);&cr;&lf;	p += point(position[0] * UOffset, position[1] * VOffset, 0.0);&cr;&lf;	&cr;&lf;	p += point(0.5,0.5,0.0);&cr;&lf;	&cr;&lf;	UV = p;&cr;&lf;&cr;&lf;	// Default lookup, just use u and inverted v...&cr;&lf;	float ulookup = p[0];&cr;&lf;	float vlookup = 1.0 - p[1];&cr;&lf;	&cr;&lf;	// But for UDIM compatibility and max's idea that 0,0 is in &cr;&lf;	// lower left corner, we need this juggling of v....&cr;&lf;	if (UDIM)&cr;&lf;	{&cr;&lf;		float vfloor  = floor(p[1]);&cr;&lf;		float vfrac   = p[1] - vfloor;&cr;&lf;		vlookup = vfloor + (1.0 - vfrac);&cr;&lf;	}&cr;&lf;	&cr;&lf;	Col  = texture(Filename, ulookup, vlookup, &quot;wrap&quot;, WrapMode, &quot;alpha&quot;, A);&cr;&lf;&cr;&lf;	if (NormalMap  == 0)&cr;&lf;	{	&cr;&lf;		color hsv = transformc(&quot;rgb&quot;, &quot;hsv&quot;, Col);&cr;&lf;		hsv[0] += hsvTweak[0]; // Offset the hue&cr;&lf;		//hsv[1] *= hsvTweak[1]; // Scale the saturation&cr;&lf;		hsv[2] *= hsvTweak[2]; // Scale the value&cr;&lf;		Col = transformc(&quot;hsv&quot;, &quot;rgb&quot;, hsv);					&cr;&lf;		// Simulate saturation via gamma - more visually pleasing&cr;&lf;		Col = pow(Col, hsvTweak[1]); &cr;&lf;	}&cr;&lf;	else&cr;&lf;	{&cr;&lf;		// Flip components if needed&cr;&lf;		if (NormalFlipR) Col[0] = 1.0 - Col[0];&cr;&lf;		if (NormalFlipG) Col[1] = 1.0 - Col[1];&cr;&lf;		&cr;&lf;		Col = rotate(Col, rotation, point(0.5,0.5,0.0), point(0.5,0.5,1.0));&cr;&lf;		&cr;&lf;		// Flip components back if needed&cr;&lf;		if (NormalFlipR) Col[0] = 1.0 - Col[0];&cr;&lf;		if (NormalFlipG) Col[1] = 1.0 - Col[1];&cr;&lf;	}&cr;&lf;	&cr;&lf;	&cr;&lf;	int channels;&cr;&lf;	gettextureinfo(Filename, &quot;channels&quot;, channels);&cr;&lf;	if (channels < 4) // No alpha? Set it to opaque&cr;&lf;	{&cr;&lf;		A = 1.0;&cr;&lf;&cr;&lf;		if (WrapMode == &quot;black&quot;) // 2018-04-25: Allow Decals&cr;&lf;		{&cr;&lf;			if (p[0] < 0.0 || p[0] > 1.0 ||&cr;&lf;			    p[1] < 0.0 || p[1] > 1.0)&cr;&lf;			    A = 0.0;&cr;&lf;		}&cr;&lf;	}&cr;&lf;	&cr;&lf;	if (!NormalMap)&cr;&lf;	{&cr;&lf;		// Temporary workaround for color space issues&cr;&lf;		if (AutoGamma)&cr;&lf;		{&cr;&lf;			if (!endswith(Filename, &quot;.exr&quot;) &&&cr;&lf;				!endswith(Filename, &quot;.EXR&quot;) &&&cr;&lf;				!endswith(Filename, &quot;.hdr&quot;) &&&cr;&lf;				!endswith(Filename, &quot;.HDR&quot;) &&&cr;&lf;				!endswith(Filename, &quot;.tx&quot;)  &&&cr;&lf;				!endswith(Filename, &quot;.TX&quot;))&cr;&lf;			{&cr;&lf;				// Gamma 2.2 for sRGB approx)&cr;&lf;				Col = pow(Col, 2.2);&cr;&lf;			}&cr;&lf;		}&cr;&lf;		else&cr;&lf;		{&cr;&lf;			if (ManualGamma != 1.0)&cr;&lf;				Col = pow(Col, ManualGamma);&cr;&lf;		}&cr;&lf;	}&cr;&lf;	&cr;&lf;	R = Col[0];&cr;&lf;	G = Col[1];&cr;&lf;	B = Col[2];&cr;&lf;	Luminance = luminance(Col);&cr;&lf;	Average   = (R + G + B) / 3.0;&cr;&lf;}"
+             
+			P: "3dsMax|params|OSLAutoUpdate", "Bool", "", "A",1
+			P: "3dsMax|params|OSLShaderName", "KString", "", "A", "RandomTilingBitmap"
+			P: "3dsMax|params|OSLPresetName", "KString", "", "A", ""
+			P: "3dsMax|RandomTilingBitmap", "Compound", "", ""
+			P: "3dsMax|RandomTilingBitmap|Scale", "Float", "", "A",0.25
+			P: "3dsMax|RandomTilingBitmap|Filename", "KString", "", "A", "D:\Dev\clean\ufbx\data\textures\checkerboard_diffuse.png"
+			P: "3dsMax|RandomTilingBitmap|NormalMap", "Integer", "", "A",0
+			P: "3dsMax|RandomTilingBitmap|NormalFlipR", "Integer", "", "A",0
+			P: "3dsMax|RandomTilingBitmap|NormalFlipG", "Integer", "", "A",0
+			P: "3dsMax|RandomTilingBitmap|Filename_UDIMList", "KString", "", "A", ""
+			P: "3dsMax|RandomTilingBitmap|LoadUDIM", "KString", "", "A", "Load UDIM..."
+			P: "3dsMax|RandomTilingBitmap|UDIM", "Integer", "", "A",0
+			P: "3dsMax|RandomTilingBitmap|WrapMode", "KString", "", "A", "periodic"
+			P: "3dsMax|RandomTilingBitmap|Randomize", "Integer", "", "A",1
+			P: "3dsMax|RandomTilingBitmap|RandomizePos", "Integer", "", "A",1
+			P: "3dsMax|RandomTilingBitmap|RandScale", "Float", "", "A",1
+			P: "3dsMax|RandomTilingBitmap|WiggleScale", "Float", "", "A",0.2
+			P: "3dsMax|RandomTilingBitmap|WiggleAmount", "Float", "", "A",0.25
+			P: "3dsMax|RandomTilingBitmap|EdgeFuzz", "Float", "", "A",0.1
+			P: "3dsMax|RandomTilingBitmap|RotMin", "Float", "", "A",0
+			P: "3dsMax|RandomTilingBitmap|RotMax", "Float", "", "A",360
+			P: "3dsMax|RandomTilingBitmap|ScaleMin", "Float", "", "A",1
+			P: "3dsMax|RandomTilingBitmap|ScaleMax", "Float", "", "A",1
+			P: "3dsMax|RandomTilingBitmap|UOffset", "Float", "", "A",0
+			P: "3dsMax|RandomTilingBitmap|VOffset", "Float", "", "A",0
+			P: "3dsMax|RandomTilingBitmap|Seed", "Integer", "", "A",0
+			P: "3dsMax|RandomTilingBitmap|HSVMin", "Vector", "", "A",0,1,1
+			P: "3dsMax|RandomTilingBitmap|HSVMax", "Vector", "", "A",0,1,1
+			P: "3dsMax|RandomTilingBitmap|AutoGamma", "Integer", "", "A",1
+			P: "3dsMax|RandomTilingBitmap|ManualGamma", "Float", "", "A",1
+			P: "3dsMax|RandomTilingBitmap|Pos_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|Scale_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|Filename_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|WrapMode_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|RandScale_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|WiggleScale_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|WiggleAmount_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|EdgeFuzz_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|RotMin_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|RotMax_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|ScaleMin_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|ScaleMax_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|UOffset_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|VOffset_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|Seed_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|HSVMin_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|HSVMax_map", "Reference", "", "A"
+			P: "3dsMax|RandomTilingBitmap|ManualGamma_map", "Reference", "", "A"
+		}
+		Media: ""
+		FileName: ""
+		RelativeFilename: ""
+		ModelUVTranslation: 0,0
+		ModelUVScaling: 1,1
+		Texture_Alpha_Source: "None"
+		Cropping: 0,0,0,0
+	}
+	Texture: 2629283311600, "Texture::Map #7", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Map #7"
+		Properties70:  {
+			P: "3dsMax", "Compound", "", ""
+			P: "3dsMax|ClassIDa", "int", "Integer", "",2140830621
+			P: "3dsMax|ClassIDb", "int", "Integer", "",1875767309
+			P: "3dsMax|SuperClassID", "int", "Integer", "",3088
+			P: "3dsMax|params", "Compound", "", ""
+			P: "3dsMax|MaxTexture", "KString", "", "", "OSLMap"
+			P: "3dsMax|params|OSLPath", "KString", "", "A", "C:\Program Files\Autodesk\3ds Max 2023\OSL\ColorTweak.osl"
+			P: "3dsMax|params|OSLCode", "KString", "", "A", "// Tweak a color.&cr;&lf;// ColorTweak.osl, by Zap Andersson&cr;&lf;// Modified: 2019-11-25&cr;&lf;// Copyright 2019 Autodesk Inc, All rights reserved. This file is licensed under Apache 2.0 license&cr;&lf;//    https://github.com/ADN-DevTech/3dsMax-OSL-Shaders/blob/license/LICENSE.txt&cr;&lf;&cr;&lf;shader ColorTweak&cr;&lf;[[ string help = &quot;Tweaks a color (Levels)&quot;,&cr;&lf;   string label= &quot;Tweak/Levels&quot;,&cr;&lf;   // string category = &quot;Color Correction&quot; &cr;&lf;]]&cr;&lf;(&cr;&lf;	color Input = 0.0,&cr;&lf;	&cr;&lf;	vector HSV = vector(0.0,1.0,1.0)&cr;&lf;		[[ string help = &quot;Hue shift and Saturation / Value multiplier &quot; ]],	&cr;&lf;	color InputMin   = 0.0&cr;&lf;		[[ string help = &quot;The input value that maps to the darkest output. Incoming black level. &quot; ]],	&cr;&lf;	color InputMax   = 1.0&cr;&lf;		[[ string help = &quot;The input value that maps to the brightst output. Incoming white level. &quot; ]],	&cr;&lf;	float MidTones = 1.0&cr;&lf;		[[ string help = &quot;Adjusts the MidTones/Gamma.&quot;,&cr;&lf;		   float min   = 0.01, float max = 9.99 ]],&cr;&lf;	color OutputMin  = 0.0&cr;&lf;		[[ string help = &quot;The output black level.&quot; ]],	&cr;&lf;	color OutputMax  = 1.0&cr;&lf;		[[ string help = &quot;The output white level.&quot; ]],&cr;&lf;&cr;&lf;	int   Clamp = 1&cr;&lf;		[[ string widget = &quot;checkBox&quot;,&cr;&lf;		   string help = &quot;Clamp the output to the 0-1 range for each component&quot; ]],&cr;&lf;		&cr;&lf;	output color Out = 0.0,&cr;&lf;)&cr;&lf;{&cr;&lf;	color col = (Input - InputMin) / InputMax;&cr;&lf;&cr;&lf;	// Tramsform to HSV space	&cr;&lf;	color hsv = transformc(&quot;rgb&quot;, &quot;hsv&quot;, col);&cr;&lf;&cr;&lf;	hsv[0] += HSV[0]; // Add to hue (offset)&cr;&lf;	hsv[1] *= HSV[1]; // Scale saturation&cr;&lf;	hsv[2] *= HSV[2]; // Scale value&cr;&lf;	&cr;&lf;	// Convert back to RGB&cr;&lf;	col = transformc(&quot;hsv&quot;, &quot;rgb&quot;, hsv);&cr;&lf;		&cr;&lf;	Out = mix(OutputMin, OutputMax, pow(col, 1.0/MidTones));&cr;&lf;	&cr;&lf;	if (Clamp)&cr;&lf;		Out = clamp(Out, 0.0, 1.0);&cr;&lf;}&cr;&lf;"
+             
+			P: "3dsMax|params|OSLAutoUpdate", "Bool", "", "A",1
+			P: "3dsMax|params|OSLShaderName", "KString", "", "A", "ColorTweak"
+			P: "3dsMax|params|OSLPresetName", "KString", "", "A", ""
+			P: "3dsMax|ColorTweak", "Compound", "", ""
+			P: "3dsMax|ColorTweak|Input", "ColorAndAlpha", "", "A",0,0,0,1
+			P: "3dsMax|ColorTweak|HSV", "Vector", "", "A",0,1,1
+			P: "3dsMax|ColorTweak|InputMin", "ColorAndAlpha", "", "A",0,0,0,1
+			P: "3dsMax|ColorTweak|InputMax", "ColorAndAlpha", "", "A",1,1,1,1
+			P: "3dsMax|ColorTweak|MidTones", "Float", "", "A",1
+			P: "3dsMax|ColorTweak|OutputMin", "ColorAndAlpha", "", "A",0,0,0,1
+			P: "3dsMax|ColorTweak|OutputMax", "ColorAndAlpha", "", "A",1,1,1,1
+			P: "3dsMax|ColorTweak|Clamp", "Integer", "", "A",1
+			P: "3dsMax|ColorTweak|Input_map", "Reference", "", "A"
+			P: "3dsMax|ColorTweak|HSV_map", "Reference", "", "A"
+			P: "3dsMax|ColorTweak|InputMin_map", "Reference", "", "A"
+			P: "3dsMax|ColorTweak|InputMax_map", "Reference", "", "A"
+			P: "3dsMax|ColorTweak|MidTones_map", "Reference", "", "A"
+			P: "3dsMax|ColorTweak|OutputMin_map", "Reference", "", "A"
+			P: "3dsMax|ColorTweak|OutputMax_map", "Reference", "", "A"
+			P: "3dsMax|ColorTweak|Clamp_map", "Reference", "", "A"
+		}
+		Media: ""
+		FileName: ""
+		RelativeFilename: ""
+		ModelUVTranslation: 0,0
+		ModelUVScaling: 1,1
+		Texture_Alpha_Source: "None"
+		Cropping: 0,0,0,0
+	}
+	Texture: 2629283312080, "Texture::Map #8", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Map #8"
+		Properties70:  {
+			P: "UVSet", "KString", "", "", "UVChannel_1"
+			P: "UseMaterial", "bool", "", "",1
+		}
+		Media: "Video::Map #8"
+		FileName: "D:\Dev\clean\ufbx\data\textures\checkerboard_emissive.png"
+		RelativeFilename: "textures\checkerboard_emissive.png"
+		ModelUVTranslation: 0,0
+		ModelUVScaling: 1,1
+		Texture_Alpha_Source: "Alpha_Black"
+		Cropping: 0,0,0,0
+	}
+	Texture: 2627031770624, "Texture::Map #16", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Map #16"
+		Properties70:  {
+			P: "3dsMax", "Compound", "", ""
+			P: "3dsMax|ClassIDa", "int", "Integer", "",-1989217540
+			P: "3dsMax|ClassIDb", "int", "Integer", "",1153266751
+			P: "3dsMax|SuperClassID", "int", "Integer", "",3088
+			P: "3dsMax|parameters", "Compound", "", ""
+			P: "3dsMax|MaxTexture", "KString", "", "", "MULTIOUTPUT_TO_OSLMap"
+			P: "3dsMax|parameters|sourceMap", "Reference", "", "A"
+			P: "3dsMax|parameters|outputChannelIndex", "Integer", "", "A",0
+		}
+		Media: ""
+		FileName: ""
+		RelativeFilename: ""
+		ModelUVTranslation: 0,0
+		ModelUVScaling: 1,1
+		Texture_Alpha_Source: "None"
+		Cropping: 0,0,0,0
+	}
+	Texture: 2627031769664, "Texture::Map #4", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Map #4"
+		Properties70:  {
+			P: "3dsMax", "Compound", "", ""
+			P: "3dsMax|ClassIDa", "int", "Integer", "",2140830621
+			P: "3dsMax|ClassIDb", "int", "Integer", "",1875767309
+			P: "3dsMax|SuperClassID", "int", "Integer", "",3088
+			P: "3dsMax|params", "Compound", "", ""
+			P: "3dsMax|MaxTexture", "KString", "", "", "OSLMap"
+			P: "3dsMax|params|OSLPath", "KString", "", "A", "C:\Program Files\Autodesk\3ds Max 2023\OSL\UberBitmap.osl"
+			P: "3dsMax|params|OSLCode", "KString", "", "A", "// Load a bitmap into OSL (UBER version, with everything built-in)&cr;&lf;// UberBitmap.osl, by Zap Andersson&cr;&lf;// Modified: 2020-04-14&cr;&lf;// Copyright 2020 Autodesk Inc, All rights reserved. This file is licensed under Apache 2.0 license&cr;&lf;//    https://github.com/ADN-DevTech/3dsMax-OSL-Shaders/blob/license/LICENSE.txt&cr;&lf;&cr;&lf;shader UberBitmap2&cr;&lf;[[ string help  = &quot;All-in-one shader for loading a bitmap via OpenImageIO.<br>Includes UVW channels and transforms in a monolithic version.&quot;,&cr;&lf;   string label = &quot;Uber Bitmap&quot;,&cr;&lf;   string version = &quot;2.0&quot; &cr;&lf;]]&cr;&lf;(  &cr;&lf;	int    UVSet = 1 &cr;&lf;		[[ string label=&quot;Map Channel&quot;,&cr;&lf;		   string help =&quot;The 3ds max Map channel to look up&quot;,&cr;&lf;		   int min = 0, int max = 99 ]],&cr;&lf;	float  Scale = 1.0      &cr;&lf;		[[ string help=&quot;The overall Scale. Larger number = bigger.&quot; ]],&cr;&lf;	vector Tiling = 1.0     &cr;&lf;		[[ string help=&quot;A per-axis dividing scale, to subdivide the values. Larger number = smaller.&quot; ]],&cr;&lf;	vector Offset = 0.0&cr;&lf;		[[ string help=&quot;Moves the UVW coordinates around&quot; ]],&cr;&lf;		&cr;&lf;	// Real world parameters		&cr;&lf;	int    RealWorld = 0 &cr;&lf;		[[ string widget = &quot;checkBox&quot;,&cr;&lf;		   int connectable = 0,&cr;&lf;		   string help   = &quot;Enable Real-World Scaling&quot; ]],&cr;&lf;	float  RealWidth  = 0.2 &cr;&lf;		[[ int worldunits=1,&cr;&lf;		   string help = &quot;Real Width of one unit of texture space&quot; ]],		   		&cr;&lf;	float  RealHeight = 0.2 &cr;&lf;		[[ int worldunits=1,&cr;&lf;           string help = &quot;Real Height of one unit of texture space&quot; ]],		   				&cr;&lf;	&cr;&lf;	float  Rotate = 0.0&cr;&lf;		[[ string help=&quot;A rotation angle in <i>degrees</i>.&quot; ]],,&cr;&lf;	point  RotCenter = point(0.5,0.5,0)     &cr;&lf;		[[ string label = &quot;Rotation Center&quot;,&cr;&lf;		   string help  = &quot;The center of rotation in UVW space&quot; ]],&cr;&lf;	vector RotAxis   = vector(0.0,0.0,1.0)  &cr;&lf;		[[ string label = &quot;Rotation Axis&quot;,&cr;&lf;		   string help  = &quot;An axis around which the rotation occurs.&quot; ]],&cr;&lf;  &cr;&lf;  string Filename = &quot;&quot; &cr;&lf;  	[[ string widget=&quot;filename&quot;, &cr;&lf;  	   string label=&quot;File name&quot;,&cr;&lf;  	   string help=&quot;The name of the texture to look up&quot; ]], &cr;&lf;  	   &cr;&lf;  string Filename_UDIMList = &quot;&quot; &cr;&lf;  	[[ string widget = &quot;null&quot;,&cr;&lf;  	   string label=&quot;Viewport UDIM List&quot;,&cr;&lf;  	   string help=&quot;The list of UDIM items to load into the viewport. If empty, will be deduced from the file system automatically. &quot; ]], &cr;&lf;  string LoadUDIM = &quot;Load UDIM...&quot; &cr;&lf;  	[[ string widget=&quot;max:actionButton&quot;, &cr;&lf;  	   string actionID=&quot;loadUDIM(\&quot;Filename\&quot;)&quot;,&cr;&lf;  	   string help=&quot;Select a set of files to load as an UDIM.&quot;,&cr;&lf;  	   int    connectable = 0 ]],   	   &cr;&lf;  	   &cr;&lf;  int    UDIM   = 0&cr;&lf;  	[[ string widget=&quot;checkBox&quot;, string label=&quot;UDIM-compatible lookup&quot;,&cr;&lf;  	   int    connectable = 0,&cr;&lf;  	   string help  =&quot;Modifies the UV coordinate so that UDIM's are looked up similar to the max MultiTile map&quot; ]],  	     	   &cr;&lf;  string WrapMode = &quot;periodic&quot;&cr;&lf;  	[[ string widget=&quot;popup&quot;, string options = &quot;default|black|clamp|periodic|mirror&quot;,&cr;&lf;  	   string label=&quot;Wrap Mode&quot;,&cr;&lf;  	   string help=&quot;How the texture wraps: (black, clamp, periodic or mirror).&quot; ]],&cr;&lf; &cr;&lf;  int    AutoGamma   = 1   &cr;&lf;  	[[ string widget=&quot;checkBox&quot;, int connectable = 0 ]],&cr;&lf;  float  ManualGamma = 1.0 &cr;&lf;  	[[ string label=&quot;Manual Gamma&quot; ]],&cr;&lf;    &cr;&lf;  output color Col = 0     [[ string label=&quot;Col (RGB)&quot; ]],&cr;&lf;  output float R = 0,&cr;&lf;  output float G = 0,&cr;&lf;  output float B = 0,&cr;&lf;  output float A = 1,&cr;&lf;  output float Luminance = 0,&cr;&lf;  output float Average = 0&cr;&lf;)&cr;&lf;{&cr;&lf;	// Skip empty filenames&cr;&lf;	if (Filename == &quot;&quot;)&cr;&lf;		return;&cr;&lf;		&cr;&lf;	point UVW = point(u,v,0);&cr;&lf;&cr;&lf;	// Get UVW channel&cr;&lf;	if (!getattribute(format(&quot;UV%d&quot;, UVSet), UVW))&cr;&lf;	{&cr;&lf;		// Get MAXtoA style UV&cr;&lf;		float w = 0.0;&cr;&lf;		&cr;&lf;		// Default UV set handled in&cr;&lf;		// a special way in MAXtoA&cr;&lf;		if (UVSet == 1)&cr;&lf;		{&cr;&lf;			UVW = vector(u,v,0);&cr;&lf;			getattribute(&quot;w&quot;,  w);&cr;&lf;		}&cr;&lf;		else // ...the others are just attributes&cr;&lf;		{&cr;&lf;			getattribute(format(&quot;uv_%d&quot;, UVSet), UVW);&cr;&lf;			getattribute(format(&quot;w_%d&quot;, UVSet), w);&cr;&lf;		}&cr;&lf;		// Insert 3rd dimension if any&cr;&lf;		UVW[2] = w;&cr;&lf;	}&cr;&lf;&cr;&lf;	vector worldScale = 1.0;&cr;&lf;	&cr;&lf;	if (RealWorld)&cr;&lf;		worldScale = vector(RealWidth, RealHeight, 1.0);&cr;&lf;&cr;&lf;	// Do the transform stuff&cr;&lf;	point p = rotate(UVW - Offset, radians(Rotate), RotCenter, RotCenter + RotAxis) * Tiling / worldScale / Scale;&cr;&lf;&cr;&lf;	// Default lookup, just use u and inverted v...&cr;&lf;	float ulookup = p[0];&cr;&lf;	float vlookup = 1.0 - p[1];&cr;&lf;	&cr;&lf;	// But for UDIM compatibility and max's idea that 0,0 is in &cr;&lf;	// lower left corner, we need this juggling of v....&cr;&lf;	if (UDIM)&cr;&lf;	{&cr;&lf;		float vfloor  = floor(p[1]);&cr;&lf;		float vfrac   = p[1] - vfloor;&cr;&lf;		vlookup = vfloor + (1.0 - vfrac);&cr;&lf;	}&cr;&lf;	&cr;&lf;	Col  = texture(Filename, ulookup, vlookup, &quot;wrap&quot;, WrapMode, &quot;alpha&quot;, A);&cr;&lf;		&cr;&lf;	int channels;&cr;&lf;	gettextureinfo(Filename, &quot;channels&quot;, channels);&cr;&lf;	if (channels < 4) // No alpha? Set it to opaque&cr;&lf;	{&cr;&lf;		A = 1.0;&cr;&lf;&cr;&lf;		if (WrapMode == &quot;black&quot;) // 2018-04-25: Allow Decals&cr;&lf;		{&cr;&lf;			if (p[0] < 0.0 || p[0] > 1.0 ||&cr;&lf;			    p[1] < 0.0 || p[1] > 1.0)&cr;&lf;			    A = 0.0;&cr;&lf;		}&cr;&lf;	}&cr;&lf;&cr;&lf;	// Temporary workaround for color space issues&cr;&lf;	if (AutoGamma)&cr;&lf;	{&cr;&lf;		if (!endswith(Filename, &quot;.exr&quot;) &&&cr;&lf;			!endswith(Filename, &quot;.EXR&quot;) &&&cr;&lf;			!endswith(Filename, &quot;.hdr&quot;) &&&cr;&lf;			!endswith(Filename, &quot;.HDR&quot;) &&&cr;&lf;			!endswith(Filename, &quot;.tx&quot;) &&&cr;&lf;			!endswith(Filename, &quot;.TX&quot;))&cr;&lf;		{&cr;&lf;			// Gamma 2.2 for sRGB approx)&cr;&lf;			Col = pow(Col, 2.2);&cr;&lf;		}&cr;&lf;	}&cr;&lf;	else&cr;&lf;	{&cr;&lf;		if (ManualGamma != 1.0)&cr;&lf;			Col = pow(Col, ManualGamma);&cr;&lf;	}&cr;&lf;	&cr;&lf;	R = Col[0];&cr;&lf;	G = Col[1];&cr;&lf;	B = Col[2];&cr;&lf;	Luminance = luminance(Col);&cr;&lf;	Average   = (R + G + B) / 3.0;&cr;&lf;}"
+             
+			P: "3dsMax|params|OSLAutoUpdate", "Bool", "", "A",1
+			P: "3dsMax|params|OSLShaderName", "KString", "", "A", "UberBitmap2"
+			P: "3dsMax|params|OSLPresetName", "KString", "", "A", ""
+			P: "3dsMax|UberBitmap2", "Compound", "", ""
+			P: "3dsMax|UberBitmap2|UVSet", "Integer", "", "A",1
+			P: "3dsMax|UberBitmap2|Scale", "Float", "", "A",1
+			P: "3dsMax|UberBitmap2|Tiling", "Vector", "", "A",1,1,1
+			P: "3dsMax|UberBitmap2|Offset", "Vector", "", "A",0,0,0
+			P: "3dsMax|UberBitmap2|RealWorld", "Integer", "", "A",0
+			P: "3dsMax|UberBitmap2|RealWidth", "Float", "", "A",7.874016
+			P: "3dsMax|UberBitmap2|RealHeight", "Float", "", "A",7.874016
+			P: "3dsMax|UberBitmap2|Rotate", "Float", "", "A",0
+			P: "3dsMax|UberBitmap2|RotCenter", "Vector", "", "A",0.5,0.5,0
+			P: "3dsMax|UberBitmap2|RotAxis", "Vector", "", "A",0,0,1
+			P: "3dsMax|UberBitmap2|Filename", "KString", "", "A", "D:\Dev\clean\ufbx\data\textures\checkerboard_roughness.png"
+			P: "3dsMax|UberBitmap2|Filename_UDIMList", "KString", "", "A", ""
+			P: "3dsMax|UberBitmap2|LoadUDIM", "KString", "", "A", "Load UDIM..."
+			P: "3dsMax|UberBitmap2|UDIM", "Integer", "", "A",0
+			P: "3dsMax|UberBitmap2|WrapMode", "KString", "", "A", "periodic"
+			P: "3dsMax|UberBitmap2|AutoGamma", "Integer", "", "A",1
+			P: "3dsMax|UberBitmap2|ManualGamma", "Float", "", "A",1
+			P: "3dsMax|UberBitmap2|UVSet_map", "Reference", "", "A"
+			P: "3dsMax|UberBitmap2|Scale_map", "Reference", "", "A"
+			P: "3dsMax|UberBitmap2|Tiling_map", "Reference", "", "A"
+			P: "3dsMax|UberBitmap2|Offset_map", "Reference", "", "A"
+			P: "3dsMax|UberBitmap2|RealWidth_map", "Reference", "", "A"
+			P: "3dsMax|UberBitmap2|RealHeight_map", "Reference", "", "A"
+			P: "3dsMax|UberBitmap2|Rotate_map", "Reference", "", "A"
+			P: "3dsMax|UberBitmap2|RotCenter_map", "Reference", "", "A"
+			P: "3dsMax|UberBitmap2|RotAxis_map", "Reference", "", "A"
+			P: "3dsMax|UberBitmap2|Filename_map", "Reference", "", "A"
+			P: "3dsMax|UberBitmap2|Filename_UDIMList_map", "Reference", "", "A"
+			P: "3dsMax|UberBitmap2|WrapMode_map", "Reference", "", "A"
+			P: "3dsMax|UberBitmap2|ManualGamma_map", "Reference", "", "A"
+		}
+		Media: ""
+		FileName: ""
+		RelativeFilename: ""
+		ModelUVTranslation: 0,0
+		ModelUVScaling: 1,1
+		Texture_Alpha_Source: "None"
+		Cropping: 0,0,0,0
+	}
+	Texture: 2627031771584, "Texture::Map #9", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Map #9"
+		Properties70:  {
+			P: "3dsMax", "Compound", "", ""
+			P: "3dsMax|ClassIDa", "int", "Integer", "",2121471519
+			P: "3dsMax|ClassIDb", "int", "Integer", "",-1235266194
+			P: "3dsMax|SuperClassID", "int", "Integer", "",3088
+			P: "3dsMax|ai_bump2d Parameter Wrapper", "Compound", "", ""
+			P: "3dsMax|ai_bump2d Parameter Wrapper|TheList", "Reference", "", "A"
+			P: "3dsMax|ai_bump2d Parameter Wrapper|Shader Version", "Integer", "", "A",0
+			P: "3dsMax|ai_bump2d Parameters/Connections", "Compound", "", ""
+			P: "3dsMax|ai_bump2d Parameters/Connections|bump_map", "Float", "", "A",0
+			P: "3dsMax|ai_bump2d Parameters/Connections|bump_map.connected", "Bool", "", "A",1
+			P: "3dsMax|ai_bump2d Parameters/Connections|bump_map.shader", "Reference", "", "A"
+			P: "3dsMax|ai_bump2d Parameters/Connections|bump_height", "Float", "", "A",1
+			P: "3dsMax|ai_bump2d Parameters/Connections|bump_height.connected", "Bool", "", "A",1
+			P: "3dsMax|ai_bump2d Parameters/Connections|bump_height.shader", "Reference", "", "A"
+			P: "3dsMax|ai_bump2d Parameters/Connections|normal", "Vector", "", "A",0,0,0
+			P: "3dsMax|ai_bump2d Parameters/Connections|normal.connected", "Bool", "", "A",1
+			P: "3dsMax|ai_bump2d Parameters/Connections|normal.shader", "Reference", "", "A"
+			P: "3dsMax|ai_bump2d Results", "Compound", "", ""
+		}
+		Media: ""
+		FileName: ""
+		RelativeFilename: ""
+		ModelUVTranslation: 0,0
+		ModelUVScaling: 1,1
+		Texture_Alpha_Source: "None"
+		Cropping: 0,0,0,0
+	}
+	Texture: 2627031772064, "Texture::Map #10", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Map #10"
+		Properties70:  {
+			P: "UVSet", "KString", "", "", "UVChannel_1"
+			P: "UseMaterial", "bool", "", "",1
+		}
+		Media: "Video::Map #10"
+		FileName: "D:\Dev\clean\ufbx\data\textures\checkerboard_normal.png"
+		RelativeFilename: "textures\checkerboard_normal.png"
+		ModelUVTranslation: 0,0
+		ModelUVScaling: 1,1
+		Texture_Alpha_Source: "Alpha_Black"
+		Cropping: 0,0,0,0
+	}
+	Texture: 2627031772544, "Texture::Map #12", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Map #12"
+		Properties70:  {
+			P: "3dsMax", "Compound", "", ""
+			P: "3dsMax|ClassIDa", "int", "Integer", "",-1989217540
+			P: "3dsMax|ClassIDb", "int", "Integer", "",1153266751
+			P: "3dsMax|SuperClassID", "int", "Integer", "",3088
+			P: "3dsMax|parameters", "Compound", "", ""
+			P: "3dsMax|MaxTexture", "KString", "", "", "MULTIOUTPUT_TO_OSLMap"
+			P: "3dsMax|parameters|sourceMap", "Reference", "", "A"
+			P: "3dsMax|parameters|outputChannelIndex", "Integer", "", "A",0
+		}
+		Media: ""
+		FileName: ""
+		RelativeFilename: ""
+		ModelUVTranslation: 0,0
+		ModelUVScaling: 1,1
+		Texture_Alpha_Source: "None"
+		Cropping: 0,0,0,0
+	}
+	Texture: 2627031773024, "Texture::Map #2", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Map #2"
+		Properties70:  {
+			P: "3dsMax", "Compound", "", ""
+			P: "3dsMax|ClassIDa", "int", "Integer", "",2140830621
+			P: "3dsMax|ClassIDb", "int", "Integer", "",1875767309
+			P: "3dsMax|SuperClassID", "int", "Integer", "",3088
+			P: "3dsMax|params", "Compound", "", ""
+			P: "3dsMax|MaxTexture", "KString", "", "", "OSLMap"
+			P: "3dsMax|params|OSLPath", "KString", "", "A", "C:\Program Files\Autodesk\3ds Max 2023\OSL\OSLBitmap.osl"
+			P: "3dsMax|params|OSLCode", "KString", "", "A", "// Lookup a bitmap bitmap with OSL&cr;&lf;// OSLBitmap.osl, by Zap Andersson&cr;&lf;// Modified: 2020-06-23&cr;&lf;// Copyright 2020 Autodesk Inc, All rights reserved. This file is licensed under Apache 2.0 license&cr;&lf;//    https://github.com/ADN-DevTech/3dsMax-OSL-Shaders/blob/license/LICENSE.txt&cr;&lf;&cr;&lf;shader OSLBitmap2&cr;&lf;[[ string help  = &quot;Look up a bitmap from passed in UV coordinates<br/>(through OpenImageIO)&quot;,&cr;&lf;   string label = &quot;Bitmap Lookup&quot;,&cr;&lf;   string version = &quot;2.0&quot; ]]&cr;&lf;(  &cr;&lf;  point  Pos   = point(u,v,0) &cr;&lf;  	[[  string label= &quot;UV Coordinate&quot;, &cr;&lf;  		string help = &quot;The 2D coordinate at which the texture is looked up.&quot; ]],&cr;&lf;  float  Scale  = 1.0&cr;&lf;  	[[  string help = &quot;A linear scale factor. For more complex UV manipulation, connect the UVWTransform.&quot; ]], &cr;&lf;  &cr;&lf;  string Filename = &quot;&quot; &cr;&lf;  	[[ string widget=&quot;filename&quot;, &cr;&lf;  	   string label=&quot;File name&quot;,&cr;&lf;  	   string help=&quot;The name of the texture to look up&quot; ]], &cr;&lf;  string Filename_UDIMList = &quot;&quot; &cr;&lf;  	[[ string widget = &quot;null&quot;,&cr;&lf;  	   string label=&quot;Viewport UDIM List&quot;,&cr;&lf;  	   string help=&quot;The list of UDIM items to load into the viewport. If empty, will be deduced from the file system automatically. &quot; ]], &cr;&lf;  string LoadUDIM = &quot;Load UDIM...&quot; &cr;&lf;  	[[ string widget=&quot;max:actionButton&quot;, &cr;&lf;  	   string actionID=&quot;loadUDIM(\&quot;Filename\&quot;)&quot;,&cr;&lf;  	   string help=&quot;Select a set of files to load as an UDIM.&quot;,&cr;&lf;  	   int    connectable = 0 ]],   	   &cr;&lf;  int    UDIM   = 0&cr;&lf;  	[[ string widget=&quot;checkBox&quot;, string label=&quot;UDIM-compatible lookup&quot;,&cr;&lf;  	   int connectable = 0,&cr;&lf;  	   string help  =&quot;Modifies the UV coordinate so that UDIM's are looked up similar to the max MultiTile map&quot; ]],  	   &cr;&lf;  string WrapMode = &quot;periodic&quot;&cr;&lf;  	[[ string widget=&quot;popup&quot;, string options = &quot;default|black|clamp|periodic|mirror&quot;,&cr;&lf;  	   string label=&quot;Wrap Mode&quot;,&cr;&lf;  	   string help=&quot;How the texture wraps: (black, clamp, periodic or mirror).&quot; ]],&cr;&lf; &cr;&lf;  int    AutoGamma   = 1   &cr;&lf;  	[[ string widget=&quot;checkBox&quot;, int connectable=0 ]],&cr;&lf;  float  ManualGamma = 1.0 &cr;&lf;  	[[ string label=&quot;Manual Gamma&quot; ]],&cr;&lf;    &cr;&lf;  output color Col = 0     [[ string label=&quot;Col (RGB)&quot; ]],&cr;&lf;  output float R = 0,&cr;&lf;  output float G = 0,&cr;&lf;  output float B = 0,&cr;&lf;  output float A = 1,&cr;&lf;  output float Luminance = 0,&cr;&lf;  output float Average = 0&cr;&lf;)&cr;&lf;{&cr;&lf;	// Skip empty files&cr;&lf;	if (Filename == &quot;&quot;)&cr;&lf;		return;&cr;&lf;	&cr;&lf;	point p = Pos  / Scale;&cr;&lf;&cr;&lf;	// Default lookup, just use u and inverted v...&cr;&lf;	float ulookup = p[0];&cr;&lf;	float vlookup = 1.0 - p[1];&cr;&lf;	&cr;&lf;	// But for UDIM compatibility and max's idea that 0,0 is in &cr;&lf;	// lower left corner, we need this juggling of v....&cr;&lf;	if (UDIM)&cr;&lf;	{&cr;&lf;		float vfloor  = floor(p[1]);&cr;&lf;		float vfrac   = p[1] - vfloor;&cr;&lf;		vlookup = vfloor + (1.0 - vfrac);&cr;&lf;	}&cr;&lf;	&cr;&lf;	Col  = texture(Filename, ulookup, vlookup, &quot;wrap&quot;, WrapMode, &quot;alpha&quot;, A);&cr;&lf;	&cr;&lf;	int channels;&cr;&lf;	gettextureinfo(Filename, &quot;channels&quot;, channels);&cr;&lf;	if (channels < 4) // No alpha? Set it to opaque&cr;&lf;	{&cr;&lf;		A = 1.0;&cr;&lf;&cr;&lf;		if (WrapMode == &quot;black&quot;) // 2018-04-25: Allow Decals&cr;&lf;		{&cr;&lf;			if (p[0] < 0.0 || p[0] > 1.0 ||&cr;&lf;			    p[1] < 0.0 || p[1] > 1.0)&cr;&lf;			    A = 0.0;&cr;&lf;		}&cr;&lf;	}&cr;&lf;	&cr;&lf;&cr;&lf;	// Temporary workaround for color space issues&cr;&lf;	if (AutoGamma)&cr;&lf;	{&cr;&lf;		if (!endswith(Filename, &quot;.exr&quot;) &&&cr;&lf;			!endswith(Filename, &quot;.EXR&quot;) &&&cr;&lf;			!endswith(Filename, &quot;.hdr&quot;) &&&cr;&lf;			!endswith(Filename, &quot;.HDR&quot;) &&&cr;&lf;			!endswith(Filename, &quot;.tx&quot;)  &&&cr;&lf;			!endswith(Filename, &quot;.TX&quot;))&cr;&lf;		{&cr;&lf;			// Gamma 2.2 for sRGB approx)&cr;&lf;			Col = pow(Col, 2.2);&cr;&lf;		}&cr;&lf;	}&cr;&lf;	else&cr;&lf;	{&cr;&lf;		if (ManualGamma != 1.0)&cr;&lf;			Col = pow(Col, ManualGamma);&cr;&lf;	}&cr;&lf;	&cr;&lf;	R = Col[0];&cr;&lf;	G = Col[1];&cr;&lf;	B = Col[2];&cr;&lf;	Luminance = luminance(Col);&cr;&lf;	Average   = (R + G + B) / 3.0;&cr;&lf;}"
+             
+			P: "3dsMax|params|OSLAutoUpdate", "Bool", "", "A",1
+			P: "3dsMax|params|OSLShaderName", "KString", "", "A", "OSLBitmap2"
+			P: "3dsMax|params|OSLPresetName", "KString", "", "A", ""
+			P: "3dsMax|OSLBitmap2", "Compound", "", ""
+			P: "3dsMax|OSLBitmap2|Scale", "Float", "", "A",1
+			P: "3dsMax|OSLBitmap2|Filename", "KString", "", "A", "D:\Dev\clean\ufbx\data\textures\checkerboard_weight.png"
+			P: "3dsMax|OSLBitmap2|Filename_UDIMList", "KString", "", "A", ""
+			P: "3dsMax|OSLBitmap2|LoadUDIM", "KString", "", "A", "Load UDIM..."
+			P: "3dsMax|OSLBitmap2|UDIM", "Integer", "", "A",0
+			P: "3dsMax|OSLBitmap2|WrapMode", "KString", "", "A", "periodic"
+			P: "3dsMax|OSLBitmap2|AutoGamma", "Integer", "", "A",1
+			P: "3dsMax|OSLBitmap2|ManualGamma", "Float", "", "A",1
+			P: "3dsMax|OSLBitmap2|Pos_map", "Reference", "", "A"
+			P: "3dsMax|OSLBitmap2|Scale_map", "Reference", "", "A"
+			P: "3dsMax|OSLBitmap2|Filename_map", "Reference", "", "A"
+			P: "3dsMax|OSLBitmap2|Filename_UDIMList_map", "Reference", "", "A"
+			P: "3dsMax|OSLBitmap2|WrapMode_map", "Reference", "", "A"
+			P: "3dsMax|OSLBitmap2|ManualGamma_map", "Reference", "", "A"
+		}
+		Media: ""
+		FileName: ""
+		RelativeFilename: ""
+		ModelUVTranslation: 0,0
+		ModelUVScaling: 1,1
+		Texture_Alpha_Source: "None"
+		Cropping: 0,0,0,0
+	}
+	Texture: 2627031770144, "Texture::Map #5", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Map #5"
+		Properties70:  {
+			P: "UVSet", "KString", "", "", "UVChannel_1"
+			P: "UseMaterial", "bool", "", "",1
+		}
+		Media: "Video::Map #5"
+		FileName: "D:\Dev\clean\ufbx\data\textures\checkerboard_metallic.png"
+		RelativeFilename: "textures\checkerboard_metallic.png"
+		ModelUVTranslation: 0,0
+		ModelUVScaling: 1,1
+		Texture_Alpha_Source: "Alpha_Black"
+		Cropping: 0,0,0,0
+	}
+	Texture: 2629283309200, "Texture::Map #6", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Map #6"
+		Properties70:  {
+			P: "3dsMax", "Compound", "", ""
+			P: "3dsMax|ClassIDa", "int", "Integer", "",2121471519
+			P: "3dsMax|ClassIDb", "int", "Integer", "",-1387024086
+			P: "3dsMax|SuperClassID", "int", "Integer", "",3088
+			P: "3dsMax|ai_image Parameter Wrapper", "Compound", "", ""
+			P: "3dsMax|ai_image Parameter Wrapper|TheList", "Reference", "", "A"
+			P: "3dsMax|ai_image Parameter Wrapper|Shader Version", "Integer", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections", "Compound", "", ""
+			P: "3dsMax|ai_image Parameters/Connections|filename", "KString", "", "A", "D:\Dev\clean\ufbx\data\textures\checkerboard_transparency.png"
+			P: "3dsMax|ai_image Parameters/Connections|Image Frame Number", "Integer", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|color_space", "Integer", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|filter", "Integer", "", "A",3
+			P: "3dsMax|ai_image Parameters/Connections|mipmap_bias", "Integer", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|single_channel", "Bool", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|start_channel", "Integer", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|swrap", "Integer", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|twrap", "Integer", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|sscale", "Float", "", "A",1
+			P: "3dsMax|ai_image Parameters/Connections|tscale", "Float", "", "A",1
+			P: "3dsMax|ai_image Parameters/Connections|sflip", "Bool", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|tflip", "Bool", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|soffset", "Float", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|toffset", "Float", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|swap_st", "Bool", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|uvcoords.connected", "Bool", "", "A",1
+			P: "3dsMax|ai_image Parameters/Connections|uvcoords.shader", "Reference", "", "A"
+			P: "3dsMax|ai_image Parameters/Connections|uvset", "Integer", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|multiply", "Color", "", "A",1,1,1
+			P: "3dsMax|ai_image Parameters/Connections|multiply.connected", "Bool", "", "A",1
+			P: "3dsMax|ai_image Parameters/Connections|multiply.shader", "Reference", "", "A"
+			P: "3dsMax|ai_image Parameters/Connections|offset", "Color", "", "A",0,0,0
+			P: "3dsMax|ai_image Parameters/Connections|offset.connected", "Bool", "", "A",1
+			P: "3dsMax|ai_image Parameters/Connections|offset.shader", "Reference", "", "A"
+			P: "3dsMax|ai_image Parameters/Connections|ignore_missing_textures", "Bool", "", "A",0
+			P: "3dsMax|ai_image Parameters/Connections|missing_texture_color", "ColorAndAlpha", "", "A",0,0,0,0
+			P: "3dsMax|ai_image Parameters/Connections|missing_texture_color.connected", "Bool", "", "A",1
+			P: "3dsMax|ai_image Parameters/Connections|missing_texture_color.shader", "Reference", "", "A"
+			P: "3dsMax|ai_image Results", "Compound", "", ""
+		}
+		Media: ""
+		FileName: ""
+		RelativeFilename: ""
+		ModelUVTranslation: 0,0
+		ModelUVScaling: 1,1
+		Texture_Alpha_Source: "None"
+		Cropping: 0,0,0,0
+	}
+	Implementation: 2629397946768, "Implementation::01 - Default_Implementation", "" {
+		Version: 100
+		Properties70:  {
+			P: "ShaderLanguage", "KString", "", "", "StandardSSL"
+			P: "ShaderLanguageVersion", "KString", "", "", "1.0.1"
+			P: "RenderAPI", "KString", "", "", "OSL"
+			P: "RootBindingName", "KString", "", "", "root"
+		}
+	}
+	BindingTable: 2629360321232, "BindingTable::root 1", "" {
+		Version: 100
+		Properties70:  {
+			P: "TargetName", "KString", "", "", "root"
+			P: "TargetType", "KString", "", "", "shader"
+		}
+		Entry: "3dsMax|Parameters|material_mode", "FbxPropertyEntry", "material_mode", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|base_weight", "FbxPropertyEntry", "base", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|base_color", "FbxPropertyEntry", "base_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|reflectivity", "FbxPropertyEntry", "specular", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|roughness", "FbxPropertyEntry", "specular_roughness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|roughness_inv", "FbxPropertyEntry", "roughness_inv", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|metalness", "FbxPropertyEntry", "metalness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|refl_color", "FbxPropertyEntry", "specular_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|diff_roughness", "FbxPropertyEntry", "diffuse_roughness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|brdf_mode", "FbxPropertyEntry", "brdf_mode", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|brdf_low", "FbxPropertyEntry", "brdf_low", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|brdf_high", "FbxPropertyEntry", "brdf_high", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|brdf_curve", "FbxPropertyEntry", "brdf_curve", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|anisotropy", "FbxPropertyEntry", "specular_anisotropy", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|anisoangle", "FbxPropertyEntry", "specular_rotation", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|aniso_mode", "FbxPropertyEntry", "aniso_mode", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|aniso_channel", "FbxPropertyEntry", "aniso_channel", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|transparency", "FbxPropertyEntry", "transmission", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_color", "FbxPropertyEntry", "transmission_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_depth", "FbxPropertyEntry", "transmission_depth", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_roughness", "FbxPropertyEntry", "transmission_extra_roughness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_roughness_inv", "FbxPropertyEntry", "trans_roughness_inv", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_roughness_lock", "FbxPropertyEntry", "trans_roughness_lock", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_ior", "FbxPropertyEntry", "specular_IOR", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|thin_walled", "FbxPropertyEntry", "thin_walled", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|dispersion", "FbxPropertyEntry", "transmisison_dispersion", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_scatter_color", "FbxPropertyEntry", "transmission_scatter", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_scatter_aniso", "FbxPropertyEntry", "transmission_scatter_anisotropy", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|scattering", "FbxPropertyEntry", "subsurface", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sss_color", "FbxPropertyEntry", "subsurface_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sss_depth", "FbxPropertyEntry", "sss_depth", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sss_scale", "FbxPropertyEntry", "subsurface_scale", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sss_scatter_color", "FbxPropertyEntry", "subsurface_radius", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|emission", "FbxPropertyEntry", "emission", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|emit_color", "FbxPropertyEntry", "emission_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|emit_luminance", "FbxPropertyEntry", "emit_luminance", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|emit_kelvin", "FbxPropertyEntry", "emit_kelvin", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coating", "FbxPropertyEntry", "coat", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_color", "FbxPropertyEntry", "coat_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_roughness", "FbxPropertyEntry", "coat_roughness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_roughness_inv", "FbxPropertyEntry", "coat_roughness_inv", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_affect_color", "FbxPropertyEntry", "coat_affect_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_affect_roughness", "FbxPropertyEntry", "coat_affect_roughness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_ior", "FbxPropertyEntry", "coat_IOR", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_anisotropy", "FbxPropertyEntry", "coat_anisotropy", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_anisoangle", "FbxPropertyEntry", "coat_rotation", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sheen", "FbxPropertyEntry", "sheen", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sheen_color", "FbxPropertyEntry", "sheen_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sheen_roughness", "FbxPropertyEntry", "sheen_roughness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|thin_film", "FbxPropertyEntry", "thin_film", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|thin_film_thickness", "FbxPropertyEntry", "thin_film_thickness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|thin_film_ior", "FbxPropertyEntry", "thin_film_IOR", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|base_weight_map", "FbxPropertyEntry", "base", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|base_color_map", "FbxPropertyEntry", "base_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|reflectivity_map", "FbxPropertyEntry", "specular", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|refl_color_map", "FbxPropertyEntry", "specular_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|roughness_map", "FbxPropertyEntry", "specular_roughness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|metalness_map", "FbxPropertyEntry", "metalness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|diff_rough_map", "FbxPropertyEntry", "diffuse_roughness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|anisotropy_map", "FbxPropertyEntry", "specular_anisotropy", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|aniso_angle_map", "FbxPropertyEntry", "specular_rotation", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|transparency_map", "FbxPropertyEntry", "transmission", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_color_map", "FbxPropertyEntry", "transmission_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_rough_map", "FbxPropertyEntry", "transmission_extra_roughness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_ior_map", "FbxPropertyEntry", "specular_IOR", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|scattering_map", "FbxPropertyEntry", "subsurface", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sss_color_map", "FbxPropertyEntry", "subsurface_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sss_scale_map", "FbxPropertyEntry", "subsurface_scale", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|emission_map", "FbxPropertyEntry", "emission", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|emit_color_map", "FbxPropertyEntry", "emission_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_map", "FbxPropertyEntry", "coat", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_color_map", "FbxPropertyEntry", "coat_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_rough_map", "FbxPropertyEntry", "coat_roughness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|bump_map", "FbxPropertyEntry", "normal", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|normalCamera", "FbxPropertyEntry", "normalCamera", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|normalCameraUsedAs", "FbxPropertyEntry", "normalCameraUsedAs", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|normalCameraFactor", "FbxPropertyEntry", "normalCameraFactor", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|displacement_map", "FbxPropertyEntry", "displacement_map", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|cutout_map", "FbxPropertyEntry", "opacity", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_aniso_map", "FbxPropertyEntry", "coat_anisotropy", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_aniso_angle_map", "FbxPropertyEntry", "coat_rotation", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sheen_map", "FbxPropertyEntry", "sheen", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sheen_color_map", "FbxPropertyEntry", "sheen_color", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sheen_rough_map", "FbxPropertyEntry", "sheen_roughness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|thin_film_map", "FbxPropertyEntry", "thin_film_thickness", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|thin_film_ior_map", "FbxPropertyEntry", "thin_film_IOR", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|base_weight_map_on", "FbxPropertyEntry", "base_weight_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|base_color_map_on", "FbxPropertyEntry", "base_color_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|reflectivity_map_on", "FbxPropertyEntry", "reflectivity_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|refl_color_map_on", "FbxPropertyEntry", "refl_color_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|roughness_map_on", "FbxPropertyEntry", "roughness_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|metalness_map_on", "FbxPropertyEntry", "metalness_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|diff_rough_map_on", "FbxPropertyEntry", "diff_rough_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|anisotropy_map_on", "FbxPropertyEntry", "anisotropy_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|aniso_angle_map_on", "FbxPropertyEntry", "aniso_angle_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|transparency_map_on", "FbxPropertyEntry", "transparency_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_color_map_on", "FbxPropertyEntry", "trans_color_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_rough_map_on", "FbxPropertyEntry", "trans_rough_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|trans_ior_map_on", "FbxPropertyEntry", "trans_ior_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|scattering_map_on", "FbxPropertyEntry", "scattering_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sss_color_map_on", "FbxPropertyEntry", "sss_color_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sss_scale_map_on", "FbxPropertyEntry", "sss_scale_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|emission_map_on", "FbxPropertyEntry", "emission_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|emit_color_map_on", "FbxPropertyEntry", "emit_color_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_map_on", "FbxPropertyEntry", "coat_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_color_map_on", "FbxPropertyEntry", "coat_color_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_rough_map_on", "FbxPropertyEntry", "coat_rough_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_aniso_map_on", "FbxPropertyEntry", "coat_aniso_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|coat_aniso_angle_map_on", "FbxPropertyEntry", "coat_aniso_angle_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sheen_map_on", "FbxPropertyEntry", "sheen_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sheen_color_map_on", "FbxPropertyEntry", "sheen_color_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|sheen_rough_map_on", "FbxPropertyEntry", "sheen_rough_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|thin_film_map_on", "FbxPropertyEntry", "thin_film_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|thin_film_ior_map_on", "FbxPropertyEntry", "thin_film_ior_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|displacement_map_on", "FbxPropertyEntry", "displacement_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|cutout_map_on", "FbxPropertyEntry", "cutout_map_on", "FbxSemanticEntry"
+		Entry: "3dsMax|Parameters|displacement_map_amt", "FbxPropertyEntry", "displacement_map_amt", "FbxSemanticEntry"
+	}
+	AnimationStack: 2629359884896, "AnimStack::Take 001", "" {
+		Properties70:  {
+			P: "LocalStop", "KTime", "Time", "",153953860000
+			P: "ReferenceStop", "KTime", "Time", "",153953860000
+		}
+	}
+	AnimationLayer: 2629272900496, "AnimLayer::BaseLayer", "" {
+	}
+}
+
+; Object connections
+;------------------------------------------------------------------
+
+Connections:  {
+	
+	;Model::Box001, Model::RootNode
+	C: "OO",2629269223296,0
+	
+	;AnimLayer::BaseLayer, AnimStack::Take 001
+	C: "OO",2629272900496,2629359884896
+	
+	;Geometry::, Model::Box001
+	C: "OO",2629283310640,2629269223296
+	
+	;Material::01 - Default, Model::Box001
+	C: "OO",2629355879840,2629269223296
+	
+	;Texture::Map #14, Material::01 - Default
+	C: "OP",2629283312560,2629355879840, "DiffuseColor"
+	
+	;Texture::Map #16, Material::01 - Default
+	C: "OP",2627031770624,2629355879840, "ShininessExponent"
+	
+	;Texture::Map #7, Material::01 - Default
+	C: "OP",2629283311600,2629355879840, "EmissiveColor"
+	
+	;Texture::Map #12, Material::01 - Default
+	C: "OP",2627031772544,2629355879840, "3dsMax|Parameters|base_weight_map"
+	
+	;Texture::Map #14, Material::01 - Default
+	C: "OP",2629283312560,2629355879840, "3dsMax|Parameters|base_color_map"
+	
+	;Texture::Map #16, Material::01 - Default
+	C: "OP",2627031770624,2629355879840, "3dsMax|Parameters|roughness_map"
+	
+	;Texture::Map #5, Material::01 - Default
+	C: "OP",2627031770144,2629355879840, "3dsMax|Parameters|metalness_map"
+	
+	;Texture::Map #6, Material::01 - Default
+	C: "OP",2629283309200,2629355879840, "3dsMax|Parameters|trans_color_map"
+	
+	;Texture::Map #7, Material::01 - Default
+	C: "OP",2629283311600,2629355879840, "3dsMax|Parameters|emit_color_map"
+	
+	;Texture::Map #9, Material::01 - Default
+	C: "OP",2627031771584,2629355879840, "3dsMax|Parameters|bump_map"
+	
+	;Texture::Map #9, Material::01 - Default
+	C: "OP",2627031771584,2629355879840, "3dsMax|Parameters|normalCamera"
+	
+	;Texture::Map #3, Texture::Map #14
+	C: "OP",2629283311120,2629283312560, "3dsMax|parameters|sourceMap"
+	
+	;Texture::Map #8, Texture::Map #7
+	C: "OP",2629283312080,2629283311600, "3dsMax|ColorTweak|Input_map"
+	
+	;Video::Map #8, Texture::Map #8
+	C: "OO",2629360425328,2629283312080
+	
+	;Texture::Map #4, Texture::Map #16
+	C: "OP",2627031769664,2627031770624, "3dsMax|parameters|sourceMap"
+	
+	;Texture::Map #10, Texture::Map #9
+	C: "OP",2627031772064,2627031771584, "3dsMax|ai_bump2d Parameters/Connections|bump_map.shader"
+	
+	;Video::Map #10, Texture::Map #10
+	C: "OO",2629360426288,2627031772064
+	
+	;Texture::Map #2, Texture::Map #12
+	C: "OP",2627031773024,2627031772544, "3dsMax|parameters|sourceMap"
+	
+	;Video::Map #5, Texture::Map #5
+	C: "OO",2629360428208,2627031770144
+	
+	;Material::01 - Default, Implementation::01 - Default_Implementation
+	C: "OO",2629355879840,2629397946768
+	
+	;BindingTable::root 1, Implementation::01 - Default_Implementation
+	C: "OO",2629360321232,2629397946768
+}
+;Takes section
+;----------------------------------------------------
+
+Takes:  {
+	Current: ""
+	Take: "Take 001" {
+		FileName: "Take_001.tak"
+		LocalTime: 0,153953860000
+		ReferenceTime: 0,153953860000
+	}
+}

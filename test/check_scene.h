@@ -94,10 +94,18 @@ static void ufbxt_check_blob(ufbx_blob blob)
 
 #define ufbxt_check_list(list) ufbxt_check_memory((list).data, (list).count * sizeof(*(list).data))
 
-static void ufbxt_check_element_ptr(ufbx_scene *scene, void *v_element)
+static void ufbxt_check_element_ptr_any(ufbx_scene *scene, ufbx_element *element)
+{
+	if (!element) return;
+	ufbxt_assert(scene->elements.data[element->element_id] == element);
+	ufbxt_assert(scene->elements_by_type[element->type].data[element->typed_id] == element);
+}
+
+static void ufbxt_check_element_ptr(ufbx_scene *scene, void *v_element, ufbx_element_type type)
 {
 	if (!v_element) return;
 	ufbx_element *element = (ufbx_element*)v_element;
+	ufbxt_assert(element->type == type);
 	ufbxt_assert(scene->elements.data[element->element_id] == element);
 	ufbxt_assert(scene->elements_by_type[element->type].data[element->typed_id] == element);
 }
@@ -208,7 +216,7 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 		ufbxt_check_string(c->src_prop);
 		ufbxt_check_string(c->dst_prop);
 		ufbxt_assert(c->src == element);
-		ufbxt_check_element_ptr(scene, c->dst);
+		ufbxt_check_element_ptr_any(scene, c->dst);
 		if (i > 0) {
 			int cmp = strcmp(c[-1].src_prop.data, c[0].src_prop.data);
 			ufbxt_assert(cmp <= 0);
@@ -223,7 +231,7 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 		ufbxt_check_string(c->src_prop);
 		ufbxt_check_string(c->dst_prop);
 		ufbxt_assert(c->dst == element);
-		ufbxt_check_element_ptr(scene, c->src);
+		ufbxt_check_element_ptr_any(scene, c->src);
 		if (i > 0) {
 			int cmp = strcmp(c[-1].dst_prop.data, c[0].dst_prop.data);
 			ufbxt_assert(cmp <= 0);
@@ -238,7 +246,7 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 	if (element->type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && element->type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB) {
 		for (size_t i = 0; i < element->instances.count; i++) {
 			ufbx_node *node = element->instances.data[i];
-			ufbxt_check_element_ptr(scene, node);
+			ufbxt_check_element_ptr(scene, node, UFBX_ELEMENT_NODE);
 			bool found = false;
 			for (size_t j = 0; j < node->all_attribs.count; j++) {
 				if (node->all_attribs.data[j] == element) {
@@ -262,7 +270,7 @@ static void ufbxt_check_unknown(ufbx_scene *scene, ufbx_unknown *unknown)
 
 static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 {
-	ufbxt_check_element_ptr(scene, node->parent);
+	ufbxt_check_element_ptr(scene, node->parent, UFBX_ELEMENT_NODE);
 	if (node->parent) {
 		bool found = false;
 		for (size_t i = 0; i < node->parent->children.count; i++) {
@@ -280,7 +288,7 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 
 	for (size_t i = 0; i < node->all_attribs.count; i++) {
 		ufbx_element *attrib = node->all_attribs.data[i];
-		ufbxt_check_element_ptr(scene, attrib);
+		ufbxt_check_element_ptr_any(scene, attrib);
 		bool found = false;
 		for (size_t j = 0; j < attrib->instances.count; j++) {
 			if (attrib->instances.data[j] == node) {
@@ -426,7 +434,7 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 
 	for (size_t i = 0; i < mesh->materials.count; i++) {
 		ufbx_mesh_material *mat = &mesh->materials.data[i];
-		ufbxt_check_element_ptr(scene, mat->material);
+		ufbxt_check_element_ptr(scene, mat->material, UFBX_ELEMENT_MATERIAL);
 
 		for (size_t j = 0; j < mat->num_faces; j++) {
 			ufbxt_assert(mesh->face_material.data[mat->face_indices.data[j]] == (int32_t)i);
@@ -434,16 +442,16 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	}
 	for (size_t i = 0; i < mesh->skin_deformers.count; i++) {
 		ufbxt_assert(mesh->skin_deformers.data[i]->vertices.count >= mesh->num_vertices);
-		ufbxt_check_element_ptr(scene, mesh->skin_deformers.data[i]);
+		ufbxt_check_element_ptr(scene, mesh->skin_deformers.data[i], UFBX_ELEMENT_SKIN_DEFORMER);
 	}
 	for (size_t i = 0; i < mesh->blend_deformers.count; i++) {
-		ufbxt_check_element_ptr(scene, mesh->blend_deformers.data[i]);
+		ufbxt_check_element_ptr(scene, mesh->blend_deformers.data[i], UFBX_ELEMENT_BLEND_DEFORMER);
 	}
 	for (size_t i = 0; i < mesh->cache_deformers.count; i++) {
-		ufbxt_check_element_ptr(scene, mesh->cache_deformers.data[i]);
+		ufbxt_check_element_ptr(scene, mesh->cache_deformers.data[i], UFBX_ELEMENT_CACHE_DEFORMER);
 	}
 	for (size_t i = 0; i < mesh->all_deformers.count; i++) {
-		ufbxt_check_element_ptr(scene, mesh->all_deformers.data[i]);
+		ufbxt_check_element_ptr_any(scene, mesh->all_deformers.data[i]);
 	}
 }
 
@@ -524,8 +532,8 @@ static void ufbxt_check_procedural_geometry(ufbx_scene *scene, ufbx_procedural_g
 
 static void ufbxt_check_stereo_camera(ufbx_scene *scene, ufbx_stereo_camera *camera)
 {
-	ufbxt_check_element_ptr(scene, camera->left);
-	ufbxt_check_element_ptr(scene, camera->right);
+	ufbxt_check_element_ptr(scene, camera->left, UFBX_ELEMENT_CAMERA);
+	ufbxt_check_element_ptr(scene, camera->right, UFBX_ELEMENT_CAMERA);
 }
 
 static void ufbxt_check_camera_switcher(ufbx_scene *scene, ufbx_camera_switcher *switcher)
@@ -552,7 +560,7 @@ static void ufbxt_check_lod_group(ufbx_scene *scene, ufbx_lod_group *lod_group)
 static void ufbxt_check_skin_deformer(ufbx_scene *scene, ufbx_skin_deformer *deformer)
 {
 	for (size_t i = 0; i < deformer->clusters.count; i++) {
-		ufbxt_check_element_ptr(scene, deformer->clusters.data[i]);
+		ufbxt_check_element_ptr(scene, deformer->clusters.data[i], UFBX_ELEMENT_SKIN_CLUSTER);
 		ufbxt_assert(deformer->clusters.data[i]->bone_node);
 	}
 	for (size_t i = 0; i < deformer->vertices.count; i++) {
@@ -572,7 +580,7 @@ static void ufbxt_check_skin_deformer(ufbx_scene *scene, ufbx_skin_deformer *def
 
 static void ufbxt_check_skin_cluster(ufbx_scene *scene, ufbx_skin_cluster *cluster)
 {
-	ufbxt_check_element_ptr(scene, cluster->bone_node);
+	ufbxt_check_element_ptr(scene, cluster->bone_node, UFBX_ELEMENT_NODE);
 	ufbxt_check_list(cluster->vertices);
 	ufbxt_check_list(cluster->weights);
 }
@@ -580,7 +588,7 @@ static void ufbxt_check_skin_cluster(ufbx_scene *scene, ufbx_skin_cluster *clust
 static void ufbxt_check_blend_deformer(ufbx_scene *scene, ufbx_blend_deformer *deformer)
 {
 	for (size_t i = 0; i < deformer->channels.count; i++) {
-		ufbxt_check_element_ptr(scene, deformer->channels.data[i]);
+		ufbxt_check_element_ptr(scene, deformer->channels.data[i], UFBX_ELEMENT_BLEND_CHANNEL);
 	}
 }
 
@@ -590,7 +598,7 @@ static void ufbxt_check_blend_channel(ufbx_scene *scene, ufbx_blend_channel *cha
 		if (i > 0) {
 			ufbxt_assert(channel->keyframes.data[i - 1].target_weight <= channel->keyframes.data[i].target_weight);
 		}
-		ufbxt_check_element_ptr(scene, channel->keyframes.data[i].shape);
+		ufbxt_check_element_ptr(scene, channel->keyframes.data[i].shape, UFBX_ELEMENT_BLEND_SHAPE);
 	}
 }
 
@@ -608,7 +616,7 @@ static void ufbxt_check_blend_shape(ufbx_scene *scene, ufbx_blend_shape *shape)
 static void ufbxt_check_cache_deformer(ufbx_scene *scene, ufbx_cache_deformer *deformer)
 {
 	ufbxt_check_string(deformer->channel);
-	ufbxt_check_element_ptr(scene, deformer->file);
+	ufbxt_check_element_ptr(scene, deformer->file, UFBX_ELEMENT_CACHE_FILE);
 }
 
 static void ufbxt_check_cache_file(ufbx_scene *scene, ufbx_cache_file *file)
@@ -623,19 +631,56 @@ static void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
 	for (size_t i = 0; i < material->textures.count; i++) {
 		ufbxt_check_string(material->textures.data[i].material_prop);
 		ufbxt_check_string(material->textures.data[i].shader_prop);
-		ufbxt_check_element_ptr(scene, material->textures.data[i].texture);
+		ufbxt_check_element_ptr(scene, material->textures.data[i].texture, UFBX_ELEMENT_TEXTURE);
 	}
 
 	for (size_t i = 0; i < UFBX_MATERIAL_FBX_MAP_COUNT; i++) {
-		ufbxt_check_element_ptr(scene, material->fbx.maps[i].texture);
+		ufbxt_check_element_ptr(scene, material->fbx.maps[i].texture, UFBX_ELEMENT_TEXTURE);
 	}
 
 	for (size_t i = 0; i < UFBX_MATERIAL_PBR_MAP_COUNT; i++) {
-		ufbxt_check_element_ptr(scene, material->pbr.maps[i].texture);
+		ufbxt_check_element_ptr(scene, material->pbr.maps[i].texture, UFBX_ELEMENT_TEXTURE);
 	}
 
 	ufbxt_check_string(material->shader_prop_prefix);
-	ufbxt_check_element_ptr(scene, material->shader);
+	ufbxt_check_element_ptr(scene, material->shader, UFBX_ELEMENT_SHADER);
+}
+
+static void ufbxt_check_texture_shader_input(ufbx_scene *scene, ufbx_texture *texture, ufbx_texture_shader *shader, ufbx_texture_shader_input *input)
+{
+	ufbxt_check_string(input->name);
+	ufbxt_assert(input->prop);
+
+	ufbxt_check_string(input->value_str);
+
+	if (input->prop) {
+		ufbx_prop *prop = input->prop;
+		ufbxt_assert(prop == ufbx_find_prop(&texture->props, prop->name.data));
+	}
+
+	if (input->texture_prop) {
+		ufbx_prop *prop = input->texture_prop;
+		ufbxt_assert(prop == ufbx_find_prop(&texture->props, prop->name.data));
+	}
+
+	if (input->texture_enabled_prop) {
+		ufbx_prop *prop = input->texture_enabled_prop;
+		ufbxt_assert(prop == ufbx_find_prop(&texture->props, prop->name.data));
+	}
+
+	ufbxt_check_element_ptr(scene, input->texture, UFBX_ELEMENT_TEXTURE);
+}
+
+static void ufbxt_check_texture_shader(ufbx_scene *scene, ufbx_texture *texture, ufbx_texture_shader *shader)
+{
+	ufbxt_check_string(shader->shader_name);
+	ufbxt_check_string(shader->shader_source);
+
+	ufbxt_check_element_ptr(scene, shader->main_texture, UFBX_ELEMENT_TEXTURE);
+
+	for (size_t i = 0; i < shader->inputs.count; i++) {
+		ufbxt_check_texture_shader_input(scene, texture, shader, &shader->inputs.data[i]);
+	}
 }
 
 static void ufbxt_check_texture(ufbx_scene *scene, ufbx_texture *texture)
@@ -648,10 +693,14 @@ static void ufbxt_check_texture(ufbx_scene *scene, ufbx_texture *texture)
 	ufbxt_check_blob(texture->raw_relative_filename);
 	ufbxt_check_blob(texture->raw_absolute_filename);
 
-	ufbxt_check_element_ptr(scene, texture->video);
+	ufbxt_check_element_ptr(scene, texture->video, UFBX_ELEMENT_VIDEO);
 	for (size_t i = 0; i < texture->layers.count; i++) {
 		ufbxt_assert(texture->layers.data[i].texture);
-		ufbxt_check_element_ptr(scene, texture->layers.data[i].texture);
+		ufbxt_check_element_ptr(scene, texture->layers.data[i].texture, UFBX_ELEMENT_TEXTURE);
+	}
+
+	if (texture->shader) {
+		ufbxt_check_texture_shader(scene, texture, texture->shader);
 	}
 }
 
@@ -670,7 +719,7 @@ static void ufbxt_check_shader(ufbx_scene *scene, ufbx_shader *shader)
 {
 	ufbxt_assert((uint32_t)shader->type < (uint32_t)UFBX_SHADER_TYPE_COUNT);
 	for (size_t i = 0; i < shader->bindings.count; i++) {
-		ufbxt_check_element_ptr(scene, shader->bindings.data[i]);
+		ufbxt_check_element_ptr(scene, shader->bindings.data[i], UFBX_ELEMENT_SHADER_BINDING);
 	}
 }
 
@@ -686,7 +735,7 @@ static void ufbxt_check_shader_binding(ufbx_scene *scene, ufbx_shader_binding *b
 static void ufbxt_check_anim(ufbx_scene *scene, ufbx_anim *anim)
 {
 	for (size_t i = 0; i < anim->layers.count; i++) {
-		ufbxt_check_element_ptr(scene, anim->layers.data[i].layer);
+		ufbxt_check_element_ptr(scene, anim->layers.data[i].layer, UFBX_ELEMENT_ANIM_LAYER);
 	}
 	ufbxt_assert(anim->prop_overrides.count == 0);
 }
@@ -694,7 +743,7 @@ static void ufbxt_check_anim(ufbx_scene *scene, ufbx_anim *anim)
 static void ufbxt_check_anim_stack(ufbx_scene *scene, ufbx_anim_stack *anim_stack)
 {
 	for (size_t i = 0; i < anim_stack->layers.count; i++) {
-		ufbxt_check_element_ptr(scene, anim_stack->layers.data[i]);
+		ufbxt_check_element_ptr(scene, anim_stack->layers.data[i], UFBX_ELEMENT_ANIM_LAYER);
 	}
 }
 
@@ -703,7 +752,7 @@ static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_laye
 	ufbxt_check_string(anim_layer->name);
 
 	for (size_t i = 0; i < anim_layer->anim_values.count; i++) {
-		ufbxt_check_element_ptr(scene, anim_layer->anim_values.data[i]);
+		ufbxt_check_element_ptr(scene, anim_layer->anim_values.data[i], UFBX_ELEMENT_ANIM_VALUE);
 	}
 
 	size_t props_left = 0;
@@ -713,8 +762,8 @@ static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_laye
 		ufbx_anim_prop *anim_prop = &anim_layer->anim_props.data[i];
 
 		ufbxt_check_string(anim_prop->prop_name);
-		ufbxt_check_element_ptr(scene, anim_prop->element);
-		ufbxt_check_element_ptr(scene, anim_prop->anim_value);
+		ufbxt_check_element_ptr_any(scene, anim_prop->element);
+		ufbxt_check_element_ptr(scene, anim_prop->anim_value, UFBX_ELEMENT_ANIM_VALUE);
 
 		ufbx_anim_prop *ref = ufbx_find_anim_prop(anim_layer, anim_prop->element, anim_prop->prop_name.data);
 		ufbxt_assert(ref);
@@ -736,9 +785,9 @@ static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_laye
 
 static void ufbxt_check_anim_value(ufbx_scene *scene, ufbx_anim_value *anim_value)
 {
-	ufbxt_check_element_ptr(scene, anim_value->curves[0]);
-	ufbxt_check_element_ptr(scene, anim_value->curves[1]);
-	ufbxt_check_element_ptr(scene, anim_value->curves[2]);
+	ufbxt_check_element_ptr(scene, anim_value->curves[0], UFBX_ELEMENT_ANIM_CURVE);
+	ufbxt_check_element_ptr(scene, anim_value->curves[1], UFBX_ELEMENT_ANIM_CURVE);
+	ufbxt_check_element_ptr(scene, anim_value->curves[2], UFBX_ELEMENT_ANIM_CURVE);
 }
 
 static void ufbxt_check_anim_curve(ufbx_scene *scene, ufbx_anim_curve *anim_curve)
@@ -753,7 +802,7 @@ static void ufbxt_check_display_layer(ufbx_scene *scene, ufbx_display_layer *lay
 {
 	for (size_t i = 0; i < layer->nodes.count; i++) {
 		ufbxt_assert(layer->nodes.data[i]);
-		ufbxt_check_element_ptr(scene, layer->nodes.data[i]);
+		ufbxt_check_element_ptr(scene, layer->nodes.data[i], UFBX_ELEMENT_NODE);
 	}
 }
 
@@ -761,14 +810,14 @@ static void ufbxt_check_selection_set(ufbx_scene *scene, ufbx_selection_set *set
 {
 	for (size_t i = 0; i < set->nodes.count; i++) {
 		ufbxt_assert(set->nodes.data[i]);
-		ufbxt_check_element_ptr(scene, set->nodes.data[i]);
+		ufbxt_check_element_ptr(scene, set->nodes.data[i], UFBX_ELEMENT_NODE);
 	}
 }
 
 static void ufbxt_check_selection_node(ufbx_scene *scene, ufbx_selection_node *node)
 {
-	ufbxt_check_element_ptr(scene, node->target_node);
-	ufbxt_check_element_ptr(scene, node->target_mesh);
+	ufbxt_check_element_ptr(scene, node->target_node, UFBX_ELEMENT_NODE);
+	ufbxt_check_element_ptr(scene, node->target_mesh, UFBX_ELEMENT_MESH);
 }
 
 static void ufbxt_check_character(ufbx_scene *scene, ufbx_character *character)
@@ -777,13 +826,13 @@ static void ufbxt_check_character(ufbx_scene *scene, ufbx_character *character)
 
 static void ufbxt_check_constraint(ufbx_scene *scene, ufbx_constraint *constraint)
 {
-	ufbxt_check_element_ptr(scene, constraint->node);
-	ufbxt_check_element_ptr(scene, constraint->aim_up_node);
-	ufbxt_check_element_ptr(scene, constraint->ik_effector);
-	ufbxt_check_element_ptr(scene, constraint->ik_end_node);
+	ufbxt_check_element_ptr(scene, constraint->node, UFBX_ELEMENT_NODE);
+	ufbxt_check_element_ptr(scene, constraint->aim_up_node, UFBX_ELEMENT_NODE);
+	ufbxt_check_element_ptr(scene, constraint->ik_effector, UFBX_ELEMENT_NODE);
+	ufbxt_check_element_ptr(scene, constraint->ik_end_node, UFBX_ELEMENT_NODE);
 	for (size_t i = 0; i < constraint->targets.count; i++) {
 		ufbxt_assert(constraint->targets.data[i].node);
-		ufbxt_check_element_ptr(scene, constraint->targets.data[i].node);
+		ufbxt_check_element_ptr(scene, constraint->targets.data[i].node, UFBX_ELEMENT_NODE);
 	}
 }
 
@@ -792,7 +841,7 @@ static void ufbxt_check_pose(ufbx_scene *scene, ufbx_pose *pose)
 	for (size_t i = 0; i < pose->bone_poses.count; i++) {
 		ufbx_bone_pose bone_pose = pose->bone_poses.data[i];
 		ufbxt_assert(bone_pose.bone_node);
-		ufbxt_check_element_ptr(scene, bone_pose.bone_node);
+		ufbxt_check_element_ptr(scene, bone_pose.bone_node, UFBX_ELEMENT_NODE);
 	}
 }
 
@@ -1050,7 +1099,7 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 	}
 
 	ufbxt_assert(scene->root_node);
-	ufbxt_check_element_ptr(scene, scene->root_node);
+	ufbxt_check_element_ptr(scene, scene->root_node, UFBX_ELEMENT_NODE);
 	ufbxt_assert(scene->root_node->is_root);
 }
 

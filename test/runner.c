@@ -1699,8 +1699,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			load_opts.evaluate_skinning = true;
 			load_opts.load_external_files = true;
-			load_opts.filename.data = buf;
-			load_opts.filename.length = SIZE_MAX;
+
+			if (!load_opts.filename.length) {
+				load_opts.filename.data = buf;
+				load_opts.filename.length = SIZE_MAX;
+			}
 
 			ufbxt_progress_ctx progress_ctx = { 0 };
 
