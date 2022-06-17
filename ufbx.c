@@ -12833,7 +12833,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_texture_shader(ufbxi_co
 	ufbx_string max_texture = ufbx_find_string(&texture->props, "3dsMax|MaxTexture", ufbx_empty_string);
 
 	// Check first if the texture looks like it could be a shader.
-	ufbx_shader_type type = UFBX_TEXTURE_SHADER_TYPE_COUNT;
+	ufbx_texture_shader_type type = UFBX_TEXTURE_SHADER_TYPE_COUNT;
 
 	if (!strcmp(max_texture.data, "MULTIOUTPUT_TO_OSLMap") || classid == UINT64_C(0x896ef2fc44bd743f)) {
 		type = UFBX_TEXTURE_SHADER_SELECT_OUTPUT;
