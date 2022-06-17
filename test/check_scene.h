@@ -810,7 +810,7 @@ static void ufbxt_check_selection_set(ufbx_scene *scene, ufbx_selection_set *set
 {
 	for (size_t i = 0; i < set->nodes.count; i++) {
 		ufbxt_assert(set->nodes.data[i]);
-		ufbxt_check_element_ptr(scene, set->nodes.data[i], UFBX_ELEMENT_NODE);
+		ufbxt_check_element_ptr(scene, set->nodes.data[i], UFBX_ELEMENT_SELECTION_NODE);
 	}
 }
 
