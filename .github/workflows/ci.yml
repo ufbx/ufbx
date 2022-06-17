@@ -205,6 +205,10 @@ jobs:
         run: |
           qemu-ppc build/ppc_hasher_debug --check build/hashes.txt --dump build/hashdumps/ci_exotic_powerpc_debug.txt --max-dump-errors 3
           qemu-ppc build/ppc_hasher_release --check build/hashes.txt --dump build/hashdumps/ci_exotic_powerpc_release.txt --max-dump-errors 3
+      - name: Compile runner with fdlibm
+        run: clang -DUFBX_NO_MATH_H -DUFBX_MATH_PREFIX=fdlibm_ ufbx.c test/runner.c misc/fdlibm.c -lm -o build/fdlibm_runner
+      - name: Run tests using fdlibm
+        run: build/fdlibm_runner -d data
       - name: Compile runner.c
         run: gcc -c test/runner.c -o build/runner.o
       - name: Build and run standard C99
