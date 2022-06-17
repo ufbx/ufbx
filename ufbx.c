@@ -5861,6 +5861,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 			ufbxi_consume_bytes(uc, 5);
 			d->data = ufbxi_read_bytes(uc, len);
 			d->length = len;
+			ufbxi_check(d->data);
 			if (dst_type == 'C') {
 				ufbxi_buf *buf = size == 1 || uc->opts.retain_dom ? &uc->result : tmp_buf;
 				d->data = ufbxi_push_copy(buf, char, len, d->data);
