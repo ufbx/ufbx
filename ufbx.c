@@ -13172,7 +13172,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_file_textures(ufbxi_contex
 		ufbxi_pop(&uc->tmp_stack, ufbx_texture*, 1, &texture);
 
 		ufbxi_texture_extra *extra = (ufbxi_texture_extra*)ufbxi_get_element_extra(uc, texture->element_id);
-		ufbxi_file_texture_fetch_state state = states[texture->typed_id];
+		ufbxi_file_texture_fetch_state state = (ufbxi_file_texture_fetch_state)states[texture->typed_id];
 		if (state == UFBXI_FILE_TEXTURE_FETCH_FINISHED) continue;
 		ufbx_shader_texture *shader = texture->shader;
 
