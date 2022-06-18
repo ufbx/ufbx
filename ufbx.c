@@ -12560,11 +12560,23 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_
 
 	// Undo directories from `prefix` for every `..`
 	while (prefix_length > 0 && src_length >= 3 && src[0] == '.' && src[1] == '.' && (src[2] == '/' || src[2] == '\\')) {
-		while (prefix_length > 0 && !(prefix_data[prefix_length - 1] == '/' || prefix_data[prefix_length - 1] == '\\')) {
-			prefix_length--;
+		size_t part_start = prefix_length;
+		while (part_start > 0 && !(prefix_data[part_start - 1] == '/' || prefix_data[part_start - 1] == '\\')) {
+			part_start--;
 		}
-		if (prefix_length > 0) {
-			prefix_length--;
+		size_t part_len = prefix_length - part_start;
+
+		if (part_len == 2 && prefix_data[part_start] == '.' && prefix_data[part_start + 1] == '.') {
+			// Prefix itself ends in `..`, cannot cancel out a leading `../`
+			break;
+		}
+
+		// Eat the leading '/' before the part segment
+		prefix_length = part_start > 0 ? part_start - 1 : 0;
+
+		if (part_len == 1 && prefix_data[part_start] == '.') {
+			// Single '.' -> remove and continue without cancelling out a leading `../`
+			continue;
 		}
 
 		src += 3;
