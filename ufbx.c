@@ -20992,25 +20992,16 @@ ufbx_abi ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material,
 ufbx_abi ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *name, size_t name_len)
 {
 	ufbx_string name_str = { name, name_len };
-	if (!shader) return name_str;
-
-	ufbxi_for_ptr_list(ufbx_shader_binding, p_bind, shader->bindings) {
-		ufbx_shader_binding *bind = *p_bind;
-
-		size_t index = SIZE_MAX;
-		ufbxi_macro_lower_bound_eq(ufbx_shader_prop_binding, 4, &index, bind->prop_bindings.data, 0, bind->prop_bindings.count, 
-			( ufbxi_str_less(a->shader_prop, name_str) ), ( ufbxi_str_equal(a->shader_prop, name_str) ));
-		if (index != SIZE_MAX) {
-			return bind->prop_bindings.data[index].material_prop;
-		}
+	ufbx_shader_prop_binding_list bindings = ufbx_find_shader_prop_bindings_len(shader, name, name_len);
+	if (bindings.count > 0) {
+		return bindings.data[0].shader_prop;
 	}
-
 	return name_str;
 }
 
 ufbx_abi ufbx_shader_prop_binding_list ufbx_find_shader_prop_bindings_len(const ufbx_shader *shader, const char *name, size_t name_len)
 {
-	ufbx_shader_prop_binding_list bindings = { NULL, 0 } ;
+	ufbx_shader_prop_binding_list bindings = { NULL, 0 };
 
 	ufbx_string name_str = { name, name_len };
 	if (!shader) return bindings;
