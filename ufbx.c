@@ -3,6 +3,12 @@
 #ifndef UFBX_UFBX_C_INLCUDED
 #define UFBX_UFBX_C_INLCUDED
 
+// -- User configuration
+
+#if defined(UFBX_CONFIG_SOURCE)
+	#include UFBX_CONFIG_SOURCE
+#endif
+
 // -- Configuration
 
 #define UFBXI_MAX_NON_ARRAY_VALUES 8
