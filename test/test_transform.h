@@ -327,3 +327,40 @@ UFBXT_FILE_TEST_OPTS(maya_scale_no_inherit, ufbxt_scale_to_cm_opts)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_node_dag)
+#if UFBXT_IMPL
+{
+	ufbx_node *root = scene->root_node;
+	ufbx_node *a = ufbx_find_node(scene, "A");
+	ufbx_node *b = ufbx_find_node(scene, "B");
+	ufbx_node *c = ufbx_find_node(scene, "C");
+	ufbx_node *d = ufbx_find_node(scene, "D");
+
+	ufbxt_assert(root && a && b && c && d);
+	ufbxt_assert(root->children.count == 1);
+	ufbxt_assert(root->children.data[0] == a);
+
+	ufbxt_assert(a->parent == root);
+	ufbxt_assert(a->children.count == 1);
+	ufbxt_assert(a->children.data[0] == b);
+
+	ufbxt_assert(b->parent == a);
+	ufbxt_assert(b->children.count == 1);
+	ufbxt_assert(b->children.data[0] == c);
+
+	ufbxt_assert(c->parent == b);
+	ufbxt_assert(c->children.count == 1);
+	ufbxt_assert(c->children.data[0] == d);
+
+	ufbxt_assert(d->parent == c);
+	ufbxt_assert(d->children.count == 0);
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_node_cycle_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!scene);
+}
+#endif
