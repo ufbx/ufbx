@@ -646,7 +646,7 @@ static void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
 	ufbxt_check_element_ptr(scene, material->shader, UFBX_ELEMENT_SHADER);
 }
 
-static void ufbxt_check_texture_shader_input(ufbx_scene *scene, ufbx_texture *texture, ufbx_texture_shader *shader, ufbx_texture_shader_input *input)
+static void ufbxt_check_shader_texture_input(ufbx_scene *scene, ufbx_texture *texture, ufbx_shader_texture *shader, ufbx_shader_texture_input *input)
 {
 	ufbxt_check_string(input->name);
 	ufbxt_assert(input->prop);
@@ -671,7 +671,7 @@ static void ufbxt_check_texture_shader_input(ufbx_scene *scene, ufbx_texture *te
 	ufbxt_check_element_ptr(scene, input->texture, UFBX_ELEMENT_TEXTURE);
 }
 
-static void ufbxt_check_texture_shader(ufbx_scene *scene, ufbx_texture *texture, ufbx_texture_shader *shader)
+static void ufbxt_check_shader_texture(ufbx_scene *scene, ufbx_texture *texture, ufbx_shader_texture *shader)
 {
 	ufbxt_check_string(shader->shader_name);
 	ufbxt_check_string(shader->shader_source);
@@ -679,7 +679,7 @@ static void ufbxt_check_texture_shader(ufbx_scene *scene, ufbx_texture *texture,
 	ufbxt_check_element_ptr(scene, shader->main_texture, UFBX_ELEMENT_TEXTURE);
 
 	for (size_t i = 0; i < shader->inputs.count; i++) {
-		ufbxt_check_texture_shader_input(scene, texture, shader, &shader->inputs.data[i]);
+		ufbxt_check_shader_texture_input(scene, texture, shader, &shader->inputs.data[i]);
 	}
 }
 
@@ -700,7 +700,7 @@ static void ufbxt_check_texture(ufbx_scene *scene, ufbx_texture *texture)
 	}
 
 	if (texture->shader) {
-		ufbxt_check_texture_shader(scene, texture, texture->shader);
+		ufbxt_check_shader_texture(scene, texture, texture->shader);
 	}
 }
 

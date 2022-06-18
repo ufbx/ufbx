@@ -1775,7 +1775,10 @@ typedef struct ufbx_material_map {
 typedef struct ufbx_material_texture {
 	ufbx_string material_prop; // < Name of the property in `ufbx_material.props`
 	ufbx_string shader_prop;   // < Shader-specific property mapping name
-	ufbx_texture *texture;     // < The attached texture
+
+	// Texture attached to the property.
+	ufbx_texture *texture;
+
 } ufbx_material_texture;
 
 UFBX_LIST_TYPE(ufbx_material_texture_list, ufbx_material_texture);
@@ -2041,6 +2044,7 @@ typedef enum ufbx_texture_type {
 	UFBX_TEXTURE_PROCEDURAL,
 
 	// Node in a shader graph.
+	// Use `ufbx_texture.shader` for more information.
 	UFBX_TEXTURE_SHADER,
 
 	UFBX_TEXTURE_TYPE_COUNT,
@@ -2106,23 +2110,23 @@ typedef struct ufbx_texture_layer {
 
 UFBX_LIST_TYPE(ufbx_texture_layer_list, ufbx_texture_layer);
 
-typedef enum ufbx_texture_shader_type {
-	UFBX_TEXTURE_SHADER_UNKNOWN,
+typedef enum ufbx_shader_texture_type {
+	UFBX_SHADER_TEXTURE_UNKNOWN,
 
 	// Select an output of a multi-output shader.
-	// HINT: If this type is used the `ufbx_texture_shader.main_texture` and
-	// `ufbx_texture_shader.main_texture_output_index` fields are set.
-	UFBX_TEXTURE_SHADER_SELECT_OUTPUT,
+	// HINT: If this type is used the `ufbx_shader_texture_texture` and
+	// `ufbx_shader_texture.main_texture_output_index` fields are set.
+	UFBX_SHADER_TEXTURE_SELECT_OUTPUT,
 
 	// Open Shading Language (OSL) shader.
 	// https://github.com/AcademySoftwareFoundation/OpenShadingLanguage
-	UFBX_TEXTURE_SHADER_OSL,
+	UFBX_SHADER_TEXTURE_OSL,
 
-	UFBX_TEXTURE_SHADER_TYPE_COUNT,
-	UFBX_TEXTURE_SHADER_TYPE_FORCE_32BIT = 0x7fffffff,
-} ufbx_texture_shader_type;
+	UFBX_SHADER_TEXTURE_TYPE_COUNT,
+	UFBX_SHADER_TEXTURE_TYPE_FORCE_32BIT = 0x7fffffff,
+} ufbx_shader_texture_type;
 
-typedef struct ufbx_texture_shader_input {
+typedef struct ufbx_shader_texture_input {
 
 	// Name of the input.
 	ufbx_string name;
@@ -2141,6 +2145,9 @@ typedef struct ufbx_texture_shader_input {
 	// Texture connected to this input.
 	ufbx_nullable ufbx_texture *texture;
 
+	// Index of the output to use if `texture` is a multi-output shader node.
+	size_t texture_output_index;
+
 	// Controls whether shading should use `texture`.
 	// NOTE: Some shading models allow this to be `true` even if `texture == NULL`.
 	bool texture_enabled;
@@ -2154,14 +2161,14 @@ typedef struct ufbx_texture_shader_input {
 	// Property representing `texture_enabled`.
 	ufbx_nullable ufbx_prop *texture_enabled_prop;
 
-} ufbx_texture_shader_input;
+} ufbx_shader_texture_input;
 
-UFBX_LIST_TYPE(ufbx_texture_shader_input_list, ufbx_texture_shader_input);
+UFBX_LIST_TYPE(ufbx_shader_texture_input_list, ufbx_shader_texture_input);
 
-typedef struct ufbx_texture_shader {
+typedef struct ufbx_shader_texture {
 
 	// Type of this shader node.
-	ufbx_texture_shader_type type;
+	ufbx_shader_texture_type type;
 
 	// Name of the shader to use.
 	ufbx_string shader_name;
@@ -2170,16 +2177,16 @@ typedef struct ufbx_texture_shader {
 	uint64_t shader_type_id;
 
 	// Input values/textures (possibly further shader textures) to the shader.
-	// Sorted by `ufbx_texture_shader_input.name`.
-	ufbx_texture_shader_input_list inputs;
+	// Sorted by `ufbx_shader_texture_input.name`.
+	ufbx_shader_texture_input_list inputs;
 
 	// Shader source code if found.
 	ufbx_string shader_source;
 	ufbx_blob raw_shader_source;
 
 	// Representative texture for this shader.
-	// NOTE: This may be a further shader, you may traverse this recursively
-	// to find a potential root file texture.
+	// Only specified if `main_texture.outputs[main_texture_output_index]` is semantically
+	// equivalent to this texture.
 	ufbx_texture *main_texture;
 
 	// Output index of `main_texture` if it is a multi-output shader.
@@ -2189,7 +2196,7 @@ typedef struct ufbx_texture_shader {
 	// NOTE: Contains the trailing '|' if not empty.
 	ufbx_string prop_prefix;
 
-} ufbx_texture_shader;
+} ufbx_shader_texture;
 
 // Texture that controls material appearance
 struct ufbx_texture {
@@ -2223,7 +2230,11 @@ struct ufbx_texture {
 	// SHADER: Shader information
 	// NOTE: May be specified even if `type == UFBX_TEXTURE_FILE` if `ufbx_load_opts.disable_quirks`
 	// is _not_ specified. Some known shaders that represent files are interpreted as `UFBX_TEXTURE_FILE`.
-	ufbx_nullable ufbx_texture_shader *shader;
+	ufbx_nullable ufbx_shader_texture *shader;
+
+	// List of file textures representing this texture.
+	// Defined even if `type == UFBX_TEXTURE_FILE` in which case the array contains only itself.
+	ufbx_texture_list file_textures;
 
 	// Name of the UV set to use
 	ufbx_string uv_set;
@@ -2703,6 +2714,7 @@ typedef struct ufbx_metadata {
 	size_t temp_allocs;
 
 	size_t element_buffer_size;
+	size_t num_shader_textures;
 
 	ufbx_real bone_prop_size_unit;
 	bool bone_prop_limb_length_relative;
@@ -3606,9 +3618,9 @@ ufbx_inline ufbx_shader_prop_binding_list ufbx_find_shader_prop_bindings(const u
 	return ufbx_find_shader_prop_bindings_len(shader, name, strlen(name));
 }
 
-ufbx_abi ufbx_texture_shader_input *ufbx_find_texture_shader_input_len(const ufbx_texture_shader *shader, const char *name, size_t name_len);
-ufbx_inline ufbx_texture_shader_input *ufbx_find_texture_shader_input(const ufbx_texture_shader *shader, const char *name) {
-	return ufbx_find_texture_shader_input_len(shader, name, strlen(name));
+ufbx_abi ufbx_shader_texture_input *ufbx_find_shader_texture_input_len(const ufbx_shader_texture *shader, const char *name, size_t name_len);
+ufbx_inline ufbx_shader_texture_input *ufbx_find_shader_texture_input(const ufbx_shader_texture *shader, const char *name) {
+	return ufbx_find_shader_texture_input_len(shader, name, strlen(name));
 }
 
 // Math

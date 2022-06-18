@@ -1,6 +1,6 @@
 #include "ufbx.h"
 
-#ifndef UFBX_UFBX_C_INLCUDED
+#ifndef UFBX_UFBX_C_INLCUDE
 #define UFBX_UFBX_C_INLCUDED
 
 // -- User configuration
@@ -12778,7 +12778,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_push_prop_prefix(ufbxi_context *
 	return 1;
 }
 
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_texture_shader_find_prefix(ufbxi_context *uc, ufbx_texture *texture, ufbx_texture_shader *shader)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_shader_texture_find_prefix(ufbxi_context *uc, ufbx_texture *texture, ufbx_shader_texture *shader)
 {
 	ufbx_string suffixes[3];
 	size_t num_suffixes = 0;
@@ -12842,7 +12842,47 @@ static const ufbxi_file_shader ufbxi_file_shaders[] = {
 	{ 0, "OSLBitmap2", ufbxi_Filename },
 };
 
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_texture_shader(ufbxi_context *uc, ufbx_texture *texture)
+ufbxi_noinline static void ufbxi_update_shader_texture(ufbx_texture *texture, ufbx_shader_texture *shader)
+{
+	ufbxi_for_list(ufbx_shader_texture_input, input, shader->inputs) {
+		ufbx_prop *prop = input->prop;
+		if (prop) {
+			input->prop = prop = ufbx_find_prop_len(&texture->props, prop->name.data, prop->name.length);
+			input->value_vec4 = prop->value_vec4;
+			input->value_int = prop->value_int;
+			input->value_str = prop->value_str;
+			input->value_blob = prop->value_blob;
+			input->texture = (ufbx_texture*)ufbx_get_prop_element(&texture->element, input->prop, UFBX_ELEMENT_TEXTURE);
+		}
+
+		prop = input->texture_prop;
+		if (prop) {
+			input->texture_prop = prop = ufbx_find_prop_len(&texture->props, prop->name.data, prop->name.length);
+			ufbx_texture *tex = (ufbx_texture*)ufbx_get_prop_element(&texture->element, prop, UFBX_ELEMENT_TEXTURE);
+			if (tex) input->texture = tex;
+		}
+
+		input->texture_enabled = input->texture != NULL;
+		prop = input->texture_enabled_prop;
+		if (prop) {
+			input->texture_enabled_prop = prop = ufbx_find_prop_len(&texture->props, prop->name.data, prop->name.length);
+			input->texture_enabled = prop->value_int != 0;
+		}
+	}
+
+	if (shader->type == UFBX_SHADER_TEXTURE_SELECT_OUTPUT) {
+		ufbx_shader_texture_input *map = ufbx_find_shader_texture_input(shader, "sourceMap");
+		ufbx_shader_texture_input *index = ufbx_find_shader_texture_input(shader, "outputChannelIndex");
+		if (map) {
+			shader->main_texture = map->texture;
+		}
+		if (index) {
+			shader->main_texture_output_index = index->value_int;
+		}
+	}
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_shader_texture(ufbxi_context *uc, ufbx_texture *texture)
 {
 	uint32_t classid_a = (uint32_t)(uint64_t)ufbx_find_int(&texture->props, "3dsMax|ClassIDa", 0);
 	uint32_t classid_b = (uint32_t)(uint64_t)ufbx_find_int(&texture->props, "3dsMax|ClassIDb", 0);
@@ -12851,19 +12891,19 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_texture_shader(ufbxi_co
 	ufbx_string max_texture = ufbx_find_string(&texture->props, "3dsMax|MaxTexture", ufbx_empty_string);
 
 	// Check first if the texture looks like it could be a shader.
-	ufbx_texture_shader_type type = UFBX_TEXTURE_SHADER_TYPE_COUNT;
+	ufbx_shader_texture_type type = UFBX_SHADER_TEXTURE_TYPE_COUNT;
 
 	if (!strcmp(max_texture.data, "MULTIOUTPUT_TO_OSLMap") || classid == UINT64_C(0x896ef2fc44bd743f)) {
-		type = UFBX_TEXTURE_SHADER_SELECT_OUTPUT;
+		type = UFBX_SHADER_TEXTURE_SELECT_OUTPUT;
 	} else if (!strcmp(max_texture.data, "OSLMap") || classid == UINT64_C(0x7f9a7b9d6fcdf00d)) {
-		type = UFBX_TEXTURE_SHADER_OSL;
-	} else if (texture->type == UFBX_TEXTURE_FILE && texture->relative_filename.length == 0 && texture->absolute_filename.length == 0) {
-		type = UFBX_TEXTURE_SHADER_UNKNOWN;
+		type = UFBX_SHADER_TEXTURE_OSL;
+	} else if (texture->type == UFBX_TEXTURE_FILE && texture->relative_filename.length == 0 && texture->absolute_filename.length == 0 && !texture->video) {
+		type = UFBX_SHADER_TEXTURE_UNKNOWN;
 	}
 
-	if (type == UFBX_TEXTURE_SHADER_TYPE_COUNT) return 1;
+	if (type == UFBX_SHADER_TEXTURE_TYPE_COUNT) return 1;
 
-	ufbx_texture_shader *shader = ufbxi_push_zero(&uc->result, ufbx_texture_shader, 1);
+	ufbx_shader_texture *shader = ufbxi_push_zero(&uc->result, ufbx_shader_texture, 1);
 	ufbxi_check(shader);
 
 	shader->type = type;
@@ -12896,7 +12936,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_texture_shader(ufbxi_co
 		}
 	}
 
-	ufbxi_check(ufbxi_texture_shader_find_prefix(uc, texture, shader));
+	ufbxi_check(ufbxi_shader_texture_find_prefix(uc, texture, shader));
 
 	if (shader->shader_name.length == 0) {
 		ufbx_string name = shader->prop_prefix;
@@ -12922,73 +12962,315 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_texture_shader(ufbxi_co
 		shader->shader_type_id = classid;
 	}
 
-	if (shader->prop_prefix.length > 0) {
-		ufbxi_for_list(ufbx_prop, prop, texture->props.props) {
+	if (shader->prop_prefix.length == 0) {
+		// If we not find any shader properties so we might have guessed wrong.
+		// We "leak" (freed with scene) the shader in this case but it's negligible.
+		return 1;
+	}
 
-			ufbx_string name = prop->name;
-			if (!ufbxi_remove_prefix_str(&name, shader->prop_prefix)) continue;
+	ufbxi_for_list(ufbx_prop, prop, texture->props.props) {
 
-			// Check if this property is a modifier to an existing input.
-			ufbx_string base_name = name;
-			if (ufbxi_remove_suffix_c(&base_name, "_map") || ufbxi_remove_suffix_c(&base_name, ".shader")) {
-				ufbx_texture_shader_input *base = ufbx_find_texture_shader_input_len(shader, base_name.data, base_name.length);
-				if (base) {
-					base->texture_prop = prop;
-					continue;
+		ufbx_string name = prop->name;
+		if (!ufbxi_remove_prefix_str(&name, shader->prop_prefix)) continue;
+
+		// Check if this property is a modifier to an existing input.
+		ufbx_string base_name = name;
+		if (ufbxi_remove_suffix_c(&base_name, "_map") || ufbxi_remove_suffix_c(&base_name, ".shader")) {
+			ufbx_shader_texture_input *base = ufbx_find_shader_texture_input_len(shader, base_name.data, base_name.length);
+			if (base) {
+				base->texture_prop = prop;
+				continue;
+			}
+		} else if (ufbxi_remove_suffix_c(&base_name, ".connected")) {
+			ufbx_shader_texture_input *base = ufbx_find_shader_texture_input_len(shader, base_name.data, base_name.length);
+			if (base) {
+				base->texture_enabled_prop = prop;
+				continue;
+			}
+		}
+
+		// Use `uc->tmp_arr` to store the texture inputs so we can search them while we insert new ones.
+		ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size,
+			(shader->inputs.count + 1) * sizeof(ufbx_shader_texture_input)));
+		shader->inputs.data = (ufbx_shader_texture_input*)uc->tmp_arr;
+
+		// Add a new property
+		ufbx_shader_texture_input *input = &shader->inputs.data[shader->inputs.count++];
+		memset(input, 0, sizeof(ufbx_shader_texture_input));
+
+		// NOTE: This is a bit hackish, we are using a suffix of an interned string. It won't compare
+		// pointer equal to the same string but that shouldn't matter..
+		input->name = name;
+
+		// Connect the property only, values and textures etc are fetched in `ufbxi_update_shader_texture()`.
+		input->prop = prop;
+	}
+
+	// Retain the shader inputs
+	shader->inputs.data = ufbxi_push_copy(&uc->result, ufbx_shader_texture_input, shader->inputs.count, shader->inputs.data);
+	ufbxi_check(shader->inputs.data);
+
+	texture->shader = shader;
+	texture->type = UFBX_TEXTURE_SHADER;
+	uc->scene.metadata.num_shader_textures++;
+
+	if (!uc->opts.disable_quirks) {
+		ufbxi_nounroll for (size_t i = 0; i < ufbxi_arraycount(ufbxi_file_shaders); i++) {
+			const ufbxi_file_shader *fs = &ufbxi_file_shaders[i];
+
+			if ((fs->shader_id && shader->shader_type_id == fs->shader_id) || !strcmp(shader->shader_name.data, fs->shader_name)) {
+				ufbx_shader_texture_input *input = ufbx_find_shader_texture_input(shader, fs->input_name);
+				if (input) {
+					// TODO: Support for specifying relative filename here if ever needed
+					ufbx_prop *prop = input->prop;
+					texture->absolute_filename = prop->value_str;
+					texture->raw_absolute_filename = prop->value_blob;
+					texture->type = UFBX_TEXTURE_FILE;
+					break;
 				}
-			} else if (ufbxi_remove_suffix_c(&base_name, ".connected")) {
-				ufbx_texture_shader_input *base = ufbx_find_texture_shader_input_len(shader, base_name.data, base_name.length);
-				if (base) {
-					base->texture_enabled_prop = prop;
-					continue;
+			}
+		}
+	}
+
+	ufbxi_update_shader_texture(texture, shader);
+
+	return 1;
+}
+
+ufbxi_noinline static void ufbxi_propagate_main_textures(ufbx_scene *scene)
+{
+	// We need to do at least 2^(N-1) passes for N shader textures
+	size_t mask = scene->metadata.num_shader_textures;
+	while (mask) {
+		mask >>= 1;
+
+		ufbxi_for_ptr_list(ufbx_texture, p_texture, scene->textures) {
+			ufbx_texture *texture = *p_texture;
+			ufbx_shader_texture *shader = texture->shader;
+			if (!shader) continue;
+
+			ufbx_texture *main = shader->main_texture;
+			if (!main || shader->main_texture_output_index != 0) continue;
+
+			ufbx_shader_texture *main_shader = main->shader;
+			if (!main_shader || !main_shader->main_texture) continue;
+
+			shader->main_texture = main_shader->main_texture;
+			shader->main_texture_output_index = main_shader->main_texture_output_index;
+		}
+	}
+
+	// Remove cyclic main textures
+	ufbxi_for_ptr_list(ufbx_texture, p_texture, scene->textures) {
+		ufbx_texture *texture = *p_texture;
+		ufbx_shader_texture *shader = texture->shader;
+		if (!shader || !shader->main_texture || shader->main_texture_output_index != 0) continue;
+		ufbx_texture *main = shader->main_texture;
+		if (main && main->shader && main->shader->main_texture) {
+			// Should have been propagated to `texture`
+			shader->main_texture = NULL;
+		}
+	}
+
+	ufbxi_for_ptr_list(ufbx_texture, p_texture, scene->textures) {
+		ufbx_texture *texture = *p_texture;
+		ufbx_shader_texture *shader = texture->shader;
+		if (!shader) continue;
+
+		ufbxi_for_list(ufbx_shader_texture_input, input, shader->inputs) {
+			if (!input->texture || !input->texture->shader) continue;
+			ufbx_shader_texture *input_shader = input->texture->shader;
+			if (input_shader->main_texture) {
+				input->texture = input_shader->main_texture;
+				input->texture_output_index = input_shader->main_texture_output_index;
+			}
+		}
+	}
+
+	ufbxi_for_ptr_list(ufbx_material, p_material, scene->materials) {
+		ufbx_material *material = *p_material;
+
+		ufbxi_for_list(ufbx_material_texture, tex, material->textures) {
+			ufbx_shader_texture *shader = tex->texture->shader;
+			if (shader && shader->main_texture && shader->main_texture_output_index == 0) {
+				tex->texture = shader->main_texture;
+			}
+		}
+	}
+}
+
+typedef struct {
+	ufbx_texture *texture;
+	size_t order;
+} ufbxi_ordered_texture;
+
+ufbxi_noinline static bool ufbxi_ordered_texture_less_texture(void *user, const void *va, const void *vb)
+{
+	const ufbxi_ordered_texture *a = (const ufbxi_ordered_texture*)va, *b = (const ufbxi_ordered_texture*)vb;
+	return a->texture < b->texture;
+}
+
+ufbxi_noinline static bool ufbxi_ordered_texture_less_order(void *user, const void *va, const void *vb)
+{
+	const ufbxi_ordered_texture *a = (const ufbxi_ordered_texture*)va, *b = (const ufbxi_ordered_texture*)vb;
+	return a->order < b->order;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_deduplicate_textures(ufbxi_context *uc, ufbxi_buf *dst_buf, ufbxi_ordered_texture **p_dst, size_t *p_dst_count, size_t count)
+{
+	ufbxi_ordered_texture *textures = ufbxi_push_pop(dst_buf, &uc->tmp_stack, ufbxi_ordered_texture, count);
+	ufbxi_check(textures);
+
+	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbxi_ordered_texture)));
+
+	ufbxi_stable_sort(sizeof(ufbxi_ordered_texture), 16, textures, uc->tmp_arr, count, &ufbxi_ordered_texture_less_texture, NULL);
+
+	// Remove adjacent duplicates
+	size_t dst_ix = 0;
+	for (size_t src_ix = 0; src_ix < count; src_ix++) {
+		if (src_ix > 0 && textures[src_ix - 1].texture == textures[src_ix].texture) {
+			continue;
+		} else {
+			if (src_ix != dst_ix) {
+				textures[dst_ix] = textures[src_ix];
+			}
+			dst_ix++;
+		}
+	}
+
+	size_t new_count = dst_ix;
+	ufbxi_stable_sort(sizeof(ufbxi_ordered_texture), 16, textures, uc->tmp_arr, new_count, &ufbxi_ordered_texture_less_order, NULL);
+
+	*p_dst_count = new_count;
+	*p_dst = textures;
+
+	return 1;
+}
+
+typedef enum {
+	UFBXI_FILE_TEXTURE_FETCH_INITIAL,
+	UFBXI_FILE_TEXTURE_FETCH_STARTED,
+	UFBXI_FILE_TEXTURE_FETCH_FINISHED,
+} ufbxi_file_texture_fetch_state;
+
+// Populate `ufbx_texture.file_textures[]` arrays.
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_file_textures(ufbxi_context *uc)
+{
+	// We keep pointers to `ufbx_texture` in `tmp_stack` as a working set, since we don't know
+	// how deep the shader graphs might be.
+
+	// Start by pushing all the textures into the stack
+	size_t num_stack_textures = uc->scene.textures.count;
+	ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_texture*, num_stack_textures, uc->scene.textures.data));
+
+	// Compressed `ufbxi_file_texture_fetch_state`
+	uint8_t *states = ufbxi_push_zero(&uc->tmp, uint8_t, uc->scene.textures.count);
+	ufbxi_check(states);
+
+	while (num_stack_textures-- > 0) {
+		ufbx_texture *texture = NULL;
+		ufbxi_pop(&uc->tmp_stack, ufbx_texture*, 1, &texture);
+
+		ufbxi_texture_extra *extra = (ufbxi_texture_extra*)ufbxi_get_element_extra(uc, texture->element_id);
+		ufbxi_file_texture_fetch_state state = states[texture->typed_id];
+		if (state == UFBXI_FILE_TEXTURE_FETCH_FINISHED) continue;
+		ufbx_shader_texture *shader = texture->shader;
+
+		if (state == UFBXI_FILE_TEXTURE_FETCH_STARTED) {
+			states[texture->typed_id] = UFBXI_FILE_TEXTURE_FETCH_FINISHED;
+
+			// HACK: Reuse `tmp_parse` for storing intermediate information as we can clear it.
+			ufbxi_buf_clear(&uc->tmp_parse);
+
+			// Now all non-cyclical dependents should be processed.
+			size_t num_deps = 0;
+
+			ufbxi_for_list(ufbx_texture_layer, layer, texture->layers) {
+				ufbx_texture *dep_tex = layer->texture;
+				if (dep_tex->file_textures.count > 0) {
+					ufbxi_ordered_texture *dst = ufbxi_push(&uc->tmp_stack, ufbxi_ordered_texture, 1);
+					ufbxi_check(dst);
+					dst->texture = dep_tex;
+					dst->order = num_deps++;
 				}
 			}
 
-			// Use `uc->tmp_arr` to store the texture inputs so we can search them while we insert new ones.
-			ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size,
-				(shader->inputs.count + 1) * sizeof(ufbx_texture_shader_input)));
-			shader->inputs.data = (ufbx_texture_shader_input*)uc->tmp_arr;
+			if (shader) {
+				ufbxi_for_list(ufbx_shader_texture_input, input, shader->inputs) {
+					ufbx_texture *dep_tex = input->texture;
+					if (dep_tex && dep_tex->file_textures.count > 0) {
+						ufbxi_ordered_texture *dst = ufbxi_push(&uc->tmp_stack, ufbxi_ordered_texture, 1);
+						ufbxi_check(dst);
+						dst->texture = dep_tex;
+						dst->order = num_deps++;
+					}
+				}
+			}
 
-			// Add a new property
-			ufbx_texture_shader_input *input = &shader->inputs.data[shader->inputs.count++];
-			memset(input, 0, sizeof(ufbx_texture_shader_input));
+			// Deduplicate the direct dependencies first
+			ufbxi_ordered_texture *deps;
+			ufbxi_check(ufbxi_deduplicate_textures(uc, &uc->tmp_parse, &deps, &num_deps, num_deps));
 
-			// NOTE: This is a bit hackish, we are using a suffix of an interned string. It won't compare
-			// pointer equal to the same string but that shouldn't matter..
-			input->name = name;
+			if (num_deps == 1) {
+				// If we have only a single dependency we can just copy the pointer
+				texture->file_textures = deps[0].texture->file_textures;
+			} else {
+				// Now collect all the file textures and deduplicate them
+				size_t num_files = 0;
+				ufbxi_for(ufbxi_ordered_texture, dep, deps, num_deps) {
+					ufbxi_for_ptr_list(ufbx_texture, p_tex, dep->texture->file_textures) {
+						ufbxi_ordered_texture *dst = ufbxi_push(&uc->tmp_stack, ufbxi_ordered_texture, 1);
+						ufbxi_check(dst);
+						dst->texture = *p_tex;
+						dst->order = num_files++;
+					}
+				}
 
-			// Connect the property only, values and textures etc are fetched in `ufbxi_update_texture_shader()`.
-			input->prop = prop;
-		}
+				// Deduplicate the file textures
+				ufbxi_ordered_texture *files;
+				ufbxi_check(ufbxi_deduplicate_textures(uc, &uc->tmp_parse, &files, &num_files, num_files));
 
-		// Retain the shader inputs
-		shader->inputs.data = ufbxi_push_copy(&uc->result, ufbx_texture_shader_input, shader->inputs.count, shader->inputs.data);
-		ufbxi_check(shader->inputs.data);
+				texture->file_textures.count = num_files;
+				texture->file_textures.data = ufbxi_push(&uc->result, ufbx_texture*, num_files);
+				ufbxi_check(texture->file_textures.data);
 
-		texture->shader = shader;
-		texture->type = UFBX_TEXTURE_SHADER;
+				for (size_t i = 0; i < num_files; i++) {
+					texture->file_textures.data[i] = files[i].texture;
+				}
+			}
 
-		if (!uc->opts.disable_quirks) {
-			ufbxi_nounroll for (size_t i = 0; i < ufbxi_arraycount(ufbxi_file_shaders); i++) {
-				const ufbxi_file_shader *fs = &ufbxi_file_shaders[i];
+		} else {
+			if (texture->type == UFBX_TEXTURE_FILE) {
+				// Simple case: Just point to self
+				states[texture->typed_id] = UFBXI_FILE_TEXTURE_FETCH_FINISHED;
+				texture->file_textures.count = 1;
+				texture->file_textures.data = ufbxi_push(&uc->result, ufbx_texture*, 1);
+				ufbxi_check(texture->file_textures.data);
+				texture->file_textures.data[0] = texture;
+			} else {
+				// Complex: Process all dependencies first
+				states[texture->typed_id] = UFBXI_FILE_TEXTURE_FETCH_STARTED;
 
-				if ((fs->shader_id && shader->shader_type_id == fs->shader_id) || !strcmp(shader->shader_name.data, fs->shader_name)) {
-					ufbx_texture_shader_input *input = ufbx_find_texture_shader_input(shader, fs->input_name);
-					if (input) {
-						// TODO: Support for specifying relative filename here if ever needed
-						ufbx_prop *prop = input->prop;
-						texture->absolute_filename = prop->value_str;
-						texture->raw_absolute_filename = prop->value_blob;
-						texture->type = UFBX_TEXTURE_FILE;
-						break;
+				// Push self first so we can return after processing depenencies
+				ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_texture*, 1, &texture));
+				num_stack_textures++;
+
+				ufbxi_for_list(ufbx_texture_layer, layer, texture->layers) {
+					ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_texture*, 1, &layer->texture));
+					num_stack_textures++;
+				}
+
+				if (shader) {
+					ufbxi_for_list(ufbx_shader_texture_input, input, shader->inputs) {
+						if (input->texture) {
+							ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_texture*, 1, &input->texture));
+							num_stack_textures++;
+						}
 					}
 				}
 			}
 		}
-	} 
-
-	// If we not find any shader properties so we might have guessed wrong.
-	// We "leak" (freed with scene) the shader in this case but it's negligible.
+	}
 
 	return 1;
 }
@@ -13848,32 +14130,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		}
 	}
 
-	// Second pass to fetch material maps
-	ufbxi_for_ptr_list(ufbx_material, p_material, uc->scene.materials) {
-		ufbx_material *material = *p_material;
-
-		ufbxi_check(ufbxi_sort_material_textures(uc, material->textures.data, material->textures.count));
-		ufbxi_fetch_maps(&uc->scene, material);
-
-		// Fetch `ufbx_material_texture.shader_prop` names
-		if (material->shader) {
-			ufbxi_for_ptr_list(ufbx_shader_binding, p_binding, material->shader->bindings) {
-				ufbx_shader_binding *binding = *p_binding;
-
-				ufbxi_for_list(ufbx_shader_prop_binding, prop, binding->prop_bindings) {
-					ufbx_string name = prop->material_prop;
-
-					size_t index = SIZE_MAX;
-					ufbxi_macro_lower_bound_eq(ufbx_material_texture, 4, &index, material->textures.data, 0, material->textures.count, 
-						( ufbxi_str_less(a->material_prop, name) ), ( a->material_prop.data == name.data ));
-					for (; index < material->textures.count && material->textures.data[index].shader_prop.data == name.data; index++) {
-						material->textures.data[index].shader_prop = prop->shader_prop;
-					}
-				}
-			}
-		}
-	}
-
 	// HACK: If there are multiple textures in an FBX file that use the same embedded
 	// texture they get duplicated Video elements instead of a shared one _and only one
 	// of them has the content?!_ So let's gather all Video instances with content and
@@ -13912,9 +14168,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbx_texture *texture = *p_texture;
 		ufbxi_texture_extra *extra = (ufbxi_texture_extra*)ufbxi_get_element_extra(uc, texture->element.element_id);
 
-		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&texture->filename, (ufbxi_strblob*)&texture->absolute_filename, (ufbxi_strblob*)&texture->relative_filename, false));
-		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&texture->raw_filename, (ufbxi_strblob*)&texture->raw_absolute_filename, (ufbxi_strblob*)&texture->raw_relative_filename, true));
-
 		ufbx_prop *uv_set = ufbxi_find_prop(&texture->props, ufbxi_UVSet);
 		if (uv_set) {
 			texture->uv_set = uv_set->value_str;
@@ -13926,6 +14179,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		if (texture->video) {
 			texture->content = texture->video->content;
 		}
+
+		ufbxi_check(ufbxi_finalize_shader_texture(uc, texture));
+
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&texture->filename, (ufbxi_strblob*)&texture->absolute_filename, (ufbxi_strblob*)&texture->relative_filename, false));
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&texture->raw_filename, (ufbxi_strblob*)&texture->raw_absolute_filename, (ufbxi_strblob*)&texture->raw_relative_filename, true));
 
 		// Fetch layered texture layers and patch alphas/blend modes
 		if (texture->type == UFBX_TEXTURE_LAYERED) {
@@ -13942,8 +14200,34 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				}
 			}
 		}
+	}
 
-		ufbxi_check(ufbxi_finalize_texture_shader(uc, texture));
+	ufbxi_propagate_main_textures(&uc->scene);
+
+	// Second pass to fetch material maps
+	ufbxi_for_ptr_list(ufbx_material, p_material, uc->scene.materials) {
+		ufbx_material *material = *p_material;
+
+		ufbxi_check(ufbxi_sort_material_textures(uc, material->textures.data, material->textures.count));
+		ufbxi_fetch_maps(&uc->scene, material);
+
+		// Fetch `ufbx_material_texture.shader_prop` names
+		if (material->shader) {
+			ufbxi_for_ptr_list(ufbx_shader_binding, p_binding, material->shader->bindings) {
+				ufbx_shader_binding *binding = *p_binding;
+
+				ufbxi_for_list(ufbx_shader_prop_binding, prop, binding->prop_bindings) {
+					ufbx_string name = prop->material_prop;
+
+					size_t index = SIZE_MAX;
+					ufbxi_macro_lower_bound_eq(ufbx_material_texture, 4, &index, material->textures.data, 0, material->textures.count, 
+						( ufbxi_str_less(a->material_prop, name) ), ( a->material_prop.data == name.data ));
+					for (; index < material->textures.count && material->textures.data[index].shader_prop.data == name.data; index++) {
+						material->textures.data[index].shader_prop = prop->shader_prop;
+					}
+				}
+			}
+		}
 	}
 
 	ufbxi_for_ptr_list(ufbx_display_layer, p_layer, uc->scene.display_layers) {
@@ -14016,6 +14300,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	ufbxi_for_ptr_list(ufbx_lod_group, p_lod, uc->scene.lod_groups) {
 		ufbxi_check(ufbxi_finalize_lod_group(uc, *p_lod));
 	}
+
+	ufbxi_check(ufbxi_fetch_file_textures(uc));
 
 	uc->scene.metadata.ktime_to_sec = uc->ktime_to_sec;
 
@@ -14557,50 +14843,6 @@ ufbxi_noinline static void ufbxi_update_material(ufbx_scene *scene, ufbx_materia
 	}
 }
 
-ufbxi_noinline static void ufbxi_update_texture_shader(ufbx_texture *texture, ufbx_texture_shader *shader)
-{
-	ufbxi_for_list(ufbx_texture_shader_input, input, shader->inputs) {
-		ufbx_prop *prop = input->prop;
-		if (prop) {
-			input->prop = prop = ufbx_find_prop_len(&texture->props, prop->name.data, prop->name.length);
-			input->value_vec4 = prop->value_vec4;
-			input->value_int = prop->value_int;
-			input->value_str = prop->value_str;
-			input->value_blob = prop->value_blob;
-			input->texture = (ufbx_texture*)ufbx_get_prop_element(&texture->element, input->prop, UFBX_ELEMENT_TEXTURE);
-		}
-
-		prop = input->texture_prop;
-		if (prop) {
-			input->texture_prop = prop = ufbx_find_prop_len(&texture->props, prop->name.data, prop->name.length);
-			ufbx_texture *tex = (ufbx_texture*)ufbx_get_prop_element(&texture->element, prop, UFBX_ELEMENT_TEXTURE);
-			if (tex) input->texture = tex;
-		}
-
-		input->texture_enabled = input->texture != NULL;
-		prop = input->texture_prop;
-		if (prop) {
-			input->texture_enabled_prop = prop = ufbx_find_prop_len(&texture->props, prop->name.data, prop->name.length);
-			input->texture_enabled = prop->value_int != 0;
-		}
-	}
-
-	if (shader->type == UFBX_TEXTURE_SHADER_SELECT_OUTPUT) {
-		ufbx_texture_shader_input *map = ufbx_find_texture_shader_input(shader, "sourceMap");
-		ufbx_texture_shader_input *index = ufbx_find_texture_shader_input(shader, "outputChannelIndex");
-		if (map) {
-			shader->main_texture = map->texture;
-		}
-		if (index) {
-			shader->main_texture_output_index = index->value_int;
-		}
-	}
-
-	// Check if there is a single texture input to designate as `main`
-	if (!shader->main_texture) {
-	}
-}
-
 ufbxi_noinline static void ufbxi_update_texture(ufbx_texture *texture)
 {
 	texture->transform = ufbxi_get_texture_transform(&texture->props);
@@ -14615,7 +14857,7 @@ ufbxi_noinline static void ufbxi_update_texture(ufbx_texture *texture)
 	texture->wrap_v = (ufbx_wrap_mode)ufbxi_find_enum(&texture->props, ufbxi_WrapModeV, 0, UFBX_WRAP_CLAMP);
 
 	if (texture->shader) {
-		ufbxi_update_texture_shader(texture, texture->shader);
+		ufbxi_update_shader_texture(texture, texture->shader);
 	}
 }
 
@@ -14856,12 +15098,14 @@ ufbxi_noinline static void ufbxi_update_scene(ufbx_scene *scene, bool initial)
 		ufbxi_update_blend_channel(*p_channel);
 	}
 
-	ufbxi_for_ptr_list(ufbx_material, p_material, scene->materials) {
-		ufbxi_update_material(scene, *p_material);
-	}
-
 	ufbxi_for_ptr_list(ufbx_texture, p_texture, scene->textures) {
 		ufbxi_update_texture(*p_texture);
+	}
+
+	ufbxi_propagate_main_textures(scene);
+
+	ufbxi_for_ptr_list(ufbx_material, p_material, scene->materials) {
+		ufbxi_update_material(scene, *p_material);
 	}
 
 	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, scene->anim_stacks) {
@@ -17106,12 +17350,12 @@ ufbxi_nodiscard ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 		texture->layers.data = layers;
 
 		if (texture->shader) {
-			ufbx_texture_shader *shader = texture->shader;
-			shader = ufbxi_push_copy(&ec->result, ufbx_texture_shader, 1, shader);
+			ufbx_shader_texture *shader = texture->shader;
+			shader = ufbxi_push_copy(&ec->result, ufbx_shader_texture, 1, shader);
 			ufbxi_check_err(&ec->error, shader);
 			texture->shader = shader;
 
-			ufbx_texture_shader_input *inputs = ufbxi_push_copy(&ec->result, ufbx_texture_shader_input, shader->inputs.count, shader->inputs.data);
+			ufbx_shader_texture_input *inputs = ufbxi_push_copy(&ec->result, ufbx_shader_texture_input, shader->inputs.count, shader->inputs.data);
 			ufbxi_check_err(&ec->error, inputs);
 			shader->inputs.data = inputs;
 		}
@@ -20793,12 +21037,12 @@ ufbx_abi ufbx_shader_prop_binding_list ufbx_find_shader_prop_bindings_len(const 
 	return bindings;
 }
 
-ufbx_abi ufbx_texture_shader_input *ufbx_find_texture_shader_input_len(const ufbx_texture_shader *shader, const char *name, size_t name_len)
+ufbx_abi ufbx_shader_texture_input *ufbx_find_shader_texture_input_len(const ufbx_shader_texture *shader, const char *name, size_t name_len)
 {
 	ufbx_string name_str = { name, name_len };
 
 	size_t index = SIZE_MAX;
-	ufbxi_macro_lower_bound_eq(ufbx_texture_shader_input, 4, &index, shader->inputs.data, 0, shader->inputs.count, 
+	ufbxi_macro_lower_bound_eq(ufbx_shader_texture_input, 4, &index, shader->inputs.data, 0, shader->inputs.count, 
 		( ufbxi_str_less(a->name, name_str) ), ( ufbxi_str_equal(a->name, name_str) ));
 
 	if (index != SIZE_MAX) {

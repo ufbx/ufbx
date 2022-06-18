@@ -887,7 +887,7 @@ ufbxt_noinline static void ufbxt_hash_texture_layer_imp(ufbxt_hash *h, const ufb
 	ufbxt_hash_real(h, v.alpha);
 }
 
-ufbxt_noinline static void ufbxt_hash_texture_shader_input_imp(ufbxt_hash *h, const ufbx_texture_shader_input *v)
+ufbxt_noinline static void ufbxt_hash_shader_texture_input_imp(ufbxt_hash *h, const ufbx_shader_texture_input *v)
 {
 	ufbxt_hash_string(h, v->name);
 	ufbxt_hash_vec4(h, v->value_vec4);
@@ -901,7 +901,7 @@ ufbxt_noinline static void ufbxt_hash_texture_shader_input_imp(ufbxt_hash *h, co
 	ufbxt_hash_prop_ref(h, v->texture_enabled_prop);
 }
 
-ufbxt_noinline static void ufbxt_hash_texture_shader_imp(ufbxt_hash *h, const ufbx_texture_shader *v)
+ufbxt_noinline static void ufbxt_hash_shader_texture_imp(ufbxt_hash *h, const ufbx_shader_texture *v)
 {
 	ufbxt_hash_pod(h, v->type);
 	ufbxt_hash_string(h, v->shader_name);
@@ -914,7 +914,7 @@ ufbxt_noinline static void ufbxt_hash_texture_shader_imp(ufbxt_hash *h, const uf
 	ufbxt_hash_string(h, v->prop_prefix);
 }
 
-#define ufbxt_hash_texture_shader(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_texture_shader_imp(h, v), ufbxt_pop_tag(h))
+#define ufbxt_hash_shader_texture(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_shader_texture_imp(h, v), ufbxt_pop_tag(h))
 
 ufbxt_noinline static void ufbxt_hash_texture_imp(ufbxt_hash *h, const ufbx_texture *v)
 {
@@ -938,7 +938,7 @@ ufbxt_noinline static void ufbxt_hash_texture_imp(ufbxt_hash *h, const ufbx_text
 	ufbxt_hash_matrix(h, v->uv_to_texture);
 
 	if (v->shader) {
-		ufbxt_hash_texture_shader(h, v->shader);
+		ufbxt_hash_shader_texture(h, v->shader);
 	}
 }
 
