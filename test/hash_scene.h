@@ -906,7 +906,7 @@ ufbxt_noinline static void ufbxt_hash_shader_texture_imp(ufbxt_hash *h, const uf
 	ufbxt_hash_pod(h, v->type);
 	ufbxt_hash_string(h, v->shader_name);
 	ufbxt_hash_pod(h, v->shader_type_id);
-	ufbxt_hash_list_ptr(h, v->inputs, ufbxt_hash_texture_shader_input_imp);
+	ufbxt_hash_list_ptr(h, v->inputs, ufbxt_hash_shader_texture_input_imp);
 	ufbxt_hash_string(h, v->shader_source);
 	ufbxt_hash_blob(h, v->raw_shader_source);
 	ufbxt_hash_element_ref(h, v->main_texture);
