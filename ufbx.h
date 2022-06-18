@@ -2146,7 +2146,7 @@ typedef struct ufbx_shader_texture_input {
 	ufbx_nullable ufbx_texture *texture;
 
 	// Index of the output to use if `texture` is a multi-output shader node.
-	size_t texture_output_index;
+	int64_t texture_output_index;
 
 	// Controls whether shading should use `texture`.
 	// NOTE: Some shading models allow this to be `true` even if `texture == NULL`.
