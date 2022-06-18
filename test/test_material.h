@@ -643,6 +643,11 @@ UFBXT_FILE_TEST(maya_texture_layers)
 	ufbxt_assert_close_real(err, layered->layers.data[2].alpha, 1.0f);
 	ufbxt_assert(!strcmp(layered->layers.data[2].texture->relative_filename.data, "textures\\checkerboard_ambient.png"));
 
+	ufbxt_assert(layered->file_textures.count == 3);
+	for (size_t i = 0; i < 3; i++) {
+		ufbxt_assert(layered->file_textures.data[i] == layered->layers.data[i].texture);
+	}
+
 	{
 		ufbx_texture *texture = material->fbx.emission_color.texture;
 		ufbxt_assert(texture);
@@ -708,6 +713,12 @@ UFBXT_FILE_TEST(maya_texture_blend_modes)
 		ufbx_real alpha = i < 10 ? (ufbx_real)(i + 1) * 0.1f : 1.0f;
 		size_t ix = layered->layers.count - i - 1;
 		ufbxt_assert_close_real(err, layered->layers.data[ix].alpha, alpha);
+	}
+
+	// All point to the same texture and should be deduplicated
+	ufbxt_assert(layered->file_textures.count == 1);
+	for (size_t i = 0; i < 14; i++) {
+		ufbxt_assert(layered->layers.data[i].texture == layered->file_textures.data[0]);
 	}
 
 	ufbxt_assert(layered->layers.data[ 0].blend_mode == UFBX_BLEND_REPLACE);    // "CPV Modulate" (unsupported)
