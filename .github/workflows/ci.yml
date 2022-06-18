@@ -263,11 +263,11 @@ jobs:
       - name: Compile hash_scene
         run: |
           clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
-      - name: Dump reference hashes
+      - name: Run hash_scene N times
         run: |
           set -e
           for run in {1..100}; do
-            build/hash_scene --check build/dumped-files.txt --dump build/hashdumps/ci_determinism_x64_release.txt --max-dump-errors 3
+            build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_x64_release.txt --max-dump-errors 3
           done
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
