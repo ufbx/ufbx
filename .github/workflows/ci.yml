@@ -246,6 +246,39 @@ jobs:
           name: hash-dumps
           path: build/hashdump_ci_exotic.txt.gz
 
+  ci_determinism:
+    runs-on: ubuntu-latest
+    needs: ci_pre_hashes
+    steps:
+      - uses: actions/checkout@v2
+      - name: Prepare directories
+        run: |
+          mkdir build
+          mkdir build/hashdumps
+      - name: Download reference hashes
+        uses: actions/download-artifact@v3
+        with:
+          name: reference-hashes
+          path: build
+      - name: Compile hash_scene
+        run: |
+          clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+      - name: Dump reference hashes
+        run: |
+          set -e
+          for run in {1..100}; do
+            build/hash_scene --check build/dumped-files.txt --dump build/hashdumps/ci_determinism_x64_release.txt --max-dump-errors 3
+          done
+      - name: Compress hashdumps
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_determinism.txt.gz
+      - name: Upload hashdumps
+        uses: actions/upload-artifact@v3
+        if: ${{ always() && !cancelled() }}
+        with:
+          name: hash-dumps
+          path: build/hashdump_ci_determinism.txt.gz
+
   ci_wasm:
     runs-on: ubuntu-latest
     needs: ci_pre_hashes
@@ -347,7 +380,7 @@ jobs:
   ci_post_hashes:
     runs-on: ubuntu-latest
     if: ${{ always() }}
-    needs: [ci_ubuntu, ci_windows, ci_macos, ci_wasm, ci_arm32, ci_arm64, ci_exotic]
+    needs: [ci_ubuntu, ci_windows, ci_macos, ci_wasm, ci_arm32, ci_arm64, ci_exotic, ci_determinism]
     steps:
       - uses: actions/checkout@v2
         with:
