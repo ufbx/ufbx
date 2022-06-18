@@ -708,6 +708,11 @@ static void ufbxt_check_texture(ufbx_scene *scene, ufbx_texture *texture)
 		ufbxt_check_element_ptr(scene, file, UFBX_ELEMENT_TEXTURE);
 		ufbxt_assert(file->type == UFBX_TEXTURE_FILE);
 	}
+
+	if (texture->type == UFBX_TEXTURE_FILE) {
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == texture);
+	}
 }
 
 static void ufbxt_check_video(ufbx_scene *scene, ufbx_video *video)
