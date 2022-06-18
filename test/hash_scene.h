@@ -937,6 +937,8 @@ ufbxt_noinline static void ufbxt_hash_texture_imp(ufbxt_hash *h, const ufbx_text
 	ufbxt_hash_matrix(h, v->texture_to_uv);
 	ufbxt_hash_matrix(h, v->uv_to_texture);
 
+	ufbxt_hash_list(h, v->file_textures, ufbxt_hash_element_ref_imp);
+
 	if (v->shader) {
 		ufbxt_hash_shader_texture(h, v->shader);
 	}

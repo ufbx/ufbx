@@ -730,6 +730,143 @@ UFBXT_FILE_TEST(maya_texture_blend_modes)
 UFBXT_FILE_TEST(max_texture_mapping)
 #if UFBXT_IMPL
 {
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "01 - Default");
+	ufbxt_assert(material);
+
+	{
+		ufbx_texture *texture = material->pbr.base_factor.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_weight.png"));
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(shader->shader_name.data, "OSLBitmap2"));
+
+		uint32_t source_hash = ufbxt_fnv1a(shader->shader_source.data, shader->shader_source.length);
+		ufbxt_assert(source_hash == 0x599994a9u);
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == texture);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.base_color.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(shader->shader_name.data, "RandomTilingBitmap"));
+		uint32_t source_hash = ufbxt_fnv1a(shader->shader_source.data, shader->shader_source.length);
+		ufbxt_assert(source_hash == 0x60186ba7u);
+
+		{
+			ufbx_shader_texture_input *input = ufbx_find_shader_texture_input(shader, "Filename");
+			ufbxt_assert(input);
+			ufbxt_assert(!strcmp(input->value_str.data, "D:\\Dev\\clean\\ufbx\\data\\textures\\checkerboard_diffuse.png"));
+		}
+
+		{
+			ufbx_shader_texture_input *input = ufbx_find_shader_texture_input(shader, "Scale");
+			ufbxt_assert(input);
+			ufbxt_assert_close_real(err, input->value_real, 0.25f);
+		}
+
+		ufbxt_assert(texture->file_textures.count == 0);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.roughness.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_roughness.png"));
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(shader->shader_name.data, "UberBitmap2"));
+
+		uint32_t source_hash = ufbxt_fnv1a(shader->shader_source.data, shader->shader_source.length);
+		ufbxt_assert(source_hash == 0x19833d47);
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == texture);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.metalness.texture;
+		ufbxt_assert(texture && !texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_metallic.png"));
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == texture);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.transmission_color.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_transparency.png"));
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(shader->shader_name.data, "ai_image"));
+		ufbxt_assert(shader->shader_source.length == 0);
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == texture);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.transmission_color.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_transparency.png"));
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(shader->shader_source.length == 0);
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == texture);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.emission_color.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(shader->shader_name.data, "ColorTweak"));
+
+		uint32_t source_hash = ufbxt_fnv1a(shader->shader_source.data, shader->shader_source.length);
+		ufbxt_assert(source_hash == 0xd2f4f86f);
+
+		ufbx_shader_texture_input *input = ufbx_find_shader_texture_input(shader, "Input");
+		ufbxt_assert(input);
+		ufbx_texture *input_texture = input->texture;
+		ufbxt_assert(input_texture);
+		ufbxt_assert(input_texture->type == UFBX_TEXTURE_FILE);
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == input_texture);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.normal_map.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(shader->shader_name.data, "ai_bump2d"));
+		ufbxt_assert(shader->shader_source.length == 0);
+
+		ufbx_shader_texture_input *bump_map = ufbx_find_shader_texture_input(shader, "bump_map");
+		ufbxt_assert(bump_map);
+		ufbx_texture *bump_texture = bump_map->texture;
+		ufbxt_assert(bump_texture);
+		ufbxt_assert(bump_texture->type == UFBX_TEXTURE_FILE);
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == bump_texture);
+	}
+
 }
 #endif
 

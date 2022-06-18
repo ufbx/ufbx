@@ -12840,6 +12840,8 @@ static const ufbxi_file_shader ufbxi_file_shaders[] = {
 	{ UINT64_C(0x7e73161fad53b12a), "ai_image", "filename" },
 	{ 0, "OSLBitmap", ufbxi_Filename },
 	{ 0, "OSLBitmap2", ufbxi_Filename },
+	{ 0, "UberBitmap", ufbxi_Filename },
+	{ 0, "UberBitmap2", ufbxi_Filename },
 };
 
 ufbxi_noinline static void ufbxi_update_shader_texture(ufbx_texture *texture, ufbx_shader_texture *shader)
@@ -17349,6 +17351,8 @@ ufbxi_nodiscard ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 			layers[i].texture = (ufbx_texture*)ufbxi_translate_element(ec, layers[i].texture);
 		}
 		texture->layers.data = layers;
+
+		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &texture->file_textures));
 
 		if (texture->shader) {
 			ufbx_shader_texture *shader = texture->shader;

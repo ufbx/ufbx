@@ -702,6 +702,12 @@ static void ufbxt_check_texture(ufbx_scene *scene, ufbx_texture *texture)
 	if (texture->shader) {
 		ufbxt_check_shader_texture(scene, texture, texture->shader);
 	}
+
+	for (size_t i = 0; i < texture->file_textures.count; i++) {
+		ufbx_texture *file = texture->file_textures.data[i];
+		ufbxt_check_element_ptr(scene, file, UFBX_ELEMENT_TEXTURE);
+		ufbxt_assert(file->type == UFBX_TEXTURE_FILE);
+	}
 }
 
 static void ufbxt_check_video(ufbx_scene *scene, ufbx_video *video)
