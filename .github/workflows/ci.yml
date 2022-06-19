@@ -260,15 +260,18 @@ jobs:
         with:
           name: reference-hashes
           path: build
-      - name: Compile hash_scene
+      - name: Compile and run hash_scene with various configurations
         run: |
           clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
-      - name: Run hash_scene N times
-        run: |
-          set -e
-          for run in {1..100}; do
-            build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_x64_release.txt --max-dump-errors 3
-          done
+          build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_x64_release.txt --max-dump-errors 3
+          build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_dedicated_x64_release.txt --max-dump-errors 3 --dedicated-allocs
+          build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_linear_x64_release.txt --max-dump-errors 3 --dedicated-allocs --allocator linear
+          build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_linear_reverse_x64_release.txt --max-dump-errors 3 --dedicated-allocs --allocator linear-reverse
+          clang -DUFBX_DEV -DUFBX_REGRESSION test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+          build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_regression_x64_release.txt --max-dump-errors 3
+          build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_regression_dedicated_x64_release.txt --max-dump-errors 3 --dedicated-allocs
+          build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_regression_linear_x64_release.txt --max-dump-errors 3 --dedicated-allocs --allocator linear
+          build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_regression_linear_reverse_x64_release.txt --max-dump-errors 3 --dedicated-allocs --allocator linear-reverse
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_determinism.txt.gz
