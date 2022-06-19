@@ -2340,7 +2340,8 @@ static ufbxi_noinline void ufbxi_buf_clear(ufbxi_buf *buf)
 // The actual element comparison is left to the user of `ufbxi_map`, see usage below.
 //
 // NOTES:
-//   ufbxi_map_insert() inserts duplicates, use ufbxi_map_find() before if necessary!
+//   ufbxi_map_insert() does not support duplicate values, use find first if duplicates are possible!
+//   Inserting duplicate elements fails with an assertion if `UFBX_REGRESSION` is enabled.
 
 typedef struct ufbxi_aa_node ufbxi_aa_node;
 
@@ -2557,6 +2558,8 @@ static ufbxi_noinline void *ufbxi_map_find_size(ufbxi_map *map, size_t size, uin
 static ufbxi_noinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size, uint32_t hash, const void *value)
 {
 	if (!ufbxi_map_grow_size(map, size, 64)) return NULL;
+
+	ufbxi_regression_assert(ufbxi_map_find_size(map, size, hash, value) == NULL);
 
 	uint32_t index = map->size++;
 
@@ -8175,7 +8178,39 @@ ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_str
 	return 1;
 }
 
-ufbxi_nodiscard static ufbx_element *ufbxi_push_element_size(ufbxi_context *uc, ufbxi_element_info *info, size_t size, ufbx_element_type type)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_insert_fbx_id(ufbxi_context *uc, uint64_t fbx_id, uint32_t element_id)
+{
+	uint32_t hash = ufbxi_hash64(fbx_id);
+	ufbxi_fbx_id_entry *entry = ufbxi_map_find(&uc->fbx_id_map, ufbxi_fbx_id_entry, hash, &fbx_id);
+	// TODO: Strict / warn about duplicate objects
+
+	if (!entry) {
+		entry = ufbxi_map_insert(&uc->fbx_id_map, ufbxi_fbx_id_entry, hash, &fbx_id);
+		ufbxi_check(entry);
+		entry->fbx_id = fbx_id;
+		entry->element_id = element_id;
+	}
+	
+	return 1;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_insert_fbx_attr(ufbxi_context *uc, uint64_t fbx_id, uint64_t attrib_fbx_id)
+{
+	uint32_t hash = ufbxi_hash64(fbx_id);
+	ufbxi_fbx_attr_entry *entry = ufbxi_map_find(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, hash, &fbx_id);
+	// TODO: Strict / warn about duplicate objects
+
+	if (!entry) {
+		ufbxi_fbx_attr_entry *entry = ufbxi_map_insert(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, hash, &fbx_id);
+		ufbxi_check(entry);
+		entry->node_fbx_id = fbx_id;
+		entry->attr_fbx_id = attrib_fbx_id;
+	}
+	
+	return 1;
+}
+
+ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_element_size(ufbxi_context *uc, ufbxi_element_info *info, size_t size, ufbx_element_type type)
 {
 	size_t aligned_size = (size + 7) & ~0x7;
 
@@ -8194,11 +8229,7 @@ ufbxi_nodiscard static ufbx_element *ufbxi_push_element_size(ufbxi_context *uc, 
 	elem->props = info->props;
 	elem->dom_node = info->dom_node;
 
-	uint32_t hash = ufbxi_hash64(info->fbx_id);
-	ufbxi_fbx_id_entry *entry = ufbxi_map_insert(&uc->fbx_id_map, ufbxi_fbx_id_entry, hash, &info->fbx_id);
-	ufbxi_check_return(entry, NULL);
-	entry->fbx_id = info->fbx_id;
-	entry->element_id = elem->element_id;
+	ufbxi_check_return(ufbxi_insert_fbx_id(uc, info->fbx_id, elem->element_id), NULL);
 
 	return elem;
 }
@@ -8226,11 +8257,8 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 
 	uint64_t fbx_id = (uintptr_t)elem | UFBXI_SYNTHETIC_ID_BIT;
 	*p_fbx_id = fbx_id;
-	uint32_t hash = ufbxi_hash64(fbx_id);
-	ufbxi_fbx_id_entry *entry = ufbxi_map_insert(&uc->fbx_id_map, ufbxi_fbx_id_entry, hash, &fbx_id);
-	ufbxi_check_return(entry, NULL);
-	entry->fbx_id = fbx_id;
-	entry->element_id = elem->element_id;
+
+	ufbxi_check_return(ufbxi_insert_fbx_id(uc, fbx_id, elem->element_id), NULL);
 
 	return elem;
 }
@@ -9926,11 +9954,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_c
 	// 6x00: Link the node to the node attribute so property connections can be
 	// redirected from connections if necessary.
 	if (uc->version < 7000) {
-		uint32_t hash = ufbxi_hash64(info->fbx_id);
-		ufbxi_fbx_attr_entry *entry = ufbxi_map_insert(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, hash, &info->fbx_id);
-		ufbxi_check(entry);
-		entry->node_fbx_id = info->fbx_id;
-		entry->attr_fbx_id = attrib_info.fbx_id;
+		ufbxi_check(ufbxi_insert_fbx_attr(uc, info->fbx_id, attrib_info.fbx_id));
 
 		// Split properties between the node and the attribute
 		ufbx_prop *ps = info->props.props.data;
@@ -11095,11 +11119,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_model(ufbxi_context 
 
 	// Mark the node as having an attribute so property connections can be forwarded
 	if (has_attrib) {
-		uint32_t hash = ufbxi_hash64(info.fbx_id);
-		ufbxi_fbx_attr_entry *entry = ufbxi_map_insert(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, hash, &info.fbx_id);
-		ufbxi_check(entry);
-		entry->node_fbx_id = info.fbx_id;
-		entry->attr_fbx_id = attrib_info.fbx_id;
+		ufbxi_check(ufbxi_insert_fbx_attr(uc, info.fbx_id, attrib_info.fbx_id));
 	}
 
 	// Children are represented as an array of strings
