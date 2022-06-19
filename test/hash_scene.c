@@ -56,6 +56,7 @@ static void linear_allocator_init(ufbx_allocator *allocator, size_t size, bool r
 
 typedef struct {
 	bool dedicated_allocs;
+	bool no_read_buffer;
 	const char *allocator;
 	size_t linear_allocator_size;
 } ufbxt_hasher_opts;
@@ -87,6 +88,10 @@ static ufbx_scene *load_scene(const char *filename, int frame, ufbxt_hasher_opts
 	opts.evaluate_skinning = true;
 	opts.target_axes = ufbx_axes_right_handed_y_up;
 	opts.target_unit_meters = 1.0f;
+
+	if (hasher_opts->no_read_buffer) {
+		opts.read_buffer_size = 1;
+	}
 
 	setup_allocator(&opts.temp_allocator, hasher_opts);
 	setup_allocator(&opts.result_allocator, hasher_opts);
@@ -141,6 +146,8 @@ int main(int argc, char **argv)
 			dump_all = true;
 		} else if (!strcmp(argv[i], "--dedicated-allocs")) {
 			hasher_opts.dedicated_allocs = true;
+		} else if (!strcmp(argv[i], "--no-read-buffer")) {
+			hasher_opts.no_read_buffer = true;
 		} else if (!strcmp(argv[i], "--allocator")) {
 			if (++i < argc) hasher_opts.allocator = argv[i];
 		} else if (!strcmp(argv[i], "--max-dump-errors")) {

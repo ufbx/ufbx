@@ -264,11 +264,13 @@ jobs:
         run: |
           clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_x64_release.txt --max-dump-errors 3
+          build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_unbuffered_x64_release.txt --max-dump-errors 3 --no-read-buffer
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_dedicated_x64_release.txt --max-dump-errors 3 --dedicated-allocs
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_linear_x64_release.txt --max-dump-errors 3 --dedicated-allocs --allocator linear
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_linear_reverse_x64_release.txt --max-dump-errors 3 --dedicated-allocs --allocator linear-reverse
           clang -DUFBX_DEV -DUFBX_REGRESSION test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_regression_x64_release.txt --max-dump-errors 3
+          build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_regression_unbuffered_x64_release.txt --max-dump-errors 3 --no-read-buffer
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_regression_dedicated_x64_release.txt --max-dump-errors 3 --dedicated-allocs
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_regression_linear_x64_release.txt --max-dump-errors 3 --dedicated-allocs --allocator linear
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_determinism_regression_linear_reverse_x64_release.txt --max-dump-errors 3 --dedicated-allocs --allocator linear-reverse
