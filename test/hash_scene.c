@@ -73,7 +73,7 @@ static void setup_allocator(ufbx_allocator_opts *ator_opts, ufbxt_hasher_opts *o
 		} else if (!strcmp(opts->allocator, "linear-reverse")) {
 			linear_allocator_init(&ator_opts->allocator, linear_size, true);
 		} else {
-			fprintf("Unknown allocator: %s\n", opts->allocator);
+			fprintf(stderr, "Unknown allocator: %s\n", opts->allocator);
 			exit(1);
 		}
 	}
@@ -88,8 +88,8 @@ static ufbx_scene *load_scene(const char *filename, int frame, ufbxt_hasher_opts
 	opts.target_axes = ufbx_axes_right_handed_y_up;
 	opts.target_unit_meters = 1.0f;
 
-	if (hasher_opts->allocator) {
-	}
+	setup_allocator(&opts.temp_allocator, hasher_opts);
+	setup_allocator(&opts.result_allocator, hasher_opts);
 
 	ufbx_error error;
 	ufbx_scene *scene = ufbx_load_file(filename, &opts, &error);
