@@ -8201,7 +8201,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_insert_fbx_attr(ufbxi_context *u
 	// TODO: Strict / warn about duplicate objects
 
 	if (!entry) {
-		ufbxi_fbx_attr_entry *entry = ufbxi_map_insert(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, hash, &fbx_id);
+		entry = ufbxi_map_insert(&uc->fbx_attr_map, ufbxi_fbx_attr_entry, hash, &fbx_id);
 		ufbxi_check(entry);
 		entry->node_fbx_id = fbx_id;
 		entry->attr_fbx_id = attrib_fbx_id;
