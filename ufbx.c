@@ -6521,7 +6521,7 @@ static ufbxi_noinline uint32_t ufbxi_ascii_parse_version(ufbxi_context *uc)
 	}
 
 	if (num_digits != 3) return 0;
-	return 1000*digits[0] + 100*digits[1] + 10*digits[2];
+	return 1000u*(uint32_t)digits[0] + 100u*(uint32_t)digits[1] + 10u*(uint32_t)digits[2];
 }
 
 static ufbxi_noinline char ufbxi_ascii_skip_whitespace(ufbxi_context *uc)
@@ -8739,7 +8739,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_process_indices(ufbxi_context *u
 	// Indices less than zero (~actual_index) ends a polygon
 	size_t num_total_faces = 0;
 	ufbxi_for (uint32_t, p_ix, index_data, mesh->num_indices) {
-		num_total_faces += ((int32_t)*p_ix < 0) ? 1 : 0;
+		num_total_faces += ((int32_t)*p_ix < 0) ? 1u : 0u;
 	}
 	mesh->faces.data = ufbxi_push(&uc->result, ufbx_face, num_total_faces);
 	ufbxi_check(mesh->faces.data);
@@ -9300,7 +9300,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_line(ufbxi_context *uc, ufb
 			if (line->point_indices.count > 0) {
 				for (size_t i = 0; i < line->point_indices.count - 1; i++) {
 					uint32_t ix = line->point_indices.data[i];
-					num_segments += (int32_t)ix < 0 ? 1 : 0;
+					num_segments += (int32_t)ix < 0 ? 1u : 0u;
 				}
 			}
 
@@ -11508,7 +11508,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_connections_to_elements(ufbx
 					ufbx_prop *new_prop = ufbxi_push_zero(&uc->tmp_stack, ufbx_prop, 1);
 					ufbxi_check(new_prop);
 					if (def_prop) *new_prop = *def_prop;
-					flags |= new_prop->flags;
+					flags |= (uint32_t)new_prop->flags;
 					new_prop->flags = (ufbx_prop_flags)(UFBX_PROP_FLAG_ANIMATABLE | UFBX_PROP_FLAG_SYNTHETIC | flags);
 					new_prop->name = name;
 					new_prop->_internal_key = key;
@@ -16854,7 +16854,7 @@ static ufbxi_noinline bool ufbxi_find_prop_override(const ufbx_const_prop_overri
 	if (ix != SIZE_MAX) {
 		const ufbx_prop_override *over = &overrides->data[ix];
 		const uint32_t clear_flags = UFBX_PROP_FLAG_NO_VALUE | UFBX_PROP_FLAG_NOT_FOUND;
-		prop->flags = (ufbx_prop_flags)((prop->flags & ~clear_flags) | UFBX_PROP_FLAG_OVERRIDDEN);
+		prop->flags = (ufbx_prop_flags)(((uint32_t)prop->flags & ~clear_flags) | UFBX_PROP_FLAG_OVERRIDDEN);
 		prop->value_vec3 = over->value;
 		prop->value_real_arr[3] = 0.0f;
 		prop->value_int = over->value_int;
