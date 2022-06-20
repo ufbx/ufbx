@@ -1070,7 +1070,7 @@ typedef enum ufbx_aspect_mode {
 	UFBX_ASPECT_MODE_FIXED_HEIGHT,
 
 	UFBX_ASPECT_MODE_COUNT,
-	UFBX_ASPECT_MODE_FORCE_32BIT,
+	UFBX_ASPECT_MODE_FORCE_32BIT = 0x7ffffffff,
 } ufbx_aspect_mode;
 
 // Method of specifying the field of view from properties
@@ -1086,7 +1086,7 @@ typedef enum ufbx_aperture_mode {
 	UFBX_APERTURE_MODE_FOCAL_LENGTH,
 
 	UFBX_APERTURE_MODE_COUNT,
-	UFBX_APERTURE_MODE_FORCE_32BIT,
+	UFBX_APERTURE_MODE_FORCE_32BIT = 0x7ffffffff,
 } ufbx_aperture_mode;
 
 // Method of specifying the render gate size from properties
@@ -1107,7 +1107,7 @@ typedef enum ufbx_gate_fit {
 	UFBX_GATE_FIT_STRETCH,
 
 	UFBX_GATE_FIT_COUNT,
-	UFBX_GATE_FIT_FORCE_32BIT,
+	UFBX_GATE_FIT_FORCE_32BIT = 0x7ffffffff,
 } ufbx_gate_fit;
 
 // Camera film/aperture size defaults
