@@ -3451,7 +3451,7 @@ extern const uint32_t ufbx_source_version;
 //   ufbx_subdivide_mesh()
 //   ufbx_tessellate_nurbs_surface()
 //   ufbx_free_mesh()
-ufbx_abi bool ufbx_is_thread_safe();
+ufbx_abi bool ufbx_is_thread_safe(void);
 
 // Load a scene from a `size` byte memory buffer at `data`
 ufbx_abi ufbx_scene *ufbx_load_memory(
@@ -3631,6 +3631,7 @@ ufbx_inline ufbx_shader_texture_input *ufbx_find_shader_texture_input(const ufbx
 
 ufbx_abi bool ufbx_coordinate_axes_valid(ufbx_coordinate_axes axes);
 
+ufbx_abi ufbx_real ufbx_quat_dot(ufbx_quat a, ufbx_quat b);
 ufbx_abi ufbx_quat ufbx_quat_mul(ufbx_quat a, ufbx_quat b);
 ufbx_abi ufbx_quat ufbx_quat_normalize(ufbx_quat q);
 ufbx_abi ufbx_quat ufbx_quat_fix_antipodal(ufbx_quat q, ufbx_quat reference);

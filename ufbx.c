@@ -2838,7 +2838,7 @@ static int ufbxi_map_cmp_string(void *user, const void *va, const void *vb)
 	return ufbxi_str_cmp(*a, *b);
 }
 
-const char ufbxi_empty_char[1] = { '\0' };
+static const char ufbxi_empty_char[1] = { '\0' };
 
 static void ufbxi_string_pool_temp_free(ufbxi_string_pool *pool)
 {
@@ -4177,7 +4177,7 @@ static ufbxi_forceinline void ufbxi_consume_bytes(ufbxi_context *uc, size_t size
 	uc->data += size;
 }
 
-ufbxi_nodiscard ufbxi_noinline int ufbxi_skip_bytes(ufbxi_context *uc, uint64_t size)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_skip_bytes(ufbxi_context *uc, uint64_t size)
 {
 	if (uc->skip_fn) {
 		uc->data_size += uc->yield_size;
@@ -7499,7 +7499,7 @@ typedef struct {
 	ufbx_prop_type type;
 } ufbxi_prop_type_name;
 
-const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
+static const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
 	{ "Boolean", UFBX_PROP_BOOLEAN },
 	{ "bool", UFBX_PROP_BOOLEAN },
 	{ "Bool", UFBX_PROP_BOOLEAN },
@@ -13900,7 +13900,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbx_anim_layer *layer = *p_layer;
 		ufbxi_check(ufbxi_fetch_dst_elements(uc, &layer->anim_values, &layer->element, false, NULL, UFBX_ELEMENT_ANIM_VALUE));
 
-		ufbx_anim_layer_desc *layer_desc = ufbxi_push_zero(&uc->result, ufbx_anim_layer_desc, 1);;
+		ufbx_anim_layer_desc *layer_desc = ufbxi_push_zero(&uc->result, ufbx_anim_layer_desc, 1);
 		ufbxi_check(layer_desc);
 		layer_desc->layer = layer;
 		layer_desc->weight = 1.0f;
@@ -15063,7 +15063,7 @@ ufbxi_noinline static void ufbxi_update_initial_clusters(ufbx_scene *scene)
 	}
 }
 
-ufbxi_noinline ufbx_coordinate_axis ufbxi_find_axis(const ufbx_props *props, const char *axis_name, const char *sign_name)
+ufbxi_noinline static ufbx_coordinate_axis ufbxi_find_axis(const ufbx_props *props, const char *axis_name, const char *sign_name)
 {
 	int64_t axis = ufbxi_find_int(props, axis_name, 3);
 	int64_t sign = ufbxi_find_int(props, sign_name, 2);
@@ -16404,7 +16404,7 @@ static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, 
 	return t;
 }
 
-ufbxi_nodiscard ufbxi_noinline int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error *error, ufbxi_buf *buf_result, ufbxi_buf *buf_tmp,
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error *error, ufbxi_buf *buf_result, ufbxi_buf *buf_tmp,
 	double time, bool load_caches, ufbx_geometry_cache_data_opts *cache_opts)
 {
 	size_t max_skinned_indices = 0;
@@ -17196,7 +17196,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_translate_element_list(ufbxi_eva
 	return 1;
 }
 
-ufbxi_nodiscard ufbxi_noinline int ufbxi_translate_anim(ufbxi_eval_context *ec, ufbx_anim *anim)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_translate_anim(ufbxi_eval_context *ec, ufbx_anim *anim)
 {
 	ufbx_anim_layer_desc *layers = ufbxi_push(&ec->result, ufbx_anim_layer_desc, anim->layers.count);
 	ufbxi_check_err(&ec->error, layers);
@@ -17208,7 +17208,7 @@ ufbxi_nodiscard ufbxi_noinline int ufbxi_translate_anim(ufbxi_eval_context *ec, 
 	return 1;
 }
 
-ufbxi_nodiscard ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 {
 	// `ufbx_evaluate_opts` must be cleared to zero first!
 	ufbx_assert(ec->opts._begin_zero == 0 && ec->opts._end_zero == 0);
@@ -17552,7 +17552,7 @@ ufbxi_nodiscard ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 	return 1;
 }
 
-ufbxi_nodiscard ufbxi_noinline ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *user_opts, ufbx_error *p_error)
+ufbxi_nodiscard static ufbxi_noinline ufbx_scene *ufbxi_evaluate_scene(ufbxi_eval_context *ec, ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *user_opts, ufbx_error *p_error)
 {
 	if (user_opts) {
 		ec->opts = *user_opts;
@@ -20368,7 +20368,7 @@ ufbx_abi bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, 
 	return true;
 }
 
-ufbx_abi bool ufbx_is_thread_safe()
+ufbx_abi bool ufbx_is_thread_safe(void)
 {
 	return UFBXI_THREAD_SAFE != 0;
 }
@@ -22769,31 +22769,6 @@ ufbx_abi ufbx_character *ufbx_as_character(const ufbx_element *element) { return
 ufbx_abi ufbx_constraint *ufbx_as_constraint(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_CONSTRAINT ? (ufbx_constraint*)element : NULL; }
 ufbx_abi ufbx_pose *ufbx_as_pose(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_POSE ? (ufbx_pose*)element : NULL; }
 ufbx_abi ufbx_metadata_object *ufbx_as_metadata_object(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_METADATA_OBJECT ? (ufbx_metadata_object*)element : NULL; }
-
-ufbx_abi size_t ufbx_get_attrib_count(const ufbx_node *node, ufbx_element_type type)
-{
-	if (!node) return 0;
-	size_t count = 0;
-	ufbxi_for_ptr_list(ufbx_element, p_attrib, node->all_attribs) {
-		ufbx_element *attrib = *p_attrib;
-		if (attrib->type == type) {
-			count++;
-		}
-	}
-	return count;
-}
-
-ufbx_abi ufbx_element *ufbx_get_attrib(const ufbx_node *node, ufbx_element_type type, size_t index)
-{
-	if (!node) return NULL;
-	ufbxi_for_ptr_list(ufbx_element, p_attrib, node->all_attribs) {
-		ufbx_element *attrib = *p_attrib;
-		if (attrib->type == type) {
-			if (index-- == 0) return attrib;
-		}
-	}
-	return NULL;
-}
 
 ufbx_abi void ufbx_ffi_find_int_len(int64_t *retval, const ufbx_props *props, const char *name, size_t name_len, const int64_t *def)
 {
