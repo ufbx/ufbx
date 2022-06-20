@@ -129,8 +129,8 @@ static void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void 
 
 	// Check that the indices are in range
 	for (size_t i = 0; i < mesh->num_indices; i++) {
-		int32_t ix = elem->indices.data[i];
-		ufbxt_assert(ix >= -1 && (size_t)ix < elem->values.count);
+		uint32_t ix = elem->indices.data[i];
+		ufbxt_assert(ix < elem->values.count || ix == UFBX_NO_INDEX);
 	}
 
 	// Check that the data at invalid index is valid and zero

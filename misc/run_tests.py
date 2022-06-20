@@ -292,7 +292,7 @@ class GCCCompiler(Compiler):
             args += ["--sysroot", self.sysroot]
 
         if config.get("warnings", False):
-            args += ["-Wall", "-Wextra", "-Werror"]
+            args += ["-Wall", "-Wextra", "-Wsign-conversion", "-Werror"]
 
         args.append("-g")
 

@@ -85,6 +85,8 @@ typedef double ufbx_real;
 
 // -- Basic types
 
+#define UFBX_NO_INDEX ((uint32_t)~0u)
+
 // Null-terminated UTF-8 encoded string within an FBX file
 typedef struct ufbx_string {
 	const char *data;
@@ -172,7 +174,7 @@ typedef struct ufbx_void_list {
 } ufbx_void_list;
 
 UFBX_LIST_TYPE(ufbx_bool_list, bool);
-UFBX_LIST_TYPE(ufbx_int32_list, int32_t);
+UFBX_LIST_TYPE(ufbx_uint32_list, uint32_t);
 UFBX_LIST_TYPE(ufbx_real_list, ufbx_real);
 UFBX_LIST_TYPE(ufbx_vec2_list, ufbx_vec2);
 UFBX_LIST_TYPE(ufbx_vec3_list, ufbx_vec3);
@@ -662,7 +664,7 @@ struct ufbx_node {
 typedef struct ufbx_vertex_attrib {
 	bool exists;
 	ufbx_void_list values;
-	ufbx_int32_list indices;
+	ufbx_uint32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
 } ufbx_vertex_attrib;
@@ -671,7 +673,7 @@ typedef struct ufbx_vertex_attrib {
 typedef struct ufbx_vertex_real {
 	bool exists;
 	ufbx_real_list values;
-	ufbx_int32_list indices;
+	ufbx_uint32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
 
@@ -682,7 +684,7 @@ typedef struct ufbx_vertex_real {
 typedef struct ufbx_vertex_vec2 {
 	bool exists;
 	ufbx_vec2_list values;
-	ufbx_int32_list indices;
+	ufbx_uint32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
 
@@ -693,7 +695,7 @@ typedef struct ufbx_vertex_vec2 {
 typedef struct ufbx_vertex_vec3 {
 	bool exists;
 	ufbx_vec3_list values;
-	ufbx_int32_list indices;
+	ufbx_uint32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
 
@@ -704,7 +706,7 @@ typedef struct ufbx_vertex_vec3 {
 typedef struct ufbx_vertex_vec4 {
 	bool exists;
 	ufbx_vec4_list values;
-	ufbx_int32_list indices;
+	ufbx_uint32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
 
@@ -714,7 +716,7 @@ typedef struct ufbx_vertex_vec4 {
 // Vertex UV set/layer
 typedef struct ufbx_uv_set {
 	ufbx_string name;
-	int32_t index;
+	uint32_t index;
 
 	// Vertex attributes, see `ufbx_mesh` attributes for more information
 	ufbx_vertex_vec2 vertex_uv;        // < UV / texture coordinates
@@ -725,7 +727,7 @@ typedef struct ufbx_uv_set {
 // Vertex color set/layer
 typedef struct ufbx_color_set {
 	ufbx_string name;
-	int32_t index;
+	uint32_t index;
 
 	// Vertex attributes, see `ufbx_mesh` attributes for more information
 	ufbx_vertex_vec4 vertex_color; // < Per-vertex RGBA color
@@ -765,7 +767,7 @@ typedef struct ufbx_mesh_material {
 
 	// Indices to `ufbx_mesh.faces[]` that use this material.
 	// Always contains `num_faces` elements.
-	ufbx_int32_list face_indices; 
+	ufbx_uint32_list face_indices; 
 
 } ufbx_mesh_material;
 
@@ -780,7 +782,7 @@ UFBX_LIST_TYPE(ufbx_subdivision_weight_range_list, ufbx_subdivision_weight_range
 
 typedef struct ufbx_subdivision_weight {
 	ufbx_real weight;
-	int32_t index;
+	uint32_t index;
 } ufbx_subdivision_weight;
 
 UFBX_LIST_TYPE(ufbx_subdivision_weight_list, ufbx_subdivision_weight);
@@ -898,13 +900,13 @@ struct ufbx_mesh {
 	size_t num_edges;
 
 	// Faces and optional per-face extra data
-	ufbx_face_list faces;          // < Face index range
-	ufbx_bool_list face_smoothing; // < Should the face have soft normals
-	ufbx_int32_list face_material; // < Indices to `ufbx_mesh.materials`
-	ufbx_int32_list face_group;    // < Face polygon group index
-	ufbx_bool_list face_hole;      // < Should the face be hidden as a "hole"
-	size_t max_face_triangles;     // < Maximum number of triangles per face in this mesh
-	size_t num_bad_faces;          // < Number of faces with less than 3 vertices
+	ufbx_face_list faces;           // < Face index range
+	ufbx_bool_list face_smoothing;  // < Should the face have soft normals
+	ufbx_uint32_list face_material; // < Indices to `ufbx_mesh.materials`
+	ufbx_uint32_list face_group;    // < Face polygon group index
+	ufbx_bool_list face_hole;       // < Should the face be hidden as a "hole"
+	size_t max_face_triangles;      // < Maximum number of triangles per face in this mesh
+	size_t num_bad_faces;           // < Number of faces with less than 3 vertices
 
 	// Edges and optional per-edge extra data
 	ufbx_edge_list edges;           // < Edge index range
@@ -914,11 +916,11 @@ struct ufbx_mesh {
 
 	// Logical vertices and positions, alternatively you can use
 	// `vertex_position` for consistent interface with other attributes.
-	ufbx_int32_list vertex_indices;
+	ufbx_uint32_list vertex_indices;
 	ufbx_vec3_list vertices;
 
-	// First index referring to a given vertex, `-1` if the vertex is unused.
-	ufbx_int32_list vertex_first_index;
+	// First index referring to a given vertex, `UFBX_NO_INDEX` if the vertex is unused.
+	ufbx_uint32_list vertex_first_index;
 
 	// Vertex attributes, see the comment over the struct.
 	//
@@ -963,8 +965,8 @@ struct ufbx_mesh {
 	ufbx_element_list all_deformers;
 
 	// Subdivision
-	int32_t subdivision_preview_levels;
-	int32_t subdivision_render_levels;
+	uint32_t subdivision_preview_levels;
+	uint32_t subdivision_render_levels;
 	ufbx_subdivision_display_mode subdivision_display_mode;
 	ufbx_subdivision_boundary subdivision_boundary;
 	ufbx_subdivision_boundary subdivision_uv_boundary;
@@ -1211,7 +1213,7 @@ struct ufbx_line_curve {
 	ufbx_vec3 color;
 
 	ufbx_vec3_list control_points; // < List of possible values the line passes through
-	ufbx_int32_list point_indices; // < Indices to `control_points[]` the line goes through
+	ufbx_uint32_list point_indices; // < Indices to `control_points[]` the line goes through
 
 	ufbx_line_segment_list segments;
 
@@ -1309,8 +1311,8 @@ struct ufbx_nurbs_surface {
 	ufbx_vec4_list control_points;
 
 	// How many segments tessellate each step in `ufbx_nurbs_basis.steps`.
-	int32_t span_subdivision_u;
-	int32_t span_subdivision_v;
+	uint32_t span_subdivision_u;
+	uint32_t span_subdivision_v;
 
 	// If `true` the resulting normals should be flipped when evaluated.
 	bool flip_normals;
@@ -1524,7 +1526,7 @@ struct ufbx_skin_deformer {
 	// Blend weights between Linear Blend Skinning (0.0) and Dual Quaternion (1.0).
 	// HINT: You probably want to use `vertices` and `ufbx_skin_vertex.dq_weight` instead!
 	size_t num_dq_weights;
-	ufbx_int32_list dq_vertices;
+	ufbx_uint32_list dq_vertices;
 	ufbx_real_list dq_weights;
 };
 
@@ -1561,7 +1563,7 @@ struct ufbx_skin_cluster {
 	// Raw weights indexed by each _vertex_ of a mesh (not index!)
 	// HINT: It may be simpler to use `ufbx_skin_deformer.vertices[]/weights[]` instead!
 	size_t num_weights;       // < Number of vertices in the cluster
-	ufbx_int32_list vertices; // < Vertex indices in `ufbx_mesh.vertices[]`
+	ufbx_uint32_list vertices; // < Vertex indices in `ufbx_mesh.vertices[]`
 	ufbx_real_list weights;   // < Per-vertex weight values
 };
 
@@ -1620,7 +1622,7 @@ struct ufbx_blend_shape {
 
 	// Vertex offsets to apply over the base mesh
 	size_t num_offsets;              // < Number of vertex offsets in the following arrays
-	ufbx_int32_list offset_vertices; // < Indices to `ufbx_mesh.vertices[]`
+	ufbx_uint32_list offset_vertices; // < Indices to `ufbx_mesh.vertices[]`
 	ufbx_vec3_list position_offsets; // < Always specified per-vertex offsets
 	ufbx_vec3_list normal_offsets;   // < `NULL` if not specified
 };
@@ -2509,9 +2511,9 @@ struct ufbx_selection_node {
 
 	// Indices to selected components, may be out-of-bounds!
 	// TODO: Sanitize these!
-	ufbx_int32_list vertices; // < Indices to `ufbx_mesh.vertices`
-	ufbx_int32_list edges;    // < Indices to `ufbx_mesh.edges`
-	ufbx_int32_list faces;    // < Indices to `ufbx_mesh.faces`
+	ufbx_uint32_list vertices; // < Indices to `ufbx_mesh.vertices`
+	ufbx_uint32_list edges;    // < Indices to `ufbx_mesh.edges`
+	ufbx_uint32_list faces;    // < Indices to `ufbx_mesh.faces`
 };
 
 // -- Constraints
@@ -2930,15 +2932,17 @@ typedef struct ufbx_surface_point {
 
 typedef enum ufbx_topo_flags {
 	UFBX_TOPO_NON_MANIFOLD = 0x1, // < Edge with three or more faces
+
+	UFBX_TOPO_FLAGS_FORCE_32BIT = 0x7fffffff,
 } ufbx_topo_flags;
 
 typedef struct ufbx_topo_edge {
-	int32_t index; // < Starting index of the edge
-	int32_t next;  // < Ending index of the edge / next per-face `ufbx_topo_edge`, always defined
-	int32_t prev;  // < Previous per-face `ufbx_topo_edge`, always defined
-	int32_t twin;  // < `ufbx_topo_edge` on the opposite side, `-1` if not found
-	int32_t face;  // < Index into `mesh->faces[]`, always defined
-	int32_t edge;  // < Index into `mesh->edges[]`, `-1` if not found
+	uint32_t index; // < Starting index of the edge, always defined
+	uint32_t next;  // < Ending index of the edge / next per-face `ufbx_topo_edge`, always defined
+	uint32_t prev;  // < Previous per-face `ufbx_topo_edge`, always defined
+	uint32_t twin;  // < `ufbx_topo_edge` on the opposite side, `UFBX_NO_INDEX` if not found
+	uint32_t face;  // < Index into `mesh->faces[]`, always defined
+	uint32_t edge;  // < Index into `mesh->edges[]`, `UFBX_NO_INDEX` if not found
 
 	ufbx_topo_flags flags;
 } ufbx_topo_edge;
@@ -3303,7 +3307,7 @@ typedef struct ufbx_tessellate_curve_opts {
 	ufbx_allocator_opts result_allocator; // < Allocator used for the final line curve
 
 	// How many segments tessellate each step in `ufbx_nurbs_basis.steps`.
-	int32_t span_subdivision;
+	uint32_t span_subdivision;
 
 	uint32_t _end_zero;
 } ufbx_tessellate_curve_opts;
@@ -3321,8 +3325,8 @@ typedef struct ufbx_tessellate_surface_opts {
 	// would make it easy to create an FBX file with an absurdly high subdivision
 	// rate (similar to mesh subdivision). Please enforce copy the value yourself
 	// enforcing whatever limits you deem reasonable.
-	int32_t span_subdivision_u;
-	int32_t span_subdivision_v;
+	uint32_t span_subdivision_u;
+	uint32_t span_subdivision_v;
 
 	uint32_t _end_zero;
 } ufbx_tessellate_surface_opts;
@@ -3686,13 +3690,13 @@ ufbx_inline void ufbx_compute_topology(const ufbx_mesh *mesh, ufbx_topo_edge *to
 // Get the next/previous edge around a vertex
 // NOTE: Does not return the half-edge on the opposite side (ie. `topo[index].twin`)
 
-ufbx_abi int32_t ufbx_catch_topo_next_vertex_edge(ufbx_panic *panic, const ufbx_topo_edge *topo, size_t num_topo, int32_t index);
-ufbx_inline int32_t ufbx_topo_next_vertex_edge(const ufbx_topo_edge *topo, size_t num_topo, int32_t index) {
+ufbx_abi uint32_t ufbx_catch_topo_next_vertex_edge(ufbx_panic *panic, const ufbx_topo_edge *topo, size_t num_topo, uint32_t index);
+ufbx_inline uint32_t ufbx_topo_next_vertex_edge(const ufbx_topo_edge *topo, size_t num_topo, uint32_t index) {
 	return ufbx_catch_topo_next_vertex_edge(NULL, topo, num_topo, index);
 }
 
-ufbx_abi int32_t ufbx_catch_topo_prev_vertex_edge(ufbx_panic *panic, const ufbx_topo_edge *topo, size_t num_topo, int32_t index);
-ufbx_inline int32_t ufbx_topo_prev_vertex_edge(const ufbx_topo_edge *topo, size_t num_topo, int32_t index) {
+ufbx_abi uint32_t ufbx_catch_topo_prev_vertex_edge(ufbx_panic *panic, const ufbx_topo_edge *topo, size_t num_topo, uint32_t index);
+ufbx_inline uint32_t ufbx_topo_prev_vertex_edge(const ufbx_topo_edge *topo, size_t num_topo, uint32_t index) {
 	return ufbx_catch_topo_prev_vertex_edge(NULL, topo, num_topo, index);
 }
 
@@ -3703,16 +3707,16 @@ ufbx_inline ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *posi
 
 ufbx_abi size_t ufbx_catch_generate_normal_mapping(ufbx_panic *panic, const ufbx_mesh *mesh,
 	const ufbx_topo_edge *topo, size_t num_topo,
-	int32_t *normal_indices, size_t num_normal_indices, bool assume_smooth);
+	uint32_t *normal_indices, size_t num_normal_indices, bool assume_smooth);
 ufbx_abi size_t ufbx_generate_normal_mapping(const ufbx_mesh *mesh,
 	const ufbx_topo_edge *topo, size_t num_topo,
-	int32_t *normal_indices, size_t num_normal_indices, bool assume_smooth);
+	uint32_t *normal_indices, size_t num_normal_indices, bool assume_smooth);
 
 ufbx_abi void ufbx_catch_compute_normals(ufbx_panic *panic, const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions,
-	const int32_t *normal_indices, size_t num_normal_indices,
+	const uint32_t *normal_indices, size_t num_normal_indices,
 	ufbx_vec3 *normals, size_t num_normals);
 ufbx_abi void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3 *positions,
-	const int32_t *normal_indices, size_t num_normal_indices,
+	const uint32_t *normal_indices, size_t num_normal_indices,
 	ufbx_vec3 *normals, size_t num_normals);
 
 ufbx_abi ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error);
@@ -3758,10 +3762,10 @@ ufbx_abi ufbx_vec2 ufbx_catch_get_vertex_vec2(ufbx_panic *panic, const ufbx_vert
 ufbx_abi ufbx_vec3 ufbx_catch_get_vertex_vec3(ufbx_panic *panic, const ufbx_vertex_vec3 *v, size_t index);
 ufbx_abi ufbx_vec4 ufbx_catch_get_vertex_vec4(ufbx_panic *panic, const ufbx_vertex_vec4 *v, size_t index);
 
-ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
-ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
-ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
-ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[v->indices.data[index]]; }
+ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[(int32_t)v->indices.data[index]]; }
+ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[(int32_t)v->indices.data[index]]; }
+ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[(int32_t)v->indices.data[index]]; }
+ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[(int32_t)v->indices.data[index]]; }
 
 ufbx_abi size_t ufbx_get_triangulate_face_num_indices(ufbx_face face);
 
