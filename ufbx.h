@@ -251,6 +251,7 @@ typedef enum ufbx_prop_type {
 	UFBX_PROP_REFERENCE,
 
 	UFBX_NUM_PROP_TYPES,
+	UFBX_PROP_TYPE_FORCE_32BIT = 0x7fffffff,
 } ufbx_prop_type;
 
 // Property flags: Advanced information about properties, not usually needed.
@@ -300,6 +301,8 @@ typedef enum ufbx_prop_flags {
 	// This property has been overridden by the user.
 	// See `ufbx_anim.prop_overrides` for more information.
 	UFBX_PROP_FLAG_OVERRIDDEN = 0x20000,
+
+	UFBX_PROP_FLAG_FORCE_32BIT = 0x7fffffff,
 } ufbx_prop_flags;
 
 // Single property with name/type/value.

@@ -1129,7 +1129,7 @@ ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count)
 		uint32_t rev_code = ufbxi_bit_reverse(code, bits);
 		if (bits <= UFBXI_HUFF_FAST_BITS) {
 			uint16_t fast_sym = (uint16_t)(i | bits << 12);
-			uint32_t hi_max = 1 << (UFBXI_HUFF_FAST_BITS - bits);
+			uint32_t hi_max = 1u << (UFBXI_HUFF_FAST_BITS - bits);
 			for (uint32_t hi = 0; hi < hi_max; hi++) {
 				ufbxi_dev_assert(tree->fast_sym[rev_code | hi << bits] == 0);
 				tree->fast_sym[rev_code | hi << bits] = fast_sym;
@@ -1165,7 +1165,7 @@ ufbxi_huff_decode_bits(const ufbxi_huff_tree *tree, uint64_t *p_bits, size_t *p_
 	*p_left -= UFBXI_HUFF_FAST_BITS + 1;
 	for (uint32_t bits = UFBXI_HUFF_FAST_BITS + 1; bits < UFBXI_HUFF_MAX_BITS; bits++) {
 		if (code < tree->past_max_code[bits]) {
-			uint32_t sorted = code + (uint32_t)(int32_t)tree->code_to_sorted[bits];
+			uint32_t sorted = (uint32_t)((int32_t)code + (int32_t)tree->code_to_sorted[bits]);
 			if (sorted >= tree->num_symbols) return ~0u;
 			return tree->sorted_to_sym[sorted];
 		}
@@ -9065,7 +9065,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 			ufbx_string prop_name = ufbx_empty_string;
 			if (n->name_len > 20 && !strcmp(n->name + n->name_len - 8, "Textures")) {
 				prop_name.data = n->name + 12;
-				prop_name.length = n->name_len - 20;
+				prop_name.length = (size_t)n->name_len - 20;
 				if (prop_name.data[prop_name.length - 1] == '_') {
 					prop_name.length -= 1;
 				}
@@ -11475,7 +11475,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_connections_to_elements(ufbx
 				while (prop != prop_end && ufbxi_name_key_less(prop, name.data, name.length, key)) prop++;
 
 				if (prop != prop_end && prop->name.data == name.data) {
-					prop->flags = (ufbx_prop_flags)(prop->flags | flags);
+					prop->flags = (ufbx_prop_flags)((uint32_t)prop->flags | flags);
 				} else {
 					// Animated property that is not in the element property list
 					// Copy the preceeding properties to the stack, then push a
