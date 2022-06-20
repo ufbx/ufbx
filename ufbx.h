@@ -143,6 +143,9 @@ typedef enum ufbx_rotation_order {
 	UFBX_ROTATION_ZXY,
 	UFBX_ROTATION_ZYX,
 	UFBX_ROTATION_SPHERIC,
+
+	UFBX_ROTATION_ORDER_COUNT,
+	UFBX_ROTATION_ORDER_FORCE_32BIT = 0x7fffffff,
 } ufbx_rotation_order;
 
 // Explicit translation+rotation+scale transformation.
@@ -3099,6 +3102,8 @@ typedef struct ufbx_progress {
 typedef enum ufbx_progress_result {
 	UFBX_PROGRESS_CONTINUE = 0x100,
 	UFBX_PROGRESS_CANCEL = 0x200,
+
+	UFBX_PROGRESS_FORCE_32BIT = 0x7fffffff,
 } ufbx_progress_result;
 
 // Called periodically with the current progress
