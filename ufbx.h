@@ -1830,6 +1830,12 @@ typedef enum ufbx_shader_type {
 	// 3ds Max Physical Material
 	// https://knowledge.autodesk.com/support/3ds-max/learn-explore/caas/CloudHelp/cloudhelp/2022/ENU/3DSMax-Lighting-Shading/files/GUID-C1328905-7783-4917-AB86-FC3CC19E8972-htm.html
 	UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL,
+	// 3ds Max PBR (Metal/Rough) material
+	// https://knowledge.autodesk.com/support/3ds-max/learn-explore/caas/CloudHelp/cloudhelp/2021/ENU/3DSMax-Lighting-Shading/files/GUID-A16234A5-6500-4662-8B20-A5EC9FE1B255-htm.html
+	UFBX_SHADER_3DS_MAX_PBR_METAL_ROUGH,
+	// 3ds Max PBR (Spec/Gloss) material
+	// https://knowledge.autodesk.com/support/3ds-max/learn-explore/caas/CloudHelp/cloudhelp/2021/ENU/3DSMax-Lighting-Shading/files/GUID-18087194-B2A6-43EF-9B80-8FD1736FAE52-htm.html
+	UFBX_SHADER_3DS_MAX_PBR_SPEC_GLOSS,
 	// 3ds glTF Material
 	// https://help.autodesk.com/view/3DSMAX/2023/ENU/?guid=GUID-7ABFB805-1D9F-417E-9C22-704BFDF160FA
 	UFBX_SHADER_GLTF_MATERIAL,
@@ -1932,7 +1938,7 @@ typedef enum ufbx_material_pbr_map {
 
 // Known material features
 typedef enum ufbx_material_feature {
-	UFBX_MATERIAL_FEATURE_MICROFACET_BRDF,
+	UFBX_MATERIAL_FEATURE_METALNESS,
 	UFBX_MATERIAL_FEATURE_DIFFUSE,
 	UFBX_MATERIAL_FEATURE_SPECULAR,
 	UFBX_MATERIAL_FEATURE_EMISSION,
@@ -2048,7 +2054,7 @@ typedef struct ufbx_material_features {
 	union {
 		ufbx_material_feature_info features[UFBX_MATERIAL_FEATURE_COUNT];
 		struct {
-			ufbx_material_feature_info microfacet_brdf;
+			ufbx_material_feature_info metalness;
 			ufbx_material_feature_info diffuse;
 			ufbx_material_feature_info specular;
 			ufbx_material_feature_info emission;

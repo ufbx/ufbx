@@ -12017,12 +12017,14 @@ typedef void (*ufbxi_mat_transform_fn)(ufbx_vec4 *a);
 static void ufbxi_mat_transform_unknown_shininess(ufbx_vec4 *v) { if (v->x >= 0.0f) v->x = (ufbx_real)(1.0f - ufbx_sqrt(v->x) * (ufbx_real)0.1); }
 static void ufbxi_mat_transform_blender_opacity(ufbx_vec4 *v) { v->x = 1.0f - v->x; }
 static void ufbxi_mat_transform_blender_shininess(ufbx_vec4 *v) { if (v->x >= 0.0f) v->x = (ufbx_real)(1.0f - ufbx_sqrt(v->x) * (ufbx_real)0.1); }
+static void ufbxi_mat_transform_max_pbr_use_glossiness(ufbx_vec4 *v) { v->x = v->x >= 0.5f && v->x <= 1.5f ? 1.0f : 0.0f; }
 
 typedef enum {
 	UFBXI_MAT_TRANSFORM_IDENTITY,
 	UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS,
 	UFBXI_MAT_TRANSFORM_BLENDER_OPACITY,
 	UFBXI_MAT_TRANSFORM_BLENDER_SHININESS,
+	UFBXI_MAT_TRANSFORM_MAX_PBR_USE_GLOSSINESS,
 
 	UFBXI_MAT_TRANSFORM_COUNT,
 } ufbxi_mat_transform;
@@ -12045,6 +12047,7 @@ static const ufbxi_mat_transform_fn ufbxi_mat_transform_fns[] = {
 	&ufbxi_mat_transform_unknown_shininess,
 	&ufbxi_mat_transform_blender_opacity,
 	&ufbxi_mat_transform_blender_shininess,
+	&ufbxi_mat_transform_max_pbr_use_glossiness,
 };
 
 typedef struct {
@@ -12315,6 +12318,36 @@ static const ufbxi_shader_mapping ufbxi_gltf_material_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_SPECULAR_IOR, 0, 0, ufbxi_mat_string("extension|indexOfRefraction") },
 };
 
+static const ufbxi_shader_mapping ufbxi_3ds_max_pbr_metal_rough_pbr_mapping[] = {
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("base_color") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("baseColor") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("roughness") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("Roughness_Map") },
+	{ UFBX_MATERIAL_PBR_METALNESS, 0, 0, ufbxi_mat_string("metalness") },
+	{ UFBX_MATERIAL_PBR_AMBIENT_OCCLUSION, 0, 0, ufbxi_mat_string("ao") },
+	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("norm") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("emit_color") },
+	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement") },
+	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement_amt") },
+	{ UFBX_MATERIAL_PBR_OPACITY, 0, 0, ufbxi_mat_string("opacity") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, UFBXI_SHADER_MAPPING_TOGGLE_INVERT, UFBXI_MAT_TRANSFORM_MAX_PBR_USE_GLOSSINESS, ufbxi_mat_string("useGlossiness") },
+};
+
+static const ufbxi_shader_mapping ufbxi_3ds_max_pbr_spec_gloss_pbr_mapping[] = {
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("base_color") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("baseColor") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("Specular") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("specular") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("glossiness") },
+	{ UFBX_MATERIAL_PBR_AMBIENT_OCCLUSION, 0, 0, ufbxi_mat_string("ao") },
+	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("norm") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("emit_color") },
+	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement") },
+	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement_amt") },
+	{ UFBX_MATERIAL_PBR_OPACITY, 0, 0, ufbxi_mat_string("opacity") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, UFBXI_SHADER_MAPPING_TOGGLE_INVERT, UFBXI_MAT_TRANSFORM_MAX_PBR_USE_GLOSSINESS, ufbxi_mat_string("useGlossiness") },
+};
+
 static const ufbxi_shader_mapping ufbxi_gltf_material_features[] = {
 	{ UFBX_MATERIAL_FEATURE_DOUBLE_SIDED, 0, 0, ufbxi_mat_string("main|DoubleSided") },
 	{ UFBX_MATERIAL_FEATURE_SHEEN, 0, 0, ufbxi_mat_string("extension|enableSheen") },
@@ -12350,7 +12383,7 @@ static const ufbxi_shader_mapping ufbxi_blender_phong_shader_pbr_mapping[] = {
 };
 
 enum {
-	UFBXI_MAT_MICROFACET_BRDF = 1 << UFBX_MATERIAL_FEATURE_MICROFACET_BRDF,
+	UFBXI_MAT_METALNESS = 1 << UFBX_MATERIAL_FEATURE_METALNESS,
 	UFBXI_MAT_DIFFUSE = 1 << UFBX_MATERIAL_FEATURE_DIFFUSE,
 	UFBXI_MAT_SPECULAR = 1 << UFBX_MATERIAL_FEATURE_SPECULAR,
 	UFBXI_MAT_EMISSION = 1 << UFBX_MATERIAL_FEATURE_EMISSION,
@@ -12390,41 +12423,55 @@ static const ufbxi_shader_mapping_list ufbxi_shader_pbr_mappings[] = {
 	{ // UFBX_SHADER_OSL_STANDARD_SURFACE
 		ufbxi_osl_standard_shader_pbr_mapping, ufbxi_arraycount(ufbxi_osl_standard_shader_pbr_mapping),
 		ufbxi_osl_standard_shader_features, ufbxi_arraycount(ufbxi_osl_standard_shader_features),
-		(uint32_t)(UFBXI_MAT_MICROFACET_BRDF | UFBXI_MAT_DIFFUSE | UFBXI_MAT_SPECULAR | UFBXI_MAT_COAT
+		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_SPECULAR | UFBXI_MAT_COAT
 			| UFBXI_MAT_SHEEN | UFBXI_MAT_TRANSMISSION | UFBXI_MAT_OPACITY | UFBXI_MAT_IOR | UFBXI_MAT_DIFFUSE_ROUGHNESS),
 	},
 	{ // UFBX_SHADER_ARNOLD_STANDARD_SURFACE
 		ufbxi_arnold_shader_pbr_mapping, ufbxi_arraycount(ufbxi_arnold_shader_pbr_mapping),
 		ufbxi_arnold_shader_features, ufbxi_arraycount(ufbxi_arnold_shader_features),
-		(uint32_t)(UFBXI_MAT_MICROFACET_BRDF | UFBXI_MAT_DIFFUSE | UFBXI_MAT_SPECULAR | UFBXI_MAT_COAT
+		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_SPECULAR | UFBXI_MAT_COAT
 			| UFBXI_MAT_SHEEN | UFBXI_MAT_TRANSMISSION | UFBXI_MAT_OPACITY | UFBXI_MAT_IOR | UFBXI_MAT_DIFFUSE_ROUGHNESS),
 	},
 	{ // UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL
 		ufbxi_3ds_max_physical_material_pbr_mapping, ufbxi_arraycount(ufbxi_3ds_max_physical_material_pbr_mapping),
 		ufbxi_3ds_max_physical_material_features, ufbxi_arraycount(ufbxi_3ds_max_physical_material_features),
-		(uint32_t)(UFBXI_MAT_MICROFACET_BRDF | UFBXI_MAT_DIFFUSE | UFBXI_MAT_COAT
+		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_COAT
 			| UFBXI_MAT_SHEEN | UFBXI_MAT_TRANSMISSION | UFBXI_MAT_OPACITY | UFBXI_MAT_IOR),
 		{ NULL, 0 }, ufbxi_string_literal("_map"),    // texture_prefix/suffix
 		{ NULL, 0 }, ufbxi_string_literal("_map_on"), // texture_enabled_prefix/suffix
 	},
+	{ // UFBX_SHADER_3DS_MAX_PBR_METAL_ROUGH
+		ufbxi_3ds_max_pbr_metal_rough_pbr_mapping, ufbxi_arraycount(ufbxi_3ds_max_pbr_metal_rough_pbr_mapping),
+		NULL, 0,
+		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_OPACITY),
+		{ NULL, 0 }, ufbxi_string_literal("_map"), // texture_prefix/suffix
+		{ NULL, 0 }, { NULL, 0 }, // texture_enabled_prefix/suffix
+	},
+	{ // UFBX_SHADER_3DS_MAX_PBR_SPEC_GLOSS
+		ufbxi_3ds_max_pbr_spec_gloss_pbr_mapping, ufbxi_arraycount(ufbxi_3ds_max_pbr_spec_gloss_pbr_mapping),
+		NULL, 0,
+		(uint32_t)(UFBXI_MAT_SPECULAR | UFBXI_MAT_DIFFUSE | UFBXI_MAT_OPACITY),
+		{ NULL, 0 }, ufbxi_string_literal("_map"), // texture_prefix/suffix
+		{ NULL, 0 }, { NULL, 0 }, // texture_enabled_prefix/suffix
+	},
 	{ // UFBX_SHADER_GLTF_MATERIAL
 		ufbxi_gltf_material_pbr_mapping, ufbxi_arraycount(ufbxi_gltf_material_pbr_mapping),
 		ufbxi_gltf_material_features, ufbxi_arraycount(ufbxi_gltf_material_features),
-		(uint32_t)(UFBXI_MAT_MICROFACET_BRDF | UFBXI_MAT_DIFFUSE | UFBXI_MAT_EMISSION | UFBXI_MAT_OPACITY | UFBXI_MAT_AMBIENT_OCCLUSION),
+		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_EMISSION | UFBXI_MAT_OPACITY | UFBXI_MAT_AMBIENT_OCCLUSION),
 		{ NULL, 0 }, ufbxi_string_literal("Map"), // texture_prefix/suffix
 		{ NULL, 0 }, { NULL, 0 }, // texture_enabled_prefix/suffix
 	},
 	{ // UFBX_SHADER_SHADERFX_GRAPH
 		ufbxi_shaderfx_graph_pbr_mapping, ufbxi_arraycount(ufbxi_shaderfx_graph_pbr_mapping),
 		NULL, 0,
-		(uint32_t)(UFBXI_MAT_MICROFACET_BRDF | UFBXI_MAT_DIFFUSE | UFBXI_MAT_EMISSION | UFBXI_MAT_AMBIENT_OCCLUSION),
+		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_EMISSION | UFBXI_MAT_AMBIENT_OCCLUSION),
 		ufbxi_string_literal("TEX_"), ufbxi_string_literal("_map"), // texture_prefix/suffix
 		ufbxi_string_literal("use_"), ufbxi_string_literal("_map"), // texture_enabled_prefix/suffix
 	}, 
 	{ // UFBX_SHADER_BLENDER_PHONG
 		ufbxi_blender_phong_shader_pbr_mapping, ufbxi_arraycount(ufbxi_blender_phong_shader_pbr_mapping),
 		NULL, 0,
-		(uint32_t)(UFBXI_MAT_MICROFACET_BRDF | UFBXI_MAT_DIFFUSE | UFBXI_MAT_EMISSION),
+		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_EMISSION),
 	},
 };
 
@@ -12500,11 +12547,23 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 			ufbx_material_map *map = &maps[mapping->index];
 
 			if (mapping_flags & UFBXI_SHADER_MAPPING_TOGGLE_INVERT) {
-				if ((flags & UFBXI_MAPPING_FETCH_INVERT) != 0 && prop && prop->value_int != 0) {
-					if (map->has_value) {
-						map->value_real = 1.0f - map->value_real;
+
+				if ((flags & UFBXI_MAPPING_FETCH_INVERT) != 0 && prop) {
+					bool do_toggle = prop->value_int != 0;
+
+					if (mapping->transform) {
+						ufbxi_mat_transform_fn transform_fn = ufbxi_mat_transform_fns[mapping->transform];
+						ufbx_vec4 value = prop->value_vec4;
+						transform_fn(&value);
+						do_toggle = value.x > 0.5f;
 					}
-					map->texture_inverted = !map->texture_inverted;
+
+					if (do_toggle) {
+						if (map->has_value) {
+							map->value_real = 1.0f - map->value_real;
+						}
+						map->texture_inverted = !map->texture_inverted;
+					}
 				}
 				continue;
 			}
@@ -12523,11 +12582,13 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 
 			if (flags & UFBXI_MAPPING_FETCH_TEXTURE) {
 				ufbx_texture *texture = ufbx_find_prop_texture_len(material, name.data, name.length);
+				if (!map->texture || texture) {
+					map->texture_inverted = (mapping_flags & UFBXI_SHADER_MAPPING_INVERT_TEXTURE) != 0;
+				}
 				if (texture) {
 					map->texture = texture;
 					map->texture_enabled = true;
 				}
-				map->texture_inverted = (mapping_flags & UFBXI_SHADER_MAPPING_INVERT_TEXTURE) != 0;
 			}
 
 			if (flags & UFBXI_MAPPING_FETCH_TEXTURE_ENABLED) {
@@ -14240,10 +14301,18 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 					material->shader_type = UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL;
 					material->shader_prop_prefix.data = "3dsMax|Parameters|";
 					material->shader_prop_prefix.length = strlen("3dsMax|Parameters|");
-				} else if (classid_a == 0x38420192 && classid_b == 0x45fe4e1b) {
+				} else if (classid_a == 0x38420192u && classid_b == 0x45fe4e1bu) {
 					material->shader_type = UFBX_SHADER_GLTF_MATERIAL;
 					material->shader_prop_prefix.data = "3dsMax|";
 					material->shader_prop_prefix.length = strlen("3dsMax|");
+				} else if (classid_a == 0xd00f1e00u && classid_b == 0xbe77e500u) {
+					material->shader_type = UFBX_SHADER_3DS_MAX_PBR_METAL_ROUGH;
+					material->shader_prop_prefix.data = "3dsMax|main|";
+					material->shader_prop_prefix.length = strlen("3dsMax|main|");
+				} else if (classid_a == 0xd00f1e00u && classid_b == 0x01dbad33u) {
+					material->shader_type = UFBX_SHADER_3DS_MAX_PBR_SPEC_GLOSS;
+					material->shader_prop_prefix.data = "3dsMax|main|";
+					material->shader_prop_prefix.length = strlen("3dsMax|main|");
 				}
 			}
 		}
