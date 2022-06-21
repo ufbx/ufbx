@@ -8365,6 +8365,9 @@ static const uint32_t ufbxi_sentinel_index_consecutive[1] = { 123456789 };
 
 ufbxi_noinline static int ufbxi_fix_index(ufbxi_context *uc, uint32_t *p_dst, uint32_t index, uint32_t clamped)
 {
+	// TODO: Unsafe passthrough?
+	(void)index;
+
 	switch (uc->opts.index_error_handling) {
 	case UFBX_INDEX_ERROR_HANDLING_CLAMP:
 		*p_dst = clamped;
