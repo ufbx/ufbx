@@ -523,12 +523,6 @@ UFBXT_FILE_TEST(max_gltf_material)
 }
 #endif
 
-UFBXT_FILE_TEST(max_pbr_)
-#if UFBXT_IMPL
-{
-}
-#endif
-
 UFBXT_FILE_TEST(maya_shaderfx_pbs_material)
 #if UFBXT_IMPL
 {
