@@ -882,7 +882,7 @@ ufbxt_noinline static void ufbxt_hash_material_imp(ufbxt_hash *h, const ufbx_mat
 	ufbxt_push_tag(h, "features");
 	for (size_t i = 0; i < UFBX_MATERIAL_FEATURE_COUNT; i++) {
 		ufbxt_push_tag_index(h, i);
-		ufbxt_hash_feature_imp(h, &v->features.features[i]);
+		ufbxt_hash_material_feature_imp(h, &v->features.features[i]);
 		ufbxt_pop_tag(h);
 	}
 	ufbxt_pop_tag(h);
