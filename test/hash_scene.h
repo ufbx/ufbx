@@ -435,6 +435,7 @@ ufbxt_noinline static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v
 	ufbxt_hash_pod(h, v->visible);
 	ufbxt_hash_pod(h, v->is_root);
 	ufbxt_hash_pod(h, v->node_depth);
+	ufbxt_hash_list(h, v->materials, ufbxt_hash_element_ref_imp);
 }
 
 ufbxt_noinline static void ufbxt_hash_vertex_real_imp(ufbxt_hash *h, const ufbx_vertex_real *v)
@@ -837,7 +838,7 @@ ufbxt_noinline static void ufbxt_hash_cache_file_imp(ufbxt_hash *h, const ufbx_c
 	if (v->external_cache) ufbxt_hash_geometry_cache(h, v->external_cache);
 }
 
-ufbxt_noinline static void ufbxt_hash_material_map(ufbxt_hash *h, const ufbx_material_map *v)
+ufbxt_noinline static void ufbxt_hash_material_map_imp(ufbxt_hash *h, const ufbx_material_map *v)
 {
 	ufbxt_hash_vec4(h, v->value_vec4);
 	ufbxt_hash_pod(h, v->value_int);
@@ -845,6 +846,12 @@ ufbxt_noinline static void ufbxt_hash_material_map(ufbxt_hash *h, const ufbx_mat
 	ufbxt_hash_pod(h, v->has_value);
 	ufbxt_hash_pod(h, v->texture_enabled);
 	ufbxt_hash_pod(h, v->texture_inverted);
+}
+
+ufbxt_noinline static void ufbxt_hash_material_feature_imp(ufbxt_hash *h, const ufbx_material_feature_info *v)
+{
+	ufbxt_hash_pod(h, v->enabled);
+	ufbxt_hash_pod(h, v->is_explicit);
 }
 
 ufbxt_noinline static void ufbxt_hash_material_texture_imp(ufbxt_hash *h, const ufbx_material_texture *v)
@@ -859,7 +866,7 @@ ufbxt_noinline static void ufbxt_hash_material_imp(ufbxt_hash *h, const ufbx_mat
 	ufbxt_push_tag(h, "fbx");
 	for (size_t i = 0; i < UFBX_MATERIAL_FBX_MAP_COUNT; i++) {
 		ufbxt_push_tag_index(h, i);
-		ufbxt_hash_material_map(h, &v->fbx.maps[i]);
+		ufbxt_hash_material_map_imp(h, &v->fbx.maps[i]);
 		ufbxt_pop_tag(h);
 	}
 	ufbxt_pop_tag(h);
@@ -867,7 +874,15 @@ ufbxt_noinline static void ufbxt_hash_material_imp(ufbxt_hash *h, const ufbx_mat
 	ufbxt_push_tag(h, "pbr");
 	for (size_t i = 0; i < UFBX_MATERIAL_PBR_MAP_COUNT; i++) {
 		ufbxt_push_tag_index(h, i);
-		ufbxt_hash_material_map(h, &v->pbr.maps[i]);
+		ufbxt_hash_material_map_imp(h, &v->pbr.maps[i]);
+		ufbxt_pop_tag(h);
+	}
+	ufbxt_pop_tag(h);
+
+	ufbxt_push_tag(h, "features");
+	for (size_t i = 0; i < UFBX_MATERIAL_FEATURE_COUNT; i++) {
+		ufbxt_push_tag_index(h, i);
+		ufbxt_hash_feature_imp(h, &v->features.features[i]);
 		ufbxt_pop_tag(h);
 	}
 	ufbxt_pop_tag(h);

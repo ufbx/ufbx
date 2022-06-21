@@ -314,6 +314,11 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	default: /* No shorthand */ break;
 	}
 
+	for (size_t i = 0; i < node->materials.count; i++) {
+		ufbxt_assert(node->materials.data[i]);
+		ufbxt_check_element_ptr(scene, node->materials.data[i], UFBX_ELEMENT_MATERIAL);
+	}
+
 	ufbxt_assert((uint32_t)node->attrib_type < (uint32_t)UFBX_ELEMENT_TYPE_COUNT);
 	ufbxt_assert((uint32_t)node->inherit_type < (uint32_t)UFBX_INHERIT_TYPE_COUNT);
 }
@@ -452,6 +457,10 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	}
 	for (size_t i = 0; i < mesh->all_deformers.count; i++) {
 		ufbxt_check_element_ptr_any(scene, mesh->all_deformers.data[i]);
+	}
+
+	for (size_t i = 0; i < mesh->instances.count; i++) {
+		ufbxt_assert(mesh->instances.data[i]->materials.count >= mesh->materials.count);
 	}
 }
 

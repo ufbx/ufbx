@@ -647,6 +647,11 @@ struct ufbx_node {
 	// Equivalent to `ufbx_matrix_mul(&node_to_world, &geometry_to_node)`.
 	ufbx_matrix geometry_to_world;
 
+	// Materials used by `mesh` or other `attrib`.
+	// There may be multiple copies of a single `ufbx_mesh` with different materials
+	// in the `ufbx_node` instances.
+	ufbx_material_list materials;
+
 	// Visibility state.
 	bool visible;
 
@@ -951,6 +956,8 @@ struct ufbx_mesh {
 	// compact lists of face indices that use a specific material which can be more
 	// useful convenient `face_material`. Use `materials[index].material` for the
 	// actual material pointers.
+	// NOTE: These can be wrong if you want to support per-instance materials!
+	// Use `ufbx_node.materials[]` to get the per-instance materials at the same indices.
 	// HINT: If this mesh has no material then `materials[]` will be empty, but if
 	// you enable `ufbx_load_opts.allow_null_material` there will be a single
 	// `ufbx_mesh_material` with `material == NULL` with all the faces in it.
@@ -1777,7 +1784,22 @@ typedef struct ufbx_material_map {
 	// NOTE: Does not apply to `value_real`, ufbx inverts those values internally.
 	bool texture_inverted;
 
+	// Set to `true` if this feature should be disabled (specific to shader type).
+	bool feature_disabled;
+
 } ufbx_material_map;
+
+// Material feature
+typedef struct ufbx_material_feature_info {
+
+	// Whether the material model uses this feature or not.
+	// NOTE: The feature can be enabled but still not used if eg. the corresponding factor is at zero!
+	bool enabled;
+
+	// Explicitly enabled/disabled by the material.
+	bool is_explicit;
+
+} ufbx_material_feature_info;
 
 // Texture attached to an FBX property
 typedef struct ufbx_material_texture {
@@ -1808,6 +1830,9 @@ typedef enum ufbx_shader_type {
 	// 3ds Max Physical Material
 	// https://knowledge.autodesk.com/support/3ds-max/learn-explore/caas/CloudHelp/cloudhelp/2022/ENU/3DSMax-Lighting-Shading/files/GUID-C1328905-7783-4917-AB86-FC3CC19E8972-htm.html
 	UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL,
+	// 3ds glTF Material
+	// https://help.autodesk.com/view/3DSMAX/2023/ENU/?guid=GUID-7ABFB805-1D9F-417E-9C22-704BFDF160FA
+	UFBX_SHADER_GLTF_MATERIAL,
 	// Stingray ShaderFX shader graph.
 	// Contains a serialized `"ShaderGraph"` in `ufbx_props`.
 	UFBX_SHADER_SHADERFX_GRAPH,
@@ -1897,18 +1922,39 @@ typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_NORMAL_MAP,
 	UFBX_MATERIAL_PBR_TANGENT_MAP,
 	UFBX_MATERIAL_PBR_DISPLACEMENT_MAP,
-	UFBX_MATERIAL_PBR_MATTE_ENABLED,
 	UFBX_MATERIAL_PBR_MATTE_FACTOR,
 	UFBX_MATERIAL_PBR_MATTE_COLOR,
 	UFBX_MATERIAL_PBR_AMBIENT_OCCLUSION,
-	UFBX_MATERIAL_PBR_THIN_WALLED,
-	UFBX_MATERIAL_PBR_CAUSTICS,
-	UFBX_MATERIAL_PBR_EXIT_TO_BACKGROUND,
-	UFBX_MATERIAL_PBR_INTERNAL_REFLECTIONS,
 
 	UFBX_MATERIAL_PBR_MAP_COUNT,
 	UFBX_MATERIAL_PBR_MAP_FORCE_32BIT = 0x7fffffff,
 } ufbx_material_pbr_map;
+
+// Known material features
+typedef enum ufbx_material_feature {
+	UFBX_MATERIAL_FEATURE_MICROFACET_BRDF,
+	UFBX_MATERIAL_FEATURE_DIFFUSE,
+	UFBX_MATERIAL_FEATURE_SPECULAR,
+	UFBX_MATERIAL_FEATURE_EMISSION,
+	UFBX_MATERIAL_FEATURE_TRANSMISSION,
+	UFBX_MATERIAL_FEATURE_COAT,
+	UFBX_MATERIAL_FEATURE_SHEEN,
+	UFBX_MATERIAL_FEATURE_OPACITY,
+	UFBX_MATERIAL_FEATURE_AMBIENT_OCCLUSION,
+	UFBX_MATERIAL_FEATURE_MATTE,
+	UFBX_MATERIAL_FEATURE_UNLIT,
+	UFBX_MATERIAL_FEATURE_IOR,
+	UFBX_MATERIAL_FEATURE_DIFFUSE_ROUGHNESS,
+	UFBX_MATERIAL_FEATURE_TRANSMISSION_ROUGHNESS,
+	UFBX_MATERIAL_FEATURE_THIN_WALLED,
+	UFBX_MATERIAL_FEATURE_CAUSTICS,
+	UFBX_MATERIAL_FEATURE_EXIT_TO_BACKGROUND,
+	UFBX_MATERIAL_FEATURE_INTERNAL_REFLECTIONS,
+	UFBX_MATERIAL_FEATURE_DOUBLE_SIDED,
+
+	UFBX_MATERIAL_FEATURE_COUNT,
+	UFBX_MATERIAL_FEATURE_FORCE_32BIT = 0x7fffffff,
+} ufbx_material_feature;
 
 typedef struct ufbx_material_fbx_maps {
 	union {
@@ -1991,17 +2037,39 @@ typedef struct ufbx_material_pbr_maps {
 			ufbx_material_map normal_map;
 			ufbx_material_map tangent_map;
 			ufbx_material_map displacement_map;
-			ufbx_material_map matte_enabled;
 			ufbx_material_map matte_factor;
 			ufbx_material_map matte_color;
 			ufbx_material_map ambient_occlusion;
-			ufbx_material_map thin_walled;
-			ufbx_material_map caustics;
-			ufbx_material_map exit_to_background;
-			ufbx_material_map internal_reflections;
 		};
 	};
 } ufbx_material_pbr_maps;
+
+typedef struct ufbx_material_features {
+	union {
+		ufbx_material_feature_info features[UFBX_MATERIAL_FEATURE_COUNT];
+		struct {
+			ufbx_material_feature_info microfacet_brdf;
+			ufbx_material_feature_info diffuse;
+			ufbx_material_feature_info specular;
+			ufbx_material_feature_info emission;
+			ufbx_material_feature_info transmission;
+			ufbx_material_feature_info coat;
+			ufbx_material_feature_info sheen;
+			ufbx_material_feature_info opacity;
+			ufbx_material_feature_info ambient_occlusion;
+			ufbx_material_feature_info matte;
+			ufbx_material_feature_info unlit;
+			ufbx_material_feature_info ior;
+			ufbx_material_feature_info diffuse_roughness;
+			ufbx_material_feature_info transmission_roughness;
+			ufbx_material_feature_info thin_walled;
+			ufbx_material_feature_info caustics;
+			ufbx_material_feature_info exit_to_background;
+			ufbx_material_feature_info internal_reflections;
+			ufbx_material_feature_info double_sided;
+		};
+	};
+} ufbx_material_features;
 
 // Surface material properties such as color, roughness, etc. Each property may
 // be optionally bound to an `ufbx_texture`.
@@ -2020,6 +2088,9 @@ struct ufbx_material {
 	// PBR material properties, defined for all shading models but may be
 	// somewhat approximate if `shader == NULL`.
 	ufbx_material_pbr_maps pbr;
+
+	// Material features, primarily applies to `pbr`.
+	ufbx_material_features features;
 
 	// Shading information
 	ufbx_shader_type shader_type;      // < Always defined
@@ -3078,6 +3149,7 @@ typedef enum ufbx_error_type {
 	UFBX_ERROR_INVALID_UTF8,
 	UFBX_ERROR_FEATURE_DISABLED,
 	UFBX_ERROR_BAD_NURBS,
+	UFBX_ERROR_BAD_INDEX,
 
 	UFBX_ERROR_TYPE_COUNT,
 	UFBX_ERROR_TYPE_FORCE_32BIT = 0x7fffffff,
@@ -3163,6 +3235,21 @@ struct ufbx_inflate_retain {
 	uint64_t data[512];
 };
 
+typedef enum ufbx_index_error_handling {
+	// Clamp to a valid value.
+	UFBX_INDEX_ERROR_HANDLING_CLAMP,
+	// Set bad indices to `UFBX_NO_INDEX`.
+	// This is the recommended way if you need to deal with files with gaps in information.
+	// HINT: If you use this `ufbx_get_vertex_TYPE()` functions will return zero
+	// on invalid indices instead of failing.
+	UFBX_INDEX_ERROR_HANDLING_NO_INDEX,
+	// Fail loading entierely when encountering a bad index.
+	UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING,
+
+	UFBX_INDEX_ERROR_HANDLING_COUNT,
+	UFBX_INDEX_ERROR_HANDLING_FORCE_32BIT = 0x7fffffff,
+} ufbx_index_error_handling;
+
 typedef enum ufbx_unicode_error_handling {
 	// Replace errors with U+FFFD "Replacement Character"
 	UFBX_UNICODE_ERROR_HANDLING_REPLACEMENT_CHARACTER,
@@ -3209,10 +3296,8 @@ typedef struct ufbx_load_opts {
 	// Don't allow partially broken FBX files to load
 	bool strict;
 
-	// Allow indices in `ufbx_vertex_TYPE` arrays that area larger than the data
-	// array. Enabling this makes `ufbx_get_vertex_TYPE()` unsafe as they don't
-	// do bounds checking.
-	bool allow_out_of_bounds_vertex_indices;
+	// Specify how to handle broken indices.
+	ufbx_index_error_handling index_error_handling;
 
 	// Connect related elements even if they are broken. If `false` (default)
 	// `ufbx_skin_cluster` with a missing `bone` field are _not_ included in
@@ -3275,9 +3360,6 @@ typedef struct ufbx_load_opts {
 	ufbx_transform root_transform;
 
 	// Specify how to handle Unicode errors in strings.
-	// The default loses data on non-UTF-8 encoded files, use
-	// `UFBX_UNICODE_ERROR_HANDLING_PRIVATE_USE_ESCAPE` and `ufbx_expand_private_use_escapes()`
-	// to retrieve the original bytes.
 	ufbx_unicode_error_handling unicode_error_handling;
 
 	// Retain the raw document structure using `ufbx_dom_node`.
