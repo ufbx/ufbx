@@ -306,11 +306,15 @@ bool process_fbx_file(const char *input_file, const char *coverage_path, bool dr
 		}
 
 		format_path(path_str, sizeof(path_str), root, iter.path);
-		printf("%d: %s/ %s %u: ", current_step, path_str, mutators[iter.mutator_index].name, iter.mutator_internal_index);
+		if (g_verbose) {
+			printf("%d: %s/ %s %u: ", current_step, path_str, mutators[iter.mutator_index].name, iter.mutator_internal_index);
+		}
 
 		size_t dump_size = fbxdom::dump(dump_buffer, sizeof(dump_buffer), mut_root);
 		if (dry_run) {
-			printf("SKIP (dry run)\n");
+			if (g_verbose) {
+				printf("SKIP (dry run)\n");
+			}
 			continue;
 		}
 
@@ -320,14 +324,21 @@ bool process_fbx_file(const char *input_file, const char *coverage_path, bool dr
 
 		if (scene) {
 			ufbxt_check_scene(scene);
-			printf("OK!\n");
+			if (g_verbose) {
+				printf("OK!\n");
+			}
 		} else {
-			printf("%s\n", error.description.data);
+			if (g_verbose) {
+				printf("%s\n", error.description.data);
+			}
 		}
 
 		if (coverage_path && pre_cov != post_cov) {
 			size_t index = ++coverage_output_count;
 			char dst_path[1024];
+			if (!g_verbose) {
+				printf("%d: %s/ %s %u: ", current_step, path_str, mutators[iter.mutator_index].name, iter.mutator_internal_index);
+			}
 			snprintf(dst_path, sizeof(dst_path), "%s%06zu.fbx", coverage_path, coverage_output_count);
 			printf("%zu new edges! Writing to: %s\n", post_cov - pre_cov, dst_path);
 			FILE *f = fopen(dst_path, "wb");
