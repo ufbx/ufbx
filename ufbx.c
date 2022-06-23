@@ -8414,7 +8414,8 @@ ufbxi_noinline static int ufbxi_fix_index(ufbxi_context *uc, uint32_t *p_dst, ui
 		ufbxi_fail_msg("UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING", "Bad index");
 		break;
 	case UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE:
-		return index;
+		*p_dst = index;
+		break;
 	default:
 		ufbx_assert(0 && "Unhandled index_error_handling");
 		return 0;
