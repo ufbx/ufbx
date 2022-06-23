@@ -8154,6 +8154,30 @@ ufbxi_nodiscard static ufbx_props *ufbxi_find_template(ufbxi_context *uc, const 
 // Name ID categories
 #define UFBXI_SYNTHETIC_ID_BIT UINT64_C(0x8000000000000000)
 
+ufbx_static_assert(uptr_size, sizeof(uintptr_t) <= sizeof(uint64_t));
+
+static ufbxi_forceinline uint64_t ufbxi_synthetic_id_from_pointer(const void *ptr)
+{
+	uintptr_t uptr = (uintptr_t)ptr;
+	ufbx_assert((uptr & 0x1) == 0);
+	return (uptr >> 1u) | UFBXI_SYNTHETIC_ID_BIT;
+}
+
+static ufbxi_forceinline uint64_t ufbxi_synthetic_id_from_string(const char *str)
+{
+	uintptr_t uptr = (uintptr_t)str;
+	uptr &= ~(uintptr_t)1;
+	return (uptr >> 1u) | UFBXI_SYNTHETIC_ID_BIT;
+}
+
+static ufbxi_noinline int ufbxi_push_synthetic_id(ufbxi_context *uc, uint64_t *p_dst)
+{
+	void *ptr = ufbxi_push_size(&uc->tmp, 2, 1);
+	ufbxi_check(ptr);
+	*p_dst = ufbxi_synthetic_id_from_pointer(ptr);
+	return 1;
+}
+
 ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_string type_and_name, ufbx_string *type, ufbx_string *name)
 {
 	// Name and type are packed in a single property as Type::Name (in ASCII)
@@ -8274,7 +8298,7 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 		elem->name.length = strlen(name);
 	}
 
-	uint64_t fbx_id = (uintptr_t)elem | UFBXI_SYNTHETIC_ID_BIT;
+	uint64_t fbx_id = ufbxi_synthetic_id_from_pointer(elem);
 	*p_fbx_id = fbx_id;
 
 	ufbxi_check_return(ufbxi_insert_fbx_id(uc, fbx_id, elem->element_id), NULL);
@@ -8748,10 +8772,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_blend_shapes(ufbx
 
 		ufbxi_element_info shape_info = { 0 };
 
-		// HACK: Derive an FBX ID for the shape from the channel. Synthetic IDs are
-		// equivalent to resulting object pointers (as `uintptr_t`) so incrementing
-		// it gives us an unique ID (as long as `sizeof(ufbx_blend_channel) > 0`...)
-		shape_info.fbx_id = channel_fbx_id + 1;
+		ufbxi_check(ufbxi_push_synthetic_id(uc, &shape_info.fbx_id));
 		shape_info.name = name;
 		shape_info.dom_node = ufbxi_get_dom_node(uc, n);
 
@@ -9807,7 +9828,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_pose(ufbxi_context *uc, ufb
 		if (uc->version < 7000) {
 			char *name = NULL;
 			if (!ufbxi_find_val1(n, ufbxi_Node, "c", &name)) continue;
-			fbx_id = (uintptr_t)name | UFBXI_SYNTHETIC_ID_BIT;
+			fbx_id = ufbxi_synthetic_id_from_string(name);
 		} else {
 			if (!ufbxi_find_val1(n, ufbxi_Node, "L", &fbx_id)) continue;
 		}
@@ -9974,10 +9995,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_c
 
 	ufbxi_element_info attrib_info = *info;
 
-	// HACK: We can create an unique FBX ID from the existing node ID as the
-	// IDs are derived from NULL-terminated string pool pointers so bumping
-	// the ID value by one can never cross to the next string...
-	attrib_info.fbx_id = info->fbx_id + 1;
+	ufbxi_check(ufbxi_push_synthetic_id(uc, &attrib_info.fbx_id));
 
 	// Use type and name from NodeAttributeName if it exists *uniquely*
 	ufbx_string type_and_name;
@@ -9986,7 +10004,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_c
 		ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &attrib_type_str, &attrib_name_str));
 		if (attrib_name_str.length > 0) {
 			attrib_info.name = attrib_name_str;
-			uint64_t attrib_id = (uintptr_t)type_and_name.data | UFBXI_SYNTHETIC_ID_BIT;
+			uint64_t attrib_id = ufbxi_synthetic_id_from_string(type_and_name.data);
 			if (info->fbx_id != attrib_id && !ufbxi_fbx_id_exists(uc, attrib_id)) {
 				attrib_info.fbx_id = attrib_id;
 			}
@@ -10095,7 +10113,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects(ufbxi_context *uc)
 			ufbxi_check((info.fbx_id & UFBXI_SYNTHETIC_ID_BIT) == 0);
 		} else {
 			if (!ufbxi_get_val2(node, "ss", &type_and_name, &sub_type_str)) continue;
-			info.fbx_id = (uintptr_t)type_and_name.data | UFBXI_SYNTHETIC_ID_BIT;
+			info.fbx_id = ufbxi_synthetic_id_from_string(type_and_name.data);
 		}
 
 		// Remove the "Fbx" prefix from sub-types, remember to re-intern!
@@ -10262,8 +10280,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_connections(ufbxi_context *
 				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &dst_prop, false));
 			}
 
-			src_id = (uintptr_t)src_name | UFBXI_SYNTHETIC_ID_BIT;
-			dst_id = (uintptr_t)dst_name | UFBXI_SYNTHETIC_ID_BIT;
+			src_id = ufbxi_synthetic_id_from_string(src_name);
+			dst_id = ufbxi_synthetic_id_from_string(dst_name);
 
 		} else {
 			// Post-7000 versions use proper unique 64-bit IDs
@@ -10580,7 +10598,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_object(ufbxi_context *
 	// pooled interned string pointers.
 	const char *type_and_name;
 	ufbxi_check(ufbxi_get_val1(node, "c", (char**)&type_and_name));
-	uint64_t target_fbx_id = (uintptr_t)type_and_name | UFBXI_SYNTHETIC_ID_BIT;
+	uint64_t target_fbx_id = ufbxi_synthetic_id_from_string(type_and_name);
 
 	// Add all suitable Channels as animated properties
 	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
@@ -10684,7 +10702,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_root(ufbxi_context *uc)
 		const char *root_name = uc->from_ascii ? "Model::Scene" : "Scene\x00\x01Model";
 		root_name = ufbxi_push_string_imp(&uc->string_pool, root_name, 12, NULL, false, true);
 		ufbxi_check(root_name);
-		uc->root_id = (uintptr_t)root_name | UFBXI_SYNTHETIC_ID_BIT;
+		uc->root_id = ufbxi_synthetic_id_from_string(root_name);
 	}
 
 	// Add a nameless root node with the root ID
@@ -11100,7 +11118,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 			ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type, &name));
 			ufbxi_check(ufbxi_read_legacy_link(uc, child, &fbx_id, name.data));
 
-			uint64_t node_fbx_id = (uintptr_t)type_and_name.data | UFBXI_SYNTHETIC_ID_BIT;
+			uint64_t node_fbx_id = ufbxi_synthetic_id_from_string(type_and_name.data);
 			ufbxi_check(ufbxi_connect_oo(uc, node_fbx_id, fbx_id));
 			if (!skin) {
 				skin = ufbxi_push_synthetic_element(uc, &skin_fbx_id, NULL, info->name.data, ufbx_skin_deformer, UFBX_ELEMENT_SKIN_DEFORMER);
@@ -11127,7 +11145,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_model(ufbxi_context 
 	ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type, &name));
 
 	ufbxi_element_info info = { 0 };
-	info.fbx_id = (uintptr_t)type_and_name.data | UFBXI_SYNTHETIC_ID_BIT;
+	info.fbx_id = ufbxi_synthetic_id_from_string(type_and_name.data);
 	info.name = name;
 	info.dom_node = ufbxi_get_dom_node(uc, node);
 
@@ -11136,7 +11154,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_model(ufbxi_context 
 	ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &elem_node->element.element_id));
 
 	ufbxi_element_info attrib_info = { 0 };
-	attrib_info.fbx_id = info.fbx_id + 1;
+	ufbxi_check(ufbxi_push_synthetic_id(uc, &attrib_info.fbx_id));
 	attrib_info.name = name;
 	attrib_info.dom_node = info.dom_node;
 
@@ -11169,7 +11187,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_model(ufbxi_context 
 	if (children) {
 		ufbx_string *names = (ufbx_string*)children->data;
 		for (size_t i = 0; i < children->size; i++) {
-			uint64_t child_fbx_id = (uintptr_t)names[i].data | UFBXI_SYNTHETIC_ID_BIT;
+			uint64_t child_fbx_id = ufbxi_synthetic_id_from_string(names[i].data);
 			ufbxi_check(ufbxi_connect_oo(uc, child_fbx_id, info.fbx_id));
 		}
 	}
@@ -11181,7 +11199,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_model(ufbxi_context 
 			if (ufbxi_get_val1(child, "S", &channel_name)) {
 				if (uc->legacy_implicit_anim_layer_id == 0) {
 					// Defer creation so we won't be the first animation stack..
-					uc->legacy_implicit_anim_layer_id = ((uintptr_t)uc + 1) | UFBXI_SYNTHETIC_ID_BIT;
+					ufbxi_check(ufbxi_push_synthetic_id(uc, &uc->legacy_implicit_anim_layer_id));
 				}
 				ufbxi_check(ufbxi_read_take_prop_channel(uc, child, info.fbx_id, uc->legacy_implicit_anim_layer_id, channel_name));
 			}
@@ -11237,7 +11255,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_legacy_root(ufbxi_context *
 		ufbxi_check(layer);
 
 		ufbxi_element_info stack_info = layer_info;
-		stack_info.fbx_id = uc->legacy_implicit_anim_layer_id + 1;
+		ufbxi_check(ufbxi_push_synthetic_id(uc, &stack_info.fbx_id));
 		ufbx_anim_stack *stack = ufbxi_push_element(uc, &stack_info, ufbx_anim_stack, UFBX_ELEMENT_ANIM_STACK);
 		ufbxi_check(stack);
 
