@@ -898,3 +898,109 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_parent_directory_parent, synthetic_parent_dir
 	ufbxt_assert(!strcmp(inner_video->filename.data, "fake/../directory/inner.png"));
 }
 #endif
+
+UFBXT_TEST(unsafe_options)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t mask = 0; mask < 0x8; mask++) {
+			bool allow_unsafe = (mask & 0x1) != 0;
+			uint32_t unsafe_mask = mask >> 1;
+
+			ufbx_load_opts opts = { 0 };
+			opts.allow_unsafe = allow_unsafe;
+			if ((unsafe_mask & 0x1) != 0) {
+				opts.index_error_handling = UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE;
+			}
+			if ((unsafe_mask & 0x2) != 0) {
+				opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_UNSAFE_IGNORE;
+			}
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (allow_unsafe || unsafe_mask == 0) {
+				ufbxt_assert(scene);
+				ufbx_free_scene(scene);
+			} else {
+				ufbxt_assert(!scene);
+				ufbxt_assert(error.type == UFBX_ERROR_UNSAFE_OPTIONS);
+			}
+		}
+	}
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_underscore_no_index_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.index_error_handling = UFBX_INDEX_ERROR_HANDLING_NO_INDEX;
+	opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_UNDERSCORE;
+	return opts;
+}
+static ufbx_load_opts ufbxt_all_unsafe_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.allow_unsafe = true;
+	opts.index_error_handling = UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE;
+	opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_UNSAFE_IGNORE;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_unsafe_cube, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pC" "\xef\xbf\xbd" "\xef\xbf\xbd" "e1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->vertex_uv.indices.data[0] == 0);
+	ufbxt_assert(mesh->vertex_uv.indices.data[1] == 1);
+	ufbxt_assert(mesh->vertex_uv.indices.data[2] == 3);
+	ufbxt_assert(mesh->vertex_uv.indices.data[3] == 13);
+	ufbxt_assert(mesh->vertex_uv.indices.data[4] == 13);
+	ufbxt_assert(mesh->vertex_uv.indices.data[5] == 13);
+	ufbxt_assert(mesh->vertex_uv.indices.data[6] == 13);
+	ufbxt_assert(mesh->vertex_uv.indices.data[7] == 4);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_unsafe_cube_underscore_no_index, synthetic_unsafe_cube, ufbxt_underscore_no_index_opts, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pC__e1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->vertex_uv.indices.data[0] == 0);
+	ufbxt_assert(mesh->vertex_uv.indices.data[1] == 1);
+	ufbxt_assert(mesh->vertex_uv.indices.data[2] == 3);
+	ufbxt_assert(mesh->vertex_uv.indices.data[3] == UFBX_NO_INDEX);
+	ufbxt_assert(mesh->vertex_uv.indices.data[4] == UFBX_NO_INDEX);
+	ufbxt_assert(mesh->vertex_uv.indices.data[5] == UFBX_NO_INDEX);
+	ufbxt_assert(mesh->vertex_uv.indices.data[6] == UFBX_NO_INDEX);
+	ufbxt_assert(mesh->vertex_uv.indices.data[7] == 4);
+
+	for (size_t i = 3; i <= 6; i++) {
+		ufbx_vec2 v = ufbx_get_vertex_vec2(&mesh->vertex_uv, i);
+		ufbxt_assert_close_vec2(err, v, ufbx_zero_vec2);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_unsafe_cube_unsafe, synthetic_unsafe_cube, ufbxt_all_unsafe_opts, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node_len(scene, "pC" "\xff" "\x00" "e1", 6);
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->vertex_uv.indices.data[0] == 0);
+	ufbxt_assert(mesh->vertex_uv.indices.data[1] == 1);
+	ufbxt_assert(mesh->vertex_uv.indices.data[2] == 3);
+	ufbxt_assert(mesh->vertex_uv.indices.data[3] == 0xffu);
+	ufbxt_assert(mesh->vertex_uv.indices.data[4] == 0xffffu);
+	ufbxt_assert(mesh->vertex_uv.indices.data[5] == 0xffffffu);
+	ufbxt_assert(mesh->vertex_uv.indices.data[6] == 0xffffffffu);
+	ufbxt_assert(mesh->vertex_uv.indices.data[7] == 4);
+}
+#endif

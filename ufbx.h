@@ -32,7 +32,11 @@
 	#define ufbx_assert(cond) assert(cond)
 #endif
 
+// Pointer may be `NULL`.
 #define ufbx_nullable
+
+// Changing this value from default can lead into breaking API guarantees.
+#define ufbx_unsafe
 
 #ifndef ufbx_abi
 	#define ufbx_abi
@@ -2770,6 +2774,10 @@ typedef struct ufbx_metadata {
 	// FBX version in integer format, eg. 7400 for 7.4.
 	uint32_t version;
 
+	// Some API guarantees do not apply (depending on unsafe options used).
+	// Loaded with `ufbx_load_opts.allow_unsafe` enabled.
+	bool unsafe;
+
 	ufbx_string creator;
 	bool big_endian;
 
@@ -3156,6 +3164,7 @@ typedef enum ufbx_error_type {
 	UFBX_ERROR_FEATURE_DISABLED,
 	UFBX_ERROR_BAD_NURBS,
 	UFBX_ERROR_BAD_INDEX,
+	UFBX_ERROR_UNSAFE_OPTIONS,
 
 	UFBX_ERROR_TYPE_COUNT,
 	UFBX_ERROR_TYPE_FORCE_32BIT = 0x7fffffff,
@@ -3251,6 +3260,11 @@ typedef enum ufbx_index_error_handling {
 	UFBX_INDEX_ERROR_HANDLING_NO_INDEX,
 	// Fail loading entierely when encountering a bad index.
 	UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING,
+	// Pass bad indices through as-is.
+	// Requires `ufbx_load_opts.allow_unsafe`.
+	// UNSAFE: Breaks any API guarantees regarding indexes being in bounds and makes
+	// `ufbx_get_vertex_TYPE()` memory-unsafe to use.
+	UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE,
 
 	UFBX_INDEX_ERROR_HANDLING_COUNT,
 	UFBX_INDEX_ERROR_HANDLING_FORCE_32BIT = 0x7fffffff,
@@ -3267,6 +3281,10 @@ typedef enum ufbx_unicode_error_handling {
 	UFBX_UNICODE_ERROR_HANDLING_REMOVE,
 	// Fail loading on encountering an Unicode error
 	UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING,
+	// Ignore and pass-through non-UTF-8 string data.
+	// Requires `ufbx_load_opts.allow_unsafe`.
+	// UNSAFE: Breaks API guarantee that `ufbx_string` is UTF-8 encoded.
+	UFBX_UNICODE_ERROR_HANDLING_UNSAFE_IGNORE,
 
 	UFBX_UNICODE_ERROR_HANDLING_COUNT,
 	UFBX_UNICODE_ERROR_HANDLING_FORCE_32BIT = 0x7fffffff,
@@ -3301,6 +3319,10 @@ typedef struct ufbx_load_opts {
 
 	// Don't allow partially broken FBX files to load
 	bool strict;
+
+	// UNSAFE: If enabled allows using unsafe options that may fundamentally
+	// break the API guarantees.
+	ufbx_unsafe bool allow_unsafe;
 
 	// Specify how to handle broken indices.
 	ufbx_index_error_handling index_error_handling;

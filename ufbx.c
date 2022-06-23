@@ -1725,6 +1725,8 @@ static ufbxi_noinline void ufbxi_fix_error_type(ufbx_error *error, const char *d
 		error->type = UFBX_ERROR_BAD_NURBS;
 	} else if (!strcmp(desc, "Bad index")) {
 		error->type = UFBX_ERROR_BAD_INDEX;
+	} else if (!strcmp(desc, "Unsafe options")) {
+		error->type = UFBX_ERROR_UNSAFE_OPTIONS;
 	}
 	error->description.data = desc;
 	error->description.length = strlen(desc);
@@ -2852,7 +2854,7 @@ static void ufbxi_string_pool_temp_free(ufbxi_string_pool *pool)
 	ufbxi_map_free(&pool->map);
 }
 
-ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool, char *dst)
+ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool, char *dst, char c)
 {
 	switch (pool->error_handling) {
 
@@ -2872,6 +2874,10 @@ ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool
 
 	case UFBX_UNICODE_ERROR_HANDLING_REMOVE:
 		return 0;
+
+	case UFBX_UNICODE_ERROR_HANDLING_UNSAFE_IGNORE:
+		dst[0] = c;
+		return 1;
 
 	default:
 		return 0;
@@ -2998,7 +3004,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_sanitize_string(ufbxi_string_poo
 			}
 		}
 
-		dst_len += ufbxi_add_replacement_char(pool, dst + dst_len);
+		dst_len += ufbxi_add_replacement_char(pool, dst + dst_len, (char)c);
 		index++;
 	}
 
@@ -8397,9 +8403,6 @@ static const uint32_t ufbxi_sentinel_index_consecutive[1] = { 123456789 };
 
 ufbxi_noinline static int ufbxi_fix_index(ufbxi_context *uc, uint32_t *p_dst, uint32_t index, uint32_t clamped)
 {
-	// TODO: Unsafe passthrough?
-	(void)index;
-
 	switch (uc->opts.index_error_handling) {
 	case UFBX_INDEX_ERROR_HANDLING_CLAMP:
 		*p_dst = clamped;
@@ -8410,6 +8413,8 @@ ufbxi_noinline static int ufbxi_fix_index(ufbxi_context *uc, uint32_t *p_dst, ui
 	case UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING:
 		ufbxi_fail_msg("UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING", "Bad index");
 		break;
+	case UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE:
+		return index;
 	default:
 		ufbx_assert(0 && "Unhandled index_error_handling");
 		return 0;
@@ -16814,6 +16819,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 	ufbx_assert(uc->opts._begin_zero == 0 && uc->opts._end_zero == 0);
 	ufbxi_check_msg(uc->opts._begin_zero == 0 && uc->opts._end_zero == 0, "Uninitialized options");
 	ufbxi_check(uc->opts.path_separator >= 0x20 && uc->opts.path_separator <= 0x7e);
+
+	if (!uc->opts.allow_unsafe) {
+		ufbxi_check_msg(uc->opts.index_error_handling != UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE, "Unsafe options");
+		ufbxi_check_msg(uc->opts.unicode_error_handling != UFBX_UNICODE_ERROR_HANDLING_UNSAFE_IGNORE, "Unsafe options");
+	} else {
+		uc->scene.metadata.unsafe = true;
+	}
 
 	ufbxi_check(ufbxi_load_strings(uc));
 	ufbxi_check(ufbxi_load_maps(uc));
