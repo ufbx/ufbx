@@ -8176,7 +8176,7 @@ static ufbxi_forceinline uint64_t ufbxi_synthetic_id_from_string(const char *str
 
 static ufbxi_noinline int ufbxi_push_synthetic_id(ufbxi_context *uc, uint64_t *p_dst)
 {
-	void *ptr = ufbxi_push_size(&uc->tmp, 2, 1);
+	void *ptr = ufbxi_push_size(&uc->tmp, 8, 1);
 	ufbxi_check(ptr);
 	*p_dst = ufbxi_synthetic_id_from_pointer(ptr);
 	return 1;
