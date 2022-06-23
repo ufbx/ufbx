@@ -1697,8 +1697,6 @@ static ufbxi_noinline void ufbxi_fix_error_type(ufbx_error *error, const char *d
 	error->type = UFBX_ERROR_UNKNOWN;
 	if (!strcmp(desc, "Out of memory")) {
 		error->type = UFBX_ERROR_OUT_OF_MEMORY;
-	} else if (!strcmp(desc, "Unaligned allocation")) {
-		error->type = UFBX_ERROR_UNALIGNED_ALLOCATION;
 	} else if (!strcmp(desc, "Memory limit exceeded")) {
 		error->type = UFBX_ERROR_MEMORY_LIMIT;
 	} else if (!strcmp(desc, "Allocation limit exceeded")) {
