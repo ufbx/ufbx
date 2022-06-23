@@ -675,7 +675,7 @@ struct ufbx_node {
 //
 // If `unique_per_vertex` is set then the attribute is guaranteed to have a
 // single defined value per vertex accessible via:
-//   `attrib.values.data[attrib.indices.data[mesh->vertex_first_index[vertex_ix]]`
+//   attrib.values.data[attrib.indices.data[mesh->vertex_first_index[vertex_ix]]
 typedef struct ufbx_vertex_attrib {
 	bool exists;
 	ufbx_void_list values;
