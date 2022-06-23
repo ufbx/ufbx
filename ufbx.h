@@ -3185,24 +3185,64 @@ typedef struct ufbx_error_frame {
 	ufbx_string description;
 } ufbx_error_frame;
 
+// Error causes (and `UFBX_ERROR_NONE` for no error).
 typedef enum ufbx_error_type {
+
+	// No error, operation has been performed succesfully.
 	UFBX_ERROR_NONE,
+
+	// Unspecified error, most likely caused by an invalid FBX file or a file
+	// that contains something ufbx can't handle.
 	UFBX_ERROR_UNKNOWN,
+
+	// File not found.
 	UFBX_ERROR_FILE_NOT_FOUND,
+
+	// Out of memory (allocator returned `NULL`).
 	UFBX_ERROR_OUT_OF_MEMORY,
+
+	// `ufbx_allocator_opts.memory_limit` exhausted.
 	UFBX_ERROR_MEMORY_LIMIT,
+
+	// `ufbx_allocator_opts.allocation_limit` exhausted.
 	UFBX_ERROR_ALLOCATION_LIMIT,
+
+	// File ended abruptly.
 	UFBX_ERROR_TRUNCATED_FILE,
+
+	// IO read error.
+	// eg. returning `SIZE_MAX` from `ufbx_stream.read_fn` or stdio `ferror()` condition.
 	UFBX_ERROR_IO,
+
+	// User cancelled the loading via `ufbx_load_opts.progress_cb` returning `UFBX_PROGRESS_CANCEL`.
 	UFBX_ERROR_CANCELLED,
-	UFBX_ERROR_UNSUPPORTED_VERSION,
+
+	// File is not an FBX file.
 	UFBX_ERROR_NOT_FBX,
+
+	// Options struct (eg. `ufbx_load_opts`) is not cleared to zero.
+	// Make sure you initialize the structure to zero via eg.
+	//   ufbx_load_opts opts = { 0 }; // C
+	//   ufbx_load_opts opts = { }; // C++
 	UFBX_ERROR_UNINITIALIZED_OPTIONS,
+
+	// The vertex streams in `ufbx_generate_indices()` are empty.
 	UFBX_ERROR_ZERO_VERTEX_SIZE,
+
+	// Invalid UTF-8 encountered in a file when loading with `UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING`.
 	UFBX_ERROR_INVALID_UTF8,
+
+	// Feature needed for the operation has been compiled out.
 	UFBX_ERROR_FEATURE_DISABLED,
+
+	// Attempting to tessellate an invalid NURBS object.
+	// See `ufbx_nurbs_basis.valid`.
 	UFBX_ERROR_BAD_NURBS,
+
+	// Out of bounds index in the file when loading with `UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING`.
 	UFBX_ERROR_BAD_INDEX,
+
+	// Unsafe options specified without enabling `ufbx_load_opts.allow_unsafe`.
 	UFBX_ERROR_UNSAFE_OPTIONS,
 
 	UFBX_ERROR_TYPE_COUNT,
