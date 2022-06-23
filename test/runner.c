@@ -1596,7 +1596,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			}
 
 			if (!alternative && scene) {
-				ufbxt_do_fuzz(scene, streamed_scene, stream_progress_ctx.calls, base_name, data, size, buf);
+				ufbxt_do_fuzz(scene, streamed_scene, (size_t)stream_progress_ctx.calls, base_name, data, size, buf);
 
 				// Run known buffer size checks
 				for (size_t i = 0; i < ufbxt_arraycount(g_buffer_checks); i++) {

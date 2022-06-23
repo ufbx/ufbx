@@ -796,7 +796,7 @@ UFBXT_FILE_TEST(zbrush_d20_selection_set)
 			ufbxt_assert(sel_node->faces.count == 12);
 
 			for (size_t i = 0; i < sel_node->faces.count; i++) {
-				int32_t index = sel_node->faces.data[i];
+				uint32_t index = sel_node->faces.data[i];
 				ufbxt_assert(index < mesh->faces.count);
 				ufbx_face face = mesh->faces.data[index];
 				ufbx_vec3 normal = ufbx_get_weighted_face_normal(&mesh->vertex_position, face);

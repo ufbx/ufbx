@@ -1052,7 +1052,7 @@ static ufbxt_noinline size_t ufbxt_obj_group_key(char *cat_buf, size_t cat_cap, 
 	for (size_t i = 0; i < num_groups; i++) {
 		size_t space = (size_t)(cat_end - cat_ptr);
 		int res = snprintf(cat_ptr, space, "%s\n", groups[i]);
-		ufbxt_assert(res >= 0 && res < space);
+		ufbxt_assert(res >= 0 && (size_t)res < space);
 		cat_ptr += res;
 	}
 

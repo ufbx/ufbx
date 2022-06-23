@@ -53,7 +53,7 @@ UFBXT_TEST(fuzz_files)
 		ufbxt_assert(temp_freed);
 		ufbxt_assert(result_freed);
 
-		ufbxt_do_fuzz(scene, streamed_scene, stream_progress_ctx.calls, name, data, size, buf);
+		ufbxt_do_fuzz(scene, streamed_scene, (size_t)stream_progress_ctx.calls, name, data, size, buf);
 
 		free(data);
 	}
