@@ -613,9 +613,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			mesh->vertex_position.values.data = positions;
 			mesh->vertex_normal.values.data = normals;
 			mesh->vertex_uv.values.data = uvs;
-			mesh->vertex_position.indices.data = dpi;
-			mesh->vertex_normal.indices.data = dni;
-			mesh->vertex_uv.indices.data = dui;
+			mesh->vertex_position.indices.data = (uint32_t*)dpi;
+			mesh->vertex_normal.indices.data = (uint32_t*)dni;
+			mesh->vertex_uv.indices.data = (uint32_t*)dui;
 		}
 
 		if (line[0] == '#') {
