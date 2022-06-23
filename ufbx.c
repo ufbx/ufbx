@@ -7365,6 +7365,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_parse_toplevel(ufbxi_context *uc
 			if (uc->opts.retain_dom) {
 				ufbxi_check(ufbxi_retain_toplevel(uc, NULL));
 			}
+
+			// Not needed anymore
+			ufbxi_buf_free(&uc->tmp_parse);
+
 			return 1;
 		}
 
@@ -16815,6 +16819,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 	} else {
 		ufbxi_check(ufbxi_read_root(uc));
 	}
+
+	// We can free `tmp_parse` already here as all parsing is done by now.
+	ufbxi_buf_free(&uc->tmp_parse);
 
 	ufbxi_update_scene_metadata(&uc->scene.metadata);
 	ufbxi_check(ufbxi_init_file_paths(uc));
