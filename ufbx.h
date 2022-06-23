@@ -917,7 +917,7 @@ struct ufbx_mesh {
 	// Faces and optional per-face extra data
 	ufbx_face_list faces;           // < Face index range
 	ufbx_bool_list face_smoothing;  // < Should the face have soft normals
-	ufbx_uint32_list face_material; // < Indices to `ufbx_mesh.materials`
+	ufbx_uint32_list face_material; // < Indices to `ufbx_mesh.materials` and `ufbx_node.materials`
 	ufbx_uint32_list face_group;    // < Face polygon group index
 	ufbx_bool_list face_hole;       // < Should the face be hidden as a "hole"
 	size_t max_face_triangles;      // < Maximum number of triangles per face in this mesh
@@ -1542,6 +1542,7 @@ struct ufbx_skin_deformer {
 
 	// Blend weights between Linear Blend Skinning (0.0) and Dual Quaternion (1.0).
 	// HINT: You probably want to use `vertices` and `ufbx_skin_vertex.dq_weight` instead!
+	// NOTE: These may be out-of-bounds for a given mesh, `vertices` is always safe.
 	size_t num_dq_weights;
 	ufbx_uint32_list dq_vertices;
 	ufbx_real_list dq_weights;
@@ -1579,6 +1580,7 @@ struct ufbx_skin_cluster {
 
 	// Raw weights indexed by each _vertex_ of a mesh (not index!)
 	// HINT: It may be simpler to use `ufbx_skin_deformer.vertices[]/weights[]` instead!
+	// NOTE: These may be out-of-bounds for a given mesh, `ufbx_skin_deformer.vertices` is always safe.
 	size_t num_weights;       // < Number of vertices in the cluster
 	ufbx_uint32_list vertices; // < Vertex indices in `ufbx_mesh.vertices[]`
 	ufbx_real_list weights;   // < Per-vertex weight values
@@ -1594,11 +1596,13 @@ struct ufbx_blend_deformer {
 		uint32_t typed_id;
 	}; };
 
+	// Independent morph targets of the deformer.
 	ufbx_blend_channel_list channels;
 };
 
 // Blend shape associated with a target weight in a series of morphs
 typedef struct ufbx_blend_keyframe {
+	// The target blend shape offsets.
 	ufbx_blend_shape *shape;
 
 	// Weight value at which to apply the keyframe at full strength
@@ -1638,23 +1642,24 @@ struct ufbx_blend_shape {
 	}; };
 
 	// Vertex offsets to apply over the base mesh
-	size_t num_offsets;              // < Number of vertex offsets in the following arrays
+	// NOTE: The `offset_vertices` may be out-of-bounds for a given mesh!
+	size_t num_offsets;               // < Number of vertex offsets in the following arrays
 	ufbx_uint32_list offset_vertices; // < Indices to `ufbx_mesh.vertices[]`
-	ufbx_vec3_list position_offsets; // < Always specified per-vertex offsets
-	ufbx_vec3_list normal_offsets;   // < `NULL` if not specified
+	ufbx_vec3_list position_offsets;  // < Always specified per-vertex offsets
+	ufbx_vec3_list normal_offsets;    // < Empty if not specified
 };
 
 typedef enum ufbx_cache_file_format {
-	UFBX_CACHE_FILE_FORMAT_UNKNOWN,
-	UFBX_CACHE_FILE_FORMAT_PC2, // .pc2 Point cache file
-	UFBX_CACHE_FILE_FORMAT_MC,  // .mc/.mcx Maya cache file
+	UFBX_CACHE_FILE_FORMAT_UNKNOWN, // < Unknown cache file format
+	UFBX_CACHE_FILE_FORMAT_PC2,     // < .pc2 Point cache file
+	UFBX_CACHE_FILE_FORMAT_MC,      // < .mc/.mcx Maya cache file
 
 	UFBX_CACHE_FILE_FORMAT_COUNT,
 	UFBX_CACHE_FILE_FORMAT_FORCE_32BIT = 0x7fffffff,
 } ufbx_cache_file_format;
 
 typedef enum ufbx_cache_data_format {
-	UFBX_CACHE_DATA_FORMAT_UNKNOWN,
+	UFBX_CACHE_DATA_FORMAT_UNKNOWN,     // < Unknown data format
 	UFBX_CACHE_DATA_FORMAT_REAL_FLOAT,  // < `float data[]`
 	UFBX_CACHE_DATA_FORMAT_VEC3_FLOAT,  // < `struct { float x, y, z; } data[]`
 	UFBX_CACHE_DATA_FORMAT_REAL_DOUBLE, // < `double data[]`
@@ -1665,7 +1670,7 @@ typedef enum ufbx_cache_data_format {
 } ufbx_cache_data_format;
 
 typedef enum ufbx_cache_data_encoding {
-	UFBX_CACHE_DATA_ENCODING_UNKNOWN,
+	UFBX_CACHE_DATA_ENCODING_UNKNOWN,       // < Unknown data encoding
 	UFBX_CACHE_DATA_ENCODING_LITTLE_ENDIAN, // < Contiguous little-endian array
 	UFBX_CACHE_DATA_ENCODING_BIG_ENDIAN,    // < Contiguous big-endian array
 
@@ -1673,10 +1678,19 @@ typedef enum ufbx_cache_data_encoding {
 	UFBX_CACHE_DATA_ENCODING_FORCE_32BIT = 0x7fffffff,
 } ufbx_cache_data_encoding;
 
+// Known interpretations of geometry cache data.
 typedef enum ufbx_cache_interpretation {
+	// Unknown interpretation, see `ufbx_cache_channel.interpretation_name` for more information.
 	UFBX_CACHE_INTERPRETATION_UNKNOWN,
-	UFBX_CACHE_INTERPRETATION_POINTS,
+
+	// Generic "points" interpretation, FBX SDK default. Usually fine to interpret
+	// as vertex positions if no other cache channels are specified.
+	UFBX_CACHE_INTERPRETATION_POINTS,          
+
+	// Vertex positions.
 	UFBX_CACHE_INTERPRETATION_VERTEX_POSITION,
+
+	// Vertex normals.
 	UFBX_CACHE_INTERPRETATION_VERTEX_NORMAL,
 
 	UFBX_CACHE_INTERPRETATION_COUNT,
@@ -1684,10 +1698,19 @@ typedef enum ufbx_cache_interpretation {
 } ufbx_cache_interpretation;
 
 typedef struct ufbx_cache_frame {
+
+	// Name of the channel this frame belongs to.
 	ufbx_string channel;
+
+	// Time of this frame in seconds.
 	double time;
 
+	// Name of the file containing the data.
+	// The specified file may contain multiple frames, use `data_offset` etc. to
+	// read at the right position.
 	ufbx_string filename;
+
+	// Format of the wrapper file.
 	ufbx_cache_file_format file_format;
 
 	ufbx_cache_data_format data_format;     // < Format of the data in the file
@@ -1701,10 +1724,21 @@ typedef struct ufbx_cache_frame {
 UFBX_LIST_TYPE(ufbx_cache_frame_list, ufbx_cache_frame);
 
 typedef struct ufbx_cache_channel {
+
+	// Name of the geometry cache channel.
 	ufbx_string name;
+
+	// What does the data in this channel represent.
 	ufbx_cache_interpretation interpretation;
+
+	// Source name for `interpretation`, especially useful if `interpretation` is
+	// `UFBX_CACHE_INTERPRETATION_UNKNOWN`.
 	ufbx_string interpretation_name;
+
+	// List of frames belonging to this channel.
+	// Sorted by time (`ufbx_cache_frame.time`).
 	ufbx_cache_frame_list frames;
+
 } ufbx_cache_channel;
 
 UFBX_LIST_TYPE(ufbx_cache_channel_list, ufbx_cache_channel);
