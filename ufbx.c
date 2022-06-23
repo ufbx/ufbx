@@ -1799,9 +1799,7 @@ static ufbxi_noinline void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size,
 	}
 
 	ufbxi_check_return_err_msg(ator->error, ptr, NULL, "Out of memory");
-
-	size_t align = ufbxi_size_align_mask(total);
-	ufbxi_check_return_err_msg(ator->error, ((uintptr_t)ptr & align) == 0, NULL, "Unaligned allocation");
+	ufbx_assert(((uintptr_t)ptr & ufbxi_size_align_mask(total)) == 0);
 
 	return ptr;
 }
@@ -1845,9 +1843,7 @@ static ufbxi_noinline void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t siz
 	}
 
 	ufbxi_check_return_err_msg(ator->error, ptr, NULL, "Out of memory");
-
-	size_t align = ufbxi_size_align_mask(total);
-	ufbxi_check_return_err_msg(ator->error, ((uintptr_t)ptr & align) == 0, NULL, "Unaligned allocation");
+	ufbx_assert(((uintptr_t)ptr & ufbxi_size_align_mask(total)) == 0);
 
 	return ptr;
 }
