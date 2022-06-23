@@ -2774,6 +2774,10 @@ typedef struct ufbx_metadata {
 	// FBX version in integer format, eg. 7400 for 7.4.
 	uint32_t version;
 
+	// Index arrays may contain `UFBX_NO_INDEX` instead of a valid index
+	// to indicate gaps.
+	bool may_contain_no_index;
+
 	// Some API guarantees do not apply (depending on unsafe options used).
 	// Loaded with `ufbx_load_opts.allow_unsafe` enabled.
 	bool unsafe;

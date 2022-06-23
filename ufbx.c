@@ -16828,6 +16828,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 		uc->scene.metadata.unsafe = true;
 	}
 
+	if (uc->opts.index_error_handling == UFBX_INDEX_ERROR_HANDLING_NO_INDEX) {
+		uc->scene.metadata.may_contain_no_index = true;
+	}
+
 	ufbxi_check(ufbxi_load_strings(uc));
 	ufbxi_check(ufbxi_load_maps(uc));
 	ufbxi_check(ufbxi_begin_parse(uc));
