@@ -1045,7 +1045,7 @@ async def main():
                     if path.endswith(".fbx"):
                         target.log.clear()
                         target.ran = False
-                        run_tasks.append(run_target(target, [path], RunOpts(rerunable=True)))
+                        run_tasks.append(run_target(target, [path], RunOpts(rerunnable=True)))
             
             targets = await gather(run_tasks)
 
