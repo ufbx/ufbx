@@ -947,6 +947,18 @@ static ufbx_load_opts ufbxt_all_unsafe_opts()
 	opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_UNSAFE_IGNORE;
 	return opts;
 }
+static ufbx_load_opts ufbxt_fail_index_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.index_error_handling = UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING;
+	return opts;
+}
+static ufbx_load_opts ufbxt_fail_unicode_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING;
+	return opts;
+}
 #endif
 
 UFBXT_FILE_TEST_FLAGS(synthetic_unsafe_cube, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
@@ -1002,5 +1014,21 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_unsafe_cube_unsafe, synthetic_unsafe_cu
 	ufbxt_assert(mesh->vertex_uv.indices.data[5] == 0xffffffu);
 	ufbxt_assert(mesh->vertex_uv.indices.data[6] == 0xffffffffu);
 	ufbxt_assert(mesh->vertex_uv.indices.data[7] == 4);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_unsafe_cube_fail_index, synthetic_unsafe_cube, ufbxt_fail_index_opts, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE | UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!scene);
+	ufbxt_assert(load_error->type == UFBX_ERROR_BAD_INDEX);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_unsafe_cube_fail_unicode, synthetic_unsafe_cube, ufbxt_fail_unicode_opts, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE | UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!scene);
+	ufbxt_assert(load_error->type == UFBX_ERROR_INVALID_UTF8);
 }
 #endif
