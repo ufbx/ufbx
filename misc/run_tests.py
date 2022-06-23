@@ -67,11 +67,6 @@ def log_comment(line, fail=False, warn=False):
     else:
         log("# " + line, style=style)
 
-if sys.platform == "win32":
-    loop = asyncio.ProactorEventLoop()
-else:
-    loop = asyncio.get_event_loop()
-
 def flatten_str_list(str_list):
     """Flatten arbitrarily nested str list `item` to `dst`"""
     def inner(result, str_list):
@@ -89,14 +84,17 @@ if argv.threads > 0:
 else:
     num_threads = os.cpu_count()
 
-if sys.version_info < (3,8):
-    cmd_sema = asyncio.Semaphore(num_threads, loop=loop)
-else:
-    cmd_sema = asyncio.Semaphore(num_threads)
+g_cmd_sema = None
+def get_cmd_sema():
+    global g_cmd_sema
+    if not g_cmd_sema:
+        g_cmd_sema = asyncio.Semaphore(num_threads)
+    return g_cmd_sema
 
 async def run_cmd(*args, realtime_output=False, env=None, cwd=None):
     """Asynchronously run a command"""
 
+    cmd_sema = get_cmd_sema()
     await cmd_sema.acquire()
 
     cmd_args = flatten_str_list(args)
@@ -1233,6 +1231,11 @@ async def main():
         exit_code = 1
 
 if __name__ == "__main__":
+    if sys.platform == "win32":
+        loop = asyncio.ProactorEventLoop()
+    else:
+        loop = asyncio.get_event_loop()
+
     loop.run_until_complete(main())
     loop.close()
     sys.exit(exit_code)
