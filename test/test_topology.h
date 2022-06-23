@@ -7,7 +7,7 @@ void ufbxt_check_generated_normals(ufbx_mesh *mesh, ufbxt_diff_error *err, size_
 
 	ufbx_compute_topology(mesh, topo, mesh->num_indices);
 
-	int32_t *normal_indices = calloc(mesh->num_indices, sizeof(int32_t));
+	uint32_t *normal_indices = calloc(mesh->num_indices, sizeof(uint32_t));
 	size_t num_normals = ufbx_generate_normal_mapping(mesh, topo, mesh->num_indices, normal_indices, mesh->num_indices, false);
 
 	if (expected_normals > 0) {
