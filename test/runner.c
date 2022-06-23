@@ -231,23 +231,21 @@ double ufbxt_bechmark_end()
 
 typedef struct {
 	size_t offset;
-
 	size_t bytes_allocated;
-
-	bool *freed_ptr;
-
 	union {
-		uint64_t align;
-		char data[1024 * 1024];
-	} local;
+		bool *freed_ptr;
+		size_t size_and_align[2];
+	};
+
+	char data[1024 * 1024];
 } ufbxt_allocator;
 
 static void *ufbxt_alloc(void *user, size_t size)
 {
 	ufbxt_allocator *ator = (ufbxt_allocator*)user;
 	ator->bytes_allocated += size;
-	if (size < 1024 && sizeof(ator->local.data) - ator->offset >= size) {
-		void *ptr = ator->local.data + ator->offset;
+	if (size < 1024 && sizeof(ator->data) - ator->offset >= size) {
+		void *ptr = ator->data + ator->offset;
 		ator->offset = (ator->offset + size + 7) & ~(size_t)0x7;
 		return ptr;
 	} else {
@@ -259,8 +257,8 @@ static void ufbxt_free(void *user, void *ptr, size_t size)
 {
 	ufbxt_allocator *ator = (ufbxt_allocator*)user;
 	ator->bytes_allocated -= size;
-	if ((uintptr_t)ptr >= (uintptr_t)ator->local.data
-		&& (uintptr_t)ptr < (uintptr_t)(ator->local.data + sizeof(ator->local.data))) {
+	if ((uintptr_t)ptr >= (uintptr_t)ator->data
+		&& (uintptr_t)ptr < (uintptr_t)(ator->data + sizeof(ator->data))) {
 		// Nop
 	} else {
 		free(ptr);
