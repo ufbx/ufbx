@@ -10,7 +10,10 @@
 typedef struct {
 	size_t pos;
 	size_t size;
-	bool reverse;
+	union {
+		size_t size_and_align[2];
+		bool reverse;
+	};
 	char data[];
 } ufbxt_linear_alloactor;
 
