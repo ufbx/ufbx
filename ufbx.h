@@ -2596,7 +2596,9 @@ struct ufbx_selection_node {
 	ufbx_nullable ufbx_mesh *target_mesh;
 	bool include_node; // < Is `target_node` included in the selection
 
-	// Indices to selected components, may be out-of-bounds!
+	// Indices to selected components.
+	// Guaranteed to be valid as per `ufbx_load_opts.index_error_handling`
+	// if `target_mesh` is not `NULL`.
 	ufbx_uint32_list vertices; // < Indices to `ufbx_mesh.vertices`
 	ufbx_uint32_list edges;    // < Indices to `ufbx_mesh.edges`
 	ufbx_uint32_list faces;    // < Indices to `ufbx_mesh.faces`
