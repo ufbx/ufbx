@@ -2597,7 +2597,6 @@ struct ufbx_selection_node {
 	bool include_node; // < Is `target_node` included in the selection
 
 	// Indices to selected components, may be out-of-bounds!
-	// TODO: Sanitize these!
 	ufbx_uint32_list vertices; // < Indices to `ufbx_mesh.vertices`
 	ufbx_uint32_list edges;    // < Indices to `ufbx_mesh.edges`
 	ufbx_uint32_list faces;    // < Indices to `ufbx_mesh.faces`

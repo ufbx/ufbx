@@ -13668,6 +13668,24 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_filenames(ufbxi_context 
 	return 1;
 }
 
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_validate_indices(ufbxi_context *uc, ufbx_uint32_list *indices, size_t max_index)
+{
+	if (max_index == 0 && uc->opts.index_error_handling == UFBX_INDEX_ERROR_HANDLING_CLAMP) {
+		indices->data = NULL;
+		indices->count = 0;
+		return 1;
+	}
+
+	ufbxi_nounroll ufbxi_for_list(uint32_t, p_ix, *indices) {
+		uint32_t ix = *p_ix;
+		if (ix >= max_index) {
+			ufbxi_check(ufbxi_fix_index(uc, p_ix, ix, (uint32_t)max_index - 1));
+		}
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	size_t num_elements = uc->num_elements;
@@ -14580,6 +14598,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			node->target_mesh = node->target_node->mesh;
 		} else if (!node->target_node && node->target_mesh && node->target_mesh->instances.count > 0) {
 			node->target_node = node->target_mesh->instances.data[0];
+		}
+
+		ufbx_mesh *mesh = node->target_mesh;
+		if (mesh) {
+			ufbxi_check(ufbxi_validate_indices(uc, &node->vertices, mesh->num_vertices));
+			ufbxi_check(ufbxi_validate_indices(uc, &node->edges, mesh->num_edges));
+			ufbxi_check(ufbxi_validate_indices(uc, &node->faces, mesh->num_faces));
 		}
 	}
 
