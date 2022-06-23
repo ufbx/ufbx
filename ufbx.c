@@ -1697,6 +1697,8 @@ static ufbxi_noinline void ufbxi_fix_error_type(ufbx_error *error, const char *d
 	error->type = UFBX_ERROR_UNKNOWN;
 	if (!strcmp(desc, "Out of memory")) {
 		error->type = UFBX_ERROR_OUT_OF_MEMORY;
+	} else if (!strcmp(desc, "Unaligned allocation")) {
+		error->type = UFBX_ERROR_UNALIGNED_ALLOCATION;
 	} else if (!strcmp(desc, "Memory limit exceeded")) {
 		error->type = UFBX_ERROR_MEMORY_LIMIT;
 	} else if (!strcmp(desc, "Allocation limit exceeded")) {
@@ -1739,6 +1741,18 @@ static const char ufbxi_zero_size_buffer[4096] = { 0 };
 #else
 static const char ufbxi_zero_size_buffer[64] = { 0 };
 #endif
+
+static ufbxi_forceinline size_t ufbxi_align_to_mask(size_t value, size_t align_mask)
+{
+	return value + (((size_t)0 - value) & align_mask);
+}
+
+static ufbxi_forceinline size_t ufbxi_size_align_mask(size_t size)
+{
+	// Align to the all bits below the lowest set one in `size`
+	// up to a maximum of 0x7 (align to 8 bytes).
+	return ((size ^ (size - 1)) >> 1) & 0x7;
+}
 
 typedef struct {
 	ufbx_error *error;
@@ -1785,6 +1799,10 @@ static ufbxi_noinline void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size,
 	}
 
 	ufbxi_check_return_err_msg(ator->error, ptr, NULL, "Out of memory");
+
+	size_t align = ufbxi_size_align_mask(total);
+	ufbxi_check_return_err_msg(ator->error, ((uintptr_t)ptr & align) == 0, NULL, "Unaligned allocation");
+
 	return ptr;
 }
 
@@ -1827,6 +1845,10 @@ static ufbxi_noinline void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t siz
 	}
 
 	ufbxi_check_return_err_msg(ator->error, ptr, NULL, "Out of memory");
+
+	size_t align = ufbxi_size_align_mask(total);
+	ufbxi_check_return_err_msg(ator->error, ((uintptr_t)ptr & align) == 0, NULL, "Unaligned allocation");
+
 	return ptr;
 }
 
@@ -1944,18 +1966,6 @@ typedef struct {
 	size_t pos;
 	size_t num_items;
 } ufbxi_buf_state;
-
-static ufbxi_forceinline size_t ufbxi_align_to_mask(size_t value, size_t align_mask)
-{
-	return value + (((size_t)0 - value) & align_mask);
-}
-
-static ufbxi_forceinline size_t ufbxi_size_align_mask(size_t size)
-{
-	// Align to the all bits below the lowest set one in `size`
-	// up to a maximum of 0x7 (align to 8 bytes).
-	return ((size ^ (size - 1)) >> 1) & 0x7;
-}
 
 static ufbxi_noinline void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 {
