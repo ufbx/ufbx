@@ -586,6 +586,7 @@ async def compile_target(t):
 
 class RunOpts(NamedTuple):
     rerunnable: bool = False
+    info: str = ""
 
 async def run_target(t, args, opts=RunOpts()):
     if not t.compiled: return
@@ -631,6 +632,9 @@ async def run_target(t, args, opts=RunOpts()):
         t.ok = False
 
     head = f"Run {t.name}"
+    if opts.info:
+        head = f"{head} {opts.info}"
+
     tail = f"[{time:.1f}s OK]" if ok else ("[WARN]" if arch_test else "[FAIL]")
     log_comment(f"{tail} {head}",
         fail=not ok and not arch_test,
@@ -1045,7 +1049,12 @@ async def main():
                     if path.endswith(".fbx"):
                         target.log.clear()
                         target.ran = False
-                        run_tasks.append(run_target(target, [path], RunOpts(rerunnable=True)))
+                        run_tasks.append(run_target(target, [path],
+                            RunOpts(
+                                rerunnable=True,
+                                info=path,
+                            )
+                        ))
             
             targets = await gather(run_tasks)
 
