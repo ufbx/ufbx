@@ -1707,8 +1707,6 @@ static ufbxi_noinline void ufbxi_fix_error_type(ufbx_error *error, const char *d
 		error->type = UFBX_ERROR_IO;
 	} else if (!strcmp(desc, "Cancelled")) {
 		error->type = UFBX_ERROR_CANCELLED;
-	} else if (!strcmp(desc, "Unsupported version")) {
-		error->type = UFBX_ERROR_UNSUPPORTED_VERSION;
 	} else if (!strcmp(desc, "Not an FBX file")) {
 		error->type = UFBX_ERROR_NOT_FBX;
 	} else if (!strcmp(desc, "File not found")) {

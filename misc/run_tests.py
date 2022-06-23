@@ -9,8 +9,8 @@ import os
 import sys
 import shutil
 import functools
-import platform
 import argparse
+from typing import NamedTuple
 
 parser = argparse.ArgumentParser(description="Run ufbx tests")
 parser.add_argument("tests", type=str, nargs="*", help="Names of tests to run")
@@ -584,8 +584,12 @@ async def compile_target(t):
         warn=not ok and arch_test)
     return t
 
-async def run_target(t, args):
+class RunOpts(NamedTuple):
+    rerunnable: bool = False
+
+async def run_target(t, args, opts=RunOpts()):
     if not t.compiled: return
+
     arch_test = t.config.get("arch_test", False)
     if config_fmt_arch(t.config) not in t.compiler.run_archs and not arch_test:
         return
@@ -597,12 +601,22 @@ async def run_target(t, args):
 
     cwd = t.config.get("cwd")
 
+    if opts.rerunnable and not t.ok:
+        return
+
     if t.config.get("arch") == "wasm32":
         wasm_args = [argv.wasm_runtime, "run", "--dir", ".", t.config["output"], "--"]
         wasm_args += args
         ok, out, err, cmdline, time = await run_cmd(wasm_args, cwd=cwd)
     else:
         ok, out, err, cmdline, time = await run_cmd(t.config["output"], args, cwd=cwd)
+
+
+    if opts.rerunnable:
+        if not t.ok: return
+
+        t.log.clear()
+        t.ran = False
 
     t.log.append("$ " + cmdline)
     t.log.append(out)
@@ -1017,11 +1031,12 @@ async def main():
                 "maya_dq_weights_7500_binary",
                 "maya_triangulate_triangulated_7500_binary",
                 "maya_kenney_character_7700_binary",
+                "maya_node_attribute_zoo_6100_binary",
+                "max_physical_material_textures_6100_binary",
             ]
 
-            failed = False
+            run_tasks = []
             for root, _, files in os.walk("data"):
-                if failed: break
                 for file in files:
                     if "_ascii" in file: continue
                     if any(f in file for f in too_heavy_files): continue
@@ -1030,10 +1045,9 @@ async def main():
                     if path.endswith(".fbx"):
                         target.log.clear()
                         target.ran = False
-                        await run_target(target, [path])
-                        if not target.ran:
-                            failed = True
-                            break
+                        run_tasks.append(run_target(target, [path], RunOpts(rerunable=True)))
+            
+            targets = await gather(run_tasks)
 
     if "readme" in tests:
         log_comment("-- Compiling and running README.md --")
