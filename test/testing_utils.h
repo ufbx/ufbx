@@ -131,6 +131,7 @@ typedef struct {
 	bool bad_faces;
 	bool no_subdivision;
 	bool root_groups_at_bone;
+	bool remove_namespaces;
 	ufbx_real tolerance;
 	int32_t animation_frame;
 
@@ -647,6 +648,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			if (!strcmp(line, "ufbx:root_groups_at_bone")) {
 				obj->root_groups_at_bone = true;
 			}
+			if (!strcmp(line, "ufbx:remove_namespaces")) {
+				obj->remove_namespaces = true;
+			}
 			if (!strcmp(line, "www.blender.org")) {
 				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
 			}
@@ -1043,15 +1047,25 @@ static int ufbxt_cmp_obj_node(const void *va, const void *vb)
 	return strcmp(a->cat_name, b->cat_name);
 }
 
-static ufbxt_noinline size_t ufbxt_obj_group_key(char *cat_buf, size_t cat_cap, const char **groups, size_t num_groups)
+static ufbxt_noinline size_t ufbxt_obj_group_key(char *cat_buf, size_t cat_cap, const char **groups, size_t num_groups, bool remove_namespaces)
 {
 	ufbxt_assert(num_groups > 0);
 	qsort((void*)groups, num_groups, sizeof(const char*), &ufbxt_cmp_string);
 
 	char *cat_ptr = cat_buf, *cat_end = cat_buf + cat_cap;
 	for (size_t i = 0; i < num_groups; i++) {
+		const char *group = groups[i];
+
+		if (remove_namespaces) {
+			for (;;) {
+				const char *next = strchr(group, ':');
+				if (!next) break;
+				group = next + 1;
+			}
+		}
+
 		size_t space = (size_t)(cat_end - cat_ptr);
-		int res = snprintf(cat_ptr, space, "%s\n", groups[i]);
+		int res = snprintf(cat_ptr, space, "%s\n", group);
 		ufbxt_assert(res >= 0 && (size_t)res < space);
 		cat_ptr += res;
 	}
@@ -1108,7 +1122,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 
 			if (num_groups == 0) continue;
 
-			size_t cat_len = ufbxt_obj_group_key(cat_name, sizeof(cat_name), groups, num_groups);
+			size_t cat_len = ufbxt_obj_group_key(cat_name, sizeof(cat_name), groups, num_groups, obj->remove_namespaces);
 			if (cat_name_data) {
 				char *dst = cat_name_data + cat_name_offset;
 				memcpy(dst, cat_name, cat_len + 1);
@@ -1137,7 +1151,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 
 		// Search for a node containing all the groups
 		{
-			ufbxt_obj_group_key(cat_name, sizeof(cat_name), obj_mesh->groups, obj_mesh->num_groups);
+			ufbxt_obj_group_key(cat_name, sizeof(cat_name), obj_mesh->groups, obj_mesh->num_groups, obj->remove_namespaces);
 			ufbxt_obj_node key = { cat_name };
 			ufbxt_obj_node *found = (ufbxt_obj_node*)bsearch(&key, obj_nodes, num_obj_nodes,
 				sizeof(ufbxt_obj_node), &ufbxt_cmp_obj_node);
