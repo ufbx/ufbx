@@ -1197,3 +1197,306 @@ UFBXT_FILE_TEST(max_instanced_material)
 	}
 }
 #endif
+
+#if UFBXT_IMPL
+
+static bool ufbxt_has_texture(ufbx_texture_list list, const char *name)
+{
+	for (size_t i = 0; i < list.count; i++) {
+		if (!strcmp(list.data[i]->relative_filename.data, name)) return true;
+	}
+	return false;
+}
+
+static void ufbxt_check_shader_input_map(ufbx_texture *texture, const char *name, const char *map, int64_t output_index)
+{
+	ufbxt_assert(texture->shader);
+	ufbx_shader_texture_input *input = ufbx_find_shader_texture_input(texture->shader, name);
+	ufbxt_assert(input);
+	ufbxt_assert(input->texture);
+	ufbxt_assert(!strcmp(input->texture->name.data, map));
+	ufbxt_assert(input->texture_output_index == output_index);
+}
+
+#endif
+
+UFBXT_FILE_TEST(max_shadergraph)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #1");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_checkerboard"));
+		ufbxt_assert(texture->file_textures.count == 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #2");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_add"));
+		ufbxt_assert(texture->file_textures.count == 0);
+		ufbxt_check_shader_input_map(texture, "input1", "Map #1", 0);
+		ufbxt_check_shader_input_map(texture, "input2", "Map #3", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #3");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "Checker"));
+		ufbxt_assert(texture->file_textures.count == 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #6");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ColorMul"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_diffuse.png"));
+		ufbxt_check_shader_input_map(texture, "A", "Map #2", 0);
+		ufbxt_check_shader_input_map(texture, "B", "Map #7", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #7");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "OSLBitmap2"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_diffuse.png"));
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #11");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_metallic.png"));
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_image"));
+		ufbxt_assert(texture->file_textures.count == 2);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_diffuse.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_metallic.png"));
+		ufbxt_check_shader_input_map(texture, "offset", "Map #7", 2);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #13");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ColorMax"));
+		ufbxt_assert(texture->file_textures.count == 2);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_diffuse.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_weight.png"));
+		ufbxt_check_shader_input_map(texture, "A", "Map #15", 0);
+		ufbxt_check_shader_input_map(texture, "B", "Map #6", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #14");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_weight.png"));
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "UberBitmap2"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_weight.png"));
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #15");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "TriTone"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_weight.png"));
+		ufbxt_check_shader_input_map(texture, "Input_map", "Map #14", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #16");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_mix_rgba"));
+		ufbxt_assert(texture->file_textures.count == 3);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_diffuse.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_metallic.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_weight.png"));
+		ufbxt_check_shader_input_map(texture, "input1", "Map #13", 0);
+		ufbxt_check_shader_input_map(texture, "input2", "Map #11", 0);
+		ufbxt_check_shader_input_map(texture, "mix", "Map #7", 1);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #17");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_dot"));
+		ufbxt_assert(texture->file_textures.count == 3);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_diffuse.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_metallic.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_weight.png"));
+		ufbxt_check_shader_input_map(texture, "input1", "Map #16", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #19");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ColorAdd"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_emissive.png"));
+		ufbxt_check_shader_input_map(texture, "A", "Map #20", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #20");
+		ufbxt_assert(texture && !texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_emissive.png"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_emissive.png"));
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #21");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_add"));
+		ufbxt_assert(texture->file_textures.count == 2);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_emissive.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_specular.png"));
+		ufbxt_check_shader_input_map(texture, "input1", "Map #22", 0);
+		ufbxt_check_shader_input_map(texture, "input2", "Map #19", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #22");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_specular.png"));
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_image"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_specular.png"));
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #26");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "VectorAdd"));
+		ufbxt_assert(texture->file_textures.count == 3);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_emissive.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_specular.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_transparency.png"));
+		ufbxt_check_shader_input_map(texture, "A", "Map #28", 0);
+		ufbxt_check_shader_input_map(texture, "B", "Map #21", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #28");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_transparency.png"));
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "OSLBitmap2"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_transparency.png"));
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #29");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ColorAdd"));
+		ufbxt_assert(texture->file_textures.count == 4);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_emissive.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_specular.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_transparency.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_ambient.png"));
+		ufbxt_check_shader_input_map(texture, "A", "Map #30", 0);
+		ufbxt_check_shader_input_map(texture, "B", "Map #26", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #30");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_ambient.png"));
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "UberBitmap2"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_ambient.png"));
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #31");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, ""));
+		ufbxt_assert(texture->shader->shader_type_id == UINT64_C(0x0000023000000000));
+		ufbxt_assert(texture->file_textures.count == 5);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_emissive.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_specular.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_transparency.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_ambient.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_displacement.png"));
+		ufbxt_check_shader_input_map(texture, "map1", "Map #29", 0);
+		ufbxt_check_shader_input_map(texture, "map2", "Map #32", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #32");
+		ufbxt_assert(texture && !texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_displacement.png"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_displacement.png"));
+	}
+
+	{
+		ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Material #25");
+		ufbxt_assert(material);
+		ufbxt_assert(material->shader_type == UFBX_SHADER_OSL_STANDARD_SURFACE);
+
+		ufbxt_assert(material->pbr.base_factor.texture);
+		ufbxt_assert(!strcmp(material->pbr.base_factor.texture->name.data, "Map #17"));
+
+		ufbxt_assert(material->pbr.base_color.texture);
+		ufbxt_assert(!strcmp(material->pbr.base_color.texture->name.data, "Map #13"));
+
+		ufbxt_assert(material->pbr.emission_factor.texture);
+		ufbxt_assert(!strcmp(material->pbr.emission_factor.texture->name.data, "Map #31"));
+
+		{
+			ufbx_texture *texture = material->pbr.roughness.texture;
+			ufbxt_assert(texture);
+			ufbxt_assert(texture->shader);
+			ufbxt_assert(texture->file_textures.count == 1);
+			ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_ambient.png"));
+			ufbxt_assert(texture->shader->main_texture);
+			ufbxt_assert(texture->shader->main_texture_output_index == 6);
+			ufbxt_assert(!strcmp(texture->shader->main_texture->name.data, "Map #30"));
+			ufbxt_check_shader_input_map(texture, "sourceMap", "Map #30", 6);
+		}
+	}
+}
+#endif

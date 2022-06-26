@@ -13169,11 +13169,12 @@ ufbxi_noinline static void ufbxi_update_shader_texture(ufbx_texture *texture, uf
 	if (shader->type == UFBX_SHADER_TEXTURE_SELECT_OUTPUT) {
 		ufbx_shader_texture_input *map = ufbx_find_shader_texture_input(shader, "sourceMap");
 		ufbx_shader_texture_input *index = ufbx_find_shader_texture_input(shader, "outputChannelIndex");
-		if (map) {
-			shader->main_texture = map->texture;
-		}
 		if (index) {
 			shader->main_texture_output_index = index->value_int;
+		}
+		if (map) {
+			shader->main_texture = map->texture;
+			map->texture_output_index = shader->main_texture_output_index;
 		}
 	}
 }
@@ -13277,7 +13278,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_shader_texture(ufbxi_co
 				base->texture_prop = prop;
 				continue;
 			}
-		} else if (ufbxi_remove_suffix_c(&base_name, ".connected")) {
+		} else if (ufbxi_remove_suffix_c(&base_name, ".connected") || ufbxi_remove_suffix_c(&base_name, "Enabled")) {
 			ufbx_shader_texture_input *base = ufbx_find_shader_texture_input_len(shader, base_name.data, base_name.length);
 			if (base) {
 				base->texture_enabled_prop = prop;
@@ -13482,6 +13483,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_file_textures(ufbxi_contex
 			// Now all non-cyclical dependents should be processed.
 			size_t num_deps = 0;
 
+			if (texture->type == UFBX_TEXTURE_FILE) {
+				ufbxi_ordered_texture *dst = ufbxi_push(&uc->tmp_stack, ufbxi_ordered_texture, 1);
+				ufbxi_check(dst);
+				dst->texture = texture;
+				dst->order = num_deps++;
+			}
+
 			ufbxi_for_list(ufbx_texture_layer, layer, texture->layers) {
 				ufbx_texture *dep_tex = layer->texture;
 				if (dep_tex->file_textures.count > 0) {
@@ -13509,7 +13517,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_file_textures(ufbxi_contex
 			ufbxi_check(ufbxi_deduplicate_textures(uc, &uc->tmp_parse, &deps, &num_deps, num_deps));
 
 			if (num_deps == 1) {
-				// If we have only a single dependency we can just copy the pointer
+				// If we have only a single dependency (that is not the same one) we can just copy the pointer
 				texture->file_textures = deps[0].texture->file_textures;
 			} else {
 				// Now collect all the file textures and deduplicate them
@@ -13539,30 +13547,36 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_file_textures(ufbxi_contex
 		} else {
 			if (texture->type == UFBX_TEXTURE_FILE) {
 				// Simple case: Just point to self
-				states[texture->typed_id] = UFBXI_FILE_TEXTURE_FETCH_FINISHED;
 				texture->file_textures.count = 1;
 				texture->file_textures.data = ufbxi_push(&uc->result, ufbx_texture*, 1);
 				ufbxi_check(texture->file_textures.data);
 				texture->file_textures.data[0] = texture;
-			} else {
-				// Complex: Process all dependencies first
-				states[texture->typed_id] = UFBXI_FILE_TEXTURE_FETCH_STARTED;
 
-				// Push self first so we can return after processing depenencies
-				ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_texture*, 1, &texture));
-				num_stack_textures++;
-
-				ufbxi_for_list(ufbx_texture_layer, layer, texture->layers) {
-					ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_texture*, 1, &layer->texture));
-					num_stack_textures++;
+				// In simple cases we can quit here, for more complex file textures queue
+				// the texture in case there are other file textures as inputs.
+				if (!texture->shader) {
+					states[texture->typed_id] = UFBXI_FILE_TEXTURE_FETCH_FINISHED;
+					continue;
 				}
+			}
 
-				if (shader) {
-					ufbxi_for_list(ufbx_shader_texture_input, input, shader->inputs) {
-						if (input->texture) {
-							ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_texture*, 1, &input->texture));
-							num_stack_textures++;
-						}
+			// Complex: Process all dependencies first
+			states[texture->typed_id] = UFBXI_FILE_TEXTURE_FETCH_STARTED;
+
+			// Push self first so we can return after processing depenencies
+			ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_texture*, 1, &texture));
+			num_stack_textures++;
+
+			ufbxi_for_list(ufbx_texture_layer, layer, texture->layers) {
+				ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_texture*, 1, &layer->texture));
+				num_stack_textures++;
+			}
+
+			if (shader) {
+				ufbxi_for_list(ufbx_shader_texture_input, input, shader->inputs) {
+					if (input->texture) {
+						ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_texture*, 1, &input->texture));
+						num_stack_textures++;
 					}
 				}
 			}

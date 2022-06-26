@@ -719,8 +719,10 @@ static void ufbxt_check_texture(ufbx_scene *scene, ufbx_texture *texture)
 	}
 
 	if (texture->type == UFBX_TEXTURE_FILE) {
-		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.count >= 1);
 		ufbxt_assert(texture->file_textures.data[0] == texture);
+	} else if (texture->type == UFBX_TEXTURE_SHADER) {
+		ufbxt_assert(texture->shader);
 	}
 }
 
