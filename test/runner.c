@@ -1039,7 +1039,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 			result_allocs = streamed_scene->metadata.result_allocs + 10;
 		}
 
-		#pragma omp parallel for schedule(static, 16)
+		#pragma omp parallel for schedule(dynamic, 4)
 		for (i = 0; i < (int)temp_allocs; i++) {
 			if (ufbxt_fuzz_should_skip(i)) continue;
 			if (omp_get_thread_num() == 0) {
@@ -1056,7 +1056,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 		fprintf(stderr, "\rFuzzing temp limit %s: %d/%d\n", base_name, (int)temp_allocs, (int)temp_allocs);
 
-		#pragma omp parallel for schedule(static, 16)
+		#pragma omp parallel for schedule(dynamic, 4)
 		for (i = 0; i < (int)result_allocs; i++) {
 			if (ufbxt_fuzz_should_skip(i)) continue;
 			if (omp_get_thread_num() == 0) {
@@ -1074,7 +1074,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 		fprintf(stderr, "\rFuzzing result limit %s: %d/%d\n", base_name, (int)result_allocs, (int)result_allocs);
 
 		if (!g_fuzz_no_truncate) {
-			#pragma omp parallel for schedule(static, 16)
+			#pragma omp parallel for schedule(dynamic, 4)
 			for (i = 1; i < (int)size; i++) {
 				if (ufbxt_fuzz_should_skip(i)) continue;
 				if (omp_get_thread_num() == 0) {
@@ -1093,7 +1093,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 		}
 
 		if (!g_fuzz_no_cancel) {
-			#pragma omp parallel for schedule(static, 16)
+			#pragma omp parallel for schedule(dynamic, 4)
 			for (i = 0; i < (int)progress_calls; i++) {
 				if (ufbxt_fuzz_should_skip(i)) continue;
 				if (omp_get_thread_num() == 0) {
@@ -1120,7 +1120,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 				patch_start = 0;
 			}
 
-			#pragma omp parallel for schedule(static, 16)
+			#pragma omp parallel for schedule(dynamic, 4)
 			for (i = patch_start; i < (int)size; i++) {
 				if (ufbxt_fuzz_should_skip(i)) continue;
 
@@ -1428,7 +1428,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				int fail_sz = -1;
 
 				int buf_sz = 0;
-				#pragma omp parallel for schedule(static, 16)
+				#pragma omp parallel for schedule(dynamic, 4)
 				for (buf_sz = 0; buf_sz < (int)size; buf_sz++) {
 					if (ufbxt_fuzz_should_skip(buf_sz)) continue;
 
