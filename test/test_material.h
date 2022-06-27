@@ -23,11 +23,11 @@ void ufbxt_check_texture_content(ufbx_scene *scene, ufbx_texture *texture, const
 	free(ref);
 }
 
-void ufbxt_check_material_texture(ufbx_scene *scene, ufbx_texture *texture, const char *filename, bool require_content)
+void ufbxt_check_material_texture_ex(ufbx_scene *scene, ufbx_texture *texture, const char *directory, const char *filename, bool require_content)
 {
 	char buf[512];
 
-	snprintf(buf, sizeof(buf), "textures\\%s", filename);
+	snprintf(buf, sizeof(buf), "%s%s", directory, filename);
 	ufbxt_assert(!strcmp(texture->relative_filename.data, buf));
 
 	if (require_content && (scene->metadata.version >= 7000 || !scene->metadata.ascii)) {
@@ -37,6 +37,11 @@ void ufbxt_check_material_texture(ufbx_scene *scene, ufbx_texture *texture, cons
 	if (texture->content.size) {
 		ufbxt_check_texture_content(scene, texture, filename);
 	}
+}
+
+void ufbxt_check_material_texture(ufbx_scene *scene, ufbx_texture *texture, const char *filename, bool require_content)
+{
+	ufbxt_check_material_texture_ex(scene, texture, "textures\\", filename, require_content);
 }
 
 #endif

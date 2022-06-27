@@ -26,6 +26,7 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_norm
 
 	ufbx_evaluate_opts opts = { 0 };
 	opts.evaluate_skinning = true;
+	opts.evaluate_caches = true;
 	opts.load_external_files = true;
 
 	ufbx_anim anim = scene->anim;

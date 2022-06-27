@@ -132,3 +132,29 @@ UFBXT_TEST(cache_xml_parse)
 }
 #endif
 
+UFBXT_FILE_TEST_OPTS(marvelous_quad, ufbxt_scale_to_cm_opts)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "marvelous_quad");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->materials.count == 1);
+		ufbx_material *material = mesh->materials.data[0].material;
+
+		// What? Marvelous writes relative filenames as absolute.
+		// TODO: Quirk mode to fix this?
+		const char *prefix = "D:\\Dev\\clean\\ufbx\\data\\";
+
+		ufbxt_check_material_texture_ex(scene, material->fbx.ambient_color.texture, prefix, "marvelous_quad_diffuse_100-1.png", true);
+		ufbxt_check_material_texture_ex(scene, material->fbx.diffuse_color.texture, prefix, "marvelous_quad_diffuse_100-1.png", true);
+		ufbxt_check_material_texture_ex(scene, material->fbx.normal_map.texture, prefix, "marvelous_quad_normal_100-1.png", true);
+		ufbxt_check_material_texture_ex(scene, material->pbr.base_color.texture, prefix, "marvelous_quad_diffuse_100-1.png", true);
+		ufbxt_check_material_texture_ex(scene, material->pbr.normal_map.texture, prefix, "marvelous_quad_normal_100-1.png", true);
+	}
+
+	ufbxt_check_frame(scene, err, false, "marvelous_quad_12", NULL, 12.0/24.0);
+	ufbxt_check_frame(scene, err, false, "marvelous_quad_22", NULL, 22.0/24.0);
+}
+#endif
+

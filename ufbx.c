@@ -16534,13 +16534,20 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_files(ufbxi_contex
 		ufbx_cache_deformer *deformer = *p_deformer;
 		if (!deformer->file || !deformer->file->external_cache) continue;
 		ufbx_geometry_cache *cache = deformer->file->external_cache;
-		ufbx_string channel = deformer->channel;
 		deformer->external_cache = cache;
-		size_t ix = SIZE_MAX;
-		ufbxi_macro_lower_bound_eq(ufbx_cache_channel, 16, &ix, cache->channels.data, 0, cache->channels.count,
-			( ufbxi_str_less(a->name, channel) ), ( a->name.data == channel.data ));
-		if (ix != SIZE_MAX) {
-			deformer->external_channel = &cache->channels.data[ix];
+
+		// HACK: It seems like channels may be connected even if the name is wrong
+		// and they work when exporting from Marvelous to Maya...
+		if (cache->channels.count == 1) {
+			deformer->external_channel = &cache->channels.data[0];
+		} else {
+			ufbx_string channel = deformer->channel;
+			size_t ix = SIZE_MAX;
+			ufbxi_macro_lower_bound_eq(ufbx_cache_channel, 16, &ix, cache->channels.data, 0, cache->channels.count,
+				( ufbxi_str_less(a->name, channel) ), ( a->name.data == channel.data ));
+			if (ix != SIZE_MAX) {
+				deformer->external_channel = &cache->channels.data[ix];
+			}
 		}
 	}
 
@@ -16908,7 +16915,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 		ufbx_geometry_cache_data_opts cache_opts = { 0 };
 		cache_opts.open_file_cb = uc->opts.open_file_cb;
 		ufbxi_check(ufbxi_evaluate_skinning(&uc->scene, &uc->error, &uc->result, &uc->tmp,
-			0.0, uc->opts.load_external_files, &cache_opts));
+			0.0, uc->opts.load_external_files && uc->opts.evaluate_caches, &cache_opts));
 	}
 
 	// Copy local data to the scene
@@ -17868,7 +17875,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 		ufbx_geometry_cache_data_opts cache_opts = { 0 };
 		cache_opts.open_file_cb = ec->opts.open_file_cb;
 		ufbxi_check_err(&ec->error, ufbxi_evaluate_skinning(&ec->scene, &ec->error, &ec->result, &ec->tmp,
-			ec->time, ec->opts.load_external_files, &cache_opts));
+			ec->time, ec->opts.load_external_files && ec->opts.evaluate_caches, &cache_opts));
 	}
 
 	// Retain the scene, this must be the final allocation as we copy
