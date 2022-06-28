@@ -3919,6 +3919,40 @@ typedef struct {
 	size_t num_alphas;
 } ufbxi_texture_extra;
 
+#define UFBXI_OBJ_GEO_BUFFERS 9
+
+typedef struct {
+
+	// Current line and tokens.
+	// NOTE: `line` and `tokens` are not NULL-terminated nor UTF-8!
+	// `line` is guaranteed to be terminated by a `\n`
+	ufbx_string line;
+	ufbx_string *tokens;
+	size_t tokens_cap;
+	size_t num_tokens;
+
+
+	union {
+		ufbxi_buf tmp_geo_buf[UFBXI_OBJ_GEO_BUFFERS];
+		struct {
+			ufbxi_buf position_values;
+			ufbxi_buf normal_values;
+			ufbxi_buf uv_values;
+			ufbxi_buf color_values;
+
+			ufbxi_buf position_indices;
+			ufbxi_buf normal_indices;
+			ufbxi_buf uv_indices;
+
+			ufbxi_buf faces;
+		} tmp_geo;
+	};
+
+
+	size_t read_progress;
+
+} ufbxi_obj_context;
+
 typedef struct {
 
 	ufbx_error error;
@@ -4041,6 +4075,9 @@ typedef struct {
 
 	double ktime_to_sec;
 
+	bool eof;
+	ufbxi_obj_context obj;
+
 } ufbxi_context;
 
 static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, const char *func, uint32_t line)
@@ -4070,6 +4107,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_report_progress(ufbxi_context *u
 	ufbx_progress progress;
 	progress.bytes_read = ufbxi_get_read_offset(uc);
 	progress.bytes_total = uc->progress_bytes_total;
+	if (progress.bytes_total < progress.bytes_read) {
+		progress.bytes_total = progress.bytes_read;
+	}
 
 	uc->progress_timer = 1024;
 	uint32_t result = (uint32_t)uc->opts.progress_cb.fn(uc->opts.progress_cb.user, &progress);
@@ -4090,7 +4130,7 @@ ufbxi_unused ufbxi_nodiscard static ufbxi_forceinline int ufbxi_progress(ufbxi_c
 
 // -- IO
 
-static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size)
+static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size, bool require_size)
 {
 	ufbx_assert(uc->data_size < size);
 	ufbxi_check_return_msg(uc->read_fn, NULL, "Truncated file");
@@ -4126,9 +4166,14 @@ static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size)
 	size_t read_result = uc->read_fn(uc->read_user, uc->read_buffer + num_read, to_read);
 	ufbxi_check_return_msg(read_result != SIZE_MAX, NULL, "IO error");
 	ufbxi_check_return(read_result <= to_read, NULL);
+	if (read_result < to_read) {
+		uc->eof = true;
+	}
 
 	num_read += read_result;
-	ufbxi_check_return_msg(num_read >= size, NULL, "Truncated file");
+	if (require_size) {
+		ufbxi_check_return_msg(num_read >= size, NULL, "Truncated file");
+	}
 
 	uc->data_offset += ufbxi_to_size(uc->data - uc->data_begin);
 	uc->data_begin = uc->data = uc->read_buffer;
@@ -4144,7 +4189,7 @@ static ufbxi_noinline const char *ufbxi_yield(ufbxi_context *uc, size_t size)
 	if (uc->data_size >= size) {
 		ret = uc->data;
 	} else {
-		ret = ufbxi_refill(uc, size);
+		ret = ufbxi_refill(uc, size, true);
 	}
 	uc->yield_size = ufbxi_min_sz(uc->data_size, ufbxi_max_sz(size, uc->progress_interval));
 	uc->data_size -= uc->yield_size;
@@ -7825,11 +7870,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_property(ufbxi_context *uc,
 		ufbxi_check(ufbxi_get_val_at(node, val_ix++, 'C', (char**)&subtype_str));
 	}
 
+	uint32_t flags = 0;
 	prop->_internal_key = ufbxi_get_name_key(prop->name.data, prop->name.length);
 
 	ufbx_string flags_str;
 	if (ufbxi_get_val_at(node, val_ix++, 'S', &flags_str)) {
-		uint32_t flags = 0;
 		for (size_t i = 0; i < flags_str.length; i++) {
 			char next = i + 1 < flags_str.length ? flags_str.data[i + 1] : '0';
 			switch (flags_str.data[i]) {
@@ -7840,7 +7885,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_property(ufbxi_context *uc,
 			case 'M': flags |= ((uint32_t)(next - '0') & 0xf) << 8; break; // UFBX_PROP_FLAG_MUTE_*
 			}
 		}
-		prop->flags = (ufbx_prop_flags)flags;
 	}
 
 	prop->type = ufbxi_get_prop_type(uc, type_str);
@@ -7848,9 +7892,16 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_property(ufbxi_context *uc,
 		prop->type = ufbxi_get_prop_type(uc, subtype_str);
 	}
 
-	ufbxi_ignore(ufbxi_get_val_at(node, val_ix, 'L', &prop->value_int));
-	for (size_t i = 0; i < 4; i++) {
-		if (!ufbxi_get_val_at(node, val_ix + i, 'R', &prop->value_real_arr[i])) break;
+	if (ufbxi_get_val_at(node, val_ix, 'L', &prop->value_int)) {
+		flags |= (uint32_t)UFBX_PROP_FLAG_VALUE_INT;
+	}
+
+	size_t real_ix;
+	for (real_ix = 0; real_ix < 4; real_ix++) {
+		if (!ufbxi_get_val_at(node, val_ix + real_ix, 'R', &prop->value_real_arr[real_ix])) break;
+	}
+	if (real_ix >= 0) {
+		flags |= (uint32_t)UFBX_PROP_FLAG_VALUE_REAL << (real_ix - 1);
 	}
 
 	// Distance properties have a string unit _after_ the real value, eg. `10, "cm"`
@@ -7862,14 +7913,18 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_property(ufbxi_context *uc,
 		if (prop->value_str.length > 0) {
 			ufbxi_ignore(ufbxi_get_val_at(node, val_ix, 'b', &prop->value_blob));
 		}
+		flags |= (uint32_t)UFBX_PROP_FLAG_VALUE_STR;
 	} else {
 		prop->value_str = ufbx_empty_string;
 	}
+
+	prop->flags = (ufbx_prop_flags)flags;
 
 	// Very unlikely, seems to only exist in some "non standard" FBX files
 	if (node->num_children > 0) {
 		ufbxi_node *binary = ufbxi_find_child(node, ufbxi_BinaryData);
 		ufbxi_check(ufbxi_read_embedded_blob(uc, &prop->value_blob, binary));
+		flags |= (uint32_t)UFBX_PROP_FLAG_VALUE_BLOB;
 	}
 	
 	return 1;
@@ -10816,6 +10871,7 @@ static const ufbxi_legacy_prop ufbxi_legacy_material_props[] = {
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *node, ufbx_prop *prop, const ufbxi_legacy_prop *legacy_prop)
 {
 	size_t value_ix = 0;
+	uint32_t flags = 0;
 
 	const char *fmt = legacy_prop->node_fmt;
 	for (size_t fmt_ix = 0; fmt[fmt_ix]; fmt_ix++) {
@@ -10830,6 +10886,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 			prop->value_real_arr[3] = 0.0f;
 			prop->value_str = ufbx_empty_string;
 			prop->value_blob = ufbx_empty_blob;
+			flags |= (uint32_t)UFBX_PROP_FLAG_VALUE_INT;
 			value_ix++;
 			break;
 		case 'R':
@@ -10843,6 +10900,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 				prop->value_str = ufbx_empty_string;
 				prop->value_blob = ufbx_empty_blob;
 			}
+			flags &= ~(uint32_t)(UFBX_PROP_FLAG_VALUE_REAL|UFBX_PROP_FLAG_VALUE_VEC2|UFBX_PROP_FLAG_VALUE_VEC3|UFBX_PROP_FLAG_VALUE_VEC4);
+			flags |= (uint32_t)UFBX_PROP_FLAG_VALUE_REAL << value_ix;
 			value_ix++;
 			break;
 		case 'S':
@@ -10860,6 +10919,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 			prop->value_real_arr[2] = 0.0f;
 			prop->value_real_arr[3] = 0.0f;
 			prop->value_int = 0;
+			flags |= (uint32_t)UFBX_PROP_FLAG_VALUE_STR;
 			value_ix++;
 			break;
 		case '_':
@@ -10869,6 +10929,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 			break;
 		}
 	}
+
+	prop->flags = (ufbx_prop_flags)flags;
 
 	return 1;
 }
@@ -11276,6 +11338,194 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_legacy_root(ufbxi_context *
 
 	return 1;
 }
+
+// -- .obj file
+
+static ufbxi_noinline void ufbxi_obj_init(ufbxi_context *uc)
+{
+	ufbxi_nounroll for (size_t i = 0; i < UFBXI_OBJ_GEO_BUFFERS; i++) {
+		uc->obj.tmp_geo_buf[i].ator = &uc->ator_tmp;
+	}
+
+	// .obj parsing does its own yield logic
+	uc->data_size += uc->yield_size;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_read_line(ufbxi_context *uc)
+{
+	if (uc->eof) {
+		uc->obj.line.data = "\n";
+		uc->obj.line.length = 1;
+		return 1;
+	}
+
+	size_t offset = 0;
+
+	for (;;) {
+		const char *begin = uc->data + offset;
+		const char *end = memchr(begin, '\n', uc->data_size - offset);
+		if (!end) {
+			if (uc->eof) {
+				offset = uc->data_size;
+				break;
+			} else {
+				ufbxi_check(ufbxi_refill(uc, uc->data_size * 2, false));
+			}
+		}
+
+		offset += end - begin;
+
+		// Handle line continuations
+		const char *esc = end;
+		if (esc > begin && esc[-1] == '\r') esc--;
+		if (esc > begin && esc[-1] == '\\') {
+			continue;
+		}
+
+		break;
+	}
+
+	size_t line_len = offset;
+
+	uc->obj.line.data = uc->data;
+	uc->obj.line.length = line_len;
+	uc->data += line_len;
+	uc->data_size -= line_len;
+
+	uc->obj.read_progress += line_len;
+	if (uc->obj.read_progress >= uc->progress_interval) {
+		ufbxi_check(ufbxi_report_progress(uc));
+		uc->obj.read_progress %= uc->progress_interval;
+	}
+
+	// Push the last line to ensure we have a newline in the end
+	if (uc->eof) {
+		char *new_data = ufbxi_push(&uc->tmp, char, line_len + 1);
+		ufbxi_check(new_data);
+		memcpy(new_data, uc->obj.line.data, line_len);
+		new_data[line_len] = '\n';
+		uc->obj.line.data = new_data;
+		uc->obj.line.length++;
+	}
+
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_tokenize(ufbxi_context *uc)
+{
+	const char *ptr = uc->obj.line.data, *end = ptr + uc->obj.line.length;
+
+	for (;;) {
+		char c;
+
+		// Skip whitespace
+		for (;;) {
+			c = *ptr;
+			if (c == ' ' || c == '\t' || c == '\r') {
+				ptr++;
+				continue;
+			}
+
+			// Treat line continuations as whitespace
+			if (c == '\\') {
+				const char *p = ptr + 1;
+				if (*p == '\r') p++;
+				if (*p == '\n' && p < end - 1) {
+					ptr = p + 1;
+					continue;
+				}
+			}
+
+			break;
+		}
+
+		c = *ptr;
+		if (c == '\n' || c == '#') break;
+
+		size_t index = uc->obj.num_tokens++;
+		ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->obj.tokens, &uc->obj.tokens_cap, index + 1));
+
+		ufbx_string *tok = &uc->obj.tokens[index];
+		tok->data = ptr;
+
+		for (;;) {
+			c = *++ptr;
+
+			if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+				break;
+			}
+
+			if (c == '\\') {
+				const char *p = ptr + 1;
+				if (*p == '\r') p++;
+				if (*p == '\n' && p < end - 1) {
+					break;
+				}
+			}
+		}
+
+		tok->length = ptr - tok->data;
+	}
+
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_tokenize_line(ufbxi_context *uc)
+{
+	ufbxi_check(ufbxi_obj_read_line(uc));
+	ufbxi_check(ufbxi_obj_tokenize(uc));
+	return 1;
+}
+
+static ufbxi_noinline int ufbxi_obj_parse_vertex(ufbxi_context *uc, ufbxi_buf *dst, size_t offset, size_t num_values)
+{
+	if (uc->opts.ignore_geometry) return 1;
+
+	ufbxi_check(offset + num_values >= uc->obj.num_tokens);
+	ufbx_real *vals = ufbxi_push(dst, ufbx_real, num_values);
+	ufbxi_check(dst);
+
+	for (size_t i = 0; i < num_values; i++) {
+		ufbx_string str = uc->obj.tokens[offset + i];
+		char *end;
+		double val = strtod(str.data, &end);
+		ufbxi_check(end == str.data + str.length);
+		vals[i] = (ufbx_real)val;
+	}
+
+	return 1;
+}
+
+#define ufbxi_obj_cmd1(a) ((uint32_t)(a)<<24u)
+#define ufbxi_obj_cmd2(a,b) ((uint32_t)(a)<<24u | (uint32_t)(b)<<16)
+#define ufbxi_obj_cmd3(a,b,c) ((uint32_t)(a)<<24u | (uint32_t)(b)<<16 | (uint32_t)(c)<<8u)
+
+static ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc)
+{
+	for (;;) {
+		ufbxi_check(ufbxi_obj_tokenize_line(uc));
+		size_t num_tokens = uc->obj.num_tokens;
+		if (num_tokens == 0) continue;
+
+		ufbx_string cmd = uc->obj.tokens[0];
+		uint32_t key = ufbxi_get_name_key(cmd.data, cmd.length);
+		if (key == ufbxi_obj_cmd1('v')) {
+			ufbxi_check(ufbxi_obj_parse_vertex(uc, &uc->obj.tmp_geo.position_values, 1, 3));
+			if (num_tokens >= 7) {
+				ufbxi_check(ufbxi_obj_parse_vertex(uc, &uc->obj.tmp_geo.color_values, 4, 3));
+			}
+		} else if (key == ufbxi_obj_cmd2('v','t')) {
+			ufbxi_check(ufbxi_obj_parse_vertex(uc, &uc->obj.tmp_geo.uv_values, 1, 2));
+		} else if (key == ufbxi_obj_cmd2('v','n')) {
+			ufbxi_check(ufbxi_obj_parse_vertex(uc, &uc->obj.tmp_geo.normal_values, 1, 3));
+		} else if (key == ufbxi_obj_cmd1('f')) {
+		}
+	}
+
+	return 1;
+}
+
+// -- Scene processing
 
 static ufbxi_noinline ufbx_element *ufbxi_find_element_by_fbx_id(ufbxi_context *uc, uint64_t fbx_id)
 {

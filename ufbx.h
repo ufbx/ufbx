@@ -309,6 +309,17 @@ typedef enum ufbx_prop_flags {
 	// See `ufbx_anim.prop_overrides` for more information.
 	UFBX_PROP_FLAG_OVERRIDDEN = 0x20000,
 
+	// Value type.
+	// `REAL/VEC2/VEC3/VEC4` are mutually exclusive but may coexist with eg. `STRING`
+	// in some rare cases where the string defines the unit for the vector.
+	UFBX_PROP_FLAG_VALUE_REAL = 0x100000,
+	UFBX_PROP_FLAG_VALUE_VEC2 = 0x200000,
+	UFBX_PROP_FLAG_VALUE_VEC3 = 0x400000,
+	UFBX_PROP_FLAG_VALUE_VEC4 = 0x800000,
+	UFBX_PROP_FLAG_VALUE_INT = 0x100000,
+	UFBX_PROP_FLAG_VALUE_STR = 0x2000000,
+	UFBX_PROP_FLAG_VALUE_BLOB = 0x4000000,
+
 	UFBX_PROP_FLAG_FORCE_32BIT = 0x7fffffff,
 } ufbx_prop_flags;
 
