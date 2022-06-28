@@ -1032,3 +1032,13 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_unsafe_cube_fail_unicode, synthetic_uns
 	ufbxt_assert(load_error->type == UFBX_ERROR_INVALID_UTF8);
 }
 #endif
+
+UFBXT_TEST(obj)
+#if UFBXT_IMPL
+{
+	ufbx_scene *scene = ufbx_load_file("blender_279_default.obj", NULL, NULL);
+	ufbxt_assert(scene);
+
+	ufbx_free_scene(scene);
+}
+#endif
