@@ -249,11 +249,11 @@ sg_image pack_blend_channels_to_image(ufbx_mesh *mesh, ufbx_blend_channel **chan
 		ufbx_blend_shape *shape = chan->keyframes.data[chan->keyframes.count - 1].shape;
 
 		for (size_t oi = 0; oi < shape->num_offsets; oi++) {
-			uint32_t ix = (uint32_t)shape->offset_vertices[oi];
+			uint32_t ix = (uint32_t)shape->offset_vertices.data[oi];
 			if (ix < mesh->num_vertices) {
 				// We don't need to do any indexing to X/Y here as the memory layout of
 				// `slice_data` pixels is the same as the linear buffer would be.
-				slice_data[ix].xyz = ufbx_to_um_vec3(shape->position_offsets[oi]);
+				slice_data[ix].xyz = ufbx_to_um_vec3(shape->position_offsets.data[oi]);
 			}
 		}
 	}
@@ -408,7 +408,7 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 		// First fetch all vertices into a flat non-indexed buffer, we also need to
 		// triangulate the faces
 		for (size_t fi = 0; fi < mesh_mat->num_faces; fi++) {
-			ufbx_face face = mesh->faces[mesh_mat->face_indices[fi]];
+			ufbx_face face = mesh->faces.data[mesh_mat->face_indices.data[fi]];
 			size_t num_tris = ufbx_triangulate_face(tri_indices, num_tri_indices, mesh, face);
 
 			ufbx_vec2 default_uv = { 0 };
@@ -420,17 +420,17 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 
 				ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, ix);
 				ufbx_vec3 normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, ix);
-				ufbx_vec2 uv = mesh->vertex_uv.data ? ufbx_get_vertex_vec2(&mesh->vertex_uv, ix) : default_uv;
+				ufbx_vec2 uv = mesh->vertex_uv.exists ? ufbx_get_vertex_vec2(&mesh->vertex_uv, ix) : default_uv;
 
 				vert->position = ufbx_to_um_vec3(pos);
 				vert->normal = um_normalize3(ufbx_to_um_vec3(normal));
 				vert->uv = ufbx_to_um_vec2(uv);
-				vert->f_vertex_index = (float)mesh->vertex_indices[ix];
+				vert->f_vertex_index = (float)mesh->vertex_indices.data[ix];
 
 				// The skinning vertex stream is pre-calculated above so we just need to
 				// copy the right one by the vertex index.
 				if (skin) {
-					skin_vertices[num_indices] = mesh_skin_vertices[mesh->vertex_indices[ix]];
+					skin_vertices[num_indices] = mesh_skin_vertices[mesh->vertex_indices.data[ix]];
 				}
 
 				num_indices++;
@@ -500,7 +500,7 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 	vmesh->aabb_min = um_dup3(+INFINITY);
 	vmesh->aabb_max = um_dup3(-INFINITY);
 	for (size_t i = 0; i < mesh->num_vertices; i++) {
-		um_vec3 pos = ufbx_to_um_vec3(mesh->skinned_position.data[i]);
+		um_vec3 pos = ufbx_to_um_vec3(mesh->skinned_position.values.data[i]);
 		vmesh->aabb_min = um_min3(vmesh->aabb_min, pos);
 		vmesh->aabb_max = um_max3(vmesh->aabb_max, pos);
 	}
@@ -719,6 +719,7 @@ void load_scene(viewer_scene *vs, const char *filename)
 	ufbx_load_opts opts = {
 		.load_external_files = true,
 		.allow_null_material = true,
+		.generate_missing_normals = true,
 
 		// NOTE: We use this _only_ for computing the bounds of the scene!
 		// The viewer contains a proper implementation of skinning as well.
@@ -878,7 +879,9 @@ const char *g_filename;
 void init(void)
 {
     sg_setup(&(sg_desc){
-		.context = sapp_sgcontext()
+		.context = sapp_sgcontext(),
+		.buffer_pool_size = 4096,
+		.image_pool_size = 4096,
     });
 
 	stm_setup();

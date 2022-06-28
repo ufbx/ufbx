@@ -9,18 +9,24 @@ import os
 import sys
 import shutil
 import functools
-import platform
 import argparse
+from typing import NamedTuple
 
 parser = argparse.ArgumentParser(description="Run ufbx tests")
 parser.add_argument("tests", type=str, nargs="*", help="Names of tests to run")
 parser.add_argument("--additional-compiler", default=[], action="append", help="Additional compiler(s) to use")
+parser.add_argument("--remove-compiler", default=[], action="append", help="Remove a compiler from being used")
+parser.add_argument("--remove-arch", default=[], action="append", help="Remove an architecture")
 parser.add_argument("--compiler", default=[], action="append", help="Specify exact compiler(s) to use")
 parser.add_argument("--no-sse", action="store_true", help="Don't make SSE builds when possible")
 parser.add_argument("--wasi-sdk", default=[], action="append", help="WASI SDK path")
 parser.add_argument("--wasm-runtime", default="wasmtime", type=str, help="WASM runtime command")
 parser.add_argument("--no-sanitize", action="store_true", help="Don't compile builds with ASAN/UBSAN")
 parser.add_argument("--threads", type=int, default=0, help="Number of threads to use (0 to autodetect)")
+parser.add_argument("--verbose", action="store_true", help="Verbose output")
+parser.add_argument("--hash-file", help="Hash test input file")
+parser.add_argument("--runner", help="Descriptive name for the runner")
+parser.add_argument("--fail-on-pre-test", action="store_true", help="Indicate failure if pre-test checks fail")
 argv = parser.parse_args()
 
 color_out = sys.stdout
@@ -61,11 +67,6 @@ def log_comment(line, fail=False, warn=False):
     else:
         log("# " + line, style=style)
 
-if sys.platform == "win32":
-    loop = asyncio.ProactorEventLoop()
-else:
-    loop = asyncio.get_event_loop()
-
 def flatten_str_list(str_list):
     """Flatten arbitrarily nested str list `item` to `dst`"""
     def inner(result, str_list):
@@ -83,14 +84,17 @@ if argv.threads > 0:
 else:
     num_threads = os.cpu_count()
 
-if sys.version_info < (3,8):
-    cmd_sema = asyncio.Semaphore(num_threads, loop=loop)
-else:
-    cmd_sema = asyncio.Semaphore(num_threads)
+g_cmd_sema = None
+def get_cmd_sema():
+    global g_cmd_sema
+    if not g_cmd_sema:
+        g_cmd_sema = asyncio.Semaphore(num_threads)
+    return g_cmd_sema
 
 async def run_cmd(*args, realtime_output=False, env=None, cwd=None):
     """Asynchronously run a command"""
 
+    cmd_sema = get_cmd_sema()
     await cmd_sema.acquire()
 
     cmd_args = flatten_str_list(args)
@@ -194,14 +198,20 @@ class CLCompiler(Compiler):
         args += sources
         args += ["/MT", "/nologo"]
 
-        obj_dir = os.path.dirname(output)
-        args.append(f"/Fo{obj_dir}\\")
+        if not config.get("compile_only"):
+            obj_dir = os.path.dirname(output)
+            args.append(f"/Fo{obj_dir}\\")
 
         if config.get("warnings", False):
             args.append("/W4")
             args.append("/WX")
         else:
             args.append("/W3")
+
+        if config.get("compile_only"):
+            args.append("/c")
+
+        args.append("/DUFBX_DEV")
 
         if config.get("optimize", False):
             args.append("/Ox")
@@ -210,6 +220,12 @@ class CLCompiler(Compiler):
         
         if config.get("regression", False):
             args.append("/DUFBX_REGRESSION=1")
+
+        for key, val in config.get("defines", {}).items():
+            if not val:
+                args.append(f"/D{key}")
+            else:
+                args.append(f"/D{key}={val}")
 
         if config.get("openmp", False):
             args.append("/openmp")
@@ -220,10 +236,12 @@ class CLCompiler(Compiler):
         if config.get("sse", False):
             args.append("/DSSE=1")
 
-        args.append("/link")
-
-        args += ["/opt:ref"]
-        args.append(f"-out:{output}")
+        if config.get("compile_only"):
+            args.append(f"/Fo\"{output}\"")
+        else:
+            args.append("/link")
+            args += ["/opt:ref"]
+            args.append(f"-out:{output}")
 
         return self.run(args)
 
@@ -272,7 +290,8 @@ class GCCCompiler(Compiler):
             args += ["--sysroot", self.sysroot]
 
         if config.get("warnings", False):
-            args += ["-Wall", "-Wextra", "-Werror"]
+            args += ["-Wall", "-Wextra", "-Wsign-conversion", "-Wmissing-prototypes"]
+            args += ["-Werror"]
 
         args.append("-g")
 
@@ -292,6 +311,9 @@ class GCCCompiler(Compiler):
         if self.has_m32 and config.get("arch", "") == "x86":
             args.append("-m32")
 
+        if config.get("compile_only"):
+            args.append("-c")
+
         if self.has_cpp:
             std = "c++11"
         else:
@@ -299,28 +321,49 @@ class GCCCompiler(Compiler):
         std = config.get("std", std)
         args.append(f"-std={std}")
 
+        args.append("-DUFBX_DEV")
+
+        use_sse = False
         if config.get("sse", False):
             args.append("-DSSE=1")
             args += ["-mbmi", "-msse3", "-msse4.1", "-msse4.2"]
             if config.get("arch", "") == "x86":
-                args += ["-msse", "-msse2"]
+                use_sse = True
+
+        if config.get("arch", "") == "x86" and config.get("ieee754", False):
+            use_sse = True
+            args += ["-mfpmath=sse"]
+
+        if config.get("ieee754", False):
+            args += ["-ffp-contract=off"]
+
+        if use_sse:
+            args += ["-msse", "-msse2"]
 
         if config.get("threads", False):
             args.append("-pthread")
 
         if config.get("san"):
             args.append("-fsanitize=address")
-            args.append("-fsanitize=leak")
+            if sys.platform != "darwin":
+                args.append("-fsanitize=leak")
             args.append("-fsanitize=undefined")
             args.append("-fno-sanitize=float-cast-overflow")
+            args.append("-fno-sanitize-recover=undefined")
             args.append("-DUFBX_UBSAN")
 
         if "mingw" in self.arch:
             args.append("-D__USE_MINGW_ANSI_STDIO=1")
 
+        for key, val in config.get("defines", {}).items():
+            if not val:
+                args.append(f"-D{key}")
+            else:
+                args.append(f"-D{key}={val}")
+
         args += sources
 
-        if "msvc" not in self.arch:
+        if "msvc" not in self.arch and not config.get("compile_only"):
             args.append("-lm")
 
         args += ["-o", output]
@@ -330,6 +373,30 @@ class GCCCompiler(Compiler):
 class ClangCompiler(GCCCompiler):
     def __init__(self, name, exe, cpp, **kwargs):
         super().__init__(name, exe, cpp, **kwargs)
+
+class TCCCompiler(GCCCompiler):
+    def __init__(self, name, exe):
+        super().__init__(name, exe, False)
+        self.has_c = True
+        self.has_cpp = False
+        self.has_m32 = True
+        self.sysroot = ""
+
+    async def check_version(self):
+        _, out, err, _, _ = await self.run("-v")
+        print(out + err)
+        m = re.search(r"tcc version ([.0-9]+) \((\w+).*\)", out + err, re.M)
+        if not m: return False
+        self.arch = m.group(2).lower()
+        self.version = m.group(1)
+        return True
+
+    def supported_archs(self):
+        if "x86_64" in self.arch:
+            return ["x86", "x64"] if self.has_m32 else ["x64"]
+        if "i686" in self.arch:
+            return ["x86"]
+        return []
 
 class EmscriptenCompiler(ClangCompiler):
     def __init__(self, name, exe, cpp):
@@ -445,6 +512,15 @@ for desc in argv.additional_compiler:
             GCCCompiler(name, desc, False),
             GCCCompiler(name, cpp, True),
         ]
+    elif "tcc" in desc:
+        all_compilers += [
+            TCCCompiler(name, desc),
+        ]
+    else:
+        raise RuntimeError(f"Could not parse compiler for {desc}")
+
+if argv.remove_compiler:
+    all_compilers = [c for c in all_compilers if c.name not in argv.remove_compiler]
 
 if argv.compiler:
     compilers = set(argv.compiler)
@@ -452,7 +528,6 @@ if argv.compiler:
 
 def gather(aws):
     return asyncio.gather(*aws)
-
 
 async def check_compiler(compiler):
     if await compiler.check_version():
@@ -464,8 +539,9 @@ async def find_compilers():
     return list(ichain(await gather(check_compiler(c) for c in all_compilers)))
 
 class Target:
-    def __init__(self, name, compiler, config):
+    def __init__(self, name, suffix, compiler, config):
         self.name = name
+        self.suffix = suffix
         self.compiler = compiler
         self.config = config
         self.skipped = False
@@ -491,6 +567,9 @@ async def compile_target(t):
     t.log.append(out)
     t.log.append(err)
 
+    if argv.verbose:
+        log("\n".join(["$ " + cmdline, out, err]))
+
     if ok:
         t.compiled = True
     else:
@@ -503,8 +582,13 @@ async def compile_target(t):
         warn=not ok and arch_test)
     return t
 
-async def run_target(t, args):
+class RunOpts(NamedTuple):
+    rerunnable: bool = False
+    info: str = ""
+
+async def run_target(t, args, opts=RunOpts()):
     if not t.compiled: return
+
     arch_test = t.config.get("arch_test", False)
     if config_fmt_arch(t.config) not in t.compiler.run_archs and not arch_test:
         return
@@ -512,8 +596,12 @@ async def run_target(t, args):
     args = args[:]
     if t.config.get("dedicated-allocs", False):
         args += ["--dedicated-allocs"]
+    args = [a.replace("%TARGET_SUFFIX%", t.suffix) for a in args]
 
     cwd = t.config.get("cwd")
+
+    if opts.rerunnable and not t.ok:
+        return
 
     if t.config.get("arch") == "wasm32":
         wasm_args = [argv.wasm_runtime, "run", "--dir", ".", t.config["output"], "--"]
@@ -522,9 +610,19 @@ async def run_target(t, args):
     else:
         ok, out, err, cmdline, time = await run_cmd(t.config["output"], args, cwd=cwd)
 
+
+    if opts.rerunnable:
+        if not t.ok: return
+
+        t.log.clear()
+        t.ran = False
+
     t.log.append("$ " + cmdline)
     t.log.append(out)
     t.log.append(err)
+
+    if argv.verbose:
+        log("\n".join(["$ " + cmdline, out, err]))
 
     if ok:
         t.ran = True
@@ -532,6 +630,9 @@ async def run_target(t, args):
         t.ok = False
 
     head = f"Run {t.name}"
+    if opts.info:
+        head = f"{head} {opts.info}"
+
     tail = f"[{time:.1f}s OK]" if ok else ("[WARN]" if arch_test else "[FAIL]")
     log_comment(f"{tail} {head}",
         fail=not ok and not arch_test,
@@ -543,6 +644,22 @@ async def compile_and_run_target(t, args):
     if args is not None:
         await run_target(t, args)
     return t
+
+async def run_viewer_target(target):
+    log_comment(f"-- Running viewer with {target.name} --")
+
+    for root, _, files in os.walk("data"):
+        for file in files:
+            if "_fail_" in file: continue
+            if "\U0001F602" in file: continue
+            path = os.path.join(root, file)
+            if "fuzz" in path: continue
+            if path.endswith(".fbx"):
+                target.log.clear()
+                target.ran = False
+                await run_target(target, [path])
+                if not target.ran:
+                    return
 
 def copy_file(src, dst):
     shutil.copy(src, dst)
@@ -561,8 +678,10 @@ def decorate_arch(compiler, arch):
     return arch
 
 tests = set(argv.tests)
+impicit_tests = False
 if not tests:
-    tests = ["tests", "picort", "domfuzz", "readme"]
+    tests = ["tests", "picort", "viewer", "domfuzz", "readme", "threadcheck", "hashes"]
+    implicit_tests = True
 
 async def main():
     global exit_code
@@ -588,6 +707,9 @@ async def main():
             "sanitize": { "san": True, "dedicated-allocs": True },
         },
     }
+
+    for arch in argv.remove_arch:
+        del all_configs["arch"][arch]
 
     arch_configs = {
         "arch": all_configs["arch"],
@@ -619,7 +741,8 @@ async def main():
             for opts in opt_combos:
                 optstring = "_".join(opt for _,opt in opts if opt)
 
-                name = f"{prefix}_{compiler.name}_{optstring}"
+                suffix = f"{compiler.name}_{optstring}"
+                name = f"{prefix}_{suffix}"
 
                 path = os.path.join(build_path, name)
 
@@ -631,12 +754,14 @@ async def main():
                 if config_fmt_arch(conf) not in archs:
                     continue
                 
-                target = Target(name, compiler, conf)
+                target = Target(name, suffix, compiler, conf)
                 yield compile_and_run_target(target, run_args)
 
     exe_suffix = ""
+    obj_suffix = ".o"
     if sys.platform == "win32":
         exe_suffix = ".exe"
+        obj_suffix = ".obj"
 
     ctest_tasks = []
 
@@ -672,8 +797,11 @@ async def main():
 
     log_comment("-- Detected the following compilers --")
 
+    removed_archs = set(argv.remove_arch)
+    removed_archs.update(f"{arch}-san" for arch in argv.remove_arch)
+
     for compiler in compilers:
-        archs = ", ".join(decorate_arch(compiler, arch) for arch in supported_archs(compiler))
+        archs = ", ".join(decorate_arch(compiler, arch) for arch in supported_archs(compiler) if arch not in removed_archs)
         log_comment(f"  {compiler.exe}: {compiler.arch} {compiler.version} [{archs}]")
 
     num_fail = 0
@@ -697,6 +825,35 @@ async def main():
             "warnings": True,
         }
         target_tasks += compile_permutations("cpp", cpp_config, arch_configs, [])
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+    if "features" in tests:
+        log_comment("-- Compiling and running partial features --")
+
+        feature_defines = [
+            "UFBX_NO_SUBDIVISION",
+            "UFBX_NO_TESSELLATION",
+            "UFBX_NO_GEOMETRY_CACHE",
+            "UFBX_NO_SCENE_EVALUATION",
+            "UFBX_NO_TRIANGULATION",
+            "UFBX_NO_ERROR_STACK",
+        ]
+
+        target_tasks = []
+
+        for bits in range(1, 1 << len(feature_defines)):
+            defines = { name: 1 for ix, name in enumerate(feature_defines) if (1 << ix) & bits }
+
+            feature_config = {
+                "sources": ["ufbx.c"],
+                "output": f"features_{bits}" + obj_suffix,
+                "warnings": True,
+                "compile_only": True,
+                "defines": defines,
+            }
+            target_tasks += compile_permutations("features", feature_config, arch_configs, None)
 
         targets = await gather(target_tasks)
         all_targets += targets
@@ -789,6 +946,38 @@ async def main():
                 for line in sse_target.log[1].splitlines(keepends=False):
                     log_comment(line)
 
+    if "viewer" in tests:
+        log_comment("-- Compiling and running viewer --")
+    
+        target_tasks = []
+
+        viewer_configs = {
+            "arch": arch_configs["arch"],
+            "sanitize": {
+                "": { },
+                "sanitize": { "san": True },
+            }
+        }
+
+        viewer_config = {
+            "sources": ["ufbx.c", "examples/viewer/viewer.c", "examples/viewer/external.c"],
+            "output": "viewer" + exe_suffix,
+            "optimize": True,
+            "defines": {
+                "TEST_VIEWER": "",
+            },
+        }
+        target_tasks += compile_permutations("viewer", viewer_config, viewer_configs, None)
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+        running_viewers = []
+        for target in targets:
+            if target.compiled:
+                running_viewers.append(run_viewer_target(target))
+        await gather(running_viewers)
+
     if "domfuzz" in tests:
         log_comment("-- Compiling and running domfuzz --")
     
@@ -826,11 +1015,6 @@ async def main():
             version = int(version.group(0)) if version else 0
             return (score, version)
 
-        image_path = os.path.join("build", "images")
-        if not os.path.exists(image_path):
-            os.makedirs(image_path, exist_ok=True)
-            log_mkdir(image_path)
-
         target = max(targets, key=target_score)
 
         if target.compiled:
@@ -841,9 +1025,19 @@ async def main():
                 "maya_slime_7500_binary",
                 "maya_character_6100_binary",
                 "maya_character_7500_binary",
+                "maya_human_ik_6100_binary",
+                "maya_human_ik_7400_binary",
                 "max2009_blob_6100_binary",
+                "synthetic_unicode_7500_binary",
+                "maya_lod_group_6100_binary",
+                "maya_dq_weights_7500_binary",
+                "maya_triangulate_triangulated_7500_binary",
+                "maya_kenney_character_7700_binary",
+                "maya_node_attribute_zoo_6100_binary",
+                "max_physical_material_textures_6100_binary",
             ]
 
+            run_tasks = []
             for root, _, files in os.walk("data"):
                 for file in files:
                     if "_ascii" in file: continue
@@ -853,9 +1047,14 @@ async def main():
                     if path.endswith(".fbx"):
                         target.log.clear()
                         target.ran = False
-                        await run_target(target, [path])
-                        if not target.ran:
-                            break
+                        run_tasks.append(run_target(target, [path],
+                            RunOpts(
+                                rerunnable=True,
+                                info=path,
+                            )
+                        ))
+            
+            targets = await gather(run_tasks)
 
     if "readme" in tests:
         log_comment("-- Compiling and running README.md --")
@@ -921,6 +1120,95 @@ async def main():
         targets = await gather(target_tasks)
         all_targets += targets
 
+    if "threadcheck" in tests:
+        log_comment("-- Compiling and running threadcheck --")
+    
+        target_tasks = []
+
+        threadcheck_config = {
+            "sources": ["ufbx.c", "test/threadcheck.cpp"],
+            "output": "threadcheck" + exe_suffix,
+            "cpp": True,
+            "optimize": False,
+            "std": "c++14",
+            "threads": True,
+        }
+        target_tasks += compile_permutations("threadcheck", threadcheck_config, arch_configs, None)
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+        def target_score(target):
+            compiler = target.compiler
+            config = target.config
+            if not target.compiled:
+                return (0, 0)
+            score = 1
+            if config["arch"] == "x64":
+                score += 10
+            if "clang" in compiler.name:
+                score += 10
+            if "msvc" in compiler.name:
+                score += 5
+            version = re.search(r"\d+", compiler.version)
+            version = int(version.group(0)) if version else 0
+            return (score, version)
+
+        best_target = max(targets, key=target_score)
+        if best_target.compiled:
+            log_comment(f"-- Running {best_target.name} --")
+
+            best_target.log.clear()
+            best_target.ran = False
+            await run_target(best_target, ["data/maya_cube_7500_binary.fbx", "2"])
+            for line in best_target.log[1].splitlines(keepends=False):
+                log_comment(line)
+
+    if "hashes" in tests:
+
+        hash_file = argv.hash_file
+        if not hash_file:
+            hash_file = os.path.join(build_path, "hashes.txt")
+        if hash_file and os.path.exists(hash_file):
+            log_comment("-- Compiling and running hash_scene --")
+            target_tasks = []
+
+            hash_scene_configs = {
+                "arch": all_configs["arch"],
+                "optimize": all_configs["optimize"],
+            }
+
+            hash_scene_config = {
+                "sources": ["test/hash_scene.c", "misc/fdlibm.c"],
+                "output": "hash_scene" + exe_suffix,
+                "ieee754": True,
+            }
+
+            dump_path = os.path.join(build_path, "hashdumps")
+            if not os.path.exists(dump_path):
+                os.makedirs(dump_path, exist_ok=True)
+                log_mkdir(dump_path)
+            else:
+                for dump_file in os.listdir(dump_path):
+                    assert dump_file.endswith(".txt")
+                    os.remove(os.path.join(dump_path, dump_file))
+
+            if argv.runner:
+                dump_file = os.path.join(dump_path, f"{argv.runner}_%TARGET_SUFFIX%.txt")
+            else:
+                dump_file = os.path.join(dump_path, "%TARGET_SUFFIX%.txt")
+
+            args = ["--check", hash_file, "--dump", dump_file, "--max-dump-errors", "3"]
+            target_tasks += compile_permutations("hash_scene", hash_scene_config, hash_scene_configs, args)
+
+            targets = await gather(target_tasks)
+            all_targets += targets
+        else:
+            print("No hash file found, skipping hashes", file=sys.stderr)
+            if not implicit_tests:
+                exit_code = 2
+
+
     for target in all_targets:
         if target.ok: continue
         print()
@@ -929,15 +1217,25 @@ async def main():
         num_fail += 1
 
     print()
+    severity = "ERROR" if argv.fail_on_pre_test else "WARNING"
     if bad_compiles > 0:
-        print(f"WARNING: {bad_compiles} pre-test configurations failed to compile")
+        print(f"{severity}: {bad_compiles} pre-test configurations failed to compile")
+        if argv.fail_on_pre_test:
+            exit_code = 2
     if bad_runs > 0:
-        print(f"WARNING: {bad_runs} pre-test configurations failed to run")
+        print(f"{severity}: {bad_runs} pre-test configurations failed to run")
+        if argv.fail_on_pre_test:
+            exit_code = 2
     print(f"{len(all_targets) - num_fail}/{len(all_targets)} targets succeeded")
     if num_fail > 0:
         exit_code = 1
 
 if __name__ == "__main__":
+    if sys.platform == "win32":
+        loop = asyncio.ProactorEventLoop()
+    else:
+        loop = asyncio.get_event_loop()
+
     loop.run_until_complete(main())
     loop.close()
     sys.exit(exit_code)

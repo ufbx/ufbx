@@ -108,3 +108,42 @@ UFBXT_FILE_TEST(maya_constraint_multi)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(maya_human_ik)
+#if UFBXT_IMPL
+{
+	uint32_t ik_count = 0;
+	uint32_t fk_count = 0;
+	uint32_t unknown_count = 0;
+	for (size_t i = 0; i < scene->markers.count; i++) {
+		ufbx_marker *marker = scene->markers.data[i];
+		if (marker->type == UFBX_MARKER_IK_EFFECTOR) {
+			ik_count++;
+		} else if (marker->type == UFBX_MARKER_FK_EFFECTOR) {
+			fk_count++;
+		} else {
+			unknown_count++;
+		}
+	}
+
+	ufbxt_assert(ik_count == 28);
+	ufbxt_assert(fk_count == 62);
+	ufbxt_assert(unknown_count == 0);
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Character1_Ctrl_HipsEffector");
+		ufbxt_assert(node);
+		ufbxt_assert(node->attrib_type == UFBX_ELEMENT_MARKER);
+		ufbx_marker *marker = (ufbx_marker*)node->attrib;
+		ufbxt_assert(marker->type == UFBX_MARKER_IK_EFFECTOR);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Character1_Ctrl_RightFoot");
+		ufbxt_assert(node);
+		ufbxt_assert(node->attrib_type == UFBX_ELEMENT_MARKER);
+		ufbx_marker *marker = (ufbx_marker*)node->attrib;
+		ufbxt_assert(marker->type == UFBX_MARKER_FK_EFFECTOR);
+	}
+}
+#endif

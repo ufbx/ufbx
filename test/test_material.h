@@ -5,43 +5,64 @@ void ufbxt_check_texture_content(ufbx_scene *scene, ufbx_texture *texture, const
 {
 	char buf[512];
 
-	ufbxt_assert(texture->content_size > 0);
-	ufbxt_assert(texture->content);
+	ufbxt_assert(texture->content.size > 0);
+	ufbxt_assert(texture->content.data);
 
 	snprintf(buf, sizeof(buf), "%stextures/%s", data_root, filename);
-	void *ref = malloc(texture->content_size);
+	void *ref = malloc(texture->content.size);
 	ufbxt_assert(ref);
 
 	FILE *f = fopen(buf, "rb");
 	ufbxt_assert(f);
-	size_t num_read = fread(ref, 1, texture->content_size, f);
+	size_t num_read = fread(ref, 1, texture->content.size, f);
 	fclose(f);
 
-	ufbxt_assert(num_read == texture->content_size);
-	ufbxt_assert(!memcmp(ref, texture->content, texture->content_size));
+	ufbxt_assert(num_read == texture->content.size);
+	ufbxt_assert(!memcmp(ref, texture->content.data, texture->content.size));
 
 	free(ref);
 }
 
-void ufbxt_check_material_texture(ufbx_scene *scene, ufbx_texture *texture, const char *filename, bool require_content)
+void ufbxt_check_material_texture_ex(ufbx_scene *scene, ufbx_texture *texture, const char *directory, const char *filename, bool require_content)
 {
 	char buf[512];
 
-	snprintf(buf, sizeof(buf), "textures\\%s", filename);
+	snprintf(buf, sizeof(buf), "%s%s", directory, filename);
 	ufbxt_assert(!strcmp(texture->relative_filename.data, buf));
 
 	if (require_content && (scene->metadata.version >= 7000 || !scene->metadata.ascii)) {
-		ufbxt_assert(texture->content);
+		ufbxt_assert(texture->content.size);
 	}
 
-	if (texture->content) {
+	if (texture->content.size) {
 		ufbxt_check_texture_content(scene, texture, filename);
 	}
+}
+
+void ufbxt_check_material_texture(ufbx_scene *scene, ufbx_texture *texture, const char *filename, bool require_content)
+{
+	ufbxt_check_material_texture_ex(scene, texture, "textures\\", filename, require_content);
 }
 
 #endif
 
 UFBXT_FILE_TEST(maya_textured_cube)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "phong1");
+	ufbxt_assert(material);
+	ufbxt_assert(material->textures.count == 6);
+
+	ufbxt_check_material_texture(scene, material->fbx.diffuse_color.texture, "checkerboard_diffuse.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.specular_color.texture, "checkerboard_specular.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.reflection_color.texture, "checkerboard_reflection.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.transparency_color.texture, "checkerboard_transparency.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.emission_color.texture, "checkerboard_emissive.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.ambient_color.texture, "checkerboard_ambient.png", true);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_texture_split)
 #if UFBXT_IMPL
 {
 	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "phong1");
@@ -72,13 +93,13 @@ UFBXT_TEST(ignore_embedded)
 		ufbxt_check_scene(scene);
 		
 		for (size_t i = 0; i < scene->videos.count; i++) {
-			ufbxt_assert(scene->videos.data[i]->content == NULL);
-			ufbxt_assert(scene->videos.data[i]->content_size == 0);
+			ufbxt_assert(scene->videos.data[i]->content.data == NULL);
+			ufbxt_assert(scene->videos.data[i]->content.size == 0);
 		}
 		
 		for (size_t i = 0; i < scene->textures.count; i++) {
-			ufbxt_assert(scene->textures.data[i]->content == NULL);
-			ufbxt_assert(scene->textures.data[i]->content_size == 0);
+			ufbxt_assert(scene->textures.data[i]->content.data == NULL);
+			ufbxt_assert(scene->textures.data[i]->content.size == 0);
 		}
 
 		ufbx_free_scene(scene);
@@ -119,12 +140,436 @@ UFBXT_FILE_TEST(maya_arnold_textures)
 	ufbxt_assert(material);
 	ufbxt_assert(material->textures.count == 5);
 
-	ufbxt_assert(material->shader_type == UFBX_SHADER_ARNOLD);
+	ufbxt_assert(material->shader_type == UFBX_SHADER_ARNOLD_STANDARD_SURFACE);
 	ufbxt_check_material_texture(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png", true);
 	ufbxt_check_material_texture(scene, material->pbr.specular_color.texture, "checkerboard_specular.png", true);
 	ufbxt_check_material_texture(scene, material->pbr.roughness.texture, "checkerboard_roughness.png", true);
-	ufbxt_check_material_texture(scene, material->pbr.metallic.texture, "checkerboard_metallic.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.metalness.texture, "checkerboard_metallic.png", true);
 	ufbxt_check_material_texture(scene, material->pbr.diffuse_roughness.texture, "checkerboard_roughness.png", true);
+}
+#endif
+
+UFBXT_FILE_TEST(max_physical_material_properties)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "PhysicalMaterial");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL);
+
+	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_factor.value_real));
+	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value_vec4.x));
+	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value_vec4.y));
+	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value_vec4.z));
+	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.base_color.value_vec4.w));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.roughness.value_real));
+	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.metalness.value_real));
+	ufbxt_assert(80 == (int)round(100.0f * material->pbr.specular_ior.value_real)); // 3ds Max doesn't allow lower than 0.1 IOR
+	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.transmission_factor.value_real));
+	ufbxt_assert(10 == (int)round(100.0f * material->pbr.transmission_color.value_vec4.x));
+	ufbxt_assert(11 == (int)round(100.0f * material->pbr.transmission_color.value_vec4.y));
+	ufbxt_assert(12 == (int)round(100.0f * material->pbr.transmission_color.value_vec4.z));
+	ufbxt_assert(13 == (int)round(100.0f * material->pbr.transmission_color.value_vec4.w));
+	ufbxt_assert(14 == (int)round(100.0f * material->pbr.transmission_roughness.value_real));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.transmission_depth.value_real)); // ??? Unit conversion probably
+	ufbxt_assert(16 == (int)round(100.0f * material->pbr.subsurface_factor.value_real));
+	ufbxt_assert(17 == (int)round(100.0f * material->pbr.subsurface_tint_color.value_vec4.x));
+	ufbxt_assert(18 == (int)round(100.0f * material->pbr.subsurface_tint_color.value_vec4.y));
+	ufbxt_assert(19 == (int)round(100.0f * material->pbr.subsurface_tint_color.value_vec4.z));
+	ufbxt_assert(20 == (int)round(100.0f * material->pbr.subsurface_tint_color.value_vec4.w));
+	ufbxt_assert(21 == (int)round(100.0f * material->pbr.subsurface_color.value_vec4.x));
+	ufbxt_assert(22 == (int)round(100.0f * material->pbr.subsurface_color.value_vec4.y));
+	ufbxt_assert(23 == (int)round(100.0f * material->pbr.subsurface_color.value_vec4.z));
+	ufbxt_assert(24 == (int)round(100.0f * material->pbr.subsurface_color.value_vec4.w));
+	ufbxt_assert(10 == (int)round(100.0f * material->pbr.subsurface_radius.value_real)); // ??? Unit conversion probably
+	ufbxt_assert(26 == (int)round(100.0f * material->pbr.subsurface_scale.value_real));
+	ufbxt_assert(27 == (int)round(100.0f * material->pbr.emission_factor.value_real));
+	ufbxt_assert(28 == (int)round(100.0f * material->pbr.emission_color.value_vec4.x));
+	ufbxt_assert(29 == (int)round(100.0f * material->pbr.emission_color.value_vec4.y));
+	ufbxt_assert(30 == (int)round(100.0f * material->pbr.emission_color.value_vec4.z));
+	ufbxt_assert(31 == (int)round(100.0f * material->pbr.emission_color.value_vec4.w));
+	ufbxt_assert(32 == (int)round(100.0f * material->pbr.specular_anisotropy.value_real));
+	ufbxt_assert(33 == (int)round(100.0f * material->pbr.specular_rotation.value_real));
+	ufbxt_assert(34 == (int)round(100.0f * material->pbr.normal_map.value_real));
+	ufbxt_assert(35 == (int)round(100.0f * material->pbr.coat_normal.value_real));
+	ufbxt_assert(36 == (int)round(100.0f * material->pbr.displacement_map.value_real));
+	ufbxt_assert(37 == (int)round(100.0f * material->pbr.diffuse_roughness.value_real));
+	ufbxt_assert(38 == (int)round(100.0f * material->pbr.coat_factor.value_real));
+	ufbxt_assert(39 == (int)round(100.0f * material->pbr.coat_color.value_vec4.x));
+	ufbxt_assert(40 == (int)round(100.0f * material->pbr.coat_color.value_vec4.y));
+	ufbxt_assert(41 == (int)round(100.0f * material->pbr.coat_color.value_vec4.z));
+	ufbxt_assert(42 == (int)round(100.0f * material->pbr.coat_color.value_vec4.w));
+	ufbxt_assert(43 == (int)round(100.0f * material->pbr.coat_roughness.value_real));
+	ufbxt_assert(44 == (int)round(100.0f * material->pbr.coat_ior.value_real));
+	ufbxt_assert(45 == (int)round(100.0f * material->pbr.coat_affect_base_color.value_real));
+	ufbxt_assert(46 == (int)round(100.0f * material->pbr.coat_affect_base_roughness.value_real));
+
+	ufbxt_assert(material->pbr.base_factor.texture_enabled);
+	ufbxt_assert(material->pbr.base_color.texture_enabled);
+	ufbxt_assert(material->pbr.specular_factor.texture_enabled);
+	ufbxt_assert(material->pbr.specular_color.texture_enabled);
+	ufbxt_assert(material->pbr.roughness.texture_enabled);
+	ufbxt_assert(material->pbr.metalness.texture_enabled);
+	ufbxt_assert(material->pbr.diffuse_roughness.texture_enabled);
+	ufbxt_assert(material->pbr.specular_anisotropy.texture_enabled);
+	ufbxt_assert(material->pbr.specular_rotation.texture_enabled);
+	ufbxt_assert(material->pbr.transmission_factor.texture_enabled);
+	ufbxt_assert(material->pbr.transmission_color.texture_enabled);
+	ufbxt_assert(material->pbr.transmission_roughness.texture_enabled);
+	ufbxt_assert(material->pbr.specular_ior.texture_enabled);
+	ufbxt_assert(material->pbr.subsurface_factor.texture_enabled);
+	ufbxt_assert(material->pbr.subsurface_tint_color.texture_enabled);
+	ufbxt_assert(material->pbr.subsurface_scale.texture_enabled);
+	ufbxt_assert(material->pbr.emission_factor.texture_enabled);
+	ufbxt_assert(material->pbr.emission_color.texture_enabled);
+	ufbxt_assert(material->pbr.coat_factor.texture_enabled);
+	ufbxt_assert(material->pbr.coat_color.texture_enabled);
+	ufbxt_assert(material->pbr.coat_roughness.texture_enabled);
+	ufbxt_assert(material->pbr.normal_map.texture_enabled);
+	ufbxt_assert(material->pbr.coat_normal.texture_enabled);
+	ufbxt_assert(material->pbr.displacement_map.texture_enabled);
+	ufbxt_assert(material->pbr.opacity.texture_enabled);
+
+	ufbxt_assert(!material->pbr.roughness.texture_inverted);
+	ufbxt_assert(!material->pbr.transmission_roughness.texture_inverted);
+	ufbxt_assert(!material->pbr.coat_roughness.texture_inverted);
+}
+#endif
+
+UFBXT_FILE_TEST(max_physical_material_inverted)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "InvertedMaterial");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL);
+
+	ufbxt_assert(material->pbr.roughness.texture_inverted);
+	ufbxt_assert_close_real(err, material->pbr.roughness.value_real, 0.9f);
+	ufbxt_assert(material->pbr.transmission_roughness.texture_inverted);
+	ufbxt_assert_close_real(err, material->pbr.transmission_roughness.value_real, 0.8f);
+	ufbxt_assert(material->pbr.coat_roughness.texture_inverted);
+	ufbxt_assert_close_real(err, material->pbr.coat_roughness.value_real, 0.7f);
+}
+#endif
+
+UFBXT_FILE_TEST(max_physical_material_textures)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "PhysicalMaterial");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL);
+	ufbxt_check_material_texture(scene, material->pbr.base_factor.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.specular_factor.texture, "checkerboard_reflection.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.specular_color.texture, "checkerboard_reflection.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.roughness.texture, "checkerboard_roughness.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.metalness.texture, "checkerboard_metallic.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.diffuse_roughness.texture, "checkerboard_roughness.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.specular_anisotropy.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.specular_rotation.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.transmission_factor.texture, "checkerboard_transparency.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.transmission_color.texture, "checkerboard_transparency.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.transmission_roughness.texture, "checkerboard_roughness.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.specular_ior.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.subsurface_factor.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.subsurface_tint_color.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.subsurface_scale.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.emission_factor.texture, "checkerboard_emissive.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.coat_factor.texture, "checkerboard_specular.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.coat_color.texture, "checkerboard_specular.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.coat_roughness.texture, "checkerboard_specular.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.normal_map.texture, "checkerboard_bump.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.coat_normal.texture, "checkerboard_bump.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.displacement_map.texture, "checkerboard_displacement.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.opacity.texture, "checkerboard_transparency.png", true);
+
+}
+#endif
+
+UFBXT_FILE_TEST(max_pbr_metal_rough_material)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "01 - Default");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_3DS_MAX_PBR_METAL_ROUGH);
+
+	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_color.value_vec4.x));
+	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value_vec4.y));
+	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value_vec4.z));
+	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value_vec4.w));
+	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.metalness.value_real));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.roughness.value_real));
+	// ufbxt_assert( 7 == (int)round(100.0f * material->pbr.normal_map.value_real)); (not in file?!)
+	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.emission_color.value_vec4.x));
+	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.emission_color.value_vec4.y));
+	ufbxt_assert(10 == (int)round(100.0f * material->pbr.emission_color.value_vec4.z));
+	ufbxt_assert(11 == (int)round(100.0f * material->pbr.emission_color.value_vec4.w));
+	ufbxt_assert(12 == (int)round(100.0f * material->pbr.displacement_map.value_real));
+
+	ufbxt_assert_close_real(err, material->pbr.base_factor.value_real, 1.0f);
+	ufbxt_assert_close_real(err, material->pbr.emission_factor.value_real, 1.0f);
+
+	ufbxt_check_material_texture(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.metalness.texture, "checkerboard_metallic.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.roughness.texture, "checkerboard_roughness.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.ambient_occlusion.texture, "checkerboard_ambient.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.normal_map.texture, "checkerboard_normal.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.displacement_map.texture, "checkerboard_displacement.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.opacity.texture, "checkerboard_transparency.png", false);
+
+	ufbxt_assert(!material->pbr.roughness.texture_inverted);
+
+	ufbxt_assert(material->features.metalness.enabled);
+	ufbxt_assert(!material->features.specular.enabled);
+}
+#endif
+
+UFBXT_FILE_TEST(max_pbr_metal_gloss_material)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "01 - Default");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_3DS_MAX_PBR_METAL_ROUGH);
+
+	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_color.value_vec4.x));
+	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value_vec4.y));
+	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value_vec4.z));
+	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value_vec4.w));
+	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.metalness.value_real));
+	ufbxt_assert(94 == (int)round(100.0f * material->pbr.roughness.value_real)); // gloss!
+	// ufbxt_assert( 7 == (int)round(100.0f * material->pbr.normal_map.value_real)); (not in file?!)
+	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.emission_color.value_vec4.x));
+	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.emission_color.value_vec4.y));
+	ufbxt_assert(10 == (int)round(100.0f * material->pbr.emission_color.value_vec4.z));
+	ufbxt_assert(11 == (int)round(100.0f * material->pbr.emission_color.value_vec4.w));
+	ufbxt_assert(12 == (int)round(100.0f * material->pbr.displacement_map.value_real));
+
+	ufbxt_assert_close_real(err, material->pbr.base_factor.value_real, 1.0f);
+	ufbxt_assert_close_real(err, material->pbr.emission_factor.value_real, 1.0f);
+
+	ufbxt_check_material_texture(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.metalness.texture, "checkerboard_metallic.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.roughness.texture, "checkerboard_roughness.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.ambient_occlusion.texture, "checkerboard_ambient.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.normal_map.texture, "checkerboard_normal.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.displacement_map.texture, "checkerboard_displacement.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.opacity.texture, "checkerboard_transparency.png", false);
+
+	ufbxt_assert(material->pbr.roughness.texture_inverted);
+
+	ufbxt_assert(material->features.metalness.enabled);
+	ufbxt_assert(!material->features.specular.enabled);
+}
+#endif
+
+UFBXT_FILE_TEST(max_pbr_spec_rough_material)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "02 - Default");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_3DS_MAX_PBR_SPEC_GLOSS);
+
+	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_color.value_vec4.x));
+	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value_vec4.y));
+	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value_vec4.z));
+	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value_vec4.w));
+	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.specular_color.value_vec4.x));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.specular_color.value_vec4.y));
+	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.specular_color.value_vec4.z));
+	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.specular_color.value_vec4.w));
+	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.roughness.value_real));
+	// ufbxt_assert(10 == (int)round(100.0f * material->pbr.normal_map.value_real)); (not in file?!)
+	ufbxt_assert(12 == (int)round(100.0f * material->pbr.emission_color.value_vec4.x));
+	ufbxt_assert(13 == (int)round(100.0f * material->pbr.emission_color.value_vec4.y));
+	ufbxt_assert(14 == (int)round(100.0f * material->pbr.emission_color.value_vec4.z));
+	ufbxt_assert(15 == (int)round(100.0f * material->pbr.emission_color.value_vec4.w));
+	ufbxt_assert(16 == (int)round(100.0f * material->pbr.displacement_map.value_real));
+
+	ufbxt_assert_close_real(err, material->pbr.base_factor.value_real, 1.0f);
+	ufbxt_assert_close_real(err, material->pbr.emission_factor.value_real, 1.0f);
+
+	ufbxt_check_material_texture(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.specular_color.texture, "checkerboard_specular.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.roughness.texture, "checkerboard_weight.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.ambient_occlusion.texture, "checkerboard_ambient.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.normal_map.texture, "checkerboard_normal.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.displacement_map.texture, "checkerboard_displacement.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.opacity.texture, "checkerboard_transparency.png", false);
+
+	ufbxt_assert(!material->pbr.roughness.texture_inverted);
+
+	ufbxt_assert(!material->features.metalness.enabled);
+	ufbxt_assert(material->features.specular.enabled);
+}
+#endif
+
+UFBXT_FILE_TEST(max_pbr_spec_gloss_material)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "02 - Default");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_3DS_MAX_PBR_SPEC_GLOSS);
+
+	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_color.value_vec4.x));
+	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value_vec4.y));
+	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value_vec4.z));
+	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value_vec4.w));
+	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.specular_color.value_vec4.x));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.specular_color.value_vec4.y));
+	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.specular_color.value_vec4.z));
+	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.specular_color.value_vec4.w));
+	ufbxt_assert(91 == (int)round(100.0f * material->pbr.roughness.value_real)); // gloss!
+	// ufbxt_assert(10 == (int)round(100.0f * material->pbr.normal_map.value_real)); (not in file?!)
+	ufbxt_assert(12 == (int)round(100.0f * material->pbr.emission_color.value_vec4.x));
+	ufbxt_assert(13 == (int)round(100.0f * material->pbr.emission_color.value_vec4.y));
+	ufbxt_assert(14 == (int)round(100.0f * material->pbr.emission_color.value_vec4.z));
+	ufbxt_assert(15 == (int)round(100.0f * material->pbr.emission_color.value_vec4.w));
+	ufbxt_assert(16 == (int)round(100.0f * material->pbr.displacement_map.value_real));
+
+	ufbxt_assert_close_real(err, material->pbr.base_factor.value_real, 1.0f);
+	ufbxt_assert_close_real(err, material->pbr.emission_factor.value_real, 1.0f);
+
+	ufbxt_check_material_texture(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.specular_color.texture, "checkerboard_specular.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.roughness.texture, "checkerboard_weight.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.ambient_occlusion.texture, "checkerboard_ambient.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.normal_map.texture, "checkerboard_normal.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.displacement_map.texture, "checkerboard_displacement.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.opacity.texture, "checkerboard_transparency.png", false);
+
+	ufbxt_assert(material->pbr.roughness.texture_inverted);
+
+	ufbxt_assert(!material->features.metalness.enabled);
+	ufbxt_assert(material->features.specular.enabled);
+}
+#endif
+
+UFBXT_FILE_TEST(max_gltf_material)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "01 - Default");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_GLTF_MATERIAL);
+
+	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_color.value_vec4.x));
+	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value_vec4.y));
+	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value_vec4.z));
+	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value_vec4.w));
+	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.metalness.value_real));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.roughness.value_real));
+	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.normal_map.value_real));
+	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.ambient_occlusion.value_real));
+	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.emission_color.value_vec4.x));
+	ufbxt_assert(10 == (int)round(100.0f * material->pbr.emission_color.value_vec4.y));
+	ufbxt_assert(11 == (int)round(100.0f * material->pbr.emission_color.value_vec4.z));
+	ufbxt_assert(12 == (int)round(100.0f * material->pbr.emission_color.value_vec4.w));
+	ufbxt_assert(13 == (int)round(100.0f * material->pbr.coat_factor.value_real));
+	ufbxt_assert(14 == (int)round(100.0f * material->pbr.coat_roughness.value_real));
+	ufbxt_assert(15 == (int)round(100.0f * material->pbr.coat_normal.value_real));
+	ufbxt_assert(16 == (int)round(100.0f * material->pbr.sheen_color.value_vec4.x));
+	ufbxt_assert(17 == (int)round(100.0f * material->pbr.sheen_color.value_vec4.y));
+	ufbxt_assert(18 == (int)round(100.0f * material->pbr.sheen_color.value_vec4.z));
+	ufbxt_assert(19 == (int)round(100.0f * material->pbr.sheen_color.value_vec4.w));
+	ufbxt_assert(20 == (int)round(100.0f * material->pbr.sheen_roughness.value_real));
+	ufbxt_assert(21 == (int)round(100.0f * material->pbr.specular_factor.value_real));
+	ufbxt_assert(22 == (int)round(100.0f * material->pbr.specular_color.value_vec4.x));
+	ufbxt_assert(23 == (int)round(100.0f * material->pbr.specular_color.value_vec4.y));
+	ufbxt_assert(24 == (int)round(100.0f * material->pbr.specular_color.value_vec4.z));
+	ufbxt_assert(25 == (int)round(100.0f * material->pbr.specular_color.value_vec4.w));
+	ufbxt_assert(26 == (int)round(100.0f * material->pbr.transmission_factor.value_real));
+	// TODO? Volume
+	ufbxt_assert(133 == (int)round(100.0f * material->pbr.specular_ior.value_real));
+
+	ufbxt_assert_close_real(err, material->pbr.base_factor.value_real, 1.0f);
+	ufbxt_assert_close_real(err, material->pbr.emission_factor.value_real, 1.0f);
+
+	ufbxt_check_material_texture(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.opacity.texture, "checkerboard_transparency.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.metalness.texture, "checkerboard_metallic.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.roughness.texture, "checkerboard_roughness.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.normal_map.texture, "checkerboard_normal.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.ambient_occlusion.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.coat_factor.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.coat_roughness.texture, "checkerboard_roughness.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.coat_normal.texture, "checkerboard_normal.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.sheen_color.texture, "checkerboard_ambient.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.sheen_roughness.texture, "checkerboard_roughness.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.specular_factor.texture, "checkerboard_weight.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.specular_color.texture, "checkerboard_specular.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.transmission_factor.texture, "checkerboard_transparency.png", true);
+
+	ufbxt_assert(material->features.metalness.enabled);
+	ufbxt_assert(!material->features.metalness.is_explicit);
+	ufbxt_assert(material->features.double_sided.enabled);
+	ufbxt_assert(material->features.double_sided.is_explicit);
+	ufbxt_assert(material->features.coat.enabled);
+	ufbxt_assert(material->features.coat.is_explicit);
+	ufbxt_assert(material->features.sheen.enabled);
+	ufbxt_assert(material->features.sheen.is_explicit);
+	ufbxt_assert(material->features.specular.enabled);
+	ufbxt_assert(material->features.specular.is_explicit);
+	ufbxt_assert(material->features.transmission.enabled);
+	ufbxt_assert(material->features.transmission.is_explicit);
+	ufbxt_assert(material->features.ior.enabled);
+	ufbxt_assert(material->features.ior.is_explicit);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_shaderfx_pbs_material)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "StingrayPBS1");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_SHADERFX_GRAPH);
+
+	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_color.value_vec3.x));
+	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value_vec3.y));
+	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value_vec3.z));
+	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.metalness.value_vec3.x));
+	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.roughness.value_vec3.x));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.emission_color.value_vec3.x));
+	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.emission_color.value_vec3.y));
+	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.emission_color.value_vec3.z));
+	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.emission_factor.value_real));
+	ufbxt_assert_close_real(err, material->pbr.base_factor.value_real, 1.0f);
+
+	ufbxt_check_material_texture(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.normal_map.texture, "checkerboard_normal.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.metalness.texture, "checkerboard_metallic.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.roughness.texture, "checkerboard_roughness.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png", true);
+	ufbxt_check_material_texture(scene, material->pbr.ambient_occlusion.texture, "checkerboard_weight.png", true);
+
+	ufbxt_assert(material->pbr.base_color.texture_enabled == true);
+	ufbxt_assert(material->pbr.normal_map.texture_enabled == false);
+	ufbxt_assert(material->pbr.metalness.texture_enabled == true);
+	ufbxt_assert(material->pbr.roughness.texture_enabled == false);
+	ufbxt_assert(material->pbr.emission_color.texture_enabled == true);
+	ufbxt_assert(material->pbr.ambient_occlusion.texture_enabled == false);
+
+	ufbx_shader *shader = material->shader;
+	ufbxt_assert(shader);
+
+	if (scene->metadata.version >= 7000) {
+		ufbx_blob blob = ufbx_find_blob(&shader->props, "ShaderGraph", ufbx_empty_blob);
+		ufbxt_assert(blob.size == 32918);
+		uint32_t hash_ref = ufbxt_fnv1a(blob.data, blob.size);
+		ufbxt_assert(hash_ref == 0x7be121c5u);
+	}
 }
 #endif
 
@@ -154,7 +599,7 @@ UFBXT_FILE_TEST(blender_293_textures)
 	ufbxt_assert(material->shader_type == UFBX_SHADER_BLENDER_PHONG);
 	ufbxt_assert(!strcmp(material->pbr.base_color.texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
 	ufbxt_assert(!strcmp(material->pbr.roughness.texture->relative_filename.data, "textures\\checkerboard_roughness.png"));
-	ufbxt_assert(!strcmp(material->pbr.metallic.texture->relative_filename.data, "textures\\checkerboard_metallic.png"));
+	ufbxt_assert(!strcmp(material->pbr.metalness.texture->relative_filename.data, "textures\\checkerboard_metallic.png"));
 	ufbxt_assert(!strcmp(material->pbr.emission_color.texture->relative_filename.data, "textures\\checkerboard_emissive.png"));
 	ufbxt_assert(!strcmp(material->pbr.opacity.texture->relative_filename.data, "textures\\checkerboard_weight.png"));
 }
@@ -170,7 +615,7 @@ UFBXT_FILE_TEST(blender_293_embedded_textures)
 	ufbxt_assert(material->shader_type == UFBX_SHADER_BLENDER_PHONG);
 	ufbxt_check_texture_content(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png");
 	ufbxt_check_texture_content(scene, material->pbr.roughness.texture, "checkerboard_roughness.png");
-	ufbxt_check_texture_content(scene, material->pbr.metallic.texture, "checkerboard_metallic.png");
+	ufbxt_check_texture_content(scene, material->pbr.metalness.texture, "checkerboard_metallic.png");
 	ufbxt_check_texture_content(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png");
 	ufbxt_check_texture_content(scene, material->pbr.opacity.texture, "checkerboard_weight.png");
 }
@@ -183,10 +628,12 @@ UFBXT_FILE_TEST(blender_293_material_mapping)
 	ufbxt_assert(material);
 
 	ufbxt_assert(material->shader_type == UFBX_SHADER_BLENDER_PHONG);
-	ufbxt_assert_close_real(err, material->fbx.specular_exponent.value.x, 76.913f);
-	ufbxt_assert_close_real(err, material->fbx.transparency_factor.value.x, 0.544f);
-	ufbxt_assert_close_real(err, material->pbr.opacity.value.x, 0.456f);
-	ufbxt_assert_close_real(err, material->pbr.roughness.value.x, 0.123f);
+	ufbxt_assert_close_real(err, material->fbx.specular_exponent.value_vec3.x, 76.913f);
+	ufbxt_assert_close_real(err, material->fbx.transparency_factor.value_vec3.x, 0.544f);
+	ufbxt_assert_close_real(err, material->pbr.opacity.value_vec3.x, 0.456f);
+	ufbxt_assert_close_real(err, material->pbr.roughness.value_vec3.x, 0.123f);
+
+	ufbxt_assert(material->pbr.roughness.texture_inverted == false);
 }
 #endif
 
@@ -204,19 +651,21 @@ UFBXT_FILE_TEST(maya_different_shaders)
 
 	ufbxt_assert(lambert1->shader_type == UFBX_SHADER_FBX_LAMBERT);
 	ufbxt_assert(!strcmp(lambert1->shading_model_name.data, "lambert"));
-	ufbxt_assert_close_vec3(err, lambert1->fbx.diffuse_color.value, g);
-	ufbxt_assert_close_vec3(err, lambert1->pbr.base_color.value, g);
-	ufbxt_assert_close_real(err, lambert1->pbr.specular_factor.value.x, 0.0f);
+	ufbxt_assert_close_vec3(err, lambert1->fbx.diffuse_color.value_vec3, g);
+	ufbxt_assert_close_vec3(err, lambert1->pbr.base_color.value_vec3, g);
+	ufbxt_assert_close_real(err, lambert1->pbr.specular_factor.value_vec3.x, 0.0f);
+	ufbxt_assert(lambert1->pbr.roughness.texture_inverted == false);
 
 	ufbxt_assert(phong1->shader_type == UFBX_SHADER_FBX_PHONG);
 	ufbxt_assert(!strcmp(phong1->shading_model_name.data, "phong"));
-	ufbxt_assert_close_vec3(err, phong1->fbx.diffuse_color.value, b);
-	ufbxt_assert_close_vec3(err, phong1->pbr.base_color.value, b);
-	ufbxt_assert_close_real(err, phong1->pbr.specular_factor.value.x, 1.0f);
+	ufbxt_assert_close_vec3(err, phong1->fbx.diffuse_color.value_vec3, b);
+	ufbxt_assert_close_vec3(err, phong1->pbr.base_color.value_vec3, b);
+	ufbxt_assert_close_real(err, phong1->pbr.specular_factor.value_vec3.x, 1.0f);
+	ufbxt_assert(phong1->pbr.roughness.texture_inverted == true);
 
-	ufbxt_assert(arnold->shader_type == UFBX_SHADER_ARNOLD);
+	ufbxt_assert(arnold->shader_type == UFBX_SHADER_ARNOLD_STANDARD_SURFACE);
 	ufbxt_assert(!strcmp(arnold->shading_model_name.data, "unknown"));
-	ufbxt_assert_close_vec3(err, arnold->pbr.base_color.value, r);
+	ufbxt_assert_close_vec3(err, arnold->pbr.base_color.value_vec3, r);
 }
 #endif
 
@@ -255,85 +704,93 @@ UFBXT_FILE_TEST(maya_arnold_properties)
 {
 	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "aiStandardSurface1");
 	ufbxt_assert(material);
-	ufbxt_assert(material->shader_type == UFBX_SHADER_ARNOLD);
+	ufbxt_assert(material->shader_type == UFBX_SHADER_ARNOLD_STANDARD_SURFACE);
 
-	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_factor.value.x));
-	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value.x));
-	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value.y));
-	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value.z));
-	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.diffuse_roughness.value.x));
-	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.metallic.value.x));
-	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.specular_factor.value.x));
-	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.specular_color.value.x));
-	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.specular_color.value.y));
-	ufbxt_assert(10 == (int)round(100.0f * material->pbr.specular_color.value.z));
-	ufbxt_assert(11 == (int)round(100.0f * material->pbr.roughness.value.x));
-	ufbxt_assert(12 == (int)round(100.0f * material->pbr.specular_ior.value.x));
-	ufbxt_assert(13 == (int)round(100.0f * material->pbr.specular_anisotropy.value.x));
-	ufbxt_assert(14 == (int)round(100.0f * material->pbr.specular_rotation.value.x));
-	ufbxt_assert(15 == (int)round(100.0f * material->pbr.transmission_factor.value.x));
-	ufbxt_assert(16 == (int)round(100.0f * material->pbr.transmission_color.value.x));
-	ufbxt_assert(17 == (int)round(100.0f * material->pbr.transmission_color.value.y));
-	ufbxt_assert(18 == (int)round(100.0f * material->pbr.transmission_color.value.z));
-	ufbxt_assert(19 == (int)round(100.0f * material->pbr.transmission_depth.value.x));
-	ufbxt_assert(20 == (int)round(100.0f * material->pbr.transmission_scatter.value.x));
-	ufbxt_assert(21 == (int)round(100.0f * material->pbr.transmission_scatter.value.y));
-	ufbxt_assert(22 == (int)round(100.0f * material->pbr.transmission_scatter.value.z));
-	ufbxt_assert(23 == (int)round(100.0f * material->pbr.transmission_scatter_anisotropy.value.x));
-	ufbxt_assert(24 == (int)round(100.0f * material->pbr.transmission_dispersion.value.x));
-	ufbxt_assert(25 == (int)round(100.0f * material->pbr.transmission_roughness.value.x));
-	ufbxt_assert(26 == (int)round(100.0f * material->pbr.subsurface_factor.value.x));
-	ufbxt_assert(27 == (int)round(100.0f * material->pbr.subsurface_color.value.x));
-	ufbxt_assert(28 == (int)round(100.0f * material->pbr.subsurface_color.value.y));
-	ufbxt_assert(29 == (int)round(100.0f * material->pbr.subsurface_color.value.z));
-	ufbxt_assert(30 == (int)round(100.0f * material->pbr.subsurface_radius.value.x));
-	ufbxt_assert(31 == (int)round(100.0f * material->pbr.subsurface_radius.value.y));
-	ufbxt_assert(32 == (int)round(100.0f * material->pbr.subsurface_radius.value.z));
-	ufbxt_assert(33 == (int)round(100.0f * material->pbr.subsurface_scale.value.x));
-	ufbxt_assert(34 == (int)round(100.0f * material->pbr.subsurface_anisotropy.value.x));
-	ufbxt_assert(35 == (int)round(100.0f * material->pbr.coat_factor.value.x));
-	ufbxt_assert(36 == (int)round(100.0f * material->pbr.coat_color.value.x));
-	ufbxt_assert(37 == (int)round(100.0f * material->pbr.coat_color.value.y));
-	ufbxt_assert(38 == (int)round(100.0f * material->pbr.coat_color.value.z));
-	ufbxt_assert(39 == (int)round(100.0f * material->pbr.coat_roughness.value.x));
-	ufbxt_assert(40 == (int)round(100.0f * material->pbr.coat_ior.value.x));
-	ufbxt_assert(41 == (int)round(100.0f * material->pbr.coat_anisotropy.value.x));
-	ufbxt_assert(42 == (int)round(100.0f * material->pbr.coat_rotation.value.x));
-	ufbxt_assert(43 == (int)round(100.0f * material->pbr.coat_normal.value.x));
-	ufbxt_assert(44 == (int)round(100.0f * material->pbr.coat_normal.value.y));
-	ufbxt_assert(45 == (int)round(100.0f * material->pbr.coat_normal.value.z));
-	ufbxt_assert(46 == (int)round(100.0f * material->pbr.sheen_factor.value.x));
-	ufbxt_assert(47 == (int)round(100.0f * material->pbr.sheen_color.value.x));
-	ufbxt_assert(48 == (int)round(100.0f * material->pbr.sheen_color.value.y));
-	ufbxt_assert(49 == (int)round(100.0f * material->pbr.sheen_color.value.z));
-	ufbxt_assert(50 == (int)round(100.0f * material->pbr.sheen_roughness.value.x));
-	ufbxt_assert(51 == (int)round(100.0f * material->pbr.emission_factor.value.x));
-	ufbxt_assert(52 == (int)round(100.0f * material->pbr.emission_color.value.x));
-	ufbxt_assert(53 == (int)round(100.0f * material->pbr.emission_color.value.y));
-	ufbxt_assert(54 == (int)round(100.0f * material->pbr.emission_color.value.z));
-	ufbxt_assert(55 == (int)round(100.0f * material->pbr.thin_film_thickness.value.x));
-	ufbxt_assert(56 == (int)round(100.0f * material->pbr.thin_film_ior.value.x));
-	ufbxt_assert(57 == (int)round(100.0f * material->pbr.opacity.value.x));
-	ufbxt_assert(58 == (int)round(100.0f * material->pbr.opacity.value.y));
-	ufbxt_assert(59 == (int)round(100.0f * material->pbr.opacity.value.z));
-	ufbxt_assert(60 == (int)round(100.0f * material->pbr.tangent_map.value.x));
-	ufbxt_assert(61 == (int)round(100.0f * material->pbr.tangent_map.value.y));
-	ufbxt_assert(62 == (int)round(100.0f * material->pbr.tangent_map.value.z));
-	ufbxt_assert(63 == (int)round(100.0f * material->pbr.indirect_diffuse.value.x));
-	ufbxt_assert(64 == (int)round(100.0f * material->pbr.indirect_specular.value.x));
-	ufbxt_assert(65 == (int)round(100.0f * material->pbr.matte_color.value.x));
-	ufbxt_assert(66 == (int)round(100.0f * material->pbr.matte_color.value.y));
-	ufbxt_assert(67 == (int)round(100.0f * material->pbr.matte_color.value.z));
-	ufbxt_assert(68 == (int)round(100.0f * material->pbr.matte_factor.value.x));
+	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_factor.value_vec3.x));
+	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value_vec3.x));
+	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value_vec3.y));
+	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value_vec3.z));
+	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.diffuse_roughness.value_vec3.x));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.metalness.value_vec3.x));
+	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.specular_factor.value_vec3.x));
+	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.specular_color.value_vec3.x));
+	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.specular_color.value_vec3.y));
+	ufbxt_assert(10 == (int)round(100.0f * material->pbr.specular_color.value_vec3.z));
+	ufbxt_assert(11 == (int)round(100.0f * material->pbr.roughness.value_vec3.x));
+	ufbxt_assert(12 == (int)round(100.0f * material->pbr.specular_ior.value_vec3.x));
+	ufbxt_assert(13 == (int)round(100.0f * material->pbr.specular_anisotropy.value_vec3.x));
+	ufbxt_assert(14 == (int)round(100.0f * material->pbr.specular_rotation.value_vec3.x));
+	ufbxt_assert(15 == (int)round(100.0f * material->pbr.transmission_factor.value_vec3.x));
+	ufbxt_assert(16 == (int)round(100.0f * material->pbr.transmission_color.value_vec3.x));
+	ufbxt_assert(17 == (int)round(100.0f * material->pbr.transmission_color.value_vec3.y));
+	ufbxt_assert(18 == (int)round(100.0f * material->pbr.transmission_color.value_vec3.z));
+	ufbxt_assert(19 == (int)round(100.0f * material->pbr.transmission_depth.value_vec3.x));
+	ufbxt_assert(20 == (int)round(100.0f * material->pbr.transmission_scatter.value_vec3.x));
+	ufbxt_assert(21 == (int)round(100.0f * material->pbr.transmission_scatter.value_vec3.y));
+	ufbxt_assert(22 == (int)round(100.0f * material->pbr.transmission_scatter.value_vec3.z));
+	ufbxt_assert(23 == (int)round(100.0f * material->pbr.transmission_scatter_anisotropy.value_vec3.x));
+	ufbxt_assert(24 == (int)round(100.0f * material->pbr.transmission_dispersion.value_vec3.x));
+	ufbxt_assert(25 == (int)round(100.0f * material->pbr.transmission_extra_roughness.value_vec3.x));
+	ufbxt_assert(26 == (int)round(100.0f * material->pbr.subsurface_factor.value_vec3.x));
+	ufbxt_assert(27 == (int)round(100.0f * material->pbr.subsurface_color.value_vec3.x));
+	ufbxt_assert(28 == (int)round(100.0f * material->pbr.subsurface_color.value_vec3.y));
+	ufbxt_assert(29 == (int)round(100.0f * material->pbr.subsurface_color.value_vec3.z));
+	ufbxt_assert(30 == (int)round(100.0f * material->pbr.subsurface_radius.value_vec3.x));
+	ufbxt_assert(31 == (int)round(100.0f * material->pbr.subsurface_radius.value_vec3.y));
+	ufbxt_assert(32 == (int)round(100.0f * material->pbr.subsurface_radius.value_vec3.z));
+	ufbxt_assert(33 == (int)round(100.0f * material->pbr.subsurface_scale.value_vec3.x));
+	ufbxt_assert(34 == (int)round(100.0f * material->pbr.subsurface_anisotropy.value_vec3.x));
+	ufbxt_assert(35 == (int)round(100.0f * material->pbr.coat_factor.value_vec3.x));
+	ufbxt_assert(36 == (int)round(100.0f * material->pbr.coat_color.value_vec3.x));
+	ufbxt_assert(37 == (int)round(100.0f * material->pbr.coat_color.value_vec3.y));
+	ufbxt_assert(38 == (int)round(100.0f * material->pbr.coat_color.value_vec3.z));
+	ufbxt_assert(39 == (int)round(100.0f * material->pbr.coat_roughness.value_vec3.x));
+	ufbxt_assert(40 == (int)round(100.0f * material->pbr.coat_ior.value_vec3.x));
+	ufbxt_assert(41 == (int)round(100.0f * material->pbr.coat_anisotropy.value_vec3.x));
+	ufbxt_assert(42 == (int)round(100.0f * material->pbr.coat_rotation.value_vec3.x));
+	ufbxt_assert(43 == (int)round(100.0f * material->pbr.coat_normal.value_vec3.x));
+	ufbxt_assert(44 == (int)round(100.0f * material->pbr.coat_normal.value_vec3.y));
+	ufbxt_assert(45 == (int)round(100.0f * material->pbr.coat_normal.value_vec3.z));
+	ufbxt_assert(46 == (int)round(100.0f * material->pbr.sheen_factor.value_vec3.x));
+	ufbxt_assert(47 == (int)round(100.0f * material->pbr.sheen_color.value_vec3.x));
+	ufbxt_assert(48 == (int)round(100.0f * material->pbr.sheen_color.value_vec3.y));
+	ufbxt_assert(49 == (int)round(100.0f * material->pbr.sheen_color.value_vec3.z));
+	ufbxt_assert(50 == (int)round(100.0f * material->pbr.sheen_roughness.value_vec3.x));
+	ufbxt_assert(51 == (int)round(100.0f * material->pbr.emission_factor.value_vec3.x));
+	ufbxt_assert(52 == (int)round(100.0f * material->pbr.emission_color.value_vec3.x));
+	ufbxt_assert(53 == (int)round(100.0f * material->pbr.emission_color.value_vec3.y));
+	ufbxt_assert(54 == (int)round(100.0f * material->pbr.emission_color.value_vec3.z));
+	ufbxt_assert(55 == (int)round(100.0f * material->pbr.thin_film_thickness.value_vec3.x));
+	ufbxt_assert(56 == (int)round(100.0f * material->pbr.thin_film_ior.value_vec3.x));
+	ufbxt_assert(57 == (int)round(100.0f * material->pbr.opacity.value_vec3.x));
+	ufbxt_assert(58 == (int)round(100.0f * material->pbr.opacity.value_vec3.y));
+	ufbxt_assert(59 == (int)round(100.0f * material->pbr.opacity.value_vec3.z));
+	ufbxt_assert(60 == (int)round(100.0f * material->pbr.tangent_map.value_vec3.x));
+	ufbxt_assert(61 == (int)round(100.0f * material->pbr.tangent_map.value_vec3.y));
+	ufbxt_assert(62 == (int)round(100.0f * material->pbr.tangent_map.value_vec3.z));
+	ufbxt_assert(63 == (int)round(100.0f * material->pbr.indirect_diffuse.value_vec3.x));
+	ufbxt_assert(64 == (int)round(100.0f * material->pbr.indirect_specular.value_vec3.x));
+	ufbxt_assert(65 == (int)round(100.0f * material->pbr.matte_color.value_vec3.x));
+	ufbxt_assert(66 == (int)round(100.0f * material->pbr.matte_color.value_vec3.y));
+	ufbxt_assert(67 == (int)round(100.0f * material->pbr.matte_color.value_vec3.z));
+	ufbxt_assert(68 == (int)round(100.0f * material->pbr.matte_factor.value_vec3.x));
 	ufbxt_assert(69 == material->pbr.transmission_priority.value_int);
+
+	// Computed
+	ufbxt_assert_close_real(err, material->pbr.transmission_roughness.value_real, 0.36f); // 11+25
 
 	ufbxt_assert(material->pbr.subsurface_type.value_int == 1);
 	ufbxt_assert(material->pbr.transmission_enable_in_aov.value_int != 0);
-	ufbxt_assert(material->pbr.thin_walled.value_int != 0);
-	ufbxt_assert(material->pbr.matte_enabled.value_int != 0);
-	ufbxt_assert(material->pbr.caustics.value_int != 0);
-	ufbxt_assert(material->pbr.internal_reflections.value_int != 0);
-	ufbxt_assert(material->pbr.exit_to_background.value_int != 0);
+	ufbxt_assert(material->features.thin_walled.enabled);
+	ufbxt_assert(material->features.thin_walled.is_explicit);
+	ufbxt_assert(material->features.matte.enabled);
+	ufbxt_assert(material->features.matte.is_explicit);
+	ufbxt_assert(material->features.caustics.enabled);
+	ufbxt_assert(material->features.caustics.is_explicit);
+	ufbxt_assert(material->features.internal_reflections.enabled);
+	ufbxt_assert(material->features.internal_reflections.is_explicit);
+	ufbxt_assert(material->features.exit_to_background.enabled);
+	ufbxt_assert(material->features.exit_to_background.is_explicit);
 }
 #endif
 
@@ -342,69 +799,73 @@ UFBXT_FILE_TEST(maya_osl_properties)
 {
 	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "standardSurface2");
 	ufbxt_assert(material);
-	ufbxt_assert(material->shader_type == UFBX_SHADER_OSL_STANDARD);
+	ufbxt_assert(material->shader_type == UFBX_SHADER_OSL_STANDARD_SURFACE);
 
-	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_factor.value.x));
-	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value.x));
-	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value.y));
-	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value.z));
-	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.diffuse_roughness.value.x));
-	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.metallic.value.x));
-	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.specular_factor.value.x));
-	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.specular_color.value.x));
-	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.specular_color.value.y));
-	ufbxt_assert(10 == (int)round(100.0f * material->pbr.specular_color.value.z));
-	ufbxt_assert(11 == (int)round(100.0f * material->pbr.roughness.value.x));
-	ufbxt_assert(12 == (int)round(100.0f * material->pbr.specular_ior.value.x));
-	ufbxt_assert(13 == (int)round(100.0f * material->pbr.specular_anisotropy.value.x));
-	ufbxt_assert(14 == (int)round(100.0f * material->pbr.specular_rotation.value.x));
-	ufbxt_assert(15 == (int)round(100.0f * material->pbr.transmission_factor.value.x));
-	ufbxt_assert(16 == (int)round(100.0f * material->pbr.transmission_color.value.x));
-	ufbxt_assert(17 == (int)round(100.0f * material->pbr.transmission_color.value.y));
-	ufbxt_assert(18 == (int)round(100.0f * material->pbr.transmission_color.value.z));
-	ufbxt_assert(19 == (int)round(100.0f * material->pbr.transmission_depth.value.x));
-	ufbxt_assert(20 == (int)round(100.0f * material->pbr.transmission_scatter.value.x));
-	ufbxt_assert(21 == (int)round(100.0f * material->pbr.transmission_scatter.value.y));
-	ufbxt_assert(22 == (int)round(100.0f * material->pbr.transmission_scatter.value.z));
-	ufbxt_assert(23 == (int)round(100.0f * material->pbr.transmission_scatter_anisotropy.value.x));
-	ufbxt_assert(24 == (int)round(100.0f * material->pbr.transmission_dispersion.value.x));
-	ufbxt_assert(25 == (int)round(100.0f * material->pbr.transmission_roughness.value.x));
-	ufbxt_assert(26 == (int)round(100.0f * material->pbr.subsurface_factor.value.x));
-	ufbxt_assert(27 == (int)round(100.0f * material->pbr.subsurface_color.value.x));
-	ufbxt_assert(28 == (int)round(100.0f * material->pbr.subsurface_color.value.y));
-	ufbxt_assert(29 == (int)round(100.0f * material->pbr.subsurface_color.value.z));
-	ufbxt_assert(30 == (int)round(100.0f * material->pbr.subsurface_radius.value.x));
-	ufbxt_assert(31 == (int)round(100.0f * material->pbr.subsurface_radius.value.y));
-	ufbxt_assert(32 == (int)round(100.0f * material->pbr.subsurface_radius.value.z));
-	ufbxt_assert(33 == (int)round(100.0f * material->pbr.subsurface_scale.value.x));
-	ufbxt_assert(34 == (int)round(100.0f * material->pbr.subsurface_anisotropy.value.x));
-	ufbxt_assert(35 == (int)round(100.0f * material->pbr.coat_factor.value.x));
-	ufbxt_assert(36 == (int)round(100.0f * material->pbr.coat_color.value.x));
-	ufbxt_assert(37 == (int)round(100.0f * material->pbr.coat_color.value.y));
-	ufbxt_assert(38 == (int)round(100.0f * material->pbr.coat_color.value.z));
-	ufbxt_assert(39 == (int)round(100.0f * material->pbr.coat_roughness.value.x));
-	ufbxt_assert(40 == (int)round(100.0f * material->pbr.coat_ior.value.x));
-	ufbxt_assert(41 == (int)round(100.0f * material->pbr.coat_anisotropy.value.x));
-	ufbxt_assert(42 == (int)round(100.0f * material->pbr.coat_rotation.value.x));
-	// Not used: ufbxt_assert(43 == (int)round(100.0f * material->pbr.coat_normal.value.x));
-	// Not used: ufbxt_assert(44 == (int)round(100.0f * material->pbr.coat_normal.value.y));
-	// Not used: ufbxt_assert(45 == (int)round(100.0f * material->pbr.coat_normal.value.z));
-	ufbxt_assert(46 == (int)round(100.0f * material->pbr.sheen_factor.value.x));
-	ufbxt_assert(47 == (int)round(100.0f * material->pbr.sheen_color.value.x));
-	ufbxt_assert(48 == (int)round(100.0f * material->pbr.sheen_color.value.y));
-	ufbxt_assert(49 == (int)round(100.0f * material->pbr.sheen_color.value.z));
-	ufbxt_assert(50 == (int)round(100.0f * material->pbr.sheen_roughness.value.x));
-	ufbxt_assert(51 == (int)round(100.0f * material->pbr.emission_factor.value.x));
-	ufbxt_assert(52 == (int)round(100.0f * material->pbr.emission_color.value.x));
-	ufbxt_assert(53 == (int)round(100.0f * material->pbr.emission_color.value.y));
-	ufbxt_assert(54 == (int)round(100.0f * material->pbr.emission_color.value.z));
-	ufbxt_assert(55 == (int)round(100.0f * material->pbr.thin_film_thickness.value.x));
-	ufbxt_assert(56 == (int)round(100.0f * material->pbr.thin_film_ior.value.x));
-	ufbxt_assert(57 == (int)round(100.0f * material->pbr.opacity.value.x));
-	ufbxt_assert(58 == (int)round(100.0f * material->pbr.opacity.value.y));
-	ufbxt_assert(59 == (int)round(100.0f * material->pbr.opacity.value.z));
+	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_factor.value_vec3.x));
+	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value_vec3.x));
+	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value_vec3.y));
+	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value_vec3.z));
+	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.diffuse_roughness.value_vec3.x));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.metalness.value_vec3.x));
+	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.specular_factor.value_vec3.x));
+	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.specular_color.value_vec3.x));
+	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.specular_color.value_vec3.y));
+	ufbxt_assert(10 == (int)round(100.0f * material->pbr.specular_color.value_vec3.z));
+	ufbxt_assert(11 == (int)round(100.0f * material->pbr.roughness.value_vec3.x));
+	ufbxt_assert(12 == (int)round(100.0f * material->pbr.specular_ior.value_vec3.x));
+	ufbxt_assert(13 == (int)round(100.0f * material->pbr.specular_anisotropy.value_vec3.x));
+	ufbxt_assert(14 == (int)round(100.0f * material->pbr.specular_rotation.value_vec3.x));
+	ufbxt_assert(15 == (int)round(100.0f * material->pbr.transmission_factor.value_vec3.x));
+	ufbxt_assert(16 == (int)round(100.0f * material->pbr.transmission_color.value_vec3.x));
+	ufbxt_assert(17 == (int)round(100.0f * material->pbr.transmission_color.value_vec3.y));
+	ufbxt_assert(18 == (int)round(100.0f * material->pbr.transmission_color.value_vec3.z));
+	ufbxt_assert(19 == (int)round(100.0f * material->pbr.transmission_depth.value_vec3.x));
+	ufbxt_assert(20 == (int)round(100.0f * material->pbr.transmission_scatter.value_vec3.x));
+	ufbxt_assert(21 == (int)round(100.0f * material->pbr.transmission_scatter.value_vec3.y));
+	ufbxt_assert(22 == (int)round(100.0f * material->pbr.transmission_scatter.value_vec3.z));
+	ufbxt_assert(23 == (int)round(100.0f * material->pbr.transmission_scatter_anisotropy.value_vec3.x));
+	ufbxt_assert(24 == (int)round(100.0f * material->pbr.transmission_dispersion.value_vec3.x));
+	ufbxt_assert(25 == (int)round(100.0f * material->pbr.transmission_extra_roughness.value_vec3.x));
+	ufbxt_assert(26 == (int)round(100.0f * material->pbr.subsurface_factor.value_vec3.x));
+	ufbxt_assert(27 == (int)round(100.0f * material->pbr.subsurface_color.value_vec3.x));
+	ufbxt_assert(28 == (int)round(100.0f * material->pbr.subsurface_color.value_vec3.y));
+	ufbxt_assert(29 == (int)round(100.0f * material->pbr.subsurface_color.value_vec3.z));
+	ufbxt_assert(30 == (int)round(100.0f * material->pbr.subsurface_radius.value_vec3.x));
+	ufbxt_assert(31 == (int)round(100.0f * material->pbr.subsurface_radius.value_vec3.y));
+	ufbxt_assert(32 == (int)round(100.0f * material->pbr.subsurface_radius.value_vec3.z));
+	ufbxt_assert(33 == (int)round(100.0f * material->pbr.subsurface_scale.value_vec3.x));
+	ufbxt_assert(34 == (int)round(100.0f * material->pbr.subsurface_anisotropy.value_vec3.x));
+	ufbxt_assert(35 == (int)round(100.0f * material->pbr.coat_factor.value_vec3.x));
+	ufbxt_assert(36 == (int)round(100.0f * material->pbr.coat_color.value_vec3.x));
+	ufbxt_assert(37 == (int)round(100.0f * material->pbr.coat_color.value_vec3.y));
+	ufbxt_assert(38 == (int)round(100.0f * material->pbr.coat_color.value_vec3.z));
+	ufbxt_assert(39 == (int)round(100.0f * material->pbr.coat_roughness.value_vec3.x));
+	ufbxt_assert(40 == (int)round(100.0f * material->pbr.coat_ior.value_vec3.x));
+	ufbxt_assert(41 == (int)round(100.0f * material->pbr.coat_anisotropy.value_vec3.x));
+	ufbxt_assert(42 == (int)round(100.0f * material->pbr.coat_rotation.value_vec3.x));
+	// Not used: ufbxt_assert(43 == (int)round(100.0f * material->pbr.coat_normal.value_vec3.x));
+	// Not used: ufbxt_assert(44 == (int)round(100.0f * material->pbr.coat_normal.value_vec3.y));
+	// Not used: ufbxt_assert(45 == (int)round(100.0f * material->pbr.coat_normal.value_vec3.z));
+	ufbxt_assert(46 == (int)round(100.0f * material->pbr.sheen_factor.value_vec3.x));
+	ufbxt_assert(47 == (int)round(100.0f * material->pbr.sheen_color.value_vec3.x));
+	ufbxt_assert(48 == (int)round(100.0f * material->pbr.sheen_color.value_vec3.y));
+	ufbxt_assert(49 == (int)round(100.0f * material->pbr.sheen_color.value_vec3.z));
+	ufbxt_assert(50 == (int)round(100.0f * material->pbr.sheen_roughness.value_vec3.x));
+	ufbxt_assert(51 == (int)round(100.0f * material->pbr.emission_factor.value_vec3.x));
+	ufbxt_assert(52 == (int)round(100.0f * material->pbr.emission_color.value_vec3.x));
+	ufbxt_assert(53 == (int)round(100.0f * material->pbr.emission_color.value_vec3.y));
+	ufbxt_assert(54 == (int)round(100.0f * material->pbr.emission_color.value_vec3.z));
+	ufbxt_assert(55 == (int)round(100.0f * material->pbr.thin_film_thickness.value_vec3.x));
+	ufbxt_assert(56 == (int)round(100.0f * material->pbr.thin_film_ior.value_vec3.x));
+	ufbxt_assert(57 == (int)round(100.0f * material->pbr.opacity.value_vec3.x));
+	ufbxt_assert(58 == (int)round(100.0f * material->pbr.opacity.value_vec3.y));
+	ufbxt_assert(59 == (int)round(100.0f * material->pbr.opacity.value_vec3.z));
 
-	ufbxt_assert(material->pbr.thin_walled.value_int != 0);
+	// Computed
+	ufbxt_assert_close_real(err, material->pbr.transmission_roughness.value_real, 0.36f); // 11+25
+
+	ufbxt_assert(material->features.thin_walled.enabled);
+	ufbxt_assert(material->features.thin_walled.is_explicit);
 }
 #endif
 
@@ -431,6 +892,11 @@ UFBXT_FILE_TEST(maya_texture_layers)
 	ufbxt_assert(layered->layers.data[2].blend_mode == UFBX_BLEND_ADDITIVE);
 	ufbxt_assert_close_real(err, layered->layers.data[2].alpha, 1.0f);
 	ufbxt_assert(!strcmp(layered->layers.data[2].texture->relative_filename.data, "textures\\checkerboard_ambient.png"));
+
+	ufbxt_assert(layered->file_textures.count == 3);
+	for (size_t i = 0; i < 3; i++) {
+		ufbxt_assert(layered->file_textures.data[i] == layered->layers.data[i].texture);
+	}
 
 	{
 		ufbx_texture *texture = material->fbx.emission_color.texture;
@@ -499,6 +965,12 @@ UFBXT_FILE_TEST(maya_texture_blend_modes)
 		ufbxt_assert_close_real(err, layered->layers.data[ix].alpha, alpha);
 	}
 
+	// All point to the same texture and should be deduplicated
+	ufbxt_assert(layered->file_textures.count == 1);
+	for (size_t i = 0; i < 14; i++) {
+		ufbxt_assert(layered->layers.data[i].texture == layered->file_textures.data[0]);
+	}
+
 	ufbxt_assert(layered->layers.data[ 0].blend_mode == UFBX_BLEND_REPLACE);    // "CPV Modulate" (unsupported)
 	ufbxt_assert(layered->layers.data[ 1].blend_mode == UFBX_BLEND_LUMINOSITY); // "Illuminate"
 	ufbxt_assert(layered->layers.data[ 2].blend_mode == UFBX_BLEND_REPLACE);    // "Desaturate" (unsupported)
@@ -513,5 +985,523 @@ UFBXT_FILE_TEST(maya_texture_blend_modes)
 	ufbxt_assert(layered->layers.data[11].blend_mode == UFBX_BLEND_REPLACE);    // "In" (unsupported)
 	ufbxt_assert(layered->layers.data[12].blend_mode == UFBX_BLEND_OVER);       // "Over"
 	ufbxt_assert(layered->layers.data[13].blend_mode == UFBX_BLEND_REPLACE);    // "None"
+}
+#endif
+
+UFBXT_FILE_TEST(max_texture_mapping)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "01 - Default");
+	ufbxt_assert(material);
+
+	{
+		ufbx_texture *texture = material->pbr.base_factor.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_weight.png"));
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(shader->shader_name.data, "OSLBitmap2"));
+
+		uint32_t source_hash = ufbxt_fnv1a(shader->shader_source.data, shader->shader_source.length);
+		ufbxt_assert(source_hash == 0x599994a9u);
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == texture);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.base_color.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(shader->shader_name.data, "RandomTilingBitmap"));
+		uint32_t source_hash = ufbxt_fnv1a(shader->shader_source.data, shader->shader_source.length);
+		ufbxt_assert(source_hash == 0x60186ba7u);
+
+		{
+			ufbx_shader_texture_input *input = ufbx_find_shader_texture_input(shader, "Filename");
+			ufbxt_assert(input);
+			ufbxt_assert(!strcmp(input->value_str.data, "D:\\Dev\\clean\\ufbx\\data\\textures\\checkerboard_diffuse.png"));
+		}
+
+		{
+			ufbx_shader_texture_input *input = ufbx_find_shader_texture_input(shader, "Scale");
+			ufbxt_assert(input);
+			ufbxt_assert_close_real(err, input->value_real, 0.25f);
+		}
+
+		ufbxt_assert(texture->file_textures.count == 0);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.roughness.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_roughness.png"));
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(shader->shader_name.data, "UberBitmap2"));
+
+		uint32_t source_hash = ufbxt_fnv1a(shader->shader_source.data, shader->shader_source.length);
+		ufbxt_assert(source_hash == 0x19833d47);
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == texture);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.metalness.texture;
+		ufbxt_assert(texture && !texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_metallic.png"));
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == texture);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.transmission_color.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_transparency.png"));
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(shader->shader_name.data, "ai_image"));
+		ufbxt_assert(shader->shader_source.length == 0);
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == texture);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.transmission_color.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_transparency.png"));
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(shader->shader_source.length == 0);
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == texture);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.emission_color.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(shader->shader_name.data, "ColorTweak"));
+
+		uint32_t source_hash = ufbxt_fnv1a(shader->shader_source.data, shader->shader_source.length);
+		ufbxt_assert(source_hash == 0xd2f4f86f);
+
+		ufbx_shader_texture_input *input = ufbx_find_shader_texture_input(shader, "Input");
+		ufbxt_assert(input);
+		ufbx_texture *input_texture = input->texture;
+		ufbxt_assert(input_texture);
+		ufbxt_assert(input_texture->type == UFBX_TEXTURE_FILE);
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == input_texture);
+	}
+
+	{
+		ufbx_texture *texture = material->pbr.normal_map.texture;
+		ufbxt_assert(texture && texture->shader);
+		ufbx_shader_texture *shader = texture->shader;
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(shader->shader_name.data, "ai_bump2d"));
+		ufbxt_assert(shader->shader_source.length == 0);
+
+		ufbx_shader_texture_input *bump_map = ufbx_find_shader_texture_input(shader, "bump_map");
+		ufbxt_assert(bump_map);
+		ufbx_texture *bump_texture = bump_map->texture;
+		ufbxt_assert(bump_texture);
+		ufbxt_assert(bump_texture->type == UFBX_TEXTURE_FILE);
+
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(texture->file_textures.data[0] == bump_texture);
+	}
+
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_missing_material_factor)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "phong1");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_PHONG);
+
+	ufbxt_assert_close_real(err, material->fbx.diffuse_factor.value_vec3.x, 1.0f);
+	ufbxt_assert_close_real(err, material->fbx.specular_factor.value_vec3.x, 1.0f);
+	ufbxt_assert_close_real(err, material->fbx.reflection_factor.value_vec3.x, 1.0f);
+	ufbxt_assert_close_real(err, material->fbx.transparency_factor.value_vec3.x, 1.0f);
+	ufbxt_assert_close_real(err, material->fbx.emission_factor.value_vec3.x, 1.0f);
+	ufbxt_assert_close_real(err, material->fbx.ambient_factor.value_vec3.x, 1.0f);
+
+	// TODO: Figure out how to map transmission/opacity
+	ufbxt_assert_close_real(err, material->pbr.base_factor.value_vec3.x, 1.0f);
+	ufbxt_assert_close_real(err, material->pbr.specular_factor.value_vec3.x, 1.0f);
+	ufbxt_assert_close_real(err, material->pbr.emission_factor.value_vec3.x, 1.0f);
+}
+#endif
+
+UFBXT_FILE_TEST(max_instanced_material)
+#if UFBXT_IMPL
+{
+	ufbx_node *red_node = ufbx_find_node(scene, "Red");
+	ufbx_node *green_node = ufbx_find_node(scene, "Green");
+	ufbx_node *blue_node = ufbx_find_node(scene, "Blue");
+	ufbxt_assert(red_node && red_node->mesh);
+	ufbxt_assert(green_node && green_node->mesh);
+	ufbxt_assert(blue_node && blue_node->mesh);
+	ufbx_mesh *red_mesh = red_node->mesh;
+	ufbx_mesh *green_mesh = green_node->mesh;
+	ufbx_mesh *blue_mesh = blue_node->mesh;
+
+	ufbx_material *red_mat = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "RedMat");
+	ufbx_material *green_mat = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "GreenMat");
+	ufbx_material *blue_mat = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "BlueMat");
+
+	if (scene->metadata.version < 7000) {
+		ufbxt_assert(red_mesh != green_mesh);
+		ufbxt_assert(red_mesh != blue_mesh);
+		ufbxt_assert(green_mesh != blue_mesh);
+
+		// 6100 is a bit broken with materials?
+
+		ufbxt_assert(green_node->materials.count == 3);
+		ufbxt_assert(red_node->materials.count == 2);
+		ufbxt_assert(blue_node->materials.count == 1);
+
+		ufbxt_assert(green_mesh->materials.count == 3);
+		ufbxt_assert(red_mesh->materials.count == 2);
+		ufbxt_assert(blue_mesh->materials.count == 1);
+
+	} else {
+		ufbxt_assert(red_mesh == green_mesh);
+		ufbxt_assert(red_mesh == blue_mesh);
+		ufbxt_assert(green_mesh == blue_mesh);
+
+		ufbxt_assert(green_node->materials.count == 1);
+		ufbxt_assert(red_node->materials.count == 1);
+		ufbxt_assert(blue_node->materials.count == 1);
+
+		ufbxt_assert(green_node->materials.data[0] == green_mat);
+		ufbxt_assert(red_node->materials.data[0] == red_mat);
+		ufbxt_assert(blue_node->materials.data[0] == blue_mat);
+
+		ufbxt_assert(red_mesh->materials.data[0].material == green_mat);
+	}
+}
+#endif
+
+#if UFBXT_IMPL
+
+static bool ufbxt_has_texture(ufbx_texture_list list, const char *name)
+{
+	for (size_t i = 0; i < list.count; i++) {
+		if (!strcmp(list.data[i]->relative_filename.data, name)) return true;
+	}
+	return false;
+}
+
+static void ufbxt_check_shader_input_map(ufbx_texture *texture, const char *name, const char *map, int64_t output_index)
+{
+	ufbxt_assert(texture->shader);
+	ufbx_shader_texture_input *input = ufbx_find_shader_texture_input(texture->shader, name);
+	ufbxt_assert(input);
+	ufbxt_assert(input->texture);
+	ufbxt_assert(!strcmp(input->texture->name.data, map));
+	ufbxt_assert(input->texture_output_index == output_index);
+}
+
+#endif
+
+UFBXT_FILE_TEST(max_shadergraph)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #1");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_checkerboard"));
+		ufbxt_assert(texture->file_textures.count == 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #2");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_add"));
+		ufbxt_assert(texture->file_textures.count == 0);
+		ufbxt_check_shader_input_map(texture, "input1", "Map #1", 0);
+		ufbxt_check_shader_input_map(texture, "input2", "Map #3", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #3");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "Checker"));
+		ufbxt_assert(texture->file_textures.count == 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #6");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ColorMul"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_diffuse.png"));
+		ufbxt_check_shader_input_map(texture, "A", "Map #2", 0);
+		ufbxt_check_shader_input_map(texture, "B", "Map #7", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #7");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "OSLBitmap2"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_diffuse.png"));
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #11");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_metallic.png"));
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_image"));
+		ufbxt_assert(texture->file_textures.count == 2);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_diffuse.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_metallic.png"));
+		ufbxt_check_shader_input_map(texture, "offset", "Map #7", 2);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #13");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ColorMax"));
+		ufbxt_assert(texture->file_textures.count == 2);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_diffuse.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_weight.png"));
+		ufbxt_check_shader_input_map(texture, "A", "Map #15", 0);
+		ufbxt_check_shader_input_map(texture, "B", "Map #6", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #14");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_weight.png"));
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "UberBitmap2"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_weight.png"));
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #15");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "TriTone"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_weight.png"));
+		ufbxt_check_shader_input_map(texture, "Input_map", "Map #14", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #16");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_mix_rgba"));
+		ufbxt_assert(texture->file_textures.count == 3);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_diffuse.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_metallic.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_weight.png"));
+		ufbxt_check_shader_input_map(texture, "input1", "Map #13", 0);
+		ufbxt_check_shader_input_map(texture, "input2", "Map #11", 0);
+		ufbxt_check_shader_input_map(texture, "mix", "Map #7", 1);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #17");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_dot"));
+		ufbxt_assert(texture->file_textures.count == 3);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_diffuse.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_metallic.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_weight.png"));
+		ufbxt_check_shader_input_map(texture, "input1", "Map #16", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #19");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ColorAdd"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_emissive.png"));
+		ufbxt_check_shader_input_map(texture, "A", "Map #20", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #20");
+		ufbxt_assert(texture && !texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_emissive.png"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_emissive.png"));
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #21");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_add"));
+		ufbxt_assert(texture->file_textures.count == 2);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_emissive.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_specular.png"));
+		ufbxt_check_shader_input_map(texture, "input1", "Map #22", 0);
+		ufbxt_check_shader_input_map(texture, "input2", "Map #19", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #22");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_specular.png"));
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ai_image"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_specular.png"));
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #26");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "VectorAdd"));
+		ufbxt_assert(texture->file_textures.count == 3);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_emissive.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_specular.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_transparency.png"));
+		ufbxt_check_shader_input_map(texture, "A", "Map #28", 0);
+		ufbxt_check_shader_input_map(texture, "B", "Map #21", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #28");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_transparency.png"));
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "OSLBitmap2"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_transparency.png"));
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #29");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "ColorAdd"));
+		ufbxt_assert(texture->file_textures.count == 4);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_emissive.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_specular.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_transparency.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_ambient.png"));
+		ufbxt_check_shader_input_map(texture, "A", "Map #30", 0);
+		ufbxt_check_shader_input_map(texture, "B", "Map #26", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #30");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_ambient.png"));
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_OSL);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, "UberBitmap2"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_ambient.png"));
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #31");
+		ufbxt_assert(texture && texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_SHADER);
+		ufbxt_assert(texture->shader->type == UFBX_SHADER_TEXTURE_UNKNOWN);
+		ufbxt_assert(!strcmp(texture->shader->shader_name.data, ""));
+		ufbxt_assert(texture->shader->shader_type_id == UINT64_C(0x0000023000000000));
+		ufbxt_assert(texture->file_textures.count == 5);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_emissive.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_specular.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_transparency.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_ambient.png"));
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_displacement.png"));
+		ufbxt_check_shader_input_map(texture, "map1", "Map #29", 0);
+		ufbxt_check_shader_input_map(texture, "map2", "Map #32", 0);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "Map #32");
+		ufbxt_assert(texture && !texture->shader);
+		ufbxt_assert(texture->type == UFBX_TEXTURE_FILE);
+		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_displacement.png"));
+		ufbxt_assert(texture->file_textures.count == 1);
+		ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_displacement.png"));
+	}
+
+	{
+		ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Material #25");
+		ufbxt_assert(material);
+		ufbxt_assert(material->shader_type == UFBX_SHADER_OSL_STANDARD_SURFACE);
+
+		ufbxt_assert(material->pbr.base_factor.texture);
+		ufbxt_assert(!strcmp(material->pbr.base_factor.texture->name.data, "Map #17"));
+
+		ufbxt_assert(material->pbr.base_color.texture);
+		ufbxt_assert(!strcmp(material->pbr.base_color.texture->name.data, "Map #13"));
+
+		ufbxt_assert(material->pbr.emission_factor.texture);
+		ufbxt_assert(!strcmp(material->pbr.emission_factor.texture->name.data, "Map #31"));
+
+		{
+			ufbx_texture *texture = material->pbr.roughness.texture;
+			ufbxt_assert(texture);
+			ufbxt_assert(texture->shader);
+			ufbxt_assert(texture->file_textures.count == 1);
+			ufbxt_assert(ufbxt_has_texture(texture->file_textures, "textures\\checkerboard_ambient.png"));
+			ufbxt_assert(texture->shader->main_texture);
+			ufbxt_assert(texture->shader->main_texture_output_index == 6);
+			ufbxt_assert(!strcmp(texture->shader->main_texture->name.data, "Map #30"));
+			ufbxt_check_shader_input_map(texture, "sourceMap", "Map #30", 6);
+		}
+	}
 }
 #endif

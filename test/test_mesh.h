@@ -69,7 +69,7 @@ UFBXT_FILE_TEST(maya_cube)
 	ufbx_mesh *mesh = node->mesh;
 
 	for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
-		ufbx_face face = mesh->faces[face_i];
+		ufbx_face face = mesh->faces.data[face_i];
 		for (size_t i = face.index_begin; i < face.index_begin + face.num_indices; i++) {
 			ufbx_vec3 n = ufbx_get_vertex_vec3(&mesh->vertex_normal, i);
 			ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_bitangent, i);
@@ -281,12 +281,12 @@ UFBXT_FILE_TEST(maya_cone)
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
 
-	ufbxt_assert(mesh->vertex_crease.data);
-	ufbxt_assert(mesh->edges);
-	ufbxt_assert(mesh->edge_crease);
-	ufbxt_assert(mesh->edge_smoothing);
+	ufbxt_assert(mesh->vertex_crease.exists);
+	ufbxt_assert(mesh->edges.count);
+	ufbxt_assert(mesh->edge_crease.count);
+	ufbxt_assert(mesh->edge_smoothing.count);
 
-	ufbxt_assert(mesh->faces[0].num_indices == 16);
+	ufbxt_assert(mesh->faces.data[0].num_indices == 16);
 
 	for (size_t i = 0; i < mesh->num_indices; i++) {
 		ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, i);
@@ -296,11 +296,11 @@ UFBXT_FILE_TEST(maya_cone)
 	}
 
 	for (size_t i = 0; i < mesh->num_edges; i++) {
-		ufbx_edge edge = mesh->edges[i];
-		ufbx_real crease = mesh->edge_crease[i];
-		bool smoothing = mesh->edge_smoothing[i];
-		ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[0]);
-		ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.indices[1]);
+		ufbx_edge edge = mesh->edges.data[i];
+		ufbx_real crease = mesh->edge_crease.data[i];
+		bool smoothing = mesh->edge_smoothing.data[i];
+		ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.a);
+		ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.b);
 
 		if (a.y < 0.0 && b.y < 0.0) {
 			ufbxt_assert_close_real(err, crease, 0.583);
@@ -319,12 +319,12 @@ static void ufbxt_check_tangent_space(ufbxt_diff_error *err, ufbx_mesh *mesh)
 {
 	for (size_t set_i = 0; set_i < mesh->uv_sets.count; set_i++) {
 		ufbx_uv_set set = mesh->uv_sets.data[set_i];
-		ufbxt_assert(set.vertex_uv.data);
-		ufbxt_assert(set.vertex_bitangent.data);
-		ufbxt_assert(set.vertex_tangent.data);
+		ufbxt_assert(set.vertex_uv.exists);
+		ufbxt_assert(set.vertex_bitangent.exists);
+		ufbxt_assert(set.vertex_tangent.exists);
 
 		for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
-			ufbx_face face = mesh->faces[face_i];
+			ufbx_face face = mesh->faces.data[face_i];
 
 			for (size_t i = 0; i < face.num_indices; i++) {
 				size_t a = face.index_begin + i;
@@ -409,22 +409,22 @@ UFBXT_FILE_TEST(blender_279_ball)
 
 	ufbx_vec3 red_ref = { 0.8, 0.0, 0.0 };
 	ufbx_vec3 white_ref = { 0.8, 0.8, 0.8 };
-	ufbxt_assert_close_vec3(err, red->fbx.diffuse_color.value, red_ref);
-	ufbxt_assert_close_vec3(err, white->fbx.diffuse_color.value, white_ref);
+	ufbxt_assert_close_vec3(err, red->fbx.diffuse_color.value_vec3, red_ref);
+	ufbxt_assert_close_vec3(err, white->fbx.diffuse_color.value_vec3, white_ref);
 
 	ufbx_node *node = ufbx_find_node(scene, "Icosphere");
 	ufbxt_assert(node);
 	ufbx_mesh *mesh = node->mesh;
 	ufbxt_assert(mesh);
-	ufbxt_assert(mesh->face_material);
-	ufbxt_assert(mesh->face_smoothing);
+	ufbxt_assert(mesh->face_material.count);
+	ufbxt_assert(mesh->face_smoothing.count);
 
 	ufbxt_assert(mesh->materials.count == 2);
 	ufbxt_assert(mesh->materials.data[0].material == red);
 	ufbxt_assert(mesh->materials.data[1].material == white);
 
 	for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
-		ufbx_face face = mesh->faces[face_i];
+		ufbx_face face = mesh->faces.data[face_i];
 		ufbx_vec3 mid = { 0 };
 		for (size_t i = 0; i < face.num_indices; i++) {
 			mid = ufbxt_add3(mid, ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + i));
@@ -433,8 +433,8 @@ UFBXT_FILE_TEST(blender_279_ball)
 		mid.y /= (ufbx_real)face.num_indices;
 		mid.z /= (ufbx_real)face.num_indices;
 
-		bool smoothing = mesh->face_smoothing[face_i];
-		int32_t material = mesh->face_material[face_i];
+		bool smoothing = mesh->face_smoothing.data[face_i];
+		int32_t material = mesh->face_material.data[face_i];
 		ufbxt_assert(smoothing == (mid.x > 0.0));
 		ufbxt_assert(material == (mid.z < 0.0 ? 1 : 0));
 	}
@@ -449,7 +449,7 @@ UFBXT_FILE_TEST(synthetic_broken_material)
 	ufbx_mesh *mesh = node->mesh;
 
 	ufbxt_assert(mesh->materials.count == 0);
-	ufbxt_assert(mesh->face_material == NULL);
+	ufbxt_assert(mesh->face_material.data == NULL);
 }
 #endif
 
@@ -507,16 +507,16 @@ UFBXT_FILE_TEST(synthetic_indexed_by_vertex)
 	ufbx_mesh *mesh = scene->meshes.data[0];
 
 	for (size_t vi = 0; vi < mesh->num_vertices; vi++) {
-		int32_t ii = mesh->vertex_first_index[vi];
-		ufbx_vec3 pos = mesh->vertex_position.data[mesh->vertex_position.indices[ii]];
-		ufbx_vec3 normal = mesh->vertex_normal.data[mesh->vertex_normal.indices[ii]];
+		int32_t ii = mesh->vertex_first_index.data[vi];
+		ufbx_vec3 pos = mesh->vertex_position.values.data[mesh->vertex_position.indices.data[ii]];
+		ufbx_vec3 normal = mesh->vertex_normal.values.data[mesh->vertex_normal.indices.data[ii]];
 		ufbx_vec3 ref_normal = { 0.0f, pos.y > 0.0f ? 1.0f : -1.0f, 0.0f };
 		ufbxt_assert_close_vec3(err, normal, ref_normal);
 	}
 
 	for (size_t ii = 0; ii < mesh->num_indices; ii++) {
-		ufbx_vec3 pos = mesh->vertex_position.data[mesh->vertex_position.indices[ii]];
-		ufbx_vec3 normal = mesh->vertex_normal.data[mesh->vertex_normal.indices[ii]];
+		ufbx_vec3 pos = mesh->vertex_position.values.data[mesh->vertex_position.indices.data[ii]];
+		ufbx_vec3 normal = mesh->vertex_normal.values.data[mesh->vertex_normal.indices.data[ii]];
 		ufbx_vec3 ref_normal = { 0.0f, pos.y > 0.0f ? 1.0f : -1.0f, 0.0f };
 		ufbxt_assert_close_vec3(err, normal, ref_normal);
 	}
@@ -579,3 +579,345 @@ UFBXT_FILE_TEST(maya_lod_group)
 }
 #endif
 
+UFBXT_FILE_TEST(synthetic_missing_normals)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(!mesh->vertex_normal.exists);
+	ufbxt_assert(!mesh->skinned_normal.exists);
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_generate_normals_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.generate_missing_normals = true;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(synthetic_missing_normals_generated, synthetic_missing_normals, ufbxt_generate_normals_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->vertex_normal.exists);
+	ufbxt_assert(mesh->skinned_normal.exists);
+
+	for (size_t face_ix = 0; face_ix < mesh->faces.count; face_ix++) {
+		ufbx_face face = mesh->faces.data[face_ix];
+		ufbx_vec3 normal = ufbx_get_weighted_face_normal(&mesh->vertex_position, face);
+		normal = ufbxt_normalize(normal);
+		for (size_t i = 0; i < face.num_indices; i++) {
+			ufbx_vec3 mesh_normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, face.index_begin + i);
+			ufbx_vec3 skinned_normal = ufbx_get_vertex_vec3(&mesh->skinned_normal, face.index_begin + i);
+			ufbxt_assert_close_vec3(err, normal, mesh_normal);
+			ufbxt_assert_close_vec3(err, normal, skinned_normal);
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(blender_279_nested_meshes)
+#if UFBXT_IMPL
+{
+	// Diff to .obj file with nested objects and FBXASC escaped names
+}
+#endif
+
+UFBXT_FILE_TEST(max_edge_visibility)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Box001");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->edge_visibility.count > 0);
+
+		{
+			size_t num_visible = 0;
+
+			// Diagonal edges should be hidden
+			for (size_t i = 0; i < mesh->num_edges; i++) {
+				ufbx_edge edge = mesh->edges.data[i];
+				ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.a);
+				ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.b);
+				ufbx_real len = ufbxt_length3(ufbxt_sub3(a, b));
+				bool expected = len < 21.0f;
+				bool visible = mesh->edge_visibility.data[i];
+				ufbxt_assert(visible == expected);
+				num_visible += visible ? 1u : 0u;
+			}
+
+			ufbxt_assert(mesh->num_edges == 18);
+			ufbxt_assert(num_visible == 12);
+		}
+
+		ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 2, NULL, NULL);
+		ufbxt_assert(sub_mesh);
+		ufbxt_check_mesh(scene, sub_mesh);
+
+		{
+			size_t num_visible = 0;
+			for (size_t i = 0; i < sub_mesh->num_edges; i++) {
+				if (sub_mesh->edge_visibility.data[i]) {
+					num_visible++;
+				}
+			}
+			ufbxt_assert(num_visible == 12 * 4);
+		}
+
+		ufbx_free_mesh(sub_mesh);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Cylinder001");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->edge_visibility.count > 0);
+		size_t num_visible = 0;
+
+		// Diagonal and edges to the center should be hidden
+		for (size_t i = 0; i < mesh->num_edges; i++) {
+			ufbx_edge edge = mesh->edges.data[i];
+			ufbx_vec3 a = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.a);
+			ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.b);
+			ufbx_vec2 a2 = { a.x, a.y };
+			ufbx_vec2 b2 = { b.x, b.y };
+			ufbx_real len = ufbxt_length3(ufbxt_sub3(a, b));
+			ufbx_real len_a2 = ufbxt_length2(a2);
+			ufbx_real len_b2 = ufbxt_length2(b2);
+			bool expected = len < 20.7f && len_a2 > 0.1f && len_b2 > 0.1f;
+			bool visible = mesh->edge_visibility.data[i];
+			ufbxt_assert(visible == expected);
+			num_visible += visible ? 1u : 0u;
+		}
+
+		ufbxt_assert(mesh->num_edges == 54);
+		ufbxt_assert(num_visible == 27);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(zbrush_d20)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->nodes.count == 3);
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "20 Sided");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->num_faces == 20);
+		ufbxt_assert(mesh->face_group.count == 20);
+		for (int32_t i = 0; i < 20; i++) {
+			ufbxt_assert(mesh->face_group.data[i] == 10 + i * 5);
+		}
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "PolyMesh3D1");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->num_faces == 24);
+		ufbxt_assert(mesh->face_group.count == 24);
+
+		{
+			uint32_t num_front = 0;
+			for (size_t i = 0; i < 24; i++) {
+				ufbx_face face = mesh->faces.data[i];
+				ufbx_vec3 normal = ufbx_get_weighted_face_normal(&mesh->vertex_position, face);
+				int32_t group = normal.z < 0.0f ? 9598 : 15349;
+				num_front += normal.z < 0.0f ? 1 : 0;
+				ufbxt_assert(mesh->face_group.data[i] == group);
+			}
+			ufbxt_assert(num_front == mesh->num_faces / 2);
+		}
+
+		ufbxt_assert(mesh->blend_deformers.count > 0);
+		ufbx_blend_deformer *blend = mesh->blend_deformers.data[0];
+
+		// WHAT? The 6100 version has duplicated blend shapes
+		// and 7500 has duplicated blend deformers...
+		if (scene->metadata.version == 6100) {
+			ufbxt_assert(mesh->blend_deformers.count == 1);
+			ufbxt_assert(blend->channels.count == 4);
+		} else {
+			ufbxt_assert(mesh->blend_deformers.count == 2);
+			ufbxt_assert(blend->channels.count == 2);
+		}
+
+		// Check that poly groups work in subdivision
+		ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 2, NULL, NULL);
+		ufbxt_assert(sub_mesh);
+		ufbxt_check_mesh(scene, sub_mesh);
+
+		{
+			uint32_t num_front = 0;
+			ufbxt_assert(sub_mesh->face_group.count == sub_mesh->num_faces);
+			for (size_t i = 0; i < sub_mesh->num_faces; i++) {
+				ufbx_face face = sub_mesh->faces.data[i];
+				ufbx_vec3 normal = ufbx_get_weighted_face_normal(&sub_mesh->vertex_position, face);
+				int32_t group = normal.z < 0.0f ? 9598 : 15349;
+				num_front += normal.z < 0.0f ? 1 : 0;
+				ufbxt_assert(sub_mesh->face_group.data[i] == group);
+			}
+			ufbxt_assert(num_front == sub_mesh->num_faces / 2);
+		}
+
+		ufbx_free_mesh(sub_mesh);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(zbrush_d20_selection_set)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "PolyMesh3D1");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+
+		for (size_t i = 0; i < 2; i++)
+		{
+			bool front = i == 0;
+			const char *name = front ? "PolyMesh3D1_9598" : "PolyMesh3D1_15349";
+			ufbx_selection_set *set = (ufbx_selection_set*)ufbx_find_element(scene, UFBX_ELEMENT_SELECTION_SET, name);
+			ufbxt_assert(set);
+			ufbxt_assert(set->nodes.count == 1);
+			ufbx_selection_node *sel_node = set->nodes.data[0];
+
+			ufbxt_assert(sel_node->target_node == node);
+			ufbxt_assert(sel_node->target_mesh == mesh);
+			ufbxt_assert(sel_node->faces.count == 12);
+
+			for (size_t i = 0; i < sel_node->faces.count; i++) {
+				uint32_t index = sel_node->faces.data[i];
+				ufbxt_assert(index < mesh->faces.count);
+				ufbx_face face = mesh->faces.data[index];
+				ufbx_vec3 normal = ufbx_get_weighted_face_normal(&mesh->vertex_position, face);
+				ufbxt_assert((normal.z < 0.0f) == front);
+			}
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(maya_polygon_hole)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 6);
+
+	{
+		size_t num_holes = 0;
+		ufbxt_assert(mesh->face_hole.count == mesh->num_faces);
+		for (size_t i = 0; i < mesh->num_faces; i++) {
+			ufbx_face face = mesh->faces.data[i];
+			ufbx_vec3 avg_pos = ufbx_zero_vec3;
+			for (size_t j = 0; j < face.num_indices; j++) {
+				ufbx_vec3 p = ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + j);
+				avg_pos = ufbxt_add3(avg_pos, p);
+			}
+			avg_pos = ufbxt_mul3(avg_pos, 1.0f / (ufbx_real)face.num_indices);
+
+			bool hole = fabs(avg_pos.y) > 0.49f;
+			num_holes += hole ? 1 : 0;
+			ufbxt_assert(mesh->face_hole.data[i] == hole);
+		}
+		ufbxt_assert(num_holes == 2);
+	}
+
+	ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 2, NULL, NULL);
+	ufbxt_assert(sub_mesh);
+	ufbxt_check_mesh(scene, sub_mesh);
+
+	{
+		size_t num_holes = 0;
+		ufbxt_assert(sub_mesh->face_hole.count == sub_mesh->num_faces);
+		for (size_t i = 0; i < sub_mesh->num_faces; i++) {
+			ufbx_face face = sub_mesh->faces.data[i];
+			ufbx_vec3 avg_pos = ufbx_zero_vec3;
+			for (size_t j = 0; j < face.num_indices; j++) {
+				ufbx_vec3 p = ufbx_get_vertex_vec3(&sub_mesh->vertex_position, face.index_begin + j);
+				avg_pos = ufbxt_add3(avg_pos, p);
+			}
+			avg_pos = ufbxt_mul3(avg_pos, 1.0f / (ufbx_real)face.num_indices);
+
+			bool hole = fabs(avg_pos.y) > 0.49f;
+			num_holes += hole ? 1 : 0;
+			ufbxt_assert(sub_mesh->face_hole.data[i] == hole);
+		}
+		ufbxt_assert(num_holes == 32);
+	}
+
+	ufbx_free_mesh(sub_mesh);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(synthetic_cursed_geometry, ufbxt_generate_normals_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pDisc1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	uint32_t indices[64];
+
+	for (size_t i = 0; i < mesh->num_faces; i++) {
+		ufbx_face face = mesh->faces.data[i];
+		size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, face);
+		ufbxt_assert(num_tris == 0 || num_tris == face.num_indices - 2);
+	}
+
+	ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 2, NULL, NULL);
+	ufbx_free_mesh(sub_mesh);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_vertex_gaps)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->vertices.count == 7);
+
+	ufbx_vec3 gap_values[] = {
+		{ -1.0f, -1.1f, -1.2f },
+		{ -2.0f, -2.1f, -2.2f },
+		{ -3.0f, -3.1f, -3.2f },
+		{ -4.0f, -4.1f, -4.2f },
+	};
+
+	ufbxt_assert_close_vec3(err, mesh->vertices.data[0], gap_values[0]);
+	ufbxt_assert_close_vec3(err, mesh->vertices.data[3], gap_values[1]);
+	ufbxt_assert_close_vec3(err, mesh->vertices.data[6], gap_values[2]);
+
+	ufbxt_assert(mesh->vertex_normal.values.count == 8);
+	ufbxt_assert_close_vec3(err, mesh->vertex_normal.values.data[0], gap_values[0]);
+	ufbxt_assert_close_vec3(err, mesh->vertex_normal.values.data[3], gap_values[1]);
+	ufbxt_assert_close_vec3(err, mesh->vertex_normal.values.data[6], gap_values[2]);
+	ufbxt_assert_close_vec3(err, mesh->vertex_normal.values.data[7], gap_values[3]);
+
+	ufbx_vec2 gap_uvs[] = {
+		{ -1.3f, -1.4f },
+		{ -2.3f, -2.4f },
+		{ -3.3f, -3.4f },
+		{ -4.3f, -4.4f },
+	};
+
+	ufbxt_assert(mesh->vertex_uv.values.count == 8);
+	ufbxt_assert_close_vec2(err, mesh->vertex_uv.values.data[0], gap_uvs[0]);
+	ufbxt_assert_close_vec2(err, mesh->vertex_uv.values.data[2], gap_uvs[1]);
+	ufbxt_assert_close_vec2(err, mesh->vertex_uv.values.data[5], gap_uvs[2]);
+	ufbxt_assert_close_vec2(err, mesh->vertex_uv.values.data[7], gap_uvs[3]);
+}
+#endif

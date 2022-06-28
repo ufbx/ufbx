@@ -2,9 +2,9 @@
 #if UFBXT_IMPL
 static void ufbxt_diff_material_value(ufbxt_diff_error *err, const ufbx_material_map *color, const ufbx_material_map *factor, ufbx_vec3 value)
 {
-	ufbxt_assert_close_real(err, color->value.x * factor->value.x, value.x);
-	ufbxt_assert_close_real(err, color->value.y * factor->value.x, value.y);
-	ufbxt_assert_close_real(err, color->value.z * factor->value.x, value.z);
+	ufbxt_assert_close_real(err, color->value_vec3.x * factor->value_vec3.x, value.x);
+	ufbxt_assert_close_real(err, color->value_vec3.y * factor->value_vec3.x, value.y);
+	ufbxt_assert_close_real(err, color->value_vec3.z * factor->value_vec3.x, value.z);
 }
 #endif
 
@@ -39,7 +39,7 @@ UFBXT_FILE_TEST(max2009_blob)
 		size_t num_front = 0;
 
 		for (size_t fi = 0; fi < mesh->num_faces; fi++) {
-			ufbx_face face = mesh->faces[fi];
+			ufbx_face face = mesh->faces.data[fi];
 			ufbx_vec3 center = ufbx_zero_vec3;
 			for (size_t i = 0; i < face.num_indices; i++) {
 				ufbx_vec3 v = ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + i);
@@ -52,22 +52,22 @@ UFBXT_FILE_TEST(max2009_blob)
 			center.z /= (ufbx_real)face.num_indices;
 
 			if (center.z >= 14.0f) {
-				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material[fi]];
+				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material.data[fi]];
 				ufbxt_assert(!strcmp(mat->material->name.data, "Top"));
 				num_top++;
 			}
 			if (center.y <= -10.0f) {
-				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material[fi]];
+				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material.data[fi]];
 				ufbxt_assert(!strcmp(mat->material->name.data, "Right"));
 				num_right++;
 			}
 			if (center.y >= 10.0f) {
-				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material[fi]];
+				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material.data[fi]];
 				ufbxt_assert(!strcmp(mat->material->name.data, "Left"));
 				num_left++;
 			}
 			if (center.x >= 9.0f) {
-				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material[fi]];
+				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material.data[fi]];
 				ufbxt_assert(!strcmp(mat->material->name.data, "Front"));
 				num_front++;
 			}
@@ -143,7 +143,7 @@ UFBXT_FILE_TEST(max2009_blob)
 		ufbxt_diff_material_value(err, &material->fbx.diffuse_color, &material->fbx.diffuse_factor, diffuse);
 		ufbxt_diff_material_value(err, &material->fbx.specular_color, &material->fbx.specular_factor, specular);
 		ufbxt_diff_material_value(err, &material->fbx.emission_color, &material->fbx.emission_factor, emission);
-		ufbxt_assert_close_real(err, material->fbx.specular_exponent.value.x, shininess);
+		ufbxt_assert_close_real(err, material->fbx.specular_exponent.value_vec3.x, shininess);
 	}
 
 	{
@@ -158,7 +158,7 @@ UFBXT_FILE_TEST(max2009_blob)
 		ufbxt_diff_material_value(err, &material->fbx.diffuse_color, &material->fbx.diffuse_factor, diffuse);
 		ufbxt_diff_material_value(err, &material->fbx.specular_color, &material->fbx.specular_factor, specular);
 		ufbxt_diff_material_value(err, &material->fbx.emission_color, &material->fbx.emission_factor, emission);
-		ufbxt_assert_close_real(err, material->fbx.specular_exponent.value.x, shininess);
+		ufbxt_assert_close_real(err, material->fbx.specular_exponent.value_vec3.x, shininess);
 	}
 
 	{
@@ -173,7 +173,7 @@ UFBXT_FILE_TEST(max2009_blob)
 		ufbxt_diff_material_value(err, &material->fbx.diffuse_color, &material->fbx.diffuse_factor, diffuse);
 		ufbxt_diff_material_value(err, &material->fbx.specular_color, &material->fbx.specular_factor, specular);
 		ufbxt_diff_material_value(err, &material->fbx.emission_color, &material->fbx.emission_factor, emission);
-		ufbxt_assert_close_real(err, material->fbx.specular_exponent.value.x, shininess);
+		ufbxt_assert_close_real(err, material->fbx.specular_exponent.value_vec3.x, shininess);
 	}
 
 	{
@@ -188,7 +188,7 @@ UFBXT_FILE_TEST(max2009_blob)
 		ufbxt_diff_material_value(err, &material->fbx.diffuse_color, &material->fbx.diffuse_factor, diffuse);
 		ufbxt_diff_material_value(err, &material->fbx.specular_color, &material->fbx.specular_factor, specular);
 		ufbxt_diff_material_value(err, &material->fbx.emission_color, &material->fbx.emission_factor, emission);
-		ufbxt_assert_close_real(err, material->fbx.specular_exponent.value.x, shininess);
+		ufbxt_assert_close_real(err, material->fbx.specular_exponent.value_vec3.x, shininess);
 	}
 
 	ufbxt_check_frame(scene, err, false, "max2009_blob_8", NULL, 8.0/30.0);
@@ -227,7 +227,7 @@ UFBXT_FILE_TEST(max6_teapot)
 	ufbxt_assert(node);
 	ufbxt_assert(node->mesh);
 	ufbx_mesh *mesh = node->mesh;
-	ufbxt_assert(mesh->vertex_normal.data);
-	ufbxt_assert(mesh->vertex_uv.data);
+	ufbxt_assert(mesh->vertex_normal.exists);
+	ufbxt_assert(mesh->vertex_uv.exists);
 }
 #endif

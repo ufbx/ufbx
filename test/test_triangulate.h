@@ -10,7 +10,7 @@ size_t do_triangulate_test(ufbx_scene *scene)
 		ufbxt_assert(mesh->instances.count == 1);
 		bool should_be_top_left = mesh->instances.data[0]->name.data[0] == 'A';
 		ufbxt_assert(mesh->num_faces == 1);
-		ufbx_face face = mesh->faces[0];
+		ufbx_face face = mesh->faces.data[0];
 		ufbxt_assert(face.index_begin == 0);
 		ufbxt_assert(face.num_indices == 4);
 		uint32_t tris[6];
@@ -68,15 +68,23 @@ UFBXT_FILE_TEST(maya_tri_cone)
 	ufbx_mesh *mesh = node->mesh;
 
 	for (size_t i = 0; i < mesh->num_faces; i++) {
-		ufbx_face face = mesh->faces[i];
+		ufbx_face face = mesh->faces.data[i];
 		ufbxt_assert(face.num_indices >= 3 && face.num_indices <= 32);
 
 		uint32_t tris[32];
 
 		size_t num_tris = face.num_indices - 2;
 		for (size_t i = 0; i < 32; i++) {
-			bool ok = ufbx_triangulate_face(tris, i, mesh, face) != 0;
-			ufbxt_assert(ok == (i >= num_tris * 3));
+			ufbx_panic panic;
+			panic.did_panic = false;
+			size_t num_tris_returned = ufbx_catch_triangulate_face(&panic, tris, i, mesh, face);
+			if (i >= num_tris * 3) {
+				ufbxt_assert(!panic.did_panic);
+				ufbxt_assert(num_tris_returned == num_tris);
+			} else {
+				ufbxt_assert(panic.did_panic);
+				ufbxt_assert(num_tris_returned == 0);
+			}
 		}
 
 		ufbxt_assert(ufbx_triangulate_face(tris, ufbxt_arraycount(tris), mesh, face));
@@ -91,7 +99,7 @@ static void ufbxt_ngon_write_obj(const char *path, ufbx_mesh *mesh, const uint32
 	FILE *f = fopen(path, "w");
 
 	for (size_t i = 0; i < mesh->num_vertices; i++) {
-		ufbx_vec3 v = mesh->vertices[i];
+		ufbx_vec3 v = mesh->vertices.data[i];
 		fprintf(f, "v %f %f %f\n", v.x, v.y, v.z);
 	}
 
@@ -99,9 +107,9 @@ static void ufbxt_ngon_write_obj(const char *path, ufbx_mesh *mesh, const uint32
 	for (size_t i = 0; i < num_triangles; i++) {
 		const uint32_t *tri = indices + i * 3;
 		fprintf(f, "f %u %u %u\n",
-			mesh->vertex_indices[tri[0]] + 1,
-			mesh->vertex_indices[tri[1]] + 1,
-			mesh->vertex_indices[tri[2]] + 1);
+			mesh->vertex_indices.data[tri[0]] + 1,
+			mesh->vertex_indices.data[tri[1]] + 1,
+			mesh->vertex_indices.data[tri[2]] + 1);
 	}
 
 	fclose(f);
@@ -150,7 +158,7 @@ UFBXT_FILE_TEST(blender_300_ngon_intersection)
 	ufbx_mesh *mesh = node->mesh;
 
 	ufbxt_assert(mesh->num_faces == 1);
-	ufbx_face face = mesh->faces[0];
+	ufbx_face face = mesh->faces.data[0];
 
 	uint32_t indices[3*3];
 	size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, face);
@@ -172,7 +180,7 @@ UFBXT_FILE_TEST(blender_300_ngon_e)
 	ufbx_mesh *mesh = node->mesh;
 
 	ufbxt_assert(mesh->num_faces == 1);
-	ufbx_face face = mesh->faces[0];
+	ufbx_face face = mesh->faces.data[0];
 
 	uint32_t indices[10*3];
 	size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, face);
@@ -194,7 +202,7 @@ UFBXT_FILE_TEST(blender_300_ngon_abstract)
 	ufbx_mesh *mesh = node->mesh;
 
 	ufbxt_assert(mesh->num_faces == 1);
-	ufbx_face face = mesh->faces[0];
+	ufbx_face face = mesh->faces.data[0];
 
 	uint32_t indices[144*3];
 	size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, face);
@@ -216,7 +224,7 @@ UFBXT_FILE_TEST(blender_300_ngon_big)
 	ufbx_mesh *mesh = node->mesh;
 
 	ufbxt_assert(mesh->num_faces == 1);
-	ufbx_face face = mesh->faces[0];
+	ufbx_face face = mesh->faces.data[0];
 
 	uint32_t expected_tris = 8028;
 	uint32_t *indices = malloc(expected_tris * 3 * sizeof(uint32_t));
@@ -245,7 +253,7 @@ UFBXT_FILE_TEST(blender_300_ngon_irregular)
 	uint32_t indices[256];
 
 	for (size_t i = 0; i < mesh->num_faces; i++) {
-		ufbx_face face = mesh->faces[i];
+		ufbx_face face = mesh->faces.data[i];
 
 		size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, face);
 		ufbxt_assert(num_tris == face.num_indices - 2);

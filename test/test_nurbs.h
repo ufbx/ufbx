@@ -56,7 +56,7 @@ UFBXT_FILE_TEST(maya_nurbs_curve_form)
 
 		{
 			ufbx_real weights[16];
-			size_t knot = ufbx_evaluate_nurbs_basis(&open->basis, 0.0f, 16, weights, NULL);
+			size_t knot = ufbx_evaluate_nurbs_basis(&open->basis, 0.0f, weights, 16, NULL, 0);
 			ufbxt_assert(knot == 0);
 			ufbxt_assert_close_real(err, weights[0], 1.0f);
 			ufbxt_assert_close_real(err, weights[1], 0.0f);
@@ -66,7 +66,7 @@ UFBXT_FILE_TEST(maya_nurbs_curve_form)
 
 		{
 			ufbx_real weights[16];
-			size_t knot = ufbx_evaluate_nurbs_basis(&open->basis, 0.5f, 16, weights, NULL);
+			size_t knot = ufbx_evaluate_nurbs_basis(&open->basis, 0.5f, weights, 16, NULL, 0);
 			ufbxt_assert(knot == 0);
 			ufbxt_assert_close_real(err, weights[0], 0.125f);
 			ufbxt_assert_close_real(err, weights[1], 0.375f);
@@ -76,7 +76,7 @@ UFBXT_FILE_TEST(maya_nurbs_curve_form)
 
 		{
 			ufbx_real weights[16];
-			size_t knot = ufbx_evaluate_nurbs_basis(&open->basis, 1.0f, 16, weights, NULL);
+			size_t knot = ufbx_evaluate_nurbs_basis(&open->basis, 1.0f, weights, 16, NULL, 0);
 			ufbxt_assert(knot == 0);
 			ufbxt_assert_close_real(err, weights[0], 0.0f);
 			ufbxt_assert_close_real(err, weights[1], 0.0f);
@@ -118,7 +118,7 @@ UFBXT_FILE_TEST(maya_nurbs_curve_form)
 
 		{
 			ufbx_real weights[16];
-			size_t knot = ufbx_evaluate_nurbs_basis(&closed->basis, 3.14f, 16, weights, NULL);
+			size_t knot = ufbx_evaluate_nurbs_basis(&closed->basis, 3.14f, weights, 16, NULL, 0);
 			ufbxt_assert(knot == 2);
 			ufbxt_assert_close_real(err, weights[0], 0.106009f);
 			ufbxt_assert_close_real(err, weights[1], 0.648438f);
@@ -457,7 +457,7 @@ UFBXT_FILE_TEST_ALT(nurbs_alloc_fail, maya_nurbs_surface_plane)
 	ufbx_nurbs_surface *surface = (ufbx_nurbs_surface*)node->attrib;
 
 	for (size_t max_temp = 1; max_temp < 10000; max_temp++) {
-		ufbx_tessellate_opts opts = { 0 };
+		ufbx_tessellate_surface_opts opts = { 0 };
 		opts.temp_allocator.huge_threshold = 1;
 		opts.temp_allocator.allocation_limit = max_temp;
 
@@ -474,7 +474,7 @@ UFBXT_FILE_TEST_ALT(nurbs_alloc_fail, maya_nurbs_surface_plane)
 	}
 
 	for (size_t max_result = 1; max_result < 10000; max_result++) {
-		ufbx_tessellate_opts opts = { 0 };
+		ufbx_tessellate_surface_opts opts = { 0 };
 		opts.result_allocator.huge_threshold = 1;
 		opts.result_allocator.allocation_limit = max_result;
 
@@ -485,6 +485,148 @@ UFBXT_FILE_TEST_ALT(nurbs_alloc_fail, maya_nurbs_surface_plane)
 		if (tess_mesh) {
 			ufbxt_logf(".. Tested up to %zu result allocations", max_result);
 			ufbx_free_mesh(tess_mesh);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_nurbs_invalid)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "curve1");
+		ufbxt_assert(node);
+		ufbx_nurbs_curve *curve = ufbx_as_nurbs_curve(node->attrib);
+		ufbxt_assert(!curve->basis.valid);
+
+		ufbx_error error;
+		ufbx_line_curve *line = ufbx_tessellate_nurbs_curve(curve, NULL, &error);
+		ufbxt_assert(!line);
+		ufbxt_assert(error.type == UFBX_ERROR_BAD_NURBS);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "nurbsPlane1");
+		ufbxt_assert(node);
+		ufbx_nurbs_surface *surface = ufbx_as_nurbs_surface(node->attrib);
+		ufbxt_assert(!surface->basis_u.valid);
+		ufbxt_assert(!surface->basis_v.valid);
+
+		ufbx_error error;
+		ufbx_mesh *mesh = ufbx_tessellate_nurbs_surface(surface, NULL, &error);
+		ufbxt_assert(!mesh);
+		ufbxt_assert(error.type == UFBX_ERROR_BAD_NURBS);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_nurbs_truncated)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "curve1");
+		ufbxt_assert(node);
+		ufbx_nurbs_curve *curve = ufbx_as_nurbs_curve(node->attrib);
+		ufbxt_assert(curve->basis.valid);
+
+		ufbx_line_curve *line = ufbx_tessellate_nurbs_curve(curve, NULL, NULL);
+		ufbxt_assert(line);
+		ufbx_free_line_curve(line);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "nurbsPlane1");
+		ufbxt_assert(node);
+		ufbx_nurbs_surface *surface = ufbx_as_nurbs_surface(node->attrib);
+		ufbxt_assert(surface->basis_u.valid);
+		ufbxt_assert(surface->basis_v.valid);
+
+		ufbx_error error;
+		ufbx_mesh *mesh = ufbx_tessellate_nurbs_surface(surface, NULL, &error);
+		ufbxt_assert(mesh);
+		ufbx_free_mesh(mesh);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(max_nurbs_to_line)
+#if UFBXT_IMPL
+{
+	ufbx_node *line_node = ufbx_find_node(scene, "Line");
+	ufbx_node *nurbs_node = ufbx_find_node(scene, "Nurbs");
+	ufbxt_assert(line_node);
+	ufbxt_assert(nurbs_node);
+	ufbx_line_curve *line = ufbx_as_line_curve(line_node->attrib);
+	ufbx_nurbs_curve *nurbs = ufbx_as_nurbs_curve(nurbs_node->attrib);
+	ufbxt_assert(line);
+	ufbxt_assert(nurbs);
+
+	ufbx_tessellate_curve_opts opts = { 0 };
+	opts.span_subdivision = 5;
+	ufbx_line_curve *tess_line = ufbx_tessellate_nurbs_curve(nurbs, &opts, NULL);
+	ufbxt_assert(tess_line);
+
+	size_t num_indices = line->point_indices.count;
+	ufbxt_assert(line->segments.count == 1);
+	ufbxt_assert(tess_line->segments.count == 1);
+	ufbxt_assert(tess_line->point_indices.count == num_indices);
+
+	ufbxt_assert(line->segments.data[0].index_begin == 0);
+	ufbxt_assert(tess_line->segments.data[0].index_begin == 0);
+	ufbxt_assert(line->segments.data[0].num_indices == num_indices);
+	ufbxt_assert(tess_line->segments.data[0].num_indices == num_indices);
+
+	for (size_t i = 0; i < num_indices; i++) {
+		ufbx_vec3 point = line->control_points.data[line->point_indices.data[i]];
+		ufbx_vec3 tess_point = tess_line->control_points.data[tess_line->point_indices.data[i]];
+		ufbxt_assert_close_vec3(err, point, tess_point);
+	}
+
+	ufbx_retain_line_curve(tess_line);
+	ufbx_free_line_curve(tess_line);
+
+	ufbx_free_line_curve(tess_line);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(tessellate_line_alloc_fail, max_nurbs_to_line)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Nurbs");
+	ufbx_nurbs_curve *nurbs = ufbx_as_nurbs_curve(node->attrib);
+	ufbxt_assert(nurbs);
+
+	for (size_t max_temp = 1; max_temp < 10000; max_temp++) {
+		ufbx_tessellate_curve_opts opts = { 0 };
+		opts.temp_allocator.huge_threshold = 1;
+		opts.temp_allocator.allocation_limit = max_temp;
+
+		ufbxt_hintf("Temp limit: %zu", max_temp);
+
+		ufbx_error error;
+		ufbx_line_curve *line = ufbx_tessellate_nurbs_curve(nurbs, &opts, &error);
+		if (line) {
+			ufbxt_logf(".. Tested up to %zu temporary allocations", max_temp);
+			ufbx_free_line_curve(line);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+
+	for (size_t max_result = 1; max_result < 10000; max_result++) {
+		ufbx_tessellate_curve_opts opts = { 0 };
+		opts.result_allocator.huge_threshold = 1;
+		opts.result_allocator.allocation_limit = max_result;
+
+		ufbxt_hintf("Result limit: %zu", max_result);
+
+		ufbx_error error;
+		ufbx_line_curve *line = ufbx_tessellate_nurbs_curve(nurbs, &opts, &error);
+		if (line) {
+			ufbxt_logf(".. Tested up to %zu result allocations", max_result);
+			ufbx_free_line_curve(line);
 			break;
 		}
 		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);

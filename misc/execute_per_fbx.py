@@ -7,6 +7,7 @@ import subprocess
 parser = argparse.ArgumentParser(usage="execute_per_fbx.py --exe loader --root .")
 parser.add_argument("--exe", help="Executable to run")
 parser.add_argument("--root", default=".", help="Root path to search from")
+parser.add_argument("--start", default="", help="Top-level file to start from")
 argv = parser.parse_args()
 
 begin = time.time()
@@ -24,7 +25,11 @@ for root, dirs, files in os.walk(argv.root):
         path = os.path.join(root, file)
         size = os.stat(path).st_size
         display = os.path.relpath(path, argv.root)
-        print(f"-- {display}")
+
+        if argv.start and display < argv.start:
+            continue
+
+        print(f"-- {display}", flush=True)
 
         total_size += size
         if argv.exe:

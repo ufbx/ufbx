@@ -5,22 +5,24 @@ void ufbxt_check_generated_normals(ufbx_mesh *mesh, ufbxt_diff_error *err, size_
 	ufbx_topo_edge *topo = calloc(mesh->num_indices, sizeof(ufbx_topo_edge));
 	ufbxt_assert(topo);
 
-	ufbx_compute_topology(mesh, topo);
+	ufbx_compute_topology(mesh, topo, mesh->num_indices);
 
-	int32_t *normal_indices = calloc(mesh->num_indices, sizeof(int32_t));
-	size_t num_normals = ufbx_generate_normal_mapping(mesh, topo, normal_indices, false);
+	uint32_t *normal_indices = calloc(mesh->num_indices, sizeof(uint32_t));
+	size_t num_normals = ufbx_generate_normal_mapping(mesh, topo, mesh->num_indices, normal_indices, mesh->num_indices, false);
 
 	if (expected_normals > 0) {
 		ufbxt_assert(num_normals == expected_normals);
 	}
 
 	ufbx_vec3 *normals = calloc(num_normals, sizeof(ufbx_vec3));
-	ufbx_compute_normals(mesh, &mesh->vertex_position, normal_indices, normals, num_normals);
+	ufbx_compute_normals(mesh, &mesh->vertex_position, normal_indices, mesh->num_indices, normals, num_normals);
 
 	ufbx_vertex_vec3 new_normals = { 0 };
-	new_normals.data = normals;
-	new_normals.indices = normal_indices;
-	new_normals.num_values = num_normals;
+	new_normals.exists = true;
+	new_normals.values.data = normals;
+	new_normals.values.count = num_normals;
+	new_normals.indices.data = normal_indices;
+	new_normals.indices.count = mesh->num_indices;
 
 	for (size_t i = 0; i < mesh->num_indices; i++) {
 		ufbx_vec3 fn = ufbx_get_vertex_vec3(&mesh->vertex_normal, i);
@@ -66,6 +68,12 @@ UFBXT_FILE_TEST(maya_planar_ngon)
 #endif
 
 UFBXT_FILE_TEST(maya_subsurf_cube)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST(maya_subsurf_plane)
 #if UFBXT_IMPL
 {
 }
@@ -157,23 +165,23 @@ UFBXT_FILE_TEST(blender_293x_subsurf_max_crease)
 	ufbx_mesh *subdivided = ufbx_subdivide_mesh(mesh, 1, NULL, NULL);
 
 	for (size_t i = 0; i < mesh->num_edges; i++) {
-		ufbxt_assert_close_real(err, mesh->edge_crease[i], 1.0f);
+		ufbxt_assert_close_real(err, mesh->edge_crease.data[i], 1.0f);
 	}
 
 	size_t num_edge = 0;
 	size_t num_center = 0;
 	for (size_t i = 0; i < subdivided->num_edges; i++) {
-		ufbx_edge edge = subdivided->edges[i];
-		ufbx_vec3 a = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.indices[0]);
-		ufbx_vec3 b = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.indices[1]);
+		ufbx_edge edge = subdivided->edges.data[i];
+		ufbx_vec3 a = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.a);
+		ufbx_vec3 b = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.b);
 		ufbx_real a_len = a.x*a.x + a.y*a.y + a.z*a.z;
 		ufbx_real b_len = b.x*b.x + b.y*b.y + b.z*b.z;
 
 		if (a_len < 0.01f || b_len < 0.01f) {
-			ufbxt_assert_close_real(err, subdivided->edge_crease[i], 0.0f);
+			ufbxt_assert_close_real(err, subdivided->edge_crease.data[i], 0.0f);
 			num_center++;
 		} else {
-			ufbxt_assert_close_real(err, subdivided->edge_crease[i], 1.0f);
+			ufbxt_assert_close_real(err, subdivided->edge_crease.data[i], 1.0f);
 			num_edge++;
 		}
 	}
@@ -196,20 +204,20 @@ UFBXT_FILE_TEST(maya_subsurf_max_crease)
 	size_t num_top = 0;
 	size_t num_bottom = 0;
 	for (size_t i = 0; i < subdivided->num_edges; i++) {
-		ufbx_edge edge = subdivided->edges[i];
-		ufbx_vec3 a = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.indices[0]);
-		ufbx_vec3 b = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.indices[1]);
+		ufbx_edge edge = subdivided->edges.data[i];
+		ufbx_vec3 a = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.a);
+		ufbx_vec3 b = ufbx_get_vertex_vec3(&subdivided->vertex_position, edge.b);
 		ufbx_real a_len = a.x*a.x + a.z*a.z;
 		ufbx_real b_len = b.x*b.x + b.z*b.z;
 
 		if (a.y < -0.49f && b.y < -0.49f && a_len > 0.01f && b_len > 0.01f) {
-			ufbxt_assert_close_real(err, subdivided->edge_crease[i], 0.8f);
+			ufbxt_assert_close_real(err, subdivided->edge_crease.data[i], 0.8f);
 			num_bottom++;
 		} else if (a.y > +0.49f && b.y > +0.49f && a_len > 0.01f && b_len > 0.01f) {
-			ufbxt_assert_close_real(err, subdivided->edge_crease[i], 1.0f);
+			ufbxt_assert_close_real(err, subdivided->edge_crease.data[i], 1.0f);
 			num_top++;
 		} else {
-			ufbxt_assert_close_real(err, subdivided->edge_crease[i], 0.0f);
+			ufbxt_assert_close_real(err, subdivided->edge_crease.data[i], 0.0f);
 		}
 		a = a;
 	}
@@ -255,7 +263,7 @@ UFBXT_FILE_TEST(blender_293_half_smooth_cube)
 
 	uint32_t tri[64];
 	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
-		size_t num_tris = ufbx_triangulate_face(tri, 64, mesh, mesh->faces[fi]);
+		size_t num_tris = ufbx_triangulate_face(tri, 64, mesh, mesh->faces.data[fi]);
 		for (size_t ti = 0; ti < num_tris * 3; ti++) {
 			vertices[num_indices].position = ufbx_get_vertex_vec3(&mesh->vertex_position, tri[ti]);
 			vertices[num_indices].normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, tri[ti]);
@@ -269,4 +277,24 @@ UFBXT_FILE_TEST(blender_293_half_smooth_cube)
 
 }
 #endif
+
+UFBXT_FILE_TEST(maya_vertex_crease_single)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+
+UFBXT_FILE_TEST(maya_vertex_crease)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST(blender_312x_vertex_crease)
+#if UFBXT_IMPL
+{
+}
+#endif
+
 

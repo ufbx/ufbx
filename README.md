@@ -9,7 +9,7 @@ ufbx_load_opts opts = { 0 }; // Optional, pass NULL for defaults
 ufbx_error error; // Optional, pass NULL if you don't care about errors
 ufbx_scene *scene = ufbx_load_file("thing.fbx", &opts, &error);
 if (!scene) {
-    fprintf(stderr, "Failed to load: %s\n", error.description);
+    fprintf(stderr, "Failed to load: %s\n", error.description.data);
     exit(1);
 }
 
@@ -19,16 +19,16 @@ if (!scene) {
 ufbx_node *cube = ufbx_find_node(scene, "Cube");
 ufbx_mesh *mesh = cube->mesh;
 for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
-    ufbx_face face = mesh->faces[face_ix];
+    ufbx_face face = mesh->faces.data[face_ix];
     for (size_t vertex_ix = 0; vertex_ix < face.num_indices; vertex_ix++) {
         size_t index = face.index_begin + vertex_ix;
-        ufbx_vec3 position = mesh->vertex_position.data[mesh->vertex_position.indices[index]];
+        ufbx_vec3 position = mesh->vertex_position.values.data[mesh->vertex_position.indices.data[index]];
         ufbx_vec3 normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, index); // Equivalent utility function
         push_vertex(&position, &normal);
     }
 }
 
-// There's also helper functions for evaluating animations:
+// There are helper functions for evaluating animations:
 for (double time = 0.0; time <= 1.0; time += 1.0/60.0) {
     ufbx_transform transform = ufbx_evaluate_transform(&scene->anim, cube, time);
     ufbx_matrix matrix = ufbx_transform_to_matrix(&transform);

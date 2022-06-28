@@ -610,7 +610,8 @@ std::vector<char> load_file(const char *filename)
 		size_t size = ftell(f);
 		fseek(f, 0, SEEK_SET);
 		data.resize(size);
-		fread(data.data(), 1, size, f);
+		size_t result = fread(data.data(), 1, size, f);
+		ufbx_assert(result == size);
 		fclose(f);
 	}
 	return data;
@@ -2794,12 +2795,12 @@ bool ends_with(const std::string &str, const char *suffix)
 void setup_texture(Texture &texture, const ufbx_material_map &map)
 {
 	if (map.has_value) {
-		texture.value = from_ufbx(map.value);
+		texture.value = from_ufbx(map.value_vec3);
 	}
-	if (map.texture && map.texture->content_size > 0) {
+	if (map.texture && map.texture->content.size > 0) {
 		verbosef("Loading texture: %s\n", map.texture->relative_filename.data);
 
-		texture.image = read_png(map.texture->content, map.texture->content_size);
+		texture.image = read_png(map.texture->content.data, map.texture->content.size);
 		if (!texture.image.error) return;
 		fprintf(stderr, "Failed to load %s: %s\n",
 			map.texture->relative_filename.data, texture.image.error);
@@ -2821,14 +2822,14 @@ struct ProgressState
 {
 };
 
-bool progress(void *user, const ufbx_progress *progress)
+ufbx_progress_result progress(void *user, const ufbx_progress *progress)
 {
 	ProgressState *state = (ProgressState*)user;
 	static int timer;
 	if ((timer++ & 0xfff) == 0) {
 		verbosef("%.1f/%.1f MB\n", (double)progress->bytes_read/1e6, (double)progress->bytes_total/1e6);
 	}
-	return true;
+	return UFBX_PROGRESS_CONTINUE;
 }
 
 struct alignas(8) OptBase
@@ -3041,7 +3042,7 @@ void render_frame(ufbx_scene *original_scene, const Opts &opts, int frame_offset
 		setup_texture(dst.base_factor, mat->pbr.base_factor);
 		setup_texture(dst.base_color, mat->pbr.base_color);
 		setup_texture(dst.roughness, mat->pbr.roughness);
-		setup_texture(dst.metallic, mat->pbr.metallic);
+		setup_texture(dst.metallic, mat->pbr.metalness);
 		setup_texture(dst.emission_factor, mat->pbr.emission_factor);
 		setup_texture(dst.emission_color, mat->pbr.emission_color);
 		dst.base_color.image.srgb = true;
@@ -3086,7 +3087,7 @@ void render_frame(ufbx_scene *original_scene, const Opts &opts, int frame_offset
 					TriangleInfo info;
 					tri.index = triangles.size();
 
-					if (mesh->face_material) {
+					if (mesh->face_material.count > 0) {
 						ufbx_material *mat = mesh->materials.data[mesh->face_material[face_ix]].material;
 						info.material = mat->element.typed_id + 1;
 					}
@@ -3097,7 +3098,7 @@ void render_frame(ufbx_scene *original_scene, const Opts &opts, int frame_offset
 						// Load the skinned vertex position at `index`
 						ufbx_vec3 v = ufbx_get_vertex_vec3(&mesh->skinned_position, index);
 
-						ufbx_vec2 uv = mesh->vertex_uv.data ? ufbx_get_vertex_vec2(&mesh->vertex_uv, index) : ufbx_vec2{};
+						ufbx_vec2 uv = mesh->vertex_uv.exists ? ufbx_get_vertex_vec2(&mesh->vertex_uv, index) : ufbx_vec2{};
 						ufbx_vec3 n = ufbx_get_vertex_vec3(&mesh->skinned_normal, index);
 
 						// If the skinned positions are local we must apply `to_root` to get
@@ -3318,8 +3319,8 @@ void render_file(const Opts &opts)
 
 	load_opts.evaluate_skinning = true;
 
-	load_opts.progress_fn = &progress;
-	load_opts.progress_user = &progress_state;
+	load_opts.progress_cb.fn = &progress;
+	load_opts.progress_cb.user = &progress_state;
 
 	ufbx_real scale = (ufbx_real)opts.scene_scale.value;
 
