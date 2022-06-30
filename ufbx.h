@@ -1894,6 +1894,8 @@ typedef enum ufbx_shader_type {
 	// Variation of the FBX phong shader that can recover PBR properties like
 	// `metalness` or `roughness` from the FBX non-physical values.
 	UFBX_SHADER_BLENDER_PHONG,
+	// Wavefront .mtl format shader (used by .obj files)
+	UFBX_SHADER_WAVEFRONT_MTL,
 
 	UFBX_SHADER_TYPE_COUNT,
 	UFBX_SHADER_TYPE_FORCE_32BIT = 0x7fffffff,
@@ -2811,6 +2813,12 @@ typedef struct ufbx_application {
 	ufbx_string version;
 } ufbx_application;
 
+typedef enum ufbx_file_format {
+	UFBX_FILE_FORMAT_UNKNOWN,
+	UFBX_FILE_FORMAT_FBX,
+	UFBX_FILE_FORMAT_OBJ,
+} ufbx_file_format;
+
 // Miscellaneous data related to the loaded file
 typedef struct ufbx_metadata {
 
@@ -2819,6 +2827,9 @@ typedef struct ufbx_metadata {
 
 	// FBX version in integer format, eg. 7400 for 7.4.
 	uint32_t version;
+
+	// File format of the source file.
+	ufbx_file_format file_format;
 
 	// Index arrays may contain `UFBX_NO_INDEX` instead of a valid index
 	// to indicate gaps.
@@ -3482,6 +3493,15 @@ typedef struct ufbx_load_opts {
 
 	// Retain the raw document structure using `ufbx_dom_node`.
 	bool retain_dom;
+
+	// (.obj) Don't split geometry into meshes by object.
+	bool obj_merge_objects;
+
+	// (.obj) Don't split geometry into meshes by groups.
+	bool obj_merge_groups;
+
+	// (.obj) Force splitting groups even on object boundaries
+	bool obj_split_groups;
 
 	uint32_t _end_zero; 
 } ufbx_load_opts;

@@ -1039,7 +1039,7 @@ UFBXT_TEST(obj)
 	ufbx_load_opts opts = { 0 };
 	opts.load_external_files = true;
 
-	ufbx_scene *scene = ufbx_load_file("C:\\Users\\Datacube\\Documents\\doublecube.obj", &opts, NULL);
+	ufbx_scene *scene = ufbx_load_file("C:\\Users\\Datacube\\Documents\\objgroups.obj", &opts, NULL);
 	ufbxt_assert(scene);
 
 	ufbx_free_scene(scene);

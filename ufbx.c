@@ -3946,6 +3946,8 @@ typedef struct {
 	uint64_t fbx_mesh_id;
 
 	uint32_t usemtl_base;
+
+	uint32_t num_groups;
 } ufbxi_obj_mesh;
 
 static const uint8_t ufbxi_obj_attrib_stride[] = {
@@ -3953,6 +3955,12 @@ static const uint8_t ufbxi_obj_attrib_stride[] = {
 };
 
 ufbx_static_assert(obj_attrib_strides, ufbxi_arraycount(ufbxi_obj_attrib_stride) == UFBXI_OBJ_NUM_ATTRIBS_EXT);
+
+typedef struct {
+	const char *name;
+	uint32_t local_id;
+	uint32_t mesh_id;
+} ufbxi_obj_group_entry;
 
 typedef struct {
 
@@ -3970,9 +3978,12 @@ typedef struct {
 	ufbxi_buf tmp_color_indices;
 	ufbxi_buf tmp_faces;
 	ufbxi_buf tmp_face_smoothing;
+	ufbxi_buf tmp_face_group;
 	ufbxi_buf tmp_face_material;
 	ufbxi_buf tmp_meshes;
 	ufbxi_buf tmp_props;
+
+	ufbxi_map group_map;
 
 	size_t read_progress;
 
@@ -3983,6 +3994,10 @@ typedef struct {
 	ufbx_string usemtl_name;
 
 	uint32_t face_material;
+
+	uint32_t face_group;
+	bool has_face_group;
+
 	bool face_smoothing;
 	bool has_face_smoothing;
 
@@ -3993,6 +4008,12 @@ typedef struct {
 
 	ufbx_material **tmp_materials;
 	size_t tmp_materials_cap;
+
+	ufbx_string object;
+	ufbx_string group;
+	bool object_dirty;
+	bool group_dirty;
+	bool face_group_dirty;
 
 } ufbxi_obj_context;
 
@@ -11565,6 +11586,10 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_props(ufbxi_context *uc,
 		if (!prop->value_int) {
 			prop->value_int = (int64_t)prop->value_real;
 		}
+		if (prop->value_blob.size == 0 && prop->value_str.length > 0) {
+			prop->value_blob.data = prop->value_str.data;
+			prop->value_blob.size = prop->value_str.length;
+		}
 	}
 
 	if (props.count > 1) {
@@ -11586,15 +11611,36 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_push_mesh(ufbxi_context *uc)
 		mesh->vertex_range[i].min_ix = UINT64_MAX;
 	}
 
-	mesh->fbx_node = ufbxi_push_synthetic_element(uc, &mesh->fbx_node_id, NULL, "", ufbx_node, UFBX_ELEMENT_NODE);
-	mesh->fbx_mesh = ufbxi_push_synthetic_element(uc, &mesh->fbx_mesh_id, NULL, "", ufbx_mesh, UFBX_ELEMENT_MESH);
+	const char *name = "";
+	if (uc->opts.obj_split_groups && uc->obj.group.length > 0) {
+		name = uc->obj.group.data;
+	} else if (!uc->opts.obj_merge_objects && uc->obj.object.length > 0) {
+		name = uc->obj.object.data;
+	} else if (!uc->opts.obj_merge_groups && uc->obj.group.length > 0) {
+		name = uc->obj.group.data;
+	}
+
+	mesh->fbx_node = ufbxi_push_synthetic_element(uc, &mesh->fbx_node_id, NULL, name, ufbx_node, UFBX_ELEMENT_NODE);
+	mesh->fbx_mesh = ufbxi_push_synthetic_element(uc, &mesh->fbx_mesh_id, NULL, name, ufbx_mesh, UFBX_ELEMENT_MESH);
 
 	ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &mesh->fbx_node->element_id));
 
 	uc->obj.face_material = UFBX_NO_INDEX;
+	uc->obj.face_group = 0;
+	uc->obj.face_group_dirty = true;
 
 	ufbxi_check(ufbxi_connect_oo(uc, mesh->fbx_mesh_id, mesh->fbx_node_id));
 	ufbxi_check(ufbxi_connect_oo(uc, mesh->fbx_node_id, 0));
+
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_flush_mesh(ufbxi_context *uc)
+{
+	if (!uc->obj.mesh) return 1;
+
+	size_t num_props = uc->obj.tmp_props.num_items;
+	ufbxi_check(ufbxi_obj_pop_props(uc, &uc->obj.mesh->fbx_mesh->props.props, num_props));
 
 	return 1;
 }
@@ -11611,11 +11657,17 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_init(ufbxi_context *uc)
 	uc->obj.tmp_faces.ator = &uc->ator_tmp;
 	uc->obj.tmp_face_material.ator = &uc->ator_tmp;
 	uc->obj.tmp_face_smoothing.ator = &uc->ator_tmp;
+	uc->obj.tmp_face_group.ator = &uc->ator_tmp;
 	uc->obj.tmp_meshes.ator = &uc->ator_tmp;
 	uc->obj.tmp_props.ator = &uc->ator_tmp;
 
 	// .obj parsing does its own yield logic
 	uc->data_size += uc->yield_size;
+
+	uc->obj.object.data = ufbxi_empty_char;
+	uc->obj.group.data = ufbxi_empty_char;
+
+	ufbxi_map_init(&uc->obj.group_map, &uc->ator_tmp, ufbxi_map_cmp_const_char_ptr, NULL);
 
 	return 1;
 }
@@ -11632,8 +11684,11 @@ static ufbxi_noinline void ufbxi_obj_free(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->obj.tmp_faces);
 	ufbxi_buf_free(&uc->obj.tmp_face_material);
 	ufbxi_buf_free(&uc->obj.tmp_face_smoothing);
+	ufbxi_buf_free(&uc->obj.tmp_face_group);
 	ufbxi_buf_free(&uc->obj.tmp_meshes);
 	ufbxi_buf_free(&uc->obj.tmp_props);
+
+	ufbxi_map_free(&uc->obj.group_map);
 
 	ufbxi_free(&uc->ator_tmp, ufbx_string, uc->obj.tokens, uc->obj.tokens_cap);
 	ufbxi_free(&uc->ator_tmp, ufbx_material*, uc->obj.tmp_materials, uc->obj.tmp_materials_cap);
@@ -11861,16 +11916,79 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 {
 	if (uc->opts.ignore_geometry) return 1;
 
-	ufbx_face *face = ufbxi_push(&uc->obj.tmp_faces, ufbx_face, 1);
-	ufbxi_check(face);
+	if (uc->obj.object_dirty) {
+		if (!uc->opts.obj_merge_objects) {
+			uc->obj.mesh = NULL;
+		}
+		uc->obj.object_dirty = false;
+	}
+
+	if (uc->obj.group_dirty) {
+		if ((uc->obj.object.length == 0 || uc->opts.obj_merge_objects) && !uc->opts.obj_merge_groups || uc->opts.obj_split_groups) {
+			uc->obj.mesh = NULL;
+		}
+		uc->obj.group_dirty = false;
+		uc->obj.face_group_dirty = true;
+	}
 
 	if (!uc->obj.mesh) {
+		ufbxi_check(ufbxi_obj_flush_mesh(uc));
 		ufbxi_check(ufbxi_obj_push_mesh(uc));
 	}
 	ufbxi_obj_mesh *mesh = uc->obj.mesh;
 
+	if (uc->obj.face_group_dirty) {
+		if (uc->obj.group.length > 0 && !uc->opts.obj_split_groups) {
+			const char *group = uc->obj.group.data;
+			uint32_t hash = ufbxi_hash_ptr(group);
+			ufbxi_obj_group_entry *entry = ufbxi_map_find(&uc->obj.group_map, ufbxi_obj_group_entry, hash, &group);
+			if (!entry) {
+				entry = ufbxi_map_insert(&uc->obj.group_map, ufbxi_obj_group_entry, hash, &uc->obj.group.data);
+				entry->name = group;
+				entry->mesh_id = 0;
+				entry->local_id = 0;
+			}
+
+			uint32_t mesh_id = mesh->fbx_mesh->element_id;
+			if (entry->mesh_id != mesh_id) {
+				uint32_t id = ++mesh->num_groups;
+				entry->mesh_id = mesh_id;
+				entry->local_id = id;
+
+				ufbx_prop *prop = ufbxi_push_zero(&uc->obj.tmp_props, ufbx_prop, 1);
+				ufbxi_check(prop);
+
+				char name_buf[128];
+				int name_len = snprintf(name_buf, sizeof(name_buf), "obj|face_group|%u", id);
+				ufbx_assert(name_len >= 0 && name_len < sizeof(name_buf));
+
+				prop->name.data = name_buf;
+				prop->name.length = (size_t)name_len;
+				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &prop->name, false));
+
+				prop->type = UFBX_PROP_STRING;
+				prop->flags = UFBX_PROP_FLAG_VALUE_STR;
+				prop->value_str = uc->obj.group;
+			}
+
+			uc->obj.face_group = entry->local_id;
+
+			if (!uc->obj.has_face_group) {
+				uc->obj.has_face_group = true;
+				ufbxi_check(ufbxi_push_zero(&uc->obj.tmp_face_group, uint32_t, uc->obj.tmp_faces.num_items));
+			}
+		} else {
+			uc->obj.face_group = 0;
+		}
+
+		uc->obj.face_group_dirty = true;
+	}
+
 	size_t num_indices = uc->obj.num_tokens - 1;
 	ufbxi_check(UINT32_MAX - mesh->num_indices >= num_indices);
+
+	ufbx_face *face = ufbxi_push(&uc->obj.tmp_faces, ufbx_face, 1);
+	ufbxi_check(face);
 
 	face->index_begin = (uint32_t)mesh->num_indices;
 	face->num_indices = (uint32_t)num_indices;
@@ -11891,6 +12009,11 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 	if (uc->obj.has_face_smoothing) {
 		bool *p_face_smooth = ufbxi_push(&uc->obj.tmp_face_smoothing, bool, 1);
 		*p_face_smooth = uc->obj.face_smoothing;
+	}
+
+	if (uc->obj.has_face_group) {
+		uint32_t *p_face_group = ufbxi_push(&uc->obj.tmp_face_group, uint32_t, 1);
+		*p_face_group = uc->obj.face_group;
 	}
 
 	for (size_t ix = 0; ix < num_indices; ix++) {
@@ -11926,6 +12049,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context
 		ufbx_material *material = ufbxi_push_element(uc, &info, ufbx_material, UFBX_ELEMENT_MATERIAL);
 		ufbxi_check(material);
 
+		material->shader_type = UFBX_SHADER_WAVEFRONT_MTL;
 		material->shading_model_name.data = ufbxi_empty_char;
 		material->shader_prop_prefix.data = ufbxi_empty_char;
 
@@ -12101,6 +12225,12 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 			ufbxi_check(fbx_mesh->face_smoothing.data);
 		}
 
+		if (uc->obj.has_face_group) {
+			fbx_mesh->face_group.count = num_faces;
+			fbx_mesh->face_group.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_face_group, uint32_t, num_faces);
+			ufbxi_check(fbx_mesh->face_group.data);
+		}
+
 		ufbxi_check(ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_vertex_attrib*)&fbx_mesh->vertex_position,
 			&vertices[UFBXI_OBJ_ATTRIB_POSITION], UFBXI_OBJ_ATTRIB_POSITION, non_disjoint[UFBXI_OBJ_ATTRIB_POSITION]));
 
@@ -12161,6 +12291,18 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc
 					ufbxi_check(ufbxi_push_zero(&uc->obj.tmp_face_smoothing, bool, uc->obj.tmp_faces.num_items));
 				}
 			}
+		} else if (key == ufbxi_obj_cmd1('o')) {
+			if (num_tokens >= 2) {
+				uc->obj.object = ufbxi_obj_span_token(uc, 1, SIZE_MAX);
+				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->obj.object, false));
+				uc->obj.object_dirty = true;
+			}
+		} else if (key == ufbxi_obj_cmd1('g')) {
+			if (num_tokens >= 2) {
+				uc->obj.group = ufbxi_obj_span_token(uc, 1, SIZE_MAX);
+				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->obj.group, false));
+				uc->obj.group_dirty = true;
+			}
 		} else if (ufbxi_str_equal(cmd, ufbxi_str_c("mtllib"))) {
 			ufbxi_check(uc->obj.num_tokens >= 2);
 			ufbx_string lib = ufbxi_obj_span_token(uc, 1, SIZE_MAX);
@@ -12173,6 +12315,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc
 		}
 	}
 
+	ufbxi_check(ufbxi_obj_flush_mesh(uc));
 	ufbxi_check(ufbxi_obj_pop_meshes(uc));
 
 	return 1;
@@ -12211,7 +12354,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc
 
 	size_t num_reals = 0;
 	for (; num_reals < 4; num_reals++) {
-		if (start + num_reals < uc->obj.num_tokens) break;
+		if (start + num_reals >= uc->obj.num_tokens) break;
 		ufbx_string tok = uc->obj.tokens[start + num_reals];
 
 		char *end;
@@ -12256,12 +12399,12 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl_map(ufbxi_context *uc)
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl_map(ufbxi_context *uc, size_t prefix_len)
 {
 	if (uc->obj.num_tokens < 2) return 1;
 
 	size_t num_props = 1;
-	ufbxi_check(ufbxi_obj_parse_prop(uc, ufbxi_str_c("ufbx|args"), 1, true, NULL));
+	ufbxi_check(ufbxi_obj_parse_prop(uc, ufbxi_str_c("obj|args"), 1, true, NULL));
 
 	size_t start = 1;
 	for (; start + 1 < uc->obj.num_tokens; ) {
@@ -12295,8 +12438,9 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl_map(ufbxi_context 
 	ufbxi_check(ufbxi_obj_pop_props(uc, &texture->props.props, num_props));
 
 	ufbx_string prop = uc->obj.tokens[0];
-	prop.data += 4;
-	prop.length -= 4;
+	ufbx_assert(prop.length >= prefix_len);
+	prop.data += prefix_len;
+	prop.length -= prefix_len;
 	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &prop, false));
 
 	if (uc->obj.usemtl_fbx_id != 0) {
@@ -12334,7 +12478,9 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl(ufbxi_context *uc,
 			ufbxi_check(ufbxi_obj_flush_material(uc));
 			ufbxi_check(ufbxi_obj_parse_material(uc));
 		} else if (cmd.length > 4 && !memcmp(cmd.data, "map_", 4)) {
-			ufbxi_check(ufbxi_obj_parse_mtl_map(uc));
+			ufbxi_check(ufbxi_obj_parse_mtl_map(uc, 4));
+		} else if (cmd.length == 4 && (!memcmp(cmd.data, "bump", 4) || !memcmp(cmd.data, "disp", 4) || !memcmp(cmd.data, "norm", 4))) {
+			ufbxi_check(ufbxi_obj_parse_mtl_map(uc, 0));
 		} else {
 			ufbxi_check(ufbxi_obj_parse_prop(uc, uc->obj.tokens[0], 1, true, NULL));
 		}
@@ -13168,11 +13314,15 @@ typedef enum {
 	// Property toggles inversion of a value
 	// NOTE: These need to be the last entries in mappings
 	UFBXI_SHADER_MAPPING_TOGGLE_INVERT = 0x2,
+	// Set `value_vec4.w` (usually alpha) to 1.0 if not defined by the property
+	UFBXI_SHADER_MAPPING_DEFAULT_W_1 = 0x4,
 } ufbxi_shader_mapping_flag;
 
 typedef enum {
 	// Invert the feature flag
 	UFBXI_SHADER_FEATURE_INVERTED = 0x1,
+	// Enable the feature if the given property exists
+	UFBXI_SHADER_FEATURE_IF_EXISTS = 0x2,
 } ufbxi_shader_feature_flag;
 
 static const ufbxi_mat_transform_fn ufbxi_mat_transform_fns[] = {
@@ -13208,26 +13358,26 @@ ufbx_static_assert(transform_count, ufbxi_arraycount(ufbxi_mat_transform_fns) ==
 #define ufbxi_mat_string(str) sizeof(str) - 1, str
 
 static const ufbxi_shader_mapping ufbxi_base_fbx_mapping[] = {
-	{ UFBX_MATERIAL_FBX_DIFFUSE_COLOR, 0, 0, ufbxi_mat_string("Diffuse") },
-	{ UFBX_MATERIAL_FBX_DIFFUSE_COLOR, 0, 0, ufbxi_mat_string("DiffuseColor") },
+	{ UFBX_MATERIAL_FBX_DIFFUSE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Diffuse") },
+	{ UFBX_MATERIAL_FBX_DIFFUSE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("DiffuseColor") },
 	{ UFBX_MATERIAL_FBX_DIFFUSE_FACTOR, 0, 0, ufbxi_mat_string("DiffuseFactor") },
-	{ UFBX_MATERIAL_FBX_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("Specular") },
-	{ UFBX_MATERIAL_FBX_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("SpecularColor") },
+	{ UFBX_MATERIAL_FBX_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Specular") },
+	{ UFBX_MATERIAL_FBX_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("SpecularColor") },
 	{ UFBX_MATERIAL_FBX_SPECULAR_FACTOR, 0, 0, ufbxi_mat_string("SpecularFactor") },
 	{ UFBX_MATERIAL_FBX_SPECULAR_EXPONENT, 0, 0, ufbxi_mat_string("Shininess") },
 	{ UFBX_MATERIAL_FBX_SPECULAR_EXPONENT, 0, 0, ufbxi_mat_string("ShininessExponent") },
-	{ UFBX_MATERIAL_FBX_REFLECTION_COLOR, 0, 0, ufbxi_mat_string("Reflection") },
-	{ UFBX_MATERIAL_FBX_REFLECTION_COLOR, 0, 0, ufbxi_mat_string("ReflectionColor") },
+	{ UFBX_MATERIAL_FBX_REFLECTION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Reflection") },
+	{ UFBX_MATERIAL_FBX_REFLECTION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("ReflectionColor") },
 	{ UFBX_MATERIAL_FBX_REFLECTION_FACTOR, 0, 0, ufbxi_mat_string("ReflectionFactor") },
-	{ UFBX_MATERIAL_FBX_TRANSPARENCY_COLOR, 0, 0, ufbxi_mat_string("Transparent") },
-	{ UFBX_MATERIAL_FBX_TRANSPARENCY_COLOR, 0, 0, ufbxi_mat_string("TransparentColor") },
+	{ UFBX_MATERIAL_FBX_TRANSPARENCY_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Transparent") },
+	{ UFBX_MATERIAL_FBX_TRANSPARENCY_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("TransparentColor") },
 	{ UFBX_MATERIAL_FBX_TRANSPARENCY_FACTOR, 0, 0, ufbxi_mat_string("TransparentFactor") },
 	{ UFBX_MATERIAL_FBX_TRANSPARENCY_FACTOR, 0, 0, ufbxi_mat_string("TransparencyFactor") },
-	{ UFBX_MATERIAL_FBX_EMISSION_COLOR, 0, 0, ufbxi_mat_string("Emissive") },
-	{ UFBX_MATERIAL_FBX_EMISSION_COLOR, 0, 0, ufbxi_mat_string("EmissiveColor") },
+	{ UFBX_MATERIAL_FBX_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Emissive") },
+	{ UFBX_MATERIAL_FBX_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("EmissiveColor") },
 	{ UFBX_MATERIAL_FBX_EMISSION_FACTOR, 0, 0, ufbxi_mat_string("EmissiveFactor") },
-	{ UFBX_MATERIAL_FBX_AMBIENT_COLOR, 0, 0, ufbxi_mat_string("Ambient") },
-	{ UFBX_MATERIAL_FBX_AMBIENT_COLOR, 0, 0, ufbxi_mat_string("AmbientColor") },
+	{ UFBX_MATERIAL_FBX_AMBIENT_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Ambient") },
+	{ UFBX_MATERIAL_FBX_AMBIENT_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("AmbientColor") },
 	{ UFBX_MATERIAL_FBX_AMBIENT_FACTOR, 0, 0, ufbxi_mat_string("AmbientFactor") },
 	{ UFBX_MATERIAL_FBX_NORMAL_MAP, 0, 0, ufbxi_mat_string("NormalMap") },
 	{ UFBX_MATERIAL_FBX_BUMP, 0, 0, ufbxi_mat_string("Bump") },
@@ -13238,67 +13388,80 @@ static const ufbxi_shader_mapping ufbxi_base_fbx_mapping[] = {
 	{ UFBX_MATERIAL_FBX_VECTOR_DISPLACEMENT_FACTOR, 0, 0, ufbxi_mat_string("VectorDisplacementFactor") },
 };
 
+static const ufbxi_shader_mapping ufbxi_obj_fbx_mapping[] = {
+	{ UFBX_MATERIAL_FBX_AMBIENT_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Ka") },
+	{ UFBX_MATERIAL_FBX_DIFFUSE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Kd") },
+	{ UFBX_MATERIAL_FBX_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Ks") },
+	{ UFBX_MATERIAL_FBX_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Ke") },
+	{ UFBX_MATERIAL_FBX_SPECULAR_EXPONENT, 0, 0, ufbxi_mat_string("Ns") },
+	{ UFBX_MATERIAL_FBX_TRANSPARENCY_FACTOR, 0, 0, ufbxi_mat_string("d") },
+	{ UFBX_MATERIAL_FBX_TRANSPARENCY_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Tf") },
+	{ UFBX_MATERIAL_FBX_DISPLACEMENT, 0, 0, ufbxi_mat_string("disp") },
+	{ UFBX_MATERIAL_FBX_BUMP, 0, 0, ufbxi_mat_string("bump") },
+	{ UFBX_MATERIAL_FBX_NORMAL_MAP, 0, 0, ufbxi_mat_string("norm") },
+};
+
 static const ufbxi_shader_mapping ufbxi_fbx_lambert_shader_pbr_mapping[] = {
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("Diffuse") },
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("DiffuseColor") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Diffuse") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("DiffuseColor") },
 	{ UFBX_MATERIAL_PBR_BASE_FACTOR, 0, 0, ufbxi_mat_string("DiffuseFactor") },
-	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, 0, 0, ufbxi_mat_string("Transparent") },
-	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, 0, 0, ufbxi_mat_string("TransparentColor") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Transparent") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("TransparentColor") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_FACTOR, 0, 0, ufbxi_mat_string("TransparentFactor") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_FACTOR, 0, 0, ufbxi_mat_string("TransparencyFactor") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("Emissive") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("EmissiveColor") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Emissive") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("EmissiveColor") },
 	{ UFBX_MATERIAL_PBR_EMISSION_FACTOR, 0, 0, ufbxi_mat_string("EmissiveFactor") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("NormalMap") },
 };
 
 static const ufbxi_shader_mapping ufbxi_fbx_phong_shader_pbr_mapping[] = {
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("Diffuse") },
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("DiffuseColor") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Diffuse") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("DiffuseColor") },
 	{ UFBX_MATERIAL_PBR_BASE_FACTOR, 0, 0, ufbxi_mat_string("DiffuseFactor") },
-	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("Specular") },
-	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("SpecularColor") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Specular") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("SpecularColor") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_FACTOR, 0, 0, ufbxi_mat_string("SpecularFactor") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, UFBXI_SHADER_MAPPING_INVERT_TEXTURE, UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS, ufbxi_mat_string("Shininess") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, UFBXI_SHADER_MAPPING_INVERT_TEXTURE, UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS, ufbxi_mat_string("ShininessExponent") },
-	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, 0, 0, ufbxi_mat_string("Transparent") },
-	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, 0, 0, ufbxi_mat_string("TransparentColor") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Transparent") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("TransparentColor") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_FACTOR, 0, 0, ufbxi_mat_string("TransparentFactor") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_FACTOR, 0, 0, ufbxi_mat_string("TransparencyFactor") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("Emissive") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("EmissiveColor") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Emissive") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("EmissiveColor") },
 	{ UFBX_MATERIAL_PBR_EMISSION_FACTOR, 0, 0, ufbxi_mat_string("EmissiveFactor") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("NormalMap") },
 };
 
 static const ufbxi_shader_mapping ufbxi_osl_standard_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_BASE_FACTOR, 0, 0, ufbxi_mat_string("base") },
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("base_color") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("base_color") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("specular_roughness") },
 	{ UFBX_MATERIAL_PBR_DIFFUSE_ROUGHNESS, 0, 0, ufbxi_mat_string("diffuse_roughness") },
 	{ UFBX_MATERIAL_PBR_METALNESS, 0, 0, ufbxi_mat_string("metalness") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_FACTOR, 0, 0, ufbxi_mat_string("specular") },
-	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("specular_color") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("specular_color") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_IOR, 0, 0, ufbxi_mat_string("specular_IOR") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_ANISOTROPY, 0, 0, ufbxi_mat_string("specular_anisotropy") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_ROTATION, 0, 0, ufbxi_mat_string("specular_rotation") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_FACTOR, 0, 0, ufbxi_mat_string("transmission") },
-	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, 0, 0, ufbxi_mat_string("transmission_color") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("transmission_color") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_DEPTH, 0, 0, ufbxi_mat_string("transmission_depth") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER, 0, 0, ufbxi_mat_string("transmission_scatter") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER_ANISOTROPY, 0, 0, ufbxi_mat_string("transmission_scatter_anisotropy") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_DISPERSION, 0, 0, ufbxi_mat_string("transmission_dispersion") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_EXTRA_ROUGHNESS, 0, 0, ufbxi_mat_string("transmission_extra_roughness") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_FACTOR, 0, 0, ufbxi_mat_string("subsurface") },
-	{ UFBX_MATERIAL_PBR_SUBSURFACE_COLOR, 0, 0, ufbxi_mat_string("subsurface_color") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("subsurface_color") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_RADIUS, 0, 0, ufbxi_mat_string("subsurface_radius") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_SCALE, 0, 0, ufbxi_mat_string("subsurface_scale") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_ANISOTROPY, 0, 0, ufbxi_mat_string("subsurface_anisotropy") },
 	{ UFBX_MATERIAL_PBR_SHEEN_FACTOR, 0, 0, ufbxi_mat_string("sheen") },
-	{ UFBX_MATERIAL_PBR_SHEEN_COLOR, 0, 0, ufbxi_mat_string("sheen_color") },
+	{ UFBX_MATERIAL_PBR_SHEEN_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("sheen_color") },
 	{ UFBX_MATERIAL_PBR_SHEEN_ROUGHNESS, 0, 0, ufbxi_mat_string("sheen_roughness") },
 	{ UFBX_MATERIAL_PBR_COAT_FACTOR, 0, 0, ufbxi_mat_string("coat") },
-	{ UFBX_MATERIAL_PBR_COAT_COLOR, 0, 0, ufbxi_mat_string("coat_color") },
+	{ UFBX_MATERIAL_PBR_COAT_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("coat_color") },
 	{ UFBX_MATERIAL_PBR_COAT_ROUGHNESS, 0, 0, ufbxi_mat_string("coat_roughness") },
 	{ UFBX_MATERIAL_PBR_COAT_IOR, 0, 0, ufbxi_mat_string("coat_IOR") },
 	{ UFBX_MATERIAL_PBR_COAT_ANISOTROPY, 0, 0, ufbxi_mat_string("coat_anisotropy") },
@@ -13307,7 +13470,7 @@ static const ufbxi_shader_mapping ufbxi_osl_standard_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_THIN_FILM_THICKNESS, 0, 0, ufbxi_mat_string("thin_film_thickness") },
 	{ UFBX_MATERIAL_PBR_THIN_FILM_IOR, 0, 0, ufbxi_mat_string("thin_film_IOR") },
 	{ UFBX_MATERIAL_PBR_EMISSION_FACTOR, 0, 0, ufbxi_mat_string("emission") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("emission_color") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("emission_color") },
 	{ UFBX_MATERIAL_PBR_OPACITY, 0, 0, ufbxi_mat_string("opacity") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("NormalMap") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("normalCamera") },
@@ -13320,32 +13483,32 @@ static const ufbxi_shader_mapping ufbxi_osl_standard_shader_features[] = {
 
 static const ufbxi_shader_mapping ufbxi_arnold_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_BASE_FACTOR, 0, 0, ufbxi_mat_string("base") },
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("baseColor") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("baseColor") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("specularRoughness") },
 	{ UFBX_MATERIAL_PBR_DIFFUSE_ROUGHNESS, 0, 0, ufbxi_mat_string("diffuseRoughness") },
 	{ UFBX_MATERIAL_PBR_METALNESS, 0, 0, ufbxi_mat_string("metalness") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_FACTOR, 0, 0, ufbxi_mat_string("specular") },
-	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("specularColor") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("specularColor") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_IOR, 0, 0, ufbxi_mat_string("specularIOR") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_ANISOTROPY, 0, 0, ufbxi_mat_string("specularAnisotropy") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_ROTATION, 0, 0, ufbxi_mat_string("specularRotation") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_FACTOR, 0, 0, ufbxi_mat_string("transmission") },
-	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, 0, 0, ufbxi_mat_string("transmissionColor") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("transmissionColor") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_DEPTH, 0, 0, ufbxi_mat_string("transmissionDepth") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER, 0, 0, ufbxi_mat_string("transmissionScatter") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_SCATTER_ANISOTROPY, 0, 0, ufbxi_mat_string("transmissionScatterAnisotropy") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_DISPERSION, 0, 0, ufbxi_mat_string("transmissionDispersion") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_EXTRA_ROUGHNESS, 0, 0, ufbxi_mat_string("transmissionExtraRoughness") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_FACTOR, 0, 0, ufbxi_mat_string("subsurface") },
-	{ UFBX_MATERIAL_PBR_SUBSURFACE_COLOR, 0, 0, ufbxi_mat_string("subsurfaceColor") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("subsurfaceColor") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_RADIUS, 0, 0, ufbxi_mat_string("subsurfaceRadius") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_SCALE, 0, 0, ufbxi_mat_string("subsurfaceScale") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_ANISOTROPY, 0, 0, ufbxi_mat_string("subsurfaceAnisotropy") },
 	{ UFBX_MATERIAL_PBR_SHEEN_FACTOR, 0, 0, ufbxi_mat_string("sheen") },
-	{ UFBX_MATERIAL_PBR_SHEEN_COLOR, 0, 0, ufbxi_mat_string("sheenColor") },
+	{ UFBX_MATERIAL_PBR_SHEEN_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("sheenColor") },
 	{ UFBX_MATERIAL_PBR_SHEEN_ROUGHNESS, 0, 0, ufbxi_mat_string("sheenRoughness") },
 	{ UFBX_MATERIAL_PBR_COAT_FACTOR, 0, 0, ufbxi_mat_string("coat") },
-	{ UFBX_MATERIAL_PBR_COAT_COLOR, 0, 0, ufbxi_mat_string("coatColor") },
+	{ UFBX_MATERIAL_PBR_COAT_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("coatColor") },
 	{ UFBX_MATERIAL_PBR_COAT_ROUGHNESS, 0, 0, ufbxi_mat_string("coatRoughness") },
 	{ UFBX_MATERIAL_PBR_COAT_IOR, 0, 0, ufbxi_mat_string("coatIOR") },
 	{ UFBX_MATERIAL_PBR_COAT_ANISOTROPY, 0, 0, ufbxi_mat_string("coatAnisotropy") },
@@ -13354,14 +13517,14 @@ static const ufbxi_shader_mapping ufbxi_arnold_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_THIN_FILM_THICKNESS, 0, 0, ufbxi_mat_string("thinFilmThickness") },
 	{ UFBX_MATERIAL_PBR_THIN_FILM_IOR, 0, 0, ufbxi_mat_string("thinFilmIOR") },
 	{ UFBX_MATERIAL_PBR_EMISSION_FACTOR, 0, 0, ufbxi_mat_string("emission") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("emissionColor") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("emissionColor") },
 	{ UFBX_MATERIAL_PBR_OPACITY, 0, 0, ufbxi_mat_string("opacity") },
 	{ UFBX_MATERIAL_PBR_INDIRECT_DIFFUSE, 0, 0, ufbxi_mat_string("indirectDiffuse") },
 	{ UFBX_MATERIAL_PBR_INDIRECT_SPECULAR, 0, 0, ufbxi_mat_string("indirectSpecular") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("NormalMap") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("normalCamera") },
 	{ UFBX_MATERIAL_PBR_TANGENT_MAP, 0, 0, ufbxi_mat_string("tangent") },
-	{ UFBX_MATERIAL_PBR_MATTE_COLOR, 0, 0, ufbxi_mat_string("aiMatteColor") },
+	{ UFBX_MATERIAL_PBR_MATTE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("aiMatteColor") },
 	{ UFBX_MATERIAL_PBR_MATTE_FACTOR, 0, 0, ufbxi_mat_string("aiMatteColorA") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_TYPE, 0, 0, ufbxi_mat_string("subsurfaceType") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_PRIORITY, 0, 0, ufbxi_mat_string("dielectricPriority") },
@@ -13378,39 +13541,39 @@ static const ufbxi_shader_mapping ufbxi_arnold_shader_features[] = {
 
 static const ufbxi_shader_mapping ufbxi_3ds_max_physical_material_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_BASE_FACTOR, 0, 0, ufbxi_mat_string("base_weight") },
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("base_color") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("base_color") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("roughness") },
 	{ UFBX_MATERIAL_PBR_DIFFUSE_ROUGHNESS, 0, 0, ufbxi_mat_string("diff_rough") },
 	{ UFBX_MATERIAL_PBR_DIFFUSE_ROUGHNESS, 0, 0, ufbxi_mat_string("diff_roughness") },
 	{ UFBX_MATERIAL_PBR_METALNESS, 0, 0, ufbxi_mat_string("metalness") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_FACTOR, 0, 0, ufbxi_mat_string("reflectivity") },
-	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("refl_color") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("refl_color") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_ANISOTROPY, 0, 0, ufbxi_mat_string("anisotropy") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_ROTATION, 0, 0, ufbxi_mat_string("aniso_angle") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_ROTATION, 0, 0, ufbxi_mat_string("anisoangle") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_IOR, 0, 0, ufbxi_mat_string("trans_ior") }, // NOTE: Not a typo, IOR is same for transparency/specular
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_FACTOR, 0, 0, ufbxi_mat_string("transparency") },
-	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, 0, 0, ufbxi_mat_string("trans_color") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("trans_color") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_DEPTH, 0, 0, ufbxi_mat_string("trans_depth") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_ROUGHNESS, 0, 0, ufbxi_mat_string("trans_rough") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_ROUGHNESS, 0, 0, ufbxi_mat_string("trans_roughness") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_FACTOR, 0, 0, ufbxi_mat_string("scattering") },
-	{ UFBX_MATERIAL_PBR_SUBSURFACE_TINT_COLOR, 0, 0, ufbxi_mat_string("sss_color") },
-	{ UFBX_MATERIAL_PBR_SUBSURFACE_COLOR, 0, 0, ufbxi_mat_string("sss_scatter_color") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_TINT_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("sss_color") },
+	{ UFBX_MATERIAL_PBR_SUBSURFACE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("sss_scatter_color") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_RADIUS, 0, 0, ufbxi_mat_string("sss_depth") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_SCALE, 0, 0, ufbxi_mat_string("sss_scale") },
 	{ UFBX_MATERIAL_PBR_COAT_FACTOR, 0, 0, ufbxi_mat_string("coat") },
 	{ UFBX_MATERIAL_PBR_COAT_FACTOR, 0, 0, ufbxi_mat_string("coating") },
-	{ UFBX_MATERIAL_PBR_COAT_COLOR, 0, 0, ufbxi_mat_string("coat_color") },
+	{ UFBX_MATERIAL_PBR_COAT_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("coat_color") },
 	{ UFBX_MATERIAL_PBR_COAT_ROUGHNESS, 0, 0, ufbxi_mat_string("coat_rough") },
 	{ UFBX_MATERIAL_PBR_COAT_ROUGHNESS, 0, 0, ufbxi_mat_string("coat_roughness") },
 	{ UFBX_MATERIAL_PBR_COAT_IOR, 0, 0, ufbxi_mat_string("coat_ior") },
 	{ UFBX_MATERIAL_PBR_COAT_NORMAL, 0, 0, ufbxi_mat_string("coat_bump") },
 	{ UFBX_MATERIAL_PBR_COAT_NORMAL, 0, 0, ufbxi_mat_string("clearcoat_bump_map_amt") },
-	{ UFBX_MATERIAL_PBR_COAT_AFFECT_BASE_COLOR, 0, 0, ufbxi_mat_string("coat_affect_color") },
+	{ UFBX_MATERIAL_PBR_COAT_AFFECT_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("coat_affect_color") },
 	{ UFBX_MATERIAL_PBR_COAT_AFFECT_BASE_ROUGHNESS, 0, 0, ufbxi_mat_string("coat_affect_roughness") },
 	{ UFBX_MATERIAL_PBR_EMISSION_FACTOR, 0, 0, ufbxi_mat_string("emission") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("emit_color") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("emit_color") },
 	{ UFBX_MATERIAL_PBR_OPACITY, 0, 0, ufbxi_mat_string("cutout") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("bump") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("bump_map_amt") },
@@ -13430,36 +13593,36 @@ static const ufbxi_shader_mapping ufbxi_3ds_max_physical_material_features[] = {
 };
 
 static const ufbxi_shader_mapping ufbxi_gltf_material_pbr_mapping[] = {
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("main|baseColor") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("main|baseColor") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("main|roughness") },
 	{ UFBX_MATERIAL_PBR_METALNESS, 0, 0, ufbxi_mat_string("main|metalness") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("main|normal") },
 	{ UFBX_MATERIAL_PBR_AMBIENT_OCCLUSION, 0, 0, ufbxi_mat_string("main|ambientOcclusion") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("main|emission") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("main|emissionColor") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("main|emission") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("main|emissionColor") },
 	{ UFBX_MATERIAL_PBR_OPACITY, 0, 0, ufbxi_mat_string("main|Alpha") },
 	{ UFBX_MATERIAL_PBR_COAT_FACTOR, 0, 0, ufbxi_mat_string("extension|clearcoat") },
 	{ UFBX_MATERIAL_PBR_COAT_ROUGHNESS, 0, 0, ufbxi_mat_string("extension|clearcoatRoughness") },
 	{ UFBX_MATERIAL_PBR_COAT_NORMAL, 0, 0, ufbxi_mat_string("extension|clearcoatNormal") },
-	{ UFBX_MATERIAL_PBR_SHEEN_COLOR, 0, 0, ufbxi_mat_string("extension|sheenColor") },
+	{ UFBX_MATERIAL_PBR_SHEEN_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("extension|sheenColor") },
 	{ UFBX_MATERIAL_PBR_SHEEN_ROUGHNESS, 0, 0, ufbxi_mat_string("extension|sheenRoughness") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_FACTOR, 0, 0, ufbxi_mat_string("extension|specular") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_FACTOR, 0, 0, ufbxi_mat_string("extension|Specular") },
-	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("extension|specularcolor") },
-	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("extension|specularColor") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("extension|specularcolor") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("extension|specularColor") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_FACTOR, 0, 0, ufbxi_mat_string("extension|transmission") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_IOR, 0, 0, ufbxi_mat_string("extension|indexOfRefraction") },
 };
 
 static const ufbxi_shader_mapping ufbxi_3ds_max_pbr_metal_rough_pbr_mapping[] = {
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("base_color") },
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("baseColor") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("base_color") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("baseColor") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("roughness") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("Roughness_Map") },
 	{ UFBX_MATERIAL_PBR_METALNESS, 0, 0, ufbxi_mat_string("metalness") },
 	{ UFBX_MATERIAL_PBR_AMBIENT_OCCLUSION, 0, 0, ufbxi_mat_string("ao") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("norm") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("emit_color") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("emit_color") },
 	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement") },
 	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement_amt") },
 	{ UFBX_MATERIAL_PBR_OPACITY, 0, 0, ufbxi_mat_string("opacity") },
@@ -13467,14 +13630,14 @@ static const ufbxi_shader_mapping ufbxi_3ds_max_pbr_metal_rough_pbr_mapping[] = 
 };
 
 static const ufbxi_shader_mapping ufbxi_3ds_max_pbr_spec_gloss_pbr_mapping[] = {
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("base_color") },
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("baseColor") },
-	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("Specular") },
-	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, 0, 0, ufbxi_mat_string("specular") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("base_color") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("baseColor") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Specular") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("specular") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("glossiness") },
 	{ UFBX_MATERIAL_PBR_AMBIENT_OCCLUSION, 0, 0, ufbxi_mat_string("ao") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("norm") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("emit_color") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("emit_color") },
 	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement") },
 	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement_amt") },
 	{ UFBX_MATERIAL_PBR_OPACITY, 0, 0, ufbxi_mat_string("opacity") },
@@ -13494,25 +13657,54 @@ static const ufbxi_shader_mapping ufbxi_gltf_material_features[] = {
 // NOTE: These are just the names used by the standard PBS "preset".
 // In _theory_ we could walk ShaderGraph but that's a bit out of scope for ufbx.
 static const ufbxi_shader_mapping ufbxi_shaderfx_graph_pbr_mapping[] = {
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("color") },
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("base_color") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("color") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("base_color") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("roughness") },
 	{ UFBX_MATERIAL_PBR_METALNESS, 0, 0, ufbxi_mat_string("metallic") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("normal") },
 	{ UFBX_MATERIAL_PBR_EMISSION_FACTOR, 0, 0, ufbxi_mat_string("emissive_intensity") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("emissive") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("emissive") },
 	{ UFBX_MATERIAL_PBR_AMBIENT_OCCLUSION, 0, 0, ufbxi_mat_string("ao") },
 };
 
 static const ufbxi_shader_mapping ufbxi_blender_phong_shader_pbr_mapping[] = {
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, 0, 0, ufbxi_mat_string("DiffuseColor") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("DiffuseColor") },
 	{ UFBX_MATERIAL_PBR_OPACITY, 0, UFBXI_MAT_TRANSFORM_BLENDER_OPACITY, ufbxi_mat_string("TransparencyFactor") },
 	{ UFBX_MATERIAL_PBR_EMISSION_FACTOR, 0, 0, ufbxi_mat_string("EmissiveFactor") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, 0, 0, ufbxi_mat_string("EmissiveColor") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("EmissiveColor") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, UFBXI_MAT_TRANSFORM_BLENDER_SHININESS, ufbxi_mat_string("Shininess") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, UFBXI_MAT_TRANSFORM_BLENDER_SHININESS, ufbxi_mat_string("ShininessExponent") },
 	{ UFBX_MATERIAL_PBR_METALNESS, 0, 0, ufbxi_mat_string("ReflectionFactor") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("NormalMap") },
+};
+
+static const ufbxi_shader_mapping ufbxi_obj_pbr_mapping[] = {
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Kd") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Ks") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Ke") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS, ufbxi_mat_string("Ns") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("Pr") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_IOR, 0, 0, ufbxi_mat_string("Ni") },
+	{ UFBX_MATERIAL_PBR_METALNESS, 0, 0, ufbxi_mat_string("Pm") },
+	{ UFBX_MATERIAL_PBR_OPACITY, 0, 0, ufbxi_mat_string("d") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Tf") },
+	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("disp") },
+	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("bump") },
+	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("norm") },
+	{ UFBX_MATERIAL_PBR_SHEEN_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Ps") },
+	{ UFBX_MATERIAL_PBR_COAT_FACTOR, 0, 0, ufbxi_mat_string("Pc") },
+	{ UFBX_MATERIAL_PBR_COAT_ROUGHNESS, 0, 0, ufbxi_mat_string("Pcr") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_ANISOTROPY, 0, 0, ufbxi_mat_string("aniso") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_ROTATION, 0, 0, ufbxi_mat_string("anisor") },
+};
+
+static const ufbxi_shader_mapping ufbxi_obj_features[] = {
+	{ UFBX_MATERIAL_FEATURE_SHEEN, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Ps") },
+	{ UFBX_MATERIAL_FEATURE_COAT, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Pc") },
+	{ UFBX_MATERIAL_FEATURE_METALNESS, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Pm") },
+	{ UFBX_MATERIAL_FEATURE_IOR, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Ni") },
+	{ UFBX_MATERIAL_FEATURE_OPACITY, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("d") },
+	{ UFBX_MATERIAL_FEATURE_EMISSION, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Ke") },
 };
 
 enum {
@@ -13606,6 +13798,11 @@ static const ufbxi_shader_mapping_list ufbxi_shader_pbr_mappings[] = {
 		NULL, 0,
 		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_EMISSION),
 	},
+	{ // UFBX_SHADER_WAVEFRONT_MTL
+		ufbxi_obj_pbr_mapping, ufbxi_arraycount(ufbxi_obj_pbr_mapping),
+		ufbxi_obj_features, ufbxi_arraycount(ufbxi_obj_features),
+		(uint32_t)(UFBXI_MAT_DIFFUSE | UFBXI_MAT_SPECULAR),
+	},
 };
 
 ufbx_static_assert(shader_pbr_mapping_list, ufbxi_arraycount(ufbxi_shader_pbr_mappings) == UFBX_SHADER_TYPE_COUNT);
@@ -13673,6 +13870,9 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 					if (mapping_flags & UFBXI_SHADER_FEATURE_INVERTED) {
 						feature->enabled = !feature->enabled;
 					}
+					if (mapping_flags & UFBXI_SHADER_FEATURE_IF_EXISTS) {
+						feature->enabled = true;
+					}
 				}
 				continue;
 			}
@@ -13709,6 +13909,9 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 					if (mapping->transform) {
 						ufbxi_mat_transform_fn transform_fn = ufbxi_mat_transform_fns[mapping->transform];
 						transform_fn(&map->value_vec4);
+					}
+					if ((mapping->flags & UFBXI_SHADER_MAPPING_DEFAULT_W_1) != 0 && (prop->flags & UFBX_PROP_FLAG_VALUE_VEC4) == 0) {
+						map->value_vec4.w = 1.0f;
 					}
 				}
 			}
@@ -13757,8 +13960,16 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 	memset(&material->pbr, 0, sizeof(material->pbr));
 	memset(&material->features, 0, sizeof(material->features));
 
+	const ufbxi_shader_mapping *base_mapping = ufbxi_base_fbx_mapping;
+	size_t num_base_mapping = ufbxi_arraycount(ufbxi_base_fbx_mapping);
+
+	if (scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ) {
+		base_mapping = ufbxi_obj_fbx_mapping;
+		num_base_mapping = ufbxi_arraycount(ufbxi_obj_fbx_mapping);
+	}
+
 	ufbxi_fetch_mapping_maps(material, material->fbx.maps, NULL, NULL,
-		ufbxi_base_fbx_mapping, ufbxi_arraycount(ufbxi_base_fbx_mapping),
+		base_mapping, num_base_mapping,
 		ufbx_empty_string, ufbx_empty_string, ufbx_empty_string,
 		UFBXI_MAPPING_FETCH_VALUE | UFBXI_MAPPING_FETCH_TEXTURE);
 
@@ -17828,6 +18039,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_check(ufbxi_load_maps(uc));
 
 	// .obj workflow
+	uc->scene.metadata.file_format = UFBX_FILE_FORMAT_OBJ;
 	ufbxi_check(ufbxi_obj_init(uc));
 	ufbxi_check(ufbxi_obj_parse_file(uc));
 	ufbxi_check(ufbxi_init_file_paths(uc));
