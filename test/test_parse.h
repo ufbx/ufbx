@@ -1036,7 +1036,10 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_unsafe_cube_fail_unicode, synthetic_uns
 UFBXT_TEST(obj)
 #if UFBXT_IMPL
 {
-	ufbx_scene *scene = ufbx_load_file("C:\\Users\\Datacube\\Documents\\doublecube.obj", NULL, NULL);
+	ufbx_load_opts opts = { 0 };
+	opts.load_external_files = true;
+
+	ufbx_scene *scene = ufbx_load_file("C:\\Users\\Datacube\\Documents\\doublecube.obj", &opts, NULL);
 	ufbxt_assert(scene);
 
 	ufbx_free_scene(scene);

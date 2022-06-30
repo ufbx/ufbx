@@ -3991,6 +3991,9 @@ typedef struct {
 
 	ufbx_blob mtllib_relative_path;
 
+	ufbx_material **tmp_materials;
+	size_t tmp_materials_cap;
+
 } ufbxi_obj_context;
 
 typedef struct {
@@ -11547,9 +11550,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_
 
 // -- .obj file
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_postprocess_props(ufbxi_context *uc, ufbx_prop_list *props)
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_props(ufbxi_context *uc, ufbx_prop_list *dst, size_t count)
 {
-	ufbxi_for_list(ufbx_prop, prop, *props) {
+	ufbx_prop_list props;
+	props.count = count;
+	props.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_props, ufbx_prop, count);
+	ufbxi_check(props.data);
+
+	ufbxi_for_list(ufbx_prop, prop, props) {
 		prop->_internal_key = ufbxi_get_name_key(prop->name.data, prop->name.length);
 		if (prop->value_str.length == 0) {
 			prop->value_str.data = ufbxi_empty_char;
@@ -11559,11 +11567,12 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_postprocess_props(ufbxi_context 
 		}
 	}
 
-	if (props->count > 1) {
-		ufbxi_check(ufbxi_sort_properties(uc, props->data, props->count));
-		ufbxi_deduplicate_properties(uc, props);
+	if (props.count > 1) {
+		ufbxi_check(ufbxi_sort_properties(uc, props.data, props.count));
+		ufbxi_deduplicate_properties(uc, &props);
 	}
 
+	*dst = props;
 	return 1;
 }
 
@@ -11579,6 +11588,8 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_push_mesh(ufbxi_context *uc)
 
 	mesh->fbx_node = ufbxi_push_synthetic_element(uc, &mesh->fbx_node_id, NULL, "", ufbx_node, UFBX_ELEMENT_NODE);
 	mesh->fbx_mesh = ufbxi_push_synthetic_element(uc, &mesh->fbx_mesh_id, NULL, "", ufbx_mesh, UFBX_ELEMENT_MESH);
+
+	ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &mesh->fbx_node->element_id));
 
 	uc->obj.face_material = UFBX_NO_INDEX;
 
@@ -11623,6 +11634,9 @@ static ufbxi_noinline void ufbxi_obj_free(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->obj.tmp_face_smoothing);
 	ufbxi_buf_free(&uc->obj.tmp_meshes);
 	ufbxi_buf_free(&uc->obj.tmp_props);
+
+	ufbxi_free(&uc->ator_tmp, ufbx_string, uc->obj.tokens, uc->obj.tokens_cap);
+	ufbxi_free(&uc->ator_tmp, ufbx_material*, uc->obj.tmp_materials, uc->obj.tmp_materials_cap);
 }
 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_read_line(ufbxi_context *uc)
@@ -11687,7 +11701,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_read_line(ufbxi_context *uc)
 	return 1;
 }
 
-static ufbxi_noinline ufbx_string ufbxi_obj_span_token(ufbxi_context *uc, uint32_t start_token, size_t end_token)
+static ufbxi_noinline ufbx_string ufbxi_obj_span_token(ufbxi_context *uc, size_t start_token, size_t end_token)
 {
 	ufbx_assert(start_token < uc->obj.num_tokens);
 	end_token = ufbxi_min_sz(end_token, uc->obj.num_tokens - 1);
@@ -11853,13 +11867,14 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 	if (!uc->obj.mesh) {
 		ufbxi_check(ufbxi_obj_push_mesh(uc));
 	}
+	ufbxi_obj_mesh *mesh = uc->obj.mesh;
 
 	size_t num_indices = uc->obj.num_tokens - 1;
+	ufbxi_check(UINT32_MAX - mesh->num_indices >= num_indices);
 
-	face->index_begin = uc->obj.mesh->num_indices;
-	face->num_indices = num_indices;
+	face->index_begin = (uint32_t)mesh->num_indices;
+	face->num_indices = (uint32_t)num_indices;
 
-	ufbxi_obj_mesh *mesh = uc->obj.mesh;
 	mesh->num_faces++;
 	mesh->num_indices += num_indices;
 
@@ -11910,6 +11925,13 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context
 
 		ufbx_material *material = ufbxi_push_element(uc, &info, ufbx_material, UFBX_ELEMENT_MATERIAL);
 		ufbxi_check(material);
+
+		material->shading_model_name.data = ufbxi_empty_char;
+		material->shader_prop_prefix.data = ufbxi_empty_char;
+
+		size_t id = material->element_id;
+		ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->obj.tmp_materials, &uc->obj.tmp_materials_cap, id + 1));
+		uc->obj.tmp_materials[id] = material;
 	}
 
 	ufbxi_obj_mesh *mesh = uc->obj.mesh;
@@ -12094,6 +12116,18 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc)
 {
+	uc->scene.metadata.ascii = true;
+
+	// Add a nameless root node with the root ID
+	{
+		ufbxi_element_info root_info = { uc->root_id };
+		root_info.name = ufbx_empty_string;
+		ufbx_node *root = ufbxi_push_element(uc, &root_info, ufbx_node, UFBX_ELEMENT_NODE);
+		ufbxi_check(root);
+		ufbxi_setup_root_node(uc, root);
+		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &root->element.element_id));
+	}
+
 	while (!uc->obj.eof) {
 		ufbxi_check(ufbxi_obj_tokenize_line(uc));
 		size_t num_tokens = uc->obj.num_tokens;
@@ -12148,47 +12182,24 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_flush_material(ufbxi_context
 {
 	if (uc->obj.usemtl_fbx_id == 0) return 1;
 
-	ufbx_prop_list props;
-	props.count = uc->obj.tmp_props.num_items;
-	props.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_props, ufbx_prop, props.count);
-	ufbxi_check(props.data);
+	ufbxi_fbx_id_entry *entry = ufbxi_find_fbx_id(uc, uc->obj.usemtl_fbx_id);
+	ufbx_assert(entry);
+	ufbx_material *material = uc->obj.tmp_materials[entry->element_id];
 
-	ufbxi_check(ufbxi_postprocess_props(uc, &props));
+	size_t num_props = uc->obj.tmp_props.num_items;
+	ufbxi_check(ufbxi_obj_pop_props(uc, &material->props.props, num_props));
 
 	return 1;
 }
 
-typedef enum {
-	UFBXI_OBJ_PROP_VEC,
-	UFBXI_OBJ_PROP_BOOL,
-	UFBXI_OBJ_PROP_STR,
-} ufbxi_obj_prop_type;
-
-typedef struct {
-	const char *flag;
-	uint8_t flag_len;
-	uint8_t num_opts;
-	uint8_t type;
-	uint8_t aliases;
-} ufbxi_obj_tex_opt;
-
-static const ufbxi_obj_tex_opt ufbxi_obj_tex_opts[] = {
-	{ "bm", 2, 1, UFBXI_OBJ_PROP_VEC },
-	{ "clamp", 5, 1, UFBXI_OBJ_PROP_BOOL },
-	{ "blendu", 6, 1, UFBXI_OBJ_PROP_BOOL },
-	{ "blendv", 6, 1, UFBXI_OBJ_PROP_BOOL },
-	{ "imfchan", 7, 1, UFBXI_OBJ_PROP_STR },
-	{ "mm", 2, 2, UFBXI_OBJ_PROP_VEC },
-	{ "o", 1, 3, UFBXI_OBJ_PROP_VEC },
-	{ "s", 1, 3, UFBXI_OBJ_PROP_VEC },
-	{ "t", 1, 3, UFBXI_OBJ_PROP_VEC },
-	{ "texres", 6, 1, UFBXI_OBJ_PROP_VEC },
-};
-
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc, ufbx_string name, ufbxi_obj_prop_type type, size_t start, size_t max_count)
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc, ufbx_string name, size_t start, bool include_rest, size_t *p_next)
 {
-	size_t end = ufbxi_min_sz(start + max_count, uc->obj.num_tokens);
-	if (start == end) return 1;
+	if (start >= uc->obj.num_tokens) {
+		if (p_next) {
+			*p_next = start;
+		}
+		return 1;
+	}
 
 	ufbx_prop *prop = ufbxi_push_zero(&uc->obj.tmp_props, ufbx_prop, 1);
 	ufbxi_check(prop);
@@ -12198,7 +12209,25 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc
 
 	uint32_t flags = UFBX_PROP_FLAG_VALUE_STR;
 
-	ufbx_string span = ufbxi_obj_span_token(uc, start, end - 1);
+	size_t num_reals = 0;
+	for (; num_reals < 4; num_reals++) {
+		if (start + num_reals < uc->obj.num_tokens) break;
+		ufbx_string tok = uc->obj.tokens[start + num_reals];
+
+		char *end;
+		double val = strtod(tok.data, &end);
+		if (end != tok.data + tok.length) break;
+
+		prop->value_real_arr[num_reals] = (ufbx_real)val;
+		if (num_reals == 0) {
+			prop->value_int = ufbxi_f64_to_i64(val);
+			flags |= UFBX_PROP_FLAG_VALUE_INT;
+		}
+	}
+
+	size_t advance = ufbxi_max_sz(num_reals, 1);
+	size_t end = include_rest ? SIZE_MAX : start + advance - 1;
+	ufbx_string span = ufbxi_obj_span_token(uc, start, end);
 	prop->value_str = span;
 	prop->value_blob.data = span.data;
 	prop->value_blob.size = span.length;
@@ -12206,32 +12235,23 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc
 	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &prop->value_str, false));
 	ufbxi_check(ufbxi_push_string_place_blob(&uc->string_pool, &prop->value_blob, true));
 
-	if (type == UFBXI_OBJ_PROP_VEC) {
-		size_t num_reals = 0;
-		size_t max_reals = ufbxi_min_sz(max_count, 4);
-		for (; num_reals < max_reals; num_reals++) {
-			if (start + num_reals < end) break;
-			ufbx_string tok = uc->obj.tokens[start + num_reals];
-
-			char *end;
-			double val = strtod(tok.data, &end);
-			if (end != tok.data + tok.length) break;
-
-			prop->value_real_arr[num_reals] = (ufbx_real)val;
-			if (num_reals == 0) {
-				prop->value_int = ufbxi_f64_to_i64(val);
-				flags |= UFBX_PROP_FLAG_VALUE_INT;
-			}
+	if (num_reals > 0) {
+		flags = (uint32_t)UFBX_PROP_FLAG_VALUE_REAL << (num_reals - 1);
+	} else {
+		if (!strcmp(prop->value_str.data, "on")) {
+			prop->value_int = 1;
+			flags |= UFBX_PROP_FLAG_VALUE_INT;
+		} else if (!strcmp(prop->value_str.data, "off")) {
+			prop->value_int = 0;
+			flags |= UFBX_PROP_FLAG_VALUE_INT;
 		}
-
-		if (num_reals > 0) {
-			flags = (uint32_t)UFBX_PROP_FLAG_VALUE_REAL << (num_reals - 1);
-		}
-	} else if (type == UFBXI_OBJ_PROP_BOOL) {
-		prop->value_int = !strcmp(prop->value_str.data, "on");
 	}
 
 	prop->flags = (ufbx_prop_flags)flags;
+
+	if (p_next) {
+		*p_next = start + advance;
+	}
 
 	return 1;
 }
@@ -12240,32 +12260,17 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl_map(ufbxi_context 
 {
 	if (uc->obj.num_tokens < 2) return 1;
 
+	size_t num_props = 1;
+	ufbxi_check(ufbxi_obj_parse_prop(uc, ufbxi_str_c("ufbx|args"), 1, true, NULL));
+
 	size_t start = 1;
-	for (; start < uc->obj.num_tokens; ) {
+	for (; start + 1 < uc->obj.num_tokens; ) {
 		ufbx_string tok = uc->obj.tokens[start];
 		if (tok.data[0] == '-') {
 			tok.data += 1;
 			tok.length -= 1;
-
-			size_t opt_ix = SIZE_MAX;
-			for (size_t i = 0; i < ufbxi_arraycount(ufbxi_obj_tex_opts); i++) {
-				const ufbxi_obj_tex_opt *opt = &ufbxi_obj_tex_opts[i];
-				ufbx_string opt_str = { opt->flag, opt->flag_len };
-				if (ufbxi_str_equal(tok, opt_str)) {
-					opt_ix = i;
-					break;
-				}
-			}
-
-			if (opt_ix != SIZE_MAX) {
-				const ufbxi_obj_tex_opt *opt = &ufbxi_obj_tex_opts[opt_ix];
-				size_t next = start + 1 + (size_t)opt->num_opts;
-				if (next < uc->obj.num_tokens) {
-					ufbxi_check(ufbxi_obj_parse_prop(uc, tok, (ufbxi_obj_prop_type)opt->type, start, opt->num_opts));
-					start = next;
-					continue;
-				}
-			}
+			ufbxi_check(ufbxi_obj_parse_prop(uc, tok, start + 1, false, &start));
+			num_props++;
 		}
 		break;
 	}
@@ -12280,14 +12285,23 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl_map(ufbxi_context 
 	ufbx_texture *texture = ufbxi_push_synthetic_element(uc, &fbx_id, NULL, "", ufbx_texture, UFBX_ELEMENT_TEXTURE);
 	ufbxi_check(texture);
 
-	return 1;
-}
+	texture->filename.data = ufbxi_empty_char;
+	texture->absolute_filename.data = ufbxi_empty_char;
+	texture->uv_set.data = ufbxi_empty_char;
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl_prop(ufbxi_context *uc)
-{
-	if (uc->obj.num_tokens < 2) return 1;
+	texture->relative_filename = tex_str;
+	texture->raw_relative_filename = tex_raw;
 
-	ufbxi_check(ufbxi_obj_parse_prop(uc, uc->obj.tokens[0], UFBXI_OBJ_PROP_VEC, 1, SIZE_MAX));
+	ufbxi_check(ufbxi_obj_pop_props(uc, &texture->props.props, num_props));
+
+	ufbx_string prop = uc->obj.tokens[0];
+	prop.data += 4;
+	prop.length -= 4;
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &prop, false));
+
+	if (uc->obj.usemtl_fbx_id != 0) {
+		ufbxi_check(ufbxi_connect_op(uc, fbx_id, uc->obj.usemtl_fbx_id, prop));
+	}
 
 	return 1;
 }
@@ -12298,6 +12312,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl(ufbxi_context *uc,
 	uc->read_fn = stream->read_fn;
 	uc->read_user = stream->user;
 
+	uc->data_begin = NULL;
 	uc->data = NULL;
 	uc->data_size = 0;
 	uc->yield_size = 0;
@@ -12318,10 +12333,10 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl(ufbxi_context *uc,
 			// HACK: Reuse mesh material parsing
 			ufbxi_check(ufbxi_obj_flush_material(uc));
 			ufbxi_check(ufbxi_obj_parse_material(uc));
-		} else if (cmd.length >= 4 && !memcmp(cmd.data, "map_", 4)) {
+		} else if (cmd.length > 4 && !memcmp(cmd.data, "map_", 4)) {
 			ufbxi_check(ufbxi_obj_parse_mtl_map(uc));
 		} else {
-			ufbxi_check(ufbxi_obj_parse_mtl_prop(uc));
+			ufbxi_check(ufbxi_obj_parse_prop(uc, uc->obj.tokens[0], 1, true, NULL));
 		}
 	}
 
@@ -12332,6 +12347,8 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl(ufbxi_context *uc,
 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 {
+	if (!uc->opts.load_external_files) return 1;
+
 	ufbx_stream stream;
 	bool has_stream = false;
 
@@ -12515,7 +12532,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_contex
 
 	// HACK: Translate property connections from node to attribute if
 	// the property name is not included in the known node properties.
-	if (uc->version < 7000) {
+	if (uc->version > 0 && uc->version < 7000) {
 		ufbxi_for(ufbxi_tmp_connection, tmp_conn, tmp_connections, num_connections) {
 			if (tmp_conn->src_prop.length > 0 && !ufbxi_is_node_property(uc, tmp_conn->src_prop.data)) {
 				tmp_conn->src = ufbxi_find_attribute_fbx_id(uc, tmp_conn->src);
@@ -17811,14 +17828,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_check(ufbxi_load_maps(uc));
 
 	// .obj workflow
-	{
-		ufbxi_check(ufbxi_obj_init(uc));
-		ufbxi_check(ufbxi_obj_parse_file(uc));
-		ufbxi_check(ufbxi_init_file_paths(uc));
-		ufbxi_check(ufbxi_obj_load_mtl(uc));
+	ufbxi_check(ufbxi_obj_init(uc));
+	ufbxi_check(ufbxi_obj_parse_file(uc));
+	ufbxi_check(ufbxi_init_file_paths(uc));
+	ufbxi_check(ufbxi_obj_load_mtl(uc));
 
-	}
-
+#if 0
 	return 1;
 
 	ufbxi_check(ufbxi_begin_parse(uc));
@@ -17829,11 +17844,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 		ufbxi_check(ufbxi_read_root(uc));
 	}
 
-	// We can free `tmp_parse` already here as all parsing is done by now.
-	ufbxi_buf_free(&uc->tmp_parse);
-
 	ufbxi_update_scene_metadata(&uc->scene.metadata);
 	ufbxi_check(ufbxi_init_file_paths(uc));
+#endif
+
+	// We can free `tmp_parse` already here as all parsing is done by now.
+	ufbxi_buf_free(&uc->tmp_parse);
 
 	ufbxi_check(ufbxi_finalize_scene(uc));
 
@@ -17937,6 +17953,8 @@ static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_free(&uc->ator_tmp, char, uc->read_buffer, uc->read_buffer_size);
 	ufbxi_free(&uc->ator_tmp, char, uc->tmp_arr, uc->tmp_arr_size);
 	ufbxi_free(&uc->ator_tmp, char, uc->swap_arr, uc->swap_arr_size);
+
+	ufbxi_obj_free(uc);
 
 	ufbxi_free_ator(&uc->ator_tmp);
 }
