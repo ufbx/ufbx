@@ -3130,13 +3130,13 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place(ufbxi_strin
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place_str(ufbxi_string_pool *pool, ufbx_string *p_str, bool raw)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_string_place_str(ufbxi_string_pool *pool, ufbx_string *p_str, bool raw)
 {
 	ufbxi_check_err(pool->error, p_str);
 	return ufbxi_push_string_place(pool, &p_str->data, &p_str->length, raw);
 }
 
-ufbxi_nodiscard static ufbxi_forceinline int ufbxi_push_string_place_blob(ufbxi_string_pool *pool, ufbx_blob *p_blob, bool raw)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_string_place_blob(ufbxi_string_pool *pool, ufbx_blob *p_blob, bool raw)
 {
 	if (p_blob->size == 0) {
 		p_blob->data = NULL;
@@ -3931,7 +3931,7 @@ typedef enum {
 #define UFBXI_OBJ_NUM_ATTRIBS_EXT 4
 
 typedef struct {
-	uint64_t min, max;
+	uint64_t min_ix, max_ix;
 } ufbxi_obj_index_range;
 
 typedef struct {
@@ -3944,6 +3944,8 @@ typedef struct {
 
 	uint64_t fbx_node_id;
 	uint64_t fbx_mesh_id;
+
+	uint32_t usemtl_base;
 } ufbxi_obj_mesh;
 
 static const uint8_t ufbxi_obj_attrib_stride[] = {
@@ -3970,15 +3972,24 @@ typedef struct {
 	ufbxi_buf tmp_face_smoothing;
 	ufbxi_buf tmp_face_material;
 	ufbxi_buf tmp_meshes;
+	ufbxi_buf tmp_props;
 
 	size_t read_progress;
 
 	ufbxi_obj_mesh *mesh;
 
+	uint64_t usemtl_fbx_id;
 	uint32_t usemtl_index;
+	ufbx_string usemtl_name;
+
+	uint32_t face_material;
+	bool face_smoothing;
+	bool has_face_smoothing;
 
 	bool eof;
 	bool initialized;
+
+	ufbx_blob mtllib_relative_path;
 
 } ufbxi_obj_context;
 
@@ -7978,6 +7989,24 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_properties(ufbxi_context *u
 	return 1;
 }
 
+ufbxi_noinline static void ufbxi_deduplicate_properties(ufbxi_context *uc, ufbx_prop_list *list)
+{
+	if (list->count >= 2) {
+		ufbx_prop *ps = list->data;
+		size_t dst = 0, src = 0, end = list->count;
+		while (src < end) {
+			if (src + 1 < end && ps[src].name.data == ps[src + 1].name.data) {
+				src++;
+			} else if (dst != src) {
+				ps[dst++] = ps[src++];
+			} else {
+				dst++; src++;
+			}
+		}
+		list->count = dst;
+	}
+}
+
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_properties(ufbxi_context *uc, ufbxi_node *parent, ufbx_props *props)
 {
 	props->defaults = NULL;
@@ -8003,24 +8032,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_properties(ufbxi_context *u
 		ufbxi_check(ufbxi_read_property(uc, &node->children[i], &props->props.data[i], version));
 	}
 
-	// Sort the properties
 	ufbxi_check(ufbxi_sort_properties(uc, props->props.data, props->props.count));
-
-	// Remove duplicates, the last one wins
-	if (props->props.count >= 2) {
-		ufbx_prop *ps = props->props.data;
-		size_t dst = 0, src = 0, end = props->props.count;
-		while (src < end) {
-			if (src + 1 < end && ps[src].name.data == ps[src + 1].name.data) {
-				src++;
-			} else if (dst != src) {
-				ps[dst++] = ps[src++];
-			} else {
-				dst++; src++;
-			}
-		}
-		props->props.count = dst;
-	}
+	ufbxi_deduplicate_properties(uc, &props->props);
 
 	return 1;
 }
@@ -11378,7 +11391,181 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_legacy_root(ufbxi_context *
 	return 1;
 }
 
+// Filename manipulation
+
+ufbxi_nodiscard ufbxi_noinline static size_t ufbxi_trim_delimiters(ufbxi_context *uc, const char *data, size_t length)
+{
+	for (; length > 0; length--) {
+		char c = data[length - 1];
+		bool is_separator = c == '/' || c == uc->opts.path_separator;
+		if (is_separator) {
+			length--;
+			break;
+		}
+	}
+	return length;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_init_file_paths(ufbxi_context *uc)
+{
+	if (uc->opts.filename.length > 0) {
+		uc->scene.metadata.filename = uc->opts.filename;
+	} else if (uc->opts.raw_filename.size > 0) {
+		uc->scene.metadata.filename.data = (const char*)uc->opts.raw_filename.data;
+		uc->scene.metadata.filename.length = uc->opts.raw_filename.size;
+	}
+
+	if (uc->opts.raw_filename.size > 0) {
+		uc->scene.metadata.raw_filename = uc->opts.raw_filename;
+	} else if (uc->opts.filename.length > 0) {
+		uc->scene.metadata.raw_filename.data = uc->opts.filename.data;
+		uc->scene.metadata.raw_filename.size = uc->opts.filename.length;
+	}
+
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->scene.metadata.filename, false));
+	ufbxi_check(ufbxi_push_string_place_blob(&uc->string_pool, &uc->scene.metadata.raw_filename, true));
+
+	uc->scene.metadata.relative_root.data = uc->scene.metadata.filename.data;
+	uc->scene.metadata.relative_root.length = ufbxi_trim_delimiters(uc, uc->scene.metadata.filename.data, uc->scene.metadata.filename.length);
+
+	uc->scene.metadata.raw_relative_root.data = uc->scene.metadata.raw_filename.data;
+	uc->scene.metadata.raw_relative_root.size = ufbxi_trim_delimiters(uc, (const char*)uc->scene.metadata.raw_filename.data, uc->scene.metadata.raw_filename.size);
+
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->scene.metadata.relative_root, false));
+	ufbxi_check(ufbxi_push_string_place_blob(&uc->string_pool, &uc->scene.metadata.raw_relative_root, true));
+
+	return 1;
+}
+
+typedef union {
+	ufbx_string str;
+	ufbx_blob blob;
+} ufbxi_strblob;
+
+static ufbxi_noinline void ufbxi_strblob_set(ufbxi_strblob *dst, const char *data, size_t length, bool raw)
+{
+	if (raw) {
+		dst->blob.data = data;
+		dst->blob.size = length;
+	} else {
+		dst->str.data = length == 0 ? ufbxi_empty_char : data;
+		dst->str.length = length;
+	}
+}
+
+static ufbxi_forceinline const char *ufbxi_strblob_data(const ufbxi_strblob *strblob, bool raw)
+{
+	return raw ? (const char*)strblob->blob.data : strblob->str.data;
+}
+
+static ufbxi_forceinline size_t ufbxi_strblob_length(const ufbxi_strblob *strblob, bool raw)
+{
+	return raw ? strblob->blob.size : strblob->str.length;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_context *uc, ufbxi_strblob *p_dst, const ufbxi_strblob *p_src, bool raw)
+{
+	const char *src = ufbxi_strblob_data(p_src, raw);
+	size_t src_length = ufbxi_strblob_length(p_src, raw);
+
+	// Skip leading directory separators and early return if the relative path is empty
+	while (src_length > 0 && (src[0] == '/' || src[0] == '\\')) {
+		src++;
+		src_length--;
+	}
+	if (src_length == 0) {
+		ufbxi_strblob_set(p_dst, NULL, 0, raw);
+		return 1;
+	}
+
+	const char *prefix_data;
+	size_t prefix_length;
+	if (raw) {
+		prefix_data = (const char*)uc->scene.metadata.raw_relative_root.data;
+		prefix_length = uc->scene.metadata.raw_relative_root.size;
+	} else {
+		prefix_data = (const char*)uc->scene.metadata.relative_root.data;
+		prefix_length = uc->scene.metadata.relative_root.length;
+	}
+
+	// Undo directories from `prefix` for every `..`
+	while (prefix_length > 0 && src_length >= 3 && src[0] == '.' && src[1] == '.' && (src[2] == '/' || src[2] == '\\')) {
+		size_t part_start = prefix_length;
+		while (part_start > 0 && !(prefix_data[part_start - 1] == '/' || prefix_data[part_start - 1] == '\\')) {
+			part_start--;
+		}
+		size_t part_len = prefix_length - part_start;
+
+		if (part_len == 2 && prefix_data[part_start] == '.' && prefix_data[part_start + 1] == '.') {
+			// Prefix itself ends in `..`, cannot cancel out a leading `../`
+			break;
+		}
+
+		// Eat the leading '/' before the part segment
+		prefix_length = part_start > 0 ? part_start - 1 : 0;
+
+		if (part_len == 1 && prefix_data[part_start] == '.') {
+			// Single '.' -> remove and continue without cancelling out a leading `../`
+			continue;
+		}
+
+		src += 3;
+		src_length -= 3;
+	}
+
+	size_t result_cap = prefix_length + src_length + 1;
+	char *result = ufbxi_push(&uc->tmp_stack, char, result_cap);
+	ufbxi_check(result);
+	char *ptr = result;
+
+	// Copy prefix and suffix converting separators in the process
+	if (prefix_length > 0) {
+		memcpy(ptr, prefix_data, prefix_length);
+		ptr[prefix_length] = uc->opts.path_separator;
+		ptr += prefix_length + 1;
+	}
+	for (size_t i = 0; i < src_length; i++) {
+		char c = src[i];
+		if (c == '/' || c == '\\') {
+			c = uc->opts.path_separator;
+		}
+		*ptr++ = c;
+	}
+	*ptr = '\0';
+
+	// Intern the string and pop the temporary buffer
+	ufbx_string dst = { result, ufbxi_to_size(ptr - result) };
+	ufbx_assert(dst.length <= result_cap);
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &dst, raw));
+	ufbxi_pop(&uc->tmp_stack, char, result_cap, NULL);
+
+	ufbxi_strblob_set(p_dst, dst.data, dst.length, raw);
+
+	return 1;
+}
+
+
 // -- .obj file
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_postprocess_props(ufbxi_context *uc, ufbx_prop_list *props)
+{
+	ufbxi_for_list(ufbx_prop, prop, *props) {
+		prop->_internal_key = ufbxi_get_name_key(prop->name.data, prop->name.length);
+		if (prop->value_str.length == 0) {
+			prop->value_str.data = ufbxi_empty_char;
+		}
+		if (!prop->value_int) {
+			prop->value_int = (int64_t)prop->value_real;
+		}
+	}
+
+	if (props->count > 1) {
+		ufbxi_check(ufbxi_sort_properties(uc, props->data, props->count));
+		ufbxi_deduplicate_properties(uc, props);
+	}
+
+	return 1;
+}
 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_push_mesh(ufbxi_context *uc)
 {
@@ -11387,11 +11574,13 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_push_mesh(ufbxi_context *uc)
 	uc->obj.mesh = mesh;
 
 	ufbxi_nounroll for (size_t i = 0; i < UFBXI_OBJ_NUM_ATTRIBS; i++) {
-		mesh->vertex_range[i].min = UINT64_MAX;
+		mesh->vertex_range[i].min_ix = UINT64_MAX;
 	}
 
 	mesh->fbx_node = ufbxi_push_synthetic_element(uc, &mesh->fbx_node_id, NULL, "", ufbx_node, UFBX_ELEMENT_NODE);
 	mesh->fbx_mesh = ufbxi_push_synthetic_element(uc, &mesh->fbx_mesh_id, NULL, "", ufbx_mesh, UFBX_ELEMENT_MESH);
+
+	uc->obj.face_material = UFBX_NO_INDEX;
 
 	ufbxi_check(ufbxi_connect_oo(uc, mesh->fbx_mesh_id, mesh->fbx_node_id));
 	ufbxi_check(ufbxi_connect_oo(uc, mesh->fbx_node_id, 0));
@@ -11409,7 +11598,10 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_init(ufbxi_context *uc)
 	}
 	uc->obj.tmp_color_indices.ator = &uc->ator_tmp;
 	uc->obj.tmp_faces.ator = &uc->ator_tmp;
+	uc->obj.tmp_face_material.ator = &uc->ator_tmp;
+	uc->obj.tmp_face_smoothing.ator = &uc->ator_tmp;
 	uc->obj.tmp_meshes.ator = &uc->ator_tmp;
+	uc->obj.tmp_props.ator = &uc->ator_tmp;
 
 	// .obj parsing does its own yield logic
 	uc->data_size += uc->yield_size;
@@ -11427,7 +11619,10 @@ static ufbxi_noinline void ufbxi_obj_free(ufbxi_context *uc)
 	}
 	ufbxi_buf_free(&uc->obj.tmp_color_indices);
 	ufbxi_buf_free(&uc->obj.tmp_faces);
+	ufbxi_buf_free(&uc->obj.tmp_face_material);
+	ufbxi_buf_free(&uc->obj.tmp_face_smoothing);
 	ufbxi_buf_free(&uc->obj.tmp_meshes);
+	ufbxi_buf_free(&uc->obj.tmp_props);
 }
 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_read_line(ufbxi_context *uc)
@@ -11490,6 +11685,22 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_read_line(ufbxi_context *uc)
 	}
 
 	return 1;
+}
+
+static ufbxi_noinline ufbx_string ufbxi_obj_span_token(ufbxi_context *uc, uint32_t start_token, size_t end_token)
+{
+	ufbx_assert(start_token < uc->obj.num_tokens);
+	end_token = ufbxi_min_sz(end_token, uc->obj.num_tokens - 1);
+
+	ufbx_assert(start_token <= end_token);
+	ufbx_string start = uc->obj.tokens[start_token];
+	ufbx_string end = uc->obj.tokens[end_token];
+	size_t num_between = end.data - start.data;
+
+	ufbx_string result;
+	result.data = start.data;
+	result.length = num_between + end.length;
+	return result;
 }
 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_tokenize(ufbxi_context *uc)
@@ -11622,8 +11833,8 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_index(ufbxi_context *u
 
 	if (index != UINT64_MAX) {
 		ufbxi_obj_index_range *range = &mesh->vertex_range[attrib];
-		range->min = ufbxi_min64(range->min, index);
-		range->max = ufbxi_min64(range->max, index);
+		range->min_ix = ufbxi_min64(range->min_ix, index);
+		range->max_ix = ufbxi_max64(range->max_ix, index);
 	}
 
 	s->data = ptr;
@@ -11648,12 +11859,28 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 	face->index_begin = uc->obj.mesh->num_indices;
 	face->num_indices = num_indices;
 
-	uc->obj.mesh->num_faces++;
-	uc->obj.mesh->num_indices += num_indices;
+	ufbxi_obj_mesh *mesh = uc->obj.mesh;
+	mesh->num_faces++;
+	mesh->num_indices += num_indices;
+
+	if (mesh->usemtl_base == 0 && uc->obj.usemtl_index > 0) {
+		mesh->usemtl_base = uc->obj.usemtl_index;
+		uc->obj.face_material = 0;
+		ufbxi_check(ufbxi_connect_oo(uc, uc->obj.usemtl_fbx_id, mesh->fbx_node_id));
+	}
+
+	uint32_t *p_face_mat = ufbxi_push(&uc->obj.tmp_face_material, uint32_t, 1);
+	ufbxi_check(p_face_mat);
+	*p_face_mat = uc->obj.face_material;
+
+	if (uc->obj.has_face_smoothing) {
+		bool *p_face_smooth = ufbxi_push(&uc->obj.tmp_face_smoothing, bool, 1);
+		*p_face_smooth = uc->obj.face_smoothing;
+	}
 
 	for (size_t ix = 0; ix < num_indices; ix++) {
 		ufbx_string tok = uc->obj.tokens[1 + ix];
-		for (uint32_t attrib = 0; attrib < 3; attrib++) {
+		for (uint32_t attrib = 0; attrib < UFBXI_OBJ_NUM_ATTRIBS; attrib++) {
 			ufbxi_check(ufbxi_obj_parse_index(uc, &tok, attrib));
 		}
 	}
@@ -11664,29 +11891,52 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context *uc)
 {
 	ufbxi_check(uc->obj.num_tokens >= 2);
-	ufbx_string name = uc->obj.tokens[1];
+	ufbx_string name = ufbxi_obj_span_token(uc, 1, SIZE_MAX);
 
 	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &name, false));
 
 	uint64_t fbx_id = ufbxi_synthetic_id_from_string(name.data);
 
 	ufbxi_fbx_id_entry *entry = ufbxi_find_fbx_id(uc, fbx_id);
+	bool push_index = true;
 
-	uint32_t index = ++uc->obj.usemtl_index;
+	uc->obj.usemtl_fbx_id = fbx_id;
+	uc->obj.usemtl_name = name;
 
-	// TODO? Support files with more than 2^32 usemtl directives
-	ufbxi_check(index < UINT32_MAX);
-
-	if (entry) {
-		// TODO: Use `user_id` to maintain a mapping from materials to face material
-		entry->user_id = index;
-	} else {
+	if (!entry) {
 		ufbxi_element_info info = { 0 };
 		info.fbx_id = fbx_id;
 		info.name = name;
 
 		ufbx_material *material = ufbxi_push_element(uc, &info, ufbx_material, UFBX_ELEMENT_MATERIAL);
 		ufbxi_check(material);
+	}
+
+	ufbxi_obj_mesh *mesh = uc->obj.mesh;
+	if (mesh) {
+		if (entry && mesh->usemtl_base > 0 && entry->user_id >= mesh->usemtl_base) {
+			uc->obj.face_material = entry->user_id - mesh->usemtl_base;
+			push_index = false;
+		} else {
+			ufbxi_check(ufbxi_connect_oo(uc, fbx_id, mesh->fbx_node_id));
+		}
+	}
+
+	if (push_index) {
+		uint32_t index = ++uc->obj.usemtl_index;
+		ufbxi_check(index < UINT32_MAX);
+
+		if (!entry) {
+			entry = ufbxi_find_fbx_id(uc, fbx_id);
+		}
+		entry->user_id = index;
+
+		if (mesh) {
+			if (mesh->usemtl_base == 0) {
+				mesh->usemtl_base = index;
+			}
+			uc->obj.face_material = index - mesh->usemtl_base;
+		}
 	}
 
 	return 1;
@@ -11718,8 +11968,48 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_vertices(ufbxi_context *
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_setup_attrib(ufbxi_context *uc, ufbx_real_list *dst, uint32_t attrib, uint64_t min_index)
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_setup_attrib(ufbxi_context *uc, ufbxi_obj_mesh *mesh, uint64_t *tmp_indices,
+	ufbx_vertex_attrib *dst, const ufbx_real_list *p_data, uint32_t attrib, bool non_disjoint)
 {
+	ufbx_real_list data = *p_data;
+
+	size_t num_indices = mesh->num_indices;
+	size_t stride = ufbxi_obj_attrib_stride[attrib];
+	size_t num_values = data.count / stride;
+
+	uint64_t mesh_min_ix = mesh->vertex_range[attrib].min_ix;
+	if (num_indices == 0 || num_values == 0 || mesh_min_ix == UINT64_MAX) {
+		// Pop indices without copying if the attribute is not used
+		ufbxi_pop(&uc->obj.tmp_indices[attrib], uint64_t, num_indices, NULL);
+		return 1;
+	}
+
+	uint64_t min_index = non_disjoint ? 0 : mesh_min_ix;
+
+	ufbxi_pop(&uc->obj.tmp_indices[attrib], uint64_t, num_indices, tmp_indices);
+
+	uint32_t *dst_indices = ufbxi_push(&uc->result, uint32_t, num_indices);
+	ufbxi_check(dst_indices);
+
+	dst->exists = true;
+
+	dst->values.data = data.data;
+	dst->values.count = num_values;
+
+	dst->indices.data = dst_indices;
+	dst->indices.count = num_indices;
+
+	ufbxi_nounroll for (size_t i = 0; i < num_indices; i++) {
+		uint64_t ix = tmp_indices[i] - min_index;
+		ufbxi_check(ix < UINT32_MAX);
+		if (ix < data.count) {
+			dst_indices[i] = (uint32_t)ix;
+		} else {
+			ufbxi_check(ufbxi_fix_index(uc, &dst_indices[i], (uint32_t)ix, (uint32_t)num_values));
+		}
+	}
+
+	return 1;
 }
 
 static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc)
@@ -11731,30 +12021,73 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 	// Check if the file has disjoint vertices
 	bool non_disjoint[UFBXI_OBJ_NUM_ATTRIBS] = { 0 };
 	uint64_t next_min[UFBXI_OBJ_NUM_ATTRIBS] = { 0 };
+	ufbx_real_list vertices[UFBXI_OBJ_NUM_ATTRIBS_EXT];
+
+	size_t max_indices = 0;
 
 	for (size_t i = 0; i < num_meshes; i++) {
 		ufbxi_obj_mesh *mesh = &meshes[i];
+		max_indices = ufbxi_max_sz(max_indices, mesh->num_indices);
 		ufbxi_nounroll for (uint32_t attrib = 0; attrib < UFBXI_OBJ_NUM_ATTRIBS; attrib++) {
 			ufbxi_obj_index_range range = mesh->vertex_range[attrib];
-			if (range.min > range.max) continue;
-			if (range.min < next_min[attrib]) {
+			if (range.min_ix > range.max_ix) continue;
+			if (range.min_ix < next_min[attrib]) {
 				non_disjoint[attrib] = true;
 			}
-			next_min[attrib] = range.max + 1;
+			next_min[attrib] = range.max_ix + 1;
 		}
 	}
 
-	ufbx_real_list vertices[UFBXI_OBJ_NUM_ATTRIBS_EXT];
+	uint64_t *tmp_indices = ufbxi_push(&uc->tmp, uint64_t, max_indices);
+	ufbxi_check(tmp_indices);
+
 	ufbxi_nounroll for (uint32_t attrib = 0; attrib < UFBXI_OBJ_NUM_ATTRIBS; attrib++) {
 		if (!non_disjoint[attrib]) continue;
 		ufbxi_check(ufbxi_obj_pop_vertices(uc, &vertices[attrib], attrib, 0));
 	}
 
-#if 0
 	for (size_t i = num_meshes; i > 0; i--) {
-		ufbxi_obj_mesh *mesh = meshes[i - 1];
+		ufbxi_obj_mesh *mesh = &meshes[i - 1];
+
+		ufbxi_nounroll for (uint32_t attrib = 0; attrib < UFBXI_OBJ_NUM_ATTRIBS; attrib++) {
+			if (non_disjoint[attrib]) continue;
+			uint64_t min_ix = mesh->vertex_range[attrib].min_ix;
+			if (min_ix < UINT64_MAX) {
+				ufbxi_check(ufbxi_obj_pop_vertices(uc, &vertices[attrib], attrib, min_ix));
+			}
+		}
+
+		ufbx_mesh *fbx_mesh = mesh->fbx_mesh;
+
+		size_t num_faces = mesh->num_faces;
+
+		fbx_mesh->num_faces = mesh->num_faces;
+		fbx_mesh->num_indices = mesh->num_indices;
+
+		fbx_mesh->faces.count = num_faces;
+		fbx_mesh->face_material.count = num_faces;
+
+		fbx_mesh->faces.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_faces, ufbx_face, num_faces);
+		fbx_mesh->face_material.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_face_material, uint32_t, num_faces);
+
+		ufbxi_check(fbx_mesh->faces.data);
+		ufbxi_check(fbx_mesh->face_material.data);
+
+		if (uc->obj.has_face_smoothing) {
+			fbx_mesh->face_smoothing.count = num_faces;
+			fbx_mesh->face_smoothing.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_face_smoothing, bool, num_faces);
+			ufbxi_check(fbx_mesh->face_smoothing.data);
+		}
+
+		ufbxi_check(ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_vertex_attrib*)&fbx_mesh->vertex_position,
+			&vertices[UFBXI_OBJ_ATTRIB_POSITION], UFBXI_OBJ_ATTRIB_POSITION, non_disjoint[UFBXI_OBJ_ATTRIB_POSITION]));
+
+		ufbxi_check(ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_vertex_attrib*)&fbx_mesh->vertex_uv,
+			&vertices[UFBXI_OBJ_ATTRIB_UV], UFBXI_OBJ_ATTRIB_UV, non_disjoint[UFBXI_OBJ_ATTRIB_UV]));
+
+		ufbxi_check(ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_vertex_attrib*)&fbx_mesh->vertex_normal,
+			&vertices[UFBXI_OBJ_ATTRIB_NORMAL], UFBXI_OBJ_ATTRIB_NORMAL, non_disjoint[UFBXI_OBJ_ATTRIB_NORMAL]));
 	}
-#endif
 
 	return 1;
 }
@@ -11784,9 +12117,240 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc
 			ufbxi_check(ufbxi_obj_parse_vertex(uc, UFBXI_OBJ_ATTRIB_NORMAL, 1));
 		} else if (key == ufbxi_obj_cmd1('f')) {
 			ufbxi_check(ufbxi_obj_parse_indices(uc));
+		} else if (key == ufbxi_obj_cmd1('s')) {
+			if (num_tokens >= 2) {
+				uc->obj.has_face_smoothing = true;
+				uc->obj.face_smoothing = !ufbxi_str_equal(uc->obj.tokens[1], ufbxi_str_c("off"));
+
+				// Fill in previously missed face smoothing data
+				if (uc->obj.tmp_face_smoothing.num_items == 0 && uc->obj.tmp_faces.num_items > 0) {
+					ufbxi_check(ufbxi_push_zero(&uc->obj.tmp_face_smoothing, bool, uc->obj.tmp_faces.num_items));
+				}
+			}
+		} else if (ufbxi_str_equal(cmd, ufbxi_str_c("mtllib"))) {
+			ufbxi_check(uc->obj.num_tokens >= 2);
+			ufbx_string lib = ufbxi_obj_span_token(uc, 1, SIZE_MAX);
+			lib.data = ufbxi_push_copy(&uc->tmp, char, lib.length + 1, lib.data);
+			ufbxi_check(lib.data);
+			uc->obj.mtllib_relative_path.data = lib.data;
+			uc->obj.mtllib_relative_path.size = lib.length;
 		} else if (ufbxi_str_equal(cmd, ufbxi_str_c("usemtl"))) {
 			ufbxi_check(ufbxi_obj_parse_material(uc));
 		}
+	}
+
+	ufbxi_check(ufbxi_obj_pop_meshes(uc));
+
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_flush_material(ufbxi_context *uc)
+{
+	if (uc->obj.usemtl_fbx_id == 0) return 1;
+
+	ufbx_prop_list props;
+	props.count = uc->obj.tmp_props.num_items;
+	props.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_props, ufbx_prop, props.count);
+	ufbxi_check(props.data);
+
+	ufbxi_check(ufbxi_postprocess_props(uc, &props));
+
+	return 1;
+}
+
+typedef enum {
+	UFBXI_OBJ_PROP_VEC,
+	UFBXI_OBJ_PROP_BOOL,
+	UFBXI_OBJ_PROP_STR,
+} ufbxi_obj_prop_type;
+
+typedef struct {
+	const char *flag;
+	uint8_t flag_len;
+	uint8_t num_opts;
+	uint8_t type;
+	uint8_t aliases;
+} ufbxi_obj_tex_opt;
+
+static const ufbxi_obj_tex_opt ufbxi_obj_tex_opts[] = {
+	{ "bm", 2, 1, UFBXI_OBJ_PROP_VEC },
+	{ "clamp", 5, 1, UFBXI_OBJ_PROP_BOOL },
+	{ "blendu", 6, 1, UFBXI_OBJ_PROP_BOOL },
+	{ "blendv", 6, 1, UFBXI_OBJ_PROP_BOOL },
+	{ "imfchan", 7, 1, UFBXI_OBJ_PROP_STR },
+	{ "mm", 2, 2, UFBXI_OBJ_PROP_VEC },
+	{ "o", 1, 3, UFBXI_OBJ_PROP_VEC },
+	{ "s", 1, 3, UFBXI_OBJ_PROP_VEC },
+	{ "t", 1, 3, UFBXI_OBJ_PROP_VEC },
+	{ "texres", 6, 1, UFBXI_OBJ_PROP_VEC },
+};
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc, ufbx_string name, ufbxi_obj_prop_type type, size_t start, size_t max_count)
+{
+	size_t end = ufbxi_min_sz(start + max_count, uc->obj.num_tokens);
+	if (start == end) return 1;
+
+	ufbx_prop *prop = ufbxi_push_zero(&uc->obj.tmp_props, ufbx_prop, 1);
+	ufbxi_check(prop);
+	prop->name = name;
+
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &prop->name, false));
+
+	uint32_t flags = UFBX_PROP_FLAG_VALUE_STR;
+
+	ufbx_string span = ufbxi_obj_span_token(uc, start, end - 1);
+	prop->value_str = span;
+	prop->value_blob.data = span.data;
+	prop->value_blob.size = span.length;
+
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &prop->value_str, false));
+	ufbxi_check(ufbxi_push_string_place_blob(&uc->string_pool, &prop->value_blob, true));
+
+	if (type == UFBXI_OBJ_PROP_VEC) {
+		size_t num_reals = 0;
+		size_t max_reals = ufbxi_min_sz(max_count, 4);
+		for (; num_reals < max_reals; num_reals++) {
+			if (start + num_reals < end) break;
+			ufbx_string tok = uc->obj.tokens[start + num_reals];
+
+			char *end;
+			double val = strtod(tok.data, &end);
+			if (end != tok.data + tok.length) break;
+
+			prop->value_real_arr[num_reals] = (ufbx_real)val;
+			if (num_reals == 0) {
+				prop->value_int = ufbxi_f64_to_i64(val);
+				flags |= UFBX_PROP_FLAG_VALUE_INT;
+			}
+		}
+
+		if (num_reals > 0) {
+			flags = (uint32_t)UFBX_PROP_FLAG_VALUE_REAL << (num_reals - 1);
+		}
+	} else if (type == UFBXI_OBJ_PROP_BOOL) {
+		prop->value_int = !strcmp(prop->value_str.data, "on");
+	}
+
+	prop->flags = (ufbx_prop_flags)flags;
+
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl_map(ufbxi_context *uc)
+{
+	if (uc->obj.num_tokens < 2) return 1;
+
+	size_t start = 1;
+	for (; start < uc->obj.num_tokens; ) {
+		ufbx_string tok = uc->obj.tokens[start];
+		if (tok.data[0] == '-') {
+			tok.data += 1;
+			tok.length -= 1;
+
+			size_t opt_ix = SIZE_MAX;
+			for (size_t i = 0; i < ufbxi_arraycount(ufbxi_obj_tex_opts); i++) {
+				const ufbxi_obj_tex_opt *opt = &ufbxi_obj_tex_opts[i];
+				ufbx_string opt_str = { opt->flag, opt->flag_len };
+				if (ufbxi_str_equal(tok, opt_str)) {
+					opt_ix = i;
+					break;
+				}
+			}
+
+			if (opt_ix != SIZE_MAX) {
+				const ufbxi_obj_tex_opt *opt = &ufbxi_obj_tex_opts[opt_ix];
+				size_t next = start + 1 + (size_t)opt->num_opts;
+				if (next < uc->obj.num_tokens) {
+					ufbxi_check(ufbxi_obj_parse_prop(uc, tok, (ufbxi_obj_prop_type)opt->type, start, opt->num_opts));
+					start = next;
+					continue;
+				}
+			}
+		}
+		break;
+	}
+
+	ufbx_string tex_str = ufbxi_obj_span_token(uc, start, SIZE_MAX);
+	ufbx_blob tex_raw = { tex_str.data, tex_str.length };
+
+	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &tex_str, false));
+	ufbxi_check(ufbxi_push_string_place_blob(&uc->string_pool, &tex_raw, true));
+
+	uint64_t fbx_id;
+	ufbx_texture *texture = ufbxi_push_synthetic_element(uc, &fbx_id, NULL, "", ufbx_texture, UFBX_ELEMENT_TEXTURE);
+	ufbxi_check(texture);
+
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl_prop(ufbxi_context *uc)
+{
+	if (uc->obj.num_tokens < 2) return 1;
+
+	ufbxi_check(ufbxi_obj_parse_prop(uc, uc->obj.tokens[0], UFBXI_OBJ_PROP_VEC, 1, SIZE_MAX));
+
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl(ufbxi_context *uc, ufbx_stream *stream)
+{
+	// HACK: Patch the global read function
+	uc->read_fn = stream->read_fn;
+	uc->read_user = stream->user;
+
+	uc->data = NULL;
+	uc->data_size = 0;
+	uc->yield_size = 0;
+
+	uc->eof = false;
+	uc->obj.eof = false;
+
+	uc->obj.mesh = NULL;
+	uc->obj.usemtl_fbx_id = 0;
+
+	while (!uc->obj.eof) {
+		ufbxi_check(ufbxi_obj_tokenize_line(uc));
+		size_t num_tokens = uc->obj.num_tokens;
+		if (num_tokens == 0) continue;
+
+		ufbx_string cmd = uc->obj.tokens[0];
+		if (ufbxi_str_equal(cmd, ufbxi_str_c("newmtl"))) {
+			// HACK: Reuse mesh material parsing
+			ufbxi_check(ufbxi_obj_flush_material(uc));
+			ufbxi_check(ufbxi_obj_parse_material(uc));
+		} else if (cmd.length >= 4 && !memcmp(cmd.data, "map_", 4)) {
+			ufbxi_check(ufbxi_obj_parse_mtl_map(uc));
+		} else {
+			ufbxi_check(ufbxi_obj_parse_mtl_prop(uc));
+		}
+	}
+
+	ufbxi_check(ufbxi_obj_flush_material(uc));
+
+	return 1;
+}
+
+static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
+{
+	ufbx_stream stream;
+	bool has_stream = false;
+
+	if (uc->obj.mtllib_relative_path.size > 0) {
+		ufbx_blob dst;
+		ufbxi_check(ufbxi_resolve_relative_filename(uc, (ufbxi_strblob*)&dst, (const ufbxi_strblob*)&uc->obj.mtllib_relative_path, true));
+
+		if (uc->opts.open_file_cb.fn) {
+			// `dst` is guaranteed to be NULL-terminated but not UTF-8 encoded.
+			has_stream = uc->opts.open_file_cb.fn(uc->opts.open_file_cb.user, &stream, (const char*)dst.data, dst.size);
+		}
+	}
+
+	if (has_stream) {
+		int ok = ufbxi_obj_parse_mtl(uc, &stream);
+		if (stream.close_fn) {
+			stream.close_fn(stream.user);
+		}
+		ufbxi_check(ok);
 	}
 
 	return 1;
@@ -13275,156 +13839,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_constraint_prop(ufbxi_contex
 		} break;
 		}
 	}
-
-	return 1;
-}
-
-ufbxi_nodiscard ufbxi_noinline static size_t ufbxi_trim_delimiters(ufbxi_context *uc, const char *data, size_t length)
-{
-	for (; length > 0; length--) {
-		char c = data[length - 1];
-		bool is_separator = c == '/' || c == uc->opts.path_separator;
-		if (is_separator) {
-			length--;
-			break;
-		}
-	}
-	return length;
-}
-
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_init_file_paths(ufbxi_context *uc)
-{
-	if (uc->opts.filename.length > 0) {
-		uc->scene.metadata.filename = uc->opts.filename;
-	} else if (uc->opts.raw_filename.size > 0) {
-		uc->scene.metadata.filename.data = (const char*)uc->opts.raw_filename.data;
-		uc->scene.metadata.filename.length = uc->opts.raw_filename.size;
-	}
-
-	if (uc->opts.raw_filename.size > 0) {
-		uc->scene.metadata.raw_filename = uc->opts.raw_filename;
-	} else if (uc->opts.filename.length > 0) {
-		uc->scene.metadata.raw_filename.data = uc->opts.filename.data;
-		uc->scene.metadata.raw_filename.size = uc->opts.filename.length;
-	}
-
-	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->scene.metadata.filename, false));
-	ufbxi_check(ufbxi_push_string_place_blob(&uc->string_pool, &uc->scene.metadata.raw_filename, true));
-
-	uc->scene.metadata.relative_root.data = uc->opts.filename.data;
-	uc->scene.metadata.relative_root.length = ufbxi_trim_delimiters(uc, uc->opts.filename.data, uc->opts.filename.length);
-
-	uc->scene.metadata.raw_relative_root.data = uc->opts.raw_filename.data;
-	uc->scene.metadata.raw_relative_root.size = ufbxi_trim_delimiters(uc, (const char*)uc->opts.raw_filename.data, uc->opts.raw_filename.size);
-
-	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->scene.metadata.relative_root, false));
-	ufbxi_check(ufbxi_push_string_place_blob(&uc->string_pool, &uc->scene.metadata.raw_relative_root, true));
-
-	return 1;
-}
-
-typedef union {
-	ufbx_string str;
-	ufbx_blob blob;
-} ufbxi_strblob;
-
-static ufbxi_noinline void ufbxi_strblob_set(ufbxi_strblob *dst, const char *data, size_t length, bool raw)
-{
-	if (raw) {
-		dst->blob.data = data;
-		dst->blob.size = length;
-	} else {
-		dst->str.data = length == 0 ? ufbxi_empty_char : data;
-		dst->str.length = length;
-	}
-}
-
-static ufbxi_forceinline const char *ufbxi_strblob_data(const ufbxi_strblob *strblob, bool raw)
-{
-	return raw ? (const char*)strblob->blob.data : strblob->str.data;
-}
-
-static ufbxi_forceinline size_t ufbxi_strblob_length(const ufbxi_strblob *strblob, bool raw)
-{
-	return raw ? strblob->blob.size : strblob->str.length;
-}
-
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_context *uc, ufbxi_strblob *p_dst, const ufbxi_strblob *p_src, bool raw)
-{
-	const char *src = ufbxi_strblob_data(p_src, raw);
-	size_t src_length = ufbxi_strblob_length(p_src, raw);
-
-	// Skip leading directory separators and early return if the relative path is empty
-	while (src_length > 0 && (src[0] == '/' || src[0] == '\\')) {
-		src++;
-		src_length--;
-	}
-	if (src_length == 0) {
-		ufbxi_strblob_set(p_dst, NULL, 0, raw);
-		return 1;
-	}
-
-	const char *prefix_data;
-	size_t prefix_length;
-	if (raw) {
-		prefix_data = (const char*)uc->scene.metadata.raw_relative_root.data;
-		prefix_length = uc->scene.metadata.raw_relative_root.size;
-	} else {
-		prefix_data = (const char*)uc->scene.metadata.relative_root.data;
-		prefix_length = uc->scene.metadata.relative_root.length;
-	}
-
-	// Undo directories from `prefix` for every `..`
-	while (prefix_length > 0 && src_length >= 3 && src[0] == '.' && src[1] == '.' && (src[2] == '/' || src[2] == '\\')) {
-		size_t part_start = prefix_length;
-		while (part_start > 0 && !(prefix_data[part_start - 1] == '/' || prefix_data[part_start - 1] == '\\')) {
-			part_start--;
-		}
-		size_t part_len = prefix_length - part_start;
-
-		if (part_len == 2 && prefix_data[part_start] == '.' && prefix_data[part_start + 1] == '.') {
-			// Prefix itself ends in `..`, cannot cancel out a leading `../`
-			break;
-		}
-
-		// Eat the leading '/' before the part segment
-		prefix_length = part_start > 0 ? part_start - 1 : 0;
-
-		if (part_len == 1 && prefix_data[part_start] == '.') {
-			// Single '.' -> remove and continue without cancelling out a leading `../`
-			continue;
-		}
-
-		src += 3;
-		src_length -= 3;
-	}
-
-	size_t result_cap = prefix_length + src_length + 1;
-	char *result = ufbxi_push(&uc->tmp_stack, char, result_cap);
-	ufbxi_check(result);
-	char *ptr = result;
-
-	// Copy prefix and suffix converting separators in the process
-	if (prefix_length > 0) {
-		memcpy(ptr, prefix_data, prefix_length);
-		ptr[prefix_length] = uc->opts.path_separator;
-		ptr += prefix_length + 1;
-	}
-	for (size_t i = 0; i < src_length; i++) {
-		char c = src[i];
-		if (c == '/' || c == '\\') {
-			c = uc->opts.path_separator;
-		}
-		*ptr++ = c;
-	}
-
-	// Intern the string and pop the temporary buffer
-	ufbx_string dst = { result, ufbxi_to_size(ptr - result) };
-	ufbx_assert(dst.length <= result_cap);
-	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &dst, raw));
-	ufbxi_pop(&uc->tmp_stack, char, result_cap, NULL);
-
-	ufbxi_strblob_set(p_dst, dst.data, dst.length, raw);
 
 	return 1;
 }
@@ -17396,8 +17810,15 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_check(ufbxi_load_strings(uc));
 	ufbxi_check(ufbxi_load_maps(uc));
 
-	ufbxi_check(ufbxi_obj_init(uc));
-	ufbxi_check(ufbxi_obj_parse_file(uc));
+	// .obj workflow
+	{
+		ufbxi_check(ufbxi_obj_init(uc));
+		ufbxi_check(ufbxi_obj_parse_file(uc));
+		ufbxi_check(ufbxi_init_file_paths(uc));
+		ufbxi_check(ufbxi_obj_load_mtl(uc));
+
+	}
+
 	return 1;
 
 	ufbxi_check(ufbxi_begin_parse(uc));
@@ -17413,6 +17834,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 
 	ufbxi_update_scene_metadata(&uc->scene.metadata);
 	ufbxi_check(ufbxi_init_file_paths(uc));
+
 	ufbxi_check(ufbxi_finalize_scene(uc));
 
 	ufbxi_update_scene_settings(&uc->scene.settings);
