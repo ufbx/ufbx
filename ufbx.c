@@ -12634,7 +12634,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 	// Check if the file has disjoint vertices
 	bool non_disjoint[UFBXI_OBJ_NUM_ATTRIBS] = { 0 };
 	uint64_t next_min[UFBXI_OBJ_NUM_ATTRIBS] = { 0 };
-	ufbx_real_list vertices[UFBXI_OBJ_NUM_ATTRIBS_EXT];
+	ufbx_real_list vertices[UFBXI_OBJ_NUM_ATTRIBS_EXT] = { 0 };
 	bool *color_valid = NULL;
 
 	size_t max_indices = 0;
