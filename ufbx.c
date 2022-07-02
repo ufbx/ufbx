@@ -8348,14 +8348,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_property(ufbxi_context *uc,
 		prop->value_str = ufbx_empty_string;
 	}
 
-	prop->flags = (ufbx_prop_flags)flags;
-
 	// Very unlikely, seems to only exist in some "non standard" FBX files
 	if (node->num_children > 0) {
 		ufbxi_node *binary = ufbxi_find_child(node, ufbxi_BinaryData);
 		ufbxi_check(ufbxi_read_embedded_blob(uc, &prop->value_blob, binary));
 		flags |= (uint32_t)UFBX_PROP_FLAG_VALUE_BLOB;
 	}
+
+	prop->flags = (ufbx_prop_flags)flags;
 	
 	return 1;
 }
@@ -12155,6 +12155,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_read_line(ufbxi_context *uc)
 
 	for (;;) {
 		const char *begin = uc->data + offset;
+		ufbx_assert(begin);
+
 		const char *end = (const char*)memchr(begin, '\n', uc->data_size - offset);
 		if (!end) {
 			if (uc->eof) {
@@ -12719,6 +12721,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 			&vertices[UFBXI_OBJ_ATTRIB_NORMAL], UFBXI_OBJ_ATTRIB_NORMAL, non_disjoint[UFBXI_OBJ_ATTRIB_NORMAL]));
 
 		if (uc->obj.has_vertex_color) {
+			ufbx_assert(color_valid);
 			bool has_color = false;
 			size_t max_index = fbx_mesh->vertex_position.values.count;
 			ufbxi_for_list(uint32_t, p_ix, fbx_mesh->vertex_position.indices) {
@@ -12937,7 +12940,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_mtl_map(ufbxi_context 
 	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &tex_str, false));
 	ufbxi_check(ufbxi_push_string_place_blob(&uc->string_pool, &tex_raw, true));
 
-	uint64_t fbx_id;
+	uint64_t fbx_id = 0;
 	ufbx_texture *texture = ufbxi_push_synthetic_element(uc, &fbx_id, NULL, "", ufbx_texture, UFBX_ELEMENT_TEXTURE);
 	ufbxi_check(texture);
 
@@ -13017,7 +13020,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 		uc->opts.obj_mtl_path.length = strlen(uc->opts.obj_mtl_path.data);
 	}
 
-	ufbx_stream stream;
+	ufbx_stream stream = { 0 };
 	bool has_stream = false;
 
 	if (uc->opts.open_file_cb.fn) {
