@@ -12018,7 +12018,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, uf
 
 #if UFBXI_FEATURE_FORMAT_OBJ
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_props(ufbxi_context *uc, ufbx_prop_list *dst, size_t count)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_props(ufbxi_context *uc, ufbx_prop_list *dst, size_t count)
 {
 	ufbx_prop_list props;
 	props.count = count;
@@ -12048,7 +12048,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_props(ufbxi_context *uc,
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_push_mesh(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_push_mesh(ufbxi_context *uc)
 {
 	ufbxi_obj_mesh *mesh = ufbxi_push_zero(&uc->obj.tmp_meshes, ufbxi_obj_mesh, 1);
 	ufbxi_check(mesh);
@@ -12084,7 +12084,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_push_mesh(ufbxi_context *uc)
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_flush_mesh(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_flush_mesh(ufbxi_context *uc)
 {
 	if (!uc->obj.mesh) return 1;
 
@@ -12094,7 +12094,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_flush_mesh(ufbxi_context *uc
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_init(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_init(ufbxi_context *uc)
 {
 	uc->obj.initialized = true;
 
@@ -12143,7 +12143,7 @@ static ufbxi_noinline void ufbxi_obj_free(ufbxi_context *uc)
 	ufbxi_free(&uc->ator_tmp, ufbx_material*, uc->obj.tmp_materials, uc->obj.tmp_materials_cap);
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_read_line(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_read_line(ufbxi_context *uc)
 {
 	if (uc->obj.eof) {
 		uc->obj.line.data = "\n";
@@ -12221,7 +12221,7 @@ static ufbxi_noinline ufbx_string ufbxi_obj_span_token(ufbxi_context *uc, size_t
 	return result;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_tokenize(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_tokenize(ufbxi_context *uc)
 {
 	const char *ptr = uc->obj.line.data, *end = ptr + uc->obj.line.length;
 	uc->obj.num_tokens = 0;
@@ -12281,7 +12281,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_tokenize(ufbxi_context *uc)
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_tokenize_line(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_tokenize_line(ufbxi_context *uc)
 {
 	ufbxi_check(ufbxi_obj_read_line(uc));
 	ufbxi_check(ufbxi_obj_tokenize(uc));
@@ -12324,7 +12324,7 @@ static ufbxi_noinline int ufbxi_obj_parse_vertex(ufbxi_context *uc, ufbxi_obj_at
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_index(ufbxi_context *uc, ufbx_string *s, uint32_t attrib)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_index(ufbxi_context *uc, ufbx_string *s, uint32_t attrib)
 {
 	const char *ptr = s->data, *end = ptr + s->length;
 
@@ -12374,7 +12374,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_index(ufbxi_context *u
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context *uc)
 {
 	if (uc->obj.object_dirty) {
 		if (!uc->opts.obj_merge_objects) {
@@ -12491,7 +12491,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context *uc)
 {
 	ufbxi_check(uc->obj.num_tokens >= 2);
 	ufbx_string name = ufbxi_obj_span_token(uc, 1, SIZE_MAX);
@@ -12557,7 +12557,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context
 #define ufbxi_obj_cmd2(a,b) ((uint32_t)(a)<<24u | (uint32_t)(b)<<16)
 #define ufbxi_obj_cmd3(a,b,c) ((uint32_t)(a)<<24u | (uint32_t)(b)<<16 | (uint32_t)(c)<<8u)
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_vertices(ufbxi_context *uc, ufbx_real_list *dst, uint32_t attrib, uint64_t min_index)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_vertices(ufbxi_context *uc, ufbx_real_list *dst, uint32_t attrib, uint64_t min_index)
 {
 	ufbxi_check(min_index < uc->obj.tmp_vertices[attrib].num_items);
 
@@ -12579,7 +12579,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_vertices(ufbxi_context *
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_setup_attrib(ufbxi_context *uc, ufbxi_obj_mesh *mesh, uint64_t *tmp_indices,
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_setup_attrib(ufbxi_context *uc, ufbxi_obj_mesh *mesh, uint64_t *tmp_indices,
 	ufbx_vertex_attrib *dst, const ufbx_real_list *p_data, uint32_t attrib, bool non_disjoint)
 {
 	ufbx_real_list data = *p_data;
@@ -12623,7 +12623,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_setup_attrib(ufbxi_context *
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc)
 {
 	size_t num_meshes = uc->obj.tmp_meshes.num_items;
 	ufbxi_obj_mesh *meshes = ufbxi_push_pop(&uc->tmp, &uc->obj.tmp_meshes, ufbxi_obj_mesh, num_meshes);
@@ -12750,7 +12750,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc)
 {
 	uc->scene.metadata.ascii = true;
 
@@ -12834,7 +12834,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_flush_material(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_flush_material(ufbxi_context *uc)
 {
 	if (uc->obj.usemtl_fbx_id == 0) return 1;
 
@@ -12848,7 +12848,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_flush_material(ufbxi_context
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc, ufbx_string name, size_t start, bool include_rest, size_t *p_next)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc, ufbx_string name, size_t start, bool include_rest, size_t *p_next)
 {
 	if (start >= uc->obj.num_tokens) {
 		if (p_next) {
@@ -12912,7 +12912,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl_map(ufbxi_context *uc, size_t prefix_len)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_mtl_map(ufbxi_context *uc, size_t prefix_len)
 {
 	if (uc->obj.num_tokens < 2) return 1;
 
@@ -12963,7 +12963,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl_map(ufbxi_context 
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_mtl(ufbxi_context *uc)
 {
 	uc->obj.mesh = NULL;
 	uc->obj.usemtl_fbx_id = 0;
@@ -12992,7 +12992,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_mtl(ufbxi_context *uc)
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 {
 	// HACK: Reset everything and switch to loading the .mtl file globally
 	uc->read_fn = NULL;
@@ -13045,7 +13045,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 	return 1;
 }
 
-static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_load(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load(ufbxi_context *uc)
 {
 	ufbxi_check(ufbxi_obj_init(uc));
 	ufbxi_check(ufbxi_obj_parse_file(uc));
@@ -13063,7 +13063,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_load(ufbxi_context *uc)
 }
 
 #else
-static ufbxi_nodiscard ufbxi_forceinline int ufbxi_obj_load(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_forceinline int ufbxi_obj_load(ufbxi_context *uc)
 {
 	ufbxi_fail_msg("UFBXI_FEATURE_FORMAT_OBJ", "Feature disabled");
 	return 0;
