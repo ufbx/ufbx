@@ -2817,6 +2817,9 @@ typedef enum ufbx_file_format {
 	UFBX_FILE_FORMAT_UNKNOWN,
 	UFBX_FILE_FORMAT_FBX,
 	UFBX_FILE_FORMAT_OBJ,
+
+	UFBX_FILE_FORMAT_COUNT,
+	UFBX_FILE_FORMAT_FORCE_32BIT = 0x7fffffff,
 } ufbx_file_format;
 
 // Miscellaneous data related to the loaded file
@@ -3239,8 +3242,10 @@ typedef enum ufbx_error_type {
 	// User cancelled the loading via `ufbx_load_opts.progress_cb` returning `UFBX_PROGRESS_CANCEL`.
 	UFBX_ERROR_CANCELLED,
 
-	// File is not an FBX file.
-	UFBX_ERROR_NOT_FBX,
+	// Could not detect file format from file data or filename.
+	// HINT: You can supply it manually using `ufbx_load_opts.file_format` or use `ufbx_load_opts.filename`
+	// when using `ufbx_load_memory()` to let ufbx guess the format from the extension.
+	UFBX_ERROR_UNRECOGNIZED_FILE_FORMAT,
 
 	// Options struct (eg. `ufbx_load_opts`) is not cleared to zero.
 	// Make sure you initialize the structure to zero via eg.
@@ -3494,14 +3499,38 @@ typedef struct ufbx_load_opts {
 	// Retain the raw document structure using `ufbx_dom_node`.
 	bool retain_dom;
 
+	// Force a specific file format instead of detecting it.
+	ufbx_file_format file_format;
+
+	// How far to read into the file to determine the file format.
+	// Default: 16kB
+	size_t file_format_lookahead;
+
+	// Do not attempt to detect file format from file content.
+	bool no_format_from_content;
+
+	// Do not attempt to detect file format from filename extension.
+	// ufbx primarily detects file format from the file header,
+	// this is just used as a fallback.
+	bool no_format_from_extension;
+
 	// (.obj) Don't split geometry into meshes by object.
 	bool obj_merge_objects;
 
 	// (.obj) Don't split geometry into meshes by groups.
 	bool obj_merge_groups;
 
-	// (.obj) Force splitting groups even on object boundaries
+	// (.obj) Force splitting groups even on object boundaries.
 	bool obj_split_groups;
+
+	// (.obj) Path to the .mtl file.
+	// Use `length = SIZE_MAX` for NULL-terminated strings.
+	// NOTE: This is used _instead_ of the one in the file even if not found
+	// and sidesteps `load_external_files` as it's _explicitly_ requested.
+	ufbx_string obj_mtl_path;
+
+	// (.obj) Data for the .mtl file.
+	ufbx_blob obj_mtl_data;
 
 	uint32_t _end_zero; 
 } ufbx_load_opts;
