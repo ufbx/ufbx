@@ -9417,6 +9417,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	mesh->vertex_position.values.count = mesh->num_vertices;
 	mesh->vertex_position.indices.data = index_data;
 	mesh->vertex_position.indices.count = mesh->num_indices;
+	mesh->vertex_position.unique_per_vertex = true;
 
 	// Check/make sure that the last index is negated (last of polygon)
 	if (mesh->num_indices > 0) {
@@ -11521,6 +11522,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 	mesh->vertex_position.values.count = mesh->num_vertices;
 	mesh->vertex_position.indices.data = index_data;
 	mesh->vertex_position.indices.count = mesh->num_indices;
+	mesh->vertex_position.unique_per_vertex = true;
 
 	// Check/make sure that the last index is negated (last of polygon)
 	if (mesh->num_indices > 0) {

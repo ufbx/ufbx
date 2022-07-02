@@ -363,7 +363,9 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_assert(mesh->vertex_color.value_reals == 4);
 	ufbxt_assert(mesh->vertex_crease.value_reals == 1);
 
-	ufbxt_assert(mesh->vertex_position.unique_per_vertex);
+	if (mesh->vertex_position.exists) {
+		ufbxt_assert(mesh->vertex_position.unique_per_vertex);
+	}
 
 	ufbxt_check_mesh_list(scene, mesh, mesh->edges, mesh->num_edges, false);
 	ufbxt_check_mesh_list(scene, mesh, mesh->edge_crease, mesh->num_edges, true);

@@ -1511,8 +1511,21 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	ufbxt_obj_file *obj_file = obj_data ? ufbxt_load_obj(obj_data, obj_size, NULL) : NULL;
 	free(obj_data);
 
+	ufbx_scene *obj_scene = NULL;
 	if (obj_file) {
 		ufbxt_logf("%s [diff target found]", buf);
+
+		ufbx_load_opts obj_opts = { 0 };
+		obj_opts.load_external_files = true;
+		ufbx_error obj_error;
+		obj_scene = ufbx_load_file(buf, &obj_opts, &obj_error);
+		if (!obj_scene) {
+			ufbxt_log_error(&obj_error);
+			ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse .obj file");
+		}
+		ufbxt_assert(obj_scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ);
+
+		// TODO: Diff to the other .obj
 	}
 
 	char base_name[512];
@@ -1816,6 +1829,10 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 	if (num_opened == 0) {
 		ufbxt_assert_fail(__FILE__, __LINE__, "File not found");
+	}
+
+	if (obj_scene) {
+		ufbx_free_scene(obj_scene);
 	}
 
 	free(obj_file);
