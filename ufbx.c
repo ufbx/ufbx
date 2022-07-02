@@ -7439,7 +7439,7 @@ static ufbxi_noinline bool ufbxi_next_line(ufbx_string *line, ufbx_string *buf, 
 {
 	if (buf->length == 0) return false;
 	const char *newline = (const char*)memchr(buf->data, '\n', buf->length);
-	size_t length = newline ? newline + 1 - buf->data : buf->length;
+	size_t length = newline ? ufbxi_to_size(newline - buf->data) + 1 : buf->length;
 
 	line->data = buf->data;
 	line->length = length;
@@ -8330,7 +8330,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_property(ufbxi_context *uc,
 	for (real_ix = 0; real_ix < 4; real_ix++) {
 		if (!ufbxi_get_val_at(node, val_ix + real_ix, 'R', &prop->value_real_arr[real_ix])) break;
 	}
-	if (real_ix >= 0) {
+	if (real_ix > 0) {
 		flags |= (uint32_t)UFBX_PROP_FLAG_VALUE_REAL << (real_ix - 1);
 	}
 
@@ -8374,7 +8374,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_properties(ufbxi_context *u
 	return 1;
 }
 
-ufbxi_noinline static void ufbxi_deduplicate_properties(ufbxi_context *uc, ufbx_prop_list *list)
+ufbxi_noinline static void ufbxi_deduplicate_properties(ufbx_prop_list *list)
 {
 	if (list->count >= 2) {
 		ufbx_prop *ps = list->data;
@@ -8418,7 +8418,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_properties(ufbxi_context *u
 	}
 
 	ufbxi_check(ufbxi_sort_properties(uc, props->props.data, props->props.count));
-	ufbxi_deduplicate_properties(uc, &props->props);
+	ufbxi_deduplicate_properties(&props->props);
 
 	return 1;
 }
@@ -12042,7 +12042,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_pop_props(ufbxi_context *uc,
 
 	if (props.count > 1) {
 		ufbxi_check(ufbxi_sort_properties(uc, props.data, props.count));
-		ufbxi_deduplicate_properties(uc, &props);
+		ufbxi_deduplicate_properties(&props);
 	}
 
 	*dst = props;
@@ -12169,7 +12169,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_read_line(ufbxi_context *uc)
 			}
 		}
 
-		offset += end - begin + 1;
+		offset += ufbxi_to_size(end - begin) + 1;
 
 		// Handle line continuations
 		const char *esc = end;
@@ -12214,7 +12214,7 @@ static ufbxi_noinline ufbx_string ufbxi_obj_span_token(ufbxi_context *uc, size_t
 	ufbx_assert(start_token <= end_token);
 	ufbx_string start = uc->obj.tokens[start_token];
 	ufbx_string end = uc->obj.tokens[end_token];
-	size_t num_between = end.data - start.data;
+	size_t num_between = ufbxi_to_size(end.data - start.data);
 
 	ufbx_string result;
 	result.data = start.data;
@@ -12276,7 +12276,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_tokenize(ufbxi_context *uc)
 			}
 		}
 
-		tok->length = ptr - tok->data;
+		tok->length = ufbxi_to_size(ptr - tok->data);
 	}
 
 	return 1;
@@ -12370,7 +12370,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_index(ufbxi_context *u
 	}
 
 	s->data = ptr;
-	s->length = end - ptr;
+	s->length = ufbxi_to_size(end - ptr);
 
 	return 1;
 }
@@ -12385,7 +12385,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 	}
 
 	if (uc->obj.group_dirty) {
-		if ((uc->obj.object.length == 0 || uc->opts.obj_merge_objects) && !uc->opts.obj_merge_groups || uc->opts.obj_split_groups) {
+		if (((uc->obj.object.length == 0 || uc->opts.obj_merge_objects) && !uc->opts.obj_merge_groups) || uc->opts.obj_split_groups) {
 			uc->obj.mesh = NULL;
 		}
 		uc->obj.group_dirty = false;
@@ -12430,7 +12430,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 
 				char name_buf[128];
 				int name_len = snprintf(name_buf, sizeof(name_buf), "obj|face_group|%u", id);
-				ufbx_assert(name_len >= 0 && name_len < sizeof(name_buf));
+				ufbx_assert(name_len >= 0 && (size_t)name_len < sizeof(name_buf));
 
 				prop->name.data = name_buf;
 				prop->name.length = (size_t)name_len;
@@ -15881,10 +15881,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				mesh->face_material.data = uc->zero_indices;
 				mesh->face_material.count = mesh->num_faces;
 			} else if (mesh->materials.count > 0 && mesh->face_material.count) {
-				size_t num_materials = mesh->materials.count;
-
 				ufbxi_check(ufbxi_finalize_mesh_material(&uc->result, &uc->error, mesh));
-
 			} else {
 				mesh->face_material.data = NULL;
 				mesh->face_material.count = 0;
