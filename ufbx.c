@@ -13038,6 +13038,14 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_load(ufbxi_context *uc)
 	ufbxi_check(ufbxi_obj_parse_file(uc));
 	ufbxi_check(ufbxi_init_file_paths(uc));
 	ufbxi_check(ufbxi_obj_load_mtl(uc));
+
+	if (uc->opts.retain_dom) {
+		ufbx_dom_node *dom_root = ufbxi_push_zero(&uc->result, ufbx_dom_node, 1);
+		ufbxi_check(dom_root);
+		dom_root->name.data = ufbxi_empty_char;
+		uc->scene.dom_root = dom_root;
+	}
+
 	return 1;
 }
 
