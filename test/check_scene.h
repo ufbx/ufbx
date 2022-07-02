@@ -334,12 +334,17 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_assert(mesh->vertex_indices.count == mesh->num_indices);
 	ufbxt_assert(mesh->vertex_first_index.count == mesh->num_vertices);
 
+	for (size_t ii = 0; ii < mesh->num_indices; ii++) {
+		uint32_t vi = mesh->vertex_indices.data[ii];
+		ufbxt_assert(mesh->vertex_first_index.data[vi] <= ii);
+	}
+
 	for (size_t vi = 0; vi < mesh->num_vertices; vi++) {
-		int32_t ii = mesh->vertex_first_index.data[vi];
+		int32_t ii = (int32_t)mesh->vertex_first_index.data[vi];
 		if (ii >= 0) {
 			ufbxt_assert(mesh->vertex_indices.data[ii] == vi);
 		} else {
-			ufbxt_assert(ii == -1);
+			ufbxt_assert((uint32_t)ii == UFBX_NO_INDEX);
 		}
 	}
 

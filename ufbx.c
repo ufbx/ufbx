@@ -4128,6 +4128,7 @@ typedef struct {
 	// Call progress function periodically
 	ptrdiff_t progress_timer;
 	uint64_t progress_bytes_total;
+	uint64_t latest_progress_bytes;
 	size_t progress_interval;
 
 	// Extra data on the side of elements
@@ -4180,8 +4181,12 @@ static ufbxi_forceinline uint64_t ufbxi_get_read_offset(ufbxi_context *uc)
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_report_progress(ufbxi_context *uc)
 {
 	if (!uc->opts.progress_cb.fn) return 1;
+
+	uint64_t read_offset = ufbxi_get_read_offset(uc);
+	uc->latest_progress_bytes = read_offset;
+
 	ufbx_progress progress;
-	progress.bytes_read = ufbxi_get_read_offset(uc);
+	progress.bytes_read = read_offset;
 	progress.bytes_total = uc->progress_bytes_total;
 	if (progress.bytes_total < progress.bytes_read) {
 		progress.bytes_total = progress.bytes_read;
@@ -4264,6 +4269,24 @@ static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size, b
 	return uc->read_buffer;
 }
 
+static ufbxi_forceinline void ufbxi_pause_progress(ufbxi_context *uc)
+{
+	uc->data_size += uc->yield_size;
+	uc->yield_size = 0;
+}
+
+static ufbxi_noinline int ufbxi_resume_progress(ufbxi_context *uc)
+{
+	uc->yield_size = ufbxi_min_sz(uc->data_size, uc->progress_interval);
+	uc->data_size -= uc->yield_size;
+
+	if (ufbxi_get_read_offset(uc) - uc->latest_progress_bytes >= uc->progress_interval) {
+		ufbxi_check(ufbxi_report_progress(uc));
+	}
+
+	return 1;
+}
+
 static ufbxi_noinline const char *ufbxi_yield(ufbxi_context *uc, size_t size)
 {
 	const char *ret;
@@ -4317,8 +4340,7 @@ static ufbxi_forceinline void ufbxi_consume_bytes(ufbxi_context *uc, size_t size
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_skip_bytes(ufbxi_context *uc, uint64_t size)
 {
 	if (uc->skip_fn) {
-		uc->data_size += uc->yield_size;
-		uc->yield_size = 0;
+		ufbxi_pause_progress(uc);
 
 		if (size > uc->data_size) {
 			size -= uc->data_size;
@@ -4348,8 +4370,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_skip_bytes(ufbxi_context *uc, ui
 			uc->data_size -= (size_t)size;
 		}
 
-		uc->yield_size = ufbxi_min_sz(uc->data_size, uc->progress_interval);
-		uc->data_size -= uc->yield_size;
+		ufbxi_check(ufbxi_resume_progress(uc));
 	} else {
 		// Read and discard bytes in reasonable chunks
 		uint64_t skip_size = ufbxi_max64(uc->read_buffer_size, uc->opts.read_buffer_size);
@@ -4367,8 +4388,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_to(ufbxi_context *uc, void 
 {
 	char *ptr = (char*)dst;
 
-	uc->data_size += uc->yield_size;
-	uc->yield_size = 0;
+	ufbxi_pause_progress(uc);
 
 	// Copy data from the current buffer first
 	size_t len = ufbxi_min_sz(uc->data_size, size);
@@ -4379,7 +4399,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_to(ufbxi_context *uc, void 
 	size -= len;
 
 	// If there's data left to copy try to read from user IO
-	// TODO: Progress reporting here...
 	if (size > 0) {
 		uc->data_offset += ufbxi_to_size(uc->data - uc->data_begin);
 
@@ -4393,8 +4412,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_to(ufbxi_context *uc, void 
 		uc->data_offset += size;
 	}
 
-	uc->yield_size = ufbxi_min_sz(uc->data_size, uc->progress_interval);
-	uc->data_size -= uc->yield_size;
+	ufbxi_check(ufbxi_resume_progress(uc));
 
 	return 1;
 }
@@ -6309,8 +6327,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 			} else if (encoding == 1) {
 				// Encoding 1: DEFLATE
 
-				uc->data_size += uc->yield_size;
-				uc->yield_size = 0;
+				ufbxi_pause_progress(uc);
 
 				// Inflate the data from the user-provided IO buffer / read callbacks
 				ufbx_inflate_input input;
@@ -6356,8 +6373,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 					input.read_user = 0;
 					uc->data += encoded_size;
 					uc->data_size -= encoded_size;
-					uc->yield_size = ufbxi_min_sz(uc->data_size, uc->progress_interval);
-					uc->data_size -= uc->yield_size;
+					ufbxi_check(ufbxi_resume_progress(uc));
 				}
 
 				ptrdiff_t res = ufbx_inflate(decoded_data, decoded_data_size, &input, uc->inflate_retain);
@@ -7684,8 +7700,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_determine_format(ufbxi_context *
 	ufbx_file_format format = uc->opts.file_format;
 
 	if (format == UFBX_FILE_FORMAT_UNKNOWN && !uc->opts.no_format_from_content) {
-		uc->data_size += uc->yield_size;
-		uc->yield_size = 0;
+		ufbxi_pause_progress(uc);
 
 		size_t lookahead = UFBXI_MIN_FILE_FORMAT_LOOKAHEAD;
 		while (format == UFBX_FILE_FORMAT_UNKNOWN && lookahead <= uc->opts.file_format_lookahead) {
@@ -7711,8 +7726,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_determine_format(ufbxi_context *
 			}
 		}
 
-		uc->yield_size = ufbxi_min_sz(uc->data_size, uc->progress_interval);
-		uc->data_size -= uc->yield_size;
+		ufbxi_check(ufbxi_resume_progress(uc));
 	}
 
 	if (format == UFBX_FILE_FORMAT_UNKNOWN && !uc->opts.no_format_from_extension) {
@@ -11924,8 +11938,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, ufbx_error *error, ufbx_mesh *mesh)
 {
-	ufbxi_patch_mesh_reals(mesh);
-
 	if (mesh->vertices.count == 0) {
 		mesh->vertices = mesh->vertex_position.values;
 	}
@@ -11997,6 +12009,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, uf
 		mesh->color_sets.data = color_set;
 		mesh->color_sets.count = 1;
 	}
+
+	ufbxi_patch_mesh_reals(mesh);
 
 	return 1;
 }
@@ -15399,10 +15413,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_validate_indices(ufbxi_context *
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh_material(ufbxi_buf *buf, ufbx_error *error, ufbx_mesh *mesh)
 {
+	if (!mesh->face_material.count) return 1;
+
 	size_t num_materials = mesh->materials.count;
+	size_t num_faces = mesh->faces.count;
 
 	// Count the number of faces and triangles per material
-	for (size_t i = 0; i < mesh->num_faces; i++) {
+	ufbxi_nounroll for (size_t i = 0; i < num_faces; i++) {
 		ufbx_face face = mesh->faces.data[i];
 		uint32_t mat_ix = mesh->face_material.data[i];
 		if (mat_ix >= num_materials) {
@@ -15425,7 +15442,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh_material(ufbxi_buf
 	}
 
 	// Fetch the per-material face indices
-	for (size_t i = 0; i < mesh->num_faces; i++) {
+	ufbxi_nounroll for (size_t i = 0; i < num_faces; i++) {
 		uint32_t mat_ix = mesh->face_material.data ? mesh->face_material.data[i] : 0;
 		if (mat_ix < num_materials) {
 			ufbx_mesh_material *mat = &mesh->materials.data[mat_ix];
@@ -21899,6 +21916,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 		}
 		index_offset += face.num_indices;
 	}
+
+	// Will be filled in by `ufbxi_finalize_mesh()`.
+	result->vertex_first_index.count = 0;
 
 	ufbxi_check_err(&sc->error, ufbxi_finalize_mesh_material(&sc->result, &sc->error, result));
 	ufbxi_check_err(&sc->error, ufbxi_finalize_mesh(&sc->result, &sc->error, result));

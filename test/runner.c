@@ -1575,6 +1575,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				load_opts.filename.length = SIZE_MAX;
 			}
 
+			load_opts.file_format = UFBX_FILE_FORMAT_FBX;
+
 			ufbxt_progress_ctx progress_ctx = { 0 };
 
 			ufbx_load_opts memory_opts = load_opts;
@@ -1617,6 +1619,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbx_scene *streamed_scene = ufbx_load_file(buf, &stream_opts, &error);
 			if (streamed_scene) {
 				ufbxt_check_scene(streamed_scene);
+				ufbxt_assert(streamed_scene->dom_root);
 			} else if (!allow_error) {
 				ufbxt_log_error(&error);
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse streamed file");
