@@ -11918,7 +11918,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_
 		}
 		*ptr++ = c;
 	}
-	*ptr = '\0';
 
 	// Intern the string and pop the temporary buffer
 	ufbx_string dst = { result, ufbxi_to_size(ptr - result) };
