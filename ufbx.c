@@ -7438,7 +7438,7 @@ static ufbxi_forceinline bool ufbxi_is_space(char c)
 static ufbxi_noinline bool ufbxi_next_line(ufbx_string *line, ufbx_string *buf, bool skip_space)
 {
 	if (buf->length == 0) return false;
-	const char *newline = memchr(buf->data, '\n', buf->length);
+	const char *newline = (const char*)memchr(buf->data, '\n', buf->length);
 	size_t length = newline ? newline + 1 - buf->data : buf->length;
 
 	line->data = buf->data;
@@ -12156,7 +12156,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_read_line(ufbxi_context *uc)
 
 	for (;;) {
 		const char *begin = uc->data + offset;
-		const char *end = memchr(begin, '\n', uc->data_size - offset);
+		const char *end = (const char*)memchr(begin, '\n', uc->data_size - offset);
 		if (!end) {
 			if (uc->eof) {
 				offset = uc->data_size;
@@ -13006,7 +13006,7 @@ static ufbxi_nodiscard ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 	uc->obj.eof = false;
 
 	if (uc->opts.obj_mtl_data.size > 0) {
-		uc->data_begin = uc->data = uc->opts.obj_mtl_data.data;
+		uc->data_begin = uc->data = (const char*)uc->opts.obj_mtl_data.data;
 		uc->data_size = uc->opts.obj_mtl_data.size;
 		ufbxi_check(ufbxi_obj_parse_mtl(uc));
 		return 1;
