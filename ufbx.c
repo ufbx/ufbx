@@ -14145,6 +14145,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				// Allocate per-material buffers (clear `num_faces` to 0 to re-use it as
 				// an index when fetching the face indices).
 				ufbxi_for_list(ufbx_mesh_material, mat, mesh->materials) {
+					mat->face_indices.count = mat->num_faces;
 					mat->face_indices.data = ufbxi_push(&uc->result, uint32_t, mat->num_faces);
 					ufbxi_check(mat->face_indices.data);
 					mat->num_faces = 0;
@@ -18126,6 +18127,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, uf
 
 	// See `ufbxi_finalize_scene()`
 	ufbxi_for_list(ufbx_mesh_material, mat, mesh->materials) {
+		mat->face_indices.count = mat->num_faces;
 		mat->face_indices.data = ufbxi_push(buf, uint32_t, mat->num_faces);
 		ufbxi_check_err(error, mat->face_indices.data);
 		mat->num_faces = 0;
