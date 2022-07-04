@@ -441,6 +441,7 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbx_mesh_material *mat = &mesh->materials.data[i];
 		ufbxt_check_element_ptr(scene, mat->material, UFBX_ELEMENT_MATERIAL);
 
+		ufbxt_assert(mat->face_indices.count == mat->num_faces);
 		for (size_t j = 0; j < mat->num_faces; j++) {
 			ufbxt_assert(mesh->face_material.data[mat->face_indices.data[j]] == (int32_t)i);
 		}
