@@ -280,6 +280,8 @@ jobs:
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_schar_x64_release.txt --max-dump-errors 3
           clang -funsigned-char test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_uchar_x64_release.txt --max-dump-errors 3
+          clang -DUFBX_STANDARD_C -DUFBX_DEV -DUFBX_REGRESSION test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+          build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_stdc_x64_release.txt --max-dump-errors 3
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_hasher.txt.gz
