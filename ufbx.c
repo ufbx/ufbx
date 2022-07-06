@@ -185,6 +185,12 @@
 
 // -- Platform
 
+#if defined(_MSC_VER)
+	#define UFBXI_MSC_VER _MSC_VER
+#else
+	#define UFBXI_MSC_VER 0
+#endif
+
 #if !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
 	#define ufbxi_noinline __declspec(noinline)
 	#define ufbxi_forceinline __forceinline
@@ -440,6 +446,12 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 
 #define UFBXI_THREAD_SAFE 1
 
+#if defined(__cplusplus)
+	#define ufbxi_extern_c extern "C"
+#else
+	#define ufbxi_extern_c
+#endif
+
 #if !defined(UFBX_STANDARD_C) && (defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER))
     typedef size_t ufbxi_atomic_counter;
     #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
@@ -448,26 +460,16 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
     #define ufbxi_atomic_counter_dec(ptr) __sync_fetch_and_sub((ptr), 1)
 #elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
     #if defined(_M_X64)  || defined(_M_ARM64)
-		#if defined(__cplusplus)
-			extern "C" __int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
-			extern "C" __int64 _InterlockedDecrement64(__int64 volatile * lpAddend);
-		#else
-			__int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
-			__int64 _InterlockedDecrement64(__int64 volatile * lpAddend);
-		#endif
+		ufbxi_extern_c __int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
+		ufbxi_extern_c __int64 _InterlockedDecrement64(__int64 volatile * lpAddend);
         typedef volatile __int64 ufbxi_atomic_counter;
         #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
         #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
         #define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement64(ptr) - 1)
         #define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement64(ptr) + 1)
     #else
-		#if defined(__cplusplus)
-			extern "C" long _InterlockedIncrement(long volatile * lpAddend);
-			extern "C" long _InterlockedDecrement(long volatile * lpAddend);
-		#else
-			long _InterlockedIncrement(long volatile * lpAddend);
-			long _InterlockedDecrement(long volatile * lpAddend);
-		#endif
+		ufbxi_extern_c long _InterlockedIncrement(long volatile * lpAddend);
+		ufbxi_extern_c long _InterlockedDecrement(long volatile * lpAddend);
         typedef volatile long ufbxi_atomic_counter;
         #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
         #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
@@ -516,6 +518,44 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
     #define ufbxi_atomic_counter_dec(ptr) ((*(ptr))--)
     #undef UFBXI_THREAD_SAFE
     #define UFBXI_THREAD_SAFE 0
+#endif
+
+// -- Bit manipulation
+
+#if !defined(UFBX_STANDARD_C) && defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+	ufbxi_extern_c unsigned char _BitScanReverse(unsigned long * _Index, unsigned long _Mask);
+	ufbxi_extern_c unsigned char _BitScanReverse64(unsigned long * _Index, unsigned __int64 _Mask);
+	static ufbxi_forceinline ufbxi_unused uint32_t ufbxi_lzcnt64(uint64_t v) {
+		unsigned long index;
+		#if defined(_M_X64)
+			_BitScanReverse64(&index, (unsigned __int64)v);
+		#else
+			uint32_t hi = (uint32_t)(v >> 32u);
+			uint32_t hi_nonzero = hi != 0 ? 1 : 0;
+			uint32_t part = hi_nonzero ? hi : (uint32_t)v;
+			_BitScanReverse(&index, (unsigned long)part);
+			index += hi_nonzero * 32u;
+		#endif
+		return 63 - (uint32_t)index;
+	}
+#elif !defined(UFBX_STANDARD_C) && (defined(__GNUC__) || defined(__clang__))
+	#define ufbxi_lzcnt64(v) ((uint32_t)__builtin_clzll((unsigned long long)(v)))
+#else
+	// DeBrujin table lookup
+	static const uint8_t ufbxi_lzcnt_table[] = {
+		63, 16, 62, 7, 15, 36, 61, 3, 6, 14, 22, 26, 35, 47, 60, 2, 9, 5, 28, 11, 13, 21, 42,
+		19, 25, 31, 34, 40, 46, 52, 59, 1, 17, 8, 37, 4, 23, 27, 48, 10, 29, 12, 43, 20, 32, 41,
+		53, 18, 38, 24, 49, 30, 44, 33, 54, 39, 50, 45, 55, 51, 56, 57, 58, 0,
+	};
+	static ufbxi_noinline ufbxi_unused uint32_t ufbxi_lzcnt64(uint64_t v) {
+		v |= v >> 1; 
+		v |= v >> 2;
+		v |= v >> 4;
+		v |= v >> 8;
+		v |= v >> 16;
+		v |= v >> 32;
+		return ufbxi_lzcnt_table[(v * UINT64_C(0x03f79d71b4cb0a89)) >> 58];
+	}
 #endif
 
 // -- Version
@@ -763,6 +803,231 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 	}
 	/* Copy the result to `data` if we ended up in `tmp` */
 	if (dst != data) memcpy((void*)data, dst, size * stride);
+}
+
+// -- Float parsing
+
+#if !defined(UFBX_STANDARD_C) && UFBXI_MSC_VER >= 1920 && defined(_M_X64) && !defined(__clang__)
+	ufbxi_extern_c extern unsigned __int64 __cdecl _udiv128(unsigned __int64  highdividend,
+		unsigned __int64 lowdividend, unsigned __int64 divisor, unsigned __int64* remainder);
+	#define ufbxi_div128(a_hi, a_lo, b, p_rem) (_udiv128((a_hi), (a_lo), (b), (p_rem)))
+#elif !defined(UFBX_STANDARD_C) && (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(_M_X64))
+	static ufbxi_forceinline uint64_t ufbxi_div128(uint64_t a_hi, uint64_t a_lo, uint64_t b, uint64_t *p_rem) {
+		uint64_t quot, rem;
+		__asm__("divq %[v]" : "=a"(quot), "=d"(rem) : [v] "r"(b), "a"(a_lo), "d"(a_hi));
+		*p_rem = rem;
+		return quot;
+	}
+#else
+	static ufbxi_forceinline uint64_t ufbxi_div128(uint64_t a_hi, uint64_t a_lo, uint64_t b, uint64_t *p_rem) {
+		// Divide `(a_hi << 64 | a_lo)` by `b`, returns quotinent and stores reminder in `p_rem`.
+		// Based on TAOCP 2.4 multi-word division single algorithm digit step.
+		//
+		// Notation:
+		//   b is the base (2^32) in this case
+		//   aN is the Nth digit (base b) of a from the LSB
+		//   { x y z } is a multi-digit number b^2*x + b*y + z
+		//   ie. for a 64-bit number a = { a1 a0 } = b*a1 + a0
+		//
+		// We do the division in two steps by dividing three digits in each iteration:
+		//
+		//   q1, r = { a3 a2 a1 } / { b1 b0 }
+		//   q0, r = { r1 r0 a0 } / { b1 b0 }
+		//
+		// In each step we want to compute the expression:
+		//
+		//   q, r = { u2 u1 u0 } / { v1 v0 }
+		//
+		// However we cannot rely on being able to do `u96 / u64` division we estimate
+		// the result by considering only the leading digits:
+		//
+		//   q^ = { u2 u1 } / v1                                       [A]
+		//   r^ = { u2 u1 } % v1 = { u2 u1 } - v1 * q^                 [B]
+		//
+		// As long as `v1 >= b/2` the estimate `q^` is at most two larger than the actual `q`
+		// (proof in TAOCP 2.4) so we can compute the correction amount `c`:
+		//
+		//   q <= q^ <= q + 2
+		//   q = q^ - c
+		//
+		// We can compute the final remainder (that must be non-negative) as follows:
+		//
+		//   r = { u2 u1 u0 } - v*q
+		//   r = { u2 u1 u0 } - v*(q^ - c)
+		//   r = { u2 u1 u0 } - v*q^ + v*c
+		//   r = { u2 u1 u0 } - { v1 v0 } * q^ + v*c
+		//   r = b^2*u2 + b*u1 + u0 - b*v1*q^ - v0*q^ + v*c
+		//   r = b*(b*u2 + u1 - v1*q^) + u0 - v0*q^ + v*c
+		//   r = b*({ u2 u1 } - v1*q^) + u0 - v0*q^ + v*c
+		//   r = b*r^ + u0 - v0*q^ + v*c
+		//   r = { r^ u0 } - v0*q^ + v*c                               [C]
+		//
+		// As we know `0 <= c <= 2` we can first check if `r < 0` requiring `c >= 1`:
+		//
+		//   { r^ u0 } - v0*q^ < 0
+		//   { r^ u0 } < v0*q^                                         [D]
+		//
+		// If we know that `r < 0` we can check if `r < -{ v1 v0 }` requiring `c = 2`:
+		//
+		//   { r^ u0 } - v0*q^ < -{ v1 v0 }
+		//   v0*q^ - { r^ u0 } > { v1 v0 }                             [E]
+		//
+
+		// First we need to make sure `v1 >= b/2`, we can do this by multiplying the whole
+		// expression by `2^shift` so that the high bit of `v` is set.
+		uint32_t shift = ufbxi_lzcnt64(b);
+		a_hi = (a_hi << shift) | (shift ? a_lo >> (64 - shift) : 0);
+		a_lo <<= shift;
+		b <<= shift;
+
+		uint64_t v = b;
+		uint32_t v1 = (uint32_t)(v >> 32);
+		uint32_t v0 = (uint32_t)(v);
+		uint64_t q1, q0, r;
+
+		// q1, r = { a3 a2 a1 } / { b1 b0 }
+		{
+			uint64_t u2_u1 = a_hi;
+			uint32_t u0 = (uint32_t)(a_lo >> 32u);
+
+			uint64_t qh = u2_u1 / v1; // [A]
+			uint64_t rh = u2_u1 % v1; // [B]
+			uint64_t rh_u0 = rh << 32u | u0;
+			uint64_t v0qh = v0 * qh;
+			uint32_t c = rh_u0 < v0qh ? 1 : 0; // [D]
+			c += c & (v0qh - rh_u0 > v ? 1 : 0); // [E]
+
+			q1 = qh - c;
+			r = rh_u0 - v0qh + v*c; // [C]
+		}
+
+		// q0, r = { r1 r0 a0 } / { b1 b0 }
+		{
+			uint64_t u2_u1 = r;
+			uint32_t u0 = (uint32_t)a_lo;
+
+			uint64_t qh = u2_u1 / v1; // [A]
+			uint64_t rh = u2_u1 % v1; // [B]
+			uint64_t rh_u0 = rh << 32u | u0;
+			uint64_t v0qh = v0 * qh;
+			uint32_t c = rh_u0 < v0qh ? 1 : 0; // [D]
+			c += c & (v0qh - rh_u0 > v ? 1 : 0); // [E]
+
+			q0 = qh - c;
+			r = rh_u0 - v0qh + v*c; // [C]
+		}
+
+		// Un-normalize the remainder and return the quotinent
+		*p_rem = r >> shift;
+		return q1 << 32u | q0;
+	}
+#endif
+
+static const uint64_t ufbxi_pow10_tab[] = {
+	UINT64_C(1),
+	UINT64_C(10),
+	UINT64_C(100),
+	UINT64_C(1000),
+	UINT64_C(10000),
+	UINT64_C(100000),
+	UINT64_C(1000000),
+	UINT64_C(10000000),
+	UINT64_C(100000000),
+	UINT64_C(1000000000),
+	UINT64_C(10000000000),
+	UINT64_C(100000000000),
+	UINT64_C(1000000000000),
+	UINT64_C(10000000000000),
+	UINT64_C(100000000000000),
+	UINT64_C(1000000000000000),
+	UINT64_C(10000000000000000),
+	UINT64_C(100000000000000000),
+	UINT64_C(1000000000000000000),
+};
+
+static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_length, char **end)
+{
+	// TODO: Use this for optimizing digit parsing
+	(void)max_length;
+
+	uint64_t integer = 0;
+	uint64_t decimals = 0;
+	uint32_t n_decimals = 0;
+	bool negative = false;
+
+	const char *p = str;
+	if (*p == '-') {
+		negative = true;
+		p++;
+	}
+	while (((uint32_t)*p - '0') <= 10) {
+		integer = integer * 10 + (uint64_t)(*p++ - '0');
+	}
+	if (*p == '.') {
+		p++;
+		while (((uint32_t)*p - '0') <= 10) {
+			decimals = decimals * 10 + (uint64_t)(*p++ - '0');
+			n_decimals++;
+		}
+	}
+
+	if (((*p | 0x20) == 'e') || n_decimals >= 19) {
+		return strtod(str, end);
+	}
+	*end = (char*)p;
+
+	if (!decimals) {
+		return (negative ? -1.0 : 1.0) * (double)integer;
+	}
+
+	uint64_t divisor = ufbxi_pow10_tab[n_decimals];
+
+	uint64_t b_int = integer;
+	uint32_t n_int = b_int ? 64 - ufbxi_lzcnt64(b_int) : 0;
+
+	uint64_t rem_hi, rem_lo;
+	uint64_t b_hi = ufbxi_div128(decimals, 0, divisor, &rem_hi);
+	uint32_t n_hi = b_hi ? 64 - ufbxi_lzcnt64(b_hi) : 0;
+
+	int32_t exponent;
+	uint64_t mantissa;
+	bool nonzero_tail;
+	if (b_int) {
+		mantissa = b_int << (64u - n_int) | (b_hi >> n_int);
+		nonzero_tail = (b_hi << (64u - n_int) | rem_hi) != 0;
+		exponent = (int32_t)n_int - 1;
+	} else if (n_hi >= 54) {
+		mantissa = b_hi << (64u - n_hi);
+		nonzero_tail = rem_hi != 0;
+		exponent = (int32_t)n_hi - 65;
+	} else {
+		uint64_t b_lo = ufbxi_div128(rem_hi, 0, divisor, &rem_lo);
+		mantissa = b_hi << (64u - n_hi) | (b_lo >> n_hi);
+		nonzero_tail = (b_lo << (64u - n_hi) | rem_lo) != 0;
+		exponent = (int32_t)n_hi - 65;
+	}
+
+	bool r_odd = mantissa & (1 << 11u);
+	bool r_round = mantissa & (1 << 10u);
+	bool r_tail = (mantissa & ((1 << 10u) - 1)) != 0 || nonzero_tail;
+
+	uint64_t round = (r_round && (r_odd || r_tail)) ? 1u : 0u;
+
+	uint64_t bits
+		= (uint64_t)negative << 63u
+		| (uint64_t)(exponent + 1023) << 52u
+		| ((mantissa >> 11u) & ~(UINT64_C(1) << 52u));
+	bits += round;
+
+#if defined(__cplusplus)
+	double result;
+	memcpy(&result, &bits, 8);
+	return result;
+#else
+	union { uint64_t u; double d; } u_to_d;
+	u_to_d.u = bits;
+	return u_to_d.d;
+#endif
 }
 
 // -- DEFLATE implementation
@@ -4483,7 +4748,7 @@ static ufbxi_noinline FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi
 	wpath[wlen] = 0;
 
 	FILE *file = NULL;
-#if defined(_MSC_VER) && _MSC_VER >= 1400
+#if UFBXI_MSC_VER >= 1400
 	if (_wfopen_s(&file, wpath, L"rb") != 0) {
 		file = NULL;
 	}
@@ -6869,7 +7134,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 				if (ua->parse_as_f32) {
 					token->value.f64 = strtof(token->str_data, &end);
 				} else {
-					token->value.f64 = strtod(token->str_data, &end);
+					token->value.f64 = ufbxi_parse_double(token->str_data, token->str_len, &end);
 				}
 				ufbxi_check(end == token->str_data + token->str_len - 1);
 			}
@@ -12312,7 +12577,7 @@ static ufbxi_noinline int ufbxi_obj_parse_vertex(ufbxi_context *uc, ufbxi_obj_at
 	for (size_t i = 0; i < read_values; i++) {
 		ufbx_string str = uc->obj.tokens[offset + i];
 		char *end;
-		double val = strtod(str.data, &end);
+		double val = ufbxi_parse_double(str.data, str.length, &end);
 		ufbxi_check(end == str.data + str.length);
 		vals[i] = (ufbx_real)val;
 	}
@@ -12874,7 +13139,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc
 		ufbx_string tok = uc->obj.tokens[start + num_reals];
 
 		char *end;
-		double val = strtod(tok.data, &end);
+		double val = ufbxi_parse_double(tok.data, tok.length, &end);
 		if (end != tok.data + tok.length) break;
 
 		prop->value_real_arr[num_reals] = (ufbx_real)val;
