@@ -867,10 +867,10 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 		//   { r^ u0 } - v0*q^ < 0
 		//   { r^ u0 } < v0*q^                                         [D]
 		//
-		// If we know that `r < 0` we can check if `r < -{ v1 v0 }` requiring `c = 2`:
+		// If we know that `r < 0` we can check if `r < -v` requiring `c = 2`:
 		//
-		//   { r^ u0 } - v0*q^ < -{ v1 v0 }
-		//   v0*q^ - { r^ u0 } > { v1 v0 }                             [E]
+		//   { r^ u0 } - v0*q^ < -v
+		//   v0*q^ - { r^ u0 } > v                                     [E]
 		//
 
 		// First we need to make sure `v1 >= b/2`, we can do this by multiplying the whole
