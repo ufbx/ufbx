@@ -987,7 +987,8 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 
 	uint64_t rem_hi, rem_lo;
 	uint64_t b_hi = ufbxi_div128(decimals, 0, divisor, &rem_hi);
-	uint32_t n_hi = b_hi ? 64 - ufbxi_lzcnt64(b_hi) : 0;
+	ufbxi_regression_assert(b_hi > 0); // 1 * 2^64 / 10^18 > 0
+	uint32_t n_hi = ufbxi_lzcnt64(b_hi);
 
 	int32_t exponent;
 	uint64_t mantissa;
