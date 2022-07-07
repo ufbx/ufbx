@@ -4246,6 +4246,11 @@ typedef struct {
 } ufbxi_obj_group_entry;
 
 typedef struct {
+	uint64_t *indices;
+	size_t num_left;
+} ufbxi_obj_fast_indices;
+
+typedef struct {
 
 	// Current line and tokens.
 	// NOTE: `line` and `tokens` are not NULL-terminated nor UTF-8!
@@ -4254,6 +4259,8 @@ typedef struct {
 	ufbx_string *tokens;
 	size_t tokens_cap;
 	size_t num_tokens;
+
+	ufbxi_obj_fast_indices fast_indices[UFBXI_OBJ_NUM_ATTRIBS];
 
 	size_t vertex_count[UFBXI_OBJ_NUM_ATTRIBS_EXT];
 	ufbxi_buf tmp_vertices[UFBXI_OBJ_NUM_ATTRIBS_EXT];
@@ -12428,9 +12435,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_read_line(ufbxi_context *uc)
 
 	for (;;) {
 		const char *begin = uc->data + offset;
-		ufbx_assert(begin);
-
-		const char *end = (const char*)memchr(begin, '\n', uc->data_size - offset);
+		const char *end = begin ? (const char*)memchr(begin, '\n', uc->data_size - offset) : NULL;
 		if (!end) {
 			if (uc->eof) {
 				offset = uc->data_size;
@@ -12631,9 +12636,17 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_index(ufbxi_context *u
 		index -= 1;
 	}
 
-	uint64_t *dst = ufbxi_push(&uc->obj.tmp_indices[attrib], uint64_t, 1);
-	ufbxi_check(dst);
-	*dst = index;
+	ufbxi_obj_fast_indices *fast_indices = &uc->obj.fast_indices[attrib];
+	if (fast_indices->num_left == 0) {
+		size_t num_push = 128;
+		uint64_t *dst = ufbxi_push(&uc->obj.tmp_indices[attrib], uint64_t, num_push);
+		ufbxi_check(dst);
+		uc->obj.fast_indices[attrib].indices = dst;
+		uc->obj.fast_indices[attrib].num_left = num_push;
+	}
+
+	*fast_indices->indices++ = index;
+	fast_indices->num_left--;
 
 	ufbxi_obj_mesh *mesh = uc->obj.mesh;
 
@@ -12903,6 +12916,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 	size_t num_meshes = uc->obj.tmp_meshes.num_items;
 	ufbxi_obj_mesh *meshes = ufbxi_push_pop(&uc->tmp, &uc->obj.tmp_meshes, ufbxi_obj_mesh, num_meshes);
 	ufbxi_check(meshes);
+
+	// Pop unused fast indices
+	for (size_t i = 0; i < UFBXI_OBJ_NUM_ATTRIBS; i++) {
+		ufbxi_pop(&uc->obj.tmp_indices[i], uint64_t, uc->obj.fast_indices[i].num_left, NULL);
+	}
 
 	// Check if the file has disjoint vertices
 	bool non_disjoint[UFBXI_OBJ_NUM_ATTRIBS] = { 0 };
@@ -13307,6 +13325,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 			}
 		}
 	}
+
+	// TODO: Search by replacing .obj to .mtl
 
 	if (has_stream) {
 		uc->read_fn = stream.read_fn;
