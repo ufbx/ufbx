@@ -848,7 +848,7 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 		// (proof in TAOCP 2.4) so we can compute the correction amount `c`:
 		//
 		//   q <= q^ <= q + 2
-		//   q = q^ - c
+		//   q = q^ - c                                                [C]
 		//
 		// We can compute the final remainder (that must be non-negative) as follows:
 		//
@@ -860,17 +860,17 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 		//   r = b*(b*u2 + u1 - v1*q^) + u0 - v0*q^ + v*c
 		//   r = b*({ u2 u1 } - v1*q^) + u0 - v0*q^ + v*c
 		//   r = b*r^ + u0 - v0*q^ + v*c
-		//   r = { r^ u0 } - v0*q^ + v*c                               [C]
+		//   r = { r^ u0 } - v0*q^ + v*c                               [D]
 		//
 		// As we know `0 <= c <= 2` we can first check if `r < 0` requiring `c >= 1`:
 		//
 		//   { r^ u0 } - v0*q^ < 0
-		//   { r^ u0 } < v0*q^                                         [D]
+		//   { r^ u0 } < v0*q^                                         [E]
 		//
 		// If we know that `r < 0` we can check if `r < -v` requiring `c = 2`:
 		//
 		//   { r^ u0 } - v0*q^ < -v
-		//   v0*q^ - { r^ u0 } > v                                     [E]
+		//   v0*q^ - { r^ u0 } > v                                     [F]
 		//
 
 		// First we need to make sure `v1 >= b/2`, we can do this by multiplying the whole
@@ -890,15 +890,14 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 			uint64_t u2_u1 = a_hi;
 			uint32_t u0 = (uint32_t)(a_lo >> 32u);
 
-			uint64_t qh = u2_u1 / v1; // [A]
-			uint64_t rh = u2_u1 % v1; // [B]
-			uint64_t rh_u0 = rh << 32u | u0;
-			uint64_t v0qh = v0 * qh;
-			uint32_t c = rh_u0 < v0qh ? 1 : 0; // [D]
-			c += c & (v0qh - rh_u0 > v ? 1 : 0); // [E]
-
-			q1 = qh - c;
-			r = rh_u0 - v0qh + v*c; // [C]
+			uint64_t qh = u2_u1 / v1;            // q^ = { u2 u1 } / v1          [A]
+			uint64_t rh = u2_u1 % v1;            // r^ = { u2 u1 } % v1          [B]
+			uint64_t rh_u0 = rh << 32u | u0;     // { r^ u0 }
+			uint64_t v0qh = v0 * qh;             // v0*q^
+			uint32_t c = rh_u0 < v0qh ? 1 : 0;   // { r^ u0 } < v0*q^            [E]
+			c += c & (v0qh - rh_u0 > v ? 1 : 0); // v0*q^ - { r^ u0 } > v        [F]
+			q1 = qh - c;                         // q1 = q^ - c                  [C]
+			r = rh_u0 - v0qh + v*c;              // r = { r^ u0 } - v0*q^ + v*c  [D]
 		}
 
 		// q0, r = { r1 r0 a0 } / { b1 b0 }
@@ -906,15 +905,14 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 			uint64_t u2_u1 = r;
 			uint32_t u0 = (uint32_t)a_lo;
 
-			uint64_t qh = u2_u1 / v1; // [A]
-			uint64_t rh = u2_u1 % v1; // [B]
-			uint64_t rh_u0 = rh << 32u | u0;
-			uint64_t v0qh = v0 * qh;
-			uint32_t c = rh_u0 < v0qh ? 1 : 0; // [D]
-			c += c & (v0qh - rh_u0 > v ? 1 : 0); // [E]
-
-			q0 = qh - c;
-			r = rh_u0 - v0qh + v*c; // [C]
+			uint64_t qh = u2_u1 / v1;            // q^ = { u2 u1 } / v1          [A]
+			uint64_t rh = u2_u1 % v1;            // r^ = { u2 u1 } % v1          [B]
+			uint64_t rh_u0 = rh << 32u | u0;     // { r^ u0 }
+			uint64_t v0qh = v0 * qh;             // v0*q^
+			uint32_t c = rh_u0 < v0qh ? 1 : 0;   // { r^ u0 } < v0*q^            [E]
+			c += c & (v0qh - rh_u0 > v ? 1 : 0); // v0*q^ - { r^ u0 } > v        [F]
+			q0 = qh - c;                         // q0 = q^ - c                  [C]
+			r = rh_u0 - v0qh + v*c;              // r = { r^ u0 } - v0*q^ + v*c  [D]
 		}
 
 		// Un-normalize the remainder and return the quotinent
