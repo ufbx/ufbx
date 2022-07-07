@@ -211,7 +211,8 @@ class CLCompiler(Compiler):
         if config.get("compile_only"):
             args.append("/c")
 
-        args.append("/DUFBX_DEV")
+        if config.get("dev", True):
+            args.append("/DUFBX_DEV")
 
         if config.get("optimize", False):
             args.append("/Ox")
@@ -825,6 +826,16 @@ async def main():
             "warnings": True,
         }
         target_tasks += compile_permutations("cpp", cpp_config, arch_configs, [])
+
+        cpp_no_dev_config = {
+            "sources": ["misc/test_build.cpp"],
+            "output": "cpp" + exe_suffix,
+            "cpp": True,
+            "warnings": True,
+            "optimize": True,
+            "dev": False,
+        }
+        target_tasks += compile_permutations("cpp_no_dev", cpp_no_dev_config, arch_configs, [])
 
         targets = await gather(target_tasks)
         all_targets += targets
