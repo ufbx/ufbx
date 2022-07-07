@@ -825,7 +825,7 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 		//
 		// Notation:
 		//   b is the base (2^32) in this case
-		//   aN is the Nth digit (base b) of a from the LSB
+		//   aN is the Nth digit (base b) of a from the least significant digit
 		//   { x y z } is a multi-digit number b^2*x + b*y + z
 		//   ie. for a 64-bit number a = { a1 a0 } = b*a1 + a0
 		//
