@@ -806,6 +806,11 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 }
 
 // -- Float parsing
+//
+// Custom float parsing that handles floats up to (-)ddddddddddddddddddd.ddddddddddddddddddd
+// If larger or scientific notation is used then it defers to `strtod()`.
+// For the algorithm we need 128-bit division that is either provided by hardware on x64 or
+// a custom implementation below.
 
 #if !defined(UFBX_STANDARD_C) && UFBXI_MSC_VER >= 1920 && defined(_M_X64) && !defined(__clang__)
 	ufbxi_extern_c extern unsigned __int64 __cdecl _udiv128(unsigned __int64  highdividend,
@@ -949,6 +954,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	(void)max_length;
 
 	uint64_t integer = 0;
+	uint32_t n_integer = 0;
 	uint64_t decimals = 0;
 	uint32_t n_decimals = 0;
 	bool negative = false;
@@ -960,6 +966,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	}
 	while (((uint32_t)*p - '0') <= 10) {
 		integer = integer * 10 + (uint64_t)(*p++ - '0');
+		n_integer++;
 	}
 	if (*p == '.') {
 		p++;
@@ -969,7 +976,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 		}
 	}
 
-	if (((*p | 0x20) == 'e') || n_decimals >= 19) {
+	if (((*p | 0x20) == 'e') || n_decimals >= 19 || n_integer >= 19) {
 		return strtod(str, end);
 	}
 	*end = (char*)p;
@@ -1018,6 +1025,8 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 		| ((mantissa >> 11u) & ~(UINT64_C(1) << 52u));
 	bits += round;
 
+	// Type punning via unions is safe in C but in C++ the only safe way
+	// (pre std::bit_cast) is to use `memcpy()` and hope it gets optimized out.
 #if defined(__cplusplus)
 	double result;
 	memcpy(&result, &bits, 8);
