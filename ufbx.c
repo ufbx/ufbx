@@ -948,7 +948,7 @@ static const uint64_t ufbxi_pow10_tab[] = {
 	UINT64_C(1000000000000000000),
 };
 
-static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_length, char **end)
+static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_length, char **end, bool verify_length)
 {
 	// TODO: Use this for optimizing digit parsing
 	(void)max_length;
@@ -970,13 +970,26 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	}
 	if (*p == '.') {
 		p++;
-		while (((uint32_t)*p - '0') <= 10) {
-			decimals = decimals * 10 + (uint64_t)(*p++ - '0');
-			n_decimals++;
-		}
+		size_t left = ufbxi_to_size((str + max_length) - p);
+		decimals = ufbxi_parse_uint(p, left, &n_decimals);
+		p += n_decimals;
 	}
 
 	if (((*p | 0x20) == 'e') || n_decimals >= 19 || n_integer >= 19) {
+		if (verify_length) {
+			size_t len;
+			for (len = 0; len < max_length; len++) {
+				char c = str[len];
+				if (!((c >= '0' && c <= '9') || (c|0x20) == 'e' || c == '-' || c == '+')) {
+					break;
+				}
+			}
+			if (len == max_length) {
+				*end = NULL;
+				return 0.0;
+			}
+		}
+
 		return strtod(str, end);
 	}
 	*end = (char*)p;
@@ -2427,6 +2440,31 @@ static ufbxi_noinline void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
 	}
 }
 
+static ufbxi_forceinline void *ufbxi_push_size_fast(ufbxi_buf *b, size_t size, size_t n)
+{
+	// Always succeed with an emtpy non-NULL buffer for empty allocations
+	ufbxi_regression_assert(size > 0);
+	ufbxi_regression_assert(n > 0);
+
+	size_t total = size * n;
+	ufbxi_regression_assert(!ufbxi_does_overflow(total, size, n));
+
+	b->num_items += n;
+
+	// Align to the natural alignment based on the size
+	size_t pos = b->pos;
+	ufbxi_regression_assert((pos & (ufbxi_size_align_mask(size) - 1)) == 0);
+
+	// Try to push to the current block. Allocate a new block
+	// if the aligned size doesn't fit.
+	if (total <= b->size - pos) {
+		b->pos = pos + total;
+		return b->chunks[0]->data + pos;
+	} else {
+		return ufbxi_push_size_new_block(b, total);
+	}
+}
+
 static ufbxi_forceinline void *ufbxi_push_size_zero(ufbxi_buf *b, size_t size, size_t n)
 {
 	void *ptr = ufbxi_push_size(b, size, n);
@@ -2630,6 +2668,7 @@ static ufbxi_noinline void ufbxi_buf_clear(ufbxi_buf *buf)
 #define ufbxi_push(b, type, n) ufbxi_maybe_null((type*)ufbxi_push_size((b), sizeof(type), (n)))
 #define ufbxi_push_zero(b, type, n) ufbxi_maybe_null((type*)ufbxi_push_size_zero((b), sizeof(type), (n)))
 #define ufbxi_push_copy(b, type, n, data) ufbxi_maybe_null((type*)ufbxi_push_size_copy((b), sizeof(type), (n), (data)))
+#define ufbxi_push_fast(b, type, n) ufbxi_maybe_null((type*)ufbxi_push_size_fast((b), sizeof(type), (n)))
 #define ufbxi_pop(b, type, n, dst) ufbxi_pop_size((b), sizeof(type), (n), (dst))
 #define ufbxi_push_pop(dst, src, type, n) ufbxi_maybe_null((type*)ufbxi_push_pop_size((dst), (src), sizeof(type), (n)))
 
@@ -5552,9 +5591,10 @@ typedef enum {
 } ufbxi_parse_state;
 
 typedef enum {
-	UFBXI_ARRAY_FLAG_RESULT    = 0x1, // < Alloacte the array from the result buffer
-	UFBXI_ARRAY_FLAG_TMP_BUF   = 0x2, // < Alloacte the array from the result buffer
-	UFBXI_ARRAY_FLAG_PAD_BEGIN = 0x4, // < Pad the begin of the array with 4 zero elements to guard from invalid -1 index accesses
+	UFBXI_ARRAY_FLAG_RESULT       = 0x1, // < Alloacte the array from the result buffer
+	UFBXI_ARRAY_FLAG_TMP_BUF      = 0x2, // < Alloacte the array from the result buffer
+	UFBXI_ARRAY_FLAG_PAD_BEGIN    = 0x4, // < Pad the begin of the array with 4 zero elements to guard from invalid -1 index accesses
+	UFBXI_ARRAY_FLAG_ACCURATE_F32 = 0x8, // < Must be parsed as bit-accurate 32-bit floats
 } ufbxi_array_flags;
 
 typedef struct {
@@ -5751,6 +5791,9 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			// in versions >= 7200 as some of the elements aren't actually floats (!)
 			info->type = uc->from_ascii && uc->version >= 7200 ? 'i' : 'f';
 			if (uc->opts.ignore_animation) info->type = '-';
+			if (uc->from_ascii && uc->version >= 7200) {
+				info->flags |= UFBXI_ARRAY_FLAG_ACCURATE_F32;
+			}
 			return true;
 		} else if (name == ufbxi_KeyAttrRefCount) {
 			info->type = uc->opts.ignore_animation ? '-' : 'i';
@@ -6957,6 +7000,22 @@ static ufbxi_noinline uint32_t ufbxi_ascii_parse_version(ufbxi_context *uc)
 	return 1000u*(uint32_t)digits[0] + 100u*(uint32_t)digits[1] + 10u*(uint32_t)digits[2];
 }
 
+static const uint32_t ufbxi_space_mask =
+	(1u << ((uint32_t)' '  - 1)) |
+	(1u << ((uint32_t)'\t' - 1)) |
+	(1u << ((uint32_t)'\r' - 1)) |
+	(1u << ((uint32_t)'\n' - 1)) ;
+
+ufbx_static_assert(space_codepoint,
+	(uint32_t)' '  <= 32u && (uint32_t)'\t' <= 32u &&
+	(uint32_t)'\r' <= 32u && (uint32_t)'\n' <= 32u);
+
+static ufbxi_forceinline bool ufbxi_is_space(char c)
+{
+	uint32_t v = (uint32_t)(uint8_t)c - 1;
+	return v < 32 && ((ufbxi_space_mask >> v) & 0x1) != 0;
+}
+
 static ufbxi_noinline char ufbxi_ascii_skip_whitespace(ufbxi_context *uc)
 {
 	ufbxi_ascii *ua = &uc->ascii;
@@ -6964,7 +7023,7 @@ static ufbxi_noinline char ufbxi_ascii_skip_whitespace(ufbxi_context *uc)
 	// Ignore whitespace
 	char c = ufbxi_ascii_peek(uc);
 	for (;;) {
-		while (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+		while (ufbxi_is_space(c)) {
 			c = ufbxi_ascii_next(uc);
 		}
 
@@ -7141,6 +7200,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 
 		} else {
 			ufbxi_check(ufbxi_ascii_push_token_char(uc, token, '\0'));
+
 			char *end;
 			if (token->type == UFBXI_ASCII_INT) {
 				token->value.i64 = strtoll(token->str_data, &end, 10);
@@ -7149,7 +7209,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 				if (ua->parse_as_f32) {
 					token->value.f64 = strtof(token->str_data, &end);
 				} else {
-					token->value.f64 = ufbxi_parse_double(token->str_data, token->str_len, &end);
+					token->value.f64 = ufbxi_parse_double(token->str_data, token->str_len, &end, false);
 				}
 				ufbxi_check(end == token->str_data + token->str_len - 1);
 			}
@@ -7233,6 +7293,114 @@ ufbxi_nodiscard static int ufbxi_ascii_accept(ufbxi_context *uc, char type)
 	}
 }
 
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_int_array(ufbxi_context *uc, char type, size_t *p_num_read)
+{
+	ufbxi_ascii *ua = &uc->ascii;
+	if (ua->parse_as_f32) return 1;
+	size_t initial_items = uc->tmp_stack.num_items;
+
+	int64_t val;
+	if (ua->token.type == UFBXI_ASCII_INT) {
+		val = ua->token.value.i64;
+	} else {
+		return 1;
+	}
+
+	const char *src = ua->src;
+	const char *end = ua->src_yield;
+	for (;;) {
+		if (*src == ',') src++;
+
+		if (type == 'i') {
+			int32_t *v = ufbxi_push_fast(&uc->tmp_stack, int32_t, 1);
+			ufbxi_check(v);
+			*v = (int32_t)val;
+		} else if (type == 'l') {
+			int64_t *v = ufbxi_push_fast(&uc->tmp_stack, int64_t, 1);
+			ufbxi_check(v);
+			*v = (int64_t)val;
+		}
+
+		while (src != end && ufbxi_is_space(*src)) src++;
+
+		size_t left = ufbxi_to_size(end - src);
+		if (left < 32) break;
+
+		uint64_t abs_val = 0;
+		bool negative = *src == '-';
+
+		uint64_t max_val = (uint64_t)INT64_MAX + (negative ? 1u : 0u);
+
+		size_t init_len = negative ? 1 : 0;
+		size_t len = init_len;
+		for (; len < 20; len++) {
+			char c = src[len];
+			if (!(c >= '0' && c <= '9')) break;
+			abs_val = 10 * abs_val + (uint64_t)(c - '0');
+		}
+		if (len == 20 || len == init_len) break;
+
+		val = negative ? -(int64_t)abs_val : (int64_t)abs_val;
+		src += len;
+	}
+
+	ua->src = src;
+	ufbxi_check(ufbxi_ascii_next_token(uc, &ua->token));
+
+	*p_num_read = uc->tmp_stack.num_items - initial_items;
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_float_array(ufbxi_context *uc, char type, size_t *p_num_read)
+{
+	ufbxi_ascii *ua = &uc->ascii;
+	if (ua->parse_as_f32) return 1;
+	size_t initial_items = uc->tmp_stack.num_items;
+
+	double val;
+	if (ua->token.type == UFBXI_ASCII_FLOAT) {
+		val = ua->token.value.f64;
+	} else if (ua->token.type == UFBXI_ASCII_INT) {
+		val = (double)ua->token.value.i64;
+	} else {
+		return 1;
+	}
+
+	const char *src = ua->src;
+	const char *end = ua->src_yield;
+	for (;;) {
+		if (*src == ',') src++;
+
+		if (type == 'd') {
+			double *v = ufbxi_push_fast(&uc->tmp_stack, double, 1);
+			ufbxi_check(v);
+			*v = (double)val;
+		} else if (type == 'f') {
+			float *v = ufbxi_push_fast(&uc->tmp_stack, float, 1);
+			ufbxi_check(v);
+			*v = (float)val;
+		}
+
+		while (src != end && ufbxi_is_space(*src)) src++;
+
+		char *num_end = NULL;
+		size_t left = ufbxi_to_size(end - src);
+		if (left < 64) break;
+		val = ufbxi_parse_double(src, left - 2, &num_end, true);
+		if (!num_end || num_end == src) {
+			break;
+		}
+
+		src = num_end;
+	}
+
+	ua->src = src;
+	ufbxi_check(ufbxi_ascii_next_token(uc, &ua->token));
+
+	*p_num_read = uc->tmp_stack.num_items - initial_items;
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t depth, ufbxi_parse_state parent_state, bool *p_end, ufbxi_buf *tmp_buf, bool recursive)
 {
 	ufbxi_ascii *ua = &uc->ascii;
@@ -7295,7 +7463,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 		// Parse array values using strtof() if the array destination is 32-bit float
 		// since KeyAttrDataFloat packs integer data (!) into floating point values so we
 		// should try to be as exact as possible.
-		if (arr->type == 'f') {
+		if (arr_info.flags & UFBXI_ARRAY_FLAG_ACCURATE_F32) {
 			ua->parse_as_f32 = true;
 		}
 
@@ -7327,6 +7495,18 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 	// NOTE: Infinite loop to allow skipping the comma parsing via `continue`.
 	for (;;) {
 		ufbxi_ascii_token *tok = &ua->prev_token;
+
+		if (arr_type) {
+			size_t num_read = 0;
+			if (arr_type == 'f' || arr_type == 'd') {
+				ufbxi_check(ufbxi_ascii_read_float_array(uc, (char)arr_type, &num_read));
+			} else if (arr_type == 'i' || arr_type == 'l') {
+				ufbxi_check(ufbxi_ascii_read_int_array(uc, (char)arr_type, &num_read));
+			}
+			ufbxi_check(UINT32_MAX - num_values > num_read);
+			num_values += (uint32_t)num_read;
+		}
+
 		if (ufbxi_ascii_accept(uc, UFBXI_ASCII_STRING)) {
 
 			if (arr_type) {
@@ -7698,22 +7878,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_toplevel_child(ufbxi_cont
 }
 
 // -- General parsing
-
-static const uint32_t ufbxi_space_mask =
-	(1u << ((uint32_t)' '  - 1)) |
-	(1u << ((uint32_t)'\t' - 1)) |
-	(1u << ((uint32_t)'\r' - 1)) |
-	(1u << ((uint32_t)'\n' - 1)) ;
-
-ufbx_static_assert(space_codepoint,
-	(uint32_t)' '  <= 32u && (uint32_t)'\t' <= 32u &&
-	(uint32_t)'\r' <= 32u && (uint32_t)'\n' <= 32u);
-
-static ufbxi_forceinline bool ufbxi_is_space(char c)
-{
-	uint32_t v = (uint32_t)(uint8_t)c - 1;
-	return v < 32 && ((ufbxi_space_mask >> v) & 0x1) != 0;
-}
 
 static ufbxi_noinline bool ufbxi_next_line(ufbx_string *line, ufbx_string *buf, bool skip_space)
 {
@@ -12590,7 +12754,7 @@ static ufbxi_noinline int ufbxi_obj_parse_vertex(ufbxi_context *uc, ufbxi_obj_at
 	for (size_t i = 0; i < read_values; i++) {
 		ufbx_string str = uc->obj.tokens[offset + i];
 		char *end;
-		double val = ufbxi_parse_double(str.data, str.length, &end);
+		double val = ufbxi_parse_double(str.data, str.length, &end, false);
 		ufbxi_check(end == str.data + str.length);
 		vals[i] = (ufbx_real)val;
 	}
@@ -12744,7 +12908,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 	size_t num_indices = uc->obj.num_tokens - 1;
 	ufbxi_check(UINT32_MAX - mesh->num_indices >= num_indices);
 
-	ufbx_face *face = ufbxi_push(&uc->obj.tmp_faces, ufbx_face, 1);
+	ufbx_face *face = ufbxi_push_fast(&uc->obj.tmp_faces, ufbx_face, 1);
 	ufbxi_check(face);
 
 	face->index_begin = (uint32_t)mesh->num_indices;
@@ -12753,18 +12917,18 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 	mesh->num_faces++;
 	mesh->num_indices += num_indices;
 
-	uint32_t *p_face_mat = ufbxi_push(&uc->obj.tmp_face_material, uint32_t, 1);
+	uint32_t *p_face_mat = ufbxi_push_fast(&uc->obj.tmp_face_material, uint32_t, 1);
 	ufbxi_check(p_face_mat);
 	*p_face_mat = uc->obj.face_material;
 
 	if (uc->obj.has_face_smoothing) {
-		bool *p_face_smooth = ufbxi_push(&uc->obj.tmp_face_smoothing, bool, 1);
+		bool *p_face_smooth = ufbxi_push_fast(&uc->obj.tmp_face_smoothing, bool, 1);
 		ufbxi_check(p_face_smooth);
 		*p_face_smooth = uc->obj.face_smoothing;
 	}
 
 	if (uc->obj.has_face_group) {
-		uint32_t *p_face_group = ufbxi_push(&uc->obj.tmp_face_group, uint32_t, 1);
+		uint32_t *p_face_group = ufbxi_push_fast(&uc->obj.tmp_face_group, uint32_t, 1);
 		ufbxi_check(p_face_group);
 		*p_face_group = uc->obj.face_group;
 	}
@@ -13165,7 +13329,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc
 		ufbx_string tok = uc->obj.tokens[start + num_reals];
 
 		char *end;
-		double val = ufbxi_parse_double(tok.data, tok.length, &end);
+		double val = ufbxi_parse_double(tok.data, tok.length, &end, false);
 		if (end != tok.data + tok.length) break;
 
 		prop->value_real_arr[num_reals] = (ufbx_real)val;
