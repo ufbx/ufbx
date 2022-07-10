@@ -970,9 +970,10 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	}
 	if (*p == '.') {
 		p++;
-		size_t left = ufbxi_to_size((str + max_length) - p);
-		decimals = ufbxi_parse_uint(p, left, &n_decimals);
-		p += n_decimals;
+		while (((uint32_t)*p - '0') <= 10) {
+			decimals = decimals * 10 + (uint64_t)(*p++ - '0');
+			n_decimals++;
+		}
 	}
 
 	if (((*p | 0x20) == 'e') || n_decimals >= 19 || n_integer >= 19) {
