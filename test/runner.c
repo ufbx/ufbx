@@ -289,6 +289,7 @@ static bool g_fuzz_no_buffer = false;
 static int g_patch_start = 0;
 static int g_fuzz_quality = 16;
 static size_t g_fuzz_step = SIZE_MAX;
+static size_t g_deflate_opt = SIZE_MAX;
 
 const char *g_fuzz_test_name = NULL;
 
@@ -1841,6 +1842,47 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	free(obj_file);
 }
 
+typedef struct ufbxt_inflate_opts {
+	size_t fast_bits;
+	bool force_fast;
+	bool primary;
+} ufbxt_inflate_opts;
+
+void ufbxt_do_deflate_test(const char *name, void (*test_fn)(const ufbxt_inflate_opts *opts))
+{
+	size_t opt = 0;
+
+	{
+		ufbxt_inflate_opts opts = { 0 };
+		opts.primary = true;
+		if (g_deflate_opt == SIZE_MAX || opt == g_deflate_opt) {
+			ufbxt_logf("(opt %u) default", opt, opts.fast_bits);
+			test_fn(&opts);
+		}
+		opt++;
+	}
+
+	for (uint32_t fast_bits = 1; fast_bits <= 8; fast_bits++) {
+		ufbxt_inflate_opts opts = { 0 };
+		opts.fast_bits = fast_bits;
+		if (g_deflate_opt == SIZE_MAX || opt == g_deflate_opt) {
+			ufbxt_logf("(opt %u) fast_bits = %u", opt, fast_bits);
+			test_fn(&opts);
+		}
+		opt++;
+	}
+
+	{
+		ufbxt_inflate_opts opts = { 0 };
+		opts.force_fast = true;
+		if (g_deflate_opt == SIZE_MAX || opt == g_deflate_opt) {
+			ufbxt_logf("(opt %u) force_fast = true", opt);
+			test_fn(&opts);
+		}
+		opt++;
+	}
+}
+
 #define UFBXT_IMPL 1
 #define UFBXT_TEST(name) void ufbxt_test_fn_##name(void)
 #define UFBXT_FILE_TEST_FLAGS(name, flags) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
@@ -1870,6 +1912,10 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	void ufbxt_test_fn_file_##name(void) { \
 	ufbxt_do_file_test(#file, &ufbxt_test_fn_imp_file_##name, NULL, get_opts(), flags | UFBXT_FILE_TEST_FLAG_ALTERNATIVE); } \
 	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
+#define UFBXT_DEFLATE_TEST(name) void ufbxt_test_fn_imp_deflate_##name(const ufbxt_inflate_opts *opts); \
+	void ufbxt_test_fn_deflate_##name(void) { \
+	ufbxt_do_deflate_test(#name, &ufbxt_test_fn_imp_deflate_##name); } \
+	void ufbxt_test_fn_imp_deflate_##name(const ufbxt_inflate_opts *opts)
 
 #define UFBXT_FILE_TEST(name) UFBXT_FILE_TEST_FLAGS(name, 0)
 #define UFBXT_FILE_TEST_OPTS(name, get_opts) UFBXT_FILE_TEST_OPTS_FLAGS(name, get_opts, 0)
@@ -1888,6 +1934,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 #undef UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS
 #undef UFBXT_FILE_TEST_ALT_FLAGS
 #undef UFBXT_FILE_TEST_OPTS_ALT_FLAGS
+#undef UFBXT_DEFLATE_TEST
 #define UFBXT_IMPL 0
 #define UFBXT_TEST(name) { #name, &ufbxt_test_fn_##name },
 #define UFBXT_FILE_TEST_FLAGS(name, flags) { #name, &ufbxt_test_fn_file_##name },
@@ -1896,6 +1943,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 #define UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS(name, suffix, get_opts, flags) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
 #define UFBXT_FILE_TEST_ALT_FLAGS(name, file, flags) { #name, &ufbxt_test_fn_file_##name },
 #define UFBXT_FILE_TEST_OPTS_ALT_FLAGS(name, file, get_opts, flags) { #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_DEFLATE_TEST(name) { #name, &ufbxt_test_fn_deflate_##name },
+
 ufbxt_test g_tests[] = {
 	#include "all_tests.h"
 };
@@ -1964,6 +2013,10 @@ int main(int argc, char **argv)
 		if (!strcmp(argv[i], "-f")) {
 			if (++i < argc) g_file_version = (uint32_t)atoi(argv[i]);
 			if (++i < argc) g_file_type = argv[i];
+		}
+
+		if (!strcmp(argv[i], "--deflate-opt")) {
+			if (++i < argc) g_deflate_opt = (size_t)atoi(argv[i]);
 		}
 
 		if (!strcmp(argv[i], "--allow-non-thread-safe")) {

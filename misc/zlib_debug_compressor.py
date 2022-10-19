@@ -11,6 +11,8 @@ class Options:
         self.search_budget = kwargs.get("search_budget", 4096)
         self.force_block_types = kwargs.get("force_block_types", [])
         self.block_size = kwargs.get("block_size", 32768)
+        self.invalid_sym = kwargs.get("invalid_sym", None)
+        self.no_decode = kwargs.get("no_decode", False)
 
 Code = namedtuple("Code", "code bits")
 IntCoding = namedtuple("IntCoding", "symbol base bits")
@@ -67,6 +69,8 @@ class BitBuf:
     def push_code(self, code, desc=""):
         self.push(code.code, code.bits, desc)
     def push_rev_code(self, code, desc=""):
+        if code is None:
+            raise RuntimeError("Empty code")
         self.push_rev(code.code, code.bits, desc)
 
     def append(self, buf):
@@ -90,9 +94,9 @@ class Literal:
         for c in self.data:
             litlen_count[c] += 1
 
-    def encode(self, buf, litlen_syms, dist_syms):
+    def encode(self, buf, litlen_syms, dist_syms, opts):
         for c in self.data:
-            sym = litlen_syms[c]
+            sym = litlen_syms.get(c, opts.invalid_sym)
             if c >= 32 and c <= 128:
                 buf.push_rev_code(sym, "Literal '{}' (0x{:02x})".format(chr(c), c))
             else:
@@ -123,9 +127,9 @@ class Match:
         litlen_count[self.lcode.symbol] += 1
         dist_count[self.dcode.symbol] += 1
 
-    def encode(self, buf, litlen_syms, dist_syms):
-        lsym = litlen_syms[self.lcode.symbol]
-        dsym = dist_syms[self.dcode.symbol]
+    def encode(self, buf, litlen_syms, dist_syms, opts):
+        lsym = litlen_syms.get(self.lcode.symbol, opts.invalid_sym)
+        dsym = dist_syms.get(self.dcode.symbol, opts.invalid_sym)
         buf.push_rev_code(lsym, "Length: {}".format(self.length))
         if self.lcode.bits > 0:
             buf.push(self.length - self.lcode.base, self.lcode.bits, "Length extra")
@@ -337,10 +341,10 @@ def compress_block_static(buf, message, final, opts):
     buf.push(0b01, 2,  "BTYPE       Chunk type: Static Huffman")
 
     for m in message:
-        m.encode(buf, litlen_syms, distance_syms)
+        m.encode(buf, litlen_syms, distance_syms, opts)
 
     # End-of-block
-    buf.push_rev_code(litlen_syms[256], "End-of-block")
+    buf.push_rev_code(litlen_syms.get(256, opts.invalid_sym), "End-of-block")
 
 def compress_block_dynamic(buf, message, final, opts):
     litlen_count = [0] * 286
@@ -404,10 +408,10 @@ def compress_block_dynamic(buf, message, final, opts):
     write_encoded_huff_bits(buf, distance_bit_codes, codelen_syms, "Distance")
 
     for m in message:
-        m.encode(buf, litlen_syms, distance_syms)
+        m.encode(buf, litlen_syms, distance_syms, opts)
 
     # End-of-block
-    buf.push_rev_code(litlen_syms[256], "End-of-block")
+    buf.push_rev_code(litlen_syms.get(256, opts.invalid_sym), "End-of-block")
 
 def adler32(data):
     a, b = 1, 0
@@ -416,7 +420,7 @@ def adler32(data):
         b = (b + a) % 65521
     return b << 16 | a
 
-def compress_message(message, opts=Options()):
+def compress_message(message, opts=Options(), *args):
     buf = BitBuf()
 
     # ZLIB CFM byte
@@ -428,56 +432,81 @@ def compress_message(message, opts=Options()):
     buf.push(0, 1,  "FDICT=0     Preset dictionary: No")
     buf.push(2, 2,  "FLEVEL=2    Compression level: Default")
 
+    multi_part = False
+    multi_messages = []
+    multi_opts = []
+    if args:
+        multi_part = True
+        multi_messages = [message]
+        multi_opts = [opts]
+        args_it = iter(args)
+        message = message[:]
+        for msg, opt in zip(args_it, args_it):
+            message += msg
+            multi_messages.append(msg)
+            multi_opts.append(opt)
+
     byte_offset = 0
     part_pos = 0
-    block_index = 0
     num_parts = len(message)
     overflow_part = Literal(b"")
     block_message = []
+    block_opts = opts
 
-    message_bytes = decode(message)
+    message_bytes = b"" if opts.no_decode else decode(message)
 
     last_part = False
+    multi_index = 0
     while not last_part:
-        block_message.clear()
+        if multi_part:
+            block_message = multi_messages[multi_index]
+            block_opts = multi_opts[multi_index]
+            size = sum(m.length for m in block_message)
+            block_index = 0
 
-        part, overflow_part = overflow_part.split(opts.block_size)
-        if part.length > 0:
-            block_message.append(part)
-        size = part.length
+            multi_index += 1
+            last_part = multi_index == len(multi_messages)
+        else:
+            block_message.clear()
 
-        # Append parts until desired block size is reached
-        if size < opts.block_size:
-            while part_pos < num_parts:
-                part = message[part_pos]
-                part_pos += 1
-                if size + part.length >= opts.block_size:
-                    last_part, overflow_part = part.split(opts.block_size - size)
-                    if last_part.length > 0:
-                        block_message.append(last_part)
-                    size += last_part.length
-                    break
-                else:
-                    block_message.append(part)
-                    size += part.length
+            part, overflow_part = overflow_part.split(opts.block_size)
+            if part.length > 0:
+                block_message.append(part)
+            size = part.length
 
-        last_part = part_pos >= num_parts and overflow_part.length == 0
+            # Append parts until desired block size is reached
+            if size < opts.block_size:
+                while part_pos < num_parts:
+                    part = message[part_pos]
+                    part_pos += 1
+                    if size + part.length >= opts.block_size:
+                        last_part, overflow_part = part.split(opts.block_size - size)
+                        if last_part.length > 0:
+                            block_message.append(last_part)
+                        size += last_part.length
+                        break
+                    else:
+                        block_message.append(part)
+                        size += part.length
+
+            last_part = part_pos >= num_parts and overflow_part.length == 0
 
         # Compress the block
         best_buf = None
+        block_index = 0
         for block_type in range(3):
-            if block_index < len(opts.force_block_types):
-                if block_type != opts.force_block_types[block_index]:
+            if block_index < len(block_opts.force_block_types):
+                if block_type != block_opts.force_block_types[block_index]:
                     continue
 
             block_buf = BitBuf()
 
             if block_type == 0:
-                compress_block_uncompressed(block_buf, message_bytes[byte_offset:byte_offset + size], buf.pos, last_part, opts)
+                compress_block_uncompressed(block_buf, message_bytes[byte_offset:byte_offset + size], buf.pos, last_part, block_opts)
             elif block_type == 1:
-                compress_block_static(block_buf, block_message, last_part, opts)
+                compress_block_static(block_buf, block_message, last_part, block_opts)
             elif block_type == 2:
-                compress_block_dynamic(block_buf, block_message, last_part, opts)
+                compress_block_dynamic(block_buf, block_message, last_part, block_opts)
 
             if not best_buf or block_buf.pos < best_buf.pos:
                 best_buf = block_buf
@@ -522,7 +551,3 @@ def print_buf(buf):
 
 def print_bytes(data):
     print(''.join('\\x%02x' % b for b in data))
-
-
-
-

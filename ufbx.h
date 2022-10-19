@@ -3347,13 +3347,16 @@ struct ufbx_inflate_input {
 
 	// (optional) No the Adler32 checksum
 	bool no_checksum;
+
+	// (optional) Force internal fast lookup bit amount
+	size_t internal_fast_bits;
 };
 
 // Persistent data between `ufbx_inflate()` calls
 // NOTE: You must set `initialized` to `false`, but `data` may be uninitialized
 struct ufbx_inflate_retain {
 	bool initialized;
-	uint64_t data[512];
+	uint64_t data[1024];
 };
 
 typedef enum ufbx_index_error_handling {
