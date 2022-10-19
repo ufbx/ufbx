@@ -7974,7 +7974,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_float_array(ufbxi_con
 	if (ua->token.type == UFBXI_ASCII_FLOAT) {
 		val = ua->token.value.f64;
 	} else if (ua->token.type == UFBXI_ASCII_INT) {
-		val = (double)ua->token.value.i64;
+		double fsign = !ua->token.value.i64 && ua->token.negative ? -1.0 : 1.0;
+		val = (double)ua->token.value.i64 * fsign;
 	} else {
 		return 1;
 	}
