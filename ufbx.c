@@ -2061,8 +2061,6 @@ ufbxi_inflate_block_slow(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	size_t left = dc->stream.left;
 	const char *data = dc->stream.chunk_ptr;
 
-	// static uint32_t counter;
-
 	for (;;) {
 		ufbxi_bit_refill(&bits, &left, &data, &dc->stream);
 		uint64_t sym_bits = bits;
@@ -2168,8 +2166,6 @@ ufbxi_inflate_block_fast(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	const char *data = dc->stream.chunk_ptr;
 	const char *data_end = dc->stream.chunk_yield;
 
-	// static uint32_t counter;
-
 	uint64_t sym01_bits;
 	ufbxi_huff_sym sym0, sym1;
 	uint64_t refill_bits = ufbxi_read_u64(data);
@@ -2196,8 +2192,8 @@ ufbxi_inflate_block_fast(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 				// Literal, Literal
 				// -> Output the two literals and loop back to start.
 
-				out_ptr[0] = ufbxi_huff_sym_value(sym0);
-				out_ptr[1] = ufbxi_huff_sym_value(sym1);
+				out_ptr[0] = (char)ufbxi_huff_sym_value(sym0);
+				out_ptr[1] = (char)ufbxi_huff_sym_value(sym1);
 				out_ptr += 2;
 
 				ufbxi_fast_inflate_refill_and_decode();
@@ -2208,7 +2204,7 @@ ufbxi_inflate_block_fast(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 				// Literal, Match, (Distance)
 				// -> Output a single literal, decode the missing distance and fall through to match.
 
-				out_ptr[0] = ufbxi_huff_sym_value(sym0);
+				out_ptr[0] = (char)ufbxi_huff_sym_value(sym0);
 				out_ptr += 1;
 
 				sym01_bits = ufbxi_wrap_shr64(sym01_bits, sym0);
