@@ -4752,6 +4752,9 @@ typedef struct {
 	// or one of UFBXI_ASCII_* defines.
 	char type;
 
+	// Sign for integer if negative.
+	bool negative;
+
 	// Parsed semantic value
 	union {
 		double f64;
@@ -7769,6 +7772,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 	} else if ((c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.') {
 		token->type = UFBXI_ASCII_INT;
 
+		token->negative = c == '-';
 		while ((c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.' || c == 'e' || c == 'E') {
 			if (c == '.' || c == 'e' || c == 'E') {
 				token->type = UFBXI_ASCII_FLOAT;
@@ -7800,6 +7804,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 
 			char *end;
 			if (token->type == UFBXI_ASCII_INT) {
+				// TODO: Custom parsing is probably better?
 				token->value.i64 = strtoll(token->str_data, &end, 10);
 				ufbxi_check(end == token->str_data + token->str_len - 1);
 			} else if (token->type == UFBXI_ASCII_FLOAT) {
@@ -8179,6 +8184,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 
 		} else if (ufbxi_ascii_accept(uc, UFBXI_ASCII_INT)) {
 			int64_t val = tok->value.i64;
+			ufbx_real fsign = !val && tok->negative ? (ufbx_real)-1.0f : (ufbx_real)1.0f;
 
 			switch (arr_type) {
 
@@ -8194,7 +8200,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 				if (num_values < UFBXI_MAX_NON_ARRAY_VALUES) {
 					type_mask |= (uint32_t)UFBXI_VALUE_NUMBER << (num_values*2);
 					ufbxi_value *v = &vals[num_values];
-					v->f = (double)(v->i = val);
+					v->f = (double)(v->i = val) * (double)fsign;
 				}
 				break;
 
@@ -8202,8 +8208,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 			case 'c': { uint8_t *v = ufbxi_push(&uc->tmp_stack, uint8_t, 1); ufbxi_check(v); *v = (uint8_t)val; } break;
 			case 'i': { int32_t *v = ufbxi_push(&uc->tmp_stack, int32_t, 1); ufbxi_check(v); *v = (int32_t)val; } break;
 			case 'l': { int64_t *v = ufbxi_push(&uc->tmp_stack, int64_t, 1); ufbxi_check(v); *v = (int64_t)val; } break;
-			case 'f': { float *v = ufbxi_push(&uc->tmp_stack, float, 1); ufbxi_check(v); *v = (float)val; } break;
-			case 'd': { double *v = ufbxi_push(&uc->tmp_stack, double, 1); ufbxi_check(v); *v = (double)val; } break;
+			case 'f': { float *v = ufbxi_push(&uc->tmp_stack, float, 1); ufbxi_check(v); *v = (float)val * (float)fsign; } break;
+			case 'd': { double *v = ufbxi_push(&uc->tmp_stack, double, 1); ufbxi_check(v); *v = (double)val * (double)fsign; } break;
 			case '-': num_values--; break;
 
 			default:
