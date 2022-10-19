@@ -1412,7 +1412,7 @@ ufbxi_bit_yield(ufbxi_bit_stream *s, const char *ptr)
 	return ptr;
 }
 
-static ufbxi_forceinline void
+static ufbxi_noinline void
 ufbxi_bit_refill(uint64_t *p_bits, size_t *p_left, const char **p_data, ufbxi_bit_stream *s)
 {
 	if (*p_data > s->chunk_yield) {
