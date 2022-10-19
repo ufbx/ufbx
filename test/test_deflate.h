@@ -10,7 +10,7 @@ static ptrdiff_t ufbxt_inflate_no_fuzz(void *dst, size_t dst_size, const void *s
 	input.data = src;
 	input.data_size = src_size;
 	input.total_size = src_size;
-	input.internal_fast_bits = (uint32_t)opts->fast_bits;
+	input.internal_fast_bits = opts->fast_bits;
 
 	if (opts->force_fast) {
 		size_t padding = 512;
