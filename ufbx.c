@@ -2047,14 +2047,6 @@ static ufbxi_noinline uint32_t ufbxi_adler32(const void *data, size_t size)
 	return (uint32_t)((b << 16) | (a & 0xffff));
 }
 
-static void print_bits(uint64_t bits, uint32_t count, bool rev)
-{
-	for (uint32_t i = 0; i < count; i++) {
-		uint64_t mask = (uint64_t)1u << (uint64_t)(rev ? i : count - i - 1u);
-		putchar((bits & mask) ? '1' : '0');
-	}
-}
-
 static ufbxi_noinline int
 ufbxi_inflate_block_slow(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 {
@@ -7948,8 +7940,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_int_array(ufbxi_conte
 		uint64_t abs_val = 0;
 		bool negative = *src_scan == '-';
 
-		uint64_t max_val = (uint64_t)INT64_MAX + (negative ? 1u : 0u);
-
 		size_t init_len = negative ? 1 : 0;
 		size_t len = init_len;
 		for (; len < 20; len++) {
@@ -7959,6 +7949,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_int_array(ufbxi_conte
 		}
 		if (len == 20 || len == init_len) break;
 
+		// TODO: Do we want to wrap here?
 		val = negative ? -(int64_t)abs_val : (int64_t)abs_val;
 		src_scan += len;
 	}
