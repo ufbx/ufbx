@@ -1225,10 +1225,10 @@ typedef struct {
 //
 typedef uint16_t ufbxi_huff_sym;
 
-#define ufbxi_huff_sym_total_bits(sym) ((sym) & 0x1f)
-#define ufbxi_huff_sym_long_mask(sym) ((sym) & 0x1f)
-#define ufbxi_huff_sym_long_offset(sym) ((sym) >> 7u)
-#define ufbxi_huff_sym_value(sym) ((sym) >> 8u)
+#define ufbxi_huff_sym_total_bits(sym) ((uint32_t)(sym) & 0x1f)
+#define ufbxi_huff_sym_long_mask(sym) ((uint32_t)(sym) & 0x1f)
+#define ufbxi_huff_sym_long_offset(sym) ((uint32_t)(sym) >> 7u)
+#define ufbxi_huff_sym_value(sym) ((uint32_t)(sym) >> 8u)
 
 enum {
 	UFBXI_HUFF_SYM_END   = 0x20,
