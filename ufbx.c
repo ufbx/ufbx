@@ -5155,7 +5155,7 @@ static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size, b
 	// Copy the remains of the previous buffer to the beginning of the new one
 	size_t num_read = uc->data_size;
 	if (num_read > 0) {
-		ufbx_assert(uc->read_buffer != NULL);
+		ufbx_assert(uc->read_buffer != NULL && uc->data != NULL);
 		memmove(uc->read_buffer, uc->data, num_read);
 	}
 
