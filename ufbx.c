@@ -1542,7 +1542,7 @@ ufbxi_huff_build_imp(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_coun
 
 			if (count > 0 && bits > fast_bits && bits - fast_bits <= UFBXI_HUFF_MAX_LONG_BITS) {
 				uint32_t shift = bits - fast_bits;
-				uint32_t last_inclusive = num_codes_left == 0 ? (1<<shift) - 1 : 0;
+				uint32_t last_inclusive = num_codes_left == 0 ? (1u<<shift) - 1u : 0u;
 				uint32_t first_prefix = code >> shift;
 				uint32_t last_prefix = (code + count + last_inclusive) >> shift;
 				uint32_t mask = (1u << shift) - 1u;
@@ -2291,8 +2291,8 @@ ufbxi_inflate_block_fast(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 		ufbxi_fast_inflate_refill_and_decode();
 
 		// Bounds checking: We don't actually handle the error here, just bail out to the slow implementation
-		ptrdiff_t dst_space = out_end - out_ptr - length + UFBXI_INFLATE_FAST_MIN_OUT;
-		ptrdiff_t src_space = out_ptr - out_begin - distance;
+		ptrdiff_t dst_space = out_end - out_ptr - (ptrdiff_t)length + UFBXI_INFLATE_FAST_MIN_OUT;
+		ptrdiff_t src_space = out_ptr - out_begin - (ptrdiff_t)distance;
 		if ((dst_space | src_space) < 0) {
 			return -12;
 		}
@@ -2445,8 +2445,6 @@ ufbxi_extern_c ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inf
 				if (err) return err;
 				trees = &tree_data;
 			}
-
-			static int serial = 0;
 
 			for (;;) {
 				// `ufbxi_inflate_block_fast()` needs a bit more upfront setup, see asserts on top of the function
