@@ -319,6 +319,15 @@ def test_fail_bad_distance():
     
     return data, buf
 
+def test_fail_bad_static_litlen():
+    """Test bad static lit/length (286..287)"""
+    data = b"A"
+    opts = zz.Options(force_block_types=[1])
+    buf = zz.deflate(data, opts)
+    buf.patch(19, 0b01100011, 8, "Invalid symbol 285")
+    
+    return data, buf
+
 def test_fail_distance_too_far():
     """Test with distance too far to the output"""
     opts = zz.Options(force_block_types=[1], no_decode=True)

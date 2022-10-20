@@ -496,11 +496,42 @@ UFBXT_DEFLATE_TEST(deflate_fail_distance_bad_huffman)
 UFBXT_DEFLATE_TEST(deflate_fail_bad_distance)
 #if UFBXT_IMPL
 {
-	char src[] = "\x78\x9c\x73\xc9\x2c\x2e\x51\x00\x3d\x00\x0f\xd7\x03\x49";
-	char dst[64];
-	ptrdiff_t res = ufbxt_inflate(dst, sizeof(dst), src, sizeof(src) - 1, opts);
-	ufbxt_hintf("res = %d", (int)res);
-	ufbxt_assert(res == -11);
+	{
+		char src[] = "\x78\x9c\x73\xc9\x2c\x2e\x51\x00\x3d\x00\x0f\xd7\x03\x49";
+		char dst[64];
+		ptrdiff_t res = ufbxt_inflate(dst, sizeof(dst), src, sizeof(src) - 1, opts);
+		ufbxt_hintf("res = %d", (int)res);
+		ufbxt_assert(res == -11);
+	}
+
+	{
+		char src[] = "\x78\x9c\x73\xc9\x2c\x2e\x51\x00\x7d\x00\x0f\xd7\x03\x49";
+		char dst[64];
+		ptrdiff_t res = ufbxt_inflate(dst, sizeof(dst), src, sizeof(src) - 1, opts);
+		ufbxt_hintf("res = %d", (int)res);
+		ufbxt_assert(res == -11);
+	}
+}
+#endif
+
+UFBXT_DEFLATE_TEST(deflate_fail_bad_litlen)
+#if UFBXT_IMPL
+{
+	{
+		char src[] = "\x78\x9c\x1b\x03\x00\x00\x42\x00\x42";
+		char dst[64];
+		ptrdiff_t res = ufbxt_inflate(dst, sizeof(dst), src, sizeof(src) - 1, opts);
+		ufbxt_hintf("res = %d", (int)res);
+		ufbxt_assert(res == -13);
+	}
+
+	{
+		char src[] = "\x78\x9c\x1b\x07\x00\x00\x42\x00\x42";
+		char dst[64];
+		ptrdiff_t res = ufbxt_inflate(dst, sizeof(dst), src, sizeof(src) - 1, opts);
+		ufbxt_hintf("res = %d", (int)res);
+		ufbxt_assert(res == -13);
+	}
 }
 #endif
 
