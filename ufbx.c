@@ -1602,7 +1602,9 @@ ufbxi_huff_build_imp(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_coun
 			uint32_t extra = sym_extra[i - sym_extra_offset];
 			sym += extra;
 
-			if ((extra & 0xffff001f) != 0) {
+			// Store length/distance codes with extra values in a table.
+			// TODO: This is unnecessary for small values
+			if ((extra & 0xffff001f) != 0 && (extra & 0x20) == 0) {
 				uint32_t ix = ++num_extra;
 				tree->extra_shift_base[ix] = (extra & 0xffff0000) | bits;
 				tree->extra_mask[ix] = (1u << (extra & 0x1f)) - 1;
