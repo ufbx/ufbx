@@ -22,6 +22,7 @@ static ptrdiff_t ufbxt_inflate_no_fuzz(void *dst, size_t dst_size, const void *s
 		memcpy(large_src, src, src_size);
 		memset(large_src + src_size, 0, padding);
 
+		input.data = large_src;
 		input.data_size += padding;
 		input.total_size += padding;
 		input.internal_fast_bits = 10;
