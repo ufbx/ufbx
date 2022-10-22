@@ -18434,6 +18434,7 @@ typedef struct {
 	ufbx_error error;
 	ufbx_string filename;
 	bool owned_by_scene;
+	bool ignore_if_not_found;
 
 	ufbx_geometry_cache_opts opts;
 
@@ -19286,6 +19287,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_contex
 	uc->result = cc.result;
 
 	if (!cache) {
+		if (cc.error.type == UFBX_ERROR_FILE_NOT_FOUND && uc->opts.ignore_missing_external_files) {
+			return 1;
+		}
+
 		uc->error = cc.error;
 		return 0;
 	}

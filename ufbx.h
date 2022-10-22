@@ -3419,6 +3419,9 @@ typedef struct ufbx_load_opts {
 	// WARNING: Potentially unsafe! Try to open external files such as geometry caches
 	bool load_external_files;
 
+	// Don't fail loading if external files are not found.
+	bool ignore_missing_external_files;
+
 	// Don't compute `ufbx_skin_deformer` `vertices` and `weights` arrays saving
 	// a bit of memory and time if not needed
 	bool skip_skin_vertices;

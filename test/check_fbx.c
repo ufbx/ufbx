@@ -58,6 +58,7 @@ int main(int argc, char **argv)
 	int frame = INT_MIN;
 	bool allow_bad_unicode = false;
 	bool sink = false;
+	bool ignore_missing_external = false;
 
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-v")) {
@@ -74,6 +75,8 @@ int main(int argc, char **argv)
 			allow_bad_unicode = true;
 		} else if (!strcmp(argv[i], "--sink")) {
 			sink = true;
+		} else if (!strcmp(argv[i], "--ignore-missing-external")) {
+			ignore_missing_external = true;
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "Unrecognized flag: %s\n", argv[i]);
 			exit(1);
@@ -96,6 +99,7 @@ int main(int argc, char **argv)
 	opts.evaluate_caches = true;
 	opts.load_external_files = true;
 	opts.generate_missing_normals = true;
+	opts.ignore_missing_external_files = ignore_missing_external;
 	opts.target_axes = ufbx_axes_right_handed_y_up;
 	opts.target_unit_meters = 0.01;
 	if (!allow_bad_unicode) {
