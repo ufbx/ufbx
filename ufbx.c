@@ -452,6 +452,14 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 	#define UFBXI_HAS_SSE 0
 #endif
 
+#if !defined(UFBXI_LITTLE_ENDIAN)
+	#if !defined(UFBX_STANDARD_C) && (defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__) || defined(__wasm__) || defined(__EMSCRIPTEN__))
+		#define UFBXI_LITTLE_ENDIAN 1
+	#else
+		#define UFBXI_LITTLE_ENDIAN 0
+	#endif
+#endif
+
 // -- Fast copy
 
 #if UFBXI_HAS_SSE
@@ -1991,7 +1999,7 @@ static ufbxi_noinline uint32_t ufbxi_adler32(const void *data, size_t size)
 			a += (uint32_t)_mm_cvtsi128_si32(s1);
 			b += (uint32_t)_mm_cvtsi128_si32(s2);
 		}
-#else
+#elif UFBXI_LITTLE_ENDIAN
 		for (;;) {
 			size_t chunk_size = ufbxi_min_sz(ufbxi_to_size(end - p), 256*8/4) & ~(size_t)0xf;
 			if (chunk_size == 0) break;
