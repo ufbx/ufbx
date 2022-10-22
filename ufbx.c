@@ -1117,6 +1117,7 @@ static const uint8_t ufbxi_deflate_code_length_permutation[] = {
 	16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15,
 };
 
+#define UFBXI_INFLATE_FAST_MIN_IN 8
 #define UFBXI_INFLATE_FAST_MIN_OUT 2
 
 #define UFBXI_HUFF_MAX_BITS 16
@@ -2050,7 +2051,7 @@ static ufbxi_noinline uint32_t ufbxi_adler32(const void *data, size_t size)
 }
 
 static ufbxi_noinline int
-ufbxi_inflate_block_slow(ufbxi_deflate_context *dc, ufbxi_trees *trees)
+ufbxi_inflate_block_slow(ufbxi_deflate_context *dc, ufbxi_trees *trees, size_t max_symbols)
 {
 	char *out_ptr = dc->out_ptr;
 	char *const out_begin = dc->out_begin;
@@ -2064,6 +2065,8 @@ ufbxi_inflate_block_slow(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	const char *data = dc->stream.chunk_ptr;
 
 	for (;;) {
+		if (max_symbols-- == 0) break;
+
 		ufbxi_bit_refill(&bits, &left, &data, &dc->stream);
 		uint64_t sym_bits = bits;
 
@@ -2076,7 +2079,12 @@ ufbxi_inflate_block_slow(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 		left -= sym0_bits;
 		if (sym0 & UFBXI_HUFF_SYM_END) {
 			if (ufbxi_huff_sym_value(sym0) != 0) return -13;
-			break;
+
+			dc->out_ptr = out_ptr;
+			dc->stream.bits = bits;
+			dc->stream.left = left;
+			dc->stream.chunk_ptr = data;
+			return 0;
 		} else if ((sym0 & UFBXI_HUFF_SYM_MATCH) == 0) {
 			if (out_ptr == out_end) return -10;
 			*out_ptr++ = (char)ufbxi_huff_sym_value(sym0);
@@ -2140,7 +2148,7 @@ ufbxi_inflate_block_slow(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	dc->stream.bits = bits;
 	dc->stream.left = left;
 	dc->stream.chunk_ptr = data;
-	return 0;
+	return 1;
 }
 
 ufbx_static_assert(inflate_huff_fast_bits, UFBXI_HUFF_FAST_BITS <= 11); // `fast lit, fast len, slow dist` in 56 bits
@@ -2153,7 +2161,7 @@ ufbxi_inflate_block_fast(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 {
 	ufbxi_dev_assert(!dc->stream.cancelled);
 	ufbxi_dev_assert(trees->fast_bits == UFBXI_HUFF_FAST_BITS);
-	ufbxi_dev_assert(dc->stream.chunk_yield - dc->stream.chunk_ptr >= 0);
+	ufbxi_dev_assert(dc->stream.chunk_yield - dc->stream.chunk_ptr >= UFBXI_INFLATE_FAST_MIN_IN);
 	ufbxi_dev_assert(dc->out_end - dc->out_ptr >= UFBXI_INFLATE_FAST_MIN_OUT);
 
 	char *out_ptr = dc->out_ptr;
@@ -2166,7 +2174,7 @@ ufbxi_inflate_block_fast(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	uint64_t bits = dc->stream.bits;
 	size_t left = dc->stream.left;
 	const char *data = dc->stream.chunk_ptr;
-	const char *data_end = dc->stream.chunk_yield;
+	const char *data_end = dc->stream.chunk_yield - UFBXI_INFLATE_FAST_MIN_IN;
 
 	uint64_t sym01_bits;
 	ufbxi_huff_sym sym0, sym1;
@@ -2445,20 +2453,17 @@ ufbxi_extern_c ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inf
 			}
 
 			for (;;) {
+				bool fast_viable = trees->fast_bits == UFBXI_HUFF_FAST_BITS && dc.out_end - dc.out_ptr >= UFBXI_INFLATE_FAST_MIN_OUT;
+
 				// `ufbxi_inflate_block_fast()` needs a bit more upfront setup, see asserts on top of the function
-				if (trees->fast_bits == UFBXI_HUFF_FAST_BITS && dc.out_end - dc.out_ptr >= UFBXI_INFLATE_FAST_MIN_OUT) {
-					while (dc.stream.chunk_ptr > dc.stream.chunk_yield) {
-						ufbxi_bit_refill(&dc.stream.bits, &dc.stream.left, &dc.stream.chunk_ptr, &dc.stream);
-					}
-					if (dc.stream.cancelled) return -28;
+				if (fast_viable && dc.stream.chunk_yield - dc.stream.chunk_ptr >= UFBXI_INFLATE_FAST_MIN_IN) {
 					err = ufbxi_inflate_block_fast(&dc, trees);
-					if (err < 0) return err;
-					if (err == 0) break;
 				} else {
-					err = ufbxi_inflate_block_slow(&dc, trees);
-					if (err < 0) return err;
-					break;
+					err = ufbxi_inflate_block_slow(&dc, trees, fast_viable ? 32 : SIZE_MAX);
 				}
+
+				if (err < 0) return err;
+				if (err == 0) break;
 			}
 
 			// `ufbxi_inflate_block()` returns normally on cancel so check it here
