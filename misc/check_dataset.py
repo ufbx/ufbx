@@ -142,6 +142,9 @@ if __name__ == "__main__":
 
     ok_count = 0
     test_count = 0
+
+    case_ok_count = 0
+
     for case in cases:
 
         log(f"== '{case.title}' by '{case.author}' ({case.license}) ==")
@@ -153,6 +156,8 @@ if __name__ == "__main__":
         for extra in case.extra_files:
             log(f"   extra url: {fmt_url(extra, case.root)}")
         log()
+
+        case_ok = True
 
         for model in case.models:
             test_count += 1
@@ -196,9 +201,13 @@ if __name__ == "__main__":
             except subprocess.CalledProcessError:
                 log()
                 log("-- FAIL --")
+                case_ok = False
             log()
 
-    log(f"{ok_count}/{test_count} tests passed")
+        if case_ok:
+            case_ok_count += 1
+
+    log(f"{ok_count}/{test_count} files passed ({case_ok_count}/{len(cases)} test cases)")
 
     if ok_count < test_count:
         exit(1)
