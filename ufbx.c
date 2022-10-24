@@ -13251,7 +13251,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_read_line(ufbxi_context *uc)
 	size_t offset = 0;
 
 	for (;;) {
-		const char *begin = uc->data + offset;
+		const char *begin = ufbxi_add_ptr(uc->data, offset);
 		const char *end = begin ? (const char*)memchr(begin, '\n', uc->data_size - offset) : NULL;
 		if (!end) {
 			if (uc->eof) {
