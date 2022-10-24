@@ -13638,7 +13638,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_comment(ufbxi_context 
 		}
 
 		ufbx_string mrgb = uc->obj.tokens[2];
-		for (size_t i = 0; i < mrgb.length; i += 8) {
+		for (size_t i = 0; i + 8 <= mrgb.length; i += 8) {
 			ufbx_real *p_rgba = ufbxi_push(&uc->obj.tmp_vertices[UFBXI_OBJ_ATTRIB_COLOR], ufbx_real, 4);
 			bool *p_valid = ufbxi_push(&uc->obj.tmp_color_valid, bool, 1);
 			ufbxi_check(p_rgba && p_valid);
