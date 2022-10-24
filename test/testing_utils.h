@@ -457,6 +457,12 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 		}
 	}
 
+	bool implicit_mesh = false;
+	if (num_meshes == 0) {
+		num_meshes = 1;
+		implicit_mesh = true;
+	}
+
 	total_name_length += num_groups;
 
 	size_t alloc_size = 0;
@@ -507,6 +513,19 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 	obj->animation_frame = -1;
 	obj->exporter = UFBXT_OBJ_EXPORTER_UNKNOWN;
 	obj->position_scale = 1.0;
+
+	if (implicit_mesh) {
+		mesh = meshes;
+		memset(mesh, 0, sizeof(ufbxt_obj_mesh));
+
+		mesh->faces = df;
+		mesh->vertex_position.values.data = positions;
+		mesh->vertex_normal.values.data = normals;
+		mesh->vertex_uv.values.data = uvs;
+		mesh->vertex_position.indices.data = (uint32_t*)dpi;
+		mesh->vertex_normal.indices.data = (uint32_t*)dni;
+		mesh->vertex_uv.indices.data = (uint32_t*)dui;
+	}
 
 	line = (char*)obj_data;
 	for (;;) {
@@ -621,11 +640,12 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 
 		if (line[0] == '#') {
 			line += 1;
-			while (line < line_end && (line[0] == ' ' || line[0] == '\t')) {
+			char *end = line_end;
+			while (line < end && (line[0] == ' ' || line[0] == '\t')) {
 				line++;
 			}
-			while (line_end > line && (line_end[-1] == ' ' || line_end[-1] == '\t')) {
-				*--line_end = '\0';
+			while (end > line && (end[-1] == ' ' || end[-1] == '\t')) {
+				*--end = '\0';
 			}
 			if (!strcmp(line, "ufbx:bad_normals")) {
 				obj->bad_normals = true;
@@ -961,7 +981,7 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 	}
 	for (size_t i = 0; i < fbx_mesh->num_indices; i++) {
 		ufbx_vec3 fp = ufbx_get_vertex_vec3(&fbx_mesh->skinned_position, i);
-		ufbx_vec3 fn = ufbx_get_vertex_vec3(&fbx_mesh->skinned_normal, i);
+		ufbx_vec3 fn = fbx_mesh->skinned_normal.exists ? ufbx_get_vertex_vec3(&fbx_mesh->skinned_normal, i) : ufbx_zero_vec3;
 		if (fbx_mesh->skinned_is_local) {
 			fp = ufbx_transform_position(&fbx_node->geometry_to_world, fp);
 			fn = ufbx_transform_direction(&norm_mat, fn);
@@ -1150,7 +1170,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		ufbx_node *node = NULL;
 
 		// Search for a node containing all the groups
-		{
+		if (obj_mesh->num_groups > 0) {
 			ufbxt_obj_group_key(cat_name, sizeof(cat_name), obj_mesh->groups, obj_mesh->num_groups, obj->remove_namespaces);
 			ufbxt_obj_node key = { cat_name };
 			ufbxt_obj_node *found = (ufbxt_obj_node*)bsearch(&key, obj_nodes, num_obj_nodes,
@@ -1170,6 +1190,10 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 					}
 				}
 			}
+		} else {
+			ufbxt_assert(scene->meshes.count == 1);
+			ufbxt_assert(scene->meshes.data[0]->instances.count == 1);
+			node = scene->meshes.data[0]->instances.data[0];
 		}
 
 		if (!node) {

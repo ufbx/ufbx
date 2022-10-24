@@ -1014,13 +1014,13 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 		negative = true;
 		p++;
 	}
-	while (((uint32_t)*p - '0') <= 10) {
+	while (((uint32_t)*p - '0') < 10) {
 		integer = integer * 10 + (uint64_t)(*p++ - '0');
 		n_integer++;
 	}
 	if (*p == '.') {
 		p++;
-		while (((uint32_t)*p - '0') <= 10) {
+		while (((uint32_t)*p - '0') < 10) {
 			decimals = decimals * 10 + (uint64_t)(*p++ - '0');
 			n_decimals++;
 		}
@@ -3844,7 +3844,7 @@ ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(const char 
 		} else if ((c & 0xf8) == 0xf0 && left >= 4) {
 			uint8_t t0 = (uint8_t)str[index + 1], t1 = (uint8_t)str[index + 2], t2 = (uint8_t)str[index + 3];
 			uint32_t code = (uint32_t)c << 24 | (uint32_t)t0 << 16 | (uint32_t)t1 << 8 | (uint32_t)t2;
-			if ((code & 0xc0c0c0) == 0x808080 && code >= 0xf0908080 && code >= 0x400) {
+			if ((code & 0xc0c0c0) == 0x808080 && code >= 0xf0908080u && code <= 0xf48fbfbfu) {
 				index += 4;
 				continue;
 			}
@@ -3923,7 +3923,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_sanitize_string(ufbxi_string_poo
 		} else if ((c & 0xf8) == 0xf0 && left >= 4) {
 			uint8_t t0 = (uint8_t)str[index + 1], t1 = (uint8_t)str[index + 2], t2 = (uint8_t)str[index + 3];
 			uint32_t code = (uint32_t)c << 24 | (uint32_t)t0 << 16 | (uint32_t)t1 << 8 | (uint32_t)t2;
-			if ((code & 0xc0c0c0) == 0x808080 && code >= 0xf0908080 && code >= 0x400) {
+			if ((code & 0xc0c0c0) == 0x808080 && code >= 0xf0908080u && code <= 0xf48fbfbfu) {
 				dst[dst_len + 0] = (char)c;
 				dst[dst_len + 1] = (char)t0;
 				dst[dst_len + 2] = (char)t1;
@@ -4944,6 +4944,7 @@ typedef struct {
 	bool has_face_smoothing;
 
 	bool has_vertex_color;
+	size_t mrgb_vertex_count;
 
 	bool eof;
 	bool initialized;
@@ -13164,6 +13165,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_push_mesh(ufbxi_context *uc)
 
 	mesh->fbx_node = ufbxi_push_synthetic_element(uc, &mesh->fbx_node_id, NULL, name, ufbx_node, UFBX_ELEMENT_NODE);
 	mesh->fbx_mesh = ufbxi_push_synthetic_element(uc, &mesh->fbx_mesh_id, NULL, name, ufbx_mesh, UFBX_ELEMENT_MESH);
+	ufbxi_check(mesh->fbx_node && mesh->fbx_mesh);
 
 	mesh->fbx_mesh->vertex_position.unique_per_vertex = true;
 
@@ -13346,13 +13348,21 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_tokenize(ufbxi_context *uc)
 		}
 
 		c = *ptr;
-		if (c == '\n' || c == '#') break;
+		if (c == '\n') break;
+		if (c == '#' && uc->obj.num_tokens > 0) break;
 
 		size_t index = uc->obj.num_tokens++;
 		ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->obj.tokens, &uc->obj.tokens_cap, index + 1));
 
 		ufbx_string *tok = &uc->obj.tokens[index];
 		tok->data = ptr;
+
+		// Treat comment start as a single token
+		if (c == '#') {
+			ptr++;
+			tok->length = 1;
+			continue;
+		}
 
 		for (;;) {
 			c = *++ptr;
@@ -13399,8 +13409,8 @@ static ufbxi_noinline int ufbxi_obj_parse_vertex(ufbxi_context *uc, ufbxi_obj_at
 	}
 	ufbxi_check(offset + read_values <= uc->obj.num_tokens);
 
-	ufbx_real *vals = ufbxi_push(dst, ufbx_real, num_values);
-	ufbxi_check(dst);
+	ufbx_real *vals = ufbxi_push_fast(dst, ufbx_real, num_values);
+	ufbxi_check(vals);
 
 	for (size_t i = 0; i < read_values; i++) {
 		ufbx_string str = uc->obj.tokens[offset + i];
@@ -13594,6 +13604,67 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 	return 1;
 }
 
+static ufbxi_noinline uint32_t ufbxi_parse_hex(const char *digits, size_t length)
+{
+	uint32_t value = 0;
+
+	for (size_t i = 0; i < length; i++) {
+		char c =  digits[i];
+		uint32_t v = 0;
+		if (c >= '0' && c <= '9') {
+			v = (uint32_t)(c - '0');
+		} else if (c >= 'A' && c <= 'F') {
+			v = (uint32_t)(c - 'A') + 10;
+		} else if (c >= 'a' && c <= 'f') {
+			v = (uint32_t)(c - 'a') + 10;
+		}
+		value = (value << 4) | v;
+	}
+
+	return value;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_comment(ufbxi_context *uc)
+{
+	if (uc->obj.num_tokens >= 3 && ufbxi_str_equal(uc->obj.tokens[1], ufbxi_str_c("MRGB"))) {
+		size_t num_color = uc->obj.vertex_count[UFBXI_OBJ_ATTRIB_COLOR];
+
+		// Pop standard vertex colors and replace them with MRGB colors
+		if (num_color > uc->obj.mrgb_vertex_count) {
+			size_t num_pop = num_color - uc->obj.mrgb_vertex_count;
+			ufbxi_pop(&uc->obj.tmp_color_valid, bool, num_pop, NULL);
+			ufbxi_pop(&uc->obj.tmp_vertices[UFBXI_OBJ_ATTRIB_COLOR], ufbx_real, num_pop * 4, NULL);
+			uc->obj.vertex_count[UFBXI_OBJ_ATTRIB_COLOR] -= num_pop;
+		}
+
+		ufbx_string mrgb = uc->obj.tokens[2];
+		for (size_t i = 0; i < mrgb.length; i += 8) {
+			ufbx_real *p_rgba = ufbxi_push(&uc->obj.tmp_vertices[UFBXI_OBJ_ATTRIB_COLOR], ufbx_real, 4);
+			bool *p_valid = ufbxi_push(&uc->obj.tmp_color_valid, bool, 1);
+			ufbxi_check(p_rgba && p_valid);
+			*p_valid = true;
+
+			uint32_t hex = ufbxi_parse_hex(mrgb.data + i, 8);
+			p_rgba[0] = (ufbx_real)((hex >> 16u) & 0xff) / 255.0f;
+			p_rgba[1] = (ufbx_real)((hex >>  8u) & 0xff) / 255.0f;
+			p_rgba[2] = (ufbx_real)((hex >>  0u) & 0xff) / 255.0f;
+			p_rgba[3] = (ufbx_real)((hex >> 24u) & 0xff) / 255.0f;
+		}
+
+		uc->obj.has_vertex_color = true;
+	}
+
+	if (!uc->opts.disable_quirks) {
+		if (ufbxi_match(&uc->obj.line, "\\s*#\\s*File exported by ZBrush.*")) {
+			if (!uc->obj.mesh) {
+				uc->opts.obj_merge_groups = true;
+			}
+		}
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context *uc)
 {
 	ufbxi_check(uc->obj.num_tokens >= 2);
@@ -13662,9 +13733,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_vertices(ufbxi_context *uc, ufbx_real_list *dst, uint32_t attrib, uint64_t min_index)
 {
-	ufbxi_check(min_index < uc->obj.tmp_vertices[attrib].num_items);
-
 	size_t stride = ufbxi_obj_attrib_stride[attrib];
+	ufbxi_check(min_index < uc->obj.tmp_vertices[attrib].num_items / stride);
+
 	size_t count = uc->obj.tmp_vertices[attrib].num_items - (size_t)min_index * stride;
 	ufbx_real *data = ufbxi_push(&uc->result, ufbx_real, count + 4);
 	ufbxi_check(data);
@@ -13683,7 +13754,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_vertices(ufbxi_context *
 }
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_setup_attrib(ufbxi_context *uc, ufbxi_obj_mesh *mesh, uint64_t *tmp_indices,
-	ufbx_vertex_attrib *dst, const ufbx_real_list *p_data, uint32_t attrib, bool non_disjoint)
+	ufbx_vertex_attrib *dst, const ufbx_real_list *p_data, uint32_t attrib, bool non_disjoint, bool required)
 {
 	ufbx_real_list data = *p_data;
 
@@ -13693,6 +13764,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_setup_attrib(ufbxi_context *
 
 	uint64_t mesh_min_ix = mesh->vertex_range[attrib].min_ix;
 	if (num_indices == 0 || num_values == 0 || mesh_min_ix == UINT64_MAX) {
+		ufbxi_check(num_indices == 0 || !required);
+
 		// Pop indices without copying if the attribute is not used
 		ufbxi_pop(&uc->obj.tmp_indices[attrib], uint64_t, num_indices, NULL);
 		return 1;
@@ -13716,11 +13789,24 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_setup_attrib(ufbxi_context *
 	ufbxi_nounroll for (size_t i = 0; i < num_indices; i++) {
 		uint64_t ix = tmp_indices[i] - min_index;
 		ufbxi_check(ix < UINT32_MAX);
-		if (ix < data.count) {
+		if (ix < num_values) {
 			dst_indices[i] = (uint32_t)ix;
 		} else {
-			ufbxi_check(ufbxi_fix_index(uc, &dst_indices[i], (uint32_t)ix, (uint32_t)num_values));
+			ufbxi_check(ufbxi_fix_index(uc, &dst_indices[i], (uint32_t)ix, (uint32_t)num_values - 1));
 		}
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pad_colors(ufbxi_context *uc, size_t num_vertices)
+{
+	size_t num_colors = uc->obj.vertex_count[UFBXI_OBJ_ATTRIB_COLOR];
+	if (num_vertices > num_colors) {
+		size_t num_pad = num_vertices - num_colors;
+		ufbxi_check(ufbxi_push_zero(&uc->obj.tmp_vertices[UFBXI_OBJ_ATTRIB_COLOR], ufbx_real, num_pad * 4));
+		ufbxi_check(ufbxi_push_zero(&uc->obj.tmp_color_valid, bool, num_pad));
+		uc->obj.vertex_count[UFBXI_OBJ_ATTRIB_COLOR] += num_pad;
 	}
 
 	return 1;
@@ -13731,6 +13817,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 	size_t num_meshes = uc->obj.tmp_meshes.num_items;
 	ufbxi_obj_mesh *meshes = ufbxi_push_pop(&uc->tmp, &uc->obj.tmp_meshes, ufbxi_obj_mesh, num_meshes);
 	ufbxi_check(meshes);
+
+	if (uc->obj.has_vertex_color) {
+		ufbxi_check(ufbxi_obj_pad_colors(uc, uc->obj.vertex_count[UFBXI_OBJ_ATTRIB_POSITION]));
+	}
 
 	// Pop unused fast indices
 	for (size_t i = 0; i < UFBXI_OBJ_NUM_ATTRIBS; i++) {
@@ -13774,77 +13864,76 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 	for (size_t i = num_meshes; i > 0; i--) {
 		ufbxi_obj_mesh *mesh = &meshes[i - 1];
 
-		ufbxi_nounroll for (uint32_t attrib = 0; attrib < UFBXI_OBJ_NUM_ATTRIBS; attrib++) {
-			if (non_disjoint[attrib]) continue;
-			uint64_t min_ix = mesh->vertex_range[attrib].min_ix;
-			if (min_ix < UINT64_MAX) {
-				ufbxi_check(ufbxi_obj_pop_vertices(uc, &vertices[attrib], attrib, min_ix));
-			}
-		}
-		if (uc->obj.has_vertex_color && !non_disjoint[UFBXI_OBJ_ATTRIB_POSITION]) {
-			uint64_t min_ix = mesh->vertex_range[UFBXI_OBJ_ATTRIB_POSITION].min_ix;
-			ufbxi_check(min_ix < UINT64_MAX);
-			ufbxi_check(ufbxi_obj_pop_vertices(uc, &vertices[UFBXI_OBJ_ATTRIB_COLOR], UFBXI_OBJ_ATTRIB_COLOR, min_ix));
-			color_valid = ufbxi_push_pop(&uc->tmp, &uc->obj.tmp_color_valid, bool, vertices[UFBXI_OBJ_ATTRIB_COLOR].count / 4);
-			ufbxi_check(color_valid);
-		}
-
 		ufbx_mesh *fbx_mesh = mesh->fbx_mesh;
 
 		size_t num_faces = mesh->num_faces;
 
-		fbx_mesh->num_faces = mesh->num_faces;
-		fbx_mesh->num_indices = mesh->num_indices;
-
-		fbx_mesh->faces.count = num_faces;
-		fbx_mesh->face_material.count = num_faces;
-
-		fbx_mesh->faces.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_faces, ufbx_face, num_faces);
-		fbx_mesh->face_material.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_face_material, uint32_t, num_faces);
-
-		ufbxi_check(fbx_mesh->faces.data);
-		ufbxi_check(fbx_mesh->face_material.data);
-
-		if (uc->obj.has_face_smoothing) {
-			fbx_mesh->face_smoothing.count = num_faces;
-			fbx_mesh->face_smoothing.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_face_smoothing, bool, num_faces);
-			ufbxi_check(fbx_mesh->face_smoothing.data);
-		}
-
-		if (uc->obj.has_face_group) {
-			fbx_mesh->face_group.count = num_faces;
-			fbx_mesh->face_group.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_face_group, uint32_t, num_faces);
-			ufbxi_check(fbx_mesh->face_group.data);
-		}
-
-		ufbxi_check(ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_vertex_attrib*)&fbx_mesh->vertex_position,
-			&vertices[UFBXI_OBJ_ATTRIB_POSITION], UFBXI_OBJ_ATTRIB_POSITION, non_disjoint[UFBXI_OBJ_ATTRIB_POSITION]));
-
-		ufbxi_check(ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_vertex_attrib*)&fbx_mesh->vertex_uv,
-			&vertices[UFBXI_OBJ_ATTRIB_UV], UFBXI_OBJ_ATTRIB_UV, non_disjoint[UFBXI_OBJ_ATTRIB_UV]));
-
-		ufbxi_check(ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_vertex_attrib*)&fbx_mesh->vertex_normal,
-			&vertices[UFBXI_OBJ_ATTRIB_NORMAL], UFBXI_OBJ_ATTRIB_NORMAL, non_disjoint[UFBXI_OBJ_ATTRIB_NORMAL]));
-
-		if (uc->obj.has_vertex_color) {
-			ufbx_assert(color_valid);
-			bool has_color = false;
-			size_t max_index = fbx_mesh->vertex_position.values.count;
-			ufbxi_for_list(uint32_t, p_ix, fbx_mesh->vertex_position.indices) {
-				if (*p_ix < max_index) {
-					if (color_valid[*p_ix]) {
-						has_color = true;
-						break;
-					}
+		if (!uc->opts.ignore_geometry) {
+			ufbxi_nounroll for (uint32_t attrib = 0; attrib < UFBXI_OBJ_NUM_ATTRIBS; attrib++) {
+				if (non_disjoint[attrib]) continue;
+				uint64_t min_ix = mesh->vertex_range[attrib].min_ix;
+				if (min_ix < UINT64_MAX) {
+					ufbxi_check(ufbxi_obj_pop_vertices(uc, &vertices[attrib], attrib, min_ix));
 				}
 			}
+			if (uc->obj.has_vertex_color && !non_disjoint[UFBXI_OBJ_ATTRIB_POSITION]) {
+				uint64_t min_ix = mesh->vertex_range[UFBXI_OBJ_ATTRIB_POSITION].min_ix;
+				ufbxi_check(min_ix < UINT64_MAX);
+				ufbxi_check(ufbxi_obj_pop_vertices(uc, &vertices[UFBXI_OBJ_ATTRIB_COLOR], UFBXI_OBJ_ATTRIB_COLOR, min_ix));
+				color_valid = ufbxi_push_pop(&uc->tmp, &uc->obj.tmp_color_valid, bool, vertices[UFBXI_OBJ_ATTRIB_COLOR].count / 4);
+				ufbxi_check(color_valid);
+			}
 
-			if (has_color) {
-				fbx_mesh->vertex_color.exists = true;
-				fbx_mesh->vertex_color.values.data = (ufbx_vec4*)vertices[UFBXI_OBJ_ATTRIB_COLOR].data;
-				fbx_mesh->vertex_color.values.count = vertices[UFBXI_OBJ_ATTRIB_COLOR].count / 4;
-				fbx_mesh->vertex_color.indices = fbx_mesh->vertex_position.indices;
-				fbx_mesh->vertex_color.unique_per_vertex = true;
+			fbx_mesh->faces.count = num_faces;
+			fbx_mesh->face_material.count = num_faces;
+
+			fbx_mesh->faces.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_faces, ufbx_face, num_faces);
+			fbx_mesh->face_material.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_face_material, uint32_t, num_faces);
+
+			ufbxi_check(fbx_mesh->faces.data);
+			ufbxi_check(fbx_mesh->face_material.data);
+
+			if (uc->obj.has_face_smoothing) {
+				fbx_mesh->face_smoothing.count = num_faces;
+				fbx_mesh->face_smoothing.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_face_smoothing, bool, num_faces);
+				ufbxi_check(fbx_mesh->face_smoothing.data);
+			}
+
+			if (uc->obj.has_face_group) {
+				fbx_mesh->face_group.count = num_faces;
+				fbx_mesh->face_group.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_face_group, uint32_t, num_faces);
+				ufbxi_check(fbx_mesh->face_group.data);
+			}
+
+			ufbxi_check(ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_vertex_attrib*)&fbx_mesh->vertex_position,
+				&vertices[UFBXI_OBJ_ATTRIB_POSITION], UFBXI_OBJ_ATTRIB_POSITION, non_disjoint[UFBXI_OBJ_ATTRIB_POSITION], true));
+
+			ufbxi_check(ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_vertex_attrib*)&fbx_mesh->vertex_uv,
+				&vertices[UFBXI_OBJ_ATTRIB_UV], UFBXI_OBJ_ATTRIB_UV, non_disjoint[UFBXI_OBJ_ATTRIB_UV], false));
+
+			ufbxi_check(ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_vertex_attrib*)&fbx_mesh->vertex_normal,
+				&vertices[UFBXI_OBJ_ATTRIB_NORMAL], UFBXI_OBJ_ATTRIB_NORMAL, non_disjoint[UFBXI_OBJ_ATTRIB_NORMAL], false));
+
+			if (uc->obj.has_vertex_color) {
+				ufbx_assert(color_valid);
+				bool has_color = false;
+				size_t max_index = fbx_mesh->vertex_position.values.count;
+				ufbxi_for_list(uint32_t, p_ix, fbx_mesh->vertex_position.indices) {
+					if (*p_ix < max_index) {
+						if (color_valid[*p_ix]) {
+							has_color = true;
+							break;
+						}
+					}
+				}
+
+				if (has_color) {
+					fbx_mesh->vertex_color.exists = true;
+					fbx_mesh->vertex_color.values.data = (ufbx_vec4*)vertices[UFBXI_OBJ_ATTRIB_COLOR].data;
+					fbx_mesh->vertex_color.values.count = vertices[UFBXI_OBJ_ATTRIB_COLOR].count / 4;
+					fbx_mesh->vertex_color.indices = fbx_mesh->vertex_position.indices;
+					fbx_mesh->vertex_color.unique_per_vertex = true;
+				}
 			}
 		}
 
@@ -13883,19 +13972,16 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc
 		if (key == ufbxi_obj_cmd1('v')) {
 			ufbxi_check(ufbxi_obj_parse_vertex(uc, UFBXI_OBJ_ATTRIB_POSITION, 1));
 			if (num_tokens >= 7) {
-				if (!uc->obj.has_vertex_color) {
-					size_t num_vertices = (uc->obj.tmp_vertices[UFBXI_OBJ_ATTRIB_POSITION].num_items - 3) / 3;
-					ufbxi_check(ufbxi_push_zero(&uc->obj.tmp_vertices[UFBXI_OBJ_ATTRIB_COLOR], ufbx_real, num_vertices * 4));
-					ufbxi_check(ufbxi_push_zero(&uc->obj.tmp_color_valid, bool, num_vertices));
-					uc->obj.has_vertex_color = true;
+				size_t num_vertices = uc->obj.vertex_count[UFBXI_OBJ_ATTRIB_POSITION];
+				uc->obj.has_vertex_color = true;
+				ufbxi_check(ufbxi_obj_pad_colors(uc, num_vertices - 1));
+				if (uc->obj.vertex_count[UFBXI_OBJ_ATTRIB_COLOR] < num_vertices) {
+					ufbx_assert(uc->obj.vertex_count[UFBXI_OBJ_ATTRIB_COLOR] == num_vertices - 1);
+					ufbxi_check(ufbxi_obj_parse_vertex(uc, UFBXI_OBJ_ATTRIB_COLOR, 4));
+					bool *valid = ufbxi_push(&uc->obj.tmp_color_valid, bool, 1);
+					ufbxi_check(valid);
+					*valid = true;
 				}
-				ufbxi_check(ufbxi_obj_parse_vertex(uc, UFBXI_OBJ_ATTRIB_COLOR, 4));
-				bool *valid = ufbxi_push(&uc->obj.tmp_color_valid, bool, 1);
-				ufbxi_check(valid);
-				*valid = true;
-			} else if (uc->obj.has_vertex_color) {
-				ufbxi_check(ufbxi_push_zero(&uc->obj.tmp_vertices[UFBXI_OBJ_ATTRIB_COLOR], ufbx_real, 4));
-				ufbxi_check(ufbxi_push_zero(&uc->obj.tmp_color_valid, bool, 1));
 			}
 		} else if (key == ufbxi_obj_cmd2('v','t')) {
 			ufbxi_check(ufbxi_obj_parse_vertex(uc, UFBXI_OBJ_ATTRIB_UV, 1));
@@ -13925,6 +14011,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc
 				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->obj.group, false));
 				uc->obj.group_dirty = true;
 			}
+		} else if (key == ufbxi_obj_cmd1('#')) {
+			ufbxi_check(ufbxi_obj_parse_comment(uc));
 		} else if (ufbxi_str_equal(cmd, ufbxi_str_c("mtllib"))) {
 			ufbxi_check(uc->obj.num_tokens >= 2);
 			ufbx_string lib = ufbxi_obj_span_token(uc, 1, SIZE_MAX);

@@ -16,6 +16,10 @@ elif [ "$1" == "build-cache-asan" ]; then
     AFL_USE_ASAN=1 afl-clang-fast -DDISCRETE_ALLOCATIONS ../../misc/fuzz_cache_persist.c -lm -o fuzz_cache_asan
 elif [ "$1" == "build-cache-asan-32" ]; then
     AFL_USE_ASAN=1 afl-clang-fast -DDISCRETE_ALLOCATIONS ../../misc/fuzz_cache_persist.c -lm -o fuzz_cache_asan_32
+elif [ "$1" == "build-obj" ]; then
+    afl-clang-fast -DLOAD_OBJ -static ../../misc/fuzz_ufbx_persist.c -lm -o fuzz_obj
+elif [ "$1" == "build-obj-asan" ]; then
+    AFL_USE_ASAN=1 afl-clang-fast -DLOAD_OBJ -DDISCRETE_ALLOCATIONS ../../misc/fuzz_ufbx_persist.c -lm -o fuzz_obj_asan
 fi
 
 if [ "$1" == "fuzz" ]; then

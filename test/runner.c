@@ -289,6 +289,7 @@ static bool g_fuzz_no_buffer = false;
 static int g_patch_start = 0;
 static int g_fuzz_quality = 16;
 static size_t g_fuzz_step = SIZE_MAX;
+static size_t g_fuzz_file = SIZE_MAX;
 static size_t g_deflate_opt = SIZE_MAX;
 
 const char *g_fuzz_test_name = NULL;
@@ -1437,7 +1438,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 	}
 }
 
-const uint32_t ufbxt_file_versions[] = { 3000, 5000, 5800, 6100, 7100, 7200, 7300, 7400, 7500, 7700 };
+const uint32_t ufbxt_file_versions[] = { 0, 3000, 5000, 5800, 6100, 7100, 7200, 7300, 7400, 7500, 7700 };
 
 typedef struct ufbxt_file_iterator {
 	// Input
@@ -1518,6 +1519,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 		ufbx_load_opts obj_opts = { 0 };
 		obj_opts.load_external_files = true;
+
 		ufbx_error obj_error;
 		obj_scene = ufbx_load_file(buf, &obj_opts, &obj_error);
 		if (!obj_scene) {
@@ -1525,6 +1527,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse .obj file");
 		}
 		ufbxt_assert(obj_scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ);
+		ufbxt_check_scene(obj_scene);
 
 		// TODO: Diff to the other .obj
 	}
@@ -1539,14 +1542,22 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	bool alternative = (flags & UFBXT_FILE_TEST_FLAG_ALTERNATIVE) != 0;
 
 	for (uint32_t vi = 0; vi < ufbxt_arraycount(ufbxt_file_versions); vi++) {
-		for (uint32_t fi = 0; fi < 2; fi++) {
+		for (uint32_t fi = 0; fi < 3; fi++) {
 			uint32_t version = ufbxt_file_versions[vi];
-			const char *format = fi == 1 ? "ascii" : "binary";
+			const char *format = NULL;
+			const char *ext = "fbx";
+			switch (fi) {
+			case 0: format = "binary"; break;
+			case 1: format = "ascii"; break;
+			case 2: format = "obj"; ext = "obj"; break;
+			}
+			ufbxt_assert(format);
+
 			if (suffix) {
-				snprintf(buf, sizeof(buf), "%s%s_%u_%s_%s.fbx", data_root, name, version, format, suffix);
+				snprintf(buf, sizeof(buf), "%s%s_%u_%s_%s.%s", data_root, name, version, format, suffix, ext);
 				snprintf(base_name, sizeof(base_name), "%s_%u_%s_%s", name, version, format, suffix);
 			} else {
-				snprintf(buf, sizeof(buf), "%s%s_%u_%s.fbx", data_root, name, version, format);
+				snprintf(buf, sizeof(buf), "%s%s_%u_%s.%s", data_root, name, version, format, ext);
 				snprintf(base_name, sizeof(base_name), "%s_%u_%s", name, version, format);
 			}
 
@@ -1576,7 +1587,9 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				load_opts.filename.length = SIZE_MAX;
 			}
 
-			load_opts.file_format = UFBX_FILE_FORMAT_FBX;
+			if (fi < 2) {
+				load_opts.file_format = UFBX_FILE_FORMAT_FBX;
+			}
 
 			ufbxt_progress_ctx progress_ctx = { 0 };
 
@@ -1603,6 +1616,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbx_load_opts stream_opts = load_opts;
 			ufbxt_init_allocator(&stream_opts.temp_allocator, &temp_freed);
 			ufbxt_init_allocator(&stream_opts.result_allocator, &result_freed);
+			stream_opts.file_format = UFBX_FILE_FORMAT_UNKNOWN;
 			stream_opts.read_buffer_size = 1;
 			stream_opts.temp_allocator.huge_threshold = 2;
 			stream_opts.result_allocator.huge_threshold = 2;
@@ -2073,6 +2087,10 @@ int main(int argc, char **argv)
 
 		if (!strcmp(argv[i], "--fuzz-step")) {
 			if (++i < argc) g_fuzz_step = (size_t)atoi(argv[i]);
+		}
+
+		if (!strcmp(argv[i], "--fuzz-file")) {
+			if (++i < argc) g_fuzz_file = (size_t)atoi(argv[i]);
 		}
 	}
 

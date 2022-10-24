@@ -525,12 +525,49 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unicode, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNIC
 
 		for (size_t prop_ix = 0; prop_ix < node->props.props.count; prop_ix++) {
 			ufbx_prop *prop = &node->props.props.data[prop_ix];
-			size_t len = ufbxt_decode_hex(ref, ufbxt_arraycount(ref), prop->name);
+			size_t ref_len = ufbxt_decode_hex(ref, ufbxt_arraycount(ref), prop->name);
 
 			ufbx_string src = prop->value_str;
 
 			size_t src_ix = 0;
-			for (size_t ref_ix = 0; ref_ix < len; ref_ix++) {
+			for (size_t ref_ix = 0; ref_ix < ref_len; ref_ix++) {
+				uint8_t rc = ref[ref_ix];
+				if (rc == 0) {
+					ufbxt_assert(src_ix + 3 <= src.length);
+					ufbxt_assert((uint8_t)src.data[src_ix + 0] == 0xef);
+					ufbxt_assert((uint8_t)src.data[src_ix + 1] == 0xbf);
+					ufbxt_assert((uint8_t)src.data[src_ix + 2] == 0xbd);
+					src_ix += 3;
+				} else {
+					ufbxt_assert(src_ix < src.length);
+					ufbxt_assert((uint8_t)src.data[src_ix] == rc);
+					src_ix += 1;
+				}
+			}
+			ufbxt_assert(src_ix == src.length);
+		}
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Ok");
+		ufbxt_assert(node);
+
+		for (size_t prop_ix = 0; prop_ix < node->props.props.count; prop_ix++) {
+			ufbx_prop *prop = &node->props.props.data[prop_ix];
+			size_t ref_len = ufbxt_decode_hex(ref, ufbxt_arraycount(ref), prop->name);
+
+			ufbx_string src = prop->value_str;
+
+			ufbxt_assert(ref_len >= 1);
+			ufbxt_assert((uint8_t)ref[0] == 0xff);
+
+			size_t src_ix = 0;
+			ufbxt_assert((uint8_t)src.data[src_ix + 0] == 0xef);
+			ufbxt_assert((uint8_t)src.data[src_ix + 1] == 0xbf);
+			ufbxt_assert((uint8_t)src.data[src_ix + 2] == 0xbd);
+			src_ix += 3;
+
+			for (size_t ref_ix = 1; ref_ix < ref_len; ref_ix++) {
 				uint8_t rc = ref[ref_ix];
 				if (rc == 0) {
 					ufbxt_assert(src_ix + 3 <= src.length);
@@ -554,7 +591,7 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unicode, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNIC
 
 		for (size_t prop_ix = 0; prop_ix < node->props.props.count; prop_ix++) {
 			ufbx_prop *prop = &node->props.props.data[prop_ix];
-			size_t len = ufbxt_decode_hex(ref, ufbxt_arraycount(ref), prop->name);
+			size_t ref_len = ufbxt_decode_hex(ref, ufbxt_arraycount(ref), prop->name);
 
 			ufbx_string src = prop->value_str;
 			const char *replacement = strstr(src.data, "\xef\xbf\xbd");

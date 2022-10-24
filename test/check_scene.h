@@ -185,7 +185,7 @@ static void ufbxt_check_props(ufbx_scene *scene, const ufbx_props *props, bool t
 
 static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 {
-	if (scene->dom_root) {
+	if (scene->dom_root && scene->metadata.file_format == UFBX_FILE_FORMAT_FBX) {
 		bool requires_dom = true;
 		uint32_t version = scene->metadata.version;
 
