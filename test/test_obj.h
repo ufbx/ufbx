@@ -50,6 +50,9 @@ UFBXT_FILE_TEST(synthetic_color_suzanne)
 	ufbxt_assert(mesh->vertex_color.exists);
 	ufbxt_assert(mesh->vertex_color.unique_per_vertex);
 
+	ufbxt_assert(mesh->num_faces == 500);
+	ufbxt_assert(mesh->num_triangles == 968);
+
 	for (size_t i = 0; i < mesh->num_indices; i++) {
 		ufbx_vec3 position = ufbx_get_vertex_vec3(&mesh->vertex_position, i);
 		ufbx_vec4 color = ufbx_get_vertex_vec4(&mesh->vertex_color, i);
