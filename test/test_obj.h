@@ -155,6 +155,8 @@ static void ufbxt_check_obj_elements(ufbxt_diff_error *err, ufbx_scene *scene, i
 UFBXT_FILE_TEST(synthetic_mixed_attribs)
 #if UFBXT_IMPL
 {
+	ufbxt_assert(scene->nodes.count == 9);
+	ufbxt_assert(scene->meshes.count == 8);
 	ufbxt_check_obj_elements(err, scene, 1, 0, 0, 0, "V");
 	ufbxt_check_obj_elements(err, scene, 2, 1, 0, 0, "VT");
 	ufbxt_check_obj_elements(err, scene, 3, 0, 1, 0, "VN");
@@ -169,6 +171,8 @@ UFBXT_FILE_TEST(synthetic_mixed_attribs)
 UFBXT_FILE_TEST(synthetic_mixed_attribs_reverse)
 #if UFBXT_IMPL
 {
+	ufbxt_assert(scene->nodes.count == 9);
+	ufbxt_assert(scene->meshes.count == 8);
 	ufbxt_check_obj_elements(err, scene, 1, 0, 0, 0, "V");
 	ufbxt_check_obj_elements(err, scene, 2, 1, 0, 0, "VT");
 	ufbxt_check_obj_elements(err, scene, 3, 0, 1, 0, "VN");
@@ -183,6 +187,8 @@ UFBXT_FILE_TEST(synthetic_mixed_attribs_reverse)
 UFBXT_FILE_TEST(synthetic_mixed_attribs_reuse)
 #if UFBXT_IMPL
 {
+	ufbxt_assert(scene->nodes.count == 9);
+	ufbxt_assert(scene->meshes.count == 8);
 	ufbxt_check_obj_elements(err, scene, 1, 0, 0, 0, "V");
 	ufbxt_check_obj_elements(err, scene, 1, 1, 0, 0, "VT");
 	ufbxt_check_obj_elements(err, scene, 1, 0, 1, 0, "VN");
