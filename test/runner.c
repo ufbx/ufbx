@@ -1438,7 +1438,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 	}
 }
 
-const uint32_t ufbxt_file_versions[] = { 0, 3000, 5000, 5800, 6100, 7100, 7200, 7300, 7400, 7500, 7700 };
+const uint32_t ufbxt_file_versions[] = { 0, 1, 2, 3, 3000, 5000, 5800, 6100, 7100, 7200, 7300, 7400, 7500, 7700 };
 
 typedef struct ufbxt_file_iterator {
 	// Input
@@ -1541,8 +1541,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	bool allow_error = (flags & UFBXT_FILE_TEST_FLAG_ALLOW_ERROR) != 0;
 	bool alternative = (flags & UFBXT_FILE_TEST_FLAG_ALTERNATIVE) != 0;
 
-	for (uint32_t vi = 0; vi < ufbxt_arraycount(ufbxt_file_versions); vi++) {
-		for (uint32_t fi = 0; fi < 3; fi++) {
+	for (uint32_t fi = 0; fi < 3; fi++) {
+		for (uint32_t vi = 0; vi < ufbxt_arraycount(ufbxt_file_versions); vi++) {
 			uint32_t version = ufbxt_file_versions[vi];
 			const char *format = NULL;
 			const char *ext = "fbx";
@@ -1762,8 +1762,13 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 					scene->metadata.result_allocs
 				);
 
-				ufbxt_assert(scene->metadata.ascii == ((fi == 1) ? 1 : 0));
-				ufbxt_assert(scene->metadata.version == version);
+				if (fi <= 1) {
+					ufbxt_assert(scene->metadata.file_format == UFBX_FILE_FORMAT_FBX);
+					ufbxt_assert(scene->metadata.ascii == ((fi == 1) ? 1 : 0));
+					ufbxt_assert(scene->metadata.version == version);
+				} else if (fi == 2) {
+					ufbxt_assert(scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ);
+				}
 
 				ufbxt_check_scene(scene);
 			}

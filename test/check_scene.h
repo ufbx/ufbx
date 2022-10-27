@@ -917,6 +917,13 @@ static void ufbxt_check_metadata(ufbx_scene *scene, ufbx_metadata *metadata)
 	ufbxt_check_blob(metadata->raw_relative_root);
 	ufbxt_check_application(scene, &metadata->latest_application);
 	ufbxt_check_application(scene, &metadata->original_application);
+
+	if (metadata->file_format == UFBX_FILE_FORMAT_FBX) {
+	} else if (metadata->file_format == UFBX_FILE_FORMAT_OBJ) {
+		ufbxt_assert(metadata->ascii);
+	} else {
+		ufbxt_assert(0 && "Invalid file format");
+	}
 }
 
 static void ufbxt_check_dom_value(ufbx_scene *scene, ufbx_dom_value *value)

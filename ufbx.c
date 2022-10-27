@@ -13801,6 +13801,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_setup_attrib(ufbxi_context *
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pad_colors(ufbxi_context *uc, size_t num_vertices)
 {
+	if (uc->opts.ignore_geometry) return 1;
+
 	size_t num_colors = uc->obj.vertex_count[UFBXI_OBJ_ATTRIB_COLOR];
 	if (num_vertices > num_colors) {
 		size_t num_pad = num_vertices - num_colors;
@@ -13950,7 +13952,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc)
 {
-	uc->scene.metadata.ascii = true;
+	uc->from_ascii = true;
 
 	// Add a nameless root node with the root ID
 	{

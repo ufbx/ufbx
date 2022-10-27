@@ -98,6 +98,11 @@ static ufbx_vec3 ufbxt_normalize(ufbx_vec3 a) {
 	}
 }
 
+static ufbx_real ufbxt_min(ufbx_real a, ufbx_real b) { return a < b ? a : b; }
+static ufbx_real ufbxt_max(ufbx_real a, ufbx_real b) { return a < b ? b : a; }
+static ufbx_real ufbxt_clamp(ufbx_real v, ufbx_real min_v, ufbx_real max_v) { return ufbxt_min(ufbxt_max(v, min_v), max_v); }
+
+
 // -- obj load and diff
 
 typedef struct {
@@ -1340,8 +1345,8 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 
 					ufbx_vec3 op = ufbx_get_vertex_vec3(&obj_mesh->vertex_position, oix);
 					ufbx_vec3 fp = ufbx_get_vertex_vec3(&mesh->skinned_position, fix);
-					ufbx_vec3 on = ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, oix);
-					ufbx_vec3 fn = ufbx_get_vertex_vec3(&mesh->skinned_normal, fix);
+					ufbx_vec3 on = check_normals ? ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, oix) : ufbx_zero_vec3;
+					ufbx_vec3 fn = check_normals ? ufbx_get_vertex_vec3(&mesh->skinned_normal, fix) : ufbx_zero_vec3;
 
 					if (mesh->skinned_is_local) {
 						fp = ufbx_transform_position(mat, fp);

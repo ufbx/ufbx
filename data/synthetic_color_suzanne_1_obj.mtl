@@ -1,0 +1,5 @@
+# File created by ZBrush
+# ToolType: PolyMesh3D
+# www.zbrush.com
+newmtl defaultMat
+map_Kd synthetic_color_suzanne_1_obj.bmp
