@@ -8812,10 +8812,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_determine_format(ufbxi_context *
 				}
 			}
 
-			if (lookahead < SIZE_MAX / 2) {
-				lookahead = ufbxi_min_sz(lookahead * 2, uc->opts.file_format_lookahead);
-			} else if (lookahead == SIZE_MAX) {
+			if (lookahead >= uc->opts.file_format_lookahead) {
 				break;
+			} else if (lookahead < SIZE_MAX / 2) {
+				lookahead = ufbxi_min_sz(lookahead * 2, uc->opts.file_format_lookahead);
 			} else {
 				lookahead = SIZE_MAX;
 			}
