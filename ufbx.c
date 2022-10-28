@@ -13075,9 +13075,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, uf
 		ufbxi_for_list(uint32_t, p_vx_ix, mesh->vertex_first_index) {
 			*p_vx_ix = UFBX_NO_INDEX;
 		}
+
+		uint32_t num_vertices = (uint32_t)mesh->num_vertices;
 		for (size_t ix = 0; ix < mesh->num_indices; ix++) {
 			uint32_t vx = mesh->vertex_indices.data[ix];
-			if (mesh->vertex_first_index.data[vx] == UFBX_NO_INDEX) {
+			if (vx < num_vertices && mesh->vertex_first_index.data[vx] == UFBX_NO_INDEX) {
 				mesh->vertex_first_index.data[vx] = (uint32_t)ix;
 			}
 		}

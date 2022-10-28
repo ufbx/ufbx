@@ -337,7 +337,10 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 
 	for (size_t ii = 0; ii < mesh->num_indices; ii++) {
 		uint32_t vi = mesh->vertex_indices.data[ii];
-		ufbxt_assert(mesh->vertex_first_index.data[vi] <= ii);
+		if (vi != UFBX_NO_INDEX) {
+			ufbxt_assert(vi < mesh->num_vertices);
+			ufbxt_assert(mesh->vertex_first_index.data[vi] <= ii);
+		}
 	}
 
 	for (size_t vi = 0; vi < mesh->num_vertices; vi++) {
