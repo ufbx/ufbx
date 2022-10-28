@@ -13529,6 +13529,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 			ufbxi_obj_group_entry *entry = ufbxi_map_find(&uc->obj.group_map, ufbxi_obj_group_entry, hash, &group);
 			if (!entry) {
 				entry = ufbxi_map_insert(&uc->obj.group_map, ufbxi_obj_group_entry, hash, &uc->obj.group.data);
+				ufbxi_check(entry);
 				entry->name = group;
 				entry->mesh_id = 0;
 				entry->local_id = 0;
