@@ -1775,8 +1775,10 @@ static ufbxi_noinline void ufbxi_init_static_huff(ufbxi_trees *trees, const ufbx
 	memset(dist_bits + 0, 5, 32 - 0);
 	err |= ufbxi_huff_build(&trees->dist, dist_bits, sizeof(dist_bits), ufbxi_deflate_dist_lut, 0, trees->fast_bits);
 
+#if 0
 	// Building the static trees cannot fail as we use pre-defined code lengths.
 	ufbx_assert(err == 0);
+#endif
 }
 
 // 0: Success
