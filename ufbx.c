@@ -1752,7 +1752,7 @@ ufbxi_huff_decode_bits(const ufbxi_huff_tree *tree, uint64_t bits, uint32_t fast
 
 static ufbxi_noinline void ufbxi_init_static_huff(ufbxi_trees *trees, const ufbx_inflate_input *input)
 {
-	// ptrdiff_t err = 0;
+	ptrdiff_t err = 0;
 
 	// Override `fast_bits` if necessary, this must always be valid as it's checked in the beginning of `ufbx_inflate()`.
 	if (input->internal_fast_bits != 0) {
@@ -1768,17 +1768,15 @@ static ufbxi_noinline void ufbxi_init_static_huff(ufbxi_trees *trees, const ufbx
 	memset(lit_length_bits + 144, 9, 256 - 144);
 	memset(lit_length_bits + 256, 7, 280 - 256);
 	memset(lit_length_bits + 280, 8, 288 - 280);
-	/*err |= */ufbxi_huff_build(&trees->lit_length, lit_length_bits, sizeof(lit_length_bits), ufbxi_deflate_length_lut, 256, trees->fast_bits);
+	err |= ufbxi_huff_build(&trees->lit_length, lit_length_bits, sizeof(lit_length_bits), ufbxi_deflate_length_lut, 256, trees->fast_bits);
 
 	// "Distance codes 0-31 are represented by (fixed-length) 5-bit codes"
 	uint8_t dist_bits[32];
 	memset(dist_bits + 0, 5, 32 - 0);
-	/*err |= */ufbxi_huff_build(&trees->dist, dist_bits, sizeof(dist_bits), ufbxi_deflate_dist_lut, 0, trees->fast_bits);
+	err |= ufbxi_huff_build(&trees->dist, dist_bits, sizeof(dist_bits), ufbxi_deflate_dist_lut, 0, trees->fast_bits);
 
-#if 0
 	// Building the static trees cannot fail as we use pre-defined code lengths.
 	ufbx_assert(err == 0);
-#endif
 }
 
 // 0: Success
@@ -1789,7 +1787,8 @@ static ufbxi_noinline void ufbxi_init_static_huff(ufbxi_trees *trees, const ufbx
 // -5: Code 18 repeat overflow
 // -6: Bad length code
 // -7: Cancelled
-static ufbxi_noinline ptrdiff_t ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *huff_code_length, ufbxi_huff_tree *tree, uint32_t num_symbols, const uint32_t *sym_extra, uint32_t sym_extra_offset, uint32_t fast_bits)
+static ufbxi_noinline ptrdiff_t ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *huff_code_length, ufbxi_huff_tree *tree,
+	uint32_t num_symbols, const uint32_t *sym_extra, uint32_t sym_extra_offset, uint32_t fast_bits)
 {
 	uint8_t code_lengths[UFBXI_HUFF_MAX_VALUE];
 	ufbx_assert(num_symbols <= UFBXI_HUFF_MAX_VALUE);
