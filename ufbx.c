@@ -9987,11 +9987,13 @@ static ufbx_real ufbxi_zero_element[8] = { 0 };
 static const uint32_t ufbxi_sentinel_index_zero[1] = { 100000000 };
 static const uint32_t ufbxi_sentinel_index_consecutive[1] = { 123456789 };
 
-ufbxi_noinline static int ufbxi_fix_index(ufbxi_context *uc, uint32_t *p_dst, uint32_t index, uint32_t clamped)
+ufbxi_noinline static int ufbxi_fix_index(ufbxi_context *uc, uint32_t *p_dst, uint32_t index, size_t one_past_max_val)
 {
 	switch (uc->opts.index_error_handling) {
 	case UFBX_INDEX_ERROR_HANDLING_CLAMP:
-		*p_dst = clamped;
+		ufbxi_check(one_past_max_val > 0);
+		ufbxi_check(one_past_max_val <= UINT32_MAX);
+		*p_dst = (uint32_t)one_past_max_val - 1;
 		break;
 	case UFBX_INDEX_ERROR_HANDLING_NO_INDEX:
 		*p_dst = UFBX_NO_INDEX;
@@ -10041,7 +10043,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_check_indices(ufbxi_context *uc,
 				indices = new_indices;
 				owns_indices = true;
 			}
-			ufbxi_check(ufbxi_fix_index(uc, &indices[i], ix, (uint32_t)(num_elems - 1)));
+			ufbxi_check(ufbxi_fix_index(uc, &indices[i], ix, num_elems));
 		}
 	}
 
@@ -10113,7 +10115,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 				if (ix < num_indices) {
 					new_index_data[i] = index_data[ix];
 				} else {
-					ufbxi_check(ufbxi_fix_index(uc, &new_index_data[i], ix, (uint32_t)(num_elems - 1)));
+					ufbxi_check(ufbxi_fix_index(uc, &new_index_data[i], ix, num_elems));
 				}
 			}
 
@@ -10445,7 +10447,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_process_indices(ufbxi_context *u
 				mesh->vertex_first_index.data[vx] = (uint32_t)ix;
 			}
 		} else {
-			ufbxi_check(ufbxi_fix_index(uc, &mesh->vertex_indices.data[ix], vx, (uint32_t)mesh->num_vertices - 1));
+			ufbxi_check(ufbxi_fix_index(uc, &mesh->vertex_indices.data[ix], vx, mesh->num_vertices));
 		}
 	}
 
@@ -10976,7 +10978,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_line(ufbxi_context *uc, ufb
 				if (ix < line->control_points.count) {
 					line->point_indices.data[i] = ix;
 				} else {
-					ufbxi_check(ufbxi_fix_index(uc, &line->point_indices.data[i], ix, (uint32_t)line->control_points.count - 1));
+					ufbxi_check(ufbxi_fix_index(uc, &line->point_indices.data[i], ix, line->control_points.count));
 				}
 			}
 
@@ -13792,7 +13794,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_setup_attrib(ufbxi_context *
 		if (ix < num_values) {
 			dst_indices[i] = (uint32_t)ix;
 		} else {
-			ufbxi_check(ufbxi_fix_index(uc, &dst_indices[i], (uint32_t)ix, (uint32_t)num_values - 1));
+			ufbxi_check(ufbxi_fix_index(uc, &dst_indices[i], (uint32_t)ix, num_values));
 		}
 	}
 
@@ -16604,7 +16606,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_validate_indices(ufbxi_context *
 	ufbxi_nounroll ufbxi_for_list(uint32_t, p_ix, *indices) {
 		uint32_t ix = *p_ix;
 		if (ix >= max_index) {
-			ufbxi_check(ufbxi_fix_index(uc, p_ix, ix, (uint32_t)max_index - 1));
+			ufbxi_check(ufbxi_fix_index(uc, p_ix, ix, max_index));
 		}
 	}
 

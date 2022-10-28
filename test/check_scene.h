@@ -122,6 +122,7 @@ static void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void 
 	}
 
 	ufbxt_assert(elem->values.count >= 0);
+	ufbxt_assert(elem->values.count <= INT32_MAX);
 	ufbxt_assert(elem->indices.count == mesh->num_indices);
 	if (mesh->num_indices > 0) {
 		ufbxt_assert(elem->indices.data != NULL);
