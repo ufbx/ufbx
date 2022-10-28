@@ -1788,8 +1788,7 @@ static ufbxi_noinline void ufbxi_init_static_huff(ufbxi_trees *trees, const ufbx
 // -6: Bad length code
 // -7: Cancelled
 static ufbxi_noinline ptrdiff_t
-ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *huff_code_length,
-	ufbxi_huff_tree *tree, uint32_t num_symbols, const uint32_t *sym_extra, uint32_t sym_extra_offset, uint32_t fast_bits)
+ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *huff_code_length, ufbxi_huff_tree *tree, uint32_t num_symbols, const uint32_t *sym_extra, uint32_t sym_extra_offset, uint32_t fast_bits)
 {
 	uint8_t code_lengths[UFBXI_HUFF_MAX_VALUE];
 	ufbx_assert(num_symbols <= UFBXI_HUFF_MAX_VALUE);
