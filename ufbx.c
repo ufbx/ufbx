@@ -1753,6 +1753,7 @@ ufbxi_huff_decode_bits(const ufbxi_huff_tree *tree, uint64_t bits, uint32_t fast
 static ufbxi_noinline void ufbxi_init_static_huff(ufbxi_trees *trees, const ufbx_inflate_input *input)
 {
 	ptrdiff_t err = 0;
+	(void)err;
 
 	// Override `fast_bits` if necessary, this must always be valid as it's checked in the beginning of `ufbx_inflate()`.
 	if (input->internal_fast_bits != 0) {
