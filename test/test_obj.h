@@ -200,3 +200,132 @@ UFBXT_FILE_TEST(synthetic_mixed_attribs_reuse)
 }
 #endif
 
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_no_index_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.index_error_handling = UFBX_INDEX_ERROR_HANDLING_NO_INDEX;
+	return opts;
+}
+
+static ufbx_load_opts ufbxt_abort_index_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.index_error_handling = UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING;
+	return opts;
+}
+
+static void ufbxt_check_obj_face(ufbx_mesh *mesh, size_t face_ix, int32_t v, int32_t vt, int32_t vn, int32_t vc, bool no_index)
+{
+	ufbxt_hintf("face_ix = %zu", face_ix);
+
+	ufbxt_assert(face_ix < mesh->faces.count);
+	ufbx_face face = mesh->faces.data[face_ix];
+	uint32_t a = face.index_begin + 0;
+	uint32_t b = face.index_begin + 1;
+	uint32_t c = face.index_begin + 2;
+
+	if (v) {
+		ufbxt_assert(mesh->vertex_position.indices.data[a] == v - 1 + 0);
+		ufbxt_assert(mesh->vertex_position.indices.data[b] == v - 1 + 1);
+		ufbxt_assert(mesh->vertex_position.indices.data[c] == v - 1 + 2);
+	} else {
+		uint32_t sentinel = no_index ? UFBX_NO_INDEX : (uint32_t)mesh->vertex_position.values.count - 1;
+		ufbxt_assert(mesh->vertex_position.indices.data[a] == sentinel);
+		ufbxt_assert(mesh->vertex_position.indices.data[b] == sentinel);
+		ufbxt_assert(mesh->vertex_position.indices.data[c] == sentinel);
+	}
+
+	if (vt) {
+		ufbxt_assert(mesh->vertex_uv.indices.data[a] == vt - 1 + 0);
+		ufbxt_assert(mesh->vertex_uv.indices.data[b] == vt - 1 + 1);
+		ufbxt_assert(mesh->vertex_uv.indices.data[c] == vt - 1 + 2);
+	} else {
+		uint32_t sentinel = no_index ? UFBX_NO_INDEX : (uint32_t)mesh->vertex_uv.values.count - 1;
+		ufbxt_assert(mesh->vertex_uv.indices.data[a] == sentinel);
+		ufbxt_assert(mesh->vertex_uv.indices.data[b] == sentinel);
+		ufbxt_assert(mesh->vertex_uv.indices.data[c] == sentinel);
+	}
+
+	if (vn) {
+		ufbxt_assert(mesh->vertex_normal.indices.data[a] == vn - 1 + 0);
+		ufbxt_assert(mesh->vertex_normal.indices.data[b] == vn - 1 + 1);
+		ufbxt_assert(mesh->vertex_normal.indices.data[c] == vn - 1 + 2);
+	} else {
+		uint32_t sentinel = no_index ? UFBX_NO_INDEX : (uint32_t)mesh->vertex_normal.values.count - 1;
+		ufbxt_assert(mesh->vertex_normal.indices.data[a] == sentinel);
+		ufbxt_assert(mesh->vertex_normal.indices.data[b] == sentinel);
+		ufbxt_assert(mesh->vertex_normal.indices.data[c] == sentinel);
+	}
+
+	if (vc) {
+		ufbxt_assert(mesh->vertex_color.indices.data[a] == vc - 1 + 0);
+		ufbxt_assert(mesh->vertex_color.indices.data[b] == vc - 1 + 1);
+		ufbxt_assert(mesh->vertex_color.indices.data[c] == vc - 1 + 2);
+	} else {
+		uint32_t sentinel = no_index ? UFBX_NO_INDEX : (uint32_t)mesh->vertex_color.values.count - 1;
+		ufbxt_assert(mesh->vertex_color.indices.data[a] == sentinel);
+		ufbxt_assert(mesh->vertex_color.indices.data[b] == sentinel);
+		ufbxt_assert(mesh->vertex_color.indices.data[c] == sentinel);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_partial_attrib)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Mesh");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 8);
+	ufbxt_assert(mesh->num_triangles == 8);
+	ufbxt_assert(mesh->vertex_position.exists);
+	ufbxt_assert(mesh->vertex_uv.exists);
+	ufbxt_assert(mesh->vertex_normal.exists);
+	ufbxt_assert(mesh->vertex_color.exists);
+
+	ufbxt_check_obj_face(mesh, 0, 1, 0, 0, 0, false);
+	ufbxt_check_obj_face(mesh, 1, 1, 1, 0, 0, false);
+	ufbxt_check_obj_face(mesh, 2, 1, 0, 1, 0, false);
+	ufbxt_check_obj_face(mesh, 3, 1, 1, 1, 0, false);
+	ufbxt_check_obj_face(mesh, 4, 4, 0, 0, 4, false);
+	ufbxt_check_obj_face(mesh, 5, 4, 1, 0, 4, false);
+	ufbxt_check_obj_face(mesh, 6, 4, 0, 1, 4, false);
+	ufbxt_check_obj_face(mesh, 7, 4, 1, 1, 4, false);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(synthetic_partial_attrib_no_index, synthetic_partial_attrib, ufbxt_no_index_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Mesh");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 8);
+	ufbxt_assert(mesh->num_triangles == 8);
+	ufbxt_assert(mesh->vertex_position.exists);
+	ufbxt_assert(mesh->vertex_uv.exists);
+	ufbxt_assert(mesh->vertex_normal.exists);
+	ufbxt_assert(mesh->vertex_color.exists);
+
+	ufbxt_check_obj_face(mesh, 0, 1, 0, 0, 0, true);
+	ufbxt_check_obj_face(mesh, 1, 1, 1, 0, 0, true);
+	ufbxt_check_obj_face(mesh, 2, 1, 0, 1, 0, true);
+	ufbxt_check_obj_face(mesh, 3, 1, 1, 1, 0, true);
+	ufbxt_check_obj_face(mesh, 4, 4, 0, 0, 4, true);
+	ufbxt_check_obj_face(mesh, 5, 4, 1, 0, 4, true);
+	ufbxt_check_obj_face(mesh, 6, 4, 0, 1, 4, true);
+	ufbxt_check_obj_face(mesh, 7, 4, 1, 1, 4, true);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_partial_attrib_strict, synthetic_partial_attrib, ufbxt_abort_index_opts, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!scene);
+	ufbxt_assert(load_error);
+	ufbxt_assert(load_error->type == UFBX_ERROR_BAD_INDEX);
+}
+#endif

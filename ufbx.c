@@ -13789,8 +13789,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_setup_attrib(ufbxi_context *
 	dst->indices.count = num_indices;
 
 	ufbxi_nounroll for (size_t i = 0; i < num_indices; i++) {
-		uint64_t ix = tmp_indices[i] - min_index;
-		ufbxi_check(ix < UINT32_MAX);
+		uint64_t ix = tmp_indices[i];
+		if (ix != UINT64_MAX) {
+			ix -= min_index;
+			ufbxi_check(ix < UINT32_MAX);
+		}
 		if (ix < num_values) {
 			dst_indices[i] = (uint32_t)ix;
 		} else {
@@ -13921,12 +13924,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 			if (uc->obj.has_vertex_color) {
 				ufbx_assert(color_valid);
 				bool has_color = false;
+				bool all_valid = true;
 				size_t max_index = fbx_mesh->vertex_position.values.count;
 				ufbxi_for_list(uint32_t, p_ix, fbx_mesh->vertex_position.indices) {
 					if (*p_ix < max_index) {
 						if (color_valid[*p_ix]) {
 							has_color = true;
-							break;
+						} else {
+							all_valid = false;
 						}
 					}
 				}
@@ -13937,6 +13942,21 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 					fbx_mesh->vertex_color.values.count = vertices[UFBXI_OBJ_ATTRIB_COLOR].count / 4;
 					fbx_mesh->vertex_color.indices = fbx_mesh->vertex_position.indices;
 					fbx_mesh->vertex_color.unique_per_vertex = true;
+
+					if (!all_valid) {
+						uint32_t *indices = fbx_mesh->vertex_color.indices.data;
+						indices = ufbxi_push_copy(&uc->result, uint32_t, mesh->num_indices, indices);
+						ufbxi_check(indices);
+
+						size_t num_values = fbx_mesh->vertex_color.values.count;
+						ufbxi_for(uint32_t, p_ix, indices, mesh->num_indices) {
+							if (*p_ix >= num_values || !color_valid[*p_ix]) {
+								ufbxi_check(ufbxi_fix_index(uc, p_ix, *p_ix, num_values));
+							}
+						}
+
+						fbx_mesh->vertex_color.indices.data = indices;
+					}
 				}
 			}
 		}
