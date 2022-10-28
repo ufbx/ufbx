@@ -3540,8 +3540,8 @@ static ufbxi_noinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size, u
 }
 
 #define ufbxi_map_grow(map, type, min_size) ufbxi_map_grow_size((map), sizeof(type), (min_size))
-#define ufbxi_map_find(map, type, hash, value) (type*)ufbxi_map_find_size((map), sizeof(type), (hash), (value))
-#define ufbxi_map_insert(map, type, hash, value) (type*)ufbxi_map_insert_size((map), sizeof(type), (hash), (value))
+#define ufbxi_map_find(map, type, hash, value) ufbxi_maybe_null((type*)ufbxi_map_find_size((map), sizeof(type), (hash), (value)))
+#define ufbxi_map_insert(map, type, hash, value) ufbxi_maybe_null((type*)ufbxi_map_insert_size((map), sizeof(type), (hash), (value)))
 
 static int ufbxi_map_cmp_uint64(void *user, const void *va, const void *vb)
 {
