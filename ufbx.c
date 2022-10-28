@@ -8249,8 +8249,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 
 			case 'b': { bool *v = ufbxi_push(&uc->tmp_stack, bool, 1); ufbxi_check(v); *v = val != 0; } break;
 			case 'c': { uint8_t *v = ufbxi_push(&uc->tmp_stack, uint8_t, 1); ufbxi_check(v); *v = (uint8_t)val; } break;
-			case 'i': { int32_t *v = ufbxi_push(&uc->tmp_stack, int32_t, 1); ufbxi_check(v); *v = (int32_t)val; } break;
-			case 'l': { int64_t *v = ufbxi_push(&uc->tmp_stack, int64_t, 1); ufbxi_check(v); *v = (int64_t)val; } break;
+			case 'i': { int32_t *v = ufbxi_push(&uc->tmp_stack, int32_t, 1); ufbxi_check(v); *v = ufbxi_f64_to_i32(val); } break;
+			case 'l': { int64_t *v = ufbxi_push(&uc->tmp_stack, int64_t, 1); ufbxi_check(v); *v = ufbxi_f64_to_i64(val); } break;
 			case 'f': { float *v = ufbxi_push(&uc->tmp_stack, float, 1); ufbxi_check(v); *v = (float)val; } break;
 			case 'd': { double *v = ufbxi_push(&uc->tmp_stack, double, 1); ufbxi_check(v); *v = (double)val; } break;
 			case '-': num_values--; break;
@@ -13131,7 +13131,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_props(ufbxi_context *uc,
 			prop->value_str.data = ufbxi_empty_char;
 		}
 		if (!prop->value_int) {
-			prop->value_int = (int64_t)prop->value_real;
+			prop->value_int = ufbxi_f64_to_i64(prop->value_real);
 		}
 		if (prop->value_blob.size == 0 && prop->value_str.length > 0) {
 			prop->value_blob.data = prop->value_str.data;
