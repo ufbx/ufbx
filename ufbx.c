@@ -8783,6 +8783,12 @@ static ufbxi_noinline bool ufbxi_is_format(const char *data, size_t size, ufbx_f
 				"(usemtl|mtllib)\\s+\\S.*";
 			if (ufbxi_match(&line, pattern)) return true;
 		}
+	} else if (format == UFBX_FILE_FORMAT_MTL) {
+		while (ufbxi_next_line(&line, &buf, true)) {
+			const char *pattern =
+				"newmtl\\s+\\S.*";
+			if (ufbxi_match(&line, pattern)) return true;
+		}
 	} else {
 		ufbx_assert(0 && "Unhandled format");
 	}
@@ -8839,6 +8845,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_determine_format(ufbxi_context *
 				format = UFBX_FILE_FORMAT_FBX;
 			} else if (ufbxi_match(&extension, "\\c\\.obj")) {
 				format = UFBX_FILE_FORMAT_OBJ;
+			} else if (ufbxi_match(&extension, "\\c\\.mtl")) {
+				format = UFBX_FILE_FORMAT_MTL;
 			}
 		}
 	}
@@ -13196,7 +13204,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_flush_mesh(ufbxi_context *uc
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_init(ufbxi_context *uc)
 {
+	uc->from_ascii = true;
 	uc->obj.initialized = true;
+
 
 	ufbxi_nounroll for (size_t i = 0; i < UFBXI_OBJ_NUM_ATTRIBS_EXT; i++) {
 		uc->obj.tmp_vertices[i].ator = &uc->ator_tmp;
@@ -13217,6 +13227,16 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_init(ufbxi_context *uc)
 	uc->obj.group.data = ufbxi_empty_char;
 
 	ufbxi_map_init(&uc->obj.group_map, &uc->ator_tmp, ufbxi_map_cmp_const_char_ptr, NULL);
+
+	// Add a nameless root node with the root ID
+	{
+		ufbxi_element_info root_info = { uc->root_id };
+		root_info.name = ufbx_empty_string;
+		ufbx_node *root = ufbxi_push_element(uc, &root_info, ufbx_node, UFBX_ELEMENT_NODE);
+		ufbxi_check(root);
+		ufbxi_setup_root_node(uc, root);
+		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &root->element.element_id));
+	}
 
 	return 1;
 }
@@ -13976,18 +13996,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc)
 {
-	uc->from_ascii = true;
-
-	// Add a nameless root node with the root ID
-	{
-		ufbxi_element_info root_info = { uc->root_id };
-		root_info.name = ufbx_empty_string;
-		ufbx_node *root = ufbxi_push_element(uc, &root_info, ufbx_node, UFBX_ELEMENT_NODE);
-		ufbxi_check(root);
-		ufbxi_setup_root_node(uc, root);
-		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &root->element.element_id));
-	}
-
 	while (!uc->obj.eof) {
 		ufbxi_check(ufbxi_obj_tokenize_line(uc));
 		size_t num_tokens = uc->obj.num_tokens;
@@ -14205,6 +14213,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_mtl(ufbxi_context *uc)
 			ufbxi_check(ufbxi_obj_parse_mtl_map(uc, 4));
 		} else if (cmd.length == 4 && (!memcmp(cmd.data, "bump", 4) || !memcmp(cmd.data, "disp", 4) || !memcmp(cmd.data, "norm", 4))) {
 			ufbxi_check(ufbxi_obj_parse_mtl_map(uc, 0));
+		} else if (cmd.length == 1 && cmd.data[0] == '#') {
+			// Implement .mtl magic comment handling here if necessary
 		} else {
 			ufbxi_check(ufbxi_obj_parse_prop(uc, uc->obj.tokens[0], 1, true, NULL));
 		}
@@ -14277,12 +14287,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load(ufbxi_context *uc)
 	ufbxi_check(ufbxi_init_file_paths(uc));
 	ufbxi_check(ufbxi_obj_load_mtl(uc));
 
-	if (uc->opts.retain_dom) {
-		ufbx_dom_node *dom_root = ufbxi_push_zero(&uc->result, ufbx_dom_node, 1);
-		ufbxi_check(dom_root);
-		dom_root->name.data = ufbxi_empty_char;
-		uc->scene.dom_root = dom_root;
-	}
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_mtl_load(ufbxi_context *uc)
+{
+	ufbxi_check(ufbxi_obj_init(uc));
+	ufbxi_check(ufbxi_init_file_paths(uc));
+	ufbxi_check(ufbxi_obj_parse_mtl(uc));
 
 	return 1;
 }
@@ -14293,6 +14305,13 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_obj_load(ufbxi_context *uc)
 	ufbxi_fail_msg("UFBXI_FEATURE_FORMAT_OBJ", "Feature disabled");
 	return 0;
 }
+
+ufbxi_nodiscard static ufbxi_forceinline int ufbxi_mtl_load(ufbxi_context *uc)
+{
+	ufbxi_fail_msg("UFBXI_FEATURE_FORMAT_OBJ", "Feature disabled");
+	return 0;
+}
+
 static ufbxi_forceinline void ufbxi_obj_free(ufbxi_context *uc)
 {
 }
@@ -15095,6 +15114,8 @@ typedef enum {
 	UFBXI_SHADER_MAPPING_TOGGLE_INVERT = 0x2,
 	// Set `value_vec4.w` (usually alpha) to 1.0 if not defined by the property
 	UFBXI_SHADER_MAPPING_DEFAULT_W_1 = 0x4,
+	// Widen values to RGB if only a single value is present.
+	UFBXI_SHADER_MAPPING_WIDEN_TO_RGB = 0x8,
 } ufbxi_shader_mapping_flag;
 
 typedef enum {
@@ -15168,16 +15189,12 @@ static const ufbxi_shader_mapping ufbxi_base_fbx_mapping[] = {
 };
 
 static const ufbxi_shader_mapping ufbxi_obj_fbx_mapping[] = {
-	{ UFBX_MATERIAL_FBX_AMBIENT_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Ka") },
-	{ UFBX_MATERIAL_FBX_DIFFUSE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Kd") },
-	{ UFBX_MATERIAL_FBX_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Ks") },
-	{ UFBX_MATERIAL_FBX_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Ke") },
+	{ UFBX_MATERIAL_FBX_AMBIENT_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1|UFBXI_SHADER_MAPPING_WIDEN_TO_RGB, 0, ufbxi_mat_string("Ka") },
+	{ UFBX_MATERIAL_FBX_DIFFUSE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1|UFBXI_SHADER_MAPPING_WIDEN_TO_RGB, 0, ufbxi_mat_string("Kd") },
+	{ UFBX_MATERIAL_FBX_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1|UFBXI_SHADER_MAPPING_WIDEN_TO_RGB, 0, ufbxi_mat_string("Ks") },
+	{ UFBX_MATERIAL_FBX_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1|UFBXI_SHADER_MAPPING_WIDEN_TO_RGB, 0, ufbxi_mat_string("Ke") },
 	{ UFBX_MATERIAL_FBX_SPECULAR_EXPONENT, 0, 0, ufbxi_mat_string("Ns") },
 	{ UFBX_MATERIAL_FBX_TRANSPARENCY_FACTOR, 0, 0, ufbxi_mat_string("d") },
-	{ UFBX_MATERIAL_FBX_TRANSPARENCY_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Tf") },
-	{ UFBX_MATERIAL_FBX_DISPLACEMENT, 0, 0, ufbxi_mat_string("disp") },
-	{ UFBX_MATERIAL_FBX_BUMP, 0, 0, ufbxi_mat_string("bump") },
-	{ UFBX_MATERIAL_FBX_NORMAL_MAP, 0, 0, ufbxi_mat_string("norm") },
 };
 
 static const ufbxi_shader_mapping ufbxi_fbx_lambert_shader_pbr_mapping[] = {
@@ -15458,19 +15475,19 @@ static const ufbxi_shader_mapping ufbxi_blender_phong_shader_pbr_mapping[] = {
 };
 
 static const ufbxi_shader_mapping ufbxi_obj_pbr_mapping[] = {
-	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Kd") },
-	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Ks") },
-	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Ke") },
+	{ UFBX_MATERIAL_PBR_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1|UFBXI_SHADER_MAPPING_WIDEN_TO_RGB, 0, ufbxi_mat_string("Kd") },
+	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1|UFBXI_SHADER_MAPPING_WIDEN_TO_RGB, 0, ufbxi_mat_string("Ks") },
+	{ UFBX_MATERIAL_PBR_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1|UFBXI_SHADER_MAPPING_WIDEN_TO_RGB, 0, ufbxi_mat_string("Ke") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS, ufbxi_mat_string("Ns") },
 	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, 0, ufbxi_mat_string("Pr") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_IOR, 0, 0, ufbxi_mat_string("Ni") },
 	{ UFBX_MATERIAL_PBR_METALNESS, 0, 0, ufbxi_mat_string("Pm") },
 	{ UFBX_MATERIAL_PBR_OPACITY, 0, 0, ufbxi_mat_string("d") },
-	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Tf") },
+	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1|UFBXI_SHADER_MAPPING_WIDEN_TO_RGB, 0, ufbxi_mat_string("Tf") },
 	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("disp") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("bump") },
 	{ UFBX_MATERIAL_PBR_NORMAL_MAP, 0, 0, ufbxi_mat_string("norm") },
-	{ UFBX_MATERIAL_PBR_SHEEN_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Ps") },
+	{ UFBX_MATERIAL_PBR_SHEEN_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1|UFBXI_SHADER_MAPPING_WIDEN_TO_RGB, 0, ufbxi_mat_string("Ps") },
 	{ UFBX_MATERIAL_PBR_COAT_FACTOR, 0, 0, ufbxi_mat_string("Pc") },
 	{ UFBX_MATERIAL_PBR_COAT_ROUGHNESS, 0, 0, ufbxi_mat_string("Pcr") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_ANISOTROPY, 0, 0, ufbxi_mat_string("aniso") },
@@ -15483,6 +15500,7 @@ static const ufbxi_shader_mapping ufbxi_obj_features[] = {
 	{ UFBX_MATERIAL_FEATURE_METALNESS, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Pm") },
 	{ UFBX_MATERIAL_FEATURE_IOR, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Ni") },
 	{ UFBX_MATERIAL_FEATURE_OPACITY, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("d") },
+	{ UFBX_MATERIAL_FEATURE_TRANSMISSION, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Tf") },
 	{ UFBX_MATERIAL_FEATURE_EMISSION, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Ke") },
 };
 
@@ -15692,6 +15710,10 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 					if ((mapping->flags & UFBXI_SHADER_MAPPING_DEFAULT_W_1) != 0 && (prop->flags & UFBX_PROP_FLAG_VALUE_VEC4) == 0) {
 						map->value_vec4.w = 1.0f;
 					}
+					if ((mapping->flags & UFBXI_SHADER_MAPPING_WIDEN_TO_RGB) != 0 && (prop->flags & UFBX_PROP_FLAG_VALUE_REAL) != 0) {
+						map->value_vec3.y = map->value_vec3.x;
+						map->value_vec3.z = map->value_vec3.x;
+					}
 				}
 			}
 
@@ -15742,7 +15764,7 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 	const ufbxi_shader_mapping *base_mapping = ufbxi_base_fbx_mapping;
 	size_t num_base_mapping = ufbxi_arraycount(ufbxi_base_fbx_mapping);
 
-	if (scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ) {
+	if (scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ || scene->metadata.file_format == UFBX_FILE_FORMAT_MTL) {
 		base_mapping = ufbxi_obj_fbx_mapping;
 		num_base_mapping = ufbxi_arraycount(ufbxi_obj_fbx_mapping);
 	}
@@ -15795,6 +15817,8 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 	ufbxi_update_factor(&material->pbr.base_factor, &material->pbr.base_color);
 	ufbxi_update_factor(&material->pbr.specular_factor, &material->pbr.specular_color);
 	ufbxi_update_factor(&material->pbr.emission_factor, &material->pbr.emission_color);
+	ufbxi_update_factor(&material->pbr.sheen_factor, &material->pbr.sheen_color);
+	ufbxi_update_factor(&material->pbr.transmission_factor, &material->pbr.transmission_color);
 
 	// Patch transmission roughness if only extra roughness is defined
 	if (!material->pbr.transmission_roughness.has_value && material->pbr.roughness.has_value && material->pbr.transmission_extra_roughness.has_value) {
@@ -19835,6 +19859,17 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 	} else if (format == UFBX_FILE_FORMAT_OBJ) {
 		ufbxi_check(ufbxi_obj_load(uc));
 		ufbxi_update_scene_metadata(&uc->scene.metadata);
+	} else if (format == UFBX_FILE_FORMAT_MTL) {
+		ufbxi_check(ufbxi_mtl_load(uc));
+		ufbxi_update_scene_metadata(&uc->scene.metadata);
+	}
+
+	// Fake DOM root if necessary
+	if (uc->opts.retain_dom && !uc->scene.dom_root) {
+		ufbx_dom_node *dom_root = ufbxi_push_zero(&uc->result, ufbx_dom_node, 1);
+		ufbxi_check(dom_root);
+		dom_root->name.data = ufbxi_empty_char;
+		uc->scene.dom_root = dom_root;
 	}
 
 	// We can free `tmp_parse` already here as all parsing is done by now.
@@ -23918,6 +23953,11 @@ ufbx_abi ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name
 ufbx_abi ufbx_anim_stack *ufbx_find_anim_stack_len(const ufbx_scene *scene, const char *name, size_t name_len)
 {
 	return (ufbx_anim_stack*)ufbx_find_element_len(scene, UFBX_ELEMENT_ANIM_STACK, name, name_len);
+}
+
+ufbx_abi ufbx_material *ufbx_find_material_len(const ufbx_scene *scene, const char *name, size_t name_len)
+{
+	return (ufbx_material*)ufbx_find_element_len(scene, UFBX_ELEMENT_MATERIAL, name, name_len);
 }
 
 ufbx_abi ufbx_anim_prop *ufbx_find_anim_prop_len(const ufbx_anim_layer *layer, const ufbx_element *element, const char *prop, size_t prop_len)

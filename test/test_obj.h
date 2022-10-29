@@ -449,3 +449,103 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_partial_attrib_face_strict, synthetic_p
 	ufbxt_assert(load_error->type == UFBX_ERROR_BAD_INDEX);
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_simple_materials)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->materials.count == 3);
+
+	{
+		ufbx_material *mat = ufbx_find_material(scene, "RGB");
+		ufbxt_assert(mat);
+		ufbxt_assert(mat->shader_type == UFBX_SHADER_WAVEFRONT_MTL);
+
+		ufbx_vec3 ka = { 1.0f, 0.0f, 0.0f };
+		ufbx_vec3 kd = { 0.0f, 1.0f, 0.0f };
+		ufbx_vec3 ks = { 0.0f, 0.0f, 1.0f };
+		ufbx_vec3 ke = { 1.0f, 0.0f, 1.0f };
+		ufbx_real ns = 99.0f;
+		ufbx_real d = 0.25f;
+
+		ufbxt_assert_close_vec3(err, mat->fbx.ambient_color.value_vec3, ka);
+		ufbxt_assert_close_vec3(err, mat->fbx.diffuse_color.value_vec3, kd);
+		ufbxt_assert_close_vec3(err, mat->fbx.specular_color.value_vec3, ks);
+		ufbxt_assert_close_vec3(err, mat->fbx.emission_color.value_vec3, ke);
+		ufbxt_assert_close_real(err, mat->fbx.specular_exponent.value_real, ns);
+		ufbxt_assert_close_real(err, mat->fbx.transparency_factor.value_real, d);
+		ufbxt_assert(mat->fbx.ambient_factor.value_real == 1.0f);
+		ufbxt_assert(mat->fbx.diffuse_factor.value_real == 1.0f);
+		ufbxt_assert(mat->fbx.specular_factor.value_real == 1.0f);
+		ufbxt_assert(mat->fbx.emission_factor.value_real == 1.0f);
+
+		ufbxt_assert_close_vec3(err, mat->pbr.base_color.value_vec3, kd);
+		ufbxt_assert_close_vec3(err, mat->pbr.specular_color.value_vec3, ks);
+		ufbxt_assert_close_vec3(err, mat->pbr.emission_color.value_vec3, ke);
+		ufbxt_assert_close_real(err, mat->pbr.roughness.value_real, 0.00501256289f);
+		ufbxt_assert_close_real(err, mat->pbr.opacity.value_real, d);
+		ufbxt_assert(mat->pbr.base_factor.value_real == 1.0f);
+		ufbxt_assert(mat->pbr.specular_factor.value_real == 1.0f);
+		ufbxt_assert(mat->pbr.emission_factor.value_real == 1.0f);
+	}
+
+	{
+		ufbx_material *mat = ufbx_find_material(scene, "PBR");
+		ufbxt_assert(mat);
+		ufbxt_assert(mat->shader_type == UFBX_SHADER_WAVEFRONT_MTL);
+
+		ufbx_real pr = 0.1f;
+		ufbx_real pm = 0.2f;
+		ufbx_vec3 ps = { 0.3f, 0.4f, 0.5f };
+		ufbx_real pc = 0.6f;
+		ufbx_real pcr = 0.7f;
+		ufbx_real ni = 1.33f;
+		ufbx_vec3 tf = { 0.8f, 0.9f, 1.0f };
+		ufbx_real d = 0.75f;
+
+		ufbxt_assert_close_real(err, mat->pbr.roughness.value_real, pr);
+		ufbxt_assert_close_real(err, mat->pbr.metalness.value_real, pm);
+		ufbxt_assert_close_vec3(err, mat->pbr.sheen_color.value_vec3, ps);
+		ufbxt_assert_close_real(err, mat->pbr.coat_factor.value_real, pc);
+		ufbxt_assert_close_real(err, mat->pbr.coat_roughness.value_real, pcr);
+		ufbxt_assert_close_real(err, mat->pbr.specular_ior.value_real, ni);
+		ufbxt_assert_close_vec3(err, mat->pbr.transmission_color.value_vec3, tf);
+		ufbxt_assert_close_real(err, mat->pbr.opacity.value_real, d);
+
+		ufbxt_assert(mat->pbr.sheen_factor.value_real == 1.0f);
+		ufbxt_assert(mat->pbr.transmission_factor.value_real == 1.0f);
+
+		ufbxt_assert(mat->features.metalness.enabled);
+		ufbxt_assert(mat->features.diffuse.enabled);
+		ufbxt_assert(mat->features.specular.enabled);
+		ufbxt_assert(mat->features.sheen.enabled);
+		ufbxt_assert(mat->features.coat.enabled);
+		ufbxt_assert(mat->features.transmission.enabled);
+		ufbxt_assert(mat->features.opacity.enabled);
+	}
+
+	{
+		ufbx_material *mat = ufbx_find_material(scene, "Wide");
+		ufbxt_assert(mat);
+		ufbxt_assert(mat->shader_type == UFBX_SHADER_WAVEFRONT_MTL);
+
+		ufbx_vec3 ka = { 0.1f, 0.1f, 0.1f };
+		ufbx_vec3 kd = { 0.2f, 0.2f, 0.2f };
+		ufbx_vec3 ks = { 0.3f, 0.3f, 0.3f };
+		ufbx_vec3 ke = { 0.4f, 0.4f, 0.4f };
+		ufbx_vec3 ps = { 0.5f, 0.5f, 0.5f };
+		ufbx_vec3 tf = { 0.6f, 0.6f, 0.6f };
+
+		ufbxt_assert_close_vec3(err, mat->fbx.ambient_color.value_vec3, ka);
+		ufbxt_assert_close_vec3(err, mat->fbx.diffuse_color.value_vec3, kd);
+		ufbxt_assert_close_vec3(err, mat->fbx.specular_color.value_vec3, ks);
+		ufbxt_assert_close_vec3(err, mat->fbx.emission_color.value_vec3, ke);
+
+		ufbxt_assert_close_vec3(err, mat->pbr.base_color.value_vec3, kd);
+		ufbxt_assert_close_vec3(err, mat->pbr.specular_color.value_vec3, ks);
+		ufbxt_assert_close_vec3(err, mat->pbr.emission_color.value_vec3, ke);
+		ufbxt_assert_close_vec3(err, mat->pbr.sheen_color.value_vec3, ps);
+		ufbxt_assert_close_vec3(err, mat->pbr.transmission_color.value_vec3, tf);
+
+	}
+}
+#endif

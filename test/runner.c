@@ -1736,7 +1736,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	bool allow_error = (flags & UFBXT_FILE_TEST_FLAG_ALLOW_ERROR) != 0;
 	bool alternative = (flags & UFBXT_FILE_TEST_FLAG_ALTERNATIVE) != 0;
 
-	for (uint32_t fi = 0; fi < 3; fi++) {
+	for (uint32_t fi = 0; fi < 4; fi++) {
 		for (uint32_t vi = 0; vi < ufbxt_arraycount(ufbxt_file_versions); vi++) {
 			uint32_t version = ufbxt_file_versions[vi];
 			const char *format = NULL;
@@ -1745,6 +1745,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			case 0: format = "binary"; break;
 			case 1: format = "ascii"; break;
 			case 2: format = "obj"; ext = "obj"; break;
+			case 3: format = "mtl"; ext = "mtl"; break;
 			}
 			ufbxt_assert(format);
 
@@ -1784,6 +1785,10 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			if (fi < 2) {
 				load_opts.file_format = UFBX_FILE_FORMAT_FBX;
+			} else if (fi == 2) {
+				load_opts.file_format = UFBX_FILE_FORMAT_OBJ;
+			} else if (fi == 3) {
+				load_opts.file_format = UFBX_FILE_FORMAT_MTL;
 			}
 
 			ufbxt_progress_ctx progress_ctx = { 0 };
@@ -1830,6 +1835,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			if (streamed_scene) {
 				ufbxt_check_scene(streamed_scene);
 				ufbxt_assert(streamed_scene->dom_root);
+				ufbxt_assert(streamed_scene->metadata.file_format == load_opts.file_format);
 			} else if (!allow_error) {
 				ufbxt_log_error(&error);
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse streamed file");
@@ -1963,6 +1969,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 					ufbxt_assert(scene->metadata.version == version);
 				} else if (fi == 2) {
 					ufbxt_assert(scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ);
+				} else if (fi == 3) {
+					ufbxt_assert(scene->metadata.file_format == UFBX_FILE_FORMAT_MTL);
 				}
 
 				ufbxt_check_scene(scene);

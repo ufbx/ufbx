@@ -2814,9 +2814,10 @@ typedef struct ufbx_application {
 } ufbx_application;
 
 typedef enum ufbx_file_format {
-	UFBX_FILE_FORMAT_UNKNOWN,
-	UFBX_FILE_FORMAT_FBX,
-	UFBX_FILE_FORMAT_OBJ,
+	UFBX_FILE_FORMAT_UNKNOWN, // < Unknown file format
+	UFBX_FILE_FORMAT_FBX,     // < .fbx Kaydara/Autodesk FBX file
+	UFBX_FILE_FORMAT_OBJ,     // < .obj Wavefront OBJ file
+	UFBX_FILE_FORMAT_MTL,     // < .mtl Wavefront MTL (Material template library) file
 
 	UFBX_FILE_FORMAT_COUNT,
 	UFBX_FILE_FORMAT_FORCE_32BIT = 0x7fffffff,
@@ -3803,6 +3804,10 @@ ufbx_inline ufbx_node *ufbx_find_node(const ufbx_scene *scene, const char *name)
 // Find an animation stack in `scene` by `name` (shorthand for `ufbx_find_element(UFBX_ELEMENT_ANIM_STACK)`)
 ufbx_abi ufbx_anim_stack *ufbx_find_anim_stack_len(const ufbx_scene *scene, const char *name, size_t name_len);
 ufbx_inline ufbx_anim_stack *ufbx_find_anim_stack(const ufbx_scene *scene, const char *name) { return ufbx_find_anim_stack_len(scene, name, strlen(name)); }
+
+// Find a material in `scene` by `name` (shorthand for `ufbx_find_element(UFBX_ELEMENT_MATERIAL)`).
+ufbx_abi ufbx_material *ufbx_find_material_len(const ufbx_scene *scene, const char *name, size_t name_len);
+ufbx_inline ufbx_material *ufbx_find_material(const ufbx_scene *scene, const char *name) { return ufbx_find_material_len(scene, name, strlen(name)); }
 
 // Find a single animated property `prop` of `element` in `layer`.
 // Returns `NULL` if not found.
