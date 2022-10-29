@@ -1,5 +1,5 @@
 
-UFBXT_FILE_TEST(maya_slime)
+UFBXT_FILE_TEST_FLAGS(maya_slime, UFBXT_FILE_TEST_FLAG_HEAVY_TO_FUZZ)
 #if UFBXT_IMPL
 {
 	ufbx_node *node_high = ufbx_find_node(scene, "Slime_002:Slime_Body_high");

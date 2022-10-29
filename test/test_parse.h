@@ -311,7 +311,7 @@ UFBXT_FILE_TEST(synthetic_cube_nan)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_string_collision)
+UFBXT_FILE_TEST_FLAGS(synthetic_string_collision, UFBXT_FILE_TEST_FLAG_HEAVY_TO_FUZZ)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
@@ -332,7 +332,7 @@ UFBXT_FILE_TEST(synthetic_string_collision)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_id_collision)
+UFBXT_FILE_TEST_FLAGS(synthetic_id_collision, UFBXT_FILE_TEST_FLAG_HEAVY_TO_FUZZ)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(scene->nodes.count == 10002);
@@ -514,7 +514,7 @@ static size_t ufbxt_decode_hex(uint8_t *dst, size_t dst_len, ufbx_string src)
 }
 #endif
 
-UFBXT_FILE_TEST_FLAGS(synthetic_unicode, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+UFBXT_FILE_TEST_FLAGS(synthetic_unicode, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_HEAVY_TO_FUZZ)
 #if UFBXT_IMPL
 {
 	uint8_t ref[128];

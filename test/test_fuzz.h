@@ -56,7 +56,10 @@ UFBXT_TEST(fuzz_files)
 		ufbxt_assert(temp_freed);
 		ufbxt_assert(result_freed);
 
+		int prev_fuzz_quality = g_fuzz_quality;
+		g_fuzz_quality = g_heavy_fuzz_quality;
 		ufbxt_do_fuzz(scene, streamed_scene, (size_t)stream_progress_ctx.calls, name, data, size, buf);
+		g_fuzz_quality = prev_fuzz_quality;
 
 		free(data);
 	}
