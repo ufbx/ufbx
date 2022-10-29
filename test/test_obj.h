@@ -549,3 +549,61 @@ UFBXT_FILE_TEST(synthetic_simple_materials)
 	}
 }
 #endif
+
+#if UFBXT_IMPL
+void ufbxt_check_obj_texture(ufbx_scene *scene, ufbx_texture *texture, const char *filename)
+{
+	char rel_path[256];
+	snprintf(rel_path, sizeof(rel_path), "textures/%s", filename);
+
+	ufbxt_assert(texture);
+	ufbxt_assert(!strcmp(texture->relative_filename.data, rel_path));
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_simple_textures)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->materials.count == 2);
+
+	{
+		ufbx_material *mat = ufbx_find_material(scene, "RGB");
+		ufbxt_assert(mat);
+		ufbxt_assert(mat->shader_type == UFBX_SHADER_WAVEFRONT_MTL);
+
+		ufbxt_check_obj_texture(scene, mat->fbx.ambient_color.texture, "checkerboard_ambient.png");
+		ufbxt_check_obj_texture(scene, mat->fbx.diffuse_color.texture, "checkerboard_diffuse.png");
+		ufbxt_check_obj_texture(scene, mat->fbx.specular_color.texture, "checkerboard_specular.png");
+		ufbxt_check_obj_texture(scene, mat->fbx.emission_color.texture, "checkerboard_emissive.png");
+		ufbxt_check_obj_texture(scene, mat->fbx.specular_exponent.texture, "checkerboard_roughness.png");
+		ufbxt_check_obj_texture(scene, mat->fbx.transparency_factor.texture, "checkerboard_transparency.png");
+
+		ufbxt_check_obj_texture(scene, mat->pbr.base_color.texture, "checkerboard_diffuse.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.specular_color.texture, "checkerboard_specular.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.emission_color.texture, "checkerboard_emissive.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.roughness.texture, "checkerboard_roughness.png");
+	}
+
+	{
+		ufbx_material *mat = ufbx_find_material(scene, "PBR");
+		ufbxt_assert(mat);
+		ufbxt_assert(mat->shader_type == UFBX_SHADER_WAVEFRONT_MTL);
+
+		ufbxt_check_obj_texture(scene, mat->pbr.roughness.texture, "checkerboard_roughness.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.metalness.texture, "checkerboard_metallic.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.sheen_color.texture, "checkerboard_reflection.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.coat_factor.texture, "checkerboard_specular.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.coat_roughness.texture, "checkerboard_weight.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.transmission_color.texture, "checkerboard_transparency.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.opacity.texture, "checkerboard_weight.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.specular_ior.texture, "checkerboard_specular.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.normal_map.texture, "checkerboard_normal.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.displacement_map.texture, "checkerboard_displacement.png");
+
+		ufbxt_check_obj_texture(scene, mat->fbx.transparency_factor.texture, "checkerboard_weight.png");
+		ufbxt_check_obj_texture(scene, mat->fbx.normal_map.texture, "checkerboard_normal.png");
+		ufbxt_check_obj_texture(scene, mat->fbx.displacement.texture, "checkerboard_displacement.png");
+	}
+
+}
+#endif
