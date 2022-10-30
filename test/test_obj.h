@@ -564,7 +564,7 @@ void ufbxt_check_obj_texture(ufbx_scene *scene, ufbx_texture *texture, const cha
 UFBXT_FILE_TEST(synthetic_simple_textures)
 #if UFBXT_IMPL
 {
-	ufbxt_assert(scene->materials.count == 2);
+	ufbxt_assert(scene->materials.count == 3);
 
 	{
 		ufbx_material *mat = ufbx_find_material(scene, "RGB");
@@ -577,11 +577,13 @@ UFBXT_FILE_TEST(synthetic_simple_textures)
 		ufbxt_check_obj_texture(scene, mat->fbx.emission_color.texture, "checkerboard_emissive.png");
 		ufbxt_check_obj_texture(scene, mat->fbx.specular_exponent.texture, "checkerboard_roughness.png");
 		ufbxt_check_obj_texture(scene, mat->fbx.transparency_factor.texture, "checkerboard_transparency.png");
+		ufbxt_check_obj_texture(scene, mat->fbx.bump.texture, "checkerboard_bump.png");
 
 		ufbxt_check_obj_texture(scene, mat->pbr.base_color.texture, "checkerboard_diffuse.png");
 		ufbxt_check_obj_texture(scene, mat->pbr.specular_color.texture, "checkerboard_specular.png");
 		ufbxt_check_obj_texture(scene, mat->pbr.emission_color.texture, "checkerboard_emissive.png");
 		ufbxt_check_obj_texture(scene, mat->pbr.roughness.texture, "checkerboard_roughness.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.normal_map.texture, "checkerboard_bump.png");
 	}
 
 	{
@@ -603,6 +605,88 @@ UFBXT_FILE_TEST(synthetic_simple_textures)
 		ufbxt_check_obj_texture(scene, mat->fbx.transparency_factor.texture, "checkerboard_weight.png");
 		ufbxt_check_obj_texture(scene, mat->fbx.normal_map.texture, "checkerboard_normal.png");
 		ufbxt_check_obj_texture(scene, mat->fbx.displacement.texture, "checkerboard_displacement.png");
+	}
+
+	{
+		ufbx_material *mat = ufbx_find_material(scene, "NonMap");
+		ufbxt_assert(mat);
+		ufbxt_assert(mat->shader_type == UFBX_SHADER_WAVEFRONT_MTL);
+
+		ufbxt_assert(mat->textures.count == 3);
+
+		ufbxt_check_obj_texture(scene, mat->pbr.normal_map.texture, "checkerboard_normal.png");
+		ufbxt_check_obj_texture(scene, mat->pbr.displacement_map.texture, "checkerboard_displacement.png");
+
+		ufbxt_check_obj_texture(scene, mat->fbx.normal_map.texture, "checkerboard_normal.png");
+		ufbxt_check_obj_texture(scene, mat->fbx.displacement.texture, "checkerboard_displacement.png");
+
+		ufbxt_check_obj_texture(scene, ufbx_find_prop_texture(mat, "norm"), "checkerboard_normal.png");
+		ufbxt_check_obj_texture(scene, ufbx_find_prop_texture(mat, "disp"), "checkerboard_displacement.png");
+		ufbxt_check_obj_texture(scene, ufbx_find_prop_texture(mat, "bump"), "checkerboard_bump.png");
+	}
+}
+#endif
+
+#if UFBXT_IMPL
+void ufbxt_check_obj_prop(ufbxt_diff_error *err, ufbx_props *props, const char *name, const char *str, int64_t i, ufbx_real x, ufbx_real y, ufbx_real z)
+{
+	ufbxt_hintf("name = \"%s\"", name);
+
+	ufbx_prop *prop = ufbx_find_prop(props, name);
+	ufbxt_assert(prop);
+	if (str) {
+		ufbxt_assert(!strcmp(prop->value_str.data, str));
+	}
+
+	ufbxt_assert(prop->value_int == i);
+
+	ufbxt_assert_close_real(err, prop->value_vec3.x, x);
+	ufbxt_assert_close_real(err, prop->value_vec3.y, y);
+	ufbxt_assert_close_real(err, prop->value_vec3.z, z);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_texture_opts)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->materials.count == 1);
+
+	ufbx_material *mat = ufbx_find_material(scene, "Opts");
+	ufbxt_assert(mat);
+	ufbxt_assert(mat->shader_type == UFBX_SHADER_WAVEFRONT_MTL);
+
+	{
+		ufbx_texture *tex = mat->fbx.diffuse_color.texture;
+		ufbxt_assert(tex);
+		ufbxt_assert(!strcmp(tex->relative_filename.data, "textures/checkerboard_diffuse.png"));
+
+		ufbxt_check_obj_prop(err, &tex->props, "blendu", "off", 0, 0.0f, 0.0f, 0.0f);
+		ufbxt_check_obj_prop(err, &tex->props, "blendv", "on", 1, 1.0f, 0.0f, 0.0f);
+		ufbxt_check_obj_prop(err, &tex->props, "clamp", "off", 0, 0.0f, 0.0f, 0.0f);
+		ufbxt_check_obj_prop(err, &tex->props, "imfchan", "r", 0, 0.0f, 0.0f, 0.0f);
+		ufbxt_check_obj_prop(err, &tex->props, "mm", "1 2", 1, 1.0f, 2.0f, 0.0f);
+		ufbxt_check_obj_prop(err, &tex->props, "o", "0.1 0.2 0.3", 0, 0.1f, 0.2f, 0.3f);
+		ufbxt_check_obj_prop(err, &tex->props, "s", "0.4 0.5 0.6", 0, 0.4f, 0.5f, 0.6f);
+		ufbxt_check_obj_prop(err, &tex->props, "t", "0.7 0.8 0.9", 0, 0.7f, 0.8f, 0.9f);
+		ufbxt_check_obj_prop(err, &tex->props, "texres", "512", 512, 512.0f, 0.0f, 0.0f);
+	}
+
+	{
+		ufbx_texture *tex = mat->fbx.specular_color.texture;
+		ufbxt_assert(tex);
+		ufbxt_assert(!strcmp(tex->relative_filename.data, "textures/checkerboard_specular.png"));
+
+		ufbxt_check_obj_prop(err, &tex->props, "blendu", "on", 1, 1.0f, 0.0f, 0.0f);
+		ufbxt_check_obj_prop(err, &tex->props, "blendv", "off", 0, 0.0f, 0.0f, 0.0f);
+		ufbxt_check_obj_prop(err, &tex->props, "clamp", "on", 1, 1.0f, 0.0f, 0.0f);
+		ufbxt_check_obj_prop(err, &tex->props, "imfchan", "g", 0, 0.0f, 0.0f, 0.0f);
+		ufbxt_check_obj_prop(err, &tex->props, "mm", "3 4", 3, 3.0f, 4.0f, 0.0f);
+		ufbxt_check_obj_prop(err, &tex->props, "o", "-0.1 -.2 1.3", 0, -0.1f, -0.2f, 1.3f);
+		ufbxt_check_obj_prop(err, &tex->props, "s", NULL, 1, 1.4f, 1.5f, 1.6f);
+		ufbxt_check_obj_prop(err, &tex->props, "t", "1.7 1.8 1.9", 1, 1.7f, 1.8f, 1.9f);
+		ufbxt_check_obj_prop(err, &tex->props, "texres", "1024", 1024, 1024.0f, 0.0f, 0.0f);
+		ufbxt_check_obj_prop(err, &tex->props, "unknown", "hello world", 0, 0.0f, 0.0f, 0.0f);
+		ufbxt_check_obj_prop(err, &tex->props, "single-unknown", "", 0, 0.0f, 0.0f, 0.0f);
 	}
 
 }

@@ -1744,8 +1744,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			switch (fi) {
 			case 0: format = "binary"; break;
 			case 1: format = "ascii"; break;
-			case 2: format = "obj"; ext = "obj"; break;
-			case 3: format = "mtl"; ext = "mtl"; break;
+			case 2: format = "mtl"; ext = "mtl"; break;
+			case 3: format = "obj"; ext = "obj"; break;
 			}
 			ufbxt_assert(format);
 
@@ -1786,9 +1786,9 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			if (fi < 2) {
 				load_opts.file_format = UFBX_FILE_FORMAT_FBX;
 			} else if (fi == 2) {
-				load_opts.file_format = UFBX_FILE_FORMAT_OBJ;
-			} else if (fi == 3) {
 				load_opts.file_format = UFBX_FILE_FORMAT_MTL;
+			} else if (fi == 3) {
+				load_opts.file_format = UFBX_FILE_FORMAT_OBJ;
 			}
 
 			ufbxt_progress_ctx progress_ctx = { 0 };
@@ -1968,9 +1968,9 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 					ufbxt_assert(scene->metadata.ascii == ((fi == 1) ? 1 : 0));
 					ufbxt_assert(scene->metadata.version == version);
 				} else if (fi == 2) {
-					ufbxt_assert(scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ);
-				} else if (fi == 3) {
 					ufbxt_assert(scene->metadata.file_format == UFBX_FILE_FORMAT_MTL);
+				} else if (fi == 3) {
+					ufbxt_assert(scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ);
 				}
 
 				ufbxt_check_scene(scene);

@@ -14112,24 +14112,35 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc
 		}
 	}
 
-	size_t advance = ufbxi_max_sz(num_reals, 1);
-	size_t end = include_rest ? SIZE_MAX : start + advance - 1;
-	ufbx_string span = ufbxi_obj_span_token(uc, start, end);
-	prop->value_str = span;
-	prop->value_blob.data = span.data;
-	prop->value_blob.size = span.length;
+	size_t num_args = 0;
+	if (!include_rest) {
+		for (; start + num_args < uc->obj.num_tokens - 1; num_args++) {
+			if (ufbxi_match(&uc->obj.tokens[start + num_args], "-[A-Za-z][\\-A-Za-z0-9_]*")) break;
+		}
+	}
 
-	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &prop->value_str, false));
-	ufbxi_check(ufbxi_push_string_place_blob(&uc->string_pool, &prop->value_blob, true));
+	if (num_args > 0 || include_rest) {
+		ufbx_string span = ufbxi_obj_span_token(uc, start, include_rest ? SIZE_MAX : start + num_args - 1);
+		prop->value_str = span;
+		prop->value_blob.data = span.data;
+		prop->value_blob.size = span.length;
+
+		ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &prop->value_str, false));
+		ufbxi_check(ufbxi_push_string_place_blob(&uc->string_pool, &prop->value_blob, true));
+	} else {
+		prop->value_str.data = ufbxi_empty_char;
+	}
 
 	if (num_reals > 0) {
 		flags = (uint32_t)UFBX_PROP_FLAG_VALUE_REAL << (num_reals - 1);
 	} else {
 		if (!strcmp(prop->value_str.data, "on")) {
 			prop->value_int = 1;
+			prop->value_real = 1.0f;
 			flags |= UFBX_PROP_FLAG_VALUE_INT;
 		} else if (!strcmp(prop->value_str.data, "off")) {
 			prop->value_int = 0;
+			prop->value_real = 0.0f;
 			flags |= UFBX_PROP_FLAG_VALUE_INT;
 		}
 	}
@@ -14137,7 +14148,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc
 	prop->flags = (ufbx_prop_flags)flags;
 
 	if (p_next) {
-		*p_next = start + advance;
+		*p_next = start + num_args;
 	}
 
 	return 1;
@@ -14153,13 +14164,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_mtl_map(ufbxi_context 
 	size_t start = 1;
 	for (; start + 1 < uc->obj.num_tokens; ) {
 		ufbx_string tok = uc->obj.tokens[start];
-		if (tok.data[0] == '-') {
+		if (ufbxi_match(&tok, "-[A-Za-z][\\-A-Za-z0-9_]*")) {
 			tok.data += 1;
 			tok.length -= 1;
 			ufbxi_check(ufbxi_obj_parse_prop(uc, tok, start + 1, false, &start));
 			num_props++;
+		} else {
+			break;
 		}
-		break;
 	}
 
 	ufbx_string tex_str = ufbxi_obj_span_token(uc, start, SIZE_MAX);
@@ -15197,6 +15209,7 @@ static const ufbxi_shader_mapping ufbxi_obj_fbx_mapping[] = {
 	{ UFBX_MATERIAL_FBX_TRANSPARENCY_FACTOR, 0, 0, ufbxi_mat_string("d") },
 	{ UFBX_MATERIAL_FBX_NORMAL_MAP, 0, 0, ufbxi_mat_string("norm") },
 	{ UFBX_MATERIAL_FBX_DISPLACEMENT, 0, 0, ufbxi_mat_string("disp") },
+	{ UFBX_MATERIAL_FBX_BUMP, 0, 0, ufbxi_mat_string("bump") },
 };
 
 static const ufbxi_shader_mapping ufbxi_fbx_lambert_shader_pbr_mapping[] = {
