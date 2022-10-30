@@ -404,8 +404,8 @@ UFBXT_FILE_TEST(blender_279_ball)
 {
 	ufbx_material *red = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Red");
 	ufbx_material *white = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "White");
-	ufbxt_assert(!strcmp(red->name.data, "Red"));
-	ufbxt_assert(!strcmp(white->name.data, "White"));
+	ufbxt_assert(red && !strcmp(red->name.data, "Red"));
+	ufbxt_assert(white && !strcmp(white->name.data, "White"));
 
 	ufbx_vec3 red_ref = { 0.8, 0.0, 0.0 };
 	ufbx_vec3 white_ref = { 0.8, 0.8, 0.8 };
