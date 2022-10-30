@@ -1393,8 +1393,62 @@ static bool ufbxt_fuzz_should_skip(int iter)
 	}
 }
 
-void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progress_calls, const char *base_name, void *data, size_t size, const char *filename)
+typedef struct {
+	uint64_t calls;
+} ufbxt_progress_ctx;
+
+ufbx_progress_result ufbxt_measure_progress(void *user, const ufbx_progress *progress)
 {
+	ufbxt_progress_ctx *ctx = (ufbxt_progress_ctx*)user;
+	ctx->calls++;
+	return UFBX_PROGRESS_CONTINUE;
+}
+
+void ufbxt_do_fuzz(const char *base_name, void *data, size_t size, const char *filename, bool allow_error, ufbx_file_format file_format)
+{
+	size_t temp_allocs = 1000;
+	size_t result_allocs = 500;
+	size_t progress_calls = 100;
+
+	{
+		ufbxt_progress_ctx progress_ctx = { 0 };
+
+		bool temp_freed = false, result_freed = false;
+
+		ufbx_load_opts prog_opts = { 0 };
+		ufbxt_init_allocator(&prog_opts.temp_allocator, &temp_freed);
+		ufbxt_init_allocator(&prog_opts.result_allocator, &result_freed);
+		prog_opts.file_format = file_format;
+		prog_opts.read_buffer_size = 1;
+		prog_opts.temp_allocator.huge_threshold = 1;
+		prog_opts.result_allocator.huge_threshold = 1;
+		prog_opts.filename.data = NULL;
+		prog_opts.filename.length = 0;
+		prog_opts.progress_cb.fn = &ufbxt_measure_progress;
+		prog_opts.progress_cb.user = &progress_ctx;
+		prog_opts.progress_interval_hint = 1;
+
+		ufbx_error prog_error;
+		ufbx_scene *prog_scene = ufbx_load_memory(data, size, &prog_opts, &prog_error);
+		if (!allow_error) {
+			if (!prog_scene) {
+				ufbxt_log_error(&prog_error);
+			}
+			ufbxt_assert(prog_scene);
+		}
+
+		if (prog_scene) {
+			progress_calls = (size_t)progress_ctx.calls;
+			temp_allocs = prog_scene->metadata.temp_allocs + 10;
+			result_allocs = prog_scene->metadata.result_allocs + 10;
+
+			ufbx_free_scene(prog_scene);
+		}
+
+		ufbxt_assert(temp_freed);
+		ufbxt_assert(result_freed);
+	}
+
 	if (g_fuzz) {
 		uint64_t begin = cputime_os_tick();
 
@@ -1402,13 +1456,6 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 		int i;
 
 		g_fuzz_test_name = base_name;
-
-		size_t temp_allocs = 1000;
-		size_t result_allocs = 500;
-		if (streamed_scene) {
-			temp_allocs = streamed_scene->metadata.temp_allocs + 10;
-			result_allocs = streamed_scene->metadata.result_allocs + 10;
-		}
 
 		#pragma omp parallel for schedule(dynamic, 4)
 		for (i = 0; i < (int)temp_allocs; i++) {
@@ -1666,17 +1713,6 @@ bool ufbxt_next_file(ufbxt_file_iterator *iter, char *buffer, size_t buffer_size
 	}
 }
 
-typedef struct {
-	uint64_t calls;
-} ufbxt_progress_ctx;
-
-ufbx_progress_result ufbxt_measure_progress(void *user, const ufbx_progress *progress)
-{
-	ufbxt_progress_ctx *ctx = (ufbxt_progress_ctx*)user;
-	ctx->calls++;
-	return UFBX_PROGRESS_CONTINUE;
-}
-
 typedef enum ufbxt_file_test_flags {
 	// Alternative test for a given file, does not execute fuzz tests again.
 	UFBXT_FILE_TEST_FLAG_ALTERNATIVE = 0x1,
@@ -1708,6 +1744,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 		g_fuzz_quality = g_heavy_fuzz_quality;
 	}
 
+	char base_name[512];
+
+	bool allow_error = (flags & UFBXT_FILE_TEST_FLAG_ALLOW_ERROR) != 0;
+	bool alternative = (flags & UFBXT_FILE_TEST_FLAG_ALTERNATIVE) != 0;
+
 	ufbx_scene *obj_scene = NULL;
 	if (obj_file) {
 		ufbxt_logf("%s [diff target found]", buf);
@@ -1724,17 +1765,30 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 		ufbxt_assert(obj_scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ);
 		ufbxt_check_scene(obj_scene);
 
-		// TODO: Diff to the other .obj
-	}
+		{
+			ufbxt_diff_error err = { 0 };
+			ufbxt_diff_to_obj(obj_scene, obj_file, &err, false);
+			if (err.num > 0) {
+				ufbx_real avg = err.sum / (ufbx_real)err.num;
+				ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+			}
+		}
 
-	char base_name[512];
+		size_t size = 0;
+		void *data = ufbxt_read_file(buf, &size);
+		ufbxt_assert(data);
+
+		snprintf(base_name, sizeof(base_name), "%s_obj", name);
+		if (!alternative) {
+			ufbxt_do_fuzz(base_name, data, size, buf, allow_error, UFBX_FILE_FORMAT_UNKNOWN);
+		}
+
+		free(data);
+	}
 
 	ufbxt_begin_fuzz();
 
 	uint32_t num_opened = 0;
-
-	bool allow_error = (flags & UFBXT_FILE_TEST_FLAG_ALLOW_ERROR) != 0;
-	bool alternative = (flags & UFBXT_FILE_TEST_FLAG_ALTERNATIVE) != 0;
 
 	for (uint32_t fi = 0; fi < 4; fi++) {
 		for (uint32_t vi = 0; vi < ufbxt_arraycount(ufbxt_file_versions); vi++) {
@@ -1890,7 +1944,6 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				} else {
 					fprintf(stderr, "\rFuzzing read buffer size %s: %d/%d\n", base_name, (int)size, (int)size);
 				}
-
 			}
 
 			// Ignore geometry, animations, and both
@@ -2020,9 +2073,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 			}
 
-			if (!alternative && scene) {
-				ufbxt_do_fuzz(scene, streamed_scene, (size_t)stream_progress_ctx.calls, base_name, data, size, buf);
+			if (!alternative) {
+				ufbxt_do_fuzz(base_name, data, size, buf, allow_error, UFBX_FILE_FORMAT_UNKNOWN);
+			}
 
+			if (!alternative && scene) {
 				// Run known buffer size checks
 				for (size_t i = 0; i < ufbxt_arraycount(g_buffer_checks); i++) {
 					const ufbxt_buffer_check *check = &g_buffer_checks[i];

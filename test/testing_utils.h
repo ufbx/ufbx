@@ -107,6 +107,7 @@ static ufbx_real ufbxt_clamp(ufbx_real v, ufbx_real min_v, ufbx_real max_v) { re
 
 typedef struct {
 	const char **groups;
+	const char *original_group;
 	size_t num_groups;
 
 	size_t num_faces;
@@ -449,8 +450,10 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 				bool space = *c == ' ' || *c == '\t';
 				if (space && !prev_space) num_groups++;
 				if (!space) total_name_length++;
+				total_name_length++;
 				prev_space = space;
 			}
+			total_name_length++;
 			num_meshes++;
 		}
 
@@ -599,6 +602,11 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 		} else if (!strncmp(line, "g ", 2)) {
 			mesh = mesh ? mesh + 1 : meshes;
 			memset(mesh, 0, sizeof(ufbxt_obj_mesh));
+
+			size_t groups_len = strlen(line + 2);
+			memcpy(name_data, line + 2, groups_len + 1);
+			mesh->original_group = name_data;
+			name_data += groups_len + 1;
 
 			mesh->groups = group_ptrs;
 
@@ -1199,6 +1207,10 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			ufbxt_assert(scene->meshes.count == 1);
 			ufbxt_assert(scene->meshes.data[0]->instances.count == 1);
 			node = scene->meshes.data[0]->instances.data[0];
+		}
+
+		if (!node) {
+			node = ufbx_find_node(scene, obj_mesh->original_group);
 		}
 
 		if (!node) {

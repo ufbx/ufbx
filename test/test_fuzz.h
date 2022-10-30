@@ -28,6 +28,7 @@ UFBXT_TEST(fuzz_files)
 			ufbxt_check_scene(scene);
 			ok++;
 		}
+		bool allow_error = scene == NULL;
 
 		ufbx_free_scene(scene);
 
@@ -58,7 +59,7 @@ UFBXT_TEST(fuzz_files)
 
 		int prev_fuzz_quality = g_fuzz_quality;
 		g_fuzz_quality = g_heavy_fuzz_quality;
-		ufbxt_do_fuzz(scene, streamed_scene, (size_t)stream_progress_ctx.calls, name, data, size, buf);
+		ufbxt_do_fuzz(name, data, size, buf, allow_error, UFBX_FILE_FORMAT_FBX);
 		g_fuzz_quality = prev_fuzz_quality;
 
 		free(data);
@@ -180,6 +181,8 @@ UFBXT_TEST(fuzz_obj_files)
 			ok++;
 		}
 
+		bool allow_error = scene == NULL;
+
 		ufbx_free_scene(scene);
 
 		ufbxt_progress_ctx stream_progress_ctx = { 0 };
@@ -207,7 +210,7 @@ UFBXT_TEST(fuzz_obj_files)
 		ufbxt_assert(temp_freed);
 		ufbxt_assert(result_freed);
 
-		ufbxt_do_fuzz(scene, streamed_scene, (size_t)stream_progress_ctx.calls, name, data, size, buf);
+		ufbxt_do_fuzz(name, data, size, buf, allow_error, UFBX_FILE_FORMAT_OBJ);
 
 		free(data);
 	}
