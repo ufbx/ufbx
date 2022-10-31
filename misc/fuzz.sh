@@ -23,7 +23,7 @@ elif [ "$1" == "build-obj-asan" ]; then
 elif [ "$1" == "build-mtl" ]; then
     afl-clang-fast -DLOAD_MTL -static ../../misc/fuzz_ufbx_persist.c -lm -o fuzz_mtl
 elif [ "$1" == "build-mtl-asan" ]; then
-    AFL_USE_ASAN=1 afl-clang-fast -DLOAD_MTL -DDISCRETE_ALLOCATIONS ../../misc/fuzz_ufbx_persist.c -lm -o fuzz_mtl
+    AFL_USE_ASAN=1 afl-clang-fast -DLOAD_MTL -DDISCRETE_ALLOCATIONS ../../misc/fuzz_ufbx_persist.c -lm -o fuzz_mtl_asan
 fi
 
 if [ "$1" == "fuzz" ]; then
