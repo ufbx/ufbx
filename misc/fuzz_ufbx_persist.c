@@ -33,6 +33,9 @@ int main(int argc, char **argv)
 
 #if defined(LOAD_OBJ)
 	opts.file_format = UFBX_FILE_FORMAT_OBJ;
+#elif defined(LOAD_MTL)
+	opts.file_format = UFBX_FILE_FORMAT_MTL;
+#elif defined(LOAD_GUESS)
 #else
 	opts.file_format = UFBX_FILE_FORMAT_FBX;
 #endif
