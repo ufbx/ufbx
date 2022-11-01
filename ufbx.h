@@ -3411,9 +3411,11 @@ typedef struct ufbx_load_opts {
 	ufbx_allocator_opts result_allocator; // < Allocator used for the final scene
 
 	// Preferences
-	bool ignore_geometry;   // < Do not load geometry datsa (vertices, indices, etc)
-	bool ignore_animation;  // < Do not load animation curves
-	bool ignore_embedded;   // < Do not load embedded content
+	bool ignore_geometry;    // < Do not load geometry datsa (vertices, indices, etc)
+	bool ignore_animation;   // < Do not load animation curves
+	bool ignore_embedded;    // < Do not load embedded content
+	bool ignore_all_content; // < Do not load any content (geometry, animation, embedded)
+
 	bool evaluate_skinning; // < Evaluate skinning (see ufbx_mesh.skinned_vertices)
 	bool evaluate_caches;   // < Evaluate vertex caches (see ufbx_mesh.skinned_vertices)
 

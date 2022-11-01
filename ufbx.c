@@ -20030,6 +20030,12 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 		uc->opts.filename.length = uc->opts.filename.data ? strlen(uc->opts.filename.data) : 0;
 	}
 
+	if (uc->opts.ignore_all_content) {
+		uc->opts.ignore_geometry = true;
+		uc->opts.ignore_animation = true;
+		uc->opts.ignore_embedded = true;
+	}
+
 	ufbx_inflate_retain inflate_retain;
 	inflate_retain.initialized = false;
 
