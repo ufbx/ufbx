@@ -711,3 +711,14 @@ UFBXT_FILE_TEST_PATH(blender_331_space_texture, "blender_331_space texture")
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_obj_zoo)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Object");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 1);
+}
+#endif
