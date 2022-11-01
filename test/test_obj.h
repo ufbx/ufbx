@@ -691,3 +691,23 @@ UFBXT_FILE_TEST(synthetic_texture_opts)
 
 }
 #endif
+
+UFBXT_FILE_TEST_PATH(blender_331_space_texture, "blender_331_space texture")
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->materials.count == 1);
+	ufbx_material *material = ufbx_find_material(scene, "Material");
+	ufbxt_assert(material);
+
+	ufbx_texture *texture = material->fbx.diffuse_color.texture;
+	ufbxt_assert(texture);
+	ufbxt_assert(!strcmp(texture->relative_filename.data, "space dir/space tex.png"));
+
+	if (scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ) {
+		ufbx_node *node = ufbx_find_node(scene, "Cube");
+		ufbxt_assert(node && node->mesh);
+		ufbxt_assert(node->materials.count == 1);
+		ufbxt_assert(node->materials.data[0] == material);
+	}
+}
+#endif

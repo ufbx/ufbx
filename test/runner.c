@@ -2171,6 +2171,11 @@ void ufbxt_do_deflate_test(const char *name, void (*test_fn)(const ufbxt_inflate
 	ufbx_load_opts user_opts = { 0 }; \
 	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL, user_opts, flags); } \
 	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
+#define UFBXT_FILE_TEST_PATH_FLAGS(name, path, flags) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
+	void ufbxt_test_fn_file_##name(void) { \
+	ufbx_load_opts user_opts = { 0 }; \
+	ufbxt_do_file_test(path, &ufbxt_test_fn_imp_file_##name, NULL, user_opts, flags); } \
+	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
 #define UFBXT_FILE_TEST_OPTS_FLAGS(name, get_opts, flags) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
 	void ufbxt_test_fn_file_##name(void) { \
 	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL, get_opts(), flags); } \
@@ -2199,6 +2204,7 @@ void ufbxt_do_deflate_test(const char *name, void (*test_fn)(const ufbxt_inflate
 	void ufbxt_test_fn_imp_deflate_##name(const ufbxt_inflate_opts *opts)
 
 #define UFBXT_FILE_TEST(name) UFBXT_FILE_TEST_FLAGS(name, 0)
+#define UFBXT_FILE_TEST_PATH(name, path) UFBXT_FILE_TEST_PATH_FLAGS(name, path, 0)
 #define UFBXT_FILE_TEST_OPTS(name, get_opts) UFBXT_FILE_TEST_OPTS_FLAGS(name, get_opts, 0)
 #define UFBXT_FILE_TEST_SUFFIX(name, suffix) UFBXT_FILE_TEST_SUFFIX_FLAGS(name, suffix, 0)
 #define UFBXT_FILE_TEST_SUFFIX_OPTS(name, suffix, get_opts) UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS(name, suffix, get_opts, 0)
@@ -2210,6 +2216,7 @@ void ufbxt_do_deflate_test(const char *name, void (*test_fn)(const ufbxt_inflate
 #undef UFBXT_IMPL
 #undef UFBXT_TEST
 #undef UFBXT_FILE_TEST_FLAGS
+#undef UFBXT_FILE_TEST_PATH_FLAGS
 #undef UFBXT_FILE_TEST_OPTS_FLAGS
 #undef UFBXT_FILE_TEST_SUFFIX_FLAGS
 #undef UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS
@@ -2219,6 +2226,7 @@ void ufbxt_do_deflate_test(const char *name, void (*test_fn)(const ufbxt_inflate
 #define UFBXT_IMPL 0
 #define UFBXT_TEST(name) { #name, &ufbxt_test_fn_##name },
 #define UFBXT_FILE_TEST_FLAGS(name, flags) { #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST_PATH_FLAGS(name, path, flags) { #name, &ufbxt_test_fn_file_##name },
 #define UFBXT_FILE_TEST_OPTS_FLAGS(name, get_opts, flags) { #name, &ufbxt_test_fn_file_##name },
 #define UFBXT_FILE_TEST_SUFFIX_FLAGS(name, suffix, flags) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
 #define UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS(name, suffix, get_opts, flags) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
