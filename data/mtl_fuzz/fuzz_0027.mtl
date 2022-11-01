@@ -1,0 +1,22 @@
+
+# Stanterial+propertiesd 0 1 0
+Ks 0 0 1
+Ke 1 0 1
+Ns 99
+d extension"í
+newmtl PBR
+Pr 0.1
+Pm0.2
+Ps 0.30.4 0.5
+Pc 0.6
+Pcr 0.7
+Tf 0.8 0931.0î	d 0.75
+Ni 1.33
+
+# Widen to RGB values
+newm800000'l Gide
+Ka 0.1Kd 0.2
+Ks 0.3
+Ke 0.4
+Ps 0.5
+File::f 0.6
