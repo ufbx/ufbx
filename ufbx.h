@@ -799,6 +799,21 @@ typedef struct ufbx_mesh_material {
 
 UFBX_LIST_TYPE(ufbx_mesh_material_list, ufbx_mesh_material);
 
+typedef struct ufbx_face_group {
+	int32_t id;       // < Numerical ID for this group.
+	ufbx_string name; // < Name for the face group.
+
+	// Sub-set of the geometry in this face group
+	size_t num_faces;     // < Number of faces (polygons) using this material
+	size_t num_triangles; // < Number of triangles using this material if triangulated
+
+	// Indices to `ufbx_mesh.faces[]` that use this material.
+	// Always contains `num_faces` elements.
+	ufbx_uint32_list face_indices; 
+} ufbx_face_group;
+
+UFBX_LIST_TYPE(ufbx_face_group_list, ufbx_face_group);
+
 typedef struct ufbx_subdivision_weight_range {
 	uint32_t weight_begin;
 	uint32_t num_weights;
@@ -928,8 +943,8 @@ struct ufbx_mesh {
 	// Faces and optional per-face extra data
 	ufbx_face_list faces;           // < Face index range
 	ufbx_bool_list face_smoothing;  // < Should the face have soft normals
-	ufbx_uint32_list face_material; // < Indices to `ufbx_mesh.materials` and `ufbx_node.materials`
-	ufbx_uint32_list face_group;    // < Face polygon group index
+	ufbx_uint32_list face_material; // < Indices to `ufbx_mesh.materials[]` and `ufbx_node.materials[]`
+	ufbx_uint32_list face_group;    // < Face polygon group index, indices to `ufbx_mesh.face_groups[]`
 	ufbx_bool_list face_hole;       // < Should the face be hidden as a "hole"
 	size_t max_face_triangles;      // < Maximum number of triangles per face in this mesh
 	size_t num_bad_faces;           // < Number of faces with less than 3 vertices
@@ -977,6 +992,9 @@ struct ufbx_mesh {
 	// you enable `ufbx_load_opts.allow_null_material` there will be a single
 	// `ufbx_mesh_material` with `material == NULL` with all the faces in it.
 	ufbx_mesh_material_list materials;
+
+	// Face groups for this mesh.
+	ufbx_face_group_list face_groups;
 
 	// Skinned vertex positions, for efficiency the skinned positions are the
 	// same as the static ones for non-skinned meshes and `skinned_is_local`
@@ -2838,6 +2856,10 @@ typedef struct ufbx_metadata {
 	// Index arrays may contain `UFBX_NO_INDEX` instead of a valid index
 	// to indicate gaps.
 	bool may_contain_no_index;
+
+	// May contain `ufbx_mesh_material` entries where `ufbx_mesh_material.material == NULL`.
+	// NOTE: The corresponding `ufbx_node.material[]` will be empty in this case.
+	bool may_contain_null_materials;
 
 	// Some API guarantees do not apply (depending on unsafe options used).
 	// Loaded with `ufbx_load_opts.allow_unsafe` enabled.

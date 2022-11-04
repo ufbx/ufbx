@@ -1312,6 +1312,9 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, mesh->subdivision_preview_levels, &opts, NULL);
 			ufbxt_assert(sub_mesh);
 
+			// Check that we didn't break the original mesh
+			ufbxt_check_mesh(scene, mesh);
+
 			ufbxt_check_source_vertices(sub_mesh, mesh, p_err);
 
 			ufbxt_check_mesh(scene, sub_mesh);

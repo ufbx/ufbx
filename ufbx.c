@@ -18,6 +18,7 @@
 #define UFBXI_KD_FAST_DEPTH 6
 #define UFBXI_HUGE_MAX_SCAN 16
 #define UFBXI_MIN_FILE_FORMAT_LOOKAHEAD 32
+#define UFBXI_FACE_GROUP_HASH_BITS 8
 
 #ifndef UFBXI_MAX_NURBS_ORDER
 #define UFBXI_MAX_NURBS_ORDER 128
@@ -632,6 +633,9 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 
 	#undef UFBXI_KD_FAST_DEPTH
 	#define UFBXI_KD_FAST_DEPTH 2
+
+	#undef UFBXI_FACE_GROUP_HASH_BITS
+	#define UFBXI_FACE_GROUP_HASH_BITS 2
 #endif
 
 #if defined(UFBX_REGRESSION)
@@ -1012,6 +1016,8 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	const char *p = str;
 	if (*p == '-') {
 		negative = true;
+		p++;
+	} else if (*p == '+') {
 		p++;
 	}
 	while (((uint32_t)*p - '0') < 10) {
@@ -2810,6 +2816,13 @@ static ufbxi_noinline void ufbxi_free_ator(ufbxi_allocator *ator)
 
 #define ufbxi_grow_array(ator, p_ptr, p_cap, n) ufbxi_grow_array_size((ator), sizeof(**(p_ptr)), (p_ptr), (p_cap), (n))
 
+#define UFBXI_SCENE_IMP_MAGIC 0x58424655
+#define UFBXI_MESH_IMP_MAGIC 0x48534d55
+#define UFBXI_LINE_CURVE_IMP_MAGIC 0x55434c55
+#define UFBXI_CACHE_IMP_MAGIC 0x48434355
+#define UFBXI_REFCOUNT_IMP_MAGIC 0x46455255
+#define UFBXI_BUF_CHUNK_IMP_MAGIC 0x46554255
+
 // -- Memory buffer
 //
 // General purpose memory buffer that can be used either as a chunked linear memory
@@ -2831,7 +2844,10 @@ struct ufbxi_buf_chunk {
 	ufbxi_buf_chunk *prev;
 	ufbxi_buf_chunk *next;
 
-	void *align_0; // < Align to 4x pointer size (16/32 bytes)
+	union {
+		size_t magic;  // < Magic for debugging
+		void *align_0; // < Align to 4x pointer size (16/32 bytes)
+	};
 
 	size_t size;         // < Size of the chunk `data`, excluding this header
 	size_t pushed_pos;   // < Size of valid data when pushed to the list
@@ -2882,6 +2898,7 @@ static ufbxi_noinline void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 			chunk->pushed_pos = b->pos;
 			ufbxi_buf_chunk *next = chunk->next;
 			while (next != NULL) {
+				ufbx_assert(next->magic == UFBXI_BUF_CHUNK_IMP_MAGIC);
 				chunk = next;
 				ufbx_assert(b->unordered || chunk->pushed_pos == 0);
 				chunk->pushed_pos = 0;
@@ -2908,6 +2925,7 @@ static ufbxi_noinline void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 			// as those chunks are never reused.
 			// Unreachable chunks in the tail are freed in `ufbxi_buf_clear()`.
 			for (size_t i = 0; next && i < UFBXI_HUGE_MAX_SCAN; i++) {
+				ufbx_assert(next->magic == UFBXI_BUF_CHUNK_IMP_MAGIC);
 				if (next->size < size) break;
 				chunk = next;
 
@@ -2959,7 +2977,7 @@ static ufbxi_noinline void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 	new_chunk->prev = chunk;
 	new_chunk->size = chunk_size;
 	new_chunk->next_size = next_size;
-	new_chunk->align_0 = NULL;
+	new_chunk->magic = UFBXI_BUF_CHUNK_IMP_MAGIC;
 	new_chunk->padding_pos = 0;
 	new_chunk->pushed_pos = 0;
 
@@ -3104,12 +3122,16 @@ static ufbxi_noinline void ufbxi_buf_free_unused(ufbxi_buf *b)
 	while (next) {
 		ufbxi_buf_chunk *to_free = next;
 		next = next->next;
+		ufbx_assert(to_free->magic == UFBXI_BUF_CHUNK_IMP_MAGIC);
+		to_free->magic = 0;
 		ufbxi_free_size(b->ator, 1, to_free, sizeof(ufbxi_buf_chunk) + to_free->size);
 	}
 	chunk->next = NULL;
 
 	while (b->pos == 0 && chunk) {
 		ufbxi_buf_chunk *prev = chunk->prev;
+		ufbx_assert(chunk->magic == UFBXI_BUF_CHUNK_IMP_MAGIC);
+		chunk->magic = 0;
 		ufbxi_free_size(b->ator, 1, chunk, sizeof(ufbxi_buf_chunk) + chunk->size);
 		chunk = prev;
 		b->chunks[0] = prev;
@@ -3219,6 +3241,8 @@ static ufbxi_noinline void ufbxi_buf_free(ufbxi_buf *buf)
 			chunk = chunk->root;
 			while (chunk) {
 				ufbxi_buf_chunk *next = chunk->next;
+				ufbx_assert(chunk->magic == UFBXI_BUF_CHUNK_IMP_MAGIC);
+				chunk->magic = 0;
 				ufbxi_free_size(buf->ator, 1, chunk, sizeof(ufbxi_buf_chunk) + chunk->size);
 				chunk = next;
 			}
@@ -3267,6 +3291,8 @@ static ufbxi_noinline void ufbxi_buf_clear(ufbxi_buf *buf)
 			huge->prev->next = NULL;
 			while (huge) {
 				ufbxi_buf_chunk *next = huge->next;
+				ufbx_assert(huge->magic == UFBXI_BUF_CHUNK_IMP_MAGIC);
+				huge->magic = 0;
 				ufbxi_free_size(buf->ator, 1, huge, sizeof(ufbxi_buf_chunk) + huge->size);
 				huge = next;
 			}
@@ -4709,12 +4735,6 @@ struct ufbxi_node {
 	};
 };
 
-#define UFBXI_SCENE_IMP_MAGIC 0x58424655
-#define UFBXI_MESH_IMP_MAGIC 0x48534d55
-#define UFBXI_LINE_CURVE_IMP_MAGIC 0x55434c55
-#define UFBXI_CACHE_IMP_MAGIC 0x48434355
-#define UFBXI_REFCOUNT_IMP_MAGIC 0x46455255
-
 typedef struct ufbxi_refcount ufbxi_refcount;
 
 struct ufbxi_refcount {
@@ -4920,6 +4940,7 @@ typedef struct {
 	ufbxi_buf tmp_faces;
 	ufbxi_buf tmp_face_smoothing;
 	ufbxi_buf tmp_face_group;
+	ufbxi_buf tmp_face_group_infos;
 	ufbxi_buf tmp_face_material;
 	ufbxi_buf tmp_meshes;
 	ufbxi_buf tmp_props;
@@ -4955,6 +4976,7 @@ typedef struct {
 
 	ufbx_string object;
 	ufbx_string group;
+	bool material_dirty;
 	bool object_dirty;
 	bool group_dirty;
 	bool face_group_dirty;
@@ -10489,6 +10511,167 @@ ufbxi_noinline static void ufbxi_patch_mesh_reals(ufbx_mesh *mesh)
 	}
 }
 
+typedef struct {
+	uint32_t id, index;
+} ufbxi_id_group;
+
+static int ufbxi_cmp_uint32(const void *va, const void *vb)
+{
+	const uint32_t a = *(const uint32_t*)va, b = *(const uint32_t*)vb;
+	if (a != b) return a < b ? -1 : +1;
+	return 0;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_assign_face_groups(ufbxi_buf *buf, ufbx_error *error, ufbx_mesh *mesh, size_t *p_consecutive_indices)
+{
+	size_t num_faces = mesh->num_faces;
+	ufbxi_check_err(error, num_faces > 0);
+	ufbxi_check_err(error, num_faces < UINT32_MAX);
+	ufbxi_check_err(error, mesh->face_group.count == num_faces);
+
+	uint32_t *ids = ufbxi_push(buf, uint32_t, num_faces);
+	ufbxi_check_err(error, ids);
+
+	uint32_t num_ids = 0;
+
+	ufbxi_id_group seen_ids[1 << UFBXI_FACE_GROUP_HASH_BITS];
+	memset(seen_ids, 0, sizeof(seen_ids));
+
+	uint32_t seed = 2654435769u;
+	uint32_t rehash_threshold = 256;
+
+	// Loosely deduplicate group IDs
+	ufbxi_for_list(uint32_t, p_id, mesh->face_group) {
+		uint32_t id = *p_id;
+		uint32_t id_hash = (id * seed) >> (32u - UFBXI_FACE_GROUP_HASH_BITS);
+		if (seen_ids[id_hash].id != id || seen_ids[id_hash].index == 0) {
+			seen_ids[id_hash].id = id;
+			if (++seen_ids[id_hash].index > rehash_threshold) {
+				seed *= seed;
+				rehash_threshold *= 2;
+			}
+			ids[num_ids++] = id;
+		}
+	}
+
+	// Sort and deduplicate remaining IDs
+	qsort(ids, num_ids, sizeof(uint32_t), &ufbxi_cmp_uint32);
+
+	size_t num_groups = 0;
+	for (size_t i = 0; i < num_ids; ) {
+		uint32_t id = ids[i];
+		ids[num_groups++] = id;
+		do { i++; } while (i < num_ids && ids[i] == id);
+	}
+
+	// Allocate group info structs
+	ufbx_face_group *groups = ufbxi_push_zero(buf, ufbx_face_group, num_groups);
+	ufbxi_check_err(error, groups);
+	for (size_t i = 0; i < num_groups; i++) {
+		groups[i].id = (int32_t)ids[i];
+		groups[i].name.data = ufbxi_empty_char;
+	}
+
+	mesh->face_groups.data = groups;
+	mesh->face_groups.count = num_groups;
+
+	// Optimization: Use `consecutive_indices` for a single group
+	if (p_consecutive_indices && num_groups == 1) {
+		groups[0].face_indices.data = (uint32_t*)ufbxi_sentinel_index_consecutive;
+		groups[0].face_indices.count = num_faces;
+		groups[0].num_faces = num_faces;
+		groups[0].num_triangles = mesh->num_triangles;
+		*p_consecutive_indices = ufbxi_max_sz(*p_consecutive_indices, num_faces);
+		return 1;
+	}
+
+	memset(seen_ids, 0, sizeof(seen_ids));
+
+	// Count faces and triangles per group and reassign IDs
+	const ufbx_face *p_face = mesh->faces.data;
+	ufbxi_for_list(uint32_t, p_id, mesh->face_group) {
+		int32_t id = (int32_t)*p_id;
+		uint32_t id_hash = (id * seed) >> (32u - UFBXI_FACE_GROUP_HASH_BITS);
+
+		uint32_t num_indices = p_face->num_indices;
+		uint32_t num_triangles = num_indices >= 3 ? num_indices - 2 : 0;
+
+		size_t index;
+		if (seen_ids[id_hash].id == id && seen_ids[id_hash].index > 0) {
+			index = seen_ids[id_hash].index - 1;
+			*p_id = (uint32_t)index;
+		} else {
+			index = SIZE_MAX;
+			ufbxi_macro_lower_bound_eq(ufbx_face_group, 8, &index, groups, 0, num_groups, ( a->id < id ), ( a->id == id ));
+			ufbx_assert(index < num_groups);
+			seen_ids[id_hash].id = id;
+			seen_ids[id_hash].index = (uint32_t)index + 1;
+		}
+
+		groups[index].num_faces++;
+		groups[index].num_triangles += num_triangles;
+		*p_id = (uint32_t)index;
+		p_face++;
+	}
+
+	// Subdivide `ids` for per-group `face_indices`
+	uint32_t *face_indices = ids;
+	ufbxi_for(ufbx_face_group, group, groups, num_groups) {
+		group->face_indices.data = face_indices;
+		face_indices += group->num_faces;
+	}
+	ufbx_assert(face_indices == ids + num_faces);
+
+	// Collect per-group faces
+	uint32_t face_index = 0;
+	ufbxi_for_list(uint32_t, p_id, mesh->face_group) {
+		ufbx_face_group *info = &groups[*p_id];
+		info->face_indices.data[info->face_indices.count++] = face_index++;
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_update_face_groups(ufbxi_buf *buf, ufbx_error *error, ufbx_mesh *mesh, bool need_copy)
+{
+	if (!mesh->face_group.count) return 1;
+
+	size_t num_faces = mesh->faces.count;
+
+	if (need_copy) {
+		mesh->face_groups.data = ufbxi_push_copy(buf, ufbx_face_group, mesh->face_groups.count, mesh->face_groups.data);
+		ufbxi_check_err(error, mesh->face_groups.data);
+	}
+
+	uint32_t *face_indices = ufbxi_push(buf, uint32_t, num_faces);
+	ufbxi_check_err(error, face_indices);
+
+	ufbxi_for_list(ufbx_face_group, group, mesh->face_groups) {
+		group->num_faces = 0;
+		group->num_triangles = 0;
+	}
+
+	ufbxi_nounroll for (size_t i = 0; i < num_faces; i++) {
+		uint32_t num_indices = mesh->faces.data[i].num_indices;
+		ufbx_face_group *group = &mesh->face_groups.data[mesh->face_group.data[i]];
+		group->num_faces++;
+		group->num_triangles += num_indices >= 3 ? num_indices - 2 : 0;
+	}
+
+	ufbxi_for_list(ufbx_face_group, group, mesh->face_groups) {
+		group->face_indices.data = face_indices;
+		group->face_indices.count = 0;
+		face_indices += group->num_faces;
+	}
+
+	ufbxi_nounroll for (uint32_t i = 0; i < num_faces; i++) {
+		ufbx_face_group *group = &mesh->face_groups.data[mesh->face_group.data[i]];
+		group->face_indices.data[group->face_indices.count++] = i;
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_mesh *ufbxi_restrict mesh = ufbxi_push_element(uc, info, ufbx_mesh, UFBX_ELEMENT_MESH);
@@ -10822,6 +11005,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	mesh->skinned_normal = mesh->vertex_normal;
 
 	ufbxi_patch_mesh_reals(mesh);
+
+	if (mesh->face_group.count > 0 && mesh->face_groups.count == 0) {
+		ufbxi_check(ufbxi_assign_face_groups(&uc->result, &uc->error, mesh, &uc->max_consecutive_indices));
+	}
 
 	// Sort UV and color sets by set index
 	ufbxi_check(ufbxi_sort_uv_sets(uc, mesh->uv_sets.data, mesh->uv_sets.count));
@@ -13185,6 +13372,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_push_mesh(ufbxi_context *uc)
 	uc->obj.face_material = UFBX_NO_INDEX;
 	uc->obj.face_group = 0;
 	uc->obj.face_group_dirty = true;
+	uc->obj.material_dirty = true;
 
 	ufbxi_check(ufbxi_connect_oo(uc, mesh->fbx_mesh_id, mesh->fbx_node_id));
 	ufbxi_check(ufbxi_connect_oo(uc, mesh->fbx_node_id, 0));
@@ -13198,6 +13386,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_flush_mesh(ufbxi_context *uc
 
 	size_t num_props = uc->obj.tmp_props.num_items;
 	ufbxi_check(ufbxi_obj_pop_props(uc, &uc->obj.mesh->fbx_mesh->props.props, num_props));
+
+	size_t num_groups = uc->obj.tmp_face_group_infos.num_items;
+	ufbx_face_group *groups = ufbxi_push_pop(&uc->result, &uc->obj.tmp_face_group_infos, ufbx_face_group, num_groups);
+	ufbxi_check(groups);
+
+	uc->obj.mesh->fbx_mesh->face_groups.data = groups;
+	uc->obj.mesh->fbx_mesh->face_groups.count = num_groups;
 
 	return 1;
 }
@@ -13217,6 +13412,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_init(ufbxi_context *uc)
 	uc->obj.tmp_face_material.ator = &uc->ator_tmp;
 	uc->obj.tmp_face_smoothing.ator = &uc->ator_tmp;
 	uc->obj.tmp_face_group.ator = &uc->ator_tmp;
+	uc->obj.tmp_face_group_infos.ator = &uc->ator_tmp;
 	uc->obj.tmp_meshes.ator = &uc->ator_tmp;
 	uc->obj.tmp_props.ator = &uc->ator_tmp;
 
@@ -13254,6 +13450,7 @@ static ufbxi_noinline void ufbxi_obj_free(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->obj.tmp_face_material);
 	ufbxi_buf_free(&uc->obj.tmp_face_smoothing);
 	ufbxi_buf_free(&uc->obj.tmp_face_group);
+	ufbxi_buf_free(&uc->obj.tmp_face_group_infos);
 	ufbxi_buf_free(&uc->obj.tmp_meshes);
 	ufbxi_buf_free(&uc->obj.tmp_props);
 
@@ -13434,7 +13631,6 @@ static ufbxi_noinline int ufbxi_obj_parse_vertex(ufbxi_context *uc, ufbxi_obj_at
 
 	ufbx_real *vals = ufbxi_push_fast(dst, ufbx_real, num_values);
 	ufbxi_check(vals);
-
 	for (size_t i = 0; i < read_values; i++) {
 		ufbx_string str = uc->obj.tokens[offset + i];
 		char *end;
@@ -13512,82 +13708,87 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_index(ufbxi_context *u
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context *uc)
 {
+	bool flush_mesh = false;
 	if (uc->obj.object_dirty) {
 		if (!uc->opts.obj_merge_objects) {
-			uc->obj.mesh = NULL;
+			flush_mesh = true;
 		}
 		uc->obj.object_dirty = false;
 	}
 
 	if (uc->obj.group_dirty) {
 		if (((uc->obj.object.length == 0 || uc->opts.obj_merge_objects) && !uc->opts.obj_merge_groups) || uc->opts.obj_split_groups) {
-			uc->obj.mesh = NULL;
+			flush_mesh = true;
 		}
 		uc->obj.group_dirty = false;
 		uc->obj.face_group_dirty = true;
 	}
 
-	if (!uc->obj.mesh) {
+	if (!uc->obj.mesh || flush_mesh) {
 		ufbxi_check(ufbxi_obj_flush_mesh(uc));
 		ufbxi_check(ufbxi_obj_push_mesh(uc));
 	}
 	ufbxi_obj_mesh *mesh = uc->obj.mesh;
 
-	if (mesh->usemtl_base == 0 && uc->obj.usemtl_index > 0) {
-		mesh->usemtl_base = uc->obj.usemtl_index;
-		uc->obj.face_material = 0;
-		ufbxi_check(ufbxi_connect_oo(uc, uc->obj.usemtl_fbx_id, mesh->fbx_node_id));
+	if (uc->obj.material_dirty) {
+		if (uc->obj.usemtl_fbx_id != 0) {
+			ufbxi_fbx_id_entry *entry = ufbxi_find_fbx_id(uc, uc->obj.usemtl_fbx_id);
+			ufbx_assert(entry);
+			if (mesh->usemtl_base == 0 || entry->user_id < mesh->usemtl_base) {
+				ufbxi_check(ufbxi_connect_oo(uc, uc->obj.usemtl_fbx_id, mesh->fbx_node_id));
+
+				uint32_t index = ++uc->obj.usemtl_index;
+				ufbxi_check(index < UINT32_MAX);
+				entry->user_id = index;
+
+				if (mesh->usemtl_base == 0) {
+					mesh->usemtl_base = index;
+				}
+				uc->obj.face_material = index - mesh->usemtl_base;
+			}
+			uc->obj.face_material = entry->user_id - mesh->usemtl_base;
+		}
 	}
 
 	// EARLY RETURN: Rest of the function should only be related to geometry!
 	if (uc->opts.ignore_geometry) return 1;
 
 	if (uc->obj.face_group_dirty) {
+		ufbx_string name = ufbx_empty_string;
 		if (uc->obj.group.length > 0 && (uc->obj.object.length > 0 || uc->opts.obj_merge_groups) && !uc->opts.obj_split_groups) {
-			const char *group = uc->obj.group.data;
-			uint32_t hash = ufbxi_hash_ptr(group);
-			ufbxi_obj_group_entry *entry = ufbxi_map_find(&uc->obj.group_map, ufbxi_obj_group_entry, hash, &group);
-			if (!entry) {
-				entry = ufbxi_map_insert(&uc->obj.group_map, ufbxi_obj_group_entry, hash, &uc->obj.group.data);
-				ufbxi_check(entry);
-				entry->name = group;
-				entry->mesh_id = 0;
-				entry->local_id = 0;
-			}
-
-			uint32_t mesh_id = mesh->fbx_mesh->element_id;
-			if (entry->mesh_id != mesh_id) {
-				uint32_t id = ++mesh->num_groups;
-				entry->mesh_id = mesh_id;
-				entry->local_id = id;
-
-				ufbx_prop *prop = ufbxi_push_zero(&uc->obj.tmp_props, ufbx_prop, 1);
-				ufbxi_check(prop);
-
-				char name_buf[128];
-				int name_len = snprintf(name_buf, sizeof(name_buf), "obj|face_group|%u", id);
-				ufbx_assert(name_len >= 0 && (size_t)name_len < sizeof(name_buf));
-
-				prop->name.data = name_buf;
-				prop->name.length = (size_t)name_len;
-				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &prop->name, false));
-
-				prop->type = UFBX_PROP_STRING;
-				prop->flags = UFBX_PROP_FLAG_VALUE_STR;
-				prop->value_str = uc->obj.group;
-			}
-
-			uc->obj.face_group = entry->local_id;
-
-			if (!uc->obj.has_face_group) {
-				uc->obj.has_face_group = true;
-				ufbxi_check(ufbxi_push_zero(&uc->obj.tmp_face_group, uint32_t, uc->obj.tmp_faces.num_items));
-			}
-		} else {
-			uc->obj.face_group = 0;
+			name = uc->obj.group;
 		}
 
-		uc->obj.face_group_dirty = true;
+		uint32_t hash = ufbxi_hash_ptr(name.data);
+		ufbxi_obj_group_entry *entry = ufbxi_map_find(&uc->obj.group_map, ufbxi_obj_group_entry, hash, &name.data);
+		if (!entry) {
+			entry = ufbxi_map_insert(&uc->obj.group_map, ufbxi_obj_group_entry, hash, &name.data);
+			ufbxi_check(entry);
+			entry->name = name.data;
+			entry->mesh_id = 0;
+			entry->local_id = 0;
+		}
+
+		uint32_t mesh_id = mesh->fbx_mesh->element_id;
+		if (entry->mesh_id != mesh_id) {
+			uint32_t id = mesh->num_groups++;
+			entry->mesh_id = mesh_id;
+			entry->local_id = id;
+
+			ufbx_face_group *group = ufbxi_push_zero(&uc->obj.tmp_face_group_infos, ufbx_face_group, 1);
+			ufbxi_check(group);
+			group->id = 0;
+			group->name = name;
+		}
+
+		uc->obj.face_group = entry->local_id;
+
+		if (!uc->obj.has_face_group) {
+			uc->obj.has_face_group = true;
+			ufbxi_check(ufbxi_push_zero(&uc->obj.tmp_face_group, uint32_t, uc->obj.tmp_faces.num_items));
+		}
+
+		uc->obj.face_group_dirty = false;
 	}
 
 	size_t num_indices = uc->obj.num_tokens - 1;
@@ -13721,32 +13922,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context
 		uc->obj.tmp_materials[id] = material;
 	}
 
-	ufbxi_obj_mesh *mesh = uc->obj.mesh;
-	if (mesh) {
-		if (entry && mesh->usemtl_base > 0 && entry->user_id >= mesh->usemtl_base) {
-			uc->obj.face_material = entry->user_id - mesh->usemtl_base;
-			push_index = false;
-		} else {
-			ufbxi_check(ufbxi_connect_oo(uc, fbx_id, mesh->fbx_node_id));
-		}
-	}
-
-	if (push_index) {
-		uint32_t index = ++uc->obj.usemtl_index;
-		ufbxi_check(index < UINT32_MAX);
-
-		if (!entry) {
-			entry = ufbxi_find_fbx_id(uc, fbx_id);
-		}
-		entry->user_id = index;
-
-		if (mesh) {
-			if (mesh->usemtl_base == 0) {
-				mesh->usemtl_base = index;
-			}
-			uc->obj.face_material = index - mesh->usemtl_base;
-		}
-	}
+	uc->obj.material_dirty = true;
 
 	return 1;
 }
@@ -13929,9 +14105,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 			}
 
 			if (uc->obj.has_face_group) {
-				fbx_mesh->face_group.count = num_faces;
-				fbx_mesh->face_group.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_face_group, uint32_t, num_faces);
-				ufbxi_check(fbx_mesh->face_group.data);
+				if (mesh->num_groups > 1) {
+					fbx_mesh->face_group.count = num_faces;
+					fbx_mesh->face_group.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_face_group, uint32_t, num_faces);
+					ufbxi_check(fbx_mesh->face_group.data);
+				} else {
+					ufbxi_pop(&uc->obj.tmp_face_group, uint32_t, num_faces, NULL);
+				}
 			}
 
 			ufbxi_check(ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_vertex_attrib*)&fbx_mesh->vertex_position,
@@ -13985,10 +14165,23 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_meshes(ufbxi_context *uc
 
 		ufbxi_check_err(&uc->error, ufbxi_finalize_mesh(&uc->result, &uc->error, fbx_mesh));
 
+		if (mesh->num_groups > 1) {
+			ufbxi_check_err(&uc->error, ufbxi_update_face_groups(&uc->result, &uc->error, fbx_mesh, false));
+		} else if (mesh->num_groups == 1) {
+			// NOTE: Consecutive and zero indices are always allocated so we can skip doing it here,
+			// see HACK(consecutiv-faces)..
+			fbx_mesh->face_group.data = (uint32_t*)ufbxi_sentinel_index_zero;
+			fbx_mesh->face_group.count = num_faces;
+			fbx_mesh->face_groups.data[0].num_faces = num_faces;
+			fbx_mesh->face_groups.data[0].num_triangles = fbx_mesh->num_triangles;
+			fbx_mesh->face_groups.data[0].face_indices.data = (uint32_t*)ufbxi_sentinel_index_consecutive;
+			fbx_mesh->face_groups.data[0].face_indices.count = num_faces;
+		}
+
 		// HACK(consecutive-faces): Prepare for finalize to re-use a consecutive/zero
 		// index buffer for face materials..
-		uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, mesh->num_faces);
-		uc->max_consecutive_indices = ufbxi_max_sz(uc->max_consecutive_indices, mesh->num_faces);
+		uc->max_zero_indices = ufbxi_max_sz(uc->max_zero_indices, num_faces);
+		uc->max_consecutive_indices = ufbxi_max_sz(uc->max_consecutive_indices, num_faces);
 	}
 
 	return 1;
@@ -14043,6 +14236,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc
 			if (num_tokens >= 2) {
 				uc->obj.group = ufbxi_obj_span_token(uc, 1, SIZE_MAX);
 				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &uc->obj.group, false));
+				uc->obj.group_dirty = true;
+			} else {
+				uc->obj.group = ufbx_empty_string;
 				uc->obj.group_dirty = true;
 			}
 		} else if (key == ufbxi_obj_cmd1('#')) {
@@ -17062,6 +17258,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			ufbxi_patch_index_pointer(uc, &mesh->vertex_bitangent.indices.data);
 			ufbxi_patch_index_pointer(uc, &mesh->vertex_tangent.indices.data);
 			ufbxi_patch_index_pointer(uc, &mesh->face_material.data);
+			ufbxi_patch_index_pointer(uc, &mesh->face_group.data);
 
 			ufbxi_patch_index_pointer(uc, &mesh->skinned_position.indices.data);
 			ufbxi_patch_index_pointer(uc, &mesh->skinned_normal.indices.data);
@@ -17089,6 +17286,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			}
 			if (mesh->color_sets.count > 0) {
 				mesh->vertex_color = mesh->color_sets.data[0].vertex_color;
+			}
+
+			if (mesh->face_groups.count == 1) {
+				ufbxi_patch_index_pointer(uc, &mesh->face_groups.data[0].face_indices.data);
 			}
 
 			ufbxi_check(ufbxi_fetch_mesh_materials(uc, &mesh->materials, &mesh->element, true));
@@ -18277,7 +18478,7 @@ ufbxi_noinline static void ufbxi_update_constraint(ufbx_constraint *constraint)
 		ufbx_node *node = target->node;
 
 		// Node names are at most 255 bytes so the suffixed names are bounded
-		char name_buf[256 + 8];
+		char name_buf[256 + 16];
 		size_t name_len = node->name.length;
 		ufbx_assert(name_len < 256);
 		memcpy(name_buf, node->name.data, name_len);
@@ -19852,6 +20053,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 
 	if (uc->opts.index_error_handling == UFBX_INDEX_ERROR_HANDLING_NO_INDEX) {
 		uc->scene.metadata.may_contain_no_index = true;
+	}
+
+	if (uc->opts.allow_null_material) {
+		uc->scene.metadata.may_contain_null_materials = true;
 	}
 
 	uc->scene.metadata.creator.data = ufbxi_empty_char;
@@ -23204,6 +23409,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 
 	ufbxi_check_err(&sc->error, ufbxi_finalize_mesh_material(&sc->result, &sc->error, result));
 	ufbxi_check_err(&sc->error, ufbxi_finalize_mesh(&sc->result, &sc->error, result));
+	ufbxi_check_err(&sc->error, ufbxi_update_face_groups(&sc->result, &sc->error, result, true));
 
 	return 1;
 }

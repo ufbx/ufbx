@@ -715,7 +715,9 @@ UFBXT_FILE_TEST(zbrush_d20)
 		ufbxt_assert(mesh->num_faces == 20);
 		ufbxt_assert(mesh->face_group.count == 20);
 		for (int32_t i = 0; i < 20; i++) {
-			ufbxt_assert(mesh->face_group.data[i] == 10 + i * 5);
+			uint32_t group_ix = mesh->face_group.data[i];
+			ufbx_face_group *group = &mesh->face_groups.data[group_ix];
+			ufbxt_assert(group->id == 10 + i * 5);
 		}
 	}
 
@@ -733,7 +735,8 @@ UFBXT_FILE_TEST(zbrush_d20)
 				ufbx_vec3 normal = ufbx_get_weighted_face_normal(&mesh->vertex_position, face);
 				int32_t group = normal.z < 0.0f ? 9598 : 15349;
 				num_front += normal.z < 0.0f ? 1 : 0;
-				ufbxt_assert(mesh->face_group.data[i] == group);
+				uint32_t group_ix = mesh->face_group.data[i];
+				ufbxt_assert(mesh->face_groups.data[group_ix].id == group);
 			}
 			ufbxt_assert(num_front == mesh->num_faces / 2);
 		}
@@ -756,6 +759,9 @@ UFBXT_FILE_TEST(zbrush_d20)
 		ufbxt_assert(sub_mesh);
 		ufbxt_check_mesh(scene, sub_mesh);
 
+		// Check that we didn't break the original mesh
+		ufbxt_check_mesh(scene, mesh);
+
 		{
 			uint32_t num_front = 0;
 			ufbxt_assert(sub_mesh->face_group.count == sub_mesh->num_faces);
@@ -764,7 +770,8 @@ UFBXT_FILE_TEST(zbrush_d20)
 				ufbx_vec3 normal = ufbx_get_weighted_face_normal(&sub_mesh->vertex_position, face);
 				int32_t group = normal.z < 0.0f ? 9598 : 15349;
 				num_front += normal.z < 0.0f ? 1 : 0;
-				ufbxt_assert(sub_mesh->face_group.data[i] == group);
+				uint32_t group_ix = sub_mesh->face_group.data[i];
+				ufbxt_assert(sub_mesh->face_groups.data[group_ix].id == group);
 			}
 			ufbxt_assert(num_front == sub_mesh->num_faces / 2);
 		}
@@ -921,3 +928,43 @@ UFBXT_FILE_TEST(synthetic_vertex_gaps)
 	ufbxt_assert_close_vec2(err, mesh->vertex_uv.values.data[7], gap_uvs[3]);
 }
 #endif
+
+#if UFBXT_IMPL
+
+typedef struct {
+	size_t num_faces;
+	size_t num_groups;
+} ufbxt_groups_per_face_count;
+
+#endif
+
+UFBXT_FILE_TEST(zbrush_polygroup_mess)
+#if UFBXT_IMPL
+{
+
+	ufbxt_assert(scene->meshes.count == 1);
+	ufbx_mesh *mesh = scene->meshes.data[0];
+
+	ufbxt_groups_per_face_count groups_per_face_count_ref[] = {
+		{ 1, 2 }, { 2, 1164 }, { 3, 1 }, { 4, 482 }, { 6, 181 }, { 8, 90 }, { 10, 26 }, { 12, 21 },
+		{ 14, 8 }, { 16, 10 }, { 18, 5 }, { 20, 6 }, { 22, 4 }, { 24, 7 }, { 26, 1 }, { 28, 1 },
+		{ 30, 1 }, { 32, 5 }, { 34, 2 }, { 40, 1 }, { 48, 3 }, { 50, 1 }, { 60, 1 }, { 64, 2 },
+		{ 72, 1 }, { 104, 1 }, { 128, 1 }, { 328, 1 },
+	};
+
+	uint32_t groups_per_face_count[512] = { 0 };
+
+	ufbxt_assert(mesh->face_groups.count == 2029);
+	for (size_t i = 0; i < mesh->face_groups.count; i++) {
+		ufbx_face_group *group = &mesh->face_groups.data[i];
+		ufbxt_assert(group->num_faces < ufbxt_arraycount(groups_per_face_count));
+		groups_per_face_count[group->num_faces]++;
+	}
+
+	for (size_t i = 0; i < ufbxt_arraycount(groups_per_face_count_ref); i++) {
+		ufbxt_groups_per_face_count ref = groups_per_face_count_ref[i];
+		ufbxt_assert(groups_per_face_count[ref.num_faces] == ref.num_groups);
+	}
+}
+#endif
+

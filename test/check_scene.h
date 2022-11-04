@@ -466,6 +466,10 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbx_mesh_material *mat = &mesh->materials.data[i];
 		ufbxt_check_element_ptr(scene, mat->material, UFBX_ELEMENT_MATERIAL);
 
+		if (!scene->metadata.may_contain_null_materials) {
+			ufbxt_assert(mat->material);
+		}
+
 		ufbxt_assert(mat->face_indices.count == mat->num_faces);
 
 		size_t mat_tris = 0;
@@ -479,6 +483,44 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		}
 		ufbxt_assert(mat->num_triangles == mat_tris);
 	}
+
+	if (mesh->face_group.count) {
+		ufbxt_assert(mesh->face_group.count == mesh->num_faces);
+		for (size_t i = 0; i < mesh->num_faces; i++) {
+			uint32_t group = mesh->face_group.data[i];
+			ufbxt_assert((size_t)group < mesh->face_groups.count);
+		}
+	} else {
+		ufbxt_assert(mesh->face_groups.count == 0);
+	}
+
+	if (mesh->face_groups.count > 0) {
+		size_t total_group_faces = 0;
+		size_t total_group_tris = 0;
+		for (size_t i = 0; i < mesh->face_groups.count; i++) {
+			ufbx_face_group *group = &mesh->face_groups.data[i];
+
+			ufbxt_check_string(group->name);
+			ufbxt_assert(group->face_indices.count == group->num_faces);
+
+			size_t group_tris = 0;
+			for (size_t j = 0; j < group->num_faces; j++) {
+				uint32_t ix = group->face_indices.data[j];
+				ufbx_face face = mesh->faces.data[ix];
+				if (face.num_indices >= 3) {
+					group_tris += face.num_indices - 2;
+				}
+				ufbxt_assert(mesh->face_group.data[ix] == (uint32_t)i);
+			}
+			ufbxt_assert(group->num_triangles == group_tris);
+
+			total_group_faces += group->num_faces;
+			total_group_tris += group->num_triangles;
+		}
+		ufbxt_assert(total_group_faces == mesh->num_faces);
+		ufbxt_assert(total_group_tris == mesh->num_triangles);
+	}
+
 	for (size_t i = 0; i < mesh->skin_deformers.count; i++) {
 		ufbxt_assert(mesh->skin_deformers.data[i]->vertices.count >= mesh->num_vertices);
 		ufbxt_check_element_ptr(scene, mesh->skin_deformers.data[i], UFBX_ELEMENT_SKIN_DEFORMER);
@@ -493,8 +535,10 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_check_element_ptr_any(scene, mesh->all_deformers.data[i]);
 	}
 
-	for (size_t i = 0; i < mesh->instances.count; i++) {
-		ufbxt_assert(mesh->instances.data[i]->materials.count >= mesh->materials.count);
+	if (!scene->metadata.may_contain_null_materials) {
+		for (size_t i = 0; i < mesh->instances.count; i++) {
+			ufbxt_assert(mesh->instances.data[i]->materials.count >= mesh->materials.count);
+		}
 	}
 }
 

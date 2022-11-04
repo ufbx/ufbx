@@ -1,0 +1,29 @@
+v 0 0 0
+v 1 0 0
+v 1 1 0
+
+o First
+f 1 2 3
+
+o Second
+f 1 2 3
+usemtl A
+f 1 2 3
+usemtl A
+usemtl B
+f 1 2 3
+usemtl C
+usemtl D
+f 1 2 3
+usemtl A
+f 1 2 3
+
+usemtl E
+o Third
+usemtl F
+f 1 2 3
+usemtl G
+usemtl A
+f 1 2 3
+usemtl H
+
