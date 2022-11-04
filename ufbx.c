@@ -10597,7 +10597,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_assign_face_groups(ufbxi_buf *bu
 		uint32_t num_triangles = num_indices >= 3 ? num_indices - 2 : 0;
 
 		size_t index;
-		if (seen_ids[id_hash].id == id && seen_ids[id_hash].index > 0) {
+		if (seen_ids[id_hash].id == (uint32_t)id && seen_ids[id_hash].index > 0) {
 			index = seen_ids[id_hash].index - 1;
 			*p_id = (uint32_t)index;
 		} else {
@@ -13900,7 +13900,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context
 	uint64_t fbx_id = ufbxi_synthetic_id_from_string(name.data);
 
 	ufbxi_fbx_id_entry *entry = ufbxi_find_fbx_id(uc, fbx_id);
-	bool push_index = true;
 
 	uc->obj.usemtl_fbx_id = fbx_id;
 	uc->obj.usemtl_name = name;
