@@ -10596,19 +10596,20 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_assign_face_groups(ufbxi_buf *bu
 	// Count faces and triangles per group and reassign IDs
 	const ufbx_face *p_face = mesh->faces.data;
 	ufbxi_for_list(uint32_t, p_id, mesh->face_group) {
-		int32_t id = (int32_t)*p_id;
+		uint32_t id = *p_id;
 		uint32_t id_hash = (id * seed) >> (32u - UFBXI_FACE_GROUP_HASH_BITS);
 
 		uint32_t num_indices = p_face->num_indices;
 		uint32_t num_triangles = num_indices >= 3 ? num_indices - 2 : 0;
 
 		size_t index;
-		if (seen_ids[id_hash].id == (uint32_t)id && seen_ids[id_hash].index > 0) {
+		if (seen_ids[id_hash].id == id && seen_ids[id_hash].index > 0) {
 			index = seen_ids[id_hash].index - 1;
 			*p_id = (uint32_t)index;
 		} else {
+			int32_t signed_id = (int32_t)id;
 			index = SIZE_MAX;
-			ufbxi_macro_lower_bound_eq(ufbx_face_group, 8, &index, groups, 0, num_groups, ( a->id < id ), ( a->id == id ));
+			ufbxi_macro_lower_bound_eq(ufbx_face_group, 8, &index, groups, 0, num_groups, ( a->id < signed_id ), ( a->id == signed_id ));
 			ufbx_assert(index < num_groups);
 			seen_ids[id_hash].id = id;
 			seen_ids[id_hash].index = (uint32_t)index + 1;
