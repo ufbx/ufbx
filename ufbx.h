@@ -840,7 +840,7 @@ typedef struct ufbx_subdivision_result {
 	ufbx_subdivision_weight_list source_vertex_weights;
 
 	// Weights of skin clusters in the source model.
-	// Defined if `ufbx_subdivide_opts.evaluate_source_vertices` is set.
+	// Defined if `ufbx_subdivide_opts.evaluate_skin_weights` is set.
 	ufbx_subdivision_weight_range_list skin_cluster_ranges;
 	ufbx_subdivision_weight_list skin_cluster_weights;
 
@@ -3641,13 +3641,14 @@ typedef struct ufbx_subdivide_opts {
 	bool interpolate_tangents;
 
 	// Map subdivided vertices into weighted original vertices.
-	// NOTE: May be O(n^2) if `max_vertex_sources` is not specified!
+	// NOTE: May be O(n^2) if `max_source_vertices` is not specified!
 	bool evaluate_source_vertices;
 
 	// Limit source vertices per subdivided vertex.
 	size_t max_source_vertices;
 
 	// Calculate bone influences over subdivided vertices (if applicable).
+	// NOTE: May be O(n^2) if `max_skin_weights` is not specified!
 	bool evaluate_skin_weights;
 
 	// Limit bone influences per subdivided vertex.
