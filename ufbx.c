@@ -192,6 +192,12 @@
 	#define UFBXI_MSC_VER 0
 #endif
 
+#if defined(__GNUC__)
+	#define UFBXI_GNUC __GNUC__
+#else
+	#define UFBXI_GNUC 0
+#endif
+
 #if !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
 	#define ufbxi_noinline __declspec(noinline)
 	#define ufbxi_forceinline __forceinline
@@ -223,7 +229,7 @@
 
 #if !defined(UFBX_STANDARD_C) && defined(__clang__)
 	#define ufbxi_nounroll _Pragma("clang loop unroll(disable)") _Pragma("clang loop vectorize(disable)")
-#elif !defined(UFBX_STANDARD_C) && defined(__GNUC__)
+#elif !defined(UFBX_STANDARD_C) && UFBXI_GNUC >= 8
 	#define ufbxi_nounroll _Pragma("GCC unroll 0")
 #elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
 	#define ufbxi_nounroll __pragma(loop(no_vector))
