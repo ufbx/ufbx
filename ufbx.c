@@ -24114,29 +24114,13 @@ ufbx_abi ufbxi_noinline size_t ufbx_format_error(char *dst, size_t dst_size, con
 ufbx_abi ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len)
 {
 	uint32_t key = ufbxi_get_name_key(name, name_len);
+	ufbx_string name_str = { name, name_len };
 
 	do {
-		ufbx_prop *prop_data = props->props.data;
-		size_t begin = 0;
-		size_t end = props->props.count;
-		while (end - begin >= 16) {
-			size_t mid = (begin + end) >> 1;
-			const ufbx_prop *p = &prop_data[mid];
-			if (p->_internal_key < key) {
-				begin = mid + 1;
-			} else { 
-				end = mid;
-			}
-		}
-
-		end = props->props.count;
-		for (; begin < end; begin++) {
-			const ufbx_prop *p = &prop_data[begin];
-			if (p->_internal_key > key) break;
-			if (p->_internal_key == key && p->name.length == name_len && !memcmp(p->name.data, name, name_len)) {
-				return (ufbx_prop*)p;
-			}
-		}
+		size_t index = SIZE_MAX;
+		ufbxi_macro_lower_bound_eq(ufbx_prop, 4, &index, props->props.data, 0, props->props.count,
+			( ufbxi_cmp_prop_less_ref(a, name_str, key) ), ( a->_internal_key == key && ufbxi_str_equal(a->name, name_str) ));
+		if (index != SIZE_MAX) return &props->props.data[index];
 
 		props = props->defaults;
 	} while (props);
