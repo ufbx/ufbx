@@ -968,3 +968,9 @@ UFBXT_FILE_TEST(zbrush_polygroup_mess)
 }
 #endif
 
+UFBXT_FILE_TEST(zbrush_cut_sphere)
+#if UFBXT_IMPL
+{
+}
+#endif
+

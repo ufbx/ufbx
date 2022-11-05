@@ -10583,6 +10583,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_assign_face_groups(ufbxi_buf *bu
 
 	// Optimization: Use `consecutive_indices` for a single group
 	if (p_consecutive_indices && num_groups == 1) {
+		memset(mesh->face_group.data, 0, sizeof(uint32_t) * num_faces);
 		groups[0].face_indices.data = (uint32_t*)ufbxi_sentinel_index_consecutive;
 		groups[0].face_indices.count = num_faces;
 		groups[0].num_faces = num_faces;
