@@ -1076,6 +1076,33 @@ UFBXT_FILE_TEST_ALT(find_prop_concat, maya_node_attribute_zoo)
 	ufbx_string parts[512];
 	size_t num_parts = 0;
 
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Null");
+		ufbxt_assert(node);
+
+		{
+			ufbx_string parts[] = {
+				{ "Geometric", 9 },
+				{ "Rotation", 8 },
+			};
+
+			ufbx_prop *prop = ufbx_find_prop_concat(&node->props, parts, 2);
+			ufbxt_assert(prop);
+			ufbxt_assert(!strcmp(prop->name.data, "GeometricRotation"));
+		}
+
+		{
+			ufbx_string parts[] = {
+				{ "Geometric", SIZE_MAX },
+				{ "Translation", SIZE_MAX },
+			};
+
+			ufbx_prop *prop = ufbx_find_prop_concat(&node->props, parts, 2);
+			ufbxt_assert(prop);
+			ufbxt_assert(!strcmp(prop->name.data, "GeometricTranslation"));
+		}
+	}
+
 	for (size_t elem_ix = 0; elem_ix < scene->elements.count; elem_ix++) {
 		ufbx_element *element = scene->elements.data[elem_ix];
 		ufbx_props *props = &element->props;
