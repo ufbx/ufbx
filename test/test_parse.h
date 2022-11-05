@@ -1073,9 +1073,6 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_unsafe_cube_fail_unicode, synthetic_uns
 UFBXT_FILE_TEST_ALT(find_prop_concat, maya_node_attribute_zoo)
 #if UFBXT_IMPL
 {
-	ufbx_string parts[512];
-	size_t num_parts = 0;
-
 	{
 		ufbx_node *node = ufbx_find_node(scene, "Null");
 		ufbxt_assert(node);
@@ -1102,6 +1099,9 @@ UFBXT_FILE_TEST_ALT(find_prop_concat, maya_node_attribute_zoo)
 			ufbxt_assert(!strcmp(prop->name.data, "GeometricTranslation"));
 		}
 	}
+
+	ufbx_string parts[512];
+	size_t num_parts = 0;
 
 	for (size_t elem_ix = 0; elem_ix < scene->elements.count; elem_ix++) {
 		ufbx_element *element = scene->elements.data[elem_ix];
