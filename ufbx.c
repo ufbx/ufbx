@@ -24116,14 +24116,14 @@ ufbx_abi ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name
 	uint32_t key = ufbxi_get_name_key(name, name_len);
 	ufbx_string name_str = { name, name_len };
 
-	do {
+	while (props) {
 		size_t index = SIZE_MAX;
 		ufbxi_macro_lower_bound_eq(ufbx_prop, 4, &index, props->props.data, 0, props->props.count,
 			( ufbxi_cmp_prop_less_ref(a, name_str, key) ), ( a->_internal_key == key && ufbxi_str_equal(a->name, name_str) ));
 		if (index != SIZE_MAX) return &props->props.data[index];
 
 		props = props->defaults;
-	} while (props);
+	}
 
 	return NULL;
 }
@@ -24192,7 +24192,7 @@ ufbx_abi ufbx_prop *ufbx_find_prop_concat(const ufbx_props *props, const ufbx_st
 {
 	uint32_t key = ufbxi_get_concat_key(parts, num_parts);
 
-	do {
+	while (props) {
 		size_t index = SIZE_MAX;
 
 		ufbxi_macro_lower_bound_eq(ufbx_prop, 2, &index, props->props.data, 0, props->props.count,
@@ -24201,7 +24201,7 @@ ufbx_abi ufbx_prop *ufbx_find_prop_concat(const ufbx_props *props, const ufbx_st
 		if (index != SIZE_MAX) return &props->props.data[index];
 
 		props = props->defaults;
-	} while (props);
+	}
 
 	return NULL;
 }
