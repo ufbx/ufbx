@@ -1070,3 +1070,78 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_unsafe_cube_fail_unicode, synthetic_uns
 }
 #endif
 
+UFBXT_FILE_TEST_ALT(find_prop_concat, maya_node_attribute_zoo)
+#if UFBXT_IMPL
+{
+	ufbx_string parts[512];
+	size_t num_parts = 0;
+
+	for (size_t elem_ix = 0; elem_ix < scene->elements.count; elem_ix++) {
+		ufbx_element *element = scene->elements.data[elem_ix];
+		ufbx_props *props = &element->props;
+
+		while (props) {
+			for (size_t prop_ix = 0; prop_ix < props->props.count; prop_ix++) {
+				ufbx_prop *prop = &props->props.data[prop_ix];
+				ufbx_string name = prop->name;
+				ufbxt_assert(name.length * 2 < ufbxt_arraycount(parts));
+
+				static int serial = 0;
+				serial++;
+
+				// One single part
+				num_parts = 0;
+				parts[num_parts] = name;
+				num_parts++;
+				ufbxt_assert(ufbx_find_prop_concat(props, parts, num_parts) == prop);
+
+				// One single part (NULL terminated)
+				num_parts = 0;
+				parts[num_parts].data = name.data;
+				parts[num_parts].length = SIZE_MAX;
+				num_parts++;
+				ufbxt_assert(ufbx_find_prop_concat(props, parts, num_parts) == prop);
+
+				// Single characters
+				num_parts = 0;
+				for (size_t i = 0; i < name.length; i++) {
+					parts[num_parts].data = &name.data[i];
+					parts[num_parts].length = 1;
+					num_parts++;
+				}
+				ufbxt_assert(ufbx_find_prop_concat(props, parts, num_parts) == prop);
+
+				// Single characters with empty in between
+				num_parts = 0;
+				for (size_t i = 0; i < name.length; i++) {
+					parts[num_parts].data = &name.data[i];
+					parts[num_parts].length = 1;
+					num_parts++;
+					parts[num_parts].data = NULL;
+					parts[num_parts].length = 0;
+					num_parts++;
+				}
+				ufbxt_assert(ufbx_find_prop_concat(props, parts, num_parts) == prop);
+
+				// Even parts
+				for (size_t step = 1; step < name.length; step++) {
+					num_parts = 0;
+					for (size_t i = 0; i < name.length; i += step) {
+						parts[num_parts].data = name.data + i;
+						parts[num_parts].length = step;
+						if (i + step > name.length) {
+							parts[num_parts].length = SIZE_MAX;
+						}
+						num_parts++;
+					}
+					ufbxt_assert(ufbx_find_prop_concat(props, parts, num_parts) == prop);
+				}
+
+			}
+
+			props = props->defaults;
+		}
+	}
+}
+#endif
+

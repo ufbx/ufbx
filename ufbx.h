@@ -3813,6 +3813,9 @@ ufbx_inline ufbx_string ufbx_find_string(const ufbx_props *props, const char *na
 ufbx_abi ufbx_blob ufbx_find_blob_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_blob def);
 ufbx_inline ufbx_blob ufbx_find_blob(const ufbx_props *props, const char *name, ufbx_blob def) { return ufbx_find_blob_len(props, name, strlen(name), def); }
 
+// Find property in `props` with concatendated `parts[num_parts]`.
+ufbx_abi ufbx_prop *ufbx_find_prop_concat(const ufbx_props *props, const ufbx_string *parts, size_t num_parts);
+
 // Get an element connected to a property.
 ufbx_abi ufbx_element *ufbx_get_prop_element(const ufbx_element *element, const ufbx_prop *prop, ufbx_element_type type);
 

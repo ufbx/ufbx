@@ -767,14 +767,14 @@ static ufbxi_forceinline int64_t ufbxi_f64_to_i64(double value)
 	ufbx_assert(mi_linear_size > 1); \
 	/* Binary search until we get down to `m_linear_size` elements */ \
 	while (mi_hi - mi_lo > mi_linear_size) { \
-			size_t mi_mid = mi_lo + (mi_hi - mi_lo) / 2; \
-			const mi_type *a = &mi_data[mi_mid]; \
-			if ( m_cmp_lambda ) { mi_lo = mi_mid + 1; } else { mi_hi = mi_mid + 1; } \
+		size_t mi_mid = mi_lo + (mi_hi - mi_lo) / 2; \
+		const mi_type *a = &mi_data[mi_mid]; \
+		if ( m_cmp_lambda ) { mi_lo = mi_mid + 1; } else { mi_hi = mi_mid + 1; } \
 	} \
 	/* Linearly scan until we find the edge */ \
 	for (; mi_lo < mi_hi; mi_lo++) { \
-			const mi_type *a = &mi_data[mi_lo]; \
-			if ( m_eq_lambda ) { *(m_result_ptr) = mi_lo; break; } \
+		const mi_type *a = &mi_data[mi_lo]; \
+		if ( m_eq_lambda ) { *(m_result_ptr) = mi_lo; break; } \
 	} \
 	} while (0)
 
@@ -3758,6 +3758,33 @@ static ufbxi_forceinline ufbx_string ufbxi_str_c(const char *str)
 	return s;
 }
 
+static ufbxi_noinline uint32_t ufbxi_get_concat_key(const ufbx_string *parts, size_t num_parts)
+{
+	uint32_t key = 0, shift = 32;
+	ufbxi_for(const ufbx_string, part, parts, num_parts) {
+		size_t length = part->length != SIZE_MAX ? part->length : strlen(part->data);
+		for (size_t i = 0; i < part->length; i++) {
+			shift -= 8;
+			key |= (uint32_t)(uint8_t)part->data[i] << shift;
+			if (shift == 0) return key;
+		}
+	}
+	return key;
+}
+
+static ufbxi_noinline int ufbxi_concat_str_cmp(const ufbx_string *ref, const ufbx_string *parts, size_t num_parts)
+{
+	const char *ptr = ref->data, *end = ptr + ref->length;
+	ufbxi_for(const ufbx_string, part, parts, num_parts) {
+		size_t length = part->length != SIZE_MAX ? part->length : strlen(part->data);
+		size_t to_cmp = ufbxi_min_sz(ufbxi_to_size(end - ptr), length);
+		int cmp = memcmp(ptr, part->data, to_cmp);
+		if (cmp != 0) return cmp;
+		if (to_cmp != length) return -1;
+		ptr += length;
+	}
+	return ptr == end ? 0 : +1;
+}
 
 static ufbxi_forceinline bool ufbxi_starts_with(ufbx_string str, ufbx_string prefix)
 {
@@ -14559,6 +14586,18 @@ ufbxi_forceinline static bool ufbxi_cmp_name_element_less_ref(const ufbx_name_el
 	return a->type < type;
 }
 
+ufbxi_forceinline static bool ufbxi_cmp_prop_less_ref(const ufbx_prop *a, ufbx_string name, uint32_t key)
+{
+	if (a->_internal_key != key) return a->_internal_key < key;
+	return ufbxi_str_less(a->name, name);
+}
+
+ufbxi_forceinline static bool ufbxi_cmp_prop_less_concat(const ufbx_prop *a, const ufbx_string *parts, size_t num_parts, uint32_t key)
+{
+	if (a->_internal_key != key) return a->_internal_key < key;
+	return ufbxi_concat_str_cmp(&a->name, parts, num_parts) < 0;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_name_elements(ufbxi_context *uc, ufbx_name_element *name_elems, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_name_element)));
@@ -18489,28 +18528,29 @@ ufbxi_noinline static void ufbxi_update_constraint(ufbx_constraint *constraint)
 	ufbxi_for_list(ufbx_constraint_target, target, constraint->targets) {
 		ufbx_node *node = target->node;
 
-		// Node names are at most 255 bytes so the suffixed names are bounded
-		char name_buf[256 + 16];
-		size_t name_len = node->name.length;
-		ufbx_assert(name_len < 256);
-		memcpy(name_buf, node->name.data, name_len);
-
 		ufbx_real weight_scale = (ufbx_real)100.0;
 		if (constraint_type == UFBX_CONSTRAINT_SINGLE_CHAIN_IK) {
 			// IK weights seem to be not scaled 100x?
 			weight_scale = (ufbx_real)1.0;
 		}
 
-		memcpy(name_buf + name_len, ".Weight", 7 + 1);
-		target->weight = ufbx_find_real_len(props, name_buf, name_len + 7, weight_scale) / weight_scale;
+		ufbx_prop *prop;
+		ufbx_string parts[2];
+		parts[0] = node->name;
+		parts[1] = ufbxi_str_c(".Weight");
+		prop = ufbx_find_prop_concat(props, parts, 2);
+		target->weight = (prop ? prop->value_real : weight_scale) / weight_scale;
 
 		if (constraint_type == UFBX_CONSTRAINT_PARENT) {
-			memcpy(name_buf + name_len, ".Offset T", 9 + 1);
-			ufbx_vec3 t = ufbx_find_vec3_len(props, name_buf, name_len + 9, ufbx_zero_vec3);
-			name_buf[name_len + 8] = 'R';
-			ufbx_vec3 r = ufbx_find_vec3_len(props, name_buf, name_len + 9, ufbx_zero_vec3);
-			name_buf[name_len + 8] = 'S';
-			ufbx_vec3 s = ufbx_find_vec3_len(props, name_buf, name_len + 9, ufbxi_one_vec3);
+			parts[1] = ufbxi_str_c(".Offset T");
+			prop = ufbx_find_prop_concat(props, parts, 2);
+			ufbx_vec3 t = prop ? prop->value_vec3 : ufbx_zero_vec3;
+			parts[1] = ufbxi_str_c(".Offset R");
+			prop = ufbx_find_prop_concat(props, parts, 2);
+			ufbx_vec3 r = prop ? prop->value_vec3 : ufbx_zero_vec3;
+			parts[1] = ufbxi_str_c(".Offset S");
+			prop = ufbx_find_prop_concat(props, parts, 2);
+			ufbx_vec3 s = prop ? prop->value_vec3 : ufbx_zero_vec3;
 
 			target->transform.translation = t;
 			target->transform.rotation = ufbx_euler_to_quat(r, UFBX_ROTATION_XYZ);
@@ -24162,6 +24202,24 @@ ufbx_abi ufbx_blob ufbx_find_blob_len(const ufbx_props *props, const char *name,
 	} else {
 		return def;
 	}
+}
+
+ufbx_abi ufbx_prop *ufbx_find_prop_concat(const ufbx_props *props, const ufbx_string *parts, size_t num_parts)
+{
+	uint32_t key = ufbxi_get_concat_key(parts, num_parts);
+
+	do {
+		size_t index = SIZE_MAX;
+
+		ufbxi_macro_lower_bound_eq(ufbx_prop, 2, &index, props->props.data, 0, props->props.count,
+			( ufbxi_cmp_prop_less_concat(a, parts, num_parts, key) ),
+			( a->_internal_key == key && ufbxi_concat_str_cmp(&a->name, parts, num_parts) == 0 ));
+		if (index != SIZE_MAX) return &props->props.data[index];
+
+		props = props->defaults;
+	} while (props);
+
+	return NULL;
 }
 
 ufbx_abi ufbx_element *ufbx_find_element_len(const ufbx_scene *scene, ufbx_element_type type, const char *name, size_t name_len)
