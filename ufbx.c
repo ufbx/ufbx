@@ -3763,7 +3763,7 @@ static ufbxi_noinline uint32_t ufbxi_get_concat_key(const ufbx_string *parts, si
 	uint32_t key = 0, shift = 32;
 	ufbxi_for(const ufbx_string, part, parts, num_parts) {
 		size_t length = part->length != SIZE_MAX ? part->length : strlen(part->data);
-		for (size_t i = 0; i < part->length; i++) {
+		for (size_t i = 0; i < length; i++) {
 			shift -= 8;
 			key |= (uint32_t)(uint8_t)part->data[i] << shift;
 			if (shift == 0) return key;

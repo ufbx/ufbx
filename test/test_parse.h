@@ -1100,6 +1100,7 @@ UFBXT_FILE_TEST_ALT(find_prop_concat, maya_node_attribute_zoo)
 		}
 	}
 
+	char chars[1024];
 	ufbx_string parts[512];
 	size_t num_parts = 0;
 
@@ -1134,6 +1135,18 @@ UFBXT_FILE_TEST_ALT(find_prop_concat, maya_node_attribute_zoo)
 				for (size_t i = 0; i < name.length; i++) {
 					parts[num_parts].data = &name.data[i];
 					parts[num_parts].length = 1;
+					num_parts++;
+				}
+				ufbxt_assert(ufbx_find_prop_concat(props, parts, num_parts) == prop);
+
+				// Single characters (NULL terminated)
+				num_parts = 0;
+				for (size_t i = 0; i < name.length; i++) {
+					char *part = chars + num_parts*2;
+					part[0] = name.data[i];
+					part[1] = '\0';
+					parts[num_parts].data = part;
+					parts[num_parts].length = SIZE_MAX;
 					num_parts++;
 				}
 				ufbxt_assert(ufbx_find_prop_concat(props, parts, num_parts) == prop);
