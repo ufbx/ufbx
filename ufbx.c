@@ -14707,6 +14707,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_contex
 		ufbx_element *dst = ufbxi_find_element_by_fbx_id(uc, tmp_conn->dst);
 		if (!src || !dst) continue;
 
+		if (!uc->opts.disable_quirks) {
+			// Some exporters connect arbitrary non-nodes to root breaking further code, ignore those connections here!
+			if (dst->type == UFBX_ELEMENT_NODE && src->type != UFBX_ELEMENT_NODE && ((ufbx_node*)dst)->is_root) continue;
+		}
+
 		ufbx_connection *conn = &uc->scene.connections_src.data[uc->scene.connections_src.count++];
 		conn->src = src;
 		conn->dst = dst;

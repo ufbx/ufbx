@@ -504,3 +504,11 @@ UFBXT_FILE_TEST(max_transformed_skin)
 	ufbxt_check_frame(scene, err, false, "max_transformed_skin_15", NULL, 15.0/30.0);
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_bind_to_root)
+#if UFBXT_IMPL
+{
+	// Some unknown exporter is exporting skin deformers being parented to root
+	// This test exists to check that it is handled gracefully if quirks are enabled
+}
+#endif
