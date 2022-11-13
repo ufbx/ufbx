@@ -24149,9 +24149,18 @@ ufbx_abi ufbxi_noinline size_t ufbx_format_error(char *dst, size_t dst_size, con
 	size_t offset = 0;
 
 	{
-		int num = ufbxi_snprintf(dst + offset, dst_size - offset, "ufbx v%u.%u.%u error: %s\n",
-			UFBX_SOURCE_VERSION/1000000, UFBX_SOURCE_VERSION/1000%1000, UFBX_SOURCE_VERSION%1000,
-			error->description.data ? error->description.data : "Unknown error");
+		int num;
+		if (error->info_length > 0 && error->info_length < UFBX_ERROR_INFO_LENGTH) {
+			num = ufbxi_snprintf(dst + offset, dst_size - offset, "ufbx v%u.%u.%u error: %s (%.*s)\n",
+				UFBX_SOURCE_VERSION/1000000, UFBX_SOURCE_VERSION/1000%1000, UFBX_SOURCE_VERSION%1000,
+				error->description.data ? error->description.data : "Unknown error",
+				(int)error->info_length, error->info);
+		} else {
+			num = ufbxi_snprintf(dst + offset, dst_size - offset, "ufbx v%u.%u.%u error: %s\n",
+				UFBX_SOURCE_VERSION/1000000, UFBX_SOURCE_VERSION/1000%1000, UFBX_SOURCE_VERSION%1000,
+				error->description.data ? error->description.data : "Unknown error");
+		}
+
 		if (num > 0) offset = ufbxi_min_sz(offset + (size_t)num, dst_size - 1);
 	}
 
