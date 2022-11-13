@@ -2532,11 +2532,10 @@ static const char ufbxi_empty_char[1] = { '\0' };
 
 static ufbxi_noinline int ufbxi_vsnprintf(char *buf, size_t buf_size, const char *fmt, va_list args)
 {
-	buf_size = ufbxi_min_sz(buf_size, (size_t)INT_MAX);
 	int result = vsnprintf(buf, buf_size, fmt, args);
 
 	if (result < 0) result = 0;
-	if (result >= (int)buf_size - 1) result = (int)buf_size - 1;
+	if ((size_t)result >= buf_size - 1) result = (int)buf_size - 1;
 
 	// HACK: On some MSYS/MinGW implementations `vsnprintf` is broken and does
 	// not write the null terminator on trunctation, it's always safe to do so
