@@ -24,6 +24,8 @@ if __name__ == "__main__":
                 if not is_ascii(path): continue
                 if "_fail_" in path: continue
                 if "/fuzz/" in path: continue
+                if "/obj_fuzz/" in path: continue
+                if "/mtl_fuzz/" in path: continue
 
                 if file.endswith(".fbx"):
                     prev_output = None
