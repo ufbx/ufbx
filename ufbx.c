@@ -16311,6 +16311,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_generate_normals(ufbxi_context *
 {
 	size_t num_indices = mesh->num_indices;
 
+	mesh->generated_normals = true;
+
 	ufbx_topo_edge *topo = ufbxi_push(&uc->tmp_stack, ufbx_topo_edge, num_indices);
 	ufbxi_check(topo);
 

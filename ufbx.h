@@ -1018,6 +1018,10 @@ struct ufbx_mesh {
 	ufbx_subdivision_boundary subdivision_boundary;
 	ufbx_subdivision_boundary subdivision_uv_boundary;
 
+	// Normals have been generated instead of evalauted.
+	// See `ufbx_load_opts.generate_missing_normals`.
+	bool generated_normals;
+
 	// Subdivision (result)
 	bool subdivision_evaluated;
 	ufbx_nullable ufbx_subdivision_result *subdivision_result;
@@ -3482,6 +3486,7 @@ typedef struct ufbx_load_opts {
 	bool allow_null_material;
 
 	// Generate vertex normals for a meshes that are missing normals.
+	// You can see if the normals have been generated from `ufbx_mesh.generated_normals`.
 	bool generate_missing_normals;
 
 	// Path separator character, defaults to '\' on Windows and '/' otherwise.

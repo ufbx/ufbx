@@ -68,6 +68,8 @@ UFBXT_FILE_TEST(maya_cube)
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
 
+	ufbxt_assert(!mesh->generated_normals);
+
 	for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
 		ufbx_face face = mesh->faces.data[face_i];
 		for (size_t i = face.index_begin; i < face.index_begin + face.num_indices; i++) {
@@ -607,6 +609,7 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_missing_normals_generated, synthetic_missing_
 	ufbx_mesh *mesh = node->mesh;
 	ufbxt_assert(mesh->vertex_normal.exists);
 	ufbxt_assert(mesh->skinned_normal.exists);
+	ufbxt_assert(mesh->generated_normals);
 
 	for (size_t face_ix = 0; face_ix < mesh->faces.count; face_ix++) {
 		ufbx_face face = mesh->faces.data[face_ix];
