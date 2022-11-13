@@ -1,7 +1,9 @@
 * text=auto
 
-# Treat all .fbx files (even ASCII) as binary
+# Treat all .fbx/.obj/.mtl files (even ASCII) as binary
 *.fbx binary
+*.obj binary
+*.mtl binary
 
 *.png binary
 *.mcx binary
