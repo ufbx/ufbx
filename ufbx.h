@@ -49,6 +49,7 @@ typedef double ufbx_real;
 
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
 #define UFBX_PANIC_MESSAGE_LENGTH 128
+#define UFBX_ERROR_INFO_LENGTH 256
 
 // -- Language
 
@@ -3306,6 +3307,8 @@ typedef struct ufbx_error {
 	ufbx_string description;
 	uint32_t stack_size;
 	ufbx_error_frame stack[UFBX_ERROR_STACK_MAX_DEPTH];
+	size_t info_length;
+	char info[UFBX_ERROR_INFO_LENGTH];
 } ufbx_error;
 
 // -- Progress callbacks

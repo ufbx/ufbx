@@ -2528,6 +2528,33 @@ ufbxi_extern_c ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inf
 
 // -- Errors
 
+static const char ufbxi_empty_char[1] = { '\0' };
+
+static ufbxi_noinline int ufbxi_vsnprintf(char *buf, size_t buf_size, const char *fmt, va_list args)
+{
+	buf_size = ufbxi_min_sz(buf_size, (size_t)INT_MAX);
+	int result = vsnprintf(buf, buf_size, fmt, args);
+
+	if (result < 0) result = 0;
+	if (result >= (int)buf_size - 1) result = (int)buf_size - 1;
+
+	// HACK: On some MSYS/MinGW implementations `vsnprintf` is broken and does
+	// not write the null terminator on trunctation, it's always safe to do so
+	// let's just do it unconditionally here...
+	buf[result] = '\0';
+
+	return result;
+}
+
+static ufbxi_noinline int ufbxi_snprintf(char *buf, size_t buf_size, const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	int result = ufbxi_vsnprintf(buf, buf_size, fmt, args);
+	va_end(args);
+	return result;
+}
+
 static ufbxi_noinline void ufbxi_panicf_imp(ufbx_panic *panic, const char *fmt, ...)
 {
 	if (panic && panic->did_panic) return;
@@ -2537,15 +2564,7 @@ static ufbxi_noinline void ufbxi_panicf_imp(ufbx_panic *panic, const char *fmt, 
 
 	if (panic) {
 		panic->did_panic = true;
-		int result = vsnprintf(panic->message, sizeof(panic->message), fmt, args);
-		if (result < 0) result = 0;
-		size_t length = ufbxi_min_sz((size_t)result, sizeof(panic->message) - 1);
-
-		// HACK: On some MSYS/MinGW implementations `snprintf` is broken and does
-		// not write the null terminator on trunctation, it's always safe to do so
-		// let's just do it unconditionally here...
-		panic->message[length] = '\0';
-		panic->message_length = length;
+		panic->message_length = (size_t)ufbxi_vsnprintf(panic->message, sizeof(panic->message), fmt, args);
 	} else {
 		fprintf(stderr, "ufbx panic: ");
 		vfprintf(stderr, fmt, args);
@@ -2585,7 +2604,41 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 		frame->function.length = strlen(func);
 		frame->source_line = line;
 	}
+
 	return 0;
+}
+
+static ufbxi_noinline void ufbxi_set_err_info(ufbx_error *err, const char *data, size_t length)
+{
+	if (!err) return;
+
+	if (length == SIZE_MAX) length = strlen(data);
+	size_t to_copy = ufbxi_min_sz(sizeof(err->info) - 1, length);
+	memcpy(err->info, data, to_copy);
+	err->info[to_copy] = '\0';
+	err->info_length = to_copy;
+}
+
+static ufbxi_noinline void ufbxi_fmt_err_info(ufbx_error *err, const char *fmt, ...)
+{
+	if (!err) return;
+
+	va_list args;
+	va_start(args, fmt);
+	err->info_length = (size_t)ufbxi_vsnprintf(err->info, sizeof(err->info), fmt, args);
+	va_end(args);
+}
+
+static ufbxi_noinline void ufbxi_clear_error(ufbx_error *err)
+{
+	if (!err) return;
+
+	err->type = UFBX_ERROR_NONE;
+	err->description.data = ufbxi_empty_char;
+	err->description.length = 0;
+	err->stack_size = 0;
+	err->info[0] = '\0';
+	err->info_length = 0;
 }
 
 #if UFBXI_FEATURE_ERROR_STACK
@@ -2678,6 +2731,7 @@ typedef struct {
 	size_t huge_size;
 	size_t chunk_max;
 	ufbx_allocator_opts ator;
+	const char *name;
 } ufbxi_allocator;
 
 static ufbxi_forceinline bool ufbxi_does_overflow(size_t total, size_t a, size_t b)
@@ -2698,8 +2752,16 @@ static ufbxi_noinline void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size,
 	size_t total = size * n;
 	ufbxi_check_return_err(ator->error, !ufbxi_does_overflow(total, size, n), NULL);
 	ufbxi_check_return_err(ator->error, total <= SIZE_MAX / 2, NULL); // Make sure it's always safe to double allocations
-	ufbxi_check_return_err_msg(ator->error, total <= ator->max_size - ator->current_size, NULL, "Memory limit exceeded");
-	ufbxi_check_return_err_msg(ator->error, ator->num_allocs < ator->max_allocs, NULL, "Allocation limit exceeded");
+	if (!(total < ator->max_size - ator->current_size)) {
+		ufbxi_report_err_msg(ator->error, "total <= ator->max_size - ator->current_size", "Memory limit exceeded");
+		ufbxi_fmt_err_info(ator->error, "%s", ator->name);
+		return NULL;
+	}
+	if (!(ator->num_allocs < ator->max_allocs)) {
+		ufbxi_report_err_msg(ator->error, "ator->num_allocs < ator->max_allocs", "Allocation limit exceeded");
+		ufbxi_fmt_err_info(ator->error, "%s", ator->name);
+		return NULL;
+	}
 	ator->num_allocs++;
 
 	ator->current_size += total;
@@ -2713,7 +2775,11 @@ static ufbxi_noinline void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size,
 		ptr = malloc(total);
 	}
 
-	ufbxi_check_return_err_msg(ator->error, ptr, NULL, "Out of memory");
+	if (!ptr) {
+		ufbxi_report_err_msg(ator->error, "ptr", "Out of memory");
+		ufbxi_fmt_err_info(ator->error, "%s", ator->name);
+		return NULL;
+	}
 	ufbx_assert(((uintptr_t)ptr & ufbxi_size_align_mask(total)) == 0);
 
 	return ptr;
@@ -3833,8 +3899,6 @@ static int ufbxi_map_cmp_string(void *user, const void *va, const void *vb)
 	const ufbx_string *a = (const ufbx_string*)va, *b = (const ufbx_string*)vb;
 	return ufbxi_str_cmp(*a, *b);
 }
-
-static const char ufbxi_empty_char[1] = { '\0' };
 
 static ufbxi_forceinline ufbx_string ufbxi_safe_string(const char *data, size_t length)
 {
@@ -5413,7 +5477,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_to(ufbxi_context *uc, void 
 
 // -- File IO
 
-static ufbxi_noinline void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *ator, const ufbx_allocator_opts *opts)
+static ufbxi_noinline void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *ator, const ufbx_allocator_opts *opts, const char *name)
 {
 	ufbx_allocator_opts zero_opts;
 	if (!opts) {
@@ -5427,6 +5491,7 @@ static ufbxi_noinline void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *a
 	ator->max_allocs = opts->allocation_limit ? opts->allocation_limit : SIZE_MAX;
 	ator->huge_size = opts->huge_threshold ? opts->huge_threshold : 0x100000;
 	ator->chunk_max = opts->max_chunk_size ? opts->max_chunk_size : 0x1000000;
+	ator->name = name;
 }
 
 static ufbxi_noinline FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp_ator)
@@ -10067,6 +10132,7 @@ ufbxi_noinline static int ufbxi_fix_index(ufbxi_context *uc, uint32_t *p_dst, ui
 		*p_dst = UFBX_NO_INDEX;
 		break;
 	case UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING:
+		ufbxi_fmt_err_info(&uc->error, "%u (max %u)", index, one_past_max_val ? (one_past_max_val - 1) : 0);
 		ufbxi_fail_msg("UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING", "Bad index");
 		break;
 	case UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE:
@@ -16201,7 +16267,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_lod_group(ufbxi_context
 
 	char prop_name[64];
 	for (size_t i = 0; ; i++) {
-		int len = snprintf(prop_name, sizeof(prop_name), "Thresholds|Level%zu", i);
+		int len = ufbxi_snprintf(prop_name, sizeof(prop_name), "Thresholds|Level%zu", i);
 		ufbx_prop *prop = ufbx_find_prop_len(&lod->props, prop_name, (size_t)len);
 		if (!prop) break;
 		num_levels = ufbxi_max_sz(num_levels, i + 1);
@@ -16224,14 +16290,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_lod_group(ufbxi_context
 		ufbx_lod_level *level = &levels[i];
 
 		if (i > 0) {
-			int len = snprintf(prop_name, sizeof(prop_name), "Thresholds|Level%zu", i - 1);
+			int len = ufbxi_snprintf(prop_name, sizeof(prop_name), "Thresholds|Level%zu", i - 1);
 			level->distance = ufbx_find_real_len(&lod->props, prop_name, (size_t)len, 0.0f);
 		} else if (lod->relative_distances) {
 			level->distance = (ufbx_real)100.0;
 		}
 
 		{
-			int len = snprintf(prop_name, sizeof(prop_name), "DisplayLevels|Level%zu", i);
+			int len = ufbxi_snprintf(prop_name, sizeof(prop_name), "DisplayLevels|Level%zu", i);
 			int64_t display = ufbx_find_int_len(&lod->props, prop_name, (size_t)len, 0);
 			if (display >= 0 && display <= 2) {
 				level->display = (ufbx_lod_display)display;
@@ -19349,7 +19415,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cac
 	filename.data = name_buf;
 
 	if (cc->xml_type == UFBXI_CACHE_XML_TYPE_SINGLE_FILE) {
-		filename.length = prefix_len + (size_t)snprintf(suffix_data, suffix_len, ".%s", extension);
+		filename.length = prefix_len + (size_t)ufbxi_snprintf(suffix_data, suffix_len, ".%s", extension);
 		bool found = false;
 		ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, &found));
 	} else if (cc->xml_type == UFBXI_CACHE_XML_TYPE_FILE_PER_FRAME) {
@@ -19380,9 +19446,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cac
 			uint32_t frame = time / cc->xml_ticks_per_frame;
 			uint32_t tick = time % cc->xml_ticks_per_frame;
 			if (tick == 0) {
-				filename.length = prefix_len + (size_t)snprintf(suffix_data, suffix_len, "Frame%u.%s", frame, extension);
+				filename.length = prefix_len + (size_t)ufbxi_snprintf(suffix_data, suffix_len, "Frame%u.%s", frame, extension);
 			} else {
-				filename.length = prefix_len + (size_t)snprintf(suffix_data, suffix_len, "Frame%uTick%u.%s", frame, tick, extension);
+				filename.length = prefix_len + (size_t)ufbxi_snprintf(suffix_data, suffix_len, "Frame%uTick%u.%s", frame, tick, extension);
 			}
 			bool found = false;
 			ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, &found));
@@ -19506,6 +19572,7 @@ static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_str
 	bool found = false;
 	ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename_copy, &found));
 	if (!found) {
+		ufbxi_set_err_info(&cc->error, filename.data, filename.length);
 		ufbxi_fail_err_msg(&cc->error, "open_file_fn()", "File not found");
 	}
 
@@ -19575,8 +19642,8 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 
 	ufbxi_cache_context cc = { UFBX_ERROR_NONE };
 	ufbxi_allocator ator_tmp = { 0 };
-	ufbxi_init_ator(&cc.error, &ator_tmp, &opts.temp_allocator);
-	ufbxi_init_ator(&cc.error, &cc.ator_result, &opts.result_allocator);
+	ufbxi_init_ator(&cc.error, &ator_tmp, &opts.temp_allocator, "temp");
+	ufbxi_init_ator(&cc.error, &cc.ator_result, &opts.result_allocator, "result");
 	cc.ator_tmp = &ator_tmp;
 
 	cc.opts = opts;
@@ -19595,10 +19662,7 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 	ufbx_geometry_cache *cache = ufbxi_cache_load(&cc, filename);
 	if (p_error) {
 		if (cache) {
-			p_error->type = UFBX_ERROR_NONE;
-			p_error->description.data = ufbxi_empty_char;
-			p_error->description.length = 0;
-			p_error->stack_size = 0;
+			ufbxi_clear_error(p_error);
 		} else {
 			*p_error = cc.error;
 		}
@@ -20303,8 +20367,8 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	ufbx_inflate_retain inflate_retain;
 	inflate_retain.initialized = false;
 
-	ufbxi_init_ator(&uc->error, &uc->ator_tmp, &uc->opts.temp_allocator);
-	ufbxi_init_ator(&uc->error, &uc->ator_result, &uc->opts.result_allocator);
+	ufbxi_init_ator(&uc->error, &uc->ator_tmp, &uc->opts.temp_allocator, "temp");
+	ufbxi_init_ator(&uc->error, &uc->ator_result, &uc->opts.result_allocator, "result");
 
 	if (uc->opts.read_buffer_size == 0) {
 		uc->opts.read_buffer_size = 0x4000;
@@ -20380,10 +20444,7 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 
 	if (ok) {
 		if (p_error) {
-			p_error->type = UFBX_ERROR_NONE;
-			p_error->description.data = ufbxi_empty_char;
-			p_error->description.length = 0;
-			p_error->stack_size = 0;
+			ufbxi_clear_error(p_error);
 		}
 		return &uc->scene_imp->scene;
 	} else {
@@ -21202,8 +21263,8 @@ ufbxi_nodiscard static ufbxi_noinline ufbx_scene *ufbxi_evaluate_scene(ufbxi_eva
 	ec->anim = anim ? *anim : scene->anim;
 	ec->time = time;
 
-	ufbxi_init_ator(&ec->error, &ec->ator_tmp, &ec->opts.temp_allocator);
-	ufbxi_init_ator(&ec->error, &ec->ator_result, &ec->opts.result_allocator);
+	ufbxi_init_ator(&ec->error, &ec->ator_tmp, &ec->opts.temp_allocator, "temp");
+	ufbxi_init_ator(&ec->error, &ec->ator_result, &ec->opts.result_allocator, "result");
 
 	ec->result.ator = &ec->ator_result;
 	ec->tmp.ator = &ec->ator_tmp;
@@ -21215,10 +21276,7 @@ ufbxi_nodiscard static ufbxi_noinline ufbx_scene *ufbxi_evaluate_scene(ufbxi_eva
 		ufbxi_buf_free(&ec->tmp);
 		ufbxi_free_ator(&ec->ator_tmp);
 		if (p_error) {
-			p_error->type = UFBX_ERROR_NONE;
-			p_error->description.data = ufbxi_empty_char;
-			p_error->description.length = 0;
-			p_error->stack_size = 0;
+			ufbxi_clear_error(p_error);
 		}
 		return &ec->scene_imp->scene;
 	} else {
@@ -21451,8 +21509,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_curve_imp(ufbxi
 	ufbx_line_curve *line = &tc->line;
 	ufbxi_check_err_msg(&tc->error, curve->basis.valid && curve->control_points.count > 0, "Bad NURBS geometry");
 
-	ufbxi_init_ator(&tc->error, &tc->ator_tmp, &tc->opts.temp_allocator);
-	ufbxi_init_ator(&tc->error, &tc->ator_result, &tc->opts.result_allocator);
+	ufbxi_init_ator(&tc->error, &tc->ator_tmp, &tc->opts.temp_allocator, "temp");
+	ufbxi_init_ator(&tc->error, &tc->ator_result, &tc->opts.result_allocator, "result");
 
 	tc->result.unordered = true;
 	tc->result.ator = &tc->ator_result;
@@ -21554,8 +21612,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 	ufbxi_check_err_msg(&tc->error, surface->basis_u.valid && surface->basis_v.valid
 		&& surface->num_control_points_u > 0 && surface->num_control_points_v > 0, "Bad NURBS geometry");
 
-	ufbxi_init_ator(&tc->error, &tc->ator_tmp, &tc->opts.temp_allocator);
-	ufbxi_init_ator(&tc->error, &tc->ator_result, &tc->opts.result_allocator);
+	ufbxi_init_ator(&tc->error, &tc->ator_tmp, &tc->opts.temp_allocator, "temp");
+	ufbxi_init_ator(&tc->error, &tc->ator_result, &tc->opts.result_allocator, "result");
 
 	tc->result.unordered = true;
 	tc->tmp.unordered = true;
@@ -23487,8 +23545,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivi
 		sc->opts.uv_boundary = sc->src_mesh.subdivision_uv_boundary;
 	}
 
-	ufbxi_init_ator(&sc->error, &sc->ator_tmp, &sc->opts.temp_allocator);
-	ufbxi_init_ator(&sc->error, &sc->ator_result, &sc->opts.result_allocator);
+	ufbxi_init_ator(&sc->error, &sc->ator_tmp, &sc->opts.temp_allocator, "temp");
+	ufbxi_init_ator(&sc->error, &sc->ator_result, &sc->opts.result_allocator, "result");
 
 	sc->result.unordered = true;
 	sc->source.unordered = true;
@@ -23599,10 +23657,7 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 	if (ok) {
 		ufbxi_free_ator(&sc.ator_tmp);
 		if (p_error) {
-			p_error->type = UFBX_ERROR_NONE;
-			p_error->description.data = ufbxi_empty_char;
-			p_error->description.length = 0;
-			p_error->stack_size = 0;
+			ufbxi_clear_error(p_error);
 		}
 
 		ufbxi_mesh_imp *imp = sc.imp;
@@ -23657,7 +23712,7 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 	bool fail = false;
 
 	ufbxi_allocator ator = { 0 };
-	ufbxi_init_ator(error, &ator, allocator);
+	ufbxi_init_ator(error, &ator, allocator, "allocator");
 
 	ufbxi_vertex_stream local_streams[16];
 	uint64_t local_packed_vertex[64];
@@ -23749,10 +23804,7 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 			}
 		}
 
-		error->stack_size = 0;
-		error->description.data = ufbxi_empty_char;
-		error->description.length = 0;
-		error->type = UFBX_ERROR_NONE;
+		ufbxi_clear_error(error);
 	} else {
 		ufbxi_fix_error_type(error, "Failed to generate indices");
 	}
@@ -23939,7 +23991,7 @@ ufbx_abi bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, 
 
 	ufbxi_allocator tmp_ator = { 0 };
 	ufbx_error tmp_error = { UFBX_ERROR_NONE };
-	ufbxi_init_ator(&tmp_error, &tmp_ator, NULL);
+	ufbxi_init_ator(&tmp_error, &tmp_ator, NULL, "filename");
 	FILE *f = ufbxi_fopen(path, path_len, &tmp_ator);
 	if (!f) return false;
 
@@ -23973,11 +24025,12 @@ ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_le
 {
 	ufbxi_allocator tmp_ator = { 0 };
 	ufbx_error tmp_error = { UFBX_ERROR_NONE };
-	ufbxi_init_ator(&tmp_error, &tmp_ator, opts ? &opts->temp_allocator : NULL);
+	ufbxi_init_ator(&tmp_error, &tmp_ator, opts ? &opts->temp_allocator : NULL, "filename");
 
 	FILE *file = ufbxi_fopen(filename, filename_len, &tmp_ator);
 	if (!file) {
 		if (error) {
+			ufbxi_set_err_info(error, filename, filename_len);
 			error->stack_size = 1;
 			error->type = UFBX_ERROR_FILE_NOT_FOUND;
 			error->description.data = "File not found";
@@ -24097,7 +24150,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_format_error(char *dst, size_t dst_size, con
 	size_t offset = 0;
 
 	{
-		int num = snprintf(dst + offset, dst_size - offset, "ufbx v%u.%u.%u error: %s\n",
+		int num = ufbxi_snprintf(dst + offset, dst_size - offset, "ufbx v%u.%u.%u error: %s\n",
 			UFBX_SOURCE_VERSION/1000000, UFBX_SOURCE_VERSION/1000%1000, UFBX_SOURCE_VERSION%1000,
 			error->description.data ? error->description.data : "Unknown error");
 		if (num > 0) offset = ufbxi_min_sz(offset + (size_t)num, dst_size - 1);
@@ -24106,14 +24159,9 @@ ufbx_abi ufbxi_noinline size_t ufbx_format_error(char *dst, size_t dst_size, con
 	size_t stack_size = ufbxi_min_sz(error->stack_size, UFBX_ERROR_STACK_MAX_DEPTH);
 	for (size_t i = 0; i < stack_size; i++) {
 		const ufbx_error_frame *frame = &error->stack[i];
-		int num = snprintf(dst + offset, dst_size - offset, "%6u:%s: %s\n", frame->source_line, frame->function.data, frame->description.data);
+		int num = ufbxi_snprintf(dst + offset, dst_size - offset, "%6u:%s: %s\n", frame->source_line, frame->function.data, frame->description.data);
 		if (num > 0) offset = ufbxi_min_sz(offset + (size_t)num, dst_size - 1);
 	}
-
-	// HACK: On some MSYS/MinGW implementations `snprintf` is broken and does
-	// not write the null terminator on trunctation, it's always safe to do so
-	// let's just do it unconditionally here...
-	dst[offset] = '\0';
 
 	return offset;
 }
@@ -25470,12 +25518,7 @@ ufbx_abi ufbx_line_curve *ufbx_tessellate_nurbs_curve(const ufbx_nurbs_curve *cu
 	ufbxi_free_ator(&tc.ator_tmp);
 
 	if (ok) {
-		if (error) {
-			error->type = UFBX_ERROR_NONE;
-			error->description.data = ufbxi_empty_char;
-			error->description.length = 0;
-			error->stack_size = 0;
-		}
+		ufbxi_clear_error(error);
 		ufbxi_line_curve_imp *imp = tc.imp;
 		return &imp->curve;
 	} else {
@@ -25514,12 +25557,7 @@ ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surf
 	ufbxi_free_ator(&tc.ator_tmp);
 
 	if (ok) {
-		if (error) {
-			error->type = UFBX_ERROR_NONE;
-			error->description.data = ufbxi_empty_char;
-			error->description.length = 0;
-			error->stack_size = 0;
-		}
+		ufbxi_clear_error(error);
 		ufbxi_mesh_imp *imp = tc.imp;
 		return &imp->mesh;
 	} else {
@@ -26274,9 +26312,6 @@ ufbx_abi ufbx_dom_node *ufbx_dom_find_len(const ufbx_dom_node *parent, const cha
 ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator_opts *allocator, ufbx_error *error)
 {
 	ufbx_error local_error;
-	if (!error) {
-		memset(&local_error, 0, sizeof(local_error));
-	}
 	return ufbxi_generate_indices(streams, num_streams, indices, num_indices, allocator, error ? error : &local_error);
 }
 
