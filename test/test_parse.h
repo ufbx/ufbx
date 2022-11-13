@@ -395,7 +395,7 @@ UFBXT_TEST(file_not_found)
 	ufbxt_assert(!scene);
 	ufbxt_assert(error.type == UFBX_ERROR_FILE_NOT_FOUND);
 	ufbxt_assert(error.info_length == strlen(error.info));
-	ufbxt_assert(!strcmp(error.info, name));
+	ufbxt_assert(!strcmp(error.info, buf));
 }
 #endif
 
