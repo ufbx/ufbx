@@ -40,6 +40,7 @@ def strip_ext(path):
 def get_fbx_files(json_path):
     base_path = strip_ext(json_path)
     yield from single_file(f"{base_path}.fbx")
+    yield from single_file(f"{base_path}.ufbx.obj")
     yield from glob.glob(f"{glob.escape(base_path)}/*.fbx")
 
 def get_obj_files(fbx_path):

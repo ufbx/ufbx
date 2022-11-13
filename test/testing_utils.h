@@ -421,6 +421,8 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 	size_t num_groups = 0;
 	size_t total_name_length = 0;
 
+	bool merge_groups = false;
+
 	char *line = (char*)obj_data;
 	for (;;) {
 		char *end = ufbxt_find_newline(line);
@@ -443,7 +445,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			}
 		}
 		else if (!strncmp(line, "g default", 7)) { /* ignore default group */ }
-		else if (!strncmp(line, "g ", 2)) {
+		else if ((!strncmp(line, "g ", 2) && !merge_groups) || !strncmp(line, "o ", 2)) {
 			bool prev_space = false;
 			num_groups++;
 			for (char *c = line; *c; c++) {
@@ -455,6 +457,8 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			}
 			total_name_length++;
 			num_meshes++;
+		} else if (strstr(line, "ufbx:merge_groups")) {
+			merge_groups = true;
 		}
 
 		if (end) {
@@ -599,7 +603,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			df++;
 		} else if (!strncmp(line, "g default", 7)) {
 			/* ignore default group */
-		} else if (!strncmp(line, "g ", 2)) {
+		} else if ((!strncmp(line, "g ", 2) && !merge_groups) || !strncmp(line, "o ", 2)) {
 			mesh = mesh ? mesh + 1 : meshes;
 			memset(mesh, 0, sizeof(ufbxt_obj_mesh));
 
@@ -1373,6 +1377,13 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 							fn.y /= fn_len;
 							fn.z /= fn_len;
 						}
+
+						ufbx_real on_len = (ufbx_real)sqrt(on.x*on.x + on.y*on.y + on.z*on.z);
+						if (on_len > 0.00001f) {
+							on.x /= on_len;
+							on.y /= on_len;
+							on.z /= on_len;
+						}
 					}
 
 					if (scale != 1.0) {
@@ -1386,7 +1397,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 
 					ufbxt_assert_close_vec3(p_err, op, fp);
 
-					if (check_normals) {
+					if (check_normals && !mesh->generated_normals) {
 						ufbx_real on2 = on.x*on.x + on.y*on.y + on.z*on.z;
 						ufbx_real fn2 = fn.x*fn.x + fn.y*fn.y + fn.z*fn.z;
 						if (on2 > 0.01f && fn2 > 0.01f) {
