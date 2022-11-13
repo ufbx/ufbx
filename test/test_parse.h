@@ -1114,9 +1114,6 @@ UFBXT_FILE_TEST_ALT(find_prop_concat, maya_node_attribute_zoo)
 				ufbx_string name = prop->name;
 				ufbxt_assert(name.length * 2 < ufbxt_arraycount(parts));
 
-				static int serial = 0;
-				serial++;
-
 				// One single part
 				num_parts = 0;
 				parts[num_parts] = name;
