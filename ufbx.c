@@ -20149,6 +20149,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_skinning(ufbx_scene *sc
 
 			ufbx_compute_normals(mesh, &mesh->skinned_position, normal_indices, num_indices, normal_data, num_normals);
 
+			mesh->generated_normals = true;
 			mesh->skinned_normal.exists = true;
 			mesh->skinned_normal.values.data = normal_data;
 			mesh->skinned_normal.values.count = num_normals;
@@ -21835,6 +21836,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 	ufbxi_check_err(&tc->error, ufbxi_finalize_mesh_material(&tc->result, &tc->error, mesh));
 	ufbxi_check_err(&tc->error, ufbxi_finalize_mesh(&tc->result, &tc->error, mesh));
 
+	mesh->generated_normals = true;
 	ufbx_compute_normals(mesh, &mesh->vertex_position,
 		mesh->vertex_normal.indices.data, mesh->vertex_normal.indices.count,
 		mesh->vertex_normal.values.data, mesh->vertex_normal.values.count);
@@ -23602,6 +23604,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivi
 
 		ufbx_compute_normals(mesh, &mesh->skinned_position, normal_indices, mesh->num_indices, normal_data, num_normals);
 
+		mesh->generated_normals = true;
 		mesh->vertex_normal.exists = true;
 		mesh->vertex_normal.values.data = normal_data;
 		mesh->vertex_normal.values.count = num_normals;

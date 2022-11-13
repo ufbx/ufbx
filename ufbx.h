@@ -1019,7 +1019,8 @@ struct ufbx_mesh {
 	ufbx_subdivision_boundary subdivision_uv_boundary;
 
 	// Normals have been generated instead of evalauted.
-	// See `ufbx_load_opts.generate_missing_normals`.
+	// Either from missing normals (via `ufbx_load_opts.generate_missing_normals`), skinning,
+	// tessellation, or subdivision.
 	bool generated_normals;
 
 	// Subdivision (result)
