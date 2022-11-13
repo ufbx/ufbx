@@ -26,6 +26,7 @@ if __name__ == "__main__":
                 if "/fuzz/" in path: continue
                 if "/obj_fuzz/" in path: continue
                 if "/mtl_fuzz/" in path: continue
+                if " " in path: continue
 
                 if file.endswith(".fbx"):
                     prev_output = None
