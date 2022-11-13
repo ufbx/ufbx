@@ -3778,7 +3778,7 @@ static ufbxi_noinline int ufbxi_concat_str_cmp(const ufbx_string *ref, const ufb
 	ufbxi_for(const ufbx_string, part, parts, num_parts) {
 		size_t length = part->length != SIZE_MAX ? part->length : strlen(part->data);
 		size_t to_cmp = ufbxi_min_sz(ufbxi_to_size(end - ptr), length);
-		int cmp = memcmp(ptr, part->data, to_cmp);
+		int cmp = to_cmp > 0 ? memcmp(ptr, part->data, to_cmp) : 0;
 		if (cmp != 0) return cmp;
 		if (to_cmp != length) return -1;
 		ptr += length;
@@ -3835,6 +3835,12 @@ static int ufbxi_map_cmp_string(void *user, const void *va, const void *vb)
 }
 
 static const char ufbxi_empty_char[1] = { '\0' };
+
+static ufbxi_forceinline ufbx_string ufbxi_safe_string(const char *data, size_t length)
+{
+	ufbx_string str = { length > 0 ? data : ufbxi_empty_char, length };
+	return str;
+}
 
 static void ufbxi_string_pool_temp_free(ufbxi_string_pool *pool)
 {
@@ -24114,7 +24120,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_format_error(char *dst, size_t dst_size, con
 ufbx_abi ufbx_prop *ufbx_find_prop_len(const ufbx_props *props, const char *name, size_t name_len)
 {
 	uint32_t key = ufbxi_get_name_key(name, name_len);
-	ufbx_string name_str = { name, name_len };
+	ufbx_string name_str = ufbxi_safe_string(name, name_len);
 
 	while (props) {
 		size_t index = SIZE_MAX;
@@ -24209,7 +24215,7 @@ ufbx_abi ufbx_prop *ufbx_find_prop_concat(const ufbx_props *props, const ufbx_st
 ufbx_abi ufbx_element *ufbx_find_element_len(const ufbx_scene *scene, ufbx_element_type type, const char *name, size_t name_len)
 {
 	if (!scene) return NULL;
-	ufbx_string name_str = { name, name_len };
+	ufbx_string name_str = ufbxi_safe_string(name, name_len);
 	uint32_t key = ufbxi_get_name_key(name, name_len);
 
 	size_t index = SIZE_MAX;
@@ -24247,7 +24253,7 @@ ufbx_abi ufbx_anim_prop *ufbx_find_anim_prop_len(const ufbx_anim_layer *layer, c
 	ufbx_assert(element);
 	if (!layer || !element) return NULL;
 
-	ufbx_string prop_str = { prop, prop_len };
+	ufbx_string prop_str = ufbxi_safe_string(prop, prop_len);
 
 	size_t index = SIZE_MAX;
 	ufbxi_macro_lower_bound_eq(ufbx_anim_prop, 16, &index, layer->anim_props.data, 0, layer->anim_props.count,
@@ -24597,7 +24603,7 @@ ufbx_abi ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_ani
 
 ufbx_abi ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const char *name, size_t name_len)
 {
-	ufbx_string name_str = { name, name_len };
+	ufbx_string name_str = ufbxi_safe_string(name, name_len);
 	if (!material) return NULL;
 
 	size_t index = SIZE_MAX;
@@ -24608,7 +24614,7 @@ ufbx_abi ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material,
 
 ufbx_abi ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const char *name, size_t name_len)
 {
-	ufbx_string name_str = { name, name_len };
+	ufbx_string name_str = ufbxi_safe_string(name, name_len);
 	ufbx_shader_prop_binding_list bindings = ufbx_find_shader_prop_bindings_len(shader, name, name_len);
 	if (bindings.count > 0) {
 		return bindings.data[0].shader_prop;
@@ -24620,7 +24626,7 @@ ufbx_abi ufbx_shader_prop_binding_list ufbx_find_shader_prop_bindings_len(const 
 {
 	ufbx_shader_prop_binding_list bindings = { NULL, 0 };
 
-	ufbx_string name_str = { name, name_len };
+	ufbx_string name_str = ufbxi_safe_string(name, name_len);
 	if (!shader) return bindings;
 
 	ufbxi_for_ptr_list(ufbx_shader_binding, p_bind, shader->bindings) {
@@ -24647,7 +24653,7 @@ ufbx_abi ufbx_shader_prop_binding_list ufbx_find_shader_prop_bindings_len(const 
 
 ufbx_abi ufbx_shader_texture_input *ufbx_find_shader_texture_input_len(const ufbx_shader_texture *shader, const char *name, size_t name_len)
 {
-	ufbx_string name_str = { name, name_len };
+	ufbx_string name_str = ufbxi_safe_string(name, name_len);
 
 	size_t index = SIZE_MAX;
 	ufbxi_macro_lower_bound_eq(ufbx_shader_texture_input, 4, &index, shader->inputs.data, 0, shader->inputs.count, 
@@ -25843,7 +25849,7 @@ ufbx_abi ufbx_geometry_cache *ufbx_load_geometry_cache_len(
 	const char *filename, size_t filename_len,
 	const ufbx_geometry_cache_opts *opts, ufbx_error *error)
 {
-	ufbx_string str = { filename, filename_len };
+	ufbx_string str = ufbxi_safe_string(filename, filename_len);
 	return ufbxi_load_geometry_cache(str, opts, error);
 }
 
@@ -26257,7 +26263,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_
 
 ufbx_abi ufbx_dom_node *ufbx_dom_find_len(const ufbx_dom_node *parent, const char *name, size_t name_len)
 {
-	ufbx_string ref = { name, name_len };
+	ufbx_string ref = ufbxi_safe_string(name, name_len);
 	ufbxi_for_ptr_list(ufbx_dom_node, p_child, parent->children) {
 		if (ufbxi_str_equal((*p_child)->name, ref)) return (ufbx_dom_node*)*p_child;
 	}
