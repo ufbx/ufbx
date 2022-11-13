@@ -411,8 +411,11 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 
 	ufbxt_assert(mesh->num_triangles == num_triangles);
 	ufbxt_assert(mesh->max_face_triangles == max_face_triangles);
-	ufbxt_assert(scene->metadata.max_face_triangles >= max_face_triangles);
 	ufbxt_assert(mesh->num_bad_faces == num_bad_faces);
+
+	if (!mesh->from_tessellated_nurbs && !mesh->subdivision_evaluated) {
+		ufbxt_assert(scene->metadata.max_face_triangles >= max_face_triangles);
+	}
 
 	ufbxt_assert(mesh->edges.count == mesh->num_edges);
 	for (size_t i = 0; i < mesh->num_edges; i++) {
