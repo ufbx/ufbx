@@ -680,7 +680,7 @@ def decorate_arch(compiler, arch):
 tests = set(argv.tests)
 impicit_tests = False
 if not tests:
-    tests = ["tests", "picort", "viewer", "domfuzz", "readme", "threadcheck", "hashes"]
+    tests = ["tests", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
     implicit_tests = True
 
 async def main():
@@ -1048,6 +1048,80 @@ async def main():
                         target.log.clear()
                         target.ran = False
                         run_tasks.append(run_target(target, [path],
+                            RunOpts(
+                                rerunnable=True,
+                                info=path,
+                            )
+                        ))
+            
+            targets = await gather(run_tasks)
+
+    if "objfuzz" in tests:
+        log_comment("-- Compiling and running objfuzz --")
+    
+        target_tasks = []
+
+        objfuzz_configs = {
+            "arch": arch_configs["arch"],
+        }
+
+        objfuzz_config = {
+            "sources": ["ufbx.c", "test/objfuzz.cpp"],
+            "output": "objfuzz" + exe_suffix,
+            "cpp": True,
+            "optimize": True,
+            "std": "c++14",
+        }
+        target_tasks += compile_permutations("objfuzz", objfuzz_config, objfuzz_configs, None)
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+        def target_score(target):
+            compiler = target.compiler
+            config = target.config
+            if not target.compiled:
+                return (0, 0)
+            score = 1
+            if config["arch"] == "x64":
+                score += 10
+            if "clang" in compiler.name:
+                score += 10
+            if "msvc" in compiler.name:
+                score += 5
+            version = re.search(r"\d+", compiler.version)
+            version = int(version.group(0)) if version else 0
+            return (score, version)
+
+        target = max(targets, key=target_score)
+
+        if target.compiled:
+            log_comment(f"-- Running objfuzz with {target.name} --")
+
+            too_heavy_files = [
+                "synthetic_color_suzanne_0_obj.obj",
+                "synthetic_color_suzanne_1_obj.obj",
+                "zbrush_polygroup_mess_0_obj.obj",
+            ]
+
+            run_tasks = []
+            for root, _, files in os.walk("data"):
+                for file in files:
+                    path = os.path.join(root, file)
+                    if any(f in file for f in too_heavy_files): continue
+                    if re.match(r"^.*_\d+_obj.obj$", file):
+                        target.log.clear()
+                        target.ran = False
+                        run_tasks.append(run_target(target, [path],
+                            RunOpts(
+                                rerunnable=True,
+                                info=path,
+                            )
+                        ))
+                    elif re.match(r"^.*_\d+_mtl.mtl$", file):
+                        target.log.clear()
+                        target.ran = False
+                        run_tasks.append(run_target(target, ["--mtl", path],
                             RunOpts(
                                 rerunnable=True,
                                 info=path,
