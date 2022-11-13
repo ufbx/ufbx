@@ -13281,18 +13281,22 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, uf
 	ufbxi_patch_zero(mesh->num_indices, mesh->vertex_indices.count);
 	ufbxi_patch_zero(mesh->num_faces, mesh->faces.count);
 
-	if (mesh->num_triangles == 0) {
+	if (mesh->num_triangles == 0 || mesh->max_face_triangles == 0) {
 		size_t num_triangles = 0;
+		size_t max_face_triangles = 0;
 		size_t num_bad_faces = 0;
 		ufbxi_nounroll ufbxi_for_list(ufbx_face, face, mesh->faces) {
 			if (face->num_indices >= 3) {
-				num_triangles += face->num_indices - 2;
+				size_t tris = face->num_indices - 2;
+				num_triangles += tris;
+				max_face_triangles = ufbxi_max_sz(max_face_triangles, tris);
 			} else {
 				num_bad_faces++;
 			}
 		}
 
 		ufbxi_patch_zero(mesh->num_triangles, num_triangles);
+		ufbxi_patch_zero(mesh->max_face_triangles, max_face_triangles);
 		ufbxi_patch_zero(mesh->num_bad_faces, num_bad_faces);
 	}
 

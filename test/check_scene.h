@@ -388,6 +388,7 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 
 	size_t num_triangles = 0;
 	size_t num_bad_faces = 0;
+	size_t max_face_triangles = 0;
 
 	uint32_t prev_end = 0;
 	ufbxt_assert(mesh->faces.count == mesh->num_faces);
@@ -398,13 +399,19 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_assert(prev_end <= mesh->num_indices);
 
 		if (face.num_indices >= 3) {
-			num_triangles += face.num_indices - 2;
+			size_t tris = face.num_indices - 2;
+			num_triangles += tris;
+			if (tris > max_face_triangles) {
+				max_face_triangles = tris;
+			}
 		} else {
 			num_bad_faces++;
 		}
 	}
 
 	ufbxt_assert(mesh->num_triangles == num_triangles);
+	ufbxt_assert(mesh->max_face_triangles == max_face_triangles);
+	ufbxt_assert(scene->metadata.max_face_triangles >= max_face_triangles);
 	ufbxt_assert(mesh->num_bad_faces == num_bad_faces);
 
 	ufbxt_assert(mesh->edges.count == mesh->num_edges);
