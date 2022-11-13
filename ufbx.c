@@ -17412,9 +17412,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				mesh->face_material.count = 0;
 			}
 
-			// Blender writes materials attached to models even in 7x00
-			// TODO: Should per-instance materials be supported?
-
 			// Fetch deformers
 			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->skin_deformers, &mesh->element, search_node, NULL, UFBX_ELEMENT_SKIN_DEFORMER));
 			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->blend_deformers, &mesh->element, search_node, NULL, UFBX_ELEMENT_BLEND_DEFORMER));
