@@ -503,6 +503,15 @@ ufbxt_noinline static void ufbxt_hash_mesh_material_imp(ufbxt_hash *h, const ufb
 	ufbxt_hash_list(h, v->face_indices, ufbxt_hash_pod_imp);
 }
 
+ufbxt_noinline static void ufbxt_hash_face_group_imp(ufbxt_hash *h, const ufbx_face_group *v)
+{
+	ufbxt_hash_pod(h, v->id);
+	ufbxt_hash_string(h, v->name);
+	ufbxt_hash_size_t(h, v->num_faces);
+	ufbxt_hash_size_t(h, v->num_triangles);
+	ufbxt_hash_list(h, v->face_indices, ufbxt_hash_pod_imp);
+}
+
 ufbxt_noinline static void ufbxt_hash_subdivision_weight_range_imp(ufbxt_hash *h, ufbx_subdivision_weight_range v)
 {
 	ufbxt_hash_pod(h, v.weight_begin);
@@ -574,6 +583,7 @@ ufbxt_noinline static void ufbxt_hash_mesh_imp(ufbxt_hash *h, const ufbx_mesh *v
 	ufbxt_hash_list_ptr(h, v->color_sets, ufbxt_hash_color_set_imp);
 
 	ufbxt_hash_list_ptr(h, v->materials, ufbxt_hash_mesh_material_imp);
+	ufbxt_hash_list_ptr(h, v->face_groups, ufbxt_hash_face_group_imp);
 
 	ufbxt_hash_pod(h, v->skinned_is_local);
 	ufbxt_hash_vertex_vec3(h, &v->skinned_position);
