@@ -18556,7 +18556,7 @@ ufbxi_noinline static void ufbxi_update_constraint(ufbx_constraint *constraint)
 			ufbx_vec3 r = prop ? prop->value_vec3 : ufbx_zero_vec3;
 			parts[1] = ufbxi_str_c(".Offset S");
 			prop = ufbx_find_prop_concat(props, parts, 2);
-			ufbx_vec3 s = prop ? prop->value_vec3 : ufbx_zero_vec3;
+			ufbx_vec3 s = prop ? prop->value_vec3 : ufbxi_one_vec3;
 
 			target->transform.translation = t;
 			target->transform.rotation = ufbx_euler_to_quat(r, UFBX_ROTATION_XYZ);
