@@ -654,7 +654,7 @@ async def run_viewer_target(target):
             if "\U0001F602" in file: continue
             path = os.path.join(root, file)
             if "fuzz" in path: continue
-            if path.endswith(".fbx"):
+            if path.endswith(".fbx") or path.endswith(".obj"):
                 target.log.clear()
                 target.ran = False
                 await run_target(target, [path])
