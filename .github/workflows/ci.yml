@@ -156,7 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Compile feature permutaitons
+      - name: Compile feature permutations
         run: python misc/run_tests.py features
 
   ci_analysis:
