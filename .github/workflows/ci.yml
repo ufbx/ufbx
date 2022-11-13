@@ -142,7 +142,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Run domfuzz
+      - name: Run domfuzz/objfuzz
         run: python misc/run_tests.py domfuzz objfuzz
 
   ci_viewer:
