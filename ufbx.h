@@ -3554,6 +3554,12 @@ typedef struct ufbx_load_opts {
 	// this is just used as a fallback.
 	bool no_format_from_extension;
 
+	// (.obj) Try to find .mtl file with matching filename as the .obj file.
+	// Used if the file specified `mtllib` line is not found, eg. for a file called
+	// `model.obj` that contains the line `usemtl materials.mtl`, ufbx would first
+	// try to open `materials.mtl` and if that fails it tries to open `model.mtl`.
+	bool obj_search_mtl_by_filename;
+
 	// (.obj) Don't split geometry into meshes by object.
 	bool obj_merge_objects;
 

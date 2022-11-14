@@ -14580,9 +14580,20 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 				has_stream = uc->opts.open_file_cb.fn(uc->opts.open_file_cb.user, &stream, (const char*)dst.data, dst.size);
 			}
 		}
-	}
 
-	// TODO: Search by replacing .obj to .mtl
+		ufbx_string path = uc->scene.metadata.filename;
+		if (!has_stream && uc->opts.obj_search_mtl_by_filename && path.length > 4) {
+			ufbx_string ext = { path.data + path.length - 4, 4 };
+			if (ufbxi_match(&ext, "\\c.obj")) {
+				char *copy = ufbxi_push_copy(&uc->tmp, char, path.length + 1, path.data);
+				ufbxi_check(copy);
+				copy[path.length - 3] = copy[path.length - 3] == 'O' ? 'M' : 'm';
+				copy[path.length - 2] = copy[path.length - 2] == 'B' ? 'T' : 't';
+				copy[path.length - 1] = copy[path.length - 1] == 'J' ? 'L' : 'l';
+				has_stream = uc->opts.open_file_cb.fn(uc->opts.open_file_cb.user, &stream, copy, path.length);
+			}
+		}
+	}
 
 	if (has_stream) {
 		uc->read_fn = stream.read_fn;

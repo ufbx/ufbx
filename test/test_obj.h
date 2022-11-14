@@ -1101,3 +1101,34 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_partial_material_merged, synthetic_partial_ma
 }
 #endif
 
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_search_mtl_by_filename_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.obj_search_mtl_by_filename = UFBX_INDEX_ERROR_HANDLING_NO_INDEX;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(synthetic_filename_mtl, ufbxt_search_mtl_by_filename_opts)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_vec3 ka = { 1.0f, 0.0f, 0.0f };
+		ufbx_vec3 kd = { 0.0f, 1.0f, 0.0f };
+		ufbx_vec3 ks = { 0.0f, 0.0f, 1.0f };
+
+		ufbx_material *material = ufbx_find_material(scene, "Material");
+		ufbxt_assert(material);
+		ufbxt_assert_close_vec3(err, material->fbx.ambient_color.value_vec3, ka);
+		ufbxt_assert_close_vec3(err, material->fbx.diffuse_color.value_vec3, kd);
+		ufbxt_assert_close_vec3(err, material->fbx.specular_color.value_vec3, ks);
+	}
+
+	{
+		ufbx_material *material = ufbx_find_material(scene, "Other");
+		ufbxt_assert(material);
+	}
+}
+#endif
+
