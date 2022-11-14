@@ -102,6 +102,7 @@ int main(int argc, char **argv)
 	opts.ignore_missing_external_files = ignore_missing_external;
 	opts.target_axes = ufbx_axes_right_handed_y_up;
 	opts.target_unit_meters = 0.01;
+	opts.obj_search_mtl_by_filename = true;
 	if (!allow_bad_unicode) {
 		opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING;
 	}
