@@ -1896,7 +1896,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			}
 
 			// Try a couple of read buffer sizes
-			if (g_fuzz && !g_fuzz_no_buffer && g_fuzz_step == SIZE_MAX) {
+			if (g_fuzz && !g_fuzz_no_buffer && g_fuzz_step == SIZE_MAX && !alternative) {
 				ufbxt_begin_fuzz();
 
 				int fail_sz = -1;
