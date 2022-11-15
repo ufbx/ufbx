@@ -138,6 +138,7 @@ typedef struct {
 	bool no_subdivision;
 	bool root_groups_at_bone;
 	bool remove_namespaces;
+	bool match_by_order;
 	ufbx_real tolerance;
 	int32_t animation_frame;
 
@@ -688,6 +689,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			if (!strcmp(line, "ufbx:remove_namespaces")) {
 				obj->remove_namespaces = true;
 			}
+			if (!strcmp(line, "ufbx:match_by_order")) {
+				obj->match_by_order = true;
+			}
 			if (!strcmp(line, "www.blender.org")) {
 				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
 			}
@@ -1186,8 +1190,13 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 
 		ufbx_node *node = NULL;
 
+		if (obj->match_by_order) {
+			ufbxt_assert(mesh_i + 1 < scene->nodes.count);
+			node = scene->nodes.data[mesh_i + 1];
+		}
+
 		// Search for a node containing all the groups
-		if (obj_mesh->num_groups > 0) {
+		if (!node && obj_mesh->num_groups > 0) {
 			ufbxt_obj_group_key(cat_name, sizeof(cat_name), obj_mesh->groups, obj_mesh->num_groups, obj->remove_namespaces);
 			ufbxt_obj_node key = { cat_name };
 			ufbxt_obj_node *found = (ufbxt_obj_node*)bsearch(&key, obj_nodes, num_obj_nodes,
@@ -1207,13 +1216,9 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 					}
 				}
 			}
-		} else {
-			ufbxt_assert(scene->meshes.count == 1);
-			ufbxt_assert(scene->meshes.data[0]->instances.count == 1);
-			node = scene->meshes.data[0]->instances.data[0];
 		}
 
-		if (!node) {
+		if (!node && obj_mesh->original_group) {
 			node = ufbx_find_node(scene, obj_mesh->original_group);
 		}
 
@@ -1239,6 +1244,12 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 					if (!seen) break;
 				}
 			}
+		}
+
+		if (!node) {
+			ufbxt_assert(scene->meshes.count == 1);
+			ufbxt_assert(scene->meshes.data[0]->instances.count == 1);
+			node = scene->meshes.data[0]->instances.data[0];
 		}
 
 		if (obj->ignore_duplicates) {
