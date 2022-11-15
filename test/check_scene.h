@@ -510,6 +510,10 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		for (size_t i = 0; i < mesh->face_groups.count; i++) {
 			ufbx_face_group *group = &mesh->face_groups.data[i];
 
+			if (i > 0) {
+				ufbxt_assert(group->id >= mesh->face_groups.data[i - 1].id);
+			}
+
 			ufbxt_check_string(group->name);
 			ufbxt_assert(group->face_indices.count == group->num_faces);
 
