@@ -977,3 +977,44 @@ UFBXT_FILE_TEST(zbrush_cut_sphere)
 }
 #endif
 
+#if UFBXT_IMPL
+typedef struct {
+	int32_t id;
+	uint32_t face_count;
+} ufbxt_face_group_ref;
+#endif
+
+UFBXT_FILE_TEST(synthetic_face_group_id)
+#if UFBXT_IMPL
+{
+	const ufbxt_face_group_ref ref_groups[] = {
+		{ -2147483647 - 1, 1 },
+		{ -2000, 2 },
+		{ -2, 1 },
+		{ -1, 1 },
+		{ 0, 3 },
+		{ 1, 2 },
+		{ 2, 2 },
+		{ 10, 1 },
+		{ 20, 1 },
+		{ 30, 1 },
+		{ 40, 1 },
+		{ 50, 1 },
+		{ 3000, 2 },
+		{ 2147483647, 1 },
+	};
+
+	ufbx_node *node = ufbx_find_node(scene, "20 Sided");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	for (size_t i = 0; i < ufbxt_arraycount(ref_groups); i++) {
+		ufbxt_hintf("i = %zu", i);
+		ufbxt_assert(i < mesh->face_groups.count);
+		ufbx_face_group *group = &mesh->face_groups.data[i];
+		ufbxt_assert(group->id == ref_groups[i].id);
+		ufbxt_assert(group->num_faces == ref_groups[i].face_count);
+	}
+}
+#endif
+
