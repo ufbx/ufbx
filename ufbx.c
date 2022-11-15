@@ -1326,7 +1326,7 @@ ufbxi_bit_chunk_refill(ufbxi_bit_stream *s, const char *ptr)
 
 	// Read more user data if the user supplied a `read_fn()`, otherwise
 	// we assume the initial data chunk is the whole input buffer.
-	if (s->read_fn) {
+	if (s->read_fn && !s->cancelled) {
 		size_t to_read = ufbxi_min_sz(s->input_left, s->buffer_size - left);
 		if (to_read > 0) {
 			size_t num_read = s->read_fn(s->read_user, s->buffer + left, to_read);
@@ -1411,12 +1411,6 @@ ufbxi_bit_yield(ufbxi_bit_stream *s, const char *ptr)
 		ptr = ufbxi_bit_chunk_refill(s, ptr);
 	}
 
-	if (s->progress_cb.fn && ufbxi_to_size(s->chunk_end - ptr) > s->progress_interval + 8) {
-		s->chunk_yield = ptr + s->progress_interval;
-	} else {
-		s->chunk_yield = s->chunk_end;
-	}
-
 	if (s->progress_cb.fn) {
 		size_t num_read = s->num_read_before_chunk + ufbxi_to_size(ptr - s->chunk_begin);
 
@@ -1426,8 +1420,20 @@ ufbxi_bit_yield(ufbxi_bit_stream *s, const char *ptr)
 		if (result == UFBX_PROGRESS_CANCEL) {
 			s->cancelled = true;
 			ptr = s->local_buffer;
+			s->buffer = s->local_buffer;
+			s->buffer_size = sizeof(s->local_buffer);
+			s->chunk_begin = ptr;
+			s->chunk_ptr = ptr;
+			s->chunk_end = ptr + sizeof(s->local_buffer) - 8;
+			s->chunk_real_end = ptr + sizeof(s->local_buffer);
 			memset(s->local_buffer, 0, sizeof(s->local_buffer));
 		}
+	}
+
+	if (s->progress_cb.fn && ufbxi_to_size(s->chunk_end - ptr) > s->progress_interval + 8) {
+		s->chunk_yield = ptr + s->progress_interval;
+	} else {
+		s->chunk_yield = s->chunk_end;
 	}
 
 	return ptr;
@@ -2482,11 +2488,12 @@ ufbxi_extern_c ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inf
 				}
 
 				if (err < 0) return err;
+
+				// `ufbxi_inflate_block()` returns normally on cancel so check it here
+				if (dc.stream.cancelled) return -28;
+
 				if (err == 0) break;
 			}
-
-			// `ufbxi_inflate_block()` returns normally on cancel so check it here
-			if (dc.stream.cancelled) return -28;
 
 		} else {
 			// 0b11 - reserved (error)
