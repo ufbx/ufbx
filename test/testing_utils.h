@@ -1218,7 +1218,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			}
 		}
 
-		if (!node && obj_mesh->original_group) {
+		if (!node && obj_mesh->original_group && *obj_mesh->original_group) {
 			node = ufbx_find_node(scene, obj_mesh->original_group);
 		}
 
@@ -1246,12 +1246,6 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			}
 		}
 
-		if (!node) {
-			ufbxt_assert(scene->meshes.count == 1);
-			ufbxt_assert(scene->meshes.data[0]->instances.count == 1);
-			node = scene->meshes.data[0]->instances.data[0];
-		}
-
 		if (obj->ignore_duplicates) {
 			if (!node) {
 				bool is_ncl = false;
@@ -1277,6 +1271,12 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 				}
 				if (duplicate_name) continue;
 			}
+		}
+
+		if (!node) {
+			ufbxt_assert(scene->meshes.count == 1);
+			ufbxt_assert(scene->meshes.data[0]->instances.count == 1);
+			node = scene->meshes.data[0]->instances.data[0];
 		}
 
 		ufbxt_assert(node);
