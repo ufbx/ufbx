@@ -13004,7 +13004,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 				material = ((uint32_t*)arr->data)[0];
 			}
 
-			mesh->face_material.count = mesh->num_indices;
+			mesh->face_material.count = mesh->num_faces;
 			if (material == 0) {
 				mesh->face_material.data = (uint32_t*)ufbxi_sentinel_index_zero;
 			} else {
