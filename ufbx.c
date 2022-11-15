@@ -10626,9 +10626,9 @@ typedef struct {
 	uint32_t id, index;
 } ufbxi_id_group;
 
-static int ufbxi_cmp_uint32(const void *va, const void *vb)
+static int ufbxi_cmp_int32(const void *va, const void *vb)
 {
-	const uint32_t a = *(const uint32_t*)va, b = *(const uint32_t*)vb;
+	const int32_t a = *(const int32_t*)va, b = *(const int32_t*)vb;
 	if (a != b) return a < b ? -1 : +1;
 	return 0;
 }
@@ -10666,7 +10666,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_assign_face_groups(ufbxi_buf *bu
 	}
 
 	// Sort and deduplicate remaining IDs
-	qsort(ids, num_ids, sizeof(uint32_t), &ufbxi_cmp_uint32);
+	qsort(ids, num_ids, sizeof(uint32_t), &ufbxi_cmp_int32);
 
 	size_t num_groups = 0;
 	for (size_t i = 0; i < num_ids; ) {
