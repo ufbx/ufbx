@@ -18266,9 +18266,11 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 	if (!ufbxi_is_transform_identity(node->geometry_transform)) {
 		node->geometry_to_node = ufbx_transform_to_matrix(&node->geometry_transform); 
 		node->geometry_to_world = ufbx_matrix_mul(&node->node_to_world, &node->geometry_to_node);
+        node->has_geometry_transform = true;
 	} else {
 		node->geometry_to_node = ufbx_identity_matrix;
 		node->geometry_to_world = node->node_to_world;
+        node->has_geometry_transform = false;
 	}
 
 	node->visible = ufbxi_find_int(&node->props, ufbxi_Visibility, 1) != 0;

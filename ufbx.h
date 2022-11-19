@@ -674,6 +674,9 @@ struct ufbx_node {
 	// True if this node is the implicit root node of the scene.
 	bool is_root;
 
+    // True if the node has a non-identity `geometry_transform`.
+    bool has_geometry_transform;
+
 	// How deep is this node in the parent hierarchy. Root node is at depth `0`
 	// and the immediate children of root at `1`.
 	uint32_t node_depth;
