@@ -1104,6 +1104,17 @@ struct ufbx_light {
 	bool cast_shadows;
 };
 
+typedef enum ufbx_projection_mode {
+	// Perspective projection.
+	UFBX_PROJECTION_MODE_PERSPECTIVE,
+
+	// Orthographic projection.
+	UFBX_PROJECTION_MODE_ORTOGRAPHIC,
+
+	UFBX_PROJECTION_MODE_COUNT,
+	UFBX_PROJECTION_MODE_FORCE_32BIT = 0x7fffffff,
+} ufbx_projection_mode;
+
 // Method of specifying the rendering resolution from properties
 // NOTE: Handled internally by ufbx, ignore unless you interpret `ufbx_props` directly!
 typedef enum ufbx_aspect_mode {
@@ -1189,6 +1200,9 @@ struct ufbx_camera {
 		ufbx_node_list instances;
 	}; };
 
+	// Projection mode (perspective/orthographic).
+	ufbx_projection_mode projection_mode;
+
 	// If set to `true`, `resolution` reprensents actual pixel values, otherwise
 	// it's only useful for its aspect ratio.
 	bool resolution_is_pixels;
@@ -1197,11 +1211,25 @@ struct ufbx_camera {
 	ufbx_vec2 resolution;
 
 	// Horizontal/vertical field of view in degrees
+	// Valid if `projection_mode == UFBX_PROJECTION_MODE_PERSPECTIVE`.
 	ufbx_vec2 field_of_view_deg;
 
 	// Component-wise `tan(field_of_view_deg)`, also represents the size of the
 	// proection frustum slice at distance of 1.
+	// Valid if `projection_mode == UFBX_PROJECTION_MODE_PERSPECTIVE`.
 	ufbx_vec2 field_of_view_tan;
+
+	// Orthographic camera extents.
+	// Valid if `projection_mode == UFBX_PROJECTION_MODE_ORTHOGRAPHIC`.
+	ufbx_real orthographic_extent;
+
+	// Orthographic camera size.
+	// Valid if `projection_mode == UFBX_PROJECTION_MODE_ORTHOGRAPHIC`.
+	ufbx_vec2 orthographic_size;
+
+	// Size of the projection plane at distance 1.
+	// Equal to `field_of_view_tan` if perspective, `orthographic_size` if orthographic.
+	ufbx_vec2 projection_plane;
 
 	// Advanced properties used to compute the above
 	ufbx_aspect_mode aspect_mode;

@@ -565,10 +565,21 @@ static void ufbxt_check_light(ufbx_scene *scene, ufbx_light *light)
 
 static void ufbxt_check_camera(ufbx_scene *scene, ufbx_camera *camera)
 {
+	ufbxt_assert((uint32_t)camera->projection_mode < (uint32_t)UFBX_PROJECTION_MODE_COUNT);
 	ufbxt_assert((uint32_t)camera->aspect_mode < (uint32_t)UFBX_ASPECT_MODE_COUNT);
 	ufbxt_assert((uint32_t)camera->aperture_mode < (uint32_t)UFBX_APERTURE_MODE_COUNT);
 	ufbxt_assert((uint32_t)camera->gate_fit < (uint32_t)UFBX_GATE_FIT_COUNT);
 	ufbxt_assert((uint32_t)camera->aperture_format < (uint32_t)UFBX_APERTURE_FORMAT_COUNT);
+
+	if (camera->projection_mode == UFBX_PROJECTION_MODE_PERSPECTIVE) {
+		ufbxt_assert(camera->projection_plane.x == camera->field_of_view_tan.x);
+		ufbxt_assert(camera->projection_plane.y == camera->field_of_view_tan.y);
+	} else if (camera->projection_mode == UFBX_PROJECTION_MODE_ORTOGRAPHIC) {
+		ufbxt_assert(camera->projection_plane.x == camera->orthographic_size.x);
+		ufbxt_assert(camera->projection_plane.y == camera->orthographic_size.y);
+	} else {
+		ufbxt_assert(false && "Unhandled projection_mode");
+	}
 }
 
 static void ufbxt_check_bone(ufbx_scene *scene, ufbx_bone *bone)

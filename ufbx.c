@@ -4254,6 +4254,7 @@ static const char ufbxi_ByPolygon[] = "ByPolygon";
 static const char ufbxi_ByVertex[] = "ByVertex";
 static const char ufbxi_ByVertice[] = "ByVertice";
 static const char ufbxi_Cache[] = "Cache";
+static const char ufbxi_CameraProjectionType[] = "CameraProjectionType";
 static const char ufbxi_CameraStereo[] = "CameraStereo";
 static const char ufbxi_CameraSwitcher[] = "CameraSwitcher";
 static const char ufbxi_Camera[] = "Camera";
@@ -4400,8 +4401,9 @@ static const char ufbxi_ObjectType[] = "ObjectType";
 static const char ufbxi_Objects[] = "Objects";
 static const char ufbxi_Order[] = "Order";
 static const char ufbxi_OriginalUnitScaleFactor[] = "OriginalUnitScaleFactor";
-static const char ufbxi_OriginalUpAxisSign[] = "OriginalUpAxisSign";
 static const char ufbxi_OriginalUpAxis[] = "OriginalUpAxis";
+static const char ufbxi_OriginalUpAxisSign[] = "OriginalUpAxisSign";
+static const char ufbxi_OrthoZoom[] = "OrthoZoom";
 static const char ufbxi_OuterAngle[] = "OuterAngle";
 static const char ufbxi_PO[] = "PO\0";
 static const char ufbxi_PP[] = "PP\0";
@@ -4540,6 +4542,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_ByVertice, 9 },
 	{ ufbxi_Cache, 5 },
 	{ ufbxi_Camera, 6 },
+	{ ufbxi_CameraProjectionType, 20 },
 	{ ufbxi_CameraStereo, 12 },
 	{ ufbxi_CameraSwitcher, 14 },
 	{ ufbxi_CastLight, 9 },
@@ -4687,6 +4690,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_OriginalUnitScaleFactor, 23 },
 	{ ufbxi_OriginalUpAxis, 14 },
 	{ ufbxi_OriginalUpAxisSign, 18 },
+	{ ufbxi_OrthoZoom, 9 },
 	{ ufbxi_OuterAngle, 10 },
 	{ ufbxi_PO, 2 },
 	{ ufbxi_PP, 2 },
@@ -18324,7 +18328,8 @@ static const ufbxi_aperture_format ufbxi_aperture_formats[] = {
 
 ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 {
-	camera->aspect_mode = (ufbx_aspect_mode) ufbxi_find_enum(&camera->props, ufbxi_AspectRatioMode, 0, UFBX_ASPECT_MODE_FIXED_HEIGHT);
+	camera->projection_mode = (ufbx_projection_mode)ufbxi_find_enum(&camera->props, ufbxi_CameraProjectionType, 0, UFBX_PROJECTION_MODE_ORTOGRAPHIC);
+	camera->aspect_mode = (ufbx_aspect_mode)ufbxi_find_enum(&camera->props, ufbxi_AspectRatioMode, 0, UFBX_ASPECT_MODE_FIXED_HEIGHT);
 	camera->aperture_mode = (ufbx_aperture_mode)ufbxi_find_enum(&camera->props, ufbxi_ApertureMode, UFBX_APERTURE_MODE_VERTICAL, UFBX_APERTURE_MODE_FOCAL_LENGTH);
 	camera->aperture_format = (ufbx_aperture_format)ufbxi_find_enum(&camera->props, ufbxi_ApertureFormat, UFBX_APERTURE_FORMAT_CUSTOM, UFBX_APERTURE_FORMAT_IMAX);
 	camera->gate_fit = (ufbx_gate_fit)ufbxi_find_enum(&camera->props, ufbxi_GateFit, 0, UFBX_GATE_FIT_STRETCH);
@@ -18340,6 +18345,7 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 	ufbx_real fov_y = ufbxi_find_real(&camera->props, ufbxi_FieldOfViewY, 0.0f);
 
 	ufbx_real focal_length = ufbxi_find_real(&camera->props, ufbxi_FocalLength, 0.0f);
+	ufbx_real ortho_extent = (ufbx_real)30.0 * ufbxi_find_real(&camera->props, ufbxi_OrthoZoom, 1.0f);
 
 	ufbxi_aperture_format format = ufbxi_aperture_formats[camera->aperture_format];
 	ufbx_vec2 film_size = { (ufbx_real)format.film_size_x * (ufbx_real)0.001, (ufbx_real)format.film_size_y * (ufbx_real)0.001 };
@@ -18371,6 +18377,7 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 	camera->focal_length_mm = focal_length;
 	camera->film_size_inch = film_size;
 	camera->squeeze_ratio = squeeze_ratio;
+	camera->orthographic_extent = ortho_extent;
 
 	switch (camera->aspect_mode) {
 	case UFBX_ASPECT_MODE_WINDOW_SIZE:
@@ -18412,22 +18419,32 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 	switch (effective_fit) {
 	case UFBX_GATE_FIT_NONE:
 		camera->aperture_size_inch = camera->film_size_inch;
+		camera->orthographic_size.x = ortho_extent;
+		camera->orthographic_size.y = ortho_extent;
 		break;
 	case UFBX_GATE_FIT_VERTICAL:
 		camera->aperture_size_inch.x = camera->film_size_inch.y * aspect_ratio;
 		camera->aperture_size_inch.y = camera->film_size_inch.y;
+		camera->orthographic_size.x = ortho_extent * aspect_ratio;
+		camera->orthographic_size.y = ortho_extent;
 		break;
 	case UFBX_GATE_FIT_HORIZONTAL:
 		camera->aperture_size_inch.x = camera->film_size_inch.x;
 		camera->aperture_size_inch.y = camera->film_size_inch.x / aspect_ratio;
+		camera->orthographic_size.x = ortho_extent;
+		camera->orthographic_size.y = ortho_extent / aspect_ratio;
 		break;
 	case UFBX_GATE_FIT_FILL:
 	case UFBX_GATE_FIT_OVERSCAN:
 		camera->aperture_size_inch = camera->film_size_inch;
+		camera->orthographic_size.x = ortho_extent;
+		camera->orthographic_size.y = ortho_extent;
 		ufbx_assert(0 && "Unreachable, set to vertical/horizontal above");
 		break;
 	case UFBX_GATE_FIT_STRETCH:
 		camera->aperture_size_inch = camera->film_size_inch;
+		camera->orthographic_size.x = ortho_extent;
+		camera->orthographic_size.y = ortho_extent;
 		// TODO: Not sure what to do here...
 		break;
 	default:
@@ -18463,6 +18480,12 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 	default:
 		ufbx_assert(0 && "Unexpected aperture mode");
 		break;
+	}
+
+	if (camera->projection_mode == UFBX_PROJECTION_MODE_PERSPECTIVE) {
+		camera->projection_plane = camera->field_of_view_tan;
+	} else {
+		camera->projection_plane = camera->orthographic_size;
 	}
 }
 
