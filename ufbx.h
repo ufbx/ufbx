@@ -4173,6 +4173,68 @@ ufbx_inline size_t ufbx_check_index(size_t index, size_t count) {
 }
 #endif
 
+#if defined(__cplusplus) && (__cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1900))
+
+ufbx_inline void ufbx_retain(ufbx_scene *scene) { ufbx_retain_scene(scene); }
+ufbx_inline void ufbx_free(ufbx_scene *scene) { ufbx_free_scene(scene); }
+ufbx_inline void ufbx_retain(ufbx_mesh *mesh) { ufbx_retain_mesh(mesh); }
+ufbx_inline void ufbx_free(ufbx_mesh *mesh) { ufbx_free_mesh(mesh); }
+ufbx_inline void ufbx_retain(ufbx_line_curve *curve) { ufbx_retain_line_curve(curve); }
+ufbx_inline void ufbx_free(ufbx_line_curve *curve) { ufbx_free_line_curve(curve); }
+ufbx_inline void ufbx_retain(ufbx_geometry_cache *cache) { ufbx_retain_geometry_cache(cache); }
+ufbx_inline void ufbx_free(ufbx_geometry_cache *cache) { ufbx_free_geometry_cache(cache); }
+
+// RAII wrapper over refcounted ufbx types.
+// Behaves like `std::shared_ptr<T>`.
+template <typename T>
+struct ufbx_ref {
+	ufbx_ref() noexcept : ptr(nullptr) { }
+	explicit ufbx_ref(T *ptr) noexcept : ptr(ptr) { }
+	ufbx_ref(const ufbx_ref &ref) noexcept : ptr(ref.ptr) { ufbx_retain(ref.ptr); }
+	ufbx_ref(ufbx_ref &&ref) noexcept : ptr(ref.ptr) { ref.ptr = nullptr; }
+	~ufbx_ref() { ufbx_free(ptr); }
+
+	ufbx_ref &operator=(const ufbx_ref &ref) noexcept {
+		if (&ref == this) return *this;
+		ufbx_free(ptr);
+		ufbx_retain(ref.ptr);
+		ptr = ref.ptr;
+        return *this;
+	}
+
+	ufbx_ref &operator=(ufbx_ref &&ref) noexcept {
+		if (&ref == this) return *this;
+		ptr = ref.ptr;
+		ref.ptr = nullptr;
+        return *this;
+	}
+
+	void reset() noexcept {
+		ufbx_free(ptr);
+		ptr = nullptr;
+	}
+
+	void swap(ufbx_ref &ref) noexcept {
+		T *tmp = ptr;
+		ptr = ref.ptr;
+		ref.ptr = tmp;
+	}
+
+	T &operator*() const noexcept { return *ptr; }
+	T *operator->() const noexcept { return ptr; }
+	T *get() const noexcept { return ptr; }
+
+private:
+	T *ptr;
+};
+
+typedef ufbx_ref<ufbx_scene> ufbx_scene_ref;
+typedef ufbx_ref<ufbx_mesh> ufbx_mesh_ref;
+typedef ufbx_ref<ufbx_line_curve> ufbx_line_curve_ref;
+typedef ufbx_ref<ufbx_geometry_cache> ufbx_geometry_cache_ref;
+
+#endif
+
 #if defined(_MSC_VER)
 	#pragma warning(pop)
 #endif
