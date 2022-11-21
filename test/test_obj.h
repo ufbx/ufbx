@@ -1132,3 +1132,9 @@ UFBXT_FILE_TEST_OPTS(synthetic_filename_mtl, ufbxt_search_mtl_by_filename_opts)
 }
 #endif
 
+UFBXT_FILE_TEST_FLAGS(synthetic_missing_position, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+}
+#endif
+

@@ -17511,6 +17511,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->cache_deformers, &mesh->element, search_node, NULL, UFBX_ELEMENT_CACHE_DEFORMER));
 			ufbxi_check(ufbxi_fetch_deformers(uc, &mesh->all_deformers, &mesh->element, search_node));
 
+			// Vertex position must always exist if not explicitly allowed to be missing
+			if (!mesh->vertex_position.exists && !uc->opts.allow_missing_vertex_position) {
+				ufbxi_check(mesh->num_indices == 0);
+				mesh->vertex_position.exists = true;
+				mesh->vertex_position.unique_per_vertex = true;
+				mesh->skinned_position.exists = true;
+				mesh->skinned_position.unique_per_vertex = true;
+			}
+
 			// Update metadata
 			if (mesh->max_face_triangles > uc->scene.metadata.max_face_triangles) {
 				uc->scene.metadata.max_face_triangles = mesh->max_face_triangles;
@@ -20238,6 +20247,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 
 	if (uc->opts.allow_null_material) {
 		uc->scene.metadata.may_contain_null_materials = true;
+	}
+
+	if (uc->opts.allow_missing_vertex_position) {
+		uc->scene.metadata.may_contain_missing_vertex_position = true;
 	}
 
 	uc->scene.metadata.creator.data = ufbxi_empty_char;

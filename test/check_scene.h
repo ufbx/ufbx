@@ -135,9 +135,11 @@ static void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void 
 	}
 
 	// Check that the data at invalid index is valid and zero
-	char zero[32] = { 0 };
-	ufbxt_assert(elem_size <= 32);
-	ufbxt_assert(!memcmp((char*)elem->values.data - elem_size, zero, elem_size));
+	if (elem->indices.count > 0) {
+		char zero[32] = { 0 };
+		ufbxt_assert(elem_size <= 32);
+		ufbxt_assert(!memcmp((char*)elem->values.data - elem_size, zero, elem_size));
+	}
 }
 
 static void ufbxt_check_mesh_list_count(ufbx_scene *scene, ufbx_mesh *mesh, size_t count, size_t required_count, bool optional)
@@ -375,6 +377,10 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_assert(mesh->vertex_uv.value_reals == 2);
 	ufbxt_assert(mesh->vertex_color.value_reals == 4);
 	ufbxt_assert(mesh->vertex_crease.value_reals == 1);
+
+	if (!scene->metadata.may_contain_missing_vertex_position) {
+		ufbxt_assert(mesh->vertex_position.exists);
+	}
 
 	if (mesh->vertex_position.exists) {
 		ufbxt_assert(mesh->vertex_position.unique_per_vertex);
