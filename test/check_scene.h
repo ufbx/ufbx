@@ -322,6 +322,10 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 
 	ufbxt_assert((uint32_t)node->attrib_type < (uint32_t)UFBX_ELEMENT_TYPE_COUNT);
 	ufbxt_assert((uint32_t)node->inherit_type < (uint32_t)UFBX_INHERIT_TYPE_COUNT);
+
+	if (node->is_root) {
+		ufbxt_assert(!node->has_geometry_transform);
+	}
 }
 
 static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)

@@ -18247,6 +18247,8 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 		node->local_transform = ufbxi_get_transform(&node->props, node->rotation_order);
 		node->geometry_transform = ufbxi_get_geometry_transform(&node->props);
 		node->node_to_parent = ufbx_transform_to_matrix(&node->local_transform); 
+	} else {
+		node->geometry_transform = ufbx_identity_transform;
 	}
 
 	ufbx_node *parent = node->parent;
