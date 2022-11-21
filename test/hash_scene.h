@@ -424,6 +424,7 @@ ufbxt_noinline static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v
 	ufbxt_hash_list(h, v->all_attribs, ufbxt_hash_element_ref_imp);
 	ufbxt_hash_pod(h, v->inherit_type);
 	ufbxt_hash_transform(h, v->local_transform);
+	ufbxt_hash_pod(h, v->has_geometry_transform);
 	ufbxt_hash_transform(h, v->geometry_transform);
 	ufbxt_hash_pod(h, v->rotation_order);
 	ufbxt_hash_vec3(h, v->euler_rotation);
@@ -958,7 +959,8 @@ ufbxt_noinline static void ufbxt_hash_texture_imp(ufbxt_hash *h, const ufbx_text
 	ufbxt_hash_string(h, v->uv_set);
 	ufbxt_hash_pod(h, v->wrap_u);
 	ufbxt_hash_pod(h, v->wrap_v);
-	ufbxt_hash_transform(h, v->transform);
+	ufbxt_hash_pod(h, v->has_uv_transform);
+	ufbxt_hash_transform(h, v->uv_transform);
 	ufbxt_hash_matrix(h, v->texture_to_uv);
 	ufbxt_hash_matrix(h, v->uv_to_texture);
 
