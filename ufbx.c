@@ -4298,10 +4298,10 @@ static const char ufbxi_EdgeIndexArray[] = "EdgeIndexArray";
 static const char ufbxi_Edges[] = "Edges";
 static const char ufbxi_EmissiveColor[] = "EmissiveColor";
 static const char ufbxi_Entry[] = "Entry";
-static const char ufbxi_FarPlane[] = "FarPlane";
 static const char ufbxi_FBXHeaderExtension[] = "FBXHeaderExtension";
 static const char ufbxi_FBXVersion[] = "FBXVersion";
 static const char ufbxi_FKEffector[] = "FKEffector";
+static const char ufbxi_FarPlane[] = "FarPlane";
 static const char ufbxi_FbxPropertyEntry[] = "FbxPropertyEntry";
 static const char ufbxi_FbxSemanticEntry[] = "FbxSemanticEntry";
 static const char ufbxi_FieldOfViewX[] = "FieldOfViewX";
@@ -4587,10 +4587,10 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Edges, 5 },
 	{ ufbxi_EmissiveColor, 13 },
 	{ ufbxi_Entry, 5 },
-	{ ufbxi_FarPlane, 8 },
 	{ ufbxi_FBXHeaderExtension, 18 },
 	{ ufbxi_FBXVersion, 10 },
 	{ ufbxi_FKEffector, 10 },
+	{ ufbxi_FarPlane, 8 },
 	{ ufbxi_FbxPropertyEntry, 16 },
 	{ ufbxi_FbxSemanticEntry, 16 },
 	{ ufbxi_FieldOfView, 11 },
