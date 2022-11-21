@@ -18581,11 +18581,13 @@ ufbxi_noinline static void ufbxi_update_material(ufbx_scene *scene, ufbx_materia
 
 ufbxi_noinline static void ufbxi_update_texture(ufbx_texture *texture)
 {
-	texture->transform = ufbxi_get_texture_transform(&texture->props);
-	if (!ufbxi_is_transform_identity(texture->transform)) {
-		texture->texture_to_uv = ufbx_transform_to_matrix(&texture->transform);
+	texture->uv_transform = ufbxi_get_texture_transform(&texture->props);
+	if (!ufbxi_is_transform_identity(texture->uv_transform)) {
+		texture->has_uv_transform = true;
+		texture->texture_to_uv = ufbx_transform_to_matrix(&texture->uv_transform);
 		texture->uv_to_texture = ufbx_matrix_invert(&texture->texture_to_uv);
 	} else {
+		texture->has_uv_transform = false;
 		texture->texture_to_uv = ufbx_identity_matrix;
 		texture->uv_to_texture = ufbx_identity_matrix;
 	}

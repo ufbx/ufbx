@@ -902,9 +902,9 @@ UFBXT_FILE_TEST(maya_texture_layers)
 		ufbx_texture *texture = material->fbx.emission_color.texture;
 		ufbxt_assert(texture);
 		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_emissive.png"));
-		ufbxt_assert_close_real(err, texture->transform.translation.x, 1.0f);
-		ufbxt_assert_close_real(err, texture->transform.translation.y, 2.0f);
-		ufbxt_assert_close_real(err, texture->transform.translation.z, 0.0f);
+		ufbxt_assert_close_real(err, texture->uv_transform.translation.x, 1.0f);
+		ufbxt_assert_close_real(err, texture->uv_transform.translation.y, 2.0f);
+		ufbxt_assert_close_real(err, texture->uv_transform.translation.z, 0.0f);
 
 		ufbx_vec3 uv = { 0.5f, 0.5f, 0.0f };
 		uv = ufbx_transform_position(&texture->uv_to_texture, uv);
@@ -917,10 +917,10 @@ UFBXT_FILE_TEST(maya_texture_layers)
 		ufbx_texture *texture = material->fbx.transparency_color.texture;
 		ufbxt_assert(texture);
 		ufbxt_assert(!strcmp(texture->relative_filename.data, "textures\\checkerboard_transparency.png"));
-		ufbxt_assert_close_real(err, texture->transform.translation.x, 0.5f);
-		ufbxt_assert_close_real(err, texture->transform.translation.y, -0.20710678f);
-		ufbxt_assert_close_real(err, texture->transform.translation.z, 0.0f);
-		ufbx_vec3 euler = ufbx_quat_to_euler(texture->transform.rotation, UFBX_ROTATION_XYZ);
+		ufbxt_assert_close_real(err, texture->uv_transform.translation.x, 0.5f);
+		ufbxt_assert_close_real(err, texture->uv_transform.translation.y, -0.20710678f);
+		ufbxt_assert_close_real(err, texture->uv_transform.translation.z, 0.0f);
+		ufbx_vec3 euler = ufbx_quat_to_euler(texture->uv_transform.rotation, UFBX_ROTATION_XYZ);
 		ufbxt_assert_close_real(err, euler.x, 0.0f);
 		ufbxt_assert_close_real(err, euler.y, 0.0f);
 		ufbxt_assert_close_real(err, euler.z, 45.0f);

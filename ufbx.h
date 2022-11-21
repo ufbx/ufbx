@@ -2444,9 +2444,10 @@ struct ufbx_texture {
 	ufbx_wrap_mode wrap_v;
 
 	// UV transform
-	ufbx_transform transform;  // < Texture transformation in UV space
-	ufbx_matrix texture_to_uv; // < Matrix representation of `transform`
-	ufbx_matrix uv_to_texture; // < UV coordinate to normalized texture coordinate matrix
+	bool has_uv_transform;       // < Has a non-identity `transform` and derived matrices.
+	ufbx_transform uv_transform; // < Texture transformation in UV space
+	ufbx_matrix texture_to_uv;   // < Matrix representation of `transform`
+	ufbx_matrix uv_to_texture;   // < UV coordinate to normalized texture coordinate matrix
 };
 
 // TODO: Video textures
