@@ -4213,8 +4213,6 @@ ufbx_inline size_t ufbx_check_index(size_t index, size_t count) {
 
 #if defined(__cplusplus) && (__cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1900))
 
-#if 0
-
 ufbx_inline void ufbx_retain(ufbx_scene *scene) { ufbx_retain_scene(scene); }
 ufbx_inline void ufbx_free(ufbx_scene *scene) { ufbx_free_scene(scene); }
 ufbx_inline void ufbx_retain(ufbx_mesh *mesh) { ufbx_retain_mesh(mesh); }
@@ -4272,8 +4270,6 @@ typedef ufbx_ref<ufbx_scene> ufbx_scene_ref;
 typedef ufbx_ref<ufbx_mesh> ufbx_mesh_ref;
 typedef ufbx_ref<ufbx_line_curve> ufbx_line_curve_ref;
 typedef ufbx_ref<ufbx_geometry_cache> ufbx_geometry_cache_ref;
-
-#endif
 
 #endif
 
