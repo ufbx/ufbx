@@ -1231,6 +1231,15 @@ struct ufbx_camera {
 	// Equal to `field_of_view_tan` if perspective, `orthographic_size` if orthographic.
 	ufbx_vec2 projection_plane;
 
+    // Aspect ratio of the camera.
+    ufbx_real aspect_ratio;
+
+    // Near plane of the frustum in units from the camera.
+    ufbx_real near_plane;
+
+    // Far plane of the frustum in units from the camera.
+    ufbx_real far_plane;
+
 	// Advanced properties used to compute the above
 	ufbx_aspect_mode aspect_mode;
 	ufbx_aperture_mode aperture_mode;

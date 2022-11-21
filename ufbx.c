@@ -4298,6 +4298,7 @@ static const char ufbxi_EdgeIndexArray[] = "EdgeIndexArray";
 static const char ufbxi_Edges[] = "Edges";
 static const char ufbxi_EmissiveColor[] = "EmissiveColor";
 static const char ufbxi_Entry[] = "Entry";
+static const char ufbxi_FarPlane[] = "FarPlane";
 static const char ufbxi_FBXHeaderExtension[] = "FBXHeaderExtension";
 static const char ufbxi_FBXVersion[] = "FBXVersion";
 static const char ufbxi_FKEffector[] = "FKEffector";
@@ -4383,6 +4384,7 @@ static const char ufbxi_Matrix[] = "Matrix";
 static const char ufbxi_Mesh[] = "Mesh";
 static const char ufbxi_Model[] = "Model";
 static const char ufbxi_Name[] = "Name";
+static const char ufbxi_NearPlane[] = "NearPlane";
 static const char ufbxi_NodeAttributeName[] = "NodeAttributeName";
 static const char ufbxi_NodeAttribute[] = "NodeAttribute";
 static const char ufbxi_Node[] = "Node";
@@ -4585,6 +4587,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Edges, 5 },
 	{ ufbxi_EmissiveColor, 13 },
 	{ ufbxi_Entry, 5 },
+	{ ufbxi_FarPlane, 8 },
 	{ ufbxi_FBXHeaderExtension, 18 },
 	{ ufbxi_FBXVersion, 10 },
 	{ ufbxi_FKEffector, 10 },
@@ -4670,6 +4673,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Mesh, 4 },
 	{ ufbxi_Model, 5 },
 	{ ufbxi_Name, 4 },
+	{ ufbxi_NearPlane, 9 },
 	{ ufbxi_Node, 4 },
 	{ ufbxi_NodeAttribute, 13 },
 	{ ufbxi_NodeAttributeName, 17 },
@@ -18334,6 +18338,9 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 	camera->aperture_format = (ufbx_aperture_format)ufbxi_find_enum(&camera->props, ufbxi_ApertureFormat, UFBX_APERTURE_FORMAT_CUSTOM, UFBX_APERTURE_FORMAT_IMAX);
 	camera->gate_fit = (ufbx_gate_fit)ufbxi_find_enum(&camera->props, ufbxi_GateFit, 0, UFBX_GATE_FIT_STRETCH);
 
+    camera->near_plane = ufbxi_find_real(&camera->props, ufbxi_NearPlane, 0.0f);
+    camera->far_plane = ufbxi_find_real(&camera->props, ufbxi_FarPlane, 0.0f);
+
 	// Search both W/H and Width/Height but prefer the latter
 	ufbx_real aspect_x = ufbxi_find_real(&camera->props, ufbxi_AspectW, 0.0f);
 	ufbx_real aspect_y = ufbxi_find_real(&camera->props, ufbxi_AspectH, 0.0f);
@@ -18408,6 +18415,8 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 
 	ufbx_real aspect_ratio = camera->resolution.x / camera->resolution.y;
 	ufbx_real film_ratio = film_size.x / film_size.y;
+
+    camera->aspect_ratio = aspect_ratio;
 
 	ufbx_gate_fit effective_fit = camera->gate_fit;
 	if (effective_fit == UFBX_GATE_FIT_FILL) {
