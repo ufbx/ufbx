@@ -5692,7 +5692,7 @@ static size_t ufbxi_memory_read(void *user, void *data, size_t max_size)
 static bool ufbxi_memory_skip(void *user, size_t size)
 {
 	ufbxi_memory_stream *stream = (ufbxi_memory_stream*)user;
-    if (stream->position + size >= stream->size) return false;
+    if (stream->size - stream->position < size) return false;
     stream->position += size;
     return true;
 }
@@ -16321,7 +16321,7 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 		ufbx_material_map *glossiness = &material->pbr.maps[remap->glossiness_map];
 		if (material->features.features[remap->feature].enabled) {
 			*glossiness = *roughness;
-			memset(roughness, 0, sizeof(*roughness));
+			memset(roughness, 0, sizeof(ufbx_material_map));
 			if (glossiness->has_value) {
 				roughness->value_real = 1.0f - glossiness->value_real;
 			}
@@ -24260,15 +24260,16 @@ ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t dat
         memset(&local_opts, 0, sizeof(local_opts));
         opts = &local_opts;
     }
+	ufbx_assert(opts->_begin_zero == 0 && opts->_end_zero == 0);
 
     ufbx_error local_error = { UFBX_ERROR_NONE };
-    ufbxi_allocator ator;
+	ufbxi_allocator ator = { 0 };
     ufbxi_init_ator(&local_error, &ator, &opts->allocator, "memory");
 
     size_t copy_size = opts->no_copy ? 0 : data_size;
 
     // Align the allocation size to 8 bytes to make sure the header is aligned.
-    size_t self_size = ufbxi_align_to_mask(sizeof(ufbxi_memory_stream) + copy_size, ~(size_t)7);
+    size_t self_size = ufbxi_align_to_mask(sizeof(ufbxi_memory_stream) + copy_size, 7);
 
     void *memory = ufbxi_alloc(&ator, char, self_size);
     if (!memory) {
@@ -24277,9 +24278,15 @@ ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t dat
     }
 
     ufbxi_memory_stream *mem = (ufbxi_memory_stream*)memory;
-    mem->size = data_size;
+	memset(mem, 0, sizeof(ufbxi_memory_stream));
 
-    if (!opts->no_copy) {
+    mem->size = data_size;
+	mem->self_size = self_size;
+	mem->close_cb = opts->close_cb;
+
+    if (opts->no_copy) {
+		mem->data = data;
+	} else {
         memcpy(mem->data_copy, data, data_size);
         mem->data = mem->data_copy;
     }
