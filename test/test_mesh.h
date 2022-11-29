@@ -1018,3 +1018,20 @@ UFBXT_FILE_TEST(synthetic_face_group_id)
 }
 #endif
 
+UFBXT_FILE_TEST(blender_279_empty_cube)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 0);
+	ufbxt_assert(mesh->num_indices == 0);
+	ufbxt_assert(mesh->num_vertices == 0);
+
+	ufbxt_assert(mesh->materials.count == 1);
+	ufbxt_assert(mesh->materials.data[0].material);
+	ufbxt_assert(mesh->materials.data[0].num_faces == 0);
+}
+#endif
+
