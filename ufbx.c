@@ -39,8 +39,14 @@
 	#if !defined(UFBX_NO_SCENE_EVALUATION)
 		#define UFBXI_FEATURE_SCENE_EVALUATION 1
 	#endif
+	#if !defined(UFBX_NO_SKINNING_EVALUATION)
+		#define UFBXI_FEATURE_SKINNING_EVALUATION 1
+	#endif
 	#if !defined(UFBX_NO_TRIANGULATION)
 		#define UFBXI_FEATURE_TRIANGULATION 1
+	#endif
+	#if !defined(UFBX_NO_INDEX_GENERATION)
+		#define UFBXI_FEATURE_INDEX_GENERATION 1
 	#endif
 	#if !defined(UFBX_NO_FORMAT_OBJ)
 		#define UFBXI_FEATURE_FORMAT_OBJ 1
@@ -65,8 +71,14 @@
 #if !defined(UFBXI_FEATURE_SCENE_EVALUATION) && defined(UFBX_ENABLE_SCENE_EVALUATION)
 	#define UFBXI_FEATURE_SCENE_EVALUATION 1
 #endif
+#if !defined(UFBXI_FEATURE_SKINNING_EVALUATION) && defined(UFBX_ENABLE_SKINNING_EVALUATION)
+	#define UFBXI_FEATURE_SKINNING_EVALUATION 1
+#endif
 #if !defined(UFBXI_FEATURE_TRIANGULATION) && defined(UFBX_ENABLE_TRIANGULATION)
 	#define UFBXI_FEATURE_TRIANGULATION 1
+#endif
+#if !defined(UFBXI_FEATURE_INDEX_GENERATION) && defined(UFBX_ENABLE_INDEX_GENERATION)
+	#define UFBXI_FEATURE_INDEX_GENERATION 1
 #endif
 #if !defined(UFBXI_FEATURE_FORMAT_OBJ) && defined(UFBX_ENABLE_FORMAT_OBJ)
 	#define UFBXI_FEATURE_FORMAT_OBJ 1
@@ -87,8 +99,14 @@
 #if !defined(UFBXI_FEATURE_SCENE_EVALUATION)
 	#define UFBXI_FEATURE_SCENE_EVALUATION 0
 #endif
+#if !defined(UFBXI_FEATURE_SKINNING_EVALUATION)
+	#define UFBXI_FEATURE_SKINNING_EVALUATION 0
+#endif
 #if !defined(UFBXI_FEATURE_TRIANGULATION)
 	#define UFBXI_FEATURE_TRIANGULATION 0
+#endif
+#if !defined(UFBXI_FEATURE_INDEX_GENERATION)
+	#define UFBXI_FEATURE_INDEX_GENERATION 0
 #endif
 #if !defined(UFBXI_FEATURE_FORMAT_OBJ)
 	#define UFBXI_FEATURE_FORMAT_OBJ 0
@@ -117,7 +135,7 @@
 	#define UFBXI_FEATURE_KD 0
 #endif
 
-#if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_SPATIAL || !UFBXI_FEATURE_KD
+#if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_SKINNING_EVALUATION || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_INDEX_GENERATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_SPATIAL || !UFBXI_FEATURE_KD
 	#define UFBXI_PARTIAL_FEATURES 1
 #endif
 
@@ -202,7 +220,7 @@
 	#define ufbxi_noinline __declspec(noinline)
 	#define ufbxi_forceinline __forceinline
 	#define ufbxi_restrict __restrict
-	#if defined(__cplusplus) && _MSC_VER >= 1900
+	#if defined(__cplusplus) && _MSC_VER >= 1900 && defined(_MSVC_LANG) && _MSVC_LANG >= 201703L
 		#define ufbxi_nodiscard [[nodiscard]]
 	#elif defined(_Check_return_)
 		#define ufbxi_nodiscard _Check_return_
@@ -253,6 +271,10 @@
 	#if defined(UFBX_STANDARD_C)
 		#pragma warning(disable: 4996) // 'fopen': This function or variable may be unsafe. Consider using fopen_s instead.
 	#endif
+	#if defined(UFBXI_PARTIAL_FEATURES)
+	    #pragma warning(disable: 4100) // 'name': unreferenced formal parameter
+        #pragma warning(disable: 4505) // 'func': unreferenced function with internal linkage has been removed
+    #endif
 #endif
 
 #if defined(__clang__)
@@ -5633,6 +5655,48 @@ static void ufbxi_file_close(void *user)
 {
 	FILE *file = (FILE*)user;
 	fclose(file);
+}
+
+typedef struct {
+    const void *data;
+    size_t size;
+    size_t position;
+    ufbx_close_memory_cb close_cb;
+
+    // Own allocation information
+    size_t self_size;
+    ufbxi_allocator ator;
+    ufbx_error error;
+    char data_copy[];
+} ufbxi_memory_stream;
+
+static size_t ufbxi_memory_read(void *user, void *data, size_t max_size)
+{
+	ufbxi_memory_stream *stream = (ufbxi_memory_stream*)user;
+    size_t to_read = ufbxi_min_sz(stream->size - stream->position, max_size);
+    memcpy(data, (const char*)stream->data + stream->position, to_read);
+    stream->position += to_read;
+    return to_read;
+}
+
+static bool ufbxi_memory_skip(void *user, size_t size)
+{
+	ufbxi_memory_stream *stream = (ufbxi_memory_stream*)user;
+    if (stream->position + size >= stream->size) return false;
+    stream->position += size;
+    return true;
+}
+
+static void ufbxi_memory_close(void *user)
+{
+	ufbxi_memory_stream *stream = (ufbxi_memory_stream*)user;
+    if (stream->close_cb.fn) {
+        stream->close_cb.fn(stream->close_cb.user, (void*)stream->data, stream->size);
+    }
+
+    ufbxi_allocator ator = stream->ator;
+    ufbxi_free_size(&ator, stream->self_size, stream, 1);
+    ufbxi_free_ator(&ator);
 }
 
 // -- XML
@@ -13355,6 +13419,56 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_
 	return 1;
 }
 
+// Open file utility
+
+static void *ufbxi_ator_alloc(void *user, size_t size)
+{
+    ufbxi_allocator *ator = (ufbxi_allocator*)user;
+    return ufbxi_alloc(ator, char, size);
+}
+
+static void *ufbxi_ator_realloc(void *user, void *old_ptr, size_t old_size, size_t new_size)
+{
+    ufbxi_allocator *ator = (ufbxi_allocator*)user;
+    return ufbxi_realloc(ator, char, old_ptr, old_size, new_size);
+}
+
+static void ufbxi_ator_free(void *user, void *ptr, size_t size)
+{
+    ufbxi_allocator *ator = (ufbxi_allocator*)user;
+    ufbxi_free(ator, char, ptr, size);
+}
+
+static ufbxi_noinline void ufbxi_setup_ator_allocator(ufbx_allocator *allocator, ufbxi_allocator *ator)
+{
+    allocator->alloc_fn = &ufbxi_ator_alloc;
+    allocator->realloc_fn = &ufbxi_ator_realloc;
+    allocator->free_fn = &ufbxi_ator_free;
+    allocator->user = ator;
+}
+
+static ufbxi_noinline bool ufbxi_open_file(const ufbx_open_file_cb *cb, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_blob *original_filename, ufbxi_allocator *ator, ufbx_open_file_type type)
+{
+    if (!cb || !cb->fn) return false;
+
+    ufbx_open_file_info info;
+    if (ator) {
+        ufbxi_setup_ator_allocator(&info.temp_allocator, ator);
+    } else {
+        memset(&info.temp_allocator, 0, sizeof(info.temp_allocator));
+    }
+
+    if (original_filename) {
+        info.original_filename = *original_filename;
+    } else {
+        info.original_filename.data = path;
+        info.original_filename.size = path_len;
+    }
+    info.type = type;
+
+    return cb->fn(cb->user, stream, path, path_len, &info);
+}
+
 #define ufbxi_patch_zero(dst, src) do { \
 		ufbx_assert((dst) == 0 || (dst) == (src)); \
 		(dst) = (src); \
@@ -14599,12 +14713,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 
 	if (uc->opts.open_file_cb.fn) {
 		if (uc->opts.obj_mtl_path.length > 0) {
-			has_stream = uc->opts.open_file_cb.fn(uc->opts.open_file_cb.user, &stream, uc->opts.obj_mtl_path.data, uc->opts.obj_mtl_path.length);
+			has_stream = ufbxi_open_file(&uc->opts.open_file_cb, &stream, uc->opts.obj_mtl_path.data, uc->opts.obj_mtl_path.length, NULL, &uc->ator_tmp, UFBX_OPEN_FILE_OBJ_MTL);
 		} else {
 			if (uc->obj.mtllib_relative_path.size > 0) {
 				ufbx_blob dst;
 				ufbxi_check(ufbxi_resolve_relative_filename(uc, (ufbxi_strblob*)&dst, (const ufbxi_strblob*)&uc->obj.mtllib_relative_path, true));
-				has_stream = uc->opts.open_file_cb.fn(uc->opts.open_file_cb.user, &stream, (const char*)dst.data, dst.size);
+				has_stream = ufbxi_open_file(&uc->opts.open_file_cb, &stream, (const char*)dst.data, dst.size, &uc->obj.mtllib_relative_path, &uc->ator_tmp, UFBX_OPEN_FILE_OBJ_MTL);
 			}
 		}
 
@@ -14617,7 +14731,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 				copy[path.length - 3] = copy[path.length - 3] == 'O' ? 'M' : 'm';
 				copy[path.length - 2] = copy[path.length - 2] == 'B' ? 'T' : 't';
 				copy[path.length - 1] = copy[path.length - 1] == 'J' ? 'L' : 'l';
-				has_stream = uc->opts.open_file_cb.fn(uc->opts.open_file_cb.user, &stream, copy, path.length);
+				has_stream = ufbxi_open_file(&uc->opts.open_file_cb, &stream, copy, path.length, NULL, &uc->ator_tmp, UFBX_OPEN_FILE_OBJ_MTL);
 			}
 		}
 	}
@@ -14657,12 +14771,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_mtl_load(ufbxi_context *uc)
 #else
 ufbxi_nodiscard static ufbxi_forceinline int ufbxi_obj_load(ufbxi_context *uc)
 {
+	ufbxi_fmt_err_info(&uc->error, "UFBX_ENABLE_FORMAT_OBJ");
 	ufbxi_fail_msg("UFBXI_FEATURE_FORMAT_OBJ", "Feature disabled");
 	return 0;
 }
 
 ufbxi_nodiscard static ufbxi_forceinline int ufbxi_mtl_load(ufbxi_context *uc)
 {
+	ufbxi_fmt_err_info(&uc->error, "UFBX_ENABLE_FORMAT_OBJ");
 	ufbxi_fail_msg("UFBXI_FEATURE_FORMAT_OBJ", "Feature disabled");
 	return 0;
 }
@@ -15880,6 +15996,7 @@ static const ufbxi_shader_mapping ufbxi_obj_features[] = {
 };
 
 enum {
+	UFBXI_MAT_PBR = 1 << UFBX_MATERIAL_FEATURE_PBR,
 	UFBXI_MAT_METALNESS = 1 << UFBX_MATERIAL_FEATURE_METALNESS,
 	UFBXI_MAT_DIFFUSE = 1 << UFBX_MATERIAL_FEATURE_DIFFUSE,
 	UFBXI_MAT_SPECULAR = 1 << UFBX_MATERIAL_FEATURE_SPECULAR,
@@ -15920,19 +16037,19 @@ static const ufbxi_shader_mapping_list ufbxi_shader_pbr_mappings[] = {
 	{ // UFBX_SHADER_OSL_STANDARD_SURFACE
 		ufbxi_osl_standard_shader_pbr_mapping, ufbxi_arraycount(ufbxi_osl_standard_shader_pbr_mapping),
 		ufbxi_osl_standard_shader_features, ufbxi_arraycount(ufbxi_osl_standard_shader_features),
-		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_SPECULAR | UFBXI_MAT_COAT
+		(uint32_t)(UFBXI_MAT_PBR | UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_SPECULAR | UFBXI_MAT_COAT
 			| UFBXI_MAT_SHEEN | UFBXI_MAT_TRANSMISSION | UFBXI_MAT_OPACITY | UFBXI_MAT_IOR | UFBXI_MAT_DIFFUSE_ROUGHNESS),
 	},
 	{ // UFBX_SHADER_ARNOLD_STANDARD_SURFACE
 		ufbxi_arnold_shader_pbr_mapping, ufbxi_arraycount(ufbxi_arnold_shader_pbr_mapping),
 		ufbxi_arnold_shader_features, ufbxi_arraycount(ufbxi_arnold_shader_features),
-		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_SPECULAR | UFBXI_MAT_COAT
+		(uint32_t)(UFBXI_MAT_PBR | UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_SPECULAR | UFBXI_MAT_COAT
 			| UFBXI_MAT_SHEEN | UFBXI_MAT_TRANSMISSION | UFBXI_MAT_OPACITY | UFBXI_MAT_IOR | UFBXI_MAT_DIFFUSE_ROUGHNESS),
 	},
 	{ // UFBX_SHADER_3DS_MAX_PHYSICAL_MATERIAL
 		ufbxi_3ds_max_physical_material_pbr_mapping, ufbxi_arraycount(ufbxi_3ds_max_physical_material_pbr_mapping),
 		ufbxi_3ds_max_physical_material_features, ufbxi_arraycount(ufbxi_3ds_max_physical_material_features),
-		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_COAT
+		(uint32_t)(UFBXI_MAT_PBR | UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_COAT
 			| UFBXI_MAT_SHEEN | UFBXI_MAT_TRANSMISSION | UFBXI_MAT_OPACITY | UFBXI_MAT_IOR),
 		{ NULL, 0 }, ufbxi_string_literal("_map"),    // texture_prefix/suffix
 		{ NULL, 0 }, ufbxi_string_literal("_map_on"), // texture_enabled_prefix/suffix
@@ -15940,35 +16057,35 @@ static const ufbxi_shader_mapping_list ufbxi_shader_pbr_mappings[] = {
 	{ // UFBX_SHADER_3DS_MAX_PBR_METAL_ROUGH
 		ufbxi_3ds_max_pbr_metal_rough_pbr_mapping, ufbxi_arraycount(ufbxi_3ds_max_pbr_metal_rough_pbr_mapping),
 		NULL, 0,
-		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_OPACITY),
+		(uint32_t)(UFBXI_MAT_PBR | UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_OPACITY),
 		{ NULL, 0 }, ufbxi_string_literal("_map"), // texture_prefix/suffix
 		{ NULL, 0 }, { NULL, 0 }, // texture_enabled_prefix/suffix
 	},
 	{ // UFBX_SHADER_3DS_MAX_PBR_SPEC_GLOSS
 		ufbxi_3ds_max_pbr_spec_gloss_pbr_mapping, ufbxi_arraycount(ufbxi_3ds_max_pbr_spec_gloss_pbr_mapping),
 		NULL, 0,
-		(uint32_t)(UFBXI_MAT_SPECULAR | UFBXI_MAT_DIFFUSE | UFBXI_MAT_OPACITY),
+		(uint32_t)(UFBXI_MAT_PBR | UFBXI_MAT_SPECULAR | UFBXI_MAT_DIFFUSE | UFBXI_MAT_OPACITY),
 		{ NULL, 0 }, ufbxi_string_literal("_map"), // texture_prefix/suffix
 		{ NULL, 0 }, { NULL, 0 }, // texture_enabled_prefix/suffix
 	},
 	{ // UFBX_SHADER_GLTF_MATERIAL
 		ufbxi_gltf_material_pbr_mapping, ufbxi_arraycount(ufbxi_gltf_material_pbr_mapping),
 		ufbxi_gltf_material_features, ufbxi_arraycount(ufbxi_gltf_material_features),
-		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_EMISSION | UFBXI_MAT_OPACITY | UFBXI_MAT_AMBIENT_OCCLUSION),
+		(uint32_t)(UFBXI_MAT_PBR | UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_EMISSION | UFBXI_MAT_OPACITY | UFBXI_MAT_AMBIENT_OCCLUSION),
 		{ NULL, 0 }, ufbxi_string_literal("Map"), // texture_prefix/suffix
 		{ NULL, 0 }, { NULL, 0 }, // texture_enabled_prefix/suffix
 	},
 	{ // UFBX_SHADER_SHADERFX_GRAPH
 		ufbxi_shaderfx_graph_pbr_mapping, ufbxi_arraycount(ufbxi_shaderfx_graph_pbr_mapping),
 		NULL, 0,
-		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_EMISSION | UFBXI_MAT_AMBIENT_OCCLUSION),
+		(uint32_t)(UFBXI_MAT_PBR | UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_EMISSION | UFBXI_MAT_AMBIENT_OCCLUSION),
 		ufbxi_string_literal("TEX_"), ufbxi_string_literal("_map"), // texture_prefix/suffix
 		ufbxi_string_literal("use_"), ufbxi_string_literal("_map"), // texture_enabled_prefix/suffix
 	}, 
 	{ // UFBX_SHADER_BLENDER_PHONG
 		ufbxi_blender_phong_shader_pbr_mapping, ufbxi_arraycount(ufbxi_blender_phong_shader_pbr_mapping),
 		NULL, 0,
-		(uint32_t)(UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_EMISSION),
+		(uint32_t)(UFBXI_MAT_PBR | UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_EMISSION),
 	},
 	{ // UFBX_SHADER_WAVEFRONT_MTL
 		ufbxi_obj_pbr_mapping, ufbxi_arraycount(ufbxi_obj_pbr_mapping),
@@ -17464,7 +17581,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			if (mesh->materials.count > 0) {
 				ufbxi_for_ptr_list(ufbx_node, p_node, mesh->instances) {
 					ufbx_node *node = *p_node;
-					if (node->materials.count < mesh->materials.count) {
+					if (node->materials.count < mesh->materials.count && mesh->materials.data[0].material != NULL) {
 						ufbx_material **materials = ufbxi_push(&uc->result, ufbx_material*, mesh->materials.count);
 						ufbxi_check(materials);
 						ufbxi_nounroll for (size_t i = 0; i < node->materials.count; i++) {
@@ -17822,7 +17939,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				if (mat_tex.material_id != prev_material) {
 					if (prev_material >= 0 && num_textures_in_material > 0) {
 						ufbx_material *mat = mesh->materials.data[prev_material].material;
-						if (mat->textures.count == 0) {
+						if (mat && mat->textures.count == 0) {
 							ufbx_material_texture *texs = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_material_texture, num_textures_in_material);
 							ufbxi_check(texs);
 							mat->textures.data = texs;
@@ -19442,11 +19559,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_file(ufbxi_cache_cont
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_try_open_file(ufbxi_cache_context *cc, ufbx_string filename, bool *p_found)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_try_open_file(ufbxi_cache_context *cc, ufbx_string filename, const ufbx_blob *original_filename, bool *p_found)
 {
 	memset(&cc->stream, 0, sizeof(cc->stream));
 	ufbxi_regression_assert(strlen(filename.data) == filename.length);
-	if (!cc->open_file_cb.fn(cc->open_file_cb.user, &cc->stream, filename.data, filename.length)) {
+	if (!ufbxi_open_file(&cc->open_file_cb, &cc->stream, filename.data, filename.length, original_filename, cc->ator_tmp, UFBX_OPEN_FILE_GEOMETRY_CACHE)) {
 		return 1;
 	}
 
@@ -19495,7 +19612,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cac
 	if (cc->xml_type == UFBXI_CACHE_XML_TYPE_SINGLE_FILE) {
 		filename.length = prefix_len + (size_t)ufbxi_snprintf(suffix_data, suffix_len, ".%s", extension);
 		bool found = false;
-		ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, &found));
+		ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, NULL, &found));
 	} else if (cc->xml_type == UFBXI_CACHE_XML_TYPE_FILE_PER_FRAME) {
 		uint32_t lowest_time = 0;
 		for (;;) {
@@ -19529,7 +19646,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cac
 				filename.length = prefix_len + (size_t)ufbxi_snprintf(suffix_data, suffix_len, "Frame%uTick%u.%s", frame, tick, extension);
 			}
 			bool found = false;
-			ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, &found));
+			ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, NULL, &found));
 
 			// Update channel status
 			ufbxi_for(ufbxi_cache_tmp_channel, chan, cc->channels, cc->num_channels) {
@@ -19636,7 +19753,7 @@ static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_str
 	cc->channel_name.data = ufbxi_empty_char;
 
 	if (!cc->open_file_cb.fn) {
-		cc->open_file_cb.fn = ufbx_open_file;
+		cc->open_file_cb.fn = ufbx_default_open_file;
 	}
 
 	// Make sure the filename we pass to `open_file_fn()` is NULL-terminated
@@ -19648,7 +19765,7 @@ static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_str
 
 	// TODO: NULL termination!
 	bool found = false;
-	ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename_copy, &found));
+	ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename_copy, NULL, &found));
 	if (!found) {
 		ufbxi_set_err_info(&cc->error, filename.data, filename.length);
 		ufbxi_fail_err_msg(&cc->error, "open_file_fn()", "File not found");
@@ -19779,6 +19896,7 @@ static ufbxi_noinline ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 {
 	if (p_error) {
 		memset(p_error, 0, sizeof(ufbx_error));
+		ufbxi_fmt_err_info(p_error, "UFBX_ENABLE_GEOMETRY_CACHE");
 		ufbxi_report_err_msg(p_error, "UFBXI_FEATURE_GEOMETRY_CACHE", "Feature disabled");
 	}
 	return NULL;
@@ -19853,6 +19971,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_contex
 	file->data = cache;
 	return 1;
 #else
+	if (uc->opts.ignore_missing_external_files) return 1;
+
+	ufbxi_fmt_err_info(&uc->error, "UFBX_ENABLE_GEOMETRY_CACHE");
 	ufbxi_fail_msg("UFBXI_FEATURE_GEOMETRY_CACHE", "Feature disabled");
 #endif
 }
@@ -20130,6 +20251,7 @@ static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_skinning(ufbx_scene *scene, ufbx_error *error, ufbxi_buf *buf_result, ufbxi_buf *buf_tmp,
 	double time, bool load_caches, ufbx_geometry_cache_data_opts *cache_opts)
 {
+#if UFBXI_FEATURE_SKINNING_EVALUATION
 	size_t max_skinned_indices = 0;
 
 	ufbxi_for_ptr_list(ufbx_mesh, p_mesh, scene->meshes) {
@@ -20237,6 +20359,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_skinning(ufbx_scene *sc
 	}
 
 	return 1;
+#else
+    ufbxi_fmt_err_info(error, "UFBX_ENABLE_SKINNING_EVALUATION");
+    ufbxi_report_err_msg(error, "UFBXI_FEATURE_SKINNING_EVALUATION", "Feature disabled");
+    return 0;
+#endif
 }
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
@@ -20257,9 +20384,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 		uc->scene.metadata.may_contain_no_index = true;
 	}
 
-	uc->scene.metadata.may_contain_null_materials = uc->opts.allow_null_material;
-	uc->scene.metadata.may_contain_missing_vertex_position = uc->opts.allow_missing_vertex_position;
-	uc->scene.metadata.may_contain_broken_elements = uc->opts.connect_broken_elements;
+	if (uc->opts.allow_null_material) {
+		uc->scene.metadata.may_contain_null_materials = true;
+	}
+
+	if (uc->opts.allow_missing_vertex_position) {
+		uc->scene.metadata.may_contain_missing_vertex_position = true;
+	}
 
 	uc->scene.metadata.creator.data = ufbxi_empty_char;
 
@@ -20472,7 +20603,7 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	}
 
 	if (!uc->opts.open_file_cb.fn) {
-		uc->opts.open_file_cb.fn = &ufbx_open_file;
+		uc->opts.open_file_cb.fn = &ufbx_default_open_file;
 	}
 
 	uc->string_pool.error = &uc->error;
@@ -20503,10 +20634,6 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	uc->tmp_dom_nodes.ator = &uc->ator_tmp;
 
 	uc->result.ator = &uc->ator_result;
-
-	// Set zero size `swap_arr` to a non-NULL buffer so we can tell the difference between empty
-	// array and an allocation failure.
-	uc->swap_arr = (char*)ufbxi_zero_size_buffer;
 
 	uc->tmp.unordered = true;
 	uc->tmp_parse.unordered = true;
@@ -22208,6 +22335,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	// Build a KD-tree out of the collected reflex vertices.
 	uint32_t num_skip_indices = (1u << (UFBXI_KD_FAST_DEPTH + 1)) - 1;
 	uint32_t kd_slow_indices = num_kd_indices > num_skip_indices ? num_kd_indices - num_skip_indices : 0;
+    ufbxi_ignore(kd_slow_indices);
 	ufbx_assert(kd_slow_indices + face.num_indices * 2 <= num_indices);
 	ufbxi_kd_build(nc, kd_indices, kd_tmp, num_kd_indices, 0, 0, 0);
 
@@ -22460,6 +22588,7 @@ ufbxi_noinline static void ufbxi_compute_topology(const ufbx_mesh *mesh, ufbx_to
 
 static bool ufbxi_is_edge_smooth(const ufbx_mesh *mesh, const ufbx_topo_edge *topo, size_t num_topo, uint32_t index, bool assume_smooth)
 {
+    ufbxi_ignore(num_topo);
 	ufbx_assert((size_t)index < num_topo);
 	if (mesh->edge_smoothing.data) {
 		uint32_t edge = topo[index].edge;
@@ -23763,6 +23892,7 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 {
 	if (p_error) {
 		memset(p_error, 0, sizeof(ufbx_error));
+		ufbxi_fmt_err_info(p_error, "UFBX_ENABLE_SUBDIVISION");
 		ufbxi_report_err_msg(p_error, "UFBXI_FEATURE_SUBDIVISION", "Feature disabled");
 	}
 	return NULL;
@@ -23771,6 +23901,8 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 #endif
 
 // -- Utility
+
+#if UFBXI_FEATURE_INDEX_GENERATION
 
 static int ufbxi_map_cmp_vertex(void *user, const void *va, const void *vb)
 {
@@ -23907,6 +24039,20 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 	return result_vertices;
 
 }
+
+#else
+
+static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *user_streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator_opts *allocator, ufbx_error *error)
+{
+	if (error) {
+		memset(error, 0, sizeof(ufbx_error));
+        ufbxi_fmt_err_info(error, "UFBX_ENABLE_INDEX_GENERATION");
+		ufbxi_report_err_msg(error, "UFBXI_FEATURE_INDEX_GENERATION", "Feature disabled");
+	}
+	return NULL;
+}
+
+#endif
 
 static ufbxi_noinline void ufbxi_free_scene_imp(ufbxi_scene_imp *imp)
 {
@@ -24070,10 +24216,8 @@ const size_t ufbx_element_type_size[UFBX_ELEMENT_TYPE_COUNT] = {
 	sizeof(ufbx_metadata_object),
 };
 
-ufbx_abi bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len)
+ufbx_abi bool ufbx_open_file(ufbx_stream *stream, const char *path, size_t path_len)
 {
-	(void)user;
-
 	ufbxi_allocator tmp_ator = { 0 };
 	ufbx_error tmp_error = { UFBX_ERROR_NONE };
 	ufbxi_init_ator(&tmp_error, &tmp_ator, NULL, "filename");
@@ -24085,6 +24229,56 @@ ufbx_abi bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, 
 	stream->close_fn = &ufbxi_file_close;
 	stream->user = f;
 	return true;
+}
+
+ufbx_abi bool ufbx_default_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info)
+{
+    (void)user;
+    (void)info;
+    return ufbx_open_file(stream, path, path_len);
+}
+
+ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t data_size, const ufbx_open_memory_opts *opts)
+{
+    ufbx_open_memory_opts local_opts;
+    if (!opts) {
+        memset(&local_opts, 0, sizeof(local_opts));
+        opts = &local_opts;
+    }
+
+    ufbx_error local_error = { UFBX_ERROR_NONE };
+    ufbxi_allocator ator;
+    ufbxi_init_ator(&local_error, &ator, &opts->allocator, "memory");
+
+    size_t copy_size = opts->no_copy ? 0 : data_size;
+
+    // Align the allocation size to 8 bytes to make sure the header is aligned.
+    size_t self_size = ufbxi_align_to_mask(sizeof(ufbxi_memory_stream) + copy_size, ~(size_t)7);
+
+    void *memory = ufbxi_alloc(&ator, char, self_size);
+    if (!memory) {
+        ufbxi_free_ator(&ator);
+        return false;
+    }
+
+    ufbxi_memory_stream *mem = (ufbxi_memory_stream*)memory;
+    mem->size = data_size;
+
+    if (!opts->no_copy) {
+        memcpy(mem->data_copy, data, data_size);
+        mem->data = mem->data_copy;
+    }
+
+    // Transplant the allocator in the result blob
+    mem->ator = ator;
+    mem->ator.error = &mem->error;
+
+    stream->read_fn = ufbxi_memory_read;
+    stream->skip_fn = ufbxi_memory_skip;
+    stream->close_fn = ufbxi_memory_close;
+    stream->user = mem;
+
+    return true;
 }
 
 ufbx_abi bool ufbx_is_thread_safe(void)
@@ -24108,6 +24302,38 @@ ufbx_abi ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *
 
 ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_len, const ufbx_load_opts *opts, ufbx_error *error)
 {
+	ufbx_load_opts opts_copy;
+	if (opts) {
+		opts_copy = *opts;
+	} else {
+		memset(&opts_copy, 0, sizeof(opts_copy));
+	}
+	if (opts_copy.filename.length == 0 || opts_copy.filename.data == NULL) {
+		opts_copy.filename.data = filename;
+		opts_copy.filename.length = filename_len;
+	}
+
+    // Defer to `ufbx_load_stream()` if the user so prefers.
+    if (!opts->open_main_file_with_default && opts->open_file_cb.fn) {
+        ufbx_stream stream = { 0 };
+        if (ufbxi_open_file(&opts->open_file_cb, &stream, filename, filename_len, NULL, NULL, UFBX_OPEN_FILE_MAIN_MODEL)) {
+            return ufbx_load_stream_prefix(&stream, NULL, 0, &opts_copy, error);
+        } else {
+            // TODO: Factor this?
+			ufbxi_set_err_info(error, filename, filename_len);
+			error->stack_size = 1;
+			error->type = UFBX_ERROR_FILE_NOT_FOUND;
+			error->description.data = "File not found";
+			error->description.length = strlen(error->description.data);
+			error->stack[0].description.data = "File not found";
+			error->stack[0].description.length = strlen(error->stack[0].description.data);
+			error->stack[0].function.data = ufbxi_function;
+			error->stack[0].function.length = strlen(ufbxi_function);
+			error->stack[0].source_line = ufbxi_line;
+            return NULL;
+        }
+    }
+
 	ufbxi_allocator tmp_ator = { 0 };
 	ufbx_error tmp_error = { UFBX_ERROR_NONE };
 	ufbxi_init_ator(&tmp_error, &tmp_ator, opts ? &opts->temp_allocator : NULL, "filename");
@@ -24127,17 +24353,6 @@ ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_le
 			error->stack[0].source_line = ufbxi_line;
 		}
 		return NULL;
-	}
-
-	ufbx_load_opts opts_copy;
-	if (opts) {
-		opts_copy = *opts;
-	} else {
-		memset(&opts_copy, 0, sizeof(opts_copy));
-	}
-	if (opts_copy.filename.length == 0 || opts_copy.filename.data == NULL) {
-		opts_copy.filename.data = filename;
-		opts_copy.filename.length = filename_len;
 	}
 
 	ufbx_scene *scene = ufbx_load_stdio(file, &opts_copy, error);
@@ -24253,6 +24468,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_format_error(char *dst, size_t dst_size, con
 	size_t stack_size = ufbxi_min_sz(error->stack_size, UFBX_ERROR_STACK_MAX_DEPTH);
 	for (size_t i = 0; i < stack_size; i++) {
 		const ufbx_error_frame *frame = &error->stack[i];
+        if (!frame->source_line) break;
 		int num = ufbxi_snprintf(dst + offset, dst_size - offset, "%6u:%s: %s\n", frame->source_line, frame->function.data, frame->description.data);
 		if (num > 0) offset = ufbxi_min_sz(offset + (size_t)num, dst_size - 1);
 	}
@@ -24738,6 +24954,7 @@ ufbx_abi ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_ani
 #else
 	if (error) {
 		memset(error, 0, sizeof(ufbx_error));
+		ufbxi_fmt_err_info(error, "UFBX_ENABLE_SCENE_EVALUATION");
 		ufbxi_report_err_msg(error, "UFBXI_FEATURE_SCENE_EVALUATION", "Feature disabled");
 	}
 	return NULL;
@@ -25625,6 +25842,7 @@ ufbx_abi ufbx_line_curve *ufbx_tessellate_nurbs_curve(const ufbx_nurbs_curve *cu
 #else
 	if (error) {
 		memset(error, 0, sizeof(ufbx_error));
+		ufbxi_fmt_err_info(error, "UFBX_ENABLE_TESSELLATION");
 		ufbxi_report_err_msg(error, "UFBXI_FEATURE_TESSELLATION", "Feature disabled");
 	}
 	return NULL;
@@ -26010,7 +26228,10 @@ ufbx_abi void ufbx_retain_geometry_cache(ufbx_geometry_cache *cache)
 
 ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *frame, ufbx_real *data, size_t count, const ufbx_geometry_cache_data_opts *user_opts)
 {
+#if UFBXI_FEATURE_GEOMETRY_CACHE
 	if (!frame || count == 0) return 0;
+	ufbx_assert(data);
+	if (!data) return 0;
 
 	ufbx_geometry_cache_data_opts opts;
 	if (user_opts) {
@@ -26020,7 +26241,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 	}
 
 	if (!opts.open_file_cb.fn) {
-		opts.open_file_cb.fn = ufbx_open_file;
+		opts.open_file_cb.fn = ufbx_default_open_file;
 	}
 
 	// `ufbx_geometry_cache_data_opts` must be cleared to zero first!
@@ -26061,7 +26282,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 	src_count = ufbxi_min_sz(src_count, count);
 
 	ufbx_stream stream = { 0 };
-	if (!opts.open_file_cb.fn(opts.open_file_cb.user, &stream, frame->filename.data, frame->filename.length)) {
+	if (!ufbxi_open_file(&opts.open_file_cb, &stream, frame->filename.data, frame->filename.length, NULL, NULL, UFBX_OPEN_FILE_GEOMETRY_CACHE)) {
 		return 0;
 	}
 
@@ -26183,11 +26404,17 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 	}
 
 	return ufbxi_to_size(dst - data);
+#else
+    return 0;
+#endif
 }
 
 ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *channel, double time, ufbx_real *data, size_t count, const ufbx_geometry_cache_data_opts *user_opts)
 {
+#if UFBXI_FEATURE_GEOMETRY_CACHE
 	if (!channel || count == 0) return 0;
+	ufbx_assert(data);
+	if (!data) return 0;
 	if (channel->frames.count == 0) return 0;
 
 	ufbx_geometry_cache_data_opts opts;
@@ -26252,18 +26479,33 @@ ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_real(const ufbx_cache_
 	// Last frame
 	const ufbx_cache_frame *last = &frames[end - 1];
 	return ufbx_read_geometry_cache_real(last, data, count, &opts);
+#else
+    return 0;
+#endif
 }
 
 ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_frame *frame, ufbx_vec3 *data, size_t count, const ufbx_geometry_cache_data_opts *opts)
 {
+#if UFBXI_FEATURE_GEOMETRY_CACHE
 	if (!frame || count == 0) return 0;
+	ufbx_assert(data);
+	if (!data) return 0;
 	return ufbx_read_geometry_cache_real(frame, (ufbx_real*)data, count * 3, opts) / 3;
+#else
+    return 0;
+#endif
 }
 
 ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *channel, double time, ufbx_vec3 *data, size_t count, const ufbx_geometry_cache_data_opts *opts)
 {
+#if UFBXI_FEATURE_GEOMETRY_CACHE
 	if (!channel || count == 0) return 0;
+	ufbx_assert(data);
+	if (!data) return 0;
 	return ufbx_sample_geometry_cache_real(channel, time, (ufbx_real*)data, count * 3, opts) / 3;
+#else
+    return 0;
+#endif
 }
 
 ufbx_abi ufbx_dom_node *ufbx_dom_find_len(const ufbx_dom_node *parent, const char *name, size_t name_len)

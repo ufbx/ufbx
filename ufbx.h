@@ -70,13 +70,13 @@ typedef double ufbx_real;
 #endif
 
 #if defined(__cplusplus) && (__cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1900))
-	#define UFBX_CALLBACK_IMPL(p_name, p_fn, p_params, p_args) \
+	#define UFBX_CALLBACK_IMPL(p_name, p_fn, p_return, p_params, p_args) \
+        template <typename F> static p_return _cpp_adapter p_params { F &f = *static_cast<F*>(user); return f p_args; } \
 		p_name() = default; \
 		p_name(p_fn *f) : fn(f), user(nullptr) { } \
-		template <typename F> p_name(F &f) \
-			: fn([] p_params { F *f = (F*)user; return f p_args; }), user((void*)&f) { }
+		template <typename F> p_name(F *f) : fn(&_cpp_adapter<F>), user((void*)f) { }
 #else
-	#define UFBX_CALLBACK_IMPL(p_name, p_fn, p_params, p_args)
+	#define UFBX_CALLBACK_IMPL(p_name, p_fn, p_return, p_params, p_args)
 #endif
 
 // -- Version
@@ -2053,6 +2053,7 @@ typedef enum ufbx_material_pbr_map {
 
 // Known material features
 typedef enum ufbx_material_feature {
+	UFBX_MATERIAL_FEATURE_PBR,
 	UFBX_MATERIAL_FEATURE_METALNESS,
 	UFBX_MATERIAL_FEATURE_DIFFUSE,
 	UFBX_MATERIAL_FEATURE_SPECULAR,
@@ -2169,6 +2170,7 @@ typedef struct ufbx_material_features {
 	union {
 		ufbx_material_feature_info features[UFBX_MATERIAL_FEATURE_COUNT];
 		struct {
+			ufbx_material_feature_info pbr;
 			ufbx_material_feature_info metalness;
 			ufbx_material_feature_info diffuse;
 			ufbx_material_feature_info specular;
@@ -3269,17 +3271,70 @@ typedef struct ufbx_stream {
 	void *user;
 } ufbx_stream;
 
+typedef enum ufbx_open_file_type {
+    UFBX_OPEN_FILE_MAIN_MODEL,     // < Main model file
+    UFBX_OPEN_FILE_GEOMETRY_CACHE, // < Unknown geometry cache file
+    UFBX_OPEN_FILE_OBJ_MTL,        // < .mtl material library file
+
+    UFBX_OPEN_FILE_TYPE_COUNT,
+    UFBX_OPEN_FILE_TYPE_FORCE_32BIT = 0x7fffffff,
+} ufbx_open_file_type;
+
+typedef struct ufbx_open_file_info {
+    // Kind of file to load.
+    ufbx_open_file_type type;
+
+    // Temporary allocator to use.
+    ufbx_allocator temp_allocator;
+
+	// Original filename in the file, not resolved or UTF-8 encoded.
+    // NOTE: Not necessarily NULL-terminated!
+    ufbx_blob original_filename;
+} ufbx_open_file_info;
+
 // Callback for opening an external file from the filesystem
-typedef bool ufbx_open_file_fn(void *user, ufbx_stream *stream, const char *path, size_t path_len);
+typedef bool ufbx_open_file_fn(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info);
 
 typedef struct ufbx_open_file_cb { 
 	ufbx_open_file_fn *fn;
 	void *user;
 
-	UFBX_CALLBACK_IMPL(ufbx_open_file_cb, ufbx_open_file_fn,
-		(void *user, ufbx_stream *stream, const char *path, size_t path_len),
-		(stream, path, path_len))
+	UFBX_CALLBACK_IMPL(ufbx_open_file_cb, ufbx_open_file_fn, bool,
+		(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info),
+		(stream, path, path_len, info))
 } ufbx_open_file_cb;
+
+// Memory stream options
+typedef void ufbx_close_memory_fn(void *user, void *data, size_t data_size);
+
+typedef struct ufbx_close_memory_cb { 
+	ufbx_close_memory_fn *fn;
+	void *user;
+
+	UFBX_CALLBACK_IMPL(ufbx_close_memory_cb, ufbx_close_memory_fn, void,
+		(void *user, void *data, size_t data_size),
+		(data, data_size))
+} ufbx_close_memory_cb;
+
+// Options for `ufbx_open_memory()`.
+typedef struct ufbx_open_memory_opts {
+    uint32_t _begin_zero;
+
+    // Allocator to allocate the memory with.
+    // NOTE: Used even if no copy is made to allocate a small metadata block.
+    ufbx_allocator_opts allocator;
+
+    // Do not copy the memory.
+    // You can use `close_cb` to free the memory when the stream is closed.
+    // NOTE: This means the provided data pointer is referenced after creating
+    // the memory stream, make sure the data stays valid until the stream is closed!
+    ufbx_unsafe bool no_copy;
+
+    // Callback to free the memory blob.
+    ufbx_close_memory_cb close_cb;
+
+    uint32_t _end_zero;
+} ufbx_open_memory_opts;
 
 // Detailed error stack frame
 typedef struct ufbx_error_frame {
@@ -3387,7 +3442,7 @@ typedef struct ufbx_progress_cb {
 	ufbx_progress_fn *fn;
 	void *user;
 
-	UFBX_CALLBACK_IMPL(ufbx_progress_cb, ufbx_progress_fn,
+	UFBX_CALLBACK_IMPL(ufbx_progress_cb, ufbx_progress_fn, ufbx_progress_result,
 		(void *user, const ufbx_progress *progress),
 		(progress))
 } ufbx_progress_cb;
@@ -3542,6 +3597,9 @@ typedef struct ufbx_load_opts {
 	// Generate vertex normals for a meshes that are missing normals.
 	// You can see if the normals have been generated from `ufbx_mesh.generated_normals`.
 	bool generate_missing_normals;
+
+    // Ignore `open_file_cb` when loading the main file.
+    bool open_main_file_with_default;
 
 	// Path separator character, defaults to '\' on Windows and '/' otherwise.
 	char path_separator;
@@ -3929,8 +3987,14 @@ ufbx_abi ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_i
 
 // Open a `ufbx_stream` from a file.
 // Use `path_len == SIZE_MAX` for NULL terminated string.
-// NOTE: `user` is not used, it exists only for compatability to `ufbx_open_file_fn`
-ufbx_abi bool ufbx_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len);
+ufbx_abi bool ufbx_open_file(ufbx_stream *stream, const char *path, size_t path_len);
+
+// Same as `ufbx_open_file()` but compatible with the callback in `ufbx_open_file_fn`.
+// The `user` parameter is actually not used here.
+ufbx_abi bool ufbx_default_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info);
+
+// NOTE: Uses the default ufbx allocator!
+ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t data_size, const ufbx_open_memory_opts *opts);
 
 // Animation evaluation
 
@@ -4208,6 +4272,7 @@ ufbx_abi size_t ufbx_ffi_get_triangulate_face_num_indices(const ufbx_face *face)
 ufbx_abi uint32_t ufbx_ffi_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, const ufbx_face *face);
 
 ufbx_inline size_t ufbx_check_index(size_t index, size_t count) {
+    (void)(count);
 	ufbx_assert(index < count);
 	return index;
 }
