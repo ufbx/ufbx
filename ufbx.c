@@ -20636,6 +20636,10 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	uc->tmp_parse.clearable = true;
 	uc->result.unordered = true;
 
+	// Set zero size `swap_arr` to a non-NULL buffer so we can tell the difference between empty
+	// array and an allocation failure.
+	uc->swap_arr = (char*)ufbxi_zero_size_buffer;
+
 	// NOTE: Though `inflate_retain` leaks out of the scope we don't use it outside this function.
 	// cppcheck-suppress autoVariables
 	uc->inflate_retain = &inflate_retain;
