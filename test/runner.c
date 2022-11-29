@@ -1920,7 +1920,7 @@ bool ufbxt_next_file(ufbxt_file_iterator *iter, char *buffer, size_t buffer_size
 		}
 
 		ufbx_stream stream = { 0 };
-		if (ufbx_open_file(NULL, &stream, buffer, SIZE_MAX)) {
+		if (ufbx_open_file(&stream, buffer, SIZE_MAX)) {
 			if (stream.close_fn) {
 				stream.close_fn(stream.user);
 			}

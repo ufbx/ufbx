@@ -362,7 +362,7 @@ UFBXT_TEST(open_file)
 
 	for (size_t i = 0; i < 2; i++) {
 		ufbx_stream stream = { 0 };
-		bool ok = ufbx_open_file(NULL, &stream, buf, i == 0 ? SIZE_MAX : strlen(buf));
+		bool ok = ufbx_open_file(&stream, buf, i == 0 ? SIZE_MAX : strlen(buf));
 		ufbxt_assert(ok);
 		ufbxt_assert(stream.skip_fn);
 		ufbxt_assert(stream.read_fn);
