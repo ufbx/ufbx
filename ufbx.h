@@ -4097,11 +4097,6 @@ ufbx_abi ufbx_geometry_cache *ufbx_load_geometry_cache_len(
 ufbx_abi void ufbx_free_geometry_cache(ufbx_geometry_cache *cache);
 ufbx_abi void ufbx_retain_geometry_cache(ufbx_geometry_cache *cache);
 
-ufbx_abi size_t ufbx_get_read_geometry_cache_real_num_data(const ufbx_cache_frame *frame);
-ufbx_abi size_t ufbx_get_sample_geometry_cache_real_num_data(const ufbx_cache_channel *channel, double time);
-ufbx_abi size_t ufbx_get_read_geometry_cache_vec3_num_data(const ufbx_cache_frame *frame);
-ufbx_abi size_t ufbx_get_sample_geometry_cache_vec3_num_data(const ufbx_cache_channel *channel, double time);
-
 ufbx_abi size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *frame, ufbx_real *data, size_t num_data, const ufbx_geometry_cache_data_opts *opts);
 ufbx_abi size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *channel, double time, ufbx_real *data, size_t num_data, const ufbx_geometry_cache_data_opts *opts);
 ufbx_abi size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_frame *frame, ufbx_vec3 *data, size_t num_data, const ufbx_geometry_cache_data_opts *opts);

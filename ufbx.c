@@ -26008,135 +26008,9 @@ ufbx_abi void ufbx_retain_geometry_cache(ufbx_geometry_cache *cache)
 	ufbxi_retain_ref(&imp->refcount);
 }
 
-ufbx_abi ufbxi_noinline size_t ufbx_get_read_geometry_cache_real_num_data(const ufbx_cache_frame *frame)
-{
-	if (!frame) return 0;
-	switch (frame->data_format) {
-	case UFBX_CACHE_DATA_FORMAT_UNKNOWN: return 0;
-	case UFBX_CACHE_DATA_FORMAT_REAL_FLOAT: return frame->data_count;
-	case UFBX_CACHE_DATA_FORMAT_VEC3_FLOAT: return frame->data_count * 3;
-	case UFBX_CACHE_DATA_FORMAT_REAL_DOUBLE: return frame->data_count;
-	case UFBX_CACHE_DATA_FORMAT_VEC3_DOUBLE: return frame->data_count * 3;
-	default: return 0;
-	}
-}
-
-ufbx_abi ufbxi_noinline size_t ufbx_get_sample_geometry_cache_real_num_data(const ufbx_cache_channel *channel, double time)
-{
-	if (!channel) return 0;
-	if (channel->frames.count == 0) return 0;
-
-	size_t begin = 0;
-	size_t end = channel->frames.count;
-	const ufbx_cache_frame *frames = channel->frames.data;
-	while (end - begin >= 8) {
-		size_t mid = (begin + end) >> 1;
-		if (frames[mid].time < time) {
-			begin = mid + 1;
-		} else { 
-			end = mid;
-		}
-	}
-
-	const double eps = 0.00000001;
-
-	end = channel->frames.count;
-	for (; begin < end; begin++) {
-		const ufbx_cache_frame *next = &frames[begin];
-		if (next->time < time) continue;
-
-		// First keyframe
-		if (begin == 0) {
-			return ufbx_get_read_geometry_cache_real_num_data(next);
-		}
-
-		const ufbx_cache_frame *prev = next - 1;
-
-		// Snap to exact frames if near
-		if (ufbx_fabs(next->time - time) < eps) {
-			return ufbx_get_read_geometry_cache_real_num_data(next);
-		}
-		if (ufbx_fabs(prev->time - time) < eps) {
-			return ufbx_get_read_geometry_cache_real_num_data(prev);
-		}
-
-		size_t num_prev = ufbx_get_read_geometry_cache_real_num_data(prev);
-		size_t num_next = ufbx_get_read_geometry_cache_real_num_data(next);
-		return ufbxi_min_sz(num_prev, num_next);
-	}
-
-	// Last frame
-	const ufbx_cache_frame *last = &frames[end - 1];
-	return ufbx_get_read_geometry_cache_real_num_data(last);
-}
-
-ufbx_abi size_t ufbx_get_read_geometry_cache_vec3_num_data(const ufbx_cache_frame *frame)
-{
-	if (!frame) return 0;
-	switch (frame->data_format) {
-	case UFBX_CACHE_DATA_FORMAT_UNKNOWN: return 0;
-	case UFBX_CACHE_DATA_FORMAT_REAL_FLOAT: return frame->data_count / 3;
-	case UFBX_CACHE_DATA_FORMAT_VEC3_FLOAT: return frame->data_count;
-	case UFBX_CACHE_DATA_FORMAT_REAL_DOUBLE: return frame->data_count / 3;
-	case UFBX_CACHE_DATA_FORMAT_VEC3_DOUBLE: return frame->data_count;
-	default: return 0;
-	}
-}
-
-ufbx_abi size_t ufbx_get_sample_geometry_cache_vec3_num_data(const ufbx_cache_channel *channel, double time)
-{
-	if (!channel) return 0;
-	if (channel->frames.count == 0) return 0;
-
-	size_t begin = 0;
-	size_t end = channel->frames.count;
-	const ufbx_cache_frame *frames = channel->frames.data;
-	while (end - begin >= 8) {
-		size_t mid = (begin + end) >> 1;
-		if (frames[mid].time < time) {
-			begin = mid + 1;
-		} else { 
-			end = mid;
-		}
-	}
-
-	const double eps = 0.00000001;
-
-	end = channel->frames.count;
-	for (; begin < end; begin++) {
-		const ufbx_cache_frame *next = &frames[begin];
-		if (next->time < time) continue;
-
-		// First keyframe
-		if (begin == 0) {
-			return ufbx_get_read_geometry_cache_vec3_num_data(next);
-		}
-
-		const ufbx_cache_frame *prev = next - 1;
-
-		// Snap to exact frames if near
-		if (ufbx_fabs(next->time - time) < eps) {
-			return ufbx_get_read_geometry_cache_vec3_num_data(next);
-		}
-		if (ufbx_fabs(prev->time - time) < eps) {
-			return ufbx_get_read_geometry_cache_vec3_num_data(prev);
-		}
-
-		size_t num_prev = ufbx_get_read_geometry_cache_vec3_num_data(prev);
-		size_t num_next = ufbx_get_read_geometry_cache_vec3_num_data(next);
-		return ufbxi_min_sz(num_prev, num_next);
-	}
-
-	// Last frame
-	const ufbx_cache_frame *last = &frames[end - 1];
-	return ufbx_get_read_geometry_cache_vec3_num_data(last);
-}
-
 ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *frame, ufbx_real *data, size_t count, const ufbx_geometry_cache_data_opts *user_opts)
 {
 	if (!frame || count == 0) return 0;
-	ufbx_assert(data);
-	if (!data) return 0;
 
 	ufbx_geometry_cache_data_opts opts;
 	if (user_opts) {
@@ -26237,26 +26111,28 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 				}
 			}
 
-			ufbx_real weight = opts.weight;
-			if (opts.additive && opts.use_weight) {
-				for (size_t i = 0; i < num_read; i++) {
-					dst[i] += (ufbx_real)buffer[i] * weight;
+			if (dst) {
+				ufbx_real weight = opts.weight;
+				if (opts.additive && opts.use_weight) {
+					for (size_t i = 0; i < num_read; i++) {
+						dst[i] += (ufbx_real)buffer[i] * weight;
+					}
+				} else if (opts.additive) {
+					for (size_t i = 0; i < num_read; i++) {
+						dst[i] += (ufbx_real)buffer[i];
+					}
+				} else if (opts.use_weight) {
+					for (size_t i = 0; i < num_read; i++) {
+						dst[i] = (ufbx_real)buffer[i] * weight;
+					}
+				} else {
+					for (size_t i = 0; i < num_read; i++) {
+						dst[i] = (ufbx_real)buffer[i];
+					}
 				}
-			} else if (opts.additive) {
-				for (size_t i = 0; i < num_read; i++) {
-					dst[i] += (ufbx_real)buffer[i];
-				}
-			} else if (opts.use_weight) {
-				for (size_t i = 0; i < num_read; i++) {
-					dst[i] = (ufbx_real)buffer[i] * weight;
-				}
-			} else {
-				for (size_t i = 0; i < num_read; i++) {
-					dst[i] = (ufbx_real)buffer[i];
-				}
+				dst += num_read;
 			}
 
-			dst += num_read;
 			if (num_read != to_read) break;
 		}
 	} else {
@@ -26276,26 +26152,28 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 				}
 			}
 
-			ufbx_real weight = opts.weight;
-			if (opts.additive && opts.use_weight) {
-				for (size_t i = 0; i < num_read; i++) {
-					dst[i] += (ufbx_real)buffer[i] * weight;
+			if (dst) {
+				ufbx_real weight = opts.weight;
+				if (opts.additive && opts.use_weight) {
+					for (size_t i = 0; i < num_read; i++) {
+						dst[i] += (ufbx_real)buffer[i] * weight;
+					}
+				} else if (opts.additive) {
+					for (size_t i = 0; i < num_read; i++) {
+						dst[i] += (ufbx_real)buffer[i];
+					}
+				} else if (opts.use_weight) {
+					for (size_t i = 0; i < num_read; i++) {
+						dst[i] = (ufbx_real)buffer[i] * weight;
+					}
+				} else {
+					for (size_t i = 0; i < num_read; i++) {
+						dst[i] = (ufbx_real)buffer[i];
+					}
 				}
-			} else if (opts.additive) {
-				for (size_t i = 0; i < num_read; i++) {
-					dst[i] += (ufbx_real)buffer[i];
-				}
-			} else if (opts.use_weight) {
-				for (size_t i = 0; i < num_read; i++) {
-					dst[i] = (ufbx_real)buffer[i] * weight;
-				}
-			} else {
-				for (size_t i = 0; i < num_read; i++) {
-					dst[i] = (ufbx_real)buffer[i];
-				}
+				dst += num_read;
 			}
 
-			dst += num_read;
 			if (num_read != to_read) break;
 		}
 	}
@@ -26310,8 +26188,6 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *channel, double time, ufbx_real *data, size_t count, const ufbx_geometry_cache_data_opts *user_opts)
 {
 	if (!channel || count == 0) return 0;
-	ufbx_assert(data);
-	if (!data) return 0;
 	if (channel->frames.count == 0) return 0;
 
 	ufbx_geometry_cache_data_opts opts;
@@ -26381,16 +26257,12 @@ ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_real(const ufbx_cache_
 ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_frame *frame, ufbx_vec3 *data, size_t count, const ufbx_geometry_cache_data_opts *opts)
 {
 	if (!frame || count == 0) return 0;
-	ufbx_assert(data);
-	if (!data) return 0;
 	return ufbx_read_geometry_cache_real(frame, (ufbx_real*)data, count * 3, opts) / 3;
 }
 
 ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_channel *channel, double time, ufbx_vec3 *data, size_t count, const ufbx_geometry_cache_data_opts *opts)
 {
 	if (!channel || count == 0) return 0;
-	ufbx_assert(data);
-	if (!data) return 0;
 	return ufbx_sample_geometry_cache_real(channel, time, (ufbx_real*)data, count * 3, opts) / 3;
 }
 

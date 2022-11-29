@@ -22,6 +22,9 @@ static void ufbxt_test_sine_cache(ufbxt_diff_error *err, const char *path, doubl
 				size_t num_verts = ufbx_sample_geometry_cache_vec3(channel, time, pos, ufbxt_arraycount(pos), NULL);
 				ufbxt_assert(num_verts == 36);
 
+				size_t dry_verts = ufbx_sample_geometry_cache_vec3(channel, time, pos, SIZE_MAX, NULL);
+				ufbxt_assert(num_verts == dry_verts);
+
 				double t = (time - 1.0/24.0) / (29.0/24.0) * 4.0;
 				double pi2 = 3.141592653589793*2.0;
 				double err_scale = 0.001 / err_threshold;
