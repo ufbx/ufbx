@@ -1573,7 +1573,7 @@ typedef struct ufbx_skin_vertex {
 	// The weights are sorted by decreasing weight so you can take the first N
 	// weights to get a cheaper approximation of the vertex.
 	// NOTE: The weights are not guaranteed to be normalized!
-	uint32_t weight_begin; // < Index to start from in the `weights[]` array
+	uint32_t weight_begin; // < Index to start from in the `ufbx_skin_deformer.weights[]` array
 	uint32_t num_weights; // < Number of weights influencing the vertex
 
 	// Blend weight between Linear Blend Skinning (0.0) and Dual Quaternion (1.0).
@@ -2565,6 +2565,8 @@ struct ufbx_anim_stack {
 	double time_begin;
 	double time_end;
 
+	ufbx_element_list anim_elements; // < Sorted by `element`
+
 	ufbx_anim_layer_list layers;
 	ufbx_anim anim;
 };
@@ -2595,6 +2597,9 @@ struct ufbx_anim_layer {
 
 	ufbx_anim_value_list anim_values;
 	ufbx_anim_prop_list anim_props; // < Sorted by `element,prop_name`
+	ufbx_element_list anim_elements; // < Sorted by `element`
+
+	ufbx_anim_stack_list parent_stacks;
 
 	ufbx_anim anim;
 
@@ -2607,6 +2612,9 @@ struct ufbx_anim_value {
 	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
 
 	ufbx_vec3 default_value;
+
+    bool is_constant;
+
 	ufbx_nullable ufbx_anim_curve *curves[3];
 };
 
@@ -2656,6 +2664,8 @@ struct ufbx_anim_curve {
 		uint32_t element_id;
 		uint32_t typed_id;
 	}; };
+
+    bool is_constant;
 
 	ufbx_keyframe_list keyframes;
 };
@@ -3908,6 +3918,12 @@ ufbx_inline ufbx_anim_prop *ufbx_find_anim_prop(const ufbx_anim_layer *layer, co
 
 // Find all animated properties of `element` in `layer`.
 ufbx_abi ufbx_anim_prop_list ufbx_find_anim_props(const ufbx_anim_layer *layer, const ufbx_element *element);
+
+// Does animation stack `stack` contain element `element`.
+ufbx_abi bool ufbx_anim_stack_contains_element(const ufbx_anim_stack *stack, const ufbx_element *element);
+
+// Does animation layer `layer` contain element `element`.
+ufbx_abi bool ufbx_anim_layer_contains_element(const ufbx_anim_layer *layer, const ufbx_element *element);
 
 // Get a matrix that transforms normals in the same way as Autodesk software.
 // NOTE: The resulting normals are slightly incorrect as this function deliberately

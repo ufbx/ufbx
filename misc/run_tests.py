@@ -838,6 +838,7 @@ async def main():
             "UFBX_NO_GEOMETRY_CACHE",
             "UFBX_NO_SCENE_EVALUATION",
             "UFBX_NO_TRIANGULATION",
+            "UFBX_NO_INDEX_GENERATION",
             "UFBX_NO_ERROR_STACK",
         ]
 

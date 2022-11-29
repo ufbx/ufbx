@@ -488,6 +488,15 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 
 		if (!scene->metadata.may_contain_null_materials) {
 			ufbxt_assert(mat->material);
+		} else {
+			ufbxt_assert(mat->material || i == 0);
+		}
+
+		if (mat->material) {
+			for (size_t j = 0; j < mesh->instances.count; j++) {
+				ufbx_node *node = mesh->instances.data[j];
+				ufbxt_assert(node->materials.count > i);
+			}
 		}
 
 		ufbxt_assert(mat->face_indices.count == mat->num_faces);
@@ -502,6 +511,13 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 			ufbxt_assert(mesh->face_material.data[ix] == (int32_t)i);
 		}
 		ufbxt_assert(mat->num_triangles == mat_tris);
+	}
+
+	if (scene->metadata.may_contain_null_materials) {
+		ufbxt_assert(mesh->materials.count >= 1);
+		if (mesh->materials.data[0].material == NULL) {
+			ufbxt_assert(mesh->materials.count == 1);
+		}
 	}
 
 	if (mesh->face_group.count) {
@@ -880,6 +896,23 @@ static void ufbxt_check_anim_stack(ufbx_scene *scene, ufbx_anim_stack *anim_stac
 	for (size_t i = 0; i < anim_stack->layers.count; i++) {
 		ufbxt_check_element_ptr(scene, anim_stack->layers.data[i], UFBX_ELEMENT_ANIM_LAYER);
 	}
+
+	for (size_t layer_ix = 0; layer_ix < anim_stack->layers.count; layer_ix++) {
+		ufbx_anim_layer *layer = anim_stack->layers.data[layer_ix];
+		for (size_t i = 0; i < layer->anim_elements.count; i++) {
+			ufbx_element *element = layer->anim_elements.data[i];
+			ufbxt_assert(ufbx_anim_stack_contains_element(anim_stack, element));
+		}
+
+		bool found = false;
+		for (size_t i = 0; i < layer->parent_stacks.count; i++) {
+			if (layer->parent_stacks.data[i] == anim_stack) {
+				found = true;
+				break;
+			}
+		}
+		ufbxt_assert(found);
+	}
 }
 
 static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_layer)
@@ -913,6 +946,26 @@ static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_laye
 			prev_element = anim_prop->element;
 			props_left = list.count - 1;
 		}
+
+		ufbxt_assert(ufbx_anim_layer_contains_element(anim_layer, anim_prop->element));
+	}
+
+	for (size_t i = 0; i < anim_layer->anim_elements.count; i++) {
+		ufbxt_check_element_ptr_any(scene, anim_layer->anim_elements.data[i]);
+	}
+
+	for (size_t i = 0; i < anim_layer->parent_stacks.count; i++) {
+		ufbx_anim_stack *stack = anim_layer->parent_stacks.data[i];
+		ufbxt_check_element_ptr(scene, stack, UFBX_ELEMENT_ANIM_STACK);
+
+		bool found = false;
+		for (size_t j = 0; j < stack->layers.count; j++) {
+			if (stack->layers.data[j] == anim_layer) {
+				found = true;
+				break;
+			}
+		}
+		ufbxt_assert(found);
 	}
 
 	ufbxt_assert(props_left == 0);

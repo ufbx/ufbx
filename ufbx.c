@@ -42,6 +42,9 @@
 	#if !defined(UFBX_NO_TRIANGULATION)
 		#define UFBXI_FEATURE_TRIANGULATION 1
 	#endif
+	#if !defined(UFBX_NO_INDEX_GENERATION)
+		#define UFBXI_FEATURE_INDEX_GENERATION 1
+	#endif
 	#if !defined(UFBX_NO_FORMAT_OBJ)
 		#define UFBXI_FEATURE_FORMAT_OBJ 1
 	#endif
@@ -68,6 +71,9 @@
 #if !defined(UFBXI_FEATURE_TRIANGULATION) && defined(UFBX_ENABLE_TRIANGULATION)
 	#define UFBXI_FEATURE_TRIANGULATION 1
 #endif
+#if !defined(UFBXI_FEATURE_INDEX_GENERATION) && defined(UFBX_ENABLE_INDEX_GENERATION)
+	#define UFBXI_FEATURE_INDEX_GENERATION 1
+#endif
 #if !defined(UFBXI_FEATURE_FORMAT_OBJ) && defined(UFBX_ENABLE_FORMAT_OBJ)
 	#define UFBXI_FEATURE_FORMAT_OBJ 1
 #endif
@@ -89,6 +95,9 @@
 #endif
 #if !defined(UFBXI_FEATURE_TRIANGULATION)
 	#define UFBXI_FEATURE_TRIANGULATION 0
+#endif
+#if !defined(UFBXI_FEATURE_INDEX_GENERATION)
+	#define UFBXI_FEATURE_INDEX_GENERATION 0
 #endif
 #if !defined(UFBXI_FEATURE_FORMAT_OBJ)
 	#define UFBXI_FEATURE_FORMAT_OBJ 0
@@ -117,7 +126,7 @@
 	#define UFBXI_FEATURE_KD 0
 #endif
 
-#if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_SPATIAL || !UFBXI_FEATURE_KD
+#if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_INDEX_GENERATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_SPATIAL || !UFBXI_FEATURE_KD
 	#define UFBXI_PARTIAL_FEATURES 1
 #endif
 
@@ -202,7 +211,7 @@
 	#define ufbxi_noinline __declspec(noinline)
 	#define ufbxi_forceinline __forceinline
 	#define ufbxi_restrict __restrict
-	#if defined(__cplusplus) && _MSC_VER >= 1900
+	#if defined(__cplusplus) && _MSC_VER >= 1900 && defined(_MSVC_LANG) && _MSVC_LANG >= 201703L
 		#define ufbxi_nodiscard [[nodiscard]]
 	#elif defined(_Check_return_)
 		#define ufbxi_nodiscard _Check_return_
@@ -5222,6 +5231,8 @@ typedef struct {
 	uint64_t legacy_implicit_anim_layer_id;
 
 	double ktime_to_sec;
+
+	ufbx_element *past_last_element;
 
 	bool eof;
 	ufbxi_obj_context obj;
@@ -11491,6 +11502,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 	double prev_time = 0.0;
 	double next_time = 0.0;
 
+    curve->is_constant = true;
+
 	if (num_keys > 0) {
 		next_time = (double)p_time[0] * uc->ktime_to_sec;
 	}
@@ -11501,6 +11514,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 
 		key->time = next_time;
 		key->value = *p_value;
+
+        if (i > 0 && p_value[0] != p_value[-1]) {
+            curve->is_constant = false;
+        }
 
 		if (i + 1 < num_keys) {
 			next_time = (double)p_time[1] * uc->ktime_to_sec;
@@ -12266,6 +12283,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 	// floating point values, and _bare characters_. We cast all values to double and interpret them.
 	double *data = (double*)keys->data, *data_end = data + keys->size;
 
+    curve->is_constant = true;
+
 	if (num_keys > 0) {
 		ufbxi_check(data_end - data >= 2);
 		// TODO: This could break with large times...
@@ -12380,6 +12399,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 		if (i + 1 < num_keys) {
 			ufbxi_check(data_end - data >= 2);
 			next_time = data[0] * uc->ktime_to_sec;
+            if (data[1] != next_value) {
+                curve->is_constant = false;
+            }
 			next_value = data[1];
 		}
 
@@ -14645,12 +14667,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_mtl_load(ufbxi_context *uc)
 #else
 ufbxi_nodiscard static ufbxi_forceinline int ufbxi_obj_load(ufbxi_context *uc)
 {
+	ufbxi_fmt_err_info(&uc->error, "UFBX_ENABLE_FORMAT_OBJ");
 	ufbxi_fail_msg("UFBXI_FEATURE_FORMAT_OBJ", "Feature disabled");
 	return 0;
 }
 
 ufbxi_nodiscard static ufbxi_forceinline int ufbxi_mtl_load(ufbxi_context *uc)
 {
+	ufbxi_fmt_err_info(&uc->error, "UFBX_ENABLE_FORMAT_OBJ");
 	ufbxi_fail_msg("UFBXI_FEATURE_FORMAT_OBJ", "Feature disabled");
 	return 0;
 }
@@ -17066,6 +17090,90 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh_material(ufbxi_buf
 	return 1;
 }
 
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_anim_elements(ufbxi_context *uc, ufbx_anim_layer *layer)
+{
+    ufbx_element *prev_elem = NULL;
+	size_t num_elems = 0;
+
+    ufbx_anim_prop_list aprops = layer->anim_props;
+    for (uint32_t i = 0; i <aprops.count; i++) {
+		ufbx_element *elem = aprops.data[i].element;
+        if (elem != prev_elem) {
+			ufbx_element **p_elem = ufbxi_push(&uc->tmp_stack, ufbx_element*, 1);
+			ufbxi_check(p_elem);
+			*p_elem = elem;
+			prev_elem = elem;
+			num_elems++;
+        }
+    }
+
+	layer->anim_elements.count = num_elems;
+	layer->anim_elements.data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_element*, num_elems);
+	ufbxi_check(layer->anim_elements.data);
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_gather_anim_elements(ufbxi_context *uc, ufbx_anim_stack *stack)
+{
+	// Simple cases: Either no animated elements or copy from a single layer
+	ufbx_anim_layer_list layers = stack->layers;
+	if (layers.count == 0) {
+		return 1;
+	} if (layers.count == 1) {
+		stack->anim_elements = layers.data[0]->anim_elements;
+		return 1;
+	}
+
+	uint32_t *cursor = ufbxi_push_zero(&uc->tmp, uint32_t, layers.count);
+	ufbxi_check(cursor);
+
+	ufbx_element *const no_element = uc->past_last_element;
+	ufbx_element *element = no_element;
+
+	// Find the first element
+	for (size_t i = 0; i < layers.count; i++) {
+		ufbx_anim_layer *layer = layers.data[i];
+		if (layer->anim_elements.count > 0) {
+			ufbx_element *elem = layer->anim_elements.data[i];
+			if (elem < element) element = elem;
+		}
+	}
+
+	size_t num_elems = 0;
+	while (element != no_element) {
+		ufbx_element **p_elem = ufbxi_push(&uc->tmp_stack, ufbx_element*, 1);
+		ufbxi_check(p_elem);
+		*p_elem = element;
+		
+		ufbx_element *next_elem = no_element;
+
+		for (size_t layer_ix = 0; layer_ix < layers.count; layer_ix++) {
+			ufbx_anim_layer *layer = layers.data[layer_ix];
+			uint32_t pos = cursor[layer_ix];
+			if (pos >= layer->anim_elements.count) continue;
+
+			ufbx_element *elem = layer->anim_elements.data[pos];
+			ufbxi_dev_assert(elem >= element);
+			if (elem == element) {
+				cursor[layer_ix] = ++pos;
+				if (pos >= layer->anim_elements.count) continue;
+				elem = layer->anim_elements.data[pos];
+			}
+			if (elem < next_elem) next_elem = elem;
+		}
+
+		element = next_elem;
+		num_elems++;
+	}
+
+	stack->anim_elements.count = num_elems;
+	stack->anim_elements.data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_element*, num_elems);
+	ufbxi_check(stack->anim_elements.data);
+
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	size_t num_elements = uc->num_elements;
@@ -17086,6 +17194,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		uc->scene.elements.data[i] = (ufbx_element*)(element_data + element_offsets[i]);
 	}
 	uc->scene.elements.count = num_elements;
+
+	uc->past_last_element = (ufbx_element*)(element_data + uc->tmp_element_byte_offset);
+
 	ufbxi_buf_free(&uc->tmp_element_offsets);
 
 	uc->scene.metadata.original_file_path = ufbx_find_string(&uc->scene.metadata.scene_props, "DocumentUrl", ufbx_empty_string);
@@ -17452,7 +17563,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			if (mesh->materials.count > 0) {
 				ufbxi_for_ptr_list(ufbx_node, p_node, mesh->instances) {
 					ufbx_node *node = *p_node;
-					if (node->materials.count < mesh->materials.count) {
+					if (node->materials.count < mesh->materials.count && mesh->materials.data[0].material != NULL) {
 						ufbx_material **materials = ufbxi_push(&uc->result, ufbx_material*, mesh->materials.count);
 						ufbxi_check(materials);
 						ufbxi_nounroll for (size_t i = 0; i < node->materials.count; i++) {
@@ -17564,6 +17675,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, uc->scene.anim_layers) {
 		ufbx_anim_layer *layer = *p_layer;
 		ufbxi_check(ufbxi_fetch_dst_elements(uc, &layer->anim_values, &layer->element, false, NULL, UFBX_ELEMENT_ANIM_VALUE));
+		ufbxi_check(ufbxi_fetch_src_elements(uc, &layer->parent_stacks, &layer->element, false, NULL, UFBX_ELEMENT_ANIM_STACK));
 
 		ufbx_anim_layer_desc *layer_desc = ufbxi_push_zero(&uc->result, ufbx_anim_layer_desc, 1);
 		ufbxi_check(layer_desc);
@@ -17674,7 +17786,23 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				value->curves[index] = curve;
 			}
 		}
+
+        value->is_constant = true;
+        for (uint32_t i = 0; i < 3; i++) {
+            if (value->curves[i] && !value->curves[i]->is_constant) {
+                value->is_constant = false;
+                break;
+            }
+        }
 	}
+
+	ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, uc->scene.anim_layers) {
+        ufbxi_check(ufbxi_finalize_anim_elements(uc, *p_layer));
+    }
+
+	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
+        ufbxi_check(ufbxi_gather_anim_elements(uc, *p_stack));
+    }
 
 	ufbxi_for_ptr_list(ufbx_shader, p_shader, uc->scene.shaders) {
 		ufbx_shader *shader = *p_shader;
@@ -17810,7 +17938,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				if (mat_tex.material_id != prev_material) {
 					if (prev_material >= 0 && num_textures_in_material > 0) {
 						ufbx_material *mat = mesh->materials.data[prev_material].material;
-						if (mat->textures.count == 0) {
+						if (mat && mat->textures.count == 0) {
 							ufbx_material_texture *texs = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_material_texture, num_textures_in_material);
 							ufbxi_check(texs);
 							mat->textures.data = texs;
@@ -19767,6 +19895,7 @@ static ufbxi_noinline ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 {
 	if (p_error) {
 		memset(p_error, 0, sizeof(ufbx_error));
+		ufbxi_fmt_err_info(p_error, "UFBX_ENABLE_GEOMETRY_CACHE");
 		ufbxi_report_err_msg(p_error, "UFBXI_FEATURE_GEOMETRY_CACHE", "Feature disabled");
 	}
 	return NULL;
@@ -19841,6 +19970,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_contex
 	file->data = cache;
 	return 1;
 #else
+	if (uc->opts.ignore_missing_external_files) return 1;
+
+	ufbxi_fmt_err_info(&uc->error, "UFBX_ENABLE_GEOMETRY_CACHE");
 	ufbxi_fail_msg("UFBXI_FEATURE_GEOMETRY_CACHE", "Feature disabled");
 #endif
 }
@@ -20670,6 +20802,16 @@ static double ufbxi_pow_abs(double v, double e)
 	return sign * ufbx_pow(v * sign, e);
 }
 
+static ufbxi_noinline bool ufbxi_contains_element(ufbx_element_list elems, const ufbx_element *element)
+{
+	if (!element) return false;
+
+	size_t index = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(const ufbx_element*, 8, &index, elems.data, 0, elems.count,
+		( *a < element ), ( *a == element ));
+	return index != SIZE_MAX;
+}
+
 static ufbxi_noinline void ufbxi_combine_anim_layer(ufbxi_anim_layer_combine_ctx *ctx, ufbx_anim_layer *layer, ufbx_real weight, const char *prop_name, ufbx_vec3 *result, const ufbx_vec3 *value)
 {
 	if (layer->compose_rotation && layer->blended && prop_name == ufbxi_Lcl_Rotation && !ctx->has_rotation_order) {
@@ -21206,17 +21348,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 		constraint->targets.data = targets;
 	}
 
-	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, ec->scene.anim_stacks) {
-		ufbx_anim_stack *stack = *p_stack;
-
-		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &stack->layers));
-		ufbxi_check_err(&ec->error, ufbxi_translate_anim(ec, &stack->anim));
-	}
-
 	ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, ec->scene.anim_layers) {
 		ufbx_anim_layer *layer = *p_layer;
 
+		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &layer->anim_elements));
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &layer->anim_values));
+		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &layer->parent_stacks));
 		ufbx_anim_prop *props = ufbxi_push(&ec->result, ufbx_anim_prop, layer->anim_props.count);
 		ufbxi_check_err(&ec->error, props);
 		for (size_t i = 0; i < layer->anim_props.count; i++) {
@@ -21225,6 +21362,19 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 			props[i].anim_value = (ufbx_anim_value*)ufbxi_translate_element(ec, props[i].anim_value);
 		}
 		layer->anim_props.data = props;
+	}
+
+	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, ec->scene.anim_stacks) {
+		ufbx_anim_stack *stack = *p_stack;
+
+		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &stack->layers));
+		ufbxi_check_err(&ec->error, ufbxi_translate_anim(ec, &stack->anim));
+
+		if (stack->layers.count > 1) {
+			ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &stack->anim_elements));
+		} else {
+			stack->anim_elements = stack->layers.data[0]->anim_elements;
+		}
 	}
 
 	ufbxi_for_ptr_list(ufbx_pose, p_pose, ec->scene.poses) {
@@ -23751,6 +23901,7 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 {
 	if (p_error) {
 		memset(p_error, 0, sizeof(ufbx_error));
+		ufbxi_fmt_err_info(p_error, "UFBX_ENABLE_SUBDIVISION");
 		ufbxi_report_err_msg(p_error, "UFBXI_FEATURE_SUBDIVISION", "Feature disabled");
 	}
 	return NULL;
@@ -23759,6 +23910,8 @@ ufbxi_noinline static ufbx_mesh *ufbxi_subdivide_mesh(const ufbx_mesh *mesh, siz
 #endif
 
 // -- Utility
+
+#if UFBXI_FEATURE_INDEX_GENERATION
 
 static int ufbxi_map_cmp_vertex(void *user, const void *va, const void *vb)
 {
@@ -23895,6 +24048,20 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 	return result_vertices;
 
 }
+
+#else
+
+static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *user_streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator_opts *allocator, ufbx_error *error)
+{
+	if (error) {
+		memset(error, 0, sizeof(ufbx_error));
+        ufbxi_fmt_err_info(error, "UFBX_ENABLE_INDEX_GENERATION");
+		ufbxi_report_err_msg(error, "UFBXI_FEATURE_INDEX_GENERATION", "Feature disabled");
+	}
+	return NULL;
+}
+
+#endif
 
 static ufbxi_noinline void ufbxi_free_scene_imp(ufbxi_scene_imp *imp)
 {
@@ -24241,6 +24408,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_format_error(char *dst, size_t dst_size, con
 	size_t stack_size = ufbxi_min_sz(error->stack_size, UFBX_ERROR_STACK_MAX_DEPTH);
 	for (size_t i = 0; i < stack_size; i++) {
 		const ufbx_error_frame *frame = &error->stack[i];
+		if (!frame->source_line) break;
 		int num = ufbxi_snprintf(dst + offset, dst_size - offset, "%6u:%s: %s\n", frame->source_line, frame->function.data, frame->description.data);
 		if (num > 0) offset = ufbxi_min_sz(offset + (size_t)num, dst_size - 1);
 	}
@@ -24415,6 +24583,19 @@ ufbx_abi ufbxi_noinline ufbx_anim_prop_list ufbx_find_anim_props(const ufbx_anim
 	}
 
 	return result;
+}
+
+ufbx_abi bool ufbx_anim_stack_contains_element(const ufbx_anim_stack *stack, const ufbx_element *element)
+{
+	if (!stack || !element) return false;
+	return ufbxi_contains_element(stack->anim_elements, element);
+}
+
+ufbx_abi bool ufbx_anim_layer_contains_element(const ufbx_anim_layer *layer, const ufbx_element *element)
+{
+	if (!layer || !element) return false;
+	if (!ufbxi_anim_layer_might_contain_id(layer, element->element_id)) return false;
+	return ufbxi_contains_element(layer->anim_elements, element);
 }
 
 ufbx_abi ufbxi_noinline ufbx_matrix ufbx_get_compatible_matrix_for_normals(const ufbx_node *node)
@@ -24726,6 +24907,7 @@ ufbx_abi ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_ani
 #else
 	if (error) {
 		memset(error, 0, sizeof(ufbx_error));
+		ufbxi_fmt_err_info(error, "UFBX_ENABLE_SCENE_EVALUATION");
 		ufbxi_report_err_msg(error, "UFBXI_FEATURE_SCENE_EVALUATION", "Feature disabled");
 	}
 	return NULL;
@@ -25613,6 +25795,7 @@ ufbx_abi ufbx_line_curve *ufbx_tessellate_nurbs_curve(const ufbx_nurbs_curve *cu
 #else
 	if (error) {
 		memset(error, 0, sizeof(ufbx_error));
+		ufbxi_fmt_err_info(error, "UFBX_ENABLE_TESSELLATION");
 		ufbxi_report_err_msg(error, "UFBXI_FEATURE_TESSELLATION", "Feature disabled");
 	}
 	return NULL;
