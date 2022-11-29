@@ -2634,6 +2634,9 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 		frame->function.length = strlen(func);
 		frame->source_line = line;
 	}
+#else
+	ufbxi_ignore(func);
+	ufbxi_ignore(line);
 #endif
 
 	return 0;
