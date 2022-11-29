@@ -1943,6 +1943,9 @@ typedef enum ufbxt_file_test_flags {
 
 	// This test is heavy to fuzz and is fuzzed with lower quality, use `--heavy-fuzz-quality` to control it.
 	UFBXT_FILE_TEST_FLAG_HEAVY_TO_FUZZ = 0x8,
+
+	// Allow scene loading to fail if `ufbx_load_opts.strict` is specified.
+	UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR = 0x10,
 } ufbxt_file_test_flags;
 
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err, ufbx_error *load_error), const char *suffix, ufbx_load_opts user_opts, ufbxt_file_test_flags flags)
@@ -1965,6 +1968,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 	bool allow_error = (flags & UFBXT_FILE_TEST_FLAG_ALLOW_ERROR) != 0;
 	bool alternative = (flags & UFBXT_FILE_TEST_FLAG_ALTERNATIVE) != 0;
+	bool allow_strict_error = (flags & UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR) != 0;
 
 	ufbx_scene *obj_scene = NULL;
 	if (obj_file) {
@@ -2220,6 +2224,48 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				} else if (!allow_error) {
 					ufbxt_log_error(&ignore_error);
 					ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file ignoring everything");
+				}
+			}
+
+			// Strict mode
+			{
+				ufbx_load_opts strict_opts = load_opts;
+				strict_opts.disable_quirks = true;
+				strict_opts.strict = true;
+				strict_opts.no_format_from_content = true;
+				strict_opts.no_format_from_extension = true;
+
+				ufbx_error strict_error;
+				ufbx_scene *strict_scene = ufbx_load_file(buf, &strict_opts, &strict_error);
+				if (strict_scene) {
+					ufbxt_check_scene(strict_scene);
+					ufbxt_assert(strict_scene->metadata.file_format == load_opts.file_format);
+					ufbx_free_scene(strict_scene);
+				} else if (!allow_error && !allow_strict_error) {
+					ufbxt_log_error(&strict_error);
+					ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file with strict options");
+				}
+			}
+
+			// Loose mode
+			{
+				ufbx_load_opts loose_opts = load_opts;
+				loose_opts.allow_missing_vertex_position = true;
+				loose_opts.allow_nodes_out_of_root = true;
+				loose_opts.allow_null_material = true;
+				loose_opts.connect_broken_elements = true;
+				loose_opts.generate_missing_normals = true;
+				loose_opts.ignore_missing_external_files = true;
+
+				ufbx_error loose_error;
+				ufbx_scene *loose_scene = ufbx_load_file(buf, &loose_opts, &loose_error);
+				if (loose_scene) {
+					ufbxt_check_scene(loose_scene);
+					ufbxt_assert(loose_scene->metadata.file_format == load_opts.file_format);
+					ufbx_free_scene(loose_scene);
+				} else if (!allow_error) {
+					ufbxt_log_error(&loose_error);
+					ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file with loose options");
 				}
 			}
 

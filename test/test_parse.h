@@ -214,7 +214,7 @@ UFBXT_FILE_TEST(synthetic_duplicate_prop)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_missing_version)
+UFBXT_FILE_TEST_FLAGS(synthetic_missing_version, UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(scene->metadata.version == 6100);
@@ -223,7 +223,7 @@ UFBXT_FILE_TEST(synthetic_missing_version)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_missing_exporter)
+UFBXT_FILE_TEST_FLAGS(synthetic_missing_exporter, UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(scene->metadata.version == 6100);
@@ -232,7 +232,7 @@ UFBXT_FILE_TEST(synthetic_missing_exporter)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_blender_old_exporter)
+UFBXT_FILE_TEST_FLAGS(synthetic_blender_old_exporter, UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(scene->metadata.version == 6100);

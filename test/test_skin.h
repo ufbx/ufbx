@@ -432,7 +432,7 @@ UFBXT_FILE_TEST(blender_279_bone_radius)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_broken_cluster)
+UFBXT_FILE_TEST_FLAGS(synthetic_broken_cluster, UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR)
 #if UFBXT_IMPL
 {
 	ufbx_node *cube = ufbx_find_node(scene, "pCube1");
