@@ -5499,8 +5499,10 @@ static ufbxi_noinline void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *a
 		opts = &zero_opts;
 	}
 
-	ator->error = error;
+	// `opts` is either passed in or `zero_opts`.
+	// cppcheck-suppress uninitvar
 	ator->ator = *opts;
+	ator->error = error;
 	ator->max_size = opts->memory_limit ? opts->memory_limit : SIZE_MAX;
 	ator->max_allocs = opts->allocation_limit ? opts->allocation_limit : SIZE_MAX;
 	ator->huge_size = opts->huge_threshold ? opts->huge_threshold : 0x100000;
@@ -8006,6 +8008,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 				}
 
 				size_t step = 1;
+
+				ufbxi_dev_assert(entity && *entity);
+				// `entity` is a NULL terminated string longer than a single character
+				// cppcheck-suppress arrayIndexOutOfBounds
 				for (; entity[step]; step++) {
 					if (c != entity[step]) break;
 					c = ufbxi_ascii_next(uc);
@@ -8356,6 +8362,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 				if (num_values < UFBXI_MAX_NON_ARRAY_VALUES) {
 					type_mask |= (uint32_t)UFBXI_VALUE_NUMBER << (num_values*2);
 					ufbxi_value *v = &vals[num_values];
+					// False positive: `v->f` and `v->i` do not overlap in the union.
+					// cppcheck-suppress overlappingWriteUnion
 					v->f = (double)(v->i = val) * (double)fsign;
 				}
 				break;
@@ -8382,6 +8390,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 				if (num_values < UFBXI_MAX_NON_ARRAY_VALUES) {
 					type_mask |= (uint32_t)UFBXI_VALUE_NUMBER << (num_values*2);
 					ufbxi_value *v = &vals[num_values];
+					// False positive: `v->f` and `v->i` do not overlap in the union.
+					// cppcheck-suppress overlappingWriteUnion
 					v->i = ufbxi_f64_to_i64(v->f = val);
 				}
 				break;
@@ -8412,6 +8422,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 				if (num_values < UFBXI_MAX_NON_ARRAY_VALUES) {
 					type_mask |= (uint32_t)UFBXI_VALUE_NUMBER << (num_values*2);
 					ufbxi_value *v = &vals[num_values];
+					// False positive: `v->f` and `v->i` do not overlap in the union.
+					// cppcheck-suppress overlappingWriteUnion
 					v->f = (double)(v->i = val);
 				}
 				break;
