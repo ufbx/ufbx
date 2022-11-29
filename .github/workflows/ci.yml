@@ -194,7 +194,7 @@ jobs:
       - name: Compile ufbx.c wth x86 TCC
         run: i386-tcc -Wall -Werror -c ufbx.c -o build/tcc-ufbx-x86.o
       - name: Compile PowerPC tests
-        run: python3 -m ziglang cc -fno-sanitize=undefined -target powerpc-linux ufbx.c test/runner.c -g -o build/ppc-runner
+        run: python3 -m ziglang cc -fno-sanitize=undefined -target powerpc-linux -DUFBX_DEV ufbx.c test/runner.c -g -o build/ppc-runner
       - name: Run PowerPC tests
         run: qemu-ppc build/ppc-runner -d data
       - name: Compile PowerPC hash_scene
