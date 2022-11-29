@@ -20257,13 +20257,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 		uc->scene.metadata.may_contain_no_index = true;
 	}
 
-	if (uc->opts.allow_null_material) {
-		uc->scene.metadata.may_contain_null_materials = true;
-	}
-
-	if (uc->opts.allow_missing_vertex_position) {
-		uc->scene.metadata.may_contain_missing_vertex_position = true;
-	}
+	uc->scene.metadata.may_contain_null_materials = uc->opts.allow_null_material;
+	uc->scene.metadata.may_contain_missing_vertex_position = uc->opts.allow_missing_vertex_position;
+	uc->scene.metadata.may_contain_broken_elements = uc->opts.connect_broken_elements;
 
 	uc->scene.metadata.creator.data = ufbxi_empty_char;
 

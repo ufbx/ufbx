@@ -683,7 +683,9 @@ static void ufbxt_check_skin_deformer(ufbx_scene *scene, ufbx_skin_deformer *def
 {
 	for (size_t i = 0; i < deformer->clusters.count; i++) {
 		ufbxt_check_element_ptr(scene, deformer->clusters.data[i], UFBX_ELEMENT_SKIN_CLUSTER);
-		ufbxt_assert(deformer->clusters.data[i]->bone_node);
+		if (!scene->metadata.may_contain_broken_elements) {
+			ufbxt_assert(deformer->clusters.data[i]->bone_node);
+		}
 	}
 	for (size_t i = 0; i < deformer->vertices.count; i++) {
 		ufbx_skin_vertex vertex = deformer->vertices.data[i];

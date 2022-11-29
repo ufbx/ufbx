@@ -2912,6 +2912,10 @@ typedef struct ufbx_metadata {
 	// NOTE: `ufbx_mesh.vertex_position.exists` may be `false`!
 	bool may_contain_missing_vertex_position;
 
+	// Arrays may contain items with `NULL` element references.
+	// See `ufbx_load_opts.connect_broken_elements`.
+	bool may_contain_broken_elements;
+
 	// Some API guarantees do not apply (depending on unsafe options used).
 	// Loaded with `ufbx_load_opts.allow_unsafe` enabled.
 	bool unsafe;
