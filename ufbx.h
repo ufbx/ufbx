@@ -4272,7 +4272,7 @@ ufbx_abi size_t ufbx_ffi_get_triangulate_face_num_indices(const ufbx_face *face)
 ufbx_abi uint32_t ufbx_ffi_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, const ufbx_face *face);
 
 ufbx_inline size_t ufbx_check_index(size_t index, size_t count) {
-    (void)(count);
+	(void)count;
 	ufbx_assert(index < count);
 	return index;
 }
