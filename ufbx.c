@@ -20384,13 +20384,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 		uc->scene.metadata.may_contain_no_index = true;
 	}
 
-	if (uc->opts.allow_null_material) {
-		uc->scene.metadata.may_contain_null_materials = true;
-	}
-
-	if (uc->opts.allow_missing_vertex_position) {
-		uc->scene.metadata.may_contain_missing_vertex_position = true;
-	}
+	uc->scene.metadata.may_contain_null_materials = uc->opts.allow_null_material;
+	uc->scene.metadata.may_contain_missing_vertex_position = uc->opts.allow_missing_vertex_position;
+	uc->scene.metadata.may_contain_broken_elements = uc->opts.connect_broken_elements;
 
 	uc->scene.metadata.creator.data = ufbxi_empty_char;
 
@@ -24307,6 +24303,7 @@ ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_le
 		opts_copy = *opts;
 	} else {
 		memset(&opts_copy, 0, sizeof(opts_copy));
+		opts = &opts_copy;
 	}
 	if (opts_copy.filename.length == 0 || opts_copy.filename.data == NULL) {
 		opts_copy.filename.data = filename;
