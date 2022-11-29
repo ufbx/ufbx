@@ -1816,6 +1816,7 @@ static ufbxi_noinline void ufbxi_init_static_huff(ufbxi_trees *trees, const ufbx
 	err |= ufbxi_huff_build(&trees->dist, dist_bits, sizeof(dist_bits), ufbxi_deflate_dist_lut, 0, trees->fast_bits);
 
 	// Building the static trees cannot fail as we use pre-defined code lengths.
+	ufbxi_ignore(err);
 	ufbx_assert(err == 0);
 }
 
@@ -22335,7 +22336,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	// Build a KD-tree out of the collected reflex vertices.
 	uint32_t num_skip_indices = (1u << (UFBXI_KD_FAST_DEPTH + 1)) - 1;
 	uint32_t kd_slow_indices = num_kd_indices > num_skip_indices ? num_kd_indices - num_skip_indices : 0;
-    ufbxi_ignore(kd_slow_indices);
+	ufbxi_ignore(kd_slow_indices);
 	ufbx_assert(kd_slow_indices + face.num_indices * 2 <= num_indices);
 	ufbxi_kd_build(nc, kd_indices, kd_tmp, num_kd_indices, 0, 0, 0);
 
@@ -22588,7 +22589,7 @@ ufbxi_noinline static void ufbxi_compute_topology(const ufbx_mesh *mesh, ufbx_to
 
 static bool ufbxi_is_edge_smooth(const ufbx_mesh *mesh, const ufbx_topo_edge *topo, size_t num_topo, uint32_t index, bool assume_smooth)
 {
-    ufbxi_ignore(num_topo);
+	ufbxi_ignore(num_topo);
 	ufbx_assert((size_t)index < num_topo);
 	if (mesh->edge_smoothing.data) {
 		uint32_t edge = topo[index].edge;
