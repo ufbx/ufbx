@@ -15588,28 +15588,21 @@ typedef void (*ufbxi_mat_transform_fn)(ufbx_vec4 *a);
 static void ufbxi_mat_transform_unknown_shininess(ufbx_vec4 *v) { if (v->x >= 0.0f) v->x = (ufbx_real)(1.0f - ufbx_sqrt(v->x) * (ufbx_real)0.1); if (!(v->x >= 0.0f)) v->x = 0.0f; }
 static void ufbxi_mat_transform_blender_opacity(ufbx_vec4 *v) { v->x = 1.0f - v->x; }
 static void ufbxi_mat_transform_blender_shininess(ufbx_vec4 *v) { if (v->x >= 0.0f) v->x = (ufbx_real)(1.0f - ufbx_sqrt(v->x) * (ufbx_real)0.1); if (!(v->x >= 0.0f)) v->x = 0.0f; }
-static void ufbxi_mat_transform_max_pbr_use_glossiness(ufbx_vec4 *v) { v->x = v->x >= 0.5f && v->x <= 1.5f ? 1.0f : 0.0f; }
 
 typedef enum {
 	UFBXI_MAT_TRANSFORM_IDENTITY,
 	UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS,
 	UFBXI_MAT_TRANSFORM_BLENDER_OPACITY,
 	UFBXI_MAT_TRANSFORM_BLENDER_SHININESS,
-	UFBXI_MAT_TRANSFORM_MAX_PBR_USE_GLOSSINESS,
 
 	UFBXI_MAT_TRANSFORM_COUNT,
 } ufbxi_mat_transform;
 
 typedef enum {
-	// Invert texture
-	UFBXI_SHADER_MAPPING_INVERT_TEXTURE = 0x1,
-	// Property toggles inversion of a value
-	// NOTE: These need to be the last entries in mappings
-	UFBXI_SHADER_MAPPING_TOGGLE_INVERT = 0x2,
 	// Set `value_vec4.w` (usually alpha) to 1.0 if not defined by the property
-	UFBXI_SHADER_MAPPING_DEFAULT_W_1 = 0x4,
+	UFBXI_SHADER_MAPPING_DEFAULT_W_1 = 0x1,
 	// Widen values to RGB if only a single value is present.
-	UFBXI_SHADER_MAPPING_WIDEN_TO_RGB = 0x8,
+	UFBXI_SHADER_MAPPING_WIDEN_TO_RGB = 0x2,
 } ufbxi_shader_mapping_flag;
 
 typedef enum {
@@ -15617,6 +15610,8 @@ typedef enum {
 	UFBXI_SHADER_FEATURE_INVERTED = 0x1,
 	// Enable the feature if the given property exists
 	UFBXI_SHADER_FEATURE_IF_EXISTS = 0x2,
+	// Enable if the feature is in [0.5, 1.5], (ie. 2 won't enable this feature)
+	UFBXI_SHADER_FEATURE_IF_AROUND_1 = 0x4,
 } ufbxi_shader_feature_flag;
 
 static const ufbxi_mat_transform_fn ufbxi_mat_transform_fns[] = {
@@ -15624,7 +15619,6 @@ static const ufbxi_mat_transform_fn ufbxi_mat_transform_fns[] = {
 	&ufbxi_mat_transform_unknown_shininess,
 	&ufbxi_mat_transform_blender_opacity,
 	&ufbxi_mat_transform_blender_shininess,
-	&ufbxi_mat_transform_max_pbr_use_glossiness,
 };
 
 typedef struct {
@@ -15715,8 +15709,8 @@ static const ufbxi_shader_mapping ufbxi_fbx_phong_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Specular") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("SpecularColor") },
 	{ UFBX_MATERIAL_PBR_SPECULAR_FACTOR, 0, 0, ufbxi_mat_string("SpecularFactor") },
-	{ UFBX_MATERIAL_PBR_ROUGHNESS, UFBXI_SHADER_MAPPING_INVERT_TEXTURE, UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS, ufbxi_mat_string("Shininess") },
-	{ UFBX_MATERIAL_PBR_ROUGHNESS, UFBXI_SHADER_MAPPING_INVERT_TEXTURE, UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS, ufbxi_mat_string("ShininessExponent") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS, ufbxi_mat_string("Shininess") },
+	{ UFBX_MATERIAL_PBR_ROUGHNESS, 0, UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS, ufbxi_mat_string("ShininessExponent") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("Transparent") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("TransparentColor") },
 	{ UFBX_MATERIAL_PBR_TRANSMISSION_FACTOR, 0, 0, ufbxi_mat_string("TransparentFactor") },
@@ -15873,9 +15867,6 @@ static const ufbxi_shader_mapping ufbxi_3ds_max_physical_material_pbr_mapping[] 
 	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement") },
 	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement_map_amt") },
 	{ UFBX_MATERIAL_PBR_SUBSURFACE_TYPE, 0, 0, ufbxi_mat_string("subsurfaceType") },
-	{ UFBX_MATERIAL_PBR_ROUGHNESS, UFBXI_SHADER_MAPPING_TOGGLE_INVERT, 0, ufbxi_mat_string("roughness_inv") },
-	{ UFBX_MATERIAL_PBR_TRANSMISSION_ROUGHNESS, UFBXI_SHADER_MAPPING_TOGGLE_INVERT, 0, ufbxi_mat_string("trans_roughness_inv") },
-	{ UFBX_MATERIAL_PBR_COAT_ROUGHNESS, UFBXI_SHADER_MAPPING_TOGGLE_INVERT, 0, ufbxi_mat_string("coat_roughness_inv") },
 };
 
 static const ufbxi_shader_mapping ufbxi_3ds_max_physical_material_features[] = {
@@ -15883,6 +15874,9 @@ static const ufbxi_shader_mapping ufbxi_3ds_max_physical_material_features[] = {
 	{ UFBX_MATERIAL_FEATURE_SPECULAR, 0, 0, ufbxi_mat_string("material_mode") },
 	{ UFBX_MATERIAL_FEATURE_DIFFUSE_ROUGHNESS, 0, 0, ufbxi_mat_string("material_mode") },
 	{ UFBX_MATERIAL_FEATURE_TRANSMISSION_ROUGHNESS, UFBXI_SHADER_FEATURE_INVERTED, 0, ufbxi_mat_string("trans_roughness_lock") },
+	{ UFBX_MATERIAL_FEATURE_ROUGHNESS_AS_GLOSSINESS, 0, 0, ufbxi_mat_string("roughness_inv") },
+	{ UFBX_MATERIAL_FEATURE_TRANSMISSION_ROUGHNESS_AS_GLOSSINESS, 0, 0, ufbxi_mat_string("trans_roughness_inv") },
+	{ UFBX_MATERIAL_FEATURE_COAT_ROUGHNESS_AS_GLOSSINESS, 0, 0, ufbxi_mat_string("coat_roughness_inv") },
 };
 
 static const ufbxi_shader_mapping ufbxi_gltf_material_pbr_mapping[] = {
@@ -15919,7 +15913,6 @@ static const ufbxi_shader_mapping ufbxi_3ds_max_pbr_metal_rough_pbr_mapping[] = 
 	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement") },
 	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement_amt") },
 	{ UFBX_MATERIAL_PBR_OPACITY, 0, 0, ufbxi_mat_string("opacity") },
-	{ UFBX_MATERIAL_PBR_ROUGHNESS, UFBXI_SHADER_MAPPING_TOGGLE_INVERT, UFBXI_MAT_TRANSFORM_MAX_PBR_USE_GLOSSINESS, ufbxi_mat_string("useGlossiness") },
 };
 
 static const ufbxi_shader_mapping ufbxi_3ds_max_pbr_spec_gloss_pbr_mapping[] = {
@@ -15934,7 +15927,10 @@ static const ufbxi_shader_mapping ufbxi_3ds_max_pbr_spec_gloss_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement") },
 	{ UFBX_MATERIAL_PBR_DISPLACEMENT_MAP, 0, 0, ufbxi_mat_string("displacement_amt") },
 	{ UFBX_MATERIAL_PBR_OPACITY, 0, 0, ufbxi_mat_string("opacity") },
-	{ UFBX_MATERIAL_PBR_ROUGHNESS, UFBXI_SHADER_MAPPING_TOGGLE_INVERT, UFBXI_MAT_TRANSFORM_MAX_PBR_USE_GLOSSINESS, ufbxi_mat_string("useGlossiness") },
+};
+
+static const ufbxi_shader_mapping ufbxi_3ds_max_pbr_features[] = {
+	{ UFBX_MATERIAL_FEATURE_ROUGHNESS_AS_GLOSSINESS, UFBXI_SHADER_FEATURE_IF_AROUND_1, 0, ufbxi_mat_string("useGlossiness") },
 };
 
 static const ufbxi_shader_mapping ufbxi_gltf_material_features[] = {
@@ -16062,14 +16058,14 @@ static const ufbxi_shader_mapping_list ufbxi_shader_pbr_mappings[] = {
 	},
 	{ // UFBX_SHADER_3DS_MAX_PBR_METAL_ROUGH
 		ufbxi_3ds_max_pbr_metal_rough_pbr_mapping, ufbxi_arraycount(ufbxi_3ds_max_pbr_metal_rough_pbr_mapping),
-		NULL, 0,
+		ufbxi_3ds_max_pbr_features, ufbxi_arraycount(ufbxi_3ds_max_pbr_features),
 		(uint32_t)(UFBXI_MAT_PBR | UFBXI_MAT_METALNESS | UFBXI_MAT_DIFFUSE | UFBXI_MAT_OPACITY),
 		{ NULL, 0 }, ufbxi_string_literal("_map"), // texture_prefix/suffix
 		{ NULL, 0 }, { NULL, 0 }, // texture_enabled_prefix/suffix
 	},
 	{ // UFBX_SHADER_3DS_MAX_PBR_SPEC_GLOSS
 		ufbxi_3ds_max_pbr_spec_gloss_pbr_mapping, ufbxi_arraycount(ufbxi_3ds_max_pbr_spec_gloss_pbr_mapping),
-		NULL, 0,
+		ufbxi_3ds_max_pbr_features, ufbxi_arraycount(ufbxi_3ds_max_pbr_features),
 		(uint32_t)(UFBXI_MAT_PBR | UFBXI_MAT_SPECULAR | UFBXI_MAT_DIFFUSE | UFBXI_MAT_OPACITY),
 		{ NULL, 0 }, ufbxi_string_literal("_map"), // texture_prefix/suffix
 		{ NULL, 0 }, { NULL, 0 }, // texture_enabled_prefix/suffix
@@ -16106,8 +16102,7 @@ enum {
 	UFBXI_MAPPING_FETCH_VALUE = 0x1,
 	UFBXI_MAPPING_FETCH_TEXTURE = 0x2,
 	UFBXI_MAPPING_FETCH_TEXTURE_ENABLED = 0x4,
-	UFBXI_MAPPING_FETCH_INVERT = 0x8,
-	UFBXI_MAPPING_FETCH_FEATURE = 0x10,
+	UFBXI_MAPPING_FETCH_FEATURE = 0x8,
 };
 
 ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufbx_material_map *maps, ufbx_material_feature_info *features,
@@ -16162,6 +16157,9 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 				if (prop && prop->type != UFBX_PROP_REFERENCE) {
 					feature->enabled = prop->value_int != 0;
 					feature->is_explicit = true;
+					if (mapping_flags & UFBXI_SHADER_FEATURE_IF_AROUND_1) {
+						feature->enabled = (prop->value_real >= 0.5f && prop->value_real <= 1.5f);
+					}
 					if (mapping_flags & UFBXI_SHADER_FEATURE_INVERTED) {
 						feature->enabled = !feature->enabled;
 					}
@@ -16173,28 +16171,6 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 			}
 
 			ufbx_material_map *map = &maps[mapping->index];
-
-			if (mapping_flags & UFBXI_SHADER_MAPPING_TOGGLE_INVERT) {
-
-				if ((flags & UFBXI_MAPPING_FETCH_INVERT) != 0 && prop) {
-					bool do_toggle = prop->value_int != 0;
-
-					if (mapping->transform) {
-						ufbxi_mat_transform_fn transform_fn = ufbxi_mat_transform_fns[mapping->transform];
-						ufbx_vec4 value = prop->value_vec4;
-						transform_fn(&value);
-						do_toggle = value.x > 0.5f;
-					}
-
-					if (do_toggle) {
-						if (map->has_value) {
-							map->value_real = 1.0f - map->value_real;
-						}
-						map->texture_inverted = !map->texture_inverted;
-					}
-				}
-				continue;
-			}
 
 			if (flags & UFBXI_MAPPING_FETCH_VALUE) {
 				if (prop && prop->type != UFBX_PROP_REFERENCE) {
@@ -16217,9 +16193,6 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 
 			if (flags & UFBXI_MAPPING_FETCH_TEXTURE) {
 				ufbx_texture *texture = ufbx_find_prop_texture_len(material, name.data, name.length);
-				if (!map->texture || texture) {
-					map->texture_inverted = (mapping_flags & UFBXI_SHADER_MAPPING_INVERT_TEXTURE) != 0;
-				}
 				if (texture) {
 					map->texture = texture;
 					map->texture_enabled = true;
@@ -16247,6 +16220,21 @@ ufbxi_noinline static void ufbxi_update_factor(ufbx_material_map *factor_map, uf
 		}
 	}
 }
+
+// Some material modes have toggleable roughness/glossiness mode, we read it initially
+// always as roughness and if a matching feature such as `roughness_as_glossiness` is set
+// we transfer the data into the glossiness and invert the roughness.
+typedef struct {
+	uint8_t feature;
+	uint8_t roughness_map;
+	uint8_t glossiness_map;
+} ufbxi_glossiness_remap;
+
+static const ufbxi_glossiness_remap ufbxi_glossiness_remaps[] = {
+	{ UFBX_MATERIAL_FEATURE_ROUGHNESS_AS_GLOSSINESS, UFBX_MATERIAL_PBR_ROUGHNESS, UFBX_MATERIAL_PBR_GLOSSINESS },
+	{ UFBX_MATERIAL_FEATURE_COAT_ROUGHNESS_AS_GLOSSINESS, UFBX_MATERIAL_PBR_COAT_ROUGHNESS, UFBX_MATERIAL_PBR_COAT_GLOSSINESS },
+	{ UFBX_MATERIAL_FEATURE_TRANSMISSION_ROUGHNESS_AS_GLOSSINESS, UFBX_MATERIAL_PBR_TRANSMISSION_ROUGHNESS, UFBX_MATERIAL_PBR_TRANSMISSION_GLOSSINESS },
+};
 
 ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *material)
 {
@@ -16293,7 +16281,7 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 
 	ufbxi_fetch_mapping_maps(material, material->pbr.maps, NULL, shader,
 		list.data, list.count, prefix, ufbx_empty_string, ufbx_empty_string,
-		UFBXI_MAPPING_FETCH_VALUE | UFBXI_MAPPING_FETCH_TEXTURE | UFBXI_MAPPING_FETCH_INVERT);
+		UFBXI_MAPPING_FETCH_VALUE | UFBXI_MAPPING_FETCH_TEXTURE);
 
 	if (list.texture_enabled_prefix.length > 0 || list.texture_enabled_suffix.length > 0) {
 		ufbxi_fetch_mapping_maps(material, material->pbr.maps, NULL, shader,
@@ -16321,6 +16309,23 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 	// Patch transmission roughness if only extra roughness is defined
 	if (!material->pbr.transmission_roughness.has_value && material->pbr.roughness.has_value && material->pbr.transmission_extra_roughness.has_value) {
 		material->pbr.transmission_roughness.value_real = material->pbr.roughness.value_real + material->pbr.transmission_extra_roughness.value_real;
+	}
+
+	// Map roughness to glossiness and vice versa
+	ufbxi_for(const ufbxi_glossiness_remap, remap, ufbxi_glossiness_remaps, ufbxi_arraycount(ufbxi_glossiness_remaps)) {
+		ufbx_material_map *roughness = &material->pbr.maps[remap->roughness_map];
+		ufbx_material_map *glossiness = &material->pbr.maps[remap->glossiness_map];
+		if (material->features.features[remap->feature].enabled) {
+			*glossiness = *roughness;
+			memset(roughness, 0, sizeof(*roughness));
+			if (glossiness->has_value) {
+				roughness->value_real = 1.0f - glossiness->value_real;
+			}
+		} else {
+			if (roughness->has_value) {
+				glossiness->value_real = 1.0f - roughness->value_real;
+			}
+		}
 	}
 }
 

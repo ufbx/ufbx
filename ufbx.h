@@ -1892,11 +1892,6 @@ typedef struct ufbx_material_map {
 	// NOTE: Some shading models allow this to be `true` even if `texture == NULL`.
 	bool texture_enabled;
 
-	// Set if the texture values should be interpreted as `1 - x`.
-	// Used on various `roughness` maps when the native software uses smoothness values.
-	// NOTE: Does not apply to `value_real`, ufbx inverts those values internally.
-	bool texture_inverted;
-
 	// Set to `true` if this feature should be disabled (specific to shader type).
 	bool feature_disabled;
 
@@ -2046,6 +2041,9 @@ typedef enum ufbx_material_pbr_map {
 	UFBX_MATERIAL_PBR_MATTE_FACTOR,
 	UFBX_MATERIAL_PBR_MATTE_COLOR,
 	UFBX_MATERIAL_PBR_AMBIENT_OCCLUSION,
+	UFBX_MATERIAL_PBR_GLOSSINESS,
+	UFBX_MATERIAL_PBR_COAT_GLOSSINESS,
+	UFBX_MATERIAL_PBR_TRANSMISSION_GLOSSINESS,
 
 	UFBX_MATERIAL_PBR_MAP_COUNT,
 	UFBX_MATERIAL_PBR_MAP_FORCE_32BIT = 0x7fffffff,
@@ -2073,6 +2071,9 @@ typedef enum ufbx_material_feature {
 	UFBX_MATERIAL_FEATURE_EXIT_TO_BACKGROUND,
 	UFBX_MATERIAL_FEATURE_INTERNAL_REFLECTIONS,
 	UFBX_MATERIAL_FEATURE_DOUBLE_SIDED,
+	UFBX_MATERIAL_FEATURE_ROUGHNESS_AS_GLOSSINESS,
+	UFBX_MATERIAL_FEATURE_COAT_ROUGHNESS_AS_GLOSSINESS,
+	UFBX_MATERIAL_FEATURE_TRANSMISSION_ROUGHNESS_AS_GLOSSINESS,
 
 	UFBX_MATERIAL_FEATURE_COUNT,
 	UFBX_MATERIAL_FEATURE_FORCE_32BIT = 0x7fffffff,
@@ -2162,6 +2163,9 @@ typedef struct ufbx_material_pbr_maps {
 			ufbx_material_map matte_factor;
 			ufbx_material_map matte_color;
 			ufbx_material_map ambient_occlusion;
+			ufbx_material_map glossiness;
+			ufbx_material_map coat_glossiness;
+			ufbx_material_map transmission_glossiness;
 		};
 	};
 } ufbx_material_pbr_maps;
@@ -2190,6 +2194,9 @@ typedef struct ufbx_material_features {
 			ufbx_material_feature_info exit_to_background;
 			ufbx_material_feature_info internal_reflections;
 			ufbx_material_feature_info double_sided;
+			ufbx_material_feature_info roughness_as_glossiness;
+			ufbx_material_feature_info coat_roughness_as_glossiness;
+			ufbx_material_feature_info transmission_roughness_as_glossiness;
 		};
 	};
 } ufbx_material_features;
