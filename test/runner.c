@@ -146,8 +146,6 @@ void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
 
 void ufbxt_logf(const char *fmt, ...)
 {
-	if (!g_verbose) return;
-
 	va_list args;
 	va_start(args, fmt);
 	if (g_log_pos < sizeof(g_log_buf)) {
@@ -181,22 +179,24 @@ void ufbxt_assert_eq_test(const void *a, const void *b, size_t size, const char 
 	}
 }
 
-void ufbxt_log_flush()
+void ufbxt_log_flush(bool print_always)
 {
-	int prev_newline = 1;
-	for (uint32_t i = 0; i < g_log_pos; i++) {
-		if (i >= sizeof(g_log_buf)) break;
-		char ch = g_log_buf[i];
-		if (ch == '\n') {
-			putchar('\n');
-			prev_newline = 1;
-		} else {
-			if (prev_newline) {
-				putchar(' ');
-				putchar(' ');
+	if (g_verbose || print_always) {
+		int prev_newline = 1;
+		for (uint32_t i = 0; i < g_log_pos; i++) {
+			if (i >= sizeof(g_log_buf)) break;
+			char ch = g_log_buf[i];
+			if (ch == '\n') {
+				putchar('\n');
+				prev_newline = 1;
+			} else {
+				if (prev_newline) {
+					putchar(' ');
+					putchar(' ');
+				}
+				prev_newline = 0;
+				putchar(ch);
 			}
-			prev_newline = 0;
-			putchar(ch);
 		}
 	}
 	g_log_pos = 0;
@@ -2671,11 +2671,14 @@ int main(int argc, char **argv)
 		}
 
 		num_ran++;
+		bool print_always = false;
 		if (ufbxt_run_test(test)) {
 			num_ok++;
+		} else {
+			print_always = true;
 		}
 
-		ufbxt_log_flush();
+		ufbxt_log_flush(print_always);
 	}
 
 	if (num_ok < num_tests) {
