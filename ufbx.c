@@ -2620,7 +2620,11 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 			err->description.data = cond + 1;
 			err->description.length = strlen(err->description.data);
 		}
+
+#if UFBXI_FEATURE_ERROR_STACK
+		// Skip the description part if adding to a stack
 		cond = cond + strlen(cond) + 1;
+#endif
 	}
 
 	// NOTE: This is the base function all fails boil down to, place a breakpoint here to
