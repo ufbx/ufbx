@@ -34,7 +34,7 @@ jobs:
           path: build/hashes.txt
 
   ci_ubuntu:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v2
@@ -117,7 +117,7 @@ jobs:
           path: build/hashdump_ci_macos.txt.gz
 
   ci_picort:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - name: Run picort
