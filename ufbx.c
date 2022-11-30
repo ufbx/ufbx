@@ -5705,7 +5705,7 @@ static void ufbxi_memory_close(void *user)
     }
 
     ufbxi_allocator ator = stream->ator;
-    ufbxi_free_size(&ator, stream->self_size, stream, 1);
+    ufbxi_free(&ator, char, stream, stream->self_size);
     ufbxi_free_ator(&ator);
 }
 
@@ -13454,6 +13454,7 @@ static ufbxi_noinline void ufbxi_setup_ator_allocator(ufbx_allocator *allocator,
     allocator->alloc_fn = &ufbxi_ator_alloc;
     allocator->realloc_fn = &ufbxi_ator_realloc;
     allocator->free_fn = &ufbxi_ator_free;
+	allocator->free_allocator_fn = NULL;
     allocator->user = ator;
 }
 
