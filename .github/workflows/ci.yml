@@ -117,7 +117,7 @@ jobs:
           path: build/hashdump_ci_macos.txt.gz
 
   ci_picort:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
       - name: Run picort
