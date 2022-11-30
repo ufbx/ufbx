@@ -322,7 +322,8 @@ class GCCCompiler(Compiler):
         std = config.get("std", std)
         args.append(f"-std={std}")
 
-        args.append("-DUFBX_DEV")
+        if config.get("dev", True):
+            args.append("-DUFBX_DEV")
 
         use_sse = False
         if config.get("sse", False):
