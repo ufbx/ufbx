@@ -46,7 +46,7 @@ static bool ufbxt_open_file_memory_ref(void *user, ufbx_stream *stream, const ch
 	ufbx_open_memory_opts opts = { 0 };
 	opts.no_copy = true;
 	opts.close_cb.fn = &ufbxt_close_memory;
-	return ufbx_open_memory(&stream, data, size, NULL);
+	return ufbx_open_memory(stream, data, size, NULL);
 }
 
 #endif
@@ -61,7 +61,7 @@ static void ufbxt_do_open_memory_test(ufbx_open_file_fn *open_file_fn)
 			ufbx_load_opts opts = { 0 };
 			size_t num_calls = 0;
 
-			opts.open_file_cb.fn = ufbxt_open_file_memory_default;
+			opts.open_file_cb.fn = open_file_fn;
 			opts.open_file_cb.user = &num_calls;
 			opts.load_external_files = true;
 			if (i == 1) {
