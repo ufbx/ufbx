@@ -28,8 +28,12 @@
 #endif
 
 #ifndef ufbx_assert
-	#include <assert.h>
-	#define ufbx_assert(cond) assert(cond)
+	#if !defined(UFBX_NO_ASSERT)
+		#include <assert.h>
+		#define ufbx_assert(cond) assert(cond)
+	#else
+		#define ufbx_assert(cond) (void)0
+	#endif
 #endif
 
 // Pointer may be `NULL`.
