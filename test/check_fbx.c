@@ -59,6 +59,7 @@ int main(int argc, char **argv)
 	bool allow_bad_unicode = false;
 	bool sink = false;
 	bool ignore_missing_external = false;
+	bool dedicated_allocs = false;
 
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-v")) {
@@ -73,6 +74,8 @@ int main(int argc, char **argv)
 			if (++i < argc) frame = atoi(argv[i]);
 		} else if (!strcmp(argv[i], "--allow-bad-unicode")) {
 			allow_bad_unicode = true;
+		} else if (!strcmp(argv[i], "--dedicated-allocs")) {
+			dedicated_allocs = true;
 		} else if (!strcmp(argv[i], "--sink")) {
 			sink = true;
 		} else if (!strcmp(argv[i], "--ignore-missing-external")) {
@@ -103,6 +106,12 @@ int main(int argc, char **argv)
 	opts.target_axes = ufbx_axes_right_handed_y_up;
 	opts.target_unit_meters = 0.01;
 	opts.obj_search_mtl_by_filename = true;
+
+	if (dedicated_allocs) {
+		opts.temp_allocator.huge_threshold = 1;
+		opts.result_allocator.huge_threshold = 1;
+	}
+
 	if (!allow_bad_unicode) {
 		opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING;
 	}
