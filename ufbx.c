@@ -3475,27 +3475,29 @@ typedef struct {
 	ufbxi_buf aa_buf;
 	ufbxi_aa_node *aa_root;
 
-	// HACK: Maps contain pointers that are not stable between runs, in regression
-	// mode this causes instability in allocation patterns due to different AA trees
-	// being built, which is a problem in fuzz checks that need to have deterministic
-	// allocation counts. We can work around this using a local allocator that doesn't
-	// count the allocations.
-#if defined(UFBX_REGRESSION)
-	ufbxi_allocator regression_ator;
-#endif
 } ufbxi_map;
 
 static ufbxi_noinline void ufbxi_map_init(ufbxi_map *map, ufbxi_allocator *ator, ufbxi_cmp_fn *cmp_fn, void *cmp_user)
 {
 	map->ator = ator;
 #if defined(UFBX_REGRESSION)
-	map->regression_ator.name = "regression";
-	map->regression_ator.error = ator->error;
-	map->regression_ator.huge_size = ator->huge_size;
-	map->regression_ator.max_size = SIZE_MAX;
-	map->regression_ator.max_allocs = SIZE_MAX;
-	map->regression_ator.chunk_max = 0x1000000;
-	map->aa_buf.ator = &map->regression_ator;
+	// HACK: Maps contain pointers that are not stable between runs, in regression
+	// mode this causes instability in allocation patterns due to different AA trees
+	// being built, which is a problem in fuzz checks that need to have deterministic
+	// allocation counts. We can work around this using a local allocator that doesn't
+	// count the allocations.
+	{
+		ufbxi_allocator *regression_ator = (ufbxi_allocator*)malloc(sizeof(ufbxi_allocator));
+		ufbx_assert(regression_ator);
+		memset(regression_ator, 0, sizeof(ufbxi_allocator));
+		regression_ator->name = "regression";
+		regression_ator->error = ator->error;
+		regression_ator->huge_size = ator->huge_size;
+		regression_ator->max_size = SIZE_MAX;
+		regression_ator->max_allocs = SIZE_MAX;
+		regression_ator->chunk_max = 0x1000000;
+		map->aa_buf.ator = regression_ator;
+	}
 #else
 	map->aa_buf.ator = ator;
 #endif
@@ -3505,6 +3507,10 @@ static ufbxi_noinline void ufbxi_map_init(ufbxi_map *map, ufbxi_allocator *ator,
 
 static ufbxi_noinline void ufbxi_map_free(ufbxi_map *map)
 {
+#if defined(UFBX_REGRESSION)
+	ufbxi_allocator *regression_ator = map->aa_buf.ator;
+#endif
+
 	ufbxi_buf_free(&map->aa_buf);
 	ufbxi_free(map->ator, char, map->entries, map->data_size);
 	map->entries = NULL;
@@ -3513,7 +3519,8 @@ static ufbxi_noinline void ufbxi_map_free(ufbxi_map *map)
 	map->mask = map->capacity = map->size = 0;
 
 #if defined(UFBX_REGRESSION)
-	ufbxi_free_ator(&map->regression_ator);
+	ufbxi_free_ator(regression_ator);
+	free(regression_ator);
 #endif
 }
 
