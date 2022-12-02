@@ -15,6 +15,12 @@ static ufbx_load_opts ufbxt_retain_dom_opts()
 	opts.retain_dom = true;
 	return opts;
 }
+static ufbx_load_opts ufbxt_strict_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.strict = true;
+	return opts;
+}
 #endif
 
 UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_cube_dom, maya_cube, ufbxt_retain_dom_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
@@ -60,6 +66,12 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_cube_dom, maya_cube, ufbxt_retain_dom_opts, 
 		}
 	}
 	ufbxt_assert(num_negative == 6);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_cube_strict, maya_cube, ufbxt_strict_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
 }
 #endif
 

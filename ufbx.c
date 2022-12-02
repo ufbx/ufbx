@@ -3146,10 +3146,18 @@ static ufbxi_noinline void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
 	ufbx_assert(size > 0);
 	if (n == 0) return (void*)ufbxi_zero_size_buffer;
 
-	b->num_items += n;
-
 	size_t total = size * n;
 	if (ufbxi_does_overflow(total, size, n)) return NULL;
+
+	#if defined(UFBX_REGRESSION)
+	{
+		ufbxi_allocator *ator = b->ator;
+		ufbxi_check_return_err_msg(ator->error, ator->num_allocs < ator->max_allocs, NULL, "Allocation limit exceeded");
+		ator->num_allocs++;
+	}
+	#endif
+
+	b->num_items += n;
 
 	// Align to the natural alignment based on the size
 	size_t align_mask = ufbxi_size_align_mask(size);
@@ -3192,6 +3200,14 @@ static ufbxi_forceinline void *ufbxi_push_size_fast(ufbxi_buf *b, size_t size, s
 
 	size_t total = size * n;
 	ufbxi_regression_assert(!ufbxi_does_overflow(total, size, n));
+
+	#if defined(UFBX_REGRESSION)
+	{
+		ufbxi_allocator *ator = b->ator;
+		ufbxi_check_return_err_msg(ator->error, ator->num_allocs < ator->max_allocs, NULL, "Allocation limit exceeded");
+		ator->num_allocs++;
+	}
+	#endif
 
 	b->num_items += n;
 
@@ -3471,17 +3487,18 @@ typedef struct {
 
 static ufbxi_noinline void ufbxi_map_init(ufbxi_map *map, ufbxi_allocator *ator, ufbxi_cmp_fn *cmp_fn, void *cmp_user)
 {
+	map->ator = ator;
 #if defined(UFBX_REGRESSION)
-	map->ator = &map->regression_ator;
+	map->regression_ator.name = "regression";
 	map->regression_ator.error = ator->error;
 	map->regression_ator.huge_size = ator->huge_size;
 	map->regression_ator.max_size = SIZE_MAX;
 	map->regression_ator.max_allocs = SIZE_MAX;
 	map->regression_ator.chunk_max = 0x1000000;
+	map->aa_buf.ator = &map->regression_ator;
 #else
-	map->ator = ator;
-#endif
 	map->aa_buf.ator = ator;
+#endif
 	map->cmp_fn = cmp_fn;
 	map->cmp_user = cmp_user;
 }
@@ -3636,7 +3653,7 @@ static ufbxi_forceinline bool ufbxi_map_grow_size(ufbxi_map *map, size_t size, s
 	#if defined(UFBX_REGRESSION)
 	{
 		ufbxi_allocator *ator = map->ator;
-		ufbxi_check_return_err_msg(map->ator->error, ator->num_allocs < ator->max_allocs, false, "Allocation limit exceeded");
+		ufbxi_check_return_err_msg(ator->error, ator->num_allocs < ator->max_allocs, false, "Allocation limit exceeded");
 		ator->num_allocs++;
 	}
 	#endif
