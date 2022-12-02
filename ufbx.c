@@ -2895,6 +2895,13 @@ static ufbxi_noinline void ufbxi_free_size(ufbxi_allocator *ator, size_t size, v
 
 ufbxi_nodiscard static bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t size, void *p_ptr, size_t *p_cap, size_t n)
 {
+	#if defined(UFBX_REGRESSION)
+	{
+		ufbxi_check_return_err_msg(ator->error, ator->num_allocs < ator->max_allocs, false, "Allocation limit exceeded");
+		ator->num_allocs++;
+	}
+	#endif
+
 	if (n <= *p_cap) return true;
 	void *ptr = *(void**)p_ptr;
 	size_t old_n = *p_cap;
@@ -3604,6 +3611,14 @@ static ufbxi_noinline bool ufbxi_map_grow_size_imp(ufbxi_map *map, size_t item_s
 
 static ufbxi_forceinline bool ufbxi_map_grow_size(ufbxi_map *map, size_t size, size_t min_size)
 {
+	#if defined(UFBX_REGRESSION)
+	{
+		ufbxi_allocator *ator = map->ator;
+		ufbxi_check_return_err_msg(map->ator->error, ator->num_allocs < ator->max_allocs, false, "Allocation limit exceeded");
+		ator->num_allocs++;
+	}
+	#endif
+
 	if (map->size < map->capacity && map->capacity >= min_size) return true;
 	return ufbxi_map_grow_size_imp(map, size, min_size);
 }

@@ -59,7 +59,7 @@ UFBXT_TEST(fuzz_files)
 
 		int prev_fuzz_quality = g_fuzz_quality;
 		g_fuzz_quality = g_heavy_fuzz_quality;
-		ufbxt_do_fuzz(name, data, size, buf, allow_error, UFBX_FILE_FORMAT_FBX);
+		ufbxt_do_fuzz(name, data, size, buf, allow_error, UFBX_FILE_FORMAT_FBX, NULL);
 		g_fuzz_quality = prev_fuzz_quality;
 
 		free(data);
@@ -210,7 +210,7 @@ UFBXT_TEST(fuzz_obj_files)
 		ufbxt_assert(temp_freed);
 		ufbxt_assert(result_freed);
 
-		ufbxt_do_fuzz(name, data, size, buf, allow_error, UFBX_FILE_FORMAT_OBJ);
+		ufbxt_do_fuzz(name, data, size, buf, allow_error, UFBX_FILE_FORMAT_OBJ, NULL);
 
 		free(data);
 	}
@@ -278,7 +278,7 @@ UFBXT_TEST(fuzz_mtl_files)
 		ufbxt_assert(temp_freed);
 		ufbxt_assert(result_freed);
 
-		ufbxt_do_fuzz(name, data, size, buf, allow_error, UFBX_FILE_FORMAT_MTL);
+		ufbxt_do_fuzz(name, data, size, buf, allow_error, UFBX_FILE_FORMAT_MTL, NULL);
 
 		free(data);
 	}

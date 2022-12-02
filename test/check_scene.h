@@ -1063,6 +1063,7 @@ static void ufbxt_check_dom_value(ufbx_scene *scene, ufbx_dom_value *value)
 
 static void ufbxt_check_dom_node(ufbx_scene *scene, ufbx_dom_node *node)
 {
+	ufbxt_assert(node);
 	ufbxt_check_string(node->name);
 	for (size_t i = 0; i < node->children.count; i++) {
 		ufbxt_check_dom_node(scene, node->children.data[i]);

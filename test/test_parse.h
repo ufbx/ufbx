@@ -17,7 +17,7 @@ static ufbx_load_opts ufbxt_retain_dom_opts()
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT(maya_cube_dom, maya_cube, ufbxt_retain_dom_opts)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_cube_dom, maya_cube, ufbxt_retain_dom_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(scene->dom_root);
