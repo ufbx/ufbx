@@ -3458,11 +3458,29 @@ typedef struct {
 
 	ufbxi_buf aa_buf;
 	ufbxi_aa_node *aa_root;
+
+	// HACK: Maps contain pointers that are not stable between runs, in regression
+	// mode this causes instability in allocation patterns due to different AA trees
+	// being built, which is a problem in fuzz checks that need to have deterministic
+	// allocation counts. We can work around this using a local allocator that doesn't
+	// count the allocations.
+#if defined(UFBX_REGRESSION)
+	ufbxi_allocator regression_ator;
+#endif
 } ufbxi_map;
 
 static ufbxi_noinline void ufbxi_map_init(ufbxi_map *map, ufbxi_allocator *ator, ufbxi_cmp_fn *cmp_fn, void *cmp_user)
 {
+#if defined(UFBX_REGRESSION)
+	map->ator = &map->regression_ator;
+	map->regression_ator.error = ator->error;
+	map->regression_ator.huge_size = ator->huge_size;
+	map->regression_ator.max_size = SIZE_MAX;
+	map->regression_ator.max_allocs = SIZE_MAX;
+	map->regression_ator.chunk_max = 0x1000000;
+#else
 	map->ator = ator;
+#endif
 	map->aa_buf.ator = ator;
 	map->cmp_fn = cmp_fn;
 	map->cmp_user = cmp_user;
@@ -3476,6 +3494,10 @@ static ufbxi_noinline void ufbxi_map_free(ufbxi_map *map)
 	map->items = NULL;
 	map->aa_root = NULL;
 	map->mask = map->capacity = map->size = 0;
+
+#if defined(UFBX_REGRESSION)
+	ufbxi_free_ator(&map->regression_ator);
+#endif
 }
 
 static ufbxi_noinline ufbxi_aa_node *ufbxi_aa_tree_insert(ufbxi_map *map, ufbxi_aa_node *node, const void *value, uint32_t index, size_t item_size)
