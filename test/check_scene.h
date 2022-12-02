@@ -12,6 +12,7 @@
 
 static uint32_t ufbxt_sink = 0;
 
+#include <math.h>
 #include <string.h>
 #include "../ufbx.h"
 
@@ -67,6 +68,15 @@ static int ufbxt_is_utf8(const char *str, size_t length)
 	}
 
 	return 1;
+}
+
+static bool ufbxt_float_equal(double a, double b)
+{
+	if (isnan(a)) {
+		return isnan(b);
+	} else {
+		return a == b;
+	}
 }
 
 static void ufbxt_check_string(ufbx_string str)
@@ -582,11 +592,11 @@ static void ufbxt_check_camera(ufbx_scene *scene, ufbx_camera *camera)
 	ufbxt_assert((uint32_t)camera->aperture_format < (uint32_t)UFBX_APERTURE_FORMAT_COUNT);
 
 	if (camera->projection_mode == UFBX_PROJECTION_MODE_PERSPECTIVE) {
-		ufbxt_assert(camera->projection_plane.x == camera->field_of_view_tan.x);
-		ufbxt_assert(camera->projection_plane.y == camera->field_of_view_tan.y);
+		ufbxt_assert(ufbxt_float_equal(camera->projection_plane.x, camera->field_of_view_tan.x));
+		ufbxt_assert(ufbxt_float_equal(camera->projection_plane.y, camera->field_of_view_tan.y));
 	} else if (camera->projection_mode == UFBX_PROJECTION_MODE_ORTOGRAPHIC) {
-		ufbxt_assert(camera->projection_plane.x == camera->orthographic_size.x);
-		ufbxt_assert(camera->projection_plane.y == camera->orthographic_size.y);
+		ufbxt_assert(ufbxt_float_equal(camera->projection_plane.x, camera->orthographic_size.x));
+		ufbxt_assert(ufbxt_float_equal(camera->projection_plane.y, camera->orthographic_size.y));
 	} else {
 		ufbxt_assert(false && "Unhandled projection_mode");
 	}
