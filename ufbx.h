@@ -788,7 +788,7 @@ typedef struct ufbx_edge {
 
 UFBX_LIST_TYPE(ufbx_edge_list, ufbx_edge);
 
-// Polygonal face with arbitrary number vertices, a single face contains a 
+// Polygonal face with arbitrary number vertices, a single face contains a
 // contiguous range of mesh indices, eg. `{5,3}` would have indices 5, 6, 7
 //
 // NOTE: `num_indices` maybe less than 3 in which case the face is invalid!
@@ -809,7 +809,7 @@ typedef struct ufbx_mesh_material {
 
 	// Indices to `ufbx_mesh.faces[]` that use this material.
 	// Always contains `num_faces` elements.
-	ufbx_uint32_list face_indices; 
+	ufbx_uint32_list face_indices;
 
 } ufbx_mesh_material;
 
@@ -825,7 +825,7 @@ typedef struct ufbx_face_group {
 
 	// Indices to `ufbx_mesh.faces[]` that use this material.
 	// Always contains `num_faces` elements.
-	ufbx_uint32_list face_indices; 
+	ufbx_uint32_list face_indices;
 } ufbx_face_group;
 
 UFBX_LIST_TYPE(ufbx_face_group_list, ufbx_face_group);
@@ -893,7 +893,7 @@ typedef enum ufbx_subdivision_boundary {
 // Example mesh with two triangles (x, z) and a quad (y).
 // The faces have a constant UV coordinate x/y/z.
 // The vertices have _per vertex_ normals that point up/down.
-// 
+//
 //     ^   ^     ^
 //     A---B-----C
 //     |x /     /|
@@ -909,13 +909,13 @@ typedef enum ufbx_subdivision_boundary {
 //
 //   {0,3}    {3,4}    {7,3}   faces ({ index_begin, num_indices })
 //   0 1 2   3 4 5 6   7 8 9   index
-//   
+//
 //   0 1 3   1 2 4 3   2 4 5   vertex_indices[index]
 //   A B D   B C E D   C E F   vertices[vertex_indices[index]]
-//   
+//
 //   0 0 1   0 0 1 1   0 1 1   vertex_normal.indices[index]
 //   ^ ^ v   ^ ^ v v   ^ v v   vertex_normal.data[vertex_normal.indices[index]]
-//   
+//
 //   0 0 0   1 1 1 1   2 2 2   vertex_uv.indices[index]
 //   x x x   y y y y   z z z   vertex_uv.data[vertex_uv.indices[index]]
 //
@@ -931,7 +931,7 @@ typedef enum ufbx_subdivision_boundary {
 //
 //   0 1 2 3 4 5  vertex
 //   A B C D E F  vertices[vertex]
-//   
+//
 //   0 1 4 2 5 9  vertex_first_index[vertex]
 //   0 0 0 1 1 1  vertex_normal.indices[vertex_first_index[vertex]]
 //   ^ ^ ^ v v v  vertex_normal.data[vertex_normal.indices[vertex_first_index[vertex]]]
@@ -1096,7 +1096,7 @@ struct ufbx_light {
 		ufbx_node_list instances;
 	}; };
 
-	// Color and intensity of the light, usually you want to use `color * intensity` 
+	// Color and intensity of the light, usually you want to use `color * intensity`
 	// NOTE: `intensity` is 0.01x of the property `"Intensity"` as that matches
 	// matches values in DCC programs before exporting.
 	ufbx_vec3 color;
@@ -1422,7 +1422,7 @@ struct ufbx_nurbs_surface {
 	bool flip_normals;
 
 	// Material for the whole surface.
-	// NOTE: May be `NULL`!	
+	// NOTE: May be `NULL`!
 	ufbx_nullable ufbx_material *material;
 };
 
@@ -1602,7 +1602,7 @@ typedef struct ufbx_skin_weight {
 	ufbx_real weight;       // < Amount this bone influence the vertex
 } ufbx_skin_weight;
 
-UFBX_LIST_TYPE(ufbx_skin_weight_list, ufbx_skin_weight); 
+UFBX_LIST_TYPE(ufbx_skin_weight_list, ufbx_skin_weight);
 
 // Skin deformer specifies a binding between a logical set of bones (a skeleton)
 // and a mesh. Each bone is represented by a `ufbx_skin_cluster` that contains
@@ -1650,7 +1650,7 @@ struct ufbx_skin_cluster {
 	ufbx_nullable ufbx_node *bone_node;
 
 	// Binding matrix from local mesh vertices to the bone
-	ufbx_matrix geometry_to_bone; 
+	ufbx_matrix geometry_to_bone;
 
 	// Binding matrix from local mesh _node_ to the bone.
 	// NOTE: Prefer `geometry_to_bone` in most use cases!
@@ -1772,7 +1772,7 @@ typedef enum ufbx_cache_interpretation {
 
 	// Generic "points" interpretation, FBX SDK default. Usually fine to interpret
 	// as vertex positions if no other cache channels are specified.
-	UFBX_CACHE_INTERPRETATION_POINTS,          
+	UFBX_CACHE_INTERPRETATION_POINTS,
 
 	// Vertex positions.
 	UFBX_CACHE_INTERPRETATION_VERTEX_POSITION,
@@ -2242,7 +2242,7 @@ struct ufbx_material {
 	// For example `"3dsMax|Parameters|"` where properties would have names like
 	// `"3dsMax|Parameters|base_color"`. You can ignore this if you use the built-in
 	// `ufbx_material_fbx_maps fbx` and `ufbx_material_pbr_maps pbr` structures.
-	ufbx_string shader_prop_prefix;    
+	ufbx_string shader_prop_prefix;
 
 	// All textures attached to the material, if you want specific maps if might be
 	// more convenient to use eg. `fbx.diffuse_color.texture` or `pbr.base_color.texture`
@@ -2304,7 +2304,7 @@ typedef enum ufbx_blend_mode {
 	UFBX_BLEND_DIVIDE,        // < `dst / src`
 	UFBX_BLEND_HUE,           // < Replace hue
 	UFBX_BLEND_SATURATION,    // < Replace saturation
-	UFBX_BLEND_COLOR,         // < Replace hue and saturatio 
+	UFBX_BLEND_COLOR,         // < Replace hue and saturatio
 	UFBX_BLEND_LUMINOSITY,    // < Replace value
 	UFBX_BLEND_OVERLAY,       // < Same as `HARD_LIGHT` but with `src` and `dst` swapped
 
@@ -3343,7 +3343,7 @@ typedef struct ufbx_open_file_info {
 // Callback for opening an external file from the filesystem
 typedef bool ufbx_open_file_fn(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info);
 
-typedef struct ufbx_open_file_cb { 
+typedef struct ufbx_open_file_cb {
 	ufbx_open_file_fn *fn;
 	void *user;
 
@@ -3355,7 +3355,7 @@ typedef struct ufbx_open_file_cb {
 // Memory stream options
 typedef void ufbx_close_memory_fn(void *user, void *data, size_t data_size);
 
-typedef struct ufbx_close_memory_cb { 
+typedef struct ufbx_close_memory_cb {
 	ufbx_close_memory_fn *fn;
 	void *user;
 
@@ -3587,7 +3587,7 @@ typedef enum ufbx_unicode_error_handling {
 // Options for `ufbx_load_file/memory/stream/stdio()`
 // NOTE: Initialize to zero with `{ 0 }` (C) or `{ }` (C++)
 typedef struct ufbx_load_opts {
-	uint32_t _begin_zero; 
+	uint32_t _begin_zero;
 
 	ufbx_allocator_opts temp_allocator;   // < Allocator used during loading
 	ufbx_allocator_opts result_allocator; // < Allocator used for the final scene
@@ -3737,7 +3737,7 @@ typedef struct ufbx_load_opts {
 	// (.obj) Data for the .mtl file.
 	ufbx_blob obj_mtl_data;
 
-	uint32_t _end_zero; 
+	uint32_t _end_zero;
 } ufbx_load_opts;
 
 // Options for `ufbx_evaluate_scene()`
