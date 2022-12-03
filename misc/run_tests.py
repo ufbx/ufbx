@@ -291,7 +291,9 @@ class GCCCompiler(Compiler):
             args += ["--sysroot", self.sysroot]
 
         if config.get("warnings", False):
-            args += ["-Wall", "-Wextra", "-Wsign-conversion", "-Wmissing-prototypes", "-Wconversion-null"]
+            args += ["-Wall", "-Wextra", "-Wsign-conversion", "-Wmissing-prototypes"]
+            if self.has_cpp:
+                args += ["-Wconversion-null"]
             args += ["-Werror"]
 
         args.append("-g")

@@ -282,7 +282,6 @@
 	#pragma clang diagnostic ignored "-Wmissing-field-initializers"
 	#pragma clang diagnostic ignored "-Wmissing-braces"
 	#pragma clang diagnostic ignored "-Wdouble-promotion"
-	#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
 	#pragma clang diagnostic ignored "-Wpedantic"
 	#if defined(UFBX_STANDARD_C)
 		#pragma clang diagnostic ignored "-Wunused-function"
@@ -293,6 +292,7 @@
 	#endif
 	#if defined(__cplusplus)
 		#pragma clang diagnostic ignored "-Wold-style-cast"
+		#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
 	#endif
 #endif
 
@@ -301,7 +301,6 @@
 	#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 	#pragma GCC diagnostic ignored "-Wmissing-braces"
 	#pragma GCC diagnostic ignored "-Wdouble-promotion"
-	#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 	#pragma GCC diagnostic ignored "-Wpedantic"
 	#if defined(UFBX_STANDARD_C)
 		#pragma GCC diagnostic ignored "-Wunused-function"
@@ -312,6 +311,7 @@
 	#endif
 	#if defined(__cplusplus)
 		#pragma GCC diagnostic ignored "-Wold-style-cast"
+		#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 	#endif
 #endif
 
