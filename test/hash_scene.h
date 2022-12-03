@@ -1277,7 +1277,7 @@ ufbxt_noinline static void ufbxt_hash_scene_imp(ufbxt_hash *h, const ufbx_scene 
 	ufbxt_hash_list(h, v->poses, ufbxt_hash_pose_imp);
 	ufbxt_hash_list(h, v->metadata_objects, ufbxt_hash_metadata_object_imp);
 
-	ufbxt_hash_list(h, v->texture_files, ufbxt_hash_texture_file_imp);
+	ufbxt_hash_list_ptr(h, v->texture_files, ufbxt_hash_texture_file_imp);
 
 	ufbxt_hash_list(h, v->connections_src, ufbxt_hash_connection_imp);
 	ufbxt_hash_list(h, v->connections_dst, ufbxt_hash_connection_imp);
