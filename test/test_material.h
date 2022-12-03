@@ -1494,3 +1494,45 @@ UFBXT_FILE_TEST(max_shadergraph)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(maya_duplicated_texture)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->texture_files.count == 1);
+	ufbxt_assert(scene->textures.count == 4);
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "file1");
+		ufbxt_assert(texture->has_file);
+		ufbxt_assert(texture->file_index == 0);
+		ufbxt_assert(!strcmp(texture->uv_set.data, "map1"));
+		ufbxt_assert(!texture->has_uv_transform);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "file2");
+		ufbxt_assert(texture->has_file);
+		ufbxt_assert(texture->file_index == 0);
+		ufbxt_assert(!strcmp(texture->uv_set.data, "map1"));
+		ufbxt_assert(!texture->has_uv_transform);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "file3");
+		ufbxt_assert(texture->has_file);
+		ufbxt_assert(texture->file_index == 0);
+		ufbxt_assert(!strcmp(texture->uv_set.data, "map1"));
+		ufbxt_assert(texture->has_uv_transform);
+		ufbxt_assert_close_real(err, texture->uv_transform.scale.x, 2.0f);
+		ufbxt_assert_close_real(err, texture->uv_transform.scale.y, 2.0f);
+	}
+
+	{
+		ufbx_texture *texture = (ufbx_texture*)ufbx_find_element(scene, UFBX_ELEMENT_TEXTURE, "file4");
+		ufbxt_assert(texture->has_file);
+		ufbxt_assert(texture->file_index == 0);
+		ufbxt_assert(!strcmp(texture->uv_set.data, "second"));
+		ufbxt_assert(!texture->has_uv_transform);
+	}
+}
+#endif

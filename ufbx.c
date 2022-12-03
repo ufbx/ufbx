@@ -5229,15 +5229,16 @@ typedef struct {
 	ufbxi_allocator ator_tmp;
 
 	// Temporary maps
-	ufbxi_map prop_type_map;  // < `ufbxi_prop_type_name` Property type to enum
-	ufbxi_map fbx_id_map;     // < `ufbxi_fbx_id_entry` FBX ID to local ID
+	ufbxi_map prop_type_map;    // < `ufbxi_prop_type_name` Property type to enum
+	ufbxi_map fbx_id_map;       // < `ufbxi_fbx_id_entry` FBX ID to local ID
+	ufbxi_map texture_file_map; // < `ufbxi_texture_file_entry` absolute raw filename to element ID
 
 	// 6x00 specific maps
-	ufbxi_map fbx_attr_map;   // < `ufbxi_fbx_attr_entry` Node ID to attrib ID
-	ufbxi_map node_prop_set;  // < `const char*` Node property names
+	ufbxi_map fbx_attr_map;  // < `ufbxi_fbx_attr_entry` Node ID to attrib ID
+	ufbxi_map node_prop_set; // < `const char*` Node property names
 
 	// DOM nodes
-	ufbxi_map dom_node_map;  // < `const char*` Node property names
+	ufbxi_map dom_node_map; // < `const char*` Node property names
 
 	// Temporary array
 	char *tmp_arr;
@@ -9453,6 +9454,11 @@ static ufbxi_noinline ufbx_prop *ufbxi_find_prop_with_key(const ufbx_props *prop
 
 	return NULL;
 }
+
+typedef struct {
+	const char *key;
+	ufbx_texture_file *file;
+} ufbxi_texture_file_entry;
 
 #define ufbxi_find_prop(props, name) ufbxi_find_prop_with_key((props), (name), \
 	((uint32_t)(uint8_t)name[0] << 24u) | ((uint32_t)(uint8_t)name[1] << 16u) | \
@@ -16930,6 +16936,69 @@ ufbxi_noinline static void ufbxi_propagate_main_textures(ufbx_scene *scene)
 	}
 }
 
+#define ufbxi_patch_empty(m_dst, m_len, m_src) \
+	if (!(m_dst).m_len) m_dst = m_src;
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_insert_texture_file(ufbxi_context *uc, ufbx_texture *texture)
+{
+	const char *key = NULL;
+
+	// HACK: Even the raw entries have a null terminator so we can offset the
+	// pointer by one for relative filenames. This guarantees that an overlapping
+	// absolute and relative filenames will get separate textures.
+	if (texture->raw_absolute_filename.size > 0) {
+		key = (const char*)texture->raw_absolute_filename.data;
+	} else if (texture->raw_relative_filename.size > 0) {
+		key = (const char*)texture->raw_relative_filename.data + 1;
+	}
+
+	if (key == NULL) return 1;
+	uint32_t hash = ufbxi_hash_ptr(key);
+	ufbxi_texture_file_entry *entry = ufbxi_map_find(&uc->texture_file_map, ufbxi_texture_file_entry, hash, &key);
+	if (!entry) {
+		entry = ufbxi_map_insert(&uc->texture_file_map, ufbxi_texture_file_entry, hash, &key);
+		ufbxi_check(entry);
+
+		ufbx_texture_file *file = ufbxi_push_zero(&uc->tmp, ufbx_texture_file, 1);
+		ufbxi_check(file);
+
+		file->index = uc->texture_file_map.size - 1;
+
+		entry->key = key;
+		entry->file = file;
+	}
+
+	ufbx_texture_file *file = entry->file;
+	texture->file_index = file->index;
+	texture->has_file = true;
+	ufbxi_patch_empty(file->filename, length, texture->filename);
+	ufbxi_patch_empty(file->relative_filename, length, texture->relative_filename);
+	ufbxi_patch_empty(file->absolute_filename, length, texture->absolute_filename);
+	ufbxi_patch_empty(file->raw_filename, size, texture->raw_filename);
+	ufbxi_patch_empty(file->raw_relative_filename, size, texture->raw_relative_filename);
+	ufbxi_patch_empty(file->raw_absolute_filename, size, texture->raw_absolute_filename);
+	ufbxi_patch_empty(file->content, size, texture->content);
+
+	return 1;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_pop_texture_files(ufbxi_context *uc)
+{
+	uint32_t num_files = uc->texture_file_map.size;
+	ufbx_texture_file *files = ufbxi_push(&uc->result, ufbx_texture_file, num_files);
+	ufbxi_check(files);
+
+	uc->scene.texture_files.data = files;
+	uc->scene.texture_files.count = num_files;
+
+	ufbxi_texture_file_entry *entries = (ufbxi_texture_file_entry*)uc->texture_file_map.items;
+	for (size_t i = 0; i < num_files; i++) {
+		memcpy(&files[i], entries[i].file, sizeof(ufbx_texture_file));
+	}
+
+	return 1;
+}
+
 typedef struct {
 	ufbx_texture *texture;
 	size_t order;
@@ -18118,9 +18187,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				}
 			}
 		}
+
+		ufbxi_check(ufbxi_insert_texture_file(uc, texture));
 	}
 
 	ufbxi_propagate_main_textures(&uc->scene);
+	ufbxi_check(ufbxi_pop_texture_files(uc));
 
 	// Second pass to fetch material maps
 	ufbxi_for_ptr_list(ufbx_material, p_material, uc->scene.materials) {
@@ -20578,6 +20650,7 @@ static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 
 	ufbxi_map_free(&uc->prop_type_map);
 	ufbxi_map_free(&uc->fbx_id_map);
+	ufbxi_map_free(&uc->texture_file_map);
 	ufbxi_map_free(&uc->fbx_attr_map);
 	ufbxi_map_free(&uc->node_prop_set);
 	ufbxi_map_free(&uc->dom_node_map);
@@ -20690,6 +20763,7 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 
 	ufbxi_map_init(&uc->prop_type_map, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
 	ufbxi_map_init(&uc->fbx_id_map, &uc->ator_tmp, &ufbxi_map_cmp_uint64, NULL);
+	ufbxi_map_init(&uc->texture_file_map, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
 	ufbxi_map_init(&uc->fbx_attr_map, &uc->ator_tmp, &ufbxi_map_cmp_uint64, NULL);
 	ufbxi_map_init(&uc->node_prop_set, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
 	ufbxi_map_init(&uc->dom_node_map, &uc->ator_tmp, &ufbxi_map_cmp_uintptr, NULL);

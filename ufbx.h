@@ -1856,7 +1856,6 @@ struct ufbx_cache_file {
 	ufbx_string filename;
 	ufbx_string absolute_filename;
 	ufbx_string relative_filename;
-
 	ufbx_blob raw_filename;
 	ufbx_blob raw_absolute_filename;
 	ufbx_blob raw_relative_filename;
@@ -2411,6 +2410,27 @@ typedef struct ufbx_shader_texture {
 
 } ufbx_shader_texture;
 
+// Unique texture within the file.
+typedef struct ufbx_texture_file {
+
+	// Index in `ufbx_scene.texture_files[]`.
+	uint32_t index;
+
+	// Paths to the resource.
+	ufbx_string filename;
+	ufbx_string absolute_filename;
+	ufbx_string relative_filename;
+	ufbx_blob raw_filename;
+	ufbx_blob raw_absolute_filename;
+	ufbx_blob raw_relative_filename;
+
+	// Optional embedded content blob, eg. raw .png format data
+	ufbx_blob content;
+
+} ufbx_texture_file;
+
+UFBX_LIST_TYPE(ufbx_texture_file_list, ufbx_texture_file);
+
 // Texture that controls material appearance
 struct ufbx_texture {
 	union { ufbx_element element; struct {
@@ -2436,6 +2456,12 @@ struct ufbx_texture {
 
 	// FILE: Optional video texture
 	ufbx_nullable ufbx_video *video;
+
+	// FILE: Index into `ufbx_scene.texture_files[]` or `UFBX_NO_INDEX`.
+	uint32_t file_index;
+
+	// FILE: True if `file_index` has a valid value.
+	bool has_file;
 
 	// LAYERED: Inner texture layers, ordered from _bottom_ to _top_
 	ufbx_texture_layer_list layers;
@@ -3146,6 +3172,9 @@ struct ufbx_scene {
 
 		ufbx_element_list elements_by_type[UFBX_ELEMENT_TYPE_COUNT];
 	};
+
+	// Unique texture files referenced by the scene.
+	ufbx_texture_file_list texture_files;
 
 	// All elements and connections in the whole file
 	ufbx_element_list elements;           // < Sorted by `id`

@@ -953,6 +953,9 @@ ufbxt_noinline static void ufbxt_hash_texture_imp(ufbxt_hash *h, const ufbx_text
 	ufbxt_hash_blob(h, v->content);
 	ufbxt_hash_element_ref(h, v->video);
 
+	ufbxt_hash_pod(h, v->file_index);
+	ufbxt_hash_pod(h, v->has_file);
+
 	ufbxt_hash_list(h, v->layers, ufbxt_hash_texture_layer_imp);
 
 	ufbxt_hash_string(h, v->uv_set);
@@ -1156,6 +1159,16 @@ ufbxt_noinline static void ufbxt_hash_metadata_object_imp(ufbxt_hash *h, const u
 {
 }
 
+ufbxt_noinline static void ufbxt_hash_texture_file_imp(ufbxt_hash *h, const ufbx_texture_file *v)
+{
+	ufbxt_hash_pod(h, v->index);
+	ufbxt_hash_string(h, v->absolute_filename);
+	ufbxt_hash_string(h, v->relative_filename);
+	ufbxt_hash_blob(h, v->raw_absolute_filename);
+	ufbxt_hash_blob(h, v->raw_relative_filename);
+	ufbxt_hash_blob(h, v->content);
+}
+
 ufbxt_noinline static void ufbxt_hash_name_element_imp(ufbxt_hash *h, const ufbx_name_element *v)
 {
 	ufbxt_hash_string(h, v->name);
@@ -1263,6 +1276,8 @@ ufbxt_noinline static void ufbxt_hash_scene_imp(ufbxt_hash *h, const ufbx_scene 
 	ufbxt_hash_list(h, v->constraints, ufbxt_hash_constraint_imp);
 	ufbxt_hash_list(h, v->poses, ufbxt_hash_pose_imp);
 	ufbxt_hash_list(h, v->metadata_objects, ufbxt_hash_metadata_object_imp);
+
+	ufbxt_hash_list(h, v->texture_files, ufbxt_hash_texture_file_imp);
 
 	ufbxt_hash_list(h, v->connections_src, ufbxt_hash_connection_imp);
 	ufbxt_hash_list(h, v->connections_dst, ufbxt_hash_connection_imp);

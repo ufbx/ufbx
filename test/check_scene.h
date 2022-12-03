@@ -849,6 +849,18 @@ static void ufbxt_check_texture(ufbx_scene *scene, ufbx_texture *texture)
 	} else if (texture->type == UFBX_TEXTURE_SHADER) {
 		ufbxt_assert(texture->shader);
 	}
+
+	if (texture->raw_absolute_filename.size > 0 || texture->raw_relative_filename.size > 0) {
+		ufbxt_assert(texture->has_file);
+	}
+
+	ufbxt_assert(texture->file_index < scene->texture_files.count || texture->file_index == UFBX_NO_INDEX);
+	if (texture->has_file) {
+		ufbxt_assert(texture->file_index < scene->texture_files.count);
+		ufbx_texture_file *file = &scene->texture_files.data[texture->file_index];
+		ufbxt_assert(!strcmp(file->absolute_filename.data, texture->absolute_filename.data)
+			|| !strcmp(file->relative_filename.data, texture->relative_filename.data));
+	}
 }
 
 static void ufbxt_check_video(ufbx_scene *scene, ufbx_video *video)
@@ -996,6 +1008,17 @@ static void ufbxt_check_metadata_object(ufbx_scene *scene, ufbx_metadata_object 
 {
 }
 
+static void ufbxt_check_texture_file(ufbx_scene *scene, ufbx_texture_file *texture_file)
+{
+	ufbxt_check_string(texture_file->filename);
+	ufbxt_check_string(texture_file->absolute_filename);
+	ufbxt_check_string(texture_file->relative_filename);
+	ufbxt_check_blob(texture_file->raw_filename);
+	ufbxt_check_blob(texture_file->raw_absolute_filename);
+	ufbxt_check_blob(texture_file->raw_relative_filename);
+	ufbxt_check_blob(texture_file->content);
+}
+
 static void ufbxt_check_application(ufbx_scene *scene, ufbx_application *application)
 {
 	ufbxt_check_string(application->name);
@@ -1091,6 +1114,7 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 	ufbxt_check_metadata(scene, &scene->metadata);
 
 	for (size_t i = 0; i < scene->elements.count; i++) {
+		ufbxt_assert(scene->elements.data[i]->element_id == (uint32_t)i);
 		ufbxt_check_element(scene, scene->elements.data[i]);
 	}
 
@@ -1254,9 +1278,24 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 		ufbxt_check_metadata_object(scene, scene->metadata_objects.data[i]);
 	}
 
+	for (size_t i = 0; i < scene->texture_files.count; i++) {
+		ufbxt_assert(scene->texture_files.data[i].index == i);
+		ufbxt_check_texture_file(scene, &scene->texture_files.data[i]);
+	}
+
 	if (scene->dom_root) {
 		ufbxt_check_dom_node(scene, scene->dom_root);
 	}
+
+	for (size_t type_ix = 0; type_ix < UFBX_ELEMENT_TYPE_COUNT; type_ix++) {
+		size_t num_elements = scene->elements_by_type[type_ix].count;
+		for (size_t i = 0; i < num_elements; i++) {
+			ufbx_element *element = scene->elements_by_type[type_ix].data[i];
+			ufbxt_assert(element->type == (ufbx_element_type)type_ix);
+			ufbxt_assert(element->typed_id == (uint32_t)i);
+		}
+	}
+
 
 	ufbxt_assert(scene->root_node);
 	ufbxt_check_element_ptr(scene, scene->root_node, UFBX_ELEMENT_NODE);
