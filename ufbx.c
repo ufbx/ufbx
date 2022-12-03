@@ -3519,8 +3519,10 @@ static ufbxi_noinline void ufbxi_map_free(ufbxi_map *map)
 	map->mask = map->capacity = map->size = 0;
 
 #if defined(UFBX_REGRESSION)
-	ufbxi_free_ator(regression_ator);
-	free(regression_ator);
+	if (regression_ator) {
+		ufbxi_free_ator(regression_ator);
+		free(regression_ator);
+	}
 #endif
 }
 
