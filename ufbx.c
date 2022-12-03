@@ -272,9 +272,9 @@
 		#pragma warning(disable: 4996) // 'fopen': This function or variable may be unsafe. Consider using fopen_s instead.
 	#endif
 	#if defined(UFBXI_PARTIAL_FEATURES)
-	    #pragma warning(disable: 4100) // 'name': unreferenced formal parameter
-        #pragma warning(disable: 4505) // 'func': unreferenced function with internal linkage has been removed
-    #endif
+		#pragma warning(disable: 4100) // 'name': unreferenced formal parameter
+		#pragma warning(disable: 4505) // 'func': unreferenced function with internal linkage has been removed
+	#endif
 #endif
 
 #if defined(__clang__)
@@ -532,29 +532,29 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 #endif
 
 #if !defined(UFBX_STANDARD_C) && (defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER))
-    typedef size_t ufbxi_atomic_counter;
-    #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
-    #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
-    #define ufbxi_atomic_counter_inc(ptr) __sync_fetch_and_add((ptr), 1)
-    #define ufbxi_atomic_counter_dec(ptr) __sync_fetch_and_sub((ptr), 1)
+	typedef size_t ufbxi_atomic_counter;
+	#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+	#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
+	#define ufbxi_atomic_counter_inc(ptr) __sync_fetch_and_add((ptr), 1)
+	#define ufbxi_atomic_counter_dec(ptr) __sync_fetch_and_sub((ptr), 1)
 #elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
-    #if defined(_M_X64)  || defined(_M_ARM64)
+	#if defined(_M_X64)  || defined(_M_ARM64)
 		ufbxi_extern_c __int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
 		ufbxi_extern_c __int64 _InterlockedDecrement64(__int64 volatile * lpAddend);
-        typedef volatile __int64 ufbxi_atomic_counter;
-        #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
-        #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
-        #define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement64(ptr) - 1)
-        #define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement64(ptr) + 1)
-    #else
+		typedef volatile __int64 ufbxi_atomic_counter;
+		#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+		#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
+		#define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement64(ptr) - 1)
+		#define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement64(ptr) + 1)
+	#else
 		ufbxi_extern_c long _InterlockedIncrement(long volatile * lpAddend);
 		ufbxi_extern_c long _InterlockedDecrement(long volatile * lpAddend);
-        typedef volatile long ufbxi_atomic_counter;
-        #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
-        #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
-        #define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement(ptr) - 1)
-        #define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement(ptr) + 1)
-    #endif
+		typedef volatile long ufbxi_atomic_counter;
+		#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+		#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
+		#define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement(ptr) - 1)
+		#define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement(ptr) + 1)
+	#endif
 #elif !defined(UFBX_STANDARD_C) && defined(__TINYC__)
 	#if defined(__x86_64__) || defined(_AMD64_)
 		static size_t ufbxi_tcc_atomic_add(volatile size_t *dst, size_t value) {
@@ -569,34 +569,34 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 	#else
 		#error Unexpected TCC architecture
 	#endif
-    typedef volatile size_t ufbxi_atomic_counter;
-    #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
-    #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
-    #define ufbxi_atomic_counter_inc(ptr) ufbxi_tcc_atomic_add((ptr), 1)
-    #define ufbxi_atomic_counter_dec(ptr) ufbxi_tcc_atomic_add((ptr), SIZE_MAX)
+	typedef volatile size_t ufbxi_atomic_counter;
+	#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+	#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
+	#define ufbxi_atomic_counter_inc(ptr) ufbxi_tcc_atomic_add((ptr), 1)
+	#define ufbxi_atomic_counter_dec(ptr) ufbxi_tcc_atomic_add((ptr), SIZE_MAX)
 #elif defined(__cplusplus) && (__cplusplus >= 201103L)
-    #include <new>
-    #include <atomic>
-    typedef struct { alignas(std::atomic_size_t) char data[sizeof(std::atomic_size_t)]; } ufbxi_atomic_counter;
-    #define ufbxi_atomic_counter_init(ptr) (new (&(ptr)->data) std::atomic_size_t(0))
-    #define ufbxi_atomic_counter_free(ptr) (((std::atomic_size_t*)(ptr)->data)->~atomic_size_t())
-    #define ufbxi_atomic_counter_inc(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_add(1)
-    #define ufbxi_atomic_counter_dec(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_sub(1)
+	#include <new>
+	#include <atomic>
+	typedef struct { alignas(std::atomic_size_t) char data[sizeof(std::atomic_size_t)]; } ufbxi_atomic_counter;
+	#define ufbxi_atomic_counter_init(ptr) (new (&(ptr)->data) std::atomic_size_t(0))
+	#define ufbxi_atomic_counter_free(ptr) (((std::atomic_size_t*)(ptr)->data)->~atomic_size_t())
+	#define ufbxi_atomic_counter_inc(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_add(1)
+	#define ufbxi_atomic_counter_dec(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_sub(1)
 #elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(__STDC_NO_ATOMICS__)
-    #include <stdatomic.h>
-    typedef volatile atomic_size_t ufbxi_atomic_counter;
-    #define ufbxi_atomic_counter_init(ptr) atomic_init(ptr, 0)
-    #define ufbxi_atomic_counter_free(ptr) (void)0
-    #define ufbxi_atomic_counter_inc(ptr) atomic_fetch_add((ptr), 1)
-    #define ufbxi_atomic_counter_dec(ptr) atomic_fetch_sub((ptr), 1)
+	#include <stdatomic.h>
+	typedef volatile atomic_size_t ufbxi_atomic_counter;
+	#define ufbxi_atomic_counter_init(ptr) atomic_init(ptr, 0)
+	#define ufbxi_atomic_counter_free(ptr) (void)0
+	#define ufbxi_atomic_counter_inc(ptr) atomic_fetch_add((ptr), 1)
+	#define ufbxi_atomic_counter_dec(ptr) atomic_fetch_sub((ptr), 1)
 #else
-    typedef volatile size_t ufbxi_atomic_counter;
-    #define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
-    #define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
-    #define ufbxi_atomic_counter_inc(ptr) ((*(ptr))++)
-    #define ufbxi_atomic_counter_dec(ptr) ((*(ptr))--)
-    #undef UFBXI_THREAD_SAFE
-    #define UFBXI_THREAD_SAFE 0
+	typedef volatile size_t ufbxi_atomic_counter;
+	#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+	#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
+	#define ufbxi_atomic_counter_inc(ptr) ((*(ptr))++)
+	#define ufbxi_atomic_counter_dec(ptr) ((*(ptr))--)
+	#undef UFBXI_THREAD_SAFE
+	#define UFBXI_THREAD_SAFE 0
 #endif
 
 // -- Bit manipulation
@@ -1143,16 +1143,16 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 // Lookup data: [0:5] extra bits [5:8] flags [16:32] base value
 // Generated by `misc/deflate_lut.py`
 static const uint32_t ufbxi_deflate_length_lut[] = {
-        0x00000020, 0x00030040, 0x00040040, 0x00050040, 0x00060040, 0x00070040, 0x00080040, 0x00090040, 
-        0x000a0040, 0x000b0041, 0x000d0041, 0x000f0041, 0x00110041, 0x00130042, 0x00170042, 0x001b0042, 
-        0x001f0042, 0x00230043, 0x002b0043, 0x00330043, 0x003b0043, 0x00430044, 0x00530044, 0x00630044, 
-        0x00730044, 0x00830045, 0x00a30045, 0x00c30045, 0x00e30045, 0x01020040, 0x00010020, 0x00010020, 
+		0x00000020, 0x00030040, 0x00040040, 0x00050040, 0x00060040, 0x00070040, 0x00080040, 0x00090040, 
+		0x000a0040, 0x000b0041, 0x000d0041, 0x000f0041, 0x00110041, 0x00130042, 0x00170042, 0x001b0042, 
+		0x001f0042, 0x00230043, 0x002b0043, 0x00330043, 0x003b0043, 0x00430044, 0x00530044, 0x00630044, 
+		0x00730044, 0x00830045, 0x00a30045, 0x00c30045, 0x00e30045, 0x01020040, 0x00010020, 0x00010020, 
 };
 static const uint32_t ufbxi_deflate_dist_lut[] = {
-        0x00010000, 0x00020000, 0x00030000, 0x00040000, 0x00050001, 0x00070001, 0x00090002, 0x000d0002, 
-        0x00110003, 0x00190003, 0x00210004, 0x00310004, 0x00410005, 0x00610005, 0x00810006, 0x00c10006,
-        0x01010007, 0x01810007, 0x02010008, 0x03010008, 0x04010009, 0x06010009, 0x0801000a, 0x0c01000a,
-        0x1001000b, 0x1801000b, 0x2001000c, 0x3001000c, 0x4001000d, 0x6001000d, 0x00010020, 0x00010020,
+		0x00010000, 0x00020000, 0x00030000, 0x00040000, 0x00050001, 0x00070001, 0x00090002, 0x000d0002, 
+		0x00110003, 0x00190003, 0x00210004, 0x00310004, 0x00410005, 0x00610005, 0x00810006, 0x00c10006,
+		0x01010007, 0x01810007, 0x02010008, 0x03010008, 0x04010009, 0x06010009, 0x0801000a, 0x0c01000a,
+		0x1001000b, 0x1801000b, 0x2001000c, 0x3001000c, 0x4001000d, 0x6001000d, 0x00010020, 0x00010020,
 };
 
 static const uint8_t ufbxi_deflate_code_length_permutation[] = {
@@ -5731,45 +5731,45 @@ static void ufbxi_file_close(void *user)
 }
 
 typedef struct {
-    const void *data;
-    size_t size;
-    size_t position;
-    ufbx_close_memory_cb close_cb;
+	const void *data;
+	size_t size;
+	size_t position;
+	ufbx_close_memory_cb close_cb;
 
-    // Own allocation information
-    size_t self_size;
-    ufbxi_allocator ator;
-    ufbx_error error;
-    char data_copy[];
+	// Own allocation information
+	size_t self_size;
+	ufbxi_allocator ator;
+	ufbx_error error;
+	char data_copy[];
 } ufbxi_memory_stream;
 
 static size_t ufbxi_memory_read(void *user, void *data, size_t max_size)
 {
 	ufbxi_memory_stream *stream = (ufbxi_memory_stream*)user;
-    size_t to_read = ufbxi_min_sz(stream->size - stream->position, max_size);
-    memcpy(data, (const char*)stream->data + stream->position, to_read);
-    stream->position += to_read;
-    return to_read;
+	size_t to_read = ufbxi_min_sz(stream->size - stream->position, max_size);
+	memcpy(data, (const char*)stream->data + stream->position, to_read);
+	stream->position += to_read;
+	return to_read;
 }
 
 static bool ufbxi_memory_skip(void *user, size_t size)
 {
 	ufbxi_memory_stream *stream = (ufbxi_memory_stream*)user;
-    if (stream->size - stream->position < size) return false;
-    stream->position += size;
-    return true;
+	if (stream->size - stream->position < size) return false;
+	stream->position += size;
+	return true;
 }
 
 static void ufbxi_memory_close(void *user)
 {
 	ufbxi_memory_stream *stream = (ufbxi_memory_stream*)user;
-    if (stream->close_cb.fn) {
-        stream->close_cb.fn(stream->close_cb.user, (void*)stream->data, stream->size);
-    }
+	if (stream->close_cb.fn) {
+		stream->close_cb.fn(stream->close_cb.user, (void*)stream->data, stream->size);
+	}
 
-    ufbxi_allocator ator = stream->ator;
-    ufbxi_free(&ator, char, stream, stream->self_size);
-    ufbxi_free_ator(&ator);
+	ufbxi_allocator ator = stream->ator;
+	ufbxi_free(&ator, char, stream, stream->self_size);
+	ufbxi_free_ator(&ator);
 }
 
 // -- XML
@@ -13496,51 +13496,51 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_
 
 static void *ufbxi_ator_alloc(void *user, size_t size)
 {
-    ufbxi_allocator *ator = (ufbxi_allocator*)user;
-    return ufbxi_alloc(ator, char, size);
+	ufbxi_allocator *ator = (ufbxi_allocator*)user;
+	return ufbxi_alloc(ator, char, size);
 }
 
 static void *ufbxi_ator_realloc(void *user, void *old_ptr, size_t old_size, size_t new_size)
 {
-    ufbxi_allocator *ator = (ufbxi_allocator*)user;
-    return ufbxi_realloc(ator, char, old_ptr, old_size, new_size);
+	ufbxi_allocator *ator = (ufbxi_allocator*)user;
+	return ufbxi_realloc(ator, char, old_ptr, old_size, new_size);
 }
 
 static void ufbxi_ator_free(void *user, void *ptr, size_t size)
 {
-    ufbxi_allocator *ator = (ufbxi_allocator*)user;
-    ufbxi_free(ator, char, ptr, size);
+	ufbxi_allocator *ator = (ufbxi_allocator*)user;
+	ufbxi_free(ator, char, ptr, size);
 }
 
 static ufbxi_noinline void ufbxi_setup_ator_allocator(ufbx_allocator *allocator, ufbxi_allocator *ator)
 {
-    allocator->alloc_fn = &ufbxi_ator_alloc;
-    allocator->realloc_fn = &ufbxi_ator_realloc;
-    allocator->free_fn = &ufbxi_ator_free;
+	allocator->alloc_fn = &ufbxi_ator_alloc;
+	allocator->realloc_fn = &ufbxi_ator_realloc;
+	allocator->free_fn = &ufbxi_ator_free;
 	allocator->free_allocator_fn = NULL;
-    allocator->user = ator;
+	allocator->user = ator;
 }
 
 static ufbxi_noinline bool ufbxi_open_file(const ufbx_open_file_cb *cb, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_blob *original_filename, ufbxi_allocator *ator, ufbx_open_file_type type)
 {
-    if (!cb || !cb->fn) return false;
+	if (!cb || !cb->fn) return false;
 
-    ufbx_open_file_info info;
-    if (ator) {
-        ufbxi_setup_ator_allocator(&info.temp_allocator, ator);
-    } else {
-        memset(&info.temp_allocator, 0, sizeof(info.temp_allocator));
-    }
+	ufbx_open_file_info info;
+	if (ator) {
+		ufbxi_setup_ator_allocator(&info.temp_allocator, ator);
+	} else {
+		memset(&info.temp_allocator, 0, sizeof(info.temp_allocator));
+	}
 
-    if (original_filename) {
-        info.original_filename = *original_filename;
-    } else {
-        info.original_filename.data = path;
-        info.original_filename.size = path_len;
-    }
-    info.type = type;
+	if (original_filename) {
+		info.original_filename = *original_filename;
+	} else {
+		info.original_filename.data = path;
+		info.original_filename.size = path_len;
+	}
+	info.type = type;
 
-    return cb->fn(cb->user, stream, path, path_len, &info);
+	return cb->fn(cb->user, stream, path, path_len, &info);
 }
 
 #define ufbxi_patch_zero(dst, src) do { \
@@ -18493,11 +18493,11 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 	if (!ufbxi_is_transform_identity(node->geometry_transform)) {
 		node->geometry_to_node = ufbx_transform_to_matrix(&node->geometry_transform); 
 		node->geometry_to_world = ufbx_matrix_mul(&node->node_to_world, &node->geometry_to_node);
-        node->has_geometry_transform = true;
+		node->has_geometry_transform = true;
 	} else {
 		node->geometry_to_node = ufbx_identity_matrix;
 		node->geometry_to_world = node->node_to_world;
-        node->has_geometry_transform = false;
+		node->has_geometry_transform = false;
 	}
 
 	node->visible = ufbxi_find_int(&node->props, ufbxi_Visibility, 1) != 0;
@@ -18557,8 +18557,8 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 	camera->aperture_format = (ufbx_aperture_format)ufbxi_find_enum(&camera->props, ufbxi_ApertureFormat, UFBX_APERTURE_FORMAT_CUSTOM, UFBX_APERTURE_FORMAT_IMAX);
 	camera->gate_fit = (ufbx_gate_fit)ufbxi_find_enum(&camera->props, ufbxi_GateFit, 0, UFBX_GATE_FIT_STRETCH);
 
-    camera->near_plane = ufbxi_find_real(&camera->props, ufbxi_NearPlane, 0.0f);
-    camera->far_plane = ufbxi_find_real(&camera->props, ufbxi_FarPlane, 0.0f);
+	camera->near_plane = ufbxi_find_real(&camera->props, ufbxi_NearPlane, 0.0f);
+	camera->far_plane = ufbxi_find_real(&camera->props, ufbxi_FarPlane, 0.0f);
 
 	// Search both W/H and Width/Height but prefer the latter
 	ufbx_real aspect_x = ufbxi_find_real(&camera->props, ufbxi_AspectW, 0.0f);
@@ -18635,7 +18635,7 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 	ufbx_real aspect_ratio = camera->resolution.x / camera->resolution.y;
 	ufbx_real film_ratio = film_size.x / film_size.y;
 
-    camera->aspect_ratio = aspect_ratio;
+	camera->aspect_ratio = aspect_ratio;
 
 	ufbx_gate_fit effective_fit = camera->gate_fit;
 	if (effective_fit == UFBX_GATE_FIT_FILL) {
@@ -20439,9 +20439,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_skinning(ufbx_scene *sc
 
 	return 1;
 #else
-    ufbxi_fmt_err_info(error, "UFBX_ENABLE_SKINNING_EVALUATION");
-    ufbxi_report_err_msg(error, "UFBXI_FEATURE_SKINNING_EVALUATION", "Feature disabled");
-    return 0;
+	ufbxi_fmt_err_info(error, "UFBX_ENABLE_SKINNING_EVALUATION");
+	ufbxi_report_err_msg(error, "UFBXI_FEATURE_SKINNING_EVALUATION", "Feature disabled");
+	return 0;
 #endif
 }
 
@@ -24125,7 +24125,7 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 {
 	if (error) {
 		memset(error, 0, sizeof(ufbx_error));
-        ufbxi_fmt_err_info(error, "UFBX_ENABLE_INDEX_GENERATION");
+		ufbxi_fmt_err_info(error, "UFBX_ENABLE_INDEX_GENERATION");
 		ufbxi_report_err_msg(error, "UFBXI_FEATURE_INDEX_GENERATION", "Feature disabled");
 	}
 	return NULL;
@@ -24312,59 +24312,59 @@ ufbx_abi bool ufbx_open_file(ufbx_stream *stream, const char *path, size_t path_
 
 ufbx_abi bool ufbx_default_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info)
 {
-    (void)user;
-    (void)info;
-    return ufbx_open_file(stream, path, path_len);
+	(void)user;
+	(void)info;
+	return ufbx_open_file(stream, path, path_len);
 }
 
 ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t data_size, const ufbx_open_memory_opts *opts)
 {
-    ufbx_open_memory_opts local_opts;
-    if (!opts) {
-        memset(&local_opts, 0, sizeof(local_opts));
-        opts = &local_opts;
-    }
+	ufbx_open_memory_opts local_opts;
+	if (!opts) {
+		memset(&local_opts, 0, sizeof(local_opts));
+		opts = &local_opts;
+	}
 	ufbx_assert(opts->_begin_zero == 0 && opts->_end_zero == 0);
 
-    ufbx_error local_error = { UFBX_ERROR_NONE };
+	ufbx_error local_error = { UFBX_ERROR_NONE };
 	ufbxi_allocator ator = { 0 };
-    ufbxi_init_ator(&local_error, &ator, &opts->allocator, "memory");
+	ufbxi_init_ator(&local_error, &ator, &opts->allocator, "memory");
 
-    size_t copy_size = opts->no_copy ? 0 : data_size;
+	size_t copy_size = opts->no_copy ? 0 : data_size;
 
-    // Align the allocation size to 8 bytes to make sure the header is aligned.
-    size_t self_size = ufbxi_align_to_mask(sizeof(ufbxi_memory_stream) + copy_size, 7);
+	// Align the allocation size to 8 bytes to make sure the header is aligned.
+	size_t self_size = ufbxi_align_to_mask(sizeof(ufbxi_memory_stream) + copy_size, 7);
 
-    void *memory = ufbxi_alloc(&ator, char, self_size);
-    if (!memory) {
-        ufbxi_free_ator(&ator);
-        return false;
-    }
+	void *memory = ufbxi_alloc(&ator, char, self_size);
+	if (!memory) {
+		ufbxi_free_ator(&ator);
+		return false;
+	}
 
-    ufbxi_memory_stream *mem = (ufbxi_memory_stream*)memory;
+	ufbxi_memory_stream *mem = (ufbxi_memory_stream*)memory;
 	memset(mem, 0, sizeof(ufbxi_memory_stream));
 
-    mem->size = data_size;
+	mem->size = data_size;
 	mem->self_size = self_size;
 	mem->close_cb = opts->close_cb;
 
-    if (opts->no_copy) {
+	if (opts->no_copy) {
 		mem->data = data;
 	} else {
-        memcpy(mem->data_copy, data, data_size);
-        mem->data = mem->data_copy;
-    }
+		memcpy(mem->data_copy, data, data_size);
+		mem->data = mem->data_copy;
+	}
 
-    // Transplant the allocator in the result blob
-    mem->ator = ator;
-    mem->ator.error = &mem->error;
+	// Transplant the allocator in the result blob
+	mem->ator = ator;
+	mem->ator.error = &mem->error;
 
-    stream->read_fn = ufbxi_memory_read;
-    stream->skip_fn = ufbxi_memory_skip;
-    stream->close_fn = ufbxi_memory_close;
-    stream->user = mem;
+	stream->read_fn = ufbxi_memory_read;
+	stream->skip_fn = ufbxi_memory_skip;
+	stream->close_fn = ufbxi_memory_close;
+	stream->user = mem;
 
-    return true;
+	return true;
 }
 
 ufbx_abi bool ufbx_is_thread_safe(void)
@@ -24400,13 +24400,13 @@ ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_le
 		opts_copy.filename.length = filename_len;
 	}
 
-    // Defer to `ufbx_load_stream()` if the user so prefers.
-    if (!opts->open_main_file_with_default && opts->open_file_cb.fn) {
-        ufbx_stream stream = { 0 };
-        if (ufbxi_open_file(&opts->open_file_cb, &stream, filename, filename_len, NULL, NULL, UFBX_OPEN_FILE_MAIN_MODEL)) {
-            return ufbx_load_stream_prefix(&stream, NULL, 0, &opts_copy, error);
-        } else {
-            // TODO: Factor this?
+	// Defer to `ufbx_load_stream()` if the user so prefers.
+	if (!opts->open_main_file_with_default && opts->open_file_cb.fn) {
+		ufbx_stream stream = { 0 };
+		if (ufbxi_open_file(&opts->open_file_cb, &stream, filename, filename_len, NULL, NULL, UFBX_OPEN_FILE_MAIN_MODEL)) {
+			return ufbx_load_stream_prefix(&stream, NULL, 0, &opts_copy, error);
+		} else {
+			// TODO: Factor this?
 			ufbxi_set_err_info(error, filename, filename_len);
 			error->stack_size = 1;
 			error->type = UFBX_ERROR_FILE_NOT_FOUND;
@@ -24417,9 +24417,9 @@ ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_le
 			error->stack[0].function.data = ufbxi_function;
 			error->stack[0].function.length = strlen(ufbxi_function);
 			error->stack[0].source_line = ufbxi_line;
-            return NULL;
-        }
-    }
+			return NULL;
+		}
+	}
 
 	ufbxi_allocator tmp_ator = { 0 };
 	ufbx_error tmp_error = { UFBX_ERROR_NONE };
@@ -26491,7 +26491,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 
 	return ufbxi_to_size(dst - data);
 #else
-    return 0;
+	return 0;
 #endif
 }
 
@@ -26566,7 +26566,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_real(const ufbx_cache_
 	const ufbx_cache_frame *last = &frames[end - 1];
 	return ufbx_read_geometry_cache_real(last, data, count, &opts);
 #else
-    return 0;
+	return 0;
 #endif
 }
 
@@ -26578,7 +26578,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_vec3(const ufbx_cache_fr
 	if (!data) return 0;
 	return ufbx_read_geometry_cache_real(frame, (ufbx_real*)data, count * 3, opts) / 3;
 #else
-    return 0;
+	return 0;
 #endif
 }
 
@@ -26590,7 +26590,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_vec3(const ufbx_cache_
 	if (!data) return 0;
 	return ufbx_sample_geometry_cache_real(channel, time, (ufbx_real*)data, count * 3, opts) / 3;
 #else
-    return 0;
+	return 0;
 #endif
 }
 
