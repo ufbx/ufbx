@@ -288,6 +288,9 @@
 		#pragma clang diagnostic ignored "-Wunused-function"
 		#pragma clang diagnostic ignored "-Wunused-parameter"
 	#endif
+	#if defined(__cplusplus)
+		#pragma clang diagnostic ignored "-Wold-style-cast"
+	#endif
 #endif
 
 #if defined(__GNUC__)
@@ -300,6 +303,9 @@
 	#if defined(UFBXI_PARTIAL_FEATURES)
 		#pragma GCC diagnostic ignored "-Wunused-function"
 		#pragma GCC diagnostic ignored "-Wunused-parameter"
+	#endif
+	#if defined(__cplusplus)
+		#pragma GCC diagnostic ignored "-Wold-style-cast"
 	#endif
 #endif
 
