@@ -21,7 +21,15 @@
 	#pragma warning(disable: 4201) // nonstandard extension used: nameless struct/union
 	#pragma warning(disable: 4505) // unreferenced local function has been removed
 	#define ufbx_inline static __forceinline
+#elif defined(__clang__)
+	#pragma clang diagnostic push
+	#pragma clang diagnostic ignored "-Wpedantic"
 #elif defined(__GNUC__)
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+
+#if defined(__GNUC__)
 	#define ufbx_inline static inline __attribute__((always_inline, unused))
 #else
 	#define ufbx_inline static
@@ -78,7 +86,7 @@ typedef double ufbx_real;
 		template <typename F> static p_return _cpp_adapter p_params { F &f = *static_cast<F*>(user); return f p_args; } \
 		p_name() = default; \
 		p_name(p_fn *f) : fn(f), user(nullptr) { } \
-		template <typename F> p_name(F *f) : fn(&_cpp_adapter<F>), user((void*)f) { }
+		template <typename F> p_name(F *f) : fn(&_cpp_adapter<F>), user(static_cast<void*>(f)) { }
 #else
 	#define UFBX_CALLBACK_IMPL(p_name, p_fn, p_return, p_params, p_args)
 #endif
@@ -4387,6 +4395,10 @@ typedef ufbx_ref<ufbx_geometry_cache> ufbx_geometry_cache_ref;
 
 #if defined(_MSC_VER)
 	#pragma warning(pop)
+#elif defined(__clang__)
+	#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+	#pragma GCC diagnostic pop
 #endif
 
 #endif
