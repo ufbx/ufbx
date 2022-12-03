@@ -860,6 +860,8 @@ static void ufbxt_check_texture(ufbx_scene *scene, ufbx_texture *texture)
 		ufbx_texture_file *file = &scene->texture_files.data[texture->file_index];
 		ufbxt_assert(!strcmp(file->absolute_filename.data, texture->absolute_filename.data)
 			|| !strcmp(file->relative_filename.data, texture->relative_filename.data));
+	} else {
+		ufbxt_assert(texture->file_index == UFBX_NO_INDEX);
 	}
 }
 

@@ -16941,6 +16941,8 @@ ufbxi_noinline static void ufbxi_propagate_main_textures(ufbx_scene *scene)
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_insert_texture_file(ufbxi_context *uc, ufbx_texture *texture)
 {
+	texture->file_index = UFBX_NO_INDEX;
+
 	const char *key = NULL;
 
 	// HACK: Even the raw entries have a null terminator so we can offset the
