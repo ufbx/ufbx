@@ -336,8 +336,8 @@ typedef enum ufbx_prop_flags {
 	UFBX_PROP_FLAG_VALUE_VEC2 = 0x200000,
 	UFBX_PROP_FLAG_VALUE_VEC3 = 0x400000,
 	UFBX_PROP_FLAG_VALUE_VEC4 = 0x800000,
-	UFBX_PROP_FLAG_VALUE_INT = 0x100000,
-	UFBX_PROP_FLAG_VALUE_STR = 0x2000000,
+	UFBX_PROP_FLAG_VALUE_INT  = 0x1000000,
+	UFBX_PROP_FLAG_VALUE_STR  = 0x2000000,
 	UFBX_PROP_FLAG_VALUE_BLOB = 0x4000000,
 
 	UFBX_PROP_FLAG_FORCE_32BIT = 0x7fffffff,
@@ -1912,6 +1912,9 @@ typedef struct ufbx_material_map {
 
 	// Set to `true` if this feature should be disabled (specific to shader type).
 	bool feature_disabled;
+
+	// Number of components in the value from 1 to 4 if defined, 0 if not.
+	uint8_t value_components;
 
 } ufbx_material_map;
 

@@ -856,6 +856,7 @@ ufbxt_noinline static void ufbxt_hash_material_map_imp(ufbxt_hash *h, const ufbx
 	ufbxt_hash_element_ref(h, v->texture);
 	ufbxt_hash_pod(h, v->has_value);
 	ufbxt_hash_pod(h, v->texture_enabled);
+	ufbxt_hash_pod(h, v->value_components);
 }
 
 ufbxt_noinline static void ufbxt_hash_material_feature_imp(ufbxt_hash *h, const ufbx_material_feature_info *v)

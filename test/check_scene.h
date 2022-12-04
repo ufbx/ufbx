@@ -188,6 +188,10 @@ static void ufbxt_check_props(ufbx_scene *scene, const ufbx_props *props, bool t
 			ufbxt_assert(ref != NULL);
 		}
 
+		// `REAL/VEC2/VEC3/VEC4` are mutually exclusive
+		uint32_t vec_flag = (uint32_t)prop->flags & (UFBX_PROP_FLAG_VALUE_REAL|UFBX_PROP_FLAG_VALUE_VEC2|UFBX_PROP_FLAG_VALUE_VEC3|UFBX_PROP_FLAG_VALUE_VEC4);
+		ufbxt_assert((vec_flag & (vec_flag - 1)) == 0);
+
 		prev = prop;
 	}
 
@@ -760,6 +764,12 @@ static void ufbxt_check_cache_file(ufbx_scene *scene, ufbx_cache_file *file)
 	ufbxt_check_string(file->relative_filename);
 }
 
+static void ufbxt_check_material_map(ufbx_scene *scene, ufbx_material *material, ufbx_material_map *map)
+{
+	ufbxt_check_element_ptr(scene, map->texture, UFBX_ELEMENT_TEXTURE);
+	ufbxt_assert(map->value_components <= 4);
+}
+
 static void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
 {
 	for (size_t i = 0; i < material->textures.count; i++) {
@@ -769,11 +779,11 @@ static void ufbxt_check_material(ufbx_scene *scene, ufbx_material *material)
 	}
 
 	for (size_t i = 0; i < UFBX_MATERIAL_FBX_MAP_COUNT; i++) {
-		ufbxt_check_element_ptr(scene, material->fbx.maps[i].texture, UFBX_ELEMENT_TEXTURE);
+		ufbxt_check_material_map(scene, material, &material->fbx.maps[i]);
 	}
 
 	for (size_t i = 0; i < UFBX_MATERIAL_PBR_MAP_COUNT; i++) {
-		ufbxt_check_element_ptr(scene, material->pbr.maps[i].texture, UFBX_ELEMENT_TEXTURE);
+		ufbxt_check_material_map(scene, material, &material->pbr.maps[i]);
 	}
 
 	ufbxt_check_string(material->shader_prop_prefix);
