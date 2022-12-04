@@ -52,10 +52,10 @@ static bool ufbxt_open_file_memory_ref(void *user, ufbx_stream *stream, const ch
 #endif
 
 #if UFBXT_IMPL
-static void ufbxt_do_open_memory_test(ufbx_open_file_fn *open_file_fn)
+static void ufbxt_do_open_memory_test(const char *filename, size_t expected_calls_fbx, size_t expected_calls_obj, ufbx_open_file_fn *open_file_fn)
 {
 	char path[512];
-	ufbxt_file_iterator iter = { "maya_cache_sine" };
+	ufbxt_file_iterator iter = { filename };
 	while (ufbxt_next_file(&iter, path, sizeof(path))) {
 		for (size_t i = 0; i < 2; i++) {
 			ufbx_load_opts opts = { 0 };
@@ -74,9 +74,16 @@ static void ufbxt_do_open_memory_test(ufbx_open_file_fn *open_file_fn)
 			ufbxt_assert(scene);
 
 			ufbxt_check_scene(scene);
-			ufbx_free_scene(scene);
 
-			ufbxt_assert(num_calls == 5);
+			if (scene->metadata.file_format == UFBX_FILE_FORMAT_FBX) {
+				ufbxt_assert(num_calls == expected_calls_fbx);
+			} else if (scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ) {
+				ufbxt_assert(num_calls == expected_calls_obj);
+			} else {
+				ufbxt_assert(false);
+			}
+
+			ufbx_free_scene(scene);
 		}
 	}
 }
@@ -85,22 +92,41 @@ static void ufbxt_do_open_memory_test(ufbx_open_file_fn *open_file_fn)
 UFBXT_TEST(open_memory_default)
 #if UFBXT_IMPL
 {
-	ufbxt_do_open_memory_test(ufbxt_open_file_memory_default);
+	ufbxt_do_open_memory_test("maya_cache_sine", 5, 0, ufbxt_open_file_memory_default);
 }
 #endif
 
 UFBXT_TEST(open_memory_temp)
 #if UFBXT_IMPL
 {
-	ufbxt_do_open_memory_test(ufbxt_open_file_memory_temp);
+	ufbxt_do_open_memory_test("maya_cache_sine", 5, 0, ufbxt_open_file_memory_temp);
 }
 #endif
 
 UFBXT_TEST(open_memory_ref)
 #if UFBXT_IMPL
 {
-	ufbxt_do_open_memory_test(ufbxt_open_file_memory_ref);
+	ufbxt_do_open_memory_test("maya_cache_sine", 5, 0, ufbxt_open_file_memory_ref);
 }
 #endif
 
+UFBXT_TEST(obj_open_memory_default)
+#if UFBXT_IMPL
+{
+	ufbxt_do_open_memory_test("blender_279_ball", 1, 2, ufbxt_open_file_memory_default);
+}
+#endif
 
+UFBXT_TEST(obj_open_memory_temp)
+#if UFBXT_IMPL
+{
+	ufbxt_do_open_memory_test("blender_279_ball", 1, 2, ufbxt_open_file_memory_temp);
+}
+#endif
+
+UFBXT_TEST(obj_open_memory_ref)
+#if UFBXT_IMPL
+{
+	ufbxt_do_open_memory_test("blender_279_ball", 1, 2, ufbxt_open_file_memory_ref);
+}
+#endif

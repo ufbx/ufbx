@@ -14778,7 +14778,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_mtl(ufbxi_context *uc)
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 {
 	// HACK: Reset everything and switch to loading the .mtl file globally
+	if (uc->close_fn) {
+		uc->close_fn(uc->read_user);
+	}
+
 	uc->read_fn = NULL;
+	uc->close_fn = NULL;
 	uc->read_user = NULL;
 	uc->data_begin = NULL;
 	uc->data = NULL;
@@ -14829,12 +14834,20 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 	}
 
 	if (has_stream) {
+		// Adopt `stream` to ufbx read callbacks
 		uc->read_fn = stream.read_fn;
+		uc->close_fn = stream.close_fn;
 		uc->read_user = stream.user;
+
 		int ok = ufbxi_obj_parse_mtl(uc);
-		if (stream.close_fn) {
-			stream.close_fn(stream.user);
+
+		if (uc->close_fn) {
+			uc->close_fn(uc->read_user);
 		}
+		uc->read_fn = NULL;
+		uc->close_fn = NULL;
+		uc->read_user = NULL;
+
 		ufbxi_check(ok);
 	}
 

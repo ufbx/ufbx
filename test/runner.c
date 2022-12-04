@@ -2147,11 +2147,18 @@ bool ufbxt_next_file(ufbxt_file_iterator *iter, char *buffer, size_t buffer_size
 		}
 
 		uint32_t version = ufbxt_file_versions[iter->version_ix];
-		const char *format = iter->format_ix == 1 ? "ascii" : "binary";
-		snprintf(buffer, buffer_size, "%s%s_%u_%s.fbx", iter->root ? iter->root : data_root, iter->path, version, format);
+		const char *format = "";
+		const char *ext = "fbx";
+		switch (iter->format_ix) {
+		case 0: format = "binary"; break;
+		case 1: format = "ascii"; break;
+		case 2: format = "mtl"; ext = "mtl"; break;
+		case 3: format = "obj"; ext = "obj"; break;
+		}
+		snprintf(buffer, buffer_size, "%s%s_%u_%s.%s", iter->root ? iter->root : data_root, iter->path, version, format, ext);
 
 		iter->format_ix++;
-		if (iter->format_ix >= 2) {
+		if (iter->format_ix >= 4) {
 			iter->format_ix = 0;
 			iter->version_ix++;
 		}
