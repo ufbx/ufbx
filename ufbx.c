@@ -24216,7 +24216,7 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 		ufbxi_fmt_err_info(error, "UFBX_ENABLE_INDEX_GENERATION");
 		ufbxi_report_err_msg(error, "UFBXI_FEATURE_INDEX_GENERATION", "Feature disabled");
 	}
-	return NULL;
+	return 0;
 }
 
 #endif
