@@ -20568,7 +20568,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 		ufbxi_check_msg(uc->opts.index_error_handling != UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE, "Unsafe options");
 		ufbxi_check_msg(uc->opts.unicode_error_handling != UFBX_UNICODE_ERROR_HANDLING_UNSAFE_IGNORE, "Unsafe options");
 	} else {
-		uc->scene.metadata.unsafe = true;
+		uc->scene.metadata.is_unsafe = true;
 	}
 
 	if (uc->opts.index_error_handling == UFBX_INDEX_ERROR_HANDLING_NO_INDEX) {

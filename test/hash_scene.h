@@ -1192,6 +1192,7 @@ ufbxt_noinline static void ufbxt_hash_metadata_imp(ufbxt_hash *h, const ufbx_met
 	ufbxt_hash_pod(h, v->ascii);
 	ufbxt_hash_pod(h, v->version);
 	ufbxt_hash_string(h, v->creator);
+	ufbxt_hash_pod(h, v->is_unsafe);
 	ufbxt_hash_pod(h, v->big_endian);
 	ufbxt_hash_pod(h, v->exporter);
 	ufbxt_hash_pod(h, v->exporter_version);

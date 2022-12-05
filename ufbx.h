@@ -2975,7 +2975,7 @@ typedef struct ufbx_metadata {
 
 	// Some API guarantees do not apply (depending on unsafe options used).
 	// Loaded with `ufbx_load_opts.allow_unsafe` enabled.
-	bool unsafe;
+	bool is_unsafe;
 
 	ufbx_string creator;
 	bool big_endian;

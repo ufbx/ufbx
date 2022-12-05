@@ -1121,7 +1121,7 @@ static void ufbxt_check_dom_node(ufbx_scene *scene, ufbx_dom_node *node)
 static void ufbxt_check_scene(ufbx_scene *scene)
 {
 	// TODO: Partial safety validation?
-	if (scene->metadata.unsafe) return;
+	if (scene->metadata.is_unsafe) return;
 
 	ufbxt_check_metadata(scene, &scene->metadata);
 
