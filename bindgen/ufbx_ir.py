@@ -263,6 +263,9 @@ def init_type(file, typ, key, mods):
     name = typ["name"]
     t = Type(base_name=name, key=key)
 
+    if typ.get("kind", "") == "define":
+        t.kind = "define"
+
     if mods:
         mods = mods[:]
 
@@ -302,8 +305,9 @@ def init_type(file, typ, key, mods):
         elif mt == "const":
             t.kind = "const"
             t.inner = parse_type_imp(file, typ, mods)
-        elif mt == "":
-            pass
+        elif mt == "unsafe":
+            t.kind = "unsafe"
+            t.inner = parse_type_imp(file, typ, mods)
         else:
             raise ValueError(f"Unhandled mod {mt}")
 
@@ -325,6 +329,8 @@ def parse_type_imp(file, typ, mods):
             key = key + "*"
         elif mt == "nullable":
             key = key + "?"
+        elif mt == "unsafe":
+            key = key + " unsafe"
         elif mt == "const":
             key = key + " const"
         elif mt == "array":
@@ -511,6 +517,7 @@ def parse_file(decls):
     # HACK
     file.constants["UFBX_ERROR_STACK_MAX_DEPTH"] = Constant(name="UFBX_ERROR_STACK_MAX_DEPTH", value_int=8)
     file.constants["UFBX_PANIC_MESSAGE_LENGTH"] = Constant(name="UFBX_PANIC_MESSAGE_LENGTH", value_int=128)
+    file.constants["UFBX_ERROR_INFO_LENGTH"] = Constant(name="UFBX_ERROR_INFO_LENGTH", value_int=256)
 
     for decl in decls:
         parse_decl(file, decl)
@@ -614,7 +621,7 @@ def layout_type(arch: Arch, file: File, typ: Type):
         layout_type(arch, file, inner)
         typ.size[arch.name] = inner.size[arch.name]
         typ.align[arch.name] = inner.align[arch.name]
-    elif typ.kind == "const":
+    elif typ.kind in ("const", "unsafe"):
         inner = file.types[typ.inner]
         layout_type(arch, file, inner)
         typ.size[arch.name] = inner.size[arch.name]
@@ -630,6 +637,9 @@ def layout_type(arch: Arch, file: File, typ: Type):
     elif typ.kind == "function":
         inner = file.types[typ.inner]
         layout_type(arch, file, inner)
+        typ.size[arch.name] = 0
+        typ.align[arch.name] = 0
+    elif typ.kind == "define":
         typ.size[arch.name] = 0
         typ.align[arch.name] = 0
     else:
@@ -708,7 +718,8 @@ input_structs = [
     "ufbx_allocator_opts",
     "ufbx_load_opts",
     "ufbx_evaluate_opts",
-    "ufbx_tessellate_opts",
+    "ufbx_tessellate_curve_opts",
+    "ufbx_tessellate_surface_opts",
     "ufbx_subdivide_opts",
     "ufbx_geometry_cache_opts",
     "ufbx_geometry_cache_data_opts",

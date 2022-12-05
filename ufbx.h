@@ -4329,18 +4329,11 @@ ufbx_abi void ufbx_ffi_get_weighted_face_normal(ufbx_vec3 *retval, const ufbx_ve
 ufbx_abi size_t ufbx_ffi_get_triangulate_face_num_indices(const ufbx_face *face);
 ufbx_abi uint32_t ufbx_ffi_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, const ufbx_face *face);
 
-ufbx_inline size_t ufbx_check_index(size_t index, size_t count) {
-	(void)count;
-	ufbx_assert(index < count);
-	return index;
-}
-
-#define ufbx_at(list, index) ((list).data[ufbx_check_index((index), (list).count)])
-
 #ifdef __cplusplus
 }
 #endif
 
+// bindgen-disable
 #if defined(__cplusplus) && (__cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1900))
 
 ufbx_inline void ufbx_retain(ufbx_scene *scene) { ufbx_retain_scene(scene); }
@@ -4402,6 +4395,7 @@ typedef ufbx_ref<ufbx_line_curve> ufbx_line_curve_ref;
 typedef ufbx_ref<ufbx_geometry_cache> ufbx_geometry_cache_ref;
 
 #endif
+// bindgen-enable
 
 #if defined(_MSC_VER)
 	#pragma warning(pop)
