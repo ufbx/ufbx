@@ -173,6 +173,17 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: clang --analyze -Xanalyzer -analyzer-werror -Xanalyzer -analyzer-disable-checker=unix.Malloc ufbx.c
 
+  ci_bindgen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Create bindgen/build directory
+        run: mkdir bindgen/build
+      - name: Parse ufbx.h
+        run: python3 bindgen/ufbx_parser.py
+      - name: Generate typed IR
+        run: python3 bindgen/ufbx_ir.py
+
   ci_exotic:
     runs-on: ubuntu-latest
     needs: ci_pre_hashes
