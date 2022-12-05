@@ -155,6 +155,7 @@ class Struct(Base):
     is_callback: bool
     is_interface: bool
     member_functions: List[str]
+    member_globals: List[str]
 
 class EnumValue(Base):
     name: str    
@@ -239,6 +240,11 @@ class MemberFunction(Base):
     member_name: str
     self_index: int
 
+class MemberGlobal(Base):
+    global_name: str
+    self_type: str
+    member_name: str
+
 class File(Base):
     constants: Dict[str, Constant]
     types: Dict[str, Type]
@@ -249,6 +255,7 @@ class File(Base):
     globals: Dict[str, Global]
     typedefs: Dict[str, Typedef]
     member_functions: Dict[str, MemberFunction]
+    member_globals: Dict[str, MemberGlobal]
     declarations: List[Declaration]
     element_types: List[str]
 
@@ -774,6 +781,20 @@ member_functions = [
     MemberFunction(func="ufbx_sample_geometry_cache_vec3", self_type="ufbx_cache_channel", member_name="sample_vec3"),
 ]
 
+member_globals = [
+    MemberGlobal(global_name="ufbx_empty_string", self_type="ufbx_string", member_name="empty"),
+    MemberGlobal(global_name="ufbx_identity_matrix", self_type="ufbx_matrix", member_name="identity"),
+    MemberGlobal(global_name="ufbx_identity_transform", self_type="ufbx_transform", member_name="identity"),
+    MemberGlobal(global_name="ufbx_zero_vec2", self_type="ufbx_vec2", member_name="zero"),
+    MemberGlobal(global_name="ufbx_zero_vec3", self_type="ufbx_vec3", member_name="zero"),
+    MemberGlobal(global_name="ufbx_zero_vec4", self_type="ufbx_vec4", member_name="zero"),
+    MemberGlobal(global_name="ufbx_identity_quat", self_type="ufbx_quat", member_name="identity"),
+    MemberGlobal(global_name="ufbx_axes_right_handed_y_up", self_type="ufbx_coordinate_axes", member_name="right_handed_y_up"),
+    MemberGlobal(global_name="ufbx_axes_right_handed_z_up", self_type="ufbx_coordinate_axes", member_name="right_handed_z_up"),
+    MemberGlobal(global_name="ufbx_axes_left_handed_y_up", self_type="ufbx_coordinate_axes", member_name="left_handed_y_up"),
+    MemberGlobal(global_name="ufbx_axes_left_handed_z_up", self_type="ufbx_coordinate_axes", member_name="left_handed_z_up"),
+]
+
 def find_index(list, predicate):
     for i,v in enumerate(list):
         if predicate(v):
@@ -1005,6 +1026,10 @@ if __name__ == "__main__":
         file.structs[mf.self_type].member_functions.append(mf.func)
 
         file.member_functions[mf.func] = mf
+
+    for mg in member_globals:
+        file.structs[mg.self_type].member_globals.append(mg.global_name)
+        file.member_globals[mg.global_name] = mg
 
     for arch in archs:
         layout_file(arch, file)
