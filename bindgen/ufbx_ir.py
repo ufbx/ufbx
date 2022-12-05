@@ -134,6 +134,7 @@ class Type(Base):
 class Field(Base):
     type: str
     name: str    
+    kind: str
     private: bool
     offset: Dict[str, int]
     comment: Optional[str]
@@ -383,6 +384,15 @@ def parse_field(file: File, st: Struct, decl, anon_path):
             fd.private = True
         st.fields.append(fd)
 
+def postprocess_fields(file: File, st: Struct):
+    for field in st.fields:
+        tp = file.types[field.type]
+        if tp.kind == "array" and tp.inner == "char":
+            len_ix = find_index(st.fields, lambda f: f.name == field.name + "_length")
+            if len_ix >= 0:
+                field.kind = "inlineBuf"
+                st.fields[len_ix].kind = "inlineBufLength"
+
 def shorten_name(name: str, prefix: str):
     for part in prefix.split("_"):
         if name.lower().startswith(part.lower() + "_"):
@@ -407,7 +417,8 @@ def parse_enum(file: File, en: Enum, decl, ctx):
         for inner in decl["decls"]:
             parse_enum(file, en, inner, ctx)
     elif kind == "decl":
-        if name == en.name.upper() + "_COUNT":
+        upper_name = en.name.upper()
+        if name in (f"{upper_name}_COUNT", f"{upper_name}_FORCE_32BIT"):
             ctx.hit_aux = True
         ev = EnumValue(name=name, flag=en.flag)
         ev.short_name_raw = shorten_name(name, en.name)
@@ -692,6 +703,7 @@ ref_types = {
     "ufbx_geometry_cache",
     "ufbx_cache_channel",
     "ufbx_cache_frame",
+    "ufbx_texture_file",
 }
 
 pod_structs = [
@@ -716,6 +728,7 @@ pod_structs = [
 
 input_structs = [
     "ufbx_allocator_opts",
+    "ufbx_open_memory_opts",
     "ufbx_load_opts",
     "ufbx_evaluate_opts",
     "ufbx_tessellate_curve_opts",
@@ -782,6 +795,7 @@ member_functions = [
     MemberFunction(func="ufbx_evaluate_nurbs_basis", self_type="ufbx_nurbs_basis", member_name="evaluate"),
     MemberFunction(func="ufbx_evaluate_nurbs_curve", self_type="ufbx_nurbs_curve", member_name="evaluate"),
     MemberFunction(func="ufbx_evaluate_nurbs_surface", self_type="ufbx_nurbs_surface", member_name="evaluate"),
+    MemberFunction(func="ufbx_tessellate_nurbs_curve", self_type="ufbx_nurbs_curve", member_name="tessellate"),
     MemberFunction(func="ufbx_tessellate_nurbs_surface", self_type="ufbx_nurbs_surface", member_name="tessellate"),
     MemberFunction(func="ufbx_catch_triangulate_face", self_type="ufbx_mesh"),
     MemberFunction(func="ufbx_triangulate_face", self_type="ufbx_mesh"),
@@ -794,6 +808,7 @@ member_functions = [
 
 member_globals = [
     MemberGlobal(global_name="ufbx_empty_string", self_type="ufbx_string", member_name="empty"),
+    MemberGlobal(global_name="ufbx_empty_blob", self_type="ufbx_blob", member_name="empty"),
     MemberGlobal(global_name="ufbx_identity_matrix", self_type="ufbx_matrix", member_name="identity"),
     MemberGlobal(global_name="ufbx_identity_transform", self_type="ufbx_transform", member_name="identity"),
     MemberGlobal(global_name="ufbx_zero_vec2", self_type="ufbx_vec2", member_name="zero"),
@@ -881,6 +896,9 @@ if __name__ == "__main__":
             inner = file.types[typ.inner]
             if inner.is_function:
                 typ.is_function = True
+
+    for st in file.structs.values():
+        postprocess_fields(file, st)
 
     for func in file.functions.values():
         for index, arg in enumerate(func.arguments):
@@ -970,6 +988,8 @@ if __name__ == "__main__":
                 arg.return_ref = True
             if typ.base_name in { "ufbx_scene", "ufbx_anim", "ufbx_element", "ufbx_geometry_cache", "ufbx_props" }:
                 arg.return_ref = True
+        if len(func.arguments) == 1 and func.arguments[0].type == "void":
+            func.arguments.clear()
 
     for func in file.functions.values():
         if "_ffi_" in func.name:
@@ -994,16 +1014,19 @@ if __name__ == "__main__":
     file.functions["ufbx_load_stdio_prefix"].alloc_type = "scene"
     file.functions["ufbx_evaluate_scene"].alloc_type = "scene"
     file.functions["ufbx_subdivide_mesh"].alloc_type = "mesh"
+    file.functions["ufbx_tessellate_nurbs_curve"].alloc_type = "line"
     file.functions["ufbx_tessellate_nurbs_surface"].alloc_type = "mesh"
     file.functions["ufbx_load_geometry_cache"].alloc_type = "geometryCache"
     file.functions["ufbx_load_geometry_cache_len"].alloc_type = "geometryCache"
 
     file.functions["ufbx_free_scene"].kind = "free"
     file.functions["ufbx_free_mesh"].kind = "free"
+    file.functions["ufbx_free_line_curve"].kind = "free"
     file.functions["ufbx_free_geometry_cache"].kind = "free"
 
     file.functions["ufbx_retain_scene"].kind = "retain"
     file.functions["ufbx_retain_mesh"].kind = "retain"
+    file.functions["ufbx_retain_line_curve"].kind = "retain"
     file.functions["ufbx_retain_geometry_cache"].kind = "retain"
 
     file.functions["ufbx_triangulate_face"].return_array_scale = 3

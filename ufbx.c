@@ -24230,7 +24230,6 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 	ufbxi_free_ator(&ator);
 
 	return result_vertices;
-
 }
 
 #else
@@ -24431,7 +24430,7 @@ ufbx_abi bool ufbx_default_open_file(void *user, ufbx_stream *stream, const char
 	return ufbx_open_file(stream, path, path_len);
 }
 
-ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t data_size, const ufbx_open_memory_opts *opts)
+ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t data_size, const ufbx_open_memory_opts *opts, ufbx_error *error)
 {
 	ufbx_open_memory_opts local_opts;
 	if (!opts) {
@@ -24441,8 +24440,11 @@ ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t dat
 	ufbx_assert(opts->_begin_zero == 0 && opts->_end_zero == 0);
 
 	ufbx_error local_error = { UFBX_ERROR_NONE };
+	if (!error) error = &local_error;
+	ufbxi_clear_error(error);
+
 	ufbxi_allocator ator = { 0 };
-	ufbxi_init_ator(&local_error, &ator, &opts->allocator, "memory");
+	ufbxi_init_ator(error, &ator, &opts->allocator, "memory");
 
 	size_t copy_size = opts->no_copy ? 0 : data_size;
 
@@ -24452,6 +24454,7 @@ ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t dat
 	void *memory = ufbxi_alloc(&ator, char, self_size);
 	if (!memory) {
 		ufbxi_free_ator(&ator);
+		ufbxi_fix_error_type(error, "Failed to open memory");
 		return false;
 	}
 
@@ -26721,9 +26724,10 @@ ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t 
 {
 	ufbx_error local_error;
 	if (!error) {
-		memset(&local_error, 0, sizeof(local_error));
+		error = &local_error;
 	}
-	return ufbxi_generate_indices(streams, num_streams, indices, num_indices, allocator, error ? error : &local_error);
+	ufbxi_clear_error(error);
+	return ufbxi_generate_indices(streams, num_streams, indices, num_indices, allocator, error);
 }
 
 ufbx_abi ufbx_real ufbx_catch_get_vertex_real(ufbx_panic *panic, const ufbx_vertex_real *v, size_t index)

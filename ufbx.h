@@ -3489,7 +3489,7 @@ typedef enum ufbx_progress_result {
 	UFBX_PROGRESS_CONTINUE = 0x100,
 	UFBX_PROGRESS_CANCEL = 0x200,
 
-	UFBX_PROGRESS_FORCE_32BIT = 0x7fffffff,
+	UFBX_PROGRESS_RESULT_FORCE_32BIT = 0x7fffffff,
 } ufbx_progress_result;
 
 // Called periodically with the current progress
@@ -4052,7 +4052,7 @@ ufbx_abi bool ufbx_open_file(ufbx_stream *stream, const char *path, size_t path_
 ufbx_abi bool ufbx_default_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info);
 
 // NOTE: Uses the default ufbx allocator!
-ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t data_size, const ufbx_open_memory_opts *opts);
+ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t data_size, const ufbx_open_memory_opts *opts, ufbx_error *error);
 
 // Animation evaluation
 

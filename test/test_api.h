@@ -14,7 +14,7 @@ static bool ufbxt_open_file_memory_default(void *user, ufbx_stream *stream, cons
 	void *data = ufbxt_read_file(path, &size);
 	if (!data) return false;
 
-	bool ok = ufbx_open_memory(stream, data, size, NULL);
+	bool ok = ufbx_open_memory(stream, data, size, NULL, NULL);
 	free(data);
 	return ok;
 }
@@ -30,7 +30,7 @@ static bool ufbxt_open_file_memory_temp(void *user, ufbx_stream *stream, const c
 	ufbx_open_memory_opts opts = { 0 };
 	opts.allocator.allocator = info->temp_allocator;
 
-	bool ok = ufbx_open_memory(stream, data, size, &opts);
+	bool ok = ufbx_open_memory(stream, data, size, &opts, NULL);
 	free(data);
 	return ok;
 }
@@ -46,7 +46,7 @@ static bool ufbxt_open_file_memory_ref(void *user, ufbx_stream *stream, const ch
 	ufbx_open_memory_opts opts = { 0 };
 	opts.no_copy = true;
 	opts.close_cb.fn = &ufbxt_close_memory;
-	return ufbx_open_memory(stream, data, size, &opts);
+	return ufbx_open_memory(stream, data, size, &opts, NULL);
 }
 
 #endif
