@@ -10355,7 +10355,7 @@ ufbxi_noinline static void ufbxi_init_synthetic_vec3_prop(ufbx_prop *dst, const 
 	dst->name.data = name;
 	dst->name.length = strlen(name);
 	dst->value_vec3 = *value;
-	dst->flags = (uint32_t)(UFBX_PROP_FLAG_SYNTHETIC|UFBX_PROP_FLAG_VALUE_VEC3|UFBX_PROP_FLAG_VALUE_INT);
+	dst->flags = (ufbx_prop_flags)(UFBX_PROP_FLAG_SYNTHETIC|UFBX_PROP_FLAG_VALUE_VEC3|UFBX_PROP_FLAG_VALUE_INT);
 	dst->value_int = ufbxi_f64_to_i64(dst->value_real);
 	dst->value_str.data = ufbxi_empty_char;
 
@@ -17324,7 +17324,7 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_node *ufbxi_get_geometry_transform_no
 	return geo_node;
 }
 
-ufbxi_nodiscard ufbxi_noinline static void ufbxi_transform_vec3_list(const void *v_list, const ufbx_matrix *matrix, size_t stride)
+ufbxi_noinline static void ufbxi_transform_vec3_list(const void *v_list, const ufbx_matrix *matrix, size_t stride)
 {
 	const ufbx_void_list *list = (const ufbx_void_list*)v_list;
 	if (!list || list->count == 0) return;
@@ -20559,14 +20559,14 @@ static ufbxi_noinline void ufbxi_transform_to_axes(ufbxi_context *uc, ufbx_coord
 	if (!ufbxi_axis_matrix(&uc->axis_matrix, uc->scene.settings.axes, dst_axes)) return;
 
 	if (uc->opts.space_conversion == UFBX_SPACE_CONVERSION_TRANSFORM_ROOT) {
-		ufbx_matrix root_mat = uc->axis_matrix;
+		ufbx_matrix axis_mat = uc->axis_matrix;
 		if (!ufbxi_is_transform_identity(uc->scene.root_node->local_transform)) {
 			ufbx_matrix root_mat = ufbx_transform_to_matrix(&uc->scene.root_node->local_transform);
-			root_mat = ufbx_matrix_mul(&root_mat, &root_mat);
+			axis_mat = ufbx_matrix_mul(&root_mat, &axis_mat);
 		}
 
-		uc->scene.root_node->local_transform = ufbx_matrix_to_transform(&root_mat);
-		uc->scene.root_node->node_to_parent = root_mat;
+		uc->scene.root_node->local_transform = ufbx_matrix_to_transform(&axis_mat);
+		uc->scene.root_node->node_to_parent = axis_mat;
 	}
 }
 
