@@ -10355,7 +10355,7 @@ ufbxi_noinline static void ufbxi_init_synthetic_vec3_prop(ufbx_prop *dst, const 
 	dst->name.data = name;
 	dst->name.length = strlen(name);
 	dst->value_vec3 = *value;
-	dst->flags = UFBX_PROP_FLAG_SYNTHETIC | UFBX_PROP_FLAG_VALUE_VEC3 | UFBX_PROP_FLAG_VALUE_INT;
+	dst->flags = (uint32_t)(UFBX_PROP_FLAG_SYNTHETIC|UFBX_PROP_FLAG_VALUE_VEC3|UFBX_PROP_FLAG_VALUE_INT);
 	dst->value_int = ufbxi_f64_to_i64(dst->value_real);
 	dst->value_str.data = ufbxi_empty_char;
 
@@ -10408,7 +10408,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_model(ufbxi_context *uc, uf
 			elem_node->has_geometry_transform = true;
 			geo_node->is_geometry_transform_helper = true;
 
-			ufbxi_connect_oo(uc, geo_fbx_id, info->fbx_id);
+			ufbxi_check(ufbxi_connect_oo(uc, geo_fbx_id, info->fbx_id));
 			uc->has_geometry_transform_nodes = true;
 		}
 	}
