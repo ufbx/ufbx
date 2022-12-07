@@ -636,6 +636,10 @@ struct ufbx_node {
 	// is multiple attributes this will be the first one.
 	ufbx_nullable ufbx_element *attrib;
 
+	// Geometry trasnform helper if one exists.
+	// See `UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES`.
+	ufbx_nullable ufbx_node *geometry_transform_helper;
+
 	// `attrib->type` if `attrib` is defined, otherwise `UFBX_ELEMENT_UNKNOWN`.
 	ufbx_element_type attrib_type;
 

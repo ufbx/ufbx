@@ -10386,19 +10386,23 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_model(ufbxi_context *uc, uf
 
 	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES) {
 		ufbx_vec3 geo_translation = ufbxi_find_vec3(&elem_node->props, ufbxi_GeometricTranslation, 0.0f, 0.0f, 0.0f);
-		ufbx_vec3 geo_rotation = ufbxi_find_vec3(&elem_node->props, ufbxi_GeometricTranslation, 0.0f, 0.0f, 0.0f);
-		ufbx_vec3 geo_scaling = ufbxi_find_vec3(&elem_node->props, ufbxi_GeometricTranslation, 1.0f, 1.0f, 1.0f);
+		ufbx_vec3 geo_rotation = ufbxi_find_vec3(&elem_node->props, ufbxi_GeometricRotation, 0.0f, 0.0f, 0.0f);
+		ufbx_vec3 geo_scaling = ufbxi_find_vec3(&elem_node->props, ufbxi_GeometricScaling, 1.0f, 1.0f, 1.0f);
 		if (!ufbxi_is_vec3_zero(geo_translation) || !ufbxi_is_vec3_zero(geo_rotation) || !ufbxi_is_vec3_one(geo_scaling)) {
 
 			uint64_t geo_fbx_id;
-			ufbx_node *geo_node = ufbxi_push_synthetic_element(uc, &geo_fbx_id, NULL, uc->opts.geometry_transform_helper_name.data, ufbx_node, UFBX_ELEMENT_NODE);
+			ufbx_node *geo_node = ufbxi_push_synthetic_element(uc, &geo_fbx_id, node, uc->opts.geometry_transform_helper_name.data, ufbx_node, UFBX_ELEMENT_NODE);
 			ufbxi_check(geo_node);
+			ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &geo_node->element.element_id));
 
 			ufbx_prop *props = ufbxi_push_zero(&uc->result, ufbx_prop, 3);
 			ufbxi_check(props);
 			ufbxi_init_synthetic_vec3_prop(&props[0], ufbxi_Lcl_Rotation, &geo_rotation, UFBX_PROP_ROTATION);
 			ufbxi_init_synthetic_vec3_prop(&props[1], ufbxi_Lcl_Scaling, &geo_scaling, UFBX_PROP_SCALING);
 			ufbxi_init_synthetic_vec3_prop(&props[2], ufbxi_Lcl_Translation, &geo_translation, UFBX_PROP_TRANSLATION);
+
+			geo_node->props.props.data = props;
+			geo_node->props.props.count = 3;
 
 			// HACK: We tag this node as a geometry transform node prematurely here,
 			// this is used to detect which nodes need remapping in `ufbxi_resolve_connections()`.
@@ -17655,6 +17659,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			if (parent->children.data == NULL) {
 				parent->children.data = p_node;
 			}
+
+			if (node->is_geometry_transform_helper) {
+				parent->geometry_transform_helper = node;
+			}
 		}
 
 		ufbx_connection_list conns = ufbxi_find_dst_connections(&node->element, NULL);
@@ -21707,6 +21715,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 		} else if (node->all_attribs.count == 1) {
 			node->all_attribs.data = &node->attrib;
 		}
+
+		node->geometry_transform_helper = (ufbx_node*)ufbxi_translate_element(ec, node->geometry_transform_helper);
 
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &node->materials));
 	}

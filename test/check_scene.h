@@ -342,6 +342,11 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	if (node->is_root) {
 		ufbxt_assert(!node->has_geometry_transform);
 	}
+
+	ufbxt_check_element_ptr(scene, node->geometry_transform_helper, UFBX_ELEMENT_NODE);
+	if (node->geometry_transform_helper) {
+		ufbxt_assert(node->geometry_transform_helper->is_geometry_transform_helper);
+	}
 }
 
 static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
