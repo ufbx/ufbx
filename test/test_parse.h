@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "parse"
 
 UFBXT_TEST(thread_safety)
 #if UFBXT_IMPL

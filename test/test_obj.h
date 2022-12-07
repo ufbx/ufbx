@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "obj"
 
 UFBXT_FILE_TEST(zbrush_vertex_color)
 #if UFBXT_IMPL

@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "legacy"
 
 #if UFBXT_IMPL
 static void ufbxt_diff_material_value(ufbxt_diff_error *err, const ufbx_material_map *color, const ufbx_material_map *factor, ufbx_vec3 value)

@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "convert"
 
 #if UFBXT_IMPL
 ufbx_load_opts ufbxt_geometry_transform_helper_opts()

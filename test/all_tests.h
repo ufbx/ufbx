@@ -1,4 +1,6 @@
 
+#define UFBXT_TEST_GROUP ""
+
 #include "test_deflate.h"
 #include "test_math.h"
 #include "test_parse.h"
@@ -22,3 +24,4 @@
 #include "test_scenes.h"
 #include "test_fuzz.h"
 
+#undef UFBXT_TEST_GROUP

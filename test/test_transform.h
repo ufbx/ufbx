@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "transform"
 
 UFBXT_FILE_TEST(maya_pivots)
 #if UFBXT_IMPL

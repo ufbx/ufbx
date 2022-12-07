@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "mesh"
 
 UFBXT_FILE_TEST(blender_279_default)
 #if UFBXT_IMPL

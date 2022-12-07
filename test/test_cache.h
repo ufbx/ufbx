@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "cache"
 
 #if UFBXT_IMPL
 static void ufbxt_test_sine_cache(ufbxt_diff_error *err, const char *path, double begin, double end, double err_threshold)

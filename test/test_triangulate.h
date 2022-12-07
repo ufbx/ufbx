@@ -1,4 +1,5 @@
-
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "triangulate"
 
 #if UFBXT_IMPL
 size_t do_triangulate_test(ufbx_scene *scene)

@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "animation"
 
 #if UFBXT_IMPL
 typedef struct {

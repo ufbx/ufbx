@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "constraints"
 
 UFBXT_FILE_TEST(maya_constraint_zoo)
 #if UFBXT_IMPL

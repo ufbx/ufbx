@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "fuzz"
 
 UFBXT_TEST(fuzz_files)
 #if UFBXT_IMPL

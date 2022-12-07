@@ -91,6 +91,7 @@ typedef struct {
 } ufbxt_fail;
 
 typedef struct {
+	const char *group;
 	const char *name;
 	void (*func)(void);
 
@@ -2751,19 +2752,41 @@ void ufbxt_do_deflate_test(const char *name, void (*test_fn)(const ufbxt_inflate
 #undef UFBXT_FILE_TEST_OPTS_ALT_FLAGS
 #undef UFBXT_DEFLATE_TEST
 #define UFBXT_IMPL 0
-#define UFBXT_TEST(name) { #name, &ufbxt_test_fn_##name },
-#define UFBXT_FILE_TEST_FLAGS(name, flags) { #name, &ufbxt_test_fn_file_##name },
-#define UFBXT_FILE_TEST_PATH_FLAGS(name, path, flags) { #name, &ufbxt_test_fn_file_##name },
-#define UFBXT_FILE_TEST_OPTS_FLAGS(name, get_opts, flags) { #name, &ufbxt_test_fn_file_##name },
-#define UFBXT_FILE_TEST_SUFFIX_FLAGS(name, suffix, flags) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
-#define UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS(name, suffix, get_opts, flags) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
-#define UFBXT_FILE_TEST_ALT_FLAGS(name, file, flags) { #name, &ufbxt_test_fn_file_##name },
-#define UFBXT_FILE_TEST_OPTS_ALT_FLAGS(name, file, get_opts, flags) { #name, &ufbxt_test_fn_file_##name },
-#define UFBXT_DEFLATE_TEST(name) { #name, &ufbxt_test_fn_deflate_##name },
+#define UFBXT_TEST(name) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_##name },
+#define UFBXT_FILE_TEST_FLAGS(name, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST_PATH_FLAGS(name, path, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST_OPTS_FLAGS(name, get_opts, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST_SUFFIX_FLAGS(name, suffix, flags) { UFBXT_TEST_GROUP, #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
+#define UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS(name, suffix, get_opts, flags) { UFBXT_TEST_GROUP, #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
+#define UFBXT_FILE_TEST_ALT_FLAGS(name, file, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST_OPTS_ALT_FLAGS(name, file, get_opts, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_DEFLATE_TEST(name) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_deflate_##name },
 
 ufbxt_test g_tests[] = {
 	#include "all_tests.h"
 };
+
+typedef struct {
+	const char *name;
+	uint32_t num_total;
+	uint32_t num_ran;
+	uint32_t num_ok;
+} ufbxt_test_stats;
+
+ufbxt_test_stats g_test_groups[ufbxt_arraycount(g_tests)];
+size_t g_num_groups = 0;
+
+ufbxt_test_stats *ufbxt_get_test_group(const char *name)
+{
+	for (size_t i = g_num_groups; i > 0; --i) {
+		ufbxt_test_stats *group = &g_test_groups[i - 1];
+		if (!strcmp(group->name, name)) return group;
+	}
+
+	ufbxt_test_stats *group = &g_test_groups[g_num_groups++];
+	group->name = name;
+	return group;
+}
 
 int ufbxt_run_test(ufbxt_test *test)
 {
@@ -2799,19 +2822,20 @@ int main(int argc, char **argv)
 	uint32_t num_tests = ufbxt_arraycount(g_tests);
 	uint32_t num_ok = 0;
 	const char *test_filter = NULL;
+	const char *test_group = NULL;
 
 	cputime_init();
 
 	for (int i = 1; i < argc; i++) {
-		if (!strcmp(argv[i], "-v")) {
+		if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
 			g_verbose = 1;
 		}
-		if (!strcmp(argv[i], "-t")) {
+		if (!strcmp(argv[i], "-t") || !strcmp(argv[i], "--test")) {
 			if (++i < argc) {
 				test_filter = argv[i];
 			}
 		}
-		if (!strcmp(argv[i], "-d")) {
+		if (!strcmp(argv[i], "-d") || !strcmp(argv[i], "--data")) {
 			if (++i < argc) {
 				size_t len = strlen(argv[i]);
 				if (len + 2 > sizeof(data_root)) {
@@ -2826,9 +2850,14 @@ int main(int argc, char **argv)
 				}
 			}
 		}
-		if (!strcmp(argv[i], "-f")) {
+		if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "--format")) {
 			if (++i < argc) g_file_version = (uint32_t)atoi(argv[i]);
 			if (++i < argc) g_file_type = argv[i];
+		}
+		if (!strcmp(argv[i], "-g") || !strcmp(argv[i], "--group")) {
+			if (++i < argc) {
+				test_group = argv[i];
+			}
 		}
 
 		if (!strcmp(argv[i], "--deflate-opt")) {
@@ -2923,14 +2952,22 @@ int main(int argc, char **argv)
 	uint32_t num_ran = 0;
 	for (uint32_t i = 0; i < num_tests; i++) {
 		ufbxt_test *test = &g_tests[i];
+		ufbxt_test_stats *group_stats = ufbxt_get_test_group(test->group);
+		group_stats->num_total++;
+
 		if (test_filter && strcmp(test->name, test_filter)) {
 			continue;
 		}
+		if (test_group && strcmp(test->group, test_group)) {
+			continue;
+		}
 
+		group_stats->num_ran++;
 		num_ran++;
 		bool print_always = false;
 		if (ufbxt_run_test(test)) {
 			num_ok++;
+			group_stats->num_ok++;
 		} else {
 			print_always = true;
 		}
@@ -2956,6 +2993,21 @@ int main(int argc, char **argv)
 	}
 
 	printf("\nTests passed: %u/%u\n", num_ok, num_ran);
+
+	if (g_verbose) {
+		size_t num_skipped = 0;
+		for (size_t i = 0; i < g_num_groups; i++) {
+			ufbxt_test_stats *group = &g_test_groups[i];
+			if (group->num_ran == 0) {
+				num_skipped++;
+				continue;
+			}
+			printf("  %s: %u/%u\n", group->name, group->num_ok, group->num_ran);
+		}
+		if (num_skipped > 0) {
+			printf("  .. skipped %zu groups\n", num_skipped);
+		}
+	}
 
 	if (g_fuzz) {
 		printf("Fuzz checks:\n\nstatic const ufbxt_fuzz_check g_fuzz_checks[] = {\n");
