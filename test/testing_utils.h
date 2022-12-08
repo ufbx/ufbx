@@ -9,6 +9,10 @@
 
 #include "testing_basics.h"
 
+#ifndef ufbxt_soft_assert
+#define ufbxt_soft_assert(cond) ufbxt_assert(cond)
+#endif
+
 // -- Vector helpers
 
 static ufbx_real ufbxt_dot2(ufbx_vec2 a, ufbx_vec2 b)
