@@ -15372,7 +15372,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_contex
 			if (dst->type == UFBX_ELEMENT_NODE && src->type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && src->type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB) {
 				ufbx_node *node = (ufbx_node*)dst;
 				if (node->has_geometry_transform) {
-					ufbxi_node_extra *extra = ufbxi_get_element_extra(uc, node->element_id);
+					ufbxi_node_extra *extra = (ufbxi_node_extra*)ufbxi_get_element_extra(uc, node->element_id);
 					ufbx_assert(extra);
 					dst = uc->scene.elements.data[extra->geometry_helper_id];
 					ufbx_assert(dst->type == UFBX_ELEMENT_NODE && ((ufbx_node*)dst)->is_geometry_transform_helper);
