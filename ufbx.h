@@ -636,7 +636,7 @@ struct ufbx_node {
 	// is multiple attributes this will be the first one.
 	ufbx_nullable ufbx_element *attrib;
 
-	// Geometry trasnform helper if one exists.
+	// Geometry transform helper if one exists.
 	// See `UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES`.
 	ufbx_nullable ufbx_node *geometry_transform_helper;
 
@@ -3661,7 +3661,7 @@ typedef enum ufbx_space_conversion {
 	// Perform the conversion by using "adjust" transforms.
 	// Compensates for the transforms using `ufbx_node.adjust_pre_rotation` and
 	// `ufbx_node.adjust_pre_scale`. You don't need to account for these unless
-	// you are manually building trasnforms from `ufbx_props`.
+	// you are manually building transforms from `ufbx_props`.
 	UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS,
 
 	UFBX_SPACE_CONVERSION_COUNT,
