@@ -15282,6 +15282,10 @@ ufbxi_noinline static bool ufbxi_cmp_node_less(ufbx_node *a, ufbx_node *b)
 	} else {
 		ufbx_assert(a->parent == NULL && b->parent == NULL);
 	}
+	if (a->is_geometry_transform_helper != b->is_geometry_transform_helper) {
+		// Sort geometry transform helpers always before rest of the children.
+		return (unsigned)a->is_geometry_transform_helper > (unsigned)b->is_geometry_transform_helper;
+	}
 	return a->element.element_id < b->element.element_id;
 }
 

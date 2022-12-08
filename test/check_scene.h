@@ -346,6 +346,9 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	ufbxt_check_element_ptr(scene, node->geometry_transform_helper, UFBX_ELEMENT_NODE);
 	if (node->geometry_transform_helper) {
 		ufbxt_assert(node->geometry_transform_helper->is_geometry_transform_helper);
+
+		// Geometry transform helper must always be the first child
+		ufbxt_assert(node->geometry_transform_helper == node->children.data[0]);
 	}
 
 	if (node->is_geometry_transform_helper) {

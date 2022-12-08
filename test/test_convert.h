@@ -910,3 +910,94 @@ UFBXT_FILE_TEST_OPTS(blender_340_default_unscaled, ufbxt_blender_space_adjust_op
 }
 #endif
 
+UFBXT_FILE_TEST(max_geometry_transform_order)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->nodes.count == 3);
+	ufbx_node **nodes = scene->nodes.data;
+
+	ufbxt_assert(!strcmp(nodes[0]->name.data, ""));
+	ufbxt_assert(nodes[0]->is_root);
+	ufbxt_assert(nodes[0]->node_depth == 0);
+	ufbxt_assert(nodes[0]->parent == NULL);
+
+	ufbxt_assert(!strcmp(nodes[1]->name.data, "Box001"));
+	ufbxt_assert(nodes[1]->has_geometry_transform);
+	ufbxt_assert(nodes[1]->node_depth == 1);
+	ufbxt_assert(nodes[1]->parent == nodes[0]);
+
+	ufbxt_assert(!strcmp(nodes[2]->name.data, "Box002"));
+	ufbxt_assert(nodes[2]->has_geometry_transform);
+	ufbxt_assert(nodes[2]->node_depth == 2);
+	ufbxt_assert(nodes[2]->parent == nodes[1]);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_order_helper, max_geometry_transform_order, ufbxt_geometry_transform_helper_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->nodes.count == 5);
+	ufbx_node **nodes = scene->nodes.data;
+
+	ufbxt_assert(!strcmp(nodes[0]->name.data, ""));
+	ufbxt_assert(nodes[0]->is_root);
+	ufbxt_assert(nodes[0]->node_depth == 0);
+	ufbxt_assert(nodes[0]->parent == NULL);
+
+	ufbxt_assert(!strcmp(nodes[1]->name.data, "Box001"));
+	ufbxt_assert(nodes[1]->geometry_transform_helper);
+	ufbxt_assert(nodes[1]->node_depth == 1);
+	ufbxt_assert(nodes[1]->parent == nodes[0]);
+
+	ufbxt_assert(!strcmp(nodes[2]->name.data, ""));
+	ufbxt_assert(nodes[2]->is_geometry_transform_helper);
+	ufbxt_assert(nodes[2]->node_depth == 2);
+	ufbxt_assert(nodes[2]->parent == nodes[1]);
+
+	ufbxt_assert(!strcmp(nodes[3]->name.data, "Box002"));
+	ufbxt_assert(nodes[3]->geometry_transform_helper);
+	ufbxt_assert(nodes[3]->node_depth == 2);
+	ufbxt_assert(nodes[3]->parent == nodes[1]);
+
+	ufbxt_assert(!strcmp(nodes[4]->name.data, ""));
+	ufbxt_assert(nodes[4]->is_geometry_transform_helper);
+	ufbxt_assert(nodes[4]->node_depth == 3);
+	ufbxt_assert(nodes[4]->parent == nodes[3]);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_order_modify, max_geometry_transform_order, ufbxt_geometry_transform_modify_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->nodes.count == 5);
+	ufbx_node **nodes = scene->nodes.data;
+
+	ufbxt_assert(!strcmp(nodes[0]->name.data, ""));
+	ufbxt_assert(nodes[0]->is_root);
+	ufbxt_assert(nodes[0]->node_depth == 0);
+	ufbxt_assert(nodes[0]->parent == NULL);
+
+	ufbxt_assert(!strcmp(nodes[1]->name.data, "Box001"));
+	ufbxt_assert(nodes[1]->geometry_transform_helper);
+	ufbxt_assert(nodes[1]->node_depth == 1);
+	ufbxt_assert(nodes[1]->parent == nodes[0]);
+
+	ufbxt_assert(!strcmp(nodes[2]->name.data, ""));
+	ufbxt_assert(nodes[2]->is_geometry_transform_helper);
+	ufbxt_assert(nodes[2]->node_depth == 2);
+	ufbxt_assert(nodes[2]->parent == nodes[1]);
+
+	ufbxt_assert(!strcmp(nodes[3]->name.data, "Box002"));
+	ufbxt_assert(nodes[3]->geometry_transform_helper);
+	ufbxt_assert(nodes[3]->node_depth == 2);
+	ufbxt_assert(nodes[3]->parent == nodes[1]);
+
+	ufbxt_assert(!strcmp(nodes[4]->name.data, ""));
+	ufbxt_assert(nodes[4]->is_geometry_transform_helper);
+	ufbxt_assert(nodes[4]->node_depth == 3);
+	ufbxt_assert(nodes[4]->parent == nodes[3]);
+}
+#endif
+
