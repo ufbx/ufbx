@@ -3645,8 +3645,8 @@ typedef enum ufbx_geometry_transform_handling {
 	// NOTE: This will not work correctly for instanced geometry.
 	UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK,
 
-	UFBX_UNIT_CONVERSION_COUNT,
-	UFBX_UNIT_CONVERSION_FORCE_32BIT = 0x7fffffff,
+	UFBX_GEOMETRY_TRANSFORM_HANDLING_COUNT,
+	UFBX_GEOMETRY_TRANSFORM_HANDLING_FORCE_32BIT = 0x7fffffff,
 } ufbx_geometry_transform_handling;
 
 // Specify how unit / coordinate system conversion should be performed.
