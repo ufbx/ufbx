@@ -15153,6 +15153,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 
 	uint32_t num_elements = uc->num_elements;
 	ufbx_element **elements = ufbxi_push_pop(&uc->tmp_parse, &uc->tmp_element_ptrs, ufbx_element*, num_elements);
+	ufbxi_check(elements);
 
 	size_t num_connections = uc->tmp_connections.num_items;
 	ufbxi_tmp_connection *tmp_connections = ufbxi_push_peek(&uc->tmp_parse, &uc->tmp_connections, ufbxi_tmp_connection, num_connections);
