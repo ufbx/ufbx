@@ -3793,6 +3793,12 @@ typedef struct ufbx_load_opts {
 	// Used only if `space_conversion == UFBX_SPACE_CONVERSION_TRANSFORM_ROOT`.
 	bool no_anim_curve_unit_scaling;
 
+	// Normalize vertex normals.
+	bool normalize_normals;
+
+	// Normalize tangents and bitangents.
+	bool normalize_tangents;
+
 	// Override for the root transform
 	bool use_root_transform;
 	ufbx_transform root_transform;

@@ -649,6 +649,12 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 	}
 #endif
 
+// By default enough to have squares be non-denormal
+#ifndef UFBX_EPSILON
+#define UFBX_EPSILON (sizeof(ufbx_real) == sizeof(float) ? \
+	(ufbx_real)1.0842021795674597e-19f : (ufbx_real)1.4916681462400413e-154)
+#endif
+
 // -- Version
 
 #define UFBX_SOURCE_VERSION ufbx_pack_version(0, 1, 1)
@@ -4926,6 +4932,53 @@ static const ufbx_vec3 ufbxi_one_vec3 = { 1.0f, 1.0f, 1.0f };
 #define UFBXI_DEG_TO_RAD ((ufbx_real)(UFBXI_PI / 180.0))
 #define UFBXI_RAD_TO_DEG ((ufbx_real)(180.0 / UFBXI_PI))
 #define UFBXI_MM_TO_INCH ((ufbx_real)0.0393700787)
+
+ufbx_inline ufbx_vec3 ufbxi_add3(ufbx_vec3 a, ufbx_vec3 b) {
+	ufbx_vec3 v = { a.x + b.x, a.y + b.y, a.z + b.z };
+	return v;
+}
+
+ufbx_inline ufbx_vec3 ufbxi_sub3(ufbx_vec3 a, ufbx_vec3 b) {
+	ufbx_vec3 v = { a.x - b.x, a.y - b.y, a.z - b.z };
+	return v;
+}
+
+ufbx_inline ufbx_vec3 ufbxi_mul3(ufbx_vec3 a, ufbx_real b) {
+	ufbx_vec3 v = { a.x * b, a.y * b, a.z * b };
+	return v;
+}
+
+ufbx_inline ufbx_real ufbxi_dot3(ufbx_vec3 a, ufbx_vec3 b) {
+	return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+ufbx_inline ufbx_real ufbxi_length3(ufbx_vec3 v)
+{
+	return (ufbx_real)ufbx_sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+}
+
+ufbx_inline ufbx_vec3 ufbxi_cross3(ufbx_vec3 a, ufbx_vec3 b) {
+	ufbx_vec3 v = { a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x };
+	return v;
+}
+
+ufbx_inline ufbx_vec3 ufbxi_normalize3(ufbx_vec3 a) {
+	ufbx_real len = (ufbx_real)ufbx_sqrt(ufbxi_dot3(a, a));
+	if (len > UFBX_EPSILON) {
+		return ufbxi_mul3(a, (ufbx_real)1.0 / len);
+	} else {
+		ufbx_vec3 zero = { (ufbx_real)0 };
+		return zero;
+	}
+}
+
+static ufbxi_noinline ufbx_vec3 ufbxi_slow_normalize3(const ufbx_vec3 *a) {
+	return ufbxi_normalize3(*a);
+}
+
+static ufbxi_noinline ufbx_vec3 ufbxi_slow_normalized_cross3(const ufbx_vec3 *a, const ufbx_vec3 *b) {
+	return ufbxi_normalize3(ufbxi_cross3(*a, *b));
+}
 
 // -- Type definitions
 
@@ -15481,7 +15534,7 @@ ufbxi_nodiscard static ufbx_element *ufbxi_get_element_node(ufbx_element *elemen
 	if (!element) return NULL;
 	if (element->type == UFBX_ELEMENT_NODE) {
 		ufbx_node *node = (ufbx_node*)element;
-		if (node->is_geometry_transform_helper) return node->parent;
+		if (node->is_geometry_transform_helper) return (ufbx_element*)node->parent;
 		return NULL;
 	} else {
 		return element->instances.count > 0 ? &element->instances.data[0]->element : NULL;
@@ -17447,6 +17500,31 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_handle_geometry_transforms(ufbxi
 	return 1;
 }
 
+ufbxi_noinline static void ufbxi_normalize_vec3_list(const ufbx_vec3_list *list)
+{
+	ufbxi_nounroll ufbxi_for_list(ufbx_vec3, normal, *list) {
+		*normal = ufbxi_normalize3(*normal);
+	}
+}
+
+ufbxi_noinline static void ufbxi_postprocess_scene(ufbxi_context *uc)
+{
+	if (uc->opts.normalize_normals || uc->opts.normalize_tangents) {
+		ufbxi_for_ptr_list(ufbx_mesh, p_mesh, uc->scene.meshes) {
+			ufbx_mesh *mesh = *p_mesh;
+			if (uc->opts.normalize_normals) {
+				ufbxi_normalize_vec3_list(&mesh->vertex_normal.values);
+			}
+			if (uc->opts.normalize_tangents) {
+				ufbxi_for_list(ufbx_uv_set, set, mesh->uv_sets) {
+					ufbxi_normalize_vec3_list(&mesh->vertex_tangent.values);
+					ufbxi_normalize_vec3_list(&mesh->vertex_bitangent.values);
+				}
+			}
+		}
+	}
+}
+
 ufbxi_noinline static size_t ufbxi_next_path_segment(const char *data, size_t begin, size_t length)
 {
 	for (size_t i = begin; i < length; i++) {
@@ -18564,6 +18642,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	ufbxi_check(ufbxi_fetch_file_textures(uc));
 	ufbxi_check(ufbxi_handle_geometry_transforms(uc));
+	ufbxi_postprocess_scene(uc);
 
 	uc->scene.metadata.ktime_to_sec = uc->ktime_to_sec;
 
@@ -20281,6 +20360,7 @@ static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 	return 1;
 }
 
+
 static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_string filename)
 {
 	// `ufbx_geometry_cache_opts` must be cleared to zero first!
@@ -21215,55 +21295,6 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 		ufbxi_free_result(uc);
 		return NULL;
 	}
-}
-
-// -- TODO: Find a place for these...
-
-ufbx_inline ufbx_vec3 ufbxi_add3(ufbx_vec3 a, ufbx_vec3 b) {
-	ufbx_vec3 v = { a.x + b.x, a.y + b.y, a.z + b.z };
-	return v;
-}
-
-ufbx_inline ufbx_vec3 ufbxi_sub3(ufbx_vec3 a, ufbx_vec3 b) {
-	ufbx_vec3 v = { a.x - b.x, a.y - b.y, a.z - b.z };
-	return v;
-}
-
-ufbx_inline ufbx_vec3 ufbxi_mul3(ufbx_vec3 a, ufbx_real b) {
-	ufbx_vec3 v = { a.x * b, a.y * b, a.z * b };
-	return v;
-}
-
-ufbx_inline ufbx_real ufbxi_dot3(ufbx_vec3 a, ufbx_vec3 b) {
-	return a.x*b.x + a.y*b.y + a.z*b.z;
-}
-
-ufbx_inline ufbx_real ufbxi_length3(ufbx_vec3 v)
-{
-	return (ufbx_real)ufbx_sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
-}
-
-ufbx_inline ufbx_vec3 ufbxi_cross3(ufbx_vec3 a, ufbx_vec3 b) {
-	ufbx_vec3 v = { a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x };
-	return v;
-}
-
-ufbx_inline ufbx_vec3 ufbxi_normalize3(ufbx_vec3 a) {
-	ufbx_real len = (ufbx_real)ufbx_sqrt(ufbxi_dot3(a, a));
-	if (len != 0.0) {
-		return ufbxi_mul3(a, (ufbx_real)1.0 / len);
-	} else {
-		ufbx_vec3 zero = { (ufbx_real)0 };
-		return zero;
-	}
-}
-
-static ufbxi_noinline ufbx_vec3 ufbxi_slow_normalize3(const ufbx_vec3 *a) {
-	return ufbxi_normalize3(*a);
-}
-
-static ufbxi_noinline ufbx_vec3 ufbxi_slow_normalized_cross3(const ufbx_vec3 *a, const ufbx_vec3 *b) {
-	return ufbxi_normalize3(ufbxi_cross3(*a, *b));
 }
 
 // -- Animation evaluation
@@ -22840,7 +22871,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	// Form an orthonormal basis to project the polygon into a 2D plane
 	ufbx_vec3 normal = ufbx_get_weighted_face_normal(&nc->positions, face);
 	ufbx_real len = ufbxi_length3(normal);
-	if (len > 1e-20f) {
+	if (len > UFBX_EPSILON) {
 		normal = ufbxi_mul3(normal, 1.0f / len);
 	} else {
 		normal.x = 1.0f;
@@ -25888,7 +25919,7 @@ ufbx_abi ufbxi_noinline ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m
 	ufbx_real det = ufbx_matrix_determinant(m);
 
 	ufbx_matrix r;
-	if (det == 0.0) {
+	if (det <= UFBX_EPSILON) {
 		memset(&r, 0, sizeof(r));
 		return r;
 	}
@@ -26015,8 +26046,8 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_matrix_to_transform(const ufbx_matri
 	}
 
 	ufbx_real len = t.rotation.x*t.rotation.x + t.rotation.y*t.rotation.y + t.rotation.z*t.rotation.z + t.rotation.w*t.rotation.w;
-	if (ufbx_fabs(len - 1.0f) > (ufbx_real)1e-20) {
-		if (len == 0.0f) {
+	if (ufbx_fabs(len - 1.0f) > UFBX_EPSILON) {
+		if (ufbx_fabs(len) > UFBX_EPSILON) {
 			t.rotation = ufbx_identity_quat;
 		} else {
 			t.rotation.x /= len;
@@ -26086,8 +26117,8 @@ ufbx_abi ufbxi_noinline ufbx_matrix ufbx_catch_get_skin_vertex_matrix(ufbx_panic
 		}
 	}
 
-	if (ufbx_fabs(total_weight - 1.0f) > (ufbx_real)1e-20) {
-		ufbx_real rcp_weight = 1.0f / total_weight;
+	if (ufbx_fabs(total_weight - 1.0f) > UFBX_EPSILON) {
+		ufbx_real rcp_weight = ufbx_fabs(total_weight) > UFBX_EPSILON ? 1.0f / total_weight : 0.0f;
 		if (skin_vertex.dq_weight > 0.0f) {
 			q0.x *= rcp_weight; q0.y *= rcp_weight; q0.z *= rcp_weight; q0.w *= rcp_weight;
 			qe.x *= rcp_weight; qe.y *= rcp_weight; qe.z *= rcp_weight; qe.w *= rcp_weight;
