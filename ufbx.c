@@ -3329,11 +3329,13 @@ static ufbxi_noinline void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, v
 				ptr -= pos;
 				bytes_left -= pos;
 				memcpy(ptr, chunk->data, pos);
-				chunk->pushed_pos = 0;
-				chunk = chunk->prev;
 				if (!peek) {
+					chunk->pushed_pos = 0;
+					chunk = chunk->prev;
 					b->chunks[0] = chunk;
 					b->size = chunk->size;
+				} else {
+					chunk = chunk->prev;
 				}
 				pos = chunk->pushed_pos;
 			}
@@ -3350,11 +3352,13 @@ static ufbxi_noinline void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, v
 			} else {
 				// Pop the whole chunk
 				bytes_left -= pos;
-				chunk->pushed_pos = 0;
-				chunk = chunk->prev;
 				if (!peek) {
+					chunk->pushed_pos = 0;
+					chunk = chunk->prev;
 					b->chunks[0] = chunk;
 					b->size = chunk->size;
+				} else {
+					chunk = chunk->prev;
 				}
 				pos = chunk->pushed_pos;
 			}
