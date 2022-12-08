@@ -24,15 +24,6 @@ ufbx_load_opts ufbxt_geometry_transform_helper_name_opts()
 	opts.geometry_transform_helper_name.length = SIZE_MAX;
 	return opts;
 }
-
-ufbx_load_opts ufbxt_geometry_transform_modify_normalize_opts()
-{
-	ufbx_load_opts opts = { 0 };
-	opts.geometry_transform_handling = UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY;
-	opts.normalize_normals = true;
-	opts.normalize_tangents = true;
-	return opts;
-}
 #endif
 
 #if UFBXT_IMPL
@@ -434,7 +425,7 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_types_helper, max_geometry
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_types_modify, max_geometry_transform_types, ufbxt_geometry_transform_modify_normalize_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_types_modify, max_geometry_transform_types, ufbxt_geometry_transform_modify_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
 #if UFBXT_IMPL
 {
 	{

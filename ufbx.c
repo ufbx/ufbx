@@ -17411,6 +17411,13 @@ ufbxi_noinline static void ufbxi_transform_vec3_list(const void *v_list, const u
 	}
 }
 
+ufbxi_noinline static void ufbxi_normalize_vec3_list(const ufbx_vec3_list *list)
+{
+	ufbxi_nounroll ufbxi_for_list(ufbx_vec3, normal, *list) {
+		*normal = ufbxi_normalize3(*normal);
+	}
+}
+
 // Forward declare as we're kind of preprocessing ata here that would usually happen later.
 ufbxi_noinline static ufbx_transform ufbxi_get_geometry_transform(const ufbx_props *props);
 
@@ -17447,9 +17454,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_handle_geometry_transforms(ufbxi
 
 			ufbxi_transform_vec3_list(&mesh->vertex_position.values, &geo_node->geometry_to_node, 0);
 			ufbxi_transform_vec3_list(&mesh->vertex_normal.values, &normal_matrix, 0);
+			ufbxi_normalize_vec3_list(&mesh->vertex_normal.values);
+
 			ufbxi_for_list(ufbx_uv_set, set, mesh->uv_sets) {
 				ufbxi_transform_vec3_list(&set->vertex_tangent.values, &tangent_matrix, 0);
 				ufbxi_transform_vec3_list(&set->vertex_bitangent.values, &tangent_matrix, 0);
+				ufbxi_normalize_vec3_list(&set->vertex_tangent.values);
+				ufbxi_normalize_vec3_list(&set->vertex_bitangent.values);
 			}
 		}
 
@@ -17498,13 +17509,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_handle_geometry_transforms(ufbxi
 	}
 
 	return 1;
-}
-
-ufbxi_noinline static void ufbxi_normalize_vec3_list(const ufbx_vec3_list *list)
-{
-	ufbxi_nounroll ufbxi_for_list(ufbx_vec3, normal, *list) {
-		*normal = ufbxi_normalize3(*normal);
-	}
 }
 
 ufbxi_noinline static void ufbxi_postprocess_scene(ufbxi_context *uc)
