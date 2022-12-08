@@ -3313,8 +3313,8 @@ static ufbxi_noinline void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, v
 	if (ptr) {
 		ptr += bytes_left;
 		size_t pos = b->pos;
+		ufbxi_buf_chunk *chunk = b->chunks[0];
 		for (;;) {
-			ufbxi_buf_chunk *chunk = b->chunks[0];
 			if (bytes_left <= pos) {
 				// Rest of the data is in this single chunk
 				pos -= bytes_left;
@@ -3342,8 +3342,8 @@ static ufbxi_noinline void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, v
 		}
 	} else {
 		size_t pos = b->pos;
+		ufbxi_buf_chunk *chunk = b->chunks[0];
 		for (;;) {
-			ufbxi_buf_chunk *chunk = b->chunks[0];
 			if (bytes_left <= pos) {
 				// Rest of the data is in this single chunk
 				pos -= bytes_left;
