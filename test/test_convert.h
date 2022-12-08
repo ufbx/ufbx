@@ -107,6 +107,8 @@ static void ufbxt_check_transform(ufbxt_diff_error *err, const char *name, ufbx_
 	ufbxt_assert_close_vec3(err, transform.translation, ref.translation);
 	ufbxt_assert_close_vec3(err, rotation_euler, ref.rotation_euler);
 	ufbxt_assert_close_vec3(err, transform.scale, ref.scale);
+
+	ufbxt_hintf("");
 }
 
 static const ufbxt_ref_transform ufbxt_ref_transform_identity = {
@@ -883,6 +885,12 @@ UFBXT_FILE_TEST_OPTS(blender_340_default_unscaled, ufbxt_blender_space_adjust_op
 			{ 7.3589f, -6.9258f, 4.9583f }, { 63.5593f, 0.0f, 46.6919f }, { 1.0f, 1.0f, 1.0f }
 		};
 		ufbxt_check_transform(err, "Camera", node->local_transform, ref_transform);
+
+		ufbx_camera *camera = node->camera;
+		ufbxt_assert(camera);
+		ufbxt_assert(camera->projection_axes.right == UFBX_COORDINATE_AXIS_POSITIVE_X);
+		ufbxt_assert(camera->projection_axes.up == UFBX_COORDINATE_AXIS_POSITIVE_Y);
+		ufbxt_assert(camera->projection_axes.front == UFBX_COORDINATE_AXIS_POSITIVE_Z);
 	}
 
 	{
@@ -892,6 +900,12 @@ UFBXT_FILE_TEST_OPTS(blender_340_default_unscaled, ufbxt_blender_space_adjust_op
 			{ 4.0762f, 1.0055f, 5.9039f }, { 37.261f, 3.16371f, 106.936f }, { 1.0f, 1.0f, 1.0f },
 		};
 		ufbxt_check_transform(err, "Light", node->local_transform, ref_transform);
+
+		ufbx_light *light = node->light;
+		ufbxt_assert(light);
+
+		ufbx_vec3 ref_dir = { 0.0f, 0.0f, -1.0f };
+		ufbxt_assert_close_vec3(err, light->local_direction, ref_dir);
 	}
 }
 #endif

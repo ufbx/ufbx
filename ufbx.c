@@ -19628,7 +19628,6 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 	ufbx_quat light_post_rotation = ufbx_identity_quat;
 	ufbx_quat camera_post_rotation = ufbx_identity_quat;
 	ufbx_vec3 light_direction = { 0.0f, -1.0f, 0.0f };
-	ufbx_coordinate_axes camera_axes = uc->opts.target_camera_axes;
 	bool has_light_transform = false;
 	bool has_camera_transform = false;
 
@@ -19641,7 +19640,9 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 		};
 		if (ufbxi_axis_matrix(&mat, uc->opts.target_light_axes, light_axes)) {
 			light_post_rotation = ufbx_matrix_to_transform(&mat).rotation;
-			light_direction = ufbx_transform_direction(&mat, light_direction);
+
+			ufbx_matrix inv = ufbx_matrix_invert(&mat);
+			light_direction = ufbx_transform_direction(&inv, light_direction);
 			has_light_transform = true;
 		}
 	}
@@ -19687,7 +19688,7 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 			}
 			if (has_camera_transform && node->camera) {
 				node->adjust_post_rotation = camera_post_rotation;
-				node->camera->projection_axes = camera_axes;
+				node->camera->projection_axes = uc->opts.target_camera_axes;
 				node->has_adjust_transform = true;
 			}
 		}
