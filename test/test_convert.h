@@ -1001,3 +1001,62 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_order_modify, max_geometry
 }
 #endif
 
+
+UFBXT_FILE_TEST(synthetic_geometry_transform_camera)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Camera001");
+	ufbxt_assert(node);
+
+	ufbxt_ref_transform geo_transform = {
+		{ 10.0f, 20.0f, 30.0f }, { 90.0f, 0.0f, 0.0f }, { 1.0f, 2.0f, 3.0f },
+	};
+	ufbxt_check_transform(err, "Camera geometry", node->geometry_transform, geo_transform);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_geometry_transform_camera_helper, synthetic_geometry_transform_camera, ufbxt_geometry_transform_helper_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Camera001");
+	ufbxt_assert(node);
+	ufbxt_assert(!node->has_geometry_transform);
+
+	ufbx_node *geo_node = node->geometry_transform_helper;
+	ufbxt_assert(geo_node);
+
+	ufbxt_ref_transform geo_transform = {
+		{ 10.0f, 20.0f, 30.0f }, { 90.0f, 0.0f, 0.0f }, { 1.0f, 2.0f, 3.0f },
+	};
+	ufbxt_check_transform(err, "Camera geometry", geo_node->local_transform, geo_transform);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_geometry_transform_camera_modify, synthetic_geometry_transform_camera, ufbxt_geometry_transform_modify_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Camera001");
+	ufbxt_assert(node);
+	ufbxt_assert(!node->has_geometry_transform);
+
+	ufbx_node *geo_node = node->geometry_transform_helper;
+	ufbxt_assert(geo_node);
+
+	ufbxt_ref_transform geo_transform = {
+		{ 10.0f, 20.0f, 30.0f }, { 90.0f, 0.0f, 0.0f }, { 1.0f, 2.0f, 3.0f },
+	};
+	ufbxt_check_transform(err, "Camera geometry", geo_node->local_transform, geo_transform);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_geometry_transform_camera_modify_no_fallback, synthetic_geometry_transform_camera, ufbxt_geometry_transform_modify_no_fallback_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Camera001");
+	ufbxt_assert(node);
+	ufbxt_assert(!node->has_geometry_transform);
+}
+#endif

@@ -15165,6 +15165,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 	uint32_t *instance_counts = ufbxi_push_zero(&uc->tmp_parse, uint32_t, num_elements);
 	ufbxi_check(instance_counts);
 
+	bool *modify_not_supported = ufbxi_push_zero(&uc->tmp_parse, bool, num_elements);
+	ufbxi_check(modify_not_supported);
+
 	uint64_t *fbx_ids = ufbxi_push_zero(&uc->tmp_parse, uint64_t, num_elements);
 	ufbxi_check(fbx_ids);
 
@@ -15189,6 +15192,18 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 			if (dst->type == UFBX_ELEMENT_NODE) {
 				if (src->type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && src->type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB) {
 					++instance_counts[src->element_id];
+
+					// These must match what can be trasnsformed in `ufbxi_handle_geometry_transforms()`
+					switch (src->type) {
+					case UFBX_ELEMENT_MESH:
+					case UFBX_ELEMENT_LINE_CURVE:
+					case UFBX_ELEMENT_NURBS_CURVE:
+					case UFBX_ELEMENT_NURBS_SURFACE:
+						break; // Nop, supported
+					default:
+						modify_not_supported[dst->element_id] = true;
+						break;
+					}
 				}
 			}
 		}
@@ -15217,8 +15232,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 		if (element->type == UFBX_ELEMENT_NODE) {
 			ufbx_node *node = (ufbx_node*)element;
 			// Setup a geometry transform helper for nodes that have instanced attributes
-			if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY && instance_counts[i] > 1) {
-				ufbxi_check(ufbxi_setup_geometry_transform_helper(uc, node, fbx_id));
+			if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) {
+				if (instance_counts[i] > 1 || modify_not_supported[i]) {
+					ufbxi_check(ufbxi_setup_geometry_transform_helper(uc, node, fbx_id));
+				}
 			}
 		}
 	}
