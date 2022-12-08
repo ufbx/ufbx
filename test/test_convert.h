@@ -15,6 +15,15 @@ ufbx_load_opts ufbxt_geometry_transform_modify_opts()
 	opts.geometry_transform_handling = UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY;
 	return opts;
 }
+
+ufbx_load_opts ufbxt_geometry_transform_helper_name_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.geometry_transform_handling = UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES;
+	opts.geometry_transform_helper_name.data = "(ufbxt helper)";
+	opts.geometry_transform_helper_name.length = SIZE_MAX;
+	return opts;
+}
 #endif
 
 #if UFBXT_IMPL
@@ -297,4 +306,24 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_modify, max_geom
 }
 #endif
 
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_helper_names, max_geometry_transform, ufbxt_geometry_transform_helper_name_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->nodes.count == 5);
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Box001");
+		ufbxt_assert(node->geometry_transform_helper != NULL);
+		node = node->geometry_transform_helper;
+		ufbxt_assert(!strcmp(node->name.data, "(ufbxt helper)"));
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Box002");
+		ufbxt_assert(node->geometry_transform_helper != NULL);
+		node = node->geometry_transform_helper;
+		ufbxt_assert(!strcmp(node->name.data, "(ufbxt helper)"));
+	}
+}
+#endif
 
