@@ -1,0 +1,23 @@
+# ufbx:bad_normals
+# 3ds Max Wavefront OBJ Exporter v0.99 - (c)2007 guruware
+# File Created: 08.12.2022 04:57:15
+
+#
+# object Plane001
+#
+
+v  20.0000 10.0000 0.0000
+v  -0.0000 10.0000 10.0000
+v  20.0000 -10.0000 0.0000
+# 3 vertices
+
+vn 0.0000 0.7071 0.7071
+vn 0.0000 0.7071 0.7071
+vn 0.0000 0.7071 0.7071
+# 3 vertex normals
+
+vt 0.0000 0.0000 0.0000
+vt 0.0000 1.0000 0.0000
+vt 1.0000 1.0000 0.0000
+# 3 texture coords
+
