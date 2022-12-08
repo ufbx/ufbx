@@ -31,6 +31,43 @@ ufbx_load_opts ufbxt_geometry_transform_helper_name_opts()
 	opts.geometry_transform_helper_name.length = SIZE_MAX;
 	return opts;
 }
+
+ufbx_load_opts ufbxt_y_up_meters_root_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_axes = ufbx_axes_right_handed_y_up;
+	opts.target_unit_meters = 1.0f;
+	opts.space_conversion = UFBX_SPACE_CONVERSION_TRANSFORM_ROOT;
+	return opts;
+}
+
+ufbx_load_opts ufbxt_y_up_meters_adjust_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_axes = ufbx_axes_right_handed_y_up;
+	opts.target_unit_meters = 1.0f;
+	opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+	return opts;
+}
+
+ufbx_load_opts ufbxt_z_up_meters_root_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_axes = ufbx_axes_right_handed_z_up;
+	opts.target_unit_meters = 1.0f;
+	opts.space_conversion = UFBX_SPACE_CONVERSION_TRANSFORM_ROOT;
+	return opts;
+}
+
+ufbx_load_opts ufbxt_z_up_meters_adjust_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_axes = ufbx_axes_right_handed_z_up;
+	opts.target_unit_meters = 1.0f;
+	opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+	return opts;
+}
+
 #endif
 
 #if UFBXT_IMPL
@@ -102,7 +139,8 @@ UFBXT_FILE_TEST(max_geometry_transform)
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_helper, max_geometry_transform, ufbxt_geometry_transform_helper_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_helper, max_geometry_transform, ufbxt_geometry_transform_helper_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(scene->nodes.count == 5);
@@ -161,7 +199,8 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_helper, max_geometry_trans
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_modify, max_geometry_transform, ufbxt_geometry_transform_modify_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_modify, max_geometry_transform, ufbxt_geometry_transform_modify_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(scene->nodes.count == 3);
@@ -209,7 +248,8 @@ UFBXT_FILE_TEST_OPTS_ALT(no_unnecessary_geometry_helpers, maya_cube, ufbxt_geome
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_transformed_skin_helpers, max_transformed_skin, ufbxt_geometry_transform_helper_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_transformed_skin_helpers, max_transformed_skin, ufbxt_geometry_transform_helper_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "Box001");
@@ -229,7 +269,8 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_transformed_skin_helpers, max_transformed_ski
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_transformed_skin_modify, max_transformed_skin, ufbxt_geometry_transform_modify_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_transformed_skin_modify, max_transformed_skin, ufbxt_geometry_transform_modify_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "Box001");
@@ -264,7 +305,8 @@ UFBXT_FILE_TEST(max_geometry_transform_instances)
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_helper, max_geometry_transform_instances, ufbxt_geometry_transform_helper_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_helper, max_geometry_transform_instances, ufbxt_geometry_transform_helper_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
 #if UFBXT_IMPL
 {
 	if (scene->metadata.version >= 7000) {
@@ -290,7 +332,8 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_helper, max_geom
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_modify, max_geometry_transform_instances, ufbxt_geometry_transform_modify_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_modify, max_geometry_transform_instances, ufbxt_geometry_transform_modify_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
 #if UFBXT_IMPL
 {
 	if (scene->metadata.version >= 7000) {
@@ -327,7 +370,8 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_modify, max_geom
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_modify_no_fallback, max_geometry_transform_instances, ufbxt_geometry_transform_modify_no_fallback_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_modify_no_fallback, max_geometry_transform_instances, ufbxt_geometry_transform_modify_no_fallback_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_DIFF_EXPECT_FAIL_POST_7000)
 #if UFBXT_IMPL
 {
 	if (scene->metadata.version >= 7000) {
@@ -347,7 +391,8 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_modify_no_fallba
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_helper_names, max_geometry_transform, ufbxt_geometry_transform_helper_name_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_helper_names, max_geometry_transform, ufbxt_geometry_transform_helper_name_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(scene->nodes.count == 5);
@@ -409,7 +454,8 @@ UFBXT_FILE_TEST(max_geometry_transform_types)
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_types_helper, max_geometry_transform_types, ufbxt_geometry_transform_helper_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_types_helper, max_geometry_transform_types, ufbxt_geometry_transform_helper_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
 #if UFBXT_IMPL
 {
 	{
@@ -466,7 +512,8 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_types_helper, max_geometry
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_types_modify, max_geometry_transform_types, ufbxt_geometry_transform_modify_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_types_modify, max_geometry_transform_types, ufbxt_geometry_transform_modify_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
 #if UFBXT_IMPL
 {
 	{
@@ -594,3 +641,161 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_types_modify, max_geometry
 	}
 }
 #endif
+
+UFBXT_FILE_TEST_FLAGS(blender_340_z_up, UFBXT_FILE_TEST_FLAG_DIFF_EXPECT_FAIL)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_z_up_root, blender_340_z_up, ufbxt_y_up_meters_root_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *root = scene->root_node;
+	ufbxt_ref_transform root_transform = {
+		{ 0.0f, 0.0f, 0.0f }, { -90.0f, 0.0f, 0.0f }, { 0.01f, 0.01f, 0.01f },
+	};
+	ufbxt_check_transform(err, "root", root->local_transform, root_transform);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_z_up_adjust, blender_340_z_up, ufbxt_y_up_meters_adjust_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *root = scene->root_node;
+	ufbxt_check_transform(err, "root", root->local_transform, ufbxt_ref_transform_identity);
+
+	size_t num_adjusted = 0;
+	for (size_t i = 0; i < scene->nodes.count; i++) {
+		ufbx_node *node = scene->nodes.data[i];
+		if (node->node_depth == 1) {
+			ufbxt_assert(node->has_adjust_transform);
+			ufbx_vec3 rotation = { -90.0f, 0.0f, 0.0f };
+			ufbx_vec3 scale = { 0.01f, 0.01f, 0.01f };
+			ufbx_quat rotation_quat = ufbx_euler_to_quat(rotation, UFBX_ROTATION_XYZ);
+			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, rotation_quat);
+			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);
+			num_adjusted++;
+		} else {
+			ufbxt_assert(!node->has_adjust_transform);
+			ufbx_vec3 scale = { 1.0f, 1.0f, 1.0f };
+			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);
+		}
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Light");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 4.0f, 5.0f, -1.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "Light", node->local_transform, ref_transform);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Camera");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 7.0f, 5.0f, -6.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "Camera", node->local_transform, ref_transform);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Cube");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 0.0f, 1.0f, -1.0f }, { -90.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "Camera", node->local_transform, ref_transform);
+	}
+
+	ufbxt_assert(scene->nodes.count == 5);
+	ufbxt_assert(num_adjusted == 3);
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(blender_340_y_up, UFBXT_FILE_TEST_FLAG_DIFF_EXPECT_FAIL)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_y_up_root, blender_340_y_up, ufbxt_z_up_meters_root_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *root = scene->root_node;
+	ufbxt_ref_transform root_transform = {
+		{ 0.0f, 0.0f, 0.0f }, { 90.0f, 0.0f, 0.0f }, { 0.01f, 0.01f, 0.01f },
+	};
+	ufbxt_check_transform(err, "root", root->local_transform, root_transform);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_y_up_adjust, blender_340_y_up, ufbxt_z_up_meters_adjust_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *root = scene->root_node;
+	ufbxt_check_transform(err, "root", root->local_transform, ufbxt_ref_transform_identity);
+
+	size_t num_adjusted = 0;
+	for (size_t i = 0; i < scene->nodes.count; i++) {
+		ufbx_node *node = scene->nodes.data[i];
+		if (node->node_depth == 1) {
+			ufbxt_assert(node->has_adjust_transform);
+			ufbx_vec3 rotation = { 90.0f, 0.0f, 0.0f };
+			ufbx_vec3 scale = { 0.01f, 0.01f, 0.01f };
+			ufbx_quat rotation_quat = ufbx_euler_to_quat(rotation, UFBX_ROTATION_XYZ);
+			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, rotation_quat);
+			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);
+			num_adjusted++;
+		} else {
+			ufbxt_assert(!node->has_adjust_transform);
+			ufbx_vec3 scale = { 1.0f, 1.0f, 1.0f };
+			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);
+		}
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Light");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 4.0f, 1.0f, 5.0f }, { 90.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "Light", node->local_transform, ref_transform);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Camera");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 7.0f, 6.0f, 5.0f }, { 90.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "Camera", node->local_transform, ref_transform);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Cube");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 0.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "Camera", node->local_transform, ref_transform);
+	}
+
+	ufbxt_assert(scene->nodes.count == 5);
+	ufbxt_assert(num_adjusted == 3);
+}
+#endif
+
+

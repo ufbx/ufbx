@@ -19669,16 +19669,19 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 		if (conversion == UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS && node->node_depth <= 1 && !node->is_root) {
 			node->adjust_pre_rotation = root_transform.rotation;
 			node->adjust_pre_scale = root_transform.scale;
+			node->has_adjust_transform = true;
 		}
 
 		if (node->all_attribs.count == 1) {
 			if (has_light_transform && node->light) {
 				node->adjust_post_rotation = light_post_rotation;
 				node->light->local_direction = light_direction;
+				node->has_adjust_transform = true;
 			}
 			if (has_camera_transform && node->camera) {
 				node->adjust_post_rotation = camera_post_rotation;
 				node->camera->projection_axes = camera_axes;
+				node->has_adjust_transform = true;
 			}
 		}
 	}
@@ -20840,6 +20843,8 @@ static ufbxi_noinline int ufbxi_scale_units(ufbxi_context *uc, ufbx_real target_
 	ufbx_real ratio = uc->scene.settings.unit_meters / target_meters;
 	ratio = ufbxi_round_if_near(ufbxi_pow10_targets, ufbxi_arraycount(ufbxi_pow10_targets), ratio);
 	if (ratio == 1.0f) return 1;
+
+	uc->unit_scale = ratio;
 
 	if (uc->opts.space_conversion == UFBX_SPACE_CONVERSION_TRANSFORM_ROOT) {
 		uc->scene.root_node->local_transform.scale.x *= ratio;

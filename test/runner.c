@@ -1,7 +1,11 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <stdint.h>
-void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr);
+#include <stdbool.h>
+void ufbxt_assert_fail_imp(const char *file, uint32_t line, const char *expr, bool fatal);
+static void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr) {
+	ufbxt_assert_fail_imp(file, line, expr, true);
+}
 
 #include "../ufbx.h"
 
@@ -72,7 +76,11 @@ static void ufbxt_longjmp(int env, int value, const char *file, uint32_t line, c
 	ufbxt_make_memory_context_values(data, (uint32_t)sizeof(data) - 1)
 
 #define ufbxt_assert(cond) do { \
-		if (!(cond)) ufbxt_assert_fail(__FILE__, __LINE__, #cond); \
+		if (!(cond)) ufbxt_assert_fail_imp(__FILE__, __LINE__, #cond, true); \
+	} while (0)
+
+#define ufbxt_soft_assert(cond) do { \
+		if (!(cond)) ufbxt_assert_fail_imp(__FILE__, __LINE__, #cond, false); \
 	} while (0)
 
 #define ufbxt_assert_eq(a, b, size) do { \
@@ -127,10 +135,18 @@ typedef struct {
 
 static ufbxt_check_line g_checks[32768];
 
+bool g_expect_fail = false;
+size_t g_expect_fail_count = 0;
+
 ufbxt_threadlocal ufbxt_jmp_buf *t_jmp_buf;
 
-void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
+void ufbxt_assert_fail_imp(const char *file, uint32_t line, const char *expr, bool fatal)
 {
+	if (!fatal && g_expect_fail) {
+		g_expect_fail_count++;
+		return;
+	}
+
 	if (t_jmp_buf) {
 		ufbxt_longjmp(*t_jmp_buf, 1, file, line, expr);
 	}
@@ -183,7 +199,7 @@ void ufbxt_assert_eq_test(const void *a, const void *b, size_t size, const char 
 
 void ufbxt_log_flush(bool print_always)
 {
-	if (g_verbose || print_always) {
+	if ((g_verbose || print_always) && g_log_pos > 0) {
 		int prev_newline = 1;
 		for (uint32_t i = 0; i < g_log_pos; i++) {
 			if (i >= sizeof(g_log_buf)) break;
@@ -330,6 +346,21 @@ static bool ufbxt_begin_fuzz()
 	} else {
 		return false;
 	}
+}
+
+static void ufbxt_begin_expect_fail()
+{
+	ufbxt_assert(!g_expect_fail);
+	g_expect_fail = true;
+	g_expect_fail_count = 0;
+}
+
+static size_t ufbxt_end_expect_fail()
+{
+	ufbxt_assert(g_expect_fail);
+	ufbxt_assert(g_expect_fail_count > 0);
+	g_expect_fail = false;
+	return g_expect_fail_count;
 }
 
 typedef struct {
@@ -2206,6 +2237,12 @@ typedef enum ufbxt_file_test_flags {
 
 	// Diff even if being an alternative test
 	UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS = 0x100,
+
+	// Expect the diff to fail
+	UFBXT_FILE_TEST_FLAG_DIFF_EXPECT_FAIL = 0x200,
+
+	// Expect the diff to fail for version >= 7000 files
+	UFBXT_FILE_TEST_FLAG_DIFF_EXPECT_FAIL_POST_7000 = 0x400,
 } ufbxt_file_test_flags;
 
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err, ufbx_error *load_error), const char *suffix, ufbx_load_opts user_opts, ufbxt_file_test_flags flags)
@@ -2245,7 +2282,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 	ufbxt_begin_fuzz();
 
-	if (obj_file && !g_skip_obj_test) {
+	if (obj_file && !g_skip_obj_test && !alternative) {
 		ufbx_load_opts obj_opts = { 0 };
 		obj_opts.load_external_files = true;
 
@@ -2258,13 +2295,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 		ufbxt_assert(obj_scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ);
 		ufbxt_check_scene(obj_scene);
 
-		{
-			ufbxt_diff_error err = { 0 };
-			ufbxt_diff_to_obj(obj_scene, obj_file, &err, false);
-			if (err.num > 0) {
-				ufbx_real avg = err.sum / (ufbx_real)err.num;
-				ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
-			}
+		ufbxt_diff_error err = { 0 };
+		ufbxt_diff_to_obj(obj_scene, obj_file, &err, false);
+		if (err.num > 0) {
+			ufbx_real avg = err.sum / (ufbx_real)err.num;
+			ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 		}
 
 		size_t size = 0;
@@ -2308,6 +2343,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			size_t size = 0;
 			void *data = ufbxt_read_file(buf, &size);
 			if (!data) continue;
+
+			bool expect_diff_fail = (flags & UFBXT_FILE_TEST_FLAG_DIFF_EXPECT_FAIL) != 0;
+			if ((flags & UFBXT_FILE_TEST_FLAG_DIFF_EXPECT_FAIL_POST_7000) != 0 && version >= 7000) {
+				expect_diff_fail = true;
+			}
 
 			num_opened++;
 			ufbxt_logf("%s", buf);
@@ -2597,15 +2637,26 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			ufbxt_diff_error err = { 0 };
 
+			size_t num_failing_diff_checks = 0;
 			if (scene && obj_file && (!alternative || diff_always)) {
-				ufbxt_diff_to_obj(scene, obj_file, &err, false);
+				if (expect_diff_fail) {
+					ufbxt_begin_expect_fail();
+					ufbxt_diff_to_obj(scene, obj_file, &err, false);
+					num_failing_diff_checks = ufbxt_end_expect_fail();
+				} else {
+					ufbxt_diff_to_obj(scene, obj_file, &err, false);
+				}
 			}
 
 			test_fn(scene, &err, &error);
 
 			if (err.num > 0) {
 				ufbx_real avg = err.sum / (ufbx_real)err.num;
-				ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+				if (expect_diff_fail) {
+					ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests, %zu failing as expected)", avg, err.max, err.num, num_failing_diff_checks);
+				} else {
+					ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+				}
 			}
 
 			if (!alternative || fuzz_always) {
@@ -2803,10 +2854,13 @@ int ufbxt_run_test(ufbxt_test *test)
 	g_error.stack_size = 0;
 	g_hint[0] = '\0';
 
+	g_expect_fail = false;
+
 	g_current_test = test;
 	if (!ufbxt_setjmp(g_test_jmp)) {
 		g_skip_print_ok = false;
 		test->func();
+		ufbxt_assert(!g_expect_fail);
 		if (!g_skip_print_ok) {
 			printf("OK\n");
 			fflush(stdout);

@@ -151,8 +151,6 @@ UFBXT_TEST(blender_axes)
 {
 	char path[512], name[512];
 
-	ufbxt_diff_error err = { 0 };
-
 	static const char *axis_names[] = {
 		"px", "nx", "py", "ny", "pz", "nz",
 	};
@@ -170,6 +168,7 @@ UFBXT_TEST(blender_axes)
 
 			ufbxt_file_iterator iter = { name };
 			while (ufbxt_next_file(&iter, path, sizeof(path))) {
+				ufbxt_diff_error err = { 0 };
 
 				// Load normally and check axes
 				{
@@ -186,8 +185,12 @@ UFBXT_TEST(blender_axes)
 				}
 
 				// Axis conversion
-				for (int transform_root = 0; transform_root <= 1; transform_root++) {
+				for (int mode = 0; mode < 4; mode++) {
+					ufbxt_hintf("mode = %d", mode);
 					ufbx_load_opts opts = { 0 };
+
+					bool transform_root = (mode % 2) != 0;
+					bool use_adjust = (mode / 2) != 0;
 
 					opts.target_axes = ufbx_axes_right_handed_z_up;
 					opts.target_unit_meters = 1.0f;
@@ -196,6 +199,12 @@ UFBXT_TEST(blender_axes)
 						opts.use_root_transform = true;
 						opts.root_transform = ufbx_identity_transform;
 						opts.root_transform.translation.z = 1.0f;
+					}
+
+					if (use_adjust) {
+						opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+					} else {
+						opts.space_conversion = UFBX_SPACE_CONVERSION_TRANSFORM_ROOT;
 					}
 
 					ufbx_scene *scene = ufbx_load_file(path, &opts, NULL);
@@ -209,6 +218,14 @@ UFBXT_TEST(blender_axes)
 					ufbxt_assert(mesh->num_faces == 1);
 					ufbx_face face = mesh->faces.data[0];
 					ufbxt_assert(face.num_indices == 3);
+
+					if (use_adjust && !transform_root) {
+						ufbx_node *root = scene->root_node;
+
+						ufbx_vec3 identity_scale = { 1.0f, 1.0f, 1.0f };
+						ufbxt_assert_close_quat(&err, root->local_transform.rotation, ufbx_identity_quat);
+						ufbxt_assert_close_vec3(&err, root->local_transform.scale, identity_scale);
+					}
 
 					for (uint32_t i = 0; i < face.num_indices; i++) {
 						ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + i);
@@ -242,11 +259,11 @@ UFBXT_TEST(blender_axes)
 
 					ufbx_free_scene(scene);
 				}
+
+				ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
 			}
 		}
 	}
-
-	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
 }
 #endif
 
