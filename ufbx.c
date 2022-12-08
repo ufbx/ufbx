@@ -15202,6 +15202,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_contex
 			}
 		}
 
+		// Translate deformers to point to the geometry in 6100, we don't need to worry about
+		// blend shapes here as they're always connected synthetically in older files.
+		if (uc->version > 0 && uc->version < 7000 && dst->type == UFBX_ELEMENT_NODE) {
+			if (src->type == UFBX_ELEMENT_SKIN_DEFORMER || src->type == UFBX_ELEMENT_CACHE_DEFORMER) {
+				tmp_conn->dst = ufbxi_find_attribute_fbx_id(uc, tmp_conn->dst);
+				dst = ufbxi_find_element_by_fbx_id(uc, tmp_conn->dst);
+			}
+		}
+
 		ufbx_connection *conn = &uc->scene.connections_src.data[uc->scene.connections_src.count++];
 		conn->src = src;
 		conn->dst = dst;
@@ -15469,7 +15478,14 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_connection_list ufbxi_find_src_connec
 
 ufbxi_nodiscard static ufbx_element *ufbxi_get_element_node(ufbx_element *element)
 {
-	return element && element->instances.count > 0 ? &element->instances.data[0]->element : NULL;
+	if (!element) return NULL;
+	if (element->type == UFBX_ELEMENT_NODE) {
+		ufbx_node *node = (ufbx_node*)element;
+		if (node->is_geometry_transform_helper) return node->parent;
+		return NULL;
+	} else {
+		return element->instances.count > 0 ? &element->instances.data[0]->element : NULL;
+	}
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_dst_elements(ufbxi_context *uc, void *p_dst_list, ufbx_element *element, bool search_node, const char *prop, ufbx_element_type src_type)
@@ -17787,7 +17803,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				if (conn->dst->type == UFBX_ELEMENT_MESH) {
 					mesh = (ufbx_mesh*)conn->dst;
 				} else if (conn->dst->type == UFBX_ELEMENT_NODE) {
-					mesh = ((ufbx_node*)conn->dst)->mesh;
+					ufbx_node *node = (ufbx_node*)conn->dst;
+					if (node->geometry_transform_helper) node = node->geometry_transform_helper;
+					mesh = node->mesh;
 				}
 				if (!mesh) continue;
 				num_vertices = ufbxi_max_sz(num_vertices, mesh->num_vertices);
@@ -19307,12 +19325,28 @@ ufbxi_noinline static void ufbxi_update_initial_clusters(ufbx_scene *scene)
 		}
 		if (!node) continue;
 
+		// Normalize to the non-helper node
+		if (node->is_geometry_transform_helper) {
+			node = node->parent;
+		}
+
 		if (ufbxi_matrix_all_zero(&cluster->mesh_node_to_bone)) {
 			ufbx_matrix world_to_bind = ufbx_matrix_invert(&cluster->bind_to_world);
 			cluster->mesh_node_to_bone = ufbx_matrix_mul(&world_to_bind, &node->node_to_world);
 		}
 
-		cluster->geometry_to_bone = ufbx_matrix_mul(&cluster->mesh_node_to_bone, &node->geometry_to_node);
+		// HACK: Account for geometry transforms by looking at the transform of the
+		// helper node if one is present. I don't think this is exactly how the skinning
+		// matrices are formed.
+		// TODO: Add a test with moving the skinned mesh root around.
+		if (node->geometry_transform_helper) {
+			ufbx_node *geo_node = node->geometry_transform_helper;
+			cluster->geometry_to_bone = ufbx_matrix_mul(&cluster->mesh_node_to_bone, &geo_node->node_to_parent);
+		} else if (node->has_geometry_transform) {
+			cluster->geometry_to_bone = ufbx_matrix_mul(&cluster->mesh_node_to_bone, &node->geometry_to_node);
+		} else {
+			cluster->geometry_to_bone = cluster->mesh_node_to_bone;
+		}
 	}
 }
 

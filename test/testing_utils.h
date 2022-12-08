@@ -1150,6 +1150,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 	for (int step = 0; step < 2; step++) {
 		for (size_t node_i = 0; node_i < scene->nodes.count; node_i++) {
 			ufbx_node *node = scene->nodes.data[node_i];
+			if (!node->name.length) continue;
 
 			size_t num_groups = 0;
 			ufbx_node *parent = node;
@@ -1280,6 +1281,10 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		}
 
 		ufbxt_assert(node);
+		if (node->geometry_transform_helper) {
+			node = node->geometry_transform_helper;
+		}
+
 		ufbx_mesh *mesh = node->mesh;
 
 		double scale = 1.0;

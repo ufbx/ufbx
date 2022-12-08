@@ -86,7 +86,7 @@ UFBXT_FILE_TEST(max_geometry_transform)
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_helper, max_geometry_transform, ufbxt_geometry_transform_helper_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_helper, max_geometry_transform, ufbxt_geometry_transform_helper_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(scene->nodes.count == 5);
@@ -145,7 +145,7 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_helper, max_geometry_trans
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_modify, max_geometry_transform, ufbxt_geometry_transform_modify_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_modify, max_geometry_transform, ufbxt_geometry_transform_modify_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(scene->nodes.count == 3);
@@ -192,4 +192,109 @@ UFBXT_FILE_TEST_OPTS_ALT(no_unnecessary_geometry_helpers, maya_cube, ufbxt_geome
 	ufbxt_assert(node->geometry_transform_helper == NULL);
 }
 #endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_transformed_skin_helpers, max_transformed_skin, ufbxt_geometry_transform_helper_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Box001");
+	ufbxt_assert(node);
+	ufbxt_assert(!node->mesh);
+	ufbxt_assert(!node->is_geometry_transform_helper);
+	ufbxt_assert(node->geometry_transform_helper);
+	ufbxt_assert(!node->has_geometry_transform);
+	ufbx_node *geo_node = node->geometry_transform_helper;
+	ufbxt_assert(geo_node->mesh);
+	ufbxt_assert(geo_node->is_geometry_transform_helper);
+	ufbxt_assert(!geo_node->geometry_transform_helper);
+	ufbxt_assert(!geo_node->has_geometry_transform);
+
+	ufbxt_check_frame(scene, err, false, "max_transformed_skin_5", NULL, 5.0/30.0);
+	ufbxt_check_frame(scene, err, false, "max_transformed_skin_15", NULL, 15.0/30.0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_transformed_skin_modify, max_transformed_skin, ufbxt_geometry_transform_modify_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Box001");
+	ufbxt_assert(node);
+	ufbxt_assert(node->mesh);
+	ufbxt_assert(!node->is_geometry_transform_helper);
+	ufbxt_assert(!node->geometry_transform_helper);
+	ufbxt_assert(!node->has_geometry_transform);
+
+	ufbxt_check_frame(scene, err, false, "max_transformed_skin_5", NULL, 5.0/30.0);
+	ufbxt_check_frame(scene, err, false, "max_transformed_skin_15", NULL, 15.0/30.0);
+}
+#endif
+
+UFBXT_FILE_TEST(max_geometry_transform_instances)
+#if UFBXT_IMPL
+{
+	if (scene->metadata.version >= 7000) {
+		ufbxt_assert(scene->meshes.count == 1);
+	} else {
+		ufbxt_assert(scene->meshes.count == 4);
+	}
+
+	ufbxt_assert(scene->nodes.count == 5);
+	for (size_t i = 1; i < scene->nodes.count; i++) {
+		ufbx_node *node = scene->nodes.data[i];
+		ufbxt_assert(node->has_geometry_transform);
+		ufbxt_assert(node->mesh);
+		ufbxt_assert(!node->is_geometry_transform_helper);
+		ufbxt_assert(!node->geometry_transform_helper);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_helper, max_geometry_transform_instances, ufbxt_geometry_transform_helper_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	if (scene->metadata.version >= 7000) {
+		ufbxt_assert(scene->meshes.count == 1);
+	} else {
+		ufbxt_assert(scene->meshes.count == 4);
+	}
+
+	ufbxt_assert(scene->nodes.count == 9);
+	for (size_t i = 1; i < scene->nodes.count; i++) {
+		ufbx_node *node = scene->nodes.data[i];
+		ufbxt_assert(!node->has_geometry_transform);
+		if (node->name.length > 0) {
+			ufbxt_assert(!node->mesh);
+			ufbxt_assert(!node->is_geometry_transform_helper);
+			ufbxt_assert(node->geometry_transform_helper);
+		} else {
+			ufbxt_assert(node->mesh);
+			ufbxt_assert(node->is_geometry_transform_helper);
+			ufbxt_assert(!node->geometry_transform_helper);
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_modify, max_geometry_transform_instances, ufbxt_geometry_transform_modify_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
+	if (scene->metadata.version >= 7000) {
+		ufbxt_assert(scene->meshes.count == 1);
+	} else {
+		ufbxt_assert(scene->meshes.count == 4);
+	}
+
+	ufbxt_assert(scene->nodes.count == 5);
+	for (size_t i = 1; i < scene->nodes.count; i++) {
+		ufbx_node *node = scene->nodes.data[i];
+		ufbxt_assert(!node->has_geometry_transform);
+		ufbxt_assert(node->mesh);
+		ufbxt_assert(!node->is_geometry_transform_helper);
+		ufbxt_assert(!node->geometry_transform_helper);
+	}
+
+	// No diff as it would fail by design
+	// TODO: Some way to check that diff actually fails?
+}
+#endif
+
 

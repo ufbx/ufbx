@@ -2202,6 +2202,9 @@ typedef enum ufbxt_file_test_flags {
 
 	// Pass user_opts to the fuzzer
 	UFBXT_FILE_TEST_FLAG_FUZZ_OPTS = 0x80,
+
+	// Diff even if being an alternative test
+	UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS = 0x100,
 } ufbxt_file_test_flags;
 
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err, ufbx_error *load_error), const char *suffix, ufbx_load_opts user_opts, ufbxt_file_test_flags flags)
@@ -2227,6 +2230,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	bool allow_strict_error = (flags & UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR) != 0;
 	bool skip_opts_checks = (flags & UFBXT_FILE_TEST_FLAG_SKIP_LOAD_OPTS_CHECKS) != 0;
 	bool fuzz_always = (flags & UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS) != 0;
+	bool diff_always = (flags & UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS) != 0;
 
 	const ufbx_load_opts *fuzz_opts = NULL;
 	if ((flags & UFBXT_FILE_TEST_FLAG_FUZZ_OPTS) != 0) {
@@ -2590,7 +2594,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			ufbxt_diff_error err = { 0 };
 
-			if (scene && obj_file && !alternative) {
+			if (scene && obj_file && (!alternative || diff_always)) {
 				ufbxt_diff_to_obj(scene, obj_file, &err, false);
 			}
 
