@@ -420,11 +420,11 @@ ufbxt_noinline static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v
 	ufbxt_hash_element_ref(h, v->camera);
 	ufbxt_hash_element_ref(h, v->bone);
 	ufbxt_hash_element_ref(h, v->attrib);
+	ufbxt_hash_element_ref(h, v->geometry_transform_helper);
 	ufbxt_hash_pod(h, v->attrib_type);
 	ufbxt_hash_list(h, v->all_attribs, ufbxt_hash_element_ref_imp);
 	ufbxt_hash_pod(h, v->inherit_type);
 	ufbxt_hash_transform(h, v->local_transform);
-	ufbxt_hash_pod(h, v->has_geometry_transform);
 	ufbxt_hash_transform(h, v->geometry_transform);
 	ufbxt_hash_pod(h, v->rotation_order);
 	ufbxt_hash_vec3(h, v->euler_rotation);
@@ -433,8 +433,14 @@ ufbxt_noinline static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v
 	ufbxt_hash_matrix(h, v->node_to_world);
 	ufbxt_hash_matrix(h, v->geometry_to_node);
 	ufbxt_hash_matrix(h, v->geometry_to_world);
+	ufbxt_hash_quat(h, v->adjust_pre_rotation);
+	ufbxt_hash_vec3(h, v->adjust_pre_scale);
+	ufbxt_hash_quat(h, v->adjust_post_rotation);
 	ufbxt_hash_pod(h, v->visible);
 	ufbxt_hash_pod(h, v->is_root);
+	ufbxt_hash_pod(h, v->has_geometry_transform);
+	ufbxt_hash_pod(h, v->has_adjust_transform);
+	ufbxt_hash_pod(h, v->is_geometry_transform_helper);
 	ufbxt_hash_pod(h, v->node_depth);
 	ufbxt_hash_list(h, v->materials, ufbxt_hash_element_ref_imp);
 }
