@@ -19639,21 +19639,23 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 			UFBX_COORDINATE_AXIS_NEGATIVE_Z,
 			UFBX_COORDINATE_AXIS_POSITIVE_Y,
 		};
-		if (ufbxi_axis_matrix(&mat, light_axes, uc->opts.target_light_axes)) {
+		if (ufbxi_axis_matrix(&mat, uc->opts.target_light_axes, light_axes)) {
 			light_post_rotation = ufbx_matrix_to_transform(&mat).rotation;
+			light_direction = ufbx_transform_direction(&mat, light_direction);
+			has_light_transform = true;
 		}
 	}
 
 	if (ufbx_coordinate_axes_valid(uc->opts.target_camera_axes)) {
 		ufbx_matrix mat;
-		ufbx_coordinate_axes light_axes = {
+		ufbx_coordinate_axes camera_axes = {
 			UFBX_COORDINATE_AXIS_POSITIVE_Z,
 			UFBX_COORDINATE_AXIS_POSITIVE_Y,
 			UFBX_COORDINATE_AXIS_NEGATIVE_X,
 		};
-		if (ufbxi_axis_matrix(&mat, light_axes, uc->opts.target_light_axes)) {
-			light_post_rotation = ufbx_matrix_to_transform(&mat).rotation;
-			light_direction = ufbx_transform_direction(&mat, light_direction);
+		if (ufbxi_axis_matrix(&mat, uc->opts.target_camera_axes, camera_axes)) {
+			camera_post_rotation = ufbx_matrix_to_transform(&mat).rotation;
+			has_camera_transform = true;
 		}
 	}
 

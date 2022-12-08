@@ -68,6 +68,25 @@ ufbx_load_opts ufbxt_z_up_meters_adjust_opts()
 	return opts;
 }
 
+ufbx_load_opts ufbxt_rh_y_camera_light_axes_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_camera_axes = ufbx_axes_right_handed_y_up;
+	opts.target_light_axes = ufbx_axes_right_handed_y_up;
+	return opts;
+}
+
+ufbx_load_opts ufbxt_blender_space_adjust_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_axes = ufbx_axes_right_handed_z_up;
+	opts.target_unit_meters = 1.0f;
+	opts.target_camera_axes = ufbx_axes_right_handed_y_up;
+	opts.target_light_axes = ufbx_axes_right_handed_y_up;
+	opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+	return opts;
+}
+
 #endif
 
 #if UFBXT_IMPL
@@ -798,4 +817,82 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_y_up_adjust, blender_340_y_up, ufbxt_
 }
 #endif
 
+UFBXT_FILE_TEST(maya_camera_light_axes_y_up)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "forwardCamera");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 0.0f, 0.0f, 0.0f }, { 0.0f, 90.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "forwardCamera", node->local_transform, ref_transform);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "forwardLight");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 0.0f, 0.0f, 0.0f }, { 90.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "forwardLight", node->local_transform, ref_transform);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_camera_light_axes_y_up_rh_y, maya_camera_light_axes_y_up, ufbxt_rh_y_camera_light_axes_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "forwardCamera");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "forwardCamera", node->local_transform, ref_transform);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "forwardLight");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "forwardLight", node->local_transform, ref_transform);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(blender_340_default_unscaled, ufbxt_blender_space_adjust_opts)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Cube");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "Cube", node->local_transform, ref_transform);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Camera");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 7.3589f, -6.9258f, 4.9583f }, { 63.5593f, 0.0f, 46.6919f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "Camera", node->local_transform, ref_transform);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Light");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 4.0762f, 1.0055f, 5.9039f }, { 37.261f, 3.16371f, 106.936f }, { 1.0f, 1.0f, 1.0f },
+		};
+		ufbxt_check_transform(err, "Light", node->local_transform, ref_transform);
+	}
+}
+#endif
 
