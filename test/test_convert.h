@@ -16,6 +16,13 @@ ufbx_load_opts ufbxt_geometry_transform_modify_opts()
 	return opts;
 }
 
+ufbx_load_opts ufbxt_geometry_transform_modify_no_fallback_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.geometry_transform_handling = UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK;
+	return opts;
+}
+
 ufbx_load_opts ufbxt_geometry_transform_helper_name_opts()
 {
 	ufbx_load_opts opts = { 0 };
@@ -283,7 +290,44 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_helper, max_geom
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_modify, max_geometry_transform_instances, ufbxt_geometry_transform_modify_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_modify, max_geometry_transform_instances, ufbxt_geometry_transform_modify_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	if (scene->metadata.version >= 7000) {
+		ufbxt_assert(scene->meshes.count == 1);
+	} else {
+		ufbxt_assert(scene->meshes.count == 4);
+	}
+
+	if (scene->metadata.version >= 7000) {
+		ufbxt_assert(scene->nodes.count == 9);
+		for (size_t i = 1; i < scene->nodes.count; i++) {
+			ufbx_node *node = scene->nodes.data[i];
+			ufbxt_assert(!node->has_geometry_transform);
+			if (node->name.length > 0) {
+				ufbxt_assert(!node->mesh);
+				ufbxt_assert(!node->is_geometry_transform_helper);
+				ufbxt_assert(node->geometry_transform_helper);
+			} else {
+				ufbxt_assert(node->mesh);
+				ufbxt_assert(node->is_geometry_transform_helper);
+				ufbxt_assert(!node->geometry_transform_helper);
+			}
+		}
+	} else {
+		ufbxt_assert(scene->nodes.count == 5);
+		for (size_t i = 1; i < scene->nodes.count; i++) {
+			ufbx_node *node = scene->nodes.data[i];
+			ufbxt_assert(!node->has_geometry_transform);
+			ufbxt_assert(node->mesh);
+			ufbxt_assert(!node->is_geometry_transform_helper);
+			ufbxt_assert(!node->geometry_transform_helper);
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_modify_no_fallback, max_geometry_transform_instances, ufbxt_geometry_transform_modify_no_fallback_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
 	if (scene->metadata.version >= 7000) {
@@ -300,9 +344,6 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_instances_modify, max_geom
 		ufbxt_assert(!node->is_geometry_transform_helper);
 		ufbxt_assert(!node->geometry_transform_helper);
 	}
-
-	// No diff as it would fail by design
-	// TODO: Some way to check that diff actually fails?
 }
 #endif
 

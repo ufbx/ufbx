@@ -3636,9 +3636,14 @@ typedef enum ufbx_geometry_transform_handling {
 	UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES,
 
 	// Modify the geometry of meshes attached to nodes with geometry transforms.
-	// NOTE: This does not work correctly if the scene contains instanced meshes
-	// with 
+	// Will add helper nodes like `UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES` if
+	// necessary, for example if there are multiple instances of the same mesh with
+	// geometry transforms.
 	UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY,
+
+	// Modify the geometry of meshes attached to nodes with geometry transforms.
+	// NOTE: This will not work correctly for instanced geometry.
+	UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK,
 
 	UFBX_UNIT_CONVERSION_COUNT,
 	UFBX_UNIT_CONVERSION_FORCE_32BIT = 0x7fffffff,

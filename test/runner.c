@@ -111,6 +111,7 @@ uint32_t g_log_pos;
 char g_hint[8*1024];
 
 bool g_skip_print_ok = false;
+int g_skip_obj_test = false;
 
 typedef struct {
 	size_t step;
@@ -2240,7 +2241,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	ufbx_scene *obj_scene = NULL;
 	if (obj_file) {
 		ufbxt_logf("%s [diff target found]", buf);
+	}
 
+	ufbxt_begin_fuzz();
+
+	if (obj_file && !g_skip_obj_test) {
 		ufbx_load_opts obj_opts = { 0 };
 		obj_opts.load_external_files = true;
 
@@ -2273,8 +2278,6 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 		free(data);
 	}
-
-	ufbxt_begin_fuzz();
 
 	uint32_t num_opened = 0;
 
@@ -2890,6 +2893,10 @@ int main(int argc, char **argv)
 
 		if (!strcmp(argv[i], "--dedicated-allocs")) {
 			g_dedicated_allocs = true;
+		}
+
+		if (!strcmp(argv[i], "--skip-obj-test")) {
+			g_skip_obj_test = true;
 		}
 
 		if (!strcmp(argv[i], "--fuzz-no-patch")) {

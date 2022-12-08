@@ -2911,7 +2911,7 @@ static ufbxi_noinline void ufbxi_free_size(ufbxi_allocator *ator, size_t size, v
 	}
 }
 
-ufbxi_nodiscard static bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t size, void *p_ptr, size_t *p_cap, size_t n)
+ufbxi_noinline ufbxi_nodiscard static bool ufbxi_grow_array_size(ufbxi_allocator *ator, size_t size, void *p_ptr, size_t *p_cap, size_t n)
 {
 	#if defined(UFBX_REGRESSION)
 	{
@@ -3297,12 +3297,12 @@ static ufbxi_noinline void ufbxi_buf_free_unused(ufbxi_buf *b)
 	}
 }
 
-static ufbxi_noinline void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst)
+static ufbxi_noinline void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, void *dst, bool peek)
 {
 	ufbx_assert(!b->unordered);
 	ufbx_assert(size > 0);
 	ufbx_assert(b->num_items >= n);
-	b->num_items -= n;
+	if (!peek) b->num_items -= n;
 
 	char *ptr = (char*)dst;
 	size_t bytes_left = size * n;
@@ -3318,7 +3318,7 @@ static ufbxi_noinline void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, v
 			if (bytes_left <= pos) {
 				// Rest of the data is in this single chunk
 				pos -= bytes_left;
-				b->pos = pos;
+				if (!peek) b->pos = pos;
 				ptr -= bytes_left;
 				if (bytes_left > 0) {
 					memcpy(ptr, chunk->data + pos, bytes_left);
@@ -3331,8 +3331,10 @@ static ufbxi_noinline void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, v
 				memcpy(ptr, chunk->data, pos);
 				chunk->pushed_pos = 0;
 				chunk = chunk->prev;
-				b->chunks[0] = chunk;
-				b->size = chunk->size;
+				if (!peek) {
+					b->chunks[0] = chunk;
+					b->size = chunk->size;
+				}
 				pos = chunk->pushed_pos;
 			}
 		}
@@ -3343,36 +3345,40 @@ static ufbxi_noinline void ufbxi_pop_size(ufbxi_buf *b, size_t size, size_t n, v
 			if (bytes_left <= pos) {
 				// Rest of the data is in this single chunk
 				pos -= bytes_left;
-				b->pos = pos;
+				if (!peek) b->pos = pos;
 				break;
 			} else {
 				// Pop the whole chunk
 				bytes_left -= pos;
 				chunk->pushed_pos = 0;
 				chunk = chunk->prev;
-				b->chunks[0] = chunk;
-				b->size = chunk->size;
+				if (!peek) {
+					b->chunks[0] = chunk;
+					b->size = chunk->size;
+				}
 				pos = chunk->pushed_pos;
 			}
 		}
 	}
 
-	// Check if we need to rewind past some alignment padding
-	ufbxi_buf_chunk *chunk = b->chunks[0];
-	if (chunk) {
-		size_t pos = b->pos, padding_pos = chunk->padding_pos;
-		if (pos < padding_pos) {
-			ufbx_assert(pos + 1 == padding_pos);
-			ufbxi_buf_padding *padding = (ufbxi_buf_padding*)(chunk->data + padding_pos - 1 - 16);
-			b->pos = padding->original_pos;
-			chunk->padding_pos = padding->prev_padding;
+	if (!peek) {
+		// Check if we need to rewind past some alignment padding
+		ufbxi_buf_chunk *chunk = b->chunks[0];
+		if (chunk) {
+			size_t pos = b->pos, padding_pos = chunk->padding_pos;
+			if (pos < padding_pos) {
+				ufbx_assert(pos + 1 == padding_pos);
+				ufbxi_buf_padding *padding = (ufbxi_buf_padding*)(chunk->data + padding_pos - 1 - 16);
+				b->pos = padding->original_pos;
+				chunk->padding_pos = padding->prev_padding;
+			}
 		}
-	}
 
-	// Immediately free popped items if all the allocations are huge
-	// as it means we want to have dedicated allocations for each push.
-	if (b->ator->huge_size <= 1) {
-		ufbxi_buf_free_unused(b);
+		// Immediately free popped items if all the allocations are huge
+		// as it means we want to have dedicated allocations for each push.
+		if (b->ator->huge_size <= 1) {
+			ufbxi_buf_free_unused(b);
+		}
 	}
 }
 
@@ -3380,7 +3386,15 @@ static ufbxi_noinline void *ufbxi_push_pop_size(ufbxi_buf *dst, ufbxi_buf *src, 
 {
 	void *data = ufbxi_push_size(dst, size, n);
 	if (!data) return NULL;
-	ufbxi_pop_size(src, size, n, data);
+	ufbxi_pop_size(src, size, n, data, false);
+	return data;
+}
+
+static ufbxi_noinline void *ufbxi_push_peek_size(ufbxi_buf *dst, ufbxi_buf *src, size_t size, size_t n)
+{
+	void *data = ufbxi_push_size(dst, size, n);
+	if (!data) return NULL;
+	ufbxi_pop_size(src, size, n, data, true);
 	return data;
 }
 
@@ -3455,8 +3469,10 @@ static ufbxi_noinline void ufbxi_buf_clear(ufbxi_buf *buf)
 #define ufbxi_push_zero(b, type, n) ufbxi_maybe_null((type*)ufbxi_push_size_zero((b), sizeof(type), (n)))
 #define ufbxi_push_copy(b, type, n, data) ufbxi_maybe_null((type*)ufbxi_push_size_copy((b), sizeof(type), (n), (data)))
 #define ufbxi_push_fast(b, type, n) ufbxi_maybe_null((type*)ufbxi_push_size_fast((b), sizeof(type), (n)))
-#define ufbxi_pop(b, type, n, dst) ufbxi_pop_size((b), sizeof(type), (n), (dst))
+#define ufbxi_pop(b, type, n, dst) ufbxi_pop_size((b), sizeof(type), (n), (dst), false)
+#define ufbxi_peek(b, type, n, dst) ufbxi_pop_size((b), sizeof(type), (n), (dst), true)
 #define ufbxi_push_pop(dst, src, type, n) ufbxi_maybe_null((type*)ufbxi_push_pop_size((dst), (src), sizeof(type), (n)))
+#define ufbxi_push_peek(dst, src, type, n) ufbxi_maybe_null((type*)ufbxi_push_peek_size((dst), (src), sizeof(type), (n)))
 
 // -- Hash map
 //
@@ -5331,6 +5347,7 @@ typedef struct {
 	ufbxi_buf tmp_node_ids;
 	ufbxi_buf tmp_elements;
 	ufbxi_buf tmp_element_offsets;
+	ufbxi_buf tmp_element_ptrs;
 	ufbxi_buf tmp_typed_element_offsets[UFBX_ELEMENT_TYPE_COUNT];
 	ufbxi_buf tmp_mesh_textures;
 	ufbxi_buf tmp_full_weights;
@@ -6489,6 +6506,7 @@ ufbxi_nodiscard static ufbxi_noinline void *ufbxi_push_element_extra_size(ufbxi_
 		ufbxi_check_return(ufbxi_grow_array(&uc->ator_tmp, &uc->element_extra_arr, &uc->element_extra_cap, id + 1), NULL);
 		memset(uc->element_extra_arr + old_cap, 0, (uc->element_extra_cap - old_cap) * sizeof(void*));
 	}
+	// TODO: Return existing if ever needed
 	ufbx_assert(uc->element_extra_arr[id] == NULL);
 	uc->element_extra_arr[id] = extra;
 
@@ -8706,7 +8724,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 			}
 
 			// Pop alignment helper
-			ufbxi_pop_size(&uc->tmp_stack, 8, 1, NULL);
+			ufbxi_pop_size(&uc->tmp_stack, 8, 1, NULL, false);
 		}
 	} else {
 		num_values = ufbxi_min32(num_values, UFBXI_MAX_NON_ARRAY_VALUES);
@@ -10332,6 +10350,8 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_element_size(ufbx
 	elem->props = info->props;
 	elem->dom_node = info->dom_node;
 
+	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_element_ptrs, ufbx_element*, 1, &elem), NULL);
+
 	ufbxi_check_return(ufbxi_insert_fbx_id(uc, info->fbx_id, element_id), NULL);
 
 	return elem;
@@ -10358,6 +10378,8 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 		elem->name.data = name;
 		elem->name.length = strlen(name);
 	}
+
+	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_element_ptrs, ufbx_element*, 1, &elem), NULL);
 
 	uint64_t fbx_id = ufbxi_synthetic_id_from_pointer(elem);
 	*p_fbx_id = fbx_id;
@@ -10430,6 +10452,46 @@ ufbxi_noinline static void ufbxi_set_own_prop_vec3_uniform(ufbx_props *props, co
 	}
 }
 
+typedef struct {
+	uint32_t geometry_helper_id;
+} ufbxi_node_extra;
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_setup_geometry_transform_helper(ufbxi_context *uc, ufbx_node *node, uint64_t node_fbx_id)
+{
+	ufbx_vec3 geo_translation = ufbxi_find_vec3(&node->props, ufbxi_GeometricTranslation, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 geo_rotation = ufbxi_find_vec3(&node->props, ufbxi_GeometricRotation, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 geo_scaling = ufbxi_find_vec3(&node->props, ufbxi_GeometricScaling, 1.0f, 1.0f, 1.0f);
+	if (!ufbxi_is_vec3_zero(geo_translation) || !ufbxi_is_vec3_zero(geo_rotation) || !ufbxi_is_vec3_one(geo_scaling)) {
+
+		uint64_t geo_fbx_id;
+		ufbx_node *geo_node = ufbxi_push_synthetic_element(uc, &geo_fbx_id, NULL, uc->opts.geometry_transform_helper_name.data, ufbx_node, UFBX_ELEMENT_NODE);
+		ufbxi_check(geo_node);
+		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &geo_node->element.element_id));
+		geo_node->element.dom_node = node->element.dom_node;
+
+		ufbx_prop *props = ufbxi_push_zero(&uc->result, ufbx_prop, 3);
+		ufbxi_check(props);
+		ufbxi_init_synthetic_vec3_prop(&props[0], ufbxi_Lcl_Rotation, &geo_rotation, UFBX_PROP_ROTATION);
+		ufbxi_init_synthetic_vec3_prop(&props[1], ufbxi_Lcl_Scaling, &geo_scaling, UFBX_PROP_SCALING);
+		ufbxi_init_synthetic_vec3_prop(&props[2], ufbxi_Lcl_Translation, &geo_translation, UFBX_PROP_TRANSLATION);
+
+		geo_node->props.props.data = props;
+		geo_node->props.props.count = 3;
+
+		node->has_geometry_transform = true;
+		geo_node->is_geometry_transform_helper = true;
+
+		ufbxi_check(ufbxi_connect_oo(uc, geo_fbx_id, node_fbx_id));
+		uc->has_geometry_transform_nodes = true;
+
+		ufbxi_node_extra *extra = ufbxi_push_element_extra(uc, node->element_id, ufbxi_node_extra);
+		ufbxi_check(extra);
+		extra->geometry_helper_id = geo_node->element_id;
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_model(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	(void)node;
@@ -10438,36 +10500,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_model(ufbxi_context *uc, uf
 	ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &elem_node->element.element_id));
 
 	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES) {
-		ufbx_vec3 geo_translation = ufbxi_find_vec3(&elem_node->props, ufbxi_GeometricTranslation, 0.0f, 0.0f, 0.0f);
-		ufbx_vec3 geo_rotation = ufbxi_find_vec3(&elem_node->props, ufbxi_GeometricRotation, 0.0f, 0.0f, 0.0f);
-		ufbx_vec3 geo_scaling = ufbxi_find_vec3(&elem_node->props, ufbxi_GeometricScaling, 1.0f, 1.0f, 1.0f);
-		if (!ufbxi_is_vec3_zero(geo_translation) || !ufbxi_is_vec3_zero(geo_rotation) || !ufbxi_is_vec3_one(geo_scaling)) {
-
-			uint64_t geo_fbx_id;
-			ufbx_node *geo_node = ufbxi_push_synthetic_element(uc, &geo_fbx_id, node, uc->opts.geometry_transform_helper_name.data, ufbx_node, UFBX_ELEMENT_NODE);
-			ufbxi_check(geo_node);
-			ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &geo_node->element.element_id));
-
-			ufbx_prop *props = ufbxi_push_zero(&uc->result, ufbx_prop, 3);
-			ufbxi_check(props);
-			ufbxi_init_synthetic_vec3_prop(&props[0], ufbxi_Lcl_Rotation, &geo_rotation, UFBX_PROP_ROTATION);
-			ufbxi_init_synthetic_vec3_prop(&props[1], ufbxi_Lcl_Scaling, &geo_scaling, UFBX_PROP_SCALING);
-			ufbxi_init_synthetic_vec3_prop(&props[2], ufbxi_Lcl_Translation, &geo_translation, UFBX_PROP_TRANSLATION);
-
-			geo_node->props.props.data = props;
-			geo_node->props.props.count = 3;
-
-			// HACK: We tag this node as a geometry transform node prematurely here,
-			// this is used to detect which nodes need remapping in `ufbxi_resolve_connections()`.
-			// We also assume we can remap to the geometry transform helper node by bumping
-			// the element ID by one.
-			ufbx_assert(geo_node->element_id == elem_node->element_id + 1);
-			elem_node->has_geometry_transform = true;
-			geo_node->is_geometry_transform_helper = true;
-
-			ufbxi_check(ufbxi_connect_oo(uc, geo_fbx_id, info->fbx_id));
-			uc->has_geometry_transform_nodes = true;
-		}
+		ufbxi_check(ufbxi_setup_geometry_transform_helper(uc, elem_node, info->fbx_id));
 	}
 
 	return 1;
@@ -15098,6 +15131,96 @@ static ufbxi_forceinline void ufbxi_obj_free(ufbxi_context *uc)
 }
 #endif
 
+// -- Scene pre-processing
+
+typedef struct {
+	ufbx_element *src, *dst;
+} ufbxi_pre_connection;
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context *uc)
+{
+	bool required = false;
+	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) required = true;
+#if defined(UFBX_REGRESSION)
+	required = true;
+#endif
+
+	if (!required) return 1;
+
+	uint32_t num_elements = uc->num_elements;
+	ufbx_element **elements = ufbxi_push_pop(&uc->tmp_parse, &uc->tmp_element_ptrs, ufbx_element*, num_elements);
+
+	size_t num_connections = uc->tmp_connections.num_items;
+	ufbxi_tmp_connection *tmp_connections = ufbxi_push_peek(&uc->tmp_parse, &uc->tmp_connections, ufbxi_tmp_connection, num_connections);
+	ufbxi_check(tmp_connections);
+
+	ufbxi_pre_connection *pre_connections = ufbxi_push(&uc->tmp_parse, ufbxi_pre_connection, num_connections);
+	ufbxi_check(pre_connections);
+
+	uint32_t *instance_counts = ufbxi_push_zero(&uc->tmp_parse, uint32_t, num_elements);
+	ufbxi_check(instance_counts);
+
+	uint64_t *fbx_ids = ufbxi_push_zero(&uc->tmp_parse, uint64_t, num_elements);
+	ufbxi_check(fbx_ids);
+
+	for (size_t i = 0; i < num_connections; i++) {
+		ufbxi_tmp_connection *tmp = &tmp_connections[i];
+		ufbxi_pre_connection *pre = &pre_connections[i];
+
+		ufbxi_fbx_id_entry *src_entry = ufbxi_find_fbx_id(uc, tmp->src);
+		ufbxi_fbx_id_entry *dst_entry = ufbxi_find_fbx_id(uc, tmp->dst);
+
+		ufbx_element *src = src_entry ? elements[src_entry->element_id] : NULL;
+		ufbx_element *dst = dst_entry ? elements[dst_entry->element_id] : NULL;
+		pre->src = src;
+		pre->dst = dst;
+		if (!src || !dst) continue;
+
+		fbx_ids[src->element_id] = tmp->src;
+		fbx_ids[dst->element_id] = tmp->dst;
+
+		if (tmp->src_prop.length == 0 && tmp->dst_prop.length == 0) {
+			// Count number of instances of each attribute
+			if (dst->type == UFBX_ELEMENT_NODE) {
+				if (src->type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && src->type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB) {
+					++instance_counts[src->element_id];
+				}
+			}
+		}
+	}
+
+	for (size_t i = 0; i < num_connections; i++) {
+		ufbxi_tmp_connection *tmp = &tmp_connections[i];
+		ufbxi_pre_connection *pre = &pre_connections[i];
+		ufbx_element *src = pre->src, *dst = pre->dst;
+		if (!src || !dst) continue;
+
+		if (tmp->src_prop.length == 0 && tmp->dst_prop.length == 0) {
+			// Count maximum number of instanced attributes in a node
+			if (dst->type == UFBX_ELEMENT_NODE) {
+				if (src->type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && src->type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB) {
+					instance_counts[dst->element_id] = ufbxi_max32(instance_counts[dst->element_id], instance_counts[src->element_id]);
+				}
+			}
+		}
+	}
+
+	for (size_t i = 0; i < num_elements; i++) {
+		ufbx_element *element = elements[i];
+		uint64_t fbx_id = fbx_ids[i];
+
+		if (element->type == UFBX_ELEMENT_NODE) {
+			ufbx_node *node = (ufbx_node*)element;
+			// Setup a geometry transform helper for nodes that have instanced attributes
+			if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY && instance_counts[i] > 1) {
+				ufbxi_check(ufbxi_setup_geometry_transform_helper(uc, node, fbx_id));
+			}
+		}
+	}
+
+	return 1;
+}
+
 // -- Scene processing
 
 static ufbxi_noinline ufbx_element *ufbxi_find_element_by_fbx_id(ufbxi_context *uc, uint64_t fbx_id)
@@ -15249,7 +15372,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_contex
 			if (dst->type == UFBX_ELEMENT_NODE && src->type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && src->type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB) {
 				ufbx_node *node = (ufbx_node*)dst;
 				if (node->has_geometry_transform) {
-					dst = uc->scene.elements.data[dst->element_id + 1];
+					ufbxi_node_extra *extra = ufbxi_get_element_extra(uc, node->element_id);
+					ufbx_assert(extra);
+					dst = uc->scene.elements.data[extra->geometry_helper_id];
 					ufbx_assert(dst->type == UFBX_ELEMENT_NODE && ((ufbx_node*)dst)->is_geometry_transform_helper);
 				}
 			}
@@ -17384,17 +17509,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_file_textures(ufbxi_contex
 
 ufbxi_nodiscard ufbxi_noinline static ufbx_node *ufbxi_get_geometry_transform_node(ufbx_element *element)
 {
-	ufbx_node *geo_node = NULL;
-	ufbxi_for_ptr_list(ufbx_node, p_node, element->instances) {
-		ufbx_node *node = *p_node;
-		if (node->has_geometry_transform) {
-			// Two or more conflicting geometric transforms.
-			// TODO: Warning/fail here
-			if (geo_node) return NULL;
-			geo_node = node;
-		}
+	if (element->instances.count == 1) {
+		ufbx_node *node = element->instances.data[0];
+		if (node->has_geometry_transform) return node;
 	}
-	return geo_node;
+	return NULL;
 }
 
 ufbxi_noinline static void ufbxi_transform_vec3_list(const void *v_list, const ufbx_matrix *matrix, size_t stride)
@@ -17425,8 +17544,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_handle_geometry_transforms(ufbxi
 {
 	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_PRESERVE) return 1;
 
-	// Prefetch geometry transforms for processing, they will later be overwritten in `ufbxi_update_node()`.
-	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) {
+	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY
+		|| uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK) {
+		// Prefetch geometry transforms for processing, they will later be overwritten in `ufbxi_update_node()`.
 		ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
 			ufbx_node *node = *p_node;
 			if (node->is_root) continue;
@@ -21056,6 +21176,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 		uc->scene.dom_root = dom_root;
 	}
 
+	ufbxi_check(ufbxi_pre_finalize_scene(uc));
+
 	// We can free `tmp_parse` already here as all parsing is done by now.
 	ufbxi_buf_free(&uc->tmp_parse);
 
@@ -21149,6 +21271,7 @@ static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->tmp_node_ids);
 	ufbxi_buf_free(&uc->tmp_elements);
 	ufbxi_buf_free(&uc->tmp_element_offsets);
+	ufbxi_buf_free(&uc->tmp_element_ptrs);
 	for (size_t i = 0; i < UFBX_ELEMENT_TYPE_COUNT; i++) {
 		ufbxi_buf_free(&uc->tmp_typed_element_offsets[i]);
 	}
@@ -21258,6 +21381,7 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	uc->tmp_node_ids.ator = &uc->ator_tmp;
 	uc->tmp_elements.ator = &uc->ator_tmp;
 	uc->tmp_element_offsets.ator = &uc->ator_tmp;
+	uc->tmp_element_ptrs.ator = &uc->ator_tmp;
 	for (size_t i = 0; i < UFBX_ELEMENT_TYPE_COUNT; i++) {
 		uc->tmp_typed_element_offsets[i].ator = &uc->ator_tmp;
 	}
