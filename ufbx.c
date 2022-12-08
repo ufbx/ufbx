@@ -26032,7 +26032,7 @@ ufbx_abi ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m)
 	ufbx_real det = ufbx_matrix_determinant(m);
 
 	ufbx_matrix r;
-	if (det == 0.0) {
+	if (ufbx_fabs(det) <= UFBX_EPSILON) {
 		memset(&r, 0, sizeof(r));
 		return r;
 	}
@@ -26060,7 +26060,7 @@ ufbx_abi ufbxi_noinline ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m
 	ufbx_real det = ufbx_matrix_determinant(m);
 
 	ufbx_matrix r;
-	if (det <= UFBX_EPSILON) {
+	if (ufbx_fabs(det) <= UFBX_EPSILON) {
 		memset(&r, 0, sizeof(r));
 		return r;
 	}
