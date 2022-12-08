@@ -26047,7 +26047,7 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_matrix_to_transform(const ufbx_matri
 
 	ufbx_real len = t.rotation.x*t.rotation.x + t.rotation.y*t.rotation.y + t.rotation.z*t.rotation.z + t.rotation.w*t.rotation.w;
 	if (ufbx_fabs(len - 1.0f) > UFBX_EPSILON) {
-		if (ufbx_fabs(len) > UFBX_EPSILON) {
+		if (ufbx_fabs(len) <= UFBX_EPSILON) {
 			t.rotation = ufbx_identity_quat;
 		} else {
 			t.rotation.x /= len;
