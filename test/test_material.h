@@ -719,6 +719,37 @@ UFBXT_TEST(blender_phong_quirks)
 }
 #endif
 
+UFBXT_FILE_TEST(maya_phong_properties)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "phong1");
+	ufbxt_assert(material);
+	ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_PHONG);
+
+	ufbxt_assert( 1 == (int)round(100.0f * material->fbx.diffuse_color.value_vec3.x));
+	ufbxt_assert( 2 == (int)round(100.0f * material->fbx.diffuse_color.value_vec3.y));
+	ufbxt_assert( 3 == (int)round(100.0f * material->fbx.diffuse_color.value_vec3.z));
+	ufbxt_assert( 4 == (int)round(100.0f * material->fbx.transparency_color.value_vec3.x));
+	ufbxt_assert( 5 == (int)round(100.0f * material->fbx.transparency_color.value_vec3.y));
+	ufbxt_assert( 6 == (int)round(100.0f * material->fbx.transparency_color.value_vec3.z));
+	ufbxt_assert( 7 == (int)round(100.0f * material->fbx.ambient_color.value_vec3.x));
+	ufbxt_assert( 8 == (int)round(100.0f * material->fbx.ambient_color.value_vec3.y));
+	ufbxt_assert( 9 == (int)round(100.0f * material->fbx.ambient_color.value_vec3.z));
+	ufbxt_assert(10 == (int)round(100.0f * material->fbx.emission_color.value_vec3.x));
+	ufbxt_assert(11 == (int)round(100.0f * material->fbx.emission_color.value_vec3.y));
+	ufbxt_assert(12 == (int)round(100.0f * material->fbx.emission_color.value_vec3.z));
+	ufbxt_assert(13 == (int)round(100.0f * material->fbx.diffuse_factor.value_vec3.x));
+	ufbxt_assert(17 == (int)round(  1.0f * material->fbx.specular_exponent.value_vec3.x));
+	ufbxt_assert(18 == (int)round(100.0f * material->fbx.specular_color.value_vec3.x));
+	ufbxt_assert(19 == (int)round(100.0f * material->fbx.specular_color.value_vec3.y));
+	ufbxt_assert(20 == (int)round(100.0f * material->fbx.specular_color.value_vec3.z));
+	ufbxt_assert(21 == (int)round(100.0f * material->fbx.reflection_factor.value_vec3.x));
+	ufbxt_assert(22 == (int)round(100.0f * material->fbx.reflection_color.value_vec3.x));
+	ufbxt_assert(23 == (int)round(100.0f * material->fbx.reflection_color.value_vec3.y));
+	ufbxt_assert(24 == (int)round(100.0f * material->fbx.reflection_color.value_vec3.z));
+}
+#endif
+
 UFBXT_FILE_TEST(maya_arnold_properties)
 #if UFBXT_IMPL
 {
@@ -839,7 +870,6 @@ UFBXT_FILE_TEST(maya_arnold_properties)
 	ufbxt_assert(material->features.internal_reflections.is_explicit);
 	ufbxt_assert(material->features.exit_to_background.enabled);
 	ufbxt_assert(material->features.exit_to_background.is_explicit);
-
 }
 #endif
 
