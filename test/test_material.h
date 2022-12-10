@@ -747,6 +747,13 @@ UFBXT_FILE_TEST(maya_phong_properties)
 	ufbxt_assert(22 == (int)round(100.0f * material->fbx.reflection_color.value_vec3.x));
 	ufbxt_assert(23 == (int)round(100.0f * material->fbx.reflection_color.value_vec3.y));
 	ufbxt_assert(24 == (int)round(100.0f * material->fbx.reflection_color.value_vec3.z));
+
+	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_color.value_vec3.x));
+	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value_vec3.y));
+	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value_vec3.z));
+	ufbxt_assert(13 == (int)round(100.0f * material->pbr.base_factor.value_vec3.x));
+	ufbxt_assert_close_real(err, material->pbr.metalness.value_real, 0.0f);
+	ufbxt_assert_close_real(err, material->pbr.roughness.value_real, 0.587689f);
 }
 #endif
 
