@@ -16661,7 +16661,7 @@ ufbxi_noinline static void ufbxi_fetch_maps(ufbx_scene *scene, ufbx_material *ma
 	(void)scene;
 
 	ufbx_shader *shader = material->shader;
-	ufbx_assert(material->shader_type < UFBX_SHADER_TYPE_COUNT);
+	ufbx_assert((uint32_t)material->shader_type < UFBX_SHADER_TYPE_COUNT);
 
 	memset(&material->fbx, 0, sizeof(material->fbx));
 	memset(&material->pbr, 0, sizeof(material->pbr));
@@ -17074,7 +17074,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_shader_texture(ufbxi_co
 	ufbx_string max_texture = ufbx_find_string(&texture->props, "3dsMax|MaxTexture", ufbx_empty_string);
 
 	// Check first if the texture looks like it could be a shader.
-	ufbx_shader_texture_type type = UFBX_SHADER_TEXTURE_TYPE_COUNT;
+	ufbx_shader_texture_type type = (ufbx_shader_texture_type)UFBX_SHADER_TEXTURE_TYPE_COUNT;
 
 	if (!strcmp(max_texture.data, "MULTIOUTPUT_TO_OSLMap") || classid == UINT64_C(0x896ef2fc44bd743f)) {
 		type = UFBX_SHADER_TEXTURE_SELECT_OUTPUT;
@@ -17084,7 +17084,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_shader_texture(ufbxi_co
 		type = UFBX_SHADER_TEXTURE_UNKNOWN;
 	}
 
-	if (type == UFBX_SHADER_TEXTURE_TYPE_COUNT) return 1;
+	if ((uint32_t)type == UFBX_SHADER_TEXTURE_TYPE_COUNT) return 1;
 
 	ufbx_shader_texture *shader = ufbxi_push_zero(&uc->result, ufbx_shader_texture, 1);
 	ufbxi_check(shader);
