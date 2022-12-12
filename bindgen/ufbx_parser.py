@@ -1,4 +1,3 @@
-from ast import SetComp
 import parsette
 import string
 from typing import List, Optional, NamedTuple, Union
@@ -17,7 +16,7 @@ TNumber = lexer.rule("number", r"(0[Xx][0-9A-Fa-f]+)|([0-9]+)", prefix=string.di
 TComment = lexer.rule("comment", r"//[^\r\n]*", prefix="/")
 TPreproc = lexer.rule("preproc", r"#[^\n\\]*(\\\r?\n[^\n\\]*?)*\n", prefix="#")
 TString = lexer.rule("string", r"\"[^\"]*\"", prefix="\"")
-lexer.literals(*"const typedef struct union enum extern ufbx_abi ufbx_inline ufbx_nullable ufbx_abi ufbx_unsafe UFBX_LIST_TYPE".split())
+lexer.literals(*"const typedef struct union enum extern ufbx_abi ufbx_inline ufbx_nullable ufbx_abi ufbx_unsafe UFBX_LIST_TYPE UFBX_ENUM_REPR UFBX_FLAG_REPR UFBX_ENUM_FORCE_WIDTH UFBX_FLAG_FORCE_WIDTH UFBX_ENUM_TYPE".split())
 lexer.literals(*",.*[]{}()<>=-;")
 lexer.ignore("disable", re.compile(r"//\s*bindgen-disable.*?//\s*bindgen-enable", flags=re.DOTALL))
 
@@ -116,6 +115,11 @@ class ATopList(ATop):
     name: Token
     type: ADecl
 
+class ATopEnumType(ATop):
+    enum_type: Token
+    prefix: Token
+    last_value: Token
+
 class Parser(parsette.Parser):
     def __init__(self, source, filename=""):
         super().__init__(lexer, source, filename)
@@ -171,14 +175,24 @@ class Parser(parsette.Parser):
     def finish_enum(self, kind) -> ATypeStruct:
         kn = kind.text()
         name = self.accept(TIdent)
+        self.require(["UFBX_ENUM_REPR", "UFBX_FLAG_REPR"], "enum repr macro")
         if self.accept("{"):
             decls = []
             loc = name if name else kind
+            has_force_width = False
             with self.hint(loc, f"{kn} {name.text()}" if name else f"anonymous {kn}"):
                 while not self.accept("}"):
                     if self.accept(","):
                         continue
+                    if self.accept(["UFBX_ENUM_FORCE_WIDTH", "UFBX_FLAG_FORCE_WIDTH"]):
+                        self.require("(", "for FORCE_WIDTH macro parameters")
+                        self.require(TIdent, "for FORCE_WIDTH macro name")
+                        self.require(")", "for FORCE_WIDTH macro parameters")
+                        has_force_width = True
+                        continue
                     decls.append(self.parse_enum_decl())
+                if not has_force_width:
+                    self.fail_at(self.prev_token, "enum missing FORCE_WIDTH macro")
         else:
             decls = None
         return ATypeEnum(kind, name, decls)
@@ -247,6 +261,16 @@ class Parser(parsette.Parser):
         self.require(")", "for macro parameters")
         return ATopList(name, decl)
 
+    def finish_top_enum_type(self) -> ATopEnumType:
+        self.require("(", "for macro parameters")
+        enum_name = self.require(TIdent, "for enum type name")
+        self.require(",", "for macro parameters")
+        prefix = self.require(TIdent, "for enum prefix")
+        self.require(",", "for macro parameters")
+        last_value = self.require(TIdent, "for enum last value")
+        self.require(")", "for macro parameters")
+        return ATopEnumType(enum_name, prefix, last_value)
+
     def finish_macro_params(self):
         while not self.accept(")"):
             if self.accept(TEnd): self.fail("Unclosed macro parameters")
@@ -280,6 +304,9 @@ class Parser(parsette.Parser):
         elif self.accept("UFBX_LIST_TYPE"):
             tl = self.finish_top_list()
             self.require(";", "after UFBX_LIST_TYPE()")
+            return [tl]
+        elif self.accept("UFBX_ENUM_TYPE"):
+            tl = self.finish_top_enum_type()
             return [tl]
         else:
             decl = self.parse_decl("top-level")
@@ -336,7 +363,7 @@ class SType(NamedTuple):
     kind: str
     name: Optional[str]
     mods: List[SMod] = []
-    body: Union["SStruct", "SEnum", None] = None
+    body: Union["SStruct", "SEnum", "SEnumType", None] = None
 
 class SName(NamedTuple):
     name: Optional[str]
@@ -374,6 +401,12 @@ class SEnum(NamedTuple):
     line: int
     name: Optional[str]
     decls: List[SCommentDecl]
+
+class SEnumType(NamedTuple):
+    line: int
+    enum_name: str
+    enum_prefix: str
+    last_value: str
 
 def type_line(typ: AType):
     if isinstance(typ, ATypeIdent):
@@ -544,6 +577,15 @@ def top_sdecls(top: ATop) -> List[SCommentDecl]:
                 SDecl(line+1, line+1, "field", [SName("count", SType("name", "size_t"))]),
             ], is_list=True)
         ))])]
+    elif isinstance(top, ATopEnumType):
+        line = top.enum_type.location.line
+        name = top.prefix.text() + "_COUNT"
+        return [SDecl(line, line, "enumCount",
+            [SName(name, SType("enumType", "enumType", body=SEnumType(
+                line, top.enum_type.text(), top.prefix.text(), top.last_value.text())
+                )
+            )]
+        )]
     elif isinstance(top, ATopPreproc):
         line = top.preproc.location.line
         text = top.preproc.text()
@@ -690,6 +732,16 @@ def format_decls(decls: List[SCommentDecl], allow_groups: bool):
                     "comment": decl.comment.text if decl.comment else [],
                     "commentInline": decl.comment_inline,
                     "decls": list(format_decls(body.decls, allow_groups=True)),
+                }
+            elif isinstance(body, SEnumType):
+                yield {
+                    "kind": "enumType",
+                    "line": body.line,
+                    "enumName": body.enum_name,
+                    "countName": body.enum_prefix + "_COUNT",
+                    "lastValue": body.last_value,
+                    "comment": decl.comment.text if decl.comment else [],
+                    "commentInline": decl.comment_inline,
                 }
             else:
                 for name in decl.names:

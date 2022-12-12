@@ -170,7 +170,7 @@ static void ufbxt_check_props(ufbx_scene *scene, const ufbx_props *props, bool t
 	for (size_t i = 0; i < props->props.count; i++) {
 		ufbx_prop *prop = &props->props.data[i];
 
-		ufbxt_assert(prop->type < UFBX_NUM_PROP_TYPES);
+		ufbxt_assert(prop->type < UFBX_PROP_TYPE_COUNT);
 		ufbxt_check_string(prop->name);
 		ufbxt_check_string(prop->value_str);
 		ufbxt_check_blob(prop->value_blob);

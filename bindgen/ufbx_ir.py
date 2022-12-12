@@ -417,8 +417,7 @@ def parse_enum(file: File, en: Enum, decl, ctx):
         for inner in decl["decls"]:
             parse_enum(file, en, inner, ctx)
     elif kind == "decl":
-        upper_name = en.name.upper()
-        if name in (f"{upper_name}_COUNT", f"{upper_name}_FORCE_32BIT"):
+        if name in ("UFBX_ELEMENT_TYPE_FIRST_ATTRIB"):
             ctx.hit_aux = True
         ev = EnumValue(name=name, flag=en.flag)
         ev.short_name_raw = shorten_name(name, en.name)
@@ -521,6 +520,24 @@ def parse_decl(file: File, decl):
             parse_func(file, decl)
         elif decl["kind"] == "decl":
             parse_global(file, decl)
+    elif kind == "enumType":
+        line = decl["line"]
+        enum_name = decl["enumName"]
+        last_value = decl["lastValue"]
+        count_name = decl["countName"]
+        en = file.enums.get(enum_name)
+        if not en:
+            raise RuntimeError(f"ufbx.h:{line}: UFBX_ENUM_TYPE() has undefined enum name {enum_name}")
+        max_value = max((file.enum_values[n] for n in en.values), key=lambda v: v.value)
+        if max_value.name != last_value:
+            if last_value in file.enum_values:
+                wrong_value = file.enum_values[last_value].value
+            else:
+                wrong_value = "(undefined)"
+            raise RuntimeError(f"ufbx.h:{line}: UFBX_ENUM_TYPE() has wrong highest value ({last_value} = {wrong_value}), actual highest value is ({max_value.name} = {max_value.value})")
+        count = max_value.value + 1
+        file.constants[count_name] = Constant(name=count_name, value_int=count)
+        file.declarations.append(Declaration(kind="enumCount", name=count_name))
 
 def parse_file(decls):
     file = File()
@@ -1064,6 +1081,14 @@ if __name__ == "__main__":
     for mg in member_globals:
         file.structs[mg.self_type].member_globals.append(mg.global_name)
         file.member_globals[mg.global_name] = mg
+
+    allow_missing_enum_count = ["ufbx_progress_result"]
+    for en in file.enums.values():
+        if en.flag: continue
+        if en.name in allow_missing_enum_count: continue
+        count_name = en.name.upper() + "_COUNT"
+        if count_name not in file.constants:
+            raise RuntimeError(f"enum {en.name} is missing UFBX_ENUM_TYPE()")
 
     for arch in archs:
         layout_file(arch, file)
