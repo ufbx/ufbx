@@ -240,12 +240,12 @@ jobs:
           build/runner-cpp11 -d data
       - name: Build and run threadcheck (standard C11)
         run: |
-          gcc -Wall -Wextra -Werror -std=c11 -DUFBX_STANDARD_C -c ufbx.c -o build/ufbx-c11.o
-          g++ -Wall -Wextra -Werror -pthread -std=c++11 build/ufbx-c11.o test/threadcheck.cpp -lm -o build/threadcheck-c11
+          gcc -Wall -Wextra -Werror -Wno-unused-function -std=c11 -DUFBX_STANDARD_C -c ufbx.c -o build/ufbx-c11.o
+          g++ -Wall -Wextra -Werror -Wno-unused-function -pthread -std=c++11 build/ufbx-c11.o test/threadcheck.cpp -lm -o build/threadcheck-c11
           build/threadcheck-c11 data/maya_cube_7500_binary.fbx 2
       - name: Build and run threadcheck (standard C++11)
         run: |
-          g++ -Wall -Wextra -Werror -pthread -std=c++11 -DUFBX_STANDARD_C -x c++ ufbx.c test/threadcheck.cpp -lm -o build/threadcheck-cpp11
+          g++ -Wall -Wextra -Werror -Wno-unused-function -pthread -std=c++11 -DUFBX_STANDARD_C -x c++ ufbx.c test/threadcheck.cpp -lm -o build/threadcheck-cpp11
           build/threadcheck-cpp11 data/maya_cube_7500_binary.fbx 2
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
