@@ -507,6 +507,9 @@ ufbxt_noinline static void ufbxt_hash_mesh_material_imp(ufbxt_hash *h, const ufb
 	ufbxt_hash_element_ref(h, v->material);
 	ufbxt_hash_size_t(h, v->num_faces);
 	ufbxt_hash_size_t(h, v->num_triangles);
+	ufbxt_hash_size_t(h, v->num_empty_faces);
+	ufbxt_hash_size_t(h, v->num_point_faces);
+	ufbxt_hash_size_t(h, v->num_line_faces);
 	ufbxt_hash_list(h, v->face_indices, ufbxt_hash_pod_imp);
 }
 
@@ -567,7 +570,9 @@ ufbxt_noinline static void ufbxt_hash_mesh_imp(ufbxt_hash *h, const ufbx_mesh *v
 	ufbxt_hash_list(h, v->face_group, ufbxt_hash_pod_imp);
 	ufbxt_hash_list(h, v->face_hole, ufbxt_hash_pod_imp);
 	ufbxt_hash_size_t(h, v->max_face_triangles);
-	ufbxt_hash_size_t(h, v->num_bad_faces);
+	ufbxt_hash_size_t(h, v->num_empty_faces);
+	ufbxt_hash_size_t(h, v->num_point_faces);
+	ufbxt_hash_size_t(h, v->num_line_faces);
 
 	ufbxt_hash_list(h, v->edges, ufbxt_hash_edge_imp);
 	ufbxt_hash_list(h, v->edge_smoothing, ufbxt_hash_pod_imp);

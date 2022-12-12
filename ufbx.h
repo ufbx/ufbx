@@ -833,6 +833,10 @@ typedef struct ufbx_mesh_material {
 	size_t num_faces;     // < Number of faces (polygons) using this material
 	size_t num_triangles; // < Number of triangles using this material if triangulated
 
+	size_t num_empty_faces; // < Number of faces with zero vertices
+	size_t num_point_faces; // < Number of faces with a single vertex
+	size_t num_line_faces;  // < Number of faces with two vertices
+
 	// Indices to `ufbx_mesh.faces[]` that use this material.
 	// Always contains `num_faces` elements.
 	ufbx_uint32_list face_indices;
@@ -982,14 +986,18 @@ struct ufbx_mesh {
 	// NOTE: May be zero in valid meshes if the file doesn't contain edge adjacency data!
 	size_t num_edges;
 
+	size_t max_face_triangles; // < Maximum number of triangles in a face in this mesh
+
+	size_t num_empty_faces; // < Number of faces with zero vertices
+	size_t num_point_faces; // < Number of faces with a single vertex
+	size_t num_line_faces;  // < Number of faces with two vertices
+
 	// Faces and optional per-face extra data
 	ufbx_face_list faces;           // < Face index range
 	ufbx_bool_list face_smoothing;  // < Should the face have soft normals
 	ufbx_uint32_list face_material; // < Indices to `ufbx_mesh.materials[]` and `ufbx_node.materials[]`
 	ufbx_uint32_list face_group;    // < Face polygon group index, indices to `ufbx_mesh.face_groups[]`
 	ufbx_bool_list face_hole;       // < Should the face be hidden as a "hole"
-	size_t max_face_triangles;      // < Maximum number of triangles per face in this mesh
-	size_t num_bad_faces;           // < Number of faces with less than 3 vertices
 
 	// Edges and optional per-edge extra data
 	ufbx_edge_list edges;           // < Edge index range

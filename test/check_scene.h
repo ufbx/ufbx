@@ -424,8 +424,8 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_hole, mesh->num_faces, true);
 
 	size_t num_triangles = 0;
-	size_t num_bad_faces = 0;
 	size_t max_face_triangles = 0;
+	size_t num_bad_faces[3] = { 0 };
 
 	uint32_t prev_end = 0;
 	ufbxt_assert(mesh->faces.count == mesh->num_faces);
@@ -442,13 +442,15 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 				max_face_triangles = tris;
 			}
 		} else {
-			num_bad_faces++;
+			num_bad_faces[face.num_indices]++;
 		}
 	}
 
 	ufbxt_assert(mesh->num_triangles == num_triangles);
 	ufbxt_assert(mesh->max_face_triangles == max_face_triangles);
-	ufbxt_assert(mesh->num_bad_faces == num_bad_faces);
+	ufbxt_assert(mesh->num_empty_faces == num_bad_faces[0]);
+	ufbxt_assert(mesh->num_point_faces == num_bad_faces[1]);
+	ufbxt_assert(mesh->num_line_faces == num_bad_faces[2]);
 
 	if (!mesh->from_tessellated_nurbs && !mesh->subdivision_evaluated) {
 		ufbxt_assert(scene->metadata.max_face_triangles >= max_face_triangles);
@@ -519,16 +521,23 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 
 		ufbxt_assert(mat->face_indices.count == mat->num_faces);
 
+		size_t mat_bad_faces[3] = { 0 };
 		size_t mat_tris = 0;
 		for (size_t j = 0; j < mat->num_faces; j++) {
 			uint32_t ix = mat->face_indices.data[j];
 			ufbx_face face = mesh->faces.data[ix];
 			if (face.num_indices >= 3) {
 				mat_tris += face.num_indices - 2;
+			} else {
+				mat_bad_faces[face.num_indices]++;
 			}
 			ufbxt_assert(mesh->face_material.data[ix] == (int32_t)i);
 		}
+
 		ufbxt_assert(mat->num_triangles == mat_tris);
+		ufbxt_assert(mat->num_empty_faces == mat_bad_faces[0]);
+		ufbxt_assert(mat->num_point_faces == mat_bad_faces[1]);
+		ufbxt_assert(mat->num_line_faces == mat_bad_faces[2]);
 	}
 
 	if (mesh->face_group.count) {

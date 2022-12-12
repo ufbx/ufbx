@@ -476,14 +476,64 @@ UFBXT_FILE_TEST(maya_uv_and_color_sets)
 UFBXT_FILE_TEST(maya_bad_face)
 #if UFBXT_IMPL
 {
-	// TODO: Implement this if bad faces are trimmed
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_empty_faces == 0);
+	ufbxt_assert(mesh->num_point_faces == 1);
+	ufbxt_assert(mesh->num_line_faces == 1);
+	ufbxt_assert(mesh->num_triangles == 7);
+	ufbxt_assert(mesh->num_faces == 6);
+
+	ufbxt_assert(mesh->faces.data[0].num_indices == 1);
+	ufbxt_assert(mesh->faces.data[1].num_indices == 2);
+	ufbxt_assert(mesh->faces.data[2].num_indices == 3);
+	ufbxt_assert(mesh->faces.data[3].num_indices == 4);
+
+	ufbxt_assert(mesh->faces.data[0].index_begin == 0);
+	ufbxt_assert(mesh->faces.data[1].index_begin == 1);
+	ufbxt_assert(mesh->faces.data[2].index_begin == 3);
+	ufbxt_assert(mesh->faces.data[3].index_begin == 6);
+
+	// ??? Maya exports an edge for the single point
+	ufbxt_assert(mesh->num_edges == 12);
+	ufbxt_assert(mesh->edges.data[0].a == 0);
+	ufbxt_assert(mesh->edges.data[0].b == 0);
+	ufbxt_assert(mesh->edges.data[1].a == 2);
+	ufbxt_assert(mesh->edges.data[1].b == 1);
 }
 #endif
 
 UFBXT_FILE_TEST(blender_279_edge_vertex)
 #if UFBXT_IMPL
 {
-	// TODO: Implement this if bad faces are trimmed
+	ufbx_node *node = ufbx_find_node(scene, "Plane");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_empty_faces == 0);
+	ufbxt_assert(mesh->num_point_faces == 0);
+	ufbxt_assert(mesh->num_line_faces == 1);
+	ufbxt_assert(mesh->num_triangles == 0);
+	ufbxt_assert(mesh->num_faces == 1);
+
+	ufbxt_assert(mesh->faces.data[0].index_begin == 0);
+	ufbxt_assert(mesh->faces.data[0].num_indices == 2);
+
+	// ??? Maya exports an edge for the single point
+	if (scene->metadata.version == 7400) {
+		ufbxt_assert(mesh->num_edges == 1);
+		ufbxt_assert(mesh->edges.data[0].a == 0);
+		ufbxt_assert(mesh->edges.data[0].b == 1);
+	} else {
+		// 6100 has an edge for both directions
+		ufbxt_assert(mesh->num_edges == 2);
+		ufbxt_assert(mesh->edges.data[0].a == 0);
+		ufbxt_assert(mesh->edges.data[0].b == 1);
+		ufbxt_assert(mesh->edges.data[1].a == 1);
+		ufbxt_assert(mesh->edges.data[1].b == 0);
+	}
 }
 #endif
 
@@ -492,6 +542,33 @@ UFBXT_FILE_TEST(blender_279_edge_circle)
 {
 	ufbx_node *node = ufbx_find_node(scene, "Circle");
 	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_indices == 512);
+
+	// ??? The 7400_binary export starts off with individual edges but has a
+	// massive N-gon for the rest of it.
+	if (scene->metadata.version == 7400) {
+		ufbxt_assert(mesh->num_line_faces == 127);
+		ufbxt_assert(mesh->num_faces == 128);
+
+		for (size_t i = 0; i < 127; i++) {
+			ufbxt_assert(mesh->faces.data[i].num_indices == 2);
+		}
+		ufbxt_assert(mesh->faces.data[127].num_indices == 258);
+
+		ufbxt_assert(mesh->num_edges == 256);
+	} else {
+		ufbxt_assert(mesh->num_line_faces == 256);
+		ufbxt_assert(mesh->num_faces == 256);
+
+		for (size_t i = 0; i < 256; i++) {
+			ufbxt_assert(mesh->faces.data[i].num_indices == 2);
+		}
+
+		// 6100 has an edge for both directions
+		ufbxt_assert(mesh->num_edges == 512);
+	}
 }
 #endif
 
