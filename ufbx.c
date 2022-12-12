@@ -17814,6 +17814,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh_material(ufbxi_buf
 			mesh->materials.data[mat_ix].num_triangles += face.num_indices - 2;
 		} else {
 			// `num_empty/point/line_faces` are consecutive, see static asserts above.
+			// cppcheck-suppress objectIndex
 			(&mesh->materials.data[mat_ix].num_empty_faces)[face.num_indices]++;
 		}
 	}
