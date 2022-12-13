@@ -135,7 +135,7 @@ typedef double ufbx_real;
 #endif
 
 #define UFBX_ENUM_TYPE(p_name, p_prefix, p_last) \
-	enum { p_prefix##_COUNT = p_last + 1 };
+	enum { p_prefix##_COUNT = p_last + 1 }
 
 #if UFBX_CPP
 	#define UFBX_VERTEX_ATTRIB_IMPL(p_type) \
@@ -227,7 +227,7 @@ typedef enum ufbx_rotation_order UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_ROTATION_ORDER)
 } ufbx_rotation_order;
 
-UFBX_ENUM_TYPE(ufbx_rotation_order, UFBX_ROTATION_ORDER, UFBX_ROTATION_ORDER_SPHERIC)
+UFBX_ENUM_TYPE(ufbx_rotation_order, UFBX_ROTATION_ORDER, UFBX_ROTATION_ORDER_SPHERIC);
 
 // Explicit translation+rotation+scale transformation.
 // NOTE: Rotation is a quaternion, not Euler angles!
@@ -281,7 +281,7 @@ typedef enum ufbx_dom_value_type UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_DOM_VALUE_TYPE)
 } ufbx_dom_value_type;
 
-UFBX_ENUM_TYPE(ufbx_dom_value_type, UFBX_DOM_VALUE_TYPE, UFBX_DOM_VALUE_ARRAY_IGNORED)
+UFBX_ENUM_TYPE(ufbx_dom_value_type, UFBX_DOM_VALUE_TYPE, UFBX_DOM_VALUE_ARRAY_IGNORED);
 
 typedef struct ufbx_dom_node ufbx_dom_node;
 
@@ -338,7 +338,7 @@ typedef enum ufbx_prop_type UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_PROP_TYPE)
 } ufbx_prop_type;
 
-UFBX_ENUM_TYPE(ufbx_prop_type, UFBX_PROP_TYPE, UFBX_PROP_REFERENCE)
+UFBX_ENUM_TYPE(ufbx_prop_type, UFBX_PROP_TYPE, UFBX_PROP_REFERENCE);
 
 // Property flags: Advanced information about properties, not usually needed.
 typedef enum ufbx_prop_flags UFBX_FLAG_REPR {
@@ -595,7 +595,7 @@ typedef enum ufbx_element_type UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_ELEMENT_TYPE)
 } ufbx_element_type;
 
-UFBX_ENUM_TYPE(ufbx_element_type, UFBX_ELEMENT_TYPE, UFBX_ELEMENT_METADATA_OBJECT)
+UFBX_ENUM_TYPE(ufbx_element_type, UFBX_ELEMENT_TYPE, UFBX_ELEMENT_METADATA_OBJECT);
 
 // Connection between two elements.
 // Source and destination are somewhat arbitrary but the destination is
@@ -660,7 +660,7 @@ typedef enum ufbx_inherit_type UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_INHERIT_TYPE)
 } ufbx_inherit_type;
 
-UFBX_ENUM_TYPE(ufbx_inherit_type, UFBX_INHERIT_TYPE, UFBX_INHERIT_NO_SCALE)
+UFBX_ENUM_TYPE(ufbx_inherit_type, UFBX_INHERIT_TYPE, UFBX_INHERIT_NO_SCALE);
 
 // Nodes form the scene transformation hierarchy and can contain attached
 // elements such as meshes or lights. In normal cases a single `ufbx_node`
@@ -963,7 +963,7 @@ typedef enum ufbx_subdivision_display_mode UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_SUBDIVISION_DISPLAY_MODE)
 } ufbx_subdivision_display_mode;
 
-UFBX_ENUM_TYPE(ufbx_subdivision_display_mode, UFBX_SUBDIVISION_DISPLAY_MODE, UFBX_SUBDIVISION_DISPLAY_SMOOTH)
+UFBX_ENUM_TYPE(ufbx_subdivision_display_mode, UFBX_SUBDIVISION_DISPLAY_MODE, UFBX_SUBDIVISION_DISPLAY_SMOOTH);
 
 typedef enum ufbx_subdivision_boundary UFBX_ENUM_REPR {
 	UFBX_SUBDIVISION_BOUNDARY_DEFAULT,
@@ -980,7 +980,7 @@ typedef enum ufbx_subdivision_boundary UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_SUBDIVISION_BOUNDARY)
 } ufbx_subdivision_boundary;
 
-UFBX_ENUM_TYPE(ufbx_subdivision_boundary, UFBX_SUBDIVISION_BOUNDARY, UFBX_SUBDIVISION_BOUNDARY_SHARP_INTERIOR)
+UFBX_ENUM_TYPE(ufbx_subdivision_boundary, UFBX_SUBDIVISION_BOUNDARY, UFBX_SUBDIVISION_BOUNDARY_SHARP_INTERIOR);
 
 // Polygonal mesh geometry.
 //
@@ -1164,7 +1164,7 @@ typedef enum ufbx_light_type UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_LIGHT_TYPE)
 } ufbx_light_type;
 
-UFBX_ENUM_TYPE(ufbx_light_type, UFBX_LIGHT_TYPE, UFBX_LIGHT_VOLUME)
+UFBX_ENUM_TYPE(ufbx_light_type, UFBX_LIGHT_TYPE, UFBX_LIGHT_VOLUME);
 
 // How fast does the light intensity decay at a distance
 typedef enum ufbx_light_decay UFBX_ENUM_REPR {
@@ -1176,7 +1176,7 @@ typedef enum ufbx_light_decay UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_LIGHT_DECAY)
 } ufbx_light_decay;
 
-UFBX_ENUM_TYPE(ufbx_light_decay, UFBX_LIGHT_DECAY, UFBX_LIGHT_DECAY_CUBIC)
+UFBX_ENUM_TYPE(ufbx_light_decay, UFBX_LIGHT_DECAY, UFBX_LIGHT_DECAY_CUBIC);
 
 typedef enum ufbx_light_area_shape UFBX_ENUM_REPR {
 	UFBX_LIGHT_AREA_SHAPE_RECTANGLE,
@@ -1185,7 +1185,7 @@ typedef enum ufbx_light_area_shape UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_LIGHT_AREA_SHAPE)
 } ufbx_light_area_shape;
 
-UFBX_ENUM_TYPE(ufbx_light_area_shape, UFBX_LIGHT_AREA_SHAPE, UFBX_LIGHT_AREA_SHAPE_SPHERE)
+UFBX_ENUM_TYPE(ufbx_light_area_shape, UFBX_LIGHT_AREA_SHAPE, UFBX_LIGHT_AREA_SHAPE_SPHERE);
 
 // Light source attached to a `ufbx_node`
 struct ufbx_light {
@@ -1227,7 +1227,7 @@ typedef enum ufbx_projection_mode UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_PROJECTION_MODE)
 } ufbx_projection_mode;
 
-UFBX_ENUM_TYPE(ufbx_projection_mode, UFBX_PROJECTION_MODE, UFBX_PROJECTION_MODE_ORTOGRAPHIC)
+UFBX_ENUM_TYPE(ufbx_projection_mode, UFBX_PROJECTION_MODE, UFBX_PROJECTION_MODE_ORTOGRAPHIC);
 
 // Method of specifying the rendering resolution from properties
 // NOTE: Handled internally by ufbx, ignore unless you interpret `ufbx_props` directly!
@@ -1246,7 +1246,7 @@ typedef enum ufbx_aspect_mode UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_ASPECT_MODE)
 } ufbx_aspect_mode;
 
-UFBX_ENUM_TYPE(ufbx_aspect_mode, UFBX_ASPECT_MODE, UFBX_ASPECT_MODE_FIXED_HEIGHT)
+UFBX_ENUM_TYPE(ufbx_aspect_mode, UFBX_ASPECT_MODE, UFBX_ASPECT_MODE_FIXED_HEIGHT);
 
 // Method of specifying the field of view from properties
 // NOTE: Handled internally by ufbx, ignore unless you interpret `ufbx_props` directly!
@@ -1263,7 +1263,7 @@ typedef enum ufbx_aperture_mode UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_APERTURE_MODE)
 } ufbx_aperture_mode;
 
-UFBX_ENUM_TYPE(ufbx_aperture_mode, UFBX_APERTURE_MODE, UFBX_APERTURE_MODE_FOCAL_LENGTH)
+UFBX_ENUM_TYPE(ufbx_aperture_mode, UFBX_APERTURE_MODE, UFBX_APERTURE_MODE_FOCAL_LENGTH);
 
 // Method of specifying the render gate size from properties
 // NOTE: Handled internally by ufbx, ignore unless you interpret `ufbx_props` directly!
@@ -1285,7 +1285,7 @@ typedef enum ufbx_gate_fit UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_GATE_FIT)
 } ufbx_gate_fit;
 
-UFBX_ENUM_TYPE(ufbx_gate_fit, UFBX_GATE_FIT, UFBX_GATE_FIT_STRETCH)
+UFBX_ENUM_TYPE(ufbx_gate_fit, UFBX_GATE_FIT, UFBX_GATE_FIT_STRETCH);
 
 // Camera film/aperture size defaults
 // NOTE: Handled internally by ufbx, ignore unless you interpret `ufbx_props` directly!
@@ -1306,7 +1306,7 @@ typedef enum ufbx_aperture_format UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_APERTURE_FORMAT)
 } ufbx_aperture_format;
 
-UFBX_ENUM_TYPE(ufbx_aperture_format, UFBX_APERTURE_FORMAT, UFBX_APERTURE_FORMAT_IMAX)
+UFBX_ENUM_TYPE(ufbx_aperture_format, UFBX_APERTURE_FORMAT, UFBX_APERTURE_FORMAT_IMAX);
 
 typedef enum ufbx_coordinate_axis UFBX_ENUM_REPR {
 	UFBX_COORDINATE_AXIS_POSITIVE_X,
@@ -1320,7 +1320,7 @@ typedef enum ufbx_coordinate_axis UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_COORDINATE_AXIS)
 } ufbx_coordinate_axis;
 
-UFBX_ENUM_TYPE(ufbx_coordinate_axis, UFBX_COORDINATE_AXIS, UFBX_COORDINATE_AXIS_UNKNOWN)
+UFBX_ENUM_TYPE(ufbx_coordinate_axis, UFBX_COORDINATE_AXIS, UFBX_COORDINATE_AXIS_UNKNOWN);
 
 // Coordinate axes the scene is represented in.
 // NOTE: `front` is the _opposite_ from forward!
@@ -1469,7 +1469,7 @@ typedef enum ufbx_nurbs_topology UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_NURBS_TOPOLOGY)
 } ufbx_nurbs_topology;
 
-UFBX_ENUM_TYPE(ufbx_nurbs_topology, UFBX_NURBS_TOPOLOGY, UFBX_NURBS_TOPOLOGY_CLOSED)
+UFBX_ENUM_TYPE(ufbx_nurbs_topology, UFBX_NURBS_TOPOLOGY, UFBX_NURBS_TOPOLOGY_CLOSED);
 
 // NURBS basis functions for an axis
 typedef struct ufbx_nurbs_basis {
@@ -1623,7 +1623,7 @@ typedef enum ufbx_marker_type UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_MARKER_TYPE)
 } ufbx_marker_type;
 
-UFBX_ENUM_TYPE(ufbx_marker_type, UFBX_MARKER_TYPE, UFBX_MARKER_IK_EFFECTOR)
+UFBX_ENUM_TYPE(ufbx_marker_type, UFBX_MARKER_TYPE, UFBX_MARKER_IK_EFFECTOR);
 
 // Tracking marker for effectors
 struct ufbx_marker {
@@ -1648,7 +1648,7 @@ typedef enum ufbx_lod_display UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_LOD_DISPLAY)
 } ufbx_lod_display;
 
-UFBX_ENUM_TYPE(ufbx_lod_display, UFBX_LOD_DISPLAY, UFBX_LOD_DISPLAY_HIDE)
+UFBX_ENUM_TYPE(ufbx_lod_display, UFBX_LOD_DISPLAY, UFBX_LOD_DISPLAY_HIDE);
 
 // Single LOD level within an LOD group.
 // Specifies properties of the Nth child of the _node_ containing the LOD group.
@@ -1713,7 +1713,7 @@ typedef enum ufbx_skinning_method UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_SKINNING_METHOD)
 } ufbx_skinning_method;
 
-UFBX_ENUM_TYPE(ufbx_skinning_method, UFBX_SKINNING_METHOD, UFBX_SKINNING_METHOD_BLENDED_DQ_LINEAR)
+UFBX_ENUM_TYPE(ufbx_skinning_method, UFBX_SKINNING_METHOD, UFBX_SKINNING_METHOD_BLENDED_DQ_LINEAR);
 
 // Skin weight information for a single mesh vertex
 typedef struct ufbx_skin_vertex {
@@ -1881,7 +1881,7 @@ typedef enum ufbx_cache_file_format UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_CACHE_FILE_FORMAT)
 } ufbx_cache_file_format;
 
-UFBX_ENUM_TYPE(ufbx_cache_file_format, UFBX_CACHE_FILE_FORMAT, UFBX_CACHE_FILE_FORMAT_MC)
+UFBX_ENUM_TYPE(ufbx_cache_file_format, UFBX_CACHE_FILE_FORMAT, UFBX_CACHE_FILE_FORMAT_MC);
 
 typedef enum ufbx_cache_data_format UFBX_ENUM_REPR {
 	UFBX_CACHE_DATA_FORMAT_UNKNOWN,     // < Unknown data format
@@ -1893,7 +1893,7 @@ typedef enum ufbx_cache_data_format UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_CACHE_DATA_FORMAT)
 } ufbx_cache_data_format;
 
-UFBX_ENUM_TYPE(ufbx_cache_data_format, UFBX_CACHE_DATA_FORMAT, UFBX_CACHE_DATA_FORMAT_VEC3_DOUBLE)
+UFBX_ENUM_TYPE(ufbx_cache_data_format, UFBX_CACHE_DATA_FORMAT, UFBX_CACHE_DATA_FORMAT_VEC3_DOUBLE);
 
 typedef enum ufbx_cache_data_encoding UFBX_ENUM_REPR {
 	UFBX_CACHE_DATA_ENCODING_UNKNOWN,       // < Unknown data encoding
@@ -1903,7 +1903,7 @@ typedef enum ufbx_cache_data_encoding UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_CACHE_DATA_ENCODING)
 } ufbx_cache_data_encoding;
 
-UFBX_ENUM_TYPE(ufbx_cache_data_encoding, UFBX_CACHE_DATA_ENCODING, UFBX_CACHE_DATA_ENCODING_BIG_ENDIAN)
+UFBX_ENUM_TYPE(ufbx_cache_data_encoding, UFBX_CACHE_DATA_ENCODING, UFBX_CACHE_DATA_ENCODING_BIG_ENDIAN);
 
 // Known interpretations of geometry cache data.
 typedef enum ufbx_cache_interpretation UFBX_ENUM_REPR {
@@ -1923,7 +1923,7 @@ typedef enum ufbx_cache_interpretation UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_CACHE_INTERPRETATION)
 } ufbx_cache_interpretation;
 
-UFBX_ENUM_TYPE(ufbx_cache_interpretation, UFBX_CACHE_INTERPRETATION, UFBX_CACHE_INTERPRETATION_VERTEX_NORMAL)
+UFBX_ENUM_TYPE(ufbx_cache_interpretation, UFBX_CACHE_INTERPRETATION, UFBX_CACHE_INTERPRETATION_VERTEX_NORMAL);
 
 typedef struct ufbx_cache_frame {
 
@@ -2114,7 +2114,7 @@ typedef enum ufbx_shader_type UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_SHADER_TYPE)
 } ufbx_shader_type;
 
-UFBX_ENUM_TYPE(ufbx_shader_type, UFBX_SHADER_TYPE, UFBX_SHADER_WAVEFRONT_MTL)
+UFBX_ENUM_TYPE(ufbx_shader_type, UFBX_SHADER_TYPE, UFBX_SHADER_WAVEFRONT_MTL);
 
 // FBX builtin material properties, matches maps in `ufbx_material_fbx_maps`
 typedef enum ufbx_material_fbx_map UFBX_ENUM_REPR {
@@ -2142,7 +2142,7 @@ typedef enum ufbx_material_fbx_map UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_MATERIAL_FBX_MAP)
 } ufbx_material_fbx_map;
 
-UFBX_ENUM_TYPE(ufbx_material_fbx_map, UFBX_MATERIAL_FBX_MAP, UFBX_MATERIAL_FBX_VECTOR_DISPLACEMENT)
+UFBX_ENUM_TYPE(ufbx_material_fbx_map, UFBX_MATERIAL_FBX_MAP, UFBX_MATERIAL_FBX_VECTOR_DISPLACEMENT);
 
 // Known PBR material properties, matches maps in `ufbx_material_pbr_maps`
 typedef enum ufbx_material_pbr_map UFBX_ENUM_REPR {
@@ -2205,7 +2205,7 @@ typedef enum ufbx_material_pbr_map UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_MATERIAL_PBR_MAP)
 } ufbx_material_pbr_map;
 
-UFBX_ENUM_TYPE(ufbx_material_pbr_map, UFBX_MATERIAL_PBR_MAP, UFBX_MATERIAL_PBR_TRANSMISSION_GLOSSINESS)
+UFBX_ENUM_TYPE(ufbx_material_pbr_map, UFBX_MATERIAL_PBR_MAP, UFBX_MATERIAL_PBR_TRANSMISSION_GLOSSINESS);
 
 // Known material features
 typedef enum ufbx_material_feature UFBX_ENUM_REPR {
@@ -2236,7 +2236,7 @@ typedef enum ufbx_material_feature UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_MATERIAL_FEATURE)
 } ufbx_material_feature;
 
-UFBX_ENUM_TYPE(ufbx_material_feature, UFBX_MATERIAL_FEATURE, UFBX_MATERIAL_FEATURE_TRANSMISSION_ROUGHNESS_AS_GLOSSINESS)
+UFBX_ENUM_TYPE(ufbx_material_feature, UFBX_MATERIAL_FEATURE, UFBX_MATERIAL_FEATURE_TRANSMISSION_ROUGHNESS_AS_GLOSSINESS);
 
 typedef struct ufbx_material_fbx_maps {
 	union {
@@ -2418,7 +2418,7 @@ typedef enum ufbx_texture_type UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_TEXTURE_TYPE)
 } ufbx_texture_type;
 
-UFBX_ENUM_TYPE(ufbx_texture_type, UFBX_TEXTURE_TYPE, UFBX_TEXTURE_SHADER)
+UFBX_ENUM_TYPE(ufbx_texture_type, UFBX_TEXTURE_TYPE, UFBX_TEXTURE_SHADER);
 
 // Blend modes to combine layered textures with, compatible with common blend
 // mode definitions in many art programs. Simpler blend modes have equations
@@ -2460,7 +2460,7 @@ typedef enum ufbx_blend_mode UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_BLEND_MODE)
 } ufbx_blend_mode;
 
-UFBX_ENUM_TYPE(ufbx_blend_mode, UFBX_BLEND_MODE, UFBX_BLEND_OVERLAY)
+UFBX_ENUM_TYPE(ufbx_blend_mode, UFBX_BLEND_MODE, UFBX_BLEND_OVERLAY);
 
 // Blend modes to combine layered textures with, compatible with common blend
 typedef enum ufbx_wrap_mode UFBX_ENUM_REPR {
@@ -2470,7 +2470,7 @@ typedef enum ufbx_wrap_mode UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_WRAP_MODE)
 } ufbx_wrap_mode;
 
-UFBX_ENUM_TYPE(ufbx_wrap_mode, UFBX_WRAP_MODE, UFBX_WRAP_CLAMP)
+UFBX_ENUM_TYPE(ufbx_wrap_mode, UFBX_WRAP_MODE, UFBX_WRAP_CLAMP);
 
 // Single layer in a layered texture
 typedef struct ufbx_texture_layer {
@@ -2496,7 +2496,7 @@ typedef enum ufbx_shader_texture_type UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_SHADER_TEXTURE_TYPE)
 } ufbx_shader_texture_type;
 
-UFBX_ENUM_TYPE(ufbx_shader_texture_type, UFBX_SHADER_TEXTURE_TYPE, UFBX_SHADER_TEXTURE_OSL)
+UFBX_ENUM_TYPE(ufbx_shader_texture_type, UFBX_SHADER_TEXTURE_TYPE, UFBX_SHADER_TEXTURE_OSL);
 
 typedef struct ufbx_shader_texture_input {
 
@@ -2819,7 +2819,7 @@ typedef enum ufbx_interpolation UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_INTERPOLATION)
 } ufbx_interpolation;
 
-UFBX_ENUM_TYPE(ufbx_interpolation, UFBX_INTERPOLATION, UFBX_INTERPOLATION_CUBIC)
+UFBX_ENUM_TYPE(ufbx_interpolation, UFBX_INTERPOLATION, UFBX_INTERPOLATION_CUBIC);
 
 // Tangent vector at a keyframe, may be split into left/right
 typedef struct ufbx_tangent {
@@ -2942,7 +2942,7 @@ typedef enum ufbx_constraint_type UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_CONSTRAINT_TYPE)
 } ufbx_constraint_type;
 
-UFBX_ENUM_TYPE(ufbx_constraint_type, UFBX_CONSTRAINT_TYPE, UFBX_CONSTRAINT_SINGLE_CHAIN_IK)
+UFBX_ENUM_TYPE(ufbx_constraint_type, UFBX_CONSTRAINT_TYPE, UFBX_CONSTRAINT_SINGLE_CHAIN_IK);
 
 // Target to follow with a constraint
 typedef struct ufbx_constraint_target {
@@ -2964,7 +2964,7 @@ typedef enum ufbx_constraint_aim_up_type UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_CONSTRAINT_AIM_UP_TYPE)
 } ufbx_constraint_aim_up_type;
 
-UFBX_ENUM_TYPE(ufbx_constraint_aim_up_type, UFBX_CONSTRAINT_AIM_UP_TYPE, UFBX_CONSTRAINT_AIM_UP_NONE)
+UFBX_ENUM_TYPE(ufbx_constraint_aim_up_type, UFBX_CONSTRAINT_AIM_UP_TYPE, UFBX_CONSTRAINT_AIM_UP_NONE);
 
 // Method to determine the up vector in aim constraints
 typedef enum ufbx_constraint_ik_pole_type UFBX_ENUM_REPR {
@@ -2974,7 +2974,7 @@ typedef enum ufbx_constraint_ik_pole_type UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_CONSTRAINT_IK_POLE_TYPE)
 } ufbx_constraint_ik_pole_type;
 
-UFBX_ENUM_TYPE(ufbx_constraint_ik_pole_type, UFBX_CONSTRAINT_IK_POLE_TYPE, UFBX_CONSTRAINT_IK_POLE_NODE)
+UFBX_ENUM_TYPE(ufbx_constraint_ik_pole_type, UFBX_CONSTRAINT_IK_POLE_TYPE, UFBX_CONSTRAINT_IK_POLE_NODE);
 
 struct ufbx_constraint {
 	union { ufbx_element element; struct {
@@ -3074,7 +3074,7 @@ typedef enum ufbx_exporter UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_EXPORTER)
 } ufbx_exporter;
 
-UFBX_ENUM_TYPE(ufbx_exporter, UFBX_EXPORTER, UFBX_EXPORTER_BC_UNITY_EXPORTER)
+UFBX_ENUM_TYPE(ufbx_exporter, UFBX_EXPORTER, UFBX_EXPORTER_BC_UNITY_EXPORTER);
 
 typedef struct ufbx_application {
 	ufbx_string vendor;
@@ -3091,7 +3091,7 @@ typedef enum ufbx_file_format UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_FILE_FORMAT)
 } ufbx_file_format;
 
-UFBX_ENUM_TYPE(ufbx_file_format, UFBX_FILE_FORMAT, UFBX_FILE_FORMAT_MTL)
+UFBX_ENUM_TYPE(ufbx_file_format, UFBX_FILE_FORMAT, UFBX_FILE_FORMAT_MTL);
 
 // Miscellaneous data related to the loaded file
 typedef struct ufbx_metadata {
@@ -3188,7 +3188,7 @@ typedef enum ufbx_time_mode UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_TIME_MODE)
 } ufbx_time_mode;
 
-UFBX_ENUM_TYPE(ufbx_time_mode, UFBX_TIME_MODE, UFBX_TIME_MODE_59_94_FPS)
+UFBX_ENUM_TYPE(ufbx_time_mode, UFBX_TIME_MODE, UFBX_TIME_MODE_59_94_FPS);
 
 typedef enum ufbx_time_protocol UFBX_ENUM_REPR {
 	UFBX_TIME_PROTOCOL_SMPTE,
@@ -3198,7 +3198,7 @@ typedef enum ufbx_time_protocol UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_TIME_PROTOCOL)
 } ufbx_time_protocol;
 
-UFBX_ENUM_TYPE(ufbx_time_protocol, UFBX_TIME_PROTOCOL, UFBX_TIME_PROTOCOL_DEFAULT)
+UFBX_ENUM_TYPE(ufbx_time_protocol, UFBX_TIME_PROTOCOL, UFBX_TIME_PROTOCOL_DEFAULT);
 
 typedef enum ufbx_snap_mode UFBX_ENUM_REPR {
 	UFBX_SNAP_MODE_NONE,
@@ -3209,7 +3209,7 @@ typedef enum ufbx_snap_mode UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_SNAP_MODE)
 } ufbx_snap_mode;
 
-UFBX_ENUM_TYPE(ufbx_snap_mode, UFBX_SNAP_MODE, UFBX_SNAP_MODE_SNAP_AND_PLAY)
+UFBX_ENUM_TYPE(ufbx_snap_mode, UFBX_SNAP_MODE, UFBX_SNAP_MODE_SNAP_AND_PLAY);
 
 // Global settings: Axes and time/unit scales
 typedef struct ufbx_scene_settings {
@@ -3466,7 +3466,8 @@ typedef enum ufbx_open_file_type UFBX_ENUM_REPR {
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_OPEN_FILE_TYPE)
 } ufbx_open_file_type;
-UFBX_ENUM_TYPE(ufbx_open_file_type, UFBX_OPEN_FILE_TYPE, UFBX_OPEN_FILE_OBJ_MTL)
+
+UFBX_ENUM_TYPE(ufbx_open_file_type, UFBX_OPEN_FILE_TYPE, UFBX_OPEN_FILE_OBJ_MTL);
 
 typedef struct ufbx_open_file_info {
 	// Kind of file to load.
@@ -3595,7 +3596,8 @@ typedef enum ufbx_error_type UFBX_ENUM_REPR {
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_ERROR_TYPE)
 } ufbx_error_type;
-UFBX_ENUM_TYPE(ufbx_error_type, UFBX_ERROR_TYPE, UFBX_ERROR_UNSAFE_OPTIONS)
+
+UFBX_ENUM_TYPE(ufbx_error_type, UFBX_ERROR_TYPE, UFBX_ERROR_UNSAFE_OPTIONS);
 
 // Error description with detailed stack trace
 // HINT: You can use `ufbx_format_error()` for formatting the error
@@ -3700,7 +3702,8 @@ typedef enum ufbx_index_error_handling UFBX_ENUM_REPR {
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_INDEX_ERROR_HANDLING)
 } ufbx_index_error_handling;
-UFBX_ENUM_TYPE(ufbx_index_error_handling, UFBX_INDEX_ERROR_HANDLING, UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE)
+
+UFBX_ENUM_TYPE(ufbx_index_error_handling, UFBX_INDEX_ERROR_HANDLING, UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE);
 
 typedef enum ufbx_unicode_error_handling UFBX_ENUM_REPR {
 	// Replace errors with U+FFFD "Replacement Character"
@@ -3720,7 +3723,8 @@ typedef enum ufbx_unicode_error_handling UFBX_ENUM_REPR {
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_UNICODE_ERROR_HANDLING)
 } ufbx_unicode_error_handling;
-UFBX_ENUM_TYPE(ufbx_unicode_error_handling, UFBX_UNICODE_ERROR_HANDLING, UFBX_UNICODE_ERROR_HANDLING_UNSAFE_IGNORE)
+
+UFBX_ENUM_TYPE(ufbx_unicode_error_handling, UFBX_UNICODE_ERROR_HANDLING, UFBX_UNICODE_ERROR_HANDLING_UNSAFE_IGNORE);
 
 // How to handle FBX node geometry transforms.
 // FBX nodes can have "geometry transforms" that affect only the attached meshes,
@@ -3753,7 +3757,8 @@ typedef enum ufbx_geometry_transform_handling UFBX_ENUM_REPR {
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_GEOMETRY_TRANSFORM_HANDLING)
 } ufbx_geometry_transform_handling;
-UFBX_ENUM_TYPE(ufbx_geometry_transform_handling, UFBX_GEOMETRY_TRANSFORM_HANDLING, UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK)
+
+UFBX_ENUM_TYPE(ufbx_geometry_transform_handling, UFBX_GEOMETRY_TRANSFORM_HANDLING, UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK);
 
 // Specify how unit / coordinate system conversion should be performed.
 // Affects how `ufbx_load_opts.target_axes` and `ufbx_load_opts.target_unit_meters` work,
@@ -3772,7 +3777,8 @@ typedef enum ufbx_space_conversion UFBX_ENUM_REPR {
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_SPACE_CONVERSION)
 } ufbx_space_conversion;
-UFBX_ENUM_TYPE(ufbx_space_conversion, UFBX_SPACE_CONVERSION, UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS)
+
+UFBX_ENUM_TYPE(ufbx_space_conversion, UFBX_SPACE_CONVERSION, UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS);
 
 // -- Main API
 
