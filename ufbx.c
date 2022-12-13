@@ -3976,7 +3976,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_vwarnf_imp(ufbxi_warnings *ws, u
 	}
 
 	char desc[256];
-	size_t desc_len = ufbxi_vsnprintf(desc, sizeof(desc), fmt, args);
+	size_t desc_len = (size_t)ufbxi_vsnprintf(desc, sizeof(desc), fmt, args);
 
 	size_t pos = 0;
 	for (;;) {
