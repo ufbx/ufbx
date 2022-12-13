@@ -307,6 +307,7 @@ class Parser(parsette.Parser):
             return [tl]
         elif self.accept("UFBX_ENUM_TYPE"):
             tl = self.finish_top_enum_type()
+            self.require(";", "after UFBX_ENUM_TYPE()")
             return [tl]
         else:
             decl = self.parse_decl("top-level")
