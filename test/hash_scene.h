@@ -1201,7 +1201,7 @@ ufbxt_noinline static void ufbxt_hash_application_imp(ufbxt_hash *h, const ufbx_
 ufbxt_noinline static void ufbxt_hash_warning_imp(ufbxt_hash *h, const ufbx_warning *v)
 {
 	ufbxt_hash_pod(h, v->type);
-	ufbxt_hash_pod(h, v->count);
+	ufbxt_hash_size_t(h, v->count);
 	// `v->description` omitted as it contains path-specific string
 }
 
