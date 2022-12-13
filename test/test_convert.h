@@ -98,7 +98,7 @@ typedef struct {
 
 static void ufbxt_check_transform(ufbxt_diff_error *err, const char *name, ufbx_transform transform, ufbxt_ref_transform ref)
 {
-	ufbx_vec3 rotation_euler = ufbx_quat_to_euler(transform.rotation, UFBX_ROTATION_XYZ);
+	ufbx_vec3 rotation_euler = ufbx_quat_to_euler(transform.rotation, UFBX_ROTATION_ORDER_XYZ);
 	ufbxt_hintf("%s { { %.2f, %.2f, %.2f }, { %.2f, %.2f, %.2f }, { %.2f, %.2f, %.2f } }", name,
 		transform.translation.x, transform.translation.y, transform.translation.z,
 		rotation_euler.x, rotation_euler.y, rotation_euler.z,
@@ -695,7 +695,7 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_z_up_adjust, blender_340_z_up, ufbxt_
 			ufbxt_assert(node->has_adjust_transform);
 			ufbx_vec3 rotation = { -90.0f, 0.0f, 0.0f };
 			ufbx_vec3 scale = { 0.01f, 0.01f, 0.01f };
-			ufbx_quat rotation_quat = ufbx_euler_to_quat(rotation, UFBX_ROTATION_XYZ);
+			ufbx_quat rotation_quat = ufbx_euler_to_quat(rotation, UFBX_ROTATION_ORDER_XYZ);
 			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
 			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, rotation_quat);
 			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);
@@ -773,7 +773,7 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_y_up_adjust, blender_340_y_up, ufbxt_
 			ufbxt_assert(node->has_adjust_transform);
 			ufbx_vec3 rotation = { 90.0f, 0.0f, 0.0f };
 			ufbx_vec3 scale = { 0.01f, 0.01f, 0.01f };
-			ufbx_quat rotation_quat = ufbx_euler_to_quat(rotation, UFBX_ROTATION_XYZ);
+			ufbx_quat rotation_quat = ufbx_euler_to_quat(rotation, UFBX_ROTATION_ORDER_XYZ);
 			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
 			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, rotation_quat);
 			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);

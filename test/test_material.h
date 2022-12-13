@@ -1006,7 +1006,7 @@ UFBXT_FILE_TEST(maya_texture_layers)
 		ufbxt_assert_close_real(err, texture->uv_transform.translation.x, 0.5f);
 		ufbxt_assert_close_real(err, texture->uv_transform.translation.y, -0.20710678f);
 		ufbxt_assert_close_real(err, texture->uv_transform.translation.z, 0.0f);
-		ufbx_vec3 euler = ufbx_quat_to_euler(texture->uv_transform.rotation, UFBX_ROTATION_XYZ);
+		ufbx_vec3 euler = ufbx_quat_to_euler(texture->uv_transform.rotation, UFBX_ROTATION_ORDER_XYZ);
 		ufbxt_assert_close_real(err, euler.x, 0.0f);
 		ufbxt_assert_close_real(err, euler.y, 0.0f);
 		ufbxt_assert_close_real(err, euler.z, 45.0f);

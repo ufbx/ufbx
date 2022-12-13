@@ -216,18 +216,18 @@ typedef struct ufbx_quat {
 // not the multiplication order: eg. `UFBX_ROTATION_XYZ` is `Z*Y*X`
 // [TODO: Figure out what the spheric rotation order is...]
 typedef enum ufbx_rotation_order UFBX_ENUM_REPR {
-	UFBX_ROTATION_XYZ,
-	UFBX_ROTATION_XZY,
-	UFBX_ROTATION_YZX,
-	UFBX_ROTATION_YXZ,
-	UFBX_ROTATION_ZXY,
-	UFBX_ROTATION_ZYX,
-	UFBX_ROTATION_SPHERIC,
+	UFBX_ROTATION_ORDER_XYZ,
+	UFBX_ROTATION_ORDER_XZY,
+	UFBX_ROTATION_ORDER_YZX,
+	UFBX_ROTATION_ORDER_YXZ,
+	UFBX_ROTATION_ORDER_ZXY,
+	UFBX_ROTATION_ORDER_ZYX,
+	UFBX_ROTATION_ORDER_SPHERIC,
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_ROTATION_ORDER)
 } ufbx_rotation_order;
 
-UFBX_ENUM_TYPE(ufbx_rotation_order, UFBX_ROTATION_ORDER, UFBX_ROTATION_SPHERIC)
+UFBX_ENUM_TYPE(ufbx_rotation_order, UFBX_ROTATION_ORDER, UFBX_ROTATION_ORDER_SPHERIC)
 
 // Explicit translation+rotation+scale transformation.
 // NOTE: Rotation is a quaternion, not Euler angles!

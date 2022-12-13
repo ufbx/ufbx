@@ -26,28 +26,28 @@ static void ufbxt_check_rotation_order(ufbx_scene *scene, const char *name, ufbx
 UFBXT_FILE_TEST(maya_rotation_order)
 #if UFBXT_IMPL
 {
-	ufbxt_check_rotation_order(scene, "XYZ", UFBX_ROTATION_XYZ);
-	ufbxt_check_rotation_order(scene, "XZY", UFBX_ROTATION_XZY);
-	ufbxt_check_rotation_order(scene, "YZX", UFBX_ROTATION_YZX);
-	ufbxt_check_rotation_order(scene, "YXZ", UFBX_ROTATION_YXZ);
-	ufbxt_check_rotation_order(scene, "ZXY", UFBX_ROTATION_ZXY);
-	ufbxt_check_rotation_order(scene, "ZYX", UFBX_ROTATION_ZYX);
+	ufbxt_check_rotation_order(scene, "XYZ", UFBX_ROTATION_ORDER_XYZ);
+	ufbxt_check_rotation_order(scene, "XZY", UFBX_ROTATION_ORDER_XZY);
+	ufbxt_check_rotation_order(scene, "YZX", UFBX_ROTATION_ORDER_YZX);
+	ufbxt_check_rotation_order(scene, "YXZ", UFBX_ROTATION_ORDER_YXZ);
+	ufbxt_check_rotation_order(scene, "ZXY", UFBX_ROTATION_ORDER_ZXY);
+	ufbxt_check_rotation_order(scene, "ZYX", UFBX_ROTATION_ORDER_ZYX);
 }
 #endif
 
 UFBXT_FILE_TEST(maya_post_rotate_order)
 #if UFBXT_IMPL
 {
-	ufbxt_check_rotation_order(scene, "pCube1", UFBX_ROTATION_XYZ);
-	ufbxt_check_rotation_order(scene, "pCube2", UFBX_ROTATION_ZYX);
+	ufbxt_check_rotation_order(scene, "pCube1", UFBX_ROTATION_ORDER_XYZ);
+	ufbxt_check_rotation_order(scene, "pCube2", UFBX_ROTATION_ORDER_ZYX);
 }
 #endif
 
 UFBXT_FILE_TEST(synthetic_pre_post_rotate)
 #if UFBXT_IMPL
 {
-	ufbxt_check_rotation_order(scene, "pCube1", UFBX_ROTATION_XYZ);
-	ufbxt_check_rotation_order(scene, "pCube2", UFBX_ROTATION_ZYX);
+	ufbxt_check_rotation_order(scene, "pCube1", UFBX_ROTATION_ORDER_XYZ);
+	ufbxt_check_rotation_order(scene, "pCube2", UFBX_ROTATION_ORDER_ZYX);
 }
 #endif
 
@@ -71,7 +71,7 @@ UFBXT_FILE_TEST(synthetic_geometric_transform)
 {
 	ufbx_node *node = ufbx_find_node(scene, "Parent");
 	ufbxt_assert(node);
-	ufbx_vec3 euler = ufbx_quat_to_euler(node->geometry_transform.rotation, UFBX_ROTATION_XYZ);
+	ufbx_vec3 euler = ufbx_quat_to_euler(node->geometry_transform.rotation, UFBX_ROTATION_ORDER_XYZ);
 	ufbxt_assert_close_real(err, node->geometry_transform.translation.x, -0.5f);
 	ufbxt_assert_close_real(err, node->geometry_transform.translation.y, -1.0f);
 	ufbxt_assert_close_real(err, node->geometry_transform.translation.z, -1.5f);
@@ -110,7 +110,7 @@ UFBXT_TEST(root_transform)
 		opts.root_transform.translation.x = -1.0f;
 		opts.root_transform.translation.y = -2.0f;
 		opts.root_transform.translation.z = -3.0f;
-		opts.root_transform.rotation = ufbx_euler_to_quat(euler, UFBX_ROTATION_XYZ);
+		opts.root_transform.rotation = ufbx_euler_to_quat(euler, UFBX_ROTATION_ORDER_XYZ);
 		opts.root_transform.scale.x = 2.0f;
 		opts.root_transform.scale.y = 3.0f;
 		opts.root_transform.scale.z = 4.0f;
