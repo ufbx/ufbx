@@ -1078,6 +1078,11 @@ static void ufbxt_check_metadata(ufbx_scene *scene, ufbx_metadata *metadata)
 	} else {
 		ufbxt_assert(0 && "Invalid file format");
 	}
+
+	for (size_t i = 0; i < metadata->warnings.count; i++) {
+		ufbx_warning *warning = &metadata->warnings.data[i];
+		ufbxt_check_string(warning->description);
+	}
 }
 
 static void ufbxt_check_dom_value(ufbx_scene *scene, ufbx_dom_value *value)

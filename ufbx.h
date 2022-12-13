@@ -3093,8 +3093,54 @@ typedef enum ufbx_file_format UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_file_format, UFBX_FILE_FORMAT, UFBX_FILE_FORMAT_MTL);
 
+typedef enum ufbx_warning_type {
+	// Missing external file file (for example .mtl for Wavefront .obj file or a
+	// geometry cache)
+	UFBX_WARNING_MISSING_EXTERNAL_FILE,
+
+	// Loaded a Wavefront .mtl file derived from the filename instead of a proper
+	// `mtllib` statement.
+	UFBX_WARNING_IMPLICIT_MTL,
+
+	// Out-of-bounds index has been clamped to be in-bounds.
+	// HINT: You can use `ufbx_index_error_handling` to adjust behavior.
+	UFBX_WARNING_INDEX_CLAMPED,
+
+	// Non-UTF8 encoded strings.
+	// HINT: You can use `ufbx_unicode_error_handling` to adjust behavior.
+	UFBX_WARNING_BAD_UNICODE,
+
+	// Non-node element connected to root.
+	UFBX_WARNING_BAD_ELEMENT_CONNECTED_TO_ROOT,
+
+	// Warnings after this one are deduplicated.
+	// See `ufbx_warning.count` for how many times they happened.
+	UFBX_WARNING_TYPE_FIRST_DEDUPLICATED = UFBX_WARNING_INDEX_CLAMPED,
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_WARNING_TYPE)
+} ufbx_warning_type;
+
+UFBX_ENUM_TYPE(ufbx_warning_type, UFBX_WARNING_TYPE, UFBX_WARNING_BAD_ELEMENT_CONNECTED_TO_ROOT);
+
+// Warning about a non-fatal issue in the file.
+// Often contains information about issues that ufbx has corrected about the
+// file but it might indicate something is not working properly.
+typedef struct ufbx_warning {
+	// Type of the warning.
+	ufbx_warning_type type;
+	// Description of the warning.
+	ufbx_string description;
+	// Number of times this warning was encountered.
+	size_t count;
+} ufbx_warning;
+
+UFBX_LIST_TYPE(ufbx_warning_list, ufbx_warning);
+
 // Miscellaneous data related to the loaded file
 typedef struct ufbx_metadata {
+
+	// List of non-fatal warnings about the file.
+	ufbx_warning_list warnings;
 
 	// FBX ASCII file format.
 	bool ascii;

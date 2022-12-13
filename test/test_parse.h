@@ -1,6 +1,31 @@
 #undef UFBXT_TEST_GROUP
 #define UFBXT_TEST_GROUP "parse"
 
+#if UFBXT_IMPL
+static void ufbxt_check_warning(ufbx_scene *scene, ufbx_warning_type type, size_t count, const char *substring)
+{
+	bool found = false;
+	for (size_t i = 0; i < scene->metadata.warnings.count; i++) {
+		ufbx_warning *warning = &scene->metadata.warnings.data[i];
+		if (warning->type == type) {
+			if (substring) {
+				ufbxt_assert(strstr(warning->description.data, substring));
+			}
+			if (count == SIZE_MAX) {
+				ufbxt_assert(warning->count > 0);
+			} else {
+				ufbxt_assert(warning->count == count);
+			}
+			found = true;
+			break;
+		}
+	}
+
+	ufbxt_logf("Warning not found: %d", (int)type);
+	ufbxt_assert(found);
+}
+#endif
+
 UFBXT_TEST(thread_safety)
 #if UFBXT_IMPL
 {
@@ -540,6 +565,10 @@ static size_t ufbxt_decode_hex(uint8_t *dst, size_t dst_len, ufbx_string src)
 UFBXT_FILE_TEST_FLAGS(synthetic_unicode, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_HEAVY_TO_FUZZ|UFBXT_FILE_TEST_FLAG_SKIP_LOAD_OPTS_CHECKS)
 #if UFBXT_IMPL
 {
+	ufbxt_assert(scene->metadata.warnings.count == 1);
+	ufbxt_assert(scene->metadata.warnings.data[0].type == UFBX_WARNING_BAD_UNICODE);
+	ufbxt_assert(scene->metadata.warnings.data[0].count >= 6000);
+
 	uint8_t ref[128];
 
 	{
@@ -1024,6 +1053,9 @@ static ufbx_load_opts ufbxt_fail_unicode_opts()
 UFBXT_FILE_TEST_FLAGS(synthetic_unsafe_cube, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
 #if UFBXT_IMPL
 {
+	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, 4, NULL);
+	ufbxt_check_warning(scene, UFBX_WARNING_BAD_UNICODE, 1, NULL);
+
 	ufbx_node *node = ufbx_find_node(scene, "pC" "\xef\xbf\xbd" "\xef\xbf\xbd" "e1");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;

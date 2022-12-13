@@ -3913,6 +3913,111 @@ static ufbxi_forceinline uint32_t ufbxi_hash_uptr(uintptr_t ptr)
 
 #define ufbxi_hash_ptr(ptr) ufbxi_hash_uptr((uintptr_t)(ptr))
 
+// -- Warnings
+
+ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(const char *str, size_t length)
+{
+	size_t index = 0;
+	while (index < length) {
+		uint8_t c = (uint8_t)str[index];
+		size_t left = length - index;
+
+		if ((c & 0x80) == 0) {
+			if (c != 0) {
+				index += 1;
+				continue;
+			}
+		} else if ((c & 0xe0) == 0xc0 && left >= 2) {
+			uint8_t t0 = (uint8_t)str[index + 1];
+			uint32_t code = (uint32_t)c << 8 | (uint32_t)t0;
+			if ((code & 0xc0) == 0x80 && code >= 0xc280) {
+				index += 2;
+				continue;
+			}
+		} else if ((c & 0xf0) == 0xe0 && left >= 3) {
+			uint8_t t0 = (uint8_t)str[index + 1], t1 = (uint8_t)str[index + 2];
+			uint32_t code = (uint32_t)c << 16 | (uint32_t)t0 << 8 | (uint32_t)t1;
+			if ((code & 0xc0c0) == 0x8080 && code >= 0xe0a080 && (code < 0xeda080 || code >= 0xee8080)) {
+				index += 3;
+				continue;
+			}
+		} else if ((c & 0xf8) == 0xf0 && left >= 4) {
+			uint8_t t0 = (uint8_t)str[index + 1], t1 = (uint8_t)str[index + 2], t2 = (uint8_t)str[index + 3];
+			uint32_t code = (uint32_t)c << 24 | (uint32_t)t0 << 16 | (uint32_t)t1 << 8 | (uint32_t)t2;
+			if ((code & 0xc0c0c0) == 0x808080 && code >= 0xf0908080u && code <= 0xf48fbfbfu) {
+				index += 4;
+				continue;
+			}
+		}
+
+		break;
+	}
+
+	ufbx_assert(index <= length);
+	return index;
+}
+
+typedef struct {
+	ufbx_error *error;
+	ufbxi_buf *result;
+	ufbxi_buf tmp_stack;
+	ufbx_warning *prev_warnings[UFBX_WARNING_TYPE_COUNT];
+} ufbxi_warnings;
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_vwarnf_imp(ufbxi_warnings *ws, ufbx_warning_type type, const char *fmt, va_list args)
+{
+	if (!ws) return 1;
+	if (type >= UFBX_WARNING_INDEX_CLAMPED) {
+		ufbx_warning *prev = ws->prev_warnings[type];
+		if (prev) {
+			prev->count++;
+			return 1;
+		}
+	}
+
+	char desc[256];
+	size_t desc_len = ufbxi_vsnprintf(desc, sizeof(desc), fmt, args);
+
+	size_t pos = 0;
+	for (;;) {
+		pos += ufbxi_utf8_valid_length(desc + pos, desc_len - pos);
+		if (pos == desc_len) break;
+		desc[pos++] = '?';
+	}
+
+	char *desc_copy = ufbxi_push_copy(ws->result, char, desc_len + 1, desc);
+	ufbxi_check_err(ws->error, desc_copy);
+
+	ufbx_warning *warning = ufbxi_push(&ws->tmp_stack, ufbx_warning, 1);
+	ufbxi_check_err(ws->error, warning);
+
+	warning->type = type;
+	warning->description.data = desc_copy;
+	warning->description.length = desc_len;
+	warning->count = 1;
+	ws->prev_warnings[type] = warning;
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_warnf_imp(ufbxi_warnings *ws, ufbx_warning_type type, const char *fmt, ...)
+{
+	// NOTE: `ws` may be `NULL` here, handled by `ufbxi_vwarnf()`
+	va_list args;
+	va_start(args, fmt);
+	int ok = ufbxi_vwarnf_imp(ws, type, fmt, args);
+	va_end(args);
+	return ok;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_pop_warnings(ufbxi_warnings *ws, ufbx_warning_list *warnings)
+{
+	warnings->count = ws->tmp_stack.num_items;
+	warnings->data = ufbxi_push_pop(ws->result, &ws->tmp_stack, ufbx_warning, warnings->count);
+	ufbxi_check_err(ws->error, warnings->data);
+	return 1;
+}
+
 // -- String pool
 
 // All strings found in FBX files are interned for deduplication and fast
@@ -3927,6 +4032,7 @@ typedef struct {
 	char  *temp_str; // < Temporary string buffer of `temp_cap`
 	size_t temp_cap; // < Capacity of the temporary buffer
 	ufbx_unicode_error_handling error_handling;
+	ufbxi_warnings *warnings;
 } ufbxi_string_pool;
 
 typedef struct {
@@ -4082,53 +4188,12 @@ ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool
 	}
 }
 
-ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(const char *str, size_t length)
-{
-	size_t index = 0;
-	while (index < length) {
-		uint8_t c = (uint8_t)str[index];
-		size_t left = length - index;
-
-		if ((c & 0x80) == 0) {
-			if (c != 0) {
-				index += 1;
-				continue;
-			}
-		} else if ((c & 0xe0) == 0xc0 && left >= 2) {
-			uint8_t t0 = (uint8_t)str[index + 1];
-			uint32_t code = (uint32_t)c << 8 | (uint32_t)t0;
-			if ((code & 0xc0) == 0x80 && code >= 0xc280) {
-				index += 2;
-				continue;
-			}
-		} else if ((c & 0xf0) == 0xe0 && left >= 3) {
-			uint8_t t0 = (uint8_t)str[index + 1], t1 = (uint8_t)str[index + 2];
-			uint32_t code = (uint32_t)c << 16 | (uint32_t)t0 << 8 | (uint32_t)t1;
-			if ((code & 0xc0c0) == 0x8080 && code >= 0xe0a080 && (code < 0xeda080 || code >= 0xee8080)) {
-				index += 3;
-				continue;
-			}
-		} else if ((c & 0xf8) == 0xf0 && left >= 4) {
-			uint8_t t0 = (uint8_t)str[index + 1], t1 = (uint8_t)str[index + 2], t2 = (uint8_t)str[index + 3];
-			uint32_t code = (uint32_t)c << 24 | (uint32_t)t0 << 16 | (uint32_t)t1 << 8 | (uint32_t)t2;
-			if ((code & 0xc0c0c0) == 0x808080 && code >= 0xf0908080u && code <= 0xf48fbfbfu) {
-				index += 4;
-				continue;
-			}
-		}
-
-		break;
-	}
-
-	ufbx_assert(index <= length);
-	return index;
-}
-
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_sanitize_string(ufbxi_string_pool *pool, ufbxi_sanitized_string *sanitized, const char *str, size_t length, size_t valid_length, bool push_both)
 {
 	// Handle only invalid cases here
 	ufbx_assert(valid_length < length);
 	ufbxi_check_err_msg(pool->error, pool->error_handling != UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING, "Invalid UTF-8");
+	ufbxi_check_err(pool->error, ufbxi_warnf_imp(pool->warnings, UFBX_WARNING_BAD_UNICODE, "Bad UTF-8 string"));
 
 	size_t index = valid_length;
 	size_t dst_len = index;
@@ -5421,6 +5486,7 @@ typedef struct {
 	ufbx_matrix axis_matrix;
 	ufbx_real unit_scale;
 
+	ufbxi_warnings warnings;
 } ufbxi_context;
 
 static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, const char *func, uint32_t line)
@@ -5436,6 +5502,8 @@ static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, co
 #define ufbxi_check_msg(cond, msg) if (ufbxi_unlikely(!ufbxi_trace(cond))) return ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), ufbxi_function, ufbxi_line)
 #define ufbxi_check_return_msg(cond, ret, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), ufbxi_function, ufbxi_line); return ret; } } while (0)
 #define ufbxi_fail_msg(desc, msg) return ufbxi_fail_imp(uc, ufbxi_error_msg(desc, msg), ufbxi_function, ufbxi_line)
+
+#define ufbxi_warnf(type, ...) ufbxi_warnf_imp(&uc->warnings, type, __VA_ARGS__)
 
 // -- Progress
 
@@ -10554,6 +10622,7 @@ ufbxi_noinline static int ufbxi_fix_index(ufbxi_context *uc, uint32_t *p_dst, ui
 		ufbxi_check(one_past_max_val > 0);
 		ufbxi_check(one_past_max_val <= UINT32_MAX);
 		*p_dst = (uint32_t)one_past_max_val - 1;
+		ufbxi_check(ufbxi_warnf(UFBX_WARNING_INDEX_CLAMPED, "Clamped index"));
 		break;
 	case UFBX_INDEX_ERROR_HANDLING_NO_INDEX:
 		*p_dst = UFBX_NO_INDEX;
@@ -15049,7 +15118,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 		return 1;
 	}
 
-	if (!uc->opts.load_external_files && !uc->opts.obj_mtl_path.length) return 1;
+	if (!uc->opts.load_external_files) return 1;
 
 	ufbx_stream stream = { 0 };
 	bool has_stream = false;
@@ -15057,16 +15126,22 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 	if (uc->opts.open_file_cb.fn) {
 		if (uc->opts.obj_mtl_path.length > 0) {
 			has_stream = ufbxi_open_file(&uc->opts.open_file_cb, &stream, uc->opts.obj_mtl_path.data, uc->opts.obj_mtl_path.length, NULL, &uc->ator_tmp, UFBX_OPEN_FILE_OBJ_MTL);
-		} else {
-			if (uc->obj.mtllib_relative_path.size > 0) {
-				ufbx_blob dst;
-				ufbxi_check(ufbxi_resolve_relative_filename(uc, (ufbxi_strblob*)&dst, (const ufbxi_strblob*)&uc->obj.mtllib_relative_path, true));
-				has_stream = ufbxi_open_file(&uc->opts.open_file_cb, &stream, (const char*)dst.data, dst.size, &uc->obj.mtllib_relative_path, &uc->ator_tmp, UFBX_OPEN_FILE_OBJ_MTL);
+			if (!has_stream) {
+				ufbxi_check(ufbxi_warnf(UFBX_WARNING_MISSING_EXTERNAL_FILE, "Could not open .mtl file: %s", uc->opts.obj_mtl_path.data));
+			}
+		}
+
+		if (!has_stream && uc->opts.load_external_files && uc->obj.mtllib_relative_path.size > 0) {
+			ufbx_blob dst;
+			ufbxi_check(ufbxi_resolve_relative_filename(uc, (ufbxi_strblob*)&dst, (const ufbxi_strblob*)&uc->obj.mtllib_relative_path, true));
+			has_stream = ufbxi_open_file(&uc->opts.open_file_cb, &stream, (const char*)dst.data, dst.size, &uc->obj.mtllib_relative_path, &uc->ator_tmp, UFBX_OPEN_FILE_OBJ_MTL);
+			if (!has_stream) {
+				ufbxi_check(ufbxi_warnf(UFBX_WARNING_MISSING_EXTERNAL_FILE, "Could not open .mtl file: %s", dst.data));
 			}
 		}
 
 		ufbx_string path = uc->scene.metadata.filename;
-		if (!has_stream && uc->opts.obj_search_mtl_by_filename && path.length > 4) {
+		if (!has_stream && uc->opts.load_external_files && uc->opts.obj_search_mtl_by_filename && path.length > 4) {
 			ufbx_string ext = { path.data + path.length - 4, 4 };
 			if (ufbxi_match(&ext, "\\c.obj")) {
 				char *copy = ufbxi_push_copy(&uc->tmp, char, path.length + 1, path.data);
@@ -15075,6 +15150,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 				copy[path.length - 2] = copy[path.length - 2] == 'B' ? 'T' : 't';
 				copy[path.length - 1] = copy[path.length - 1] == 'J' ? 'L' : 'l';
 				has_stream = ufbxi_open_file(&uc->opts.open_file_cb, &stream, copy, path.length, NULL, &uc->ator_tmp, UFBX_OPEN_FILE_OBJ_MTL);
+				if (has_stream) {
+					ufbxi_check(ufbxi_warnf(UFBX_WARNING_IMPLICIT_MTL, "Opened .mtl file derived from .obj filename: %s", copy));
+				}
 			}
 		}
 	}
@@ -15394,7 +15472,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_contex
 
 		if (!uc->opts.disable_quirks) {
 			// Some exporters connect arbitrary non-nodes to root breaking further code, ignore those connections here!
-			if (dst->type == UFBX_ELEMENT_NODE && src->type != UFBX_ELEMENT_NODE && ((ufbx_node*)dst)->is_root) continue;
+			if (dst->type == UFBX_ELEMENT_NODE && src->type != UFBX_ELEMENT_NODE && ((ufbx_node*)dst)->is_root) {
+				ufbxi_check(ufbxi_warnf(UFBX_WARNING_BAD_ELEMENT_CONNECTED_TO_ROOT, "Non-node element connected to root"));
+				continue;
+			}
 		}
 
 		// Remap connections to geometry transform helpers if necessary, see `ufbxi_read_model()` for how these are setup.
@@ -20751,6 +20832,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_contex
 
 	if (!cache) {
 		if (cc.error.type == UFBX_ERROR_FILE_NOT_FOUND && uc->opts.ignore_missing_external_files) {
+			ufbxi_check(ufbxi_warnf(UFBX_WARNING_MISSING_EXTERNAL_FILE, "Failed to open geometry cache: %s", file->filename.data));
 			return 1;
 		}
 
@@ -21171,7 +21253,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_check(uc->opts.path_separator >= 0x20 && uc->opts.path_separator <= 0x7e);
 
 	ufbxi_check(ufbxi_fixup_opts_string(uc, &uc->opts.filename, false));
-	ufbxi_check(ufbxi_fixup_opts_string(uc, &uc->opts.obj_mtl_path, false));
+	ufbxi_check(ufbxi_fixup_opts_string(uc, &uc->opts.obj_mtl_path, true));
 	ufbxi_check(ufbxi_fixup_opts_string(uc, &uc->opts.geometry_transform_helper_name, true));
 
 	if (!uc->opts.allow_unsafe) {
@@ -21260,6 +21342,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 			0.0, uc->opts.load_external_files && uc->opts.evaluate_caches, &cache_opts));
 	}
 
+	// Pop warnings to metadata
+	ufbxi_check(ufbxi_pop_warnings(&uc->warnings, &uc->scene.metadata.warnings));
+
 	// Copy local data to the scene
 	uc->scene.metadata.version = uc->version;
 	uc->scene.metadata.ascii = uc->from_ascii;
@@ -21304,6 +21389,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 {
 	ufbxi_string_pool_temp_free(&uc->string_pool);
+	ufbxi_buf_free(&uc->warnings.tmp_stack);
 
 	ufbxi_map_free(&uc->prop_type_map);
 	ufbxi_map_free(&uc->fbx_id_map);
@@ -21443,6 +21529,11 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	uc->tmp_parse.unordered = true;
 	uc->tmp_parse.clearable = true;
 	uc->result.unordered = true;
+
+	uc->warnings.error = &uc->error;
+	uc->warnings.result = &uc->result;
+	uc->warnings.tmp_stack.ator = &uc->ator_tmp;
+	uc->string_pool.warnings = &uc->warnings;
 
 	// Set zero size `swap_arr` to a non-NULL buffer so we can tell the difference between empty
 	// array and an allocation failure.

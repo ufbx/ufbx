@@ -1107,7 +1107,7 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_partial_material_merged, synthetic_partial_ma
 static ufbx_load_opts ufbxt_search_mtl_by_filename_opts()
 {
 	ufbx_load_opts opts = { 0 };
-	opts.obj_search_mtl_by_filename = UFBX_INDEX_ERROR_HANDLING_NO_INDEX;
+	opts.obj_search_mtl_by_filename = true;
 	return opts;
 }
 #endif
@@ -1115,6 +1115,9 @@ static ufbx_load_opts ufbxt_search_mtl_by_filename_opts()
 UFBXT_FILE_TEST_OPTS(synthetic_filename_mtl, ufbxt_search_mtl_by_filename_opts)
 #if UFBXT_IMPL
 {
+	ufbxt_check_warning(scene, UFBX_WARNING_MISSING_EXTERNAL_FILE, 1, "materials.mtl");
+	ufbxt_check_warning(scene, UFBX_WARNING_IMPLICIT_MTL, 1, "synthetic_filename_mtl_0_obj.mtl");
+
 	{
 		ufbx_vec3 ka = { 1.0f, 0.0f, 0.0f };
 		ufbx_vec3 kd = { 0.0f, 1.0f, 0.0f };
