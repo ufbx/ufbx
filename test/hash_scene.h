@@ -1198,6 +1198,13 @@ ufbxt_noinline static void ufbxt_hash_application_imp(ufbxt_hash *h, const ufbx_
 
 #define ufbxt_hash_application(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_application_imp(h, v), ufbxt_pop_tag(h))
 
+ufbxt_noinline static void ufbxt_hash_warning_imp(ufbxt_hash *h, const ufbx_warning *v)
+{
+	ufbxt_hash_pod(h, v->type);
+	ufbxt_hash_pod(h, v->count);
+	// `v->description` omitted as it contains path-specific string
+}
+
 ufbxt_noinline static void ufbxt_hash_metadata_imp(ufbxt_hash *h, const ufbx_metadata *v)
 {
 	ufbxt_hash_pod(h, v->ascii);
@@ -1210,6 +1217,7 @@ ufbxt_noinline static void ufbxt_hash_metadata_imp(ufbxt_hash *h, const ufbx_met
 	ufbxt_hash_props(h, &v->scene_props);
 	ufbxt_hash_application(h, &v->original_application);
 	ufbxt_hash_application(h, &v->latest_application);
+	ufbxt_hash_list_ptr(h, v->warnings, ufbxt_hash_warning_imp);
 }
 
 #define ufbxt_hash_metadata(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_metadata_imp(h, v), ufbxt_pop_tag(h))
