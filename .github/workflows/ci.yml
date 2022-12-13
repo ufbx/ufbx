@@ -197,15 +197,13 @@ jobs:
       - name: Update apt
         run: sudo apt-get update
       - name: Install apt dependencies
-        run: sudo apt-get install -y tcc qemu qemu-user gcc-multilib gcc-opt gcc-3.4
+        run: sudo apt-get install -y tcc qemu qemu-user gcc-multilib
       - name: Install zig cc via PIP
         run: sudo pip3 install ziglang
       - name: Run tests with TCC
         run: python3 misc/run_tests.py tests hashes --additional-compiler tcc --compiler tcc --remove-arch x86 --runner ci_exotic
       - name: Compile ufbx.c wth x86 TCC
         run: i386-tcc -Wall -Werror -c ufbx.c -o build/tcc-ufbx-x86.o
-      - name: Run tests with GCC 3.4
-        run: python3 misc/run_tests.py tests hashes --additional-compiler gcc-3.4 --compiler gcc-3.4 --remove-arch x86 --runner ci_exotic
       - name: Compile PowerPC tests
         run: python3 -m ziglang cc -fno-sanitize=undefined -target powerpc-linux -DUFBX_DEV ufbx.c test/runner.c -g -o build/ppc-runner
       - name: Run PowerPC tests
