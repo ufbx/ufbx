@@ -3093,7 +3093,7 @@ typedef enum ufbx_file_format UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_file_format, UFBX_FILE_FORMAT, UFBX_FILE_FORMAT_MTL);
 
-typedef enum ufbx_warning_type {
+typedef enum ufbx_warning_type UFBX_ENUM_REPR {
 	// Missing external file file (for example .mtl for Wavefront .obj file or a
 	// geometry cache)
 	UFBX_WARNING_MISSING_EXTERNAL_FILE,
