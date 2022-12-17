@@ -10,7 +10,7 @@ static void ufbxt_check_ortho_camera(ufbxt_diff_error *err, ufbx_scene *scene, c
 	ufbxt_assert(node && node->camera);
 	ufbx_camera *camera = node->camera;
 
-	ufbxt_assert(camera->projection_mode == UFBX_PROJECTION_MODE_ORTOGRAPHIC);
+	ufbxt_assert(camera->projection_mode == UFBX_PROJECTION_MODE_ORTHOGRAPHIC);
 	ufbxt_assert(camera->gate_fit == gate_fit);
 	ufbxt_assert_close_real(err, camera->orthographic_extent, extent);
 	ufbxt_assert_close_real(err, camera->orthographic_size.x, width);

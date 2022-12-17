@@ -620,7 +620,7 @@ static void ufbxt_check_camera(ufbx_scene *scene, ufbx_camera *camera)
 	if (camera->projection_mode == UFBX_PROJECTION_MODE_PERSPECTIVE) {
 		ufbxt_assert(ufbxt_float_equal(camera->projection_plane.x, camera->field_of_view_tan.x));
 		ufbxt_assert(ufbxt_float_equal(camera->projection_plane.y, camera->field_of_view_tan.y));
-	} else if (camera->projection_mode == UFBX_PROJECTION_MODE_ORTOGRAPHIC) {
+	} else if (camera->projection_mode == UFBX_PROJECTION_MODE_ORTHOGRAPHIC) {
 		ufbxt_assert(ufbxt_float_equal(camera->projection_plane.x, camera->orthographic_size.x));
 		ufbxt_assert(ufbxt_float_equal(camera->projection_plane.y, camera->orthographic_size.y));
 	} else {

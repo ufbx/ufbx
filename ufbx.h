@@ -1222,12 +1222,12 @@ typedef enum ufbx_projection_mode UFBX_ENUM_REPR {
 	UFBX_PROJECTION_MODE_PERSPECTIVE,
 
 	// Orthographic projection.
-	UFBX_PROJECTION_MODE_ORTOGRAPHIC,
+	UFBX_PROJECTION_MODE_ORTHOGRAPHIC,
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_PROJECTION_MODE)
 } ufbx_projection_mode;
 
-UFBX_ENUM_TYPE(ufbx_projection_mode, UFBX_PROJECTION_MODE, UFBX_PROJECTION_MODE_ORTOGRAPHIC);
+UFBX_ENUM_TYPE(ufbx_projection_mode, UFBX_PROJECTION_MODE, UFBX_PROJECTION_MODE_ORTHOGRAPHIC);
 
 // Method of specifying the rendering resolution from properties
 // NOTE: Handled internally by ufbx, ignore unless you interpret `ufbx_props` directly!

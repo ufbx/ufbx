@@ -19224,7 +19224,7 @@ static const ufbxi_aperture_format ufbxi_aperture_formats[] = {
 
 ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 {
-	camera->projection_mode = (ufbx_projection_mode)ufbxi_find_enum(&camera->props, ufbxi_CameraProjectionType, 0, UFBX_PROJECTION_MODE_ORTOGRAPHIC);
+	camera->projection_mode = (ufbx_projection_mode)ufbxi_find_enum(&camera->props, ufbxi_CameraProjectionType, 0, UFBX_PROJECTION_MODE_ORTHOGRAPHIC);
 	camera->aspect_mode = (ufbx_aspect_mode)ufbxi_find_enum(&camera->props, ufbxi_AspectRatioMode, 0, UFBX_ASPECT_MODE_FIXED_HEIGHT);
 	camera->aperture_mode = (ufbx_aperture_mode)ufbxi_find_enum(&camera->props, ufbxi_ApertureMode, UFBX_APERTURE_MODE_VERTICAL, UFBX_APERTURE_MODE_FOCAL_LENGTH);
 	camera->aperture_format = (ufbx_aperture_format)ufbxi_find_enum(&camera->props, ufbxi_ApertureFormat, UFBX_APERTURE_FORMAT_CUSTOM, UFBX_APERTURE_FORMAT_IMAX);
