@@ -135,9 +135,45 @@ UFBXT_TEST(error_format_long)
 	size_t length = ufbx_format_error(error_buf, sizeof(error_buf), &error);
 	ufbxt_assert(strlen(error_buf) == length);
 
+	#if defined(UFBX_DEV)
+		ufbxt_assert(error.stack_size >= 2);
+	#endif
+
+	char func[64] = { 0 }, desc[64] = { 0 };
+	size_t line_begin = 0;
 	size_t num_lines = 0;
 	for (size_t i = 0; i < length; i++) {
-		if (error_buf[i] == '\n') num_lines++;
+		if (error_buf[i] == '\n') {
+			if (num_lines == 0) {
+				ufbxt_check_string(error.description);
+
+				unsigned major = 0, minor = 0, patch = 0;
+				char func[64] = { 0 }, desc[64] = { 0 };
+				int num_scanned = sscanf(error_buf + line_begin, "ufbx v%u.%u.%u error: %64[^\n]\n",
+					&major, &minor, &patch, desc);
+
+				ufbxt_assert(num_scanned == 4);
+				ufbxt_assert(major == ufbx_version_major(ufbx_source_version));
+				ufbxt_assert(minor == ufbx_version_minor(ufbx_source_version));
+				ufbxt_assert(patch == ufbx_version_patch(ufbx_source_version));
+				ufbxt_assert(!strcmp(desc, error.description.data));
+			} else {
+				size_t stack_ix = num_lines - 1;
+				ufbxt_check_string(error.stack[stack_ix].function);
+				ufbxt_check_string(error.stack[stack_ix].description);
+
+				unsigned line = 0;
+				int num_scanned = sscanf(error_buf + line_begin, "%u:%64[^:]: %64[^\n]\n", &line, func, desc);
+				ufbxt_assert(num_scanned == 3);
+				ufbxt_assert(stack_ix < error.stack_size);
+				ufbxt_assert(line == error.stack[stack_ix].source_line);
+				ufbxt_assert(!strcmp(func, error.stack[stack_ix].function.data));
+				ufbxt_assert(!strcmp(desc, error.stack[stack_ix].description.data));
+			}
+
+			line_begin = i + 1;
+			num_lines++;
+		}
 	}
 	ufbxt_assert(num_lines == error.stack_size + 1);
 }
