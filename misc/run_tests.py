@@ -772,6 +772,9 @@ async def main():
                 if overrides:
                     overrides(conf, compiler)
 
+                if conf.get("skip", False):
+                    continue
+
                 if config_fmt_arch(conf) not in archs:
                     continue
                 
@@ -867,7 +870,10 @@ async def main():
 
         def debug_overrides(config, compiler):
             stack_limit = 128*1024
-            if sys.platform == "win32" and compiler.name in ["clang", "gcc"]:
+            if sys.platform == "win32" and compiler.name in ["gcc"]:
+                # GCC can't handle CreateThread on CI..
+                config["skip"] = True
+            elif sys.platform == "win32" and compiler.name in ["clang"]:
                 # TODO: Check what causes this stack usage
                 stack_limit = 256*1024
             config["defines"]["UFBXT_STACK_LIMIT"] = stack_limit
@@ -886,7 +892,10 @@ async def main():
 
         def release_overrides(config, compiler):
             stack_limit = 64*1024
-            if sys.platform == "win32" and compiler.name in ["clang", "gcc", "vs_cl64"]:
+            if sys.platform == "win32" and compiler.name in ["gcc"]:
+                # GCC can't handle CreateThread on CI..
+                config["skip"] = True
+            elif sys.platform == "win32" and compiler.name in ["clang", "vs_cl64"]:
                 # TODO: Check what causes this stack usage
                 stack_limit = 128*1024
             elif config["arch"] == "arm64":
