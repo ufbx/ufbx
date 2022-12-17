@@ -13,6 +13,7 @@
 
 #define UFBXI_MAX_NON_ARRAY_VALUES 8
 #define UFBXI_MAX_NODE_DEPTH 32
+#define UFBXI_MAX_XML_DEPTH 32
 #define UFBXI_MAX_SKIP_SIZE 0x40000000
 #define UFBXI_MAP_MAX_SCAN 32
 #define UFBXI_KD_FAST_DEPTH 6
@@ -5990,8 +5991,6 @@ typedef struct {
 	char data[4096];
 
 	bool io_error;
-
-	size_t depth;
 } ufbxi_xml_context;
 
 enum {
@@ -6162,8 +6161,10 @@ static ufbxi_noinline int ufbxi_xml_read_until(ufbxi_xml_context *xc, ufbx_strin
 	return 1;
 }
 
-static ufbxi_noinline int ufbxi_xml_parse_tag(ufbxi_xml_context *xc, bool *p_closing, const char *opening)
+static ufbxi_noinline int ufbxi_xml_parse_tag(ufbxi_xml_context *xc, size_t depth, bool *p_closing, const char *opening)
 {
+	ufbxi_check_err(&xc->error, depth < UFBXI_MAX_XML_DEPTH);
+
 	if (!ufbxi_xml_accept(xc, '<')) {
 		if (*xc->pos == '\0') {
 			*p_closing = true;
@@ -6266,7 +6267,7 @@ static ufbxi_noinline int ufbxi_xml_parse_tag(ufbxi_xml_context *xc, bool *p_clo
 		size_t children_begin = xc->tmp_stack.num_items;
 		for (;;) {
 			bool closing = false;
-			ufbxi_check_err(&xc->error, ufbxi_xml_parse_tag(xc, &closing, tag->name.data));
+			ufbxi_check_err(&xc->error, ufbxi_xml_parse_tag(xc, depth + 1, &closing, tag->name.data));
 			if (closing) break;
 		}
 
@@ -6287,7 +6288,7 @@ static ufbxi_noinline int ufbxi_xml_parse_root(ufbxi_xml_context *xc)
 
 	for (;;) {
 		bool closing = false;
-		ufbxi_check_err(&xc->error, ufbxi_xml_parse_tag(xc, &closing, NULL));
+		ufbxi_check_err(&xc->error, ufbxi_xml_parse_tag(xc, 0, &closing, NULL));
 		if (closing) break;
 	}
 

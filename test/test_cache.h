@@ -137,6 +137,19 @@ UFBXT_TEST(cache_xml_parse)
 }
 #endif
 
+UFBXT_TEST(cache_xml_depth)
+#if UFBXT_IMPL
+{
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s", data_root, "cache_xml_depth.xml");
+
+	ufbx_error error;
+	ufbx_geometry_cache *cache = ufbx_load_geometry_cache(buf, NULL, &error);
+	ufbxt_assert(!cache);
+	ufbxt_assert(error.type == UFBX_ERROR_UNKNOWN);
+}
+#endif
+
 UFBXT_FILE_TEST_OPTS(marvelous_quad, ufbxt_scale_to_cm_opts)
 #if UFBXT_IMPL
 {
