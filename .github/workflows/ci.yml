@@ -329,7 +329,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests stack hashes --wasi-sdk build/wasi-sdk --compiler wasi_clang --runner ci_wasm
+        run: python3 misc/run_tests.py tests hashes --wasi-sdk build/wasi-sdk --compiler wasi_clang --runner ci_wasm
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_wasm.txt.gz
