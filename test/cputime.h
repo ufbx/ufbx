@@ -153,7 +153,7 @@ static void cputime_os_wait()
 	static uint64_t cputime_imp_timestamp()
 	{
 		struct timespec time;
-		clock_gettime(CLOCK_THREAD_CPUTIME_ID, &time);
+		clock_gettime(CLOCK_MONOTONIC, &time);
 		return (uint64_t)time.tv_sec*UINT64_C(1000000000) + (uint64_t)time.tv_nsec;
 	}
 #endif
