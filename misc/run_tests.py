@@ -350,6 +350,9 @@ class GCCCompiler(Compiler):
         if config.get("threads", False):
             args.append("-pthread")
 
+        if config.get("stack_protector", False):
+            args.append("-fstack-protector")
+
         if config.get("san"):
             args.append("-fsanitize=address")
             if sys.platform != "darwin":
@@ -692,7 +695,7 @@ def decorate_arch(compiler, arch):
 tests = set(argv.tests)
 impicit_tests = False
 if not tests:
-    tests = ["tests", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
+    tests = ["tests", "stack", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
     implicit_tests = True
 
 async def main():
@@ -760,6 +763,11 @@ async def main():
 
                 conf = dict(config)
                 conf["output"] = os.path.join(path, config.get("output", "a.exe"))
+
+                compiler_overrides = conf.get("compiler_overrides", { })
+                for k, v in compiler_overrides.get(compiler.name, { }).items():
+                    conf[k] = v
+
                 for opt_name, opt in opts:
                     conf.update(config_options[opt_name][opt])
                 
@@ -847,6 +855,53 @@ async def main():
             "dev": False,
         }
         target_tasks += compile_permutations("cpp_no_dev", cpp_no_dev_config, arch_configs, [])
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+    if "stack" in tests:
+        log_comment("-- Compiling and running stack limited tests --")
+
+        target_tasks = []
+
+        debug_stack_config = {
+            "sources": ["test/runner.c", "ufbx.c"],
+            "output": "runner" + exe_suffix,
+            "optimize": False,
+            "threads": True,
+            "stack_protector": True,
+            "defines": { "UFBXT_STACK_LIMIT": 128*1024 },
+            "compiler_overrides": { },
+        }
+
+        # TODO: Check what causes this stack usage
+        if sys.platform == "win32":
+            debug_stack_config["compiler_overrides"]["clang"] = {
+                "defines": { "UFBXT_STACK_LIMIT": 256*1024 },
+            }
+
+        target_tasks += compile_permutations("runner_debug_stack", debug_stack_config, arch_configs, ["-d", "data"])
+
+        release_stack_config = {
+            "sources": ["test/runner.c", "ufbx.c"],
+            "output": "runner" + exe_suffix,
+            "optimize": True,
+            "threads": True,
+            "stack_protector": True,
+            "defines": { "UFBXT_STACK_LIMIT": 64*1024 },
+            "compiler_overrides": { },
+        }
+
+        # TODO: Check what causes this stack usage
+        if sys.platform == "win32":
+            release_stack_config["compiler_overrides"]["clang"] = {
+                "defines": { "UFBXT_STACK_LIMIT": 128*1024 },
+            }
+            release_stack_config["compiler_overrides"]["vs_cl64"] = {
+                "defines": { "UFBXT_STACK_LIMIT": 128*1024 },
+            }
+
+        target_tasks += compile_permutations("runner_release_stack", release_stack_config, arch_configs, ["-d", "data"])
 
         targets = await gather(target_tasks)
         all_targets += targets

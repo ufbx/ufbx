@@ -15,6 +15,45 @@ static void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
 #include <stdarg.h>
 #include <math.h>
 
+#if defined(UFBXT_STACK_LIMIT)
+	static int ufbxt_main_argc;
+	static char **ufbxt_main_argv;
+	static int ufbxt_main_return;
+	#if defined(_WIN32)
+		#define NOMINMAX
+		#define WIN32_LEAN_AND_MEAN
+		#include <Windows.h>
+
+		#define UFBXT_THREAD_ENTRYPOINT DWORD WINAPI ufbxt_win32_entry(LPVOID _param)
+		#define ufbxt_thread_return() return 0
+
+		UFBXT_THREAD_ENTRYPOINT;
+		static bool ufbxt_run_thread() {
+			HANDLE handle = CreateThread(NULL, (SIZE_T)(UFBXT_STACK_LIMIT), &ufbxt_win32_entry, NULL, STACK_SIZE_PARAM_IS_A_RESERVATION , NULL);
+			if (handle == NULL) return false;
+			WaitForSingleObject(handle, INFINITE);
+			CloseHandle(handle);
+			return true;
+		}
+	#else
+		#include <pthread.h>
+
+		#define UFBXT_THREAD_ENTRYPOINT void *ufbxt_pthread_entry(void *param)
+		#define ufbxt_thread_return() return 0
+
+		UFBXT_THREAD_ENTRYPOINT;
+		static bool ufbxt_run_thread() {
+			pthread_attr_t attr;
+			pthread_t thread;
+			if (pthread_attr_init(&attr)) return false;
+			if (pthread_attr_setstacksize(&attr, (size_t)(UFBXT_STACK_LIMIT))) return false;
+			if (pthread_create(&thread, &attr, ufbxt_pthread_entry, NULL)) return false;
+			if (pthread_join(thread, NULL)) return false;
+			return true;
+		}
+	#endif
+#endif
+
 // -- Thread local
 
 #define UFBXT_HAS_THREADLOCAL 1
@@ -2920,7 +2959,11 @@ int ufbxt_run_test(ufbxt_test *test)
 	}
 }
 
+#if defined(UFBXT_STACK_LIMIT)
+int ufbxt_thread_main(int argc, char **argv)
+#else
 int main(int argc, char **argv)
+#endif
 {
 	uint32_t num_tests = ufbxt_arraycount(g_tests);
 	uint32_t num_ok = 0;
@@ -3155,4 +3198,26 @@ int main(int argc, char **argv)
 
 	return num_ok == num_ran ? 0 : 1;
 }
+
+#if defined(UFBXT_STACK_LIMIT)
+
+UFBXT_THREAD_ENTRYPOINT
+{
+	ufbxt_main_return = ufbxt_thread_main(ufbxt_main_argc, ufbxt_main_argv);
+	ufbxt_thread_return();
+}
+
+int main(int argc, char **argv)
+{
+	ufbxt_main_argc = argc;
+	ufbxt_main_argv = argv;
+	bool ok = ufbxt_run_thread();
+	if (!ok) {
+		fprintf(stderr, "Failed to run thread with stack size of %zu bytes\n", (size_t)(UFBXT_STACK_LIMIT));
+		return 1;
+	}
+	return ufbxt_main_return;
+}
+
+#endif
 

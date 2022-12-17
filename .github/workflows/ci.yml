@@ -50,7 +50,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests readme threadcheck hashes --runner ci_linux
+        run: python3 misc/run_tests.py tests stack readme threadcheck hashes --runner ci_linux
       - name: Verbose test info
         run: build/runner_clang_release_x64/runner -d data -v
       - name: Generate coverage
@@ -79,7 +79,7 @@ jobs:
           path: build
       - run: type build\hashes.txt
       - name: Run tests
-        run: python misc/run_tests.py tests readme threadcheck hashes --runner ci_windows
+        run: python misc/run_tests.py tests stack readme threadcheck hashes --runner ci_windows
       - name: Verbose test info
         run: build\runner_vs_cl64_release_x64\runner.exe -d data -v
       - name: Compress hashdumps
@@ -103,7 +103,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests readme threadcheck hashes --remove-compiler gcc --additional-compiler gcc-11 --remove-arch x86 --runner ci_macos
+        run: python3 misc/run_tests.py tests stack readme threadcheck hashes --remove-compiler gcc --additional-compiler gcc-11 --remove-arch x86 --runner ci_macos
       - name: Compile ufbx as Objective C
         run: clang -Wall -Wextra -Werror -ObjC -c ufbx.c -o build/ufbx-objc.o
       - name: Compress hashdumps
@@ -329,7 +329,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests hashes --wasi-sdk build/wasi-sdk --compiler wasi_clang --runner ci_wasm
+        run: python3 misc/run_tests.py tests stack hashes --wasi-sdk build/wasi-sdk --compiler wasi_clang --runner ci_wasm
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_wasm.txt.gz
@@ -353,7 +353,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests hashes --no-sanitize --threads 2 --runner ci_arm64
+        run: python3 misc/run_tests.py tests stack hashes --no-sanitize --threads 2 --runner ci_arm64
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_arm32.txt.gz
@@ -377,7 +377,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests hashes --no-sanitize --threads 2 --runner ci_arm64
+        run: python3 misc/run_tests.py tests stack hashes --no-sanitize --threads 2 --runner ci_arm64
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_arm64.txt.gz
