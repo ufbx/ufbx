@@ -10,6 +10,7 @@ import sys
 import shutil
 import functools
 import argparse
+import copy
 from typing import NamedTuple
 
 parser = argparse.ArgumentParser(description="Run ufbx tests")
@@ -761,16 +762,16 @@ async def main():
 
                 path = os.path.join(build_path, name)
 
-                conf = dict(config)
+                conf = copy.deepcopy(config)
                 conf["output"] = os.path.join(path, config.get("output", "a.exe"))
-
-                compiler_overrides = conf.get("compiler_overrides", { })
-                for k, v in compiler_overrides.get(compiler.name, { }).items():
-                    conf[k] = v
 
                 for opt_name, opt in opts:
                     conf.update(config_options[opt_name][opt])
-                
+
+                overrides = conf.get("overrides")
+                if overrides:
+                    overrides(conf, compiler)
+
                 if config_fmt_arch(conf) not in archs:
                     continue
                 
@@ -864,24 +865,35 @@ async def main():
 
         target_tasks = []
 
+        def debug_overrides(config, compiler):
+            stack_limit = 128*1024
+            if sys.platform == "win32" and compiler.name in ["clang", "gcc"]:
+                # TODO: Check what causes this stack usage
+                stack_limit = 256*1024
+            config["defines"]["UFBXT_STACK_LIMIT"] = stack_limit
+
         debug_stack_config = {
             "sources": ["test/runner.c", "ufbx.c"],
             "output": "runner" + exe_suffix,
             "optimize": False,
             "threads": True,
             "stack_protector": True,
-            "defines": { "UFBXT_STACK_LIMIT": 128*1024 },
-            "compiler_overrides": { },
+            "defines": { },
+            "overrides": debug_overrides,
         }
 
-        # TODO: Check what causes this stack usage
-        if sys.platform == "win32":
-            for compiler in ["clang", "gcc"]:
-                debug_stack_config["compiler_overrides"][compiler] = {
-                    "defines": { "UFBXT_STACK_LIMIT": 256*1024 },
-                }
-
         target_tasks += compile_permutations("runner_debug_stack", debug_stack_config, arch_configs, ["-d", "data"])
+
+        def release_overrides(config, compiler):
+            stack_limit = 64*1024
+            if sys.platform == "win32" and compiler.name in ["clang", "gcc", "vs_cl64"]:
+                # TODO: Check what causes this stack usage
+                stack_limit = 128*1024
+            elif config["arch"] == "arm64":
+                # Fails with 'Failed to run thread with stack size of 65536 bytes'
+                # with 64kiB stack..
+                stack_limit = 128*1024
+            config["defines"]["UFBXT_STACK_LIMIT"] = stack_limit
 
         release_stack_config = {
             "sources": ["test/runner.c", "ufbx.c"],
@@ -889,16 +901,9 @@ async def main():
             "optimize": True,
             "threads": True,
             "stack_protector": True,
-            "defines": { "UFBXT_STACK_LIMIT": 64*1024 },
-            "compiler_overrides": { },
+            "defines": { },
+            "overrides": release_overrides,
         }
-
-        # TODO: Check what causes this stack usage
-        if sys.platform == "win32":
-            for compiler in ["clang", "gcc", "vs_cl64"]:
-                release_stack_config["compiler_overrides"][compiler] = {
-                    "defines": { "UFBXT_STACK_LIMIT": 128*1024 },
-                }
 
         target_tasks += compile_permutations("runner_release_stack", release_stack_config, arch_configs, ["-d", "data"])
 
