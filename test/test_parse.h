@@ -148,7 +148,6 @@ UFBXT_TEST(error_format_long)
 				ufbxt_check_string(error.description);
 
 				unsigned major = 0, minor = 0, patch = 0;
-				char func[64] = { 0 }, desc[64] = { 0 };
 				int num_scanned = sscanf(error_buf + line_begin, "ufbx v%u.%u.%u error: %64[^\n]\n",
 					&major, &minor, &patch, desc);
 
