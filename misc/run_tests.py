@@ -876,9 +876,10 @@ async def main():
 
         # TODO: Check what causes this stack usage
         if sys.platform == "win32":
-            debug_stack_config["compiler_overrides"]["clang"] = {
-                "defines": { "UFBXT_STACK_LIMIT": 256*1024 },
-            }
+            for compiler in ["clang", "gcc"]:
+                debug_stack_config["compiler_overrides"][compiler] = {
+                    "defines": { "UFBXT_STACK_LIMIT": 256*1024 },
+                }
 
         target_tasks += compile_permutations("runner_debug_stack", debug_stack_config, arch_configs, ["-d", "data"])
 
@@ -894,12 +895,10 @@ async def main():
 
         # TODO: Check what causes this stack usage
         if sys.platform == "win32":
-            release_stack_config["compiler_overrides"]["clang"] = {
-                "defines": { "UFBXT_STACK_LIMIT": 128*1024 },
-            }
-            release_stack_config["compiler_overrides"]["vs_cl64"] = {
-                "defines": { "UFBXT_STACK_LIMIT": 128*1024 },
-            }
+            for compiler in ["clang", "gcc", "vs_cl64"]:
+                release_stack_config["compiler_overrides"][compiler] = {
+                    "defines": { "UFBXT_STACK_LIMIT": 128*1024 },
+                }
 
         target_tasks += compile_permutations("runner_release_stack", release_stack_config, arch_configs, ["-d", "data"])
 
