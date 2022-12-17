@@ -281,6 +281,9 @@ class GCCCompiler(Compiler):
         archs += (a + "-san" for a in raw_archs if a != "wasm32")
         return archs
 
+    def modify_compile_args(self, config, args):
+        pass
+
     def compile(self, config):
         sources = config["sources"]
         output = config["output"]
@@ -372,6 +375,8 @@ class GCCCompiler(Compiler):
 
         args += ["-o", output]
 
+        self.modify_compile_args(config, args)
+
         return self.run(args)
 
 class ClangCompiler(GCCCompiler):
@@ -410,6 +415,9 @@ class WasiCompiler(ClangCompiler):
     def __init__(self, name, exe, cpp, sysroot):
         super().__init__(name, exe, cpp)
         self.sysroot = sysroot
+
+    def modify_compile_args(self, config, args):
+        args.append("-Wl,--stack-first")
 
 class ZigCompiler(ClangCompiler):
     def __init__(self, name, exe, cpp):
