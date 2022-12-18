@@ -1183,6 +1183,8 @@ UFBXT_TEST(obj_opts_mtl_data)
 		ufbx_real avg = err.sum / (ufbx_real)err.num;
 		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 	}
+
+	ufbx_free_scene(scene);
 }
 #endif
 
@@ -1223,6 +1225,8 @@ UFBXT_TEST(obj_opts_mtl_path)
 		ufbx_real avg = err.sum / (ufbx_real)err.num;
 		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 	}
+
+	ufbx_free_scene(scene);
 }
 #endif
 
