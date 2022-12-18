@@ -10881,13 +10881,6 @@ static ufbxi_noinline bool ufbxi_blend_offset_less(void *user, const void *va, c
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_blend_offsets(ufbxi_context *uc, ufbxi_blend_offset *offsets, size_t count)
 {
-	// Practically always ordered
-	while (count >= 2 && offsets[0].vertex <= offsets[1].vertex) {
-		offsets += 1;
-		count -= 1;
-	}
-	if (count <= 1) return 1;
-
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbxi_blend_offset)));
 	ufbxi_stable_sort(sizeof(ufbxi_blend_offset), 16, offsets, uc->tmp_arr, count, &ufbxi_blend_offset_less, NULL);
 	return 1;
