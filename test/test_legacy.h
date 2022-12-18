@@ -233,3 +233,21 @@ UFBXT_FILE_TEST(max6_teapot)
 	ufbxt_assert(mesh->vertex_uv.exists);
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_legacy_nonzero_material)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Box01");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->faces.count == 1);
+	ufbxt_assert(mesh->num_indices == 3);
+	ufbxt_assert(mesh->materials.count == 2);
+	ufbxt_assert(!strcmp(mesh->materials.data[0].material->name.data, "Right"));
+	ufbxt_assert(mesh->materials.data[0].num_faces == 0);
+	ufbxt_assert(!strcmp(mesh->materials.data[1].material->name.data, "Left"));
+	ufbxt_assert(mesh->materials.data[1].num_faces == 1);
+	ufbxt_assert(mesh->face_material.count == 1);
+	ufbxt_assert(mesh->face_material.data[0] == 1);
+}
+#endif

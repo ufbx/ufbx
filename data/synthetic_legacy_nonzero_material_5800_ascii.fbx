@@ -1,0 +1,1351 @@
+; FBX 5.8.0 project file
+; Copyright (C) 1997-2007 Autodesk Inc. and/or its licensors.
+; All rights reserved.
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+    FBXHeaderVersion: 1003
+    FBXVersion: 5800
+    CreationTimeStamp:  {
+        Version: 1000
+        Year: 2021
+        Month: 8
+        Day: 29
+        Hour: 11
+        Minute: 37
+        Second: 14
+        Millisecond: 227
+    }
+    Creator: "FBX SDK/FBX Plugins build 20080212"
+    OtherFlags:  {
+        FlagPLE: 0
+    }
+}
+CreationTime: "2021-08-29 11:37:14:227"
+Creator: "FBX SDK/FBX Plugins build 20080212"
+Media:  {
+    Video:  {
+    }
+}
+Switcher:  {
+    CameraIndexName: "Model::Camera01"
+}
+Model: "Model::FDirect02" {
+    Version: 194
+    MultiLayer: 0
+    MultiTake: 0
+    Shading: T
+    Culling: "CullingOff"
+    Limits:  {
+        TAuto: 1
+        RAuto: 0
+        SAuto: 1
+        REnable: 0
+        RXAxis: -90
+    }
+    AnimatedProperty: "mTranslationProperty", "mRotationProperty", "mScalingProperty"
+    Animated: "Lcl Translation", "Lcl Rotation", "Lcl Scaling"
+    Type: "Light"
+    TypeFlags: "Light"
+    GeometryVersion: 123
+    LightTypeVersion: 202
+    LightType: 1
+    CastLight: 1
+    Color: 0.533333361148834,0.858823597431183,0.647058844566345
+    Intensity: 100
+    ConeAngle: 45
+    Fog: 0
+}
+Model: "Model::Omni01" {
+    Version: 194
+    MultiLayer: 0
+    MultiTake: 0
+    Shading: T
+    Culling: "CullingOff"
+    Limits:  {
+        TAuto: 1
+        RAuto: 0
+        SAuto: 1
+        REnable: 0
+        RXAxis: -90
+    }
+    AnimatedProperty: "mTranslationProperty", "mRotationProperty", "mScalingProperty"
+    Animated: "Lcl Translation", "Lcl Rotation", "Lcl Scaling"
+    Type: "Light"
+    TypeFlags: "Light"
+    GeometryVersion: 123
+    LightTypeVersion: 202
+    LightType: 0
+    CastLight: 1
+    Color: 0.172549024224281,0.364705890417099,1
+    Intensity: 100
+    ConeAngle: 45
+    Fog: 0
+}
+Model: "Model::Camera01" {
+    Version: 194
+    MultiLayer: 0
+    MultiTake: 0
+    Shading: T
+    Culling: "CullingOff"
+    Limits:  {
+        TAuto: 1
+        RAuto: 0
+        SAuto: 1
+        REnable: 0
+        RYAxis: -90
+    }
+    AnimatedProperty: "mTranslationProperty", "mRotationProperty", "mScalingProperty"
+    Animated: "Lcl Translation", "Lcl Rotation", "Lcl Scaling"
+    Type: "Camera"
+    TypeFlags: "Camera"
+    Version: 220
+    Name: "Model::Camera01"
+    Position: 113.362701416016,-2.43022918701172,0
+    Up: 0,0,1
+    LookAt: 111.954688727284,157.563575381379,0
+    Roll: 0
+    TurnTable: 0
+    Type: 0
+    FormatName: "Custom"
+    AspectType: 0
+    AspectW: 0
+    AspectH: 0
+    PixelRatio: 1
+    NearPlane: 10
+    FarPlane: 4000
+    CameraLock: 0
+    ApertureFormat: "Custom"
+    ApertureMode: 1
+    CameraAperture: 1.41732287406921,1.06299209594727
+    SqueezeRatio: 1
+    FocalLength: 43.4558439883016
+    Aperture: 45.0000012522391
+    FieldOfViewXProperty: 40
+    FieldOfViewYProperty: 40
+    OpticalCenterXProperty: 0
+    OpticalCenterYProperty: 0
+    ViewFrustumPlane: 2
+    BackgroundMode: 0
+    ForegroundTransparent: 1
+    BackgroundTreshold: 0.5
+    DisplayMode: 6
+    ViewFrustumPlaneDistance: 100
+    ViewFrustumPlaneDistanceMode: 0
+    ViewLookAt: 1
+    ViewFrustum: 0
+    ShowGrid: 1
+    ShowAzimut: 1
+    ShowName: 1
+    ShowInfoOnMoving: 1
+    ShowTimeCode: 0
+    DisplaySafeArea: 0
+    SafeAreaStyle: 1
+    DisplaySafeAreaOnRender: 0
+    ShowAudio: 0
+    BackGroundColor: 0.63,0.63,0.63
+    AudioColor: 0,1,0
+    UseFrameColor: 0
+    FrameColor: 0.3,0.3,0.3
+    CameraAndLens:  {
+        DepthOfField: 0,0,3.5,200
+        Antialiasing: 0,0,0.77777
+        OverSampling: 7,1,0
+        UseOverSamplingTime: 0
+    }
+}
+Model: "Model::Fspot01" {
+    Version: 194
+    MultiLayer: 0
+    MultiTake: 0
+    Shading: T
+    Culling: "CullingOff"
+    Limits:  {
+        TAuto: 1
+        RAuto: 0
+        SAuto: 1
+        REnable: 0
+        RXAxis: -90
+    }
+    AnimatedProperty: "mTranslationProperty", "mRotationProperty", "mScalingProperty"
+    Animated: "Lcl Translation", "Lcl Rotation", "Lcl Scaling"
+    Type: "Light"
+    TypeFlags: "Light"
+    GeometryVersion: 123
+    LightTypeVersion: 202
+    LightType: 2
+    CastLight: 1
+    Color: 0.972549080848694,0.0705882385373116,0.0705882385373116
+    Intensity: 100
+    ConeAngle: 45
+    Fog: 0
+}
+Model: "Model::Box01" {
+    Version: 194
+    MultiLayer: 0
+    MultiTake: 1
+    Shading: T
+    Culling: "CullingOff"
+    Limits:  {
+        TAuto: 1
+        RAuto: 1
+        SAuto: 1
+    }
+    AnimatedProperty: "mTranslationProperty", "mRotationProperty", "mScalingProperty"
+    Animated: "Lcl Translation", "Lcl Rotation", "Lcl Scaling"
+    Material: "Material::Right" {
+        Version: 100
+        ShadingModel: "phong"
+        Ambient: 0.588235318660736,0.588235318660736,0.588235318660736
+        Diffuse: 0.588235318660736,0.588235318660736,0.588235318660736
+        Specular: 0,0,0
+        Emissive: 0,0.803921639919281,0
+        Shininess: 7.99999900844507
+        Alpha: 1
+        Reflectivity: 1
+    }
+    Material: "Material::Left" {
+        Version: 100
+        ShadingModel: "phong"
+        Ambient: 0.588235318660736,0.588235318660736,0.588235318660736
+        Diffuse: 0.588235318660736,0.588235318660736,0.588235318660736
+        Specular: 0.179999984502793,0.179999984502793,0.179999984502793
+        Emissive: 0.823529481887817,0,0
+        Shininess: 1.99999991737042
+        Alpha: 1
+        Reflectivity: 1
+    }
+    GeometryVersion: 123
+    Vertices: 0,0,0, 1,0,0, 0,1,0
+    MaterialAssignation: "AllSame"
+    Materials: 1
+    PolygonVertexIndex: 0,1,-2
+    GeometryUVInfo:  {
+        Version: 240
+        MappingInformationType: "ByPolygon"
+        TextureUV: 0,0,1,0,0,1
+        TextureUVVerticeIndex: 0,1,2
+    }
+}
+;Takes and animation section
+;----------------------------------------------------
+
+Takes:  {
+    Current: "Take 001"
+    Take: "Take 001" {
+        FileName: "Take_001.tak"
+        LocalTime: 0,36948926400
+        ReferenceTime: 0,36948926400
+        ;Models animation
+        ;----------------------------------------------------
+        
+        Model: "Model::FDirect02" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 25.8810729980469
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: -53.8989562988281
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 113.885711669922
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 27.5977668762207
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: -0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Omni01" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: -17.43505859375
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 43.0893516540527
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 74.018310546875
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Camera01" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 113.362701416016
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: -2.43022918701172
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 90
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: -0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 90.5042114257813
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Fspot01" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 84.9012756347656
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 73.4773101806641
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 101.438201904297
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 42.467155456543
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 32.9069976806641
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Box01" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        KeyVer: 4005
+                        KeyCount: 2
+                        Key: 0,0,U,s,0,-0,a,0.333233326673508,0.333233326673508,36948926400,0,U,s,0,0,r,0.989998996257782
+                                        
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        KeyVer: 4005
+                        KeyCount: 2
+                        Key: 0,0,U,s,0,-0,a,0.333233326673508,0.333233326673508,36948926400,0,U,s,0,0,r,0.989998996257782
+                                        
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        KeyVer: 4005
+                        KeyCount: 2
+                        Key: 0,0,U,s,0,-0,a,0.333233326673508,0.333233326673508,36948926400,-167.801681518555,U
+                                        ,s,0,0,r,0.989998996257782
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 0.860116004943848
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 2.74418640136719
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid04" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: -40.4315414428711
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: -41.1997528076172
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid05" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: -40.4315414428711
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: -15.0629539489746
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid06" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: -40.4315414428711
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 11.073844909668
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid07" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: -40.4315414428711
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 37.2106437683105
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid08" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: -11.3556032180786
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: -15.0629539489746
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid09" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: -11.3556032180786
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 11.073844909668
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid10" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: -11.3556032180786
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 37.2106437683105
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid11" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: -11.3556032180786
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: -41.1997528076172
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid12" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 17.7203369140625
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: -15.0629539489746
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid13" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 17.7203369140625
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 11.073844909668
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid14" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 17.7203369140625
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 37.2106437683105
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid15" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 17.7203369140625
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: -41.1997528076172
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid16" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 46.7962760925293
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: -15.0629539489746
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid17" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 46.7962760925293
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 11.073844909668
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid18" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 46.7962760925293
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 37.2106437683105
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        Model: "Model::Pyramid19" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 46.7962760925293
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: -41.1997528076172
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -25.7016258239746
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        ;Textures animation
+        ;----------------------------------------------------
+        
+        ;Materials animation
+        ;----------------------------------------------------
+        
+    }
+}
+GoboManager:  {
+}
+SceneGenericPersistence:  {
+    SceneInfo: "SceneInfo::GlobalInfo" {
+        Type: "UserData"
+        Version: 100
+        MetaData:  {
+            Version: 100
+            Title: ""
+            Subject: ""
+            Author: ""
+            Keywords: ""
+            Revision: ""
+            Comment: ""
+        }
+    }
+}
+AmbientRenderSettings:  {
+    Version: 101
+    AmbientLightColor: 0,0,0,1
+}
+FogOptions:  {
+    FlogEnable: 0
+    FogMode: 0
+    FogDensity: 0.002
+    FogStart: 0.3
+    FogEnd: 1000
+    FogColor: 1,1,1,1
+}
+RendererSetting:  {
+    DefaultCamera: ""
+    DefaultViewingMode: 0
+}
+Settings:  {
+    TimeMode: 3
+    FrameRate: "30"
+    TimeFormat: 1
+    SnapOnFrames: 0
+    ReferenceTimeIndex: -1
+}
