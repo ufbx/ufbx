@@ -49,7 +49,9 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_norm
 
 	ufbxt_check_scene(eval);
 
-	ufbxt_diff_to_obj(eval, obj_file, err, check_normals);
+	uint32_t diff_flags = 0;
+	if (check_normals) diff_flags |= UFBXT_OBJ_DIFF_FLAG_CHECK_DEFORMED_NORMALS;
+	ufbxt_diff_to_obj(eval, obj_file, err, diff_flags);
 
 	ufbx_free_scene(eval);
 	free(obj_file);

@@ -2329,6 +2329,10 @@ typedef enum ufbxt_file_test_flags {
 
 	// Expect the diff to fail for version >= 7000 files
 	UFBXT_FILE_TEST_FLAG_DIFF_EXPECT_FAIL_POST_7000 = 0x400,
+
+	// Ignore normals when doing diff to .obj when testing with various
+	// `ufbx_load_opts.geometry_transform_handling` values.
+	UFBXT_FILE_TEST_FLAG_OPT_HANDLING_IGNORE_NORMALS_IN_DIFF = 0x800,
 } ufbxt_file_test_flags;
 
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err, ufbx_error *load_error), const char *suffix, ufbx_load_opts user_opts, ufbxt_file_test_flags flags)
@@ -2382,7 +2386,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 		ufbxt_check_scene(obj_scene);
 
 		ufbxt_diff_error err = { 0 };
-		ufbxt_diff_to_obj(obj_scene, obj_file, &err, false);
+		ufbxt_diff_to_obj(obj_scene, obj_file, &err, 0);
 		if (err.num > 0) {
 			ufbx_real avg = err.sum / (ufbx_real)err.num;
 			ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
@@ -2727,10 +2731,58 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			if (scene && obj_file && (!alternative || diff_always)) {
 				if (expect_diff_fail) {
 					ufbxt_begin_expect_fail();
-					ufbxt_diff_to_obj(scene, obj_file, &err, false);
+					ufbxt_diff_to_obj(scene, obj_file, &err, 0);
 					num_failing_diff_checks = ufbxt_end_expect_fail();
 				} else {
-					ufbxt_diff_to_obj(scene, obj_file, &err, false);
+					ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+				}
+			}
+
+			if (!skip_opts_checks) {
+				{
+					ufbx_error opt_error;
+					ufbx_load_opts opts = load_opts;
+					opts.geometry_transform_handling = UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES;
+					ufbx_scene *opt_scene = ufbx_load_memory(data, size, &opts, &opt_error);
+					if (opt_scene) {
+						ufbxt_check_scene(opt_scene);
+
+						if (scene && obj_file && (!alternative || diff_always) && !expect_diff_fail) {
+							uint32_t diff_flags = 0;
+							if ((flags & UFBXT_FILE_TEST_FLAG_OPT_HANDLING_IGNORE_NORMALS_IN_DIFF) != 0) {
+								diff_flags |= UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS;
+							}
+							ufbxt_diff_to_obj(opt_scene, obj_file, &err, diff_flags);
+						}
+
+						ufbx_free_scene(opt_scene);
+					} else if (!allow_error) {
+						ufbxt_log_error(&opt_error);
+						ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file with helper nodes");
+					}
+				}
+
+				{
+					ufbx_error opt_error;
+					ufbx_load_opts opts = load_opts;
+					opts.geometry_transform_handling = UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY;
+					ufbx_scene *opt_scene = ufbx_load_memory(data, size, &opts, &opt_error);
+					if (opt_scene) {
+						ufbxt_check_scene(opt_scene);
+
+						if (scene && obj_file && (!alternative || diff_always) && !expect_diff_fail) {
+							uint32_t diff_flags = 0;
+							if ((flags & UFBXT_FILE_TEST_FLAG_OPT_HANDLING_IGNORE_NORMALS_IN_DIFF) != 0) {
+								diff_flags |= UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS;
+							}
+							ufbxt_diff_to_obj(opt_scene, obj_file, &err, diff_flags);
+						}
+
+						ufbx_free_scene(opt_scene);
+					} else if (!allow_error) {
+						ufbxt_log_error(&opt_error);
+						ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file with modifying geometry");
+					}
 				}
 			}
 

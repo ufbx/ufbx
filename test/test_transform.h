@@ -57,7 +57,7 @@ UFBXT_FILE_TEST(maya_parented_cubes)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_geometric_squish)
+UFBXT_FILE_TEST_FLAGS(synthetic_geometric_squish, UFBXT_FILE_TEST_FLAG_OPT_HANDLING_IGNORE_NORMALS_IN_DIFF)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "pSphere1");
@@ -66,7 +66,7 @@ UFBXT_FILE_TEST(synthetic_geometric_squish)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_geometric_transform)
+UFBXT_FILE_TEST_FLAGS(synthetic_geometric_transform, UFBXT_FILE_TEST_FLAG_OPT_HANDLING_IGNORE_NORMALS_IN_DIFF)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "Parent");

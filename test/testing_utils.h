@@ -1133,7 +1133,12 @@ static ufbxt_noinline bool ufbxt_face_has_duplicate_vertex(ufbx_mesh *mesh, ufbx
 	return false;
 }
 
-static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, bool check_deformed_normals)
+enum {
+	UFBXT_OBJ_DIFF_FLAG_CHECK_DEFORMED_NORMALS = 0x1,
+	UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS = 0x2,
+};
+
+static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, uint32_t flags)
 {
 	ufbx_node **used_nodes = (ufbx_node**)malloc(obj->num_meshes * sizeof(ufbx_node*));
 	ufbxt_assert(used_nodes);
@@ -1355,7 +1360,8 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 
 		bool check_normals = true;
 		if (obj->bad_normals) check_normals = false;
-		if (!check_deformed_normals && mesh->all_deformers.count > 0) check_normals = false;
+		if ((flags & UFBXT_OBJ_DIFF_FLAG_CHECK_DEFORMED_NORMALS) == 0 && mesh->all_deformers.count > 0) check_normals = false;
+		if ((flags & UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS) != 0) check_normals = false;
 
 		if (obj->bad_order) {
 			ufbxt_match_obj_mesh(obj, node, mesh, obj_mesh, p_err, scale);

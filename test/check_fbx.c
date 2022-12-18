@@ -286,7 +286,7 @@ int main(int argc, char **argv)
 		}
 
 		ufbxt_diff_error err = { 0 };
-		ufbxt_diff_to_obj(state, obj_file, &err, false);
+		ufbxt_diff_to_obj(state, obj_file, &err, 0);
 
 		if (err.num > 0) {
 			ufbx_real avg = err.sum / (ufbx_real)err.num;
