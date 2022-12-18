@@ -15116,8 +15116,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 		return 1;
 	}
 
-	if (!uc->opts.load_external_files) return 1;
-
 	ufbx_stream stream = { 0 };
 	bool has_stream = false;
 

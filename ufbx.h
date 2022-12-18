@@ -3857,7 +3857,13 @@ typedef struct ufbx_load_opts {
 	bool evaluate_skinning; // < Evaluate skinning (see ufbx_mesh.skinned_vertices)
 	bool evaluate_caches;   // < Evaluate vertex caches (see ufbx_mesh.skinned_vertices)
 
-	// WARNING: Potentially unsafe! Try to open external files such as geometry caches
+	// Try to open external files referenced by the main file automatically.
+	// Applies to geometry caches and .mtl files for OBJ.
+	// NOTE: This may be risky for untrusted data as the input files may contain
+	// references to arbitrary paths in the filesystem.
+	// NOTE: This only applies to files *implicitly* referenced by the scene, if
+	// you request additional files via eg. `ufbx_load_opts.obj_mtl_path` they
+	// are still loaded.
 	bool load_external_files;
 
 	// Don't fail loading if external files are not found.

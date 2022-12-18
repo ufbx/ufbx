@@ -1143,3 +1143,177 @@ UFBXT_FILE_TEST_FLAGS(synthetic_missing_position_fail, UFBXT_FILE_TEST_FLAG_ALLO
 }
 #endif
 
+UFBXT_TEST(obj_opts_mtl_data)
+#if UFBXT_IMPL
+{
+	const char obj[] =
+		"v 0 0 0\n"
+		"v 1 0 0\n"
+		"v 0 1 0\n"
+		"usemtl Material\n"
+		"f 0 1 2\n";
+
+	const char mtl[] =
+		"newmtl Material\n"
+		"Ka 1 0 0\n"
+		"Kd 0 1 0\n"
+		"Ks 0 0 1\n";
+
+	ufbx_load_opts opts = { 0 };
+	opts.obj_mtl_data.data = mtl;
+	opts.obj_mtl_data.size = sizeof(mtl) - 1;
+	ufbx_scene *scene = ufbx_load_memory(obj, sizeof(obj) - 1, &opts, NULL);
+	ufbxt_assert(scene);
+	ufbxt_assert(scene->meshes.count == 1);
+	ufbx_mesh *mesh = scene->meshes.data[0];
+	ufbxt_assert(mesh->faces.count == 1);
+	ufbxt_assert(mesh->materials.count == 1);
+	ufbx_material *material = mesh->materials.data[0].material;
+	ufbxt_assert(!strcmp(material->name.data, "Material"));
+
+	ufbx_vec3 ka = { 1.0f, 0.0f, 0.0f };
+	ufbx_vec3 kd = { 0.0f, 1.0f, 0.0f };
+	ufbx_vec3 ks = { 0.0f, 0.0f, 1.0f };
+
+	ufbxt_diff_error err = { 0 };
+	ufbxt_assert_close_vec3(&err, material->fbx.ambient_color.value_vec3, ka);
+	ufbxt_assert_close_vec3(&err, material->fbx.diffuse_color.value_vec3, kd);
+	ufbxt_assert_close_vec3(&err, material->fbx.specular_color.value_vec3, ks);
+	if (err.num > 0) {
+		ufbx_real avg = err.sum / (ufbx_real)err.num;
+		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+	}
+}
+#endif
+
+UFBXT_TEST(obj_opts_mtl_path)
+#if UFBXT_IMPL
+{
+	const char obj[] =
+		"v 0 0 0\n"
+		"v 1 0 0\n"
+		"v 0 1 0\n"
+		"usemtl RGB\n"
+		"f 0 1 2\n";
+
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%ssynthetic_simple_materials_0_mtl.mtl", data_root);
+
+	ufbx_load_opts opts = { 0 };
+	opts.obj_mtl_path.data = buf;
+	opts.obj_mtl_path.length = SIZE_MAX;
+	ufbx_scene *scene = ufbx_load_memory(obj, sizeof(obj) - 1, &opts, NULL);
+	ufbxt_assert(scene);
+	ufbxt_assert(scene->meshes.count == 1);
+	ufbx_mesh *mesh = scene->meshes.data[0];
+	ufbxt_assert(mesh->faces.count == 1);
+	ufbxt_assert(mesh->materials.count == 1);
+	ufbx_material *material = mesh->materials.data[0].material;
+	ufbxt_assert(!strcmp(material->name.data, "RGB"));
+
+	ufbx_vec3 ka = { 1.0f, 0.0f, 0.0f };
+	ufbx_vec3 kd = { 0.0f, 1.0f, 0.0f };
+	ufbx_vec3 ks = { 0.0f, 0.0f, 1.0f };
+
+	ufbxt_diff_error err = { 0 };
+	ufbxt_assert_close_vec3(&err, material->fbx.ambient_color.value_vec3, ka);
+	ufbxt_assert_close_vec3(&err, material->fbx.diffuse_color.value_vec3, kd);
+	ufbxt_assert_close_vec3(&err, material->fbx.specular_color.value_vec3, ks);
+	if (err.num > 0) {
+		ufbx_real avg = err.sum / (ufbx_real)err.num;
+		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+	}
+}
+#endif
+
+UFBXT_TEST(obj_opts_no_extrnal_files)
+#if UFBXT_IMPL
+{
+	char path[512];
+
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_file_iterator iter = { "blender_279_ball" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (int load_external = 0; load_external <= 1; load_external++) {
+			ufbx_load_opts opts = { 0 };
+			opts.load_external_files = load_external != 0;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, NULL);
+			ufbxt_assert(scene);
+			ufbxt_check_scene(scene);
+
+			if (scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ) {
+				ufbx_material *red = ufbx_find_material(scene, "Red");
+				ufbx_material *white = ufbx_find_material(scene, "White");
+				ufbxt_assert(red);
+				ufbxt_assert(white);
+
+				if (load_external) {
+					ufbx_vec3 ref_red = { 0.8f, 0.0f, 0.0f };
+					ufbx_vec3 ref_white = { 0.8f, 0.8f, 0.8f };
+					ufbxt_assert_close_vec3(&err, red->fbx.diffuse_color.value_vec3, ref_red);
+					ufbxt_assert_close_vec3(&err, white->fbx.diffuse_color.value_vec3, ref_white);
+				} else {
+					ufbxt_assert(red->props.props.count == 0);
+					ufbxt_assert(white->props.props.count == 0);
+				}
+			}
+
+			ufbx_free_scene(scene);
+		}
+	}
+
+	if (err.num > 0) {
+		ufbx_real avg = err.sum / (ufbx_real)err.num;
+		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+	}
+}
+#endif
+
+UFBXT_TEST(obj_opts_no_extrnal_files_by_filename)
+#if UFBXT_IMPL
+{
+	char path[512];
+
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_file_iterator iter = { "synthetic_filename_mtl" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (int load_by_filename = 0; load_by_filename <= 1; load_by_filename++)
+		for (int load_external = 0; load_external <= 1; load_external++) {
+			ufbx_load_opts opts = { 0 };
+			opts.load_external_files = load_external != 0;
+			opts.obj_search_mtl_by_filename = load_by_filename != 0;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, NULL);
+			ufbxt_assert(scene);
+			ufbxt_check_scene(scene);
+
+			if (scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ) {
+				ufbx_material *material = ufbx_find_material(scene, "Material");
+				ufbxt_assert(material);
+
+				if (load_external && load_by_filename) {
+					ufbxt_check_warning(scene, UFBX_WARNING_IMPLICIT_MTL, 1, "synthetic_filename_mtl_0_obj.mtl");
+					ufbx_vec3 ka = { 1.0f, 0.0f, 0.0f };
+					ufbx_vec3 kd = { 0.0f, 1.0f, 0.0f };
+					ufbx_vec3 ks = { 0.0f, 0.0f, 1.0f };
+					ufbxt_assert_close_vec3(&err, material->fbx.ambient_color.value_vec3, ka);
+					ufbxt_assert_close_vec3(&err, material->fbx.diffuse_color.value_vec3, kd);
+					ufbxt_assert_close_vec3(&err, material->fbx.specular_color.value_vec3, ks);
+				} else {
+					ufbxt_assert(material->props.props.count == 0);
+				}
+			}
+
+			ufbx_free_scene(scene);
+		}
+	}
+
+	if (err.num > 0) {
+		ufbx_real avg = err.sum / (ufbx_real)err.num;
+		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+	}
+}
+#endif
+
+
