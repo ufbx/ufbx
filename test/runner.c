@@ -1986,6 +1986,7 @@ void ufbxt_do_fuzz(const char *base_name, void *data, size_t size, const char *f
 
 		ufbxt_init_allocator(&prog_opts.temp_allocator, &temp_freed);
 		ufbxt_init_allocator(&prog_opts.result_allocator, &result_freed);
+		prog_opts.load_external_files = true;
 		prog_opts.file_format = file_format;
 		prog_opts.read_buffer_size = 1;
 		prog_opts.temp_allocator.huge_threshold = 1;
