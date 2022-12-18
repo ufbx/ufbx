@@ -18324,20 +18324,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				}
 			}
 
-			// Search for a non-standard `ufbx:UVBoundary` property in both the mesh and node
-			ufbx_prop *uv_prop = ufbx_find_prop(&mesh->props, "ufbx:UVBoundary");
-			if (!uv_prop) {
-				ufbxi_for_ptr_list(ufbx_node, p_node, mesh->instances) {
-					uv_prop = ufbx_find_prop(&(*p_node)->props, "ufbx:UVBoundary");
-					if (uv_prop) break;
-				}
-			}
-			if (uv_prop && uv_prop->value_int >= 0 && uv_prop->value_int <= UFBX_SUBDIVISION_BOUNDARY_SHARP_INTERIOR) {
-				mesh->subdivision_uv_boundary = (ufbx_subdivision_boundary)uv_prop->value_int;
-			} else {
-				mesh->subdivision_uv_boundary = UFBX_SUBDIVISION_BOUNDARY_SHARP_BOUNDARY;
-			}
-
 			// Push a NULL material if necessary if requested
 			if (mesh->materials.count == 0 && uc->opts.allow_null_material) {
 				mesh->materials.data = ufbxi_push_zero(&uc->result, ufbx_mesh_material, 1);
