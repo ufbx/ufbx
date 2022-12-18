@@ -691,6 +691,10 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unicode, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNIC
 UFBXT_FILE_TEST(max_quote)
 #if UFBXT_IMPL
 {
+	if (scene->metadata.ascii && scene->metadata.version == 6100) {
+		ufbxt_check_warning(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, 1, NULL);
+	}
+
 	{
 		ufbx_node *node = ufbx_find_node(scene, "\"'&\"");
 		ufbxt_assert(node);
@@ -1269,6 +1273,20 @@ UFBXT_FILE_TEST_ALT(find_prop_concat, maya_node_attribute_zoo)
 			props = props->defaults;
 		}
 	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_duplicate_id)
+#if UFBXT_IMPL
+{
+	if (scene->metadata.version >= 7000) {
+		ufbxt_check_warning(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, 5, NULL);
+	} else {
+		ufbxt_check_warning(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, 3, NULL);
+	}
+
+	// Don't make any assumptions about the scene, ufbxt_check_scene() makes sure
+	// that it doesn't break any of the API guarantees.
 }
 #endif
 

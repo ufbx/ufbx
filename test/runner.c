@@ -160,6 +160,8 @@ char g_hint[8*1024];
 bool g_skip_print_ok = false;
 int g_skip_obj_test = false;
 
+bool g_no_fuzz = false;
+
 typedef struct {
 	size_t step;
 	char *test_name;
@@ -1966,6 +1968,8 @@ ufbx_progress_result ufbxt_measure_progress(void *user, const ufbx_progress *pro
 
 void ufbxt_do_fuzz(const char *base_name, void *data, size_t size, const char *filename, bool allow_error, ufbx_file_format file_format, const ufbx_load_opts *default_opts)
 {
+	if (g_no_fuzz) return;
+
 	size_t temp_allocs = 1000;
 	size_t result_allocs = 500;
 	size_t progress_calls = 100;
@@ -2744,7 +2748,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbxt_do_fuzz(base_name, data, size, buf, allow_error, UFBX_FILE_FORMAT_UNKNOWN, fuzz_opts);
 			}
 
-			if ((!alternative || fuzz_always) && scene) {
+			if ((!alternative || fuzz_always) && scene && !g_no_fuzz) {
 				// Run known buffer size checks
 				for (size_t i = 0; i < ufbxt_arraycount(g_buffer_checks); i++) {
 					const ufbxt_buffer_check *check = &g_buffer_checks[i];
@@ -3078,6 +3082,10 @@ int main(int argc, char **argv)
 
 		if (!strcmp(argv[i], "--fuzz-file")) {
 			if (++i < argc) g_fuzz_file = (size_t)atoi(argv[i]);
+		}
+
+		if (!strcmp(argv[i], "--no-fuzz")) {
+			g_no_fuzz = true;
 		}
 	}
 

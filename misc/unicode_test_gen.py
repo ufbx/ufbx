@@ -144,7 +144,7 @@ def fmt_fbx_root(ascii):
     fbx_good_props = Node(b"Properties70", [], list(fmt_fbx_props(good, ascii)))
     fbx_good.children.append(fbx_good_props)
 
-    fbx_bad = Node(b"Model", [Value(b"L", 1), fmt_fbx_model_name("Bad", ascii), Value(b"S", b"Mesh")], [])
+    fbx_bad = Node(b"Model", [Value(b"L", 2), fmt_fbx_model_name("Bad", ascii), Value(b"S", b"Mesh")], [])
     fbx_objects.children.append(fbx_bad)
 
     fbx_bad_props = Node(b"Properties70", [], list(fmt_fbx_props(bad, ascii)))
@@ -152,7 +152,7 @@ def fmt_fbx_root(ascii):
 
     ok = [b"\xff" + enc for enc in good]
 
-    fbx_ok = Node(b"Model", [Value(b"L", 1), fmt_fbx_model_name("Ok", ascii), Value(b"S", b"Mesh")], [])
+    fbx_ok = Node(b"Model", [Value(b"L", 3), fmt_fbx_model_name("Ok", ascii), Value(b"S", b"Mesh")], [])
     fbx_objects.children.append(fbx_ok)
 
     fbx_ok_props = Node(b"Properties70", [], list(fmt_fbx_props(ok, ascii)))

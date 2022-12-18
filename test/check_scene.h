@@ -347,13 +347,24 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	if (node->geometry_transform_helper) {
 		ufbxt_assert(node->geometry_transform_helper->is_geometry_transform_helper);
 
-		// Geometry transform helper must always be the first child
-		ufbxt_assert(node->geometry_transform_helper == node->children.data[0]);
+		if (scene->metadata.has_warning[UFBX_WARNING_DUPLICATE_OBJECT_ID]) {
+			// In broken cases we may have multiple geometry transform helpers
+			ufbxt_assert(node->children.count > 0);
+			ufbxt_assert(node->children.data[0]->is_geometry_transform_helper);
+		} else {
+			// Geometry transform helper must always be the first child if the scene
+			ufbxt_assert(node->geometry_transform_helper == node->children.data[0]);
+		}
 	}
 
 	if (node->is_geometry_transform_helper) {
 		ufbxt_assert(node->parent);
-		ufbxt_assert(node->parent->geometry_transform_helper == node);
+		if (scene->metadata.has_warning[UFBX_WARNING_DUPLICATE_OBJECT_ID]) {
+			// In broken cases we may have multiple geometry transform helpers
+			ufbxt_assert(node->parent->geometry_transform_helper);
+		} else {
+			ufbxt_assert(node->parent->geometry_transform_helper == node);
+		}
 	}
 }
 
@@ -1082,6 +1093,7 @@ static void ufbxt_check_metadata(ufbx_scene *scene, ufbx_metadata *metadata)
 	for (size_t i = 0; i < metadata->warnings.count; i++) {
 		ufbx_warning *warning = &metadata->warnings.data[i];
 		ufbxt_check_string(warning->description);
+		ufbxt_assert(metadata->has_warning[warning->type]);
 	}
 }
 

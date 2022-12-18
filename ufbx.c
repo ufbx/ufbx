@@ -4011,11 +4011,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_warnf_imp(ufbxi_warnings *ws, uf
 	return ok;
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_pop_warnings(ufbxi_warnings *ws, ufbx_warning_list *warnings)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_pop_warnings(ufbxi_warnings *ws, ufbx_warning_list *warnings, bool *p_has_warning)
 {
 	warnings->count = ws->tmp_stack.num_items;
 	warnings->data = ufbxi_push_pop(ws->result, &ws->tmp_stack, ufbx_warning, warnings->count);
 	ufbxi_check_err(ws->error, warnings->data);
+	ufbxi_for_list(ufbx_warning, warning, *warnings) {
+		p_has_warning[warning->type] = true;
+	}
 	return 1;
 }
 
@@ -10363,7 +10366,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_insert_fbx_id(ufbxi_context *uc,
 {
 	uint32_t hash = ufbxi_hash64(fbx_id);
 	ufbxi_fbx_id_entry *entry = ufbxi_map_find(&uc->fbx_id_map, ufbxi_fbx_id_entry, hash, &fbx_id);
-	// TODO: Strict / warn about duplicate objects
 
 	if (!entry) {
 		entry = ufbxi_map_insert(&uc->fbx_id_map, ufbxi_fbx_id_entry, hash, &fbx_id);
@@ -10371,6 +10373,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_insert_fbx_id(ufbxi_context *uc,
 		entry->fbx_id = fbx_id;
 		entry->element_id = element_id;
 		entry->user_id = 0;
+	} else {
+		ufbxi_check(ufbxi_warnf(UFBX_WARNING_DUPLICATE_OBJECT_ID, "Duplicate object ID"));
 	}
 
 	return 1;
@@ -21344,7 +21348,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 	}
 
 	// Pop warnings to metadata
-	ufbxi_check(ufbxi_pop_warnings(&uc->warnings, &uc->scene.metadata.warnings));
+	ufbxi_check(ufbxi_pop_warnings(&uc->warnings, &uc->scene.metadata.warnings, uc->scene.metadata.has_warning));
 
 	// Copy local data to the scene
 	uc->scene.metadata.version = uc->version;
