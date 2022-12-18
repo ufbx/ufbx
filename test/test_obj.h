@@ -1274,7 +1274,6 @@ UFBXT_TEST(obj_opts_no_extrnal_files_by_filename)
 #if UFBXT_IMPL
 {
 	char path[512];
-
 	ufbxt_diff_error err = { 0 };
 
 	ufbxt_file_iterator iter = { "synthetic_filename_mtl" };
@@ -1315,5 +1314,4 @@ UFBXT_TEST(obj_opts_no_extrnal_files_by_filename)
 	}
 }
 #endif
-
 

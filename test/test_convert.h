@@ -1060,3 +1060,69 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_geometry_transform_camera_modify_no_fal
 	ufbxt_assert(!node->has_geometry_transform);
 }
 #endif
+
+UFBXT_TEST(synthetic_unnormalized)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_file_iterator iter = { "synthetic_unnormalized" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (int normalize_normals = 0; normalize_normals <= 1; normalize_normals++)
+		for (int normalize_tangents = 0; normalize_tangents <= 1; normalize_tangents++) {
+			ufbxt_hintf("normalize_normals=%d normalize_tangets=%d", normalize_normals, normalize_tangents);
+			ufbx_load_opts opts = { 0 };
+			opts.normalize_normals = normalize_normals != 0;
+			opts.normalize_tangents = normalize_tangents != 0;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, NULL);
+			ufbxt_assert(scene);
+			ufbxt_check_scene(scene);
+
+			ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+			ufbxt_assert(node && node->mesh);
+			ufbx_mesh *mesh = node->mesh;
+
+			ufbxt_assert(mesh->vertex_normal.values.count == 4);
+			for (size_t i = 0; i < 4; i++) {
+				ufbx_vec3 ref = ufbx_zero_vec3;
+				if (normalize_normals) {
+					ref.y = i > 0 ? 1.0f : 0.0f;
+				} else {
+					ref.y = (ufbx_real)i;
+				}
+				ufbxt_assert_close_vec3(&err, mesh->vertex_normal.values.data[i], ref);
+			}
+
+			ufbxt_assert(mesh->vertex_tangent.values.count == 4);
+			for (size_t i = 0; i < 4; i++) {
+				ufbx_vec3 ref = ufbx_zero_vec3;
+				if (normalize_tangents) {
+					ref.x = i > 0 ? 1.0f : 0.0f;
+				} else {
+					ref.x = (ufbx_real)i;
+				}
+				ufbxt_assert_close_vec3(&err, mesh->vertex_tangent.values.data[i], ref);
+			}
+
+			ufbxt_assert(mesh->vertex_bitangent.values.count == 4);
+			for (size_t i = 0; i < 4; i++) {
+				ufbx_vec3 ref = ufbx_zero_vec3;
+				if (normalize_tangents) {
+					ref.z = i > 0 ? -1.0f : 0.0f;
+				} else {
+					ref.z = -(ufbx_real)i;
+				}
+				ufbxt_assert_close_vec3(&err, mesh->vertex_bitangent.values.data[i], ref);
+			}
+
+			ufbx_free_scene(scene);
+		}
+	}
+
+	if (err.num > 0) {
+		ufbx_real avg = err.sum / (ufbx_real)err.num;
+		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+	}
+}
+#endif
