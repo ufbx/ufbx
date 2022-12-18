@@ -1786,7 +1786,7 @@ typedef struct {
 	size_t position;
 } ufbxt_deflate_byte_stream;
 
-static size_t ufbxt_deflate_byte_stream_init(ufbxt_deflate_byte_stream *s,
+static void ufbxt_deflate_byte_stream_init(ufbxt_deflate_byte_stream *s,
 	const char *prefix, size_t prefix_len,
 	size_t content_len,
 	const char *suffix, size_t suffix_len)
