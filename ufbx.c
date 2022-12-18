@@ -10816,6 +10816,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_truncated_array(ufbxi_conte
 
 	void *data = arr->data;
 	if (arr->size < size) {
+		ufbxi_check(ufbxi_warnf(UFBX_WARNING_TRUNCATED_ARRAY, "Truncated array: %s", name));
+
 		size_t elem_size = ufbxi_array_type_size(fmt);
 		void *new_data = ufbxi_push_size(&uc->result, elem_size, size);
 		ufbxi_check(new_data);
@@ -10827,7 +10829,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_truncated_array(ufbxi_conte
 				memcpy((char*)new_data + i * elem_size, first_elem, elem_size);
 			}
 		} else {
-			memset((char*)new_data + arr->size * elem_size, 0, (size - arr->size) * elem_size);
+			memset(new_data, 0, size * elem_size);
 		}
 		data = new_data;
 	}

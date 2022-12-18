@@ -1159,3 +1159,34 @@ UFBXT_FILE_TEST(blender_279_empty_cube)
 }
 #endif
 
+UFBXT_FILE_TEST(synthetic_truncated_crease_partial)
+#if UFBXT_IMPL
+{
+	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, 1, "Truncated array: EdgeCrease");
+
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->edge_crease.count == 4);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[0], 0.25f);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[1], 0.5f);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[2], 0.5f);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[3], 0.5f);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_truncated_crease_full)
+#if UFBXT_IMPL
+{
+	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, 1, "Truncated array: EdgeCrease");
+
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->edge_crease.count == 4);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[0], 0.0f);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[1], 0.0f);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[2], 0.0f);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[3], 0.0f);
+}
+#endif

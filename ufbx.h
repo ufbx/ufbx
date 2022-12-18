@@ -3102,6 +3102,9 @@ typedef enum ufbx_warning_type UFBX_ENUM_REPR {
 	// `mtllib` statement.
 	UFBX_WARNING_IMPLICIT_MTL,
 
+	// Truncated array has been auto-expanded.
+	UFBX_WARNING_TRUNCATED_ARRAY,
+
 	// Out-of-bounds index has been clamped to be in-bounds.
 	// HINT: You can use `ufbx_index_error_handling` to adjust behavior.
 	UFBX_WARNING_INDEX_CLAMPED,
