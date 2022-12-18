@@ -601,7 +601,52 @@ UFBXT_FILE_TEST(synthetic_indexed_by_vertex)
 		ufbx_vec3 ref_normal = { 0.0f, pos.y > 0.0f ? 1.0f : -1.0f, 0.0f };
 		ufbxt_assert_close_vec3(err, normal, ref_normal);
 	}
+}
+#endif
 
+UFBXT_FILE_TEST(synthetic_by_vertex_bad_index)
+#if UFBXT_IMPL
+{
+	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, 9, NULL);
+
+	ufbxt_assert(scene->meshes.count == 1);
+	ufbx_mesh *mesh = scene->meshes.data[0];
+
+	for (size_t vi = 0; vi < mesh->num_vertices; vi++) {
+		int32_t ii = mesh->vertex_first_index.data[vi];
+		ufbx_vec3 pos = mesh->vertex_position.values.data[mesh->vertex_position.indices.data[ii]];
+		ufbx_vec3 normal = mesh->vertex_normal.values.data[mesh->vertex_normal.indices.data[ii]];
+		ufbx_vec3 ref_normal = { 0.0f, pos.y > 0.0f ? 1.0f : -1.0f, 0.0f };
+		ufbxt_assert_close_vec3(err, normal, ref_normal);
+	}
+
+	for (size_t ii = 0; ii < mesh->num_indices; ii++) {
+		ufbx_vec3 pos = mesh->vertex_position.values.data[mesh->vertex_position.indices.data[ii]];
+		ufbx_vec3 normal = mesh->vertex_normal.values.data[mesh->vertex_normal.indices.data[ii]];
+		ufbx_vec3 ref_normal = { 0.0f, pos.y > 0.0f ? 1.0f : -1.0f, 0.0f };
+		ufbxt_assert_close_vec3(err, normal, ref_normal);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_by_vertex_overflow)
+#if UFBXT_IMPL
+{
+	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, 12, NULL);
+
+	ufbxt_assert(scene->meshes.count == 1);
+	ufbx_mesh *mesh = scene->meshes.data[0];
+
+	ufbxt_assert(mesh->vertex_normal.values.count == 4);
+	for (size_t ii = 0; ii < mesh->num_indices; ii++) {
+		uint32_t vertex_ix = mesh->vertex_position.indices.data[ii];
+		uint32_t normal_ix = mesh->vertex_normal.indices.data[ii];
+		if (vertex_ix < mesh->vertex_normal.values.count) {
+			ufbxt_assert(normal_ix == vertex_ix);
+		} else {
+			ufbxt_assert(normal_ix == (uint32_t)mesh->vertex_normal.values.count - 1);
+		}
+	}
 }
 #endif
 

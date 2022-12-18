@@ -10672,10 +10672,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_check_indices(ufbxi_context *uc,
 			// If the indices refer to an external buffer we need to
 			// allocate a separate buffer for them
 			if (!owns_indices) {
-				uint32_t *new_indices = ufbxi_push(&uc->result, uint32_t, num_indices);
-				ufbxi_check(new_indices);
-				memcpy(new_indices, indices, sizeof(uint32_t) * num_indices);
-				indices = new_indices;
+				indices = ufbxi_push_copy(&uc->result, uint32_t, num_indices, indices);
+				ufbxi_check(indices);
 				owns_indices = true;
 			}
 			ufbxi_check(ufbxi_fix_index(uc, &indices[i], ix, num_elems));
