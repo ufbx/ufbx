@@ -1404,8 +1404,8 @@ static ufbxi_noinline void ufbxi_bit_stream_init(ufbxi_bit_stream *s, const ufbx
 	s->progress_cb = input->progress_cb;
 	s->chunk_begin = (const char*)input->data;
 	s->chunk_ptr = (const char*)input->data;
-	s->chunk_end = (const char*)input->data + data_size - 8;
-	s->chunk_real_end = (const char*)input->data + data_size;
+	s->chunk_end = ufbxi_add_ptr((const char*)input->data, ufbxi_max_sz(8, data_size) - 8);
+	s->chunk_real_end = ufbxi_add_ptr((const char*)input->data, data_size);
 	s->input_left = input->total_size - data_size;
 
 	// Use the user buffer if it's large enough, otherwise `local_buffer`
