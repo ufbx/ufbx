@@ -148,7 +148,7 @@ UFBXT_TEST(error_format_long)
 				ufbxt_check_string(error.description);
 
 				unsigned major = 0, minor = 0, patch = 0;
-				int num_scanned = sscanf(error_buf + line_begin, "ufbx v%u.%u.%u error: %64[^\n]\n",
+				int num_scanned = sscanf(error_buf + line_begin, "ufbx v%u.%u.%u error: %63[^\n]\n",
 					&major, &minor, &patch, desc);
 
 				ufbxt_assert(num_scanned == 4);
@@ -162,7 +162,7 @@ UFBXT_TEST(error_format_long)
 				ufbxt_check_string(error.stack[stack_ix].description);
 
 				unsigned line = 0;
-				int num_scanned = sscanf(error_buf + line_begin, "%u:%64[^:]: %64[^\n]\n", &line, func, desc);
+				int num_scanned = sscanf(error_buf + line_begin, "%u:%63[^:]: %63[^\n]\n", &line, func, desc);
 				ufbxt_assert(num_scanned == 3);
 				ufbxt_assert(stack_ix < error.stack_size);
 				ufbxt_assert(line == error.stack[stack_ix].source_line);
