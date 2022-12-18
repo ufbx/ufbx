@@ -1361,7 +1361,7 @@ ufbxi_bit_chunk_refill(ufbxi_bit_stream *s, const char *ptr)
 	// Copy any left-over data to the beginning of `buffer`
 	size_t left = ufbxi_to_size(s->chunk_real_end - ptr);
 	ufbxi_dev_assert(left < 64);
-	memmove(s->buffer, ptr, left);
+	if (left > 0) memmove(s->buffer, ptr, left);
 
 	s->num_read_before_chunk += ufbxi_to_size(ptr - s->chunk_begin);
 
