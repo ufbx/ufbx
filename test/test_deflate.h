@@ -1770,3 +1770,175 @@ UFBXT_DEFLATE_TEST(deflate_benchmark)
 	free(dst);
 }
 #endif
+
+#if UFBXT_IMPL
+typedef struct {
+	const char *prefix;
+	size_t prefix_end;
+
+	size_t content_end;
+
+	const char *suffix;
+	size_t suffix_end;
+
+	size_t total_size;
+
+	size_t position;
+} ufbxt_deflate_byte_stream;
+
+static size_t ufbxt_deflate_byte_stream_init(ufbxt_deflate_byte_stream *s,
+	const char *prefix, size_t prefix_len,
+	size_t content_len,
+	const char *suffix, size_t suffix_len)
+{
+	s->position = 0;
+	s->prefix = prefix;
+	s->prefix_end = prefix_len;
+
+	s->content_end = s->prefix_end + content_len;
+
+	s->suffix = suffix;
+	s->suffix_end = s->content_end + suffix_len;
+
+	s->total_size = s->suffix_end;
+}
+
+static size_t ufbxt_deflate_byte_stream_read(void *user, void *data, size_t size)
+{
+	ufbxt_deflate_byte_stream *s = (ufbxt_deflate_byte_stream*)user;
+	char *dst = (char*)data;
+
+	for (size_t len = 0; len < size; len++) {
+		if (s->position < s->prefix_end) {
+			size_t pos = s->position;
+			dst[len] = s->prefix[pos];
+		} else if (s->position < s->content_end) {
+			size_t pos = s->position - s->prefix_end;
+			dst[len] = (char)(unsigned char)pos;
+		} else if (s->position < s->suffix_end) {
+			size_t pos = s->position - s->content_end;
+			dst[len] = s->suffix[pos];
+		} else {
+			return len;
+		}
+
+		s->position++;
+	}
+
+	return size;
+}
+
+static void ufbxt_check_deflate_byte_result(const char *data, size_t length)
+{
+	for (size_t i = 0; i < length; i++) {
+		ufbxt_assert(data[i] == (char)(unsigned char)i);
+	}
+}
+
+#endif
+
+UFBXT_TEST(deflate_byte_stream)
+#if UFBXT_IMPL
+{
+	const char prefix[] = "\x78\x01\x01\x00\x80\xff\x7f";
+	const char suffix[] = "\x3f\xdc\xc3\xb2";
+	ufbxt_deflate_byte_stream stream;
+	ufbxt_deflate_byte_stream_init(&stream, prefix, sizeof(prefix) - 1, 0x8000, suffix, sizeof(suffix) - 1);
+
+	ufbx_inflate_input input = { 0 };
+	input.total_size = stream.total_size;
+	input.read_fn = &ufbxt_deflate_byte_stream_read;
+	input.read_user = &stream;
+
+	ufbx_inflate_retain retain;
+	retain.initialized = false;
+
+	size_t result_len = 0x8000;
+	char *result = (char*)malloc(0x8000);
+	ufbxt_assert(result);
+	ptrdiff_t ret = ufbx_inflate(result, result_len, &input, &retain);
+	ufbxt_assert(ret >= 0);
+	ufbxt_assert(ret == result_len);
+	ufbxt_check_deflate_byte_result(result, result_len);
+	free(result);
+}
+#endif
+
+UFBXT_TEST(deflate_byte_stream_prefix)
+#if UFBXT_IMPL
+{
+	const char prefix[] = "\x78\x01\x01\x00\x80\xff\x7f";
+	const char suffix[] = "\x3f\xdc\xc3\xb2";
+	ufbxt_deflate_byte_stream stream;
+	ufbxt_deflate_byte_stream_init(&stream, NULL, 0, 0x8000, suffix, sizeof(suffix) - 1);
+
+	ufbx_inflate_input input = { 0 };
+	input.total_size = stream.total_size + (sizeof(prefix) - 1);
+	input.data = prefix;
+	input.data_size = sizeof(prefix) - 1;
+	input.read_fn = &ufbxt_deflate_byte_stream_read;
+	input.read_user = &stream;
+
+	ufbx_inflate_retain retain;
+	retain.initialized = false;
+
+	size_t result_len = 0x8000;
+	char *result = (char*)malloc(0x8000);
+	ufbxt_assert(result);
+	ptrdiff_t ret = ufbx_inflate(result, result_len, &input, &retain);
+	ufbxt_assert(ret >= 0);
+	ufbxt_assert(ret == result_len);
+	ufbxt_check_deflate_byte_result(result, result_len);
+	free(result);
+}
+#endif
+
+UFBXT_TEST(deflate_byte_stream_truncated)
+#if UFBXT_IMPL
+{
+	const char prefix[] = "\x78\x01\x01\x00\x80\xff\x7f";
+	const char suffix[] = "\x3f\xdc\xc3\xb2";
+	ufbxt_deflate_byte_stream stream;
+	ufbxt_deflate_byte_stream_init(&stream, prefix, sizeof(prefix) - 1, 0x4000, suffix, sizeof(suffix) - 1);
+
+	ufbx_inflate_input input = { 0 };
+	input.total_size = stream.total_size;
+	input.read_fn = &ufbxt_deflate_byte_stream_read;
+	input.read_user = &stream;
+
+	ufbx_inflate_retain retain;
+	retain.initialized = false;
+
+	size_t result_len = 0x8000;
+	char *result = (char*)malloc(0x8000);
+	ufbxt_assert(result);
+	ptrdiff_t ret = ufbx_inflate(result, result_len, &input, &retain);
+	ufbxt_assert(ret == -5);
+	free(result);
+}
+#endif
+
+UFBXT_TEST(deflate_byte_stream_no_adler)
+#if UFBXT_IMPL
+{
+	const char prefix[] = "\x78\x01\x01\x00\x80\xff\x7f";
+	ufbxt_deflate_byte_stream stream;
+	ufbxt_deflate_byte_stream_init(&stream, prefix, sizeof(prefix) - 1, 0x8000, NULL, 0);
+
+	ufbx_inflate_input input = { 0 };
+	input.total_size = stream.total_size;
+	input.read_fn = &ufbxt_deflate_byte_stream_read;
+	input.read_user = &stream;
+
+	ufbx_inflate_retain retain;
+	retain.initialized = false;
+
+	size_t result_len = 0x8000;
+	char *result = (char*)malloc(0x8000);
+	ufbxt_assert(result);
+	ptrdiff_t ret = ufbx_inflate(result, result_len, &input, &retain);
+	ufbxt_assert(ret == -9);
+	free(result);
+}
+#endif
+
