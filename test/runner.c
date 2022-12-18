@@ -1993,8 +1993,6 @@ void ufbxt_do_fuzz(const char *base_name, void *data, size_t size, const char *f
 		prog_opts.read_buffer_size = 1;
 		prog_opts.temp_allocator.huge_threshold = 1;
 		prog_opts.result_allocator.huge_threshold = 1;
-		prog_opts.filename.data = NULL;
-		prog_opts.filename.length = 0;
 		prog_opts.progress_cb.fn = &ufbxt_measure_progress;
 		prog_opts.progress_cb.user = &progress_ctx;
 		prog_opts.progress_interval_hint = 1;
