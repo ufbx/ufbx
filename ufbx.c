@@ -697,6 +697,12 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 	#define ufbxi_dev_assert(cond) (void)0
 #endif
 
+#if defined(UFBX_REGRESSION)
+	#define UFBXI_IS_REGRESSION 1
+#else
+	#define UFBXI_IS_REGRESSION 0
+#endif
+
 // -- Utility
 
 #if defined(UFBX_UBSAN)
@@ -6029,7 +6035,7 @@ static ufbxi_forceinline void ufbxi_xml_advance(ufbxi_xml_context *xc)
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_xml_push_token_char(ufbxi_xml_context *xc, char c)
 {
-	if (xc->tok_len == xc->tok_cap) {
+	if (xc->tok_len == xc->tok_cap || UFBXI_IS_REGRESSION) {
 		ufbxi_check_err(&xc->error, ufbxi_grow_array(xc->ator, &xc->tok, &xc->tok_cap, xc->tok_len + 1));
 	}
 	xc->tok[xc->tok_len++] = c;
