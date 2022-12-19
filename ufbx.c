@@ -13480,10 +13480,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 		ufbx_uv_set *set = ufbxi_push_zero(&uc->result, ufbx_uv_set, 1);
 		ufbxi_check(set);
 		set->index = 0;
-		set->name = ufbx_empty_string;
+		set->name.data = ufbxi_empty_char;
 		ufbxi_check(ufbxi_read_vertex_element(uc, mesh, uv_info, (ufbx_vertex_attrib*)&set->vertex_uv,
 			ufbxi_TextureUV, ufbxi_TextureUVVerticeIndex, 'r', 2));
 
+		mesh->uv_sets.data = set;
+		mesh->uv_sets.count = 1;
 		mesh->vertex_uv = set->vertex_uv;
 	}
 

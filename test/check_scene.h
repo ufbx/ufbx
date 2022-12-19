@@ -611,6 +611,14 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 			ufbxt_assert(mesh->instances.data[i]->materials.count >= mesh->materials.count);
 		}
 	}
+
+	// No loose UV or color
+	if (mesh->vertex_uv.exists) {
+		ufbxt_assert(mesh->uv_sets.count > 0);
+	}
+	if (mesh->vertex_color.exists) {
+		ufbxt_assert(mesh->color_sets.count > 0);
+	}
 }
 
 static void ufbxt_check_light(ufbx_scene *scene, ufbx_light *light)
