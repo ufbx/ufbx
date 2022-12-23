@@ -703,6 +703,46 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 	#define UFBXI_IS_REGRESSION 0
 #endif
 
+#if defined(_MSC_VER)
+	#define ufbxi_thread_local __declspec(thread)
+#elif defined(__GNUC__) || defined(__clang__)
+	#define ufbxi_thread_local __thread
+#elif UFBXI_HAS_CPP11
+	#define ufbxi_thread_local thread_local
+#elif UFBX_STDC >= 201112L
+	#define ufbxi_thread_local _Thread_local
+#endif
+
+#if defined(UFBXI_ANALYSIS_RECURSIVE)
+	#define ufbxi_recursive_function(m_ret, m_name, m_args, m_max_depth, m_params) UFBXI_RECURSIVE_FUNCTION(m_name, m_max_depth);
+	#define ufbxi_recursive_function_void(m_name, m_args, m_max_depth, m_params) UFBXI_RECURSIVE_FUNCTION(m_name, m_max_depth);
+#elif UFBXI_IS_REGRESSION && defined(ufbxi_thread_local)
+	#define ufbxi_recursive_function(m_ret, m_name, m_args, m_max_depth, m_params) \
+		{ \
+			static m_ret m_name##_rec m_params; \
+			static ufbxi_thread_local unsigned ufbxi_recursion_depth; \
+			ufbx_assert(ufbxi_recursion_depth < m_max_depth); \
+			++ufbxi_recursion_depth; \
+			m_ret ret = m_name##_rec m_args; \
+			--ufbxi_recursion_depth; \
+			return ret; \
+		} \
+		static m_ret m_name##_rec m_params
+	#define ufbxi_recursive_function_void(m_name, m_args, m_max_depth, m_params) \
+		{ \
+			static void m_name##_rec m_params; \
+			static ufbxi_thread_local unsigned ufbxi_recursion_depth; \
+			ufbx_assert(ufbxi_recursion_depth < m_max_depth); \
+			++ufbxi_recursion_depth; \
+			m_name##_rec m_args; \
+			--ufbxi_recursion_depth; \
+		} \
+		static void m_name##_rec m_params
+#else
+	#define ufbxi_recursive_function(m_ret, m_name, m_args, m_max_depth, m_params)
+	#define ufbxi_recursive_function_void(m_name, m_args, m_max_depth, m_params)
+#endif
+
 // -- Utility
 
 #if defined(UFBX_UBSAN)
@@ -3572,6 +3612,8 @@ static ufbxi_noinline void ufbxi_map_free(ufbxi_map *map)
 }
 
 static ufbxi_noinline ufbxi_aa_node *ufbxi_aa_tree_insert(ufbxi_map *map, ufbxi_aa_node *node, const void *value, uint32_t index, size_t item_size)
+	ufbxi_recursive_function(ufbxi_aa_node *, ufbxi_aa_tree_insert, (map, node, value, index, item_size), 59,
+		(ufbxi_map *map, ufbxi_aa_node *node, const void *value, uint32_t index, size_t item_size))
 {
 	if (!node) {
 		ufbxi_aa_node *new_node = ufbxi_push(&map->aa_buf, ufbxi_aa_node, 1);
@@ -6171,6 +6213,8 @@ static ufbxi_noinline int ufbxi_xml_read_until(ufbxi_xml_context *xc, ufbx_strin
 }
 
 static ufbxi_noinline int ufbxi_xml_parse_tag(ufbxi_xml_context *xc, size_t depth, bool *p_closing, const char *opening)
+	ufbxi_recursive_function(int, ufbxi_xml_parse_tag, (xc, depth, p_closing, opening), UFBXI_MAX_XML_DEPTH,
+		(ufbxi_xml_context *xc, size_t depth, bool *p_closing, const char *opening))
 {
 	ufbxi_check_err(&xc->error, depth < UFBXI_MAX_XML_DEPTH);
 
@@ -7565,6 +7609,8 @@ ufbxi_nodiscard ufbxi_noinline static void *ufbxi_push_array_data(ufbxi_context 
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t depth, ufbxi_parse_state parent_state, bool *p_end, ufbxi_buf *tmp_buf, bool recursive)
+	ufbxi_recursive_function(int, ufbxi_binary_parse_node, (uc, depth, parent_state, p_end, tmp_buf, recursive), UFBXI_MAX_NODE_DEPTH,
+		(ufbxi_context *uc, uint32_t depth, ufbxi_parse_state parent_state, bool *p_end, ufbxi_buf *tmp_buf, bool recursive))
 {
 	// https://code.blender.org/2013/08/fbx-binary-file-format-specification
 	// Parse an FBX document node in the binary format
@@ -8505,6 +8551,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_float_array(ufbxi_con
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *uc, uint32_t depth, ufbxi_parse_state parent_state, bool *p_end, ufbxi_buf *tmp_buf, bool recursive)
+	ufbxi_recursive_function(int, ufbxi_ascii_parse_node, (uc, depth, parent_state, p_end, tmp_buf, recursive), UFBXI_MAX_NODE_DEPTH,
+		(ufbxi_context *uc, uint32_t depth, ufbxi_parse_state parent_state, bool *p_end, ufbxi_buf *tmp_buf, bool recursive))
 {
 	ufbxi_ascii *ua = &uc->ascii;
 
@@ -8864,6 +8912,8 @@ ufbxi_nodiscard static ufbxi_forceinline ufbx_dom_node *ufbxi_get_dom_node(ufbxi
 }
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_dom_node(ufbxi_context *uc, ufbxi_node *node, ufbx_dom_node **p_dom_node)
+	ufbxi_recursive_function(int, ufbxi_retain_dom_node, (uc, node, p_dom_node), UFBXI_MAX_NODE_DEPTH,
+		(ufbxi_context *uc, ufbxi_node *node, ufbx_dom_node **p_dom_node))
 {
 	ufbx_dom_node *dst = ufbxi_push_zero(&uc->result, ufbx_dom_node, 1);
 	ufbxi_check(dst);
@@ -9023,6 +9073,8 @@ static ufbxi_noinline bool ufbxi_next_line(ufbx_string *line, ufbx_string *buf, 
 }
 
 static ufbxi_noinline const char *ufbxi_match_skip(const char *fmt, bool alternation)
+	ufbxi_recursive_function(const char *, ufbxi_match_skip, (fmt, alternation), 4,
+		(const char *fmt, bool alternation))
 {
 	for (;;) {
 		char c = *fmt++;
@@ -9054,6 +9106,8 @@ static ufbxi_noinline const char *ufbxi_match_skip(const char *fmt, bool alterna
 }
 
 static ufbxi_noinline bool ufbxi_match_imp(const char **p_str, const char *end, const char **p_fmt)
+	ufbxi_recursive_function(bool, ufbxi_match_imp, (p_str, end, p_fmt), 4,
+		(const char **p_str, const char *end, const char **p_fmt))
 {
 	const char *str_original_begin = *p_str;
 	const char *str = str_original_begin;
@@ -12921,6 +12975,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_prop_channel(ufbxi_context *uc, ufbxi_node *node, uint64_t target_fbx_id, uint64_t layer_fbx_id, ufbx_string name)
+	ufbxi_recursive_function(int, ufbxi_read_take_prop_channel, (uc, node, target_fbx_id, layer_fbx_id, name), 2,
+		(ufbxi_context *uc, ufbxi_node *node, uint64_t target_fbx_id, uint64_t layer_fbx_id, ufbx_string name))
 {
 	if (name.data == ufbxi_Transform) {
 		// Pre-7000 have transform keyframes in a deeply nested structure,
@@ -21650,6 +21706,8 @@ static double ufbxi_pow_abs(double v, double e)
 }
 
 static ufbxi_noinline void ufbxi_combine_anim_layer(ufbxi_anim_layer_combine_ctx *ctx, ufbx_anim_layer *layer, ufbx_real weight, const char *prop_name, ufbx_vec3 *result, const ufbx_vec3 *value)
+	ufbxi_recursive_function_void(ufbxi_combine_anim_layer, (ctx, layer, weight, prop_name, result, value), 2,
+		(ufbxi_anim_layer_combine_ctx *ctx, ufbx_anim_layer *layer, ufbx_real weight, const char *prop_name, ufbx_vec3 *result, const ufbx_vec3 *value))
 {
 	if (layer->compose_rotation && layer->blended && prop_name == ufbxi_Lcl_Rotation && !ctx->has_rotation_order) {
 		ufbx_prop rp = ufbx_evaluate_prop_len(&ctx->anim, ctx->element, ufbxi_RotationOrder, sizeof(ufbxi_RotationOrder) - 1, ctx->time);
@@ -21767,6 +21825,8 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 }
 
 static ufbxi_noinline void ufbxi_evaluate_connected_prop(ufbx_prop *prop, const ufbx_anim *anim, const ufbx_element *element, const char *name, double time)
+	ufbxi_recursive_function_void(ufbxi_evaluate_connected_prop, (prop, anim, element, name, time), 2,
+		(ufbx_prop *prop, const ufbx_anim *anim, const ufbx_element *element, const char *name, double time))
 {
 	ufbx_connection *conn = ufbxi_find_prop_connection(element, name);
 
@@ -22974,6 +23034,8 @@ ufbxi_forceinline static bool ufbxi_kd_check_point(ufbxi_ngon_context *nc, const
 }
 
 ufbxi_noinline static bool ufbxi_kd_check_slow(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t begin, uint32_t count, uint32_t axis)
+	ufbxi_recursive_function(bool, ufbxi_kd_check_slow, (nc, tri, begin, count, axis), 32 - UFBXI_KD_FAST_DEPTH,
+		(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t begin, uint32_t count, uint32_t axis))
 {
 	ufbx_vertex_vec3 pos = nc->positions;
 	uint32_t *kd_indices = nc->kd_indices;
@@ -23012,6 +23074,8 @@ ufbxi_noinline static bool ufbxi_kd_check_slow(ufbxi_ngon_context *nc, const ufb
 }
 
 ufbxi_noinline static bool ufbxi_kd_check_fast(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t kd_index, uint32_t axis, uint32_t depth)
+	ufbxi_recursive_function(bool, ufbxi_kd_check_fast, (nc, tri, kd_index, axis, depth), UFBXI_KD_FAST_DEPTH,
+		(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t kd_index, uint32_t axis, uint32_t depth))
 {
 	ufbx_vertex_vec3 pos = nc->positions;
 
@@ -23028,7 +23092,7 @@ ufbxi_noinline static bool ufbxi_kd_check_fast(ufbxi_ngon_context *nc, const ufb
 
 			// Check for the point on the split plane
 			ufbx_vec3 point = pos.values.data[pos.indices.data[nc->face.index_begin + node.index]];
-			if(ufbxi_kd_check_point(nc, tri, node.index, point)) {
+			if (ufbxi_kd_check_point(nc, tri, node.index, point)) {
 				return true;
 			}
 
@@ -23069,6 +23133,8 @@ ufbxi_noinline static bool ufbxi_kd_index_less(void *user, const void *va, const
 }
 
 ufbxi_noinline static void ufbxi_kd_build(ufbxi_ngon_context *nc, uint32_t *indices, uint32_t *tmp, uint32_t num, uint32_t axis, uint32_t fast_index, uint32_t depth)
+	ufbxi_recursive_function_void(ufbxi_kd_build, (nc, indices, tmp, num, axis, fast_index, depth), 32,
+		(ufbxi_ngon_context *nc, uint32_t *indices, uint32_t *tmp, uint32_t num, uint32_t axis, uint32_t fast_index, uint32_t depth))
 {
 	if (num == 0) return;
 
