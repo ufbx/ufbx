@@ -169,6 +169,8 @@ jobs:
         run: sudo apt-get install -y cppcheck
       - name: Install PIP dependencies
         run: sudo pip3 install pcpp pycparser
+      - name: Prepare directories
+        run: mkdir build
       - name: cppcheck
         run: cppcheck --error-exitcode=1 --inline-suppr --std=c99 ufbx.c -DUFBX_STATIC_ANALYSIS=1
       - name: Clang Analyzer
