@@ -172,6 +172,30 @@ jobs:
       - name: Clang Analyzer
         if: ${{ always() && !cancelled() }}
         run: clang --analyze -Xanalyzer -analyzer-werror -Xanalyzer -analyzer-disable-checker=unix.Malloc ufbx.c
+      - name: Get Clang debug stack usage
+        if: ${{ always() && !cancelled() }}
+        run: clang -fstack-usage -DUFBX_STANDARD_C -o build/ufbx-clang-debug.o
+      - name: Get Clang release stack usage
+        if: ${{ always() && !cancelled() }}
+        run: clang -fstack-usage -O2 -o build/ufbx-clang-release.o
+      - name: Get GCC debug stack usage
+        if: ${{ always() && !cancelled() }}
+        run: gcc -fstack-usage -DUFBX_STANDARD_C -o build/ufbx-gcc-debug.o
+      - name: Get GCC release stack usage
+        if: ${{ always() && !cancelled() }}
+        run: gcc -fstack-usage -O2 -o build/ufbx-gcc-release.o
+      - name: Analyze Clang debug stack
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/analyze_stack.py build/ufbx-clang-debug.o --limit 0x20000 --cache build/ufbx-cache.pickle
+      - name: Analyze Clang release stack
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/analyze_stack.py build/ufbx-clang-release.o --limit 0x10000 --cache build/ufbx-cache.pickle
+      - name: Analyze GCC debug stack
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/analyze_stack.py build/ufbx-gcc-debug.o --limit 0x20000 --cache build/ufbx-cache.pickle
+      - name: Analyze GCC release stack
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/analyze_stack.py build/ufbx-gcc-release.o --limit 0x10000 --cache build/ufbx-cache.pickle
 
   ci_bindgen:
     runs-on: ubuntu-latest

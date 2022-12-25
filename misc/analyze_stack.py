@@ -1,6 +1,7 @@
 from typing import NamedTuple, List, Mapping, Optional, Tuple, Set, DefaultDict
 from collections import defaultdict
 import pickle
+import argparse
 
 import os
 import io
@@ -290,13 +291,13 @@ def parse_file(c_path: str, su_path: str, cache_path: Optional[str]) -> File:
 
     return file
 
-def get_max_dynamic_usage(file: File) -> None:
-    max_dynamic_usage = 0
+def get_max_dynamic_usage(file: File) -> Tuple[int, str]:
+    max_dynamic_usage = (0, "")
 
     addr_funcs = file.addresses & set(file.functions.keys())
     for func in addr_funcs:
         usage = get_stack_usage(file, func).usage
-        max_dynamic_usage = max(max_dynamic_usage, usage)
+        max_dynamic_usage = max(max_dynamic_usage, (usage, func))
 
     return max_dynamic_usage
 
@@ -338,36 +339,60 @@ def dump_largest_stack(file: File, func: str) -> List[str]:
         index += 1
 
 if __name__ == "__main__":
-    c_path = os.path.join(os.path.dirname(__file__), "..\\ufbx.c")
-    su_path = os.path.join(os.path.dirname(__file__), "..\\build\\ufbx3.su")
-    cache_path = os.path.join(os.path.dirname(__file__), "..\\ufbx.pickle")
-    file = parse_file(c_path, su_path, cache_path)
-    file.max_dynamic_usage = get_max_dynamic_usage(file)
-    print(file.max_dynamic_usage)
+    parser = argparse.ArgumentParser("analyze_stack.py")
+    parser.add_argument("su", help="Stack usage .su file")
+    parser.add_argument("--source", help="Path to ufbx.c")
+    parser.add_argument("--cache", help="Cache file to use")
+    parser.add_argument("--limit", help="Maximum stack usage in bytes")
+    argv = parser.parse_args()
 
-    max_usage = StackUsage(0, "")
+    su_path = argv.su
+    if argv.source:
+        c_path = argv.source
+    else:
+        c_path = os.path.relpath(os.path.join(os.path.dirname(__file__), "..\\ufbx.c"))
+
+    file = parse_file(c_path, su_path, argv.cache)
+    file.max_dynamic_usage = get_max_dynamic_usage(file)
+
+    max_usage = (0, "")
     for func in file.functions:
         usage = get_stack_usage(file, func)
-        max_usage = max(max_usage, usage)
-    print(max_usage)
-    # dump_largest_stack(file, max_usage[1])
+        max_usage = max(max_usage, (usage.usage, func))
 
-    interesting_functions = [
-        "ufbx_load_file",
-        "ufbx_evaluate_scene",
-        "ufbx_subdivide_mesh",
-        "ufbx_tessellate_nurbs_surface",
-        "ufbx_tessellate_nurbs_curve",
-        "ufbx_evaluate_transform",
-        "ufbx_generate_indices",
-        "ufbx_inflate",
-        "ufbx_triangulate_face",
-    ]
-
-    for func in interesting_functions:
-        print()
-        dump_largest_stack(file, func)
+    if argv.limit:
+        limit = int(argv.limit, base=0)
+        total = max_usage[0] + file.max_dynamic_usage[0]
+        if total >= limit:
+            error(f"Stack overflow in {max_usage[1]}: {max_usage[0]} bytes + {file.max_dynamic_usage[0]} dynamic\noverflows limit of {limit} bytes")
+            print("\nLargest stack:")
+            dump_largest_stack(file, max_usage[1])
+            print("\nLargest dynamic stack:")
+            dump_largest_stack(file, file.max_dynamic_usage[1])
 
     for func, stack in file.recursion_errors.items():
         stack_str = "\n".join(f"{ix:3}: {s}()" for ix, s in enumerate(stack))
         error(f"Unbounded recursion in {func}()\nStack trace:\n{stack_str}")
+
+    if not g_failed:
+        interesting_functions = [
+            "ufbx_load_file",
+            "ufbx_evaluate_scene",
+            "ufbx_subdivide_mesh",
+            "ufbx_tessellate_nurbs_surface",
+            "ufbx_tessellate_nurbs_curve",
+            "ufbx_evaluate_transform",
+            "ufbx_generate_indices",
+            "ufbx_inflate",
+            "ufbx_triangulate_face",
+        ]
+
+        for func in interesting_functions:
+            print()
+            dump_largest_stack(file, func)
+
+        print()
+        print("Success!")
+
+    if g_failed:
+        exit(1)
