@@ -400,6 +400,10 @@ if __name__ == "__main__":
             for func in interesting_functions:
                 print()
                 dump_largest_stack(file, func)
+
+            print()
+            print("Largest potentially dynamically called stack:")
+            dump_largest_stack(file, file.max_dynamic_usage[1])
     else:
         print("Skipping further tests due to no .su file specified")
 
