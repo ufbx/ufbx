@@ -178,16 +178,16 @@ jobs:
         run: clang --analyze -Xanalyzer -analyzer-werror -Xanalyzer -analyzer-disable-checker=unix.Malloc ufbx.c
       - name: Get Clang debug stack usage
         if: ${{ always() && !cancelled() }}
-        run: clang -fstack-usage -DUFBX_STANDARD_C -c ufbx.c -o build/ufbx-clang-debug.o
+        run: clang -fstack-usage -DUFBX_DEV -DUFBX_STANDARD_C -c ufbx.c -o build/ufbx-clang-debug.o
       - name: Get Clang release stack usage
         if: ${{ always() && !cancelled() }}
-        run: clang -fstack-usage -O2 -c ufbx.c -o build/ufbx-clang-release.o
+        run: clang -fstack-usage -DUFBX_DEV -O2 -c ufbx.c -o build/ufbx-clang-release.o
       - name: Get GCC debug stack usage
         if: ${{ always() && !cancelled() }}
-        run: gcc -fstack-usage -DUFBX_STANDARD_C -c ufbx.c -o build/ufbx-gcc-debug.o
+        run: gcc -fstack-usage -DUFBX_DEV -DUFBX_STANDARD_C -c ufbx.c -o build/ufbx-gcc-debug.o
       - name: Get GCC release stack usage
         if: ${{ always() && !cancelled() }}
-        run: gcc -fstack-usage -O2 -c ufbx.c -o build/ufbx-gcc-release.o
+        run: gcc -fstack-usage -DUFBX_DEV -O2 -c ufbx.c -o build/ufbx-gcc-release.o
       - name: Parse ufbx.c to AST for analysis
         if: ${{ always() && !cancelled() }}
         run: python3 misc/analyze_stack.py --no-su --cache build/ufbx-cache.pickle
