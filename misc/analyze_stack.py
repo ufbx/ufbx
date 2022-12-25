@@ -277,17 +277,18 @@ def parse_file(c_path: str, su_path: str, cache_path: Optional[str]) -> File:
     for func, rec in max_recursions.items():
         file.functions[func].max_recursion = rec
 
-    verbose(f"Reading stack usage file: {su_path}")
-    with open(su_path) as f:
-        for line in f:
-            line = line.strip()
-            if not line: continue
-            m = re.match(r".*:\d+:(?:\d+:)?(\w+)(?:\.[a-z0-9\.]+)?\s+(\d+)\s+([a-z,]+)", line)
-            if not m:
-                raise RuntimeError(f"Bad .su line: {line}")
-            func, stack, usage = m.groups()
-            assert usage in ("static", "dynamic,bounded")
-            file.functions[func].stack_usage = int(stack)
+    if su_path:
+        verbose(f"Reading stack usage file: {su_path}")
+        with open(su_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line: continue
+                m = re.match(r".*:\d+:(?:\d+:)?(\w+)(?:\.[a-z0-9\.]+)?\s+(\d+)\s+([a-z,]+)", line)
+                if not m:
+                    raise RuntimeError(f"Bad .su line: {line}")
+                func, stack, usage = m.groups()
+                assert usage in ("static", "dynamic,bounded")
+                file.functions[func].stack_usage = int(stack)
 
     return file
 
@@ -340,59 +341,70 @@ def dump_largest_stack(file: File, func: str) -> List[str]:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("analyze_stack.py")
-    parser.add_argument("su", help="Stack usage .su file")
+    parser.add_argument("su", nargs="?", help="Stack usage .su file")
     parser.add_argument("--source", help="Path to ufbx.c")
     parser.add_argument("--cache", help="Cache file to use")
     parser.add_argument("--limit", help="Maximum stack usage in bytes")
+    parser.add_argument("--no-su", action="store_true", help="Allow running with no .su file")
     argv = parser.parse_args()
 
-    su_path = argv.su
+    if argv.su:
+        su_path = argv.su
+    elif not argv.no_su:
+        raise RuntimeError("Expected an .su file as a positional argument")
+    else:
+        su_path = ""
+
     if argv.source:
         c_path = argv.source
     else:
-        c_path = os.path.relpath(os.path.join(os.path.dirname(__file__), "..\\ufbx.c"))
+        c_path = os.path.relpath(os.path.join(os.path.dirname(__file__), "..", "ufbx.c"))
 
     file = parse_file(c_path, su_path, argv.cache)
-    file.max_dynamic_usage = get_max_dynamic_usage(file)
 
-    max_usage = (0, "")
-    for func in file.functions:
-        usage = get_stack_usage(file, func)
-        max_usage = max(max_usage, (usage.usage, func))
+    if su_path:
+        file.max_dynamic_usage = get_max_dynamic_usage(file)
 
-    if argv.limit:
-        limit = int(argv.limit, base=0)
-        total = max_usage[0] + file.max_dynamic_usage[0]
-        if total >= limit:
-            error(f"Stack overflow in {max_usage[1]}: {max_usage[0]} bytes + {file.max_dynamic_usage[0]} dynamic\noverflows limit of {limit} bytes")
-            print("\nLargest stack:")
-            dump_largest_stack(file, max_usage[1])
-            print("\nLargest dynamic stack:")
-            dump_largest_stack(file, file.max_dynamic_usage[1])
+        max_usage = (0, "")
+        for func in file.functions:
+            usage = get_stack_usage(file, func)
+            max_usage = max(max_usage, (usage.usage, func))
 
-    for func, stack in file.recursion_errors.items():
-        stack_str = "\n".join(f"{ix:3}: {s}()" for ix, s in enumerate(stack))
-        error(f"Unbounded recursion in {func}()\nStack trace:\n{stack_str}")
+        if argv.limit:
+            limit = int(argv.limit, base=0)
+            total = max_usage[0] + file.max_dynamic_usage[0]
+            if total >= limit:
+                error(f"Stack overflow in {max_usage[1]}: {max_usage[0]} bytes + {file.max_dynamic_usage[0]} dynamic\noverflows limit of {limit} bytes")
+                print("\nLargest stack:")
+                dump_largest_stack(file, max_usage[1])
+                print("\nLargest dynamic stack:")
+                dump_largest_stack(file, file.max_dynamic_usage[1])
 
-    if not g_failed:
-        interesting_functions = [
-            "ufbx_load_file",
-            "ufbx_evaluate_scene",
-            "ufbx_subdivide_mesh",
-            "ufbx_tessellate_nurbs_surface",
-            "ufbx_tessellate_nurbs_curve",
-            "ufbx_evaluate_transform",
-            "ufbx_generate_indices",
-            "ufbx_inflate",
-            "ufbx_triangulate_face",
-        ]
+        for func, stack in file.recursion_errors.items():
+            stack_str = "\n".join(f"{ix:3}: {s}()" for ix, s in enumerate(stack))
+            error(f"Unbounded recursion in {func}()\nStack trace:\n{stack_str}")
 
-        for func in interesting_functions:
-            print()
-            dump_largest_stack(file, func)
+        if not g_failed:
+            interesting_functions = [
+                "ufbx_load_file",
+                "ufbx_evaluate_scene",
+                "ufbx_subdivide_mesh",
+                "ufbx_tessellate_nurbs_surface",
+                "ufbx_tessellate_nurbs_curve",
+                "ufbx_evaluate_transform",
+                "ufbx_generate_indices",
+                "ufbx_inflate",
+                "ufbx_triangulate_face",
+            ]
 
-        print()
-        print("Success!")
+            for func in interesting_functions:
+                print()
+                dump_largest_stack(file, func)
+    else:
+        print("Skipping further tests due to no .su file specified")
 
     if g_failed:
         exit(1)
+    else:
+        print()
+        print("Success!")
