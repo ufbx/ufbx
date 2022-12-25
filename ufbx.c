@@ -21825,7 +21825,7 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 }
 
 static ufbxi_noinline void ufbxi_evaluate_connected_prop(ufbx_prop *prop, const ufbx_anim *anim, const ufbx_element *element, const char *name, double time)
-	ufbxi_recursive_function_void(ufbxi_evaluate_connected_prop, (prop, anim, element, name, time), 2,
+	ufbxi_recursive_function_void(ufbxi_evaluate_connected_prop, (prop, anim, element, name, time), 3,
 		(ufbx_prop *prop, const ufbx_anim *anim, const ufbx_element *element, const char *name, double time))
 {
 	ufbx_connection *conn = ufbxi_find_prop_connection(element, name);
@@ -21836,7 +21836,8 @@ static ufbxi_noinline void ufbxi_evaluate_connected_prop(ufbx_prop *prop, const 
 		conn = next_conn;
 	}
 
-	if (conn) {
+	// Found a non-cyclic connection
+	if (conn && !ufbxi_find_prop_connection(conn->src, conn->src_prop.data)) {
 		ufbx_prop ep = ufbx_evaluate_prop_len(anim, conn->src, conn->src_prop.data, conn->src_prop.length, time);
 		prop->value_vec4 = ep.value_vec4;
 		prop->value_int = ep.value_int;

@@ -1326,3 +1326,34 @@ UFBXT_FILE_TEST_OPTS(synthetic_recursive_transform, ufbxt_retain_dom_opts)
 }
 #endif
 
+UFBXT_FILE_TEST(synthetic_recursive_connections)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "pCube1");
+		ufbxt_assert(node);
+
+		ufbx_prop *prop = ufbx_find_prop(&node->props, "Lcl Translation");
+		ufbxt_assert(prop);
+		ufbxt_assert((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0);
+
+		ufbx_vec3 ref = { 1.0f, 0.0f, 0.0f };
+		ufbx_prop value = ufbx_evaluate_prop(&scene->anim, &node->element, "Lcl Translation", 0.5);
+		ufbxt_assert_close_vec3(err, value.value_vec3, ref);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "pCube3");
+		ufbxt_assert(node);
+
+		ufbx_prop *prop = ufbx_find_prop(&node->props, "Lcl Translation");
+		ufbxt_assert(prop);
+		ufbxt_assert((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0);
+
+		ufbx_vec3 ref = { 0.0f, 0.0f, 1.0f };
+		ufbx_prop value = ufbx_evaluate_prop(&scene->anim, &node->element, "Lcl Translation", 0.5);
+		ufbxt_assert_close_vec3(err, value.value_vec3, ref);
+	}
+}
+#endif
+
