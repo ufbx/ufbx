@@ -1357,3 +1357,29 @@ UFBXT_FILE_TEST(synthetic_recursive_connections)
 }
 #endif
 
+UFBXT_FILE_TEST(synthetic_rotation_order_layers)
+#if UFBXT_IMPL
+{
+	ufbx_anim_layer *layer_base_layer = ufbx_as_anim_layer(ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "BaseLayer"));
+	ufbx_anim_layer *layer_base = ufbx_as_anim_layer(ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "Base"));
+	ufbx_anim_layer *layer_rotation = ufbx_as_anim_layer(ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "Rotation"));
+
+	ufbx_anim_layer_desc layers[] = {
+		{ layer_base_layer, 1.0f },
+		{ layer_base, 0.5f },
+		{ layer_rotation, 0.25f },
+	};
+
+	ufbx_anim anim = { 0 };
+	anim.layers.data = layers;
+	anim.layers.count = ufbxt_arraycount(layers);
+
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	// We don't really care about the result here as runtime rotation order is not really supported,
+	// just want to make sure we don't hit any infinite recursion with rotation order layers
+	(void)ufbx_evaluate_prop(&anim, &node->element, "Lcl Rotation", 0.2f);
+}
+#endif
+
