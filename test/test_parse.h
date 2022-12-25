@@ -1290,3 +1290,39 @@ UFBXT_FILE_TEST(synthetic_duplicate_id)
 }
 #endif
 
+UFBXT_FILE_TEST_OPTS(synthetic_recursive_transform, ufbxt_retain_dom_opts)
+#if UFBXT_IMPL
+{
+	ufbx_dom_node *takes = ufbx_dom_find(scene->dom_root, "Takes");
+	ufbxt_assert(takes);
+	ufbx_dom_node *take = ufbx_dom_find(takes, "Take");
+	ufbxt_assert(take);
+	ufbx_dom_node *model = ufbx_dom_find(take, "Model");
+	ufbxt_assert(model);
+	ufbx_dom_node *channel = ufbx_dom_find(model, "Channel");
+	ufbxt_assert(channel);
+
+	ufbxt_assert(channel->values.count == 1);
+	ufbxt_assert(channel->values.data[0].type == UFBX_DOM_VALUE_STRING);
+	ufbxt_assert(!strcmp(channel->values.data[0].value_str.data, "Transform"));
+
+	ufbx_dom_node *rec_channel = ufbx_dom_find(channel, "Channel");
+	ufbxt_assert(rec_channel);
+
+	size_t count = 1;
+	for (;;) {
+		ufbxt_hintf("count=%zu", count);
+		count += 1;
+		ufbxt_assert(rec_channel->values.count == 1);
+		ufbxt_assert(rec_channel->values.data[0].type == UFBX_DOM_VALUE_STRING);
+		ufbxt_assert(!strcmp(rec_channel->values.data[0].value_str.data, "Transform"));
+
+		if (rec_channel->children.count == 0) break;
+		ufbxt_assert(rec_channel->children.count == 1);
+		rec_channel = rec_channel->children.data[0];
+	}
+
+	ufbxt_assert(count == 29);
+}
+#endif
+
