@@ -719,7 +719,7 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 #elif UFBXI_IS_REGRESSION && defined(ufbxi_thread_local)
 	#define ufbxi_recursive_function(m_ret, m_name, m_args, m_max_depth, m_params) \
 		{ \
-			static m_ret m_name##_rec m_params; \
+			m_ret m_name##_rec m_params; \
 			static ufbxi_thread_local unsigned ufbxi_recursion_depth; \
 			ufbx_assert(ufbxi_recursion_depth < m_max_depth); \
 			++ufbxi_recursion_depth; \
@@ -727,17 +727,17 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 			--ufbxi_recursion_depth; \
 			return ret; \
 		} \
-		static m_ret m_name##_rec m_params
+		m_ret m_name##_rec m_params
 	#define ufbxi_recursive_function_void(m_name, m_args, m_max_depth, m_params) \
 		{ \
-			static void m_name##_rec m_params; \
+			void m_name##_rec m_params; \
 			static ufbxi_thread_local unsigned ufbxi_recursion_depth; \
 			ufbx_assert(ufbxi_recursion_depth < m_max_depth); \
 			++ufbxi_recursion_depth; \
 			m_name##_rec m_args; \
 			--ufbxi_recursion_depth; \
 		} \
-		static void m_name##_rec m_params
+		void m_name##_rec m_params
 #else
 	#define ufbxi_recursive_function(m_ret, m_name, m_args, m_max_depth, m_params)
 	#define ufbxi_recursive_function_void(m_name, m_args, m_max_depth, m_params)
