@@ -2,7 +2,7 @@
 
 Single source file FBX file loader.
 
-```c
+```cpp
 ufbx_load_opts opts = { 0 }; // Optional, pass NULL for defaults
 ufbx_error error; // Optional, pass NULL if you don't care about errors
 ufbx_scene *scene = ufbx_load_file("thing.fbx", &opts, &error);
@@ -39,26 +39,26 @@ The goal is to be at feature parity with the official FBX SDK.
 * Supports binary and ASCII FBX files starting from version 3000
 * Easy to integrate: one header and a single portable C99/C++11 file
 * Safe
-** Invalid files and out-of-memory conditions are handled gracefully
-** Loaded scenes are sanitized by default, no out-of-bounds indices or non-UTF-8 strings
-** Extensively [tested](#testing)
+  * Invalid files and out-of-memory conditions are handled gracefully
+  * Loaded scenes are sanitized by default, no out-of-bounds indices or non-UTF-8 strings
+  * Extensively [tested](#testing)
 * Various object types
-** Meshes, skinning, blend shapes
-** Lights and cameras
-** Embedded textures
-** NURBS curves and surfaces
-** Geometry caches
-** LOD groups
-** Display/selection sets
-** Rigging constraints
+  * Meshes, skinning, blend shapes
+  * Lights and cameras
+  * Embedded textures
+  * NURBS curves and surfaces
+  * Geometry caches
+  * LOD groups
+  * Display/selection sets
+  * Rigging constraints
 * Unified PBR material from known vendor-specific materials
 * Various utilities for evaluating the scene (can be compiled out if not needed)
-** Polygon triangulation
-** Index generation
-** Animation curve evaluation / layer blending
-** CPU skinning (all FBX modes: linear, dual-quaternion, blended)
-** Subdivision surface evaluation
-** NURBS curve/surface tessellation
+  * Polygon triangulation
+  * Index generation
+  * Animation curve evaluation / layer blending
+  * CPU skinning (all FBX modes: linear, dual-quaternion, blended)
+  * Subdivision surface evaluation
+  * NURBS curve/surface tessellation
 * Progress reporting and cancellation
 * Support for Wavefront `.obj` files as well
 
@@ -80,13 +80,13 @@ The following platforms are tested on CI and produce bit-exact results:
 
 * Internal tests run on all platforms listed above
 * Fuzzed in multiple layers
-** Parsers (fbx binary/fbx ascii/deflate/xml/mcx/obj/mtl) fuzzed via AFL
-** Built-in fuzzing for byte modifications/truncation/out-of-memory
-** Semantic fuzzing for binary FBX and OBJ files
+  * Parsers (fbx binary/fbx ascii/deflate/xml/mcx/obj/mtl) fuzzed via AFL
+  * Built-in fuzzing for byte modifications/truncation/out-of-memory
+  * Semantic fuzzing for binary FBX and OBJ files
 * Public dataset: 3.0GB / 245 files
-** Loaded, validated, and compared against reference .obj files
+  * Loaded, validated, and compared against reference .obj files
 * Private dataset: 33.6GB / 12618 files
-** Loaded and validated
+  * Loaded and validated
 * Static analysis for maximum stack depth on Linux GCC/Clang
 
 ## License
