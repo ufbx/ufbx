@@ -26850,6 +26850,17 @@ ufbx_abi void ufbx_retain_line_curve(ufbx_line_curve *line_curve)
 	ufbxi_retain_ref(&imp->refcount);
 }
 
+ufbx_abi uint32_t ufbx_find_face_index(ufbx_mesh *mesh, size_t index)
+{
+	if (!mesh || index > UINT32_MAX) return UFBX_NO_INDEX;
+	uint32_t ix = (uint32_t)index;
+
+	size_t face_ix = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbx_face, 4, &face_ix, mesh->faces.data, 0, mesh->faces.count,
+		( a->index_begin + a->num_indices <= ix ), ( ix >= a->index_begin && ix < a->index_begin + a->num_indices ));
+	return (uint32_t)face_ix;
+}
+
 ufbx_abi ufbxi_noinline uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face)
 {
 #if UFBXI_FEATURE_TRIANGULATION

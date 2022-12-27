@@ -132,3 +132,54 @@ UFBXT_TEST(obj_open_memory_ref)
 	ufbxt_do_open_memory_test("blender_279_ball", 1, 2, ufbxt_open_file_memory_ref);
 }
 #endif
+
+UFBXT_FILE_TEST_ALT(find_face_index, maya_cube)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		ufbxt_hintf("i=%zu", i);
+		uint32_t face_ix = ufbx_find_face_index(mesh, i);
+		ufbxt_assert(face_ix == i / 4);
+	}
+
+	{
+		uint32_t face_ix = ufbx_find_face_index(mesh, mesh->num_indices);
+		ufbxt_assert(face_ix == UFBX_NO_INDEX);
+	}
+
+	{
+		uint32_t face_ix = ufbx_find_face_index(mesh, SIZE_MAX);
+		ufbxt_assert(face_ix == UFBX_NO_INDEX);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(find_face_index_bad_face, maya_bad_face)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(ufbx_find_face_index(mesh, 0) == 0);
+	ufbxt_assert(ufbx_find_face_index(mesh, 1) == 1);
+	ufbxt_assert(ufbx_find_face_index(mesh, 2) == 1);
+	ufbxt_assert(ufbx_find_face_index(mesh, 3) == 2);
+	ufbxt_assert(ufbx_find_face_index(mesh, 4) == 2);
+	ufbxt_assert(ufbx_find_face_index(mesh, 5) == 2);
+
+
+	for (size_t face_ix = 0; face_ix < mesh->faces.count; face_ix++) {
+		ufbx_face face = mesh->faces.data[face_ix];
+		for (size_t i = 0; i < face.num_indices; i++) {
+			ufbxt_hintf("face_ix=%zu i=%zu", face_ix, i);
+			ufbxt_assert(ufbx_find_face_index(mesh, face.index_begin + i) == face_ix);
+		}
+	}
+}
+#endif
+
