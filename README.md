@@ -29,15 +29,15 @@ ufbx_free_scene(scene);
 
 ## Setup
 
-Copy `ufbx.h` and `ufbx.c` to your project. You can also add `misc/ufbx.natvis`
-to get debug formatting for the types.
+Copy `ufbx.h` and `ufbx.c` to your project, `ufbx.c` needs to be compiled as
+C99/C++11 or more recent. You can also add `misc/ufbx.natvis` to get debug
+formatting for the types.
 
 ## Features
 
 The goal is to be at feature parity with the official FBX SDK.
 
 * Supports binary and ASCII FBX files starting from version 3000
-* Easy to integrate: one header and a single portable C99/C++11 file
 * Safe
   * Invalid files and out-of-memory conditions are handled gracefully
   * Loaded scenes are sanitized by default, no out-of-bounds indices or non-UTF-8 strings
@@ -56,7 +56,7 @@ The goal is to be at feature parity with the official FBX SDK.
   * Polygon triangulation
   * Index generation
   * Animation curve evaluation / layer blending
-  * CPU skinning (all FBX modes: linear, dual-quaternion, blended)
+  * CPU skinning evaluation
   * Subdivision surface evaluation
   * NURBS curve/surface tessellation
 * Progress reporting and cancellation
