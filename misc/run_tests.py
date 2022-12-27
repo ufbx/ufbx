@@ -10,6 +10,7 @@ import sys
 import shutil
 import functools
 import argparse
+import copy
 from typing import NamedTuple
 
 parser = argparse.ArgumentParser(description="Run ufbx tests")
@@ -281,6 +282,9 @@ class GCCCompiler(Compiler):
         archs += (a + "-san" for a in raw_archs if a != "wasm32")
         return archs
 
+    def modify_compile_args(self, config, args):
+        pass
+
     def compile(self, config):
         sources = config["sources"]
         output = config["output"]
@@ -292,6 +296,8 @@ class GCCCompiler(Compiler):
 
         if config.get("warnings", False):
             args += ["-Wall", "-Wextra", "-Wsign-conversion", "-Wmissing-prototypes"]
+            if self.has_cpp:
+                args += ["-Wconversion-null"]
             args += ["-Werror"]
 
         args.append("-g")
@@ -322,7 +328,8 @@ class GCCCompiler(Compiler):
         std = config.get("std", std)
         args.append(f"-std={std}")
 
-        args.append("-DUFBX_DEV")
+        if config.get("dev", True):
+            args.append("-DUFBX_DEV")
 
         use_sse = False
         if config.get("sse", False):
@@ -343,6 +350,9 @@ class GCCCompiler(Compiler):
 
         if config.get("threads", False):
             args.append("-pthread")
+
+        if config.get("stack_protector", False):
+            args.append("-fstack-protector")
 
         if config.get("san"):
             args.append("-fsanitize=address")
@@ -368,6 +378,8 @@ class GCCCompiler(Compiler):
             args.append("-lm")
 
         args += ["-o", output]
+
+        self.modify_compile_args(config, args)
 
         return self.run(args)
 
@@ -407,6 +419,9 @@ class WasiCompiler(ClangCompiler):
     def __init__(self, name, exe, cpp, sysroot):
         super().__init__(name, exe, cpp)
         self.sysroot = sysroot
+
+    def modify_compile_args(self, config, args):
+        args.append("-Wl,--stack-first")
 
 class ZigCompiler(ClangCompiler):
     def __init__(self, name, exe, cpp):
@@ -655,7 +670,7 @@ async def run_viewer_target(target):
             if "\U0001F602" in file: continue
             path = os.path.join(root, file)
             if "fuzz" in path: continue
-            if path.endswith(".fbx"):
+            if path.endswith(".fbx") or path.endswith(".obj"):
                 target.log.clear()
                 target.ran = False
                 await run_target(target, [path])
@@ -681,7 +696,7 @@ def decorate_arch(compiler, arch):
 tests = set(argv.tests)
 impicit_tests = False
 if not tests:
-    tests = ["tests", "picort", "viewer", "domfuzz", "readme", "threadcheck", "hashes"]
+    tests = ["tests", "stack", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
     implicit_tests = True
 
 async def main():
@@ -747,11 +762,19 @@ async def main():
 
                 path = os.path.join(build_path, name)
 
-                conf = dict(config)
+                conf = copy.deepcopy(config)
                 conf["output"] = os.path.join(path, config.get("output", "a.exe"))
+
                 for opt_name, opt in opts:
                     conf.update(config_options[opt_name][opt])
-                
+
+                overrides = conf.get("overrides")
+                if overrides:
+                    overrides(conf, compiler)
+
+                if conf.get("skip", False):
+                    continue
+
                 if config_fmt_arch(conf) not in archs:
                     continue
                 
@@ -836,6 +859,62 @@ async def main():
             "dev": False,
         }
         target_tasks += compile_permutations("cpp_no_dev", cpp_no_dev_config, arch_configs, [])
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+    if "stack" in tests:
+        log_comment("-- Compiling and running stack limited tests --")
+
+        target_tasks = []
+
+        def debug_overrides(config, compiler):
+            stack_limit = 128*1024
+            if sys.platform == "win32" and compiler.name in ["gcc"]:
+                # GCC can't handle CreateThread on CI..
+                config["skip"] = True
+            elif sys.platform == "win32" and compiler.name in ["clang"]:
+                # TODO: Check what causes this stack usage
+                stack_limit = 256*1024
+            config["defines"]["UFBXT_STACK_LIMIT"] = stack_limit
+
+        debug_stack_config = {
+            "sources": ["test/runner.c", "ufbx.c"],
+            "output": "runner" + exe_suffix,
+            "optimize": False,
+            "threads": True,
+            "stack_protector": True,
+            "defines": { },
+            "overrides": debug_overrides,
+        }
+
+        target_tasks += compile_permutations("runner_debug_stack", debug_stack_config, arch_configs, ["-d", "data"])
+
+        def release_overrides(config, compiler):
+            stack_limit = 64*1024
+            if sys.platform == "win32" and compiler.name in ["gcc"]:
+                # GCC can't handle CreateThread on CI..
+                config["skip"] = True
+            elif sys.platform == "win32" and compiler.name in ["clang", "vs_cl64"]:
+                # TODO: Check what causes this stack usage
+                stack_limit = 128*1024
+            elif config["arch"] == "arm64":
+                # Fails with 'Failed to run thread with stack size of 65536 bytes'
+                # with 64kiB stack..
+                stack_limit = 128*1024
+            config["defines"]["UFBXT_STACK_LIMIT"] = stack_limit
+
+        release_stack_config = {
+            "sources": ["test/runner.c", "ufbx.c"],
+            "output": "runner" + exe_suffix,
+            "optimize": True,
+            "threads": True,
+            "stack_protector": True,
+            "defines": { },
+            "overrides": release_overrides,
+        }
+
+        target_tasks += compile_permutations("runner_release_stack", release_stack_config, arch_configs, ["-d", "data"])
 
         targets = await gather(target_tasks)
         all_targets += targets
@@ -1059,6 +1138,80 @@ async def main():
                         target.log.clear()
                         target.ran = False
                         run_tasks.append(run_target(target, [path],
+                            RunOpts(
+                                rerunnable=True,
+                                info=path,
+                            )
+                        ))
+            
+            targets = await gather(run_tasks)
+
+    if "objfuzz" in tests:
+        log_comment("-- Compiling and running objfuzz --")
+    
+        target_tasks = []
+
+        objfuzz_configs = {
+            "arch": arch_configs["arch"],
+        }
+
+        objfuzz_config = {
+            "sources": ["ufbx.c", "test/objfuzz.cpp"],
+            "output": "objfuzz" + exe_suffix,
+            "cpp": True,
+            "optimize": True,
+            "std": "c++14",
+        }
+        target_tasks += compile_permutations("objfuzz", objfuzz_config, objfuzz_configs, None)
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+        def target_score(target):
+            compiler = target.compiler
+            config = target.config
+            if not target.compiled:
+                return (0, 0)
+            score = 1
+            if config["arch"] == "x64":
+                score += 10
+            if "clang" in compiler.name:
+                score += 10
+            if "msvc" in compiler.name:
+                score += 5
+            version = re.search(r"\d+", compiler.version)
+            version = int(version.group(0)) if version else 0
+            return (score, version)
+
+        target = max(targets, key=target_score)
+
+        if target.compiled:
+            log_comment(f"-- Running objfuzz with {target.name} --")
+
+            too_heavy_files = [
+                "synthetic_color_suzanne_0_obj.obj",
+                "synthetic_color_suzanne_1_obj.obj",
+                "zbrush_polygroup_mess_0_obj.obj",
+            ]
+
+            run_tasks = []
+            for root, _, files in os.walk("data"):
+                for file in files:
+                    path = os.path.join(root, file)
+                    if any(f in file for f in too_heavy_files): continue
+                    if re.match(r"^.*_\d+_obj.obj$", file):
+                        target.log.clear()
+                        target.ran = False
+                        run_tasks.append(run_target(target, [path],
+                            RunOpts(
+                                rerunnable=True,
+                                info=path,
+                            )
+                        ))
+                    elif re.match(r"^.*_\d+_mtl.mtl$", file):
+                        target.log.clear()
+                        target.ran = False
+                        run_tasks.append(run_target(target, ["--mtl", path],
                             RunOpts(
                                 rerunnable=True,
                                 info=path,

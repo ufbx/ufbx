@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "curves"
 
 UFBXT_FILE_TEST(max_curve_line)
 #if UFBXT_IMPL

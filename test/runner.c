@@ -1,7 +1,11 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <stdint.h>
-void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr);
+#include <stdbool.h>
+void ufbxt_assert_fail_imp(const char *file, uint32_t line, const char *expr, bool fatal);
+static void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr) {
+	ufbxt_assert_fail_imp(file, line, expr, true);
+}
 
 #include "../ufbx.h"
 
@@ -10,6 +14,45 @@ void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr);
 #include <stdio.h>
 #include <stdarg.h>
 #include <math.h>
+
+#if defined(UFBXT_STACK_LIMIT)
+	static int ufbxt_main_argc;
+	static char **ufbxt_main_argv;
+	static int ufbxt_main_return;
+	#if defined(_WIN32)
+		#define NOMINMAX
+		#define WIN32_LEAN_AND_MEAN
+		#include <Windows.h>
+
+		#define UFBXT_THREAD_ENTRYPOINT DWORD WINAPI ufbxt_win32_entry(LPVOID _param)
+		#define ufbxt_thread_return() return 0
+
+		UFBXT_THREAD_ENTRYPOINT;
+		static bool ufbxt_run_thread() {
+			HANDLE handle = CreateThread(NULL, (SIZE_T)(UFBXT_STACK_LIMIT), &ufbxt_win32_entry, NULL, STACK_SIZE_PARAM_IS_A_RESERVATION , NULL);
+			if (handle == NULL) return false;
+			WaitForSingleObject(handle, INFINITE);
+			CloseHandle(handle);
+			return true;
+		}
+	#else
+		#include <pthread.h>
+
+		#define UFBXT_THREAD_ENTRYPOINT void *ufbxt_pthread_entry(void *param)
+		#define ufbxt_thread_return() return 0
+
+		UFBXT_THREAD_ENTRYPOINT;
+		static bool ufbxt_run_thread() {
+			pthread_attr_t attr;
+			pthread_t thread;
+			if (pthread_attr_init(&attr)) return false;
+			if (pthread_attr_setstacksize(&attr, (size_t)(UFBXT_STACK_LIMIT))) return false;
+			if (pthread_create(&thread, &attr, ufbxt_pthread_entry, NULL)) return false;
+			if (pthread_join(thread, NULL)) return false;
+			return true;
+		}
+	#endif
+#endif
 
 // -- Thread local
 
@@ -72,7 +115,11 @@ static void ufbxt_longjmp(int env, int value, const char *file, uint32_t line, c
 	ufbxt_make_memory_context_values(data, (uint32_t)sizeof(data) - 1)
 
 #define ufbxt_assert(cond) do { \
-		if (!(cond)) ufbxt_assert_fail(__FILE__, __LINE__, #cond); \
+		if (!(cond)) ufbxt_assert_fail_imp(__FILE__, __LINE__, #cond, true); \
+	} while (0)
+
+#define ufbxt_soft_assert(cond) do { \
+		if (!(cond)) ufbxt_assert_fail_imp(__FILE__, __LINE__, #cond, false); \
 	} while (0)
 
 #define ufbxt_assert_eq(a, b, size) do { \
@@ -91,6 +138,7 @@ typedef struct {
 } ufbxt_fail;
 
 typedef struct {
+	const char *group;
 	const char *name;
 	void (*func)(void);
 
@@ -110,6 +158,9 @@ uint32_t g_log_pos;
 char g_hint[8*1024];
 
 bool g_skip_print_ok = false;
+int g_skip_obj_test = false;
+
+bool g_no_fuzz = false;
 
 typedef struct {
 	size_t step;
@@ -125,10 +176,18 @@ typedef struct {
 
 static ufbxt_check_line g_checks[32768];
 
+bool g_expect_fail = false;
+size_t g_expect_fail_count = 0;
+
 ufbxt_threadlocal ufbxt_jmp_buf *t_jmp_buf;
 
-void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
+void ufbxt_assert_fail_imp(const char *file, uint32_t line, const char *expr, bool fatal)
 {
+	if (!fatal && g_expect_fail) {
+		g_expect_fail_count++;
+		return;
+	}
+
 	if (t_jmp_buf) {
 		ufbxt_longjmp(*t_jmp_buf, 1, file, line, expr);
 	}
@@ -146,8 +205,6 @@ void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
 
 void ufbxt_logf(const char *fmt, ...)
 {
-	if (!g_verbose) return;
-
 	va_list args;
 	va_start(args, fmt);
 	if (g_log_pos < sizeof(g_log_buf)) {
@@ -181,22 +238,24 @@ void ufbxt_assert_eq_test(const void *a, const void *b, size_t size, const char 
 	}
 }
 
-void ufbxt_log_flush()
+void ufbxt_log_flush(bool print_always)
 {
-	int prev_newline = 1;
-	for (uint32_t i = 0; i < g_log_pos; i++) {
-		if (i >= sizeof(g_log_buf)) break;
-		char ch = g_log_buf[i];
-		if (ch == '\n') {
-			putchar('\n');
-			prev_newline = 1;
-		} else {
-			if (prev_newline) {
-				putchar(' ');
-				putchar(' ');
+	if ((g_verbose || print_always) && g_log_pos > 0) {
+		int prev_newline = 1;
+		for (uint32_t i = 0; i < g_log_pos; i++) {
+			if (i >= sizeof(g_log_buf)) break;
+			char ch = g_log_buf[i];
+			if (ch == '\n') {
+				putchar('\n');
+				prev_newline = 1;
+			} else {
+				if (prev_newline) {
+					putchar(' ');
+					putchar(' ');
+				}
+				prev_newline = 0;
+				putchar(ch);
 			}
-			prev_newline = 0;
-			putchar(ch);
 		}
 	}
 	g_log_pos = 0;
@@ -288,7 +347,10 @@ static bool g_fuzz_no_cancel = false;
 static bool g_fuzz_no_buffer = false;
 static int g_patch_start = 0;
 static int g_fuzz_quality = 16;
+static int g_heavy_fuzz_quality = -1;
 static size_t g_fuzz_step = SIZE_MAX;
+static size_t g_fuzz_file = SIZE_MAX;
+static size_t g_deflate_opt = SIZE_MAX;
 
 const char *g_fuzz_test_name = NULL;
 
@@ -327,6 +389,21 @@ static bool ufbxt_begin_fuzz()
 	}
 }
 
+static void ufbxt_begin_expect_fail()
+{
+	ufbxt_assert(!g_expect_fail);
+	g_expect_fail = true;
+	g_expect_fail_count = 0;
+}
+
+static size_t ufbxt_end_expect_fail()
+{
+	ufbxt_assert(g_expect_fail);
+	ufbxt_assert(g_expect_fail_count > 0);
+	g_expect_fail = false;
+	return g_expect_fail_count;
+}
+
 typedef struct {
 	size_t calls_left;
 } ufbxt_cancel_ctx;
@@ -337,7 +414,7 @@ ufbx_progress_result ufbxt_cancel_progress(void *user, const ufbx_progress *prog
 	return --ctx->calls_left > 0 ? UFBX_PROGRESS_CONTINUE : UFBX_PROGRESS_CANCEL;
 }
 
-int ufbxt_test_fuzz(const char *filename, void *data, size_t size, size_t step, int offset, size_t temp_limit, size_t result_limit, size_t truncate_length, size_t cancel_step)
+int ufbxt_test_fuzz(const char *filename, void *data, size_t size, const ufbx_load_opts *default_opts, size_t step, int offset, size_t temp_limit, size_t result_limit, size_t truncate_length, size_t cancel_step)
 {
 	if (g_fuzz_step < SIZE_MAX && step != g_fuzz_step) return 1;
 
@@ -350,6 +427,10 @@ int ufbxt_test_fuzz(const char *filename, void *data, size_t size, size_t step, 
 
 		ufbx_load_opts opts = { 0 };
 		ufbxt_cancel_ctx cancel_ctx = { 0 };
+
+		if (default_opts) {
+			opts = *default_opts;
+		}
 
 		opts.load_external_files = true;
 		opts.filename.data = filename;
@@ -459,731 +540,1499 @@ typedef struct {
 
 // Generated by running `runner --fuzz`
 // Take both normal and `UFBX_REGRESSION` builds, combine results and use `sort -u` to remove duplciates.
-// From commit 185f487
+// From commit 348b7e8
 static const ufbxt_fuzz_check g_fuzz_checks[] = {
-	{ "blender_279_ball_6100_ascii", 14149, -1, 0, 0, 238, 0, 0, "mat->face_indices.data" },
-	{ "blender_279_ball_6100_ascii", 9077, 18422, 84, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->face_smoothing.da..." },
-	{ "blender_279_sausage_6100_ascii", 13866, -1, 0, 0, 415, 0, 0, "ufbxi_fetch_dst_elements(uc, &skin->clusters, &skin->el..." },
-	{ "blender_279_sausage_6100_ascii", 13909, -1, 0, 0, 416, 0, 0, "skin->vertices.data" },
-	{ "blender_279_sausage_6100_ascii", 13913, -1, 0, 0, 417, 0, 0, "skin->weights.data" },
-	{ "blender_279_sausage_6100_ascii", 14170, -1, 0, 0, 421, 0, 0, "ufbxi_fetch_dst_elements(uc, &mesh->skin_deformers, &me..." },
-	{ "blender_279_sausage_7400_binary", 10192, -1, 0, 706, 0, 0, 0, "ufbxi_read_skin(uc, node, &info)" },
-	{ "blender_279_sausage_7400_binary", 10192, -1, 0, 710, 0, 0, 0, "ufbxi_read_skin(uc, node, &info)" },
-	{ "blender_279_sausage_7400_binary", 10194, 23076, 0, 0, 0, 0, 0, "ufbxi_read_skin_cluster(uc, node, &info)" },
-	{ "blender_279_sausage_7400_binary", 10217, -1, 0, 833, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_va..." },
-	{ "blender_279_sausage_7400_binary", 10217, -1, 0, 838, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_va..." },
-	{ "blender_279_sausage_7400_binary", 10221, 21748, 0, 0, 0, 0, 0, "ufbxi_read_pose(uc, node, &info, sub_type)" },
-	{ "blender_279_sausage_7400_binary", 9442, -1, 0, 706, 0, 0, 0, "skin" },
-	{ "blender_279_sausage_7400_binary", 9442, -1, 0, 710, 0, 0, 0, "skin" },
-	{ "blender_279_sausage_7400_binary", 9474, -1, 0, 728, 0, 0, 0, "cluster" },
-	{ "blender_279_sausage_7400_binary", 9474, -1, 0, 733, 0, 0, 0, "cluster" },
-	{ "blender_279_sausage_7400_binary", 9480, 23076, 0, 0, 0, 0, 0, "indices->size == weights->size" },
-	{ "blender_279_sausage_7400_binary", 9491, 23900, 0, 0, 0, 0, 0, "transform->size >= 16" },
-	{ "blender_279_sausage_7400_binary", 9492, 24063, 0, 0, 0, 0, 0, "transform_link->size >= 16" },
-	{ "blender_279_sausage_7400_binary", 9548, -1, 0, 856, 0, 0, 0, "curve" },
-	{ "blender_279_sausage_7400_binary", 9548, -1, 0, 861, 0, 0, 0, "curve" },
-	{ "blender_279_sausage_7400_binary", 9829, -1, 0, 691, 0, 0, 0, "pose" },
-	{ "blender_279_sausage_7400_binary", 9829, -1, 0, 695, 0, 0, 0, "pose" },
-	{ "blender_279_sausage_7400_binary", 9850, 21748, 0, 0, 0, 0, 0, "matrix->size >= 16" },
-	{ "blender_279_sausage_7400_binary", 9853, -1, 0, 693, 0, 0, 0, "tmp_pose" },
-	{ "blender_279_sausage_7400_binary", 9853, -1, 0, 697, 0, 0, 0, "tmp_pose" },
-	{ "blender_279_sausage_7400_binary", 9863, -1, 0, 698, 0, 0, 0, "pose->bone_poses.data" },
-	{ "blender_279_sausage_7400_binary", 9863, -1, 0, 702, 0, 0, 0, "pose->bone_poses.data" },
-	{ "blender_279_unicode_6100_ascii", 10695, 432, 11, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_Creator)" },
-	{ "blender_279_uv_sets_6100_ascii", 5049, -1, 0, 717, 0, 0, 0, "extra" },
-	{ "blender_279_uv_sets_6100_ascii", 5049, -1, 0, 724, 0, 0, 0, "extra" },
-	{ "blender_279_uv_sets_6100_ascii", 5053, -1, 0, 718, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->e..." },
-	{ "blender_279_uv_sets_6100_ascii", 5053, -1, 0, 725, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->e..." },
-	{ "blender_279_uv_sets_6100_ascii", 9141, -1, 0, 0, 63, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prop_nam..." },
-	{ "blender_279_uv_sets_6100_ascii", 9147, -1, 0, 716, 0, 0, 0, "tex" },
-	{ "blender_279_uv_sets_6100_ascii", 9147, -1, 0, 723, 0, 0, 0, "tex" },
-	{ "blender_279_uv_sets_6100_ascii", 9234, -1, 0, 717, 0, 0, 0, "extra" },
-	{ "blender_279_uv_sets_6100_ascii", 9234, -1, 0, 724, 0, 0, 0, "extra" },
-	{ "blender_279_uv_sets_6100_ascii", 9237, -1, 0, 719, 0, 0, 0, "extra->texture_arr" },
-	{ "blender_279_uv_sets_6100_ascii", 9237, -1, 0, 726, 0, 0, 0, "extra->texture_arr" },
-	{ "blender_293_barbarian_7400_binary", 10196, -1, 0, 991, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_blend_d..." },
-	{ "blender_293_barbarian_7400_binary", 10196, -1, 0, 998, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_blend_d..." },
-	{ "blender_293_barbarian_7400_binary", 10198, -1, 0, 1003, 0, 0, 0, "ufbxi_read_blend_channel(uc, node, &info)" },
-	{ "blender_293_barbarian_7400_binary", 10198, -1, 0, 1010, 0, 0, 0, "ufbxi_read_blend_channel(uc, node, &info)" },
-	{ "blender_293_barbarian_7400_binary", 9504, -1, 0, 1003, 0, 0, 0, "channel" },
-	{ "blender_293_barbarian_7400_binary", 9504, -1, 0, 1010, 0, 0, 0, "channel" },
-	{ "blender_293_barbarian_7400_binary", 9512, -1, 0, 1005, 0, 0, 0, "((ufbx_real_list*)ufbxi_push_size_copy((&uc->tmp_full_w..." },
-	{ "blender_293_barbarian_7400_binary", 9512, -1, 0, 1012, 0, 0, 0, "((ufbx_real_list*)ufbxi_push_size_copy((&uc->tmp_full_w..." },
-	{ "fuzz_0000", 10318, -1, 0, 480, 0, 0, 0, "conn" },
-	{ "fuzz_0000", 10318, -1, 0, 484, 0, 0, 0, "conn" },
-	{ "fuzz_0000", 11430, -1, 0, 485, 0, 0, 0, "tmp_connections" },
-	{ "fuzz_0000", 11606, -1, 0, 486, 0, 0, 0, "node_ids" },
-	{ "fuzz_0000", 11620, -1, 0, 488, 0, 0, 0, "node_offsets" },
-	{ "fuzz_0000", 11665, -1, 0, 489, 0, 0, 0, "p_offset" },
-	{ "fuzz_0000", 11754, -1, 0, 496, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
-	{ "fuzz_0001", 11732, -1, 0, 709, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
-	{ "fuzz_0001", 11732, -1, 0, 718, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
-	{ "fuzz_0001", 14242, -1, 0, 713, 0, 0, 0, "aprop" },
-	{ "fuzz_0001", 14242, -1, 0, 722, 0, 0, 0, "aprop" },
-	{ "fuzz_0001", 14293, -1, 0, 727, 0, 0, 0, "aprop" },
-	{ "fuzz_0001", 7033, -1, 0, 521, 0, 0, 0, "v" },
-	{ "fuzz_0001", 7033, -1, 0, 530, 0, 0, 0, "v" },
-	{ "fuzz_0002", 11829, -1, 0, 783, 0, 0, 0, "((ufbx_mesh_material*)ufbxi_push_size_copy((&uc->tmp_st..." },
-	{ "fuzz_0003", 11545, -1, 0, 719, 0, 0, 0, "((ufbx_prop*)ufbxi_push_size_copy((&uc->tmp_stack), siz..." },
-	{ "fuzz_0003", 11545, -1, 0, 723, 0, 0, 0, "((ufbx_prop*)ufbxi_push_size_copy((&uc->tmp_stack), siz..." },
-	{ "fuzz_0003", 11571, -1, 0, 720, 0, 0, 0, "new_prop" },
-	{ "fuzz_0003", 11571, -1, 0, 724, 0, 0, 0, "new_prop" },
-	{ "fuzz_0003", 11586, -1, 0, 722, 0, 0, 0, "((ufbx_prop*)ufbxi_push_size_copy((&uc->tmp_stack), siz..." },
-	{ "fuzz_0003", 11586, -1, 0, 726, 0, 0, 0, "((ufbx_prop*)ufbxi_push_size_copy((&uc->tmp_stack), siz..." },
-	{ "fuzz_0018", 11245, 810, 0, 0, 0, 0, 0, "ufbxi_read_header_extension(uc)" },
-	{ "fuzz_0070", 2959, -1, 0, 32, 0, 0, 0, "ufbxi_grow_array_size((pool->map.ator), sizeof(**(&pool..." },
-	{ "fuzz_0070", 2959, -1, 0, 34, 0, 0, 0, "ufbxi_grow_array_size((pool->map.ator), sizeof(**(&pool..." },
-	{ "fuzz_0272", 10249, -1, 0, 449, 0, 0, 0, "ufbxi_read_unknown(uc, node, &info, type_str, sub_type_..." },
-	{ "fuzz_0272", 10249, -1, 0, 453, 0, 0, 0, "ufbxi_read_unknown(uc, node, &info, type_str, sub_type_..." },
-	{ "fuzz_0272", 2948, -1, 0, 451, 0, 0, 0, "ufbxi_grow_array_size((pool->map.ator), sizeof(**(&pool..." },
-	{ "fuzz_0272", 2948, -1, 0, 455, 0, 0, 0, "ufbxi_grow_array_size((pool->map.ator), sizeof(**(&pool..." },
-	{ "fuzz_0272", 3089, -1, 0, 451, 0, 0, 0, "ufbxi_sanitize_string(pool, &sanitized, str, length, va..." },
-	{ "fuzz_0272", 3089, -1, 0, 455, 0, 0, 0, "ufbxi_sanitize_string(pool, &sanitized, str, length, va..." },
-	{ "fuzz_0272", 8377, -1, 0, 449, 0, 0, 0, "unknown" },
-	{ "fuzz_0272", 8377, -1, 0, 453, 0, 0, 0, "unknown" },
-	{ "fuzz_0272", 8386, -1, 0, 451, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &unknown-..." },
-	{ "fuzz_0272", 8386, -1, 0, 455, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &unknown-..." },
-	{ "fuzz_0393", 8559, -1, 0, 0, 137, 0, 0, "index_data" },
-	{ "fuzz_0491", 11308, -1, 0, 26, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
-	{ "fuzz_0491", 11308, -1, 0, 28, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
-	{ "fuzz_0491", 11328, -1, 0, 23, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
-	{ "fuzz_0491", 11328, -1, 0, 25, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
-	{ "fuzz_0491", 11661, -1, 0, 23, 0, 0, 0, "ufbxi_sort_node_ptrs(uc, node_ptrs, num_nodes)" },
-	{ "fuzz_0491", 11661, -1, 0, 25, 0, 0, 0, "ufbxi_sort_node_ptrs(uc, node_ptrs, num_nodes)" },
-	{ "fuzz_0491", 13765, -1, 0, 26, 0, 0, 0, "ufbxi_sort_name_elements(uc, uc->scene.elements_by_name..." },
-	{ "fuzz_0491", 13765, -1, 0, 28, 0, 0, 0, "ufbxi_sort_name_elements(uc, uc->scene.elements_by_name..." },
-	{ "fuzz_0561", 10188, -1, 0, 450, 0, 0, 0, "ufbxi_read_unknown(uc, node, &info, type_str, sub_type_..." },
-	{ "fuzz_0561", 10188, -1, 0, 454, 0, 0, 0, "ufbxi_read_unknown(uc, node, &info, type_str, sub_type_..." },
-	{ "marvelous_quad_7200_binary", 15989, -1, 0, 0, 272, 0, 0, "ufbxi_push_string_place_str(&cc->string_pool, &channel-..." },
-	{ "max2009_blob_5800_ascii", 6922, -1, 0, 0, 118, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, v, raw)" },
-	{ "max2009_blob_5800_ascii", 7465, 12, 0, 0, 0, 0, 0, "ufbxi_ascii_parse_node(uc, 0, UFBXI_PARSE_ROOT, &end, &..." },
-	{ "max2009_blob_5800_binary", 10901, -1, 0, 570, 0, 0, 0, "material" },
-	{ "max2009_blob_5800_binary", 10901, -1, 0, 577, 0, 0, 0, "material" },
-	{ "max2009_blob_5800_binary", 10909, -1, 0, 0, 142, 0, 0, "material->props.props.data" },
-	{ "max2009_blob_5800_binary", 10950, -1, 0, 106, 0, 0, 0, "light" },
-	{ "max2009_blob_5800_binary", 10950, -1, 0, 113, 0, 0, 0, "light" },
-	{ "max2009_blob_5800_binary", 10957, -1, 0, 0, 44, 0, 0, "light->props.props.data" },
-	{ "max2009_blob_5800_binary", 10965, -1, 0, 307, 0, 0, 0, "camera" },
-	{ "max2009_blob_5800_binary", 10965, -1, 0, 314, 0, 0, 0, "camera" },
-	{ "max2009_blob_5800_binary", 10972, -1, 0, 0, 96, 0, 0, "camera->props.props.data" },
-	{ "max2009_blob_5800_binary", 11093, 56700, 78, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->face_material.dat..." },
-	{ "max2009_blob_5800_binary", 11122, 6207, 0, 0, 0, 0, 0, "ufbxi_get_val1(child, \"s\", &type_and_name)" },
-	{ "max2009_blob_5800_binary", 11123, -1, 0, 0, 141, 0, 0, "ufbxi_split_type_and_name(uc, type_and_name, &type, &na..." },
-	{ "max2009_blob_5800_binary", 11124, -1, 0, 570, 0, 0, 0, "ufbxi_read_legacy_material(uc, child, &fbx_id, name.dat..." },
-	{ "max2009_blob_5800_binary", 11124, -1, 0, 577, 0, 0, 0, "ufbxi_read_legacy_material(uc, child, &fbx_id, name.dat..." },
-	{ "max2009_blob_5800_binary", 11125, -1, 0, 572, 0, 0, 0, "ufbxi_connect_oo(uc, fbx_id, info->fbx_id)" },
-	{ "max2009_blob_5800_binary", 11125, -1, 0, 579, 0, 0, 0, "ufbxi_connect_oo(uc, fbx_id, info->fbx_id)" },
-	{ "max2009_blob_5800_binary", 11157, -1, 0, 0, 43, 0, 0, "ufbxi_split_type_and_name(uc, type_and_name, &type, &na..." },
-	{ "max2009_blob_5800_binary", 11166, -1, 0, 361, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
-	{ "max2009_blob_5800_binary", 11166, -1, 0, 368, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
-	{ "max2009_blob_5800_binary", 11181, -1, 0, 106, 0, 0, 0, "ufbxi_read_legacy_light(uc, node, &attrib_info)" },
-	{ "max2009_blob_5800_binary", 11181, -1, 0, 113, 0, 0, 0, "ufbxi_read_legacy_light(uc, node, &attrib_info)" },
-	{ "max2009_blob_5800_binary", 11183, -1, 0, 307, 0, 0, 0, "ufbxi_read_legacy_camera(uc, node, &attrib_info)" },
-	{ "max2009_blob_5800_binary", 11183, -1, 0, 314, 0, 0, 0, "ufbxi_read_legacy_camera(uc, node, &attrib_info)" },
-	{ "max2009_blob_5800_binary", 11247, 113392, 1, 0, 0, 0, 0, "ufbxi_read_takes(uc)" },
-	{ "max2009_blob_5800_binary", 14084, -1, 0, 0, 412, 0, 0, "materials" },
-	{ "max7_blend_cube_5000_binary", 10633, -1, 0, 496, 0, 0, 0, "stack" },
-	{ "max7_blend_cube_5000_binary", 11007, 2350, 0, 0, 0, 0, 0, "ufbxi_read_synthetic_blend_shapes(uc, node, info)" },
-	{ "max7_blend_cube_5000_binary", 8778, -1, 0, 312, 0, 0, 0, "ufbxi_connect_pp(uc, info->fbx_id, channel_fbx_id, name..." },
-	{ "max7_blend_cube_5000_binary", 8778, -1, 0, 319, 0, 0, 0, "ufbxi_connect_pp(uc, info->fbx_id, channel_fbx_id, name..." },
-	{ "max7_cube_5000_binary", 10595, -1, 0, 137, 0, 0, 0, "ufbxi_connect_oo(uc, value_fbx_id, layer_fbx_id)" },
-	{ "max7_cube_5000_binary", 10595, -1, 0, 144, 0, 0, 0, "ufbxi_connect_oo(uc, value_fbx_id, layer_fbx_id)" },
-	{ "max7_cube_5000_binary", 10596, -1, 0, 141, 0, 0, 0, "ufbxi_connect_op(uc, value_fbx_id, target_fbx_id, name)" },
-	{ "max7_cube_5000_binary", 10596, -1, 0, 148, 0, 0, 0, "ufbxi_connect_op(uc, value_fbx_id, target_fbx_id, name)" },
-	{ "max7_cube_5000_binary", 11005, -1, 0, 275, 0, 0, 0, "mesh" },
-	{ "max7_cube_5000_binary", 11005, -1, 0, 282, 0, 0, 0, "mesh" },
-	{ "max7_cube_5000_binary", 11016, 2383, 23, 0, 0, 0, 0, "vertices->size % 3 == 0" },
-	{ "max7_cube_5000_binary", 11048, 2383, 0, 0, 0, 0, 0, "ufbxi_process_indices(uc, mesh, index_data)" },
-	{ "max7_cube_5000_binary", 11079, -1, 0, 0, 36, 0, 0, "set" },
-	{ "max7_cube_5000_binary", 11083, 3130, 0, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, uv_info, (ufbx_vert..." },
-	{ "max7_cube_5000_binary", 11091, 2856, 0, 0, 0, 0, 0, "ufbxi_find_val1(node, ufbxi_MaterialAssignation, \"C\",..." },
-	{ "max7_cube_5000_binary", 11156, 324, 0, 0, 0, 0, 0, "ufbxi_get_val1(node, \"s\", &type_and_name)" },
-	{ "max7_cube_5000_binary", 11165, -1, 0, 132, 0, 0, 0, "elem_node" },
-	{ "max7_cube_5000_binary", 11165, -1, 0, 139, 0, 0, 0, "elem_node" },
-	{ "max7_cube_5000_binary", 11169, -1, 0, 133, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &attrib_info.fbx_id)" },
-	{ "max7_cube_5000_binary", 11169, -1, 0, 140, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &attrib_info.fbx_id)" },
-	{ "max7_cube_5000_binary", 11174, -1, 0, 134, 0, 0, 0, "ufbxi_connect_oo(uc, attrib_info.fbx_id, info.fbx_id)" },
-	{ "max7_cube_5000_binary", 11174, -1, 0, 141, 0, 0, 0, "ufbxi_connect_oo(uc, attrib_info.fbx_id, info.fbx_id)" },
-	{ "max7_cube_5000_binary", 11187, 2383, 23, 0, 0, 0, 0, "ufbxi_read_legacy_mesh(uc, node, &attrib_info)" },
-	{ "max7_cube_5000_binary", 11194, -1, 0, 277, 0, 0, 0, "ufbxi_insert_fbx_attr(uc, info.fbx_id, attrib_info.fbx_..." },
-	{ "max7_cube_5000_binary", 11194, -1, 0, 284, 0, 0, 0, "ufbxi_insert_fbx_attr(uc, info.fbx_id, attrib_info.fbx_..." },
-	{ "max7_cube_5000_binary", 11203, -1, 0, 135, 0, 0, 0, "ufbxi_connect_oo(uc, child_fbx_id, info.fbx_id)" },
-	{ "max7_cube_5000_binary", 11203, -1, 0, 142, 0, 0, 0, "ufbxi_connect_oo(uc, child_fbx_id, info.fbx_id)" },
-	{ "max7_cube_5000_binary", 11214, -1, 0, 136, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &uc->legacy_implicit_anim_l..." },
-	{ "max7_cube_5000_binary", 11214, -1, 0, 143, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &uc->legacy_implicit_anim_l..." },
-	{ "max7_cube_5000_binary", 11216, 942, 0, 0, 0, 0, 0, "ufbxi_read_take_prop_channel(uc, child, info.fbx_id, uc..." },
-	{ "max7_cube_5000_binary", 11227, -1, 0, 3, 0, 0, 0, "ufbxi_init_node_prop_names(uc)" },
-	{ "max7_cube_5000_binary", 11227, -1, 0, 4, 0, 0, 0, "ufbxi_init_node_prop_names(uc)" },
-	{ "max7_cube_5000_binary", 11234, -1, 0, 4, 0, 0, 0, "root" },
-	{ "max7_cube_5000_binary", 11234, -1, 0, 6, 0, 0, 0, "root" },
-	{ "max7_cube_5000_binary", 11236, -1, 0, 15, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
-	{ "max7_cube_5000_binary", 11236, -1, 0, 8, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
-	{ "max7_cube_5000_binary", 11251, 324, 0, 0, 0, 0, 0, "ufbxi_read_legacy_model(uc, node)" },
-	{ "max7_cube_5000_binary", 11265, -1, 0, 0, 108, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &layer_in..." },
-	{ "max7_cube_5000_binary", 5940, -1, 0, 0, 26, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, d, raw)" },
-	{ "max7_cube_5000_binary", 8316, -1, 0, 14, 0, 0, 0, "ufbxi_insert_fbx_id(uc, fbx_id, elem->element_id)" },
-	{ "max7_cube_5000_binary", 8316, -1, 0, 7, 0, 0, 0, "ufbxi_insert_fbx_id(uc, fbx_id, elem->element_id)" },
-	{ "max7_cube_5000_binary", 8354, -1, 0, 141, 0, 0, 0, "conn" },
-	{ "max7_cube_5000_binary", 8354, -1, 0, 148, 0, 0, 0, "conn" },
-	{ "max7_skin_5000_binary", 10340, -1, 0, 1279, 0, 0, 0, "curve" },
-	{ "max7_skin_5000_binary", 10340, -1, 0, 1289, 0, 0, 0, "curve" },
-	{ "max7_skin_5000_binary", 10342, -1, 0, 1281, 0, 0, 0, "ufbxi_connect_op(uc, curve_fbx_id, value_fbx_id, curve-..." },
-	{ "max7_skin_5000_binary", 10342, -1, 0, 1291, 0, 0, 0, "ufbxi_connect_op(uc, curve_fbx_id, value_fbx_id, curve-..." },
-	{ "max7_skin_5000_binary", 10633, -1, 0, 1265, 0, 0, 0, "stack" },
-	{ "max7_skin_5000_binary", 10637, -1, 0, 1267, 0, 0, 0, "layer" },
-	{ "max7_skin_5000_binary", 10637, -1, 0, 1276, 0, 0, 0, "layer" },
-	{ "max7_skin_5000_binary", 10639, -1, 0, 1270, 0, 0, 0, "ufbxi_connect_oo(uc, layer_fbx_id, stack_fbx_id)" },
-	{ "max7_skin_5000_binary", 10639, -1, 0, 1279, 0, 0, 0, "ufbxi_connect_oo(uc, layer_fbx_id, stack_fbx_id)" },
-	{ "max7_skin_5000_binary", 10919, -1, 0, 338, 0, 0, 0, "cluster" },
-	{ "max7_skin_5000_binary", 10919, -1, 0, 346, 0, 0, 0, "cluster" },
-	{ "max7_skin_5000_binary", 10926, 2420, 136, 0, 0, 0, 0, "indices->size == weights->size" },
-	{ "max7_skin_5000_binary", 10937, 4378, 15, 0, 0, 0, 0, "transform->size >= 16" },
-	{ "max7_skin_5000_binary", 10938, 4544, 15, 0, 0, 0, 0, "transform_link->size >= 16" },
-	{ "max7_skin_5000_binary", 10980, -1, 0, 488, 0, 0, 0, "bone" },
-	{ "max7_skin_5000_binary", 10980, -1, 0, 496, 0, 0, 0, "bone" },
-	{ "max7_skin_5000_binary", 10992, -1, 0, 0, 51, 0, 0, "bone->props.props.data" },
-	{ "max7_skin_5000_binary", 11129, 2361, 0, 0, 0, 0, 0, "ufbxi_get_val1(child, \"s\", &type_and_name)" },
-	{ "max7_skin_5000_binary", 11131, 2420, 136, 0, 0, 0, 0, "ufbxi_read_legacy_link(uc, child, &fbx_id, name.data)" },
-	{ "max7_skin_5000_binary", 11134, -1, 0, 341, 0, 0, 0, "ufbxi_connect_oo(uc, node_fbx_id, fbx_id)" },
-	{ "max7_skin_5000_binary", 11134, -1, 0, 349, 0, 0, 0, "ufbxi_connect_oo(uc, node_fbx_id, fbx_id)" },
-	{ "max7_skin_5000_binary", 11137, -1, 0, 342, 0, 0, 0, "skin" },
-	{ "max7_skin_5000_binary", 11137, -1, 0, 350, 0, 0, 0, "skin" },
-	{ "max7_skin_5000_binary", 11138, -1, 0, 344, 0, 0, 0, "ufbxi_connect_oo(uc, skin_fbx_id, info->fbx_id)" },
-	{ "max7_skin_5000_binary", 11138, -1, 0, 352, 0, 0, 0, "ufbxi_connect_oo(uc, skin_fbx_id, info->fbx_id)" },
-	{ "max7_skin_5000_binary", 11140, -1, 0, 345, 0, 0, 0, "ufbxi_connect_oo(uc, fbx_id, skin_fbx_id)" },
-	{ "max7_skin_5000_binary", 11140, -1, 0, 353, 0, 0, 0, "ufbxi_connect_oo(uc, fbx_id, skin_fbx_id)" },
-	{ "max7_skin_5000_binary", 11185, -1, 0, 488, 0, 0, 0, "ufbxi_read_legacy_limb_node(uc, node, &attrib_info)" },
-	{ "max7_skin_5000_binary", 11185, -1, 0, 496, 0, 0, 0, "ufbxi_read_legacy_limb_node(uc, node, &attrib_info)" },
-	{ "max_curve_line_7500_ascii", 9353, 8302, 43, 0, 0, 0, 0, "points->size % 3 == 0" },
-	{ "max_curve_line_7500_binary", 10182, 13861, 255, 0, 0, 0, 0, "ufbxi_read_line(uc, node, &info)" },
-	{ "max_curve_line_7500_binary", 9351, 13861, 255, 0, 0, 0, 0, "points" },
-	{ "max_curve_line_7500_binary", 9352, 13985, 56, 0, 0, 0, 0, "points_index" },
-	{ "max_curve_line_7500_binary", 9374, -1, 0, 0, 140, 0, 0, "line->segments.data" },
-	{ "max_nurbs_curve_rational_6100_binary", 9275, -1, 0, 283, 0, 0, 0, "nurbs" },
-	{ "max_quote_6100_ascii", 13806, -1, 0, 0, 175, 0, 0, "node->all_attribs.data" },
-	{ "max_quote_6100_binary", 9081, 8983, 36, 0, 0, 0, 0, "ufbxi_find_val1(n, ufbxi_MappingInformationType, \"c\",..." },
-	{ "max_quote_6100_binary", 9084, 9030, 36, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->edge_visibility.d..." },
-	{ "max_texture_mapping_6100_binary", 13065, -1, 0, 0, 663, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prefix, ..." },
-	{ "max_texture_mapping_6100_binary", 13117, -1, 0, 0, 663, 0, 0, "ufbxi_push_prop_prefix(uc, &shader->prop_prefix, name)" },
-	{ "max_texture_mapping_6100_binary", 13204, -1, 0, 0, 662, 0, 0, "shader" },
-	{ "max_texture_mapping_6100_binary", 13236, -1, 0, 0, 663, 0, 0, "ufbxi_shader_texture_find_prefix(uc, texture, shader)" },
-	{ "max_texture_mapping_6100_binary", 13248, -1, 0, 0, 681, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &shader->..." },
-	{ "max_texture_mapping_6100_binary", 13308, -1, 0, 0, 664, 0, 0, "shader->inputs.data" },
-	{ "max_texture_mapping_6100_binary", 14545, -1, 0, 0, 662, 0, 0, "ufbxi_finalize_shader_texture(uc, texture)" },
-	{ "max_texture_mapping_7700_binary", 13094, -1, 0, 0, 736, 0, 0, "ufbxi_push_prop_prefix(uc, &shader->prop_prefix, prop->..." },
-	{ "max_transformed_skin_6100_binary", 10398, 63310, 98, 0, 0, 0, 0, "data_end - data >= 2" },
-	{ "max_transformed_skin_6100_binary", 10450, 64699, 7, 0, 0, 0, 0, "data_end - data >= 1" },
-	{ "maya_anim_light_6100_binary", 10053, -1, 0, 312, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
-	{ "maya_arnold_textures_6100_binary", 10225, -1, 0, 0, 343, 0, 0, "ufbxi_read_binding_table(uc, node, &info)" },
-	{ "maya_arnold_textures_6100_binary", 14333, -1, 0, 0, 393, 0, 0, "ufbxi_fetch_dst_elements(uc, &shader->bindings, &shader..." },
-	{ "maya_arnold_textures_6100_binary", 9909, -1, 0, 0, 343, 0, 0, "bindings->prop_bindings.data" },
-	{ "maya_blend_shape_cube_6100_binary", 8298, -1, 0, 371, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_typed_element_..." },
-	{ "maya_blend_shape_cube_6100_binary", 8298, -1, 0, 378, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_typed_element_..." },
-	{ "maya_blend_shape_cube_6100_binary", 8299, -1, 0, 372, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_element_offset..." },
-	{ "maya_blend_shape_cube_6100_binary", 8299, -1, 0, 379, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_element_offset..." },
-	{ "maya_blend_shape_cube_6100_binary", 8303, -1, 0, 373, 0, 0, 0, "elem" },
-	{ "maya_blend_shape_cube_6100_binary", 8303, -1, 0, 380, 0, 0, 0, "elem" },
-	{ "maya_blend_shape_cube_6100_binary", 8365, -1, 0, 378, 0, 0, 0, "conn" },
-	{ "maya_blend_shape_cube_6100_binary", 8365, -1, 0, 385, 0, 0, 0, "conn" },
-	{ "maya_blend_shape_cube_6100_binary", 8679, -1, 0, 380, 0, 0, 0, "shape" },
-	{ "maya_blend_shape_cube_6100_binary", 8679, -1, 0, 387, 0, 0, 0, "shape" },
-	{ "maya_blend_shape_cube_6100_binary", 8751, -1, 0, 371, 0, 0, 0, "deformer" },
-	{ "maya_blend_shape_cube_6100_binary", 8751, -1, 0, 378, 0, 0, 0, "deformer" },
-	{ "maya_blend_shape_cube_6100_binary", 8752, -1, 0, 374, 0, 0, 0, "ufbxi_connect_oo(uc, deformer_fbx_id, info->fbx_id)" },
-	{ "maya_blend_shape_cube_6100_binary", 8752, -1, 0, 381, 0, 0, 0, "ufbxi_connect_oo(uc, deformer_fbx_id, info->fbx_id)" },
-	{ "maya_blend_shape_cube_6100_binary", 8757, -1, 0, 375, 0, 0, 0, "channel" },
-	{ "maya_blend_shape_cube_6100_binary", 8757, -1, 0, 382, 0, 0, 0, "channel" },
-	{ "maya_blend_shape_cube_6100_binary", 8760, -1, 0, 377, 0, 0, 0, "((ufbx_real_list*)ufbxi_push_size_copy((&uc->tmp_full_w..." },
-	{ "maya_blend_shape_cube_6100_binary", 8760, -1, 0, 384, 0, 0, 0, "((ufbx_real_list*)ufbxi_push_size_copy((&uc->tmp_full_w..." },
-	{ "maya_blend_shape_cube_6100_binary", 8776, -1, 0, 378, 0, 0, 0, "ufbxi_connect_pp(uc, info->fbx_id, channel_fbx_id, name..." },
-	{ "maya_blend_shape_cube_6100_binary", 8776, -1, 0, 385, 0, 0, 0, "ufbxi_connect_pp(uc, info->fbx_id, channel_fbx_id, name..." },
-	{ "maya_blend_shape_cube_6100_binary", 8787, -1, 0, 379, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &shape_info.fbx_id)" },
-	{ "maya_blend_shape_cube_6100_binary", 8787, -1, 0, 386, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &shape_info.fbx_id)" },
-	{ "maya_blend_shape_cube_6100_binary", 8793, -1, 0, 383, 0, 0, 0, "ufbxi_connect_oo(uc, channel_fbx_id, deformer_fbx_id)" },
-	{ "maya_blend_shape_cube_6100_binary", 8793, -1, 0, 390, 0, 0, 0, "ufbxi_connect_oo(uc, channel_fbx_id, deformer_fbx_id)" },
-	{ "maya_blend_shape_cube_6100_binary", 8794, -1, 0, 384, 0, 0, 0, "ufbxi_connect_oo(uc, shape_info.fbx_id, channel_fbx_id)" },
-	{ "maya_blend_shape_cube_6100_binary", 8794, -1, 0, 391, 0, 0, 0, "ufbxi_connect_oo(uc, shape_info.fbx_id, channel_fbx_id)" },
-	{ "maya_cache_sine_6100_binary", 13997, -1, 0, 0, 232, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&cache->fil..." },
-	{ "maya_cache_sine_6100_binary", 13998, -1, 0, 0, 233, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&cache->raw..." },
-	{ "maya_cache_sine_6100_binary", 14172, -1, 0, 0, 239, 0, 0, "ufbxi_fetch_dst_elements(uc, &mesh->cache_deformers, &m..." },
-	{ "maya_cache_sine_6100_binary", 15940, -1, 0, 0, 249, 0, 0, "ufbxi_push_string_place_str(&cc->string_pool, extra, 0)" },
-	{ "maya_cache_sine_6100_binary", 15945, -1, 0, 0, 252, 0, 0, "cc->cache.extra_info.data" },
-	{ "maya_cache_sine_6100_binary", 15990, -1, 0, 0, 253, 0, 0, "ufbxi_push_string_place_str(&cc->string_pool, &channel-..." },
-	{ "maya_cache_sine_6100_binary", 16023, -1, 0, 0, 249, 0, 0, "xml_ok" },
-	{ "maya_cache_sine_6100_binary", 16031, -1, 0, 0, 255, 0, 0, "ufbxi_push_string_place_str(&cc->string_pool, &cc->stre..." },
-	{ "maya_cache_sine_6100_binary", 16047, -1, 0, 0, 249, 0, 0, "ufbxi_cache_load_xml(cc)" },
-	{ "maya_cache_sine_6100_binary", 16106, -1, 0, 0, 255, 0, 0, "ufbxi_cache_try_open_file(cc, filename, &found)" },
-	{ "maya_cache_sine_6100_binary", 16243, -1, 0, 0, 257, 0, 0, "cc->cache.channels.data" },
-	{ "maya_cache_sine_6100_binary", 16273, -1, 0, 0, 249, 0, 0, "ufbxi_cache_try_open_file(cc, filename_copy, &found)" },
-	{ "maya_cache_sine_6100_binary", 16275, 62580, 46, 0, 0, 0, 0, "open_file_fn()" },
-	{ "maya_cache_sine_6100_binary", 16280, -1, 0, 0, 255, 0, 0, "ufbxi_cache_load_frame_files(cc)" },
-	{ "maya_cache_sine_6100_binary", 16285, -1, 0, 0, 256, 0, 0, "cc->cache.frames.data" },
-	{ "maya_cache_sine_6100_binary", 16288, -1, 0, 0, 257, 0, 0, "ufbxi_cache_setup_channels(cc)" },
-	{ "maya_cache_sine_6100_binary", 16292, -1, 0, 0, 258, 0, 0, "cc->imp" },
-	{ "maya_cache_sine_6100_binary", 16516, 62580, 46, 0, 0, 0, 0, "ufbxi_load_external_cache(uc, file)" },
-	{ "maya_cache_sine_6100_binary", 16910, 62580, 46, 0, 0, 0, 0, "ufbxi_load_external_files(uc)" },
-	{ "maya_color_sets_6100_binary", 9009, -1, 0, 0, 77, 0, 0, "mesh->color_sets.data" },
-	{ "maya_color_sets_6100_binary", 9056, 9966, 0, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_att..." },
-	{ "maya_cone_6100_binary", 9061, 16081, 0, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_att..." },
-	{ "maya_cone_6100_binary", 9064, 15524, 255, 0, 0, 0, 0, "ufbxi_find_val1(n, ufbxi_MappingInformationType, \"c\",..." },
-	{ "maya_cone_6100_binary", 9067, 15571, 255, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->edge_crease.data,..." },
-	{ "maya_constraint_zoo_6100_binary", 14642, -1, 0, 0, 315, 0, 0, "constraint->targets.data" },
-	{ "maya_cube_big_endian_6100_binary", 5742, -1, 0, 3, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->s..." },
-	{ "maya_cube_big_endian_6100_binary", 5742, -1, 0, 4, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->s..." },
-	{ "maya_cube_big_endian_6100_binary", 6052, -1, 0, 4, 0, 0, 0, "header_words" },
-	{ "maya_cube_big_endian_6100_binary", 6052, -1, 0, 6, 0, 0, 0, "header_words" },
-	{ "maya_cube_big_endian_6100_binary", 7296, -1, 0, 3, 0, 0, 0, "version_word" },
-	{ "maya_cube_big_endian_6100_binary", 7296, -1, 0, 4, 0, 0, 0, "version_word" },
-	{ "maya_cube_big_endian_7500_binary", 6043, -1, 0, 4, 0, 0, 0, "header_words" },
-	{ "maya_cube_big_endian_7500_binary", 6043, -1, 0, 6, 0, 0, 0, "header_words" },
-	{ "maya_display_layers_6100_binary", 14597, -1, 0, 0, 242, 0, 0, "ufbxi_fetch_dst_elements(uc, &layer->nodes, &layer->ele..." },
-	{ "maya_human_ik_7400_binary", 10164, -1, 0, 2544, 0, 0, 0, "ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKE..." },
-	{ "maya_human_ik_7400_binary", 10164, -1, 0, 2577, 0, 0, 0, "ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKE..." },
-	{ "maya_human_ik_7400_binary", 10166, -1, 0, 1799, 0, 0, 0, "ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKE..." },
-	{ "maya_human_ik_7400_binary", 10166, -1, 0, 1826, 0, 0, 0, "ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKE..." },
-	{ "maya_human_ik_7400_binary", 9432, -1, 0, 1799, 0, 0, 0, "marker" },
-	{ "maya_human_ik_7400_binary", 9432, -1, 0, 1826, 0, 0, 0, "marker" },
-	{ "maya_interpolation_modes_6100_binary", 10364, 16936, 0, 0, 0, 0, 0, "data_end - data >= 2" },
-	{ "maya_interpolation_modes_6100_binary", 10431, 16936, 73, 0, 0, 0, 0, "data_end - data >= 1" },
-	{ "maya_interpolation_modes_6100_binary", 10541, 16805, 0, 0, 0, 0, 0, "ufbxi_get_val1(child, \"C\", (char**)&old_name)" },
-	{ "maya_interpolation_modes_6100_binary", 10612, 16706, 0, 0, 0, 0, 0, "ufbxi_get_val1(node, \"c\", (char**)&type_and_name)" },
-	{ "maya_leading_comma_7500_ascii", 10097, -1, 0, 0, 182, 0, 0, "ufbxi_read_properties(uc, node, &uc->scene.settings.pro..." },
-	{ "maya_leading_comma_7500_ascii", 10106, 8861, 33, 0, 0, 0, 0, "ufbxi_parse_toplevel_child(uc, &node)" },
-	{ "maya_leading_comma_7500_ascii", 10139, -1, 0, 0, 168, 0, 0, "ufbxi_split_type_and_name(uc, type_and_name, &type_str,..." },
-	{ "maya_leading_comma_7500_ascii", 10142, -1, 0, 0, 169, 0, 0, "ufbxi_read_properties(uc, node, &info.props)" },
-	{ "maya_leading_comma_7500_ascii", 10174, 8926, 43, 0, 0, 0, 0, "ufbxi_read_mesh(uc, node, &info)" },
-	{ "maya_leading_comma_7500_ascii", 10261, 13120, 33, 0, 0, 0, 0, "ufbxi_parse_toplevel_child(uc, &node)" },
-	{ "maya_leading_comma_7500_ascii", 10690, 0, 60, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_FBXHeaderExtension)" },
-	{ "maya_leading_comma_7500_ascii", 10691, 100, 33, 0, 0, 0, 0, "ufbxi_read_header_extension(uc)" },
-	{ "maya_leading_comma_7500_ascii", 10709, 1525, 11, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_Documents)" },
-	{ "maya_leading_comma_7500_ascii", 10710, 2615, 33, 0, 0, 0, 0, "ufbxi_read_document(uc)" },
-	{ "maya_leading_comma_7500_ascii", 10725, -1, 0, 147, 0, 0, 0, "root" },
-	{ "maya_leading_comma_7500_ascii", 10725, -1, 0, 149, 0, 0, 0, "root" },
-	{ "maya_leading_comma_7500_ascii", 10727, -1, 0, 151, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
-	{ "maya_leading_comma_7500_ascii", 10727, -1, 0, 153, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
-	{ "maya_leading_comma_7500_ascii", 10731, 2808, 11, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_Definitions)" },
-	{ "maya_leading_comma_7500_ascii", 10732, 3021, 33, 0, 0, 0, 0, "ufbxi_read_definitions(uc)" },
-	{ "maya_leading_comma_7500_ascii", 10735, 8762, 11, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_Objects)" },
-	{ "maya_leading_comma_7500_ascii", 10739, 0, 0, 0, 0, 0, 0, "uc->top_node" },
-	{ "maya_leading_comma_7500_ascii", 10741, 8861, 33, 0, 0, 0, 0, "ufbxi_read_objects(uc)" },
-	{ "maya_leading_comma_7500_ascii", 10744, 13016, 11, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_Connections)" },
-	{ "maya_leading_comma_7500_ascii", 10745, 13120, 33, 0, 0, 0, 0, "ufbxi_read_connections(uc)" },
-	{ "maya_leading_comma_7500_ascii", 10757, -1, 0, 0, 182, 0, 0, "ufbxi_read_global_settings(uc, uc->top_node)" },
-	{ "maya_leading_comma_7500_ascii", 11434, -1, 0, 0, 187, 0, 0, "uc->scene.connections_src.data" },
-	{ "maya_leading_comma_7500_ascii", 11464, -1, 0, 0, 188, 0, 0, "uc->scene.connections_dst.data" },
-	{ "maya_leading_comma_7500_ascii", 11741, -1, 0, 0, 195, 0, 0, "list->data" },
-	{ "maya_leading_comma_7500_ascii", 11763, -1, 0, 0, 196, 0, 0, "list->data" },
-	{ "maya_leading_comma_7500_ascii", 11839, -1, 0, 0, 199, 0, 0, "list->data" },
-	{ "maya_leading_comma_7500_ascii", 12795, -1, 0, 0, 183, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &uc->scen..." },
-	{ "maya_leading_comma_7500_ascii", 12804, -1, 0, 0, 184, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &uc->scen..." },
-	{ "maya_leading_comma_7500_ascii", 13707, -1, 0, 0, 185, 0, 0, "uc->scene.elements.data" },
-	{ "maya_leading_comma_7500_ascii", 13712, -1, 0, 0, 186, 0, 0, "element_data" },
-	{ "maya_leading_comma_7500_ascii", 13727, -1, 0, 0, 187, 0, 0, "ufbxi_resolve_connections(uc)" },
-	{ "maya_leading_comma_7500_ascii", 13740, -1, 0, 0, 189, 0, 0, "typed_elems->data" },
-	{ "maya_leading_comma_7500_ascii", 13752, -1, 0, 0, 194, 0, 0, "uc->scene.elements_by_name.data" },
-	{ "maya_leading_comma_7500_ascii", 13811, -1, 0, 0, 195, 0, 0, "ufbxi_fetch_dst_elements(uc, &node->materials, &node->e..." },
-	{ "maya_leading_comma_7500_ascii", 13853, -1, 0, 0, 196, 0, 0, "ufbxi_fetch_src_elements(uc, &elem->instances, elem, 0,..." },
-	{ "maya_leading_comma_7500_ascii", 14029, -1, 0, 0, 197, 0, 0, "zero_indices && consecutive_indices" },
-	{ "maya_leading_comma_7500_ascii", 14076, -1, 0, 0, 199, 0, 0, "ufbxi_fetch_mesh_materials(uc, &mesh->materials, &mesh-..." },
-	{ "maya_leading_comma_7500_ascii", 14203, -1, 0, 0, 200, 0, 0, "ufbxi_fetch_dst_elements(uc, &stack->layers, &stack->el..." },
-	{ "maya_leading_comma_7500_ascii", 14207, -1, 0, 0, 201, 0, 0, "stack->anim.layers.data" },
-	{ "maya_leading_comma_7500_ascii", 14221, -1, 0, 0, 202, 0, 0, "layer_desc" },
-	{ "maya_leading_comma_7500_ascii", 14297, -1, 0, 0, 203, 0, 0, "layer->anim_props.data" },
-	{ "maya_leading_comma_7500_ascii", 14653, -1, 0, 0, 204, 0, 0, "descs" },
-	{ "maya_leading_comma_7500_ascii", 16880, -1, 0, 1, 0, 0, 0, "ufbxi_load_maps(uc)" },
-	{ "maya_leading_comma_7500_ascii", 16881, -1, 0, 3, 0, 0, 0, "ufbxi_begin_parse(uc)" },
-	{ "maya_leading_comma_7500_ascii", 16881, -1, 0, 4, 0, 0, 0, "ufbxi_begin_parse(uc)" },
-	{ "maya_leading_comma_7500_ascii", 16885, 0, 60, 0, 0, 0, 0, "ufbxi_read_root(uc)" },
-	{ "maya_leading_comma_7500_ascii", 16892, -1, 0, 0, 183, 0, 0, "ufbxi_init_file_paths(uc)" },
-	{ "maya_leading_comma_7500_ascii", 16893, -1, 0, 0, 185, 0, 0, "ufbxi_finalize_scene(uc)" },
-	{ "maya_leading_comma_7500_ascii", 16932, -1, 0, 0, 205, 0, 0, "imp" },
-	{ "maya_leading_comma_7500_ascii", 1785, -1, 0, 1, 0, 0, 0, "ator->num_allocs < ator->max_allocs" },
-	{ "maya_leading_comma_7500_ascii", 1823, -1, 0, 86, 0, 0, 0, "ator->num_allocs < ator->max_allocs" },
-	{ "maya_leading_comma_7500_ascii", 1823, -1, 0, 88, 0, 0, 0, "ator->num_allocs < ator->max_allocs" },
-	{ "maya_leading_comma_7500_ascii", 2485, -1, 0, 1, 0, 0, 0, "data" },
-	{ "maya_leading_comma_7500_ascii", 3063, -1, 0, 0, 10, 0, 0, "dst" },
-	{ "maya_leading_comma_7500_ascii", 3107, -1, 0, 0, 1, 0, 0, "dst" },
-	{ "maya_leading_comma_7500_ascii", 3128, -1, 0, 0, 52, 0, 0, "str" },
-	{ "maya_leading_comma_7500_ascii", 4077, -1, 0, 0, 0, 0, 1, "result != UFBX_PROGRESS_CANCEL" },
-	{ "maya_leading_comma_7500_ascii", 4096, -1, 0, 0, 0, 1, 0, "uc->read_fn" },
-	{ "maya_leading_comma_7500_ascii", 4152, -1, 0, 0, 0, 0, 1, "ufbxi_report_progress(uc)" },
-	{ "maya_leading_comma_7500_ascii", 6478, -1, 0, 0, 0, 0, 57, "ufbxi_report_progress(uc)" },
-	{ "maya_leading_comma_7500_ascii", 6602, -1, 0, 3, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&token..." },
-	{ "maya_leading_comma_7500_ascii", 6602, -1, 0, 4, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&token..." },
-	{ "maya_leading_comma_7500_ascii", 6625, -1, 0, 0, 0, 9570, 0, "c != '\\0'" },
-	{ "maya_leading_comma_7500_ascii", 6679, -1, 0, 3, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, c)" },
-	{ "maya_leading_comma_7500_ascii", 6679, -1, 0, 4, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, c)" },
-	{ "maya_leading_comma_7500_ascii", 6697, -1, 0, 6, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, c)" },
-	{ "maya_leading_comma_7500_ascii", 6697, -1, 0, 8, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, c)" },
-	{ "maya_leading_comma_7500_ascii", 6724, 288, 45, 0, 0, 0, 0, "end == token->str_data + token->str_len - 1" },
-	{ "maya_leading_comma_7500_ascii", 6731, 3707, 45, 0, 0, 0, 0, "end == token->str_data + token->str_len - 1" },
-	{ "maya_leading_comma_7500_ascii", 6786, 291, 0, 0, 0, 0, 0, "c != '\\0'" },
-	{ "maya_leading_comma_7500_ascii", 6806, 288, 45, 0, 0, 0, 0, "ufbxi_ascii_next_token(uc, &ua->token)" },
-	{ "maya_leading_comma_7500_ascii", 6818, 2537, 0, 0, 0, 0, 0, "ufbxi_ascii_next_token(uc, &ua->token)" },
-	{ "maya_leading_comma_7500_ascii", 6824, 168, 0, 0, 0, 0, 0, "depth == 0" },
-	{ "maya_leading_comma_7500_ascii", 6832, 0, 60, 0, 0, 0, 0, "Expected a 'Name:' token" },
-	{ "maya_leading_comma_7500_ascii", 6834, 12, 0, 0, 0, 0, 0, "ufbxi_ascii_accept(uc, 'N')" },
-	{ "maya_leading_comma_7500_ascii", 6838, -1, 0, 0, 1, 0, 0, "name" },
-	{ "maya_leading_comma_7500_ascii", 6843, -1, 0, 4, 0, 0, 0, "node" },
-	{ "maya_leading_comma_7500_ascii", 6843, -1, 0, 6, 0, 0, 0, "node" },
-	{ "maya_leading_comma_7500_ascii", 6897, 291, 0, 0, 0, 0, 0, "ufbxi_ascii_next_token(uc, &ua->token)" },
-	{ "maya_leading_comma_7500_ascii", 6946, -1, 0, 0, 10, 0, 0, "ufbxi_push_sanitized_string(&uc->string_pool, &v->s, st..." },
-	{ "maya_leading_comma_7500_ascii", 7041, 8927, 0, 0, 0, 0, 0, "ufbxi_ascii_accept(uc, 'I')" },
-	{ "maya_leading_comma_7500_ascii", 7044, 8931, 11, 0, 0, 0, 0, "ufbxi_ascii_accept(uc, 'N')" },
-	{ "maya_leading_comma_7500_ascii", 7052, -1, 0, 0, 0, 9570, 0, "ufbxi_ascii_skip_until(uc, '}')" },
-	{ "maya_leading_comma_7500_ascii", 7069, 8937, 33, 0, 0, 0, 0, "ufbxi_ascii_accept(uc, '}')" },
-	{ "maya_leading_comma_7500_ascii", 7080, -1, 0, 0, 144, 0, 0, "arr_data" },
-	{ "maya_leading_comma_7500_ascii", 7093, -1, 0, 10, 0, 0, 0, "node->vals" },
-	{ "maya_leading_comma_7500_ascii", 7093, -1, 0, 8, 0, 0, 0, "node->vals" },
-	{ "maya_leading_comma_7500_ascii", 7103, 168, 11, 0, 0, 0, 0, "ufbxi_ascii_parse_node(uc, depth + 1, parse_state, &end..." },
-	{ "maya_leading_comma_7500_ascii", 7110, -1, 0, 28, 0, 0, 0, "node->children" },
-	{ "maya_leading_comma_7500_ascii", 7110, -1, 0, 30, 0, 0, 0, "node->children" },
-	{ "maya_leading_comma_7500_ascii", 7282, -1, 0, 0, 0, 1, 0, "header" },
-	{ "maya_leading_comma_7500_ascii", 7314, -1, 0, 3, 0, 0, 0, "ufbxi_ascii_next_token(uc, &uc->ascii.token)" },
-	{ "maya_leading_comma_7500_ascii", 7314, -1, 0, 4, 0, 0, 0, "ufbxi_ascii_next_token(uc, &uc->ascii.token)" },
-	{ "maya_leading_comma_7500_ascii", 7334, 100, 33, 0, 0, 0, 0, "ufbxi_ascii_parse_node(uc, 0, state, p_end, buf, 1)" },
-	{ "maya_leading_comma_7500_ascii", 7363, 0, 60, 0, 0, 0, 0, "ufbxi_ascii_parse_node(uc, 0, UFBXI_PARSE_ROOT, &end, &..." },
-	{ "maya_leading_comma_7500_ascii", 7384, -1, 0, 5, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
-	{ "maya_leading_comma_7500_ascii", 7384, -1, 0, 7, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
-	{ "maya_leading_comma_7500_ascii", 7403, 1544, 11, 0, 0, 0, 0, "ufbxi_parse_toplevel_child_imp(uc, state, &uc->tmp, &en..." },
-	{ "maya_leading_comma_7500_ascii", 7411, -1, 0, 131, 0, 0, 0, "node->children" },
-	{ "maya_leading_comma_7500_ascii", 7411, -1, 0, 133, 0, 0, 0, "node->children" },
-	{ "maya_leading_comma_7500_ascii", 7434, 100, 33, 0, 0, 0, 0, "ufbxi_parse_toplevel_child_imp(uc, state, &uc->tmp_pars..." },
-	{ "maya_leading_comma_7500_ascii", 7732, -1, 0, 1, 0, 0, 0, "ufbxi_map_grow_size((&uc->prop_type_map), sizeof(ufbxi_..." },
-	{ "maya_leading_comma_7500_ascii", 7738, -1, 0, 2, 0, 0, 0, "entry" },
-	{ "maya_leading_comma_7500_ascii", 7738, -1, 0, 3, 0, 0, 0, "entry" },
-	{ "maya_leading_comma_7500_ascii", 7887, -1, 0, 84, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
-	{ "maya_leading_comma_7500_ascii", 7887, -1, 0, 86, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
-	{ "maya_leading_comma_7500_ascii", 7911, -1, 0, 0, 42, 0, 0, "props->props.data" },
-	{ "maya_leading_comma_7500_ascii", 7918, -1, 0, 84, 0, 0, 0, "ufbxi_sort_properties(uc, props->props.data, props->pro..." },
-	{ "maya_leading_comma_7500_ascii", 7918, -1, 0, 86, 0, 0, 0, "ufbxi_sort_properties(uc, props->props.data, props->pro..." },
-	{ "maya_leading_comma_7500_ascii", 7941, -1, 0, 84, 0, 0, 0, "ufbxi_read_properties(uc, node, &uc->scene.metadata.sce..." },
-	{ "maya_leading_comma_7500_ascii", 7941, -1, 0, 86, 0, 0, 0, "ufbxi_read_properties(uc, node, &uc->scene.metadata.sce..." },
-	{ "maya_leading_comma_7500_ascii", 7953, 100, 33, 0, 0, 0, 0, "ufbxi_parse_toplevel_child(uc, &child)" },
-	{ "maya_leading_comma_7500_ascii", 7970, -1, 0, 84, 0, 0, 0, "ufbxi_read_scene_info(uc, child)" },
-	{ "maya_leading_comma_7500_ascii", 7970, -1, 0, 86, 0, 0, 0, "ufbxi_read_scene_info(uc, child)" },
-	{ "maya_leading_comma_7500_ascii", 8082, 2615, 33, 0, 0, 0, 0, "ufbxi_parse_toplevel_child(uc, &child)" },
-	{ "maya_leading_comma_7500_ascii", 8101, 3021, 33, 0, 0, 0, 0, "ufbxi_parse_toplevel_child(uc, &object)" },
-	{ "maya_leading_comma_7500_ascii", 8108, -1, 0, 164, 0, 0, 0, "tmpl" },
-	{ "maya_leading_comma_7500_ascii", 8108, -1, 0, 166, 0, 0, 0, "tmpl" },
-	{ "maya_leading_comma_7500_ascii", 8109, 3061, 33, 0, 0, 0, 0, "ufbxi_get_val1(object, \"C\", (char**)&tmpl->type)" },
-	{ "maya_leading_comma_7500_ascii", 8127, -1, 0, 0, 52, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &tmpl->su..." },
-	{ "maya_leading_comma_7500_ascii", 8130, -1, 0, 283, 0, 0, 0, "ufbxi_read_properties(uc, props, &tmpl->props)" },
-	{ "maya_leading_comma_7500_ascii", 8130, -1, 0, 285, 0, 0, 0, "ufbxi_read_properties(uc, props, &tmpl->props)" },
-	{ "maya_leading_comma_7500_ascii", 8136, -1, 0, 0, 142, 0, 0, "uc->templates" },
-	{ "maya_leading_comma_7500_ascii", 8224, -1, 0, 0, 168, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, name, 0)" },
-	{ "maya_leading_comma_7500_ascii", 8237, -1, 0, 150, 0, 0, 0, "entry" },
-	{ "maya_leading_comma_7500_ascii", 8237, -1, 0, 152, 0, 0, 0, "entry" },
-	{ "maya_leading_comma_7500_ascii", 8274, -1, 0, 147, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_typed_element_..." },
-	{ "maya_leading_comma_7500_ascii", 8274, -1, 0, 149, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_typed_element_..." },
-	{ "maya_leading_comma_7500_ascii", 8275, -1, 0, 148, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_element_offset..." },
-	{ "maya_leading_comma_7500_ascii", 8275, -1, 0, 150, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_element_offset..." },
-	{ "maya_leading_comma_7500_ascii", 8279, -1, 0, 149, 0, 0, 0, "elem" },
-	{ "maya_leading_comma_7500_ascii", 8279, -1, 0, 151, 0, 0, 0, "elem" },
-	{ "maya_leading_comma_7500_ascii", 8287, -1, 0, 150, 0, 0, 0, "ufbxi_insert_fbx_id(uc, info->fbx_id, elem->element_id)" },
-	{ "maya_leading_comma_7500_ascii", 8287, -1, 0, 152, 0, 0, 0, "ufbxi_insert_fbx_id(uc, info->fbx_id, elem->element_id)" },
-	{ "maya_leading_comma_7500_ascii", 8478, 9370, 43, 0, 0, 0, 0, "data->size % num_components == 0" },
-	{ "maya_leading_comma_7500_ascii", 8494, 9278, 78, 0, 0, 0, 0, "ufbxi_find_val1(node, ufbxi_MappingInformationType, \"C..." },
-	{ "maya_leading_comma_7500_ascii", 8545, 10556, 67, 0, 0, 0, 0, "Invalid mapping" },
-	{ "maya_leading_comma_7500_ascii", 8580, 9303, 67, 0, 0, 0, 0, "Invalid mapping" },
-	{ "maya_leading_comma_7500_ascii", 8590, 10999, 84, 0, 0, 0, 0, "arr" },
-	{ "maya_leading_comma_7500_ascii", 8809, -1, 0, 0, 159, 0, 0, "mesh->faces.data" },
-	{ "maya_leading_comma_7500_ascii", 8835, 9073, 43, 0, 0, 0, 0, "(size_t)ix < mesh->num_vertices" },
-	{ "maya_leading_comma_7500_ascii", 8847, -1, 0, 0, 160, 0, 0, "mesh->vertex_first_index.data" },
-	{ "maya_leading_comma_7500_ascii", 8919, 8926, 43, 0, 0, 0, 0, "vertices->size % 3 == 0" },
-	{ "maya_leading_comma_7500_ascii", 8955, -1, 0, 0, 158, 0, 0, "edges" },
-	{ "maya_leading_comma_7500_ascii", 8988, 9073, 43, 0, 0, 0, 0, "ufbxi_process_indices(uc, mesh, index_data)" },
-	{ "maya_leading_comma_7500_ascii", 9008, -1, 0, 0, 161, 0, 0, "mesh->uv_sets.data" },
-	{ "maya_leading_comma_7500_ascii", 9018, 9278, 78, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_att..." },
-	{ "maya_leading_comma_7500_ascii", 9024, 9692, 78, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_att..." },
-	{ "maya_leading_comma_7500_ascii", 9032, 10114, 78, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_att..." },
-	{ "maya_leading_comma_7500_ascii", 9044, 10531, 78, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_att..." },
-	{ "maya_leading_comma_7500_ascii", 9071, 10925, 78, 0, 0, 0, 0, "ufbxi_find_val1(n, ufbxi_MappingInformationType, \"c\",..." },
-	{ "maya_leading_comma_7500_ascii", 9074, 10999, 84, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->edge_smoothing.da..." },
-	{ "maya_leading_comma_7500_ascii", 9089, 11116, 78, 0, 0, 0, 0, "ufbxi_find_val1(n, ufbxi_MappingInformationType, \"c\",..." },
-	{ "maya_leading_comma_7500_ascii", 9094, 11198, 78, 0, 0, 0, 0, "arr && arr->size >= 1" },
-	{ "maya_lod_group_6100_binary", 10085, -1, 0, 278, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
-	{ "maya_lod_group_6100_binary", 10085, -1, 0, 286, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
-	{ "maya_lod_group_7500_ascii", 10168, -1, 0, 486, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_lod_gro..." },
-	{ "maya_lod_group_7500_ascii", 10168, -1, 0, 491, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_lod_gro..." },
-	{ "maya_node_attribute_zoo_6100_ascii", 6867, -1, 0, 442, 0, 0, 0, "arr" },
-	{ "maya_node_attribute_zoo_6100_ascii", 6867, -1, 0, 449, 0, 0, 0, "arr" },
-	{ "maya_node_attribute_zoo_6100_ascii", 6883, -1, 0, 443, 0, 0, 0, "ufbxi_push_size_zero(&uc->tmp_stack, arr_elem_size, 4)" },
-	{ "maya_node_attribute_zoo_6100_ascii", 6883, -1, 0, 450, 0, 0, 0, "ufbxi_push_size_zero(&uc->tmp_stack, arr_elem_size, 4)" },
-	{ "maya_node_attribute_zoo_6100_ascii", 6974, -1, 0, 458, 0, 0, 0, "v" },
-	{ "maya_node_attribute_zoo_6100_ascii", 6974, -1, 0, 465, 0, 0, 0, "v" },
-	{ "maya_node_attribute_zoo_6100_ascii", 6977, -1, 0, 485, 0, 0, 0, "v" },
-	{ "maya_node_attribute_zoo_6100_ascii", 6977, -1, 0, 492, 0, 0, 0, "v" },
-	{ "maya_node_attribute_zoo_6100_ascii", 7003, -1, 0, 444, 0, 0, 0, "v" },
-	{ "maya_node_attribute_zoo_6100_ascii", 7003, -1, 0, 451, 0, 0, 0, "v" },
-	{ "maya_node_attribute_zoo_6100_binary", 10010, -1, 0, 269, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &attrib_info.fbx_id)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10010, -1, 0, 276, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &attrib_info.fbx_id)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10016, -1, 0, 0, 39, 0, 0, "ufbxi_split_type_and_name(uc, type_and_name, &attrib_ty..." },
-	{ "maya_node_attribute_zoo_6100_binary", 10029, -1, 0, 270, 0, 0, 0, "ufbxi_insert_fbx_attr(uc, info->fbx_id, attrib_info.fbx..." },
-	{ "maya_node_attribute_zoo_6100_binary", 10029, -1, 0, 277, 0, 0, 0, "ufbxi_insert_fbx_attr(uc, info->fbx_id, attrib_info.fbx..." },
-	{ "maya_node_attribute_zoo_6100_binary", 10036, -1, 0, 271, 0, 0, 0, "((ufbx_prop*)ufbxi_push_size_copy((&uc->tmp_stack), siz..." },
-	{ "maya_node_attribute_zoo_6100_binary", 10036, -1, 0, 278, 0, 0, 0, "((ufbx_prop*)ufbxi_push_size_copy((&uc->tmp_stack), siz..." },
-	{ "maya_node_attribute_zoo_6100_binary", 10046, -1, 0, 0, 40, 0, 0, "attrib_info.props.props.data" },
-	{ "maya_node_attribute_zoo_6100_binary", 10051, 12128, 23, 0, 0, 0, 0, "ufbxi_read_mesh(uc, node, &attrib_info)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10057, -1, 0, 707, 0, 0, 0, "ufbxi_read_bone(uc, node, &attrib_info, sub_type)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10057, -1, 0, 714, 0, 0, 0, "ufbxi_read_bone(uc, node, &attrib_info, sub_type)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10059, -1, 0, 274, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
-	{ "maya_node_attribute_zoo_6100_binary", 10059, -1, 0, 281, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
-	{ "maya_node_attribute_zoo_6100_binary", 10091, -1, 0, 276, 0, 0, 0, "ufbxi_connect_oo(uc, attrib_info.fbx_id, info->fbx_id)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10091, -1, 0, 283, 0, 0, 0, "ufbxi_connect_oo(uc, attrib_info.fbx_id, info->fbx_id)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10112, 157559, 0, 0, 0, 0, 0, "ufbxi_read_global_settings(uc, node)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10147, 12128, 23, 0, 0, 0, 0, "ufbxi_read_synthetic_attribute(uc, node, &info, type_st..." },
-	{ "maya_node_attribute_zoo_6100_binary", 10149, -1, 0, 277, 0, 0, 0, "ufbxi_read_model(uc, node, &info)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10149, -1, 0, 284, 0, 0, 0, "ufbxi_read_model(uc, node, &info)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10178, 138209, 3, 0, 0, 0, 0, "ufbxi_read_nurbs_curve(uc, node, &info)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10180, 139478, 3, 0, 0, 0, 0, "ufbxi_read_nurbs_surface(uc, node, &info)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10243, -1, 0, 0, 392, 0, 0, "ufbxi_read_scene_info(uc, node)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10347, 163331, 0, 0, 0, 0, 0, "ufbxi_find_val1(node, ufbxi_KeyCount, \"Z\", &num_keys)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10350, 163352, 1, 0, 0, 0, 0, "curve->keyframes.data" },
-	{ "maya_node_attribute_zoo_6100_binary", 10470, 163388, 86, 0, 0, 0, 0, "Unknown key mode" },
-	{ "maya_node_attribute_zoo_6100_binary", 10475, 163349, 3, 0, 0, 0, 0, "data_end - data >= 2" },
-	{ "maya_node_attribute_zoo_6100_binary", 10524, 163349, 1, 0, 0, 0, 0, "data == data_end" },
-	{ "maya_node_attribute_zoo_6100_binary", 10599, 163331, 0, 0, 0, 0, 0, "ufbxi_read_take_anim_channel(uc, channel_nodes[i], valu..." },
-	{ "maya_node_attribute_zoo_6100_binary", 10621, 163331, 0, 0, 0, 0, 0, "ufbxi_read_take_prop_channel(uc, child, target_fbx_id, ..." },
-	{ "maya_node_attribute_zoo_6100_binary", 10634, 163019, 0, 0, 0, 0, 0, "ufbxi_get_val1(node, \"S\", &stack->name)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10644, 163046, 255, 0, 0, 0, 0, "ufbxi_find_val2(node, ufbxi_ReferenceTime, \"LL\", &beg..." },
-	{ "maya_node_attribute_zoo_6100_binary", 10654, 163331, 0, 0, 0, 0, 0, "ufbxi_read_take_object(uc, child, layer_fbx_id)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10664, 162983, 125, 0, 0, 0, 0, "ufbxi_parse_toplevel_child(uc, &node)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10668, 163019, 0, 0, 0, 0, 0, "ufbxi_read_take(uc, node)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10704, -1, 0, 41, 0, 0, 0, "ufbxi_init_node_prop_names(uc)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10704, -1, 0, 43, 0, 0, 0, "ufbxi_init_node_prop_names(uc)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10750, 158678, 255, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_Takes)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10751, 162983, 125, 0, 0, 0, 0, "ufbxi_read_takes(uc)" },
-	{ "maya_node_attribute_zoo_6100_binary", 10755, 162983, 255, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_GlobalSettings)" },
-	{ "maya_node_attribute_zoo_6100_binary", 12935, -1, 0, 0, 490, 0, 0, "spans" },
-	{ "maya_node_attribute_zoo_6100_binary", 12978, -1, 0, 0, 509, 0, 0, "levels" },
-	{ "maya_node_attribute_zoo_6100_binary", 14190, -1, 0, 0, 490, 0, 0, "ufbxi_finalize_nurbs_basis(uc, &curve->basis)" },
-	{ "maya_node_attribute_zoo_6100_binary", 14195, -1, 0, 0, 499, 0, 0, "ufbxi_finalize_nurbs_basis(uc, &surface->basis_u)" },
-	{ "maya_node_attribute_zoo_6100_binary", 14196, -1, 0, 0, 500, 0, 0, "ufbxi_finalize_nurbs_basis(uc, &surface->basis_v)" },
-	{ "maya_node_attribute_zoo_6100_binary", 14218, -1, 0, 0, 505, 0, 0, "ufbxi_fetch_dst_elements(uc, &layer->anim_values, &laye..." },
-	{ "maya_node_attribute_zoo_6100_binary", 14670, -1, 0, 0, 509, 0, 0, "ufbxi_finalize_lod_group(uc, *p_lod)" },
-	{ "maya_node_attribute_zoo_6100_binary", 5951, -1, 0, 0, 0, 12405, 0, "val" },
-	{ "maya_node_attribute_zoo_6100_binary", 5954, -1, 0, 0, 0, 12158, 0, "val" },
-	{ "maya_node_attribute_zoo_6100_binary", 6100, -1, 0, 448, 0, 0, 0, "arr" },
-	{ "maya_node_attribute_zoo_6100_binary", 6100, -1, 0, 455, 0, 0, 0, "arr" },
-	{ "maya_node_attribute_zoo_6100_binary", 6260, 12130, 255, 0, 0, 0, 0, "arr_data" },
-	{ "maya_node_attribute_zoo_6100_binary", 7706, -1, 0, 41, 0, 0, 0, "ufbxi_map_grow_size((&uc->node_prop_set), sizeof(const ..." },
-	{ "maya_node_attribute_zoo_6100_binary", 7706, -1, 0, 43, 0, 0, 0, "ufbxi_map_grow_size((&uc->node_prop_set), sizeof(const ..." },
-	{ "maya_node_attribute_zoo_6100_binary", 8188, -1, 0, 269, 0, 0, 0, "ptr" },
-	{ "maya_node_attribute_zoo_6100_binary", 8188, -1, 0, 276, 0, 0, 0, "ptr" },
-	{ "maya_node_attribute_zoo_6100_binary", 8260, -1, 0, 270, 0, 0, 0, "entry" },
-	{ "maya_node_attribute_zoo_6100_binary", 8260, -1, 0, 277, 0, 0, 0, "entry" },
-	{ "maya_node_attribute_zoo_6100_binary", 8328, -1, 0, 277, 0, 0, 0, "elem_node" },
-	{ "maya_node_attribute_zoo_6100_binary", 8328, -1, 0, 284, 0, 0, 0, "elem_node" },
-	{ "maya_node_attribute_zoo_6100_binary", 8337, -1, 0, 274, 0, 0, 0, "elem" },
-	{ "maya_node_attribute_zoo_6100_binary", 8337, -1, 0, 281, 0, 0, 0, "elem" },
-	{ "maya_node_attribute_zoo_6100_binary", 8344, -1, 0, 276, 0, 0, 0, "conn" },
-	{ "maya_node_attribute_zoo_6100_binary", 8344, -1, 0, 283, 0, 0, 0, "conn" },
-	{ "maya_node_attribute_zoo_6100_binary", 8898, -1, 0, 532, 0, 0, 0, "mesh" },
-	{ "maya_node_attribute_zoo_6100_binary", 8898, -1, 0, 539, 0, 0, 0, "mesh" },
-	{ "maya_node_attribute_zoo_6100_binary", 9280, 138209, 3, 0, 0, 0, 0, "ufbxi_find_val1(node, ufbxi_Order, \"I\", &nurbs->basis..." },
-	{ "maya_node_attribute_zoo_6100_binary", 9282, 138308, 255, 0, 0, 0, 0, "ufbxi_find_val1(node, ufbxi_Form, \"C\", (char**)&form)" },
-	{ "maya_node_attribute_zoo_6100_binary", 9289, 138359, 3, 0, 0, 0, 0, "points" },
-	{ "maya_node_attribute_zoo_6100_binary", 9290, 138416, 1, 0, 0, 0, 0, "knot" },
-	{ "maya_node_attribute_zoo_6100_binary", 9291, 143462, 27, 0, 0, 0, 0, "points->size % 4 == 0" },
-	{ "maya_node_attribute_zoo_6100_binary", 9310, 139478, 3, 0, 0, 0, 0, "ufbxi_find_val2(node, ufbxi_NurbsSurfaceOrder, \"II\", ..." },
-	{ "maya_node_attribute_zoo_6100_binary", 9311, 139592, 1, 0, 0, 0, 0, "ufbxi_find_val2(node, ufbxi_Dimensions, \"ZZ\", &dimens..." },
-	{ "maya_node_attribute_zoo_6100_binary", 9312, 139631, 3, 0, 0, 0, 0, "ufbxi_find_val2(node, ufbxi_Step, \"II\", &step_u, &ste..." },
-	{ "maya_node_attribute_zoo_6100_binary", 9313, 139664, 3, 0, 0, 0, 0, "ufbxi_find_val2(node, ufbxi_Form, \"CC\", (char**)&form..." },
-	{ "maya_node_attribute_zoo_6100_binary", 9326, 139691, 3, 0, 0, 0, 0, "points" },
-	{ "maya_node_attribute_zoo_6100_binary", 9327, 139727, 1, 0, 0, 0, 0, "knot_u" },
-	{ "maya_node_attribute_zoo_6100_binary", 9328, 140321, 3, 0, 0, 0, 0, "knot_v" },
-	{ "maya_node_attribute_zoo_6100_binary", 9329, 141818, 63, 0, 0, 0, 0, "points->size % 4 == 0" },
-	{ "maya_node_attribute_zoo_6100_binary", 9330, 139655, 1, 0, 0, 0, 0, "points->size / 4 == (size_t)dimension_u * (size_t)dimen..." },
-	{ "maya_node_attribute_zoo_6100_binary", 9417, -1, 0, 707, 0, 0, 0, "bone" },
-	{ "maya_node_attribute_zoo_6100_binary", 9417, -1, 0, 714, 0, 0, 0, "bone" },
-	{ "maya_node_attribute_zoo_7500_ascii", 10152, -1, 0, 723, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_light),..." },
-	{ "maya_node_attribute_zoo_7500_ascii", 10152, -1, 0, 727, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_light),..." },
-	{ "maya_node_attribute_zoo_7500_ascii", 10154, -1, 0, 709, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera)..." },
-	{ "maya_node_attribute_zoo_7500_ascii", 10154, -1, 0, 713, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera)..." },
-	{ "maya_node_attribute_zoo_7500_ascii", 10156, -1, 0, 654, 0, 0, 0, "ufbxi_read_bone(uc, node, &info, sub_type)" },
-	{ "maya_node_attribute_zoo_7500_ascii", 10156, -1, 0, 658, 0, 0, 0, "ufbxi_read_bone(uc, node, &info, sub_type)" },
-	{ "maya_node_attribute_zoo_7500_ascii", 10160, -1, 0, 774, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_stereo_..." },
-	{ "maya_node_attribute_zoo_7500_ascii", 10160, -1, 0, 778, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_stereo_..." },
-	{ "maya_node_attribute_zoo_7500_ascii", 9275, -1, 0, 897, 0, 0, 0, "nurbs" },
-	{ "maya_node_attribute_zoo_7500_binary", 10158, -1, 0, 488, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_empty),..." },
-	{ "maya_node_attribute_zoo_7500_binary", 10158, -1, 0, 493, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_empty),..." },
-	{ "maya_node_attribute_zoo_7500_binary", 10219, 61038, 255, 0, 0, 0, 0, "ufbxi_read_animation_curve(uc, node, &info)" },
-	{ "maya_node_attribute_zoo_7500_binary", 11588, -1, 0, 0, 359, 0, 0, "elem->props.props.data" },
-	{ "maya_node_attribute_zoo_7500_binary", 13728, -1, 0, 0, 359, 0, 0, "ufbxi_add_connections_to_elements(uc)" },
-	{ "maya_node_attribute_zoo_7500_binary", 5993, 61146, 109, 0, 0, 0, 0, "Bad multivalue array type" },
-	{ "maya_node_attribute_zoo_7500_binary", 5994, 61333, 103, 0, 0, 0, 0, "Bad multivalue array type" },
-	{ "maya_node_attribute_zoo_7500_binary", 6237, -1, 0, 0, 0, 0, 2909, "res != -28" },
-	{ "maya_node_attribute_zoo_7500_binary", 8223, -1, 0, 0, 327, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, type, 0)" },
-	{ "maya_node_attribute_zoo_7500_binary", 9553, 61038, 255, 0, 0, 0, 0, "times = ufbxi_find_array(node, ufbxi_KeyTime, 'l')" },
-	{ "maya_node_attribute_zoo_7500_binary", 9554, 61115, 255, 0, 0, 0, 0, "values = ufbxi_find_array(node, ufbxi_KeyValueFloat, 'r..." },
-	{ "maya_node_attribute_zoo_7500_binary", 9555, 61175, 255, 0, 0, 0, 0, "attr_flags = ufbxi_find_array(node, ufbxi_KeyAttrFlags,..." },
-	{ "maya_node_attribute_zoo_7500_binary", 9556, 61234, 255, 0, 0, 0, 0, "attrs = ufbxi_find_array(node, ufbxi_KeyAttrDataFloat, ..." },
-	{ "maya_node_attribute_zoo_7500_binary", 9557, 61292, 255, 0, 0, 0, 0, "refs = ufbxi_find_array(node, ufbxi_KeyAttrRefCount, 'i..." },
-	{ "maya_node_attribute_zoo_7500_binary", 9560, 61122, 0, 0, 0, 0, 0, "times->size == values->size" },
-	{ "maya_node_attribute_zoo_7500_binary", 9565, 61242, 0, 0, 0, 0, 0, "attr_flags->size == refs->size" },
-	{ "maya_node_attribute_zoo_7500_binary", 9566, 61300, 0, 0, 0, 0, 0, "attrs->size == refs->size * 4u" },
-	{ "maya_node_attribute_zoo_7500_binary", 9570, -1, 0, 0, 328, 0, 0, "keys" },
-	{ "maya_node_attribute_zoo_7500_binary", 9721, 61431, 0, 0, 0, 0, 0, "refs_left >= 0" },
-	{ "maya_polygon_hole_6100_binary", 9117, 9377, 37, 0, 0, 0, 0, "ufbxi_find_val1(n, ufbxi_MappingInformationType, \"c\",..." },
-	{ "maya_polygon_hole_6100_binary", 9119, 9342, 0, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->face_hole.data, &..." },
-	{ "maya_resampled_7500_binary", 9594, 24917, 23, 0, 0, 0, 0, "p_ref < p_ref_end" },
-	{ "maya_scale_no_inherit_6100_ascii", 10427, 19165, 114, 0, 0, 0, 0, "Unknown slope mode" },
-	{ "maya_scale_no_inherit_6100_ascii", 10457, 19171, 111, 0, 0, 0, 0, "Unknown weight mode" },
-	{ "maya_shaderfx_pbs_material_7700_ascii", 7872, -1, 0, 0, 321, 0, 0, "ufbxi_read_embedded_blob(uc, &prop->value_blob, binary)" },
-	{ "maya_slime_7500_binary", 9346, -1, 0, 854, 0, 0, 0, "line" },
-	{ "maya_slime_7500_binary", 9346, -1, 0, 860, 0, 0, 0, "line" },
-	{ "maya_texture_layers_6100_binary", 11904, -1, 0, 0, 272, 0, 0, "list->data" },
-	{ "maya_texture_layers_6100_binary", 13540, -1, 0, 0, 277, 0, 0, "texture->file_textures.data" },
-	{ "maya_texture_layers_6100_binary", 14552, -1, 0, 0, 272, 0, 0, "ufbxi_fetch_texture_layers(uc, &texture->layers, &textu..." },
-	{ "maya_transform_animation_6100_binary", 10466, 17549, 11, 0, 0, 0, 0, "data_end - data >= 1" },
-	{ "maya_zero_end_7400_binary", 10125, 12333, 255, 0, 0, 0, 0, "(info.fbx_id & 0x8000000000000000UL) == 0" },
-	{ "maya_zero_end_7400_binary", 1784, 12382, 255, 0, 0, 0, 0, "total <= ator->max_size - ator->current_size" },
-	{ "maya_zero_end_7400_binary", 1822, 16748, 1, 0, 0, 0, 0, "total <= ator->max_size - ator->current_size" },
-	{ "maya_zero_end_7400_binary", 4231, 36, 255, 0, 0, 0, 0, "ufbxi_read_bytes(uc, (size_t)to_skip)" },
-	{ "maya_zero_end_7400_binary", 4261, -1, 0, 0, 0, 12392, 0, "uc->read_fn" },
-	{ "maya_zero_end_7400_binary", 5991, 16744, 106, 0, 0, 0, 0, "Bad multivalue array type" },
-	{ "maya_zero_end_7400_binary", 5992, 12615, 106, 0, 0, 0, 0, "Bad multivalue array type" },
-	{ "maya_zero_end_7400_binary", 5995, 12379, 101, 0, 0, 0, 0, "Bad multivalue array type" },
-	{ "maya_zero_end_7400_binary", 6017, 12382, 255, 0, 0, 0, 0, "data" },
-	{ "maya_zero_end_7400_binary", 6039, -1, 0, 0, 0, 27, 0, "header" },
-	{ "maya_zero_end_7400_binary", 6060, 24, 29, 0, 0, 0, 0, "num_values64 <= (4294967295U)" },
-	{ "maya_zero_end_7400_binary", 6078, -1, 0, 3, 0, 0, 0, "node" },
-	{ "maya_zero_end_7400_binary", 6078, -1, 0, 4, 0, 0, 0, "node" },
-	{ "maya_zero_end_7400_binary", 6082, -1, 0, 0, 0, 40, 0, "name" },
-	{ "maya_zero_end_7400_binary", 6084, -1, 0, 0, 1, 0, 0, "name" },
-	{ "maya_zero_end_7400_binary", 6109, -1, 0, 0, 0, 12379, 0, "data" },
-	{ "maya_zero_end_7400_binary", 6144, 12382, 255, 0, 0, 0, 0, "arr_data" },
-	{ "maya_zero_end_7400_binary", 6151, 16748, 1, 0, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
-	{ "maya_zero_end_7400_binary", 6164, 12379, 99, 0, 0, 0, 0, "encoded_size == decoded_data_size" },
-	{ "maya_zero_end_7400_binary", 6180, -1, 0, 0, 0, 12392, 0, "ufbxi_read_to(uc, decoded_data, encoded_size)" },
-	{ "maya_zero_end_7400_binary", 6238, 12384, 1, 0, 0, 0, 0, "res == (ptrdiff_t)decoded_data_size" },
-	{ "maya_zero_end_7400_binary", 6241, 12384, 255, 0, 0, 0, 0, "Bad array encoding" },
-	{ "maya_zero_end_7400_binary", 6261, 12379, 101, 0, 0, 0, 0, "ufbxi_binary_parse_multivalue_array(uc, dst_type, arr_d..." },
-	{ "maya_zero_end_7400_binary", 6277, -1, 0, 6, 0, 0, 0, "vals" },
-	{ "maya_zero_end_7400_binary", 6277, -1, 0, 8, 0, 0, 0, "vals" },
-	{ "maya_zero_end_7400_binary", 6285, -1, 0, 0, 0, 87, 0, "data" },
-	{ "maya_zero_end_7400_binary", 6338, 331, 0, 0, 0, 0, 0, "str" },
-	{ "maya_zero_end_7400_binary", 6348, -1, 0, 0, 11, 0, 0, "ufbxi_push_sanitized_string(&uc->string_pool, &vals[i]...." },
-	{ "maya_zero_end_7400_binary", 6363, 593, 8, 0, 0, 0, 0, "ufbxi_skip_bytes(uc, encoded_size)" },
-	{ "maya_zero_end_7400_binary", 6368, 22, 1, 0, 0, 0, 0, "Bad value type" },
-	{ "maya_zero_end_7400_binary", 6379, 66, 4, 0, 0, 0, 0, "offset <= values_end_offset" },
-	{ "maya_zero_end_7400_binary", 6381, 36, 255, 0, 0, 0, 0, "ufbxi_skip_bytes(uc, values_end_offset - offset)" },
-	{ "maya_zero_end_7400_binary", 6393, 58, 93, 0, 0, 0, 0, "current_offset == end_offset || end_offset == 0" },
-	{ "maya_zero_end_7400_binary", 6398, 70, 0, 0, 0, 0, 0, "ufbxi_binary_parse_node(uc, depth + 1, parse_state, &en..." },
-	{ "maya_zero_end_7400_binary", 6407, -1, 0, 28, 0, 0, 0, "node->children" },
-	{ "maya_zero_end_7400_binary", 6407, -1, 0, 30, 0, 0, 0, "node->children" },
-	{ "maya_zero_end_7400_binary", 7336, 35, 1, 0, 0, 0, 0, "ufbxi_binary_parse_node(uc, 0, state, p_end, buf, 1)" },
-	{ "maya_zero_end_7400_binary", 7365, 22, 1, 0, 0, 0, 0, "ufbxi_binary_parse_node(uc, 0, UFBXI_PARSE_ROOT, &end, ..." },
-	{ "maya_zero_end_7400_binary", 7822, 797, 0, 0, 0, 0, 0, "ufbxi_get_val2(node, \"SC\", &prop->name, (char**)&type..." },
-	{ "maya_zero_end_7400_binary", 7825, 6091, 0, 0, 0, 0, 0, "ufbxi_get_val_at(node, val_ix++, 'C', (char**)&subtype_..." },
-	{ "maya_zero_end_7400_binary", 7914, 797, 0, 0, 0, 0, 0, "ufbxi_read_property(uc, &node->children[i], &props->pro..." },
-	{ "maya_zero_end_7400_binary", 8115, 4105, 0, 0, 0, 0, 0, "ufbxi_get_val1(props, \"S\", &tmpl->sub_type)" },
-	{ "maya_zero_end_7400_binary", 9124, 12861, 0, 0, 0, 0, 0, "!memchr(n->name, '\\0', n->name_len)" },
-	{ "maya_zero_end_7500_binary", 11240, 24, 0, 0, 0, 0, 0, "ufbxi_parse_legacy_toplevel(uc)" },
-	{ "maya_zero_end_7500_binary", 16883, 24, 0, 0, 0, 0, 0, "ufbxi_read_legacy_root(uc)" },
-	{ "maya_zero_end_7500_binary", 7467, 24, 0, 0, 0, 0, 0, "ufbxi_binary_parse_node(uc, 0, UFBXI_PARSE_ROOT, &end, ..." },
-	{ "revit_empty_7400_binary", 5925, 25199, 2, 0, 0, 0, 0, "type == 'S' || type == 'R'" },
-	{ "revit_empty_7400_binary", 5934, 25220, 255, 0, 0, 0, 0, "d->data" },
-	{ "revit_empty_7400_binary", 5938, -1, 0, 0, 305, 0, 0, "d->data" },
-	{ "revit_empty_7400_binary", 8431, -1, 0, 0, 262, 0, 0, "new_indices" },
-	{ "revit_empty_7400_binary", 8514, -1, 0, 0, 262, 0, 0, "ufbxi_check_indices(uc, &attrib->indices.data, index_da..." },
-	{ "revit_empty_7400_binary", 9091, 21004, 255, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->face_material.dat..." },
-	{ "synthetic_binary_props_7500_ascii", 6914, -1, 0, 58, 0, 0, 0, "v" },
-	{ "synthetic_binary_props_7500_ascii", 6914, -1, 0, 60, 0, 0, 0, "v" },
-	{ "synthetic_binary_props_7500_ascii", 6920, -1, 0, 102, 0, 0, 0, "v->data" },
-	{ "synthetic_binary_props_7500_ascii", 6920, -1, 0, 104, 0, 0, 0, "v->data" },
-	{ "synthetic_broken_filename_7500_ascii", 11815, -1, 0, 0, 255, 0, 0, "list->data" },
-	{ "synthetic_broken_filename_7500_ascii", 12908, -1, 0, 0, 256, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &dst, raw..." },
-	{ "synthetic_broken_filename_7500_ascii", 13552, -1, 0, 0, 259, 0, 0, "texture->file_textures.data" },
-	{ "synthetic_broken_filename_7500_ascii", 13678, -1, 0, 0, 256, 0, 0, "ufbxi_resolve_relative_filename(uc, filename, relative_..." },
-	{ "synthetic_broken_filename_7500_ascii", 14388, -1, 0, 0, 255, 0, 0, "ufbxi_fetch_textures(uc, &material->textures, &material..." },
-	{ "synthetic_broken_filename_7500_ascii", 14505, -1, 0, 0, 256, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&video->fil..." },
-	{ "synthetic_broken_filename_7500_ascii", 14506, -1, 0, 0, 257, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&video->raw..." },
-	{ "synthetic_broken_filename_7500_ascii", 14673, -1, 0, 0, 259, 0, 0, "ufbxi_fetch_file_textures(uc)" },
-	{ "synthetic_cube_nan_6100_ascii", 6702, 4866, 45, 0, 0, 0, 0, "token->type == 'F'" },
-	{ "synthetic_empty_elements_7500_ascii", 11649, 2800, 49, 0, 0, 0, 0, "depth <= num_nodes" },
-	{ "synthetic_id_collision_7500_ascii", 10205, -1, 0, 788, 0, 0, 0, "ufbxi_read_material(uc, node, &info)" },
-	{ "synthetic_id_collision_7500_ascii", 6973, -1, 0, 680, 0, 0, 0, "v" },
-	{ "synthetic_id_collision_7500_ascii", 8329, -1, 0, 823, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
-	{ "synthetic_id_collision_7500_ascii", 8329, -1, 0, 827, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
-	{ "synthetic_id_collision_7500_ascii", 9003, -1, 0, 740, 0, 0, 0, "bitangents" },
-	{ "synthetic_id_collision_7500_ascii", 9004, -1, 0, 737, 0, 0, 0, "tangents" },
-	{ "synthetic_id_collision_7500_ascii", 9737, -1, 0, 788, 0, 0, 0, "material" },
-	{ "synthetic_indexed_by_vertex_7500_ascii", 8520, -1, 0, 0, 159, 0, 0, "new_index_data" },
-	{ "synthetic_missing_version_6100_ascii", 10053, -1, 0, 868, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
-	{ "synthetic_missing_version_6100_ascii", 10055, -1, 0, 633, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
-	{ "synthetic_missing_version_6100_ascii", 10055, -1, 0, 640, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
-	{ "synthetic_missing_version_6100_ascii", 10079, -1, 0, 250, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
-	{ "synthetic_missing_version_6100_ascii", 10079, -1, 0, 257, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
-	{ "synthetic_missing_version_6100_ascii", 10552, 72840, 102, 0, 0, 0, 0, "ufbxi_read_take_prop_channel(uc, child, target_fbx_id, ..." },
-	{ "synthetic_missing_version_6100_ascii", 13822, -1, 0, 0, 255, 0, 0, "pose->bone_poses.data" },
-	{ "synthetic_parent_directory_7700_ascii", 13661, -1, 0, 0, 262, 0, 0, "dst" },
-	{ "synthetic_parent_directory_7700_ascii", 13675, -1, 0, 0, 262, 0, 0, "ufbxi_absolute_to_relative_path(uc, relative_filename, ..." },
-	{ "synthetic_parent_directory_7700_ascii", 14547, -1, 0, 0, 265, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&texture->f..." },
-	{ "synthetic_parent_directory_7700_ascii", 14548, -1, 0, 0, 267, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&texture->r..." },
-	{ "synthetic_string_collision_7500_ascii", 10205, -1, 0, 140066, 0, 0, 0, "ufbxi_read_material(uc, node, &info)" },
-	{ "synthetic_string_collision_7500_ascii", 10213, -1, 0, 140051, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_st..." },
-	{ "synthetic_string_collision_7500_ascii", 10213, -1, 0, 140081, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_st..." },
-	{ "synthetic_string_collision_7500_ascii", 10215, -1, 0, 140054, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_la..." },
-	{ "synthetic_string_collision_7500_ascii", 10215, -1, 0, 140087, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_la..." },
-	{ "synthetic_string_collision_7500_ascii", 11430, -1, 0, 140102, 0, 0, 0, "tmp_connections" },
-	{ "synthetic_string_collision_7500_ascii", 11609, -1, 0, 140072, 0, 0, 0, "node_ptrs" },
-	{ "synthetic_string_collision_7500_ascii", 11620, -1, 0, 140105, 0, 0, 0, "node_offsets" },
-	{ "synthetic_string_collision_7500_ascii", 11754, -1, 0, 140081, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
-	{ "synthetic_string_collision_7500_ascii", 11829, -1, 0, 140114, 0, 0, 0, "((ufbx_mesh_material*)ufbxi_push_size_copy((&uc->tmp_st..." },
-	{ "synthetic_string_collision_7500_ascii", 13716, -1, 0, 140069, 0, 0, 0, "element_offsets" },
-	{ "synthetic_string_collision_7500_ascii", 13729, -1, 0, 140072, 0, 0, 0, "ufbxi_linearize_nodes(uc)" },
-	{ "synthetic_string_collision_7500_ascii", 13729, -1, 0, 140105, 0, 0, 0, "ufbxi_linearize_nodes(uc)" },
-	{ "synthetic_string_collision_7500_ascii", 13735, -1, 0, 140075, 0, 0, 0, "typed_offsets" },
-	{ "synthetic_string_collision_7500_ascii", 13735, -1, 0, 140108, 0, 0, 0, "typed_offsets" },
-	{ "synthetic_string_collision_7500_ascii", 14293, -1, 0, 140084, 0, 0, 0, "aprop" },
-	{ "synthetic_string_collision_7500_ascii", 3077, -1, 0, 2221, 0, 0, 0, "ufbxi_map_grow_size((&pool->map), sizeof(ufbx_string), ..." },
-	{ "synthetic_string_collision_7500_ascii", 3077, -1, 0, 2253, 0, 0, 0, "ufbxi_map_grow_size((&pool->map), sizeof(ufbx_string), ..." },
-	{ "synthetic_string_collision_7500_ascii", 6973, -1, 0, 139916, 0, 0, 0, "v" },
-	{ "synthetic_string_collision_7500_ascii", 9003, -1, 0, 139976, 0, 0, 0, "bitangents" },
-	{ "synthetic_string_collision_7500_ascii", 9004, -1, 0, 140009, 0, 0, 0, "tangents" },
-	{ "synthetic_string_collision_7500_ascii", 9737, -1, 0, 140066, 0, 0, 0, "material" },
-	{ "synthetic_texture_split_7500_ascii", 6787, -1, 0, 920, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, c)" },
-	{ "synthetic_texture_split_7500_ascii", 6787, -1, 0, 927, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, c)" },
-	{ "synthetic_texture_split_7500_ascii", 6981, 14287, 45, 0, 0, 0, 0, "Bad array dst type" },
-	{ "synthetic_texture_split_7500_ascii", 7007, 28571, 35, 0, 0, 0, 0, "Bad array dst type" },
-	{ "synthetic_texture_split_7500_ascii", 9804, -1, 0, 844, 0, 0, 0, "video" },
-	{ "synthetic_texture_split_7500_ascii", 9804, -1, 0, 851, 0, 0, 0, "video" },
-	{ "synthetic_texture_split_7500_binary", 5923, -1, 0, 0, 0, 26628, 0, "val" },
-	{ "synthetic_texture_split_7500_binary", 7788, -1, 0, 0, 229, 0, 0, "dst" },
-	{ "synthetic_unicode_7500_binary", 11606, -1, 0, 14372, 0, 0, 0, "node_ids" },
-	{ "synthetic_unicode_7500_binary", 11609, -1, 0, 14373, 0, 0, 0, "node_ptrs" },
-	{ "synthetic_unicode_7500_binary", 11665, -1, 0, 14375, 0, 0, 0, "p_offset" },
-	{ "synthetic_unicode_7500_binary", 13716, -1, 0, 14371, 0, 0, 0, "element_offsets" },
-	{ "synthetic_unicode_7500_binary", 2939, -1, 0, 12, 0, 0, 0, "ufbxi_grow_array_size((pool->map.ator), sizeof(**(&pool..." },
-	{ "synthetic_unicode_7500_binary", 2939, -1, 0, 14, 0, 0, 0, "ufbxi_grow_array_size((pool->map.ator), sizeof(**(&pool..." },
-	{ "synthetic_unicode_7500_binary", 3035, -1, 0, 1144, 0, 0, 0, "ufbxi_map_grow_size((&pool->map), sizeof(ufbx_string), ..." },
-	{ "synthetic_unicode_7500_binary", 3035, -1, 0, 1337, 0, 0, 0, "ufbxi_map_grow_size((&pool->map), sizeof(ufbx_string), ..." },
-	{ "synthetic_unicode_7500_binary", 3046, -1, 0, 12, 0, 0, 0, "ufbxi_sanitize_string(pool, sanitized, str, length, val..." },
-	{ "synthetic_unicode_7500_binary", 3046, -1, 0, 14, 0, 0, 0, "ufbxi_sanitize_string(pool, sanitized, str, length, val..." },
-	{ "zbrush_d20_6100_binary", 11861, -1, 0, 0, 263, 0, 0, "list->data" },
-	{ "zbrush_d20_6100_binary", 11881, -1, 0, 0, 254, 0, 0, "list->data" },
-	{ "zbrush_d20_6100_binary", 13974, -1, 0, 0, 253, 0, 0, "ufbxi_fetch_dst_elements(uc, &blend->channels, &blend->..." },
-	{ "zbrush_d20_6100_binary", 14009, -1, 0, 0, 254, 0, 0, "ufbxi_fetch_blend_keyframes(uc, &channel->keyframes, &c..." },
-	{ "zbrush_d20_6100_binary", 14171, -1, 0, 0, 262, 0, 0, "ufbxi_fetch_dst_elements(uc, &mesh->blend_deformers, &m..." },
-	{ "zbrush_d20_6100_binary", 14173, -1, 0, 0, 263, 0, 0, "ufbxi_fetch_deformers(uc, &mesh->all_deformers, &mesh->..." },
-	{ "zbrush_d20_6100_binary", 14403, -1, 0, 0, 268, 0, 0, "ufbxi_fetch_dst_elements(uc, &textures, &mesh->element,..." },
-	{ "zbrush_d20_6100_binary", 14467, -1, 0, 0, 269, 0, 0, "texs" },
-	{ "zbrush_d20_6100_binary", 8687, 25242, 2, 0, 0, 0, 0, "vertices->size % 3 == 0" },
-	{ "zbrush_d20_6100_binary", 8688, 25217, 0, 0, 0, 0, 0, "indices->size == vertices->size / 3" },
-	{ "zbrush_d20_6100_binary", 8701, 25290, 2, 0, 0, 0, 0, "normals && normals->size == vertices->size" },
-	{ "zbrush_d20_6100_binary", 8747, 25189, 0, 0, 0, 0, 0, "ufbxi_get_val1(n, \"S\", &name)" },
-	{ "zbrush_d20_6100_binary", 8764, -1, 0, 0, 99, 0, 0, "shape_props" },
-	{ "zbrush_d20_6100_binary", 8791, 25217, 0, 0, 0, 0, 0, "ufbxi_read_shape(uc, n, &shape_info)" },
-	{ "zbrush_d20_6100_binary", 8902, 25189, 0, 0, 0, 0, 0, "ufbxi_read_synthetic_blend_shapes(uc, node, info)" },
-	{ "zbrush_d20_6100_binary", 9110, 8305, 32, 0, 0, 0, 0, "ufbxi_find_val1(n, ufbxi_MappingInformationType, \"c\",..." },
-	{ "zbrush_d20_6100_binary", 9112, 8394, 33, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->face_group.data, ..." },
-	{ "zbrush_d20_7500_ascii", 10211, -1, 0, 0, 252, 0, 0, "ufbxi_read_video(uc, node, &info)" },
-	{ "zbrush_d20_7500_ascii", 7806, -1, 0, 0, 252, 0, 0, "dst_blob->data" },
-	{ "zbrush_d20_7500_ascii", 9821, -1, 0, 0, 252, 0, 0, "ufbxi_read_embedded_blob(uc, &video->content, content_n..." },
-	{ "zbrush_d20_7500_binary", 10176, 32981, 0, 0, 0, 0, 0, "ufbxi_read_shape(uc, node, &info)" },
-	{ "zbrush_d20_selection_set_6100_binary", 14602, -1, 0, 0, 405, 0, 0, "ufbxi_fetch_dst_elements(uc, &set->nodes, &set->element..." },
+	{ "blender_279_ball_0_obj", 14053, -1, 0, 0, 31, 0, 0, "props.data" },
+	{ "blender_279_ball_0_obj", 14053, -1, 0, 0, 62, 0, 0, "props.data" },
+	{ "blender_279_ball_0_obj", 14070, -1, 0, 2261, 0, 0, 0, "ufbxi_sort_properties(uc, props.data, props.count)" },
+	{ "blender_279_ball_0_obj", 14070, -1, 0, 246, 0, 0, 0, "ufbxi_sort_properties(uc, props.data, props.count)" },
+	{ "blender_279_ball_0_obj", 14216, -1, 0, 2166, 0, 0, 0, "ufbxi_refill(uc, new_cap, 0)" },
+	{ "blender_279_ball_0_obj", 14216, -1, 0, 237, 0, 0, 0, "ufbxi_refill(uc, new_cap, 0)" },
+	{ "blender_279_ball_0_obj", 14471, -1, 0, 134, 0, 0, 0, "ufbxi_connect_oo(uc, uc->obj.usemtl_fbx_id, mesh->fbx_n..." },
+	{ "blender_279_ball_0_obj", 14471, -1, 0, 1389, 0, 0, 0, "ufbxi_connect_oo(uc, uc->obj.usemtl_fbx_id, mesh->fbx_n..." },
+	{ "blender_279_ball_0_obj", 14628, -1, 0, 0, 0, 3099, 0, "uc->obj.num_tokens >= 2" },
+	{ "blender_279_ball_0_obj", 14631, -1, 0, 0, 1, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &name, 0)" },
+	{ "blender_279_ball_0_obj", 14631, -1, 0, 1350, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &name, 0)" },
+	{ "blender_279_ball_0_obj", 14646, -1, 0, 123, 0, 0, 0, "material" },
+	{ "blender_279_ball_0_obj", 14646, -1, 0, 1352, 0, 0, 0, "material" },
+	{ "blender_279_ball_0_obj", 14653, -1, 0, 125, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->o..." },
+	{ "blender_279_ball_0_obj", 14653, -1, 0, 1359, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->o..." },
+	{ "blender_279_ball_0_obj", 14964, -1, 0, 692, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &uc->obj...." },
+	{ "blender_279_ball_0_obj", 14979, -1, 0, 0, 0, 54, 0, "uc->obj.num_tokens >= 2" },
+	{ "blender_279_ball_0_obj", 14982, -1, 0, 13, 0, 0, 0, "lib.data" },
+	{ "blender_279_ball_0_obj", 14982, -1, 0, 688, 0, 0, 0, "lib.data" },
+	{ "blender_279_ball_0_obj", 14986, -1, 0, 123, 0, 0, 0, "ufbxi_obj_parse_material(uc)" },
+	{ "blender_279_ball_0_obj", 14986, -1, 0, 1350, 0, 0, 0, "ufbxi_obj_parse_material(uc)" },
+	{ "blender_279_ball_0_obj", 15005, -1, 0, 2261, 0, 0, 0, "ufbxi_obj_pop_props(uc, &material->props.props, num_pro..." },
+	{ "blender_279_ball_0_obj", 15005, -1, 0, 246, 0, 0, 0, "ufbxi_obj_pop_props(uc, &material->props.props, num_pro..." },
+	{ "blender_279_ball_0_obj", 15020, -1, 0, 2181, 0, 0, 0, "prop" },
+	{ "blender_279_ball_0_obj", 15020, -1, 0, 238, 0, 0, 0, "prop" },
+	{ "blender_279_ball_0_obj", 15023, -1, 0, 0, 15, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prop->na..." },
+	{ "blender_279_ball_0_obj", 15023, -1, 0, 2183, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prop->na..." },
+	{ "blender_279_ball_0_obj", 15056, -1, 0, 0, 16, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prop->va..." },
+	{ "blender_279_ball_0_obj", 15056, -1, 0, 2185, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prop->va..." },
+	{ "blender_279_ball_0_obj", 15057, -1, 0, 2187, 0, 0, 0, "ufbxi_push_string_place_blob(&uc->string_pool, &prop->v..." },
+	{ "blender_279_ball_0_obj", 15143, -1, 0, 2166, 0, 0, 0, "ufbxi_obj_tokenize_line(uc)" },
+	{ "blender_279_ball_0_obj", 15143, -1, 0, 237, 0, 0, 0, "ufbxi_obj_tokenize_line(uc)" },
+	{ "blender_279_ball_0_obj", 15150, -1, 0, 2261, 0, 0, 0, "ufbxi_obj_flush_material(uc)" },
+	{ "blender_279_ball_0_obj", 15150, -1, 0, 246, 0, 0, 0, "ufbxi_obj_flush_material(uc)" },
+	{ "blender_279_ball_0_obj", 15151, -1, 0, 2178, 0, 0, 0, "ufbxi_obj_parse_material(uc)" },
+	{ "blender_279_ball_0_obj", 15159, -1, 0, 2181, 0, 0, 0, "ufbxi_obj_parse_prop(uc, uc->obj.tokens[0], 1, 1, ((voi..." },
+	{ "blender_279_ball_0_obj", 15159, -1, 0, 238, 0, 0, 0, "ufbxi_obj_parse_prop(uc, uc->obj.tokens[0], 1, 1, ((voi..." },
+	{ "blender_279_ball_0_obj", 15163, -1, 0, 0, 33, 0, 0, "ufbxi_obj_flush_material(uc)" },
+	{ "blender_279_ball_0_obj", 15163, -1, 0, 2331, 0, 0, 0, "ufbxi_obj_flush_material(uc)" },
+	{ "blender_279_ball_0_obj", 15205, -1, 0, 2162, 0, 0, 0, "ufbxi_resolve_relative_filename(uc, (ufbxi_strblob*)&ds..." },
+	{ "blender_279_ball_0_obj", 15205, -1, 0, 236, 0, 0, 0, "ufbxi_resolve_relative_filename(uc, (ufbxi_strblob*)&ds..." },
+	{ "blender_279_ball_0_obj", 15244, -1, 0, 2166, 0, 0, 0, "ok" },
+	{ "blender_279_ball_0_obj", 15244, -1, 0, 237, 0, 0, 0, "ok" },
+	{ "blender_279_ball_0_obj", 15255, -1, 0, 2162, 0, 0, 0, "ufbxi_obj_load_mtl(uc)" },
+	{ "blender_279_ball_0_obj", 15255, -1, 0, 236, 0, 0, 0, "ufbxi_obj_load_mtl(uc)" },
+	{ "blender_279_ball_0_obj", 5623, -1, 0, 2166, 0, 0, 0, "new_buffer" },
+	{ "blender_279_ball_0_obj", 5623, -1, 0, 237, 0, 0, 0, "new_buffer" },
+	{ "blender_279_ball_7400_binary", 11528, 12516, 255, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->face_smoothing.da..." },
+	{ "blender_279_default_obj", 14669, 481, 48, 0, 0, 0, 0, "min_index < uc->obj.tmp_vertices[attrib].num_items / st..." },
+	{ "blender_279_sausage_7400_binary", 11897, -1, 0, 3089, 0, 0, 0, "skin" },
+	{ "blender_279_sausage_7400_binary", 11897, -1, 0, 712, 0, 0, 0, "skin" },
+	{ "blender_279_sausage_7400_binary", 11929, -1, 0, 3150, 0, 0, 0, "cluster" },
+	{ "blender_279_sausage_7400_binary", 11929, -1, 0, 735, 0, 0, 0, "cluster" },
+	{ "blender_279_sausage_7400_binary", 11935, 23076, 0, 0, 0, 0, 0, "indices->size == weights->size" },
+	{ "blender_279_sausage_7400_binary", 11946, 23900, 0, 0, 0, 0, 0, "transform->size >= 16" },
+	{ "blender_279_sausage_7400_binary", 11947, 24063, 0, 0, 0, 0, 0, "transform_link->size >= 16" },
+	{ "blender_279_sausage_7400_binary", 12305, 21748, 0, 0, 0, 0, 0, "matrix->size >= 16" },
+	{ "blender_279_sausage_7400_binary", 12647, -1, 0, 3089, 0, 0, 0, "ufbxi_read_skin(uc, node, &info)" },
+	{ "blender_279_sausage_7400_binary", 12647, -1, 0, 712, 0, 0, 0, "ufbxi_read_skin(uc, node, &info)" },
+	{ "blender_279_sausage_7400_binary", 12649, 23076, 0, 0, 0, 0, 0, "ufbxi_read_skin_cluster(uc, node, &info)" },
+	{ "blender_279_sausage_7400_binary", 16116, -1, 0, 13665, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "blender_279_sausage_7400_binary", 18162, -1, 0, 13660, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &skin->clusters, &skin->el..." },
+	{ "blender_279_sausage_7400_binary", 18162, -1, 0, 4415, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &skin->clusters, &skin->el..." },
+	{ "blender_279_sausage_7400_binary", 18207, -1, 0, 0, 382, 0, 0, "skin->vertices.data" },
+	{ "blender_279_sausage_7400_binary", 18207, -1, 0, 0, 764, 0, 0, "skin->vertices.data" },
+	{ "blender_279_sausage_7400_binary", 18211, -1, 0, 0, 383, 0, 0, "skin->weights.data" },
+	{ "blender_279_sausage_7400_binary", 18211, -1, 0, 0, 766, 0, 0, "skin->weights.data" },
+	{ "blender_279_sausage_7400_binary", 18266, -1, 0, 13665, 0, 0, 0, "ufbxi_sort_skin_weights(uc, skin)" },
+	{ "blender_279_sausage_7400_binary", 18428, -1, 0, 13666, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &mesh->skin_deformers, &me..." },
+	{ "blender_279_sausage_7400_binary", 18428, -1, 0, 4417, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &mesh->skin_deformers, &me..." },
+	{ "blender_279_unicode_6100_ascii", 13154, 432, 11, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_Creator)" },
+	{ "blender_279_uv_sets_6100_ascii", 11592, -1, 0, 0, 63, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prop_nam..." },
+	{ "blender_279_uv_sets_6100_ascii", 11592, -1, 0, 3146, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prop_nam..." },
+	{ "blender_279_uv_sets_6100_ascii", 11598, -1, 0, 3148, 0, 0, 0, "tex" },
+	{ "blender_279_uv_sets_6100_ascii", 11598, -1, 0, 728, 0, 0, 0, "tex" },
+	{ "blender_279_uv_sets_6100_ascii", 11689, -1, 0, 3152, 0, 0, 0, "extra" },
+	{ "blender_279_uv_sets_6100_ascii", 11689, -1, 0, 729, 0, 0, 0, "extra" },
+	{ "blender_279_uv_sets_6100_ascii", 11692, -1, 0, 3156, 0, 0, 0, "extra->texture_arr" },
+	{ "blender_279_uv_sets_6100_ascii", 11692, -1, 0, 731, 0, 0, 0, "extra->texture_arr" },
+	{ "blender_279_uv_sets_6100_ascii", 15477, -1, 0, 13058, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "blender_279_uv_sets_6100_ascii", 18713, -1, 0, 13054, 0, 0, 0, "mat_tex" },
+	{ "blender_279_uv_sets_6100_ascii", 18713, -1, 0, 3845, 0, 0, 0, "mat_tex" },
+	{ "blender_279_uv_sets_6100_ascii", 18720, -1, 0, 13056, 0, 0, 0, "mat_texs" },
+	{ "blender_279_uv_sets_6100_ascii", 18720, -1, 0, 3846, 0, 0, 0, "mat_texs" },
+	{ "blender_279_uv_sets_6100_ascii", 18721, -1, 0, 13058, 0, 0, 0, "ufbxi_sort_tmp_material_textures(uc, mat_texs, num_mate..." },
+	{ "blender_279_uv_sets_6100_ascii", 6630, -1, 0, 3152, 0, 0, 0, "extra" },
+	{ "blender_279_uv_sets_6100_ascii", 6630, -1, 0, 729, 0, 0, 0, "extra" },
+	{ "blender_279_uv_sets_6100_ascii", 6634, -1, 0, 3154, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->e..." },
+	{ "blender_279_uv_sets_6100_ascii", 6634, -1, 0, 730, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->e..." },
+	{ "blender_282_suzanne_and_transform_obj", 14461, -1, 0, 0, 2, 0, 0, "ufbxi_obj_flush_mesh(uc)" },
+	{ "blender_282_suzanne_and_transform_obj", 14461, -1, 0, 0, 4, 0, 0, "ufbxi_obj_flush_mesh(uc)" },
+	{ "blender_293_instancing_obj", 14103, -1, 0, 8037, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "blender_293_instancing_obj", 15208, -1, 0, 112260, 0, 0, 0, "ufbxi_warnf_imp(&uc->warnings, UFBX_WARNING_MISSING_EXT..." },
+	{ "blender_293_instancing_obj", 15208, -1, 0, 17219, 0, 0, 0, "ufbxi_warnf_imp(&uc->warnings, UFBX_WARNING_MISSING_EXT..." },
+	{ "fuzz_0018", 13714, 810, 0, 0, 0, 0, 0, "ufbxi_read_header_extension(uc)" },
+	{ "fuzz_0070", 4276, -1, 0, 33, 0, 0, 0, "ufbxi_grow_array_size((pool->map.ator), sizeof(**(&pool..." },
+	{ "fuzz_0070", 4276, -1, 0, 748, 0, 0, 0, "ufbxi_grow_array_size((pool->map.ator), sizeof(**(&pool..." },
+	{ "fuzz_0272", 10673, -1, 0, 2224, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &unknown-..." },
+	{ "fuzz_0272", 10674, -1, 0, 452, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &unknown-..." },
+	{ "fuzz_0393", 10849, -1, 0, 0, 137, 0, 0, "index_data" },
+	{ "fuzz_0393", 10849, -1, 0, 0, 274, 0, 0, "index_data" },
+	{ "fuzz_0393", 10853, -1, 0, 2226, 0, 0, 0, "ufbxi_check_indices(uc, &attrib->indices.data, index_da..." },
+	{ "fuzz_0393", 10853, -1, 0, 454, 0, 0, 0, "ufbxi_check_indices(uc, &attrib->indices.data, index_da..." },
+	{ "fuzz_0561", 12643, -1, 0, 2216, 0, 0, 0, "ufbxi_read_unknown(uc, node, &info, type_str, sub_type_..." },
+	{ "fuzz_0561", 12643, -1, 0, 451, 0, 0, 0, "ufbxi_read_unknown(uc, node, &info, type_str, sub_type_..." },
+	{ "marvelous_quad_7200_binary", 20423, -1, 0, 0, 273, 0, 0, "ufbxi_push_string_place_str(&cc->string_pool, &channel-..." },
+	{ "max2009_blob_5800_ascii", 12882, 164150, 114, 0, 0, 0, 0, "Unknown slope mode" },
+	{ "max2009_blob_5800_ascii", 12912, 164903, 98, 0, 0, 0, 0, "Unknown weight mode" },
+	{ "max2009_blob_5800_ascii", 12925, 164150, 116, 0, 0, 0, 0, "Unknown key mode" },
+	{ "max2009_blob_5800_ascii", 8678, -1, 0, 15576, 0, 0, 0, "v" },
+	{ "max2009_blob_5800_ascii", 8678, -1, 0, 4417, 0, 0, 0, "v" },
+	{ "max2009_blob_5800_ascii", 8686, -1, 0, 0, 116, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, v, raw)" },
+	{ "max2009_blob_5800_ascii", 8686, -1, 0, 15578, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, v, raw)" },
+	{ "max2009_blob_5800_ascii", 8748, 131240, 45, 0, 0, 0, 0, "Bad array dst type" },
+	{ "max2009_blob_5800_ascii", 8804, -1, 0, 23169, 0, 0, 0, "v" },
+	{ "max2009_blob_5800_ascii", 8804, -1, 0, 6973, 0, 0, 0, "v" },
+	{ "max2009_blob_5800_ascii", 9572, 12, 0, 0, 0, 0, 0, "ufbxi_ascii_parse_node(uc, 0, UFBXI_PARSE_ROOT, &end, &..." },
+	{ "max2009_blob_5800_binary", 10531, -1, 0, 8, 0, 0, 0, "ufbxi_insert_fbx_id(uc, fbx_id, element_id)" },
+	{ "max2009_blob_5800_binary", 10552, -1, 0, 3336, 0, 0, 0, "conn" },
+	{ "max2009_blob_5800_binary", 10552, -1, 0, 9838, 0, 0, 0, "conn" },
+	{ "max2009_blob_5800_binary", 12795, -1, 0, 3391, 0, 0, 0, "curve" },
+	{ "max2009_blob_5800_binary", 12795, -1, 0, 9978, 0, 0, 0, "curve" },
+	{ "max2009_blob_5800_binary", 12797, -1, 0, 3393, 0, 0, 0, "ufbxi_connect_op(uc, curve_fbx_id, value_fbx_id, curve-..." },
+	{ "max2009_blob_5800_binary", 12797, -1, 0, 9985, 0, 0, 0, "ufbxi_connect_op(uc, curve_fbx_id, value_fbx_id, curve-..." },
+	{ "max2009_blob_5800_binary", 12802, 119084, 0, 0, 0, 0, 0, "ufbxi_find_val1(node, ufbxi_KeyCount, \"Z\", &num_keys)" },
+	{ "max2009_blob_5800_binary", 12805, 119104, 255, 0, 0, 0, 0, "curve->keyframes.data" },
+	{ "max2009_blob_5800_binary", 12819, 119110, 0, 0, 0, 0, 0, "data_end - data >= 2" },
+	{ "max2009_blob_5800_binary", 12905, 119110, 16, 0, 0, 0, 0, "data_end - data >= 1" },
+	{ "max2009_blob_5800_binary", 12930, 119102, 3, 0, 0, 0, 0, "data_end - data >= 2" },
+	{ "max2009_blob_5800_binary", 12979, 119102, 1, 0, 0, 0, 0, "data == data_end" },
+	{ "max2009_blob_5800_binary", 13000, 114022, 0, 0, 0, 0, 0, "ufbxi_get_val1(child, \"C\", (char**)&old_name)" },
+	{ "max2009_blob_5800_binary", 13011, 119084, 0, 0, 0, 0, 0, "ufbxi_read_take_prop_channel(uc, child, target_fbx_id, ..." },
+	{ "max2009_blob_5800_binary", 13054, -1, 0, 3331, 0, 0, 0, "ufbxi_connect_oo(uc, value_fbx_id, layer_fbx_id)" },
+	{ "max2009_blob_5800_binary", 13054, -1, 0, 9827, 0, 0, 0, "ufbxi_connect_oo(uc, value_fbx_id, layer_fbx_id)" },
+	{ "max2009_blob_5800_binary", 13055, -1, 0, 3336, 0, 0, 0, "ufbxi_connect_op(uc, value_fbx_id, target_fbx_id, name)" },
+	{ "max2009_blob_5800_binary", 13055, -1, 0, 9838, 0, 0, 0, "ufbxi_connect_op(uc, value_fbx_id, target_fbx_id, name)" },
+	{ "max2009_blob_5800_binary", 13058, 119084, 0, 0, 0, 0, 0, "ufbxi_read_take_anim_channel(uc, channel_nodes[i], valu..." },
+	{ "max2009_blob_5800_binary", 13071, 114858, 0, 0, 0, 0, 0, "ufbxi_get_val1(node, \"c\", (char**)&type_and_name)" },
+	{ "max2009_blob_5800_binary", 13080, 114022, 0, 0, 0, 0, 0, "ufbxi_read_take_prop_channel(uc, child, target_fbx_id, ..." },
+	{ "max2009_blob_5800_binary", 13113, 114022, 0, 0, 0, 0, 0, "ufbxi_read_take_object(uc, child, layer_fbx_id)" },
+	{ "max2009_blob_5800_binary", 13367, -1, 0, 2519, 0, 0, 0, "material" },
+	{ "max2009_blob_5800_binary", 13367, -1, 0, 576, 0, 0, 0, "material" },
+	{ "max2009_blob_5800_binary", 13375, -1, 0, 0, 140, 0, 0, "material->props.props.data" },
+	{ "max2009_blob_5800_binary", 13375, -1, 0, 0, 280, 0, 0, "material->props.props.data" },
+	{ "max2009_blob_5800_binary", 13416, -1, 0, 107, 0, 0, 0, "light" },
+	{ "max2009_blob_5800_binary", 13416, -1, 0, 1178, 0, 0, 0, "light" },
+	{ "max2009_blob_5800_binary", 13423, -1, 0, 0, 44, 0, 0, "light->props.props.data" },
+	{ "max2009_blob_5800_binary", 13423, -1, 0, 0, 88, 0, 0, "light->props.props.data" },
+	{ "max2009_blob_5800_binary", 13431, -1, 0, 1765, 0, 0, 0, "camera" },
+	{ "max2009_blob_5800_binary", 13431, -1, 0, 310, 0, 0, 0, "camera" },
+	{ "max2009_blob_5800_binary", 13438, -1, 0, 0, 188, 0, 0, "camera->props.props.data" },
+	{ "max2009_blob_5800_binary", 13438, -1, 0, 0, 94, 0, 0, "camera->props.props.data" },
+	{ "max2009_blob_5800_binary", 13471, -1, 0, 2507, 0, 0, 0, "mesh" },
+	{ "max2009_blob_5800_binary", 13471, -1, 0, 572, 0, 0, 0, "mesh" },
+	{ "max2009_blob_5800_binary", 13482, 9030, 37, 0, 0, 0, 0, "vertices->size % 3 == 0" },
+	{ "max2009_blob_5800_binary", 13492, -1, 0, 0, 1328, 0, 0, "index_data" },
+	{ "max2009_blob_5800_binary", 13492, -1, 0, 0, 664, 0, 0, "index_data" },
+	{ "max2009_blob_5800_binary", 13515, 58502, 255, 0, 0, 0, 0, "ufbxi_process_indices(uc, mesh, index_data)" },
+	{ "max2009_blob_5800_binary", 13546, -1, 0, 0, 138, 0, 0, "set" },
+	{ "max2009_blob_5800_binary", 13546, -1, 0, 0, 276, 0, 0, "set" },
+	{ "max2009_blob_5800_binary", 13550, 65596, 0, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, uv_info, (ufbx_vert..." },
+	{ "max2009_blob_5800_binary", 13560, 56645, 0, 0, 0, 0, 0, "ufbxi_find_val1(node, ufbxi_MaterialAssignation, \"C\",..." },
+	{ "max2009_blob_5800_binary", 13562, 56700, 78, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->face_material.dat..." },
+	{ "max2009_blob_5800_binary", 13591, 6207, 0, 0, 0, 0, 0, "ufbxi_get_val1(child, \"s\", &type_and_name)" },
+	{ "max2009_blob_5800_binary", 13592, -1, 0, 0, 139, 0, 0, "ufbxi_split_type_and_name(uc, type_and_name, &type, &na..." },
+	{ "max2009_blob_5800_binary", 13592, -1, 0, 2516, 0, 0, 0, "ufbxi_split_type_and_name(uc, type_and_name, &type, &na..." },
+	{ "max2009_blob_5800_binary", 13593, -1, 0, 2519, 0, 0, 0, "ufbxi_read_legacy_material(uc, child, &fbx_id, name.dat..." },
+	{ "max2009_blob_5800_binary", 13593, -1, 0, 576, 0, 0, 0, "ufbxi_read_legacy_material(uc, child, &fbx_id, name.dat..." },
+	{ "max2009_blob_5800_binary", 13594, -1, 0, 2526, 0, 0, 0, "ufbxi_connect_oo(uc, fbx_id, info->fbx_id)" },
+	{ "max2009_blob_5800_binary", 13594, -1, 0, 578, 0, 0, 0, "ufbxi_connect_oo(uc, fbx_id, info->fbx_id)" },
+	{ "max2009_blob_5800_binary", 13625, 818, 0, 0, 0, 0, 0, "ufbxi_get_val1(node, \"s\", &type_and_name)" },
+	{ "max2009_blob_5800_binary", 13626, -1, 0, 0, 43, 0, 0, "ufbxi_split_type_and_name(uc, type_and_name, &type, &na..." },
+	{ "max2009_blob_5800_binary", 13626, -1, 0, 1164, 0, 0, 0, "ufbxi_split_type_and_name(uc, type_and_name, &type, &na..." },
+	{ "max2009_blob_5800_binary", 13634, -1, 0, 104, 0, 0, 0, "elem_node" },
+	{ "max2009_blob_5800_binary", 13634, -1, 0, 1167, 0, 0, 0, "elem_node" },
+	{ "max2009_blob_5800_binary", 13635, -1, 0, 1173, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "max2009_blob_5800_binary", 13635, -1, 0, 365, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "max2009_blob_5800_binary", 13638, -1, 0, 105, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &attrib_info.fbx_id)" },
+	{ "max2009_blob_5800_binary", 13638, -1, 0, 1174, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &attrib_info.fbx_id)" },
+	{ "max2009_blob_5800_binary", 13643, -1, 0, 106, 0, 0, 0, "ufbxi_connect_oo(uc, attrib_info.fbx_id, info.fbx_id)" },
+	{ "max2009_blob_5800_binary", 13643, -1, 0, 1176, 0, 0, 0, "ufbxi_connect_oo(uc, attrib_info.fbx_id, info.fbx_id)" },
+	{ "max2009_blob_5800_binary", 13650, -1, 0, 107, 0, 0, 0, "ufbxi_read_legacy_light(uc, node, &attrib_info)" },
+	{ "max2009_blob_5800_binary", 13650, -1, 0, 1178, 0, 0, 0, "ufbxi_read_legacy_light(uc, node, &attrib_info)" },
+	{ "max2009_blob_5800_binary", 13652, -1, 0, 1765, 0, 0, 0, "ufbxi_read_legacy_camera(uc, node, &attrib_info)" },
+	{ "max2009_blob_5800_binary", 13652, -1, 0, 310, 0, 0, 0, "ufbxi_read_legacy_camera(uc, node, &attrib_info)" },
+	{ "max2009_blob_5800_binary", 13656, 6207, 0, 0, 0, 0, 0, "ufbxi_read_legacy_mesh(uc, node, &attrib_info)" },
+	{ "max2009_blob_5800_binary", 13663, -1, 0, 111, 0, 0, 0, "ufbxi_insert_fbx_attr(uc, info.fbx_id, attrib_info.fbx_..." },
+	{ "max2009_blob_5800_binary", 13663, -1, 0, 1187, 0, 0, 0, "ufbxi_insert_fbx_attr(uc, info.fbx_id, attrib_info.fbx_..." },
+	{ "max2009_blob_5800_binary", 13672, -1, 0, 2604, 0, 0, 0, "ufbxi_connect_oo(uc, child_fbx_id, info.fbx_id)" },
+	{ "max2009_blob_5800_binary", 13672, -1, 0, 600, 0, 0, 0, "ufbxi_connect_oo(uc, child_fbx_id, info.fbx_id)" },
+	{ "max2009_blob_5800_binary", 13696, -1, 0, 3, 0, 0, 0, "ufbxi_init_node_prop_names(uc)" },
+	{ "max2009_blob_5800_binary", 13696, -1, 0, 662, 0, 0, 0, "ufbxi_init_node_prop_names(uc)" },
+	{ "max2009_blob_5800_binary", 13703, -1, 0, 4, 0, 0, 0, "root" },
+	{ "max2009_blob_5800_binary", 13703, -1, 0, 859, 0, 0, 0, "root" },
+	{ "max2009_blob_5800_binary", 13705, -1, 0, 869, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "max2009_blob_5800_binary", 13705, -1, 0, 9, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "max2009_blob_5800_binary", 13716, 113392, 1, 0, 0, 0, 0, "ufbxi_read_takes(uc)" },
+	{ "max2009_blob_5800_binary", 13720, 818, 0, 0, 0, 0, 0, "ufbxi_read_legacy_model(uc, node)" },
+	{ "max2009_blob_5800_binary", 13725, -1, 0, 0, 3550, 0, 0, "ufbxi_retain_toplevel(uc, ((void *)0))" },
+	{ "max2009_blob_5800_binary", 13725, -1, 0, 0, 7100, 0, 0, "ufbxi_retain_toplevel(uc, ((void *)0))" },
+	{ "max2009_blob_5800_binary", 15498, -1, 0, 3693, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "max2009_blob_5800_binary", 15584, -1, 0, 3693, 0, 0, 0, "ufbxi_sort_connections(uc, uc->scene.connections_src.da..." },
+	{ "max2009_blob_5800_binary", 15689, -1, 0, 10798, 0, 0, 0, "new_prop" },
+	{ "max2009_blob_5800_binary", 15689, -1, 0, 3694, 0, 0, 0, "new_prop" },
+	{ "max2009_blob_5800_binary", 15706, -1, 0, 0, 355, 0, 0, "elem->props.props.data" },
+	{ "max2009_blob_5800_binary", 15706, -1, 0, 0, 710, 0, 0, "elem->props.props.data" },
+	{ "max2009_blob_5800_binary", 17977, -1, 0, 0, 411, 0, 0, "mat->face_indices.data" },
+	{ "max2009_blob_5800_binary", 17977, -1, 0, 0, 822, 0, 0, "mat->face_indices.data" },
+	{ "max2009_blob_5800_binary", 18020, -1, 0, 10798, 0, 0, 0, "ufbxi_add_connections_to_elements(uc)" },
+	{ "max2009_blob_5800_binary", 18020, -1, 0, 3694, 0, 0, 0, "ufbxi_add_connections_to_elements(uc)" },
+	{ "max2009_blob_5800_binary", 18387, -1, 0, 0, 410, 0, 0, "materials" },
+	{ "max2009_blob_5800_binary", 18387, -1, 0, 0, 820, 0, 0, "materials" },
+	{ "max2009_blob_5800_binary", 18421, -1, 0, 0, 411, 0, 0, "ufbxi_finalize_mesh_material(&uc->result, &uc->error, m..." },
+	{ "max2009_blob_5800_binary", 18421, -1, 0, 0, 822, 0, 0, "ufbxi_finalize_mesh_material(&uc->result, &uc->error, m..." },
+	{ "max2009_blob_5800_binary", 18485, -1, 0, 11041, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &layer->anim_values, &laye..." },
+	{ "max2009_blob_5800_binary", 18485, -1, 0, 3809, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &layer->anim_values, &laye..." },
+	{ "max2009_blob_5800_binary", 18509, -1, 0, 11136, 0, 0, 0, "aprop" },
+	{ "max2009_blob_5800_binary", 18509, -1, 0, 3841, 0, 0, 0, "aprop" },
+	{ "max2009_blob_5800_binary", 7509, -1, 0, 0, 0, 80100, 0, "val" },
+	{ "max2009_blob_5800_binary", 7511, 80062, 17, 0, 0, 0, 0, "type == 'S' || type == 'R'" },
+	{ "max2009_blob_5800_binary", 7520, 80082, 1, 0, 0, 0, 0, "d->data" },
+	{ "max2009_blob_5800_binary", 7526, -1, 0, 0, 119, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, d, raw)" },
+	{ "max2009_blob_5800_binary", 7526, -1, 0, 2459, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, d, raw)" },
+	{ "max2009_blob_5800_binary", 9590, -1, 0, 42, 0, 0, 0, "ufbxi_retain_toplevel(uc, &uc->legacy_node)" },
+	{ "max2009_blob_5800_binary", 9590, -1, 0, 966, 0, 0, 0, "ufbxi_retain_toplevel(uc, &uc->legacy_node)" },
+	{ "max2009_blob_6100_binary", 10644, -1, 0, 1357, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "max2009_blob_6100_binary", 11542, 149477, 3, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->face_material.dat..." },
+	{ "max2009_blob_6100_binary", 12508, -1, 0, 2107, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
+	{ "max2009_blob_6100_binary", 12508, -1, 0, 372, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
+	{ "max2009_blob_6100_binary", 12510, -1, 0, 1060, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
+	{ "max2009_blob_6100_binary", 12510, -1, 0, 4493, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
+	{ "max7_blend_cube_5000_binary", 11063, -1, 0, 1715, 0, 0, 0, "ufbxi_connect_pp(uc, info->fbx_id, channel_fbx_id, name..." },
+	{ "max7_blend_cube_5000_binary", 11063, -1, 0, 317, 0, 0, 0, "ufbxi_connect_pp(uc, info->fbx_id, channel_fbx_id, name..." },
+	{ "max7_blend_cube_5000_binary", 13022, -1, 0, 1804, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &name, 0)" },
+	{ "max7_blend_cube_5000_binary", 13473, 2350, 0, 0, 0, 0, 0, "ufbxi_read_synthetic_blend_shapes(uc, node, info)" },
+	{ "max7_cube_5000_binary", 13683, -1, 0, 1239, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &uc->legacy_implicit_anim_l..." },
+	{ "max7_cube_5000_binary", 13683, -1, 0, 137, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &uc->legacy_implicit_anim_l..." },
+	{ "max7_cube_5000_binary", 13685, 942, 0, 0, 0, 0, 0, "ufbxi_read_take_prop_channel(uc, child, info.fbx_id, uc..." },
+	{ "max7_cube_5000_binary", 13734, -1, 0, 0, 106, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &layer_in..." },
+	{ "max7_cube_5000_binary", 13734, -1, 0, 4122, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &layer_in..." },
+	{ "max7_cube_5000_binary", 13736, -1, 0, 1218, 0, 0, 0, "layer" },
+	{ "max7_cube_5000_binary", 13736, -1, 0, 4124, 0, 0, 0, "layer" },
+	{ "max7_cube_5000_binary", 13739, -1, 0, 1222, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &stack_info.fbx_id)" },
+	{ "max7_cube_5000_binary", 13739, -1, 0, 4133, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &stack_info.fbx_id)" },
+	{ "max7_cube_5000_binary", 13741, -1, 0, 1223, 0, 0, 0, "stack" },
+	{ "max7_cube_5000_binary", 13741, -1, 0, 4135, 0, 0, 0, "stack" },
+	{ "max7_cube_5000_binary", 13743, -1, 0, 1225, 0, 0, 0, "ufbxi_connect_oo(uc, layer_info.fbx_id, stack_info.fbx_..." },
+	{ "max7_cube_5000_binary", 13743, -1, 0, 4142, 0, 0, 0, "ufbxi_connect_oo(uc, layer_info.fbx_id, stack_info.fbx_..." },
+	{ "max7_skin_5000_binary", 13385, -1, 0, 1776, 0, 0, 0, "cluster" },
+	{ "max7_skin_5000_binary", 13385, -1, 0, 342, 0, 0, 0, "cluster" },
+	{ "max7_skin_5000_binary", 13392, 2420, 136, 0, 0, 0, 0, "indices->size == weights->size" },
+	{ "max7_skin_5000_binary", 13403, 4378, 15, 0, 0, 0, 0, "transform->size >= 16" },
+	{ "max7_skin_5000_binary", 13404, 4544, 15, 0, 0, 0, 0, "transform_link->size >= 16" },
+	{ "max7_skin_5000_binary", 13446, -1, 0, 2189, 0, 0, 0, "bone" },
+	{ "max7_skin_5000_binary", 13446, -1, 0, 497, 0, 0, 0, "bone" },
+	{ "max7_skin_5000_binary", 13458, -1, 0, 0, 102, 0, 0, "bone->props.props.data" },
+	{ "max7_skin_5000_binary", 13458, -1, 0, 0, 51, 0, 0, "bone->props.props.data" },
+	{ "max7_skin_5000_binary", 13598, 2361, 0, 0, 0, 0, 0, "ufbxi_get_val1(child, \"s\", &type_and_name)" },
+	{ "max7_skin_5000_binary", 13599, -1, 0, 1775, 0, 0, 0, "ufbxi_split_type_and_name(uc, type_and_name, &type, &na..." },
+	{ "max7_skin_5000_binary", 13600, 2420, 136, 0, 0, 0, 0, "ufbxi_read_legacy_link(uc, child, &fbx_id, name.data)" },
+	{ "max7_skin_5000_binary", 13603, -1, 0, 1785, 0, 0, 0, "ufbxi_connect_oo(uc, node_fbx_id, fbx_id)" },
+	{ "max7_skin_5000_binary", 13603, -1, 0, 346, 0, 0, 0, "ufbxi_connect_oo(uc, node_fbx_id, fbx_id)" },
+	{ "max7_skin_5000_binary", 13606, -1, 0, 1787, 0, 0, 0, "skin" },
+	{ "max7_skin_5000_binary", 13606, -1, 0, 347, 0, 0, 0, "skin" },
+	{ "max7_skin_5000_binary", 13607, -1, 0, 1794, 0, 0, 0, "ufbxi_connect_oo(uc, skin_fbx_id, info->fbx_id)" },
+	{ "max7_skin_5000_binary", 13607, -1, 0, 349, 0, 0, 0, "ufbxi_connect_oo(uc, skin_fbx_id, info->fbx_id)" },
+	{ "max7_skin_5000_binary", 13609, -1, 0, 1796, 0, 0, 0, "ufbxi_connect_oo(uc, fbx_id, skin_fbx_id)" },
+	{ "max7_skin_5000_binary", 13609, -1, 0, 350, 0, 0, 0, "ufbxi_connect_oo(uc, fbx_id, skin_fbx_id)" },
+	{ "max7_skin_5000_binary", 13654, -1, 0, 2189, 0, 0, 0, "ufbxi_read_legacy_limb_node(uc, node, &attrib_info)" },
+	{ "max7_skin_5000_binary", 13654, -1, 0, 497, 0, 0, 0, "ufbxi_read_legacy_limb_node(uc, node, &attrib_info)" },
+	{ "max_cache_box_7500_binary", 20307, -1, 0, 2956, 0, 0, 0, "frames" },
+	{ "max_cache_box_7500_binary", 20307, -1, 0, 663, 0, 0, 0, "frames" },
+	{ "max_cache_box_7500_binary", 20477, -1, 0, 2956, 0, 0, 0, "ufbxi_cache_load_pc2(cc)" },
+	{ "max_cache_box_7500_binary", 20477, -1, 0, 663, 0, 0, 0, "ufbxi_cache_load_pc2(cc)" },
+	{ "max_curve_line_7500_ascii", 11808, 8302, 43, 0, 0, 0, 0, "points->size % 3 == 0" },
+	{ "max_curve_line_7500_binary", 11801, -1, 0, 2214, 0, 0, 0, "line" },
+	{ "max_curve_line_7500_binary", 11801, -1, 0, 426, 0, 0, 0, "line" },
+	{ "max_curve_line_7500_binary", 11806, 13861, 255, 0, 0, 0, 0, "points" },
+	{ "max_curve_line_7500_binary", 11807, 13985, 56, 0, 0, 0, 0, "points_index" },
+	{ "max_curve_line_7500_binary", 11829, -1, 0, 0, 140, 0, 0, "line->segments.data" },
+	{ "max_curve_line_7500_binary", 11829, -1, 0, 0, 280, 0, 0, "line->segments.data" },
+	{ "max_curve_line_7500_binary", 12637, 13861, 255, 0, 0, 0, 0, "ufbxi_read_line(uc, node, &info)" },
+	{ "max_geometry_transform_6100_binary", 10612, -1, 0, 1868, 0, 0, 0, "geo_node" },
+	{ "max_geometry_transform_6100_binary", 10612, -1, 0, 317, 0, 0, 0, "geo_node" },
+	{ "max_geometry_transform_6100_binary", 10613, -1, 0, 1875, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "max_geometry_transform_6100_binary", 10613, -1, 0, 564, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "max_geometry_transform_6100_binary", 10617, -1, 0, 0, 108, 0, 0, "props" },
+	{ "max_geometry_transform_6100_binary", 10617, -1, 0, 0, 54, 0, 0, "props" },
+	{ "max_geometry_transform_6100_binary", 10628, -1, 0, 1876, 0, 0, 0, "ufbxi_connect_oo(uc, geo_fbx_id, node_fbx_id)" },
+	{ "max_geometry_transform_6100_binary", 10628, -1, 0, 319, 0, 0, 0, "ufbxi_connect_oo(uc, geo_fbx_id, node_fbx_id)" },
+	{ "max_geometry_transform_6100_binary", 10632, -1, 0, 1878, 0, 0, 0, "extra" },
+	{ "max_geometry_transform_6100_binary", 10632, -1, 0, 320, 0, 0, 0, "extra" },
+	{ "max_geometry_transform_6100_binary", 10647, -1, 0, 1868, 0, 0, 0, "ufbxi_setup_geometry_transform_helper(uc, elem_node, in..." },
+	{ "max_geometry_transform_6100_binary", 10647, -1, 0, 317, 0, 0, 0, "ufbxi_setup_geometry_transform_helper(uc, elem_node, in..." },
+	{ "max_geometry_transform_6100_binary", 15307, -1, 0, 722, 0, 0, 0, "elements" },
+	{ "max_geometry_transform_6100_binary", 15311, -1, 0, 723, 0, 0, 0, "tmp_connections" },
+	{ "max_geometry_transform_6100_binary", 15314, -1, 0, 724, 0, 0, 0, "pre_connections" },
+	{ "max_geometry_transform_6100_binary", 15317, -1, 0, 725, 0, 0, 0, "instance_counts" },
+	{ "max_geometry_transform_6100_binary", 15323, -1, 0, 726, 0, 0, 0, "fbx_ids" },
+	{ "max_geometry_transform_6100_binary", 21294, -1, 0, 1, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, str, 0)" },
+	{ "max_geometry_transform_6100_binary", 21312, -1, 0, 1, 0, 0, 0, "ufbxi_fixup_opts_string(uc, &uc->opts.geometry_transfor..." },
+	{ "max_geometry_transform_6100_binary", 21364, -1, 0, 722, 0, 0, 0, "ufbxi_pre_finalize_scene(uc)" },
+	{ "max_geometry_transform_instances_7700_binary", 15388, -1, 0, 2927, 0, 0, 0, "ufbxi_setup_geometry_transform_helper(uc, node, fbx_id)" },
+	{ "max_geometry_transform_instances_7700_binary", 15388, -1, 0, 642, 0, 0, 0, "ufbxi_setup_geometry_transform_helper(uc, node, fbx_id)" },
+	{ "max_geometry_transform_types_obj", 15438, -1, 0, 30, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "max_geometry_transform_types_obj", 15462, -1, 0, 27, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "max_geometry_transform_types_obj", 15779, -1, 0, 27, 0, 0, 0, "ufbxi_sort_node_ptrs(uc, node_ptrs, num_nodes)" },
+	{ "max_geometry_transform_types_obj", 18057, -1, 0, 30, 0, 0, 0, "ufbxi_sort_name_elements(uc, uc->scene.elements_by_name..." },
+	{ "max_quote_6100_ascii", 10444, -1, 0, 1137, 0, 0, 0, "ufbxi_warnf_imp(&uc->warnings, UFBX_WARNING_DUPLICATE_O..." },
+	{ "max_quote_6100_ascii", 10444, -1, 0, 4518, 0, 0, 0, "ufbxi_warnf_imp(&uc->warnings, UFBX_WARNING_DUPLICATE_O..." },
+	{ "max_quote_6100_ascii", 18086, -1, 0, 1393, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "max_quote_6100_ascii", 18086, -1, 0, 5442, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "max_quote_6100_ascii", 18088, -1, 0, 5444, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "max_quote_6100_ascii", 18102, -1, 0, 0, 176, 0, 0, "node->all_attribs.data" },
+	{ "max_quote_6100_ascii", 18102, -1, 0, 0, 352, 0, 0, "node->all_attribs.data" },
+	{ "max_quote_6100_ascii", 21401, -1, 0, 0, 188, 0, 0, "ufbxi_pop_warnings(&uc->warnings, &uc->scene.metadata.w..." },
+	{ "max_quote_6100_ascii", 4067, -1, 0, 0, 188, 0, 0, "warnings->data" },
+	{ "max_quote_6100_binary", 11532, 8983, 36, 0, 0, 0, 0, "ufbxi_find_val1(n, ufbxi_MappingInformationType, \"c\",..." },
+	{ "max_quote_6100_binary", 11535, 9030, 36, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->edge_visibility.d..." },
+	{ "max_shadergraph_7700_ascii", 8387, -1, 0, 1096, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, replacement)" },
+	{ "max_shadergraph_7700_ascii", 8387, -1, 0, 4772, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, replacement)" },
+	{ "max_texture_mapping_6100_binary", 17093, -1, 0, 10758, 0, 0, 0, "copy" },
+	{ "max_texture_mapping_6100_binary", 17093, -1, 0, 2715, 0, 0, 0, "copy" },
+	{ "max_texture_mapping_6100_binary", 17101, -1, 0, 0, 660, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prefix, ..." },
+	{ "max_texture_mapping_6100_binary", 17101, -1, 0, 10760, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prefix, ..." },
+	{ "max_texture_mapping_6100_binary", 17153, -1, 0, 10758, 0, 0, 0, "ufbxi_push_prop_prefix(uc, &shader->prop_prefix, name)" },
+	{ "max_texture_mapping_6100_binary", 17153, -1, 0, 2715, 0, 0, 0, "ufbxi_push_prop_prefix(uc, &shader->prop_prefix, name)" },
+	{ "max_texture_mapping_6100_binary", 17240, -1, 0, 0, 1318, 0, 0, "shader" },
+	{ "max_texture_mapping_6100_binary", 17240, -1, 0, 0, 659, 0, 0, "shader" },
+	{ "max_texture_mapping_6100_binary", 17272, -1, 0, 10758, 0, 0, 0, "ufbxi_shader_texture_find_prefix(uc, texture, shader)" },
+	{ "max_texture_mapping_6100_binary", 17272, -1, 0, 2715, 0, 0, 0, "ufbxi_shader_texture_find_prefix(uc, texture, shader)" },
+	{ "max_texture_mapping_6100_binary", 17284, -1, 0, 0, 677, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &shader->..." },
+	{ "max_texture_mapping_6100_binary", 17284, -1, 0, 10862, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &shader->..." },
+	{ "max_texture_mapping_6100_binary", 17327, -1, 0, 10762, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "max_texture_mapping_6100_binary", 17344, -1, 0, 0, 1322, 0, 0, "shader->inputs.data" },
+	{ "max_texture_mapping_6100_binary", 17344, -1, 0, 0, 661, 0, 0, "shader->inputs.data" },
+	{ "max_texture_mapping_6100_binary", 17589, -1, 0, 10968, 0, 0, 0, "dst" },
+	{ "max_texture_mapping_6100_binary", 17589, -1, 0, 2745, 0, 0, 0, "dst" },
+	{ "max_texture_mapping_6100_binary", 17609, -1, 0, 10980, 0, 0, 0, "dst" },
+	{ "max_texture_mapping_6100_binary", 17668, -1, 0, 2753, 0, 0, 0, "((ufbx_texture**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "max_texture_mapping_6100_binary", 17679, -1, 0, 10979, 0, 0, 0, "((ufbx_texture**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "max_texture_mapping_6100_binary", 18812, -1, 0, 10758, 0, 0, 0, "ufbxi_finalize_shader_texture(uc, texture)" },
+	{ "max_texture_mapping_6100_binary", 18812, -1, 0, 2715, 0, 0, 0, "ufbxi_finalize_shader_texture(uc, texture)" },
+	{ "max_texture_mapping_7700_binary", 17130, -1, 0, 2340, 0, 0, 0, "ufbxi_push_prop_prefix(uc, &shader->prop_prefix, prop->..." },
+	{ "max_texture_mapping_7700_binary", 17130, -1, 0, 9444, 0, 0, 0, "ufbxi_push_prop_prefix(uc, &shader->prop_prefix, prop->..." },
+	{ "max_transformed_skin_6100_binary", 12853, 63310, 98, 0, 0, 0, 0, "data_end - data >= 2" },
+	{ "max_transformed_skin_6100_binary", 15320, -1, 0, 2030, 0, 0, 0, "modify_not_supported" },
+	{ "maya_arnold_textures_6100_binary", 12325, -1, 0, 6386, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_arnold_textures_6100_binary", 12335, -1, 0, 1514, 0, 0, 0, "bindings" },
+	{ "maya_arnold_textures_6100_binary", 12335, -1, 0, 6243, 0, 0, 0, "bindings" },
+	{ "maya_arnold_textures_6100_binary", 12349, -1, 0, 1516, 0, 0, 0, "bind" },
+	{ "maya_arnold_textures_6100_binary", 12349, -1, 0, 6250, 0, 0, 0, "bind" },
+	{ "maya_arnold_textures_6100_binary", 12364, -1, 0, 0, 343, 0, 0, "bindings->prop_bindings.data" },
+	{ "maya_arnold_textures_6100_binary", 12364, -1, 0, 0, 686, 0, 0, "bindings->prop_bindings.data" },
+	{ "maya_arnold_textures_6100_binary", 12366, -1, 0, 6386, 0, 0, 0, "ufbxi_sort_shader_prop_bindings(uc, bindings->prop_bind..." },
+	{ "maya_arnold_textures_6100_binary", 12678, -1, 0, 1349, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_shader)..." },
+	{ "maya_arnold_textures_6100_binary", 12678, -1, 0, 5457, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_shader)..." },
+	{ "maya_arnold_textures_6100_binary", 12680, -1, 0, 1514, 0, 0, 0, "ufbxi_read_binding_table(uc, node, &info)" },
+	{ "maya_arnold_textures_6100_binary", 12680, -1, 0, 6243, 0, 0, 0, "ufbxi_read_binding_table(uc, node, &info)" },
+	{ "maya_arnold_textures_6100_binary", 18600, -1, 0, 1754, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &shader->bindings, &shader..." },
+	{ "maya_arnold_textures_6100_binary", 18600, -1, 0, 6942, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &shader->bindings, &shader..." },
+	{ "maya_auto_clamp_7100_ascii", 8530, -1, 0, 3181, 0, 0, 0, "v" },
+	{ "maya_auto_clamp_7100_ascii", 8530, -1, 0, 724, 0, 0, 0, "v" },
+	{ "maya_auto_clamp_7100_ascii", 8743, -1, 0, 3200, 0, 0, 0, "v" },
+	{ "maya_cache_sine_6100_binary", 12655, -1, 0, 1216, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_cache_d..." },
+	{ "maya_cache_sine_6100_binary", 12655, -1, 0, 4851, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_cache_d..." },
+	{ "maya_cache_sine_6100_binary", 12700, -1, 0, 1284, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_cache_f..." },
+	{ "maya_cache_sine_6100_binary", 12700, -1, 0, 5097, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_cache_f..." },
+	{ "maya_cache_sine_6100_binary", 18295, -1, 0, 1471, 0, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&cache->fil..." },
+	{ "maya_cache_sine_6100_binary", 18295, -1, 0, 5700, 0, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&cache->fil..." },
+	{ "maya_cache_sine_6100_binary", 18296, -1, 0, 1472, 0, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&cache->raw..." },
+	{ "maya_cache_sine_6100_binary", 18296, -1, 0, 5704, 0, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&cache->raw..." },
+	{ "maya_cache_sine_6100_binary", 18430, -1, 0, 1476, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &mesh->cache_deformers, &m..." },
+	{ "maya_cache_sine_6100_binary", 18430, -1, 0, 5716, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &mesh->cache_deformers, &m..." },
+	{ "maya_cache_sine_6100_binary", 20249, -1, 0, 1627, 0, 0, 0, "ufbxi_grow_array_size((cc->ator_tmp), sizeof(**(&cc->na..." },
+	{ "maya_cache_sine_6100_binary", 20249, -1, 0, 6707, 0, 0, 0, "ufbxi_grow_array_size((cc->ator_tmp), sizeof(**(&cc->na..." },
+	{ "maya_cache_sine_6100_binary", 20253, -1, 0, 6709, 0, 0, 0, "ufbxi_push_string_place_str(&cc->string_pool, &cc->chan..." },
+	{ "maya_cache_sine_6100_binary", 20266, -1, 0, 1628, 0, 0, 0, "frame" },
+	{ "maya_cache_sine_6100_binary", 20266, -1, 0, 6710, 0, 0, 0, "frame" },
+	{ "maya_cache_sine_6100_binary", 20351, -1, 0, 1625, 0, 0, 0, "ufbxi_grow_array_size((cc->ator_tmp), sizeof(**(&cc->tm..." },
+	{ "maya_cache_sine_6100_binary", 20351, -1, 0, 6701, 0, 0, 0, "ufbxi_grow_array_size((cc->ator_tmp), sizeof(**(&cc->tm..." },
+	{ "maya_cache_sine_6100_binary", 20372, -1, 0, 1621, 0, 0, 0, "extra" },
+	{ "maya_cache_sine_6100_binary", 20372, -1, 0, 6681, 0, 0, 0, "extra" },
+	{ "maya_cache_sine_6100_binary", 20374, -1, 0, 0, 247, 0, 0, "ufbxi_push_string_place_str(&cc->string_pool, extra, 0)" },
+	{ "maya_cache_sine_6100_binary", 20374, -1, 0, 6683, 0, 0, 0, "ufbxi_push_string_place_str(&cc->string_pool, extra, 0)" },
+	{ "maya_cache_sine_6100_binary", 20379, -1, 0, 0, 250, 0, 0, "cc->cache.extra_info.data" },
+	{ "maya_cache_sine_6100_binary", 20379, -1, 0, 0, 500, 0, 0, "cc->cache.extra_info.data" },
+	{ "maya_cache_sine_6100_binary", 20412, -1, 0, 1624, 0, 0, 0, "cc->channels" },
+	{ "maya_cache_sine_6100_binary", 20412, -1, 0, 6693, 0, 0, 0, "cc->channels" },
+	{ "maya_cache_sine_6100_binary", 20423, -1, 0, 6695, 0, 0, 0, "ufbxi_push_string_place_str(&cc->string_pool, &channel-..." },
+	{ "maya_cache_sine_6100_binary", 20424, -1, 0, 0, 251, 0, 0, "ufbxi_push_string_place_str(&cc->string_pool, &channel-..." },
+	{ "maya_cache_sine_6100_binary", 20424, -1, 0, 6696, 0, 0, 0, "ufbxi_push_string_place_str(&cc->string_pool, &channel-..." },
+	{ "maya_cache_sine_6100_binary", 20440, -1, 0, 1625, 0, 0, 0, "ufbxi_cache_sort_tmp_channels(cc, cc->channels, cc->num..." },
+	{ "maya_cache_sine_6100_binary", 20440, -1, 0, 6701, 0, 0, 0, "ufbxi_cache_sort_tmp_channels(cc, cc->channels, cc->num..." },
+	{ "maya_cache_sine_6100_binary", 20453, -1, 0, 1487, 0, 0, 0, "doc" },
+	{ "maya_cache_sine_6100_binary", 20453, -1, 0, 5745, 0, 0, 0, "doc" },
+	{ "maya_cache_sine_6100_binary", 20457, -1, 0, 1621, 0, 0, 0, "xml_ok" },
+	{ "maya_cache_sine_6100_binary", 20457, -1, 0, 6681, 0, 0, 0, "xml_ok" },
+	{ "maya_cache_sine_6100_binary", 20465, -1, 0, 0, 253, 0, 0, "ufbxi_push_string_place_str(&cc->string_pool, &cc->stre..." },
+	{ "maya_cache_sine_6100_binary", 20465, -1, 0, 5744, 0, 0, 0, "ufbxi_push_string_place_str(&cc->string_pool, &cc->stre..." },
+	{ "maya_cache_sine_6100_binary", 20479, -1, 0, 1627, 0, 0, 0, "ufbxi_cache_load_mc(cc)" },
+	{ "maya_cache_sine_6100_binary", 20479, -1, 0, 6707, 0, 0, 0, "ufbxi_cache_load_mc(cc)" },
+	{ "maya_cache_sine_6100_binary", 20481, -1, 0, 1487, 0, 0, 0, "ufbxi_cache_load_xml(cc)" },
+	{ "maya_cache_sine_6100_binary", 20481, -1, 0, 5745, 0, 0, 0, "ufbxi_cache_load_xml(cc)" },
+	{ "maya_cache_sine_6100_binary", 20519, -1, 0, 1626, 0, 0, 0, "name_buf" },
+	{ "maya_cache_sine_6100_binary", 20519, -1, 0, 6703, 0, 0, 0, "name_buf" },
+	{ "maya_cache_sine_6100_binary", 20540, -1, 0, 1627, 0, 0, 0, "ufbxi_cache_try_open_file(cc, filename, ((void *)0), &f..." },
+	{ "maya_cache_sine_6100_binary", 20540, -1, 0, 6705, 0, 0, 0, "ufbxi_cache_try_open_file(cc, filename, ((void *)0), &f..." },
+	{ "maya_cache_sine_6100_binary", 20604, -1, 0, 1689, 0, 0, 0, "ufbxi_grow_array_size((cc->ator_tmp), sizeof(**(&cc->tm..." },
+	{ "maya_cache_sine_6100_binary", 20604, -1, 0, 6949, 0, 0, 0, "ufbxi_grow_array_size((cc->ator_tmp), sizeof(**(&cc->tm..." },
+	{ "maya_cache_sine_6100_binary", 20633, -1, 0, 1690, 0, 0, 0, "chan" },
+	{ "maya_cache_sine_6100_binary", 20633, -1, 0, 6951, 0, 0, 0, "chan" },
+	{ "maya_cache_sine_6100_binary", 20663, -1, 0, 0, 255, 0, 0, "cc->cache.channels.data" },
+	{ "maya_cache_sine_6100_binary", 20663, -1, 0, 0, 510, 0, 0, "cc->cache.channels.data" },
+	{ "maya_cache_sine_6100_binary", 20687, -1, 0, 1486, 0, 0, 0, "filename_data" },
+	{ "maya_cache_sine_6100_binary", 20687, -1, 0, 5742, 0, 0, 0, "filename_data" },
+	{ "maya_cache_sine_6100_binary", 20694, -1, 0, 1487, 0, 0, 0, "ufbxi_cache_try_open_file(cc, filename_copy, ((void *)0..." },
+	{ "maya_cache_sine_6100_binary", 20694, -1, 0, 5744, 0, 0, 0, "ufbxi_cache_try_open_file(cc, filename_copy, ((void *)0..." },
+	{ "maya_cache_sine_6100_binary", 20702, -1, 0, 1626, 0, 0, 0, "ufbxi_cache_load_frame_files(cc)" },
+	{ "maya_cache_sine_6100_binary", 20702, -1, 0, 6703, 0, 0, 0, "ufbxi_cache_load_frame_files(cc)" },
+	{ "maya_cache_sine_6100_binary", 20707, -1, 0, 0, 254, 0, 0, "cc->cache.frames.data" },
+	{ "maya_cache_sine_6100_binary", 20707, -1, 0, 0, 508, 0, 0, "cc->cache.frames.data" },
+	{ "maya_cache_sine_6100_binary", 20709, -1, 0, 1689, 0, 0, 0, "ufbxi_cache_sort_frames(cc, cc->cache.frames.data, cc->..." },
+	{ "maya_cache_sine_6100_binary", 20709, -1, 0, 6949, 0, 0, 0, "ufbxi_cache_sort_frames(cc, cc->cache.frames.data, cc->..." },
+	{ "maya_cache_sine_6100_binary", 20710, -1, 0, 1690, 0, 0, 0, "ufbxi_cache_setup_channels(cc)" },
+	{ "maya_cache_sine_6100_binary", 20710, -1, 0, 6951, 0, 0, 0, "ufbxi_cache_setup_channels(cc)" },
+	{ "maya_cache_sine_6100_binary", 20714, -1, 0, 0, 256, 0, 0, "cc->imp" },
+	{ "maya_cache_sine_6100_binary", 20714, -1, 0, 0, 512, 0, 0, "cc->imp" },
+	{ "maya_cache_sine_6100_binary", 20926, -1, 0, 1483, 0, 0, 0, "file" },
+	{ "maya_cache_sine_6100_binary", 20926, -1, 0, 5736, 0, 0, 0, "file" },
+	{ "maya_cache_sine_6100_binary", 20936, -1, 0, 1485, 0, 0, 0, "files" },
+	{ "maya_cache_sine_6100_binary", 20936, -1, 0, 5740, 0, 0, 0, "files" },
+	{ "maya_cache_sine_6100_binary", 20944, -1, 0, 1486, 0, 0, 0, "ufbxi_load_external_cache(uc, file)" },
+	{ "maya_cache_sine_6100_binary", 20944, -1, 0, 5742, 0, 0, 0, "ufbxi_load_external_cache(uc, file)" },
+	{ "maya_cache_sine_6100_binary", 21389, -1, 0, 1483, 0, 0, 0, "ufbxi_load_external_files(uc)" },
+	{ "maya_cache_sine_6100_binary", 21389, -1, 0, 5736, 0, 0, 0, "ufbxi_load_external_files(uc)" },
+	{ "maya_cache_sine_6100_binary", 6082, -1, 0, 1488, 0, 0, 0, "ufbxi_grow_array_size((xc->ator), sizeof(**(&xc->tok)),..." },
+	{ "maya_cache_sine_6100_binary", 6082, -1, 0, 5747, 0, 0, 0, "ufbxi_grow_array_size((xc->ator), sizeof(**(&xc->tok)),..." },
+	{ "maya_cache_sine_6100_binary", 6117, -1, 0, 1488, 0, 0, 0, "ufbxi_xml_push_token_char(xc, buf[(ix - suffix_len) & w..." },
+	{ "maya_cache_sine_6100_binary", 6117, -1, 0, 5747, 0, 0, 0, "ufbxi_xml_push_token_char(xc, buf[(ix - suffix_len) & w..." },
+	{ "maya_cache_sine_6100_binary", 6129, -1, 0, 5770, 0, 0, 0, "ufbxi_xml_push_token_char(xc, '\\0')" },
+	{ "maya_cache_sine_6100_binary", 6201, -1, 0, 1537, 0, 0, 0, "ufbxi_xml_push_token_char(xc, c)" },
+	{ "maya_cache_sine_6100_binary", 6201, -1, 0, 5771, 0, 0, 0, "ufbxi_xml_push_token_char(xc, c)" },
+	{ "maya_cache_sine_6100_binary", 6206, -1, 0, 5773, 0, 0, 0, "ufbxi_xml_push_token_char(xc, '\\0')" },
+	{ "maya_cache_sine_6100_binary", 6210, -1, 0, 1497, 0, 0, 0, "dst->data" },
+	{ "maya_cache_sine_6100_binary", 6210, -1, 0, 5800, 0, 0, 0, "dst->data" },
+	{ "maya_cache_sine_6100_binary", 6227, -1, 0, 1537, 0, 0, 0, "ufbxi_xml_read_until(xc, ((void *)0), UFBXI_XML_CTYPE_T..." },
+	{ "maya_cache_sine_6100_binary", 6227, -1, 0, 5771, 0, 0, 0, "ufbxi_xml_read_until(xc, ((void *)0), UFBXI_XML_CTYPE_T..." },
+	{ "maya_cache_sine_6100_binary", 6238, -1, 0, 1494, 0, 0, 0, "tag" },
+	{ "maya_cache_sine_6100_binary", 6238, -1, 0, 5774, 0, 0, 0, "tag" },
+	{ "maya_cache_sine_6100_binary", 6243, -1, 0, 1495, 0, 0, 0, "tag->text.data" },
+	{ "maya_cache_sine_6100_binary", 6243, -1, 0, 5776, 0, 0, 0, "tag->text.data" },
+	{ "maya_cache_sine_6100_binary", 6250, -1, 0, 6068, 0, 0, 0, "ufbxi_xml_read_until(xc, ((void *)0), UFBXI_XML_CTYPE_N..." },
+	{ "maya_cache_sine_6100_binary", 6276, -1, 0, 1488, 0, 0, 0, "ufbxi_xml_skip_until_string(xc, ((void *)0), \"?>\")" },
+	{ "maya_cache_sine_6100_binary", 6276, -1, 0, 5747, 0, 0, 0, "ufbxi_xml_skip_until_string(xc, ((void *)0), \"?>\")" },
+	{ "maya_cache_sine_6100_binary", 6281, -1, 0, 1496, 0, 0, 0, "tag" },
+	{ "maya_cache_sine_6100_binary", 6281, -1, 0, 5778, 0, 0, 0, "tag" },
+	{ "maya_cache_sine_6100_binary", 6282, -1, 0, 1497, 0, 0, 0, "ufbxi_xml_read_until(xc, &tag->name, UFBXI_XML_CTYPE_NA..." },
+	{ "maya_cache_sine_6100_binary", 6282, -1, 0, 5780, 0, 0, 0, "ufbxi_xml_read_until(xc, &tag->name, UFBXI_XML_CTYPE_NA..." },
+	{ "maya_cache_sine_6100_binary", 6298, -1, 0, 1502, 0, 0, 0, "attrib" },
+	{ "maya_cache_sine_6100_binary", 6298, -1, 0, 5825, 0, 0, 0, "attrib" },
+	{ "maya_cache_sine_6100_binary", 6299, -1, 0, 1503, 0, 0, 0, "ufbxi_xml_read_until(xc, &attrib->name, UFBXI_XML_CTYPE..." },
+	{ "maya_cache_sine_6100_binary", 6299, -1, 0, 5827, 0, 0, 0, "ufbxi_xml_read_until(xc, &attrib->name, UFBXI_XML_CTYPE..." },
+	{ "maya_cache_sine_6100_binary", 6311, -1, 0, 1504, 0, 0, 0, "ufbxi_xml_read_until(xc, &attrib->value, quote_ctype)" },
+	{ "maya_cache_sine_6100_binary", 6311, -1, 0, 5834, 0, 0, 0, "ufbxi_xml_read_until(xc, &attrib->value, quote_ctype)" },
+	{ "maya_cache_sine_6100_binary", 6319, -1, 0, 1508, 0, 0, 0, "tag->attribs" },
+	{ "maya_cache_sine_6100_binary", 6319, -1, 0, 5861, 0, 0, 0, "tag->attribs" },
+	{ "maya_cache_sine_6100_binary", 6325, -1, 0, 1498, 0, 0, 0, "ufbxi_xml_parse_tag(xc, depth + 1, &closing, tag->name...." },
+	{ "maya_cache_sine_6100_binary", 6325, -1, 0, 5802, 0, 0, 0, "ufbxi_xml_parse_tag(xc, depth + 1, &closing, tag->name...." },
+	{ "maya_cache_sine_6100_binary", 6331, -1, 0, 1540, 0, 0, 0, "tag->children" },
+	{ "maya_cache_sine_6100_binary", 6331, -1, 0, 6074, 0, 0, 0, "tag->children" },
+	{ "maya_cache_sine_6100_binary", 6340, -1, 0, 1487, 0, 0, 0, "tag" },
+	{ "maya_cache_sine_6100_binary", 6340, -1, 0, 5745, 0, 0, 0, "tag" },
+	{ "maya_cache_sine_6100_binary", 6346, -1, 0, 1488, 0, 0, 0, "ufbxi_xml_parse_tag(xc, 0, &closing, ((void *)0))" },
+	{ "maya_cache_sine_6100_binary", 6346, -1, 0, 5747, 0, 0, 0, "ufbxi_xml_parse_tag(xc, 0, &closing, ((void *)0))" },
+	{ "maya_cache_sine_6100_binary", 6352, -1, 0, 1619, 0, 0, 0, "tag->children" },
+	{ "maya_cache_sine_6100_binary", 6352, -1, 0, 6677, 0, 0, 0, "tag->children" },
+	{ "maya_cache_sine_6100_binary", 6355, -1, 0, 1620, 0, 0, 0, "xc->doc" },
+	{ "maya_cache_sine_6100_binary", 6355, -1, 0, 6679, 0, 0, 0, "xc->doc" },
+	{ "maya_character_6100_binary", 12412, -1, 0, 47240, 0, 0, 0, "character" },
+	{ "maya_character_6100_binary", 12693, -1, 0, 47240, 0, 0, 0, "ufbxi_read_character(uc, node, &info)" },
+	{ "maya_character_7500_binary", 12412, -1, 0, 6220, 0, 0, 0, "character" },
+	{ "maya_character_7500_binary", 12693, -1, 0, 6220, 0, 0, 0, "ufbxi_read_character(uc, node, &info)" },
+	{ "maya_color_sets_6100_binary", 11460, -1, 0, 0, 154, 0, 0, "mesh->color_sets.data" },
+	{ "maya_color_sets_6100_binary", 11460, -1, 0, 0, 77, 0, 0, "mesh->color_sets.data" },
+	{ "maya_color_sets_6100_binary", 11507, 9966, 0, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_att..." },
+	{ "maya_cone_6100_binary", 11512, 16081, 0, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_att..." },
+	{ "maya_cone_6100_binary", 11515, 15524, 255, 0, 0, 0, 0, "ufbxi_find_val1(n, ufbxi_MappingInformationType, \"c\",..." },
+	{ "maya_cone_6100_binary", 11518, 15571, 255, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->edge_crease.data,..." },
+	{ "maya_constraint_zoo_6100_binary", 12438, -1, 0, 12976, 0, 0, 0, "constraint" },
+	{ "maya_constraint_zoo_6100_binary", 12438, -1, 0, 3507, 0, 0, 0, "constraint" },
+	{ "maya_constraint_zoo_6100_binary", 12695, -1, 0, 12976, 0, 0, 0, "ufbxi_read_constraint(uc, node, &info)" },
+	{ "maya_constraint_zoo_6100_binary", 12695, -1, 0, 3507, 0, 0, 0, "ufbxi_read_constraint(uc, node, &info)" },
+	{ "maya_constraint_zoo_6100_binary", 16939, -1, 0, 14697, 0, 0, 0, "target" },
+	{ "maya_constraint_zoo_6100_binary", 16939, -1, 0, 4000, 0, 0, 0, "target" },
+	{ "maya_constraint_zoo_6100_binary", 18906, -1, 0, 14697, 0, 0, 0, "ufbxi_add_constraint_prop(uc, constraint, (ufbx_node*)c..." },
+	{ "maya_constraint_zoo_6100_binary", 18906, -1, 0, 4000, 0, 0, 0, "ufbxi_add_constraint_prop(uc, constraint, (ufbx_node*)c..." },
+	{ "maya_constraint_zoo_6100_binary", 18912, -1, 0, 0, 315, 0, 0, "constraint->targets.data" },
+	{ "maya_constraint_zoo_6100_binary", 18912, -1, 0, 0, 630, 0, 0, "constraint->targets.data" },
+	{ "maya_cube_6100_ascii", 3272, -1, 0, 1700, 0, 0, 0, "ator->num_allocs < ator->max_allocs" },
+	{ "maya_cube_6100_ascii", 8066, -1, 0, 0, 0, 0, 57, "ufbxi_report_progress(uc)" },
+	{ "maya_cube_6100_ascii", 8206, -1, 0, 3, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&token..." },
+	{ "maya_cube_6100_ascii", 8206, -1, 0, 662, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&token..." },
+	{ "maya_cube_6100_ascii", 8283, -1, 0, 3, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, c)" },
+	{ "maya_cube_6100_ascii", 8283, -1, 0, 662, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, c)" },
+	{ "maya_cube_6100_ascii", 8302, -1, 0, 6, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, c)" },
+	{ "maya_cube_6100_ascii", 8302, -1, 0, 669, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, c)" },
+	{ "maya_cube_6100_ascii", 8331, 514, 0, 0, 0, 0, 0, "end == token->str_data + token->str_len - 1" },
+	{ "maya_cube_6100_ascii", 8338, 4541, 45, 0, 0, 0, 0, "end == token->str_data + token->str_len - 1" },
+	{ "maya_cube_6100_ascii", 8397, 190, 0, 0, 0, 0, 0, "c != '\\0'" },
+	{ "maya_cube_6100_ascii", 8417, 190, 0, 0, 0, 0, 0, "ufbxi_ascii_next_token(uc, &ua->token)" },
+	{ "maya_cube_6100_ascii", 8454, -1, 0, 1743, 0, 0, 0, "v" },
+	{ "maya_cube_6100_ascii", 8454, -1, 0, 273, 0, 0, 0, "v" },
+	{ "maya_cube_6100_ascii", 8486, 4998, 45, 0, 0, 0, 0, "ufbxi_ascii_next_token(uc, &ua->token)" },
+	{ "maya_cube_6100_ascii", 8526, -1, 0, 1700, 0, 0, 0, "v" },
+	{ "maya_cube_6100_ascii", 8526, -1, 0, 258, 0, 0, 0, "v" },
+	{ "maya_cube_6100_ascii", 8549, 4870, 46, 0, 0, 0, 0, "ufbxi_ascii_next_token(uc, &ua->token)" },
+	{ "maya_cube_6100_ascii", 8564, 514, 0, 0, 0, 0, 0, "ufbxi_ascii_next_token(uc, &ua->token)" },
+	{ "maya_cube_6100_ascii", 8570, 174, 0, 0, 0, 0, 0, "depth == 0" },
+	{ "maya_cube_6100_ascii", 8580, 12, 0, 0, 0, 0, 0, "ufbxi_ascii_accept(uc, 'N')" },
+	{ "maya_cube_6100_ascii", 8584, -1, 0, 0, 1, 0, 0, "name" },
+	{ "maya_cube_6100_ascii", 8584, -1, 0, 664, 0, 0, 0, "name" },
+	{ "maya_cube_6100_ascii", 8589, -1, 0, 4, 0, 0, 0, "node" },
+	{ "maya_cube_6100_ascii", 8589, -1, 0, 665, 0, 0, 0, "node" },
+	{ "maya_cube_6100_ascii", 8613, -1, 0, 1694, 0, 0, 0, "arr" },
+	{ "maya_cube_6100_ascii", 8613, -1, 0, 255, 0, 0, 0, "arr" },
+	{ "maya_cube_6100_ascii", 8630, -1, 0, 1696, 0, 0, 0, "ufbxi_push_size_zero(&uc->tmp_stack, 8, 1)" },
+	{ "maya_cube_6100_ascii", 8630, -1, 0, 256, 0, 0, 0, "ufbxi_push_size_zero(&uc->tmp_stack, 8, 1)" },
+	{ "maya_cube_6100_ascii", 8634, -1, 0, 1698, 0, 0, 0, "ufbxi_push_size_zero(&uc->tmp_stack, arr_elem_size, 4)" },
+	{ "maya_cube_6100_ascii", 8634, -1, 0, 257, 0, 0, 0, "ufbxi_push_size_zero(&uc->tmp_stack, arr_elem_size, 4)" },
+	{ "maya_cube_6100_ascii", 8663, 4870, 46, 0, 0, 0, 0, "ufbxi_ascii_read_float_array(uc, (char)arr_type, &num_r..." },
+	{ "maya_cube_6100_ascii", 8665, 4998, 45, 0, 0, 0, 0, "ufbxi_ascii_read_int_array(uc, (char)arr_type, &num_rea..." },
+	{ "maya_cube_6100_ascii", 8710, -1, 0, 0, 3, 0, 0, "ufbxi_push_sanitized_string(&uc->string_pool, &v->s, st..." },
+	{ "maya_cube_6100_ascii", 8710, -1, 0, 690, 0, 0, 0, "ufbxi_push_sanitized_string(&uc->string_pool, &v->s, st..." },
+	{ "maya_cube_6100_ascii", 8740, -1, 0, 2398, 0, 0, 0, "v" },
+	{ "maya_cube_6100_ascii", 8740, -1, 0, 492, 0, 0, 0, "v" },
+	{ "maya_cube_6100_ascii", 8741, -1, 0, 1772, 0, 0, 0, "v" },
+	{ "maya_cube_6100_ascii", 8744, -1, 0, 1948, 0, 0, 0, "v" },
+	{ "maya_cube_6100_ascii", 8772, -1, 0, 1735, 0, 0, 0, "v" },
+	{ "maya_cube_6100_ascii", 8851, -1, 0, 1795, 0, 0, 0, "arr_data" },
+	{ "maya_cube_6100_ascii", 8851, -1, 0, 285, 0, 0, 0, "arr_data" },
+	{ "maya_cube_6100_ascii", 8867, -1, 0, 675, 0, 0, 0, "node->vals" },
+	{ "maya_cube_6100_ascii", 8867, -1, 0, 8, 0, 0, 0, "node->vals" },
+	{ "maya_cube_6100_ascii", 8877, 174, 11, 0, 0, 0, 0, "ufbxi_ascii_parse_node(uc, depth + 1, parse_state, &end..." },
+	{ "maya_cube_6100_ascii", 8884, -1, 0, 20, 0, 0, 0, "node->children" },
+	{ "maya_cube_6100_ascii", 8884, -1, 0, 714, 0, 0, 0, "node->children" },
+	{ "maya_cube_6100_ascii", 9424, -1, 0, 3, 0, 0, 0, "ufbxi_ascii_next_token(uc, &uc->ascii.token)" },
+	{ "maya_cube_6100_ascii", 9424, -1, 0, 662, 0, 0, 0, "ufbxi_ascii_next_token(uc, &uc->ascii.token)" },
+	{ "maya_cube_6100_ascii", 9441, 100, 33, 0, 0, 0, 0, "ufbxi_ascii_parse_node(uc, 0, state, p_end, buf, 1)" },
+	{ "maya_cube_6100_binary", 10013, 1442, 0, 0, 0, 0, 0, "ufbxi_get_val2(node, \"SC\", &prop->name, (char**)&type..." },
+	{ "maya_cube_6100_binary", 10088, -1, 0, 2077, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_cube_6100_binary", 10088, -1, 0, 393, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_cube_6100_binary", 10130, -1, 0, 0, 116, 0, 0, "props->props.data" },
+	{ "maya_cube_6100_binary", 10130, -1, 0, 0, 58, 0, 0, "props->props.data" },
+	{ "maya_cube_6100_binary", 10133, 1442, 0, 0, 0, 0, 0, "ufbxi_read_property(uc, &node->children[i], &props->pro..." },
+	{ "maya_cube_6100_binary", 10136, -1, 0, 2077, 0, 0, 0, "ufbxi_sort_properties(uc, props->props.data, props->pro..." },
+	{ "maya_cube_6100_binary", 10136, -1, 0, 393, 0, 0, 0, "ufbxi_sort_properties(uc, props->props.data, props->pro..." },
+	{ "maya_cube_6100_binary", 10144, -1, 0, 0, 96, 0, 0, "ufbxi_read_properties(uc, node, &uc->scene.metadata.sce..." },
+	{ "maya_cube_6100_binary", 10144, -1, 0, 2332, 0, 0, 0, "ufbxi_read_properties(uc, node, &uc->scene.metadata.sce..." },
+	{ "maya_cube_6100_binary", 10156, 35, 1, 0, 0, 0, 0, "ufbxi_parse_toplevel_child(uc, &child)" },
+	{ "maya_cube_6100_binary", 10304, 954, 1, 0, 0, 0, 0, "ufbxi_parse_toplevel_child(uc, &object)" },
+	{ "maya_cube_6100_binary", 10311, -1, 0, 1062, 0, 0, 0, "tmpl" },
+	{ "maya_cube_6100_binary", 10311, -1, 0, 72, 0, 0, 0, "tmpl" },
+	{ "maya_cube_6100_binary", 10312, 1022, 0, 0, 0, 0, 0, "ufbxi_get_val1(object, \"C\", (char**)&tmpl->type)" },
+	{ "maya_cube_6100_binary", 10339, -1, 0, 0, 25, 0, 0, "uc->templates" },
+	{ "maya_cube_6100_binary", 10339, -1, 0, 0, 50, 0, 0, "uc->templates" },
+	{ "maya_cube_6100_binary", 10391, -1, 0, 2079, 0, 0, 0, "ptr" },
+	{ "maya_cube_6100_binary", 10391, -1, 0, 394, 0, 0, 0, "ptr" },
+	{ "maya_cube_6100_binary", 10426, -1, 0, 2074, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, type, 0)" },
+	{ "maya_cube_6100_binary", 10427, -1, 0, 0, 57, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, name, 0)" },
+	{ "maya_cube_6100_binary", 10427, -1, 0, 2075, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, name, 0)" },
+	{ "maya_cube_6100_binary", 10439, -1, 0, 46, 0, 0, 0, "entry" },
+	{ "maya_cube_6100_binary", 10439, -1, 0, 986, 0, 0, 0, "entry" },
+	{ "maya_cube_6100_binary", 10469, -1, 0, 2084, 0, 0, 0, "entry" },
+	{ "maya_cube_6100_binary", 10469, -1, 0, 395, 0, 0, 0, "entry" },
+	{ "maya_cube_6100_binary", 10484, -1, 0, 42, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_typed_element_..." },
+	{ "maya_cube_6100_binary", 10484, -1, 0, 978, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_typed_element_..." },
+	{ "maya_cube_6100_binary", 10485, -1, 0, 43, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_element_offset..." },
+	{ "maya_cube_6100_binary", 10485, -1, 0, 980, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_element_offset..." },
+	{ "maya_cube_6100_binary", 10489, -1, 0, 44, 0, 0, 0, "elem" },
+	{ "maya_cube_6100_binary", 10489, -1, 0, 982, 0, 0, 0, "elem" },
+	{ "maya_cube_6100_binary", 10497, -1, 0, 45, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_element..." },
+	{ "maya_cube_6100_binary", 10497, -1, 0, 984, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_element..." },
+	{ "maya_cube_6100_binary", 10499, -1, 0, 46, 0, 0, 0, "ufbxi_insert_fbx_id(uc, info->fbx_id, element_id)" },
+	{ "maya_cube_6100_binary", 10499, -1, 0, 986, 0, 0, 0, "ufbxi_insert_fbx_id(uc, info->fbx_id, element_id)" },
+	{ "maya_cube_6100_binary", 10511, -1, 0, 2754, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_typed_element_..." },
+	{ "maya_cube_6100_binary", 10511, -1, 0, 581, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_typed_element_..." },
+	{ "maya_cube_6100_binary", 10512, -1, 0, 2756, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_element_offset..." },
+	{ "maya_cube_6100_binary", 10512, -1, 0, 582, 0, 0, 0, "((size_t*)ufbxi_push_size_copy((&uc->tmp_element_offset..." },
+	{ "maya_cube_6100_binary", 10516, -1, 0, 2758, 0, 0, 0, "elem" },
+	{ "maya_cube_6100_binary", 10516, -1, 0, 583, 0, 0, 0, "elem" },
+	{ "maya_cube_6100_binary", 10526, -1, 0, 2760, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_element..." },
+	{ "maya_cube_6100_binary", 10526, -1, 0, 584, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_element..." },
+	{ "maya_cube_6100_binary", 10531, -1, 0, 2762, 0, 0, 0, "ufbxi_insert_fbx_id(uc, fbx_id, element_id)" },
+	{ "maya_cube_6100_binary", 10542, -1, 0, 2113, 0, 0, 0, "conn" },
+	{ "maya_cube_6100_binary", 10542, -1, 0, 407, 0, 0, 0, "conn" },
+	{ "maya_cube_6100_binary", 10643, -1, 0, 2115, 0, 0, 0, "elem_node" },
+	{ "maya_cube_6100_binary", 10643, -1, 0, 408, 0, 0, 0, "elem_node" },
+	{ "maya_cube_6100_binary", 10644, -1, 0, 2123, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "maya_cube_6100_binary", 10767, 7295, 255, 0, 0, 0, 0, "data" },
+	{ "maya_cube_6100_binary", 10768, 7448, 71, 0, 0, 0, 0, "data->size % num_components == 0" },
+	{ "maya_cube_6100_binary", 10784, 7345, 0, 0, 0, 0, 0, "ufbxi_find_val1(node, ufbxi_MappingInformationType, \"C..." },
+	{ "maya_cube_6100_binary", 10835, 9992, 14, 0, 0, 0, 0, "Invalid mapping" },
+	{ "maya_cube_6100_binary", 10870, 7377, 14, 0, 0, 0, 0, "Invalid mapping" },
+	{ "maya_cube_6100_binary", 10880, 10572, 255, 0, 0, 0, 0, "arr" },
+	{ "maya_cube_6100_binary", 10924, -1, 0, 2111, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_cube_6100_binary", 10931, -1, 0, 2112, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_cube_6100_binary", 11094, -1, 0, 0, 124, 0, 0, "mesh->faces.data" },
+	{ "maya_cube_6100_binary", 11094, -1, 0, 0, 62, 0, 0, "mesh->faces.data" },
+	{ "maya_cube_6100_binary", 11120, 6763, 0, 0, 0, 0, 0, "(size_t)ix < mesh->num_vertices" },
+	{ "maya_cube_6100_binary", 11134, -1, 0, 0, 126, 0, 0, "mesh->vertex_first_index.data" },
+	{ "maya_cube_6100_binary", 11134, -1, 0, 0, 63, 0, 0, "mesh->vertex_first_index.data" },
+	{ "maya_cube_6100_binary", 11348, -1, 0, 2100, 0, 0, 0, "mesh" },
+	{ "maya_cube_6100_binary", 11348, -1, 0, 403, 0, 0, 0, "mesh" },
+	{ "maya_cube_6100_binary", 11369, 6763, 23, 0, 0, 0, 0, "vertices->size % 3 == 0" },
+	{ "maya_cube_6100_binary", 11379, -1, 0, 0, 438, 0, 0, "index_data" },
+	{ "maya_cube_6100_binary", 11379, -1, 0, 0, 876, 0, 0, "index_data" },
+	{ "maya_cube_6100_binary", 11397, 7000, 23, 0, 0, 0, 0, "Non-negated last index" },
+	{ "maya_cube_6100_binary", 11406, -1, 0, 0, 122, 0, 0, "edges" },
+	{ "maya_cube_6100_binary", 11406, -1, 0, 0, 61, 0, 0, "edges" },
+	{ "maya_cube_6100_binary", 11416, 7000, 0, 0, 0, 0, 0, "Edge index out of bounds" },
+	{ "maya_cube_6100_binary", 11439, 6763, 0, 0, 0, 0, 0, "ufbxi_process_indices(uc, mesh, index_data)" },
+	{ "maya_cube_6100_binary", 11454, -1, 0, 2107, 0, 0, 0, "bitangents" },
+	{ "maya_cube_6100_binary", 11454, -1, 0, 405, 0, 0, 0, "bitangents" },
+	{ "maya_cube_6100_binary", 11455, -1, 0, 2109, 0, 0, 0, "tangents" },
+	{ "maya_cube_6100_binary", 11455, -1, 0, 406, 0, 0, 0, "tangents" },
+	{ "maya_cube_6100_binary", 11459, -1, 0, 0, 128, 0, 0, "mesh->uv_sets.data" },
+	{ "maya_cube_6100_binary", 11459, -1, 0, 0, 64, 0, 0, "mesh->uv_sets.data" },
+	{ "maya_cube_6100_binary", 11469, 7295, 255, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_att..." },
+	{ "maya_cube_6100_binary", 11475, 8164, 255, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_att..." },
+	{ "maya_cube_6100_binary", 11483, 9038, 255, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_att..." },
+	{ "maya_cube_6100_binary", 11495, 9906, 255, 0, 0, 0, 0, "ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_att..." },
+	{ "maya_cube_6100_binary", 11522, 10525, 255, 0, 0, 0, 0, "ufbxi_find_val1(n, ufbxi_MappingInformationType, \"c\",..." },
+	{ "maya_cube_6100_binary", 11525, 10572, 255, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->edge_smoothing.da..." },
+	{ "maya_cube_6100_binary", 11540, 10799, 255, 0, 0, 0, 0, "ufbxi_find_val1(n, ufbxi_MappingInformationType, \"c\",..." },
+	{ "maya_cube_6100_binary", 11545, 10846, 255, 0, 0, 0, 0, "arr && arr->size >= 1" },
+	{ "maya_cube_6100_binary", 11575, 7283, 0, 0, 0, 0, 0, "!memchr(n->name, '\\0', n->name_len)" },
+	{ "maya_cube_6100_binary", 11619, 10070, 0, 0, 0, 0, 0, "mesh->uv_sets.count == num_uv" },
+	{ "maya_cube_6100_binary", 11621, 8321, 0, 0, 0, 0, 0, "num_bitangents_read == num_bitangents" },
+	{ "maya_cube_6100_binary", 11622, 9195, 0, 0, 0, 0, 0, "num_tangents_read == num_tangents" },
+	{ "maya_cube_6100_binary", 11684, -1, 0, 2111, 0, 0, 0, "ufbxi_sort_uv_sets(uc, mesh->uv_sets.data, mesh->uv_set..." },
+	{ "maya_cube_6100_binary", 11685, -1, 0, 2112, 0, 0, 0, "ufbxi_sort_color_sets(uc, mesh->color_sets.data, mesh->..." },
+	{ "maya_cube_6100_binary", 12192, -1, 0, 2541, 0, 0, 0, "material" },
+	{ "maya_cube_6100_binary", 12192, -1, 0, 517, 0, 0, 0, "material" },
+	{ "maya_cube_6100_binary", 12465, -1, 0, 2079, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &attrib_info.fbx_id)" },
+	{ "maya_cube_6100_binary", 12465, -1, 0, 394, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &attrib_info.fbx_id)" },
+	{ "maya_cube_6100_binary", 12471, -1, 0, 0, 59, 0, 0, "ufbxi_split_type_and_name(uc, type_and_name, &attrib_ty..." },
+	{ "maya_cube_6100_binary", 12471, -1, 0, 2081, 0, 0, 0, "ufbxi_split_type_and_name(uc, type_and_name, &attrib_ty..." },
+	{ "maya_cube_6100_binary", 12484, -1, 0, 2084, 0, 0, 0, "ufbxi_insert_fbx_attr(uc, info->fbx_id, attrib_info.fbx..." },
+	{ "maya_cube_6100_binary", 12484, -1, 0, 395, 0, 0, 0, "ufbxi_insert_fbx_attr(uc, info->fbx_id, attrib_info.fbx..." },
+	{ "maya_cube_6100_binary", 12491, -1, 0, 2086, 0, 0, 0, "((ufbx_prop*)ufbxi_push_size_copy((&uc->tmp_stack), siz..." },
+	{ "maya_cube_6100_binary", 12491, -1, 0, 396, 0, 0, 0, "((ufbx_prop*)ufbxi_push_size_copy((&uc->tmp_stack), siz..." },
+	{ "maya_cube_6100_binary", 12501, -1, 0, 0, 120, 0, 0, "attrib_info.props.props.data" },
+	{ "maya_cube_6100_binary", 12501, -1, 0, 0, 60, 0, 0, "attrib_info.props.props.data" },
+	{ "maya_cube_6100_binary", 12506, 6763, 23, 0, 0, 0, 0, "ufbxi_read_mesh(uc, node, &attrib_info)" },
+	{ "maya_cube_6100_binary", 12546, -1, 0, 2113, 0, 0, 0, "ufbxi_connect_oo(uc, attrib_info.fbx_id, info->fbx_id)" },
+	{ "maya_cube_6100_binary", 12546, -1, 0, 407, 0, 0, 0, "ufbxi_connect_oo(uc, attrib_info.fbx_id, info->fbx_id)" },
+	{ "maya_cube_6100_binary", 12552, 15140, 0, 0, 0, 0, 0, "ufbxi_read_properties(uc, node, &uc->scene.settings.pro..." },
+	{ "maya_cube_6100_binary", 12561, 1331, 1, 0, 0, 0, 0, "ufbxi_parse_toplevel_child(uc, &node)" },
+	{ "maya_cube_6100_binary", 12567, 15140, 0, 0, 0, 0, 0, "ufbxi_read_global_settings(uc, node)" },
+	{ "maya_cube_6100_binary", 12594, -1, 0, 0, 57, 0, 0, "ufbxi_split_type_and_name(uc, type_and_name, &type_str,..." },
+	{ "maya_cube_6100_binary", 12594, -1, 0, 2074, 0, 0, 0, "ufbxi_split_type_and_name(uc, type_and_name, &type_str,..." },
+	{ "maya_cube_6100_binary", 12597, 1442, 0, 0, 0, 0, 0, "ufbxi_read_properties(uc, node, &info.props)" },
+	{ "maya_cube_6100_binary", 12602, 6763, 23, 0, 0, 0, 0, "ufbxi_read_synthetic_attribute(uc, node, &info, type_st..." },
+	{ "maya_cube_6100_binary", 12604, -1, 0, 2115, 0, 0, 0, "ufbxi_read_model(uc, node, &info)" },
+	{ "maya_cube_6100_binary", 12604, -1, 0, 408, 0, 0, 0, "ufbxi_read_model(uc, node, &info)" },
+	{ "maya_cube_6100_binary", 12660, -1, 0, 2541, 0, 0, 0, "ufbxi_read_material(uc, node, &info)" },
+	{ "maya_cube_6100_binary", 12660, -1, 0, 517, 0, 0, 0, "ufbxi_read_material(uc, node, &info)" },
+	{ "maya_cube_6100_binary", 12698, -1, 0, 0, 96, 0, 0, "ufbxi_read_scene_info(uc, node)" },
+	{ "maya_cube_6100_binary", 12698, -1, 0, 2332, 0, 0, 0, "ufbxi_read_scene_info(uc, node)" },
+	{ "maya_cube_6100_binary", 12716, 16292, 1, 0, 0, 0, 0, "ufbxi_parse_toplevel_child(uc, &node)" },
+	{ "maya_cube_6100_binary", 12773, -1, 0, 2705, 0, 0, 0, "conn" },
+	{ "maya_cube_6100_binary", 12773, -1, 0, 565, 0, 0, 0, "conn" },
+	{ "maya_cube_6100_binary", 13092, -1, 0, 2754, 0, 0, 0, "stack" },
+	{ "maya_cube_6100_binary", 13092, -1, 0, 581, 0, 0, 0, "stack" },
+	{ "maya_cube_6100_binary", 13093, 16506, 0, 0, 0, 0, 0, "ufbxi_get_val1(node, \"S\", &stack->name)" },
+	{ "maya_cube_6100_binary", 13096, -1, 0, 2763, 0, 0, 0, "layer" },
+	{ "maya_cube_6100_binary", 13096, -1, 0, 585, 0, 0, 0, "layer" },
+	{ "maya_cube_6100_binary", 13098, -1, 0, 2770, 0, 0, 0, "ufbxi_connect_oo(uc, layer_fbx_id, stack_fbx_id)" },
+	{ "maya_cube_6100_binary", 13098, -1, 0, 587, 0, 0, 0, "ufbxi_connect_oo(uc, layer_fbx_id, stack_fbx_id)" },
+	{ "maya_cube_6100_binary", 13103, 16533, 65, 0, 0, 0, 0, "ufbxi_find_val2(node, ufbxi_ReferenceTime, \"LL\", &beg..." },
+	{ "maya_cube_6100_binary", 13123, 16459, 1, 0, 0, 0, 0, "ufbxi_parse_toplevel_child(uc, &node)" },
+	{ "maya_cube_6100_binary", 13127, 16506, 0, 0, 0, 0, 0, "ufbxi_read_take(uc, node)" },
+	{ "maya_cube_6100_binary", 13149, 0, 76, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_FBXHeaderExtension)" },
+	{ "maya_cube_6100_binary", 13150, 35, 1, 0, 0, 0, 0, "ufbxi_read_header_extension(uc)" },
+	{ "maya_cube_6100_binary", 13163, -1, 0, 41, 0, 0, 0, "ufbxi_init_node_prop_names(uc)" },
+	{ "maya_cube_6100_binary", 13163, -1, 0, 779, 0, 0, 0, "ufbxi_init_node_prop_names(uc)" },
+	{ "maya_cube_6100_binary", 13175, -1, 0, 976, 0, 0, 0, "root_name" },
+	{ "maya_cube_6100_binary", 13184, -1, 0, 42, 0, 0, 0, "root" },
+	{ "maya_cube_6100_binary", 13184, -1, 0, 978, 0, 0, 0, "root" },
+	{ "maya_cube_6100_binary", 13186, -1, 0, 47, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "maya_cube_6100_binary", 13186, -1, 0, 988, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "maya_cube_6100_binary", 13190, 59, 255, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_Definitions)" },
+	{ "maya_cube_6100_binary", 13191, 954, 1, 0, 0, 0, 0, "ufbxi_read_definitions(uc)" },
+	{ "maya_cube_6100_binary", 13194, 954, 255, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_Objects)" },
+	{ "maya_cube_6100_binary", 13198, 0, 0, 0, 0, 0, 0, "uc->top_node" },
+	{ "maya_cube_6100_binary", 13200, 1331, 1, 0, 0, 0, 0, "ufbxi_read_objects(uc)" },
+	{ "maya_cube_6100_binary", 13203, 16288, 1, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_Connections)" },
+	{ "maya_cube_6100_binary", 13204, 16292, 1, 0, 0, 0, 0, "ufbxi_read_connections(uc)" },
+	{ "maya_cube_6100_binary", 13209, 16309, 64, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_Takes)" },
+	{ "maya_cube_6100_binary", 13210, 16459, 1, 0, 0, 0, 0, "ufbxi_read_takes(uc)" },
+	{ "maya_cube_6100_binary", 13214, 16470, 65, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_GlobalSettings)" },
+	{ "maya_cube_6100_binary", 13780, -1, 0, 0, 143, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &uc->scen..." },
+	{ "maya_cube_6100_binary", 13780, -1, 0, 2900, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &uc->scen..." },
+	{ "maya_cube_6100_binary", 13781, -1, 0, 2902, 0, 0, 0, "ufbxi_push_string_place_blob(&uc->string_pool, &uc->sce..." },
+	{ "maya_cube_6100_binary", 13789, -1, 0, 0, 144, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &uc->scen..." },
+	{ "maya_cube_6100_binary", 13789, -1, 0, 2903, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &uc->scen..." },
+	{ "maya_cube_6100_binary", 13790, -1, 0, 2905, 0, 0, 0, "ufbxi_push_string_place_blob(&uc->string_pool, &uc->sce..." },
+	{ "maya_cube_6100_binary", 15307, -1, 0, 2906, 0, 0, 0, "elements" },
+	{ "maya_cube_6100_binary", 15311, -1, 0, 2908, 0, 0, 0, "tmp_connections" },
+	{ "maya_cube_6100_binary", 15314, -1, 0, 2910, 0, 0, 0, "pre_connections" },
+	{ "maya_cube_6100_binary", 15317, -1, 0, 2912, 0, 0, 0, "instance_counts" },
+	{ "maya_cube_6100_binary", 15320, -1, 0, 2914, 0, 0, 0, "modify_not_supported" },
+	{ "maya_cube_6100_binary", 15323, -1, 0, 2915, 0, 0, 0, "fbx_ids" },
+	{ "maya_cube_6100_binary", 15438, -1, 0, 2943, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_cube_6100_binary", 15462, -1, 0, 2929, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_cube_6100_binary", 15498, -1, 0, 2921, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_cube_6100_binary", 15518, -1, 0, 2919, 0, 0, 0, "tmp_connections" },
+	{ "maya_cube_6100_binary", 15518, -1, 0, 631, 0, 0, 0, "tmp_connections" },
+	{ "maya_cube_6100_binary", 15522, -1, 0, 0, 147, 0, 0, "uc->scene.connections_src.data" },
+	{ "maya_cube_6100_binary", 15522, -1, 0, 0, 294, 0, 0, "uc->scene.connections_src.data" },
+	{ "maya_cube_6100_binary", 15582, -1, 0, 0, 148, 0, 0, "uc->scene.connections_dst.data" },
+	{ "maya_cube_6100_binary", 15582, -1, 0, 0, 296, 0, 0, "uc->scene.connections_dst.data" },
+	{ "maya_cube_6100_binary", 15584, -1, 0, 2921, 0, 0, 0, "ufbxi_sort_connections(uc, uc->scene.connections_src.da..." },
+	{ "maya_cube_6100_binary", 15585, -1, 0, 2922, 0, 0, 0, "ufbxi_sort_connections(uc, uc->scene.connections_dst.da..." },
+	{ "maya_cube_6100_binary", 15724, -1, 0, 2923, 0, 0, 0, "node_ids" },
+	{ "maya_cube_6100_binary", 15724, -1, 0, 632, 0, 0, 0, "node_ids" },
+	{ "maya_cube_6100_binary", 15727, -1, 0, 2925, 0, 0, 0, "node_ptrs" },
+	{ "maya_cube_6100_binary", 15727, -1, 0, 633, 0, 0, 0, "node_ptrs" },
+	{ "maya_cube_6100_binary", 15738, -1, 0, 2927, 0, 0, 0, "node_offsets" },
+	{ "maya_cube_6100_binary", 15738, -1, 0, 634, 0, 0, 0, "node_offsets" },
+	{ "maya_cube_6100_binary", 15779, -1, 0, 2929, 0, 0, 0, "ufbxi_sort_node_ptrs(uc, node_ptrs, num_nodes)" },
+	{ "maya_cube_6100_binary", 15783, -1, 0, 2930, 0, 0, 0, "p_offset" },
+	{ "maya_cube_6100_binary", 15783, -1, 0, 635, 0, 0, 0, "p_offset" },
+	{ "maya_cube_6100_binary", 15857, -1, 0, 2944, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "maya_cube_6100_binary", 15857, -1, 0, 641, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "maya_cube_6100_binary", 15866, -1, 0, 0, 155, 0, 0, "list->data" },
+	{ "maya_cube_6100_binary", 15866, -1, 0, 0, 310, 0, 0, "list->data" },
+	{ "maya_cube_6100_binary", 15879, -1, 0, 2946, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "maya_cube_6100_binary", 15879, -1, 0, 642, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "maya_cube_6100_binary", 15888, -1, 0, 0, 156, 0, 0, "list->data" },
+	{ "maya_cube_6100_binary", 15888, -1, 0, 0, 312, 0, 0, "list->data" },
+	{ "maya_cube_6100_binary", 15954, -1, 0, 2948, 0, 0, 0, "((ufbx_mesh_material*)ufbxi_push_size_copy((&uc->tmp_st..." },
+	{ "maya_cube_6100_binary", 15954, -1, 0, 643, 0, 0, 0, "((ufbx_mesh_material*)ufbxi_push_size_copy((&uc->tmp_st..." },
+	{ "maya_cube_6100_binary", 15964, -1, 0, 0, 159, 0, 0, "list->data" },
+	{ "maya_cube_6100_binary", 15964, -1, 0, 0, 318, 0, 0, "list->data" },
+	{ "maya_cube_6100_binary", 16073, -1, 0, 2954, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_cube_6100_binary", 16087, -1, 0, 2955, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_cube_6100_binary", 17999, -1, 0, 0, 145, 0, 0, "uc->scene.elements.data" },
+	{ "maya_cube_6100_binary", 17999, -1, 0, 0, 290, 0, 0, "uc->scene.elements.data" },
+	{ "maya_cube_6100_binary", 18004, -1, 0, 0, 146, 0, 0, "element_data" },
+	{ "maya_cube_6100_binary", 18004, -1, 0, 0, 292, 0, 0, "element_data" },
+	{ "maya_cube_6100_binary", 18008, -1, 0, 2917, 0, 0, 0, "element_offsets" },
+	{ "maya_cube_6100_binary", 18008, -1, 0, 630, 0, 0, 0, "element_offsets" },
+	{ "maya_cube_6100_binary", 18019, -1, 0, 2919, 0, 0, 0, "ufbxi_resolve_connections(uc)" },
+	{ "maya_cube_6100_binary", 18019, -1, 0, 631, 0, 0, 0, "ufbxi_resolve_connections(uc)" },
+	{ "maya_cube_6100_binary", 18021, -1, 0, 2923, 0, 0, 0, "ufbxi_linearize_nodes(uc)" },
+	{ "maya_cube_6100_binary", 18021, -1, 0, 632, 0, 0, 0, "ufbxi_linearize_nodes(uc)" },
+	{ "maya_cube_6100_binary", 18027, -1, 0, 2933, 0, 0, 0, "typed_offsets" },
+	{ "maya_cube_6100_binary", 18027, -1, 0, 636, 0, 0, 0, "typed_offsets" },
+	{ "maya_cube_6100_binary", 18032, -1, 0, 0, 149, 0, 0, "typed_elems->data" },
+	{ "maya_cube_6100_binary", 18032, -1, 0, 0, 298, 0, 0, "typed_elems->data" },
+	{ "maya_cube_6100_binary", 18044, -1, 0, 0, 154, 0, 0, "uc->scene.elements_by_name.data" },
+	{ "maya_cube_6100_binary", 18044, -1, 0, 0, 308, 0, 0, "uc->scene.elements_by_name.data" },
+	{ "maya_cube_6100_binary", 18057, -1, 0, 2943, 0, 0, 0, "ufbxi_sort_name_elements(uc, uc->scene.elements_by_name..." },
+	{ "maya_cube_6100_binary", 18107, -1, 0, 2944, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &node->materials, &node->e..." },
+	{ "maya_cube_6100_binary", 18107, -1, 0, 641, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &node->materials, &node->e..." },
+	{ "maya_cube_6100_binary", 18149, -1, 0, 2946, 0, 0, 0, "ufbxi_fetch_src_elements(uc, &elem->instances, elem, 0,..." },
+	{ "maya_cube_6100_binary", 18149, -1, 0, 642, 0, 0, 0, "ufbxi_fetch_src_elements(uc, &elem->instances, elem, 0,..." },
+	{ "maya_cube_6100_binary", 18327, -1, 0, 0, 157, 0, 0, "zero_indices && consecutive_indices" },
+	{ "maya_cube_6100_binary", 18327, -1, 0, 0, 314, 0, 0, "zero_indices && consecutive_indices" },
+	{ "maya_cube_6100_binary", 18379, -1, 0, 2948, 0, 0, 0, "ufbxi_fetch_mesh_materials(uc, &mesh->materials, &mesh-..." },
+	{ "maya_cube_6100_binary", 18379, -1, 0, 643, 0, 0, 0, "ufbxi_fetch_mesh_materials(uc, &mesh->materials, &mesh-..." },
+	{ "maya_cube_6100_binary", 18470, -1, 0, 2950, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &stack->layers, &stack->el..." },
+	{ "maya_cube_6100_binary", 18470, -1, 0, 644, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &stack->layers, &stack->el..." },
+	{ "maya_cube_6100_binary", 18474, -1, 0, 0, 161, 0, 0, "stack->anim.layers.data" },
+	{ "maya_cube_6100_binary", 18474, -1, 0, 0, 322, 0, 0, "stack->anim.layers.data" },
+	{ "maya_cube_6100_binary", 18488, -1, 0, 0, 162, 0, 0, "layer_desc" },
+	{ "maya_cube_6100_binary", 18488, -1, 0, 0, 324, 0, 0, "layer_desc" },
+	{ "maya_cube_6100_binary", 18560, -1, 0, 2952, 0, 0, 0, "aprop" },
+	{ "maya_cube_6100_binary", 18560, -1, 0, 645, 0, 0, 0, "aprop" },
+	{ "maya_cube_6100_binary", 18564, -1, 0, 0, 163, 0, 0, "layer->anim_props.data" },
+	{ "maya_cube_6100_binary", 18564, -1, 0, 0, 326, 0, 0, "layer->anim_props.data" },
+	{ "maya_cube_6100_binary", 18566, -1, 0, 2954, 0, 0, 0, "ufbxi_sort_anim_props(uc, layer->anim_props.data, layer..." },
+	{ "maya_cube_6100_binary", 18843, -1, 0, 2955, 0, 0, 0, "ufbxi_sort_material_textures(uc, material->textures.dat..." },
+	{ "maya_cube_6100_binary", 18923, -1, 0, 0, 164, 0, 0, "descs" },
+	{ "maya_cube_6100_binary", 18923, -1, 0, 0, 328, 0, 0, "descs" },
+	{ "maya_cube_6100_binary", 21333, -1, 0, 1, 0, 0, 0, "ufbxi_load_strings(uc)" },
+	{ "maya_cube_6100_binary", 21334, -1, 0, 1, 0, 0, 0, "ufbxi_load_maps(uc)" },
+	{ "maya_cube_6100_binary", 21334, -1, 0, 575, 0, 0, 0, "ufbxi_load_maps(uc)" },
+	{ "maya_cube_6100_binary", 21340, 0, 76, 0, 0, 0, 0, "ufbxi_begin_parse(uc)" },
+	{ "maya_cube_6100_binary", 21344, 0, 76, 0, 0, 0, 0, "ufbxi_read_root(uc)" },
+	{ "maya_cube_6100_binary", 21347, -1, 0, 0, 143, 0, 0, "ufbxi_init_file_paths(uc)" },
+	{ "maya_cube_6100_binary", 21347, -1, 0, 2900, 0, 0, 0, "ufbxi_init_file_paths(uc)" },
+	{ "maya_cube_6100_binary", 21364, -1, 0, 2906, 0, 0, 0, "ufbxi_pre_finalize_scene(uc)" },
+	{ "maya_cube_6100_binary", 21369, -1, 0, 2917, 0, 0, 0, "ufbxi_finalize_scene(uc)" },
+	{ "maya_cube_6100_binary", 21369, -1, 0, 630, 0, 0, 0, "ufbxi_finalize_scene(uc)" },
+	{ "maya_cube_6100_binary", 21414, -1, 0, 0, 165, 0, 0, "imp" },
+	{ "maya_cube_6100_binary", 21414, -1, 0, 0, 330, 0, 0, "imp" },
+	{ "maya_cube_6100_binary", 2859, 6765, 255, 0, 0, 0, 0, "total <= ator->max_size - ator->current_size" },
+	{ "maya_cube_6100_binary", 2864, -1, 0, 1, 0, 0, 0, "ator->num_allocs < ator->max_allocs" },
+	{ "maya_cube_6100_binary", 2909, -1, 0, 50, 0, 0, 0, "ator->num_allocs < ator->max_allocs" },
+	{ "maya_cube_6100_binary", 2909, -1, 0, 999, 0, 0, 0, "ator->num_allocs < ator->max_allocs" },
+	{ "maya_cube_6100_binary", 2965, -1, 0, 665, 0, 0, 0, "ator->num_allocs < ator->max_allocs" },
+	{ "maya_cube_6100_binary", 3220, -1, 0, 662, 0, 0, 0, "ator->num_allocs < ator->max_allocs" },
+	{ "maya_cube_6100_binary", 3695, -1, 0, 1, 0, 0, 0, "data" },
+	{ "maya_cube_6100_binary", 3753, -1, 0, 2, 0, 0, 0, "ator->num_allocs < ator->max_allocs" },
+	{ "maya_cube_6100_binary", 4352, -1, 0, 694, 0, 0, 0, "ufbxi_map_grow_size((&pool->map), sizeof(ufbx_string), ..." },
+	{ "maya_cube_6100_binary", 4377, -1, 0, 695, 0, 0, 0, "entry" },
+	{ "maya_cube_6100_binary", 4380, -1, 0, 0, 4, 0, 0, "dst" },
+	{ "maya_cube_6100_binary", 4380, -1, 0, 0, 8, 0, 0, "dst" },
+	{ "maya_cube_6100_binary", 4394, -1, 0, 1, 0, 0, 0, "ufbxi_map_grow_size((&pool->map), sizeof(ufbx_string), ..." },
+	{ "maya_cube_6100_binary", 4420, -1, 0, 2, 0, 0, 0, "entry" },
+	{ "maya_cube_6100_binary", 4424, -1, 0, 0, 1, 0, 0, "dst" },
+	{ "maya_cube_6100_binary", 4445, -1, 0, 0, 57, 0, 0, "str" },
+	{ "maya_cube_6100_binary", 4445, -1, 0, 671, 0, 0, 0, "str" },
+	{ "maya_cube_6100_binary", 4463, -1, 0, 2902, 0, 0, 0, "p_blob->data" },
+	{ "maya_cube_6100_binary", 5585, -1, 0, 0, 0, 0, 1, "result != UFBX_PROGRESS_CANCEL" },
+	{ "maya_cube_6100_binary", 5604, -1, 0, 0, 0, 1, 0, "!uc->eof" },
+	{ "maya_cube_6100_binary", 5606, 36, 255, 0, 0, 0, 0, "uc->read_fn" },
+	{ "maya_cube_6100_binary", 5690, -1, 0, 0, 0, 0, 1, "ufbxi_report_progress(uc)" },
+	{ "maya_cube_6100_binary", 5767, 36, 255, 0, 0, 0, 0, "ufbxi_read_bytes(uc, (size_t)to_skip)" },
+	{ "maya_cube_6100_binary", 7537, -1, 0, 0, 0, 7040, 0, "val" },
+	{ "maya_cube_6100_binary", 7540, -1, 0, 0, 0, 6793, 0, "val" },
+	{ "maya_cube_6100_binary", 7577, 10670, 13, 0, 0, 0, 0, "Bad multivalue array type" },
+	{ "maya_cube_6100_binary", 7578, 7000, 25, 0, 0, 0, 0, "Bad multivalue array type" },
+	{ "maya_cube_6100_binary", 7581, 6763, 25, 0, 0, 0, 0, "Bad multivalue array type" },
+	{ "maya_cube_6100_binary", 7603, 6765, 255, 0, 0, 0, 0, "data" },
+	{ "maya_cube_6100_binary", 7628, -1, 0, 0, 0, 27, 0, "header" },
+	{ "maya_cube_6100_binary", 7649, 24, 255, 0, 0, 0, 0, "num_values64 <= 0xffffffffui32" },
+	{ "maya_cube_6100_binary", 7667, -1, 0, 3, 0, 0, 0, "node" },
+	{ "maya_cube_6100_binary", 7667, -1, 0, 662, 0, 0, 0, "node" },
+	{ "maya_cube_6100_binary", 7671, -1, 0, 0, 0, 40, 0, "name" },
+	{ "maya_cube_6100_binary", 7673, -1, 0, 0, 1, 0, 0, "name" },
+	{ "maya_cube_6100_binary", 7673, -1, 0, 664, 0, 0, 0, "name" },
+	{ "maya_cube_6100_binary", 7689, -1, 0, 1722, 0, 0, 0, "arr" },
+	{ "maya_cube_6100_binary", 7689, -1, 0, 261, 0, 0, 0, "arr" },
+	{ "maya_cube_6100_binary", 7698, -1, 0, 0, 0, 6780, 0, "data" },
+	{ "maya_cube_6100_binary", 7848, 6765, 255, 0, 0, 0, 0, "arr_data" },
+	{ "maya_cube_6100_binary", 7849, 6763, 25, 0, 0, 0, 0, "ufbxi_binary_parse_multivalue_array(uc, dst_type, arr_d..." },
+	{ "maya_cube_6100_binary", 7865, -1, 0, 6, 0, 0, 0, "vals" },
+	{ "maya_cube_6100_binary", 7865, -1, 0, 671, 0, 0, 0, "vals" },
+	{ "maya_cube_6100_binary", 7873, -1, 0, 0, 0, 87, 0, "data" },
+	{ "maya_cube_6100_binary", 7926, 213, 255, 0, 0, 0, 0, "str" },
+	{ "maya_cube_6100_binary", 7936, -1, 0, 0, 4, 0, 0, "ufbxi_push_sanitized_string(&uc->string_pool, &vals[i]...." },
+	{ "maya_cube_6100_binary", 7936, -1, 0, 694, 0, 0, 0, "ufbxi_push_sanitized_string(&uc->string_pool, &vals[i]...." },
+	{ "maya_cube_6100_binary", 7951, 164, 0, 0, 0, 0, 0, "ufbxi_skip_bytes(uc, encoded_size)" },
+	{ "maya_cube_6100_binary", 7956, 22, 1, 0, 0, 0, 0, "Bad value type" },
+	{ "maya_cube_6100_binary", 7967, 66, 4, 0, 0, 0, 0, "offset <= values_end_offset" },
+	{ "maya_cube_6100_binary", 7969, 36, 255, 0, 0, 0, 0, "ufbxi_skip_bytes(uc, values_end_offset - offset)" },
+	{ "maya_cube_6100_binary", 7981, 58, 93, 0, 0, 0, 0, "current_offset == end_offset || end_offset == 0" },
+	{ "maya_cube_6100_binary", 7986, 70, 0, 0, 0, 0, 0, "ufbxi_binary_parse_node(uc, depth + 1, parse_state, &en..." },
+	{ "maya_cube_6100_binary", 7995, -1, 0, 20, 0, 0, 0, "node->children" },
+	{ "maya_cube_6100_binary", 7995, -1, 0, 716, 0, 0, 0, "node->children" },
+	{ "maya_cube_6100_binary", 8578, 0, 76, 0, 0, 0, 0, "Expected a 'Name:' token" },
+	{ "maya_cube_6100_binary", 8924, -1, 0, 0, 1, 0, 0, "dst" },
+	{ "maya_cube_6100_binary", 8924, -1, 0, 0, 2, 0, 0, "dst" },
+	{ "maya_cube_6100_binary", 8925, -1, 0, 5, 0, 0, 0, "((ufbx_dom_node**)ufbxi_push_size_copy((&uc->tmp_dom_no..." },
+	{ "maya_cube_6100_binary", 8925, -1, 0, 667, 0, 0, 0, "((ufbx_dom_node**)ufbxi_push_size_copy((&uc->tmp_dom_no..." },
+	{ "maya_cube_6100_binary", 8940, -1, 0, 6, 0, 0, 0, "result" },
+	{ "maya_cube_6100_binary", 8940, -1, 0, 669, 0, 0, 0, "result" },
+	{ "maya_cube_6100_binary", 8946, -1, 0, 671, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &dst->nam..." },
+	{ "maya_cube_6100_binary", 8951, -1, 0, 0, 303, 0, 0, "val" },
+	{ "maya_cube_6100_binary", 8951, -1, 0, 0, 606, 0, 0, "val" },
+	{ "maya_cube_6100_binary", 8979, -1, 0, 681, 0, 0, 0, "val" },
+	{ "maya_cube_6100_binary", 8979, -1, 0, 9, 0, 0, 0, "val" },
+	{ "maya_cube_6100_binary", 8996, -1, 0, 0, 3, 0, 0, "dst->values.data" },
+	{ "maya_cube_6100_binary", 8996, -1, 0, 0, 6, 0, 0, "dst->values.data" },
+	{ "maya_cube_6100_binary", 9001, -1, 0, 28, 0, 0, 0, "ufbxi_retain_dom_node(uc, child, ((void *)0))" },
+	{ "maya_cube_6100_binary", 9001, -1, 0, 740, 0, 0, 0, "ufbxi_retain_dom_node(uc, child, ((void *)0))" },
+	{ "maya_cube_6100_binary", 9006, -1, 0, 0, 25, 0, 0, "dst->children.data" },
+	{ "maya_cube_6100_binary", 9006, -1, 0, 0, 50, 0, 0, "dst->children.data" },
+	{ "maya_cube_6100_binary", 9016, -1, 0, 0, 116, 0, 0, "children" },
+	{ "maya_cube_6100_binary", 9016, -1, 0, 0, 58, 0, 0, "children" },
+	{ "maya_cube_6100_binary", 9023, -1, 0, 5, 0, 0, 0, "ufbxi_retain_dom_node(uc, node, &uc->dom_parse_toplevel..." },
+	{ "maya_cube_6100_binary", 9023, -1, 0, 667, 0, 0, 0, "ufbxi_retain_dom_node(uc, node, &uc->dom_parse_toplevel..." },
+	{ "maya_cube_6100_binary", 9030, -1, 0, 0, 1462, 0, 0, "nodes" },
+	{ "maya_cube_6100_binary", 9030, -1, 0, 0, 731, 0, 0, "nodes" },
+	{ "maya_cube_6100_binary", 9033, -1, 0, 0, 1464, 0, 0, "dom_root" },
+	{ "maya_cube_6100_binary", 9033, -1, 0, 0, 732, 0, 0, "dom_root" },
+	{ "maya_cube_6100_binary", 9048, -1, 0, 678, 0, 0, 0, "ufbxi_retain_dom_node(uc, child, ((void *)0))" },
+	{ "maya_cube_6100_binary", 9048, -1, 0, 9, 0, 0, 0, "ufbxi_retain_dom_node(uc, child, ((void *)0))" },
+	{ "maya_cube_6100_binary", 9392, -1, 0, 0, 0, 1, 0, "header" },
+	{ "maya_cube_6100_binary", 9431, 0, 76, 0, 0, 0, 0, "uc->version > 0" },
+	{ "maya_cube_6100_binary", 9443, 35, 1, 0, 0, 0, 0, "ufbxi_binary_parse_node(uc, 0, state, p_end, buf, 1)" },
+	{ "maya_cube_6100_binary", 9470, 0, 76, 0, 0, 0, 0, "ufbxi_ascii_parse_node(uc, 0, UFBXI_PARSE_ROOT, &end, &..." },
+	{ "maya_cube_6100_binary", 9472, 22, 1, 0, 0, 0, 0, "ufbxi_binary_parse_node(uc, 0, UFBXI_PARSE_ROOT, &end, ..." },
+	{ "maya_cube_6100_binary", 9481, -1, 0, 0, 1460, 0, 0, "ufbxi_retain_toplevel(uc, ((void *)0))" },
+	{ "maya_cube_6100_binary", 9481, -1, 0, 0, 730, 0, 0, "ufbxi_retain_toplevel(uc, ((void *)0))" },
+	{ "maya_cube_6100_binary", 9491, -1, 0, 4, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_cube_6100_binary", 9491, -1, 0, 665, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_cube_6100_binary", 9495, -1, 0, 5, 0, 0, 0, "ufbxi_retain_toplevel(uc, node)" },
+	{ "maya_cube_6100_binary", 9495, -1, 0, 667, 0, 0, 0, "ufbxi_retain_toplevel(uc, node)" },
+	{ "maya_cube_6100_binary", 9510, 39, 19, 0, 0, 0, 0, "ufbxi_parse_toplevel_child_imp(uc, state, &uc->tmp, &en..." },
+	{ "maya_cube_6100_binary", 9518, -1, 0, 1028, 0, 0, 0, "node->children" },
+	{ "maya_cube_6100_binary", 9518, -1, 0, 60, 0, 0, 0, "node->children" },
+	{ "maya_cube_6100_binary", 9522, -1, 0, 1145, 0, 0, 0, "ufbxi_retain_toplevel_child(uc, &node->children[i])" },
+	{ "maya_cube_6100_binary", 9522, -1, 0, 93, 0, 0, 0, "ufbxi_retain_toplevel_child(uc, &node->children[i])" },
+	{ "maya_cube_6100_binary", 9541, 35, 1, 0, 0, 0, 0, "ufbxi_parse_toplevel_child_imp(uc, state, &uc->tmp_pars..." },
+	{ "maya_cube_6100_binary", 9549, -1, 0, 678, 0, 0, 0, "ufbxi_retain_toplevel_child(uc, &uc->top_child)" },
+	{ "maya_cube_6100_binary", 9549, -1, 0, 9, 0, 0, 0, "ufbxi_retain_toplevel_child(uc, &uc->top_child)" },
+	{ "maya_cube_6100_binary", 9612, -1, 0, 1, 0, 0, 0, "ufbxi_push_string_imp(&uc->string_pool, str->data, str-..." },
+	{ "maya_cube_6100_binary", 9897, -1, 0, 41, 0, 0, 0, "ufbxi_map_grow_size((&uc->node_prop_set), sizeof(const ..." },
+	{ "maya_cube_6100_binary", 9897, -1, 0, 779, 0, 0, 0, "ufbxi_map_grow_size((&uc->node_prop_set), sizeof(const ..." },
+	{ "maya_cube_6100_binary", 9901, -1, 0, 781, 0, 0, 0, "pooled" },
+	{ "maya_cube_6100_binary", 9904, -1, 0, 783, 0, 0, 0, "entry" },
+	{ "maya_cube_6100_binary", 9923, -1, 0, 1, 0, 0, 0, "ufbxi_map_grow_size((&uc->prop_type_map), sizeof(ufbxi_..." },
+	{ "maya_cube_6100_binary", 9923, -1, 0, 575, 0, 0, 0, "ufbxi_map_grow_size((&uc->prop_type_map), sizeof(ufbxi_..." },
+	{ "maya_cube_6100_binary", 9926, -1, 0, 577, 0, 0, 0, "pooled" },
+	{ "maya_cube_6100_binary", 9929, -1, 0, 2, 0, 0, 0, "entry" },
+	{ "maya_cube_6100_binary", 9929, -1, 0, 579, 0, 0, 0, "entry" },
+	{ "maya_cube_7100_ascii", 8812, 8925, 0, 0, 0, 0, 0, "ufbxi_ascii_accept(uc, 'I')" },
+	{ "maya_cube_7100_ascii", 8815, 8929, 11, 0, 0, 0, 0, "ufbxi_ascii_accept(uc, 'N')" },
+	{ "maya_cube_7100_ascii", 8840, 8935, 33, 0, 0, 0, 0, "ufbxi_ascii_accept(uc, '}')" },
+	{ "maya_cube_7100_binary", 10016, 6091, 0, 0, 0, 0, 0, "ufbxi_get_val_at(node, val_ix++, 'C', (char**)&subtype_..." },
+	{ "maya_cube_7100_binary", 10173, 797, 0, 0, 0, 0, 0, "ufbxi_read_scene_info(uc, child)" },
+	{ "maya_cube_7100_binary", 10285, 3549, 1, 0, 0, 0, 0, "ufbxi_parse_toplevel_child(uc, &child)" },
+	{ "maya_cube_7100_binary", 10318, 4105, 0, 0, 0, 0, 0, "ufbxi_get_val1(props, \"S\", &tmpl->sub_type)" },
+	{ "maya_cube_7100_binary", 10330, -1, 0, 0, 58, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &tmpl->su..." },
+	{ "maya_cube_7100_binary", 10330, -1, 0, 1319, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &tmpl->su..." },
+	{ "maya_cube_7100_binary", 10333, 4176, 0, 0, 0, 0, 0, "ufbxi_read_properties(uc, props, &tmpl->props)" },
+	{ "maya_cube_7100_binary", 10657, -1, 0, 2933, 0, 0, 0, "elem" },
+	{ "maya_cube_7100_binary", 10657, -1, 0, 650, 0, 0, 0, "elem" },
+	{ "maya_cube_7100_binary", 12580, 12333, 255, 0, 0, 0, 0, "(info.fbx_id & (0x8000000000000000ULL)) == 0" },
+	{ "maya_cube_7100_binary", 12629, 12362, 0, 0, 0, 0, 0, "ufbxi_read_mesh(uc, node, &info)" },
+	{ "maya_cube_7100_binary", 12668, -1, 0, 2933, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_st..." },
+	{ "maya_cube_7100_binary", 12668, -1, 0, 650, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_st..." },
+	{ "maya_cube_7100_binary", 12670, -1, 0, 2951, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_la..." },
+	{ "maya_cube_7100_binary", 12670, -1, 0, 656, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_la..." },
+	{ "maya_cube_7100_binary", 13168, 59, 255, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ufbxi_Documents)" },
+	{ "maya_cube_7100_binary", 13169, 3549, 1, 0, 0, 0, 0, "ufbxi_read_document(uc)" },
+	{ "maya_cube_7100_binary", 13216, 2241, 0, 0, 0, 0, 0, "ufbxi_read_global_settings(uc, uc->top_node)" },
+	{ "maya_cube_7100_binary", 13221, 18890, 74, 0, 0, 0, 0, "ufbxi_parse_toplevel(uc, ((void *)0))" },
+	{ "maya_cube_7100_binary", 2908, 16067, 1, 0, 0, 0, 0, "total <= ator->max_size - ator->current_size" },
+	{ "maya_cube_7100_binary", 5672, -1, 0, 0, 0, 0, 1434, "ufbxi_report_progress(uc)" },
+	{ "maya_cube_7100_binary", 5795, -1, 0, 0, 0, 12392, 0, "uc->read_fn" },
+	{ "maya_cube_7100_binary", 5803, -1, 0, 0, 0, 0, 1434, "ufbxi_resume_progress(uc)" },
+	{ "maya_cube_7100_binary", 7733, 12382, 255, 0, 0, 0, 0, "arr_data" },
+	{ "maya_cube_7100_binary", 7740, 16067, 1, 0, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_cube_7100_binary", 7753, 12379, 99, 0, 0, 0, 0, "encoded_size == decoded_data_size" },
+	{ "maya_cube_7100_binary", 7769, -1, 0, 0, 0, 12392, 0, "ufbxi_read_to(uc, decoded_data, encoded_size)" },
+	{ "maya_cube_7100_binary", 7826, 12384, 1, 0, 0, 0, 0, "res == (ptrdiff_t)decoded_data_size" },
+	{ "maya_cube_7100_binary", 7829, 12384, 255, 0, 0, 0, 0, "Bad array encoding" },
+	{ "maya_cube_7400_ascii", 8229, -1, 0, 0, 0, 9568, 0, "c != '\\0'" },
+	{ "maya_cube_7400_ascii", 8823, -1, 0, 0, 0, 9568, 0, "ufbxi_ascii_skip_until(uc, '}')" },
+	{ "maya_cube_7500_binary", 13709, 24, 0, 0, 0, 0, 0, "ufbxi_parse_legacy_toplevel(uc)" },
+	{ "maya_cube_7500_binary", 21342, 24, 0, 0, 0, 0, 0, "ufbxi_read_legacy_root(uc)" },
+	{ "maya_cube_7500_binary", 9574, 24, 0, 0, 0, 0, 0, "ufbxi_binary_parse_node(uc, 0, UFBXI_PARSE_ROOT, &end, ..." },
+	{ "maya_cube_big_endian_6100_binary", 7328, -1, 0, 3, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->s..." },
+	{ "maya_cube_big_endian_6100_binary", 7328, -1, 0, 662, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->s..." },
+	{ "maya_cube_big_endian_6100_binary", 7641, -1, 0, 4, 0, 0, 0, "header_words" },
+	{ "maya_cube_big_endian_6100_binary", 7641, -1, 0, 664, 0, 0, 0, "header_words" },
+	{ "maya_cube_big_endian_6100_binary", 9406, -1, 0, 3, 0, 0, 0, "version_word" },
+	{ "maya_cube_big_endian_6100_binary", 9406, -1, 0, 662, 0, 0, 0, "version_word" },
+	{ "maya_cube_big_endian_7100_binary", 7397, -1, 0, 2332, 0, 0, 0, "src" },
+	{ "maya_cube_big_endian_7100_binary", 7397, -1, 0, 453, 0, 0, 0, "src" },
+	{ "maya_cube_big_endian_7100_binary", 7834, -1, 0, 2332, 0, 0, 0, "ufbxi_binary_convert_array(uc, src_type, dst_type, deco..." },
+	{ "maya_cube_big_endian_7100_binary", 7834, -1, 0, 453, 0, 0, 0, "ufbxi_binary_convert_array(uc, src_type, dst_type, deco..." },
+	{ "maya_cube_big_endian_7500_binary", 7632, -1, 0, 4, 0, 0, 0, "header_words" },
+	{ "maya_cube_big_endian_7500_binary", 7632, -1, 0, 664, 0, 0, 0, "header_words" },
+	{ "maya_cube_big_endian_obj", 14000, -1, 0, 0, 12, 0, 0, "mesh->vertex_first_index.data" },
+	{ "maya_cube_big_endian_obj", 14000, -1, 0, 0, 24, 0, 0, "mesh->vertex_first_index.data" },
+	{ "maya_cube_big_endian_obj", 14017, -1, 0, 0, 13, 0, 0, "uv_set" },
+	{ "maya_cube_big_endian_obj", 14017, -1, 0, 0, 26, 0, 0, "uv_set" },
+	{ "maya_cube_big_endian_obj", 14081, -1, 0, 60, 0, 0, 0, "mesh" },
+	{ "maya_cube_big_endian_obj", 14081, -1, 0, 966, 0, 0, 0, "mesh" },
+	{ "maya_cube_big_endian_obj", 14099, -1, 0, 61, 0, 0, 0, "mesh->fbx_node && mesh->fbx_mesh" },
+	{ "maya_cube_big_endian_obj", 14099, -1, 0, 968, 0, 0, 0, "mesh->fbx_node && mesh->fbx_mesh" },
+	{ "maya_cube_big_endian_obj", 14103, -1, 0, 983, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "maya_cube_big_endian_obj", 14110, -1, 0, 66, 0, 0, 0, "ufbxi_connect_oo(uc, mesh->fbx_mesh_id, mesh->fbx_node_..." },
+	{ "maya_cube_big_endian_obj", 14110, -1, 0, 984, 0, 0, 0, "ufbxi_connect_oo(uc, mesh->fbx_mesh_id, mesh->fbx_node_..." },
+	{ "maya_cube_big_endian_obj", 14111, -1, 0, 67, 0, 0, 0, "ufbxi_connect_oo(uc, mesh->fbx_node_id, 0)" },
+	{ "maya_cube_big_endian_obj", 14111, -1, 0, 986, 0, 0, 0, "ufbxi_connect_oo(uc, mesh->fbx_node_id, 0)" },
+	{ "maya_cube_big_endian_obj", 14125, -1, 0, 0, 2, 0, 0, "groups" },
+	{ "maya_cube_big_endian_obj", 14125, -1, 0, 0, 4, 0, 0, "groups" },
+	{ "maya_cube_big_endian_obj", 14165, -1, 0, 3, 0, 0, 0, "root" },
+	{ "maya_cube_big_endian_obj", 14165, -1, 0, 662, 0, 0, 0, "root" },
+	{ "maya_cube_big_endian_obj", 14167, -1, 0, 672, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "maya_cube_big_endian_obj", 14167, -1, 0, 8, 0, 0, 0, "((uint32_t*)ufbxi_push_size_copy((&uc->tmp_node_ids), s..." },
+	{ "maya_cube_big_endian_obj", 14242, -1, 0, 0, 0, 0, 1, "ufbxi_report_progress(uc)" },
+	{ "maya_cube_big_endian_obj", 14248, -1, 0, 1055, 0, 0, 0, "new_data" },
+	{ "maya_cube_big_endian_obj", 14248, -1, 0, 81, 0, 0, 0, "new_data" },
+	{ "maya_cube_big_endian_obj", 14308, -1, 0, 674, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->o..." },
+	{ "maya_cube_big_endian_obj", 14308, -1, 0, 9, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->o..." },
+	{ "maya_cube_big_endian_obj", 14344, -1, 0, 1055, 0, 0, 0, "ufbxi_obj_read_line(uc)" },
+	{ "maya_cube_big_endian_obj", 14344, -1, 0, 81, 0, 0, 0, "ufbxi_obj_read_line(uc)" },
+	{ "maya_cube_big_endian_obj", 14345, -1, 0, 674, 0, 0, 0, "ufbxi_obj_tokenize(uc)" },
+	{ "maya_cube_big_endian_obj", 14345, -1, 0, 9, 0, 0, 0, "ufbxi_obj_tokenize(uc)" },
+	{ "maya_cube_big_endian_obj", 14363, 92, 33, 0, 0, 0, 0, "offset + read_values <= uc->obj.num_tokens" },
+	{ "maya_cube_big_endian_obj", 14366, -1, 0, 14, 0, 0, 0, "vals" },
+	{ "maya_cube_big_endian_obj", 14366, -1, 0, 697, 0, 0, 0, "vals" },
+	{ "maya_cube_big_endian_obj", 14371, 83, 46, 0, 0, 0, 0, "end == str.data + str.length" },
+	{ "maya_cube_big_endian_obj", 14420, -1, 0, 1000, 0, 0, 0, "dst" },
+	{ "maya_cube_big_endian_obj", 14420, -1, 0, 74, 0, 0, 0, "dst" },
+	{ "maya_cube_big_endian_obj", 14462, -1, 0, 60, 0, 0, 0, "ufbxi_obj_push_mesh(uc)" },
+	{ "maya_cube_big_endian_obj", 14462, -1, 0, 966, 0, 0, 0, "ufbxi_obj_push_mesh(uc)" },
+	{ "maya_cube_big_endian_obj", 14499, -1, 0, 68, 0, 0, 0, "entry" },
+	{ "maya_cube_big_endian_obj", 14499, -1, 0, 988, 0, 0, 0, "entry" },
+	{ "maya_cube_big_endian_obj", 14512, -1, 0, 69, 0, 0, 0, "group" },
+	{ "maya_cube_big_endian_obj", 14512, -1, 0, 990, 0, 0, 0, "group" },
+	{ "maya_cube_big_endian_obj", 14531, -1, 0, 70, 0, 0, 0, "face" },
+	{ "maya_cube_big_endian_obj", 14531, -1, 0, 992, 0, 0, 0, "face" },
+	{ "maya_cube_big_endian_obj", 14540, -1, 0, 71, 0, 0, 0, "p_face_mat" },
+	{ "maya_cube_big_endian_obj", 14540, -1, 0, 994, 0, 0, 0, "p_face_mat" },
+	{ "maya_cube_big_endian_obj", 14545, -1, 0, 72, 0, 0, 0, "p_face_smooth" },
+	{ "maya_cube_big_endian_obj", 14545, -1, 0, 996, 0, 0, 0, "p_face_smooth" },
+	{ "maya_cube_big_endian_obj", 14551, -1, 0, 73, 0, 0, 0, "p_face_group" },
+	{ "maya_cube_big_endian_obj", 14551, -1, 0, 998, 0, 0, 0, "p_face_group" },
+	{ "maya_cube_big_endian_obj", 14558, -1, 0, 1000, 0, 0, 0, "ufbxi_obj_parse_index(uc, &tok, attrib)" },
+	{ "maya_cube_big_endian_obj", 14558, -1, 0, 74, 0, 0, 0, "ufbxi_obj_parse_index(uc, &tok, attrib)" },
+	{ "maya_cube_big_endian_obj", 14673, -1, 0, 0, 3, 0, 0, "data" },
+	{ "maya_cube_big_endian_obj", 14673, -1, 0, 0, 6, 0, 0, "data" },
+	{ "maya_cube_big_endian_obj", 14699, 71, 102, 0, 0, 0, 0, "num_indices == 0 || !required" },
+	{ "maya_cube_big_endian_obj", 14711, -1, 0, 0, 18, 0, 0, "dst_indices" },
+	{ "maya_cube_big_endian_obj", 14711, -1, 0, 0, 9, 0, 0, "dst_indices" },
+	{ "maya_cube_big_endian_obj", 14756, -1, 0, 1057, 0, 0, 0, "meshes" },
+	{ "maya_cube_big_endian_obj", 14756, -1, 0, 82, 0, 0, 0, "meshes" },
+	{ "maya_cube_big_endian_obj", 14789, -1, 0, 1059, 0, 0, 0, "tmp_indices" },
+	{ "maya_cube_big_endian_obj", 14789, -1, 0, 83, 0, 0, 0, "tmp_indices" },
+	{ "maya_cube_big_endian_obj", 14813, -1, 0, 0, 3, 0, 0, "ufbxi_obj_pop_vertices(uc, &vertices[attrib], attrib, m..." },
+	{ "maya_cube_big_endian_obj", 14813, -1, 0, 0, 6, 0, 0, "ufbxi_obj_pop_vertices(uc, &vertices[attrib], attrib, m..." },
+	{ "maya_cube_big_endian_obj", 14830, -1, 0, 0, 12, 0, 0, "fbx_mesh->faces.data" },
+	{ "maya_cube_big_endian_obj", 14830, -1, 0, 0, 6, 0, 0, "fbx_mesh->faces.data" },
+	{ "maya_cube_big_endian_obj", 14831, -1, 0, 0, 14, 0, 0, "fbx_mesh->face_material.data" },
+	{ "maya_cube_big_endian_obj", 14831, -1, 0, 0, 7, 0, 0, "fbx_mesh->face_material.data" },
+	{ "maya_cube_big_endian_obj", 14836, -1, 0, 0, 16, 0, 0, "fbx_mesh->face_smoothing.data" },
+	{ "maya_cube_big_endian_obj", 14836, -1, 0, 0, 8, 0, 0, "fbx_mesh->face_smoothing.data" },
+	{ "maya_cube_big_endian_obj", 14850, 71, 102, 0, 0, 0, 0, "ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_ver..." },
+	{ "maya_cube_big_endian_obj", 14853, -1, 0, 0, 10, 0, 0, "ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_ver..." },
+	{ "maya_cube_big_endian_obj", 14853, -1, 0, 0, 20, 0, 0, "ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_ver..." },
+	{ "maya_cube_big_endian_obj", 14856, -1, 0, 0, 11, 0, 0, "ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_ver..." },
+	{ "maya_cube_big_endian_obj", 14856, -1, 0, 0, 22, 0, 0, "ufbxi_obj_setup_attrib(uc, mesh, tmp_indices, (ufbx_ver..." },
+	{ "maya_cube_big_endian_obj", 14898, -1, 0, 0, 12, 0, 0, "ufbxi_finalize_mesh(&uc->result, &uc->error, fbx_mesh)" },
+	{ "maya_cube_big_endian_obj", 14898, -1, 0, 0, 24, 0, 0, "ufbxi_finalize_mesh(&uc->result, &uc->error, fbx_mesh)" },
+	{ "maya_cube_big_endian_obj", 14925, -1, 0, 674, 0, 0, 0, "ufbxi_obj_tokenize_line(uc)" },
+	{ "maya_cube_big_endian_obj", 14925, -1, 0, 9, 0, 0, 0, "ufbxi_obj_tokenize_line(uc)" },
+	{ "maya_cube_big_endian_obj", 14932, 83, 46, 0, 0, 0, 0, "ufbxi_obj_parse_vertex(uc, UFBXI_OBJ_ATTRIB_POSITION, 1..." },
+	{ "maya_cube_big_endian_obj", 14939, 111, 9, 0, 0, 0, 0, "ufbxi_obj_parse_vertex(uc, UFBXI_OBJ_ATTRIB_COLOR, 4)" },
+	{ "maya_cube_big_endian_obj", 14946, 328, 47, 0, 0, 0, 0, "ufbxi_obj_parse_vertex(uc, UFBXI_OBJ_ATTRIB_UV, 1)" },
+	{ "maya_cube_big_endian_obj", 14948, 622, 47, 0, 0, 0, 0, "ufbxi_obj_parse_vertex(uc, UFBXI_OBJ_ATTRIB_NORMAL, 1)" },
+	{ "maya_cube_big_endian_obj", 14950, -1, 0, 60, 0, 0, 0, "ufbxi_obj_parse_indices(uc)" },
+	{ "maya_cube_big_endian_obj", 14950, -1, 0, 966, 0, 0, 0, "ufbxi_obj_parse_indices(uc)" },
+	{ "maya_cube_big_endian_obj", 14970, -1, 0, 0, 1, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &uc->obj...." },
+	{ "maya_cube_big_endian_obj", 14970, -1, 0, 691, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &uc->obj...." },
+	{ "maya_cube_big_endian_obj", 14990, -1, 0, 0, 2, 0, 0, "ufbxi_obj_flush_mesh(uc)" },
+	{ "maya_cube_big_endian_obj", 14990, -1, 0, 0, 4, 0, 0, "ufbxi_obj_flush_mesh(uc)" },
+	{ "maya_cube_big_endian_obj", 14991, 71, 102, 0, 0, 0, 0, "ufbxi_obj_pop_meshes(uc)" },
+	{ "maya_cube_big_endian_obj", 15252, -1, 0, 3, 0, 0, 0, "ufbxi_obj_init(uc)" },
+	{ "maya_cube_big_endian_obj", 15252, -1, 0, 662, 0, 0, 0, "ufbxi_obj_init(uc)" },
+	{ "maya_cube_big_endian_obj", 15253, 71, 102, 0, 0, 0, 0, "ufbxi_obj_parse_file(uc)" },
+	{ "maya_cube_big_endian_obj", 15254, -1, 0, 0, 14, 0, 0, "ufbxi_init_file_paths(uc)" },
+	{ "maya_cube_big_endian_obj", 15254, -1, 0, 1061, 0, 0, 0, "ufbxi_init_file_paths(uc)" },
+	{ "maya_cube_big_endian_obj", 21349, 71, 102, 0, 0, 0, 0, "ufbxi_obj_load(uc)" },
+	{ "maya_display_layers_6100_binary", 12687, -1, 0, 1534, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_display..." },
+	{ "maya_display_layers_6100_binary", 12687, -1, 0, 5731, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_display..." },
+	{ "maya_display_layers_6100_binary", 18867, -1, 0, 1693, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &layer->nodes, &layer->ele..." },
+	{ "maya_display_layers_6100_binary", 18867, -1, 0, 6230, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &layer->nodes, &layer->ele..." },
+	{ "maya_human_ik_6100_binary", 11887, -1, 0, 11927, 0, 0, 0, "marker" },
+	{ "maya_human_ik_6100_binary", 11887, -1, 0, 41356, 0, 0, 0, "marker" },
+	{ "maya_human_ik_6100_binary", 12536, -1, 0, 17429, 0, 0, 0, "ufbxi_read_marker(uc, node, &attrib_info, sub_type, UFB..." },
+	{ "maya_human_ik_6100_binary", 12536, -1, 0, 60359, 0, 0, 0, "ufbxi_read_marker(uc, node, &attrib_info, sub_type, UFB..." },
+	{ "maya_human_ik_6100_binary", 12538, -1, 0, 11927, 0, 0, 0, "ufbxi_read_marker(uc, node, &attrib_info, sub_type, UFB..." },
+	{ "maya_human_ik_6100_binary", 12538, -1, 0, 41356, 0, 0, 0, "ufbxi_read_marker(uc, node, &attrib_info, sub_type, UFB..." },
+	{ "maya_human_ik_7400_binary", 12619, -1, 0, 10199, 0, 0, 0, "ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKE..." },
+	{ "maya_human_ik_7400_binary", 12619, -1, 0, 2591, 0, 0, 0, "ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKE..." },
+	{ "maya_human_ik_7400_binary", 12621, -1, 0, 1832, 0, 0, 0, "ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKE..." },
+	{ "maya_human_ik_7400_binary", 12621, -1, 0, 7486, 0, 0, 0, "ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKE..." },
+	{ "maya_interpolation_modes_6100_binary", 12886, 16936, 73, 0, 0, 0, 0, "data_end - data >= 1" },
+	{ "maya_interpolation_modes_7500_ascii", 8458, -1, 0, 848, 0, 0, 0, "v" },
+	{ "maya_leading_comma_7500_ascii", 8649, 291, 0, 0, 0, 0, 0, "ufbxi_ascii_next_token(uc, &ua->token)" },
+	{ "maya_node_attribute_zoo_6100_ascii", 8744, -1, 0, 5492, 0, 0, 0, "v" },
+	{ "maya_node_attribute_zoo_6100_ascii", 8772, -1, 0, 5921, 0, 0, 0, "v" },
+	{ "maya_node_attribute_zoo_6100_binary", 11730, -1, 0, 15032, 0, 0, 0, "nurbs" },
+	{ "maya_node_attribute_zoo_6100_binary", 11730, -1, 0, 4140, 0, 0, 0, "nurbs" },
+	{ "maya_node_attribute_zoo_6100_binary", 11735, 138209, 3, 0, 0, 0, 0, "ufbxi_find_val1(node, ufbxi_Order, \"I\", &nurbs->basis..." },
+	{ "maya_node_attribute_zoo_6100_binary", 11737, 138308, 255, 0, 0, 0, 0, "ufbxi_find_val1(node, ufbxi_Form, \"C\", (char**)&form)" },
+	{ "maya_node_attribute_zoo_6100_binary", 11744, 138359, 3, 0, 0, 0, 0, "points" },
+	{ "maya_node_attribute_zoo_6100_binary", 11745, 138416, 1, 0, 0, 0, 0, "knot" },
+	{ "maya_node_attribute_zoo_6100_binary", 11746, 143462, 27, 0, 0, 0, 0, "points->size % 4 == 0" },
+	{ "maya_node_attribute_zoo_6100_binary", 11760, -1, 0, 15234, 0, 0, 0, "nurbs" },
+	{ "maya_node_attribute_zoo_6100_binary", 11760, -1, 0, 4209, 0, 0, 0, "nurbs" },
+	{ "maya_node_attribute_zoo_6100_binary", 11765, 139478, 3, 0, 0, 0, 0, "ufbxi_find_val2(node, ufbxi_NurbsSurfaceOrder, \"II\", ..." },
+	{ "maya_node_attribute_zoo_6100_binary", 11766, 139592, 1, 0, 0, 0, 0, "ufbxi_find_val2(node, ufbxi_Dimensions, \"ZZ\", &dimens..." },
+	{ "maya_node_attribute_zoo_6100_binary", 11767, 139631, 3, 0, 0, 0, 0, "ufbxi_find_val2(node, ufbxi_Step, \"II\", &step_u, &ste..." },
+	{ "maya_node_attribute_zoo_6100_binary", 11768, 139664, 3, 0, 0, 0, 0, "ufbxi_find_val2(node, ufbxi_Form, \"CC\", (char**)&form..." },
+	{ "maya_node_attribute_zoo_6100_binary", 11781, 139691, 3, 0, 0, 0, 0, "points" },
+	{ "maya_node_attribute_zoo_6100_binary", 11782, 139727, 1, 0, 0, 0, 0, "knot_u" },
+	{ "maya_node_attribute_zoo_6100_binary", 11783, 140321, 3, 0, 0, 0, 0, "knot_v" },
+	{ "maya_node_attribute_zoo_6100_binary", 11784, 141818, 63, 0, 0, 0, 0, "points->size % 4 == 0" },
+	{ "maya_node_attribute_zoo_6100_binary", 11785, 139655, 1, 0, 0, 0, 0, "points->size / 4 == (size_t)dimension_u * (size_t)dimen..." },
+	{ "maya_node_attribute_zoo_6100_binary", 11872, -1, 0, 3196, 0, 0, 0, "bone" },
+	{ "maya_node_attribute_zoo_6100_binary", 11872, -1, 0, 710, 0, 0, 0, "bone" },
+	{ "maya_node_attribute_zoo_6100_binary", 12512, -1, 0, 3196, 0, 0, 0, "ufbxi_read_bone(uc, node, &attrib_info, sub_type)" },
+	{ "maya_node_attribute_zoo_6100_binary", 12512, -1, 0, 710, 0, 0, 0, "ufbxi_read_bone(uc, node, &attrib_info, sub_type)" },
+	{ "maya_node_attribute_zoo_6100_binary", 12514, -1, 0, 1742, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
+	{ "maya_node_attribute_zoo_6100_binary", 12514, -1, 0, 275, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
+	{ "maya_node_attribute_zoo_6100_binary", 12532, -1, 0, 1963, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
+	{ "maya_node_attribute_zoo_6100_binary", 12532, -1, 0, 7532, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
+	{ "maya_node_attribute_zoo_6100_binary", 12540, -1, 0, 10390, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
+	{ "maya_node_attribute_zoo_6100_binary", 12540, -1, 0, 2787, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
+	{ "maya_node_attribute_zoo_6100_binary", 12609, -1, 0, 14094, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera)..." },
+	{ "maya_node_attribute_zoo_6100_binary", 12609, -1, 0, 3879, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera)..." },
+	{ "maya_node_attribute_zoo_6100_binary", 12633, 138209, 3, 0, 0, 0, 0, "ufbxi_read_nurbs_curve(uc, node, &info)" },
+	{ "maya_node_attribute_zoo_6100_binary", 12635, 139478, 3, 0, 0, 0, 0, "ufbxi_read_nurbs_surface(uc, node, &info)" },
+	{ "maya_node_attribute_zoo_6100_binary", 12639, -1, 0, 15652, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_t..." },
+	{ "maya_node_attribute_zoo_6100_binary", 12639, -1, 0, 4348, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_t..." },
+	{ "maya_node_attribute_zoo_6100_binary", 12641, -1, 0, 15805, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_t..." },
+	{ "maya_node_attribute_zoo_6100_binary", 12641, -1, 0, 4393, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_t..." },
+	{ "maya_node_attribute_zoo_6100_binary", 12744, -1, 0, 17393, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &src_prop..." },
+	{ "maya_node_attribute_zoo_6100_binary", 12747, -1, 0, 17368, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &dst_prop..." },
+	{ "maya_node_attribute_zoo_6100_binary", 16969, -1, 0, 0, 486, 0, 0, "spans" },
+	{ "maya_node_attribute_zoo_6100_binary", 16969, -1, 0, 0, 972, 0, 0, "spans" },
+	{ "maya_node_attribute_zoo_6100_binary", 17012, -1, 0, 0, 1010, 0, 0, "levels" },
+	{ "maya_node_attribute_zoo_6100_binary", 17012, -1, 0, 0, 505, 0, 0, "levels" },
+	{ "maya_node_attribute_zoo_6100_binary", 18457, -1, 0, 0, 486, 0, 0, "ufbxi_finalize_nurbs_basis(uc, &curve->basis)" },
+	{ "maya_node_attribute_zoo_6100_binary", 18457, -1, 0, 0, 972, 0, 0, "ufbxi_finalize_nurbs_basis(uc, &curve->basis)" },
+	{ "maya_node_attribute_zoo_6100_binary", 18462, -1, 0, 0, 495, 0, 0, "ufbxi_finalize_nurbs_basis(uc, &surface->basis_u)" },
+	{ "maya_node_attribute_zoo_6100_binary", 18462, -1, 0, 0, 990, 0, 0, "ufbxi_finalize_nurbs_basis(uc, &surface->basis_u)" },
+	{ "maya_node_attribute_zoo_6100_binary", 18463, -1, 0, 0, 496, 0, 0, "ufbxi_finalize_nurbs_basis(uc, &surface->basis_v)" },
+	{ "maya_node_attribute_zoo_6100_binary", 18463, -1, 0, 0, 992, 0, 0, "ufbxi_finalize_nurbs_basis(uc, &surface->basis_v)" },
+	{ "maya_node_attribute_zoo_6100_binary", 18940, -1, 0, 0, 1010, 0, 0, "ufbxi_finalize_lod_group(uc, *p_lod)" },
+	{ "maya_node_attribute_zoo_6100_binary", 18940, -1, 0, 0, 505, 0, 0, "ufbxi_finalize_lod_group(uc, *p_lod)" },
+	{ "maya_node_attribute_zoo_7500_ascii", 8458, -1, 0, 11662, 0, 0, 0, "v" },
+	{ "maya_node_attribute_zoo_7500_ascii", 8741, -1, 0, 3339, 0, 0, 0, "v" },
+	{ "maya_node_attribute_zoo_7500_ascii", 8742, -1, 0, 11663, 0, 0, 0, "v" },
+	{ "maya_node_attribute_zoo_7500_ascii", 8742, -1, 0, 3326, 0, 0, 0, "v" },
+	{ "maya_node_attribute_zoo_7500_binary", 10426, -1, 0, 0, 325, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, type, 0)" },
+	{ "maya_node_attribute_zoo_7500_binary", 12003, -1, 0, 1749, 0, 0, 0, "curve" },
+	{ "maya_node_attribute_zoo_7500_binary", 12003, -1, 0, 6405, 0, 0, 0, "curve" },
+	{ "maya_node_attribute_zoo_7500_binary", 12008, 61038, 255, 0, 0, 0, 0, "times = ufbxi_find_array(node, ufbxi_KeyTime, 'l')" },
+	{ "maya_node_attribute_zoo_7500_binary", 12009, 61115, 255, 0, 0, 0, 0, "values = ufbxi_find_array(node, ufbxi_KeyValueFloat, 'r..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12010, 61175, 255, 0, 0, 0, 0, "attr_flags = ufbxi_find_array(node, ufbxi_KeyAttrFlags,..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12011, 61234, 255, 0, 0, 0, 0, "attrs = ufbxi_find_array(node, ufbxi_KeyAttrDataFloat, ..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12012, 61292, 255, 0, 0, 0, 0, "refs = ufbxi_find_array(node, ufbxi_KeyAttrRefCount, 'i..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12015, 61122, 0, 0, 0, 0, 0, "times->size == values->size" },
+	{ "maya_node_attribute_zoo_7500_binary", 12020, 61242, 0, 0, 0, 0, 0, "attr_flags->size == refs->size" },
+	{ "maya_node_attribute_zoo_7500_binary", 12021, 61300, 0, 0, 0, 0, 0, "attrs->size == refs->size * 4u" },
+	{ "maya_node_attribute_zoo_7500_binary", 12025, -1, 0, 0, 326, 0, 0, "keys" },
+	{ "maya_node_attribute_zoo_7500_binary", 12025, -1, 0, 0, 652, 0, 0, "keys" },
+	{ "maya_node_attribute_zoo_7500_binary", 12176, 61431, 0, 0, 0, 0, 0, "refs_left >= 0" },
+	{ "maya_node_attribute_zoo_7500_binary", 12607, -1, 0, 2954, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_light),..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12607, -1, 0, 652, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_light),..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12611, -1, 0, 2711, 0, 0, 0, "ufbxi_read_bone(uc, node, &info, sub_type)" },
+	{ "maya_node_attribute_zoo_7500_binary", 12611, -1, 0, 582, 0, 0, 0, "ufbxi_read_bone(uc, node, &info, sub_type)" },
+	{ "maya_node_attribute_zoo_7500_binary", 12613, -1, 0, 2451, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_empty),..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12613, -1, 0, 489, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_empty),..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12615, -1, 0, 3149, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_stereo_..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12615, -1, 0, 703, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_stereo_..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12623, -1, 0, 1145, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_lod_gro..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12623, -1, 0, 4460, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_lod_gro..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12672, -1, 0, 1760, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_va..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12672, -1, 0, 6440, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_va..." },
+	{ "maya_node_attribute_zoo_7500_binary", 12674, 61038, 255, 0, 0, 0, 0, "ufbxi_read_animation_curve(uc, node, &info)" },
+	{ "maya_node_attribute_zoo_7500_binary", 15663, -1, 0, 2112, 0, 0, 0, "((ufbx_prop*)ufbxi_push_size_copy((&uc->tmp_stack), siz..." },
+	{ "maya_node_attribute_zoo_7500_binary", 15663, -1, 0, 7512, 0, 0, 0, "((ufbx_prop*)ufbxi_push_size_copy((&uc->tmp_stack), siz..." },
+	{ "maya_node_attribute_zoo_7500_binary", 15704, -1, 0, 2114, 0, 0, 0, "((ufbx_prop*)ufbxi_push_size_copy((&uc->tmp_stack), siz..." },
+	{ "maya_node_attribute_zoo_7500_binary", 15704, -1, 0, 7516, 0, 0, 0, "((ufbx_prop*)ufbxi_push_size_copy((&uc->tmp_stack), siz..." },
+	{ "maya_node_attribute_zoo_7500_binary", 7579, 61146, 109, 0, 0, 0, 0, "Bad multivalue array type" },
+	{ "maya_node_attribute_zoo_7500_binary", 7580, 61333, 103, 0, 0, 0, 0, "Bad multivalue array type" },
+	{ "maya_node_attribute_zoo_7500_binary", 7821, -1, 0, 0, 0, 0, 2942, "ufbxi_resume_progress(uc)" },
+	{ "maya_node_attribute_zoo_7500_binary", 7825, -1, 0, 0, 0, 0, 2943, "res != -28" },
+	{ "maya_polygon_hole_6100_binary", 11568, 9377, 37, 0, 0, 0, 0, "ufbxi_find_val1(n, ufbxi_MappingInformationType, \"c\",..." },
+	{ "maya_polygon_hole_6100_binary", 11570, 9342, 0, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->face_hole.data, &..." },
+	{ "maya_resampled_7500_binary", 12049, 24917, 23, 0, 0, 0, 0, "p_ref < p_ref_end" },
+	{ "maya_shaderfx_pbs_material_7700_ascii", 10070, -1, 0, 1352, 0, 0, 0, "ufbxi_read_embedded_blob(uc, &prop->value_blob, binary)" },
+	{ "maya_shaderfx_pbs_material_7700_ascii", 10070, -1, 0, 5212, 0, 0, 0, "ufbxi_read_embedded_blob(uc, &prop->value_blob, binary)" },
+	{ "maya_texture_layers_6100_binary", 12230, -1, 0, 1451, 0, 0, 0, "texture" },
+	{ "maya_texture_layers_6100_binary", 12230, -1, 0, 5527, 0, 0, 0, "texture" },
+	{ "maya_texture_layers_6100_binary", 12239, -1, 0, 1454, 0, 0, 0, "extra" },
+	{ "maya_texture_layers_6100_binary", 12239, -1, 0, 5535, 0, 0, 0, "extra" },
+	{ "maya_texture_layers_6100_binary", 12664, -1, 0, 1451, 0, 0, 0, "ufbxi_read_layered_texture(uc, node, &info)" },
+	{ "maya_texture_layers_6100_binary", 12664, -1, 0, 5527, 0, 0, 0, "ufbxi_read_layered_texture(uc, node, &info)" },
+	{ "maya_texture_layers_6100_binary", 16022, -1, 0, 1666, 0, 0, 0, "((ufbx_texture_layer*)ufbxi_push_size_copy((&uc->tmp_st..." },
+	{ "maya_texture_layers_6100_binary", 16022, -1, 0, 6196, 0, 0, 0, "((ufbx_texture_layer*)ufbxi_push_size_copy((&uc->tmp_st..." },
+	{ "maya_texture_layers_6100_binary", 16029, -1, 0, 0, 267, 0, 0, "list->data" },
+	{ "maya_texture_layers_6100_binary", 16029, -1, 0, 0, 534, 0, 0, "list->data" },
+	{ "maya_texture_layers_6100_binary", 17522, -1, 0, 1676, 0, 0, 0, "textures" },
+	{ "maya_texture_layers_6100_binary", 17522, -1, 0, 6219, 0, 0, 0, "textures" },
+	{ "maya_texture_layers_6100_binary", 17524, -1, 0, 6221, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "maya_texture_layers_6100_binary", 17598, -1, 0, 1673, 0, 0, 0, "dst" },
+	{ "maya_texture_layers_6100_binary", 17598, -1, 0, 6213, 0, 0, 0, "dst" },
+	{ "maya_texture_layers_6100_binary", 17618, -1, 0, 1676, 0, 0, 0, "ufbxi_deduplicate_textures(uc, &uc->tmp_parse, &deps, &..." },
+	{ "maya_texture_layers_6100_binary", 17618, -1, 0, 6219, 0, 0, 0, "ufbxi_deduplicate_textures(uc, &uc->tmp_parse, &deps, &..." },
+	{ "maya_texture_layers_6100_binary", 17629, -1, 0, 1677, 0, 0, 0, "dst" },
+	{ "maya_texture_layers_6100_binary", 17629, -1, 0, 6222, 0, 0, 0, "dst" },
+	{ "maya_texture_layers_6100_binary", 17637, -1, 0, 1680, 0, 0, 0, "ufbxi_deduplicate_textures(uc, &uc->tmp_parse, &files, ..." },
+	{ "maya_texture_layers_6100_binary", 17637, -1, 0, 6228, 0, 0, 0, "ufbxi_deduplicate_textures(uc, &uc->tmp_parse, &files, ..." },
+	{ "maya_texture_layers_6100_binary", 17641, -1, 0, 0, 273, 0, 0, "texture->file_textures.data" },
+	{ "maya_texture_layers_6100_binary", 17641, -1, 0, 0, 546, 0, 0, "texture->file_textures.data" },
+	{ "maya_texture_layers_6100_binary", 17668, -1, 0, 6207, 0, 0, 0, "((ufbx_texture**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "maya_texture_layers_6100_binary", 17672, -1, 0, 1671, 0, 0, 0, "((ufbx_texture**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "maya_texture_layers_6100_binary", 17672, -1, 0, 6208, 0, 0, 0, "((ufbx_texture**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "maya_texture_layers_6100_binary", 18819, -1, 0, 1666, 0, 0, 0, "ufbxi_fetch_texture_layers(uc, &texture->layers, &textu..." },
+	{ "maya_texture_layers_6100_binary", 18819, -1, 0, 6196, 0, 0, 0, "ufbxi_fetch_texture_layers(uc, &texture->layers, &textu..." },
+	{ "maya_textured_cube_6100_binary", 18678, -1, 0, 1658, 0, 0, 0, "mat_texs" },
+	{ "maya_textured_cube_6100_binary", 18678, -1, 0, 6245, 0, 0, 0, "mat_texs" },
+	{ "maya_transform_animation_6100_binary", 12921, 17549, 11, 0, 0, 0, 0, "data_end - data >= 1" },
+	{ "mtl_fuzz_0000", 15057, -1, 0, 0, 5, 0, 0, "ufbxi_push_string_place_blob(&uc->string_pool, &prop->v..." },
+	{ "mtl_fuzz_0000", 4463, -1, 0, 0, 5, 0, 0, "p_blob->data" },
+	{ "obj_fuzz_0030", 14958, -1, 0, 28, 0, 0, 0, "((_Bool*)ufbxi_push_size_zero((&uc->obj.tmp_face_smooth..." },
+	{ "obj_fuzz_0030", 14958, -1, 0, 740, 0, 0, 0, "((_Bool*)ufbxi_push_size_zero((&uc->obj.tmp_face_smooth..." },
+	{ "obj_fuzz_0159", 14400, 116, 11, 0, 0, 0, 0, "index < 0xffffffffffffffffui64 / 10 - 10" },
+	{ "revit_empty_7400_binary", 10697, -1, 0, 3503, 0, 0, 0, "ufbxi_warnf_imp(&uc->warnings, UFBX_WARNING_INDEX_CLAMP..." },
+	{ "revit_empty_7400_binary", 10697, -1, 0, 787, 0, 0, 0, "ufbxi_warnf_imp(&uc->warnings, UFBX_WARNING_INDEX_CLAMP..." },
+	{ "revit_empty_7400_binary", 10723, -1, 0, 0, 258, 0, 0, "new_indices" },
+	{ "revit_empty_7400_binary", 10723, -1, 0, 0, 516, 0, 0, "new_indices" },
+	{ "revit_empty_7400_binary", 10746, -1, 0, 3503, 0, 0, 0, "ufbxi_fix_index(uc, &indices[i], ix, num_elems)" },
+	{ "revit_empty_7400_binary", 10746, -1, 0, 787, 0, 0, 0, "ufbxi_fix_index(uc, &indices[i], ix, num_elems)" },
+	{ "revit_empty_7400_binary", 10804, -1, 0, 3503, 0, 0, 0, "ufbxi_check_indices(uc, &attrib->indices.data, index_da..." },
+	{ "revit_empty_7400_binary", 10804, -1, 0, 787, 0, 0, 0, "ufbxi_check_indices(uc, &attrib->indices.data, index_da..." },
+	{ "revit_empty_7400_binary", 12702, -1, 0, 3936, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_metadat..." },
+	{ "revit_empty_7400_binary", 12702, -1, 0, 899, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_metadat..." },
+	{ "revit_empty_7400_binary", 7524, -1, 0, 0, 302, 0, 0, "d->data" },
+	{ "revit_empty_7400_binary", 7524, -1, 0, 0, 604, 0, 0, "d->data" },
+	{ "synthetic_binary_props_7500_ascii", 10665, -1, 0, 3793, 0, 0, 0, "unknown" },
+	{ "synthetic_binary_props_7500_ascii", 10665, -1, 0, 946, 0, 0, 0, "unknown" },
+	{ "synthetic_binary_props_7500_ascii", 10672, -1, 0, 3802, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &unknown-..." },
+	{ "synthetic_binary_props_7500_ascii", 10674, -1, 0, 3803, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &unknown-..." },
+	{ "synthetic_binary_props_7500_ascii", 12704, -1, 0, 3793, 0, 0, 0, "ufbxi_read_unknown(uc, node, &info, type_str, sub_type_..." },
+	{ "synthetic_binary_props_7500_ascii", 12704, -1, 0, 946, 0, 0, 0, "ufbxi_read_unknown(uc, node, &info, type_str, sub_type_..." },
+	{ "synthetic_binary_props_7500_ascii", 8684, -1, 0, 104, 0, 0, 0, "v->data" },
+	{ "synthetic_binary_props_7500_ascii", 8684, -1, 0, 831, 0, 0, 0, "v->data" },
+	{ "synthetic_bind_to_root_7700_ascii", 15545, -1, 0, 1984, 0, 0, 0, "ufbxi_warnf_imp(&uc->warnings, UFBX_WARNING_BAD_ELEMENT..." },
+	{ "synthetic_bind_to_root_7700_ascii", 15545, -1, 0, 7190, 0, 0, 0, "ufbxi_warnf_imp(&uc->warnings, UFBX_WARNING_BAD_ELEMENT..." },
+	{ "synthetic_blend_shape_order_7500_ascii", 10951, -1, 0, 3274, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "synthetic_blend_shape_order_7500_ascii", 11002, -1, 0, 3272, 0, 0, 0, "offsets" },
+	{ "synthetic_blend_shape_order_7500_ascii", 11002, -1, 0, 755, 0, 0, 0, "offsets" },
+	{ "synthetic_blend_shape_order_7500_ascii", 11010, -1, 0, 3274, 0, 0, 0, "ufbxi_sort_blend_offsets(uc, offsets, num_offsets)" },
+	{ "synthetic_broken_filename_7500_ascii", 12206, -1, 0, 3632, 0, 0, 0, "texture" },
+	{ "synthetic_broken_filename_7500_ascii", 12206, -1, 0, 832, 0, 0, 0, "texture" },
+	{ "synthetic_broken_filename_7500_ascii", 12259, -1, 0, 3518, 0, 0, 0, "video" },
+	{ "synthetic_broken_filename_7500_ascii", 12259, -1, 0, 797, 0, 0, 0, "video" },
+	{ "synthetic_broken_filename_7500_ascii", 12662, -1, 0, 3632, 0, 0, 0, "ufbxi_read_texture(uc, node, &info)" },
+	{ "synthetic_broken_filename_7500_ascii", 12662, -1, 0, 832, 0, 0, 0, "ufbxi_read_texture(uc, node, &info)" },
+	{ "synthetic_broken_filename_7500_ascii", 12666, -1, 0, 3518, 0, 0, 0, "ufbxi_read_video(uc, node, &info)" },
+	{ "synthetic_broken_filename_7500_ascii", 12666, -1, 0, 797, 0, 0, 0, "ufbxi_read_video(uc, node, &info)" },
+	{ "synthetic_broken_filename_7500_ascii", 13873, -1, 0, 3917, 0, 0, 0, "result" },
+	{ "synthetic_broken_filename_7500_ascii", 13873, -1, 0, 924, 0, 0, 0, "result" },
+	{ "synthetic_broken_filename_7500_ascii", 13893, -1, 0, 0, 257, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &dst, raw..." },
+	{ "synthetic_broken_filename_7500_ascii", 13893, -1, 0, 3919, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &dst, raw..." },
+	{ "synthetic_broken_filename_7500_ascii", 15930, -1, 0, 3913, 0, 0, 0, "tex" },
+	{ "synthetic_broken_filename_7500_ascii", 15930, -1, 0, 922, 0, 0, 0, "tex" },
+	{ "synthetic_broken_filename_7500_ascii", 15940, -1, 0, 0, 256, 0, 0, "list->data" },
+	{ "synthetic_broken_filename_7500_ascii", 15940, -1, 0, 0, 512, 0, 0, "list->data" },
+	{ "synthetic_broken_filename_7500_ascii", 17458, -1, 0, 3931, 0, 0, 0, "entry" },
+	{ "synthetic_broken_filename_7500_ascii", 17458, -1, 0, 928, 0, 0, 0, "entry" },
+	{ "synthetic_broken_filename_7500_ascii", 17461, -1, 0, 3933, 0, 0, 0, "file" },
+	{ "synthetic_broken_filename_7500_ascii", 17461, -1, 0, 929, 0, 0, 0, "file" },
+	{ "synthetic_broken_filename_7500_ascii", 17487, -1, 0, 0, 259, 0, 0, "files" },
+	{ "synthetic_broken_filename_7500_ascii", 17487, -1, 0, 0, 518, 0, 0, "files" },
+	{ "synthetic_broken_filename_7500_ascii", 17564, -1, 0, 3936, 0, 0, 0, "((ufbx_texture**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "synthetic_broken_filename_7500_ascii", 17564, -1, 0, 930, 0, 0, 0, "((ufbx_texture**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "synthetic_broken_filename_7500_ascii", 17568, -1, 0, 3938, 0, 0, 0, "states" },
+	{ "synthetic_broken_filename_7500_ascii", 17568, -1, 0, 931, 0, 0, 0, "states" },
+	{ "synthetic_broken_filename_7500_ascii", 17653, -1, 0, 0, 261, 0, 0, "texture->file_textures.data" },
+	{ "synthetic_broken_filename_7500_ascii", 17653, -1, 0, 0, 522, 0, 0, "texture->file_textures.data" },
+	{ "synthetic_broken_filename_7500_ascii", 17921, -1, 0, 3917, 0, 0, 0, "ufbxi_resolve_relative_filename(uc, filename, relative_..." },
+	{ "synthetic_broken_filename_7500_ascii", 17921, -1, 0, 924, 0, 0, 0, "ufbxi_resolve_relative_filename(uc, filename, relative_..." },
+	{ "synthetic_broken_filename_7500_ascii", 18655, -1, 0, 3913, 0, 0, 0, "ufbxi_fetch_textures(uc, &material->textures, &material..." },
+	{ "synthetic_broken_filename_7500_ascii", 18655, -1, 0, 922, 0, 0, 0, "ufbxi_fetch_textures(uc, &material->textures, &material..." },
+	{ "synthetic_broken_filename_7500_ascii", 18767, -1, 0, 3915, 0, 0, 0, "content_videos" },
+	{ "synthetic_broken_filename_7500_ascii", 18767, -1, 0, 923, 0, 0, 0, "content_videos" },
+	{ "synthetic_broken_filename_7500_ascii", 18772, -1, 0, 3917, 0, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&video->fil..." },
+	{ "synthetic_broken_filename_7500_ascii", 18772, -1, 0, 924, 0, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&video->fil..." },
+	{ "synthetic_broken_filename_7500_ascii", 18773, -1, 0, 3921, 0, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&video->raw..." },
+	{ "synthetic_broken_filename_7500_ascii", 18773, -1, 0, 925, 0, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&video->raw..." },
+	{ "synthetic_broken_filename_7500_ascii", 18814, -1, 0, 3925, 0, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&texture->f..." },
+	{ "synthetic_broken_filename_7500_ascii", 18814, -1, 0, 926, 0, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&texture->f..." },
+	{ "synthetic_broken_filename_7500_ascii", 18815, -1, 0, 3928, 0, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&texture->r..." },
+	{ "synthetic_broken_filename_7500_ascii", 18815, -1, 0, 927, 0, 0, 0, "ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&texture->r..." },
+	{ "synthetic_broken_filename_7500_ascii", 18833, -1, 0, 3931, 0, 0, 0, "ufbxi_insert_texture_file(uc, texture)" },
+	{ "synthetic_broken_filename_7500_ascii", 18833, -1, 0, 928, 0, 0, 0, "ufbxi_insert_texture_file(uc, texture)" },
+	{ "synthetic_broken_filename_7500_ascii", 18837, -1, 0, 0, 259, 0, 0, "ufbxi_pop_texture_files(uc)" },
+	{ "synthetic_broken_filename_7500_ascii", 18837, -1, 0, 0, 518, 0, 0, "ufbxi_pop_texture_files(uc)" },
+	{ "synthetic_broken_filename_7500_ascii", 18943, -1, 0, 3936, 0, 0, 0, "ufbxi_fetch_file_textures(uc)" },
+	{ "synthetic_broken_filename_7500_ascii", 18943, -1, 0, 930, 0, 0, 0, "ufbxi_fetch_file_textures(uc)" },
+	{ "synthetic_by_vertex_bad_index_7500_ascii", 10822, -1, 0, 2697, 0, 0, 0, "ufbxi_check_indices(uc, &attrib->indices.data, new_inde..." },
+	{ "synthetic_by_vertex_bad_index_7500_ascii", 10822, -1, 0, 577, 0, 0, 0, "ufbxi_check_indices(uc, &attrib->indices.data, new_inde..." },
+	{ "synthetic_by_vertex_overflow_7500_ascii", 10743, -1, 0, 0, 159, 0, 0, "indices" },
+	{ "synthetic_by_vertex_overflow_7500_ascii", 10743, -1, 0, 0, 318, 0, 0, "indices" },
+	{ "synthetic_by_vertex_overflow_7500_ascii", 10859, -1, 0, 2690, 0, 0, 0, "ufbxi_check_indices(uc, &attrib->indices.data, mesh->ve..." },
+	{ "synthetic_by_vertex_overflow_7500_ascii", 10859, -1, 0, 575, 0, 0, 0, "ufbxi_check_indices(uc, &attrib->indices.data, mesh->ve..." },
+	{ "synthetic_color_suzanne_0_obj", 14941, -1, 0, 15, 0, 0, 0, "valid" },
+	{ "synthetic_color_suzanne_0_obj", 14941, -1, 0, 697, 0, 0, 0, "valid" },
+	{ "synthetic_color_suzanne_1_obj", 14745, -1, 0, 2184, 0, 0, 0, "((_Bool*)ufbxi_push_size_zero((&uc->obj.tmp_color_valid..." },
+	{ "synthetic_cube_nan_6100_ascii", 8307, 4866, 45, 0, 0, 0, 0, "token->type == 'F'" },
+	{ "synthetic_empty_elements_7500_ascii", 15767, 2800, 49, 0, 0, 0, 0, "depth <= num_nodes" },
+	{ "synthetic_face_groups_0_obj", 14964, -1, 0, 0, 1, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &uc->obj...." },
+	{ "synthetic_indexed_by_vertex_7500_ascii", 10810, -1, 0, 0, 159, 0, 0, "new_index_data" },
+	{ "synthetic_indexed_by_vertex_7500_ascii", 10810, -1, 0, 0, 318, 0, 0, "new_index_data" },
+	{ "synthetic_legacy_nonzero_material_5800_ascii", 13575, -1, 0, 0, 114, 0, 0, "mesh->face_material.data" },
+	{ "synthetic_legacy_nonzero_material_5800_ascii", 13575, -1, 0, 0, 228, 0, 0, "mesh->face_material.data" },
+	{ "synthetic_missing_version_6100_ascii", 12284, -1, 0, 13460, 0, 0, 0, "pose" },
+	{ "synthetic_missing_version_6100_ascii", 12284, -1, 0, 3892, 0, 0, 0, "pose" },
+	{ "synthetic_missing_version_6100_ascii", 12308, -1, 0, 13469, 0, 0, 0, "tmp_pose" },
+	{ "synthetic_missing_version_6100_ascii", 12308, -1, 0, 3896, 0, 0, 0, "tmp_pose" },
+	{ "synthetic_missing_version_6100_ascii", 12318, -1, 0, 13471, 0, 0, 0, "pose->bone_poses.data" },
+	{ "synthetic_missing_version_6100_ascii", 12318, -1, 0, 3897, 0, 0, 0, "pose->bone_poses.data" },
+	{ "synthetic_missing_version_6100_ascii", 12534, -1, 0, 1655, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
+	{ "synthetic_missing_version_6100_ascii", 12534, -1, 0, 251, 0, 0, 0, "ufbxi_read_element(uc, node, &attrib_info, sizeof(ufbx_..." },
+	{ "synthetic_missing_version_6100_ascii", 12676, -1, 0, 13460, 0, 0, 0, "ufbxi_read_pose(uc, node, &info, sub_type)" },
+	{ "synthetic_missing_version_6100_ascii", 12676, -1, 0, 3892, 0, 0, 0, "ufbxi_read_pose(uc, node, &info, sub_type)" },
+	{ "synthetic_missing_version_6100_ascii", 18118, -1, 0, 0, 252, 0, 0, "pose->bone_poses.data" },
+	{ "synthetic_missing_version_6100_ascii", 18118, -1, 0, 0, 504, 0, 0, "pose->bone_poses.data" },
+	{ "synthetic_mixed_attribs_0_obj", 14936, -1, 0, 83, 0, 0, 0, "ufbxi_obj_pad_colors(uc, num_vertices - 1)" },
+	{ "synthetic_mixed_attribs_0_obj", 14936, -1, 0, 998, 0, 0, 0, "ufbxi_obj_pad_colors(uc, num_vertices - 1)" },
+	{ "synthetic_mixed_attribs_reuse_0_obj", 14793, -1, 0, 0, 16, 0, 0, "ufbxi_obj_pop_vertices(uc, &vertices[attrib], attrib, 0..." },
+	{ "synthetic_mixed_attribs_reuse_0_obj", 14793, -1, 0, 0, 32, 0, 0, "ufbxi_obj_pop_vertices(uc, &vertices[attrib], attrib, 0..." },
+	{ "synthetic_mixed_attribs_reuse_0_obj", 14796, -1, 0, 0, 19, 0, 0, "ufbxi_obj_pop_vertices(uc, &vertices[UFBXI_OBJ_ATTRIB_C..." },
+	{ "synthetic_mixed_attribs_reuse_0_obj", 14796, -1, 0, 0, 38, 0, 0, "ufbxi_obj_pop_vertices(uc, &vertices[UFBXI_OBJ_ATTRIB_C..." },
+	{ "synthetic_mixed_attribs_reuse_0_obj", 14798, -1, 0, 1113, 0, 0, 0, "color_valid" },
+	{ "synthetic_mixed_attribs_reuse_0_obj", 14798, -1, 0, 119, 0, 0, 0, "color_valid" },
+	{ "synthetic_node_depth_fail_7400_binary", 7620, 23, 233, 0, 0, 0, 0, "depth < 32" },
+	{ "synthetic_node_depth_fail_7500_ascii", 8576, 1, 33, 0, 0, 0, 0, "depth < 32" },
+	{ "synthetic_obj_zoo_0_obj", 14888, -1, 0, 42, 0, 0, 0, "ufbxi_fix_index(uc, p_ix, *p_ix, num_values)" },
+	{ "synthetic_obj_zoo_0_obj", 14888, -1, 0, 920, 0, 0, 0, "ufbxi_fix_index(uc, p_ix, *p_ix, num_values)" },
+	{ "synthetic_parent_directory_7700_ascii", 17864, -1, 0, 3916, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "synthetic_parent_directory_7700_ascii", 17904, -1, 0, 0, 261, 0, 0, "dst" },
+	{ "synthetic_parent_directory_7700_ascii", 17904, -1, 0, 3917, 0, 0, 0, "dst" },
+	{ "synthetic_parent_directory_7700_ascii", 17918, -1, 0, 0, 261, 0, 0, "ufbxi_absolute_to_relative_path(uc, relative_filename, ..." },
+	{ "synthetic_parent_directory_7700_ascii", 17918, -1, 0, 3916, 0, 0, 0, "ufbxi_absolute_to_relative_path(uc, relative_filename, ..." },
+	{ "synthetic_partial_attrib_0_obj", 14730, -1, 0, 59, 0, 0, 0, "ufbxi_fix_index(uc, &dst_indices[i], (uint32_t)ix, num_..." },
+	{ "synthetic_partial_attrib_0_obj", 14730, -1, 0, 908, 0, 0, 0, "ufbxi_fix_index(uc, &dst_indices[i], (uint32_t)ix, num_..." },
+	{ "synthetic_partial_attrib_0_obj", 14883, -1, 0, 0, 11, 0, 0, "indices" },
+	{ "synthetic_partial_attrib_0_obj", 14883, -1, 0, 0, 22, 0, 0, "indices" },
+	{ "synthetic_simple_materials_0_mtl", 15151, -1, 0, 13, 0, 0, 0, "ufbxi_obj_parse_material(uc)" },
+	{ "synthetic_simple_materials_0_mtl", 15262, -1, 0, 3, 0, 0, 0, "ufbxi_obj_init(uc)" },
+	{ "synthetic_simple_materials_0_mtl", 15262, -1, 0, 662, 0, 0, 0, "ufbxi_obj_init(uc)" },
+	{ "synthetic_simple_materials_0_mtl", 15263, -1, 0, 0, 1, 0, 0, "ufbxi_init_file_paths(uc)" },
+	{ "synthetic_simple_materials_0_mtl", 15263, -1, 0, 674, 0, 0, 0, "ufbxi_init_file_paths(uc)" },
+	{ "synthetic_simple_materials_0_mtl", 15264, -1, 0, 680, 0, 0, 0, "ufbxi_obj_parse_mtl(uc)" },
+	{ "synthetic_simple_materials_0_mtl", 15264, -1, 0, 9, 0, 0, 0, "ufbxi_obj_parse_mtl(uc)" },
+	{ "synthetic_simple_materials_0_mtl", 21352, -1, 0, 3, 0, 0, 0, "ufbxi_mtl_load(uc)" },
+	{ "synthetic_simple_materials_0_mtl", 21352, -1, 0, 662, 0, 0, 0, "ufbxi_mtl_load(uc)" },
+	{ "synthetic_simple_textures_0_mtl", 15155, -1, 0, 101, 0, 0, 0, "ufbxi_obj_parse_mtl_map(uc, 0)" },
+	{ "synthetic_simple_textures_0_mtl", 15155, -1, 0, 1100, 0, 0, 0, "ufbxi_obj_parse_mtl_map(uc, 0)" },
+	{ "synthetic_string_collision_7500_ascii", 4394, -1, 0, 2213, 0, 0, 0, "ufbxi_map_grow_size((&pool->map), sizeof(ufbx_string), ..." },
+	{ "synthetic_texture_opts_0_mtl", 15098, -1, 0, 19, 0, 0, 0, "ufbxi_obj_parse_prop(uc, tok, start + 1, 0, &start)" },
+	{ "synthetic_texture_opts_0_mtl", 15098, -1, 0, 733, 0, 0, 0, "ufbxi_obj_parse_prop(uc, tok, start + 1, 0, &start)" },
+	{ "synthetic_texture_opts_0_mtl", 15108, -1, 0, 0, 22, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &tex_str,..." },
+	{ "synthetic_texture_split_7500_ascii", 8776, 28571, 35, 0, 0, 0, 0, "Bad array dst type" },
+	{ "synthetic_texture_split_7500_binary", 9979, -1, 0, 0, 229, 0, 0, "dst" },
+	{ "synthetic_texture_split_7500_binary", 9979, -1, 0, 0, 458, 0, 0, "dst" },
+	{ "synthetic_truncated_crease_partial_7700_ascii", 10886, -1, 0, 2858, 0, 0, 0, "ufbxi_warnf_imp(&uc->warnings, UFBX_WARNING_TRUNCATED_A..." },
+	{ "synthetic_truncated_crease_partial_7700_ascii", 10886, -1, 0, 650, 0, 0, 0, "ufbxi_warnf_imp(&uc->warnings, UFBX_WARNING_TRUNCATED_A..." },
+	{ "synthetic_truncated_crease_partial_7700_ascii", 10890, -1, 0, 0, 169, 0, 0, "new_data" },
+	{ "synthetic_truncated_crease_partial_7700_ascii", 10890, -1, 0, 0, 338, 0, 0, "new_data" },
+	{ "synthetic_unicode_7500_binary", 21401, -1, 0, 0, 39604, 0, 0, "ufbxi_pop_warnings(&uc->warnings, &uc->scene.metadata.w..." },
+	{ "synthetic_unicode_7500_binary", 4039, -1, 0, 0, 3, 0, 0, "desc_copy" },
+	{ "synthetic_unicode_7500_binary", 4039, -1, 0, 0, 6, 0, 0, "desc_copy" },
+	{ "synthetic_unicode_7500_binary", 4042, -1, 0, 12, 0, 0, 0, "warning" },
+	{ "synthetic_unicode_7500_binary", 4042, -1, 0, 692, 0, 0, 0, "warning" },
+	{ "synthetic_unicode_7500_binary", 4067, -1, 0, 0, 39604, 0, 0, "warnings->data" },
+	{ "synthetic_unicode_7500_binary", 4249, -1, 0, 12, 0, 0, 0, "ufbxi_warnf_imp(pool->warnings, UFBX_WARNING_BAD_UNICOD..." },
+	{ "synthetic_unicode_7500_binary", 4249, -1, 0, 692, 0, 0, 0, "ufbxi_warnf_imp(pool->warnings, UFBX_WARNING_BAD_UNICOD..." },
+	{ "synthetic_unicode_7500_binary", 4256, -1, 0, 13, 0, 0, 0, "ufbxi_grow_array_size((pool->map.ator), sizeof(**(&pool..." },
+	{ "synthetic_unicode_7500_binary", 4256, -1, 0, 694, 0, 0, 0, "ufbxi_grow_array_size((pool->map.ator), sizeof(**(&pool..." },
+	{ "synthetic_unicode_7500_binary", 4352, -1, 0, 1141, 0, 0, 0, "ufbxi_map_grow_size((&pool->map), sizeof(ufbx_string), ..." },
+	{ "synthetic_unicode_7500_binary", 4363, -1, 0, 12, 0, 0, 0, "ufbxi_sanitize_string(pool, sanitized, str, length, val..." },
+	{ "synthetic_unicode_7500_binary", 4363, -1, 0, 692, 0, 0, 0, "ufbxi_sanitize_string(pool, sanitized, str, length, val..." },
+	{ "synthetic_unicode_error_identity_6100_binary", 4265, -1, 0, 3069, 0, 0, 0, "ufbxi_grow_array_size((pool->map.ator), sizeof(**(&pool..." },
+	{ "synthetic_unicode_error_identity_6100_binary", 4265, -1, 0, 713, 0, 0, 0, "ufbxi_grow_array_size((pool->map.ator), sizeof(**(&pool..." },
+	{ "synthetic_unicode_error_identity_6100_binary", 4406, -1, 0, 3067, 0, 0, 0, "ufbxi_sanitize_string(pool, &sanitized, str, length, va..." },
+	{ "synthetic_unicode_error_identity_6100_binary", 4406, -1, 0, 712, 0, 0, 0, "ufbxi_sanitize_string(pool, &sanitized, str, length, va..." },
+	{ "zbrush_d20_6100_binary", 10563, -1, 0, 3522, 0, 0, 0, "conn" },
+	{ "zbrush_d20_6100_binary", 10563, -1, 0, 888, 0, 0, 0, "conn" },
+	{ "zbrush_d20_6100_binary", 10964, -1, 0, 3526, 0, 0, 0, "shape" },
+	{ "zbrush_d20_6100_binary", 10964, -1, 0, 890, 0, 0, 0, "shape" },
+	{ "zbrush_d20_6100_binary", 10972, 25242, 2, 0, 0, 0, 0, "vertices->size % 3 == 0" },
+	{ "zbrush_d20_6100_binary", 10973, 25217, 0, 0, 0, 0, 0, "indices->size == vertices->size / 3" },
+	{ "zbrush_d20_6100_binary", 10986, 25290, 2, 0, 0, 0, 0, "normals && normals->size == vertices->size" },
+	{ "zbrush_d20_6100_binary", 11032, 25189, 0, 0, 0, 0, 0, "ufbxi_get_val1(n, \"S\", &name)" },
+	{ "zbrush_d20_6100_binary", 11036, -1, 0, 3502, 0, 0, 0, "deformer" },
+	{ "zbrush_d20_6100_binary", 11036, -1, 0, 880, 0, 0, 0, "deformer" },
+	{ "zbrush_d20_6100_binary", 11037, -1, 0, 3511, 0, 0, 0, "ufbxi_connect_oo(uc, deformer_fbx_id, info->fbx_id)" },
+	{ "zbrush_d20_6100_binary", 11037, -1, 0, 884, 0, 0, 0, "ufbxi_connect_oo(uc, deformer_fbx_id, info->fbx_id)" },
+	{ "zbrush_d20_6100_binary", 11042, -1, 0, 3513, 0, 0, 0, "channel" },
+	{ "zbrush_d20_6100_binary", 11042, -1, 0, 885, 0, 0, 0, "channel" },
+	{ "zbrush_d20_6100_binary", 11045, -1, 0, 3520, 0, 0, 0, "((ufbx_real_list*)ufbxi_push_size_copy((&uc->tmp_full_w..." },
+	{ "zbrush_d20_6100_binary", 11045, -1, 0, 887, 0, 0, 0, "((ufbx_real_list*)ufbxi_push_size_copy((&uc->tmp_full_w..." },
+	{ "zbrush_d20_6100_binary", 11049, -1, 0, 0, 101, 0, 0, "shape_props" },
+	{ "zbrush_d20_6100_binary", 11049, -1, 0, 0, 202, 0, 0, "shape_props" },
+	{ "zbrush_d20_6100_binary", 11061, -1, 0, 3522, 0, 0, 0, "ufbxi_connect_pp(uc, info->fbx_id, channel_fbx_id, name..." },
+	{ "zbrush_d20_6100_binary", 11061, -1, 0, 888, 0, 0, 0, "ufbxi_connect_pp(uc, info->fbx_id, channel_fbx_id, name..." },
+	{ "zbrush_d20_6100_binary", 11072, -1, 0, 3524, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &shape_info.fbx_id)" },
+	{ "zbrush_d20_6100_binary", 11072, -1, 0, 889, 0, 0, 0, "ufbxi_push_synthetic_id(uc, &shape_info.fbx_id)" },
+	{ "zbrush_d20_6100_binary", 11076, 25217, 0, 0, 0, 0, 0, "ufbxi_read_shape(uc, n, &shape_info)" },
+	{ "zbrush_d20_6100_binary", 11078, -1, 0, 3535, 0, 0, 0, "ufbxi_connect_oo(uc, channel_fbx_id, deformer_fbx_id)" },
+	{ "zbrush_d20_6100_binary", 11078, -1, 0, 894, 0, 0, 0, "ufbxi_connect_oo(uc, channel_fbx_id, deformer_fbx_id)" },
+	{ "zbrush_d20_6100_binary", 11079, -1, 0, 3537, 0, 0, 0, "ufbxi_connect_oo(uc, shape_info.fbx_id, channel_fbx_id)" },
+	{ "zbrush_d20_6100_binary", 11079, -1, 0, 895, 0, 0, 0, "ufbxi_connect_oo(uc, shape_info.fbx_id, channel_fbx_id)" },
+	{ "zbrush_d20_6100_binary", 11201, -1, 0, 0, 136, 0, 0, "ids" },
+	{ "zbrush_d20_6100_binary", 11201, -1, 0, 0, 68, 0, 0, "ids" },
+	{ "zbrush_d20_6100_binary", 11237, -1, 0, 0, 138, 0, 0, "groups" },
+	{ "zbrush_d20_6100_binary", 11237, -1, 0, 0, 69, 0, 0, "groups" },
+	{ "zbrush_d20_6100_binary", 11352, 25189, 0, 0, 0, 0, 0, "ufbxi_read_synthetic_blend_shapes(uc, node, info)" },
+	{ "zbrush_d20_6100_binary", 11561, 8305, 32, 0, 0, 0, 0, "ufbxi_find_val1(n, ufbxi_MappingInformationType, \"c\",..." },
+	{ "zbrush_d20_6100_binary", 11563, 8394, 33, 0, 0, 0, 0, "ufbxi_read_truncated_array(uc, &mesh->face_group.data, ..." },
+	{ "zbrush_d20_6100_binary", 11680, -1, 0, 0, 136, 0, 0, "ufbxi_assign_face_groups(&uc->result, &uc->error, mesh,..." },
+	{ "zbrush_d20_6100_binary", 11680, -1, 0, 0, 68, 0, 0, "ufbxi_assign_face_groups(&uc->result, &uc->error, mesh,..." },
+	{ "zbrush_d20_6100_binary", 15978, -1, 0, 1405, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "zbrush_d20_6100_binary", 15978, -1, 0, 5293, 0, 0, 0, "((ufbx_element**)ufbxi_push_size_copy((&uc->tmp_stack),..." },
+	{ "zbrush_d20_6100_binary", 15986, -1, 0, 0, 267, 0, 0, "list->data" },
+	{ "zbrush_d20_6100_binary", 15986, -1, 0, 0, 534, 0, 0, "list->data" },
+	{ "zbrush_d20_6100_binary", 15999, -1, 0, 1398, 0, 0, 0, "((ufbx_blend_keyframe*)ufbxi_push_size_copy((&uc->tmp_s..." },
+	{ "zbrush_d20_6100_binary", 15999, -1, 0, 5275, 0, 0, 0, "((ufbx_blend_keyframe*)ufbxi_push_size_copy((&uc->tmp_s..." },
+	{ "zbrush_d20_6100_binary", 16006, -1, 0, 0, 258, 0, 0, "list->data" },
+	{ "zbrush_d20_6100_binary", 16006, -1, 0, 0, 516, 0, 0, "list->data" },
+	{ "zbrush_d20_6100_binary", 16101, -1, 0, 5325, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "zbrush_d20_6100_binary", 16136, -1, 0, 5277, 0, 0, 0, "ufbxi_grow_array_size((&uc->ator_tmp), sizeof(**(&uc->t..." },
+	{ "zbrush_d20_6100_binary", 18272, -1, 0, 1395, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &blend->channels, &blend->..." },
+	{ "zbrush_d20_6100_binary", 18272, -1, 0, 5267, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &blend->channels, &blend->..." },
+	{ "zbrush_d20_6100_binary", 18302, -1, 0, 1397, 0, 0, 0, "full_weights" },
+	{ "zbrush_d20_6100_binary", 18302, -1, 0, 5273, 0, 0, 0, "full_weights" },
+	{ "zbrush_d20_6100_binary", 18307, -1, 0, 1398, 0, 0, 0, "ufbxi_fetch_blend_keyframes(uc, &channel->keyframes, &c..." },
+	{ "zbrush_d20_6100_binary", 18307, -1, 0, 5275, 0, 0, 0, "ufbxi_fetch_blend_keyframes(uc, &channel->keyframes, &c..." },
+	{ "zbrush_d20_6100_binary", 18318, -1, 0, 5277, 0, 0, 0, "ufbxi_sort_blend_keyframes(uc, channel->keyframes.data,..." },
+	{ "zbrush_d20_6100_binary", 18429, -1, 0, 1404, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &mesh->blend_deformers, &m..." },
+	{ "zbrush_d20_6100_binary", 18429, -1, 0, 5291, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &mesh->blend_deformers, &m..." },
+	{ "zbrush_d20_6100_binary", 18431, -1, 0, 1405, 0, 0, 0, "ufbxi_fetch_deformers(uc, &mesh->all_deformers, &mesh->..." },
+	{ "zbrush_d20_6100_binary", 18431, -1, 0, 5293, 0, 0, 0, "ufbxi_fetch_deformers(uc, &mesh->all_deformers, &mesh->..." },
+	{ "zbrush_d20_6100_binary", 18670, -1, 0, 1410, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &textures, &mesh->element,..." },
+	{ "zbrush_d20_6100_binary", 18670, -1, 0, 5305, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &textures, &mesh->element,..." },
+	{ "zbrush_d20_6100_binary", 18700, -1, 0, 1411, 0, 0, 0, "mat_tex" },
+	{ "zbrush_d20_6100_binary", 18700, -1, 0, 5307, 0, 0, 0, "mat_tex" },
+	{ "zbrush_d20_6100_binary", 18734, -1, 0, 0, 273, 0, 0, "texs" },
+	{ "zbrush_d20_6100_binary", 18734, -1, 0, 0, 546, 0, 0, "texs" },
+	{ "zbrush_d20_6100_binary", 18753, -1, 0, 1414, 0, 0, 0, "tex" },
+	{ "zbrush_d20_6100_binary", 18753, -1, 0, 5314, 0, 0, 0, "tex" },
+	{ "zbrush_d20_6100_binary", 18780, -1, 0, 5325, 0, 0, 0, "ufbxi_sort_videos_by_filename(uc, content_videos, num_c..." },
+	{ "zbrush_d20_7500_ascii", 12276, -1, 0, 0, 256, 0, 0, "ufbxi_read_embedded_blob(uc, &video->content, content_n..." },
+	{ "zbrush_d20_7500_ascii", 12276, -1, 0, 0, 512, 0, 0, "ufbxi_read_embedded_blob(uc, &video->content, content_n..." },
+	{ "zbrush_d20_7500_ascii", 8398, -1, 0, 1476, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, c)" },
+	{ "zbrush_d20_7500_ascii", 8398, -1, 0, 5630, 0, 0, 0, "ufbxi_ascii_push_token_char(uc, token, c)" },
+	{ "zbrush_d20_7500_ascii", 9997, -1, 0, 0, 256, 0, 0, "dst_blob->data" },
+	{ "zbrush_d20_7500_ascii", 9997, -1, 0, 0, 512, 0, 0, "dst_blob->data" },
+	{ "zbrush_d20_7500_binary", 11959, -1, 0, 1059, 0, 0, 0, "channel" },
+	{ "zbrush_d20_7500_binary", 11959, -1, 0, 4179, 0, 0, 0, "channel" },
+	{ "zbrush_d20_7500_binary", 11967, -1, 0, 1063, 0, 0, 0, "((ufbx_real_list*)ufbxi_push_size_copy((&uc->tmp_full_w..." },
+	{ "zbrush_d20_7500_binary", 11967, -1, 0, 4188, 0, 0, 0, "((ufbx_real_list*)ufbxi_push_size_copy((&uc->tmp_full_w..." },
+	{ "zbrush_d20_7500_binary", 12631, 32981, 0, 0, 0, 0, 0, "ufbxi_read_shape(uc, node, &info)" },
+	{ "zbrush_d20_7500_binary", 12651, -1, 0, 1047, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_blend_d..." },
+	{ "zbrush_d20_7500_binary", 12651, -1, 0, 4144, 0, 0, 0, "ufbxi_read_element(uc, node, &info, sizeof(ufbx_blend_d..." },
+	{ "zbrush_d20_7500_binary", 12653, -1, 0, 1059, 0, 0, 0, "ufbxi_read_blend_channel(uc, node, &info)" },
+	{ "zbrush_d20_7500_binary", 12653, -1, 0, 4179, 0, 0, 0, "ufbxi_read_blend_channel(uc, node, &info)" },
+	{ "zbrush_d20_selection_set_6100_binary", 12376, -1, 0, 1289, 0, 0, 0, "set" },
+	{ "zbrush_d20_selection_set_6100_binary", 12376, -1, 0, 4773, 0, 0, 0, "set" },
+	{ "zbrush_d20_selection_set_6100_binary", 12393, -1, 0, 3786, 0, 0, 0, "sel" },
+	{ "zbrush_d20_selection_set_6100_binary", 12393, -1, 0, 969, 0, 0, 0, "sel" },
+	{ "zbrush_d20_selection_set_6100_binary", 12683, -1, 0, 1289, 0, 0, 0, "ufbxi_read_selection_set(uc, node, &info)" },
+	{ "zbrush_d20_selection_set_6100_binary", 12683, -1, 0, 4773, 0, 0, 0, "ufbxi_read_selection_set(uc, node, &info)" },
+	{ "zbrush_d20_selection_set_6100_binary", 12690, -1, 0, 3786, 0, 0, 0, "ufbxi_read_selection_node(uc, node, &info)" },
+	{ "zbrush_d20_selection_set_6100_binary", 12690, -1, 0, 969, 0, 0, 0, "ufbxi_read_selection_node(uc, node, &info)" },
+	{ "zbrush_d20_selection_set_6100_binary", 18872, -1, 0, 2190, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &set->nodes, &set->element..." },
+	{ "zbrush_d20_selection_set_6100_binary", 18872, -1, 0, 7782, 0, 0, 0, "ufbxi_fetch_dst_elements(uc, &set->nodes, &set->element..." },
+	{ "zbrush_polygroup_mess_0_obj", 11317, -1, 0, 0, 2036, 0, 0, "face_indices" },
+	{ "zbrush_polygroup_mess_0_obj", 11317, -1, 0, 0, 4072, 0, 0, "face_indices" },
+	{ "zbrush_polygroup_mess_0_obj", 14843, -1, 0, 0, 2033, 0, 0, "fbx_mesh->face_group.data" },
+	{ "zbrush_polygroup_mess_0_obj", 14843, -1, 0, 0, 4066, 0, 0, "fbx_mesh->face_group.data" },
+	{ "zbrush_polygroup_mess_0_obj", 14901, -1, 0, 0, 2036, 0, 0, "ufbxi_update_face_groups(&uc->result, &uc->error, fbx_m..." },
+	{ "zbrush_polygroup_mess_0_obj", 14901, -1, 0, 0, 4072, 0, 0, "ufbxi_update_face_groups(&uc->result, &uc->error, fbx_m..." },
+	{ "zbrush_vertex_color_obj", 14030, -1, 0, 0, 11, 0, 0, "color_set" },
+	{ "zbrush_vertex_color_obj", 14030, -1, 0, 0, 22, 0, 0, "color_set" },
+	{ "zbrush_vertex_color_obj", 14602, -1, 0, 26, 0, 0, 0, "p_rgba && p_valid" },
+	{ "zbrush_vertex_color_obj", 14602, -1, 0, 810, 0, 0, 0, "p_rgba && p_valid" },
+	{ "zbrush_vertex_color_obj", 14744, -1, 0, 1002, 0, 0, 0, "((ufbx_real*)ufbxi_push_size_zero((&uc->obj.tmp_vertice..." },
+	{ "zbrush_vertex_color_obj", 14744, -1, 0, 70, 0, 0, 0, "((ufbx_real*)ufbxi_push_size_zero((&uc->obj.tmp_vertice..." },
+	{ "zbrush_vertex_color_obj", 14745, -1, 0, 1004, 0, 0, 0, "((_Bool*)ufbxi_push_size_zero((&uc->obj.tmp_color_valid..." },
+	{ "zbrush_vertex_color_obj", 14759, -1, 0, 1002, 0, 0, 0, "ufbxi_obj_pad_colors(uc, uc->obj.vertex_count[UFBXI_OBJ..." },
+	{ "zbrush_vertex_color_obj", 14759, -1, 0, 70, 0, 0, 0, "ufbxi_obj_pad_colors(uc, uc->obj.vertex_count[UFBXI_OBJ..." },
+	{ "zbrush_vertex_color_obj", 14818, -1, 0, 0, 0, 880, 0, "min_ix < 0xffffffffffffffffui64" },
+	{ "zbrush_vertex_color_obj", 14819, -1, 0, 0, 4, 0, 0, "ufbxi_obj_pop_vertices(uc, &vertices[UFBXI_OBJ_ATTRIB_C..." },
+	{ "zbrush_vertex_color_obj", 14819, -1, 0, 0, 8, 0, 0, "ufbxi_obj_pop_vertices(uc, &vertices[UFBXI_OBJ_ATTRIB_C..." },
+	{ "zbrush_vertex_color_obj", 14821, -1, 0, 1007, 0, 0, 0, "color_valid" },
+	{ "zbrush_vertex_color_obj", 14821, -1, 0, 72, 0, 0, 0, "color_valid" },
+	{ "zbrush_vertex_color_obj", 14977, -1, 0, 26, 0, 0, 0, "ufbxi_obj_parse_comment(uc)" },
+	{ "zbrush_vertex_color_obj", 14977, -1, 0, 810, 0, 0, 0, "ufbxi_obj_parse_comment(uc)" },
+	{ "zbrush_vertex_color_obj", 15090, -1, 0, 1035, 0, 0, 0, "ufbxi_obj_parse_prop(uc, ufbxi_str_c(\"obj|args\"), 1, ..." },
+	{ "zbrush_vertex_color_obj", 15090, -1, 0, 75, 0, 0, 0, "ufbxi_obj_parse_prop(uc, ufbxi_str_c(\"obj|args\"), 1, ..." },
+	{ "zbrush_vertex_color_obj", 15108, -1, 0, 1042, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &tex_str,..." },
+	{ "zbrush_vertex_color_obj", 15109, -1, 0, 1043, 0, 0, 0, "ufbxi_push_string_place_blob(&uc->string_pool, &tex_raw..." },
+	{ "zbrush_vertex_color_obj", 15113, -1, 0, 1044, 0, 0, 0, "texture" },
+	{ "zbrush_vertex_color_obj", 15113, -1, 0, 76, 0, 0, 0, "texture" },
+	{ "zbrush_vertex_color_obj", 15122, -1, 0, 0, 17, 0, 0, "ufbxi_obj_pop_props(uc, &texture->props.props, num_prop..." },
+	{ "zbrush_vertex_color_obj", 15122, -1, 0, 0, 34, 0, 0, "ufbxi_obj_pop_props(uc, &texture->props.props, num_prop..." },
+	{ "zbrush_vertex_color_obj", 15128, -1, 0, 0, 18, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prop, 0)" },
+	{ "zbrush_vertex_color_obj", 15128, -1, 0, 1053, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prop, 0)" },
+	{ "zbrush_vertex_color_obj", 15131, -1, 0, 1055, 0, 0, 0, "ufbxi_connect_op(uc, fbx_id, uc->obj.usemtl_fbx_id, pro..." },
+	{ "zbrush_vertex_color_obj", 15131, -1, 0, 80, 0, 0, 0, "ufbxi_connect_op(uc, fbx_id, uc->obj.usemtl_fbx_id, pro..." },
+	{ "zbrush_vertex_color_obj", 15153, -1, 0, 1035, 0, 0, 0, "ufbxi_obj_parse_mtl_map(uc, 4)" },
+	{ "zbrush_vertex_color_obj", 15153, -1, 0, 75, 0, 0, 0, "ufbxi_obj_parse_mtl_map(uc, 4)" },
 };
 
 typedef struct {
@@ -1212,20 +2061,76 @@ static bool ufbxt_fuzz_should_skip(int iter)
 	}
 }
 
-void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progress_calls, const char *base_name, void *data, size_t size, const char *filename)
+typedef struct {
+	uint64_t calls;
+} ufbxt_progress_ctx;
+
+ufbx_progress_result ufbxt_measure_progress(void *user, const ufbx_progress *progress)
 {
+	ufbxt_progress_ctx *ctx = (ufbxt_progress_ctx*)user;
+	ctx->calls++;
+	return UFBX_PROGRESS_CONTINUE;
+}
+
+void ufbxt_do_fuzz(const char *base_name, void *data, size_t size, const char *filename, bool allow_error, ufbx_file_format file_format, const ufbx_load_opts *default_opts)
+{
+	if (g_no_fuzz) return;
+
+	size_t temp_allocs = 1000;
+	size_t result_allocs = 500;
+	size_t progress_calls = 100;
+
+	{
+		ufbxt_progress_ctx progress_ctx = { 0 };
+
+		bool temp_freed = false, result_freed = false;
+
+		ufbx_load_opts prog_opts = { 0 };
+		if (default_opts) {
+			prog_opts = *default_opts;
+		}
+
+		ufbxt_init_allocator(&prog_opts.temp_allocator, &temp_freed);
+		ufbxt_init_allocator(&prog_opts.result_allocator, &result_freed);
+		prog_opts.load_external_files = true;
+		prog_opts.filename.data = filename;
+		prog_opts.filename.length = SIZE_MAX;
+		prog_opts.file_format = file_format;
+		prog_opts.read_buffer_size = 1;
+		prog_opts.temp_allocator.huge_threshold = 1;
+		prog_opts.result_allocator.huge_threshold = 1;
+		prog_opts.progress_cb.fn = &ufbxt_measure_progress;
+		prog_opts.progress_cb.user = &progress_ctx;
+		prog_opts.progress_interval_hint = 1;
+
+		ufbx_error prog_error;
+		ufbx_scene *prog_scene = ufbx_load_memory(data, size, &prog_opts, &prog_error);
+		if (!allow_error) {
+			if (!prog_scene) {
+				ufbxt_log_error(&prog_error);
+			}
+			ufbxt_assert(prog_scene);
+		}
+
+		if (prog_scene) {
+			progress_calls = (size_t)progress_ctx.calls;
+			temp_allocs = prog_scene->metadata.temp_allocs + 10;
+			result_allocs = prog_scene->metadata.result_allocs + 10;
+
+			ufbx_free_scene(prog_scene);
+		}
+
+		ufbxt_assert(temp_freed);
+		ufbxt_assert(result_freed);
+	}
+
 	if (g_fuzz) {
+		uint64_t begin = cputime_os_tick();
+
 		size_t fail_step = 0;
 		int i;
 
 		g_fuzz_test_name = base_name;
-
-		size_t temp_allocs = 1000;
-		size_t result_allocs = 500;
-		if (streamed_scene) {
-			temp_allocs = streamed_scene->metadata.temp_allocs + 10;
-			result_allocs = streamed_scene->metadata.result_allocs + 10;
-		}
 
 		#pragma omp parallel for schedule(dynamic, 4)
 		for (i = 0; i < (int)temp_allocs; i++) {
@@ -1239,7 +2144,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 			size_t step = 10000000 + (size_t)i;
 
-			if (!ufbxt_test_fuzz(filename, data, size, step, -1, (size_t)i, 0, 0, 0)) fail_step = step;
+			if (!ufbxt_test_fuzz(filename, data, size, default_opts, step, -1, (size_t)i, 0, 0, 0)) fail_step = step;
 		}
 
 		fprintf(stderr, "\rFuzzing temp limit %s: %d/%d\n", base_name, (int)temp_allocs, (int)temp_allocs);
@@ -1256,7 +2161,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 			size_t step = 20000000 + (size_t)i;
 
-			if (!ufbxt_test_fuzz(filename, data, size, step, -1, 0, (size_t)i, 0, 0)) fail_step = step;
+			if (!ufbxt_test_fuzz(filename, data, size, default_opts, step, -1, 0, (size_t)i, 0, 0)) fail_step = step;
 		}
 
 		fprintf(stderr, "\rFuzzing result limit %s: %d/%d\n", base_name, (int)result_allocs, (int)result_allocs);
@@ -1274,7 +2179,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 				size_t step = 30000000 + (size_t)i;
 
-				if (!ufbxt_test_fuzz(filename, data, size, step, -1, 0, 0, (size_t)i, 0)) fail_step = step;
+				if (!ufbxt_test_fuzz(filename, data, size, default_opts, step, -1, 0, 0, (size_t)i, 0)) fail_step = step;
 			}
 
 			fprintf(stderr, "\rFuzzing truncate %s: %d/%d\n", base_name, (int)size, (int)size);
@@ -1293,7 +2198,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 				size_t step = 40000000 + (size_t)i;
 
-				if (!ufbxt_test_fuzz(filename, data, size, step, -1, 0, 0, 0, (size_t)i+1)) fail_step = step;
+				if (!ufbxt_test_fuzz(filename, data, size, default_opts, step, -1, 0, 0, 0, (size_t)i+1)) fail_step = step;
 			}
 
 			fprintf(stderr, "\rFuzzing cancel %s: %d/%d\n", base_name, (int)size, (int)size);
@@ -1333,23 +2238,23 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 				if (g_all_byte_values) {
 					for (uint32_t v = 0; v < 256; v++) {
 						data_u8[i] = (uint8_t)v;
-						if (!ufbxt_test_fuzz(filename, data_u8, size, step + v, i, 0, 0, 0, 0)) fail_step = step + v;
+						if (!ufbxt_test_fuzz(filename, data_u8, size, default_opts, step + v, i, 0, 0, 0, 0)) fail_step = step + v;
 					}
 				} else {
 					data_u8[i] = original + 1;
-					if (!ufbxt_test_fuzz(filename, data_u8, size, step + 1, i, 0, 0, 0, 0)) fail_step = step + 1;
+					if (!ufbxt_test_fuzz(filename, data_u8, size, default_opts, step + 1, i, 0, 0, 0, 0)) fail_step = step + 1;
 
 					data_u8[i] = original - 1;
-					if (!ufbxt_test_fuzz(filename, data_u8, size, step + 2, i, 0, 0, 0, 0)) fail_step = step + 2;
+					if (!ufbxt_test_fuzz(filename, data_u8, size, default_opts, step + 2, i, 0, 0, 0, 0)) fail_step = step + 2;
 
 					if (original != 0) {
 						data_u8[i] = 0;
-						if (!ufbxt_test_fuzz(filename, data_u8, size, step + 3, i, 0, 0, 0, 0)) fail_step = step + 3;
+						if (!ufbxt_test_fuzz(filename, data_u8, size, default_opts, step + 3, i, 0, 0, 0, 0)) fail_step = step + 3;
 					}
 
 					if (original != 0xff) {
 						data_u8[i] = 0xff;
-						if (!ufbxt_test_fuzz(filename, data_u8, size, step + 4, i, 0, 0, 0, 0)) fail_step = step + 4;
+						if (!ufbxt_test_fuzz(filename, data_u8, size, default_opts, step + 4, i, 0, 0, 0, 0)) fail_step = step + 4;
 					}
 				}
 
@@ -1367,6 +2272,10 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 		ufbxt_hintf("Fuzz failed on step: %zu", fail_step);
 		ufbxt_assert(fail_step == 0);
+
+		uint64_t end = cputime_os_tick();
+		fprintf(stderr, ".. fuzzing done in %.2fs (quality=%d)\n", cputime_os_delta_to_sec(NULL, end - begin), g_fuzz_quality);
+
 	} else {
 		uint8_t *data_u8 = (uint8_t*)data;
 
@@ -1385,6 +2294,10 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 
 			ufbx_load_opts opts = { 0 };
 			ufbxt_cancel_ctx cancel_ctx = { 0 };
+
+			if (default_opts) {
+				opts = *default_opts;
+			}
 
 			opts.load_external_files = true;
 			opts.filename.data = filename;
@@ -1436,7 +2349,7 @@ void ufbxt_do_fuzz(ufbx_scene *scene, ufbx_scene *streamed_scene, size_t progres
 	}
 }
 
-const uint32_t ufbxt_file_versions[] = { 3000, 5000, 5800, 6100, 7100, 7200, 7300, 7400, 7500, 7700 };
+const uint32_t ufbxt_file_versions[] = { 0, 1, 2, 3, 3000, 5000, 5800, 6100, 7100, 7200, 7300, 7400, 7500, 7700 };
 
 typedef struct ufbxt_file_iterator {
 	// Input
@@ -1459,17 +2372,25 @@ bool ufbxt_next_file(ufbxt_file_iterator *iter, char *buffer, size_t buffer_size
 		}
 
 		uint32_t version = ufbxt_file_versions[iter->version_ix];
-		const char *format = iter->format_ix == 1 ? "ascii" : "binary";
-		snprintf(buffer, buffer_size, "%s%s_%u_%s.fbx", iter->root ? iter->root : data_root, iter->path, version, format);
+		const char *format = "";
+		const char *ext = "fbx";
+		switch (iter->format_ix) {
+		case 0: format = "binary"; break;
+		case 1: format = "ascii"; break;
+		case 2: format = "mtl"; ext = "mtl"; break;
+		case 3: format = "obj"; ext = "obj"; break;
+		}
+		snprintf(buffer, buffer_size, "%s%s_%u_%s.%s", iter->root ? iter->root : data_root, iter->path, version, format, ext);
 
 		iter->format_ix++;
-		if (iter->format_ix >= 2) {
+		if (iter->format_ix >= 4) {
 			iter->format_ix = 0;
 			iter->version_ix++;
 		}
 
 		ufbx_stream stream = { 0 };
-		if (ufbx_open_file(NULL, &stream, buffer, SIZE_MAX)) {
+		if (ufbx_open_file(&stream, buffer, SIZE_MAX)) {
+			ufbxt_logf("%s", buffer);
 			if (stream.close_fn) {
 				stream.close_fn(stream.user);
 			}
@@ -1477,17 +2398,6 @@ bool ufbxt_next_file(ufbxt_file_iterator *iter, char *buffer, size_t buffer_size
 			return true;
 		}
 	}
-}
-
-typedef struct {
-	uint64_t calls;
-} ufbxt_progress_ctx;
-
-ufbx_progress_result ufbxt_measure_progress(void *user, const ufbx_progress *progress)
-{
-	ufbxt_progress_ctx *ctx = (ufbxt_progress_ctx*)user;
-	ctx->calls++;
-	return UFBX_PROGRESS_CONTINUE;
 }
 
 typedef enum ufbxt_file_test_flags {
@@ -1500,6 +2410,35 @@ typedef enum ufbxt_file_test_flags {
 
 	// Allow invalid Unicode in the file.
 	UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE = 0x4,
+
+	// This test is heavy to fuzz and is fuzzed with lower quality, use `--heavy-fuzz-quality` to control it.
+	UFBXT_FILE_TEST_FLAG_HEAVY_TO_FUZZ = 0x8,
+
+	// Allow scene loading to fail if `ufbx_load_opts.strict` is specified.
+	UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR = 0x10,
+
+	// Skip tests with various `ufbx_load_opts`.
+	// Useful if the file isn't particularly interesting but has a lot of content.
+	UFBXT_FILE_TEST_FLAG_SKIP_LOAD_OPTS_CHECKS = 0x20,
+
+	// Fuzz even if being an alternative test
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS = 0x40,
+
+	// Pass user_opts to the fuzzer
+	UFBXT_FILE_TEST_FLAG_FUZZ_OPTS = 0x80,
+
+	// Diff even if being an alternative test
+	UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS = 0x100,
+
+	// Expect the diff to fail
+	UFBXT_FILE_TEST_FLAG_DIFF_EXPECT_FAIL = 0x200,
+
+	// Expect the diff to fail for version >= 7000 files
+	UFBXT_FILE_TEST_FLAG_DIFF_EXPECT_FAIL_POST_7000 = 0x400,
+
+	// Ignore normals when doing diff to .obj when testing with various
+	// `ufbx_load_opts.geometry_transform_handling` values.
+	UFBXT_FILE_TEST_FLAG_OPT_HANDLING_IGNORE_NORMALS_IN_DIFF = 0x800,
 } ufbxt_file_test_flags;
 
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err, ufbx_error *load_error), const char *suffix, ufbx_load_opts user_opts, ufbxt_file_test_flags flags)
@@ -1511,28 +2450,86 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	ufbxt_obj_file *obj_file = obj_data ? ufbxt_load_obj(obj_data, obj_size, NULL) : NULL;
 	free(obj_data);
 
-	if (obj_file) {
-		ufbxt_logf("%s [diff target found]", buf);
+	// Override g_fuzz_quality if necessary
+	int prev_fuzz_quality = -1;
+	if (flags & UFBXT_FILE_TEST_FLAG_HEAVY_TO_FUZZ) {
+		prev_fuzz_quality = g_fuzz_quality;
+		g_fuzz_quality = g_heavy_fuzz_quality;
 	}
 
 	char base_name[512];
 
+	bool allow_error = (flags & UFBXT_FILE_TEST_FLAG_ALLOW_ERROR) != 0;
+	bool alternative = (flags & UFBXT_FILE_TEST_FLAG_ALTERNATIVE) != 0;
+	bool allow_strict_error = (flags & UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR) != 0;
+	bool skip_opts_checks = (flags & UFBXT_FILE_TEST_FLAG_SKIP_LOAD_OPTS_CHECKS) != 0;
+	bool fuzz_always = (flags & UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS) != 0;
+	bool diff_always = (flags & UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS) != 0;
+
+	const ufbx_load_opts *fuzz_opts = NULL;
+	if ((flags & UFBXT_FILE_TEST_FLAG_FUZZ_OPTS) != 0) {
+		fuzz_opts = &user_opts;
+	}
+
+	ufbx_scene *obj_scene = NULL;
+	if (obj_file) {
+		ufbxt_logf("%s [diff target found]", buf);
+	}
+
 	ufbxt_begin_fuzz();
+
+	if (obj_file && !g_skip_obj_test && !alternative) {
+		ufbx_load_opts obj_opts = { 0 };
+		obj_opts.load_external_files = true;
+
+		ufbx_error obj_error;
+		obj_scene = ufbx_load_file(buf, &obj_opts, &obj_error);
+		if (!obj_scene) {
+			ufbxt_log_error(&obj_error);
+			ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse .obj file");
+		}
+		ufbxt_assert(obj_scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ);
+		ufbxt_check_scene(obj_scene);
+
+		ufbxt_diff_error err = { 0 };
+		ufbxt_diff_to_obj(obj_scene, obj_file, &err, 0);
+		if (err.num > 0) {
+			ufbx_real avg = err.sum / (ufbx_real)err.num;
+			ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+		}
+
+		size_t size = 0;
+		void *data = ufbxt_read_file(buf, &size);
+		ufbxt_assert(data);
+
+		snprintf(base_name, sizeof(base_name), "%s_obj", name);
+		if (!alternative || fuzz_always) {
+			ufbxt_do_fuzz(base_name, data, size, buf, allow_error, UFBX_FILE_FORMAT_UNKNOWN, fuzz_opts);
+		}
+
+		free(data);
+	}
 
 	uint32_t num_opened = 0;
 
-	bool allow_error = (flags & UFBXT_FILE_TEST_FLAG_ALLOW_ERROR) != 0;
-	bool alternative = (flags & UFBXT_FILE_TEST_FLAG_ALTERNATIVE) != 0;
-
-	for (uint32_t vi = 0; vi < ufbxt_arraycount(ufbxt_file_versions); vi++) {
-		for (uint32_t fi = 0; fi < 2; fi++) {
+	for (uint32_t fi = 0; fi < 4; fi++) {
+		for (uint32_t vi = 0; vi < ufbxt_arraycount(ufbxt_file_versions); vi++) {
 			uint32_t version = ufbxt_file_versions[vi];
-			const char *format = fi == 1 ? "ascii" : "binary";
+			const char *format = NULL;
+			const char *ext = "fbx";
+			switch (fi) {
+			case 0: format = "binary"; break;
+			case 1: format = "ascii"; break;
+			case 2: format = "mtl"; ext = "mtl"; break;
+			case 3: format = "obj"; ext = "obj"; break;
+			}
+			ufbxt_assert(format);
+
 			if (suffix) {
-				snprintf(buf, sizeof(buf), "%s%s_%u_%s_%s.fbx", data_root, name, version, format, suffix);
+				snprintf(buf, sizeof(buf), "%s%s_%u_%s_%s.%s", data_root, name, version, format, suffix, ext);
 				snprintf(base_name, sizeof(base_name), "%s_%u_%s_%s", name, version, format, suffix);
 			} else {
-				snprintf(buf, sizeof(buf), "%s%s_%u_%s.fbx", data_root, name, version, format);
+				snprintf(buf, sizeof(buf), "%s%s_%u_%s.%s", data_root, name, version, format, ext);
 				snprintf(base_name, sizeof(base_name), "%s_%u_%s", name, version, format);
 			}
 
@@ -1542,6 +2539,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			size_t size = 0;
 			void *data = ufbxt_read_file(buf, &size);
 			if (!data) continue;
+
+			bool expect_diff_fail = (flags & UFBXT_FILE_TEST_FLAG_DIFF_EXPECT_FAIL) != 0;
+			if ((flags & UFBXT_FILE_TEST_FLAG_DIFF_EXPECT_FAIL_POST_7000) != 0 && version >= 7000) {
+				expect_diff_fail = true;
+			}
 
 			num_opened++;
 			ufbxt_logf("%s", buf);
@@ -1560,6 +2562,14 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			if (!load_opts.filename.length) {
 				load_opts.filename.data = buf;
 				load_opts.filename.length = SIZE_MAX;
+			}
+
+			if (fi < 2) {
+				load_opts.file_format = UFBX_FILE_FORMAT_FBX;
+			} else if (fi == 2) {
+				load_opts.file_format = UFBX_FILE_FORMAT_MTL;
+			} else if (fi == 3) {
+				load_opts.file_format = UFBX_FILE_FORMAT_OBJ;
 			}
 
 			ufbxt_progress_ctx progress_ctx = { 0 };
@@ -1587,6 +2597,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbx_load_opts stream_opts = load_opts;
 			ufbxt_init_allocator(&stream_opts.temp_allocator, &temp_freed);
 			ufbxt_init_allocator(&stream_opts.result_allocator, &result_freed);
+			stream_opts.file_format = UFBX_FILE_FORMAT_UNKNOWN;
 			stream_opts.read_buffer_size = 1;
 			stream_opts.temp_allocator.huge_threshold = 2;
 			stream_opts.result_allocator.huge_threshold = 2;
@@ -1604,13 +2615,15 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			ufbx_scene *streamed_scene = ufbx_load_file(buf, &stream_opts, &error);
 			if (streamed_scene) {
 				ufbxt_check_scene(streamed_scene);
+				ufbxt_assert(streamed_scene->dom_root);
+				ufbxt_assert(streamed_scene->metadata.file_format == load_opts.file_format);
 			} else if (!allow_error) {
 				ufbxt_log_error(&error);
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse streamed file");
 			}
 
 			// Try a couple of read buffer sizes
-			if (g_fuzz && !g_fuzz_no_buffer && g_fuzz_step == SIZE_MAX) {
+			if (g_fuzz && !g_fuzz_no_buffer && g_fuzz_step == SIZE_MAX && (!alternative || fuzz_always)) {
 				ufbxt_begin_fuzz();
 
 				int fail_sz = -1;
@@ -1658,66 +2671,109 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				} else {
 					fprintf(stderr, "\rFuzzing read buffer size %s: %d/%d\n", base_name, (int)size, (int)size);
 				}
-
 			}
 
 			// Ignore geometry, animations, and both
 
-			{
-				ufbx_error ignore_error;
-				ufbx_load_opts opts = load_opts;
-				opts.ignore_geometry = true;
-				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, &ignore_error);
-				if (ignore_scene) {
-					ufbxt_check_scene(ignore_scene);
-					ufbx_free_scene(ignore_scene);
-				} else if (!allow_error) {
-					ufbxt_log_error(&ignore_error);
-					ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file ignoring geometry");
+			if (!skip_opts_checks) {
+				{
+					ufbx_error ignore_error;
+					ufbx_load_opts opts = load_opts;
+					opts.ignore_geometry = true;
+					ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, &ignore_error);
+					if (ignore_scene) {
+						ufbxt_check_scene(ignore_scene);
+						ufbx_free_scene(ignore_scene);
+					} else if (!allow_error) {
+						ufbxt_log_error(&ignore_error);
+						ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file ignoring geometry");
+					}
 				}
-			}
 
-			{
-				ufbx_error ignore_error;
-				ufbx_load_opts opts = load_opts;
-				opts.ignore_animation = true;
-				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, &ignore_error);
-				if (ignore_scene) {
-					ufbxt_check_scene(ignore_scene);
-					ufbx_free_scene(ignore_scene);
-				} else if (!allow_error) {
-					ufbxt_log_error(&ignore_error);
-					ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file ignoring animation");
+				{
+					ufbx_error ignore_error;
+					ufbx_load_opts opts = load_opts;
+					opts.ignore_animation = true;
+					ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, &ignore_error);
+					if (ignore_scene) {
+						ufbxt_check_scene(ignore_scene);
+						ufbx_free_scene(ignore_scene);
+					} else if (!allow_error) {
+						ufbxt_log_error(&ignore_error);
+						ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file ignoring animation");
+					}
 				}
-			}
 
-			{
-				ufbx_error ignore_error;
-				ufbx_load_opts opts = load_opts;
-				opts.ignore_embedded = true;
-				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, &ignore_error);
-				if (ignore_scene) {
-					ufbxt_check_scene(ignore_scene);
-					ufbx_free_scene(ignore_scene);
-				} else if (!allow_error) {
-					ufbxt_log_error(&ignore_error);
-					ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file ignoring embedded files");
+				{
+					ufbx_error ignore_error;
+					ufbx_load_opts opts = load_opts;
+					opts.ignore_embedded = true;
+					ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, &ignore_error);
+					if (ignore_scene) {
+						ufbxt_check_scene(ignore_scene);
+						ufbx_free_scene(ignore_scene);
+					} else if (!allow_error) {
+						ufbxt_log_error(&ignore_error);
+						ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file ignoring embedded files");
+					}
 				}
-			}
 
-			{
-				ufbx_error ignore_error;
-				ufbx_load_opts opts = load_opts;
-				opts.ignore_geometry = true;
-				opts.ignore_animation = true;
-				opts.ignore_embedded = true;
-				ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, &ignore_error);
-				if (ignore_scene) {
-					ufbxt_check_scene(ignore_scene);
-					ufbx_free_scene(ignore_scene);
-				} else if (!allow_error) {
-					ufbxt_log_error(&ignore_error);
-					ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file ignoring everything");
+				{
+					ufbx_error ignore_error;
+					ufbx_load_opts opts = load_opts;
+					opts.ignore_geometry = true;
+					opts.ignore_animation = true;
+					opts.ignore_embedded = true;
+					ufbx_scene *ignore_scene = ufbx_load_memory(data, size, &opts, &ignore_error);
+					if (ignore_scene) {
+						ufbxt_check_scene(ignore_scene);
+						ufbx_free_scene(ignore_scene);
+					} else if (!allow_error) {
+						ufbxt_log_error(&ignore_error);
+						ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file ignoring everything");
+					}
+				}
+
+				// Strict mode
+				{
+					ufbx_load_opts strict_opts = load_opts;
+					strict_opts.disable_quirks = true;
+					strict_opts.strict = true;
+					strict_opts.no_format_from_content = true;
+					strict_opts.no_format_from_extension = true;
+
+					ufbx_error strict_error;
+					ufbx_scene *strict_scene = ufbx_load_file(buf, &strict_opts, &strict_error);
+					if (strict_scene) {
+						ufbxt_check_scene(strict_scene);
+						ufbxt_assert(strict_scene->metadata.file_format == load_opts.file_format);
+						ufbx_free_scene(strict_scene);
+					} else if (!allow_error && !allow_strict_error) {
+						ufbxt_log_error(&strict_error);
+						ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file with strict options");
+					}
+				}
+
+				// Loose mode
+				{
+					ufbx_load_opts loose_opts = load_opts;
+					loose_opts.allow_missing_vertex_position = true;
+					loose_opts.allow_nodes_out_of_root = true;
+					loose_opts.allow_null_material = true;
+					loose_opts.connect_broken_elements = true;
+					loose_opts.generate_missing_normals = true;
+					loose_opts.ignore_missing_external_files = true;
+
+					ufbx_error loose_error;
+					ufbx_scene *loose_scene = ufbx_load_file(buf, &loose_opts, &loose_error);
+					if (loose_scene) {
+						ufbxt_check_scene(loose_scene);
+						ufbxt_assert(loose_scene->metadata.file_format == load_opts.file_format);
+						ufbx_free_scene(loose_scene);
+					} else if (!allow_error) {
+						ufbxt_log_error(&loose_error);
+						ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file with loose options");
+					}
 				}
 			}
 
@@ -1731,8 +2787,15 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 					scene->metadata.result_allocs
 				);
 
-				ufbxt_assert(scene->metadata.ascii == ((fi == 1) ? 1 : 0));
-				ufbxt_assert(scene->metadata.version == version);
+				if (fi <= 1) {
+					ufbxt_assert(scene->metadata.file_format == UFBX_FILE_FORMAT_FBX);
+					ufbxt_assert(scene->metadata.ascii == ((fi == 1) ? 1 : 0));
+					ufbxt_assert(scene->metadata.version == version);
+				} else if (fi == 2) {
+					ufbxt_assert(scene->metadata.file_format == UFBX_FILE_FORMAT_MTL);
+				} else if (fi == 3) {
+					ufbxt_assert(scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ);
+				}
 
 				ufbxt_check_scene(scene);
 			}
@@ -1770,20 +2833,81 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			ufbxt_diff_error err = { 0 };
 
-			if (scene && obj_file && !alternative) {
-				ufbxt_diff_to_obj(scene, obj_file, &err, false);
+			size_t num_failing_diff_checks = 0;
+			if (scene && obj_file && (!alternative || diff_always)) {
+				if (expect_diff_fail) {
+					ufbxt_begin_expect_fail();
+					ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+					num_failing_diff_checks = ufbxt_end_expect_fail();
+				} else {
+					ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+				}
+			}
+
+			if (!skip_opts_checks) {
+				{
+					ufbx_error opt_error;
+					ufbx_load_opts opts = load_opts;
+					opts.geometry_transform_handling = UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES;
+					ufbx_scene *opt_scene = ufbx_load_memory(data, size, &opts, &opt_error);
+					if (opt_scene) {
+						ufbxt_check_scene(opt_scene);
+
+						if (scene && obj_file && (!alternative || diff_always) && !expect_diff_fail) {
+							uint32_t diff_flags = 0;
+							if ((flags & UFBXT_FILE_TEST_FLAG_OPT_HANDLING_IGNORE_NORMALS_IN_DIFF) != 0) {
+								diff_flags |= UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS;
+							}
+							ufbxt_diff_to_obj(opt_scene, obj_file, &err, diff_flags);
+						}
+
+						ufbx_free_scene(opt_scene);
+					} else if (!allow_error) {
+						ufbxt_log_error(&opt_error);
+						ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file with helper nodes");
+					}
+				}
+
+				{
+					ufbx_error opt_error;
+					ufbx_load_opts opts = load_opts;
+					opts.geometry_transform_handling = UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY;
+					ufbx_scene *opt_scene = ufbx_load_memory(data, size, &opts, &opt_error);
+					if (opt_scene) {
+						ufbxt_check_scene(opt_scene);
+
+						if (scene && obj_file && (!alternative || diff_always) && !expect_diff_fail) {
+							uint32_t diff_flags = 0;
+							if ((flags & UFBXT_FILE_TEST_FLAG_OPT_HANDLING_IGNORE_NORMALS_IN_DIFF) != 0) {
+								diff_flags |= UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS;
+							}
+							ufbxt_diff_to_obj(opt_scene, obj_file, &err, diff_flags);
+						}
+
+						ufbx_free_scene(opt_scene);
+					} else if (!allow_error) {
+						ufbxt_log_error(&opt_error);
+						ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file with modifying geometry");
+					}
+				}
 			}
 
 			test_fn(scene, &err, &error);
 
 			if (err.num > 0) {
 				ufbx_real avg = err.sum / (ufbx_real)err.num;
-				ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+				if (expect_diff_fail) {
+					ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests, %zu failing as expected)", avg, err.max, err.num, num_failing_diff_checks);
+				} else {
+					ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
+				}
 			}
 
-			if (!alternative && scene) {
-				ufbxt_do_fuzz(scene, streamed_scene, (size_t)stream_progress_ctx.calls, base_name, data, size, buf);
+			if (!alternative || fuzz_always) {
+				ufbxt_do_fuzz(base_name, data, size, buf, allow_error, UFBX_FILE_FORMAT_UNKNOWN, fuzz_opts);
+			}
 
+			if ((!alternative || fuzz_always) && scene && !g_no_fuzz) {
 				// Run known buffer size checks
 				for (size_t i = 0; i < ufbxt_arraycount(g_buffer_checks); i++) {
 					const ufbxt_buffer_check *check = &g_buffer_checks[i];
@@ -1818,7 +2942,56 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 		ufbxt_assert_fail(__FILE__, __LINE__, "File not found");
 	}
 
+	if (obj_scene) {
+		ufbx_free_scene(obj_scene);
+	}
+
 	free(obj_file);
+
+	if (prev_fuzz_quality > 0) {
+		g_fuzz_quality = prev_fuzz_quality;
+	}
+}
+
+typedef struct ufbxt_inflate_opts {
+	size_t fast_bits;
+	bool force_fast;
+	bool primary;
+} ufbxt_inflate_opts;
+
+void ufbxt_do_deflate_test(const char *name, void (*test_fn)(const ufbxt_inflate_opts *opts))
+{
+	size_t opt = 0;
+
+	{
+		ufbxt_inflate_opts opts = { 0 };
+		opts.primary = true;
+		if (g_deflate_opt == SIZE_MAX || opt == g_deflate_opt) {
+			ufbxt_logf("(opt %u) default", opt, opts.fast_bits);
+			test_fn(&opts);
+		}
+		opt++;
+	}
+
+	for (uint32_t fast_bits = 1; fast_bits <= 8; fast_bits++) {
+		ufbxt_inflate_opts opts = { 0 };
+		opts.fast_bits = fast_bits;
+		if (g_deflate_opt == SIZE_MAX || opt == g_deflate_opt) {
+			ufbxt_logf("(opt %u) fast_bits = %u", opt, fast_bits);
+			test_fn(&opts);
+		}
+		opt++;
+	}
+
+	{
+		ufbxt_inflate_opts opts = { 0 };
+		opts.force_fast = true;
+		if (g_deflate_opt == SIZE_MAX || opt == g_deflate_opt) {
+			ufbxt_logf("(opt %u) force_fast = true", opt);
+			test_fn(&opts);
+		}
+		opt++;
+	}
 }
 
 #define UFBXT_IMPL 1
@@ -1827,6 +3000,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	void ufbxt_test_fn_file_##name(void) { \
 	ufbx_load_opts user_opts = { 0 }; \
 	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name, NULL, user_opts, flags); } \
+	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
+#define UFBXT_FILE_TEST_PATH_FLAGS(name, path, flags) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
+	void ufbxt_test_fn_file_##name(void) { \
+	ufbx_load_opts user_opts = { 0 }; \
+	ufbxt_do_file_test(path, &ufbxt_test_fn_imp_file_##name, NULL, user_opts, flags); } \
 	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
 #define UFBXT_FILE_TEST_OPTS_FLAGS(name, get_opts, flags) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
 	void ufbxt_test_fn_file_##name(void) { \
@@ -1850,8 +3028,13 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	void ufbxt_test_fn_file_##name(void) { \
 	ufbxt_do_file_test(#file, &ufbxt_test_fn_imp_file_##name, NULL, get_opts(), flags | UFBXT_FILE_TEST_FLAG_ALTERNATIVE); } \
 	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
+#define UFBXT_DEFLATE_TEST(name) void ufbxt_test_fn_imp_deflate_##name(const ufbxt_inflate_opts *opts); \
+	void ufbxt_test_fn_deflate_##name(void) { \
+	ufbxt_do_deflate_test(#name, &ufbxt_test_fn_imp_deflate_##name); } \
+	void ufbxt_test_fn_imp_deflate_##name(const ufbxt_inflate_opts *opts)
 
 #define UFBXT_FILE_TEST(name) UFBXT_FILE_TEST_FLAGS(name, 0)
+#define UFBXT_FILE_TEST_PATH(name, path) UFBXT_FILE_TEST_PATH_FLAGS(name, path, 0)
 #define UFBXT_FILE_TEST_OPTS(name, get_opts) UFBXT_FILE_TEST_OPTS_FLAGS(name, get_opts, 0)
 #define UFBXT_FILE_TEST_SUFFIX(name, suffix) UFBXT_FILE_TEST_SUFFIX_FLAGS(name, suffix, 0)
 #define UFBXT_FILE_TEST_SUFFIX_OPTS(name, suffix, get_opts) UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS(name, suffix, get_opts, 0)
@@ -1863,22 +3046,49 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 #undef UFBXT_IMPL
 #undef UFBXT_TEST
 #undef UFBXT_FILE_TEST_FLAGS
+#undef UFBXT_FILE_TEST_PATH_FLAGS
 #undef UFBXT_FILE_TEST_OPTS_FLAGS
 #undef UFBXT_FILE_TEST_SUFFIX_FLAGS
 #undef UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS
 #undef UFBXT_FILE_TEST_ALT_FLAGS
 #undef UFBXT_FILE_TEST_OPTS_ALT_FLAGS
+#undef UFBXT_DEFLATE_TEST
 #define UFBXT_IMPL 0
-#define UFBXT_TEST(name) { #name, &ufbxt_test_fn_##name },
-#define UFBXT_FILE_TEST_FLAGS(name, flags) { #name, &ufbxt_test_fn_file_##name },
-#define UFBXT_FILE_TEST_OPTS_FLAGS(name, get_opts, flags) { #name, &ufbxt_test_fn_file_##name },
-#define UFBXT_FILE_TEST_SUFFIX_FLAGS(name, suffix, flags) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
-#define UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS(name, suffix, get_opts, flags) { #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
-#define UFBXT_FILE_TEST_ALT_FLAGS(name, file, flags) { #name, &ufbxt_test_fn_file_##name },
-#define UFBXT_FILE_TEST_OPTS_ALT_FLAGS(name, file, get_opts, flags) { #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_TEST(name) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_##name },
+#define UFBXT_FILE_TEST_FLAGS(name, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST_PATH_FLAGS(name, path, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST_OPTS_FLAGS(name, get_opts, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST_SUFFIX_FLAGS(name, suffix, flags) { UFBXT_TEST_GROUP, #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
+#define UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS(name, suffix, get_opts, flags) { UFBXT_TEST_GROUP, #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
+#define UFBXT_FILE_TEST_ALT_FLAGS(name, file, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_FILE_TEST_OPTS_ALT_FLAGS(name, file, get_opts, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
+#define UFBXT_DEFLATE_TEST(name) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_deflate_##name },
+
 ufbxt_test g_tests[] = {
 	#include "all_tests.h"
 };
+
+typedef struct {
+	const char *name;
+	uint32_t num_total;
+	uint32_t num_ran;
+	uint32_t num_ok;
+} ufbxt_test_stats;
+
+ufbxt_test_stats g_test_groups[ufbxt_arraycount(g_tests)];
+size_t g_num_groups = 0;
+
+ufbxt_test_stats *ufbxt_get_test_group(const char *name)
+{
+	for (size_t i = g_num_groups; i > 0; --i) {
+		ufbxt_test_stats *group = &g_test_groups[i - 1];
+		if (!strcmp(group->name, name)) return group;
+	}
+
+	ufbxt_test_stats *group = &g_test_groups[g_num_groups++];
+	group->name = name;
+	return group;
+}
 
 int ufbxt_run_test(ufbxt_test *test)
 {
@@ -1888,10 +3098,13 @@ int ufbxt_run_test(ufbxt_test *test)
 	g_error.stack_size = 0;
 	g_hint[0] = '\0';
 
+	g_expect_fail = false;
+
 	g_current_test = test;
 	if (!ufbxt_setjmp(g_test_jmp)) {
 		g_skip_print_ok = false;
 		test->func();
+		ufbxt_assert(!g_expect_fail);
 		if (!g_skip_print_ok) {
 			printf("OK\n");
 			fflush(stdout);
@@ -1909,24 +3122,29 @@ int ufbxt_run_test(ufbxt_test *test)
 	}
 }
 
+#if defined(UFBXT_STACK_LIMIT)
+int ufbxt_thread_main(int argc, char **argv)
+#else
 int main(int argc, char **argv)
+#endif
 {
 	uint32_t num_tests = ufbxt_arraycount(g_tests);
 	uint32_t num_ok = 0;
 	const char *test_filter = NULL;
+	const char *test_group = NULL;
 
 	cputime_init();
 
 	for (int i = 1; i < argc; i++) {
-		if (!strcmp(argv[i], "-v")) {
+		if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
 			g_verbose = 1;
 		}
-		if (!strcmp(argv[i], "-t")) {
+		if (!strcmp(argv[i], "-t") || !strcmp(argv[i], "--test")) {
 			if (++i < argc) {
 				test_filter = argv[i];
 			}
 		}
-		if (!strcmp(argv[i], "-d")) {
+		if (!strcmp(argv[i], "-d") || !strcmp(argv[i], "--data")) {
 			if (++i < argc) {
 				size_t len = strlen(argv[i]);
 				if (len + 2 > sizeof(data_root)) {
@@ -1941,9 +3159,18 @@ int main(int argc, char **argv)
 				}
 			}
 		}
-		if (!strcmp(argv[i], "-f")) {
+		if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "--format")) {
 			if (++i < argc) g_file_version = (uint32_t)atoi(argv[i]);
 			if (++i < argc) g_file_type = argv[i];
+		}
+		if (!strcmp(argv[i], "-g") || !strcmp(argv[i], "--group")) {
+			if (++i < argc) {
+				test_group = argv[i];
+			}
+		}
+
+		if (!strcmp(argv[i], "--deflate-opt")) {
+			if (++i < argc) g_deflate_opt = (size_t)atoi(argv[i]);
 		}
 
 		if (!strcmp(argv[i], "--allow-non-thread-safe")) {
@@ -1970,6 +3197,10 @@ int main(int argc, char **argv)
 			g_dedicated_allocs = true;
 		}
 
+		if (!strcmp(argv[i], "--skip-obj-test")) {
+			g_skip_obj_test = true;
+		}
+
 		if (!strcmp(argv[i], "--fuzz-no-patch")) {
 			g_fuzz_no_patch = true;
 		}
@@ -1992,6 +3223,12 @@ int main(int argc, char **argv)
 			if (g_fuzz_quality > 31) g_fuzz_quality = 31;
 		}
 
+		if (!strcmp(argv[i], "--heavy-fuzz-quality")) {
+			if (++i < argc) g_heavy_fuzz_quality = atoi(argv[i]);
+			if (g_heavy_fuzz_quality < 1) g_heavy_fuzz_quality = 1;
+			if (g_heavy_fuzz_quality > 31) g_heavy_fuzz_quality = 31;
+		}
+
 		if (!strcmp(argv[i], "--threads")) {
 			#if _OPENMP
 			if (++i < argc) omp_set_num_threads(atoi(argv[i]));
@@ -2000,6 +3237,22 @@ int main(int argc, char **argv)
 
 		if (!strcmp(argv[i], "--fuzz-step")) {
 			if (++i < argc) g_fuzz_step = (size_t)atoi(argv[i]);
+		}
+
+		if (!strcmp(argv[i], "--fuzz-file")) {
+			if (++i < argc) g_fuzz_file = (size_t)atoi(argv[i]);
+		}
+
+		if (!strcmp(argv[i], "--no-fuzz")) {
+			g_no_fuzz = true;
+		}
+	}
+
+	// Autofill heavy fuzz quality if necessary
+	if (g_heavy_fuzz_quality < 0) {
+		g_heavy_fuzz_quality = g_fuzz_quality - 4;
+		if (g_heavy_fuzz_quality < 1) {
+			g_heavy_fuzz_quality = 1;
 		}
 	}
 
@@ -2016,16 +3269,27 @@ int main(int argc, char **argv)
 	uint32_t num_ran = 0;
 	for (uint32_t i = 0; i < num_tests; i++) {
 		ufbxt_test *test = &g_tests[i];
+		ufbxt_test_stats *group_stats = ufbxt_get_test_group(test->group);
+		group_stats->num_total++;
+
 		if (test_filter && strcmp(test->name, test_filter)) {
 			continue;
 		}
-
-		num_ran++;
-		if (ufbxt_run_test(test)) {
-			num_ok++;
+		if (test_group && strcmp(test->group, test_group)) {
+			continue;
 		}
 
-		ufbxt_log_flush();
+		group_stats->num_ran++;
+		num_ran++;
+		bool print_always = false;
+		if (ufbxt_run_test(test)) {
+			num_ok++;
+			group_stats->num_ok++;
+		} else {
+			print_always = true;
+		}
+
+		ufbxt_log_flush(print_always);
 	}
 
 	if (num_ok < num_tests) {
@@ -2046,6 +3310,21 @@ int main(int argc, char **argv)
 	}
 
 	printf("\nTests passed: %u/%u\n", num_ok, num_ran);
+
+	if (g_verbose) {
+		size_t num_skipped = 0;
+		for (size_t i = 0; i < g_num_groups; i++) {
+			ufbxt_test_stats *group = &g_test_groups[i];
+			if (group->num_ran == 0) {
+				num_skipped++;
+				continue;
+			}
+			printf("  %s: %u/%u\n", group->name, group->num_ok, group->num_ran);
+		}
+		if (num_skipped > 0) {
+			printf("  .. skipped %zu groups\n", num_skipped);
+		}
+	}
 
 	if (g_fuzz) {
 		printf("Fuzz checks:\n\nstatic const ufbxt_fuzz_check g_fuzz_checks[] = {\n");
@@ -2086,4 +3365,26 @@ int main(int argc, char **argv)
 
 	return num_ok == num_ran ? 0 : 1;
 }
+
+#if defined(UFBXT_STACK_LIMIT)
+
+UFBXT_THREAD_ENTRYPOINT
+{
+	ufbxt_main_return = ufbxt_thread_main(ufbxt_main_argc, ufbxt_main_argv);
+	ufbxt_thread_return();
+}
+
+int main(int argc, char **argv)
+{
+	ufbxt_main_argc = argc;
+	ufbxt_main_argv = argv;
+	bool ok = ufbxt_run_thread();
+	if (!ok) {
+		fprintf(stderr, "Failed to run thread with stack size of %zu bytes\n", (size_t)(UFBXT_STACK_LIMIT));
+		return 1;
+	}
+	return ufbxt_main_return;
+}
+
+#endif
 

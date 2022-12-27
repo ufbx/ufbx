@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "transform"
 
 UFBXT_FILE_TEST(maya_pivots)
 #if UFBXT_IMPL
@@ -24,28 +26,28 @@ static void ufbxt_check_rotation_order(ufbx_scene *scene, const char *name, ufbx
 UFBXT_FILE_TEST(maya_rotation_order)
 #if UFBXT_IMPL
 {
-	ufbxt_check_rotation_order(scene, "XYZ", UFBX_ROTATION_XYZ);
-	ufbxt_check_rotation_order(scene, "XZY", UFBX_ROTATION_XZY);
-	ufbxt_check_rotation_order(scene, "YZX", UFBX_ROTATION_YZX);
-	ufbxt_check_rotation_order(scene, "YXZ", UFBX_ROTATION_YXZ);
-	ufbxt_check_rotation_order(scene, "ZXY", UFBX_ROTATION_ZXY);
-	ufbxt_check_rotation_order(scene, "ZYX", UFBX_ROTATION_ZYX);
+	ufbxt_check_rotation_order(scene, "XYZ", UFBX_ROTATION_ORDER_XYZ);
+	ufbxt_check_rotation_order(scene, "XZY", UFBX_ROTATION_ORDER_XZY);
+	ufbxt_check_rotation_order(scene, "YZX", UFBX_ROTATION_ORDER_YZX);
+	ufbxt_check_rotation_order(scene, "YXZ", UFBX_ROTATION_ORDER_YXZ);
+	ufbxt_check_rotation_order(scene, "ZXY", UFBX_ROTATION_ORDER_ZXY);
+	ufbxt_check_rotation_order(scene, "ZYX", UFBX_ROTATION_ORDER_ZYX);
 }
 #endif
 
 UFBXT_FILE_TEST(maya_post_rotate_order)
 #if UFBXT_IMPL
 {
-	ufbxt_check_rotation_order(scene, "pCube1", UFBX_ROTATION_XYZ);
-	ufbxt_check_rotation_order(scene, "pCube2", UFBX_ROTATION_ZYX);
+	ufbxt_check_rotation_order(scene, "pCube1", UFBX_ROTATION_ORDER_XYZ);
+	ufbxt_check_rotation_order(scene, "pCube2", UFBX_ROTATION_ORDER_ZYX);
 }
 #endif
 
 UFBXT_FILE_TEST(synthetic_pre_post_rotate)
 #if UFBXT_IMPL
 {
-	ufbxt_check_rotation_order(scene, "pCube1", UFBX_ROTATION_XYZ);
-	ufbxt_check_rotation_order(scene, "pCube2", UFBX_ROTATION_ZYX);
+	ufbxt_check_rotation_order(scene, "pCube1", UFBX_ROTATION_ORDER_XYZ);
+	ufbxt_check_rotation_order(scene, "pCube2", UFBX_ROTATION_ORDER_ZYX);
 }
 #endif
 
@@ -55,7 +57,7 @@ UFBXT_FILE_TEST(maya_parented_cubes)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_geometric_squish)
+UFBXT_FILE_TEST_FLAGS(synthetic_geometric_squish, UFBXT_FILE_TEST_FLAG_OPT_HANDLING_IGNORE_NORMALS_IN_DIFF)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "pSphere1");
@@ -64,12 +66,12 @@ UFBXT_FILE_TEST(synthetic_geometric_squish)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_geometric_transform)
+UFBXT_FILE_TEST_FLAGS(synthetic_geometric_transform, UFBXT_FILE_TEST_FLAG_OPT_HANDLING_IGNORE_NORMALS_IN_DIFF)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "Parent");
 	ufbxt_assert(node);
-	ufbx_vec3 euler = ufbx_quat_to_euler(node->geometry_transform.rotation, UFBX_ROTATION_XYZ);
+	ufbx_vec3 euler = ufbx_quat_to_euler(node->geometry_transform.rotation, UFBX_ROTATION_ORDER_XYZ);
 	ufbxt_assert_close_real(err, node->geometry_transform.translation.x, -0.5f);
 	ufbxt_assert_close_real(err, node->geometry_transform.translation.y, -1.0f);
 	ufbxt_assert_close_real(err, node->geometry_transform.translation.z, -1.5f);
@@ -108,7 +110,7 @@ UFBXT_TEST(root_transform)
 		opts.root_transform.translation.x = -1.0f;
 		opts.root_transform.translation.y = -2.0f;
 		opts.root_transform.translation.z = -3.0f;
-		opts.root_transform.rotation = ufbx_euler_to_quat(euler, UFBX_ROTATION_XYZ);
+		opts.root_transform.rotation = ufbx_euler_to_quat(euler, UFBX_ROTATION_ORDER_XYZ);
 		opts.root_transform.scale.x = 2.0f;
 		opts.root_transform.scale.y = 3.0f;
 		opts.root_transform.scale.z = 4.0f;
@@ -149,8 +151,6 @@ UFBXT_TEST(blender_axes)
 {
 	char path[512], name[512];
 
-	ufbxt_diff_error err = { 0 };
-
 	static const char *axis_names[] = {
 		"px", "nx", "py", "ny", "pz", "nz",
 	};
@@ -168,6 +168,7 @@ UFBXT_TEST(blender_axes)
 
 			ufbxt_file_iterator iter = { name };
 			while (ufbxt_next_file(&iter, path, sizeof(path))) {
+				ufbxt_diff_error err = { 0 };
 
 				// Load normally and check axes
 				{
@@ -184,8 +185,12 @@ UFBXT_TEST(blender_axes)
 				}
 
 				// Axis conversion
-				for (int transform_root = 0; transform_root <= 1; transform_root++) {
+				for (int mode = 0; mode < 4; mode++) {
+					ufbxt_hintf("mode = %d", mode);
 					ufbx_load_opts opts = { 0 };
+
+					bool transform_root = (mode % 2) != 0;
+					bool use_adjust = (mode / 2) != 0;
 
 					opts.target_axes = ufbx_axes_right_handed_z_up;
 					opts.target_unit_meters = 1.0f;
@@ -194,6 +199,12 @@ UFBXT_TEST(blender_axes)
 						opts.use_root_transform = true;
 						opts.root_transform = ufbx_identity_transform;
 						opts.root_transform.translation.z = 1.0f;
+					}
+
+					if (use_adjust) {
+						opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+					} else {
+						opts.space_conversion = UFBX_SPACE_CONVERSION_TRANSFORM_ROOT;
 					}
 
 					ufbx_scene *scene = ufbx_load_file(path, &opts, NULL);
@@ -207,6 +218,14 @@ UFBXT_TEST(blender_axes)
 					ufbxt_assert(mesh->num_faces == 1);
 					ufbx_face face = mesh->faces.data[0];
 					ufbxt_assert(face.num_indices == 3);
+
+					if (use_adjust && !transform_root) {
+						ufbx_node *root = scene->root_node;
+
+						ufbx_vec3 identity_scale = { 1.0f, 1.0f, 1.0f };
+						ufbxt_assert_close_quat(&err, root->local_transform.rotation, ufbx_identity_quat);
+						ufbxt_assert_close_vec3(&err, root->local_transform.scale, identity_scale);
+					}
 
 					for (uint32_t i = 0; i < face.num_indices; i++) {
 						ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, face.index_begin + i);
@@ -240,11 +259,11 @@ UFBXT_TEST(blender_axes)
 
 					ufbx_free_scene(scene);
 				}
+
+				ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
 			}
 		}
 	}
-
-	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
 }
 #endif
 

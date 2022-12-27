@@ -420,6 +420,7 @@ ufbxt_noinline static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v
 	ufbxt_hash_element_ref(h, v->camera);
 	ufbxt_hash_element_ref(h, v->bone);
 	ufbxt_hash_element_ref(h, v->attrib);
+	ufbxt_hash_element_ref(h, v->geometry_transform_helper);
 	ufbxt_hash_pod(h, v->attrib_type);
 	ufbxt_hash_list(h, v->all_attribs, ufbxt_hash_element_ref_imp);
 	ufbxt_hash_pod(h, v->inherit_type);
@@ -432,8 +433,14 @@ ufbxt_noinline static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v
 	ufbxt_hash_matrix(h, v->node_to_world);
 	ufbxt_hash_matrix(h, v->geometry_to_node);
 	ufbxt_hash_matrix(h, v->geometry_to_world);
+	ufbxt_hash_quat(h, v->adjust_pre_rotation);
+	ufbxt_hash_vec3(h, v->adjust_pre_scale);
+	ufbxt_hash_quat(h, v->adjust_post_rotation);
 	ufbxt_hash_pod(h, v->visible);
 	ufbxt_hash_pod(h, v->is_root);
+	ufbxt_hash_pod(h, v->has_geometry_transform);
+	ufbxt_hash_pod(h, v->has_adjust_transform);
+	ufbxt_hash_pod(h, v->is_geometry_transform_helper);
 	ufbxt_hash_pod(h, v->node_depth);
 	ufbxt_hash_list(h, v->materials, ufbxt_hash_element_ref_imp);
 }
@@ -500,6 +507,18 @@ ufbxt_noinline static void ufbxt_hash_mesh_material_imp(ufbxt_hash *h, const ufb
 	ufbxt_hash_element_ref(h, v->material);
 	ufbxt_hash_size_t(h, v->num_faces);
 	ufbxt_hash_size_t(h, v->num_triangles);
+	ufbxt_hash_size_t(h, v->num_empty_faces);
+	ufbxt_hash_size_t(h, v->num_point_faces);
+	ufbxt_hash_size_t(h, v->num_line_faces);
+	ufbxt_hash_list(h, v->face_indices, ufbxt_hash_pod_imp);
+}
+
+ufbxt_noinline static void ufbxt_hash_face_group_imp(ufbxt_hash *h, const ufbx_face_group *v)
+{
+	ufbxt_hash_pod(h, v->id);
+	ufbxt_hash_string(h, v->name);
+	ufbxt_hash_size_t(h, v->num_faces);
+	ufbxt_hash_size_t(h, v->num_triangles);
 	ufbxt_hash_list(h, v->face_indices, ufbxt_hash_pod_imp);
 }
 
@@ -551,7 +570,9 @@ ufbxt_noinline static void ufbxt_hash_mesh_imp(ufbxt_hash *h, const ufbx_mesh *v
 	ufbxt_hash_list(h, v->face_group, ufbxt_hash_pod_imp);
 	ufbxt_hash_list(h, v->face_hole, ufbxt_hash_pod_imp);
 	ufbxt_hash_size_t(h, v->max_face_triangles);
-	ufbxt_hash_size_t(h, v->num_bad_faces);
+	ufbxt_hash_size_t(h, v->num_empty_faces);
+	ufbxt_hash_size_t(h, v->num_point_faces);
+	ufbxt_hash_size_t(h, v->num_line_faces);
 
 	ufbxt_hash_list(h, v->edges, ufbxt_hash_edge_imp);
 	ufbxt_hash_list(h, v->edge_smoothing, ufbxt_hash_pod_imp);
@@ -574,6 +595,7 @@ ufbxt_noinline static void ufbxt_hash_mesh_imp(ufbxt_hash *h, const ufbx_mesh *v
 	ufbxt_hash_list_ptr(h, v->color_sets, ufbxt_hash_color_set_imp);
 
 	ufbxt_hash_list_ptr(h, v->materials, ufbxt_hash_mesh_material_imp);
+	ufbxt_hash_list_ptr(h, v->face_groups, ufbxt_hash_face_group_imp);
 
 	ufbxt_hash_pod(h, v->skinned_is_local);
 	ufbxt_hash_vertex_vec3(h, &v->skinned_position);
@@ -845,7 +867,7 @@ ufbxt_noinline static void ufbxt_hash_material_map_imp(ufbxt_hash *h, const ufbx
 	ufbxt_hash_element_ref(h, v->texture);
 	ufbxt_hash_pod(h, v->has_value);
 	ufbxt_hash_pod(h, v->texture_enabled);
-	ufbxt_hash_pod(h, v->texture_inverted);
+	ufbxt_hash_pod(h, v->value_components);
 }
 
 ufbxt_noinline static void ufbxt_hash_material_feature_imp(ufbxt_hash *h, const ufbx_material_feature_info *v)
@@ -943,12 +965,16 @@ ufbxt_noinline static void ufbxt_hash_texture_imp(ufbxt_hash *h, const ufbx_text
 	ufbxt_hash_blob(h, v->content);
 	ufbxt_hash_element_ref(h, v->video);
 
+	ufbxt_hash_pod(h, v->file_index);
+	ufbxt_hash_pod(h, v->has_file);
+
 	ufbxt_hash_list(h, v->layers, ufbxt_hash_texture_layer_imp);
 
 	ufbxt_hash_string(h, v->uv_set);
 	ufbxt_hash_pod(h, v->wrap_u);
 	ufbxt_hash_pod(h, v->wrap_v);
-	ufbxt_hash_transform(h, v->transform);
+	ufbxt_hash_pod(h, v->has_uv_transform);
+	ufbxt_hash_transform(h, v->uv_transform);
 	ufbxt_hash_matrix(h, v->texture_to_uv);
 	ufbxt_hash_matrix(h, v->uv_to_texture);
 
@@ -1145,6 +1171,16 @@ ufbxt_noinline static void ufbxt_hash_metadata_object_imp(ufbxt_hash *h, const u
 {
 }
 
+ufbxt_noinline static void ufbxt_hash_texture_file_imp(ufbxt_hash *h, const ufbx_texture_file *v)
+{
+	ufbxt_hash_pod(h, v->index);
+	ufbxt_hash_string(h, v->absolute_filename);
+	ufbxt_hash_string(h, v->relative_filename);
+	ufbxt_hash_blob(h, v->raw_absolute_filename);
+	ufbxt_hash_blob(h, v->raw_relative_filename);
+	ufbxt_hash_blob(h, v->content);
+}
+
 ufbxt_noinline static void ufbxt_hash_name_element_imp(ufbxt_hash *h, const ufbx_name_element *v)
 {
 	ufbxt_hash_string(h, v->name);
@@ -1162,17 +1198,26 @@ ufbxt_noinline static void ufbxt_hash_application_imp(ufbxt_hash *h, const ufbx_
 
 #define ufbxt_hash_application(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_application_imp(h, v), ufbxt_pop_tag(h))
 
+ufbxt_noinline static void ufbxt_hash_warning_imp(ufbxt_hash *h, const ufbx_warning *v)
+{
+	ufbxt_hash_pod(h, v->type);
+	ufbxt_hash_size_t(h, v->count);
+	// `v->description` omitted as it contains path-specific string
+}
+
 ufbxt_noinline static void ufbxt_hash_metadata_imp(ufbxt_hash *h, const ufbx_metadata *v)
 {
 	ufbxt_hash_pod(h, v->ascii);
 	ufbxt_hash_pod(h, v->version);
 	ufbxt_hash_string(h, v->creator);
+	ufbxt_hash_pod(h, v->is_unsafe);
 	ufbxt_hash_pod(h, v->big_endian);
 	ufbxt_hash_pod(h, v->exporter);
 	ufbxt_hash_pod(h, v->exporter_version);
 	ufbxt_hash_props(h, &v->scene_props);
 	ufbxt_hash_application(h, &v->original_application);
 	ufbxt_hash_application(h, &v->latest_application);
+	ufbxt_hash_list_ptr(h, v->warnings, ufbxt_hash_warning_imp);
 }
 
 #define ufbxt_hash_metadata(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_metadata_imp(h, v), ufbxt_pop_tag(h))
@@ -1252,6 +1297,8 @@ ufbxt_noinline static void ufbxt_hash_scene_imp(ufbxt_hash *h, const ufbx_scene 
 	ufbxt_hash_list(h, v->constraints, ufbxt_hash_constraint_imp);
 	ufbxt_hash_list(h, v->poses, ufbxt_hash_pose_imp);
 	ufbxt_hash_list(h, v->metadata_objects, ufbxt_hash_metadata_object_imp);
+
+	ufbxt_hash_list_ptr(h, v->texture_files, ufbxt_hash_texture_file_imp);
 
 	ufbxt_hash_list(h, v->connections_src, ufbxt_hash_connection_imp);
 	ufbxt_hash_list(h, v->connections_dst, ufbxt_hash_connection_imp);

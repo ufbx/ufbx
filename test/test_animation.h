@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "animation"
 
 #if UFBXT_IMPL
 typedef struct {
@@ -364,8 +366,8 @@ UFBXT_FILE_TEST(maya_transform_animation)
 		ufbx_transform t1 = state->nodes.data[node->element.typed_id]->local_transform;
 		ufbx_transform t2 = ufbx_evaluate_transform(&scene->anim, node, time);
 
-		ufbx_vec3 t1_euler = ufbx_quat_to_euler(t1.rotation, UFBX_ROTATION_XYZ);
-		ufbx_vec3 t2_euler = ufbx_quat_to_euler(t2.rotation, UFBX_ROTATION_XYZ);
+		ufbx_vec3 t1_euler = ufbx_quat_to_euler(t1.rotation, UFBX_ROTATION_ORDER_XYZ);
+		ufbx_vec3 t2_euler = ufbx_quat_to_euler(t2.rotation, UFBX_ROTATION_ORDER_XYZ);
 
 		ufbxt_assert_close_vec3(err, ref->translation, t1.translation);
 		ufbxt_assert_close_vec3(err, ref->translation, t2.translation);
@@ -404,8 +406,8 @@ UFBXT_FILE_TEST(maya_transform_animation)
 		ufbx_transform t1 = state->nodes.data[node->element.typed_id]->local_transform;
 		ufbx_transform t2 = ufbx_evaluate_transform(&anim, node, time);
 
-		ufbx_vec3 t1_euler = ufbx_quat_to_euler(t1.rotation, UFBX_ROTATION_XYZ);
-		ufbx_vec3 t2_euler = ufbx_quat_to_euler(t2.rotation, UFBX_ROTATION_XYZ);
+		ufbx_vec3 t1_euler = ufbx_quat_to_euler(t1.rotation, UFBX_ROTATION_ORDER_XYZ);
+		ufbx_vec3 t2_euler = ufbx_quat_to_euler(t2.rotation, UFBX_ROTATION_ORDER_XYZ);
 
 		ufbxt_assert_close_vec3(err, ref.translation, t1.translation);
 		ufbxt_assert_close_vec3(err, ref.translation, t2.translation);

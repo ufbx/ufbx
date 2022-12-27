@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "cache"
 
 #if UFBXT_IMPL
 static void ufbxt_test_sine_cache(ufbxt_diff_error *err, const char *path, double begin, double end, double err_threshold)
@@ -21,6 +23,9 @@ static void ufbxt_test_sine_cache(ufbxt_diff_error *err, const char *path, doubl
 			for (double time = begin; time <= end + 0.0001; time += 0.1/24.0) {
 				size_t num_verts = ufbx_sample_geometry_cache_vec3(channel, time, pos, ufbxt_arraycount(pos), NULL);
 				ufbxt_assert(num_verts == 36);
+
+				size_t dry_verts = ufbx_sample_geometry_cache_vec3(channel, time, pos, SIZE_MAX, NULL);
+				ufbxt_assert(num_verts == dry_verts);
 
 				double t = (time - 1.0/24.0) / (29.0/24.0) * 4.0;
 				double pi2 = 3.141592653589793*2.0;
@@ -129,6 +134,19 @@ UFBXT_TEST(cache_xml_parse)
 	ufbxt_assert(!strcmp(cache->channels.data[1].interpretation_name.data, "<![CDATA[<positions>]]>"));
 
 	ufbx_free_geometry_cache(cache);
+}
+#endif
+
+UFBXT_TEST(cache_xml_depth)
+#if UFBXT_IMPL
+{
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s", data_root, "cache_xml_depth.xml");
+
+	ufbx_error error;
+	ufbx_geometry_cache *cache = ufbx_load_geometry_cache(buf, NULL, &error);
+	ufbxt_assert(!cache);
+	ufbxt_assert(error.type == UFBX_ERROR_UNKNOWN);
 }
 #endif
 

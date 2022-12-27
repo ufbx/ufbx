@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "nurbs"
 
 #if UFBXT_IMPL
 

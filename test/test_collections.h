@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "collections"
 
 UFBXT_FILE_TEST(max_selection_sets)
 #if UFBXT_IMPL

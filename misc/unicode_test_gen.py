@@ -20,9 +20,11 @@ def max_codepoint(width):
     else:
         raise ValueError(f"Unsupported width: {width}")
 
-def codepoint_to_utf8(codepoint, width):
+def codepoint_to_utf8(codepoint, width, *, allow_overflow=False):
     """Unrestricted codepoint to UTF-8"""
-    assert codepoint <= max_codepoint(width)
+
+    if not allow_overflow:
+        assert codepoint <= max_codepoint(width)
 
     c = codepoint
     if width == 1:
@@ -95,6 +97,13 @@ for n in range(0x400):
 for n in range(0, 0x1_00_00, 64):
     fuzz_encodings.add(int_to_bytes(n))
 
+fuzz_encodings.add(codepoint_to_utf8(max_codepoint(4) + 1, 4, allow_overflow=True))
+for n in range(32):
+    codepoint = 0x10FFFF + n**4
+    assert codepoint <= 0x1FFFFF
+    fuzz_encodings.add(codepoint_to_utf8(codepoint, 4, allow_overflow=True))
+fuzz_encodings.add(codepoint_to_utf8(0x1FFFFF, 4, allow_overflow=True))
+
 random.seed(1)
 for n in range(200):
     for k in range(1, 4+1):
@@ -135,11 +144,19 @@ def fmt_fbx_root(ascii):
     fbx_good_props = Node(b"Properties70", [], list(fmt_fbx_props(good, ascii)))
     fbx_good.children.append(fbx_good_props)
 
-    fbx_bad = Node(b"Model", [Value(b"L", 1), fmt_fbx_model_name("Bad", ascii), Value(b"S", b"Mesh")], [])
+    fbx_bad = Node(b"Model", [Value(b"L", 2), fmt_fbx_model_name("Bad", ascii), Value(b"S", b"Mesh")], [])
     fbx_objects.children.append(fbx_bad)
 
     fbx_bad_props = Node(b"Properties70", [], list(fmt_fbx_props(bad, ascii)))
     fbx_bad.children.append(fbx_bad_props)
+
+    ok = [b"\xff" + enc for enc in good]
+
+    fbx_ok = Node(b"Model", [Value(b"L", 3), fmt_fbx_model_name("Ok", ascii), Value(b"S", b"Mesh")], [])
+    fbx_objects.children.append(fbx_ok)
+
+    fbx_ok_props = Node(b"Properties70", [], list(fmt_fbx_props(ok, ascii)))
+    fbx_ok.children.append(fbx_ok_props)
 
     return fbx_root
 
@@ -150,57 +167,3 @@ argv = parser.parse_args()
 root = fmt_fbx_root(ascii=False)
 with open(argv.outfile, "wb") as f:
     tfbx.binary_dump_root(f, root, tfbx.BinaryFormat(7500, False), b"")
-
-if False:
-    import math
-
-    if False:
-        enc_set = { 0, 1, 0xffff_ffff }
-
-        n = 0
-        while n < 0x1_0000_0000:
-            enc_set.add(max(0, n - 1))
-            enc_set.add(n)
-            enc_set.add(n + 1)
-
-            step = 1 << max(0, int(math.log2(max(n, 1)) - 16))
-            n += step
-
-    def enc_to_utf8(enc):
-        num_bytes = int(math.ceil(math.log2(enc + 1) / 8))
-        return enc.to_bytes(num_bytes, "big", signed=False)
-
-    def valid_utf8(utf8):
-        try:
-            utf8.decode("utf-8")
-            return True
-        except UnicodeDecodeError:
-            return False
-
-    fuzz_enc = { 0, 1, 0x10_FFFF, 0x11_0000, 0xffff_ffff }
-
-    n = 0
-    while n < 0x1_0000_0000:
-        if n > 0:
-            prev = enc_to_utf8(n - 1)
-            next = enc_to_utf8(n)
-            if valid_utf8(prev) != valid_utf8(next):
-                fuzz_enc.add(n - 1)
-                fuzz_enc.add(n)
-
-        step = 1 << max(0, int(math.log2(max(n, 1)) - 8))
-        n += step
-
-    for enc in sorted(fuzz_enc):
-        utf8 = enc_to_utf8(enc)
-        print(" ".join(f"{x:02x}" for x in utf8))
-    exit(0)
-
-    n = 0
-    while n < 0x1_0000_0000:
-        fuzz_enc.add(n)
-
-        step = 1 << max(0, int(math.log2(max(n, 1)) - 8))
-        n += step
-
-    print(len(fuzz_enc))

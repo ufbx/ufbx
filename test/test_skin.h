@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "skin"
 
 #if UFBXT_IMPL
 void ufbxt_check_stack_times(ufbx_scene *scene, ufbxt_diff_error *err, const char *stack_name, double begin, double end)
@@ -47,7 +49,9 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_norm
 
 	ufbxt_check_scene(eval);
 
-	ufbxt_diff_to_obj(eval, obj_file, err, check_normals);
+	uint32_t diff_flags = 0;
+	if (check_normals) diff_flags |= UFBXT_OBJ_DIFF_FLAG_CHECK_DEFORMED_NORMALS;
+	ufbxt_diff_to_obj(eval, obj_file, err, diff_flags);
 
 	ufbx_free_scene(eval);
 	free(obj_file);
@@ -432,7 +436,7 @@ UFBXT_FILE_TEST(blender_279_bone_radius)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_broken_cluster)
+UFBXT_FILE_TEST_FLAGS(synthetic_broken_cluster, UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR)
 #if UFBXT_IMPL
 {
 	ufbx_node *cube = ufbx_find_node(scene, "pCube1");
@@ -502,5 +506,14 @@ UFBXT_FILE_TEST(max_transformed_skin)
 {
 	ufbxt_check_frame(scene, err, false, "max_transformed_skin_5", NULL, 5.0/30.0);
 	ufbxt_check_frame(scene, err, false, "max_transformed_skin_15", NULL, 15.0/30.0);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_bind_to_root)
+#if UFBXT_IMPL
+{
+	ufbxt_check_warning(scene, UFBX_WARNING_BAD_ELEMENT_CONNECTED_TO_ROOT, SIZE_MAX, NULL);
+	// Some unknown exporter is exporting skin deformers being parented to root
+	// This test exists to check that it is handled gracefully if quirks are enabled
 }
 #endif

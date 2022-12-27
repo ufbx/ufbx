@@ -34,7 +34,7 @@ jobs:
           path: build/hashes.txt
 
   ci_ubuntu:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v2
@@ -50,7 +50,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests readme threadcheck hashes --runner ci_linux
+        run: python3 misc/run_tests.py tests stack readme threadcheck hashes --runner ci_linux
       - name: Verbose test info
         run: build/runner_clang_release_x64/runner -d data -v
       - name: Generate coverage
@@ -79,7 +79,7 @@ jobs:
           path: build
       - run: type build\hashes.txt
       - name: Run tests
-        run: python misc/run_tests.py tests readme threadcheck hashes --runner ci_windows
+        run: python misc/run_tests.py tests stack readme threadcheck hashes --runner ci_windows
       - name: Verbose test info
         run: build\runner_vs_cl64_release_x64\runner.exe -d data -v
       - name: Compress hashdumps
@@ -93,7 +93,7 @@ jobs:
           path: build/hashdump_ci_windows.txt.gz
 
   ci_macos:
-    runs-on: macos-latest
+    runs-on: macos-11
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v2
@@ -103,7 +103,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests readme threadcheck hashes --remove-compiler gcc --additional-compiler gcc-11 --remove-arch x86 --runner ci_macos
+        run: python3 misc/run_tests.py tests stack readme threadcheck hashes --remove-compiler gcc --additional-compiler gcc-11 --remove-arch x86 --runner ci_macos
       - name: Compile ufbx as Objective C
         run: clang -Wall -Wextra -Werror -ObjC -c ufbx.c -o build/ufbx-objc.o
       - name: Compress hashdumps
@@ -142,8 +142,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Run domfuzz
-        run: python misc/run_tests.py domfuzz
+      - name: Run domfuzz/objfuzz
+        run: python misc/run_tests.py domfuzz objfuzz
 
   ci_viewer:
     runs-on: ubuntu-latest
@@ -156,7 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Compile feature permutaitons
+      - name: Compile feature permutations
         run: python misc/run_tests.py features
 
   ci_analysis:
@@ -167,11 +167,53 @@ jobs:
         run: sudo apt-get update
       - name: Install apt dependencies
         run: sudo apt-get install -y cppcheck
+      - name: Install PIP dependencies
+        run: sudo pip3 install pcpp pycparser
+      - name: Prepare directories
+        run: mkdir build
       - name: cppcheck
         run: cppcheck --error-exitcode=1 --inline-suppr --std=c99 ufbx.c -DUFBX_STATIC_ANALYSIS=1
       - name: Clang Analyzer
         if: ${{ always() && !cancelled() }}
         run: clang --analyze -Xanalyzer -analyzer-werror -Xanalyzer -analyzer-disable-checker=unix.Malloc ufbx.c
+      - name: Get Clang debug stack usage
+        if: ${{ always() && !cancelled() }}
+        run: clang -fstack-usage -DUFBX_DEV -DUFBX_STANDARD_C -c ufbx.c -o build/ufbx-clang-debug.o
+      - name: Get Clang release stack usage
+        if: ${{ always() && !cancelled() }}
+        run: clang -fstack-usage -DUFBX_DEV -O2 -c ufbx.c -o build/ufbx-clang-release.o
+      - name: Get GCC debug stack usage
+        if: ${{ always() && !cancelled() }}
+        run: gcc -fstack-usage -DUFBX_DEV -DUFBX_STANDARD_C -c ufbx.c -o build/ufbx-gcc-debug.o
+      - name: Get GCC release stack usage
+        if: ${{ always() && !cancelled() }}
+        run: gcc -fstack-usage -DUFBX_DEV -O2 -c ufbx.c -o build/ufbx-gcc-release.o
+      - name: Parse ufbx.c to AST for analysis
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/analyze_stack.py --no-su --cache build/ufbx-cache.pickle
+      - name: Analyze Clang debug stack
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/analyze_stack.py build/ufbx-clang-debug.su --limit 0x20000 --cache build/ufbx-cache.pickle
+      - name: Analyze Clang release stack
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/analyze_stack.py build/ufbx-clang-release.su --limit 0x10000 --cache build/ufbx-cache.pickle
+      - name: Analyze GCC debug stack
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/analyze_stack.py build/ufbx-gcc-debug.su --limit 0x20000 --cache build/ufbx-cache.pickle
+      - name: Analyze GCC release stack
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/analyze_stack.py build/ufbx-gcc-release.su --limit 0x10000 --cache build/ufbx-cache.pickle
+
+  ci_bindgen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Create bindgen/build directory
+        run: mkdir bindgen/build
+      - name: Parse ufbx.h
+        run: python3 bindgen/ufbx_parser.py
+      - name: Generate typed IR
+        run: python3 bindgen/ufbx_ir.py
 
   ci_exotic:
     runs-on: ubuntu-latest
@@ -194,7 +236,7 @@ jobs:
       - name: Compile ufbx.c wth x86 TCC
         run: i386-tcc -Wall -Werror -c ufbx.c -o build/tcc-ufbx-x86.o
       - name: Compile PowerPC tests
-        run: python3 -m ziglang cc -fno-sanitize=undefined -target powerpc-linux ufbx.c test/runner.c -g -o build/ppc-runner
+        run: python3 -m ziglang cc -fno-sanitize=undefined -target powerpc-linux -DUFBX_DEV ufbx.c test/runner.c -g -o build/ppc-runner
       - name: Run PowerPC tests
         run: qemu-ppc build/ppc-runner -d data
       - name: Compile PowerPC hash_scene
@@ -213,28 +255,28 @@ jobs:
         run: gcc -c test/runner.c -o build/runner.o
       - name: Build and run standard C99
         run: |
-          gcc -Wall -Wextra -Werror -std=c99 -DUFBX_STANDARD_C build/runner.o ufbx.c -lm -o build/runner-c99
+          gcc -Wall -Wextra -Werror -Wno-unused-function -std=c99 -DUFBX_STANDARD_C build/runner.o ufbx.c -lm -o build/runner-c99
           build/runner-c99 -d data --allow-non-thread-safe
       - name: Build and run standard C11
         run: |
-          gcc -Wall -Wextra -Werror -std=c11 -DUFBX_STANDARD_C build/runner.o ufbx.c -lm -o build/runner-c11
+          gcc -Wall -Wextra -Werror -Wno-unused-function -std=c11 -DUFBX_STANDARD_C build/runner.o ufbx.c -lm -o build/runner-c11
           build/runner-c11 -d data
       - name: Build and run standard C++98
         run: |
-          g++ -Wall -Wextra -Werror -std=c++98 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp98
+          g++ -Wall -Wextra -Werror -Wno-unused-function -std=c++98 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp98
           build/runner-cpp98 -d data --allow-non-thread-safe
       - name: Build and run standard C++11
         run: |
-          g++ -Wall -Wextra -Werror -std=c++11 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp11
+          g++ -Wall -Wextra -Werror -Wno-unused-function -std=c++11 -DUFBX_STANDARD_C build/runner.o -x c++ ufbx.c -lm -o build/runner-cpp11
           build/runner-cpp11 -d data
       - name: Build and run threadcheck (standard C11)
         run: |
-          gcc -Wall -Wextra -Werror -std=c11 -DUFBX_STANDARD_C -c ufbx.c -o build/ufbx-c11.o
-          g++ -Wall -Wextra -Werror -pthread -std=c++11 build/ufbx-c11.o test/threadcheck.cpp -lm -o build/threadcheck-c11
+          gcc -Wall -Wextra -Werror -Wno-unused-function -std=c11 -DUFBX_STANDARD_C -c ufbx.c -o build/ufbx-c11.o
+          g++ -Wall -Wextra -Werror -Wno-unused-function -pthread -std=c++11 build/ufbx-c11.o test/threadcheck.cpp -lm -o build/threadcheck-c11
           build/threadcheck-c11 data/maya_cube_7500_binary.fbx 2
       - name: Build and run threadcheck (standard C++11)
         run: |
-          g++ -Wall -Wextra -Werror -pthread -std=c++11 -DUFBX_STANDARD_C -x c++ ufbx.c test/threadcheck.cpp -lm -o build/threadcheck-cpp11
+          g++ -Wall -Wextra -Werror -Wno-unused-function -pthread -std=c++11 -DUFBX_STANDARD_C -x c++ ufbx.c test/threadcheck.cpp -lm -o build/threadcheck-cpp11
           build/threadcheck-cpp11 data/maya_cube_7500_binary.fbx 2
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
@@ -280,6 +322,8 @@ jobs:
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_schar_x64_release.txt --max-dump-errors 3
           clang -funsigned-char test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_uchar_x64_release.txt --max-dump-errors 3
+          clang -DUFBX_STANDARD_C -DUFBX_DEV -DUFBX_REGRESSION test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+          build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_stdc_x64_release.txt --max-dump-errors 3
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_hasher.txt.gz
@@ -298,7 +342,7 @@ jobs:
       - name: Install wasi-sdk
         run: |
           mkdir build
-          export WASI_VERSION=14
+          export WASI_VERSION=17
           export WASI_VERSION_FULL=${WASI_VERSION}.0
           curl -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_VERSION}/wasi-sdk-${WASI_VERSION_FULL}-linux.tar.gz -o build/wasi-sdk.tar.gz
           tar xzf build/wasi-sdk.tar.gz -C build
@@ -306,7 +350,7 @@ jobs:
       - name: Install wasmtime
         run: |
           curl https://wasmtime.dev/install.sh -sSf > wasmtime-install.sh
-          bash wasmtime-install.sh --version v0.34.0
+          bash wasmtime-install.sh --version v4.0.0
           echo "$HOME/.wasmtime/bin" >> $GITHUB_PATH
       - name: Test wasmtime
         run: wasmtime --version
@@ -340,7 +384,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests hashes --no-sanitize --threads 2 --runner ci_arm64
+        run: python3 misc/run_tests.py tests stack hashes --no-sanitize --threads 2 --runner ci_arm64
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_arm32.txt.gz
@@ -364,7 +408,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests hashes --no-sanitize --threads 2 --runner ci_arm64
+        run: python3 misc/run_tests.py tests stack hashes --no-sanitize --threads 2 --runner ci_arm64
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_arm64.txt.gz

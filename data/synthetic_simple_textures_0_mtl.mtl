@@ -1,0 +1,30 @@
+
+# Standard .mtl material properties
+newmtl RGB
+map_Ka textures/checkerboard_ambient.png
+map_Kd textures/checkerboard_diffuse.png
+map_Ks textures/checkerboard_specular.png
+map_Ke textures/checkerboard_emissive.png
+map_Ns textures/checkerboard_roughness.png
+map_d textures/checkerboard_transparency.png
+map_bump textures/checkerboard_bump.png
+
+# PBR "extension"
+newmtl PBR
+map_Pr textures/checkerboard_roughness.png
+map_Pm textures/checkerboard_metallic.png
+map_Ps textures/checkerboard_reflection.png
+map_Pc textures/checkerboard_specular.png
+map_Pcr textures/checkerboard_weight.png
+map_Tf textures/checkerboard_transparency.png
+map_d textures/checkerboard_weight.png
+map_Ni textures/checkerboard_specular.png
+map_norm textures/checkerboard_normal.png
+map_disp textures/checkerboard_displacement.png
+
+# Non-map_ special cases
+newmtl NonMap
+norm textures/checkerboard_normal.png
+disp textures/checkerboard_displacement.png
+bump textures/checkerboard_bump.png
+

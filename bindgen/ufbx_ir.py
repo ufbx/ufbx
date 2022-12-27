@@ -134,6 +134,7 @@ class Type(Base):
 class Field(Base):
     type: str
     name: str    
+    kind: str
     private: bool
     offset: Dict[str, int]
     comment: Optional[str]
@@ -155,6 +156,7 @@ class Struct(Base):
     is_callback: bool
     is_interface: bool
     member_functions: List[str]
+    member_globals: List[str]
 
 class EnumValue(Base):
     name: str    
@@ -239,6 +241,11 @@ class MemberFunction(Base):
     member_name: str
     self_index: int
 
+class MemberGlobal(Base):
+    global_name: str
+    self_type: str
+    member_name: str
+
 class File(Base):
     constants: Dict[str, Constant]
     types: Dict[str, Type]
@@ -249,12 +256,16 @@ class File(Base):
     globals: Dict[str, Global]
     typedefs: Dict[str, Typedef]
     member_functions: Dict[str, MemberFunction]
+    member_globals: Dict[str, MemberGlobal]
     declarations: List[Declaration]
     element_types: List[str]
 
 def init_type(file, typ, key, mods):
     name = typ["name"]
     t = Type(base_name=name, key=key)
+
+    if typ.get("kind", "") == "define":
+        t.kind = "define"
 
     if mods:
         mods = mods[:]
@@ -295,8 +306,9 @@ def init_type(file, typ, key, mods):
         elif mt == "const":
             t.kind = "const"
             t.inner = parse_type_imp(file, typ, mods)
-        elif mt == "":
-            pass
+        elif mt == "unsafe":
+            t.kind = "unsafe"
+            t.inner = parse_type_imp(file, typ, mods)
         else:
             raise ValueError(f"Unhandled mod {mt}")
 
@@ -318,6 +330,8 @@ def parse_type_imp(file, typ, mods):
             key = key + "*"
         elif mt == "nullable":
             key = key + "?"
+        elif mt == "unsafe":
+            key = key + " unsafe"
         elif mt == "const":
             key = key + " const"
         elif mt == "array":
@@ -370,6 +384,15 @@ def parse_field(file: File, st: Struct, decl, anon_path):
             fd.private = True
         st.fields.append(fd)
 
+def postprocess_fields(file: File, st: Struct):
+    for field in st.fields:
+        tp = file.types[field.type]
+        if tp.kind == "array" and tp.inner == "char":
+            len_ix = find_index(st.fields, lambda f: f.name == field.name + "_length")
+            if len_ix >= 0:
+                field.kind = "inlineBuf"
+                st.fields[len_ix].kind = "inlineBufLength"
+
 def shorten_name(name: str, prefix: str):
     for part in prefix.split("_"):
         if name.lower().startswith(part.lower() + "_"):
@@ -394,7 +417,7 @@ def parse_enum(file: File, en: Enum, decl, ctx):
         for inner in decl["decls"]:
             parse_enum(file, en, inner, ctx)
     elif kind == "decl":
-        if name == en.name.upper() + "_COUNT":
+        if name in ("UFBX_ELEMENT_TYPE_FIRST_ATTRIB"):
             ctx.hit_aux = True
         ev = EnumValue(name=name, flag=en.flag)
         ev.short_name_raw = shorten_name(name, en.name)
@@ -497,6 +520,24 @@ def parse_decl(file: File, decl):
             parse_func(file, decl)
         elif decl["kind"] == "decl":
             parse_global(file, decl)
+    elif kind == "enumType":
+        line = decl["line"]
+        enum_name = decl["enumName"]
+        last_value = decl["lastValue"]
+        count_name = decl["countName"]
+        en = file.enums.get(enum_name)
+        if not en:
+            raise RuntimeError(f"ufbx.h:{line}: UFBX_ENUM_TYPE() has undefined enum name {enum_name}")
+        max_value = max((file.enum_values[n] for n in en.values), key=lambda v: v.value)
+        if max_value.name != last_value:
+            if last_value in file.enum_values:
+                wrong_value = file.enum_values[last_value].value
+            else:
+                wrong_value = "(undefined)"
+            raise RuntimeError(f"ufbx.h:{line}: UFBX_ENUM_TYPE() has wrong highest value ({last_value} = {wrong_value}), actual highest value is ({max_value.name} = {max_value.value})")
+        count = max_value.value + 1
+        file.constants[count_name] = Constant(name=count_name, value_int=count)
+        file.declarations.append(Declaration(kind="enumCount", name=count_name))
 
 def parse_file(decls):
     file = File()
@@ -504,6 +545,7 @@ def parse_file(decls):
     # HACK
     file.constants["UFBX_ERROR_STACK_MAX_DEPTH"] = Constant(name="UFBX_ERROR_STACK_MAX_DEPTH", value_int=8)
     file.constants["UFBX_PANIC_MESSAGE_LENGTH"] = Constant(name="UFBX_PANIC_MESSAGE_LENGTH", value_int=128)
+    file.constants["UFBX_ERROR_INFO_LENGTH"] = Constant(name="UFBX_ERROR_INFO_LENGTH", value_int=256)
 
     for decl in decls:
         parse_decl(file, decl)
@@ -607,7 +649,7 @@ def layout_type(arch: Arch, file: File, typ: Type):
         layout_type(arch, file, inner)
         typ.size[arch.name] = inner.size[arch.name]
         typ.align[arch.name] = inner.align[arch.name]
-    elif typ.kind == "const":
+    elif typ.kind in ("const", "unsafe"):
         inner = file.types[typ.inner]
         layout_type(arch, file, inner)
         typ.size[arch.name] = inner.size[arch.name]
@@ -623,6 +665,9 @@ def layout_type(arch: Arch, file: File, typ: Type):
     elif typ.kind == "function":
         inner = file.types[typ.inner]
         layout_type(arch, file, inner)
+        typ.size[arch.name] = 0
+        typ.align[arch.name] = 0
+    elif typ.kind == "define":
         typ.size[arch.name] = 0
         typ.align[arch.name] = 0
     else:
@@ -675,6 +720,7 @@ ref_types = {
     "ufbx_geometry_cache",
     "ufbx_cache_channel",
     "ufbx_cache_frame",
+    "ufbx_texture_file",
 }
 
 pod_structs = [
@@ -699,9 +745,11 @@ pod_structs = [
 
 input_structs = [
     "ufbx_allocator_opts",
+    "ufbx_open_memory_opts",
     "ufbx_load_opts",
     "ufbx_evaluate_opts",
-    "ufbx_tessellate_opts",
+    "ufbx_tessellate_curve_opts",
+    "ufbx_tessellate_surface_opts",
     "ufbx_subdivide_opts",
     "ufbx_geometry_cache_opts",
     "ufbx_geometry_cache_data_opts",
@@ -764,6 +812,7 @@ member_functions = [
     MemberFunction(func="ufbx_evaluate_nurbs_basis", self_type="ufbx_nurbs_basis", member_name="evaluate"),
     MemberFunction(func="ufbx_evaluate_nurbs_curve", self_type="ufbx_nurbs_curve", member_name="evaluate"),
     MemberFunction(func="ufbx_evaluate_nurbs_surface", self_type="ufbx_nurbs_surface", member_name="evaluate"),
+    MemberFunction(func="ufbx_tessellate_nurbs_curve", self_type="ufbx_nurbs_curve", member_name="tessellate"),
     MemberFunction(func="ufbx_tessellate_nurbs_surface", self_type="ufbx_nurbs_surface", member_name="tessellate"),
     MemberFunction(func="ufbx_catch_triangulate_face", self_type="ufbx_mesh"),
     MemberFunction(func="ufbx_triangulate_face", self_type="ufbx_mesh"),
@@ -772,6 +821,21 @@ member_functions = [
     MemberFunction(func="ufbx_sample_geometry_cache_real", self_type="ufbx_cache_channel", member_name="sample_real"),
     MemberFunction(func="ufbx_read_geometry_cache_vec3", self_type="ufbx_cache_frame", member_name="read_vec3"),
     MemberFunction(func="ufbx_sample_geometry_cache_vec3", self_type="ufbx_cache_channel", member_name="sample_vec3"),
+]
+
+member_globals = [
+    MemberGlobal(global_name="ufbx_empty_string", self_type="ufbx_string", member_name="empty"),
+    MemberGlobal(global_name="ufbx_empty_blob", self_type="ufbx_blob", member_name="empty"),
+    MemberGlobal(global_name="ufbx_identity_matrix", self_type="ufbx_matrix", member_name="identity"),
+    MemberGlobal(global_name="ufbx_identity_transform", self_type="ufbx_transform", member_name="identity"),
+    MemberGlobal(global_name="ufbx_zero_vec2", self_type="ufbx_vec2", member_name="zero"),
+    MemberGlobal(global_name="ufbx_zero_vec3", self_type="ufbx_vec3", member_name="zero"),
+    MemberGlobal(global_name="ufbx_zero_vec4", self_type="ufbx_vec4", member_name="zero"),
+    MemberGlobal(global_name="ufbx_identity_quat", self_type="ufbx_quat", member_name="identity"),
+    MemberGlobal(global_name="ufbx_axes_right_handed_y_up", self_type="ufbx_coordinate_axes", member_name="right_handed_y_up"),
+    MemberGlobal(global_name="ufbx_axes_right_handed_z_up", self_type="ufbx_coordinate_axes", member_name="right_handed_z_up"),
+    MemberGlobal(global_name="ufbx_axes_left_handed_y_up", self_type="ufbx_coordinate_axes", member_name="left_handed_y_up"),
+    MemberGlobal(global_name="ufbx_axes_left_handed_z_up", self_type="ufbx_coordinate_axes", member_name="left_handed_z_up"),
 ]
 
 def find_index(list, predicate):
@@ -849,6 +913,9 @@ if __name__ == "__main__":
             inner = file.types[typ.inner]
             if inner.is_function:
                 typ.is_function = True
+
+    for st in file.structs.values():
+        postprocess_fields(file, st)
 
     for func in file.functions.values():
         for index, arg in enumerate(func.arguments):
@@ -938,6 +1005,8 @@ if __name__ == "__main__":
                 arg.return_ref = True
             if typ.base_name in { "ufbx_scene", "ufbx_anim", "ufbx_element", "ufbx_geometry_cache", "ufbx_props" }:
                 arg.return_ref = True
+        if len(func.arguments) == 1 and func.arguments[0].type == "void":
+            func.arguments.clear()
 
     for func in file.functions.values():
         if "_ffi_" in func.name:
@@ -962,16 +1031,19 @@ if __name__ == "__main__":
     file.functions["ufbx_load_stdio_prefix"].alloc_type = "scene"
     file.functions["ufbx_evaluate_scene"].alloc_type = "scene"
     file.functions["ufbx_subdivide_mesh"].alloc_type = "mesh"
+    file.functions["ufbx_tessellate_nurbs_curve"].alloc_type = "line"
     file.functions["ufbx_tessellate_nurbs_surface"].alloc_type = "mesh"
     file.functions["ufbx_load_geometry_cache"].alloc_type = "geometryCache"
     file.functions["ufbx_load_geometry_cache_len"].alloc_type = "geometryCache"
 
     file.functions["ufbx_free_scene"].kind = "free"
     file.functions["ufbx_free_mesh"].kind = "free"
+    file.functions["ufbx_free_line_curve"].kind = "free"
     file.functions["ufbx_free_geometry_cache"].kind = "free"
 
     file.functions["ufbx_retain_scene"].kind = "retain"
     file.functions["ufbx_retain_mesh"].kind = "retain"
+    file.functions["ufbx_retain_line_curve"].kind = "retain"
     file.functions["ufbx_retain_geometry_cache"].kind = "retain"
 
     file.functions["ufbx_triangulate_face"].return_array_scale = 3
@@ -1005,6 +1077,18 @@ if __name__ == "__main__":
         file.structs[mf.self_type].member_functions.append(mf.func)
 
         file.member_functions[mf.func] = mf
+
+    for mg in member_globals:
+        file.structs[mg.self_type].member_globals.append(mg.global_name)
+        file.member_globals[mg.global_name] = mg
+
+    allow_missing_enum_count = ["ufbx_progress_result"]
+    for en in file.enums.values():
+        if en.flag: continue
+        if en.name in allow_missing_enum_count: continue
+        count_name = en.name.upper() + "_COUNT"
+        if count_name not in file.constants:
+            raise RuntimeError(f"enum {en.name} is missing UFBX_ENUM_TYPE()")
 
     for arch in archs:
         layout_file(arch, file)

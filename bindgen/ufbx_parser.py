@@ -1,4 +1,3 @@
-from ast import SetComp
 import parsette
 import string
 from typing import List, Optional, NamedTuple, Union
@@ -17,8 +16,9 @@ TNumber = lexer.rule("number", r"(0[Xx][0-9A-Fa-f]+)|([0-9]+)", prefix=string.di
 TComment = lexer.rule("comment", r"//[^\r\n]*", prefix="/")
 TPreproc = lexer.rule("preproc", r"#[^\n\\]*(\\\r?\n[^\n\\]*?)*\n", prefix="#")
 TString = lexer.rule("string", r"\"[^\"]*\"", prefix="\"")
-lexer.literals(*"const typedef struct union enum extern ufbx_abi ufbx_inline ufbx_nullable UFBX_LIST_TYPE".split())
+lexer.literals(*"const typedef struct union enum extern ufbx_abi ufbx_inline ufbx_nullable ufbx_abi ufbx_unsafe UFBX_LIST_TYPE UFBX_ENUM_REPR UFBX_FLAG_REPR UFBX_ENUM_FORCE_WIDTH UFBX_FLAG_FORCE_WIDTH UFBX_ENUM_TYPE".split())
 lexer.literals(*",.*[]{}()<>=-;")
+lexer.ignore("disable", re.compile(r"//\s*bindgen-disable.*?//\s*bindgen-enable", flags=re.DOTALL))
 
 Token = parsette.Token
 Ast = parsette.Ast
@@ -60,17 +60,12 @@ class ANameFunction(AName):
 class ANameAnonymous(AName):
     pass
 
-class ATypeInline(AType):
-    inner: AType
-
-class ATypeAbi(AType):
-    inner: AType
-
 class ATypeConst(AType):
     inner: AType
 
-class ATypeNullable(AType):
+class ATypeSpec(AType):
     inner: AType
+    spec: Token
 
 class ATypeIdent(AType):
     name: Token
@@ -119,6 +114,11 @@ class ATopFile(ATop):
 class ATopList(ATop):
     name: Token
     type: ADecl
+
+class ATopEnumType(ATop):
+    enum_type: Token
+    prefix: Token
+    last_value: Token
 
 class Parser(parsette.Parser):
     def __init__(self, source, filename=""):
@@ -175,31 +175,36 @@ class Parser(parsette.Parser):
     def finish_enum(self, kind) -> ATypeStruct:
         kn = kind.text()
         name = self.accept(TIdent)
+        self.require(["UFBX_ENUM_REPR", "UFBX_FLAG_REPR"], "enum repr macro")
         if self.accept("{"):
             decls = []
             loc = name if name else kind
+            has_force_width = False
             with self.hint(loc, f"{kn} {name.text()}" if name else f"anonymous {kn}"):
                 while not self.accept("}"):
                     if self.accept(","):
                         continue
+                    if self.accept(["UFBX_ENUM_FORCE_WIDTH", "UFBX_FLAG_FORCE_WIDTH"]):
+                        self.require("(", "for FORCE_WIDTH macro parameters")
+                        self.require(TIdent, "for FORCE_WIDTH macro name")
+                        self.require(")", "for FORCE_WIDTH macro parameters")
+                        has_force_width = True
+                        continue
                     decls.append(self.parse_enum_decl())
+                if not has_force_width:
+                    self.fail_at(self.prev_token, "enum missing FORCE_WIDTH macro")
         else:
             decls = None
         return ATypeEnum(kind, name, decls)
 
     def parse_type(self) -> AType:
+        token = self.token
         if self.accept("const"):
             inner = self.parse_type()
             return ATypeConst(inner)
-        elif self.accept("ufbx_nullable"):
+        elif self.accept(["ufbx_nullable", "ufbx_abi", "ufbx_unsafe", "ufbx_inline"]):
             inner = self.parse_type()
-            return ATypeNullable(inner)
-        elif self.accept("ufbx_inline"):
-            inner = self.parse_type()
-            return ATypeInline(inner)
-        elif self.accept("ufbx_abi"):
-            inner = self.parse_type()
-            return ATypeAbi(inner)
+            return ATypeSpec(inner, token)
         elif self.accept(["struct", "union"]):
             return self.finish_struct(self.prev_token)
         elif self.accept("enum"):
@@ -230,7 +235,7 @@ class Parser(parsette.Parser):
             elif self.accept("("):
                 args = []
                 while not self.accept(")"):
-                    args.append(self.parse_decl("argument", allow_list=False))
+                    args.append(self.parse_decl("argument", allow_list=False, allow_anonymous=True))
                     self.accept(",")
                 ast = ANameFunction(ast, args)
             else:
@@ -255,6 +260,16 @@ class Parser(parsette.Parser):
         decl = self.parse_decl("UFBX_TOP_LIST type", allow_anonymous=True, allow_list=False)
         self.require(")", "for macro parameters")
         return ATopList(name, decl)
+
+    def finish_top_enum_type(self) -> ATopEnumType:
+        self.require("(", "for macro parameters")
+        enum_name = self.require(TIdent, "for enum type name")
+        self.require(",", "for macro parameters")
+        prefix = self.require(TIdent, "for enum prefix")
+        self.require(",", "for macro parameters")
+        last_value = self.require(TIdent, "for enum last value")
+        self.require(")", "for macro parameters")
+        return ATopEnumType(enum_name, prefix, last_value)
 
     def finish_macro_params(self):
         while not self.accept(")"):
@@ -290,6 +305,10 @@ class Parser(parsette.Parser):
             tl = self.finish_top_list()
             self.require(";", "after UFBX_LIST_TYPE()")
             return [tl]
+        elif self.accept("UFBX_ENUM_TYPE"):
+            tl = self.finish_top_enum_type()
+            self.require(";", "after UFBX_ENUM_TYPE()")
+            return [tl]
         else:
             decl = self.parse_decl("top-level")
             if self.accept("{"):
@@ -319,14 +338,15 @@ def fmt_type(type: AType):
         return type.name.text()
     elif isinstance(type, ATypeConst):
         return f"const {fmt_type(type.inner)}"
-    elif isinstance(type, ATypeNullable):
-        return f"ufbx_nullable {fmt_type(type.inner)}"
+    elif isinstance(type, ATypeSpec):
+        return f"{type.spec.text()} {fmt_type(type.inner)}"
 
 class SMod: pass
 class SModConst(SMod): pass
 class SModNullable(SMod): pass
 class SModInline(SMod): pass
 class SModAbi(SMod): pass
+class SModUnsafe(SMod): pass
 class SModPointer(SMod): pass
 class SModArray(SMod):
     def __init__(self, length: Optional[str]):
@@ -344,7 +364,7 @@ class SType(NamedTuple):
     kind: str
     name: Optional[str]
     mods: List[SMod] = []
-    body: Union["SStruct", "SEnum", None] = None
+    body: Union["SStruct", "SEnum", "SEnumType", None] = None
 
 class SName(NamedTuple):
     name: Optional[str]
@@ -359,6 +379,7 @@ class SDecl(NamedTuple):
     comment: Optional[SComment] = None
     comment_inline: bool = False
     is_function: bool = False
+    define_args: Optional[List[str]] = None
     value: Optional[str] = None
 
 class SDeclGroup(NamedTuple):
@@ -382,47 +403,51 @@ class SEnum(NamedTuple):
     name: Optional[str]
     decls: List[SCommentDecl]
 
-def type_line(type: AType):
-    if isinstance(type, ATypeIdent):
-        return type.name.location.line
-    elif isinstance(type, ATypeConst):
-        return type_line(type.inner)
-    elif isinstance(type, ATypeNullable):
-        return type_line(type.inner)
-    elif isinstance(type, ATypeInline):
-        return type_line(type.inner)
-    elif isinstance(type, ATypeAbi):
-        return type_line(type.inner)
-    elif isinstance(type, ATypeStruct):
-        return type.kind.location.line
-    elif isinstance(type, ATypeEnum):
-        return type.kind.location.line
-    else:
-        raise TypeError(f"Unhandled type {type(type)}")
+class SEnumType(NamedTuple):
+    line: int
+    enum_name: str
+    enum_prefix: str
+    last_value: str
 
-def to_stype(type: AType) -> SType:
-    if isinstance(type, ATypeIdent):
-        return SType("name", type.name.text())
-    elif isinstance(type, ATypeConst):
-        st = to_stype(type.inner)
-        return st._replace(mods=st.mods + [SModConst()])
-    elif isinstance(type, ATypeNullable):
-        st = to_stype(type.inner)
-        return st._replace(mods=st.mods + [SModNullable()])
-    elif isinstance(type, ATypeInline):
-        st = to_stype(type.inner)
-        return st._replace(mods=st.mods + [SModInline()])
-    elif isinstance(type, ATypeAbi):
-        st = to_stype(type.inner)
-        return st._replace(mods=st.mods + [SModAbi()])
-    elif isinstance(type, ATypeStruct):
-        body = to_sstruct(type) if type.decls is not None else None
-        return SType(type.kind.text(), type.name.text() if type.name else None, body=body)
-    elif isinstance(type, ATypeEnum):
-        body = to_senum(type) if type.decls is not None else None
-        return SType("enum", type.name.text() if type.name else None, body=body)
+def type_line(typ: AType):
+    if isinstance(typ, ATypeIdent):
+        return typ.name.location.line
+    elif isinstance(typ, ATypeConst):
+        return type_line(typ.inner)
+    elif isinstance(typ, ATypeStruct):
+        return typ.kind.location.line
+    elif isinstance(typ, ATypeEnum):
+        return typ.kind.location.line
+    elif isinstance(typ, ATypeSpec):
+        return type_line(typ.inner)
     else:
-        raise TypeError(f"Unhandled type {type(type)}")
+        raise TypeError(f"Unhandled type {type(typ).__name__}")
+
+spec_to_mod = {
+    "ufbx_abi": SModAbi,
+    "ufbx_nullable": SModNullable,
+    "ufbx_inline": SModInline,
+    "ufbx_unsafe": SModUnsafe,
+}
+
+def to_stype(typ: AType) -> SType:
+    if isinstance(typ, ATypeIdent):
+        return SType("name", typ.name.text())
+    elif isinstance(typ, ATypeConst):
+        st = to_stype(typ.inner)
+        return st._replace(mods=st.mods + [SModConst()])
+    elif isinstance(typ, ATypeSpec):
+        st = to_stype(typ.inner)
+        spec = typ.spec.text()
+        return st._replace(mods=st.mods + [spec_to_mod[spec]()])
+    elif isinstance(typ, ATypeStruct):
+        body = to_sstruct(typ) if typ.decls is not None else None
+        return SType(typ.kind.text(), typ.name.text() if typ.name else None, body=body)
+    elif isinstance(typ, ATypeEnum):
+        body = to_senum(typ) if typ.decls is not None else None
+        return SType("enum", typ.name.text() if typ.name else None, body=body)
+    else:
+        raise TypeError(f"Unhandled type {type(typ).__name__}")
 
 def name_to_stype(base: SType, name: AName) -> SType:
     if isinstance(name, ANamePointer):
@@ -553,8 +578,32 @@ def top_sdecls(top: ATop) -> List[SCommentDecl]:
                 SDecl(line+1, line+1, "field", [SName("count", SType("name", "size_t"))]),
             ], is_list=True)
         ))])]
+    elif isinstance(top, ATopEnumType):
+        line = top.enum_type.location.line
+        name = top.prefix.text() + "_COUNT"
+        return [SDecl(line, line, "enumCount",
+            [SName(name, SType("enumType", "enumType", body=SEnumType(
+                line, top.enum_type.text(), top.prefix.text(), top.last_value.text())
+                )
+            )]
+        )]
     elif isinstance(top, ATopPreproc):
-        return [] # TODO
+        line = top.preproc.location.line
+        text = top.preproc.text()
+        m = re.match(r"#\s*define\s+(\w+)(\([^\)]*\))?\s+(.*)", text)
+        if m:
+            name = m.group(1)
+            args = m.group(2)
+            if args:
+                args = [arg.strip() for arg in args.split(",")]
+            else:
+                args = None
+            value = m.group(3)
+            return [SDecl(line, line, "define", [SName(name, SType("define", "define"))],
+                define_args=args,
+                value=value)]
+        else:
+            return [] # TODO
     else:
         raise TypeError(f"Unhandled type {type(top)}")
 
@@ -632,12 +681,14 @@ def format_mod(mod: SMod):
         return { "type": "abi" }
     elif isinstance(mod, SModPointer):
         return { "type": "pointer" }
+    elif isinstance(mod, SModUnsafe):
+        return { "type": "unsafe" }
     elif isinstance(mod, SModArray):
         return { "type": "array", "length": mod.length }
     elif isinstance(mod, SModFunction):
         return { "type": "function", "args": [format_arg(d) for d in mod.args] }
     else:
-        raise TypeError(f"Unhandled type {type(type)}")
+        raise TypeError(f"Unhandled mod {type(mod)}")
 
 def format_type(type: SType):
     return {
@@ -683,6 +734,16 @@ def format_decls(decls: List[SCommentDecl], allow_groups: bool):
                     "commentInline": decl.comment_inline,
                     "decls": list(format_decls(body.decls, allow_groups=True)),
                 }
+            elif isinstance(body, SEnumType):
+                yield {
+                    "kind": "enumType",
+                    "line": body.line,
+                    "enumName": body.enum_name,
+                    "countName": body.enum_prefix + "_COUNT",
+                    "lastValue": body.last_value,
+                    "comment": decl.comment.text if decl.comment else [],
+                    "commentInline": decl.comment_inline,
+                }
             else:
                 for name in decl.names:
                     yield {
@@ -694,6 +755,7 @@ def format_decls(decls: List[SCommentDecl], allow_groups: bool):
                         "commentInline": decl.comment_inline,
                         "isFunction": decl.is_function,
                         "value": decl.value,
+                        "defineArgs": decl.define_args,
                         "type": format_type(name.type),
                     }
         elif isinstance(decl, SDeclGroup):

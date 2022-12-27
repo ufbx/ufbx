@@ -2,6 +2,7 @@ import zlib_debug_compressor as zz
 import zlib
 import sys
 import itertools
+import random
 
 def test_dynamic():
     """Simple dynamic Huffman tree compressed block"""
@@ -15,11 +16,24 @@ def test_dynamic_no_match():
     data = b"Hello World!"
     return data, zz.deflate(data, opts)
 
+def test_dynamic_empty():
+    """Dynamic Huffman block with a single symbol (end)"""
+    opts = zz.Options(force_block_types=[2])
+    data = b""
+    return data, zz.deflate(data, opts)
+
 def test_dynamic_rle():
     """Simple dynamic Huffman with a single repeating match"""
     opts = zz.Options(force_block_types=[2])
     data = b"AAAAAAAAAAAAAAAAA"
     message = [zz.Literal(b"A"), zz.Match(16, 1)]
+    return data, zz.compress_message(message, opts)
+
+def test_dynamic_rle_boundary():
+    """Simple dynamic Huffman with a single repeating match, adjusted to cross a 16 byte boundary"""
+    opts = zz.Options(force_block_types=[2])
+    data = b"AAAAAAAAAAAAAAAAAAAAAAAAA"
+    message = [zz.Literal(b"A"), zz.Match(24, 1)]
     return data, zz.compress_message(message, opts)
 
 def test_repeat_length():
@@ -123,6 +137,100 @@ def test_long_codes():
     data = zz.decode(message)
     return data, zz.compress_message(message, opts)
 
+def test_long_code_sequences():
+    """Test sequences of long codes with N bit symbols"""
+    messages = []
+
+    # Generate random prefix
+    random.seed(1)
+
+    total_message = []
+
+    message = []
+
+    data = bytes(random.choices(range(ord("0"), ord("4")), k=300))
+    message.append(zz.Literal(data))
+    message_len = 300
+
+    while message_len <= 24000:
+        dist = min(random.randrange(256, 1024), message_len - 200)
+        message.append(zz.Match(200, dist))
+
+        data = bytes(random.choices(range(ord("0"), ord("4")), k=10))
+        message.append(zz.Literal(data))
+
+        message_len += 210
+
+    opts = zz.Options(force_block_types=[2])
+    messages += [message, opts]
+    total_message += message
+
+    # Generate matches with increasing bit counts
+    for ll_bits in range(2, 15+1):
+        for dist_bits in [ll_bits, 15]:
+            message = []
+
+            ll_override = { }
+            dist_override = { }
+            for n in range(ll_bits - 3):
+                ll_override[n] = 2**(32-n)
+            for n in range(dist_bits - 1):
+                dist_override[n] = 2**(32-n)
+
+            for ll in [256, 284, ord("A"), ord("B"), ord("C"), ord("D"), ord("E"), ord("F")]:
+                ll_override[ll] = 2**8
+            dist_override[29] = 2**8
+
+            match_len = random.randrange(230, 250)
+            match_dist = random.randrange(17000, 24000)
+            message.append(zz.Match(match_len, match_dist))
+
+            for lits in range(0, 8):
+                if lits:
+                    message.append(zz.Literal(bytes(random.choices(b"ABCDEF", k=lits))))
+                match_len = random.randrange(230, 250)
+                match_dist = random.randrange(17000, 24000)
+                message.append(zz.Match(match_len, match_dist))
+
+            opts = zz.Options(force_block_types=[2],
+                            override_litlen_counts=ll_override,
+                            override_dist_counts=dist_override)
+            messages += [message, opts]
+            total_message += message
+
+
+    data = zz.decode(total_message)
+    return data, zz.compress_message(*messages)
+
+def test_two_symbol_bits():
+    """Test some combinations of bit lengths for two symbols"""
+    messages = []
+    data = b""
+
+    for lo in range(2, 16):
+        for hi in range(lo, min(lo + 6, 16)):
+            delta = hi - lo
+
+            ll_override = { }
+            ll_override[256] = 64**16
+
+            for n in range(lo):
+                ll_override[96 + n] = 8**(16-n)
+            ll_override[ord("A")] = 8**(16-lo)
+
+            for n in range(2**delta):
+                assert n < 64
+                ll_override[n] = 8**(16-hi)
+            ll_override[ord("B")] = 8**(16-hi)
+
+            message = [zz.Literal(b"AB")]
+            data += b"AB"
+            opts = zz.Options(force_block_types=[2],
+                            override_litlen_counts=ll_override)
+            messages += [message, opts]
+
+    return data, zz.compress_message(*messages)
+
 def test_fail_codelen_16_overflow():
     """Test oveflow of codelen symbol 16"""
     data = b"\xfd\xfe\xff"
@@ -211,6 +319,23 @@ def test_fail_bad_distance():
     
     return data, buf
 
+def test_fail_bad_static_litlen():
+    """Test bad static lit/length (286..287)"""
+    data = b"A"
+    opts = zz.Options(force_block_types=[1])
+    buf = zz.deflate(data, opts)
+    buf.patch(19, 0b01100011, 8, "Invalid symbol 285")
+    
+    return data, buf
+
+def test_fail_distance_too_far():
+    """Test with distance too far to the output"""
+    opts = zz.Options(force_block_types=[1], no_decode=True)
+    message = [zz.Literal(b"A"), zz.Match(4, 2)]
+    buf = zz.compress_message(message, opts)
+    
+    return b"", buf
+
 def test_fail_bad_distance_bit():
     """Test bad distance symbol in one symbol alphabet"""
     data = b"asd asd"
@@ -246,6 +371,24 @@ def test_fail_bad_lit_length():
 
     return data, buf
 
+def test_fail_no_litlen_codes():
+    """Test lit/len table with no codes"""
+    data = b""
+    probs = { n: 0 for n in range(286) }
+    opts = zz.Options(force_block_types=[2], override_litlen_counts=probs, invalid_sym=zz.Code(0, 1))
+    buf = zz.deflate(data, opts)
+
+    return data, buf
+
+def test_fail_no_dist_codes():
+    """Test distance table with no codes"""
+    probs = { n: 0 for n in range(30) }
+    opts = zz.Options(force_block_types=[2], override_dist_counts=probs, invalid_sym=zz.Code(0, 1))
+    message = [zz.Literal(b"A"), zz.Match(4, 1)]
+    buf = zz.compress_message(message, opts)
+
+    return data, buf
+
 def fmt_bytes(data, cols=20):
     lines = []
     for begin in range(0, len(data), cols):
@@ -262,6 +405,8 @@ def fnv1a(data):
 test_cases = [
     test_dynamic,
     test_dynamic_no_match,
+    test_dynamic_empty,
+    test_dynamic_rle,
     test_dynamic_rle,
     test_repeat_length,
     test_huff_lengths,
@@ -269,6 +414,8 @@ test_cases = [
     test_static_distances_and_lengths,
     test_dynamic_distances_and_lengths,
     test_long_codes,
+    test_long_code_sequences,
+    test_two_symbol_bits,
 ]
 
 good = True

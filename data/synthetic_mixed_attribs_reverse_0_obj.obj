@@ -1,0 +1,80 @@
+# vertex
+v -1 0 0
+v 1 0 0
+v 0 1 0
+g V
+f -3 -2 -1
+
+# vertex + texcoord
+v -2 0 1
+v 2 0 1
+v 0 2 1
+vt 0 0
+vt 1 0
+vt 0 1
+g VT
+f -3/-3 -2/-2 -1/-1
+
+# vertex + normal
+v -3 0 2
+v 3 0 2
+v 0 3 2
+vn 0 -1 0
+vn 0 -1 0
+vn 0 1 0
+g VN
+f -3//-3 -2//-2 -1//-1
+
+# vertex + texcoord + normal
+v -4 0 3
+v 4 0 3
+v 0 4 3
+vt 0 0
+vt 2 0
+vt 0 2
+vn 0 -2 0
+vn 0 -2 0
+vn 0 2 0
+g VTN
+f -3/-3/-3 -2/-2/-2 -1/-1/-1
+
+# vertex + color
+v -5 0 4 1 0 0
+v 5 0 4 0 1 0
+v 0 5 4 0 0 1
+g VC
+f -3 -2 -1
+
+# vertex + texcoord + color
+v -6 0 5 2 0 0
+v 6 0 5 0 2 0
+v 0 6 5 0 0 2
+vt 0 0
+vt 3 0
+vt 0 3
+g VTC
+f -3/-3 -2/-2 -1/-1
+
+# vertex + normal + color
+v -7 0 6 3 0 0
+v 7 0 6 0 3 0
+v 0 7 6 0 0 3
+vn 0 -3 0
+vn 0 -3 0
+vn 0 3 0
+g VNC
+f -3//-3 -2//-2 -1//-1
+
+# vertex + texcoord + normal + color
+v -8 0 7 4 0 0
+v 8 0 7 0 4 0
+v 0 8 7 0 0 4
+vt 0 0
+vt 4 0
+vt 0 4
+vn 0 -4 0
+vn 0 -4 0
+vn 0 4 0
+g VTNC
+f -3/-3/-3 -2/-2/-2 -1/-1/-1
+

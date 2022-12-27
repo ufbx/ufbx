@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "constraints"
 
 UFBXT_FILE_TEST(maya_constraint_zoo)
 #if UFBXT_IMPL
@@ -79,7 +81,7 @@ UFBXT_FILE_TEST(maya_constraint_zoo)
 }
 #endif
 
-UFBXT_FILE_TEST(maya_character)
+UFBXT_FILE_TEST_FLAGS(maya_character, UFBXT_FILE_TEST_FLAG_HEAVY_TO_FUZZ)
 #if UFBXT_IMPL
 {
 	// TODO: Test things
@@ -109,7 +111,7 @@ UFBXT_FILE_TEST(maya_constraint_multi)
 }
 #endif
 
-UFBXT_FILE_TEST(maya_human_ik)
+UFBXT_FILE_TEST_FLAGS(maya_human_ik, UFBXT_FILE_TEST_FLAG_HEAVY_TO_FUZZ)
 #if UFBXT_IMPL
 {
 	uint32_t ik_count = 0;

@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
 	uint64_t os_tick;
 	uint64_t cpu_tick;
@@ -33,11 +37,19 @@ double cputime_os_delta_to_sec(const cputime_sync_span *span, uint64_t os_delta)
 double cputime_cpu_tick_to_sec(const cputime_sync_span *span, uint64_t cpu_tick);
 double cputime_os_tick_to_sec(const cputime_sync_span *span, uint64_t os_tick);
 
+#ifdef __cplusplus
+}
+#endif
+
 #endif
 
 #if defined(CPUTIME_IMPLEMENTATION)
 #ifndef CPUTIME_IMEPLEMENTED
 #define CPUTIME_IMEPLEMENTED
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #if defined(CPUTIME_STANDARD_C) || defined(UFBX_STANDARD_C)
 
@@ -141,7 +153,7 @@ static void cputime_os_wait()
 	static uint64_t cputime_imp_timestamp()
 	{
 		struct timespec time;
-		clock_gettime(CLOCK_THREAD_CPUTIME_ID, &time);
+		clock_gettime(CLOCK_MONOTONIC, &time);
 		return (uint64_t)time.tv_sec*UINT64_C(1000000000) + (uint64_t)time.tv_nsec;
 	}
 #endif
@@ -271,6 +283,10 @@ double cputime_os_tick_to_sec(const cputime_sync_span *span, uint64_t os_tick)
 	if (!span) span = &g_cputime_sync;
 	return (double)(os_tick - span->begin.os_tick) * span->rcp_os_freq;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 #endif

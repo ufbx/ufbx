@@ -1,3 +1,5 @@
+#undef UFBXT_TEST_GROUP
+#define UFBXT_TEST_GROUP "mesh"
 
 UFBXT_FILE_TEST(blender_279_default)
 #if UFBXT_IMPL
@@ -67,6 +69,8 @@ UFBXT_FILE_TEST(maya_cube)
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(!mesh->generated_normals);
 
 	for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
 		ufbx_face face = mesh->faces.data[face_i];
@@ -404,8 +408,8 @@ UFBXT_FILE_TEST(blender_279_ball)
 {
 	ufbx_material *red = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Red");
 	ufbx_material *white = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "White");
-	ufbxt_assert(!strcmp(red->name.data, "Red"));
-	ufbxt_assert(!strcmp(white->name.data, "White"));
+	ufbxt_assert(red && !strcmp(red->name.data, "Red"));
+	ufbxt_assert(white && !strcmp(white->name.data, "White"));
 
 	ufbx_vec3 red_ref = { 0.8, 0.0, 0.0 };
 	ufbx_vec3 white_ref = { 0.8, 0.8, 0.8 };
@@ -472,14 +476,64 @@ UFBXT_FILE_TEST(maya_uv_and_color_sets)
 UFBXT_FILE_TEST(maya_bad_face)
 #if UFBXT_IMPL
 {
-	// TODO: Implement this if bad faces are trimmed
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_empty_faces == 0);
+	ufbxt_assert(mesh->num_point_faces == 1);
+	ufbxt_assert(mesh->num_line_faces == 1);
+	ufbxt_assert(mesh->num_triangles == 7);
+	ufbxt_assert(mesh->num_faces == 6);
+
+	ufbxt_assert(mesh->faces.data[0].num_indices == 1);
+	ufbxt_assert(mesh->faces.data[1].num_indices == 2);
+	ufbxt_assert(mesh->faces.data[2].num_indices == 3);
+	ufbxt_assert(mesh->faces.data[3].num_indices == 4);
+
+	ufbxt_assert(mesh->faces.data[0].index_begin == 0);
+	ufbxt_assert(mesh->faces.data[1].index_begin == 1);
+	ufbxt_assert(mesh->faces.data[2].index_begin == 3);
+	ufbxt_assert(mesh->faces.data[3].index_begin == 6);
+
+	// ??? Maya exports an edge for the single point
+	ufbxt_assert(mesh->num_edges == 12);
+	ufbxt_assert(mesh->edges.data[0].a == 0);
+	ufbxt_assert(mesh->edges.data[0].b == 0);
+	ufbxt_assert(mesh->edges.data[1].a == 2);
+	ufbxt_assert(mesh->edges.data[1].b == 1);
 }
 #endif
 
 UFBXT_FILE_TEST(blender_279_edge_vertex)
 #if UFBXT_IMPL
 {
-	// TODO: Implement this if bad faces are trimmed
+	ufbx_node *node = ufbx_find_node(scene, "Plane");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_empty_faces == 0);
+	ufbxt_assert(mesh->num_point_faces == 0);
+	ufbxt_assert(mesh->num_line_faces == 1);
+	ufbxt_assert(mesh->num_triangles == 0);
+	ufbxt_assert(mesh->num_faces == 1);
+
+	ufbxt_assert(mesh->faces.data[0].index_begin == 0);
+	ufbxt_assert(mesh->faces.data[0].num_indices == 2);
+
+	// ??? Maya exports an edge for the single point
+	if (scene->metadata.version == 7400) {
+		ufbxt_assert(mesh->num_edges == 1);
+		ufbxt_assert(mesh->edges.data[0].a == 0);
+		ufbxt_assert(mesh->edges.data[0].b == 1);
+	} else {
+		// 6100 has an edge for both directions
+		ufbxt_assert(mesh->num_edges == 2);
+		ufbxt_assert(mesh->edges.data[0].a == 0);
+		ufbxt_assert(mesh->edges.data[0].b == 1);
+		ufbxt_assert(mesh->edges.data[1].a == 1);
+		ufbxt_assert(mesh->edges.data[1].b == 0);
+	}
 }
 #endif
 
@@ -488,6 +542,33 @@ UFBXT_FILE_TEST(blender_279_edge_circle)
 {
 	ufbx_node *node = ufbx_find_node(scene, "Circle");
 	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_indices == 512);
+
+	// ??? The 7400_binary export starts off with individual edges but has a
+	// massive N-gon for the rest of it.
+	if (scene->metadata.version == 7400) {
+		ufbxt_assert(mesh->num_line_faces == 127);
+		ufbxt_assert(mesh->num_faces == 128);
+
+		for (size_t i = 0; i < 127; i++) {
+			ufbxt_assert(mesh->faces.data[i].num_indices == 2);
+		}
+		ufbxt_assert(mesh->faces.data[127].num_indices == 258);
+
+		ufbxt_assert(mesh->num_edges == 256);
+	} else {
+		ufbxt_assert(mesh->num_line_faces == 256);
+		ufbxt_assert(mesh->num_faces == 256);
+
+		for (size_t i = 0; i < 256; i++) {
+			ufbxt_assert(mesh->faces.data[i].num_indices == 2);
+		}
+
+		// 6100 has an edge for both directions
+		ufbxt_assert(mesh->num_edges == 512);
+	}
 }
 #endif
 
@@ -520,7 +601,52 @@ UFBXT_FILE_TEST(synthetic_indexed_by_vertex)
 		ufbx_vec3 ref_normal = { 0.0f, pos.y > 0.0f ? 1.0f : -1.0f, 0.0f };
 		ufbxt_assert_close_vec3(err, normal, ref_normal);
 	}
+}
+#endif
 
+UFBXT_FILE_TEST(synthetic_by_vertex_bad_index)
+#if UFBXT_IMPL
+{
+	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, 9, NULL);
+
+	ufbxt_assert(scene->meshes.count == 1);
+	ufbx_mesh *mesh = scene->meshes.data[0];
+
+	for (size_t vi = 0; vi < mesh->num_vertices; vi++) {
+		int32_t ii = mesh->vertex_first_index.data[vi];
+		ufbx_vec3 pos = mesh->vertex_position.values.data[mesh->vertex_position.indices.data[ii]];
+		ufbx_vec3 normal = mesh->vertex_normal.values.data[mesh->vertex_normal.indices.data[ii]];
+		ufbx_vec3 ref_normal = { 0.0f, pos.y > 0.0f ? 1.0f : -1.0f, 0.0f };
+		ufbxt_assert_close_vec3(err, normal, ref_normal);
+	}
+
+	for (size_t ii = 0; ii < mesh->num_indices; ii++) {
+		ufbx_vec3 pos = mesh->vertex_position.values.data[mesh->vertex_position.indices.data[ii]];
+		ufbx_vec3 normal = mesh->vertex_normal.values.data[mesh->vertex_normal.indices.data[ii]];
+		ufbx_vec3 ref_normal = { 0.0f, pos.y > 0.0f ? 1.0f : -1.0f, 0.0f };
+		ufbxt_assert_close_vec3(err, normal, ref_normal);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_by_vertex_overflow)
+#if UFBXT_IMPL
+{
+	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, 12, NULL);
+
+	ufbxt_assert(scene->meshes.count == 1);
+	ufbx_mesh *mesh = scene->meshes.data[0];
+
+	ufbxt_assert(mesh->vertex_normal.values.count == 4);
+	for (size_t ii = 0; ii < mesh->num_indices; ii++) {
+		uint32_t vertex_ix = mesh->vertex_position.indices.data[ii];
+		uint32_t normal_ix = mesh->vertex_normal.indices.data[ii];
+		if (vertex_ix < mesh->vertex_normal.values.count) {
+			ufbxt_assert(normal_ix == vertex_ix);
+		} else {
+			ufbxt_assert(normal_ix == (uint32_t)mesh->vertex_normal.values.count - 1);
+		}
+	}
 }
 #endif
 
@@ -607,6 +733,7 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_missing_normals_generated, synthetic_missing_
 	ufbx_mesh *mesh = node->mesh;
 	ufbxt_assert(mesh->vertex_normal.exists);
 	ufbxt_assert(mesh->skinned_normal.exists);
+	ufbxt_assert(mesh->generated_normals);
 
 	for (size_t face_ix = 0; face_ix < mesh->faces.count; face_ix++) {
 		ufbx_face face = mesh->faces.data[face_ix];
@@ -715,7 +842,9 @@ UFBXT_FILE_TEST(zbrush_d20)
 		ufbxt_assert(mesh->num_faces == 20);
 		ufbxt_assert(mesh->face_group.count == 20);
 		for (int32_t i = 0; i < 20; i++) {
-			ufbxt_assert(mesh->face_group.data[i] == 10 + i * 5);
+			uint32_t group_ix = mesh->face_group.data[i];
+			ufbx_face_group *group = &mesh->face_groups.data[group_ix];
+			ufbxt_assert(group->id == 10 + i * 5);
 		}
 	}
 
@@ -733,7 +862,8 @@ UFBXT_FILE_TEST(zbrush_d20)
 				ufbx_vec3 normal = ufbx_get_weighted_face_normal(&mesh->vertex_position, face);
 				int32_t group = normal.z < 0.0f ? 9598 : 15349;
 				num_front += normal.z < 0.0f ? 1 : 0;
-				ufbxt_assert(mesh->face_group.data[i] == group);
+				uint32_t group_ix = mesh->face_group.data[i];
+				ufbxt_assert(mesh->face_groups.data[group_ix].id == group);
 			}
 			ufbxt_assert(num_front == mesh->num_faces / 2);
 		}
@@ -756,6 +886,9 @@ UFBXT_FILE_TEST(zbrush_d20)
 		ufbxt_assert(sub_mesh);
 		ufbxt_check_mesh(scene, sub_mesh);
 
+		// Check that we didn't break the original mesh
+		ufbxt_check_mesh(scene, mesh);
+
 		{
 			uint32_t num_front = 0;
 			ufbxt_assert(sub_mesh->face_group.count == sub_mesh->num_faces);
@@ -764,7 +897,8 @@ UFBXT_FILE_TEST(zbrush_d20)
 				ufbx_vec3 normal = ufbx_get_weighted_face_normal(&sub_mesh->vertex_position, face);
 				int32_t group = normal.z < 0.0f ? 9598 : 15349;
 				num_front += normal.z < 0.0f ? 1 : 0;
-				ufbxt_assert(sub_mesh->face_group.data[i] == group);
+				uint32_t group_ix = sub_mesh->face_group.data[i];
+				ufbxt_assert(sub_mesh->face_groups.data[group_ix].id == group);
 			}
 			ufbxt_assert(num_front == sub_mesh->num_faces / 2);
 		}
@@ -919,5 +1053,140 @@ UFBXT_FILE_TEST(synthetic_vertex_gaps)
 	ufbxt_assert_close_vec2(err, mesh->vertex_uv.values.data[2], gap_uvs[1]);
 	ufbxt_assert_close_vec2(err, mesh->vertex_uv.values.data[5], gap_uvs[2]);
 	ufbxt_assert_close_vec2(err, mesh->vertex_uv.values.data[7], gap_uvs[3]);
+}
+#endif
+
+#if UFBXT_IMPL
+
+typedef struct {
+	size_t num_faces;
+	size_t num_groups;
+} ufbxt_groups_per_face_count;
+
+#endif
+
+UFBXT_FILE_TEST(zbrush_polygroup_mess)
+#if UFBXT_IMPL
+{
+
+	ufbxt_assert(scene->meshes.count == 1);
+	ufbx_mesh *mesh = scene->meshes.data[0];
+
+	ufbxt_groups_per_face_count groups_per_face_count_ref[] = {
+		{ 1, 2 }, { 2, 1164 }, { 3, 1 }, { 4, 482 }, { 6, 181 }, { 8, 90 }, { 10, 26 }, { 12, 21 },
+		{ 14, 8 }, { 16, 10 }, { 18, 5 }, { 20, 6 }, { 22, 4 }, { 24, 7 }, { 26, 1 }, { 28, 1 },
+		{ 30, 1 }, { 32, 5 }, { 34, 2 }, { 40, 1 }, { 48, 3 }, { 50, 1 }, { 60, 1 }, { 64, 2 },
+		{ 72, 1 }, { 104, 1 }, { 128, 1 }, { 328, 1 },
+	};
+
+	uint32_t groups_per_face_count[512] = { 0 };
+
+	ufbxt_assert(mesh->face_groups.count == 2029);
+	for (size_t i = 0; i < mesh->face_groups.count; i++) {
+		ufbx_face_group *group = &mesh->face_groups.data[i];
+		ufbxt_assert(group->num_faces < ufbxt_arraycount(groups_per_face_count));
+		groups_per_face_count[group->num_faces]++;
+	}
+
+	for (size_t i = 0; i < ufbxt_arraycount(groups_per_face_count_ref); i++) {
+		ufbxt_groups_per_face_count ref = groups_per_face_count_ref[i];
+		ufbxt_assert(groups_per_face_count[ref.num_faces] == ref.num_groups);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(zbrush_cut_sphere)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+#if UFBXT_IMPL
+typedef struct {
+	int32_t id;
+	uint32_t face_count;
+} ufbxt_face_group_ref;
+#endif
+
+UFBXT_FILE_TEST(synthetic_face_group_id)
+#if UFBXT_IMPL
+{
+	const ufbxt_face_group_ref ref_groups[] = {
+		{ -2147483647 - 1, 1 },
+		{ -2000, 2 },
+		{ -2, 1 },
+		{ -1, 1 },
+		{ 0, 3 },
+		{ 1, 2 },
+		{ 2, 2 },
+		{ 10, 1 },
+		{ 20, 1 },
+		{ 30, 1 },
+		{ 40, 1 },
+		{ 50, 1 },
+		{ 3000, 2 },
+		{ 2147483647, 1 },
+	};
+
+	ufbx_node *node = ufbx_find_node(scene, "20 Sided");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	for (size_t i = 0; i < ufbxt_arraycount(ref_groups); i++) {
+		ufbxt_hintf("i = %zu", i);
+		ufbxt_assert(i < mesh->face_groups.count);
+		ufbx_face_group *group = &mesh->face_groups.data[i];
+		ufbxt_assert(group->id == ref_groups[i].id);
+		ufbxt_assert(group->num_faces == ref_groups[i].face_count);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(blender_279_empty_cube)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 0);
+	ufbxt_assert(mesh->num_indices == 0);
+	ufbxt_assert(mesh->num_vertices == 0);
+
+	ufbxt_assert(mesh->materials.count == 1);
+	ufbxt_assert(mesh->materials.data[0].material);
+	ufbxt_assert(mesh->materials.data[0].num_faces == 0);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_truncated_crease_partial)
+#if UFBXT_IMPL
+{
+	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, 1, "Truncated array: EdgeCrease");
+
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->edge_crease.count == 4);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[0], 0.25f);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[1], 0.5f);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[2], 0.5f);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[3], 0.5f);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_truncated_crease_full)
+#if UFBXT_IMPL
+{
+	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, 1, "Truncated array: EdgeCrease");
+
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->edge_crease.count == 4);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[0], 0.0f);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[1], 0.0f);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[2], 0.0f);
+	ufbxt_assert_close_real(err, mesh->edge_crease.data[3], 0.0f);
 }
 #endif

@@ -8,6 +8,8 @@ parser = argparse.ArgumentParser(usage="execute_per_fbx.py --exe loader --root .
 parser.add_argument("--exe", help="Executable to run")
 parser.add_argument("--root", default=".", help="Root path to search from")
 parser.add_argument("--start", default="", help="Top-level file to start from")
+parser.add_argument("--verbose", action="store_true", help="Verbose information")
+parser.add_argument('remainder', nargs="...")
 argv = parser.parse_args()
 
 begin = time.time()
@@ -33,7 +35,12 @@ for root, dirs, files in os.walk(argv.root):
 
         total_size += size
         if argv.exe:
-            args = [argv.exe, path.encode("utf-8")]
+            args = [argv.exe, path.encode("utf-8")] + argv.remainder[1:]
+
+            if argv.verbose:
+                cmdline = subprocess.list2cmdline(args)
+                print(f"$ {cmdline}")
+
             subprocess.check_call(args)
         num_tested += 1
 
