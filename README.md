@@ -1,8 +1,6 @@
 # ufbx [![CI](https://github.com/bqqbarbhg/ufbx/actions/workflows/ci.yml/badge.svg)](https://github.com/bqqbarbhg/ufbx/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/bqqbarbhg/ufbx/branch/master/graph/badge.svg)](https://codecov.io/gh/bqqbarbhg/ufbx)
 
-Single source file FBX reader.
-
-## Usage
+Single source file FBX file loader.
 
 ```c
 ufbx_load_opts opts = { 0 }; // Optional, pass NULL for defaults
@@ -15,35 +13,81 @@ if (!scene) {
 
 // Use and inspect `scene`, it's just plain data!
 
-// Geometry is always stored in a consistent indexed format:
-ufbx_node *cube = ufbx_find_node(scene, "Cube");
-ufbx_mesh *mesh = cube->mesh;
-for (size_t face_ix = 0; face_ix < mesh->num_faces; face_ix++) {
-    ufbx_face face = mesh->faces.data[face_ix];
-    for (size_t vertex_ix = 0; vertex_ix < face.num_indices; vertex_ix++) {
-        size_t index = face.index_begin + vertex_ix;
-        ufbx_vec3 position = mesh->vertex_position.values.data[mesh->vertex_position.indices.data[index]];
-        ufbx_vec3 normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, index); // Equivalent utility function
-        push_vertex(&position, &normal);
+// Let's just list all objects within the scene for example:
+for (size_t i = 0; i < scene->nodes.count; i++) {
+    ufbx_node *node = scene->nodes.data[i];
+    if (node->is_root) continue;
+
+    printf("Object: %s\n", node->name.data);
+    if (node->mesh) {
+        printf("-> mesh with %zu faces\n", node->mesh->faces.count);
     }
 }
 
-// There are helper functions for evaluating animations:
-for (double time = 0.0; time <= 1.0; time += 1.0/60.0) {
-    ufbx_transform transform = ufbx_evaluate_transform(&scene->anim, cube, time);
-    ufbx_matrix matrix = ufbx_transform_to_matrix(&transform);
-    push_pose(&matrix);
-}
-
-// Don't forget to free the allocation!
 ufbx_free_scene(scene);
 ```
 
-## WIP
+## Setup
 
-The library is nearing first proper version so most of the API should be relatively
-stable now for `1.0`. The header file contains some documentation but proper guide
-is still on the way.
+Copy `ufbx.h` and `ufbx.c` to your project. You can also add `misc/ufbx.natvis`
+to get debug formatting for the types.
+
+## Features
+
+The goal is to be at feature parity with the official FBX SDK.
+
+* Supports binary and ASCII FBX files starting from version 3000
+* Easy to integrate: one header and a single portable C99/C++11 file
+* Safe
+** Invalid files and out-of-memory conditions are handled gracefully
+** Loaded scenes are sanitized by default, no out-of-bounds indices or non-UTF-8 strings
+** Extensively [tested](#testing)
+* Various object types
+** Meshes, skinning, blend shapes
+** Lights and cameras
+** Embedded textures
+** NURBS curves and surfaces
+** Geometry caches
+** LOD groups
+** Display/selection sets
+** Rigging constraints
+* Unified PBR material from known vendor-specific materials
+* Various utilities for evaluating the scene (can be compiled out if not needed)
+** Polygon triangulation
+** Index generation
+** Animation curve evaluation / layer blending
+** CPU skinning (all FBX modes: linear, dual-quaternion, blended)
+** Subdivision surface evaluation
+** NURBS curve/surface tessellation
+* Progress reporting and cancellation
+* Support for Wavefront `.obj` files as well
+
+## Platforms
+
+The library is written in portable C (also compiles as C++) and should work on
+almost any platform without modification. If compiled as pre-C11/C++11 on an
+unknown compiler (not MSVC/Clang/GCC/TCC), some functions will not be
+thread-safe as C99 does not have support for atomics.
+
+The following platforms are tested on CI and produce bit-exact results:
+
+* Windows: MSVC x64/x86, Clang x64/x86, GCC MinGW x64
+* macOS: Clang x64, GCC x64
+* Linux: Clang x64/x86/ARM64/ARM32/PowerPC, GCC x64/x86/ARM64/ARM32, TCC x64/x86
+* WASI: Clang WASM
+
+## Testing
+
+* Internal tests run on all platforms listed above
+* Fuzzed in multiple layers
+** Parsers (fbx binary/fbx ascii/deflate/xml/mcx/obj/mtl) fuzzed via AFL
+** Built-in fuzzing for byte modifications/truncation/out-of-memory
+** Semantic fuzzing for binary FBX and OBJ files
+* Public dataset: 3.0GB / 245 files
+** Loaded, validated, and compared against reference .obj files
+* Private dataset: 33.6GB / 12618 files
+** Loaded and validated
+* Static analysis for maximum stack depth on Linux GCC/Clang
 
 ## License
 
