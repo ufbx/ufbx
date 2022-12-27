@@ -350,7 +350,7 @@ jobs:
       - name: Install wasmtime
         run: |
           curl https://wasmtime.dev/install.sh -sSf > wasmtime-install.sh
-          bash wasmtime-install.sh
+          bash wasmtime-install.sh --version v4.0.0
           echo "$HOME/.wasmtime/bin" >> $GITHUB_PATH
       - name: Test wasmtime
         run: wasmtime --version
