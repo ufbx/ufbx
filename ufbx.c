@@ -16545,6 +16545,8 @@ static const ufbxi_shader_mapping ufbxi_obj_pbr_mapping[] = {
 };
 
 static const ufbxi_shader_mapping ufbxi_obj_features[] = {
+	{ UFBX_MATERIAL_FEATURE_PBR, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Pr") },
+	{ UFBX_MATERIAL_FEATURE_PBR, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Pm") },
 	{ UFBX_MATERIAL_FEATURE_SHEEN, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Ps") },
 	{ UFBX_MATERIAL_FEATURE_COAT, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Pc") },
 	{ UFBX_MATERIAL_FEATURE_METALNESS, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Pm") },
