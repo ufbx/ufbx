@@ -17,7 +17,7 @@ jobs:
   ci_pre_hashes:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 2
       - name: Compile hash_scene
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 2
       - name: Update apt
@@ -71,7 +71,7 @@ jobs:
     runs-on: windows-2019
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Download reference hashes
         uses: actions/download-artifact@v3
         with:
@@ -96,7 +96,7 @@ jobs:
     runs-on: macos-11
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Download reference hashes
         uses: actions/download-artifact@v3
         with:
@@ -119,7 +119,7 @@ jobs:
   ci_picort:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Run picort
         run: python misc/run_tests.py picort
       - name: Upload result images
@@ -141,28 +141,28 @@ jobs:
   ci_domfuzz:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Run domfuzz/objfuzz
         run: python misc/run_tests.py domfuzz objfuzz
 
   ci_viewer:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Run viewer
         run: python misc/run_tests.py viewer
 
   ci_features:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Compile feature permutations
         run: python misc/run_tests.py features
 
   ci_analysis:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Update apt
         run: sudo apt-get update
       - name: Install apt dependencies
@@ -207,7 +207,7 @@ jobs:
   ci_bindgen:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Create bindgen/build directory
         run: mkdir bindgen/build
       - name: Parse ufbx.h
@@ -219,7 +219,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Download reference hashes
         uses: actions/download-artifact@v3
         with:
@@ -292,7 +292,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Prepare directories
         run: |
           mkdir build
@@ -338,7 +338,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install wasi-sdk
         run: |
           mkdir build
@@ -375,7 +375,7 @@ jobs:
     runs-on: [self-hosted, ARM]
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 2
       - name: Download reference hashes
@@ -399,7 +399,7 @@ jobs:
     runs-on: [self-hosted, ARM64]
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 2
       - name: Download reference hashes
@@ -422,7 +422,7 @@ jobs:
   ci_dataset:
     runs-on: [self-hosted, ARM64]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 2
       - name: Create build directory
@@ -437,7 +437,7 @@ jobs:
     if: ${{ always() }}
     needs: [ci_ubuntu, ci_windows, ci_macos, ci_wasm, ci_arm32, ci_arm64, ci_exotic, ci_hasher]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 2
       - name: Compile hash_scene

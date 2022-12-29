@@ -488,6 +488,15 @@ UFBXT_FILE_TEST(synthetic_simple_materials)
 		ufbxt_assert(mat->pbr.base_factor.value_real == 1.0f);
 		ufbxt_assert(mat->pbr.specular_factor.value_real == 1.0f);
 		ufbxt_assert(mat->pbr.emission_factor.value_real == 1.0f);
+
+		ufbxt_assert(mat->features.diffuse.enabled);
+		ufbxt_assert(mat->features.specular.enabled);
+		ufbxt_assert(mat->features.opacity.enabled);
+		ufbxt_assert(!mat->features.pbr.enabled);
+		ufbxt_assert(!mat->features.metalness.enabled);
+		ufbxt_assert(!mat->features.sheen.enabled);
+		ufbxt_assert(!mat->features.coat.enabled);
+		ufbxt_assert(!mat->features.transmission.enabled);
 	}
 
 	{
@@ -516,6 +525,7 @@ UFBXT_FILE_TEST(synthetic_simple_materials)
 		ufbxt_assert(mat->pbr.sheen_factor.value_real == 1.0f);
 		ufbxt_assert(mat->pbr.transmission_factor.value_real == 1.0f);
 
+		ufbxt_assert(mat->features.pbr.enabled);
 		ufbxt_assert(mat->features.metalness.enabled);
 		ufbxt_assert(mat->features.diffuse.enabled);
 		ufbxt_assert(mat->features.specular.enabled);
