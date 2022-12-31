@@ -16142,12 +16142,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_blend_keyframes(ufbxi_conte
 
 typedef void (*ufbxi_mat_transform_fn)(ufbx_vec4 *a);
 
+static void ufbxi_mat_transform_invert_x(ufbx_vec4 *v) { v->x = 1.0f - v->x; }
 static void ufbxi_mat_transform_unknown_shininess(ufbx_vec4 *v) { if (v->x >= 0.0f) v->x = (ufbx_real)(1.0f - ufbx_sqrt(v->x) * (ufbx_real)0.1); if (!(v->x >= 0.0f)) v->x = 0.0f; }
 static void ufbxi_mat_transform_blender_opacity(ufbx_vec4 *v) { v->x = 1.0f - v->x; }
 static void ufbxi_mat_transform_blender_shininess(ufbx_vec4 *v) { if (v->x >= 0.0f) v->x = (ufbx_real)(1.0f - ufbx_sqrt(v->x) * (ufbx_real)0.1); if (!(v->x >= 0.0f)) v->x = 0.0f; }
 
 typedef enum {
 	UFBXI_MAT_TRANSFORM_IDENTITY,
+	UFBXI_MAT_TRANSFORM_INVERT_X,
 	UFBXI_MAT_TRANSFORM_UNKNOWN_SHININESS,
 	UFBXI_MAT_TRANSFORM_BLENDER_OPACITY,
 	UFBXI_MAT_TRANSFORM_BLENDER_SHININESS,
@@ -16173,10 +16175,13 @@ typedef enum {
 
 static const ufbxi_mat_transform_fn ufbxi_mat_transform_fns[] = {
 	NULL,
+	&ufbxi_mat_transform_invert_x,
 	&ufbxi_mat_transform_unknown_shininess,
 	&ufbxi_mat_transform_blender_opacity,
 	&ufbxi_mat_transform_blender_shininess,
 };
+
+ufbx_static_assert(transform_count, ufbxi_arraycount(ufbxi_mat_transform_fns) == UFBXI_MAT_TRANSFORM_COUNT);
 
 typedef struct {
 	uint8_t index;     // < `ufbx_material_(fbx|pbr)_map`
@@ -16197,8 +16202,6 @@ typedef struct {
 	ufbx_string texture_enabled_prefix;
 	ufbx_string texture_enabled_suffix;
 } ufbxi_shader_mapping_list;
-
-ufbx_static_assert(transform_count, ufbxi_arraycount(ufbxi_mat_transform_fns) == UFBXI_MAT_TRANSFORM_COUNT);
 
 #define ufbxi_mat_string(str) sizeof(str) - 1, str
 
@@ -16239,7 +16242,7 @@ static const ufbxi_shader_mapping ufbxi_obj_fbx_mapping[] = {
 	{ UFBX_MATERIAL_FBX_SPECULAR_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1|UFBXI_SHADER_MAPPING_WIDEN_TO_RGB, 0, ufbxi_mat_string("Ks") },
 	{ UFBX_MATERIAL_FBX_EMISSION_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1|UFBXI_SHADER_MAPPING_WIDEN_TO_RGB, 0, ufbxi_mat_string("Ke") },
 	{ UFBX_MATERIAL_FBX_SPECULAR_EXPONENT, 0, 0, ufbxi_mat_string("Ns") },
-	{ UFBX_MATERIAL_FBX_TRANSPARENCY_FACTOR, 0, 0, ufbxi_mat_string("d") },
+	{ UFBX_MATERIAL_FBX_TRANSPARENCY_FACTOR, 0, UFBXI_MAT_TRANSFORM_INVERT_X, ufbxi_mat_string("d") },
 	{ UFBX_MATERIAL_FBX_NORMAL_MAP, 0, 0, ufbxi_mat_string("norm") },
 	{ UFBX_MATERIAL_FBX_DISPLACEMENT, 0, 0, ufbxi_mat_string("disp") },
 	{ UFBX_MATERIAL_FBX_BUMP, 0, 0, ufbxi_mat_string("bump") },
