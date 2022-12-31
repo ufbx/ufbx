@@ -474,7 +474,7 @@ UFBXT_FILE_TEST(synthetic_simple_materials)
 		ufbxt_assert_close_vec3(err, mat->fbx.specular_color.value_vec3, ks);
 		ufbxt_assert_close_vec3(err, mat->fbx.emission_color.value_vec3, ke);
 		ufbxt_assert_close_real(err, mat->fbx.specular_exponent.value_real, ns);
-		ufbxt_assert_close_real(err, mat->fbx.transparency_factor.value_real, d);
+		ufbxt_assert_close_real(err, mat->fbx.transparency_factor.value_real, 1.0f - d);
 		ufbxt_assert(mat->fbx.ambient_factor.value_real == 1.0f);
 		ufbxt_assert(mat->fbx.diffuse_factor.value_real == 1.0f);
 		ufbxt_assert(mat->fbx.specular_factor.value_real == 1.0f);
