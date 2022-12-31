@@ -179,8 +179,32 @@ static size_t ufbxt_tokenize_line(char *buf, size_t buf_len, const char **tokens
 				tokens[num_tokens++] = buf + buf_pos;
 			}
 
-			ufbxt_assert(buf_pos < buf_len);
-			buf[buf_pos++] = c;
+			if (c == '"') {
+				p++;
+				while (*p != '"') {
+					c = *p;
+					if (c == '\\') {
+						p++;
+						switch (*p) {
+						case 'n': c = '\n'; break;
+						case 'r': c = '\r'; break;
+						case 't': c = '\t'; break;
+						case '\\': c = '\\'; break;
+						case '"': c = '"'; break;
+						default:
+							fprintf(stderr, "Bad escape '\\%c'\n", *p);
+							ufbxt_assert(0 && "Bad escape");
+							return 0;
+						}
+					}
+					ufbxt_assert(buf_pos < buf_len);
+					buf[buf_pos++] = c;
+					p++;
+				}
+			} else {
+				ufbxt_assert(buf_pos < buf_len);
+				buf[buf_pos++] = c;
+			}
 		}
 		prev_sep = sep;
 		p++;
@@ -209,6 +233,8 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 	char dot_buf[512];
 	const char *dots[8];
 
+	bool seen_materials[256];
+
 	ufbx_material *material = NULL;
 	size_t num_materials = 0;
 	size_t num_props = 0;
@@ -218,6 +244,7 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 	size_t err_num = 0;
 
 	bool material_error = false;
+	bool require_all = false;
 
 	long version = 0;
 
@@ -241,6 +268,22 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 			}
 
 			continue;
+		} else if (!strcmp(dots[0], "require")) {
+			if (!strcmp(tokens[1], "all")) {
+				if (scene->materials.count > ufbxt_arraycount(seen_materials)) {
+					fprintf(stderr, "%s:%d: Too many materials in file for 'reqiure all': %zu (max %zu)\n", filename, line,
+						scene->materials.count, (size_t)ufbxt_arraycount(seen_materials));
+					ok = false;
+					continue;
+				}
+				require_all = true;
+				memset(seen_materials, 0, scene->materials.count * sizeof(bool));
+			} else {
+				fprintf(stderr, "%s:%d: Bad require directive: '%s'\n", filename, line, tokens[1]);
+				ok = false;
+				continue;
+			}
+			continue;
 		} else if (!strcmp(dots[0], "material")) {
 			if (*tokens[1] == '\0') {
 				fprintf(stderr, "%s:%d: Expected material name for 'material'\n", filename, line);
@@ -253,6 +296,10 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 				ok = false;
 			}
 			material_error = !material;
+
+			if (material) {
+				seen_materials[material->typed_id] = true;
+			}
 
 			num_materials++;
 			continue;
@@ -458,6 +505,16 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 		} else {
 			fprintf(stderr, "%s:%d: Invalid token '%s'\n", filename, line, tokens[0]);
 			ok = false;
+		}
+	}
+
+	if (require_all) {
+		for (size_t i = 0; i < scene->materials.count; i++) {
+			if (!seen_materials[i]) {
+				fprintf(stderr, "%s: 'require all': Material in FBX not described: '%s'\n", filename,
+					scene->materials.data[i]->name.data);
+				ok = false;
+			}
 		}
 	}
 
