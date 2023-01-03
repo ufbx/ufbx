@@ -1,7 +1,7 @@
 #include "ufbx.h"
 
-#ifndef UFBX_UFBX_C_INLCUDED
-#define UFBX_UFBX_C_INLCUDED
+#ifndef UFBX_UFBX_C_INCLUDED
+#define UFBX_UFBX_C_INCLUDED
 
 // -- User configuration
 
