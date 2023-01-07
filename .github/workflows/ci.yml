@@ -215,9 +215,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         uses: crate-ci/typos@master
         with: 
-          files:
-            - ./ufbx.h
-            - ./ufbx.c
+          files: ufbx.h ufbx.c
           config: ./misc/typos.toml
 
   ci_bindgen:
