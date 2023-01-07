@@ -204,6 +204,22 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/analyze_stack.py build/ufbx-gcc-release.su --limit 0x10000 --cache build/ufbx-cache.pickle
 
+  ci_lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check formatting
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/check_formatting.py ufbx.c ufbx.h
+      - name: Check for typos
+        if: ${{ always() && !cancelled() }}
+        uses: crate-ci/typos@master
+        with: 
+          files:
+            - ./ufbx.h
+            - ./ufbx.c
+          config: ./misc/typos.toml
+
   ci_bindgen:
     runs-on: ubuntu-latest
     steps:

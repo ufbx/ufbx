@@ -1,0 +1,14 @@
+[default.extend-identifiers]
+
+# Offset Translation
+OT = "OT"
+
+# Typos in the FBX fileformat
+PreferedAngleX = "PreferedAngleX"
+PreferedAngleY = "PreferedAngleY"
+PreferedAngleZ = "PreferedAngleZ"
+
+[default.extend-words]
+
+# Level of Detail
+lod = "lod"
