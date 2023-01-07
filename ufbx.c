@@ -961,7 +961,7 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 
 #if !defined(UFBX_STANDARD_C) && UFBXI_MSC_VER >= 1920 && defined(_M_X64) && !defined(__clang__)
 	ufbxi_extern_c extern unsigned __int64 __cdecl _udiv128(unsigned __int64  highdividend,
-		unsigned __int64 lowdividend, unsigned __int64 divisor, unsigned __int64* remainder);
+		unsigned __int64 lowdividend, unsigned __int64 divisor, unsigned __int64 *remainder);
 	#define ufbxi_div128(a_hi, a_lo, b, p_rem) (_udiv128((a_hi), (a_lo), (b), (p_rem)))
 #elif !defined(UFBX_STANDARD_C) && (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(_M_X64))
 	static ufbxi_forceinline uint64_t ufbxi_div128(uint64_t a_hi, uint64_t a_lo, uint64_t b, uint64_t *p_rem) {
@@ -1552,7 +1552,7 @@ ufbxi_bit_refill(uint64_t *p_bits, size_t *p_left, const char **p_data, ufbxi_bi
 		m_bits |= m_refill_bits << m_left; \
 		m_data += (63 - m_left) >> 3; \
 		m_left |= 56; \
-	} while(0)
+	} while (0)
 
 static ufbxi_noinline int
 ufbxi_bit_copy_bytes(void *dst, ufbxi_bit_stream *s, size_t len)
@@ -24396,10 +24396,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 	memset(&result->vertex_color, 0, sizeof(result->vertex_color));
 
 	result->uv_sets.data = ufbxi_push_copy(&sc->result, ufbx_uv_set, result->uv_sets.count, result->uv_sets.data);
-	ufbxi_check_err(&sc->error,	result->uv_sets.data);
+	ufbxi_check_err(&sc->error, result->uv_sets.data);
 
 	result->color_sets.data = ufbxi_push_copy(&sc->result, ufbx_color_set, result->color_sets.count, result->color_sets.data);
-	ufbxi_check_err(&sc->error,	result->color_sets.data);
+	ufbxi_check_err(&sc->error, result->color_sets.data);
 
 	ufbxi_for_list(ufbx_uv_set, set, result->uv_sets) {
 		ufbxi_check_err(&sc->error, ufbxi_subdivide_attrib(sc, (ufbx_vertex_attrib*)&set->vertex_uv, sc->opts.uv_boundary, true));
