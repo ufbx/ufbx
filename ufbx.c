@@ -1,7 +1,7 @@
 #include "ufbx.h"
 
-#ifndef UFBX_UFBX_C_INLCUDED
-#define UFBX_UFBX_C_INLCUDED
+#ifndef UFBX_UFBX_C_INCLUDED
+#define UFBX_UFBX_C_INCLUDED
 
 // -- User configuration
 
@@ -1323,11 +1323,11 @@ typedef struct {
 //   dist.long_sym[]         N 0 0 0 I  // Long N bit code (huff+extra bits) for distance index I
 //   dist.long_sym[]         N 1 0 0 1  // Unused symbol 30-31 or invalid distance code
 //
-//   code_length.fast_sym[]  N 0 0 1 B  // Short N bit code (huff only, extra handled explcitly) for symbol bit count B
+//   code_length.fast_sym[]  N 0 0 1 B  // Short N bit code (huff only, extra handled explicitly) for symbol bit count B
 //   code_length.fast_sym[]  M 0 0 0 X  // Long code at `dist.long_sym[X*2 + ((bits>>FAST_BITS) & M)]`
 //   code_length.fast_sym[]  0 0 0 0 R  // Extra long code with prefix R, use `code_length.sorted_to_sym[]` to resolve (*1)
 //
-//   code_length.long_sym[]  N 0 0 0 B  // Long N bit code (huff only, extra handled explcitly) for symbol bit count B
+//   code_length.long_sym[]  N 0 0 0 B  // Long N bit code (huff only, extra handled explicitly) for symbol bit count B
 //
 // (*1) Never necessary if `fast_bits >= 10` due to `long_sym[]` covering all possible codes,
 //
@@ -1417,7 +1417,7 @@ ufbxi_bit_chunk_refill(ufbxi_bit_stream *s, const char *ptr)
 		size_t to_read = ufbxi_min_sz(s->input_left, s->buffer_size - left);
 		if (to_read > 0) {
 			size_t num_read = s->read_fn(s->read_user, s->buffer + left, to_read);
-			// TOOD: IO error, should unify with (currently broken) cancel logic
+			// TODO: IO error, should unify with (currently broken) cancel logic
 			if (num_read > to_read) num_read = 0;
 			ufbxi_dev_assert(s->input_left >= num_read);
 			s->input_left -= num_read;
@@ -2633,7 +2633,7 @@ static ufbxi_noinline int ufbxi_vsnprintf(char *buf, size_t buf_size, const char
 	if ((size_t)result >= buf_size - 1) result = (int)buf_size - 1;
 
 	// HACK: On some MSYS/MinGW implementations `vsnprintf` is broken and does
-	// not write the null terminator on trunctation, it's always safe to do so
+	// not write the null terminator on truncation, it's always safe to do so
 	// let's just do it unconditionally here...
 	buf[result] = '\0';
 
@@ -2848,7 +2848,7 @@ static ufbxi_forceinline bool ufbxi_does_overflow(size_t total, size_t a, size_t
 
 static ufbxi_noinline void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size, size_t n)
 {
-	// Always succeed with an emtpy non-NULL buffer for empty allocations
+	// Always succeed with an empty non-NULL buffer for empty allocations
 	ufbx_assert(size > 0);
 	if (n == 0) return (void*)ufbxi_zero_size_buffer;
 
@@ -3207,7 +3207,7 @@ static ufbxi_noinline void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 
 static ufbxi_noinline void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
 {
-	// Always succeed with an emtpy non-NULL buffer for empty allocations
+	// Always succeed with an empty non-NULL buffer for empty allocations
 	ufbx_assert(size > 0);
 	if (n == 0) return (void*)ufbxi_zero_size_buffer;
 
@@ -3259,7 +3259,7 @@ static ufbxi_noinline void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
 
 static ufbxi_forceinline void *ufbxi_push_size_fast(ufbxi_buf *b, size_t size, size_t n)
 {
-	// Always succeed with an emtpy non-NULL buffer for empty allocations
+	// Always succeed with an empty non-NULL buffer for empty allocations
 	ufbxi_regression_assert(size > 0);
 	ufbxi_regression_assert(n > 0);
 
@@ -3276,7 +3276,7 @@ static ufbxi_forceinline void *ufbxi_push_size_fast(ufbxi_buf *b, size_t size, s
 
 	b->num_items += n;
 
-	// Homogenous arrays should always be aligned
+	// Homogeneous arrays should always be aligned
 	size_t pos = b->pos;
 	ufbxi_regression_assert((pos & ufbxi_size_align_mask(size)) == 0);
 
@@ -3299,7 +3299,7 @@ static ufbxi_forceinline void *ufbxi_push_size_zero(ufbxi_buf *b, size_t size, s
 
 ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_push_size_copy(ufbxi_buf *b, size_t size, size_t n, const void *data)
 {
-	// Always succeed with an emtpy non-NULL buffer for empty allocations, even if `data == NULL`
+	// Always succeed with an empty non-NULL buffer for empty allocations, even if `data == NULL`
 	ufbx_assert(size > 0);
 	if (n == 0) return (void*)ufbxi_zero_size_buffer;
 
@@ -5141,7 +5141,7 @@ typedef struct {
 } ufbxi_value_array;
 
 struct ufbxi_node {
-	const char *name;      // < Name of the node (pooled, comapre with == to ufbxi_* strings)
+	const char *name;      // < Name of the node (pooled, compare with == to ufbxi_* strings)
 	uint32_t num_children; // < Number of child nodes
 	uint8_t name_len;      // < Length of `name` in bytes
 
@@ -10787,7 +10787,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 
 	// Data array is always used as-is, if empty set the data to a global
 	// zero buffer so invalid zero index can point to some valid data.
-	// The zero data is offset by 4 elements to accomodate for invalid index (-1)
+	// The zero data is offset by 4 elements to accommodate for invalid index (-1)
 	if (num_elems > 0) {
 		*p_dst_data = (ufbx_real*)data->data;
 	} else {
@@ -13023,7 +13023,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_prop_channel(ufbxi_con
 			}
 		}
 
-		// Find 1-3 channel nodes thast contain a `Key:` node
+		// Find 1-3 channel nodes that contain a `Key:` node
 		ufbxi_node *channel_nodes[3] = { 0 };
 		const char *channel_names[3] = { 0 };
 		size_t num_channel_nodes = 0;
@@ -15658,7 +15658,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_connections_to_elements(ufbx
 					prop->flags = (ufbx_prop_flags)((uint32_t)prop->flags | flags);
 				} else {
 					// Animated property that is not in the element property list
-					// Copy the preceeding properties to the stack, then push a
+					// Copy the preceding properties to the stack, then push a
 					// synthetic property for the animated property.
 					ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_prop, ufbxi_to_size(prop - copy_start), copy_start));
 					copy_start = prop;
@@ -15742,7 +15742,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_linearize_nodes(ufbxi_context *u
 		ufbx_node *node = *p_node;
 
 		// Pre-6000 files don't have any explicit root connections so they must always
-		// be connected to ther root..
+		// be connected to the root..
 		if (node->parent == NULL && !(uc->opts.allow_nodes_out_of_root && uc->version >= 6000)) {
 			if (node != uc->scene.root_node) {
 				node->parent = uc->scene.root_node;
@@ -17669,7 +17669,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_file_textures(ufbxi_contex
 			// Complex: Process all dependencies first
 			states[texture->typed_id] = UFBXI_FILE_TEXTURE_FETCH_STARTED;
 
-			// Push self first so we can return after processing depenencies
+			// Push self first so we can return after processing dependencies
 			ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_texture*, 1, &texture));
 			num_stack_textures++;
 
@@ -20018,7 +20018,7 @@ typedef struct {
 	uint32_t start_time;
 	uint32_t end_time;
 	uint32_t current_time;
-	uint32_t conescutive_fails;
+	uint32_t consecutive_fails;
 	bool try_load;
 } ufbxi_cache_tmp_channel;
 
@@ -20549,7 +20549,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cac
 			// Find the first `time >= lowest_time` value that has data in some channel
 			uint32_t time = UINT32_MAX;
 			ufbxi_for(ufbxi_cache_tmp_channel, chan, cc->channels, cc->num_channels) {
-				if (!chan->try_load || chan->conescutive_fails > 10) continue;
+				if (!chan->try_load || chan->consecutive_fails > 10) continue;
 				uint32_t sample_rate = chan->sample_rate ? chan->sample_rate : cc->xml_ticks_per_frame;
 				if (chan->current_time < lowest_time) {
 					uint32_t delta = (lowest_time - chan->current_time - 1) / sample_rate;
@@ -20581,7 +20581,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cac
 			// Update channel status
 			ufbxi_for(ufbxi_cache_tmp_channel, chan, cc->channels, cc->num_channels) {
 				if (chan->current_time == time) {
-					chan->conescutive_fails = found ? 0 : chan->conescutive_fails + 1;
+					chan->consecutive_fails = found ? 0 : chan->consecutive_fails + 1;
 				}
 			}
 
@@ -21791,7 +21791,7 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 		if (!ufbxi_anim_layer_might_contain_id(layer, element_id)) continue;
 
 		// Find the weight for the current layer
-		// TODO: Should this be searched from multipler layers?
+		// TODO: Should this be searched from multiple layers?
 		// TODO: Use weight from layer_desc
 		ufbx_real weight = layer->weight;
 		if (layer->weight_is_animated && layer->blended) {
@@ -23272,7 +23272,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	uint32_t *edges = indices + num_indices - face.num_indices * 2;
 
 	// Initialize `edges` to be a connectivity structure where:
-	//  `edges[2*i + 0]` is the prevous vertex of `i`
+	//  `edges[2*i + 0]` is the previous vertex of `i`
 	//  `edges[2*i + 1]` is the next vertex of `i`
 	// When clipped we mark indices with the high bit (0x80000000)
 	for (uint32_t i = 0; i < face.num_indices; i++) {
