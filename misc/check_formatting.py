@@ -77,6 +77,11 @@ if __name__ == "__main__":
     p.add_argument("--no-color", action="store_true")
     argv = p.parse_args()
 
+    failed = False
     colors = not argv.no_color and sys.stdout.isatty()
     for f in argv.files:
-        check_file(f, colors)
+        if check_file(f, colors):
+            failed = True
+
+    if failed:
+        sys.exit(1)
