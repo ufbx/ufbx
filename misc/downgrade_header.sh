@@ -9,7 +9,7 @@ if [[ "$TAG" == v*.*.0 ]]; then
     echo "No older header available"
 elif [[ "$TAG" == v*.*.* ]]; then
     OLD_TAG="${TAG%.*}".0
-    OLD_COMMIT=$(git rev-parse "$OLD_TAG")
+    OLD_COMMIT=$( set -x; git rev-parse "$OLD_TAG" )
     echo "Downgrading ufbx.h to tag $OLD_TAG, commit $OLD_COMMIT"
     ( set -x; git checkout "$OLD_TAG" -- ufbx.h )
 else
