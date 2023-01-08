@@ -16314,6 +16314,8 @@ static const ufbxi_shader_mapping ufbxi_osl_standard_shader_pbr_mapping[] = {
 	{ UFBX_MATERIAL_PBR_COAT_ANISOTROPY, 0, 0, ufbxi_mat_string("coat_anisotropy") },
 	{ UFBX_MATERIAL_PBR_COAT_ROTATION, 0, 0, ufbxi_mat_string("coat_rotation") },
 	{ UFBX_MATERIAL_PBR_COAT_NORMAL, 0, 0, ufbxi_mat_string("coat_normal") },
+	{ UFBX_MATERIAL_PBR_COAT_AFFECT_BASE_COLOR, UFBXI_SHADER_MAPPING_DEFAULT_W_1, 0, ufbxi_mat_string("coat_affect_color") },
+	{ UFBX_MATERIAL_PBR_COAT_AFFECT_BASE_ROUGHNESS, 0, 0, ufbxi_mat_string("coat_affect_roughness") },
 	{ UFBX_MATERIAL_PBR_THIN_FILM_THICKNESS, 0, 0, ufbxi_mat_string("thin_film_thickness") },
 	{ UFBX_MATERIAL_PBR_THIN_FILM_IOR, 0, 0, ufbxi_mat_string("thin_film_IOR") },
 	{ UFBX_MATERIAL_PBR_EMISSION_FACTOR, 0, 0, ufbxi_mat_string("emission") },
