@@ -204,6 +204,17 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/analyze_stack.py build/ufbx-gcc-release.su --limit 0x10000 --cache build/ufbx-cache.pickle
 
+  ci_compat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - name: Downgrade to oldest compatible header
+        run: bash misc/downgrade_header.sh
+      - name: Run tests
+        run: python3 misc/run_tests.py tests --no-sanitize --runner ci_compat
+
   ci_lint:
     runs-on: ubuntu-latest
     steps:
