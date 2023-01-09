@@ -1040,6 +1040,8 @@ struct ufbx_mesh {
 		ufbx_node_list instances;
 	}; };
 
+	int abi_break_test;
+
 	// Number of "logical" vertices that would be treated as a single point,
 	// one vertex may be split to multiple indices for split attributes, eg. UVs
 	size_t num_vertices;  // < Number of logical "vertex" points
