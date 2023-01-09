@@ -210,10 +210,14 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+      - name: Copy the current ufbx.h to ufbx_new.h
+        run: cp ufbx.h ufbx_new.h
       - name: Downgrade to oldest compatible header
         run: bash misc/downgrade_header.sh
-      - name: Run tests
+      - name: Run tests with old header (source compatability)
         run: python3 misc/run_tests.py tests --no-sanitize --runner ci_compat
+      - name: Run tests with new header in ufbx.c, old header in runner.c (ABI compatability)
+        run: python3 misc/run_tests.py tests --no-sanitize --runner ci_compat --define UFBX_HEADER_PATH=\"ufbx_new.h\"
 
   ci_lint:
     runs-on: ubuntu-latest

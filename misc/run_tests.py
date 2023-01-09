@@ -19,6 +19,7 @@ parser.add_argument("--additional-compiler", default=[], action="append", help="
 parser.add_argument("--remove-compiler", default=[], action="append", help="Remove a compiler from being used")
 parser.add_argument("--remove-arch", default=[], action="append", help="Remove an architecture")
 parser.add_argument("--compiler", default=[], action="append", help="Specify exact compiler(s) to use")
+parser.add_argument("--define", default=[], action="append", help="Define preprocessor symbols")
 parser.add_argument("--no-sse", action="store_true", help="Don't make SSE builds when possible")
 parser.add_argument("--wasi-sdk", default=[], action="append", help="WASI SDK path")
 parser.add_argument("--wasm-runtime", default="wasmtime", type=str, help="WASM runtime command")
@@ -765,6 +766,16 @@ async def main():
                 conf = copy.deepcopy(config)
                 conf["output"] = os.path.join(path, config.get("output", "a.exe"))
 
+                if "defines" not in conf:
+                    conf["defines"] = { }
+
+                if not conf.get("ignore_user_defines", False):
+                    for k in argv.define:
+                        v = "1"
+                        if "=" in k:
+                            k, v = k.split("=", 1)
+                        conf["defines"][k] = v
+
                 for opt_name, opt in opts:
                     conf.update(config_options[opt_name][opt])
 
@@ -793,6 +804,7 @@ async def main():
         "sources": ["misc/compiler_test.c"],
         "output": "ctest" + exe_suffix,
         "arch_test": True,
+        "ignore_user_defines": True,
     }
     ctest_tasks += compile_permutations("ctest", ctest_config, arch_test_configs, ["1.5"])
 
@@ -801,6 +813,7 @@ async def main():
         "output": "cpptest" + exe_suffix,
         "cpp": True,
         "arch_test": True,
+        "ignore_user_defines": True,
     }
     ctest_tasks += compile_permutations("cpptest", cpptest_config, arch_test_configs, ["1.5"])
 
