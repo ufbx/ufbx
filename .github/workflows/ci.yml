@@ -210,6 +210,10 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+      - name: Update apt
+        run: sudo apt-get update
+      - name: Install apt dependencies
+        run: sudo apt-get install -y gcc-multilib g++-multilib
       - name: Copy the current ufbx.h to ufbx_new.h
         run: cp ufbx.h ufbx_new.h
       - name: Downgrade to oldest compatible header
@@ -217,7 +221,7 @@ jobs:
       - name: Run tests with old header (source compatability)
         run: python3 misc/run_tests.py tests --no-sanitize --runner ci_compat
       - name: Run tests with new header in ufbx.c, old header in runner.c (ABI compatability)
-        run: python3 misc/run_tests.py tests --runner ci_compat --define UFBX_HEADER_PATH=\"ufbx_new.h\"
+        run: python3 misc/run_tests.py tests --no-sanitize-arch x86 --runner ci_compat --define UFBX_HEADER_PATH=\"ufbx_new.h\"
 
   ci_lint:
     runs-on: ubuntu-latest

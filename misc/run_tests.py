@@ -24,6 +24,7 @@ parser.add_argument("--no-sse", action="store_true", help="Don't make SSE builds
 parser.add_argument("--wasi-sdk", default=[], action="append", help="WASI SDK path")
 parser.add_argument("--wasm-runtime", default="wasmtime", type=str, help="WASM runtime command")
 parser.add_argument("--no-sanitize", action="store_true", help="Don't compile builds with ASAN/UBSAN")
+parser.add_argument("--no-sanitize-arch", default=[], action="append", help="Disable sanitization on specific architectures")
 parser.add_argument("--threads", type=int, default=0, help="Number of threads to use (0 to autodetect)")
 parser.add_argument("--verbose", action="store_true", help="Verbose output")
 parser.add_argument("--hash-file", help="Hash test input file")
@@ -486,6 +487,8 @@ def supported_archs(compiler):
     archs = compiler.supported_archs()
     if argv.no_sanitize:
         archs = [a for a in archs if not a.endswith("-san")]
+    if argv.no_sanitize_arch:
+        archs = [a for a in archs if not a.endswith("-san") or a[:-4] not in argv.no_sanitize_arch]
     return archs
 
 all_compilers = [
