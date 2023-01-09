@@ -10,6 +10,7 @@ class TestModel(NamedTuple):
     fbx_path: str
     obj_path: Optional[str]
     mtl_path: Optional[str]
+    mat_path: Optional[str]
     frame: Optional[int]
 
 class TestCase(NamedTuple):
@@ -54,6 +55,10 @@ def get_mtl_files(obj_path):
     base_path = strip_ext(obj_path)
     yield from single_file(f"{base_path}.mtl")
 
+def get_mat_files(obj_path):
+    base_path = strip_ext(obj_path)
+    yield from single_file(f"{base_path}.mat")
+
 def remove_duplicate_files(paths):
     seen = set()
     for path in paths:
@@ -66,6 +71,7 @@ def gather_case_models(json_path):
     for fbx_path in get_fbx_files(json_path):
         for obj_path in remove_duplicate_files(get_obj_files(fbx_path)):
             mtl_path = next(get_mtl_files(obj_path), None)
+            mat_path = next(get_mat_files(fbx_path), None)
 
             fbx_base = strip_ext(fbx_path)
             obj_base = strip_ext(obj_path)
@@ -83,6 +89,7 @@ def gather_case_models(json_path):
                 fbx_path=fbx_path,
                 obj_path=obj_path,
                 mtl_path=mtl_path,
+                mat_path=mat_path,
                 frame=frame)
 
         else:
@@ -171,6 +178,9 @@ if __name__ == "__main__":
             if model.obj_path:
                 args += ["--obj", model.obj_path]
 
+            if model.mat_path:
+                args += ["--mat", model.mat_path]
+
             if model.frame is not None:
                 extra.append(f"frame {model.frame}")
                 args += ["--frame", str(model.frame)]
@@ -189,6 +199,8 @@ if __name__ == "__main__":
                     log(f"    .obj url: {fmt_url(model.obj_path, case.root)}")
                 if model.mtl_path:
                     log(f"    .mtl url: {fmt_url(model.mtl_path, case.root)}")
+                if model.mat_path:
+                    log(f"    .mat url: {fmt_url(model.mat_path, case.root)}")
 
             log()
             log("$ " + " ".join(args))

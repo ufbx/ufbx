@@ -25,6 +25,7 @@ bool g_verbose = false;
 
 #include "../ufbx.h"
 #include "check_scene.h"
+#include "check_material.h"
 #include "testing_utils.h"
 #include "cputime.h"
 
@@ -53,6 +54,7 @@ int main(int argc, char **argv)
 
 	const char *path = NULL;
 	const char *obj_path = NULL;
+	const char *mat_path = NULL;
 	const char *dump_obj_path = NULL;
 	int profile_runs = 0;
 	int frame = INT_MIN;
@@ -66,6 +68,8 @@ int main(int argc, char **argv)
 			g_verbose = true;
 		} else if (!strcmp(argv[i], "--obj")) {
 			if (++i < argc) obj_path = argv[i];
+		} else if (!strcmp(argv[i], "--mat")) {
+			if (++i < argc) mat_path = argv[i];
 		} else if (!strcmp(argv[i], "--dump-obj")) {
 			if (++i < argc) dump_obj_path = argv[i];
 		} else if (!strcmp(argv[i], "--profile-runs")) {
@@ -301,6 +305,26 @@ int main(int argc, char **argv)
 			ufbxt_debug_dump_obj_scene(dump_obj_path, scene);
 			printf("Dumped .obj to %s\n", dump_obj_path);
 		}
+	}
+
+	if (mat_path) {
+		size_t mat_size;
+		void *mat_data = ufbxt_read_file_ex(mat_path, &mat_size);
+		if (!mat_data) {
+			fprintf(stderr, "Failed to read .mat file: %s\n", mat_path);
+			return 1;
+		}
+
+		const char *mat_filename = mat_path + strlen(mat_path);
+		while (mat_filename > mat_path && (mat_filename[-1] != '\\' && mat_filename[-1] != '/')) {
+			mat_filename--;
+		}
+		bool ok = ufbxt_check_materials(scene, (const char*)mat_data, mat_filename);
+		if (!ok && !result) {
+			result = 4;
+		}
+
+		free(mat_data);
 	}
 
 	ufbx_free_scene(scene);

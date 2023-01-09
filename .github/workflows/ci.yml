@@ -204,6 +204,39 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/analyze_stack.py build/ufbx-gcc-release.su --limit 0x10000 --cache build/ufbx-cache.pickle
 
+  ci_compat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Update apt
+        run: sudo apt-get update
+      - name: Install apt dependencies
+        run: sudo apt-get install -y gcc-multilib g++-multilib
+      - name: Copy the current ufbx.h to ufbx_new.h
+        run: cp ufbx.h ufbx_new.h
+      - name: Downgrade to oldest compatible header
+        run: bash misc/downgrade_header.sh
+      - name: Run tests with old header (source compatability)
+        run: python3 misc/run_tests.py tests --no-sanitize --runner ci_compat
+      - name: Run tests with new header in ufbx.c, old header in runner.c (ABI compatability)
+        run: python3 misc/run_tests.py tests --no-sanitize-arch x86 --runner ci_compat --define UFBX_HEADER_PATH=\"ufbx_new.h\"
+
+  ci_lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check formatting
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/check_formatting.py ufbx.c ufbx.h
+      - name: Check for typos
+        if: ${{ always() && !cancelled() }}
+        uses: crate-ci/typos@master
+        with: 
+          files: ufbx.h ufbx.c
+          config: ./misc/typos.toml
+
   ci_bindgen:
     runs-on: ubuntu-latest
     steps:
