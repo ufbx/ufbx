@@ -89,6 +89,16 @@ The following platforms are tested on CI and produce bit-exact results:
   * Loaded and validated
 * Static analysis for maximum stack depth on Linux GCC/Clang
 
+## Versioning
+
+The latest commit in the [`master`](https://github.com/ufbx/ufbx/tree/master)
+branch contains the latest stable version of the library.
+
+Older versions are tagged as `vX.Y.Z`, patch updates (`Z`) are ABI compatible
+and work with older versions of the header from the same minor version (`Y`).
+Major versions (`X`) are expected to be source compatible after `1.0.0` but the
+`0.Y.Z` releases can break for every minor release.
+
 ## License
 
 ```
