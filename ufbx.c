@@ -25655,7 +25655,7 @@ ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time
 	const ufbx_keyframe *keys = curve->keyframes.data;
 	while (end - begin >= 8) {
 		size_t mid = (begin + end) >> 1;
-		if (keys[mid].time < time) {
+		if (keys[mid].time <= time) {
 			begin = mid + 1;
 		} else {
 			end = mid;
@@ -25665,12 +25665,15 @@ ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time
 	end = curve->keyframes.count;
 	for (; begin < end; begin++) {
 		const ufbx_keyframe *next = &keys[begin];
-		if (next->time < time) continue;
+		if (next->time <= time) continue;
 
 		// First keyframe
 		if (begin == 0) return next->value;
 
 		const ufbx_keyframe *prev = next - 1;
+
+		// Exact keyframe
+		if (prev->time == time) return prev->value;
 
 		double rcp_delta = 1.0 / (next->time - prev->time);
 		double t = (time - prev->time) * rcp_delta;
