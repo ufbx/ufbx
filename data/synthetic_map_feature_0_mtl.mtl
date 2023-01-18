@@ -1,0 +1,19 @@
+
+newmtl Phong
+map_Kd diffuse.png
+map_Ks specular.png
+
+newmtl PBR
+map_Pr roughness.png
+map_Pm metalness.png
+
+newmtl Extended
+map_Ps sheen.png
+map_Pc coat.png
+map_Pm metalness.png
+map_Ni ior.png
+map_d opacity.png
+map_Tf transmission.png
+map_Ke emission.png
+
+

@@ -1329,3 +1329,73 @@ UFBXT_TEST(obj_opts_no_extrnal_files_by_filename)
 }
 #endif
 
+#if UFBXT_IMPL
+static void ufbxt_check_only_texture(ufbx_material_map *map, const char *filename)
+{
+	ufbxt_assert(!map->has_value);
+	ufbxt_assert(map->texture);
+	ufbxt_assert(!strcmp(map->texture->relative_filename.data, filename));
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_map_feature)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_material *material = ufbx_find_material(scene, "Phong");
+		ufbxt_assert(material->shader_type == UFBX_SHADER_WAVEFRONT_MTL);
+
+		ufbxt_check_only_texture(&material->fbx.diffuse_color, "diffuse.png");
+		ufbxt_check_only_texture(&material->fbx.specular_color, "specular.png");
+
+		ufbxt_assert(!material->features.pbr.enabled);
+		ufbxt_assert(!material->features.sheen.enabled);
+		ufbxt_assert(!material->features.coat.enabled);
+		ufbxt_assert(!material->features.metalness.enabled);
+		ufbxt_assert(!material->features.ior.enabled);
+		ufbxt_assert(!material->features.opacity.enabled);
+		ufbxt_assert(!material->features.transmission.enabled);
+		ufbxt_assert(!material->features.emission.enabled);
+	}
+
+	{
+		ufbx_material *material = ufbx_find_material(scene, "PBR");
+		ufbxt_assert(material->shader_type == UFBX_SHADER_WAVEFRONT_MTL);
+
+		ufbxt_check_only_texture(&material->pbr.roughness, "roughness.png");
+		ufbxt_check_only_texture(&material->pbr.metalness, "metalness.png");
+
+		ufbxt_assert(material->features.pbr.enabled);
+		ufbxt_assert(!material->features.sheen.enabled);
+		ufbxt_assert(!material->features.coat.enabled);
+		ufbxt_assert(material->features.metalness.enabled);
+		ufbxt_assert(!material->features.ior.enabled);
+		ufbxt_assert(!material->features.opacity.enabled);
+		ufbxt_assert(!material->features.transmission.enabled);
+		ufbxt_assert(!material->features.emission.enabled);
+	}
+
+	{
+		ufbx_material *material = ufbx_find_material(scene, "Extended");
+		ufbxt_assert(material->shader_type == UFBX_SHADER_WAVEFRONT_MTL);
+
+		ufbxt_check_only_texture(&material->pbr.sheen_color, "sheen.png");
+		ufbxt_check_only_texture(&material->pbr.coat_factor, "coat.png");
+		ufbxt_check_only_texture(&material->pbr.metalness, "metalness.png");
+		ufbxt_check_only_texture(&material->pbr.specular_ior, "ior.png");
+		ufbxt_check_only_texture(&material->pbr.opacity, "opacity.png");
+		ufbxt_check_only_texture(&material->pbr.transmission_color, "transmission.png");
+		ufbxt_check_only_texture(&material->pbr.emission_color, "emission.png");
+
+		ufbxt_assert(material->features.pbr.enabled);
+		ufbxt_assert(material->features.sheen.enabled);
+		ufbxt_assert(material->features.coat.enabled);
+		ufbxt_assert(material->features.metalness.enabled);
+		ufbxt_assert(material->features.ior.enabled);
+		ufbxt_assert(material->features.opacity.enabled);
+		ufbxt_assert(material->features.transmission.enabled);
+		ufbxt_assert(material->features.emission.enabled);
+	}
+}
+#endif
+

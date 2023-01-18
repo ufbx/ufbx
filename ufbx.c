@@ -16173,8 +16173,12 @@ typedef enum {
 	UFBXI_SHADER_FEATURE_INVERTED = 0x1,
 	// Enable the feature if the given property exists
 	UFBXI_SHADER_FEATURE_IF_EXISTS = 0x2,
+	// Enable the feature if the given property has a texture
+	UFBXI_SHADER_FEATURE_IF_TEXTURE = 0x4,
 	// Enable if the feature is in [0.5, 1.5], (ie. 2 won't enable this feature)
-	UFBXI_SHADER_FEATURE_IF_AROUND_1 = 0x4,
+	UFBXI_SHADER_FEATURE_IF_AROUND_1 = 0x8,
+
+	UFBXI_SHADER_FEATURE_IF_EXISTS_OR_TEXTURE = UFBXI_SHADER_FEATURE_IF_EXISTS|UFBXI_SHADER_FEATURE_IF_TEXTURE,
 } ufbxi_shader_feature_flag;
 
 static const ufbxi_mat_transform_fn ufbxi_mat_transform_fns[] = {
@@ -16554,15 +16558,15 @@ static const ufbxi_shader_mapping ufbxi_obj_pbr_mapping[] = {
 };
 
 static const ufbxi_shader_mapping ufbxi_obj_features[] = {
-	{ UFBX_MATERIAL_FEATURE_PBR, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Pr") },
-	{ UFBX_MATERIAL_FEATURE_PBR, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Pm") },
-	{ UFBX_MATERIAL_FEATURE_SHEEN, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Ps") },
-	{ UFBX_MATERIAL_FEATURE_COAT, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Pc") },
-	{ UFBX_MATERIAL_FEATURE_METALNESS, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Pm") },
-	{ UFBX_MATERIAL_FEATURE_IOR, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Ni") },
-	{ UFBX_MATERIAL_FEATURE_OPACITY, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("d") },
-	{ UFBX_MATERIAL_FEATURE_TRANSMISSION, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Tf") },
-	{ UFBX_MATERIAL_FEATURE_EMISSION, UFBXI_SHADER_FEATURE_IF_EXISTS, 0, ufbxi_mat_string("Ke") },
+	{ UFBX_MATERIAL_FEATURE_PBR, UFBXI_SHADER_FEATURE_IF_EXISTS_OR_TEXTURE, 0, ufbxi_mat_string("Pr") },
+	{ UFBX_MATERIAL_FEATURE_PBR, UFBXI_SHADER_FEATURE_IF_EXISTS_OR_TEXTURE, 0, ufbxi_mat_string("Pm") },
+	{ UFBX_MATERIAL_FEATURE_SHEEN, UFBXI_SHADER_FEATURE_IF_EXISTS_OR_TEXTURE, 0, ufbxi_mat_string("Ps") },
+	{ UFBX_MATERIAL_FEATURE_COAT, UFBXI_SHADER_FEATURE_IF_EXISTS_OR_TEXTURE, 0, ufbxi_mat_string("Pc") },
+	{ UFBX_MATERIAL_FEATURE_METALNESS, UFBXI_SHADER_FEATURE_IF_EXISTS_OR_TEXTURE, 0, ufbxi_mat_string("Pm") },
+	{ UFBX_MATERIAL_FEATURE_IOR, UFBXI_SHADER_FEATURE_IF_EXISTS_OR_TEXTURE, 0, ufbxi_mat_string("Ni") },
+	{ UFBX_MATERIAL_FEATURE_OPACITY, UFBXI_SHADER_FEATURE_IF_EXISTS_OR_TEXTURE, 0, ufbxi_mat_string("d") },
+	{ UFBX_MATERIAL_FEATURE_TRANSMISSION, UFBXI_SHADER_FEATURE_IF_EXISTS_OR_TEXTURE, 0, ufbxi_mat_string("Tf") },
+	{ UFBX_MATERIAL_FEATURE_EMISSION, UFBXI_SHADER_FEATURE_IF_EXISTS_OR_TEXTURE, 0, ufbxi_mat_string("Ke") },
 };
 
 enum {
@@ -16732,6 +16736,12 @@ ufbxi_noinline static void ufbxi_fetch_mapping_maps(ufbx_material *material, ufb
 						feature->enabled = !feature->enabled;
 					}
 					if (mapping_flags & UFBXI_SHADER_FEATURE_IF_EXISTS) {
+						feature->enabled = true;
+					}
+				}
+				if (mapping_flags & UFBXI_SHADER_FEATURE_IF_TEXTURE) {
+					ufbx_texture *texture = ufbx_find_prop_texture_len(material, name.data, name.length);
+					if (texture) {
 						feature->enabled = true;
 					}
 				}
