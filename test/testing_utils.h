@@ -1361,7 +1361,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			continue;
 		}
 
-		if (!obj->bad_faces && !obj->line_faces || !obj->point_faces) {
+		if (!(obj->bad_faces || obj->line_faces || obj->point_faces)) {
 			ufbxt_assert(obj_mesh->num_faces == mesh->num_faces);
 			ufbxt_assert(obj_mesh->num_indices == mesh->num_indices);
 		}
