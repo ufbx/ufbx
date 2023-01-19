@@ -14490,6 +14490,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 	// EARLY RETURN: Rest of the function should only be related to geometry!
 	if (uc->opts.ignore_geometry) return 1;
 
+	if (num_tokens == 0 && !uc->opts.allow_empty_faces) {
+		ufbxi_check(ufbxi_warnf(UFBX_WARNING_EMPTY_FACE_REMOVED, "Empty face has been removed"));
+		return 1;
+	}
+
 	if (uc->obj.face_group_dirty) {
 		ufbx_string name = ufbx_empty_string;
 		if (uc->obj.group.length > 0 && (uc->obj.object.length > 0 || uc->opts.obj_merge_groups) && !uc->opts.obj_split_groups) {
@@ -14526,11 +14531,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 		}
 
 		uc->obj.face_group_dirty = false;
-	}
-
-	if (num_tokens == 0 && !uc->opts.allow_empty_faces) {
-		ufbxi_check(ufbxi_warnf(UFBX_WARNING_EMPTY_FACE_REMOVED, "Empty face has been removed"));
-		return 1;
 	}
 
 	size_t num_indices = num_tokens;
