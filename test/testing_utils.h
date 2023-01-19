@@ -1387,7 +1387,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 					continue;
 				} else if (obj->point_faces && face.num_indices == 1) {
 					continue;
-				} else {
+				} else if (!obj->bad_faces) {
 					ufbxt_assert(obj_face.index_begin == face.index_begin);
 				}
 
