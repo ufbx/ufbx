@@ -9894,6 +9894,7 @@ static const char *ufbxi_node_prop_names[] = {
 	"UpVectorProperty",
 	"Visibility Inheritance",
 	"Visibility",
+	"notes",
 };
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_init_node_prop_names(ufbxi_context *uc)

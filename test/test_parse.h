@@ -1383,3 +1383,80 @@ UFBXT_FILE_TEST(synthetic_rotation_order_layers)
 }
 #endif
 
+UFBXT_FILE_TEST(maya_notes)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "pCube1");
+		ufbxt_assert(node);
+		ufbx_prop *notes = ufbx_find_prop(&node->props, "notes");
+		ufbxt_assert(notes);
+
+		const char *lines[] = {
+			"pCube1 notes:\n",
+		};
+
+		const char *str = notes->value_str.data;
+		for (size_t i = 0; i < ufbxt_arraycount(lines); i++) {
+			ufbxt_hintf("i=%zu", i);
+			const char *end = strchr(str, '\n');
+			if (!end) {
+				end = str + strlen(str);
+			} else {
+				end += 1;
+			}
+
+			size_t len = (size_t)(end - str);
+			ufbxt_assert(!strncmp(str, lines[i], len));
+			ufbxt_assert(len == strlen(lines[i]));
+			str = end;
+		}
+
+		for (size_t i = 0; i < 4096; i++) {
+			const char *end;
+			unsigned long l = strtoul(str, &end, 10);
+			ufbxt_assert(l == i);
+			if (i + 1 < 16384) {
+				ufbxt_assert(*end == ' ');
+				str = end + 1;
+			}
+		}
+	}
+
+	{
+		ufbx_material *material = ufbx_find_material(scene, "lambert1");
+		ufbxt_assert(material);
+		ufbx_prop *notes = ufbx_find_prop(&material->props, "notes");
+		ufbxt_assert(notes);
+
+		const char *lines[] = {
+			"lambert1 notes:\n",
+			"\n",
+			"- material\n",
+			"- \"lambertian\"\n",
+			"- unicode: \x61\xc3\x9f???\n",
+			"- tab\t\n",
+			"- cr \n",
+		};
+
+		const char *str = notes->value_str.data;
+		for (size_t i = 0; i < ufbxt_arraycount(lines); i++) {
+			ufbxt_hintf("i=%zu", i);
+			const char *end = strchr(str, '\n');
+			if (!end) {
+				end = str + strlen(str);
+			} else {
+				end += 1;
+			}
+
+			size_t len = (size_t)(end - str);
+			ufbxt_assert(!strncmp(str, lines[i], len));
+			ufbxt_assert(len == strlen(lines[i]));
+			str = end;
+		}
+
+		ufbxt_assert(*str == '\0');
+	}
+}
+#endif
+
