@@ -1500,7 +1500,7 @@ UFBXT_FILE_TEST(synthetic_empty_face)
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
 
-	ufbxt_assert(mesh->num_faces == 1);
+	ufbxt_assert(mesh->num_faces == 0);
 	ufbxt_assert(mesh->num_empty_faces == 0);
 }
 #endif
