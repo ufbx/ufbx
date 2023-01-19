@@ -14443,7 +14443,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_index(ufbxi_context *u
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context *uc)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context *uc, size_t token_begin, size_t num_tokens)
 {
 	bool flush_mesh = false;
 	if (uc->obj.object_dirty) {
@@ -14528,7 +14528,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 		uc->obj.face_group_dirty = false;
 	}
 
-	size_t num_indices = uc->obj.num_tokens - 1;
+	size_t num_indices = num_tokens;
 	ufbxi_check(UINT32_MAX - mesh->num_indices >= num_indices);
 
 	ufbx_face *face = ufbxi_push_fast(&uc->obj.tmp_faces, ufbx_face, 1);
@@ -14557,12 +14557,20 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 	}
 
 	for (size_t ix = 0; ix < num_indices; ix++) {
-		ufbx_string tok = uc->obj.tokens[1 + ix];
+		ufbx_string tok = uc->obj.tokens[token_begin + ix];
 		for (uint32_t attrib = 0; attrib < UFBXI_OBJ_NUM_ATTRIBS; attrib++) {
 			ufbxi_check(ufbxi_obj_parse_index(uc, &tok, attrib));
 		}
 	}
 
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_multi_indices(ufbxi_context *uc, size_t window)
+{
+	for (size_t begin = 1; begin + window <= uc->obj.num_tokens; begin++) {
+		ufbxi_check(ufbxi_obj_parse_indices(uc, begin, window));
+	}
 	return 1;
 }
 
@@ -14951,7 +14959,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc
 		} else if (key == ufbxi_obj_cmd2('v','n')) {
 			ufbxi_check(ufbxi_obj_parse_vertex(uc, UFBXI_OBJ_ATTRIB_NORMAL, 1));
 		} else if (key == ufbxi_obj_cmd1('f')) {
-			ufbxi_check(ufbxi_obj_parse_indices(uc));
+			ufbxi_check(ufbxi_obj_parse_indices(uc, 1, uc->obj.num_tokens - 1));
+		} else if (key == ufbxi_obj_cmd1('p')) {
+			ufbxi_check(ufbxi_obj_parse_multi_indices(uc, 1));
+		} else if (key == ufbxi_obj_cmd1('l')) {
+			ufbxi_check(ufbxi_obj_parse_multi_indices(uc, 2));
 		} else if (key == ufbxi_obj_cmd1('s')) {
 			if (num_tokens >= 2) {
 				uc->obj.has_face_smoothing = true;

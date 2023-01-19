@@ -1399,3 +1399,93 @@ UFBXT_FILE_TEST(synthetic_map_feature)
 }
 #endif
 
+UFBXT_FILE_TEST(blender_340_line_point)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 6);
+	ufbxt_assert(mesh->num_empty_faces == 0);
+	ufbxt_assert(mesh->num_point_faces == 0);
+	ufbxt_assert(mesh->num_line_faces == 5);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_extended_line)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Line");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 4);
+	ufbxt_assert(mesh->num_empty_faces == 0);
+	ufbxt_assert(mesh->num_point_faces == 0);
+	ufbxt_assert(mesh->num_line_faces == 4);
+	ufbxt_assert(mesh->num_indices == 8);
+
+	ufbx_vec3 pos_ref[] = {
+		{ 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f },
+		{ 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f },
+		{ 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f, 0.0f },
+		{ 1.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 0.0f },
+	};
+
+	ufbx_vec2 uv_ref[] = {
+		{ 0.0f, 0.0f }, { 2.0f, 0.0f },
+		{ 2.0f, 0.0f }, { 0.0f, 2.0f },
+		{ 0.0f, 2.0f }, { 2.0f, 2.0f },
+		{ 2.0f, 2.0f }, { 0.0f, 0.0f },
+	};
+
+	ufbx_vec4 col_ref[] = {
+		{ 1.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f },
+		{ 0.0f, 1.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f },
+		{ 0.0f, 0.0f, 1.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f },
+		{ 1.0f, 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f, 0.0f, 1.0f },
+	};
+
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		ufbxt_hintf("i=%zu", i);
+		ufbxt_assert_close_vec3(err, pos_ref[i], ufbx_get_vertex_vec3(&mesh->vertex_position, i));
+		ufbxt_assert_close_vec2(err, uv_ref[i], ufbx_get_vertex_vec2(&mesh->vertex_uv, i));
+		ufbxt_assert_close_vec4(err, col_ref[i], ufbx_get_vertex_vec4(&mesh->vertex_color, i));
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_extended_points)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Points");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 3);
+	ufbxt_assert(mesh->num_empty_faces == 0);
+	ufbxt_assert(mesh->num_point_faces == 3);
+	ufbxt_assert(mesh->num_line_faces == 0);
+	ufbxt_assert(mesh->num_indices == 3);
+
+	ufbx_vec3 pos_ref[] = {
+		{ 0.0f, 0.0f, 0.0f },
+		{ 1.0f, 0.0f, 0.0f },
+		{ 0.0f, 1.0f, 0.0f },
+	};
+
+	ufbx_vec4 col_ref[] = {
+		{ 1.0f, 0.0f, 0.0f, 1.0f },
+		{ 0.0f, 1.0f, 0.0f, 1.0f },
+		{ 0.0f, 0.0f, 1.0f, 1.0f },
+	};
+
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		ufbxt_hintf("i=%zu", i);
+		ufbxt_assert_close_vec3(err, pos_ref[i], ufbx_get_vertex_vec3(&mesh->vertex_position, i));
+		ufbxt_assert_close_vec4(err, col_ref[i], ufbx_get_vertex_vec4(&mesh->vertex_color, i));
+	}
+}
+#endif
+
