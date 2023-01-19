@@ -4021,7 +4021,7 @@ typedef struct {
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_vwarnf_imp(ufbxi_warnings *ws, ufbx_warning_type type, const char *fmt, va_list args)
 {
 	if (!ws) return 1;
-	if (type >= UFBX_WARNING_INDEX_CLAMPED) {
+	if (type >= UFBX_WARNING_TYPE_FIRST_DEDUPLICATED) {
 		ufbx_warning *prev = ws->prev_warnings[type];
 		if (prev) {
 			prev->count++;
@@ -14528,6 +14528,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 		uc->obj.face_group_dirty = false;
 	}
 
+	if (num_tokens == 0 && !uc->opts.allow_empty_faces) {
+		ufbxi_check(ufbxi_warnf(UFBX_WARNING_EMPTY_FACE_REMOVED, "Empty face has been removed"));
+		return 1;
+	}
+
 	size_t num_indices = num_tokens;
 	ufbxi_check(UINT32_MAX - mesh->num_indices >= num_indices);
 
@@ -15000,6 +15005,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_file(ufbxi_context *uc
 			uc->obj.mtllib_relative_path.size = lib.length;
 		} else if (ufbxi_str_equal(cmd, ufbxi_str_c("usemtl"))) {
 			ufbxi_check(ufbxi_obj_parse_material(uc));
+		} else {
+			ufbxi_check(ufbxi_warnf(UFBX_WARNING_UNKNOWN_OBJ_DIRECTIVE, "Unknown .obj directive, skipped line"));
 		}
 	}
 
@@ -26994,7 +27001,7 @@ ufbx_abi uint32_t ufbx_catch_topo_prev_vertex_edge(ufbx_panic *panic, const ufbx
 
 ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_catch_get_weighted_face_normal(ufbx_panic *panic, const ufbx_vertex_vec3 *positions, ufbx_face face)
 {
-	if (ufbxi_panicf(panic, face.index_begin < positions->indices.count, "Face index begin (%u) out of bounds (%zu)", face.index_begin, positions->indices.count)) return ufbx_zero_vec3;
+	if (ufbxi_panicf(panic, face.index_begin <= positions->indices.count, "Face index begin (%u) out of bounds (%zu)", face.index_begin, positions->indices.count)) return ufbx_zero_vec3;
 	if (ufbxi_panicf(panic, positions->indices.count - face.index_begin >= face.num_indices, "Face index end (%u + %u) out of bounds (%zu)", face.index_begin, face.num_indices, positions->indices.count)) return ufbx_zero_vec3;
 
 	if (face.num_indices < 3) {

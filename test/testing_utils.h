@@ -1374,7 +1374,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 				ufbx_face face = mesh->faces.data[face_ix];
 
 				if (obj->bad_faces) {
-					if (ufbxt_face_has_duplicate_vertex(mesh, face)) {
+					if (ufbxt_face_has_duplicate_vertex(mesh, face) || face.num_indices < 3) {
 						continue;
 					}
 				} else {

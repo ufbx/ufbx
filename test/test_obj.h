@@ -727,11 +727,15 @@ UFBXT_FILE_TEST_PATH(blender_331_space_texture, "blender_331_space texture")
 UFBXT_FILE_TEST(synthetic_obj_zoo)
 #if UFBXT_IMPL
 {
+	ufbxt_check_warning(scene, UFBX_WARNING_UNKNOWN_OBJ_DIRECTIVE, 24, "Unknown .obj directive, skipped line");
+
 	ufbx_node *node = ufbx_find_node(scene, "Object");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
 
-	ufbxt_assert(mesh->num_faces == 1);
+	ufbxt_assert(mesh->num_faces == 7);
+	ufbxt_assert(mesh->num_line_faces == 2);
+	ufbxt_assert(mesh->num_point_faces == 4);
 }
 #endif
 
@@ -1486,6 +1490,42 @@ UFBXT_FILE_TEST(synthetic_extended_points)
 		ufbxt_assert_close_vec3(err, pos_ref[i], ufbx_get_vertex_vec3(&mesh->vertex_position, i));
 		ufbxt_assert_close_vec4(err, col_ref[i], ufbx_get_vertex_vec4(&mesh->vertex_color, i));
 	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_empty_face)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Object");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 1);
+	ufbxt_assert(mesh->num_empty_faces == 0);
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_allow_empty_faces_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.allow_empty_faces = true;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(synthetic_empty_face_allow, synthetic_empty_face, ufbxt_allow_empty_faces_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Object");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 1);
+	ufbxt_assert(mesh->num_empty_faces == 1);
+
+	ufbxt_assert(mesh->faces.data[0].index_begin == 0);
+	ufbxt_assert(mesh->faces.data[0].num_indices == 0);
 }
 #endif
 
