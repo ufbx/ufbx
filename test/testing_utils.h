@@ -139,6 +139,8 @@ typedef struct {
 	bool bad_order;
 	bool bad_uvs;
 	bool bad_faces;
+	bool line_faces;
+	bool point_faces;
 	bool no_subdivision;
 	bool root_groups_at_bone;
 	bool remove_namespaces;
@@ -680,6 +682,12 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			}
 			if (!strcmp(line, "ufbx:bad_faces")) {
 				obj->bad_faces = true;
+			}
+			if (!strcmp(line, "ufbx:line_faces")) {
+				obj->line_faces = true;
+			}
+			if (!strcmp(line, "ufbx:point_faces")) {
+				obj->point_faces = true;
 			}
 			if (!strcmp(line, "ufbx:no_subdivision")) {
 				obj->no_subdivision = true;
@@ -1353,7 +1361,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			continue;
 		}
 
-		if (!obj->bad_faces) {
+		if (!(obj->bad_faces || obj->line_faces || obj->point_faces)) {
 			ufbxt_assert(obj_mesh->num_faces == mesh->num_faces);
 			ufbxt_assert(obj_mesh->num_indices == mesh->num_indices);
 		}
@@ -1373,11 +1381,13 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 				ufbx_face obj_face = obj_mesh->faces[obj_face_ix];
 				ufbx_face face = mesh->faces.data[face_ix];
 
-				if (obj->bad_faces) {
-					if (ufbxt_face_has_duplicate_vertex(mesh, face)) {
-						continue;
-					}
-				} else {
+				if (obj->bad_faces && ufbxt_face_has_duplicate_vertex(mesh, face)) {
+					continue;
+				} else if (obj->line_faces && face.num_indices == 2) {
+					continue;
+				} else if (obj->point_faces && face.num_indices == 1) {
+					continue;
+				} else if (!obj->bad_faces) {
 					ufbxt_assert(obj_face.index_begin == face.index_begin);
 				}
 

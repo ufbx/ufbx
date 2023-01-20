@@ -727,11 +727,15 @@ UFBXT_FILE_TEST_PATH(blender_331_space_texture, "blender_331_space texture")
 UFBXT_FILE_TEST(synthetic_obj_zoo)
 #if UFBXT_IMPL
 {
+	ufbxt_check_warning(scene, UFBX_WARNING_UNKNOWN_OBJ_DIRECTIVE, 24, "Unknown .obj directive, skipped line");
+
 	ufbx_node *node = ufbx_find_node(scene, "Object");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
 
-	ufbxt_assert(mesh->num_faces == 1);
+	ufbxt_assert(mesh->num_faces == 7);
+	ufbxt_assert(mesh->num_line_faces == 2);
+	ufbxt_assert(mesh->num_point_faces == 4);
 }
 #endif
 
@@ -1326,6 +1330,202 @@ UFBXT_TEST(obj_opts_no_extrnal_files_by_filename)
 		ufbx_real avg = err.sum / (ufbx_real)err.num;
 		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 	}
+}
+#endif
+
+#if UFBXT_IMPL
+static void ufbxt_check_only_texture(ufbx_material_map *map, const char *filename)
+{
+	ufbxt_assert(!map->has_value);
+	ufbxt_assert(map->texture);
+	ufbxt_assert(!strcmp(map->texture->relative_filename.data, filename));
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_map_feature)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_material *material = ufbx_find_material(scene, "Phong");
+		ufbxt_assert(material->shader_type == UFBX_SHADER_WAVEFRONT_MTL);
+
+		ufbxt_check_only_texture(&material->fbx.diffuse_color, "diffuse.png");
+		ufbxt_check_only_texture(&material->fbx.specular_color, "specular.png");
+
+		ufbxt_assert(!material->features.pbr.enabled);
+		ufbxt_assert(!material->features.sheen.enabled);
+		ufbxt_assert(!material->features.coat.enabled);
+		ufbxt_assert(!material->features.metalness.enabled);
+		ufbxt_assert(!material->features.ior.enabled);
+		ufbxt_assert(!material->features.opacity.enabled);
+		ufbxt_assert(!material->features.transmission.enabled);
+		ufbxt_assert(!material->features.emission.enabled);
+	}
+
+	{
+		ufbx_material *material = ufbx_find_material(scene, "PBR");
+		ufbxt_assert(material->shader_type == UFBX_SHADER_WAVEFRONT_MTL);
+
+		ufbxt_check_only_texture(&material->pbr.roughness, "roughness.png");
+		ufbxt_check_only_texture(&material->pbr.metalness, "metalness.png");
+
+		ufbxt_assert(material->features.pbr.enabled);
+		ufbxt_assert(!material->features.sheen.enabled);
+		ufbxt_assert(!material->features.coat.enabled);
+		ufbxt_assert(material->features.metalness.enabled);
+		ufbxt_assert(!material->features.ior.enabled);
+		ufbxt_assert(!material->features.opacity.enabled);
+		ufbxt_assert(!material->features.transmission.enabled);
+		ufbxt_assert(!material->features.emission.enabled);
+	}
+
+	{
+		ufbx_material *material = ufbx_find_material(scene, "Extended");
+		ufbxt_assert(material->shader_type == UFBX_SHADER_WAVEFRONT_MTL);
+
+		ufbxt_check_only_texture(&material->pbr.sheen_color, "sheen.png");
+		ufbxt_check_only_texture(&material->pbr.coat_factor, "coat.png");
+		ufbxt_check_only_texture(&material->pbr.metalness, "metalness.png");
+		ufbxt_check_only_texture(&material->pbr.specular_ior, "ior.png");
+		ufbxt_check_only_texture(&material->pbr.opacity, "opacity.png");
+		ufbxt_check_only_texture(&material->pbr.transmission_color, "transmission.png");
+		ufbxt_check_only_texture(&material->pbr.emission_color, "emission.png");
+
+		ufbxt_assert(material->features.pbr.enabled);
+		ufbxt_assert(material->features.sheen.enabled);
+		ufbxt_assert(material->features.coat.enabled);
+		ufbxt_assert(material->features.metalness.enabled);
+		ufbxt_assert(material->features.ior.enabled);
+		ufbxt_assert(material->features.opacity.enabled);
+		ufbxt_assert(material->features.transmission.enabled);
+		ufbxt_assert(material->features.emission.enabled);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(blender_340_line_point)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 6);
+	ufbxt_assert(mesh->num_empty_faces == 0);
+	ufbxt_assert(mesh->num_point_faces == 0);
+	ufbxt_assert(mesh->num_line_faces == 5);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_extended_line)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Line");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 4);
+	ufbxt_assert(mesh->num_empty_faces == 0);
+	ufbxt_assert(mesh->num_point_faces == 0);
+	ufbxt_assert(mesh->num_line_faces == 4);
+	ufbxt_assert(mesh->num_indices == 8);
+
+	ufbx_vec3 pos_ref[] = {
+		{ 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f },
+		{ 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f },
+		{ 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f, 0.0f },
+		{ 1.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 0.0f },
+	};
+
+	ufbx_vec2 uv_ref[] = {
+		{ 0.0f, 0.0f }, { 2.0f, 0.0f },
+		{ 2.0f, 0.0f }, { 0.0f, 2.0f },
+		{ 0.0f, 2.0f }, { 2.0f, 2.0f },
+		{ 2.0f, 2.0f }, { 0.0f, 0.0f },
+	};
+
+	ufbx_vec4 col_ref[] = {
+		{ 1.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f },
+		{ 0.0f, 1.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f },
+		{ 0.0f, 0.0f, 1.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f },
+		{ 1.0f, 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f, 0.0f, 1.0f },
+	};
+
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		ufbxt_hintf("i=%zu", i);
+		ufbxt_assert_close_vec3(err, pos_ref[i], ufbx_get_vertex_vec3(&mesh->vertex_position, i));
+		ufbxt_assert_close_vec2(err, uv_ref[i], ufbx_get_vertex_vec2(&mesh->vertex_uv, i));
+		ufbxt_assert_close_vec4(err, col_ref[i], ufbx_get_vertex_vec4(&mesh->vertex_color, i));
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_extended_points)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Points");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 3);
+	ufbxt_assert(mesh->num_empty_faces == 0);
+	ufbxt_assert(mesh->num_point_faces == 3);
+	ufbxt_assert(mesh->num_line_faces == 0);
+	ufbxt_assert(mesh->num_indices == 3);
+
+	ufbx_vec3 pos_ref[] = {
+		{ 0.0f, 0.0f, 0.0f },
+		{ 1.0f, 0.0f, 0.0f },
+		{ 0.0f, 1.0f, 0.0f },
+	};
+
+	ufbx_vec4 col_ref[] = {
+		{ 1.0f, 0.0f, 0.0f, 1.0f },
+		{ 0.0f, 1.0f, 0.0f, 1.0f },
+		{ 0.0f, 0.0f, 1.0f, 1.0f },
+	};
+
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		ufbxt_hintf("i=%zu", i);
+		ufbxt_assert_close_vec3(err, pos_ref[i], ufbx_get_vertex_vec3(&mesh->vertex_position, i));
+		ufbxt_assert_close_vec4(err, col_ref[i], ufbx_get_vertex_vec4(&mesh->vertex_color, i));
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_empty_face)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Object");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 0);
+	ufbxt_assert(mesh->num_empty_faces == 0);
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_allow_empty_faces_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.allow_empty_faces = true;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(synthetic_empty_face_allow, synthetic_empty_face, ufbxt_allow_empty_faces_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Object");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->num_faces == 1);
+	ufbxt_assert(mesh->num_empty_faces == 1);
+
+	ufbxt_assert(mesh->faces.data[0].index_begin == 0);
+	ufbxt_assert(mesh->faces.data[0].num_indices == 0);
 }
 #endif
 
