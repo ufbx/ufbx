@@ -507,3 +507,64 @@ UFBXT_FILE_TEST(maya_cube_blinky)
 }
 #endif
 
+#if UFBXT_IMPL
+typedef struct {
+	double time;
+	ufbx_real value;
+} ufbxt_anim_ref;
+#endif
+
+UFBXT_FILE_TEST(maya_anim_interpolation)
+#if UFBXT_IMPL
+{
+	ufbxt_anim_ref anim_ref[] = {
+		// Cubic
+		{ 0.0 / 30.0, 0.0 },
+		{ 1.0 / 30.0, -0.855245 },
+		{ 2.0 / 30.0, -1.13344 },
+		{ 3.0 / 30.0, -1.17802 },
+		{ 4.0 / 30.0, -1.10882 },
+		{ 5.0 / 30.0, -0.991537 },
+		{ 6.0 / 30.0, -0.875223 },
+		{ 7.0 / 30.0, -0.808958 },
+		{ 8.0 / 30.0, -0.858419 },
+		{ 9.0 / 30.0, -1.14293 },
+		// Linear
+		{ 10.0 / 30.0, -2.0 },
+		// Constant previous
+		{ 20.0 / 30.0, -4.0 },
+		{ 25.0 / 30.0 - 0.001, -4.0 },
+		// Constant next
+		{ 25.0 / 30.0, -6.0 },
+		{ 25.0 / 30.0 + 0.001, -8.0 },
+		// Constant previous
+		{ 30.0 / 30.0, -8.0 },
+		{ 35.0 / 30.0 - 0.001, -8.0 },
+		// Linear
+		{ 35.0 / 30.0, -10.0 },
+		// Constant next
+		{ 40.0 / 30.0, -12.0 },
+		{ 40.0 / 30.0 + 0.001, -14.0 },
+		// Constant previous
+		{ 45.0 / 30.0, -14.0 },
+		{ 50.0 / 30.0 - 0.001, -14.0 },
+		// Constant next
+		{ 50.0 / 30.0, -16.0 },
+		{ 50.0 / 30.0 + 0.001, -14.0 },
+		// inal
+		{ 55.0 / 30.0, -14.0, },
+	};
+
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	for (size_t i = 0; i < ufbxt_arraycount(anim_ref); i++) {
+		ufbxt_anim_ref ref = anim_ref[i];
+		ufbxt_hintf("%zu: %f (frame %.2f)", i, ref.time, ref.time * 30.0f);
+
+		ufbx_prop p = ufbx_evaluate_prop(&scene->anim, &node->element, "Lcl Translation", ref.time);
+		ufbxt_assert_close_real(err, p.value_vec3.x, ref.value);
+	}
+}
+#endif
+
