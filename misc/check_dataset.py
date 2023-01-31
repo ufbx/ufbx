@@ -1,10 +1,13 @@
 import os
 import json
-from typing import NamedTuple, Optional, List
+from typing import NamedTuple, Optional, List, Mapping
 import subprocess
 import glob
 import re
 import urllib.parse
+import time
+import math
+import itertools
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -22,6 +25,7 @@ class TestCase(NamedTuple):
     url: str
     extra_files: List[str]
     models: List[TestModel]
+    options: Mapping[str, List[str]]
 
 def log(message=""):
     print(message, flush=True)
@@ -96,7 +100,23 @@ def gather_case_models(json_path):
             # TODO: Handle objless fbx
             pass
 
-def gather_dataset_tasks(root_dir):
+def as_list(v):
+    return v if isinstance(v, list) else [v]
+
+def append_unique(l, items):
+    for item in items:
+        if item not in l:
+            l.append(item)
+    return l
+
+def append_unique_opt(options, name, items):
+    options[name] = append_unique(options.get(name, []), items)
+
+def iter_options(options):
+    if not options: return [()]
+    return itertools.product(*([(k,v) for v in vs] for k,vs in options.items()))
+
+def gather_dataset_tasks(root_dir, heavy):
     for root, _, files in os.walk(root_dir):
         for filename in files:
             if not filename.endswith(".json"):
@@ -110,7 +130,35 @@ def gather_dataset_tasks(root_dir):
             if not models:
                 raise RuntimeError(f"No models found for {path}")
 
+            features = desc.get("features", [])
+
             extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
+            options = { k: as_list(v) for k,v in desc.get("options", {}).items() }
+
+            if heavy:
+                append_unique_opt(options, "geometry-transform-handling", [
+                    "preserve", "helper-nodes", "modify-geometry",
+                ])
+
+                append_unique_opt(options, "space-conversion", [
+                    "transform-root", "adjust-transforms",
+                ])
+
+            for feature in features:
+                if feature == "geometry-transform":
+                    append_unique_opt(options, "geometry-transform-handling", [
+                        "preserve", "helper-nodes", "modify-geometry",
+                    ])
+                elif feature == "geometry-transform-no-instances":
+                    append_unique_opt(options, "geometry-transform-handling", [
+                        "preserve", "helper-nodes", "modify-geometry", "modify-geometry-no-fallback",
+                    ])
+                elif feature == "space-conversion":
+                    append_unique_opt(options, "space-conversion", [
+                        "transform-root", "adjust-transforms",
+                    ])
+                else:
+                    raise RuntimeError(f"Unknown feature: {feature}")
 
             yield TestCase(
                 root=root_dir,
@@ -121,6 +169,7 @@ def gather_dataset_tasks(root_dir):
                 url=desc["url"],
                 extra_files=extra_files,
                 models=models,
+                options=options,
             )
 
 if __name__ == "__main__":
@@ -128,19 +177,23 @@ if __name__ == "__main__":
 
     parser = ArgumentParser("check_dataset.py --root <root>")
     parser.add_argument("--root", help="Root directory to search for .json files")
-    parser.add_argument("--host-url", help="URL where the files are hosted")
+    parser.add_argument("--host-url", default="", help="URL where the files are hosted")
     parser.add_argument("--exe", help="check_fbx.c executable")
     parser.add_argument("--verbose", action="store_true", help="Print verbose information")
+    parser.add_argument("--heavy", action="store_true", help="Run heavy checks")
     argv = parser.parse_args()
 
-    cases = list(gather_dataset_tasks(root_dir=argv.root))
+    host_url = argv.host_url if argv.host_url else argv.root
+    host_url = host_url.rstrip("\\/")
+
+    cases = list(gather_dataset_tasks(root_dir=argv.root, heavy=argv.heavy))
 
     def fmt_url(path, root=""):
         if root:
             path = os.path.relpath(path, root)
         path = path.replace("\\", "/")
         safe_path = urllib.parse.quote(path)
-        return f"{argv.host_url}/{safe_path}"
+        return f"{host_url}/{safe_path}"
 
     def fmt_rel(path, root=""):
         if root:
@@ -152,6 +205,8 @@ if __name__ == "__main__":
     test_count = 0
 
     case_ok_count = 0
+
+    begin_time = time.time()
 
     for case in cases:
 
@@ -168,22 +223,20 @@ if __name__ == "__main__":
         case_ok = True
 
         for model in case.models:
-            test_count += 1
-
-            args = [argv.exe]
-            args.append(model.fbx_path)
+            case_args = [argv.exe]
+            case_args.append(model.fbx_path)
 
             extra = []
 
             if model.obj_path:
-                args += ["--obj", model.obj_path]
+                case_args += ["--obj", model.obj_path]
 
             if model.mat_path:
-                args += ["--mat", model.mat_path]
+                case_args += ["--mat", model.mat_path]
 
             if model.frame is not None:
                 extra.append(f"frame {model.frame}")
-                args += ["--frame", str(model.frame)]
+                case_args += ["--frame", str(model.frame)]
 
             name = fmt_rel(model.fbx_path, case.root)
 
@@ -193,34 +246,46 @@ if __name__ == "__main__":
 
             log(f"-- {name}{extra_str} --")
             log()
-            if argv.host_url:
-                log(f"    .fbx url: {fmt_url(model.fbx_path, case.root)}")
-                if model.obj_path:
-                    log(f"    .obj url: {fmt_url(model.obj_path, case.root)}")
-                if model.mtl_path:
-                    log(f"    .mtl url: {fmt_url(model.mtl_path, case.root)}")
-                if model.mat_path:
-                    log(f"    .mat url: {fmt_url(model.mat_path, case.root)}")
+            log(f"    .fbx url: {fmt_url(model.fbx_path, case.root)}")
+            if model.obj_path:
+                log(f"    .obj url: {fmt_url(model.obj_path, case.root)}")
+            if model.mtl_path:
+                log(f"    .mtl url: {fmt_url(model.mtl_path, case.root)}")
+            if model.mat_path:
+                log(f"    .mat url: {fmt_url(model.mat_path, case.root)}")
 
             log()
-            log("$ " + " ".join(args))
-            log()
 
-            try:
-                subprocess.check_call(args)
+            for opts in iter_options(case.options):
+                test_count += 1
+
+                args = case_args[:]
+                for k,v in opts:
+                    args += [f"--{k}", v]
+
+                log("$ " + " ".join(args))
                 log()
-                log("-- PASS --")
-                ok_count += 1
-            except subprocess.CalledProcessError:
+
+                try:
+                    subprocess.check_call(args)
+                    log()
+                    log("-- PASS --")
+                    ok_count += 1
+                except subprocess.CalledProcessError:
+                    log()
+                    log("-- FAIL --")
+                    case_ok = False
                 log()
-                log("-- FAIL --")
-                case_ok = False
-            log()
 
         if case_ok:
             case_ok_count += 1
 
+    end_time = time.time()
+
     log(f"{ok_count}/{test_count} files passed ({case_ok_count}/{len(cases)} test cases)")
+
+    dur = int(math.ceil(end_time - begin_time))
+    log(f"Total time: {int(dur/60)}min {dur%60}s")
 
     if ok_count < test_count:
         exit(1)

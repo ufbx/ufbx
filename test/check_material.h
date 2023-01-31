@@ -97,9 +97,9 @@ static const char *ufbxt_pbr_map_name(ufbx_material_pbr_map map)
 	return 0;
 }
 
-static const char *ufbxt_material_feature_name(ufbx_material_pbr_map map)
+static const char *ufbxt_material_feature_name(ufbx_material_feature feature)
 {
-	switch (map) {
+	switch (feature) {
 	case UFBX_MATERIAL_FEATURE_PBR: return "pbr";
 	case UFBX_MATERIAL_FEATURE_METALNESS: return "metalness";
 	case UFBX_MATERIAL_FEATURE_DIFFUSE: return "diffuse";

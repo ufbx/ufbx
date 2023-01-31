@@ -29,6 +29,58 @@ bool g_verbose = false;
 #include "testing_utils.h"
 #include "cputime.h"
 
+typedef struct {
+	const char *name;
+	int value;
+} ufbxt_enum_name;
+
+static const ufbxt_enum_name ufbxt_names_ufbx_geometry_transform_handling[] = {
+	{ "preserve", UFBX_GEOMETRY_TRANSFORM_HANDLING_PRESERVE },
+	{ "helper-nodes", UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES },
+	{ "modify-geometry", UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY },
+	{ "modify-geometry-no-fallback", UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK },
+};
+
+static const ufbxt_enum_name ufbxt_names_ufbx_space_conversion[] = {
+	{ "transform-root", UFBX_SPACE_CONVERSION_TRANSFORM_ROOT },
+	{ "adjust-transforms", UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS },
+};
+
+static int ufbxt_str_to_enum_imp(const ufbxt_enum_name *names, size_t count, const char *type_name, const char *name)
+{
+	for (size_t i = 0; i < count; i++) {
+		if (!strcmp(names[i].name, name)) {
+			return names[i].value;
+		}
+	}
+	fprintf(stderr, "Unsupported enum name in %s: %s\n", type_name, name);
+	ufbxt_assert(false);
+	return -1;
+}
+
+#define ufbxt_cat2(a, b) a##b
+#define ufbxt_cat(a, b) ufbxt_cat2(a,b)
+#define ufbxt_str_to_enum_names(m_type, m_names, m_str) \
+	(m_type)ufbxt_str_to_enum_imp(m_names, ufbxt_arraycount(m_names), #m_type, (m_str))
+#define ufbxt_str_to_enum(m_type, m_str) \
+	ufbxt_str_to_enum_names(m_type, ufbxt_cat2(ufbxt_names_, m_type), m_str)
+
+typedef struct {
+	size_t count;
+	const char *names[64];
+} ufbxt_fbx_features;
+
+static void ufbxt_add_feature(ufbxt_fbx_features *features, const char *name)
+{
+	for (size_t i = 0; i < features->count; i++) {
+		if (!strcmp(features->names[i], name)) return;
+	}
+
+	size_t index = features->count++;
+	ufbxt_assert(index < ufbxt_arraycount(features->names));
+	features->names[index] = name;
+}
+
 #ifdef _WIN32
 int wmain(int argc, wchar_t **wide_argv)
 #else
@@ -60,8 +112,17 @@ int main(int argc, char **argv)
 	int frame = INT_MIN;
 	bool allow_bad_unicode = false;
 	bool sink = false;
-	bool ignore_missing_external = false;
 	bool dedicated_allocs = false;
+
+	ufbx_load_opts opts = { 0 };
+
+	opts.evaluate_skinning = true;
+	opts.evaluate_caches = true;
+	opts.load_external_files = true;
+	opts.generate_missing_normals = true;
+	opts.target_axes = ufbx_axes_right_handed_y_up;
+	opts.target_unit_meters = 0.01;
+	opts.obj_search_mtl_by_filename = true;
 
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-v")) {
@@ -83,7 +144,11 @@ int main(int argc, char **argv)
 		} else if (!strcmp(argv[i], "--sink")) {
 			sink = true;
 		} else if (!strcmp(argv[i], "--ignore-missing-external")) {
-			ignore_missing_external = true;
+			opts.ignore_missing_external_files = true;
+		} else if (!strcmp(argv[i], "--geometry-transform-handling")) {
+			if (++i < argc) opts.geometry_transform_handling = ufbxt_str_to_enum(ufbx_geometry_transform_handling, argv[i]);
+		} else if (!strcmp(argv[i], "--space-conversion")) {
+			if (++i < argc) opts.space_conversion = ufbxt_str_to_enum(ufbx_space_conversion, argv[i]);
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "Unrecognized flag: %s\n", argv[i]);
 			exit(1);
@@ -100,16 +165,6 @@ int main(int argc, char **argv)
 	if (strstr(path, "ufbx-bad-unicode")) {
 		allow_bad_unicode = true;
 	}
-
-	ufbx_load_opts opts = { 0 };
-	opts.evaluate_skinning = true;
-	opts.evaluate_caches = true;
-	opts.load_external_files = true;
-	opts.generate_missing_normals = true;
-	opts.ignore_missing_external_files = ignore_missing_external;
-	opts.target_axes = ufbx_axes_right_handed_y_up;
-	opts.target_unit_meters = 0.01;
-	opts.obj_search_mtl_by_filename = true;
 
 	if (dedicated_allocs) {
 		opts.temp_allocator.huge_threshold = 1;
@@ -242,6 +297,32 @@ int main(int argc, char **argv)
 	ufbxt_assert(scene->metadata.exporter != UFBX_EXPORTER_UNKNOWN || known_unknown);
 
 	ufbxt_check_scene(scene);
+
+	ufbxt_fbx_features features = { 0 };
+	for (size_t i = 0; i < scene->nodes.count; i++) {
+		ufbx_node *node = scene->nodes.data[i];
+		if (node->has_geometry_transform) {
+			ufbxt_add_feature(&features, "geometry-transform");
+		}
+	}
+
+	for (size_t i = 0; i < scene->meshes.count; i++) {
+		ufbx_mesh *mesh = scene->meshes.data[i];
+		if (mesh->instances.count > 1) {
+			ufbxt_add_feature(&features, "instanced-mesh");
+		}
+	}
+
+	if (scene->nurbs_curves.count > 0) ufbxt_add_feature(&features, "nurbs-curve");
+	if (scene->nurbs_surfaces.count > 0) ufbxt_add_feature(&features, "nurbs-surface");
+
+	if (features.count > 0) {
+		printf("Features:");
+		for (size_t i = 0; i < features.count; i++) {
+			printf(" %s", features.names[i]);
+		}
+		printf("\n");
+	}
 
 	if (obj_path) {
 		size_t obj_size;

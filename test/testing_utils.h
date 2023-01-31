@@ -1146,6 +1146,11 @@ enum {
 	UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS = 0x2,
 };
 
+static bool ufbxt_has_mesh(ufbx_node *node)
+{
+	return node->mesh || (node->geometry_transform_helper && node->geometry_transform_helper->mesh);
+}
+
 static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, uint32_t flags)
 {
 	ufbx_node **used_nodes = (ufbx_node**)malloc(obj->num_meshes * sizeof(ufbx_node*));
@@ -1221,7 +1226,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 				sizeof(ufbxt_obj_node), &ufbxt_cmp_obj_node);
 
 			if (found) {
-				if (found->node && found->node->mesh) {
+				if (found->node && ufbxt_has_mesh(found->node)) {
 					bool seen = false;
 					for (size_t i = 0; i < num_used_nodes; i++) {
 						if (used_nodes[i] == found->node) {
@@ -1251,7 +1256,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 					node = ufbx_find_node_len(scene, name, name_len);
 				}
 
-				if (node && node->mesh) {
+				if (node && ufbxt_has_mesh(node)) {
 					bool seen = false;
 					for (size_t i = 0; i < num_used_nodes; i++) {
 						if (used_nodes[i] == node) {
@@ -1486,7 +1491,7 @@ static ufbxt_noinline void *ufbxt_read_file(const char *name, size_t *p_size)
 #endif
 	fseek(file, 0, SEEK_SET);
 
-	char *data = malloc(size + 1);
+	char *data = (char*)malloc(size + 1);
 	ufbxt_assert(data != NULL);
 	size_t num_read = fread(data, 1, size, file);
 	fclose(file);
