@@ -140,7 +140,7 @@
 	#define UFBXI_FEATURE_KD 0
 #endif
 
-#if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_SKINNING_EVALUATION || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_INDEX_GENERATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_SPATIAL || !UFBXI_FEATURE_KD
+#if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_SKINNING_EVALUATION || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_INDEX_GENERATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_SPATIAL || !UFBXI_FEATURE_KD || !UFBXI_FEATURE_FORMAT_OBJ
 	#define UFBXI_PARTIAL_FEATURES 1
 #endif
 
@@ -5330,12 +5330,6 @@ typedef struct {
 
 	uint32_t num_groups;
 } ufbxi_obj_mesh;
-
-static const uint8_t ufbxi_obj_attrib_stride[] = {
-	3, 2, 3, 4,
-};
-
-ufbx_static_assert(obj_attrib_strides, ufbxi_arraycount(ufbxi_obj_attrib_stride) == UFBXI_OBJ_NUM_ATTRIBS_EXT);
 
 typedef struct {
 	const char *name;
@@ -14049,6 +14043,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, uf
 // -- .obj file
 
 #if UFBXI_FEATURE_FORMAT_OBJ
+
+static const uint8_t ufbxi_obj_attrib_stride[] = {
+	3, 2, 3, 4,
+};
+
+ufbx_static_assert(obj_attrib_strides, ufbxi_arraycount(ufbxi_obj_attrib_stride) == UFBXI_OBJ_NUM_ATTRIBS_EXT);
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_props(ufbxi_context *uc, ufbx_prop_list *dst, size_t count)
 {
