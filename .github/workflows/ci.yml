@@ -156,8 +156,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Compile feature permutations
+      - name: Update apt
+        run: sudo apt-get update
+      - name: Install apt dependencies
+        run: sudo apt-get install -y tcc
+      - name: Compile feature permutations (limited, Clang+GCC)
         run: python misc/run_tests.py features
+      - name: Compile feature permutations (exhaustive, TCC)
+        run: python misc/run_tests.py features --heavy --additional-compiler tcc --compiler tcc
 
   ci_analysis:
     runs-on: ubuntu-latest

@@ -29,6 +29,7 @@ parser.add_argument("--threads", type=int, default=0, help="Number of threads to
 parser.add_argument("--verbose", action="store_true", help="Verbose output")
 parser.add_argument("--hash-file", help="Hash test input file")
 parser.add_argument("--runner", help="Descriptive name for the runner")
+parser.add_argument("--heavy", action="store_true", help="Run heavy tests")
 parser.add_argument("--fail-on-pre-test", action="store_true", help="Indicate failure if pre-test checks fail")
 argv = parser.parse_args()
 
@@ -943,20 +944,25 @@ async def main():
             "UFBX_NO_TESSELLATION",
             "UFBX_NO_GEOMETRY_CACHE",
             "UFBX_NO_SCENE_EVALUATION",
+            "UFBX_NO_SKINNING_EVALUATION",
+            "UFBX_NO_FORMAT_OBJ",
+            "UFBX_NO_INDEX_GENERATION",
             "UFBX_NO_TRIANGULATION",
             "UFBX_NO_ERROR_STACK",
         ]
 
         target_tasks = []
 
-        for bits in range(1, 1 << len(feature_defines)):
+        for bits in range(0, 1 << len(feature_defines)):
             defines = { name: 1 for ix, name in enumerate(feature_defines) if (1 << ix) & bits }
 
+            if not argv.heavy and len(defines) > 2:
+                continue
+
             feature_config = {
-                "sources": ["ufbx.c"],
+                "sources": ["ufbx.c", "misc/minimal_main.c"],
                 "output": f"features_{bits}" + obj_suffix,
                 "warnings": True,
-                "compile_only": True,
                 "defines": defines,
             }
             target_tasks += compile_permutations("features", feature_config, arch_configs, None)
@@ -1147,7 +1153,7 @@ async def main():
             for root, _, files in os.walk("data"):
                 for file in files:
                     if "_ascii" in file: continue
-                    if any(f in file for f in too_heavy_files): continue
+                    if any(f in file for f in too_heavy_files) and not argv.heavy: continue
                     path = os.path.join(root, file)
                     if "fuzz" in path: continue
                     if path.endswith(".fbx"):
@@ -1214,7 +1220,7 @@ async def main():
             for root, _, files in os.walk("data"):
                 for file in files:
                     path = os.path.join(root, file)
-                    if any(f in file for f in too_heavy_files): continue
+                    if any(f in file for f in too_heavy_files) and not argv.heavy: continue
                     if re.match(r"^.*_\d+_obj.obj$", file):
                         target.log.clear()
                         target.ran = False
