@@ -970,7 +970,7 @@ async def main():
 
             feature_config = {
                 "sources": ["ufbx.c", "misc/minimal_main.c"],
-                "output": f"features_{bits}" + obj_suffix,
+                "output": f"features_{bits}" + exe_suffix,
                 "temp_dir": f"features_{bits}",
                 "warnings": True,
                 "defines": defines,
