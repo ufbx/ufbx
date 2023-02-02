@@ -204,6 +204,8 @@ class CLCompiler(Compiler):
 
         if not config.get("compile_only"):
             obj_dir = os.path.dirname(output)
+            if "temp_dir" in config:
+                obj_dir = config["temp_dir"]
             args.append(f"/Fo{obj_dir}\\")
 
         if config.get("warnings", False):
@@ -222,7 +224,7 @@ class CLCompiler(Compiler):
             args.append("/Ox")
         else:
             args.append("/DDEBUG=1")
-        
+
         if config.get("regression", False):
             args.append("/DUFBX_REGRESSION=1")
 
@@ -770,6 +772,12 @@ async def main():
                 conf = copy.deepcopy(config)
                 conf["output"] = os.path.join(path, config.get("output", "a.exe"))
 
+                temp_dir = config.get("temp_dir", "")
+                if temp_dir:
+                    temp_dir = os.path.join(path, temp_dir)
+                    conf["temp_dir"] = temp_dir
+                    os.makedirs(temp_dir, exist_ok=True)
+
                 if "defines" not in conf:
                     conf["defines"] = { }
 
@@ -956,12 +964,14 @@ async def main():
         for bits in range(0, 1 << len(feature_defines)):
             defines = { name: 1 for ix, name in enumerate(feature_defines) if (1 << ix) & bits }
 
-            if not argv.heavy and len(defines) > 2:
+            # Only consider up to two positive or negative features
+            if not argv.heavy and (len(defines) > 2 | len(defines) >= len(feature_defines) - 2):
                 continue
 
             feature_config = {
                 "sources": ["ufbx.c", "misc/minimal_main.c"],
                 "output": f"features_{bits}" + obj_suffix,
+                "temp_dir": f"features_{bits}",
                 "warnings": True,
                 "defines": defines,
             }
