@@ -965,7 +965,7 @@ async def main():
             defines = { name: 1 for ix, name in enumerate(feature_defines) if (1 << ix) & bits }
 
             # Only consider up to two positive or negative features
-            if not argv.heavy and (len(defines) > 2 | len(defines) >= len(feature_defines) - 2):
+            if not argv.heavy and (len(defines) > 2 or len(defines) >= len(feature_defines) - 2):
                 continue
 
             feature_config = {
