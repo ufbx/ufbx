@@ -113,11 +113,43 @@ typedef double ufbx_real;
 
 // -- Language
 
+#if UFBX_CPP11
+
+template <typename T, typename U>
+struct ufbxi_type_is { };
+
+template <typename T>
+struct ufbxi_type_is<T, T> { using type = int; };
+
+template <typename T>
+struct ufbx_converter { };
+
+#define UFBX_CONVERSION_IMPL(p_name) \
+	template <typename T, typename S=typename ufbxi_type_is<T, decltype(ufbx_converter<T>::from(*(const p_name*)nullptr))>::type> \
+	operator T() const { return ufbx_converter<T>::from(*this); }
+
+#define UFBX_CONVERSION_IMPL_TO(p_name) \
+	template <typename T, typename S=typename ufbxi_type_is<p_name, decltype(ufbx_converter<T>::to(*(const T*)nullptr))>::type> \
+	p_name(const T &t) { *this = ufbx_converter<T>::to(t); }
+
+#define UFBX_CONVERSION_IMPL_LIST(p_name) \
+	template <typename T, typename S=typename ufbxi_type_is<T, decltype(ufbx_converter<T>::from_list((p_name*)nullptr, (size_t)0))>::type> \
+	operator T() const { return ufbx_converter<T>::from_list(data, count); }
+
+#else
+
+#define UFBX_CONVERSION_IMPL(p_name)
+#define UFBX_CONVERSION_IMPL_LIST(p_name)
+
+#endif
+
 #if defined(__cplusplus)
 	#define UFBX_LIST_TYPE(p_name, p_type) struct p_name { p_type *data; size_t count; \
 		p_type &operator[](size_t index) const { ufbx_assert(index < count); return data[index]; } \
 		p_type *begin() const { return data; } \
-		p_type *end() const { return data + count; } }
+		p_type *end() const { return data + count; } \
+		UFBX_CONVERSION_IMPL_LIST(p_type) \
+	}
 #else
 	#define UFBX_LIST_TYPE(p_name, p_type) typedef struct p_name { p_type *data; size_t count; } p_name
 #endif
@@ -172,12 +204,16 @@ typedef double ufbx_real;
 typedef struct ufbx_string {
 	const char *data;
 	size_t length;
+
+	UFBX_CONVERSION_IMPL(ufbx_string)
 } ufbx_string;
 
 // Opaque byte buffer blob
 typedef struct ufbx_blob {
 	const void *data;
 	size_t size;
+
+	UFBX_CONVERSION_IMPL(ufbx_blob)
 } ufbx_blob;
 
 // 2D vector
@@ -186,6 +222,8 @@ typedef struct ufbx_vec2 {
 		struct { ufbx_real x, y; };
 		ufbx_real v[2];
 	};
+
+	UFBX_CONVERSION_IMPL(ufbx_vec2)
 } ufbx_vec2;
 
 // 3D vector
@@ -194,6 +232,8 @@ typedef struct ufbx_vec3 {
 		struct { ufbx_real x, y, z; };
 		ufbx_real v[3];
 	};
+
+	UFBX_CONVERSION_IMPL(ufbx_vec3)
 } ufbx_vec3;
 
 // 4D vector
@@ -202,6 +242,8 @@ typedef struct ufbx_vec4 {
 		struct { ufbx_real x, y, z, w; };
 		ufbx_real v[4];
 	};
+
+	UFBX_CONVERSION_IMPL(ufbx_vec4)
 } ufbx_vec4;
 
 // Quaternion
@@ -210,6 +252,8 @@ typedef struct ufbx_quat {
 		struct { ufbx_real x, y, z, w; };
 		ufbx_real v[4];
 	};
+
+	UFBX_CONVERSION_IMPL(ufbx_quat)
 } ufbx_quat;
 
 // Order in which Euler-angle rotation axes are applied for a transform
@@ -236,6 +280,8 @@ typedef struct ufbx_transform {
 	ufbx_vec3 translation;
 	ufbx_quat rotation;
 	ufbx_vec3 scale;
+
+	UFBX_CONVERSION_IMPL(ufbx_transform)
 } ufbx_transform;
 
 // 4x3 matrix encoding an affine transformation.
@@ -251,6 +297,8 @@ typedef struct ufbx_matrix {
 		ufbx_vec3 cols[4];
 		ufbx_real v[12];
 	};
+
+	UFBX_CONVERSION_IMPL(ufbx_matrix)
 } ufbx_matrix;
 
 typedef struct ufbx_void_list {
@@ -4633,6 +4681,10 @@ ufbx_abi uint32_t ufbx_ffi_triangulate_face(uint32_t *indices, size_t num_indice
 struct ufbx_string_view {
 	const char *data;
 	size_t length;
+
+	ufbx_string_view() : data(nullptr), length(0) { }
+	ufbx_string_view(const char *data, size_t length) : data(data), length(length) { }
+	UFBX_CONVERSION_IMPL_TO(ufbx_string_view)
 };
 
 ufbx_inline ufbx_scene *ufbx_load_file(ufbx_string_view filename, const ufbx_load_opts *opts, ufbx_error *error) { return ufbx_load_file_len(filename.data, filename.length, opts, error); }
@@ -4731,6 +4783,7 @@ public:
 	T &operator*() const noexcept { return *ptr; }
 	T *operator->() const noexcept { return ptr; }
 	T *get() const noexcept { return ptr; }
+	explicit operator bool() const noexcept { return ptr != nullptr; }
 };
 
 // Behaves like `std::shared_ptr<T>`.
@@ -4776,6 +4829,7 @@ public:
 	T &operator*() const noexcept { return *ptr; }
 	T *operator->() const noexcept { return ptr; }
 	T *get() const noexcept { return ptr; }
+	explicit operator bool() const noexcept { return ptr != nullptr; }
 };
 
 #endif

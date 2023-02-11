@@ -228,6 +228,11 @@ class CLCompiler(Compiler):
         if config.get("regression", False):
             args.append("/DUFBX_REGRESSION=1")
 
+        std = config.get("std", "")
+        if std:
+            assert std in ("c++14", "c++17", "c++20")
+            args.append(f"/std:{std}")
+
         for key, val in config.get("defines", {}).items():
             if not val:
                 args.append(f"/D{key}")
@@ -703,7 +708,7 @@ def decorate_arch(compiler, arch):
 tests = set(argv.tests)
 impicit_tests = False
 if not tests:
-    tests = ["tests", "stack", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
+    tests = ["tests", "cpp", "stack", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
     implicit_tests = True
 
 async def main():
@@ -884,6 +889,37 @@ async def main():
             "dev": False,
         }
         target_tasks += compile_permutations("cpp_no_dev", cpp_no_dev_config, arch_configs, [])
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+    if "cpp" in tests:
+        log_comment("-- Compiling and running C++ tests --")
+
+        target_tasks = []
+
+        cpp_configs = all_configs.copy()
+        if not argv.heavy:
+            del cpp_configs["sanitize"]
+        cpp_configs.update({
+            "cpp": {
+                "cpp11": { "std": "c++11" },
+                "cpp14": { "std": "c++14" },
+                "cpp17": { "std": "c++17" },
+                "cpp20": { "std": "c++20" },
+            },
+        })
+
+        # MSVC-based C++ standard libraries don't support C++11
+        if sys.platform == "win32":
+            del cpp_configs["cpp"]["cpp11"]
+
+        runner_config = {
+            "sources": ["test/cpp/cpp_runner.cpp", "ufbx.c"],
+            "output": "cpp_runner" + exe_suffix,
+            "cpp": True,
+        }
+        target_tasks += compile_permutations("cpp_runner", runner_config, cpp_configs, ["-d", "data"])
 
         targets = await gather(target_tasks)
         all_targets += targets

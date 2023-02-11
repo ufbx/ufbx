@@ -225,9 +225,7 @@
 	#define ufbxi_noinline __declspec(noinline)
 	#define ufbxi_forceinline __forceinline
 	#define ufbxi_restrict __restrict
-	#if defined(__cplusplus) && _MSC_VER >= 1900 && defined(_MSVC_LANG) && _MSVC_LANG >= 201703L
-		#define ufbxi_nodiscard [[nodiscard]]
-	#elif defined(_Check_return_)
+	#if defined(_Check_return_)
 		#define ufbxi_nodiscard _Check_return_
 	#else
 		#define ufbxi_nodiscard
