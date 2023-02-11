@@ -113,6 +113,8 @@ typedef double ufbx_real;
 
 // -- Language
 
+// bindgen-disable
+
 #if UFBX_CPP11
 
 template <typename T, typename U>
@@ -128,18 +130,19 @@ struct ufbx_converter { };
 	template <typename T, typename S=typename ufbxi_type_is<T, decltype(ufbx_converter<T>::from(*(const p_name*)nullptr))>::type> \
 	operator T() const { return ufbx_converter<T>::from(*this); }
 
-#define UFBX_CONVERSION_IMPL_TO(p_name) \
+#define UFBX_CONVERSION_TO_IMPL(p_name) \
 	template <typename T, typename S=typename ufbxi_type_is<p_name, decltype(ufbx_converter<T>::to(*(const T*)nullptr))>::type> \
 	p_name(const T &t) { *this = ufbx_converter<T>::to(t); }
 
-#define UFBX_CONVERSION_IMPL_LIST(p_name) \
+#define UFBX_CONVERSION_LIST_IMPL(p_name) \
 	template <typename T, typename S=typename ufbxi_type_is<T, decltype(ufbx_converter<T>::from_list((p_name*)nullptr, (size_t)0))>::type> \
 	operator T() const { return ufbx_converter<T>::from_list(data, count); }
 
 #else
 
 #define UFBX_CONVERSION_IMPL(p_name)
-#define UFBX_CONVERSION_IMPL_LIST(p_name)
+#define UFBX_CONVERSION_TO_IMPL(p_name)
+#define UFBX_CONVERSION_LIST_IMPL(p_name)
 
 #endif
 
@@ -148,7 +151,7 @@ struct ufbx_converter { };
 		p_type &operator[](size_t index) const { ufbx_assert(index < count); return data[index]; } \
 		p_type *begin() const { return data; } \
 		p_type *end() const { return data + count; } \
-		UFBX_CONVERSION_IMPL_LIST(p_type) \
+		UFBX_CONVERSION_LIST_IMPL(p_type) \
 	}
 #else
 	#define UFBX_LIST_TYPE(p_name, p_type) typedef struct p_name { p_type *data; size_t count; } p_name
@@ -185,6 +188,8 @@ struct ufbx_converter { };
 #else
 	#define UFBX_CALLBACK_IMPL(p_name, p_fn, p_return, p_params, p_args)
 #endif
+
+// bindgen-enable
 
 // -- Version
 
@@ -4684,7 +4689,7 @@ struct ufbx_string_view {
 
 	ufbx_string_view() : data(nullptr), length(0) { }
 	ufbx_string_view(const char *data, size_t length) : data(data), length(length) { }
-	UFBX_CONVERSION_IMPL_TO(ufbx_string_view)
+	UFBX_CONVERSION_TO_IMPL(ufbx_string_view)
 };
 
 ufbx_inline ufbx_scene *ufbx_load_file(ufbx_string_view filename, const ufbx_load_opts *opts, ufbx_error *error) { return ufbx_load_file_len(filename.data, filename.length, opts, error); }
