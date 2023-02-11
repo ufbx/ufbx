@@ -79,9 +79,11 @@ jobs:
           path: build
       - run: type build\hashes.txt
       - name: Run tests
-        run: python misc/run_tests.py tests cpp stack readme threadcheck hashes --runner ci_windows
+        run: python misc/run_tests.py tests stack readme threadcheck hashes --runner ci_windows
       - name: Verbose test info
         run: build\runner_vs_cl64_release_x64\runner.exe -d data -v
+      - name: Check C++ tests
+        run: python misc/run_tests.py cpp --compiler vs_cl64
       - name: Check features
         run: python misc/run_tests.py features --compiler vs_cl64
       - name: Compress hashdumps
