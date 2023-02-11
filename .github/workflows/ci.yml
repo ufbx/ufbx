@@ -68,7 +68,7 @@ jobs:
           path: build/hashdump_ci_linux.txt.gz
 
   ci_windows:
-    runs-on: windows-2019
+    runs-on: windows-2022
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
