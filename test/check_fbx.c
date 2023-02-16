@@ -315,6 +315,7 @@ int main(int argc, char **argv)
 
 	if (scene->nurbs_curves.count > 0) ufbxt_add_feature(&features, "nurbs-curve");
 	if (scene->nurbs_surfaces.count > 0) ufbxt_add_feature(&features, "nurbs-surface");
+	if (scene->lod_groups.count > 0) ufbxt_add_feature(&features, "lod-group");
 
 	if (features.count > 0) {
 		printf("Features:");
