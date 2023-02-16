@@ -429,6 +429,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 	size_t total_name_length = 0;
 
 	bool merge_groups = false;
+	bool allow_default = false;
 
 	char *line = (char*)obj_data;
 	for (;;) {
@@ -451,7 +452,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 				prev_space = space;
 			}
 		}
-		else if (!strncmp(line, "g default", 7)) { /* ignore default group */ }
+		else if (!strncmp(line, "g default", 7) && !allow_default) { /* ignore default group */ }
 		else if ((!strncmp(line, "g ", 2) && !merge_groups) || !strncmp(line, "o ", 2)) {
 			bool prev_space = false;
 			num_groups++;
@@ -466,6 +467,8 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			num_meshes++;
 		} else if (strstr(line, "ufbx:merge_groups")) {
 			merge_groups = true;
+		} else if (strstr(line, "ufbx:allow_default")) {
+			allow_default = true;
 		}
 
 		if (end) {
@@ -608,7 +611,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 
 			mesh->num_faces++;
 			df++;
-		} else if (!strncmp(line, "g default", 7)) {
+		} else if (!strncmp(line, "g default", 7) && !allow_default) {
 			/* ignore default group */
 		} else if ((!strncmp(line, "g ", 2) && !merge_groups) || !strncmp(line, "o ", 2)) {
 			mesh = mesh ? mesh + 1 : meshes;
