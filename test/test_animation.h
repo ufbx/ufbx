@@ -575,6 +575,39 @@ typedef struct {
 } ufbxt_frame_ref;
 #endif
 
+#if UFBXT_IMPL
+
+// Clang x86 UBSAN emits an undefined reference to __mulodi4() for 64-bit
+// multiplication and this is the only instance where we need it at the
+// moment so just use a dumb implementation if necessary.
+#if defined(__clang__) && defined(__x86_64__) && defined(__SANITIZE_UNDEFINED__)
+static int64_t ufbxt_mul_i64(int64_t a, int64_t b)
+{
+	int64_t sign = 1;
+	if (a < 0) {
+		sign *= -1;
+		a = -a;
+	}
+	if (b < 0) {
+		sign *= -1;
+		b = -b;
+	}
+
+	int64_t result = 0;
+	for (int32_t i = 0; i < 64; i++) {
+		result += ((a >> i) & 1) ? (b << i) : 0;
+	}
+	return sign * result;
+}
+#else
+static int64_t ufbxt_mul_i64(int64_t a, int64_t b)
+{
+	return a * b;
+}
+#endif
+
+#endif
+
 UFBXT_FILE_TEST(maya_long_keyframes)
 #if UFBXT_IMPL
 {
@@ -646,7 +679,7 @@ UFBXT_FILE_TEST(maya_long_keyframes)
 			tick_accurate = false;
 		}
 
-		int64_t ref_tick = ref.frame * 46186158000 / 30;
+		int64_t ref_tick = ufbxt_mul_i64(ref.frame, INT64_C(46186158000) / 30);
 		int64_t tick = (int64_t)round(key.time * 46186158000.0);
 		if (tick_accurate) {
 			ufbxt_assert(ref_tick == tick);
