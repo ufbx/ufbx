@@ -551,7 +551,7 @@ UFBXT_FILE_TEST(maya_anim_interpolation)
 		// Constant next
 		{ 50.0 / 30.0, -16.0 },
 		{ 50.0 / 30.0 + 0.001, -14.0 },
-		// inal
+		// Final
 		{ 55.0 / 30.0, -14.0, },
 	};
 

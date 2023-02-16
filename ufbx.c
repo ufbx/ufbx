@@ -11996,25 +11996,6 @@ static ufbxi_forceinline float ufbxi_solve_auto_tangent(double prev_time, double
 	return (float)(slope_sign * abs_slope);
 }
 
-static ufbxi_noinline double ufbxi_ktime_to_sec_imp(int64_t ktime_sec, int64_t ktime)
-{
-	int64_t sec = ktime / ktime_sec;
-	int64_t rem = ktime % ktime_sec;
-	return (double)sec + rem / (double)ktime_sec;
-}
-
-static ufbxi_noinline double ufbxi_ktime_to_sec(ufbxi_context *uc, int64_t ktime)
-{
-	int64_t sec = ktime / uc->ktime_sec;
-	int64_t rem = ktime % uc->ktime_sec;
-	return (double)sec + rem / uc->ktime_sec_double;
-}
-
-static ufbxi_noinline double ufbxi_ktime_f64_to_sec(ufbxi_context *uc, double ktime)
-{
-	return ufbxi_ktime_to_sec(uc, ufbxi_f64_to_i64(ktime));
-}
-
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_anim_curve *curve = ufbxi_push_element(uc, info, ufbx_anim_curve, UFBX_ELEMENT_ANIM_CURVE);
@@ -12059,7 +12040,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 	double next_time = 0.0;
 
 	if (num_keys > 0) {
-		next_time = ufbxi_ktime_to_sec(uc, p_time[0]);
+		next_time = p_time[0] / uc->ktime_sec_double;
 	}
 
 	for (size_t i = 0; i < num_keys; i++) {
@@ -12070,7 +12051,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 		key->value = *p_value;
 
 		if (i + 1 < num_keys) {
-			next_time = ufbxi_ktime_to_sec(uc, p_time[1]);
+			next_time = p_time[1] / uc->ktime_sec_double;
 		}
 
 		uint32_t flags = (uint32_t)*p_flag;
@@ -12835,7 +12816,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 
 	if (num_keys > 0) {
 		ufbxi_check(data_end - data >= 2);
-		next_time = ufbxi_ktime_f64_to_sec(uc, data[0]);
+		next_time = data[0] / uc->ktime_sec_double;
 		next_value = data[1];
 	}
 
@@ -12945,7 +12926,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 		// Retrieve next key and value
 		if (i + 1 < num_keys) {
 			ufbxi_check(data_end - data >= 2);
-			next_time = ufbxi_ktime_f64_to_sec(uc, data[0]);
+			next_time = data[0] / uc->ktime_sec_double;
 			next_value = data[1];
 		}
 
@@ -13119,8 +13100,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take(ufbxi_context *uc, ufb
 	if (!ufbxi_find_val2(node, ufbxi_LocalTime, "LL", &begin, &end)) {
 		ufbxi_check(ufbxi_find_val2(node, ufbxi_ReferenceTime, "LL", &begin, &end));
 	}
-	stack->time_begin = ufbxi_ktime_to_sec(uc, begin);
-	stack->time_end = ufbxi_ktime_to_sec(uc, end);
+	stack->time_begin = (double)begin / uc->ktime_sec_double;
+	stack->time_end = (double)end / uc->ktime_sec_double;
 
 	// Read all properties of objects included in the take
 	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
@@ -19611,8 +19592,8 @@ ufbxi_noinline static void ufbxi_update_anim_stack(ufbx_scene *scene, ufbx_anim_
 	}
 
 	if (begin && end) {
-		stack->time_begin = ufbxi_ktime_to_sec_imp(scene->metadata.ktime_second, begin->value_int);
-		stack->time_end = ufbxi_ktime_to_sec_imp(scene->metadata.ktime_second, end->value_int);
+		stack->time_begin = begin->value_int / (double)scene->metadata.ktime_second;
+		stack->time_end = end->value_int / (double)scene->metadata.ktime_second;
 	}
 
 	stack->anim.time_begin = stack->time_begin;
