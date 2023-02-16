@@ -5527,7 +5527,8 @@ typedef struct {
 	ufbxi_node legacy_node;
 	uint64_t legacy_implicit_anim_layer_id;
 
-	double ktime_to_sec;
+	int64_t ktime_sec;
+	double ktime_sec_double;
 
 	bool eof;
 	ufbxi_obj_context obj;
@@ -10146,7 +10147,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_scene_info(ufbxi_context *u
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_header_extension(ufbxi_context *uc)
 {
 	// TODO: Read TCDefinition and adjust timestamps
-	uc->ktime_to_sec = (1.0 / 46186158000.0);
+	uc->ktime_sec = 46186158000;
+	uc->ktime_sec_double = (double)uc->ktime_sec;
 
 	for (;;) {
 		ufbxi_node *child;
@@ -11994,6 +11996,25 @@ static ufbxi_forceinline float ufbxi_solve_auto_tangent(double prev_time, double
 	return (float)(slope_sign * abs_slope);
 }
 
+static ufbxi_noinline double ufbxi_ktime_to_sec_imp(int64_t ktime_sec, int64_t ktime)
+{
+	int64_t sec = ktime / ktime_sec;
+	int64_t rem = ktime % ktime_sec;
+	return (double)sec + rem / (double)ktime_sec;
+}
+
+static ufbxi_noinline double ufbxi_ktime_to_sec(ufbxi_context *uc, int64_t ktime)
+{
+	int64_t sec = ktime / uc->ktime_sec;
+	int64_t rem = ktime % uc->ktime_sec;
+	return (double)sec + rem / uc->ktime_sec_double;
+}
+
+static ufbxi_noinline double ufbxi_ktime_f64_to_sec(ufbxi_context *uc, double ktime)
+{
+	return ufbxi_ktime_to_sec(uc, ufbxi_f64_to_i64(ktime));
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_anim_curve *curve = ufbxi_push_element(uc, info, ufbx_anim_curve, UFBX_ELEMENT_ANIM_CURVE);
@@ -12038,7 +12059,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 	double next_time = 0.0;
 
 	if (num_keys > 0) {
-		next_time = (double)p_time[0] * uc->ktime_to_sec;
+		next_time = ufbxi_ktime_to_sec(uc, p_time[0]);
 	}
 
 	for (size_t i = 0; i < num_keys; i++) {
@@ -12049,7 +12070,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 		key->value = *p_value;
 
 		if (i + 1 < num_keys) {
-			next_time = (double)p_time[1] * uc->ktime_to_sec;
+			next_time = ufbxi_ktime_to_sec(uc, p_time[1]);
 		}
 
 		uint32_t flags = (uint32_t)*p_flag;
@@ -12814,8 +12835,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 
 	if (num_keys > 0) {
 		ufbxi_check(data_end - data >= 2);
-		// TODO: This could break with large times...
-		next_time = data[0] * uc->ktime_to_sec;
+		next_time = ufbxi_ktime_f64_to_sec(uc, data[0]);
 		next_value = data[1];
 	}
 
@@ -12925,7 +12945,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 		// Retrieve next key and value
 		if (i + 1 < num_keys) {
 			ufbxi_check(data_end - data >= 2);
-			next_time = data[0] * uc->ktime_to_sec;
+			next_time = ufbxi_ktime_f64_to_sec(uc, data[0]);
 			next_value = data[1];
 		}
 
@@ -13099,8 +13119,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take(ufbxi_context *uc, ufb
 	if (!ufbxi_find_val2(node, ufbxi_LocalTime, "LL", &begin, &end)) {
 		ufbxi_check(ufbxi_find_val2(node, ufbxi_ReferenceTime, "LL", &begin, &end));
 	}
-	stack->time_begin = (double)begin * uc->ktime_to_sec;
-	stack->time_end = (double)end * uc->ktime_to_sec;
+	stack->time_begin = ufbxi_ktime_to_sec(uc, begin);
+	stack->time_end = ufbxi_ktime_to_sec(uc, end);
 
 	// Read all properties of objects included in the take
 	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
@@ -18981,7 +19001,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	ufbxi_check(ufbxi_handle_geometry_transforms(uc));
 	ufbxi_postprocess_scene(uc);
 
-	uc->scene.metadata.ktime_to_sec = uc->ktime_to_sec;
+	uc->scene.metadata.ktime_second = uc->ktime_sec;
 
 	// Maya seems to use scale of 100/3, Blender binary uses exactly 33, ASCII has always value of 1.0
 	if (uc->version < 6000) {
@@ -19585,16 +19605,14 @@ ufbxi_noinline static void ufbxi_update_anim_stack(ufbx_scene *scene, ufbx_anim_
 	ufbx_prop *begin, *end;
 	begin = ufbxi_find_prop(&stack->props, ufbxi_LocalStart);
 	end = ufbxi_find_prop(&stack->props, ufbxi_LocalStop);
-	if (begin && end) {
-		stack->time_begin = (double)begin->value_int * scene->metadata.ktime_to_sec;
-		stack->time_end = (double)end->value_int * scene->metadata.ktime_to_sec;
-	} else {
+	if (!begin || !end) {
 		begin = ufbxi_find_prop(&stack->props, ufbxi_ReferenceStart);
 		end = ufbxi_find_prop(&stack->props, ufbxi_ReferenceStop);
-		if (begin && end) {
-			stack->time_begin = (double)begin->value_int * scene->metadata.ktime_to_sec;
-			stack->time_end = (double)end->value_int * scene->metadata.ktime_to_sec;
-		}
+	}
+
+	if (begin && end) {
+		stack->time_begin = ufbxi_ktime_to_sec_imp(scene->metadata.ktime_second, begin->value_int);
+		stack->time_end = ufbxi_ktime_to_sec_imp(scene->metadata.ktime_second, end->value_int);
 	}
 
 	stack->anim.time_begin = stack->time_begin;
