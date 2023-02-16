@@ -35,3 +35,4 @@ UFBXT_CPP_TEST(test_shared_deleter)
     std::shared_ptr<ufbx_scene> scene2 = scene;
     std::shared_ptr<ufbx_scene> scene3 = std::move(scene2);
 }
+
