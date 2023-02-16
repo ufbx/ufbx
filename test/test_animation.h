@@ -583,13 +583,13 @@ typedef struct {
 #if defined(__clang__) && defined(__i386__) && (defined(UFBX_UBSAN) || defined(__SANITIZE_UNDEFINED__))
 static int64_t ufbxt_mul_i64(int64_t a, int64_t b)
 {
-	int64_t sign = 1;
+	bool negative = false;
 	if (a < 0) {
-		sign *= -1;
+		negative = !negative;
 		a = -a;
 	}
 	if (b < 0) {
-		sign *= -1;
+		negative = !negative;
 		b = -b;
 	}
 
@@ -597,7 +597,7 @@ static int64_t ufbxt_mul_i64(int64_t a, int64_t b)
 	for (int32_t i = 0; i < 64; i++) {
 		result += ((a >> i) & 1) ? (b << i) : 0;
 	}
-	return sign * result;
+	return negative ? -result : result;
 }
 #else
 static int64_t ufbxt_mul_i64(int64_t a, int64_t b)
