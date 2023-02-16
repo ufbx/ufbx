@@ -646,8 +646,8 @@ UFBXT_FILE_TEST(maya_long_keyframes)
 			tick_accurate = false;
 		}
 
-		uint64_t ref_tick = ref.frame * 46186158000 / 30;
-		uint64_t tick = (uint64_t)round(key.time * 46186158000.0);
+		int64_t ref_tick = ref.frame * 46186158000 / 30;
+		int64_t tick = (int64_t)round(key.time * 46186158000.0);
 		if (tick_accurate) {
 			ufbxt_assert(ref_tick == tick);
 		} else {
