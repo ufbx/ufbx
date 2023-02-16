@@ -580,7 +580,7 @@ typedef struct {
 // Clang x86 UBSAN emits an undefined reference to __mulodi4() for 64-bit
 // multiplication and this is the only instance where we need it at the
 // moment so just use a dumb implementation if necessary.
-#if defined(__clang__) && defined(__i386__) && defined(__SANITIZE_UNDEFINED__)
+#if defined(__clang__) && defined(__i386__) && (defined(UFBX_UBSAN) || defined(__SANITIZE_UNDEFINED__))
 static int64_t ufbxt_mul_i64(int64_t a, int64_t b)
 {
 	int64_t sign = 1;
