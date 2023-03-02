@@ -264,7 +264,11 @@ void ufbxt_log_flush(bool print_always)
 void ufbxt_log_error(ufbx_error *err)
 {
 	if (!err) return;
-	ufbxt_logf("Error: %s", err->description.data);
+	if (err->info_length > 0) {
+		ufbxt_logf("Error: %s (%s)", err->description.data, err->info);
+	} else {
+		ufbxt_logf("Error: %s", err->description.data);
+	}
 	for (size_t i = 0; i < err->stack_size; i++) {
 		ufbx_error_frame *f = &err->stack[i];
 		ufbxt_logf("Line %u %s: %s", f->source_line, f->function.data, f->description.data);
@@ -2102,6 +2106,9 @@ void ufbxt_do_fuzz(const char *base_name, void *data, size_t size, const char *f
 		ufbxt_init_allocator(&prog_opts.temp_allocator, &temp_freed);
 		ufbxt_init_allocator(&prog_opts.result_allocator, &result_freed);
 		prog_opts.load_external_files = true;
+		if (file_format == UFBX_FILE_FORMAT_UNKNOWN || file_format == UFBX_FILE_FORMAT_OBJ) {
+			prog_opts.ignore_missing_external_files = true;
+		}
 		prog_opts.filename.data = filename;
 		prog_opts.filename.length = SIZE_MAX;
 		prog_opts.file_format = file_format;
@@ -2490,6 +2497,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	if (obj_file && !g_skip_obj_test && !alternative) {
 		ufbx_load_opts obj_opts = { 0 };
 		obj_opts.load_external_files = true;
+		obj_opts.ignore_missing_external_files = true;
 
 		ufbx_error obj_error;
 		obj_scene = ufbx_load_file(buf, &obj_opts, &obj_error);
@@ -2813,7 +2821,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			if (scene) {
 				uint64_t eval_begin = cputime_cpu_tick();
-				ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, 1.0, NULL, NULL);
+				ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, 1.0, NULL, NULL);
 				uint64_t eval_end = cputime_cpu_tick();
 
 				ufbxt_assert(state);
@@ -2833,7 +2841,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			if (scene) {
 				for (size_t i = 1; i < scene->anim_stacks.count; i++) {
-					ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim_stacks.data[i]->anim, 1.0, NULL, NULL);
+					ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim_stacks.data[i]->anim, 1.0, NULL, NULL);
 					ufbxt_assert(state);
 					ufbxt_check_scene(state);
 					ufbx_free_scene(state);

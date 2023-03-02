@@ -1151,6 +1151,15 @@ UFBXT_FILE_TEST_OPTS(synthetic_filename_mtl, ufbxt_search_mtl_by_filename_opts)
 }
 #endif
 
+UFBXT_FILE_TEST_ALT_FLAGS(synthetic_filename_mtl_not_found, synthetic_filename_mtl, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(load_error->type == UFBX_ERROR_EXTERNAL_FILE_NOT_FOUND);
+	ufbxt_assert(!strcmp(load_error->info, "materials.mtl"));
+}
+#endif
+
+
 UFBXT_FILE_TEST_FLAGS(synthetic_missing_position_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
 #if UFBXT_IMPL
 {
@@ -1301,6 +1310,7 @@ UFBXT_TEST(obj_opts_no_extrnal_files_by_filename)
 			ufbx_load_opts opts = { 0 };
 			opts.load_external_files = load_external != 0;
 			opts.obj_search_mtl_by_filename = load_by_filename != 0;
+			opts.ignore_missing_external_files = true;
 			ufbx_scene *scene = ufbx_load_file(path, &opts, NULL);
 			ufbxt_assert(scene);
 			ufbxt_check_scene(scene);
@@ -1318,6 +1328,10 @@ UFBXT_TEST(obj_opts_no_extrnal_files_by_filename)
 					ufbxt_assert_close_vec3(&err, material->fbx.diffuse_color.value_vec3, kd);
 					ufbxt_assert_close_vec3(&err, material->fbx.specular_color.value_vec3, ks);
 				} else {
+					if (load_external && !load_by_filename) {
+						ufbxt_check_warning(scene, UFBX_WARNING_MISSING_EXTERNAL_FILE, 1, "materials.mtl");
+
+					}
 					ufbxt_assert(material->props.props.count == 0);
 				}
 			}

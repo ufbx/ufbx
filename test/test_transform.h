@@ -124,12 +124,12 @@ UFBXT_TEST(root_transform)
 		ufbxt_assert_close_quat(&err, scene->root_node->local_transform.rotation, opts.root_transform.rotation);
 		ufbxt_assert_close_vec3(&err, scene->root_node->local_transform.scale, opts.root_transform.scale);
 
-		ufbx_transform eval = ufbx_evaluate_transform(&scene->anim, scene->root_node, 0.1);
+		ufbx_transform eval = ufbx_evaluate_transform(scene->anim, scene->root_node, 0.1);
 		ufbxt_assert_close_vec3(&err, eval.translation, opts.root_transform.translation);
 		ufbxt_assert_close_quat(&err, eval.rotation, opts.root_transform.rotation);
 		ufbxt_assert_close_vec3(&err, eval.scale, opts.root_transform.scale);
 
-		ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, 0.1, NULL, NULL);
+		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, 0.1, NULL, NULL);
 		ufbxt_assert(state);
 
 		ufbxt_assert_close_vec3(&err, state->root_node->local_transform.translation, opts.root_transform.translation);
@@ -331,14 +331,14 @@ UFBXT_FILE_TEST_OPTS(maya_scale_no_inherit, ufbxt_scale_to_cm_opts)
 		ufbx_node *node = ufbx_find_node(scene, "joint3");
 
 		{
-			ufbx_transform transform = ufbx_evaluate_transform(&scene->anim, node, 1.0);
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, node, 1.0);
 			ufbxt_assert_close_real(err, transform.scale.x, 0.3f);
 			ufbxt_assert_close_real(err, transform.scale.y, 0.6f);
 			ufbxt_assert_close_real(err, transform.scale.z, 0.9f);
 		}
 
 		{
-			ufbx_transform transform = ufbx_evaluate_transform(&scene->anim, node, 0.5);
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, node, 0.5);
 			ufbxt_assert_close_real(err, transform.scale.x, 0.67281f);
 			ufbxt_assert_close_real(err, transform.scale.y, 0.81304f);
 			ufbxt_assert_close_real(err, transform.scale.z, 0.95326f);

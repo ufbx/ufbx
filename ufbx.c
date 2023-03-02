@@ -2786,6 +2786,8 @@ static ufbxi_noinline void ufbxi_fix_error_type(ufbx_error *error, const char *d
 		error->type = UFBX_ERROR_UNRECOGNIZED_FILE_FORMAT;
 	} else if (!strcmp(desc, "File not found")) {
 		error->type = UFBX_ERROR_FILE_NOT_FOUND;
+	} else if (!strcmp(desc, "External file not found")) {
+		error->type = UFBX_ERROR_EXTERNAL_FILE_NOT_FOUND;
 	} else if (!strcmp(desc, "Uninitialized options")) {
 		error->type = UFBX_ERROR_UNINITIALIZED_OPTIONS;
 	} else if (!strcmp(desc, "Zero vertex size")) {
@@ -3004,6 +3006,7 @@ static ufbxi_noinline void ufbxi_free_ator(ufbxi_allocator *ator)
 #define UFBXI_MESH_IMP_MAGIC 0x48534d55
 #define UFBXI_LINE_CURVE_IMP_MAGIC 0x55434c55
 #define UFBXI_CACHE_IMP_MAGIC 0x48434355
+#define UFBXI_ANIM_IMP_MAGIC 0x494e4155
 #define UFBXI_REFCOUNT_IMP_MAGIC 0x46455255
 #define UFBXI_BUF_CHUNK_IMP_MAGIC 0x46554255
 
@@ -5167,6 +5170,8 @@ struct ufbxi_refcount {
 	void *align_0;
 	uint32_t self_magic;
 	uint32_t type_magic;
+	ufbxi_buf buf;
+	ufbxi_allocator ator;
 	uint64_t zero_pad_pre[8];
 	ufbxi_atomic_counter refcount;
 	uint64_t zero_pad_post[8];
@@ -5182,8 +5187,6 @@ typedef struct {
 	ufbx_scene scene;
 	uint32_t magic;
 
-	ufbxi_allocator ator;
-	ufbxi_buf result_buf;
 	ufbxi_buf string_buf;
 } ufbxi_scene_imp;
 
@@ -5193,9 +5196,6 @@ typedef struct {
 	ufbxi_refcount refcount;
 	ufbx_mesh mesh;
 	uint32_t magic;
-
-	ufbxi_allocator ator;
-	ufbxi_buf result_buf;
 } ufbxi_mesh_imp;
 
 ufbx_static_assert(mesh_imp_offset, offsetof(ufbxi_mesh_imp, mesh) == sizeof(ufbxi_refcount));
@@ -15214,10 +15214,15 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 
 	ufbx_stream stream = { 0 };
 	bool has_stream = false;
+	bool needs_stream = false;
+	ufbx_blob stream_path;
 
 	if (uc->opts.open_file_cb.fn) {
 		if (uc->opts.obj_mtl_path.length > 0) {
 			has_stream = ufbxi_open_file(&uc->opts.open_file_cb, &stream, uc->opts.obj_mtl_path.data, uc->opts.obj_mtl_path.length, NULL, &uc->ator_tmp, UFBX_OPEN_FILE_OBJ_MTL);
+			stream_path.data = uc->opts.obj_mtl_path.data;
+			stream_path.size = uc->opts.obj_mtl_path.length;
+			needs_stream = true;
 			if (!has_stream) {
 				ufbxi_check(ufbxi_warnf(UFBX_WARNING_MISSING_EXTERNAL_FILE, "Could not open .mtl file: %s", uc->opts.obj_mtl_path.data));
 			}
@@ -15227,6 +15232,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 			ufbx_blob dst;
 			ufbxi_check(ufbxi_resolve_relative_filename(uc, (ufbxi_strblob*)&dst, (const ufbxi_strblob*)&uc->obj.mtllib_relative_path, true));
 			has_stream = ufbxi_open_file(&uc->opts.open_file_cb, &stream, (const char*)dst.data, dst.size, &uc->obj.mtllib_relative_path, &uc->ator_tmp, UFBX_OPEN_FILE_OBJ_MTL);
+			stream_path = uc->obj.mtllib_relative_path;
+			needs_stream = true;
 			if (!has_stream) {
 				ufbxi_check(ufbxi_warnf(UFBX_WARNING_MISSING_EXTERNAL_FILE, "Could not open .mtl file: %s", dst.data));
 			}
@@ -15265,6 +15272,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 		uc->read_user = NULL;
 
 		ufbxi_check(ok);
+	} else if (needs_stream && !uc->opts.ignore_missing_external_files) {
+		ufbx_string filename = { stream_path.data, stream_path.size };
+		ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &filename, false));
+		ufbxi_set_err_info(&uc->error, filename.data, filename.length);
+		ufbxi_fail_msg("ufbxi_obj_load_mtl()", "External file not found");
 	}
 
 	return 1;
@@ -18028,6 +18040,24 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh_material(ufbxi_buf
 	return 1;
 }
 
+typedef struct {
+	ufbxi_refcount refcount;
+	ufbx_anim anim;
+	uint32_t magic;
+} ufbxi_anim_imp;
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_push_anim(ufbxi_context *uc, ufbx_anim **p_anim, ufbx_anim_layer **layers, size_t num_layers)
+{
+	ufbx_anim *anim = ufbxi_push_zero(&uc->result, ufbx_anim, 1);
+	ufbxi_check(anim);
+
+	anim->layers.data = layers;
+	anim->layers.count = num_layers;
+
+	*p_anim = anim;
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc)
 {
 	size_t num_elements = uc->num_elements;
@@ -18130,7 +18160,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			case UFBX_ELEMENT_MESH: node->mesh = (ufbx_mesh*)elem; break;
 			case UFBX_ELEMENT_LIGHT: node->light = (ufbx_light*)elem; break;
 			case UFBX_ELEMENT_CAMERA: node->camera = (ufbx_camera*)elem; break;
-			case UFBX_ELEMENT_BONE: node->bone = (ufbx_bone*)elem; break;
 			default: /* No shorthand */ break;
 			}
 		}
@@ -18507,28 +18536,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbx_anim_stack *stack = *p_stack;
 		ufbxi_check(ufbxi_fetch_dst_elements(uc, &stack->layers, &stack->element, false, NULL, UFBX_ELEMENT_ANIM_LAYER));
 
-		stack->anim.layers.count = stack->layers.count;
-		stack->anim.layers.data = ufbxi_push_zero(&uc->result, ufbx_anim_layer_desc, stack->layers.count);
-		ufbxi_check(stack->anim.layers.data);
-
-		for (size_t i = 0; i < stack->layers.count; i++) {
-			ufbx_anim_layer_desc *desc = (ufbx_anim_layer_desc*)&stack->anim.layers.data[i];
-			desc->layer = stack->layers.data[i];
-			desc->weight = 1.0f;
-		}
+		ufbxi_check(ufbxi_push_anim(uc, &stack->anim, stack->layers.data, stack->layers.count));
 	}
 
 	ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, uc->scene.anim_layers) {
 		ufbx_anim_layer *layer = *p_layer;
 		ufbxi_check(ufbxi_fetch_dst_elements(uc, &layer->anim_values, &layer->element, false, NULL, UFBX_ELEMENT_ANIM_VALUE));
 
-		ufbx_anim_layer_desc *layer_desc = ufbxi_push_zero(&uc->result, ufbx_anim_layer_desc, 1);
-		ufbxi_check(layer_desc);
-		layer_desc->layer = layer;
-		layer_desc->weight = 1.0f;
-
-		layer->anim.layers.data = layer_desc;
-		layer->anim.layers.count = 1;
+		ufbxi_check(ufbxi_push_anim(uc, &layer->anim, p_layer, 1));
 
 		uint32_t min_id = UINT32_MAX, max_id = 0;
 
@@ -18950,30 +18965,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbxi_check(constraint->targets.data);
 	}
 
-	if (uc->scene.anim_stacks.count > 0) {
-		// Combine all animation stacks into one
-		size_t num_layers = 0;
-		ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
-			num_layers += (*p_stack)->layers.count;
-		}
-
-		ufbx_anim_layer_desc *descs = ufbxi_push_zero(&uc->result, ufbx_anim_layer_desc, num_layers);
-		ufbxi_check(descs);
-		uc->scene.combined_anim.layers.data = descs;
-		uc->scene.combined_anim.layers.count = num_layers;
-
-		ufbx_anim_layer_desc *desc = descs;
-		ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
-			ufbx_anim_stack *stack = *p_stack;
-
-			ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, stack->layers) {
-				desc->layer = *p_layer;
-				desc->weight = 1.0f;
-				desc++;
-			}
-		}
-	}
-
 	ufbxi_for_ptr_list(ufbx_lod_group, p_lod, uc->scene.lod_groups) {
 		ufbxi_check(ufbxi_finalize_lod_group(uc, *p_lod));
 	}
@@ -18981,6 +18972,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	ufbxi_check(ufbxi_fetch_file_textures(uc));
 	ufbxi_check(ufbxi_handle_geometry_transforms(uc));
 	ufbxi_postprocess_scene(uc);
+
+	// NOTE: This will be patched over in `ufbxi_update_scene()` if there are `anim_layers`
+	if (uc->scene.anim_layers.count == 0) {
+		ufbxi_check(ufbxi_push_anim(uc, &uc->scene.anim, NULL, 0));
+	}
 
 	uc->scene.metadata.ktime_second = uc->ktime_sec;
 
@@ -19596,8 +19592,8 @@ ufbxi_noinline static void ufbxi_update_anim_stack(ufbx_scene *scene, ufbx_anim_
 		stack->time_end = end->value_int / (double)scene->metadata.ktime_second;
 	}
 
-	stack->anim.time_begin = stack->time_begin;
-	stack->anim.time_end = stack->time_end;
+	stack->anim->time_begin = stack->time_begin;
+	stack->anim->time_end = stack->time_end;
 }
 
 ufbxi_noinline static void ufbxi_update_display_layer(ufbx_display_layer *layer)
@@ -19704,16 +19700,6 @@ ufbxi_noinline static void ufbxi_update_anim(ufbx_scene *scene)
 {
 	if (scene->anim_stacks.count > 0) {
 		scene->anim = scene->anim_stacks.data[0]->anim;
-
-		scene->combined_anim.time_begin = scene->anim.time_begin;
-		scene->combined_anim.time_end = scene->anim.time_end;
-
-		ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, scene->anim_stacks) {
-			ufbx_anim_stack *stack = *p_stack;
-
-			if (stack->time_begin < scene->combined_anim.time_begin) scene->combined_anim.time_begin = stack->time_begin;
-			if (stack->time_end > scene->combined_anim.time_end) scene->combined_anim.time_end = stack->time_end;
-		}
 	}
 }
 
@@ -20035,8 +20021,6 @@ typedef struct {
 	uint32_t magic;
 	bool owned_by_scene;
 
-	ufbxi_allocator ator;
-	ufbxi_buf result_buf;
 	ufbxi_buf string_buf;
 } ufbxi_geometry_cache_imp;
 
@@ -20754,11 +20738,11 @@ static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_str
 	cc->imp->cache = cc->cache;
 	cc->imp->magic = UFBXI_CACHE_IMP_MAGIC;
 	cc->imp->owned_by_scene = cc->owned_by_scene;
-	cc->imp->ator = cc->ator_result;
-	cc->imp->result_buf = cc->result;
-	cc->imp->result_buf.ator = &cc->imp->ator;
+	cc->imp->refcount.ator = cc->ator_result;
+	cc->imp->refcount.buf = cc->result;
+	cc->imp->refcount.buf.ator = &cc->imp->refcount.ator;
 	cc->imp->string_buf = cc->string_pool.buf;
-	cc->imp->string_buf.ator = &cc->imp->ator;
+	cc->imp->string_buf.ator = &cc->imp->refcount.ator;
 
 	return 1;
 }
@@ -20830,20 +20814,7 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string
 static ufbxi_noinline void ufbxi_free_geometry_cache_imp(ufbxi_geometry_cache_imp *imp)
 {
 	ufbx_assert(imp->magic == UFBXI_CACHE_IMP_MAGIC);
-	if (imp->magic != UFBXI_CACHE_IMP_MAGIC) return;
-	if (imp->owned_by_scene) return;
-	imp->magic = 0;
-
 	ufbxi_buf_free(&imp->string_buf);
-
-	// We need to free `result_buf` last and be careful to copy it to
-	// the stack since the `ufbxi_scene_imp` that contains it is allocated
-	// from the same result buffer!
-	ufbxi_allocator ator = imp->ator;
-	ufbxi_buf result = imp->result_buf;
-	result.ator = &ator;
-	ufbxi_buf_free(&result);
-	ufbxi_free_ator(&ator);
 }
 
 #else
@@ -20922,9 +20893,15 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_contex
 	uc->result = cc.result;
 
 	if (!cache) {
-		if (cc.error.type == UFBX_ERROR_FILE_NOT_FOUND && uc->opts.ignore_missing_external_files) {
-			ufbxi_check(ufbxi_warnf(UFBX_WARNING_MISSING_EXTERNAL_FILE, "Failed to open geometry cache: %s", file->filename.data));
-			return 1;
+		if (cc.error.type == UFBX_ERROR_FILE_NOT_FOUND) {
+			if (uc->opts.ignore_missing_external_files) {
+				ufbxi_check(ufbxi_warnf(UFBX_WARNING_MISSING_EXTERNAL_FILE, "Failed to open geometry cache: %s", file->filename.data));
+				return 1;
+			} else {
+				cc.error.type = UFBX_ERROR_EXTERNAL_FILE_NOT_FOUND;
+				cc.error.description.data = "External file not found";
+				cc.error.description.length = strlen("External file not found");
+			}
 		}
 
 		uc->error = cc.error;
@@ -21453,19 +21430,19 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 
 	imp->magic = UFBXI_SCENE_IMP_MAGIC;
 	imp->scene = uc->scene;
-	imp->ator = uc->ator_result;
-	imp->ator.error = NULL;
+	imp->refcount.ator = uc->ator_result;
+	imp->refcount.ator.error = NULL;
 
 	// Copy retained buffers and translate the allocator struct to the one
 	// contained within `ufbxi_scene_imp`
-	imp->result_buf = uc->result;
-	imp->result_buf.ator = &imp->ator;
+	imp->refcount.buf = uc->result;
+	imp->refcount.buf.ator = &imp->refcount.ator;
 	imp->string_buf = uc->string_pool.buf;
-	imp->string_buf.ator = &imp->ator;
+	imp->string_buf.ator = &imp->refcount.ator;
 
-	imp->scene.metadata.result_memory_used = imp->ator.current_size;
+	imp->scene.metadata.result_memory_used = imp->refcount.ator.current_size;
 	imp->scene.metadata.temp_memory_used = uc->ator_tmp.current_size;
-	imp->scene.metadata.result_allocs = imp->ator.num_allocs;
+	imp->scene.metadata.result_allocs = imp->refcount.ator.num_allocs;
 	imp->scene.metadata.temp_allocs = uc->ator_tmp.num_allocs;
 
 	ufbxi_for_ptr_list(ufbx_element, p_elem, imp->scene.elements) {
@@ -21657,42 +21634,22 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 
 // -- Animation evaluation
 
-static int ufbxi_cmp_prop_override(const void *va, const void *vb)
-{
-	const ufbx_prop_override *a = (const ufbx_prop_override*)va, *b = (const ufbx_prop_override*)vb;
-	if (a->element_id != b->element_id) return a->element_id < b->element_id ? -1 : 1;
-	if (a->_internal_key != b->_internal_key) return a->_internal_key < b->_internal_key ? -1 : 1;
-	return strcmp(a->prop_name, b->prop_name);
-}
-
 static ufbxi_forceinline bool ufbxi_override_less_than_prop(const ufbx_prop_override *over, uint32_t element_id, const ufbx_prop *prop)
 {
 	if (over->element_id != element_id) return over->element_id < element_id;
 	if (over->_internal_key != prop->_internal_key) return over->_internal_key < prop->_internal_key;
-	return strcmp(over->prop_name, prop->name.data);
+	return strcmp(over->prop_name.data, prop->name.data);
 }
 
 static ufbxi_forceinline bool ufbxi_override_equals_to_prop(const ufbx_prop_override *over, uint32_t element_id, const ufbx_prop *prop)
 {
 	if (over->element_id != element_id) return false;
 	if (over->_internal_key != prop->_internal_key) return false;
-	return strcmp(over->prop_name, prop->name.data) == 0;
+	return !strcmp(over->prop_name.data, prop->name.data);
 }
 
-static ufbxi_forceinline ufbxi_unused bool ufbxi_prop_override_is_prepared(const ufbx_prop_override *over)
+static ufbxi_noinline bool ufbxi_find_prop_override(const ufbx_prop_override_list *overrides, uint32_t element_id, ufbx_prop *prop)
 {
-	if (over->_internal_key != ufbxi_get_name_key_c(over->prop_name)) return false;
-	if (over->value_str == NULL) return false;
-	return true;
-}
-
-static ufbxi_noinline bool ufbxi_find_prop_override(const ufbx_const_prop_override_list *overrides, uint32_t element_id, ufbx_prop *prop)
-{
-	if (overrides->count > 0) {
-		// If this assert fails make sure to call `ufbx_prepare_prop_overrides()` first!
-		ufbx_assert(ufbxi_prop_override_is_prepared(&overrides->data[0]));
-	}
-
 	size_t ix = SIZE_MAX;
 	ufbxi_macro_lower_bound_eq(ufbx_prop_override, 16, &ix, overrides->data, 0, overrides->count,
 		( ufbxi_override_less_than_prop(a, element_id, prop) ),
@@ -21702,10 +21659,10 @@ static ufbxi_noinline bool ufbxi_find_prop_override(const ufbx_const_prop_overri
 		const ufbx_prop_override *over = &overrides->data[ix];
 		const uint32_t clear_flags = UFBX_PROP_FLAG_NO_VALUE | UFBX_PROP_FLAG_NOT_FOUND;
 		prop->flags = (ufbx_prop_flags)(((uint32_t)prop->flags & ~clear_flags) | UFBX_PROP_FLAG_OVERRIDDEN);
-		prop->value_vec3 = over->value;
+		prop->value_vec4 = over->value;
 		prop->value_real_arr[3] = 0.0f;
 		prop->value_int = over->value_int;
-		prop->value_str = ufbxi_str_c(over->value_str);
+		prop->value_str = over->value_str;
 		prop->value_blob.data = prop->value_str.data;
 		prop->value_blob.size = prop->value_str.length;
 		return true;
@@ -21714,13 +21671,8 @@ static ufbxi_noinline bool ufbxi_find_prop_override(const ufbx_const_prop_overri
 	}
 }
 
-static ufbxi_noinline ufbx_const_prop_override_list ufbxi_find_element_prop_overrides(const ufbx_const_prop_override_list *overrides, uint32_t element_id)
+static ufbxi_noinline ufbx_prop_override_list ufbxi_find_element_prop_overrides(const ufbx_prop_override_list *overrides, uint32_t element_id)
 {
-	if (overrides->count > 0) {
-		// If this assert fails make sure to call `ufbx_prepare_prop_overrides()` first!
-		ufbx_assert(ufbxi_prop_override_is_prepared(&overrides->data[0]));
-	}
-
 	size_t begin = overrides->count, end = begin;
 
 	ufbxi_macro_lower_bound_eq(ufbx_prop_override, 32, &begin, overrides->data, 0, overrides->count,
@@ -21730,12 +21682,12 @@ static ufbxi_noinline ufbx_const_prop_override_list ufbxi_find_element_prop_over
 	ufbxi_macro_upper_bound_eq(ufbx_prop_override, 32, &end, overrides->data, begin, overrides->count,
 		(a->element_id == element_id));
 
-	ufbx_const_prop_override_list result = { overrides->data + begin, end - begin };
+	ufbx_prop_override_list result = { overrides->data + begin, end - begin };
 	return result;
 }
 
 typedef struct ufbxi_anim_layer_combine_ctx {
-	ufbx_anim anim;
+	const ufbx_anim *anim;
 	const ufbx_element *element;
 	double time;
 	ufbx_rotation_order rotation_order;
@@ -21757,7 +21709,7 @@ static ufbxi_noinline void ufbxi_combine_anim_layer(ufbxi_anim_layer_combine_ctx
 		(ufbxi_anim_layer_combine_ctx *ctx, ufbx_anim_layer *layer, ufbx_real weight, const char *prop_name, ufbx_vec3 *result, const ufbx_vec3 *value))
 {
 	if (layer->compose_rotation && layer->blended && prop_name == ufbxi_Lcl_Rotation && !ctx->has_rotation_order) {
-		ufbx_prop rp = ufbx_evaluate_prop_len(&ctx->anim, ctx->element, ufbxi_RotationOrder, sizeof(ufbxi_RotationOrder) - 1, ctx->time);
+		ufbx_prop rp = ufbx_evaluate_prop_len(ctx->anim, ctx->element, ufbxi_RotationOrder, sizeof(ufbxi_RotationOrder) - 1, ctx->time);
 		// NOTE: Defaults to 0 (UFBX_ROTATION_XYZ) gracefully if property is not found
 		if (rp.value_int >= 0 && rp.value_int <= UFBX_ROTATION_ORDER_SPHERIC) {
 			ctx->rotation_order = (ufbx_rotation_order)rp.value_int;
@@ -21814,17 +21766,17 @@ static ufbxi_forceinline bool ufbxi_anim_layer_might_contain_id(const ufbx_anim_
 
 static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *props, size_t num_props)
 {
-	ufbxi_anim_layer_combine_ctx combine_ctx = { *anim, element, time };
+	ufbxi_anim_layer_combine_ctx combine_ctx = { anim, element, time };
 
 	uint32_t element_id = element->element_id;
-	ufbxi_for_list(const ufbx_anim_layer_desc, layer_desc, anim->layers) {
-		ufbx_anim_layer *layer = layer_desc->layer;
+	size_t num_layers = anim->layers.count;
+	for (size_t layer_ix = 0; layer_ix < num_layers; layer_ix++) {
+		ufbx_anim_layer *layer = anim->layers.data[layer_ix];
 		if (!ufbxi_anim_layer_might_contain_id(layer, element_id)) continue;
 
 		// Find the weight for the current layer
 		// TODO: Should this be searched from multiple layers?
-		// TODO: Use weight from layer_desc
-		ufbx_real weight = layer->weight;
+		ufbx_real weight = layer_ix < anim->override_layer_weights.count ? anim->override_layer_weights.data[layer_ix] : layer->weight;
 		if (layer->weight_is_animated && layer->blended) {
 			ufbx_anim_prop *weight_aprop = ufbxi_find_anim_prop_start(layer, &layer->element);
 			if (weight_aprop) {
@@ -21857,7 +21809,7 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 			// that gets set for the first layer of animation that is applied.
 			if (aprop->prop_name.data == prop->name.data) {
 				ufbx_vec3 v = ufbx_evaluate_anim_value_vec3(aprop->anim_value, time);
-				if (layer_desc == anim->layers.data) {
+				if (layer_ix == 0) {
 					prop->value_vec3 = v;
 				} else {
 					ufbxi_combine_anim_layer(&combine_ctx, layer, weight, prop->name.data, &prop->value_vec3, &v);
@@ -21905,8 +21857,8 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 	size_t num_props = 0;
 
 	const ufbx_prop_override *over = NULL, *over_end = NULL;
-	if (anim->prop_overrides.count > 0) {
-		ufbx_const_prop_override_list list = ufbxi_find_element_prop_overrides(&anim->prop_overrides, element->element_id);
+	if (anim->overrides.count > 0) {
+		ufbx_prop_override_list list = ufbxi_find_element_prop_overrides(&anim->overrides, element->element_id);
 		over = list.data;
 		over_end = over + list.count;
 	}
@@ -21928,9 +21880,9 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 				bool found_override = false;
 				for (; over != over_end; over++) {
 					ufbx_prop *dst = &props[num_props];
-					if (over->_internal_key < key || strcmp(over->prop_name, name) < 0) {
+					if (over->_internal_key < key || strcmp(over->prop_name.data, name) < 0) {
 						continue;
-					} else if (over->_internal_key == key && strcmp(over->prop_name, name) == 0) {
+					} else if (over->_internal_key == key && strcmp(over->prop_name.data, name) == 0) {
 						dst->name = ufbxi_str_c(name);
 						dst->_internal_key = key;
 						dst->type = UFBX_PROP_UNKNOWN;
@@ -21938,11 +21890,11 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 					} else {
 						break;
 					}
-					dst->value_str = ufbxi_str_c(over->value_str);
+					dst->value_str = over->value_str;
 					dst->value_blob.data = dst->value_str.data;
 					dst->value_blob.size = dst->value_str.length;
 					dst->value_int = over->value_int;
-					dst->value_vec3 = over->value;
+					dst->value_vec4 = over->value;
 					dst->value_real_arr[3] = 0.0f;
 					num_props++;
 					found_override = true;
@@ -21974,9 +21926,9 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 	if (over) {
 		for (; over != over_end && name_ix < max_props; over++) {
 			ufbx_prop *dst = &props[num_props];
-			if (over->_internal_key < key || strcmp(over->prop_name, name) < 0) {
+			if (over->_internal_key < key || strcmp(over->prop_name.data, name) < 0) {
 				continue;
-			} else if (over->_internal_key == key && strcmp(over->prop_name, name) == 0) {
+			} else if (over->_internal_key == key && strcmp(over->prop_name.data, name) == 0) {
 				dst->name = ufbxi_str_c(name);
 				dst->_internal_key = key;
 				dst->type = UFBX_PROP_UNKNOWN;
@@ -21988,11 +21940,11 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 					key = ufbxi_get_name_key_c(name);
 				}
 			}
-			dst->value_str = ufbxi_str_c(over->value_str);
+			dst->value_str = over->value_str;
 			dst->value_blob.data = dst->value_str.data;
 			dst->value_blob.size = dst->value_str.length;
 			dst->value_int = over->value_int;
-			dst->value_vec3 = over->value;
+			dst->value_vec4 = over->value;
 			dst->value_real_arr[3] = 0.0f;
 			num_props++;
 		}
@@ -22016,7 +21968,7 @@ typedef struct {
 	ufbxi_scene_imp *src_imp;
 	ufbx_scene src_scene;
 	ufbx_evaluate_opts opts;
-	ufbx_anim anim;
+	ufbx_anim *anim;
 	double time;
 
 	ufbx_error error;
@@ -22052,15 +22004,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_translate_element_list(ufbxi_eva
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_translate_anim(ufbxi_eval_context *ec, ufbx_anim *anim)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_translate_anim(ufbxi_eval_context *ec, ufbx_anim **p_anim)
 {
-	ufbx_anim_layer_desc *layers = ufbxi_push(&ec->result, ufbx_anim_layer_desc, anim->layers.count);
-	ufbxi_check_err(&ec->error, layers);
-	for (size_t i = 0; i < anim->layers.count; i++) {
-		layers[i] = anim->layers.data[i];
-		layers[i].layer = (ufbx_anim_layer*)ufbxi_translate_element(ec, layers[i].layer);
-	}
-	anim->layers.data = layers;
+	ufbx_anim *anim = ufbxi_push_copy(&ec->result, ufbx_anim, 1, *p_anim);
+	ufbxi_check_err(&ec->error, anim);
+	ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &anim->layers));
+	*p_anim = anim;
 	return 1;
 }
 
@@ -22108,7 +22057,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 
 	ec->scene.root_node = (ufbx_node*)ufbxi_translate_element(ec, ec->scene.root_node);
 	ufbxi_check_err(&ec->error, ufbxi_translate_anim(ec, &ec->scene.anim));
-	ufbxi_check_err(&ec->error, ufbxi_translate_anim(ec, &ec->scene.combined_anim));
 
 	for (size_t i = 0; i < num_elements; i++) {
 		ufbx_element *src = ec->src_scene.elements.data[i];
@@ -22140,7 +22088,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 		node->mesh = (ufbx_mesh*)ufbxi_translate_element(ec, node->mesh);
 		node->light = (ufbx_light*)ufbxi_translate_element(ec, node->light);
 		node->camera = (ufbx_camera*)ufbxi_translate_element(ec, node->camera);
-		node->bone = (ufbx_bone*)ufbxi_translate_element(ec, node->bone);
 
 		if (node->all_attribs.count > 1) {
 			ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &node->all_attribs));
@@ -22339,8 +22286,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 		value->curves[2] = (ufbx_anim_curve*)ufbxi_translate_element(ec, value->curves[2]);
 	}
 
-	ufbx_anim anim = ec->anim;
-	ufbx_const_prop_override_list overrides_left = ec->anim.prop_overrides;
+	ufbx_anim *anim = ec->anim;
+	ufbx_prop_override_list overrides_left = anim->overrides;
 
 	// Evaluate the properties
 	ufbxi_for_ptr_list(ufbx_element, p_elem, ec->scene.elements) {
@@ -22350,10 +22297,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 		// Setup the overrides for this element if found
 		if (overrides_left.count > 0) {
 			if (overrides_left.data[0].element_id <= elem->element_id) {
-				anim.prop_overrides = ufbxi_find_element_prop_overrides(&overrides_left, elem->element_id);
-				overrides_left.data = anim.prop_overrides.data + anim.prop_overrides.count;
-				overrides_left.count = ufbxi_to_size((ec->anim.prop_overrides.data + ec->anim.prop_overrides.count) - overrides_left.data);
-				num_animated += anim.prop_overrides.count;
+				anim->overrides = ufbxi_find_element_prop_overrides(&overrides_left, elem->element_id);
+				overrides_left.data = anim->overrides.data + anim->overrides.count;
+				overrides_left.count = ufbxi_to_size((anim->overrides.data + anim->overrides.count) - overrides_left.data);
+				num_animated += anim->overrides.count;
 			}
 		}
 
@@ -22362,10 +22309,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 		ufbx_prop *props = ufbxi_push(&ec->result, ufbx_prop, num_animated);
 		ufbxi_check_err(&ec->error, props);
 
-		elem->props = ufbx_evaluate_props(&anim, elem, ec->time, props, num_animated);
+		elem->props = ufbx_evaluate_props(anim, elem, ec->time, props, num_animated);
 		elem->props.defaults = &ec->src_scene.elements.data[elem->element_id]->props;
 
-		anim.prop_overrides.count = 0;
+		anim->overrides.count = 0;
 	}
 
 	// Update all derived values
@@ -22389,17 +22336,17 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 
 	imp->magic = UFBXI_SCENE_IMP_MAGIC;
 	imp->scene = ec->scene;
-	imp->ator = ec->ator_result;
-	imp->ator.error = NULL;
+	imp->refcount.ator = ec->ator_result;
+	imp->refcount.ator.error = NULL;
 
 	// Copy retained buffers and translate the allocator struct to the one
 	// contained within `ufbxi_scene_imp`
-	imp->result_buf = ec->result;
-	imp->result_buf.ator = &imp->ator;
+	imp->refcount.buf = ec->result;
+	imp->refcount.buf.ator = &imp->refcount.ator;
 
-	imp->scene.metadata.result_memory_used = imp->ator.current_size;
+	imp->scene.metadata.result_memory_used = imp->refcount.ator.current_size;
 	imp->scene.metadata.temp_memory_used = ec->ator_tmp.current_size;
-	imp->scene.metadata.result_allocs = imp->ator.num_allocs;
+	imp->scene.metadata.result_allocs = imp->refcount.ator.num_allocs;
 	imp->scene.metadata.temp_allocs = ec->ator_tmp.num_allocs;
 
 	ufbxi_for_ptr_list(ufbx_element, p_elem, imp->scene.elements) {
@@ -22422,7 +22369,7 @@ ufbxi_nodiscard static ufbxi_noinline ufbx_scene *ufbxi_evaluate_scene(ufbxi_eva
 
 	ec->src_imp = ufbxi_get_imp(ufbxi_scene_imp, scene);
 	ec->src_scene = *scene;
-	ec->anim = anim ? *anim : scene->anim;
+	ec->anim = anim ? (ufbx_anim*)anim : scene->anim;
 	ec->time = time;
 
 	ufbxi_init_ator(&ec->error, &ec->ator_tmp, &ec->opts.temp_allocator, "temp");
@@ -22453,6 +22400,169 @@ ufbxi_nodiscard static ufbxi_noinline ufbx_scene *ufbxi_evaluate_scene(ufbxi_eva
 }
 
 #endif
+
+typedef struct {
+	ufbx_error error;
+	ufbxi_allocator ator_result;
+	ufbxi_buf result;
+	const ufbx_scene *scene;
+	ufbx_anim_opts opts;
+
+	ufbx_anim anim;
+	ufbxi_anim_imp *imp;
+} ufbxi_create_anim_context;
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_check_string(ufbx_error *error, ufbx_string *dst, const ufbx_string *src)
+{
+	size_t length = src->length != SIZE_MAX ? src->length : strlen(src->data);
+	const char *data = length != 0 ? src->data : ufbxi_empty_char;
+	if (length > 0) {
+		size_t valid_length = ufbxi_utf8_valid_length(data, length);
+		ufbxi_check_err_msg(error, valid_length == length, "Invalid UTF-8");
+	}
+
+	dst->data = data;
+	dst->length = length;
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_anim_string(ufbxi_create_anim_context *ac, ufbx_string *str)
+{
+	size_t length = str->length;
+	if (length > 0) {
+		char *copy = ufbxi_push(&ac->result, char, length + 1);
+		ufbxi_check_err(&ac->error, copy);
+		memcpy(copy, str->data, length);
+		copy[str->length] = '\0';
+		str->data = copy;
+	} else {
+		ufbx_assert(str->data == ufbxi_empty_char);
+	}
+
+	return 1;
+}
+
+static int ufbxi_cmp_prop_override_prop_name(const void *va, const void *vb)
+{
+	const ufbx_prop_override *a = (const ufbx_prop_override*)va, *b = (const ufbx_prop_override*)vb;
+	if (a->_internal_key != b->_internal_key) return a->_internal_key < b->_internal_key ? -1 : 1;
+	return ufbxi_str_cmp(a->prop_name, b->prop_name);
+}
+
+static int ufbxi_cmp_prop_override(const void *va, const void *vb)
+{
+	const ufbx_prop_override *a = (const ufbx_prop_override*)va, *b = (const ufbx_prop_override*)vb;
+	if (a->element_id != b->element_id) return a->element_id < b->element_id ? -1 : 1;
+	if (a->_internal_key != b->_internal_key) return a->_internal_key < b->_internal_key ? -1 : 1;
+	return strcmp(a->prop_name.data, b->prop_name.data);
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_create_anim_imp(ufbxi_create_anim_context *ac)
+{
+	const ufbx_scene *scene = ac->scene;
+	ufbx_anim *anim = &ac->anim;
+
+	// `ufbx_anim_opts` must be cleared to zero first!
+	ufbx_assert(ac->opts._begin_zero == 0 && ac->opts._end_zero == 0);
+	ufbxi_check_err_msg(&ac->error, ac->opts._begin_zero == 0 && ac->opts._end_zero == 0, "Uninitialized options");
+
+	ufbxi_init_ator(&ac->error, &ac->ator_result, &ac->opts.result_allocator, "result");
+	ac->result.unordered = true;
+	ac->result.ator = &ac->ator_result;
+
+	anim->ignore_connections = ac->opts.ignore_connections;
+	anim->custom = true;
+
+	size_t num_layers = ac->opts.layer_ids.count;
+	anim->layers.count = num_layers;
+	anim->layers.data = ufbxi_push_zero(&ac->result, ufbx_anim_layer*, num_layers);
+	ufbxi_check_err(&ac->error, anim->layers.data);
+
+	if (ac->opts.override_layer_weights.count > 0) {
+		ufbxi_check_err_msg(&ac->error, ac->opts.override_layer_weights.count == num_layers, "override_layer_weights[] count must match layer_ids[] count");
+		anim->override_layer_weights.data = ufbxi_push_copy(&ac->result, ufbx_real, num_layers, ac->opts.override_layer_weights.data);
+		ufbxi_check_err(&ac->error, anim->override_layer_weights.data);
+		anim->override_layer_weights.count = num_layers;
+	}
+
+	for (size_t i = 0; i < num_layers; i++) {
+		uint32_t index = ac->opts.layer_ids.data[i];
+		ufbxi_check_err_msg(&ac->error, index < scene->anim_layers.count, "layer_ids out of bounds");
+		anim->layers.data[i] = ac->scene->anim_layers.data[index];
+	}
+
+	ufbx_const_prop_override_desc_list overrides = ac->opts.overrides;
+	if (overrides.count > 0) {
+		anim->overrides.count = overrides.count;
+		anim->overrides.data = ufbxi_push_zero(&ac->result, ufbx_prop_override, overrides.count);
+		ufbxi_check_err(&ac->error, anim->layers.data);
+
+		for (size_t i = 0; i < overrides.count; i++) {
+			const ufbx_prop_override_desc *src = &overrides.data[i];
+			ufbx_prop_override *dst = &anim->overrides.data[i];
+
+			dst->element_id = src->element_id;
+			dst->value = src->value;
+			dst->value_int = src->value_int;
+
+			if (dst->value.x != 0.0f && dst->value_int == 0) {
+				dst->value_int = (int64_t)dst->value.x;
+			} else if (dst->value_int != 0 && dst->value.x == 0.0f) {
+				dst->value.x = (ufbx_real)dst->value_int;
+			}
+
+			ufbxi_check_err(&ac->error, ufbxi_check_string(&ac->error, &dst->prop_name, &src->prop_name));
+			ufbxi_check_err(&ac->error, ufbxi_check_string(&ac->error, &dst->value_str, &src->value_str));
+
+			dst->_internal_key = ufbxi_get_name_key(dst->prop_name.data, dst->prop_name.length);
+		}
+
+		// Sort `anim->overrides` first by `prop_name` only so we can deduplicate and
+		// convert them to global strings in `ufbxi_strings[]` if possible.
+		qsort(anim->overrides.data, anim->overrides.count, sizeof(ufbx_prop_override), &ufbxi_cmp_prop_override_prop_name);
+
+		const ufbx_string *global_str = ufbxi_strings, *global_end = global_str + ufbxi_arraycount(ufbxi_strings);
+
+		ufbx_string prev = { ufbxi_empty_char };
+		ufbxi_for_list(ufbx_prop_override, over, anim->overrides) {
+			if (over->value_str.length > 0) {
+				ufbxi_check_err(&ac->error, ufbxi_push_anim_string(ac, &over->value_str));
+			}
+
+			if (ufbxi_str_equal(over->prop_name, prev)) {
+				over->prop_name = prev;
+				continue;
+			}
+
+			while (global_str != global_end && ufbxi_str_less(*global_str, over->prop_name)) {
+				++global_str;
+			}
+
+			if (global_str != global_end && ufbxi_str_equal(*global_str, over->prop_name)) {
+				over->prop_name = *global_str;
+			} else {
+				ufbxi_check_err(&ac->error, ufbxi_push_anim_string(ac, &over->prop_name));
+			}
+
+			prev = over->prop_name;
+		}
+
+		// Sort `anim->overrides` to the actual order expected by evaluation.
+		qsort(anim->overrides.data, anim->overrides.count, sizeof(ufbx_prop_override), &ufbxi_cmp_prop_override);
+	}
+
+	ac->imp = ufbxi_push(&ac->result, ufbxi_anim_imp, 1);
+	ufbxi_check_err(&ac->error, ac->imp);
+
+	ufbxi_init_ref(&ac->imp->refcount, UFBXI_ANIM_IMP_MAGIC, &(ufbxi_get_imp(ufbxi_scene_imp, scene))->refcount);
+
+	ac->imp->magic = UFBXI_ANIM_IMP_MAGIC;
+	ac->imp->anim = ac->anim;
+	ac->imp->refcount.ator = ac->ator_result;
+	ac->imp->refcount.buf = ac->result;
+
+	return 1;
+}
 
 // -- Spatial
 
@@ -22608,9 +22718,6 @@ typedef struct {
 	ufbxi_refcount refcount;
 	ufbx_line_curve curve;
 	uint32_t magic;
-
-	ufbxi_allocator ator;
-	ufbxi_buf result_buf;
 } ufbxi_line_curve_imp;
 
 ufbx_static_assert(line_curve_imp_offset, offsetof(ufbxi_line_curve_imp, curve) == sizeof(ufbxi_refcount));
@@ -22747,8 +22854,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_curve_imp(ufbxi
 
 	tc->imp->magic = UFBXI_LINE_CURVE_IMP_MAGIC;
 	tc->imp->curve = tc->line;
-	tc->imp->ator = tc->ator_result;
-	tc->imp->result_buf = tc->result;
+	tc->imp->refcount.ator = tc->ator_result;
+	tc->imp->refcount.buf = tc->result;
 
 	return 1;
 }
@@ -23016,8 +23123,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 
 	tc->imp->magic = UFBXI_MESH_IMP_MAGIC;
 	tc->imp->mesh = tc->mesh;
-	tc->imp->ator = tc->ator_result;
-	tc->imp->result_buf = tc->result;
+	tc->imp->refcount.ator = tc->ator_result;
+	tc->imp->refcount.buf = tc->result;
 	tc->imp->mesh.subdivision_evaluated = true;
 
 	return 1;
@@ -24811,8 +24918,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivi
 
 	sc->imp->magic = UFBXI_MESH_IMP_MAGIC;
 	sc->imp->mesh = sc->dst_mesh;
-	sc->imp->ator = sc->ator_result;
-	sc->imp->result_buf = sc->result;
+	sc->imp->refcount.ator = sc->ator_result;
+	sc->imp->refcount.buf = sc->result;
 	sc->imp->mesh.subdivision_evaluated = true;
 
 	return 1;
@@ -25022,47 +25129,7 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 static ufbxi_noinline void ufbxi_free_scene_imp(ufbxi_scene_imp *imp)
 {
 	ufbx_assert(imp->magic == UFBXI_SCENE_IMP_MAGIC);
-	if (imp->magic != UFBXI_SCENE_IMP_MAGIC) return;
-	imp->magic = 0;
-
 	ufbxi_buf_free(&imp->string_buf);
-
-	// We need to free `result_buf` last and be careful to copy it to
-	// the stack since the `ufbxi_scene_imp` that contains it is allocated
-	// from the same result buffer!
-	ufbxi_allocator ator = imp->ator;
-	ufbxi_buf result = imp->result_buf;
-	result.ator = &ator;
-	ufbxi_buf_free(&result);
-	ufbxi_free_ator(&ator);
-}
-
-static ufbxi_noinline void ufbxi_free_mesh_imp(ufbxi_mesh_imp *imp)
-{
-	ufbx_assert(imp->magic == UFBXI_MESH_IMP_MAGIC);
-	if (imp->magic != UFBXI_MESH_IMP_MAGIC) return;
-	imp->magic = 0;
-
-	// See `ufbxi_free_scene()` for more information
-	ufbxi_allocator ator = imp->ator;
-	ufbxi_buf result = imp->result_buf;
-	result.ator = &ator;
-	ufbxi_buf_free(&result);
-	ufbxi_free_ator(&ator);
-}
-
-static ufbxi_noinline void ufbxi_free_line_curve_imp(ufbxi_line_curve_imp *imp)
-{
-	ufbx_assert(imp->magic == UFBXI_LINE_CURVE_IMP_MAGIC);
-	if (imp->magic != UFBXI_LINE_CURVE_IMP_MAGIC) return;
-	imp->magic = 0;
-
-	// See `ufbxi_free_scene()` for more information
-	ufbxi_allocator ator = imp->ator;
-	ufbxi_buf result = imp->result_buf;
-	result.ator = &ator;
-	ufbxi_buf_free(&result);
-	ufbxi_free_ator(&ator);
 }
 
 static ufbxi_noinline void ufbxi_init_ref(ufbxi_refcount *refcount, uint32_t magic, ufbxi_refcount *parent)
@@ -25097,13 +25164,21 @@ static ufbxi_noinline void ufbxi_release_ref(ufbxi_refcount *refcount)
 		refcount->self_magic = 0;
 		refcount->type_magic = 0;
 
+		// Type-specific cleanup
 		switch (type_magic) {
 		case UFBXI_SCENE_IMP_MAGIC: ufbxi_free_scene_imp((ufbxi_scene_imp*)refcount); break;
-		case UFBXI_MESH_IMP_MAGIC: ufbxi_free_mesh_imp((ufbxi_mesh_imp*)refcount); break;
-		case UFBXI_LINE_CURVE_IMP_MAGIC: ufbxi_free_line_curve_imp((ufbxi_line_curve_imp*)refcount); break;
 		case UFBXI_CACHE_IMP_MAGIC: ufbxi_free_geometry_cache_imp((ufbxi_geometry_cache_imp*)refcount); break;
-		default: ufbx_assert(0 && "Bad refcount type_magic"); break;
+		default: break;
 		}
+
+		// We need to free `data_buf` last and be careful to copy it to
+		// the stack since the `ufbxi_refcount` that contains it is allocated
+		// from the same result buffer!
+		ufbxi_allocator ator = refcount->ator;
+		ufbxi_buf buf = refcount->buf;
+		buf.ator = &ator;
+		ufbxi_buf_free(&buf);
+		ufbxi_free_ator(&ator);
 
 		refcount = parent;
 	}
@@ -25769,8 +25844,8 @@ ufbx_abi ufbxi_noinline ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, 
 		result.value_blob.size = 0;
 	}
 
-	if (anim->prop_overrides.count > 0) {
-		ufbxi_find_prop_override(&anim->prop_overrides, element->element_id, &result);
+	if (anim->overrides.count > 0) {
+		ufbxi_find_prop_override(&anim->overrides, element->element_id, &result);
 		return result;
 	}
 
@@ -25791,8 +25866,8 @@ ufbx_abi ufbxi_noinline ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, co
 	if (!element) return ret;
 
 	const ufbx_prop_override *over = NULL, *over_end = NULL;
-	if (anim->prop_overrides.count > 0) {
-		ufbx_const_prop_override_list list = ufbxi_find_element_prop_overrides(&anim->prop_overrides, element->element_id);
+	if (anim->overrides.count > 0) {
+		ufbx_prop_override_list list = ufbxi_find_element_prop_overrides(&anim->overrides, element->element_id);
 		over = list.data;
 		over_end = over + list.count;
 	}
@@ -25803,22 +25878,22 @@ ufbx_abi ufbxi_noinline ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, co
 		for (; over != over_end && num_anim < buffer_size; over++) {
 			ufbx_prop *dst = &buffer[num_anim];
 			if (over->_internal_key < prop->_internal_key
-				|| (over->_internal_key == prop->_internal_key && strcmp(over->prop_name, prop->name.data) < 0)) {
-				dst->name = ufbxi_str_c(over->prop_name);
+				|| (over->_internal_key == prop->_internal_key && strcmp(over->prop_name.data, prop->name.data) < 0)) {
+				dst->name = over->prop_name;
 				dst->_internal_key = over->_internal_key;
 				dst->type = UFBX_PROP_UNKNOWN;
 				dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
-			} else if (over->_internal_key == prop->_internal_key && strcmp(over->prop_name, prop->name.data) == 0) {
+			} else if (over->_internal_key == prop->_internal_key && strcmp(over->prop_name.data, prop->name.data) == 0) {
 				*dst = *prop;
 				dst->flags = (ufbx_prop_flags)(dst->flags | UFBX_PROP_FLAG_OVERRIDDEN);
 			} else {
 				break;
 			}
-			dst->value_str = ufbxi_str_c(over->value_str);
+			dst->value_str = over->value_str;
 			dst->value_blob.data = dst->value_str.data;
 			dst->value_blob.size = dst->value_str.length;
 			dst->value_int = over->value_int;
-			dst->value_vec3 = over->value;
+			dst->value_vec4 = over->value;
 			dst->value_real_arr[3] = 0.0f;
 			num_anim++;
 			found_override = true;
@@ -25838,15 +25913,15 @@ ufbx_abi ufbxi_noinline ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, co
 
 	for (; over != over_end && num_anim < buffer_size; over++) {
 		ufbx_prop *dst = &buffer[num_anim++];
-		dst->name = ufbxi_str_c(over->prop_name);
+		dst->name = over->prop_name;
 		dst->_internal_key = over->_internal_key;
 		dst->type = UFBX_PROP_UNKNOWN;
 		dst->flags = UFBX_PROP_FLAG_OVERRIDDEN;
-		dst->value_str = ufbxi_str_c(over->value_str);
+		dst->value_str = over->value_str;
 		dst->value_blob.data = dst->value_str.data;
 		dst->value_blob.size = dst->value_str.length;
 		dst->value_int = over->value_int;
-		dst->value_vec3 = over->value;
+		dst->value_vec4 = over->value;
 		dst->value_real_arr[3] = 0.0f;
 	}
 
@@ -25896,35 +25971,6 @@ ufbx_abi ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_
 	return ufbxi_find_real(&props, ufbxi_DeformPercent, channel->weight * (ufbx_real)100.0) * (ufbx_real)0.01;
 }
 
-ufbx_abi ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *overrides, size_t num_overrides)
-{
-	ufbxi_for(ufbx_prop_override, over, overrides, num_overrides) {
-		if (over->prop_name == NULL) {
-			over->prop_name = ufbxi_empty_char;
-		}
-		if (over->value_str == NULL) {
-			over->value_str = ufbxi_empty_char;
-		}
-		if (over->value_int == 0) {
-			over->value_int = ufbxi_f64_to_i64(over->value.x);
-		} else if (over->value.x == 0.0) {
-			over->value.x = (ufbx_real)over->value_int;
-		}
-
-		size_t len = strlen(over->prop_name);
-		over->prop_name = ufbxi_find_canonical_string(over->prop_name, len);
-		over->_internal_key = ufbxi_get_name_key(over->prop_name, len);
-	}
-
-	// TODO: Macro for non-stable sort
-	qsort(overrides, num_overrides, sizeof(ufbx_prop_override), &ufbxi_cmp_prop_override);
-
-	ufbx_const_prop_override_list result;
-	result.data = overrides;
-	result.count = num_overrides;
-	return result;
-}
-
 ufbx_abi ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error)
 {
 #if UFBXI_FEATURE_SCENE_EVALUATION
@@ -25938,6 +25984,54 @@ ufbx_abi ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_ani
 	}
 	return NULL;
 #endif
+}
+
+ufbx_abi ufbx_anim *ufbx_create_anim(const ufbx_scene *scene, const ufbx_anim_opts *opts, ufbx_error *error)
+{
+	ufbx_assert(scene);
+
+	ufbxi_create_anim_context ac = { UFBX_ERROR_NONE };
+	if (opts) {
+		ac.opts = *opts;
+	}
+
+	ac.scene = scene;
+
+	int ok = ufbxi_create_anim_imp(&ac);
+
+	if (ok) {
+		ufbxi_clear_error(error);
+		ufbxi_anim_imp *imp = ac.imp;
+		return &imp->anim;
+	} else {
+		ufbxi_fix_error_type(&ac.error, "Failed to create anim");
+		if (error) *error = ac.error;
+		ufbxi_buf_free(&ac.result);
+		ufbxi_free_ator(&ac.ator_result);
+		return NULL;
+	}
+}
+
+ufbx_abi void ufbx_free_anim(ufbx_anim *anim)
+{
+	if (!anim) return;
+	if (!anim->custom) return;
+
+	ufbxi_anim_imp *imp = ufbxi_get_imp(ufbxi_anim_imp, anim);
+	ufbx_assert(imp->magic == UFBXI_ANIM_IMP_MAGIC);
+	if (imp->magic != UFBXI_ANIM_IMP_MAGIC) return;
+	ufbxi_release_ref(&imp->refcount);
+}
+
+ufbx_abi void ufbx_retain_anim(ufbx_anim *anim)
+{
+	if (!anim) return;
+	if (!anim->custom) return;
+
+	ufbxi_anim_imp *imp = ufbxi_get_imp(ufbxi_anim_imp, anim);
+	ufbx_assert(imp->magic == UFBXI_ANIM_IMP_MAGIC);
+	if (imp->magic != UFBXI_ANIM_IMP_MAGIC) return;
+	ufbxi_retain_ref(&imp->refcount);
 }
 
 ufbx_abi ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const char *name, size_t name_len)
@@ -26889,6 +26983,17 @@ ufbx_abi void ufbx_retain_line_curve(ufbx_line_curve *line_curve)
 	ufbxi_retain_ref(&imp->refcount);
 }
 
+ufbx_abi uint32_t ufbx_find_face_index(ufbx_mesh *mesh, size_t index)
+{
+	if (!mesh || index > UINT32_MAX) return UFBX_NO_INDEX;
+	uint32_t ix = (uint32_t)index;
+
+	size_t face_ix = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbx_face, 4, &face_ix, mesh->faces.data, 0, mesh->faces.count,
+		( a->index_begin + a->num_indices <= ix ), ( ix >= a->index_begin && ix < a->index_begin + a->num_indices ));
+	return (uint32_t)face_ix;
+}
+
 ufbx_abi ufbxi_noinline uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face)
 {
 #if UFBXI_FEATURE_TRIANGULATION
@@ -27638,11 +27743,6 @@ ufbx_abi void ufbx_ffi_evaluate_transform(ufbx_transform *retval, const ufbx_ani
 ufbx_abi ufbx_real ufbx_ffi_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time)
 {
 	return ufbx_evaluate_blend_weight(anim, channel, time);
-}
-
-ufbx_abi void ufbx_ffi_prepare_prop_overrides(ufbx_const_prop_override_list *retval, ufbx_prop_override *overrides, size_t num_overrides)
-{
-	*retval = ufbx_prepare_prop_overrides(overrides, num_overrides);
 }
 
 ufbx_abi void ufbx_ffi_quat_mul(ufbx_quat *retval, const ufbx_quat *a, const ufbx_quat *b)
