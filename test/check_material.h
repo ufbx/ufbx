@@ -27,9 +27,9 @@ static const char *ufbxt_fbx_map_name(ufbx_material_fbx_map map)
 	case UFBX_MATERIAL_FBX_DISPLACEMENT: return "displacement";
 	case UFBX_MATERIAL_FBX_VECTOR_DISPLACEMENT_FACTOR: return "vector_displacement_factor";
 	case UFBX_MATERIAL_FBX_VECTOR_DISPLACEMENT: return "vector_displacement";
-	#if UFBX_HAS_FORCE_32BIT
+#if UFBX_HAS_FORCE_32BIT
 	case UFBX_MATERIAL_FBX_FORCE_32BIT: ufbx_assert(0); return NULL;
-	#endif
+#endif
 	}
 
 	ufbxt_assert(0 && "Unhandled PBR map name");
@@ -94,9 +94,9 @@ static const char *ufbxt_pbr_map_name(ufbx_material_pbr_map map)
 	case UFBX_MATERIAL_PBR_GLOSSINESS: return "glossiness";
 	case UFBX_MATERIAL_PBR_COAT_GLOSSINESS: return "coat_glossiness";
 	case UFBX_MATERIAL_PBR_TRANSMISSION_GLOSSINESS: return "transmission_glossiness";
-	#if UFBX_HAS_FORCE_32BIT
+#if UFBX_HAS_FORCE_32BIT
 	case UFBX_MATERIAL_PBR_FORCE_32BIT: ufbx_assert(0); return NULL;
-	#endif
+#endif
 	}
 
 	ufbxt_assert(0 && "Unhandled PBR map name");
@@ -129,9 +129,9 @@ static const char *ufbxt_material_feature_name(ufbx_material_feature feature)
 	case UFBX_MATERIAL_FEATURE_ROUGHNESS_AS_GLOSSINESS: return "roughness_as_glossiness";
 	case UFBX_MATERIAL_FEATURE_COAT_ROUGHNESS_AS_GLOSSINESS: return "coat_roughness_as_glossiness";
 	case UFBX_MATERIAL_FEATURE_TRANSMISSION_ROUGHNESS_AS_GLOSSINESS: return "transmission_roughness_as_glossiness";
-	#if UFBX_HAS_FORCE_32BIT
+#if UFBX_HAS_FORCE_32BIT
 	case UFBX_MATERIAL_FEATURE_FORCE_32BIT: ufbx_assert(0); return NULL;
-	#endif
+#endif
 	}
 
 	ufbxt_assert(0 && "Unhandled material feature name");
@@ -153,9 +153,9 @@ static const char *ufbxt_shader_type_name(ufbx_shader_type map)
 	case UFBX_SHADER_SHADERFX_GRAPH: return "shaderfx_graph";
 	case UFBX_SHADER_BLENDER_PHONG: return "blender_phong";
 	case UFBX_SHADER_WAVEFRONT_MTL: return "wavefront_mtl";
-	#if UFBX_HAS_FORCE_32BIT
-	case UFBX_SHADER_FORCE_32BIT: ufbx_assert(0); return NULL;
-	#endif
+#if UFBX_HAS_FORCE_32BIT
+	case UFBX_SHADER_TYPE_FORCE_32BIT: ufbx_assert(0); return NULL;
+#endif
 	}
 
 	ufbxt_assert(0 && "Unhandled material feature name");
