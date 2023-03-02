@@ -28,7 +28,7 @@ static const char *ufbxt_fbx_map_name(ufbx_material_fbx_map map)
 	case UFBX_MATERIAL_FBX_VECTOR_DISPLACEMENT_FACTOR: return "vector_displacement_factor";
 	case UFBX_MATERIAL_FBX_VECTOR_DISPLACEMENT: return "vector_displacement";
 #if UFBX_HAS_FORCE_32BIT
-	case UFBX_MATERIAL_FBX_FORCE_32BIT: ufbx_assert(0); return NULL;
+	case UFBX_MATERIAL_FBX_MAP_FORCE_32BIT: ufbx_assert(0); return NULL;
 #endif
 	}
 
@@ -95,7 +95,7 @@ static const char *ufbxt_pbr_map_name(ufbx_material_pbr_map map)
 	case UFBX_MATERIAL_PBR_COAT_GLOSSINESS: return "coat_glossiness";
 	case UFBX_MATERIAL_PBR_TRANSMISSION_GLOSSINESS: return "transmission_glossiness";
 #if UFBX_HAS_FORCE_32BIT
-	case UFBX_MATERIAL_PBR_FORCE_32BIT: ufbx_assert(0); return NULL;
+	case UFBX_MATERIAL_PBR_MAP_FORCE_32BIT: ufbx_assert(0); return NULL;
 #endif
 	}
 
