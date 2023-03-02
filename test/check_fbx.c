@@ -341,7 +341,7 @@ int main(int argc, char **argv)
 
 		ufbx_scene *state;
 		if (obj_file->animation_frame >= 0 || frame != INT_MIN) {
-			ufbx_anim anim = scene->anim;
+			ufbx_anim *anim = scene->anim;
 
 			if (obj_file->animation_name[0]) {
 				ufbx_anim_stack *stack = ufbx_find_anim_stack(scene, obj_file->animation_name);
@@ -349,7 +349,7 @@ int main(int argc, char **argv)
 				anim = stack->anim;
 			}
 
-			double time = anim.time_begin + (double)obj_file->animation_frame / (double)scene->settings.frames_per_second;
+			double time = anim->time_begin + (double)obj_file->animation_frame / (double)scene->settings.frames_per_second;
 
 			if (frame != INT_MIN) {
 				time = (double)frame / (double)scene->settings.frames_per_second;

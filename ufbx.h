@@ -162,11 +162,13 @@ struct ufbx_converter { };
 	#define UFBX_ENUM_FORCE_WIDTH(p_prefix)
 	#define UFBX_FLAG_REPR : int
 	#define UFBX_FLAG_FORCE_WIDTH(p_prefix)
+	#define UFBX_HAS_FORCE_32BIT 0
 #else
 	#define UFBX_ENUM_REPR
 	#define UFBX_ENUM_FORCE_WIDTH(p_prefix) p_prefix##_FORCE_32BIT = 0x7fffffff
 	#define UFBX_FLAG_REPR
 	#define UFBX_FLAG_FORCE_WIDTH(p_prefix) p_prefix##_FORCE_32BIT = 0x7fffffff
+	#define UFBX_HAS_FORCE_32BIT 1
 #endif
 
 #define UFBX_ENUM_TYPE(p_name, p_prefix, p_last) \

@@ -87,6 +87,7 @@ static ufbx_scene *load_scene(const char *filename, int frame, ufbxt_hasher_opts
 {
 	ufbx_load_opts opts = { 0 };
 	opts.load_external_files = true;
+	opts.ignore_missing_external_files = true;
 	opts.evaluate_caches = true;
 	opts.evaluate_skinning = true;
 	opts.target_axes = ufbx_axes_right_handed_y_up;

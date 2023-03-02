@@ -718,6 +718,7 @@ void load_scene(viewer_scene *vs, const char *filename)
 {
 	ufbx_load_opts opts = {
 		.load_external_files = true,
+		.ignore_missing_external_files = true,
 		.allow_null_material = true,
 		.generate_missing_normals = true,
 
