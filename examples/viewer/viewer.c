@@ -526,7 +526,7 @@ void read_node_anim(viewer_anim *va, viewer_node_anim *vna, ufbx_anim_stack *sta
 	for (size_t i = 0; i < va->num_frames; i++) {
 		double time = stack->time_begin + (double)i / va->framerate;
 
-		ufbx_transform transform = ufbx_evaluate_transform(&stack->anim, node, time);
+		ufbx_transform transform = ufbx_evaluate_transform(stack->anim, node, time);
 		vna->rot[i] = ufbx_to_um_quat(transform.rotation);
 		vna->pos[i] = ufbx_to_um_vec3(transform.translation);
 		vna->scale[i] = ufbx_to_um_vec3(transform.scale);
@@ -560,7 +560,7 @@ void read_blend_channel_anim(viewer_anim *va, viewer_blend_channel_anim *vbca, u
 	for (size_t i = 0; i < va->num_frames; i++) {
 		double time = stack->time_begin + (double)i / va->framerate;
 
-		ufbx_real weight = ufbx_evaluate_blend_weight(&stack->anim, chan, time);
+		ufbx_real weight = ufbx_evaluate_blend_weight(stack->anim, chan, time);
 		vbca->weight[i] = (float)weight;
 
 		// Keep track of which channels are constant for the whole animation as an optimization

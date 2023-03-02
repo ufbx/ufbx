@@ -112,7 +112,7 @@ static ufbx_scene *load_scene(const char *filename, int frame, ufbxt_hasher_opts
 		eval_opts.evaluate_skinning = true;
 		eval_opts.load_external_files = true;
 
-		double time = scene->anim.time_begin + frame / scene->settings.frames_per_second;
+		double time = scene->anim->time_begin + frame / scene->settings.frames_per_second;
 		ufbx_scene *state = ufbx_evaluate_scene(scene, NULL, time, NULL, &error);
 		if (!state) {
 			fprintf(stderr, "Failed to evaluate scene: %s\n", error.description.data);

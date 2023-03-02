@@ -1159,6 +1159,13 @@ UFBXT_FILE_TEST_ALT_FLAGS(synthetic_filename_mtl_not_found, synthetic_filename_m
 }
 #endif
 
+UFBXT_FILE_TEST_FLAGS(synthetic_bad_unicode_mtl, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(load_error->type == UFBX_ERROR_EXTERNAL_FILE_NOT_FOUND);
+	ufbxt_assert(!strcmp(load_error->info, "material?.mtl"));
+}
+#endif
 
 UFBXT_FILE_TEST_FLAGS(synthetic_missing_position_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
 #if UFBXT_IMPL

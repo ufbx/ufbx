@@ -418,7 +418,6 @@ ufbxt_noinline static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v
 	ufbxt_hash_element_ref(h, v->mesh);
 	ufbxt_hash_element_ref(h, v->light);
 	ufbxt_hash_element_ref(h, v->camera);
-	ufbxt_hash_element_ref(h, v->bone);
 	ufbxt_hash_element_ref(h, v->attrib);
 	ufbxt_hash_element_ref(h, v->geometry_transform_helper);
 	ufbxt_hash_pod(h, v->attrib_type);
@@ -1012,18 +1011,25 @@ ufbxt_noinline static void ufbxt_hash_shader_binding_imp(ufbxt_hash *h, const uf
 	ufbxt_hash_list(h, v->prop_bindings, ufbxt_hash_shader_prop_binding_imp);
 }
 
-ufbxt_noinline static void ufbxt_hash_anim_layer_desc_imp(ufbxt_hash *h, ufbx_anim_layer_desc v)
+ufbxt_noinline static void ufbxt_hash_prop_override_imp(ufbxt_hash *h, const ufbx_prop_override *v)
 {
-	ufbxt_hash_element_ref(h, v.layer);
-	ufbxt_hash_real(h, v.weight);
+	ufbxt_hash_pod(h, v->element_id);
+	ufbxt_hash_pod(h, v->_internal_key);
+	ufbxt_hash_string(h, v->prop_name);
+	ufbxt_hash_vec4(h, v->value);
+	ufbxt_hash_string(h, v->value_str);
+	ufbxt_hash_pod(h, v->value_int);
 }
 
 ufbxt_noinline static void ufbxt_hash_anim_imp(ufbxt_hash *h, const ufbx_anim *v)
 {
-	ufbxt_hash_list(h, v->layers, ufbxt_hash_anim_layer_desc_imp);
-	ufbxt_hash_pod(h, v->ignore_connections);
 	ufbxt_hash_double(h, v->time_begin);
 	ufbxt_hash_double(h, v->time_end);
+	ufbxt_hash_list(h, v->layers, ufbxt_hash_element_ref_imp);
+	ufbxt_hash_list(h, v->override_layer_weights, ufbxt_hash_pod_imp);
+	ufbxt_hash_list_ptr(h, v->overrides, ufbxt_hash_prop_override_imp);
+	ufbxt_hash_pod(h, v->ignore_connections);
+	ufbxt_hash_pod(h, v->custom);
 }
 
 #define ufbxt_hash_anim(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_anim_imp(h, v), ufbxt_pop_tag(h))
@@ -1034,7 +1040,7 @@ ufbxt_noinline static void ufbxt_hash_anim_stack_imp(ufbxt_hash *h, const ufbx_a
 	ufbxt_hash_double(h, v->time_end);
 
 	ufbxt_hash_list(h, v->layers, ufbxt_hash_element_ref_imp);
-	ufbxt_hash_anim(h, &v->anim);
+	ufbxt_hash_anim(h, v->anim);
 }
 
 ufbxt_noinline static void ufbxt_hash_anim_prop_imp(ufbxt_hash *h, const ufbx_anim_prop *v)
@@ -1057,7 +1063,7 @@ ufbxt_noinline static void ufbxt_hash_anim_layer_imp(ufbxt_hash *h, const ufbx_a
 	ufbxt_hash_list(h, v->anim_values, ufbxt_hash_element_ref_imp);
 	ufbxt_hash_list_ptr(h, v->anim_props, ufbxt_hash_anim_prop_imp);
 
-	ufbxt_hash_anim(h, &v->anim);
+	ufbxt_hash_anim(h, v->anim);
 
 	ufbxt_hash_pod(h, v->_min_element_id);
 	ufbxt_hash_pod(h, v->_max_element_id);
@@ -1252,8 +1258,7 @@ ufbxt_noinline static void ufbxt_hash_scene_imp(ufbxt_hash *h, const ufbx_scene 
 	ufbxt_hash_metadata(h, &v->metadata);
 	ufbxt_hash_scene_settings(h, &v->settings);
 	ufbxt_hash_element_ref(h, v->root_node);
-	ufbxt_hash_anim(h, &v->anim);
-	ufbxt_hash_anim(h, &v->combined_anim);
+	ufbxt_hash_anim(h, v->anim);
 
 	ufbxt_hash_list(h, v->elements, ufbxt_hash_element_imp);
 

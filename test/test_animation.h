@@ -601,7 +601,7 @@ UFBXT_FILE_TEST(maya_anim_interpolation)
 		ufbxt_anim_ref ref = anim_ref[i];
 		ufbxt_hintf("%zu: %f (frame %.2f)", i, ref.time, ref.time * 30.0f);
 
-		ufbx_prop p = ufbx_evaluate_prop(&scene->anim, &node->element, "Lcl Translation", ref.time);
+		ufbx_prop p = ufbx_evaluate_prop(scene->anim, &node->element, "Lcl Translation", ref.time);
 		ufbxt_assert_close_real(err, p.value_vec3.x, ref.value);
 	}
 }
