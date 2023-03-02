@@ -2713,58 +2713,6 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 	return 0;
 }
 
-ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(const char *str, size_t length)
-{
-	size_t index = 0;
-	while (index < length) {
-		uint8_t c = (uint8_t)str[index];
-		size_t left = length - index;
-
-		if ((c & 0x80) == 0) {
-			if (c != 0) {
-				index += 1;
-				continue;
-			}
-		} else if ((c & 0xe0) == 0xc0 && left >= 2) {
-			uint8_t t0 = (uint8_t)str[index + 1];
-			uint32_t code = (uint32_t)c << 8 | (uint32_t)t0;
-			if ((code & 0xc0) == 0x80 && code >= 0xc280) {
-				index += 2;
-				continue;
-			}
-		} else if ((c & 0xf0) == 0xe0 && left >= 3) {
-			uint8_t t0 = (uint8_t)str[index + 1], t1 = (uint8_t)str[index + 2];
-			uint32_t code = (uint32_t)c << 16 | (uint32_t)t0 << 8 | (uint32_t)t1;
-			if ((code & 0xc0c0) == 0x8080 && code >= 0xe0a080 && (code < 0xeda080 || code >= 0xee8080)) {
-				index += 3;
-				continue;
-			}
-		} else if ((c & 0xf8) == 0xf0 && left >= 4) {
-			uint8_t t0 = (uint8_t)str[index + 1], t1 = (uint8_t)str[index + 2], t2 = (uint8_t)str[index + 3];
-			uint32_t code = (uint32_t)c << 24 | (uint32_t)t0 << 16 | (uint32_t)t1 << 8 | (uint32_t)t2;
-			if ((code & 0xc0c0c0) == 0x808080 && code >= 0xf0908080u && code <= 0xf48fbfbfu) {
-				index += 4;
-				continue;
-			}
-		}
-
-		break;
-	}
-
-	ufbx_assert(index <= length);
-	return index;
-}
-
-static ufbxi_noinline void ufbxi_clean_string_utf8(char *str, size_t length)
-{
-	size_t pos = 0;
-	for (;;) {
-		pos += ufbxi_utf8_valid_length(str + pos, length);
-		if (pos == length) break;
-		str[pos++] = '?';
-	}
-}
-
 static ufbxi_noinline void ufbxi_set_err_info(ufbx_error *err, const char *data, size_t length)
 {
 	if (!err) return;
@@ -2774,7 +2722,6 @@ static ufbxi_noinline void ufbxi_set_err_info(ufbx_error *err, const char *data,
 	memcpy(err->info, data, to_copy);
 	err->info[to_copy] = '\0';
 	err->info_length = to_copy;
-	ufbxi_clean_string_utf8(err->info, err->info_length);
 }
 
 static ufbxi_noinline void ufbxi_fmt_err_info(ufbx_error *err, const char *fmt, ...)
@@ -2785,7 +2732,6 @@ static ufbxi_noinline void ufbxi_fmt_err_info(ufbx_error *err, const char *fmt, 
 	va_start(args, fmt);
 	err->info_length = (size_t)ufbxi_vsnprintf(err->info, sizeof(err->info), fmt, args);
 	va_end(args);
-	ufbxi_clean_string_utf8(err->info, err->info_length);
 }
 
 static ufbxi_noinline void ufbxi_clear_error(ufbx_error *err)
@@ -4024,6 +3970,48 @@ static ufbxi_forceinline uint32_t ufbxi_hash_uptr(uintptr_t ptr)
 
 // -- Warnings
 
+ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(const char *str, size_t length)
+{
+	size_t index = 0;
+	while (index < length) {
+		uint8_t c = (uint8_t)str[index];
+		size_t left = length - index;
+
+		if ((c & 0x80) == 0) {
+			if (c != 0) {
+				index += 1;
+				continue;
+			}
+		} else if ((c & 0xe0) == 0xc0 && left >= 2) {
+			uint8_t t0 = (uint8_t)str[index + 1];
+			uint32_t code = (uint32_t)c << 8 | (uint32_t)t0;
+			if ((code & 0xc0) == 0x80 && code >= 0xc280) {
+				index += 2;
+				continue;
+			}
+		} else if ((c & 0xf0) == 0xe0 && left >= 3) {
+			uint8_t t0 = (uint8_t)str[index + 1], t1 = (uint8_t)str[index + 2];
+			uint32_t code = (uint32_t)c << 16 | (uint32_t)t0 << 8 | (uint32_t)t1;
+			if ((code & 0xc0c0) == 0x8080 && code >= 0xe0a080 && (code < 0xeda080 || code >= 0xee8080)) {
+				index += 3;
+				continue;
+			}
+		} else if ((c & 0xf8) == 0xf0 && left >= 4) {
+			uint8_t t0 = (uint8_t)str[index + 1], t1 = (uint8_t)str[index + 2], t2 = (uint8_t)str[index + 3];
+			uint32_t code = (uint32_t)c << 24 | (uint32_t)t0 << 16 | (uint32_t)t1 << 8 | (uint32_t)t2;
+			if ((code & 0xc0c0c0) == 0x808080 && code >= 0xf0908080u && code <= 0xf48fbfbfu) {
+				index += 4;
+				continue;
+			}
+		}
+
+		break;
+	}
+
+	ufbx_assert(index <= length);
+	return index;
+}
+
 typedef struct {
 	ufbx_error *error;
 	ufbxi_buf *result;
@@ -4045,7 +4033,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_vwarnf_imp(ufbxi_warnings *ws, u
 	char desc[256];
 	size_t desc_len = (size_t)ufbxi_vsnprintf(desc, sizeof(desc), fmt, args);
 
-	ufbxi_clean_string_utf8(desc, desc_len);
+	size_t pos = 0;
+	for (;;) {
+		pos += ufbxi_utf8_valid_length(desc + pos, desc_len - pos);
+		if (pos == desc_len) break;
+		desc[pos++] = '?';
+	}
 
 	char *desc_copy = ufbxi_push_copy(ws->result, char, desc_len + 1, desc);
 	ufbxi_check_err(ws->error, desc_copy);
@@ -5059,6 +5052,21 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_d_Y, 3 },
 	{ ufbxi_d_Z, 3 },
 };
+
+static ufbxi_noinline const char *ufbxi_find_canonical_string(const char *data, size_t length)
+{
+	ufbx_string str = { data, length };
+
+	size_t ix = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbx_string, 8, &ix, ufbxi_strings, 0, ufbxi_arraycount(ufbxi_strings),
+		( ufbxi_str_less(*a, str) ), ( ufbxi_str_equal(*a, str) ));
+
+	if (ix < SIZE_MAX) {
+		return ufbxi_strings[ix].data;
+	} else {
+		return data;
+	}
+}
 
 static const ufbx_vec3 ufbxi_one_vec3 = { 1.0f, 1.0f, 1.0f };
 
@@ -15207,7 +15215,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 	ufbx_stream stream = { 0 };
 	bool has_stream = false;
 	bool needs_stream = false;
-	ufbx_blob stream_path = { 0 };
+	ufbx_blob stream_path;
 
 	if (uc->opts.open_file_cb.fn) {
 		if (uc->opts.obj_mtl_path.length > 0) {
@@ -15265,7 +15273,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 
 		ufbxi_check(ok);
 	} else if (needs_stream && !uc->opts.ignore_missing_external_files) {
-		ufbxi_set_err_info(&uc->error, (const char*)stream_path.data, stream_path.size);
+		ufbx_string filename = { stream_path.data, stream_path.size };
+		ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &filename, false));
+		ufbxi_set_err_info(&uc->error, filename.data, filename.length);
 		ufbxi_fail_msg("ufbxi_obj_load_mtl()", "External file not found");
 	}
 
