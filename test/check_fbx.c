@@ -359,7 +359,7 @@ int main(int argc, char **argv)
 			eval_opts.evaluate_skinning = true;
 			eval_opts.evaluate_caches = true;
 			eval_opts.load_external_files = true;
-			state = ufbx_evaluate_scene(scene, &anim, time, &eval_opts, NULL);
+			state = ufbx_evaluate_scene(scene, anim, time, &eval_opts, NULL);
 			ufbxt_assert(state);
 		} else {
 			state = scene;
