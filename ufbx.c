@@ -140,7 +140,7 @@
 	#define UFBXI_FEATURE_KD 0
 #endif
 
-#if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_SKINNING_EVALUATION || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_INDEX_GENERATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_SPATIAL || !UFBXI_FEATURE_KD
+#if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_SKINNING_EVALUATION || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_INDEX_GENERATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_SPATIAL || !UFBXI_FEATURE_KD || !UFBXI_FEATURE_FORMAT_OBJ
 	#define UFBXI_PARTIAL_FEATURES 1
 #endif
 
@@ -225,9 +225,7 @@
 	#define ufbxi_noinline __declspec(noinline)
 	#define ufbxi_forceinline __forceinline
 	#define ufbxi_restrict __restrict
-	#if defined(__cplusplus) && _MSC_VER >= 1900 && defined(_MSVC_LANG) && _MSVC_LANG >= 201703L
-		#define ufbxi_nodiscard [[nodiscard]]
-	#elif defined(_Check_return_)
+	#if defined(_Check_return_)
 		#define ufbxi_nodiscard _Check_return_
 	#else
 		#define ufbxi_nodiscard
@@ -662,7 +660,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 
 // -- Version
 
-#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 3, 1)
+#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 4, 0)
 const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
 
 ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEADER_VERSION/1000u);
@@ -5331,12 +5329,6 @@ typedef struct {
 	uint32_t num_groups;
 } ufbxi_obj_mesh;
 
-static const uint8_t ufbxi_obj_attrib_stride[] = {
-	3, 2, 3, 4,
-};
-
-ufbx_static_assert(obj_attrib_strides, ufbxi_arraycount(ufbxi_obj_attrib_stride) == UFBXI_OBJ_NUM_ATTRIBS_EXT);
-
 typedef struct {
 	const char *name;
 	uint32_t local_id;
@@ -5535,7 +5527,8 @@ typedef struct {
 	ufbxi_node legacy_node;
 	uint64_t legacy_implicit_anim_layer_id;
 
-	double ktime_to_sec;
+	int64_t ktime_sec;
+	double ktime_sec_double;
 
 	bool eof;
 	ufbxi_obj_context obj;
@@ -10154,7 +10147,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_scene_info(ufbxi_context *u
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_header_extension(ufbxi_context *uc)
 {
 	// TODO: Read TCDefinition and adjust timestamps
-	uc->ktime_to_sec = (1.0 / 46186158000.0);
+	uc->ktime_sec = 46186158000;
+	uc->ktime_sec_double = (double)uc->ktime_sec;
 
 	for (;;) {
 		ufbxi_node *child;
@@ -12046,7 +12040,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 	double next_time = 0.0;
 
 	if (num_keys > 0) {
-		next_time = (double)p_time[0] * uc->ktime_to_sec;
+		next_time = (double)p_time[0] / uc->ktime_sec_double;
 	}
 
 	for (size_t i = 0; i < num_keys; i++) {
@@ -12057,7 +12051,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 		key->value = *p_value;
 
 		if (i + 1 < num_keys) {
-			next_time = (double)p_time[1] * uc->ktime_to_sec;
+			next_time = (double)p_time[1] / uc->ktime_sec_double;
 		}
 
 		uint32_t flags = (uint32_t)*p_flag;
@@ -12822,8 +12816,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 
 	if (num_keys > 0) {
 		ufbxi_check(data_end - data >= 2);
-		// TODO: This could break with large times...
-		next_time = data[0] * uc->ktime_to_sec;
+		next_time = data[0] / uc->ktime_sec_double;
 		next_value = data[1];
 	}
 
@@ -12933,7 +12926,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 		// Retrieve next key and value
 		if (i + 1 < num_keys) {
 			ufbxi_check(data_end - data >= 2);
-			next_time = data[0] * uc->ktime_to_sec;
+			next_time = data[0] / uc->ktime_sec_double;
 			next_value = data[1];
 		}
 
@@ -13107,8 +13100,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take(ufbxi_context *uc, ufb
 	if (!ufbxi_find_val2(node, ufbxi_LocalTime, "LL", &begin, &end)) {
 		ufbxi_check(ufbxi_find_val2(node, ufbxi_ReferenceTime, "LL", &begin, &end));
 	}
-	stack->time_begin = (double)begin * uc->ktime_to_sec;
-	stack->time_end = (double)end * uc->ktime_to_sec;
+	stack->time_begin = (double)begin / uc->ktime_sec_double;
+	stack->time_end = (double)end / uc->ktime_sec_double;
 
 	// Read all properties of objects included in the take
 	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
@@ -14049,6 +14042,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, uf
 // -- .obj file
 
 #if UFBXI_FEATURE_FORMAT_OBJ
+
+static const uint8_t ufbxi_obj_attrib_stride[] = {
+	3, 2, 3, 4,
+};
+
+ufbx_static_assert(obj_attrib_strides, ufbxi_arraycount(ufbxi_obj_attrib_stride) == UFBXI_OBJ_NUM_ATTRIBS_EXT);
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_props(ufbxi_context *uc, ufbx_prop_list *dst, size_t count)
 {
@@ -15295,14 +15294,12 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_obj_load(ufbxi_context *uc)
 {
 	ufbxi_fmt_err_info(&uc->error, "UFBX_ENABLE_FORMAT_OBJ");
 	ufbxi_fail_msg("UFBXI_FEATURE_FORMAT_OBJ", "Feature disabled");
-	return 0;
 }
 
 ufbxi_nodiscard static ufbxi_forceinline int ufbxi_mtl_load(ufbxi_context *uc)
 {
 	ufbxi_fmt_err_info(&uc->error, "UFBX_ENABLE_FORMAT_OBJ");
 	ufbxi_fail_msg("UFBXI_FEATURE_FORMAT_OBJ", "Feature disabled");
-	return 0;
 }
 
 static ufbxi_forceinline void ufbxi_obj_free(ufbxi_context *uc)
@@ -18985,7 +18982,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	ufbxi_check(ufbxi_handle_geometry_transforms(uc));
 	ufbxi_postprocess_scene(uc);
 
-	uc->scene.metadata.ktime_to_sec = uc->ktime_to_sec;
+	uc->scene.metadata.ktime_second = uc->ktime_sec;
 
 	// Maya seems to use scale of 100/3, Blender binary uses exactly 33, ASCII has always value of 1.0
 	if (uc->version < 6000) {
@@ -19589,16 +19586,14 @@ ufbxi_noinline static void ufbxi_update_anim_stack(ufbx_scene *scene, ufbx_anim_
 	ufbx_prop *begin, *end;
 	begin = ufbxi_find_prop(&stack->props, ufbxi_LocalStart);
 	end = ufbxi_find_prop(&stack->props, ufbxi_LocalStop);
-	if (begin && end) {
-		stack->time_begin = (double)begin->value_int * scene->metadata.ktime_to_sec;
-		stack->time_end = (double)end->value_int * scene->metadata.ktime_to_sec;
-	} else {
+	if (!begin || !end) {
 		begin = ufbxi_find_prop(&stack->props, ufbxi_ReferenceStart);
 		end = ufbxi_find_prop(&stack->props, ufbxi_ReferenceStop);
-		if (begin && end) {
-			stack->time_begin = (double)begin->value_int * scene->metadata.ktime_to_sec;
-			stack->time_end = (double)end->value_int * scene->metadata.ktime_to_sec;
-		}
+	}
+
+	if (begin && end) {
+		stack->time_begin = begin->value_int / (double)scene->metadata.ktime_second;
+		stack->time_end = end->value_int / (double)scene->metadata.ktime_second;
 	}
 
 	stack->anim.time_begin = stack->time_begin;

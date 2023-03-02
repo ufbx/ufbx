@@ -113,11 +113,46 @@ typedef double ufbx_real;
 
 // -- Language
 
+// bindgen-disable
+
+#if UFBX_CPP11
+
+template <typename T, typename U>
+struct ufbxi_type_is { };
+
+template <typename T>
+struct ufbxi_type_is<T, T> { using type = int; };
+
+template <typename T>
+struct ufbx_converter { };
+
+#define UFBX_CONVERSION_IMPL(p_name) \
+	template <typename T, typename S=typename ufbxi_type_is<T, decltype(ufbx_converter<T>::from(*(const p_name*)nullptr))>::type> \
+	operator T() const { return ufbx_converter<T>::from(*this); }
+
+#define UFBX_CONVERSION_TO_IMPL(p_name) \
+	template <typename T, typename S=typename ufbxi_type_is<p_name, decltype(ufbx_converter<T>::to(*(const T*)nullptr))>::type> \
+	p_name(const T &t) { *this = ufbx_converter<T>::to(t); }
+
+#define UFBX_CONVERSION_LIST_IMPL(p_name) \
+	template <typename T, typename S=typename ufbxi_type_is<T, decltype(ufbx_converter<T>::from_list((p_name*)nullptr, (size_t)0))>::type> \
+	operator T() const { return ufbx_converter<T>::from_list(data, count); }
+
+#else
+
+#define UFBX_CONVERSION_IMPL(p_name)
+#define UFBX_CONVERSION_TO_IMPL(p_name)
+#define UFBX_CONVERSION_LIST_IMPL(p_name)
+
+#endif
+
 #if defined(__cplusplus)
 	#define UFBX_LIST_TYPE(p_name, p_type) struct p_name { p_type *data; size_t count; \
 		p_type &operator[](size_t index) const { ufbx_assert(index < count); return data[index]; } \
 		p_type *begin() const { return data; } \
-		p_type *end() const { return data + count; } }
+		p_type *end() const { return data + count; } \
+		UFBX_CONVERSION_LIST_IMPL(p_type) \
+	}
 #else
 	#define UFBX_LIST_TYPE(p_name, p_type) typedef struct p_name { p_type *data; size_t count; } p_name
 #endif
@@ -154,6 +189,8 @@ typedef double ufbx_real;
 	#define UFBX_CALLBACK_IMPL(p_name, p_fn, p_return, p_params, p_args)
 #endif
 
+// bindgen-enable
+
 // -- Version
 
 #define ufbx_pack_version(major, minor, patch) ((uint32_t)(major)*1000000u + (uint32_t)(minor)*1000u + (uint32_t)(patch))
@@ -161,7 +198,7 @@ typedef double ufbx_real;
 #define ufbx_version_minor(version) ((uint32_t)(version)/1000u%1000u)
 #define ufbx_version_patch(version) ((uint32_t)(version)%1000u)
 
-#define UFBX_HEADER_VERSION ufbx_pack_version(0, 3, 1)
+#define UFBX_HEADER_VERSION ufbx_pack_version(0, 4, 0)
 #define UFBX_VERSION UFBX_HEADER_VERSION
 
 // -- Basic types
@@ -172,12 +209,16 @@ typedef double ufbx_real;
 typedef struct ufbx_string {
 	const char *data;
 	size_t length;
+
+	UFBX_CONVERSION_IMPL(ufbx_string)
 } ufbx_string;
 
 // Opaque byte buffer blob
 typedef struct ufbx_blob {
 	const void *data;
 	size_t size;
+
+	UFBX_CONVERSION_IMPL(ufbx_blob)
 } ufbx_blob;
 
 // 2D vector
@@ -186,6 +227,8 @@ typedef struct ufbx_vec2 {
 		struct { ufbx_real x, y; };
 		ufbx_real v[2];
 	};
+
+	UFBX_CONVERSION_IMPL(ufbx_vec2)
 } ufbx_vec2;
 
 // 3D vector
@@ -194,6 +237,8 @@ typedef struct ufbx_vec3 {
 		struct { ufbx_real x, y, z; };
 		ufbx_real v[3];
 	};
+
+	UFBX_CONVERSION_IMPL(ufbx_vec3)
 } ufbx_vec3;
 
 // 4D vector
@@ -202,6 +247,8 @@ typedef struct ufbx_vec4 {
 		struct { ufbx_real x, y, z, w; };
 		ufbx_real v[4];
 	};
+
+	UFBX_CONVERSION_IMPL(ufbx_vec4)
 } ufbx_vec4;
 
 // Quaternion
@@ -210,6 +257,8 @@ typedef struct ufbx_quat {
 		struct { ufbx_real x, y, z, w; };
 		ufbx_real v[4];
 	};
+
+	UFBX_CONVERSION_IMPL(ufbx_quat)
 } ufbx_quat;
 
 // Order in which Euler-angle rotation axes are applied for a transform
@@ -236,6 +285,8 @@ typedef struct ufbx_transform {
 	ufbx_vec3 translation;
 	ufbx_quat rotation;
 	ufbx_vec3 scale;
+
+	UFBX_CONVERSION_IMPL(ufbx_transform)
 } ufbx_transform;
 
 // 4x3 matrix encoding an affine transformation.
@@ -251,6 +302,8 @@ typedef struct ufbx_matrix {
 		ufbx_vec3 cols[4];
 		ufbx_real v[12];
 	};
+
+	UFBX_CONVERSION_IMPL(ufbx_matrix)
 } ufbx_matrix;
 
 typedef struct ufbx_void_list {
@@ -3224,7 +3277,7 @@ typedef struct ufbx_metadata {
 
 	ufbx_real bone_prop_size_unit;
 	bool bone_prop_limb_length_relative;
-	double ktime_to_sec;
+	int64_t ktime_second; // < One second in internal KTime units
 
 	ufbx_string original_file_path;
 	ufbx_blob raw_original_file_path;
@@ -4627,48 +4680,106 @@ ufbx_abi uint32_t ufbx_ffi_triangulate_face(uint32_t *indices, size_t num_indice
 #endif
 
 // bindgen-disable
+
 #if UFBX_CPP11
 
-ufbx_inline void ufbx_retain(ufbx_scene *scene) { ufbx_retain_scene(scene); }
-ufbx_inline void ufbx_free(ufbx_scene *scene) { ufbx_free_scene(scene); }
-ufbx_inline void ufbx_retain(ufbx_mesh *mesh) { ufbx_retain_mesh(mesh); }
-ufbx_inline void ufbx_free(ufbx_mesh *mesh) { ufbx_free_mesh(mesh); }
-ufbx_inline void ufbx_retain(ufbx_line_curve *curve) { ufbx_retain_line_curve(curve); }
-ufbx_inline void ufbx_free(ufbx_line_curve *curve) { ufbx_free_line_curve(curve); }
-ufbx_inline void ufbx_retain(ufbx_geometry_cache *cache) { ufbx_retain_geometry_cache(cache); }
-ufbx_inline void ufbx_free(ufbx_geometry_cache *cache) { ufbx_free_geometry_cache(cache); }
+struct ufbx_string_view {
+	const char *data;
+	size_t length;
+
+	ufbx_string_view() : data(nullptr), length(0) { }
+	ufbx_string_view(const char *data, size_t length) : data(data), length(length) { }
+	UFBX_CONVERSION_TO_IMPL(ufbx_string_view)
+};
+
+ufbx_inline ufbx_scene *ufbx_load_file(ufbx_string_view filename, const ufbx_load_opts *opts, ufbx_error *error) { return ufbx_load_file_len(filename.data, filename.length, opts, error); }
+ufbx_inline ufbx_prop *ufbx_find_prop(const ufbx_props *props, ufbx_string_view name) { return ufbx_find_prop_len(props, name.data, name.length); }
+ufbx_inline ufbx_real ufbx_find_real(const ufbx_props *props, ufbx_string_view name, ufbx_real def) { return ufbx_find_real_len(props, name.data, name.length, def); }
+ufbx_inline ufbx_vec3 ufbx_find_vec3(const ufbx_props *props, ufbx_string_view name, ufbx_vec3 def) { return ufbx_find_vec3_len(props, name.data, name.length, def); }
+ufbx_inline int64_t ufbx_find_int(const ufbx_props *props, ufbx_string_view name, int64_t def) { return ufbx_find_int_len(props, name.data, name.length, def); }
+ufbx_inline bool ufbx_find_bool(const ufbx_props *props, ufbx_string_view name, bool def) { return ufbx_find_bool_len(props, name.data, name.length, def); }
+ufbx_inline ufbx_string ufbx_find_string(const ufbx_props *props, ufbx_string_view name, ufbx_string def) { return ufbx_find_string_len(props, name.data, name.length, def); }
+ufbx_inline ufbx_blob ufbx_find_blob(const ufbx_props *props, ufbx_string_view name, ufbx_blob def) { return ufbx_find_blob_len(props, name.data, name.length, def); }
+ufbx_inline ufbx_element *ufbx_find_element(const ufbx_scene *scene, ufbx_element_type type, ufbx_string_view name) { return ufbx_find_element_len(scene, type, name.data, name.length); }
+ufbx_inline ufbx_node *ufbx_find_node(const ufbx_scene *scene, ufbx_string_view name) { return ufbx_find_node_len(scene, name.data, name.length); }
+ufbx_inline ufbx_anim_stack *ufbx_find_anim_stack(const ufbx_scene *scene, ufbx_string_view name) { return ufbx_find_anim_stack_len(scene, name.data, name.length); }
+ufbx_inline ufbx_material *ufbx_find_material(const ufbx_scene *scene, ufbx_string_view name) { return ufbx_find_material_len(scene, name.data, name.length); }
+ufbx_inline ufbx_anim_prop *ufbx_find_anim_prop(const ufbx_anim_layer *layer, const ufbx_element *element, ufbx_string_view prop) { return ufbx_find_anim_prop_len(layer, element, prop.data, prop.length); }
+ufbx_inline ufbx_prop ufbx_evaluate_prop(const ufbx_anim *anim, const ufbx_element *element, ufbx_string_view name, double time) { return ufbx_evaluate_prop_len(anim, element, name.data, name.length, time); }
+ufbx_inline ufbx_texture *ufbx_find_prop_texture(const ufbx_material *material, ufbx_string_view name) { return ufbx_find_prop_texture_len(material, name.data, name.length); }
+ufbx_inline ufbx_string ufbx_find_shader_prop(const ufbx_shader *shader, ufbx_string_view name) { return ufbx_find_shader_prop_len(shader, name.data, name.length); }
+ufbx_inline ufbx_shader_prop_binding_list ufbx_find_shader_prop_bindings(const ufbx_shader *shader, ufbx_string_view name) { return ufbx_find_shader_prop_bindings_len(shader, name.data, name.length); }
+ufbx_inline ufbx_shader_texture_input *ufbx_find_shader_texture_input(const ufbx_shader_texture *shader, ufbx_string_view name) { return ufbx_find_shader_texture_input_len(shader, name.data, name.length); }
+ufbx_inline ufbx_geometry_cache *ufbx_load_geometry_cache(ufbx_string_view filename, const ufbx_geometry_cache_opts *opts, ufbx_error *error) { return ufbx_load_geometry_cache_len(filename.data, filename.length, opts, error); }
+ufbx_inline ufbx_dom_node *ufbx_dom_find(const ufbx_dom_node *parent, ufbx_string_view name) { return ufbx_dom_find_len(parent, name.data, name.length); }
+
+#endif
+
+#if UFBX_CPP11
+
+template <typename T>
+struct ufbx_type_traits { enum { valid = 0 }; };
+
+template<> struct ufbx_type_traits<ufbx_scene> {
+	enum { valid = 1 };
+	static void retain(ufbx_scene *ptr) { ufbx_retain_scene(ptr); }
+	static void free(ufbx_scene *ptr) { ufbx_free_scene(ptr); }
+};
+
+template<> struct ufbx_type_traits<ufbx_mesh> {
+	enum { valid = 1 };
+	static void retain(ufbx_mesh *ptr) { ufbx_retain_mesh(ptr); }
+	static void free(ufbx_mesh *ptr) { ufbx_free_mesh(ptr); }
+};
+
+template<> struct ufbx_type_traits<ufbx_line_curve> {
+	enum { valid = 1 };
+	static void retain(ufbx_line_curve *ptr) { ufbx_retain_line_curve(ptr); }
+	static void free(ufbx_line_curve *ptr) { ufbx_free_line_curve(ptr); }
+};
+
+template<> struct ufbx_type_traits<ufbx_geometry_cache> {
+	enum { valid = 1 };
+	static void retain(ufbx_geometry_cache *ptr) { ufbx_retain_geometry_cache(ptr); }
+	static void free(ufbx_geometry_cache *ptr) { ufbx_free_geometry_cache(ptr); }
+};
+
+class ufbx_deleter {
+public:
+	template <typename T>
+	void operator()(T *ptr) const {
+		static_assert(ufbx_type_traits<T>::valid, "ufbx_deleter() unsupported for type");
+		ufbx_type_traits<T>::free(ptr);
+	}
+};
 
 // RAII wrapper over refcounted ufbx types.
-// Behaves like `std::shared_ptr<T>`.
+
+// Behaves like `std::unique_ptr<T>`.
 template <typename T>
-struct ufbx_ref {
-	ufbx_ref() noexcept : ptr(nullptr) { }
-	explicit ufbx_ref(T *ptr) noexcept : ptr(ptr) { }
-	ufbx_ref(const ufbx_ref &ref) noexcept : ptr(ref.ptr) { ufbx_retain(ref.ptr); }
-	ufbx_ref(ufbx_ref &&ref) noexcept : ptr(ref.ptr) { ref.ptr = nullptr; }
-	~ufbx_ref() { ufbx_free(ptr); }
+class ufbx_unique_ptr {
+	T *ptr;
+	using traits = ufbx_type_traits<T>;
+	static_assert(ufbx_type_traits<T>::valid, "ufbx_unique_ptr unsupported for type");
+public:
+	ufbx_unique_ptr() noexcept : ptr(nullptr) { }
+	explicit ufbx_unique_ptr(T *ptr) noexcept : ptr(ptr) { }
+	ufbx_unique_ptr(ufbx_unique_ptr &&ref) noexcept : ptr(ref.ptr) { ref.ptr = nullptr; }
+	~ufbx_unique_ptr() { traits::free(ptr); }
 
-	ufbx_ref &operator=(const ufbx_ref &ref) noexcept {
-		if (&ref == this) return *this;
-		ufbx_free(ptr);
-		ufbx_retain(ref.ptr);
-		ptr = ref.ptr;
-		return *this;
-	}
-
-	ufbx_ref &operator=(ufbx_ref &&ref) noexcept {
+	ufbx_unique_ptr &operator=(ufbx_unique_ptr &&ref) noexcept {
 		if (&ref == this) return *this;
 		ptr = ref.ptr;
 		ref.ptr = nullptr;
 		return *this;
 	}
 
-	void reset() noexcept {
-		ufbx_free(ptr);
-		ptr = nullptr;
+	void reset(T *new_ptr=nullptr) noexcept {
+		traits::free(ptr);
+		ptr = new_ptr;
 	}
 
-	void swap(ufbx_ref &ref) noexcept {
+	void swap(ufbx_unique_ptr &ref) noexcept {
 		T *tmp = ptr;
 		ptr = ref.ptr;
 		ref.ptr = tmp;
@@ -4677,15 +4788,54 @@ struct ufbx_ref {
 	T &operator*() const noexcept { return *ptr; }
 	T *operator->() const noexcept { return ptr; }
 	T *get() const noexcept { return ptr; }
-
-private:
-	T *ptr;
+	explicit operator bool() const noexcept { return ptr != nullptr; }
 };
 
-typedef ufbx_ref<ufbx_scene> ufbx_scene_ref;
-typedef ufbx_ref<ufbx_mesh> ufbx_mesh_ref;
-typedef ufbx_ref<ufbx_line_curve> ufbx_line_curve_ref;
-typedef ufbx_ref<ufbx_geometry_cache> ufbx_geometry_cache_ref;
+// Behaves like `std::shared_ptr<T>`.
+template <typename T>
+class ufbx_shared_ptr {
+	T *ptr;
+	using traits = ufbx_type_traits<T>;
+	static_assert(ufbx_type_traits<T>::valid, "ufbx_shared_ptr unsupported for type");
+public:
+
+	ufbx_shared_ptr() noexcept : ptr(nullptr) { }
+	explicit ufbx_shared_ptr(T *ptr) noexcept : ptr(ptr) { }
+	ufbx_shared_ptr(const ufbx_shared_ptr &ref) noexcept : ptr(ref.ptr) { traits::retain(ref.ptr); }
+	ufbx_shared_ptr(ufbx_shared_ptr &&ref) noexcept : ptr(ref.ptr) { ref.ptr = nullptr; }
+	~ufbx_shared_ptr() { traits::free(ptr); }
+
+	ufbx_shared_ptr &operator=(const ufbx_shared_ptr &ref) noexcept {
+		if (&ref == this) return *this;
+		traits::free(ptr);
+		traits::retain(ref.ptr);
+		ptr = ref.ptr;
+		return *this;
+	}
+
+	ufbx_shared_ptr &operator=(ufbx_shared_ptr &&ref) noexcept {
+		if (&ref == this) return *this;
+		ptr = ref.ptr;
+		ref.ptr = nullptr;
+		return *this;
+	}
+
+	void reset(T *new_ptr=nullptr) noexcept {
+		traits::free(ptr);
+		ptr = new_ptr;
+	}
+
+	void swap(ufbx_shared_ptr &ref) noexcept {
+		T *tmp = ptr;
+		ptr = ref.ptr;
+		ref.ptr = tmp;
+	}
+
+	T &operator*() const noexcept { return *ptr; }
+	T *operator->() const noexcept { return ptr; }
+	T *get() const noexcept { return ptr; }
+	explicit operator bool() const noexcept { return ptr != nullptr; }
+};
 
 #endif
 // bindgen-enable

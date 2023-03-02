@@ -551,7 +551,7 @@ UFBXT_FILE_TEST(maya_anim_interpolation)
 		// Constant next
 		{ 50.0 / 30.0, -16.0 },
 		{ 50.0 / 30.0 + 0.001, -14.0 },
-		// inal
+		// Final
 		{ 55.0 / 30.0, -14.0, },
 	};
 
@@ -564,6 +564,129 @@ UFBXT_FILE_TEST(maya_anim_interpolation)
 
 		ufbx_prop p = ufbx_evaluate_prop(&scene->anim, &node->element, "Lcl Translation", ref.time);
 		ufbxt_assert_close_real(err, p.value_vec3.x, ref.value);
+	}
+}
+#endif
+
+#if UFBXT_IMPL
+typedef struct {
+	int64_t frame;
+	ufbx_real value;
+} ufbxt_frame_ref;
+#endif
+
+#if UFBXT_IMPL
+
+// Clang x86 UBSAN emits an undefined reference to __mulodi4() for 64-bit
+// multiplication and this is the only instance where we need it at the
+// moment so just use a dumb implementation if necessary.
+#if defined(__clang__) && defined(__i386__) && (defined(UFBX_UBSAN) || defined(__SANITIZE_UNDEFINED__))
+static int64_t ufbxt_mul_i64(int64_t a, int64_t b)
+{
+	bool negative = false;
+	if (a < 0) {
+		negative = !negative;
+		a = -a;
+	}
+	if (b < 0) {
+		negative = !negative;
+		b = -b;
+	}
+
+	int64_t result = 0;
+	for (int32_t i = 0; i < 64; i++) {
+		result += ((a >> i) & 1) ? (b << i) : 0;
+	}
+	return negative ? -result : result;
+}
+#else
+static int64_t ufbxt_mul_i64(int64_t a, int64_t b)
+{
+	return a * b;
+}
+#endif
+
+#endif
+
+UFBXT_FILE_TEST(maya_long_keyframes)
+#if UFBXT_IMPL
+{
+	ufbxt_frame_ref anim_ref[] = {
+		{ -5000000, -50.0f },
+		{ -2925270, -29.0f },
+		{ -2925269, -28.0f },
+		{ -2925268, -27.0f },
+		{ -2925267, -26.0f },
+		{ -2925266, -25.0f },
+		{ -2925265, -24.0f },
+		{ -2925264, -23.0f },
+		{ -2925263, -22.0f },
+		{ -2925262, -21.0f },
+		{ -2000000, -20.0f },
+		{ -599999, -5.9f },
+		{ -500000, -5.0f },
+		{ -49999, -4.9f },
+		{ -40000, -4.0f },
+		{ -3999, -3.9f },
+		{ -3000, -3.0f },
+		{ -299, -2.9f },
+		{ -200, -2.0f },
+		{ -10, -1.0f },
+		{ 0, 0.0f },
+		{ 10, 1.0f },
+		{ 200, 2.0f },
+		{ 299, 2.9f },
+		{ 3000, 3.0f },
+		{ 3999, 3.9f },
+		{ 40000, 4.0f },
+		{ 49999, 4.9f },
+		{ 500000, 5.0f },
+		{ 599999, 5.9f },
+		{ 2000000, 20.0f },
+		{ 2925262, 21.0f },
+		{ 2925263, 22.0f },
+		{ 2925264, 23.0f },
+		{ 2925265, 24.0f },
+		{ 2925266, 25.0f },
+		{ 2925267, 26.0f },
+		{ 2925268, 27.0f },
+		{ 2925269, 28.0f },
+		{ 2925270, 29.0f },
+		{ 5000000, 50.0f },
+	};
+
+	ufbxt_assert(scene->metadata.ktime_second == 46186158000);
+
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim_layers.count > 0);
+
+	ufbx_anim_prop *aprop = ufbx_find_anim_prop(scene->anim_layers.data[0], &node->element, "Lcl Translation");
+	ufbxt_assert(aprop);
+
+	ufbx_anim_curve *curve = aprop->anim_value->curves[0];
+	ufbxt_assert(curve);
+
+	for (size_t i = 0; i < ufbxt_arraycount(anim_ref); i++) {
+		ufbxt_frame_ref ref = anim_ref[i];
+		ufbxt_hintf("%zu: (frame %lld)", i, (long long)ref.frame);
+		ufbxt_assert(i < curve->keyframes.count);
+		ufbx_keyframe key = curve->keyframes.data[i];
+
+		bool tick_accurate = true;
+		if (llabs(ref.frame) > 2925270) {
+			tick_accurate = false;
+		}
+
+		int64_t ref_tick = ufbxt_mul_i64(ref.frame, INT64_C(46186158000) / 30);
+		int64_t tick = (int64_t)round(key.time * 46186158000.0);
+		if (tick_accurate) {
+			ufbxt_assert(ref_tick == tick);
+		} else {
+			ufbxt_assert_close_real(err, key.time, (double)ref.frame / 30.0);
+		}
+		ufbxt_assert_close_real(err, key.value, ref.value);
 	}
 }
 #endif

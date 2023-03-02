@@ -97,9 +97,9 @@ static const char *ufbxt_pbr_map_name(ufbx_material_pbr_map map)
 	return 0;
 }
 
-static const char *ufbxt_material_feature_name(ufbx_material_pbr_map map)
+static const char *ufbxt_material_feature_name(ufbx_material_feature feature)
 {
-	switch (map) {
+	switch (feature) {
 	case UFBX_MATERIAL_FEATURE_PBR: return "pbr";
 	case UFBX_MATERIAL_FEATURE_METALNESS: return "metalness";
 	case UFBX_MATERIAL_FEATURE_DIFFUSE: return "diffuse";
@@ -360,10 +360,13 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 			if (!strcmp(dots[2], "texture")) {
 				size_t tok_start = 1;
 				bool content = false;
+				bool absolute = false;
 				for (;;) {
 					const char *tok = tokens[tok_start];
 					if (!strcmp(tok, "content")) {
 						content = true;
+					} else if (!strcmp(tok, "absolute")) {
+						absolute = true;
 					} else {
 						break;
 					}
@@ -372,14 +375,18 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 
 				const char *tex_name = tokens[tok_start];
 				if (map->texture) {
-					if (strcmp(map->texture->relative_filename.data, tex_name) != 0) {
+					ufbx_string tex_filename = map->texture->relative_filename;
+					if (absolute) {
+						tex_filename = map->texture->absolute_filename;
+					}
+					if (strcmp(tex_filename.data, tex_name) != 0) {
 						fprintf(stderr, "%s:%d: Material '%s' %s.%s is different: got '%s', expected '%s'\n", filename, line,
-							material->name.data, dots[0], dots[1], map->texture->relative_filename.data, tex_name);
+							material->name.data, dots[0], dots[1], tex_filename.data, tex_name);
 						ok = false;
 					}
 					if (content && map->texture->content.size == 0) {
 						fprintf(stderr, "%s:%d: Material '%s' %s.%s expected content for the texture %s\n", filename, line,
-							material->name.data, dots[0], dots[1], map->texture->relative_filename.data);
+							material->name.data, dots[0], dots[1], tex_filename.data);
 						ok = false;
 					}
 				} else {

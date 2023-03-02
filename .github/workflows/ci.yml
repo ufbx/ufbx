@@ -68,7 +68,7 @@ jobs:
           path: build/hashdump_ci_linux.txt.gz
 
   ci_windows:
-    runs-on: windows-2019
+    runs-on: windows-2022
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
@@ -82,6 +82,10 @@ jobs:
         run: python misc/run_tests.py tests stack readme threadcheck hashes --runner ci_windows
       - name: Verbose test info
         run: build\runner_vs_cl64_release_x64\runner.exe -d data -v
+      - name: Check C++ tests
+        run: python misc/run_tests.py cpp --compiler vs_cl64
+      - name: Check features
+        run: python misc/run_tests.py features --compiler vs_cl64
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_windows.txt.gz
@@ -103,7 +107,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests stack readme threadcheck hashes --remove-compiler gcc --additional-compiler gcc-11 --remove-arch x86 --runner ci_macos
+        run: python3 misc/run_tests.py tests cpp stack readme threadcheck hashes --remove-compiler gcc --additional-compiler gcc-11 --remove-arch x86 --runner ci_macos
       - name: Compile ufbx as Objective C
         run: clang -Wall -Wextra -Werror -ObjC -c ufbx.c -o build/ufbx-objc.o
       - name: Compress hashdumps
@@ -115,6 +119,17 @@ jobs:
         with:
           name: hash-dumps
           path: build/hashdump_ci_macos.txt.gz
+
+  ci_cpp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Update apt
+        run: sudo apt-get update
+      - name: Install apt dependencies
+        run: sudo apt-get install -y gcc-multilib g++-multilib llvm-11
+      - name: Run tests
+        run: python3 misc/run_tests.py cpp --heavy
 
   ci_picort:
     runs-on: ubuntu-latest
@@ -156,8 +171,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Compile feature permutations
+      - name: Update apt
+        run: sudo apt-get update
+      - name: Install apt dependencies
+        run: sudo apt-get install -y tcc
+      - name: Compile feature permutations (limited, Clang+GCC)
         run: python misc/run_tests.py features
+      - name: Compile feature permutations (exhaustive, TCC)
+        run: python misc/run_tests.py features --heavy --additional-compiler tcc --compiler tcc
 
   ci_analysis:
     runs-on: ubuntu-latest
