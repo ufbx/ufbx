@@ -157,6 +157,8 @@ def gather_dataset_tasks(root_dir, heavy):
                     append_unique_opt(options, "space-conversion", [
                         "transform-root", "adjust-transforms",
                     ])
+                elif feature == "ignore-missing-external":
+                    options["ignore-missing-external"] = [True]
                 else:
                     raise RuntimeError(f"Unknown feature: {feature}")
 
@@ -261,7 +263,10 @@ if __name__ == "__main__":
 
                 args = case_args[:]
                 for k,v in opts:
-                    args += [f"--{k}", v]
+                    if v is True:
+                        args += [f"--{k}"]
+                    else:
+                        args += [f"--{k}", v]
 
                 log("$ " + " ".join(args))
                 log()

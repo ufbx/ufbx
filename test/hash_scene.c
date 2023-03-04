@@ -87,6 +87,7 @@ static ufbx_scene *load_scene(const char *filename, int frame, ufbxt_hasher_opts
 {
 	ufbx_load_opts opts = { 0 };
 	opts.load_external_files = true;
+	opts.ignore_missing_external_files = true;
 	opts.evaluate_caches = true;
 	opts.evaluate_skinning = true;
 	opts.target_axes = ufbx_axes_right_handed_y_up;
@@ -112,7 +113,7 @@ static ufbx_scene *load_scene(const char *filename, int frame, ufbxt_hasher_opts
 		eval_opts.evaluate_skinning = true;
 		eval_opts.load_external_files = true;
 
-		double time = scene->anim.time_begin + frame / scene->settings.frames_per_second;
+		double time = scene->anim->time_begin + frame / scene->settings.frames_per_second;
 		ufbx_scene *state = ufbx_evaluate_scene(scene, NULL, time, NULL, &error);
 		if (!state) {
 			fprintf(stderr, "Failed to evaluate scene: %s\n", error.description.data);

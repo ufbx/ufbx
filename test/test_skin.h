@@ -31,7 +31,7 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_norm
 	opts.evaluate_caches = true;
 	opts.load_external_files = true;
 
-	ufbx_anim anim = scene->anim;
+	ufbx_anim *anim = scene->anim;
 
 	if (anim_name) {
 		for (size_t i = 0; i < scene->anim_stacks.count; i++) {
@@ -44,7 +44,7 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_norm
 		}
 	}
 
-	ufbx_scene *eval = ufbx_evaluate_scene(scene, &anim, time, &opts, NULL);
+	ufbx_scene *eval = ufbx_evaluate_scene(scene, anim, time, &opts, NULL);
 	ufbxt_assert(eval);
 
 	ufbxt_check_scene(eval);
@@ -224,10 +224,10 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 			double time = frame[0];
 			ufbx_real ref = (ufbx_real)frame[1 + chan_ix];
 
-			ufbx_real weight = ufbx_evaluate_blend_weight(&scene->anim, chan, time);
+			ufbx_real weight = ufbx_evaluate_blend_weight(scene->anim, chan, time);
 			ufbxt_assert_close_real(err, weight, ref);
 
-			ufbx_prop prop = ufbx_evaluate_prop(&scene->anim, &chan->element, "DeformPercent", time);
+			ufbx_prop prop = ufbx_evaluate_prop(scene->anim, &chan->element, "DeformPercent", time);
 			ufbxt_assert_close_real(err, prop.value_real / 100.0f, ref);
 		}
 	}
@@ -250,7 +250,7 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 
 			opts.evaluate_skinning = eval_skin != 0;
 
-			ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, time, &opts, NULL);
+			ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, &opts, NULL);
 			ufbxt_assert(state);
 
 			ufbx_real weights[2];
@@ -260,7 +260,7 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 				ufbx_blend_channel *chan = state->blend_channels.data[top[chan_ix]->typed_id];
 				ufbxt_assert(chan);
 
-				ufbx_prop prop = ufbx_evaluate_prop(&scene->anim, &chan->element, "DeformPercent", time);
+				ufbx_prop prop = ufbx_evaluate_prop(scene->anim, &chan->element, "DeformPercent", time);
 
 				ufbxt_assert_close_real(err, prop.value_real / 100.0, ref);
 				ufbxt_assert_close_real(err, chan->weight, ref);
@@ -403,9 +403,10 @@ UFBXT_FILE_TEST(maya_bone_radius)
 	for (size_t i = 1; i < scene->nodes.count; i++) {
 		ufbx_node *node = scene->nodes.data[i];
 		ufbxt_assert(strstr(node->name.data, "joint"));
-		ufbxt_assert(node->bone);
-		ufbxt_assert_close_real(err, node->bone->radius, (ufbx_real)i * 0.2f);
-		ufbxt_assert_close_real(err, node->bone->relative_length, 1.0f);
+		ufbx_bone *bone = ufbx_as_bone(node->attrib);
+		ufbxt_assert(bone);
+		ufbxt_assert_close_real(err, bone->radius, (ufbx_real)i * 0.2f);
+		ufbxt_assert_close_real(err, bone->relative_length, 1.0f);
 	}
 }
 #endif
@@ -420,18 +421,19 @@ UFBXT_FILE_TEST(blender_279_bone_radius)
 		node = node->children.data[0];
 
 		ufbxt_assert(strstr(node->name.data, "Bone"));
-		ufbxt_assert(node->bone);
+		ufbx_bone *bone = ufbx_as_bone(node->attrib);
+		ufbxt_assert(bone);
 
 		// Blender end bones have some weird scaling factor
 		// TODO: Add quirks mode for this?
 		if (strstr(node->name.data, "end")) continue;
 
 		if (scene->metadata.ascii) {
-			ufbxt_assert_close_real(err, node->bone->radius, 1.0f);
+			ufbxt_assert_close_real(err, bone->radius, 1.0f);
 		} else {
-			ufbxt_assert_close_real(err, node->bone->radius, (ufbx_real)(i + 1) * 0.1f);
+			ufbxt_assert_close_real(err, bone->radius, (ufbx_real)(i + 1) * 0.1f);
 		}
-		ufbxt_assert_close_real(err, node->bone->relative_length, 1.0f);
+		ufbxt_assert_close_real(err, bone->relative_length, 1.0f);
 	}
 }
 #endif

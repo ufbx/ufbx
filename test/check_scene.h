@@ -327,7 +327,6 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	case UFBX_ELEMENT_MESH: ufbxt_assert(node->mesh); break;
 	case UFBX_ELEMENT_LIGHT: ufbxt_assert(node->light); break;
 	case UFBX_ELEMENT_CAMERA: ufbxt_assert(node->camera); break;
-	case UFBX_ELEMENT_BONE: ufbxt_assert(node->bone); break;
 	default: /* No shorthand */ break;
 	}
 
@@ -946,10 +945,19 @@ static void ufbxt_check_shader_binding(ufbx_scene *scene, ufbx_shader_binding *b
 
 static void ufbxt_check_anim(ufbx_scene *scene, ufbx_anim *anim)
 {
+	ufbxt_assert(anim);
 	for (size_t i = 0; i < anim->layers.count; i++) {
-		ufbxt_check_element_ptr(scene, anim->layers.data[i].layer, UFBX_ELEMENT_ANIM_LAYER);
+		ufbxt_check_element_ptr(scene, anim->layers.data[i], UFBX_ELEMENT_ANIM_LAYER);
 	}
-	ufbxt_assert(anim->prop_overrides.count == 0);
+	for (size_t i = 0; i < anim->overrides.count; i++) {
+		ufbx_prop_override *over = &anim->overrides.data[i];
+		ufbxt_check_string(over->prop_name);
+		ufbxt_check_string(over->value_str);
+	}
+	if (!anim->custom) {
+		ufbxt_assert(anim->overrides.count == 0);
+		ufbxt_assert(anim->override_layer_weights.count == 0);
+	}
 }
 
 static void ufbxt_check_anim_stack(ufbx_scene *scene, ufbx_anim_stack *anim_stack)

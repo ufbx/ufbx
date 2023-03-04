@@ -205,7 +205,7 @@ UFBXT_FILE_TEST(maya_anim_light)
 		const ufbxt_anim_light_ref *ref = &refs[i];
 
 		double time = ref->frame * (1.0/24.0);
-		ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, time, NULL, NULL);
+		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, NULL, NULL);
 		ufbxt_assert(state);
 
 		ufbxt_check_scene(state);
@@ -226,17 +226,35 @@ UFBXT_FILE_TEST(maya_anim_light)
 		ufbxt_assert(node && node->light);
 		uint32_t element_id = node->light->element.element_id;
 
-		ufbx_prop_override overrides[] = {
-			{ element_id, "Intensity", { (ufbx_real)10.0 } },
-			{ element_id, "Color", { (ufbx_real)0.3, (ufbx_real)0.6, (ufbx_real)0.9 } },
-			{ element_id, "|NewProp", { 10, 20, 30 }, "Test" },
-			{ element_id, "IntProp", { 0, 0, 0 }, "", 15 },
+		ufbx_prop_override_desc overrides[] = {
+			{ element_id, { "Intensity", SIZE_MAX }, { (ufbx_real)10.0 } },
+			{ element_id, { "Color", SIZE_MAX }, { (ufbx_real)0.3, (ufbx_real)0.6, (ufbx_real)0.9 } },
+			{ element_id, { "|NewProp", SIZE_MAX }, { 10, 20, 30 }, { "Test", SIZE_MAX } },
+			{ element_id, { "IntProp", SIZE_MAX }, { 0, 0, 0 }, { "", SIZE_MAX }, 15 },
 		};
 
-		ufbx_anim anim = scene->anim;
-		anim.prop_overrides = ufbx_prepare_prop_overrides(overrides, ufbxt_arraycount(overrides));
+		uint32_t layers[32];
+		size_t num_layers = scene->anim->layers.count;
+		for (size_t i = 0; i < num_layers; i++) {
+			layers[i] = scene->anim->layers.data[i]->typed_id;
+		}
 
-		ufbx_scene *state = ufbx_evaluate_scene(scene, &anim, 1.0f, NULL, NULL);
+		ufbx_anim_opts opts = { 0 };
+		opts.layer_ids.data = layers;
+		opts.layer_ids.count = num_layers;
+		opts.overrides.data = overrides;
+		opts.overrides.count = ufbxt_arraycount(overrides);
+
+		ufbx_error error;
+		ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
+		if (!anim) {
+			ufbxt_log_error(&error);
+		}
+		ufbxt_assert(anim);
+
+		ufbxt_check_anim(scene, anim);
+
+		ufbx_scene *state = ufbx_evaluate_scene(scene, anim, 1.0f, NULL, NULL);
 		ufbxt_assert(state);
 
 		ufbxt_check_scene(state);
@@ -269,28 +287,30 @@ UFBXT_FILE_TEST(maya_anim_light)
 		{
 			ufbx_element *original_light = &node->light->element;
 
-			ufbx_prop color = ufbx_evaluate_prop(&anim, original_light, "Color", 1.0);
+			ufbx_prop color = ufbx_evaluate_prop(anim, original_light, "Color", 1.0);
 			ufbxt_assert((color.flags & UFBX_PROP_FLAG_OVERRIDDEN) != 0);
 			ufbxt_assert_close_vec3(err, color.value_vec3, ref_color);
 
-			ufbx_prop intensity = ufbx_evaluate_prop(&anim, original_light, "Intensity", 1.0);
+			ufbx_prop intensity = ufbx_evaluate_prop(anim, original_light, "Intensity", 1.0);
 			ufbxt_assert((intensity.flags & UFBX_PROP_FLAG_OVERRIDDEN) != 0);
 			ufbxt_assert_close_real(err, intensity.value_real, 10.0f);
 
 			ufbx_vec3 ref_new = { 10, 20, 30 };
-			ufbx_prop new_prop = ufbx_evaluate_prop(&anim, original_light, "|NewProp", 1.0);
+			ufbx_prop new_prop = ufbx_evaluate_prop(anim, original_light, "|NewProp", 1.0);
 			ufbxt_assert((new_prop.flags & UFBX_PROP_FLAG_OVERRIDDEN) != 0);
 			ufbxt_assert(!strcmp(new_prop.value_str.data, "Test"));
 			ufbxt_assert(new_prop.value_int == 10);
 			ufbxt_assert_close_vec3(err, new_prop.value_vec3, ref_new);
 
-			ufbx_prop int_prop = ufbx_evaluate_prop(&anim, original_light, "IntProp", 1.0);
+			ufbx_prop int_prop = ufbx_evaluate_prop(anim, original_light, "IntProp", 1.0);
 			ufbxt_assert((int_prop.flags & UFBX_PROP_FLAG_OVERRIDDEN) != 0);
 			ufbxt_assert_close_real(err, int_prop.value_real, 15.0f);
 			ufbxt_assert(int_prop.value_int == 15);
 		}
 
 		ufbx_free_scene(state);
+
+		ufbx_free_anim(anim);
 	}
 
 	{
@@ -359,12 +379,12 @@ UFBXT_FILE_TEST(maya_transform_animation)
 		const ufbxt_anim_transform_ref *ref = &refs[i];
 		double time = ref->frame * (1.0/24.0);
 
-		ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, time, NULL, NULL);
+		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, NULL, NULL);
 		ufbxt_assert(state);
 		ufbxt_check_scene(state);
 
 		ufbx_transform t1 = state->nodes.data[node->element.typed_id]->local_transform;
-		ufbx_transform t2 = ufbx_evaluate_transform(&scene->anim, node, time);
+		ufbx_transform t2 = ufbx_evaluate_transform(scene->anim, node, time);
 
 		ufbx_vec3 t1_euler = ufbx_quat_to_euler(t1.rotation, UFBX_ROTATION_ORDER_XYZ);
 		ufbx_vec3 t2_euler = ufbx_quat_to_euler(t2.rotation, UFBX_ROTATION_ORDER_XYZ);
@@ -389,22 +409,40 @@ UFBXT_FILE_TEST(maya_transform_animation)
 		ref.scale.y = 3.0f;
 		ref.scale.z = 4.0f;
 
-		ufbx_prop_override overrides[] = {
-			{ element_id, "Color", { (ufbx_real)0.3, (ufbx_real)0.6, (ufbx_real)0.9 } },
-			{ element_id, "|NewProp", { 10, 20, 30 }, "Test", },
-			{ element_id, "Lcl Scaling", { 2.0f, 3.0f, 4.0f } },
-			{ element_id, "RotationOffset", { -0.1f, -0.2f, -0.3f } },
+		ufbx_prop_override_desc overrides[] = {
+			{ element_id, { "Color", SIZE_MAX }, { (ufbx_real)0.3, (ufbx_real)0.6, (ufbx_real)0.9 } },
+			{ element_id, { "|NewProp", SIZE_MAX }, { 10, 20, 30 }, { "Test", SIZE_MAX }, },
+			{ element_id, { "Lcl Scaling", SIZE_MAX }, { 2.0f, 3.0f, 4.0f } },
+			{ element_id, { "RotationOffset", SIZE_MAX }, { -0.1f, -0.2f, -0.3f } },
 		};
 
+		uint32_t layers[32];
+		size_t num_layers = scene->anim->layers.count;
+		for (size_t i = 0; i < num_layers; i++) {
+			layers[i] = scene->anim->layers.data[i]->typed_id;
+		}
+
+		ufbx_anim_opts opts = { 0 };
+		opts.layer_ids.data = layers;
+		opts.layer_ids.count = num_layers;
+		opts.overrides.data = overrides;
+		opts.overrides.count = ufbxt_arraycount(overrides);
+
+		ufbx_error error;
+		ufbx_anim *anim = ufbx_create_anim(scene, &opts, NULL);
+		if (!anim) {
+			ufbxt_log_error(&error);
+		}
+		ufbxt_assert(anim);
+		ufbxt_check_anim(scene, anim);
+
 		double time = 14.0/24.0;
-		ufbx_anim anim = scene->anim;
-		anim.prop_overrides = ufbx_prepare_prop_overrides(overrides, ufbxt_arraycount(overrides));
-		ufbx_scene *state = ufbx_evaluate_scene(scene, &anim, time, NULL, NULL);
+		ufbx_scene *state = ufbx_evaluate_scene(scene, anim, time, NULL, NULL);
 		ufbxt_assert(state);
 		ufbxt_check_scene(state);
 
 		ufbx_transform t1 = state->nodes.data[node->element.typed_id]->local_transform;
-		ufbx_transform t2 = ufbx_evaluate_transform(&anim, node, time);
+		ufbx_transform t2 = ufbx_evaluate_transform(anim, node, time);
 
 		ufbx_vec3 t1_euler = ufbx_quat_to_euler(t1.rotation, UFBX_ROTATION_ORDER_XYZ);
 		ufbx_vec3 t2_euler = ufbx_quat_to_euler(t2.rotation, UFBX_ROTATION_ORDER_XYZ);
@@ -417,6 +455,7 @@ UFBXT_FILE_TEST(maya_transform_animation)
 		ufbxt_assert_close_vec3(err, ref.scale, t2.scale);
 
 		ufbx_free_scene(state);
+		ufbx_free_anim(anim);
 	}
 }
 #endif
@@ -493,7 +532,7 @@ UFBXT_FILE_TEST(maya_cube_blinky)
 
 	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
 		double time = refs[i].time / 24.0;
-		ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, time, NULL, NULL);
+		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, NULL, NULL);
 		ufbxt_assert(state);
 
 		ufbxt_check_scene(state);
@@ -562,7 +601,7 @@ UFBXT_FILE_TEST(maya_anim_interpolation)
 		ufbxt_anim_ref ref = anim_ref[i];
 		ufbxt_hintf("%zu: %f (frame %.2f)", i, ref.time, ref.time * 30.0f);
 
-		ufbx_prop p = ufbx_evaluate_prop(&scene->anim, &node->element, "Lcl Translation", ref.time);
+		ufbx_prop p = ufbx_evaluate_prop(scene->anim, &node->element, "Lcl Translation", ref.time);
 		ufbxt_assert_close_real(err, p.value_vec3.x, ref.value);
 	}
 }
@@ -691,3 +730,82 @@ UFBXT_FILE_TEST(maya_long_keyframes)
 }
 #endif
 
+UFBXT_FILE_TEST_ALT(anim_override_utf8, blender_279_default)
+#if UFBXT_IMPL
+{
+	ufbx_node *cube = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(cube);
+	uint32_t cube_id = cube->element_id;
+
+	ufbx_string good_strings[] = {
+		{ NULL, 0 },
+		{ "", 0 },
+		{ "", SIZE_MAX },
+		{ "a", 1 },
+		{ "a", SIZE_MAX },
+	};
+
+	ufbx_string bad_strings[] = {
+		{ "\0", 1 },
+		{ "\xff", 1 },
+		{ "\xff", SIZE_MAX },
+		{ "a\xff", 2 },
+		{ "a\xff", SIZE_MAX },
+	};
+
+	for (size_t i = 0; i < ufbxt_arraycount(good_strings); i++) {
+		for (int do_value = 0; do_value <= 1; do_value++) {
+			ufbxt_hintf("i=%zu, do_value=%d", i, do_value);
+
+			ufbx_prop_override_desc over = { cube_id };
+
+			over.prop_name.data = "prop";
+			over.prop_name.length = 4;
+
+			if (do_value) {
+				over.value_str = good_strings[i];
+			} else {
+				over.prop_name = good_strings[i];
+			}
+
+			ufbx_anim_opts opts = { 0 };
+			opts.overrides.data = &over;
+			opts.overrides.count = 1;
+
+			ufbx_error error;
+			ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
+			if (!anim) {
+				ufbxt_log_error(&error);
+			}
+			ufbxt_assert(anim);
+			ufbx_free_anim(anim);
+		}
+	}
+
+	for (size_t i = 0; i < ufbxt_arraycount(bad_strings); i++) {
+		for (int do_value = 0; do_value <= 1; do_value++) {
+			ufbxt_hintf("i=%zu, do_value=%d", i, do_value);
+
+			ufbx_prop_override_desc over = { cube_id };
+
+			over.prop_name.data = "prop";
+			over.prop_name.length = 4;
+
+			if (do_value) {
+				over.value_str = bad_strings[i];
+			} else {
+				over.prop_name = bad_strings[i];
+			}
+
+			ufbx_anim_opts opts = { 0 };
+			opts.overrides.data = &over;
+			opts.overrides.count = 1;
+
+			ufbx_error error;
+			ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
+			ufbxt_assert(!anim);
+			ufbxt_assert(error.type == UFBX_ERROR_INVALID_UTF8);
+		}
+	}
+}
+#endif

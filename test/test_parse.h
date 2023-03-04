@@ -228,9 +228,10 @@ UFBXT_FILE_TEST(maya_node_attribute_zoo)
 	node = ufbx_find_node(scene, "Bone");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_BONE);
 	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_BONE);
-	ufbxt_assert(&node->bone->element == node->attrib);
-	ufbxt_assert_close_real(err, node->bone->radius, 0.5f);
-	ufbxt_assert_close_real(err, node->bone->relative_length, 1.0f);
+	ufbx_bone *bone = ufbx_as_bone(node->attrib);
+	ufbxt_assert(bone);
+	ufbxt_assert_close_real(err, bone->radius, 0.5f);
+	ufbxt_assert_close_real(err, bone->relative_length, 1.0f);
 
 	node = ufbx_find_node(scene, "Camera");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_CAMERA);
@@ -255,8 +256,8 @@ UFBXT_FILE_TEST(maya_node_attribute_zoo)
 	ufbx_stereo_camera *stereo = (ufbx_stereo_camera*)node->attrib;
 	ufbxt_assert(stereo->left && stereo->left->element.type == UFBX_ELEMENT_CAMERA);
 	ufbxt_assert(stereo->right && stereo->right->element.type == UFBX_ELEMENT_CAMERA);
-	ufbx_prop left_focal_prop = ufbx_evaluate_prop(&scene->anim, &stereo->left->element, "FocalLength", 0.5);
-	ufbx_prop right_focal_prop = ufbx_evaluate_prop(&scene->anim, &stereo->right->element, "FocalLength", 0.5);
+	ufbx_prop left_focal_prop = ufbx_evaluate_prop(scene->anim, &stereo->left->element, "FocalLength", 0.5);
+	ufbx_prop right_focal_prop = ufbx_evaluate_prop(scene->anim, &stereo->right->element, "FocalLength", 0.5);
 	ufbxt_assert_close_real(err, left_focal_prop.value_real, 42.011f);
 	ufbxt_assert_close_real(err, right_focal_prop.value_real, 42.011f);
 
@@ -1338,7 +1339,7 @@ UFBXT_FILE_TEST(synthetic_recursive_connections)
 		ufbxt_assert((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0);
 
 		ufbx_vec3 ref = { 1.0f, 0.0f, 0.0f };
-		ufbx_prop value = ufbx_evaluate_prop(&scene->anim, &node->element, "Lcl Translation", 0.5);
+		ufbx_prop value = ufbx_evaluate_prop(scene->anim, &node->element, "Lcl Translation", 0.5);
 		ufbxt_assert_close_vec3(err, value.value_vec3, ref);
 	}
 
@@ -1351,7 +1352,7 @@ UFBXT_FILE_TEST(synthetic_recursive_connections)
 		ufbxt_assert((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0);
 
 		ufbx_vec3 ref = { 0.0f, 0.0f, 1.0f };
-		ufbx_prop value = ufbx_evaluate_prop(&scene->anim, &node->element, "Lcl Translation", 0.5);
+		ufbx_prop value = ufbx_evaluate_prop(scene->anim, &node->element, "Lcl Translation", 0.5);
 		ufbxt_assert_close_vec3(err, value.value_vec3, ref);
 	}
 }
@@ -1364,22 +1365,38 @@ UFBXT_FILE_TEST(synthetic_rotation_order_layers)
 	ufbx_anim_layer *layer_base = ufbx_as_anim_layer(ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "Base"));
 	ufbx_anim_layer *layer_rotation = ufbx_as_anim_layer(ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "Rotation"));
 
-	ufbx_anim_layer_desc layers[] = {
-		{ layer_base_layer, 1.0f },
-		{ layer_base, 0.5f },
-		{ layer_rotation, 0.25f },
+	uint32_t layer_ids[] = {
+		layer_base_layer->typed_id,
+		layer_base->typed_id,
+		layer_rotation->typed_id,
 	};
 
-	ufbx_anim anim = { 0 };
-	anim.layers.data = layers;
-	anim.layers.count = ufbxt_arraycount(layers);
+	ufbx_real layer_weights[] = {
+		1.0f, 0.5f, 0.25f,
+	};
+
+	ufbx_anim_opts opts = { 0 };
+	opts.layer_ids.data = layer_ids;
+	opts.layer_ids.count = ufbxt_arraycount(layer_ids);
+	opts.override_layer_weights.data = layer_weights;
+	opts.override_layer_weights.count = ufbxt_arraycount(layer_weights);
+
+	ufbx_error error;
+	ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
+	if (!anim) {
+		ufbxt_log_error(&error);
+	}
+	ufbxt_assert(anim);
+	ufbxt_check_anim(scene, anim);
 
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node);
 
 	// We don't really care about the result here as runtime rotation order is not really supported,
 	// just want to make sure we don't hit any infinite recursion with rotation order layers
-	(void)ufbx_evaluate_prop(&anim, &node->element, "Lcl Rotation", 0.2f);
+	(void)ufbx_evaluate_prop(anim, &node->element, "Lcl Rotation", 0.2f);
+
+	ufbx_free_anim(anim);
 }
 #endif
 

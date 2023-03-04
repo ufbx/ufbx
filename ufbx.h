@@ -162,11 +162,13 @@ struct ufbx_converter { };
 	#define UFBX_ENUM_FORCE_WIDTH(p_prefix)
 	#define UFBX_FLAG_REPR : int
 	#define UFBX_FLAG_FORCE_WIDTH(p_prefix)
+	#define UFBX_HAS_FORCE_32BIT 0
 #else
 	#define UFBX_ENUM_REPR
 	#define UFBX_ENUM_FORCE_WIDTH(p_prefix) p_prefix##_FORCE_32BIT = 0x7fffffff
 	#define UFBX_FLAG_REPR
 	#define UFBX_FLAG_FORCE_WIDTH(p_prefix) p_prefix##_FORCE_32BIT = 0x7fffffff
+	#define UFBX_HAS_FORCE_32BIT 1
 #endif
 
 #define UFBX_ENUM_TYPE(p_name, p_prefix, p_last) \
@@ -263,7 +265,7 @@ typedef struct ufbx_quat {
 
 // Order in which Euler-angle rotation axes are applied for a transform
 // NOTE: The order in the name refers to the order of axes *applied*,
-// not the multiplication order: eg. `UFBX_ROTATION_XYZ` is `Z*Y*X`
+// not the multiplication order: eg. `UFBX_ROTATION_ORDER_XYZ` is `Z*Y*X`
 // [TODO: Figure out what the spheric rotation order is...]
 typedef enum ufbx_rotation_order UFBX_ENUM_REPR {
 	UFBX_ROTATION_ORDER_XYZ,
@@ -459,7 +461,9 @@ typedef enum ufbx_prop_flags UFBX_FLAG_REPR {
 // Single property with name/type/value.
 struct ufbx_prop {
 	ufbx_string name;
+
 	uint32_t _internal_key;
+
 	ufbx_prop_type type;
 	ufbx_prop_flags flags;
 
@@ -738,13 +742,15 @@ struct ufbx_node {
 	// List of child nodes parented to this node.
 	ufbx_node_list children;
 
-	// Attached element type and typed pointers.
+	// Common attached element type and typed pointers. Set to `NULL` if not in
+	// use, so checking `attrib_type` is not required.
 	//
-	// Set to `NULL` if not in use, so checking `attrib_type` is not required.
+	// HINT: If you need less common attributes access `ufbx_node.attrib`, you
+	// can use utility functions like `ufbx_as_nurbs_curve(attrib)` to convert
+	// and check the attribute in one step.
 	ufbx_nullable ufbx_mesh *mesh;
 	ufbx_nullable ufbx_light *light;
 	ufbx_nullable ufbx_camera *camera;
-	ufbx_nullable ufbx_bone *bone;
 
 	// Less common attributes use these fields.
 	//
@@ -1138,7 +1144,7 @@ struct ufbx_mesh {
 	// NOTE: UV/tangent/bitangent and color are the from first sets,
 	// use `uv_sets/color_sets` to access the other layers.
 	ufbx_vertex_vec3 vertex_position;  // < Vertex positions
-	ufbx_vertex_vec3 vertex_normal;    // < (optional) Normal vectors (TODO: Generate?)
+	ufbx_vertex_vec3 vertex_normal;    // < (optional) Normal vectors, always defined if `ufbx_load_opts.generate_missing_normals`
 	ufbx_vertex_vec2 vertex_uv;        // < (optional) UV / texture coordinates
 	ufbx_vertex_vec3 vertex_tangent;   // < (optional) Tangent vector in UV.x direction
 	ufbx_vertex_vec3 vertex_bitangent; // < (optional) Tangent vector in UV.y direction
@@ -1484,7 +1490,7 @@ struct ufbx_empty {
 
 // -- Node attributes (curves/surfaces)
 
-// Segment of a `ufbx_line_curve`, indices refer to `ufbx_line_curve.point_indces[]`
+// Segment of a `ufbx_line_curve`, indices refer to `ufbx_line_curve.point_indices[]`
 typedef struct ufbx_line_segment {
 	uint32_t index_begin;
 	uint32_t num_indices;
@@ -1553,7 +1559,7 @@ typedef struct ufbx_nurbs_basis {
 	// `order`. If for example `num_wrap_control_points == 3` you should repeat
 	// the first 3 control points after the end.
 	// HINT: You don't need to worry about this if you use ufbx functions
-	// like `ufbx_evaluate_nurbs_curve_point()` as they handle this internally.
+	// like `ufbx_evaluate_nurbs_curve()` as they handle this internally.
 	size_t num_wrap_control_points;
 
 	// `true` if the parametrization is well defined.
@@ -1602,7 +1608,7 @@ struct ufbx_nurbs_surface {
 	// them by `w` before evaluating the surface.
 	ufbx_vec4_list control_points;
 
-	// How many segments tessellate each step in `ufbx_nurbs_basis.steps`.
+	// How many segments tessellate each span in `ufbx_nurbs_basis.spans`.
 	uint32_t span_subdivision_u;
 	uint32_t span_subdivision_v;
 
@@ -1710,7 +1716,7 @@ typedef struct ufbx_lod_level {
 
 	// Minimum distance to show this LOD level.
 	// NOTE: In world units by default, or in screen percentage if
-	// `ufbx_lod_group.relative_thresholds` is set.
+	// `ufbx_lod_group.relative_distances` is set.
 	ufbx_real distance;
 
 	// LOD display mode.
@@ -1908,6 +1914,9 @@ struct ufbx_blend_channel {
 	// Key morph targets to blend between depending on `weight`
 	// In usual cases there's only one target per channel
 	ufbx_blend_keyframe_list keyframes;
+
+	// Final blend shape ignoring any intermediate blend shapes.
+	ufbx_blend_shape *target_shape;
 };
 
 // Blend shape target containing the actual vertex offsets
@@ -2539,7 +2548,7 @@ typedef enum ufbx_shader_texture_type UFBX_ENUM_REPR {
 	UFBX_SHADER_TEXTURE_UNKNOWN,
 
 	// Select an output of a multi-output shader.
-	// HINT: If this type is used the `ufbx_shader_texture_texture` and
+	// HINT: If this type is used the `ufbx_shader_texture.main_texture` and
 	// `ufbx_shader_texture.main_texture_output_index` fields are set.
 	UFBX_SHADER_TEXTURE_SELECT_OUTPUT,
 
@@ -2766,45 +2775,46 @@ struct ufbx_shader_binding {
 
 // -- Animation
 
-typedef struct ufbx_anim_layer_desc {
-	ufbx_anim_layer *layer;
-	ufbx_real weight;
-} ufbx_anim_layer_desc;
-
-UFBX_LIST_TYPE(ufbx_const_anim_layer_desc_list, const ufbx_anim_layer_desc);
-
 typedef struct ufbx_prop_override {
-	// Element (`ufbx_element.id`) to override the property from
-	// NOTE: You can get this from typed structs eg. `my_node->element.id`
 	uint32_t element_id;
 
-	// Property name to override.
-	const char *prop_name;
-
-	// Override value, use `value.x` for scalars. `value_int` is initialized
-	// from `value.x` if zero so keep `value` zeroed even if you don't need it!
-	ufbx_vec3 value;
-	const char *value_str;
-	int64_t value_int;
-
-	// Internal: Gets filled automatically by `ufbx_prepare_prop_overrides()`
 	uint32_t _internal_key;
+
+	ufbx_string prop_name;
+	ufbx_vec4 value;
+	ufbx_string value_str;
+	int64_t value_int;
 } ufbx_prop_override;
 
-UFBX_LIST_TYPE(ufbx_const_prop_override_list, const ufbx_prop_override);
+UFBX_LIST_TYPE(ufbx_prop_override_list, ufbx_prop_override);
 
+// Animation descriptor used for evaluating animation.
+// Usually obtained from `ufbx_scene` via either global animation `ufbx_scene.anim`,
+// per-stack animation `ufbx_anim_stack.anim` or per-layer animation `ufbx_anim_layer.anim`.
+//
+// For advanced usage you can use `ufbx_create_anim()` to create animation descriptors
+// with custom layers, property overrides, special flags, etc.
 typedef struct ufbx_anim {
-	ufbx_const_anim_layer_desc_list layers;
 
-	// Override individual `ufbx_prop` values from elements
-	// NOTE: Call `ufbx_prepare_prop_overrides()` to obtain this!
-	ufbx_const_prop_override_list prop_overrides;
-
-	bool ignore_connections;
-
-	// Not used by evaluation
+	// Time begin/end for the animation, both may be zero if absent.
 	double time_begin;
 	double time_end;
+
+	// List of layers in the animation.
+	ufbx_anim_layer_list layers;
+
+	// Optional overrides for weights for each layer in `layers[]`.
+	ufbx_real_list override_layer_weights;
+
+	// Sorted by `element_id, prop_name`
+	ufbx_prop_override_list overrides;
+
+	// Evaluate connected properties as if they would not be connected.
+	bool ignore_connections;
+
+	// Custom `ufbx_anim` created by `ufbx_create_anim()`.
+	bool custom;
+
 } ufbx_anim;
 
 struct ufbx_anim_stack {
@@ -2819,12 +2829,14 @@ struct ufbx_anim_stack {
 	double time_end;
 
 	ufbx_anim_layer_list layers;
-	ufbx_anim anim;
+	ufbx_anim *anim;
 };
 
 typedef struct ufbx_anim_prop {
 	ufbx_element *element;
+
 	uint32_t _internal_key;
+
 	ufbx_string prop_name;
 	ufbx_anim_value *anim_value;
 } ufbx_anim_prop;
@@ -2849,7 +2861,7 @@ struct ufbx_anim_layer {
 	ufbx_anim_value_list anim_values;
 	ufbx_anim_prop_list anim_props; // < Sorted by `element,prop_name`
 
-	ufbx_anim anim;
+	ufbx_anim *anim;
 
 	uint32_t _min_element_id;
 	uint32_t _max_element_id;
@@ -3107,7 +3119,9 @@ struct ufbx_metadata_object {
 typedef struct ufbx_name_element {
 	ufbx_string name;
 	ufbx_element_type type;
+
 	uint32_t _internal_key;
+
 	ufbx_element *element;
 } ufbx_name_element;
 
@@ -3225,7 +3239,7 @@ typedef struct ufbx_metadata {
 	bool may_contain_no_index;
 
 	// May contain `ufbx_mesh_material` entries where `ufbx_mesh_material.material == NULL`.
-	// NOTE: The corresponding `ufbx_node.material[]` will be empty in this case.
+	// NOTE: The corresponding `ufbx_node.materials[]` will be empty in this case.
 	bool may_contain_null_materials;
 
 	// May contain meshes with no defined vertex position.
@@ -3368,10 +3382,7 @@ struct ufbx_scene {
 	ufbx_node *root_node;
 
 	// Default animation descriptor
-	ufbx_anim anim;
-
-	// All animation stacks combined
-	ufbx_anim combined_anim;
+	ufbx_anim *anim;
 
 	union {
 		struct {
@@ -3664,6 +3675,10 @@ typedef enum ufbx_error_type UFBX_ENUM_REPR {
 	// File not found.
 	UFBX_ERROR_FILE_NOT_FOUND,
 
+	// External file not found.
+	// See `ufbx_load_opts.load_external_files` for more information.
+	UFBX_ERROR_EXTERNAL_FILE_NOT_FOUND,
+
 	// Out of memory (allocator returned `NULL`).
 	UFBX_ERROR_OUT_OF_MEMORY,
 
@@ -3925,6 +3940,9 @@ typedef struct ufbx_load_opts {
 	// NOTE: This only applies to files *implicitly* referenced by the scene, if
 	// you request additional files via eg. `ufbx_load_opts.obj_mtl_path` they
 	// are still loaded.
+	// NOTE: Will fail loading if any external files are not found by default, use
+	// `ufbx_load_opts.ignore_missing_external_files` to suppress this, in this case
+	// you can find the errors at `ufbx_metadata.warnings[]` as `UFBX_WARNING_MISSING_EXTERNAL_FILE`.
 	bool load_external_files;
 
 	// Don't fail loading if external files are not found.
@@ -4116,6 +4134,45 @@ typedef struct ufbx_evaluate_opts {
 	uint32_t _end_zero;
 } ufbx_evaluate_opts;
 
+UFBX_LIST_TYPE(ufbx_const_uint32_list, const uint32_t);
+UFBX_LIST_TYPE(ufbx_const_real_list, const ufbx_real);
+
+typedef struct ufbx_prop_override_desc {
+	// Element (`ufbx_element.element_id`) to override the property from
+	uint32_t element_id;
+
+	// Property name to override.
+	ufbx_string prop_name;
+
+	// Override value, use `value.x` for scalars. `value_int` is initialized
+	// from `value.x` if zero so keep `value` zeroed even if you don't need it!
+	ufbx_vec4 value;
+	ufbx_string value_str;
+	int64_t value_int;
+} ufbx_prop_override_desc;
+
+UFBX_LIST_TYPE(ufbx_const_prop_override_desc_list, const ufbx_prop_override_desc);
+
+typedef struct ufbx_anim_opts {
+	uint32_t _begin_zero;
+
+	// Animation layers
+	ufbx_const_uint32_list layer_ids;
+
+	// Override layer weights
+	ufbx_const_real_list override_layer_weights;
+
+	// Property overrides
+	ufbx_const_prop_override_desc_list overrides;
+
+	// Ignore connected properties
+	bool ignore_connections;
+
+	ufbx_allocator_opts result_allocator; // < Allocator used to create the `ufbx_anim`
+
+	uint32_t _end_zero;
+} ufbx_anim_opts;
+
 // Options for `ufbx_tessellate_nurbs_curve()`
 // NOTE: Initialize to zero with `{ 0 }` (C) or `{ }` (C++)
 typedef struct ufbx_tessellate_curve_opts {
@@ -4124,7 +4181,7 @@ typedef struct ufbx_tessellate_curve_opts {
 	ufbx_allocator_opts temp_allocator;   // < Allocator used during tessellation
 	ufbx_allocator_opts result_allocator; // < Allocator used for the final line curve
 
-	// How many segments tessellate each step in `ufbx_nurbs_basis.steps`.
+	// How many segments tessellate each span in `ufbx_nurbs_basis.spans`.
 	uint32_t span_subdivision;
 
 	uint32_t _end_zero;
@@ -4138,7 +4195,7 @@ typedef struct ufbx_tessellate_surface_opts {
 	ufbx_allocator_opts temp_allocator;   // < Allocator used during tessellation
 	ufbx_allocator_opts result_allocator; // < Allocator used for the final mesh
 
-	// How many segments tessellate each step in `ufbx_nurbs_basis.steps`.
+	// How many segments tessellate each span in `ufbx_nurbs_basis.spans`.
 	// NOTE: Default is `4`, _not_ `ufbx_nurbs_surface.span_subdivision_u/v` as that
 	// would make it easy to create an FBX file with an absurdly high subdivision
 	// rate (similar to mesh subdivision). Please enforce copy the value yourself
@@ -4207,7 +4264,7 @@ typedef struct ufbx_geometry_cache_opts {
 	uint32_t _end_zero;
 } ufbx_geometry_cache_opts;
 
-// Options for `ufbx_read_geometry_cache_*()`
+// Options for `ufbx_read_geometry_cache_TYPE()`
 // NOTE: Initialize to zero with `{ 0 }` (C) or `{ }` (C++)
 typedef struct ufbx_geometry_cache_data_opts {
 	uint32_t _begin_zero;
@@ -4426,8 +4483,6 @@ ufbx_abi ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, const ufbx_elemen
 ufbx_abi ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *node, double time);
 ufbx_abi ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time);
 
-ufbx_abi ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_override *overrides, size_t num_overrides);
-
 // Evaluate the whole `scene` at a specific `time` in the animation `anim`.
 // The returned scene behaves as if it had been exported at a specific time
 // in the specified animation, except that animated elements' properties contain
@@ -4436,6 +4491,11 @@ ufbx_abi ufbx_const_prop_override_list ufbx_prepare_prop_overrides(ufbx_prop_ove
 // NOTE: The returned scene refers to the original `scene` so the original
 // scene cannot be freed until all evaluated scenes are freed.
 ufbx_abi ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error);
+
+ufbx_abi ufbx_anim *ufbx_create_anim(const ufbx_scene *scene, const ufbx_anim_opts *opts, ufbx_error *error);
+
+ufbx_abi void ufbx_retain_anim(ufbx_anim *anim);
+ufbx_abi void ufbx_free_anim(ufbx_anim *anim);
 
 // Materials
 
@@ -4508,6 +4568,10 @@ ufbx_abi void ufbx_free_line_curve(ufbx_line_curve *curve);
 ufbx_abi void ufbx_retain_line_curve(ufbx_line_curve *curve);
 
 // Mesh Topology
+
+// Find the face that contains a given `index`.
+// Returns `UFBX_NO_INDEX` if out of bounds.
+uint32_t ufbx_find_face_index(ufbx_mesh *mesh, size_t index);
 
 ufbx_abi uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face);
 ufbx_inline uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face) {
@@ -4651,7 +4715,6 @@ ufbx_abi void ufbx_ffi_evaluate_prop_len(ufbx_prop *retval, const ufbx_anim *ani
 ufbx_abi void ufbx_ffi_evaluate_props(ufbx_props *retval, const ufbx_anim *anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
 ufbx_abi void ufbx_ffi_evaluate_transform(ufbx_transform *retval, const ufbx_anim *anim, const ufbx_node *node, double time);
 ufbx_abi ufbx_real ufbx_ffi_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time);
-ufbx_abi void ufbx_ffi_prepare_prop_overrides(ufbx_const_prop_override_list *retval, ufbx_prop_override *overrides, size_t num_overrides);
 ufbx_abi void ufbx_ffi_quat_mul(ufbx_quat *retval, const ufbx_quat *a, const ufbx_quat *b);
 ufbx_abi void ufbx_ffi_quat_normalize(ufbx_quat *retval, const ufbx_quat *q);
 ufbx_abi void ufbx_ffi_quat_fix_antipodal(ufbx_quat *retval, const ufbx_quat *q, const ufbx_quat *reference);
