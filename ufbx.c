@@ -21867,6 +21867,7 @@ static ufbxi_forceinline void ufbxi_init_prop_iter(ufbxi_prop_iter *iter, const 
 {
 	iter->prop = element->props.props.data;
 	iter->prop_end = element->props.props.data + element->props.props.count;
+	iter->over = iter->over_end = NULL;
 	if (anim->overrides.count > 0) {
 		ufbxi_init_prop_iter_slow(iter, anim, element);
 	}
