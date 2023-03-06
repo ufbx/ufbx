@@ -75,10 +75,10 @@ UFBXT_CPP_TEST(test_line_curve_ptr)
 
 UFBXT_CPP_TEST(test_geometry_cache_ptr)
 {
-    ufbx_unique_ptr<ufbx_geometry_cache> cache1{ufbx_load_geometry_cache("marvelous_quad.xml", nullptr, nullptr)};
-    ufbx_shared_ptr<ufbx_geometry_cache> cache2{ufbx_load_geometry_cache("marvelous_quad.xml", nullptr, nullptr)};
+    ufbx_unique_ptr<ufbx_geometry_cache> cache1{ufbx_load_geometry_cache(data_path("marvelous_quad.xml"), nullptr, nullptr)};
+    ufbx_shared_ptr<ufbx_geometry_cache> cache2{ufbx_load_geometry_cache(data_path("marvelous_quad.xml"), nullptr, nullptr)};
     ufbx_shared_ptr<ufbx_geometry_cache> cache3{cache2};
-    std::unique_ptr<ufbx_geometry_cache, ufbx_deleter> cache4{ufbx_load_geometry_cache("marvelous_quad.xml", nullptr, nullptr)};
+    std::unique_ptr<ufbx_geometry_cache, ufbx_deleter> cache4{ufbx_load_geometry_cache(data_path("marvelous_quad.xml"), nullptr, nullptr)};
 	ufbxt_assert(cache1);
 	ufbxt_assert(cache2);
 	ufbxt_assert(cache3);
