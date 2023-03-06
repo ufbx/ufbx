@@ -2,7 +2,8 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
   <Type Name="ufbx_string">
-    <DisplayString>{data,[length]s}</DisplayString>
+    <DisplayString Condition="length!=~(size_t)0">{data,[length]s}</DisplayString>
+    <DisplayString Condition="length==~(size_t)0">{data,s}</DisplayString>
   </Type>
 
   <Type Name="ufbx_vec2"><DisplayString>{{ x={x} y={y} }}</DisplayString></Type>
