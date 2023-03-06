@@ -22301,7 +22301,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 	}
 
 	ufbx_anim anim = *ec->anim;
-	ufbx_prop_override *over = anim.overrides.data, *over_end = over + anim.overrides.count;
+	ufbx_prop_override *over = anim.overrides.data, *over_end = ufbxi_add_ptr(over, anim.overrides.count);
 
 	// Evaluate the properties
 	ufbxi_for_ptr_list(ufbx_element, p_elem, ec->scene.elements) {
