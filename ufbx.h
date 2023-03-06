@@ -4807,6 +4807,12 @@ template<> struct ufbx_type_traits<ufbx_geometry_cache> {
 	static void free(ufbx_geometry_cache *ptr) { ufbx_free_geometry_cache(ptr); }
 };
 
+template<> struct ufbx_type_traits<ufbx_anim> {
+	enum { valid = 1 };
+	static void retain(ufbx_anim *ptr) { ufbx_retain_anim(ptr); }
+	static void free(ufbx_anim *ptr) { ufbx_free_anim(ptr); }
+};
+
 class ufbx_deleter {
 public:
 	template <typename T>
@@ -4854,7 +4860,8 @@ public:
 	explicit operator bool() const noexcept { return ptr != nullptr; }
 };
 
-// Behaves like `std::shared_ptr<T>`.
+// Behaves like `std::shared_ptr<T>` except uses ufbx's internal reference counting,
+// so it is half the size of a standard `shared_ptr` but might be marginally slower.
 template <typename T>
 class ufbx_shared_ptr {
 	T *ptr;
