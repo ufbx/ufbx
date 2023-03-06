@@ -852,7 +852,7 @@ UFBXT_FILE_TEST_ALT(anim_multi_override, blender_293_instancing)
 	};
 
 	size_t num_nodes = ufbxt_arraycount(node_names);
-	ufbx_prop_override overrides[ufbxt_arraycount(node_names) * 3];
+	ufbx_prop_override_desc overrides[ufbxt_arraycount(node_names) * 3];
 	memset(&overrides, 0, sizeof(overrides));
 
 	for (size_t i = 0; i < num_nodes; i++) {
@@ -892,7 +892,7 @@ UFBXT_FILE_TEST_ALT(anim_multi_override, blender_293_instancing)
 	ufbxt_check_anim(scene, anim);
 
 	ufbx_scene *state = ufbx_evaluate_scene(scene, anim, 0.0f, NULL, &error);
-	if (!state) ufbxt_log_error(&state);
+	if (!state) ufbxt_log_error(&error);
 	ufbxt_assert(state);
 	ufbxt_check_scene(state);
 
@@ -908,8 +908,8 @@ UFBXT_FILE_TEST_ALT(anim_multi_override, blender_293_instancing)
 		ref_transform.rotation_euler.y = 10.0f * (ufbx_real)i;
 		ref_transform.scale.z = 1.0f + 0.1f * (ufbx_real)i;
 
-		ufbxt_check_transform(&err, "scene_transform", scene_transform, ref_transform);
-		ufbxt_check_transform(&err, "state_transform", state_transform, ref_transform);
+		ufbxt_check_transform(err, "scene_transform", scene_transform, ref_transform);
+		ufbxt_check_transform(err, "state_transform", state_transform, ref_transform);
 	}
 
 	ufbx_free_scene(state);
