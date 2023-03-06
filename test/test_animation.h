@@ -809,3 +809,135 @@ UFBXT_FILE_TEST_ALT(anim_override_utf8, blender_279_default)
 	}
 }
 #endif
+
+#if UFBXT_IMPL
+typedef struct {
+	ufbx_vec3 translation;
+	ufbx_vec3 rotation_euler;
+	ufbx_vec3 scale;
+} ufbxt_ref_transform;
+
+static void ufbxt_check_transform(ufbxt_diff_error *err, const char *name, ufbx_transform transform, ufbxt_ref_transform ref)
+{
+	ufbx_vec3 rotation_euler = ufbx_quat_to_euler(transform.rotation, UFBX_ROTATION_ORDER_XYZ);
+	ufbxt_hintf("%s { { %.2f, %.2f, %.2f }, { %.2f, %.2f, %.2f }, { %.2f, %.2f, %.2f } }", name,
+		transform.translation.x, transform.translation.y, transform.translation.z,
+		rotation_euler.x, rotation_euler.y, rotation_euler.z,
+		transform.scale.x, transform.scale.y, transform.scale.z);
+
+	ufbxt_assert_close_vec3(err, transform.translation, ref.translation);
+	ufbxt_assert_close_vec3(err, rotation_euler, ref.rotation_euler);
+	ufbxt_assert_close_vec3(err, transform.scale, ref.scale);
+
+	ufbxt_hintf("");
+}
+
+static const ufbxt_ref_transform ufbxt_ref_transform_identity = {
+	{ 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f },
+};
+#endif
+
+UFBXT_FILE_TEST_ALT(anim_multi_override, blender_293_instancing)
+#if UFBXT_IMPL
+{
+	static const char *node_names[] = {
+		"Suzanne",
+		"Suzanne.001",
+		"Suzanne.002",
+		"Suzanne.003",
+		"Suzanne.004",
+		"Suzanne.005",
+		"Suzanne.006",
+		"Suzanne.007",
+	};
+
+	size_t num_nodes = ufbxt_arraycount(node_names);
+	ufbx_prop_override overrides[ufbxt_arraycount(node_names) * 3];
+	memset(&overrides, 0, sizeof(overrides));
+
+	for (size_t i = 0; i < num_nodes; i++) {
+		ufbx_node *node = ufbx_find_node(scene, node_names[i]);
+		ufbxt_assert(node);
+
+		overrides[i*3 + 0].element_id = node->element_id;
+		overrides[i*3 + 0].prop_name.data = "Lcl Translation";
+		overrides[i*3 + 0].prop_name.length = SIZE_MAX;
+		overrides[i*3 + 0].value.x = (ufbx_real)i;
+		overrides[i*3 + 0].value.y = 0.0f;
+		overrides[i*3 + 0].value.z = 0.0f;
+
+		overrides[i*3 + 1].element_id = node->element_id;
+		overrides[i*3 + 1].prop_name.data = "Lcl Rotation";
+		overrides[i*3 + 1].prop_name.length = SIZE_MAX;
+		overrides[i*3 + 1].value.x = 0.0f;
+		overrides[i*3 + 1].value.y = 10.0f * (ufbx_real)i;
+		overrides[i*3 + 1].value.z = 0.0f;
+
+		overrides[i*3 + 2].element_id = node->element_id;
+		overrides[i*3 + 2].prop_name.data = "Lcl Scaling";
+		overrides[i*3 + 2].prop_name.length = SIZE_MAX;
+		overrides[i*3 + 2].value.x = 1.0f;
+		overrides[i*3 + 2].value.y = 1.0f;
+		overrides[i*3 + 2].value.z = 1.0f + 0.1f * (ufbx_real)i;
+	}
+
+	ufbx_anim_opts opts = { 0 };
+	opts.overrides.data = overrides;
+	opts.overrides.count = ufbxt_arraycount(overrides);
+
+	ufbx_error error;
+	ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
+	if (!anim) ufbxt_log_error(&error);
+	ufbxt_assert(anim);
+	ufbxt_check_anim(scene, anim);
+
+	ufbx_scene *state = ufbx_evaluate_scene(scene, anim, 0.0f, NULL, &error);
+	if (!state) ufbxt_log_error(&state);
+	ufbxt_assert(state);
+	ufbxt_check_scene(state);
+
+	for (size_t i = 0; i < num_nodes; i++) {
+		ufbx_node *scene_node = ufbx_find_node(scene, node_names[i]);
+		ufbx_node *state_node = ufbx_find_node(state, node_names[i]);
+
+		ufbx_transform scene_transform = ufbx_evaluate_transform(anim, scene_node, 0.0f);
+		ufbx_transform state_transform = state_node->local_transform;
+
+		ufbxt_ref_transform ref_transform = ufbxt_ref_transform_identity;
+		ref_transform.translation.x = (ufbx_real)i;
+		ref_transform.rotation_euler.y = 10.0f * (ufbx_real)i;
+		ref_transform.scale.z = 1.0f + 0.1f * (ufbx_real)i;
+
+		ufbxt_check_transform(&err, "scene_transform", scene_transform, ref_transform);
+		ufbxt_check_transform(&err, "state_transform", state_transform, ref_transform);
+	}
+
+	ufbx_free_scene(state);
+	ufbx_free_anim(anim);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(anim_override_duplicate, blender_293_instancing)
+#if UFBXT_IMPL
+{
+	ufbx_prop_override_desc overrides[] = {
+		{ 1, { "PropA", SIZE_MAX }, { 1.0f } },
+		{ 1, { "PropB", SIZE_MAX }, { 1.0f } },
+		{ 1, { "PropC", SIZE_MAX }, { 1.0f } },
+		{ 2, { "PropA", SIZE_MAX }, { 1.0f } },
+		{ 2, { "PropB", SIZE_MAX }, { 1.0f } },
+		{ 2, { "PropB", SIZE_MAX }, { 1.0f } },
+		{ 2, { "PropC", SIZE_MAX }, { 1.0f } },
+	};
+
+	ufbx_anim_opts opts = { 0 };
+	opts.overrides.data = overrides;
+	opts.overrides.count = ufbxt_arraycount(overrides);
+
+	ufbx_error error;
+	ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
+	ufbxt_assert(!anim);
+	ufbxt_assert(error.type == UFBX_ERROR_DUPLICATE_OVERRIDE);
+	ufbxt_assert(!strcmp(error.info, "element 2 prop \"PropB\""));
+}
+#endif

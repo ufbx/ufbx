@@ -3728,6 +3728,9 @@ typedef enum ufbx_error_type UFBX_ENUM_REPR {
 	// Unsafe options specified without enabling `ufbx_load_opts.allow_unsafe`.
 	UFBX_ERROR_UNSAFE_OPTIONS,
 
+	// Duplicated override property in `ufbx_create_anim()`
+	UFBX_ERROR_DUPLICATE_OVERRIDE,
+
 	UFBX_ENUM_FORCE_WIDTH(UFBX_ERROR_TYPE)
 } ufbx_error_type;
 
