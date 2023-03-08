@@ -48,12 +48,12 @@ def get_fbx_files(json_path):
     yield from single_file(f"{base_path}.ufbx.obj")
     yield from glob.glob(f"{glob.escape(base_path)}/*.fbx")
 
-def get_obj_files(fbx_path):
+def get_obj_files(fbx_path, flag_separator):
     base_path = strip_ext(fbx_path)
     yield from single_file(f"{base_path}.obj.gz")
     yield from single_file(f"{base_path}.obj")
-    yield from glob.glob(f"{glob.escape(base_path)}_*.obj.gz")
-    yield from glob.glob(f"{glob.escape(base_path)}_*.obj")
+    yield from glob.glob(f"{glob.escape(base_path)}{flag_separator}*.obj.gz")
+    yield from glob.glob(f"{glob.escape(base_path)}{flag_separator}_*.obj")
 
 def get_mtl_files(obj_path):
     base_path = strip_ext(obj_path)
@@ -71,16 +71,16 @@ def remove_duplicate_files(paths):
         seen.add(base)
         yield path
 
-def gather_case_models(json_path):
+def gather_case_models(json_path, flag_separator):
     for fbx_path in get_fbx_files(json_path):
-        for obj_path in remove_duplicate_files(get_obj_files(fbx_path)):
+        for obj_path in remove_duplicate_files(get_obj_files(fbx_path, flag_separator)):
             mtl_path = next(get_mtl_files(obj_path), None)
             mat_path = next(get_mat_files(fbx_path), None)
 
             fbx_base = strip_ext(fbx_path)
             obj_base = strip_ext(obj_path)
 
-            flags = obj_base[len(fbx_base):].split("_")
+            flags = obj_base[len(fbx_base):].split(flag_separator)
 
             # Parse flags
             frame = None
@@ -126,7 +126,9 @@ def gather_dataset_tasks(root_dir, heavy):
             with open(path, "rt", encoding="utf-8") as f:
                 desc = json.load(f)
 
-            models = list(gather_case_models(path))
+            flag_separator = desc.get("flagSeparator", "_")
+
+            models = list(gather_case_models(path, flag_separator))
             if not models:
                 raise RuntimeError(f"No models found for {path}")
 

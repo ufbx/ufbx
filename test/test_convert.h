@@ -89,34 +89,6 @@ ufbx_load_opts ufbxt_blender_space_adjust_opts()
 
 #endif
 
-#if UFBXT_IMPL
-typedef struct {
-	ufbx_vec3 translation;
-	ufbx_vec3 rotation_euler;
-	ufbx_vec3 scale;
-} ufbxt_ref_transform;
-
-static void ufbxt_check_transform(ufbxt_diff_error *err, const char *name, ufbx_transform transform, ufbxt_ref_transform ref)
-{
-	ufbx_vec3 rotation_euler = ufbx_quat_to_euler(transform.rotation, UFBX_ROTATION_ORDER_XYZ);
-	ufbxt_hintf("%s { { %.2f, %.2f, %.2f }, { %.2f, %.2f, %.2f }, { %.2f, %.2f, %.2f } }", name,
-		transform.translation.x, transform.translation.y, transform.translation.z,
-		rotation_euler.x, rotation_euler.y, rotation_euler.z,
-		transform.scale.x, transform.scale.y, transform.scale.z);
-
-	ufbxt_assert_close_vec3(err, transform.translation, ref.translation);
-	ufbxt_assert_close_vec3(err, rotation_euler, ref.rotation_euler);
-	ufbxt_assert_close_vec3(err, transform.scale, ref.scale);
-
-	ufbxt_hintf("");
-}
-
-static const ufbxt_ref_transform ufbxt_ref_transform_identity = {
-	{ 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f },
-};
-#endif
-
-
 UFBXT_FILE_TEST(max_geometry_transform)
 #if UFBXT_IMPL
 {
