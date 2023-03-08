@@ -22535,14 +22535,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_create_anim_imp(ufbxi_create_ani
 		qsort(anim->overrides.data, anim->overrides.count, sizeof(ufbx_prop_override), &ufbxi_cmp_prop_override_prop_name);
 
 		const ufbx_string *global_str = ufbxi_strings, *global_end = global_str + ufbxi_arraycount(ufbxi_strings);
-		ufbx_string prev = { ufbxi_empty_char };
+		ufbx_string prev_name = { ufbxi_empty_char };
 		ufbxi_for_list(ufbx_prop_override, over, anim->overrides) {
 			if (over->value_str.length > 0) {
 				ufbxi_check_err(&ac->error, ufbxi_push_anim_string(ac, &over->value_str));
 			}
 
-			if (ufbxi_str_equal(over->prop_name, prev)) {
-				over->prop_name = prev;
+			if (ufbxi_str_equal(over->prop_name, prev_name)) {
+				over->prop_name = prev_name;
 				continue;
 			}
 
@@ -22556,7 +22556,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_create_anim_imp(ufbxi_create_ani
 				ufbxi_check_err(&ac->error, ufbxi_push_anim_string(ac, &over->prop_name));
 			}
 
-			prev = over->prop_name;
+			prev_name = over->prop_name;
 		}
 
 		// Sort `anim->overrides` to the actual order expected by evaluation.
