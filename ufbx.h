@@ -4692,6 +4692,62 @@ typedef ufbx_ref<ufbx_geometry_cache> ufbx_geometry_cache_ref;
 #endif
 // bindgen-enable
 
+// -- Properties
+
+// Names of common properties in `ufbx_props`.
+// Some of these differ from ufbx interpretations.
+
+// Local translation.
+// Used by: `ufbx_node`
+#define UFBX_Lcl_Translation "Lcl Translation"
+
+// Local rotation expressed in Euler degrees.
+// Used by: `ufbx_node`
+// The rotation order is defined by the `UFBX_RotationOrder` property.
+#define UFBX_Lcl_Rotation "Lcl Rotation"
+
+// Local scaling factor, 3D vector.
+// Used by: `ufbx_node`
+#define UFBX_Lcl_Scaling "Lcl Scaling"
+
+// Euler rotation interpretation, used by `UFBX_Lcl_Rotation`.
+// Used by: `ufbx_node`, enum value `ufbx_rotation_order`.
+#define UFBX_RotationOrder "RotationOrder"
+
+// Scaling pivot: point around which scaling is performed.
+// Used by: `ufbx_node`.
+#define UFBX_ScalingPivot "ScalingPivot"
+
+// Scaling pivot: point around which rotation is performed.
+// Used by: `ufbx_node`.
+#define UFBX_RotationPivot "RotationPivot"
+
+// Scaling offset: translation added after scaling is performed.
+// Used by: `ufbx_node`.
+#define UFBX_ScalingOffset "ScalingOffset"
+
+// Rotation offset: translation added after rotation is performed.
+// Used by: `ufbx_node`.
+#define UFBX_RotationOffset "RotationOffset"
+
+// Pre-rotation: Rotation applied _after_ `ufbxi_Lcl_Rotation`.
+// Used by: `ufbx_node`.
+// Affected by `UFBX_RotationPivot` but not `UFBX_RotationOrder`.
+#define UFBX_PreRotation "PreRotation"
+
+// Post-rotation: Rotation applied _before_ `ufbxi_Lcl_Rotation`.
+// Used by: `ufbx_node`.
+// Affected by `UFBX_RotationPivot` but not `UFBX_RotationOrder`.
+#define UFBX_PostRotation "PostRotation"
+
+// Controls whether the node should be displayed or not.
+// Used by: `ufbx_node`.
+#define UFBX_Visibility "Visibility"
+
+// Weight of an animation layer in percentage (100.0 being full).
+// Used by: `ufbx_anim_layer`.
+#define UFBX_Weight "Weight"
+
 #if defined(_MSC_VER)
 	#pragma warning(pop)
 #elif defined(__clang__)
