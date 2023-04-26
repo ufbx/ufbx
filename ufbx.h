@@ -66,12 +66,14 @@
 	#pragma clang diagnostic ignored "-Wpedantic"
 	#if defined(__cplusplus)
 		#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+		#pragma clang diagnostic ignored "-Wold-style-cast"
 	#endif
 #elif defined(__GNUC__)
 	#pragma GCC diagnostic push
 	#pragma GCC diagnostic ignored "-Wpedantic"
 	#if defined(__cplusplus)
 		#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
+		#pragma GCC diagnostic ignored "-Wold-style-cast"
 	#endif
 #endif
 
