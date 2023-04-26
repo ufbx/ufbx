@@ -5,6 +5,11 @@ import subprocess
 import glob
 import re
 import urllib.parse
+import datetime
+
+LATEST_SUPPORTED_DATE = "2023-01-22"
+
+latest_supported_time = datetime.datetime.strptime(LATEST_SUPPORTED_DATE, "%Y-%m-%d")
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -20,6 +25,7 @@ class TestCase(NamedTuple):
     author: str
     license: str
     url: str
+    skip: bool
     extra_files: List[str]
     models: List[TestModel]
 
@@ -106,11 +112,20 @@ def gather_dataset_tasks(root_dir):
             with open(path, "rt", encoding="utf-8") as f:
                 desc = json.load(f)
 
-            models = list(gather_case_models(path))
-            if not models:
-                raise RuntimeError(f"No models found for {path}")
+            mtime = os.path.getmtime(path)
+            
+            skip = False
+            if mtime > latest_supported_time.timestamp():
+                skip = True
 
-            extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
+            models = []
+            extra_files = []
+            if not skip:
+                models = list(gather_case_models(path))
+                if not models:
+                    raise RuntimeError(f"No models found for {path}")
+
+                extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
 
             yield TestCase(
                 root=root_dir,
@@ -119,6 +134,7 @@ def gather_dataset_tasks(root_dir):
                 author=desc["author"],
                 license=desc["license"],
                 url=desc["url"],
+                skip=skip,
                 extra_files=extra_files,
                 models=models,
             )
@@ -152,6 +168,8 @@ if __name__ == "__main__":
     test_count = 0
 
     case_ok_count = 0
+    case_run_count = 0
+    case_skip_count = 0
 
     for case in cases:
 
@@ -166,6 +184,14 @@ if __name__ == "__main__":
         log()
 
         case_ok = True
+
+        if case.skip:
+            log("-- SKIP --")
+            log()
+            case_skip_count += 1
+            continue
+
+        case_run_count += 1
 
         for model in case.models:
             test_count += 1
@@ -220,7 +246,13 @@ if __name__ == "__main__":
         if case_ok:
             case_ok_count += 1
 
-    log(f"{ok_count}/{test_count} files passed ({case_ok_count}/{len(cases)} test cases)")
+    log(f"{ok_count}/{test_count} files passed ({case_ok_count}/{case_run_count} test cases)")
+    if case_skip_count > 0:
+        if (latest_supported_time.hour, latest_supported_time.minute, latest_supported_time.second) == (0, 0, 0):
+            time_str = latest_supported_time.strftime("%Y-%m-%d")
+        else:
+            time_str = latest_supported_time.strftime("%Y-%m-%d %H:%M:%S")
+        log(f"WARNING: Skipped {case_skip_count} test cases modified after {time_str}")
 
     if ok_count < test_count:
         exit(1)
