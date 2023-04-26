@@ -18251,7 +18251,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			skin->weights.data = ufbxi_push_zero(&uc->result, ufbx_skin_weight, total_weights);
 			ufbxi_check(skin->weights.data);
 
-            bool retain_all = !uc->opts.clean_skin_weights;
+			bool retain_all = !uc->opts.clean_skin_weights;
 
 			// Count the number of weights per vertex
 			ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, skin->clusters) {

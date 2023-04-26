@@ -3883,7 +3883,7 @@ typedef struct ufbx_load_opts {
 	// a bit of memory and time if not needed
 	bool skip_skin_vertices;
 
-    // Clean-up skin weights by removing negative, zero and NAN weights.
+	// Clean-up skin weights by removing negative, zero and NAN weights.
 	bool clean_skin_weights;
 
 	// Don't adjust reading the FBX file depending on the detected exporter
