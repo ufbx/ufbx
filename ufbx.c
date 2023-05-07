@@ -662,7 +662,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 
 // -- Version
 
-#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 3, 1)
+#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 4, 0)
 const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
 
 ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEADER_VERSION/1000u);
@@ -18251,12 +18251,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			skin->weights.data = ufbxi_push_zero(&uc->result, ufbx_skin_weight, total_weights);
 			ufbxi_check(skin->weights.data);
 
+			bool retain_all = !uc->opts.clean_skin_weights;
+
 			// Count the number of weights per vertex
 			ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, skin->clusters) {
 				ufbx_skin_cluster *cluster = *p_cluster;
 				for (size_t i = 0; i < cluster->num_weights; i++) {
 					uint32_t vertex = cluster->vertices.data[i];
-					if (vertex < num_vertices) {
+					if (vertex < num_vertices && (retain_all || cluster->weights.data[i] > 0.0f)) {
 						skin->vertices.data[vertex].num_weights++;
 					}
 				}
@@ -18293,7 +18295,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				ufbx_skin_cluster *cluster = *p_cluster;
 				for (size_t i = 0; i < cluster->num_weights; i++) {
 					uint32_t vertex = cluster->vertices.data[i];
-					if (vertex < num_vertices) {
+					if (vertex < num_vertices && (retain_all || cluster->weights.data[i] > 0.0f)) {
 						uint32_t local_index = skin->vertices.data[vertex].num_weights++;
 						uint32_t index = skin->vertices.data[vertex].weight_begin + local_index;
 						skin->weights.data[index].cluster_index = cluster_index;

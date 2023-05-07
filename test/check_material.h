@@ -248,6 +248,8 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 
 	long version = 0;
 
+	const long current_version = 2;
+
 	int line = 0;
 	while (*spec != '\0') {
 		size_t num_tokens = ufbxt_tokenize_line(line_buf, sizeof(line_buf), tokens, ufbxt_arraycount(tokens), &spec, " \t\r");
@@ -265,6 +267,14 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 				fprintf(stderr, "%s:%d: Bad value in '%s': '%s'\n", filename, line, tokens[0], tokens[1]);
 				ok = false;
 				continue;
+			}
+
+			if (version > current_version)
+			{
+				fprintf(stderr, "%s:%d: \"version %ld\" is too high for current check_material.h, maximum supported is %ld\n", filename, line,
+					version, current_version);
+				ok = false;
+				break;
 			}
 
 			continue;
