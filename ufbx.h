@@ -107,13 +107,13 @@
 // -- Configuration
 
 #ifndef UFBX_REAL_IS_FLOAT
-    #define UFBX_REAL_IS_FLOAT 0
+	#define UFBX_REAL_IS_FLOAT 0
 #endif
 
 #if UFBX_REAL_IS_FLOAT
-    typedef float ufbx_real;
+	typedef float ufbx_real;
 #else
-    typedef double ufbx_real;
+	typedef double ufbx_real;
 #endif
 
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
