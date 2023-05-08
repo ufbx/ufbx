@@ -106,11 +106,7 @@
 
 // -- Configuration
 
-#ifndef UFBX_REAL_IS_FLOAT
-	#define UFBX_REAL_IS_FLOAT 0
-#endif
-
-#if UFBX_REAL_IS_FLOAT
+#if defined(UFBX_REAL_IS_FLOAT)
 	typedef float ufbx_real;
 #else
 	typedef double ufbx_real;

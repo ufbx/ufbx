@@ -945,6 +945,7 @@ async def main():
             "UFBX_NO_SCENE_EVALUATION",
             "UFBX_NO_TRIANGULATION",
             "UFBX_NO_ERROR_STACK",
+            "UFBX_REAL_IS_FLOAT",
         ]
 
         target_tasks = []
