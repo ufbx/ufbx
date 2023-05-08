@@ -128,19 +128,13 @@
 	#define UFBXI_FEATURE_XML 0
 #endif
 
-#if UFBXI_FEATURE_TESSELLATION
-	#define UFBXI_FEATURE_SPATIAL 1
-#else
-	#define UFBXI_FEATURE_SPATIAL 0
-#endif
-
 #if UFBXI_FEATURE_TRIANGULATION
 	#define UFBXI_FEATURE_KD 1
 #else
 	#define UFBXI_FEATURE_KD 0
 #endif
 
-#if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_SKINNING_EVALUATION || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_INDEX_GENERATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_SPATIAL || !UFBXI_FEATURE_KD
+#if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_SKINNING_EVALUATION || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_INDEX_GENERATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_KD
 	#define UFBXI_PARTIAL_FEATURES 1
 #endif
 
@@ -180,7 +174,6 @@
 	#define ufbx_copysign ufbxi_math_fn(copysign)
 	#define ufbx_fmin ufbxi_math_fn(fmin)
 	#define ufbx_fmax ufbxi_math_fn(fmax)
-	#define ufbx_frexp ufbxi_math_fn(frexp)
 #endif
 
 #if defined(UFBX_NO_MATH_H) && !defined(UFBX_NO_MATH_DECLARATIONS)
@@ -196,7 +189,6 @@
 	double ufbx_fmin(double a, double b);
 	double ufbx_fmax(double a, double b);
 	double ufbx_fabs(double x);
-	double ufbx_frexp(double x, int *eptr);
 	double ufbx_copysign(double x, double y);
 #endif
 
@@ -22461,134 +22453,6 @@ ufbxi_nodiscard static ufbxi_noinline ufbx_scene *ufbxi_evaluate_scene(ufbxi_eva
 
 #endif
 
-// -- Spatial
-
-#if UFBXI_FEATURE_SPATIAL
-
-typedef struct {
-	int32_t x, y, z;
-} ufbxi_spatial_key;
-
-typedef struct {
-	ufbxi_spatial_key key;
-	ufbx_vec3 position;
-} ufbxi_spatial_bucket;
-
-static ufbxi_forceinline uint32_t ufbxi_hash_spatial_key(ufbxi_spatial_key key)
-{
-	uint32_t h = 0;
-	h = (h<<6) + (h>>2) + 0x9e3779b9 + ufbxi_hash32((uint32_t)key.x);
-	h = (h<<6) + (h>>2) + 0x9e3779b9 + ufbxi_hash32((uint32_t)key.y);
-	h = (h<<6) + (h>>2) + 0x9e3779b9 + ufbxi_hash32((uint32_t)key.z);
-	return h;
-}
-
-static int ufbxi_map_cmp_spatial_key(void *user, const void *va, const void *vb)
-{
-	(void)user;
-	ufbxi_spatial_key a = *(const ufbxi_spatial_key*)va, b = *(const ufbxi_spatial_key*)vb;
-	if (a.x != b.x) return a.x < b.x ? -1 : +1;
-	if (a.y != b.y) return a.y < b.y ? -1 : +1;
-	if (a.z != b.z) return a.z < b.z ? -1 : +1;
-	return 0;
-}
-
-static int32_t ufbxi_noinline ufbxi_spatial_coord(ufbx_real v)
-{
-	bool negative = false;
-	if (v < 0.0f) {
-		v = -v;
-		negative = true;
-	}
-	if (!(v < 1.27605887595e+38f)) {
-		return INT32_MIN;
-	}
-
-	const int32_t min_exponent = -20;
-	const int32_t mantissa_bits = 21;
-	const int32_t mantissa_max = 1 << mantissa_bits;
-
-	int exponent = 0;
-	double mantissa = ufbx_frexp(v, &exponent);
-	if (exponent < min_exponent) {
-		return 0;
-	} else {
-		int32_t biased = (int32_t)(exponent - min_exponent);
-		int32_t truncated_mantissa = (int32_t)(mantissa * (double)(mantissa_max*2)) - mantissa_max;
-		int32_t value = (biased << mantissa_bits) + truncated_mantissa;
-		return negative ? -value : value;
-	}
-}
-
-static uint32_t ufbxi_noinline ufbxi_insert_spatial_imp(ufbxi_map *map, int32_t kx, int32_t ky, int32_t kz)
-{
-	ufbxi_spatial_key key = { kx, ky, kz };
-	uint32_t hash = ufbxi_hash_spatial_key(key);
-	ufbxi_spatial_bucket *bucket = ufbxi_map_find(map, ufbxi_spatial_bucket, hash, &key);
-	if (bucket) {
-		return (uint32_t)(bucket - (ufbxi_spatial_bucket*)map->items);
-	} else {
-		return UINT32_MAX;
-	}
-}
-
-static uint32_t ufbxi_noinline ufbxi_insert_spatial(ufbxi_map *map, const ufbx_vec3 *pos)
-{
-	int32_t kx = ufbxi_spatial_coord(pos->x);
-	int32_t ky = ufbxi_spatial_coord(pos->y);
-	int32_t kz = ufbxi_spatial_coord(pos->z);
-
-	uint32_t ix = UINT32_MAX;
-	if (kx != INT32_MIN && ky != INT32_MIN && kz != INT32_MIN) {
-		const int32_t low_bits = 2, low_mask = (1 << low_bits) - 1;
-
-		kx += low_mask/2;
-		ky += low_mask/2;
-		kz += low_mask/2;
-
-		int32_t dx = (((kx+1) & low_mask) < 2) ? (((kx >> (low_bits-1)) & 1) ? +1 : -1) : 0;
-		int32_t dy = (((ky+1) & low_mask) < 2) ? (((ky >> (low_bits-1)) & 1) ? +1 : -1) : 0;
-		int32_t dz = (((kz+1) & low_mask) < 2) ? (((kz >> (low_bits-1)) & 1) ? +1 : -1) : 0;
-		int32_t dnum = (dx&1) + (dy&1) + (dz&1);
-
-		kx >>= low_bits;
-		ky >>= low_bits;
-		kz >>= low_bits;
-
-		ix = ufbxi_insert_spatial_imp(map, kx, ky, kz);
-
-		if (dnum >= 1 && ix == UINT32_MAX) {
-			if (dx) ix = ufbxi_insert_spatial_imp(map, kx+dx, ky, kz);
-			if (dy) ix = ufbxi_insert_spatial_imp(map, kx, ky+dy, kz);
-			if (dz) ix = ufbxi_insert_spatial_imp(map, kx, ky, kz+dz);
-
-			if (dnum >= 2 && ix == UINT32_MAX) {
-				if (dx && dy) ix = ufbxi_insert_spatial_imp(map, kx+dx, ky+dy, kz);
-				if (dy && dz) ix = ufbxi_insert_spatial_imp(map, kx, ky+dy, kz+dz);
-				if (dx && dz) ix = ufbxi_insert_spatial_imp(map, kx+dx, ky, kz+dz);
-
-				if (dnum >= 3 && ix == UINT32_MAX) {
-					ix = ufbxi_insert_spatial_imp(map, kx+dx, ky+dy, kz+dz);
-				}
-			}
-		}
-	}
-
-	if (ix == UINT32_MAX) {
-		ix = map->size;
-		ufbxi_spatial_key key = { kx, ky, kz };
-		uint32_t hash = ufbxi_hash_spatial_key(key);
-		ufbxi_spatial_bucket *bucket = ufbxi_map_insert(map, ufbxi_spatial_bucket, hash, &key);
-		ufbxi_check_return_err(map->ator->error, bucket, UINT32_MAX);
-		bucket->key = key;
-		bucket->position = *pos;
-	}
-
-	return ix;
-}
-
-#endif
-
 // -- NURBS
 
 static ufbxi_forceinline ufbx_real ufbxi_nurbs_weight(const ufbx_real_list *knots, size_t knot, size_t degree, ufbx_real u)
@@ -22808,33 +22672,38 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 		ufbxi_check_err(&tc->error, !ufbxi_does_overflow(over_uv, over_u, over_v));
 	}
 
-	ufbxi_map_init(&tc->position_map, &tc->ator_tmp, &ufbxi_map_cmp_spatial_key, NULL);
-
 	size_t faces_u = (spans_u - 1) * sub_u;
 	size_t faces_v = (spans_v - 1) * sub_v;
 
-	size_t indices_u = spans_u + (spans_u - 1) * sub_u;
-	size_t indices_v = spans_v + (spans_v - 1) * sub_v;
+	size_t indices_u = spans_u + (spans_u - 1) * (sub_u - 1);
+	size_t indices_v = spans_v + (spans_v - 1) * (sub_v - 1);
 
 	size_t num_faces = faces_u * faces_v;
 	size_t num_indices = indices_u * indices_v;
 	ufbxi_check_err(&tc->error, num_indices <= INT32_MAX);
 
 	uint32_t *position_ix = ufbxi_push(&tc->tmp, uint32_t, num_indices);
+	ufbx_vec3 *positions = ufbxi_push(&tc->result, ufbx_vec3, num_indices + 1);
+	ufbx_vec3 *normals = ufbxi_push(&tc->result, ufbx_vec3, num_indices + 1);
 	ufbx_vec2 *uvs = ufbxi_push(&tc->result, ufbx_vec2, num_indices + 1);
 	ufbx_vec3 *tangents = ufbxi_push(&tc->result, ufbx_vec3, num_indices + 1);
 	ufbx_vec3 *bitangents = ufbxi_push(&tc->result, ufbx_vec3, num_indices + 1);
 	ufbxi_check_err(&tc->error, position_ix && uvs && tangents && bitangents);
 
+	*positions++ = ufbx_zero_vec3;
+	*normals++ = ufbx_zero_vec3;
 	*uvs++ = ufbx_zero_vec2;
 	*tangents++ = ufbx_zero_vec3;
 	*bitangents++ = ufbx_zero_vec3;
+
+	uint32_t num_positions = 0;
 
 	for (size_t span_v = 0; span_v < spans_v; span_v++) {
 		size_t splits_v = span_v + 1 == spans_v ? 1 : sub_v;
 
 		for (size_t split_v = 0; split_v < splits_v; split_v++) {
 			size_t ix_v = span_v * sub_v + split_v;
+			ufbx_assert(ix_v < indices_v);
 
 			ufbx_real v = surface->basis_v.spans.data[span_v];
 			if (split_v > 0) {
@@ -22850,6 +22719,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 				size_t splits_u = span_u + 1 == spans_u ? 1 : sub_u;
 				for (size_t split_u = 0; split_u < splits_u; split_u++) {
 					size_t ix_u = span_u * sub_u + split_u;
+					ufbx_assert(ix_u < indices_u);
 
 					ufbx_real u = surface->basis_u.spans.data[span_u];
 					if (split_u > 0) {
@@ -22864,14 +22734,55 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 					ufbx_surface_point point = ufbx_evaluate_nurbs_surface(surface, u, v);
 					ufbx_vec3 pos = point.position;
 
-					uint32_t pos_ix = ufbxi_insert_spatial(&tc->position_map, &pos);
-					ufbxi_check_err(&tc->error, pos_ix != UINT32_MAX);
-
 					ufbx_vec3 tangent_u = ufbxi_slow_normalize3(&point.derivative_u);
 					ufbx_vec3 tangent_v = ufbxi_slow_normalize3(&point.derivative_v);
 
+					// Check if there's any wrapped positions that we could match
+					size_t neighbors[5];
+					size_t num_neighbors = 0;
+
+					if ((span_v == 0 && (span_u > 0 || split_u > 0)) || (span_u == 0 && (span_v > 0 || split_v > 0))) {
+						// Top/left
+						neighbors[num_neighbors++] = 0;
+					}
+					if (span_v + 1 == spans_v) {
+						// Bottom
+						neighbors[num_neighbors++] = ix_u;
+						if (span_u > 0 || split_u > 0) {
+							neighbors[num_neighbors++] = ix_v * indices_u;
+						}
+					}
+					if (span_u + 1 == spans_u) {
+						// Right
+						neighbors[num_neighbors++] = ix_v * indices_u;
+						if (span_v > 0 || split_v > 0) {
+							neighbors[num_neighbors++] = indices_u - 1;
+						}
+					}
+
 					size_t ix = ix_v * indices_u + ix_u;
-					position_ix[ix] = (uint32_t)pos_ix;
+
+					uint32_t pos_ix = num_positions;
+					for (size_t i = 0; i < num_neighbors; i++) {
+						size_t nb_ix = neighbors[i];
+						ufbx_assert(nb_ix < ix);
+						uint32_t nb_pos_ix = position_ix[nb_ix];
+						ufbx_vec3 nb_pos = positions[nb_pos_ix];
+						ufbx_real dx = nb_pos.x - pos.x;
+						ufbx_real dy = nb_pos.y - pos.y;
+						ufbx_real dz = nb_pos.z - pos.z;
+						ufbx_real delta = dx*dx + dy*dy + dz*dz;
+						if (delta < 0.0000001f) { // TODO: Configurable / something more rigorous
+							pos_ix = nb_pos_ix;
+							break;
+						}
+					}
+
+					position_ix[ix] = pos_ix;
+					if (pos_ix == num_positions) {
+						positions[pos_ix] = pos;
+						num_positions = pos_ix + 1;
+					}
 					uvs[ix].x = original_u;
 					uvs[ix].y = original_v;
 					tangents[ix] = tangent_u;
@@ -22925,18 +22836,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 		}
 	}
 
-	size_t num_positions = tc->position_map.size;
-	ufbx_vec3 *positions = ufbxi_push(&tc->result, ufbx_vec3, num_positions + 1);
-	ufbx_vec3 *normals = ufbxi_push(&tc->result, ufbx_vec3, num_positions + 1);
 	ufbxi_check_err(&tc->error, positions && normals);
-
-	*positions++ = ufbx_zero_vec3;
-	*normals++ = ufbx_zero_vec3;
-
-	ufbxi_spatial_bucket *buckets = (ufbxi_spatial_bucket*)tc->position_map.items;
-	for (size_t i = 0; i < num_positions; i++) {
-		positions[i] = buckets[i].position;
-	}
 
 	mesh->element.name.data = ufbxi_empty_char;
 	mesh->element.type = UFBX_ELEMENT_MESH;
