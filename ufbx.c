@@ -7164,7 +7164,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			// Ignore blend shape FullWeights as it's used in Blender for vertex groups
 			// which we don't currently handle. https://developer.blender.org/T90382
 			// TODO: Should we present this to users anyway somehow?
-			info->type = 'd';
+			info->type = 'r';
 			if (!uc->opts.disable_quirks && uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
 				info->type = '-';
 			}
@@ -11964,7 +11964,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_blend_channel(ufbxi_context
 	ufbxi_check(channel);
 
 	ufbx_real_list list = { NULL, 0 };
-	ufbxi_value_array *full_weights = ufbxi_find_array(node, ufbxi_FullWeights, 'd');
+	ufbxi_value_array *full_weights = ufbxi_find_array(node, ufbxi_FullWeights, 'r');
 	if (full_weights) {
 		list.data = (ufbx_real*)full_weights->data;
 		list.count = full_weights->size;
