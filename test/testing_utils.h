@@ -154,6 +154,7 @@ typedef struct {
 	ufbxt_obj_exporter exporter;
 
 	double position_scale;
+	double position_scale_float;
 
 	char animation_name[128];
 
@@ -532,6 +533,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 	obj->animation_frame = -1;
 	obj->exporter = UFBXT_OBJ_EXPORTER_UNKNOWN;
 	obj->position_scale = 1.0;
+	obj->position_scale_float = 1.0;
 
 	if (implicit_mesh) {
 		mesh = meshes;
@@ -719,7 +721,11 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			}
 			double position_scale = 0.0;
 			if (sscanf(line, "ufbx:position_scale=%lf", &position_scale) == 1) {
-				obj->position_scale = (ufbx_real)position_scale;
+				obj->position_scale = position_scale;
+			}
+			double position_scale_float = 0.0;
+			if (sscanf(line, "ufbx:position_scale_float=%lf", &position_scale_float) == 1) {
+				obj->position_scale_float = position_scale_float;
 			}
 			int frame = 0;
 			if (sscanf(line, "ufbx:frame=%d", &frame) == 1) {
@@ -858,7 +864,7 @@ typedef struct {
 
 static void ufbxt_assert_close_real(ufbxt_diff_error *p_err, ufbx_real a, ufbx_real b)
 {
-	ufbx_real err = fabs(a - b);
+	ufbx_real err = (ufbx_real)fabs(a - b);
 	ufbxt_soft_assert(err < 0.001);
 	p_err->num++;
 	p_err->sum += err;
@@ -904,7 +910,7 @@ static void ufbxt_assert_close_matrix(ufbxt_diff_error *p_err, ufbx_matrix a, uf
 
 static void ufbxt_assert_close_real_threshold(ufbxt_diff_error *p_err, ufbx_real a, ufbx_real b, ufbx_real threshold)
 {
-	ufbx_real err = fabs(a - b);
+	ufbx_real err = (ufbx_real)fabs(a - b);
 	ufbxt_assert(err < threshold);
 	p_err->num++;
 	p_err->sum += err;
@@ -985,7 +991,7 @@ static int ufbxt_cmp_sub_vertex(const void *va, const void *vb)
 	return 0;
 }
 
-static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt_obj_mesh *obj_mesh, ufbxt_diff_error *p_err, double scale)
+static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt_obj_mesh *obj_mesh, ufbxt_diff_error *p_err, ufbx_real scale)
 {
 	ufbx_real tolerance = obj->tolerance;
 
@@ -1313,6 +1319,9 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		if (obj->position_scale != 1.0) {
 			scale *= obj->position_scale;
 		}
+		#if defined(UFBX_REAL_IS_FLOAT)
+			scale *= obj->position_scale_float;
+		#endif
 
 		used_nodes[num_used_nodes++] = node;
 
@@ -1327,7 +1336,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			// ufbxt_debug_dump_obj_mesh("test.obj", node, tess_mesh);
 
 			ufbxt_check_mesh(scene, tess_mesh);
-			ufbxt_match_obj_mesh(obj, node, tess_mesh, obj_mesh, p_err, scale);
+			ufbxt_match_obj_mesh(obj, node, tess_mesh, obj_mesh, p_err, (ufbx_real)scale);
 			ufbx_free_mesh(tess_mesh);
 
 			continue;
@@ -1355,7 +1364,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			ufbxt_check_source_vertices(sub_mesh, mesh, p_err);
 
 			ufbxt_check_mesh(scene, sub_mesh);
-			ufbxt_match_obj_mesh(obj, node, sub_mesh, obj_mesh, p_err, scale);
+			ufbxt_match_obj_mesh(obj, node, sub_mesh, obj_mesh, p_err, (ufbx_real)scale);
 			ufbx_free_mesh(sub_mesh);
 
 			continue;
@@ -1372,7 +1381,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		if ((flags & UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS) != 0) check_normals = false;
 
 		if (obj->bad_order) {
-			ufbxt_match_obj_mesh(obj, node, mesh, obj_mesh, p_err, scale);
+			ufbxt_match_obj_mesh(obj, node, mesh, obj_mesh, p_err, (ufbx_real)scale);
 		} else {
 			size_t obj_face_ix = 0;
 
