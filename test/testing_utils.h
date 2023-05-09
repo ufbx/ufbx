@@ -858,13 +858,22 @@ static ufbxt_noinline void ufbxt_debug_dump_obj_scene(const char *file, ufbx_sce
 
 typedef struct {
 	size_t num;
-	ufbx_real sum;
-	ufbx_real max;
+	double sum;
+	double max;
 } ufbxt_diff_error;
 
 static void ufbxt_assert_close_real(ufbxt_diff_error *p_err, ufbx_real a, ufbx_real b)
 {
 	ufbx_real err = (ufbx_real)fabs(a - b);
+	ufbxt_soft_assert(err < 0.001);
+	p_err->num++;
+	p_err->sum += err;
+	if (err > p_err->max) p_err->max = err;
+}
+
+static void ufbxt_assert_close_double(ufbxt_diff_error *p_err, double a, double b)
+{
+	double err = (double)fabs(a - b);
 	ufbxt_soft_assert(err < 0.001);
 	p_err->num++;
 	p_err->sum += err;
