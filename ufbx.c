@@ -5065,6 +5065,8 @@ static const ufbx_vec3 ufbxi_one_vec3 = { 1.0f, 1.0f, 1.0f };
 #define UFBXI_DPI (3.14159265358979323846)
 #define UFBXI_DEG_TO_RAD ((ufbx_real)(UFBXI_PI / 180.0))
 #define UFBXI_RAD_TO_DEG ((ufbx_real)(180.0 / UFBXI_PI))
+#define UFBXI_DEG_TO_RAD_DOUBLE (UFBXI_DPI / 180.0)
+#define UFBXI_RAD_TO_DEG_DOUBLE (180.0 / UFBXI_DPI)
 #define UFBXI_MM_TO_INCH ((ufbx_real)0.0393700787)
 
 ufbx_inline ufbx_vec3 ufbxi_add3(ufbx_vec3 a, ufbx_vec3 b) {
@@ -25996,9 +25998,9 @@ ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_quat_rotate_vec3(ufbx_quat q, ufbx_vec3 v
 
 ufbx_abi ufbxi_noinline ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order)
 {
-	double vx = v.x * UFBXI_DEG_TO_RAD * 0.5;
-	double vy = v.y * UFBXI_DEG_TO_RAD * 0.5;
-	double vz = v.z * UFBXI_DEG_TO_RAD * 0.5;
+	double vx = v.x * (UFBXI_DEG_TO_RAD_DOUBLE * 0.5);
+	double vy = v.y * (UFBXI_DEG_TO_RAD_DOUBLE * 0.5);
+	double vz = v.z * (UFBXI_DEG_TO_RAD_DOUBLE * 0.5);
 	double cx = ufbx_cos(vx), sx = ufbx_sin(vx);
 	double cy = ufbx_cos(vy), sy = ufbx_sin(vy);
 	double cz = ufbx_cos(vz), sz = ufbx_sin(vz);
@@ -26143,9 +26145,9 @@ ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_quat_to_euler(ufbx_quat q, ufbx_rotation_
 		break;
 	}
 
-	vx *= UFBXI_RAD_TO_DEG;
-	vy *= UFBXI_RAD_TO_DEG;
-	vz *= UFBXI_RAD_TO_DEG;
+	vx *= UFBXI_RAD_TO_DEG_DOUBLE;
+	vy *= UFBXI_RAD_TO_DEG_DOUBLE;
+	vz *= UFBXI_RAD_TO_DEG_DOUBLE;
 
 	ufbx_vec3 v = { (ufbx_real)vx, (ufbx_real)vy, (ufbx_real)vz };
 	return v;
