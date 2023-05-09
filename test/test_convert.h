@@ -105,7 +105,17 @@ static void ufbxt_check_transform(ufbxt_diff_error *err, const char *name, ufbx_
 		transform.scale.x, transform.scale.y, transform.scale.z);
 
 	ufbxt_assert_close_vec3(err, transform.translation, ref.translation);
-	ufbxt_assert_close_vec3(err, rotation_euler, ref.rotation_euler);
+	#if defined(UFBX_REAL_IS_FLOAT)
+	{
+		ufbx_quat ref_quat = ufbx_euler_to_quat(ref.rotation_euler, UFBX_ROTATION_ORDER_XYZ);
+		ref_quat = ufbx_quat_fix_antipodal(ref_quat, transform.rotation);
+		ufbxt_assert_close_quat(err, transform.rotation, ref_quat);
+	}
+	#else
+	{
+		ufbxt_assert_close_vec3(err, rotation_euler, ref.rotation_euler);
+	}
+	#endif
 	ufbxt_assert_close_vec3(err, transform.scale, ref.scale);
 
 	ufbxt_hintf("");
@@ -1121,7 +1131,7 @@ UFBXT_TEST(synthetic_unnormalized)
 	}
 
 	if (err.num > 0) {
-		ufbx_real avg = err.sum / (ufbx_real)err.num;
+		double avg = err.sum / (double)err.num;
 		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 	}
 }

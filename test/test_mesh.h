@@ -123,10 +123,10 @@ UFBXT_FILE_TEST(maya_color_sets)
 			{ 1.0, 1.0, 1.0, 0.0 },
 		};
 
-		refs[0].x = pos.x + 0.5;
-		refs[0].y = pos.y + 0.5;
-		refs[0].z = pos.z + 0.5;
-		refs[3].w = (pos.x + 0.5) * 0.1 + (pos.y + 0.5) * 0.2 + (pos.z + 0.5) * 0.4;
+		refs[0].x = pos.x + 0.5f;
+		refs[0].y = pos.y + 0.5f;
+		refs[0].z = pos.z + 0.5f;
+		refs[3].w = (pos.x + 0.5f) * 0.1f + (pos.y + 0.5f) * 0.2f + (pos.z + 0.5f) * 0.4f;
 
 		for (size_t set_i = 0; set_i < 4; set_i++) {
 			ufbx_vec4 color = ufbx_get_vertex_vec4(&mesh->color_sets.data[set_i].vertex_color, i);
@@ -202,9 +202,9 @@ UFBXT_FILE_TEST(blender_279_color_sets)
 			{ 0.0, 0.0, 0.0, 1.0 },
 		};
 
-		refs[0].x = pos.x + 0.5;
-		refs[0].y = pos.y + 0.5;
-		refs[0].z = pos.z + 0.5;
+		refs[0].x = pos.x + 0.5f;
+		refs[0].y = pos.y + 0.5f;
+		refs[0].z = pos.z + 0.5f;
 
 		for (size_t set_i = 0; set_i < 3; set_i++) {
 			ufbx_vec4 color = ufbx_get_vertex_vec4(&mesh->color_sets.data[set_i].vertex_color, i);
@@ -296,7 +296,7 @@ UFBXT_FILE_TEST(maya_cone)
 		ufbx_vec3 pos = ufbx_get_vertex_vec3(&mesh->vertex_position, i);
 		ufbx_real crease = ufbx_get_vertex_real(&mesh->vertex_crease, i);
 
-		ufbxt_assert_close_real(err, crease, pos.y > 0.0 ? 0.998 : 0.0);
+		ufbxt_assert_close_real(err, crease, pos.y > 0.0f ? 0.998f : 0.0f);
 	}
 
 	for (size_t i = 0; i < mesh->num_edges; i++) {
@@ -307,11 +307,11 @@ UFBXT_FILE_TEST(maya_cone)
 		ufbx_vec3 b = ufbx_get_vertex_vec3(&mesh->vertex_position, edge.b);
 
 		if (a.y < 0.0 && b.y < 0.0) {
-			ufbxt_assert_close_real(err, crease, 0.583);
+			ufbxt_assert_close_real(err, crease, 0.583f);
 			ufbxt_assert(!smoothing);
 		} else {
 			ufbxt_assert(a.y > 0.0 || b.y > 0.0);
-			ufbxt_assert_close_real(err, crease, 0.0);
+			ufbxt_assert_close_real(err, crease, 0.0f);
 			ufbxt_assert(smoothing);
 		}
 	}
@@ -346,12 +346,12 @@ static void ufbxt_check_tangent_space(ufbxt_diff_error *err, ufbx_mesh *mesh)
 				ufbx_vec3 dp = ufbxt_sub3(pb, pa);
 				ufbx_vec2 du = ufbxt_sub2(ua, ub);
 
-				ufbx_real dp_len = sqrt(ufbxt_dot3(dp, dp));
+				ufbx_real dp_len = (ufbx_real)sqrt(ufbxt_dot3(dp, dp));
 				dp.x /= dp_len;
 				dp.y /= dp_len;
 				dp.z /= dp_len;
 
-				ufbx_real du_len = sqrt(ufbxt_dot2(du, du));
+				ufbx_real du_len = (ufbx_real)sqrt(ufbxt_dot2(du, du));
 				du.x /= du_len;
 				du.y /= du_len;
 
@@ -411,8 +411,8 @@ UFBXT_FILE_TEST(blender_279_ball)
 	ufbxt_assert(red && !strcmp(red->name.data, "Red"));
 	ufbxt_assert(white && !strcmp(white->name.data, "White"));
 
-	ufbx_vec3 red_ref = { 0.8, 0.0, 0.0 };
-	ufbx_vec3 white_ref = { 0.8, 0.8, 0.8 };
+	ufbx_vec3 red_ref = { 0.8f, 0.0f, 0.0f };
+	ufbx_vec3 white_ref = { 0.8f, 0.8f, 0.8f };
 	ufbxt_assert_close_vec3(err, red->fbx.diffuse_color.value_vec3, red_ref);
 	ufbxt_assert_close_vec3(err, white->fbx.diffuse_color.value_vec3, white_ref);
 

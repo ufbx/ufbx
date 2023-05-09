@@ -106,8 +106,11 @@
 
 // -- Configuration
 
-// TODO: Support overriding `ufbx_real` with `float` or anything else.
-typedef double ufbx_real;
+#if defined(UFBX_REAL_IS_FLOAT)
+	typedef float ufbx_real;
+#else
+	typedef double ufbx_real;
+#endif
 
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
 #define UFBX_PANIC_MESSAGE_LENGTH 128
@@ -163,7 +166,7 @@ typedef double ufbx_real;
 #define ufbx_version_minor(version) ((uint32_t)(version)/1000u%1000u)
 #define ufbx_version_patch(version) ((uint32_t)(version)%1000u)
 
-#define UFBX_HEADER_VERSION ufbx_pack_version(0, 4, 0)
+#define UFBX_HEADER_VERSION ufbx_pack_version(0, 5, 0)
 #define UFBX_VERSION UFBX_HEADER_VERSION
 
 // -- Basic types

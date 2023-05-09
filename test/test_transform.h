@@ -7,7 +7,7 @@ UFBXT_FILE_TEST(maya_pivots)
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node);
 
-	ufbx_vec3 origin_ref = { 0.7211236250, 1.8317762500, -0.6038020000 };
+	ufbx_vec3 origin_ref = { (ufbx_real)0.7211236250, (ufbx_real)1.8317762500, (ufbx_real)-0.6038020000 };
 	ufbxt_assert_close_vec3(err, node->local_transform.translation, origin_ref);
 }
 #endif

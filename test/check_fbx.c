@@ -108,7 +108,7 @@ int main(int argc, char **argv)
 	opts.generate_missing_normals = true;
 	opts.ignore_missing_external_files = ignore_missing_external;
 	opts.target_axes = ufbx_axes_right_handed_y_up;
-	opts.target_unit_meters = 0.01;
+	opts.target_unit_meters = (ufbx_real)0.01;
 	opts.obj_search_mtl_by_filename = true;
 
 	if (dedicated_allocs) {
