@@ -3178,6 +3178,9 @@ typedef enum ufbx_warning_type UFBX_ENUM_REPR {
 	// Truncated array has been auto-expanded.
 	UFBX_WARNING_TRUNCATED_ARRAY,
 
+	// Geometry data has been defined but has no data.
+	UFBX_WARNING_MISSING_GEOMETRY_DATA,
+
 	// Out-of-bounds index has been clamped to be in-bounds.
 	// HINT: You can use `ufbx_index_error_handling` to adjust behavior.
 	UFBX_WARNING_INDEX_CLAMPED,
@@ -3216,6 +3219,8 @@ typedef struct ufbx_warning {
 	ufbx_warning_type type;
 	// Description of the warning.
 	ufbx_string description;
+	// The element related to this warning or `UFBX_NO_INDEX` if not related to a specific element.
+	uint32_t element_id;
 	// Number of times this warning was encountered.
 	size_t count;
 } ufbx_warning;

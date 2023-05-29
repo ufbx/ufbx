@@ -727,7 +727,7 @@ UFBXT_FILE_TEST_PATH(blender_331_space_texture, "blender_331_space texture")
 UFBXT_FILE_TEST(synthetic_obj_zoo)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_UNKNOWN_OBJ_DIRECTIVE, 24, "Unknown .obj directive, skipped line");
+	ufbxt_check_warning(scene, UFBX_WARNING_UNKNOWN_OBJ_DIRECTIVE, UFBX_ELEMENT_UNKNOWN, NULL, 24, "Unknown .obj directive, skipped line");
 
 	ufbx_node *node = ufbx_find_node(scene, "Object");
 	ufbxt_assert(node && node->mesh);
@@ -1129,8 +1129,8 @@ static ufbx_load_opts ufbxt_search_mtl_by_filename_opts()
 UFBXT_FILE_TEST_OPTS(synthetic_filename_mtl, ufbxt_search_mtl_by_filename_opts)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_MISSING_EXTERNAL_FILE, 1, "materials.mtl");
-	ufbxt_check_warning(scene, UFBX_WARNING_IMPLICIT_MTL, 1, "synthetic_filename_mtl_0_obj.mtl");
+	ufbxt_check_warning(scene, UFBX_WARNING_MISSING_EXTERNAL_FILE, UFBX_ELEMENT_UNKNOWN, NULL, 1, "materials.mtl");
+	ufbxt_check_warning(scene, UFBX_WARNING_IMPLICIT_MTL, UFBX_ELEMENT_UNKNOWN, NULL, 1, "synthetic_filename_mtl_0_obj.mtl");
 
 	{
 		ufbx_vec3 ka = { 1.0f, 0.0f, 0.0f };
@@ -1327,7 +1327,7 @@ UFBXT_TEST(obj_opts_no_extrnal_files_by_filename)
 				ufbxt_assert(material);
 
 				if (load_external && load_by_filename) {
-					ufbxt_check_warning(scene, UFBX_WARNING_IMPLICIT_MTL, 1, "synthetic_filename_mtl_0_obj.mtl");
+					ufbxt_check_warning(scene, UFBX_WARNING_IMPLICIT_MTL, UFBX_ELEMENT_UNKNOWN, NULL, 1, "synthetic_filename_mtl_0_obj.mtl");
 					ufbx_vec3 ka = { 1.0f, 0.0f, 0.0f };
 					ufbx_vec3 kd = { 0.0f, 1.0f, 0.0f };
 					ufbx_vec3 ks = { 0.0f, 0.0f, 1.0f };
@@ -1336,7 +1336,7 @@ UFBXT_TEST(obj_opts_no_extrnal_files_by_filename)
 					ufbxt_assert_close_vec3(&err, material->fbx.specular_color.value_vec3, ks);
 				} else {
 					if (load_external && !load_by_filename) {
-						ufbxt_check_warning(scene, UFBX_WARNING_MISSING_EXTERNAL_FILE, 1, "materials.mtl");
+						ufbxt_check_warning(scene, UFBX_WARNING_MISSING_EXTERNAL_FILE, UFBX_ELEMENT_UNKNOWN, NULL, 1, "materials.mtl");
 
 					}
 					ufbxt_assert(material->props.props.count == 0);

@@ -4024,15 +4024,26 @@ typedef struct {
 	ufbx_error *error;
 	ufbxi_buf *result;
 	ufbxi_buf tmp_stack;
-	ufbx_warning *prev_warnings[UFBX_WARNING_TYPE_COUNT];
+	uint32_t deferred_element_id_plus_one;
+	// Separate lists for specific and non-specific warnings
+	ufbx_warning *prev_warnings[UFBX_WARNING_TYPE_COUNT][2];
 } ufbxi_warnings;
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_vwarnf_imp(ufbxi_warnings *ws, ufbx_warning_type type, const char *fmt, va_list args)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_vwarnf_imp(ufbxi_warnings *ws, ufbx_warning_type type, uint32_t element_id, const char *fmt, va_list args)
 {
 	if (!ws) return 1;
+
+	// HACK(warning-element): Encode potential deferred element ID into `ufbx_warning.element_id`,
+	// `ws->element_id_index_plus_one` contains index to `uc->tmp_element_id`.
+	// Tag deferred indices with the high bit.
+	if (element_id == ~0u && ws->deferred_element_id_plus_one > 0) {
+		element_id = (ws->deferred_element_id_plus_one - 1) | 0x80000000u;
+	}
+
+	uint32_t has_element_id = element_id != ~0u;
 	if (type >= UFBX_WARNING_TYPE_FIRST_DEDUPLICATED) {
-		ufbx_warning *prev = ws->prev_warnings[type];
-		if (prev) {
+		ufbx_warning *prev = ws->prev_warnings[type][has_element_id];
+		if (prev && prev->element_id == element_id) {
 			prev->count++;
 			return 1;
 		}
@@ -4052,18 +4063,19 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_vwarnf_imp(ufbxi_warnings *ws, u
 	warning->type = type;
 	warning->description.data = desc_copy;
 	warning->description.length = desc_len;
+	warning->element_id = element_id;
 	warning->count = 1;
-	ws->prev_warnings[type] = warning;
+	ws->prev_warnings[type][has_element_id] = warning;
 
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_warnf_imp(ufbxi_warnings *ws, ufbx_warning_type type, const char *fmt, ...)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_warnf_imp(ufbxi_warnings *ws, ufbx_warning_type type, uint32_t element_id, const char *fmt, ...)
 {
 	// NOTE: `ws` may be `NULL` here, handled by `ufbxi_vwarnf()`
 	va_list args;
 	va_start(args, fmt);
-	int ok = ufbxi_vwarnf_imp(ws, type, fmt, args);
+	int ok = ufbxi_vwarnf_imp(ws, type, element_id, fmt, args);
 	va_end(args);
 	return ok;
 }
@@ -4254,7 +4266,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_sanitize_string(ufbxi_string_poo
 	// Handle only invalid cases here
 	ufbx_assert(valid_length < length);
 	ufbxi_check_err_msg(pool->error, pool->error_handling != UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING, "Invalid UTF-8");
-	ufbxi_check_err(pool->error, ufbxi_warnf_imp(pool->warnings, UFBX_WARNING_BAD_UNICODE, "Bad UTF-8 string"));
+	ufbxi_check_err(pool->error, ufbxi_warnf_imp(pool->warnings, UFBX_WARNING_BAD_UNICODE, ~0u, "Bad UTF-8 string"));
 
 	size_t index = valid_length;
 	size_t dst_len = index;
@@ -5460,6 +5472,7 @@ typedef struct {
 	ufbxi_buf tmp_mesh_textures;
 	ufbxi_buf tmp_full_weights;
 	ufbxi_buf tmp_dom_nodes;
+	ufbxi_buf tmp_element_id;
 	size_t tmp_element_byte_offset;
 
 	ufbxi_template *templates;
@@ -5467,6 +5480,8 @@ typedef struct {
 
 	ufbx_dom_node *dom_parse_toplevel;
 	size_t dom_parse_num_children;
+
+	uint32_t *p_element_id;
 
 	// String pool
 	ufbxi_string_pool string_pool;
@@ -5543,7 +5558,8 @@ static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, co
 #define ufbxi_check_return_msg(cond, ret, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), ufbxi_function, ufbxi_line); return ret; } } while (0)
 #define ufbxi_fail_msg(desc, msg) return ufbxi_fail_imp(uc, ufbxi_error_msg(desc, msg), ufbxi_function, ufbxi_line)
 
-#define ufbxi_warnf(type, ...) ufbxi_warnf_imp(&uc->warnings, type, __VA_ARGS__)
+#define ufbxi_warnf(type, ...) ufbxi_warnf_imp(&uc->warnings, type, ~0u, __VA_ARGS__)
+#define ufbxi_warnf_tag(type, element_id, ...) ufbxi_warnf_imp(&uc->warnings, type, (element_id), __VA_ARGS__)
 
 // -- Progress
 
@@ -10483,6 +10499,10 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_element_size(ufbx
 	elem->props = info->props;
 	elem->dom_node = info->dom_node;
 
+	if (uc->p_element_id) {
+		*uc->p_element_id = element_id;
+	}
+
 	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_element_ptrs, ufbx_element*, 1, &elem), NULL);
 
 	ufbxi_check_return(ufbxi_insert_fbx_id(uc, info->fbx_id, element_id), NULL);
@@ -10866,7 +10886,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_truncated_array(ufbxi_context *uc, void *p_data, size_t *p_count, ufbxi_node *node, const char *name, char fmt, size_t size)
 {
 	ufbxi_value_array *arr = ufbxi_find_array(node, name, fmt);
-	ufbxi_check(arr);
+	if (!arr) {
+		ufbxi_check(ufbxi_warnf(UFBX_WARNING_MISSING_GEOMETRY_DATA, "Missing geometry data: %s", name));
+		return 1;
+	}
 
 	*p_count = size;
 
@@ -12546,6 +12569,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects(ufbxi_context *uc)
 {
 	ufbxi_element_info info = { 0 };
 	for (;;) {
+		// Push a deferred element ID for tagging warnings
+		uc->p_element_id = ufbxi_push(&uc->tmp_element_id, uint32_t, 1);
+		ufbxi_check(uc->p_element_id);
+		*uc->p_element_id = UFBX_NO_INDEX;
+		uc->warnings.deferred_element_id_plus_one = (uint32_t)uc->tmp_element_id.num_items;
+
 		ufbxi_node *node;
 		ufbxi_check(ufbxi_parse_toplevel_child(uc, &node));
 		if (!node) break;
@@ -12692,6 +12721,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects(ufbxi_context *uc)
 		} else {
 			ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
 		}
+
+		uc->warnings.deferred_element_id_plus_one = 0;
+		uc->p_element_id = NULL;
 	}
 
 	return 1;
@@ -15563,7 +15595,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_contex
 		if (!uc->opts.disable_quirks) {
 			// Some exporters connect arbitrary non-nodes to root breaking further code, ignore those connections here!
 			if (dst->type == UFBX_ELEMENT_NODE && src->type != UFBX_ELEMENT_NODE && ((ufbx_node*)dst)->is_root) {
-				ufbxi_check(ufbxi_warnf(UFBX_WARNING_BAD_ELEMENT_CONNECTED_TO_ROOT, "Non-node element connected to root"));
+				ufbxi_check(ufbxi_warnf_tag(UFBX_WARNING_BAD_ELEMENT_CONNECTED_TO_ROOT, src->element_id, "Non-node element connected to root"));
 				continue;
 			}
 		}
@@ -21303,6 +21335,23 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_fixup_opts_string(ufbxi_context 
 	return 1;
 }
 
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_resolve_warning_elements(ufbxi_context *uc)
+{
+	size_t num_elements = uc->tmp_element_id.num_items;
+	uint32_t *element_ids = ufbxi_push_pop(&uc->tmp, &uc->tmp_element_id, uint32_t, num_elements);
+	ufbxi_check(element_ids);
+
+	ufbxi_for_list(ufbx_warning, warning, uc->scene.metadata.warnings) {
+		uint32_t element_id = warning->element_id;
+		// Decode `element_id`, see HACK(warning-element) in `ufbxi_vwarnf_imp()` for the encoding.
+		if ((element_id & 0x80000000u) != 0 && element_id != ~0u) {
+			warning->element_id = element_ids[element_id & ~0x80000000u];
+		}
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 {
 	// `ufbx_load_opts` must be cleared to zero first!
@@ -21402,6 +21451,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 
 	// Pop warnings to metadata
 	ufbxi_check(ufbxi_pop_warnings(&uc->warnings, &uc->scene.metadata.warnings, uc->scene.metadata.has_warning));
+	ufbxi_check(ufbxi_resolve_warning_elements(uc));
 
 	// Copy local data to the scene
 	uc->scene.metadata.version = uc->version;
@@ -21470,6 +21520,7 @@ static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->tmp_mesh_textures);
 	ufbxi_buf_free(&uc->tmp_full_weights);
 	ufbxi_buf_free(&uc->tmp_dom_nodes);
+	ufbxi_buf_free(&uc->tmp_element_id);
 
 	ufbxi_free(&uc->ator_tmp, ufbxi_node, uc->top_nodes, uc->top_nodes_cap);
 	ufbxi_free(&uc->ator_tmp, void*, uc->element_extra_arr, uc->element_extra_cap);
@@ -21580,6 +21631,7 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	uc->tmp_mesh_textures.ator = &uc->ator_tmp;
 	uc->tmp_full_weights.ator = &uc->ator_tmp;
 	uc->tmp_dom_nodes.ator = &uc->ator_tmp;
+	uc->tmp_element_id.ator = &uc->ator_tmp;
 
 	uc->result.ator = &uc->ator_result;
 

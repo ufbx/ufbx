@@ -1110,6 +1110,9 @@ static void ufbxt_check_metadata(ufbx_scene *scene, ufbx_metadata *metadata)
 		ufbx_warning *warning = &metadata->warnings.data[i];
 		ufbxt_check_string(warning->description);
 		ufbxt_assert(metadata->has_warning[warning->type]);
+		if (warning->element_id != UFBX_NO_INDEX) {
+			ufbxt_assert(warning->element_id < scene->elements.count);
+		}
 	}
 }
 

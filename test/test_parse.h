@@ -2,12 +2,12 @@
 #define UFBXT_TEST_GROUP "parse"
 
 #if UFBXT_IMPL
-static void ufbxt_check_warning(ufbx_scene *scene, ufbx_warning_type type, size_t count, const char *substring)
+static void ufbxt_check_warning_imp(ufbx_scene *scene, ufbx_warning_type type, uint32_t element_id, size_t count, const char *substring)
 {
 	bool found = false;
 	for (size_t i = 0; i < scene->metadata.warnings.count; i++) {
 		ufbx_warning *warning = &scene->metadata.warnings.data[i];
-		if (warning->type == type) {
+		if (warning->type == type && warning->element_id == element_id) {
 			if (substring) {
 				ufbxt_assert(strstr(warning->description.data, substring));
 			}
@@ -23,6 +23,51 @@ static void ufbxt_check_warning(ufbx_scene *scene, ufbx_warning_type type, size_
 
 	ufbxt_logf("Warning not found: %d", (int)type);
 	ufbxt_assert(found);
+}
+
+// element_name can be prefixed with '#' to match elements parented to a node with the set name
+static void ufbxt_check_warning_ix(ufbx_scene *scene, ufbx_warning_type type, ufbx_element_type element_type, const char *element_name, uint32_t element_index, size_t count, const char *substring)
+{
+	uint32_t element_id = ~0u;
+	if (element_name != NULL) {
+		uint32_t match_index = 0;
+		for (uint32_t i = 0; i < scene->elements.count; i++) {
+			ufbx_element *element = scene->elements.data[i];
+			if (element->type != element_type) continue;
+
+			bool name_match = false;
+			if (element_name[0] == '#') {
+				for (uint32_t j = 0; j < element->instances.count; j++) {
+					ufbx_node *instance = element->instances.data[j];
+					if (!strcmp(instance->name.data, element_name + 1)) {
+						name_match = true;
+						break;
+					}
+				}
+			} else {
+				if (!strcmp(element->name.data, element_name)) {
+					name_match = true;
+				}
+			}
+
+			if (name_match) {
+				if (match_index == element_index) {
+					element_id = element->element_id;
+					break;
+				}
+				match_index++;
+			}
+		}
+		ufbxt_assert(element_id != ~0u);
+	}
+
+	ufbxt_check_warning_imp(scene, type, element_id, count, substring);
+}
+
+// element_name can be prefixed with '#' to match elements parented to a node with the set name
+static void ufbxt_check_warning(ufbx_scene *scene, ufbx_warning_type type, ufbx_element_type element_type, const char *element_name, size_t count, const char *substring)
+{
+	ufbxt_check_warning_ix(scene, type, element_type, element_name, 0, count, substring);
 }
 #endif
 
@@ -693,7 +738,7 @@ UFBXT_FILE_TEST(max_quote)
 #if UFBXT_IMPL
 {
 	if (scene->metadata.ascii && scene->metadata.version == 6100) {
-		ufbxt_check_warning(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_NODE, "\"", 1, 1, NULL);
 	}
 
 	{
@@ -1093,8 +1138,8 @@ static ufbx_load_opts ufbxt_fail_unicode_opts()
 UFBXT_FILE_TEST_FLAGS(synthetic_unsafe_cube, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, 4, NULL);
-	ufbxt_check_warning(scene, UFBX_WARNING_BAD_UNICODE, 1, NULL);
+	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, UFBX_ELEMENT_MESH, "#" "pC" "\xef\xbf\xbd" "\xef\xbf\xbd" "e1", 4, NULL);
+	ufbxt_check_warning(scene, UFBX_WARNING_BAD_UNICODE, UFBX_ELEMENT_NODE, "pC" "\xef\xbf\xbd" "\xef\xbf\xbd" "e1", 1, NULL);
 
 	ufbx_node *node = ufbx_find_node(scene, "pC" "\xef\xbf\xbd" "\xef\xbf\xbd" "e1");
 	ufbxt_assert(node && node->mesh);
@@ -1281,9 +1326,15 @@ UFBXT_FILE_TEST(synthetic_duplicate_id)
 #if UFBXT_IMPL
 {
 	if (scene->metadata.version >= 7000) {
-		ufbxt_check_warning(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, 5, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_NODE, "pCube2", 0, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_NODE, "pointLight2", 0, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_MATERIAL, "lambert2", 0, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_MESH, "", 1, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_LIGHT, "", 1, 1, NULL);
 	} else {
-		ufbxt_check_warning(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, 3, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_NODE, "pCube1", 1, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_NODE, "pointLight1", 1, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_MATERIAL, "lambert1", 1, 1, NULL);
 	}
 
 	// Don't make any assumptions about the scene, ufbxt_check_scene() makes sure
@@ -1474,6 +1525,16 @@ UFBXT_FILE_TEST(maya_notes)
 
 		ufbxt_assert(*str == '\0');
 	}
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_cube, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!strcmp(scene->metadata.latest_application.name.data, "MotionBuilder"));
+
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
 }
 #endif
 

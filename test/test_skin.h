@@ -514,7 +514,7 @@ UFBXT_FILE_TEST(max_transformed_skin)
 UFBXT_FILE_TEST(synthetic_bind_to_root)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_BAD_ELEMENT_CONNECTED_TO_ROOT, SIZE_MAX, NULL);
+	ufbxt_check_warning(scene, UFBX_WARNING_BAD_ELEMENT_CONNECTED_TO_ROOT, UFBX_ELEMENT_SKIN_DEFORMER, "", SIZE_MAX, NULL);
 	// Some unknown exporter is exporting skin deformers being parented to root
 	// This test exists to check that it is handled gracefully if quirks are enabled
 }

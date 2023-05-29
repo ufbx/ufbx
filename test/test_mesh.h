@@ -607,7 +607,7 @@ UFBXT_FILE_TEST(synthetic_indexed_by_vertex)
 UFBXT_FILE_TEST(synthetic_by_vertex_bad_index)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, 9, NULL);
+	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, UFBX_ELEMENT_MESH, "#pCube1", 9, NULL);
 
 	ufbxt_assert(scene->meshes.count == 1);
 	ufbx_mesh *mesh = scene->meshes.data[0];
@@ -632,7 +632,7 @@ UFBXT_FILE_TEST(synthetic_by_vertex_bad_index)
 UFBXT_FILE_TEST(synthetic_by_vertex_overflow)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, 12, NULL);
+	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, UFBX_ELEMENT_MESH, "#pCube1", 12, NULL);
 
 	ufbxt_assert(scene->meshes.count == 1);
 	ufbx_mesh *mesh = scene->meshes.data[0];
@@ -1162,7 +1162,7 @@ UFBXT_FILE_TEST(blender_279_empty_cube)
 UFBXT_FILE_TEST(synthetic_truncated_crease_partial)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, 1, "Truncated array: EdgeCrease");
+	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, UFBX_ELEMENT_MESH, "#pPlane1", 1, "Truncated array: EdgeCrease");
 
 	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
 	ufbxt_assert(node && node->mesh);
@@ -1178,7 +1178,7 @@ UFBXT_FILE_TEST(synthetic_truncated_crease_partial)
 UFBXT_FILE_TEST(synthetic_truncated_crease_full)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, 1, "Truncated array: EdgeCrease");
+	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, UFBX_ELEMENT_MESH, "#pPlane1", 1, "Truncated array: EdgeCrease");
 
 	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
 	ufbxt_assert(node && node->mesh);
@@ -1188,5 +1188,12 @@ UFBXT_FILE_TEST(synthetic_truncated_crease_full)
 	ufbxt_assert_close_real(err, mesh->edge_crease.data[1], 0.0f);
 	ufbxt_assert_close_real(err, mesh->edge_crease.data[2], 0.0f);
 	ufbxt_assert_close_real(err, mesh->edge_crease.data[3], 0.0f);
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_smoothing, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbxt_check_warning(scene, UFBX_WARNING_MISSING_GEOMETRY_DATA, UFBX_ELEMENT_MESH, "#pCube1", 1, "Missing geometry data: Smoothing");
 }
 #endif
