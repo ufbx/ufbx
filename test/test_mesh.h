@@ -1195,5 +1195,11 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_smoothing, UFBXT_FILE_TEST_FLAG_ALLOW_INVALI
 #if UFBXT_IMPL
 {
 	ufbxt_check_warning(scene, UFBX_WARNING_MISSING_GEOMETRY_DATA, UFBX_ELEMENT_MESH, "#pCube1", 1, "Missing geometry data: Smoothing");
+
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->edge_smoothing.count == 0);
 }
 #endif
