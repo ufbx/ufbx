@@ -57,7 +57,7 @@ def get_obj_files(fbx_path, flag_separator):
     yield from single_file(f"{base_path}.obj.gz")
     yield from single_file(f"{base_path}.obj")
     yield from glob.glob(f"{glob.escape(base_path)}{flag_separator}*.obj.gz")
-    yield from glob.glob(f"{glob.escape(base_path)}{flag_separator}_*.obj")
+    yield from glob.glob(f"{glob.escape(base_path)}{flag_separator}*.obj")
 
 def get_mtl_files(obj_path):
     base_path = strip_ext(obj_path)
@@ -144,10 +144,6 @@ def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time):
 
             flag_separator = desc.get("flagSeparator", "_")
 
-            models = list(gather_case_models(path, flag_separator))
-            if not models:
-                raise RuntimeError(f"No models found for {path}")
-
             features = desc.get("features", [])
 
             extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
@@ -188,7 +184,7 @@ def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time):
             models = []
             extra_files = []
             if not skip:
-                models = list(gather_case_models(path))
+                models = list(gather_case_models(path, flag_separator))
                 if not models:
                     raise RuntimeError(f"No models found for {path}")
 
