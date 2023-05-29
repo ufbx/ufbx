@@ -121,7 +121,7 @@ int main(int argc, char **argv)
 	opts.load_external_files = true;
 	opts.generate_missing_normals = true;
 	opts.target_axes = ufbx_axes_right_handed_y_up;
-	opts.target_unit_meters = 0.01;
+	opts.target_unit_meters = (ufbx_real)0.01;
 	opts.obj_search_mtl_by_filename = true;
 
 	for (int i = 1; i < argc; i++) {

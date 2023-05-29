@@ -214,7 +214,7 @@ UFBXT_FILE_TEST(maya_node_attribute_zoo)
 	ufbxt_assert(scene->settings.axes.front == UFBX_COORDINATE_AXIS_POSITIVE_Z);
 	ufbxt_assert(scene->settings.time_mode == UFBX_TIME_MODE_24_FPS);
 	ufbxt_assert_close_real(err, scene->settings.unit_meters, 0.01f);
-	ufbxt_assert_close_real(err, scene->settings.frames_per_second, 24.0f);
+	ufbxt_assert_close_real(err, (ufbx_real)scene->settings.frames_per_second, 24.0f);
 
 	node = ufbx_find_node(scene, "Null");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_EMPTY);

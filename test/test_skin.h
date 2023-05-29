@@ -198,8 +198,8 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 		{ 120.0/24.0, 1.0, 1.0 },
 	};
 	ufbx_vec3 ref_offsets[2][8] = {
-		{ {0,0,0},{0,0,0},{0.317,0,0},{-0.317,0,0},{0.317,0,0},{-0.317,0,0},{0,0,0},{0,0,0}, },
-		{ {0,0,0},{0,0,0},{0,0,-0.284},{0,0,-0.284},{0,0,0.284},{0,0,0.284},{0,0,0},{0,0,0}, },
+		{ {0,0,0},{0,0,0},{0.317f,0,0},{-0.317f,0,0},{0.317f,0,0},{-0.317f,0,0},{0,0,0},{0,0,0}, },
+		{ {0,0,0},{0,0,0},{0,0,-0.284f},{0,0,-0.284f},{0,0,0.284f},{0,0,0.284f},{0,0,0},{0,0,0}, },
 	};
 
 	for (size_t chan_ix = 0; chan_ix < 2; chan_ix++) {
@@ -262,7 +262,7 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 
 				ufbx_prop prop = ufbx_evaluate_prop(scene->anim, &chan->element, "DeformPercent", time);
 
-				ufbxt_assert_close_real(err, prop.value_real / 100.0, ref);
+				ufbxt_assert_close_real(err, prop.value_real / 100.0f, ref);
 				ufbxt_assert_close_real(err, chan->weight, ref);
 				weights[chan_ix] = chan->weight;
 			}

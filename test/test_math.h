@@ -7,7 +7,7 @@ static ufbx_real ufbxt_quat_error(ufbx_quat a, ufbx_quat b)
 {
 	double pos = fabs(a.x-b.x) + fabs(a.y-b.y) + fabs(a.z-b.z) + fabs(a.w-b.w);
 	double neg = fabs(a.x+b.x) + fabs(a.y+b.y) + fabs(a.z+b.z) + fabs(a.w+b.w);
-	return pos < neg ? pos : neg;
+	return (ufbx_real)(pos < neg ? pos : neg);
 }
 
 static uint32_t ufbxt_xorshift32(uint32_t *state)

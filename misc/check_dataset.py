@@ -8,6 +8,9 @@ import urllib.parse
 import time
 import math
 import itertools
+import datetime
+
+LATEST_SUPPORTED_DATE = "2023-05-29"
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -23,6 +26,7 @@ class TestCase(NamedTuple):
     author: str
     license: str
     url: str
+    skip: bool
     extra_files: List[str]
     models: List[TestModel]
     options: Mapping[str, List[str]]
@@ -116,7 +120,19 @@ def iter_options(options):
     if not options: return [()]
     return itertools.product(*([(k,v) for v in vs] for k,vs in options.items()))
 
-def gather_dataset_tasks(root_dir, heavy):
+def get_field(path, desc, name, allow_unknown):
+    value = desc.get(name)
+    if isinstance(value, str):
+        return value
+    elif value is None:
+        if allow_unknown:
+            return None
+        else:
+            raise RuntimeError(f"{path}: Unknown value for '{name}', use --allow-unknown to bypass")
+    else:
+        raise RuntimeError(f"{path}: Bad value for '{name}': {value!r}")
+
+def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time):
     for root, _, files in os.walk(root_dir):
         for filename in files:
             if not filename.endswith(".json"):
@@ -163,14 +179,29 @@ def gather_dataset_tasks(root_dir, heavy):
                     options["ignore-missing-external"] = [True]
                 else:
                     raise RuntimeError(f"Unknown feature: {feature}")
+            mtime = os.path.getmtime(path)
+            
+            skip = False
+            if last_supported_time and mtime > latest_supported_time.timestamp():
+                skip = True
+
+            models = []
+            extra_files = []
+            if not skip:
+                models = list(gather_case_models(path))
+                if not models:
+                    raise RuntimeError(f"No models found for {path}")
+
+                extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
 
             yield TestCase(
                 root=root_dir,
                 json_path=path,
-                title=desc["title"],
-                author=desc["author"],
-                license=desc["license"],
-                url=desc["url"],
+                title=get_field(path, desc, "title", allow_unknown),
+                author=get_field(path, desc, "author", allow_unknown),
+                license=get_field(path, desc, "license", allow_unknown),
+                url=get_field(path, desc, "url", allow_unknown),
+                skip=skip,
                 extra_files=extra_files,
                 models=models,
                 options=options,
@@ -185,12 +216,18 @@ if __name__ == "__main__":
     parser.add_argument("--exe", help="check_fbx.c executable")
     parser.add_argument("--verbose", action="store_true", help="Print verbose information")
     parser.add_argument("--heavy", action="store_true", help="Run heavy checks")
+    parser.add_argument("--allow-unknown", action="store_true", help="Allow unknown fields")
+    parser.add_argument("--include-recent", action="store_true", help="Run tests that are too recent")
     argv = parser.parse_args()
 
     host_url = argv.host_url if argv.host_url else argv.root
     host_url = host_url.rstrip("\\/")
 
-    cases = list(gather_dataset_tasks(root_dir=argv.root, heavy=argv.heavy))
+    latest_supported_time = datetime.datetime.strptime(LATEST_SUPPORTED_DATE, "%Y-%m-%d")
+    if argv.include_recent:
+        latest_supported_time = None
+
+    cases = list(gather_dataset_tasks(root_dir=argv.root, heavy=argv.heavy, allow_unknown=argv.allow_unknown, last_supported_time=latest_supported_time))
 
     def fmt_url(path, root=""):
         if root:
@@ -209,12 +246,17 @@ if __name__ == "__main__":
     test_count = 0
 
     case_ok_count = 0
+    case_run_count = 0
+    case_skip_count = 0
 
     begin_time = time.time()
 
     for case in cases:
 
-        log(f"== '{case.title}' by '{case.author}' ({case.license}) ==")
+        title = case.title if case.title else "(unknown)"
+        author = case.author if case.author else "(unknown)"
+        license = case.license if case.license else "PROPRIETARY"
+        log(f"== '{title}' by '{author}' ({license}) ==")
         log()
 
         if case.url:
@@ -225,6 +267,14 @@ if __name__ == "__main__":
         log()
 
         case_ok = True
+
+        if case.skip:
+            log("-- SKIP --")
+            log()
+            case_skip_count += 1
+            continue
+
+        case_run_count += 1
 
         for model in case.models:
             case_args = [argv.exe]
@@ -289,7 +339,13 @@ if __name__ == "__main__":
 
     end_time = time.time()
 
-    log(f"{ok_count}/{test_count} files passed ({case_ok_count}/{len(cases)} test cases)")
+    log(f"{ok_count}/{test_count} files passed ({case_ok_count}/{case_run_count} test cases)")
+    if case_skip_count > 0:
+        if (latest_supported_time.hour, latest_supported_time.minute, latest_supported_time.second) == (0, 0, 0):
+            time_str = latest_supported_time.strftime("%Y-%m-%d")
+        else:
+            time_str = latest_supported_time.strftime("%Y-%m-%d %H:%M:%S")
+        log(f"WARNING: Skipped {case_skip_count} test cases modified after {time_str}")
 
     dur = int(math.ceil(end_time - begin_time))
     log(f"Total time: {int(dur/60)}min {dur%60}s")

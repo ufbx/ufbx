@@ -2511,7 +2511,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 		ufbxt_diff_error err = { 0 };
 		ufbxt_diff_to_obj(obj_scene, obj_file, &err, 0);
 		if (err.num > 0) {
-			ufbx_real avg = err.sum / (ufbx_real)err.num;
+			double avg = err.sum / (double)err.num;
 			ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 		}
 
@@ -2912,7 +2912,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			test_fn(scene, &err, &error);
 
 			if (err.num > 0) {
-				ufbx_real avg = err.sum / (ufbx_real)err.num;
+				double avg = err.sum / (double)err.num;
 				if (expect_diff_fail) {
 					ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests, %zu failing as expected)", avg, err.max, err.num, num_failing_diff_checks);
 				} else {

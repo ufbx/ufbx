@@ -872,6 +872,15 @@ async def main():
         }
         target_tasks += compile_permutations("runner", runner_config, all_configs, ["-d", "data"])
 
+        float_config = {
+            "sources": ["test/runner.c", "ufbx.c"],
+            "output": "runner_float" + exe_suffix,
+            "defines": {
+                "UFBX_REAL_IS_FLOAT": 1,
+            }
+        }
+        target_tasks += compile_permutations("runner_float", float_config, arch_configs, ["-d", "data"])
+
         cpp_config = {
             "sources": ["misc/test_build.cpp"],
             "output": "cpp" + exe_suffix,
@@ -993,6 +1002,7 @@ async def main():
             "UFBX_NO_INDEX_GENERATION",
             "UFBX_NO_TRIANGULATION",
             "UFBX_NO_ERROR_STACK",
+            "UFBX_REAL_IS_FLOAT",
         ]
 
         target_tasks = []

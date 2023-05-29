@@ -1093,7 +1093,7 @@ UFBXT_TEST(synthetic_unnormalized)
 	}
 
 	if (err.num > 0) {
-		ufbx_real avg = err.sum / (ufbx_real)err.num;
+		double avg = err.sum / (double)err.num;
 		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 	}
 }

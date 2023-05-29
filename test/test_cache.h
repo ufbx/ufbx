@@ -36,7 +36,7 @@ static void ufbxt_test_sine_cache(ufbxt_diff_error *err, const char *path, doubl
 					double sx = sin((v.y + t * 0.5f)*pi2) * 0.25;
 					double vx = v.x;
 					vx += vx > 0.0 ? -0.5 : 0.5;
-					ufbxt_assert_close_real(err, vx*err_scale, sx*err_scale);
+					ufbxt_assert_close_double(err, vx*err_scale, sx*err_scale);
 				}
 			}
 		}

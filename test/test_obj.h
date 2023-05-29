@@ -1210,7 +1210,7 @@ UFBXT_TEST(obj_opts_mtl_data)
 	ufbxt_assert_close_vec3(&err, material->fbx.diffuse_color.value_vec3, kd);
 	ufbxt_assert_close_vec3(&err, material->fbx.specular_color.value_vec3, ks);
 	if (err.num > 0) {
-		ufbx_real avg = err.sum / (ufbx_real)err.num;
+		double avg = err.sum / (double)err.num;
 		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 	}
 
@@ -1252,7 +1252,7 @@ UFBXT_TEST(obj_opts_mtl_path)
 	ufbxt_assert_close_vec3(&err, material->fbx.diffuse_color.value_vec3, kd);
 	ufbxt_assert_close_vec3(&err, material->fbx.specular_color.value_vec3, ks);
 	if (err.num > 0) {
-		ufbx_real avg = err.sum / (ufbx_real)err.num;
+		double avg = err.sum / (double)err.num;
 		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 	}
 
@@ -1298,7 +1298,7 @@ UFBXT_TEST(obj_opts_no_extrnal_files)
 	}
 
 	if (err.num > 0) {
-		ufbx_real avg = err.sum / (ufbx_real)err.num;
+		double avg = err.sum / (double)err.num;
 		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 	}
 }
@@ -1348,7 +1348,7 @@ UFBXT_TEST(obj_opts_no_extrnal_files_by_filename)
 	}
 
 	if (err.num > 0) {
-		ufbx_real avg = err.sum / (ufbx_real)err.num;
+		double avg = err.sum / (double)err.num;
 		ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", avg, err.max, err.num);
 	}
 }

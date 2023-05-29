@@ -12,7 +12,7 @@ UFBXT_FILE_TEST(maya_interpolation_modes)
 #if UFBXT_IMPL
 {
 	// Curve evaluated values at 24fps
-	static const ufbx_real values[] = {
+	static const double values[] = {
 		-8.653366, // Start from zero time
 		-8.653366,-8.602998,-8.464664,-8.257528,-8.00075,-7.713489,-7.414906,-7.124163,-6.86042,
 		-6.642837,-6.490576,-6.388305,-6.306414,-6.242637,-6.19471,-6.160368,-6.137348,-6.123385,
@@ -56,8 +56,8 @@ UFBXT_FILE_TEST(maya_interpolation_modes)
 		ufbxt_assert(ufbxt_arraycount(key_ref) == num_keys);
 
 		for (size_t i = 0; i < num_keys; i++) {
-			ufbxt_assert_close_real(err, keys[i].time, (double)key_ref[i].frame / 24.0);
-			ufbxt_assert_close_real(err, keys[i].value, key_ref[i].value);
+			ufbxt_assert_close_double(err, keys[i].time, (double)key_ref[i].frame / 24.0);
+			ufbxt_assert_close_real(err, keys[i].value, (ufbx_real)key_ref[i].value);
 			if (i > 0) ufbxt_assert(keys[i].left.dx > 0.0f);
 			if (i + 1 < num_keys) ufbxt_assert(keys[i].right.dx > 0.0f);
 		}
@@ -87,7 +87,7 @@ UFBXT_FILE_TEST(maya_interpolation_modes)
 			// Round up to the next frame to make stepped tangents consistent
 			double time = (double)i * (1.0/24.0) + 0.000001;
 			ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
-			ufbxt_assert_close_real(err, value, values[i]);
+			ufbxt_assert_close_real(err, value, (ufbx_real)values[i]);
 		}
 
 		size_t num_samples = 64 * 1024;
@@ -104,7 +104,7 @@ UFBXT_FILE_TEST(maya_auto_clamp)
 #if UFBXT_IMPL
 {
 	// Curve evaluated values at 24fps
-	static const ufbx_real values[] = {
+	static const double values[] = {
 		0.000, 0.000, 0.273, 0.515, 0.718, 0.868, 0.945, 0.920, 0.779, 0.611,
 		0.591, 0.747, 1.206, 2.059, 3.191, 4.489, 5.837, 7.121, 8.228, 9.042,
 		9.449, 9.694, 10.128, 10.610, 10.873, 10.927, 10.854, 10.704, 10.502,
@@ -122,7 +122,7 @@ UFBXT_FILE_TEST(maya_auto_clamp)
 		for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
 			double time = (double)i * (1.0/24.0);
 			ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
-			ufbxt_assert_close_real(err, value, values[i]);
+			ufbxt_assert_close_real(err, value, (ufbx_real)values[i]);
 		}
 	}
 }
@@ -131,7 +131,7 @@ UFBXT_FILE_TEST(maya_auto_clamp)
 UFBXT_FILE_TEST(maya_resampled)
 #if UFBXT_IMPL
 {
-	static const ufbx_real values6[] = {
+	static const double values6[] = {
 		0,0,0,0,0,0,0,0,0,
 		-0.004, -0.022, -0.056, -0.104, -0.166, -0.241, -0.328, -0.427, -0.536, -0.654, -0.783,
 		-0.919, -1.063, -1.214, -1.371, -1.533, -1.700, -1.871, -2.044, -2.220, -2.398, -2.577,
@@ -141,7 +141,7 @@ UFBXT_FILE_TEST(maya_resampled)
 		-4.919, -4.810, -4.686,
 	};
 
-	static const ufbx_real values7[] = {
+	static const double values7[] = {
 		0,0,0,0,0,0,0,0,
 		0.000, -0.004, -0.025, -0.061, -0.112, -0.176, -0.252, -0.337, -0.431, -0.533, -0.648, 
 		-0.776, -0.915, -1.064, -1.219, -1.378, -1.539, -1.700, -1.865, -2.037, -2.216, -2.397, -2.580, 
@@ -151,7 +151,7 @@ UFBXT_FILE_TEST(maya_resampled)
 		-4.800, -4.680, -4.550, -4.403, -4.239, 
 	};
 
-	const ufbx_real *values = scene->metadata.version >= 7000 ? values7 : values6;
+	const double *values = scene->metadata.version >= 7000 ? values7 : values6;
 	size_t num_values = scene->metadata.version >= 7000 ? ufbxt_arraycount(values7) : ufbxt_arraycount(values6);
 
 	ufbxt_assert(scene->anim_layers.count == 1);
@@ -164,7 +164,7 @@ UFBXT_FILE_TEST(maya_resampled)
 		for (size_t i = 0; i < num_values; i++) {
 			double time = (double)i * (1.0/200.0);
 			ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
-			ufbxt_assert_close_real(err, value, values[i]);
+			ufbxt_assert_close_real(err, value, (ufbx_real)values[i]);
 		}
 	}
 }
@@ -191,14 +191,14 @@ UFBXT_FILE_TEST(maya_anim_light)
 #if UFBXT_IMPL
 {
 	static const ufbxt_anim_light_ref refs[] = {
-		{  0, 3.072, { 0.148, 0.095, 0.440 } },
-		{ 12, 1.638, { 0.102, 0.136, 0.335 } },
-		{ 24, 1.948, { 0.020, 0.208, 0.149 } },
-		{ 32, 3.676, { 0.010, 0.220, 0.113 } },
-		{ 40, 4.801, { 0.118, 0.195, 0.115 } },
-		{ 48, 3.690, { 0.288, 0.155, 0.117 } },
-		{ 56, 1.565, { 0.421, 0.124, 0.119 } },
-		{ 60, 1.145, { 0.442, 0.119, 0.119 } },
+		{  0, 3.072f, { 0.148f, 0.095f, 0.440f } },
+		{ 12, 1.638f, { 0.102f, 0.136f, 0.335f } },
+		{ 24, 1.948f, { 0.020f, 0.208f, 0.149f } },
+		{ 32, 3.676f, { 0.010f, 0.220f, 0.113f } },
+		{ 40, 4.801f, { 0.118f, 0.195f, 0.115f } },
+		{ 48, 3.690f, { 0.288f, 0.155f, 0.117f } },
+		{ 56, 1.565f, { 0.421f, 0.124f, 0.119f } },
+		{ 60, 1.145f, { 0.442f, 0.119f, 0.119f } },
 	};
 
 	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
@@ -549,7 +549,7 @@ UFBXT_FILE_TEST(maya_cube_blinky)
 #if UFBXT_IMPL
 typedef struct {
 	double time;
-	ufbx_real value;
+	double value;
 } ufbxt_anim_ref;
 #endif
 
@@ -602,7 +602,7 @@ UFBXT_FILE_TEST(maya_anim_interpolation)
 		ufbxt_hintf("%zu: %f (frame %.2f)", i, ref.time, ref.time * 30.0f);
 
 		ufbx_prop p = ufbx_evaluate_prop(scene->anim, &node->element, "Lcl Translation", ref.time);
-		ufbxt_assert_close_real(err, p.value_vec3.x, ref.value);
+		ufbxt_assert_close_real(err, p.value_vec3.x, (ufbx_real)ref.value);
 	}
 }
 #endif
