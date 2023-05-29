@@ -3227,10 +3227,12 @@ typedef struct ufbx_warning {
 
 UFBX_LIST_TYPE(ufbx_warning_list, ufbx_warning);
 
-typedef enum ufbx_thumbnail_format {
+typedef enum ufbx_thumbnail_format UFBX_ENUM_REPR {
 	UFBX_THUMBNAIL_FORMAT_UNKNOWN, // < Unknown format
 	UFBX_THUMBNAIL_FORMAT_RGB_24,  // < 8-bit RGB pixels, in memory R,G,B
 	UFBX_THUMBNAIL_FORMAT_RGBA_32, // < 8-bit RGBA pixels, in memory R,G,B,A
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_THUMBNAIL_FORMAT)
 } ufbx_thumbnail_format;
 
 UFBX_ENUM_TYPE(ufbx_thumbnail_format, UFBX_THUMBNAIL_FORMAT, UFBX_THUMBNAIL_FORMAT_RGBA_32);
