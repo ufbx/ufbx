@@ -260,7 +260,7 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 
 	long version = 0;
 
-	const long current_version = 2;
+	const long current_version = 3;
 
 	int line = 0;
 	while (*spec != '\0') {
