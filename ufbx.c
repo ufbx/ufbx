@@ -4600,6 +4600,7 @@ static const char ufbxi_GlobalSettings[] = "GlobalSettings";
 static const char ufbxi_Hole[] = "Hole";
 static const char ufbxi_HotSpot[] = "HotSpot";
 static const char ufbxi_IKEffector[] = "IKEffector";
+static const char ufbxi_ImageData[] = "ImageData";
 static const char ufbxi_Implementation[] = "Implementation";
 static const char ufbxi_Indexes[] = "Indexes";
 static const char ufbxi_InheritType[] = "InheritType";
@@ -4742,6 +4743,7 @@ static const char ufbxi_TextureRotationPivot[] = "TextureRotationPivot";
 static const char ufbxi_TextureScalingPivot[] = "TextureScalingPivot";
 static const char ufbxi_TextureUV[] = "TextureUV";
 static const char ufbxi_TextureUVVerticeIndex[] = "TextureUVVerticeIndex";
+static const char ufbxi_Thumbnail[] = "Thumbnail";
 static const char ufbxi_TimeMarker[] = "TimeMarker";
 static const char ufbxi_TimeMode[] = "TimeMode";
 static const char ufbxi_TimeProtocol[] = "TimeProtocol";
@@ -4889,6 +4891,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Hole, 4 },
 	{ ufbxi_HotSpot, 7 },
 	{ ufbxi_IKEffector, 10 },
+	{ ufbxi_ImageData, 9 },
 	{ ufbxi_Implementation, 14 },
 	{ ufbxi_Indexes, 7 },
 	{ ufbxi_InheritType, 11 },
@@ -5031,6 +5034,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_TextureScalingPivot, 19 },
 	{ ufbxi_TextureUV, 9 },
 	{ ufbxi_TextureUVVerticeIndex, 21 },
+	{ ufbxi_Thumbnail, 9 },
 	{ ufbxi_TimeMarker, 10 },
 	{ ufbxi_TimeMode, 8 },
 	{ ufbxi_TimeProtocol, 12 },
@@ -6664,6 +6668,8 @@ static ufbxi_noinline void *ufbxi_get_element_extra(ufbxi_context *uc, uint32_t 
 typedef enum {
 	UFBXI_PARSE_ROOT,
 	UFBXI_PARSE_FBX_HEADER_EXTENSION,
+	UFBXI_PARSE_SCENE_INFO,
+	UFBXI_PARSE_THUMBNAIL,
 	UFBXI_PARSE_DEFINITIONS,
 	UFBXI_PARSE_OBJECTS,
 	UFBXI_PARSE_CONNECTIONS,
@@ -6742,6 +6748,11 @@ static ufbxi_noinline ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_sta
 
 	case UFBXI_PARSE_FBX_HEADER_EXTENSION:
 		if (name == ufbxi_FBXVersion) return UFBXI_PARSE_FBX_VERSION;
+		if (name == ufbxi_SceneInfo) return UFBXI_PARSE_SCENE_INFO;
+		break;
+
+	case UFBXI_PARSE_SCENE_INFO:
+		if (name == ufbxi_Thumbnail) return UFBXI_PARSE_THUMBNAIL;
 		break;
 
 	case UFBXI_PARSE_OBJECTS:
@@ -6829,6 +6840,14 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	}
 
 	switch (parent) {
+
+	case UFBXI_PARSE_THUMBNAIL:
+		if (name == ufbxi_ImageData) {
+			info->type = 'c';
+			info->flags = UFBXI_ARRAY_FLAG_RESULT;
+			return true;
+		}
+		break;
 
 	case UFBXI_PARSE_GEOMETRY:
 	case UFBXI_PARSE_MODEL:
@@ -10143,9 +10162,49 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_properties(ufbxi_context *u
 	return 1;
 }
 
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_thumbnail(ufbxi_context *uc, ufbxi_node *node, ufbx_thumbnail *thumbnail)
+{
+	ufbxi_check(ufbxi_read_properties(uc, node, &thumbnail->props));
+
+	int64_t custom_width = ufbx_find_int(&thumbnail->props, "CustomWidth", 0);
+	int64_t custom_height = ufbx_find_int(&thumbnail->props, "CustomHeight", 0);
+
+	int32_t format;
+	ufbxi_node *format_node = ufbxi_find_child_strcmp(node, "Format");
+	if (format_node && ufbxi_get_val1(format_node, "I", &format)) {
+		if (format >= 0 && format + 1 < UFBX_THUMBNAIL_FORMAT_COUNT) {
+			thumbnail->format = (ufbx_thumbnail_format)(format + 1);
+		}
+	}
+
+	int32_t size;
+	if (ufbxi_find_val1(node, ufbxi_Size, "I", &size)) {
+		if (size > 0) {
+			thumbnail->width = (uint32_t)size;
+			thumbnail->height = (uint32_t)size;
+		} else if (size < 0 && custom_width > 0 && custom_height > 0) {
+			thumbnail->width = (uint32_t)custom_width;
+			thumbnail->height = (uint32_t)custom_height;
+		}
+	}
+
+	ufbxi_value_array *data_arr = ufbxi_find_array(node, ufbxi_ImageData, 'c');
+	if (data_arr) {
+		thumbnail->data.data = data_arr->data;
+		thumbnail->data.size = data_arr->size;
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_scene_info(ufbxi_context *uc, ufbxi_node *node)
 {
 	ufbxi_check(ufbxi_read_properties(uc, node, &uc->scene.metadata.scene_props));
+
+	ufbxi_node *thumbnail = ufbxi_find_child(node, ufbxi_Thumbnail);
+	if (thumbnail) {
+		ufbxi_check(ufbxi_read_thumbnail(uc, thumbnail, &uc->scene.metadata.thumbnail));
+	}
 
 	return 1;
 }

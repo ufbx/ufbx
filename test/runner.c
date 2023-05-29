@@ -2455,6 +2455,9 @@ typedef enum ufbxt_file_test_flags {
 	// Ignore normals when doing diff to .obj when testing with various
 	// `ufbx_load_opts.geometry_transform_handling` values.
 	UFBXT_FILE_TEST_FLAG_OPT_HANDLING_IGNORE_NORMALS_IN_DIFF = 0x800,
+
+	// Allow fewer than default progress calls
+	UFBXT_FILE_TEST_FLAG_ALLOW_FEWER_PROGRESS_CALLS = 0x1000,
 } ufbxt_file_test_flags;
 
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err, ufbx_error *load_error), const char *suffix, ufbx_load_opts user_opts, ufbxt_file_test_flags flags)
@@ -2601,7 +2604,9 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 
 			if (scene) {
 				ufbxt_check_scene(scene);
-				ufbxt_assert(progress_ctx.calls >= size / 0x4000 / 2);
+				if ((flags & UFBXT_FILE_TEST_FLAG_ALLOW_FEWER_PROGRESS_CALLS) == 0) {
+					ufbxt_assert(progress_ctx.calls >= size / 0x4000 / 2);
+				}
 			} else if (!allow_error) {
 				ufbxt_log_error(&error);
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse file");

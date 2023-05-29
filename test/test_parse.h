@@ -909,18 +909,6 @@ UFBXT_FILE_TEST_OPTS_FLAGS(synthetic_broken_filename, ufbxt_unicode_error_questi
 }
 #endif
 
-#if UFBXT_IMPL
-static uint32_t ufbxt_fnv1a(const void *data, size_t size)
-{
-	const char *src = (const char*)data;
-	uint32_t hash = 0x811c9dc5u;
-	for (size_t i = 0; i < size; i++) {
-		hash = (hash ^ (uint32_t)(uint8_t)src[i]) * 0x01000193u;
-	}
-	return hash;
-}
-#endif
-
 UFBXT_FILE_TEST(revit_empty)
 #if UFBXT_IMPL
 {
@@ -1535,6 +1523,27 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_cube, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNI
 
 	ufbx_node *node = ufbx_find_node(scene, "Cube");
 	ufbxt_assert(node && node->mesh);
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_thumbnail, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_ALLOW_FEWER_PROGRESS_CALLS)
+#if UFBXT_IMPL
+{
+	ufbx_thumbnail *thumbnail = &scene->metadata.thumbnail;
+	ufbxt_assert(ufbx_find_int(&thumbnail->props, "CustomWidth", 0) == 100);
+	ufbxt_assert(ufbx_find_int(&thumbnail->props, "CustomHeight", 0) == 100);
+	ufbxt_assert(thumbnail->format == UFBX_THUMBNAIL_FORMAT_RGBA_32);
+	ufbxt_assert(thumbnail->width == 128);
+	ufbxt_assert(thumbnail->height == 128);
+	ufbxt_assert(ufbxt_fnv1a(thumbnail->data.data, thumbnail->data.size) == 0xc9d71343u);
+
+	size_t num_pixels = thumbnail->width * thumbnail->height;
+	ufbxt_assert(thumbnail->data.size == num_pixels * 4);
+	const uint8_t *pixels = (const uint8_t*)thumbnail->data.data;
+	for (size_t i = 0; i < num_pixels; i++) {
+		uint8_t a = pixels[i * 4 + 3];
+		ufbxt_assert(a == 255);
+	}
 }
 #endif
 

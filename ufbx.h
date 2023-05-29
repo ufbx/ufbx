@@ -3227,6 +3227,30 @@ typedef struct ufbx_warning {
 
 UFBX_LIST_TYPE(ufbx_warning_list, ufbx_warning);
 
+typedef enum ufbx_thumbnail_format {
+	UFBX_THUMBNAIL_FORMAT_UNKNOWN, // < Unknown format
+	UFBX_THUMBNAIL_FORMAT_RGB_24,  // < 8-bit RGB pixels, in memory R,G,B
+	UFBX_THUMBNAIL_FORMAT_RGBA_32, // < 8-bit RGBA pixels, in memory R,G,B,A
+} ufbx_thumbnail_format;
+
+UFBX_ENUM_TYPE(ufbx_thumbnail_format, UFBX_THUMBNAIL_FORMAT, UFBX_THUMBNAIL_FORMAT_RGBA_32);
+
+// Embedded thumbnail in the file, valid if the dimensions are non-zero.
+typedef struct ufbx_thumbnail {
+	ufbx_props props;
+
+	// Extents of the thumbnail
+	uint32_t width;
+	uint32_t height;
+
+	// Format of `ufbx_thumbnail.data`.
+	ufbx_thumbnail_format format;
+
+	// Thumbnail pixel data, layout as contiguous rows from bottom to top.
+	// See `ufbx_thumbnail.format` for the pixel format.
+	ufbx_blob data;
+} ufbx_thumbnail;
+
 // Miscellaneous data related to the loaded file
 typedef struct ufbx_metadata {
 
@@ -3284,6 +3308,8 @@ typedef struct ufbx_metadata {
 
 	ufbx_application original_application;
 	ufbx_application latest_application;
+
+	ufbx_thumbnail thumbnail;
 
 	bool geometry_ignored;
 	bool animation_ignored;

@@ -1087,6 +1087,12 @@ static void ufbxt_check_application(ufbx_scene *scene, ufbx_application *applica
 	ufbxt_check_string(application->version);
 }
 
+static void ufbxt_check_thumbnail(ufbx_scene *scene, ufbx_thumbnail *thumbnail)
+{
+	ufbxt_assert((uint32_t)thumbnail->format < (uint32_t)UFBX_THUMBNAIL_FORMAT_COUNT);
+	ufbxt_check_blob(thumbnail->data);
+}
+
 static void ufbxt_check_metadata(ufbx_scene *scene, ufbx_metadata *metadata)
 {
 	ufbxt_check_string(metadata->creator);
@@ -1114,6 +1120,8 @@ static void ufbxt_check_metadata(ufbx_scene *scene, ufbx_metadata *metadata)
 			ufbxt_assert(warning->element_id < scene->elements.count);
 		}
 	}
+
+	ufbxt_check_thumbnail(scene, &metadata->thumbnail);
 }
 
 static void ufbxt_check_dom_value(ufbx_scene *scene, ufbx_dom_value *value)

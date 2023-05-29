@@ -3,6 +3,16 @@
 
 #if UFBXT_IMPL
 
+static uint32_t ufbxt_fnv1a(const void *data, size_t size)
+{
+	const char *src = (const char*)data;
+	uint32_t hash = 0x811c9dc5u;
+	for (size_t i = 0; i < size; i++) {
+		hash = (hash ^ (uint32_t)(uint8_t)src[i]) * 0x01000193u;
+	}
+	return hash;
+}
+
 static ptrdiff_t ufbxt_inflate_no_fuzz(void *dst, size_t dst_size, const void *src, size_t src_size, const ufbxt_inflate_opts *opts)
 {
 	ufbx_inflate_retain retain;
@@ -636,18 +646,6 @@ UFBXT_DEFLATE_TEST(deflate_fail_no_dist_codes)
 }
 #endif
 
-#if UFBXT_IMPL
-static uint32_t fnv1a(const void *data, size_t size)
-{
-	const char *ptr = data, *end = ptr + size;
-	uint32_t h = 0x811c9dc5u;
-	for (; ptr != end; ptr++) {
-		h = (h ^ (uint8_t)*ptr) * 0x01000193;
-	}
-	return h;
-}
-#endif
-
 UFBXT_DEFLATE_TEST(deflate_bit_flip)
 #if UFBXT_IMPL
 {
@@ -747,7 +745,7 @@ UFBXT_DEFLATE_TEST(deflate_static_distances_and_lengths)
 	ptrdiff_t res = ufbxt_inflate(dst, dst_size, src, sizeof(src) - 1, opts);
 	ufbxt_hintf("res = %d", (int)res);
 	ufbxt_assert(res == dst_size);
-	ufbxt_assert(fnv1a(dst, dst_size) == 0x88398917);
+	ufbxt_assert(ufbxt_fnv1a(dst, dst_size) == 0x88398917);
 	free(dst);
 }
 #endif
@@ -807,7 +805,7 @@ UFBXT_DEFLATE_TEST(deflate_dynamic_distances_and_lengths)
 	ptrdiff_t res = ufbxt_inflate(dst, dst_size, src, sizeof(src) - 1, opts);
 	ufbxt_hintf("res = %d", (int)res);
 	ufbxt_assert(res == dst_size);
-	ufbxt_assert(fnv1a(dst, dst_size) == 0x88398917);
+	ufbxt_assert(ufbxt_fnv1a(dst, dst_size) == 0x88398917);
 	free(dst);
 }
 #endif
@@ -835,7 +833,7 @@ UFBXT_DEFLATE_TEST(deflate_long_codes)
 	ptrdiff_t res = ufbxt_inflate(dst, dst_size, src, sizeof(src) - 1, opts);
 	ufbxt_hintf("res = %d", (int)res);
 	ufbxt_assert(res == dst_size);
-	ufbxt_assert(fnv1a(dst, dst_size) == 0x9e9ed1e5);
+	ufbxt_assert(ufbxt_fnv1a(dst, dst_size) == 0x9e9ed1e5);
 	free(dst);
 }
 #endif
@@ -1025,7 +1023,7 @@ UFBXT_DEFLATE_TEST(deflate_long_code_sequences)
 	ptrdiff_t res = ufbxt_inflate(dst, dst_size, src, sizeof(src) - 1, opts);
 	ufbxt_hintf("res = %d", (int)res);
 	ufbxt_assert(res == dst_size);
-	ufbxt_assert(fnv1a(dst, dst_size) == 0x138da12f);
+	ufbxt_assert(ufbxt_fnv1a(dst, dst_size) == 0x138da12f);
 	free(dst);
 }
 #endif
@@ -1765,7 +1763,7 @@ UFBXT_DEFLATE_TEST(deflate_benchmark)
 
 	ufbxt_hintf("res = %d", (int)res);
 	ufbxt_assert(res == dst_size);
-	ufbxt_assert(fnv1a(dst, dst_size) == 0xbaccc7ea);
+	ufbxt_assert(ufbxt_fnv1a(dst, dst_size) == 0xbaccc7ea);
 
 	free(dst);
 }
