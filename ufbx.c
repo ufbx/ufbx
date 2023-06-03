@@ -19359,8 +19359,7 @@ ufbxi_noinline static void ufbxi_update_light(ufbx_light *light)
 
 	light->color = ufbxi_find_vec3(&light->props, ufbxi_Color, 1.0f, 1.0f, 1.0f);
 	light->type = (ufbx_light_type)ufbxi_find_enum(&light->props, ufbxi_LightType, 0, UFBX_LIGHT_VOLUME);
-	int64_t default_decay = light->type == UFBX_LIGHT_DIRECTIONAL ? UFBX_LIGHT_DECAY_NONE : UFBX_LIGHT_DECAY_QUADRATIC;
-	light->decay = (ufbx_light_decay)ufbxi_find_enum(&light->props, ufbxi_DecayType, default_decay, UFBX_LIGHT_DECAY_CUBIC);
+	light->decay = (ufbx_light_decay)ufbxi_find_enum(&light->props, ufbxi_DecayType, UFBX_LIGHT_DECAY_NONE, UFBX_LIGHT_DECAY_CUBIC);
 	light->area_shape = (ufbx_light_area_shape)ufbxi_find_enum(&light->props, ufbxi_AreaLightShape, 0, UFBX_LIGHT_AREA_SHAPE_SPHERE);
 	light->inner_angle = ufbxi_find_real(&light->props, ufbxi_HotSpot, 0.0f);
 	light->inner_angle = ufbxi_find_real(&light->props, ufbxi_InnerAngle, light->inner_angle);
@@ -25676,6 +25675,16 @@ ufbx_abi ufbx_element *ufbx_get_prop_element(const ufbx_element *element, const 
 	ufbx_assert(element && prop);
 	if (!element || !prop) return NULL;
 	return ufbxi_fetch_dst_element((ufbx_element*)element, false, prop->name.data, type);
+}
+
+ufbx_abi ufbx_element *ufbx_find_prop_element_len(const ufbx_element *element, const char *name, size_t name_len, ufbx_element_type type)
+{
+	const ufbx_prop *prop = ufbx_find_prop_len(&element->props, name, name_len);
+	if (prop) {
+		return ufbx_get_prop_element(element, prop, type);
+	} else {
+		return NULL;
+	}
 }
 
 ufbx_abi ufbx_node *ufbx_find_node_len(const ufbx_scene *scene, const char *name, size_t name_len)

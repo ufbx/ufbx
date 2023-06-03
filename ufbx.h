@@ -4450,6 +4450,10 @@ ufbx_abi ufbx_prop *ufbx_find_prop_concat(const ufbx_props *props, const ufbx_st
 // Get an element connected to a property.
 ufbx_abi ufbx_element *ufbx_get_prop_element(const ufbx_element *element, const ufbx_prop *prop, ufbx_element_type type);
 
+// Find an element connected to a property by name.
+ufbx_abi ufbx_element *ufbx_find_prop_element_len(const ufbx_element *element, const char *name, size_t name_len, ufbx_element_type type);
+ufbx_inline ufbx_element *ufbx_find_prop_element(const ufbx_element *element, const char *name, ufbx_element_type type) { return ufbx_find_prop_element_len(element, name, strlen(name), type); }
+
 // Find any element of type `type` in `scene` by `name`.
 // For example if you want to find `ufbx_material` named `Mat`:
 //   (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Mat");
@@ -4807,6 +4811,7 @@ ufbx_inline int64_t ufbx_find_int(const ufbx_props *props, ufbx_string_view name
 ufbx_inline bool ufbx_find_bool(const ufbx_props *props, ufbx_string_view name, bool def) { return ufbx_find_bool_len(props, name.data, name.length, def); }
 ufbx_inline ufbx_string ufbx_find_string(const ufbx_props *props, ufbx_string_view name, ufbx_string def) { return ufbx_find_string_len(props, name.data, name.length, def); }
 ufbx_inline ufbx_blob ufbx_find_blob(const ufbx_props *props, ufbx_string_view name, ufbx_blob def) { return ufbx_find_blob_len(props, name.data, name.length, def); }
+ufbx_inline ufbx_element *ufbx_find_prop_element(const ufbx_element *element, ufbx_string_view name, ufbx_element_type type) { return ufbx_find_prop_element_len(element, name.data, name.length, type); }
 ufbx_inline ufbx_element *ufbx_find_element(const ufbx_scene *scene, ufbx_element_type type, ufbx_string_view name) { return ufbx_find_element_len(scene, type, name.data, name.length); }
 ufbx_inline ufbx_node *ufbx_find_node(const ufbx_scene *scene, ufbx_string_view name) { return ufbx_find_node_len(scene, name.data, name.length); }
 ufbx_inline ufbx_anim_stack *ufbx_find_anim_stack(const ufbx_scene *scene, ufbx_string_view name) { return ufbx_find_anim_stack_len(scene, name.data, name.length); }

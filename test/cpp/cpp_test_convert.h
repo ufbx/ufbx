@@ -8,6 +8,10 @@ UFBXT_CPP_TEST(find_node_string)
 
     ufbxt_assert(ufbx_find_node(scene.get(), name) != nullptr);
     ufbxt_assert(ufbx_find_node(scene.get(), non_name) == nullptr);
+
+    ufbx_node *node = ufbx_find_node(scene.get(), "pCube1");
+    ufbxt_assert(node);
+    ufbxt_assert(std::string(node->name) == "pCube1");
 }
 
 #if defined(__cpp_lib_string_view)
@@ -61,4 +65,18 @@ UFBXT_CPP_TEST(convert_list)
 {
     ufbx_unique_ptr<ufbx_scene> scene{ufbx_load_file(data_path("maya_cube_7500_ascii.fbx"), nullptr, nullptr)};
     array_view<ufbx_element*> elements = scene->elements;
+}
+
+UFBXT_CPP_TEST(find_prop_element_string)
+{
+    ufbx_unique_ptr<ufbx_scene> scene{ufbx_load_file(data_path("motionbuilder_lights_7700_ascii.fbx"), nullptr, nullptr)};
+
+    ufbx_node *node = ufbx_find_node(scene.get(), "SpotLook");
+    ufbxt_assert(node);
+
+    std::string name = "LookAtProperty";
+    std::string non_name = "pCube2";
+
+    ufbx_node *look_at = (ufbx_node*)ufbx_find_prop_element(&node->element, name, UFBX_ELEMENT_NODE);
+    ufbxt_assert(std::string(look_at->name) == "Cube");
 }
