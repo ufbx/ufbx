@@ -12,6 +12,7 @@ import functools
 import argparse
 import copy
 from typing import NamedTuple
+from get_header_tag import get_ufbx_header_version
 
 parser = argparse.ArgumentParser(description="Run ufbx tests")
 parser.add_argument("tests", type=str, nargs="*", help="Names of tests to run")
@@ -298,6 +299,18 @@ class GCCCompiler(Compiler):
 
         if config.get("warnings", False):
             args += ["-Wall", "-Wextra", "-Wsign-conversion", "-Wmissing-prototypes"]
+
+            ufbx_version = get_ufbx_header_version()
+            if ufbx_version >= (0, 5, 1):
+                args += ["-Wshadow"]
+                if "clang" in self.name:
+                    args += [
+                        "-Wimplicit-int-float-conversion",
+                        "-Wextra-semi-stmt",
+                        "-Wunreachable-code-break",
+                        "-Wimplicit-int-conversion",
+                    ]
+
             if self.has_cpp:
                 args += ["-Wconversion-null"]
             args += ["-Werror"]
