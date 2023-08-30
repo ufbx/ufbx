@@ -64,6 +64,7 @@
 #elif defined(__clang__)
 	#pragma clang diagnostic push
 	#pragma clang diagnostic ignored "-Wpedantic"
+	#pragma clang diagnostic ignored "-Wpadded"
 	#if defined(__cplusplus)
 		#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
 		#pragma clang diagnostic ignored "-Wold-style-cast"
@@ -71,6 +72,7 @@
 #elif defined(__GNUC__)
 	#pragma GCC diagnostic push
 	#pragma GCC diagnostic ignored "-Wpedantic"
+	#pragma GCC diagnostic ignored "-Wpadded"
 	#if defined(__cplusplus)
 		#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 		#pragma GCC diagnostic ignored "-Wold-style-cast"
@@ -4651,7 +4653,7 @@ ufbx_inline void ufbx_free(ufbx_geometry_cache *cache) { ufbx_free_geometry_cach
 template <typename T>
 struct ufbx_ref {
 	ufbx_ref() noexcept : ptr(nullptr) { }
-	explicit ufbx_ref(T *ptr) noexcept : ptr(ptr) { }
+	explicit ufbx_ref(T *ptr_) noexcept : ptr(ptr_) { }
 	ufbx_ref(const ufbx_ref &ref) noexcept : ptr(ref.ptr) { ufbx_retain(ref.ptr); }
 	ufbx_ref(ufbx_ref &&ref) noexcept : ptr(ref.ptr) { ref.ptr = nullptr; }
 	~ufbx_ref() { ufbx_free(ptr); }

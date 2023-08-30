@@ -298,6 +298,13 @@ class GCCCompiler(Compiler):
 
         if config.get("warnings", False):
             args += ["-Wall", "-Wextra", "-Wsign-conversion", "-Wmissing-prototypes", "-Wshadow"]
+            if "clang" in self.name:
+                args += [
+                    "-Wimplicit-int-float-conversion",
+                    "-Wextra-semi-stmt",
+                    "-Wunreachable-code-break",
+                    "-Wimplicit-int-conversion",
+                ]
             if self.has_cpp:
                 args += ["-Wconversion-null"]
             args += ["-Werror"]

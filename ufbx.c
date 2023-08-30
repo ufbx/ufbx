@@ -280,6 +280,16 @@
 	#pragma clang diagnostic ignored "-Wmissing-braces"
 	#pragma clang diagnostic ignored "-Wdouble-promotion"
 	#pragma clang diagnostic ignored "-Wpedantic"
+	#pragma clang diagnostic ignored "-Wcast-qual"
+	#pragma clang diagnostic ignored "-Wcast-align"
+	#pragma clang diagnostic ignored "-Wcovered-switch-default"
+	#pragma clang diagnostic ignored "-Wpadded"
+	#pragma clang diagnostic ignored "-Wswitch-enum"
+	#pragma clang diagnostic ignored "-Wfloat-equal"
+	#pragma clang diagnostic ignored "-Wformat-nonliteral"
+	#if __has_warning("-Watomic-implicit-seq-cst")
+		#pragma clang diagnostic ignored "-Watomic-implicit-seq-cst"
+	#endif
 	#if defined(UFBX_STANDARD_C)
 		#pragma clang diagnostic ignored "-Wunused-function"
 	#endif
@@ -290,6 +300,9 @@
 	#if defined(__cplusplus)
 		#pragma clang diagnostic ignored "-Wold-style-cast"
 		#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+	#else
+		#pragma clang diagnostic ignored "-Wdeclaration-after-statement"
+		#pragma clang diagnostic ignored "-Wbad-function-cast"
 	#endif
 #endif
 
@@ -299,6 +312,12 @@
 	#pragma GCC diagnostic ignored "-Wmissing-braces"
 	#pragma GCC diagnostic ignored "-Wdouble-promotion"
 	#pragma GCC diagnostic ignored "-Wpedantic"
+	#pragma GCC diagnostic ignored "-Wcast-qual"
+	#pragma GCC diagnostic ignored "-Wcast-align"
+	#pragma GCC diagnostic ignored "-Wpadded"
+	#pragma GCC diagnostic ignored "-Wswitch-enum"
+	#pragma GCC diagnostic ignored "-Wfloat-equal"
+	#pragma GCC diagnostic ignored "-Wformat-nonliteral"
 	#if defined(UFBX_STANDARD_C)
 		#pragma GCC diagnostic ignored "-Wunused-function"
 	#endif
@@ -309,6 +328,9 @@
 	#if defined(__cplusplus)
 		#pragma GCC diagnostic ignored "-Wold-style-cast"
 		#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
+	#else
+		#pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
+		#pragma GCC diagnostic ignored "-Wbad-function-cast"
 	#endif
 #endif
 
@@ -1717,7 +1739,7 @@ ufbxi_huff_build_imp(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_coun
 			if ((extra & 0xffff001f) != 0 && (extra & 0x20) == 0) {
 				uint32_t ix = ++num_extra;
 				tree->extra_shift_base[ix] = (extra & 0xffff0000) | bits;
-				tree->extra_mask[ix] = (1u << (extra & 0x1f)) - 1;
+				tree->extra_mask[ix] = (uint16_t)((1u << (extra & 0x1f)) - 1);
 				sym = (sym & 0xff) | ix << 8;
 			}
 
@@ -7365,8 +7387,8 @@ ufbxi_nodiscard static ufbxi_noinline char *ufbxi_swap_endian(ufbxi_context *uc,
 ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_swap_endian_array(ufbxi_context *uc, const void *src, size_t count, char type)
 {
 	switch (type) {
-	case 'i': case 'f': return ufbxi_swap_endian(uc, src, count, 4); break;
-	case 'l': case 'd': return ufbxi_swap_endian(uc, src, count, 8); break;
+	case 'i': case 'f': return ufbxi_swap_endian(uc, src, count, 4);
+	case 'l': case 'd': return ufbxi_swap_endian(uc, src, count, 8);
 	default: return (const char*)src;
 	}
 }
@@ -7375,11 +7397,11 @@ ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_swap_endian_array(ufbxi_
 ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_swap_endian_value(ufbxi_context *uc, const void *src, char type)
 {
 	switch (type) {
-	case 'Y': return ufbxi_swap_endian(uc, src, 1, 2); break;
-	case 'I': case 'F': return ufbxi_swap_endian(uc, src, 1, 4); break;
-	case 'L': case 'D': return ufbxi_swap_endian(uc, src, 1, 8); break;
-	case 'S': case 'R': return ufbxi_swap_endian(uc, src, 1, 4); break;
-	case 'i': case 'l': case 'f': case 'd': case 'b': return ufbxi_swap_endian(uc, src, 3, 4); break;
+	case 'Y': return ufbxi_swap_endian(uc, src, 1, 2);
+	case 'I': case 'F': return ufbxi_swap_endian(uc, src, 1, 4);
+	case 'L': case 'D': return ufbxi_swap_endian(uc, src, 1, 8);
+	case 'S': case 'R': return ufbxi_swap_endian(uc, src, 1, 4);
+	case 'i': case 'l': case 'f': case 'd': case 'b': return ufbxi_swap_endian(uc, src, 3, 4);
 	default: return (const char*)src;
 	}
 }
@@ -7405,15 +7427,17 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 	switch (dst_type)
 	{
 
-	#define ufbxi_convert_loop_fast(m_dst, m_cast, m_size, m_expr) { \
+	#define ufbxi_convert_loop_fast(m_dst, m_cast, m_size, m_expr) do { \
 		const char *val = (const char*)src, *val_end = val + size*m_size; \
 		m_dst *d = (m_dst*)dst; \
-		while (val != val_end) { *d++ = m_cast(m_expr); val += m_size; } }
+		while (val != val_end) { *d++ = m_cast(m_expr); val += m_size; } \
+	} while (0)
 
-	#define ufbxi_convert_loop_slow(m_dst, m_cast, m_size, m_expr) { \
+	#define ufbxi_convert_loop_slow(m_dst, m_cast, m_size, m_expr) do { \
 		const char *val = (const char*)src, *val_end = val + size*m_size; \
 		m_dst *d = (m_dst*)dst; \
-		ufbxi_nounroll while (val != val_end) { *d++ = m_cast(m_expr); val += m_size; } }
+		ufbxi_nounroll while (val != val_end) { *d++ = m_cast(m_expr); val += m_size; } \
+	} while (0)
 
 	case 'c':
 		switch (src_type) {
@@ -7486,7 +7510,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 
 	bool file_big_endian = uc->file_big_endian;
 
-	#define ufbxi_convert_parse_fast(m_dst, m_type, m_expr) { \
+	#define ufbxi_convert_parse_fast(m_dst, m_type, m_expr) do { \
 		m_dst *d = (m_dst*)dst; \
 		for (; base < size; base++) { \
 			val = ufbxi_peek_bytes(uc, 13); \
@@ -7496,7 +7520,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 			*d++ = (m_dst)(m_expr); \
 			ufbxi_consume_bytes(uc, 1 + sizeof(m_dst)); \
 		} \
-	}
+	} while (0)
 
 	// String array special case
 	if (dst_type == 's' || dst_type == 'S' || dst_type == 'C') {
@@ -7548,7 +7572,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 	#define ufbxi_convert_parse(m_cast, m_size, m_expr) \
 		*d++ = m_cast(m_expr); val_size = m_size + 1; \
 
-	#define ufbxi_convert_parse_switch(m_dst, m_cast_int, m_cast_float) { \
+	#define ufbxi_convert_parse_switch(m_dst, m_cast_int, m_cast_float) do { \
 		m_dst *d = (m_dst*)dst + base; \
 		for (size_t i = base; i < size; i++) { \
 			val = ufbxi_peek_bytes(uc, 13); \
@@ -7570,7 +7594,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 			} \
 			ufbxi_consume_bytes(uc, val_size); \
 		} \
-	} \
+	} while (0)
 
 	case 'c': ufbxi_convert_parse_switch(uint8_t, (uint8_t), (uint8_t)); break;
 	case 'i': ufbxi_convert_parse_switch(int32_t, (int32_t), ufbxi_f64_to_i32); break;
@@ -8966,7 +8990,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_dom_node(ufbxi_context *u
 		case 's': val->type = UFBX_DOM_VALUE_ARRAY_RAW_STRING; break;
 		case 'C': val->type = UFBX_DOM_VALUE_ARRAY_RAW_STRING; break;
 		case '-': val->type = UFBX_DOM_VALUE_ARRAY_IGNORED; break;
-		default: ufbxi_fail("Bad array type"); break;
+		default: ufbxi_fail("Bad array type");
 		}
 	} else {
 		size_t ix;
@@ -10701,7 +10725,6 @@ ufbxi_noinline static int ufbxi_fix_index(ufbxi_context *uc, uint32_t *p_dst, ui
 	case UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING:
 		ufbxi_fmt_err_info(&uc->error, "%u (max %u)", index, one_past_max_val ? (one_past_max_val - 1) : 0);
 		ufbxi_fail_msg("UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING", "Bad index");
-		break;
 	case UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE:
 		*p_dst = index;
 		break;
@@ -17468,7 +17491,7 @@ ufbxi_noinline static void ufbxi_propagate_main_textures(ufbx_scene *scene)
 }
 
 #define ufbxi_patch_empty(m_dst, m_len, m_src) \
-	if (!(m_dst).m_len) m_dst = m_src;
+	do { if (!(m_dst).m_len) m_dst = m_src; } while (0)
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_insert_texture_file(ufbxi_context *uc, ufbx_texture *texture)
 {
@@ -22579,7 +22602,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_curve_imp(ufbxi
 			if (ix < num_vertices) {
 				ufbx_real u = curve->basis.spans.data[span_ix];
 				if (sub_ix > 0) {
-					ufbx_real t = (ufbx_real)sub_ix / num_sub;
+					ufbx_real t = (ufbx_real)sub_ix / (ufbx_real)num_sub;
 					u = u * (1.0f - t) + t * curve->basis.spans.data[span_ix + 1];
 				}
 
@@ -22709,7 +22732,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 
 			ufbx_real v = surface->basis_v.spans.data[span_v];
 			if (split_v > 0) {
-				ufbx_real t = (ufbx_real)split_v / splits_v;
+				ufbx_real t = (ufbx_real)split_v / (ufbx_real)splits_v;
 				v = v * (1.0f - t) + t * surface->basis_v.spans.data[span_v + 1];
 			}
 			ufbx_real original_v = v;
@@ -22725,7 +22748,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 
 					ufbx_real u = surface->basis_u.spans.data[span_u];
 					if (split_u > 0) {
-						ufbx_real t = (ufbx_real)split_u / splits_u;
+						ufbx_real t = (ufbx_real)split_u / (ufbx_real)splits_u;
 						u = u * (1.0f - t) + t * surface->basis_u.spans.data[span_u + 1];
 					}
 					ufbx_real original_u = u;
