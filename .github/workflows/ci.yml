@@ -357,7 +357,7 @@ jobs:
         run: gcc-10 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
       - name: Clang 6
         if: ${{ always() && !cancelled() }}
-          clang-6.0 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+        run: clang-6.0 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
       - name: Clang 7
         if: ${{ always() && !cancelled() }}
         run: clang-7 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
