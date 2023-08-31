@@ -310,6 +310,13 @@ class GCCCompiler(Compiler):
                         "-Wunreachable-code-break",
                         "-Wimplicit-int-conversion",
                     ]
+                elif "gcc" in self.name:
+                    args += [
+                        "-Wswitch-default",
+                        "-Wduplicated-cond",
+                        "-Wconversion",
+                        "-Warith-conversion",
+                    ]
 
             if self.has_cpp:
                 args += ["-Wconversion-null"]

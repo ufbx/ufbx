@@ -59,8 +59,10 @@
 
 #if defined(_MSC_VER)
 	#pragma warning(push)
+	#pragma warning(disable: 4061) // enumerator 'ENUM' in switch of enum 'enum' is not explicitly handled by a case label
 	#pragma warning(disable: 4201) // nonstandard extension used: nameless struct/union
 	#pragma warning(disable: 4505) // unreferenced local function has been removed
+	#pragma warning(disable: 4820) // type': 'N' bytes padding added after data member 'member'
 #elif defined(__clang__)
 	#pragma clang diagnostic push
 	#pragma clang diagnostic ignored "-Wpedantic"
@@ -76,6 +78,11 @@
 	#if defined(__cplusplus)
 		#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 		#pragma GCC diagnostic ignored "-Wold-style-cast"
+	#else
+		#if __GNUC__ >= 5
+			#pragma GCC diagnostic ignored "-Wc90-c99-compat"
+			#pragma GCC diagnostic ignored "-Wc99-c11-compat"
+		#endif
 	#endif
 #endif
 

@@ -260,11 +260,14 @@
 
 #if defined(_MSC_VER)
 	#pragma warning(push)
+	#pragma warning(disable: 4061) // enumerator 'ENUM' in switch of enum 'enum' is not explicitly handled by a case label
 	#pragma warning(disable: 4200) // nonstandard extension used: zero-sized array in struct/union
 	#pragma warning(disable: 4201) // nonstandard extension used: nameless struct/union
+	#pragma warning(disable: 4210) // nonstandard extension used: function given file scope
 	#pragma warning(disable: 4127) // conditional expression is constant
 	#pragma warning(disable: 4706) // assignment within conditional expression
 	#pragma warning(disable: 4789) // buffer 'type_and_name' of size 8 bytes will be overrun; 16 bytes will be written starting at offset 0
+	#pragma warning(disable: 4820) // type': 'N' bytes padding added after data member 'member'
 	#if defined(UFBX_STANDARD_C)
 		#pragma warning(disable: 4996) // 'fopen': This function or variable may be unsafe. Consider using fopen_s instead.
 	#endif
@@ -318,6 +321,7 @@
 	#pragma GCC diagnostic ignored "-Wswitch-enum"
 	#pragma GCC diagnostic ignored "-Wfloat-equal"
 	#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+	#pragma GCC diagnostic ignored "-Wlong-long"
 	#if defined(UFBX_STANDARD_C)
 		#pragma GCC diagnostic ignored "-Wunused-function"
 	#endif
@@ -331,6 +335,10 @@
 	#else
 		#pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
 		#pragma GCC diagnostic ignored "-Wbad-function-cast"
+		#if __GNUC__ >= 5
+			#pragma GCC diagnostic ignored "-Wc90-c99-compat"
+			#pragma GCC diagnostic ignored "-Wc99-c11-compat"
+		#endif
 	#endif
 #endif
 
@@ -1999,9 +2007,9 @@ ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	trees->fast_bits = dc->fast_bits;
 
 	// The header contains the number of Huffman codes in each of the three trees.
-	uint32_t num_lit_lengths = 257 + (bits & 0x1f);
-	uint32_t num_dists = 1 + (bits >> 5 & 0x1f);
-	uint32_t num_code_lengths = 4 + (bits >> 10 & 0xf);
+	uint32_t num_lit_lengths = 257 + (uint32_t)(bits & 0x1f);
+	uint32_t num_dists = 1 + (uint32_t)(bits >> 5 & 0x1f);
+	uint32_t num_code_lengths = 4 + (uint32_t)(bits >> 10 & 0xf);
 	bits >>= 14;
 	left -= 14;
 
@@ -2225,7 +2233,7 @@ ufbxi_inflate_block_slow(ufbxi_deflate_context *dc, ufbxi_trees *trees, size_t m
 		uint32_t sym0_value = ufbxi_huff_sym_value(sym0);
 		uint32_t len_shift_base = trees->lit_length.extra_shift_base[sym0_value];
 		uint16_t len_mask = trees->lit_length.extra_mask[sym0_value];
-		uint32_t length = (len_shift_base >> 16) + (ufbxi_wrap_shr64(sym_bits, len_shift_base) & len_mask);
+		uint32_t length = (len_shift_base >> 16) + (uint32_t)(ufbxi_wrap_shr64(sym_bits, len_shift_base) & len_mask);
 
 		ufbxi_huff_sym sym1 = ufbxi_huff_decode_bits(&trees->dist, bits, fast_bits, fast_mask);
 		ufbxi_regression_assert(sym1 != UFBXI_HUFF_UNINITIALIZED_SYM);
@@ -2239,7 +2247,7 @@ ufbxi_inflate_block_slow(ufbxi_deflate_context *dc, ufbxi_trees *trees, size_t m
 		uint32_t sym1_value = ufbxi_huff_sym_value(sym1);
 		uint32_t dist_shift_base = trees->dist.extra_shift_base[sym1_value];
 		uint16_t dist_mask = trees->dist.extra_mask[sym1_value];
-		uint32_t distance = (dist_shift_base >> 16) + (ufbxi_wrap_shr64(sym_bits, dist_shift_base + sym0) & dist_mask);
+		uint32_t distance = (dist_shift_base >> 16) + (uint32_t)(ufbxi_wrap_shr64(sym_bits, dist_shift_base + sym0) & dist_mask);
 
 		// Bounds checking
 		size_t out_space = ufbxi_to_size(out_end - out_ptr);
@@ -2418,12 +2426,12 @@ ufbxi_inflate_block_fast(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 		uint32_t sym0_value = ufbxi_huff_sym_value(sym0);
 		uint32_t len_shift_base = trees->lit_length.extra_shift_base[sym0_value];
 		uint16_t len_mask = trees->lit_length.extra_mask[sym0_value];
-		uint32_t length = (len_shift_base >> 16) + (ufbxi_wrap_shr64(sym01_bits, len_shift_base) & len_mask);
+		uint32_t length = (len_shift_base >> 16) + (uint32_t)(ufbxi_wrap_shr64(sym01_bits, len_shift_base) & len_mask);
 
 		uint32_t sym1_value = ufbxi_huff_sym_value(sym1);
 		uint32_t dist_shift_base = trees->dist.extra_shift_base[sym1_value];
 		uint16_t dist_mask = trees->dist.extra_mask[sym1_value];
-		uint32_t distance = (dist_shift_base >> 16) + (ufbxi_wrap_shr64(sym01_bits, dist_shift_base + sym0) & dist_mask);
+		uint32_t distance = (dist_shift_base >> 16) + (uint32_t)(ufbxi_wrap_shr64(sym01_bits, dist_shift_base + sym0) & dist_mask);
 
 		ufbxi_fast_inflate_refill_and_decode();
 
@@ -3739,7 +3747,7 @@ static ufbxi_noinline bool ufbxi_map_grow_size_imp(ufbxi_map *map, size_t item_s
 			// `new_element` if it has a shorter scan distance (Robin Hood).
 			uint32_t scan = 1;
 			while ((entry = new_entries[slot]) != 0) {
-				uint32_t entry_scan = (entry & new_mask);
+				uint32_t entry_scan = (uint32_t)(entry & new_mask);
 				if (entry_scan < scan) {
 					new_entries[slot] = new_entry + scan;
 					new_entry = (entry & ~(uint64_t)new_mask);
@@ -3823,7 +3831,7 @@ static ufbxi_noinline void *ufbxi_map_insert_size(ufbxi_map *map, size_t size, u
 	uint64_t entry, new_entry = (uint64_t)index << 32u | (hash & ~mask);
 	uint32_t scan = 1;
 	while ((entry = entries[slot]) != 0) {
-		uint32_t entry_scan = (entry & mask);
+		uint32_t entry_scan = (uint32_t)(entry & mask);
 		if (entry_scan < scan) {
 			entries[slot] = new_entry + scan;
 			new_entry = (entry & ~(uint64_t)mask);
@@ -7560,6 +7568,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 		case 'l': ufbxi_convert_parse_fast(int64_t, 'L', ufbxi_read_i64(val)); break;
 		case 'f': ufbxi_convert_parse_fast(float, 'F', ufbxi_read_f32(val)); break;
 		case 'd': ufbxi_convert_parse_fast(double, 'D', ufbxi_read_f64(val)); break;
+		default: break; // Fallthrough to rest
 		}
 
 		// Early return if we handled everything
@@ -8826,6 +8835,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 			case 'd': { double *v = ufbxi_push(&uc->tmp_stack, double, 1); ufbxi_check(v); *v = (double)val; } break;
 			case '-': num_values--; break;
 
+			default:
+				ufbxi_fail("Bad array dst type");
 			}
 
 		} else if (ufbxi_ascii_accept(uc, '*')) {
@@ -9129,6 +9140,7 @@ static ufbxi_noinline const char *ufbxi_match_skip(const char *fmt, bool alterna
 		case ')':
 		case '\0':
 			return fmt - 1;
+		default: break;
 		}
 	}
 }
@@ -9158,7 +9170,7 @@ static ufbxi_noinline bool ufbxi_match_imp(const char **p_str, const char *end, 
 
 		if (case_insensitive) {
 			if (ref >= 'A' && ref <= 'Z') {
-				ref = (ref - 'A') + 'a';
+				ref = (char)((int)(ref - 'A') + 'a');
 			}
 		}
 
@@ -10052,6 +10064,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_property(ufbxi_context *uc,
 			case 'H': flags |= UFBX_PROP_FLAG_HIDDEN; break;
 			case 'L': flags |= ((uint32_t)(next - '0') & 0xf) << 4; break; // UFBX_PROP_FLAG_LOCK_*
 			case 'M': flags |= ((uint32_t)(next - '0') & 0xf) << 8; break; // UFBX_PROP_FLAG_MUTE_*
+			default: break; // Ignore unknown flags
 			}
 		}
 	}
@@ -13736,8 +13749,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_legacy_root(ufbxi_context *
 			ufbxi_check(ufbxi_read_header_extension(uc));
 		} else if (node->name == ufbxi_Takes) {
 			ufbxi_check(ufbxi_read_takes(uc));
-		} else if (node->name == ufbxi_Takes) {
-			ufbxi_check(ufbxi_read_takes(uc));
 		} else if (node->name == ufbxi_Model) {
 			ufbxi_check(ufbxi_read_legacy_model(uc, node));
 		}
@@ -16999,6 +17010,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_constraint_prop(ufbxi_contex
 			target->weight = 1.0f;
 			target->transform = ufbx_identity_transform;
 		} break;
+		default:
+			ufbx_assert(0 && "Unexpected constraint prop");
+			break;
 		}
 	}
 
