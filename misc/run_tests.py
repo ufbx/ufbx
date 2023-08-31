@@ -329,9 +329,12 @@ class GCCCompiler(Compiler):
                 elif "gcc" in self.name:
                     args += [
                         "-Wswitch-default",
-                        "-Wduplicated-cond",
                         "-Wconversion",
                     ]
+                    if self.version_tuple >= (6,0,0):
+                        args += [
+                            "-Wduplicated-cond",
+                        ]
                     if self.version_tuple >= (10,0,0):
                         args += [
                             "-Warith-conversion",
