@@ -251,3 +251,12 @@ UFBXT_FILE_TEST(synthetic_legacy_nonzero_material)
 	ufbxt_assert(mesh->face_material.data[0] == 1);
 }
 #endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_legacy_unquoted_child_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!scene);
+	ufbxt_assert(load_error);
+}
+#endif
+

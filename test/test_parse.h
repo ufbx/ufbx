@@ -1413,7 +1413,7 @@ UFBXT_FILE_TEST(maya_notes)
 		}
 
 		for (size_t i = 0; i < 4096; i++) {
-			const char *end;
+			char *end;
 			unsigned long l = strtoul(str, &end, 10);
 			ufbxt_assert(l == i);
 			if (i + 1 < 16384) {

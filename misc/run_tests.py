@@ -31,6 +31,7 @@ parser.add_argument("--verbose", action="store_true", help="Verbose output")
 parser.add_argument("--hash-file", help="Hash test input file")
 parser.add_argument("--runner", help="Descriptive name for the runner")
 parser.add_argument("--fail-on-pre-test", action="store_true", help="Indicate failure if pre-test checks fail")
+parser.add_argument("--force-opt", help="Force compiler optimization level")
 argv = parser.parse_args()
 
 color_out = sys.stdout
@@ -257,13 +258,22 @@ class GCCCompiler(Compiler):
         self.has_cpp = cpp
         self.has_m32 = has_m32
         self.sysroot = ""
+        self.version_tuple = (0,0,0)
 
     async def check_version(self):
         _, vout, _, _, _ = await self.run("-dumpversion")
         _, mout, _, _, _ = await self.run("-dumpmachine")
         if not (vout and mout): return False
-        self.version = vout
+        self.version = vout.strip()
         self.arch = mout.lower()
+
+        m = re.match(r"^(\d+)\.(\d+)\.(\d+)$", self.version)
+        if m:
+            self.version_tuple = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        m = re.match(r"^(\d+)$", self.version)
+        if m:
+            self.version_tuple = (int(m.group(1)), 0, 0)
+
         return True
 
     def supported_archs_raw(self):
@@ -305,11 +315,30 @@ class GCCCompiler(Compiler):
                 args += ["-Wshadow"]
                 if "clang" in self.name:
                     args += [
-                        "-Wimplicit-int-float-conversion",
-                        "-Wextra-semi-stmt",
                         "-Wunreachable-code-break",
-                        "-Wimplicit-int-conversion",
                     ]
+                    if self.version_tuple >= (8,0,0):
+                        args += [
+                            "-Wextra-semi-stmt",
+                        ]
+                    if self.version_tuple >= (10,0,0):
+                        args += [
+                            "-Wimplicit-int-float-conversion",
+                            "-Wimplicit-int-conversion",
+                        ]
+                elif "gcc" in self.name:
+                    args += [
+                        "-Wswitch-default",
+                        "-Wconversion",
+                    ]
+                    if self.version_tuple >= (6,0,0):
+                        args += [
+                            "-Wduplicated-cond",
+                        ]
+                    if self.version_tuple >= (10,0,0):
+                        args += [
+                            "-Warith-conversion",
+                        ]
 
             if self.has_cpp:
                 args += ["-Wconversion-null"]
@@ -317,12 +346,15 @@ class GCCCompiler(Compiler):
 
         args.append("-g")
 
-        if config.get("optimize", False):
-            if config.get("san", False):
-                args.append("-O0")
-            else:
-                args.append("-O2")
-            args.append("-DNDEBUG=1")
+        if argv.force_opt:
+            args.append(f"-{argv.force_opt}")
+        else:
+            if config.get("optimize", False):
+                if config.get("san", False):
+                    args.append("-O0")
+                else:
+                    args.append("-O2")
+                args.append("-DNDEBUG=1")
 
         if config.get("regression", False):
             args.append("-DUFBX_REGRESSION=1")
