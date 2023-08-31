@@ -31,6 +31,7 @@ parser.add_argument("--verbose", action="store_true", help="Verbose output")
 parser.add_argument("--hash-file", help="Hash test input file")
 parser.add_argument("--runner", help="Descriptive name for the runner")
 parser.add_argument("--fail-on-pre-test", action="store_true", help="Indicate failure if pre-test checks fail")
+parser.add_argument("--force-opt", help="Force compiler optimization level")
 argv = parser.parse_args()
 
 color_out = sys.stdout
@@ -314,11 +315,17 @@ class GCCCompiler(Compiler):
                 args += ["-Wshadow"]
                 if "clang" in self.name:
                     args += [
-                        "-Wimplicit-int-float-conversion",
-                        "-Wextra-semi-stmt",
                         "-Wunreachable-code-break",
-                        "-Wimplicit-int-conversion",
                     ]
+                    if self.version_tuple >= (8,0,0):
+                        args += [
+                            "-Wimplicit-int-float-conversion",
+                            "-Wextra-semi-stmt",
+                        ]
+                    if self.version_tuple >= (10,0,0):
+                        args += [
+                            "-Wimplicit-int-conversion",
+                        ]
                 elif "gcc" in self.name:
                     args += [
                         "-Wswitch-default",
@@ -336,12 +343,15 @@ class GCCCompiler(Compiler):
 
         args.append("-g")
 
-        if config.get("optimize", False):
-            if config.get("san", False):
-                args.append("-O0")
-            else:
-                args.append("-O2")
-            args.append("-DNDEBUG=1")
+        if argv.force_opt:
+            args.append(f"-{argv.force_opt}")
+        else:
+            if config.get("optimize", False):
+                if config.get("san", False):
+                    args.append("-O0")
+                else:
+                    args.append("-O2")
+                args.append("-DNDEBUG=1")
 
         if config.get("regression", False):
             args.append("-DUFBX_REGRESSION=1")
