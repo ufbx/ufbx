@@ -334,7 +334,7 @@ jobs:
           sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 40976EAF437D05B5 3B4FE6ACC0B21F32
           sudo apt update
       - name: Install compilers
-        run: sudo apt-get install -y gcc-5 gcc-6 gcc-7 gcc-8 gcc-9 gcc-10 clang-6.0 clang-7 clang-8 clang-9 clang-10 clang-11 clang-12 clang-13
+        run: sudo apt-get install -y gcc-5 g++-5 gcc-6 g++-6 gcc-7 g++-7 gcc-8 g++-8 gcc-9 gcc-10 clang-6.0 clang-7 clang-8 clang-9 clang-10 clang-11 clang-12 clang-13
       - name: Make build directory
         run: mkdir build
       - name: Run tests
