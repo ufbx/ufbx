@@ -10815,7 +10815,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 	attrib->exists = true;
 	attrib->indices.count = mesh->num_indices;
 
-	const char *mapping;
+	const char *mapping = NULL;
 	ufbxi_check(ufbxi_find_val1(node, ufbxi_MappingInformationType, "C", (char**)&mapping));
 
 	attrib->values.count = num_elems ? num_elems : 1;
@@ -12833,7 +12833,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 
 	if (uc->opts.ignore_animation) return 1;
 
-	size_t num_keys;
+	size_t num_keys = 0;
 	ufbxi_check(ufbxi_find_val1(node, ufbxi_KeyCount, "Z", &num_keys));
 	curve->keyframes.data = ufbxi_push(&uc->result, ufbx_keyframe, num_keys);
 	curve->keyframes.count = num_keys;
@@ -13031,7 +13031,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_prop_channel(ufbxi_con
 		ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
 			if (child->name != ufbxi_Channel) continue;
 
-			const char *old_name;
+			const char *old_name = NULL;
 			ufbxi_check(ufbxi_get_val1(child, "C", (char**)&old_name));
 
 			ufbx_string new_name;
@@ -13102,7 +13102,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_object(ufbxi_context *
 	// Takes are used only in pre-7000 FBX versions so objects are identified
 	// by their unique Type::Name pair that we use as unique IDs through the
 	// pooled interned string pointers.
-	const char *type_and_name;
+	const char *type_and_name = NULL;
 	ufbxi_check(ufbxi_get_val1(node, "c", (char**)&type_and_name));
 	uint64_t target_fbx_id = ufbxi_synthetic_id_from_string(type_and_name);
 
