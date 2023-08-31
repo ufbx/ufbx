@@ -319,11 +319,11 @@ class GCCCompiler(Compiler):
                     ]
                     if self.version_tuple >= (8,0,0):
                         args += [
-                            "-Wimplicit-int-float-conversion",
                             "-Wextra-semi-stmt",
                         ]
                     if self.version_tuple >= (10,0,0):
                         args += [
+                            "-Wimplicit-int-float-conversion",
                             "-Wimplicit-int-conversion",
                         ]
                 elif "gcc" in self.name:
