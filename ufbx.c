@@ -17454,10 +17454,10 @@ ufbxi_noinline static void ufbxi_propagate_main_textures(ufbx_scene *scene)
 			ufbx_shader_texture *shader = texture->shader;
 			if (!shader) continue;
 
-			ufbx_texture *main = shader->main_texture;
-			if (!main || shader->main_texture_output_index != 0) continue;
+			ufbx_texture *main_tex = shader->main_texture;
+			if (!main_tex || shader->main_texture_output_index != 0) continue;
 
-			ufbx_shader_texture *main_shader = main->shader;
+			ufbx_shader_texture *main_shader = main_tex->shader;
 			if (!main_shader || !main_shader->main_texture) continue;
 
 			shader->main_texture = main_shader->main_texture;
@@ -17470,8 +17470,8 @@ ufbxi_noinline static void ufbxi_propagate_main_textures(ufbx_scene *scene)
 		ufbx_texture *texture = *p_texture;
 		ufbx_shader_texture *shader = texture->shader;
 		if (!shader || !shader->main_texture || shader->main_texture_output_index != 0) continue;
-		ufbx_texture *main = shader->main_texture;
-		if (main && main->shader && main->shader->main_texture) {
+		ufbx_texture *main_tex = shader->main_texture;
+		if (main_tex && main_tex->shader && main_tex->shader->main_texture) {
 			// Should have been propagated to `texture`
 			shader->main_texture = NULL;
 		}

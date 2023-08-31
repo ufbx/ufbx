@@ -337,24 +337,48 @@ jobs:
         run: sudo apt-get install -y gcc-5 gcc-6 gcc-7 gcc-8 gcc-9 gcc-10 clang-6.0 clang-7 clang-8 clang-9 clang-10 clang-11 clang-12 clang-13
       - name: Make build directory
         run: mkdir build
-      - name: Compile with old GCC versions
-        run: |
-          gcc-5 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
-          gcc-6 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
-          gcc-7 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
-          gcc-8 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
-          gcc-9 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
-          gcc-10 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
-      - name: Compile with old Clang versions
-        run: |
+      - name: GCC 5
+        if: ${{ always() && !cancelled() }}
+        run: gcc-5 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+      - name: GCC 6
+        if: ${{ always() && !cancelled() }}
+        run: gcc-6 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+      - name: GCC 7
+        if: ${{ always() && !cancelled() }}
+        run: gcc-7 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+      - name: GCC 8
+        if: ${{ always() && !cancelled() }}
+        run: gcc-8 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+      - name: GCC 9
+        if: ${{ always() && !cancelled() }}
+        run: gcc-9 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+      - name: GCC 10
+        if: ${{ always() && !cancelled() }}
+        run: gcc-10 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+      - name: Clang 6
+        if: ${{ always() && !cancelled() }}
           clang-6.0 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
-          clang-7 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
-          clang-8 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
-          clang-9 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
-          clang-10 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
-          clang-11 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
-          clang-12 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
-          clang-13 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+      - name: Clang 7
+        if: ${{ always() && !cancelled() }}
+        run: clang-7 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+      - name: Clang 8
+        if: ${{ always() && !cancelled() }}
+        run: clang-8 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+      - name: Clang 9
+        if: ${{ always() && !cancelled() }}
+        run: clang-9 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+      - name: Clang 10
+        if: ${{ always() && !cancelled() }}
+        run: clang-10 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+      - name: Clang 11
+        if: ${{ always() && !cancelled() }}
+        run: clang-11 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+      - name: Clang 12
+        if: ${{ always() && !cancelled() }}
+        run: clang-12 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
+      - name: Clang 13
+        if: ${{ always() && !cancelled() }}
+        run: clang-13 -Werror -Wall -Wextra -c ufbx.c -o build/ufbx.o
 
   ci_hasher:
     runs-on: ubuntu-latest
