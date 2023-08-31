@@ -136,7 +136,10 @@
 	#define UFBX_LIST_TYPE(p_name, p_type) typedef struct p_name { p_type *data; size_t count; } p_name
 #endif
 
-#if UFBX_STDC >= 202311L || UFBX_CPP11
+// This cannot be enabled automatically if supported as the source file may be
+// compiled with a different compiler using different settings than the header
+// consumers, in practice it should work but it causes issues such as #70.
+#if (UFBX_STDC >= 202311L || UFBX_CPP11) && defined(UFBX_USE_EXPLICIT_ENUM)
 	#define UFBX_ENUM_REPR : int
 	#define UFBX_ENUM_FORCE_WIDTH(p_prefix)
 	#define UFBX_FLAG_REPR : int
