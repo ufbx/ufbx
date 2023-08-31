@@ -175,7 +175,7 @@
 #define ufbx_version_minor(version) ((uint32_t)(version)/1000u%1000u)
 #define ufbx_version_patch(version) ((uint32_t)(version)%1000u)
 
-#define UFBX_HEADER_VERSION ufbx_pack_version(0, 5, 1)
+#define UFBX_HEADER_VERSION ufbx_pack_version(0, 5, 2)
 #define UFBX_VERSION UFBX_HEADER_VERSION
 
 // -- Basic types
