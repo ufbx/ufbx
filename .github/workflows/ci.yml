@@ -321,6 +321,19 @@ jobs:
           name: hash-dumps
           path: build/hashdump_ci_exotic.txt.gz
 
+  ci_compilers:
+    runs-on: ubuntu-22.04
+    needs: ci_pre_hashes
+    steps:
+      - uses: actions/checkout@v3
+      - name: Add Xenial sources
+        run: |
+          echo "deb http://dk.archive.ubuntu.com/ubuntu/ xenial main" | sudo tee -a /etc/apt/sources.list
+          echo "deb http://dk.archive.ubuntu.com/ubuntu/ xenial universe" | sudo tee -a /etc/apt/sources.list
+          sudo apt update
+      - name: Install compilers
+        run: sudo apt-get install -y gcc-5 gcc-6 gcc-7 gcc-8 gcc-9 gcc-10
+
   ci_hasher:
     runs-on: ubuntu-latest
     needs: ci_pre_hashes
