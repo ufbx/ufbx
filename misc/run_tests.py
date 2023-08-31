@@ -257,13 +257,22 @@ class GCCCompiler(Compiler):
         self.has_cpp = cpp
         self.has_m32 = has_m32
         self.sysroot = ""
+        self.version_tuple = (0,0,0)
 
     async def check_version(self):
         _, vout, _, _, _ = await self.run("-dumpversion")
         _, mout, _, _, _ = await self.run("-dumpmachine")
         if not (vout and mout): return False
-        self.version = vout
+        self.version = vout.strip()
         self.arch = mout.lower()
+
+        m = re.match(r"^(\d+)\.(\d+)\.(\d+)$", self.version)
+        if m:
+            self.version_tuple = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        m = re.match(r"^(\d+)$", self.version)
+        if m:
+            self.version_tuple = (int(m.group(1)), 0, 0)
+
         return True
 
     def supported_archs_raw(self):
@@ -315,8 +324,11 @@ class GCCCompiler(Compiler):
                         "-Wswitch-default",
                         "-Wduplicated-cond",
                         "-Wconversion",
-                        "-Warith-conversion",
                     ]
+                    if self.version_tuple >= (10,0,0):
+                        args += [
+                            "-Warith-conversion",
+                        ]
 
             if self.has_cpp:
                 args += ["-Wconversion-null"]
