@@ -338,21 +338,7 @@ jobs:
       - name: Make build directory
         run: mkdir build
       - name: Run tests
-        run: python3 misc/run_tests.py tests --no-sanitize \
-          --additional-compiler gcc-5 \
-          --additional-compiler gcc-6 \
-          --additional-compiler gcc-7 \
-          --additional-compiler gcc-8 \
-          --additional-compiler gcc-9 \
-          --additional-compiler gcc-10 \
-          --additional-compiler clang-6.0 \
-          --additional-compiler clang-7 \
-          --additional-compiler clang-8 \
-          --additional-compiler clang-9 \
-          --additional-compiler clang-10 \
-          --additional-compiler clang-11 \
-          --additional-compiler clang-12 \
-          --additional-compiler clang-13
+        run: python3 misc/run_tests.py tests --no-sanitize --additional-compiler gcc-5 --additional-compiler gcc-6 --additional-compiler gcc-7 --additional-compiler gcc-8 --additional-compiler gcc-9 --additional-compiler gcc-10 --additional-compiler clang-6.0 --additional-compiler clang-7 --additional-compiler clang-8 --additional-compiler clang-9 --additional-compiler clang-10 --additional-compiler clang-11 --additional-compiler clang-12 --additional-compiler clang-13
 
   ci_hasher:
     runs-on: ubuntu-latest
