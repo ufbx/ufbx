@@ -1,0 +1,125 @@
+; FBX 5.8.0 project file
+; Copyright (C) 1997-2007 Autodesk Inc. and/or its licensors.
+; All rights reserved.
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+    FBXHeaderVersion: 1003
+    FBXVersion: 5800
+    CreationTimeStamp:  {
+        Version: 1000
+        Year: 2021
+        Month: 8
+        Day: 29
+        Hour: 11
+        Minute: 37
+        Second: 14
+        Millisecond: 227
+    }
+    Creator: "FBX SDK/FBX Plugins build 20080212"
+    OtherFlags:  {
+        FlagPLE: 0
+    }
+}
+CreationTime: "2021-08-29 11:37:14:227"
+Creator: "FBX SDK/FBX Plugins build 20080212"
+Media:  {
+    Video:  {
+    }
+}
+Switcher:  {
+    CameraIndexName: "Model::Camera01"
+}
+Model: "Model::FDirect02" {
+    Version: 194
+    MultiLayer: 0
+    MultiTake: 0
+    Shading: T
+    Culling: "CullingOff"
+    Limits:  {
+        TAuto: 1
+        RAuto: 0
+        SAuto: 1
+        REnable: 0
+        RXAxis: -90
+    }
+    AnimatedProperty: "mTranslationProperty", "mRotationProperty", "mScalingProperty"
+    Animated: "Lcl Translation", "Lcl Rotation", "Lcl Scaling"
+    Type: "Light"
+    TypeFlags: "Light"
+    GeometryVersion: 123
+    LightTypeVersion: 202
+    LightType: 1
+    CastLight: 1
+    Color: 0.533333361148834,0.858823597431183,0.647058844566345
+    Intensity: 100
+    ConeAngle: 45
+    Fog: 0
+	Children: "Model::Omni1", UnquotedChild
+}
+Model: "Model::Omni01" {
+    Version: 194
+    MultiLayer: 0
+    MultiTake: 0
+    Shading: T
+    Culling: "CullingOff"
+    Limits:  {
+        TAuto: 1
+        RAuto: 0
+        SAuto: 1
+        REnable: 0
+        RXAxis: -90
+    }
+    AnimatedProperty: "mTranslationProperty", "mRotationProperty", "mScalingProperty"
+    Animated: "Lcl Translation", "Lcl Rotation", "Lcl Scaling"
+    Type: "Light"
+    TypeFlags: "Light"
+    GeometryVersion: 123
+    LightTypeVersion: 202
+    LightType: 0
+    CastLight: 1
+    Color: 0.172549024224281,0.364705890417099,1
+    Intensity: 100
+    ConeAngle: 45
+    Fog: 0
+}
+GoboManager:  {
+}
+SceneGenericPersistence:  {
+    SceneInfo: "SceneInfo::GlobalInfo" {
+        Type: "UserData"
+        Version: 100
+        MetaData:  {
+            Version: 100
+            Title: ""
+            Subject: ""
+            Author: ""
+            Keywords: ""
+            Revision: ""
+            Comment: ""
+        }
+    }
+}
+AmbientRenderSettings:  {
+    Version: 101
+    AmbientLightColor: 0,0,0,1
+}
+FogOptions:  {
+    FlogEnable: 0
+    FogMode: 0
+    FogDensity: 0.002
+    FogStart: 0.3
+    FogEnd: 1000
+    FogColor: 1,1,1,1
+}
+RendererSetting:  {
+    DefaultCamera: ""
+    DefaultViewingMode: 0
+}
+Settings:  {
+    TimeMode: 3
+    FrameRate: "30"
+    TimeFormat: 1
+    SnapOnFrames: 0
+    ReferenceTimeIndex: -1
+}

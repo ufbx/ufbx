@@ -34,7 +34,7 @@ jobs:
           path: build/hashes.txt
 
   ci_ubuntu:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
@@ -332,6 +332,8 @@ jobs:
         run: |
           g++ -Wall -Wextra -Werror -Wno-unused-function -pthread -std=c++11 -DUFBX_STANDARD_C -x c++ ufbx.c test/threadcheck.cpp -lm -o build/threadcheck-cpp11
           build/threadcheck-cpp11 data/maya_cube_7500_binary.fbx 2
+      - name: Link C/C++ LTO
+        run: bash misc/lto_compatability.sh
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_exotic.txt.gz
@@ -341,6 +343,25 @@ jobs:
         with:
           name: hash-dumps
           path: build/hashdump_ci_exotic.txt.gz
+
+  ci_compilers:
+    runs-on: ubuntu-22.04
+    needs: ci_pre_hashes
+    steps:
+      - uses: actions/checkout@v3
+      - name: Add Ubuntu sources
+        run: |
+          echo "deb http://azure.archive.ubuntu.com/ubuntu/ xenial main universe" | sudo tee -a /etc/apt/sources.list
+          echo "deb http://azure.archive.ubuntu.com/ubuntu/ bionic main universe" | sudo tee -a /etc/apt/sources.list
+          echo "deb http://azure.archive.ubuntu.com/ubuntu/ focal main universe" | sudo tee -a /etc/apt/sources.list
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 40976EAF437D05B5 3B4FE6ACC0B21F32
+          sudo apt update
+      - name: Install compilers
+        run: sudo apt-get install -y gcc-5 g++-5 gcc-6 g++-6 gcc-7 g++-7 gcc-8 g++-8 gcc-9 gcc-10 clang-6.0 clang-7 clang-8 clang-9 clang-10 clang-11 clang-12 clang-13
+      - name: Make build directory
+        run: mkdir build
+      - name: Run tests
+        run: python3 misc/run_tests.py tests --no-sanitize --force-opt O0 --additional-compiler gcc-5 --additional-compiler gcc-6 --additional-compiler gcc-7 --additional-compiler gcc-8 --additional-compiler gcc-9 --additional-compiler gcc-10 --additional-compiler clang-6.0 --additional-compiler clang-7 --additional-compiler clang-8 --additional-compiler clang-9 --additional-compiler clang-10 --additional-compiler clang-11 --additional-compiler clang-12 --additional-compiler clang-13
 
   ci_hasher:
     runs-on: ubuntu-latest
