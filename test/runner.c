@@ -2792,7 +2792,6 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 					ufbx_load_opts loose_opts = load_opts;
 					loose_opts.allow_missing_vertex_position = true;
 					loose_opts.allow_nodes_out_of_root = true;
-					loose_opts.allow_null_material = true;
 					loose_opts.connect_broken_elements = true;
 					loose_opts.generate_missing_normals = true;
 					loose_opts.ignore_missing_external_files = true;

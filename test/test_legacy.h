@@ -54,23 +54,23 @@ UFBXT_FILE_TEST(max2009_blob)
 			center.z /= (ufbx_real)face.num_indices;
 
 			if (center.z >= 14.0f) {
-				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material.data[fi]];
-				ufbxt_assert(!strcmp(mat->material->name.data, "Top"));
+				ufbx_material *mat = mesh->materials.data[mesh->face_material.data[fi]];
+				ufbxt_assert(!strcmp(mat->name.data, "Top"));
 				num_top++;
 			}
 			if (center.y <= -10.0f) {
-				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material.data[fi]];
-				ufbxt_assert(!strcmp(mat->material->name.data, "Right"));
+				ufbx_material *mat = mesh->materials.data[mesh->face_material.data[fi]];
+				ufbxt_assert(!strcmp(mat->name.data, "Right"));
 				num_right++;
 			}
 			if (center.y >= 10.0f) {
-				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material.data[fi]];
-				ufbxt_assert(!strcmp(mat->material->name.data, "Left"));
+				ufbx_material *mat = mesh->materials.data[mesh->face_material.data[fi]];
+				ufbxt_assert(!strcmp(mat->name.data, "Left"));
 				num_left++;
 			}
 			if (center.x >= 9.0f) {
-				ufbx_mesh_material *mat = &mesh->materials.data[mesh->face_material.data[fi]];
-				ufbxt_assert(!strcmp(mat->material->name.data, "Front"));
+				ufbx_material *mat = mesh->materials.data[mesh->face_material.data[fi]];
+				ufbxt_assert(!strcmp(mat->name.data, "Front"));
 				num_front++;
 			}
 		}
@@ -243,10 +243,10 @@ UFBXT_FILE_TEST(synthetic_legacy_nonzero_material)
 	ufbxt_assert(mesh->faces.count == 1);
 	ufbxt_assert(mesh->num_indices == 3);
 	ufbxt_assert(mesh->materials.count == 2);
-	ufbxt_assert(!strcmp(mesh->materials.data[0].material->name.data, "Right"));
-	ufbxt_assert(mesh->materials.data[0].num_faces == 0);
-	ufbxt_assert(!strcmp(mesh->materials.data[1].material->name.data, "Left"));
-	ufbxt_assert(mesh->materials.data[1].num_faces == 1);
+	ufbxt_assert(!strcmp(mesh->materials.data[0]->name.data, "Right"));
+	ufbxt_assert(mesh->material_parts.data[0].num_faces == 0);
+	ufbxt_assert(!strcmp(mesh->materials.data[1]->name.data, "Left"));
+	ufbxt_assert(mesh->material_parts.data[1].num_faces == 1);
 	ufbxt_assert(mesh->face_material.count == 1);
 	ufbxt_assert(mesh->face_material.data[0] == 1);
 }

@@ -424,8 +424,8 @@ UFBXT_FILE_TEST(blender_279_ball)
 	ufbxt_assert(mesh->face_smoothing.count);
 
 	ufbxt_assert(mesh->materials.count == 2);
-	ufbxt_assert(mesh->materials.data[0].material == red);
-	ufbxt_assert(mesh->materials.data[1].material == white);
+	ufbxt_assert(mesh->materials.data[0] == red);
+	ufbxt_assert(mesh->materials.data[1] == white);
 
 	for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
 		ufbx_face face = mesh->faces.data[face_i];
@@ -1083,9 +1083,9 @@ UFBXT_FILE_TEST(zbrush_polygroup_mess)
 
 	ufbxt_assert(mesh->face_groups.count == 2029);
 	for (size_t i = 0; i < mesh->face_groups.count; i++) {
-		ufbx_face_group *group = &mesh->face_groups.data[i];
-		ufbxt_assert(group->num_faces < ufbxt_arraycount(groups_per_face_count));
-		groups_per_face_count[group->num_faces]++;
+		ufbx_mesh_part *part = &mesh->face_group_parts.data[i];
+		ufbxt_assert(part->num_faces < ufbxt_arraycount(groups_per_face_count));
+		groups_per_face_count[part->num_faces]++;
 	}
 
 	for (size_t i = 0; i < ufbxt_arraycount(groups_per_face_count_ref); i++) {
@@ -1136,8 +1136,9 @@ UFBXT_FILE_TEST(synthetic_face_group_id)
 		ufbxt_hintf("i = %zu", i);
 		ufbxt_assert(i < mesh->face_groups.count);
 		ufbx_face_group *group = &mesh->face_groups.data[i];
+		ufbx_mesh_part *part = &mesh->face_group_parts.data[i];
 		ufbxt_assert(group->id == ref_groups[i].id);
-		ufbxt_assert(group->num_faces == ref_groups[i].face_count);
+		ufbxt_assert(part->num_faces == ref_groups[i].face_count);
 	}
 }
 #endif
@@ -1154,8 +1155,8 @@ UFBXT_FILE_TEST(blender_279_empty_cube)
 	ufbxt_assert(mesh->num_vertices == 0);
 
 	ufbxt_assert(mesh->materials.count == 1);
-	ufbxt_assert(mesh->materials.data[0].material);
-	ufbxt_assert(mesh->materials.data[0].num_faces == 0);
+	ufbxt_assert(mesh->materials.data[0]);
+	ufbxt_assert(mesh->material_parts.data[0].num_faces == 0);
 }
 #endif
 

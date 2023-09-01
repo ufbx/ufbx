@@ -970,7 +970,7 @@ UFBXT_FILE_TEST(maya_texture_layers)
 
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node && node->mesh && node->mesh->materials.count == 1);
-	ufbx_material *material = node->mesh->materials.data[0].material;
+	ufbx_material *material = node->mesh->materials.data[0];
 
 	ufbx_texture *layered = material->fbx.diffuse_color.texture;
 	ufbxt_assert(layered);
@@ -1045,7 +1045,7 @@ UFBXT_FILE_TEST(maya_texture_blend_modes)
 
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node && node->mesh && node->mesh->materials.count == 1);
-	ufbx_material *material = node->mesh->materials.data[0].material;
+	ufbx_material *material = node->mesh->materials.data[0];
 
 	ufbx_texture *layered = material->fbx.diffuse_color.texture;
 	ufbxt_assert(layered);
@@ -1291,7 +1291,7 @@ UFBXT_FILE_TEST(max_instanced_material)
 		ufbxt_assert(red_node->materials.data[0] == red_mat);
 		ufbxt_assert(blue_node->materials.data[0] == blue_mat);
 
-		ufbxt_assert(red_mesh->materials.data[0].material == green_mat);
+		ufbxt_assert(red_mesh->materials.data[0] == green_mat);
 	}
 }
 #endif

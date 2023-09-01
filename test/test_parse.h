@@ -747,7 +747,7 @@ UFBXT_FILE_TEST(max_quote)
 		ufbxt_assert(node->mesh);
 		ufbx_mesh *mesh = node->mesh;
 		ufbxt_assert(mesh->materials.count == 1);
-		ufbx_material *material = mesh->materials.data[0].material;
+		ufbx_material *material = mesh->materials.data[0];
 		if (scene->metadata.ascii) {
 			ufbxt_assert(!strcmp(material->name.data, "&&q&qu&quo&quot\"\""));
 		} else {
@@ -780,7 +780,7 @@ UFBXT_FILE_TEST(max_colon_name)
 	ufbxt_assert(node->mesh);
 	ufbx_mesh *mesh = node->mesh;
 	ufbxt_assert(mesh->materials.count == 1);
-	ufbx_material *material = mesh->materials.data[0].material;
+	ufbx_material *material = mesh->materials.data[0];
 	ufbxt_assert(!strcmp(material->name.data, "Material::Pink"));
 }
 #endif
@@ -811,7 +811,7 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unicode_error_identity, UFBXT_FILE_TEST_FLAG_ALL
 		ufbxt_assert(mesh);
 		ufbxt_assert(mesh->materials.count == 1);
 
-		ufbx_material *material = mesh->materials.data[0].material;
+		ufbx_material *material = mesh->materials.data[0];
 		ufbxt_assert(!strcmp(material->name.data, "Material_\xef\xbf\xbd"));
 
 		if (left) {

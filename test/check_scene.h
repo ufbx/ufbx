@@ -367,6 +367,33 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	}
 }
 
+static void ufbxt_check_mesh_part(ufbx_scene *scene, ufbx_mesh *mesh, ufbx_mesh_part *part, uint32_t index, uint32_t *source_list)
+{
+	ufbxt_assert(part->index == index);
+	ufbxt_assert(part->num_faces <= mesh->num_faces);
+	ufbxt_assert(part->face_indices.count == part->num_faces);
+
+	size_t mat_bad_faces[3] = { 0 };
+	size_t mat_tris = 0;
+	for (size_t j = 0; j < part->num_faces; j++) {
+		uint32_t ix = part->face_indices.data[j];
+		ufbx_face face = mesh->faces.data[ix];
+		if (face.num_indices >= 3) {
+			mat_tris += face.num_indices - 2;
+		} else {
+			mat_bad_faces[face.num_indices]++;
+		}
+		if (source_list) {
+			ufbxt_assert(source_list[ix] == index);
+		}
+	}
+
+	ufbxt_assert(part->num_triangles == mat_tris);
+	ufbxt_assert(part->num_empty_faces == mat_bad_faces[0]);
+	ufbxt_assert(part->num_point_faces == mat_bad_faces[1]);
+	ufbxt_assert(part->num_line_faces == mat_bad_faces[2]);
+}
+
 static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 {
 	// ufbx_mesh *found = ufbx_find_mesh(scene, mesh->node.name.data);
@@ -521,33 +548,32 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_assert(mesh->face_material.count == 0);
 	}
 
-	for (size_t i = 0; i < mesh->materials.count; i++) {
-		ufbx_mesh_material *mat = &mesh->materials.data[i];
-		ufbxt_check_element_ptr(scene, mat->material, UFBX_ELEMENT_MATERIAL);
+	size_t total_material_faces = 0;
+	size_t total_material_tris = 0;
+	if (mesh->materials.count > 0) {
+		ufbxt_assert(mesh->material_parts.count == 0 || mesh->material_parts.count == mesh->materials.count);
 
-		if (!scene->metadata.may_contain_null_materials) {
-			ufbxt_assert(mat->material);
-		}
+		for (size_t i = 0; i < mesh->materials.count; i++) {
+			ufbx_material *mat = mesh->materials.data[i];
+			ufbxt_check_element_ptr(scene, mat, UFBX_ELEMENT_MATERIAL);
 
-		ufbxt_assert(mat->face_indices.count == mat->num_faces);
-
-		size_t mat_bad_faces[3] = { 0 };
-		size_t mat_tris = 0;
-		for (size_t j = 0; j < mat->num_faces; j++) {
-			uint32_t ix = mat->face_indices.data[j];
-			ufbx_face face = mesh->faces.data[ix];
-			if (face.num_indices >= 3) {
-				mat_tris += face.num_indices - 2;
-			} else {
-				mat_bad_faces[face.num_indices]++;
+			if (mesh->material_parts.count > 0) {
+				ufbxt_check_mesh_part(scene, mesh, &mesh->material_parts.data[i], (uint32_t)i, mesh->face_material.data);
+				total_material_faces += mesh->material_parts.data[i].num_faces;
+				total_material_tris += mesh->material_parts.data[i].num_triangles;
 			}
-			ufbxt_assert(mesh->face_material.data[ix] == (int32_t)i);
 		}
-
-		ufbxt_assert(mat->num_triangles == mat_tris);
-		ufbxt_assert(mat->num_empty_faces == mat_bad_faces[0]);
-		ufbxt_assert(mat->num_point_faces == mat_bad_faces[1]);
-		ufbxt_assert(mat->num_line_faces == mat_bad_faces[2]);
+	} else {
+		if (mesh->material_parts.count > 0) {
+			ufbxt_assert(mesh->material_parts.count == 1);
+			ufbxt_check_mesh_part(scene, mesh, &mesh->material_parts.data[0], 0, NULL);
+			total_material_faces += mesh->material_parts.data[0].num_faces;
+			total_material_tris += mesh->material_parts.data[0].num_triangles;
+		}
+	}
+	if (mesh->material_parts.count > 0) {
+		ufbxt_assert(total_material_faces == mesh->num_faces);
+		ufbxt_assert(total_material_tris == mesh->num_triangles);
 	}
 
 	if (mesh->face_group.count) {
@@ -560,35 +586,31 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_assert(mesh->face_groups.count == 0);
 	}
 
+	ufbxt_assert(mesh->face_group_parts.count == 0 || mesh->face_group_parts.count == mesh->face_groups.count);
+
 	if (mesh->face_groups.count > 0) {
 		size_t total_group_faces = 0;
 		size_t total_group_tris = 0;
 		for (size_t i = 0; i < mesh->face_groups.count; i++) {
 			ufbx_face_group *group = &mesh->face_groups.data[i];
 
+			if (mesh->face_group_parts.count > 0) {
+				ufbxt_check_mesh_part(scene, mesh, &mesh->face_group_parts.data[i], (uint32_t)i, mesh->face_group.data);
+				total_group_faces += mesh->face_group_parts.data[i].num_faces;
+				total_group_tris += mesh->face_group_parts.data[i].num_triangles;
+			}
+
 			if (i > 0) {
 				ufbxt_assert(group->id >= mesh->face_groups.data[i - 1].id);
 			}
 
 			ufbxt_check_string(group->name);
-			ufbxt_assert(group->face_indices.count == group->num_faces);
-
-			size_t group_tris = 0;
-			for (size_t j = 0; j < group->num_faces; j++) {
-				uint32_t ix = group->face_indices.data[j];
-				ufbx_face face = mesh->faces.data[ix];
-				if (face.num_indices >= 3) {
-					group_tris += face.num_indices - 2;
-				}
-				ufbxt_assert(mesh->face_group.data[ix] == (uint32_t)i);
-			}
-			ufbxt_assert(group->num_triangles == group_tris);
-
-			total_group_faces += group->num_faces;
-			total_group_tris += group->num_triangles;
 		}
-		ufbxt_assert(total_group_faces == mesh->num_faces);
-		ufbxt_assert(total_group_tris == mesh->num_triangles);
+
+		if (mesh->face_group_parts.count > 0) {
+			ufbxt_assert(total_group_faces == mesh->num_faces);
+			ufbxt_assert(total_group_tris == mesh->num_triangles);
+		}
 	}
 
 	for (size_t i = 0; i < mesh->skin_deformers.count; i++) {
@@ -605,10 +627,8 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_check_element_ptr_any(scene, mesh->all_deformers.data[i]);
 	}
 
-	if (!scene->metadata.may_contain_null_materials) {
-		for (size_t i = 0; i < mesh->instances.count; i++) {
-			ufbxt_assert(mesh->instances.data[i]->materials.count >= mesh->materials.count);
-		}
+	for (size_t i = 0; i < mesh->instances.count; i++) {
+		ufbxt_assert(mesh->instances.data[i]->materials.count >= mesh->materials.count);
 	}
 
 	// No loose UV or color
