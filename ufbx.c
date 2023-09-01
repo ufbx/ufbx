@@ -11381,8 +11381,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_assign_face_groups(ufbxi_buf *bu
 	if (retain_parts) {
 		parts = ufbxi_push_zero(buf, ufbx_mesh_part, num_groups);
 		ufbxi_check_err(error, parts);
-		mesh->face_group_parts.data = parts; 
-		mesh->face_group_parts.count = num_groups; 
+		mesh->face_group_parts.data = parts;
+		mesh->face_group_parts.count = num_groups;
 	}
 
 	// Optimization: Use `consecutive_indices` for a single group
@@ -18196,7 +18196,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh_material(ufbxi_buf
 	ufbxi_nounroll for (size_t i = 0; i < num_faces; i++) {
 		ufbx_face face = mesh->faces.data[i];
 		uint32_t mat_ix = 0;
-		
+
 		if (face_material) {
 			mat_ix = face_material[i];
 			if (mat_ix >= num_materials) {
