@@ -1,0 +1,207 @@
+; FBX 5.8.0 project file
+; Copyright (C) 1997-2007 Autodesk Inc. and/or its licensors.
+; All rights reserved.
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+    FBXHeaderVersion: 1003
+    FBXVersion: 5800
+    CreationTimeStamp:  {
+        Version: 1000
+        Year: 2023
+        Month: 9
+        Day: 1
+        Hour: 15
+        Minute: 41
+        Second: 53
+        Millisecond: 983
+    }
+    Creator: "FBX SDK/FBX Plugins build 20080212"
+    OtherFlags:  {
+        FlagPLE: 0
+    }
+}
+CreationTime: "2023-09-01 15:41:53:983"
+Creator: "FBX SDK/FBX Plugins build 20080212"
+Media:  {
+    Video:  {
+    }
+}
+Model: "Model::Box01" {
+    Version: 194
+    MultiLayer: 0
+    MultiTake: 1
+    Shading: T
+    Culling: "CullingOff"
+    Limits:  {
+        TAuto: 1
+        RAuto: 1
+        SAuto: 1
+    }
+    AnimatedProperty: "mTranslationProperty", "mRotationProperty", "mScalingProperty"
+    Animated: "Lcl Translation", "Lcl Rotation", "Lcl Scaling"
+    GeometryVersion: 123
+    Vertices: -10.0000047683716,-10.0000047683716,0,10.0000047683716,-10.0000047683716,0,-10.0000047683716,10.0000047683716,0,10.0000047683716
+     ,10.0000047683716,0,-10.0000047683716,-10.0000047683716,20.0000095367432,10.0000047683716,-10.0000047683716,20.0000095367432
+     ,-10.0000047683716,10.0000047683716,20.0000095367432,10.0000047683716,10.0000047683716,20.0000095367432
+    Normals: 0,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0,0.999999940395355
+     ,0,0,1,0,0,0.999999940395355,0,0,0.999999940395355,0,0,1,0,0,0.999999940395355,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355
+     ,0,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0.999999940395355,0,0,1,0,0,0.999999940395355,0,0,0.999999940395355
+     ,0,0,1,0,0,0.999999940395355,0,0,0,0.999999940395355,0,0,1,0,0,0.999999940395355,0,0,0.999999940395355,0,0,1,0,0,0.999999940395355
+     ,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0
+    MaterialAssignation: "AllSame"
+    Materials: 0
+    PolygonVertexIndex: 0,2,-4,3,1,-1,4,5,-8,7,6,-5,0,1,-6,5,4,-1,1,3,-8,7,5,-2,3,2,-7,6,7,-4,2,0,-5,4,6,-3
+    GeometryUVInfo:  {
+        Version: 240
+        MappingInformationType: "ByPolygon"
+        TextureUV: 0,0,1,0,0,1,1,1,0,0,1,0,0,1,1,1,0,0,1,0,0,1,1,1
+        TextureUVVerticeIndex: 9,11,10,10,8,9,8,9,11,11,10,8,4,5,7,7,6,4,0,1,3,3,2,0,4,5,7,7,6,4,0,1,3,3,2,0
+    }
+}
+;Takes and animation section
+;----------------------------------------------------
+
+Takes:  {
+    Current: "Take 001"
+    Take: "Take 001" {
+        FileName: "Take_001.tak"
+        LocalTime: 0,92372316000
+        ReferenceTime: 0,92372316000
+        ;Models animation
+        ;----------------------------------------------------
+        
+        Model: "Model::Box01" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 0
+                        KeyVer: 4005
+                        KeyCount: 3
+                        Key: 0,0,U,s,0,0,a,0.333233326673508,0.333233326673508,46186158000,-70,U,s,0,-0,a,0.333233326673508
+                                        ,0.333233326673508,92372316000,70,U,s,0,0,r,0.989998996257782
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        KeyVer: 4005
+                        KeyCount: 3
+                        Key: 0,0,U,s,0,0,a,0.333233326673508,0.333233326673508,46186158000,0,U,s,0,-0,a,0.333233326673508
+                                        ,0.333233326673508,92372316000,0,U,s,0,0,r,0.989998996257782
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        KeyVer: 4005
+                        KeyCount: 3
+                        Key: 0,0,U,s,0,0,a,0.333233326673508,0.333233326673508,46186158000,0,U,s,0,-0,a,0.333233326673508
+                                        ,0.333233326673508,92372316000,0,U,s,0,0,r,0.989998996257782
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        KeyVer: 4005
+                        KeyCount: 3
+                        Key: 0,0,U,s,0,0,a,0.333233326673508,0.333233326673508,46186158000,0,U,s,0,-0,a,0.333233326673508
+                                        ,0.333233326673508,92372316000,0,U,s,0,0,r,0.989998996257782
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: -0
+                        KeyVer: 4005
+                        KeyCount: 3
+                        Key: 0,-0,U,s,0,0,a,0.333233326673508,0.333233326673508,46186158000,-0,U,s,0,-0,a,0.333233326673508
+                                        ,0.333233326673508,92372316000,-0,U,s,0,0,r,0.989998996257782
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: -146.25
+                        KeyVer: 4005
+                        KeyCount: 3
+                        Key: 0,0,U,s,0,-90,a,0.333233326673508,0.333233326673508,46186158000,-90,U,s,-90,-0,a,0.333233326673508
+                                        ,0.333233326673508,92372316000,-180,U,s,0,0,r,0.989998996257782
+                        Color: 1,1,1
+                    }
+                    LayerType: 2
+                }
+                Channel: "S" {
+                    Channel: "X" {
+                        Default: 1.95312476158142
+                        KeyVer: 4005
+                        KeyCount: 3
+                        Key: 0,1,U,s,0,0.62499988079071,n,46186158000,1.49999988079071,U,s,0.62499988079071,-0
+                                        ,n,92372316000,2.24999976158142,U,s,0,0,n
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 1.95312476158142
+                        KeyVer: 4005
+                        KeyCount: 3
+                        Key: 0,1,U,s,0,0.62499988079071,n,46186158000,1.49999988079071,U,s,0.62499988079071,-0
+                                        ,n,92372316000,2.24999976158142,U,s,0,0,n
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 1.95312476158142
+                        KeyVer: 4005
+                        KeyCount: 3
+                        Key: 0,1,U,s,0,0.62499988079071,n,46186158000,1.49999988079071,U,s,0.62499988079071,-0
+                                        ,n,92372316000,2.24999976158142,U,s,0,0,n
+                        Color: 1,1,1
+                    }
+                    LayerType: 3
+                }
+            }
+        }
+        ;Textures animation
+        ;----------------------------------------------------
+        
+        ;Materials animation
+        ;----------------------------------------------------
+        
+    }
+}
+GoboManager:  {
+}
+SceneGenericPersistence:  {
+    SceneInfo: "SceneInfo::GlobalInfo" {
+        Type: "UserData"
+        Version: 100
+        MetaData:  {
+            Version: 100
+            Title: ""
+            Subject: ""
+            Author: ""
+            Keywords: ""
+            Revision: ""
+            Comment: ""
+        }
+    }
+}
+AmbientRenderSettings:  {
+    Version: 101
+    AmbientLightColor: 0,0,0,1
+}
+FogOptions:  {
+    FlogEnable: 0
+    FogMode: 0
+    FogDensity: 0.002
+    FogStart: 0.3
+    FogEnd: 1000
+    FogColor: 1,1,1,1
+}
+RendererSetting:  {
+    DefaultCamera: ""
+    DefaultViewingMode: 0
+}
+Settings:  {
+    TimeMode: 3
+    FrameRate: "30"
+    TimeFormat: 1
+    SnapOnFrames: 0
+    ReferenceTimeIndex: -1
+}
