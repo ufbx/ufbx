@@ -3,26 +3,33 @@
 
 #if UFBXT_IMPL
 
-void ufbxt_check_texture_content(ufbx_scene *scene, ufbx_texture *texture, const char *filename)
+void ufbxt_check_blob_content(ufbx_blob blob, const char *filename)
 {
 	char buf[512];
 
-	ufbxt_assert(texture->content.size > 0);
-	ufbxt_assert(texture->content.data);
+	ufbxt_assert(blob.size > 0);
+	ufbxt_assert(blob.data);
 
-	snprintf(buf, sizeof(buf), "%stextures/%s", data_root, filename);
-	void *ref = malloc(texture->content.size);
+	snprintf(buf, sizeof(buf), "%s%s", data_root, filename);
+	void *ref = malloc(blob.size);
 	ufbxt_assert(ref);
 
 	FILE *f = fopen(buf, "rb");
 	ufbxt_assert(f);
-	size_t num_read = fread(ref, 1, texture->content.size, f);
+	size_t num_read = fread(ref, 1, blob.size, f);
 	fclose(f);
 
-	ufbxt_assert(num_read == texture->content.size);
-	ufbxt_assert(!memcmp(ref, texture->content.data, texture->content.size));
+	ufbxt_assert(num_read == blob.size);
+	ufbxt_assert(!memcmp(ref, blob.data, blob.size));
 
 	free(ref);
+}
+
+void ufbxt_check_texture_content(ufbx_scene *scene, ufbx_texture *texture, const char *filename)
+{
+	char buf[512];
+	snprintf(buf, sizeof(buf), "textures/%s", filename);
+	ufbxt_check_blob_content(texture->content, buf);
 }
 
 void ufbxt_check_material_texture_ex(ufbx_scene *scene, ufbx_texture *texture, const char *directory, const char *filename, bool require_content)
