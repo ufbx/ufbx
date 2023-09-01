@@ -11312,7 +11312,7 @@ static int ufbxi_cmp_int32(const void *va, const void *vb)
 
 ufbx_static_assert(mesh_mat_point_faces, offsetof(ufbx_mesh_part, num_point_faces) - offsetof(ufbx_mesh_part, num_empty_faces) == 1 * sizeof(size_t));
 ufbx_static_assert(mesh_mat_line_faces, offsetof(ufbx_mesh_part, num_line_faces) - offsetof(ufbx_mesh_part, num_empty_faces) == 2 * sizeof(size_t));
-static ufbxi_forceinline ufbxi_mesh_part_add_face(ufbx_mesh_part *part, uint32_t num_indices)
+static ufbxi_forceinline void ufbxi_mesh_part_add_face(ufbx_mesh_part *part, uint32_t num_indices)
 {
 	part->num_faces++;
 	if (num_indices >= 3) {
