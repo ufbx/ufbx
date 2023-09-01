@@ -4811,7 +4811,7 @@ struct ufbx_string_view {
 	size_t length;
 
 	ufbx_string_view() : data(nullptr), length(0) { }
-	ufbx_string_view(const char *data, size_t length) : data(data), length(length) { }
+	ufbx_string_view(const char *data_, size_t length_) : data(data_), length(length_) { }
 	UFBX_CONVERSION_TO_IMPL(ufbx_string_view)
 };
 
@@ -4893,7 +4893,7 @@ class ufbx_unique_ptr {
 	static_assert(ufbx_type_traits<T>::valid, "ufbx_unique_ptr unsupported for type");
 public:
 	ufbx_unique_ptr() noexcept : ptr(nullptr) { }
-	explicit ufbx_unique_ptr(T *ptr) noexcept : ptr(ptr) { }
+	explicit ufbx_unique_ptr(T *ptr_) noexcept : ptr(ptr_) { }
 	ufbx_unique_ptr(ufbx_unique_ptr &&ref) noexcept : ptr(ref.ptr) { ref.ptr = nullptr; }
 	~ufbx_unique_ptr() { traits::free(ptr); }
 
@@ -4931,7 +4931,7 @@ class ufbx_shared_ptr {
 public:
 
 	ufbx_shared_ptr() noexcept : ptr(nullptr) { }
-	explicit ufbx_shared_ptr(T *ptr) noexcept : ptr(ptr) { }
+	explicit ufbx_shared_ptr(T *ptr_) noexcept : ptr(ptr_) { }
 	ufbx_shared_ptr(const ufbx_shared_ptr &ref) noexcept : ptr(ref.ptr) { traits::retain(ref.ptr); }
 	ufbx_shared_ptr(ufbx_shared_ptr &&ref) noexcept : ptr(ref.ptr) { ref.ptr = nullptr; }
 	~ufbx_shared_ptr() { traits::free(ptr); }

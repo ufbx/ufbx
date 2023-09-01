@@ -19736,8 +19736,8 @@ ufbxi_noinline static void ufbxi_update_anim_stack(ufbx_scene *scene, ufbx_anim_
 	}
 
 	if (begin && end) {
-		stack->time_begin = begin->value_int / (double)scene->metadata.ktime_second;
-		stack->time_end = end->value_int / (double)scene->metadata.ktime_second;
+		stack->time_begin = (double)begin->value_int / (double)scene->metadata.ktime_second;
+		stack->time_end = (double)end->value_int / (double)scene->metadata.ktime_second;
 	}
 
 	stack->anim->time_begin = stack->time_begin;
