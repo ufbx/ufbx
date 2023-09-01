@@ -24918,7 +24918,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 		ufbxi_check_err(&sc->error, result->face_hole.data);
 	}
 
-	size_t num_materials = result->materials.count;
 	if (result->material_parts.count > 0) {
 		result->material_parts.data = ufbxi_push_zero(&sc->result, ufbx_mesh_part, result->material_parts.count);
 		ufbxi_check_err(&sc->error, result->materials.data);
