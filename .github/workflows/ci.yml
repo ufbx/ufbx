@@ -311,6 +311,8 @@ jobs:
         run: |
           g++ -Wall -Wextra -Werror -Wno-unused-function -pthread -std=c++11 -DUFBX_STANDARD_C -x c++ ufbx.c test/threadcheck.cpp -lm -o build/threadcheck-cpp11
           build/threadcheck-cpp11 data/maya_cube_7500_binary.fbx 2
+      - name: Link C/C++ LTO
+        run: bash misc/lto_compatability.sh
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_exotic.txt.gz
