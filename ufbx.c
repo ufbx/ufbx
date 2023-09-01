@@ -13669,13 +13669,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_media(ufbxi_context *uc, ufbxi_node *node)
 {
 	ufbxi_node *videos = ufbxi_find_child(node, ufbxi_Video);
-	ufbxi_for(ufbxi_node, child, videos->children, videos->num_children) {
-		ufbxi_element_info video_info = { 0 };
-		ufbxi_check(ufbxi_get_val1(child, "S", &video_info.name));
-		ufbxi_check(ufbxi_push_synthetic_id(uc, &video_info.fbx_id));
-		video_info.dom_node = ufbxi_get_dom_node(uc, node);
+	if (videos) {
+		ufbxi_for(ufbxi_node, child, videos->children, videos->num_children) {
+			ufbxi_element_info video_info = { 0 };
+			ufbxi_check(ufbxi_get_val1(child, "S", &video_info.name));
+			ufbxi_check(ufbxi_push_synthetic_id(uc, &video_info.fbx_id));
+			video_info.dom_node = ufbxi_get_dom_node(uc, node);
 
-		ufbxi_check(ufbxi_read_video(uc, child, &video_info));
+			ufbxi_check(ufbxi_read_video(uc, child, &video_info));
+		}
 	}
 
 	return 1;
