@@ -51,6 +51,8 @@ jobs:
           path: build
       - name: Run tests
         run: python3 misc/run_tests.py tests stack readme threadcheck hashes --runner ci_linux
+      - name: Verbose test info
+        run: build/runner_clang_release_x64/runner -d data -v
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_linux.txt.gz
@@ -125,8 +127,6 @@ jobs:
         run: sudo apt-get update
       - name: Install apt dependencies
         run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm-11
-      - name: Verbose test info
-        run: build/runner_clang_release_x64/runner -d data -v
       - name: Generate coverage
         run: LLVM_COV=llvm-cov-11 bash misc/generate_coverage.sh
       - name: Upload coverage
