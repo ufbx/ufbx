@@ -20110,7 +20110,7 @@ ufbxi_noinline static ufbx_coordinate_axis ufbxi_find_axis(const ufbx_props *pro
 }
 
 static const ufbx_real ufbxi_time_mode_fps[] = {
-	24.0f,   // UFBX_TIME_MODE_DEFAULT
+	30.0f,   // UFBX_TIME_MODE_DEFAULT
 	120.0f,  // UFBX_TIME_MODE_120_FPS
 	100.0f,  // UFBX_TIME_MODE_100_FPS
 	60.0f,   // UFBX_TIME_MODE_60_FPS
