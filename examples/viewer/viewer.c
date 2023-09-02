@@ -458,7 +458,7 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 			exit(1);
 		}
 
-		mesh->num_indices = num_indices;
+		part->num_indices = num_indices;
 		if (mesh_part->index < mesh->materials.count) {
 			ufbx_material *material =  mesh->materials.data[mesh_part->index];
 			part->material_index = (int32_t)material->typed_id;
