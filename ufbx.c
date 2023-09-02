@@ -13413,7 +13413,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_settings(ufbxi_conte
 		ufbxi_check(new_props);
 
 		memcpy(new_props, tmp_props, num_props * sizeof(ufbx_prop));
-		memcpy(new_props + num_props, props->props.data, num_existing * sizeof(ufbx_prop));
+		if (num_existing > 0) {
+			memcpy(new_props + num_props, props->props.data, num_existing * sizeof(ufbx_prop));
+		}
 
 		ufbxi_check(ufbxi_sort_properties(uc, new_props, new_count));
 		props->props.data = new_props;
