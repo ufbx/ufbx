@@ -590,7 +590,7 @@ ufbxt_noinline static void ufbxt_hash_mesh_imp(ufbxt_hash *h, const ufbx_mesh *v
 	ufbxt_hash_list_ptr(h, v->uv_sets, ufbxt_hash_uv_set_imp);
 	ufbxt_hash_list_ptr(h, v->color_sets, ufbxt_hash_color_set_imp);
 
-	ufbxt_hash_list_ptr(h, v->materials, ufbxt_hash_element_ref_imp);
+	ufbxt_hash_list(h, v->materials, ufbxt_hash_element_ref_imp);
 	ufbxt_hash_list_ptr(h, v->face_groups, ufbxt_hash_face_group_imp);
 
 	ufbxt_hash_list_ptr(h, v->material_parts, ufbxt_hash_mesh_part_imp);
