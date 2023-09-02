@@ -51,12 +51,6 @@ jobs:
           path: build
       - name: Run tests
         run: python3 misc/run_tests.py tests stack readme threadcheck hashes --runner ci_linux
-      - name: Verbose test info
-        run: build/runner_clang_release_x64/runner -d data -v
-      - name: Generate coverage
-        run: LLVM_COV=llvm-cov-11 bash misc/generate_coverage.sh
-      - name: Upload coverage
-        run: bash <(curl -s https://codecov.io/bash) -f coverage.lcov -y .github/codecov.yml
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_linux.txt.gz
@@ -119,6 +113,24 @@ jobs:
         with:
           name: hash-dumps
           path: build/hashdump_ci_macos.txt.gz
+
+  ci_coverage:
+    runs-on: ubuntu-20.04
+    needs: ci_pre_hashes
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - name: Update apt
+        run: sudo apt-get update
+      - name: Install apt dependencies
+        run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm-11
+      - name: Verbose test info
+        run: build/runner_clang_release_x64/runner -d data -v
+      - name: Generate coverage
+        run: LLVM_COV=llvm-cov-11 bash misc/generate_coverage.sh
+      - name: Upload coverage
+        run: bash <(curl -s https://codecov.io/bash) -f coverage.lcov -y .github/codecov.yml
 
   ci_cpp:
     runs-on: ubuntu-latest
