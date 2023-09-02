@@ -1204,3 +1204,51 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_smoothing, UFBXT_FILE_TEST_FLAG_ALLOW_INVALI
 	ufbxt_assert(mesh->edge_smoothing.count == 0);
 }
 #endif
+
+#if UFBXT_IMPL 
+static ufbx_load_opts ufbxt_skip_mesh_parts_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.skip_mesh_parts = true;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_cube_skip_mesh_parts, maya_cube, ufbxt_skip_mesh_parts_opts)
+#if UFBXT_IMPL 
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->materials.count == 1);
+	ufbxt_assert(mesh->material_parts.count == 0);
+	ufbxt_assert(mesh->face_groups.count == 0);
+	ufbxt_assert(mesh->face_group_parts.count == 0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(synthetic_face_group_id_skip_mesh_parts, synthetic_face_group_id, ufbxt_skip_mesh_parts_opts)
+#if UFBXT_IMPL 
+{
+	ufbx_node *node = ufbx_find_node(scene, "20 Sided");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->materials.count == 1);
+	ufbxt_assert(mesh->material_parts.count == 0);
+	ufbxt_assert(mesh->face_groups.count == 14);
+	ufbxt_assert(mesh->face_group_parts.count == 0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(synthetic_face_groups_skip_mesh_parts, synthetic_face_groups, ufbxt_skip_mesh_parts_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->materials.count == 2);
+	ufbxt_assert(mesh->material_parts.count == 0);
+	ufbxt_assert(mesh->face_groups.count == 4);
+	ufbxt_assert(mesh->face_group_parts.count == 0);
+}
+#endif
