@@ -1,4 +1,4 @@
-# ufbx [![CI](https://github.com/bqqbarbhg/ufbx/actions/workflows/ci.yml/badge.svg)](https://github.com/bqqbarbhg/ufbx/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/bqqbarbhg/ufbx/branch/master/graph/badge.svg)](https://codecov.io/gh/bqqbarbhg/ufbx)
+# ufbx [![CI](https://github.com/bqqbarbhg/ufbx/actions/workflows/ci.yml/badge.svg)](https://github.com/bqqbarbhg/ufbx/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/ufbx/ufbx/branch/master/graph/badge.svg)](https://codecov.io/gh/ufbx/ufbx)
 
 Single source file FBX file loader.
 
