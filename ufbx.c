@@ -4793,6 +4793,7 @@ static const char ufbxi_UV[] = "UV\0";
 static const char ufbxi_UnitScaleFactor[] = "UnitScaleFactor";
 static const char ufbxi_UpAxisSign[] = "UpAxisSign";
 static const char ufbxi_UpAxis[] = "UpAxis";
+static const char ufbxi_Version5[] = "Version5";
 static const char ufbxi_VertexCacheDeformer[] = "VertexCacheDeformer";
 static const char ufbxi_VertexCrease[] = "VertexCrease";
 static const char ufbxi_VertexCreaseIndex[] = "VertexCreaseIndex";
@@ -5085,6 +5086,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_UnitScaleFactor, 15 },
 	{ ufbxi_UpAxis, 6 },
 	{ ufbxi_UpAxisSign, 10 },
+	{ ufbxi_Version5, 8 },
 	{ ufbxi_VertexCacheDeformer, 19 },
 	{ ufbxi_VertexCrease, 12 },
 	{ ufbxi_VertexCreaseIndex, 17 },
@@ -5378,6 +5380,13 @@ typedef struct {
 	size_t num_left;
 } ufbxi_obj_fast_indices;
 
+// Temporary pointer to a `ufbx_anim_stack` by name used to patch start/stop
+// time from "Takes" if necessary.
+typedef struct {
+	const char *name;
+	ufbx_anim_stack *stack;
+} ufbxi_tmp_anim_stack;
+
 typedef struct {
 
 	// Current line and tokens.
@@ -5451,6 +5460,7 @@ typedef struct {
 	bool file_big_endian;
 	bool sure_fbx;
 	bool retain_mesh_parts;
+	bool read_legacy_settings;
 
 	ufbx_load_opts opts;
 
@@ -5478,6 +5488,7 @@ typedef struct {
 	ufbxi_map prop_type_map;    // < `ufbxi_prop_type_name` Property type to enum
 	ufbxi_map fbx_id_map;       // < `ufbxi_fbx_id_entry` FBX ID to local ID
 	ufbxi_map texture_file_map; // < `ufbxi_texture_file_entry` absolute raw filename to element ID
+	ufbxi_map anim_stack_map;   // < `ufbxi_tmp_anim_stack` anim stacks by name before finalization
 
 	// 6x00 specific maps
 	ufbxi_map fbx_attr_map;  // < `ufbxi_fbx_attr_entry` Node ID to attrib ID
@@ -10686,13 +10697,41 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_connect_pp(ufbxi_context *uc, ui
 	return 1;
 }
 
+ufbxi_noinline static void ufbxi_init_synthetic_int_prop(ufbx_prop *dst, const char *name, int64_t value, ufbx_prop_type type)
+{
+	dst->type = type;
+	dst->name.data = name;
+	dst->name.length = strlen(name);
+	dst->value_real = (ufbx_real)value;
+	dst->flags = (ufbx_prop_flags)(UFBX_PROP_FLAG_SYNTHETIC|UFBX_PROP_FLAG_VALUE_REAL|UFBX_PROP_FLAG_VALUE_INT);
+	dst->value_int = value;
+	dst->value_str.data = ufbxi_empty_char;
+
+	ufbxi_dev_assert(dst->name.length >= 4);
+	dst->_internal_key = ufbxi_get_name_key(name, 4);
+}
+
+ufbxi_noinline static void ufbxi_init_synthetic_real_prop(ufbx_prop *dst, const char *name, ufbx_real value, ufbx_prop_type type)
+{
+	dst->type = type;
+	dst->name.data = name;
+	dst->name.length = strlen(name);
+	dst->value_real = value;
+	dst->flags = (ufbx_prop_flags)(UFBX_PROP_FLAG_SYNTHETIC|UFBX_PROP_FLAG_VALUE_REAL);
+	dst->value_int = (int64_t)value;
+	dst->value_str.data = ufbxi_empty_char;
+
+	ufbxi_dev_assert(dst->name.length >= 4);
+	dst->_internal_key = ufbxi_get_name_key(name, 4);
+}
+
 ufbxi_noinline static void ufbxi_init_synthetic_vec3_prop(ufbx_prop *dst, const char *name, const ufbx_vec3 *value, ufbx_prop_type type)
 {
 	dst->type = type;
 	dst->name.data = name;
 	dst->name.length = strlen(name);
 	dst->value_vec3 = *value;
-	dst->flags = (ufbx_prop_flags)(UFBX_PROP_FLAG_SYNTHETIC|UFBX_PROP_FLAG_VALUE_VEC3|UFBX_PROP_FLAG_VALUE_INT);
+	dst->flags = (ufbx_prop_flags)(UFBX_PROP_FLAG_SYNTHETIC|UFBX_PROP_FLAG_VALUE_VEC3);
 	dst->value_int = ufbxi_f64_to_i64(dst->value_real);
 	dst->value_str.data = ufbxi_empty_char;
 
@@ -12427,6 +12466,23 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_video(ufbxi_context *uc, uf
 	return 1;
 }
 
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_anim_stack(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_anim_stack *stack = ufbxi_push_element(uc, info, ufbx_anim_stack, UFBX_ELEMENT_ANIM_STACK);
+	ufbxi_check(stack);
+
+	uint32_t hash = ufbxi_hash_ptr(info->name.data);
+	ufbxi_tmp_anim_stack *entry = ufbxi_map_find(&uc->anim_stack_map, ufbxi_tmp_anim_stack, hash, &info->name.data);
+	if (!entry) {
+		entry = ufbxi_map_insert(&uc->anim_stack_map, ufbxi_tmp_anim_stack, hash, &info->name.data);
+		ufbxi_check(entry);
+		entry->name = info->name.data;
+		entry->stack = stack;
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_pose(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, const char *sub_type)
 {
 	ufbx_pose *pose = ufbxi_push_element(uc, info, ufbx_pose, UFBX_ELEMENT_POSE);
@@ -12820,7 +12876,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects(ufbxi_context *uc)
 		} else if (name == ufbxi_Video) {
 			ufbxi_check(ufbxi_read_video(uc, node, &info));
 		} else if (name == ufbxi_AnimationStack) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_stack), UFBX_ELEMENT_ANIM_STACK));
+			ufbxi_check(ufbxi_read_anim_stack(uc, node, &info));
 		} else if (name == ufbxi_AnimationLayer) {
 			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_layer), UFBX_ELEMENT_ANIM_LAYER));
 		} else if (name == ufbxi_AnimationCurveNode) {
@@ -13242,25 +13298,55 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_object(ufbxi_context *
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take(ufbxi_context *uc, ufbxi_node *node)
 {
+	ufbx_prop tmp_props[4];
+	uint32_t num_props = 0;
+	memset(tmp_props, 0, sizeof(tmp_props));
+
+	int64_t start = 0, stop = 0;
+	if (ufbxi_find_val2(node, ufbxi_LocalTime, "LL", &start, &stop)) {
+		ufbxi_init_synthetic_int_prop(&tmp_props[num_props++], ufbxi_LocalStart, start, UFBX_PROP_INTEGER);
+		ufbxi_init_synthetic_int_prop(&tmp_props[num_props++], ufbxi_LocalStop, stop, UFBX_PROP_INTEGER);
+	}
+	if (ufbxi_find_val2(node, ufbxi_ReferenceTime, "LL", &start, &stop)) {
+		ufbxi_init_synthetic_int_prop(&tmp_props[num_props++], ufbxi_ReferenceStart, start, UFBX_PROP_INTEGER);
+		ufbxi_init_synthetic_int_prop(&tmp_props[num_props++], ufbxi_ReferenceStop, stop, UFBX_PROP_INTEGER);
+	}
+
+	const char *name;
+	ufbxi_check(ufbxi_get_val1(node, "C", (char**)&name));
+
+	// Hack: For post-7000 files we are only interested in the animation times
+	// for fallback in case the information is missing in the stacks.
+	if (uc->version >= 7000) {
+		uint32_t hash = ufbxi_hash_ptr(name);
+		ufbxi_tmp_anim_stack *entry = ufbxi_map_find(&uc->anim_stack_map, ufbxi_tmp_anim_stack, hash, &name);
+
+		if (entry) {
+			ufbx_anim_stack *stack = entry->stack;
+			if (stack->props.props.count == 0) {
+				stack->props.props.count = num_props;
+				stack->props.props.data = ufbxi_push_copy(&uc->result, ufbx_prop, num_props, tmp_props);
+				ufbxi_check(stack->props.props.data);
+			}
+		}
+
+		return 1;
+	}
+
 	uint64_t stack_fbx_id = 0, layer_fbx_id = 0;
 
 	// Treat the Take as a post-7000 version animation stack and layer.
-	ufbx_anim_stack *stack = ufbxi_push_synthetic_element(uc, &stack_fbx_id, node, NULL, ufbx_anim_stack, UFBX_ELEMENT_ANIM_STACK);
+	ufbx_anim_stack *stack = ufbxi_push_synthetic_element(uc, &stack_fbx_id, node, name, ufbx_anim_stack, UFBX_ELEMENT_ANIM_STACK);
 	ufbxi_check(stack);
-	ufbxi_check(ufbxi_get_val1(node, "S", &stack->name));
+
+	stack->props.props.count = num_props;
+	stack->props.props.data = ufbxi_push_copy(&uc->result, ufbx_prop, num_props, tmp_props);
+	ufbxi_check(stack->props.props.data);
 
 	ufbx_anim_layer *layer = ufbxi_push_synthetic_element(uc, &layer_fbx_id, node, ufbxi_BaseLayer, ufbx_anim_layer, UFBX_ELEMENT_ANIM_LAYER);
 	ufbxi_check(layer);
 
 	ufbxi_check(ufbxi_connect_oo(uc, layer_fbx_id, stack_fbx_id));
-
-	// Read stack properties from node
-	int64_t begin = 0, end = 0;
-	if (!ufbxi_find_val2(node, ufbxi_LocalTime, "LL", &begin, &end)) {
-		ufbxi_check(ufbxi_find_val2(node, ufbxi_ReferenceTime, "LL", &begin, &end));
-	}
-	stack->time_begin = (double)begin / uc->ktime_sec_double;
-	stack->time_end = (double)end / uc->ktime_sec_double;
 
 	// Read all properties of objects included in the take
 	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
@@ -13283,6 +13369,56 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_takes(ufbxi_context *uc)
 		if (node->name == ufbxi_Take) {
 			ufbxi_check(ufbxi_read_take(uc, node));
 		}
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_settings(ufbxi_context *uc, ufbxi_node *node)
+{
+	if (uc->read_legacy_settings) return 1;
+	uc->read_legacy_settings = true;
+
+	ufbx_prop tmp_props[2];
+	uint32_t num_props = 0;
+	memset(tmp_props, 0, sizeof(tmp_props));
+
+	ufbxi_node *frame_rate = ufbxi_find_child_strcmp(node, "FrameRate");
+	if (frame_rate) {
+		double fps = 0.0;
+		if (!ufbxi_get_val1(frame_rate, "D", &fps)) {
+			ufbx_string str;
+			if (ufbxi_get_val1(frame_rate, "S", &str)) {
+				char *end;
+				double val = ufbxi_parse_double(str.data, str.length, &end, false);
+				if (end == str.data + str.length) {
+					fps = val;
+				}
+			}
+		}
+		if (fps > 0.0) {
+			ufbxi_init_synthetic_real_prop(&tmp_props[num_props++], ufbxi_CustomFrameRate, (ufbx_real)fps, UFBX_PROP_NUMBER);
+			ufbxi_init_synthetic_real_prop(&tmp_props[num_props++], ufbxi_TimeMode, UFBX_TIME_MODE_CUSTOM, UFBX_PROP_INTEGER);
+		}
+	}
+
+	if (num_props > 0) {
+		ufbx_props *props = &uc->scene.settings.props;
+		size_t num_existing = props->props.count;
+
+		size_t new_count = num_props + num_existing;
+		ufbx_prop *new_props = ufbxi_push(&uc->result, ufbx_prop, new_count);
+		ufbxi_check(new_props);
+
+		memcpy(new_props, tmp_props, num_props * sizeof(ufbx_prop));
+		memcpy(new_props + num_props, props->props.data, num_existing * sizeof(ufbx_prop));
+
+		ufbxi_check(ufbxi_sort_properties(uc, new_props, new_count));
+		props->props.data = new_props;
+		props->props.count = new_count;
+		ufbxi_deduplicate_properties(&props->props);
+
+		ufbxi_check(uc->scene.settings.props.props.data);
 	}
 
 	return 1;
@@ -13360,17 +13496,23 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_root(ufbxi_context *uc)
 	ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_Connections));
 	ufbxi_check(ufbxi_read_connections(uc));
 
-	// Takes: Pre-7000 animations, don't even try to read them in
-	// post-7000 versions as the code has some assumptions about the version.
-	if (uc->version < 7000) {
-		ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_Takes));
-		ufbxi_check(ufbxi_read_takes(uc));
-	}
+	// Takes: Pre-7000 animation data
+	ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_Takes));
+	ufbxi_check(ufbxi_read_takes(uc));
 
 	// Check if there's a top-level GlobalSettings that we skimmed over
 	ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_GlobalSettings));
 	if (uc->top_node) {
 		ufbxi_check(ufbxi_read_global_settings(uc, uc->top_node));
+	}
+
+	// Version5: Pre-6000 settings
+	ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_Version5));
+	if (uc->top_node) {
+		ufbxi_node *settings = ufbxi_find_child_strcmp(uc->top_node, "Settings");
+		if (settings) {
+			ufbxi_read_legacy_settings(uc, settings);
+		}
 	}
 
 	// Force parsing all the nodes by parsing a toplevel that cannot be found
@@ -13892,6 +14034,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_legacy_root(ufbxi_context *
 			ufbxi_check(ufbxi_read_takes(uc));
 		} else if (node->name == ufbxi_Model) {
 			ufbxi_check(ufbxi_read_legacy_model(uc, node));
+		} else if (!strcmp(node->name, "Settings")) {
+			ufbxi_check(ufbxi_read_legacy_settings(uc, node));
 		}
 	}
 
@@ -21681,6 +21825,7 @@ static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_map_free(&uc->prop_type_map);
 	ufbxi_map_free(&uc->fbx_id_map);
 	ufbxi_map_free(&uc->texture_file_map);
+	ufbxi_map_free(&uc->anim_stack_map);
 	ufbxi_map_free(&uc->fbx_attr_map);
 	ufbxi_map_free(&uc->node_prop_set);
 	ufbxi_map_free(&uc->dom_node_map);
@@ -21792,6 +21937,7 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	ufbxi_map_init(&uc->prop_type_map, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
 	ufbxi_map_init(&uc->fbx_id_map, &uc->ator_tmp, &ufbxi_map_cmp_uint64, NULL);
 	ufbxi_map_init(&uc->texture_file_map, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
+	ufbxi_map_init(&uc->anim_stack_map, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
 	ufbxi_map_init(&uc->fbx_attr_map, &uc->ator_tmp, &ufbxi_map_cmp_uint64, NULL);
 	ufbxi_map_init(&uc->node_prop_set, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
 	ufbxi_map_init(&uc->dom_node_map, &uc->ator_tmp, &ufbxi_map_cmp_uintptr, NULL);

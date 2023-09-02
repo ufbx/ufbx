@@ -305,5 +305,20 @@ UFBXT_FILE_TEST(max2009_cube_anim)
 {
 	ufbxt_check_frame(scene, err, false, "max2009_cube_anim_15", NULL, 15.0/30.0);
 	ufbxt_check_frame(scene, err, false, "max2009_cube_anim_45", NULL, 45.0/30.0);
+
+	ufbxt_assert(scene->settings.frames_per_second == 30.0);
+
+	{
+		ufbx_anim_stack *stack = ufbx_find_anim_stack(scene, "Take 001");
+		ufbxt_assert(stack);
+
+		ufbxt_assert_close_double(err, stack->time_begin, 0.0 / 30.0);
+		ufbxt_assert_close_double(err, stack->time_end, 60.0 / 30.0);
+
+		ufbxt_assert(ufbx_find_int(&stack->props, "LocalStart", INT64_MIN) == INT64_C(0));
+		ufbxt_assert(ufbx_find_int(&stack->props, "LocalStop", INT64_MIN) == INT64_C(92372316000));
+		ufbxt_assert(ufbx_find_int(&stack->props, "ReferenceStart", INT64_MIN) == INT64_C(0));
+		ufbxt_assert(ufbx_find_int(&stack->props, "ReferenceStop", INT64_MIN) == INT64_C(92372316000));
+	}
 }
 #endif

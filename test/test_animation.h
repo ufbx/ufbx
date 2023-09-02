@@ -941,3 +941,44 @@ UFBXT_FILE_TEST_ALT(anim_override_duplicate, blender_293_instancing)
 	ufbxt_assert(!strcmp(error.info, "element 2 prop \"PropB\""));
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_anim_stack_no_props)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_anim_stack *stack = ufbx_find_anim_stack(scene, "X");
+		ufbxt_assert(stack);
+		ufbxt_assert_close_double(err, stack->time_begin, 1.0 / 24.0);
+		ufbxt_assert_close_double(err, stack->time_end, 12.0 / 24.0);
+
+		ufbxt_assert(ufbx_find_int(&stack->props, "LocalStart", 0) == INT64_C(1924423250));
+		ufbxt_assert(ufbx_find_int(&stack->props, "LocalStop", 0) == INT64_C(23093079000));
+		ufbxt_assert(ufbx_find_int(&stack->props, "ReferenceStart", 0) == INT64_C(1924423250));
+		ufbxt_assert(ufbx_find_int(&stack->props, "ReferenceStop", 0) == INT64_C(23093079000));
+	}
+
+	{
+		ufbx_anim_stack *stack = ufbx_find_anim_stack(scene, "Y");
+		ufbxt_assert(stack);
+		ufbxt_assert_close_double(err, stack->time_begin, 13.0 / 24.0);
+		ufbxt_assert_close_double(err, stack->time_end, 24.0 / 24.0);
+
+		ufbxt_assert(ufbx_find_int(&stack->props, "LocalStart", 0) == INT64_C(25017502250));
+		ufbxt_assert(ufbx_find_int(&stack->props, "LocalStop", 0) == INT64_C(46186158000));
+		ufbxt_assert(ufbx_find_int(&stack->props, "ReferenceStart", 0) == INT64_C(25017502250));
+		ufbxt_assert(ufbx_find_int(&stack->props, "ReferenceStop", 0) == INT64_C(46186158000));
+	}
+
+	{
+		ufbx_anim_stack *stack = ufbx_find_anim_stack(scene, "Z");
+		ufbxt_assert(stack);
+		ufbxt_assert_close_double(err, stack->time_begin, 25.0 / 24.0);
+		ufbxt_assert_close_double(err, stack->time_end, 36.0 / 24.0);
+
+		ufbxt_assert(ufbx_find_int(&stack->props, "LocalStart", 0) == INT64_C(48110581250));
+		ufbxt_assert(ufbx_find_int(&stack->props, "LocalStop", 0) == INT64_C(69279237000));
+		ufbxt_assert(ufbx_find_int(&stack->props, "ReferenceStart", 0) == INT64_C(48110581250));
+		ufbxt_assert(ufbx_find_int(&stack->props, "ReferenceStop", 0) == INT64_C(69279237000));
+	}
+}
+#endif
