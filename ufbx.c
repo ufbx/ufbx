@@ -12468,6 +12468,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_video(ufbxi_context *uc, uf
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_anim_stack(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
+	(void)node;
+
 	ufbx_anim_stack *stack = ufbxi_push_element(uc, info, ufbx_anim_stack, UFBX_ELEMENT_ANIM_STACK);
 	ufbxi_check(stack);
 
@@ -13511,7 +13513,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_root(ufbxi_context *uc)
 	if (uc->top_node) {
 		ufbxi_node *settings = ufbxi_find_child_strcmp(uc->top_node, "Settings");
 		if (settings) {
-			ufbxi_read_legacy_settings(uc, settings);
+			ufbxi_check(ufbxi_read_legacy_settings(uc, settings));
 		}
 	}
 
