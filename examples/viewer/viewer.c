@@ -281,7 +281,7 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 
 	// We need to render each material of the mesh in a separate part, so let's
 	// count the number of parts and maximum number of triangles needed.
-	for (size_t pi = 0; pi < mesh->materials.count; pi++) {
+	for (size_t pi = 0; pi < mesh->material_parts.count; pi++) {
 		ufbx_mesh_part *part = &mesh->material_parts.data[pi];
 		if (part->num_triangles == 0) continue;
 		max_parts += 1;
