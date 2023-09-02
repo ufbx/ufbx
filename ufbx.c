@@ -23247,13 +23247,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 		*mat = surface->material;
 		mesh->materials.data = mat;
 		mesh->materials.count = 1;
+	}
 
-		if (!tc->opts.skip_mesh_parts) {
-			mesh->material_parts.data = ufbxi_push_zero(&tc->result, ufbx_mesh_part, 1);
-			ufbxi_check_err(&tc->error, mesh->material_parts.data);
-
-			mesh->material_parts.count = 1;
-		}
+	if (!tc->opts.skip_mesh_parts) {
+		mesh->material_parts.count = 1;
+		mesh->material_parts.data = ufbxi_push_zero(&tc->result, ufbx_mesh_part, 1);
+		ufbxi_check_err(&tc->error, mesh->material_parts.data);
 	}
 
 	ufbxi_check_err(&tc->error, ufbxi_finalize_mesh_material(&tc->result, &tc->error, mesh));
