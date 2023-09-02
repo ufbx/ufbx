@@ -25236,7 +25236,7 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 		for (size_t si = 0; si < num_streams; si++) {
 			size_t vertex_size = streams[si].vertex_size;
 			char *dst = streams[si].begin;
-			char *src = (char*)map.items + streams[si].packed_offset;
+			char *src = ufbxi_add_ptr((char*)map.items, streams[si].packed_offset);
 			for (size_t i = 0; i < result_vertices; i++) {
 				memcpy(dst, src, vertex_size);
 				dst += vertex_size;
@@ -27730,7 +27730,7 @@ ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t 
 	if (!error) {
 		error = &local_error;
 	}
-	ufbxi_clear_error(error);
+	memset(error, 0, sizeof(ufbx_error));
 	return ufbxi_generate_indices(streams, num_streams, indices, num_indices, allocator, error);
 }
 

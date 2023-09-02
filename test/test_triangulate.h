@@ -261,3 +261,18 @@ UFBXT_FILE_TEST(blender_300_ngon_irregular)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST_ALT(triangulate_empty, maya_cube_7500_binary)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbx_face empty_face = { 0, 0 };
+	uint32_t indices[16];
+	uint32_t result = ufbx_triangulate_face(indices, 16, mesh, empty_face);
+	ufbxt_assert(result == 0);
+}
+#endif
+

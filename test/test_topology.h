@@ -299,4 +299,34 @@ UFBXT_FILE_TEST(blender_312x_vertex_crease)
 }
 #endif
 
+UFBXT_TEST(generate_indices_empty_vertex)
+#if UFBXT_IMPL
+{
+	uint32_t indices[9];
+	ufbx_error error;
+	size_t num_vertices = ufbx_generate_indices(NULL, 0, indices, 9, NULL, &error);
+	ufbxt_assert(num_vertices == 0);
+	ufbxt_assert(error.type == UFBX_ERROR_ZERO_VERTEX_SIZE);
+}
+#endif
+
+UFBXT_TEST(generate_indices_no_indices)
+#if UFBXT_IMPL
+{
+	ufbx_vec3 vertices[] = {
+		{ 0.0f, 0.0f, 0.0f },
+		{ 1.0f, 0.0f, 0.0f },
+		{ 0.0f, 1.0f, 0.0f },
+	};
+	ufbx_vertex_stream streams[] = {
+		{ vertices, sizeof(ufbx_vec3) },
+	};
+	ufbx_error error;
+	uint32_t indices[9];
+	size_t num_vertices = ufbx_generate_indices(streams, 1, indices, 0, NULL, &error);
+	ufbxt_assert(num_vertices == 0);
+	ufbxt_assert(error.type == UFBX_ERROR_NONE);
+}
+#endif
+
 
