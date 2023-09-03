@@ -139,6 +139,7 @@ typedef struct {
 	bool bad_order;
 	bool bad_uvs;
 	bool bad_faces;
+	bool missing_uvs;
 	bool line_faces;
 	bool point_faces;
 	bool no_subdivision;
@@ -146,6 +147,8 @@ typedef struct {
 	bool remove_namespaces;
 	bool match_by_order;
 	ufbx_real tolerance;
+	ufbx_real uv_tolerance;
+	uint32_t allow_missing;
 	int32_t animation_frame;
 
 	bool normalize_units;
@@ -531,7 +534,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 
 	obj->meshes = meshes;
 	obj->num_meshes = num_meshes;
-	obj->tolerance = 0.001f;
+	obj->tolerance = (ufbx_real)0.001;
+	obj->uv_tolerance = (ufbx_real)0.001;
+	obj->allow_missing = 0;
 	obj->normalize_units = false;
 	obj->animation_frame = -1;
 	obj->exporter = UFBXT_OBJ_EXPORTER_UNKNOWN;
@@ -601,6 +606,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 				mesh->vertex_position.values.count = (size_t)(dp - positions);
 				mesh->vertex_normal.values.count = (size_t)(dn - normals);
 				mesh->vertex_uv.values.count = (size_t)(du - uvs);
+				if (indices[0] > 0) mesh->vertex_position.exists = true;
+				if (indices[1] > 0) mesh->vertex_uv.exists = true;
+				if (indices[2] > 0) mesh->vertex_normal.exists = true;
 
 				*dpi++ = indices[0] - 1;
 				*dni++ = indices[2] - 1;
@@ -688,6 +696,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			if (!strcmp(line, "ufbx:bad_faces")) {
 				obj->bad_faces = true;
 			}
+			if (!strcmp(line, "ufbx:missing_uvs")) {
+				obj->missing_uvs = true;
+			}
 			if (!strcmp(line, "ufbx:line_faces")) {
 				obj->line_faces = true;
 			}
@@ -721,6 +732,14 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			double tolerance = 0.0;
 			if (sscanf(line, "ufbx:tolerance=%lf", &tolerance) == 1) {
 				obj->tolerance = (ufbx_real)tolerance;
+			}
+			double uv_tolerance = 0.0;
+			if (sscanf(line, "ufbx:uv_tolerance=%lf", &uv_tolerance) == 1) {
+				obj->uv_tolerance = (ufbx_real)uv_tolerance;
+			}
+			int allow_missing = 0;
+			if (sscanf(line, "ufbx:allow_missing=%d", &allow_missing) == 1) {
+				obj->allow_missing = (uint32_t)allow_missing;
 			}
 			double position_scale = 0.0;
 			if (sscanf(line, "ufbx:position_scale=%lf", &position_scale) == 1) {
@@ -1003,12 +1022,28 @@ static int ufbxt_cmp_sub_vertex(const void *va, const void *vb)
 	return 0;
 }
 
+static ufbxt_noinline bool ufbxt_face_has_duplicate_vertex(ufbx_mesh *mesh, ufbx_face face)
+{
+	for (size_t i = 0; i < face.num_indices; i++) {
+		uint32_t ix = mesh->vertex_indices.data[face.index_begin + i];
+		for (size_t j = 0; j < i; j++) {
+			uint32_t jx = mesh->vertex_indices.data[face.index_begin + j];
+			if (ix == jx) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt_obj_mesh *obj_mesh, ufbxt_diff_error *p_err, ufbx_real scale)
 {
 	ufbx_real tolerance = obj->tolerance;
 
-	ufbxt_assert(fbx_mesh->num_faces == obj_mesh->num_faces);
-	ufbxt_assert(fbx_mesh->num_indices == obj_mesh->num_indices);
+	if (!obj->bad_faces) {
+		ufbxt_assert(fbx_mesh->num_faces == obj_mesh->num_faces);
+		ufbxt_assert(fbx_mesh->num_indices == obj_mesh->num_indices);
+	}
 
 	// Check that all vertices exist, anything more doesn't really make sense
 	ufbxt_match_vertex *obj_verts = (ufbxt_match_vertex*)calloc(obj_mesh->num_indices, sizeof(ufbxt_match_vertex));
@@ -1027,7 +1062,7 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 		if (scale != 1.0) {
 			obj_verts[i].pos.x *= scale;
 			obj_verts[i].pos.y *= scale;
-			obj_verts[i].pos.x *= scale;
+			obj_verts[i].pos.z *= scale;
 		}
 	}
 	for (size_t i = 0; i < fbx_mesh->num_indices; i++) {
@@ -1040,26 +1075,40 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 		}
 		fbx_verts[i].pos = fp;
 		fbx_verts[i].normal = fn;
-		if (obj_mesh->vertex_uv.exists) {
-			ufbxt_assert(fbx_mesh->vertex_uv.exists);
+		if (fbx_mesh->vertex_uv.exists) {
 			fbx_verts[i].uv = ufbx_get_vertex_vec2(&fbx_mesh->vertex_uv, i);
 		}
 
 		if (scale != 1.0) {
 			fbx_verts[i].pos.x *= scale;
 			fbx_verts[i].pos.y *= scale;
-			fbx_verts[i].pos.x *= scale;
+			fbx_verts[i].pos.z *= scale;
 		}
 	}
 
 	qsort(obj_verts, obj_mesh->num_indices, sizeof(ufbxt_match_vertex), &ufbxt_cmp_sub_vertex);
 	qsort(fbx_verts, fbx_mesh->num_indices, sizeof(ufbxt_match_vertex), &ufbxt_cmp_sub_vertex);
 
+	int32_t obj_verts_left = (int32_t)obj_mesh->num_indices;
 	for (int32_t i = (int32_t)fbx_mesh->num_indices - 1; i >= 0; i--) {
 		ufbxt_match_vertex v = fbx_verts[i];
 
+		uint32_t face_ix = ufbx_find_face_index(fbx_mesh, (size_t)i);
+		ufbx_face face = fbx_mesh->faces.data[face_ix];
+
+		if (obj->bad_faces) {
+			if (obj->bad_faces && ufbxt_face_has_duplicate_vertex(fbx_mesh, face)) {
+				continue;
+			} else if (obj->line_faces && face.num_indices == 2) {
+				continue;
+			} else if (obj->point_faces && face.num_indices == 1) {
+				continue;
+			}
+		}
+
 		bool found = false;
-		for (int32_t j = i; j >= 0 && obj_verts[j].pos.x >= v.pos.x - tolerance; j--) {
+		uint32_t missing_count = 0;
+		for (int32_t j = obj_verts_left - 1; j >= 0 && obj_verts[j].pos.x >= v.pos.x - tolerance; j--) {
 			ufbx_real dx = obj_verts[j].pos.x - v.pos.x;
 			ufbx_real dy = obj_verts[j].pos.y - v.pos.y;
 			ufbx_real dz = obj_verts[j].pos.z - v.pos.z;
@@ -1075,25 +1124,29 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 				dnz = 0.0f;
 			}
 
-			if (obj->bad_uvs) {
+			if (obj->bad_uvs || !obj_mesh->vertex_uv.exists) {
 				du = 0.0f;
 				dv = 0.0f;
 			}
 
-			ufbxt_assert(dx <= tolerance);
+			// ufbxt_assert(dx <= tolerance);
 			ufbx_real err = (ufbx_real)sqrt(dx*dx + dy*dy + dz*dz + dnx*dnx + dny*dny + dnz*dnz + du*du + dv*dv);
 			if (err < tolerance) {
 				if (err > p_err->max) p_err->max = err;
 				p_err->sum += err;
 				p_err->num++;
 
-				obj_verts[j] = obj_verts[i];
+				obj_verts[j] = obj_verts[obj_verts_left - 1];
+				obj_verts_left--;
 				found = true;
 				break;
 			}
 		}
 
-		ufbxt_assert(found);
+		if (!found) {
+			ufbxt_assert(missing_count < obj->allow_missing);
+			missing_count++;
+		}
 	}
 
 	free(obj_verts);
@@ -1143,20 +1196,6 @@ static ufbxt_noinline size_t ufbxt_obj_group_key(char *cat_buf, size_t cat_cap, 
 
 	*--cat_ptr = '\0';
 	return cat_ptr - cat_buf;
-}
-
-static ufbxt_noinline bool ufbxt_face_has_duplicate_vertex(ufbx_mesh *mesh, ufbx_face face)
-{
-	for (size_t i = 0; i < face.num_indices; i++) {
-		uint32_t ix = mesh->vertex_indices.data[face.index_begin + i];
-		for (size_t j = 0; j < i; j++) {
-			uint32_t jx = mesh->vertex_indices.data[face.index_begin + j];
-			if (ix == jx) {
-				return true;
-			}
-		}
-	}
-	return false;
 }
 
 enum {
@@ -1397,6 +1436,17 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		if ((flags & UFBXT_OBJ_DIFF_FLAG_CHECK_DEFORMED_NORMALS) == 0 && mesh->all_deformers.count > 0) check_normals = false;
 		if ((flags & UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS) != 0) check_normals = false;
 
+		ufbx_string uv_set_name = ufbx_find_string(&node->props, "currentUVSet", ufbx_empty_string);
+		ufbx_vertex_vec2 vertex_uv = mesh->vertex_uv;
+		if (uv_set_name.length > 0) {
+			for (size_t i = 0; i < mesh->uv_sets.count; i++) {
+				const ufbx_uv_set *uv_set = &mesh->uv_sets.data[i];
+				if (!strcmp(uv_set->name.data, uv_set_name.data)) {
+					vertex_uv = uv_set->vertex_uv;
+				}
+			}
+		}
+
 		if (obj->bad_order) {
 			ufbxt_match_obj_mesh(obj, node, mesh, obj_mesh, p_err, (ufbx_real)scale);
 		} else {
@@ -1469,9 +1519,18 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 
 					if (obj_mesh->vertex_uv.exists && !obj->bad_uvs) {
 						ufbxt_assert(mesh->vertex_uv.exists);
-						ufbx_vec2 ou = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, oix);
-						ufbx_vec2 fu = ufbx_get_vertex_vec2(&mesh->vertex_uv, fix);
-						ufbxt_assert_close_vec2(p_err, ou, fu);
+						uint32_t ovx = obj_mesh->vertex_uv.indices.data[oix];
+
+						if (ovx == UFBX_NO_INDEX) {
+							if (!obj->missing_uvs) {
+								ufbxt_assert(vertex_uv.indices.data[fix] == UFBX_NO_INDEX);
+							}
+						} else {
+							ufbx_vec2 ou = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, oix);
+							ufbx_vec2 fu = ufbx_get_vertex_vec2(&vertex_uv, fix);
+							ufbxt_assert_close_vec2_threshold(p_err, ou, fu, obj->uv_tolerance);
+							ufbxt_assert_close_vec2_threshold(p_err, ou, fu, obj->uv_tolerance);
+						}
 					}
 				}
 			}

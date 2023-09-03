@@ -46,6 +46,13 @@ static const ufbxt_enum_name ufbxt_names_ufbx_space_conversion[] = {
 	{ "adjust-transforms", UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS },
 };
 
+static const ufbxt_enum_name ufbxt_names_ufbx_index_error_handling[] = {
+	{ "clamp", UFBX_INDEX_ERROR_HANDLING_CLAMP },
+	{ "no-index", UFBX_INDEX_ERROR_HANDLING_NO_INDEX },
+	{ "abort", UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING },
+	{ "unsafe-ignore", UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE },
+};
+
 static int ufbxt_str_to_enum_imp(const ufbxt_enum_name *names, size_t count, const char *type_name, const char *name)
 {
 	for (size_t i = 0; i < count; i++) {
@@ -124,6 +131,7 @@ int main(int argc, char **argv)
 	opts.target_axes = ufbx_axes_right_handed_y_up;
 	opts.target_unit_meters = (ufbx_real)0.01;
 	opts.obj_search_mtl_by_filename = true;
+	opts.index_error_handling = UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING;
 
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-v")) {
@@ -150,6 +158,8 @@ int main(int argc, char **argv)
 			if (++i < argc) opts.geometry_transform_handling = ufbxt_str_to_enum(ufbx_geometry_transform_handling, argv[i]);
 		} else if (!strcmp(argv[i], "--space-conversion")) {
 			if (++i < argc) opts.space_conversion = ufbxt_str_to_enum(ufbx_space_conversion, argv[i]);
+		} else if (!strcmp(argv[i], "--index-error-handling")) {
+			if (++i < argc) opts.index_error_handling = ufbxt_str_to_enum(ufbx_index_error_handling, argv[i]);
 		} else if (!strcmp(argv[i], "--fps")) {
 			if (++i < argc) override_fps = strtod(argv[i], NULL);
 		} else if (argv[i][0] == '-') {
