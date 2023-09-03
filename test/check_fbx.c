@@ -113,6 +113,7 @@ int main(int argc, char **argv)
 	bool allow_bad_unicode = false;
 	bool sink = false;
 	bool dedicated_allocs = false;
+	double override_fps = -1.0;
 
 	ufbx_load_opts opts = { 0 };
 
@@ -149,6 +150,8 @@ int main(int argc, char **argv)
 			if (++i < argc) opts.geometry_transform_handling = ufbxt_str_to_enum(ufbx_geometry_transform_handling, argv[i]);
 		} else if (!strcmp(argv[i], "--space-conversion")) {
 			if (++i < argc) opts.space_conversion = ufbxt_str_to_enum(ufbx_space_conversion, argv[i]);
+		} else if (!strcmp(argv[i], "--fps")) {
+			if (++i < argc) override_fps = strtod(argv[i], NULL);
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "Unrecognized flag: %s\n", argv[i]);
 			exit(1);
@@ -349,10 +352,14 @@ int main(int argc, char **argv)
 				anim = stack->anim;
 			}
 
-			double time = anim->time_begin + (double)obj_file->animation_frame / (double)scene->settings.frames_per_second;
+			double fps = scene->settings.frames_per_second;
+			if (override_fps > 0.0)
+				fps = override_fps;
+
+			double time = anim->time_begin + (double)obj_file->animation_frame / fps;
 
 			if (frame != INT_MIN) {
-				time = (double)frame / (double)scene->settings.frames_per_second;
+				time = (double)frame / fps;
 			}
 
 			ufbx_evaluate_opts eval_opts = { 0 };
