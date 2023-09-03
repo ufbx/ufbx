@@ -1411,6 +1411,14 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			opts.evaluate_source_vertices = true;
 			opts.evaluate_skin_weights = true;
 
+			int64_t uv_boundary = ufbx_find_int(&node->props, "ufbx:UVBoundary", -1);
+
+			if (uv_boundary >= 0 && uv_boundary < UFBX_SUBDIVISION_BOUNDARY_COUNT) {
+				opts.uv_boundary = (ufbx_subdivision_boundary)uv_boundary;
+			} else {
+				opts.uv_boundary = UFBX_SUBDIVISION_BOUNDARY_SHARP_BOUNDARY;
+			}
+
 			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, mesh->subdivision_preview_levels, &opts, NULL);
 			ufbxt_assert(sub_mesh);
 
