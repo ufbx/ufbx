@@ -4624,7 +4624,7 @@ ufbx_abi void ufbx_retain_line_curve(ufbx_line_curve *curve);
 
 // Find the face that contains a given `index`.
 // Returns `UFBX_NO_INDEX` if out of bounds.
-uint32_t ufbx_find_face_index(ufbx_mesh *mesh, size_t index);
+ufbx_abi uint32_t ufbx_find_face_index(ufbx_mesh *mesh, size_t index);
 
 ufbx_abi uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face);
 ufbx_inline uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face) {
