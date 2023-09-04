@@ -1035,6 +1035,7 @@ if __name__ == "__main__":
     file.functions["ufbx_tessellate_nurbs_surface"].alloc_type = "mesh"
     file.functions["ufbx_load_geometry_cache"].alloc_type = "geometryCache"
     file.functions["ufbx_load_geometry_cache_len"].alloc_type = "geometryCache"
+    file.functions["ufbx_create_anim"].alloc_type = "anim"
 
     file.functions["ufbx_free_scene"].kind = "free"
     file.functions["ufbx_free_mesh"].kind = "free"
