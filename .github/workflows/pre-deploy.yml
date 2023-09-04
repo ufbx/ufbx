@@ -26,3 +26,7 @@ jobs:
         run: |
           bash misc/users/magnum-plugins/build.sh
           bash misc/users/magnum-plugins/run.sh
+  ci_rust:
+    uses: ufbx/ufbx-rust/.github/workflows/test.yml@main
+    with:
+      ufbx-sha: ${{ github.sha }}
