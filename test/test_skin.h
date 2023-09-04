@@ -11,6 +11,18 @@ void ufbxt_check_stack_times(ufbx_scene *scene, ufbxt_diff_error *err, const cha
 	ufbxt_assert_close_real(err, (ufbx_real)stack->time_end, (ufbx_real)end);
 }
 
+void ufbxt_check_stack_timestamps(ufbx_scene *scene, ufbxt_diff_error *err, const char *stack_name, int64_t begin, int64_t end)
+{
+	ufbx_anim_stack *stack = (ufbx_anim_stack*)ufbx_find_element(scene, UFBX_ELEMENT_ANIM_STACK, stack_name);
+	ufbxt_assert(stack);
+	ufbxt_assert(!strcmp(stack->name.data, stack_name));
+
+	ufbxt_assert(ufbx_find_int(&stack->props, "LocalStart", 0) == begin);
+	ufbxt_assert(ufbx_find_int(&stack->props, "LocalStop", 0) == end);
+	ufbxt_assert(ufbx_find_int(&stack->props, "ReferenceStart", 0) == begin);
+	ufbxt_assert(ufbx_find_int(&stack->props, "ReferenceStop", 0) == end);
+}
+
 void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_normals, const char *file_name, const char *anim_name, double time)
 {
 	char buf[512];
@@ -143,6 +155,10 @@ UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, combined)
 	ufbxt_check_stack_times(scene, err, "wiggle", 1.0/24.0, 20.0/24.0);
 	ufbxt_check_stack_times(scene, err, "spin", 20.0/24.0, 40.0/24.0);
 	ufbxt_check_stack_times(scene, err, "deform", 40.0/24.0, 60.0/24.0);
+
+	ufbxt_check_stack_timestamps(scene, err, "wiggle", INT64_C(1924423250), INT64_C(38488465000));
+	ufbxt_check_stack_timestamps(scene, err, "spin", INT64_C(38488465000), INT64_C(76976930000));
+	ufbxt_check_stack_timestamps(scene, err, "deform", INT64_C(76976930000), INT64_C(115465395000));
 
 	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_10", "wiggle", 10.0/24.0);
 	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_18", "wiggle", 18.0/24.0);

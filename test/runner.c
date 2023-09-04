@@ -2471,8 +2471,61 @@ typedef enum ufbxt_file_test_flags {
 	UFBXT_FILE_TEST_FLAG_ALLOW_FEWER_PROGRESS_CALLS = 0x1000,
 } ufbxt_file_test_flags;
 
+const char *ufbxt_file_formats[] = {
+	"binary", "ascii", "obj", "mtl",
+};
+
+bool ufbxt_parse_format(char *buf, size_t buf_len, const char *name, const char **p_format, uint32_t *p_version)
+{
+	size_t len = strlen(name);
+	const char *p = name + len;
+	for (uint32_t i = 0; i < 2; i++) {
+		while (p > name && p[-1] != '_') p--;
+		if (p > name) p--;
+	}
+	if (p == name) return false;
+
+	const char *name_end = p;
+	p++;
+
+	uint32_t version = 0;
+	size_t digits = 0;
+	while (p[0] >= '0' && p[0] <= '9') {
+		version = version * 10 + (uint32_t)(p[0] - '0');
+		digits++;
+		p++;
+	}
+	if (digits == 0) return false;
+	if (*p++ != '_') return false;
+
+	bool format_valid = false;
+	for (size_t i = 0; i < ufbxt_arraycount(ufbxt_file_formats); i++) {
+		if (!strcmp(p, ufbxt_file_formats[i])) {
+			format_valid = true;
+			break;
+		}
+	}
+	if (!format_valid) return false;
+
+	size_t name_len = name_end - name;
+	ufbxt_assert(name_len < buf_len);
+	memcpy(buf, name, name_len);
+	buf[name_len] = '\0';
+
+	*p_format = p;
+	*p_version = version;
+	return true;
+}
+
 void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_diff_error *err, ufbx_error *load_error), const char *suffix, ufbx_load_opts user_opts, ufbxt_file_test_flags flags)
 {
+	const char *req_format = NULL;
+	uint32_t req_version = 0;
+	char name_buf[256];
+	if (ufbxt_parse_format(name_buf, sizeof(name_buf), name, &req_format, &req_version)) {
+		name = name_buf;
+	}
+
 	char buf[512];
 	snprintf(buf, sizeof(buf), "%s%s.obj", data_root, name);
 	size_t obj_size = 0;
@@ -2555,6 +2608,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			case 3: format = "obj"; ext = "obj"; break;
 			}
 			ufbxt_assert(format);
+
+			if (req_format != NULL) {
+				if (strcmp(format, req_format) != 0) continue;
+				if (version != req_version) continue;
+			}
 
 			if (suffix) {
 				snprintf(buf, sizeof(buf), "%s%s_%u_%s_%s.%s", data_root, name, version, format, suffix, ext);
@@ -2792,7 +2850,6 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 					ufbx_load_opts loose_opts = load_opts;
 					loose_opts.allow_missing_vertex_position = true;
 					loose_opts.allow_nodes_out_of_root = true;
-					loose_opts.allow_null_material = true;
 					loose_opts.connect_broken_elements = true;
 					loose_opts.generate_missing_normals = true;
 					loose_opts.ignore_missing_external_files = true;

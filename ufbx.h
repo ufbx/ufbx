@@ -965,36 +965,31 @@ typedef struct ufbx_face {
 
 UFBX_LIST_TYPE(ufbx_face_list, ufbx_face);
 
-typedef struct ufbx_mesh_material {
-	ufbx_nullable ufbx_material *material;
+// Subset of mesh faces used by a single material or group.
+typedef struct ufbx_mesh_part {
 
-	// Sub-set of the geometry that uses this specific material
-	size_t num_faces;     // < Number of faces (polygons) using this material
-	size_t num_triangles; // < Number of triangles using this material if triangulated
+	// Index of the mesh part.
+	uint32_t index;
+
+	// Sub-set of the geometry
+	size_t num_faces;     // < Number of faces (polygons)
+	size_t num_triangles; // < Number of triangles if triangulated
 
 	size_t num_empty_faces; // < Number of faces with zero vertices
 	size_t num_point_faces; // < Number of faces with a single vertex
 	size_t num_line_faces;  // < Number of faces with two vertices
 
-	// Indices to `ufbx_mesh.faces[]` that use this material.
+	// Indices to `ufbx_mesh.faces[]`.
 	// Always contains `num_faces` elements.
 	ufbx_uint32_list face_indices;
 
-} ufbx_mesh_material;
+} ufbx_mesh_part;
 
-UFBX_LIST_TYPE(ufbx_mesh_material_list, ufbx_mesh_material);
+UFBX_LIST_TYPE(ufbx_mesh_part_list, ufbx_mesh_part);
 
 typedef struct ufbx_face_group {
 	int32_t id;       // < Numerical ID for this group.
 	ufbx_string name; // < Name for the face group.
-
-	// Sub-set of the geometry in this face group
-	size_t num_faces;     // < Number of faces (polygons) using this material
-	size_t num_triangles; // < Number of triangles using this material if triangulated
-
-	// Indices to `ufbx_mesh.faces[]` that use this material.
-	// Always contains `num_faces` elements.
-	ufbx_uint32_list face_indices;
 } ufbx_face_group;
 
 UFBX_LIST_TYPE(ufbx_face_group_list, ufbx_face_group);
@@ -1173,19 +1168,20 @@ struct ufbx_mesh {
 	ufbx_uv_set_list uv_sets;
 	ufbx_color_set_list color_sets;
 
-	// List of materials used by the mesh. This is a list of structures that contains
-	// compact lists of face indices that use a specific material which can be more
-	// useful convenient `face_material`. Use `materials[index].material` for the
-	// actual material pointers.
+	// Materials used by the mesh.
 	// NOTE: These can be wrong if you want to support per-instance materials!
 	// Use `ufbx_node.materials[]` to get the per-instance materials at the same indices.
-	// HINT: If this mesh has no material then `materials[]` will be empty, but if
-	// you enable `ufbx_load_opts.allow_null_material` there will be a single
-	// `ufbx_mesh_material` with `material == NULL` with all the faces in it.
-	ufbx_mesh_material_list materials;
+	ufbx_material_list materials;
 
 	// Face groups for this mesh.
 	ufbx_face_group_list face_groups;
+
+	// Segments that use a given material.
+	// Defined even if the mesh doesn't have any materials.
+	ufbx_mesh_part_list material_parts;
+
+	// Segments for each face group.
+	ufbx_mesh_part_list face_group_parts;
 
 	// Skinned vertex positions, for efficiency the skinned positions are the
 	// same as the static ones for non-skinned meshes and `skinned_is_local`
@@ -3286,10 +3282,6 @@ typedef struct ufbx_metadata {
 	// to indicate gaps.
 	bool may_contain_no_index;
 
-	// May contain `ufbx_mesh_material` entries where `ufbx_mesh_material.material == NULL`.
-	// NOTE: The corresponding `ufbx_node.materials[]` will be empty in this case.
-	bool may_contain_null_materials;
-
 	// May contain meshes with no defined vertex position.
 	// NOTE: `ufbx_mesh.vertex_position.exists` may be `false`!
 	bool may_contain_missing_vertex_position;
@@ -4005,6 +3997,9 @@ typedef struct ufbx_load_opts {
 	// a bit of memory and time if not needed
 	bool skip_skin_vertices;
 
+	// Skip computing `ufbx_mesh.material_parts[]` and `ufbx_mesh.group_parts[]`.
+	bool skip_mesh_parts;
+
 	// Clean-up skin weights by removing negative, zero and NAN weights.
 	bool clean_skin_weights;
 
@@ -4029,11 +4024,6 @@ typedef struct ufbx_load_opts {
 	// Allow nodes that are not connected in any way to the root. Conversely if
 	// disabled, all lone nodes will be parented under `ufbx_scene.root_node`.
 	bool allow_nodes_out_of_root;
-
-	// If a mesh does not have a material create a `ufbx_mesh_material` part
-	// with a `NULL` material pointer. This can be more convenient if you need
-	// to split models into parts per material.
-	bool allow_null_material;
 
 	// Allow meshes with no vertex position attribute.
 	// NOTE: If this is set `ufbx_mesh.vertex_position.exists` may be `false`.
@@ -4258,6 +4248,9 @@ typedef struct ufbx_tessellate_surface_opts {
 	// enforcing whatever limits you deem reasonable.
 	uint32_t span_subdivision_u;
 	uint32_t span_subdivision_v;
+
+	// Skip computing `ufbx_mesh.material_parts[]`
+	bool skip_mesh_parts;
 
 	uint32_t _end_zero;
 } ufbx_tessellate_surface_opts;
@@ -4631,7 +4624,7 @@ ufbx_abi void ufbx_retain_line_curve(ufbx_line_curve *curve);
 
 // Find the face that contains a given `index`.
 // Returns `UFBX_NO_INDEX` if out of bounds.
-uint32_t ufbx_find_face_index(ufbx_mesh *mesh, size_t index);
+ufbx_abi uint32_t ufbx_find_face_index(ufbx_mesh *mesh, size_t index);
 
 ufbx_abi uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face);
 ufbx_inline uint32_t ufbx_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, ufbx_face face) {

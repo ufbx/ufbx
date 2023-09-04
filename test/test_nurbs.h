@@ -451,6 +451,53 @@ UFBXT_FILE_TEST(maya_nurbs_low_sphere)
 }
 #endif
 
+UFBXT_FILE_TEST_ALT(nurbs_tessellate_mesh_parts, maya_nurbs_surface_plane_7500_binary)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "nurbsPlane1");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_NURBS_SURFACE);
+	ufbx_nurbs_surface *surface = (ufbx_nurbs_surface*)node->attrib;
+
+	for (int skip_parts = 0; skip_parts <= 1; skip_parts++) {
+		ufbx_tessellate_surface_opts opts = { 0 };
+		opts.skip_mesh_parts = skip_parts != 0;
+
+		ufbx_mesh *tess_mesh = ufbx_tessellate_nurbs_surface(surface, &opts, NULL);
+		ufbxt_assert(tess_mesh);
+
+		ufbxt_assert(tess_mesh->materials.count == 1);
+		ufbxt_assert(!strcmp(tess_mesh->materials.data[0]->name.data, "lambert1"));
+
+		ufbxt_assert(tess_mesh->material_parts.count == (skip_parts != 0 ? 0 : 1));
+
+		ufbx_free_mesh(tess_mesh);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_nurbs_surface_no_material)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "nurbsPlane1");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_NURBS_SURFACE);
+	ufbx_nurbs_surface *surface = (ufbx_nurbs_surface*)node->attrib;
+
+	for (int skip_parts = 0; skip_parts <= 1; skip_parts++) {
+		ufbx_tessellate_surface_opts opts = { 0 };
+		opts.skip_mesh_parts = skip_parts != 0;
+
+		ufbx_mesh *tess_mesh = ufbx_tessellate_nurbs_surface(surface, &opts, NULL);
+		ufbxt_assert(tess_mesh);
+
+		ufbxt_assert(tess_mesh->materials.count == 0);
+
+		ufbxt_assert(tess_mesh->material_parts.count == (skip_parts != 0 ? 0 : 1));
+
+		ufbx_free_mesh(tess_mesh);
+	}
+}
+#endif
+
 UFBXT_FILE_TEST_ALT(nurbs_alloc_fail, maya_nurbs_surface_plane)
 #if UFBXT_IMPL
 {

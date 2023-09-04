@@ -136,9 +136,33 @@ UFBXT_FILE_TEST_ALT(subsurf_alloc_fail, maya_subsurf_cube)
 }
 #endif
 
+#if UFBXT_IMPL
+typedef struct {
+	const char *node_name;
+	ufbx_subdivision_boundary boundary;
+} ufbxt_subsurf_boundary_ref;
+#endif
+
 UFBXT_FILE_TEST(blender_293_suzanne_subsurf_uv)
 #if UFBXT_IMPL
 {
+	ufbxt_subsurf_boundary_ref ref[] = {
+		{ "SharpBoundary", UFBX_SUBDIVISION_BOUNDARY_SHARP_BOUNDARY },
+		{ "SharpCorners", UFBX_SUBDIVISION_BOUNDARY_SHARP_CORNERS },
+		{ "SharpInterior", UFBX_SUBDIVISION_BOUNDARY_SHARP_INTERIOR },
+		{ "SharpNone", UFBX_SUBDIVISION_BOUNDARY_SHARP_NONE },
+	};
+
+	for (size_t i = 0; i < ufbxt_arraycount(ref); i++) {
+		ufbx_node *node = ufbx_find_node(scene, ref[i].node_name);
+		ufbxt_assert(node);
+
+		ufbx_prop *prop = ufbx_find_prop(&node->props, "ufbx:UVBoundary");
+		ufbxt_assert(prop);
+		ufbxt_assert((prop->flags & UFBX_PROP_FLAG_USER_DEFINED) != 0);
+		ufbxt_assert(prop->type == UFBX_PROP_INTEGER);
+		ufbxt_assert(prop->value_int == (int64_t)ref[i].boundary);
+	}
 }
 #endif
 
@@ -296,6 +320,36 @@ UFBXT_FILE_TEST(maya_vertex_crease)
 UFBXT_FILE_TEST(blender_312x_vertex_crease)
 #if UFBXT_IMPL
 {
+}
+#endif
+
+UFBXT_TEST(generate_indices_empty_vertex)
+#if UFBXT_IMPL
+{
+	uint32_t indices[9];
+	ufbx_error error;
+	size_t num_vertices = ufbx_generate_indices(NULL, 0, indices, 9, NULL, &error);
+	ufbxt_assert(num_vertices == 0);
+	ufbxt_assert(error.type == UFBX_ERROR_ZERO_VERTEX_SIZE);
+}
+#endif
+
+UFBXT_TEST(generate_indices_no_indices)
+#if UFBXT_IMPL
+{
+	ufbx_vec3 vertices[] = {
+		{ 0.0f, 0.0f, 0.0f },
+		{ 1.0f, 0.0f, 0.0f },
+		{ 0.0f, 1.0f, 0.0f },
+	};
+	ufbx_vertex_stream streams[] = {
+		{ vertices, sizeof(ufbx_vec3) },
+	};
+	ufbx_error error;
+	uint32_t indices[9];
+	size_t num_vertices = ufbx_generate_indices(streams, 1, indices, 0, NULL, &error);
+	ufbxt_assert(num_vertices == 0);
+	ufbxt_assert(error.type == UFBX_ERROR_NONE);
 }
 #endif
 

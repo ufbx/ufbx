@@ -281,11 +281,11 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 
 	// We need to render each material of the mesh in a separate part, so let's
 	// count the number of parts and maximum number of triangles needed.
-	for (size_t pi = 0; pi < mesh->materials.count; pi++) {
-		ufbx_mesh_material *mesh_mat = &mesh->materials.data[pi];
-		if (mesh_mat->num_triangles == 0) continue;
+	for (size_t pi = 0; pi < mesh->material_parts.count; pi++) {
+		ufbx_mesh_part *part = &mesh->material_parts.data[pi];
+		if (part->num_triangles == 0) continue;
 		max_parts += 1;
-		max_triangles = max_sz(max_triangles, mesh_mat->num_triangles);
+		max_triangles = max_sz(max_triangles, part->num_triangles);
 	}
 
 	// Temporary buffers
@@ -396,19 +396,19 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 	}
 
 	// Our shader supports only a single material per draw call so we need to split the mesh
-	// into parts by material. `ufbx_mesh_material` contains a handy compact list of faces
+	// into parts by material. `ufbx_mesh_part` contains a handy compact list of faces
 	// that use the material which we use here.
-	for (size_t pi = 0; pi < mesh->materials.count; pi++) {
-		ufbx_mesh_material *mesh_mat = &mesh->materials.data[pi];
-		if (mesh_mat->num_triangles == 0) continue;
+	for (size_t pi = 0; pi < mesh->material_parts.count; pi++) {
+		ufbx_mesh_part *mesh_part = &mesh->material_parts.data[pi];
+		if (mesh_part->num_triangles == 0) continue;
 
 		viewer_mesh_part *part = &parts[num_parts++];
 		size_t num_indices = 0;
 
 		// First fetch all vertices into a flat non-indexed buffer, we also need to
 		// triangulate the faces
-		for (size_t fi = 0; fi < mesh_mat->num_faces; fi++) {
-			ufbx_face face = mesh->faces.data[mesh_mat->face_indices.data[fi]];
+		for (size_t fi = 0; fi < mesh_part->num_faces; fi++) {
+			ufbx_face face = mesh->faces.data[mesh_part->face_indices.data[fi]];
 			size_t num_tris = ufbx_triangulate_face(tri_indices, num_tri_indices, mesh, face);
 
 			ufbx_vec2 default_uv = { 0 };
@@ -458,11 +458,10 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 			exit(1);
 		}
 
-		// To unify code we use `ufbx_load_opts.allow_null_material` to make ufbx create a
-		// `ufbx_mesh_material` even if there are no materials, so it might be `NULL` here.
 		part->num_indices = num_indices;
-		if (mesh_mat->material) {
-			part->material_index = (int32_t)mesh_mat->material->typed_id;
+		if (mesh_part->index < mesh->materials.count) {
+			ufbx_material *material =  mesh->materials.data[mesh_part->index];
+			part->material_index = (int32_t)material->typed_id;
 		} else {
 			part->material_index = -1;
 		}
@@ -719,7 +718,6 @@ void load_scene(viewer_scene *vs, const char *filename)
 	ufbx_load_opts opts = {
 		.load_external_files = true,
 		.ignore_missing_external_files = true,
-		.allow_null_material = true,
 		.generate_missing_normals = true,
 
 		// NOTE: We use this _only_ for computing the bounds of the scene!

@@ -3088,7 +3088,7 @@ void render_frame(ufbx_scene *original_scene, const Opts &opts, int frame_offset
 					tri.index = triangles.size();
 
 					if (mesh->face_material.count > 0) {
-						ufbx_material *mat = mesh->materials.data[mesh->face_material[face_ix]].material;
+						ufbx_material *mat = mesh->materials.data[mesh->face_material[face_ix]];
 						info.material = mat->element.typed_id + 1;
 					}
 
