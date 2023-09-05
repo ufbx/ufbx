@@ -37,4 +37,5 @@ jobs:
     uses: ufbx/ufbx.github.io/.github/workflows/test.yml@master
     with:
       ufbx-documentation-ref: main
+      ufbx-rust-ref: main
       ufbx-ref: ${{ github.ref }}
