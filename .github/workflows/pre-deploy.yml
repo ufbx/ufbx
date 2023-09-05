@@ -36,6 +36,6 @@ jobs:
   pd_documentation:
     uses: ufbx/ufbx.github.io/.github/workflows/test.yml@master
     with:
-      ufbx-documentation-ref: main
+      ufbx-documentation-ref: master
       ufbx-rust-ref: main
       ufbx-ref: ${{ github.ref }}
