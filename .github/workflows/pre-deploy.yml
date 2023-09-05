@@ -29,4 +29,5 @@ jobs:
   ci_rust:
     uses: ufbx/ufbx-rust/.github/workflows/test.yml@main
     with:
-      ufbx-sha: ${{ github.sha }}
+      ufbx-rust-ref: main
+      ufbx-ref: ${{ github.ref }}
