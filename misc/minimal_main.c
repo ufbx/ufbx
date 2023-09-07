@@ -14,7 +14,7 @@ int main(int argc, char **argv)
     ufbx_triangulate_face(indices, 32, mesh, mesh->faces.data[0]);
 
     char vertices[32] = { 0 };
-    ufbx_vertex_stream stream = { vertices, 4 };
+    ufbx_vertex_stream stream = { vertices, 32, 1 };
     ufbx_generate_indices(&stream, 1, indices, 32, NULL, NULL);
 
     ufbx_free_scene(ufbx_evaluate_scene(scene, NULL, 0.0, NULL, NULL));

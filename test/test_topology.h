@@ -283,8 +283,8 @@ UFBXT_FILE_TEST(blender_293_half_smooth_cube)
 	ufbxt_assert(mesh->num_indices == 6*4);
 	ufbxt_assert(mesh->num_triangles == 6*2);
 
-	ufbxt_vertex_pn vertices[36];
-	uint32_t indices[36];
+	ufbxt_vertex_pn vertices[64];
+	uint32_t indices[64];
 	size_t num_indices = 0;
 
 	uint32_t tri[64];
@@ -297,10 +297,42 @@ UFBXT_FILE_TEST(blender_293_half_smooth_cube)
 		}
 	}
 
-	ufbx_vertex_stream stream = { vertices, sizeof(ufbxt_vertex_pn) };
+	ufbx_vertex_stream stream = { vertices, num_indices, sizeof(ufbxt_vertex_pn) };
 	size_t num_vertices = ufbx_generate_indices(&stream, 1, indices, num_indices, NULL, NULL);
 	ufbxt_assert(num_vertices == 12);
+}
+#endif
 
+UFBXT_FILE_TEST_ALT(generate_indices_multi_stream, blender_293_half_smooth_cube_7400_binary)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->num_indices == 6*4);
+	ufbxt_assert(mesh->num_triangles == 6*2);
+
+	ufbx_vec3 positions[64];
+	ufbx_vec3 normals[64];
+	uint32_t indices[64];
+	size_t num_indices = 0;
+
+	uint32_t tri[64];
+	for (size_t fi = 0; fi < mesh->num_faces; fi++) {
+		size_t num_tris = ufbx_triangulate_face(tri, 64, mesh, mesh->faces.data[fi]);
+		for (size_t ti = 0; ti < num_tris * 3; ti++) {
+			positions[num_indices] = ufbx_get_vertex_vec3(&mesh->vertex_position, tri[ti]);
+			normals[num_indices] = ufbx_get_vertex_vec3(&mesh->vertex_normal, tri[ti]);
+			num_indices++;
+		}
+	}
+
+	ufbx_vertex_stream streams[] = {
+		{ positions, num_indices, sizeof(ufbx_vec3) },
+		{ normals, num_indices, sizeof(ufbx_vec3) },
+	};
+	size_t num_vertices = ufbx_generate_indices(streams, 2, indices, num_indices, NULL, NULL);
+	ufbxt_assert(num_vertices == 12);
 }
 #endif
 
@@ -343,7 +375,7 @@ UFBXT_TEST(generate_indices_no_indices)
 		{ 0.0f, 1.0f, 0.0f },
 	};
 	ufbx_vertex_stream streams[] = {
-		{ vertices, sizeof(ufbx_vec3) },
+		{ vertices, 3, sizeof(ufbx_vec3) },
 	};
 	ufbx_error error;
 	uint32_t indices[9];
@@ -353,4 +385,24 @@ UFBXT_TEST(generate_indices_no_indices)
 }
 #endif
 
+UFBXT_TEST(generate_indices_truncated_stream)
+#if UFBXT_IMPL
+{
+	ufbx_vec3 vertices[] = {
+		{ 0.0f, 0.0f, 0.0f },
+		{ 1.0f, 0.0f, 0.0f },
+		{ 0.0f, 1.0f, 0.0f },
+	};
+	ufbx_vertex_stream streams[] = {
+		{ vertices, 2, sizeof(ufbx_vec3) },
+	};
+	ufbx_error error;
+	uint32_t indices[9];
+	size_t num_vertices = ufbx_generate_indices(streams, 1, indices, 3, NULL, &error);
+	ufbxt_assert(num_vertices == 0);
+	ufbxt_assert(error.type == UFBX_ERROR_TRUNCATED_VERTEX_STREAM);
+	ufbxt_assert(!strcmp(error.info, "0"));
+	ufbxt_assert(error.info_length == 1);
+}
+#endif
 

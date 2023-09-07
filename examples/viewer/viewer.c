@@ -441,10 +441,12 @@ void read_mesh(viewer_mesh *vmesh, ufbx_mesh *mesh)
 		size_t num_streams = 1;
 
 		streams[0].data = vertices;
+		streams[0].vertex_count = num_indices;
 		streams[0].vertex_size = sizeof(mesh_vertex);
 
 		if (skin) {
 			streams[1].data = skin_vertices;
+			streams[1].vertex_count = num_indices;
 			streams[1].vertex_size = sizeof(skin_vertex);
 			num_streams = 2;
 		}

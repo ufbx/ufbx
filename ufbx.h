@@ -3544,6 +3544,7 @@ typedef struct ufbx_topo_edge {
 
 typedef struct ufbx_vertex_stream {
 	const void *data;
+	size_t vertex_count;
 	size_t vertex_size;
 } ufbx_vertex_stream;
 
@@ -3753,6 +3754,9 @@ typedef enum ufbx_error_type UFBX_ENUM_REPR {
 
 	// The vertex streams in `ufbx_generate_indices()` are empty.
 	UFBX_ERROR_ZERO_VERTEX_SIZE,
+
+	// Vertex stream passed to `ufbx_generate_indices()`.
+	UFBX_ERROR_TRUNCATED_VERTEX_STREAM,
 
 	// Invalid UTF-8 encountered in a file when loading with `UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING`.
 	UFBX_ERROR_INVALID_UTF8,

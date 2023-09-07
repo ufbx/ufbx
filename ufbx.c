@@ -2870,6 +2870,8 @@ static ufbxi_noinline void ufbxi_fix_error_type(ufbx_error *error, const char *d
 		error->type = UFBX_ERROR_UNINITIALIZED_OPTIONS;
 	} else if (!strcmp(desc, "Zero vertex size")) {
 		error->type = UFBX_ERROR_ZERO_VERTEX_SIZE;
+	} else if (!strcmp(desc, "Truncated vertex stream")) {
+		error->type = UFBX_ERROR_TRUNCATED_VERTEX_STREAM;
 	} else if (!strcmp(desc, "Invalid UTF-8")) {
 		error->type = UFBX_ERROR_INVALID_UTF8;
 	} else if (!strcmp(desc, "Feature disabled")) {
@@ -25317,6 +25319,13 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 	size_t packed_size = 0;
 	if (!fail) {
 		for (size_t i = 0; i < num_streams; i++) {
+			if (user_streams[i].vertex_count < num_indices) {
+				ufbxi_fmt_err_info(error, "%zu", i);
+				ufbxi_report_err_msg(error, "user_streams[i].vertex_count < num_indices", "Truncated vertex stream");
+				fail = true;
+				break;
+			}
+
 			size_t vertex_size = user_streams[i].vertex_size;
 			size_t align = ufbxi_size_align_mask(vertex_size);
 			packed_size = ufbxi_align_to_mask(packed_size, align);
