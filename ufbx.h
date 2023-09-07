@@ -3543,7 +3543,7 @@ typedef struct ufbx_topo_edge {
 } ufbx_topo_edge;
 
 typedef struct ufbx_vertex_stream {
-	const void *data;
+	void *data;
 	size_t vertex_count;
 	size_t vertex_size;
 } ufbx_vertex_stream;
