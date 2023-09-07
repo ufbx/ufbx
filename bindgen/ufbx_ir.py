@@ -821,6 +821,8 @@ member_functions = [
     MemberFunction(func="ufbx_sample_geometry_cache_real", self_type="ufbx_cache_channel", member_name="sample_real"),
     MemberFunction(func="ufbx_read_geometry_cache_vec3", self_type="ufbx_cache_frame", member_name="read_vec3"),
     MemberFunction(func="ufbx_sample_geometry_cache_vec3", self_type="ufbx_cache_channel", member_name="sample_vec3"),
+    MemberFunction(func="ufbx_dom_find_len", self_type="ufbx_dom_node", member_name="find_len"),
+    MemberFunction(func="ufbx_dom_find", self_type="ufbx_dom_node", member_name="find"),
 ]
 
 member_globals = [
