@@ -1043,11 +1043,13 @@ if __name__ == "__main__":
     file.functions["ufbx_free_mesh"].kind = "free"
     file.functions["ufbx_free_line_curve"].kind = "free"
     file.functions["ufbx_free_geometry_cache"].kind = "free"
+    file.functions["ufbx_free_anim"].kind = "free"
 
     file.functions["ufbx_retain_scene"].kind = "retain"
     file.functions["ufbx_retain_mesh"].kind = "retain"
     file.functions["ufbx_retain_line_curve"].kind = "retain"
     file.functions["ufbx_retain_geometry_cache"].kind = "retain"
+    file.functions["ufbx_retain_anim"].kind = "retain"
 
     file.functions["ufbx_triangulate_face"].return_array_scale = 3
     file.functions["ufbx_ffi_triangulate_face"].return_array_scale = 3
