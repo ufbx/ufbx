@@ -1547,3 +1547,42 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_thumbnail, UFBXT_FILE_TEST_FLAG_ALLOW_INVALI
 }
 #endif
 
+#if UFBXT_IMPL
+size_t ufbxt_read_byte(void *user, void *data, size_t size)
+{
+	if (size == 0) return 0;
+	int ch = fgetc((FILE*)user);
+	if (ch == EOF) return 0;
+	*(char*)data = (char)ch;
+	return 1;
+}
+void ufbxt_close_file(void *user)
+{
+	fclose((FILE*)user);
+}
+#endif
+
+UFBXT_TEST(single_byte_stream)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		FILE *f = fopen(path, "rb");
+		ufbxt_assert(f);
+
+		ufbx_stream stream = { 0 };
+		stream.read_fn = &ufbxt_read_byte;
+		stream.close_fn = &ufbxt_close_file;
+		stream.user = f;
+
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_stream(&stream, NULL, &error);
+		if (!scene) ufbxt_log_error(&error);
+		ufbxt_assert(scene);
+
+		ufbx_free_scene(scene);
+	}
+}
+#endif
+

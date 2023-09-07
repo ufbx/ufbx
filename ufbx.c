@@ -5679,10 +5679,10 @@ static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size, b
 	}
 
 	// Copy the remains of the previous buffer to the beginning of the new one
-	size_t num_read = uc->data_size;
-	if (num_read > 0) {
+	size_t data_size = uc->data_size;
+	if (data_size > 0) {
 		ufbx_assert(uc->read_buffer != NULL && uc->data != NULL);
-		memmove(uc->read_buffer, uc->data, num_read);
+		memmove(uc->read_buffer, uc->data, data_size);
 	}
 
 	if (size_to_free) {
@@ -5690,22 +5690,26 @@ static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size, b
 	}
 
 	// Fill the rest of the buffer with user data
-	size_t to_read = uc->read_buffer_size - num_read;
-	size_t read_result = uc->read_fn(uc->read_user, uc->read_buffer + num_read, to_read);
-	ufbxi_check_return_msg(read_result != SIZE_MAX, NULL, "IO error");
-	ufbxi_check_return(read_result <= to_read, NULL);
-	if (read_result < to_read) {
-		uc->eof = true;
+	size_t data_capacity = uc->read_buffer_size;
+	while (data_size < data_capacity) {
+		size_t to_read = data_capacity - data_size;
+		size_t read_result = uc->read_fn(uc->read_user, uc->read_buffer + data_size, to_read);
+		ufbxi_check_return_msg(read_result != SIZE_MAX, NULL, "IO error");
+		ufbxi_check_return(read_result <= to_read, NULL);
+		data_size += read_result;
+		if (read_result == 0) {
+			uc->eof = true;
+			break;
+		}
 	}
 
-	num_read += read_result;
 	if (require_size) {
-		ufbxi_check_return_msg(num_read >= size, NULL, "Truncated file");
+		ufbxi_check_return_msg(data_size >= size, NULL, "Truncated file");
 	}
 
 	uc->data_offset += ufbxi_to_size(uc->data - uc->data_begin);
 	uc->data_begin = uc->data = uc->read_buffer;
-	uc->data_size = num_read;
+	uc->data_size = data_size;
 
 	return uc->read_buffer;
 }
@@ -5846,11 +5850,16 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_to(ufbxi_context *uc, void 
 		uc->data_begin = uc->data = NULL;
 		uc->data_size = 0;
 		ufbxi_check(uc->read_fn);
-		len = uc->read_fn(uc->read_user, ptr, size);
-		ufbxi_check_msg(len != SIZE_MAX, "IO error");
-		ufbxi_check(len == size);
 
-		uc->data_offset += size;
+		while (size > 0) {
+			size_t read_result = uc->read_fn(uc->read_user, ptr, size);
+			ufbxi_check_msg(read_result != SIZE_MAX, "IO error");
+			ufbxi_check(read_result != 0);
+
+			ptr += read_result;
+			size -= read_result;
+			uc->data_offset += read_result;
+		}
 	}
 
 	ufbxi_check(ufbxi_resume_progress(uc));
