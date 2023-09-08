@@ -271,18 +271,14 @@ def init_type(file, typ, key, mods):
         mods = mods[:]
 
         if mods[0]["type"] == "nullable":
-            for n in range(len(mods)):
-                if mods[n]["type"] == "pointer":
-                    mods[n]["nullable"] = True
-                    mods = mods[1:]
-                    break
+            if mods[-1]["type"] == "pointer":
+                mods[-1]["nullable"] = True
+                mods = mods[1:]
 
         if mods[0]["type"] == "const":
-            for n in range(len(mods)):
-                if mods[n]["type"] == "pointer":
-                    mods[n]["const"] = True
-                    mods = mods[1:]
-                    break
+            if mods[-1]["type"] == "pointer":
+                mods[-1]["const"] = True
+                mods = mods[1:]
 
     if mods:
         mod = mods[-1]
