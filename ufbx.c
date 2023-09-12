@@ -22201,6 +22201,7 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 	}
 
 	ufbxi_for(ufbx_prop, prop, props, num_props) {
+		if (prop->flags & UFBX_PROP_FLAG_OVERRIDDEN) continue;
 		prop->value_int = ufbxi_f64_to_i64(prop->value_real);
 	}
 }

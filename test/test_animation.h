@@ -982,3 +982,58 @@ UFBXT_FILE_TEST(synthetic_anim_stack_no_props)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST_ALT(anim_override_int64, maya_cube_7500_binary)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbx_prop *missing_prop = ufbx_find_prop(&node->props, "NewProperty");
+	ufbxt_assert(missing_prop == NULL);
+
+	ufbx_prop *existing_prop = ufbx_find_prop(&node->props, "DefaultAttributeIndex");
+	ufbxt_assert(existing_prop);
+	ufbxt_assert(existing_prop->type == UFBX_PROP_INTEGER);
+	ufbxt_assert(existing_prop->flags & UFBX_PROP_FLAG_VALUE_INT);
+	ufbxt_assert(existing_prop->value_int == 0);
+
+	ufbx_prop_override_desc overrides[2] = { 0 };
+	overrides[0].element_id = node->element_id;
+	overrides[0].prop_name.data = "NewProperty";
+	overrides[0].prop_name.length = SIZE_MAX;
+	overrides[0].value_int = INT64_C(0x4000000000000001);
+	overrides[1].element_id = node->element_id;
+	overrides[1].prop_name.data = "DefaultAttributeIndex";
+	overrides[1].prop_name.length = SIZE_MAX;
+	overrides[1].value_int = INT64_C(0x5000000000000001);
+
+	ufbx_anim_opts opts = { 0 };
+	opts.overrides.data = overrides;
+	opts.overrides.count = ufbxt_arraycount(overrides);
+
+	ufbx_anim *anim = ufbx_create_anim(scene, &opts, NULL);
+	ufbxt_assert(anim);
+
+	ufbx_scene *state = ufbx_evaluate_scene(scene, anim, 0.0, NULL, NULL);
+	ufbxt_assert(state);
+
+	ufbx_node *node_state = state->nodes.data[node->typed_id];
+	
+	ufbx_prop *new_prop = ufbx_find_prop(&node_state->props, "NewProperty");
+	ufbxt_assert(new_prop);
+	ufbxt_assert(new_prop->flags & UFBX_PROP_FLAG_OVERRIDDEN);
+	ufbxt_assert(new_prop->value_int == INT64_C(0x4000000000000001));
+	ufbxt_assert_close_real(err, new_prop->value_real, (ufbx_real)INT64_C(0x4000000000000001));
+
+	ufbx_prop *over_prop = ufbx_find_prop(&node_state->props, "DefaultAttributeIndex");
+	ufbxt_assert(over_prop);
+	ufbxt_assert(over_prop->flags & UFBX_PROP_FLAG_OVERRIDDEN);
+	ufbxt_assert(over_prop->value_int == INT64_C(0x5000000000000001));
+	ufbxt_assert_close_real(err, over_prop->value_real, (ufbx_real)INT64_C(0x5000000000000001));
+
+	ufbx_free_scene(state);
+	ufbx_free_anim(anim);
+}
+#endif
+
