@@ -4605,6 +4605,7 @@ ufbx_inline ufbx_matrix ufbx_get_skin_vertex_matrix(const ufbx_skin_deformer *sk
 	return ufbx_catch_get_skin_vertex_matrix(NULL, skin, vertex, fallback);
 }
 
+ufbx_abi uint32_t ufbx_get_blend_shape_offset_index(const ufbx_blend_shape *shape, size_t vertex);
 ufbx_abi ufbx_vec3 ufbx_get_blend_shape_vertex_offset(const ufbx_blend_shape *shape, size_t vertex);
 ufbx_abi ufbx_vec3 ufbx_get_blend_vertex_offset(const ufbx_blend_deformer *blend, size_t vertex);
 

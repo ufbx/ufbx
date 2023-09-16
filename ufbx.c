@@ -26925,18 +26925,25 @@ ufbx_abi ufbxi_noinline ufbx_matrix ufbx_catch_get_skin_vertex_matrix(ufbx_panic
 	return mat;
 }
 
-ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_get_blend_shape_vertex_offset(const ufbx_blend_shape *shape, size_t vertex)
+ufbx_abi ufbxi_noinline uint32_t ufbx_get_blend_shape_offset_index(const ufbx_blend_shape *shape, size_t vertex)
 {
 	ufbx_assert(shape);
-	if (!shape) return ufbx_zero_vec3;
+	if (!shape) return UFBX_NO_INDEX;
 
 	size_t index = SIZE_MAX;
 	uint32_t vertex_ix = (uint32_t)vertex;
 
 	ufbxi_macro_lower_bound_eq(uint32_t, 16, &index, shape->offset_vertices.data, 0, shape->num_offsets,
 		( *a < vertex_ix ), ( *a == vertex_ix ));
-	if (index == SIZE_MAX) return ufbx_zero_vec3;
+	if (index >= UINT32_MAX) return UFBX_NO_INDEX;
 
+	return (uint32_t)index;
+}
+
+ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_get_blend_shape_vertex_offset(const ufbx_blend_shape *shape, size_t vertex)
+{
+	uint32_t index = ufbx_get_blend_shape_offset_index(shape, vertex);
+	if (index == UFBX_NO_INDEX) return ufbx_zero_vec3;
 	return shape->position_offsets.data[index];
 }
 
