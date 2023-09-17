@@ -47,6 +47,9 @@
 	#if !defined(UFBX_NO_SKINNING_EVALUATION)
 		#define UFBXI_FEATURE_SKINNING_EVALUATION 1
 	#endif
+	#if !defined(UFBX_NO_ANIMATION_BAKING)
+		#define UFBXI_FEATURE_ANIMATION_BAKING 1
+	#endif
 	#if !defined(UFBX_NO_TRIANGULATION)
 		#define UFBXI_FEATURE_TRIANGULATION 1
 	#endif
@@ -78,6 +81,9 @@
 #endif
 #if !defined(UFBXI_FEATURE_SKINNING_EVALUATION) && defined(UFBX_ENABLE_SKINNING_EVALUATION)
 	#define UFBXI_FEATURE_SKINNING_EVALUATION 1
+#endif
+#if !defined(UFBXI_FEATURE_ANIMATION_BAKING) && defined(UFBX_ENABLE_ANIMATION_BAKING)
+	#define UFBXI_FEATURE_ANIMATION_BAKING 1
 #endif
 #if !defined(UFBXI_FEATURE_TRIANGULATION) && defined(UFBX_ENABLE_TRIANGULATION)
 	#define UFBXI_FEATURE_TRIANGULATION 1
@@ -134,7 +140,7 @@
 	#define UFBXI_FEATURE_KD 0
 #endif
 
-#if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_SKINNING_EVALUATION || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_INDEX_GENERATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_KD || !UFBXI_FEATURE_FORMAT_OBJ
+#if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_SKINNING_EVALUATION || !UFBXI_FEATURE_ANIMATION_BAKING || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_INDEX_GENERATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_KD || !UFBXI_FEATURE_FORMAT_OBJ
 	#define UFBXI_PARTIAL_FEATURES 1
 #endif
 
@@ -174,6 +180,8 @@
 	#define ufbx_copysign ufbxi_math_fn(copysign)
 	#define ufbx_fmin ufbxi_math_fn(fmin)
 	#define ufbx_fmax ufbxi_math_fn(fmax)
+	#define ufbx_nextafter ufbxi_math_fn(nextafter)
+	#define ufbx_ceil ufbxi_math_fn(ceil)
 #endif
 
 #if defined(UFBX_NO_MATH_H) && !defined(UFBX_NO_MATH_DECLARATIONS)
@@ -190,6 +198,7 @@
 	double ufbx_fmax(double a, double b);
 	double ufbx_fabs(double x);
 	double ufbx_copysign(double x, double y);
+	double ufbx_nextafter(double x, double y);
 #endif
 
 #if !defined(UFBX_INFINITY)
@@ -3089,6 +3098,7 @@ static ufbxi_noinline void ufbxi_free_ator(ufbxi_allocator *ator)
 #define UFBXI_LINE_CURVE_IMP_MAGIC 0x55434c55
 #define UFBXI_CACHE_IMP_MAGIC 0x48434355
 #define UFBXI_ANIM_IMP_MAGIC 0x494e4155
+#define UFBXI_BAKED_ANIM_IMP_MAGIC 0x4b414255
 #define UFBXI_REFCOUNT_IMP_MAGIC 0x46455255
 #define UFBXI_BUF_CHUNK_IMP_MAGIC 0x46554255
 
@@ -5130,6 +5140,12 @@ ufbx_inline ufbx_vec3 ufbxi_sub3(ufbx_vec3 a, ufbx_vec3 b) {
 
 ufbx_inline ufbx_vec3 ufbxi_mul3(ufbx_vec3 a, ufbx_real b) {
 	ufbx_vec3 v = { a.x * b, a.y * b, a.z * b };
+	return v;
+}
+
+ufbx_inline ufbx_vec3 ufbxi_lerp3(ufbx_vec3 a, ufbx_vec3 b, ufbx_real t) {
+	ufbx_real u = 1.0f - t;
+	ufbx_vec3 v = { a.x*u + b.x*t, a.y*u + b.y*t, a.z*u + b.z*t };
 	return v;
 }
 
@@ -22967,6 +22983,634 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_create_anim_imp(ufbxi_create_ani
 	return 1;
 }
 
+// -- Animation baking
+
+#if UFBXI_FEATURE_ANIMATION_BAKING
+
+typedef struct {
+	ufbxi_refcount refcount;
+	ufbx_baked_anim bake;
+	uint32_t magic;
+} ufbxi_baked_anim_imp;
+
+UFBX_LIST_TYPE(ufbxi_double_list, double);
+
+typedef struct {
+	ufbx_error error;
+	ufbxi_allocator ator_tmp;
+	ufbxi_allocator ator_result;
+
+	ufbxi_buf result;
+	ufbxi_buf tmp;
+	ufbxi_buf tmp_prop;
+	ufbxi_buf tmp_times;
+	ufbxi_buf tmp_bake_props;
+	ufbxi_buf tmp_nodes;
+	ufbxi_buf tmp_elements;
+	ufbxi_buf tmp_props;
+
+	ufbxi_double_list layer_weight_times;
+
+	const ufbx_scene *scene;
+	const ufbx_anim *anim;
+	ufbx_bake_opts opts;
+
+	double time_begin;
+	double time_end;
+
+	ufbx_baked_anim bake;
+	ufbxi_baked_anim_imp *imp;
+} ufbxi_bake_context;
+
+typedef struct {
+	uint32_t element_id;
+	const char *prop_name;
+	ufbx_anim_value *anim_value;
+} ufbxi_bake_prop;
+
+static int ufbxi_cmp_bake_prop(const void *va, const void *vb)
+{
+	const ufbxi_bake_prop *a = (const ufbxi_bake_prop*)va;
+	const ufbxi_bake_prop *b = (const ufbxi_bake_prop*)vb;
+	if (a->element_id != b->element_id) return a->element_id < b->element_id ? -1 : 1;
+	if (a->prop_name != b->prop_name) return strcmp(a->prop_name, b->prop_name);
+	return a->anim_value < b->anim_value;
+}
+
+static int ufbxi_cmp_double(const void *va, const void *vb)
+{
+	const double a = *(const double*)va;
+	const double b = *(const double*)vb;
+	if (a != b) return a < b ? -1 : 1;
+	return 0;
+}
+
+ufbxi_nodiscard static ufbxi_forceinline int ufbxi_bake_push_time(ufbxi_bake_context *bc, double time)
+{
+	double *p_key = ufbxi_push_fast(&bc->tmp_times, double, 1);
+	if (!p_key) return 0;
+	*p_key = time;
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_times(ufbxi_bake_context *bc, const ufbx_anim_value *anim_value, bool resample_linear)
+{
+	double sample_rate = bc->opts.resample_rate;
+	double min_duration = bc->opts.minimum_sample_rate > 0.0 ? 1.0 / bc->opts.minimum_sample_rate : 0.0;
+
+	for (size_t curve_ix = 0; curve_ix < 3; curve_ix++) {
+		ufbx_anim_curve *curve = anim_value->curves[curve_ix];
+		if (!curve) continue;
+
+		const ufbx_keyframe *keys = curve->keyframes.data;
+		size_t num_keys = curve->keyframes.count;
+		for (size_t i = 0; i < num_keys; i++) {
+			ufbx_keyframe a = keys[i];
+			double a_time = a.time - bc->opts.time_start_offset;
+			ufbxi_check_err(&bc->error, ufbxi_bake_push_time(bc, a_time));
+			if (i + 1 >= num_keys) break;
+			ufbx_keyframe b = keys[i + 1];
+			double b_time = b.time - bc->opts.time_start_offset;
+
+			// Skip fully flat sections
+			if (a.value == b.value && a.right.dy == 0.0f && b.left.dy == 0.0f) continue;
+
+			if (a.interpolation == UFBX_INTERPOLATION_CONSTANT_PREV) {
+				double time = b_time - bc->opts.constant_timestep;
+				if (time >= b_time) time = ufbx_nextafter(time, -UFBX_INFINITY);
+				if (time <= a_time) time = ufbx_nextafter(a_time, UFBX_INFINITY);
+				ufbxi_check_err(&bc->error, ufbxi_bake_push_time(bc, time));
+			} else if (a.interpolation == UFBX_INTERPOLATION_CONSTANT_NEXT) {
+				double time = a_time + bc->opts.constant_timestep;
+				if (time <= a_time) time = ufbx_nextafter(time, UFBX_INFINITY);
+				if (time >= b_time) time = ufbx_nextafter(b_time, -UFBX_INFINITY);
+				ufbxi_check_err(&bc->error, ufbxi_bake_push_time(bc, time));
+			} else if ((resample_linear || a.interpolation == UFBX_INTERPOLATION_CUBIC) && sample_rate > 0.0) {
+				double duration = b_time - a_time;
+				if (duration <= min_duration) continue;
+
+				double factor = 1.0;
+				while (duration * sample_rate / factor >= bc->opts.max_keyframe_segments) {
+					factor *= 2.0;
+				}
+
+				double padding = 0.5 / sample_rate;
+				double start = ufbx_ceil((a_time + padding) * sample_rate / factor) * factor;
+				double stop = b_time - padding;
+				for (size_t i = 0; i < bc->opts.max_keyframe_segments; i++) {
+					double time = (start + (double)i * factor) / sample_rate;
+					if (time >= stop) break;
+					ufbxi_check_err(&bc->error, ufbxi_bake_push_time(bc, time));
+				}
+			}
+		}
+	}
+
+	return 1;
+}
+
+static const char *const ufbxi_transform_props[] = {
+	ufbxi_Lcl_Translation, ufbxi_Lcl_Rotation, ufbxi_Lcl_Scaling, ufbxi_PreRotation, ufbxi_PostRotation,
+	ufbxi_RotationOffset, ufbxi_ScalingOffset, ufbxi_RotationPivot, ufbxi_ScalingPivot, ufbxi_RotationOrder,
+};
+
+static const char *const ufbxi_complex_translation_props[] = {
+	ufbxi_ScalingPivot, ufbxi_RotationPivot, ufbxi_RotationOffset, ufbxi_ScalingOffset,
+};
+
+static const char *const ufbxi_complex_rotation_props[] = {
+	ufbxi_PreRotation, ufbxi_PostRotation, ufbxi_RotationOrder,
+};
+
+static const char *const ufbxi_complex_rotation_sources[] = {
+	ufbxi_Lcl_Rotation, ufbxi_PreRotation, ufbxi_PostRotation, ufbxi_RotationOrder,
+};
+
+ufbxi_nodiscard static ufbxi_noinline bool ufbxi_in_list(const char *const *items, size_t count, const char *item)
+{
+	for (size_t i = 0; i < count; i++) {
+		if (items[i] == item) return true;
+	}
+	return false;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_context *bc, ufbxi_double_list *p_dst)
+{
+	const ufbx_anim *anim = bc->anim;
+	if (bc->layer_weight_times.count > 0) {
+		ufbxi_check_err(&bc->error, ufbxi_push_copy(&bc->tmp_times, double, bc->layer_weight_times.count, bc->layer_weight_times.data));
+	}
+
+	if (bc->tmp_times.num_items == 0) {
+		ufbxi_check_err(&bc->error, ufbxi_bake_push_time(bc, bc->time_begin));
+		ufbxi_check_err(&bc->error, ufbxi_bake_push_time(bc, bc->time_end));
+	}
+
+	size_t num_times = bc->tmp_times.num_items;
+	double *times = ufbxi_push_pop(&bc->tmp_prop, &bc->tmp_times, double, num_times);
+	ufbxi_check_err(&bc->error, times);
+
+	// TODO: Something better
+	qsort(times, num_times, sizeof(double), &ufbxi_cmp_double);
+	
+	// Deduplicate times
+	{
+		size_t dst = 0, src = 0;
+		while (src < num_times) {
+			if (src + 1 < num_times && times[src] == times[src + 1]) {
+				src++;
+			} else if (dst != src) {
+				times[dst++] = times[src++];
+			} else {
+				dst++; src++;
+			}
+		}
+		num_times = dst;
+	}
+
+	p_dst->data = times;
+	p_dst->count = num_times;
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_reduce_vec3(ufbxi_bake_context *bc, ufbx_baked_vec3_list *p_dst, ufbx_baked_vec3_list src)
+{
+	if (src.count == 0) return 1;
+
+	if (bc->opts.key_reduction_enabled) {
+		double threshold = bc->opts.key_reduction_threshold * bc->opts.key_reduction_threshold;
+		for (size_t pass = 0; pass < bc->opts.key_reduction_passes; pass++) {
+			size_t dst = 1;
+			for (size_t i = 1; i < src.count; i++) {
+				ufbx_baked_vec3 prev = src.data[i - 1];
+				ufbx_baked_vec3 cur = src.data[i];
+				if (i + 1 < src.count) {
+					ufbx_baked_vec3 next = src.data[i + 1];
+					double delta = (cur.time - prev.time) / (next.time - prev.time);
+					ufbx_vec3 tmp = ufbxi_lerp3(prev.value, next.value, (ufbx_real)delta);
+					double error = 0.0;
+					error += ((double)tmp.x - (double)cur.value.x) * ((double)tmp.x - (double)cur.value.x);
+					error += ((double)tmp.y - (double)cur.value.y) * ((double)tmp.y - (double)cur.value.y);
+					error += ((double)tmp.z - (double)cur.value.z) * ((double)tmp.z - (double)cur.value.z);
+					if (error <= threshold) {
+						src.data[dst] = src.data[i + 1];
+						i += 1;
+						dst += 1;
+						continue;
+					}
+				}
+
+				src.data[dst] = src.data[i];
+				dst += 1;
+			}
+			if (dst == src.count) break;
+			src.count = dst;
+		}
+	}
+
+	p_dst->count = src.count;
+	p_dst->data = ufbxi_push_copy(&bc->result, ufbx_baked_vec3, src.count, src.data);
+	ufbxi_check_err(&bc->error, p_dst->data);
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_reduce_quat(ufbxi_bake_context *bc, ufbx_baked_quat_list *p_dst, ufbx_baked_quat_list src)
+{
+	if (src.count == 0) return 1;
+
+	// Fix quaternion antipodality
+	for (size_t i = 1; i < src.count; i++) {
+		src.data[i].value = ufbx_quat_fix_antipodal(src.data[i].value, src.data[i - 1].value);
+	}
+
+	if (bc->opts.key_reduction_enabled) {
+		double threshold = bc->opts.key_reduction_threshold * bc->opts.key_reduction_threshold;
+		for (size_t pass = 0; pass < bc->opts.key_reduction_passes; pass++) {
+			size_t dst = 1;
+			for (size_t i = 1; i < src.count; i++) {
+				ufbx_baked_quat prev = src.data[i - 1];
+				ufbx_baked_quat cur = src.data[i];
+				if (i + 1 < src.count) {
+					ufbx_baked_quat next = src.data[i + 1];
+					double delta = (cur.time - prev.time) / (next.time - prev.time);
+					double error = 0.0;
+
+					if (bc->opts.key_reduction_rotation) {
+						ufbx_quat tmp = ufbx_quat_slerp(prev.value, next.value, (ufbx_real)delta);
+						error += ((double)tmp.x - (double)cur.value.x) * ((double)tmp.x - (double)cur.value.x);
+						error += ((double)tmp.y - (double)cur.value.y) * ((double)tmp.y - (double)cur.value.y);
+						error += ((double)tmp.z - (double)cur.value.z) * ((double)tmp.z - (double)cur.value.z);
+						error += ((double)tmp.w - (double)cur.value.w) * ((double)tmp.w - (double)cur.value.w);
+					} else {
+						error += ((double)prev.value.x - (double)cur.value.x) * ((double)prev.value.x - (double)cur.value.x);
+						error += ((double)prev.value.y - (double)cur.value.y) * ((double)prev.value.y - (double)cur.value.y);
+						error += ((double)prev.value.z - (double)cur.value.z) * ((double)prev.value.z - (double)cur.value.z);
+						error += ((double)prev.value.w - (double)cur.value.w) * ((double)prev.value.w - (double)cur.value.w);
+						error += ((double)next.value.x - (double)cur.value.x) * ((double)next.value.x - (double)cur.value.x);
+						error += ((double)next.value.y - (double)cur.value.y) * ((double)next.value.y - (double)cur.value.y);
+						error += ((double)next.value.z - (double)cur.value.z) * ((double)next.value.z - (double)cur.value.z);
+						error += ((double)next.value.w - (double)cur.value.w) * ((double)next.value.w - (double)cur.value.w);
+						error *= 0.5;
+					}
+
+					if (error <= threshold) {
+						src.data[dst] = src.data[i + 1];
+						i += 1;
+						dst += 1;
+						continue;
+					}
+				}
+
+				src.data[dst] = src.data[i];
+				dst += 1;
+			}
+			if (dst == src.count) break;
+			src.count = dst;
+		}
+	}
+
+	p_dst->count = src.count;
+	p_dst->data = ufbxi_push_copy(&bc->result, ufbx_baked_quat, src.count, src.data);
+	ufbxi_check_err(&bc->error, p_dst->data);
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node(ufbxi_bake_context *bc, uint32_t element_id, ufbxi_bake_prop *props, size_t count)
+{
+	// `ufbx_bake_opts` must be cleared to zero first!
+	ufbx_assert(bc->opts._begin_zero == 0 && bc->opts._end_zero == 0);
+	ufbxi_check_err_msg(&bc->error, bc->opts._begin_zero == 0 && bc->opts._end_zero == 0, "Uninitialized options");
+
+	ufbx_node *node = (ufbx_node*)bc->scene->elements.data[element_id];
+	ufbxi_dev_assert(node->element.type == UFBX_ELEMENT_NODE);
+
+	bool complex_translation = false;
+	bool complex_rotation = false;
+
+	for (size_t i = 0; i < ufbxi_arraycount(ufbxi_complex_translation_props); i++) {
+		const char *name = ufbxi_complex_translation_props[i];
+		ufbx_prop *prop = ufbxi_find_prop(&node->props, name);
+		if (!ufbxi_is_vec3_zero(prop->value_vec3)) {
+			complex_translation = true;
+		}
+		ufbxi_for(ufbxi_bake_prop, bprop, props, count) {
+			if (bprop->prop_name == name) {
+				complex_translation = true;
+			}
+		}
+	}
+
+	for (size_t i = 0; i < ufbxi_arraycount(ufbxi_complex_rotation_props); i++) {
+		const char *name = ufbxi_complex_rotation_props[i];
+		ufbxi_for(ufbxi_bake_prop, bprop, props, count) {
+			if (bprop->prop_name == name) {
+				complex_rotation = true;
+			}
+		}
+	}
+
+	ufbxi_double_list times_t, times_r, times_s;
+
+	// Translation
+	if (complex_translation) {
+		ufbxi_for(ufbxi_bake_prop, prop, props, count) {
+			// Literally any transform related property can affect complex translation
+			if (ufbxi_in_list(ufbxi_transform_props, ufbxi_arraycount(ufbxi_transform_props), prop->prop_name)) {
+				bool resample_linear = prop->prop_name != ufbxi_Lcl_Translation;
+				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, resample_linear));
+			}
+		}
+	} else {
+		ufbxi_for(ufbxi_bake_prop, prop, props, count) {
+			if (prop->prop_name == ufbxi_Lcl_Translation) {
+				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, false));
+			}
+		}
+	}
+	ufbxi_check_err(&bc->error, ufbxi_finalize_bake_times(bc, &times_t));
+
+	// Rotation
+	if (complex_rotation) {
+		ufbxi_for(ufbxi_bake_prop, prop, props, count) {
+			if (ufbxi_in_list(ufbxi_complex_rotation_sources, ufbxi_arraycount(ufbxi_complex_rotation_sources), prop->prop_name)) {
+				bool resample_linear = !bc->opts.no_resample_rotation || prop->prop_name != ufbxi_Lcl_Rotation;
+				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, resample_linear));
+			}
+		}
+	} else {
+		ufbxi_for(ufbxi_bake_prop, prop, props, count) {
+			if (prop->prop_name == ufbxi_Lcl_Rotation) {
+				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, !bc->opts.no_resample_rotation));
+			}
+		}
+	}
+	ufbxi_check_err(&bc->error, ufbxi_finalize_bake_times(bc, &times_r));
+
+	// Scaling
+	ufbxi_for(ufbxi_bake_prop, prop, props, count) {
+		if (prop->prop_name == ufbxi_Lcl_Scaling) {
+			ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, false));
+		}
+	}
+	ufbxi_check_err(&bc->error, ufbxi_finalize_bake_times(bc, &times_s));
+
+	ufbx_baked_vec3_list keys_t;
+	ufbx_baked_quat_list keys_r;
+	ufbx_baked_vec3_list keys_s;
+
+	keys_t.count = times_t.count;
+	keys_t.data = ufbxi_push(&bc->tmp_prop, ufbx_baked_vec3, keys_t.count);
+	ufbxi_check_err(&bc->error, keys_t.data);
+
+	keys_r.count = times_r.count;
+	keys_r.data = ufbxi_push(&bc->tmp_prop, ufbx_baked_quat, keys_r.count);
+	ufbxi_check_err(&bc->error, keys_r.data);
+
+	keys_s.count = times_s.count;
+	keys_s.data = ufbxi_push(&bc->tmp_prop, ufbx_baked_vec3, keys_s.count);
+	ufbxi_check_err(&bc->error, keys_s.data);
+
+	size_t ix_t = 0, ix_r = 0, ix_s = 0;
+	while (ix_t < times_t.count || ix_r < times_r.count || ix_s < times_s.count) {
+		double time = UFBX_INFINITY;
+		if (ix_t < times_t.count && time > times_t.data[ix_t]) time = times_t.data[ix_t];
+		if (ix_r < times_r.count && time > times_r.data[ix_r]) time = times_r.data[ix_r];
+		if (ix_s < times_s.count && time > times_s.data[ix_s]) time = times_s.data[ix_s];
+
+		ufbx_transform transform = ufbx_evaluate_transform(bc->anim, node, time);
+
+		if (ix_t < times_t.count && time == times_t.data[ix_t]) {
+			keys_t.data[ix_t].time = time;
+			keys_t.data[ix_t].value = transform.translation;
+			ix_t++;
+		}
+		if (ix_r < times_r.count && time == times_r.data[ix_r]) {
+			keys_r.data[ix_r].time = time;
+			keys_r.data[ix_r].value = transform.rotation;
+			ix_r++;
+		}
+		if (ix_s < times_s.count && time == times_s.data[ix_s]) {
+			keys_s.data[ix_s].time = time;
+			keys_s.data[ix_s].value = transform.scale;
+			ix_s++;
+		}
+	}
+
+	ufbx_baked_node *baked_node = ufbxi_push_zero(&bc->tmp_nodes, ufbx_baked_node, 1);
+	ufbxi_check_err(&bc->error, baked_node);
+
+	baked_node->element_id = node->element_id;
+	baked_node->typed_id = node->typed_id;
+	ufbxi_check_err(&bc->error, ufbxi_bake_reduce_vec3(bc, &baked_node->translation_keys, keys_t));
+	ufbxi_check_err(&bc->error, ufbxi_bake_reduce_quat(bc, &baked_node->rotation_keys, keys_r));
+	ufbxi_check_err(&bc->error, ufbxi_bake_reduce_vec3(bc, &baked_node->scale_keys, keys_s));
+
+	ufbxi_buf_clear(&bc->tmp_prop);
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim_prop(ufbxi_bake_context *bc, ufbx_element *element, const char *prop_name, ufbxi_bake_prop *props, size_t count)
+{
+	ufbxi_for(ufbxi_bake_prop, prop, props, count) {
+		ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, false));
+	}
+
+	ufbxi_double_list times;
+	ufbxi_check_err(&bc->error, ufbxi_finalize_bake_times(bc, &times));
+
+	ufbx_baked_vec3_list keys;
+	keys.count = times.count;
+	keys.data = ufbxi_push(&bc->tmp_prop, ufbx_baked_vec3, keys.count);
+	ufbxi_check_err(&bc->error, keys.data);
+
+	ufbx_string name;
+	name.data = prop_name;
+	name.length = strlen(prop_name);
+
+	for (size_t i = 0; i < times.count; i++) {
+		double time = times.data[i];
+		ufbx_prop prop = ufbx_evaluate_prop_len(bc->anim, element, name.data, name.length, time);
+		keys.data[i].time = time;
+		keys.data[i].value = prop.value_vec3;
+	}
+
+	ufbx_baked_prop *baked_prop = ufbxi_push_zero(&bc->tmp_props, ufbx_baked_prop, 1);
+	ufbxi_check_err(&bc->error, baked_prop);
+
+	baked_prop->name.length = strlen(prop_name);
+	baked_prop->name.data = ufbxi_push_copy(&bc->result, char, baked_prop->name.length + 1, prop_name);
+	ufbxi_check_err(&bc->error, baked_prop->name.data);
+
+	ufbxi_check_err(&bc->error, ufbxi_bake_reduce_vec3(bc, &baked_prop->keys, keys));
+
+	ufbxi_buf_clear(&bc->tmp_prop);
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_element(ufbxi_bake_context *bc, uint32_t element_id, ufbxi_bake_prop *props, size_t count)
+{
+	ufbx_element *element = bc->scene->elements.data[element_id];
+	if (element->type == UFBX_ELEMENT_NODE && !bc->opts.skip_node_transforms) {
+		ufbxi_check_err(&bc->error, ufbxi_bake_node(bc, element_id, props, count));
+	}
+
+	size_t begin = 0;
+	while (begin < count) {
+		const char *prop_name = props[begin].prop_name;
+		size_t end = begin + 1;
+		while (end < count && props[end].prop_name == prop_name) {
+			end++;
+		}
+
+		// Don't bake transform related props for nodes unless specifically requested
+		if (element->type == UFBX_ELEMENT_NODE && !bc->opts.bake_transform_props && ufbxi_in_list(ufbxi_transform_props, ufbxi_arraycount(ufbxi_transform_props), prop_name)) {
+			begin = end;
+			continue;
+		}
+
+		ufbxi_check_err(&bc->error, ufbxi_bake_anim_prop(bc, element, prop_name, props + begin, end - begin));
+		begin = end;
+	}
+
+	size_t num_props = bc->tmp_props.num_items;
+	if (num_props > 0) {
+		ufbx_baked_element *baked_elem = ufbxi_push_zero(&bc->tmp_elements, ufbx_baked_element, 1);
+		ufbxi_check_err(&bc->error, baked_elem);
+
+		baked_elem->element_id = element->element_id;
+		baked_elem->props.count = num_props;
+		baked_elem->props.data = ufbxi_push_pop(&bc->result, &bc->tmp_props, ufbx_baked_prop, num_props);
+		ufbxi_check_err(&bc->error, baked_elem->props.data);
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim(ufbxi_bake_context *bc)
+{
+	const ufbx_anim *anim = bc->anim;
+	const ufbx_scene *scene = bc->scene;
+	ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, anim->layers) {
+		ufbx_anim_layer *layer = *p_layer;
+
+		ufbxi_for_list(ufbx_anim_prop, anim_prop, layer->anim_props) {
+			ufbxi_bake_prop *prop = ufbxi_push(&bc->tmp_bake_props, ufbxi_bake_prop, 1);
+			ufbxi_check_err(&bc->error, prop);
+
+			prop->element_id = anim_prop->element->element_id;
+			prop->prop_name = anim_prop->prop_name.data;
+			prop->anim_value = anim_prop->anim_value;
+		}
+
+		size_t num_props = bc->tmp_bake_props.num_items;
+		ufbxi_bake_prop *props = ufbxi_push_pop(&bc->tmp, &bc->tmp_bake_props, ufbxi_bake_prop, num_props);
+		ufbxi_check_err(&bc->error, props);
+
+		// TODO: Macro unstable/non allocating sort
+		qsort(props, num_props, sizeof(ufbxi_bake_prop), &ufbxi_cmp_bake_prop);
+
+		// Pre-bake layer weight times
+		if (!bc->opts.ignore_layer_weight_animation) {
+			bool has_weight_times = false;
+			ufbxi_for(ufbxi_bake_prop, prop, props, num_props) {
+				if (prop->prop_name != ufbxi_Weight) continue;
+				ufbx_element *element = scene->elements.data[prop->element_id];
+				if (element->type == UFBX_ELEMENT_ANIM_LAYER) {
+					ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, true));
+					has_weight_times = true;
+				}
+			}
+
+			if (has_weight_times) {
+				ufbxi_double_list weight_times = { 0 };
+				ufbxi_check_err(&bc->error, ufbxi_finalize_bake_times(bc, &weight_times));
+
+				bc->layer_weight_times.count = weight_times.count;
+				bc->layer_weight_times.data = ufbxi_push_copy(&bc->tmp, double, weight_times.count, weight_times.data);
+				ufbxi_check_err(&bc->error, bc->layer_weight_times.data);
+
+				ufbxi_buf_clear(&bc->tmp_prop);
+			}
+		}
+
+		size_t begin = 0;
+		while (begin < num_props) {
+			uint32_t element_id = props[begin].element_id;
+			size_t end = begin + 1;
+			while (end < num_props && props[end].element_id == element_id) {
+				end++;
+			}
+			ufbxi_check_err(&bc->error, ufbxi_bake_element(bc, element_id, props + begin, end - begin));
+			begin = end;
+		}
+	}
+
+	size_t num_nodes = bc->tmp_nodes.num_items;
+	size_t num_elements = bc->tmp_elements.num_items;
+
+	bc->bake.nodes.count = num_nodes;
+	bc->bake.nodes.data = ufbxi_push_pop(&bc->result, &bc->tmp_nodes, ufbx_baked_node, num_nodes);
+	ufbxi_check_err(&bc->error, bc->bake.nodes.data);
+
+	bc->bake.elements.count = num_elements;
+	bc->bake.elements.data = ufbxi_push_pop(&bc->result, &bc->tmp_elements, ufbx_baked_element, num_elements);
+	ufbxi_check_err(&bc->error, bc->bake.elements.data);
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim_imp(ufbxi_bake_context *bc, const ufbx_anim *anim)
+{
+	if (bc->opts.resample_rate <= 0.0) bc->opts.resample_rate = 30.0;
+	if (bc->opts.minimum_sample_rate <= 0.0) bc->opts.minimum_sample_rate = 19.5;
+	if (bc->opts.max_keyframe_segments == 0) bc->opts.max_keyframe_segments = 32;
+	if (bc->opts.key_reduction_threshold == 0) bc->opts.key_reduction_threshold = 0.000001;
+	if (bc->opts.key_reduction_passes == 0) bc->opts.key_reduction_passes = 4;
+	if (bc->opts.constant_timestep <= 0.0) bc->opts.constant_timestep = 0.0;
+
+	ufbxi_init_ator(&bc->error, &bc->ator_tmp, &bc->opts.temp_allocator, "temp");
+	ufbxi_init_ator(&bc->error, &bc->ator_result, &bc->opts.result_allocator, "result");
+
+	bc->result.unordered = true;
+	bc->result.ator = &bc->ator_result;
+
+	bc->tmp.unordered = true;
+	bc->tmp.ator = &bc->ator_tmp;
+
+	bc->tmp_prop.ator = &bc->ator_tmp;
+	bc->tmp_prop.clearable = true;
+
+	bc->tmp_times.ator = &bc->ator_tmp;
+	bc->tmp_bake_props.ator = &bc->ator_tmp;
+	bc->tmp_nodes.ator = &bc->ator_tmp;
+	bc->tmp_elements.ator = &bc->ator_tmp;
+	bc->tmp_props.ator = &bc->ator_tmp;
+
+	bc->anim = anim;
+	bc->time_begin = anim->time_begin;
+	bc->time_end = anim->time_end;
+
+	bc->imp = ufbxi_push(&bc->result, ufbxi_baked_anim_imp, 1);
+	ufbxi_check_err(&bc->error, bc->imp);
+
+	ufbxi_check_err(&bc->error, ufbxi_bake_anim(bc));
+
+	ufbxi_init_ref(&bc->imp->refcount, UFBXI_BAKED_ANIM_IMP_MAGIC, NULL);
+
+	bc->imp->magic = UFBXI_BAKED_ANIM_IMP_MAGIC;
+	bc->imp->bake = bc->bake;
+	bc->imp->refcount.ator = bc->ator_result;
+	bc->imp->refcount.buf = bc->result;
+	return 1;
+}
+
+#endif
+
 // -- NURBS
 
 static ufbxi_forceinline ufbx_real ufbxi_nurbs_weight(const ufbx_real_list *knots, size_t knot, size_t degree, ufbx_real u)
@@ -26315,6 +26959,73 @@ ufbx_abi void ufbx_retain_anim(ufbx_anim *anim)
 	ufbxi_anim_imp *imp = ufbxi_get_imp(ufbxi_anim_imp, anim);
 	ufbx_assert(imp->magic == UFBXI_ANIM_IMP_MAGIC);
 	if (imp->magic != UFBXI_ANIM_IMP_MAGIC) return;
+	ufbxi_retain_ref(&imp->refcount);
+}
+
+ufbx_abi ufbx_baked_anim *ufbx_bake_anim(const ufbx_scene *scene, const ufbx_anim *anim, const ufbx_bake_opts *opts, ufbx_error *error)
+{
+	ufbx_assert(scene);
+#if UFBXI_FEATURE_ANIMATION_BAKING
+	if (!anim) {
+		anim = scene->anim;
+	}
+
+	ufbxi_bake_context bc = { UFBX_ERROR_NONE };
+	if (opts) {
+		bc.opts = *opts;
+	}
+
+	bc.scene = scene;
+
+	int ok = ufbxi_bake_anim_imp(&bc, anim);
+
+	ufbxi_buf_free(&bc.tmp);
+	ufbxi_buf_free(&bc.tmp_prop);
+	ufbxi_buf_free(&bc.tmp_times);
+	ufbxi_buf_free(&bc.tmp_bake_props);
+	ufbxi_buf_free(&bc.tmp_nodes);
+	ufbxi_buf_free(&bc.tmp_elements);
+	ufbxi_buf_free(&bc.tmp_props);
+	ufbxi_free_ator(&bc.ator_tmp);
+
+	if (ok) {
+		ufbxi_clear_error(error);
+		ufbxi_baked_anim_imp *imp = bc.imp;
+		return &imp->bake;
+	} else {
+		ufbxi_fix_error_type(&bc.error, "Failed to bake anim");
+		if (error) *error = bc.error;
+		ufbxi_buf_free(&bc.result);
+		ufbxi_free_ator(&bc.ator_result);
+		return NULL;
+	}
+#else
+	if (error) {
+		memset(error, 0, sizeof(ufbx_error));
+		ufbxi_fmt_err_info(error, "UFBX_ENABLE_ANIMATION_BAKING");
+		ufbxi_report_err_msg(error, "UFBXI_FEATURE_ANIMATION_BAKING", "Feature disabled");
+	}
+	return NULL;
+#endif
+}
+
+ufbx_abi void ufbx_retain_baked_anim(ufbx_baked_anim *bake)
+{
+	if (!bake) return;
+
+	ufbxi_baked_anim_imp *imp = ufbxi_get_imp(ufbxi_baked_anim_imp, bake);
+	ufbx_assert(imp->magic == UFBXI_BAKED_ANIM_IMP_MAGIC);
+	if (imp->magic != UFBXI_BAKED_ANIM_IMP_MAGIC) return;
+	ufbxi_release_ref(&imp->refcount);
+}
+
+ufbx_abi void ufbx_free_baked_anim(ufbx_baked_anim *bake)
+{
+	if (!bake) return;
+
+	ufbxi_baked_anim_imp *imp = ufbxi_get_imp(ufbxi_baked_anim_imp, bake);
+	ufbx_assert(imp->magic == UFBXI_BAKED_ANIM_IMP_MAGIC);
+	if (imp->magic != UFBXI_BAKED_ANIM_IMP_MAGIC) return;
 	ufbxi_retain_ref(&imp->refcount);
 }
 
