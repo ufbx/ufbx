@@ -4987,6 +4987,12 @@ template<> struct ufbx_type_traits<ufbx_anim> {
 	static void free(ufbx_anim *ptr) { ufbx_free_anim(ptr); }
 };
 
+template<> struct ufbx_type_traits<ufbx_baked_anim> {
+	enum { valid = 1 };
+	static void retain(ufbx_baked_anim *ptr) { ufbx_retain_baked_anim(ptr); }
+	static void free(ufbx_baked_anim *ptr) { ufbx_free_baked_anim(ptr); }
+};
+
 class ufbx_deleter {
 public:
 	template <typename T>
