@@ -1224,3 +1224,27 @@ UFBXT_FILE_TEST(maya_anim_pivot_rotate)
 }
 #endif
 
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_scale_helper_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.inherit_mode_handling = UFBX_INHERIT_MODE_HANDLING_HELPER_NODES;
+	opts.scale_helper_name.data = "(scale helper)";
+	opts.scale_helper_name.length = SIZE_MAX;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(maya_anim_no_inherit_scale, ufbxt_scale_helper_opts)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+

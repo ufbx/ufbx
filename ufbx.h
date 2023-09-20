@@ -831,6 +831,7 @@ struct ufbx_node {
 	ufbx_quat adjust_pre_rotation;  // < Rotation applied between parent and self
 	ufbx_vec3 adjust_pre_scale;     // < Scaling applied between parent and self
 	ufbx_quat adjust_post_rotation; // < Rotation applied in local space at the end
+	ufbx_real adjust_post_scale;    // < Scaling applied in local space at the end
 
 	// Materials used by `mesh` or other `attrib`.
 	// There may be multiple copies of a single `ufbx_mesh` with different materials
@@ -850,9 +851,13 @@ struct ufbx_node {
 	// See `adjust_pre_rotation`, `adjust_pre_scale`, `adjust_post_rotation`.
 	bool has_adjust_transform;
 
-	// True if this node is node is a synthetic geometry transform helper.
+	// True if this node is a synthetic geometry transform helper.
 	// See `UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES`.
 	bool is_geometry_transform_helper;
+
+	// True if the node is a synthetic scale compensation helper.
+	ufbx_node *scale_helper;
+	bool is_scale_helper;
 
 	// How deep is this node in the parent hierarchy. Root node is at depth `0`
 	// and the immediate children of root at `1`.
@@ -2942,6 +2947,9 @@ struct ufbx_anim_curve {
 	}; };
 
 	ufbx_keyframe_list keyframes;
+
+	ufbx_real min_value;
+	ufbx_real max_value;
 };
 
 // -- Collections
@@ -3948,6 +3956,18 @@ typedef enum ufbx_geometry_transform_handling UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_geometry_transform_handling, UFBX_GEOMETRY_TRANSFORM_HANDLING, UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK);
 
+// How to handle FBX transform inherit modes.
+typedef enum ufbx_inherit_mode_handling UFBX_ENUM_REPR {
+
+	UFBX_INHERIT_MODE_HANDLING_PRESERVE,
+
+	UFBX_INHERIT_MODE_HANDLING_HELPER_NODES,
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_INHERIT_MODE_HANDLING)
+} ufbx_inherit_mode_handling;
+
+UFBX_ENUM_TYPE(ufbx_inherit_mode_handling, UFBX_INHERIT_MODE_HANDLING, UFBX_INHERIT_MODE_HANDLING_HELPER_NODES);
+
 // Specify how unit / coordinate system conversion should be performed.
 // Affects how `ufbx_load_opts.target_axes` and `ufbx_load_opts.target_unit_meters` work,
 // has no effect if neither is specified.
@@ -4077,6 +4097,10 @@ typedef struct ufbx_load_opts {
 	// See `ufbx_geometry_transform_handling` for an explanation.
 	ufbx_geometry_transform_handling geometry_transform_handling;
 
+	// How to handle unconventional transform inherit modes.
+	// See `ufbx_inherit_mode_handling` for an explanation.
+	ufbx_inherit_mode_handling inherit_mode_handling;
+
 	// How to perform space conversion by `target_axes` and `target_unit_meters`.
 	// See `ufbx_space_conversion` for an explanation.
 	ufbx_space_conversion space_conversion;
@@ -4102,6 +4126,10 @@ typedef struct ufbx_load_opts {
 	// Name for dummy geometry transform helper nodes.
 	// See `UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES`.
 	ufbx_string geometry_transform_helper_name;
+
+	// Name for dummy scale helper nodes.
+	// See `UFBX_INHERIT_MODE_HANDLING_HELPER_NODES`.
+	ufbx_string scale_helper_name;
 
 	// Do not scale necessary properties curves with `target_unit_meters`.
 	// Used only if `space_conversion == UFBX_SPACE_CONVERSION_TRANSFORM_ROOT`.
@@ -4661,6 +4689,10 @@ typedef struct ufbx_bake_opts {
 	// Default: `4`
 	size_t key_reduction_passes;
 
+	// Compensate for `UFBX_INHERIT_NO_SCALE` by adjusting child scale.
+	// NOTE: This is an lossy operation, and properly works only for uniform scaling.
+	bool compensate_inherit_no_scale;
+
 	uint32_t _end_zero;
 } ufbx_bake_opts;
 
@@ -5145,6 +5177,10 @@ public:
 // Weight of an animation layer in percentage (100.0 being full).
 // Used by: `ufbx_anim_layer`.
 #define UFBX_Weight "Weight"
+
+// Blend shape deformation weight (100.0 being full).
+// Used by: `ufbx_blend_channel`.
+#define UFBX_DeformPercent "DeformPercent"
 
 #if defined(_MSC_VER)
 	#pragma warning(pop)
