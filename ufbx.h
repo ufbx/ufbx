@@ -3963,10 +3963,12 @@ typedef enum ufbx_inherit_mode_handling UFBX_ENUM_REPR {
 
 	UFBX_INHERIT_MODE_HANDLING_HELPER_NODES,
 
+	UFBX_INHERIT_MODE_HANDLING_COMPENSATE,
+
 	UFBX_ENUM_FORCE_WIDTH(UFBX_INHERIT_MODE_HANDLING)
 } ufbx_inherit_mode_handling;
 
-UFBX_ENUM_TYPE(ufbx_inherit_mode_handling, UFBX_INHERIT_MODE_HANDLING, UFBX_INHERIT_MODE_HANDLING_HELPER_NODES);
+UFBX_ENUM_TYPE(ufbx_inherit_mode_handling, UFBX_INHERIT_MODE_HANDLING, UFBX_INHERIT_MODE_HANDLING_COMPENSATE);
 
 // Specify how unit / coordinate system conversion should be performed.
 // Affects how `ufbx_load_opts.target_axes` and `ufbx_load_opts.target_unit_meters` work,
@@ -4570,7 +4572,17 @@ ufbx_inline ufbx_prop ufbx_evaluate_prop(const ufbx_anim *anim, const ufbx_eleme
 // `ufbx_props.defaults`. This lets you use `ufbx_find_prop/value()` for the results.
 ufbx_abi ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
 
+typedef enum ufbx_transform_flags UFBX_FLAG_REPR {
+
+	// Ignore parent scale helper.
+	UFBX_TRANSFORM_FLAG_IGNORE_SCALE_HELPER = 0x1,
+
+	UFBX_FLAG_FORCE_WIDTH(UFBX_TRANSFORM_FLAGS)
+} ufbx_transform_flags;
+
 ufbx_abi ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *node, double time);
+ufbx_abi ufbx_transform ufbx_evaluate_transform_flags(const ufbx_anim *anim, const ufbx_node *node, double time, ufbx_transform_flags flags);
+
 ufbx_abi ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time);
 
 // Evaluate the whole `scene` at a specific `time` in the animation `anim`.
@@ -4606,6 +4618,9 @@ UFBX_LIST_TYPE(ufbx_baked_quat_list, ufbx_baked_quat);
 typedef struct ufbx_baked_node {
 	uint32_t typed_id;
 	uint32_t element_id;
+	bool constant_translation;
+	bool constant_rotation;
+	bool constant_scale;
 	ufbx_baked_vec3_list translation_keys;
 	ufbx_baked_quat_list rotation_keys;
 	ufbx_baked_vec3_list scale_keys;
@@ -4615,6 +4630,7 @@ UFBX_LIST_TYPE(ufbx_baked_node_list, ufbx_baked_node);
 
 typedef struct ufbx_baked_prop {
 	ufbx_string name;
+	bool constant_value;
 	ufbx_baked_vec3_list keys;
 } ufbx_baked_prop;
 
@@ -4700,6 +4716,9 @@ ufbx_abi ufbx_baked_anim *ufbx_bake_anim(const ufbx_scene *scene, const ufbx_ani
 
 ufbx_abi void ufbx_retain_baked_anim(ufbx_baked_anim *bake);
 ufbx_abi void ufbx_free_baked_anim(ufbx_baked_anim *bake);
+
+ufbx_abi ufbx_vec3 ufbx_evaluate_baked_vec3(ufbx_baked_vec3_list keyframes, double time);
+ufbx_abi ufbx_quat ufbx_evaluate_baked_quat(ufbx_baked_quat_list keyframes, double time);
 
 // Materials
 

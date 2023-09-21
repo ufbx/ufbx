@@ -1233,16 +1233,161 @@ static ufbx_load_opts ufbxt_scale_helper_opts()
 	opts.scale_helper_name.length = SIZE_MAX;
 	return opts;
 }
+
+typedef struct {
+	ufbx_real scale;
+	ufbx_real global_y;
+} ufbxt_no_inherit_scale_node_ref;
+
+typedef struct {
+	double frame;
+	ufbxt_no_inherit_scale_node_ref nodes[4];
+} ufbxt_no_inherit_scale_key_ref;
+
+const ufbxt_no_inherit_scale_key_ref ufbxt_no_inherit_scale_ref[] = {
+	{ 0.0, { { 1.0f, 0.0f }, { 2.0f, 4.0f }, { 1.0f, 12.0f }, { 1.0f, 16.0f } } },
+	{ 6.0, { { 1.5f, 0.0f }, { 1.5f, 6.0f }, { 1.0f, 12.0f }, { 1.0f, 16.0f } } },
+	{ 12.0, { { 2.0f, 0.0f }, { 1.0f, 8.0f }, { 1.0f, 12.0f }, { 1.0f, 16.0f } } },
+	{ 18.0, { { 0.5f, 0.0f }, { 1.5f, 2.0f }, { 1.0f, 8.0f }, { 1.0f, 12.0f } } },
+	{ 24.0, { { 0.5f, 0.0f }, { 2.0f, 2.0f }, { 1.5f, 10.0f }, { 1.0f, 16.0f } } },
+};
+
+static ufbx_matrix ufbxt_evaluate_baked_matrix(ufbx_baked_anim *bake, ufbx_node *node, double time)
+{
+	ufbx_transform transform = node->local_transform;
+	for (size_t i = 0; i < bake->nodes.count; i++) {
+		const ufbx_baked_node *baked_node = &bake->nodes.data[i];
+		if (baked_node->typed_id == node->typed_id) {
+			if (baked_node->translation_keys.count > 0) {
+				transform.translation = ufbx_evaluate_baked_vec3(baked_node->translation_keys, time);
+			}
+			if (baked_node->rotation_keys.count > 0) {
+				transform.rotation = ufbx_evaluate_baked_quat(baked_node->rotation_keys, time);
+			}
+			if (baked_node->scale_keys.count > 0) {
+				transform.scale = ufbx_evaluate_baked_vec3(baked_node->scale_keys, time);
+			}
+		}
+	}
+
+	ufbx_matrix node_to_parent = ufbx_transform_to_matrix(&transform);
+	if (node->parent) {
+		ufbx_matrix parent_to_world = ufbxt_evaluate_baked_matrix(bake, node->parent, time);
+		node_to_parent = ufbx_matrix_mul(&parent_to_world, &node_to_parent);
+	}
+	return node_to_parent;
+}
+
 #endif
 
-UFBXT_FILE_TEST_OPTS(maya_anim_no_inherit_scale, ufbxt_scale_helper_opts)
+UFBXT_FILE_TEST(maya_anim_no_inherit_scale)
 #if UFBXT_IMPL
 {
-	ufbx_bake_opts opts = { 0 };
+	ufbx_node *nodes[4];
+	nodes[0] = ufbx_find_node(scene, "joint1");
+	nodes[1] = ufbx_find_node(scene, "joint2");
+	nodes[2] = ufbx_find_node(scene, "joint3");
+	nodes[3] = ufbx_find_node(scene, "joint4");
+	ufbxt_assert(nodes[0] && nodes[1] && nodes[2] && nodes[3]);
+
+	for (size_t key_ix = 0; key_ix < ufbxt_arraycount(ufbxt_no_inherit_scale_ref); key_ix++) {
+		ufbxt_no_inherit_scale_key_ref key = ufbxt_no_inherit_scale_ref[key_ix];
+		double time = key.frame / 24.0;
+
+		ufbx_scene *state = ufbx_evaluate_scene(scene, NULL, time, NULL, NULL);
+		ufbxt_assert(state);
+
+		for (size_t node_ix = 0; node_ix < 4; node_ix++) {
+			ufbxt_no_inherit_scale_node_ref ref = key.nodes[node_ix];
+			ufbxt_hintf("key_ix=%zu node_ix=%zu", key_ix, node_ix);
+
+			ufbx_node *node = state->nodes.data[nodes[node_ix]->typed_id];
+			if (node->scale_helper) {
+				node = node->scale_helper;
+			}
+			ufbx_matrix node_to_world = node->node_to_world;
+			ufbx_transform world_transform = ufbx_matrix_to_transform(&node_to_world);
+
+			ufbx_vec3 ref_translation = { 0.0f, ref.global_y, 0.0f };
+			ufbx_vec3 ref_scale = { ref.scale, ref.scale, ref.scale };
+
+			ufbxt_assert_close_vec3(err, world_transform.translation, ref_translation);
+			ufbxt_assert_close_vec3(err, world_transform.scale, ref_scale);
+		}
+
+		ufbx_free_scene(state);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_anim_no_inherit_scale_helper, maya_anim_no_inherit_scale, ufbxt_scale_helper_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *nodes[4];
+	nodes[0] = ufbx_find_node(scene, "joint1");
+	nodes[1] = ufbx_find_node(scene, "joint2");
+	nodes[2] = ufbx_find_node(scene, "joint3");
+	nodes[3] = ufbx_find_node(scene, "joint4");
+	ufbxt_assert(nodes[0] && nodes[1] && nodes[2] && nodes[3]);
+
+	for (size_t key_ix = 0; key_ix < ufbxt_arraycount(ufbxt_no_inherit_scale_ref); key_ix++) {
+		ufbxt_no_inherit_scale_key_ref key = ufbxt_no_inherit_scale_ref[key_ix];
+		double time = key.frame / 24.0;
+
+		ufbx_scene *state = ufbx_evaluate_scene(scene, NULL, time, NULL, NULL);
+		ufbxt_assert(state);
+
+		for (size_t node_ix = 0; node_ix < 4; node_ix++) {
+			ufbxt_no_inherit_scale_node_ref ref = key.nodes[node_ix];
+			ufbxt_hintf("key_ix=%zu node_ix=%zu", key_ix, node_ix);
+
+			ufbx_node *node = state->nodes.data[nodes[node_ix]->typed_id];
+			if (node->scale_helper) {
+				node = node->scale_helper;
+			}
+			ufbx_matrix node_to_world = node->node_to_world;
+			ufbx_transform world_transform = ufbx_matrix_to_transform(&node_to_world);
+
+			ufbx_vec3 ref_translation = { 0.0f, ref.global_y, 0.0f };
+			ufbx_vec3 ref_scale = { ref.scale, ref.scale, ref.scale };
+
+			ufbxt_assert_close_vec3(err, world_transform.translation, ref_translation);
+			ufbxt_assert_close_vec3(err, world_transform.scale, ref_scale);
+		}
+
+		ufbx_free_scene(state);
+	}
+
+	ufbx_baked_node *baked_nodes[4];
+
 	ufbx_error error;
+	ufbx_bake_opts opts = { 0 };
 	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
+
+	for (size_t key_ix = 0; key_ix < ufbxt_arraycount(ufbxt_no_inherit_scale_ref); key_ix++) {
+		ufbxt_no_inherit_scale_key_ref key = ufbxt_no_inherit_scale_ref[key_ix];
+		double time = key.frame / 24.0;
+
+		for (size_t node_ix = 0; node_ix < 4; node_ix++) {
+			ufbxt_no_inherit_scale_node_ref ref = key.nodes[node_ix];
+			ufbxt_hintf("key_ix=%zu node_ix=%zu", key_ix, node_ix);
+
+			ufbx_node *node = nodes[node_ix];
+			if (node->scale_helper) {
+				node = node->scale_helper;
+			}
+			ufbx_matrix node_to_world = ufbxt_evaluate_baked_matrix(bake, node, time);
+			ufbx_transform world_transform = ufbx_matrix_to_transform(&node_to_world);
+
+			ufbx_vec3 ref_translation = { 0.0f, ref.global_y, 0.0f };
+			ufbx_vec3 ref_scale = { ref.scale, ref.scale, ref.scale };
+
+			ufbxt_assert_close_vec3(err, world_transform.translation, ref_translation);
+			ufbxt_assert_close_vec3(err, world_transform.scale, ref_scale);
+		}
+	}
 
 	ufbx_free_baked_anim(bake);
 }

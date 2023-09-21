@@ -323,6 +323,11 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 		}
 	}
 
+	ufbxt_check_element_ptr(scene, node->mesh, UFBX_ELEMENT_MESH);
+	ufbxt_check_element_ptr(scene, node->light, UFBX_ELEMENT_LIGHT);
+	ufbxt_check_element_ptr(scene, node->camera, UFBX_ELEMENT_CAMERA);
+	ufbxt_check_element_ptr(scene, node->scale_helper, UFBX_ELEMENT_NODE);
+
 	switch (node->attrib_type) {
 	case UFBX_ELEMENT_MESH: ufbxt_assert(node->mesh); break;
 	case UFBX_ELEMENT_LIGHT: ufbxt_assert(node->light); break;
