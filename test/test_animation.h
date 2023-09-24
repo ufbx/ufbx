@@ -1225,7 +1225,7 @@ UFBXT_FILE_TEST(maya_anim_pivot_rotate)
 #endif
 
 #if UFBXT_IMPL
-static ufbx_load_opts ufbxt_scale_helper_opts()
+static ufbx_load_opts ufbxt_anim_scale_helper_opts()
 {
 	ufbx_load_opts opts = { 0 };
 	opts.inherit_mode_handling = UFBX_INHERIT_MODE_HANDLING_HELPER_NODES;
@@ -1320,7 +1320,7 @@ UFBXT_FILE_TEST(maya_anim_no_inherit_scale)
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_anim_no_inherit_scale_helper, maya_anim_no_inherit_scale, ufbxt_scale_helper_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS)
+UFBXT_FILE_TEST_OPTS_ALT(maya_anim_no_inherit_scale_helper, maya_anim_no_inherit_scale, ufbxt_anim_scale_helper_opts)
 #if UFBXT_IMPL
 {
 	ufbx_node *nodes[4];
@@ -1358,8 +1358,6 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_anim_no_inherit_scale_helper, maya_anim_no_i
 		ufbx_free_scene(state);
 	}
 
-	ufbx_baked_node *baked_nodes[4];
-
 	ufbx_error error;
 	ufbx_bake_opts opts = { 0 };
 	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
@@ -1392,4 +1390,3 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_anim_no_inherit_scale_helper, maya_anim_no_i
 	ufbx_free_baked_anim(bake);
 }
 #endif
-

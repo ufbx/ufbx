@@ -915,6 +915,13 @@ static void ufbxt_assert_close_vec3(ufbxt_diff_error *p_err, ufbx_vec3 a, ufbx_v
 	ufbxt_assert_close_real(p_err, a.z, b.z);
 }
 
+static void ufbxt_assert_close_vec3_xyz(ufbxt_diff_error *p_err, ufbx_vec3 a, ufbx_real x, ufbx_real y, ufbx_real z)
+{
+	ufbxt_assert_close_real(p_err, a.x, x);
+	ufbxt_assert_close_real(p_err, a.y, y);
+	ufbxt_assert_close_real(p_err, a.z, z);
+}
+
 static void ufbxt_assert_close_vec4(ufbxt_diff_error *p_err, ufbx_vec4 a, ufbx_vec4 b)
 {
 	ufbxt_assert_close_real(p_err, a.x, b.x);

@@ -10791,6 +10791,7 @@ ufbxi_noinline static void ufbxi_set_own_prop_vec3_uniform(ufbx_props *props, co
 
 typedef struct {
 	uint32_t geometry_helper_id;
+	uint32_t scale_helper_id;
 } ufbxi_node_extra;
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_setup_geometry_transform_helper(ufbxi_context *uc, ufbx_node *node, uint64_t node_fbx_id)
@@ -10846,6 +10847,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_setup_scale_helper(ufbxi_context
 	ufbx_prop *size_prop = ufbxi_push_zero(&uc->result, ufbx_prop, 1);
 	ufbxi_check(size_prop);
 
+	ufbxi_node_extra *extra = ufbxi_push_element_extra(uc, node->element.element_id, ufbxi_node_extra);
+	ufbxi_check(extra);
+	extra->scale_helper_id = scale_node->element_id;
+
 	size_prop->name.data = ufbxi_Lcl_Scaling;
 	size_prop->name.length = 11;
 	size_prop->type = UFBX_PROP_SCALING;
@@ -10878,6 +10883,21 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_model(ufbxi_context *uc, uf
 	ufbx_node *elem_node = ufbxi_push_element(uc, info, ufbx_node, UFBX_ELEMENT_NODE);
 	ufbxi_check(elem_node);
 	ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &elem_node->element.element_id));
+
+	int64_t inherit_type = ufbxi_find_int(&elem_node->props, ufbxi_InheritType, -1);
+	switch (inherit_type) {
+	case 0: // RrSs
+		elem_node->original_inherit_mode = UFBX_INHERIT_MODE_COMPONENTWISE_SCALE;
+		break;
+	case 2: // Rrs
+		elem_node->original_inherit_mode = UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE;
+		break;
+	default: break;
+	}
+
+	if (uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_PRESERVE) {
+		elem_node->inherit_mode = elem_node->original_inherit_mode;
+	}
 
 	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES) {
 		ufbxi_check(ufbxi_setup_geometry_transform_helper(uc, elem_node, info->fbx_id));
@@ -13524,6 +13544,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_settings(ufbxi_conte
 	return 1;
 }
 
+ufbxi_noinline static ufbx_matrix ufbxi_unscaled_transform_to_matrix(const ufbx_transform *t)
+{
+	ufbx_transform transform = *t;
+	transform.scale.x = 1.0f;
+	transform.scale.y = 1.0f;
+	transform.scale.z = 1.0f;
+	return ufbx_transform_to_matrix(&transform);
+}
+
 ufbxi_noinline static void ufbxi_setup_root_node(ufbxi_context *uc, ufbx_node *root)
 {
 	if (uc->opts.use_root_transform) {
@@ -15770,7 +15799,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 {
 	bool required = false;
 	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) required = true;
-	if (uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_HELPER_NODES) required = true;
+	if (uc->opts.inherit_mode_handling != UFBX_INHERIT_MODE_HANDLING_PRESERVE) required = true;
 #if defined(UFBX_REGRESSION)
 	required = true;
 #endif
@@ -15813,6 +15842,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 
 	// TODO
 	const ufbx_real scale_epsilon = 0.001f;
+	const ufbx_real compensate_epsilon = 0.01f;
 
 	for (size_t i = 0; i < num_elements; i++) {
 		ufbx_element *element = elements[i];
@@ -15853,6 +15883,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 		if (tmp->src_prop.length == 0 && tmp->dst_prop.length == 0) {
 			// Count number of instances of each attribute
 			if (dst->type == UFBX_ELEMENT_NODE) {
+				ufbx_node *dst_node = (ufbx_node*)dst;
+
 				if (src->type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && src->type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB) {
 					++instance_counts[src->element_id];
 
@@ -15869,9 +15901,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 					}
 				}
 
-				if (uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_HELPER_NODES && src->type == UFBX_ELEMENT_NODE) {
-					int64_t inherit = ufbxi_find_int(&src->props, ufbxi_InheritType, UFBX_INHERIT_NORMAL);
-					if (inherit != UFBX_INHERIT_NORMAL) {
+				if (uc->opts.inherit_mode_handling != UFBX_INHERIT_MODE_HANDLING_PRESERVE && src->type == UFBX_ELEMENT_NODE) {
+					ufbx_node *src_node = (ufbx_node*)src;
+					if (!dst_node->is_root && src_node->original_inherit_mode != UFBX_INHERIT_MODE_NORMAL) {
 						has_unscaled_children[dst->typed_id] = true;
 					}
 				}
@@ -15923,7 +15955,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 					if (tmp->dst_prop.data == ufbxi_Lcl_Scaling) {
 						ufbxi_pre_node *pre_node = &pre_nodes[dst->typed_id];
 						if (pre_node->has_constant_scale) {
-							ufbxi_pre_anim_value *pre_value = &pre_anim_values[dst->typed_id];
+							ufbxi_pre_anim_value *pre_value = &pre_anim_values[src->typed_id];
 							if (!pre_value->has_constant_value) {
 								pre_node->has_constant_scale = false;
 							} else {
@@ -15958,11 +15990,16 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 				ufbxi_pre_node *pre_node = &pre_nodes[node->typed_id];
 				ufbx_real ref = uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_COMPENSATE
 					? pre_node->constant_scale.x : (ufbx_real)1.0f;
-				ufbx_real dx = ufbx_fabs(pre_node->constant_scale.x - ref);
-				ufbx_real dy = ufbx_fabs(pre_node->constant_scale.y - ref);
-				ufbx_real dz = ufbx_fabs(pre_node->constant_scale.z - ref);
-				if (dx + dy + dz >= scale_epsilon || !pre_node->has_constant_scale) {
+				ufbx_vec3 scale = pre_node->constant_scale;
+				ufbx_real dx = ufbx_fabs(scale.x - ref);
+				ufbx_real dy = ufbx_fabs(scale.y - ref);
+				ufbx_real dz = ufbx_fabs(scale.z - ref);
+				if (dx + dy + dz >= scale_epsilon || !pre_node->has_constant_scale || ufbx_fabs(scale.x) <= compensate_epsilon) {
 					ufbxi_check(ufbxi_setup_scale_helper(uc, node, fbx_id));
+				} else if (uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_COMPENSATE) {
+					if (ufbx_fabs(scale.x - 1.0f) >= scale_epsilon) {
+						node->is_scale_compensate_parent = true;
+					}
 				}
 			}
 		}
@@ -16148,7 +16185,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_contex
 				if (dst_node->scale_helper) {
 					if (src->type == UFBX_ELEMENT_NODE) {
 						ufbx_node *src_node = (ufbx_node*)src;
-						if (src_node->inherit_type == UFBX_INHERIT_NORMAL) {
+						if (!src_node->is_scale_helper && src_node->original_inherit_mode == UFBX_INHERIT_MODE_NORMAL) {
 							dst = &dst_node->scale_helper->element;
 						}
 					} else if (src->type == UFBX_ELEMENT_ANIM_VALUE) {
@@ -16157,6 +16194,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_contex
 						}
 					} else {
 						dst = &dst_node->scale_helper->element;
+					}
+				}
+			} else if (src->type == UFBX_ELEMENT_NODE) {
+				ufbx_node *src_node = (ufbx_node*)src;
+				if (src_node->scale_helper) {
+					if (dst->type == UFBX_ELEMENT_SKIN_CLUSTER) {
+						src = &src_node->scale_helper->element;
 					}
 				}
 			}
@@ -18653,11 +18697,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	for (size_t i = 0; i < num_elements; i++) {
 		ufbx_element *element = (ufbx_element*)(element_data + element_offsets[i]);
 
-		// Update tempoerary pointers
 		if (element->type == UFBX_ELEMENT_NODE) {
 			ufbx_node *node = (ufbx_node*)element;
 			if (node->scale_helper) {
-				node->scale_helper = (ufbx_node*)(element_data + element_offsets[node->scale_helper->element_id]);
+				ufbxi_node_extra *extra = (ufbxi_node_extra*)ufbxi_get_element_extra(uc, node->element_id);
+				ufbx_assert(extra);
+				node->scale_helper = (ufbx_node*)(element_data + element_offsets[extra->scale_helper_id]);
 			}
 		}
 
@@ -18723,6 +18768,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 			if (node->is_geometry_transform_helper) {
 				parent->geometry_transform_helper = node;
+			}
+
+			// Force top-level nodes to have `UFBX_INHERIT_MODE_NORMAL` to make unit scaling work.
+			if (parent->is_root && uc->opts.space_conversion == UFBX_SPACE_CONVERSION_TRANSFORM_ROOT && uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_PRESERVE) {
+				node->inherit_mode = UFBX_INHERIT_MODE_NORMAL;
 			}
 		}
 
@@ -19778,7 +19828,7 @@ ufbxi_noinline static ufbx_transform ufbxi_get_transform(const ufbx_props *props
 
 	if (node->has_adjust_transform) {
 		ufbxi_mul_rotate_quat(&t, node->adjust_pre_rotation);
-		ufbxi_mul_scale(&t, node->adjust_pre_scale);
+		ufbxi_mul_scale_real(&t, node->adjust_pre_scale);
 	}
 
 	return t;
@@ -19837,7 +19887,6 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 	node->rotation_order = (ufbx_rotation_order)ufbxi_find_enum(&node->props, ufbxi_RotationOrder, UFBX_ROTATION_ORDER_XYZ, UFBX_ROTATION_ORDER_SPHERIC);
 	node->euler_rotation = ufbxi_find_vec3(&node->props, ufbxi_Lcl_Rotation, 0.0f, 0.0f, 0.0f);
 
-	node->inherit_type = (ufbx_inherit_type)ufbxi_find_enum(&node->props, ufbxi_InheritType, UFBX_INHERIT_NORMAL, UFBX_INHERIT_NO_SCALE);
 	if (!node->is_root) {
 		const ufbx_vec3 *transform_scale = NULL;
 		if (node->parent && node->parent->scale_helper) {
@@ -19845,31 +19894,42 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 		}
 		node->local_transform = ufbxi_get_transform(&node->props, node->rotation_order, node, transform_scale);
 		node->geometry_transform = ufbxi_get_geometry_transform(&node->props);
-		node->node_to_parent = ufbx_transform_to_matrix(&node->local_transform);
 	} else {
 		node->geometry_transform = ufbx_identity_transform;
 	}
 
+	ufbx_matrix unscaled_node_to_parent = ufbxi_unscaled_transform_to_matrix(&node->local_transform);
+	node->node_to_parent = ufbx_transform_to_matrix(&node->local_transform);
+
 	ufbx_node *parent = node->parent;
 	if (parent) {
-		node->world_transform.rotation = ufbxi_mul_quat(parent->world_transform.rotation, node->local_transform.rotation);
-		node->world_transform.translation = ufbx_transform_position(&parent->node_to_world, node->local_transform.translation);
-		if (node->inherit_type != UFBX_INHERIT_NO_SCALE) {
-			node->world_transform.scale.x = parent->world_transform.scale.x * node->local_transform.scale.x;
-			node->world_transform.scale.y = parent->world_transform.scale.y * node->local_transform.scale.y;
-			node->world_transform.scale.z = parent->world_transform.scale.z * node->local_transform.scale.z;
-		} else {
-			node->world_transform.scale = node->local_transform.scale;
-		}
-
-		if (node->inherit_type == UFBX_INHERIT_NORMAL) {
+		if (node->inherit_mode == UFBX_INHERIT_MODE_NORMAL) {
 			node->node_to_world = ufbx_matrix_mul(&parent->node_to_world, &node->node_to_parent);
+			node->unscaled_node_to_world = ufbx_matrix_mul(&parent->node_to_world, &unscaled_node_to_parent);
 		} else {
-			node->node_to_world = ufbx_transform_to_matrix(&node->world_transform);
+			ufbx_transform transform = node->local_transform;
+			ufbx_transform parent_transform = parent->local_transform;
+
+			transform.translation.x *= parent_transform.scale.x;
+			transform.translation.y *= parent_transform.scale.y;
+			transform.translation.z *= parent_transform.scale.z;
+			if (node->inherit_mode == UFBX_INHERIT_MODE_COMPONENTWISE_SCALE) {
+				transform.scale.x *= parent_transform.scale.x;
+				transform.scale.y *= parent_transform.scale.y;
+				transform.scale.z *= parent_transform.scale.z;
+			}
+			parent_transform.scale.x = 1.0f;
+			parent_transform.scale.y = 1.0f;
+			parent_transform.scale.z = 1.0f;
+
+			ufbx_matrix node_to_unscaled_parent = ufbx_transform_to_matrix(&transform);
+			ufbx_matrix unscaled_node_to_unscaled_parent = ufbxi_unscaled_transform_to_matrix(&transform);
+			node->node_to_world = ufbx_matrix_mul(&parent->unscaled_node_to_world, &node_to_unscaled_parent);
+			node->unscaled_node_to_world = ufbx_matrix_mul(&parent->unscaled_node_to_world, &unscaled_node_to_unscaled_parent);
 		}
 	} else {
-		node->world_transform = node->local_transform;
 		node->node_to_world = node->node_to_parent;
+		node->unscaled_node_to_world = unscaled_node_to_parent;
 	}
 
 	if (!ufbxi_is_transform_identity(node->geometry_transform)) {
@@ -20480,21 +20540,33 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 		ufbx_node *node = *p_node;
 
 		node->adjust_post_rotation = ufbx_identity_quat;
-		node->adjust_post_scale = 1.0f;
 		node->adjust_pre_rotation = ufbx_identity_quat;
-		node->adjust_pre_scale = ufbxi_one_vec3;
+		node->adjust_pre_scale = 1.0f;
+		node->adjust_post_scale = 1.0f;
 
-		// HACK: Pre-fetch `ufbx_node.inherit_type` as we need it multiple times below.
-		// This is a bit inconsistent but will get overwritten in `ufbxi_update_node()`.
-		node->inherit_type = (ufbx_inherit_type)ufbxi_find_enum(&node->props, ufbxi_InheritType, UFBX_INHERIT_NORMAL, UFBX_INHERIT_NO_SCALE);
+		ufbx_real root_scale = root_transform.scale.x;
 
 		if (conversion == UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS) {
 			if (node->node_depth <= 1 && !node->is_root) {
 				node->adjust_pre_rotation = root_transform.rotation;
-				node->adjust_pre_scale = root_transform.scale;
+				node->adjust_pre_scale = root_scale; // TODO
 				node->has_adjust_transform = true;
-			} else if (node->inherit_type == UFBX_INHERIT_NO_SCALE) {
-				node->adjust_post_scale = root_scale;
+				node->has_root_adjust_transform = true;
+			}
+		}
+
+		if (node->parent) {
+			// We are not inheriting local scale, so propagate root scale manually and
+			// apply scale compensation if necessary.
+			ufbx_node *parent = node->parent;
+			if (parent->has_root_adjust_transform && node->inherit_mode == UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE) {
+				node->adjust_post_scale *= root_scale;
+				node->has_adjust_transform = true;
+				node->has_root_adjust_transform = true;
+			}
+			if (parent->is_scale_compensate_parent) {
+				ufbx_vec3 scale = ufbxi_find_vec3(&parent->props, ufbxi_Lcl_Scaling, 1.0f, 1.0f, 1.0f);
+				node->adjust_post_scale *= 1.0f / scale.x;
 				node->has_adjust_transform = true;
 			}
 		}
@@ -21678,85 +21750,6 @@ static ufbxi_noinline int ufbxi_scale_units(ufbxi_context *uc, ufbx_real target_
 		uc->scene.root_node->node_to_parent.m20 *= ratio;
 		uc->scene.root_node->node_to_parent.m21 *= ratio;
 		uc->scene.root_node->node_to_parent.m22 *= ratio;
-
-		// HACK: Pre-fetch `ufbx_node.inherit_type` as we need it multiple times below.
-		// This is a bit inconsistent but will get overwritten in `ufbxi_update_node()`.
-		if (!uc->opts.no_prop_unit_scaling || !uc->opts.no_anim_curve_unit_scaling) {
-			ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
-				ufbx_node *node = *p_node;
-				node->inherit_type = (ufbx_inherit_type)ufbxi_find_enum(&node->props, ufbxi_InheritType, UFBX_INHERIT_NORMAL, UFBX_INHERIT_NO_SCALE);
-			}
-		}
-
-		if (!uc->opts.no_prop_unit_scaling) {
-			ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
-				ufbx_node *node = *p_node;
-				if (node->inherit_type != UFBX_INHERIT_NO_SCALE) continue;
-
-				// Find only in own properties
-				ufbx_props own_props = node->props;
-				own_props.defaults = NULL;
-				ufbx_prop *prop = ufbxi_find_prop(&own_props, ufbxi_Lcl_Scaling);
-				if (prop) {
-					prop->value_vec3.x *= ratio;
-					prop->value_vec3.y *= ratio;
-					prop->value_vec3.z *= ratio;
-					prop->value_int = ufbxi_f64_to_i64(prop->value_vec3.x);
-				} else {
-					// We need to add a new Lcl Scaling property based on the defaults
-					ufbx_props *defaults = node->props.defaults;
-					ufbx_vec3 scale = { 1.0f, 1.0f, 1.0f };
-					if (defaults) {
-						prop = ufbxi_find_prop(defaults, ufbxi_Lcl_Scaling);
-						if (prop) {
-							scale = prop->value_vec3;
-						}
-					}
-
-					scale.x *= ratio;
-					scale.y *= ratio;
-					scale.z *= ratio;
-
-					ufbx_prop new_prop = { 0 };
-					new_prop.name.data = ufbxi_Lcl_Scaling;
-					new_prop.name.length = sizeof(ufbxi_Lcl_Scaling) - 1;
-					new_prop._internal_key = ufbxi_get_name_key(ufbxi_Lcl_Scaling, sizeof(ufbxi_Lcl_Scaling) - 1);
-					new_prop.type = UFBX_PROP_SCALING;
-					new_prop.flags = UFBX_PROP_FLAG_SYNTHETIC;
-					new_prop.value_str = ufbx_empty_string;
-					new_prop.value_blob = ufbx_empty_blob;
-					new_prop.value_vec3 = scale;
-					new_prop.value_int = ufbxi_f64_to_i64(new_prop.value_vec3.x);
-
-					size_t new_num_props = node->props.props.count + 1;
-					ufbx_prop *props_copy = ufbxi_push(&uc->result, ufbx_prop, new_num_props);
-					ufbxi_check(props_copy);
-
-					memcpy(props_copy, node->props.props.data, node->props.props.count * sizeof(ufbx_prop));
-					props_copy[node->props.props.count] = new_prop;
-
-					ufbxi_check(ufbxi_sort_properties(uc, props_copy, new_num_props));
-
-					node->props.props.data = props_copy;
-					node->props.props.count = new_num_props;
-				}
-			}
-		}
-
-		if (!uc->opts.no_anim_curve_unit_scaling) {
-			ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, uc->scene.anim_layers) {
-				ufbx_anim_layer *layer = *p_layer;
-				ufbxi_for_list(ufbx_anim_prop, aprop, layer->anim_props) {
-					if (aprop->prop_name.data == ufbxi_Lcl_Scaling) {
-						ufbx_element *elem = aprop->element;
-						if (elem->type != UFBX_ELEMENT_NODE) continue;
-						ufbx_node *node = (ufbx_node*)elem;
-						if (node->inherit_type != UFBX_INHERIT_NO_SCALE) continue;
-						ufbxi_scale_anim_value(aprop->anim_value, ratio);
-					}
-				}
-			}
-		}
 	}
 
 	return 1;

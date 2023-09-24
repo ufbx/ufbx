@@ -535,3 +535,59 @@ UFBXT_FILE_TEST(synthetic_bind_to_root)
 	// This test exists to check that it is handled gracefully if quirks are enabled
 }
 #endif
+
+UFBXT_FILE_TEST(maya_mixed_inherit_mode)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_0", NULL, 0.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_1", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_2", NULL, 2.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_3", NULL, 3.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_4", NULL, 4.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_5", NULL, 5.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_6", NULL, 6.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_7", NULL, 7.0/24.0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_mixed_inherit_mode_helper, maya_mixed_inherit_mode, ufbxt_scale_helper_opts)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_0", NULL, 0.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_1", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_2", NULL, 2.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_3", NULL, 3.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_4", NULL, 4.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_5", NULL, 5.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_6", NULL, 6.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_7", NULL, 7.0/24.0);
+
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, NULL, NULL);
+	ufbxt_assert(bake);
+
+	for (int frame = 0; frame <= 7; frame++) {
+		double time = (double)frame / 24.0;
+		ufbx_scene *state = ufbx_evaluate_scene(scene, NULL, time, NULL, NULL);
+		ufbxt_assert(state);
+
+		for (size_t i = 0; i < scene->nodes.count; i++) {
+			ufbx_node *scene_node = scene->nodes.data[i];
+			ufbx_node *state_node = state->nodes.data[i];
+
+			ufbx_matrix ref_matrix = state_node->node_to_world;
+			ufbx_matrix bake_matrix = ufbxt_evaluate_baked_matrix(bake, scene_node, time);
+
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[0], bake_matrix.cols[0]);
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[1], bake_matrix.cols[1]);
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[2], bake_matrix.cols[2]);
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[3], bake_matrix.cols[3]);
+		}
+
+		ufbx_free_scene(state);
+	}
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+

@@ -724,18 +724,34 @@ struct ufbx_unknown {
 // -- Nodes
 
 // Inherit type specifies how hierarchial node transforms are combined.
-// `UFBX_INHERIT_NORMAL` is combined using the "proper" multiplication
-// `UFBX_INHERIT_NO_SHEAR` does component-wise { pos+pos, rot*rot, scale*scale }
-// `UFBX_INHERIT_NO_SCALE` ignores the parent scale { pos+pos, rot*rot, scale }
-typedef enum ufbx_inherit_type UFBX_ENUM_REPR {
-	UFBX_INHERIT_NO_SHEAR, // R*r*S*s
-	UFBX_INHERIT_NORMAL,   // R*S*r*s
-	UFBX_INHERIT_NO_SCALE, // R*r*s
+// This only affects the final scaling, as rotation and translation are always
+// inherited correctly.
+// NOTE: These don't map to `"InheritType"` property as there may be new ones for
+// compatability with various exporters.
+typedef enum ufbx_inherit_mode UFBX_ENUM_REPR {
 
-	UFBX_ENUM_FORCE_WIDTH(UFBX_INHERIT_TYPE)
-} ufbx_inherit_type;
+	// Normal matrix composition of hierarchy: `R*S*r*s`.
+	//   child.node_to_world = parent.node_to_world * child.node_to_parent;
+	UFBX_INHERIT_MODE_NORMAL,
 
-UFBX_ENUM_TYPE(ufbx_inherit_type, UFBX_INHERIT_TYPE, UFBX_INHERIT_NO_SCALE);
+	// Ignore parent scale when computing the transform: `R*r*s`.
+	//   ufbx_transform t = node.local_transform;
+	//   t.translation *= parent.local_transform.scale;
+	//   child.node_to_world = parent.unscaled_node_to_world * t;
+	// Also known as "Segment scale compensate" in some software.
+	UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE,
+
+	// Apply parent scale component-wise: `R*r*S*s`.
+	//   ufbx_transform t = node.local_transform;
+	//   t.translation *= parent.local_transform.scale;
+	//   t.scale *= parent.local_transform.scale;
+	//   child.node_to_world = parent.unscaled_node_to_world * t;
+	UFBX_INHERIT_MODE_COMPONENTWISE_SCALE,
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_INHERIT_MODE)
+} ufbx_inherit_mode;
+
+UFBX_ENUM_TYPE(ufbx_inherit_mode, UFBX_INHERIT_MODE, UFBX_INHERIT_MODE_COMPONENTWISE_SCALE);
 
 // Nodes form the scene transformation hierarchy and can contain attached
 // elements such as meshes or lights. In normal cases a single `ufbx_node`
@@ -779,6 +795,10 @@ struct ufbx_node {
 	// See `UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES`.
 	ufbx_nullable ufbx_node *geometry_transform_helper;
 
+	// Scale helper if one exists.
+	// See `UFBX_INHERIT_MODE_HANDLING_HELPER_NODES`.
+	ufbx_nullable ufbx_node *scale_helper;
+
 	// `attrib->type` if `attrib` is defined, otherwise `UFBX_ELEMENT_UNKNOWN`.
 	ufbx_element_type attrib_type;
 
@@ -790,7 +810,8 @@ struct ufbx_node {
 
 	// Local transform in parent, geometry transform is a non-inherited
 	// transform applied only to attachments like meshes
-	ufbx_inherit_type inherit_type;
+	ufbx_inherit_mode inherit_mode;
+	ufbx_inherit_mode original_inherit_mode;
 	ufbx_transform local_transform;
 	ufbx_transform geometry_transform;
 
@@ -802,10 +823,6 @@ struct ufbx_node {
 	// The angles are specified in degrees.
 	ufbx_vec3 euler_rotation;
 
-	// Transform to the global "world" space, may be incorrect if the node
-	// uses `UFBX_INHERIT_NORMAL`, prefer using the `node_to_world` matrix.
-	ufbx_transform world_transform;
-
 	// Matrices derived from the transformations, for transforming geometry
 	// prefer using `geometry_to_world` as that supports geometric transforms.
 
@@ -814,8 +831,6 @@ struct ufbx_node {
 	ufbx_matrix node_to_parent;
 	// Transform from this node to the world space, ie. multiplying all the
 	// `node_to_parent` matrices of the parent chain together.
-	// NOTE: Not the same as `ufbx_transform_to_matrix(&world_transform)`
-	// as this matrix will account for potential shear (if `inherit_type == UFBX_INHERIT_NORMAL`).
 	ufbx_matrix node_to_world;
 	// Transform from the attribute to this node. Does not affect the transforms
 	// of `children`!
@@ -824,12 +839,14 @@ struct ufbx_node {
 	// Transform from attribute space to world space.
 	// Equivalent to `ufbx_matrix_mul(&node_to_world, &geometry_to_node)`.
 	ufbx_matrix geometry_to_world;
+	// Transform from this node to world space, ignoring self scaling.
+	ufbx_matrix unscaled_node_to_world;
 
 	// ufbx-specific adjustment for switching between coodrinate/unit systems.
 	// HINT: In most cases you don't need to deal with these as these are baked
 	// into all the transforms above and into `ufbx_evaluate_transform()`.
 	ufbx_quat adjust_pre_rotation;  // < Rotation applied between parent and self
-	ufbx_vec3 adjust_pre_scale;     // < Scaling applied between parent and self
+	ufbx_real adjust_pre_scale;     // < Scaling applied between parent and self
 	ufbx_quat adjust_post_rotation; // < Rotation applied in local space at the end
 	ufbx_real adjust_post_scale;    // < Scaling applied in local space at the end
 
@@ -848,16 +865,23 @@ struct ufbx_node {
 	bool has_geometry_transform;
 
 	// If `true` the transform is adjusted by ufbx, not enabled by default.
-	// See `adjust_pre_rotation`, `adjust_pre_scale`, `adjust_post_rotation`.
+	// See `adjust_pre_rotation`, `adjust_pre_scale`, `adjust_post_rotation`,
+	// and `adjust_post_scale`.
 	bool has_adjust_transform;
+
+	// Scale is adjusted by root scale.
+	bool has_root_adjust_transform;
 
 	// True if this node is a synthetic geometry transform helper.
 	// See `UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES`.
 	bool is_geometry_transform_helper;
 
 	// True if the node is a synthetic scale compensation helper.
-	ufbx_node *scale_helper;
+	// See `UFBX_INHERIT_MODE_HANDLING_HELPER_NODES`.
 	bool is_scale_helper;
+
+	// Parent node to children that can compensate for parent scale.
+	bool is_scale_compensate_parent;
 
 	// How deep is this node in the parent hierarchy. Root node is at depth `0`
 	// and the immediate children of root at `1`.
@@ -4132,14 +4156,6 @@ typedef struct ufbx_load_opts {
 	// Name for dummy scale helper nodes.
 	// See `UFBX_INHERIT_MODE_HANDLING_HELPER_NODES`.
 	ufbx_string scale_helper_name;
-
-	// Do not scale necessary properties curves with `target_unit_meters`.
-	// Used only if `space_conversion == UFBX_SPACE_CONVERSION_TRANSFORM_ROOT`.
-	bool no_prop_unit_scaling;
-
-	// Do not scale necessary animation curves with `target_unit_meters`.
-	// Used only if `space_conversion == UFBX_SPACE_CONVERSION_TRANSFORM_ROOT`.
-	bool no_anim_curve_unit_scaling;
 
 	// Normalize vertex normals.
 	bool normalize_normals;
