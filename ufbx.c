@@ -15938,7 +15938,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 		} else if (tmp->src_prop.length == 0 && tmp->dst_prop.length != 0) {
 			const char *dst_prop = tmp->dst_prop.data;
 			if (dst->type == UFBX_ELEMENT_ANIM_VALUE && src->type == UFBX_ELEMENT_ANIM_CURVE) {
-				ufbx_anim_value *dst_value = (ufbx_anim_value*)dst;
 				ufbx_anim_curve *src_curve = (ufbx_anim_curve*)src;
 				uint32_t index = 0;
 				if (dst_prop == ufbxi_Y || dst_prop == ufbxi_d_Y) {
@@ -16026,7 +16025,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 
 					// If we added a geometry transform helper, we need to do it
 					// recursively for all child nodes using  `UFBX_INHERIT_MODE_COMPONENTWISE_SCALE`
-					ufbxi_pre_node *pre_node = &pre_nodes[node->typed_id];
 					uint32_t ix = pre_node->first_child;
 					size_t count = 0, max_count = num_nodes * 4;
 					while (ix != ~0u && ix != node->typed_id) {
@@ -19983,7 +19981,6 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 			node->unscaled_node_to_world = ufbx_matrix_mul(&parent->node_to_world, &unscaled_node_to_parent);
 		} else {
 			ufbx_transform transform = node->local_transform;
-			ufbx_transform parent_transform = parent->local_transform;
 			ufbx_vec3 parent_scale = parent->inherit_scale;
 
 			if (node->inherit_mode == UFBX_INHERIT_MODE_COMPONENTWISE_SCALE) {
@@ -19998,9 +19995,6 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 			transform.translation.x *= parent_scale.x;
 			transform.translation.y *= parent_scale.y;
 			transform.translation.z *= parent_scale.z;
-			parent_transform.scale.x = 1.0f;
-			parent_transform.scale.y = 1.0f;
-			parent_transform.scale.z = 1.0f;
 
 			ufbx_matrix node_to_unscaled_parent = ufbx_transform_to_matrix(&transform);
 			ufbx_matrix unscaled_node_to_unscaled_parent = ufbxi_unscaled_transform_to_matrix(&transform);
@@ -20623,8 +20617,6 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 		node->adjust_pre_rotation = ufbx_identity_quat;
 		node->adjust_pre_scale = 1.0f;
 		node->adjust_post_scale = 1.0f;
-
-		ufbx_real root_scale = root_transform.scale.x;
 
 		if (conversion == UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS) {
 			if (node->node_depth <= 1 && !node->is_root) {
@@ -21788,22 +21780,6 @@ static ufbxi_noinline void ufbxi_transform_to_axes(ufbxi_context *uc, ufbx_coord
 		uc->scene.root_node->local_transform = ufbx_matrix_to_transform(&axis_mat);
 		uc->scene.root_node->node_to_parent = axis_mat;
 	}
-}
-
-static ufbxi_noinline void ufbxi_scale_anim_curve(ufbx_anim_curve *curve, ufbx_real scale)
-{
-	if (!curve) return;
-	ufbxi_for_list(ufbx_keyframe, key, curve->keyframes) {
-		key->value *= scale;
-	}
-}
-
-static ufbxi_noinline void ufbxi_scale_anim_value(ufbx_anim_value *value, ufbx_real scale)
-{
-	if (!value) return;
-	ufbxi_scale_anim_curve(value->curves[0], scale);
-	ufbxi_scale_anim_curve(value->curves[1], scale);
-	ufbxi_scale_anim_curve(value->curves[2], scale);
 }
 
 static ufbxi_noinline int ufbxi_scale_units(ufbxi_context *uc, ufbx_real target_meters)
@@ -23395,12 +23371,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_times(ufbxi_bake_context *b
 
 		const ufbx_keyframe *keys = curve->keyframes.data;
 		size_t num_keys = curve->keyframes.count;
-		for (size_t i = 0; i < num_keys; i++) {
-			ufbx_keyframe a = keys[i];
+		for (size_t key_ix = 0; key_ix < num_keys; key_ix++) {
+			ufbx_keyframe a = keys[key_ix];
 			double a_time = a.time - bc->opts.time_start_offset;
 			ufbxi_check_err(&bc->error, ufbxi_bake_push_time(bc, a_time));
-			if (i + 1 >= num_keys) break;
-			ufbx_keyframe b = keys[i + 1];
+			if (key_ix + 1 >= num_keys) break;
+			ufbx_keyframe b = keys[key_ix + 1];
 			double b_time = b.time - bc->opts.time_start_offset;
 
 			// Skip fully flat sections
@@ -23467,7 +23443,6 @@ ufbxi_nodiscard static ufbxi_noinline bool ufbxi_in_list(const char *const *item
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_context *bc, ufbxi_double_list *p_dst)
 {
-	const ufbx_anim *anim = bc->anim;
 	if (bc->layer_weight_times.count > 0) {
 		ufbxi_check_err(&bc->error, ufbxi_push_copy(&bc->tmp_times, double, bc->layer_weight_times.count, bc->layer_weight_times.data));
 	}
