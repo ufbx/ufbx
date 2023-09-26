@@ -23397,7 +23397,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_times(ufbxi_bake_context *b
 				if (duration <= min_duration) continue;
 
 				double factor = 1.0;
-				while (duration * sample_rate / factor >= bc->opts.max_keyframe_segments) {
+				while (duration * sample_rate / factor >= (double)bc->opts.max_keyframe_segments) {
 					factor *= 2.0;
 				}
 
