@@ -27522,7 +27522,7 @@ ufbx_abi void ufbx_retain_baked_anim(ufbx_baked_anim *bake)
 	ufbxi_baked_anim_imp *imp = ufbxi_get_imp(ufbxi_baked_anim_imp, bake);
 	ufbx_assert(imp->magic == UFBXI_BAKED_ANIM_IMP_MAGIC);
 	if (imp->magic != UFBXI_BAKED_ANIM_IMP_MAGIC) return;
-	ufbxi_release_ref(&imp->refcount);
+	ufbxi_retain_ref(&imp->refcount);
 }
 
 ufbx_abi void ufbx_free_baked_anim(ufbx_baked_anim *bake)
@@ -27532,7 +27532,7 @@ ufbx_abi void ufbx_free_baked_anim(ufbx_baked_anim *bake)
 	ufbxi_baked_anim_imp *imp = ufbxi_get_imp(ufbxi_baked_anim_imp, bake);
 	ufbx_assert(imp->magic == UFBXI_BAKED_ANIM_IMP_MAGIC);
 	if (imp->magic != UFBXI_BAKED_ANIM_IMP_MAGIC) return;
-	ufbxi_retain_ref(&imp->refcount);
+	ufbxi_release_ref(&imp->refcount);
 }
 
 ufbx_abi ufbx_vec3 ufbx_evaluate_baked_vec3(ufbx_baked_vec3_list keyframes, double time)

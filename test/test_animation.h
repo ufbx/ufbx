@@ -1143,6 +1143,9 @@ UFBXT_FILE_TEST(maya_anim_diffuse_curve)
 
 	ufbxt_diff_baked_vec3(err, diffuse_ref, prop->keys);
 
+	ufbx_retain_baked_anim(bake);
+	ufbx_free_baked_anim(bake);
+
 	ufbx_free_baked_anim(bake);
 }
 #endif
