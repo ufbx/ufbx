@@ -727,7 +727,7 @@ struct ufbx_unknown {
 // This only affects the final scaling, as rotation and translation are always
 // inherited correctly.
 // NOTE: These don't map to `"InheritType"` property as there may be new ones for
-// compatability with various exporters.
+// compatibility with various exporters.
 typedef enum ufbx_inherit_mode UFBX_ENUM_REPR {
 
 	// Normal matrix composition of hierarchy: `R*S*r*s`.
@@ -4717,7 +4717,7 @@ typedef enum ufbx_transform_flags UFBX_FLAG_REPR {
 } ufbx_transform_flags;
 
 ufbx_abi ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *node, double time);
-ufbx_abi ufbx_transform ufbx_evaluate_transform_flags(const ufbx_anim *anim, const ufbx_node *node, double time, ufbx_transform_flags flags);
+ufbx_abi ufbx_transform ufbx_evaluate_transform_flags(const ufbx_anim *anim, const ufbx_node *node, double time, uint32_t flags);
 
 ufbx_abi ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time);
 

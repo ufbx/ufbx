@@ -443,7 +443,7 @@ ufbxt_noinline static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v
 	ufbxt_hash_pod(h, v->visible);
 	ufbxt_hash_pod(h, v->is_root);
 	ufbxt_hash_pod(h, v->has_geometry_transform);
-	ufbxt_hash_pod(h, v->has_root_adjust_trnsform);
+	ufbxt_hash_pod(h, v->has_root_adjust_transform);
 	ufbxt_hash_pod(h, v->has_adjust_transform);
 	ufbxt_hash_pod(h, v->is_geometry_transform_helper);
 	ufbxt_hash_pod(h, v->is_scale_helper);

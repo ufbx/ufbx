@@ -23483,7 +23483,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 
 	// TODO: Something better
 	qsort(times, num_times, sizeof(double), &ufbxi_cmp_double);
-	
+
 	// Deduplicate times
 	{
 		size_t dst = 0, src = 0;
@@ -23860,14 +23860,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node(ufbxi_bake_context *bc, uint32_t element_id, ufbxi_bake_prop *props, size_t count)
 {
-	ufbxi_bake_node_imp(bc, element_id, props, count);
+	ufbxi_check_err(&bc->error, ufbxi_bake_node_imp(bc, element_id, props, count));
 
 	// Baking a node may cause further nodes to be baked, so keep going
 	// until all dependencies are baked.
 	while (bc->tmp_bake_stack.num_items > 0) {
 		uint32_t child_id = 0;
 		ufbxi_pop(&bc->tmp_bake_stack, uint32_t, 1, &child_id);
-		ufbxi_bake_node_imp(bc, child_id, NULL, 0);
+		ufbxi_check_err(&bc->error, ufbxi_bake_node_imp(bc, child_id, NULL, 0));
 	}
 
 	return 1;
@@ -27352,7 +27352,7 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform(const ufbx_anim *
 	return ufbx_evaluate_transform_flags(anim, node, time, 0);
 }
 
-ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform_flags(const ufbx_anim *anim, const ufbx_node *node, double time, ufbx_transform_flags flags)
+ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform_flags(const ufbx_anim *anim, const ufbx_node *node, double time, uint32_t flags)
 {
 	ufbx_assert(anim);
 	ufbx_assert(node);
