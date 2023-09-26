@@ -1150,6 +1150,84 @@ UFBXT_FILE_TEST(maya_anim_diffuse_curve)
 }
 #endif
 
+UFBXT_FILE_TEST_ALT(anim_bake_alloc_fail, maya_anim_diffuse_curve)
+#if UFBXT_IMPL
+{
+	for (size_t max_temp = 1; max_temp < 10000; max_temp++) {
+		ufbx_bake_opts opts = { 0 };
+		opts.temp_allocator.huge_threshold = 1;
+		opts.temp_allocator.allocation_limit = max_temp;
+
+		ufbxt_hintf("Temp limit: %zu", max_temp);
+
+		ufbx_error error;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (bake) {
+			ufbxt_logf(".. Tested up to %zu temporary allocations", max_temp);
+			ufbx_free_baked_anim(bake);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+
+	for (size_t max_result = 1; max_result < 10000; max_result++) {
+		ufbx_bake_opts opts = { 0 };
+		opts.result_allocator.huge_threshold = 1;
+		opts.result_allocator.allocation_limit = max_result;
+
+		ufbxt_hintf("Result limit: %zu", max_result);
+
+		ufbx_error error;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (bake) {
+			ufbxt_logf(".. Tested up to %zu result allocations", max_result);
+			ufbx_free_baked_anim(bake);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(anim_bake_alloc_fail_alt, motionbuilder_sausage_rrss, ufbxt_scale_helper_opts, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	for (size_t max_temp = 1; max_temp < 10000; max_temp++) {
+		ufbx_bake_opts opts = { 0 };
+		opts.temp_allocator.huge_threshold = 1;
+		opts.temp_allocator.allocation_limit = max_temp;
+
+		ufbxt_hintf("Temp limit: %zu", max_temp);
+
+		ufbx_error error;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (bake) {
+			ufbxt_logf(".. Tested up to %zu temporary allocations", max_temp);
+			ufbx_free_baked_anim(bake);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+
+	for (size_t max_result = 1; max_result < 10000; max_result++) {
+		ufbx_bake_opts opts = { 0 };
+		opts.result_allocator.huge_threshold = 1;
+		opts.result_allocator.allocation_limit = max_result;
+
+		ufbxt_hintf("Result limit: %zu", max_result);
+
+		ufbx_error error;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (bake) {
+			ufbxt_logf(".. Tested up to %zu result allocations", max_result);
+			ufbx_free_baked_anim(bake);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+}
+#endif
+
 UFBXT_FILE_TEST(maya_anim_pivot_rotate)
 #if UFBXT_IMPL
 {
