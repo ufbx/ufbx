@@ -201,7 +201,7 @@
 	double ufbx_copysign(double x, double y);
 	double ufbx_nextafter(double x, double y);
 	double ufbx_ceil(double x);
-	double ufbx_isnan(double x);
+	int ufbx_isnan(double x);
 #endif
 
 #if !defined(UFBX_INFINITY)
