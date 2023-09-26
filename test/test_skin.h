@@ -574,6 +574,11 @@ UFBXT_FILE_TEST_OPTS_ALT(maya_mixed_inherit_mode_helper, maya_mixed_inherit_mode
 			ufbx_node *scene_node = scene->nodes.data[i];
 			ufbx_node *state_node = state->nodes.data[i];
 
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, scene_node, time);
+			ufbxt_assert_close_vec3(err, transform.translation, state_node->local_transform.translation);
+			ufbxt_assert_close_quat(err, transform.rotation, state_node->local_transform.rotation);
+			ufbxt_assert_close_vec3(err, transform.scale, state_node->local_transform.scale);
+
 			ufbx_matrix ref_matrix = state_node->node_to_world;
 			ufbx_matrix bake_matrix = ufbxt_evaluate_baked_matrix(bake, scene_node, time);
 
@@ -590,4 +595,54 @@ UFBXT_FILE_TEST_OPTS_ALT(maya_mixed_inherit_mode_helper, maya_mixed_inherit_mode
 }
 #endif
 
+UFBXT_FILE_TEST_FLAGS(motionbuilder_sausage_rrss, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss", NULL, 0.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_12", NULL, 12.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_24", NULL, 24.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_36", NULL, 36.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_48", NULL, 48.0/24.0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(motionbuilder_sausage_rrss_helper, motionbuilder_sausage_rrss, ufbxt_scale_helper_opts, UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss", NULL, 0.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_12", NULL, 12.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_24", NULL, 24.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_36", NULL, 36.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_48", NULL, 48.0/24.0);
+
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, NULL, NULL);
+	ufbxt_assert(bake);
+
+	for (int frame = 0; frame <= 48; frame += 12) {
+		double time = (double)frame / 24.0;
+		ufbx_scene *state = ufbx_evaluate_scene(scene, NULL, time, NULL, NULL);
+		ufbxt_assert(state);
+
+		for (size_t i = 0; i < scene->nodes.count; i++) {
+			ufbx_node *scene_node = scene->nodes.data[i];
+			ufbx_node *state_node = state->nodes.data[i];
+
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, scene_node, time);
+			ufbxt_assert_close_vec3(err, transform.translation, state_node->local_transform.translation);
+			ufbxt_assert_close_quat(err, transform.rotation, state_node->local_transform.rotation);
+			ufbxt_assert_close_vec3(err, transform.scale, state_node->local_transform.scale);
+
+			ufbx_matrix ref_matrix = state_node->node_to_world;
+			ufbx_matrix bake_matrix = ufbxt_evaluate_baked_matrix(bake, scene_node, time);
+
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[0], bake_matrix.cols[0]);
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[1], bake_matrix.cols[1]);
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[2], bake_matrix.cols[2]);
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[3], bake_matrix.cols[3]);
+		}
+
+		ufbx_free_scene(state);
+	}
+}
+#endif
 

@@ -736,15 +736,15 @@ typedef enum ufbx_inherit_mode UFBX_ENUM_REPR {
 
 	// Ignore parent scale when computing the transform: `R*r*s`.
 	//   ufbx_transform t = node.local_transform;
-	//   t.translation *= parent.local_transform.scale;
+	//   t.translation *= parent.inherit_scale;
 	//   child.node_to_world = parent.unscaled_node_to_world * t;
 	// Also known as "Segment scale compensate" in some software.
 	UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE,
 
 	// Apply parent scale component-wise: `R*r*S*s`.
 	//   ufbx_transform t = node.local_transform;
-	//   t.translation *= parent.local_transform.scale;
-	//   t.scale *= parent.local_transform.scale;
+	//   t.translation *= parent.inherit_scale;
+	//   t.scale *= parent.inherit_scale;
 	//   child.node_to_world = parent.unscaled_node_to_world * t;
 	UFBX_INHERIT_MODE_COMPONENTWISE_SCALE,
 
@@ -814,6 +814,10 @@ struct ufbx_node {
 	ufbx_inherit_mode original_inherit_mode;
 	ufbx_transform local_transform;
 	ufbx_transform geometry_transform;
+
+	// Combined scale when using `UFBX_INHERIT_MODE_COMPONENTWISE_SCALE`.
+	// Contains `local_transform.scale` otherwise.
+	ufbx_vec3 inherit_scale;
 
 	// Raw Euler angles in degrees for those who want them
 
@@ -4592,6 +4596,11 @@ typedef enum ufbx_transform_flags UFBX_FLAG_REPR {
 
 	// Ignore parent scale helper.
 	UFBX_TRANSFORM_FLAG_IGNORE_SCALE_HELPER = 0x1,
+
+	// Ignore componentwise scale.
+	// Note that if you don't specify this, ufbx will have to potentially
+	// evaluate the entire parent chain in the worst case.
+	UFBX_TRANSFORM_FLAG_IGNORE_COMPONENTWISE_SCALE = 0x2,
 
 	UFBX_FLAG_FORCE_WIDTH(UFBX_TRANSFORM_FLAGS)
 } ufbx_transform_flags;

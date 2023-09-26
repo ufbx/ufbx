@@ -941,4 +941,3 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_static_no_inherit_scale_compensate, maya_sta
 }
 #endif
 
-
