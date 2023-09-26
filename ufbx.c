@@ -13149,11 +13149,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 		ufbx_keyframe *key = &curve->keyframes.data[i];
 
 		if (i == 0) {
-			curve->min_value = next_value;
-			curve->max_value = next_value;
+			curve->min_value = (ufbx_real)next_value;
+			curve->max_value = (ufbx_real)next_value;
 		} else {
-			curve->min_value = ufbxi_min_real(curve->min_value, next_value);
-			curve->max_value = ufbxi_max_real(curve->max_value, next_value);
+			curve->min_value = ufbxi_min_real(curve->min_value, (ufbx_real)next_value);
+			curve->max_value = ufbxi_max_real(curve->max_value, (ufbx_real)next_value);
 		}
 
 		// First three values: Time, Value, InterpolationMode
@@ -15954,7 +15954,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 					if (ufbx_isnan(pre_value->constant_value.v[index])) {
 						pre_value->constant_value.v[index] = constant_value;
 					}
-					if (ufbx_fabs(pre_value->constant_value.v[index] - constant_value) > scale_epsilon) {
+					if ((ufbx_real)ufbx_fabs(pre_value->constant_value.v[index] - constant_value) > scale_epsilon) {
 						pre_value->has_constant_value = false;
 					}
 				}
@@ -15986,9 +15986,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 								pre_node->has_constant_scale = false;
 							} else {
 								ufbx_real error = 0.0f;
-								error += ufbx_fabs(pre_value->constant_value.x - pre_node->constant_scale.x);
-								error += ufbx_fabs(pre_value->constant_value.y - pre_node->constant_scale.y);
-								error += ufbx_fabs(pre_value->constant_value.z - pre_node->constant_scale.z);
+								error += (ufbx_real)ufbx_fabs(pre_value->constant_value.x - pre_node->constant_scale.x);
+								error += (ufbx_real)ufbx_fabs(pre_value->constant_value.y - pre_node->constant_scale.y);
+								error += (ufbx_real)ufbx_fabs(pre_value->constant_value.z - pre_node->constant_scale.z);
 								if (error >= scale_epsilon) {
 									pre_node->has_constant_scale = false;
 								}
@@ -16017,10 +16017,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 				ufbx_real ref = uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_COMPENSATE
 					? pre_node->constant_scale.x : (ufbx_real)1.0f;
 				ufbx_vec3 scale = pre_node->constant_scale;
-				ufbx_real dx = ufbx_fabs(scale.x - ref);
-				ufbx_real dy = ufbx_fabs(scale.y - ref);
-				ufbx_real dz = ufbx_fabs(scale.z - ref);
-				if (dx + dy + dz >= scale_epsilon || !pre_node->has_constant_scale || ufbx_fabs(scale.x) <= compensate_epsilon) {
+				ufbx_real dx = (ufbx_real)ufbx_fabs(scale.x - ref);
+				ufbx_real dy = (ufbx_real)ufbx_fabs(scale.y - ref);
+				ufbx_real dz = (ufbx_real)ufbx_fabs(scale.z - ref);
+				if (dx + dy + dz >= scale_epsilon || !pre_node->has_constant_scale || (ufbx_real)ufbx_fabs(scale.x) <= compensate_epsilon) {
 					ufbxi_check(ufbxi_setup_scale_helper(uc, node, fbx_id));
 
 					// If we added a geometry transform helper, we need to do it
@@ -16059,7 +16059,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 					}
 
 				} else if (uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_COMPENSATE) {
-					if (ufbx_fabs(scale.x - 1.0f) >= scale_epsilon) {
+					if ((ufbx_real)ufbx_fabs(scale.x - 1.0f) >= scale_epsilon) {
 						node->is_scale_compensate_parent = true;
 					}
 				}
