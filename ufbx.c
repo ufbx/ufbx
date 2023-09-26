@@ -19965,7 +19965,6 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 				node->local_transform.scale.z *= inherit_scale.z;
 			}
 		}
-		node->inherit_scale = node->local_transform.scale;
 		node->geometry_transform = ufbxi_get_geometry_transform(&node->props);
 	} else {
 		node->geometry_transform = ufbx_identity_transform;
@@ -19973,6 +19972,7 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node)
 
 	ufbx_matrix unscaled_node_to_parent = ufbxi_unscaled_transform_to_matrix(&node->local_transform);
 	node->node_to_parent = ufbx_transform_to_matrix(&node->local_transform);
+	node->inherit_scale = node->local_transform.scale;
 
 	ufbx_node *parent = node->parent;
 	if (parent) {
