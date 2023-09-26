@@ -643,6 +643,8 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(motionbuilder_sausage_rrss_helper, motionbuilder_
 
 		ufbx_free_scene(state);
 	}
+
+	ufbx_free_baked_anim(bake);
 }
 #endif
 
