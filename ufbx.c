@@ -20644,7 +20644,7 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 				node->has_adjust_transform = true;
 				node->has_root_adjust_transform = true;
 			}
-			if (parent->is_scale_compensate_parent) {
+			if (parent->is_scale_compensate_parent && node->original_inherit_mode == UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE) {
 				ufbx_vec3 scale = ufbxi_find_vec3(&parent->props, ufbxi_Lcl_Scaling, 1.0f, 1.0f, 1.0f);
 				node->adjust_post_scale *= 1.0f / scale.x;
 				node->has_adjust_transform = true;
@@ -23333,6 +23333,7 @@ typedef struct {
 	ufbxi_buf tmp_nodes;
 	ufbxi_buf tmp_elements;
 	ufbxi_buf tmp_props;
+	ufbxi_buf tmp_bake_stack;
 
 	ufbxi_double_list layer_weight_times;
 
@@ -23630,7 +23631,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_reduce_quat(ufbxi_bake_cont
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node(ufbxi_bake_context *bc, uint32_t element_id, ufbxi_bake_prop *props, size_t count)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context *bc, uint32_t element_id, ufbxi_bake_prop *props, size_t count)
 {
 	ufbx_assert(bc->baked_nodes && bc->nodes_to_bake);
 
@@ -23670,6 +23671,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node(ufbxi_bake_context *bc
 	// Account for the _resampled_ scale helper scale animation to keep the
 	// translation scale consistent with the parent scaling.
 	ufbx_baked_node *scale_helper_t = NULL;
+	ufbx_vec3 constant_scale_t = { 1.0f, 1.0f, 1.0f };
 	if (!node->is_scale_helper && node->parent && node->parent->scale_helper) {
 		scale_helper_t = bc->baked_nodes[node->parent->scale_helper->typed_id];
 		if (scale_helper_t) {
@@ -23683,6 +23685,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node(ufbxi_bake_context *bc
 			for (size_t i = 0; i < scale_keys.count; i++) {
 				times[i] = scale_keys.data[i].time;
 			}
+		} else {
+			constant_scale_t = node->parent->scale_helper->inherit_scale;
 		}
 	}
 
@@ -23726,6 +23730,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node(ufbxi_bake_context *bc
 
 	// Account for the resampled scale
 	ufbx_baked_node *scale_helper_s = NULL;
+	ufbx_vec3 constant_scale_s = { 1.0f, 1.0f, 1.0f };
 	if (node->is_scale_helper && node->parent && node->parent->original_inherit_mode == UFBX_INHERIT_MODE_COMPONENTWISE_SCALE
 			&& node->parent->parent && node->parent->parent->scale_helper) {
 		scale_helper_s = bc->baked_nodes[node->parent->parent->scale_helper->typed_id];
@@ -23740,6 +23745,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node(ufbxi_bake_context *bc
 			for (size_t i = 0; i < scale_keys.count; i++) {
 				times[i] = scale_keys.data[i].time;
 			}
+		} else {
+			constant_scale_s = node->parent->parent->scale_helper->inherit_scale;
 		}
 	}
 
@@ -23784,6 +23791,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node(ufbxi_bake_context *bc
 				transform.translation.z *= scale.z;
 			}
 
+			transform.translation.x *= constant_scale_t.x;
+			transform.translation.y *= constant_scale_t.y;
+			transform.translation.z *= constant_scale_t.z;
+
 			keys_t.data[ix_t].time = time;
 			keys_t.data[ix_t].value = transform.translation;
 			ix_t++;
@@ -23800,6 +23811,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node(ufbxi_bake_context *bc
 				transform.scale.y *= scale.y;
 				transform.scale.z *= scale.z;
 			}
+
+			transform.scale.x *= constant_scale_s.x;
+			transform.scale.y *= constant_scale_s.y;
+			transform.scale.z *= constant_scale_s.z;
 
 			keys_s.data[ix_s].time = time;
 			keys_s.data[ix_s].value = transform.scale;
@@ -23829,15 +23844,30 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node(ufbxi_bake_context *bc
 			if (child == node) continue;
 			if (!bc->nodes_to_bake[child->typed_id]) {
 				bc->nodes_to_bake[child->typed_id] = true;
-				ufbxi_check_err(&bc->error, ufbxi_bake_node(bc, child->element_id, NULL, 0));
+				ufbxi_check_err(&bc->error, ufbxi_push_copy(&bc->tmp_bake_stack, uint32_t, 1, &child->element_id));
 			}
 			if (child->original_inherit_mode == UFBX_INHERIT_MODE_COMPONENTWISE_SCALE && child->scale_helper) {
 				if (!bc->nodes_to_bake[child->scale_helper->typed_id]) {
 					bc->nodes_to_bake[child->scale_helper->typed_id] = true;
-					ufbxi_check_err(&bc->error, ufbxi_bake_node(bc, child->scale_helper->element_id, NULL, 0));
+					ufbxi_check_err(&bc->error, ufbxi_push_copy(&bc->tmp_bake_stack, uint32_t, 1, &child->scale_helper->element_id));
 				}
 			}
 		}
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node(ufbxi_bake_context *bc, uint32_t element_id, ufbxi_bake_prop *props, size_t count)
+{
+	ufbxi_bake_node_imp(bc, element_id, props, count);
+
+	// Baking a node may cause further nodes to be baked, so keep going
+	// until all dependencies are baked.
+	while (bc->tmp_bake_stack.num_items > 0) {
+		uint32_t child_id = 0;
+		ufbxi_pop(&bc->tmp_bake_stack, uint32_t, 1, &child_id);
+		ufbxi_bake_node_imp(bc, child_id, NULL, 0);
 	}
 
 	return 1;
@@ -24045,6 +24075,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim_imp(ufbxi_bake_context
 	bc->tmp_nodes.ator = &bc->ator_tmp;
 	bc->tmp_elements.ator = &bc->ator_tmp;
 	bc->tmp_props.ator = &bc->ator_tmp;
+	bc->tmp_bake_stack.ator = &bc->ator_tmp;
 
 	bc->anim = anim;
 	bc->time_begin = anim->time_begin;
@@ -27485,6 +27516,7 @@ ufbx_abi ufbx_baked_anim *ufbx_bake_anim(const ufbx_scene *scene, const ufbx_ani
 	ufbxi_buf_free(&bc.tmp_nodes);
 	ufbxi_buf_free(&bc.tmp_elements);
 	ufbxi_buf_free(&bc.tmp_props);
+	ufbxi_buf_free(&bc.tmp_bake_stack);
 	ufbxi_free_ator(&bc.ator_tmp);
 
 	if (ok) {
