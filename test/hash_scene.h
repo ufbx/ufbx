@@ -430,7 +430,6 @@ ufbxt_noinline static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v
 	ufbxt_hash_vec3(h, v->inherit_scale);
 	ufbxt_hash_pod(h, v->rotation_order);
 	ufbxt_hash_vec3(h, v->euler_rotation);
-	ufbxt_hash_transform(h, v->world_transform);
 	ufbxt_hash_matrix(h, v->node_to_parent);
 	ufbxt_hash_matrix(h, v->node_to_world);
 	ufbxt_hash_matrix(h, v->geometry_to_node);
