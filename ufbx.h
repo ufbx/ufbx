@@ -2842,6 +2842,13 @@ typedef struct ufbx_prop_override {
 
 UFBX_LIST_TYPE(ufbx_prop_override_list, ufbx_prop_override);
 
+typedef struct ufbx_transform_override {
+	uint32_t node_id;
+	ufbx_transform transform;
+} ufbx_transform_override;
+
+UFBX_LIST_TYPE(ufbx_transform_override_list, ufbx_transform_override);
+
 // Animation descriptor used for evaluating animation.
 // Usually obtained from `ufbx_scene` via either global animation `ufbx_scene.anim`,
 // per-stack animation `ufbx_anim_stack.anim` or per-layer animation `ufbx_anim_layer.anim`.
@@ -2861,7 +2868,10 @@ typedef struct ufbx_anim {
 	ufbx_real_list override_layer_weights;
 
 	// Sorted by `element_id, prop_name`
-	ufbx_prop_override_list overrides;
+	ufbx_prop_override_list prop_overrides;
+
+	// Sorted by `node_id`
+	ufbx_transform_override_list transform_overrides;
 
 	// Evaluate connected properties as if they would not be connected.
 	bool ignore_connections;
@@ -4313,6 +4323,8 @@ typedef struct ufbx_prop_override_desc {
 
 UFBX_LIST_TYPE(ufbx_const_prop_override_desc_list, const ufbx_prop_override_desc);
 
+UFBX_LIST_TYPE(ufbx_const_transform_override_list, const ufbx_transform_override);
+
 typedef struct ufbx_anim_opts {
 	uint32_t _begin_zero;
 
@@ -4323,7 +4335,10 @@ typedef struct ufbx_anim_opts {
 	ufbx_const_real_list override_layer_weights;
 
 	// Property overrides
-	ufbx_const_prop_override_desc_list overrides;
+	ufbx_const_prop_override_desc_list prop_overrides;
+
+	// Transform overrides
+	ufbx_const_transform_override_list transform_overrides;
 
 	// Ignore connected properties
 	bool ignore_connections;

@@ -233,6 +233,11 @@ UFBXT_FILE_TEST(maya_anim_light)
 			{ element_id, { "IntProp", SIZE_MAX }, { 0, 0, 0 }, { "", SIZE_MAX }, 15 },
 		};
 
+		uint32_t node_id = node->typed_id;
+		ufbx_transform_override transform_overrides[] = {
+			{ node_id, { { 1.0f, 2.0f, 3.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, { 4.0f, 5.0f, 6.0f } } },
+		};
+
 		uint32_t layers[32];
 		size_t num_layers = scene->anim->layers.count;
 		for (size_t i = 0; i < num_layers; i++) {
@@ -242,8 +247,10 @@ UFBXT_FILE_TEST(maya_anim_light)
 		ufbx_anim_opts opts = { 0 };
 		opts.layer_ids.data = layers;
 		opts.layer_ids.count = num_layers;
-		opts.overrides.data = overrides;
-		opts.overrides.count = ufbxt_arraycount(overrides);
+		opts.prop_overrides.data = overrides;
+		opts.prop_overrides.count = ufbxt_arraycount(overrides);
+		opts.transform_overrides.data = transform_overrides;
+		opts.transform_overrides.count = ufbxt_arraycount(transform_overrides);
 
 		ufbx_error error;
 		ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
@@ -261,6 +268,11 @@ UFBXT_FILE_TEST(maya_anim_light)
 
 		ufbx_node *light_node = ufbx_find_node(state, "pointLight1");
 		ufbxt_assert(light_node);
+
+		ufbxt_assert_close_vec3(err, light_node->local_transform.translation, transform_overrides[0].transform.translation);
+		ufbxt_assert_close_quat(err, light_node->local_transform.rotation, transform_overrides[0].transform.rotation);
+		ufbxt_assert_close_vec3(err, light_node->local_transform.scale, transform_overrides[0].transform.scale);
+
 		ufbx_light *light = light_node->light;
 		ufbxt_assert(light);
 
@@ -425,8 +437,8 @@ UFBXT_FILE_TEST(maya_transform_animation)
 		ufbx_anim_opts opts = { 0 };
 		opts.layer_ids.data = layers;
 		opts.layer_ids.count = num_layers;
-		opts.overrides.data = overrides;
-		opts.overrides.count = ufbxt_arraycount(overrides);
+		opts.prop_overrides.data = overrides;
+		opts.prop_overrides.count = ufbxt_arraycount(overrides);
 
 		ufbx_error error;
 		ufbx_anim *anim = ufbx_create_anim(scene, &opts, NULL);
@@ -769,8 +781,8 @@ UFBXT_FILE_TEST_ALT(anim_override_utf8, blender_279_default)
 			}
 
 			ufbx_anim_opts opts = { 0 };
-			opts.overrides.data = &over;
-			opts.overrides.count = 1;
+			opts.prop_overrides.data = &over;
+			opts.prop_overrides.count = 1;
 
 			ufbx_error error;
 			ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
@@ -798,8 +810,8 @@ UFBXT_FILE_TEST_ALT(anim_override_utf8, blender_279_default)
 			}
 
 			ufbx_anim_opts opts = { 0 };
-			opts.overrides.data = &over;
-			opts.overrides.count = 1;
+			opts.prop_overrides.data = &over;
+			opts.prop_overrides.count = 1;
 
 			ufbx_error error;
 			ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
@@ -882,8 +894,8 @@ UFBXT_FILE_TEST_ALT(anim_multi_override, blender_293_instancing)
 	}
 
 	ufbx_anim_opts opts = { 0 };
-	opts.overrides.data = overrides;
-	opts.overrides.count = ufbxt_arraycount(overrides);
+	opts.prop_overrides.data = overrides;
+	opts.prop_overrides.count = ufbxt_arraycount(overrides);
 
 	ufbx_error error;
 	ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
@@ -931,8 +943,8 @@ UFBXT_FILE_TEST_ALT(anim_override_duplicate, blender_293_instancing)
 	};
 
 	ufbx_anim_opts opts = { 0 };
-	opts.overrides.data = overrides;
-	opts.overrides.count = ufbxt_arraycount(overrides);
+	opts.prop_overrides.data = overrides;
+	opts.prop_overrides.count = ufbxt_arraycount(overrides);
 
 	ufbx_error error;
 	ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
@@ -1009,8 +1021,8 @@ UFBXT_FILE_TEST_ALT(anim_override_int64, maya_cube_7500_binary)
 	overrides[1].value_int = INT64_C(0x5000000000000001);
 
 	ufbx_anim_opts opts = { 0 };
-	opts.overrides.data = overrides;
-	opts.overrides.count = ufbxt_arraycount(overrides);
+	opts.prop_overrides.data = overrides;
+	opts.prop_overrides.count = ufbxt_arraycount(overrides);
 
 	ufbx_anim *anim = ufbx_create_anim(scene, &opts, NULL);
 	ufbxt_assert(anim);

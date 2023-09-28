@@ -975,13 +975,14 @@ static void ufbxt_check_anim(ufbx_scene *scene, ufbx_anim *anim)
 	for (size_t i = 0; i < anim->layers.count; i++) {
 		ufbxt_check_element_ptr(scene, anim->layers.data[i], UFBX_ELEMENT_ANIM_LAYER);
 	}
-	for (size_t i = 0; i < anim->overrides.count; i++) {
-		ufbx_prop_override *over = &anim->overrides.data[i];
+	for (size_t i = 0; i < anim->prop_overrides.count; i++) {
+		ufbx_prop_override *over = &anim->prop_overrides.data[i];
 		ufbxt_check_string(over->prop_name);
 		ufbxt_check_string(over->value_str);
 	}
 	if (!anim->custom) {
-		ufbxt_assert(anim->overrides.count == 0);
+		ufbxt_assert(anim->prop_overrides.count == 0);
+		ufbxt_assert(anim->transform_overrides.count == 0);
 		ufbxt_assert(anim->override_layer_weights.count == 0);
 	}
 }
