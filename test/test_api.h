@@ -132,3 +132,21 @@ UFBXT_TEST(obj_open_memory_ref)
 	ufbxt_do_open_memory_test("blender_279_ball", 1, 2, ufbxt_open_file_memory_ref);
 }
 #endif
+
+UFBXT_TEST(retain_free_null)
+#if UFBXT_IMPL
+{
+	ufbx_retain_scene(NULL);
+	ufbx_free_scene(NULL);
+	ufbx_retain_mesh(NULL);
+	ufbx_free_mesh(NULL);
+	ufbx_retain_line_curve(NULL);
+	ufbx_free_line_curve(NULL);
+	ufbx_retain_geometry_cache(NULL);
+	ufbx_free_geometry_cache(NULL);
+	ufbx_retain_anim(NULL);
+	ufbx_free_anim(NULL);
+	ufbx_retain_baked_anim(NULL);
+	ufbx_free_baked_anim(NULL);
+}
+#endif
