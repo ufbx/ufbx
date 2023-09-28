@@ -22836,6 +22836,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 		node->mesh = (ufbx_mesh*)ufbxi_translate_element(ec, node->mesh);
 		node->light = (ufbx_light*)ufbxi_translate_element(ec, node->light);
 		node->camera = (ufbx_camera*)ufbxi_translate_element(ec, node->camera);
+		node->inherit_scale_node = (ufbx_node*)ufbxi_translate_element(ec, node->inherit_scale_node);
 		node->scale_helper = (ufbx_node*)ufbxi_translate_element(ec, node->scale_helper);
 
 		if (node->all_attribs.count > 1) {
@@ -23735,9 +23736,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 	// Account for the resampled scale
 	ufbx_baked_node *scale_helper_s = NULL;
 	ufbx_vec3 constant_scale_s = { 1.0f, 1.0f, 1.0f };
-	if (node->is_scale_helper && node->parent && node->parent->original_inherit_mode == UFBX_INHERIT_MODE_COMPONENTWISE_SCALE
-			&& node->parent->parent && node->parent->parent->scale_helper) {
-		scale_helper_s = bc->baked_nodes[node->parent->parent->scale_helper->typed_id];
+	if (node->is_scale_helper && node->parent && node->parent->inherit_scale_node && node->parent->inherit_scale_node->scale_helper) {
+		ufbx_node *inherit_helper = node->parent->inherit_scale_node->scale_helper;
+		scale_helper_s = bc->baked_nodes[inherit_helper->typed_id];
 		if (scale_helper_s) {
 			if (!scale_helper_s->constant_scale) {
 				resample_scale = true;
@@ -23750,7 +23751,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 				times[i] = scale_keys.data[i].time;
 			}
 		} else {
-			constant_scale_s = node->parent->parent->scale_helper->inherit_scale;
+			constant_scale_s = inherit_helper->local_transform.scale;
 		}
 	}
 
@@ -23850,7 +23851,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 				bc->nodes_to_bake[child->typed_id] = true;
 				ufbxi_check_err(&bc->error, ufbxi_push_copy(&bc->tmp_bake_stack, uint32_t, 1, &child->element_id));
 			}
-			if (child->original_inherit_mode == UFBX_INHERIT_MODE_COMPONENTWISE_SCALE && child->scale_helper) {
+			if (child->inherit_scale_node && child->inherit_scale_node->scale_helper && child->scale_helper
+					&& bc->nodes_to_bake[child->inherit_scale_node->scale_helper->typed_id]) {
+				ufbx_assert(bc->baked_nodes[child->inherit_scale_node->scale_helper->typed_id]);
 				if (!bc->nodes_to_bake[child->scale_helper->typed_id]) {
 					bc->nodes_to_bake[child->scale_helper->typed_id] = true;
 					ufbxi_check_err(&bc->error, ufbxi_push_copy(&bc->tmp_bake_stack, uint32_t, 1, &child->scale_helper->element_id));

@@ -824,7 +824,7 @@ struct ufbx_node {
 	// and even for `UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE`.
 	// For componentwise-scale nodes, this will point to `parent`, for scale ignoring
 	// nodes this will point to the parent of the nearest componentwise-scaled node
-	// in the parent chain
+	// in the parent chain.
 	ufbx_nullable ufbx_node *inherit_scale_node;
 
 	// Raw Euler angles in degrees for those who want them

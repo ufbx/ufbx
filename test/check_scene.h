@@ -326,7 +326,9 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	ufbxt_check_element_ptr(scene, node->mesh, UFBX_ELEMENT_MESH);
 	ufbxt_check_element_ptr(scene, node->light, UFBX_ELEMENT_LIGHT);
 	ufbxt_check_element_ptr(scene, node->camera, UFBX_ELEMENT_CAMERA);
+	ufbxt_check_element_ptr(scene, node->inherit_scale_node, UFBX_ELEMENT_NODE);
 	ufbxt_check_element_ptr(scene, node->scale_helper, UFBX_ELEMENT_NODE);
+	ufbxt_check_element_ptr(scene, node->geometry_transform_helper, UFBX_ELEMENT_NODE);
 
 	switch (node->attrib_type) {
 	case UFBX_ELEMENT_MESH: ufbxt_assert(node->mesh); break;
@@ -347,7 +349,6 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 		ufbxt_assert(!node->has_geometry_transform);
 	}
 
-	ufbxt_check_element_ptr(scene, node->geometry_transform_helper, UFBX_ELEMENT_NODE);
 	if (node->geometry_transform_helper) {
 		ufbxt_assert(node->geometry_transform_helper->is_geometry_transform_helper);
 
