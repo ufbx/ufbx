@@ -606,7 +606,7 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_sausage_rrss, UFBXT_FILE_TEST_FLAG_ALLOW_INV
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(motionbuilder_sausage_rrss_helper, motionbuilder_sausage_rrss, ufbxt_scale_helper_opts, UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(motionbuilder_sausage_rrss_helper, motionbuilder_sausage_rrss, ufbxt_scale_helper_opts, UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
 	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss", NULL, 0.0/24.0);

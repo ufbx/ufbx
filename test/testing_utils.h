@@ -1367,6 +1367,9 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		}
 
 		ufbxt_assert(node);
+		if (node->scale_helper) {
+			node = node->scale_helper;
+		}
 		if (node->geometry_transform_helper) {
 			node = node->geometry_transform_helper;
 		}
