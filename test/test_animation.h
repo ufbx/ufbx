@@ -374,6 +374,57 @@ UFBXT_FILE_TEST(maya_anim_light)
 }
 #endif
 
+UFBXT_FILE_TEST_ALT(create_anim_alloc_fail, maya_anim_light_7500_binary)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pointLight1");
+	ufbxt_assert(node && node->light);
+	uint32_t element_id = node->light->element.element_id;
+
+	ufbx_prop_override_desc overrides[] = {
+		{ element_id, { "Intensity", SIZE_MAX }, { (ufbx_real)10.0 } },
+		{ element_id, { "Color", SIZE_MAX }, { (ufbx_real)0.3, (ufbx_real)0.6, (ufbx_real)0.9 } },
+		{ element_id, { "|NewProp", SIZE_MAX }, { 10, 20, 30 }, { "Test", SIZE_MAX } },
+		{ element_id, { "IntProp", SIZE_MAX }, { 0, 0, 0 }, { "", SIZE_MAX }, 15 },
+	};
+
+	uint32_t node_id = node->typed_id;
+	ufbx_transform_override transform_overrides[] = {
+		{ node_id, { { 1.0f, 2.0f, 3.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, { 4.0f, 5.0f, 6.0f } } },
+	};
+
+	uint32_t layers[32];
+	size_t num_layers = scene->anim->layers.count;
+	for (size_t i = 0; i < num_layers; i++) {
+		layers[i] = scene->anim->layers.data[i]->typed_id;
+	}
+
+	ufbx_anim_opts opts = { 0 };
+	opts.layer_ids.data = layers;
+	opts.layer_ids.count = num_layers;
+	opts.prop_overrides.data = overrides;
+	opts.prop_overrides.count = ufbxt_arraycount(overrides);
+	opts.transform_overrides.data = transform_overrides;
+	opts.transform_overrides.count = ufbxt_arraycount(transform_overrides);
+
+	for (size_t max_result = 1; max_result < 10000; max_result++) {
+		opts.result_allocator.huge_threshold = 1;
+		opts.result_allocator.allocation_limit = max_result;
+
+		ufbxt_hintf("Result limit: %zu", max_result);
+
+		ufbx_error error;
+		ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
+		if (anim) {
+			ufbxt_logf(".. Tested up to %zu result allocations", max_result);
+			ufbx_free_anim(anim);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+}
+#endif
+
 UFBXT_FILE_TEST(maya_transform_animation)
 #if UFBXT_IMPL
 {
