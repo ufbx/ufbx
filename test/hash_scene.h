@@ -1028,13 +1028,20 @@ ufbxt_noinline static void ufbxt_hash_prop_override_imp(ufbxt_hash *h, const ufb
 	ufbxt_hash_pod(h, v->value_int);
 }
 
+ufbxt_noinline static void ufbxt_hash_transform_override_imp(ufbxt_hash *h, const ufbx_transform_override *v)
+{
+	ufbxt_hash_pod(h, v->node_id);
+	ufbxt_hash_transform(h, v->transform);
+}
+
 ufbxt_noinline static void ufbxt_hash_anim_imp(ufbxt_hash *h, const ufbx_anim *v)
 {
 	ufbxt_hash_double(h, v->time_begin);
 	ufbxt_hash_double(h, v->time_end);
 	ufbxt_hash_list(h, v->layers, ufbxt_hash_element_ref_imp);
 	ufbxt_hash_list(h, v->override_layer_weights, ufbxt_hash_pod_imp);
-	ufbxt_hash_list_ptr(h, v->overrides, ufbxt_hash_prop_override_imp);
+	ufbxt_hash_list_ptr(h, v->prop_overrides, ufbxt_hash_prop_override_imp);
+	ufbxt_hash_list_ptr(h, v->transform_overrides, ufbxt_hash_transform_override_imp);
 	ufbxt_hash_pod(h, v->ignore_connections);
 	ufbxt_hash_pod(h, v->custom);
 }
