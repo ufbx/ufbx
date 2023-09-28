@@ -950,5 +950,12 @@ UFBXT_FILE_TEST(synthetic_geometry_transform_inherit_mode)
 UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_geometry_transform_inherit_mode_scale_helper, synthetic_geometry_transform_inherit_mode, ufbxt_scale_helper_opts, UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
+	for (size_t i = 0; i < scene->nodes.count; i++) {
+		ufbx_node *node = scene->nodes.data[i];
+		ufbx_transform transform = ufbx_evaluate_transform(scene->anim, node, 0.0);
+		ufbxt_assert_close_vec3(err, node->local_transform.translation, transform.translation);
+		ufbxt_assert_close_quat(err, node->local_transform.rotation, transform.rotation);
+		ufbxt_assert_close_vec3(err, node->local_transform.scale, transform.scale);
+	}
 }
 #endif

@@ -27388,24 +27388,29 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform_flags(const ufbx_
 	if (node->parent) {
 		ufbx_node *parent = node->parent;
 
-		if ((flags & UFBX_TRANSFORM_FLAG_IGNORE_COMPONENTWISE_SCALE) == 0 && parent->original_inherit_mode == UFBX_INHERIT_MODE_COMPONENTWISE_SCALE && parent->parent) {
-			ufbx_node *p = parent->parent;
+		if ((flags & UFBX_TRANSFORM_FLAG_IGNORE_COMPONENTWISE_SCALE) == 0 && parent->inherit_scale_node) {
+			ufbx_node *p = parent->inherit_scale_node;
 
 			if (node->is_scale_helper) {
 				use_scale_factor = true;
 			}
 
-			while (p && p->original_inherit_mode == UFBX_INHERIT_MODE_COMPONENTWISE_SCALE && p->scale_helper) {
+			while (p && p->scale_helper) {
 				ufbx_prop scale = ufbx_evaluate_prop(anim, &p->scale_helper->element, ufbxi_Lcl_Scaling, time);
 				scale_factor.x *= scale.value_vec3.x;
 				scale_factor.y *= scale.value_vec3.y;
 				scale_factor.z *= scale.value_vec3.z;
-				p = p->parent;
+				p = p->inherit_scale_node;
 			}
 		}
 
 		if (parent->scale_helper && (flags & UFBX_TRANSFORM_FLAG_IGNORE_SCALE_HELPER) == 0) {
-			helper_scale = ufbx_evaluate_prop(anim, &node->parent->scale_helper->element, ufbxi_Lcl_Scaling, time);
+			helper_scale = ufbx_evaluate_prop(anim, &parent->scale_helper->element, ufbxi_Lcl_Scaling, time);
+			if (helper_scale.flags & UFBX_PROP_FLAG_NOT_FOUND) {
+				helper_scale.value_vec3.x = 1.0f;
+				helper_scale.value_vec3.y = 1.0f;
+				helper_scale.value_vec3.z = 1.0f;
+			}
 			helper_scale.value_vec3.x *= scale_factor.x;
 			helper_scale.value_vec3.y *= scale_factor.y;
 			helper_scale.value_vec3.z *= scale_factor.z;
