@@ -4011,10 +4011,12 @@ typedef enum ufbx_inherit_mode_handling UFBX_ENUM_REPR {
 
 	UFBX_INHERIT_MODE_HANDLING_COMPENSATE,
 
+	UFBX_INHERIT_MODE_HANDLING_IGNORE,
+
 	UFBX_ENUM_FORCE_WIDTH(UFBX_INHERIT_MODE_HANDLING)
 } ufbx_inherit_mode_handling;
 
-UFBX_ENUM_TYPE(ufbx_inherit_mode_handling, UFBX_INHERIT_MODE_HANDLING, UFBX_INHERIT_MODE_HANDLING_COMPENSATE);
+UFBX_ENUM_TYPE(ufbx_inherit_mode_handling, UFBX_INHERIT_MODE_HANDLING, UFBX_INHERIT_MODE_HANDLING_IGNORE);
 
 // Specify how unit / coordinate system conversion should be performed.
 // Affects how `ufbx_load_opts.target_axes` and `ufbx_load_opts.target_unit_meters` work,

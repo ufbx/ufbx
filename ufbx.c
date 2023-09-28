@@ -10903,6 +10903,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_model(ufbxi_context *uc, uf
 
 	if (uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_PRESERVE) {
 		elem_node->inherit_mode = elem_node->original_inherit_mode;
+	} else if (uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_IGNORE) {
+		elem_node->original_inherit_mode = UFBX_INHERIT_MODE_NORMAL;
+		elem_node->inherit_mode = UFBX_INHERIT_MODE_NORMAL;
 	}
 
 	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES) {
@@ -15817,7 +15820,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 {
 	bool required = false;
 	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) required = true;
-	if (uc->opts.inherit_mode_handling != UFBX_INHERIT_MODE_HANDLING_PRESERVE) required = true;
+	if (uc->opts.inherit_mode_handling != UFBX_INHERIT_MODE_HANDLING_PRESERVE && uc->opts.inherit_mode_handling != UFBX_INHERIT_MODE_HANDLING_IGNORE) required = true;
 #if defined(UFBX_REGRESSION)
 	required = true;
 #endif
