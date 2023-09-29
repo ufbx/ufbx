@@ -16403,11 +16403,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_connections_to_elements(ufbx
 						ufbx_prop_type type = UFBX_PROP_UNKNOWN;
 						if (name.data == ufbxi_Lcl_Translation) type = UFBX_PROP_TRANSLATION;
 						else if (name.data == ufbxi_Lcl_Rotation) type = UFBX_PROP_ROTATION;
-						else if (name.data == ufbxi_Lcl_Scaling) type = UFBX_PROP_SCALING;
+						else if (name.data == ufbxi_Lcl_Scaling) {
+							type = UFBX_PROP_SCALING;
+							anim_def_prop.value_vec3.x = 1.0f;
+							anim_def_prop.value_vec3.y = 1.0f;
+							anim_def_prop.value_vec3.z = 1.0f;
+						}
 						anim_def_prop.type = type;
-						anim_def_prop.value_vec3 = anim_value->default_value;
-						anim_def_prop.value_int = ufbxi_f64_to_i64(anim_value->default_value.x);
-						anim_def_prop.value_real_arr[3] = 0.0f;
 						def_prop = &anim_def_prop;
 					} else {
 						flags |= UFBX_PROP_FLAG_NO_VALUE;
