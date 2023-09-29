@@ -1534,3 +1534,73 @@ UFBXT_FILE_TEST_OPTS_ALT(maya_anim_no_inherit_scale_helper, maya_anim_no_inherit
 	ufbx_free_baked_anim(bake);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_anim_layer_anim)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.resample_rate = 24.0;
+
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, NULL);
+	ufbxt_assert(bake);
+
+	ufbxt_assert(bake->nodes.count == 1);
+
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_assert(!strcmp(scene->nodes.data[node->typed_id]->name.data, "pCube1"));
+
+	static const ufbxt_ref_transform ref[] = {
+		{ { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.305556f, 0.0f }, { 3.75f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.555556f, 0.0f }, { 7.5f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.75f, 0.0f }, { 11.25f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.888889f, 0.0f }, { 15.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.972222f, 0.0f }, { 18.75f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -1.0f, 0.0f }, { 22.5f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.972222f, 0.0f }, { 26.25f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.888889f, 0.0f }, { 30.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.75f, 0.0f }, { 33.75f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.555556f, 0.0f }, { 37.5f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.305556f, 0.0f }, { 41.25f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, 0.0f, 0.0f }, { 45.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.333333f, 0.0f }, { 41.25f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.666667f, 0.0f }, { 37.5f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -1.0f, 0.0f }, { 33.75f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -1.333333f, 0.0f }, { 30.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -1.666667f, 0.0f }, { 26.25f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -2.0f, 0.0f }, { 22.5f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -2.333333f, 0.0f }, { 18.75f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -2.666667f, 0.0f }, { 15.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -3.0f, 0.0f }, { 11.25f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -3.333333f, 0.0f }, { 7.5f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -3.666667f, 0.0f }, { 3.75f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -4.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+	};
+
+	size_t num_keys = ufbxt_arraycount(ref);
+	ufbxt_assert(node->translation_keys.count == num_keys);
+	ufbxt_assert(node->rotation_keys.count == num_keys);
+	ufbxt_assert(node->scale_keys.count == num_keys);
+
+	for (size_t i = 0; i < num_keys; i++) {
+		double time = (double)i / 24.0;
+
+		// Times are exact
+		ufbxt_assert(node->translation_keys.data[i].time == time);
+		ufbxt_assert(node->rotation_keys.data[i].time == time);
+		ufbxt_assert(node->scale_keys.data[i].time == time);
+
+		ufbx_quat rotation_quat = ufbx_euler_to_quat(ref[i].rotation_euler, UFBX_ROTATION_ORDER_XYZ);
+
+		ufbxt_assert_close_vec3(err, node->translation_keys.data[i].value, ref[i].translation);
+		ufbxt_assert_close_quat(err, node->rotation_keys.data[i].value, rotation_quat);
+		ufbxt_assert_close_vec3(err, node->scale_keys.data[i].value, ref[i].scale);
+
+		ufbxt_assert_close_vec3(err, ufbx_evaluate_baked_vec3(node->translation_keys, time), ref[i].translation);
+		ufbxt_assert_close_quat(err, ufbx_evaluate_baked_quat(node->rotation_keys, time), rotation_quat);
+		ufbxt_assert_close_vec3(err, ufbx_evaluate_baked_vec3(node->scale_keys, time), ref[i].scale);
+	}
+
+	ufbx_free_baked_anim(bake);
+}
+#endif

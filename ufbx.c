@@ -24026,48 +24026,48 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim(ufbxi_bake_context *bc
 			prop->prop_name = anim_prop->prop_name.data;
 			prop->anim_value = anim_prop->anim_value;
 		}
+	}
 
-		size_t num_props = bc->tmp_bake_props.num_items;
-		ufbxi_bake_prop *props = ufbxi_push_pop(&bc->tmp, &bc->tmp_bake_props, ufbxi_bake_prop, num_props);
-		ufbxi_check_err(&bc->error, props);
+	size_t num_props = bc->tmp_bake_props.num_items;
+	ufbxi_bake_prop *props = ufbxi_push_pop(&bc->tmp, &bc->tmp_bake_props, ufbxi_bake_prop, num_props);
+	ufbxi_check_err(&bc->error, props);
 
-		// TODO: Macro unstable/non allocating sort
-		qsort(props, num_props, sizeof(ufbxi_bake_prop), &ufbxi_cmp_bake_prop);
+	// TODO: Macro unstable/non allocating sort
+	qsort(props, num_props, sizeof(ufbxi_bake_prop), &ufbxi_cmp_bake_prop);
 
-		// Pre-bake layer weight times
-		if (!bc->opts.ignore_layer_weight_animation) {
-			bool has_weight_times = false;
-			ufbxi_for(ufbxi_bake_prop, prop, props, num_props) {
-				if (prop->prop_name != ufbxi_Weight) continue;
-				ufbx_element *element = scene->elements.data[prop->element_id];
-				if (element->type == UFBX_ELEMENT_ANIM_LAYER) {
-					ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, true));
-					has_weight_times = true;
-				}
-			}
-
-			if (has_weight_times) {
-				ufbxi_double_list weight_times = { 0 };
-				ufbxi_check_err(&bc->error, ufbxi_finalize_bake_times(bc, &weight_times));
-
-				bc->layer_weight_times.count = weight_times.count;
-				bc->layer_weight_times.data = ufbxi_push_copy(&bc->tmp, double, weight_times.count, weight_times.data);
-				ufbxi_check_err(&bc->error, bc->layer_weight_times.data);
-
-				ufbxi_buf_clear(&bc->tmp_prop);
+	// Pre-bake layer weight times
+	if (!bc->opts.ignore_layer_weight_animation) {
+		bool has_weight_times = false;
+		ufbxi_for(ufbxi_bake_prop, prop, props, num_props) {
+			if (prop->prop_name != ufbxi_Weight) continue;
+			ufbx_element *element = scene->elements.data[prop->element_id];
+			if (element->type == UFBX_ELEMENT_ANIM_LAYER) {
+				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, true));
+				has_weight_times = true;
 			}
 		}
 
-		size_t begin = 0;
-		while (begin < num_props) {
-			uint32_t element_id = props[begin].element_id;
-			size_t end = begin + 1;
-			while (end < num_props && props[end].element_id == element_id) {
-				end++;
-			}
-			ufbxi_check_err(&bc->error, ufbxi_bake_element(bc, element_id, props + begin, end - begin));
-			begin = end;
+		if (has_weight_times) {
+			ufbxi_double_list weight_times = { 0 };
+			ufbxi_check_err(&bc->error, ufbxi_finalize_bake_times(bc, &weight_times));
+
+			bc->layer_weight_times.count = weight_times.count;
+			bc->layer_weight_times.data = ufbxi_push_copy(&bc->tmp, double, weight_times.count, weight_times.data);
+			ufbxi_check_err(&bc->error, bc->layer_weight_times.data);
+
+			ufbxi_buf_clear(&bc->tmp_prop);
 		}
+	}
+
+	size_t begin = 0;
+	while (begin < num_props) {
+		uint32_t element_id = props[begin].element_id;
+		size_t end = begin + 1;
+		while (end < num_props && props[end].element_id == element_id) {
+			end++;
+		}
+		ufbxi_check_err(&bc->error, ufbxi_bake_element(bc, element_id, props + begin, end - begin));
+		begin = end;
 	}
 
 	size_t num_nodes = bc->tmp_nodes.num_items;
