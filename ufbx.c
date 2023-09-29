@@ -16409,6 +16409,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_connections_to_elements(ufbx
 							anim_def_prop.value_vec3.y = 1.0f;
 							anim_def_prop.value_vec3.z = 1.0f;
 						}
+						// Property values are only defined in anim_props on legacy files
+						if (uc->version < 6000) {
+							anim_def_prop.value_vec3 = anim_value->default_value;
+						}
 						anim_def_prop.type = type;
 						def_prop = &anim_def_prop;
 					} else {
