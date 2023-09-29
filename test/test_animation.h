@@ -1584,6 +1584,7 @@ UFBXT_FILE_TEST(maya_anim_layer_anim)
 
 	for (size_t i = 0; i < num_keys; i++) {
 		double time = (double)i / 24.0;
+		ufbxt_hintf("i=%zu time=%f\n", i, time);
 
 		// Times are exact
 		ufbxt_assert(node->translation_keys.data[i].time == time);
