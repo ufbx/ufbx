@@ -16043,13 +16043,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 					ufbxi_check(ufbxi_setup_scale_helper(uc, node, fbx_id));
 
 					// If we added a geometry transform helper that may scale further helpers
-					// recursively for all child nodes using  `UFBX_INHERIT_MODE_COMPONENTWISE_SCALE`
+					// recursively for all child nodes using `UFBX_INHERIT_MODE_COMPONENTWISE_SCALE`
+					// This is guaranteed to terminate as `ufbxi_pre_node` may only have one parent,
+					// meaning any cycles must contain `node` itself.
 					uint32_t ix = pre_node->first_child;
-					size_t count = 0, max_count = num_nodes * 4;
 					while (ix != ~0u && ix != node->typed_id) {
-						// Safeguard against cyclical parents etc.
-						if (count++ >= max_count) break;
-
 						ufbxi_pre_node *pre_child = &pre_nodes[ix];
 						ufbx_node *child = (ufbx_node*)elements[pre_child->element_id];
 
@@ -16072,7 +16070,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 						// Move to next child, popping parents until we find one
 						while (pre_child->next_child == ~0u) {
 							ix = pre_child->parent;
-							if (count++ >= max_count) break;
 							if (ix == node->typed_id) break;
 							pre_child = &pre_nodes[ix];
 						}
