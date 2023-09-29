@@ -127,6 +127,7 @@ int main(int argc, char **argv)
 	bool sink = false;
 	bool dedicated_allocs = false;
 	bool bake = false;
+	double bake_fps = -1.0;
 	double override_fps = -1.0;
 
 	ufbx_load_opts opts = { 0 };
@@ -173,6 +174,8 @@ int main(int argc, char **argv)
 			if (++i < argc) override_fps = strtod(argv[i], NULL);
 		} else if (!strcmp(argv[i], "--bake")) {
 			bake = true;
+		} else if (!strcmp(argv[i], "--bake-fps")) {
+			if (++i < argc) bake_fps = strtod(argv[i], NULL);
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "Unrecognized flag: %s\n", argv[i]);
 			exit(1);
@@ -386,6 +389,9 @@ int main(int argc, char **argv)
 			if (bake) {
 				ufbx_bake_opts opts = { 0 };
 				opts.max_keyframe_segments = 4096;
+				if (bake_fps > 0) {
+					opts.resample_rate = bake_fps;
+				}
 
 				ufbx_baked_anim *bake = ufbx_bake_anim(scene, anim, &opts, NULL);
 				ufbxt_assert(bake);
