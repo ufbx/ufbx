@@ -5589,6 +5589,9 @@ typedef struct {
 	void **element_extra_arr;
 	size_t element_extra_cap;
 
+	// Temporary per-element flags
+	uint8_t *tmp_element_flag;
+
 	ufbxi_ascii ascii;
 
 	bool has_geometry_transform_nodes;
@@ -16580,7 +16583,7 @@ ufbxi_nodiscard static ufbx_element *ufbxi_get_element_node(ufbx_element *elemen
 	}
 }
 
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_dst_elements(ufbxi_context *uc, void *p_dst_list, ufbx_element *element, bool search_node, const char *prop, ufbx_element_type src_type)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_dst_elements(ufbxi_context *uc, void *p_dst_list, ufbx_element *element, bool search_node, bool ignore_duplicates, const char *prop, ufbx_element_type src_type)
 {
 	size_t num_elements = 0;
 
@@ -16588,6 +16591,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_dst_elements(ufbxi_context
 		ufbx_connection_list conns = ufbxi_find_dst_connections(element, prop);
 		ufbxi_for_list(ufbx_connection, conn, conns) {
 			if (conn->src->type == src_type) {
+				if (ignore_duplicates) {
+					uint32_t element_id = conn->src->element_id;
+					if (uc->tmp_element_flag[element_id]) continue;
+					uc->tmp_element_flag[element_id] = 1;
+				}
 				ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_element*, 1, &conn->src));
 				num_elements++;
 			}
@@ -16599,10 +16607,16 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_dst_elements(ufbxi_context
 	list->count = num_elements;
 	ufbxi_check(list->data);
 
+	if (ignore_duplicates) {
+		ufbxi_for_ptr_list(ufbx_element, p_elem, *list) {
+			uc->tmp_element_flag[(*p_elem)->element_id] = 0;
+		}
+	}
+
 	return 1;
 }
 
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_src_elements(ufbxi_context *uc, void *p_dst_list, ufbx_element *element, bool search_node, const char *prop, ufbx_element_type dst_type)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_src_elements(ufbxi_context *uc, void *p_dst_list, ufbx_element *element, bool search_node, bool ignore_duplicates, const char *prop, ufbx_element_type dst_type)
 {
 	size_t num_elements = 0;
 
@@ -16610,6 +16624,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_src_elements(ufbxi_context
 		ufbx_connection_list conns = ufbxi_find_src_connections(element, prop);
 		ufbxi_for_list(ufbx_connection, conn, conns) {
 			if (conn->dst->type == dst_type) {
+				if (ignore_duplicates) {
+					uint32_t element_id = conn->dst->element_id;
+					if (uc->tmp_element_flag[element_id]) continue;
+					uc->tmp_element_flag[element_id] = 1;
+				}
 				ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_element*, 1, &conn->dst));
 				num_elements++;
 			}
@@ -16620,6 +16639,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_src_elements(ufbxi_context
 	list->data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_element*, num_elements);
 	list->count = num_elements;
 	ufbxi_check(list->data);
+
+	if (ignore_duplicates) {
+		ufbxi_for_ptr_list(ufbx_element, p_elem, *list) {
+			uc->tmp_element_flag[(*p_elem)->element_id] = 0;
+		}
+	}
 
 	return 1;
 }
@@ -18801,6 +18826,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	ufbxi_buf_free(&uc->tmp_element_offsets);
 	ufbxi_buf_free(&uc->tmp_elements);
 
+	uc->tmp_element_flag = ufbxi_push_zero(&uc->tmp, uint8_t, num_elements);
+	ufbxi_check(uc->tmp_element_flag);
+
 	uc->scene.metadata.original_file_path = ufbx_find_string(&uc->scene.metadata.scene_props, "DocumentUrl", ufbx_empty_string);
 	uc->scene.metadata.raw_original_file_path = ufbx_find_blob(&uc->scene.metadata.scene_props, "DocumentUrl", ufbx_empty_blob);
 
@@ -18906,7 +18934,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			node->all_attribs.data = &node->attrib;
 		}
 
-		ufbxi_check(ufbxi_fetch_dst_elements(uc, &node->materials, &node->element, false, NULL, UFBX_ELEMENT_MATERIAL));
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &node->materials, &node->element, false, false, NULL, UFBX_ELEMENT_MATERIAL));
 	}
 
 	// Resolve bind pose bones that don't use the normal connection system
@@ -18948,7 +18976,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	for (int type = UFBX_ELEMENT_TYPE_FIRST_ATTRIB; type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB; type++) {
 		ufbxi_for_ptr_list(ufbx_element, p_elem, uc->scene.elements_by_type[type]) {
 			ufbx_element *elem = *p_elem;
-			ufbxi_check(ufbxi_fetch_src_elements(uc, &elem->instances, elem, false, NULL, UFBX_ELEMENT_NODE));
+			ufbxi_check(ufbxi_fetch_src_elements(uc, &elem->instances, elem, false, true, NULL, UFBX_ELEMENT_NODE));
 		}
 	}
 
@@ -18961,7 +18989,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	ufbxi_for_ptr_list(ufbx_skin_deformer, p_skin, uc->scene.skin_deformers) {
 		ufbx_skin_deformer *skin = *p_skin;
-		ufbxi_check(ufbxi_fetch_dst_elements(uc, &skin->clusters, &skin->element, false, NULL, UFBX_ELEMENT_SKIN_CLUSTER));
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &skin->clusters, &skin->element, false, true, NULL, UFBX_ELEMENT_SKIN_CLUSTER));
 
 		// Remove clusters without a valid `bone`
 		if (!uc->opts.connect_broken_elements) {
@@ -19073,7 +19101,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, uc->scene.blend_deformers) {
 		ufbx_blend_deformer *blend = *p_blend;
-		ufbxi_check(ufbxi_fetch_dst_elements(uc, &blend->channels, &blend->element, false, NULL, UFBX_ELEMENT_BLEND_CHANNEL));
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &blend->channels, &blend->element, false, true, NULL, UFBX_ELEMENT_BLEND_CHANNEL));
 	}
 
 	ufbxi_for_ptr_list(ufbx_cache_deformer, p_deformer, uc->scene.cache_deformers) {
@@ -19234,9 +19262,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			}
 
 			// Fetch deformers
-			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->skin_deformers, &mesh->element, search_node, NULL, UFBX_ELEMENT_SKIN_DEFORMER));
-			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->blend_deformers, &mesh->element, search_node, NULL, UFBX_ELEMENT_BLEND_DEFORMER));
-			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->cache_deformers, &mesh->element, search_node, NULL, UFBX_ELEMENT_CACHE_DEFORMER));
+			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->skin_deformers, &mesh->element, search_node, true, NULL, UFBX_ELEMENT_SKIN_DEFORMER));
+			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->blend_deformers, &mesh->element, search_node, true, NULL, UFBX_ELEMENT_BLEND_DEFORMER));
+			ufbxi_check(ufbxi_fetch_dst_elements(uc, &mesh->cache_deformers, &mesh->element, search_node, true, NULL, UFBX_ELEMENT_CACHE_DEFORMER));
 			ufbxi_check(ufbxi_fetch_deformers(uc, &mesh->all_deformers, &mesh->element, search_node));
 
 			// Vertex position must always exist if not explicitly allowed to be missing
@@ -19276,14 +19304,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, uc->scene.anim_stacks) {
 		ufbx_anim_stack *stack = *p_stack;
-		ufbxi_check(ufbxi_fetch_dst_elements(uc, &stack->layers, &stack->element, false, NULL, UFBX_ELEMENT_ANIM_LAYER));
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &stack->layers, &stack->element, false, true, NULL, UFBX_ELEMENT_ANIM_LAYER));
 
 		ufbxi_check(ufbxi_push_anim(uc, &stack->anim, stack->layers.data, stack->layers.count));
 	}
 
 	ufbxi_for_ptr_list(ufbx_anim_layer, p_layer, uc->scene.anim_layers) {
 		ufbx_anim_layer *layer = *p_layer;
-		ufbxi_check(ufbxi_fetch_dst_elements(uc, &layer->anim_values, &layer->element, false, NULL, UFBX_ELEMENT_ANIM_VALUE));
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &layer->anim_values, &layer->element, false, true, NULL, UFBX_ELEMENT_ANIM_VALUE));
 
 		ufbxi_check(ufbxi_push_anim(uc, &layer->anim, p_layer, 1));
 
@@ -19392,7 +19420,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	ufbxi_for_ptr_list(ufbx_shader, p_shader, uc->scene.shaders) {
 		ufbx_shader *shader = *p_shader;
-		ufbxi_check(ufbxi_fetch_dst_elements(uc, &shader->bindings, &shader->element, false, NULL, UFBX_ELEMENT_SHADER_BINDING));
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &shader->bindings, &shader->element, false, false, NULL, UFBX_ELEMENT_SHADER_BINDING));
 
 		ufbx_prop *api = ufbx_find_prop(&shader->props, "RenderAPI");
 		if (api) {
@@ -19462,7 +19490,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 			// TODO: This leaks currently to result, probably doesn't matter..
 			ufbx_texture_list textures;
-			ufbxi_check(ufbxi_fetch_dst_elements(uc, &textures, &mesh->element, true, NULL, UFBX_ELEMENT_TEXTURE));
+			ufbxi_check(ufbxi_fetch_dst_elements(uc, &textures, &mesh->element, true, false, NULL, UFBX_ELEMENT_TEXTURE));
 
 			size_t num_material_textures = 0;
 			ufbxi_for(ufbxi_tmp_mesh_texture, tex, extra->texture_arr, extra->texture_count) {
@@ -19659,12 +19687,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 	ufbxi_for_ptr_list(ufbx_display_layer, p_layer, uc->scene.display_layers) {
 		ufbx_display_layer *layer = *p_layer;
-		ufbxi_check(ufbxi_fetch_dst_elements(uc, &layer->nodes, &layer->element, false, NULL, UFBX_ELEMENT_NODE));
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &layer->nodes, &layer->element, false, true, NULL, UFBX_ELEMENT_NODE));
 	}
 
 	ufbxi_for_ptr_list(ufbx_selection_set, p_set, uc->scene.selection_sets) {
 		ufbx_selection_set *set = *p_set;
-		ufbxi_check(ufbxi_fetch_dst_elements(uc, &set->nodes, &set->element, false, NULL, UFBX_ELEMENT_SELECTION_NODE));
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &set->nodes, &set->element, false, true, NULL, UFBX_ELEMENT_SELECTION_NODE));
 	}
 
 	ufbxi_for_ptr_list(ufbx_selection_node, p_node, uc->scene.selection_nodes) {
