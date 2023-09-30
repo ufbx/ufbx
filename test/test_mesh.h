@@ -873,11 +873,13 @@ UFBXT_FILE_TEST(zbrush_d20)
 
 		// WHAT? The 6100 version has duplicated blend shapes
 		// and 7500 has duplicated blend deformers...
+		// After e8cab0f ufbx ignores duplicated connections so we see only
+		// a single blend deformer here..
 		if (scene->metadata.version == 6100) {
 			ufbxt_assert(mesh->blend_deformers.count == 1);
 			ufbxt_assert(blend->channels.count == 4);
 		} else {
-			ufbxt_assert(mesh->blend_deformers.count == 2);
+			ufbxt_assert(mesh->blend_deformers.count == 1);
 			ufbxt_assert(blend->channels.count == 2);
 		}
 
