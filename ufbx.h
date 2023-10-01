@@ -1970,7 +1970,7 @@ struct ufbx_blend_channel {
 	ufbx_blend_keyframe_list keyframes;
 
 	// Final blend shape ignoring any intermediate blend shapes.
-	ufbx_blend_shape *target_shape;
+	ufbx_nullable ufbx_blend_shape *target_shape;
 };
 
 // Blend shape target containing the actual vertex offsets

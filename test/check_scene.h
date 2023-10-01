@@ -802,8 +802,10 @@ static void ufbxt_check_blend_channel(ufbx_scene *scene, ufbx_blend_channel *cha
 		if (i > 0) {
 			ufbxt_assert(channel->keyframes.data[i - 1].target_weight <= channel->keyframes.data[i].target_weight);
 		}
+		ufbxt_assert(channel->keyframes.data[i].shape);
 		ufbxt_check_element_ptr(scene, channel->keyframes.data[i].shape, UFBX_ELEMENT_BLEND_SHAPE);
 	}
+	ufbxt_check_element_ptr(scene, channel->target_shape, UFBX_ELEMENT_BLEND_SHAPE);
 }
 
 static void ufbxt_check_blend_shape(ufbx_scene *scene, ufbx_blend_shape *shape)
