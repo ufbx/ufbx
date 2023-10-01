@@ -16593,7 +16593,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_dst_elements(ufbxi_context
 			if (conn->src->type == src_type) {
 				if (ignore_duplicates) {
 					uint32_t element_id = conn->src->element_id;
-					if (uc->tmp_element_flag[element_id]) continue;
+					if (uc->tmp_element_flag[element_id]) {
+						ufbxi_check(ufbxi_warnf_tag(UFBX_WARNING_DUPLICATE_CONNECTION, element_id, "Duplicate connection to %u", element->element_id));
+						continue;
+					}
 					uc->tmp_element_flag[element_id] = 1;
 				}
 				ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_element*, 1, &conn->src));
@@ -16626,7 +16629,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_src_elements(ufbxi_context
 			if (conn->dst->type == dst_type) {
 				if (ignore_duplicates) {
 					uint32_t element_id = conn->dst->element_id;
-					if (uc->tmp_element_flag[element_id]) continue;
+					if (uc->tmp_element_flag[element_id]) {
+						ufbxi_check(ufbxi_warnf_tag(UFBX_WARNING_DUPLICATE_CONNECTION, element_id, "Duplicate connection to %u", element->element_id));
+						continue;
+					}
 					uc->tmp_element_flag[element_id] = 1;
 				}
 				ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_element*, 1, &conn->dst));

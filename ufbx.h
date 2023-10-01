@@ -3248,6 +3248,9 @@ typedef enum ufbx_warning_type UFBX_ENUM_REPR {
 	// Geometry data has been defined but has no data.
 	UFBX_WARNING_MISSING_GEOMETRY_DATA,
 
+	// Duplicated connection between two elements that shouldn't have.
+	UFBX_WARNING_DUPLICATE_CONNECTION,
+
 	// Out-of-bounds index has been clamped to be in-bounds.
 	// HINT: You can use `ufbx_index_error_handling` to adjust behavior.
 	UFBX_WARNING_INDEX_CLAMPED,
