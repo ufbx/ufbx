@@ -233,6 +233,11 @@ UFBXT_FILE_TEST(maya_anim_light)
 			{ element_id, { "IntProp", SIZE_MAX }, { 0, 0, 0 }, { "", SIZE_MAX }, 15 },
 		};
 
+		uint32_t node_id = node->typed_id;
+		ufbx_transform_override transform_overrides[] = {
+			{ node_id, { { 1.0f, 2.0f, 3.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, { 4.0f, 5.0f, 6.0f } } },
+		};
+
 		uint32_t layers[32];
 		size_t num_layers = scene->anim->layers.count;
 		for (size_t i = 0; i < num_layers; i++) {
@@ -242,8 +247,10 @@ UFBXT_FILE_TEST(maya_anim_light)
 		ufbx_anim_opts opts = { 0 };
 		opts.layer_ids.data = layers;
 		opts.layer_ids.count = num_layers;
-		opts.overrides.data = overrides;
-		opts.overrides.count = ufbxt_arraycount(overrides);
+		opts.prop_overrides.data = overrides;
+		opts.prop_overrides.count = ufbxt_arraycount(overrides);
+		opts.transform_overrides.data = transform_overrides;
+		opts.transform_overrides.count = ufbxt_arraycount(transform_overrides);
 
 		ufbx_error error;
 		ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
@@ -261,6 +268,11 @@ UFBXT_FILE_TEST(maya_anim_light)
 
 		ufbx_node *light_node = ufbx_find_node(state, "pointLight1");
 		ufbxt_assert(light_node);
+
+		ufbxt_assert_close_vec3(err, light_node->local_transform.translation, transform_overrides[0].transform.translation);
+		ufbxt_assert_close_quat(err, light_node->local_transform.rotation, transform_overrides[0].transform.rotation);
+		ufbxt_assert_close_vec3(err, light_node->local_transform.scale, transform_overrides[0].transform.scale);
+
 		ufbx_light *light = light_node->light;
 		ufbxt_assert(light);
 
@@ -362,6 +374,57 @@ UFBXT_FILE_TEST(maya_anim_light)
 }
 #endif
 
+UFBXT_FILE_TEST_ALT(create_anim_alloc_fail, maya_anim_light_7500_binary)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pointLight1");
+	ufbxt_assert(node && node->light);
+	uint32_t element_id = node->light->element.element_id;
+
+	ufbx_prop_override_desc overrides[] = {
+		{ element_id, { "Intensity", SIZE_MAX }, { (ufbx_real)10.0 } },
+		{ element_id, { "Color", SIZE_MAX }, { (ufbx_real)0.3, (ufbx_real)0.6, (ufbx_real)0.9 } },
+		{ element_id, { "|NewProp", SIZE_MAX }, { 10, 20, 30 }, { "Test", SIZE_MAX } },
+		{ element_id, { "IntProp", SIZE_MAX }, { 0, 0, 0 }, { "", SIZE_MAX }, 15 },
+	};
+
+	uint32_t node_id = node->typed_id;
+	ufbx_transform_override transform_overrides[] = {
+		{ node_id, { { 1.0f, 2.0f, 3.0f }, { 1.0f, 0.0f, 0.0f, 0.0f }, { 4.0f, 5.0f, 6.0f } } },
+	};
+
+	uint32_t layers[32];
+	size_t num_layers = scene->anim->layers.count;
+	for (size_t i = 0; i < num_layers; i++) {
+		layers[i] = scene->anim->layers.data[i]->typed_id;
+	}
+
+	ufbx_anim_opts opts = { 0 };
+	opts.layer_ids.data = layers;
+	opts.layer_ids.count = num_layers;
+	opts.prop_overrides.data = overrides;
+	opts.prop_overrides.count = ufbxt_arraycount(overrides);
+	opts.transform_overrides.data = transform_overrides;
+	opts.transform_overrides.count = ufbxt_arraycount(transform_overrides);
+
+	for (size_t max_result = 1; max_result < 10000; max_result++) {
+		opts.result_allocator.huge_threshold = 1;
+		opts.result_allocator.allocation_limit = max_result;
+
+		ufbxt_hintf("Result limit: %zu", max_result);
+
+		ufbx_error error;
+		ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
+		if (anim) {
+			ufbxt_logf(".. Tested up to %zu result allocations", max_result);
+			ufbx_free_anim(anim);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+}
+#endif
+
 UFBXT_FILE_TEST(maya_transform_animation)
 #if UFBXT_IMPL
 {
@@ -425,8 +488,8 @@ UFBXT_FILE_TEST(maya_transform_animation)
 		ufbx_anim_opts opts = { 0 };
 		opts.layer_ids.data = layers;
 		opts.layer_ids.count = num_layers;
-		opts.overrides.data = overrides;
-		opts.overrides.count = ufbxt_arraycount(overrides);
+		opts.prop_overrides.data = overrides;
+		opts.prop_overrides.count = ufbxt_arraycount(overrides);
 
 		ufbx_error error;
 		ufbx_anim *anim = ufbx_create_anim(scene, &opts, NULL);
@@ -769,8 +832,8 @@ UFBXT_FILE_TEST_ALT(anim_override_utf8, blender_279_default)
 			}
 
 			ufbx_anim_opts opts = { 0 };
-			opts.overrides.data = &over;
-			opts.overrides.count = 1;
+			opts.prop_overrides.data = &over;
+			opts.prop_overrides.count = 1;
 
 			ufbx_error error;
 			ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
@@ -798,8 +861,8 @@ UFBXT_FILE_TEST_ALT(anim_override_utf8, blender_279_default)
 			}
 
 			ufbx_anim_opts opts = { 0 };
-			opts.overrides.data = &over;
-			opts.overrides.count = 1;
+			opts.prop_overrides.data = &over;
+			opts.prop_overrides.count = 1;
 
 			ufbx_error error;
 			ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
@@ -882,8 +945,8 @@ UFBXT_FILE_TEST_ALT(anim_multi_override, blender_293_instancing)
 	}
 
 	ufbx_anim_opts opts = { 0 };
-	opts.overrides.data = overrides;
-	opts.overrides.count = ufbxt_arraycount(overrides);
+	opts.prop_overrides.data = overrides;
+	opts.prop_overrides.count = ufbxt_arraycount(overrides);
 
 	ufbx_error error;
 	ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
@@ -931,8 +994,8 @@ UFBXT_FILE_TEST_ALT(anim_override_duplicate, blender_293_instancing)
 	};
 
 	ufbx_anim_opts opts = { 0 };
-	opts.overrides.data = overrides;
-	opts.overrides.count = ufbxt_arraycount(overrides);
+	opts.prop_overrides.data = overrides;
+	opts.prop_overrides.count = ufbxt_arraycount(overrides);
 
 	ufbx_error error;
 	ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
@@ -1009,8 +1072,8 @@ UFBXT_FILE_TEST_ALT(anim_override_int64, maya_cube_7500_binary)
 	overrides[1].value_int = INT64_C(0x5000000000000001);
 
 	ufbx_anim_opts opts = { 0 };
-	opts.overrides.data = overrides;
-	opts.overrides.count = ufbxt_arraycount(overrides);
+	opts.prop_overrides.data = overrides;
+	opts.prop_overrides.count = ufbxt_arraycount(overrides);
 
 	ufbx_anim *anim = ufbx_create_anim(scene, &opts, NULL);
 	ufbxt_assert(anim);
@@ -1037,3 +1100,508 @@ UFBXT_FILE_TEST_ALT(anim_override_int64, maya_cube_7500_binary)
 }
 #endif
 
+#if UFBXT_IMPL
+
+static void ufbxt_diff_baked_vec3_imp(ufbxt_diff_error *err, const ufbx_baked_vec3 *refs, size_t num_refs, ufbx_baked_vec3_list list, const char *name)
+{
+	for (size_t i = 0; i < num_refs; i++) {
+		ufbxt_hintf("%s i=%zu", name, i);
+		ufbxt_assert(i < list.count);
+		ufbx_baked_vec3 ref = refs[i];
+		ufbx_baked_vec3 key = list.data[i];
+
+		ufbxt_assert(key.time == ref.time);
+		ufbxt_assert_close_vec3(err, key.value, ref.value);
+	}
+	ufbxt_assert(list.count == num_refs);
+}
+
+static void ufbxt_diff_baked_quat_imp(ufbxt_diff_error *err, const ufbx_baked_vec3 *refs, size_t num_refs, ufbx_baked_quat_list list, const char *name)
+{
+	for (size_t i = 0; i < num_refs; i++) {
+		ufbxt_hintf("%s i=%zu", name, i);
+		ufbxt_assert(i < list.count);
+		ufbx_baked_vec3 ref = refs[i];
+		ufbx_baked_quat key = list.data[i];
+
+		ufbx_vec3 key_euler = ufbx_quat_to_euler(key.value, UFBX_ROTATION_ORDER_XYZ);
+
+		ufbxt_assert(key.time == ref.time);
+		ufbxt_assert_close_vec3(err, key_euler, ref.value);
+	}
+	ufbxt_assert(list.count == num_refs);
+}
+
+#define ufbxt_diff_baked_vec3(err, refs, list) ufbxt_diff_baked_vec3_imp((err), (refs), ufbxt_arraycount(refs), (list), #list)
+#define ufbxt_diff_baked_quat(err, refs, list) ufbxt_diff_baked_quat_imp((err), (refs), ufbxt_arraycount(refs), (list), #list)
+
+#endif
+
+UFBXT_FILE_TEST(maya_anim_linear)
+#if UFBXT_IMPL
+{
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, NULL, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	ufbx_baked_vec3 translation_ref[] = {
+		{ 0.0/24.0, { 0.0f, 0.0f, 0.0f } },
+		{ 2.0/24.0, { 0.5f, 2.0f, 0.0f } },
+		{ 8.0/24.0, { 2.0f, 0.0f, 0.0f } },
+		{ nextafter(12.0/24.0, -INFINITY), { 2.0f, 0.0f, 0.0f } },
+		{ 12.0/24.0, { 2.0f, 0.0f, 2.0f } },
+		{ nextafter(12.0/24.0, INFINITY), { 2.0f, 0.0f, 0.0f } },
+		{ 14.0/24.0, { 2.0f, 0.0f, 0.0f } },
+	};
+
+	ufbxt_assert(bake->nodes.count == 1);
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_anim_diffuse_curve)
+#if UFBXT_IMPL
+{
+	ufbx_error error;
+
+	ufbx_bake_opts opts = { 0 };
+	opts.resample_rate = 24.0;
+
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	ufbxt_assert(bake->nodes.count == 0);
+	ufbxt_assert(bake->elements.count == 1);
+
+	ufbx_baked_element *elem = &bake->elements.data[0];
+	ufbx_element *ref_elem = scene->elements.data[elem->element_id];
+	ufbxt_assert(ref_elem->type == UFBX_ELEMENT_MATERIAL);
+	ufbxt_assert(!strcmp(ref_elem->name.data, "lambert1"));
+
+	ufbxt_assert(elem->props.count == 1);
+	ufbx_baked_prop *prop = &elem->props.data[0];
+
+	ufbxt_check_string(prop->name);
+	ufbxt_assert(!strcmp(prop->name.data, "DiffuseColor"));
+
+	ufbx_baked_vec3 diffuse_ref[] = {
+		{ 0.0/24.0, { 0.0f, 0.5f, 0.5f } },
+		{ 4.0/24.0, { 1.0f, 0.5f, 0.5f } },
+		{ nextafter(6.0/24.0, -INFINITY), { 1.0f, 0.5f, 0.5f } },
+		{ 6.0/24.0, { 0.75f, 0.5f, 0.5f } },
+		{ 7.0/24.0, { 0.415319f, 0.5f, 0.5f } },
+		{ 8.0/24.0, { 0.795f, 0.5f, 0.5f } },
+		{ 9.0/24.0, { 1.152243f, 0.5f, 0.5f } },
+		{ 10.0/24.0, { 0.75f, 0.5f, 0.5f } },
+		{ nextafter(10.0/24.0, INFINITY), { 0.25f, 0.5f, 0.5f } },
+		{ 12.0/24.0, { 0.25f, 0.5f, 0.5f } },
+		{ 13.0/24.0, { 0.75f, 0.5f, 0.5f } },
+		{ 14.0/24.0, { 0.0f, 0.5f, 0.5f } },
+	};
+
+	ufbxt_diff_baked_vec3(err, diffuse_ref, prop->keys);
+
+	ufbx_retain_baked_anim(bake);
+	ufbx_free_baked_anim(bake);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(anim_bake_alloc_fail, maya_anim_diffuse_curve)
+#if UFBXT_IMPL
+{
+	for (size_t max_temp = 1; max_temp < 10000; max_temp++) {
+		ufbx_bake_opts opts = { 0 };
+		opts.temp_allocator.huge_threshold = 1;
+		opts.temp_allocator.allocation_limit = max_temp;
+
+		ufbxt_hintf("Temp limit: %zu", max_temp);
+
+		ufbx_error error;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (bake) {
+			ufbxt_logf(".. Tested up to %zu temporary allocations", max_temp);
+			ufbx_free_baked_anim(bake);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+
+	for (size_t max_result = 1; max_result < 10000; max_result++) {
+		ufbx_bake_opts opts = { 0 };
+		opts.result_allocator.huge_threshold = 1;
+		opts.result_allocator.allocation_limit = max_result;
+
+		ufbxt_hintf("Result limit: %zu", max_result);
+
+		ufbx_error error;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (bake) {
+			ufbxt_logf(".. Tested up to %zu result allocations", max_result);
+			ufbx_free_baked_anim(bake);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(anim_bake_alloc_fail_alt, motionbuilder_sausage_rrss, ufbxt_scale_helper_opts, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	for (size_t max_temp = 1; max_temp < 10000; max_temp++) {
+		ufbx_bake_opts opts = { 0 };
+		opts.temp_allocator.huge_threshold = 1;
+		opts.temp_allocator.allocation_limit = max_temp;
+
+		ufbxt_hintf("Temp limit: %zu", max_temp);
+
+		ufbx_error error;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (bake) {
+			ufbxt_logf(".. Tested up to %zu temporary allocations", max_temp);
+			ufbx_free_baked_anim(bake);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+
+	for (size_t max_result = 1; max_result < 10000; max_result++) {
+		ufbx_bake_opts opts = { 0 };
+		opts.result_allocator.huge_threshold = 1;
+		opts.result_allocator.allocation_limit = max_result;
+
+		ufbxt_hintf("Result limit: %zu", max_result);
+
+		ufbx_error error;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (bake) {
+			ufbxt_logf(".. Tested up to %zu result allocations", max_result);
+			ufbx_free_baked_anim(bake);
+			break;
+		}
+		ufbxt_assert(error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(maya_anim_pivot_rotate)
+#if UFBXT_IMPL
+{
+	ufbx_error error;
+
+	ufbx_baked_vec3 translation_ref[] = {
+		{ 0.0/24.0, { 0.0f, 0.0f, 0.0f } },
+		{ 1.0/24.0, { 0.0f, 0.066987f, -0.250f } },
+		{ 2.0/24.0, { 0.0f, 0.250f, -0.433f } },
+		{ 3.0/24.0, { 0.0f, 0.5f, -0.5f } },
+		{ 4.0/24.0, { 0.0f, 0.75f, -0.433f } },
+		{ 5.0/24.0, { 0.0f, 0.933013f, -0.250f } },
+		{ 6.0/24.0, { 0.0f, 1.0f, 0.0f } },
+	};
+
+	{
+		ufbx_bake_opts opts = { 0 };
+		opts.resample_rate = 24.0;
+		opts.key_reduction_enabled = true;
+		opts.key_reduction_rotation = true;
+
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (!bake) ufbxt_log_error(&error);
+		ufbxt_assert(bake);
+
+		ufbxt_assert(bake->nodes.count == 1);
+		ufbx_baked_node *node = &bake->nodes.data[0];
+
+		ufbx_node *ref_node = scene->nodes.data[node->typed_id];
+		ufbxt_assert(ref_node->element_id == node->element_id);
+		ufbxt_assert(!strcmp(ref_node->name.data, "pCube1"));
+
+		ufbx_baked_vec3 rotation_ref[] = {
+			{ 0.0/24.0, { 0.0f, 0.0f, 0.0f } },
+			{ 6.0/24.0, { 180.0f, 0.0f, 0.0f } },
+		};
+
+		ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+		ufbxt_diff_baked_quat(err, rotation_ref, node->rotation_keys);
+
+		ufbx_free_baked_anim(bake);
+	}
+
+	{
+		ufbx_bake_opts opts = { 0 };
+		opts.resample_rate = 24.0;
+		opts.key_reduction_enabled = true;
+
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (!bake) ufbxt_log_error(&error);
+		ufbxt_assert(bake);
+
+		ufbxt_assert(bake->nodes.count == 1);
+		ufbx_baked_node *node = &bake->nodes.data[0];
+
+		ufbx_node *ref_node = scene->nodes.data[node->typed_id];
+		ufbxt_assert(ref_node->element_id == node->element_id);
+		ufbxt_assert(!strcmp(ref_node->name.data, "pCube1"));
+
+		ufbx_baked_vec3 rotation_ref[] = {
+			{ 0.0/24.0, { 0.0f, 0.0f, 0.0f } },
+			{ 1.0/24.0, { 30.0f, 0.0f, 0.0f } },
+			{ 2.0/24.0, { 60.0f, 0.0f, 0.0f } },
+			{ 3.0/24.0, { 90.0f, 0.0f, 0.0f } },
+			{ 4.0/24.0, { 120.0f, 0.0f, 0.0f } },
+			{ 5.0/24.0, { 150.0f, 0.0f, 0.0f } },
+			{ 6.0/24.0, { 180.0f, 0.0f, 0.0f } },
+		};
+
+		ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+		ufbxt_diff_baked_quat(err, rotation_ref, node->rotation_keys);
+
+		ufbx_free_baked_anim(bake);
+	}
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_anim_scale_helper_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.inherit_mode_handling = UFBX_INHERIT_MODE_HANDLING_HELPER_NODES;
+	opts.scale_helper_name.data = "(scale helper)";
+	opts.scale_helper_name.length = SIZE_MAX;
+	return opts;
+}
+
+typedef struct {
+	ufbx_real scale;
+	ufbx_real global_y;
+} ufbxt_no_inherit_scale_node_ref;
+
+typedef struct {
+	double frame;
+	ufbxt_no_inherit_scale_node_ref nodes[4];
+} ufbxt_no_inherit_scale_key_ref;
+
+const ufbxt_no_inherit_scale_key_ref ufbxt_no_inherit_scale_ref[] = {
+	{ 0.0, { { 1.0f, 0.0f }, { 2.0f, 4.0f }, { 1.0f, 12.0f }, { 1.0f, 16.0f } } },
+	{ 6.0, { { 1.5f, 0.0f }, { 1.5f, 6.0f }, { 1.0f, 12.0f }, { 1.0f, 16.0f } } },
+	{ 12.0, { { 2.0f, 0.0f }, { 1.0f, 8.0f }, { 1.0f, 12.0f }, { 1.0f, 16.0f } } },
+	{ 18.0, { { 0.5f, 0.0f }, { 1.5f, 2.0f }, { 1.0f, 8.0f }, { 1.0f, 12.0f } } },
+	{ 24.0, { { 0.5f, 0.0f }, { 2.0f, 2.0f }, { 1.5f, 10.0f }, { 1.0f, 16.0f } } },
+};
+
+static ufbx_matrix ufbxt_evaluate_baked_matrix(ufbx_baked_anim *bake, ufbx_node *node, double time)
+{
+	ufbx_transform transform = node->local_transform;
+	for (size_t i = 0; i < bake->nodes.count; i++) {
+		const ufbx_baked_node *baked_node = &bake->nodes.data[i];
+		if (baked_node->typed_id == node->typed_id) {
+			if (baked_node->translation_keys.count > 0) {
+				transform.translation = ufbx_evaluate_baked_vec3(baked_node->translation_keys, time);
+			}
+			if (baked_node->rotation_keys.count > 0) {
+				transform.rotation = ufbx_evaluate_baked_quat(baked_node->rotation_keys, time);
+			}
+			if (baked_node->scale_keys.count > 0) {
+				transform.scale = ufbx_evaluate_baked_vec3(baked_node->scale_keys, time);
+			}
+		}
+	}
+
+	ufbx_matrix node_to_parent = ufbx_transform_to_matrix(&transform);
+	if (node->parent) {
+		ufbx_matrix parent_to_world = ufbxt_evaluate_baked_matrix(bake, node->parent, time);
+		node_to_parent = ufbx_matrix_mul(&parent_to_world, &node_to_parent);
+	}
+	return node_to_parent;
+}
+
+#endif
+
+UFBXT_FILE_TEST(maya_anim_no_inherit_scale)
+#if UFBXT_IMPL
+{
+	ufbx_node *nodes[4];
+	nodes[0] = ufbx_find_node(scene, "joint1");
+	nodes[1] = ufbx_find_node(scene, "joint2");
+	nodes[2] = ufbx_find_node(scene, "joint3");
+	nodes[3] = ufbx_find_node(scene, "joint4");
+	ufbxt_assert(nodes[0] && nodes[1] && nodes[2] && nodes[3]);
+
+	for (size_t key_ix = 0; key_ix < ufbxt_arraycount(ufbxt_no_inherit_scale_ref); key_ix++) {
+		ufbxt_no_inherit_scale_key_ref key = ufbxt_no_inherit_scale_ref[key_ix];
+		double time = key.frame / 24.0;
+
+		ufbx_scene *state = ufbx_evaluate_scene(scene, NULL, time, NULL, NULL);
+		ufbxt_assert(state);
+
+		for (size_t node_ix = 0; node_ix < 4; node_ix++) {
+			ufbxt_no_inherit_scale_node_ref ref = key.nodes[node_ix];
+			ufbxt_hintf("key_ix=%zu node_ix=%zu", key_ix, node_ix);
+
+			ufbx_node *node = state->nodes.data[nodes[node_ix]->typed_id];
+			if (node->scale_helper) {
+				node = node->scale_helper;
+			}
+			ufbx_matrix node_to_world = node->node_to_world;
+			ufbx_transform world_transform = ufbx_matrix_to_transform(&node_to_world);
+
+			ufbx_vec3 ref_translation = { 0.0f, ref.global_y, 0.0f };
+			ufbx_vec3 ref_scale = { ref.scale, ref.scale, ref.scale };
+
+			ufbxt_assert_close_vec3(err, world_transform.translation, ref_translation);
+			ufbxt_assert_close_vec3(err, world_transform.scale, ref_scale);
+		}
+
+		ufbx_free_scene(state);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_anim_no_inherit_scale_helper, maya_anim_no_inherit_scale, ufbxt_anim_scale_helper_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *nodes[4];
+	nodes[0] = ufbx_find_node(scene, "joint1");
+	nodes[1] = ufbx_find_node(scene, "joint2");
+	nodes[2] = ufbx_find_node(scene, "joint3");
+	nodes[3] = ufbx_find_node(scene, "joint4");
+	ufbxt_assert(nodes[0] && nodes[1] && nodes[2] && nodes[3]);
+
+	for (size_t key_ix = 0; key_ix < ufbxt_arraycount(ufbxt_no_inherit_scale_ref); key_ix++) {
+		ufbxt_no_inherit_scale_key_ref key = ufbxt_no_inherit_scale_ref[key_ix];
+		double time = key.frame / 24.0;
+
+		ufbx_scene *state = ufbx_evaluate_scene(scene, NULL, time, NULL, NULL);
+		ufbxt_assert(state);
+
+		for (size_t node_ix = 0; node_ix < 4; node_ix++) {
+			ufbxt_no_inherit_scale_node_ref ref = key.nodes[node_ix];
+			ufbxt_hintf("key_ix=%zu node_ix=%zu", key_ix, node_ix);
+
+			ufbx_node *node = state->nodes.data[nodes[node_ix]->typed_id];
+			if (node->scale_helper) {
+				node = node->scale_helper;
+			}
+			ufbx_matrix node_to_world = node->node_to_world;
+			ufbx_transform world_transform = ufbx_matrix_to_transform(&node_to_world);
+
+			ufbx_vec3 ref_translation = { 0.0f, ref.global_y, 0.0f };
+			ufbx_vec3 ref_scale = { ref.scale, ref.scale, ref.scale };
+
+			ufbxt_assert_close_vec3(err, world_transform.translation, ref_translation);
+			ufbxt_assert_close_vec3(err, world_transform.scale, ref_scale);
+		}
+
+		ufbx_free_scene(state);
+	}
+
+	ufbx_error error;
+	ufbx_bake_opts opts = { 0 };
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	for (size_t key_ix = 0; key_ix < ufbxt_arraycount(ufbxt_no_inherit_scale_ref); key_ix++) {
+		ufbxt_no_inherit_scale_key_ref key = ufbxt_no_inherit_scale_ref[key_ix];
+		double time = key.frame / 24.0;
+
+		for (size_t node_ix = 0; node_ix < 4; node_ix++) {
+			ufbxt_no_inherit_scale_node_ref ref = key.nodes[node_ix];
+			ufbxt_hintf("key_ix=%zu node_ix=%zu", key_ix, node_ix);
+
+			ufbx_node *node = nodes[node_ix];
+			if (node->scale_helper) {
+				node = node->scale_helper;
+			}
+			ufbx_matrix node_to_world = ufbxt_evaluate_baked_matrix(bake, node, time);
+			ufbx_transform world_transform = ufbx_matrix_to_transform(&node_to_world);
+
+			ufbx_vec3 ref_translation = { 0.0f, ref.global_y, 0.0f };
+			ufbx_vec3 ref_scale = { ref.scale, ref.scale, ref.scale };
+
+			ufbxt_assert_close_vec3(err, world_transform.translation, ref_translation);
+			ufbxt_assert_close_vec3(err, world_transform.scale, ref_scale);
+		}
+	}
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_anim_layer_anim)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.resample_rate = 24.0;
+
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, NULL);
+	ufbxt_assert(bake);
+
+	ufbxt_assert(bake->nodes.count == 1);
+
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_assert(!strcmp(scene->nodes.data[node->typed_id]->name.data, "pCube1"));
+
+	static const ufbxt_ref_transform ref[] = {
+		{ { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.305556f, 0.0f }, { 3.75f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.555556f, 0.0f }, { 7.5f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.75f, 0.0f }, { 11.25f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.888889f, 0.0f }, { 15.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.972222f, 0.0f }, { 18.75f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -1.0f, 0.0f }, { 22.5f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.972222f, 0.0f }, { 26.25f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.888889f, 0.0f }, { 30.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.75f, 0.0f }, { 33.75f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.555556f, 0.0f }, { 37.5f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.305556f, 0.0f }, { 41.25f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, 0.0f, 0.0f }, { 45.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.333333f, 0.0f }, { 41.25f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -0.666667f, 0.0f }, { 37.5f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -1.0f, 0.0f }, { 33.75f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -1.333333f, 0.0f }, { 30.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -1.666667f, 0.0f }, { 26.25f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -2.0f, 0.0f }, { 22.5f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -2.333333f, 0.0f }, { 18.75f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -2.666667f, 0.0f }, { 15.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -3.0f, 0.0f }, { 11.25f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -3.333333f, 0.0f }, { 7.5f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -3.666667f, 0.0f }, { 3.75f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+		{ { 0.0f, -4.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },
+	};
+
+	size_t num_keys = ufbxt_arraycount(ref);
+	ufbxt_assert(node->translation_keys.count == num_keys);
+	ufbxt_assert(node->rotation_keys.count == num_keys);
+	ufbxt_assert(node->scale_keys.count == num_keys);
+
+	for (size_t i = 0; i < num_keys; i++) {
+		double time = (double)i / 24.0;
+		ufbxt_hintf("i=%zu time=%f\n", i, time);
+
+		// Times are exact
+		ufbxt_assert(node->translation_keys.data[i].time == time);
+		ufbxt_assert(node->rotation_keys.data[i].time == time);
+		ufbxt_assert(node->scale_keys.data[i].time == time);
+
+		ufbx_quat rotation_quat = ufbx_euler_to_quat(ref[i].rotation_euler, UFBX_ROTATION_ORDER_XYZ);
+
+		ufbxt_assert_close_vec3(err, node->translation_keys.data[i].value, ref[i].translation);
+		ufbxt_assert_close_quat(err, node->rotation_keys.data[i].value, rotation_quat);
+		ufbxt_assert_close_vec3(err, node->scale_keys.data[i].value, ref[i].scale);
+
+		ufbxt_assert_close_vec3(err, ufbx_evaluate_baked_vec3(node->translation_keys, time), ref[i].translation);
+		ufbxt_assert_close_quat(err, ufbx_evaluate_baked_quat(node->rotation_keys, time), rotation_quat);
+		ufbxt_assert_close_vec3(err, ufbx_evaluate_baked_vec3(node->scale_keys, time), ref[i].scale);
+	}
+
+	ufbx_free_baked_anim(bake);
+}
+#endif

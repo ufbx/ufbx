@@ -10,7 +10,7 @@ import math
 import itertools
 import datetime
 
-LATEST_SUPPORTED_DATE = "2023-09-17"
+LATEST_SUPPORTED_DATE = "2023-10-03"
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -154,9 +154,15 @@ def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time):
                     "preserve", "helper-nodes", "modify-geometry",
                 ])
 
+                append_unique_opt(options, "inherit-mode-handling", [
+                    "preserve", "helper-nodes", "compensate",
+                ])
+
                 append_unique_opt(options, "space-conversion", [
                     "transform-root", "adjust-transforms",
                 ])
+
+                append_unique_opt(options, "bake", [False, True])
 
             for feature in features:
                 if feature == "geometry-transform":
@@ -171,6 +177,12 @@ def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time):
                     append_unique_opt(options, "space-conversion", [
                         "transform-root", "adjust-transforms",
                     ])
+                elif feature == "inherit-mode":
+                    append_unique_opt(options, "inherit-mode-handling", [
+                        "preserve", "helper-nodes", "compensate",
+                    ])
+                elif feature == "bake":
+                    append_unique_opt(options, "bake", [False, True])
                 elif feature == "ignore-missing-external":
                     options["ignore-missing-external"] = [True]
                 else:
@@ -311,7 +323,9 @@ if __name__ == "__main__":
 
                 args = case_args[:]
                 for k,v in opts:
-                    if v is True:
+                    if v is False:
+                        pass
+                    elif v is True:
                         args += [f"--{k}"]
                     else:
                         args += [f"--{k}", v]

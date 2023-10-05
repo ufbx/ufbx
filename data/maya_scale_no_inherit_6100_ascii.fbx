@@ -91,7 +91,7 @@ Objects:  {
 			Property: "RotationMaxX", "bool", "",0
 			Property: "RotationMaxY", "bool", "",0
 			Property: "RotationMaxZ", "bool", "",0
-			Property: "InheritType", "enum", "",1
+			Property: "InheritType", "enum", "",2
 			Property: "ScalingActive", "bool", "",0
 			Property: "ScalingMin", "Vector3D", "",0,0,0
 			Property: "ScalingMax", "Vector3D", "",0,0,0
@@ -128,7 +128,7 @@ Objects:  {
 			Property: "LODBox", "bool", "",0
 			Property: "Lcl Translation", "Lcl Translation", "A",0,0,0
 			Property: "Lcl Rotation", "Lcl Rotation", "A",0,0,0
-			Property: "Lcl Scaling", "Lcl Scaling", "A",0.02,0.03,0.04
+			Property: "Lcl Scaling", "Lcl Scaling", "A",0.03,0.03,0.03
 			Property: "Visibility", "Visibility", "A",1
 			Property: "Color", "ColorRGB", "N",0.8,0.8,0.8
 			Property: "Size", "double", "N",18.3908045977012

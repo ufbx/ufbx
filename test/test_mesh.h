@@ -873,12 +873,19 @@ UFBXT_FILE_TEST(zbrush_d20)
 
 		// WHAT? The 6100 version has duplicated blend shapes
 		// and 7500 has duplicated blend deformers...
+		// After e8cab0f ufbx ignores duplicated connections so we see only
+		// a single blend deformer here..
 		if (scene->metadata.version == 6100) {
 			ufbxt_assert(mesh->blend_deformers.count == 1);
 			ufbxt_assert(blend->channels.count == 4);
 		} else {
-			ufbxt_assert(mesh->blend_deformers.count == 2);
+			ufbxt_assert(mesh->blend_deformers.count == 1);
 			ufbxt_assert(blend->channels.count == 2);
+
+			ufbx_blend_deformer *blend_deformer = mesh->blend_deformers.data[0];
+			char warning_substring[128];
+			snprintf(warning_substring, sizeof(warning_substring), "to %u", mesh->element_id);
+			ufbxt_check_warning_imp(scene, UFBX_WARNING_DUPLICATE_CONNECTION, blend_deformer->element_id, 1, warning_substring);
 		}
 
 		// Check that poly groups work in subdivision

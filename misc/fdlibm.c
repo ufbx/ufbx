@@ -1342,3 +1342,111 @@ double fdlibm_fmax(double a, double b)
 {
 	return a < b ? b : a;
 }
+
+double fdlibm_nextafter(double x, double y)
+{
+	int	hx,hy,ix,iy;
+	unsigned lx,ly;
+
+	hx = __HI(x);		/* high word of x */
+	lx = __LO(x);		/* low  word of x */
+	hy = __HI(y);		/* high word of y */
+	ly = __LO(y);		/* low  word of y */
+	ix = hx&0x7fffffff;		/* |x| */
+	iy = hy&0x7fffffff;		/* |y| */
+
+	if(((ix>=0x7ff00000)&&((ix-0x7ff00000)|lx)!=0) ||   /* x is nan */ 
+	   ((iy>=0x7ff00000)&&((iy-0x7ff00000)|ly)!=0))     /* y is nan */ 
+	   return x+y;				
+	if(x==y) return x;		/* x=y, return x */
+	if((ix|lx)==0) {			/* x == 0 */
+	    __HI(x) = hy&0x80000000;	/* return +-minsubnormal */
+	    __LO(x) = 1;
+	    y = x*x;
+	    if(y==x) return y; else return x;	/* raise underflow flag */
+	} 
+	if(hx>=0) {				/* x > 0 */
+	    if(hx>hy||((hx==hy)&&(lx>ly))) {	/* x > y, x -= ulp */
+		if(lx==0) hx -= 1;
+		lx -= 1;
+	    } else {				/* x < y, x += ulp */
+		lx += 1;
+		if(lx==0) hx += 1;
+	    }
+	} else {				/* x < 0 */
+	    if(hy>=0||hx>hy||((hx==hy)&&(lx>ly))){/* x < y, x -= ulp */
+		if(lx==0) hx -= 1;
+		lx -= 1;
+	    } else {				/* x > y, x += ulp */
+		lx += 1;
+		if(lx==0) hx += 1;
+	    }
+	}
+	hy = hx&0x7ff00000;
+	if(hy>=0x7ff00000) return x+x;	/* overflow  */
+	if(hy<0x00100000) {		/* underflow */
+	    y = x*x;
+	    if(y!=x) {		/* raise underflow flag */
+		__HI(y) = hx; __LO(y) = lx;
+		return y;
+	    }
+	}
+	__HI(x) = hx; __LO(x) = lx;
+	return x;
+}
+
+double fdlibm_ceil(double x)
+{
+	static const double huge = 1.0e300;
+
+	int i0,i1,j0;
+	unsigned i,j;
+	i0 =  __HI(x);
+	i1 =  __LO(x);
+	j0 = ((i0>>20)&0x7ff)-0x3ff;
+	if(j0<20) {
+	    if(j0<0) { 	/* raise inexact if x != 0 */
+		if(huge+x>0.0) {/* return 0*sign(x) if |x|<1 */
+		    if(i0<0) {i0=0x80000000;i1=0;} 
+		    else if((i0|i1)!=0) { i0=0x3ff00000;i1=0;}
+		}
+	    } else {
+		i = (0x000fffff)>>j0;
+		if(((i0&i)|i1)==0) return x; /* x is integral */
+		if(huge+x>0.0) {	/* raise inexact flag */
+		    if(i0>0) i0 += (0x00100000)>>j0;
+		    i0 &= (~i); i1=0;
+		}
+	    }
+	} else if (j0>51) {
+	    if(j0==0x400) return x+x;	/* inf or NaN */
+	    else return x;		/* x is integral */
+	} else {
+	    i = ((unsigned)(0xffffffff))>>(j0-20);
+	    if((i1&i)==0) return x;	/* x is integral */
+	    if(huge+x>0.0) { 		/* raise inexact flag */
+		if(i0>0) {
+		    if(j0==20) i0+=1; 
+		    else {
+			j = i1 + (1<<(52-j0));
+			if(j<i1) i0+=1;	/* got a carry */
+			i1 = j;
+		    }
+		}
+		i1 &= (~i);
+	    }
+	}
+	__HI(x) = i0;
+	__LO(x) = i1;
+	return x;
+}
+
+int fdlibm_isnan(double x)
+{
+	int hx,lx;
+	hx = (__HI(x)&0x7fffffff);
+	lx = __LO(x);
+	hx |= (unsigned)(lx|(-lx))>>31;	
+	hx = 0x7ff00000 - hx;
+	return ((unsigned)(hx))>>31;
+}

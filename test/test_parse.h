@@ -803,7 +803,8 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unicode_error_identity, UFBXT_FILE_TEST_FLAG_ALL
 
 	for (size_t i = 0; i < parent->children.count; i++) {
 		ufbx_node *child = parent->children.data[i];
-		bool left = child->world_transform.translation.x < 0.0f;
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&child->node_to_world);
+		bool left = world_transform.translation.x < 0.0f;
 
 		ufbxt_assert(!strcmp(child->name.data, "Child_\xef\xbf\xbd"));
 

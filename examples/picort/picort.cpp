@@ -3137,7 +3137,8 @@ void render_frame(ufbx_scene *original_scene, const Opts &opts, int frame_offset
 				l.position = normalize(-from_ufbx(dir));
 				l.directional = true;
 			} else {
-				l.position = from_ufbx(node->world_transform.translation);
+				ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+				l.position = from_ufbx(world_transform.translation);
 			}
 
 			l.color = from_ufbx(light->color) * (Real)light->intensity;

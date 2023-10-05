@@ -217,7 +217,7 @@ struct ufbx_converter { };
 #define ufbx_version_minor(version) ((uint32_t)(version)/1000u%1000u)
 #define ufbx_version_patch(version) ((uint32_t)(version)%1000u)
 
-#define UFBX_HEADER_VERSION ufbx_pack_version(0, 7, 0)
+#define UFBX_HEADER_VERSION ufbx_pack_version(0, 8, 0)
 #define UFBX_VERSION UFBX_HEADER_VERSION
 
 // -- Basic types
@@ -724,18 +724,35 @@ struct ufbx_unknown {
 // -- Nodes
 
 // Inherit type specifies how hierarchial node transforms are combined.
-// `UFBX_INHERIT_NORMAL` is combined using the "proper" multiplication
-// `UFBX_INHERIT_NO_SHEAR` does component-wise { pos+pos, rot*rot, scale*scale }
-// `UFBX_INHERIT_NO_SCALE` ignores the parent scale { pos+pos, rot*rot, scale }
-typedef enum ufbx_inherit_type UFBX_ENUM_REPR {
-	UFBX_INHERIT_NO_SHEAR, // R*r*S*s
-	UFBX_INHERIT_NORMAL,   // R*S*r*s
-	UFBX_INHERIT_NO_SCALE, // R*r*s
+// This only affects the final scaling, as rotation and translation are always
+// inherited correctly.
+// NOTE: These don't map to `"InheritType"` property as there may be new ones for
+// compatibility with various exporters.
+typedef enum ufbx_inherit_mode UFBX_ENUM_REPR {
 
-	UFBX_ENUM_FORCE_WIDTH(UFBX_INHERIT_TYPE)
-} ufbx_inherit_type;
+	// Normal matrix composition of hierarchy: `R*S*r*s`.
+	//   child.node_to_world = parent.node_to_world * child.node_to_parent;
+	UFBX_INHERIT_MODE_NORMAL,
 
-UFBX_ENUM_TYPE(ufbx_inherit_type, UFBX_INHERIT_TYPE, UFBX_INHERIT_NO_SCALE);
+	// Ignore parent scale when computing the transform: `R*r*s`.
+	//   ufbx_transform t = node.local_transform;
+	//   t.translation *= parent.inherit_scale;
+	//   t.scale *= node.inherit_scale_node.inherit_scale;
+	//   child.node_to_world = parent.unscaled_node_to_world * t;
+	// Also known as "Segment scale compensate" in some software.
+	UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE,
+
+	// Apply parent scale component-wise: `R*r*S*s`.
+	//   ufbx_transform t = node.local_transform;
+	//   t.translation *= parent.inherit_scale;
+	//   t.scale *= node.inherit_scale_node.inherit_scale;
+	//   child.node_to_world = parent.unscaled_node_to_world * t;
+	UFBX_INHERIT_MODE_COMPONENTWISE_SCALE,
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_INHERIT_MODE)
+} ufbx_inherit_mode;
+
+UFBX_ENUM_TYPE(ufbx_inherit_mode, UFBX_INHERIT_MODE, UFBX_INHERIT_MODE_COMPONENTWISE_SCALE);
 
 // Nodes form the scene transformation hierarchy and can contain attached
 // elements such as meshes or lights. In normal cases a single `ufbx_node`
@@ -779,6 +796,10 @@ struct ufbx_node {
 	// See `UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES`.
 	ufbx_nullable ufbx_node *geometry_transform_helper;
 
+	// Scale helper if one exists.
+	// See `UFBX_INHERIT_MODE_HANDLING_HELPER_NODES`.
+	ufbx_nullable ufbx_node *scale_helper;
+
 	// `attrib->type` if `attrib` is defined, otherwise `UFBX_ELEMENT_UNKNOWN`.
 	ufbx_element_type attrib_type;
 
@@ -790,9 +811,21 @@ struct ufbx_node {
 
 	// Local transform in parent, geometry transform is a non-inherited
 	// transform applied only to attachments like meshes
-	ufbx_inherit_type inherit_type;
+	ufbx_inherit_mode inherit_mode;
+	ufbx_inherit_mode original_inherit_mode;
 	ufbx_transform local_transform;
 	ufbx_transform geometry_transform;
+
+	// Combined scale when using `UFBX_INHERIT_MODE_COMPONENTWISE_SCALE`.
+	// Contains `local_transform.scale` otherwise.
+	ufbx_vec3 inherit_scale;
+
+	// Node where scale is inherited from for `UFBX_INHERIT_MODE_COMPONENTWISE_SCALE`
+	// and even for `UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE`.
+	// For componentwise-scale nodes, this will point to `parent`, for scale ignoring
+	// nodes this will point to the parent of the nearest componentwise-scaled node
+	// in the parent chain.
+	ufbx_nullable ufbx_node *inherit_scale_node;
 
 	// Raw Euler angles in degrees for those who want them
 
@@ -802,10 +835,6 @@ struct ufbx_node {
 	// The angles are specified in degrees.
 	ufbx_vec3 euler_rotation;
 
-	// Transform to the global "world" space, may be incorrect if the node
-	// uses `UFBX_INHERIT_NORMAL`, prefer using the `node_to_world` matrix.
-	ufbx_transform world_transform;
-
 	// Matrices derived from the transformations, for transforming geometry
 	// prefer using `geometry_to_world` as that supports geometric transforms.
 
@@ -814,8 +843,6 @@ struct ufbx_node {
 	ufbx_matrix node_to_parent;
 	// Transform from this node to the world space, ie. multiplying all the
 	// `node_to_parent` matrices of the parent chain together.
-	// NOTE: Not the same as `ufbx_transform_to_matrix(&world_transform)`
-	// as this matrix will account for potential shear (if `inherit_type == UFBX_INHERIT_NORMAL`).
 	ufbx_matrix node_to_world;
 	// Transform from the attribute to this node. Does not affect the transforms
 	// of `children`!
@@ -824,13 +851,16 @@ struct ufbx_node {
 	// Transform from attribute space to world space.
 	// Equivalent to `ufbx_matrix_mul(&node_to_world, &geometry_to_node)`.
 	ufbx_matrix geometry_to_world;
+	// Transform from this node to world space, ignoring self scaling.
+	ufbx_matrix unscaled_node_to_world;
 
 	// ufbx-specific adjustment for switching between coodrinate/unit systems.
 	// HINT: In most cases you don't need to deal with these as these are baked
 	// into all the transforms above and into `ufbx_evaluate_transform()`.
 	ufbx_quat adjust_pre_rotation;  // < Rotation applied between parent and self
-	ufbx_vec3 adjust_pre_scale;     // < Scaling applied between parent and self
+	ufbx_real adjust_pre_scale;     // < Scaling applied between parent and self
 	ufbx_quat adjust_post_rotation; // < Rotation applied in local space at the end
+	ufbx_real adjust_post_scale;    // < Scaling applied in local space at the end
 
 	// Materials used by `mesh` or other `attrib`.
 	// There may be multiple copies of a single `ufbx_mesh` with different materials
@@ -847,12 +877,23 @@ struct ufbx_node {
 	bool has_geometry_transform;
 
 	// If `true` the transform is adjusted by ufbx, not enabled by default.
-	// See `adjust_pre_rotation`, `adjust_pre_scale`, `adjust_post_rotation`.
+	// See `adjust_pre_rotation`, `adjust_pre_scale`, `adjust_post_rotation`,
+	// and `adjust_post_scale`.
 	bool has_adjust_transform;
 
-	// True if this node is node is a synthetic geometry transform helper.
+	// Scale is adjusted by root scale.
+	bool has_root_adjust_transform;
+
+	// True if this node is a synthetic geometry transform helper.
 	// See `UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES`.
 	bool is_geometry_transform_helper;
+
+	// True if the node is a synthetic scale compensation helper.
+	// See `UFBX_INHERIT_MODE_HANDLING_HELPER_NODES`.
+	bool is_scale_helper;
+
+	// Parent node to children that can compensate for parent scale.
+	bool is_scale_compensate_parent;
 
 	// How deep is this node in the parent hierarchy. Root node is at depth `0`
 	// and the immediate children of root at `1`.
@@ -1674,8 +1715,8 @@ struct ufbx_stereo_camera {
 		ufbx_node_list instances;
 	}; };
 
-	ufbx_camera *left;
-	ufbx_camera *right;
+	ufbx_nullable ufbx_camera *left;
+	ufbx_nullable ufbx_camera *right;
 };
 
 struct ufbx_camera_switcher {
@@ -1929,7 +1970,7 @@ struct ufbx_blend_channel {
 	ufbx_blend_keyframe_list keyframes;
 
 	// Final blend shape ignoring any intermediate blend shapes.
-	ufbx_blend_shape *target_shape;
+	ufbx_nullable ufbx_blend_shape *target_shape;
 };
 
 // Blend shape target containing the actual vertex offsets
@@ -2801,6 +2842,13 @@ typedef struct ufbx_prop_override {
 
 UFBX_LIST_TYPE(ufbx_prop_override_list, ufbx_prop_override);
 
+typedef struct ufbx_transform_override {
+	uint32_t node_id;
+	ufbx_transform transform;
+} ufbx_transform_override;
+
+UFBX_LIST_TYPE(ufbx_transform_override_list, ufbx_transform_override);
+
 // Animation descriptor used for evaluating animation.
 // Usually obtained from `ufbx_scene` via either global animation `ufbx_scene.anim`,
 // per-stack animation `ufbx_anim_stack.anim` or per-layer animation `ufbx_anim_layer.anim`.
@@ -2820,7 +2868,10 @@ typedef struct ufbx_anim {
 	ufbx_real_list override_layer_weights;
 
 	// Sorted by `element_id, prop_name`
-	ufbx_prop_override_list overrides;
+	ufbx_prop_override_list prop_overrides;
+
+	// Sorted by `node_id`
+	ufbx_transform_override_list transform_overrides;
 
 	// Evaluate connected properties as if they would not be connected.
 	bool ignore_connections;
@@ -2882,7 +2933,12 @@ struct ufbx_anim_layer {
 };
 
 struct ufbx_anim_value {
-	union { ufbx_element element; struct { ufbx_string name; ufbx_props props; }; };
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t typed_id;
+	}; };
 
 	ufbx_vec3 default_value;
 	ufbx_nullable ufbx_anim_curve *curves[3];
@@ -2937,6 +2993,9 @@ struct ufbx_anim_curve {
 	}; };
 
 	ufbx_keyframe_list keyframes;
+
+	ufbx_real min_value;
+	ufbx_real max_value;
 };
 
 // -- Collections
@@ -3188,6 +3247,9 @@ typedef enum ufbx_warning_type UFBX_ENUM_REPR {
 
 	// Geometry data has been defined but has no data.
 	UFBX_WARNING_MISSING_GEOMETRY_DATA,
+
+	// Duplicated connection between two elements that shouldn't have.
+	UFBX_WARNING_DUPLICATE_CONNECTION,
 
 	// Out-of-bounds index has been clamped to be in-bounds.
 	// HINT: You can use `ufbx_index_error_handling` to adjust behavior.
@@ -3943,6 +4005,22 @@ typedef enum ufbx_geometry_transform_handling UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_geometry_transform_handling, UFBX_GEOMETRY_TRANSFORM_HANDLING, UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK);
 
+// How to handle FBX transform inherit modes.
+typedef enum ufbx_inherit_mode_handling UFBX_ENUM_REPR {
+
+	UFBX_INHERIT_MODE_HANDLING_PRESERVE,
+
+	UFBX_INHERIT_MODE_HANDLING_HELPER_NODES,
+
+	UFBX_INHERIT_MODE_HANDLING_COMPENSATE,
+
+	UFBX_INHERIT_MODE_HANDLING_IGNORE,
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_INHERIT_MODE_HANDLING)
+} ufbx_inherit_mode_handling;
+
+UFBX_ENUM_TYPE(ufbx_inherit_mode_handling, UFBX_INHERIT_MODE_HANDLING, UFBX_INHERIT_MODE_HANDLING_IGNORE);
+
 // Specify how unit / coordinate system conversion should be performed.
 // Affects how `ufbx_load_opts.target_axes` and `ufbx_load_opts.target_unit_meters` work,
 // has no effect if neither is specified.
@@ -3962,6 +4040,53 @@ typedef enum ufbx_space_conversion UFBX_ENUM_REPR {
 } ufbx_space_conversion;
 
 UFBX_ENUM_TYPE(ufbx_space_conversion, UFBX_SPACE_CONVERSION, UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS);
+
+typedef struct ufbx_baked_vec3 {
+	double time;
+	ufbx_vec3 value;
+} ufbx_baked_vec3;
+
+UFBX_LIST_TYPE(ufbx_baked_vec3_list, ufbx_baked_vec3);
+
+typedef struct ufbx_baked_quat {
+	double time;
+	ufbx_quat value;
+} ufbx_baked_quat;
+
+UFBX_LIST_TYPE(ufbx_baked_quat_list, ufbx_baked_quat);
+
+typedef struct ufbx_baked_node {
+	uint32_t typed_id;
+	uint32_t element_id;
+	bool constant_translation;
+	bool constant_rotation;
+	bool constant_scale;
+	ufbx_baked_vec3_list translation_keys;
+	ufbx_baked_quat_list rotation_keys;
+	ufbx_baked_vec3_list scale_keys;
+} ufbx_baked_node;
+
+UFBX_LIST_TYPE(ufbx_baked_node_list, ufbx_baked_node);
+
+typedef struct ufbx_baked_prop {
+	ufbx_string name;
+	bool constant_value;
+	ufbx_baked_vec3_list keys;
+} ufbx_baked_prop;
+
+UFBX_LIST_TYPE(ufbx_baked_prop_list, ufbx_baked_prop);
+
+typedef struct ufbx_baked_element {
+	uint32_t element_id;
+	ufbx_baked_prop_list props;
+} ufbx_baked_element;
+
+UFBX_LIST_TYPE(ufbx_baked_element_list, ufbx_baked_element);
+
+typedef struct ufbx_baked_anim {
+	ufbx_baked_node_list nodes;
+	ufbx_baked_element_list elements;
+} ufbx_baked_anim;
 
 // -- Main API
 
@@ -4072,6 +4197,10 @@ typedef struct ufbx_load_opts {
 	// See `ufbx_geometry_transform_handling` for an explanation.
 	ufbx_geometry_transform_handling geometry_transform_handling;
 
+	// How to handle unconventional transform inherit modes.
+	// See `ufbx_inherit_mode_handling` for an explanation.
+	ufbx_inherit_mode_handling inherit_mode_handling;
+
 	// How to perform space conversion by `target_axes` and `target_unit_meters`.
 	// See `ufbx_space_conversion` for an explanation.
 	ufbx_space_conversion space_conversion;
@@ -4098,13 +4227,9 @@ typedef struct ufbx_load_opts {
 	// See `UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES`.
 	ufbx_string geometry_transform_helper_name;
 
-	// Do not scale necessary properties curves with `target_unit_meters`.
-	// Used only if `space_conversion == UFBX_SPACE_CONVERSION_TRANSFORM_ROOT`.
-	bool no_prop_unit_scaling;
-
-	// Do not scale necessary animation curves with `target_unit_meters`.
-	// Used only if `space_conversion == UFBX_SPACE_CONVERSION_TRANSFORM_ROOT`.
-	bool no_anim_curve_unit_scaling;
+	// Name for dummy scale helper nodes.
+	// See `UFBX_INHERIT_MODE_HANDLING_HELPER_NODES`.
+	ufbx_string scale_helper_name;
 
 	// Normalize vertex normals.
 	bool normalize_normals;
@@ -4203,6 +4328,8 @@ typedef struct ufbx_prop_override_desc {
 
 UFBX_LIST_TYPE(ufbx_const_prop_override_desc_list, const ufbx_prop_override_desc);
 
+UFBX_LIST_TYPE(ufbx_const_transform_override_list, const ufbx_transform_override);
+
 typedef struct ufbx_anim_opts {
 	uint32_t _begin_zero;
 
@@ -4213,7 +4340,10 @@ typedef struct ufbx_anim_opts {
 	ufbx_const_real_list override_layer_weights;
 
 	// Property overrides
-	ufbx_const_prop_override_desc_list overrides;
+	ufbx_const_prop_override_desc_list prop_overrides;
+
+	// Transform overrides
+	ufbx_const_transform_override_list transform_overrides;
 
 	// Ignore connected properties
 	bool ignore_connections;
@@ -4222,6 +4352,70 @@ typedef struct ufbx_anim_opts {
 
 	uint32_t _end_zero;
 } ufbx_anim_opts;
+
+typedef struct ufbx_bake_opts {
+	uint32_t _begin_zero;
+
+	ufbx_allocator_opts temp_allocator;   // < Allocator used during loading
+	ufbx_allocator_opts result_allocator; // < Allocator used for the final baked animation
+
+	// Offset to start the evaluation from.
+	double time_start_offset;
+
+	// Sample rate in seconds.
+	// Samples per second to use for resampling non-linear animation.
+	// Default: 30
+	double resample_rate;
+
+	// Minimum sample rate to not resample.
+	// Many exporters resample animation by default. To avoid double-resampling
+	// keyframe rates higher or equal to this will not be resampled.
+	// Default: 19.5
+	double minimum_sample_rate;
+
+	// Bake the raw versions of properties related to transforms.
+	bool bake_transform_props;
+
+	// Do not bake node transforms.
+	bool skip_node_transforms;
+
+	// Do not resample linear rotation keyframes.
+	// FBX interpolates rotation in Euler angles, so this might cause incorrect interpolation.
+	bool no_resample_rotation;
+
+	// Ignore layer weight animation.
+	bool ignore_layer_weight_animation;
+
+	// Maximum number of segments to generate from one keyframe.
+	// Default: 32
+	size_t max_keyframe_segments;
+
+	// Timestep in seconds for constant interpolation.
+	// Default of `0.0` uses the smallest representable time offset.
+	double constant_timestep;
+
+	// Enable key reduction.
+	bool key_reduction_enabled;
+
+	// Enable key reduction for non-constant rotations.
+	// Assumes rotations will be interpolated using a spherical linear interpolation at runtime.
+	bool key_reduction_rotation;
+
+	// Threshold for reducing keys for linear segments.
+	// Default `0.000001`, use negative to disable.
+	double key_reduction_threshold;
+
+	// Maximum passes over the keys to reduce.
+	// Every pass can potentially halve the the amount of keys.
+	// Default: `4`
+	size_t key_reduction_passes;
+
+	// Compensate for `UFBX_INHERIT_NO_SCALE` by adjusting child scale.
+	// NOTE: This is an lossy operation, and properly works only for uniform scaling.
+	bool compensate_inherit_no_scale;
+
+	uint32_t _end_zero;
+} ufbx_bake_opts;
 
 // Options for `ufbx_tessellate_nurbs_curve()`
 // NOTE: Initialize to zero with `{ 0 }` (C) or `{ }` (C++)
@@ -4537,7 +4731,22 @@ ufbx_inline ufbx_prop ufbx_evaluate_prop(const ufbx_anim *anim, const ufbx_eleme
 // `ufbx_props.defaults`. This lets you use `ufbx_find_prop/value()` for the results.
 ufbx_abi ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
 
+typedef enum ufbx_transform_flags UFBX_FLAG_REPR {
+
+	// Ignore parent scale helper.
+	UFBX_TRANSFORM_FLAG_IGNORE_SCALE_HELPER = 0x1,
+
+	// Ignore componentwise scale.
+	// Note that if you don't specify this, ufbx will have to potentially
+	// evaluate the entire parent chain in the worst case.
+	UFBX_TRANSFORM_FLAG_IGNORE_COMPONENTWISE_SCALE = 0x2,
+
+	UFBX_FLAG_FORCE_WIDTH(UFBX_TRANSFORM_FLAGS)
+} ufbx_transform_flags;
+
 ufbx_abi ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *node, double time);
+ufbx_abi ufbx_transform ufbx_evaluate_transform_flags(const ufbx_anim *anim, const ufbx_node *node, double time, uint32_t flags);
+
 ufbx_abi ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time);
 
 // Evaluate the whole `scene` at a specific `time` in the animation `anim`.
@@ -4553,6 +4762,16 @@ ufbx_abi ufbx_anim *ufbx_create_anim(const ufbx_scene *scene, const ufbx_anim_op
 
 ufbx_abi void ufbx_retain_anim(ufbx_anim *anim);
 ufbx_abi void ufbx_free_anim(ufbx_anim *anim);
+
+// Animation baking
+
+ufbx_abi ufbx_baked_anim *ufbx_bake_anim(const ufbx_scene *scene, const ufbx_anim *anim, const ufbx_bake_opts *opts, ufbx_error *error);
+
+ufbx_abi void ufbx_retain_baked_anim(ufbx_baked_anim *bake);
+ufbx_abi void ufbx_free_baked_anim(ufbx_baked_anim *bake);
+
+ufbx_abi ufbx_vec3 ufbx_evaluate_baked_vec3(ufbx_baked_vec3_list keyframes, double time);
+ufbx_abi ufbx_quat ufbx_evaluate_baked_quat(ufbx_baked_quat_list keyframes, double time);
 
 // Materials
 
@@ -4872,6 +5091,12 @@ template<> struct ufbx_type_traits<ufbx_anim> {
 	static void free(ufbx_anim *ptr) { ufbx_free_anim(ptr); }
 };
 
+template<> struct ufbx_type_traits<ufbx_baked_anim> {
+	enum { valid = 1 };
+	static void retain(ufbx_baked_anim *ptr) { ufbx_retain_baked_anim(ptr); }
+	static void free(ufbx_baked_anim *ptr) { ufbx_free_baked_anim(ptr); }
+};
+
 class ufbx_deleter {
 public:
 	template <typename T>
@@ -5024,6 +5249,10 @@ public:
 // Weight of an animation layer in percentage (100.0 being full).
 // Used by: `ufbx_anim_layer`.
 #define UFBX_Weight "Weight"
+
+// Blend shape deformation weight (100.0 being full).
+// Used by: `ufbx_blend_channel`.
+#define UFBX_DeformPercent "DeformPercent"
 
 #if defined(_MSC_VER)
 	#pragma warning(pop)

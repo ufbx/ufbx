@@ -666,18 +666,16 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_z_up_adjust, blender_340_z_up, ufbxt_
 		if (node->node_depth == 1) {
 			ufbxt_assert(node->has_adjust_transform);
 			ufbx_vec3 rotation = { -90.0f, 0.0f, 0.0f };
-			ufbx_vec3 scale = { 0.01f, 0.01f, 0.01f };
 			ufbx_quat rotation_quat = ufbx_euler_to_quat(rotation, UFBX_ROTATION_ORDER_XYZ);
 			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
 			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, rotation_quat);
-			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);
+			ufbxt_assert_close_real(err, node->adjust_pre_scale, 0.01f);
 			num_adjusted++;
 		} else {
 			ufbxt_assert(!node->has_adjust_transform);
-			ufbx_vec3 scale = { 1.0f, 1.0f, 1.0f };
 			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
 			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, ufbx_identity_quat);
-			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);
+			ufbxt_assert_close_real(err, node->adjust_pre_scale, 1.0f);
 		}
 	}
 
@@ -744,18 +742,16 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_y_up_adjust, blender_340_y_up, ufbxt_
 		if (node->node_depth == 1) {
 			ufbxt_assert(node->has_adjust_transform);
 			ufbx_vec3 rotation = { 90.0f, 0.0f, 0.0f };
-			ufbx_vec3 scale = { 0.01f, 0.01f, 0.01f };
 			ufbx_quat rotation_quat = ufbx_euler_to_quat(rotation, UFBX_ROTATION_ORDER_XYZ);
 			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
 			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, rotation_quat);
-			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);
+			ufbxt_assert_close_real(err, node->adjust_pre_scale, 0.01f);
 			num_adjusted++;
 		} else {
 			ufbxt_assert(!node->has_adjust_transform);
-			ufbx_vec3 scale = { 1.0f, 1.0f, 1.0f };
 			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
 			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, ufbx_identity_quat);
-			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);
+			ufbxt_assert_close_real(err, node->adjust_pre_scale, 1.0f);
 		}
 	}
 

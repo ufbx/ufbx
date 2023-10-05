@@ -158,6 +158,7 @@ typedef struct {
 
 	double position_scale;
 	double position_scale_float;
+	double position_scale_bake;
 
 	char animation_name[128];
 
@@ -542,6 +543,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 	obj->exporter = UFBXT_OBJ_EXPORTER_UNKNOWN;
 	obj->position_scale = 1.0;
 	obj->position_scale_float = 1.0;
+	obj->position_scale_bake = 1.0;
 
 	if (implicit_mesh) {
 		mesh = meshes;
@@ -749,6 +751,10 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			if (sscanf(line, "ufbx:position_scale_float=%lf", &position_scale_float) == 1) {
 				obj->position_scale_float = position_scale_float;
 			}
+			double position_scale_bake = 0.0;
+			if (sscanf(line, "ufbx:position_scale_bake=%lf", &position_scale_bake) == 1) {
+				obj->position_scale_bake = position_scale_bake;
+			}
 			int frame = 0;
 			if (sscanf(line, "ufbx:frame=%d", &frame) == 1) {
 				obj->animation_frame = (int32_t)frame;
@@ -913,6 +919,13 @@ static void ufbxt_assert_close_vec3(ufbxt_diff_error *p_err, ufbx_vec3 a, ufbx_v
 	ufbxt_assert_close_real(p_err, a.x, b.x);
 	ufbxt_assert_close_real(p_err, a.y, b.y);
 	ufbxt_assert_close_real(p_err, a.z, b.z);
+}
+
+static void ufbxt_assert_close_vec3_xyz(ufbxt_diff_error *p_err, ufbx_vec3 a, ufbx_real x, ufbx_real y, ufbx_real z)
+{
+	ufbxt_assert_close_real(p_err, a.x, x);
+	ufbxt_assert_close_real(p_err, a.y, y);
+	ufbxt_assert_close_real(p_err, a.z, z);
 }
 
 static void ufbxt_assert_close_vec4(ufbxt_diff_error *p_err, ufbx_vec4 a, ufbx_vec4 b)
@@ -1201,11 +1214,16 @@ static ufbxt_noinline size_t ufbxt_obj_group_key(char *cat_buf, size_t cat_cap, 
 enum {
 	UFBXT_OBJ_DIFF_FLAG_CHECK_DEFORMED_NORMALS = 0x1,
 	UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS = 0x2,
+	UFBXT_OBJ_DIFF_FLAG_BAKED_ANIM = 0x4,
 };
 
 static bool ufbxt_has_mesh(ufbx_node *node)
 {
-	return node->mesh || (node->geometry_transform_helper && node->geometry_transform_helper->mesh);
+	if (!node) return false;
+	if (node->mesh) return true;
+	if (ufbxt_has_mesh(node->scale_helper)) return true;
+	if (ufbxt_has_mesh(node->geometry_transform_helper)) return true;
+	return false;
 }
 
 static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, uint32_t flags)
@@ -1360,6 +1378,9 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		}
 
 		ufbxt_assert(node);
+		if (node->scale_helper) {
+			node = node->scale_helper;
+		}
 		if (node->geometry_transform_helper) {
 			node = node->geometry_transform_helper;
 		}
@@ -1378,6 +1399,9 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		#if defined(UFBX_REAL_IS_FLOAT)
 			scale *= obj->position_scale_float;
 		#endif
+		if (flags & UFBXT_OBJ_DIFF_FLAG_BAKED_ANIM) {
+			scale *= obj->position_scale_bake;
+		}
 
 		used_nodes[num_used_nodes++] = node;
 

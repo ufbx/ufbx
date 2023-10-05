@@ -41,6 +41,12 @@ static const ufbxt_enum_name ufbxt_names_ufbx_geometry_transform_handling[] = {
 	{ "modify-geometry-no-fallback", UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK },
 };
 
+static const ufbxt_enum_name ufbxt_names_ufbx_inherit_mode_handling[] = {
+	{ "preserve", UFBX_INHERIT_MODE_HANDLING_PRESERVE },
+	{ "helper-nodes", UFBX_INHERIT_MODE_HANDLING_HELPER_NODES },
+	{ "compensate", UFBX_INHERIT_MODE_HANDLING_COMPENSATE },
+};
+
 static const ufbxt_enum_name ufbxt_names_ufbx_space_conversion[] = {
 	{ "transform-root", UFBX_SPACE_CONVERSION_TRANSFORM_ROOT },
 	{ "adjust-transforms", UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS },
@@ -120,6 +126,8 @@ int main(int argc, char **argv)
 	bool allow_bad_unicode = false;
 	bool sink = false;
 	bool dedicated_allocs = false;
+	bool bake = false;
+	double bake_fps = -1.0;
 	double override_fps = -1.0;
 
 	ufbx_load_opts opts = { 0 };
@@ -156,12 +164,18 @@ int main(int argc, char **argv)
 			opts.ignore_missing_external_files = true;
 		} else if (!strcmp(argv[i], "--geometry-transform-handling")) {
 			if (++i < argc) opts.geometry_transform_handling = ufbxt_str_to_enum(ufbx_geometry_transform_handling, argv[i]);
+		} else if (!strcmp(argv[i], "--inherit-mode-handling")) {
+			if (++i < argc) opts.inherit_mode_handling = ufbxt_str_to_enum(ufbx_inherit_mode_handling, argv[i]);
 		} else if (!strcmp(argv[i], "--space-conversion")) {
 			if (++i < argc) opts.space_conversion = ufbxt_str_to_enum(ufbx_space_conversion, argv[i]);
 		} else if (!strcmp(argv[i], "--index-error-handling")) {
 			if (++i < argc) opts.index_error_handling = ufbxt_str_to_enum(ufbx_index_error_handling, argv[i]);
 		} else if (!strcmp(argv[i], "--fps")) {
 			if (++i < argc) override_fps = strtod(argv[i], NULL);
+		} else if (!strcmp(argv[i], "--bake")) {
+			bake = true;
+		} else if (!strcmp(argv[i], "--bake-fps")) {
+			if (++i < argc) bake_fps = strtod(argv[i], NULL);
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "Unrecognized flag: %s\n", argv[i]);
 			exit(1);
@@ -372,12 +386,69 @@ int main(int argc, char **argv)
 				time = (double)frame / fps;
 			}
 
+			if (bake) {
+				ufbx_bake_opts opts = { 0 };
+				opts.max_keyframe_segments = 4096;
+				if (bake_fps > 0) {
+					opts.resample_rate = bake_fps;
+				}
+
+				ufbx_baked_anim *bake = ufbx_bake_anim(scene, anim, &opts, NULL);
+				ufbxt_assert(bake);
+
+				size_t num_prop_overrides = 0;
+				for (size_t i = 0; i < bake->elements.count; i++) {
+					num_prop_overrides += bake->elements.data[i].props.count;
+				}
+
+				ufbx_prop_override_desc *prop_overrides = (ufbx_prop_override_desc*)calloc(num_prop_overrides, sizeof(ufbx_prop_override_desc));
+				ufbx_transform_override *transform_overrides = (ufbx_transform_override*)calloc(bake->nodes.count, sizeof(ufbx_transform_override));
+				ufbxt_assert(prop_overrides);
+				ufbxt_assert(transform_overrides);
+
+				ufbx_prop_override_desc *prop_over = prop_overrides;
+				for (size_t elem_ix = 0; elem_ix < bake->elements.count; elem_ix++) {
+					ufbx_baked_element *elem = &bake->elements.data[elem_ix];
+					for (size_t prop_ix = 0; prop_ix < elem->props.count; prop_ix++) {
+						ufbx_baked_prop *prop = &elem->props.data[prop_ix];
+						prop_over->element_id = elem->element_id;
+						prop_over->prop_name = prop->name;
+						ufbx_vec3 val = ufbx_evaluate_baked_vec3(prop->keys, time);
+						prop_over->value.x = val.x;
+						prop_over->value.y = val.y;
+						prop_over->value.z = val.z;
+						prop_over++;
+					}
+				}
+
+				for (size_t i = 0; i < bake->nodes.count; i++) {
+					ufbx_baked_node *node = &bake->nodes.data[i];
+					transform_overrides[i].node_id = node->typed_id;
+					transform_overrides[i].transform.translation = ufbx_evaluate_baked_vec3(node->translation_keys, time);
+					transform_overrides[i].transform.rotation = ufbx_evaluate_baked_quat(node->rotation_keys, time);
+					transform_overrides[i].transform.scale = ufbx_evaluate_baked_vec3(node->scale_keys, time);
+				}
+
+				ufbxt_assert(prop_over == prop_overrides + num_prop_overrides);
+
+				ufbx_anim_opts anim_opts = { 0 };
+				anim_opts.prop_overrides.data = prop_overrides;
+				anim_opts.prop_overrides.count = num_prop_overrides;
+				anim_opts.transform_overrides.data = transform_overrides;
+				anim_opts.transform_overrides.count = bake->nodes.count;
+
+				anim = ufbx_create_anim(scene, &anim_opts, NULL);
+				ufbxt_assert(anim);
+			}
+
 			ufbx_evaluate_opts eval_opts = { 0 };
 			eval_opts.evaluate_skinning = true;
 			eval_opts.evaluate_caches = true;
 			eval_opts.load_external_files = true;
 			state = ufbx_evaluate_scene(scene, anim, time, &eval_opts, NULL);
 			ufbxt_assert(state);
+
+			ufbx_free_anim(anim);
 		} else {
 			state = scene;
 			ufbx_retain_scene(state);
@@ -389,7 +460,14 @@ int main(int argc, char **argv)
 		}
 
 		ufbxt_diff_error err = { 0 };
-		ufbxt_diff_to_obj(state, obj_file, &err, 0);
+
+		uint32_t diff_flags = 0;
+
+		if (bake) {
+			diff_flags |= UFBXT_OBJ_DIFF_FLAG_BAKED_ANIM;
+		}
+
+		ufbxt_diff_to_obj(state, obj_file, &err, diff_flags);
 
 		if (err.num > 0) {
 			ufbx_real avg = err.sum / (ufbx_real)err.num;

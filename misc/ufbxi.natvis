@@ -115,4 +115,6 @@
     </Expand>
   </Type>
 
+  <Type Name="ufbxi_double_list"><DisplayString>{{ count={count} }}</DisplayString><Expand><ArrayItems><Size>count</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
+
 </AutoVisualizer>

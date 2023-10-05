@@ -323,6 +323,13 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 		}
 	}
 
+	ufbxt_check_element_ptr(scene, node->mesh, UFBX_ELEMENT_MESH);
+	ufbxt_check_element_ptr(scene, node->light, UFBX_ELEMENT_LIGHT);
+	ufbxt_check_element_ptr(scene, node->camera, UFBX_ELEMENT_CAMERA);
+	ufbxt_check_element_ptr(scene, node->inherit_scale_node, UFBX_ELEMENT_NODE);
+	ufbxt_check_element_ptr(scene, node->scale_helper, UFBX_ELEMENT_NODE);
+	ufbxt_check_element_ptr(scene, node->geometry_transform_helper, UFBX_ELEMENT_NODE);
+
 	switch (node->attrib_type) {
 	case UFBX_ELEMENT_MESH: ufbxt_assert(node->mesh); break;
 	case UFBX_ELEMENT_LIGHT: ufbxt_assert(node->light); break;
@@ -336,13 +343,12 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	}
 
 	ufbxt_assert((uint32_t)node->attrib_type < (uint32_t)UFBX_ELEMENT_TYPE_COUNT);
-	ufbxt_assert((uint32_t)node->inherit_type < (uint32_t)UFBX_INHERIT_TYPE_COUNT);
+	ufbxt_assert((uint32_t)node->inherit_mode < (uint32_t)UFBX_INHERIT_MODE_COUNT);
 
 	if (node->is_root) {
 		ufbxt_assert(!node->has_geometry_transform);
 	}
 
-	ufbxt_check_element_ptr(scene, node->geometry_transform_helper, UFBX_ELEMENT_NODE);
 	if (node->geometry_transform_helper) {
 		ufbxt_assert(node->geometry_transform_helper->is_geometry_transform_helper);
 
@@ -796,8 +802,10 @@ static void ufbxt_check_blend_channel(ufbx_scene *scene, ufbx_blend_channel *cha
 		if (i > 0) {
 			ufbxt_assert(channel->keyframes.data[i - 1].target_weight <= channel->keyframes.data[i].target_weight);
 		}
+		ufbxt_assert(channel->keyframes.data[i].shape);
 		ufbxt_check_element_ptr(scene, channel->keyframes.data[i].shape, UFBX_ELEMENT_BLEND_SHAPE);
 	}
+	ufbxt_check_element_ptr(scene, channel->target_shape, UFBX_ELEMENT_BLEND_SHAPE);
 }
 
 static void ufbxt_check_blend_shape(ufbx_scene *scene, ufbx_blend_shape *shape)
@@ -969,13 +977,14 @@ static void ufbxt_check_anim(ufbx_scene *scene, ufbx_anim *anim)
 	for (size_t i = 0; i < anim->layers.count; i++) {
 		ufbxt_check_element_ptr(scene, anim->layers.data[i], UFBX_ELEMENT_ANIM_LAYER);
 	}
-	for (size_t i = 0; i < anim->overrides.count; i++) {
-		ufbx_prop_override *over = &anim->overrides.data[i];
+	for (size_t i = 0; i < anim->prop_overrides.count; i++) {
+		ufbx_prop_override *over = &anim->prop_overrides.data[i];
 		ufbxt_check_string(over->prop_name);
 		ufbxt_check_string(over->value_str);
 	}
 	if (!anim->custom) {
-		ufbxt_assert(anim->overrides.count == 0);
+		ufbxt_assert(anim->prop_overrides.count == 0);
+		ufbxt_assert(anim->transform_overrides.count == 0);
 		ufbxt_assert(anim->override_layer_weights.count == 0);
 	}
 }
