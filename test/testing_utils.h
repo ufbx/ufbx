@@ -1164,7 +1164,6 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 
 	free(obj_verts);
 	free(fbx_verts);
-
 }
 
 typedef struct {
