@@ -1100,3 +1100,98 @@ UFBXT_TEST(maya_axes_lefthanded_adjust)
 }
 #endif
 
+UFBXT_FILE_TEST(maya_axes_anim)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, false, "maya_axes_anim_0", NULL, 0.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_axes_anim_5", NULL, 5.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_axes_anim_8", NULL, 8.0/24.0);
+
+	ufbxt_assert(scene->poses.count == 1);
+	ufbx_pose *pose = scene->poses.data[0];
+	ufbxt_assert(pose->bind_pose);
+	ufbxt_assert(pose->bone_poses.count == 5);
+	for (size_t i = 0; i < pose->bone_poses.count; i++) {
+		ufbx_bone_pose *bone_pose = &pose->bone_poses.data[i];
+		ufbx_node *bone_node = bone_pose->bone_node;
+		ufbxt_assert(bone_node);
+
+		ufbxt_assert_close_vec3(err, bone_node->node_to_world.cols[0], bone_pose->bone_to_world.cols[0]);
+		ufbxt_assert_close_vec3(err, bone_node->node_to_world.cols[1], bone_pose->bone_to_world.cols[1]);
+		ufbxt_assert_close_vec3(err, bone_node->node_to_world.cols[2], bone_pose->bone_to_world.cols[2]);
+		ufbxt_assert_close_vec3(err, bone_node->node_to_world.cols[3], bone_pose->bone_to_world.cols[3]);
+	}
+}
+#endif
+
+UFBXT_TEST(maya_axes_anim_lefthanded)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_axes_anim" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 0; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.target_axes = ufbx_axes_left_handed_y_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+			opts.load_external_files = true;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_0", NULL, 0.0/24.0);
+			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_5", NULL, 5.0/24.0);
+			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_8", NULL, 8.0/24.0);
+
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
+UFBXT_TEST(maya_axes_anim_lefthanded_adjust)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_axes_anim" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 1; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+			opts.target_axes = ufbx_axes_left_handed_y_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+			opts.load_external_files = true;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_0", NULL, 0.0/24.0);
+			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_5", NULL, 5.0/24.0);
+			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_8", NULL, 8.0/24.0);
+
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+

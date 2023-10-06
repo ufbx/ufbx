@@ -20624,6 +20624,25 @@ ufbxi_noinline static void ufbxi_update_anim(ufbx_scene *scene)
 	}
 }
 
+static ufbxi_forceinline void ufbxi_mirror_matrix_dst(ufbx_matrix *m, ufbx_mirror_axis axis)
+{
+	if (axis == 0) return;
+	int32_t ax = (int32_t)axis - 1;
+	m->cols[0].v[ax] = -m->cols[0].v[ax];
+	m->cols[1].v[ax] = -m->cols[1].v[ax];
+	m->cols[2].v[ax] = -m->cols[2].v[ax];
+	m->cols[3].v[ax] = -m->cols[3].v[ax];
+}
+
+static ufbxi_forceinline void ufbxi_mirror_matrix_src(ufbx_matrix *m, ufbx_mirror_axis axis)
+{
+	if (axis == 0) return;
+	int32_t ax = (int32_t)axis - 1;
+	m->cols[ax].x = -m->cols[ax].x;
+	m->cols[ax].y = -m->cols[ax].y;
+	m->cols[ax].z = -m->cols[ax].z;
+}
+
 ufbxi_noinline static void ufbxi_update_initial_clusters(ufbx_scene *scene)
 {
 	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
@@ -20655,6 +20674,12 @@ ufbxi_noinline static void ufbxi_update_initial_clusters(ufbx_scene *scene)
 		if (ufbxi_matrix_all_zero(&cluster->mesh_node_to_bone)) {
 			ufbx_matrix world_to_bind = ufbx_matrix_invert(&cluster->bind_to_world);
 			cluster->mesh_node_to_bone = ufbx_matrix_mul(&world_to_bind, &node->node_to_world);
+		}
+
+		ufbx_mirror_axis mirror_axis = scene->metadata.mirror_axis;
+		if (mirror_axis) {
+			ufbxi_mirror_matrix_src(&cluster->mesh_node_to_bone, mirror_axis);
+			ufbxi_mirror_matrix_dst(&cluster->mesh_node_to_bone, mirror_axis);
 		}
 
 		// HACK: Account for geometry transforms by looking at the transform of the
@@ -21617,6 +21642,14 @@ static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 			}
 		}
 
+		ufbx_mirror_axis mirror_axis = cc->opts.mirror_axis;
+		if (mirror_axis && chan->interpretation != UFBX_CACHE_INTERPRETATION_UNKNOWN) {
+			chan->mirror_axis = mirror_axis;
+			ufbxi_for_list(ufbx_cache_frame, frame, chan->frames) {
+				frame->mirror_axis = mirror_axis;
+			}
+		}
+
 		num_channels++;
 		begin = end;
 	}
@@ -21822,6 +21855,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_contex
 	cc.string_pool = uc->string_pool;
 	cc.result = uc->result;
 
+	cc.opts.mirror_axis = uc->mirror_axis;
+
 	ufbx_geometry_cache *cache = ufbxi_cache_load(&cc, file->filename);
 	if (!cache) {
 		if (cc.error.type == UFBX_ERROR_FILE_NOT_FOUND) {
@@ -21946,11 +21981,9 @@ static ufbxi_noinline void ufbxi_transform_to_axes(ufbxi_context *uc, ufbx_coord
 		if (uc->opts.handedness_conversion_axis != UFBX_MIRROR_AXIS_NONE) {
 			ufbx_mirror_axis mirror_axis = uc->opts.handedness_conversion_axis;
 			uc->mirror_axis = mirror_axis;
-			int32_t axis = (int32_t)uc->mirror_axis - 1;
-			uc->axis_matrix.cols[0].v[axis] = -uc->axis_matrix.cols[0].v[axis];
-			uc->axis_matrix.cols[1].v[axis] = -uc->axis_matrix.cols[1].v[axis];
-			uc->axis_matrix.cols[2].v[axis] = -uc->axis_matrix.cols[2].v[axis];
+			uc->scene.metadata.mirror_axis = uc->mirror_axis;
 
+			ufbxi_mirror_matrix_dst(&uc->axis_matrix, uc->mirror_axis);
 			ufbxi_dev_assert(ufbx_matrix_determinant(&uc->axis_matrix) >= 0.0f);
 
 			ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
@@ -29186,6 +29219,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 	}
 
 	ufbx_real *dst = data;
+	size_t mirror_ix = (size_t)frame->mirror_axis - 1;
 	if (use_double) {
 		double buffer[512];
 		while (src_count > 0) {
@@ -29203,6 +29237,14 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 					t = v[2]; v[2] = v[5]; v[5] = t;
 					t = v[3]; v[3] = v[4]; v[4] = t;
 				}
+			}
+
+			if (frame->mirror_axis && !opts.ignore_transform) {
+				while (mirror_ix < num_read) {
+					buffer[mirror_ix] = -buffer[mirror_ix];
+					mirror_ix += 3;
+				}
+				mirror_ix -= num_read;
 			}
 
 			if (dst) {
@@ -29244,6 +29286,14 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 					t = v[0]; v[0] = v[3]; v[3] = t;
 					t = v[1]; v[1] = v[2]; v[2] = t;
 				}
+			}
+
+			if (frame->mirror_axis && !opts.ignore_transform) {
+				while (mirror_ix < num_read) {
+					buffer[mirror_ix] = -buffer[mirror_ix];
+					mirror_ix += 3;
+				}
+				mirror_ix -= num_read;
 			}
 
 			if (dst) {

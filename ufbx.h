@@ -1922,6 +1922,7 @@ struct ufbx_skin_cluster {
 
 	// Matrix that specifies the rest/bind pose transform of the node,
 	// not generally needed for skinning, use `geometry_to_bone` instead.
+	// NOTE: This does not account for unit scaling!
 	ufbx_matrix bind_to_world;
 
 	// Precomputed matrix/transform that accounts for the current bone transform
@@ -2071,6 +2072,9 @@ typedef struct ufbx_cache_frame {
 	// Format of the wrapper file.
 	ufbx_cache_file_format file_format;
 
+	// Axis to mirror the read data by.
+	ufbx_mirror_axis mirror_axis;
+
 	ufbx_cache_data_format data_format;     // < Format of the data in the file
 	ufbx_cache_data_encoding data_encoding; // < Binary encoding of the data
 	uint64_t data_offset;                   // < Byte offset into the file
@@ -2096,6 +2100,9 @@ typedef struct ufbx_cache_channel {
 	// List of frames belonging to this channel.
 	// Sorted by time (`ufbx_cache_frame.time`).
 	ufbx_cache_frame_list frames;
+
+	// Axis to mirror the frames by.
+	ufbx_mirror_axis mirror_axis;
 
 } ufbx_cache_channel;
 
@@ -3173,6 +3180,7 @@ struct ufbx_constraint {
 
 typedef struct ufbx_bone_pose {
 	ufbx_node *bone_node;
+	// NOTE: This does not account for unit scaling!
 	ufbx_matrix bone_to_world;
 } ufbx_bone_pose;
 
@@ -3412,6 +3420,10 @@ typedef struct ufbx_metadata {
 
 	ufbx_string original_file_path;
 	ufbx_blob raw_original_file_path;
+
+	// Axis that the scene has been mirrored by.
+	// All geometry has been mirrored in this axis.
+	ufbx_mirror_axis mirror_axis;
 
 } ufbx_metadata;
 
@@ -4538,6 +4550,9 @@ typedef struct ufbx_geometry_cache_opts {
 	// FPS value for converting frame times to seconds
 	double frames_per_second;
 
+	// Axis to mirror the geometry by.
+	ufbx_mirror_axis mirror_axis;
+
 	uint32_t _end_zero;
 } ufbx_geometry_cache_opts;
 
@@ -4552,6 +4567,9 @@ typedef struct ufbx_geometry_cache_data_opts {
 	bool additive;
 	bool use_weight;
 	ufbx_real weight;
+
+	// Ignore scene transform.
+	bool ignore_transform;
 
 	uint32_t _end_zero;
 } ufbx_geometry_cache_data_opts;
