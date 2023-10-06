@@ -21645,8 +21645,8 @@ static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 		ufbx_mirror_axis mirror_axis = cc->opts.mirror_axis;
 		if (mirror_axis && chan->interpretation != UFBX_CACHE_INTERPRETATION_UNKNOWN) {
 			chan->mirror_axis = mirror_axis;
-			ufbxi_for_list(ufbx_cache_frame, frame, chan->frames) {
-				frame->mirror_axis = mirror_axis;
+			ufbxi_for_list(ufbx_cache_frame, f, chan->frames) {
+				f->mirror_axis = mirror_axis;
 			}
 		}
 
