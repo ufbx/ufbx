@@ -1,6 +1,54 @@
 #undef UFBXT_TEST_GROUP
 #define UFBXT_TEST_GROUP "transform"
 
+#if UFBXT_IMPL
+void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_normals, const char *file_name, const char *anim_name, double time)
+{
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s.obj", data_root, file_name);
+
+	ufbxt_hintf("Frame from '%s' %s time %.2fs",
+		anim_name ? anim_name : "(implicit animation)",
+		buf, time);
+
+	size_t obj_size = 0;
+	void *obj_data = ufbxt_read_file(buf, &obj_size);
+	ufbxt_obj_file *obj_file = obj_data ? ufbxt_load_obj(obj_data, obj_size, NULL) : NULL;
+	ufbxt_assert(obj_file);
+	free(obj_data);
+
+	ufbx_evaluate_opts opts = { 0 };
+	opts.evaluate_skinning = true;
+	opts.evaluate_caches = true;
+	opts.load_external_files = true;
+
+	ufbx_anim *anim = scene->anim;
+
+	if (anim_name) {
+		for (size_t i = 0; i < scene->anim_stacks.count; i++) {
+			ufbx_anim_stack *stack = scene->anim_stacks.data[i];
+			if (strstr(stack->name.data, anim_name)) {
+				ufbxt_assert(stack->layers.count > 0);
+				anim = stack->anim;
+				break;
+			}
+		}
+	}
+
+	ufbx_scene *eval = ufbx_evaluate_scene(scene, anim, time, &opts, NULL);
+	ufbxt_assert(eval);
+
+	ufbxt_check_scene(eval);
+
+	uint32_t diff_flags = 0;
+	if (check_normals) diff_flags |= UFBXT_OBJ_DIFF_FLAG_CHECK_DEFORMED_NORMALS;
+	ufbxt_diff_to_obj(eval, obj_file, err, diff_flags);
+
+	ufbx_free_scene(eval);
+	free(obj_file);
+}
+#endif
+
 UFBXT_FILE_TEST(maya_pivots)
 #if UFBXT_IMPL
 {
@@ -957,5 +1005,13 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_geometry_transform_inherit_mode_scale_h
 		ufbxt_assert_close_quat(err, node->local_transform.rotation, transform.rotation);
 		ufbxt_assert_close_vec3(err, node->local_transform.scale, transform.scale);
 	}
+}
+#endif
+
+UFBXT_FILE_TEST(maya_child_pivots)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_child_pivots_6", NULL, 6.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_child_pivots_12", NULL, 12.0/24.0);
 }
 #endif
