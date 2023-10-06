@@ -230,6 +230,83 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_modify, max_geometry_trans
 }
 #endif
 
+UFBXT_TEST(max_geometry_transform_lefthanded)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("max_geometry_transform_lefthanded", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "max_geometry_transform" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t axis_ix = 0; axis_ix < UFBX_MIRROR_AXIS_COUNT; axis_ix++) {
+			for (uint32_t handling_ix = 0; handling_ix < UFBX_GEOMETRY_TRANSFORM_HANDLING_COUNT; handling_ix++) {
+				ufbxt_hintf("handedness_conversion_axis=%u geometry_transform_handling=%u", axis_ix, handling_ix);
+
+				ufbx_load_opts opts = { 0 };
+
+				opts.target_axes = ufbx_axes_left_handed_z_up;
+				opts.handedness_conversion_axis = (ufbx_mirror_axis)axis_ix;
+				opts.geometry_transform_handling = (ufbx_geometry_transform_handling)handling_ix;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+
+				ufbx_free_scene(scene);
+			}
+		}
+	}
+
+	free(obj_file);
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
+UFBXT_TEST(max_geometry_transform_lefthanded_adjust)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("max_geometry_transform_lefthanded", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "max_geometry_transform" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t axis_ix = 1; axis_ix < UFBX_MIRROR_AXIS_COUNT; axis_ix++) {
+			for (uint32_t handling_ix = 0; handling_ix < UFBX_GEOMETRY_TRANSFORM_HANDLING_COUNT; handling_ix++) {
+				ufbxt_hintf("handedness_conversion_axis=%u geometry_transform_handling=%u", axis_ix, handling_ix);
+
+				ufbx_load_opts opts = { 0 };
+
+				opts.target_axes = ufbx_axes_left_handed_z_up;
+				opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+				opts.handedness_conversion_axis = (ufbx_mirror_axis)axis_ix;
+				opts.geometry_transform_handling = (ufbx_geometry_transform_handling)handling_ix;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+
+				ufbx_free_scene(scene);
+			}
+		}
+	}
+
+	free(obj_file);
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
 UFBXT_FILE_TEST_OPTS_ALT(no_unnecessary_geometry_helpers, maya_cube, ufbxt_geometry_transform_helper_opts)
 #if UFBXT_IMPL
 {

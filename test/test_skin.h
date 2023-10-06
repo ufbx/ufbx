@@ -481,6 +481,73 @@ UFBXT_FILE_TEST(max_transformed_skin)
 }
 #endif
 
+UFBXT_TEST(max_transformed_skin_lefthanded)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "max_transformed_skin" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 0; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.target_axes = ufbx_axes_left_handed_z_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_5", NULL, 5.0/30.0);
+			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_15", NULL, 15.0/30.0);
+
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
+UFBXT_TEST(max_transformed_skin_lefthanded_adjust)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "max_transformed_skin" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 1; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+			opts.target_axes = ufbx_axes_left_handed_z_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_5", NULL, 5.0/30.0);
+			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_15", NULL, 15.0/30.0);
+
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
 UFBXT_FILE_TEST(synthetic_bind_to_root)
 #if UFBXT_IMPL
 {

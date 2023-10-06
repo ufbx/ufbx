@@ -22306,9 +22306,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 		ufbxi_transform_to_axes(uc, uc->opts.target_axes);
 	}
 
-	ufbxi_check(ufbxi_handle_geometry_transforms(uc));
-	ufbxi_postprocess_scene(uc);
-
 	// Unit conversion
 	if (uc->opts.target_unit_meters > 0.0f) {
 		ufbxi_check(ufbxi_scale_units(uc, uc->opts.target_unit_meters));
@@ -22316,6 +22313,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 
 	// TODO: This could be done in evaluate as well with refactoring
 	ufbxi_update_adjust_transforms(uc, &uc->scene);
+
+	ufbxi_check(ufbxi_modify_geometry(uc));
+	ufbxi_postprocess_scene(uc);
 
 	ufbxi_update_scene(&uc->scene, true, NULL, 0);
 
