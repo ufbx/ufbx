@@ -754,6 +754,18 @@ typedef enum ufbx_inherit_mode UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_inherit_mode, UFBX_INHERIT_MODE, UFBX_INHERIT_MODE_COMPONENTWISE_SCALE);
 
+typedef enum ufbx_mirror_axis UFBX_ENUM_REPR {
+
+	UFBX_MIRROR_AXIS_NONE,
+	UFBX_MIRROR_AXIS_X,
+	UFBX_MIRROR_AXIS_Y,
+	UFBX_MIRROR_AXIS_Z,
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_MIRROR_AXIS)
+} ufbx_mirror_axis;
+
+UFBX_ENUM_TYPE(ufbx_mirror_axis, UFBX_MIRROR_AXIS, UFBX_MIRROR_AXIS_Z);
+
 // Nodes form the scene transformation hierarchy and can contain attached
 // elements such as meshes or lights. In normal cases a single `ufbx_node`
 // contains only a single attached element, so using `type/mesh/...` is safe.
@@ -857,10 +869,11 @@ struct ufbx_node {
 	// ufbx-specific adjustment for switching between coodrinate/unit systems.
 	// HINT: In most cases you don't need to deal with these as these are baked
 	// into all the transforms above and into `ufbx_evaluate_transform()`.
-	ufbx_quat adjust_pre_rotation;  // < Rotation applied between parent and self
-	ufbx_real adjust_pre_scale;     // < Scaling applied between parent and self
-	ufbx_quat adjust_post_rotation; // < Rotation applied in local space at the end
-	ufbx_real adjust_post_scale;    // < Scaling applied in local space at the end
+	ufbx_quat adjust_pre_rotation;       // < Rotation applied between parent and self
+	ufbx_real adjust_pre_scale;          // < Scaling applied between parent and self
+	ufbx_quat adjust_post_rotation;      // < Rotation applied in local space at the end
+	ufbx_real adjust_post_scale;         // < Scaling applied in local space at the end
+	ufbx_mirror_axis adjust_mirror_axis; // < Mirror translation and rotation on this axis
 
 	// Materials used by `mesh` or other `attrib`.
 	// There may be multiple copies of a single `ufbx_mesh` with different materials
@@ -4218,6 +4231,9 @@ typedef struct ufbx_load_opts {
 	// How to perform space conversion by `target_axes` and `target_unit_meters`.
 	// See `ufbx_space_conversion` for an explanation.
 	ufbx_space_conversion space_conversion;
+
+	// Axis used to mirror for conversion between left-handed and right-handed coordinates.
+	ufbx_mirror_axis handedness_conversion_axis;
 
 	// Apply an implicit root transformation to match axes.
 	// Used if `ufbx_coordinate_axes_valid(target_axes)`.

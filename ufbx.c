@@ -5597,6 +5597,8 @@ typedef struct {
 	bool has_geometry_transform_nodes;
 	bool has_scale_helper_nodes;
 
+	ufbx_mirror_axis mirror_axis;
+
 	ufbxi_node root;
 
 	ufbx_scene scene;
@@ -18481,6 +18483,22 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_node *ufbxi_get_geometry_transform_no
 	return NULL;
 }
 
+ufbxi_nodiscard ufbxi_noinline static void ufbxi_mirror_vec3_list(const void *v_list, ufbx_mirror_axis axis, size_t stride)
+{
+	const ufbx_void_list *list = (const ufbx_void_list*)v_list;
+	if (axis == UFBX_MIRROR_AXIS_NONE || !list || list->count == 0) return;
+	if (!stride) stride = sizeof(ufbx_vec3);
+
+	void *ptr = (char*)list->data + (axis - 1) * sizeof(ufbx_real);
+	void *end = (char*)ptr + list->count * stride;
+	while (ptr != end) {
+		ufbx_real *v = (ufbx_real*)ptr;
+		*v = -*v;
+		ptr = (char*)ptr + stride;
+	}
+}
+
+
 ufbxi_noinline static void ufbxi_transform_vec3_list(const void *v_list, const ufbx_matrix *matrix, size_t stride)
 {
 	const ufbx_void_list *list = (const ufbx_void_list*)v_list;
@@ -18503,12 +18521,12 @@ ufbxi_noinline static void ufbxi_normalize_vec3_list(const ufbx_vec3_list *list)
 }
 
 // Forward declare as we're kind of preprocessing ata here that would usually happen later.
-ufbxi_noinline static ufbx_transform ufbxi_get_geometry_transform(const ufbx_props *props);
+ufbxi_noinline static ufbx_transform ufbxi_get_geometry_transform(const ufbx_props *props, ufbx_node *node);
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_handle_geometry_transforms(ufbxi_context *uc)
 {
-	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_PRESERVE) return 1;
-
+	bool do_mirror = false;
+	bool do_geometry_transforms = false;
 	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY
 		|| uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK) {
 		// Prefetch geometry transforms for processing, they will later be overwritten in `ufbxi_update_node()`.
@@ -18516,7 +18534,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_handle_geometry_transforms(ufbxi
 			ufbx_node *node = *p_node;
 			if (node->is_root) continue;
 
-			node->geometry_transform = ufbxi_get_geometry_transform(&node->props);
+			node->geometry_transform = ufbxi_get_geometry_transform(&node->props, node);
 			if (!ufbxi_is_transform_identity(node->geometry_transform)) {
 				node->geometry_to_node = ufbx_transform_to_matrix(&node->geometry_transform);
 				node->has_geometry_transform = true;
@@ -18525,12 +18543,38 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_handle_geometry_transforms(ufbxi
 				node->has_geometry_transform = false;
 			}
 		}
+		do_geometry_transforms = true;
+	}
+	if (uc->mirror_axis != 0) {
+		do_mirror = true;
+	}
 
-		ufbxi_for_ptr_list(ufbx_mesh, p_mesh, uc->scene.meshes) {
-			ufbx_mesh *mesh = *p_mesh;
-			ufbx_node *geo_node = ufbxi_get_geometry_transform_node(&mesh->element);
-			if (!geo_node) continue;
+	if (!do_mirror && !do_geometry_transforms) return 1;
 
+
+	ufbxi_for_ptr_list(ufbx_blend_shape, p_shape, uc->scene.blend_shapes) {
+		ufbx_blend_shape *shape = *p_shape;
+
+		if (do_mirror) {
+			ufbxi_mirror_vec3_list(&shape->position_offsets, uc->mirror_axis, 0);
+			ufbxi_mirror_vec3_list(&shape->normal_offsets, uc->mirror_axis, 0);
+		}
+	}
+
+	ufbxi_for_ptr_list(ufbx_mesh, p_mesh, uc->scene.meshes) {
+		ufbx_mesh *mesh = *p_mesh;
+
+		if (do_mirror) {
+			ufbxi_mirror_vec3_list(&mesh->vertex_position.values, uc->mirror_axis, 0);
+			ufbxi_mirror_vec3_list(&mesh->vertex_normal.values, uc->mirror_axis, 0);
+			ufbxi_for_list(ufbx_uv_set, set, mesh->uv_sets) {
+				ufbxi_mirror_vec3_list(&set->vertex_tangent.values, uc->mirror_axis, 0);
+				ufbxi_mirror_vec3_list(&set->vertex_bitangent.values, uc->mirror_axis, 0);
+			}
+		}
+
+		ufbx_node *geo_node = ufbxi_get_geometry_transform_node(&mesh->element);
+		if (do_geometry_transforms && geo_node) {
 			ufbx_matrix tangent_matrix = geo_node->geometry_to_node;
 			tangent_matrix.m03 = 0.0f;
 			tangent_matrix.m13 = 0.0f;
@@ -18547,50 +18591,77 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_handle_geometry_transforms(ufbxi
 				ufbxi_normalize_vec3_list(&set->vertex_tangent.values);
 				ufbxi_normalize_vec3_list(&set->vertex_bitangent.values);
 			}
+
+			ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, mesh->blend_deformers) {
+				ufbxi_for_ptr_list(ufbx_blend_channel, p_channel, (*p_blend)->channels) {
+					ufbxi_for_list(ufbx_blend_keyframe, key, (*p_channel)->keyframes) {
+						ufbx_blend_shape *shape = key->shape;
+						ufbxi_transform_vec3_list(&shape->position_offsets, &geo_node->geometry_to_node, 0);
+						ufbxi_transform_vec3_list(&shape->normal_offsets, &normal_matrix, 0);
+					}
+				}
+			}
+		}
+	}
+
+	ufbxi_for_ptr_list(ufbx_line_curve, p_curve, uc->scene.line_curves) {
+		ufbx_line_curve *curve = *p_curve;
+
+		if (do_mirror) {
+			ufbxi_mirror_vec3_list(&curve->control_points, uc->mirror_axis, 0);
 		}
 
-		ufbxi_for_ptr_list(ufbx_line_curve, p_curve, uc->scene.line_curves) {
-			ufbx_line_curve *curve = *p_curve;
-			ufbx_node *geo_node = ufbxi_get_geometry_transform_node(&curve->element);
-			if (!geo_node) continue;
-
+		ufbx_node *geo_node = ufbxi_get_geometry_transform_node(&curve->element);
+		if (do_geometry_transforms && geo_node) {
 			ufbxi_transform_vec3_list(&curve->control_points, &geo_node->geometry_to_node, 0);
 		}
+	}
 
-		ufbxi_for_ptr_list(ufbx_nurbs_curve, p_curve, uc->scene.nurbs_curves) {
-			ufbx_nurbs_curve *curve = *p_curve;
-			ufbx_node *geo_node = ufbxi_get_geometry_transform_node(&curve->element);
-			if (!geo_node) continue;
+	ufbxi_for_ptr_list(ufbx_nurbs_curve, p_curve, uc->scene.nurbs_curves) {
+		ufbx_nurbs_curve *curve = *p_curve;
 
-			ufbxi_transform_vec3_list(&curve->control_points, &geo_node->geometry_to_node, sizeof(ufbx_vec4));
+		if (do_mirror) {
+			ufbxi_mirror_vec3_list(&curve->control_points, uc->mirror_axis, sizeof(ufbx_vec4));
 		}
 
-		ufbxi_for_ptr_list(ufbx_nurbs_surface, p_surface, uc->scene.nurbs_surfaces) {
-			ufbx_nurbs_surface *surface = *p_surface;
-			ufbx_node *geo_node = ufbxi_get_geometry_transform_node(&surface->element);
-			if (!geo_node) continue;
+		ufbx_node *geo_node = ufbxi_get_geometry_transform_node(&curve->element);
+		if (do_geometry_transforms && geo_node) {
+			ufbxi_transform_vec3_list(&curve->control_points, &geo_node->geometry_to_node, sizeof(ufbx_vec4));
+		}
+	}
 
+	ufbxi_for_ptr_list(ufbx_nurbs_surface, p_surface, uc->scene.nurbs_surfaces) {
+		ufbx_nurbs_surface *surface = *p_surface;
+
+		if (do_mirror) {
+			ufbxi_mirror_vec3_list(&surface->control_points, uc->mirror_axis, sizeof(ufbx_vec4));
+		}
+
+		ufbx_node *geo_node = ufbxi_get_geometry_transform_node(&surface->element);
+		if (do_geometry_transforms && geo_node) {
 			ufbxi_transform_vec3_list(&surface->control_points, &geo_node->geometry_to_node, sizeof(ufbx_vec4));
 		}
 	}
 
-	// Reset all geometry transforms if we're not preserving them
-	ufbx_props *defaults = NULL;
-	ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
-		ufbx_node *node = *p_node;
-		if (!defaults) defaults = node->props.defaults;
+	if (do_geometry_transforms) {
+		// Reset all geometry transforms if we're not preserving them
+		ufbx_props *defaults = NULL;
+		ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
+			ufbx_node *node = *p_node;
+			if (!defaults) defaults = node->props.defaults;
 
-		if (node->has_geometry_transform) {
-			ufbxi_set_own_prop_vec3_uniform(&node->props, ufbxi_GeometricTranslation, 0.0f);
-			ufbxi_set_own_prop_vec3_uniform(&node->props, ufbxi_GeometricRotation, 0.0f);
-			ufbxi_set_own_prop_vec3_uniform(&node->props, ufbxi_GeometricScaling, 1.0f);
+			if (node->has_geometry_transform) {
+				ufbxi_set_own_prop_vec3_uniform(&node->props, ufbxi_GeometricTranslation, 0.0f);
+				ufbxi_set_own_prop_vec3_uniform(&node->props, ufbxi_GeometricRotation, 0.0f);
+				ufbxi_set_own_prop_vec3_uniform(&node->props, ufbxi_GeometricScaling, 1.0f);
+			}
 		}
-	}
 
-	if (defaults) {
-		ufbxi_set_own_prop_vec3_uniform(defaults, ufbxi_GeometricTranslation, 0.0f);
-		ufbxi_set_own_prop_vec3_uniform(defaults, ufbxi_GeometricRotation, 0.0f);
-		ufbxi_set_own_prop_vec3_uniform(defaults, ufbxi_GeometricScaling, 1.0f);
+		if (defaults) {
+			ufbxi_set_own_prop_vec3_uniform(defaults, ufbxi_GeometricTranslation, 0.0f);
+			ufbxi_set_own_prop_vec3_uniform(defaults, ufbxi_GeometricRotation, 0.0f);
+			ufbxi_set_own_prop_vec3_uniform(defaults, ufbxi_GeometricScaling, 1.0f);
+		}
 	}
 
 	return 1;
@@ -19746,8 +19817,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 	}
 
 	ufbxi_check(ufbxi_fetch_file_textures(uc));
-	ufbxi_check(ufbxi_handle_geometry_transforms(uc));
-	ufbxi_postprocess_scene(uc);
 
 	// NOTE: This will be patched over in `ufbxi_update_scene()` if there are `anim_layers`
 	if (uc->scene.anim_layers.count == 0) {
@@ -19894,7 +19963,20 @@ static void ufbxi_mul_inv_rotate(ufbx_transform *t, ufbx_vec3 v, ufbx_rotation_o
 
 // -- Updating state from properties
 
-ufbxi_noinline static ufbx_transform ufbxi_get_geometry_transform(const ufbx_props *props)
+ufbxi_forceinline static void ufbxi_mirror_translation(ufbx_vec3 *p_vec, ufbx_mirror_axis axis)
+{
+	ufbxi_dev_assert(axis);
+	p_vec->v[axis - 1] = -p_vec->v[axis - 1];
+}
+
+ufbxi_forceinline static void ufbxi_mirror_rotation(ufbx_quat *p_quat, ufbx_mirror_axis axis)
+{
+	ufbxi_dev_assert(axis);
+	p_quat->v[axis % 3] = -p_quat->v[axis % 3];
+	p_quat->v[(axis + 1) % 3] = -p_quat->v[(axis + 1) % 3];
+}
+
+ufbxi_noinline static ufbx_transform ufbxi_get_geometry_transform(const ufbx_props *props, ufbx_node *node)
 {
 	ufbx_vec3 translation = ufbxi_find_vec3(props, ufbxi_GeometricTranslation, 0.0f, 0.0f, 0.0f);
 	ufbx_vec3 rotation = ufbxi_find_vec3(props, ufbxi_GeometricRotation, 0.0f, 0.0f, 0.0f);
@@ -19907,6 +19989,11 @@ ufbxi_noinline static ufbx_transform ufbxi_get_geometry_transform(const ufbx_pro
 	ufbxi_mul_scale(&t, scaling);
 	ufbxi_mul_rotate(&t, rotation, UFBX_ROTATION_ORDER_XYZ);
 	ufbxi_add_translate(&t, translation);
+
+	if (node->adjust_mirror_axis) {
+		ufbxi_mirror_translation(&t.translation, node->adjust_mirror_axis);
+		ufbxi_mirror_rotation(&t.rotation, node->adjust_mirror_axis);
+	}
 
 	return t;
 }
@@ -19960,6 +20047,11 @@ ufbxi_noinline static ufbx_transform ufbxi_get_transform(const ufbx_props *props
 	if (node->has_adjust_transform) {
 		ufbxi_mul_rotate_quat(&t, node->adjust_pre_rotation);
 		ufbxi_mul_scale_real(&t, node->adjust_pre_scale);
+	}
+
+	if (node->adjust_mirror_axis) {
+		ufbxi_mirror_translation(&t.translation, node->adjust_mirror_axis);
+		ufbxi_mirror_rotation(&t.rotation, node->adjust_mirror_axis);
 	}
 
 	return t;
@@ -20044,7 +20136,7 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node, const ufbx_transfo
 			}
 		}
 
-		node->geometry_transform = ufbxi_get_geometry_transform(&node->props);
+		node->geometry_transform = ufbxi_get_geometry_transform(&node->props, node);
 	} else {
 		node->geometry_transform = ufbx_identity_transform;
 	}
@@ -21850,6 +21942,26 @@ static ufbxi_noinline void ufbxi_transform_to_axes(ufbxi_context *uc, ufbx_coord
 	if (!ufbx_coordinate_axes_valid(uc->scene.settings.axes)) return;
 	if (!ufbxi_axis_matrix(&uc->axis_matrix, uc->scene.settings.axes, dst_axes)) return;
 
+	if (ufbx_matrix_determinant(&uc->axis_matrix) < 0.0f) {
+		if (uc->opts.handedness_conversion_axis != UFBX_MIRROR_AXIS_NONE) {
+			ufbx_mirror_axis mirror_axis = uc->opts.handedness_conversion_axis;
+			uc->mirror_axis = mirror_axis;
+			int32_t axis = (int32_t)uc->mirror_axis - 1;
+			uc->axis_matrix.cols[0].v[axis] = -uc->axis_matrix.cols[0].v[axis];
+			uc->axis_matrix.cols[1].v[axis] = -uc->axis_matrix.cols[1].v[axis];
+			uc->axis_matrix.cols[2].v[axis] = -uc->axis_matrix.cols[2].v[axis];
+
+			ufbxi_dev_assert(ufbx_matrix_determinant(&uc->axis_matrix) >= 0.0f);
+
+			ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
+				ufbx_node *node = *p_node;
+				if (!node->is_root) {
+					node->adjust_mirror_axis = mirror_axis;
+				}
+			}
+		}
+	}
+
 	if (uc->opts.space_conversion == UFBX_SPACE_CONVERSION_TRANSFORM_ROOT) {
 		ufbx_matrix axis_mat = uc->axis_matrix;
 		if (!ufbxi_is_transform_identity(uc->scene.root_node->local_transform)) {
@@ -22160,6 +22272,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 	if (ufbx_coordinate_axes_valid(uc->opts.target_axes)) {
 		ufbxi_transform_to_axes(uc, uc->opts.target_axes);
 	}
+
+	ufbxi_check(ufbxi_handle_geometry_transforms(uc));
+	ufbxi_postprocess_scene(uc);
 
 	// Unit conversion
 	if (uc->opts.target_unit_meters > 0.0f) {

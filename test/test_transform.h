@@ -2,14 +2,11 @@
 #define UFBXT_TEST_GROUP "transform"
 
 #if UFBXT_IMPL
-void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_normals, const char *file_name, const char *anim_name, double time)
+
+static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj_file(const char *file_name, const ufbxt_load_obj_opts *opts)
 {
 	char buf[512];
 	snprintf(buf, sizeof(buf), "%s%s.obj", data_root, file_name);
-
-	ufbxt_hintf("Frame from '%s' %s time %.2fs",
-		anim_name ? anim_name : "(implicit animation)",
-		buf, time);
 
 	size_t obj_size = 0;
 	void *obj_data = ufbxt_read_file(buf, &obj_size);
@@ -17,10 +14,21 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_norm
 	ufbxt_assert(obj_file);
 	free(obj_data);
 
+	return obj_file;
+}
+
+void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_normals, const char *file_name, const char *anim_name, double time)
+{
+	ufbxt_hintf("Frame from '%s' %s time %.2fs",
+		anim_name ? anim_name : "(implicit animation)",
+		file_name, time);
+
 	ufbx_evaluate_opts opts = { 0 };
 	opts.evaluate_skinning = true;
 	opts.evaluate_caches = true;
 	opts.load_external_files = true;
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file(file_name, NULL);
 
 	ufbx_anim *anim = scene->anim;
 
@@ -1016,3 +1024,79 @@ UFBXT_FILE_TEST(maya_child_pivots)
 	ufbxt_check_frame(scene, err, true, "maya_child_pivots_12", NULL, 12.0/24.0);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_axes)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_TEST(maya_axes_lefthanded)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_axes_lefthanded", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_axes" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 0; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.target_axes = ufbx_axes_left_handed_y_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	free(obj_file);
+}
+#endif
+
+UFBXT_TEST(maya_axes_lefthanded_adjust)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_axes_lefthanded", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_axes" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 1; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.target_axes = ufbx_axes_left_handed_y_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+			opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	free(obj_file);
+}
+#endif
+
