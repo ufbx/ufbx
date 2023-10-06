@@ -18549,8 +18549,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_handle_geometry_transforms(ufbxi
 		do_mirror = true;
 	}
 
-	if (!do_mirror && !do_geometry_transforms) return 1;
-
 
 	ufbxi_for_ptr_list(ufbx_blend_shape, p_shape, uc->scene.blend_shapes) {
 		ufbx_blend_shape *shape = *p_shape;
@@ -18643,7 +18641,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_handle_geometry_transforms(ufbxi
 		}
 	}
 
-	if (do_geometry_transforms) {
+	if (uc->opts.geometry_transform_handling != UFBX_GEOMETRY_TRANSFORM_HANDLING_PRESERVE) {
 		// Reset all geometry transforms if we're not preserving them
 		ufbx_props *defaults = NULL;
 		ufbxi_for_ptr_list(ufbx_node, p_node, uc->scene.nodes) {
