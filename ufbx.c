@@ -20873,12 +20873,15 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 		if (conversion == UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS) {
 			if (node->node_depth <= 1 && !node->is_root) {
 				node->adjust_pre_rotation = root_transform.rotation;
-				node->adjust_pre_scale = root_scale; // TODO
+				node->adjust_pre_scale = root_scale;
 				node->has_adjust_transform = true;
 				node->has_root_adjust_transform = true;
 			}
 		} else if (conversion == UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY) {
 			if (!node->is_root) {
+				if (node->node_depth <= 1) {
+					node->adjust_pre_rotation = root_transform.rotation;
+				}
 				node->adjust_translation_scale = root_scale;
 				node->has_adjust_transform = true;
 			}

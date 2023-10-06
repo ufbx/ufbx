@@ -68,6 +68,15 @@ ufbx_load_opts ufbxt_z_up_meters_adjust_opts()
 	return opts;
 }
 
+ufbx_load_opts ufbxt_z_up_meters_modify_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_axes = ufbx_axes_right_handed_z_up;
+	opts.target_unit_meters = 1.0f;
+	opts.space_conversion = UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY;
+	return opts;
+}
+
 ufbx_load_opts ufbxt_rh_y_camera_light_axes_opts()
 {
 	ufbx_load_opts opts = { 0 };
@@ -855,6 +864,69 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_y_up_adjust, blender_340_y_up, ufbxt_
 		ufbxt_assert(node);
 		ufbxt_ref_transform ref_transform = {
 			{ 0.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "Camera", node->local_transform, ref_transform);
+	}
+
+	ufbxt_assert(scene->nodes.count == 5);
+	ufbxt_assert(num_adjusted == 3);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_y_up_modify, blender_340_y_up, ufbxt_z_up_meters_modify_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *root = scene->root_node;
+	ufbxt_check_transform(err, "root", root->local_transform, ufbxt_ref_transform_identity);
+
+	size_t num_adjusted = 0;
+	for (size_t i = 0; i < scene->nodes.count; i++) {
+		ufbx_node *node = scene->nodes.data[i];
+		if (node->is_root) {
+			ufbxt_assert(!node->has_adjust_transform);
+			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_real(err, node->adjust_translation_scale, 1.0f);
+		} else if (node->node_depth == 1) {
+			ufbxt_assert(node->has_adjust_transform);
+			ufbx_vec3 rotation = { 90.0f, 0.0f, 0.0f };
+			ufbx_quat rotation_quat = ufbx_euler_to_quat(rotation, UFBX_ROTATION_ORDER_XYZ);
+			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, rotation_quat);
+			ufbxt_assert_close_real(err, node->adjust_translation_scale, 0.01f);
+			num_adjusted++;
+		} else {
+			ufbxt_assert(node->has_adjust_transform);
+			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_real(err, node->adjust_translation_scale, 0.01f);
+		}
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Light");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 4.0f, 1.0f, 5.0f }, { 90.0f, 0.0f, 0.0f }, { 100.0f, 100.0f, 100.0f }
+		};
+		ufbxt_check_transform(err, "Light", node->local_transform, ref_transform);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Camera");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 7.0f, 6.0f, 5.0f }, { 90.0f, 0.0f, 0.0f }, { 100.0f, 100.0f, 100.0f }
+		};
+		ufbxt_check_transform(err, "Camera", node->local_transform, ref_transform);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Cube");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 0.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 100.0f, 100.0f, 100.0f }
 		};
 		ufbxt_check_transform(err, "Camera", node->local_transform, ref_transform);
 	}
