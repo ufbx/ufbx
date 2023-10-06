@@ -439,6 +439,7 @@ ufbxt_noinline static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v
 	ufbxt_hash_real(h, v->adjust_pre_scale);
 	ufbxt_hash_quat(h, v->adjust_post_rotation);
 	ufbxt_hash_real(h, v->adjust_post_scale);
+	ufbxt_hash_real(h, v->adjust_mirror_axis);
 	ufbxt_hash_pod(h, v->visible);
 	ufbxt_hash_pod(h, v->is_root);
 	ufbxt_hash_pod(h, v->has_geometry_transform);
