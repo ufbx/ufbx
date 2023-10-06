@@ -18489,7 +18489,7 @@ ufbxi_noinline static void ufbxi_mirror_vec3_list(const void *v_list, ufbx_mirro
 	if (axis == UFBX_MIRROR_AXIS_NONE || !list || list->count == 0) return;
 	if (!stride) stride = sizeof(ufbx_vec3);
 
-	void *ptr = (char*)list->data + (axis - 1) * sizeof(ufbx_real);
+	void *ptr = (char*)list->data + (size_t)((int)axis - 1) * sizeof(ufbx_real);
 	void *end = (char*)ptr + list->count * stride;
 	while (ptr != end) {
 		ufbx_real *v = (ufbx_real*)ptr;
