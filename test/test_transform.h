@@ -1011,6 +1011,7 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_geometry_transform_inherit_mode_scale_h
 UFBXT_FILE_TEST(maya_child_pivots)
 #if UFBXT_IMPL
 {
+	ufbxt_check_frame(scene, err, true, "maya_child_pivots", NULL, 0.0/24.0);
 	ufbxt_check_frame(scene, err, true, "maya_child_pivots_6", NULL, 6.0/24.0);
 	ufbxt_check_frame(scene, err, true, "maya_child_pivots_12", NULL, 12.0/24.0);
 }
