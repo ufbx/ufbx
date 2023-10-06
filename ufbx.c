@@ -18483,7 +18483,7 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_node *ufbxi_get_geometry_transform_no
 	return NULL;
 }
 
-ufbxi_nodiscard ufbxi_noinline static void ufbxi_mirror_vec3_list(const void *v_list, ufbx_mirror_axis axis, size_t stride)
+ufbxi_noinline static void ufbxi_mirror_vec3_list(const void *v_list, ufbx_mirror_axis axis, size_t stride)
 {
 	const ufbx_void_list *list = (const ufbx_void_list*)v_list;
 	if (axis == UFBX_MIRROR_AXIS_NONE || !list || list->count == 0) return;
