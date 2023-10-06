@@ -4008,12 +4008,26 @@ UFBX_ENUM_TYPE(ufbx_geometry_transform_handling, UFBX_GEOMETRY_TRANSFORM_HANDLIN
 // How to handle FBX transform inherit modes.
 typedef enum ufbx_inherit_mode_handling UFBX_ENUM_REPR {
 
+	// Preserve inherit mode in `ufbx_node.inherit_mode`.
+	// NOTE: To correctly handle all scenes you would need to handle the
+	// non-standard inherit modes.
 	UFBX_INHERIT_MODE_HANDLING_PRESERVE,
 
+	// Create scale helper nodes parented to nodes that need special inheritance.
+	// Scale helper nodes will have `ufbx_node.is_scale_helper` and parents of
+	// scale helpers will have `ufbx_node.scale_helper` pointing to it.
 	UFBX_INHERIT_MODE_HANDLING_HELPER_NODES,
 
+	// Attempt to compensate for bone scale by inversely scaling children.
+	// NOTE: This only works for uniform non-animated scaling, if scale is
+	// non-uniform or animated, ufbx will add scale helpers in the same way
+	// as `UFBX_INHERIT_MODE_HANDLING_HELPER_NODES`.
 	UFBX_INHERIT_MODE_HANDLING_COMPENSATE,
 
+	// Ignore non-standard inheritance modes.
+	// Forces all nodes to have `UFBX_INHERIT_MODE_NORMAL` regardless of the
+	// inherit mode specified in the file. This can be useful for emulating
+	// results from importers/programs that don't support inherit modes.
 	UFBX_INHERIT_MODE_HANDLING_IGNORE,
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_INHERIT_MODE_HANDLING)
