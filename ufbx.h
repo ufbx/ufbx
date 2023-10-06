@@ -873,6 +873,7 @@ struct ufbx_node {
 	ufbx_real adjust_pre_scale;          // < Scaling applied between parent and self
 	ufbx_quat adjust_post_rotation;      // < Rotation applied in local space at the end
 	ufbx_real adjust_post_scale;         // < Scaling applied in local space at the end
+	ufbx_real adjust_translation_scale;  // < Scaling applied to translation only
 	ufbx_mirror_axis adjust_mirror_axis; // < Mirror translation and rotation on this axis
 
 	// Materials used by `mesh` or other `attrib`.
@@ -3425,6 +3426,10 @@ typedef struct ufbx_metadata {
 	// All geometry has been mirrored in this axis.
 	ufbx_mirror_axis mirror_axis;
 
+	// Amount geometry has been scaled.
+	// See `UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY`.
+	ufbx_real geometry_scale;
+
 } ufbx_metadata;
 
 typedef enum ufbx_time_mode UFBX_ENUM_REPR {
@@ -4075,10 +4080,15 @@ typedef enum ufbx_space_conversion UFBX_ENUM_REPR {
 	// you are manually building transforms from `ufbx_props`.
 	UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS,
 
+	// Perform the conversion by scaling geometry in addition to adjusting transforms.
+	// Compensates transforms like `UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS` but
+	// applies scaling to geometry as well.
+	UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY,
+
 	UFBX_ENUM_FORCE_WIDTH(UFBX_SPACE_CONVERSION)
 } ufbx_space_conversion;
 
-UFBX_ENUM_TYPE(ufbx_space_conversion, UFBX_SPACE_CONVERSION, UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS);
+UFBX_ENUM_TYPE(ufbx_space_conversion, UFBX_SPACE_CONVERSION, UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY);
 
 typedef struct ufbx_baked_vec3 {
 	double time;
