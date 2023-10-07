@@ -4569,6 +4569,9 @@ typedef struct ufbx_geometry_cache_opts {
 	// Axis to mirror the geometry by.
 	ufbx_mirror_axis mirror_axis;
 
+	// Enable scaling `scale_factor` all geometry by.
+	bool use_scale_factor;
+
 	// Factor to scale the geometry by.
 	ufbx_real scale_factor;
 

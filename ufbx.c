@@ -21706,7 +21706,9 @@ static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 		ufbx_real scale_factor = 1.0f;
 		if (chan->interpretation != UFBX_CACHE_INTERPRETATION_UNKNOWN) {
 			mirror_axis = cc->opts.mirror_axis;
-			scale_factor = cc->opts.scale_factor;
+			if (cc->opts.use_scale_factor) {
+				scale_factor = cc->opts.scale_factor;
+			}
 		}
 		chan->mirror_axis = mirror_axis;
 		chan->scale_factor = scale_factor;
