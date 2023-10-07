@@ -21923,6 +21923,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_contex
 	cc.result = uc->result;
 
 	cc.opts.mirror_axis = uc->mirror_axis;
+	cc.opts.use_scale_factor = true;
 	cc.opts.scale_factor = uc->scene.metadata.geometry_scale;
 
 	ufbx_geometry_cache *cache = ufbxi_cache_load(&cc, file->filename);
