@@ -2076,6 +2076,9 @@ typedef struct ufbx_cache_frame {
 	// Axis to mirror the read data by.
 	ufbx_mirror_axis mirror_axis;
 
+	// Factor to scale the geometry by.
+	ufbx_real scale_factor;
+
 	ufbx_cache_data_format data_format;     // < Format of the data in the file
 	ufbx_cache_data_encoding data_encoding; // < Binary encoding of the data
 	uint64_t data_offset;                   // < Byte offset into the file
@@ -2104,6 +2107,9 @@ typedef struct ufbx_cache_channel {
 
 	// Axis to mirror the frames by.
 	ufbx_mirror_axis mirror_axis;
+
+	// Factor to scale the geometry by.
+	ufbx_real scale_factor;
 
 } ufbx_cache_channel;
 
@@ -4562,6 +4568,9 @@ typedef struct ufbx_geometry_cache_opts {
 
 	// Axis to mirror the geometry by.
 	ufbx_mirror_axis mirror_axis;
+
+	// Factor to scale the geometry by.
+	ufbx_real scale_factor;
 
 	uint32_t _end_zero;
 } ufbx_geometry_cache_opts;

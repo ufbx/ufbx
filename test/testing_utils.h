@@ -160,6 +160,8 @@ typedef struct {
 	double position_scale_float;
 	double position_scale_bake;
 
+	double fbx_position_scale;
+
 	char animation_name[128];
 
 } ufbxt_obj_file;
@@ -544,6 +546,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 	obj->position_scale = 1.0;
 	obj->position_scale_float = 1.0;
 	obj->position_scale_bake = 1.0;
+	obj->fbx_position_scale = 1.0;
 
 	if (implicit_mesh) {
 		mesh = meshes;
@@ -1072,6 +1075,12 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 			obj_verts[i].uv = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, i);
 		}
 
+		if (obj->fbx_position_scale != 1.0) {
+			obj_verts[i].pos.x *= (ufbx_real)obj->fbx_position_scale;
+			obj_verts[i].pos.y *= (ufbx_real)obj->fbx_position_scale;
+			obj_verts[i].pos.z *= (ufbx_real)obj->fbx_position_scale;
+		}
+
 		if (scale != 1.0) {
 			obj_verts[i].pos.x *= scale;
 			obj_verts[i].pos.y *= scale;
@@ -1527,6 +1536,12 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 							on.y /= on_len;
 							on.z /= on_len;
 						}
+					}
+
+					if (obj->fbx_position_scale != 1.0) {
+						fp.x *= (ufbx_real)obj->fbx_position_scale;
+						fp.y *= (ufbx_real)obj->fbx_position_scale;
+						fp.z *= (ufbx_real)obj->fbx_position_scale;
 					}
 
 					if (scale != 1.0) {

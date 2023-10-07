@@ -20720,6 +20720,13 @@ ufbxi_noinline static void ufbxi_update_initial_clusters(ufbx_scene *scene)
 			ufbxi_mirror_matrix_dst(&cluster->mesh_node_to_bone, mirror_axis);
 		}
 
+		ufbx_real geometry_scale = scene->metadata.geometry_scale;
+		if (geometry_scale != 1.0f) {
+			cluster->mesh_node_to_bone.cols[3].x *= geometry_scale;
+			cluster->mesh_node_to_bone.cols[3].y *= geometry_scale;
+			cluster->mesh_node_to_bone.cols[3].z *= geometry_scale;
+		}
+
 		// HACK: Account for geometry transforms by looking at the transform of the
 		// helper node if one is present. I don't think this is exactly how the skinning
 		// matrices are formed.
@@ -21695,12 +21702,17 @@ static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 			}
 		}
 
-		ufbx_mirror_axis mirror_axis = cc->opts.mirror_axis;
-		if (mirror_axis && chan->interpretation != UFBX_CACHE_INTERPRETATION_UNKNOWN) {
-			chan->mirror_axis = mirror_axis;
-			ufbxi_for_list(ufbx_cache_frame, f, chan->frames) {
-				f->mirror_axis = mirror_axis;
-			}
+		ufbx_mirror_axis mirror_axis = UFBX_MIRROR_AXIS_NONE;
+		ufbx_real scale_factor = 1.0f;
+		if (chan->interpretation != UFBX_CACHE_INTERPRETATION_UNKNOWN) {
+			mirror_axis = cc->opts.mirror_axis;
+			scale_factor = cc->opts.scale_factor;
+		}
+		chan->mirror_axis = mirror_axis;
+		chan->scale_factor = scale_factor;
+		ufbxi_for_list(ufbx_cache_frame, f, chan->frames) {
+			f->mirror_axis = mirror_axis;
+			f->scale_factor = scale_factor;
 		}
 
 		num_channels++;
@@ -21909,6 +21921,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_contex
 	cc.result = uc->result;
 
 	cc.opts.mirror_axis = uc->mirror_axis;
+	cc.opts.scale_factor = uc->scene.metadata.geometry_scale;
 
 	ufbx_geometry_cache *cache = ufbxi_cache_load(&cc, file->filename);
 	if (!cache) {
@@ -29292,12 +29305,20 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 				}
 			}
 
-			if (frame->mirror_axis && !opts.ignore_transform) {
-				while (mirror_ix < num_read) {
-					buffer[mirror_ix] = -buffer[mirror_ix];
-					mirror_ix += 3;
+			if (!opts.ignore_transform) {
+				double scale = frame->scale_factor;
+				if (scale != 1.0f) {
+					for (size_t i = 0; i < num_read; i++) {
+						buffer[i] *= scale;
+					}
 				}
-				mirror_ix -= num_read;
+				if (frame->mirror_axis) {
+					while (mirror_ix < num_read) {
+						buffer[mirror_ix] = -buffer[mirror_ix];
+						mirror_ix += 3;
+					}
+					mirror_ix -= num_read;
+				}
 			}
 
 			if (dst) {
@@ -29341,12 +29362,20 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 				}
 			}
 
-			if (frame->mirror_axis && !opts.ignore_transform) {
-				while (mirror_ix < num_read) {
-					buffer[mirror_ix] = -buffer[mirror_ix];
-					mirror_ix += 3;
+			if (!opts.ignore_transform) {
+				float scale = (float)frame->scale_factor;
+				if (scale != 1.0f) {
+					for (size_t i = 0; i < num_read; i++) {
+						buffer[i] *= scale;
+					}
 				}
-				mirror_ix -= num_read;
+				if (frame->mirror_axis) {
+					while (mirror_ix < num_read) {
+						buffer[mirror_ix] = -buffer[mirror_ix];
+						mirror_ix += 3;
+					}
+					mirror_ix -= num_read;
+				}
 			}
 
 			if (dst) {
