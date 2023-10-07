@@ -50,6 +50,7 @@ static const ufbxt_enum_name ufbxt_names_ufbx_inherit_mode_handling[] = {
 static const ufbxt_enum_name ufbxt_names_ufbx_space_conversion[] = {
 	{ "transform-root", UFBX_SPACE_CONVERSION_TRANSFORM_ROOT },
 	{ "adjust-transforms", UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS },
+	{ "modify-geometry", UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY },
 };
 
 static const ufbxt_enum_name ufbxt_names_ufbx_index_error_handling[] = {
