@@ -18618,16 +18618,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_modify_geometry(ufbxi_context *u
 				ufbxi_normalize_vec3_list(&set->vertex_tangent.values);
 				ufbxi_normalize_vec3_list(&set->vertex_bitangent.values);
 			}
-
-			ufbxi_for_ptr_list(ufbx_blend_deformer, p_blend, mesh->blend_deformers) {
-				ufbxi_for_ptr_list(ufbx_blend_channel, p_channel, (*p_blend)->channels) {
-					ufbxi_for_list(ufbx_blend_keyframe, key, (*p_channel)->keyframes) {
-						ufbx_blend_shape *shape = key->shape;
-						ufbxi_transform_vec3_list(&shape->position_offsets, &geo_node->geometry_to_node, 0);
-						ufbxi_transform_vec3_list(&shape->normal_offsets, &normal_matrix, 0);
-					}
-				}
-			}
 		}
 	}
 
