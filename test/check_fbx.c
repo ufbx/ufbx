@@ -341,6 +341,23 @@ int main(int argc, char **argv)
 		}
 	}
 
+	ufbx_vec3 unit_axes[] = {
+		{ 1.0f, 0.0f, 0.0f },
+		{ -1.0f, 0.0f, 0.0f },
+		{ 0.0f, 1.0f, 0.0f },
+		{ 0.0f, -1.0f, 0.0f },
+		{ 0.0f, 0.0f, 1.0f },
+		{ 0.0f, 0.0f, -1.0f },
+		{ 0.0f, 0.0f, 0.0f },
+	};
+
+	ufbx_vec3 axis_x = unit_axes[scene->settings.axes.right];
+	ufbx_vec3 axis_y = unit_axes[scene->settings.axes.up];
+	ufbx_vec3 axis_z = unit_axes[scene->settings.axes.front];
+	ufbx_vec3 cross = ufbxt_cross3(axis_x, axis_y);
+	ufbx_real d = ufbxt_dot3(cross, axis_z);
+
+	if (d < 0.0f) ufbxt_add_feature(&features, "left-handed");
 	if (scene->nurbs_curves.count > 0) ufbxt_add_feature(&features, "nurbs-curve");
 	if (scene->nurbs_surfaces.count > 0) ufbxt_add_feature(&features, "nurbs-surface");
 	if (scene->lod_groups.count > 0) ufbxt_add_feature(&features, "lod-group");
