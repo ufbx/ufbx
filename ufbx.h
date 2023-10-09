@@ -4153,6 +4153,58 @@ typedef struct ufbx_baked_anim {
 	ufbx_baked_element_list elements;
 } ufbx_baked_anim;
 
+typedef uintptr_t ufbx_thread_pool_context;
+
+typedef struct ufbx_thread_pool_info {
+	uint32_t max_concurrent_tasks;
+} ufbx_thread_pool_info;
+
+typedef bool ufbx_thread_pool_init_fn(void *user, ufbx_thread_pool_context ctx, const ufbx_thread_pool_info *info);
+
+typedef bool ufbx_thread_pool_run_fn(void *user, ufbx_thread_pool_context ctx, uint32_t start_index, uint32_t count);
+
+typedef bool ufbx_thread_pool_wait_fn(void *user, ufbx_thread_pool_context ctx, uint32_t max_index);
+
+typedef void ufbx_thread_pool_free_fn(void *user, ufbx_thread_pool_context ctx);
+
+typedef struct ufbx_thread_pool {
+	ufbx_thread_pool_init_fn *init_fn;
+	ufbx_thread_pool_run_fn *run_fn;
+	ufbx_thread_pool_wait_fn *wait_fn;
+	ufbx_thread_pool_free_fn *free_fn;
+	void *user;
+} ufbx_thread_pool;
+
+#if 0
+// Callback for running a task in thread
+typedef bool ufbx_thread_start_fn(void *user, size_t index);
+
+typedef bool ufbx_thread_run_fn(void *user, size_t index, ufbx_thread_task task);
+
+typedef void ufbx_thread_wait_fn(void *user, size_t index);
+
+typedef void ufbx_thread_stop_fn(void *user, size_t index);
+
+typedef void ufbx_thread_free_pool_fn(void *user);
+
+typedef struct ufbx_thread_pool {
+	// Callback functions, see `typedef`s above for information
+	ufbx_thread_start_fn *start_fn;
+	ufbx_thread_run_fn *run_fn;
+	ufbx_thread_wait_fn *wait_fn;
+	ufbx_thread_stop_fn *stop_fn;
+	ufbx_thread_free_pool_fn *free_pool_fn;
+	void *user;
+} ufbx_thread_pool;
+
+#endif
+
+typedef struct ufbx_thread_opts {
+	ufbx_thread_pool pool;
+	size_t num_tasks;
+	size_t memory_limit;
+} ufbx_thread_opts;
+
 // -- Main API
 
 // Options for `ufbx_load_file/memory/stream/stdio()`
@@ -4162,6 +4214,7 @@ typedef struct ufbx_load_opts {
 
 	ufbx_allocator_opts temp_allocator;   // < Allocator used during loading
 	ufbx_allocator_opts result_allocator; // < Allocator used for the final scene
+	ufbx_thread_opts thread_opts;         // < Threading options
 
 	// Preferences
 	bool ignore_geometry;    // < Do not load geometry datsa (vertices, indices, etc)
@@ -5014,6 +5067,12 @@ ufbx_inline ufbx_dom_node *ufbx_dom_find(const ufbx_dom_node *parent, const char
 // Utility
 
 ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator_opts *allocator, ufbx_error *error);
+
+// Thread pool
+
+ufbx_abi void ufbx_thread_pool_run_task(ufbx_thread_pool_context ctx);
+
+ufbx_abi uint32_t ufbx_thread_pool_try_wait(ufbx_thread_pool_context ctx, uint32_t max_index);
 
 // -- Inline API
 
