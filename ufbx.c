@@ -8985,6 +8985,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_float_array(ufbxi_con
 			*v = (float)val;
 		}
 
+		// TODO: Collect ASCII numbers to deferred parse integer/string segments
+
 		// Try to parse the next value, we don't commit this until we find a comma after it above.
 		char *num_end = NULL;
 		size_t left = ufbxi_to_size(end - src_scan);
