@@ -4154,30 +4154,6 @@ typedef struct ufbx_thread_pool {
 	void *user;
 } ufbx_thread_pool;
 
-#if 0
-// Callback for running a task in thread
-typedef bool ufbx_thread_start_fn(void *user, size_t index);
-
-typedef bool ufbx_thread_run_fn(void *user, size_t index, ufbx_thread_task task);
-
-typedef void ufbx_thread_wait_fn(void *user, size_t index);
-
-typedef void ufbx_thread_stop_fn(void *user, size_t index);
-
-typedef void ufbx_thread_free_pool_fn(void *user);
-
-typedef struct ufbx_thread_pool {
-	// Callback functions, see `typedef`s above for information
-	ufbx_thread_start_fn *start_fn;
-	ufbx_thread_run_fn *run_fn;
-	ufbx_thread_wait_fn *wait_fn;
-	ufbx_thread_stop_fn *stop_fn;
-	ufbx_thread_free_pool_fn *free_pool_fn;
-	void *user;
-} ufbx_thread_pool;
-
-#endif
-
 typedef struct ufbx_thread_opts {
 	ufbx_thread_pool pool;
 	size_t num_tasks;
