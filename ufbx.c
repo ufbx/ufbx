@@ -5397,6 +5397,7 @@ static void ufbxi_thread_pool_flush(ufbxi_thread_pool *pool)
 
 static void ufbxi_thread_pool_run_task(ufbxi_thread_pool *pool, ufbxi_task *task, double cost)
 {
+	(void)task;
 	uint32_t index = pool->start_index;
 	ufbx_assert(task == &pool->tasks[index % pool->num_tasks].task);
 	pool->start_index = index + 1;
