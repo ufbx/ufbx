@@ -3172,7 +3172,7 @@ typedef struct {
 
 	size_t num_items; // < Number of individual items pushed to the buffer
 
-	size_t pushed_size; // < Cumulative size of pushed chunks, not tracked accross pops
+	size_t pushed_size; // < Cumulative size of pushed chunks, not tracked across pops
 
 	bool unordered;  // < Does not support popping from the buffer
 	bool clearable;  // < Supports clearing the whole buffer even if `unordered`
