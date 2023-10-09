@@ -11800,14 +11800,20 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_process_indices(ufbxi_context *u
 		*p_vx_ix = UFBX_NO_INDEX;
 	}
 
-	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
-		uint32_t vx = mesh->vertex_indices.data[ix];
-		if (vx < mesh->num_vertices) {
-			if (mesh->vertex_first_index.data[vx] == UFBX_NO_INDEX) {
-				mesh->vertex_first_index.data[vx] = (uint32_t)ix;
+	{
+		size_t num_indices = mesh->num_indices;
+		size_t num_vertices = mesh->num_vertices;
+		uint32_t *vertex_indices = mesh->vertex_indices.data;
+		uint32_t *vertex_first_index = mesh->vertex_first_index.data;
+		for (size_t ix = 0; ix < num_indices; ix++) {
+			uint32_t vx = vertex_indices[ix];
+			if (vx < num_vertices) {
+				if (vertex_first_index[vx] == UFBX_NO_INDEX) {
+					vertex_first_index[vx] = (uint32_t)ix;
+				}
+			} else {
+				ufbxi_check(ufbxi_fix_index(uc, &vertex_indices[ix], vx, mesh->num_vertices));
 			}
-		} else {
-			ufbxi_check(ufbxi_fix_index(uc, &mesh->vertex_indices.data[ix], vx, mesh->num_vertices));
 		}
 	}
 
