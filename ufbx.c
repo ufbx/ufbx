@@ -7736,7 +7736,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 	// TODO: We might want to use the slow path if the machine float/double doesn't match IEEE 754!
 	// Convert commented out lines under some `#if UFBX_NON_IEE754` define or something.
 	if (src_type == dst_type) {
-		ufbx_assert(maybe_uc && maybe_uc->file_big_endian);
+		ufbx_assert(maybe_uc && maybe_uc->file_big_endian != maybe_uc->local_big_endian);
 		src = ufbxi_swap_endian_array(maybe_uc, src, size, src_type);
 		ufbxi_check_err(&maybe_uc->error, src);
 		memcpy(dst, src, size * ufbxi_array_type_size(dst_type));
