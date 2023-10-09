@@ -8020,7 +8020,7 @@ static bool ufbxi_deflate_task_fn(ufbxi_task *task)
 	}
 
 	if (t->arr_type == 'b') {
-		ufbxi_postprocess_bool_array(t->dst_data, t->array_size);
+		ufbxi_postprocess_bool_array((char*)t->dst_data, t->array_size);
 	}
 
 	return true;
@@ -13628,7 +13628,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects(ufbxi_context *uc)
 		ufbxi_check(ufbxi_parse_toplevel_child(uc, &node, NULL));
 		if (!node) break;
 
-		ufbxi_read_object(uc, node);
+		ufbxi_check(ufbxi_read_object(uc, node));
 
 		uc->warnings.deferred_element_id_plus_one = 0;
 		uc->p_element_id = NULL;
@@ -13720,7 +13720,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects_threaded(ufbxi_cont
 		batch_index = (batch_index + 1) % UFBXI_THREADED_PARSE_BATCHES;
 	}
 
-	ufbxi_thread_pool_wait(&uc->thread_pool, uc->thread_pool.start_index);
+	ufbxi_check(ufbxi_thread_pool_wait(&uc->thread_pool, uc->thread_pool.start_index));
 
 	uc->parse_threaded = false;
 
