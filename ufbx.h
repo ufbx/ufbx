@@ -4263,6 +4263,9 @@ typedef struct ufbx_load_opts {
 	// Axis used to mirror for conversion between left-handed and right-handed coordinates.
 	ufbx_mirror_axis handedness_conversion_axis;
 
+	// Do not change winding of faces when converting handedness.
+	bool handedness_conversion_retain_winding;
+
 	// Apply an implicit root transformation to match axes.
 	// Used if `ufbx_coordinate_axes_valid(target_axes)`.
 	ufbx_coordinate_axes target_axes;
