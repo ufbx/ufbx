@@ -586,23 +586,28 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 	#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
 	#define ufbxi_atomic_counter_inc(ptr) __sync_fetch_and_add((ptr), 1)
 	#define ufbxi_atomic_counter_dec(ptr) __sync_fetch_and_sub((ptr), 1)
+	#define ufbxi_atomic_counter_load(ptr) __sync_fetch_and_add((ptr), 0) // TODO: Proper atomic load
 #elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
-	#if defined(_M_X64)  || defined(_M_ARM64)
+	#if defined(_M_X64) || defined(_M_ARM64)
 		ufbxi_extern_c __int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
 		ufbxi_extern_c __int64 _InterlockedDecrement64(__int64 volatile * lpAddend);
+		ufbxi_extern_c __int64 _InterlockedExchangeAdd64(__int64 volatile * lpAddend, __int64 Value);
 		typedef volatile __int64 ufbxi_atomic_counter;
 		#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
 		#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
 		#define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement64(ptr) - 1)
 		#define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement64(ptr) + 1)
+		#define ufbxi_atomic_counter_load(ptr) ((size_t)_InterlockedExchangeAdd64((ptr), 0))
 	#else
-		ufbxi_extern_c long _InterlockedIncrement(long volatile * lpAddend);
-		ufbxi_extern_c long _InterlockedDecrement(long volatile * lpAddend);
+		ufbxi_extern_c _long _cdecl _InterlockedIncrement(long volatile * lpAddend);
+		ufbxi_extern_c long __cdecl _InterlockedDecrement(long volatile * lpAddend);
+		ufbxi_extern_c long __cdecl _InterlockedExchangeAdd(long volatile * lpAddend, long Value);
 		typedef volatile long ufbxi_atomic_counter;
 		#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
 		#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
 		#define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement(ptr) - 1)
 		#define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement(ptr) + 1)
+		#define ufbxi_atomic_counter_load(ptr) ((size_t)_InterlockedExchangeAdd((ptr), 0))
 	#endif
 #elif !defined(UFBX_STANDARD_C) && defined(__TINYC__)
 	#if defined(__x86_64__) || defined(_AMD64_)
@@ -623,6 +628,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 	#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
 	#define ufbxi_atomic_counter_inc(ptr) ufbxi_tcc_atomic_add((ptr), 1)
 	#define ufbxi_atomic_counter_dec(ptr) ufbxi_tcc_atomic_add((ptr), SIZE_MAX)
+	#define ufbxi_atomic_counter_load(ptr) ufbxi_tcc_atomic_add((ptr), 0)
 #elif defined(__cplusplus) && (__cplusplus >= 201103L)
 	#include <new>
 	#include <atomic>
@@ -631,6 +637,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 	#define ufbxi_atomic_counter_free(ptr) (((std::atomic_size_t*)(ptr)->data)->~atomic_size_t())
 	#define ufbxi_atomic_counter_inc(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_add(1)
 	#define ufbxi_atomic_counter_dec(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_sub(1)
+	#define ufbxi_atomic_counter_load(ptr) ((std::atomic_size_t*)(ptr)->data)->load(std::memory_order_acquire)
 #elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(__STDC_NO_ATOMICS__)
 	#include <stdatomic.h>
 	typedef volatile atomic_size_t ufbxi_atomic_counter;
@@ -638,12 +645,14 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 	#define ufbxi_atomic_counter_free(ptr) (void)0
 	#define ufbxi_atomic_counter_inc(ptr) atomic_fetch_add((ptr), 1)
 	#define ufbxi_atomic_counter_dec(ptr) atomic_fetch_sub((ptr), 1)
+	#define ufbxi_atomic_counter_load(ptr) atomic_load_explicit((ptr), memory_order_acquire)
 #else
 	typedef volatile size_t ufbxi_atomic_counter;
 	#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
 	#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
 	#define ufbxi_atomic_counter_inc(ptr) ((*(ptr))++)
 	#define ufbxi_atomic_counter_dec(ptr) ((*(ptr))--)
+	#define ufbxi_atomic_counter_load(ptr) (*(ptr))
 	#undef UFBXI_THREAD_SAFE
 	#define UFBXI_THREAD_SAFE 0
 #endif
@@ -1898,7 +1907,7 @@ static ufbxi_noinline void ufbxi_init_static_huff(ufbxi_trees *trees, const ufbx
 	ptrdiff_t err = 0;
 
 	// Override `fast_bits` if necessary, this must always be valid as it's checked in the beginning of `ufbx_inflate()`.
-	if (input->internal_fast_bits != 0) {
+	if (input && input->internal_fast_bits != 0) {
 		trees->fast_bits = (uint32_t)input->internal_fast_bits;
 		ufbx_assert(!(trees->fast_bits < 1 || trees->fast_bits == 9 || trees->fast_bits > 10));
 	} else {
@@ -2488,6 +2497,15 @@ ufbxi_inflate_block_fast(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 
 	#undef ufbxi_fast_inflate_refill_and_decode
 	#undef ufbxi_fast_inflate_should_continue
+}
+
+static void ufbxi_inflate_init_retain(ufbx_inflate_retain *retain)
+{
+	ufbxi_inflate_retain_imp *ret_imp = (ufbxi_inflate_retain_imp*)retain;
+	if (!ret_imp->initialized) {
+		ufbxi_init_static_huff(&ret_imp->static_trees, NULL);
+		ret_imp->initialized = true;
+	}
 }
 
 // TODO: Error codes should have a quick test if the destination buffer overflowed
@@ -3154,6 +3172,8 @@ typedef struct {
 
 	size_t num_items; // < Number of individual items pushed to the buffer
 
+	size_t pushed_size; // < Cumulative size of pushed chunks, not tracked accross pops
+
 	bool unordered;  // < Does not support popping from the buffer
 	bool clearable;  // < Supports clearing the whole buffer even if `unordered`
 } ufbxi_buf;
@@ -3177,6 +3197,7 @@ static ufbxi_noinline void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 		if (list_ix == 0) {
 			// Store the final position for the retired chunk and scan free
 			// chunks in case we find one the allocation fits in.
+			b->pushed_size += b->pos;
 			chunk->pushed_pos = b->pos;
 			ufbxi_buf_chunk *next = chunk->next;
 			while (next != NULL) {
@@ -3228,6 +3249,7 @@ static ufbxi_noinline void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 			if (best_chunk) {
 				size_t pos = ufbxi_align_to_mask(best_chunk->pushed_pos, align_mask);
 				best_chunk->pushed_pos = pos + size;
+				b->pushed_size += size;
 				return best_chunk->data + pos;
 			}
 		}
@@ -3281,6 +3303,7 @@ static ufbxi_noinline void *ufbxi_push_size_new_block(ufbxi_buf *b, size_t size)
 		b->size = chunk_size;
 	} else {
 		ufbxi_buf_chunk *root = b->chunks[1];
+		b->pushed_size += size;
 		if (!root) {
 			b->chunks[1] = new_chunk;
 		} else if (root->size < chunk_size) {
@@ -3590,6 +3613,7 @@ static ufbxi_noinline void ufbxi_buf_clear(ufbxi_buf *buf)
 		buf->size = root->size;
 	}
 	buf->num_items = 0;
+	buf->pushed_size = 0;
 
 	// Huge chunks are always sorted by descending size and
 	// `chunks[1]` points to the largest one.
@@ -5189,6 +5213,200 @@ static ufbxi_noinline ufbx_vec3 ufbxi_slow_normalized_cross3(const ufbx_vec3 *a,
 	return ufbxi_normalize3(ufbxi_cross3(*a, *b));
 }
 
+// -- Threading
+
+typedef struct ufbxi_task ufbxi_task;
+typedef struct ufbxi_thread ufbxi_thread;
+typedef struct ufbxi_thread_pool ufbxi_thread_pool;
+
+typedef bool ufbxi_task_fn(ufbxi_task *task);
+
+struct ufbxi_task {
+	void *data;
+	const char *error;
+};
+
+typedef struct {
+	ufbxi_task task;
+	ufbxi_task_fn *fn;
+	uint32_t num_started;
+	ufbxi_atomic_counter num_done;
+} ufbxi_task_imp;
+
+struct ufbxi_thread_pool {
+	ufbx_thread_opts opts;
+	ufbxi_allocator *ator;
+	ufbx_error *error;
+
+	bool enabled;
+	bool failed;
+	const char *error_desc;
+
+	uint32_t start_index;
+	uint32_t execute_index;
+	ufbxi_atomic_counter run_index;
+	uint32_t wait_index;
+
+	double accumulated_cost;
+
+	uint32_t num_tasks;
+	uint32_t num_tasks_init;
+	ufbxi_task_imp *tasks;
+};
+
+static void ufbxi_thread_pool_execute(ufbxi_thread_pool *pool)
+{
+	uint32_t index = (uint32_t)ufbxi_atomic_counter_inc(&pool->run_index);
+	ufbxi_task_imp *imp = &pool->tasks[index % pool->num_tasks];
+	if (imp->fn(&imp->task)) {
+		imp->task.error = NULL;
+	} else if (!imp->task.error) {
+		imp->task.error = "";
+	}
+	ufbxi_atomic_counter_inc(&imp->num_done);
+}
+
+ufbxi_noinline static uint32_t ufbxi_thread_pool_try_wait(ufbxi_thread_pool *pool, uint32_t max_index)
+{
+	while (pool->wait_index < max_index) {
+		ufbxi_task_imp *task = &pool->tasks[pool->wait_index % pool->num_tasks];
+		if (ufbxi_atomic_counter_load(&task->num_done) < task->num_started) {
+			return pool->wait_index;
+		}
+		if (!pool->failed && task->task.error) {
+			pool->failed = true;
+			pool->error_desc = task->task.error;
+		}
+		pool->wait_index += 1;
+	}
+	return UFBX_NO_INDEX;
+}
+
+ufbxi_noinline static void ufbxi_thread_pool_wait_imp(ufbxi_thread_pool *pool, uint32_t max_index)
+{
+	while (ufbxi_thread_pool_try_wait(pool, max_index) != UFBX_NO_INDEX) {
+		pool->opts.pool.wait_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool, max_index);
+	}
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_wait(ufbxi_thread_pool *pool, uint32_t max_index)
+{
+	ufbxi_thread_pool_wait_imp(pool, max_index);
+	if (pool->failed) {
+		ufbx_error *error = pool->error;
+		if (pool->error_desc) {
+			error->description.data = pool->error_desc;
+			error->description.length = strlen(pool->error_desc);
+		}
+		ufbxi_fail_err(error, "Task failed");
+	}
+	return 1;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_init(ufbxi_thread_pool *pool, ufbx_error *error, ufbxi_allocator *ator, const ufbx_thread_opts *opts)
+{
+	if (!(opts->pool.run_fn && opts->pool.wait_fn)) return 1;
+	if (!ufbx_is_thread_safe()) return 1;
+	pool->enabled = true;
+
+	uint32_t num_tasks = (uint32_t)ufbxi_min_sz(opts->num_tasks, INT32_MAX);
+	if (num_tasks == 0) {
+		num_tasks = 512;
+	}
+
+	pool->opts = *opts;
+	if (pool->opts.pool.init_fn) {
+		ufbx_thread_pool_info info;
+		info.max_concurrent_tasks = num_tasks;
+		ufbxi_check_err(error, pool->opts.pool.init_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool, &info));
+	}
+	pool->ator = ator;
+	pool->error = error;
+	ufbxi_atomic_counter_init(&pool->run_index);
+
+	pool->num_tasks = num_tasks;
+	pool->tasks = ufbxi_alloc(ator, ufbxi_task_imp, num_tasks);
+	ufbxi_check_err(error, pool->tasks);
+
+	return 1;
+}
+
+ufbxi_noinline static void ufbxi_thread_pool_free(ufbxi_thread_pool *pool)
+{
+	if (!pool->enabled) return;
+
+	// Wait for all pending tasks
+	ufbxi_thread_pool_wait_imp(pool, pool->start_index);
+
+	if (pool->opts.pool.free_fn) {
+		pool->opts.pool.free_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool);
+	}
+
+	ufbxi_atomic_counter_free(&pool->run_index);
+	for (size_t i = 0; i < pool->num_tasks_init; i++) {
+		ufbxi_task_imp *task = &pool->tasks[i];
+		ufbxi_atomic_counter_free(&task->num_done);
+	}
+
+	ufbxi_free(pool->ator, ufbxi_task_imp, pool->tasks, pool->num_tasks);
+}
+
+ufbxi_nodiscard ufbxi_noinline static uint32_t ufbxi_thread_pool_available_tasks(ufbxi_thread_pool *pool)
+{
+	ufbxi_thread_pool_try_wait(pool, pool->start_index);
+	return pool->num_tasks - (pool->start_index - pool->wait_index);
+}
+
+ufbxi_nodiscard ufbxi_noinline static ufbxi_task *ufbxi_thread_pool_create_task(ufbxi_thread_pool *pool, ufbxi_task_fn *fn)
+{
+	uint32_t index = pool->start_index;
+	if (index - pool->wait_index >= pool->num_tasks) {
+		ufbxi_thread_pool_try_wait(pool, index);
+		if (index - pool->wait_index >= pool->num_tasks) {
+			// No space left
+			return NULL;
+		}
+	} else if (index == INT32_MAX) {
+		// TODO: Expand to 64 bits if possible?
+		return NULL;
+	}
+
+	ufbxi_task_imp *imp = &pool->tasks[index % pool->num_tasks];
+	if (index < pool->num_tasks) {
+		memset(imp, 0, sizeof(ufbxi_task_imp));
+		ufbxi_atomic_counter_init(&imp->num_done);
+		pool->num_tasks_init = index + 1;
+	}
+
+	imp->num_started++;
+	imp->fn = fn;
+
+	return &imp->task;
+}
+
+static void ufbxi_thread_pool_flush(ufbxi_thread_pool *pool)
+{
+	uint32_t start_index = pool->execute_index;
+	uint32_t count = pool->start_index - start_index;
+	if (count > 0) {
+		pool->opts.pool.run_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool, start_index, count);
+		pool->execute_index = start_index + count;
+	}
+	pool->accumulated_cost = 0.0;
+}
+
+static void ufbxi_thread_pool_run_task(ufbxi_thread_pool *pool, ufbxi_task *task, double cost)
+{
+	uint32_t index = pool->start_index;
+	ufbx_assert(task == &pool->tasks[index % pool->num_tasks].task);
+	pool->start_index = index + 1;
+	pool->accumulated_cost += cost;
+
+	if (pool->accumulated_cost >= 256*1024) {
+		ufbxi_thread_pool_flush(pool);
+	}
+}
+
 // -- Type definitions
 
 typedef struct ufbxi_node ufbxi_node;
@@ -5475,6 +5693,8 @@ typedef struct {
 
 } ufbxi_obj_context;
 
+#define UFBXI_THREADED_PARSE_BATCHES 4
+
 typedef struct {
 
 	ufbx_error error;
@@ -5547,6 +5767,9 @@ typedef struct {
 	ufbxi_buf tmp_full_weights;
 	ufbxi_buf tmp_dom_nodes;
 	ufbxi_buf tmp_element_id;
+	ufbxi_buf tmp_deferred_numbers;
+	ufbxi_buf tmp_deferred_chars;
+	ufbxi_buf tmp_thread_parse[UFBXI_THREADED_PARSE_BATCHES];
 	size_t tmp_element_byte_offset;
 
 	ufbxi_template *templates;
@@ -5620,6 +5843,10 @@ typedef struct {
 	ufbx_real unit_scale;
 
 	ufbxi_warnings warnings;
+
+	bool parse_threaded;
+	ufbxi_thread_pool thread_pool;
+
 } ufbxi_context;
 
 static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, const char *func, uint32_t line)
@@ -7503,20 +7730,21 @@ ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_swap_endian_value(ufbxi_
 
 // Read and convert a post-7000 FBX data array into a different format. `src_type` may be equal to `dst_type`
 // if the platform is not binary compatible with the FBX data representation.
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_context *uc, char src_type, char dst_type, const void *src, void *dst, size_t size)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_context *maybe_uc, char src_type, char dst_type, const void *src, void *dst, size_t size)
 {
 	// TODO: We might want to use the slow path if the machine float/double doesn't match IEEE 754!
 	// Convert commented out lines under some `#if UFBX_NON_IEE754` define or something.
 	if (src_type == dst_type) {
-		src = ufbxi_swap_endian_array(uc, src, size, src_type);
-		ufbxi_check(src);
+		ufbx_assert(maybe_uc && maybe_uc->file_big_endian);
+		src = ufbxi_swap_endian_array(maybe_uc, src, size, src_type);
+		ufbxi_check_err(&maybe_uc->error, src);
 		memcpy(dst, src, size * ufbxi_array_type_size(dst_type));
 		return 1;
 	}
 
-	if (uc->file_big_endian) {
-		src = ufbxi_swap_endian_array(uc, src, size, src_type);
-		ufbxi_check(src);
+	if (maybe_uc && maybe_uc->file_big_endian) {
+		src = ufbxi_swap_endian_array(maybe_uc, src, size, src_type);
+		ufbxi_check_err(&maybe_uc->error, src);
 	}
 
 	switch (dst_type)
@@ -7541,7 +7769,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 		case 'l': ufbxi_convert_loop_slow(uint8_t, (uint8_t), 8, (uint8_t)ufbxi_read_i64(val)); break;
 		case 'f': ufbxi_convert_loop_slow(uint8_t, (uint8_t), 4, (uint8_t)ufbxi_read_f32(val)); break;
 		case 'd': ufbxi_convert_loop_slow(uint8_t, (uint8_t), 8, (uint8_t)ufbxi_read_f64(val)); break;
-		default: ufbxi_fail("Bad array source type");
+		default: if (maybe_uc) ufbxi_fail_err(&maybe_uc->error, "Bad array source type"); return 0;
 		}
 		break;
 
@@ -7552,7 +7780,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 		case 'l': ufbxi_convert_loop_slow(int32_t, (int32_t), 8, ufbxi_read_i64(val)); break;
 		case 'f': ufbxi_convert_loop_slow(int32_t, ufbxi_f64_to_i32, 4, ufbxi_read_f32(val)); break;
 		case 'd': ufbxi_convert_loop_slow(int32_t, ufbxi_f64_to_i32, 8, ufbxi_read_f64(val)); break;
-		default: ufbxi_fail("Bad array source type");
+		default: if (maybe_uc) ufbxi_fail_err(&maybe_uc->error, "Bad array source type"); return 0;
 		}
 		break;
 
@@ -7563,7 +7791,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 		// case 'l': ufbxi_convert_loop_slow(int64_t, (int64_t), 8, ufbxi_read_i64(val)); break;
 		case 'f': ufbxi_convert_loop_slow(int64_t, ufbxi_f64_to_i64, 4, ufbxi_read_f32(val)); break;
 		case 'd': ufbxi_convert_loop_slow(int64_t, ufbxi_f64_to_i64, 8, ufbxi_read_f64(val)); break;
-		default: ufbxi_fail("Bad array source type");
+		default: if (maybe_uc) ufbxi_fail_err(&maybe_uc->error, "Bad array source type"); return 0;
 		}
 		break;
 
@@ -7574,7 +7802,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 		case 'l': ufbxi_convert_loop_slow(float, (float), 8, ufbxi_read_i64(val)); break;
 		// case 'f': ufbxi_convert_loop_slow(float, (float), 4, ufbxi_read_f32(val)); break;
 		case 'd': ufbxi_convert_loop_fast(float, (float), 8, ufbxi_read_f64(val)); break;
-		default: ufbxi_fail("Bad array source type");
+		default: if (maybe_uc) ufbxi_fail_err(&maybe_uc->error, "Bad array source type"); return 0;
 		}
 		break;
 
@@ -7585,7 +7813,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_convert_array(ufbxi_conte
 		case 'l': ufbxi_convert_loop_slow(double, (double), 8, ufbxi_read_i64(val)); break;
 		case 'f': ufbxi_convert_loop_fast(double, (double), 4, ufbxi_read_f32(val)); break;
 		// case 'd': ufbxi_convert_loop_slow(double, (double), 8, ufbxi_read_f64(val)); break;
-		default: ufbxi_fail("Bad array source type");
+		default: if (maybe_uc) ufbxi_fail_err(&maybe_uc->error, "Bad array source type"); return 0;
 		}
 		break;
 
@@ -7728,6 +7956,72 @@ ufbxi_nodiscard ufbxi_noinline static void *ufbxi_push_array_data(ufbxi_context 
 	return data;
 }
 
+ufbxi_noinline static void ufbxi_postprocess_bool_array(char *data, size_t size)
+{
+	ufbxi_for(char, b, (char*)data, size) {
+		*b = (char)(*b != 0);
+	}
+}
+
+typedef struct {
+	size_t encoded_size;
+	size_t src_elem_size;
+	size_t array_size;
+	char src_type;
+	char dst_type;
+	char arr_type;
+	const void *encoded_data;
+	void *decoded_data;
+	void *dst_data;
+	ufbx_inflate_retain *inflate_retain;
+} ufbxi_deflate_task;
+
+static bool ufbxi_deflate_task_fn(ufbxi_task *task)
+{
+	ufbxi_deflate_task *t = (ufbxi_deflate_task*)task->data;
+
+	ufbx_inflate_input input;
+	input.total_size = t->encoded_size;
+	input.data = t->encoded_data;
+	input.data_size = t->encoded_size;
+	input.no_header = false;
+	input.no_checksum = false;
+	input.internal_fast_bits = 0;
+	input.progress_cb.fn = NULL;
+	input.progress_cb.user = NULL;
+	input.progress_size_before = 0;
+	input.progress_size_after = 0;
+	input.progress_interval_hint = 0;
+	input.buffer = NULL;
+	input.buffer_size = 0;
+	input.read_fn = NULL;
+	input.read_user = NULL;
+
+	size_t decoded_data_size = t->src_elem_size * t->array_size;
+	ptrdiff_t res = ufbx_inflate(t->decoded_data, decoded_data_size, &input, t->inflate_retain);
+	if (res == -28) {
+		task->error = "Cancelled";
+		return false;
+	} else if (res != (ptrdiff_t)decoded_data_size) {
+		task->error = "Bad DEFLATE data";
+		return false;
+	}
+
+	if (t->decoded_data != t->dst_data) {
+		int ok = ufbxi_binary_convert_array(NULL, t->src_type, t->dst_type, t->decoded_data, t->dst_data, t->array_size);
+		if (!ok) {
+			task->error = "Failed to convert array";
+			return false;
+		}
+	}
+
+	if (t->arr_type == 'b') {
+		ufbxi_postprocess_bool_array(t->dst_data, t->array_size);
+	}
+
+	return true;
+}
+
 // Recursion limited by check at the start
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context *uc, uint32_t depth, ufbxi_parse_state parent_state, bool *p_end, ufbxi_buf *tmp_buf, bool recursive)
 	ufbxi_recursive_function(int, ufbxi_binary_parse_node, (uc, depth, parent_state, p_end, tmp_buf, recursive), UFBXI_MAX_NODE_DEPTH + 1,
@@ -7825,6 +8119,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 		if (num_values == 0) c = '0';
 		if (dst_type == '-') c = '-';
 
+		bool deferred = false;
+
 		if (c=='c' || c=='b' || c=='i' || c=='l' || c =='f' || c=='d') {
 
 			const char *arr_words = data + 1;
@@ -7850,15 +8146,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 			char *arr_data = (char*)ufbxi_push_array_data(uc, &arr_info, size, tmp_buf);
 			ufbxi_check(arr_data);
 
-			// If the source and destination types are equal and our build is binary-compatible
-			// with the FBX format we can read the decoded data directly into the array buffer.
-			// Otherwise we need a temporary buffer to decode the array into before conversion.
-			void *decoded_data = arr_data;
-			if (src_type != dst_type || uc->local_big_endian != uc->file_big_endian) {
-				ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, decoded_data_size));
-				decoded_data = uc->tmp_arr;
-			}
-
 			uint64_t arr_begin = ufbxi_get_read_offset(uc);
 			ufbxi_check(UINT64_MAX - encoded_size > arr_begin);
 			uint64_t arr_end = arr_begin + encoded_size;
@@ -7866,7 +8153,58 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 				uc->progress_bytes_total = arr_end;
 			}
 
-			if (encoding == 0) {
+			// Threading
+			if (uc->parse_threaded && encoding == 1 && encoded_size >= 256 && !uc->file_big_endian && !uc->local_big_endian) {
+				ufbxi_task *task = ufbxi_thread_pool_create_task(&uc->thread_pool, &ufbxi_deflate_task_fn);
+				if (task) {
+					ufbxi_deflate_task *t = ufbxi_push_zero(tmp_buf, ufbxi_deflate_task, 1);
+					ufbxi_check(t);
+
+					ufbxi_inflate_init_retain(uc->inflate_retain);
+
+					t->src_elem_size = src_elem_size;
+					t->encoded_size = encoded_size;
+					t->array_size = size;
+					t->src_type = src_type;
+					t->dst_type = dst_type;
+					t->dst_data = arr_data;
+					t->inflate_retain = uc->inflate_retain;
+
+					if (!uc->read_fn) {
+						// From memory, no need to copy
+						t->encoded_data = uc->data;
+					} else {
+						void *encoded_data = ufbxi_push(tmp_buf, char, encoded_size);
+						ufbxi_check(encoded_data);
+						ufbxi_check(ufbxi_read_to(uc, encoded_data, encoded_size));
+						t->encoded_data = encoded_data;
+					}
+
+					if (src_type != dst_type) {
+						t->decoded_data = ufbxi_push_size(tmp_buf, src_elem_size, size);
+						ufbxi_check(t->decoded_data);
+					} else {
+						t->decoded_data = arr_data;
+					}
+
+					task->data = t;
+					ufbxi_thread_pool_run_task(&uc->thread_pool, task, (double)encoded_size);
+					deferred = true;
+				}
+			}
+
+			// If the source and destination types are equal and our build is binary-compatible
+			// with the FBX format we can read the decoded data directly into the array buffer.
+			// Otherwise we need a temporary buffer to decode the array into before conversion.
+			void *decoded_data = arr_data;
+			if (!deferred && (src_type != dst_type || uc->local_big_endian != uc->file_big_endian)) {
+				ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, decoded_data_size));
+				decoded_data = uc->tmp_arr;
+			}
+
+			if (deferred) {
+				// Nop
+			} else if (encoding == 0) {
 				// Encoding 0: Plain binary data.
 				ufbxi_check(encoded_size == decoded_data_size);
 
@@ -7933,7 +8271,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 					input.buffer = NULL;
 					input.buffer_size = 0;
 					input.read_fn = NULL;
-					input.read_user = 0;
+					input.read_user = NULL;
 					uc->data += encoded_size;
 					uc->data_size -= encoded_size;
 					ufbxi_check(ufbxi_resume_progress(uc));
@@ -7948,7 +8286,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 			}
 
 			// Convert the decoded array if necessary.
-			if (decoded_data != arr_data) {
+			if (!deferred && decoded_data != arr_data) {
 				ufbxi_check(ufbxi_binary_convert_array(uc, src_type, dst_type, decoded_data, arr_data, size));
 			}
 
@@ -7970,10 +8308,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 		}
 
 		// Post-process boolean arrays
-		if (arr_info.type == 'b') {
-			ufbxi_for(char, b, (char*)arr->data, arr->size) {
-				*b = (char)(*b != 0);
-			}
+		if (!deferred && arr_info.type == 'b') {
+			ufbxi_postprocess_bool_array((char*)arr->data, arr->size);
 		}
 
 	} else {
@@ -9646,7 +9982,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_parse_toplevel(ufbxi_context *uc
 	}
 }
 
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_parse_toplevel_child(ufbxi_context *uc, ufbxi_node **p_node)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_parse_toplevel_child(ufbxi_context *uc, ufbxi_node **p_node, ufbxi_buf *tmp_buf)
 {
 	// Top-level node not found
 	if (!uc->top_node) {
@@ -9656,10 +9992,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_parse_toplevel_child(ufbxi_conte
 
 	if (uc->top_child_index == SIZE_MAX) {
 		// Parse children on demand
-		ufbxi_buf_clear(&uc->tmp_parse);
+		if (!tmp_buf) {
+			ufbxi_buf_clear(&uc->tmp_parse);
+		}
 		bool end = false;
 		ufbxi_parse_state state = ufbxi_update_parse_state(UFBXI_PARSE_ROOT, uc->top_node->name);
-		ufbxi_check(ufbxi_parse_toplevel_child_imp(uc, state, &uc->tmp_parse, &end));
+		ufbxi_check(ufbxi_parse_toplevel_child_imp(uc, state, tmp_buf ? tmp_buf : &uc->tmp_parse, &end));
 		if (end) {
 			*p_node = NULL;
 		} else {
@@ -10317,7 +10655,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_header_extension(ufbxi_cont
 
 	for (;;) {
 		ufbxi_node *child;
-		ufbxi_check(ufbxi_parse_toplevel_child(uc, &child));
+		ufbxi_check(ufbxi_parse_toplevel_child(uc, &child, NULL));
 		if (!child) break;
 
 		if (child->name == ufbxi_Creator) {
@@ -10446,7 +10784,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_document(ufbxi_context *uc)
 
 	for (;;) {
 		ufbxi_node *child;
-		ufbxi_check(ufbxi_parse_toplevel_child(uc, &child));
+		ufbxi_check(ufbxi_parse_toplevel_child(uc, &child, NULL));
 		if (!child) break;
 
 		if (child->name == ufbxi_Document && !found_root_id) {
@@ -10465,7 +10803,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_definitions(ufbxi_context *
 {
 	for (;;) {
 		ufbxi_node *object;
-		ufbxi_check(ufbxi_parse_toplevel_child(uc, &object));
+		ufbxi_check(ufbxi_parse_toplevel_child(uc, &object, NULL));
 		if (!object) break;
 
 		if (object->name != ufbxi_ObjectType) continue;
@@ -12880,9 +13218,157 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_global_settings(ufbxi_conte
 	return 1;
 }
 
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects(ufbxi_context *uc)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_object(ufbxi_context *uc, ufbxi_node *node)
 {
 	ufbxi_element_info info = { 0 };
+	info.dom_node = ufbxi_get_dom_node(uc, node);
+
+	if (node->name == ufbxi_GlobalSettings) {
+		ufbxi_check(ufbxi_read_global_settings(uc, node));
+		return 1;
+	}
+
+	ufbx_string type_and_name, sub_type_str;
+
+	// Failing to parse the object properties is not an error since
+	// there's some weird objects mixed in every now and then.
+	// FBX version 7000 and up uses 64-bit unique IDs per object,
+	// older FBX versions just use name/type pairs, which we can
+	// use as IDs since all strings are interned into a string pool.
+	if (uc->version >= 7000) {
+		if (!ufbxi_get_val3(node, "Lss", &info.fbx_id, &type_and_name, &sub_type_str)) return 1;
+		ufbxi_check((info.fbx_id & UFBXI_SYNTHETIC_ID_BIT) == 0);
+	} else {
+		if (!ufbxi_get_val2(node, "ss", &type_and_name, &sub_type_str)) return 1;
+		info.fbx_id = ufbxi_synthetic_id_from_string(type_and_name.data);
+	}
+
+	// Remove the "Fbx" prefix from sub-types, remember to re-intern!
+	if (sub_type_str.length > 3 && !memcmp(sub_type_str.data, "Fbx", 3)) {
+		sub_type_str.data += 3;
+		sub_type_str.length -= 3;
+		ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &sub_type_str, false));
+	}
+
+	ufbx_string type_str;
+	ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type_str, &info.name));
+
+	const char *name = node->name, *sub_type = sub_type_str.data;
+	ufbxi_check(ufbxi_read_properties(uc, node, &info.props));
+	info.props.defaults = ufbxi_find_template(uc, name, sub_type);
+
+	if (name == ufbxi_Model) {
+		if (uc->version < 7000) {
+			ufbxi_check(ufbxi_read_synthetic_attribute(uc, node, &info, type_str, sub_type, name));
+		}
+		ufbxi_check(ufbxi_read_model(uc, node, &info));
+	} else if (name == ufbxi_NodeAttribute) {
+		if (sub_type == ufbxi_Light) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_light), UFBX_ELEMENT_LIGHT));
+		} else if (sub_type == ufbxi_Camera) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera), UFBX_ELEMENT_CAMERA));
+		} else if (sub_type == ufbxi_LimbNode || sub_type == ufbxi_Limb || sub_type == ufbxi_Root) {
+			ufbxi_check(ufbxi_read_bone(uc, node, &info, sub_type));
+		} else if (sub_type == ufbxi_Null || sub_type == ufbxi_Marker) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_empty), UFBX_ELEMENT_EMPTY));
+		} else if (sub_type == ufbxi_CameraStereo) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_stereo_camera), UFBX_ELEMENT_STEREO_CAMERA));
+		} else if (sub_type == ufbxi_CameraSwitcher) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_CAMERA_SWITCHER));
+		} else if (sub_type == ufbxi_FKEffector) {
+			ufbxi_check(ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKER_FK_EFFECTOR));
+		} else if (sub_type == ufbxi_IKEffector) {
+			ufbxi_check(ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKER_IK_EFFECTOR));
+		} else if (sub_type == ufbxi_LodGroup) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_lod_group), UFBX_ELEMENT_LOD_GROUP));
+		} else {
+			ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
+		}
+	} else if (name == ufbxi_Geometry) {
+		if (sub_type == ufbxi_Mesh) {
+			ufbxi_check(ufbxi_read_mesh(uc, node, &info));
+		} else if (sub_type == ufbxi_Shape) {
+			ufbxi_check(ufbxi_read_shape(uc, node, &info));
+		} else if (sub_type == ufbxi_NurbsCurve) {
+			ufbxi_check(ufbxi_read_nurbs_curve(uc, node, &info));
+		} else if (sub_type == ufbxi_NurbsSurface) {
+			ufbxi_check(ufbxi_read_nurbs_surface(uc, node, &info));
+		} else if (sub_type == ufbxi_Line) {
+			ufbxi_check(ufbxi_read_line(uc, node, &info));
+		} else if (sub_type == ufbxi_TrimNurbsSurface) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_trim_surface), UFBX_ELEMENT_NURBS_TRIM_SURFACE));
+		} else if (sub_type == ufbxi_Boundary) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_trim_boundary), UFBX_ELEMENT_NURBS_TRIM_BOUNDARY));
+		} else {
+			ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
+		}
+	} else if (name == ufbxi_Deformer) {
+		if (sub_type == ufbxi_Skin) {
+			ufbxi_check(ufbxi_read_skin(uc, node, &info));
+		} else if (sub_type == ufbxi_Cluster) {
+			ufbxi_check(ufbxi_read_skin_cluster(uc, node, &info));
+		} else if (sub_type == ufbxi_BlendShape) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_blend_deformer), UFBX_ELEMENT_BLEND_DEFORMER));
+		} else if (sub_type == ufbxi_BlendShapeChannel) {
+			ufbxi_check(ufbxi_read_blend_channel(uc, node, &info));
+		} else if (sub_type == ufbxi_VertexCacheDeformer) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_cache_deformer), UFBX_ELEMENT_CACHE_DEFORMER));
+		} else {
+			ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
+		}
+	} else if (name == ufbxi_Material) {
+		ufbxi_check(ufbxi_read_material(uc, node, &info));
+	} else if (name == ufbxi_Texture) {
+		ufbxi_check(ufbxi_read_texture(uc, node, &info));
+	} else if (name == ufbxi_LayeredTexture) {
+		ufbxi_check(ufbxi_read_layered_texture(uc, node, &info));
+	} else if (name == ufbxi_Video) {
+		ufbxi_check(ufbxi_read_video(uc, node, &info));
+	} else if (name == ufbxi_AnimationStack) {
+		ufbxi_check(ufbxi_read_anim_stack(uc, node, &info));
+	} else if (name == ufbxi_AnimationLayer) {
+		ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_layer), UFBX_ELEMENT_ANIM_LAYER));
+	} else if (name == ufbxi_AnimationCurveNode) {
+		ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_value), UFBX_ELEMENT_ANIM_VALUE));
+	} else if (name == ufbxi_AnimationCurve) {
+		ufbxi_check(ufbxi_read_animation_curve(uc, node, &info));
+	} else if (name == ufbxi_Pose) {
+		ufbxi_check(ufbxi_read_pose(uc, node, &info, sub_type));
+	} else if (name == ufbxi_Implementation) {
+		ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_shader), UFBX_ELEMENT_SHADER));
+	} else if (name == ufbxi_BindingTable) {
+		ufbxi_check(ufbxi_read_binding_table(uc, node, &info));
+	} else if (name == ufbxi_Collection) {
+		if (sub_type == ufbxi_SelectionSet) {
+			ufbxi_check(ufbxi_read_selection_set(uc, node, &info));
+		}
+	} else if (name == ufbxi_CollectionExclusive) {
+		if (sub_type == ufbxi_DisplayLayer) {
+			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_display_layer), UFBX_ELEMENT_DISPLAY_LAYER));
+		}
+	} else if (name == ufbxi_SelectionNode) {
+		ufbxi_check(ufbxi_read_selection_node(uc, node, &info));
+	} else if (name == ufbxi_Constraint) {
+		if (sub_type == ufbxi_Character) {
+			ufbxi_check(ufbxi_read_character(uc, node, &info));
+		} else {
+			ufbxi_check(ufbxi_read_constraint(uc, node, &info));
+		}
+	} else if (name == ufbxi_SceneInfo) {
+		ufbxi_check(ufbxi_read_scene_info(uc, node));
+	} else if (name == ufbxi_Cache) {
+		ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_cache_file), UFBX_ELEMENT_CACHE_FILE));
+	} else if (name == ufbxi_ObjectMetaData) {
+		ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_metadata_object), UFBX_ELEMENT_METADATA_OBJECT));
+	} else {
+		ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
+	}
+
+	return 1;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects(ufbxi_context *uc)
+{
 	for (;;) {
 		// Push a deferred element ID for tagging warnings
 		uc->p_element_id = ufbxi_push(&uc->tmp_element_id, uint32_t, 1);
@@ -12891,155 +13377,104 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects(ufbxi_context *uc)
 		uc->warnings.deferred_element_id_plus_one = (uint32_t)uc->tmp_element_id.num_items;
 
 		ufbxi_node *node;
-		ufbxi_check(ufbxi_parse_toplevel_child(uc, &node));
+		ufbxi_check(ufbxi_parse_toplevel_child(uc, &node, NULL));
 		if (!node) break;
 
-		info.dom_node = ufbxi_get_dom_node(uc, node);
-
-		if (node->name == ufbxi_GlobalSettings) {
-			ufbxi_check(ufbxi_read_global_settings(uc, node));
-			continue;
-		}
-
-		ufbx_string type_and_name, sub_type_str;
-
-		// Failing to parse the object properties is not an error since
-		// there's some weird objects mixed in every now and then.
-		// FBX version 7000 and up uses 64-bit unique IDs per object,
-		// older FBX versions just use name/type pairs, which we can
-		// use as IDs since all strings are interned into a string pool.
-		if (uc->version >= 7000) {
-			if (!ufbxi_get_val3(node, "Lss", &info.fbx_id, &type_and_name, &sub_type_str)) continue;
-			ufbxi_check((info.fbx_id & UFBXI_SYNTHETIC_ID_BIT) == 0);
-		} else {
-			if (!ufbxi_get_val2(node, "ss", &type_and_name, &sub_type_str)) continue;
-			info.fbx_id = ufbxi_synthetic_id_from_string(type_and_name.data);
-		}
-
-		// Remove the "Fbx" prefix from sub-types, remember to re-intern!
-		if (sub_type_str.length > 3 && !memcmp(sub_type_str.data, "Fbx", 3)) {
-			sub_type_str.data += 3;
-			sub_type_str.length -= 3;
-			ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &sub_type_str, false));
-		}
-
-		ufbx_string type_str;
-		ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type_str, &info.name));
-
-		const char *name = node->name, *sub_type = sub_type_str.data;
-		ufbxi_check(ufbxi_read_properties(uc, node, &info.props));
-		info.props.defaults = ufbxi_find_template(uc, name, sub_type);
-
-		if (name == ufbxi_Model) {
-			if (uc->version < 7000) {
-				ufbxi_check(ufbxi_read_synthetic_attribute(uc, node, &info, type_str, sub_type, name));
-			}
-			ufbxi_check(ufbxi_read_model(uc, node, &info));
-		} else if (name == ufbxi_NodeAttribute) {
-			if (sub_type == ufbxi_Light) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_light), UFBX_ELEMENT_LIGHT));
-			} else if (sub_type == ufbxi_Camera) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera), UFBX_ELEMENT_CAMERA));
-			} else if (sub_type == ufbxi_LimbNode || sub_type == ufbxi_Limb || sub_type == ufbxi_Root) {
-				ufbxi_check(ufbxi_read_bone(uc, node, &info, sub_type));
-			} else if (sub_type == ufbxi_Null || sub_type == ufbxi_Marker) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_empty), UFBX_ELEMENT_EMPTY));
-			} else if (sub_type == ufbxi_CameraStereo) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_stereo_camera), UFBX_ELEMENT_STEREO_CAMERA));
-			} else if (sub_type == ufbxi_CameraSwitcher) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_camera_switcher), UFBX_ELEMENT_CAMERA_SWITCHER));
-			} else if (sub_type == ufbxi_FKEffector) {
-				ufbxi_check(ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKER_FK_EFFECTOR));
-			} else if (sub_type == ufbxi_IKEffector) {
-				ufbxi_check(ufbxi_read_marker(uc, node, &info, sub_type, UFBX_MARKER_IK_EFFECTOR));
-			} else if (sub_type == ufbxi_LodGroup) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_lod_group), UFBX_ELEMENT_LOD_GROUP));
-			} else {
-				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
-			}
-		} else if (name == ufbxi_Geometry) {
-			if (sub_type == ufbxi_Mesh) {
-				ufbxi_check(ufbxi_read_mesh(uc, node, &info));
-			} else if (sub_type == ufbxi_Shape) {
-				ufbxi_check(ufbxi_read_shape(uc, node, &info));
-			} else if (sub_type == ufbxi_NurbsCurve) {
-				ufbxi_check(ufbxi_read_nurbs_curve(uc, node, &info));
-			} else if (sub_type == ufbxi_NurbsSurface) {
-				ufbxi_check(ufbxi_read_nurbs_surface(uc, node, &info));
-			} else if (sub_type == ufbxi_Line) {
-				ufbxi_check(ufbxi_read_line(uc, node, &info));
-			} else if (sub_type == ufbxi_TrimNurbsSurface) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_trim_surface), UFBX_ELEMENT_NURBS_TRIM_SURFACE));
-			} else if (sub_type == ufbxi_Boundary) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_nurbs_trim_boundary), UFBX_ELEMENT_NURBS_TRIM_BOUNDARY));
-			} else {
-				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
-			}
-		} else if (name == ufbxi_Deformer) {
-			if (sub_type == ufbxi_Skin) {
-				ufbxi_check(ufbxi_read_skin(uc, node, &info));
-			} else if (sub_type == ufbxi_Cluster) {
-				ufbxi_check(ufbxi_read_skin_cluster(uc, node, &info));
-			} else if (sub_type == ufbxi_BlendShape) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_blend_deformer), UFBX_ELEMENT_BLEND_DEFORMER));
-			} else if (sub_type == ufbxi_BlendShapeChannel) {
-				ufbxi_check(ufbxi_read_blend_channel(uc, node, &info));
-			} else if (sub_type == ufbxi_VertexCacheDeformer) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_cache_deformer), UFBX_ELEMENT_CACHE_DEFORMER));
-			} else {
-				ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
-			}
-		} else if (name == ufbxi_Material) {
-			ufbxi_check(ufbxi_read_material(uc, node, &info));
-		} else if (name == ufbxi_Texture) {
-			ufbxi_check(ufbxi_read_texture(uc, node, &info));
-		} else if (name == ufbxi_LayeredTexture) {
-			ufbxi_check(ufbxi_read_layered_texture(uc, node, &info));
-		} else if (name == ufbxi_Video) {
-			ufbxi_check(ufbxi_read_video(uc, node, &info));
-		} else if (name == ufbxi_AnimationStack) {
-			ufbxi_check(ufbxi_read_anim_stack(uc, node, &info));
-		} else if (name == ufbxi_AnimationLayer) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_layer), UFBX_ELEMENT_ANIM_LAYER));
-		} else if (name == ufbxi_AnimationCurveNode) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_anim_value), UFBX_ELEMENT_ANIM_VALUE));
-		} else if (name == ufbxi_AnimationCurve) {
-			ufbxi_check(ufbxi_read_animation_curve(uc, node, &info));
-		} else if (name == ufbxi_Pose) {
-			ufbxi_check(ufbxi_read_pose(uc, node, &info, sub_type));
-		} else if (name == ufbxi_Implementation) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_shader), UFBX_ELEMENT_SHADER));
-		} else if (name == ufbxi_BindingTable) {
-			ufbxi_check(ufbxi_read_binding_table(uc, node, &info));
-		} else if (name == ufbxi_Collection) {
-			if (sub_type == ufbxi_SelectionSet) {
-				ufbxi_check(ufbxi_read_selection_set(uc, node, &info));
-			}
-		} else if (name == ufbxi_CollectionExclusive) {
-			if (sub_type == ufbxi_DisplayLayer) {
-				ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_display_layer), UFBX_ELEMENT_DISPLAY_LAYER));
-			}
-		} else if (name == ufbxi_SelectionNode) {
-			ufbxi_check(ufbxi_read_selection_node(uc, node, &info));
-		} else if (name == ufbxi_Constraint) {
-			if (sub_type == ufbxi_Character) {
-				ufbxi_check(ufbxi_read_character(uc, node, &info));
-			} else {
-				ufbxi_check(ufbxi_read_constraint(uc, node, &info));
-			}
-		} else if (name == ufbxi_SceneInfo) {
-			ufbxi_check(ufbxi_read_scene_info(uc, node));
-		} else if (name == ufbxi_Cache) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_cache_file), UFBX_ELEMENT_CACHE_FILE));
-		} else if (name == ufbxi_ObjectMetaData) {
-			ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_metadata_object), UFBX_ELEMENT_METADATA_OBJECT));
-		} else {
-			ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
-		}
+		ufbxi_read_object(uc, node);
 
 		uc->warnings.deferred_element_id_plus_one = 0;
 		uc->p_element_id = NULL;
 	}
+
+	return 1;
+}
+
+typedef struct {
+	ufbxi_node *nodes;
+	size_t num_nodes;
+	uint32_t task_index;
+} ufbxi_object_batch;
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects_threaded(ufbxi_context *uc)
+{
+	uc->parse_threaded = true;
+
+	bool parsed_to_end = false;
+	ufbxi_object_batch batches[UFBXI_THREADED_PARSE_BATCHES];
+	memset(batches, 0, sizeof(batches));
+
+	size_t empty_count = 0;
+	size_t batch_index = 0;
+	while (empty_count < UFBXI_THREADED_PARSE_BATCHES) {
+		ufbxi_object_batch *batch = &batches[batch_index];
+
+		ufbxi_check(ufbxi_thread_pool_wait(&uc->thread_pool, batch->task_index));
+
+		if (batch->num_nodes > 0) {
+			ufbxi_for(ufbxi_node, node, batch->nodes, batch->num_nodes) {
+				ufbxi_buf_clear(&uc->tmp_parse);
+
+				// Push a deferred element ID for tagging warnings
+				uc->p_element_id = ufbxi_push(&uc->tmp_element_id, uint32_t, 1);
+				ufbxi_check(uc->p_element_id);
+				*uc->p_element_id = UFBX_NO_INDEX;
+				uc->warnings.deferred_element_id_plus_one = (uint32_t)uc->tmp_element_id.num_items;
+
+				ufbxi_check(ufbxi_read_object(uc, node));
+
+				uc->warnings.deferred_element_id_plus_one = 0;
+				uc->p_element_id = NULL;
+			}
+			batch->num_nodes = 0;
+
+			ufbxi_thread_pool_flush(&uc->thread_pool);
+		}
+
+		ufbxi_buf *tmp_buf = &uc->tmp_thread_parse[batch_index];
+		ufbxi_buf_clear(tmp_buf);
+
+		if (!parsed_to_end) {
+			size_t num_nodes = 0;
+			uint32_t task_start = uc->thread_pool.start_index;
+			uint32_t max_tasks = uc->thread_pool.num_tasks / UFBXI_THREADED_PARSE_BATCHES;
+			max_tasks = ufbxi_min32(max_tasks, ufbxi_thread_pool_available_tasks(&uc->thread_pool));
+			size_t max_memory = uc->opts.thread_opts.memory_limit / UFBXI_THREADED_PARSE_BATCHES;
+
+			for (;;) {
+				ufbxi_node *node;
+				ufbxi_check(ufbxi_parse_toplevel_child(uc, &node, tmp_buf));
+				if (!node) {
+					parsed_to_end = true;
+					break;
+				}
+				ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbxi_node, 1, node));
+				num_nodes++;
+
+				uint32_t num_tasks = uc->thread_pool.start_index - task_start;
+				if (num_tasks >= max_tasks) break;
+
+				size_t memory_used = tmp_buf->pushed_size + tmp_buf->pos;
+				if (memory_used >= max_memory) break;
+			}
+
+			batch->num_nodes = num_nodes;
+			batch->nodes = ufbxi_push_pop(tmp_buf, &uc->tmp_stack, ufbxi_node, num_nodes);
+			ufbxi_check(batch->nodes);
+			batch->task_index = uc->thread_pool.start_index;
+
+			ufbxi_thread_pool_flush(&uc->thread_pool);
+		}
+
+		if (batch->num_nodes == 0) {
+			empty_count += 1;
+		}
+
+		batch_index = (batch_index + 1) % UFBXI_THREADED_PARSE_BATCHES;
+	}
+
+	ufbxi_thread_pool_wait(&uc->thread_pool, uc->thread_pool.start_index);
+
+	uc->parse_threaded = false;
 
 	return 1;
 }
@@ -13049,7 +13484,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_connections(ufbxi_context *
 	// Read the connections to the list first
 	for (;;) {
 		ufbxi_node *node;
-		ufbxi_check(ufbxi_parse_toplevel_child(uc, &node));
+		ufbxi_check(ufbxi_parse_toplevel_child(uc, &node, NULL));
 		if (!node) break;
 
 		char *type;
@@ -13493,7 +13928,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_takes(ufbxi_context *uc)
 {
 	for (;;) {
 		ufbxi_node *node;
-		ufbxi_check(ufbxi_parse_toplevel_child(uc, &node));
+		ufbxi_check(ufbxi_parse_toplevel_child(uc, &node, NULL));
 		if (!node) break;
 
 		if (node->name == ufbxi_Take) {
@@ -13631,7 +14066,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_root(ufbxi_context *uc)
 		// even the objects are not found.
 		ufbxi_check_msg(uc->top_node, "Not an FBX file");
 	}
-	ufbxi_check(ufbxi_read_objects(uc));
+	if (uc->thread_pool.enabled) {
+		ufbxi_check(ufbxi_read_objects_threaded(uc));
+	} else {
+		ufbxi_check(ufbxi_read_objects(uc));
+	}
 
 	// Connections: Relationships between nodes
 	ufbxi_check(ufbxi_parse_toplevel(uc, ufbxi_Connections));
@@ -22097,6 +22536,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_check(ufbxi_fixup_opts_string(uc, &uc->opts.geometry_transform_helper_name, true));
 	ufbxi_check(ufbxi_fixup_opts_string(uc, &uc->opts.scale_helper_name, true));
 
+	ufbxi_check(ufbxi_thread_pool_init(&uc->thread_pool, &uc->error, &uc->ator_tmp, &uc->opts.thread_opts));
+
 	if (!uc->opts.allow_unsafe) {
 		ufbxi_check_msg(uc->opts.index_error_handling != UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE, "Unsafe options");
 		ufbxi_check_msg(uc->opts.unicode_error_handling != UFBX_UNICODE_ERROR_HANDLING_UNSAFE_IGNORE, "Unsafe options");
@@ -22243,6 +22684,9 @@ static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 
 	ufbxi_buf_free(&uc->tmp);
 	ufbxi_buf_free(&uc->tmp_parse);
+	for (size_t i = 0; i < UFBXI_THREADED_PARSE_BATCHES; i++) {
+		ufbxi_buf_free(&uc->tmp_thread_parse[i]);
+	}
 	ufbxi_buf_free(&uc->tmp_stack);
 	ufbxi_buf_free(&uc->tmp_connections);
 	ufbxi_buf_free(&uc->tmp_node_ids);
@@ -22256,6 +22700,8 @@ static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->tmp_full_weights);
 	ufbxi_buf_free(&uc->tmp_dom_nodes);
 	ufbxi_buf_free(&uc->tmp_element_id);
+
+	ufbxi_thread_pool_free(&uc->thread_pool);
 
 	ufbxi_free(&uc->ator_tmp, ufbxi_node, uc->top_nodes, uc->top_nodes_cap);
 	ufbxi_free(&uc->ator_tmp, void*, uc->element_extra_arr, uc->element_extra_cap);
@@ -22338,6 +22784,10 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 		uc->opts.open_file_cb.fn = &ufbx_default_open_file;
 	}
 
+	if (!uc->opts.thread_opts.memory_limit) {
+		uc->opts.thread_opts.memory_limit = 32*1024*1024;
+	}
+
 	uc->string_pool.error = &uc->error;
 	ufbxi_map_init(&uc->string_pool.map, &uc->ator_tmp, &ufbxi_map_cmp_string, NULL);
 	uc->string_pool.buf.ator = &uc->ator_result;
@@ -22368,6 +22818,12 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	uc->tmp_full_weights.ator = &uc->ator_tmp;
 	uc->tmp_dom_nodes.ator = &uc->ator_tmp;
 	uc->tmp_element_id.ator = &uc->ator_tmp;
+
+	for (size_t i = 0; i < UFBXI_THREADED_PARSE_BATCHES; i++) {
+		uc->tmp_thread_parse[i].ator = &uc->ator_tmp;
+		uc->tmp_thread_parse[i].unordered = true;
+		uc->tmp_thread_parse[i].clearable = true;
+	}
 
 	uc->result.ator = &uc->ator_result;
 
@@ -29283,6 +29739,16 @@ ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t 
 	}
 	memset(error, 0, sizeof(ufbx_error));
 	return ufbxi_generate_indices(streams, num_streams, indices, num_indices, allocator, error);
+}
+
+ufbx_abi void ufbx_thread_pool_run_task(ufbx_thread_pool_context ctx)
+{
+	ufbxi_thread_pool_execute((ufbxi_thread_pool*)ctx);
+}
+
+ufbx_abi uint32_t ufbx_thread_pool_try_wait(ufbx_thread_pool_context ctx, uint32_t max_index)
+{
+	return ufbxi_thread_pool_try_wait((ufbxi_thread_pool*)ctx, max_index);
 }
 
 ufbx_abi ufbx_real ufbx_catch_get_vertex_real(ufbx_panic *panic, const ufbx_vertex_real *v, size_t index)
