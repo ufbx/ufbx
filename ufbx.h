@@ -4159,12 +4159,42 @@ typedef struct ufbx_thread_pool_info {
 	uint32_t max_concurrent_tasks;
 } ufbx_thread_pool_info;
 
+// Initialize the thread pool.
+// Argument `ctx` will not change between any further calls to this thread pool.
 typedef bool ufbx_thread_pool_init_fn(void *user, ufbx_thread_pool_context ctx, const ufbx_thread_pool_info *info);
 
+// Run tasks, users must call `ufbx_thread_pool_run_task()` exactly `count` times.
+// The function may (and should) be called from arbitrary threads.
+// `start_index` is a running number unique for each task, you can either use
+// or ignore this value.
+//
+//   ufbx_thread_pool_run_fn(ctx, start_index=0, count=2)
+//     thread 1: ufbx_thread_pool_run_task(ctx) [task 0]
+//     thread 2: ufbx_thread_pool_run_task(ctx) [task 1]
+//   ufbx_thread_pool_run_fn(ctx, start_index=2, count=1)
+//     thread 1: ufbx_thread_pool_run_task(ctx) [task 2]
+//
 typedef bool ufbx_thread_pool_run_fn(void *user, ufbx_thread_pool_context ctx, uint32_t start_index, uint32_t count);
 
+// Wait for all tasks before `max_index` to have completed.
+// ufbx will repeatedly call this function until the tasks are completed so
+// it does not need to be precisely implemented, immediately returning would
+// be valid (but very inefficient) and result in ufbx spinning until the tasks
+// are completed.
+//
+//   ufbx_thread_pool_run_fn(ctx, start_index=0, count=3)
+//     thread 1: ufbx_thread_pool_run_task(ctx) [task 0]
+//     thread 2: ufbx_thread_pool_run_task(ctx) [task 1]
+//     thread 3: ufbx_thread_pool_run_task(ctx) [task 2]
+//   ufbx_thread_pool_wait_fn(ctx, 2)
+//     WaitForAny([task 0], [task 1])
+//
+// HINT: You can query the first non-completed task index using
+// `ufbx_thread_pool_try_wait(ctx)` and specifically wait for it.
 typedef bool ufbx_thread_pool_wait_fn(void *user, ufbx_thread_pool_context ctx, uint32_t max_index);
 
+// Free the thread pool.
+// All tasks are waited for before calling this function.
 typedef void ufbx_thread_pool_free_fn(void *user, ufbx_thread_pool_context ctx);
 
 typedef struct ufbx_thread_pool {
@@ -5070,8 +5100,13 @@ ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t 
 
 // Thread pool
 
+// Run a single thread pool task.
+// See `ufbx_thread_pool_run_fn` for more information.
 ufbx_abi void ufbx_thread_pool_run_task(ufbx_thread_pool_context ctx);
 
+// Check if all tasks before `max_index` are completed.
+// Returns the index of the first non-completed task or `UFBX_NO_INDEX` if all
+// tasks before `max_index` have completed.
 ufbx_abi uint32_t ufbx_thread_pool_try_wait(ufbx_thread_pool_context ctx, uint32_t max_index);
 
 // -- Inline API
