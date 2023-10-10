@@ -634,7 +634,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 	#include <atomic>
 	typedef struct { alignas(std::atomic_size_t) char data[sizeof(std::atomic_size_t)]; } ufbxi_atomic_counter;
 	#define ufbxi_atomic_counter_init(ptr) (new (&(ptr)->data) std::atomic_size_t(0))
-	#define ufbxi_atomic_counter_free(ptr) (((std::atomic_size_t*)(ptr)->data)->~atomic_size_t())
+	#define ufbxi_atomic_counter_free(ptr) (((std::atomic_size_t*)(ptr)->data)->~atomic())
 	#define ufbxi_atomic_counter_inc(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_add(1)
 	#define ufbxi_atomic_counter_dec(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_sub(1)
 	#define ufbxi_atomic_counter_load(ptr) ((std::atomic_size_t*)(ptr)->data)->load(std::memory_order_acquire)
