@@ -5606,6 +5606,9 @@ typedef struct {
 
 	ufbx_inflate_retain *inflate_retain;
 
+	// Per-mesh consecutive indices used by `ufbxi_flip_winding()`.
+	uint32_t *tmp_mesh_consecutive_indices;
+
 	uint64_t root_id;
 	uint32_t num_elements;
 
@@ -18545,13 +18548,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_flip_attrib_winding(ufbxi_contex
 
 	// Need to duplicate consecutive indices, but we can cache the per mesh.
 	if (indices->data == uc->consecutive_indices) {
-		if (uc->tmp_mesh_consectuive_indices) {
-			indices->data = uc->tmp_mesh_consectuive_indices;
+		if (uc->tmp_mesh_consecutive_indices) {
+			indices->data = uc->tmp_mesh_consecutive_indices;
 			return 1;
 		}
 		indices->data = ufbxi_push_copy(&uc->result, uint32_t, indices->count, indices->data);
 		ufbxi_check(indices->data);
-		uc->tmp_mesh_consectuive_indices = indices->data;
+		uc->tmp_mesh_consecutive_indices = indices->data;
 	}
 
 	uint32_t *data = indices->data;
@@ -18573,7 +18576,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_flip_attrib_winding(ufbxi_contex
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_flip_winding(ufbxi_context *uc, ufbx_mesh *mesh)
 {
-	uc->tmp_mesh_consectuive_indices = NULL;
+	uc->tmp_mesh_consecutive_indices = NULL;
 	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->vertex_position.indices));
 	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->vertex_normal.indices));
 	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->vertex_crease.indices));
