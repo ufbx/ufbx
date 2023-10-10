@@ -758,6 +758,7 @@ input_structs = [
 interface_structs = [
     "ufbx_allocator",
     "ufbx_stream",
+    "ufbx_thread_pool",
 ]
 
 union_prefer = {
