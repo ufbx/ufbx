@@ -231,13 +231,13 @@ jobs:
         run: python3 misc/analyze_stack.py build/ufbx-clang-debug.su --limit 0x20000 --cache build/ufbx-cache.pickle
       - name: Analyze Clang release stack
         if: ${{ always() && !cancelled() }}
-        run: python3 misc/analyze_stack.py build/ufbx-clang-release.su --limit 0x10000 --cache build/ufbx-cache.pickle
+        run: python3 misc/analyze_stack.py build/ufbx-clang-release.su --limit 0x20000 --cache build/ufbx-cache.pickle
       - name: Analyze GCC debug stack
         if: ${{ always() && !cancelled() }}
         run: python3 misc/analyze_stack.py build/ufbx-gcc-debug.su --limit 0x20000 --cache build/ufbx-cache.pickle
       - name: Analyze GCC release stack
         if: ${{ always() && !cancelled() }}
-        run: python3 misc/analyze_stack.py build/ufbx-gcc-release.su --limit 0x10000 --cache build/ufbx-cache.pickle
+        run: python3 misc/analyze_stack.py build/ufbx-gcc-release.su --limit 0x20000 --cache build/ufbx-cache.pickle
 
   ci_compat:
     runs-on: ubuntu-latest
