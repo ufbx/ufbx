@@ -1076,6 +1076,7 @@ UFBXT_TEST(maya_axes_lefthanded)
 
 			opts.target_axes = ufbx_axes_left_handed_y_up;
 			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+			opts.reverse_winding = (i == 0);
 
 			ufbx_error error;
 			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
@@ -1214,6 +1215,7 @@ UFBXT_TEST(maya_axes_anim_lefthanded)
 			opts.target_axes = ufbx_axes_left_handed_y_up;
 			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
 			opts.load_external_files = true;
+			opts.reverse_winding = (i == 0);
 
 			ufbx_error error;
 			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);

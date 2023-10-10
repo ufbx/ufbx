@@ -1259,6 +1259,9 @@ struct ufbx_mesh {
 	ufbx_subdivision_boundary subdivision_boundary;
 	ufbx_subdivision_boundary subdivision_uv_boundary;
 
+	// The winding of the faces has been reversed.
+	bool reversed_winding;
+
 	// Normals have been generated instead of evalauted.
 	// Either from missing normals (via `ufbx_load_opts.generate_missing_normals`), skinning,
 	// tessellation, or subdivision.
@@ -4265,6 +4268,11 @@ typedef struct ufbx_load_opts {
 
 	// Do not change winding of faces when converting handedness.
 	bool handedness_conversion_retain_winding;
+
+	// Reverse winding of all faces.
+	// If `handedness_conversion_retain_winding` is not specified, mirrored meshes
+	// will retain their original winding.
+	bool reverse_winding;
 
 	// Apply an implicit root transformation to match axes.
 	// Used if `ufbx_coordinate_axes_valid(target_axes)`.

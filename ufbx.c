@@ -18541,13 +18541,16 @@ ufbxi_noinline static void ufbxi_normalize_vec3_list(const ufbx_vec3_list *list)
 // Forward declare as we're kind of preprocessing ata here that would usually happen later.
 ufbxi_noinline static ufbx_transform ufbxi_get_geometry_transform(const ufbx_props *props, ufbx_node *node);
 
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_flip_attrib_winding(ufbxi_context *uc, ufbx_mesh *mesh, ufbx_uint32_list *indices)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_flip_attrib_winding(ufbxi_context *uc, ufbx_mesh *mesh, ufbx_uint32_list *indices, bool is_position)
 {
 	// All zero, no flipping needed
 	if (indices->data == uc->zero_indices || indices->count == 0) return 1;
 
-	// Need to duplicate consecutive indices, but we can cache the per mesh.
-	if (indices->data == uc->consecutive_indices) {
+	if (indices->data == mesh->vertex_position.indices.data && is_position) {
+		// Sharing indices with vertex position, already flipped.
+		return 1;
+	} else if (indices->data == uc->consecutive_indices) {
+		// Need to duplicate consecutive indices, but we can cache the per mesh.
 		if (uc->tmp_mesh_consecutive_indices) {
 			indices->data = uc->tmp_mesh_consecutive_indices;
 			return 1;
@@ -18577,16 +18580,20 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_flip_attrib_winding(ufbxi_contex
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_flip_winding(ufbxi_context *uc, ufbx_mesh *mesh)
 {
 	uc->tmp_mesh_consecutive_indices = NULL;
-	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->vertex_position.indices));
-	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->vertex_normal.indices));
-	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->vertex_crease.indices));
+	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->vertex_position.indices, true));
+	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->vertex_normal.indices, false));
+	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->vertex_crease.indices, false));
 	ufbxi_for_list(ufbx_uv_set, set, mesh->uv_sets) {
-		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_uv.indices));
-		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_tangent.indices));
-		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_bitangent.indices));
+		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_uv.indices, false));
+		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_tangent.indices, false));
+		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_bitangent.indices, false));
 	}
 	ufbxi_for_list(ufbx_color_set, set, mesh->color_sets) {
-		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_color.indices));
+		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_color.indices, false));
+	}
+	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->skinned_position.indices, false));
+	if (mesh->skinned_normal.indices.data != mesh->vertex_normal.indices.data) {
+		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->skinned_normal.indices, true));
 	}
 
 	// Mapping from old index values to flipped ones, reserve index -1
@@ -18600,7 +18607,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_flip_winding(ufbxi_context *uc, 
 		uint32_t count = face->num_indices - 1;
 		index_mapping[begin] = begin;
 		for (uint32_t i = 0; i < count; i++) {
-			index_mapping[begin + count - i] = begin + 1 + i;
+			index_mapping[begin + 1 + i] = begin + count - i;
 		}
 	}
 
@@ -18618,6 +18625,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_flip_winding(ufbxi_context *uc, 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_modify_geometry(ufbxi_context *uc)
 {
 	bool do_mirror = false;
+	bool do_winding = uc->opts.reverse_winding;
 	bool do_scale = false;
 	bool do_geometry_transforms = false;
 	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY
@@ -18668,6 +18676,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_modify_geometry(ufbxi_context *u
 			ufbxi_scale_vec3_list(&mesh->vertex_position.values, geometry_scale, 0);
 		}
 
+		bool do_flip_winding = do_winding;
 		if (do_mirror) {
 			ufbxi_mirror_vec3_list(&mesh->vertex_position.values, mirror_axis, 0);
 			ufbxi_mirror_vec3_list(&mesh->vertex_normal.values, mirror_axis, 0);
@@ -18675,11 +18684,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_modify_geometry(ufbxi_context *u
 				ufbxi_mirror_vec3_list(&set->vertex_tangent.values, mirror_axis, 0);
 				ufbxi_mirror_vec3_list(&set->vertex_bitangent.values, mirror_axis, 0);
 			}
-
-			// Flip face winding retaining the first vertex
 			if (!uc->opts.handedness_conversion_retain_winding) {
-				ufbxi_check(ufbxi_flip_winding(uc, mesh));
+				do_flip_winding = !do_flip_winding;
 			}
+		}
+
+		// Flip face winding retaining the first vertex
+		if (do_flip_winding) {
+			mesh->reversed_winding = true;
+			ufbxi_check(ufbxi_flip_winding(uc, mesh));
 		}
 
 		ufbx_node *geo_node = ufbxi_get_geometry_transform_node(&mesh->element);

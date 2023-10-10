@@ -258,6 +258,7 @@ UFBXT_TEST(max_geometry_transform_lefthanded)
 				opts.target_axes = ufbx_axes_left_handed_z_up;
 				opts.handedness_conversion_axis = (ufbx_mirror_axis)axis_ix;
 				opts.geometry_transform_handling = (ufbx_geometry_transform_handling)handling_ix;
+				opts.reverse_winding = axis_ix == 0;
 
 				ufbx_error error;
 				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);

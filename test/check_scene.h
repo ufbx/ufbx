@@ -415,7 +415,9 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		uint32_t vi = mesh->vertex_indices.data[ii];
 		if (vi != UFBX_NO_INDEX) {
 			ufbxt_assert(vi < mesh->num_vertices);
-			ufbxt_assert(mesh->vertex_first_index.data[vi] <= ii);
+			if (!mesh->reversed_winding) {
+				ufbxt_assert(mesh->vertex_first_index.data[vi] <= ii);
+			}
 		}
 	}
 
