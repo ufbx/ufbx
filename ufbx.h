@@ -106,7 +106,8 @@
 // Pointer may be `NULL`.
 #define ufbx_nullable
 
-// Changing this value from default can lead into breaking API guarantees.
+// Changing this value from default or calling this function can lead into
+// breaking API guarantees.
 #define ufbx_unsafe
 
 #ifndef ufbx_abi
@@ -5001,12 +5002,12 @@ ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t 
 
 // Run a single thread pool task.
 // See `ufbx_thread_pool_run_fn` for more information.
-ufbx_abi void ufbx_thread_pool_run_task(ufbx_thread_pool_context ctx);
+ufbx_unsafe ufbx_abi void ufbx_thread_pool_run_task(ufbx_thread_pool_context ctx);
 
 // Check if all tasks before `max_index` are completed.
 // Returns the index of the first non-completed task or `UFBX_NO_INDEX` if all
 // tasks before `max_index` have completed.
-ufbx_abi uint32_t ufbx_thread_pool_try_wait(ufbx_thread_pool_context ctx, uint32_t max_index);
+ufbx_unsafe ufbx_abi uint32_t ufbx_thread_pool_try_wait(ufbx_thread_pool_context ctx, uint32_t max_index);
 
 // -- Inline API
 
