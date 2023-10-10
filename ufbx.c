@@ -599,7 +599,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 		#define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement64(ptr) + 1)
 		#define ufbxi_atomic_counter_load(ptr) ((size_t)_InterlockedExchangeAdd64((ptr), 0))
 	#else
-		ufbxi_extern_c _long _cdecl _InterlockedIncrement(long volatile * lpAddend);
+		ufbxi_extern_c long __cdecl _InterlockedIncrement(long volatile * lpAddend);
 		ufbxi_extern_c long __cdecl _InterlockedDecrement(long volatile * lpAddend);
 		ufbxi_extern_c long __cdecl _InterlockedExchangeAdd(long volatile * lpAddend, long Value);
 		typedef volatile long ufbxi_atomic_counter;
