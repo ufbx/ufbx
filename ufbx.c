@@ -26541,7 +26541,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 
 			if (mesh->edge_crease.data) {
 				ufbx_real crease = mesh->edge_crease.data[i];
-				if (crease < 0.999f) crease -= 0.1f;
+				if (crease < 0.999f) crease -= (ufbx_real)0.1;
 				if (crease < 0.0f) crease = 0.0f;
 				result->edge_crease.data[di + 0] = crease;
 				result->edge_crease.data[di + 1] = crease;
