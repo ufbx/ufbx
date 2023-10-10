@@ -1006,7 +1006,7 @@ async def main():
         target_tasks += compile_permutations("runner_debug_stack", debug_stack_config, arch_configs, ["-d", "data"])
 
         def release_overrides(config, compiler):
-            stack_limit = 64*1024
+            stack_limit = 128*1024
             if sys.platform == "win32" and compiler.name in ["gcc"]:
                 # GCC can't handle CreateThread on CI..
                 config["skip"] = True
