@@ -984,7 +984,7 @@ async def main():
         target_tasks = []
 
         def debug_overrides(config, compiler):
-            stack_limit = 128*1024
+            stack_limit = 256*1024
             if sys.platform == "win32" and compiler.name in ["gcc"]:
                 # GCC can't handle CreateThread on CI..
                 config["skip"] = True
