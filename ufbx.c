@@ -27143,6 +27143,7 @@ static ufbxi_noinline void ufbxi_release_ref(ufbxi_refcount *refcount)
 	while (refcount) {
 		ufbx_assert(refcount->self_magic == UFBXI_REFCOUNT_IMP_MAGIC);
 		if (ufbxi_atomic_counter_dec(&refcount->refcount) > 0) return;
+		ufbxi_atomic_counter_free(&refcount->refcount);
 
 		ufbxi_refcount *parent = refcount->parent;
 		uint32_t type_magic = refcount->type_magic;
