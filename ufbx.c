@@ -642,7 +642,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 	#include <stdatomic.h>
 	typedef volatile atomic_size_t ufbxi_atomic_counter;
 	#define ufbxi_atomic_counter_init(ptr) atomic_init(ptr, 0)
-	#define ufbxi_atomic_counter_free(ptr) (void)0
+	#define ufbxi_atomic_counter_free(ptr) (void)(ptr)
 	#define ufbxi_atomic_counter_inc(ptr) atomic_fetch_add((ptr), 1)
 	#define ufbxi_atomic_counter_dec(ptr) atomic_fetch_sub((ptr), 1)
 	#define ufbxi_atomic_counter_load(ptr) atomic_load_explicit((ptr), memory_order_acquire)
