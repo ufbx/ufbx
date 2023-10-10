@@ -14418,6 +14418,21 @@ static ufbxi_noinline bool ufbxi_open_file(const ufbx_open_file_cb *cb, ufbx_str
 		(dst) = (src); \
 	} while (0)
 
+static void ufbxi_update_vertex_first_index(ufbx_mesh *mesh)
+{
+	ufbxi_for_list(uint32_t, p_vx_ix, mesh->vertex_first_index) {
+		*p_vx_ix = UFBX_NO_INDEX;
+	}
+
+	uint32_t num_vertices = (uint32_t)mesh->num_vertices;
+	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
+		uint32_t vx = mesh->vertex_indices.data[ix];
+		if (vx < num_vertices && mesh->vertex_first_index.data[vx] == UFBX_NO_INDEX) {
+			mesh->vertex_first_index.data[vx] = (uint32_t)ix;
+		}
+	}
+}
+
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, ufbx_error *error, ufbx_mesh *mesh)
 {
 	if (mesh->vertices.count == 0) {
@@ -14462,18 +14477,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh(ufbxi_buf *buf, uf
 		mesh->vertex_first_index.count = mesh->num_vertices;
 		mesh->vertex_first_index.data = ufbxi_push(buf, uint32_t, mesh->num_vertices);
 		ufbxi_check_err(error, mesh->vertex_first_index.data);
-
-		ufbxi_for_list(uint32_t, p_vx_ix, mesh->vertex_first_index) {
-			*p_vx_ix = UFBX_NO_INDEX;
-		}
-
-		uint32_t num_vertices = (uint32_t)mesh->num_vertices;
-		for (size_t ix = 0; ix < mesh->num_indices; ix++) {
-			uint32_t vx = mesh->vertex_indices.data[ix];
-			if (vx < num_vertices && mesh->vertex_first_index.data[vx] == UFBX_NO_INDEX) {
-				mesh->vertex_first_index.data[vx] = (uint32_t)ix;
-			}
-		}
+		ufbxi_update_vertex_first_index(mesh);
 	}
 
 	if (mesh->uv_sets.count == 0 && mesh->vertex_uv.exists) {
@@ -18546,7 +18550,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_flip_attrib_winding(ufbxi_contex
 	// All zero, no flipping needed
 	if (indices->data == uc->zero_indices || indices->count == 0) return 1;
 
-	if (indices->data == mesh->vertex_position.indices.data && is_position) {
+	if (indices->data == mesh->vertex_position.indices.data && !is_position) {
 		// Sharing indices with vertex position, already flipped.
 		return 1;
 	} else if (indices->data == uc->consecutive_indices) {
@@ -18593,30 +18597,33 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_flip_winding(ufbxi_context *uc, 
 	}
 	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->skinned_position.indices, false));
 	if (mesh->skinned_normal.indices.data != mesh->vertex_normal.indices.data) {
-		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->skinned_normal.indices, true));
+		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->skinned_normal.indices, false));
 	}
+
+	ufbxi_update_vertex_first_index(mesh);
 
 	// Mapping from old index values to flipped ones, reserve index -1
 	// (aka `UFBX_NO_INDEX`) for itself.
-	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, (mesh->num_indices + 1) * sizeof(uint32_t)));
-	uint32_t *index_mapping = (uint32_t*)uc->tmp_arr + 1;
-	index_mapping[-1] = UFBX_NO_INDEX;
-	ufbxi_for_list(ufbx_face, face, mesh->faces) {
-		if (face->num_indices == 0) continue;
-		uint32_t begin = face->index_begin;
-		uint32_t count = face->num_indices - 1;
-		index_mapping[begin] = begin;
-		for (uint32_t i = 0; i < count; i++) {
-			index_mapping[begin + 1 + i] = begin + count - i;
+	if (mesh->edges.count > 0) {
+		ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, (mesh->num_indices + 1) * sizeof(uint32_t)));
+		uint32_t *index_mapping = (uint32_t*)uc->tmp_arr + 1;
+		index_mapping[-1] = UFBX_NO_INDEX;
+		ufbxi_for_list(ufbx_face, face, mesh->faces) {
+			if (face->num_indices == 0) continue;
+			uint32_t begin = face->index_begin;
+			uint32_t count = face->num_indices - 1;
+			index_mapping[begin] = begin;
+			for (uint32_t i = 0; i < count; i++) {
+				index_mapping[begin + 1 + i] = begin + count - i;
+			}
 		}
-	}
 
-	ufbxi_for_list(uint32_t, p_ix, mesh->vertex_first_index) {
-		*p_ix = index_mapping[(int32_t)*p_ix];
-	}
-	ufbxi_for_list(ufbx_edge, p_edge, mesh->edges) {
-		p_edge->a = index_mapping[(int32_t)p_edge->a];
-		p_edge->b = index_mapping[(int32_t)p_edge->b];
+		ufbxi_for_list(ufbx_edge, p_edge, mesh->edges) {
+			uint32_t a = index_mapping[(int32_t)p_edge->a];
+			uint32_t b = index_mapping[(int32_t)p_edge->b];
+			p_edge->a = b;
+			p_edge->b = a;
+		}
 	}
 
 	return 1;
