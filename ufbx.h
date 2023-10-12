@@ -125,6 +125,7 @@
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
 #define UFBX_PANIC_MESSAGE_LENGTH 128
 #define UFBX_ERROR_INFO_LENGTH 256
+#define UFBX_THREAD_GROUP_COUNT 4
 
 // -- Language
 
@@ -4113,7 +4114,9 @@ typedef struct ufbx_thread_pool_info {
 // Argument `ctx` will not change between any further calls to this thread pool.
 typedef bool ufbx_thread_pool_init_fn(void *user, ufbx_thread_pool_context ctx, const ufbx_thread_pool_info *info);
 
-// Run tasks, users must call `ufbx_thread_pool_run_task()` exactly `count` times.
+// Run tasks eagerly, users can call `ufbx_thread_pool_run_task()` from `0` to `count` times,
+// indicated by the return value.
+//
 // The function may (and should) be called from arbitrary threads.
 // `start_index` is a running number unique for each task, you can either use
 // or ignore this value.
@@ -4124,7 +4127,11 @@ typedef bool ufbx_thread_pool_init_fn(void *user, ufbx_thread_pool_context ctx, 
 //   ufbx_thread_pool_run_fn(ctx, start_index=2, count=1)
 //     thread 1: ufbx_thread_pool_run_task(ctx) [task 2]
 //
-typedef bool ufbx_thread_pool_run_fn(void *user, ufbx_thread_pool_context ctx, uint32_t start_index, uint32_t count);
+typedef uint32_t ufbx_thread_pool_run_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count);
+
+// Run tasks late, users must call `ufbx_thread_pool_run_task()` exactly `count` times.
+// More tasks will not be run in `group` until all the preceding tasks have completed.
+typedef bool ufbx_thread_pool_flush_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count);
 
 // Wait for all tasks before `max_index` to have completed.
 // ufbx will repeatedly call this function until the tasks are completed so
@@ -4141,7 +4148,7 @@ typedef bool ufbx_thread_pool_run_fn(void *user, ufbx_thread_pool_context ctx, u
 //
 // HINT: You can query the first non-completed task index using
 // `ufbx_thread_pool_try_wait(ctx)` and specifically wait for it.
-typedef bool ufbx_thread_pool_wait_fn(void *user, ufbx_thread_pool_context ctx, uint32_t max_index);
+typedef bool ufbx_thread_pool_wait_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index);
 
 // Free the thread pool.
 // All tasks are waited for before calling this function.
@@ -4150,6 +4157,7 @@ typedef void ufbx_thread_pool_free_fn(void *user, ufbx_thread_pool_context ctx);
 typedef struct ufbx_thread_pool {
 	ufbx_thread_pool_init_fn *init_fn;
 	ufbx_thread_pool_run_fn *run_fn;
+	ufbx_thread_pool_flush_fn *flush_fn;
 	ufbx_thread_pool_wait_fn *wait_fn;
 	ufbx_thread_pool_free_fn *free_fn;
 	void *user;

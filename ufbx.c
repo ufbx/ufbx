@@ -5233,6 +5233,10 @@ typedef struct {
 	ufbxi_atomic_counter num_done;
 } ufbxi_task_imp;
 
+typedef struct {
+	uint32_t max_index;
+} ufbxi_task_group;
+
 struct ufbxi_thread_pool {
 	ufbx_thread_opts opts;
 	ufbxi_allocator *ator;
@@ -5246,6 +5250,9 @@ struct ufbxi_thread_pool {
 	uint32_t execute_index;
 	ufbxi_atomic_counter run_index;
 	uint32_t wait_index;
+
+	ufbxi_task_group groups[UFBX_THREAD_GROUP_COUNT];
+	uint32_t group;
 
 	double accumulated_cost;
 
@@ -5282,17 +5289,13 @@ ufbxi_noinline static uint32_t ufbxi_thread_pool_try_wait(ufbxi_thread_pool *poo
 	return UFBX_NO_INDEX;
 }
 
-ufbxi_noinline static void ufbxi_thread_pool_wait_imp(ufbxi_thread_pool *pool, uint32_t max_index)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_wait_imp(ufbxi_thread_pool *pool, uint32_t group, bool can_fail)
 {
+	uint32_t max_index = pool->groups[group].max_index;
 	while (ufbxi_thread_pool_try_wait(pool, max_index) != UFBX_NO_INDEX) {
-		pool->opts.pool.wait_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool, max_index);
+		pool->opts.pool.wait_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool, group, max_index);
 	}
-}
-
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_wait(ufbxi_thread_pool *pool, uint32_t max_index)
-{
-	ufbxi_thread_pool_wait_imp(pool, max_index);
-	if (pool->failed) {
+	if (pool->failed && can_fail) {
 		ufbx_error *error = pool->error;
 		if (pool->error_desc) {
 			error->description.data = pool->error_desc;
@@ -5303,9 +5306,24 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_wait(ufbxi_thread_po
 	return 1;
 }
 
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_wait_group(ufbxi_thread_pool *pool)
+{
+	ufbxi_check_err(pool->error, ufbxi_thread_pool_wait_imp(pool, pool->group, true));
+	return 1;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_wait_all(ufbxi_thread_pool *pool)
+{
+	for (uint32_t i = 0; i < UFBX_THREAD_GROUP_COUNT; i++) {
+		ufbxi_check_err(pool->error, ufbxi_thread_pool_wait_imp(pool, pool->group, true));
+		pool->group = (pool->group + 1) % UFBX_THREAD_GROUP_COUNT;
+	}
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_init(ufbxi_thread_pool *pool, ufbx_error *error, ufbxi_allocator *ator, const ufbx_thread_opts *opts)
 {
-	if (!(opts->pool.run_fn && opts->pool.wait_fn)) return 1;
+	if (!((opts->pool.run_fn || opts->pool.flush_fn) && opts->pool.wait_fn)) return 1;
 	if (!ufbx_is_thread_safe()) return 1;
 	pool->enabled = true;
 
@@ -5336,7 +5354,11 @@ ufbxi_noinline static void ufbxi_thread_pool_free(ufbxi_thread_pool *pool)
 	if (!pool->enabled) return;
 
 	// Wait for all pending tasks
-	ufbxi_thread_pool_wait_imp(pool, pool->start_index);
+	pool->groups[pool->group].max_index = pool->execute_index;
+	for (uint32_t i = 0; i < UFBX_THREAD_GROUP_COUNT; i++) {
+		pool->group = (pool->group + 1) % UFBX_THREAD_GROUP_COUNT;
+		ufbxi_ignore(ufbxi_thread_pool_wait_imp(pool, pool->group, false));
+	}
 
 	if (pool->opts.pool.free_fn) {
 		pool->opts.pool.free_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool);
@@ -5355,6 +5377,35 @@ ufbxi_nodiscard ufbxi_noinline static uint32_t ufbxi_thread_pool_available_tasks
 {
 	ufbxi_thread_pool_try_wait(pool, pool->start_index);
 	return pool->num_tasks - (pool->start_index - pool->wait_index);
+}
+
+static void ufbxi_thread_pool_flush(ufbxi_thread_pool *pool)
+{
+	uint32_t start_index = pool->execute_index;
+	uint32_t count = pool->start_index - start_index;
+	if (count > 0) {
+		if (pool->opts.pool.run_fn) {
+			uint32_t ran_count = pool->opts.pool.run_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool, pool->group, start_index, count);
+			pool->execute_index = start_index + ran_count;
+		}
+	}
+	pool->accumulated_cost = 0.0;
+}
+
+static void ufbxi_thread_pool_flush_group(ufbxi_thread_pool *pool)
+{
+	uint32_t group = pool->group;
+	uint32_t start_index = pool->execute_index;
+	uint32_t count = pool->start_index - start_index;
+	if (count > 0) {
+		if (pool->opts.pool.flush_fn) {
+			pool->opts.pool.flush_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool, group, start_index, count);
+		}
+		pool->groups[group].max_index = start_index + count;
+		pool->execute_index = start_index + count;
+	}
+	pool->accumulated_cost = 0.0;
+	pool->group = (group + 1) % UFBX_THREAD_GROUP_COUNT;
 }
 
 ufbxi_nodiscard ufbxi_noinline static ufbxi_task *ufbxi_thread_pool_create_task(ufbxi_thread_pool *pool, ufbxi_task_fn *fn)
@@ -5382,17 +5433,6 @@ ufbxi_nodiscard ufbxi_noinline static ufbxi_task *ufbxi_thread_pool_create_task(
 	imp->fn = fn;
 
 	return &imp->task;
-}
-
-static void ufbxi_thread_pool_flush(ufbxi_thread_pool *pool)
-{
-	uint32_t start_index = pool->execute_index;
-	uint32_t count = pool->start_index - start_index;
-	if (count > 0) {
-		pool->opts.pool.run_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool, start_index, count);
-		pool->execute_index = start_index + count;
-	}
-	pool->accumulated_cost = 0.0;
 }
 
 static void ufbxi_thread_pool_run_task(ufbxi_thread_pool *pool, ufbxi_task *task, double cost)
@@ -5694,8 +5734,6 @@ typedef struct {
 
 } ufbxi_obj_context;
 
-#define UFBXI_THREADED_PARSE_BATCHES 4
-
 typedef struct {
 
 	ufbx_error error;
@@ -5770,7 +5808,7 @@ typedef struct {
 	ufbxi_buf tmp_element_id;
 	ufbxi_buf tmp_deferred_numbers;
 	ufbxi_buf tmp_deferred_chars;
-	ufbxi_buf tmp_thread_parse[UFBXI_THREADED_PARSE_BATCHES];
+	ufbxi_buf tmp_thread_parse[UFBX_THREAD_GROUP_COUNT];
 	size_t tmp_element_byte_offset;
 
 	ufbxi_template *templates;
@@ -13409,15 +13447,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects_threaded(ufbxi_cont
 	uc->parse_threaded = true;
 
 	bool parsed_to_end = false;
-	ufbxi_object_batch batches[UFBXI_THREADED_PARSE_BATCHES];
+	ufbxi_object_batch batches[UFBX_THREAD_GROUP_COUNT];
 	memset(batches, 0, sizeof(batches));
 
 	size_t empty_count = 0;
 	size_t batch_index = 0;
-	while (empty_count < UFBXI_THREADED_PARSE_BATCHES) {
+	while (empty_count < UFBX_THREAD_GROUP_COUNT) {
 		ufbxi_object_batch *batch = &batches[batch_index];
 
-		ufbxi_check(ufbxi_thread_pool_wait(&uc->thread_pool, batch->task_index));
+		ufbxi_check(ufbxi_thread_pool_wait_group(&uc->thread_pool));
 
 		if (batch->num_nodes > 0) {
 			ufbxi_for(ufbxi_node, node, batch->nodes, batch->num_nodes) {
@@ -13445,9 +13483,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects_threaded(ufbxi_cont
 		if (!parsed_to_end) {
 			size_t num_nodes = 0;
 			uint32_t task_start = uc->thread_pool.start_index;
-			uint32_t max_tasks = uc->thread_pool.num_tasks / UFBXI_THREADED_PARSE_BATCHES;
+			uint32_t max_tasks = uc->thread_pool.num_tasks / UFBX_THREAD_GROUP_COUNT;
 			max_tasks = ufbxi_min32(max_tasks, ufbxi_thread_pool_available_tasks(&uc->thread_pool));
-			size_t max_memory = uc->opts.thread_opts.memory_limit / UFBXI_THREADED_PARSE_BATCHES;
+			size_t max_memory = uc->opts.thread_opts.memory_limit / UFBX_THREAD_GROUP_COUNT;
 
 			for (;;) {
 				ufbxi_node *node;
@@ -13471,17 +13509,18 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects_threaded(ufbxi_cont
 			ufbxi_check(batch->nodes);
 			batch->task_index = uc->thread_pool.start_index;
 
-			ufbxi_thread_pool_flush(&uc->thread_pool);
 		}
+
+		ufbxi_thread_pool_flush_group(&uc->thread_pool);
 
 		if (batch->num_nodes == 0) {
 			empty_count += 1;
 		}
 
-		batch_index = (batch_index + 1) % UFBXI_THREADED_PARSE_BATCHES;
+		batch_index = (batch_index + 1) % UFBX_THREAD_GROUP_COUNT;
 	}
 
-	ufbxi_check(ufbxi_thread_pool_wait(&uc->thread_pool, uc->thread_pool.start_index));
+	ufbxi_check(ufbxi_thread_pool_wait_all(&uc->thread_pool));
 
 	uc->parse_threaded = false;
 
@@ -22693,7 +22732,7 @@ static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 
 	ufbxi_buf_free(&uc->tmp);
 	ufbxi_buf_free(&uc->tmp_parse);
-	for (size_t i = 0; i < UFBXI_THREADED_PARSE_BATCHES; i++) {
+	for (size_t i = 0; i < UFBX_THREAD_GROUP_COUNT; i++) {
 		ufbxi_buf_free(&uc->tmp_thread_parse[i]);
 	}
 	ufbxi_buf_free(&uc->tmp_stack);
@@ -22828,7 +22867,7 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	uc->tmp_dom_nodes.ator = &uc->ator_tmp;
 	uc->tmp_element_id.ator = &uc->ator_tmp;
 
-	for (size_t i = 0; i < UFBXI_THREADED_PARSE_BATCHES; i++) {
+	for (size_t i = 0; i < UFBX_THREAD_GROUP_COUNT; i++) {
 		uc->tmp_thread_parse[i].ator = &uc->ator_tmp;
 		uc->tmp_thread_parse[i].unordered = true;
 		uc->tmp_thread_parse[i].clearable = true;
