@@ -1257,7 +1257,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 		return negative ? -value : value;
 	}
 
-	// Cannot handle positive exponents here, fortuantely the fast case should
+	// Cannot handle positive exponents here, fortunately the fast case should
 	// take care of most of them, for negative exponents we can only handle
 	// up to e-27 as `5^28 > 2^64` and cannot be used as a divisor below.
 	if (n_decimals < 0) {
