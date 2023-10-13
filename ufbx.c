@@ -151,6 +151,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <locale.h>
+#include <float.h>
 
 #if !defined(UFBX_NO_MATH_H)
 	#include <math.h>
@@ -1120,39 +1121,82 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 	}
 #endif
 
-static const uint64_t ufbxi_pow10_tab[] = {
-	UINT64_C(1),
-	UINT64_C(10),
-	UINT64_C(100),
-	UINT64_C(1000),
-	UINT64_C(10000),
-	UINT64_C(100000),
-	UINT64_C(1000000),
-	UINT64_C(10000000),
-	UINT64_C(100000000),
-	UINT64_C(1000000000),
-	UINT64_C(10000000000),
-	UINT64_C(100000000000),
-	UINT64_C(1000000000000),
-	UINT64_C(10000000000000),
-	UINT64_C(100000000000000),
-	UINT64_C(1000000000000000),
-	UINT64_C(10000000000000000),
-	UINT64_C(100000000000000000),
-	UINT64_C(1000000000000000000),
+typedef enum {
+	UFBXI_PARSE_DOUBLE_ALLOW_FAST_PATH = 0x1,
+	UFBXI_PARSE_DOUBLE_VERIFY_LENGTH = 0x2,
+} ufbxi_parse_double_flag;
+
+static uint64_t ufbxi_pow5_tab[] = {
+	UINT64_C(0x8000000000000000), // 5^0 * 2^63
+	UINT64_C(0xa000000000000000), // 5^1 * 2^61
+	UINT64_C(0xc800000000000000), // 5^2 * 2^59
+	UINT64_C(0xfa00000000000000), // 5^3 * 2^57
+	UINT64_C(0x9c40000000000000), // 5^4 * 2^54
+	UINT64_C(0xc350000000000000), // 5^5 * 2^52
+	UINT64_C(0xf424000000000000), // 5^6 * 2^50
+	UINT64_C(0x9896800000000000), // 5^7 * 2^47
+	UINT64_C(0xbebc200000000000), // 5^8 * 2^45
+	UINT64_C(0xee6b280000000000), // 5^9 * 2^43
+	UINT64_C(0x9502f90000000000), // 5^10 * 2^40
+	UINT64_C(0xba43b74000000000), // 5^11 * 2^38
+	UINT64_C(0xe8d4a51000000000), // 5^12 * 2^36
+	UINT64_C(0x9184e72a00000000), // 5^13 * 2^33
+	UINT64_C(0xb5e620f480000000), // 5^14 * 2^31
+	UINT64_C(0xe35fa931a0000000), // 5^15 * 2^29
+	UINT64_C(0x8e1bc9bf04000000), // 5^16 * 2^26
+	UINT64_C(0xb1a2bc2ec5000000), // 5^17 * 2^24
+	UINT64_C(0xde0b6b3a76400000), // 5^18 * 2^22
+	UINT64_C(0x8ac7230489e80000), // 5^19 * 2^19
+	UINT64_C(0xad78ebc5ac620000), // 5^20 * 2^17
+	UINT64_C(0xd8d726b7177a8000), // 5^21 * 2^15
+	UINT64_C(0x878678326eac9000), // 5^22 * 2^12
+	UINT64_C(0xa968163f0a57b400), // 5^23 * 2^10
+	UINT64_C(0xd3c21bcecceda100), // 5^24 * 2^8
+	UINT64_C(0x84595161401484a0), // 5^25 * 2^5
+	UINT64_C(0xa56fa5b99019a5c8), // 5^26 * 2^3
+	UINT64_C(0xcecb8f27f4200f3a), // 5^27 * 2^1
+};
+static int8_t ufbxi_pow2_tab[] = {
+	62, 59, 56, 53, 49, 46, 43, 39, 36, 33, 29, 26, 23, 19, 16, 13, 9, 6, 3, -1, -4, -7, -11, -14, -17, -21, -24, -27,
+};
+const double ufbxi_pow10_tab_f64[] = {
+	1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
 };
 
-static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_length, char **end, bool verify_length)
+static ufbxi_noinline uint32_t ufbxi_parse_double_init_flags()
+{
+	// We require evaluation in double precision, either for doubles (0) or always (1)
+	// and rounding to nearest, which we can check for with `1 + eps == 1 - eps`.
+	#if defined(FLT_EVAL_METHOD)
+		#if FLT_EVAL_METHOD == 0 || FLT_EVAL_METHOD == 1
+			static volatile double eps = 2.2250738585072014e-308;
+			if (1.0 + eps == 1.0 - eps) return UFBXI_PARSE_DOUBLE_ALLOW_FAST_PATH;
+		#endif
+	#endif
+
+	return 0;
+}
+
+static ufbxi_noinline double ufbxi_parse_double_slow(const char *str, char **end)
+{
+	// TODO: Locales
+	return strtod(str, end);
+}
+
+static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_length, char **end, uint32_t flags)
 {
 	// TODO: Use this for optimizing digit parsing
 	(void)max_length;
 
 	uint64_t integer = 0;
 	uint32_t n_integer = 0;
-	uint64_t decimals = 0;
-	uint32_t n_decimals = 0;
+	int32_t n_decimals = 0;
+	uint32_t n_exp = 0;
 	bool negative = false;
 
+	// Parse /[+-]?[0-9]*(\.[0-9]*)([eE][+-]?[0-9]*)?/ retaining all digits
+	// in `integer` and number of decimals in `n_decimals`, exponent simply
+	// modifies `n_decimals` accordingly.
 	const char *p = str;
 	if (*p == '-') {
 		negative = true;
@@ -1167,68 +1211,94 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	if (*p == '.') {
 		p++;
 		while (((uint32_t)*p - '0') < 10) {
-			decimals = decimals * 10 + (uint64_t)(*p++ - '0');
+			integer = integer * 10 + (uint64_t)(*p++ - '0');
+			n_integer++;
 			n_decimals++;
 		}
 	}
-
-	if (((*p | 0x20) == 'e') || n_decimals >= 19 || n_integer >= 19) {
-		if (verify_length) {
-			size_t len;
-			for (len = 0; len < max_length; len++) {
-				char c = str[len];
-				if (!((c >= '0' && c <= '9') || (c|0x20) == 'e' || c == '-' || c == '+')) {
-					break;
-				}
-			}
-			if (len == max_length) {
-				*end = NULL;
-				return 0.0;
-			}
+	if ((*p | 0x20) == 'e') {
+		p++;
+		int32_t exp = 0;
+		int32_t exp_sign = -1;
+		if (*p == '-') {
+			p++;
+			exp_sign = 1;
+		} else if (*p == '+') {
+			p++;
 		}
-
-		return strtod(str, end);
+		while (((uint32_t)*p - '0') < 10) {
+			exp = exp * 10 + (uint32_t)(*p++ - '0');
+			n_exp++;
+		}
+		n_decimals += exp * exp_sign;
 	}
 	*end = (char*)p;
 
-	if (!decimals) {
-		return (negative ? -1.0 : 1.0) * (double)integer;
+	// Check that the number is not potentially truncated.
+	if (ufbxi_to_size(p - str) >= max_length && (flags & UFBXI_PARSE_DOUBLE_VERIFY_LENGTH) != 0) {
+		*end = NULL;
+		return 0.0;
 	}
 
-	uint64_t divisor = ufbxi_pow10_tab[n_decimals];
-
-	uint64_t b_int = integer;
-	uint32_t n_int = b_int ? 64 - ufbxi_lzcnt64(b_int) : 0;
-
-	uint64_t rem_hi, rem_lo;
-	uint64_t b_hi = ufbxi_div128(decimals, 0, divisor, &rem_hi);
-	ufbxi_regression_assert(b_hi > 0); // 1 * 2^64 / 10^18 >= 1
-	uint32_t n_hi = 64 - ufbxi_lzcnt64(b_hi);
-
-	int32_t exponent;
-	uint64_t mantissa;
-	bool nonzero_tail;
-	if (b_int) {
-		mantissa = b_int << (64u - n_int) | (b_hi >> n_int);
-		nonzero_tail = (b_hi << (64u - n_int) | rem_hi) != 0;
-		exponent = (int32_t)n_int - 1;
-	} else if (n_hi >= 54) {
-		mantissa = b_hi << (64u - n_hi);
-		nonzero_tail = rem_hi != 0;
-		exponent = (int32_t)n_hi - 65;
-	} else {
-		uint64_t b_lo = ufbxi_div128(rem_hi, 0, divisor, &rem_lo);
-		mantissa = b_hi << (64u - n_hi) | (b_lo >> n_hi);
-		nonzero_tail = (b_lo << (64u - n_hi) | rem_lo) != 0;
-		exponent = (int32_t)n_hi - 65;
+	// Overflowed either 64-bit `integer` or 31-bit `exp`.
+	if (n_integer > 19 || n_exp > 9 || (integer >> 63) != 0) {
+		return ufbxi_parse_double_slow(str, end);
 	}
 
+	// Both power of 10 and integer are exactly representable as doubles
+	// Powers of 10 are factored as 2*5, and 2^N can be always exactly represented.
+	if ((flags & UFBXI_PARSE_DOUBLE_ALLOW_FAST_PATH) != 0 && n_decimals >= -22 && n_decimals <= 22 && (integer >> 53) == 0) {
+		double value;
+		if (n_decimals > 0) {
+			value = (double)integer / ufbxi_pow10_tab_f64[n_decimals];
+		} else {
+			value = (double)integer * ufbxi_pow10_tab_f64[-n_decimals];
+		}
+		return negative ? -value : value;
+	}
+
+	// Cannot handle positive exponents here, fortuantely the fast case should
+	// take care of most of them, for negative exponents we can only handle
+	// up to e-27 as `5^28 > 2^64` and cannot be used as a divisor below.
+	if (n_decimals < 0) {
+		return ufbxi_parse_double_slow(str, end);
+	} else if (!n_decimals) {
+		double value = (double)integer;
+		return negative ? -value : value;
+	} else if (n_decimals > 27) {
+		return ufbxi_parse_double_slow(str, end);
+	}
+
+	// We want to compute `integer / 10^N` precisely, we can do this
+	// using 128-bit division `2^64 * dividend / divisor`:
+	//   dividend = integer * 2^S  (S set such that highest bit is 62)
+	//   divisor = 10^N * 2^T      (T set such that highest bit is 63)
+	// We have to compensate for the shifts in the exponent:
+	//   (2^64 * integer * 2^S) / (10^N * 2^T)   * 2^(-1 - S + T)
+	// To get larger exponent range split 10^N to 5^N * 2^N and move 2^N to the exponent
+	//   (2^64 * integer * 2^S) / (5^N * 2^T)    * 2^(-1 - S + T - N)
+	uint32_t shift = ufbxi_lzcnt64(integer) - 1;
+	uint64_t dividend = integer << shift;
+	uint64_t divisor = ufbxi_pow5_tab[n_decimals];
+	int32_t exponent = (int32_t)ufbxi_pow2_tab[n_decimals] - shift; // (-1 + T - N) - S
+	uint64_t rem_hi;
+	uint64_t b_hi = ufbxi_div128(dividend, 0, divisor, &rem_hi);
+
+	// Align the mantissa so that high bit is set, due to the shifting of the
+	// divisor and dividend the smallest result is `2^62 + N`, so we need to
+	// shift at most by one bit.
+	uint64_t b_bit = 1 - (b_hi >> 63u);
+	uint64_t mantissa = b_hi << b_bit;
+	exponent -= (int32_t)b_bit;
+
+	// Round to 53 bits, accounting for potential remainder.
+	bool nonzero_tail = rem_hi != 0;
 	bool r_odd = mantissa & (1 << 11u);
 	bool r_round = mantissa & (1 << 10u);
 	bool r_tail = (mantissa & ((1 << 10u) - 1)) != 0 || nonzero_tail;
-
 	uint64_t round = (r_round && (r_odd || r_tail)) ? 1u : 0u;
 
+	// Assemble the IEEE 754 binary64 number.
 	uint64_t bits
 		= (uint64_t)negative << 63u
 		| (uint64_t)(exponent + 1023) << 52u
@@ -5746,6 +5816,7 @@ typedef struct {
 	bool sure_fbx;
 	bool retain_mesh_parts;
 	bool read_legacy_settings;
+	uint32_t double_parse_flags;
 
 	ufbx_load_opts opts;
 
@@ -8826,7 +8897,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 				if (ua->parse_as_f32) {
 					token->value.f64 = strtof(token->str_data, &end);
 				} else {
-					token->value.f64 = ufbxi_parse_double(token->str_data, token->str_len, &end, false);
+					token->value.f64 = ufbxi_parse_double(token->str_data, token->str_len, &end, uc->double_parse_flags);
 				}
 				ufbxi_check(end == token->str_data + token->str_len - 1);
 			}
@@ -9003,6 +9074,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_float_array(ufbxi_con
 	const char *end = ua->src_yield;
 	const char *src_scan = src;
 
+	uint32_t parse_flags = uc->double_parse_flags | UFBXI_PARSE_DOUBLE_VERIFY_LENGTH;
+
 	for (;;) {
 
 		// Skip '\s*,\s*' between array elements. If we don't find a comma after an element
@@ -9030,7 +9103,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_float_array(ufbxi_con
 		char *num_end = NULL;
 		size_t left = ufbxi_to_size(end - src_scan);
 		if (left < 64) break;
-		val = ufbxi_parse_double(src_scan, left - 2, &num_end, true);
+		val = ufbxi_parse_double(src_scan, left - 2, &num_end, parse_flags);
 		if (!num_end || num_end == src_scan) {
 			break;
 		}
@@ -14003,7 +14076,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_settings(ufbxi_conte
 			ufbx_string str;
 			if (ufbxi_get_val1(frame_rate, "S", &str)) {
 				char *end;
-				double val = ufbxi_parse_double(str.data, str.length, &end, false);
+				double val = ufbxi_parse_double(str.data, str.length, &end, uc->double_parse_flags);
 				if (end == str.data + str.length) {
 					fps = val;
 				}
@@ -15314,12 +15387,13 @@ static ufbxi_noinline int ufbxi_obj_parse_vertex(ufbxi_context *uc, ufbxi_obj_at
 	}
 	ufbxi_check(offset + read_values <= uc->obj.num_tokens);
 
+	uint32_t parse_flags = uc->double_parse_flags;
 	ufbx_real *vals = ufbxi_push_fast(dst, ufbx_real, num_values);
 	ufbxi_check(vals);
 	for (size_t i = 0; i < read_values; i++) {
 		ufbx_string str = uc->obj.tokens[offset + i];
 		char *end;
-		double val = ufbxi_parse_double(str.data, str.length, &end, false);
+		double val = ufbxi_parse_double(str.data, str.length, &end, parse_flags);
 		ufbxi_check(end == str.data + str.length);
 		vals[i] = (ufbx_real)val;
 	}
@@ -16014,7 +16088,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc
 		ufbx_string tok = uc->obj.tokens[start + num_reals];
 
 		char *end;
-		double val = ufbxi_parse_double(tok.data, tok.length, &end, false);
+		double val = ufbxi_parse_double(tok.data, tok.length, &end, uc->double_parse_flags);
 		if (end != tok.data + tok.length) break;
 
 		prop->value_real_arr[num_reals] = (ufbx_real)val;
@@ -22783,6 +22857,8 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 		memcpy(buf, &val, 2);
 		uc->local_big_endian = buf[0] == 0xbb;
 	}
+
+	uc->double_parse_flags = ufbxi_parse_double_init_flags();
 
 	if (user_opts) {
 		uc->opts = *user_opts;
