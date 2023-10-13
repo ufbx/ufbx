@@ -1227,7 +1227,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 			p++;
 		}
 		while (((uint32_t)*p - '0') < 10) {
-			exp = exp * 10 + (uint32_t)(*p++ - '0');
+			exp = exp * 10 + (int32_t)(*p++ - '0');
 			n_exp++;
 		}
 		n_decimals += exp * exp_sign;
@@ -1262,7 +1262,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	// up to e-27 as `5^28 > 2^64` and cannot be used as a divisor below.
 	if (n_decimals < 0) {
 		return ufbxi_parse_double_slow(str, end);
-	} else if (!n_decimals) {
+	} else if (!n_decimals || !integer) {
 		double value = (double)integer;
 		return negative ? -value : value;
 	} else if (n_decimals > 27) {
@@ -1280,7 +1280,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	uint32_t shift = ufbxi_lzcnt64(integer) - 1;
 	uint64_t dividend = integer << shift;
 	uint64_t divisor = ufbxi_pow5_tab[n_decimals];
-	int32_t exponent = (int32_t)ufbxi_pow2_tab[n_decimals] - shift; // (-1 + T - N) - S
+	int32_t exponent = (int32_t)ufbxi_pow2_tab[n_decimals] - (int32_t)shift; // (-1 + T - N) - S
 	uint64_t rem_hi;
 	uint64_t b_hi = ufbxi_div128(dividend, 0, divisor, &rem_hi);
 
