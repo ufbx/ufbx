@@ -61,6 +61,7 @@ fake_includes["stdlib.h"] = ""
 fake_includes["locale.h"] = ""
 fake_includes["math.h"] = ""
 fake_includes["assert.h"] = ""
+fake_includes["float.h"] = ""
 
 class Preprocessor(pcpp.Preprocessor):
     def __init__(self):
