@@ -9274,8 +9274,6 @@ typedef enum {
 
 ufbxi_noinline static bool ufbxi_ascii_array_task_imp(ufbxi_ascii_array_task *t)
 {
-	uint32_t parse_flags = t->parse_flags;
-
 	// Temporary buffer for parsing between spans
 	char buffer[128];
 	size_t buffer_len = 0;
