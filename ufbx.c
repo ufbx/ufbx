@@ -21426,7 +21426,7 @@ ufbxi_noinline static ufbx_quat ufbxi_get_rotation(const ufbx_props *props, ufbx
 	return t.rotation;
 }
 
-ufbxi_noinline static ufbx_vec3 ufbxi_get_scale(const ufbx_props *props, ufbx_rotation_order order, const ufbx_node *node)
+ufbxi_noinline static ufbx_vec3 ufbxi_get_scale(const ufbx_props *props, const ufbx_node *node)
 {
 	ufbx_vec3 scaling = ufbxi_find_vec3(props, ufbxi_Lcl_Scaling, 1.0f, 1.0f, 1.0f);
 
@@ -29188,7 +29188,7 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform_flags(const ufbx_
 			transform.rotation = ufbx_identity_quat;
 		}
 		if ((components & UFBX_TRANSFORM_FLAG_INCLUDE_SCALE) != 0) {
-			transform.scale = ufbxi_get_scale(&props, order, node);
+			transform.scale = ufbxi_get_scale(&props, node);
 		} else {
 			transform.scale = ufbxi_one_vec3;
 		}
