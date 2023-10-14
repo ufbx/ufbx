@@ -23160,6 +23160,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 
 static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 {
+	ufbxi_thread_pool_free(&uc->thread_pool);
+
 	ufbxi_string_pool_temp_free(&uc->string_pool);
 	ufbxi_buf_free(&uc->warnings.tmp_stack);
 
@@ -23189,8 +23191,6 @@ static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->tmp_full_weights);
 	ufbxi_buf_free(&uc->tmp_dom_nodes);
 	ufbxi_buf_free(&uc->tmp_element_id);
-
-	ufbxi_thread_pool_free(&uc->thread_pool);
 	ufbxi_buf_free(&uc->tmp_ascii_spans);
 
 	ufbxi_free(&uc->ator_tmp, ufbxi_node, uc->top_nodes, uc->top_nodes_cap);
