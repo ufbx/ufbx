@@ -1318,6 +1318,29 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 #endif
 }
 
+static ufbxi_forceinline int64_t ufbxi_parse_int64(const char *str, char **end)
+{
+	uint64_t abs_val = 0;
+	bool negative = *str == '-';
+	bool positive = *str == '+';
+
+	size_t init_len = (negative | positive) ? 1 : 0;
+	size_t len = init_len;
+	for (; len < 30; len++) {
+		char c = str[len];
+		if (!(c >= '0' && c <= '9')) break;
+		abs_val = 10 * abs_val + (uint64_t)(c - '0');
+	}
+	if (len == 30 || len == init_len) {
+		*end = NULL;
+		return 0;
+	}
+
+	// TODO: Wrap/clamp?
+	*end = (char*)str + len;
+	return negative ? -(int64_t)abs_val : (int64_t)abs_val;
+}
+
 // -- DEFLATE implementation
 
 #if !defined(ufbx_inflate)
@@ -8975,8 +8998,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 
 			char *end;
 			if (token->type == UFBXI_ASCII_INT) {
-				// TODO: Custom parsing is probably better?
-				token->value.i64 = strtoll(token->str_data, &end, 10);
+				token->value.i64 = ufbxi_parse_int64(token->str_data, &end);
 				ufbxi_check(end == token->str_data + token->str_len - 1);
 			} else if (token->type == UFBXI_ASCII_FLOAT) {
 				if (ua->parse_as_f32) {
@@ -9129,21 +9151,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_int_array(ufbxi_conte
 		size_t left = ufbxi_to_size(end - src_scan);
 		if (left < 32) break;
 
-		uint64_t abs_val = 0;
-		bool negative = *src_scan == '-';
-
-		size_t init_len = negative ? 1 : 0;
-		size_t len = init_len;
-		for (; len < 20; len++) {
-			char c = src_scan[len];
-			if (!(c >= '0' && c <= '9')) break;
-			abs_val = 10 * abs_val + (uint64_t)(c - '0');
-		}
-		if (len == 20 || len == init_len) break;
-
-		// TODO: Do we want to wrap here?
-		val = negative ? -(int64_t)abs_val : (int64_t)abs_val;
-		src_scan += len;
+		val = ufbxi_parse_int64(src_scan, &src_scan);
+		if (!src_scan) break;
 	}
 
 	// Resume conventional parsing if we moved `src`.
@@ -9216,21 +9225,8 @@ ufbxi_noinline static const char *ufbxi_ascii_array_task_parse_ints(ufbxi_ascii_
 	while (src != src_end) {
 		while (ufbxi_is_space(*src)) src++;
 
-		uint64_t abs_val = 0;
-		bool negative = *src == '-';
-		size_t init_len = negative ? 1 : 0;
-		size_t len = init_len;
-		for (;;) {
-			char c = src[len];
-			if (!(c >= '0' && c <= '9')) break;
-			abs_val = 10 * abs_val + (uint64_t)(c - '0');
-			len++;
-		}
-		if (len >= 20 || len == init_len) return NULL;
-		src += len;
-
-		// TODO: Do we want to wrap here?
-		int64_t val = negative ? -(int64_t)abs_val : (int64_t)abs_val;
+		int64_t val = ufbxi_parse_int64(src, &src);
+		if (!src) return NULL;
 
 		while (ufbxi_is_space(*src)) src++;
 		if (*src != ',') break;
