@@ -113,6 +113,9 @@
 #if !defined(UFBXI_FEATURE_SKINNING_EVALUATION)
 	#define UFBXI_FEATURE_SKINNING_EVALUATION 0
 #endif
+#if !defined(UFBXI_FEATURE_ANIMATION_BAKING)
+	#define UFBXI_FEATURE_ANIMATION_BAKING 0
+#endif
 #if !defined(UFBXI_FEATURE_TRIANGULATION)
 	#define UFBXI_FEATURE_TRIANGULATION 0
 #endif
@@ -24343,13 +24346,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_create_anim_imp(ufbxi_create_ani
 
 // -- Animation baking
 
-#if UFBXI_FEATURE_ANIMATION_BAKING
-
 typedef struct {
 	ufbxi_refcount refcount;
 	ufbx_baked_anim bake;
 	uint32_t magic;
 } ufbxi_baked_anim_imp;
+
+#if UFBXI_FEATURE_ANIMATION_BAKING
 
 UFBX_LIST_TYPE(ufbxi_double_list, double);
 
