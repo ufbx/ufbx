@@ -2980,6 +2980,8 @@ static ufbxi_noinline void ufbxi_fix_error_type(ufbx_error *error, const char *d
 		error->type = UFBX_ERROR_BAD_NURBS;
 	} else if (!strcmp(desc, "Bad index")) {
 		error->type = UFBX_ERROR_BAD_INDEX;
+	} else if (!strcmp(desc, "Threaded ASCII parse error")) {
+		error->type = UFBX_ERROR_THREADED_ASCII_PARSE;
 	} else if (!strcmp(desc, "Unsafe options")) {
 		error->type = UFBX_ERROR_UNSAFE_OPTIONS;
 	} else if (!strcmp(desc, "Duplicate override")) {
@@ -5629,6 +5631,10 @@ typedef struct {
 	bool read_first_comment;
 	bool found_version;
 	bool parse_as_f32;
+	bool src_is_retained;
+
+	ufbxi_buf *retain_buf;
+	ufbxi_buf *src_buf;
 
 	ufbxi_ascii_token prev_token;
 	ufbxi_ascii_token token;
@@ -5879,8 +5885,7 @@ typedef struct {
 	ufbxi_buf tmp_full_weights;
 	ufbxi_buf tmp_dom_nodes;
 	ufbxi_buf tmp_element_id;
-	ufbxi_buf tmp_deferred_numbers;
-	ufbxi_buf tmp_deferred_chars;
+	ufbxi_buf tmp_ascii_spans;
 	ufbxi_buf tmp_thread_parse[UFBX_THREAD_GROUP_COUNT];
 	size_t tmp_element_byte_offset;
 
@@ -8592,20 +8597,35 @@ static ufbxi_noinline char ufbxi_ascii_refill(ufbxi_context *uc)
 	ufbxi_ascii *ua = &uc->ascii;
 	uc->data_offset += ufbxi_to_size(ua->src - uc->data_begin);
 	if (uc->read_fn) {
-		// Grow the read buffer if necessary
-		if (uc->read_buffer_size < uc->opts.read_buffer_size) {
-			size_t new_size = uc->opts.read_buffer_size;
-			ufbxi_check_return(ufbxi_grow_array(&uc->ator_tmp, &uc->read_buffer, &uc->read_buffer_size, new_size), '\0');
+		char *dst_buffer = NULL;
+		size_t dst_size = 0;
+
+		if (ua->retain_buf != NULL) {
+			dst_size = uc->opts.read_buffer_size;
+			dst_buffer = ufbxi_push(ua->retain_buf, char, dst_size);
+			ufbxi_check(dst_buffer);
+			ua->src_is_retained = true;
+			ua->src_buf = ua->retain_buf;
+		} else {
+			// Grow the read buffer if necessary
+			if (uc->read_buffer_size < uc->opts.read_buffer_size) {
+				size_t new_size = uc->opts.read_buffer_size;
+				ufbxi_check_return(ufbxi_grow_array(&uc->ator_tmp, &uc->read_buffer, &uc->read_buffer_size, new_size), '\0');
+			}
+			dst_buffer = uc->read_buffer;
+			dst_size = uc->read_buffer_size;
+			ua->src_is_retained = false;
 		}
 
 		// Read user data, return '\0' on EOF
-		size_t num_read = uc->read_fn(uc->read_user, uc->read_buffer, uc->read_buffer_size);
+		// TODO: Very unoptimal for non-full-size reads in some cases
+		size_t num_read = uc->read_fn(uc->read_user, dst_buffer, dst_size);
 		ufbxi_check_return_msg(num_read != SIZE_MAX, '\0', "IO error");
 		ufbxi_check_return(num_read <= uc->read_buffer_size, '\0');
 		if (num_read == 0) return '\0';
 
-		uc->data = uc->data_begin = ua->src = uc->read_buffer;
-		ua->src_end = uc->read_buffer + num_read;
+		uc->data = uc->data_begin = ua->src = dst_buffer;
+		ua->src_end = dst_buffer + num_read;
 		return *ua->src;
 	} else {
 		// If the user didn't specify a `read_fn()` treat anything
@@ -8783,6 +8803,20 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_ascii_push_token_char(ufbxi_c
 	return 1;
 }
 
+ufbxi_nodiscard static ufbxi_forceinline int ufbxi_ascii_push_token_string(ufbxi_context *uc, ufbxi_ascii_token *token, const char *data, size_t length)
+{
+	// Grow the string data buffer if necessary
+	if (token->str_len + length >= token->str_cap) {
+		size_t len = ufbxi_max_sz(token->str_len + length, 256);
+		ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &token->str_data, &token->str_cap, len));
+	}
+
+	memcpy(token->str_data + token->str_len, data, length);
+	token->str_len += length;
+
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_skip_until(ufbxi_context *uc, char dst)
 {
 	ufbxi_ascii *ua = &uc->ascii;
@@ -8801,6 +8835,55 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_skip_until(ufbxi_context *
 			ufbxi_check(c != '\0');
 		}
 	}
+
+	return 1;
+}
+
+typedef struct {
+	const char *source;
+	size_t length;
+} ufbxi_ascii_span;
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_store_array(ufbxi_context *uc, ufbxi_buf *tmp_buf)
+{
+	ufbxi_ascii *ua = &uc->ascii;
+
+	ua->retain_buf = tmp_buf;
+
+	for (;;) {
+		size_t buffered = ufbxi_to_size(ua->src_yield - ua->src);
+		if (buffered == 0) {
+			char c = ufbxi_ascii_yield(uc);
+			ufbxi_check(c != '\0');
+			continue;
+		}
+
+		const char *begin = ua->src, *end;
+		const char *match = (const char*)memchr(begin, '}', buffered);
+		if (match) {
+			end = match;
+		} else {
+			end = begin + buffered;
+		}
+		ua->src = end;
+
+		size_t length = ufbxi_to_size(end - begin);
+		ufbxi_ascii_span *span = ufbxi_push(&uc->tmp_ascii_spans, ufbxi_ascii_span, 1);
+		ufbxi_check(span);
+		// Store the trailing '}' for parsing
+		if (match) length += 1;
+		span->length = length;
+		if (ua->src_is_retained || !uc->read_fn) {
+			span->source = begin;
+		} else {
+			span->source = ufbxi_push_copy(tmp_buf, char, length, begin);
+			ufbxi_check(span->source);
+		}
+
+		if (match) break;
+	}
+
+	ua->retain_buf = NULL;
 
 	return 1;
 }
@@ -9062,11 +9145,222 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_int_array(ufbxi_conte
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_float_array(ufbxi_context *uc, char type, size_t *p_num_read)
+typedef struct {
+	void *arr_data;
+	char arr_type;
+	size_t arr_size;
+	uint32_t parse_flags;
+
+	const ufbxi_ascii_span *spans;
+	size_t num_spans;
+
+	size_t offset;
+
+} ufbxi_ascii_array_task;
+
+ufbxi_noinline static const char *ufbxi_ascii_array_task_parse_floats(ufbxi_ascii_array_task *t, const char *src, const char *src_end)
+{
+	size_t offset = t->offset;
+	float *dst_float = t->arr_type == 'f' ? (float*)t->arr_data + offset : NULL;
+	double *dst_double = t->arr_type == 'd' ? (double*)t->arr_data + offset : NULL;
+	uint32_t parse_flags = t->parse_flags;
+	const char *src_begin = src;
+
+	while (src != src_end) {
+		while (ufbxi_is_space(*src)) src++;
+
+		// Try to parse the next value, we don't commit this until we find a comma after it above.
+		char *num_end = NULL;
+		double val = ufbxi_parse_double(src, ufbxi_to_size(src_end - src), &num_end, parse_flags);
+		if (!num_end) return src_begin;
+		src = num_end;
+
+		while (ufbxi_is_space(*src)) src++;
+		if (*src != ',') break;
+		src++;
+		src_begin = src;
+
+		if (offset >= t->arr_size) return NULL;
+		if (dst_double) {
+			*dst_double++ = val;
+		} else {
+			*dst_float++ = (float)val;
+		}
+		offset++;
+	}
+
+	t->offset = offset;
+	return src_begin;
+}
+
+ufbxi_noinline static const char *ufbxi_ascii_array_task_parse_ints(ufbxi_ascii_array_task *t, const char *src, const char *src_end)
+{
+	size_t offset = t->offset;
+	int32_t *dst32 = t->arr_type == 'i' ? (int32_t*)t->arr_data + offset : NULL;
+	int64_t *dst64 = t->arr_type == 'l' ? (int64_t*)t->arr_data + offset : NULL;
+	uint32_t parse_flags = t->parse_flags;
+	const char *src_begin = src;
+
+	while (src != src_end) {
+		while (ufbxi_is_space(*src)) src++;
+
+		uint64_t abs_val = 0;
+		bool negative = *src == '-';
+		size_t init_len = negative ? 1 : 0;
+		size_t len = init_len;
+		for (;;) {
+			char c = src[len];
+			if (!(c >= '0' && c <= '9')) break;
+			abs_val = 10 * abs_val + (uint64_t)(c - '0');
+			len++;
+		}
+		if (len >= 20 || len == init_len) return NULL;
+		src += len;
+
+		// TODO: Do we want to wrap here?
+		int64_t val = negative ? -(int64_t)abs_val : (int64_t)abs_val;
+
+		while (ufbxi_is_space(*src)) src++;
+		if (*src != ',') break;
+		src++;
+		src_begin = src;
+
+		if (offset >= t->arr_size) return NULL;
+		if (dst32) {
+			*dst32++ = (int32_t)val;
+		} else {
+			*dst64++ = val;
+		}
+		offset++;
+	}
+
+	t->offset = offset;
+	return src_begin;
+}
+
+ufbxi_noinline static const char *ufbxi_ascii_array_task_parse(ufbxi_ascii_array_task *t, const char *src, const char *src_end)
+{
+	if (t->arr_type == 'f' || t->arr_type == 'd') {
+		return ufbxi_ascii_array_task_parse_floats(t, src, src_end);
+	} else {
+		return ufbxi_ascii_array_task_parse_ints(t, src, src_end);
+	}
+}
+
+typedef enum {
+	UFBXI_ASCII_SCAN_STATE_VALUE,
+	UFBXI_ASCII_SCAN_STATE_WHITESPACE,
+	UFBXI_ASCII_SCAN_STATE_COMMENT,
+	UFBXI_ASCII_SCAN_STATE_COMMA,
+} ufbxi_ascii_scan_state;
+
+ufbxi_noinline static bool ufbxi_ascii_array_task_imp(ufbxi_ascii_array_task *t)
+{
+	uint32_t parse_flags = t->parse_flags;
+
+	// Temporary buffer for parsing between spans
+	char buffer[128];
+	size_t buffer_len = 0;
+	bool buffer_value = false;
+
+	ufbxi_ascii_scan_state state = UFBXI_ASCII_SCAN_STATE_WHITESPACE;
+	ufbxi_for(const ufbxi_ascii_span, span, t->spans, t->num_spans) {
+		const char *src = span->source;
+		const char *end = src + span->length;
+
+		while (src != end) {
+
+			// State machine for skipping whitespace and comments, potentially
+			// between multiple spans.
+			while (src != end) {
+				char c = *src;
+				if (state == UFBXI_ASCII_SCAN_STATE_VALUE) {
+					if (buffer_len >= sizeof(buffer) - 1) return false;
+					if (c == '"') {
+						return false;
+					} else if (c == ';' || ufbxi_is_space(c)) {
+						state = UFBXI_ASCII_SCAN_STATE_WHITESPACE;
+						buffer[buffer_len] = ' ';
+						buffer_len++;
+					} else if (c == ',' || c == '}') {
+						state = UFBXI_ASCII_SCAN_STATE_COMMA;
+						buffer[buffer_len] = ',';
+						buffer_len++;
+						src++;
+						break;
+					} else {
+						buffer_value = true;
+						buffer[buffer_len] = c;
+						buffer_len++;
+						src++;
+					}
+				} else if (state == UFBXI_ASCII_SCAN_STATE_WHITESPACE) {
+					if (c == ';') {
+						state = UFBXI_ASCII_SCAN_STATE_COMMENT;
+					} else if (ufbxi_is_space(c)) {
+						src++;
+					} else {
+						state = UFBXI_ASCII_SCAN_STATE_VALUE;
+					}
+				} else if (state == UFBXI_ASCII_SCAN_STATE_COMMENT) {
+					if (c == '\n') {
+						state = UFBXI_ASCII_SCAN_STATE_WHITESPACE;
+					} else {
+						src++;
+					}
+				} else if (state == UFBXI_ASCII_SCAN_STATE_COMMA) {
+					state = UFBXI_ASCII_SCAN_STATE_WHITESPACE;
+				}
+			}
+
+			if (state == UFBXI_ASCII_SCAN_STATE_COMMA) {
+				// Parse a value from the buffer
+				if (buffer_value) {
+					const char *end = ufbxi_ascii_array_task_parse(t, buffer, buffer + buffer_len);
+					if (end == NULL || end == buffer) {
+						return false;
+					}
+				}
+
+				// If not at end, we are past the last comma, so try to find a
+				// safe range to parse.
+				if (src != end) {
+					const char *parse_end = end;
+					while (parse_end > src) {
+						if (parse_end[-1] == ',') break;
+						parse_end--;
+					}
+					if (src < parse_end) {
+						src = ufbxi_ascii_array_task_parse(t, src, parse_end);
+						if (src == NULL) return false;
+					}
+				}
+
+				buffer_len = 0;
+				buffer_value = false;
+			}
+		}
+	}
+
+	if (t->offset != t->arr_size) return false;
+
+	return true;
+}
+
+ufbxi_noinline static bool ufbxi_ascii_array_task_fn(ufbxi_task *task)
+{
+	ufbxi_ascii_array_task *t = (ufbxi_ascii_array_task *)task->data;
+	if (!ufbxi_ascii_array_task_imp(t)) {
+		task->error = "Threaded ASCII parse error";
+		return false;
+	}
+	return true;
+}
+
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_float_array(ufbxi_context *uc, char type, size_t *p_num_read, uint32_t num_values, ufbxi_buf *tmp_buf)
 {
 	ufbxi_ascii *ua = &uc->ascii;
 	if (ua->parse_as_f32) return 1;
-	size_t initial_items = uc->tmp_stack.num_items;
 
 	double val;
 	if (ua->token.type == UFBXI_ASCII_FLOAT) {
@@ -9080,10 +9374,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_float_array(ufbxi_con
 
 	const char *src = ua->src;
 	const char *end = ua->src_yield;
-	const char *src_scan = src;
 
 	uint32_t parse_flags = uc->double_parse_flags | UFBXI_PARSE_DOUBLE_VERIFY_LENGTH;
 
+	size_t initial_items = uc->tmp_stack.num_items;
+	const char *src_scan = src;
 	for (;;) {
 
 		// Skip '\s*,\s*' between array elements. If we don't find a comma after an element
@@ -9229,6 +9524,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 	ufbxi_parse_state parse_state = ufbxi_update_parse_state(parent_state, node->name);
 	ufbxi_value vals[UFBXI_MAX_NON_ARRAY_VALUES];
 
+	uint32_t deferred_size = 0;
+
 	// NOTE: Infinite loop to allow skipping the comma parsing via `continue`.
 	for (;;) {
 		ufbxi_ascii_token *tok = &ua->prev_token;
@@ -9236,7 +9533,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 		if (arr_type) {
 			size_t num_read = 0;
 			if (arr_type == 'f' || arr_type == 'd') {
-				ufbxi_check(ufbxi_ascii_read_float_array(uc, (char)arr_type, &num_read));
+				ufbxi_check(ufbxi_ascii_read_float_array(uc, (char)arr_type, &num_read, num_values, tmp_buf));
 			} else if (arr_type == 'i' || arr_type == 'l') {
 				ufbxi_check(ufbxi_ascii_read_int_array(uc, (char)arr_type, &num_read));
 			}
@@ -9388,19 +9685,28 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 			// Parse a post-7000 ASCII array eg. "*3 { 1,2,3 }"
 			ufbxi_check(!in_ascii_array);
 			ufbxi_check(ufbxi_ascii_accept(uc, UFBXI_ASCII_INT));
+			int64_t count = ua->prev_token.value.i64;
 
 			if (ufbxi_ascii_accept(uc, '{')) {
 				ufbxi_check(ufbxi_ascii_accept(uc, UFBXI_ASCII_NAME));
-
-				// NOTE: This `continue` skips incrementing `num_values` and parsing
-				// a comma, continuing to parse the values in the array.
 				in_ascii_array = true;
 
-				// Optimized array skipping
+				// Optimized array skipping and threaded parsing
 				if (arr_type == '-') {
 					ufbxi_check(ufbxi_ascii_skip_until(uc, '}'));
+				} else if (uc->parse_threaded && !uc->opts.force_single_thread_ascii_parsing
+						&& !ua->parse_as_f32 && false
+						&& (arr_type == 'i' || arr_type == 'l' || arr_type == 'f' || arr_type == 'd')) {
+					// Don't bother with small arrays due to fixed overhead
+					if (count >= 64 && count <= UINT32_MAX) {
+						deferred_size = (uint32_t)count - 1;
+						ufbxi_check(ufbxi_ascii_store_array(uc, tmp_buf));
+					}
 				}
 			}
+
+			// NOTE: This `continue` skips incrementing `num_values` and parsing
+			// a comma, continuing to parse the values in the array.
 			continue;
 		} else {
 			break;
@@ -9425,18 +9731,54 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 			node->array->data = NULL;
 			node->array->size = 0;
 		} else {
-			void *arr_data = ufbxi_push_pop_size(arr_buf, &uc->tmp_stack, arr_elem_size, num_values);
+			void *arr_data = NULL;
+			
+			if (deferred_size > 0) {
+				arr_data = ufbxi_push_size(arr_buf, arr_elem_size, num_values + deferred_size);
+				// Pop any previously pushed values
+				if (num_values > 0) {
+					ufbxi_pop_size(&uc->tmp_stack, arr_elem_size, num_values, arr_data, false);
+				}
+			} else {
+				arr_data = ufbxi_push_pop_size(arr_buf, &uc->tmp_stack, arr_elem_size, num_values);
+			}
 			ufbxi_check(arr_data);
 			if (arr_info.flags & UFBXI_ARRAY_FLAG_PAD_BEGIN) {
 				node->array->data = (char*)arr_data + 4*arr_elem_size;
-				node->array->size = num_values - 4;
+				node->array->size = num_values + deferred_size - 4;
 			} else {
 				node->array->data = arr_data;
-				node->array->size = num_values;
+				node->array->size = num_values + deferred_size;
 			}
 
 			// Pop alignment helper
 			ufbxi_pop_size(&uc->tmp_stack, 8, 1, NULL, false);
+
+			// Deferred parsing
+			if (deferred_size > 0) {
+				size_t num_spans = uc->tmp_ascii_spans.num_items;
+				ufbxi_ascii_span *spans = ufbxi_push_pop(tmp_buf, &uc->tmp_ascii_spans, ufbxi_ascii_span, num_spans);
+				ufbxi_check(spans);
+
+				ufbxi_ascii_array_task t;
+				t.arr_data = (char*)arr_data + num_values * arr_elem_size;
+				t.arr_type = arr_type;
+				t.arr_size = deferred_size;
+				t.num_spans = num_spans;
+				t.spans = spans;
+				t.parse_flags = uc->double_parse_flags;
+				t.offset = 0;
+
+				// TODO: Split these further
+				ufbxi_task *task = ufbxi_thread_pool_create_task(&uc->thread_pool, &ufbxi_ascii_array_task_fn);
+				if (task) {
+					task->data = ufbxi_push_copy(tmp_buf, ufbxi_ascii_array_task, 1, &t);
+					ufbxi_check(task->data);
+					ufbxi_thread_pool_run_task(&uc->thread_pool, task, deferred_size * 10.0);
+				} else {
+					ufbxi_check_msg(ufbxi_ascii_array_task_imp(&t), "Threaded ASCII parse error");
+				}
+			}
 		}
 	} else {
 		num_values = ufbxi_min32(num_values, UFBXI_MAX_NON_ARRAY_VALUES);
@@ -13795,6 +14137,26 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects_threaded(ufbxi_cont
 		}
 
 		ufbxi_buf *tmp_buf = &uc->tmp_thread_parse[batch_index];
+
+		// ASCII data may be in `tmp_buf`, so copy it to safety in case
+		if (uc->ascii.src_buf == tmp_buf) {
+			ufbxi_ascii *ua = &uc->ascii;
+			size_t size = ufbxi_to_size(ua->src_end - ua->src);
+			if (uc->read_buffer_size < size) {
+				ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->read_buffer, &uc->read_buffer_size, size));
+			}
+			memcpy(uc->read_buffer, ua->src, size);
+			uc->data = uc->data_begin = ua->src = uc->read_buffer;
+			ua->src_end = uc->read_buffer + size;
+			ua->src_is_retained = false;
+			if (ufbxi_to_size(ua->src_end - ua->src) < uc->progress_interval) {
+				ua->src_yield = ua->src_end;
+			} else {
+				ua->src_yield = ua->src + uc->progress_interval;
+			}
+			uc->data = ua->src;
+		}
+
 		ufbxi_buf_clear(tmp_buf);
 
 		if (!parsed_to_end) {
@@ -13827,6 +14189,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects_threaded(ufbxi_cont
 			batch->task_index = uc->thread_pool.start_index;
 
 		}
+
+		// Not safe to refer to this buffer anymore
+		uc->ascii.src_is_retained = false;
 
 		ufbxi_thread_pool_flush_group(&uc->thread_pool);
 
@@ -23462,6 +23827,7 @@ static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->tmp_element_id);
 
 	ufbxi_thread_pool_free(&uc->thread_pool);
+	ufbxi_buf_free(&uc->tmp_ascii_spans);
 
 	ufbxi_free(&uc->ator_tmp, ufbxi_node, uc->top_nodes, uc->top_nodes_cap);
 	ufbxi_free(&uc->ator_tmp, void*, uc->element_extra_arr, uc->element_extra_cap);
@@ -23580,6 +23946,7 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	uc->tmp_full_weights.ator = &uc->ator_tmp;
 	uc->tmp_dom_nodes.ator = &uc->ator_tmp;
 	uc->tmp_element_id.ator = &uc->ator_tmp;
+	uc->tmp_ascii_spans.ator = &uc->ator_tmp;
 
 	for (size_t i = 0; i < UFBX_THREAD_GROUP_COUNT; i++) {
 		uc->tmp_thread_parse[i].ator = &uc->ator_tmp;
