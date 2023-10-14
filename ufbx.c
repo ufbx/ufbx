@@ -8992,6 +8992,23 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 		c = ufbxi_ascii_next(uc);
 		while (c != '"') {
 
+			// Optimized string parsing for non-special characters
+			if (ua->src + 1 < ua->src_yield) {
+				const char *begin = ua->src;
+				const char *end = ua->src_yield;
+				const char *quot = (const char*)memchr(begin, '"', ufbxi_to_size(end - begin));
+				if (quot) end = quot;
+				const char *esc = (const char*)memchr(begin, '&', ufbxi_to_size(end - begin));
+				if (esc) end = esc;
+
+				if (begin < end) {
+					ufbxi_check(ufbxi_ascii_push_token_string(uc, token, begin, ufbxi_to_size(end - begin)));
+					ua->src = end;
+					c = ufbxi_ascii_peek(uc);
+					continue;
+				}
+			}
+
 			// Escape XML-like elements, funny enough there is no way to escape '&' itself, there is no `&amp`.
 			// '&quot;' -> '"'
 			// '&cr;' -> '\r'
