@@ -8603,7 +8603,7 @@ static ufbxi_noinline char ufbxi_ascii_refill(ufbxi_context *uc)
 		if (ua->retain_buf != NULL) {
 			dst_size = uc->opts.read_buffer_size;
 			dst_buffer = ufbxi_push(ua->retain_buf, char, dst_size);
-			ufbxi_check(dst_buffer);
+			ufbxi_check_return(dst_buffer, '\0');
 			ua->src_is_retained = true;
 			ua->src_buf = ua->retain_buf;
 		} else {
@@ -9332,8 +9332,8 @@ ufbxi_noinline static bool ufbxi_ascii_array_task_imp(ufbxi_ascii_array_task *t)
 			if (state == UFBXI_ASCII_SCAN_STATE_COMMA) {
 				// Parse a value from the buffer
 				if (buffer_value) {
-					const char *end = ufbxi_ascii_array_task_parse(t, buffer, buffer + buffer_len);
-					if (end == NULL || end == buffer) {
+					const char *buffer_end = ufbxi_ascii_array_task_parse(t, buffer, buffer + buffer_len);
+					if (buffer_end == NULL || buffer_end == buffer) {
 						return false;
 					}
 				}
@@ -9373,7 +9373,7 @@ ufbxi_noinline static bool ufbxi_ascii_array_task_fn(ufbxi_task *task)
 	return true;
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_float_array(ufbxi_context *uc, char type, size_t *p_num_read, uint32_t num_values, ufbxi_buf *tmp_buf)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_float_array(ufbxi_context *uc, char type, size_t *p_num_read)
 {
 	ufbxi_ascii *ua = &uc->ascii;
 	if (ua->parse_as_f32) return 1;
@@ -9549,7 +9549,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 		if (arr_type) {
 			size_t num_read = 0;
 			if (arr_type == 'f' || arr_type == 'd') {
-				ufbxi_check(ufbxi_ascii_read_float_array(uc, (char)arr_type, &num_read, num_values, tmp_buf));
+				ufbxi_check(ufbxi_ascii_read_float_array(uc, (char)arr_type, &num_read));
 			} else if (arr_type == 'i' || arr_type == 'l') {
 				ufbxi_check(ufbxi_ascii_read_int_array(uc, (char)arr_type, &num_read));
 			}
@@ -9778,7 +9778,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 
 				ufbxi_ascii_array_task t;
 				t.arr_data = (char*)arr_data + num_values * arr_elem_size;
-				t.arr_type = arr_type;
+				t.arr_type = (char)arr_type;
 				t.arr_size = deferred_size;
 				t.num_spans = num_spans;
 				t.spans = spans;
