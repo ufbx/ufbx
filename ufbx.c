@@ -20908,6 +20908,48 @@ ufbxi_noinline static ufbx_transform ufbxi_get_transform(const ufbx_props *props
 	return t;
 }
 
+ufbxi_noinline static ufbx_quat ufbxi_get_rotation(const ufbx_props *props, ufbx_rotation_order order, const ufbx_node *node)
+{
+	ufbx_vec3 rotation = ufbxi_find_vec3(props, ufbxi_Lcl_Rotation, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 pre_rotation = ufbxi_find_vec3(props, ufbxi_PreRotation, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 post_rotation = ufbxi_find_vec3(props, ufbxi_PostRotation, 0.0f, 0.0f, 0.0f);
+
+	ufbx_transform t = { { 0,0,0 }, { 0,0,0,1 }, { 1,1,1 }};
+
+	if (node->has_adjust_transform) {
+		ufbxi_mul_rotate_quat(&t, node->adjust_post_rotation);
+	}
+
+	ufbxi_mul_inv_rotate(&t, post_rotation, UFBX_ROTATION_ORDER_XYZ);
+	ufbxi_mul_rotate(&t, rotation, order);
+	ufbxi_mul_rotate(&t, pre_rotation, UFBX_ROTATION_ORDER_XYZ);
+
+	if (node->has_adjust_transform) {
+		ufbxi_mul_rotate_quat(&t, node->adjust_pre_rotation);
+	}
+
+	return t.rotation;
+}
+
+ufbxi_noinline static ufbx_vec3 ufbxi_get_scale(const ufbx_props *props, ufbx_rotation_order order, const ufbx_node *node)
+{
+	ufbx_vec3 scaling = ufbxi_find_vec3(props, ufbxi_Lcl_Scaling, 1.0f, 1.0f, 1.0f);
+
+	ufbx_transform t = { { 0,0,0 }, { 0,0,0,1 }, { 1,1,1 }};
+
+	if (node->has_adjust_transform) {
+		ufbxi_mul_scale_real(&t, node->adjust_post_scale);
+	}
+
+	ufbxi_mul_scale(&t, scaling);
+
+	if (node->has_adjust_transform) {
+		ufbxi_mul_scale_real(&t, node->adjust_pre_scale);
+	}
+
+	return t.scale;
+}
+
 ufbxi_noinline static ufbx_transform ufbxi_get_texture_transform(const ufbx_props *props)
 {
 	ufbx_vec3 scale_pivot = ufbxi_find_vec3(props, ufbxi_TextureScalingPivot, 0.0f, 0.0f, 0.0f);
@@ -23672,7 +23714,7 @@ static ufbxi_forceinline const ufbx_prop *ufbxi_next_prop(ufbxi_prop_iter *iter)
 	}
 }
 
-static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *props, const char **prop_names, size_t max_props)
+static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *props, const char *const *prop_names, size_t max_props)
 {
 	const char *name = prop_names[0];
 	uint32_t key = ufbxi_get_name_key_c(name);
@@ -24815,10 +24857,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 		if (ix_r < times_r.count && time > times_r.data[ix_r]) time = times_r.data[ix_r];
 		if (ix_s < times_s.count && time > times_s.data[ix_s]) time = times_s.data[ix_s];
 
-		ufbx_transform transform = ufbx_evaluate_transform_flags(bc->anim, node, time,
-			UFBX_TRANSFORM_FLAG_IGNORE_SCALE_HELPER|UFBX_TRANSFORM_FLAG_IGNORE_COMPONENTWISE_SCALE);
+		uint32_t flags = UFBX_TRANSFORM_FLAG_IGNORE_SCALE_HELPER|UFBX_TRANSFORM_FLAG_IGNORE_COMPONENTWISE_SCALE|UFBX_TRANSFORM_FLAG_EXPLICIT_INCLUDES;
+		if (ix_t < times_t.count && time == times_t.data[ix_t]) flags |= UFBX_TRANSFORM_FLAG_INCLUDE_TRANSLATION;
+		if (ix_r < times_r.count && time == times_r.data[ix_r]) flags |= UFBX_TRANSFORM_FLAG_INCLUDE_ROTATION;
+		if (ix_s < times_s.count && time == times_s.data[ix_s]) flags |= UFBX_TRANSFORM_FLAG_INCLUDE_SCALE;
 
-		if (ix_t < times_t.count && time == times_t.data[ix_t]) {
+		ufbx_transform transform = ufbx_evaluate_transform_flags(bc->anim, node, time, flags);
+
+		if (flags & UFBX_TRANSFORM_FLAG_INCLUDE_TRANSLATION) {
 			if (scale_helper_t) {
 				ufbx_vec3 scale = ufbx_evaluate_baked_vec3(scale_helper_t->scale_keys, time);
 				transform.translation.x *= scale.x;
@@ -24834,12 +24880,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 			keys_t.data[ix_t].value = transform.translation;
 			ix_t++;
 		}
-		if (ix_r < times_r.count && time == times_r.data[ix_r]) {
+		if (flags & UFBX_TRANSFORM_FLAG_INCLUDE_ROTATION) {
 			keys_r.data[ix_r].time = time;
 			keys_r.data[ix_r].value = transform.rotation;
 			ix_r++;
 		}
-		if (ix_s < times_s.count && time == times_s.data[ix_s]) {
+		if (flags & UFBX_TRANSFORM_FLAG_INCLUDE_SCALE) {
 			if (scale_helper_s) {
 				ufbx_vec3 scale = ufbx_evaluate_baked_vec3(scale_helper_s->scale_keys, time);
 				transform.scale.x *= scale.x;
@@ -28390,6 +28436,38 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform(const ufbx_anim *
 	return ufbx_evaluate_transform_flags(anim, node, time, 0);
 }
 
+static const char *const ufbxi_transform_props_all[] = {
+	ufbxi_Lcl_Rotation,
+	ufbxi_Lcl_Scaling,
+	ufbxi_Lcl_Translation,
+	ufbxi_PostRotation,
+	ufbxi_PreRotation,
+	ufbxi_RotationOffset,
+	ufbxi_RotationOrder,
+	ufbxi_RotationPivot,
+	ufbxi_ScalingOffset,
+	ufbxi_ScalingPivot,
+};
+
+static const char *const ufbxi_transform_props_rotation[] = {
+	ufbxi_Lcl_Rotation,
+	ufbxi_PostRotation,
+	ufbxi_PreRotation,
+	ufbxi_RotationOrder,
+};
+
+static const char *const ufbxi_transform_props_scale[] = {
+	ufbxi_Lcl_Scaling,
+};
+
+static const char *const ufbxi_transform_props_rotation_scale[] = {
+	ufbxi_Lcl_Rotation,
+	ufbxi_Lcl_Scaling,
+	ufbxi_PostRotation,
+	ufbxi_PreRotation,
+	ufbxi_RotationOrder,
+};
+
 ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform_flags(const ufbx_anim *anim, const ufbx_node *node, double time, uint32_t flags)
 {
 	ufbx_assert(anim);
@@ -28398,25 +28476,32 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform_flags(const ufbx_
 	if (!anim) return node->local_transform;
 	if (node->is_root) return node->local_transform;
 
-	const char *prop_names[] = {
-		ufbxi_Lcl_Rotation,
-		ufbxi_Lcl_Scaling,
-		ufbxi_Lcl_Translation,
-		ufbxi_PostRotation,
-		ufbxi_PreRotation,
-		ufbxi_RotationOffset,
-		ufbxi_RotationOrder,
-		ufbxi_RotationPivot,
-		ufbxi_ScalingOffset,
-		ufbxi_ScalingPivot,
-	};
+	if ((flags & UFBX_TRANSFORM_FLAG_EXPLICIT_INCLUDES) == 0) {
+		flags |= UFBX_TRANSFORM_FLAG_INCLUDE_ROTATION|UFBX_TRANSFORM_FLAG_INCLUDE_SCALE|UFBX_TRANSFORM_FLAG_INCLUDE_TRANSLATION;
+	}
+
+	const char *const *prop_names = ufbxi_transform_props_all;
+	size_t num_prop_names = ufbxi_arraycount(ufbxi_transform_props_all);
+	uint32_t components = flags & (UFBX_TRANSFORM_FLAG_INCLUDE_ROTATION|UFBX_TRANSFORM_FLAG_INCLUDE_SCALE|UFBX_TRANSFORM_FLAG_INCLUDE_TRANSLATION);
+	if (components == (UFBX_TRANSFORM_FLAG_INCLUDE_ROTATION|UFBX_TRANSFORM_FLAG_INCLUDE_SCALE)) {
+		prop_names = ufbxi_transform_props_rotation_scale;
+		num_prop_names = ufbxi_arraycount(ufbxi_transform_props_rotation_scale);
+	} else if (components == UFBX_TRANSFORM_FLAG_INCLUDE_ROTATION) {
+		prop_names = ufbxi_transform_props_rotation;
+		num_prop_names = ufbxi_arraycount(ufbxi_transform_props_rotation);
+	} else if (components == UFBX_TRANSFORM_FLAG_INCLUDE_SCALE) {
+		prop_names = ufbxi_transform_props_scale;
+		num_prop_names = ufbxi_arraycount(ufbxi_transform_props_scale);
+	} else if (components == 0) {
+		return ufbx_identity_transform;
+	}
 
 	const ufbx_vec3 *translation_scale = NULL;
 	ufbx_prop helper_scale;
 	ufbx_vec3 scale_factor = ufbxi_one_vec3;
 	bool use_scale_factor = false;
 
-	if (node->parent) {
+	if (node->parent && (flags & (UFBX_TRANSFORM_FLAG_INCLUDE_SCALE|UFBX_TRANSFORM_FLAG_INCLUDE_TRANSLATION)) != 0) {
 		ufbx_node *parent = node->parent;
 
 		if ((flags & UFBX_TRANSFORM_FLAG_IGNORE_COMPONENTWISE_SCALE) == 0 && parent->inherit_scale_node) {
@@ -28449,10 +28534,27 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform_flags(const ufbx_
 		}
 	}
 
-	ufbx_prop buf[ufbxi_arraycount(prop_names)];
-	ufbx_props props = ufbxi_evaluate_selected_props(anim, &node->element, time, buf, prop_names, ufbxi_arraycount(prop_names));
+	ufbx_prop buf[ufbxi_arraycount(ufbxi_transform_props_all)];
+	ufbx_props props = ufbxi_evaluate_selected_props(anim, &node->element, time, buf, prop_names, num_prop_names);
 	ufbx_rotation_order order = (ufbx_rotation_order)ufbxi_find_enum(&props, ufbxi_RotationOrder, UFBX_ROTATION_ORDER_XYZ, UFBX_ROTATION_ORDER_SPHERIC);
-	ufbx_transform transform = ufbxi_get_transform(&props, order, node, translation_scale);
+
+	ufbx_transform transform;
+	if ((components & UFBX_TRANSFORM_FLAG_INCLUDE_TRANSLATION) != 0) {
+		transform = ufbxi_get_transform(&props, order, node, translation_scale);
+	} else {
+		transform.translation = ufbx_zero_vec3;
+		if ((components & UFBX_TRANSFORM_FLAG_INCLUDE_ROTATION) != 0) {
+			transform.rotation = ufbxi_get_rotation(&props, order, node);
+		} else {
+			transform.rotation = ufbx_identity_quat;
+		}
+		if ((components & UFBX_TRANSFORM_FLAG_INCLUDE_SCALE) != 0) {
+			transform.scale = ufbxi_get_scale(&props, order, node);
+		} else {
+			transform.scale = ufbxi_one_vec3;
+		}
+	}
+
 	if (use_scale_factor) {
 		transform.scale.x *= scale_factor.x;
 		transform.scale.y *= scale_factor.y;
