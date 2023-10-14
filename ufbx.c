@@ -9743,7 +9743,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 			node->array->size = 0;
 		} else {
 			void *arr_data = NULL;
-			
+
 			if (deferred_size > 0) {
 				arr_data = ufbxi_push_size(arr_buf, arr_elem_size, num_values + deferred_size);
 				// Pop any previously pushed values
