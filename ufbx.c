@@ -9154,7 +9154,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_int_array(ufbxi_conte
 		size_t left = ufbxi_to_size(end - src_scan);
 		if (left < 32) break;
 
-		val = ufbxi_parse_int64(src_scan, &src_scan);
+		val = ufbxi_parse_int64(src_scan, (char**)&src_scan);
 		if (!src_scan) break;
 	}
 
@@ -9228,7 +9228,7 @@ ufbxi_noinline static const char *ufbxi_ascii_array_task_parse_ints(ufbxi_ascii_
 	while (src != src_end) {
 		while (ufbxi_is_space(*src)) src++;
 
-		int64_t val = ufbxi_parse_int64(src, &src);
+		int64_t val = ufbxi_parse_int64(src, (char**)&src);
 		if (!src) return NULL;
 
 		while (ufbxi_is_space(*src)) src++;
