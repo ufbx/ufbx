@@ -9713,7 +9713,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 				if (arr_type == '-') {
 					ufbxi_check(ufbxi_ascii_skip_until(uc, '}'));
 				} else if (uc->parse_threaded && !uc->opts.force_single_thread_ascii_parsing
-						&& !ua->parse_as_f32 && false
+						&& !ua->parse_as_f32
 						&& (arr_type == 'i' || arr_type == 'l' || arr_type == 'f' || arr_type == 'd')) {
 					// Don't bother with small arrays due to fixed overhead
 					if (count >= 64 && count <= UINT32_MAX) {
