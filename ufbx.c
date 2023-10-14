@@ -9174,6 +9174,7 @@ ufbxi_noinline static const char *ufbxi_ascii_array_task_parse_floats(ufbxi_asci
 	size_t offset = t->offset;
 	float *dst_float = t->arr_type == 'f' ? (float*)t->arr_data + offset : NULL;
 	double *dst_double = t->arr_type == 'd' ? (double*)t->arr_data + offset : NULL;
+	ufbx_assert(dst_float || dst_double);
 	uint32_t parse_flags = t->parse_flags;
 	const char *src_begin = src;
 
@@ -9209,7 +9210,7 @@ ufbxi_noinline static const char *ufbxi_ascii_array_task_parse_ints(ufbxi_ascii_
 	size_t offset = t->offset;
 	int32_t *dst32 = t->arr_type == 'i' ? (int32_t*)t->arr_data + offset : NULL;
 	int64_t *dst64 = t->arr_type == 'l' ? (int64_t*)t->arr_data + offset : NULL;
-	uint32_t parse_flags = t->parse_flags;
+	ufbx_assert(dst32 || dst64);
 	const char *src_begin = src;
 
 	while (src != src_end) {
