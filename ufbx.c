@@ -5331,9 +5331,11 @@ struct ufbxi_thread_pool {
 	ufbxi_task_imp *tasks;
 };
 
-static void ufbxi_thread_pool_execute(ufbxi_thread_pool *pool)
+static void ufbxi_thread_pool_execute(ufbxi_thread_pool *pool, uint32_t index)
 {
-	uint32_t index = (uint32_t)ufbxi_atomic_counter_inc(&pool->run_index);
+	if (index == UFBX_NO_INDEX) {
+		index = (uint32_t)ufbxi_atomic_counter_inc(&pool->run_index);
+	}
 	ufbxi_task_imp *imp = &pool->tasks[index % pool->num_tasks];
 	if (imp->fn(&imp->task)) {
 		imp->task.error = NULL;
@@ -5399,7 +5401,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_init(ufbxi_thread_po
 
 	uint32_t num_tasks = (uint32_t)ufbxi_min_sz(opts->num_tasks, INT32_MAX);
 	if (num_tasks == 0) {
-		num_tasks = 512;
+		num_tasks = 2048;
 	}
 
 	pool->opts = *opts;
@@ -30538,9 +30540,9 @@ ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t 
 	return ufbxi_generate_indices(streams, num_streams, indices, num_indices, allocator, error);
 }
 
-ufbx_abi void ufbx_thread_pool_run_task(ufbx_thread_pool_context ctx)
+ufbx_abi void ufbx_thread_pool_run_task(ufbx_thread_pool_context ctx, uint32_t index)
 {
-	ufbxi_thread_pool_execute((ufbxi_thread_pool*)ctx);
+	ufbxi_thread_pool_execute((ufbxi_thread_pool*)ctx, index);
 }
 
 ufbx_abi uint32_t ufbx_thread_pool_try_wait(ufbx_thread_pool_context ctx, uint32_t max_index)

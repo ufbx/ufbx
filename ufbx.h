@@ -5087,7 +5087,7 @@ ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t 
 
 // Run a single thread pool task.
 // See `ufbx_thread_pool_run_fn` for more information.
-ufbx_unsafe ufbx_abi void ufbx_thread_pool_run_task(ufbx_thread_pool_context ctx);
+ufbx_unsafe ufbx_abi void ufbx_thread_pool_run_task(ufbx_thread_pool_context ctx, uint32_t index);
 
 // Check if all tasks before `max_index` are completed.
 // Returns the index of the first non-completed task or `UFBX_NO_INDEX` if all
