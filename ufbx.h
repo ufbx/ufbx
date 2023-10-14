@@ -4910,6 +4910,13 @@ typedef enum ufbx_transform_flags UFBX_FLAG_REPR {
 	// evaluate the entire parent chain in the worst case.
 	UFBX_TRANSFORM_FLAG_IGNORE_COMPONENTWISE_SCALE = 0x2,
 
+	// Require explicit components
+	UFBX_TRANSFORM_FLAG_EXPLICIT_INCLUDES = 0x4,
+
+	UFBX_TRANSFORM_FLAG_INCLUDE_TRANSLATION = 0x10,
+	UFBX_TRANSFORM_FLAG_INCLUDE_ROTATION = 0x20,
+	UFBX_TRANSFORM_FLAG_INCLUDE_SCALE = 0x40,
+
 	UFBX_FLAG_FORCE_WIDTH(UFBX_TRANSFORM_FLAGS)
 } ufbx_transform_flags;
 
