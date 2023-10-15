@@ -11,7 +11,7 @@
 
 // User configuration:
 //   UFBX_REGRESSION           Enable regression mode for development
-//   UFBX_UBSAN                Explicitly enable undefined behvaior sanitizer workarounds
+//   UFBX_UBSAN                Explicitly enable undefined behavior sanitizer workarounds
 //   UFBX_NO_UNALIGNED_LOADS   Do not use unaligned loads even when they are supported
 //   UFBX_USE_UNALIGNED_LOADS  Forcibly use unaligned loads on unknown platforms
 //   UFBX_USE_SSE              Explicitly enable SSE2 support (for x86)
