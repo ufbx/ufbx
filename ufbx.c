@@ -9,6 +9,22 @@
 
 // -- User configuration
 
+// User configuration:
+//   UFBX_REGRESSION           Enable regression mode for development
+//   UFBX_UBSAN                Explicitly enable undefined behvaior sanitizer workarounds
+//   UFBX_NO_UNALIGNED_LOADS   Do not use unaligned loads even when they are supported
+//   UFBX_USE_UNALIGNED_LOADS  Forcibly use unaligned loads on unknown platforms
+//   UFBX_USE_SSE              Explicitly enable SSE2 support (for x86)
+//   UFBX_HAS_FTELLO           Allow ufbx to use `ftello()` to measure file size
+//   UFBX_WASM_32BIT           Optimize WASM for 32-bit architectures
+//   UFBX_TRACE                Log calls of `ufbxi_check()` for tracing execution
+//   UFBX_LITTLE_ENDIAN=0/1    Explicitly define little/big endian architecture
+//   UFBX_PATH_SEPARATOR=''    Specify default platform path separator
+
+// Mostly internal for debugging:
+//   UFBX_STATIC_ANALYSIS      Enable static analysis augmentation
+//   UFBX_DEBUG_BINARY_SEARCH  Force using binary search for debugging
+
 #if defined(UFBX_CONFIG_SOURCE)
 	#include UFBX_CONFIG_SOURCE
 #endif
@@ -24,9 +40,16 @@
 #define UFBXI_HUGE_MAX_SCAN 16
 #define UFBXI_MIN_FILE_FORMAT_LOOKAHEAD 32
 #define UFBXI_FACE_GROUP_HASH_BITS 8
+#define UFBXI_MIN_THREADED_ASCII_VALUES 64
 
 #ifndef UFBXI_MAX_NURBS_ORDER
 #define UFBXI_MAX_NURBS_ORDER 128
+#endif
+
+// By default enough to have squares be non-denormal
+#ifndef UFBX_EPSILON
+#define UFBX_EPSILON (sizeof(ufbx_real) == sizeof(float) ? \
+	(ufbx_real)1.0842021795674597e-19f : (ufbx_real)1.4916681462400413e-154)
 #endif
 
 // -- Feature exclusion
@@ -146,6 +169,13 @@
 #if !UFBXI_FEATURE_SUBDIVISION || !UFBXI_FEATURE_TESSELLATION || !UFBXI_FEATURE_GEOMETRY_CACHE || !UFBXI_FEATURE_SCENE_EVALUATION || !UFBXI_FEATURE_SKINNING_EVALUATION || !UFBXI_FEATURE_ANIMATION_BAKING || !UFBXI_FEATURE_TRIANGULATION || !UFBXI_FEATURE_INDEX_GENERATION || !UFBXI_FEATURE_XML || !UFBXI_FEATURE_KD || !UFBXI_FEATURE_FORMAT_OBJ
 	#define UFBXI_PARTIAL_FEATURES 1
 #endif
+
+// -- Version
+
+#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 8, 0)
+const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
+
+ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEADER_VERSION/1000u);
 
 // -- Headers
 
@@ -384,8 +414,8 @@
 #endif
 
 #if defined(UFBX_STATIC_ANALYSIS)
-	bool g_analysis_opaque;
-	#define ufbxi_maybe_null(ptr) (g_analysis_opaque ? (ptr) : NULL)
+	bool ufbxi_analysis_opaque;
+	#define ufbxi_maybe_null(ptr) (ufbxi_analysis_opaque ? (ptr) : NULL)
 #else
 	#define ufbxi_maybe_null(ptr) (ptr)
 #endif
@@ -699,19 +729,6 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 	}
 #endif
 
-// By default enough to have squares be non-denormal
-#ifndef UFBX_EPSILON
-#define UFBX_EPSILON (sizeof(ufbx_real) == sizeof(float) ? \
-	(ufbx_real)1.0842021795674597e-19f : (ufbx_real)1.4916681462400413e-154)
-#endif
-
-// -- Version
-
-#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 8, 0)
-const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
-
-ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEADER_VERSION/1000u);
-
 // -- Debug
 
 #if defined(UFBX_DEBUG_BINARY_SEARCH) || defined(UFBX_REGRESSION)
@@ -732,6 +749,9 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 
 	#undef UFBXI_FACE_GROUP_HASH_BITS
 	#define UFBXI_FACE_GROUP_HASH_BITS 2
+
+	#undef UFBXI_MIN_THREADED_ASCII_VALUES
+	#define UFBXI_MIN_THREADED_ASCII_VALUES 2
 #endif
 
 #if defined(UFBX_REGRESSION)
@@ -3261,7 +3281,7 @@ typedef struct {
 	ufbxi_allocator *ator;
 
 	// Current chunks for normal and huge allocations.
-	// Ordered buffers (`!ufbx_buf.unordered`) never use `chunks[1]`
+	// Ordered buffers (`!ufbxi_buf.unordered`) never use `chunks[1]`
 	ufbxi_buf_chunk *chunks[2];
 
 	// Inline state for non-huge chunks
@@ -9713,7 +9733,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 						&& !ua->parse_as_f32
 						&& (arr_type == 'i' || arr_type == 'l' || arr_type == 'f' || arr_type == 'd')) {
 					// Don't bother with small arrays due to fixed overhead
-					if (count >= 64 && count <= UINT32_MAX) {
+					if (count >= UFBXI_MIN_THREADED_ASCII_VALUES && count <= UINT32_MAX) {
 						deferred_size = (uint32_t)count - 1;
 						ufbxi_check(ufbxi_ascii_store_array(uc, tmp_buf));
 					}
