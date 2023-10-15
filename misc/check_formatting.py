@@ -4,7 +4,11 @@ import sys
 import os
 
 g_filename = ""
-g_ufbx_idenitfiers = set()
+g_ufbx_idenitfiers = {
+    "ufbx_static_assert",
+    "ufbx_source_version",
+    "UFBX_SOURCE_VERSION",
+}
 g_platform_seen = False
 g_header_seen = False
 
