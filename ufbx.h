@@ -5342,12 +5342,12 @@ public:
 // Used by: `ufbx_node`.
 #define UFBX_RotationOffset "RotationOffset"
 
-// Pre-rotation: Rotation applied _after_ `ufbxi_Lcl_Rotation`.
+// Pre-rotation: Rotation applied _after_ `UFBX_Lcl_Rotation`.
 // Used by: `ufbx_node`.
 // Affected by `UFBX_RotationPivot` but not `UFBX_RotationOrder`.
 #define UFBX_PreRotation "PreRotation"
 
-// Post-rotation: Rotation applied _before_ `ufbxi_Lcl_Rotation`.
+// Post-rotation: Rotation applied _before_ `UFBX_Lcl_Rotation`.
 // Used by: `ufbx_node`.
 // Affected by `UFBX_RotationPivot` but not `UFBX_RotationOrder`.
 #define UFBX_PostRotation "PostRotation"
@@ -5373,4 +5373,3 @@ public:
 #endif
 
 #endif
-
