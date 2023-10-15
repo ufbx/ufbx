@@ -264,7 +264,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Check formatting
         if: ${{ always() && !cancelled() }}
-        run: python3 misc/check_formatting.py ufbx.c ufbx.h
+        run: python3 misc/check_formatting.py ufbx.h ufbx.c
       - name: Check for typos
         if: ${{ always() && !cancelled() }}
         uses: crate-ci/typos@master
