@@ -1186,7 +1186,7 @@ ufbxt_noinline static void ufbxt_hash_bone_pose_imp(ufbxt_hash *h, const ufbx_bo
 
 ufbxt_noinline static void ufbxt_hash_pose_imp(ufbxt_hash *h, const ufbx_pose *v)
 {
-	ufbxt_hash_pod(h, v->bind_pose);
+	ufbxt_hash_pod(h, v->is_bind_pose);
 	ufbxt_hash_list_ptr(h, v->bone_poses, ufbxt_hash_bone_pose_imp);
 }
 

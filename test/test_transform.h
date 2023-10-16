@@ -19,6 +19,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj_file(const char *file_name,
 
 typedef enum {
 	UFBXT_CHECK_FRAME_SCALE_100 = 0x1,
+	UFBXT_CHECK_FRAME_Z_TO_Y_UP = 0x2,
 } ufbxt_check_frame_flags;
 
 void ufbxt_check_frame_imp(ufbx_scene *scene, ufbxt_diff_error *err, bool check_normals, const char *file_name, const char *anim_name, double time, uint32_t flags)
@@ -36,6 +37,12 @@ void ufbxt_check_frame_imp(ufbx_scene *scene, ufbxt_diff_error *err, bool check_
 
 	if ((flags & UFBXT_CHECK_FRAME_SCALE_100) != 0) {
 		obj_file->fbx_position_scale = 100.0;
+	}
+
+	if ((flags & UFBXT_CHECK_FRAME_Z_TO_Y_UP) != 0) {
+		// -90deg rotation around X
+		obj_file->fbx_rotation.w = 0.70710678f;
+		obj_file->fbx_rotation.x = -0.70710678f;
 	}
 
 	ufbx_anim *anim = scene->anim;
@@ -1175,7 +1182,7 @@ UFBXT_FILE_TEST(maya_axes_anim)
 
 	ufbxt_assert(scene->poses.count == 1);
 	ufbx_pose *pose = scene->poses.data[0];
-	ufbxt_assert(pose->bind_pose);
+	ufbxt_assert(pose->is_bind_pose);
 	ufbxt_assert(pose->bone_poses.count == 5);
 	for (size_t i = 0; i < pose->bone_poses.count; i++) {
 		ufbx_bone_pose *bone_pose = &pose->bone_poses.data[i];

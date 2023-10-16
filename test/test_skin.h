@@ -139,6 +139,253 @@ UFBXT_FILE_TEST(synthetic_sausage_wiggle_no_bind)
 }
 #endif
 
+#if UFBXT_IMPL
+static void ufbxt_check_bind_poses(ufbx_scene *scene, ufbxt_diff_error *err)
+{
+	ufbxt_assert(scene->poses.count == 1);
+	ufbx_pose *pose = scene->poses.data[0];
+	ufbxt_assert(pose->is_bind_pose);
+
+	for (size_t i = 0; i < scene->skin_clusters.count; i++) {
+		ufbx_skin_cluster *cluster = scene->skin_clusters.data[i];
+
+		ufbx_bone_pose *bone_pose = NULL;
+		for (size_t j = 0; j < pose->bone_poses.count; j++) {
+			if (pose->bone_poses.data[j].bone_node == cluster->bone_node) {
+				bone_pose = &pose->bone_poses.data[j];
+				break;
+			}
+		}
+		ufbxt_assert(bone_pose);
+
+		ufbxt_assert_close_matrix(err, bone_pose->bone_to_world, cluster->bind_to_world);
+		ufbxt_assert_close_matrix(err, bone_pose->bone_to_world, cluster->bone_node->node_to_world);
+	}
+}
+#endif
+
+UFBXT_TEST(synthetic_sausage_wiggle_no_link_conversion)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "synthetic_sausage_wiggle_no_link" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t space_conversion_i = 0; space_conversion_i < UFBX_SPACE_CONVERSION_COUNT; space_conversion_i++) {
+			ufbx_space_conversion space_conversion = (ufbx_space_conversion)space_conversion_i;
+			ufbxt_hintf("space_conversion=%u", space_conversion_i);
+
+			{
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_unit_meters = 1.0f;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_check_bind_poses(scene, &err);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+
+				ufbx_free_scene(scene);
+			}
+
+			{
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_axes = ufbx_axes_right_handed_z_up;
+				opts.target_unit_meters = 1.0f;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_check_bind_poses(scene, &err);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+
+				ufbx_free_scene(scene);
+			}
+
+			for (uint32_t mirror_i = 0; mirror_i < UFBX_MIRROR_AXIS_COUNT; mirror_i++) {
+				// Cannot convert handedness without mirroring if not transforming root
+				if (space_conversion != UFBX_SPACE_CONVERSION_TRANSFORM_ROOT && mirror_i == 0) continue;
+
+				ufbx_mirror_axis mirror_axis = (ufbx_mirror_axis)mirror_i;
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_axes = ufbx_axes_left_handed_y_up;
+				opts.target_unit_meters = 1.0f;
+				opts.handedness_conversion_axis = mirror_axis;
+				opts.reverse_winding = (mirror_i == 0);
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_check_bind_poses(scene, &err);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+
+				ufbx_free_scene(scene);
+			}
+
+			for (uint32_t mirror_i = 0; mirror_i < UFBX_MIRROR_AXIS_COUNT; mirror_i++) {
+				// Cannot convert handedness without mirroring if not transforming root
+				if (space_conversion != UFBX_SPACE_CONVERSION_TRANSFORM_ROOT && mirror_i == 0) continue;
+
+				ufbx_mirror_axis mirror_axis = (ufbx_mirror_axis)mirror_i;
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_axes = ufbx_axes_left_handed_z_up;
+				opts.target_unit_meters = 1.0f;
+				opts.handedness_conversion_axis = mirror_axis;
+				opts.reverse_winding = (mirror_i == 0);
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_check_bind_poses(scene, &err);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+
+				ufbx_free_scene(scene);
+			}
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
+UFBXT_TEST(synthetic_sausage_wiggle_no_bind_conversion)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "synthetic_sausage_wiggle_no_bind" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t space_conversion_i = 0; space_conversion_i < UFBX_SPACE_CONVERSION_COUNT; space_conversion_i++) {
+			ufbx_space_conversion space_conversion = (ufbx_space_conversion)space_conversion_i;
+			ufbxt_hintf("space_conversion=%u", space_conversion_i);
+
+			{
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_unit_meters = 1.0f;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+
+				ufbx_free_scene(scene);
+			}
+
+			{
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_axes = ufbx_axes_right_handed_z_up;
+				opts.target_unit_meters = 1.0f;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+
+				ufbx_free_scene(scene);
+			}
+
+			for (uint32_t mirror_i = 0; mirror_i < UFBX_MIRROR_AXIS_COUNT; mirror_i++) {
+				// Cannot convert handedness without mirroring if not transforming root
+				if (space_conversion != UFBX_SPACE_CONVERSION_TRANSFORM_ROOT && mirror_i == 0) continue;
+
+				ufbx_mirror_axis mirror_axis = (ufbx_mirror_axis)mirror_i;
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_axes = ufbx_axes_left_handed_y_up;
+				opts.target_unit_meters = 1.0f;
+				opts.handedness_conversion_axis = mirror_axis;
+				opts.reverse_winding = (mirror_i == 0);
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+
+				ufbx_free_scene(scene);
+			}
+
+			for (uint32_t mirror_i = 0; mirror_i < UFBX_MIRROR_AXIS_COUNT; mirror_i++) {
+				// Cannot convert handedness without mirroring if not transforming root
+				if (space_conversion != UFBX_SPACE_CONVERSION_TRANSFORM_ROOT && mirror_i == 0) continue;
+
+				ufbx_mirror_axis mirror_axis = (ufbx_mirror_axis)mirror_i;
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_axes = ufbx_axes_left_handed_z_up;
+				opts.target_unit_meters = 1.0f;
+				opts.handedness_conversion_axis = mirror_axis;
+				opts.reverse_winding = (mirror_i == 0);
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+
+				ufbx_free_scene(scene);
+			}
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
 UFBXT_FILE_TEST(maya_blend_shape_cube)
 #if UFBXT_IMPL
 {

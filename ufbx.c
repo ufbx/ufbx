@@ -12616,7 +12616,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_pose(ufbxi_context *uc, ufb
 	ufbxi_check(pose);
 
 	// TODO: What are the actual other types?
-	pose->bind_pose = sub_type == ufbxi_BindPose;
+	pose->is_bind_pose = sub_type == ufbxi_BindPose;
 
 	size_t num_bones = 0;
 	ufbxi_for(ufbxi_node, n, node->children, node->num_children) {
@@ -19165,7 +19165,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			bone->bone_node = (ufbx_node*)elem;
 			bone->bone_to_world = tmp_poses[i].bone_to_world;
 
-			if (pose->bind_pose) {
+			if (pose->is_bind_pose) {
 				ufbx_connection_list node_conns = ufbxi_find_src_connections(elem, NULL);
 				ufbxi_for_list(ufbx_connection, conn, node_conns) {
 					if (conn->dst->type != UFBX_ELEMENT_SKIN_CLUSTER) continue;
@@ -20275,14 +20275,13 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node, const ufbx_transfo
 				node->local_transform = overrides[override_ix].transform;
 			}
 		}
-
+		node->node_to_parent = ufbx_transform_to_matrix(&node->local_transform);
 		node->geometry_transform = ufbxi_get_geometry_transform(&node->props, node);
 	} else {
 		node->geometry_transform = ufbx_identity_transform;
 	}
 
 	ufbx_matrix unscaled_node_to_parent = ufbxi_unscaled_transform_to_matrix(&node->local_transform);
-	node->node_to_parent = ufbx_transform_to_matrix(&node->local_transform);
 
 	node->inherit_scale = node->local_transform.scale;
 
@@ -20783,11 +20782,59 @@ static ufbxi_forceinline void ufbxi_mirror_matrix_src(ufbx_matrix *m, ufbx_mirro
 	m->cols[ax].z = -m->cols[ax].z;
 }
 
+static ufbxi_forceinline void ufbxi_mirror_matrix(ufbx_matrix *m, ufbx_mirror_axis axis)
+{
+	if (axis == 0) return;
+	ufbxi_mirror_matrix_src(m, axis);
+	ufbxi_mirror_matrix_dst(m, axis);
+}
+
 ufbxi_noinline static void ufbxi_update_initial_clusters(ufbx_scene *scene)
 {
 	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
 		ufbx_skin_cluster *cluster = *p_cluster;
 		cluster->geometry_to_bone = cluster->mesh_node_to_bone;
+	}
+
+	ufbx_mirror_axis mirror_axis = scene->metadata.mirror_axis;
+	ufbx_real geometry_scale = scene->metadata.geometry_scale;
+
+	// Space conversion for bind matrices
+	{
+		ufbx_matrix world_to_units;
+		ufbx_real translation_scale = 1.0f;
+
+		if (scene->metadata.space_conversion == UFBX_SPACE_CONVERSION_TRANSFORM_ROOT && scene->metadata.mirror_axis == UFBX_MIRROR_AXIS_NONE) {
+			world_to_units = scene->root_node->node_to_parent;
+		} else {
+			ufbx_transform root_transform;
+			root_transform.translation = ufbx_zero_vec3;
+			root_transform.rotation = scene->metadata.root_rotation;
+			root_transform.scale.x = scene->metadata.root_scale;
+			root_transform.scale.y = scene->metadata.root_scale;
+			root_transform.scale.z = scene->metadata.root_scale;
+			world_to_units = ufbx_transform_to_matrix(&root_transform);
+			translation_scale = scene->metadata.geometry_scale;
+		}
+
+		ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
+			ufbx_skin_cluster *cluster = *p_cluster;
+			cluster->bind_to_world = ufbx_matrix_mul(&world_to_units, &cluster->bind_to_world);
+			cluster->bind_to_world.cols[3].x *= translation_scale;
+			cluster->bind_to_world.cols[3].y *= translation_scale;
+			cluster->bind_to_world.cols[3].z *= translation_scale;
+			ufbxi_mirror_matrix(&cluster->bind_to_world, mirror_axis);
+		}
+
+		ufbxi_for_ptr_list(ufbx_pose, p_pose, scene->poses) {
+			ufbxi_for_list(ufbx_bone_pose, pose, (*p_pose)->bone_poses) {
+				pose->bone_to_world = ufbx_matrix_mul(&world_to_units, &pose->bone_to_world);
+				pose->bone_to_world.cols[3].x *= translation_scale;
+				pose->bone_to_world.cols[3].y *= translation_scale;
+				pose->bone_to_world.cols[3].z *= translation_scale;
+				ufbxi_mirror_matrix(&pose->bone_to_world, mirror_axis);
+			}
+		}
 	}
 
 	// Patch initial `mesh_node_to_bone`
@@ -20812,21 +20859,17 @@ ufbxi_noinline static void ufbxi_update_initial_clusters(ufbx_scene *scene)
 		}
 
 		if (ufbxi_matrix_all_zero(&cluster->mesh_node_to_bone)) {
+			// If `mesh_node_to_bone` is not explicitly specified compute it from bind pose.
 			ufbx_matrix world_to_bind = ufbx_matrix_invert(&cluster->bind_to_world);
 			cluster->mesh_node_to_bone = ufbx_matrix_mul(&world_to_bind, &node->node_to_world);
-		}
-
-		ufbx_mirror_axis mirror_axis = scene->metadata.mirror_axis;
-		if (mirror_axis) {
-			ufbxi_mirror_matrix_src(&cluster->mesh_node_to_bone, mirror_axis);
-			ufbxi_mirror_matrix_dst(&cluster->mesh_node_to_bone, mirror_axis);
-		}
-
-		ufbx_real geometry_scale = scene->metadata.geometry_scale;
-		if (geometry_scale != 1.0f) {
-			cluster->mesh_node_to_bone.cols[3].x *= geometry_scale;
-			cluster->mesh_node_to_bone.cols[3].y *= geometry_scale;
-			cluster->mesh_node_to_bone.cols[3].z *= geometry_scale;
+		} else {
+			// If `mesh_node_to_bone` is explicit, we may need to modify it for space conversion.
+			ufbxi_mirror_matrix(&cluster->mesh_node_to_bone, mirror_axis);
+			if (geometry_scale != 1.0f) {
+				cluster->mesh_node_to_bone.cols[3].x *= geometry_scale;
+				cluster->mesh_node_to_bone.cols[3].y *= geometry_scale;
+				cluster->mesh_node_to_bone.cols[3].z *= geometry_scale;
+			}
 		}
 
 		// HACK: Account for geometry transforms by looking at the transform of the
@@ -20954,11 +20997,15 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 	}
 
 	ufbx_real root_scale = ufbxi_min3(root_transform.scale);
+	scene->metadata.space_conversion = conversion;
 	if (conversion == UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY) {
 		scene->metadata.geometry_scale = root_scale;
+		scene->metadata.root_scale = 1.0f;
 	} else {
 		scene->metadata.geometry_scale = 1.0f;
+		scene->metadata.root_scale = root_scale;
 	}
+	scene->metadata.root_rotation = root_transform.rotation;
 
 	ufbxi_for_ptr_list(ufbx_node, p_node, scene->nodes) {
 		ufbx_node *node = *p_node;
@@ -22172,6 +22219,8 @@ static ufbxi_noinline void ufbxi_transform_to_axes(ufbxi_context *uc, ufbx_coord
 			ufbx_matrix root_mat = ufbx_transform_to_matrix(&uc->scene.root_node->local_transform);
 			axis_mat = ufbx_matrix_mul(&root_mat, &axis_mat);
 		}
+
+		ufbxi_mirror_matrix(&axis_mat, uc->mirror_axis);
 
 		uc->scene.root_node->local_transform = ufbx_matrix_to_transform(&axis_mat);
 		uc->scene.root_node->node_to_parent = axis_mat;

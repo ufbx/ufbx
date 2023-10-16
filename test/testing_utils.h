@@ -161,6 +161,7 @@ typedef struct {
 	double position_scale_bake;
 
 	double fbx_position_scale;
+	ufbx_quat fbx_rotation;
 
 	char animation_name[128];
 
@@ -547,6 +548,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 	obj->position_scale_float = 1.0;
 	obj->position_scale_bake = 1.0;
 	obj->fbx_position_scale = 1.0;
+	obj->fbx_rotation = ufbx_identity_quat;
 
 	if (implicit_mesh) {
 		mesh = meshes;
@@ -1080,6 +1082,9 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 			obj_verts[i].pos.y *= (ufbx_real)obj->fbx_position_scale;
 			obj_verts[i].pos.z *= (ufbx_real)obj->fbx_position_scale;
 		}
+		if (obj->fbx_rotation.w != 1.0f) {
+			obj_verts[i].pos = ufbx_quat_rotate_vec3(obj->fbx_rotation, obj_verts[i].pos);
+		}
 
 		if (scale != 1.0) {
 			obj_verts[i].pos.x *= scale;
@@ -1542,6 +1547,9 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 						fp.x *= (ufbx_real)obj->fbx_position_scale;
 						fp.y *= (ufbx_real)obj->fbx_position_scale;
 						fp.z *= (ufbx_real)obj->fbx_position_scale;
+					}
+					if (obj->fbx_rotation.w != 1.0f) {
+						fp = ufbx_quat_rotate_vec3(obj->fbx_rotation, fp);
 					}
 
 					if (scale != 1.0) {

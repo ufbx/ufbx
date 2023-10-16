@@ -3204,7 +3204,7 @@ struct ufbx_pose {
 		uint32_t typed_id;
 	}; };
 
-	bool bind_pose;
+	bool is_bind_pose;
 	ufbx_bone_pose_list bone_poses;
 };
 
@@ -3338,6 +3338,31 @@ typedef enum ufbx_thumbnail_format UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_thumbnail_format, UFBX_THUMBNAIL_FORMAT, UFBX_THUMBNAIL_FORMAT_RGBA_32);
 
+// Specify how unit / coordinate system conversion should be performed.
+// Affects how `ufbx_load_opts.target_axes` and `ufbx_load_opts.target_unit_meters` work,
+// has no effect if neither is specified.
+typedef enum ufbx_space_conversion UFBX_ENUM_REPR {
+
+	// Store the space conversion transform in the root node.
+	// Sets `ufbx_node.local_transform` of the root node.
+	UFBX_SPACE_CONVERSION_TRANSFORM_ROOT,
+
+	// Perform the conversion by using "adjust" transforms.
+	// Compensates for the transforms using `ufbx_node.adjust_pre_rotation` and
+	// `ufbx_node.adjust_pre_scale`. You don't need to account for these unless
+	// you are manually building transforms from `ufbx_props`.
+	UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS,
+
+	// Perform the conversion by scaling geometry in addition to adjusting transforms.
+	// Compensates transforms like `UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS` but
+	// applies scaling to geometry as well.
+	UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY,
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_SPACE_CONVERSION)
+} ufbx_space_conversion;
+
+UFBX_ENUM_TYPE(ufbx_space_conversion, UFBX_SPACE_CONVERSION, UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY);
+
 // Embedded thumbnail in the file, valid if the dimensions are non-zero.
 typedef struct ufbx_thumbnail {
 	ufbx_props props;
@@ -3430,6 +3455,13 @@ typedef struct ufbx_metadata {
 
 	ufbx_string original_file_path;
 	ufbx_blob raw_original_file_path;
+
+	// Space conversion method used on the scene.
+	ufbx_space_conversion space_conversion;
+
+	// Transform that has been applied to root for axis/unit conversion.
+	ufbx_quat root_rotation;
+	ufbx_real root_scale;
 
 	// Axis that the scene has been mirrored by.
 	// All geometry has been mirrored in this axis.
@@ -4073,31 +4105,6 @@ typedef enum ufbx_inherit_mode_handling UFBX_ENUM_REPR {
 } ufbx_inherit_mode_handling;
 
 UFBX_ENUM_TYPE(ufbx_inherit_mode_handling, UFBX_INHERIT_MODE_HANDLING, UFBX_INHERIT_MODE_HANDLING_IGNORE);
-
-// Specify how unit / coordinate system conversion should be performed.
-// Affects how `ufbx_load_opts.target_axes` and `ufbx_load_opts.target_unit_meters` work,
-// has no effect if neither is specified.
-typedef enum ufbx_space_conversion UFBX_ENUM_REPR {
-
-	// Store the space conversion transform in the root node.
-	// Sets `ufbx_node.local_transform` of the root node.
-	UFBX_SPACE_CONVERSION_TRANSFORM_ROOT,
-
-	// Perform the conversion by using "adjust" transforms.
-	// Compensates for the transforms using `ufbx_node.adjust_pre_rotation` and
-	// `ufbx_node.adjust_pre_scale`. You don't need to account for these unless
-	// you are manually building transforms from `ufbx_props`.
-	UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS,
-
-	// Perform the conversion by scaling geometry in addition to adjusting transforms.
-	// Compensates transforms like `UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS` but
-	// applies scaling to geometry as well.
-	UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY,
-
-	UFBX_ENUM_FORCE_WIDTH(UFBX_SPACE_CONVERSION)
-} ufbx_space_conversion;
-
-UFBX_ENUM_TYPE(ufbx_space_conversion, UFBX_SPACE_CONVERSION, UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY);
 
 typedef struct ufbx_baked_vec3 {
 	double time;
