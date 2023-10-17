@@ -128,6 +128,60 @@ UFBXT_FILE_TEST(maya_auto_clamp)
 }
 #endif
 
+UFBXT_FILE_TEST(maya_tangent_spline)
+#if UFBXT_IMPL
+{
+	// Curve evaluated values at 24fps
+	static const double values[] = {
+		0.00000, 3.50000, 6.00000, 6.51562, 6.37500, 6.04688, 6.00000,
+		6.67313, 7.71167, 8.39438, 8.00000, 3.63667, -1.04000, -1.96474,
+		-1.68059, -1.00000, 0.27700, 2.00000,
+	};
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *layer = scene->anim_layers.data[0];
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbx_anim_prop *aprop = ufbx_find_anim_prop(layer, &node->element, UFBX_Lcl_Translation);
+	ufbx_anim_curve *curve = aprop->anim_value->curves[0];
+	ufbxt_assert(curve);
+
+	for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
+		double time = (double)i * (1.0/24.0);
+		ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
+		ufbxt_assert_close_real(err, value, (ufbx_real)values[i]);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(maya_tangent_clamped)
+#if UFBXT_IMPL
+{
+	// Curve evaluated values at 24fps
+	static const double values[] = {
+		0.00000, 3.75000, 6.00000, 6.00000, 6.00000, 6.00000, 6.00000,
+		6.53250, 7.58667, 8.34750, 8.00000, 3.18667, -1.04000, -1.02963,
+		-1.01037, -1.00000, 0.12500, 2.00000,
+	};
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *layer = scene->anim_layers.data[0];
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbx_anim_prop *aprop = ufbx_find_anim_prop(layer, &node->element, UFBX_Lcl_Translation);
+	ufbx_anim_curve *curve = aprop->anim_value->curves[0];
+	ufbxt_assert(curve);
+
+	for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
+		double time = (double)i * (1.0/24.0);
+		ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
+		ufbxt_assert_close_real(err, value, (ufbx_real)values[i]);
+	}
+}
+#endif
+
 UFBXT_FILE_TEST(maya_resampled)
 #if UFBXT_IMPL
 {

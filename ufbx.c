@@ -12323,7 +12323,27 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_blend_channel(ufbxi_context
 	return 1;
 }
 
-static ufbxi_forceinline float ufbxi_solve_auto_tangent(double prev_time, double time, double next_time, ufbx_real prev_value, ufbx_real value, ufbx_real next_value, float weight_left, float weight_right)
+typedef enum {
+	UFBXI_KEY_INTERPOLATION_CONSTANT = 0x2,
+	UFBXI_KEY_INTERPOLATION_LINEAR = 0x4,
+	UFBXI_KEY_INTERPOLATION_CUBIC = 0x8,
+	UFBXI_KEY_CONSTANT_NEXT = 0x100,
+	UFBXI_KEY_TANGENT_AUTO = 0x100,
+	UFBXI_KEY_TANGENT_TCB = 0x200,
+	UFBXI_KEY_TANGENT_USER = 0x400,
+	UFBXI_KEY_TANGENT_BROKEN = 0x800,
+	UFBXI_KEY_CLAMP = 0x1000,
+	UFBXI_KEY_TIME_INDEPENDENT = 0x2000,
+	UFBXI_KEY_CLAMP_PROGRESSIVE = 0x4000,
+	UFBXI_KEY_WEIGHTED_RIGHT = 0x1000000,
+	UFBXI_KEY_WEIGHTED_NEXT_LEFT = 0x2000000,
+	UFBXI_KEY_VELOCITY_RIGHT = 0x10000000,
+	UFBXI_KEY_VELOCITY_NEXT_LEFT = 0x20000000,
+} ufbxi_key_flags;
+
+#define UFBXI_KEY_CLAMP_THRESHOLD 0.05
+
+static float ufbxi_solve_auto_tangent(double prev_time, double time, double next_time, ufbx_real prev_value, ufbx_real value, ufbx_real next_value, float weight_left, float weight_right, uint32_t flags)
 {
 	// In between two keyframes: Set the initial slope to be the difference between
 	// the two keyframes. Prevent overshooting by clamping the slope in case either
@@ -12334,40 +12354,56 @@ static ufbxi_forceinline float ufbxi_solve_auto_tangent(double prev_time, double
 	double slope_sign = slope >= 0.0 ? 1.0 : -1.0;
 	double abs_slope = slope_sign * slope;
 
-	// Find limits for the absolute value of the slope
-	double range_left = weight_left * (time - prev_time);
-	double range_right = weight_right * (next_time - time);
-	double max_left = range_left > 0.0 ? slope_sign * (value - prev_value) / range_left : 0.0;
-	double max_right = range_right > 0.0 ? slope_sign * (next_value - value) / range_right : 0.0;
+	if (flags & UFBXI_KEY_CLAMP) {
+		if (ufbx_fmin(ufbx_fabs(prev_value - value), ufbx_fabs(next_value - value)) < UFBXI_KEY_CLAMP_THRESHOLD) {
+			return 0.0f;
+		}
+	}
 
-	// Clamp negative values and NaNs to zero
-	if (!(max_left > 0.0)) max_left = 0.0;
-	if (!(max_right > 0.0)) max_right = 0.0;
+	if (flags & UFBXI_KEY_CLAMP_PROGRESSIVE) {
+		// Find limits for the absolute value of the slope
+		double range_left = weight_left * (time - prev_time);
+		double range_right = weight_right * (next_time - time);
+		double max_left = range_left > 0.0 ? slope_sign * (value - prev_value) / range_left : 0.0;
+		double max_right = range_right > 0.0 ? slope_sign * (next_value - value) / range_right : 0.0;
 
-	// Clamp the absolute slope from both sides
-	if (abs_slope > max_left) abs_slope = max_left;
-	if (abs_slope > max_right) abs_slope = max_right;
+		// Clamp negative values and NaNs to zero
+		if (!(max_left > 0.0)) max_left = 0.0;
+		if (!(max_right > 0.0)) max_right = 0.0;
+
+		// Clamp the absolute slope from both sides
+		if (abs_slope > max_left) abs_slope = max_left;
+		if (abs_slope > max_right) abs_slope = max_right;
+	}
 
 	return (float)(slope_sign * abs_slope);
 }
 
-enum {
-	UFBXI_KEY_INTERPOLATION_CONSTANT = 0x2,
-	UFBXI_KEY_INTERPOLATION_LINEAR = 0x4,
-	UFBXI_KEY_INTERPOLATION_CUBIC = 0x8,
-	UFBXI_KEY_CONSTANT_NEXT = 0x100,
-	UFBXI_KEY_TANGENT_AUTO = 0x100,
-	UFBXI_KEY_TANGENT_TCB = 0x200,
-	UFBXI_KEY_TANGENT_USER = 0x400,
-	UFBXI_KEY_TANGENT_BROKEN = 0x800,
-	UFBXI_KEY_CLAMP = 0x1000,
-	UFBXI_KEY_CLAMP_TIME_INDEPENDENT = 0x2000,
-	UFBXI_KEY_CLAMP_PROGRESSIVE = 0x4000,
-	UFBXI_KEY_WEIGHTED_RIGHT = 0x1000000,
-	UFBXI_KEY_WEIGHTED_NEXT_LEFT = 0x2000000,
-	UFBXI_KEY_VELOCITY_RIGHT = 0x10000000,
-	UFBXI_KEY_VELOCITY_NEXT_LEFT = 0x20000000,
-};
+static float ufbxi_solve_auto_tangent_left(double prev_time, double time, ufbx_real prev_value, ufbx_real value, float weight_left, uint32_t flags)
+{
+	if (flags & UFBXI_KEY_CLAMP_PROGRESSIVE) return 0.0f;
+	if (flags & UFBXI_KEY_CLAMP) {
+		if (ufbx_fabs(prev_value - value) < UFBXI_KEY_CLAMP_THRESHOLD) {
+			return 0.0f;
+		}
+	}
+
+	double slope = (value - prev_value) / (time - prev_time);
+	return (float)slope;
+}
+
+static float ufbxi_solve_auto_tangent_right(double time, double next_time, ufbx_real value, ufbx_real next_value, float weight_right, uint32_t flags)
+{
+	if (flags & UFBXI_KEY_CLAMP_PROGRESSIVE) return 0.0f;
+	if (flags & UFBXI_KEY_CLAMP) {
+		if (ufbx_fabs(next_value - value) < UFBXI_KEY_CLAMP_THRESHOLD) {
+			return 0.0f;
+		}
+	}
+
+	double slope = (next_value - value) / (next_time - time);
+	return (float)slope;
+}
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
@@ -12501,9 +12537,19 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 					slope_left = slope_right = ufbxi_solve_auto_tangent(
 						prev_time, key->time, next_time,
 						p_value[-1], key->value, p_value[1],
-						weight_left, weight_right);
+						weight_left, weight_right, flags);
+				} else if (i > 0 && key->time > prev_time) {
+					slope_left = slope_right = ufbxi_solve_auto_tangent_left(
+						prev_time, key->time,
+						p_value[-1], key->value,
+						weight_left, flags);
+				} else if (i + 1 < num_keys && next_time > key->time) {
+					slope_left = slope_right = ufbxi_solve_auto_tangent_right(
+						key->time, next_time,
+						key->value, p_value[1],
+						weight_right, flags);
 				} else {
-					// Endpoint / invalid keyframe: Set both slopes to zero
+					// Only / invalid keyframe: Set both slopes to zero
 					slope_left = slope_right = 0.0f;
 				}
 			}
@@ -13363,7 +13409,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				slope_left = slope_right = ufbxi_solve_auto_tangent(
 					prev_time, key->time, next_time,
 					key[-1].value, key->value, (ufbx_real)next_value,
-					weight_left, weight_right);
+					weight_left, weight_right, UFBXI_KEY_CLAMP_PROGRESSIVE|UFBXI_KEY_TIME_INDEPENDENT);
 			} else {
 				slope_left = slope_right = 0.0f;
 			}
