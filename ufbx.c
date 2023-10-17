@@ -12379,6 +12379,7 @@ static float ufbxi_solve_auto_tangent(ufbxi_context *uc, double prev_time, doubl
 
 static float ufbxi_solve_auto_tangent_left(ufbxi_context *uc, double prev_time, double time, ufbx_real prev_value, ufbx_real value, float weight_left, uint32_t flags)
 {
+	(void)weight_left;
 	if (flags & UFBXI_KEY_CLAMP_PROGRESSIVE) return 0.0f;
 	if (flags & UFBXI_KEY_CLAMP) {
 		if (ufbx_fabs(prev_value - value) <= uc->opts.key_clamp_threshold) {
@@ -12392,6 +12393,7 @@ static float ufbxi_solve_auto_tangent_left(ufbxi_context *uc, double prev_time, 
 
 static float ufbxi_solve_auto_tangent_right(ufbxi_context *uc, double time, double next_time, ufbx_real value, ufbx_real next_value, float weight_right, uint32_t flags)
 {
+	(void)weight_right;
 	if (flags & UFBXI_KEY_CLAMP_PROGRESSIVE) return 0.0f;
 	if (flags & UFBXI_KEY_CLAMP) {
 		if (ufbx_fabs(next_value - value) <= uc->opts.key_clamp_threshold) {
