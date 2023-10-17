@@ -12327,11 +12327,11 @@ typedef enum {
 	UFBXI_KEY_INTERPOLATION_CONSTANT = 0x2,
 	UFBXI_KEY_INTERPOLATION_LINEAR = 0x4,
 	UFBXI_KEY_INTERPOLATION_CUBIC = 0x8,
-	UFBXI_KEY_CONSTANT_NEXT = 0x100,
 	UFBXI_KEY_TANGENT_AUTO = 0x100,
 	UFBXI_KEY_TANGENT_TCB = 0x200,
 	UFBXI_KEY_TANGENT_USER = 0x400,
 	UFBXI_KEY_TANGENT_BROKEN = 0x800,
+	UFBXI_KEY_CONSTANT_NEXT = 0x100,
 	UFBXI_KEY_CLAMP = 0x1000,
 	UFBXI_KEY_TIME_INDEPENDENT = 0x2000,
 	UFBXI_KEY_CLAMP_PROGRESSIVE = 0x4000,
@@ -12343,21 +12343,30 @@ typedef enum {
 
 static float ufbxi_solve_auto_tangent(ufbxi_context *uc, double prev_time, double time, double next_time, ufbx_real prev_value, ufbx_real value, ufbx_real next_value, float weight_left, float weight_right, uint32_t flags)
 {
-	// In between two keyframes: Set the initial slope to be the difference between
-	// the two keyframes. Prevent overshooting by clamping the slope in case either
-	// tangent goes above/below the endpoints.
+	// Time-independent: Set the initial slope to be the difference between the two keyframes.
 	double slope = (next_value - prev_value) / (next_time - prev_time);
+
+	// Non-time-independent tangents seem to blend between left/right tangent and the total difference.
+	if ((flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
+		double slope_left = (value - prev_value) / (time - prev_time);
+		double slope_right = (next_value - value) / (next_time - time);
+		double delta = (time - prev_time) / (next_time - prev_time);
+		slope = slope * 0.5 + (slope_left * (1.0 - delta) + slope_right * delta) * 0.5;
+	}
 
 	// Split the slope to sign and a non-negative absolute value
 	double slope_sign = slope >= 0.0 ? 1.0 : -1.0;
 	double abs_slope = slope_sign * slope;
 
+	// Clamp tangent to zero if near either left or right key
 	if (flags & UFBXI_KEY_CLAMP) {
 		if (ufbx_fmin(ufbx_fabs(prev_value - value), ufbx_fabs(next_value - value)) <= uc->opts.key_clamp_threshold) {
 			return 0.0f;
 		}
 	}
 
+	// Prevent overshooting by clamping the slope in case either
+	// tangent goes above/below the endpoints.
 	if (flags & UFBXI_KEY_CLAMP_PROGRESSIVE) {
 		// Find limits for the absolute value of the slope
 		double range_left = weight_left * (time - prev_time);

@@ -148,7 +148,7 @@ UFBXT_FILE_TEST(maya_tangent_spline)
 	ufbxt_assert(curve);
 
 	for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
-		double time = (double)i * (1.0/24.0);
+		double time = (double)i / 24.0;
 		ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
 		ufbxt_assert_close_real(err, value, (ufbx_real)values[i]);
 	}
@@ -184,7 +184,37 @@ UFBXT_FILE_TEST_OPTS(maya_tangent_clamped, ufbxt_clamp_maya_opts)
 	ufbxt_assert(curve);
 
 	for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
-		double time = (double)i * (1.0/24.0);
+		double time = (double)i / 24.0;
+		ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
+		ufbxt_assert_close_real(err, value, (ufbx_real)values[i]);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(motionbuilder_tangent_smooth)
+#if UFBXT_IMPL
+{
+	// Curve evaluated values at 24fps
+	static const double values[] = {
+		0.000000, 2.851562, 5.937500, 8.554688, 10.000000, 10.117188,
+		9.375000, 8.007812, 6.250000, 4.335938, 2.500000, 0.976562,
+		0.000000, 0.000000, 1.148148, 2.518519, 2.000000, -3.041667,
+		-8.000000, -8.500000, -7.000000, -5.000000, -4.000000, -4.906250,
+		-6.750000, -8.218750, -8.000000, -4.625000,
+	};
+
+	ufbxt_assert(scene->anim_layers.count == 2);
+	ufbx_anim_layer *layer = scene->anim_layers.data[0];
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbx_anim_prop *aprop = ufbx_find_anim_prop(layer, &node->element, UFBX_Lcl_Translation);
+	ufbx_anim_curve *curve = aprop->anim_value->curves[0];
+	ufbxt_assert(curve);
+
+	for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
+		ufbxt_hintf("i=%zu", i);
+		double time = (double)i / 24.0;
 		ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
 		ufbxt_assert_close_real(err, value, (ufbx_real)values[i]);
 	}
