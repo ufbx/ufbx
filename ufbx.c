@@ -12351,6 +12351,24 @@ static ufbxi_forceinline float ufbxi_solve_auto_tangent(double prev_time, double
 	return (float)(slope_sign * abs_slope);
 }
 
+enum {
+	UFBXI_KEY_INTERPOLATION_CONSTANT = 0x2,
+	UFBXI_KEY_INTERPOLATION_LINEAR = 0x4,
+	UFBXI_KEY_INTERPOLATION_CUBIC = 0x8,
+	UFBXI_KEY_CONSTANT_NEXT = 0x100,
+	UFBXI_KEY_TANGENT_AUTO = 0x100,
+	UFBXI_KEY_TANGENT_TCB = 0x200,
+	UFBXI_KEY_TANGENT_USER = 0x400,
+	UFBXI_KEY_TANGENT_BROKEN = 0x800,
+	UFBXI_KEY_CLAMP = 0x1000,
+	UFBXI_KEY_CLAMP_TIME_INDEPENDENT = 0x2000,
+	UFBXI_KEY_CLAMP_PROGRESSIVE = 0x4000,
+	UFBXI_KEY_WEIGHTED_RIGHT = 0x1000000,
+	UFBXI_KEY_WEIGHTED_NEXT_LEFT = 0x2000000,
+	UFBXI_KEY_VELOCITY_RIGHT = 0x10000000,
+	UFBXI_KEY_VELOCITY_NEXT_LEFT = 0x20000000,
+};
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_anim_curve *curve = ufbxi_push_element(uc, info, ufbx_anim_curve, UFBX_ELEMENT_ANIM_CURVE);
@@ -12427,28 +12445,28 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 		float next_slope_left = p_attr[1];
 		float next_weight_left = 0.333333f;
 
-		if (flags & 0x3000000) {
+		if ((flags & (UFBXI_KEY_WEIGHTED_RIGHT|UFBXI_KEY_WEIGHTED_RIGHT)) != 0) {
 			// At least one of the tangents is weighted. The weights are encoded as
 			// two 0.4 _decimal_ fixed point values that are packed into 32 bits and
 			// interpreted as a 32-bit float.
 			uint32_t packed_weights;
 			memcpy(&packed_weights, &p_attr[2], sizeof(uint32_t));
 
-			if (flags & 0x1000000) {
+			if (flags & UFBXI_KEY_WEIGHTED_RIGHT) {
 				// Right tangent is weighted
 				weight_right = (float)(packed_weights & 0xffff) * 0.0001f;
 			}
 
-			if (flags & 0x2000000) {
+			if (flags & UFBXI_KEY_WEIGHTED_NEXT_LEFT) {
 				// Next left tangent is weighted
 				next_weight_left = (float)(packed_weights >> 16) * 0.0001f;
 			}
 		}
 
-		if (flags & 0x2) {
+		if (flags & UFBXI_KEY_INTERPOLATION_CONSTANT) {
 			// Constant interpolation: Set cubic tangents to flat.
 
-			if (flags & 0x100) {
+			if (flags & UFBXI_KEY_CONSTANT_NEXT) {
 				// Take constant value from next key
 				key->interpolation = UFBX_INTERPOLATION_CONSTANT_NEXT;
 
@@ -12460,14 +12478,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 			weight_right = next_weight_left = 0.333333f;
 			slope_right = next_slope_left = 0.0f;
 
-		} else if (flags & 0x8) {
+		} else if (flags & UFBXI_KEY_INTERPOLATION_CUBIC) {
 			// Cubic interpolation
 			key->interpolation = UFBX_INTERPOLATION_CUBIC;
 
-			if (flags & 0x400) {
+			if (flags & UFBXI_KEY_TANGENT_USER) {
 				// User tangents
 
-				if (flags & 0x800) {
+				if (flags & UFBXI_KEY_TANGENT_BROKEN) {
 					// Broken tangents: No need to modify slopes
 				} else {
 					// Unified tangents: Use right slope for both sides
@@ -12491,7 +12509,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 			}
 
 		} else {
-			// Linear (0x4) or unknown interpolation: Set cubic tangents to match
+			// Linear or unknown interpolation: Set cubic tangents to match
 			// the linear interpolation with weights of 1/3.
 			key->interpolation = UFBX_INTERPOLATION_LINEAR;
 
