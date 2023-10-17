@@ -221,6 +221,35 @@ UFBXT_FILE_TEST(motionbuilder_tangent_smooth)
 }
 #endif
 
+UFBXT_FILE_TEST(motionbuilder_tangent_smooth_clamp)
+#if UFBXT_IMPL
+{
+	// Curve evaluated values at 24fps
+	static const double values[] = {
+		0.000000, 0.000000, 2.361111, 6.944445, 10.000000, 10.367839, 9.609375,
+		8.056641, 6.041667, 3.896484, 1.953125, 0.543620, 0.000000, 0.000000,
+		1.333333, 3.555556, 4.000000, -0.333333, -4.000000, -4.000000, -4.000000,
+		-4.000000, -4.000000, -1.000000, 2.000000, -1.000000, -4.000000, -4.000000,
+	};
+
+	ufbxt_assert(scene->anim_layers.count == 2);
+	ufbx_anim_layer *layer = scene->anim_layers.data[0];
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbx_anim_prop *aprop = ufbx_find_anim_prop(layer, &node->element, UFBX_Lcl_Translation);
+	ufbx_anim_curve *curve = aprop->anim_value->curves[0];
+	ufbxt_assert(curve);
+
+	for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
+		ufbxt_hintf("i=%zu", i);
+		double time = (double)i / 24.0;
+		ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
+		ufbxt_assert_close_real(err, value, (ufbx_real)values[i]);
+	}
+}
+#endif
+
 UFBXT_FILE_TEST(maya_resampled)
 #if UFBXT_IMPL
 {
