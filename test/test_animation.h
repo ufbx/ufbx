@@ -155,7 +155,16 @@ UFBXT_FILE_TEST(maya_tangent_spline)
 }
 #endif
 
-UFBXT_FILE_TEST(maya_tangent_clamped)
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_clamp_maya_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.key_clamp_threshold = 0.05;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(maya_tangent_clamped, ufbxt_clamp_maya_opts)
 #if UFBXT_IMPL
 {
 	// Curve evaluated values at 24fps

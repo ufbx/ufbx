@@ -12341,9 +12341,7 @@ typedef enum {
 	UFBXI_KEY_VELOCITY_NEXT_LEFT = 0x20000000,
 } ufbxi_key_flags;
 
-#define UFBXI_KEY_CLAMP_THRESHOLD 0.05
-
-static float ufbxi_solve_auto_tangent(double prev_time, double time, double next_time, ufbx_real prev_value, ufbx_real value, ufbx_real next_value, float weight_left, float weight_right, uint32_t flags)
+static float ufbxi_solve_auto_tangent(ufbxi_context *uc, double prev_time, double time, double next_time, ufbx_real prev_value, ufbx_real value, ufbx_real next_value, float weight_left, float weight_right, uint32_t flags)
 {
 	// In between two keyframes: Set the initial slope to be the difference between
 	// the two keyframes. Prevent overshooting by clamping the slope in case either
@@ -12355,7 +12353,7 @@ static float ufbxi_solve_auto_tangent(double prev_time, double time, double next
 	double abs_slope = slope_sign * slope;
 
 	if (flags & UFBXI_KEY_CLAMP) {
-		if (ufbx_fmin(ufbx_fabs(prev_value - value), ufbx_fabs(next_value - value)) < UFBXI_KEY_CLAMP_THRESHOLD) {
+		if (ufbx_fmin(ufbx_fabs(prev_value - value), ufbx_fabs(next_value - value)) <= uc->opts.key_clamp_threshold) {
 			return 0.0f;
 		}
 	}
@@ -12379,11 +12377,11 @@ static float ufbxi_solve_auto_tangent(double prev_time, double time, double next
 	return (float)(slope_sign * abs_slope);
 }
 
-static float ufbxi_solve_auto_tangent_left(double prev_time, double time, ufbx_real prev_value, ufbx_real value, float weight_left, uint32_t flags)
+static float ufbxi_solve_auto_tangent_left(ufbxi_context *uc, double prev_time, double time, ufbx_real prev_value, ufbx_real value, float weight_left, uint32_t flags)
 {
 	if (flags & UFBXI_KEY_CLAMP_PROGRESSIVE) return 0.0f;
 	if (flags & UFBXI_KEY_CLAMP) {
-		if (ufbx_fabs(prev_value - value) < UFBXI_KEY_CLAMP_THRESHOLD) {
+		if (ufbx_fabs(prev_value - value) <= uc->opts.key_clamp_threshold) {
 			return 0.0f;
 		}
 	}
@@ -12392,11 +12390,11 @@ static float ufbxi_solve_auto_tangent_left(double prev_time, double time, ufbx_r
 	return (float)slope;
 }
 
-static float ufbxi_solve_auto_tangent_right(double time, double next_time, ufbx_real value, ufbx_real next_value, float weight_right, uint32_t flags)
+static float ufbxi_solve_auto_tangent_right(ufbxi_context *uc, double time, double next_time, ufbx_real value, ufbx_real next_value, float weight_right, uint32_t flags)
 {
 	if (flags & UFBXI_KEY_CLAMP_PROGRESSIVE) return 0.0f;
 	if (flags & UFBXI_KEY_CLAMP) {
-		if (ufbx_fabs(next_value - value) < UFBXI_KEY_CLAMP_THRESHOLD) {
+		if (ufbx_fabs(next_value - value) <= uc->opts.key_clamp_threshold) {
 			return 0.0f;
 		}
 	}
@@ -12534,17 +12532,17 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 				// TODO: Auto break (0x800)
 
 				if (i > 0 && i + 1 < num_keys && key->time > prev_time && next_time > key->time) {
-					slope_left = slope_right = ufbxi_solve_auto_tangent(
+					slope_left = slope_right = ufbxi_solve_auto_tangent(uc,
 						prev_time, key->time, next_time,
 						p_value[-1], key->value, p_value[1],
 						weight_left, weight_right, flags);
 				} else if (i > 0 && key->time > prev_time) {
-					slope_left = slope_right = ufbxi_solve_auto_tangent_left(
+					slope_left = slope_right = ufbxi_solve_auto_tangent_left(uc,
 						prev_time, key->time,
 						p_value[-1], key->value,
 						weight_left, flags);
 				} else if (i + 1 < num_keys && next_time > key->time) {
-					slope_left = slope_right = ufbxi_solve_auto_tangent_right(
+					slope_left = slope_right = ufbxi_solve_auto_tangent_right(uc,
 						key->time, next_time,
 						key->value, p_value[1],
 						weight_right, flags);
@@ -13406,7 +13404,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 
 		if (auto_slope) {
 			if (i > 0) {
-				slope_left = slope_right = ufbxi_solve_auto_tangent(
+				slope_left = slope_right = ufbxi_solve_auto_tangent(uc,
 					prev_time, key->time, next_time,
 					key[-1].value, key->value, (ufbx_real)next_value,
 					weight_left, weight_right, UFBXI_KEY_CLAMP_PROGRESSIVE|UFBXI_KEY_TIME_INDEPENDENT);
