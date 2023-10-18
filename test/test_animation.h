@@ -470,12 +470,7 @@ UFBXT_FILE_TEST(motionbuilder_tangent_velocity)
 		ufbxt_hintf("i=%zu", i);
 		double time = (double)i / 24.0;
 		ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
-		if (i == 37) {
-			// Hard Bezier solve, might be an inaccuracy in MotionBuilder
-			ufbxt_assert_close_real_threshold(err, value, (ufbx_real)values[i], 0.01f);
-		} else {
-			ufbxt_assert_close_real(err, value, (ufbx_real)values[i]);
-		}
+		ufbxt_assert_close_real_threshold(err, value, (ufbx_real)values[i], 0.01f);
 	}
 }
 #endif
