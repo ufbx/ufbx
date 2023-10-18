@@ -12420,6 +12420,18 @@ static float ufbxi_solve_auto_tangent_right(ufbxi_context *uc, double time, doub
 	return (float)slope;
 }
 
+static void ufbxi_solve_tcb(float *p_slope_left, float *p_slope_right, double tension, double continuity, double bias, double slope_left, double slope_right, bool edge)
+{
+	double factor = edge ? 1.0 : 0.5;
+	double d00 = factor * (1.0 - tension) * (1.0 + bias) * (1.0 - continuity);
+	double d01 = factor * (1.0 - tension) * (1.0 - bias) * (1.0 + continuity);
+	double d10 = factor * (1.0 - tension) * (1.0 + bias) * (1.0 + continuity);
+	double d11 = factor * (1.0 - tension) * (1.0 - bias) * (1.0 - continuity);
+
+	*p_slope_left = (float)(d00 * slope_left + d01 * slope_right);
+	*p_slope_right = (float)(d10 * slope_left + d11 * slope_right);
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_anim_curve *curve = ufbxi_push_element(uc, info, ufbx_anim_curve, UFBX_ELEMENT_ANIM_CURVE);
@@ -12552,7 +12564,28 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 			// Cubic interpolation
 			key->interpolation = UFBX_INTERPOLATION_CUBIC;
 
-			if (flags & UFBXI_KEY_TANGENT_USER) {
+			if (flags & UFBXI_KEY_TANGENT_TCB) {
+				double tcb_slope_left = 0.0;
+				double tcb_slope_right = 0.0;
+				bool tcb_edge = false;
+				if (i > 0 && key->time > prev_time) {
+					tcb_slope_left = (key->value - p_value[-1]) / (key->time - prev_time);
+				} else {
+					tcb_edge = true;
+				}
+				if (i + 1 < num_keys && next_time > key->time) {
+					tcb_slope_right = (p_value[1] - key->value) / (next_time - key->time);
+				} else {
+					tcb_edge = true;
+				}
+
+				ufbxi_solve_tcb(&slope_left, &slope_right, p_attr[0], p_attr[1], p_attr[2], tcb_slope_left, tcb_slope_right, tcb_edge);
+
+				// TODO: How to handle these?
+				next_slope_left = 0.0f;
+				next_weight_left = 0.333333f;
+				next_velocity_left = 0.0f;
+			} else if (flags & UFBXI_KEY_TANGENT_USER) {
 				// User tangents
 
 				if (flags & UFBXI_KEY_TANGENT_BROKEN) {
@@ -12629,7 +12662,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 
 		// Set the tangents based on weights (dx relative to the time difference
 		// between the previous/next key) and slope (simply d = slope * dx)
-
 		if (key->time > prev_time) {
 			double delta = key->time - prev_time;
 			key->left.dx = (float)(weight_left * delta);
