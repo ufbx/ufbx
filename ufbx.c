@@ -12392,10 +12392,12 @@ static ufbxi_noinline float ufbxi_solve_auto_tangent(ufbxi_context *uc, double p
 	slope = (slope_sign * abs_slope);
 
 	if ((flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
-		double bias_weight = ufbx_fabs(auto_bias) / 100.0;
-		if (bias_weight > 5.0) {
+		// Auto bias larger than 500 (positive or negative) adds an absolute
+		// value to the extra slope, determined by `((bias-500) / 100)^2 * 40`.
+		double bias_weight = ufbx_fabs(auto_bias) / 100.0 - 5.0;
+		if (bias_weight > 0.0) {
 			double bias_sign = auto_bias > 0.0 ? 1.0 : -1.0;
-			slope += (bias_weight - 5.0) * (bias_weight - 5.0) * bias_sign * 40.0;
+			slope += bias_weight * bias_weight * bias_sign * 40.0;
 		}
 	}
 
@@ -12415,10 +12417,10 @@ static float ufbxi_solve_auto_tangent_left(ufbxi_context *uc, double prev_time, 
 	double slope = (value - prev_value) / (time - prev_time);
 
 	if ((flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
-		double bias_weight = ufbx_fabs(auto_bias) / 100.0;
-		if (bias_weight > 5.0) {
+		double bias_weight = ufbx_fabs(auto_bias) / 100.0 - 5.0;
+		if (bias_weight > 0.0) {
 			double bias_sign = auto_bias > 0.0 ? 1.0 : -1.0;
-			slope += (bias_weight - 5.0) * (bias_weight - 5.0) * bias_sign * 40.0;
+			slope += bias_weight * bias_weight * bias_sign * 40.0;
 		}
 	}
 
@@ -12438,10 +12440,10 @@ static float ufbxi_solve_auto_tangent_right(ufbxi_context *uc, double time, doub
 	double slope = (next_value - value) / (next_time - time);
 
 	if ((flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
-		double bias_weight = ufbx_fabs(auto_bias) / 100.0;
-		if (bias_weight > 5.0) {
+		double bias_weight = ufbx_fabs(auto_bias) / 100.0 - 5.0;
+		if (bias_weight > 0.0) {
 			double bias_sign = auto_bias > 0.0 ? 1.0 : -1.0;
-			slope += (bias_weight - 5.0) * (bias_weight - 5.0) * bias_sign * 40.0;
+			slope += bias_weight * bias_weight * bias_sign * 40.0;
 		}
 	}
 
