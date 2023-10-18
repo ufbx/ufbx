@@ -608,6 +608,68 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_tangent_auto_bias_clamp, UFBXT_FILE_TEST_FLA
 }
 #endif
 
+UFBXT_FILE_TEST(motionbuilder_tangent_auto_bias_absolute_simple)
+#if UFBXT_IMPL
+{
+	// Curve evaluated values at 24fps
+	static const double values[] = {
+		0.000000, 12.731482, 46.296295, 93.750000, 148.148148, 202.546310, 250.000000, 283.564819, 296.296295,
+		281.250000, 231.481476, 140.046295, 0.000000, -140.046310, -231.481476, -281.250000, -296.296295, -283.564819,
+		-250.000000, -202.546310, -148.148148, -93.750008, -46.296303, -12.731483, 0.000000,
+	};
+
+	ufbxt_assert(scene->anim_layers.count == 2);
+	ufbx_anim_layer *layer = scene->anim_layers.data[0];
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbx_anim_prop *aprop = ufbx_find_anim_prop(layer, &node->element, UFBX_Lcl_Translation);
+	ufbx_anim_curve *curve = aprop->anim_value->curves[0];
+	ufbxt_assert(curve);
+
+	for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
+		ufbxt_hintf("i=%zu", i);
+		double time = (double)i / 24.0;
+		ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
+
+		ufbxt_assert_close_real(err, value, (ufbx_real)values[i]);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_tangent_auto_bias_absolute, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	// Curve evaluated values at 24fps
+	static const double values[] = {
+		0.000000, 30.833332, 41.111111, 37.500000, 26.666666, 15.277778, 10.000000, 10.856482, 12.962962,
+		15.624999, 18.148148, 19.837963, 20.000000, 18.634037, 15.264155, 11.020745, 7.070707, 3.423960,
+		0.000000, -3.454167, -7.205388, -11.360994, -15.907764, -19.289827, -20.000000, -19.982880, -19.254641,
+		-16.822596, -12.495454, -6.726660, 0.000000, 6.599604, 11.988842, 15.768107, 17.791979, 18.772791,
+		20.000000, 22.530613, 26.054420, 29.469387, 31.673466, 31.564625, 28.040813, 20.000000, 16.203705,
+		20.407408, 24.000000, 24.065104, 23.562500, 22.695312, 21.666668, 20.679688, 19.937500, 19.643229,
+		20.000000, 14.733797, 2.148147, -10.687501, -16.703705, -8.831019, 20.000000,
+	};
+
+	ufbxt_assert(scene->anim_layers.count == 2);
+	ufbx_anim_layer *layer = scene->anim_layers.data[0];
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbx_anim_prop *aprop = ufbx_find_anim_prop(layer, &node->element, UFBX_Lcl_Translation);
+	ufbx_anim_curve *curve = aprop->anim_value->curves[0];
+	ufbxt_assert(curve);
+
+	for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
+		ufbxt_hintf("i=%zu", i);
+		double time = (double)i / 24.0;
+		ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
+
+		ufbxt_assert_close_real(err, value, (ufbx_real)values[i]);
+	}
+}
+#endif
+
 UFBXT_FILE_TEST_FLAGS(motionbuilder_tangent_tcb, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
 #if UFBXT_IMPL
 {

@@ -12389,10 +12389,20 @@ static ufbxi_noinline float ufbxi_solve_auto_tangent(ufbxi_context *uc, double p
 		if (abs_slope > max_right) abs_slope = max_right;
 	}
 
-	return (float)(slope_sign * abs_slope);
+	slope = (slope_sign * abs_slope);
+
+	if ((flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
+		double bias_weight = ufbx_fabs(auto_bias) / 100.0;
+		if (bias_weight > 5.0) {
+			double bias_sign = auto_bias > 0.0 ? 1.0 : -1.0;
+			slope += (bias_weight - 5.0) * (bias_weight - 5.0) * bias_sign * 40.0;
+		}
+	}
+
+	return (float)slope;
 }
 
-static float ufbxi_solve_auto_tangent_left(ufbxi_context *uc, double prev_time, double time, ufbx_real prev_value, ufbx_real value, float weight_left, uint32_t flags)
+static float ufbxi_solve_auto_tangent_left(ufbxi_context *uc, double prev_time, double time, ufbx_real prev_value, ufbx_real value, float weight_left, float auto_bias, uint32_t flags)
 {
 	(void)weight_left;
 	if (flags & UFBXI_KEY_CLAMP_PROGRESSIVE) return 0.0f;
@@ -12403,10 +12413,19 @@ static float ufbxi_solve_auto_tangent_left(ufbxi_context *uc, double prev_time, 
 	}
 
 	double slope = (value - prev_value) / (time - prev_time);
+
+	if ((flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
+		double bias_weight = ufbx_fabs(auto_bias) / 100.0;
+		if (bias_weight > 5.0) {
+			double bias_sign = auto_bias > 0.0 ? 1.0 : -1.0;
+			slope += (bias_weight - 5.0) * (bias_weight - 5.0) * bias_sign * 40.0;
+		}
+	}
+
 	return (float)slope;
 }
 
-static float ufbxi_solve_auto_tangent_right(ufbxi_context *uc, double time, double next_time, ufbx_real value, ufbx_real next_value, float weight_right, uint32_t flags)
+static float ufbxi_solve_auto_tangent_right(ufbxi_context *uc, double time, double next_time, ufbx_real value, ufbx_real next_value, float weight_right, float auto_bias, uint32_t flags)
 {
 	(void)weight_right;
 	if (flags & UFBXI_KEY_CLAMP_PROGRESSIVE) return 0.0f;
@@ -12417,6 +12436,15 @@ static float ufbxi_solve_auto_tangent_right(ufbxi_context *uc, double time, doub
 	}
 
 	double slope = (next_value - value) / (next_time - time);
+
+	if ((flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
+		double bias_weight = ufbx_fabs(auto_bias) / 100.0;
+		if (bias_weight > 5.0) {
+			double bias_sign = auto_bias > 0.0 ? 1.0 : -1.0;
+			slope += (bias_weight - 5.0) * (bias_weight - 5.0) * bias_sign * 40.0;
+		}
+	}
+
 	return (float)slope;
 }
 
@@ -12620,12 +12648,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 					slope_left = slope_right = ufbxi_solve_auto_tangent_left(uc,
 						prev_time, key->time,
 						p_value[-1], key->value,
-						weight_left, flags);
+						weight_left, -slope_left, flags);
 				} else if (i + 1 < num_keys && next_time > key->time) {
 					slope_left = slope_right = ufbxi_solve_auto_tangent_right(uc,
 						key->time, next_time,
 						key->value, p_value[1],
-						weight_right, flags);
+						weight_right, slope_right, flags);
 				} else {
 					// Only / invalid keyframe: Set both slopes to zero
 					slope_left = slope_right = 0.0f;
