@@ -17,3 +17,6 @@ __pycache__/
 *.gcda
 *.gcno
 
+# FBX backup files
+
+*.bck/

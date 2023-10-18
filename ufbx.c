@@ -12453,6 +12453,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 	// The previous key defines the weight/slope of the left tangent
 	float slope_left = 0.0f;
 	float weight_left = 0.333333f;
+	float velocity_left = 0.0f;
 
 	double prev_time = 0.0;
 	double next_time = 0.0;
@@ -12487,10 +12488,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 
 		float slope_right = p_attr[0];
 		float weight_right = 0.333333f;
+		float velocity_right = 0.0f;
 		float next_slope_left = p_attr[1];
 		float next_weight_left = 0.333333f;
+		float next_velocity_left = 0.0f;
 
-		if ((flags & (UFBXI_KEY_WEIGHTED_RIGHT|UFBXI_KEY_WEIGHTED_RIGHT)) != 0) {
+		if ((flags & (UFBXI_KEY_WEIGHTED_RIGHT|UFBXI_KEY_WEIGHTED_NEXT_LEFT)) != 0) {
 			// At least one of the tangents is weighted. The weights are encoded as
 			// two 0.4 _decimal_ fixed point values that are packed into 32 bits and
 			// interpreted as a 32-bit float.
@@ -12505,6 +12508,22 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 			if (flags & UFBXI_KEY_WEIGHTED_NEXT_LEFT) {
 				// Next left tangent is weighted
 				next_weight_left = (float)(packed_weights >> 16) * 0.0001f;
+			}
+		}
+
+		if ((flags & (UFBXI_KEY_VELOCITY_RIGHT|UFBXI_KEY_VELOCITY_NEXT_LEFT)) != 0) {
+			// Velocities are encoded in the same way as weights, see above.
+			uint32_t packed_velocities;
+			memcpy(&packed_velocities, &p_attr[3], sizeof(uint32_t));
+
+			if (flags & UFBXI_KEY_VELOCITY_RIGHT) {
+				// Right tangent has velocity
+				velocity_right = (float)(int16_t)(packed_velocities & 0xffff) * 0.0001f;
+			}
+
+			if (flags & UFBXI_KEY_VELOCITY_NEXT_LEFT) {
+				// Next left tangent has velocity
+				next_velocity_left = (float)(int16_t)(packed_velocities >> 16) * 0.0001f;
 			}
 		}
 
@@ -12561,6 +12580,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 					// Only / invalid keyframe: Set both slopes to zero
 					slope_left = slope_right = 0.0f;
 				}
+
+				if (weight_left >= UFBX_EPSILON) {
+					slope_left *= 1.0 - ufbx_fmin(velocity_left / weight_left, 1.0);
+				}
+				if (weight_right >= UFBX_EPSILON) {
+					slope_right *= 1.0 - ufbx_fmin(velocity_right / weight_right, 1.0);
+				}
 			}
 
 		} else {
@@ -12607,6 +12633,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 
 		slope_left = next_slope_left;
 		weight_left = next_weight_left;
+		velocity_left = next_velocity_left;
 		prev_time = key->time;
 
 		// Decrement attribute refcount and potentially move to the next one.
