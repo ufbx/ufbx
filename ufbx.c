@@ -12341,7 +12341,7 @@ typedef enum {
 	UFBXI_KEY_VELOCITY_NEXT_LEFT = 0x20000000,
 } ufbxi_key_flags;
 
-static float ufbxi_solve_auto_tangent(ufbxi_context *uc, double prev_time, double time, double next_time, ufbx_real prev_value, ufbx_real value, ufbx_real next_value, float weight_left, float weight_right, uint32_t flags)
+static ufbxi_noinline float ufbxi_solve_auto_tangent(ufbxi_context *uc, double prev_time, double time, double next_time, ufbx_real prev_value, ufbx_real value, ufbx_real next_value, float weight_left, float weight_right, float auto_bias, uint32_t flags)
 {
 	// Time-independent: Set the initial slope to be the difference between the two keyframes.
 	double slope = (next_value - prev_value) / (next_time - prev_time);
@@ -12352,6 +12352,12 @@ static float ufbxi_solve_auto_tangent(ufbxi_context *uc, double prev_time, doubl
 		double slope_right = (next_value - value) / (next_time - time);
 		double delta = (time - prev_time) / (next_time - prev_time);
 		slope = slope * 0.5 + (slope_left * (1.0 - delta) + slope_right * delta) * 0.5;
+
+		double bias_weight = ufbx_fabs(auto_bias) / 100.0;
+		if (bias_weight > 0.0001) {
+			double bias_target = auto_bias > 0.0 ? slope_right : slope_left;
+			slope = slope * (1.0 - bias_weight) + bias_target * bias_weight;
+		}
 	}
 
 	// Split the slope to sign and a non-negative absolute value
@@ -12562,10 +12568,21 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 				// TODO: Auto break (0x800)
 
 				if (i > 0 && i + 1 < num_keys && key->time > prev_time && next_time > key->time) {
-					slope_left = slope_right = ufbxi_solve_auto_tangent(uc,
-						prev_time, key->time, next_time,
-						p_value[-1], key->value, p_value[1],
-						weight_left, weight_right, flags);
+					if (ufbx_fabs(slope_left + slope_right) <= 0.0001f) {
+						slope_left = slope_right = ufbxi_solve_auto_tangent(uc,
+							prev_time, key->time, next_time,
+							p_value[-1], key->value, p_value[1],
+							weight_left, weight_right, slope_right, flags);
+					} else {
+						slope_left = ufbxi_solve_auto_tangent(uc,
+							prev_time, key->time, next_time,
+							p_value[-1], key->value, p_value[1],
+							weight_left, weight_right, -slope_left, flags);
+						slope_right = ufbxi_solve_auto_tangent(uc,
+							prev_time, key->time, next_time,
+							p_value[-1], key->value, p_value[1],
+							weight_left, weight_right, slope_right, flags);
+					}
 				} else if (i > 0 && key->time > prev_time) {
 					slope_left = slope_right = ufbxi_solve_auto_tangent_left(uc,
 						prev_time, key->time,
@@ -13445,7 +13462,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				slope_left = slope_right = ufbxi_solve_auto_tangent(uc,
 					prev_time, key->time, next_time,
 					key[-1].value, key->value, (ufbx_real)next_value,
-					weight_left, weight_right, UFBXI_KEY_CLAMP_PROGRESSIVE|UFBXI_KEY_TIME_INDEPENDENT);
+					weight_left, weight_right, 0.0f, UFBXI_KEY_CLAMP_PROGRESSIVE|UFBXI_KEY_TIME_INDEPENDENT);
 			} else {
 				slope_left = slope_right = 0.0f;
 			}
