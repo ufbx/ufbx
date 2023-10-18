@@ -12582,10 +12582,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 				}
 
 				if (weight_left >= UFBX_EPSILON) {
-					slope_left *= 1.0 - ufbx_fmin(velocity_left / weight_left, 1.0);
+					slope_left *= (float)(1.0 - ufbx_fmin(velocity_left / weight_left, 1.0));
 				}
 				if (weight_right >= UFBX_EPSILON) {
-					slope_right *= 1.0 - ufbx_fmin(velocity_right / weight_right, 1.0);
+					slope_right *= (float)(1.0 - ufbx_fmin(velocity_right / weight_right, 1.0));
 				}
 			}
 
