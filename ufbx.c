@@ -12499,7 +12499,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 	// The previous key defines the weight/slope of the left tangent
 	float slope_left = 0.0f;
 	float weight_left = 0.333333f;
-	float velocity_left = 0.0f;
+	// float velocity_left = 0.0f;
 
 	double prev_time = 0.0;
 	double next_time = 0.0;
