@@ -12534,10 +12534,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 
 		float slope_right = p_attr[0];
 		float weight_right = 0.333333f;
-		float velocity_right = 0.0f;
+		//float velocity_right = 0.0f;
 		float next_slope_left = p_attr[1];
 		float next_weight_left = 0.333333f;
-		float next_velocity_left = 0.0f;
+		// float next_velocity_left = 0.0f;
 
 		if ((flags & (UFBXI_KEY_WEIGHTED_RIGHT|UFBXI_KEY_WEIGHTED_NEXT_LEFT)) != 0) {
 			// At least one of the tangents is weighted. The weights are encoded as
@@ -12556,7 +12556,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 				next_weight_left = (float)(packed_weights >> 16) * 0.0001f;
 			}
 		}
-
+#if 0
 		if ((flags & (UFBXI_KEY_VELOCITY_RIGHT|UFBXI_KEY_VELOCITY_NEXT_LEFT)) != 0) {
 			// Velocities are encoded in the same way as weights, see above.
 			uint32_t packed_velocities;
@@ -12572,6 +12572,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 				next_velocity_left = (float)(int16_t)(packed_velocities >> 16) * 0.0001f;
 			}
 		}
+#endif
 
 		if (flags & UFBXI_KEY_INTERPOLATION_CONSTANT) {
 			// Constant interpolation: Set cubic tangents to flat.
@@ -12612,7 +12613,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 				// TODO: How to handle these?
 				next_slope_left = 0.0f;
 				next_weight_left = 0.333333f;
-				next_velocity_left = 0.0f;
+				// next_velocity_left = 0.0f;
 			} else if (flags & UFBXI_KEY_TANGENT_USER) {
 				// User tangents
 
@@ -12624,8 +12625,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 				}
 
 			} else {
-				// Automatic (0x100) or unknown tangents
-				// TODO: TCB tangents (0x200)
 				// TODO: Auto break (0x800)
 
 				if (i > 0 && i + 1 < num_keys && key->time > prev_time && next_time > key->time) {
@@ -12659,12 +12658,20 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 					slope_left = slope_right = 0.0f;
 				}
 
+
+				// ??? Looks like at least MotionBuilder adjusts weight and auto bias to
+				// implement velocity and the velocity information in the file is purely
+				// for UI (?) If auto bias is not accounted for the velocity computation
+				// below results in the correct tangents, but with auto bias the velocity
+				// seems to be accounted for twice resulting in incorrect values...
+#if 0
 				if (weight_left >= UFBX_EPSILON) {
 					slope_left *= (float)(1.0 - ufbx_fmin(velocity_left / weight_left, 1.0));
 				}
 				if (weight_right >= UFBX_EPSILON) {
 					slope_right *= (float)(1.0 - ufbx_fmin(velocity_right / weight_right, 1.0));
 				}
+#endif
 			}
 
 		} else {
@@ -12710,7 +12717,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 
 		slope_left = next_slope_left;
 		weight_left = next_weight_left;
-		velocity_left = next_velocity_left;
+		// velocity_left = next_velocity_left;
 		prev_time = key->time;
 
 		// Decrement attribute refcount and potentially move to the next one.
