@@ -12393,7 +12393,7 @@ static ufbxi_noinline float ufbxi_solve_auto_tangent(ufbxi_context *uc, double p
 
 	if ((flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
 		// Auto bias larger than 500 (positive or negative) adds an absolute
-		// value to the extra slope, determined by `((bias-500) / 100)^2 * 40`.
+		// value to the slope, determined by `((bias-500) / 100)^2 * 40`.
 		double bias_weight = ufbx_fabs(auto_bias) / 100.0 - 5.0;
 		if (bias_weight > 0.0) {
 			double bias_sign = auto_bias > 0.0 ? 1.0 : -1.0;
