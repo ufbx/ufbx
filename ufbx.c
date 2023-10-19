@@ -12363,14 +12363,14 @@ static ufbxi_noinline float ufbxi_solve_auto_tangent(ufbxi_context *uc, double p
 		double bias_weight = ufbx_fabs(auto_bias) / 100.0;
 		if (bias_weight > 0.0001) {
 			double bias_target = auto_bias > 0.0 ? slope_right : slope_left;
-			double delta = bias_target - slope;
+			double bias_delta = bias_target - slope;
 			slope = slope * (1.0 - bias_weight) + bias_target * bias_weight;
 
 			// Auto bias larger than 500 (positive or negative) adds an absolute
 			// value to the slope, determined by `((bias-500) / 100)^2 * 40`.
 			double abs_bias_weight = bias_weight - 5.0;
 			if (abs_bias_weight > 0.0) {
-				double bias_sign = ufbx_fabs(delta) > 0.00001 ? delta : auto_bias;
+				double bias_sign = ufbx_fabs(bias_delta) > 0.00001 ? bias_delta : auto_bias;
 				bias_sign = bias_sign > 0.0 ? 1.0 : -1.0;
 				slope += abs_bias_weight * abs_bias_weight * bias_sign * 40.0;
 			}
