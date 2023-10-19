@@ -665,6 +665,98 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_tangent_auto_bias_absolute, UFBXT_FILE_TEST_
 }
 #endif
 
+UFBXT_FILE_TEST_FLAGS(motionbuilder_tangent_auto_bias_absolute_split, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	// Curve evaluated values at 24fps
+	static const double values[] = {
+		0.000000, -208.333328, -166.666672, 0.000000, 166.666672, 208.333328, 0.000000, 208.333328, 166.666672,
+		0.000000, -166.666672, -208.333328, 0.000000, -1134.259277, -907.407410, 0.000000, 907.407410, 1134.259277,
+		0.000000, -52.083332, -166.666672, -281.250000, -333.333344, -260.416656, 0.000000,
+	};
+
+	ufbxt_assert(scene->anim_layers.count == 2);
+	ufbx_anim_layer *layer = scene->anim_layers.data[0];
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbx_anim_prop *aprop = ufbx_find_anim_prop(layer, &node->element, UFBX_Lcl_Translation);
+	ufbx_anim_curve *curve = aprop->anim_value->curves[0];
+	ufbxt_assert(curve);
+
+	for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
+		ufbxt_hintf("i=%zu", i);
+		double time = (double)i / 24.0;
+		ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
+
+		ufbxt_assert_close_real_threshold(err, value, (ufbx_real)values[i], 0.01f);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_tangent_auto_bias_absolute_clamp, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	// Curve evaluated values at 24fps
+	static const double values[] = {
+		0.000000, -260.416656, -333.333344, -281.250000, -166.666672, -52.083328, 0.000000, -52.083336, -166.666672,
+		-281.250000, -333.333344, -260.416656, 0.000000, -1417.824097, -1814.814819, -1531.250000, -907.407410, -283.564819,
+		0.000000, -52.083332, -166.666672, -281.250000, -333.333344, -260.416656, 0.000000,
+	};
+
+	ufbxt_assert(scene->anim_layers.count == 2);
+	ufbx_anim_layer *layer = scene->anim_layers.data[0];
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbx_anim_prop *aprop = ufbx_find_anim_prop(layer, &node->element, UFBX_Lcl_Translation);
+	ufbx_anim_curve *curve = aprop->anim_value->curves[0];
+	ufbxt_assert(curve);
+
+	for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
+		ufbxt_hintf("i=%zu", i);
+		double time = (double)i / 24.0;
+		ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
+
+		ufbxt_assert_close_real_threshold(err, value, (ufbx_real)values[i], 0.01f);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_tangent_auto_bias_absolute_sign, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	// Curve evaluated values at 24fps
+	static const double values[] = {
+		0.000000, -1.145833, -4.166667, -8.437500, -13.333333, -18.229168, -22.500000, -25.520832, -26.666666,
+		-25.312500, -20.833332, -12.604168, 0.000000, 13.750000, 25.000000, 33.750000, 40.000000, 43.750000,
+		45.000000, 43.750000, 40.000000, 33.750000, 24.999998, 13.749999, 0.000000, -10.416666, -13.333333,
+		-11.250000, -6.666667, -2.083333, 0.000000, -0.000001, -0.000002, 0.000000, 1.145844, 4.166698,
+		8.437560, 13.333425, 18.229292, 22.500154, 25.521011, 26.666861, 25.312698, 20.833519, 12.604320,
+		0.000100, -13.749959, -25.000004, -33.750038, -40.000061, -43.750072, -45.000076, -43.750076, -40.000069,
+		-33.750053, -25.000038, -13.750021, 0.000000, 10.416676, 13.333332, 11.249978, 6.666616, 2.083255,
+		-0.000100,
+	};
+
+	ufbxt_assert(scene->anim_layers.count == 2);
+	ufbx_anim_layer *layer = scene->anim_layers.data[0];
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbx_anim_prop *aprop = ufbx_find_anim_prop(layer, &node->element, UFBX_Lcl_Translation);
+	ufbx_anim_curve *curve = aprop->anim_value->curves[0];
+	ufbxt_assert(curve);
+
+	for (size_t i = 0; i < ufbxt_arraycount(values); i++) {
+		ufbxt_hintf("i=%zu", i);
+		double time = (double)i / 24.0;
+		ufbx_real value = ufbx_evaluate_curve(curve, time, 0.0);
+
+		ufbxt_assert_close_real_threshold(err, value, (ufbx_real)values[i], 0.01f);
+	}
+}
+#endif
+
 UFBXT_FILE_TEST_FLAGS(motionbuilder_tangent_tcb, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
 #if UFBXT_IMPL
 {
