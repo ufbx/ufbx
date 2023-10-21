@@ -80,6 +80,15 @@ UFBXT_TEST(thread_safety)
 }
 #endif
 
+UFBXT_TEST(locale_safety)
+#if UFBXT_IMPL
+{
+	if (!g_allow_non_thread_safe) {
+		ufbxt_assert(ufbx_is_locale_safe());
+	}
+}
+#endif
+
 #if UFBXT_IMPL
 static ufbx_load_opts ufbxt_retain_dom_opts()
 {

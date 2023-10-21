@@ -343,6 +343,7 @@ static const char *g_file_type = NULL;
 static bool g_fuzz = false;
 static bool g_sink = false;
 static bool g_allow_non_thread_safe = false;
+static bool g_allow_non_locale_safe = false;
 static bool g_all_byte_values = false;
 static bool g_dedicated_allocs = false;
 static bool g_fuzz_no_patch = false;
@@ -3311,6 +3312,10 @@ int main(int argc, char **argv)
 
 		if (!strcmp(argv[i], "--allow-non-thread-safe")) {
 			g_allow_non_thread_safe = true;
+		}
+
+		if (!strcmp(argv[i], "--allow-non-locale-safe")) {
+			g_allow_non_locale_safe = true;
 		}
 
 		if (!strcmp(argv[i], "--fuzz")) {

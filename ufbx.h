@@ -4668,6 +4668,15 @@ extern const uint32_t ufbx_source_version;
 //   ufbx_free_mesh()
 ufbx_abi bool ufbx_is_thread_safe(void);
 
+// Returns `true` if ufbx does not depend on the current locale.
+//
+// Guaranteed to be `true` in _any_ of the following conditions:
+// - ufbx.c has been compiled using: GLIBC (2.03) / MSVC (2005)
+//
+// If `false` you should make sure to use the `"C"` locale before calling
+// any ufbx functions.
+ufbx_abi bool ufbx_is_locale_safe(void);
+
 // Load a scene from a `size` byte memory buffer at `data`
 ufbx_abi ufbx_scene *ufbx_load_memory(
 	const void *data, size_t data_size,

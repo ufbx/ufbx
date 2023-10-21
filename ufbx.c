@@ -173,10 +173,10 @@
 // -- Headers
 
 #include <string.h>
+#include <locale.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <locale.h>
 #include <float.h>
 
 #if !defined(UFBX_NO_MATH_H)
@@ -250,6 +250,13 @@
 	#define UFBXI_GNUC __GNUC__
 #else
 	#define UFBXI_GNUC 0
+#endif
+
+#if defined(__GLIBC__) && !defined(UFBX_STANDARD_C)
+	#include <features.h>
+	#define UFBXI_GLIBC __GLIBC__ * 1000 + __GLIBC_MINOR__
+#else
+	#define UFBXI_GLIBC 0
 #endif
 
 #if !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
@@ -554,6 +561,56 @@ const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
 
 ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEADER_VERSION/1000u);
 
+// -- Locale
+
+#define UFBXI_LOCALE_SAFE 1
+#if UFBXI_MSC_VER >= 1400 && !defined(UFBX_STANDARD_C)
+	typedef _locale_t ufbxi_locale_imp;
+	#define ufbxi_locale_create_imp() _create_locale(LC_ALL, "C")
+	#define ufbxi_locale_free_imp(locale) _free_locale(locale)
+	#define ufbxi_locale_strtod(locale, str, end) _strtod_l((str), (end), (locale))
+	#define ufbxi_locale_strtof(locale, str, end) _strtof_l((str), (end), (locale))
+	#define ufbxi_locale_vsnprintf(locale, buf, buf_size, fmt, list) _vsnprintf_s_l((buf), (buf_size), _TRUNCATE, (fmt), (locale), (list))
+#elif UFBXI_GLIBC >= 2003
+	#if UFBXI_GLIBC <= 2025
+		#include <xlocale.h>
+	#endif
+	typedef locale_t ufbxi_locale_imp;
+	#define ufbxi_locale_create_imp() newlocale(LC_ALL, "C", NULL)
+	#define ufbxi_locale_free_imp(locale) freelocale(locale)
+	#define ufbxi_locale_strtod(locale, str, end) strtod_l((str), (end), (locale))
+	#define ufbxi_locale_strtof(locale, str, end) strtof_l((str), (end), (locale))
+	#define ufbxi_locale_vsnprintf(locale, buf, buf_size, fmt, list) vsnprintf_l((buf), (buf_size), (fmt), (locale), (list))
+#else
+	typedef int ufbxi_locale_imp;
+	#define ufbxi_locale_create_imp() 1
+	#define ufbxi_locale_free_imp(locale) (void)0
+	#define ufbxi_locale_strtod(locale, str, end) strtod((str), (end))
+	#define ufbxi_locale_strtof(locale, str, end) strtof((str), (end))
+	#define ufbxi_locale_vsnprintf(locale, buf, buf_size, fmt, list) vsnprintf((buf), (buf_size), (fmt))
+	#undef UFBXI_LOCALE_SAFE
+	#define UFBXI_LOCALE_SAFE 0
+#endif
+
+typedef struct {
+	bool initialized;
+	ufbxi_locale_imp locale;
+} ufbxi_locale;
+
+static void ufbxi_locale_init(ufbxi_locale *l)
+{
+	if (l->initialized) return;
+	l->initialized = true;
+	l->locale = ufbxi_locale_create_imp();
+}
+
+static void ufbxi_locale_free(ufbxi_locale *l)
+{
+	if (l->initialized) return;
+	ufbxi_locale_free_imp(l->locale);
+	l->initialized = false;
+}
+
 // -- Architecture
 
 #if !defined(UFBX_STANDARD_C) && (defined(_MSC_VER) && defined(_M_X64)) || ((defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)) || defined(UFBX_USE_SSE)
@@ -570,6 +627,23 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 	#else
 		#define UFBX_LITTLE_ENDIAN 0
 	#endif
+#endif
+
+#if defined(UFBX_USE_FROM_CHARS)
+	#include <charconv>
+	static double ufbxi_parse_double_fromchars(const char *str, size_t max_length, char **end, uint32_t flags)
+	{
+		double value;
+		std::from_chars_result res = std::from_chars(str, str + max_length, value);
+		if (!res) {
+			*end = nullptr;
+			return 0.0;
+		}
+		*end = res.ptr;
+		return value;
+	}
+
+	#define ufbx_parse_double ufbxi_parse_double_fromchars
 #endif
 
 // -- Fast copy
@@ -1030,6 +1104,8 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 // For the algorithm we need 128-bit division that is either provided by hardware on x64 or
 // a custom implementation below.
 
+#if !defined(ufbx_parse_double)
+
 #if !defined(UFBX_STANDARD_C) && UFBXI_MSC_VER >= 1920 && defined(_M_X64) && !defined(__clang__)
 	ufbxi_extern_c extern unsigned __int64 __cdecl _udiv128(unsigned __int64  highdividend,
 		unsigned __int64 lowdividend, unsigned __int64 divisor, unsigned __int64 *remainder);
@@ -1200,13 +1276,13 @@ static ufbxi_noinline uint32_t ufbxi_parse_double_init_flags()
 	return 0;
 }
 
-static ufbxi_noinline double ufbxi_parse_double_slow(const char *str, char **end)
+static ufbxi_noinline double ufbxi_parse_double_slow(ufbxi_locale *locale, const char *str, char **end)
 {
-	// TODO: Locales
-	return strtod(str, end);
+	ufbxi_locale_init(locale);
+	return ufbxi_locale_strtod(locale->locale, str, end);
 }
 
-static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_length, char **end, uint32_t flags)
+static ufbxi_noinline double ufbxi_parse_double(ufbxi_locale *locale, const char *str, size_t max_length, char **end, uint32_t flags)
 {
 	// TODO: Use this for optimizing digit parsing
 	(void)max_length;
@@ -1265,7 +1341,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 
 	// Overflowed either 64-bit `integer` or 31-bit `exp`.
 	if (n_integer > 19 || n_exp > 9 || (integer >> 63) != 0) {
-		return ufbxi_parse_double_slow(str, end);
+		return ufbxi_parse_double_slow(locale, str, end);
 	}
 
 	// Both power of 10 and integer are exactly representable as doubles
@@ -1284,12 +1360,12 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	// take care of most of them, for negative exponents we can only handle
 	// up to e-27 as `5^28 > 2^64` and cannot be used as a divisor below.
 	if (n_decimals < 0) {
-		return ufbxi_parse_double_slow(str, end);
+		return ufbxi_parse_double_slow(locale, str, end);
 	} else if (!n_decimals || !integer) {
 		double value = (double)integer;
 		return negative ? -value : value;
 	} else if (n_decimals > 27) {
-		return ufbxi_parse_double_slow(str, end);
+		return ufbxi_parse_double_slow(locale, str, end);
 	}
 
 	// We want to compute `integer / 10^N` precisely, we can do this
@@ -1340,6 +1416,16 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	return u_to_d.d;
 #endif
 }
+
+#else
+
+static double ufbxi_parse_double(const char *str, size_t max_length, char **end, uint32_t flags)
+{
+	(void)flags;
+	return ufbx_parse_double(str, max_length, end);
+}
+
+#endif
 
 static ufbxi_forceinline int64_t ufbxi_parse_int64(const char *str, char **end)
 {
@@ -2797,9 +2883,22 @@ ufbxi_extern_c ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inf
 
 static const char ufbxi_empty_char[1] = { '\0' };
 
-static ufbxi_noinline int ufbxi_vsnprintf(char *buf, size_t buf_size, const char *fmt, va_list args)
+static ufbxi_noinline int ufbxi_vsnprintf(ufbxi_locale *locale, char *buf, size_t buf_size, const char *fmt, va_list args)
 {
-	int result = vsnprintf(buf, buf_size, fmt, args);
+	ufbxi_locale tmp_locale;
+	bool free_locale = false;
+	if (!locale) {
+		memset(&tmp_locale, 0, sizeof(tmp_locale));
+		locale = &tmp_locale;
+		free_locale = true;
+	}
+	ufbxi_locale_init(locale);
+
+	int result = ufbxi_locale_vsnprintf(locale->locale, buf, buf_size, fmt, args);
+
+	if (free_locale) {
+		ufbxi_locale_free(locale);
+	}
 
 	if (result < 0) result = 0;
 	if ((size_t)result >= buf_size - 1) result = (int)buf_size - 1;
@@ -2812,11 +2911,11 @@ static ufbxi_noinline int ufbxi_vsnprintf(char *buf, size_t buf_size, const char
 	return result;
 }
 
-static ufbxi_noinline int ufbxi_snprintf(char *buf, size_t buf_size, const char *fmt, ...)
+static ufbxi_noinline int ufbxi_snprintf(ufbxi_locale *locale, char *buf, size_t buf_size, const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
-	int result = ufbxi_vsnprintf(buf, buf_size, fmt, args);
+	int result = ufbxi_vsnprintf(locale, buf, buf_size, fmt, args);
 	va_end(args);
 	return result;
 }
@@ -2830,7 +2929,7 @@ static ufbxi_noinline void ufbxi_panicf_imp(ufbx_panic *panic, const char *fmt, 
 
 	if (panic) {
 		panic->did_panic = true;
-		panic->message_length = (size_t)ufbxi_vsnprintf(panic->message, sizeof(panic->message), fmt, args);
+		panic->message_length = (size_t)ufbxi_vsnprintf(NULL, panic->message, sizeof(panic->message), fmt, args);
 	} else {
 		fprintf(stderr, "ufbx panic: ");
 		vfprintf(stderr, fmt, args);
@@ -2953,7 +3052,7 @@ static ufbxi_noinline void ufbxi_fmt_err_info(ufbx_error *err, const char *fmt, 
 
 	va_list args;
 	va_start(args, fmt);
-	err->info_length = (size_t)ufbxi_vsnprintf(err->info, sizeof(err->info), fmt, args);
+	err->info_length = (size_t)ufbxi_vsnprintf(NULL, err->info, sizeof(err->info), fmt, args);
 	va_end(args);
 	ufbxi_clean_string_utf8(err->info, err->info_length);
 }
@@ -4208,6 +4307,7 @@ static ufbxi_forceinline uint32_t ufbxi_hash_uptr(uintptr_t ptr)
 // -- Warnings
 
 typedef struct {
+	ufbxi_locale *locale;
 	ufbx_error *error;
 	ufbxi_buf *result;
 	ufbxi_buf tmp_stack;
@@ -4237,7 +4337,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_vwarnf_imp(ufbxi_warnings *ws, u
 	}
 
 	char desc[256];
-	size_t desc_len = (size_t)ufbxi_vsnprintf(desc, sizeof(desc), fmt, args);
+	size_t desc_len = (size_t)ufbxi_vsnprintf(ws->locale, desc, sizeof(desc), fmt, args);
 
 	ufbxi_clean_string_utf8(desc, desc_len);
 
@@ -6005,6 +6105,7 @@ typedef struct {
 	ufbx_matrix axis_matrix;
 	ufbx_real unit_scale;
 
+	ufbxi_locale locale;
 	ufbxi_warnings warnings;
 
 	bool parse_threaded;
@@ -9025,9 +9126,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 				ufbxi_check(end == token->str_data + token->str_len - 1);
 			} else if (token->type == UFBXI_ASCII_FLOAT) {
 				if (ua->parse_as_f32) {
-					token->value.f64 = strtof(token->str_data, &end);
+					ufbxi_locale_init(&uc->locale);
+					token->value.f64 = ufbxi_locale_strtof(uc->locale.locale, token->str_data, &end);
 				} else {
-					token->value.f64 = ufbxi_parse_double(token->str_data, token->str_len, &end, uc->double_parse_flags);
+					token->value.f64 = ufbxi_parse_double(&uc->locale, token->str_data, token->str_len, &end, uc->double_parse_flags);
 				}
 				ufbxi_check(end == token->str_data + token->str_len - 1);
 			}
@@ -9199,6 +9301,8 @@ typedef struct {
 
 	size_t offset;
 
+	ufbxi_locale *locale;
+
 } ufbxi_ascii_array_task;
 
 ufbxi_noinline static const char *ufbxi_ascii_array_task_parse_floats(ufbxi_ascii_array_task *t, const char *src, const char *src_end)
@@ -9209,13 +9313,14 @@ ufbxi_noinline static const char *ufbxi_ascii_array_task_parse_floats(ufbxi_asci
 	ufbx_assert(dst_float || dst_double);
 	uint32_t parse_flags = t->parse_flags;
 	const char *src_begin = src;
+	ufbxi_locale *locale = t->locale;
 
 	while (src != src_end) {
 		while (ufbxi_is_space(*src)) src++;
 
 		// Try to parse the next value, we don't commit this until we find a comma after it above.
 		char *num_end = NULL;
-		double val = ufbxi_parse_double(src, ufbxi_to_size(src_end - src), &num_end, parse_flags);
+		double val = ufbxi_parse_double(locale, src, ufbxi_to_size(src_end - src), &num_end, parse_flags);
 		if (!num_end) return src_begin;
 		src = num_end;
 
@@ -9435,7 +9540,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_ascii_read_float_array(ufbxi_con
 		char *num_end = NULL;
 		size_t left = ufbxi_to_size(end - src_scan);
 		if (left < 64) break;
-		val = ufbxi_parse_double(src_scan, left - 2, &num_end, parse_flags);
+		val = ufbxi_parse_double(&uc->locale, src_scan, left, &num_end, parse_flags);
 		if (!num_end || num_end == src_scan) {
 			break;
 		}
@@ -9788,6 +9893,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 				size_t num_spans = uc->tmp_ascii_spans.num_items;
 				ufbxi_ascii_span *spans = ufbxi_push_pop(tmp_buf, &uc->tmp_ascii_spans, ufbxi_ascii_span, num_spans);
 				ufbxi_check(spans);
+
+				// Make sure locale is initialized
+				ufbxi_locale_init(&uc->locale);
 
 				ufbxi_ascii_array_task t;
 				t.arr_data = (char*)arr_data + num_values * arr_elem_size;
@@ -14478,7 +14586,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_settings(ufbxi_conte
 			ufbx_string str;
 			if (ufbxi_get_val1(frame_rate, "S", &str)) {
 				char *end;
-				double val = ufbxi_parse_double(str.data, str.length, &end, uc->double_parse_flags);
+				double val = ufbxi_parse_double(&uc->locale, str.data, str.length, &end, uc->double_parse_flags);
 				if (end == str.data + str.length) {
 					fps = val;
 				}
@@ -15795,7 +15903,7 @@ static ufbxi_noinline int ufbxi_obj_parse_vertex(ufbxi_context *uc, ufbxi_obj_at
 	for (size_t i = 0; i < read_values; i++) {
 		ufbx_string str = uc->obj.tokens[offset + i];
 		char *end;
-		double val = ufbxi_parse_double(str.data, str.length, &end, parse_flags);
+		double val = ufbxi_parse_double(&uc->locale, str.data, str.length, &end, parse_flags);
 		ufbxi_check(end == str.data + str.length);
 		vals[i] = (ufbx_real)val;
 	}
@@ -16490,7 +16598,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc
 		ufbx_string tok = uc->obj.tokens[start + num_reals];
 
 		char *end;
-		double val = ufbxi_parse_double(tok.data, tok.length, &end, uc->double_parse_flags);
+		double val = ufbxi_parse_double(&uc->locale, tok.data, tok.length, &end, uc->double_parse_flags);
 		if (end != tok.data + tok.length) break;
 
 		prop->value_real_arr[num_reals] = (ufbx_real)val;
@@ -18750,7 +18858,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_lod_group(ufbxi_context
 
 	char prop_name[64];
 	for (size_t i = 0; ; i++) {
-		int len = ufbxi_snprintf(prop_name, sizeof(prop_name), "Thresholds|Level%zu", i);
+		int len = ufbxi_snprintf(&uc->locale, prop_name, sizeof(prop_name), "Thresholds|Level%zu", i);
 		ufbx_prop *prop = ufbx_find_prop_len(&lod->props, prop_name, (size_t)len);
 		if (!prop) break;
 		num_levels = ufbxi_max_sz(num_levels, i + 1);
@@ -18773,14 +18881,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_lod_group(ufbxi_context
 		ufbx_lod_level *level = &levels[i];
 
 		if (i > 0) {
-			int len = ufbxi_snprintf(prop_name, sizeof(prop_name), "Thresholds|Level%zu", i - 1);
+			int len = ufbxi_snprintf(&uc->locale, prop_name, sizeof(prop_name), "Thresholds|Level%zu", i - 1);
 			level->distance = ufbx_find_real_len(&lod->props, prop_name, (size_t)len, 0.0f);
 		} else if (lod->relative_distances) {
 			level->distance = (ufbx_real)100.0;
 		}
 
 		{
-			int len = ufbxi_snprintf(prop_name, sizeof(prop_name), "DisplayLevels|Level%zu", i);
+			int len = ufbxi_snprintf(&uc->locale, prop_name, sizeof(prop_name), "DisplayLevels|Level%zu", i);
 			int64_t display = ufbx_find_int_len(&lod->props, prop_name, (size_t)len, 0);
 			if (display >= 0 && display <= 2) {
 				level->display = (ufbx_lod_display)display;
@@ -21922,6 +22030,8 @@ typedef struct {
 	ufbxi_cache_tmp_channel *channels;
 	size_t num_channels;
 
+	ufbxi_locale locale;
+
 	// Temporary array
 	char *tmp_arr;
 	size_t tmp_arr_size;
@@ -22410,7 +22520,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cac
 	filename.data = name_buf;
 
 	if (cc->xml_type == UFBXI_CACHE_XML_TYPE_SINGLE_FILE) {
-		filename.length = prefix_len + (size_t)ufbxi_snprintf(suffix_data, suffix_len, ".%s", extension);
+		filename.length = prefix_len + (size_t)ufbxi_snprintf(&cc->locale, suffix_data, suffix_len, ".%s", extension);
 		bool found = false;
 		ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, NULL, &found));
 	} else if (cc->xml_type == UFBXI_CACHE_XML_TYPE_FILE_PER_FRAME) {
@@ -22441,9 +22551,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_frame_files(ufbxi_cac
 			uint32_t frame = time / cc->xml_ticks_per_frame;
 			uint32_t tick = time % cc->xml_ticks_per_frame;
 			if (tick == 0) {
-				filename.length = prefix_len + (size_t)ufbxi_snprintf(suffix_data, suffix_len, "Frame%u.%s", frame, extension);
+				filename.length = prefix_len + (size_t)ufbxi_snprintf(&cc->locale, suffix_data, suffix_len, "Frame%u.%s", frame, extension);
 			} else {
-				filename.length = prefix_len + (size_t)ufbxi_snprintf(suffix_data, suffix_len, "Frame%uTick%u.%s", frame, tick, extension);
+				filename.length = prefix_len + (size_t)ufbxi_snprintf(&cc->locale, suffix_data, suffix_len, "Frame%uTick%u.%s", frame, tick, extension);
 			}
 			bool found = false;
 			ufbxi_check_err(&cc->error, ufbxi_cache_try_open_file(cc, filename, NULL, &found));
@@ -22606,6 +22716,7 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_cache_load(ufbxi_cache_context 
 {
 	int ok = ufbxi_cache_load_imp(cc, filename);
 
+	ufbxi_locale_free(&cc->locale);
 	ufbxi_buf_free(&cc->tmp);
 	ufbxi_buf_free(&cc->tmp_stack);
 	ufbxi_free(cc->ator_tmp, char, cc->name_buf, cc->name_cap);
@@ -23238,6 +23349,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 {
 	ufbxi_thread_pool_free(&uc->thread_pool);
+	ufbxi_locale_free(&uc->locale);
 
 	ufbxi_string_pool_temp_free(&uc->string_pool);
 	ufbxi_buf_free(&uc->warnings.tmp_stack);
@@ -23403,6 +23515,7 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	uc->result.unordered = true;
 
 	uc->warnings.error = &uc->error;
+	uc->warnings.locale = &uc->locale;
 	uc->warnings.result = &uc->result;
 	uc->warnings.tmp_stack.ator = &uc->ator_tmp;
 	uc->string_pool.warnings = &uc->warnings;
@@ -27889,6 +28002,11 @@ ufbx_abi bool ufbx_is_thread_safe(void)
 	return UFBXI_THREAD_SAFE != 0;
 }
 
+ufbx_abi bool ufbx_is_locale_safe(void)
+{
+	return UFBXI_LOCALE_SAFE != 0;
+}
+
 ufbx_abi ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)
 {
 	ufbxi_context uc = { UFBX_ERROR_NONE };
@@ -28053,15 +28171,17 @@ ufbx_abi ufbxi_noinline size_t ufbx_format_error(char *dst, size_t dst_size, con
 
 	size_t offset = 0;
 
+	ufbxi_locale locale = { false };
+
 	{
 		int num;
 		if (error->info_length > 0 && error->info_length < UFBX_ERROR_INFO_LENGTH) {
-			num = ufbxi_snprintf(dst + offset, dst_size - offset, "ufbx v%u.%u.%u error: %s (%.*s)\n",
+			num = ufbxi_snprintf(&locale, dst + offset, dst_size - offset, "ufbx v%u.%u.%u error: %s (%.*s)\n",
 				UFBX_SOURCE_VERSION/1000000, UFBX_SOURCE_VERSION/1000%1000, UFBX_SOURCE_VERSION%1000,
 				error->description.data ? error->description.data : "Unknown error",
 				(int)error->info_length, error->info);
 		} else {
-			num = ufbxi_snprintf(dst + offset, dst_size - offset, "ufbx v%u.%u.%u error: %s\n",
+			num = ufbxi_snprintf(&locale, dst + offset, dst_size - offset, "ufbx v%u.%u.%u error: %s\n",
 				UFBX_SOURCE_VERSION/1000000, UFBX_SOURCE_VERSION/1000%1000, UFBX_SOURCE_VERSION%1000,
 				error->description.data ? error->description.data : "Unknown error");
 		}
@@ -28072,9 +28192,11 @@ ufbx_abi ufbxi_noinline size_t ufbx_format_error(char *dst, size_t dst_size, con
 	size_t stack_size = ufbxi_min_sz(error->stack_size, UFBX_ERROR_STACK_MAX_DEPTH);
 	for (size_t i = 0; i < stack_size; i++) {
 		const ufbx_error_frame *frame = &error->stack[i];
-		int num = ufbxi_snprintf(dst + offset, dst_size - offset, "%6u:%s: %s\n", frame->source_line, frame->function.data, frame->description.data);
+		int num = ufbxi_snprintf(&locale, dst + offset, dst_size - offset, "%6u:%s: %s\n", frame->source_line, frame->function.data, frame->description.data);
 		if (num > 0) offset = ufbxi_min_sz(offset + (size_t)num, dst_size - 1);
 	}
+
+	ufbxi_locale_free(&locale);
 
 	return offset;
 }
