@@ -9,6 +9,9 @@ static void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
 
 #include "../ufbx.h"
 
+#define UFBX_OS_IMPLEMENTATION
+#include "../extra/ufbx_os.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -178,6 +181,8 @@ static ufbxt_check_line g_checks[32768];
 
 bool g_expect_fail = false;
 size_t g_expect_fail_count = 0;
+
+ufbx_os_thread_pool *g_thread_pool;
 
 ufbxt_threadlocal ufbxt_jmp_buf *t_jmp_buf;
 
@@ -2767,6 +2772,23 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse streamed file");
 			}
 
+			ufbx_load_opts thread_opts = load_opts;
+			thread_opts.file_format = UFBX_FILE_FORMAT_UNKNOWN;
+			thread_opts.retain_dom = true;
+
+			ufbx_os_init_ufbx_thread_pool(&thread_opts.thread_opts.pool, g_thread_pool);
+
+			ufbx_error thread_error;
+			ufbx_scene *thread_scene = ufbx_load_file(buf, &thread_opts, &thread_error);
+			if (thread_scene) {
+				ufbxt_check_scene(thread_scene);
+				ufbxt_assert(thread_scene->dom_root);
+				ufbxt_assert(thread_scene->metadata.file_format == load_opts.file_format);
+			} else if (!allow_error) {
+				ufbxt_log_error(&thread_error);
+				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse threaded file");
+			}
+
 			// Try a couple of read buffer sizes
 			if (g_fuzz && !g_fuzz_no_buffer && g_fuzz_step == SIZE_MAX && (!alternative || fuzz_always)) {
 				ufbxt_begin_fuzz();
@@ -3407,6 +3429,13 @@ int main(int argc, char **argv)
 		printf("Fuzzing with %d threads, UFBX_REGRESSION=%d\n", threads, regression);
 	}
 
+	{
+		ufbx_os_thread_pool_opts pool_opts = { 0 };
+		pool_opts.max_threads = 4;
+		g_thread_pool = ufbx_os_create_thread_pool(&pool_opts);
+		ufbxt_assert(g_thread_pool);
+	}
+
 	// Autofill heavy fuzz quality if necessary
 	if (g_heavy_fuzz_quality < 0) {
 		g_heavy_fuzz_quality = g_fuzz_quality - 4;
@@ -3521,6 +3550,8 @@ int main(int argc, char **argv)
 	if (g_sink) {
 		printf("%u\n", ufbxt_sink);
 	}
+
+	ufbx_os_free_thread_pool(g_thread_pool);
 
 	return num_ok == num_ran ? 0 : 1;
 }

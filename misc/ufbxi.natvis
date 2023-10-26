@@ -117,4 +117,13 @@
 
   <Type Name="ufbxi_double_list"><DisplayString>{{ count={count} }}</DisplayString><Expand><ArrayItems><Size>count</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
 
+  <Type Name="ufbxos_event">
+	  <Expand>
+		  <Item Name="counter">state &amp; 0xf</Item>
+		  <Item Name="waiters">(state >> 4) &amp; 0xfffff</Item>
+		  <Item Name="sema_index">state >> 24</Item>
+	  </Expand>
+  </Type>
+
+
 </AutoVisualizer>

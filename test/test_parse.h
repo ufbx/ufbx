@@ -21,7 +21,9 @@ static void ufbxt_check_warning_imp(ufbx_scene *scene, ufbx_warning_type type, u
 		}
 	}
 
-	ufbxt_logf("Warning not found: %d", (int)type);
+	if (!found) {
+		ufbxt_logf("Warning not found: %d", (int)type);
+	}
 	ufbxt_assert(found);
 }
 

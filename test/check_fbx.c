@@ -27,6 +27,8 @@ static void ufbxt_assert_fail_imp(const char *func, const char *file, size_t lin
 bool g_verbose = false;
 
 #include "../ufbx.h"
+#include "../extra/ufbx_os.h"
+
 #include "check_scene.h"
 #include "check_material.h"
 #include "testing_utils.h"
@@ -99,6 +101,31 @@ static void ufbxt_add_feature(ufbxt_fbx_features *features, const char *name)
 	features->names[index] = name;
 }
 
+typedef struct {
+	ufbxt_obj_file *obj_file;
+	const char *path;
+} ufbxt_obj_file_task;
+
+static void ufbxt_obj_file_task_fn(void *user, uint32_t index)
+{
+	ufbxt_obj_file_task *t = (ufbxt_obj_file_task*)user;
+
+	size_t obj_size;
+	void *obj_data = ufbxt_read_file_ex(t->path, &obj_size);
+	if (!obj_data) {
+		fprintf(stderr, "Failed to read .obj file: %s\n", t->path);
+		exit(1);
+	}
+
+	ufbxt_load_obj_opts obj_opts = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj(obj_data, obj_size, &obj_opts);
+	free(obj_data);
+
+	obj_file->normalize_units = true;
+
+	t->obj_file = obj_file;
+}
 
 int check_fbx_main(int argc, char **argv, const char *path)
 {
@@ -229,6 +256,19 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		}
 	}
 
+	ufbx_os_thread_pool *thread_pool = ufbx_os_create_thread_pool(NULL);
+	ufbxt_assert(thread_pool);
+
+	ufbxt_obj_file_task obj_task = { NULL };
+	uint32_t obj_task_id = ~0u;
+
+	if (obj_path) {
+		obj_task.path = obj_path;
+		obj_task_id = ufbx_os_thread_pool_run(thread_pool, &ufbxt_obj_file_task_fn, &obj_task, 1);
+	}
+
+	ufbx_os_init_ufbx_thread_pool(&opts.thread_opts.pool, thread_pool);
+
 	ufbx_error error;
 	ufbx_scene *scene;
 
@@ -298,8 +338,11 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		if (fbx_data) {
 
 			for (int i = 0; i < profile_runs; i++) {
+				ufbx_load_opts memory_opts = { 0 };
+				ufbx_os_init_ufbx_thread_pool(&memory_opts.thread_opts.pool, thread_pool);
+
 				uint64_t load_begin = cputime_cpu_tick();
-				ufbx_scene *memory_scene = ufbx_load_memory(fbx_data, fbx_size, NULL, NULL);
+				ufbx_scene *memory_scene = ufbx_load_memory(fbx_data, fbx_size, &memory_opts, NULL);
 				uint64_t load_end = cputime_cpu_tick();
 
 				printf("Loaded in %.2fms: File %.1fkB, temp %.1fkB (%zu allocs), result %.1fkB (%zu allocs)\n",
@@ -402,18 +445,8 @@ int check_fbx_main(int argc, char **argv, const char *path)
 	}
 
 	if (obj_path) {
-		size_t obj_size;
-		void *obj_data = ufbxt_read_file_ex(obj_path, &obj_size);
-		if (!obj_data) {
-			fprintf(stderr, "Failed to read .obj file: %s\n", obj_path);
-			return 1;
-		}
-
-		ufbxt_load_obj_opts obj_opts = { 0 };
-
-		ufbxt_obj_file *obj_file = ufbxt_load_obj(obj_data, obj_size, &obj_opts);
-
-		obj_file->normalize_units = true;
+		ufbx_os_thread_pool_wait(thread_pool, obj_task_id);
+		ufbxt_obj_file *obj_file = obj_task.obj_file;
 
 		ufbx_scene *state;
 		if (obj_file->animation_frame >= 0 || frame != INT_MIN) {
@@ -525,7 +558,6 @@ int check_fbx_main(int argc, char **argv, const char *path)
 
 		ufbx_free_scene(state);
 		free(obj_file);
-		free(obj_data);
 	} else {
 		if (dump_obj_path) {
 			ufbxt_debug_dump_obj_scene(dump_obj_path, scene);
@@ -558,6 +590,8 @@ int check_fbx_main(int argc, char **argv, const char *path)
 	if (sink) {
 		printf("%u\n", ufbxt_sink);
 	}
+
+	ufbx_os_free_thread_pool(thread_pool);
 
 	return result;
 }
@@ -664,6 +698,9 @@ int main(int argc, char **argv)
 }
 
 #include "cputime.h"
+
+#define UFBX_OS_IMPLEMENTATION
+#include "../extra/ufbx_os.h"
 
 #ifndef EXTERNAL_UFBX
 #include "../ufbx.c"
