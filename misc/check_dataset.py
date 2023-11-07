@@ -10,7 +10,7 @@ import math
 import itertools
 import datetime
 
-LATEST_SUPPORTED_DATE = "2023-10-20"
+LATEST_SUPPORTED_DATE = "2023-11-7"
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -84,7 +84,7 @@ def gather_case_models(json_path, flag_separator):
             fbx_base = strip_ext(fbx_path)
             obj_base = strip_ext(obj_path)
 
-            flags = obj_base[len(fbx_base):].split(flag_separator)
+            flags = obj_base[len(fbx_base) + len(flag_separator):].split("_")
 
             # Parse flags
             frame = None
