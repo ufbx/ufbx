@@ -1259,3 +1259,48 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_face_groups_skip_mesh_parts, synthetic_face_g
 	ufbxt_assert(mesh->face_group_parts.count == 0);
 }
 #endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_cm_y_up_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_unit_meters = (ufbx_real)0.01;
+	opts.target_axes = ufbx_axes_right_handed_y_up;
+	return opts;
+}
+static ufbx_load_opts ufbxt_cm_y_up_abort_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_unit_meters = (ufbx_real)0.01;
+	opts.target_axes = ufbx_axes_right_handed_y_up;
+	opts.index_error_handling = UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING;
+	return opts;
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_metadata_object *ufbxt_find_metadata_object(ufbx_element *element)
+{
+	for (size_t i = 0; i < element->connections_dst.count; i++) {
+		ufbx_connection *conn = &element->connections_dst.data[i];
+		if (conn->src_prop.length != 0 || conn->dst_prop.length != 0) continue;
+		if (conn->src->type == UFBX_ELEMENT_METADATA_OBJECT) {
+			return ufbx_as_metadata_object(conn->src);
+		}
+	}
+	return NULL;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(revit_wall_square, ufbxt_cm_y_up_opts)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(revit_wall_square_abort, revit_wall_square, ufbxt_cm_y_up_abort_opts)
+#if UFBXT_IMPL
+{
+}
+#endif
+
