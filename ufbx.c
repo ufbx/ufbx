@@ -11070,7 +11070,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 		size_t num_indices = indices->size;
 		uint32_t *index_data = (uint32_t*)indices->data;
 
-		if (mapping == ufbxi_ByPolygonVertex || mapping == ufbxi_ByPolygon) {
+		if (mapping == ufbxi_ByPolygonVertex) {
 
 			// Indexed by polygon vertex: We can use the provided indices directly.
 			ufbxi_check(ufbxi_check_indices(uc, &attrib->indices.data, index_data, true, num_indices, mesh->num_indices, num_elems));
@@ -11094,6 +11094,29 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 			ufbxi_check(ufbxi_check_indices(uc, &attrib->indices.data, new_index_data, true, mesh->num_indices, mesh->num_indices, num_elems));
 			attrib->unique_per_vertex = true;
 
+		} else if (mapping == ufbxi_ByPolygon) {
+
+			// Indexed by polygon: Generate new indices based on polygons
+			uint32_t *new_index_data = ufbxi_push(&uc->result, uint32_t, mesh->num_indices);
+			ufbxi_check(new_index_data);
+
+			size_t num_faces = mesh->num_faces;
+			for (size_t face_ix = 0; face_ix < num_faces; face_ix++) {
+				ufbx_face face = mesh->faces.data[face_ix];
+				uint32_t index = UFBX_NO_INDEX;
+				if (face_ix < num_indices) {
+					index = index_data[face_ix];
+				}
+				if (index >= num_elems) {
+					ufbxi_check(ufbxi_fix_index(uc, &index, index, num_elems));
+				}
+				for (size_t i = 0; i < face.num_indices; i++) {
+					new_index_data[face.index_begin + i] = index;
+				}
+			}
+
+			attrib->indices.data = new_index_data;
+
 		} else if (mapping == ufbxi_AllSame) {
 
 			// Indexed by all same: ??? This could be possibly used for making
@@ -11109,7 +11132,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 
 	} else {
 
-		if (mapping == ufbxi_ByPolygonVertex || mapping == ufbxi_ByPolygon) {
+		if (mapping == ufbxi_ByPolygonVertex) {
 
 			// Direct by polygon index: Use shared consecutive array if there's enough
 			// elements, otherwise use a unique truncated consecutive index array.
@@ -11130,6 +11153,22 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 			// Direct by vertex: We can re-use the position indices..
 			ufbxi_check(ufbxi_check_indices(uc, &attrib->indices.data, mesh->vertex_position.indices.data, false, mesh->num_indices, mesh->num_indices, num_elems));
 			attrib->unique_per_vertex = true;
+
+		} else if (mapping == ufbxi_ByPolygon) {
+
+			// Direct by polygon: Generate new indices based on polygons
+			uint32_t *new_index_data = ufbxi_push(&uc->result, uint32_t, mesh->num_indices);
+			ufbxi_check(new_index_data);
+
+			uint32_t num_faces = (uint32_t)mesh->num_faces;
+			for (uint32_t face_ix = 0; face_ix < num_faces; face_ix++) {
+				ufbx_face face = mesh->faces.data[face_ix];
+				for (size_t i = 0; i < face.num_indices; i++) {
+					new_index_data[face.index_begin + i] = face_ix;
+				}
+			}
+
+			ufbxi_check(ufbxi_check_indices(uc, &attrib->indices.data, new_index_data, true, mesh->num_indices, mesh->num_indices, num_elems));
 
 		} else if (mapping == ufbxi_AllSame) {
 
