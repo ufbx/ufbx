@@ -11066,6 +11066,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 		*p_dst_data = ufbxi_zero_element + 4;
 	}
 
+	// HACK: Some old exporters seem to use ByPolygon to mean ByPolygonVertex,
+	// it should be quite safe to remap this
+	if (mapping == ufbxi_ByPolygon) {
+		size_t num_indices = indices ? indices->size : num_elems;
+		if (num_indices == mesh->num_indices) {
+			mapping = ufbxi_ByPolygonVertex;
+		}
+	}
+
 	if (indices) {
 		size_t num_indices = indices->size;
 		uint32_t *index_data = (uint32_t*)indices->data;
