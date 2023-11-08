@@ -1304,3 +1304,31 @@ UFBXT_FILE_TEST_OPTS_ALT(revit_wall_square_abort, revit_wall_square, ufbxt_cm_y_
 }
 #endif
 
+UFBXT_FILE_TEST(synthetic_direct_by_polygon)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node);
+
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh);
+
+	ufbxt_assert(mesh->faces.count == 2);
+	ufbxt_assert(!mesh->vertex_normal.unique_per_vertex);
+	ufbxt_assert(mesh->vertex_normal.values.count == 2);
+
+	ufbx_vec3 ref_normals[] = {
+		{ -0.707106769f, 0.707106769f, 0.0f },
+		{ 0.707106769f, 0.707106769f, 0.0f },
+	};
+	for (size_t face_ix = 0; face_ix < mesh->faces.count; face_ix++) {
+		ufbx_face face = mesh->faces.data[face_ix];
+		for (size_t i = 0; i < face.num_indices; i++) {
+			ufbx_vec3 normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, face.index_begin + i);
+			ufbxt_assert_close_vec3(err, normal, ref_normals[face_ix]);
+		}
+	}
+}
+#endif
+
+
