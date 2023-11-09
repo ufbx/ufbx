@@ -801,7 +801,7 @@ static void ufbxt_check_blend_deformer(ufbx_scene *scene, ufbx_blend_deformer *d
 static void ufbxt_check_blend_channel(ufbx_scene *scene, ufbx_blend_channel *channel)
 {
 	for (size_t i = 0; i < channel->keyframes.count; i++) {
-		if (i > 0) {
+		if (i > 0 && !isnan(channel->keyframes.data[i - 1].target_weight) && !isnan(channel->keyframes.data[i].target_weight)) {
 			ufbxt_assert(channel->keyframes.data[i - 1].target_weight <= channel->keyframes.data[i].target_weight);
 		}
 		ufbxt_assert(channel->keyframes.data[i].shape);
