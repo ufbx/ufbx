@@ -12533,8 +12533,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 		prev_time = key->time;
 
 		// Decrement attribute refcount and potentially move to the next one.
-		int32_t refs_left = --*p_ref;
-		ufbxi_check(refs_left >= 0);
+		int32_t refs_left = *p_ref;
+		ufbxi_check(refs_left > 0);
+		*p_ref = refs_left - 1;
 		if (refs_left == 0) {
 			p_flag++;
 			p_attr += 4;
@@ -13171,6 +13172,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_connections(ufbxi_context *
 
 // -- Pre-7000 "Take" based animation
 
+ufbxi_forceinline static char ufbxi_double_to_char(double value)
+{
+	if (value >= 0.0 && value <= 127.0) {
+		return (char)(int)value;
+	} else {
+		return 0;
+	}
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_context *uc, ufbxi_node *node, uint64_t value_fbx_id, const char *name, ufbx_real *p_default)
 {
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_Default, "R", p_default));
@@ -13225,7 +13235,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 		ufbxi_check(data_end - data >= 3);
 		key->time = next_time;
 		key->value = (ufbx_real)next_value;
-		char mode = (char)data[2];
+		char mode = ufbxi_double_to_char(data[2]);
 		data += 3;
 
 		float slope_right = 0.0f;
@@ -13239,7 +13249,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 			key->interpolation = UFBX_INTERPOLATION_CUBIC;
 
 			ufbxi_check(data_end - data >= 1);
-			char slope_mode = (char)data[0];
+			char slope_mode = ufbxi_double_to_char(data[0]);
 			data += 1;
 
 			size_t num_weights = 1;
@@ -13280,7 +13290,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 
 			for (; num_weights > 0; num_weights--) {
 				ufbxi_check(data_end - data >= 1);
-				char weight_mode = (char)data[0];
+				char weight_mode = ufbxi_double_to_char(data[0]);
 				data += 1;
 
 				if (weight_mode == 'n') {
@@ -13315,7 +13325,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 		} else if (mode == 'C') {
 			// Constant interpolation: Single parameter (use prev/next)
 			ufbxi_check(data_end - data >= 1);
-			key->interpolation = (char)data[0] == 'n' ? UFBX_INTERPOLATION_CONSTANT_NEXT : UFBX_INTERPOLATION_CONSTANT_PREV;
+			key->interpolation = ufbxi_double_to_char(data[0]) == 'n' ? UFBX_INTERPOLATION_CONSTANT_NEXT : UFBX_INTERPOLATION_CONSTANT_PREV;
 			data += 1;
 		} else {
 			ufbxi_fail("Unknown key mode");
