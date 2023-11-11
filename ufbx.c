@@ -6529,9 +6529,10 @@ static ufbxi_noinline ufbxi_xml_attrib *ufbxi_xml_find_attrib(ufbxi_xml_tag *tag
 
 // -- FBX value type information
 
-static char ufbxi_normalize_array_type(char type) {
+static char ufbxi_normalize_array_type(char type, char bool_type) {
 	switch (type) {
 	case 'r': return sizeof(ufbx_real) == sizeof(float) ? 'f' : 'd';
+	case 'b': return bool_type;
 	default: return type;
 	}
 }
@@ -6636,7 +6637,7 @@ ufbxi_nodiscard ufbxi_noinline static ufbxi_value_array *ufbxi_get_array(ufbxi_n
 	if (node->value_type_mask != UFBXI_VALUE_ARRAY) return NULL;
 	ufbxi_value_array *array = node->array;
 	if (fmt != '?') {
-		fmt = ufbxi_normalize_array_type(fmt);
+		fmt = ufbxi_normalize_array_type(fmt, 'b');
 		if (array->type != fmt) return NULL;
 	}
 	return array;
@@ -7711,8 +7712,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_binary_parse_multivalue_array(uf
 
 ufbxi_nodiscard ufbxi_noinline static void *ufbxi_push_array_data(ufbxi_context *uc, const ufbxi_array_info *info, size_t size, ufbxi_buf *tmp_buf)
 {
-	char type = ufbxi_normalize_array_type(info->type);
-	size_t elem_size = ufbxi_array_type_size(type);
+	size_t elem_size = ufbxi_array_type_size(info->type);
 	uint32_t flags = info->flags;
 	if (flags & UFBXI_ARRAY_FLAG_PAD_BEGIN) size += 4;
 
@@ -7805,14 +7805,16 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 
 		// Normalize the array type (eg. 'r' to 'f'/'d' depending on the build)
 		// and get the per-element size of the array.
-		char dst_type = ufbxi_normalize_array_type(arr_info.type);
+		// Boolean arrays 'b' are normalized to 'c' as they are postprocessed
+		// below based on `arr_info.type`.
+		char dst_type = ufbxi_normalize_array_type(arr_info.type, 'c');
 
 		ufbxi_value_array *arr = ufbxi_push(tmp_buf, ufbxi_value_array, 1);
 		ufbxi_check(arr);
 
 		node->value_type_mask = UFBXI_VALUE_ARRAY;
 		node->array = arr;
-		arr->type = dst_type;
+		arr->type = ufbxi_normalize_array_type(arr_info.type, 'b');
 
 		// Peek the first bytes of the array. We can always look at least 13 bytes
 		// ahead safely as valid FBX files must end in a 13/25 byte NULL record.
@@ -7846,7 +7848,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 
 			// Normalize the source type as well, but don't convert UFBX-specific
 			// 'r' to 'f'/'d', but fail later instead.
-			if (src_type != 'r') src_type = ufbxi_normalize_array_type(src_type);
+			if (src_type != 'r') src_type = ufbxi_normalize_array_type(src_type, 'c');
 			size_t src_elem_size = ufbxi_array_type_size(src_type);
 			size_t decoded_data_size = src_elem_size * size;
 
@@ -8726,7 +8728,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 	ufbxi_array_info arr_info;
 	if (ufbxi_is_array_node(uc, parent_state, name, &arr_info)) {
 		uint32_t flags = arr_info.flags;
-		arr_type = ufbxi_normalize_array_type(arr_info.type);
+		arr_type = ufbxi_normalize_array_type(arr_info.type, 'b');
 		arr_buf = tmp_buf;
 		if (flags & UFBXI_ARRAY_FLAG_RESULT) arr_buf = &uc->result;
 		else if (flags & UFBXI_ARRAY_FLAG_TMP_BUF) arr_buf = &uc->tmp;
@@ -9085,6 +9087,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_dom_node(ufbxi_context *u
 
 		switch (arr->type) {
 		case 'c': val->type = UFBX_DOM_VALUE_ARRAY_I8; break;
+		case 'b': val->type = UFBX_DOM_VALUE_ARRAY_I8; break;
 		case 'i': val->type = UFBX_DOM_VALUE_ARRAY_I32; break;
 		case 'l': val->type = UFBX_DOM_VALUE_ARRAY_I64; break;
 		case 'f': val->type = UFBX_DOM_VALUE_ARRAY_F32; break;
