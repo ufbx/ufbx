@@ -14217,6 +14217,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_legacy_root(ufbxi_context *
 		ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &root->element.element_id));
 	}
 
+	// NOTE: `ufbxi_read_header_extension()` is optional so use default KTime definition
+	uc->ktime_sec = 46186158000;
+	uc->ktime_sec_double = (double)uc->ktime_sec;
+
 	for (;;) {
 		ufbxi_check(ufbxi_parse_legacy_toplevel(uc));
 		if (!uc->top_node) break;
@@ -22599,6 +22603,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_postprocess_scene(uc);
 
 	ufbxi_update_scene(&uc->scene, true, NULL, 0);
+
+	// Force a non-NULL anim pointer
+	if (!uc->scene.anim) {
+		uc->scene.anim = ufbxi_push_zero(&uc->result, ufbx_anim, 1);
+	}
 
 	if (uc->opts.load_external_files) {
 		ufbxi_check(ufbxi_load_external_files(uc));
