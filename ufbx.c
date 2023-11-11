@@ -12394,13 +12394,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 	double prev_time = 0.0;
 	double next_time = 0.0;
 
+	int32_t refs_left = 0;
 	if (num_keys > 0) {
 		next_time = (double)p_time[0] / uc->ktime_sec_double;
+		if (p_ref < p_ref_end) refs_left = *p_ref;
 	}
 
 	for (size_t i = 0; i < num_keys; i++) {
 		ufbx_keyframe *key = &keys[i];
-		ufbxi_check(p_ref < p_ref_end);
+		ufbxi_check(refs_left > 0);
 
 		ufbx_real value = *p_value;
 		if (i == 0) {
@@ -12535,13 +12537,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 		prev_time = key->time;
 
 		// Decrement attribute refcount and potentially move to the next one.
-		int32_t refs_left = *p_ref;
-		ufbxi_check(refs_left > 0);
-		*p_ref = refs_left - 1;
-		if (refs_left == 0) {
+		if (--refs_left == 0) {
 			p_flag++;
 			p_attr += 4;
 			p_ref++;
+			if (p_ref < p_ref_end) refs_left = *p_ref;
 		}
 		p_time++;
 		p_value++;
