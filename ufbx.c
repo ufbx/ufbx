@@ -23015,6 +23015,7 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 			if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim->ignore_connections) continue;
 
 			// Skip until we reach `aprop >= prop`
+			// NOTE: No need to check for end as `anim_props` is terminated with a NULL sentinel.
 			while (aprop->element == element && aprop->_internal_key < prop->_internal_key) aprop++;
 			if (aprop->prop_name.data != prop->name.data) {
 				while (aprop->element == element && strcmp(aprop->prop_name.data, prop->name.data) < 0) aprop++;
@@ -23487,13 +23488,15 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 		ufbx_anim_layer *layer = *p_layer;
 
 		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &layer->anim_values));
-		ufbx_anim_prop *props = ufbxi_push(&ec->result, ufbx_anim_prop, layer->anim_props.count);
+		ufbx_anim_prop *props = ufbxi_push(&ec->result, ufbx_anim_prop, layer->anim_props.count + 1);
 		ufbxi_check_err(&ec->error, props);
 		for (size_t i = 0; i < layer->anim_props.count; i++) {
 			props[i] = layer->anim_props.data[i];
 			props[i].element = ufbxi_translate_element(ec, props[i].element);
 			props[i].anim_value = (ufbx_anim_value*)ufbxi_translate_element(ec, props[i].anim_value);
 		}
+		// Maintain NULL sentinel
+		memset(props + layer->anim_props.count, 0, sizeof(ufbx_anim_prop));
 		layer->anim_props.data = props;
 	}
 
