@@ -347,9 +347,9 @@ ufbxt_noinline static void ufbxt_hash_dom_value_imp(ufbxt_hash *h, const ufbx_do
 	ufbxt_hash_string(h, v->value_str);
 	size_t count = (size_t)v->value_int;
 	if (v->type == UFBX_DOM_VALUE_ARRAY_RAW_STRING) {
-		const ufbx_string *vs = (const ufbx_string*)v->value_blob.data;
+		const ufbx_blob *vs = (const ufbx_blob*)v->value_blob.data;
 		for (size_t i = 0; i < count; i++) {
-			ufbxt_hash_string(h, vs[i]);
+			ufbxt_hash_blob(h, vs[i]);
 		}
 	} else if (v->type == UFBX_DOM_VALUE_ARRAY_F32) {
 		const float *vs = (const float*)v->value_blob.data;
