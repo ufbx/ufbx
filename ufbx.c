@@ -10332,7 +10332,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_header_extension(ufbxi_cont
 		if (uc->version < 6000 && child->name == ufbxi_FBXVersion) {
 			int32_t version;
 			if (ufbxi_get_val1(child, "I", &version)) {
-				if (version > 0 && (uint32_t)version > uc->version) {
+				if (version > 0 && version < 6000 && (uint32_t)version > uc->version) {
 					uc->version = (uint32_t)version;
 				}
 			}
@@ -13649,6 +13649,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_root(ufbxi_context *uc)
 	if (uc->version < 7000) {
 		ufbxi_check(ufbxi_init_node_prop_names(uc));
 	}
+	// Don't allow changing version from this point onwards
+	uc->ascii.found_version = true;
 
 	// Document: Read root ID
 	if (uc->version >= 7000) {
@@ -16352,8 +16354,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_contex
 		// blend shapes here as they're always connected synthetically in older files.
 		if (uc->version > 0 && uc->version < 7000 && dst->type == UFBX_ELEMENT_NODE) {
 			if (src->type == UFBX_ELEMENT_SKIN_DEFORMER || src->type == UFBX_ELEMENT_CACHE_DEFORMER) {
-				tmp_conn->dst = ufbxi_find_attribute_fbx_id(uc, tmp_conn->dst);
-				dst = ufbxi_find_element_by_fbx_id(uc, tmp_conn->dst);
+				uint64_t dst_id = ufbxi_find_attribute_fbx_id(uc, tmp_conn->dst);
+				ufbx_element *dst_elem = ufbxi_find_element_by_fbx_id(uc, dst_id);
+				if (dst_elem) {
+					dst = dst_elem;
+				}
 			}
 		}
 
@@ -18635,13 +18640,21 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_flip_winding(ufbxi_context *uc, 
 	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->vertex_position.indices, true));
 	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->vertex_normal.indices, false));
 	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->vertex_crease.indices, false));
-	ufbxi_for_list(ufbx_uv_set, set, mesh->uv_sets) {
-		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_uv.indices, false));
-		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_tangent.indices, false));
-		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_bitangent.indices, false));
+	if (mesh->uv_sets.count > 0) {
+		ufbxi_for_list(ufbx_uv_set, set, mesh->uv_sets) {
+			ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_uv.indices, false));
+			ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_tangent.indices, false));
+			ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_bitangent.indices, false));
+		}
+		mesh->vertex_uv = mesh->uv_sets.data[0].vertex_uv;
+		mesh->vertex_bitangent = mesh->uv_sets.data[0].vertex_bitangent;
+		mesh->vertex_tangent = mesh->uv_sets.data[0].vertex_tangent;
 	}
-	ufbxi_for_list(ufbx_color_set, set, mesh->color_sets) {
-		ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_color.indices, false));
+	if (mesh->color_sets.count > 0) {
+		ufbxi_for_list(ufbx_color_set, set, mesh->color_sets) {
+			ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &set->vertex_color.indices, false));
+		}
+		mesh->vertex_color = mesh->color_sets.data[0].vertex_color;
 	}
 	ufbxi_check(ufbxi_flip_attrib_winding(uc, mesh, &mesh->skinned_position.indices, false));
 	if (mesh->skinned_normal.indices.data != mesh->vertex_normal.indices.data) {

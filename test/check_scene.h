@@ -363,11 +363,8 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	}
 
 	if (node->is_geometry_transform_helper) {
-		ufbxt_assert(node->parent);
-		if (scene->metadata.has_warning[UFBX_WARNING_DUPLICATE_OBJECT_ID]) {
-			// In broken cases we may have multiple geometry transform helpers
-			ufbxt_assert(node->parent->geometry_transform_helper);
-		} else {
+		if (!scene->metadata.has_warning[UFBX_WARNING_DUPLICATE_OBJECT_ID]) {
+			ufbxt_assert(node->parent);
 			ufbxt_assert(node->parent->geometry_transform_helper == node);
 		}
 	}
