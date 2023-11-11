@@ -6532,7 +6532,6 @@ static ufbxi_noinline ufbxi_xml_attrib *ufbxi_xml_find_attrib(ufbxi_xml_tag *tag
 static char ufbxi_normalize_array_type(char type) {
 	switch (type) {
 	case 'r': return sizeof(ufbx_real) == sizeof(float) ? 'f' : 'd';
-	case 'b': return 'c';
 	default: return type;
 	}
 }

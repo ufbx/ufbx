@@ -102,6 +102,18 @@ static void ufbxt_check_blob(ufbx_blob blob)
 	ufbxt_check_memory(blob.data, blob.size);
 }
 
+static void ufbxt_check_bool(const bool *p_value)
+{
+	ufbxt_assert(*(const char*)p_value == 0 || *(const char*)p_value == 1);
+}
+
+static void ufbxt_check_bool_list(ufbx_bool_list list)
+{
+	for (size_t i = 0; i < list.count; i++) {
+		ufbxt_check_bool(&list.data[i]);
+	}
+}
+
 #define ufbxt_check_list(list) ufbxt_check_memory((list).data, (list).count * sizeof(*(list).data))
 
 static void ufbxt_check_element_ptr_any(ufbx_scene *scene, ufbx_element *element)
@@ -459,11 +471,15 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_check_mesh_list(scene, mesh, mesh->edge_crease, mesh->num_edges, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->edge_smoothing, mesh->num_edges, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->edge_visibility, mesh->num_edges, true);
+	ufbxt_check_bool_list(mesh->edge_smoothing);
+	ufbxt_check_bool_list(mesh->edge_visibility);
 
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_material, mesh->num_faces, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_smoothing, mesh->num_faces, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_group, mesh->num_faces, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_hole, mesh->num_faces, true);
+	ufbxt_check_bool_list(mesh->face_smoothing);
+	ufbxt_check_bool_list(mesh->face_hole);
 
 	size_t num_triangles = 0;
 	size_t max_face_triangles = 0;
