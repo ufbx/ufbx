@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #if defined(_WIN32)
 #define ufbx_assert(cond) do { \
 		if (!(cond)) __debugbreak(); \
@@ -14,6 +16,7 @@
 #include "decode_file.h"
 #include "../../ufbx.h"
 #include "../../test/check_scene.h"
+#include "../../test/hash_scene.h"
 
 #if defined(AFL)
 	#include <unistd.h>
@@ -29,6 +32,7 @@ semfuzz::Value g_values[128*1024];
 
 static void init_opts(ufbx_load_opts &opts, const semfuzz::File &file)
 {
+#if 0
 	if (file.temp_limit > 0) {
 		opts.temp_allocator.allocation_limit = file.temp_limit;
 		opts.temp_allocator.huge_threshold = 1;
@@ -37,6 +41,14 @@ static void init_opts(ufbx_load_opts &opts, const semfuzz::File &file)
 		opts.result_allocator.allocation_limit = file.result_limit;
 		opts.result_allocator.huge_threshold = 1;
 	}
+#endif
+
+#if defined(ASAN)
+	opts.temp_allocator.huge_threshold = 1;
+	opts.result_allocator.huge_threshold = 1;
+#endif
+
+	opts.file_format = UFBX_FILE_FORMAT_FBX;
 	opts.result_allocator.memory_limit = UINT64_C(4000000000);
 	opts.temp_allocator.memory_limit = UINT64_C(4000000000);
 
@@ -68,9 +80,12 @@ static void init_opts(ufbx_load_opts &opts, const semfuzz::File &file)
     if ((flags & 0x00020000u) == 0x00020000u) opts.generate_missing_normals = true;
     if ((flags & 0x00040000u) == 0x00040000u) opts.reverse_winding = true;
     if ((flags & 0x00080000u) == 0x00080000u) opts.normalize_normals = true;
-    if ((flags & 0x00100000u) == 0x00100000u) opts.retain_dom = true;
+    if ((flags & 0x00100000u) == 0x00100000u) opts.normalize_tangents = true;
+    if ((flags & 0x00200000u) == 0x00200000u) opts.retain_dom = true;
+	if ((flags & 0x00c00000u) == 0x00400000u) opts.index_error_handling = UFBX_INDEX_ERROR_HANDLING_NO_INDEX;
+    if ((flags & 0x00c00000u) == 0x00800000u) opts.index_error_handling = UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING;
     if ((flags & 0x10000000u) == 0x10000000u) lefthanded = true;
-    if ((flags & 0x10000000u) == 0x20000000u) z_up = true;
+    if ((flags & 0x20000000u) == 0x20000000u) z_up = true;
 
 	opts.target_unit_meters = 1.0f;
 	if (lefthanded) {
@@ -78,6 +93,60 @@ static void init_opts(ufbx_load_opts &opts, const semfuzz::File &file)
 	} else {
 		opts.target_axes = z_up ? ufbx_axes_right_handed_z_up : ufbx_axes_right_handed_y_up;
 	}
+}
+
+void load_file(const semfuzz::File &file, int index)
+{
+	size_t dst_size = semfuzz::write_ascii(g_dst, sizeof(g_dst), file);
+	if (dst_size == 0) return;
+
+	ufbx_load_opts opts = { };
+	init_opts(opts, file);
+
+	ufbx_error error;
+	ufbx_scene *scene = ufbx_load_memory(g_dst, dst_size, &opts, &error);
+
+	if (scene) {
+		ufbxt_check_scene(scene);
+
+		{
+			ufbx_evaluate_opts eval_opts = { };
+			eval_opts.evaluate_skinning = true;
+			ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, 0.1, &eval_opts, &error);
+			ufbxt_assert(state);
+			ufbxt_check_scene(state);
+			ufbx_free_scene(state);
+		}
+
+		{
+			ufbx_baked_anim *bake = ufbx_bake_anim(scene, scene->anim, NULL, NULL);
+			ufbxt_assert(bake);
+			ufbx_free_baked_anim(bake);
+		}
+
+		{
+			FILE *hash_a = NULL, *hash_b = NULL;
+			if (index == -1) {
+				hash_a = fopen("hash_a.txt", "w");
+				hash_b = fopen("hash_b.txt", "w");
+			}
+
+			uint64_t scene_hash = ufbxt_hash_scene(scene, hash_a);
+			ufbx_scene *scene_alt = ufbx_load_memory(g_dst, dst_size, &opts, &error);
+			ufbxt_assert(scene_alt);
+
+			uint64_t alt_hash = ufbxt_hash_scene(scene_alt, hash_b);
+
+			if (hash_a) fclose(hash_a);
+			if (hash_b) fclose(hash_b);
+
+			ufbxt_assert(scene_hash == alt_hash);
+
+			ufbx_free_scene(scene_alt);
+		}
+	}
+
+	ufbx_free_scene(scene);
 }
 
 int main(int argc, char **argv)
@@ -92,20 +161,7 @@ int main(int argc, char **argv)
 	while (__AFL_LOOP(10000)) {
 		size_t src_size = (size_t)read(0, g_src, sizeof(g_src));
 		if (!semfuzz::read_fbb(file, g_src, src_size)) continue;
-		size_t dst_size = semfuzz::write_ascii(g_dst, sizeof(g_dst), file);
-		if (dst_size > 0) {
-			ufbx_load_opts opts = { };
-			opts.file_format = UFBX_FILE_FORMAT_FBX;
-			init_opts(opts, file);
-
-			ufbx_error error;
-			ufbx_scene *scene = ufbx_load_memory(g_dst, dst_size, &opts, &error);
-			if (scene) {
-				ufbxt_check_scene(scene);
-			}
-
-			ufbx_free_scene(scene);
-		}
+		load_file(file, 0);
 	}
 #else
 	if (argc > 1) {
@@ -119,6 +175,7 @@ int main(int argc, char **argv)
 
 		if (fs::is_directory(path)) {
 			for (const fs::directory_entry &entry : fs::directory_iterator(path)) {
+				if (!entry.is_regular_file()) continue;
 				paths.push_back(entry.path());
 			}
 		} else {
@@ -154,19 +211,8 @@ int main(int argc, char **argv)
 			if (!semfuzz::read_fbb(file, g_src, src_size)) {
 				return 1;
 			}
-			size_t dst_size = semfuzz::write_ascii(g_dst, sizeof(g_dst), file);
-			if (dst_size > 0) {
-				ufbx_load_opts opts = { };
-				opts.file_format = UFBX_FILE_FORMAT_FBX;
-				init_opts(opts, file);
 
-				ufbx_error error;
-				ufbx_scene *scene = ufbx_load_memory(g_dst, dst_size, &opts, &error);
-				if (scene) {
-					ufbxt_check_scene(scene);
-				}
-				ufbx_free_scene(scene);
-			}
+			load_file(file, index);
 
 			index++;
 		}

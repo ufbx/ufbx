@@ -10,7 +10,7 @@ unknown_string_table = list(common.read_string_table(1))
 string_to_index = { s: i for i,s in enumerate(string_table) }
 unknown_string_to_index = { s: i for i,s in enumerate(unknown_string_table) }
 
-re_name = re.compile(r"^([A-Za-z0-9]+):\s*(.*)")
+re_name = re.compile(r"^([A-Za-z0-9_]+):\s*(.*)")
 re_str = re.compile(r"^\"([^\"]*)\"$")
 re_int = re.compile(r"^[-+]?[0-9]+$")
 re_word = re.compile(r"^[A-Za-z]+$")
@@ -187,7 +187,7 @@ def encode_value(s):
         return Value(VALUE_INTEGER, encode_int(int(m.group(0))))
     m = re_word.match(s)
     if m:
-        return Value(VALUE_CHAR, ord(s))
+        return Value(VALUE_CHAR, ord(s[0]))
     try:
         value = float(s)
         return Value(VALUE_FLOAT, encode_float(value))
@@ -204,7 +204,7 @@ def encode_file(src):
         buffer = ""
         for line in src:
             line = line.strip()
-            if line.startswith(","):
+            if buffer.endswith(",") or buffer.endswith(":") or line.startswith(","):
                 buffer += line
             else:
                 yield buffer
@@ -357,8 +357,12 @@ flag_descs = [
     (0x00020000, 0x00020000, "generate_missing_normals"),
     (0x00040000, 0x00040000, "reverse_winding"),
     (0x00080000, 0x00080000, "normalize_normals"),
-    (0x00100000, 0x00100000, "retain_dom"),
+    (0x00100000, 0x00100000, "normalize_tangents"),
+    (0x00200000, 0x00200000, "retain_dom"),
+    (0x00c00000, 0x00400000, "UFBX_INDEX_ERROR_HANDLING_NO_INDEX"),
+    (0x00c00000, 0x00800000, "UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING"),
     (0x10000000, 0x10000000, "lefthanded"),
+    (0x20000000, 0x20000000, "z_up"),
 ]
 flag_values = { name: value for _, value, name in flag_descs }
 
