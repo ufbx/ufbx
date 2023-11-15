@@ -18934,7 +18934,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_absolute_to_relative_path(ufbxi_
 	while (rel_begin < rel_length && src_begin < src_length) {
 		size_t rel_end = ufbxi_next_path_segment(rel, rel_begin, rel_length);
 		size_t src_end = ufbxi_next_path_segment(src, src_begin, src_length);
-		if (rel_end != src_end && memcmp(rel + rel_begin, src + src_begin, src_end - src_begin) != 0) break;
+		if (rel_end != src_end || memcmp(rel + rel_begin, src + src_begin, src_end - src_begin) != 0) break;
 
 		rel_begin = rel_end + 1;
 		src_begin = src_end + 1;
