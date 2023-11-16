@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <math.h>
+#include <assert.h>
 
 #include "string_table.h"
 
@@ -286,9 +287,70 @@ double rng_f64_range(rng_state &state, double min_v, double max_v)
     return min_v * (1.0 - t) + max_v * t;
 }
 
+struct NumberCache {
+    static constexpr uint32_t size = 0x10000;
+
+    int64_t int_value[size];
+    char int_str[size][64];
+
+    uint64_t float_bits[size];
+    char float_str[size][64];
+
+    static uint32_t hash_u64(uint64_t value)
+    {
+        uint64_t x = value;
+		x ^= x >> 32;
+		x *= 0xd6e8feb86659fd93U;
+		x ^= x >> 32;
+		x *= 0xd6e8feb86659fd93U;
+		x ^= x >> 32;
+		return (uint32_t)x;
+    }
+
+    void init()
+    {
+        {
+			uint32_t index = hash_u64(0) & (size - 1);
+			char *dst = int_str[index];
+			snprintf(dst, 64, "%lld", (long long)0);
+        }
+
+        {
+			uint32_t index = hash_u64(0) & (size - 1);
+			char *dst = float_str[index];
+			snprintf(dst, 64, "%g", 0.0);
+        }
+    }
+
+    char *format_int(int64_t value)
+    {
+        uint32_t index = hash_u64((uint64_t)value) & (size - 1);
+        char *dst = int_str[index];
+        if (int_value[index] != value) {
+            snprintf(dst, 64, "%lld", (long long)value);
+            int_value[index] = value;
+        }
+        return dst;
+    }
+
+    char *format_float(double value)
+    {
+        uint64_t bits = 0;
+        memcpy(&bits, &value, sizeof(double));
+        uint32_t index = hash_u64(bits) & (size - 1);
+        char *dst = float_str[index];
+        if (float_bits[index] != bits) {
+            snprintf(dst, 64, "%g", value);
+            float_bits[index] = bits;
+        }
+        return dst;
+    }
+};
+
 struct Writer {
     Stream stream;
     const File &file;
+    NumberCache *number_cache;
 
     void write_string(string_id id)
     {
@@ -352,7 +414,8 @@ struct Writer {
                 }
                 for (uint32_t i = 0; i < size; i++) {
                     if (i != 0) stream.write(", ");
-                    stream.format("%lld", rng_i64_range(rng, min_v, max_v));
+                    stream.write(number_cache->format_int(rng_i64_range(rng, min_v, max_v)));
+                    // stream.format("%lld", rng_i64_range(rng, min_v, max_v));
                 }
             } else if (field.array_type == INST_ARRAY_FLOAT) {
                 double min_v = decode_float(min_val.value);
@@ -362,7 +425,8 @@ struct Writer {
                 }
                 for (uint32_t i = 0; i < size; i++) {
                     if (i != 0) stream.write(", ");
-                    stream.format("%g", rng_f64_range(rng, min_v, max_v));
+                    stream.write(number_cache->format_float(rng_f64_range(rng, min_v, max_v)));
+                    // stream.format("%g", rng_f64_range(rng, min_v, max_v));
                 }
             }
 
@@ -378,9 +442,11 @@ struct Writer {
                 if (value.type == INST_VALUE_STRING) {
                     write_escaped_string(value.value);
                 } else if (value.type == INST_VALUE_INT) {
-                    stream.format("%lld", decode_int(value.value));
+                    stream.write(number_cache->format_int(decode_int(value.value)));
+                    // stream.format("%lld", decode_int(value.value));
                 } else if (value.type == INST_VALUE_FLOAT) {
-                    stream.format("%g", decode_float(value.value));
+                    stream.write(number_cache->format_float(decode_float(value.value)));
+                    // stream.format("%g", decode_float(value.value));
                 } else if (value.type == INST_VALUE_CHAR) {
                     stream.format("%c", (char)(value.value & 0x7f));
                 }
@@ -408,9 +474,9 @@ struct Writer {
     }
 };
 
-static size_t write_ascii(char *dst, size_t dst_size, const File &file)
+static size_t write_ascii(char *dst, size_t dst_size, const File &file, NumberCache *number_cache)
 {
-    Writer w = { { dst, dst, dst + dst_size }, file };
+    Writer w = { { dst, dst, dst + dst_size }, file, number_cache };
     w.stream.format("; FBX %u.%u.0 project file\n", file.version / 1000 % 10, file.version / 100 % 10);
     w.stream.write("; ----------------------------------------------------\n\n");
 
