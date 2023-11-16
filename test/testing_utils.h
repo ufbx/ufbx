@@ -146,6 +146,7 @@ typedef struct {
 	bool root_groups_at_bone;
 	bool remove_namespaces;
 	bool match_by_order;
+	bool negate_xz;
 	ufbx_real tolerance;
 	ufbx_real uv_tolerance;
 	uint32_t allow_missing;
@@ -727,6 +728,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			if (!strcmp(line, "ufbx:match_by_order")) {
 				obj->match_by_order = true;
 			}
+			if (!strcmp(line, "ufbx:negate_xz")) {
+				obj->negate_xz = true;
+			}
 			if (!strcmp(line, "www.blender.org")) {
 				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
 			}
@@ -1084,6 +1088,12 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 		}
 		if (obj->fbx_rotation.w != 1.0f) {
 			obj_verts[i].pos = ufbx_quat_rotate_vec3(obj->fbx_rotation, obj_verts[i].pos);
+		}
+		if (obj->negate_xz) {
+			obj_verts[i].pos.x *= -1.0f;
+			obj_verts[i].pos.z *= -1.0f;
+			obj_verts[i].normal.x *= -1.0f;
+			obj_verts[i].normal.z *= -1.0f;
 		}
 
 		if (scale != 1.0) {
@@ -1559,6 +1569,13 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 						op.x *= (ufbx_real)scale;
 						op.y *= (ufbx_real)scale;
 						op.z *= (ufbx_real)scale;
+					}
+
+					if (obj->negate_xz) {
+						op.x *= -1.0f;
+						op.z *= -1.0f;
+						on.x *= -1.0f;
+						on.z *= -1.0f;
 					}
 
 					ufbxt_assert_close_vec3(p_err, op, fp);
