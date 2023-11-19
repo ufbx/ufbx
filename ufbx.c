@@ -19456,8 +19456,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 			ufbxi_patch_index_pointer(uc, &mesh->vertex_position.indices.data);
 			ufbxi_patch_index_pointer(uc, &mesh->vertex_normal.indices.data);
-			ufbxi_patch_index_pointer(uc, &mesh->vertex_bitangent.indices.data);
-			ufbxi_patch_index_pointer(uc, &mesh->vertex_tangent.indices.data);
+			ufbxi_patch_index_pointer(uc, &mesh->vertex_color.indices.data);
+			ufbxi_patch_index_pointer(uc, &mesh->vertex_crease.indices.data);
 			ufbxi_patch_index_pointer(uc, &mesh->face_material.data);
 			ufbxi_patch_index_pointer(uc, &mesh->face_group.data);
 
