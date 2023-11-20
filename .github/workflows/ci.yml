@@ -537,10 +537,8 @@ jobs:
           build/check_fbx -d /mnt/fbx-files/fuzz/fuzz-fb
       - name: Generate coverage
         run: LLVM_COV=llvm-cov bash misc/generate_lcov.sh
-      - name: Setup coverage (temp)
-        run: curl https://codecov.io/bash -O codecov.sh
       - name: Upload coverage
-        run: bash codecov.sh -F fuzz -f coverage.lcov -y .github/codecov.yml
+        run: bash /codecov.sh -F fuzz -f coverage.lcov -y .github/codecov.yml
 
   ci_post_hashes:
     runs-on: ubuntu-latest
