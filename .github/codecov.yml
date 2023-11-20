@@ -17,3 +17,15 @@ ignore:
   - "test"
 comment: 
   layout: "diff"
+
+flags:
+  tests:
+    paths:
+      - ufbx.c
+      - ufbx.h
+    carryforward: false
+  fuzz:
+    paths:
+      - ufbx.c
+      - ufbx.h
+    carryforward: false
