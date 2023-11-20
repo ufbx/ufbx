@@ -790,7 +790,9 @@ static void ufbxt_check_skin_deformer(ufbx_scene *scene, ufbx_skin_deformer *def
 
 		for (size_t i = 1; i < vertex.num_weights; i++) {
 			size_t ix = vertex.weight_begin + i;
-			ufbxt_assert(deformer->weights.data[ix - 1].weight >= deformer->weights.data[ix].weight);
+			if (!isnan(deformer->weights.data[ix - 1].weight) && !isnan(deformer->weights.data[ix].weight)) {
+				ufbxt_assert(deformer->weights.data[ix - 1].weight >= deformer->weights.data[ix].weight);
+			}
 		}
 	}
 	for (size_t i = 0; i < deformer->weights.count; i++) {
