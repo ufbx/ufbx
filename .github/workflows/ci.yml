@@ -533,8 +533,8 @@ jobs:
         run: clang -coverage -DEXTERNAL_UFBX -O2 ufbx.c test/check_fbx.c -lm -o build/check_fbx
       - name: Check fuzz files
         run: |
-          build/check_fbx -d /mnt/fbx-files/fuzz-fa
-          build/check_fbx -d /mnt/fbx-files/fuzz-fb
+          build/check_fbx -d /mnt/fbx-files/fuzz/fuzz-fa
+          build/check_fbx -d /mnt/fbx-files/fuzz/fuzz-fb
       - name: Generate coverage
         run: LLVM_COV=llvm-cov bash misc/generate_lcov.sh
       - name: Upload coverage
