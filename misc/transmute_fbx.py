@@ -106,7 +106,7 @@ def parse_fbx(stream):
             if not node: break
             children.append(node)
         footer = stream.read(16)
-        root = Node("", [], children)
+        root = Node(b"", [], children)
         format = "binary-be" if big_endian else "binary"
         return FbxFile(root, version, format, footer)
     else:
