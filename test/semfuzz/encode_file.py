@@ -1,3 +1,5 @@
+import os
+import sys
 import common
 import argparse
 import re
@@ -18,13 +20,26 @@ re_float = re.compile(r"[-+]?[0-9]+(?:\.[0-9]+)?(?:[eE][+\-]?[0-9]+)?")
 re_magic = re.compile(r"; FBX (\d).(\d).(\d) project file")
 
 Value = namedtuple("Value", "type value")
-VALUE_STRING = 0
-VALUE_INTEGER = 1
-VALUE_FLOAT = 2
-VALUE_CHAR = 3
+TYPE_C = 0x0
+TYPE_Y = 0x1
+TYPE_I = 0x2
+TYPE_L = 0x3
+TYPE_F = 0x4
+TYPE_D = 0x5
+TYPE_S = 0x6
+TYPE_R = 0x7
+
+type_letters = "CYILFDSR"
+type_letters_b = "CYILFDSR".encode("ascii")
+arr_letters_b = "cbilfd".encode("ascii")
 
 c_gray = "\033[1;30m"
 c_def = "\033[0m"
+
+ARRAY_PATTERN_RANDOM = 0x0
+ARRAY_PATTERN_ASCENDING = 0x1
+ARRAY_PATTERN_POLYGON = 0x2
+ARRAY_PATTERN_REFCOUNT = 0x3
 
 class Field:
     def __init__(self, name, values, is_array):
@@ -35,10 +50,12 @@ class Field:
         self.is_array = is_array
         self.array_min = None
         self.array_max = None
-        self.array_float = False
+        self.array_type = -1
         self.array_size = 0
         self.array_hash = 0
+        self.array_param = 0
         self.array_explicit = False
+        self.array_pattern = ARRAY_PATTERN_RANDOM
 
 class File:
     def __init__(self):
@@ -48,14 +65,39 @@ class File:
         self.result_limit = 0
         self.top_field = None
 
-def dump_str(index):
+def decode_str(index):
+    swap_bit = index & 0x4000
+    if swap_bit:
+        index ^= 0x4000
     if index < len(string_table):
-        return f"{index:04x}{c_gray}[{string_table[index]}]{c_def}"
+        result = string_table[index]
     else:
         un_index = (index & 0x7fff) % len(unknown_string_table)
-        return f"{index:04x}{c_gray}[{unknown_string_table[un_index]}]{c_def}"
+        result = unknown_string_table[un_index]
+    if swap_bit and "::" in result:
+        type, name = result.split("::", 2)
+        result = f"{name}\\0\\1{type}"
+    return result
+
+def dump_str(index):
+    result = decode_str(index)
+    return f"{index:04x}{c_gray}[{result}]{c_def}"
 
 def decode_int(index):
+    sign = index >> 15
+    exp = (index >> 13) & 0x3
+    mantissa = index & 0x1fff
+    if exp == 0:
+        value = mantissa
+    elif exp == 1:
+        value = 0x2000 + mantissa * 0x3
+    elif exp == 2:
+        value = 0x8000 + mantissa * 0x3fc
+    elif exp == 3:
+        value = 0x800000 + mantissa * 0x3fc00
+    return -value if sign else value
+
+def decode_long(index):
     sign = index >> 15
     exp = (index >> 13) & 0x3
     mantissa = index & 0x1fff
@@ -78,44 +120,89 @@ def decode_float(index):
         value = 0
     return -value if sign else value
 
+def decode_double(index):
+    return decode_float(index)
+
+def decode_word(value):
+    return value - 0x10000 if value >= 0x8000 else value
+
 def decode_number(value):
-    if value.type == VALUE_INTEGER:
+    if value.type == TYPE_C:
         return decode_int(value.value)
-    elif value.type == VALUE_FLOAT:
+    elif value.type == TYPE_Y:
+        return decode_word(value.value)
+    elif value.type == TYPE_I:
+        return decode_int(value.value)
+    elif value.type == TYPE_L:
+        return decode_long(value.value)
+    elif value.type == TYPE_F:
         return decode_float(value.value)
+    elif value.type == TYPE_D:
+        return decode_double(value.value)
     else:
         assert False
 
 def dump_int(index):
     return f"{index:04x}{c_gray}[{decode_int(index)}]{c_def}"
 
+def dump_long(index):
+    return f"{index:04x}{c_gray}[{decode_long(index)}]{c_def}"
+
 def dump_float(index):
     return f"{index:04x}{c_gray}[{decode_float(index)}]{c_def}"
+
+def dump_double(index):
+    return f"{index:04x}{c_gray}[{decode_double(index)}]{c_def}"
+
+def dump_word(index):
+    return f"{index:04x}{c_gray}[{decode_word(index)}]{c_def}"
 
 def dump_char(index):
     char = chr(index & 0xff)
     return f"{index:04x}{c_gray}[{char}]{c_def}"
 
+def dump_value_raw(value):
+    if value.type == TYPE_S:
+        return dump_str(value.value)
+    elif value.type == TYPE_R:
+        return dump_str(value.value)
+    elif value.type == TYPE_Y:
+        return dump_word(value.value)
+    elif value.type == TYPE_I:
+        return dump_int(value.value)
+    elif value.type == TYPE_L:
+        return dump_long(value.value)
+    elif value.type == TYPE_F:
+        return dump_float(value.value)
+    elif value.type == TYPE_D:
+        return dump_double(value.value)
+    elif value.type == TYPE_C:
+        return dump_char(value.value)
+
 def dump_value(value):
-    if value.type == VALUE_STRING:
-        return f"{value.type}{c_gray}[string]{c_def}:{dump_str(value.value)}"
-    elif value.type == VALUE_INTEGER:
-        return f"{value.type}{c_gray}[integer]{c_def}:{dump_int(value.value)}"
-    elif value.type == VALUE_FLOAT:
-        return f"{value.type}{c_gray}[float]{c_def}:{dump_float(value.value)}"
-    elif value.type == VALUE_CHAR:
-        return f"{value.type}{c_gray}[char]{c_def}:{dump_char(value.value)}"
+    if value.type == TYPE_S:
+        return f"{c_gray}[string]{c_def}{dump_str(value.value)}"
+    elif value.type == TYPE_R:
+        return f"{c_gray}[raw string]{c_def}{dump_str(value.value)}"
+    elif value.type == TYPE_Y:
+        return f"{c_gray}[word]{c_def}{dump_word(value.value)}"
+    elif value.type == TYPE_I:
+        return f"{c_gray}[integer]{c_def}{dump_int(value.value)}"
+    elif value.type == TYPE_L:
+        return f"{c_gray}[long]{c_def}{dump_long(value.value)}"
+    elif value.type == TYPE_F:
+        return f"{c_gray}[float]{c_def}{dump_float(value.value)}"
+    elif value.type == TYPE_D:
+        return f"{c_gray}[double]{c_def}{dump_double(value.value)}"
+    elif value.type == TYPE_C:
+        return f"{c_gray}[char]{c_def}{dump_char(value.value)}"
 
 def dump_field(field, indent=0):
     if field.is_array:
-        if field.array_float:
-            min_v = encode_float(field.array_min)
-            max_v = encode_float(field.array_max)
-            result = f"{'  ' * indent}{dump_str(field.name)}: [array] 2:{c_gray}[float]{c_def} {field.array_size} {field.array_hash & 0xffff} {dump_float(min_v)} {dump_float(max_v)}"
-        else:
-            min_v = encode_int(int(field.array_min))
-            max_v = encode_int(int(field.array_max))
-            result = f"{'  ' * indent}{dump_str(field.name)}: [array] 1:{c_gray}[integer]{c_def} {field.array_size} {field.array_hash & 0xffff} {dump_int(min_v)} {dump_int(max_v)}"
+        min_s = dump_value(Value(field.array_type, encode_value(field.array_type, field.array_min)))
+        max_s = dump_value(Value(field.array_type, encode_value(field.array_type, field.array_max)))
+        tl = type_letters[field.array_type]
+        result = f"{'  ' * indent}{dump_str(field.name)}: [array] 2:{c_gray}[{tl}]{c_def} {field.array_size} {field.array_param & 0xffff} {field.array_hash & 0xffff} {min_s} {max_s}"
         return result
     else:
         values = (dump_value(v) for v in field.values)
@@ -124,8 +211,14 @@ def dump_field(field, indent=0):
             result += "\n" + dump_field(child, indent + 1)
         return result
 
-def encode_string(value):
-    content = value.replace("&quot;", "\"")
+def encode_string(content):
+    swap_bit = 0
+    if isinstance(content, bytes):
+        if b"\x00\x01" in content:
+            name, type = content.split(b"\x00\x01", maxsplit=1)
+            content = b"::".join((type, name))
+            swap_bit = 0x4000
+        content = content.decode("utf-8", errors="ignore")
     ix = string_to_index.get(content)
     if ix is not None:
         return ix
@@ -133,7 +226,7 @@ def encode_string(value):
         ix = unknown_string_to_index.get(content)
         if not ix:
             ix = hash(content) % len(unknown_string_table)
-        return 0x8000 | ix
+        return 0x8000 | swap_bit | ix
 
 seen_int_mapping = [{}, {}, {}, {}]
 
@@ -145,7 +238,31 @@ def add_int(exp, value):
     seen_int_mapping[exp][value] = index
     return index
 
+def encode_word(value):
+    return 0x7fff - value if value < 0 else value
+
 def encode_int(value):
+    sign = 1 if value < 0 else 0
+    if sign:
+        value = -value
+    if value < 0x2000:
+        # Factor 0x1
+        exp = 0
+    elif value < 0x8000:
+        # Factor 0x3
+        exp = 1
+        value = add_int(exp, value) & 0x1fff
+    elif value < 0x80000000:
+        # Factor 0x3fc
+        exp = 2
+        value = add_int(exp, value) & 0x1fff
+    else:
+        # Factor 0x3fc00
+        exp = 3
+        value = add_int(exp, value) & 0x1fff
+    return sign << 15 | exp << 13 | value
+
+def encode_long(value):
     sign = 1 if value < 0 else 0
     if sign:
         value = -value
@@ -170,32 +287,74 @@ def encode_float(value):
     sign = 1 if value < 0 else 0
     if sign:
         value = -value
+
+    if math.isnan(value):
+        return sign << 15 | 127 << 8 | 0
+    elif not math.isfinite(value):
+        return sign << 15 | 127 << 8 | 1
+
     if value != 0:
         m, exp = math.frexp(value)
     else:
         m, exp = 0.5, -64
-    exp = min(max(exp + 64, 0), 127)
+    exp = min(max(exp + 64, 0), 126)
     m = min(max(int((m - 0.5) * 2 * 256), 0), 255)
     return sign << 15 | exp << 8 | m
 
-def encode_value(s):
+def encode_double(value):
+    return encode_float(value)
+
+def encode_integer(value):
+    if -2147483648 <= value <= 2147483647:
+        return Value(TYPE_I, encode_int(value))
+    else:
+        return Value(TYPE_L, encode_long(value))
+
+def encode_number(value):
+    if isinstance(value, int):
+        return encode_integer(value)
+    else:
+        return Value(TYPE_D, encode_double(value))
+
+def encode_value(type, value):
+    if type == TYPE_C:
+        return value & 0xff
+    if type == TYPE_Y:
+        return encode_word(value)
+    if type == TYPE_I:
+        return encode_int(value)
+    if type == TYPE_L:
+        return encode_long(value)
+    if type == TYPE_F:
+        return encode_float(value)
+    if type == TYPE_D:
+        return encode_double(value)
+    if type == TYPE_S:
+        return encode_string(value)
+    if type == TYPE_R:
+        return encode_string(value)
+
+def parse_value(s):
     m = re_str.match(s)
     if m:
-        return Value(VALUE_STRING, encode_string(m.group(1)))
+        content = m.group(1)
+        content = content.replace("&quot;", "\"")
+        return Value(TYPE_S, encode_string(content))
     m = re_int.match(s)
     if m:
-        return Value(VALUE_INTEGER, encode_int(int(m.group(0))))
+        value = int(m.group(0))
+        return encode_integer(value)
     m = re_word.match(s)
     if m:
-        return Value(VALUE_CHAR, ord(s[0]))
+        return Value(TYPE_C, ord(s[0]))
     try:
         value = float(s)
-        return Value(VALUE_FLOAT, encode_float(value))
+        return Value(TYPE_D, encode_double(value))
     except:
         pass
     return None
 
-def encode_file(src):
+def parse_ascii(src):
     file = File()
     file.top_field = top_field = Field(0, [], False)
     stack = [top_field]
@@ -230,19 +389,9 @@ def encode_file(src):
             for v in re_float.findall(line):
                 is_int = re_int.match(v)
                 value = int(v) if is_int else float(v)
-                if not target_array.is_array or target_array.array_explicit:
-                    if is_int:
-                        target_array.values.append(Value(VALUE_INTEGER, encode_int(value)))
-                    else:
-                        target_array.values.append(Value(VALUE_FLOAT, encode_float(value)))
-                else:
-                    if not is_int:
-                        target_array.array_float = True
-                    if target_array.array_min is None or value < target_array.array_min:
-                        target_array.array_min = value
-                    if target_array.array_max is None or value > target_array.array_max:
-                        target_array.array_max = value
-                    target_array.array_hash = hash((target_array.array_hash, hash(value)))
+                encoded_value = encode_number(value)
+                if target_array.is_array:
+                    target_array.values.append(encoded_value)
             continue
 
         m = re_name.match(line)
@@ -255,10 +404,8 @@ def encode_file(src):
             values = [v.strip() for v in rest.split(",")]
 
             is_array = False
-            array_size = 0
             if len(values) == 1 and values[0].startswith("*"):
                 is_array = True
-                array_size = int(values[0][1:])
 
             name_ix = string_to_index.get(name)
             if not name_ix:
@@ -266,42 +413,136 @@ def encode_file(src):
                     stack.append(None)
                 continue
 
-            values = [encode_value(v) for v in values]
+            values = [parse_value(v) for v in values]
             values = [v for v in values if v]
             field = Field(name_ix, values, is_array)
 
-            if is_array and name == "KeyAttrRefCount":
-                field.array_explicit = True
-            field.array_size = min(array_size, 0xffff)
             if stack[-1]:
                 stack[-1].fields.append(field)
             if opens_scope:
                 stack.append(field)
 
-    if file.version < 7000:
-        def transform_to_arrays(field):
-            if not field.is_array and len(field.values) > 8 and all(v.type in (VALUE_INTEGER, VALUE_FLOAT) for v in field.values):
-                values = [decode_number(v) for v in field.values]
-                field.is_array = True
-                field.array_float = any(v.type == VALUE_FLOAT for v in field.values)
-                field.array_min = min(values)
-                field.array_max = max(values)
-                field.array_size = min(len(values), 0xffff)
-                field.array_hash = hash(tuple(values))
-                field.values = []
-            for child in field.fields:
-                transform_to_arrays(child)
-        transform_to_arrays(file.top_field)
+    def transform_to_arrays(field):
+        if field.is_array or (len(field.values) > 8 and all(v.type in (TYPE_I, TYPE_L, TYPE_F, TYPE_D) for v in field.values)):
+            values = [decode_number(v) for v in field.values]
+            field.is_array = True
+            field.array_type = max(v.type for v in field.values)
+            field.array_min = min(values)
+            field.array_max = max(values)
+            field.array_size = min(len(values), 0xffff)
+            field.array_hash = hash(tuple(values))
+            name = decode_str(field.name)
+            if name == "PolygonVertexIndex":
+                field.array_pattern = ARRAY_PATTERN_POLYGON
+                field.array_param = sum(1 for v in values if v < 0)
+            elif name == "KeyAttrRefCount":
+                field.array_pattern = ARRAY_PATTERN_REFCOUNT
+                field.array_param = sum(int(v) for v in values)
+            elif name == "KeyTime":
+                field.array_pattern = ARRAY_PATTERN_ASCENDING
+            else:
+                field.array_pattern = ARRAY_PATTERN_RANDOM
+            field.values = []
+        for child in field.fields:
+            transform_to_arrays(child)
+    transform_to_arrays(file.top_field)
 
     return file
 
+def parse_binary(f):
+    self_path = os.path.dirname(os.path.abspath(__file__))
+    misc_path = os.path.realpath(os.path.join(self_path, "..", "..", "misc"))
+    sys.path.append(misc_path)
+    import transmute_fbx
+
+    fbx_file = transmute_fbx.parse_fbx(f)
+
+    def parse_value(value):
+        type_ix = type_letters_b.index(value.type)
+        return Value(type_ix, encode_value(type_ix, value.value))
+
+    def parse_node(node):
+        name = node.name.decode("ascii")
+        name_ix = string_to_index.get(name)
+        if not name_ix: return None
+
+        array_values = None
+        array_type = -1
+        if len(node.values) == 1 and node.values[0].type in b"cbilfd":
+            arr = node.values[0]
+            array_values = arr.value
+            array_type = arr_letters_b.index(arr.type)
+        elif len(node.values) > 8 and all(v.type in b"CYILFD" for v in node.values) and name != "Key":
+            array_values = [v.value for v in node.values]
+            array_type = max(type_letters_b.index(v.type) for v in node.values)
+            if array_type == TYPE_Y:
+                array_type = TYPE_I
+
+        if array_type >= 0:
+            field = Field(name_ix, [], True)
+            field.fields = [parse_node(n) for n in node.children]
+            field.array_min = min(array_values) if array_values else 0
+            field.array_max = max(array_values) if array_values else 0
+            field.array_size = min(len(array_values), 0x2000)
+
+            if name == "PolygonVertexIndex":
+                field.array_pattern = ARRAY_PATTERN_POLYGON
+                field.array_param = sum(1 for v in array_values if v < 0)
+            elif name == "KeyAttrRefCount":
+                field.array_pattern = ARRAY_PATTERN_REFCOUNT
+                field.array_param = sum(int(v) for v in array_values)
+            elif name == "KeyTime":
+                field.array_pattern = ARRAY_PATTERN_ASCENDING
+            else:
+                field.array_pattern = ARRAY_PATTERN_RANDOM
+            field.array_hash = hash(tuple(array_values))
+            field.array_type = array_type
+        else:
+            values = [parse_value(v) for v in node.values]
+            field = Field(name_ix, values, False)
+            field.fields = [parse_node(n) for n in node.children]
+        field.fields = [f for f in field.fields if f]
+        return field
+
+    file = File()
+    file.version = fbx_file.version
+    if fbx_file.format == "binary-be":
+        file.flags |= 0x01000000
+    file.top_field = parse_node(fbx_file.root)
+
+    return file
+
+def encode_file(path):
+    is_binary = False
+    with open(path, "rb") as f:
+        magic = f.read(22)
+        if magic == b"Kaydara FBX Binary  \x00\x1a":
+            is_binary = True
+
+    if is_binary:
+        with open(path, "rb") as f:
+            return parse_binary(f)
+    else:
+        with open(path, "rt", encoding="utf-8") as f:
+            return parse_ascii(f)
+
 INST_FIELD = 0x0
-INST_ARRAY_INT = 0x1
-INST_ARRAY_FLOAT = 0x2
-INST_VALUE_STRING = 0x3
-INST_VALUE_INT = 0x4
-INST_VALUE_FLOAT = 0x5
-INST_VALUE_CHAR = 0x6
+
+INST_ARRAY_C = 0x1
+INST_ARRAY_B = 0x2
+INST_ARRAY_I = 0x3
+INST_ARRAY_L = 0x4
+INST_ARRAY_F = 0x5
+INST_ARRAY_D = 0x6
+
+INST_VALUE_C = 0x7
+INST_VALUE_Y = 0x8
+INST_VALUE_I = 0x9
+INST_VALUE_L = 0xa
+INST_VALUE_F = 0xb
+INST_VALUE_D = 0xc
+INST_VALUE_S = 0xe
+INST_VALUE_R = 0xf
 
 def push_instruction(code, inst, level, *words):
     inst_word = level << 4 | inst
@@ -313,22 +554,20 @@ def push_instruction(code, inst, level, *words):
 def encode_instructions(code, field, level):
     if field.is_array:
         hash = field.array_hash & 0xffff
+        param = field.array_param & 0xffff
         if field.array_explicit:
             push_instruction(code, INST_FIELD, level, field.name)
             for value in field.values:
-                push_instruction(code, INST_VALUE_STRING + value.type, level + 1, value.value)
-        elif field.array_float:
-            min_v = encode_float(field.array_min)
-            max_v = encode_float(field.array_max)
-            push_instruction(code, INST_ARRAY_FLOAT, level, field.name, field.array_size, hash, min_v, max_v)
+                push_instruction(code, INST_VALUE_C + value.type, level + 1, value.value)
         else:
-            min_v = encode_int(int(field.array_min))
-            max_v = encode_int(int(field.array_max))
-            push_instruction(code, INST_ARRAY_INT, level, field.name, field.array_size, hash, min_v, max_v)
+            min_v = encode_value(field.array_type, field.array_min)
+            max_v = encode_value(field.array_type, field.array_max)
+            pat_size = field.array_size | field.array_pattern << 14
+            push_instruction(code, INST_ARRAY_C + field.array_type, level, field.name, pat_size, param, hash, min_v, max_v)
     else:
         push_instruction(code, INST_FIELD, level, field.name)
         for value in field.values:
-            push_instruction(code, INST_VALUE_STRING + value.type, level + 1, value.value)
+            push_instruction(code, INST_VALUE_C + value.type, level + 1, value.value)
         for child in field.fields:
             encode_instructions(code, child, level + 1)
 
@@ -361,6 +600,7 @@ flag_descs = [
     (0x00200000, 0x00200000, "retain_dom"),
     (0x00c00000, 0x00400000, "UFBX_INDEX_ERROR_HANDLING_NO_INDEX"),
     (0x00c00000, 0x00800000, "UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING"),
+    (0x01000000, 0x01000000, "big_endian"),
     (0x10000000, 0x10000000, "lefthanded"),
     (0x20000000, 0x20000000, "z_up"),
 ]
@@ -402,29 +642,24 @@ def disassemble(code):
             inst_str = f"{inst_word:04x}{c_gray}[{level} INST_FIELD]{c_def}"
             print(f"{inst_str:<38} {dump_str(name)}")
             n += 4
-        elif INST_ARRAY_INT <= inst <= INST_ARRAY_FLOAT:
-            name, size, hash, min_v, max_v = struct.unpack("<HHHHH", code[n+2:n+12])
-            if inst == INST_ARRAY_INT:
-                inst_str = f"{inst_word:04x}{c_gray}[{level} INST_ARRAY_INT]{c_def}"
-                print(f"{inst_str:<38} {dump_str(name)} {size:04x}{c_gray}[{size}]{c_def} {hash:04x}{c_gray}[{hash}]{c_def} {dump_int(min_v)} {dump_int(max_v)}")
-            elif inst == INST_ARRAY_FLOAT:
-                inst_str = f"{inst_word:04x}{c_gray}[{level} INST_ARRAY_FLOAT]{c_def}"
-                print(f"{inst_str:<38} {dump_str(name)} {size:04x}{c_gray}[{size}]{c_def} {hash:04x}{c_gray}[{hash}]{c_def} {dump_float(min_v)} {dump_float(max_v)}")
-            n += 12
-        elif INST_VALUE_STRING <= inst <= INST_VALUE_CHAR:
+        elif INST_ARRAY_C <= inst <= INST_ARRAY_D:
+            name, pat_size, param, hash, min_v, max_v = struct.unpack("<HHHHHH", code[n+2:n+14])
+            arr_type = inst - INST_ARRAY_C
+            min_s = dump_value_raw(Value(arr_type, min_v))
+            max_s = dump_value_raw(Value(arr_type, max_v))
+            tl = type_letters[arr_type]
+            inst_str = f"{inst_word:04x}{c_gray}[{level} INST_ARRAY {tl}]{c_def}"
+            size = pat_size & 0x3fff
+            pat = pat_size >> 14
+            pattern = ["RANDOM", "ASCENDING", "POLYGON", "REFCOUNT"][pat]
+            print(f"{inst_str:<38} {dump_str(name)} {size:04x}{c_gray}[{pattern}, {size}]{c_def} {param:04x}{c_gray}[{param}]{c_def} {hash:04x}{c_gray}[{hash}]{c_def} {min_s} {max_s}")
+            n += 14
+        elif INST_VALUE_C <= inst <= INST_VALUE_R:
             value = struct.unpack("<H", code[n+2:n+4])[0]
-            if inst == INST_VALUE_STRING:
-                inst_str = f"{inst_word:04x}{c_gray}[{level} INST_VALUE_STRING]{c_def}"
-                print(f"{inst_str:<38} {dump_str(value)}")
-            elif inst == INST_VALUE_INT:
-                inst_str = f"{inst_word:04x}{c_gray}[{level} INST_VALUE_INT]{c_def}"
-                print(f"{inst_str:<38} {dump_int(value)}")
-            elif inst == INST_VALUE_FLOAT:
-                inst_str = f"{inst_word:04x}{c_gray}[{level} INST_VALUE_FLOAT]{c_def}"
-                print(f"{inst_str:<38} {dump_float(value)}")
-            elif inst == INST_VALUE_CHAR:
-                inst_str = f"{inst_word:04x}{c_gray}[{level} INST_VALUE_CHAR]{c_def}"
-                print(f"{inst_str:<38} {dump_char(value)}")
+            val_type = inst - INST_VALUE_C
+            tl = type_letters[val_type]
+            inst_str = f"{inst_word:04x}{c_gray}[{level} INST_VALUE {tl}]{c_def}"
+            print(f"{inst_str:<38} {dump_value_raw(Value(val_type, value))}")
             n += 4
         else:
             assert False
@@ -433,6 +668,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("input", help="Input filename")
     parser.add_argument("-o", type=str, help="Output path")
+    parser.add_argument("--out-dir", type=str, help="Output directory")
     parser.add_argument("-f", default=[], action="append", help="Specify flags")
     parser.add_argument("--temp-limit", type=int, help="Temporary allocation limit")
     parser.add_argument("--result-limit", type=int, help="Result allocation limit")
@@ -440,23 +676,27 @@ if __name__ == "__main__":
     parser.add_argument("--disassemble", action="store_true", help="Disassemble output")
     argv = parser.parse_args()
 
-    with open(argv.input, "rt", encoding="utf-8") as f:
-        result = encode_file(f)
+    result = encode_file(argv.input)
 
-        for flag in argv.f:
-            result.flags |= flag_values[flag]
-        result.temp_limit = min(max(argv.temp_limit or 0, 0), 0xffff)
-        result.result_limit = min(max(argv.result_limit or 0, 0), 0xffff)
+    for flag in argv.f:
+        result.flags |= flag_values[flag]
+    result.temp_limit = min(max(argv.temp_limit or 0, 0), 0xffff)
+    result.result_limit = min(max(argv.result_limit or 0, 0), 0xffff)
 
-        if argv.dump:
-            print(dump_field(result.top_field))
-        code = bytearray()
-        code += struct.pack("<HIII", result.version, result.flags, result.temp_limit, result.result_limit)
-        for field in result.top_field.fields:
-            encode_instructions(code, field, 0)
-        code = bytes(code)
-        if argv.disassemble:
-            disassemble(code)
-        if argv.o:
-            with open(argv.o, "wb") as wf:
-                wf.write(code)
+    if argv.dump:
+        print(dump_field(result.top_field))
+    code = bytearray()
+    code += struct.pack("<HIII", result.version, result.flags, result.temp_limit, result.result_limit)
+    for field in result.top_field.fields:
+        encode_instructions(code, field, 0)
+    code = bytes(code)
+    if argv.disassemble:
+        disassemble(code)
+    if argv.o:
+        with open(argv.o, "wb") as wf:
+            wf.write(code)
+    if argv.out_dir:
+        name, _ = os.path.splitext(os.path.basename(argv.input))
+        path = os.path.join(argv.out_dir, f"{name}.fbb")
+        with open(path, "wb") as wf:
+            wf.write(code)
