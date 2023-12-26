@@ -4160,6 +4160,11 @@ typedef struct ufbx_baked_anim {
 	ufbx_baked_element_list elements;
 } ufbx_baked_anim;
 
+// -- Thread API
+//
+// NOTE: This API is still experimental and may change.
+// Documentation is currently missing on purpose.
+
 typedef uintptr_t ufbx_thread_pool_context;
 
 typedef struct ufbx_thread_pool_info {

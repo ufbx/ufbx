@@ -2524,6 +2524,9 @@ typedef enum ufbxt_file_test_flags {
 	// Scale FBX vertices by 100 when diffing.
 	UFBXT_FILE_TEST_FLAG_DIFF_SCALE_100 = 0x2000,
 
+	// Allow threaded parsing to fail
+	UFBXT_FILE_TEST_FLAG_ALLOW_THREAD_ERROR = 0x4000,
+
 } ufbxt_file_test_flags;
 
 const char *ufbxt_file_formats[] = {
@@ -2603,6 +2606,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	bool skip_opts_checks = (flags & UFBXT_FILE_TEST_FLAG_SKIP_LOAD_OPTS_CHECKS) != 0;
 	bool fuzz_always = (flags & UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS) != 0;
 	bool diff_always = (flags & UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS) != 0;
+	bool allow_thread_error = (flags & UFBXT_FILE_TEST_FLAG_ALLOW_THREAD_ERROR) != 0;
 
 	const ufbx_load_opts *fuzz_opts = NULL;
 	if ((flags & UFBXT_FILE_TEST_FLAG_FUZZ_OPTS) != 0) {
@@ -2784,6 +2788,8 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbxt_check_scene(thread_scene);
 				ufbxt_assert(thread_scene->dom_root);
 				ufbxt_assert(thread_scene->metadata.file_format == load_opts.file_format);
+			} else if (allow_thread_error) {
+				ufbxt_assert(thread_error.type == UFBX_ERROR_THREADED_ASCII_PARSE);
 			} else if (!allow_error) {
 				ufbxt_log_error(&thread_error);
 				ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse threaded file");

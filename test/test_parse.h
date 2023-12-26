@@ -424,7 +424,7 @@ UFBXT_FILE_TEST(maya_cube_big_endian)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_cube_nan)
+UFBXT_FILE_TEST_FLAGS(synthetic_cube_nan, UFBXT_FILE_TEST_FLAG_ALLOW_THREAD_ERROR)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");

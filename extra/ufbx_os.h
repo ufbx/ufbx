@@ -886,6 +886,10 @@ ufbx_os_abi ufbx_os_thread_pool *ufbx_os_create_thread_pool(const ufbx_os_thread
 	return pool;
 }
 
+ufbx_os_abi void ufbx_os_free_thread_pool(ufbx_os_thread_pool *pool)
+{
+}
+
 ufbx_os_abi uint64_t ufbx_os_thread_pool_run(ufbx_os_thread_pool *pool, ufbx_os_thread_pool_task_fn *fn, void *user, uint32_t count)
 {
 	return ufbxos_push_task(pool, fn, user, count);
@@ -911,6 +915,84 @@ ufbx_os_abi void ufbx_os_thread_pool_wait(ufbx_os_thread_pool *pool, uint64_t ta
 		if (s.cycle > task_cycle) return;
 		ufbxos_atomic_wait64(pool, &task->state, state);
 	}
+}
+
+typedef struct {
+	uint64_t task_id;
+	uint32_t start_index; 
+	ufbx_thread_pool_context ctx;
+} ufbxos_pool_group;
+
+typedef struct {
+	union {
+		ufbxos_pool_group group;
+		char padding[64];
+	} groups[UFBX_THREAD_GROUP_COUNT];
+	void *allocation;
+} ufbxos_pool_ctx;
+
+static void ufbxos_ufbx_task(void *user, uint32_t index)
+{
+	ufbxos_pool_group *group = (ufbxos_pool_group*)user;
+	ufbx_thread_pool_run_task(group->ctx, group->start_index + index);
+}
+
+static bool ufbxos_ufbx_thread_pool_init(void *user, ufbx_thread_pool_context ctx, const ufbx_thread_pool_info *info)
+{
+	void *allocation = calloc(1, sizeof(ufbxos_pool_ctx) + 128);
+	if (!allocation) return false;
+
+	char *data = (char*)allocation + (((uintptr_t)-(intptr_t)allocation) & 63);
+	ufbxos_pool_ctx *up = (ufbxos_pool_ctx*)data;
+	up->allocation = allocation;
+
+	ufbx_thread_pool_set_user_ptr(ctx, up);
+
+	return true;
+}
+
+static bool ufbxos_ufbx_thread_pool_run(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count)
+{
+	ufbx_os_thread_pool *pool = (ufbx_os_thread_pool*)user;
+	ufbxos_pool_ctx *up = (ufbxos_pool_ctx*)ufbx_thread_pool_get_user_ptr(ctx);
+	ufbxos_pool_group *ug = &up->groups[group].group;
+
+	ug->start_index = start_index;
+	ug->ctx = ctx;
+	ug->task_id = ufbx_os_thread_pool_run(pool, &ufbxos_ufbx_task, ug, count);
+
+	return true;
+}
+
+static bool ufbxos_ufbx_thread_pool_wait(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index, bool speculative)
+{
+	ufbx_os_thread_pool *pool = (ufbx_os_thread_pool*)user;
+	ufbxos_pool_ctx *up = (ufbxos_pool_ctx*)ufbx_thread_pool_get_user_ptr(ctx);
+	ufbxos_pool_group *ug = &up->groups[group].group;
+
+	ufbx_os_thread_pool_wait(pool, ug->task_id);
+
+	return true;
+}
+
+static void ufbxos_ufbx_thread_pool_free(void *user, ufbx_thread_pool_context ctx)
+{
+	ufbx_os_thread_pool *pool = (ufbx_os_thread_pool*)user;
+	ufbxos_pool_ctx *up = (ufbxos_pool_ctx*)ufbx_thread_pool_get_user_ptr(ctx);
+
+	free(up->allocation);
+}
+
+ufbx_os_abi void ufbx_os_init_ufbx_thread_pool(ufbx_thread_pool *dst, ufbx_os_thread_pool *pool)
+{
+	if (!dst || !pool) return;
+
+	memset(dst, 0, sizeof(ufbx_thread_pool));
+	dst->user = pool;
+	dst->init_fn = &ufbxos_ufbx_thread_pool_init;
+	dst->run_fn = &ufbxos_ufbx_thread_pool_run;
+	dst->wait_fn = &ufbxos_ufbx_thread_pool_wait;
+	dst->free_fn = &ufbxos_ufbx_thread_pool_free;
 }
 
 #if 0
