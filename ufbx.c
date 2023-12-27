@@ -8674,6 +8674,7 @@ static ufbxi_noinline char ufbxi_ascii_refill(ufbxi_context *uc)
 			dst_buffer = uc->read_buffer;
 			dst_size = uc->read_buffer_size;
 			ua->src_is_retained = false;
+			ua->src_buf = NULL;
 		}
 
 		// Read user data, return '\0' on EOF
@@ -14204,6 +14205,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects_threaded(ufbxi_cont
 			uc->data = uc->data_begin = ua->src = uc->read_buffer;
 			ua->src_end = uc->read_buffer + size;
 			ua->src_is_retained = false;
+			ua->src_buf = NULL;
 			if (ufbxi_to_size(ua->src_end - ua->src) < uc->progress_interval) {
 				ua->src_yield = ua->src_end;
 			} else {
