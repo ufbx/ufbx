@@ -180,7 +180,7 @@ typedef dispatch_semaphore_t ufbxos_os_semaphore;
 
 static void ufbxos_os_semaphore_init(ufbxos_os_semaphore *os_sema, uint32_t max_count)
 {
-    *os_Sema = dispatch_semaphore_create(0);
+    *os_sema = dispatch_semaphore_create(0);
 }
 
 static void ufbxos_os_semaphore_free(ufbxos_os_semaphore *os_sema)
@@ -190,7 +190,7 @@ static void ufbxos_os_semaphore_free(ufbxos_os_semaphore *os_sema)
 
 static void ufbxos_os_semaphore_wait(ufbxos_os_semaphore *os_sema)
 {
-    dispatch_semaphore_wait(*os_Sema, DISPATCH_TIME_FOREVER);
+    dispatch_semaphore_wait(*os_sema, DISPATCH_TIME_FOREVER);
 }
 
 static void ufbxos_os_semaphore_signal(ufbxos_os_semaphore *os_sema, uint32_t count)
