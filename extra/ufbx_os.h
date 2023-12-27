@@ -934,6 +934,8 @@ ufbx_os_abi ufbx_os_thread_pool *ufbx_os_create_thread_pool(const ufbx_os_thread
 
 ufbx_os_abi void ufbx_os_free_thread_pool(ufbx_os_thread_pool *pool)
 {
+	if (!pool) return;
+
 	ufbxos_push_task(pool, NULL, NULL, pool->num_threads);
 	for (size_t i = 0; i < pool->num_threads; i++) {
 		ufbxos_os_thread_join(&pool->threads[i]);
@@ -945,6 +947,8 @@ ufbx_os_abi void ufbx_os_free_thread_pool(ufbx_os_thread_pool *pool)
 		ufbxos_os_semaphore_free(&pool->wait_semas[i].os_semaphore[1]);
 	}
 
+	free(pool->tasks);
+	free(pool->threads);
 	free(pool);
 }
 
