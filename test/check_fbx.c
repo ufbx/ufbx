@@ -260,7 +260,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 	ufbxt_assert(thread_pool);
 
 	ufbxt_obj_file_task obj_task = { NULL };
-	uint32_t obj_task_id = ~0u;
+	uint64_t obj_task_id = ~(uint64_t)0;
 
 	if (obj_path) {
 		obj_task.path = obj_path;

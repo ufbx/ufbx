@@ -144,10 +144,30 @@ static void ufbxos_atomic_u32_store(ufbxos_atomic_u32 *ptr, uint32_t value) { __
 static uint32_t ufbxos_atomic_u32_inc(ufbxos_atomic_u32 *ptr) { return __atomic_fetch_add(ptr, 1, __ATOMIC_SEQ_CST); }
 static bool ufbxos_atomic_u32_cas(ufbxos_atomic_u32 *ptr, uint32_t ref, uint32_t value) { return __atomic_compare_exchange(ptr, &ref, &value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }
 
+#if defined(__i386__) || defined(__i386)
+typedef volatile uint64_t ufbxos_atomic_u64;
+static bool ufbxos_atomic_u64_cas(ufbxos_atomic_u64 *ptr, uint64_t *ref, uint64_t value) {
+	uint64_t prev = *ref;
+	uint64_t next = __sync_val_compare_and_swap(ptr, *ref, value);
+	*ref = next;
+	return prev == next;
+}
+static uint64_t ufbxos_atomic_u64_load(ufbxos_atomic_u64 *ptr) {
+	uint64_t r = 0;
+	ufbxos_atomic_u64_cas(ptr, &r, 0);
+	return r;
+}
+static void ufbxos_atomic_u64_store(ufbxos_atomic_u64 *ptr, uint64_t value) {
+	uint64_t ref = ufbxos_atomic_u64_load(ptr);
+	while (!ufbxos_atomic_u64_cas(ptr, &ref, value)) { }
+}
+#else
 typedef volatile uint64_t ufbxos_atomic_u64;
 static uint64_t ufbxos_atomic_u64_load(ufbxos_atomic_u64 *ptr) { uint64_t r; __atomic_load(ptr, &r, __ATOMIC_SEQ_CST); return r; }
 static void ufbxos_atomic_u64_store(ufbxos_atomic_u64 *ptr, uint64_t value) { __atomic_store(ptr, &value, __ATOMIC_SEQ_CST); }
 static bool ufbxos_atomic_u64_cas(ufbxos_atomic_u64 *ptr, uint64_t *ref, uint64_t value) { return __atomic_compare_exchange(ptr, ref, &value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }
+#endif
+
 #else
 	#error "Unsupported compiler"
 #endif
