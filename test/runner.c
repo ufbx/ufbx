@@ -2800,6 +2800,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 					ufbxt_log_error(&thread_error);
 					ufbxt_assert_fail(__FILE__, __LINE__, "Failed to parse threaded file");
 				}
+				ufbx_free_scene(thread_scene);
 			}
 			#endif
 
