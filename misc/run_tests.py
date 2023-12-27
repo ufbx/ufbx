@@ -914,6 +914,7 @@ async def main():
         runner_config = {
             "sources": ["test/runner.c", "ufbx.c"],
             "output": "runner" + exe_suffix,
+            "threads": True,
         }
         target_tasks += compile_permutations("runner", runner_config, all_configs, ["-d", "data"])
 
