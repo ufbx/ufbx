@@ -913,7 +913,9 @@ async def main():
 
         def platform_overrides(config, compiler):
             use_threads = True
-            if config["arch"] in ("wasm32",):
+            if config["arch"] in ["wasm32"]:
+                use_threads = False
+            if compiler.name in ["tcc"]:
                 use_threads = False
 
             if use_threads:
