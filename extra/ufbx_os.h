@@ -759,7 +759,6 @@ static uint64_t ufbxos_push_task(ufbx_os_thread_pool *pool, ufbx_os_thread_pool_
 				uint32_t index = ufbxos_atomic_u32_inc(&pool->task_init_count);
 				if (index < pool->num_tasks) {
 					task_id = index;
-					// TODO: Init
 					break;
 				}
 			}
@@ -824,11 +823,13 @@ static void ufbxos_thread_pool_entry(ufbx_os_thread_pool *pool)
 		uint64_t free_task_id = 0;
 		if (ok) {
 			ufbx_os_thread_pool_task_fn *fn = task->fn;
+
 			void *user = task->user;
 			uint32_t count = task->count;
 			for (;;) {
 				uint32_t index = ufbxos_atomic_u32_inc(&task->counter);
 				if (index >= count) break;
+				if (fn == NULL) return;
 				fn(user, index);
 			}
 
@@ -904,10 +905,23 @@ ufbx_os_abi ufbx_os_thread_pool *ufbx_os_create_thread_pool(const ufbx_os_thread
 
 ufbx_os_abi void ufbx_os_free_thread_pool(ufbx_os_thread_pool *pool)
 {
+	ufbxos_push_task(pool, NULL, NULL, pool->num_threads);
+	for (size_t i = 0; i < pool->num_threads; i++) {
+		ufbxos_os_thread_join(&pool->threads[i]);
+	}
+
+	uint32_t sema_count = ufbxos_atomic_u32_load(&pool->wait_sema_count);
+	for (uint32_t i = 0; i < sema_count; i++) {
+		ufbxos_os_semaphore_free(&pool->wait_semas[i].os_semaphore[0]);
+		ufbxos_os_semaphore_free(&pool->wait_semas[i].os_semaphore[1]);
+	}
+
+	free(pool);
 }
 
 ufbx_os_abi uint64_t ufbx_os_thread_pool_run(ufbx_os_thread_pool *pool, ufbx_os_thread_pool_task_fn *fn, void *user, uint32_t count)
 {
+	ufbxos_assert(fn != NULL);
 	return ufbxos_push_task(pool, fn, user, count);
 }
 
