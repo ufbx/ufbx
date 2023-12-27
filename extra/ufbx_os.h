@@ -172,6 +172,36 @@ static bool ufbxos_atomic_u64_cas(ufbxos_atomic_u64 *ptr, uint64_t *ref, uint64_
 	#error "Unsupported compiler"
 #endif
 
+#if defined(__MACH__)
+
+#include <dispatch/dispatch.h>
+
+typedef dispatch_semaphore_t ufbxos_os_semaphore;
+
+static void ufbxos_os_semaphore_init(ufbxos_os_semaphore *os_sema, uint32_t max_count)
+{
+    *os_Sema = dispatch_semaphore_create(0);
+}
+
+static void ufbxos_os_semaphore_free(ufbxos_os_semaphore *os_sema)
+{
+    dispatch_release(*os_sema);
+}
+
+static void ufbxos_os_semaphore_wait(ufbxos_os_semaphore *os_sema)
+{
+    dispatch_semaphore_wait(*os_Sema, DISPATCH_TIME_FOREVER);
+}
+
+static void ufbxos_os_semaphore_signal(ufbxos_os_semaphore *os_sema, uint32_t count)
+{
+	for (uint32_t i = 0; i < count; i++) {
+        dispatch_semaphore_signal(*os_sema);
+	}
+}
+
+#else
+
 #include <semaphore.h>
 
 typedef sem_t ufbxos_os_semaphore;
@@ -198,6 +228,8 @@ static void ufbxos_os_semaphore_signal(ufbxos_os_semaphore *os_sema, uint32_t co
 	}
 }
 
+#endif
+
 #include <pthread.h>
 
 typedef pthread_t ufbxos_os_thread;
@@ -220,21 +252,18 @@ static void ufbxos_os_thread_join(ufbxos_os_thread *os_thread)
 	pthread_join(*os_thread, NULL);
 }
 
-
-// TOOD: Specific
-#include <sys/sysinfo.h>
 #include <sched.h>
-
-static size_t ufbxos_os_get_logical_cores(void)
-{
-	return (size_t)get_nprocs();
-}
+#include <unistd.h>
 
 static void ufbxos_os_yield(void)
 {
 	sched_yield();
 }
 
+static size_t ufbxos_os_get_logical_cores(void)
+{
+	return sysconf(_SC_NPROCESSORS_ONLN);
+}
 
 #endif
 
