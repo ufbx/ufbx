@@ -24,6 +24,7 @@
 // Mostly internal for debugging:
 //   UFBX_STATIC_ANALYSIS      Enable static analysis augmentation
 //   UFBX_DEBUG_BINARY_SEARCH  Force using binary search for debugging
+//   UFBX_EXTENSIVE_THREADING  Use threads for small inputs
 
 #if defined(UFBX_CONFIG_SOURCE)
 	#include UFBX_CONFIG_SOURCE
@@ -750,8 +751,10 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 
 	#undef UFBXI_FACE_GROUP_HASH_BITS
 	#define UFBXI_FACE_GROUP_HASH_BITS 2
+#endif
 
-	#undef UFBXI_MIN_THREADED_DEFLATE_BYTES 256
+#if defined(UFBX_REGRESSION) || defined(UFBX_EXTENSIVE_THREADING)
+	#undef UFBXI_MIN_THREADED_DEFLATE_BYTES
 	#define UFBXI_MIN_THREADED_DEFLATE_BYTES 2
 
 	#undef UFBXI_MIN_THREADED_ASCII_VALUES

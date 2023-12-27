@@ -31,6 +31,7 @@ parser.add_argument("--verbose", action="store_true", help="Verbose output")
 parser.add_argument("--hash-file", help="Hash test input file")
 parser.add_argument("--runner", help="Descriptive name for the runner")
 parser.add_argument("--heavy", action="store_true", help="Run heavy tests")
+parser.add_argument("--hash-threads", action="store_true", help="Use threading for hashes")
 parser.add_argument("--fail-on-pre-test", action="store_true", help="Indicate failure if pre-test checks fail")
 parser.add_argument("--force-opt", help="Force compiler optimization level")
 argv = parser.parse_args()
@@ -751,7 +752,7 @@ def decorate_arch(compiler, arch):
     return arch
 
 tests = set(argv.tests)
-impicit_tests = False
+implicit_tests = False
 if not tests:
     tests = ["tests", "cpp", "stack", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
     implicit_tests = True
@@ -1483,7 +1484,13 @@ async def main():
                 "sources": ["test/hash_scene.c", "misc/fdlibm.c"],
                 "output": "hash_scene" + exe_suffix,
                 "ieee754": True,
+                "defines": { },
             }
+
+            if argv.hash_threads:
+                hash_scene_config["threads"] = True
+                hash_scene_config["defines"]["USE_THREADS"] = ""
+                hash_scene_config["defines"]["UFBX_EXTENSIVE_THREADING"] = ""
 
             dump_path = os.path.join(build_path, "hashdumps")
             if not os.path.exists(dump_path):

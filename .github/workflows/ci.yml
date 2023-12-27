@@ -321,6 +321,8 @@ jobs:
         run: build/fdlibm_runner -d data
       - name: Compile runner.c
         run: gcc -c test/runner.c -o build/runner.o
+      - name: Hash scenes with threads
+        run: python3 misc/run_tests.py hashes --hash-threads --runner ci_hash_threads
       - name: Build and run standard C99
         run: |
           gcc -Wall -Wextra -Werror -Wno-unused-function -std=c99 -DUFBX_STANDARD_C build/runner.o ufbx.c -lm -o build/runner-c99
