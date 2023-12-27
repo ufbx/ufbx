@@ -911,10 +911,20 @@ async def main():
 
         target_tasks = []
 
+        def platform_overrides(config, compiler):
+            use_threads = True
+            if config["arch"] in ("wasm32",):
+                use_threads = False
+
+            if use_threads:
+                config["threads"] = True
+                config["defines"]["UFBXT_THREADS"] = ""
+
         runner_config = {
             "sources": ["test/runner.c", "ufbx.c"],
             "output": "runner" + exe_suffix,
-            "threads": True,
+            "defines": { },
+            "overrides": platform_overrides,
         }
         target_tasks += compile_permutations("runner", runner_config, all_configs, ["-d", "data"])
 
