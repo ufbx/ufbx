@@ -399,6 +399,8 @@ static uint64_t ufbxos_task_encode(ufbxos_task_state s)
 #define UFBXOS_WAIT_MAP_SIZE 128
 #define UFBXOS_WAIT_MAP_SCAN 2
 
+#define UFBXOS_TASK_FREE_BIT ((uint64_t)1<<63)
+
 struct ufbx_os_thread_pool {
 	ufbxos_atomic_u32 wait_sema_lock;
 	ufbxos_atomic_u32 wait_sema_count;
@@ -798,7 +800,8 @@ static uint64_t ufbxos_push_task(ufbx_os_thread_pool *pool, ufbx_os_thread_pool_
 
 		ufbxos_task *task = &pool->tasks[ufbxos_task_index(pool, task_id)];
 		uint64_t next_id = ufbxos_atomic_u64_load(&task->next);
-		if (ufbxos_atomic_u64_cas(&pool->task_alloc_head, &task_id, next_id)) {
+		if (ufbxos_atomic_u64_cas(&pool->task_alloc_head, &task_id, next_id & ~UFBXOS_TASK_FREE_BIT)) {
+			ufbxos_assert(next_id & UFBXOS_TASK_FREE_BIT);
 			break;
 		}
 	}
@@ -812,7 +815,7 @@ static uint64_t ufbxos_push_task(ufbx_os_thread_pool *pool, ufbx_os_thread_pool_
 	task->count = count;
 	ufbxos_atomic_u32_store(&task->counter, 0);
 	ufbxos_atomic_u64_store(&task->next, task_id);
-
+	ufbxos_atomic_notify64(pool, &task->next);
 	uint64_t work_head = ufbxos_atomic_u64_load(&pool->task_work_head);
 	for (;;) {
 		ufbxos_task *prev = &pool->tasks[ufbxos_task_index(pool, work_head)];
@@ -891,14 +894,17 @@ static void ufbxos_thread_pool_entry(ufbx_os_thread_pool *pool)
 				continue;
 			}
 
-			ufbxos_atomic_u64_cas(&pool->task_work_tail, &prev_task_id, task_id);
-			break;
+			uint64_t ref_task_id = prev_task_id;
+			if (ufbxos_atomic_u64_cas(&pool->task_work_tail, &ref_task_id, task_id)) {
+				break;
+			}
 		}
 
 		if (free_task_id != 0) {
 			uint64_t prev_head = ufbxos_atomic_u64_load(&pool->task_alloc_head);
 			for (;;) {
-				ufbxos_atomic_u64_store(&task->next, prev_head);
+				ufbxos_atomic_u64_store(&task->next, prev_head | UFBXOS_TASK_FREE_BIT);
+				ufbxos_atomic_notify64(pool, &task->next);
 				if (ufbxos_atomic_u64_cas(&pool->task_alloc_head, &prev_head, free_task_id)) {
 					break;
 				}
