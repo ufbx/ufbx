@@ -5354,8 +5354,6 @@ struct ufbxi_task {
 typedef struct {
 	ufbxi_task task;
 	ufbxi_task_fn *fn;
-	uint32_t num_started;
-	ufbxi_atomic_counter num_done;
 } ufbxi_task_imp;
 
 typedef struct {
@@ -5375,7 +5373,6 @@ struct ufbxi_thread_pool {
 
 	uint32_t start_index;
 	uint32_t execute_index;
-	ufbxi_atomic_counter run_index;
 	uint32_t wait_index;
 
 	ufbxi_task_group groups[UFBX_THREAD_GROUP_COUNT];
@@ -5384,38 +5381,29 @@ struct ufbxi_thread_pool {
 	double accumulated_cost;
 
 	uint32_t num_tasks;
-	uint32_t num_tasks_init;
 	ufbxi_task_imp *tasks;
 };
 
 static void ufbxi_thread_pool_execute(ufbxi_thread_pool *pool, uint32_t index)
 {
-	if (index == UFBX_NO_INDEX) {
-		index = (uint32_t)ufbxi_atomic_counter_inc(&pool->run_index);
-	}
 	ufbxi_task_imp *imp = &pool->tasks[index % pool->num_tasks];
 	if (imp->fn(&imp->task)) {
 		imp->task.error = NULL;
 	} else if (!imp->task.error) {
 		imp->task.error = "";
 	}
-	ufbxi_atomic_counter_inc(&imp->num_done);
 }
 
-ufbxi_noinline static uint32_t ufbxi_thread_pool_try_wait(ufbxi_thread_pool *pool, uint32_t max_index)
+ufbxi_noinline static void ufbxi_thread_pool_update_finished(ufbxi_thread_pool *pool, uint32_t max_index)
 {
 	while (pool->wait_index < max_index) {
 		ufbxi_task_imp *task = &pool->tasks[pool->wait_index % pool->num_tasks];
-		if (ufbxi_atomic_counter_load(&task->num_done) < task->num_started) {
-			return pool->wait_index;
-		}
 		if (!pool->failed && task->task.error) {
 			pool->failed = true;
 			pool->error_desc = task->task.error;
 		}
 		pool->wait_index += 1;
 	}
-	return UFBX_NO_INDEX;
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_wait_imp(ufbxi_thread_pool *pool, uint32_t group, bool can_fail)
@@ -5423,13 +5411,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_wait_imp(ufbxi_threa
 	uint32_t max_index = pool->groups[group].max_index;
 
 	if (pool->groups[group].wait_index < max_index) {
-		pool->opts.pool.wait_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool, group, max_index, true);
+		pool->opts.pool.wait_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool, group, max_index);
 		pool->groups[group].wait_index = max_index;
 	}
+	ufbxi_thread_pool_update_finished(pool, max_index);
 
-	while (ufbxi_thread_pool_try_wait(pool, max_index) != UFBX_NO_INDEX) {
-		pool->opts.pool.wait_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool, group, max_index, false);
-	}
 	if (pool->failed && can_fail) {
 		ufbx_error *error = pool->error;
 		if (pool->error_desc) {
@@ -5475,7 +5461,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_init(ufbxi_thread_po
 	}
 	pool->ator = ator;
 	pool->error = error;
-	ufbxi_atomic_counter_init(&pool->run_index);
 
 	pool->num_tasks = num_tasks;
 	pool->tasks = ufbxi_alloc(ator, ufbxi_task_imp, num_tasks);
@@ -5498,18 +5483,11 @@ ufbxi_noinline static void ufbxi_thread_pool_free(ufbxi_thread_pool *pool)
 		pool->opts.pool.free_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool);
 	}
 
-	ufbxi_atomic_counter_free(&pool->run_index);
-	for (size_t i = 0; i < pool->num_tasks_init; i++) {
-		ufbxi_task_imp *task = &pool->tasks[i];
-		ufbxi_atomic_counter_free(&task->num_done);
-	}
-
 	ufbxi_free(pool->ator, ufbxi_task_imp, pool->tasks, pool->num_tasks);
 }
 
 ufbxi_nodiscard ufbxi_noinline static uint32_t ufbxi_thread_pool_available_tasks(ufbxi_thread_pool *pool)
 {
-	ufbxi_thread_pool_try_wait(pool, pool->start_index);
 	return pool->num_tasks - (pool->start_index - pool->wait_index);
 }
 
@@ -5548,7 +5526,6 @@ ufbxi_nodiscard ufbxi_noinline static ufbxi_task *ufbxi_thread_pool_create_task(
 {
 	uint32_t index = pool->start_index;
 	if (index - pool->wait_index >= pool->num_tasks) {
-		ufbxi_thread_pool_try_wait(pool, index);
 		if (index - pool->wait_index >= pool->num_tasks) {
 			// No space left
 			return NULL;
@@ -5561,11 +5538,8 @@ ufbxi_nodiscard ufbxi_noinline static ufbxi_task *ufbxi_thread_pool_create_task(
 	ufbxi_task_imp *imp = &pool->tasks[index % pool->num_tasks];
 	if (index < pool->num_tasks) {
 		memset(imp, 0, sizeof(ufbxi_task_imp));
-		ufbxi_atomic_counter_init(&imp->num_done);
-		pool->num_tasks_init = index + 1;
 	}
 
-	imp->num_started++;
 	imp->fn = fn;
 
 	return &imp->task;
@@ -31072,11 +31046,6 @@ ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t 
 ufbx_abi void ufbx_thread_pool_run_task(ufbx_thread_pool_context ctx, uint32_t index)
 {
 	ufbxi_thread_pool_execute((ufbxi_thread_pool*)ctx, index);
-}
-
-ufbx_abi uint32_t ufbx_thread_pool_try_wait(ufbx_thread_pool_context ctx, uint32_t max_index)
-{
-	return ufbxi_thread_pool_try_wait((ufbxi_thread_pool*)ctx, max_index);
 }
 
 ufbx_abi void ufbx_thread_pool_set_user_ptr(ufbx_thread_pool_context ctx, void *user)

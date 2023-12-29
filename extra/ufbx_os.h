@@ -1033,7 +1033,7 @@ static bool ufbxos_ufbx_thread_pool_run(void *user, ufbx_thread_pool_context ctx
 	return true;
 }
 
-static bool ufbxos_ufbx_thread_pool_wait(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index, bool speculative)
+static bool ufbxos_ufbx_thread_pool_wait(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index)
 {
 	ufbx_os_thread_pool *pool = (ufbx_os_thread_pool*)user;
 	ufbxos_pool_ctx *up = (ufbxos_pool_ctx*)ufbx_thread_pool_get_user_ptr(ctx);
