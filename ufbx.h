@@ -106,7 +106,8 @@
 // Pointer may be `NULL`.
 #define ufbx_nullable
 
-// Changing this value from default can lead into breaking API guarantees.
+// Changing this value from default or calling this function can lead into
+// breaking API guarantees.
 #define ufbx_unsafe
 
 #ifndef ufbx_abi
@@ -124,6 +125,7 @@
 #define UFBX_ERROR_STACK_MAX_DEPTH 8
 #define UFBX_PANIC_MESSAGE_LENGTH 128
 #define UFBX_ERROR_INFO_LENGTH 256
+#define UFBX_THREAD_GROUP_COUNT 4
 
 // -- Language
 
@@ -3904,6 +3906,11 @@ typedef enum ufbx_error_type UFBX_ENUM_REPR {
 	// Out of bounds index in the file when loading with `UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING`.
 	UFBX_ERROR_BAD_INDEX,
 
+	// Error parsing ASCII array in a thread.
+	// Threaded ASCII parsing is slightly more strict than non-threaded, for cursed files,
+	// set `ufbx_load_opts.force_single_thread_ascii_parsing` to `true`.
+	UFBX_ERROR_THREADED_ASCII_PARSE,
+
 	// Unsafe options specified without enabling `ufbx_load_opts.allow_unsafe`.
 	UFBX_ERROR_UNSAFE_OPTIONS,
 
@@ -4153,6 +4160,36 @@ typedef struct ufbx_baked_anim {
 	ufbx_baked_element_list elements;
 } ufbx_baked_anim;
 
+// -- Thread API
+//
+// NOTE: This API is still experimental and may change.
+// Documentation is currently missing on purpose.
+
+typedef uintptr_t ufbx_thread_pool_context;
+
+typedef struct ufbx_thread_pool_info {
+	uint32_t max_concurrent_tasks;
+} ufbx_thread_pool_info;
+
+typedef bool ufbx_thread_pool_init_fn(void *user, ufbx_thread_pool_context ctx, const ufbx_thread_pool_info *info);
+typedef bool ufbx_thread_pool_run_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count);
+typedef bool ufbx_thread_pool_wait_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index);
+typedef void ufbx_thread_pool_free_fn(void *user, ufbx_thread_pool_context ctx);
+
+typedef struct ufbx_thread_pool {
+	ufbx_thread_pool_init_fn *init_fn;
+	ufbx_thread_pool_run_fn *run_fn;
+	ufbx_thread_pool_wait_fn *wait_fn;
+	ufbx_thread_pool_free_fn *free_fn;
+	void *user;
+} ufbx_thread_pool;
+
+typedef struct ufbx_thread_opts {
+	ufbx_thread_pool pool;
+	size_t num_tasks;
+	size_t memory_limit;
+} ufbx_thread_opts;
+
 // -- Main API
 
 // Options for `ufbx_load_file/memory/stream/stdio()`
@@ -4162,6 +4199,7 @@ typedef struct ufbx_load_opts {
 
 	ufbx_allocator_opts temp_allocator;   // < Allocator used during loading
 	ufbx_allocator_opts result_allocator; // < Allocator used for the final scene
+	ufbx_thread_opts thread_opts;         // < Threading options
 
 	// Preferences
 	bool ignore_geometry;    // < Do not load geometry datsa (vertices, indices, etc)
@@ -4202,6 +4240,11 @@ typedef struct ufbx_load_opts {
 
 	// Don't allow partially broken FBX files to load
 	bool strict;
+
+	// Force ASCII parsing to use a single thread.
+	// The multi-threaded ASCII parsing is slightly more lenient as it ignores
+	// the self-reported size of ASCII arrays, that threaded parsing depends on.
+	bool force_single_thread_ascii_parsing;
 
 	// UNSAFE: If enabled allows using unsafe options that may fundamentally
 	// break the API guarantees.
@@ -4832,6 +4875,13 @@ typedef enum ufbx_transform_flags UFBX_FLAG_REPR {
 	// evaluate the entire parent chain in the worst case.
 	UFBX_TRANSFORM_FLAG_IGNORE_COMPONENTWISE_SCALE = 0x2,
 
+	// Require explicit components
+	UFBX_TRANSFORM_FLAG_EXPLICIT_INCLUDES = 0x4,
+
+	UFBX_TRANSFORM_FLAG_INCLUDE_TRANSLATION = 0x10,
+	UFBX_TRANSFORM_FLAG_INCLUDE_ROTATION = 0x20,
+	UFBX_TRANSFORM_FLAG_INCLUDE_SCALE = 0x40,
+
 	UFBX_FLAG_FORCE_WIDTH(UFBX_TRANSFORM_FLAGS)
 } ufbx_transform_flags;
 
@@ -5014,6 +5064,16 @@ ufbx_inline ufbx_dom_node *ufbx_dom_find(const ufbx_dom_node *parent, const char
 // Utility
 
 ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator_opts *allocator, ufbx_error *error);
+
+// Thread pool
+
+// Run a single thread pool task.
+// See `ufbx_thread_pool_run_fn` for more information.
+ufbx_unsafe ufbx_abi void ufbx_thread_pool_run_task(ufbx_thread_pool_context ctx, uint32_t index);
+
+ufbx_unsafe ufbx_abi void ufbx_thread_pool_set_user_ptr(ufbx_thread_pool_context ctx, void *user_ptr);
+ufbx_unsafe ufbx_abi void *ufbx_thread_pool_get_user_ptr(ufbx_thread_pool_context ctx);
+
 
 // -- Inline API
 
@@ -5323,12 +5383,12 @@ public:
 // Used by: `ufbx_node`.
 #define UFBX_RotationOffset "RotationOffset"
 
-// Pre-rotation: Rotation applied _after_ `ufbxi_Lcl_Rotation`.
+// Pre-rotation: Rotation applied _after_ `UFBX_Lcl_Rotation`.
 // Used by: `ufbx_node`.
 // Affected by `UFBX_RotationPivot` but not `UFBX_RotationOrder`.
 #define UFBX_PreRotation "PreRotation"
 
-// Post-rotation: Rotation applied _before_ `ufbxi_Lcl_Rotation`.
+// Post-rotation: Rotation applied _before_ `UFBX_Lcl_Rotation`.
 // Used by: `ufbx_node`.
 // Affected by `UFBX_RotationPivot` but not `UFBX_RotationOrder`.
 #define UFBX_PostRotation "PostRotation"
@@ -5354,4 +5414,3 @@ public:
 #endif
 
 #endif
-

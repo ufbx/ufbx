@@ -11,6 +11,7 @@ parser.add_argument("--start", default="", help="Top-level file to start from")
 parser.add_argument("--list", default="", help="List of files to use instead of root")
 parser.add_argument("--verbose", action="store_true", help="Verbose information")
 parser.add_argument("--allow-fail", action="store_true", help="Verbose information")
+parser.add_argument("--cycles", default=1, type=int, help="Number of cycles to load the data")
 parser.add_argument('remainder', nargs="...")
 argv = parser.parse_args()
 
@@ -31,42 +32,43 @@ def gather_files():
                 path = os.path.join(root, file)
                 yield path
 
-for path in gather_files():
-    file = os.path.basename(path)
-    if not file.lower().endswith(".fbx"): continue
-    if file.lower().endswith(".ufbx-fail.fbx"):
-        num_fail += 1
-        continue
-    size = os.stat(path).st_size
-    display = os.path.relpath(path, argv.root) if not argv.list else path
+for cycle in range(argv.cycles):
+    for path in gather_files():
+        file = os.path.basename(path)
+        if not file.lower().endswith(".fbx"): continue
+        if file.lower().endswith(".ufbx-fail.fbx"):
+            num_fail += 1
+            continue
+        size = os.stat(path).st_size
+        display = os.path.relpath(path, argv.root) if not argv.list else path
 
-    if argv.start and display < argv.start:
-        continue
+        if argv.start and display < argv.start:
+            continue
 
-    print(f"-- {display}", flush=True)
+        print(f"-- {display}", flush=True)
 
-    total_size += size
-    if argv.exe:
-        rest = argv.remainder[1:]
-        if "#" in rest:
-            ix = rest.index("#")
-            rest[ix] = path.encode("utf-8")
-            args = [argv.exe] + rest
-        else:
-            args = [argv.exe, path.encode("utf-8")] + rest
+        total_size += size
+        if argv.exe:
+            rest = argv.remainder[1:]
+            if "#" in rest:
+                ix = rest.index("#")
+                rest[ix] = path.encode("utf-8")
+                args = [argv.exe] + rest
+            else:
+                args = [argv.exe, path.encode("utf-8")] + rest
 
-        if argv.verbose:
-            cmdline = subprocess.list2cmdline(args)
-            print(f"$ {cmdline}")
+            if argv.verbose:
+                cmdline = subprocess.list2cmdline(args)
+                print(f"$ {cmdline}")
 
-        if argv.allow_fail:
-            try:
+            if argv.allow_fail:
+                try:
+                    subprocess.check_call(args)
+                except Exception as e:
+                    print("Failed to load")
+            else:
                 subprocess.check_call(args)
-            except Exception as e:
-                print("Failed to load")
-        else:
-            subprocess.check_call(args)
-    num_tested += 1
+        num_tested += 1
 
 end = time.time()
 dur = end - begin

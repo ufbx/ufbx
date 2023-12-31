@@ -562,8 +562,8 @@ sizes_base = {
     "int16_t": 2,
     "uint32_t": 4,
     "int32_t": 4,
-    "uint64_t": 4,
-    "int64_t": 4,
+    "uint64_t": 8,
+    "int64_t": 8,
     "float": 4,
     "double": 8,
     "enum": 4,
@@ -573,6 +573,7 @@ sizes_32bit = {
     **sizes_base,
     "size_t": 4,
     "ptrdiff_t": 4,
+    "uintptr_t": 4,
     "*": 4,
 }
 
@@ -580,6 +581,7 @@ sizes_64bit = {
     **sizes_base,
     "size_t": 8,
     "ptrdiff_t": 8,
+    "uintptr_t": 8,
     "*": 8,
 }
 
@@ -756,6 +758,7 @@ input_structs = [
 interface_structs = [
     "ufbx_allocator",
     "ufbx_stream",
+    "ufbx_thread_pool",
 ]
 
 union_prefer = {

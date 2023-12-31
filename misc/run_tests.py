@@ -31,6 +31,7 @@ parser.add_argument("--verbose", action="store_true", help="Verbose output")
 parser.add_argument("--hash-file", help="Hash test input file")
 parser.add_argument("--runner", help="Descriptive name for the runner")
 parser.add_argument("--heavy", action="store_true", help="Run heavy tests")
+parser.add_argument("--hash-threads", action="store_true", help="Use threading for hashes")
 parser.add_argument("--fail-on-pre-test", action="store_true", help="Indicate failure if pre-test checks fail")
 parser.add_argument("--force-opt", help="Force compiler optimization level")
 argv = parser.parse_args()
@@ -751,7 +752,7 @@ def decorate_arch(compiler, arch):
     return arch
 
 tests = set(argv.tests)
-impicit_tests = False
+implicit_tests = False
 if not tests:
     tests = ["tests", "cpp", "stack", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
     implicit_tests = True
@@ -911,9 +912,22 @@ async def main():
 
         target_tasks = []
 
+        def platform_overrides(config, compiler):
+            use_threads = True
+            if config["arch"] in ["wasm32"]:
+                use_threads = False
+            if compiler.name in ["tcc"]:
+                use_threads = False
+
+            if use_threads:
+                config["threads"] = True
+                config["defines"]["UFBXT_THREADS"] = ""
+
         runner_config = {
             "sources": ["test/runner.c", "ufbx.c"],
             "output": "runner" + exe_suffix,
+            "defines": { },
+            "overrides": platform_overrides,
         }
         target_tasks += compile_permutations("runner", runner_config, all_configs, ["-d", "data"])
 
@@ -984,7 +998,7 @@ async def main():
         target_tasks = []
 
         def debug_overrides(config, compiler):
-            stack_limit = 128*1024
+            stack_limit = 256*1024
             if sys.platform == "win32" and compiler.name in ["gcc"]:
                 # GCC can't handle CreateThread on CI..
                 config["skip"] = True
@@ -1006,7 +1020,7 @@ async def main():
         target_tasks += compile_permutations("runner_debug_stack", debug_stack_config, arch_configs, ["-d", "data"])
 
         def release_overrides(config, compiler):
-            stack_limit = 64*1024
+            stack_limit = 128*1024
             if sys.platform == "win32" and compiler.name in ["gcc"]:
                 # GCC can't handle CreateThread on CI..
                 config["skip"] = True
@@ -1043,6 +1057,7 @@ async def main():
             "UFBX_NO_GEOMETRY_CACHE",
             "UFBX_NO_SCENE_EVALUATION",
             "UFBX_NO_SKINNING_EVALUATION",
+            "UFBX_NO_ANIMATION_BAKING",
             "UFBX_NO_FORMAT_OBJ",
             "UFBX_NO_INDEX_GENERATION",
             "UFBX_NO_TRIANGULATION",
@@ -1469,7 +1484,13 @@ async def main():
                 "sources": ["test/hash_scene.c", "misc/fdlibm.c"],
                 "output": "hash_scene" + exe_suffix,
                 "ieee754": True,
+                "defines": { },
             }
+
+            if argv.hash_threads:
+                hash_scene_config["threads"] = True
+                hash_scene_config["defines"]["USE_THREADS"] = ""
+                hash_scene_config["defines"]["UFBX_EXTENSIVE_THREADING"] = ""
 
             dump_path = os.path.join(build_path, "hashdumps")
             if not os.path.exists(dump_path):
