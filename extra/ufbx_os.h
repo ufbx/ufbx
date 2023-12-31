@@ -917,6 +917,13 @@ static void ufbxos_thread_pool_entry(ufbx_os_thread_pool *pool)
 
 ufbx_os_abi ufbx_os_thread_pool *ufbx_os_create_thread_pool(const ufbx_os_thread_pool_opts *user_opts)
 {
+	ufbx_os_thread_pool_opts opts;
+	if (user_opts) {
+		memcpy(&opts, user_opts, sizeof(ufbx_os_thread_pool_opts));
+	} else {
+		memset(&opts, 0, sizeof(ufbx_os_thread_pool_opts));
+	}
+
 	ufbx_os_thread_pool *pool = (ufbx_os_thread_pool*)calloc(1, sizeof(ufbx_os_thread_pool));
 	for (uint32_t i = 0; i < 2; i++) {
 		ufbxos_wait_sema_create(pool);
@@ -927,7 +934,16 @@ ufbx_os_abi ufbx_os_thread_pool *ufbx_os_create_thread_pool(const ufbx_os_thread
 	pool->task_cycle_shift = 8;
 	pool->tasks = (ufbxos_task*)calloc(pool->num_tasks, sizeof(ufbxos_task));
 
-	pool->num_threads = 4;
+	size_t num_threads = opts.max_threads;
+	if (num_threads == 0) {
+		num_threads = ufbxos_os_get_logical_cores();
+		if (num_threads > UFBX_OS_DEFAULT_MAX_THREADS) {
+			num_threads = UFBX_OS_DEFAULT_MAX_THREADS;
+		}
+	}
+
+	pool->num_threads = num_threads;
+
 	pool->threads = (ufbxos_os_thread*)calloc(pool->num_threads, sizeof(ufbxos_os_thread));
 	for (uint32_t i = 0; i < pool->num_threads; i++) {
 		ufbxos_os_thread_start(&pool->threads[i], pool);
