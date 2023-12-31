@@ -342,10 +342,79 @@ UFBXT_FILE_TEST(maya_vertex_crease_single)
 }
 #endif
 
+UFBXT_TEST(maya_vertex_crease_single_lefthanded)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_vertex_crease_single_lefthanded", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_vertex_crease_single" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 0; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.target_axes = ufbx_axes_left_handed_y_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+			opts.reverse_winding = (i == 0);
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	free(obj_file);
+}
+#endif
 
 UFBXT_FILE_TEST(maya_vertex_crease)
 #if UFBXT_IMPL
 {
+}
+#endif
+
+UFBXT_TEST(maya_vertex_crease_lefthanded)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_vertex_crease_lefthanded", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_vertex_crease" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 0; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.target_axes = ufbx_axes_left_handed_y_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+			opts.reverse_winding = (i == 0);
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	free(obj_file);
 }
 #endif
 

@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<Autodesk_Cache_File>
+  <cacheType Type="OneFile" Format="mcx"/>
+  <time Range="0-5000"/>
+  <cacheTimePerFrame TimePerFrame="250"/>
+  <cacheVersion Version="2.0"/>
+  <extra>W:/Temp/ufbx_test_source/maya_axes_skin.ma</extra>
+  <extra>maya 2023</extra>
+  <extra>Datacube</extra>
+  <Channels>
+    <channel0 ChannelName="YShape" ChannelType="FloatVectorArray" ChannelInterpretation="positions" SamplingType="Regular" SamplingRate="250" StartTime="0" EndTime="5000"/>
+    <channel1 ChannelName="YShape_normals" ChannelType="FloatVectorArray" ChannelInterpretation="normals" SamplingType="Regular" SamplingRate="250" StartTime="0" EndTime="5000"/>
+  </Channels>
+</Autodesk_Cache_File>

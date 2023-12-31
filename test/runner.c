@@ -2515,6 +2515,10 @@ typedef enum ufbxt_file_test_flags {
 
 	// Allow fewer than default progress calls
 	UFBXT_FILE_TEST_FLAG_ALLOW_FEWER_PROGRESS_CALLS = 0x1000,
+
+	// Scale FBX vertices by 100 when diffing.
+	UFBXT_FILE_TEST_FLAG_DIFF_SCALE_100 = 0x2000,
+
 } ufbxt_file_test_flags;
 
 const char *ufbxt_file_formats[] = {
@@ -2638,6 +2642,10 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 		}
 
 		free(data);
+	}
+
+	if ((flags & UFBXT_FILE_TEST_FLAG_DIFF_SCALE_100) != 0) {
+		obj_file->fbx_position_scale = 100.0;
 	}
 
 	uint32_t num_opened = 0;

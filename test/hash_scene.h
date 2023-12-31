@@ -347,9 +347,9 @@ ufbxt_noinline static void ufbxt_hash_dom_value_imp(ufbxt_hash *h, const ufbx_do
 	ufbxt_hash_string(h, v->value_str);
 	size_t count = (size_t)v->value_int;
 	if (v->type == UFBX_DOM_VALUE_ARRAY_RAW_STRING) {
-		const ufbx_string *vs = (const ufbx_string*)v->value_blob.data;
+		const ufbx_blob *vs = (const ufbx_blob*)v->value_blob.data;
 		for (size_t i = 0; i < count; i++) {
-			ufbxt_hash_string(h, vs[i]);
+			ufbxt_hash_blob(h, vs[i]);
 		}
 	} else if (v->type == UFBX_DOM_VALUE_ARRAY_F32) {
 		const float *vs = (const float*)v->value_blob.data;
@@ -439,6 +439,7 @@ ufbxt_noinline static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v
 	ufbxt_hash_real(h, v->adjust_pre_scale);
 	ufbxt_hash_quat(h, v->adjust_post_rotation);
 	ufbxt_hash_real(h, v->adjust_post_scale);
+	ufbxt_hash_real(h, v->adjust_mirror_axis);
 	ufbxt_hash_pod(h, v->visible);
 	ufbxt_hash_pod(h, v->is_root);
 	ufbxt_hash_pod(h, v->has_geometry_transform);
@@ -1185,7 +1186,7 @@ ufbxt_noinline static void ufbxt_hash_bone_pose_imp(ufbxt_hash *h, const ufbx_bo
 
 ufbxt_noinline static void ufbxt_hash_pose_imp(ufbxt_hash *h, const ufbx_pose *v)
 {
-	ufbxt_hash_pod(h, v->bind_pose);
+	ufbxt_hash_pod(h, v->is_bind_pose);
 	ufbxt_hash_list_ptr(h, v->bone_poses, ufbxt_hash_bone_pose_imp);
 }
 

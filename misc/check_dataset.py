@@ -10,7 +10,7 @@ import math
 import itertools
 import datetime
 
-LATEST_SUPPORTED_DATE = "2023-10-03"
+LATEST_SUPPORTED_DATE = "2023-11-13"
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -84,7 +84,7 @@ def gather_case_models(json_path, flag_separator):
             fbx_base = strip_ext(fbx_path)
             obj_base = strip_ext(obj_path)
 
-            flags = obj_base[len(fbx_base):].split(flag_separator)
+            flags = obj_base[len(fbx_base) + len(flag_separator):].split("_")
 
             # Parse flags
             frame = None
@@ -159,7 +159,7 @@ def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time):
                 ])
 
                 append_unique_opt(options, "space-conversion", [
-                    "transform-root", "adjust-transforms",
+                    "transform-root", "adjust-transforms", "modify-geometry",
                 ])
 
                 append_unique_opt(options, "bake", [False, True])
@@ -175,7 +175,7 @@ def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time):
                     ])
                 elif feature == "space-conversion":
                     append_unique_opt(options, "space-conversion", [
-                        "transform-root", "adjust-transforms",
+                        "transform-root", "adjust-transforms", "modify-geometry",
                     ])
                 elif feature == "inherit-mode":
                     append_unique_opt(options, "inherit-mode-handling", [

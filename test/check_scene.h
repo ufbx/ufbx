@@ -102,6 +102,18 @@ static void ufbxt_check_blob(ufbx_blob blob)
 	ufbxt_check_memory(blob.data, blob.size);
 }
 
+static void ufbxt_check_bool(const bool *p_value)
+{
+	ufbxt_assert(*(const char*)p_value == 0 || *(const char*)p_value == 1);
+}
+
+static void ufbxt_check_bool_list(ufbx_bool_list list)
+{
+	for (size_t i = 0; i < list.count; i++) {
+		ufbxt_check_bool(&list.data[i]);
+	}
+}
+
 #define ufbxt_check_list(list) ufbxt_check_memory((list).data, (list).count * sizeof(*(list).data))
 
 static void ufbxt_check_element_ptr_any(ufbx_scene *scene, ufbx_element *element)
@@ -363,11 +375,8 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	}
 
 	if (node->is_geometry_transform_helper) {
-		ufbxt_assert(node->parent);
-		if (scene->metadata.has_warning[UFBX_WARNING_DUPLICATE_OBJECT_ID]) {
-			// In broken cases we may have multiple geometry transform helpers
-			ufbxt_assert(node->parent->geometry_transform_helper);
-		} else {
+		if (!scene->metadata.has_warning[UFBX_WARNING_DUPLICATE_OBJECT_ID]) {
+			ufbxt_assert(node->parent);
 			ufbxt_assert(node->parent->geometry_transform_helper == node);
 		}
 	}
@@ -415,7 +424,9 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		uint32_t vi = mesh->vertex_indices.data[ii];
 		if (vi != UFBX_NO_INDEX) {
 			ufbxt_assert(vi < mesh->num_vertices);
-			ufbxt_assert(mesh->vertex_first_index.data[vi] <= ii);
+			if (!mesh->reversed_winding) {
+				ufbxt_assert(mesh->vertex_first_index.data[vi] <= ii);
+			}
 		}
 	}
 
@@ -460,11 +471,15 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_check_mesh_list(scene, mesh, mesh->edge_crease, mesh->num_edges, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->edge_smoothing, mesh->num_edges, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->edge_visibility, mesh->num_edges, true);
+	ufbxt_check_bool_list(mesh->edge_smoothing);
+	ufbxt_check_bool_list(mesh->edge_visibility);
 
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_material, mesh->num_faces, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_smoothing, mesh->num_faces, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_group, mesh->num_faces, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_hole, mesh->num_faces, true);
+	ufbxt_check_bool_list(mesh->face_smoothing);
+	ufbxt_check_bool_list(mesh->face_hole);
 
 	size_t num_triangles = 0;
 	size_t max_face_triangles = 0;
@@ -683,8 +698,9 @@ static void ufbxt_check_empty(ufbx_scene *scene, ufbx_empty *empty)
 static void ufbxt_check_line_curve(ufbx_scene *scene, ufbx_line_curve *line)
 {
 	for (size_t i = 0; i < line->point_indices.count; i++) {
-		int32_t ix = line->point_indices.data[i];
-		ufbxt_assert(ix >= 0 && (uint32_t)ix < line->control_points.count);
+		uint32_t ix = line->point_indices.data[i];
+		if (scene->metadata.may_contain_no_index && ix == UFBX_NO_INDEX) continue;
+		ufbxt_assert(ix < line->control_points.count);
 	}
 
 	for (size_t i = 0; i < line->segments.count; i++) {
@@ -774,7 +790,9 @@ static void ufbxt_check_skin_deformer(ufbx_scene *scene, ufbx_skin_deformer *def
 
 		for (size_t i = 1; i < vertex.num_weights; i++) {
 			size_t ix = vertex.weight_begin + i;
-			ufbxt_assert(deformer->weights.data[ix - 1].weight >= deformer->weights.data[ix].weight);
+			if (!isnan(deformer->weights.data[ix - 1].weight) && !isnan(deformer->weights.data[ix].weight)) {
+				ufbxt_assert(deformer->weights.data[ix - 1].weight >= deformer->weights.data[ix].weight);
+			}
 		}
 	}
 	for (size_t i = 0; i < deformer->weights.count; i++) {
@@ -799,7 +817,7 @@ static void ufbxt_check_blend_deformer(ufbx_scene *scene, ufbx_blend_deformer *d
 static void ufbxt_check_blend_channel(ufbx_scene *scene, ufbx_blend_channel *channel)
 {
 	for (size_t i = 0; i < channel->keyframes.count; i++) {
-		if (i > 0) {
+		if (i > 0 && !isnan(channel->keyframes.data[i - 1].target_weight) && !isnan(channel->keyframes.data[i].target_weight)) {
 			ufbxt_assert(channel->keyframes.data[i - 1].target_weight <= channel->keyframes.data[i].target_weight);
 		}
 		ufbxt_assert(channel->keyframes.data[i].shape);

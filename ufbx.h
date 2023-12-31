@@ -754,6 +754,18 @@ typedef enum ufbx_inherit_mode UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_inherit_mode, UFBX_INHERIT_MODE, UFBX_INHERIT_MODE_COMPONENTWISE_SCALE);
 
+typedef enum ufbx_mirror_axis UFBX_ENUM_REPR {
+
+	UFBX_MIRROR_AXIS_NONE,
+	UFBX_MIRROR_AXIS_X,
+	UFBX_MIRROR_AXIS_Y,
+	UFBX_MIRROR_AXIS_Z,
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_MIRROR_AXIS)
+} ufbx_mirror_axis;
+
+UFBX_ENUM_TYPE(ufbx_mirror_axis, UFBX_MIRROR_AXIS, UFBX_MIRROR_AXIS_Z);
+
 // Nodes form the scene transformation hierarchy and can contain attached
 // elements such as meshes or lights. In normal cases a single `ufbx_node`
 // contains only a single attached element, so using `type/mesh/...` is safe.
@@ -857,10 +869,12 @@ struct ufbx_node {
 	// ufbx-specific adjustment for switching between coodrinate/unit systems.
 	// HINT: In most cases you don't need to deal with these as these are baked
 	// into all the transforms above and into `ufbx_evaluate_transform()`.
-	ufbx_quat adjust_pre_rotation;  // < Rotation applied between parent and self
-	ufbx_real adjust_pre_scale;     // < Scaling applied between parent and self
-	ufbx_quat adjust_post_rotation; // < Rotation applied in local space at the end
-	ufbx_real adjust_post_scale;    // < Scaling applied in local space at the end
+	ufbx_quat adjust_pre_rotation;       // < Rotation applied between parent and self
+	ufbx_real adjust_pre_scale;          // < Scaling applied between parent and self
+	ufbx_quat adjust_post_rotation;      // < Rotation applied in local space at the end
+	ufbx_real adjust_post_scale;         // < Scaling applied in local space at the end
+	ufbx_real adjust_translation_scale;  // < Scaling applied to translation only
+	ufbx_mirror_axis adjust_mirror_axis; // < Mirror translation and rotation on this axis
 
 	// Materials used by `mesh` or other `attrib`.
 	// There may be multiple copies of a single `ufbx_mesh` with different materials
@@ -1244,6 +1258,9 @@ struct ufbx_mesh {
 	ufbx_subdivision_display_mode subdivision_display_mode;
 	ufbx_subdivision_boundary subdivision_boundary;
 	ufbx_subdivision_boundary subdivision_uv_boundary;
+
+	// The winding of the faces has been reversed.
+	bool reversed_winding;
 
 	// Normals have been generated instead of evalauted.
 	// Either from missing normals (via `ufbx_load_opts.generate_missing_normals`), skinning,
@@ -1909,6 +1926,7 @@ struct ufbx_skin_cluster {
 
 	// Matrix that specifies the rest/bind pose transform of the node,
 	// not generally needed for skinning, use `geometry_to_bone` instead.
+	// NOTE: This does not account for unit scaling!
 	ufbx_matrix bind_to_world;
 
 	// Precomputed matrix/transform that accounts for the current bone transform
@@ -2058,6 +2076,12 @@ typedef struct ufbx_cache_frame {
 	// Format of the wrapper file.
 	ufbx_cache_file_format file_format;
 
+	// Axis to mirror the read data by.
+	ufbx_mirror_axis mirror_axis;
+
+	// Factor to scale the geometry by.
+	ufbx_real scale_factor;
+
 	ufbx_cache_data_format data_format;     // < Format of the data in the file
 	ufbx_cache_data_encoding data_encoding; // < Binary encoding of the data
 	uint64_t data_offset;                   // < Byte offset into the file
@@ -2083,6 +2107,12 @@ typedef struct ufbx_cache_channel {
 	// List of frames belonging to this channel.
 	// Sorted by time (`ufbx_cache_frame.time`).
 	ufbx_cache_frame_list frames;
+
+	// Axis to mirror the frames by.
+	ufbx_mirror_axis mirror_axis;
+
+	// Factor to scale the geometry by.
+	ufbx_real scale_factor;
 
 } ufbx_cache_channel;
 
@@ -3160,6 +3190,7 @@ struct ufbx_constraint {
 
 typedef struct ufbx_bone_pose {
 	ufbx_node *bone_node;
+	// NOTE: This does not account for unit scaling!
 	ufbx_matrix bone_to_world;
 } ufbx_bone_pose;
 
@@ -3173,7 +3204,7 @@ struct ufbx_pose {
 		uint32_t typed_id;
 	}; };
 
-	bool bind_pose;
+	bool is_bind_pose;
 	ufbx_bone_pose_list bone_poses;
 };
 
@@ -3307,6 +3338,31 @@ typedef enum ufbx_thumbnail_format UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_thumbnail_format, UFBX_THUMBNAIL_FORMAT, UFBX_THUMBNAIL_FORMAT_RGBA_32);
 
+// Specify how unit / coordinate system conversion should be performed.
+// Affects how `ufbx_load_opts.target_axes` and `ufbx_load_opts.target_unit_meters` work,
+// has no effect if neither is specified.
+typedef enum ufbx_space_conversion UFBX_ENUM_REPR {
+
+	// Store the space conversion transform in the root node.
+	// Sets `ufbx_node.local_transform` of the root node.
+	UFBX_SPACE_CONVERSION_TRANSFORM_ROOT,
+
+	// Perform the conversion by using "adjust" transforms.
+	// Compensates for the transforms using `ufbx_node.adjust_pre_rotation` and
+	// `ufbx_node.adjust_pre_scale`. You don't need to account for these unless
+	// you are manually building transforms from `ufbx_props`.
+	UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS,
+
+	// Perform the conversion by scaling geometry in addition to adjusting transforms.
+	// Compensates transforms like `UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS` but
+	// applies scaling to geometry as well.
+	UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY,
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_SPACE_CONVERSION)
+} ufbx_space_conversion;
+
+UFBX_ENUM_TYPE(ufbx_space_conversion, UFBX_SPACE_CONVERSION, UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY);
+
 // Embedded thumbnail in the file, valid if the dimensions are non-zero.
 typedef struct ufbx_thumbnail {
 	ufbx_props props;
@@ -3399,6 +3455,21 @@ typedef struct ufbx_metadata {
 
 	ufbx_string original_file_path;
 	ufbx_blob raw_original_file_path;
+
+	// Space conversion method used on the scene.
+	ufbx_space_conversion space_conversion;
+
+	// Transform that has been applied to root for axis/unit conversion.
+	ufbx_quat root_rotation;
+	ufbx_real root_scale;
+
+	// Axis that the scene has been mirrored by.
+	// All geometry has been mirrored in this axis.
+	ufbx_mirror_axis mirror_axis;
+
+	// Amount geometry has been scaled.
+	// See `UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY`.
+	ufbx_real geometry_scale;
 
 } ufbx_metadata;
 
@@ -4035,26 +4106,6 @@ typedef enum ufbx_inherit_mode_handling UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_inherit_mode_handling, UFBX_INHERIT_MODE_HANDLING, UFBX_INHERIT_MODE_HANDLING_IGNORE);
 
-// Specify how unit / coordinate system conversion should be performed.
-// Affects how `ufbx_load_opts.target_axes` and `ufbx_load_opts.target_unit_meters` work,
-// has no effect if neither is specified.
-typedef enum ufbx_space_conversion UFBX_ENUM_REPR {
-
-	// Store the space conversion transform in the root node.
-	// Sets `ufbx_node.local_transform` of the root node.
-	UFBX_SPACE_CONVERSION_TRANSFORM_ROOT,
-
-	// Perform the conversion by using "adjust" transforms.
-	// Compensates for the transforms using `ufbx_node.adjust_pre_rotation` and
-	// `ufbx_node.adjust_pre_scale`. You don't need to account for these unless
-	// you are manually building transforms from `ufbx_props`.
-	UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS,
-
-	UFBX_ENUM_FORCE_WIDTH(UFBX_SPACE_CONVERSION)
-} ufbx_space_conversion;
-
-UFBX_ENUM_TYPE(ufbx_space_conversion, UFBX_SPACE_CONVERSION, UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS);
-
 typedef struct ufbx_baked_vec3 {
 	double time;
 	ufbx_vec3 value;
@@ -4218,6 +4269,17 @@ typedef struct ufbx_load_opts {
 	// How to perform space conversion by `target_axes` and `target_unit_meters`.
 	// See `ufbx_space_conversion` for an explanation.
 	ufbx_space_conversion space_conversion;
+
+	// Axis used to mirror for conversion between left-handed and right-handed coordinates.
+	ufbx_mirror_axis handedness_conversion_axis;
+
+	// Do not change winding of faces when converting handedness.
+	bool handedness_conversion_retain_winding;
+
+	// Reverse winding of all faces.
+	// If `handedness_conversion_retain_winding` is not specified, mirrored meshes
+	// will retain their original winding.
+	bool reverse_winding;
 
 	// Apply an implicit root transformation to match axes.
 	// Used if `ufbx_coordinate_axes_valid(target_axes)`.
@@ -4522,6 +4584,15 @@ typedef struct ufbx_geometry_cache_opts {
 	// FPS value for converting frame times to seconds
 	double frames_per_second;
 
+	// Axis to mirror the geometry by.
+	ufbx_mirror_axis mirror_axis;
+
+	// Enable scaling `scale_factor` all geometry by.
+	bool use_scale_factor;
+
+	// Factor to scale the geometry by.
+	ufbx_real scale_factor;
+
 	uint32_t _end_zero;
 } ufbx_geometry_cache_opts;
 
@@ -4536,6 +4607,9 @@ typedef struct ufbx_geometry_cache_data_opts {
 	bool additive;
 	bool use_weight;
 	ufbx_real weight;
+
+	// Ignore scene transform.
+	bool ignore_transform;
 
 	uint32_t _end_zero;
 } ufbx_geometry_cache_data_opts;

@@ -146,6 +146,7 @@ typedef struct {
 	bool root_groups_at_bone;
 	bool remove_namespaces;
 	bool match_by_order;
+	bool negate_xz;
 	ufbx_real tolerance;
 	ufbx_real uv_tolerance;
 	uint32_t allow_missing;
@@ -159,6 +160,9 @@ typedef struct {
 	double position_scale;
 	double position_scale_float;
 	double position_scale_bake;
+
+	double fbx_position_scale;
+	ufbx_quat fbx_rotation;
 
 	char animation_name[128];
 
@@ -544,6 +548,8 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 	obj->position_scale = 1.0;
 	obj->position_scale_float = 1.0;
 	obj->position_scale_bake = 1.0;
+	obj->fbx_position_scale = 1.0;
+	obj->fbx_rotation = ufbx_identity_quat;
 
 	if (implicit_mesh) {
 		mesh = meshes;
@@ -721,6 +727,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			}
 			if (!strcmp(line, "ufbx:match_by_order")) {
 				obj->match_by_order = true;
+			}
+			if (!strcmp(line, "ufbx:negate_xz")) {
+				obj->negate_xz = true;
 			}
 			if (!strcmp(line, "www.blender.org")) {
 				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
@@ -1072,6 +1081,21 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 			obj_verts[i].uv = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, i);
 		}
 
+		if (obj->fbx_position_scale != 1.0) {
+			obj_verts[i].pos.x *= (ufbx_real)obj->fbx_position_scale;
+			obj_verts[i].pos.y *= (ufbx_real)obj->fbx_position_scale;
+			obj_verts[i].pos.z *= (ufbx_real)obj->fbx_position_scale;
+		}
+		if (obj->fbx_rotation.w != 1.0f) {
+			obj_verts[i].pos = ufbx_quat_rotate_vec3(obj->fbx_rotation, obj_verts[i].pos);
+		}
+		if (obj->negate_xz) {
+			obj_verts[i].pos.x *= -1.0f;
+			obj_verts[i].pos.z *= -1.0f;
+			obj_verts[i].normal.x *= -1.0f;
+			obj_verts[i].normal.z *= -1.0f;
+		}
+
 		if (scale != 1.0) {
 			obj_verts[i].pos.x *= scale;
 			obj_verts[i].pos.y *= scale;
@@ -1164,7 +1188,6 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 
 	free(obj_verts);
 	free(fbx_verts);
-
 }
 
 typedef struct {
@@ -1530,6 +1553,15 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 						}
 					}
 
+					if (obj->fbx_position_scale != 1.0) {
+						fp.x *= (ufbx_real)obj->fbx_position_scale;
+						fp.y *= (ufbx_real)obj->fbx_position_scale;
+						fp.z *= (ufbx_real)obj->fbx_position_scale;
+					}
+					if (obj->fbx_rotation.w != 1.0f) {
+						fp = ufbx_quat_rotate_vec3(obj->fbx_rotation, fp);
+					}
+
 					if (scale != 1.0) {
 						fp.x *= (ufbx_real)scale;
 						fp.y *= (ufbx_real)scale;
@@ -1537,6 +1569,13 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 						op.x *= (ufbx_real)scale;
 						op.y *= (ufbx_real)scale;
 						op.z *= (ufbx_real)scale;
+					}
+
+					if (obj->negate_xz) {
+						op.x *= -1.0f;
+						op.z *= -1.0f;
+						on.x *= -1.0f;
+						on.z *= -1.0f;
 					}
 
 					ufbxt_assert_close_vec3(p_err, op, fp);
