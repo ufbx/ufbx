@@ -27,7 +27,10 @@ static void ufbxt_assert_fail_imp(const char *func, const char *file, size_t lin
 bool g_verbose = false;
 
 #include "../ufbx.h"
-#include "../extra/ufbx_os.h"
+
+#if defined(THREADS)
+	#include "../extra/ufbx_os.h"
+#endif
 
 #include "check_scene.h"
 #include "check_material.h"
@@ -106,14 +109,12 @@ typedef struct {
 	const char *path;
 } ufbxt_obj_file_task;
 
-static void ufbxt_obj_file_task_fn(void *user, uint32_t index)
+static ufbxt_obj_file *ufbxt_load_obj_file(const char *path)
 {
-	ufbxt_obj_file_task *t = (ufbxt_obj_file_task*)user;
-
 	size_t obj_size;
-	void *obj_data = ufbxt_read_file_ex(t->path, &obj_size);
+	void *obj_data = ufbxt_read_file_ex(path, &obj_size);
 	if (!obj_data) {
-		fprintf(stderr, "Failed to read .obj file: %s\n", t->path);
+		fprintf(stderr, "Failed to read .obj file: %s\n", path);
 		exit(1);
 	}
 
@@ -124,7 +125,13 @@ static void ufbxt_obj_file_task_fn(void *user, uint32_t index)
 
 	obj_file->normalize_units = true;
 
-	t->obj_file = obj_file;
+	return obj_file;
+}
+
+static void ufbxt_obj_file_task_fn(void *user, uint32_t index)
+{
+	ufbxt_obj_file_task *t = (ufbxt_obj_file_task*)user;
+	t->obj_file = ufbxt_load_obj_file(t->path);
 }
 
 int check_fbx_main(int argc, char **argv, const char *path)
@@ -256,18 +263,20 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		}
 	}
 
-	ufbx_os_thread_pool *thread_pool = ufbx_os_create_thread_pool(NULL);
-	ufbxt_assert(thread_pool);
+	#if defined(THREADS)
+		ufbx_os_thread_pool *thread_pool = ufbx_os_create_thread_pool(NULL);
+		ufbxt_assert(thread_pool);
 
-	ufbxt_obj_file_task obj_task = { NULL };
-	uint64_t obj_task_id = ~(uint64_t)0;
+		ufbxt_obj_file_task obj_task = { NULL };
+		uint64_t obj_task_id = ~(uint64_t)0;
 
-	if (obj_path) {
-		obj_task.path = obj_path;
-		obj_task_id = ufbx_os_thread_pool_run(thread_pool, &ufbxt_obj_file_task_fn, &obj_task, 1);
-	}
+		if (obj_path) {
+			obj_task.path = obj_path;
+			obj_task_id = ufbx_os_thread_pool_run(thread_pool, &ufbxt_obj_file_task_fn, &obj_task, 1);
+		}
 
-	ufbx_os_init_ufbx_thread_pool(&opts.thread_opts.pool, thread_pool);
+		ufbx_os_init_ufbx_thread_pool(&opts.thread_opts.pool, thread_pool);
+	#endif
 
 	ufbx_error error;
 	ufbx_scene *scene;
@@ -339,7 +348,9 @@ int check_fbx_main(int argc, char **argv, const char *path)
 
 			for (int i = 0; i < profile_runs; i++) {
 				ufbx_load_opts memory_opts = { 0 };
-				ufbx_os_init_ufbx_thread_pool(&memory_opts.thread_opts.pool, thread_pool);
+				#if defined(THREADS)
+					ufbx_os_init_ufbx_thread_pool(&memory_opts.thread_opts.pool, thread_pool);
+				#endif
 
 				uint64_t load_begin = cputime_cpu_tick();
 				ufbx_scene *memory_scene = ufbx_load_memory(fbx_data, fbx_size, &memory_opts, NULL);
@@ -445,8 +456,12 @@ int check_fbx_main(int argc, char **argv, const char *path)
 	}
 
 	if (obj_path) {
-		ufbx_os_thread_pool_wait(thread_pool, obj_task_id);
-		ufbxt_obj_file *obj_file = obj_task.obj_file;
+		#if defined(THREADS)
+			ufbx_os_thread_pool_wait(thread_pool, obj_task_id);
+			ufbxt_obj_file *obj_file = obj_task.obj_file;
+		#else
+			ufbxt_obj_file *obj_file = ufbxt_load_obj_file(obj_path);
+		#endif
 
 		ufbx_scene *state;
 		if (obj_file->animation_frame >= 0 || frame != INT_MIN) {
@@ -591,7 +606,9 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		printf("%u\n", ufbxt_sink);
 	}
 
-	ufbx_os_free_thread_pool(thread_pool);
+	#if defined(THREADS)
+		ufbx_os_free_thread_pool(thread_pool);
+	#endif
 
 	return result;
 }
@@ -699,9 +716,11 @@ int main(int argc, char **argv)
 
 #include "cputime.h"
 
-#define UFBX_OS_IMPLEMENTATION
-#include "../extra/ufbx_os.h"
+#if defined(THREADS)
+	#define UFBX_OS_IMPLEMENTATION
+	#include "../extra/ufbx_os.h"
+#endif
 
 #ifndef EXTERNAL_UFBX
-#include "../ufbx.c"
+	#include "../ufbx.c"
 #endif
