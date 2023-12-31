@@ -4317,6 +4317,9 @@ typedef struct ufbx_load_opts {
 	bool use_root_transform;
 	ufbx_transform root_transform;
 
+	// Animation keyframe clamp threhsold, only applies to specific interpolation modes.
+	double key_clamp_threshold;
+
 	// Specify how to handle Unicode errors in strings.
 	ufbx_unicode_error_handling unicode_error_handling;
 
