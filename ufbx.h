@@ -4229,7 +4229,7 @@ typedef struct ufbx_load_opts {
 	// a bit of memory and time if not needed
 	bool skip_skin_vertices;
 
-	// Skip computing `ufbx_mesh.material_parts[]` and `ufbx_mesh.group_parts[]`.
+	// Skip computing `ufbx_mesh.material_parts[]` and `ufbx_mesh.face_group_parts[]`.
 	bool skip_mesh_parts;
 
 	// Clean-up skin weights by removing negative, zero and NAN weights.
@@ -4532,7 +4532,7 @@ typedef struct ufbx_bake_opts {
 	// Default: `4`
 	size_t key_reduction_passes;
 
-	// Compensate for `UFBX_INHERIT_NO_SCALE` by adjusting child scale.
+	// Compensate for `UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE` by adjusting child scale.
 	// NOTE: This is an lossy operation, and properly works only for uniform scaling.
 	bool compensate_inherit_no_scale;
 
