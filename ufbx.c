@@ -31304,6 +31304,18 @@ ufbx_abi size_t ufbx_ffi_get_triangulate_face_num_indices(const ufbx_face *face)
 	return ufbx_get_triangulate_face_num_indices(*face);
 }
 
+ufbx_abi ufbx_vec3 ufbx_ffi_evaluate_baked_vec3(const ufbx_baked_vec3 *keyframes, size_t num_keyframes, double time)
+{
+	ufbx_baked_vec3_list list = { (ufbx_baked_vec3*)keyframes, num_keyframes };
+	return ufbx_evaluate_baked_vec3(list, time);
+}
+
+ufbx_abi ufbx_quat ufbx_ffi_evaluate_baked_quat(const ufbx_baked_quat *keyframes, size_t num_keyframes, double time)
+{
+	ufbx_baked_quat_list list = { (ufbx_baked_quat*)keyframes, num_keyframes };
+	return ufbx_evaluate_baked_quat(list, time);
+}
+
 #ifdef __cplusplus
 }
 #endif
