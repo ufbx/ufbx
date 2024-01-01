@@ -115,4 +115,25 @@
     </Expand>
   </Type>
 
+  <Type Name="ufbxi_double_list"><DisplayString>{{ count={count} }}</DisplayString><Expand><ArrayItems><Size>count</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
+
+  <Type Name="ufbxos_wait_sema">
+	  <Expand>
+		  <Item Name="waiters">state &amp; 0x7fff</Item>
+		  <Item Name="sleepers">(state >> 15) &amp; 0x7fff</Item>
+		  <Item Name="signaled">(state >> 30) &amp; 0x1</Item>
+		  <Item Name="revision">state >> 32</Item>
+	  </Expand>
+  </Type>
+
+  <Type Name="ufbxos_wait_entry">
+	  <Expand>
+		  <Item Name="sema_index">state &amp; 0xff</Item>
+		  <Item Name="hash">(state >> 8) &amp; 0x7fffff</Item>
+		  <Item Name="hash_multi">(state >> 31) &amp; 0x1</Item>
+		  <Item Name="sema_revision">state >> 32</Item>
+	  </Expand>
+  </Type>
+
+
 </AutoVisualizer>

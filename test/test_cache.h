@@ -158,7 +158,7 @@ UFBXT_FILE_TEST_OPTS(marvelous_quad, ufbxt_scale_to_cm_opts)
 		ufbxt_assert(node && node->mesh);
 		ufbx_mesh *mesh = node->mesh;
 		ufbxt_assert(mesh->materials.count == 1);
-		ufbx_material *material = mesh->materials.data[0].material;
+		ufbx_material *material = mesh->materials.data[0];
 
 		// What? Marvelous writes relative filenames as absolute.
 		// TODO: Quirk mode to fix this?
@@ -175,4 +175,13 @@ UFBXT_FILE_TEST_OPTS(marvelous_quad, ufbxt_scale_to_cm_opts)
 	ufbxt_check_frame(scene, err, false, "marvelous_quad_22", NULL, 22.0/24.0);
 }
 #endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_missing_cache_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(load_error->type == UFBX_ERROR_EXTERNAL_FILE_NOT_FOUND);
+	ufbxt_assert(!strcmp(load_error->info, "missing_cache.xml"));
+}
+#endif
+
 

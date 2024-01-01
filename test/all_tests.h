@@ -10,6 +10,7 @@
 #include "test_skin.h"
 #include "test_material.h"
 #include "test_camera.h"
+#include "test_lights.h"
 #include "test_triangulate.h"
 #include "test_topology.h"
 #include "test_legacy.h"

@@ -2,12 +2,12 @@
 #define UFBXT_TEST_GROUP "parse"
 
 #if UFBXT_IMPL
-static void ufbxt_check_warning(ufbx_scene *scene, ufbx_warning_type type, size_t count, const char *substring)
+static void ufbxt_check_warning_imp(ufbx_scene *scene, ufbx_warning_type type, uint32_t element_id, size_t count, const char *substring)
 {
 	bool found = false;
 	for (size_t i = 0; i < scene->metadata.warnings.count; i++) {
 		ufbx_warning *warning = &scene->metadata.warnings.data[i];
-		if (warning->type == type) {
+		if (warning->type == type && warning->element_id == element_id) {
 			if (substring) {
 				ufbxt_assert(strstr(warning->description.data, substring));
 			}
@@ -21,8 +21,55 @@ static void ufbxt_check_warning(ufbx_scene *scene, ufbx_warning_type type, size_
 		}
 	}
 
-	ufbxt_logf("Warning not found: %d", (int)type);
+	if (!found) {
+		ufbxt_logf("Warning not found: %d", (int)type);
+	}
 	ufbxt_assert(found);
+}
+
+// element_name can be prefixed with '#' to match elements parented to a node with the set name
+static void ufbxt_check_warning_ix(ufbx_scene *scene, ufbx_warning_type type, ufbx_element_type element_type, const char *element_name, uint32_t element_index, size_t count, const char *substring)
+{
+	uint32_t element_id = ~0u;
+	if (element_name != NULL) {
+		uint32_t match_index = 0;
+		for (uint32_t i = 0; i < scene->elements.count; i++) {
+			ufbx_element *element = scene->elements.data[i];
+			if (element->type != element_type) continue;
+
+			bool name_match = false;
+			if (element_name[0] == '#') {
+				for (uint32_t j = 0; j < element->instances.count; j++) {
+					ufbx_node *instance = element->instances.data[j];
+					if (!strcmp(instance->name.data, element_name + 1)) {
+						name_match = true;
+						break;
+					}
+				}
+			} else {
+				if (!strcmp(element->name.data, element_name)) {
+					name_match = true;
+				}
+			}
+
+			if (name_match) {
+				if (match_index == element_index) {
+					element_id = element->element_id;
+					break;
+				}
+				match_index++;
+			}
+		}
+		ufbxt_assert(element_id != ~0u);
+	}
+
+	ufbxt_check_warning_imp(scene, type, element_id, count, substring);
+}
+
+// element_name can be prefixed with '#' to match elements parented to a node with the set name
+static void ufbxt_check_warning(ufbx_scene *scene, ufbx_warning_type type, ufbx_element_type element_type, const char *element_name, size_t count, const char *substring)
+{
+	ufbxt_check_warning_ix(scene, type, element_type, element_name, 0, count, substring);
 }
 #endif
 
@@ -228,9 +275,10 @@ UFBXT_FILE_TEST(maya_node_attribute_zoo)
 	node = ufbx_find_node(scene, "Bone");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_BONE);
 	ufbxt_assert(node->attrib && node->attrib->type == UFBX_ELEMENT_BONE);
-	ufbxt_assert(&node->bone->element == node->attrib);
-	ufbxt_assert_close_real(err, node->bone->radius, 0.5f);
-	ufbxt_assert_close_real(err, node->bone->relative_length, 1.0f);
+	ufbx_bone *bone = ufbx_as_bone(node->attrib);
+	ufbxt_assert(bone);
+	ufbxt_assert_close_real(err, bone->radius, 0.5f);
+	ufbxt_assert_close_real(err, bone->relative_length, 1.0f);
 
 	node = ufbx_find_node(scene, "Camera");
 	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_CAMERA);
@@ -255,8 +303,8 @@ UFBXT_FILE_TEST(maya_node_attribute_zoo)
 	ufbx_stereo_camera *stereo = (ufbx_stereo_camera*)node->attrib;
 	ufbxt_assert(stereo->left && stereo->left->element.type == UFBX_ELEMENT_CAMERA);
 	ufbxt_assert(stereo->right && stereo->right->element.type == UFBX_ELEMENT_CAMERA);
-	ufbx_prop left_focal_prop = ufbx_evaluate_prop(&scene->anim, &stereo->left->element, "FocalLength", 0.5);
-	ufbx_prop right_focal_prop = ufbx_evaluate_prop(&scene->anim, &stereo->right->element, "FocalLength", 0.5);
+	ufbx_prop left_focal_prop = ufbx_evaluate_prop(scene->anim, &stereo->left->element, "FocalLength", 0.5);
+	ufbx_prop right_focal_prop = ufbx_evaluate_prop(scene->anim, &stereo->right->element, "FocalLength", 0.5);
 	ufbxt_assert_close_real(err, left_focal_prop.value_real, 42.011f);
 	ufbxt_assert_close_real(err, right_focal_prop.value_real, 42.011f);
 
@@ -376,7 +424,7 @@ UFBXT_FILE_TEST(maya_cube_big_endian)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_cube_nan)
+UFBXT_FILE_TEST_FLAGS(synthetic_cube_nan, UFBXT_FILE_TEST_FLAG_ALLOW_THREAD_ERROR)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
@@ -692,7 +740,7 @@ UFBXT_FILE_TEST(max_quote)
 #if UFBXT_IMPL
 {
 	if (scene->metadata.ascii && scene->metadata.version == 6100) {
-		ufbxt_check_warning(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_NODE, "\"", 1, 1, NULL);
 	}
 
 	{
@@ -701,7 +749,7 @@ UFBXT_FILE_TEST(max_quote)
 		ufbxt_assert(node->mesh);
 		ufbx_mesh *mesh = node->mesh;
 		ufbxt_assert(mesh->materials.count == 1);
-		ufbx_material *material = mesh->materials.data[0].material;
+		ufbx_material *material = mesh->materials.data[0];
 		if (scene->metadata.ascii) {
 			ufbxt_assert(!strcmp(material->name.data, "&&q&qu&quo&quot\"\""));
 		} else {
@@ -734,7 +782,7 @@ UFBXT_FILE_TEST(max_colon_name)
 	ufbxt_assert(node->mesh);
 	ufbx_mesh *mesh = node->mesh;
 	ufbxt_assert(mesh->materials.count == 1);
-	ufbx_material *material = mesh->materials.data[0].material;
+	ufbx_material *material = mesh->materials.data[0];
 	ufbxt_assert(!strcmp(material->name.data, "Material::Pink"));
 }
 #endif
@@ -757,7 +805,8 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unicode_error_identity, UFBXT_FILE_TEST_FLAG_ALL
 
 	for (size_t i = 0; i < parent->children.count; i++) {
 		ufbx_node *child = parent->children.data[i];
-		bool left = child->world_transform.translation.x < 0.0f;
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&child->node_to_world);
+		bool left = world_transform.translation.x < 0.0f;
 
 		ufbxt_assert(!strcmp(child->name.data, "Child_\xef\xbf\xbd"));
 
@@ -765,7 +814,7 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unicode_error_identity, UFBXT_FILE_TEST_FLAG_ALL
 		ufbxt_assert(mesh);
 		ufbxt_assert(mesh->materials.count == 1);
 
-		ufbx_material *material = mesh->materials.data[0].material;
+		ufbx_material *material = mesh->materials.data[0];
 		ufbxt_assert(!strcmp(material->name.data, "Material_\xef\xbf\xbd"));
 
 		if (left) {
@@ -860,18 +909,6 @@ UFBXT_FILE_TEST_OPTS_FLAGS(synthetic_broken_filename, ufbxt_unicode_error_questi
 		ufbxt_assert(!memcmp(abs_path.data, abs_path_raw, abs_path.size));
 		ufbxt_assert(!memcmp(rel_path.data, rel_path_raw, rel_path.size));
 	}
-}
-#endif
-
-#if UFBXT_IMPL
-static uint32_t ufbxt_fnv1a(const void *data, size_t size)
-{
-	const char *src = (const char*)data;
-	uint32_t hash = 0x811c9dc5u;
-	for (size_t i = 0; i < size; i++) {
-		hash = (hash ^ (uint32_t)(uint8_t)src[i]) * 0x01000193u;
-	}
-	return hash;
 }
 #endif
 
@@ -1092,8 +1129,8 @@ static ufbx_load_opts ufbxt_fail_unicode_opts()
 UFBXT_FILE_TEST_FLAGS(synthetic_unsafe_cube, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, 4, NULL);
-	ufbxt_check_warning(scene, UFBX_WARNING_BAD_UNICODE, 1, NULL);
+	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, UFBX_ELEMENT_MESH, "#" "pC" "\xef\xbf\xbd" "\xef\xbf\xbd" "e1", 4, NULL);
+	ufbxt_check_warning(scene, UFBX_WARNING_BAD_UNICODE, UFBX_ELEMENT_NODE, "pC" "\xef\xbf\xbd" "\xef\xbf\xbd" "e1", 1, NULL);
 
 	ufbx_node *node = ufbx_find_node(scene, "pC" "\xef\xbf\xbd" "\xef\xbf\xbd" "e1");
 	ufbxt_assert(node && node->mesh);
@@ -1280,9 +1317,15 @@ UFBXT_FILE_TEST(synthetic_duplicate_id)
 #if UFBXT_IMPL
 {
 	if (scene->metadata.version >= 7000) {
-		ufbxt_check_warning(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, 5, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_NODE, "pCube2", 0, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_NODE, "pointLight2", 0, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_MATERIAL, "lambert2", 0, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_MESH, "", 1, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_LIGHT, "", 1, 1, NULL);
 	} else {
-		ufbxt_check_warning(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, 3, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_NODE, "pCube1", 1, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_NODE, "pointLight1", 1, 1, NULL);
+		ufbxt_check_warning_ix(scene, UFBX_WARNING_DUPLICATE_OBJECT_ID, UFBX_ELEMENT_MATERIAL, "lambert1", 1, 1, NULL);
 	}
 
 	// Don't make any assumptions about the scene, ufbxt_check_scene() makes sure
@@ -1338,7 +1381,7 @@ UFBXT_FILE_TEST(synthetic_recursive_connections)
 		ufbxt_assert((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0);
 
 		ufbx_vec3 ref = { 1.0f, 0.0f, 0.0f };
-		ufbx_prop value = ufbx_evaluate_prop(&scene->anim, &node->element, "Lcl Translation", 0.5);
+		ufbx_prop value = ufbx_evaluate_prop(scene->anim, &node->element, "Lcl Translation", 0.5);
 		ufbxt_assert_close_vec3(err, value.value_vec3, ref);
 	}
 
@@ -1351,7 +1394,7 @@ UFBXT_FILE_TEST(synthetic_recursive_connections)
 		ufbxt_assert((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0);
 
 		ufbx_vec3 ref = { 0.0f, 0.0f, 1.0f };
-		ufbx_prop value = ufbx_evaluate_prop(&scene->anim, &node->element, "Lcl Translation", 0.5);
+		ufbx_prop value = ufbx_evaluate_prop(scene->anim, &node->element, "Lcl Translation", 0.5);
 		ufbxt_assert_close_vec3(err, value.value_vec3, ref);
 	}
 }
@@ -1364,22 +1407,38 @@ UFBXT_FILE_TEST(synthetic_rotation_order_layers)
 	ufbx_anim_layer *layer_base = ufbx_as_anim_layer(ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "Base"));
 	ufbx_anim_layer *layer_rotation = ufbx_as_anim_layer(ufbx_find_element(scene, UFBX_ELEMENT_ANIM_LAYER, "Rotation"));
 
-	ufbx_anim_layer_desc layers[] = {
-		{ layer_base_layer, 1.0f },
-		{ layer_base, 0.5f },
-		{ layer_rotation, 0.25f },
+	uint32_t layer_ids[] = {
+		layer_base_layer->typed_id,
+		layer_base->typed_id,
+		layer_rotation->typed_id,
 	};
 
-	ufbx_anim anim = { 0 };
-	anim.layers.data = layers;
-	anim.layers.count = ufbxt_arraycount(layers);
+	ufbx_real layer_weights[] = {
+		1.0f, 0.5f, 0.25f,
+	};
+
+	ufbx_anim_opts opts = { 0 };
+	opts.layer_ids.data = layer_ids;
+	opts.layer_ids.count = ufbxt_arraycount(layer_ids);
+	opts.override_layer_weights.data = layer_weights;
+	opts.override_layer_weights.count = ufbxt_arraycount(layer_weights);
+
+	ufbx_error error;
+	ufbx_anim *anim = ufbx_create_anim(scene, &opts, &error);
+	if (!anim) {
+		ufbxt_log_error(&error);
+	}
+	ufbxt_assert(anim);
+	ufbxt_check_anim(scene, anim);
 
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node);
 
 	// We don't really care about the result here as runtime rotation order is not really supported,
 	// just want to make sure we don't hit any infinite recursion with rotation order layers
-	(void)ufbx_evaluate_prop(&anim, &node->element, "Lcl Rotation", 0.2f);
+	(void)ufbx_evaluate_prop(anim, &node->element, "Lcl Rotation", 0.2f);
+
+	ufbx_free_anim(anim);
 }
 #endif
 
@@ -1456,6 +1515,76 @@ UFBXT_FILE_TEST(maya_notes)
 		}
 
 		ufbxt_assert(*str == '\0');
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_cube, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!strcmp(scene->metadata.latest_application.name.data, "MotionBuilder"));
+
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_thumbnail, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_ALLOW_FEWER_PROGRESS_CALLS)
+#if UFBXT_IMPL
+{
+	ufbx_thumbnail *thumbnail = &scene->metadata.thumbnail;
+	ufbxt_assert(ufbx_find_int(&thumbnail->props, "CustomWidth", 0) == 100);
+	ufbxt_assert(ufbx_find_int(&thumbnail->props, "CustomHeight", 0) == 100);
+	ufbxt_assert(thumbnail->format == UFBX_THUMBNAIL_FORMAT_RGBA_32);
+	ufbxt_assert(thumbnail->width == 128);
+	ufbxt_assert(thumbnail->height == 128);
+	ufbxt_assert(ufbxt_fnv1a(thumbnail->data.data, thumbnail->data.size) == 0xc9d71343u);
+
+	size_t num_pixels = thumbnail->width * thumbnail->height;
+	ufbxt_assert(thumbnail->data.size == num_pixels * 4);
+	const uint8_t *pixels = (const uint8_t*)thumbnail->data.data;
+	for (size_t i = 0; i < num_pixels; i++) {
+		uint8_t a = pixels[i * 4 + 3];
+		ufbxt_assert(a == 255);
+	}
+}
+#endif
+
+#if UFBXT_IMPL
+size_t ufbxt_read_byte(void *user, void *data, size_t size)
+{
+	if (size == 0) return 0;
+	int ch = fgetc((FILE*)user);
+	if (ch == EOF) return 0;
+	*(char*)data = (char)ch;
+	return 1;
+}
+void ufbxt_close_file(void *user)
+{
+	fclose((FILE*)user);
+}
+#endif
+
+UFBXT_TEST(single_byte_stream)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		FILE *f = fopen(path, "rb");
+		ufbxt_assert(f);
+
+		ufbx_stream stream = { 0 };
+		stream.read_fn = &ufbxt_read_byte;
+		stream.close_fn = &ufbxt_close_file;
+		stream.user = f;
+
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_stream(&stream, NULL, &error);
+		if (!scene) ufbxt_log_error(&error);
+		ufbxt_assert(scene);
+
+		ufbx_free_scene(scene);
 	}
 }
 #endif

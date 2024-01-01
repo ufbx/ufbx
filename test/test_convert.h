@@ -68,6 +68,15 @@ ufbx_load_opts ufbxt_z_up_meters_adjust_opts()
 	return opts;
 }
 
+ufbx_load_opts ufbxt_z_up_meters_modify_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_axes = ufbx_axes_right_handed_z_up;
+	opts.target_unit_meters = 1.0f;
+	opts.space_conversion = UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY;
+	return opts;
+}
+
 ufbx_load_opts ufbxt_rh_y_camera_light_axes_opts()
 {
 	ufbx_load_opts opts = { 0 };
@@ -88,44 +97,6 @@ ufbx_load_opts ufbxt_blender_space_adjust_opts()
 }
 
 #endif
-
-#if UFBXT_IMPL
-typedef struct {
-	ufbx_vec3 translation;
-	ufbx_vec3 rotation_euler;
-	ufbx_vec3 scale;
-} ufbxt_ref_transform;
-
-static void ufbxt_check_transform(ufbxt_diff_error *err, const char *name, ufbx_transform transform, ufbxt_ref_transform ref)
-{
-	ufbx_vec3 rotation_euler = ufbx_quat_to_euler(transform.rotation, UFBX_ROTATION_ORDER_XYZ);
-	ufbxt_hintf("%s { { %.2f, %.2f, %.2f }, { %.2f, %.2f, %.2f }, { %.2f, %.2f, %.2f } }", name,
-		transform.translation.x, transform.translation.y, transform.translation.z,
-		rotation_euler.x, rotation_euler.y, rotation_euler.z,
-		transform.scale.x, transform.scale.y, transform.scale.z);
-
-	ufbxt_assert_close_vec3(err, transform.translation, ref.translation);
-	#if defined(UFBX_REAL_IS_FLOAT)
-	{
-		ufbx_quat ref_quat = ufbx_euler_to_quat(ref.rotation_euler, UFBX_ROTATION_ORDER_XYZ);
-		ref_quat = ufbx_quat_fix_antipodal(ref_quat, transform.rotation);
-		ufbxt_assert_close_quat(err, transform.rotation, ref_quat);
-	}
-	#else
-	{
-		ufbxt_assert_close_vec3(err, rotation_euler, ref.rotation_euler);
-	}
-	#endif
-	ufbxt_assert_close_vec3(err, transform.scale, ref.scale);
-
-	ufbxt_hintf("");
-}
-
-static const ufbxt_ref_transform ufbxt_ref_transform_identity = {
-	{ 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f },
-};
-#endif
-
 
 UFBXT_FILE_TEST(max_geometry_transform)
 #if UFBXT_IMPL
@@ -265,6 +236,84 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_modify, max_geometry_trans
 		ufbxt_check_transform(err, "Box002 local", node->local_transform, local_transform);
 		ufbxt_check_transform(err, "Box002 geometry", node->geometry_transform, ufbxt_ref_transform_identity);
 	}
+}
+#endif
+
+UFBXT_TEST(max_geometry_transform_lefthanded)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("max_geometry_transform_lefthanded", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "max_geometry_transform" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t axis_ix = 0; axis_ix < UFBX_MIRROR_AXIS_COUNT; axis_ix++) {
+			for (uint32_t handling_ix = 0; handling_ix < UFBX_GEOMETRY_TRANSFORM_HANDLING_COUNT; handling_ix++) {
+				ufbxt_hintf("handedness_conversion_axis=%u geometry_transform_handling=%u", axis_ix, handling_ix);
+
+				ufbx_load_opts opts = { 0 };
+
+				opts.target_axes = ufbx_axes_left_handed_z_up;
+				opts.handedness_conversion_axis = (ufbx_mirror_axis)axis_ix;
+				opts.geometry_transform_handling = (ufbx_geometry_transform_handling)handling_ix;
+				opts.reverse_winding = axis_ix == 0;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+
+				ufbx_free_scene(scene);
+			}
+		}
+	}
+
+	free(obj_file);
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
+UFBXT_TEST(max_geometry_transform_lefthanded_adjust)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("max_geometry_transform_lefthanded", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "max_geometry_transform" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t axis_ix = 1; axis_ix < UFBX_MIRROR_AXIS_COUNT; axis_ix++) {
+			for (uint32_t handling_ix = 0; handling_ix < UFBX_GEOMETRY_TRANSFORM_HANDLING_COUNT; handling_ix++) {
+				ufbxt_hintf("handedness_conversion_axis=%u geometry_transform_handling=%u", axis_ix, handling_ix);
+
+				ufbx_load_opts opts = { 0 };
+
+				opts.target_axes = ufbx_axes_left_handed_z_up;
+				opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+				opts.handedness_conversion_axis = (ufbx_mirror_axis)axis_ix;
+				opts.geometry_transform_handling = (ufbx_geometry_transform_handling)handling_ix;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+
+				ufbx_free_scene(scene);
+			}
+		}
+	}
+
+	free(obj_file);
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
 }
 #endif
 
@@ -704,18 +753,16 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_z_up_adjust, blender_340_z_up, ufbxt_
 		if (node->node_depth == 1) {
 			ufbxt_assert(node->has_adjust_transform);
 			ufbx_vec3 rotation = { -90.0f, 0.0f, 0.0f };
-			ufbx_vec3 scale = { 0.01f, 0.01f, 0.01f };
 			ufbx_quat rotation_quat = ufbx_euler_to_quat(rotation, UFBX_ROTATION_ORDER_XYZ);
 			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
 			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, rotation_quat);
-			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);
+			ufbxt_assert_close_real(err, node->adjust_pre_scale, 0.01f);
 			num_adjusted++;
 		} else {
 			ufbxt_assert(!node->has_adjust_transform);
-			ufbx_vec3 scale = { 1.0f, 1.0f, 1.0f };
 			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
 			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, ufbx_identity_quat);
-			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);
+			ufbxt_assert_close_real(err, node->adjust_pre_scale, 1.0f);
 		}
 	}
 
@@ -782,18 +829,16 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_y_up_adjust, blender_340_y_up, ufbxt_
 		if (node->node_depth == 1) {
 			ufbxt_assert(node->has_adjust_transform);
 			ufbx_vec3 rotation = { 90.0f, 0.0f, 0.0f };
-			ufbx_vec3 scale = { 0.01f, 0.01f, 0.01f };
 			ufbx_quat rotation_quat = ufbx_euler_to_quat(rotation, UFBX_ROTATION_ORDER_XYZ);
 			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
 			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, rotation_quat);
-			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);
+			ufbxt_assert_close_real(err, node->adjust_pre_scale, 0.01f);
 			num_adjusted++;
 		} else {
 			ufbxt_assert(!node->has_adjust_transform);
-			ufbx_vec3 scale = { 1.0f, 1.0f, 1.0f };
 			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
 			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, ufbx_identity_quat);
-			ufbxt_assert_close_vec3(err, node->adjust_pre_scale, scale);
+			ufbxt_assert_close_real(err, node->adjust_pre_scale, 1.0f);
 		}
 	}
 
@@ -820,6 +865,69 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_y_up_adjust, blender_340_y_up, ufbxt_
 		ufbxt_assert(node);
 		ufbxt_ref_transform ref_transform = {
 			{ 0.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }
+		};
+		ufbxt_check_transform(err, "Camera", node->local_transform, ref_transform);
+	}
+
+	ufbxt_assert(scene->nodes.count == 5);
+	ufbxt_assert(num_adjusted == 3);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(blender_340_y_up_modify, blender_340_y_up, ufbxt_z_up_meters_modify_opts,
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *root = scene->root_node;
+	ufbxt_check_transform(err, "root", root->local_transform, ufbxt_ref_transform_identity);
+
+	size_t num_adjusted = 0;
+	for (size_t i = 0; i < scene->nodes.count; i++) {
+		ufbx_node *node = scene->nodes.data[i];
+		if (node->is_root) {
+			ufbxt_assert(!node->has_adjust_transform);
+			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_real(err, node->adjust_translation_scale, 1.0f);
+		} else if (node->node_depth == 1) {
+			ufbxt_assert(node->has_adjust_transform);
+			ufbx_vec3 rotation = { 90.0f, 0.0f, 0.0f };
+			ufbx_quat rotation_quat = ufbx_euler_to_quat(rotation, UFBX_ROTATION_ORDER_XYZ);
+			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, rotation_quat);
+			ufbxt_assert_close_real(err, node->adjust_translation_scale, 0.01f);
+			num_adjusted++;
+		} else {
+			ufbxt_assert(node->has_adjust_transform);
+			ufbxt_assert_close_quat(err, node->adjust_post_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_quat(err, node->adjust_pre_rotation, ufbx_identity_quat);
+			ufbxt_assert_close_real(err, node->adjust_translation_scale, 0.01f);
+		}
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Light");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 4.0f, 1.0f, 5.0f }, { 90.0f, 0.0f, 0.0f }, { 100.0f, 100.0f, 100.0f }
+		};
+		ufbxt_check_transform(err, "Light", node->local_transform, ref_transform);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Camera");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 7.0f, 6.0f, 5.0f }, { 90.0f, 0.0f, 0.0f }, { 100.0f, 100.0f, 100.0f }
+		};
+		ufbxt_check_transform(err, "Camera", node->local_transform, ref_transform);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Cube");
+		ufbxt_assert(node);
+		ufbxt_ref_transform ref_transform = {
+			{ 0.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 100.0f, 100.0f, 100.0f }
 		};
 		ufbxt_check_transform(err, "Camera", node->local_transform, ref_transform);
 	}

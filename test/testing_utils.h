@@ -139,13 +139,17 @@ typedef struct {
 	bool bad_order;
 	bool bad_uvs;
 	bool bad_faces;
+	bool missing_uvs;
 	bool line_faces;
 	bool point_faces;
 	bool no_subdivision;
 	bool root_groups_at_bone;
 	bool remove_namespaces;
 	bool match_by_order;
+	bool negate_xz;
 	ufbx_real tolerance;
+	ufbx_real uv_tolerance;
+	uint32_t allow_missing;
 	int32_t animation_frame;
 
 	bool normalize_units;
@@ -155,6 +159,10 @@ typedef struct {
 
 	double position_scale;
 	double position_scale_float;
+	double position_scale_bake;
+
+	double fbx_position_scale;
+	ufbx_quat fbx_rotation;
 
 	char animation_name[128];
 
@@ -430,6 +438,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 	size_t total_name_length = 0;
 
 	bool merge_groups = false;
+	bool allow_default = false;
 
 	char *line = (char*)obj_data;
 	for (;;) {
@@ -452,7 +461,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 				prev_space = space;
 			}
 		}
-		else if (!strncmp(line, "g default", 7)) { /* ignore default group */ }
+		else if (!strncmp(line, "g default", 7) && !allow_default) { /* ignore default group */ }
 		else if ((!strncmp(line, "g ", 2) && !merge_groups) || !strncmp(line, "o ", 2)) {
 			bool prev_space = false;
 			num_groups++;
@@ -467,6 +476,8 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			num_meshes++;
 		} else if (strstr(line, "ufbx:merge_groups")) {
 			merge_groups = true;
+		} else if (strstr(line, "ufbx:allow_default")) {
+			allow_default = true;
 		}
 
 		if (end) {
@@ -528,12 +539,17 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 
 	obj->meshes = meshes;
 	obj->num_meshes = num_meshes;
-	obj->tolerance = 0.001f;
+	obj->tolerance = (ufbx_real)0.001;
+	obj->uv_tolerance = (ufbx_real)0.001;
+	obj->allow_missing = 0;
 	obj->normalize_units = false;
 	obj->animation_frame = -1;
 	obj->exporter = UFBXT_OBJ_EXPORTER_UNKNOWN;
 	obj->position_scale = 1.0;
 	obj->position_scale_float = 1.0;
+	obj->position_scale_bake = 1.0;
+	obj->fbx_position_scale = 1.0;
+	obj->fbx_rotation = ufbx_identity_quat;
 
 	if (implicit_mesh) {
 		mesh = meshes;
@@ -598,6 +614,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 				mesh->vertex_position.values.count = (size_t)(dp - positions);
 				mesh->vertex_normal.values.count = (size_t)(dn - normals);
 				mesh->vertex_uv.values.count = (size_t)(du - uvs);
+				if (indices[0] > 0) mesh->vertex_position.exists = true;
+				if (indices[1] > 0) mesh->vertex_uv.exists = true;
+				if (indices[2] > 0) mesh->vertex_normal.exists = true;
 
 				*dpi++ = indices[0] - 1;
 				*dni++ = indices[2] - 1;
@@ -610,7 +629,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 
 			mesh->num_faces++;
 			df++;
-		} else if (!strncmp(line, "g default", 7)) {
+		} else if (!strncmp(line, "g default", 7) && !allow_default) {
 			/* ignore default group */
 		} else if ((!strncmp(line, "g ", 2) && !merge_groups) || !strncmp(line, "o ", 2)) {
 			mesh = mesh ? mesh + 1 : meshes;
@@ -685,6 +704,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			if (!strcmp(line, "ufbx:bad_faces")) {
 				obj->bad_faces = true;
 			}
+			if (!strcmp(line, "ufbx:missing_uvs")) {
+				obj->missing_uvs = true;
+			}
 			if (!strcmp(line, "ufbx:line_faces")) {
 				obj->line_faces = true;
 			}
@@ -706,6 +728,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			if (!strcmp(line, "ufbx:match_by_order")) {
 				obj->match_by_order = true;
 			}
+			if (!strcmp(line, "ufbx:negate_xz")) {
+				obj->negate_xz = true;
+			}
 			if (!strcmp(line, "www.blender.org")) {
 				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
 			}
@@ -719,6 +744,14 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			if (sscanf(line, "ufbx:tolerance=%lf", &tolerance) == 1) {
 				obj->tolerance = (ufbx_real)tolerance;
 			}
+			double uv_tolerance = 0.0;
+			if (sscanf(line, "ufbx:uv_tolerance=%lf", &uv_tolerance) == 1) {
+				obj->uv_tolerance = (ufbx_real)uv_tolerance;
+			}
+			int allow_missing = 0;
+			if (sscanf(line, "ufbx:allow_missing=%d", &allow_missing) == 1) {
+				obj->allow_missing = (uint32_t)allow_missing;
+			}
 			double position_scale = 0.0;
 			if (sscanf(line, "ufbx:position_scale=%lf", &position_scale) == 1) {
 				obj->position_scale = position_scale;
@@ -726,6 +759,10 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			double position_scale_float = 0.0;
 			if (sscanf(line, "ufbx:position_scale_float=%lf", &position_scale_float) == 1) {
 				obj->position_scale_float = position_scale_float;
+			}
+			double position_scale_bake = 0.0;
+			if (sscanf(line, "ufbx:position_scale_bake=%lf", &position_scale_bake) == 1) {
+				obj->position_scale_bake = position_scale_bake;
 			}
 			int frame = 0;
 			if (sscanf(line, "ufbx:frame=%d", &frame) == 1) {
@@ -893,6 +930,13 @@ static void ufbxt_assert_close_vec3(ufbxt_diff_error *p_err, ufbx_vec3 a, ufbx_v
 	ufbxt_assert_close_real(p_err, a.z, b.z);
 }
 
+static void ufbxt_assert_close_vec3_xyz(ufbxt_diff_error *p_err, ufbx_vec3 a, ufbx_real x, ufbx_real y, ufbx_real z)
+{
+	ufbxt_assert_close_real(p_err, a.x, x);
+	ufbxt_assert_close_real(p_err, a.y, y);
+	ufbxt_assert_close_real(p_err, a.z, z);
+}
+
 static void ufbxt_assert_close_vec4(ufbxt_diff_error *p_err, ufbx_vec4 a, ufbx_vec4 b)
 {
 	ufbxt_assert_close_real(p_err, a.x, b.x);
@@ -1000,12 +1044,28 @@ static int ufbxt_cmp_sub_vertex(const void *va, const void *vb)
 	return 0;
 }
 
+static ufbxt_noinline bool ufbxt_face_has_duplicate_vertex(ufbx_mesh *mesh, ufbx_face face)
+{
+	for (size_t i = 0; i < face.num_indices; i++) {
+		uint32_t ix = mesh->vertex_indices.data[face.index_begin + i];
+		for (size_t j = 0; j < i; j++) {
+			uint32_t jx = mesh->vertex_indices.data[face.index_begin + j];
+			if (ix == jx) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *fbx_node, ufbx_mesh *fbx_mesh, ufbxt_obj_mesh *obj_mesh, ufbxt_diff_error *p_err, ufbx_real scale)
 {
 	ufbx_real tolerance = obj->tolerance;
 
-	ufbxt_assert(fbx_mesh->num_faces == obj_mesh->num_faces);
-	ufbxt_assert(fbx_mesh->num_indices == obj_mesh->num_indices);
+	if (!obj->bad_faces) {
+		ufbxt_assert(fbx_mesh->num_faces == obj_mesh->num_faces);
+		ufbxt_assert(fbx_mesh->num_indices == obj_mesh->num_indices);
+	}
 
 	// Check that all vertices exist, anything more doesn't really make sense
 	ufbxt_match_vertex *obj_verts = (ufbxt_match_vertex*)calloc(obj_mesh->num_indices, sizeof(ufbxt_match_vertex));
@@ -1021,10 +1081,25 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 			obj_verts[i].uv = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, i);
 		}
 
+		if (obj->fbx_position_scale != 1.0) {
+			obj_verts[i].pos.x *= (ufbx_real)obj->fbx_position_scale;
+			obj_verts[i].pos.y *= (ufbx_real)obj->fbx_position_scale;
+			obj_verts[i].pos.z *= (ufbx_real)obj->fbx_position_scale;
+		}
+		if (obj->fbx_rotation.w != 1.0f) {
+			obj_verts[i].pos = ufbx_quat_rotate_vec3(obj->fbx_rotation, obj_verts[i].pos);
+		}
+		if (obj->negate_xz) {
+			obj_verts[i].pos.x *= -1.0f;
+			obj_verts[i].pos.z *= -1.0f;
+			obj_verts[i].normal.x *= -1.0f;
+			obj_verts[i].normal.z *= -1.0f;
+		}
+
 		if (scale != 1.0) {
 			obj_verts[i].pos.x *= scale;
 			obj_verts[i].pos.y *= scale;
-			obj_verts[i].pos.x *= scale;
+			obj_verts[i].pos.z *= scale;
 		}
 	}
 	for (size_t i = 0; i < fbx_mesh->num_indices; i++) {
@@ -1037,26 +1112,40 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 		}
 		fbx_verts[i].pos = fp;
 		fbx_verts[i].normal = fn;
-		if (obj_mesh->vertex_uv.exists) {
-			ufbxt_assert(fbx_mesh->vertex_uv.exists);
+		if (fbx_mesh->vertex_uv.exists) {
 			fbx_verts[i].uv = ufbx_get_vertex_vec2(&fbx_mesh->vertex_uv, i);
 		}
 
 		if (scale != 1.0) {
 			fbx_verts[i].pos.x *= scale;
 			fbx_verts[i].pos.y *= scale;
-			fbx_verts[i].pos.x *= scale;
+			fbx_verts[i].pos.z *= scale;
 		}
 	}
 
 	qsort(obj_verts, obj_mesh->num_indices, sizeof(ufbxt_match_vertex), &ufbxt_cmp_sub_vertex);
 	qsort(fbx_verts, fbx_mesh->num_indices, sizeof(ufbxt_match_vertex), &ufbxt_cmp_sub_vertex);
 
+	int32_t obj_verts_left = (int32_t)obj_mesh->num_indices;
 	for (int32_t i = (int32_t)fbx_mesh->num_indices - 1; i >= 0; i--) {
 		ufbxt_match_vertex v = fbx_verts[i];
 
+		uint32_t face_ix = ufbx_find_face_index(fbx_mesh, (size_t)i);
+		ufbx_face face = fbx_mesh->faces.data[face_ix];
+
+		if (obj->bad_faces) {
+			if (obj->bad_faces && ufbxt_face_has_duplicate_vertex(fbx_mesh, face)) {
+				continue;
+			} else if (obj->line_faces && face.num_indices == 2) {
+				continue;
+			} else if (obj->point_faces && face.num_indices == 1) {
+				continue;
+			}
+		}
+
 		bool found = false;
-		for (int32_t j = i; j >= 0 && obj_verts[j].pos.x >= v.pos.x - tolerance; j--) {
+		uint32_t missing_count = 0;
+		for (int32_t j = obj_verts_left - 1; j >= 0 && obj_verts[j].pos.x >= v.pos.x - tolerance; j--) {
 			ufbx_real dx = obj_verts[j].pos.x - v.pos.x;
 			ufbx_real dy = obj_verts[j].pos.y - v.pos.y;
 			ufbx_real dz = obj_verts[j].pos.z - v.pos.z;
@@ -1072,30 +1161,33 @@ static ufbxt_noinline void ufbxt_match_obj_mesh(ufbxt_obj_file *obj, ufbx_node *
 				dnz = 0.0f;
 			}
 
-			if (obj->bad_uvs) {
+			if (obj->bad_uvs || !obj_mesh->vertex_uv.exists) {
 				du = 0.0f;
 				dv = 0.0f;
 			}
 
-			ufbxt_assert(dx <= tolerance);
+			// ufbxt_assert(dx <= tolerance);
 			ufbx_real err = (ufbx_real)sqrt(dx*dx + dy*dy + dz*dz + dnx*dnx + dny*dny + dnz*dnz + du*du + dv*dv);
 			if (err < tolerance) {
 				if (err > p_err->max) p_err->max = err;
 				p_err->sum += err;
 				p_err->num++;
 
-				obj_verts[j] = obj_verts[i];
+				obj_verts[j] = obj_verts[obj_verts_left - 1];
+				obj_verts_left--;
 				found = true;
 				break;
 			}
 		}
 
-		ufbxt_assert(found);
+		if (!found) {
+			ufbxt_assert(missing_count < obj->allow_missing);
+			missing_count++;
+		}
 	}
 
 	free(obj_verts);
 	free(fbx_verts);
-
 }
 
 typedef struct {
@@ -1142,24 +1234,20 @@ static ufbxt_noinline size_t ufbxt_obj_group_key(char *cat_buf, size_t cat_cap, 
 	return cat_ptr - cat_buf;
 }
 
-static ufbxt_noinline bool ufbxt_face_has_duplicate_vertex(ufbx_mesh *mesh, ufbx_face face)
-{
-	for (size_t i = 0; i < face.num_indices; i++) {
-		uint32_t ix = mesh->vertex_indices.data[face.index_begin + i];
-		for (size_t j = 0; j < i; j++) {
-			uint32_t jx = mesh->vertex_indices.data[face.index_begin + j];
-			if (ix == jx) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
 enum {
 	UFBXT_OBJ_DIFF_FLAG_CHECK_DEFORMED_NORMALS = 0x1,
 	UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS = 0x2,
+	UFBXT_OBJ_DIFF_FLAG_BAKED_ANIM = 0x4,
 };
+
+static bool ufbxt_has_mesh(ufbx_node *node)
+{
+	if (!node) return false;
+	if (node->mesh) return true;
+	if (ufbxt_has_mesh(node->scale_helper)) return true;
+	if (ufbxt_has_mesh(node->geometry_transform_helper)) return true;
+	return false;
+}
 
 static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *obj, ufbxt_diff_error *p_err, uint32_t flags)
 {
@@ -1236,7 +1324,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 				sizeof(ufbxt_obj_node), &ufbxt_cmp_obj_node);
 
 			if (found) {
-				if (found->node && found->node->mesh) {
+				if (found->node && ufbxt_has_mesh(found->node)) {
 					bool seen = false;
 					for (size_t i = 0; i < num_used_nodes; i++) {
 						if (used_nodes[i] == found->node) {
@@ -1266,7 +1354,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 					node = ufbx_find_node_len(scene, name, name_len);
 				}
 
-				if (node && node->mesh) {
+				if (node && ufbxt_has_mesh(node)) {
 					bool seen = false;
 					for (size_t i = 0; i < num_used_nodes; i++) {
 						if (used_nodes[i] == node) {
@@ -1313,6 +1401,9 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		}
 
 		ufbxt_assert(node);
+		if (node->scale_helper) {
+			node = node->scale_helper;
+		}
 		if (node->geometry_transform_helper) {
 			node = node->geometry_transform_helper;
 		}
@@ -1331,6 +1422,9 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		#if defined(UFBX_REAL_IS_FLOAT)
 			scale *= obj->position_scale_float;
 		#endif
+		if (flags & UFBXT_OBJ_DIFF_FLAG_BAKED_ANIM) {
+			scale *= obj->position_scale_bake;
+		}
 
 		used_nodes[num_used_nodes++] = node;
 
@@ -1364,6 +1458,14 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			opts.evaluate_source_vertices = true;
 			opts.evaluate_skin_weights = true;
 
+			int64_t uv_boundary = ufbx_find_int(&node->props, "ufbx:UVBoundary", -1);
+
+			if (uv_boundary >= 0 && uv_boundary < UFBX_SUBDIVISION_BOUNDARY_COUNT) {
+				opts.uv_boundary = (ufbx_subdivision_boundary)uv_boundary;
+			} else {
+				opts.uv_boundary = UFBX_SUBDIVISION_BOUNDARY_SHARP_BOUNDARY;
+			}
+
 			ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, mesh->subdivision_preview_levels, &opts, NULL);
 			ufbxt_assert(sub_mesh);
 
@@ -1388,6 +1490,17 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		if (obj->bad_normals) check_normals = false;
 		if ((flags & UFBXT_OBJ_DIFF_FLAG_CHECK_DEFORMED_NORMALS) == 0 && mesh->all_deformers.count > 0) check_normals = false;
 		if ((flags & UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS) != 0) check_normals = false;
+
+		ufbx_string uv_set_name = ufbx_find_string(&node->props, "currentUVSet", ufbx_empty_string);
+		ufbx_vertex_vec2 vertex_uv = mesh->vertex_uv;
+		if (uv_set_name.length > 0) {
+			for (size_t i = 0; i < mesh->uv_sets.count; i++) {
+				const ufbx_uv_set *uv_set = &mesh->uv_sets.data[i];
+				if (!strcmp(uv_set->name.data, uv_set_name.data)) {
+					vertex_uv = uv_set->vertex_uv;
+				}
+			}
+		}
 
 		if (obj->bad_order) {
 			ufbxt_match_obj_mesh(obj, node, mesh, obj_mesh, p_err, (ufbx_real)scale);
@@ -1440,6 +1553,15 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 						}
 					}
 
+					if (obj->fbx_position_scale != 1.0) {
+						fp.x *= (ufbx_real)obj->fbx_position_scale;
+						fp.y *= (ufbx_real)obj->fbx_position_scale;
+						fp.z *= (ufbx_real)obj->fbx_position_scale;
+					}
+					if (obj->fbx_rotation.w != 1.0f) {
+						fp = ufbx_quat_rotate_vec3(obj->fbx_rotation, fp);
+					}
+
 					if (scale != 1.0) {
 						fp.x *= (ufbx_real)scale;
 						fp.y *= (ufbx_real)scale;
@@ -1447,6 +1569,13 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 						op.x *= (ufbx_real)scale;
 						op.y *= (ufbx_real)scale;
 						op.z *= (ufbx_real)scale;
+					}
+
+					if (obj->negate_xz) {
+						op.x *= -1.0f;
+						op.z *= -1.0f;
+						on.x *= -1.0f;
+						on.z *= -1.0f;
 					}
 
 					ufbxt_assert_close_vec3(p_err, op, fp);
@@ -1461,9 +1590,18 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 
 					if (obj_mesh->vertex_uv.exists && !obj->bad_uvs) {
 						ufbxt_assert(mesh->vertex_uv.exists);
-						ufbx_vec2 ou = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, oix);
-						ufbx_vec2 fu = ufbx_get_vertex_vec2(&mesh->vertex_uv, fix);
-						ufbxt_assert_close_vec2(p_err, ou, fu);
+						uint32_t ovx = obj_mesh->vertex_uv.indices.data[oix];
+
+						if (ovx == UFBX_NO_INDEX) {
+							if (!obj->missing_uvs) {
+								ufbxt_assert(vertex_uv.indices.data[fix] == UFBX_NO_INDEX);
+							}
+						} else {
+							ufbx_vec2 ou = ufbx_get_vertex_vec2(&obj_mesh->vertex_uv, oix);
+							ufbx_vec2 fu = ufbx_get_vertex_vec2(&vertex_uv, fix);
+							ufbxt_assert_close_vec2_threshold(p_err, ou, fu, obj->uv_tolerance);
+							ufbxt_assert_close_vec2_threshold(p_err, ou, fu, obj->uv_tolerance);
+						}
 					}
 				}
 			}
@@ -1504,7 +1642,7 @@ static ufbxt_noinline void *ufbxt_read_file(const char *name, size_t *p_size)
 #endif
 	fseek(file, 0, SEEK_SET);
 
-	char *data = malloc(size + 1);
+	char *data = (char*)malloc(size + 1);
 	ufbxt_assert(data != NULL);
 	size_t num_read = fread(data, 1, size, file);
 	fclose(file);

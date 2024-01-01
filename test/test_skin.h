@@ -11,50 +11,16 @@ void ufbxt_check_stack_times(ufbx_scene *scene, ufbxt_diff_error *err, const cha
 	ufbxt_assert_close_real(err, (ufbx_real)stack->time_end, (ufbx_real)end);
 }
 
-void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_normals, const char *file_name, const char *anim_name, double time)
+void ufbxt_check_stack_timestamps(ufbx_scene *scene, ufbxt_diff_error *err, const char *stack_name, int64_t begin, int64_t end)
 {
-	char buf[512];
-	snprintf(buf, sizeof(buf), "%s%s.obj", data_root, file_name);
+	ufbx_anim_stack *stack = (ufbx_anim_stack*)ufbx_find_element(scene, UFBX_ELEMENT_ANIM_STACK, stack_name);
+	ufbxt_assert(stack);
+	ufbxt_assert(!strcmp(stack->name.data, stack_name));
 
-	ufbxt_hintf("Frame from '%s' %s time %.2fs",
-		anim_name ? anim_name : "(implicit animation)",
-		buf, time);
-
-	size_t obj_size = 0;
-	void *obj_data = ufbxt_read_file(buf, &obj_size);
-	ufbxt_obj_file *obj_file = obj_data ? ufbxt_load_obj(obj_data, obj_size, NULL) : NULL;
-	ufbxt_assert(obj_file);
-	free(obj_data);
-
-	ufbx_evaluate_opts opts = { 0 };
-	opts.evaluate_skinning = true;
-	opts.evaluate_caches = true;
-	opts.load_external_files = true;
-
-	ufbx_anim anim = scene->anim;
-
-	if (anim_name) {
-		for (size_t i = 0; i < scene->anim_stacks.count; i++) {
-			ufbx_anim_stack *stack = scene->anim_stacks.data[i];
-			if (strstr(stack->name.data, anim_name)) {
-				ufbxt_assert(stack->layers.count > 0);
-				anim = stack->anim;
-				break;
-			}
-		}
-	}
-
-	ufbx_scene *eval = ufbx_evaluate_scene(scene, &anim, time, &opts, NULL);
-	ufbxt_assert(eval);
-
-	ufbxt_check_scene(eval);
-
-	uint32_t diff_flags = 0;
-	if (check_normals) diff_flags |= UFBXT_OBJ_DIFF_FLAG_CHECK_DEFORMED_NORMALS;
-	ufbxt_diff_to_obj(eval, obj_file, err, diff_flags);
-
-	ufbx_free_scene(eval);
-	free(obj_file);
+	ufbxt_assert(ufbx_find_int(&stack->props, "LocalStart", 0) == begin);
+	ufbxt_assert(ufbx_find_int(&stack->props, "LocalStop", 0) == end);
+	ufbxt_assert(ufbx_find_int(&stack->props, "ReferenceStart", 0) == begin);
+	ufbxt_assert(ufbx_find_int(&stack->props, "ReferenceStop", 0) == end);
 }
 #endif
 
@@ -144,6 +110,10 @@ UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, combined)
 	ufbxt_check_stack_times(scene, err, "spin", 20.0/24.0, 40.0/24.0);
 	ufbxt_check_stack_times(scene, err, "deform", 40.0/24.0, 60.0/24.0);
 
+	ufbxt_check_stack_timestamps(scene, err, "wiggle", INT64_C(1924423250), INT64_C(38488465000));
+	ufbxt_check_stack_timestamps(scene, err, "spin", INT64_C(38488465000), INT64_C(76976930000));
+	ufbxt_check_stack_timestamps(scene, err, "deform", INT64_C(76976930000), INT64_C(115465395000));
+
 	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_10", "wiggle", 10.0/24.0);
 	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_18", "wiggle", 18.0/24.0);
 	ufbxt_check_frame(scene, err, false, "maya_game_sausage_spin_7", "spin", 27.0/24.0);
@@ -166,6 +136,253 @@ UFBXT_FILE_TEST(synthetic_sausage_wiggle_no_bind)
 {
 	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0);
 	ufbxt_check_frame(scene, err, true, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0);
+}
+#endif
+
+#if UFBXT_IMPL
+static void ufbxt_check_bind_poses(ufbx_scene *scene, ufbxt_diff_error *err)
+{
+	ufbxt_assert(scene->poses.count == 1);
+	ufbx_pose *pose = scene->poses.data[0];
+	ufbxt_assert(pose->is_bind_pose);
+
+	for (size_t i = 0; i < scene->skin_clusters.count; i++) {
+		ufbx_skin_cluster *cluster = scene->skin_clusters.data[i];
+
+		ufbx_bone_pose *bone_pose = NULL;
+		for (size_t j = 0; j < pose->bone_poses.count; j++) {
+			if (pose->bone_poses.data[j].bone_node == cluster->bone_node) {
+				bone_pose = &pose->bone_poses.data[j];
+				break;
+			}
+		}
+		ufbxt_assert(bone_pose);
+
+		ufbxt_assert_close_matrix(err, bone_pose->bone_to_world, cluster->bind_to_world);
+		ufbxt_assert_close_matrix(err, bone_pose->bone_to_world, cluster->bone_node->node_to_world);
+	}
+}
+#endif
+
+UFBXT_TEST(synthetic_sausage_wiggle_no_link_conversion)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "synthetic_sausage_wiggle_no_link" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t space_conversion_i = 0; space_conversion_i < UFBX_SPACE_CONVERSION_COUNT; space_conversion_i++) {
+			ufbx_space_conversion space_conversion = (ufbx_space_conversion)space_conversion_i;
+			ufbxt_hintf("space_conversion=%u", space_conversion_i);
+
+			{
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_unit_meters = 1.0f;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_check_bind_poses(scene, &err);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+
+				ufbx_free_scene(scene);
+			}
+
+			{
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_axes = ufbx_axes_right_handed_z_up;
+				opts.target_unit_meters = 1.0f;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_check_bind_poses(scene, &err);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+
+				ufbx_free_scene(scene);
+			}
+
+			for (uint32_t mirror_i = 0; mirror_i < UFBX_MIRROR_AXIS_COUNT; mirror_i++) {
+				// Cannot convert handedness without mirroring if not transforming root
+				if (space_conversion != UFBX_SPACE_CONVERSION_TRANSFORM_ROOT && mirror_i == 0) continue;
+
+				ufbx_mirror_axis mirror_axis = (ufbx_mirror_axis)mirror_i;
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_axes = ufbx_axes_left_handed_y_up;
+				opts.target_unit_meters = 1.0f;
+				opts.handedness_conversion_axis = mirror_axis;
+				opts.reverse_winding = (mirror_i == 0);
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_check_bind_poses(scene, &err);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+
+				ufbx_free_scene(scene);
+			}
+
+			for (uint32_t mirror_i = 0; mirror_i < UFBX_MIRROR_AXIS_COUNT; mirror_i++) {
+				// Cannot convert handedness without mirroring if not transforming root
+				if (space_conversion != UFBX_SPACE_CONVERSION_TRANSFORM_ROOT && mirror_i == 0) continue;
+
+				ufbx_mirror_axis mirror_axis = (ufbx_mirror_axis)mirror_i;
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_axes = ufbx_axes_left_handed_z_up;
+				opts.target_unit_meters = 1.0f;
+				opts.handedness_conversion_axis = mirror_axis;
+				opts.reverse_winding = (mirror_i == 0);
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_check_bind_poses(scene, &err);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+
+				ufbx_free_scene(scene);
+			}
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
+UFBXT_TEST(synthetic_sausage_wiggle_no_bind_conversion)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "synthetic_sausage_wiggle_no_bind" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t space_conversion_i = 0; space_conversion_i < UFBX_SPACE_CONVERSION_COUNT; space_conversion_i++) {
+			ufbx_space_conversion space_conversion = (ufbx_space_conversion)space_conversion_i;
+			ufbxt_hintf("space_conversion=%u", space_conversion_i);
+
+			{
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_unit_meters = 1.0f;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+
+				ufbx_free_scene(scene);
+			}
+
+			{
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_axes = ufbx_axes_right_handed_z_up;
+				opts.target_unit_meters = 1.0f;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+
+				ufbx_free_scene(scene);
+			}
+
+			for (uint32_t mirror_i = 0; mirror_i < UFBX_MIRROR_AXIS_COUNT; mirror_i++) {
+				// Cannot convert handedness without mirroring if not transforming root
+				if (space_conversion != UFBX_SPACE_CONVERSION_TRANSFORM_ROOT && mirror_i == 0) continue;
+
+				ufbx_mirror_axis mirror_axis = (ufbx_mirror_axis)mirror_i;
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_axes = ufbx_axes_left_handed_y_up;
+				opts.target_unit_meters = 1.0f;
+				opts.handedness_conversion_axis = mirror_axis;
+				opts.reverse_winding = (mirror_i == 0);
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+
+				ufbx_free_scene(scene);
+			}
+
+			for (uint32_t mirror_i = 0; mirror_i < UFBX_MIRROR_AXIS_COUNT; mirror_i++) {
+				// Cannot convert handedness without mirroring if not transforming root
+				if (space_conversion != UFBX_SPACE_CONVERSION_TRANSFORM_ROOT && mirror_i == 0) continue;
+
+				ufbx_mirror_axis mirror_axis = (ufbx_mirror_axis)mirror_i;
+				ufbx_load_opts opts = { 0 };
+
+				opts.space_conversion = space_conversion;
+				opts.target_axes = ufbx_axes_left_handed_z_up;
+				opts.target_unit_meters = 1.0f;
+				opts.handedness_conversion_axis = mirror_axis;
+				opts.reverse_winding = (mirror_i == 0);
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_10", NULL, 10.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+				ufbxt_check_frame_imp(scene, &err, true, "maya_game_sausage_wiggle_lefthanded_18", NULL, 18.0/24.0, UFBXT_CHECK_FRAME_SCALE_100|UFBXT_CHECK_FRAME_Z_TO_Y_UP);
+
+				ufbx_free_scene(scene);
+			}
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
 }
 #endif
 
@@ -224,10 +441,10 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 			double time = frame[0];
 			ufbx_real ref = (ufbx_real)frame[1 + chan_ix];
 
-			ufbx_real weight = ufbx_evaluate_blend_weight(&scene->anim, chan, time);
+			ufbx_real weight = ufbx_evaluate_blend_weight(scene->anim, chan, time);
 			ufbxt_assert_close_real(err, weight, ref);
 
-			ufbx_prop prop = ufbx_evaluate_prop(&scene->anim, &chan->element, "DeformPercent", time);
+			ufbx_prop prop = ufbx_evaluate_prop(scene->anim, &chan->element, "DeformPercent", time);
 			ufbxt_assert_close_real(err, prop.value_real / 100.0f, ref);
 		}
 	}
@@ -250,7 +467,7 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 
 			opts.evaluate_skinning = eval_skin != 0;
 
-			ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, time, &opts, NULL);
+			ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, &opts, NULL);
 			ufbxt_assert(state);
 
 			ufbx_real weights[2];
@@ -260,7 +477,7 @@ UFBXT_FILE_TEST(maya_blend_shape_cube)
 				ufbx_blend_channel *chan = state->blend_channels.data[top[chan_ix]->typed_id];
 				ufbxt_assert(chan);
 
-				ufbx_prop prop = ufbx_evaluate_prop(&scene->anim, &chan->element, "DeformPercent", time);
+				ufbx_prop prop = ufbx_evaluate_prop(scene->anim, &chan->element, "DeformPercent", time);
 
 				ufbxt_assert_close_real(err, prop.value_real / 100.0f, ref);
 				ufbxt_assert_close_real(err, chan->weight, ref);
@@ -403,9 +620,10 @@ UFBXT_FILE_TEST(maya_bone_radius)
 	for (size_t i = 1; i < scene->nodes.count; i++) {
 		ufbx_node *node = scene->nodes.data[i];
 		ufbxt_assert(strstr(node->name.data, "joint"));
-		ufbxt_assert(node->bone);
-		ufbxt_assert_close_real(err, node->bone->radius, (ufbx_real)i * 0.2f);
-		ufbxt_assert_close_real(err, node->bone->relative_length, 1.0f);
+		ufbx_bone *bone = ufbx_as_bone(node->attrib);
+		ufbxt_assert(bone);
+		ufbxt_assert_close_real(err, bone->radius, (ufbx_real)i * 0.2f);
+		ufbxt_assert_close_real(err, bone->relative_length, 1.0f);
 	}
 }
 #endif
@@ -420,18 +638,19 @@ UFBXT_FILE_TEST(blender_279_bone_radius)
 		node = node->children.data[0];
 
 		ufbxt_assert(strstr(node->name.data, "Bone"));
-		ufbxt_assert(node->bone);
+		ufbx_bone *bone = ufbx_as_bone(node->attrib);
+		ufbxt_assert(bone);
 
 		// Blender end bones have some weird scaling factor
 		// TODO: Add quirks mode for this?
 		if (strstr(node->name.data, "end")) continue;
 
 		if (scene->metadata.ascii) {
-			ufbxt_assert_close_real(err, node->bone->radius, 1.0f);
+			ufbxt_assert_close_real(err, bone->radius, 1.0f);
 		} else {
-			ufbxt_assert_close_real(err, node->bone->radius, (ufbx_real)(i + 1) * 0.1f);
+			ufbxt_assert_close_real(err, bone->radius, (ufbx_real)(i + 1) * 0.1f);
 		}
-		ufbxt_assert_close_real(err, node->bone->relative_length, 1.0f);
+		ufbxt_assert_close_real(err, bone->relative_length, 1.0f);
 	}
 }
 #endif
@@ -509,11 +728,191 @@ UFBXT_FILE_TEST(max_transformed_skin)
 }
 #endif
 
+UFBXT_TEST(max_transformed_skin_lefthanded)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "max_transformed_skin" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 0; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.target_axes = ufbx_axes_left_handed_z_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_5", NULL, 5.0/30.0);
+			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_15", NULL, 15.0/30.0);
+
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
+UFBXT_TEST(max_transformed_skin_lefthanded_adjust)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "max_transformed_skin" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 1; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+			opts.target_axes = ufbx_axes_left_handed_z_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_5", NULL, 5.0/30.0);
+			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_15", NULL, 15.0/30.0);
+
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
 UFBXT_FILE_TEST(synthetic_bind_to_root)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_BAD_ELEMENT_CONNECTED_TO_ROOT, SIZE_MAX, NULL);
+	ufbxt_check_warning(scene, UFBX_WARNING_BAD_ELEMENT_CONNECTED_TO_ROOT, UFBX_ELEMENT_SKIN_DEFORMER, "", SIZE_MAX, NULL);
 	// Some unknown exporter is exporting skin deformers being parented to root
 	// This test exists to check that it is handled gracefully if quirks are enabled
 }
 #endif
+
+UFBXT_FILE_TEST(maya_mixed_inherit_mode)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_0", NULL, 0.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_1", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_2", NULL, 2.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_3", NULL, 3.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_4", NULL, 4.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_5", NULL, 5.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_6", NULL, 6.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_7", NULL, 7.0/24.0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_mixed_inherit_mode_helper, maya_mixed_inherit_mode, ufbxt_scale_helper_opts)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_0", NULL, 0.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_1", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_2", NULL, 2.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_3", NULL, 3.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_4", NULL, 4.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_5", NULL, 5.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_6", NULL, 6.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_7", NULL, 7.0/24.0);
+
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, NULL, NULL);
+	ufbxt_assert(bake);
+
+	for (int frame = 0; frame <= 7; frame++) {
+		double time = (double)frame / 24.0;
+		ufbx_scene *state = ufbx_evaluate_scene(scene, NULL, time, NULL, NULL);
+		ufbxt_assert(state);
+
+		for (size_t i = 0; i < scene->nodes.count; i++) {
+			ufbx_node *scene_node = scene->nodes.data[i];
+			ufbx_node *state_node = state->nodes.data[i];
+
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, scene_node, time);
+			ufbxt_assert_close_vec3(err, transform.translation, state_node->local_transform.translation);
+			ufbxt_assert_close_quat(err, transform.rotation, state_node->local_transform.rotation);
+			ufbxt_assert_close_vec3(err, transform.scale, state_node->local_transform.scale);
+
+			ufbx_matrix ref_matrix = state_node->node_to_world;
+			ufbx_matrix bake_matrix = ufbxt_evaluate_baked_matrix(bake, scene_node, time);
+
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[0], bake_matrix.cols[0]);
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[1], bake_matrix.cols[1]);
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[2], bake_matrix.cols[2]);
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[3], bake_matrix.cols[3]);
+		}
+
+		ufbx_free_scene(state);
+	}
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_sausage_rrss, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss", NULL, 0.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_12", NULL, 12.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_24", NULL, 24.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_36", NULL, 36.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_48", NULL, 48.0/24.0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(motionbuilder_sausage_rrss_helper, motionbuilder_sausage_rrss, ufbxt_scale_helper_opts, UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss", NULL, 0.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_12", NULL, 12.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_24", NULL, 24.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_36", NULL, 36.0/24.0);
+	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_48", NULL, 48.0/24.0);
+
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, NULL, NULL);
+	ufbxt_assert(bake);
+
+	for (int frame = 0; frame <= 48; frame += 12) {
+		double time = (double)frame / 24.0;
+		ufbx_scene *state = ufbx_evaluate_scene(scene, NULL, time, NULL, NULL);
+		ufbxt_assert(state);
+
+		for (size_t i = 0; i < scene->nodes.count; i++) {
+			ufbx_node *scene_node = scene->nodes.data[i];
+			ufbx_node *state_node = state->nodes.data[i];
+
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, scene_node, time);
+			ufbxt_assert_close_vec3(err, transform.translation, state_node->local_transform.translation);
+			ufbxt_assert_close_quat(err, transform.rotation, state_node->local_transform.rotation);
+			ufbxt_assert_close_vec3(err, transform.scale, state_node->local_transform.scale);
+
+			ufbx_matrix ref_matrix = state_node->node_to_world;
+			ufbx_matrix bake_matrix = ufbxt_evaluate_baked_matrix(bake, scene_node, time);
+
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[0], bake_matrix.cols[0]);
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[1], bake_matrix.cols[1]);
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[2], bake_matrix.cols[2]);
+			ufbxt_assert_close_vec3(err, ref_matrix.cols[3], bake_matrix.cols[3]);
+		}
+
+		ufbx_free_scene(state);
+	}
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+

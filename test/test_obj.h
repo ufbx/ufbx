@@ -727,7 +727,7 @@ UFBXT_FILE_TEST_PATH(blender_331_space_texture, "blender_331_space texture")
 UFBXT_FILE_TEST(synthetic_obj_zoo)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_UNKNOWN_OBJ_DIRECTIVE, 24, "Unknown .obj directive, skipped line");
+	ufbxt_check_warning(scene, UFBX_WARNING_UNKNOWN_OBJ_DIRECTIVE, UFBX_ELEMENT_UNKNOWN, NULL, 24, "Unknown .obj directive, skipped line");
 
 	ufbx_node *node = ufbx_find_node(scene, "Object");
 	ufbxt_assert(node && node->mesh);
@@ -741,24 +741,51 @@ UFBXT_FILE_TEST(synthetic_obj_zoo)
 
 #if UFBXT_IMPL
 
-static ufbx_mesh_material *ufbxt_find_mesh_material(ufbx_mesh *mesh, const char *name)
+typedef struct ufbxt_mesh_material {
+	ufbx_material *material;
+	ufbx_mesh_part *part;
+} ufbxt_mesh_material;
+
+typedef struct ufbxt_mesh_group {
+	ufbx_face_group *group;
+	ufbx_mesh_part *part;
+} ufbxt_mesh_group;
+
+static ufbxt_mesh_material ufbxt_find_mesh_material(ufbx_mesh *mesh, const char *name)
 {
+	ufbxt_mesh_material mat = { NULL, NULL };
 	for (size_t i = 0; i < mesh->materials.count; i++) {
-		if (!strcmp(mesh->materials.data[i].material->name.data, name)) {
-			return &mesh->materials.data[i];
+		if (!strcmp(mesh->materials.data[i]->name.data, name)) {
+			mat.material = mesh->materials.data[i];
+			mat.part = mesh->material_parts.count > 0 ? &mesh->material_parts.data[i] : NULL;
+			return mat;
 		}
 	}
-	return NULL;
+	return mat;
 }
 
-static ufbx_face_group *ufbxt_find_face_group(ufbx_mesh *mesh, const char *name)
+static ufbxt_mesh_group ufbxt_find_face_group(ufbx_mesh *mesh, const char *name)
 {
+	ufbxt_mesh_group group = { NULL, NULL };
 	for (size_t i = 0; i < mesh->face_groups.count; i++) {
 		if (!strcmp(mesh->face_groups.data[i].name.data, name)) {
-			return &mesh->face_groups.data[i];
+			group.group = &mesh->face_groups.data[i];
+			group.part = mesh->face_group_parts.count > 0 ? &mesh->face_group_parts.data[i] : NULL;
 		}
 	}
-	return NULL;
+	return group;
+}
+
+static ufbx_mesh_part *ufbxt_find_mesh_material_part(ufbx_mesh *mesh, const char *name)
+{
+	ufbxt_mesh_material mat = ufbxt_find_mesh_material(mesh, name);
+	return mat.part;
+}
+
+static ufbx_mesh_part *ufbxt_find_face_group_part(ufbx_mesh *mesh, const char *name)
+{
+	ufbxt_mesh_group group = ufbxt_find_face_group(mesh, name);
+	return group.part;
 }
 
 static void ufbxt_check_planar_face(ufbxt_diff_error *err, ufbx_mesh *mesh, ufbx_face face, ufbx_vec3 normal, ufbx_real w)
@@ -793,7 +820,7 @@ UFBXT_FILE_TEST(synthetic_face_groups)
 	ufbx_vec3 neg_z = { 0.0f, 0.0f, -1.0f };
 
 	{
-		ufbx_face_group *group = ufbxt_find_face_group(mesh, "");
+		ufbx_mesh_part *group = ufbxt_find_face_group_part(mesh, "");
 		ufbxt_assert(group);
 		ufbxt_assert(group->num_faces == 2);
 		ufbxt_assert(group->face_indices.data[0] == 0);
@@ -803,7 +830,7 @@ UFBXT_FILE_TEST(synthetic_face_groups)
 	}
 
 	{
-		ufbx_face_group *group = ufbxt_find_face_group(mesh, "Front");
+		ufbx_mesh_part *group = ufbxt_find_face_group_part(mesh, "Front");
 		ufbxt_assert(group);
 		ufbxt_assert(group->num_faces == 1);
 		ufbxt_assert(group->face_indices.data[0] == 1);
@@ -811,7 +838,7 @@ UFBXT_FILE_TEST(synthetic_face_groups)
 	}
 
 	{
-		ufbx_face_group *group = ufbxt_find_face_group(mesh, "Sides");
+		ufbx_mesh_part *group = ufbxt_find_face_group_part(mesh, "Sides");
 		ufbxt_assert(group);
 		ufbxt_assert(group->num_faces == 2);
 		ufbxt_assert(group->face_indices.data[0] == 2);
@@ -821,7 +848,7 @@ UFBXT_FILE_TEST(synthetic_face_groups)
 	}
 
 	{
-		ufbx_face_group *group = ufbxt_find_face_group(mesh, "Back");
+		ufbx_mesh_part *group = ufbxt_find_face_group_part(mesh, "Back");
 		ufbxt_assert(group);
 		ufbxt_assert(group->num_faces == 1);
 		ufbxt_assert(group->face_indices.data[0] == 3);
@@ -829,7 +856,7 @@ UFBXT_FILE_TEST(synthetic_face_groups)
 	}
 
 	{
-		ufbx_mesh_material *mat = ufbxt_find_mesh_material(mesh, "A");
+		ufbx_mesh_part *mat = ufbxt_find_mesh_material_part(mesh, "A");
 		ufbxt_assert(mat);
 		ufbxt_assert(mat->num_faces == 3);
 		ufbxt_assert(mat->face_indices.data[0] == 0);
@@ -838,7 +865,7 @@ UFBXT_FILE_TEST(synthetic_face_groups)
 	}
 
 	{
-		ufbx_mesh_material *mat = ufbxt_find_mesh_material(mesh, "B");
+		ufbx_mesh_part *mat = ufbxt_find_mesh_material_part(mesh, "B");
 		ufbxt_assert(mat);
 		ufbxt_assert(mat->num_faces == 3);
 		ufbxt_assert(mat->face_indices.data[0] == 3);
@@ -863,14 +890,6 @@ static ufbx_load_opts ufbxt_merge_objects_opts()
 	opts.obj_merge_objects = true;
 	return opts;
 }
-
-static ufbx_load_opts ufbxt_allow_null_material_opts()
-{
-	ufbx_load_opts opts = { 0 };
-	opts.allow_null_material = true;
-	return opts;
-}
-
 
 #endif
 
@@ -898,7 +917,7 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_face_groups_split, synthetic_face_groups, ufb
 		ufbxt_assert(mesh->materials.count == 1);
 		ufbxt_assert(mesh->num_faces == 1);
 
-		ufbx_material *material = mesh->materials.data[0].material;
+		ufbx_material *material = mesh->materials.data[0];
 		if (material == mat_a) {
 			ufbxt_check_planar_face_ix(err, mesh, 0, pos_y, 1.0f);
 			num_a_found++;
@@ -921,7 +940,7 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_face_groups_split, synthetic_face_groups, ufb
 		ufbxt_check_planar_face_ix(err, mesh, 0, neg_z, 1.0f);
 
 		ufbxt_assert(mesh->materials.count == 1);
-		ufbxt_assert(mesh->materials.data[0].material == mat_a);
+		ufbxt_assert(mesh->materials.data[0] == mat_a);
 	}
 
 	{
@@ -933,7 +952,7 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_face_groups_split, synthetic_face_groups, ufb
 		ufbxt_check_planar_face_ix(err, mesh, 0, pos_z, 1.0f);
 
 		ufbxt_assert(mesh->materials.count == 1);
-		ufbxt_assert(mesh->materials.data[0].material == mat_b);
+		ufbxt_assert(mesh->materials.data[0] == mat_b);
 	}
 
 	num_a_found = 0;
@@ -947,7 +966,7 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_face_groups_split, synthetic_face_groups, ufb
 		ufbxt_assert(mesh->materials.count == 1);
 		ufbxt_assert(mesh->num_faces == 1);
 
-		ufbx_material *material = mesh->materials.data[0].material;
+		ufbx_material *material = mesh->materials.data[0];
 		if (material == mat_a) {
 			ufbxt_check_planar_face_ix(err, mesh, 0, neg_x, 1.0f);
 			num_a_found++;
@@ -967,8 +986,6 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_face_groups_split, synthetic_face_groups, ufb
 UFBXT_FILE_TEST(synthetic_partial_material)
 #if UFBXT_IMPL
 {
-	ufbxt_assert(!scene->metadata.may_contain_null_materials);
-
 	ufbxt_assert(scene->materials.count == 8);
 	ufbxt_assert(ufbx_find_material(scene, "A"));
 	ufbxt_assert(ufbx_find_material(scene, "B"));
@@ -983,8 +1000,9 @@ UFBXT_FILE_TEST(synthetic_partial_material)
 		ufbx_node *node = ufbx_find_node(scene, "First");
 		ufbxt_assert(node && node->mesh);
 		ufbx_mesh *mesh = node->mesh;
-		ufbxt_assert(mesh->materials.count == 0);
 		ufbxt_assert(mesh->face_material.count == 0);
+		ufbxt_assert(mesh->materials.count == 0);
+		ufbxt_assert(mesh->material_parts.count == 1);
 	}
 
 	{
@@ -993,9 +1011,9 @@ UFBXT_FILE_TEST(synthetic_partial_material)
 		ufbx_mesh *mesh = node->mesh;
 
 		ufbxt_assert(mesh->materials.count == 3);
-		ufbxt_assert(!strcmp(mesh->materials.data[0].material->name.data, "A"));
-		ufbxt_assert(!strcmp(mesh->materials.data[1].material->name.data, "B"));
-		ufbxt_assert(!strcmp(mesh->materials.data[2].material->name.data, "D"));
+		ufbxt_assert(!strcmp(mesh->materials.data[0]->name.data, "A"));
+		ufbxt_assert(!strcmp(mesh->materials.data[1]->name.data, "B"));
+		ufbxt_assert(!strcmp(mesh->materials.data[2]->name.data, "D"));
 
 		ufbxt_assert(mesh->face_material.count == 5);
 		ufbxt_assert(mesh->face_material.data[0] == 0);
@@ -1011,66 +1029,8 @@ UFBXT_FILE_TEST(synthetic_partial_material)
 		ufbx_mesh *mesh = node->mesh;
 
 		ufbxt_assert(mesh->materials.count == 2);
-		ufbxt_assert(!strcmp(mesh->materials.data[0].material->name.data, "F"));
-		ufbxt_assert(!strcmp(mesh->materials.data[1].material->name.data, "A"));
-
-		ufbxt_assert(mesh->face_material.count == 2);
-		ufbxt_assert(mesh->face_material.data[0] == 0);
-		ufbxt_assert(mesh->face_material.data[1] == 1);
-	}
-}
-#endif
-
-UFBXT_FILE_TEST_OPTS_ALT(synthetic_partial_material_allow_null, synthetic_partial_material, ufbxt_allow_null_material_opts)
-#if UFBXT_IMPL
-{
-	ufbxt_assert(scene->metadata.may_contain_null_materials);
-
-	ufbxt_assert(scene->materials.count == 8);
-	ufbxt_assert(ufbx_find_material(scene, "A"));
-	ufbxt_assert(ufbx_find_material(scene, "B"));
-	ufbxt_assert(ufbx_find_material(scene, "C"));
-	ufbxt_assert(ufbx_find_material(scene, "D"));
-	ufbxt_assert(ufbx_find_material(scene, "E"));
-	ufbxt_assert(ufbx_find_material(scene, "F"));
-	ufbxt_assert(ufbx_find_material(scene, "G"));
-	ufbxt_assert(ufbx_find_material(scene, "H"));
-
-	{
-		ufbx_node *node = ufbx_find_node(scene, "First");
-		ufbxt_assert(node && node->mesh);
-		ufbx_mesh *mesh = node->mesh;
-		ufbxt_assert(mesh->face_material.count == 1);
-		ufbxt_assert(mesh->materials.count == 1);
-		ufbxt_assert(mesh->materials.data[0].material == NULL);
-	}
-
-	{
-		ufbx_node *node = ufbx_find_node(scene, "Second");
-		ufbxt_assert(node && node->mesh);
-		ufbx_mesh *mesh = node->mesh;
-
-		ufbxt_assert(mesh->materials.count == 3);
-		ufbxt_assert(!strcmp(mesh->materials.data[0].material->name.data, "A"));
-		ufbxt_assert(!strcmp(mesh->materials.data[1].material->name.data, "B"));
-		ufbxt_assert(!strcmp(mesh->materials.data[2].material->name.data, "D"));
-
-		ufbxt_assert(mesh->face_material.count == 5);
-		ufbxt_assert(mesh->face_material.data[0] == 0);
-		ufbxt_assert(mesh->face_material.data[1] == 0);
-		ufbxt_assert(mesh->face_material.data[2] == 1);
-		ufbxt_assert(mesh->face_material.data[3] == 2);
-		ufbxt_assert(mesh->face_material.data[4] == 0);
-	}
-
-	{
-		ufbx_node *node = ufbx_find_node(scene, "Third");
-		ufbxt_assert(node && node->mesh);
-		ufbx_mesh *mesh = node->mesh;
-
-		ufbxt_assert(mesh->materials.count == 2);
-		ufbxt_assert(!strcmp(mesh->materials.data[0].material->name.data, "F"));
-		ufbxt_assert(!strcmp(mesh->materials.data[1].material->name.data, "A"));
+		ufbxt_assert(!strcmp(mesh->materials.data[0]->name.data, "F"));
+		ufbxt_assert(!strcmp(mesh->materials.data[1]->name.data, "A"));
 
 		ufbxt_assert(mesh->face_material.count == 2);
 		ufbxt_assert(mesh->face_material.data[0] == 0);
@@ -1082,8 +1042,6 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_partial_material_allow_null, synthetic_partia
 UFBXT_FILE_TEST_OPTS_ALT(synthetic_partial_material_merged, synthetic_partial_material, ufbxt_merge_objects_opts)
 #if UFBXT_IMPL
 {
-	ufbxt_assert(!scene->metadata.may_contain_null_materials);
-
 	ufbxt_assert(scene->materials.count == 8);
 	ufbxt_assert(ufbx_find_material(scene, "A"));
 	ufbxt_assert(ufbx_find_material(scene, "B"));
@@ -1100,10 +1058,10 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_partial_material_merged, synthetic_partial_ma
 	ufbx_mesh *mesh = node->mesh;
 
 	ufbxt_assert(mesh->materials.count == 4);
-	ufbxt_assert(!strcmp(mesh->materials.data[0].material->name.data, "A"));
-	ufbxt_assert(!strcmp(mesh->materials.data[1].material->name.data, "B"));
-	ufbxt_assert(!strcmp(mesh->materials.data[2].material->name.data, "D"));
-	ufbxt_assert(!strcmp(mesh->materials.data[3].material->name.data, "F"));
+	ufbxt_assert(!strcmp(mesh->materials.data[0]->name.data, "A"));
+	ufbxt_assert(!strcmp(mesh->materials.data[1]->name.data, "B"));
+	ufbxt_assert(!strcmp(mesh->materials.data[2]->name.data, "D"));
+	ufbxt_assert(!strcmp(mesh->materials.data[3]->name.data, "F"));
 
 	ufbxt_assert(mesh->face_material.count == 8);
 	ufbxt_assert(mesh->face_material.data[0] == 0);
@@ -1129,8 +1087,8 @@ static ufbx_load_opts ufbxt_search_mtl_by_filename_opts()
 UFBXT_FILE_TEST_OPTS(synthetic_filename_mtl, ufbxt_search_mtl_by_filename_opts)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_MISSING_EXTERNAL_FILE, 1, "materials.mtl");
-	ufbxt_check_warning(scene, UFBX_WARNING_IMPLICIT_MTL, 1, "synthetic_filename_mtl_0_obj.mtl");
+	ufbxt_check_warning(scene, UFBX_WARNING_MISSING_EXTERNAL_FILE, UFBX_ELEMENT_UNKNOWN, NULL, 1, "materials.mtl");
+	ufbxt_check_warning(scene, UFBX_WARNING_IMPLICIT_MTL, UFBX_ELEMENT_UNKNOWN, NULL, 1, "synthetic_filename_mtl_0_obj.mtl");
 
 	{
 		ufbx_vec3 ka = { 1.0f, 0.0f, 0.0f };
@@ -1148,6 +1106,22 @@ UFBXT_FILE_TEST_OPTS(synthetic_filename_mtl, ufbxt_search_mtl_by_filename_opts)
 		ufbx_material *material = ufbx_find_material(scene, "Other");
 		ufbxt_assert(material);
 	}
+}
+#endif
+
+UFBXT_FILE_TEST_ALT_FLAGS(synthetic_filename_mtl_not_found, synthetic_filename_mtl, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(load_error->type == UFBX_ERROR_EXTERNAL_FILE_NOT_FOUND);
+	ufbxt_assert(!strcmp(load_error->info, "materials.mtl"));
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_bad_unicode_mtl, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(load_error->type == UFBX_ERROR_EXTERNAL_FILE_NOT_FOUND);
+	ufbxt_assert(!strcmp(load_error->info, "material?.mtl"));
 }
 #endif
 
@@ -1182,7 +1156,7 @@ UFBXT_TEST(obj_opts_mtl_data)
 	ufbx_mesh *mesh = scene->meshes.data[0];
 	ufbxt_assert(mesh->faces.count == 1);
 	ufbxt_assert(mesh->materials.count == 1);
-	ufbx_material *material = mesh->materials.data[0].material;
+	ufbx_material *material = mesh->materials.data[0];
 	ufbxt_assert(!strcmp(material->name.data, "Material"));
 
 	ufbx_vec3 ka = { 1.0f, 0.0f, 0.0f };
@@ -1224,7 +1198,7 @@ UFBXT_TEST(obj_opts_mtl_path)
 	ufbx_mesh *mesh = scene->meshes.data[0];
 	ufbxt_assert(mesh->faces.count == 1);
 	ufbxt_assert(mesh->materials.count == 1);
-	ufbx_material *material = mesh->materials.data[0].material;
+	ufbx_material *material = mesh->materials.data[0];
 	ufbxt_assert(!strcmp(material->name.data, "RGB"));
 
 	ufbx_vec3 ka = { 1.0f, 0.0f, 0.0f };
@@ -1301,6 +1275,7 @@ UFBXT_TEST(obj_opts_no_extrnal_files_by_filename)
 			ufbx_load_opts opts = { 0 };
 			opts.load_external_files = load_external != 0;
 			opts.obj_search_mtl_by_filename = load_by_filename != 0;
+			opts.ignore_missing_external_files = true;
 			ufbx_scene *scene = ufbx_load_file(path, &opts, NULL);
 			ufbxt_assert(scene);
 			ufbxt_check_scene(scene);
@@ -1310,7 +1285,7 @@ UFBXT_TEST(obj_opts_no_extrnal_files_by_filename)
 				ufbxt_assert(material);
 
 				if (load_external && load_by_filename) {
-					ufbxt_check_warning(scene, UFBX_WARNING_IMPLICIT_MTL, 1, "synthetic_filename_mtl_0_obj.mtl");
+					ufbxt_check_warning(scene, UFBX_WARNING_IMPLICIT_MTL, UFBX_ELEMENT_UNKNOWN, NULL, 1, "synthetic_filename_mtl_0_obj.mtl");
 					ufbx_vec3 ka = { 1.0f, 0.0f, 0.0f };
 					ufbx_vec3 kd = { 0.0f, 1.0f, 0.0f };
 					ufbx_vec3 ks = { 0.0f, 0.0f, 1.0f };
@@ -1318,6 +1293,10 @@ UFBXT_TEST(obj_opts_no_extrnal_files_by_filename)
 					ufbxt_assert_close_vec3(&err, material->fbx.diffuse_color.value_vec3, kd);
 					ufbxt_assert_close_vec3(&err, material->fbx.specular_color.value_vec3, ks);
 				} else {
+					if (load_external && !load_by_filename) {
+						ufbxt_check_warning(scene, UFBX_WARNING_MISSING_EXTERNAL_FILE, UFBX_ELEMENT_UNKNOWN, NULL, 1, "materials.mtl");
+
+					}
 					ufbxt_assert(material->props.props.count == 0);
 				}
 			}

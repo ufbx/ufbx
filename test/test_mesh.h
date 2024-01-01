@@ -424,8 +424,8 @@ UFBXT_FILE_TEST(blender_279_ball)
 	ufbxt_assert(mesh->face_smoothing.count);
 
 	ufbxt_assert(mesh->materials.count == 2);
-	ufbxt_assert(mesh->materials.data[0].material == red);
-	ufbxt_assert(mesh->materials.data[1].material == white);
+	ufbxt_assert(mesh->materials.data[0] == red);
+	ufbxt_assert(mesh->materials.data[1] == white);
 
 	for (size_t face_i = 0; face_i < mesh->num_faces; face_i++) {
 		ufbx_face face = mesh->faces.data[face_i];
@@ -607,7 +607,7 @@ UFBXT_FILE_TEST(synthetic_indexed_by_vertex)
 UFBXT_FILE_TEST(synthetic_by_vertex_bad_index)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, 9, NULL);
+	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, UFBX_ELEMENT_MESH, "#pCube1", 9, NULL);
 
 	ufbxt_assert(scene->meshes.count == 1);
 	ufbx_mesh *mesh = scene->meshes.data[0];
@@ -632,7 +632,7 @@ UFBXT_FILE_TEST(synthetic_by_vertex_bad_index)
 UFBXT_FILE_TEST(synthetic_by_vertex_overflow)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, 12, NULL);
+	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, UFBX_ELEMENT_MESH, "#pCube1", 12, NULL);
 
 	ufbxt_assert(scene->meshes.count == 1);
 	ufbx_mesh *mesh = scene->meshes.data[0];
@@ -873,12 +873,19 @@ UFBXT_FILE_TEST(zbrush_d20)
 
 		// WHAT? The 6100 version has duplicated blend shapes
 		// and 7500 has duplicated blend deformers...
+		// After e8cab0f ufbx ignores duplicated connections so we see only
+		// a single blend deformer here..
 		if (scene->metadata.version == 6100) {
 			ufbxt_assert(mesh->blend_deformers.count == 1);
 			ufbxt_assert(blend->channels.count == 4);
 		} else {
-			ufbxt_assert(mesh->blend_deformers.count == 2);
+			ufbxt_assert(mesh->blend_deformers.count == 1);
 			ufbxt_assert(blend->channels.count == 2);
+
+			ufbx_blend_deformer *blend_deformer = mesh->blend_deformers.data[0];
+			char warning_substring[128];
+			snprintf(warning_substring, sizeof(warning_substring), "to %u", mesh->element_id);
+			ufbxt_check_warning_imp(scene, UFBX_WARNING_DUPLICATE_CONNECTION, blend_deformer->element_id, 1, warning_substring);
 		}
 
 		// Check that poly groups work in subdivision
@@ -1083,9 +1090,9 @@ UFBXT_FILE_TEST(zbrush_polygroup_mess)
 
 	ufbxt_assert(mesh->face_groups.count == 2029);
 	for (size_t i = 0; i < mesh->face_groups.count; i++) {
-		ufbx_face_group *group = &mesh->face_groups.data[i];
-		ufbxt_assert(group->num_faces < ufbxt_arraycount(groups_per_face_count));
-		groups_per_face_count[group->num_faces]++;
+		ufbx_mesh_part *part = &mesh->face_group_parts.data[i];
+		ufbxt_assert(part->num_faces < ufbxt_arraycount(groups_per_face_count));
+		groups_per_face_count[part->num_faces]++;
 	}
 
 	for (size_t i = 0; i < ufbxt_arraycount(groups_per_face_count_ref); i++) {
@@ -1136,8 +1143,9 @@ UFBXT_FILE_TEST(synthetic_face_group_id)
 		ufbxt_hintf("i = %zu", i);
 		ufbxt_assert(i < mesh->face_groups.count);
 		ufbx_face_group *group = &mesh->face_groups.data[i];
+		ufbx_mesh_part *part = &mesh->face_group_parts.data[i];
 		ufbxt_assert(group->id == ref_groups[i].id);
-		ufbxt_assert(group->num_faces == ref_groups[i].face_count);
+		ufbxt_assert(part->num_faces == ref_groups[i].face_count);
 	}
 }
 #endif
@@ -1154,15 +1162,15 @@ UFBXT_FILE_TEST(blender_279_empty_cube)
 	ufbxt_assert(mesh->num_vertices == 0);
 
 	ufbxt_assert(mesh->materials.count == 1);
-	ufbxt_assert(mesh->materials.data[0].material);
-	ufbxt_assert(mesh->materials.data[0].num_faces == 0);
+	ufbxt_assert(mesh->materials.data[0]);
+	ufbxt_assert(mesh->material_parts.data[0].num_faces == 0);
 }
 #endif
 
 UFBXT_FILE_TEST(synthetic_truncated_crease_partial)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, 1, "Truncated array: EdgeCrease");
+	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, UFBX_ELEMENT_MESH, "#pPlane1", 1, "Truncated array: EdgeCrease");
 
 	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
 	ufbxt_assert(node && node->mesh);
@@ -1178,7 +1186,7 @@ UFBXT_FILE_TEST(synthetic_truncated_crease_partial)
 UFBXT_FILE_TEST(synthetic_truncated_crease_full)
 #if UFBXT_IMPL
 {
-	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, 1, "Truncated array: EdgeCrease");
+	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, UFBX_ELEMENT_MESH, "#pPlane1", 1, "Truncated array: EdgeCrease");
 
 	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
 	ufbxt_assert(node && node->mesh);
@@ -1190,3 +1198,137 @@ UFBXT_FILE_TEST(synthetic_truncated_crease_full)
 	ufbxt_assert_close_real(err, mesh->edge_crease.data[3], 0.0f);
 }
 #endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_smoothing, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbxt_check_warning(scene, UFBX_WARNING_MISSING_GEOMETRY_DATA, UFBX_ELEMENT_MESH, "#pCube1", 1, "Missing geometry data: Smoothing");
+
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->edge_smoothing.count == 0);
+}
+#endif
+
+#if UFBXT_IMPL 
+static ufbx_load_opts ufbxt_skip_mesh_parts_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.skip_mesh_parts = true;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_cube_skip_mesh_parts, maya_cube, ufbxt_skip_mesh_parts_opts)
+#if UFBXT_IMPL 
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->materials.count == 1);
+	ufbxt_assert(mesh->material_parts.count == 0);
+	ufbxt_assert(mesh->face_groups.count == 0);
+	ufbxt_assert(mesh->face_group_parts.count == 0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(synthetic_face_group_id_skip_mesh_parts, synthetic_face_group_id, ufbxt_skip_mesh_parts_opts)
+#if UFBXT_IMPL 
+{
+	ufbx_node *node = ufbx_find_node(scene, "20 Sided");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->materials.count == 1);
+	ufbxt_assert(mesh->material_parts.count == 0);
+	ufbxt_assert(mesh->face_groups.count == 14);
+	ufbxt_assert(mesh->face_group_parts.count == 0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(synthetic_face_groups_skip_mesh_parts, synthetic_face_groups, ufbxt_skip_mesh_parts_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->materials.count == 2);
+	ufbxt_assert(mesh->material_parts.count == 0);
+	ufbxt_assert(mesh->face_groups.count == 4);
+	ufbxt_assert(mesh->face_group_parts.count == 0);
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_cm_y_up_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_unit_meters = (ufbx_real)0.01;
+	opts.target_axes = ufbx_axes_right_handed_y_up;
+	return opts;
+}
+static ufbx_load_opts ufbxt_cm_y_up_abort_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_unit_meters = (ufbx_real)0.01;
+	opts.target_axes = ufbx_axes_right_handed_y_up;
+	opts.index_error_handling = UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING;
+	return opts;
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_metadata_object *ufbxt_find_metadata_object(ufbx_element *element)
+{
+	for (size_t i = 0; i < element->connections_dst.count; i++) {
+		ufbx_connection *conn = &element->connections_dst.data[i];
+		if (conn->src_prop.length != 0 || conn->dst_prop.length != 0) continue;
+		if (conn->src->type == UFBX_ELEMENT_METADATA_OBJECT) {
+			return ufbx_as_metadata_object(conn->src);
+		}
+	}
+	return NULL;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(revit_wall_square, ufbxt_cm_y_up_opts)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(revit_wall_square_abort, revit_wall_square, ufbxt_cm_y_up_abort_opts)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_direct_by_polygon)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node);
+
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh);
+
+	ufbxt_assert(mesh->faces.count == 2);
+	ufbxt_assert(!mesh->vertex_normal.unique_per_vertex);
+	ufbxt_assert(mesh->vertex_normal.values.count == 2);
+
+	ufbx_vec3 ref_normals[] = {
+		{ -0.707106769f, 0.707106769f, 0.0f },
+		{ 0.707106769f, 0.707106769f, 0.0f },
+	};
+	for (size_t face_ix = 0; face_ix < mesh->faces.count; face_ix++) {
+		ufbx_face face = mesh->faces.data[face_ix];
+		for (size_t i = 0; i < face.num_indices; i++) {
+			ufbx_vec3 normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, face.index_begin + i);
+			ufbxt_assert_close_vec3(err, normal, ref_normals[face_ix]);
+		}
+	}
+}
+#endif
+
+

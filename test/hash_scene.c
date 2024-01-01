@@ -7,6 +7,15 @@
 #include <inttypes.h>
 #include <assert.h>
 
+#if defined(USE_THREADS)
+	#define UFBX_OS_IMPLEMENTATION
+	#include "../extra/ufbx_os.h"
+#endif
+
+#if defined(USE_THREADS)
+	ufbx_os_thread_pool *g_thread_pool;
+#endif
+
 typedef struct {
 	size_t pos;
 	size_t size;
@@ -87,10 +96,15 @@ static ufbx_scene *load_scene(const char *filename, int frame, ufbxt_hasher_opts
 {
 	ufbx_load_opts opts = { 0 };
 	opts.load_external_files = true;
+	opts.ignore_missing_external_files = true;
 	opts.evaluate_caches = true;
 	opts.evaluate_skinning = true;
 	opts.target_axes = ufbx_axes_right_handed_y_up;
 	opts.target_unit_meters = 1.0f;
+
+	#if defined(USE_THREADS)
+		ufbx_os_init_ufbx_thread_pool(&opts.thread_opts.pool, g_thread_pool);
+	#endif
 
 	if (hasher_opts->no_read_buffer) {
 		opts.read_buffer_size = 1;
@@ -102,6 +116,10 @@ static ufbx_scene *load_scene(const char *filename, int frame, ufbxt_hasher_opts
 	ufbx_error error;
 	ufbx_scene *scene = ufbx_load_file(filename, &opts, &error);
 	if (!scene) {
+		#if defined(USE_THREADS)
+			if (error.type == UFBX_ERROR_THREADED_ASCII_PARSE) return NULL;
+		#endif
+
 		fprintf(stderr, "Failed to load scene: %s\n", error.description.data);
 		exit(2);
 	}
@@ -112,7 +130,7 @@ static ufbx_scene *load_scene(const char *filename, int frame, ufbxt_hasher_opts
 		eval_opts.evaluate_skinning = true;
 		eval_opts.load_external_files = true;
 
-		double time = scene->anim.time_begin + frame / scene->settings.frames_per_second;
+		double time = scene->anim->time_begin + frame / scene->settings.frames_per_second;
 		ufbx_scene *state = ufbx_evaluate_scene(scene, NULL, time, NULL, &error);
 		if (!state) {
 			fprintf(stderr, "Failed to evaluate scene: %s\n", error.description.data);
@@ -134,6 +152,15 @@ int main(int argc, char **argv)
 	bool dump_all = false;
 	bool verbose = false;
 	ufbxt_hasher_opts hasher_opts = { 0 };
+
+	#if defined(USE_THREADS)
+	 {
+		ufbx_os_thread_pool_opts pool_opts = { 0 };
+		pool_opts.max_threads = 4;
+		g_thread_pool = ufbx_os_create_thread_pool(&pool_opts);
+		assert(g_thread_pool);
+	 }
+	#endif
 
 	int frame = -1;
 	for (int i = 1; i < argc; i++) {
@@ -191,6 +218,7 @@ int main(int argc, char **argv)
 		char fbx_file[1024];
 		while (fscanf(f, "%" SCNx64 " %d %s", &fbx_hash, &frame, fbx_file) == 3) {
 			ufbx_scene *scene = load_scene(fbx_file, frame, &hasher_opts);
+			if (!scene) continue;
 
 			uint64_t hash = ufbxt_hash_scene(scene, NULL);
 			if (hash != fbx_hash || dump_all) {
@@ -241,6 +269,10 @@ int main(int argc, char **argv)
 	if (dump_file) {
 		fclose(dump_file);
 	}
+
+	#if defined(UFBXT_THREADS)
+		ufbx_os_free_thread_pool(g_thread_pool);
+	#endif
 
 	return num_fail > 0 ? 3 : 0;
 }

@@ -1,6 +1,16 @@
 import argparse
 import re
 import sys
+import os
+
+g_filename = ""
+g_ufbx_idenitfiers = {
+    "ufbx_static_assert",
+    "ufbx_source_version",
+    "UFBX_SOURCE_VERSION",
+}
+g_platform_seen = False
+g_header_seen = False
 
 def strip_comments(line):
     if "//" in line:
@@ -32,15 +42,58 @@ def pointer_alignment(line):
     line = strip_comments(line)
     return forbid(r"\w(\* )\w", line, "pointers should be aligned to the right")
 
+def identifier_prefix(line):
+    global g_platform_seen
+    if line.strip() == "// -- Platform":
+        g_platform_seen = True
+
+    for m in re.finditer(r"\b(ufbx[0-9a-z]*)_(\w+)\b", line, re.IGNORECASE):
+        ident = m.group(0)
+        prefix = m.group(1).lower()
+        begin, end = m.start(1), m.end(1)
+        if g_filename == "ufbx.h":
+            if prefix not in ("ufbx", "ufbxi"):
+                return "forbidden ufbx prefix variant", begin, end
+            g_ufbx_idenitfiers.add(ident)
+        elif g_filename == "ufbx.c":
+            if prefix not in ("ufbx", "ufbxi"):
+                return "forbidden ufbx prefix variant", begin, end
+            if not g_platform_seen:
+                g_ufbx_idenitfiers.add(ident)
+
+    if g_header_seen:
+        line = strip_comments(line)
+        for m in re.finditer(r"\b(ufbx[0-9a-z]*)_(\w+)\b", line, re.IGNORECASE):
+            ident = m.group(0)
+            prefix = m.group(1).lower()
+            begin, end = m.start(1), m.end(1)
+            if g_filename == "ufbx.c":
+                found = False
+                if ident in g_ufbx_idenitfiers:
+                    found = True
+                if ident.endswith("_COUNT") and ident[:-6] in g_ufbx_idenitfiers:
+                    found = True
+                if prefix == "ufbx" and not found:
+                    return "non-ufbxi prefix used in implementation", begin, end
+
 checks = [
     no_trailing_whitespace,
     indent_tabs,
     no_trailing_tabs,
     keyword_spacing,
     pointer_alignment,
+    identifier_prefix,
 ]
 
 def check_file(path, colors):
+    global g_filename
+    global g_platform_seen
+    global g_header_seen
+    g_filename = os.path.basename(path)
+    g_platform_seen = False
+    if g_filename == "ufbx.h":
+        g_header_seen = True
+
     failed = False
     if colors:
         c_gray = "\033[1;30m"

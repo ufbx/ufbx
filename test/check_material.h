@@ -27,6 +27,9 @@ static const char *ufbxt_fbx_map_name(ufbx_material_fbx_map map)
 	case UFBX_MATERIAL_FBX_DISPLACEMENT: return "displacement";
 	case UFBX_MATERIAL_FBX_VECTOR_DISPLACEMENT_FACTOR: return "vector_displacement_factor";
 	case UFBX_MATERIAL_FBX_VECTOR_DISPLACEMENT: return "vector_displacement";
+#if UFBX_HAS_FORCE_32BIT
+	case UFBX_MATERIAL_FBX_MAP_FORCE_32BIT: ufbx_assert(0); return NULL;
+#endif
 	}
 
 	ufbxt_assert(0 && "Unhandled PBR map name");
@@ -91,15 +94,18 @@ static const char *ufbxt_pbr_map_name(ufbx_material_pbr_map map)
 	case UFBX_MATERIAL_PBR_GLOSSINESS: return "glossiness";
 	case UFBX_MATERIAL_PBR_COAT_GLOSSINESS: return "coat_glossiness";
 	case UFBX_MATERIAL_PBR_TRANSMISSION_GLOSSINESS: return "transmission_glossiness";
+#if UFBX_HAS_FORCE_32BIT
+	case UFBX_MATERIAL_PBR_MAP_FORCE_32BIT: ufbx_assert(0); return NULL;
+#endif
 	}
 
 	ufbxt_assert(0 && "Unhandled PBR map name");
 	return 0;
 }
 
-static const char *ufbxt_material_feature_name(ufbx_material_pbr_map map)
+static const char *ufbxt_material_feature_name(ufbx_material_feature feature)
 {
-	switch (map) {
+	switch (feature) {
 	case UFBX_MATERIAL_FEATURE_PBR: return "pbr";
 	case UFBX_MATERIAL_FEATURE_METALNESS: return "metalness";
 	case UFBX_MATERIAL_FEATURE_DIFFUSE: return "diffuse";
@@ -123,6 +129,9 @@ static const char *ufbxt_material_feature_name(ufbx_material_pbr_map map)
 	case UFBX_MATERIAL_FEATURE_ROUGHNESS_AS_GLOSSINESS: return "roughness_as_glossiness";
 	case UFBX_MATERIAL_FEATURE_COAT_ROUGHNESS_AS_GLOSSINESS: return "coat_roughness_as_glossiness";
 	case UFBX_MATERIAL_FEATURE_TRANSMISSION_ROUGHNESS_AS_GLOSSINESS: return "transmission_roughness_as_glossiness";
+#if UFBX_HAS_FORCE_32BIT
+	case UFBX_MATERIAL_FEATURE_FORCE_32BIT: ufbx_assert(0); return NULL;
+#endif
 	}
 
 	ufbxt_assert(0 && "Unhandled material feature name");
@@ -144,6 +153,9 @@ static const char *ufbxt_shader_type_name(ufbx_shader_type map)
 	case UFBX_SHADER_SHADERFX_GRAPH: return "shaderfx_graph";
 	case UFBX_SHADER_BLENDER_PHONG: return "blender_phong";
 	case UFBX_SHADER_WAVEFRONT_MTL: return "wavefront_mtl";
+#if UFBX_HAS_FORCE_32BIT
+	case UFBX_SHADER_TYPE_FORCE_32BIT: ufbx_assert(0); return NULL;
+#endif
 	}
 
 	ufbxt_assert(0 && "Unhandled material feature name");
@@ -248,7 +260,7 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 
 	long version = 0;
 
-	const long current_version = 2;
+	const long current_version = 3;
 
 	int line = 0;
 	while (*spec != '\0') {
@@ -370,10 +382,13 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 			if (!strcmp(dots[2], "texture")) {
 				size_t tok_start = 1;
 				bool content = false;
+				bool absolute = false;
 				for (;;) {
 					const char *tok = tokens[tok_start];
 					if (!strcmp(tok, "content")) {
 						content = true;
+					} else if (!strcmp(tok, "absolute")) {
+						absolute = true;
 					} else {
 						break;
 					}
@@ -382,14 +397,18 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 
 				const char *tex_name = tokens[tok_start];
 				if (map->texture) {
-					if (strcmp(map->texture->relative_filename.data, tex_name) != 0) {
+					ufbx_string tex_filename = map->texture->relative_filename;
+					if (absolute) {
+						tex_filename = map->texture->absolute_filename;
+					}
+					if (strcmp(tex_filename.data, tex_name) != 0) {
 						fprintf(stderr, "%s:%d: Material '%s' %s.%s is different: got '%s', expected '%s'\n", filename, line,
-							material->name.data, dots[0], dots[1], map->texture->relative_filename.data, tex_name);
+							material->name.data, dots[0], dots[1], tex_filename.data, tex_name);
 						ok = false;
 					}
 					if (content && map->texture->content.size == 0) {
 						fprintf(stderr, "%s:%d: Material '%s' %s.%s expected content for the texture %s\n", filename, line,
-							material->name.data, dots[0], dots[1], map->texture->relative_filename.data);
+							material->name.data, dots[0], dots[1], tex_filename.data);
 						ok = false;
 					}
 				} else {

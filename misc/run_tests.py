@@ -30,6 +30,8 @@ parser.add_argument("--threads", type=int, default=0, help="Number of threads to
 parser.add_argument("--verbose", action="store_true", help="Verbose output")
 parser.add_argument("--hash-file", help="Hash test input file")
 parser.add_argument("--runner", help="Descriptive name for the runner")
+parser.add_argument("--heavy", action="store_true", help="Run heavy tests")
+parser.add_argument("--hash-threads", action="store_true", help="Use threading for hashes")
 parser.add_argument("--fail-on-pre-test", action="store_true", help="Indicate failure if pre-test checks fail")
 parser.add_argument("--force-opt", help="Force compiler optimization level")
 argv = parser.parse_args()
@@ -205,6 +207,8 @@ class CLCompiler(Compiler):
 
         if not config.get("compile_only"):
             obj_dir = os.path.dirname(output)
+            if "temp_dir" in config:
+                obj_dir = config["temp_dir"]
             args.append(f"/Fo{obj_dir}\\")
 
         if config.get("warnings", False):
@@ -223,9 +227,14 @@ class CLCompiler(Compiler):
             args.append("/Ox")
         else:
             args.append("/DDEBUG=1")
-        
+
         if config.get("regression", False):
             args.append("/DUFBX_REGRESSION=1")
+
+        std = config.get("std", "")
+        if std:
+            assert std in ("c++14", "c++17", "c++20")
+            args.append(f"/std:{std}")
 
         for key, val in config.get("defines", {}).items():
             if not val:
@@ -743,9 +752,9 @@ def decorate_arch(compiler, arch):
     return arch
 
 tests = set(argv.tests)
-impicit_tests = False
+implicit_tests = False
 if not tests:
-    tests = ["tests", "stack", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
+    tests = ["tests", "cpp", "stack", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
     implicit_tests = True
 
 async def main():
@@ -813,6 +822,12 @@ async def main():
 
                 conf = copy.deepcopy(config)
                 conf["output"] = os.path.join(path, config.get("output", "a.exe"))
+
+                temp_dir = config.get("temp_dir", "")
+                if temp_dir:
+                    temp_dir = os.path.join(path, temp_dir)
+                    conf["temp_dir"] = temp_dir
+                    os.makedirs(temp_dir, exist_ok=True)
 
                 if "defines" not in conf:
                     conf["defines"] = { }
@@ -897,9 +912,22 @@ async def main():
 
         target_tasks = []
 
+        def platform_overrides(config, compiler):
+            use_threads = True
+            if config["arch"] in ["wasm32"]:
+                use_threads = False
+            if compiler.name in ["tcc"]:
+                use_threads = False
+
+            if use_threads:
+                config["threads"] = True
+                config["defines"]["UFBXT_THREADS"] = ""
+
         runner_config = {
             "sources": ["test/runner.c", "ufbx.c"],
             "output": "runner" + exe_suffix,
+            "defines": { },
+            "overrides": platform_overrides,
         }
         target_tasks += compile_permutations("runner", runner_config, all_configs, ["-d", "data"])
 
@@ -933,13 +961,44 @@ async def main():
         targets = await gather(target_tasks)
         all_targets += targets
 
+    if "cpp" in tests:
+        log_comment("-- Compiling and running C++ tests --")
+
+        target_tasks = []
+
+        cpp_configs = all_configs.copy()
+        if not argv.heavy:
+            del cpp_configs["sanitize"]
+        cpp_configs.update({
+            "cpp": {
+                "cpp11": { "std": "c++11" },
+                "cpp14": { "std": "c++14" },
+                "cpp17": { "std": "c++17" },
+                "cpp20": { "std": "c++20" },
+            },
+        })
+
+        # MSVC-based C++ standard libraries don't support C++11
+        if sys.platform == "win32":
+            del cpp_configs["cpp"]["cpp11"]
+
+        runner_config = {
+            "sources": ["test/cpp/cpp_runner.cpp", "ufbx.c"],
+            "output": "cpp_runner" + exe_suffix,
+            "cpp": True,
+        }
+        target_tasks += compile_permutations("cpp_runner", runner_config, cpp_configs, ["-d", "data"])
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
     if "stack" in tests:
         log_comment("-- Compiling and running stack limited tests --")
 
         target_tasks = []
 
         def debug_overrides(config, compiler):
-            stack_limit = 128*1024
+            stack_limit = 256*1024
             if sys.platform == "win32" and compiler.name in ["gcc"]:
                 # GCC can't handle CreateThread on CI..
                 config["skip"] = True
@@ -961,7 +1020,7 @@ async def main():
         target_tasks += compile_permutations("runner_debug_stack", debug_stack_config, arch_configs, ["-d", "data"])
 
         def release_overrides(config, compiler):
-            stack_limit = 64*1024
+            stack_limit = 128*1024
             if sys.platform == "win32" and compiler.name in ["gcc"]:
                 # GCC can't handle CreateThread on CI..
                 config["skip"] = True
@@ -997,6 +1056,10 @@ async def main():
             "UFBX_NO_TESSELLATION",
             "UFBX_NO_GEOMETRY_CACHE",
             "UFBX_NO_SCENE_EVALUATION",
+            "UFBX_NO_SKINNING_EVALUATION",
+            "UFBX_NO_ANIMATION_BAKING",
+            "UFBX_NO_FORMAT_OBJ",
+            "UFBX_NO_INDEX_GENERATION",
             "UFBX_NO_TRIANGULATION",
             "UFBX_NO_ERROR_STACK",
             "UFBX_REAL_IS_FLOAT",
@@ -1004,14 +1067,18 @@ async def main():
 
         target_tasks = []
 
-        for bits in range(1, 1 << len(feature_defines)):
+        for bits in range(0, 1 << len(feature_defines)):
             defines = { name: 1 for ix, name in enumerate(feature_defines) if (1 << ix) & bits }
 
+            # Only consider up to two positive or negative features
+            if not argv.heavy and not (len(defines) <= 2 or len(defines) >= len(feature_defines) - 2):
+                continue
+
             feature_config = {
-                "sources": ["ufbx.c"],
-                "output": f"features_{bits}" + obj_suffix,
+                "sources": ["ufbx.c", "misc/minimal_main.c"],
+                "output": f"features_{bits}" + exe_suffix,
+                "temp_dir": os.path.join("temp", f"features_{bits}"),
                 "warnings": True,
-                "compile_only": True,
                 "defines": defines,
             }
             target_tasks += compile_permutations("features", feature_config, arch_configs, None)
@@ -1202,7 +1269,7 @@ async def main():
             for root, _, files in os.walk("data"):
                 for file in files:
                     if "_ascii" in file: continue
-                    if any(f in file for f in too_heavy_files): continue
+                    if any(f in file for f in too_heavy_files) and not argv.heavy: continue
                     path = os.path.join(root, file)
                     if "fuzz" in path: continue
                     if path.endswith(".fbx"):
@@ -1269,7 +1336,7 @@ async def main():
             for root, _, files in os.walk("data"):
                 for file in files:
                     path = os.path.join(root, file)
-                    if any(f in file for f in too_heavy_files): continue
+                    if any(f in file for f in too_heavy_files) and not argv.heavy: continue
                     if re.match(r"^.*_\d+_obj.obj$", file):
                         target.log.clear()
                         target.ran = False
@@ -1417,7 +1484,13 @@ async def main():
                 "sources": ["test/hash_scene.c", "misc/fdlibm.c"],
                 "output": "hash_scene" + exe_suffix,
                 "ieee754": True,
+                "defines": { },
             }
+
+            if argv.hash_threads:
+                hash_scene_config["threads"] = True
+                hash_scene_config["defines"]["USE_THREADS"] = ""
+                hash_scene_config["defines"]["UFBX_EXTENSIVE_THREADING"] = ""
 
             dump_path = os.path.join(build_path, "hashdumps")
             if not os.path.exists(dump_path):

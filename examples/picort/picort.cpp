@@ -3005,7 +3005,7 @@ void render_frame(ufbx_scene *original_scene, const Opts &opts, int frame_offset
 		eval_opts.evaluate_caches = true;
 		eval_opts.load_external_files = true;
 
-		ufbx_anim anim = original_scene->anim;
+		ufbx_anim *anim = original_scene->anim;
 		if (opts.animation.defined) {
 			ufbx_anim_stack *stack = (ufbx_anim_stack*)ufbx_find_element(original_scene, UFBX_ELEMENT_ANIM_STACK, opts.animation.value.c_str());
 			if (stack) {
@@ -3014,7 +3014,7 @@ void render_frame(ufbx_scene *original_scene, const Opts &opts, int frame_offset
 		}
 
 		ufbx_error error;
-		scene = ufbx_evaluate_scene(original_scene, &anim, time, &eval_opts, &error);
+		scene = ufbx_evaluate_scene(original_scene, anim, time, &eval_opts, &error);
 		if (!scene) {
 			char buf[4096];
 			ufbx_format_error(buf, sizeof(buf), &error);
@@ -3088,7 +3088,7 @@ void render_frame(ufbx_scene *original_scene, const Opts &opts, int frame_offset
 					tri.index = triangles.size();
 
 					if (mesh->face_material.count > 0) {
-						ufbx_material *mat = mesh->materials.data[mesh->face_material[face_ix]].material;
+						ufbx_material *mat = mesh->materials.data[mesh->face_material[face_ix]];
 						info.material = mat->element.typed_id + 1;
 					}
 
@@ -3137,7 +3137,8 @@ void render_frame(ufbx_scene *original_scene, const Opts &opts, int frame_offset
 				l.position = normalize(-from_ufbx(dir));
 				l.directional = true;
 			} else {
-				l.position = from_ufbx(node->world_transform.translation);
+				ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+				l.position = from_ufbx(world_transform.translation);
 			}
 
 			l.color = from_ufbx(light->color) * (Real)light->intensity;

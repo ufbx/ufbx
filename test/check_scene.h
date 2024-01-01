@@ -102,6 +102,18 @@ static void ufbxt_check_blob(ufbx_blob blob)
 	ufbxt_check_memory(blob.data, blob.size);
 }
 
+static void ufbxt_check_bool(const bool *p_value)
+{
+	ufbxt_assert(*(const char*)p_value == 0 || *(const char*)p_value == 1);
+}
+
+static void ufbxt_check_bool_list(ufbx_bool_list list)
+{
+	for (size_t i = 0; i < list.count; i++) {
+		ufbxt_check_bool(&list.data[i]);
+	}
+}
+
 #define ufbxt_check_list(list) ufbxt_check_memory((list).data, (list).count * sizeof(*(list).data))
 
 static void ufbxt_check_element_ptr_any(ufbx_scene *scene, ufbx_element *element)
@@ -323,11 +335,17 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 		}
 	}
 
+	ufbxt_check_element_ptr(scene, node->mesh, UFBX_ELEMENT_MESH);
+	ufbxt_check_element_ptr(scene, node->light, UFBX_ELEMENT_LIGHT);
+	ufbxt_check_element_ptr(scene, node->camera, UFBX_ELEMENT_CAMERA);
+	ufbxt_check_element_ptr(scene, node->inherit_scale_node, UFBX_ELEMENT_NODE);
+	ufbxt_check_element_ptr(scene, node->scale_helper, UFBX_ELEMENT_NODE);
+	ufbxt_check_element_ptr(scene, node->geometry_transform_helper, UFBX_ELEMENT_NODE);
+
 	switch (node->attrib_type) {
 	case UFBX_ELEMENT_MESH: ufbxt_assert(node->mesh); break;
 	case UFBX_ELEMENT_LIGHT: ufbxt_assert(node->light); break;
 	case UFBX_ELEMENT_CAMERA: ufbxt_assert(node->camera); break;
-	case UFBX_ELEMENT_BONE: ufbxt_assert(node->bone); break;
 	default: /* No shorthand */ break;
 	}
 
@@ -337,13 +355,12 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	}
 
 	ufbxt_assert((uint32_t)node->attrib_type < (uint32_t)UFBX_ELEMENT_TYPE_COUNT);
-	ufbxt_assert((uint32_t)node->inherit_type < (uint32_t)UFBX_INHERIT_TYPE_COUNT);
+	ufbxt_assert((uint32_t)node->inherit_mode < (uint32_t)UFBX_INHERIT_MODE_COUNT);
 
 	if (node->is_root) {
 		ufbxt_assert(!node->has_geometry_transform);
 	}
 
-	ufbxt_check_element_ptr(scene, node->geometry_transform_helper, UFBX_ELEMENT_NODE);
 	if (node->geometry_transform_helper) {
 		ufbxt_assert(node->geometry_transform_helper->is_geometry_transform_helper);
 
@@ -358,14 +375,38 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	}
 
 	if (node->is_geometry_transform_helper) {
-		ufbxt_assert(node->parent);
-		if (scene->metadata.has_warning[UFBX_WARNING_DUPLICATE_OBJECT_ID]) {
-			// In broken cases we may have multiple geometry transform helpers
-			ufbxt_assert(node->parent->geometry_transform_helper);
-		} else {
+		if (!scene->metadata.has_warning[UFBX_WARNING_DUPLICATE_OBJECT_ID]) {
+			ufbxt_assert(node->parent);
 			ufbxt_assert(node->parent->geometry_transform_helper == node);
 		}
 	}
+}
+
+static void ufbxt_check_mesh_part(ufbx_scene *scene, ufbx_mesh *mesh, ufbx_mesh_part *part, uint32_t index, uint32_t *source_list)
+{
+	ufbxt_assert(part->index == index);
+	ufbxt_assert(part->num_faces <= mesh->num_faces);
+	ufbxt_assert(part->face_indices.count == part->num_faces);
+
+	size_t mat_bad_faces[3] = { 0 };
+	size_t mat_tris = 0;
+	for (size_t j = 0; j < part->num_faces; j++) {
+		uint32_t ix = part->face_indices.data[j];
+		ufbx_face face = mesh->faces.data[ix];
+		if (face.num_indices >= 3) {
+			mat_tris += face.num_indices - 2;
+		} else {
+			mat_bad_faces[face.num_indices]++;
+		}
+		if (source_list) {
+			ufbxt_assert(source_list[ix] == index);
+		}
+	}
+
+	ufbxt_assert(part->num_triangles == mat_tris);
+	ufbxt_assert(part->num_empty_faces == mat_bad_faces[0]);
+	ufbxt_assert(part->num_point_faces == mat_bad_faces[1]);
+	ufbxt_assert(part->num_line_faces == mat_bad_faces[2]);
 }
 
 static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
@@ -383,7 +424,9 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		uint32_t vi = mesh->vertex_indices.data[ii];
 		if (vi != UFBX_NO_INDEX) {
 			ufbxt_assert(vi < mesh->num_vertices);
-			ufbxt_assert(mesh->vertex_first_index.data[vi] <= ii);
+			if (!mesh->reversed_winding) {
+				ufbxt_assert(mesh->vertex_first_index.data[vi] <= ii);
+			}
 		}
 	}
 
@@ -428,11 +471,15 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 	ufbxt_check_mesh_list(scene, mesh, mesh->edge_crease, mesh->num_edges, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->edge_smoothing, mesh->num_edges, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->edge_visibility, mesh->num_edges, true);
+	ufbxt_check_bool_list(mesh->edge_smoothing);
+	ufbxt_check_bool_list(mesh->edge_visibility);
 
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_material, mesh->num_faces, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_smoothing, mesh->num_faces, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_group, mesh->num_faces, true);
 	ufbxt_check_mesh_list(scene, mesh, mesh->face_hole, mesh->num_faces, true);
+	ufbxt_check_bool_list(mesh->face_smoothing);
+	ufbxt_check_bool_list(mesh->face_hole);
 
 	size_t num_triangles = 0;
 	size_t max_face_triangles = 0;
@@ -522,33 +569,32 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_assert(mesh->face_material.count == 0);
 	}
 
-	for (size_t i = 0; i < mesh->materials.count; i++) {
-		ufbx_mesh_material *mat = &mesh->materials.data[i];
-		ufbxt_check_element_ptr(scene, mat->material, UFBX_ELEMENT_MATERIAL);
+	size_t total_material_faces = 0;
+	size_t total_material_tris = 0;
+	if (mesh->materials.count > 0) {
+		ufbxt_assert(mesh->material_parts.count == 0 || mesh->material_parts.count == mesh->materials.count);
 
-		if (!scene->metadata.may_contain_null_materials) {
-			ufbxt_assert(mat->material);
-		}
+		for (size_t i = 0; i < mesh->materials.count; i++) {
+			ufbx_material *mat = mesh->materials.data[i];
+			ufbxt_check_element_ptr(scene, mat, UFBX_ELEMENT_MATERIAL);
 
-		ufbxt_assert(mat->face_indices.count == mat->num_faces);
-
-		size_t mat_bad_faces[3] = { 0 };
-		size_t mat_tris = 0;
-		for (size_t j = 0; j < mat->num_faces; j++) {
-			uint32_t ix = mat->face_indices.data[j];
-			ufbx_face face = mesh->faces.data[ix];
-			if (face.num_indices >= 3) {
-				mat_tris += face.num_indices - 2;
-			} else {
-				mat_bad_faces[face.num_indices]++;
+			if (mesh->material_parts.count > 0) {
+				ufbxt_check_mesh_part(scene, mesh, &mesh->material_parts.data[i], (uint32_t)i, mesh->face_material.data);
+				total_material_faces += mesh->material_parts.data[i].num_faces;
+				total_material_tris += mesh->material_parts.data[i].num_triangles;
 			}
-			ufbxt_assert(mesh->face_material.data[ix] == (int32_t)i);
 		}
-
-		ufbxt_assert(mat->num_triangles == mat_tris);
-		ufbxt_assert(mat->num_empty_faces == mat_bad_faces[0]);
-		ufbxt_assert(mat->num_point_faces == mat_bad_faces[1]);
-		ufbxt_assert(mat->num_line_faces == mat_bad_faces[2]);
+	} else {
+		if (mesh->material_parts.count > 0) {
+			ufbxt_assert(mesh->material_parts.count == 1);
+			ufbxt_check_mesh_part(scene, mesh, &mesh->material_parts.data[0], 0, NULL);
+			total_material_faces += mesh->material_parts.data[0].num_faces;
+			total_material_tris += mesh->material_parts.data[0].num_triangles;
+		}
+	}
+	if (mesh->material_parts.count > 0) {
+		ufbxt_assert(total_material_faces == mesh->num_faces);
+		ufbxt_assert(total_material_tris == mesh->num_triangles);
 	}
 
 	if (mesh->face_group.count) {
@@ -561,35 +607,31 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_assert(mesh->face_groups.count == 0);
 	}
 
+	ufbxt_assert(mesh->face_group_parts.count == 0 || mesh->face_group_parts.count == mesh->face_groups.count);
+
 	if (mesh->face_groups.count > 0) {
 		size_t total_group_faces = 0;
 		size_t total_group_tris = 0;
 		for (size_t i = 0; i < mesh->face_groups.count; i++) {
 			ufbx_face_group *group = &mesh->face_groups.data[i];
 
+			if (mesh->face_group_parts.count > 0) {
+				ufbxt_check_mesh_part(scene, mesh, &mesh->face_group_parts.data[i], (uint32_t)i, mesh->face_group.data);
+				total_group_faces += mesh->face_group_parts.data[i].num_faces;
+				total_group_tris += mesh->face_group_parts.data[i].num_triangles;
+			}
+
 			if (i > 0) {
 				ufbxt_assert(group->id >= mesh->face_groups.data[i - 1].id);
 			}
 
 			ufbxt_check_string(group->name);
-			ufbxt_assert(group->face_indices.count == group->num_faces);
-
-			size_t group_tris = 0;
-			for (size_t j = 0; j < group->num_faces; j++) {
-				uint32_t ix = group->face_indices.data[j];
-				ufbx_face face = mesh->faces.data[ix];
-				if (face.num_indices >= 3) {
-					group_tris += face.num_indices - 2;
-				}
-				ufbxt_assert(mesh->face_group.data[ix] == (uint32_t)i);
-			}
-			ufbxt_assert(group->num_triangles == group_tris);
-
-			total_group_faces += group->num_faces;
-			total_group_tris += group->num_triangles;
 		}
-		ufbxt_assert(total_group_faces == mesh->num_faces);
-		ufbxt_assert(total_group_tris == mesh->num_triangles);
+
+		if (mesh->face_group_parts.count > 0) {
+			ufbxt_assert(total_group_faces == mesh->num_faces);
+			ufbxt_assert(total_group_tris == mesh->num_triangles);
+		}
 	}
 
 	for (size_t i = 0; i < mesh->skin_deformers.count; i++) {
@@ -606,10 +648,8 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_check_element_ptr_any(scene, mesh->all_deformers.data[i]);
 	}
 
-	if (!scene->metadata.may_contain_null_materials) {
-		for (size_t i = 0; i < mesh->instances.count; i++) {
-			ufbxt_assert(mesh->instances.data[i]->materials.count >= mesh->materials.count);
-		}
+	for (size_t i = 0; i < mesh->instances.count; i++) {
+		ufbxt_assert(mesh->instances.data[i]->materials.count >= mesh->materials.count);
 	}
 
 	// No loose UV or color
@@ -658,8 +698,9 @@ static void ufbxt_check_empty(ufbx_scene *scene, ufbx_empty *empty)
 static void ufbxt_check_line_curve(ufbx_scene *scene, ufbx_line_curve *line)
 {
 	for (size_t i = 0; i < line->point_indices.count; i++) {
-		int32_t ix = line->point_indices.data[i];
-		ufbxt_assert(ix >= 0 && (uint32_t)ix < line->control_points.count);
+		uint32_t ix = line->point_indices.data[i];
+		if (scene->metadata.may_contain_no_index && ix == UFBX_NO_INDEX) continue;
+		ufbxt_assert(ix < line->control_points.count);
 	}
 
 	for (size_t i = 0; i < line->segments.count; i++) {
@@ -749,7 +790,9 @@ static void ufbxt_check_skin_deformer(ufbx_scene *scene, ufbx_skin_deformer *def
 
 		for (size_t i = 1; i < vertex.num_weights; i++) {
 			size_t ix = vertex.weight_begin + i;
-			ufbxt_assert(deformer->weights.data[ix - 1].weight >= deformer->weights.data[ix].weight);
+			if (!isnan(deformer->weights.data[ix - 1].weight) && !isnan(deformer->weights.data[ix].weight)) {
+				ufbxt_assert(deformer->weights.data[ix - 1].weight >= deformer->weights.data[ix].weight);
+			}
 		}
 	}
 	for (size_t i = 0; i < deformer->weights.count; i++) {
@@ -774,11 +817,13 @@ static void ufbxt_check_blend_deformer(ufbx_scene *scene, ufbx_blend_deformer *d
 static void ufbxt_check_blend_channel(ufbx_scene *scene, ufbx_blend_channel *channel)
 {
 	for (size_t i = 0; i < channel->keyframes.count; i++) {
-		if (i > 0) {
+		if (i > 0 && !isnan(channel->keyframes.data[i - 1].target_weight) && !isnan(channel->keyframes.data[i].target_weight)) {
 			ufbxt_assert(channel->keyframes.data[i - 1].target_weight <= channel->keyframes.data[i].target_weight);
 		}
+		ufbxt_assert(channel->keyframes.data[i].shape);
 		ufbxt_check_element_ptr(scene, channel->keyframes.data[i].shape, UFBX_ELEMENT_BLEND_SHAPE);
 	}
+	ufbxt_check_element_ptr(scene, channel->target_shape, UFBX_ELEMENT_BLEND_SHAPE);
 }
 
 static void ufbxt_check_blend_shape(ufbx_scene *scene, ufbx_blend_shape *shape)
@@ -946,10 +991,20 @@ static void ufbxt_check_shader_binding(ufbx_scene *scene, ufbx_shader_binding *b
 
 static void ufbxt_check_anim(ufbx_scene *scene, ufbx_anim *anim)
 {
+	ufbxt_assert(anim);
 	for (size_t i = 0; i < anim->layers.count; i++) {
-		ufbxt_check_element_ptr(scene, anim->layers.data[i].layer, UFBX_ELEMENT_ANIM_LAYER);
+		ufbxt_check_element_ptr(scene, anim->layers.data[i], UFBX_ELEMENT_ANIM_LAYER);
 	}
-	ufbxt_assert(anim->prop_overrides.count == 0);
+	for (size_t i = 0; i < anim->prop_overrides.count; i++) {
+		ufbx_prop_override *over = &anim->prop_overrides.data[i];
+		ufbxt_check_string(over->prop_name);
+		ufbxt_check_string(over->value_str);
+	}
+	if (!anim->custom) {
+		ufbxt_assert(anim->prop_overrides.count == 0);
+		ufbxt_assert(anim->transform_overrides.count == 0);
+		ufbxt_assert(anim->override_layer_weights.count == 0);
+	}
 }
 
 static void ufbxt_check_anim_stack(ufbx_scene *scene, ufbx_anim_stack *anim_stack)
@@ -1079,6 +1134,12 @@ static void ufbxt_check_application(ufbx_scene *scene, ufbx_application *applica
 	ufbxt_check_string(application->version);
 }
 
+static void ufbxt_check_thumbnail(ufbx_scene *scene, ufbx_thumbnail *thumbnail)
+{
+	ufbxt_assert((uint32_t)thumbnail->format < (uint32_t)UFBX_THUMBNAIL_FORMAT_COUNT);
+	ufbxt_check_blob(thumbnail->data);
+}
+
 static void ufbxt_check_metadata(ufbx_scene *scene, ufbx_metadata *metadata)
 {
 	ufbxt_check_string(metadata->creator);
@@ -1102,7 +1163,12 @@ static void ufbxt_check_metadata(ufbx_scene *scene, ufbx_metadata *metadata)
 		ufbx_warning *warning = &metadata->warnings.data[i];
 		ufbxt_check_string(warning->description);
 		ufbxt_assert(metadata->has_warning[warning->type]);
+		if (warning->element_id != UFBX_NO_INDEX) {
+			ufbxt_assert(warning->element_id < scene->elements.count);
+		}
 	}
+
+	ufbxt_check_thumbnail(scene, &metadata->thumbnail);
 }
 
 static void ufbxt_check_dom_value(ufbx_scene *scene, ufbx_dom_value *value)

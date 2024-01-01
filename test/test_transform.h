@@ -1,6 +1,81 @@
 #undef UFBXT_TEST_GROUP
 #define UFBXT_TEST_GROUP "transform"
 
+#if UFBXT_IMPL
+
+static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj_file(const char *file_name, const ufbxt_load_obj_opts *opts)
+{
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s.obj", data_root, file_name);
+
+	size_t obj_size = 0;
+	void *obj_data = ufbxt_read_file(buf, &obj_size);
+	ufbxt_obj_file *obj_file = obj_data ? ufbxt_load_obj(obj_data, obj_size, NULL) : NULL;
+	ufbxt_assert(obj_file);
+	free(obj_data);
+
+	return obj_file;
+}
+
+typedef enum {
+	UFBXT_CHECK_FRAME_SCALE_100 = 0x1,
+	UFBXT_CHECK_FRAME_Z_TO_Y_UP = 0x2,
+} ufbxt_check_frame_flags;
+
+void ufbxt_check_frame_imp(ufbx_scene *scene, ufbxt_diff_error *err, bool check_normals, const char *file_name, const char *anim_name, double time, uint32_t flags)
+{
+	ufbxt_hintf("Frame from '%s' %s time %.2fs",
+		anim_name ? anim_name : "(implicit animation)",
+		file_name, time);
+
+	ufbx_evaluate_opts opts = { 0 };
+	opts.evaluate_skinning = true;
+	opts.evaluate_caches = true;
+	opts.load_external_files = true;
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file(file_name, NULL);
+
+	if ((flags & UFBXT_CHECK_FRAME_SCALE_100) != 0) {
+		obj_file->fbx_position_scale = 100.0;
+	}
+
+	if ((flags & UFBXT_CHECK_FRAME_Z_TO_Y_UP) != 0) {
+		// -90deg rotation around X
+		obj_file->fbx_rotation.w = 0.70710678f;
+		obj_file->fbx_rotation.x = -0.70710678f;
+	}
+
+	ufbx_anim *anim = scene->anim;
+
+	if (anim_name) {
+		for (size_t i = 0; i < scene->anim_stacks.count; i++) {
+			ufbx_anim_stack *stack = scene->anim_stacks.data[i];
+			if (strstr(stack->name.data, anim_name)) {
+				ufbxt_assert(stack->layers.count > 0);
+				anim = stack->anim;
+				break;
+			}
+		}
+	}
+
+	ufbx_scene *eval = ufbx_evaluate_scene(scene, anim, time, &opts, NULL);
+	ufbxt_assert(eval);
+
+	ufbxt_check_scene(eval);
+
+	uint32_t diff_flags = 0;
+	if (check_normals) diff_flags |= UFBXT_OBJ_DIFF_FLAG_CHECK_DEFORMED_NORMALS;
+	ufbxt_diff_to_obj(eval, obj_file, err, diff_flags);
+
+	ufbx_free_scene(eval);
+	free(obj_file);
+}
+void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_normals, const char *file_name, const char *anim_name, double time)
+{
+	ufbxt_check_frame_imp(scene, err, check_normals, file_name, anim_name, time, 0);
+}
+#endif
+
 UFBXT_FILE_TEST(maya_pivots)
 #if UFBXT_IMPL
 {
@@ -124,12 +199,12 @@ UFBXT_TEST(root_transform)
 		ufbxt_assert_close_quat(&err, scene->root_node->local_transform.rotation, opts.root_transform.rotation);
 		ufbxt_assert_close_vec3(&err, scene->root_node->local_transform.scale, opts.root_transform.scale);
 
-		ufbx_transform eval = ufbx_evaluate_transform(&scene->anim, scene->root_node, 0.1);
+		ufbx_transform eval = ufbx_evaluate_transform(scene->anim, scene->root_node, 0.1);
 		ufbxt_assert_close_vec3(&err, eval.translation, opts.root_transform.translation);
 		ufbxt_assert_close_quat(&err, eval.rotation, opts.root_transform.rotation);
 		ufbxt_assert_close_vec3(&err, eval.scale, opts.root_transform.scale);
 
-		ufbx_scene *state = ufbx_evaluate_scene(scene, &scene->anim, 0.1, NULL, NULL);
+		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, 0.1, NULL, NULL);
 		ufbxt_assert(state);
 
 		ufbxt_assert_close_vec3(&err, state->root_node->local_transform.translation, opts.root_transform.translation);
@@ -274,6 +349,43 @@ static ufbx_load_opts ufbxt_scale_to_cm_opts()
 	opts.target_unit_meters = 0.01f;
 	return opts;
 }
+static ufbx_load_opts ufbxt_scale_to_cm_adjust_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_unit_meters = 0.01f;
+	opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+	return opts;
+}
+static ufbx_load_opts ufbxt_scale_to_cm_helper_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_unit_meters = 0.01f;
+	opts.inherit_mode_handling = UFBX_INHERIT_MODE_HANDLING_HELPER_NODES;
+	return opts;
+}
+static ufbx_load_opts ufbxt_scale_to_cm_adjust_helper_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_unit_meters = 0.01f;
+	opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+	opts.inherit_mode_handling = UFBX_INHERIT_MODE_HANDLING_HELPER_NODES;
+	return opts;
+}
+static ufbx_load_opts ufbxt_scale_to_cm_compensate_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_unit_meters = 0.01f;
+	opts.inherit_mode_handling = UFBX_INHERIT_MODE_HANDLING_COMPENSATE;
+	return opts;
+}
+static ufbx_load_opts ufbxt_scale_to_cm_adjust_compensate_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_unit_meters = 0.01f;
+	opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+	opts.inherit_mode_handling = UFBX_INHERIT_MODE_HANDLING_COMPENSATE;
+	return opts;
+}
 #endif
 
 UFBXT_FILE_TEST_OPTS(maya_scale_no_inherit, ufbxt_scale_to_cm_opts)
@@ -282,66 +394,427 @@ UFBXT_FILE_TEST_OPTS(maya_scale_no_inherit, ufbxt_scale_to_cm_opts)
 	{
 		ufbx_node *node = ufbx_find_node(scene, "joint1");
 		ufbxt_assert(node);
-		ufbxt_assert(node->inherit_type == UFBX_INHERIT_NORMAL);
-		ufbxt_assert_close_real(err, node->local_transform.scale.x, 0.02f);
-		ufbxt_assert_close_real(err, node->local_transform.scale.y, 0.03f);
-		ufbxt_assert_close_real(err, node->local_transform.scale.z, 0.04f);
-		ufbxt_assert_close_real(err, node->world_transform.scale.x, 2.0f);
-		ufbxt_assert_close_real(err, node->world_transform.scale.y, 3.0f);
-		ufbxt_assert_close_real(err, node->world_transform.scale.z, 4.0f);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 0.03f, 0.03f, 0.03f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 3.0f, 3.0f, 3.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 0.0f, 0.0f, 0.0f);
 	}
 
 	{
 		ufbx_node *node = ufbx_find_node(scene, "joint2");
 		ufbxt_assert(node);
-		ufbxt_assert(node->inherit_type == UFBX_INHERIT_NO_SCALE);
-		ufbxt_assert_close_real(err, node->local_transform.scale.x, 100.0f);
-		ufbxt_assert_close_real(err, node->local_transform.scale.y, 100.0f);
-		ufbxt_assert_close_real(err, node->local_transform.scale.z, 100.0f);
-		ufbxt_assert_close_real(err, node->world_transform.scale.x, 100.0f);
-		ufbxt_assert_close_real(err, node->world_transform.scale.y, 100.0f);
-		ufbxt_assert_close_real(err, node->world_transform.scale.z, 100.0f);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 100.0f, 100.0f, 100.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 0.0f, 6.0f, 0.0f);
 	}
 
 	{
 		ufbx_node *node = ufbx_find_node(scene, "joint3");
 		ufbxt_assert(node);
-		ufbxt_assert(node->inherit_type == UFBX_INHERIT_NO_SCALE);
-		ufbxt_assert_close_real(err, node->local_transform.scale.x, 1.0f);
-		ufbxt_assert_close_real(err, node->local_transform.scale.y, 1.0f);
-		ufbxt_assert_close_real(err, node->local_transform.scale.z, 1.0f);
-		ufbxt_assert_close_real(err, node->world_transform.scale.x, 1.0f);
-		ufbxt_assert_close_real(err, node->world_transform.scale.y, 1.0f);
-		ufbxt_assert_close_real(err, node->world_transform.scale.z, 1.0f);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 0.01f, 0.01f, 0.01f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 200.0f, 206.0f, 0.0f);
 	}
 
 	{
 		ufbx_node *node = ufbx_find_node(scene, "joint4");
 		ufbxt_assert(node);
-		ufbxt_assert(node->inherit_type == UFBX_INHERIT_NO_SCALE);
-		ufbxt_assert_close_real(err, node->local_transform.scale.x, 1.5f);
-		ufbxt_assert_close_real(err, node->local_transform.scale.y, 2.5f);
-		ufbxt_assert_close_real(err, node->local_transform.scale.z, 3.5f);
-		ufbxt_assert_close_real(err, node->world_transform.scale.x, 1.5f);
-		ufbxt_assert_close_real(err, node->world_transform.scale.y, 2.5f);
-		ufbxt_assert_close_real(err, node->world_transform.scale.z, 3.5f);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 0.015f, 0.025f, 0.035f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 1.5f, 2.5f, 3.5f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 200.0f, 208.0f, 0.0f);
 	}
 
 	{
 		ufbx_node *node = ufbx_find_node(scene, "joint3");
 
 		{
-			ufbx_transform transform = ufbx_evaluate_transform(&scene->anim, node, 1.0);
-			ufbxt_assert_close_real(err, transform.scale.x, 0.3f);
-			ufbxt_assert_close_real(err, transform.scale.y, 0.6f);
-			ufbxt_assert_close_real(err, transform.scale.z, 0.9f);
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, node, 1.0);
+			ufbxt_assert_close_real(err, transform.scale.x * 100.0f, 0.3f);
+			ufbxt_assert_close_real(err, transform.scale.y * 100.0f, 0.6f);
+			ufbxt_assert_close_real(err, transform.scale.z * 100.0f, 0.9f);
 		}
 
 		{
-			ufbx_transform transform = ufbx_evaluate_transform(&scene->anim, node, 0.5);
-			ufbxt_assert_close_real(err, transform.scale.x, 0.67281f);
-			ufbxt_assert_close_real(err, transform.scale.y, 0.81304f);
-			ufbxt_assert_close_real(err, transform.scale.z, 0.95326f);
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, node, 0.5);
+			ufbxt_assert_close_real(err, transform.scale.x * 100.0f, 0.67281f);
+			ufbxt_assert_close_real(err, transform.scale.y * 100.0f, 0.81304f);
+			ufbxt_assert_close_real(err, transform.scale.z * 100.0f, 0.95326f);
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_scale_no_inherit_adjust, maya_scale_no_inherit, ufbxt_scale_to_cm_adjust_opts)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint1");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 3.0f, 3.0f, 3.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 3.0f, 3.0f, 3.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 0.0f, 0.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint2");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 100.0f, 100.0f, 100.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 100.0f, 100.0f, 100.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 0.0f, 6.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint3");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 200.0f, 206.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint4");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 1.5f, 2.5f, 3.5f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 1.5f, 2.5f, 3.5f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 200.0f, 208.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint3");
+
+		{
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, node, 1.0);
+			ufbxt_assert_close_vec3_xyz(err, transform.scale, 0.3f, 0.6f, 0.9f);
+		}
+
+		{
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, node, 0.5);
+			ufbxt_assert_close_vec3_xyz(err, transform.scale, 0.67281f, 0.81304f, 0.95326f);
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_scale_no_inherit_helper, maya_scale_no_inherit, ufbxt_scale_to_cm_helper_opts)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint1");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbx_node *helper = node->scale_helper;
+		ufbxt_assert(helper);
+		ufbxt_assert(helper->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&helper->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, helper->local_transform.scale, 0.03f, 0.03f, 0.03f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 3.0f, 3.0f, 3.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 0.0f, 0.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint2");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbxt_assert(!node->scale_helper);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 100.0f, 100.0f, 100.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 0.0f, 6.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint3");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbx_node *helper = node->scale_helper;
+		ufbxt_assert(helper);
+		ufbxt_assert(helper->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&helper->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, helper->local_transform.scale, 0.01f, 0.01f, 0.01f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 200.0f, 206.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint4");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbxt_assert(!node->scale_helper);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 0.015f, 0.025f, 0.035f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 1.5f, 2.5f, 3.5f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 200.0f, 208.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint3");
+		ufbx_node *helper = node->scale_helper;
+		ufbxt_assert(helper);
+
+		{
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, helper, 1.0);
+			ufbxt_assert_close_real(err, transform.scale.x * 100.0f, 0.3f);
+			ufbxt_assert_close_real(err, transform.scale.y * 100.0f, 0.6f);
+			ufbxt_assert_close_real(err, transform.scale.z * 100.0f, 0.9f);
+		}
+
+		{
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, helper, 0.5);
+			ufbxt_assert_close_real(err, transform.scale.x * 100.0f, 0.67281f);
+			ufbxt_assert_close_real(err, transform.scale.y * 100.0f, 0.81304f);
+			ufbxt_assert_close_real(err, transform.scale.z * 100.0f, 0.95326f);
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_scale_no_inherit_adjust_helper, maya_scale_no_inherit, ufbxt_scale_to_cm_adjust_helper_opts)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint1");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbx_node *helper = node->scale_helper;
+		ufbxt_assert(helper);
+		ufbxt_assert(helper->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&helper->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 100.0f, 100.0f, 100.0f);
+		ufbxt_assert_close_vec3_xyz(err, helper->local_transform.scale, 0.03f, 0.03f, 0.03f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 3.0f, 3.0f, 3.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 0.0f, 0.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint2");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbxt_assert(!node->scale_helper);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 100.0f, 100.0f, 100.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 0.0f, 6.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint3");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbx_node *helper = node->scale_helper;
+		ufbxt_assert(helper);
+		ufbxt_assert(helper->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&helper->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, helper->local_transform.scale, 0.01f, 0.01f, 0.01f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 200.0f, 206.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint4");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbxt_assert(!node->scale_helper);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 0.015f, 0.025f, 0.035f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 1.5f, 2.5f, 3.5f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 200.0f, 208.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint3");
+		ufbx_node *helper = node->scale_helper;
+		ufbxt_assert(helper);
+
+		{
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, helper, 1.0);
+			ufbxt_assert_close_real(err, transform.scale.x * 100.0f, 0.3f);
+			ufbxt_assert_close_real(err, transform.scale.y * 100.0f, 0.6f);
+			ufbxt_assert_close_real(err, transform.scale.z * 100.0f, 0.9f);
+		}
+
+		{
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, helper, 0.5);
+			ufbxt_assert_close_real(err, transform.scale.x * 100.0f, 0.67281f);
+			ufbxt_assert_close_real(err, transform.scale.y * 100.0f, 0.81304f);
+			ufbxt_assert_close_real(err, transform.scale.z * 100.0f, 0.95326f);
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_scale_no_inherit_compensate, maya_scale_no_inherit, ufbxt_scale_to_cm_compensate_opts)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint1");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbxt_assert(!node->scale_helper);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 0.03f, 0.03f, 0.03f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 3.0f, 3.0f, 3.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 0.0f, 0.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint2");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbxt_assert(!node->scale_helper);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 33.33333f, 33.33333f, 33.33333f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 100.0f, 100.0f, 100.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 0.0f, 6.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint3");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbx_node *helper = node->scale_helper;
+		ufbxt_assert(helper);
+		ufbxt_assert(helper->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&helper->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, helper->local_transform.scale, 0.01f, 0.01f, 0.01f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 200.0f, 206.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint4");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbxt_assert(!node->scale_helper);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 0.015f, 0.025f, 0.035f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 1.5f, 2.5f, 3.5f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 200.0f, 208.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint3");
+		ufbx_node *helper = node->scale_helper;
+		ufbxt_assert(helper);
+
+		{
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, helper, 1.0);
+			ufbxt_assert_close_real(err, transform.scale.x * 100.0f, 0.3f);
+			ufbxt_assert_close_real(err, transform.scale.y * 100.0f, 0.6f);
+			ufbxt_assert_close_real(err, transform.scale.z * 100.0f, 0.9f);
+		}
+
+		{
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, helper, 0.5);
+			ufbxt_assert_close_real(err, transform.scale.x * 100.0f, 0.67281f);
+			ufbxt_assert_close_real(err, transform.scale.y * 100.0f, 0.81304f);
+			ufbxt_assert_close_real(err, transform.scale.z * 100.0f, 0.95326f);
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_scale_no_inherit_adjust_compensate, maya_scale_no_inherit, ufbxt_scale_to_cm_adjust_compensate_opts)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint1");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbxt_assert(!node->scale_helper);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 3.0f, 3.0f, 3.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 3.0f, 3.0f, 3.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 0.0f, 0.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint2");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbxt_assert(!node->scale_helper);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 33.33333f, 33.33333f, 33.33333f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 100.0f, 100.0f, 100.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 0.0f, 6.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint3");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbx_node *helper = node->scale_helper;
+		ufbxt_assert(helper);
+		ufbxt_assert(helper->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&helper->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, helper->local_transform.scale, 0.01f, 0.01f, 0.01f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 1.0f, 1.0f, 1.0f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 200.0f, 206.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint4");
+		ufbxt_assert(node);
+		ufbxt_assert(node->inherit_mode == UFBX_INHERIT_MODE_NORMAL);
+		ufbxt_assert(!node->scale_helper);
+		ufbx_transform world_transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3_xyz(err, node->local_transform.scale, 0.015f, 0.025f, 0.035f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.scale, 1.5f, 2.5f, 3.5f);
+		ufbxt_assert_close_vec3_xyz(err, world_transform.translation, 200.0f, 208.0f, 0.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint3");
+		ufbx_node *helper = node->scale_helper;
+		ufbxt_assert(helper);
+
+		{
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, helper, 1.0);
+			ufbxt_assert_close_real(err, transform.scale.x * 100.0f, 0.3f);
+			ufbxt_assert_close_real(err, transform.scale.y * 100.0f, 0.6f);
+			ufbxt_assert_close_real(err, transform.scale.z * 100.0f, 0.9f);
+		}
+
+		{
+			ufbx_transform transform = ufbx_evaluate_transform(scene->anim, helper, 0.5);
+			ufbxt_assert_close_real(err, transform.scale.x * 100.0f, 0.67281f);
+			ufbxt_assert_close_real(err, transform.scale.y * 100.0f, 0.81304f);
+			ufbxt_assert_close_real(err, transform.scale.z * 100.0f, 0.95326f);
 		}
 	}
 }
@@ -383,3 +856,462 @@ UFBXT_FILE_TEST_FLAGS(synthetic_node_cycle_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERRO
 	ufbxt_assert(!scene);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_static_no_inherit_scale)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint1");
+		ufbxt_assert(node);
+
+		ufbx_vec3 ref_translation = { 0.0f, 0.0f, 0.0f };
+		ufbx_vec3 ref_scale = { 2.0f, 2.0f, 2.0f };
+		ufbx_transform transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3(err, ref_translation, transform.translation);
+		ufbxt_assert_close_vec3(err, ref_scale, transform.scale);
+		ufbxt_assert_close_vec3(err, ref_scale, node->local_transform.scale);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint2");
+		ufbxt_assert(node);
+
+		ufbx_vec3 ref_translation = { 0.0f, 8.0f, 0.0f };
+		ufbx_vec3 ref_scale = { 1.0f, 2.0f, 2.0f };
+		ufbx_transform transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3(err, ref_translation, transform.translation);
+		ufbxt_assert_close_vec3(err, ref_scale, transform.scale);
+		ufbxt_assert_close_vec3(err, ref_scale, node->local_transform.scale);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint3");
+		ufbxt_assert(node);
+
+		ufbx_vec3 ref_translation = { 0.0f, 12.0f, 0.0f };
+		ufbx_vec3 ref_scale = { 1.0f, 1.0f, 1.0f };
+		ufbx_transform transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3(err, ref_translation, transform.translation);
+		ufbxt_assert_close_vec3(err, ref_scale, transform.scale);
+		ufbxt_assert_close_vec3(err, ref_scale, node->local_transform.scale);
+	}
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_scale_helper_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.inherit_mode_handling = UFBX_INHERIT_MODE_HANDLING_HELPER_NODES;
+	return opts;
+}
+static ufbx_load_opts ufbxt_scale_compensate_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.inherit_mode_handling = UFBX_INHERIT_MODE_HANDLING_COMPENSATE;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_static_no_inherit_scale_helper, maya_static_no_inherit_scale, ufbxt_scale_helper_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
+	ufbx_vec3 ref_scale_one = { 1.0f, 1.0f, 1.0f };
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint1");
+		ufbxt_assert(node);
+		ufbxt_assert(node->scale_helper);
+
+		ufbx_vec3 ref_translation = { 0.0f, 0.0f, 0.0f };
+		ufbx_vec3 ref_scale = { 2.0f, 2.0f, 2.0f };
+		ufbx_transform transform = ufbx_matrix_to_transform(&node->scale_helper->node_to_world);
+
+		ufbxt_assert_close_vec3(err, ref_translation, transform.translation);
+		ufbxt_assert_close_vec3(err, ref_scale, transform.scale);
+		ufbxt_assert_close_vec3(err, ref_scale, node->scale_helper->local_transform.scale);
+		ufbxt_assert_close_vec3(err, ref_scale_one, node->local_transform.scale);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint2");
+		ufbxt_assert(node);
+		ufbxt_assert(node->scale_helper);
+
+		ufbx_vec3 ref_translation = { 0.0f, 8.0f, 0.0f };
+		ufbx_vec3 ref_scale = { 1.0f, 2.0f, 2.0f };
+		ufbx_transform transform = ufbx_matrix_to_transform(&node->scale_helper->node_to_world);
+
+		ufbxt_assert_close_vec3(err, ref_translation, transform.translation);
+		ufbxt_assert_close_vec3(err, ref_scale, transform.scale);
+		ufbxt_assert_close_vec3(err, ref_scale, node->scale_helper->local_transform.scale);
+		ufbxt_assert_close_vec3(err, ref_scale_one, node->local_transform.scale);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint3");
+		ufbxt_assert(node);
+		ufbxt_assert(!node->scale_helper);
+
+		ufbx_vec3 ref_translation = { 0.0f, 12.0f, 0.0f };
+		ufbx_vec3 ref_scale = { 1.0f, 1.0f, 1.0f };
+		ufbx_transform transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3(err, ref_translation, transform.translation);
+		ufbxt_assert_close_vec3(err, ref_scale, transform.scale);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_static_no_inherit_scale_compensate, maya_static_no_inherit_scale, ufbxt_scale_compensate_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
+	ufbx_vec3 ref_scale_one = { 1.0f, 1.0f, 1.0f };
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint1");
+		ufbxt_assert(node);
+
+		ufbx_vec3 ref_translation = { 0.0f, 0.0f, 0.0f };
+		ufbx_vec3 ref_scale = { 2.0f, 2.0f, 2.0f };
+		ufbx_transform transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3(err, ref_translation, transform.translation);
+		ufbxt_assert_close_vec3(err, ref_scale, transform.scale);
+		ufbxt_assert_close_vec3(err, ref_scale, node->local_transform.scale);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint2");
+		ufbxt_assert(node);
+		ufbxt_assert(node->scale_helper);
+		ufbxt_assert_close_real(err, node->adjust_post_scale, 0.5f);
+
+		ufbx_vec3 ref_translation = { 0.0f, 8.0f, 0.0f };
+		ufbx_vec3 ref_scale = { 1.0f, 2.0f, 2.0f };
+		ufbx_vec3 local_scale = { 0.5f, 0.5f, 0.5f };
+		ufbx_transform transform = ufbx_matrix_to_transform(&node->scale_helper->node_to_world);
+
+		ufbxt_assert_close_vec3(err, ref_translation, transform.translation);
+		ufbxt_assert_close_vec3(err, ref_scale, transform.scale);
+		ufbxt_assert_close_vec3(err, ref_scale, node->scale_helper->local_transform.scale);
+		ufbxt_assert_close_vec3(err, local_scale, node->local_transform.scale);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "joint3");
+		ufbxt_assert(node);
+		ufbxt_assert(!node->scale_helper);
+
+		ufbx_vec3 ref_translation = { 0.0f, 12.0f, 0.0f };
+		ufbx_vec3 ref_scale = { 1.0f, 1.0f, 1.0f };
+		ufbx_transform transform = ufbx_matrix_to_transform(&node->node_to_world);
+
+		ufbxt_assert_close_vec3(err, ref_translation, transform.translation);
+		ufbxt_assert_close_vec3(err, ref_scale, transform.scale);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_geometry_transform_inherit_mode)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_geometry_transform_inherit_mode_scale_helper, synthetic_geometry_transform_inherit_mode, ufbxt_scale_helper_opts, UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
+	for (size_t i = 0; i < scene->nodes.count; i++) {
+		ufbx_node *node = scene->nodes.data[i];
+		ufbx_transform transform = ufbx_evaluate_transform(scene->anim, node, 0.0);
+		ufbxt_assert_close_vec3(err, node->local_transform.translation, transform.translation);
+		ufbxt_assert_close_quat(err, node->local_transform.rotation, transform.rotation);
+		ufbxt_assert_close_vec3(err, node->local_transform.scale, transform.scale);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(maya_child_pivots)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_child_pivots", NULL, 0.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_child_pivots_6", NULL, 6.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_child_pivots_12", NULL, 12.0/24.0);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_axes)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_modify_meter_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_unit_meters = 1.0f;
+	opts.space_conversion = UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_axes_modify, maya_axes, ufbxt_modify_meter_opts, UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_SCALE_100)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_TEST(maya_axes_lefthanded)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_axes_lefthanded", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_axes" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 0; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.target_axes = ufbx_axes_left_handed_y_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+			opts.reverse_winding = (i == 0);
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	free(obj_file);
+}
+#endif
+
+UFBXT_TEST(maya_axes_lefthanded_adjust)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_axes_lefthanded", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_axes" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 1; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.target_axes = ufbx_axes_left_handed_y_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+			opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	free(obj_file);
+}
+#endif
+
+UFBXT_TEST(maya_axes_lefthanded_modify)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_axes_lefthanded", NULL);
+	obj_file->fbx_position_scale = 100.0;
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_axes" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 1; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.target_axes = ufbx_axes_left_handed_y_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+			opts.space_conversion = UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY;
+			opts.target_unit_meters = 1.0f;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	free(obj_file);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_axes_anim)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, false, "maya_axes_anim_0", NULL, 0.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_axes_anim_5", NULL, 5.0/24.0);
+	ufbxt_check_frame(scene, err, false, "maya_axes_anim_8", NULL, 8.0/24.0);
+
+	ufbxt_assert(scene->poses.count == 1);
+	ufbx_pose *pose = scene->poses.data[0];
+	ufbxt_assert(pose->is_bind_pose);
+	ufbxt_assert(pose->bone_poses.count == 5);
+	for (size_t i = 0; i < pose->bone_poses.count; i++) {
+		ufbx_bone_pose *bone_pose = &pose->bone_poses.data[i];
+		ufbx_node *bone_node = bone_pose->bone_node;
+		ufbxt_assert(bone_node);
+
+		ufbxt_assert_close_vec3(err, bone_node->node_to_world.cols[0], bone_pose->bone_to_world.cols[0]);
+		ufbxt_assert_close_vec3(err, bone_node->node_to_world.cols[1], bone_pose->bone_to_world.cols[1]);
+		ufbxt_assert_close_vec3(err, bone_node->node_to_world.cols[2], bone_pose->bone_to_world.cols[2]);
+		ufbxt_assert_close_vec3(err, bone_node->node_to_world.cols[3], bone_pose->bone_to_world.cols[3]);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_axes_anim_modify, maya_axes_anim, ufbxt_modify_meter_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame_imp(scene, err, false, "maya_axes_anim_0", NULL, 0.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+	ufbxt_check_frame_imp(scene, err, false, "maya_axes_anim_5", NULL, 5.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+	ufbxt_check_frame_imp(scene, err, false, "maya_axes_anim_8", NULL, 8.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+}
+#endif
+
+UFBXT_TEST(maya_axes_anim_lefthanded)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_axes_anim" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 0; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.target_axes = ufbx_axes_left_handed_y_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+			opts.load_external_files = true;
+			opts.reverse_winding = (i == 0);
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_0", NULL, 0.0/24.0);
+			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_5", NULL, 5.0/24.0);
+			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_8", NULL, 8.0/24.0);
+
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
+UFBXT_TEST(maya_axes_anim_lefthanded_adjust)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_axes_anim" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 1; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.space_conversion = UFBX_SPACE_CONVERSION_ADJUST_TRANSFORMS;
+			opts.target_axes = ufbx_axes_left_handed_y_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+			opts.load_external_files = true;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_0", NULL, 0.0/24.0);
+			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_5", NULL, 5.0/24.0);
+			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_8", NULL, 8.0/24.0);
+
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
+UFBXT_TEST(maya_axes_anim_lefthanded_modify)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_axes_anim" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 1; i < UFBX_MIRROR_AXIS_COUNT; i++) {
+			ufbxt_hintf("mirror_axis=%u", i);
+
+			ufbx_load_opts opts = { 0 };
+
+			opts.space_conversion = UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY;
+			opts.target_unit_meters = 1.0f;
+			opts.target_axes = ufbx_axes_left_handed_y_up;
+			opts.handedness_conversion_axis = (ufbx_mirror_axis)i;
+			opts.load_external_files = true;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbxt_check_frame_imp(scene, &err, false, "maya_axes_anim_lefthanded_0", NULL, 0.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+			ufbxt_check_frame_imp(scene, &err, false, "maya_axes_anim_lefthanded_5", NULL, 5.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+			ufbxt_check_frame_imp(scene, &err, false, "maya_axes_anim_lefthanded_8", NULL, 8.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
+
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+

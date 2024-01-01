@@ -265,10 +265,10 @@ Objects:  {
 		Properties70:  {
 			P: "PreRotation", "Vector3D", "Vector", "",0,-0,90
 			P: "RotationActive", "bool", "", "",1
-			P: "InheritType", "enum", "", "",1
+			P: "InheritType", "enum", "", "",2
 			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
 			P: "DefaultAttributeIndex", "int", "Integer", "",0
-			P: "Lcl Scaling", "Lcl Scaling", "", "A",0.02,0.03,0.04
+			P: "Lcl Scaling", "Lcl Scaling", "", "A",0.03,0.03,0.03
 		}
 		Shading: Y
 		Culling: "CullingOff"
