@@ -1435,8 +1435,15 @@ UFBXT_TEST(maya_equal_pivot_handling)
 				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
 				if (!scene) ufbxt_log_error(&error);
 				ufbxt_assert(scene);
-
 				ufbxt_check_scene(scene);
+
+				ufbx_node *node = ufbx_find_node(scene, "pCube1");
+				ufbxt_assert(node);
+				if (pv == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT) {
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&node->props, "RotationPivot", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&node->props, "ScalingPivot", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+				}
+
 				ufbxt_diff_to_obj(scene, obj_file, &err, 0);
 				ufbx_free_scene(scene);
 			}
@@ -1471,12 +1478,112 @@ UFBXT_TEST(maya_equal_pivot_scale_handling)
 				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
 				if (!scene) ufbxt_log_error(&error);
 				ufbxt_assert(scene);
-
 				ufbxt_check_scene(scene);
+
+				ufbx_node *node = ufbx_find_node(scene, "Middle");
+				ufbxt_assert(node);
+				if (pv == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT) {
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&node->props, "RotationPivot", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&node->props, "ScalingPivot", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+				}
 
 				ufbxt_diff_to_obj(scene, obj_file, &err, 0);
 				ufbxt_check_frame_imp(scene, &err, false, "maya_equal_pivot_scale_6", NULL, 6.0/24.0, 0);
 				ufbxt_check_frame_imp(scene, &err, false, "maya_equal_pivot_scale_12", NULL, 12.0/24.0, 0);
+
+				ufbx_free_scene(scene);
+			}
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	free(obj_file);
+}
+#endif
+
+UFBXT_TEST(maya_instanced_pivots)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_instanced_pivots", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_instanced_pivots" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t pv = 0; pv < UFBX_PIVOT_HANDLING_COUNT; pv++) {
+			for (uint32_t gh = 0; gh < UFBX_GEOMETRY_TRANSFORM_HANDLING_COUNT; gh++) {
+				ufbxt_hintf("pivot_handling=%u, geometry_transform_handling=%u", pv, gh);
+
+				ufbx_load_opts opts = { 0 };
+
+				opts.pivot_handling = (ufbx_pivot_handling)pv;
+				opts.geometry_transform_handling = (ufbx_geometry_transform_handling)gh;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+
+				ufbx_node *cube1 = ufbx_find_node(scene, "pCube1");
+				ufbx_node *cube2 = ufbx_find_node(scene, "pCube2");
+				ufbx_node *light = ufbx_find_node(scene, "pointLight1");
+				ufbxt_assert(cube1);
+				ufbxt_assert(cube2);
+				ufbxt_assert(light);
+
+				ufbx_prop *prop = NULL;
+
+				ufbxt_assert(scene->lights.count == 1);
+				ufbx_light *light_attr = scene->lights.data[0];
+				ufbxt_assert(light_attr->instances.count == 1);
+				ufbx_node *light_parent = light_attr->instances.data[0];
+				ufbxt_assert_close_vec3_xyz(&err, light_parent->geometry_to_world.cols[3], 0.0f, 1.414f, 0.586f);
+
+				if (pv == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT && gh != UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK) {
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube1->props, "RotationPivot", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube1->props, "ScalingPivot", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+					if (gh == UFBX_GEOMETRY_TRANSFORM_HANDLING_PRESERVE) {
+						ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube1->props, "GeometricTranslation", ufbx_zero_vec3), -2.0f, 0.0f, 0.0f);
+					} else {
+						ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube1->props, "GeometricTranslation", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+						ufbxt_assert(cube1->geometry_transform_helper);
+					}
+
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube2->props, "RotationPivot", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube2->props, "ScalingPivot", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+					if (gh == UFBX_GEOMETRY_TRANSFORM_HANDLING_PRESERVE) {
+						ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube2->props, "GeometricTranslation", ufbx_zero_vec3), 2.0f, 0.0f, 0.0f);
+					} else {
+						ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube2->props, "GeometricTranslation", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+						ufbxt_assert(cube2->geometry_transform_helper);
+					}
+
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&light->props, "RotationPivot", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&light->props, "ScalingPivot", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+					if (gh == UFBX_GEOMETRY_TRANSFORM_HANDLING_PRESERVE) {
+						ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&light->props, "GeometricTranslation", ufbx_zero_vec3), 0.0f, 0.0f, -2.0f);
+					} else {
+						ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&light->props, "GeometricTranslation", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+						ufbxt_assert(cube2->geometry_transform_helper);
+					}
+
+				} else {
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube1->props, "RotationPivot", ufbx_zero_vec3), 2.0f, 0.0f, 0.0f);
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube1->props, "ScalingPivot", ufbx_zero_vec3), 2.0f, 0.0f, 0.0f);
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube1->props, "GeometricTranslation", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube2->props, "RotationPivot", ufbx_zero_vec3), -2.0f, 0.0f, 0.0f);
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube2->props, "ScalingPivot", ufbx_zero_vec3), -2.0f, 0.0f, 0.0f);
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube2->props, "GeometricTranslation", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&light->props, "RotationPivot", ufbx_zero_vec3), 0.0f, 0.0f, 2.0f);
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&light->props, "ScalingPivot", ufbx_zero_vec3), 0.0f, 0.0f, 2.0f);
+					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&light->props, "GeometricTranslation", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
+				}
 
 				ufbx_free_scene(scene);
 			}

@@ -17247,7 +17247,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 				err += (ufbx_real)ufbx_fabs(rotation_pivot.x - scaling_pivot.x);
 				err += (ufbx_real)ufbx_fabs(rotation_pivot.y - scaling_pivot.y);
 				err += (ufbx_real)ufbx_fabs(rotation_pivot.z - scaling_pivot.z);
-				if (err <= pivot_epsilon) {
+
+				bool can_modify_geometry_transform = true;
+				if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK) {
+					if (instance_counts[node->element_id] > 1 || modify_not_supported[node->element_id]) {
+						can_modify_geometry_transform = false;
+					}
+				}
+
+				if (err <= pivot_epsilon && can_modify_geometry_transform) {
 					size_t num_props = node->props.props.count;
 					ufbx_prop *new_props = ufbxi_push_zero(&uc->result, ufbx_prop, num_props + 3);
 					ufbxi_check(new_props);
