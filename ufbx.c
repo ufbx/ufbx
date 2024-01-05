@@ -21637,7 +21637,7 @@ static const ufbxi_aperture_format ufbxi_aperture_formats[] = {
 	{ 2772, 2072, }, // UFBX_APERTURE_FORMAT_IMAX
 };
 
-ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
+ufbxi_noinline static void ufbxi_update_camera(ufbx_scene *scene, ufbx_camera *camera)
 {
 	camera->projection_mode = (ufbx_projection_mode)ufbxi_find_enum(&camera->props, ufbxi_CameraProjectionType, 0, UFBX_PROJECTION_MODE_ORTHOGRAPHIC);
 	camera->aspect_mode = (ufbx_aspect_mode)ufbxi_find_enum(&camera->props, ufbxi_AspectRatioMode, 0, UFBX_ASPECT_MODE_FIXED_HEIGHT);
@@ -21687,6 +21687,11 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_camera *camera)
 	}
 
 	film_size.y *= squeeze_ratio;
+
+	// TODO: Should this be done always?
+	ortho_extent *= scene->metadata.geometry_scale;
+	camera->near_plane *= scene->metadata.geometry_scale;
+	camera->far_plane *= scene->metadata.geometry_scale;
 
 	camera->focal_length_mm = focal_length;
 	camera->film_size_inch = film_size;
@@ -22342,7 +22347,7 @@ ufbxi_noinline static void ufbxi_update_scene(ufbx_scene *scene, bool initial, c
 	}
 
 	ufbxi_for_ptr_list(ufbx_camera, p_camera, scene->cameras) {
-		ufbxi_update_camera(*p_camera);
+		ufbxi_update_camera(scene, *p_camera);
 	}
 
 	ufbxi_for_ptr_list(ufbx_bone, p_bone, scene->bones) {
