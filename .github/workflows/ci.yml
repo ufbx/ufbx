@@ -519,9 +519,13 @@ jobs:
       - name: Create build directory
         run: mkdir build
       - name: Compile check_fbx.c
-        run: clang -O2 test/check_fbx.c -lm -pthread -o build/check_fbx
+        run: clang -coverage -DEXTERNAL_UFBX -O2 ufbx.c test/check_fbx.c -lm -o build/check_fbx
       - name: Run dataset tests
         run: python3 misc/check_dataset.py --exe build/check_fbx --root /mnt/fbx-files --host-url https://ufbx-dataset.b-cdn.net
+      - name: Generate coverage
+        run: LLVM_COV=llvm-cov bash misc/generate_lcov.sh
+      - name: Upload coverage
+        run: bash /codecov.sh -F dataset -f coverage.lcov -y .github/codecov.yml
 
   ci_fuzz:
     runs-on: [self-hosted, ARM64]
