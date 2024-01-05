@@ -29,3 +29,8 @@ flags:
       - ufbx.c
       - ufbx.h
     carryforward: false
+  dataset:
+    paths:
+      - ufbx.c
+      - ufbx.h
+    carryforward: false
