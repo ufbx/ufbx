@@ -3908,6 +3908,9 @@ typedef enum ufbx_error_type UFBX_ENUM_REPR {
 	// Out of bounds index in the file when loading with `UFBX_INDEX_ERROR_HANDLING_ABORT_LOADING`.
 	UFBX_ERROR_BAD_INDEX,
 
+	// Node is deeper than `ufbx_load_opts.node_depth_limit` in the hierarchy.
+	UFBX_ERROR_NODE_DEPTH_LIMIT,
+
 	// Error parsing ASCII array in a thread.
 	// Threaded ASCII parsing is slightly more strict than non-threaded, for cursed files,
 	// set `ufbx_load_opts.force_single_thread_ascii_parsing` to `true`.
@@ -4280,6 +4283,12 @@ typedef struct ufbx_load_opts {
 
 	// Path separator character, defaults to '\' on Windows and '/' otherwise.
 	char path_separator;
+
+	// Maximum depth of the node hirerachy.
+	// Will fail with `UFBX_ERROR_NODE_DEPTH_LIMIT` if a node is deeper than this limit.
+	// NOTE: The default of 0 allows arbitrarily deep hierarchies. Be careful if using
+	// recursive algorithms without setting this limit.
+	uint32_t node_depth_limit;
 
 	// Estimated file size for progress reporting
 	uint64_t file_size_estimate;

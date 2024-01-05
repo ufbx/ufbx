@@ -3033,6 +3033,8 @@ static ufbxi_noinline void ufbxi_fix_error_type(ufbx_error *error, const char *d
 		error->type = UFBX_ERROR_BAD_NURBS;
 	} else if (!strcmp(desc, "Bad index")) {
 		error->type = UFBX_ERROR_BAD_INDEX;
+	} else if (!strcmp(desc, "Node depth limit exceeded")) {
+		error->type = UFBX_ERROR_NODE_DEPTH_LIMIT;
 	} else if (!strcmp(desc, "Threaded ASCII parse error")) {
 		error->type = UFBX_ERROR_THREADED_ASCII_PARSE;
 	} else if (!strcmp(desc, "Unsafe options")) {
@@ -17730,6 +17732,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_linearize_nodes(ufbxi_context *u
 			ufbxi_check_msg(depth <= num_nodes, "Cyclic node hierarchy");
 		}
 
+		if (uc->opts.node_depth_limit > 0) {
+			ufbxi_check_msg(depth <= uc->opts.node_depth_limit, "Node depth limit exceeded");
+		}
 		node->node_depth = depth;
 
 		// Second pass to cache the depths to avoid O(n^2)
