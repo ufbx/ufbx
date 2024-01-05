@@ -941,8 +941,10 @@ ufbx_os_abi ufbx_os_thread_pool *ufbx_os_create_thread_pool(const ufbx_os_thread
 			num_threads = UFBX_OS_DEFAULT_MAX_THREADS;
 		}
 	}
-
-	pool->num_threads = num_threads;
+	if (num_threads > UINT32_MAX) {
+		num_threads = UINT32_MAX;
+	}
+	pool->num_threads = (uint32_t)num_threads;
 
 	pool->threads = (ufbxos_os_thread*)calloc(pool->num_threads, sizeof(ufbxos_os_thread));
 	for (uint32_t i = 0; i < pool->num_threads; i++) {
