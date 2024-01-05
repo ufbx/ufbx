@@ -11749,10 +11749,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_model(ufbxi_context *uc, uf
 		elem_node->inherit_mode = UFBX_INHERIT_MODE_NORMAL;
 	}
 
-	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES) {
-		ufbxi_check(ufbxi_setup_geometry_transform_helper(uc, elem_node, info->fbx_id));
-	}
-
 	return 1;
 }
 
@@ -17047,8 +17043,9 @@ typedef struct {
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context *uc)
 {
 	bool required = false;
-	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) required = true;
+	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES || uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) required = true;
 	if (uc->opts.inherit_mode_handling != UFBX_INHERIT_MODE_HANDLING_PRESERVE && uc->opts.inherit_mode_handling != UFBX_INHERIT_MODE_HANDLING_IGNORE) required = true;
+	if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT) required = true;
 #if defined(UFBX_REGRESSION)
 	required = true;
 #endif
@@ -17091,6 +17088,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 
 	// TODO
 	const ufbx_real scale_epsilon = 0.001f;
+	const ufbx_real pivot_epsilon = 0.001f;
 	const ufbx_real compensate_epsilon = 0.01f;
 
 	for (size_t i = 0; i < num_elements; i++) {
@@ -17238,17 +17236,70 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 		}
 	}
 
+	if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT) {
+		for (size_t i = 0; i < num_nodes; i++) {
+			ufbxi_pre_node *pre_node = &pre_nodes[i];
+			ufbx_node *node = (ufbx_node*)elements[pre_node->element_id];
+			ufbx_vec3 rotation_pivot = ufbxi_find_vec3(&node->props, ufbxi_RotationPivot, 0.0f, 0.0f, 0.0f);
+			ufbx_vec3 scaling_pivot = ufbxi_find_vec3(&node->props, ufbxi_ScalingPivot, 0.0f, 0.0f, 0.0f);
+			if (!ufbxi_is_vec3_zero(rotation_pivot)) {
+				ufbx_real err = 0.0f;
+				err += (ufbx_real)ufbx_fabs(rotation_pivot.x - scaling_pivot.x);
+				err += (ufbx_real)ufbx_fabs(rotation_pivot.y - scaling_pivot.y);
+				err += (ufbx_real)ufbx_fabs(rotation_pivot.z - scaling_pivot.z);
+				if (err <= pivot_epsilon) {
+					size_t num_props = node->props.props.count;
+					ufbx_prop *new_props = ufbxi_push_zero(&uc->result, ufbx_prop, num_props + 3);
+					ufbxi_check(new_props);
+					memcpy(new_props, node->props.props.data, num_props * sizeof(ufbx_prop));
+
+					ufbx_vec3 geometric_translation;
+					geometric_translation.x = -rotation_pivot.x;
+					geometric_translation.y = -rotation_pivot.y;
+					geometric_translation.z = -rotation_pivot.z;
+
+					ufbx_prop *dst = new_props + num_props;
+					ufbxi_init_synthetic_vec3_prop(&dst[0], ufbxi_RotationPivot, &ufbx_zero_vec3, UFBX_PROP_VECTOR);
+					ufbxi_init_synthetic_vec3_prop(&dst[1], ufbxi_ScalingPivot, &ufbx_zero_vec3, UFBX_PROP_VECTOR);
+					ufbxi_init_synthetic_vec3_prop(&dst[2], ufbxi_GeometricTranslation, &geometric_translation, UFBX_PROP_VECTOR);
+
+					node->props.props.data = new_props;
+					node->props.props.count = num_props + 3;
+					ufbxi_check(ufbxi_sort_properties(uc, node->props.props.data, node->props.props.count));
+					ufbxi_deduplicate_properties(&node->props.props);
+
+					node->adjust_pre_translation = ufbxi_add3(node->adjust_pre_translation, rotation_pivot);
+					node->has_adjust_transform = true;
+					uint32_t ix = pre_node->first_child;
+					while (ix != ~0u) {
+						ufbxi_pre_node *pre_child = &pre_nodes[ix];
+						ufbx_node *child = (ufbx_node*)elements[pre_child->element_id];
+
+						child->adjust_pre_translation = ufbxi_sub3(child->adjust_pre_translation, rotation_pivot);
+						child->has_adjust_transform = true;
+
+						ix = pre_child->next_child;
+					}
+				}
+			}
+		}
+	}
+
 	for (size_t i = 0; i < num_elements; i++) {
 		ufbx_element *element = elements[i];
 		uint64_t fbx_id = fbx_ids[i];
 
 		if (element->type == UFBX_ELEMENT_NODE) {
 			ufbx_node *node = (ufbx_node*)element;
-			// Setup a geometry transform helper for nodes that have instanced attributes
-			if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) {
-				if (instance_counts[i] > 1 || modify_not_supported[i]) {
-					ufbxi_check(ufbxi_setup_geometry_transform_helper(uc, node, fbx_id));
-				}
+			bool requires_helper_node = false;
+			if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES) {
+				requires_helper_node = true;
+			} else if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) {
+				// Setup a geometry transform helper for nodes that have instanced attributes
+				requires_helper_node = instance_counts[i] > 1 || modify_not_supported[i];
+			}
+			if (requires_helper_node) {
+				ufbxi_check(ufbxi_setup_geometry_transform_helper(uc, node, fbx_id));
 			}
 		}
 	}
@@ -21412,6 +21463,7 @@ ufbxi_noinline static ufbx_transform ufbxi_get_transform(const ufbx_props *props
 	ufbxi_add_translate(&t, translation);
 
 	if (node->has_adjust_transform) {
+		ufbxi_add_translate(&t, node->adjust_pre_translation);
 		ufbxi_mul_rotate_quat(&t, node->adjust_pre_rotation);
 		ufbxi_mul_scale_real(&t, node->adjust_pre_scale);
 		t.translation.x *= node->adjust_translation_scale;

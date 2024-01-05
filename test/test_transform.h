@@ -1315,3 +1315,176 @@ UFBXT_TEST(maya_axes_anim_lefthanded_modify)
 }
 #endif
 
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_pivot_adjust_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.pivot_handling = UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST(maya_equal_pivot)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+	ufbx_prop *prop = NULL;
+
+	prop = ufbx_find_prop(&node->props, "RotationPivot");
+	ufbxt_assert(prop);
+	ufbxt_assert_close_vec3_xyz(err, prop->value_vec3, 2.0f, 0.0f, 0.0f);
+
+	prop = ufbx_find_prop(&node->props, "ScalingPivot");
+	ufbxt_assert(prop);
+	ufbxt_assert_close_vec3_xyz(err, prop->value_vec3, 2.0f, 0.0f, 0.0f);
+
+	prop = ufbx_find_prop(&node->props, "GeometricTranslation");
+	ufbxt_assert_close_vec3_xyz(err, prop->value_vec3, 0.0f, 0.0f, 0.0f);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_equal_pivot_adjust, maya_equal_pivot, ufbxt_pivot_adjust_opts, UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+	ufbx_prop *prop = NULL;
+
+	prop = ufbx_find_prop(&node->props, "RotationPivot");
+	ufbxt_assert(prop);
+	ufbxt_assert_close_vec3_xyz(err, prop->value_vec3, 0.0f, 0.0f, 0.0f);
+
+	prop = ufbx_find_prop(&node->props, "ScalingPivot");
+	ufbxt_assert(prop);
+	ufbxt_assert_close_vec3_xyz(err, prop->value_vec3, 0.0f, 0.0f, 0.0f);
+
+	prop = ufbx_find_prop(&node->props, "GeometricTranslation");
+	ufbxt_assert(prop);
+	ufbxt_assert_close_vec3_xyz(err, prop->value_vec3, -2.0f, 0.0f, 0.0f);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_equal_pivot_scale)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Middle");
+	ufbxt_assert(node);
+	ufbx_prop *prop = NULL;
+
+	prop = ufbx_find_prop(&node->props, "RotationPivot");
+	ufbxt_assert(prop);
+	ufbxt_assert_close_vec3_xyz(err, prop->value_vec3, 2.0f, 0.0f, 0.0f);
+
+	prop = ufbx_find_prop(&node->props, "ScalingPivot");
+	ufbxt_assert(prop);
+	ufbxt_assert_close_vec3_xyz(err, prop->value_vec3, 2.0f, 0.0f, 0.0f);
+
+	prop = ufbx_find_prop(&node->props, "GeometricTranslation");
+	ufbxt_assert_close_vec3_xyz(err, prop->value_vec3, 0.0f, 0.0f, 0.0f);
+
+	ufbxt_check_frame_imp(scene, err, false, "maya_equal_pivot_scale_6", NULL, 6.0/24.0, 0);
+	ufbxt_check_frame_imp(scene, err, false, "maya_equal_pivot_scale_12", NULL, 12.0/24.0, 0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_equal_pivot_scale_adjust, maya_equal_pivot_scale, ufbxt_pivot_adjust_opts, UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Middle");
+	ufbxt_assert(node);
+	ufbx_prop *prop = NULL;
+
+	prop = ufbx_find_prop(&node->props, "RotationPivot");
+	ufbxt_assert(prop);
+	ufbxt_assert_close_vec3_xyz(err, prop->value_vec3, 0.0f, 0.0f, 0.0f);
+
+	prop = ufbx_find_prop(&node->props, "ScalingPivot");
+	ufbxt_assert(prop);
+	ufbxt_assert_close_vec3_xyz(err, prop->value_vec3, 0.0f, 0.0f, 0.0f);
+
+	prop = ufbx_find_prop(&node->props, "GeometricTranslation");
+	ufbxt_assert(prop);
+	ufbxt_assert_close_vec3_xyz(err, prop->value_vec3, -2.0f, 0.0f, 0.0f);
+
+	ufbxt_check_frame_imp(scene, err, false, "maya_equal_pivot_scale_6", NULL, 6.0/24.0, 0);
+	ufbxt_check_frame_imp(scene, err, false, "maya_equal_pivot_scale_12", NULL, 12.0/24.0, 0);
+}
+#endif
+
+UFBXT_TEST(maya_equal_pivot_handling)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_equal_pivot", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_equal_pivot" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t pv = 0; pv < UFBX_PIVOT_HANDLING_COUNT; pv++) {
+			for (uint32_t gh = 0; gh < UFBX_GEOMETRY_TRANSFORM_HANDLING_COUNT; gh++) {
+				ufbxt_hintf("pivot_handling=%u, geometry_transform_handling=%u", pv, gh);
+
+				ufbx_load_opts opts = { 0 };
+
+				opts.pivot_handling = (ufbx_pivot_handling)pv;
+				opts.geometry_transform_handling = (ufbx_geometry_transform_handling)gh;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+				ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+				ufbx_free_scene(scene);
+			}
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	free(obj_file);
+}
+#endif
+
+UFBXT_TEST(maya_equal_pivot_scale_handling)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_equal_pivot_scale", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_equal_pivot_scale" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t pv = 0; pv < UFBX_PIVOT_HANDLING_COUNT; pv++) {
+			for (uint32_t gh = 0; gh < UFBX_GEOMETRY_TRANSFORM_HANDLING_COUNT; gh++) {
+				ufbxt_hintf("pivot_handling=%u, geometry_transform_handling=%u", pv, gh);
+
+				ufbx_load_opts opts = { 0 };
+
+				opts.pivot_handling = (ufbx_pivot_handling)pv;
+				opts.geometry_transform_handling = (ufbx_geometry_transform_handling)gh;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+
+				ufbxt_check_scene(scene);
+
+				ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+				ufbxt_check_frame_imp(scene, &err, false, "maya_equal_pivot_scale_6", NULL, 6.0/24.0, 0);
+				ufbxt_check_frame_imp(scene, &err, false, "maya_equal_pivot_scale_12", NULL, 12.0/24.0, 0);
+
+				ufbx_free_scene(scene);
+			}
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	free(obj_file);
+}
+#endif
+
