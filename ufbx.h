@@ -98,7 +98,7 @@
 	#if defined(UFBX_NO_ASSERT)
 		#define ufbx_assert(cond) (void)0
 	#elif defined(UFBX_VOID_ASSERT)
-		#define ufbx_assert(cond) (void)!(cond)
+		#define ufbx_assert(cond) (void)(!(cond))
 	#else
 		#include <assert.h>
 		#define ufbx_assert(cond) assert(cond)
