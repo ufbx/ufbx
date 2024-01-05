@@ -1589,3 +1589,34 @@ UFBXT_TEST(single_byte_stream)
 }
 #endif
 
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_depth_limit_3_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.node_depth_limit = 3;
+	return opts;
+}
+static ufbx_load_opts ufbxt_depth_limit_4_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.node_depth_limit = 4;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(node_depth_limit_fail, maya_game_sausage, ufbxt_depth_limit_3_opts, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!scene);
+	ufbxt_assert(load_error);
+	ufbxt_assert(load_error->type == UFBX_ERROR_NODE_DEPTH_LIMIT);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(node_depth_limit_ok, maya_game_sausage, ufbxt_depth_limit_4_opts, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene);
+}
+#endif
+
