@@ -873,6 +873,7 @@ struct ufbx_node {
 	// ufbx-specific adjustment for switching between coodrinate/unit systems.
 	// HINT: In most cases you don't need to deal with these as these are baked
 	// into all the transforms above and into `ufbx_evaluate_transform()`.
+	ufbx_vec3 adjust_pre_translation;    // < Translation applied between parent and self
 	ufbx_quat adjust_pre_rotation;       // < Rotation applied between parent and self
 	ufbx_real adjust_pre_scale;          // < Scaling applied between parent and self
 	ufbx_quat adjust_post_rotation;      // < Rotation applied in local space at the end
@@ -4118,6 +4119,23 @@ typedef enum ufbx_inherit_mode_handling UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_inherit_mode_handling, UFBX_INHERIT_MODE_HANDLING, UFBX_INHERIT_MODE_HANDLING_IGNORE);
 
+// How to handle FBX transform pivots.
+typedef enum ufbx_pivot_handling UFBX_ENUM_REPR {
+
+	// Take pivots into account when computing the transform.
+	UFBX_PIVOT_HANDLING_RETAIN,
+
+	// Translate objects to be located at their pivot.
+	// NOTE: Only applied if rotation and scaling pivots are equal.
+	// NOTE: Results in geometric translation. Use `ufbx_geometry_transform_handling`
+	// to interpret these in a standard scene graph.
+	UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT,
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_PIVOT_HANDLING)
+} ufbx_pivot_handling;
+
+UFBX_ENUM_TYPE(ufbx_pivot_handling, UFBX_PIVOT_HANDLING, UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT);
+
 typedef struct ufbx_baked_vec3 {
 	double time;
 	ufbx_vec3 value;
@@ -4319,6 +4337,10 @@ typedef struct ufbx_load_opts {
 	// How to handle unconventional transform inherit modes.
 	// See `ufbx_inherit_mode_handling` for an explanation.
 	ufbx_inherit_mode_handling inherit_mode_handling;
+
+	// How to handle pivots.
+	// See `ufbx_pivot_handling` for an explanation.
+	ufbx_pivot_handling pivot_handling;
 
 	// How to perform space conversion by `target_axes` and `target_unit_meters`.
 	// See `ufbx_space_conversion` for an explanation.

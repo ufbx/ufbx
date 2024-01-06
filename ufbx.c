@@ -5917,6 +5917,7 @@ typedef struct {
 	ufbxi_buf tmp_node_ids;
 	ufbxi_buf tmp_elements;
 	ufbxi_buf tmp_element_offsets;
+	ufbxi_buf tmp_element_fbx_ids;
 	ufbxi_buf tmp_element_ptrs;
 	ufbxi_buf tmp_typed_element_offsets[UFBX_ELEMENT_TYPE_COUNT];
 	ufbxi_buf tmp_mesh_textures;
@@ -11485,6 +11486,7 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_element_size(ufbx
 
 	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_typed_element_offsets[type], size_t, 1, &uc->tmp_element_byte_offset), NULL);
 	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_element_offsets, size_t, 1, &uc->tmp_element_byte_offset), NULL);
+	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_element_fbx_ids, uint64_t, 1, &info->fbx_id), NULL);
 	uc->tmp_element_byte_offset += aligned_size;
 
 	ufbx_element *elem = (ufbx_element*)ufbxi_push_zero(&uc->tmp_elements, uint64_t, aligned_size/8);
@@ -11534,6 +11536,7 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 	uint64_t fbx_id = ufbxi_synthetic_id_from_pointer(elem);
 	*p_fbx_id = fbx_id;
 
+	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_element_fbx_ids, uint64_t, 1, &fbx_id), NULL);
 	ufbxi_check_return(ufbxi_insert_fbx_id(uc, fbx_id, element_id), NULL);
 
 	return elem;
@@ -11747,10 +11750,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_model(ufbxi_context *uc, uf
 	} else if (uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_IGNORE) {
 		elem_node->original_inherit_mode = UFBX_INHERIT_MODE_NORMAL;
 		elem_node->inherit_mode = UFBX_INHERIT_MODE_NORMAL;
-	}
-
-	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES) {
-		ufbxi_check(ufbxi_setup_geometry_transform_helper(uc, elem_node, info->fbx_id));
 	}
 
 	return 1;
@@ -17025,12 +17024,17 @@ typedef struct {
 typedef struct {
 	bool has_constant_scale;
 	bool has_recursive_scale_helper;
+	bool has_skin_deformer;
 	ufbx_vec3 constant_scale;
 	uint32_t element_id;
 	uint32_t first_child;
 	uint32_t next_child;
 	uint32_t parent;
 } ufbxi_pre_node;
+
+typedef struct {
+	bool has_skin_deformer;
+} ufbxi_pre_mesh;
 
 typedef struct {
 	bool has_constant_value;
@@ -17047,8 +17051,9 @@ typedef struct {
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context *uc)
 {
 	bool required = false;
-	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) required = true;
+	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES || uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) required = true;
 	if (uc->opts.inherit_mode_handling != UFBX_INHERIT_MODE_HANDLING_PRESERVE && uc->opts.inherit_mode_handling != UFBX_INHERIT_MODE_HANDLING_IGNORE) required = true;
+	if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT) required = true;
 #if defined(UFBX_REGRESSION)
 	required = true;
 #endif
@@ -17082,15 +17087,20 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 	ufbxi_pre_node *pre_nodes = ufbxi_push_zero(&uc->tmp_parse, ufbxi_pre_node, num_nodes);
 	ufbxi_check(pre_nodes);
 
+	size_t num_meshes = uc->tmp_typed_element_offsets[UFBX_ELEMENT_MESH].num_items;
+	ufbxi_pre_mesh *pre_meshes = ufbxi_push_zero(&uc->tmp_parse, ufbxi_pre_mesh, num_meshes);
+	ufbxi_check(pre_meshes);
+
 	size_t num_anim_values = uc->tmp_typed_element_offsets[UFBX_ELEMENT_ANIM_VALUE].num_items;
 	ufbxi_pre_anim_value *pre_anim_values = ufbxi_push_zero(&uc->tmp_parse, ufbxi_pre_anim_value, num_anim_values);
 	ufbxi_check(pre_anim_values);
 
-	uint64_t *fbx_ids = ufbxi_push_zero(&uc->tmp_parse, uint64_t, num_elements);
+	uint64_t *fbx_ids = ufbxi_push_pop(&uc->tmp_parse, &uc->tmp_element_fbx_ids, uint64_t, num_elements);
 	ufbxi_check(fbx_ids);
 
 	// TODO
 	const ufbx_real scale_epsilon = 0.001f;
+	const ufbx_real pivot_epsilon = 0.001f;
 	const ufbx_real compensate_epsilon = 0.01f;
 
 	for (size_t i = 0; i < num_elements; i++) {
@@ -17129,9 +17139,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 		pre->src = src;
 		pre->dst = dst;
 		if (!src || !dst) continue;
-
-		fbx_ids[src->element_id] = tmp->src;
-		fbx_ids[dst->element_id] = tmp->dst;
 
 		if (tmp->src_prop.length == 0 && tmp->dst_prop.length == 0) {
 			// Count number of instances of each attribute
@@ -17172,6 +17179,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 						}
 					}
 				}
+			} else if (dst->type == UFBX_ELEMENT_MESH) {
+				if (src->type == UFBX_ELEMENT_SKIN_DEFORMER) {
+					ufbxi_pre_mesh *pre_mesh = &pre_meshes[dst->typed_id];
+					pre_mesh->has_skin_deformer = true;
+				}
 			}
 		} else if (tmp->src_prop.length == 0 && tmp->dst_prop.length != 0) {
 			const char *dst_prop = tmp->dst_prop.data;
@@ -17211,6 +17223,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 			if (dst->type == UFBX_ELEMENT_NODE) {
 				if (src->type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && src->type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB) {
 					instance_counts[dst->element_id] = ufbxi_max32(instance_counts[dst->element_id], instance_counts[src->element_id]);
+					if (src->type == UFBX_ELEMENT_MESH) {
+						ufbxi_pre_mesh *pre_mesh = &pre_meshes[src->typed_id];
+						if (pre_mesh->has_skin_deformer) {
+							pre_nodes[dst->typed_id].has_skin_deformer = true;
+						}
+					}
 				}
 			}
 		} else if (tmp->src_prop.length == 0 && tmp->dst_prop.length != 0) {
@@ -17238,17 +17256,82 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 		}
 	}
 
+	if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT) {
+		for (size_t i = 0; i < num_nodes; i++) {
+			ufbxi_pre_node *pre_node = &pre_nodes[i];
+			ufbx_node *node = (ufbx_node*)elements[pre_node->element_id];
+			ufbx_vec3 rotation_pivot = ufbxi_find_vec3(&node->props, ufbxi_RotationPivot, 0.0f, 0.0f, 0.0f);
+			ufbx_vec3 scaling_pivot = ufbxi_find_vec3(&node->props, ufbxi_ScalingPivot, 0.0f, 0.0f, 0.0f);
+			if (!ufbxi_is_vec3_zero(rotation_pivot)) {
+				ufbx_real err = 0.0f;
+				err += (ufbx_real)ufbx_fabs(rotation_pivot.x - scaling_pivot.x);
+				err += (ufbx_real)ufbx_fabs(rotation_pivot.y - scaling_pivot.y);
+				err += (ufbx_real)ufbx_fabs(rotation_pivot.z - scaling_pivot.z);
+
+				bool can_modify_geometry_transform = true;
+				if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK) {
+					if (instance_counts[node->element_id] > 1 || modify_not_supported[node->element_id]) {
+						can_modify_geometry_transform = false;
+					}
+				}
+				// Currently, geometry transform messes up skinning
+				if (pre_node->has_skin_deformer) {
+					can_modify_geometry_transform = false;
+				}
+
+				if (err <= pivot_epsilon && can_modify_geometry_transform) {
+					size_t num_props = node->props.props.count;
+					ufbx_prop *new_props = ufbxi_push_zero(&uc->result, ufbx_prop, num_props + 3);
+					ufbxi_check(new_props);
+					memcpy(new_props, node->props.props.data, num_props * sizeof(ufbx_prop));
+
+					ufbx_vec3 geometric_translation = ufbxi_find_vec3(&node->props, ufbxi_GeometricTranslation, 0.0f, 0.0f, 0.0f);
+					geometric_translation.x -= rotation_pivot.x;
+					geometric_translation.y -= rotation_pivot.y;
+					geometric_translation.z -= rotation_pivot.z;
+
+					ufbx_prop *dst = new_props + num_props;
+					ufbxi_init_synthetic_vec3_prop(&dst[0], ufbxi_RotationPivot, &ufbx_zero_vec3, UFBX_PROP_VECTOR);
+					ufbxi_init_synthetic_vec3_prop(&dst[1], ufbxi_ScalingPivot, &ufbx_zero_vec3, UFBX_PROP_VECTOR);
+					ufbxi_init_synthetic_vec3_prop(&dst[2], ufbxi_GeometricTranslation, &geometric_translation, UFBX_PROP_VECTOR);
+
+					node->props.props.data = new_props;
+					node->props.props.count = num_props + 3;
+					ufbxi_check(ufbxi_sort_properties(uc, node->props.props.data, node->props.props.count));
+					ufbxi_deduplicate_properties(&node->props.props);
+
+					node->adjust_pre_translation = ufbxi_add3(node->adjust_pre_translation, rotation_pivot);
+					node->has_adjust_transform = true;
+					uint32_t ix = pre_node->first_child;
+					while (ix != ~0u) {
+						ufbxi_pre_node *pre_child = &pre_nodes[ix];
+						ufbx_node *child = (ufbx_node*)elements[pre_child->element_id];
+
+						child->adjust_pre_translation = ufbxi_sub3(child->adjust_pre_translation, rotation_pivot);
+						child->has_adjust_transform = true;
+
+						ix = pre_child->next_child;
+					}
+				}
+			}
+		}
+	}
+
 	for (size_t i = 0; i < num_elements; i++) {
 		ufbx_element *element = elements[i];
 		uint64_t fbx_id = fbx_ids[i];
 
 		if (element->type == UFBX_ELEMENT_NODE) {
 			ufbx_node *node = (ufbx_node*)element;
-			// Setup a geometry transform helper for nodes that have instanced attributes
-			if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) {
-				if (instance_counts[i] > 1 || modify_not_supported[i]) {
-					ufbxi_check(ufbxi_setup_geometry_transform_helper(uc, node, fbx_id));
-				}
+			bool requires_helper_node = false;
+			if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES) {
+				requires_helper_node = true;
+			} else if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) {
+				// Setup a geometry transform helper for nodes that have instanced attributes
+				requires_helper_node = instance_counts[i] > 1 || modify_not_supported[i];
+			}
+			if (requires_helper_node) {
+				ufbxi_check(ufbxi_setup_geometry_transform_helper(uc, node, fbx_id));
 			}
 		}
 	}
@@ -21412,6 +21495,7 @@ ufbxi_noinline static ufbx_transform ufbxi_get_transform(const ufbx_props *props
 	ufbxi_add_translate(&t, translation);
 
 	if (node->has_adjust_transform) {
+		ufbxi_add_translate(&t, node->adjust_pre_translation);
 		ufbxi_mul_rotate_quat(&t, node->adjust_pre_rotation);
 		ufbxi_mul_scale_real(&t, node->adjust_pre_scale);
 		t.translation.x *= node->adjust_translation_scale;
@@ -23905,6 +23989,7 @@ static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 	ufbxi_buf_free(&uc->tmp_node_ids);
 	ufbxi_buf_free(&uc->tmp_elements);
 	ufbxi_buf_free(&uc->tmp_element_offsets);
+	ufbxi_buf_free(&uc->tmp_element_fbx_ids);
 	ufbxi_buf_free(&uc->tmp_element_ptrs);
 	for (size_t i = 0; i < UFBX_ELEMENT_TYPE_COUNT; i++) {
 		ufbxi_buf_free(&uc->tmp_typed_element_offsets[i]);
@@ -24024,6 +24109,7 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 	uc->tmp_node_ids.ator = &uc->ator_tmp;
 	uc->tmp_elements.ator = &uc->ator_tmp;
 	uc->tmp_element_offsets.ator = &uc->ator_tmp;
+	uc->tmp_element_fbx_ids.ator = &uc->ator_tmp;
 	uc->tmp_element_ptrs.ator = &uc->ator_tmp;
 	for (size_t i = 0; i < UFBX_ELEMENT_TYPE_COUNT; i++) {
 		uc->tmp_typed_element_offsets[i].ator = &uc->ator_tmp;

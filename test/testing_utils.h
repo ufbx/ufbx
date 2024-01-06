@@ -92,6 +92,11 @@ static ufbx_vec3 ufbxt_cross3(ufbx_vec3 a, ufbx_vec3 b)
 	return v;
 }
 
+static bool ufbxt_eq3(ufbx_vec3 a, ufbx_vec3 b)
+{
+	return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
 static ufbx_vec3 ufbxt_normalize(ufbx_vec3 a) {
 	ufbx_real len = (ufbx_real)sqrt(ufbxt_dot3(a, a));
 	if (len != 0.0) {
