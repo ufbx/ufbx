@@ -23711,8 +23711,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_skinning(ufbx_scene *sc
 					if (num_read == num_normals) {
 						cached_normals = true;
 						mesh->skinned_normal.values.data = normal_data;
-					} else {
-						ufbxi_pop(buf_result, ufbx_vec3, num_normals + 1, NULL);
 					}
 				}
 			}
