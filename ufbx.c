@@ -25334,7 +25334,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 	if (bc->opts.maximum_sample_rate > 0.0) {
 		const double epsilon = 0.001;
 		double sample_rate = bc->opts.maximum_sample_rate;
-		double min_interval = 1.0 / bc->opts.maximum_sample_rate;
+		double min_interval = 1.0 / bc->opts.maximum_sample_rate - epsilon;
 		size_t dst = 0, src = 0;
 
 		double prev_time = -UFBX_INFINITY;
