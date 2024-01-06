@@ -4527,7 +4527,7 @@ typedef struct ufbx_bake_opts {
 	// keyframe rates higher or equal to this will not be resampled.
 	// Default: 19.5
 	double minimum_sample_rate;
-	
+
 	// Maximum sample rate to use, this will remove keys if they are too close together.
 	// Default: unlimited
 	double maximum_sample_rate;
