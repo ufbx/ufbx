@@ -1281,6 +1281,8 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 	// TODO: Partial safety validation?
 	if (scene->metadata.is_unsafe) return;
 
+	ufbxt_check_element_cast(NULL);
+
 	ufbxt_check_metadata(scene, &scene->metadata);
 
 	for (size_t i = 0; i < scene->elements.count; i++) {
