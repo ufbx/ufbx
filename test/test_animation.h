@@ -2325,6 +2325,7 @@ UFBXT_FILE_TEST(maya_keyframe_spacing)
 		for (size_t i = 0; i < list.count; i++) {
 			ufbxt_hintf("i=%zu", i);
 			ufbxt_assert(i < ufbxt_arraycount(ref_times));
+			ufbxt_hintf("i=%zu: %f (ref %f)", i, list.data[i].time, ref_times[i]);
 			ufbxt_assert(list.data[i].time == ref_times[i]);
 		}
 		ufbxt_assert(list.count == ufbxt_arraycount(ref_times));
@@ -2356,6 +2357,7 @@ UFBXT_FILE_TEST(maya_keyframe_spacing)
 		for (size_t i = 0; i < list.count; i++) {
 			ufbxt_hintf("i=%zu", i);
 			ufbxt_assert(i < ufbxt_arraycount(ref_times));
+			ufbxt_hintf("i=%zu: %f (ref %f)", i, list.data[i].time, ref_times[i]);
 			ufbxt_assert(list.data[i].time == ref_times[i]);
 		}
 		ufbxt_assert(list.count == ufbxt_arraycount(ref_times));
@@ -2388,6 +2390,7 @@ UFBXT_FILE_TEST(maya_keyframe_spacing)
 		for (size_t i = 0; i < list.count; i++) {
 			ufbxt_hintf("i=%zu", i);
 			ufbxt_assert(i < ufbxt_arraycount(ref_times));
+			ufbxt_hintf("i=%zu: %f (ref %f)", i, list.data[i].time, ref_times[i]);
 			ufbxt_assert(list.data[i].time == ref_times[i]);
 		}
 		ufbxt_assert(list.count == ufbxt_arraycount(ref_times));
