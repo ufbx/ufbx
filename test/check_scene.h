@@ -212,6 +212,50 @@ static void ufbxt_check_props(ufbx_scene *scene, const ufbx_props *props, bool t
 	}
 }
 
+static void ufbxt_check_element_cast(ufbx_element *element)
+{
+	if (ufbx_as_unknown(element)) ufbxt_assert(element->type == UFBX_ELEMENT_UNKNOWN);
+	if (ufbx_as_node(element)) ufbxt_assert(element->type == UFBX_ELEMENT_NODE);
+	if (ufbx_as_mesh(element)) ufbxt_assert(element->type == UFBX_ELEMENT_MESH);
+	if (ufbx_as_light(element)) ufbxt_assert(element->type == UFBX_ELEMENT_LIGHT);
+	if (ufbx_as_camera(element)) ufbxt_assert(element->type == UFBX_ELEMENT_CAMERA);
+	if (ufbx_as_bone(element)) ufbxt_assert(element->type == UFBX_ELEMENT_BONE);
+	if (ufbx_as_empty(element)) ufbxt_assert(element->type == UFBX_ELEMENT_EMPTY);
+	if (ufbx_as_line_curve(element)) ufbxt_assert(element->type == UFBX_ELEMENT_LINE_CURVE);
+	if (ufbx_as_nurbs_curve(element)) ufbxt_assert(element->type == UFBX_ELEMENT_NURBS_CURVE);
+	if (ufbx_as_nurbs_surface(element)) ufbxt_assert(element->type == UFBX_ELEMENT_NURBS_SURFACE);
+	if (ufbx_as_nurbs_trim_surface(element)) ufbxt_assert(element->type == UFBX_ELEMENT_NURBS_TRIM_SURFACE);
+	if (ufbx_as_nurbs_trim_boundary(element)) ufbxt_assert(element->type == UFBX_ELEMENT_NURBS_TRIM_BOUNDARY);
+	if (ufbx_as_procedural_geometry(element)) ufbxt_assert(element->type == UFBX_ELEMENT_PROCEDURAL_GEOMETRY);
+	if (ufbx_as_stereo_camera(element)) ufbxt_assert(element->type == UFBX_ELEMENT_STEREO_CAMERA);
+	if (ufbx_as_camera_switcher(element)) ufbxt_assert(element->type == UFBX_ELEMENT_CAMERA_SWITCHER);
+	if (ufbx_as_marker(element)) ufbxt_assert(element->type == UFBX_ELEMENT_MARKER);
+	if (ufbx_as_lod_group(element)) ufbxt_assert(element->type == UFBX_ELEMENT_LOD_GROUP);
+	if (ufbx_as_skin_deformer(element)) ufbxt_assert(element->type == UFBX_ELEMENT_SKIN_DEFORMER);
+	if (ufbx_as_skin_cluster(element)) ufbxt_assert(element->type == UFBX_ELEMENT_SKIN_CLUSTER);
+	if (ufbx_as_blend_deformer(element)) ufbxt_assert(element->type == UFBX_ELEMENT_BLEND_DEFORMER);
+	if (ufbx_as_blend_channel(element)) ufbxt_assert(element->type == UFBX_ELEMENT_BLEND_CHANNEL);
+	if (ufbx_as_blend_shape(element)) ufbxt_assert(element->type == UFBX_ELEMENT_BLEND_SHAPE);
+	if (ufbx_as_cache_deformer(element)) ufbxt_assert(element->type == UFBX_ELEMENT_CACHE_DEFORMER);
+	if (ufbx_as_cache_file(element)) ufbxt_assert(element->type == UFBX_ELEMENT_CACHE_FILE);
+	if (ufbx_as_material(element)) ufbxt_assert(element->type == UFBX_ELEMENT_MATERIAL);
+	if (ufbx_as_texture(element)) ufbxt_assert(element->type == UFBX_ELEMENT_TEXTURE);
+	if (ufbx_as_video(element)) ufbxt_assert(element->type == UFBX_ELEMENT_VIDEO);
+	if (ufbx_as_shader(element)) ufbxt_assert(element->type == UFBX_ELEMENT_SHADER);
+	if (ufbx_as_shader_binding(element)) ufbxt_assert(element->type == UFBX_ELEMENT_SHADER_BINDING);
+	if (ufbx_as_anim_stack(element)) ufbxt_assert(element->type == UFBX_ELEMENT_ANIM_STACK);
+	if (ufbx_as_anim_layer(element)) ufbxt_assert(element->type == UFBX_ELEMENT_ANIM_LAYER);
+	if (ufbx_as_anim_value(element)) ufbxt_assert(element->type == UFBX_ELEMENT_ANIM_VALUE);
+	if (ufbx_as_anim_curve(element)) ufbxt_assert(element->type == UFBX_ELEMENT_ANIM_CURVE);
+	if (ufbx_as_display_layer(element)) ufbxt_assert(element->type == UFBX_ELEMENT_DISPLAY_LAYER);
+	if (ufbx_as_selection_set(element)) ufbxt_assert(element->type == UFBX_ELEMENT_SELECTION_SET);
+	if (ufbx_as_selection_node(element)) ufbxt_assert(element->type == UFBX_ELEMENT_SELECTION_NODE);
+	if (ufbx_as_character(element)) ufbxt_assert(element->type == UFBX_ELEMENT_CHARACTER);
+	if (ufbx_as_constraint(element)) ufbxt_assert(element->type == UFBX_ELEMENT_CONSTRAINT);
+	if (ufbx_as_pose(element)) ufbxt_assert(element->type == UFBX_ELEMENT_POSE);
+	if (ufbx_as_metadata_object(element)) ufbxt_assert(element->type == UFBX_ELEMENT_METADATA_OBJECT);
+}
+
 static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 {
 	if (scene->dom_root && scene->metadata.file_format == UFBX_FILE_FORMAT_FBX) {
@@ -233,6 +277,7 @@ static void ufbxt_check_element(ufbx_scene *scene, ufbx_element *element)
 		}
 	}
 
+	ufbxt_check_element_cast(element);
 	ufbxt_check_props(scene, &element->props, true);
 	ufbxt_check_string(element->name);
 	ufbxt_assert(scene->elements.data[element->element_id] == element);
