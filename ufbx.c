@@ -25332,7 +25332,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 
 	// Enforce maximum sample rate
 	if (bc->opts.maximum_sample_rate > 0.0) {
-		const double epsilon = 0.125 / bc->opts.maximum_sample_rate;
+		const double epsilon = 0.0078125 / bc->opts.maximum_sample_rate;
 		double sample_rate = bc->opts.maximum_sample_rate;
 		double min_interval = 1.0 / bc->opts.maximum_sample_rate - epsilon;
 		size_t dst = 0, src = 0;
@@ -25343,7 +25343,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 			src++;
 
 			size_t start_src = src;
-			double next_time = ufbx_ceil(src_time * sample_rate) / sample_rate;
+			double next_time = ufbx_ceil(src_time * sample_rate - epsilon) / sample_rate;
 			while (src < num_times && times[src] <= next_time + epsilon) {
 				src++;
 			}
