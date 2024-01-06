@@ -69,6 +69,11 @@ static const ufbxt_enum_name ufbxt_names_ufbx_index_error_handling[] = {
 	{ "unsafe-ignore", UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE },
 };
 
+static const ufbxt_enum_name ufbxt_names_ufbx_pivot_handling[] = {
+	{ "retain", UFBX_PIVOT_HANDLING_RETAIN },
+	{ "adjust-to-pivot", UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT },
+};
+
 static int ufbxt_str_to_enum_imp(const ufbxt_enum_name *names, size_t count, const char *type_name, const char *name)
 {
 	for (size_t i = 0; i < count; i++) {
@@ -190,6 +195,8 @@ int check_fbx_main(int argc, char **argv, const char *path)
 			if (++i < argc) opts.geometry_transform_handling = ufbxt_str_to_enum(ufbx_geometry_transform_handling, argv[i]);
 		} else if (!strcmp(argv[i], "--inherit-mode-handling")) {
 			if (++i < argc) opts.inherit_mode_handling = ufbxt_str_to_enum(ufbx_inherit_mode_handling, argv[i]);
+		} else if (!strcmp(argv[i], "--pivot-handling")) {
+			if (++i < argc) opts.pivot_handling = ufbxt_str_to_enum(ufbx_pivot_handling, argv[i]);
 		} else if (!strcmp(argv[i], "--space-conversion")) {
 			if (++i < argc) opts.space_conversion = ufbxt_str_to_enum(ufbx_space_conversion, argv[i]);
 		} else if (!strcmp(argv[i], "--index-error-handling")) {
@@ -416,6 +423,16 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		ufbx_node *node = scene->nodes.data[i];
 		if (node->has_geometry_transform) {
 			ufbxt_add_feature(&features, "geometry-transform");
+		}
+
+		ufbx_vec3 rotation_pivot = ufbx_find_vec3(&node->props, "RotationPivot", ufbx_zero_vec3);
+		ufbx_vec3 scale_pivot = ufbx_find_vec3(&node->props, "ScalingPivot", ufbx_zero_vec3);
+		if (!ufbxt_eq3(rotation_pivot, ufbx_zero_vec3)) {
+			if (ufbxt_eq3(rotation_pivot, scale_pivot)) {
+				ufbxt_add_feature(&features, "simple-pivot");
+			} else {
+				ufbxt_add_feature(&features, "complex-pivot");
+			}
 		}
 	}
 
