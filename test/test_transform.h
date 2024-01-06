@@ -1595,3 +1595,75 @@ UFBXT_TEST(maya_instanced_pivots)
 }
 #endif
 
+UFBXT_TEST(motionbuilder_pivot)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("motionbuilder_pivot", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "motionbuilder_pivot" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t pv = 0; pv < UFBX_PIVOT_HANDLING_COUNT; pv++) {
+			for (uint32_t gh = 0; gh < UFBX_GEOMETRY_TRANSFORM_HANDLING_COUNT; gh++) {
+				ufbxt_hintf("pivot_handling=%u, geometry_transform_handling=%u", pv, gh);
+
+				ufbx_load_opts opts = { 0 };
+
+				opts.pivot_handling = (ufbx_pivot_handling)pv;
+				opts.geometry_transform_handling = (ufbx_geometry_transform_handling)gh;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+				ufbxt_check_scene(scene);
+				ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+				ufbx_free_scene(scene);
+			}
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	free(obj_file);
+}
+#endif
+
+UFBXT_TEST(maya_skinned_pivot)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_skinned_pivot", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_skinned_pivot" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t pv = 0; pv < UFBX_PIVOT_HANDLING_COUNT; pv++) {
+			for (uint32_t gh = 0; gh < UFBX_GEOMETRY_TRANSFORM_HANDLING_COUNT; gh++) {
+				ufbxt_hintf("pivot_handling=%u, geometry_transform_handling=%u", pv, gh);
+
+				ufbx_load_opts opts = { 0 };
+				opts.evaluate_skinning = true;
+
+				opts.pivot_handling = (ufbx_pivot_handling)pv;
+				opts.geometry_transform_handling = (ufbx_geometry_transform_handling)gh;
+
+				ufbx_error error;
+				ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+				if (!scene) ufbxt_log_error(&error);
+				ufbxt_assert(scene);
+				ufbxt_check_scene(scene);
+				ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+				ufbx_free_scene(scene);
+			}
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	free(obj_file);
+}
+#endif
+
+

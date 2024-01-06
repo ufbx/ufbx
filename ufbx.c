@@ -17024,12 +17024,17 @@ typedef struct {
 typedef struct {
 	bool has_constant_scale;
 	bool has_recursive_scale_helper;
+	bool has_skin_deformer;
 	ufbx_vec3 constant_scale;
 	uint32_t element_id;
 	uint32_t first_child;
 	uint32_t next_child;
 	uint32_t parent;
 } ufbxi_pre_node;
+
+typedef struct {
+	bool has_skin_deformer;
+} ufbxi_pre_mesh;
 
 typedef struct {
 	bool has_constant_value;
@@ -17081,6 +17086,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 
 	ufbxi_pre_node *pre_nodes = ufbxi_push_zero(&uc->tmp_parse, ufbxi_pre_node, num_nodes);
 	ufbxi_check(pre_nodes);
+
+	size_t num_meshes = uc->tmp_typed_element_offsets[UFBX_ELEMENT_MESH].num_items;
+	ufbxi_pre_mesh *pre_meshes = ufbxi_push_zero(&uc->tmp_parse, ufbxi_pre_mesh, num_meshes);
+	ufbxi_check(pre_meshes);
 
 	size_t num_anim_values = uc->tmp_typed_element_offsets[UFBX_ELEMENT_ANIM_VALUE].num_items;
 	ufbxi_pre_anim_value *pre_anim_values = ufbxi_push_zero(&uc->tmp_parse, ufbxi_pre_anim_value, num_anim_values);
@@ -17170,6 +17179,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 						}
 					}
 				}
+			} else if (dst->type == UFBX_ELEMENT_MESH) {
+				if (src->type == UFBX_ELEMENT_SKIN_DEFORMER) {
+					ufbxi_pre_mesh *pre_mesh = &pre_meshes[dst->typed_id];
+					pre_mesh->has_skin_deformer = true;
+				}
 			}
 		} else if (tmp->src_prop.length == 0 && tmp->dst_prop.length != 0) {
 			const char *dst_prop = tmp->dst_prop.data;
@@ -17209,6 +17223,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 			if (dst->type == UFBX_ELEMENT_NODE) {
 				if (src->type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && src->type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB) {
 					instance_counts[dst->element_id] = ufbxi_max32(instance_counts[dst->element_id], instance_counts[src->element_id]);
+					if (src->type == UFBX_ELEMENT_MESH) {
+						ufbxi_pre_mesh *pre_mesh = &pre_meshes[src->typed_id];
+						if (pre_mesh->has_skin_deformer) {
+							pre_nodes[dst->typed_id].has_skin_deformer = true;
+						}
+					}
 				}
 			}
 		} else if (tmp->src_prop.length == 0 && tmp->dst_prop.length != 0) {
@@ -17254,6 +17274,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 						can_modify_geometry_transform = false;
 					}
 				}
+				// Currently, geometry transform messes up skinning
+				if (pre_node->has_skin_deformer) {
+					can_modify_geometry_transform = false;
+				}
 
 				if (err <= pivot_epsilon && can_modify_geometry_transform) {
 					size_t num_props = node->props.props.count;
@@ -17261,10 +17285,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 					ufbxi_check(new_props);
 					memcpy(new_props, node->props.props.data, num_props * sizeof(ufbx_prop));
 
-					ufbx_vec3 geometric_translation;
-					geometric_translation.x = -rotation_pivot.x;
-					geometric_translation.y = -rotation_pivot.y;
-					geometric_translation.z = -rotation_pivot.z;
+					ufbx_vec3 geometric_translation = ufbxi_find_vec3(&node->props, ufbxi_GeometricTranslation, 0.0f, 0.0f, 0.0f);
+					geometric_translation.x -= rotation_pivot.x;
+					geometric_translation.y -= rotation_pivot.y;
+					geometric_translation.z -= rotation_pivot.z;
 
 					ufbx_prop *dst = new_props + num_props;
 					ufbxi_init_synthetic_vec3_prop(&dst[0], ufbxi_RotationPivot, &ufbx_zero_vec3, UFBX_PROP_VECTOR);
