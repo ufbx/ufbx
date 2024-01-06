@@ -2300,3 +2300,99 @@ UFBXT_FILE_TEST(maya_anim_layer_anim)
 	ufbx_free_baked_anim(bake);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_keyframe_spacing)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_bake_opts opts = { 0 };
+		opts.maximum_sample_rate = 10.0;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, NULL);
+		ufbxt_assert(bake);
+
+		static const double ref_times[] = {
+			0.0/10.0,
+			1.0/10.0,
+			2.0/10.0,
+			3.0/10.0,
+			4.0/10.0,
+			6.0/10.0,
+			8.0/10.0,
+		};
+
+		ufbxt_assert(bake->nodes.count == 1);
+		ufbx_baked_vec3_list list = bake->nodes.data[0].translation_keys;
+		for (size_t i = 0; i < list.count; i++) {
+			ufbxt_hintf("i=%zu", i);
+			ufbxt_assert(i < ufbxt_arraycount(ref_times));
+			ufbxt_assert(list.data[i].time == ref_times[i]);
+		}
+		ufbxt_assert(list.count == ufbxt_arraycount(ref_times));
+
+		ufbx_free_baked_anim(bake);
+	}
+
+	{
+		ufbx_bake_opts opts = { 0 };
+		opts.maximum_sample_rate = 20.0;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, NULL);
+		ufbxt_assert(bake);
+
+		static const double ref_times[] = {
+			0.0/20.0,
+			1.0/20.0,
+			2.0/20.0,
+			3.0/20.0,
+			4.0/20.0,
+			5.0/20.0,
+			44.0/120.0,
+			12.0/20.0,
+			15.0/20.0,
+			16.0/20.0,
+		};
+
+		ufbxt_assert(bake->nodes.count == 1);
+		ufbx_baked_vec3_list list = bake->nodes.data[0].translation_keys;
+		for (size_t i = 0; i < list.count; i++) {
+			ufbxt_hintf("i=%zu", i);
+			ufbxt_assert(i < ufbxt_arraycount(ref_times));
+			ufbxt_assert(list.data[i].time == ref_times[i]);
+		}
+		ufbxt_assert(list.count == ufbxt_arraycount(ref_times));
+
+		ufbx_free_baked_anim(bake);
+	}
+
+	{
+		ufbx_bake_opts opts = { 0 };
+		opts.maximum_sample_rate = 30.0;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, NULL);
+		ufbxt_assert(bake);
+
+		static const double ref_times[] = {
+			0.0/30.0,
+			1.0/30.0,
+			2.0/30.0,
+			3.0/30.0,
+			4.0/30.0,
+			5.0/30.0,
+			7.0/30.0,
+			8.0/30.0,
+			44.0/120.0,
+			18.0/30.0,
+			23.0/30.0,
+		};
+
+		ufbxt_assert(bake->nodes.count == 1);
+		ufbx_baked_vec3_list list = bake->nodes.data[0].translation_keys;
+		for (size_t i = 0; i < list.count; i++) {
+			ufbxt_hintf("i=%zu", i);
+			ufbxt_assert(i < ufbxt_arraycount(ref_times));
+			ufbxt_assert(list.data[i].time == ref_times[i]);
+		}
+		ufbxt_assert(list.count == ufbxt_arraycount(ref_times));
+
+		ufbx_free_baked_anim(bake);
+	}
+}
+#endif
