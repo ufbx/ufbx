@@ -221,7 +221,7 @@ struct ufbx_converter { };
 #define ufbx_version_minor(version) ((uint32_t)(version)/1000u%1000u)
 #define ufbx_version_patch(version) ((uint32_t)(version)%1000u)
 
-#define UFBX_HEADER_VERSION ufbx_pack_version(0, 10, 0)
+#define UFBX_HEADER_VERSION ufbx_pack_version(0, 11, 0)
 #define UFBX_VERSION UFBX_HEADER_VERSION
 
 // -- Basic types
@@ -4527,6 +4527,10 @@ typedef struct ufbx_bake_opts {
 	// keyframe rates higher or equal to this will not be resampled.
 	// Default: 19.5
 	double minimum_sample_rate;
+
+	// Maximum sample rate to use, this will remove keys if they are too close together.
+	// Default: unlimited
+	double maximum_sample_rate;
 
 	// Bake the raw versions of properties related to transforms.
 	bool bake_transform_props;

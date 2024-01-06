@@ -551,7 +551,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 
 // -- Version
 
-#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 10, 0)
+#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 11, 0)
 const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
 
 ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEADER_VERSION/1000u);
@@ -25327,6 +25327,38 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 				dst++; src++;
 			}
 		}
+		num_times = dst;
+	}
+
+	// Enforce maximum sample rate
+	if (bc->opts.maximum_sample_rate > 0.0) {
+		const double epsilon = 0.0078125 / bc->opts.maximum_sample_rate;
+		double sample_rate = bc->opts.maximum_sample_rate;
+		double min_interval = 1.0 / bc->opts.maximum_sample_rate - epsilon;
+		size_t dst = 0, src = 0;
+
+		double prev_time = -UFBX_INFINITY;
+		while (src < num_times) {
+			double src_time = times[src];
+			src++;
+
+			size_t start_src = src;
+			double next_time = ufbx_ceil(src_time * sample_rate - epsilon) / sample_rate;
+			while (src < num_times && times[src] <= next_time + epsilon) {
+				src++;
+			}
+
+			if (src != start_src || src_time - prev_time <= min_interval) {
+				prev_time = next_time;
+			} else {
+				prev_time = src_time;
+			}
+
+			if (dst == 0 || prev_time > times[dst - 1]) {
+				times[dst++] = prev_time;
+			}
+		}
+
 		num_times = dst;
 	}
 
