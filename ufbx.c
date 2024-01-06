@@ -17052,7 +17052,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 {
 	bool required = false;
 	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES || uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) required = true;
-	if (uc->opts.inherit_mode_handling != UFBX_INHERIT_MODE_HANDLING_PRESERVE && uc->opts.inherit_mode_handling != UFBX_INHERIT_MODE_HANDLING_IGNORE) required = true;
+	if (uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_HELPER_NODES || uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_COMPENSATE) required = true;
 	if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT) required = true;
 #if defined(UFBX_REGRESSION)
 	required = true;
