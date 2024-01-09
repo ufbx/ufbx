@@ -29560,9 +29560,9 @@ ufbx_abi ufbx_string ufbx_find_shader_prop_len(const ufbx_shader *shader, const 
 	ufbx_string name_str = ufbxi_safe_string(name, name_len);
 	ufbx_shader_prop_binding_list bindings = ufbx_find_shader_prop_bindings_len(shader, name, name_len);
 	if (bindings.count > 0) {
-		return bindings.data[0].shader_prop;
+		return bindings.data[0].material_prop;
 	}
-	return name_str;
+	return ufbx_empty_string;
 }
 
 ufbx_abi ufbx_shader_prop_binding_list ufbx_find_shader_prop_bindings_len(const ufbx_shader *shader, const char *name, size_t name_len)
