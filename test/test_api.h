@@ -233,6 +233,16 @@ static void ufbxt_single_thread_pool_init(ufbx_thread_pool *dst, ufbxt_single_th
 }
 #endif
 
+#if UFBXT_IMPL
+static bool ufbxt_is_big_endian()
+{
+		uint8_t buf[2];
+		uint16_t val = 0xbbaa;
+		memcpy(buf, &val, 2);
+		return buf[0] == 0xbb;
+}
+#endif
+
 UFBXT_TEST(single_thread_immediate_stream)
 #if UFBXT_IMPL
 {
@@ -250,7 +260,11 @@ UFBXT_TEST(single_thread_immediate_stream)
 
 		ufbxt_assert(pool.initialized);
 		ufbxt_assert(pool.freed);
-		ufbxt_assert(pool.wait_index >= 100);
+		if (ufbxt_is_big_endian()) {
+			ufbxt_assert(pool.wait_index == 0);
+		} else {
+			ufbxt_assert(pool.wait_index >= 100);
+		}
 
 		ufbxt_check_scene(scene);
 		ufbx_free_scene(scene);
@@ -279,7 +293,11 @@ UFBXT_TEST(single_thread_immediate_memory)
 
 		ufbxt_assert(pool.initialized);
 		ufbxt_assert(pool.freed);
-		ufbxt_assert(pool.wait_index >= 100);
+		if (ufbxt_is_big_endian()) {
+			ufbxt_assert(pool.wait_index == 0);
+		} else {
+			ufbxt_assert(pool.wait_index >= 100);
+		}
 
 		ufbxt_check_scene(scene);
 		ufbx_free_scene(scene);
@@ -304,7 +322,11 @@ UFBXT_TEST(single_thread_deferred_stream)
 
 		ufbxt_assert(pool.initialized);
 		ufbxt_assert(pool.freed);
-		ufbxt_assert(pool.wait_index >= 100);
+		if (ufbxt_is_big_endian()) {
+			ufbxt_assert(pool.wait_index == 0);
+		} else {
+			ufbxt_assert(pool.wait_index >= 100);
+		}
 
 		ufbxt_check_scene(scene);
 		ufbx_free_scene(scene);
@@ -333,7 +355,11 @@ UFBXT_TEST(single_thread_deferred_memory)
 
 		ufbxt_assert(pool.initialized);
 		ufbxt_assert(pool.freed);
-		ufbxt_assert(pool.wait_index >= 100);
+		if (ufbxt_is_big_endian()) {
+			ufbxt_assert(pool.wait_index == 0);
+		} else {
+			ufbxt_assert(pool.wait_index >= 100);
+		}
 
 		ufbxt_check_scene(scene);
 		ufbx_free_scene(scene);
