@@ -94,18 +94,9 @@
 	#define ufbx_inline static
 #endif
 
-#if defined(UFBX_COVERAGE_LCOV)
-	#define UFBX_COVERAGE_NO_BRANCH (void)("LCOV_EXCL_BR_LINE");
-#else
-	#define UFBX_COVERAGE_NO_BRANCH
-#endif
-
 #ifndef ufbx_assert
 	#if defined(UFBX_NO_ASSERT)
 		#define ufbx_assert(cond) (void)0
-	#elif defined(UFBX_COVERAGE_LCOV)
-		#include <assert.h>
-		#define ufbx_assert(cond) do { UFBX_COVERAGE_NO_BRANCH assert(cond); } while (0)
 	#else
 		#include <assert.h>
 		#define ufbx_assert(cond) assert(cond)
