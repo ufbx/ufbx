@@ -184,17 +184,46 @@ UFBXT_FILE_TEST_FLAGS(synthetic_missing_cache_fail, UFBXT_FILE_TEST_FLAG_ALLOW_E
 }
 #endif
 
+#if UFBXT_IMPL
+static bool ufbxt_open_file_no_skip(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info)
+{
+	if (!ufbx_open_file(stream, path, path_len)) return false;
+	stream->skip_fn = NULL;
+	return true;
+}
+#endif
+
 UFBXT_TEST(cache_skip_read)
 #if UFBXT_IMPL
 {
 	char buffer[512];
 	snprintf(buffer, sizeof(buffer), "%s%s", data_root, "max_cache_box_7500_binary_fpc/max_cache_box.pc2");
 
-	size_t data_size = 0;
-	void *data = ufbxt_read_file(buffer, &data_size);
-	ufbxt_assert(data);
-	
-	free(data);
+	ufbx_geometry_cache_opts opts = { 0 };
+	opts.open_file_cb.fn = &ufbxt_open_file_no_skip;
+
+	ufbx_error error;
+	ufbx_geometry_cache *cache = ufbx_load_geometry_cache(buffer, &opts, &error);
+	ufbxt_assert(cache);
+	ufbxt_assert(cache->frames.count == 11);
+
+	for (size_t i = 0; i < cache->frames.count; i++) {
+		ufbx_cache_frame *frame = &cache->frames.data[0];
+		ufbxt_assert(frame->file_format == UFBX_CACHE_FILE_FORMAT_PC2);
+
+		size_t num_vertices = frame->data_count;
+		ufbxt_assert(num_vertices == 770);
+
+		ufbx_vec3 *vertices = calloc(num_vertices, sizeof(ufbx_vec3));
+		ufbxt_assert(vertices);
+
+		ufbx_geometry_cache_data_opts data_opts = { 0 };
+		data_opts.open_file_cb.fn = &ufbxt_open_file_no_skip;
+		size_t num_read = ufbx_read_geometry_cache_vec3(frame, vertices, num_vertices, &data_opts);
+		ufbxt_assert(num_read == num_vertices);
+
+		free(vertices);
+	}
 }
 #endif
 
