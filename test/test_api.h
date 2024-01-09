@@ -440,3 +440,28 @@ UFBXT_TEST(empty_file_stream)
 }
 #endif
 
+UFBXT_TEST(file_format_lookahead)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (size_t i = 0; i <= 16; i++) {
+			ufbxt_hintf("i=%zu", i);
+
+			ufbx_load_opts opts = { 0 };
+			opts.file_format_lookahead = i * i * i;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			ufbxt_check_scene(scene);
+			ufbx_free_scene(scene);
+		}
+	}
+}
+#endif
+
+
