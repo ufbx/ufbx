@@ -28308,8 +28308,8 @@ static ufbxi_noinline size_t ufbxi_generate_indices(const ufbx_vertex_stream *us
 	ufbxi_allocator ator = { 0 };
 	ufbxi_init_ator(error, &ator, allocator, "allocator");
 
-	ufbxi_vertex_stream local_streams[16];
-	uint64_t local_packed_vertex[64];
+	ufbxi_vertex_stream local_streams[16]; // ufbxi_uninit
+	uint64_t local_packed_vertex[64]; // ufbxi_uninit
 
 	ufbxi_vertex_stream *streams = NULL;
 	if (num_streams > ufbxi_arraycount(local_streams)) {
@@ -29277,7 +29277,7 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform_flags(const ufbx_
 	}
 
 	const ufbx_vec3 *translation_scale = NULL;
-	ufbx_prop helper_scale;
+	ufbx_prop helper_scale; // ufbxi_uninit
 	ufbx_vec3 scale_factor = ufbxi_one_vec3;
 	bool use_scale_factor = false;
 
@@ -29318,7 +29318,7 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform_flags(const ufbx_
 	ufbx_props props = ufbxi_evaluate_selected_props(anim, &node->element, time, buf, prop_names, num_prop_names);
 	ufbx_rotation_order order = (ufbx_rotation_order)ufbxi_find_enum(&props, ufbxi_RotationOrder, UFBX_ROTATION_ORDER_XYZ, UFBX_ROTATION_ORDER_SPHERIC);
 
-	ufbx_transform transform;
+	ufbx_transform transform; // ufbxi_uninit
 	if ((components & UFBX_TRANSFORM_FLAG_INCLUDE_TRANSLATION) != 0) {
 		transform = ufbxi_get_transform(&props, order, node, translation_scale);
 	} else {
@@ -30344,8 +30344,8 @@ ufbx_abi ufbxi_noinline ufbx_surface_point ufbx_evaluate_nurbs_surface(const ufb
 	ufbx_assert(surface);
 	if (!surface) return result;
 
-	ufbx_real weights_u[UFBXI_MAX_NURBS_ORDER], weights_v[UFBXI_MAX_NURBS_ORDER];
-	ufbx_real derivs_u[UFBXI_MAX_NURBS_ORDER], derivs_v[UFBXI_MAX_NURBS_ORDER];
+	ufbx_real weights_u[UFBXI_MAX_NURBS_ORDER], weights_v[UFBXI_MAX_NURBS_ORDER]; // ufbxi_uninit
+	ufbx_real derivs_u[UFBXI_MAX_NURBS_ORDER], derivs_v[UFBXI_MAX_NURBS_ORDER]; // ufbxi_uninit
 	size_t base_u = ufbx_evaluate_nurbs_basis(&surface->basis_u, u, weights_u, UFBXI_MAX_NURBS_ORDER, derivs_u, UFBXI_MAX_NURBS_ORDER);
 	size_t base_v = ufbx_evaluate_nurbs_basis(&surface->basis_v, v, weights_v, UFBXI_MAX_NURBS_ORDER, derivs_v, UFBXI_MAX_NURBS_ORDER);
 	if (base_u == SIZE_MAX || base_v == SIZE_MAX) return result;
@@ -30838,7 +30838,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 	ufbx_assert(data);
 	if (!data) return 0;
 
-	ufbx_geometry_cache_data_opts opts;
+	ufbx_geometry_cache_data_opts opts; // ufbxi_uninit
 	if (user_opts) {
 		opts = *user_opts;
 	} else {
