@@ -175,6 +175,7 @@ typedef struct {
 	bool initialized;
 	bool freed;
 	uint32_t wait_index;
+	uint32_t dispatches;
 } ufbxt_single_thread_pool;
 
 static bool ufbxt_single_thread_pool_init_fn(void *user, ufbx_thread_pool_context ctx, const ufbx_thread_pool_info *info)
@@ -189,6 +190,7 @@ static bool ufbxt_single_thread_pool_run_fn(void *user, ufbx_thread_pool_context
 {
 	ufbxt_single_thread_pool *pool = (ufbxt_single_thread_pool*)user;
 	ufbxt_assert(pool->initialized);
+	pool->dispatches++;
 	if (!pool->immediate) return true;
 
 	for (uint32_t i = 0; i < count; i++) {
@@ -365,6 +367,49 @@ UFBXT_TEST(single_thread_deferred_memory)
 		ufbxt_check_scene(scene);
 		ufbx_free_scene(scene);
 		free(data);
+	}
+}
+#endif
+
+UFBXT_TEST(thread_memory_limit)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "blender_293_barbarian" };
+	size_t prev_dispatches = 0;
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (size_t i = 0; i < 24; i++) {
+			ufbxt_single_thread_pool pool;
+			ufbx_load_opts opts = { 0 };
+			ufbxt_single_thread_pool_init(&opts.thread_opts.pool, &pool, true);
+			opts.thread_opts.memory_limit = (size_t)1 << i;
+
+			size_t size = 0;
+			void *data = ufbxt_read_file(path, &size);
+			ufbxt_assert(data);
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_memory(data, size, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+
+			if (pool.dispatches != prev_dispatches) {
+				ufbxt_logf("limit %zu dispatches: %u", opts.thread_opts.memory_limit, pool.dispatches);
+				prev_dispatches = pool.dispatches;
+			}
+
+			ufbxt_assert(pool.initialized);
+			ufbxt_assert(pool.freed);
+			if (ufbxt_is_big_endian()) {
+				ufbxt_assert(pool.wait_index == 0);
+			} else {
+				ufbxt_assert(pool.wait_index >= 100);
+			}
+
+			ufbxt_check_scene(scene);
+			ufbx_free_scene(scene);
+			free(data);
+		}
 	}
 }
 #endif
