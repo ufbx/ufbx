@@ -184,4 +184,17 @@ UFBXT_FILE_TEST_FLAGS(synthetic_missing_cache_fail, UFBXT_FILE_TEST_FLAG_ALLOW_E
 }
 #endif
 
+UFBXT_TEST(cache_skip_read)
+#if UFBXT_IMPL
+{
+	char buffer[512];
+	snprintf(buffer, sizeof(buffer), "%s%s", data_root, "max_cache_box_7500_binary_fpc/max_cache_box.pc2");
+
+	size_t data_size = 0;
+	void *data = ufbxt_read_file(buffer, &data_size);
+	ufbxt_assert(data);
+	
+	free(data);
+}
+#endif
 

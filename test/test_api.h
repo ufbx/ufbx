@@ -301,6 +301,7 @@ UFBXT_TEST(single_thread_immediate_memory)
 
 		ufbxt_check_scene(scene);
 		ufbx_free_scene(scene);
+		free(data);
 	}
 }
 #endif
@@ -363,6 +364,7 @@ UFBXT_TEST(single_thread_deferred_memory)
 
 		ufbxt_check_scene(scene);
 		ufbx_free_scene(scene);
+		free(data);
 	}
 }
 #endif
