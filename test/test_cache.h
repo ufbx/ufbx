@@ -224,6 +224,8 @@ UFBXT_TEST(cache_skip_read)
 
 		free(vertices);
 	}
+
+	ufbx_free_geometry_cache(cache);
 }
 #endif
 
