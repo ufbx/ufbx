@@ -5451,7 +5451,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_wait_all(ufbxi_threa
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_init(ufbxi_thread_pool *pool, ufbx_error *error, ufbxi_allocator *ator, const ufbx_thread_opts *opts)
 {
 	if (!(opts->pool.run_fn && opts->pool.wait_fn)) return 1;
-	if (!ufbx_is_thread_safe()) return 1;
 	pool->enabled = true;
 
 	uint32_t num_tasks = (uint32_t)ufbxi_min_sz(opts->num_tasks, INT32_MAX);
