@@ -6043,7 +6043,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_report_progress(ufbxi_context *u
 	uint64_t read_offset = ufbxi_get_read_offset(uc);
 	uc->latest_progress_bytes = read_offset;
 
-	ufbx_progress progress;
+	ufbx_progress progress = { 0 };
 	progress.bytes_read = read_offset;
 	progress.bytes_total = uc->progress_bytes_total;
 	if (progress.bytes_total < progress.bytes_read) {
@@ -6218,7 +6218,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_skip_bytes(ufbxi_context *uc, ui
 				// Check that we can read at least one byte in case the file is broken
 				// and causes us to seek indefinitely forwards as `fseek()` does not
 				// report if we hit EOF...
-				char single_byte[1];
+				char single_byte[1]; // ufbxi_uninit
 				size_t num_read = uc->read_fn(uc->read_user, single_byte, 1);
 				ufbxi_check_msg(num_read <= 1, "IO error");
 				ufbxi_check_msg(num_read == 1, "Truncated file");
@@ -6372,7 +6372,7 @@ static ufbxi_noinline FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi
 		return fopen(path, "rb");
 	}
 
-	char copy_buf[256];
+	char copy_buf[256]; // ufbxi_uninit
 	char *copy = NULL;
 
 	if (path_len < ufbxi_arraycount(copy_buf) - 1) {
@@ -8142,7 +8142,7 @@ static bool ufbxi_deflate_task_fn(ufbxi_task *task)
 {
 	ufbxi_deflate_task *t = (ufbxi_deflate_task*)task->data;
 
-	ufbx_inflate_input input;
+	ufbx_inflate_input input; // ufbxi_uninit
 	input.total_size = t->encoded_size;
 	input.data = t->encoded_data;
 	input.data_size = t->encoded_size;
@@ -9290,7 +9290,7 @@ typedef enum {
 ufbxi_noinline static bool ufbxi_ascii_array_task_imp(ufbxi_ascii_array_task *t)
 {
 	// Temporary buffer for parsing between spans
-	char buffer[128];
+	char buffer[128]; // ufbxi_uninit
 	size_t buffer_len = 0;
 	bool buffer_value = false;
 
@@ -9791,7 +9791,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 				ufbxi_ascii_span *spans = ufbxi_push_pop(tmp_buf, &uc->tmp_ascii_spans, ufbxi_ascii_span, num_spans);
 				ufbxi_check(spans);
 
-				ufbxi_ascii_array_task t;
+				ufbxi_ascii_array_task t; // ufbxi_uninit
 				t.arr_data = (char*)arr_data + num_values * arr_elem_size;
 				t.arr_type = (char)arr_type;
 				t.arr_size = deferred_size;
@@ -14142,7 +14142,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects_threaded(ufbxi_cont
 	uc->parse_threaded = true;
 
 	bool parsed_to_end = false;
-	ufbxi_object_batch batches[UFBX_THREAD_GROUP_COUNT];
+	ufbxi_object_batch batches[UFBX_THREAD_GROUP_COUNT]; // ufbxi_uninit
 	memset(batches, 0, sizeof(batches));
 
 	size_t empty_count = 0;
@@ -14204,7 +14204,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects_threaded(ufbxi_cont
 			size_t max_memory = uc->opts.thread_opts.memory_limit / UFBX_THREAD_GROUP_COUNT;
 
 			for (;;) {
-				ufbxi_node *node;
+				ufbxi_node *node = NULL;
 				ufbxi_check(ufbxi_parse_toplevel_child(uc, &node, tmp_buf));
 				if (!node) {
 					parsed_to_end = true;
@@ -15610,7 +15610,7 @@ static ufbxi_noinline bool ufbxi_open_file(const ufbx_open_file_cb *cb, ufbx_str
 {
 	if (!cb || !cb->fn) return false;
 
-	ufbx_open_file_info info;
+	ufbx_open_file_info info; // ufbxi_uninit
 	if (ator) {
 		ufbxi_setup_ator_allocator(&info.temp_allocator, ator);
 	} else {
@@ -15736,7 +15736,7 @@ ufbx_static_assert(obj_attrib_strides, ufbxi_arraycount(ufbxi_obj_attrib_stride)
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_pop_props(ufbxi_context *uc, ufbx_prop_list *dst, size_t count)
 {
-	ufbx_prop_list props;
+	ufbx_prop_list props; // ufbxi_uninit
 	props.count = count;
 	props.data = ufbxi_push_pop(&uc->result, &uc->obj.tmp_props, ufbx_prop, count);
 	ufbxi_check(props.data);
@@ -16056,7 +16056,7 @@ static ufbxi_noinline int ufbxi_obj_parse_vertex(ufbxi_context *uc, ufbxi_obj_at
 	ufbxi_check(vals);
 	for (size_t i = 0; i < read_values; i++) {
 		ufbx_string str = uc->obj.tokens[offset + i];
-		char *end;
+		char *end; // ufbxi_uninit
 		double val = ufbxi_parse_double(str.data, str.length, &end, parse_flags);
 		ufbxi_check(end == str.data + str.length);
 		vals[i] = (ufbx_real)val;
@@ -16751,7 +16751,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_prop(ufbxi_context *uc
 		if (start + num_reals >= uc->obj.num_tokens) break;
 		ufbx_string tok = uc->obj.tokens[start + num_reals];
 
-		char *end;
+		char *end; // ufbxi_uninit
 		double val = ufbxi_parse_double(tok.data, tok.length, &end, uc->double_parse_flags);
 		if (end != tok.data + tok.length) break;
 
@@ -22319,7 +22319,7 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 	bool has_camera_transform = false;
 
 	if (ufbx_coordinate_axes_valid(uc->opts.target_light_axes)) {
-		ufbx_matrix mat;
+		ufbx_matrix mat; // ufbxi_uninit
 		ufbx_coordinate_axes light_axes = {
 			UFBX_COORDINATE_AXIS_POSITIVE_X,
 			UFBX_COORDINATE_AXIS_NEGATIVE_Z,
@@ -22335,7 +22335,7 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 	}
 
 	if (ufbx_coordinate_axes_valid(uc->opts.target_camera_axes)) {
-		ufbx_matrix mat;
+		ufbx_matrix mat; // ufbxi_uninit
 		ufbx_coordinate_axes camera_axes = {
 			UFBX_COORDINATE_AXIS_POSITIVE_Z,
 			UFBX_COORDINATE_AXIS_POSITIVE_Y,
@@ -22706,7 +22706,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_skip(ufbxi_cache_context *
 		}
 
 	} else {
-		char skip_buf[2048];
+		char skip_buf[2048]; // ufbxi_uninit
 		while (size > 0) {
 			size_t to_skip = (size_t)ufbxi_min64(size, sizeof(skip_buf));
 			size -= to_skip;
@@ -22721,7 +22721,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_skip(ufbxi_cache_context *
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_mc_read_tag(ufbxi_cache_context *cc, uint32_t *p_tag)
 {
-	char buf[4];
+	char buf[4]; // ufbxi_uninit
 	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, true));
 	*p_tag = (uint32_t)(uint8_t)buf[0]<<24u | (uint32_t)(uint8_t)buf[1]<<16 | (uint32_t)(uint8_t)buf[2]<<8u | (uint32_t)(uint8_t)buf[3];
 	if (*p_tag == ufbxi_cache_mc_tag('F','O','R','8')) {
@@ -22732,7 +22732,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_mc_read_tag(ufbxi_cache_co
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_mc_read_u32(ufbxi_cache_context *cc, uint32_t *p_value)
 {
-	char buf[4];
+	char buf[4]; // ufbxi_uninit
 	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 4, false));
 	*p_value = (uint32_t)(uint8_t)buf[0]<<24u | (uint32_t)(uint8_t)buf[1]<<16 | (uint32_t)(uint8_t)buf[2]<<8u | (uint32_t)(uint8_t)buf[3];
 	if (cc->mc_for8) {
@@ -22744,11 +22744,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_mc_read_u32(ufbxi_cache_co
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_mc_read_u64(ufbxi_cache_context *cc, uint64_t *p_value)
 {
 	if (!cc->mc_for8) {
-		uint32_t v32;
+		uint32_t v32; // ufbxi_uninit
 		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_u32(cc, &v32));
 		*p_value = v32;
 	} else {
-		char buf[8];
+		char buf[8]; // ufbxi_uninit
 		ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, buf, 8, false));
 		uint32_t hi = (uint32_t)(uint8_t)buf[0]<<24u | (uint32_t)(uint8_t)buf[1]<<16 | (uint32_t)(uint8_t)buf[2]<<8u | (uint32_t)(uint8_t)buf[3];
 		uint32_t lo = (uint32_t)(uint8_t)buf[4]<<24u | (uint32_t)(uint8_t)buf[5]<<16 | (uint32_t)(uint8_t)buf[6]<<8u | (uint32_t)(uint8_t)buf[7];
@@ -22765,11 +22765,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 {
 	uint32_t version = 0, time_start = 0, time_end = 0;
 	uint32_t count = 0, time = 0;
-	char skip_buf[8];
+	char skip_buf[8]; // ufbxi_uninit
 
 	for (;;) {
-		uint32_t tag;
-		uint64_t size;
+		uint32_t tag; // ufbxi_uninit
+		uint64_t size; // ufbxi_uninit
 		ufbxi_check_err(&cc->error, ufbxi_cache_mc_read_tag(cc, &tag));
 		if (tag == 0) break;
 
@@ -22846,7 +22846,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_mc(ufbxi_cache_contex
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_context *cc)
 {
-	char header[32];
+	char header[32]; // ufbxi_uninit
 	ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, header, sizeof(header), false));
 
 	uint32_t version = ufbxi_read_u32(header + 12);
@@ -22868,7 +22868,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_pc2(ufbxi_cache_conte
 	// Skip almost to the end of the data and try to read one byte as there's
 	// nothing after the data so we can't detect EOF..
 	if (total_points > 0) {
-		char last_byte[1];
+		char last_byte[1]; // ufbxi_uninit
 		ufbxi_check_err(&cc->error, ufbxi_cache_skip(cc, total_points * 12 - 1));
 		ufbxi_check_err(&cc->error, ufbxi_cache_read(cc, last_byte, 1, false));
 	}
@@ -23323,7 +23323,7 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_cache_load(ufbxi_cache_context 
 
 ufbxi_noinline static ufbx_geometry_cache *ufbxi_load_geometry_cache(ufbx_string filename, const ufbx_geometry_cache_opts *user_opts, ufbx_error *p_error)
 {
-	ufbx_geometry_cache_opts opts;
+	ufbx_geometry_cache_opts opts; // ufbxi_uninit
 	if (user_opts) {
 		opts = *user_opts;
 	} else {
@@ -24475,7 +24475,7 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 
 	size_t name_ix = 0;
 
-	ufbxi_prop_iter iter;
+	ufbxi_prop_iter iter; // ufbxi_uninit
 	ufbxi_init_prop_iter(&iter, anim, element);
 	const ufbx_prop *prop = NULL;
 	while ((prop = ufbxi_next_prop(&iter)) != NULL) {
@@ -26243,7 +26243,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 					ufbx_vec3 tangent_v = ufbxi_slow_normalize3(&point.derivative_v);
 
 					// Check if there's any wrapped positions that we could match
-					size_t neighbors[5];
+					size_t neighbors[5]; // ufbxi_uninit
 					size_t num_neighbors = 0;
 
 					if ((span_v == 0 && (span_u > 0 || split_u > 0)) || (span_u == 0 && (span_v > 0 || split_v > 0))) {
@@ -26673,7 +26673,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 		normal.z = 0.0f;
 	}
 
-	ufbx_vec3 axis;
+	ufbx_vec3 axis; // ufbxi_uninit
 	if (normal.x*normal.x < 0.5f) {
 		axis.x = 1.0f;
 		axis.y = 0.0f;
@@ -26737,7 +26737,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	// to iterate the polygon once if we move backwards one step every time we clip an ear.
 	uint32_t indices_left = face.num_indices;
 	{
-		ufbxi_kd_triangle tri;
+		ufbxi_kd_triangle tri; // ufbxi_uninit
 
 		uint32_t ix = 1;
 		ufbx_vec2 a = ufbxi_ngon_project(nc, pos.values.data[pos.indices.data[face.index_begin + 0]]);
@@ -26840,7 +26840,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	// them to a stack buffer and copy them over in the end.
 	uint32_t max_triangles = face.num_indices - 2;
 	uint32_t num_triangles = 0, num_last_triangles = 0;
-	uint32_t last_triangles[4*3];
+	uint32_t last_triangles[4*3]; // ufbxi_uninit
 
 	uint32_t index_begin = face.index_begin;
 	for (uint32_t ix = 0; ix < face.num_indices; ix++) {
@@ -27418,7 +27418,7 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 			size_t num_split = 0;
 			bool on_boundary = false;
 			bool non_manifold = false;
-			size_t crease_input_indices[2];
+			size_t crease_input_indices[2]; // ufbxi_uninit
 
 			// At start we always have two edges and a single face
 			uint32_t start_prev = topo[start].prev;
@@ -27662,7 +27662,7 @@ static ufbxi_noinline int ufbxi_subdivide_attrib(ufbxi_subdivide_context *sc, uf
 
 	ufbx_assert(attrib->value_reals >= 1 && attrib->value_reals <= 4);
 
-	ufbxi_subdivide_layer_input input;
+	ufbxi_subdivide_layer_input input; // ufbxi_uninit
 	input.sum_fn = ufbxi_real_sum_fns[attrib->value_reals - 1];
 	input.sum_user = NULL;
 	input.values = attrib->values.data;
@@ -27672,7 +27672,7 @@ static ufbxi_noinline int ufbxi_subdivide_attrib(ufbxi_subdivide_context *sc, uf
 	input.check_split_data = check_split_data;
 	input.ignore_indices = false;
 
-	ufbxi_subdivide_layer_output output;
+	ufbxi_subdivide_layer_output output; // ufbxi_uninit
 	ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, &output, &input));
 
 	attrib->values.data = output.values;
@@ -27745,7 +27745,7 @@ static ufbxi_noinline int ufbxi_subdivide_weights(ufbxi_subdivide_context *sc, u
 {
 	ufbxi_check_err(&sc->error, src);
 
-	ufbxi_subdivide_layer_input input;
+	ufbxi_subdivide_layer_input input; // ufbxi_uninit
 	input.sum_fn = ufbxi_subdivide_sum_vertex_weights;
 	input.sum_user = sc;
 	input.values = src;
@@ -27757,7 +27757,7 @@ static ufbxi_noinline int ufbxi_subdivide_weights(ufbxi_subdivide_context *sc, u
 
 	sc->total_weights = 0;
 
-	ufbxi_subdivide_layer_output output;
+	ufbxi_subdivide_layer_output output; // ufbxi_uninit
 	ufbxi_check_err(&sc->error, ufbxi_subdivide_layer(sc, &output, &input));
 
 	size_t num_vertices = output.num_values;
@@ -28592,7 +28592,7 @@ ufbx_abi bool ufbx_default_open_file(void *user, ufbx_stream *stream, const char
 
 ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t data_size, const ufbx_open_memory_opts *opts, ufbx_error *error)
 {
-	ufbx_open_memory_opts local_opts;
+	ufbx_open_memory_opts local_opts; // ufbxi_uninit
 	if (!opts) {
 		memset(&local_opts, 0, sizeof(local_opts));
 		opts = &local_opts;
@@ -28745,7 +28745,7 @@ ufbx_abi ufbx_scene *ufbx_load_stdio_prefix(void *file_void, const void *prefix,
 	if (opts && opts->progress_cb.fn && opts->file_size_estimate == 0) {
 		uint64_t begin = ufbxi_ftell(file);
 		if (begin < UINT64_MAX) {
-			fpos_t pos;
+			fpos_t pos = 0;
 			if (fgetpos(file, &pos) == 0) {
 				if (fseek(file, 0, SEEK_END) == 0) {
 					uint64_t end = ufbxi_ftell(file);
@@ -29188,7 +29188,7 @@ ufbx_abi ufbxi_noinline ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, co
 	if (!element) return ret;
 
 	size_t num_anim = 0;
-	ufbxi_prop_iter iter;
+	ufbxi_prop_iter iter; // ufbxi_uninit
 	ufbxi_init_prop_iter(&iter, anim, element);
 	const ufbx_prop *prop = NULL;
 	while ((prop = ufbxi_next_prop(&iter)) != NULL) {
@@ -29314,7 +29314,7 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform_flags(const ufbx_
 		}
 	}
 
-	ufbx_prop buf[ufbxi_arraycount(ufbxi_transform_props_all)];
+	ufbx_prop buf[ufbxi_arraycount(ufbxi_transform_props_all)]; // ufbxi_uninit
 	ufbx_props props = ufbxi_evaluate_selected_props(anim, &node->element, time, buf, prop_names, num_prop_names);
 	ufbx_rotation_order order = (ufbx_rotation_order)ufbxi_find_enum(&props, ufbxi_RotationOrder, UFBX_ROTATION_ORDER_XYZ, UFBX_ROTATION_ORDER_SPHERIC);
 
@@ -30124,7 +30124,7 @@ ufbx_abi ufbxi_noinline ufbx_matrix ufbx_catch_get_skin_vertex_matrix(ufbx_panic
 	}
 
 	if (skin_vertex.dq_weight > 0.0f) {
-		ufbx_transform dqt;
+		ufbx_transform dqt; // ufbxi_uninit
 		ufbx_real rcp_len = (ufbx_real)(1.0 / ufbx_sqrt(q0.x*q0.x + q0.y*q0.y + q0.z*q0.z + q0.w*q0.w));
 		ufbx_real rcp_len2x2 = 2.0f * rcp_len * rcp_len;
 		dqt.rotation.x = q0.x * rcp_len;
@@ -30298,8 +30298,8 @@ ufbx_abi ufbxi_noinline ufbx_curve_point ufbx_evaluate_nurbs_curve(const ufbx_nu
 	ufbx_assert(curve);
 	if (!curve) return result;
 
-	ufbx_real weights[UFBXI_MAX_NURBS_ORDER];
-	ufbx_real derivs[UFBXI_MAX_NURBS_ORDER];
+	ufbx_real weights[UFBXI_MAX_NURBS_ORDER]; // ufbxi_uninit
+	ufbx_real derivs[UFBXI_MAX_NURBS_ORDER]; // ufbxi_uninit
 	size_t base = ufbx_evaluate_nurbs_basis(&curve->basis, u, weights, UFBXI_MAX_NURBS_ORDER, derivs, UFBXI_MAX_NURBS_ORDER);
 	if (base == SIZE_MAX) return result;
 
@@ -30585,7 +30585,7 @@ ufbx_abi ufbxi_noinline uint32_t ufbx_catch_triangulate_face(ufbx_panic *panic, 
 
 		uint32_t num_indices_u32 = num_indices < UINT32_MAX ? (uint32_t)num_indices : UINT32_MAX;
 
-		uint32_t local_indices[12];
+		uint32_t local_indices[12]; // ufbxi_uninit
 		if (num_indices_u32 < 12) {
 			uint32_t num_tris = ufbxi_triangulate_ngon(&nc, local_indices, 12);
 			memcpy(indices, local_indices, num_tris * 3 * sizeof(uint32_t));
@@ -30900,7 +30900,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 			offset -= to_skip;
 		}
 	} else {
-		char buffer[4096];
+		char buffer[4096]; // ufbxi_uninit
 		while (offset > 0) {
 			size_t to_skip = (size_t)ufbxi_min64(offset, sizeof(buffer));
 			size_t num_read = stream.read_fn(stream.user, buffer, to_skip);
@@ -30920,7 +30920,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 	ufbx_real *dst = data;
 	size_t mirror_ix = (size_t)frame->mirror_axis - 1;
 	if (use_double) {
-		double buffer[512];
+		double buffer[512]; // ufbxi_uninit
 		while (src_count > 0) {
 			size_t to_read = ufbxi_min_sz(src_count, ufbxi_arraycount(buffer));
 			src_count -= to_read;
@@ -30979,7 +30979,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 			if (num_read != to_read) break;
 		}
 	} else {
-		float buffer[1024];
+		float buffer[1024]; // ufbxi_uninit
 		while (src_count > 0) {
 			size_t to_read = ufbxi_min_sz(src_count, ufbxi_arraycount(buffer));
 			src_count -= to_read;
@@ -31157,7 +31157,7 @@ ufbx_abi ufbx_dom_node *ufbx_dom_find_len(const ufbx_dom_node *parent, const cha
 
 ufbx_abi size_t ufbx_generate_indices(const ufbx_vertex_stream *streams, size_t num_streams, uint32_t *indices, size_t num_indices, const ufbx_allocator_opts *allocator, ufbx_error *error)
 {
-	ufbx_error local_error;
+	ufbx_error local_error; // ufbxi_uninit
 	if (!error) {
 		error = &local_error;
 	}
