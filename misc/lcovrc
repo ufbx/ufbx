@@ -1,2 +1,3 @@
 lcov_branch_coverage=1
 lcov_excl_br_line=ufbx_assert|ufbxi_dev_assert|ufbxi_regression_assert
+lcov_excl_line=LCOV_EXCL_LINE|ufbxi_unreachable

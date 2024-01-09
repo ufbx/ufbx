@@ -773,6 +773,8 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 	#define ufbxi_dev_assert(cond) (void)0
 #endif
 
+#define ufbxi_unreachable(reason) do { ufbx_assert(0 && reason); } while (0)
+
 #if defined(UFBX_REGRESSION)
 	#define UFBXI_IS_REGRESSION 1
 #else
@@ -7010,7 +7012,7 @@ ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, 
 		return 1;
 	} else return 0;
 	default:
-		ufbx_assert(0 && "Bad format char");
+		ufbxi_unreachable("Bad format char");
 		return 0;
 	}
 }
@@ -7860,7 +7862,7 @@ ufbxi_nodiscard static ufbxi_noinline char *ufbxi_swap_endian(ufbxi_context *uc,
 		}
 		break;
 	default:
-		ufbx_assert(0 && "Bad endian swap size");
+		ufbxi_unreachable("Bad endian swap size");
 	}
 
 	return dst;
@@ -10270,7 +10272,7 @@ static ufbxi_noinline bool ufbxi_is_format(const char *data, size_t size, ufbx_f
 			if (ufbxi_match(&line, pattern)) return true;
 		}
 	} else {
-		ufbx_assert(0 && "Unhandled format");
+		ufbxi_unreachable("Unhandled format");
 	}
 
 	return false;
@@ -11223,7 +11225,7 @@ static bool ufbxi_match_version_string(const char *fmt, ufbx_string str, uint32_
 			if (len == 0) return false;
 			p_version[num_ix++] = num;
 		} else {
-			ufbx_assert(0 && "Unhandled match character");
+			ufbxi_unreachable("Unhandled match character");
 		}
 	}
 
@@ -11811,7 +11813,7 @@ ufbxi_noinline static int ufbxi_fix_index(ufbxi_context *uc, uint32_t *p_dst, ui
 		*p_dst = index;
 		break;
 	default:
-		ufbx_assert(0 && "Unhandled index_error_handling");
+		ufbxi_unreachable("Unhandled index_error_handling");
 		return 0;
 	}
 
@@ -14984,8 +14986,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 		case '_':
 			break;
 		default:
-			ufbx_assert(0 && "Unhandled legacy fmt");
-			break;
+			ufbxi_unreachable("Unhandled legacy fmt");
 		}
 	}
 
@@ -19038,8 +19039,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_constraint_prop(ufbxi_contex
 			target->transform = ufbx_identity_transform;
 		} break;
 		default:
-			ufbx_assert(0 && "Unexpected constraint prop");
-			break;
+			ufbxi_unreachable("Unexpected constraint prop");
 		}
 	}
 
@@ -21810,8 +21810,7 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_scene *scene, ufbx_camera *c
 		camera->resolution.y = aspect_y;
 		break;
 	default:
-		ufbx_assert(0 && "Unexpected aspect mode");
-		break;
+		ufbxi_unreachable("Unexpected aspect mode");
 	}
 
 	ufbx_real aspect_ratio = camera->resolution.x / camera->resolution.y;
@@ -21849,7 +21848,7 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_scene *scene, ufbx_camera *c
 		camera->aperture_size_inch = camera->film_size_inch;
 		camera->orthographic_size.x = ortho_extent;
 		camera->orthographic_size.y = ortho_extent;
-		ufbx_assert(0 && "Unreachable, set to vertical/horizontal above");
+		ufbxi_unreachable("Unreachable, set to vertical/horizontal above");
 		break;
 	case UFBX_GATE_FIT_STRETCH:
 		camera->aperture_size_inch = camera->film_size_inch;
@@ -21858,8 +21857,7 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_scene *scene, ufbx_camera *c
 		// TODO: Not sure what to do here...
 		break;
 	default:
-		ufbx_assert(0 && "Unexpected gate fit");
-		break;
+		ufbxi_unreachable("Unexpected gate fit");
 	}
 
 	switch (camera->aperture_mode) {
@@ -21888,8 +21886,7 @@ ufbxi_noinline static void ufbxi_update_camera(ufbx_scene *scene, ufbx_camera *c
 		camera->field_of_view_deg.y = (ufbx_real)ufbx_atan((double)camera->field_of_view_tan.y) * UFBXI_RAD_TO_DEG * 2.0f;
 		break;
 	default:
-		ufbx_assert(0 && "Unexpected aperture mode");
-		break;
+		ufbxi_unreachable("Unexpected aperture mode");
 	}
 
 	if (camera->projection_mode == UFBX_PROJECTION_MODE_PERSPECTIVE) {
@@ -27302,8 +27299,7 @@ static ufbxi_noinline int ufbxi_subdivide_layer(ufbxi_subdivide_context *sc, ufb
 		sharp_all = true;
 		break;
 	default:
-		ufbx_assert(0 && "Bad boundary mode");
-		break;
+		ufbxi_unreachable("Bad boundary mode");
 	}
 
 	ufbxi_subdivide_sum_fn *sum_fn = input->sum_fn;
@@ -29103,7 +29099,7 @@ ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time
 		}
 
 		default:
-			ufbx_assert(0 && "Bad interpolation mode");
+			ufbxi_unreachable("Bad interpolation mode");
 			return 0.0f;
 
 		}
@@ -30867,7 +30863,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 	case UFBX_CACHE_DATA_FORMAT_VEC3_FLOAT: src_count = frame->data_count * 3; break;
 	case UFBX_CACHE_DATA_FORMAT_REAL_DOUBLE: src_count = frame->data_count; use_double = true; break;
 	case UFBX_CACHE_DATA_FORMAT_VEC3_DOUBLE: src_count = frame->data_count * 3; use_double = true; break;
-	default: ufbx_assert(0 && "Bad data_format"); break;
+	default: ufbxi_unreachable("Bad data_format"); break;
 	}
 
 	bool src_big_endian = false;
@@ -30875,7 +30871,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 	case UFBX_CACHE_DATA_ENCODING_UNKNOWN: return 0;
 	case UFBX_CACHE_DATA_ENCODING_LITTLE_ENDIAN: src_big_endian = false; break;
 	case UFBX_CACHE_DATA_ENCODING_BIG_ENDIAN: src_big_endian = true; break;
-	default: ufbx_assert(0 && "Bad data_encoding"); break;
+	default: ufbxi_unreachable("Bad data_encoding"); break;
 	}
 
 	// Test endianness
