@@ -28745,7 +28745,7 @@ ufbx_abi ufbx_scene *ufbx_load_stdio_prefix(void *file_void, const void *prefix,
 	if (opts && opts->progress_cb.fn && opts->file_size_estimate == 0) {
 		uint64_t begin = ufbxi_ftell(file);
 		if (begin < UINT64_MAX) {
-			fpos_t pos = 0;
+			fpos_t pos; // ufbxi_uninit
 			if (fgetpos(file, &pos) == 0) {
 				if (fseek(file, 0, SEEK_END) == 0) {
 					uint64_t end = ufbxi_ftell(file);
