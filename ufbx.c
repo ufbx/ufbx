@@ -16928,7 +16928,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 		}
 
 		if (!has_stream && uc->opts.load_external_files && uc->obj.mtllib_relative_path.size > 0) {
-			ufbx_blob dst;
+			ufbx_blob dst; // ufbxi_uninit
 			ufbxi_check(ufbxi_resolve_relative_filename(uc, (ufbxi_strblob*)&dst, (const ufbxi_strblob*)&uc->obj.mtllib_relative_path, true));
 			has_stream = ufbxi_open_file(&uc->opts.open_file_cb, &stream, (const char*)dst.data, dst.size, &uc->obj.mtllib_relative_path, &uc->ator_tmp, UFBX_OPEN_FILE_OBJ_MTL);
 			stream_path = uc->obj.mtllib_relative_path;
@@ -22695,7 +22695,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_skip(ufbxi_cache_context *
 			// Check that we can read at least one byte in case the file is broken
 			// and causes us to seek indefinitely forwards as `fseek()` does not
 			// report if we hit EOF...
-			char single_byte[1];
+			char single_byte[1]; // ufbxi_uninit
 			size_t num_read = cc->stream.read_fn(cc->stream.user, single_byte, 1);
 			ufbxi_check_err_msg(&cc->error, num_read <= 1, "IO error");
 			ufbxi_check_err_msg(&cc->error, num_read == 1, "Truncated file");
