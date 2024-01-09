@@ -29637,7 +29637,7 @@ ufbx_abi ufbxi_noinline ufbx_quat ufbx_quat_normalize(ufbx_quat q)
 {
 	ufbx_real norm = ufbx_quat_dot(q, q);
 	if (norm == 0.0) return ufbx_identity_quat;
-	norm = ufbx_sqrt(norm);
+	norm = (ufbx_real)ufbx_sqrt(norm);
 	q.x /= norm;
 	q.y /= norm;
 	q.z /= norm;
