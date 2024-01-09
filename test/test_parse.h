@@ -251,6 +251,30 @@ UFBXT_TEST(error_format_short)
 }
 #endif
 
+UFBXT_TEST(error_format_hint)
+#if UFBXT_IMPL
+{
+	ufbx_error error;
+	ufbx_scene *scene = ufbx_load_file("<nonexistent>.fbx", NULL, &error);
+	ufbxt_assert(!scene);
+
+	char error_buf[512];
+	size_t ret_len = ufbx_format_error(error_buf, sizeof(error_buf), &error);
+	ufbxt_assert(strstr(error_buf, "<nonexistent>.fbx"));
+}
+#endif
+
+UFBXT_TEST(error_format_no_error)
+#if UFBXT_IMPL
+{
+	char error_buf[512];
+	error_buf[0] = 'A';
+	size_t ret_len = ufbx_format_error(error_buf, sizeof(error_buf), NULL);
+	ufbxt_assert(ret_len == 0);
+	ufbxt_assert(error_buf[0] == '\0');
+}
+#endif
+
 UFBXT_FILE_TEST(maya_node_attribute_zoo)
 #if UFBXT_IMPL
 {
