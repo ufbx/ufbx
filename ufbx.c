@@ -1780,8 +1780,8 @@ ufbxi_huff_build_imp(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_coun
 
 	uint32_t nonzero_sym_count = sym_count - bits_counts[0];
 
-	uint32_t total_syms[UFBXI_HUFF_MAX_BITS];
-	uint32_t first_code[UFBXI_HUFF_MAX_BITS];
+	uint32_t total_syms[UFBXI_HUFF_MAX_BITS]; // ufbxi_uninit
+	uint32_t first_code[UFBXI_HUFF_MAX_BITS]; // ufbxi_uninit
 
 	tree->code_to_sorted[0] = INT16_MAX;
 	tree->past_max_code[0] = 0;
@@ -1980,7 +1980,7 @@ ufbxi_huff_build(ufbxi_huff_tree *tree, uint8_t *sym_bits, uint32_t sym_count, c
 {
 	// Count the number of codes per bit length
 	// `bits_counts[0]` contains the number of non-used symbols
-	uint32_t bits_counts[UFBXI_HUFF_MAX_BITS];
+	uint32_t bits_counts[UFBXI_HUFF_MAX_BITS]; // ufbxi_uninit
 	memset(bits_counts, 0, sizeof(bits_counts));
 	for (uint32_t i = 0; i < sym_count; i++) {
 		uint32_t bits = sym_bits[i];
@@ -2040,7 +2040,7 @@ static ufbxi_noinline void ufbxi_init_static_huff(ufbxi_trees *trees, const ufbx
 	}
 
 	// 0-143: 8 bits, 144-255: 9 bits, 256-279: 7 bits, 280-287: 8 bits
-	uint8_t lit_length_bits[288];
+	uint8_t lit_length_bits[288]; // ufbxi_uninit
 	memset(lit_length_bits +   0, 8, 144 -   0);
 	memset(lit_length_bits + 144, 9, 256 - 144);
 	memset(lit_length_bits + 256, 7, 280 - 256);
@@ -2048,7 +2048,7 @@ static ufbxi_noinline void ufbxi_init_static_huff(ufbxi_trees *trees, const ufbx
 	err |= ufbxi_huff_build(&trees->lit_length, lit_length_bits, sizeof(lit_length_bits), ufbxi_deflate_length_lut, 256, trees->fast_bits);
 
 	// "Distance codes 0-31 are represented by (fixed-length) 5-bit codes"
-	uint8_t dist_bits[32];
+	uint8_t dist_bits[32]; // ufbxi_uninit
 	memset(dist_bits + 0, 5, 32 - 0);
 	err |= ufbxi_huff_build(&trees->dist, dist_bits, sizeof(dist_bits), ufbxi_deflate_dist_lut, 0, trees->fast_bits);
 
@@ -2068,13 +2068,13 @@ static ufbxi_noinline void ufbxi_init_static_huff(ufbxi_trees *trees, const ufbx
 static ufbxi_noinline ptrdiff_t ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *huff_code_length, ufbxi_huff_tree *tree,
 	uint32_t num_symbols, const uint32_t *sym_extra, uint32_t sym_extra_offset, uint32_t fast_bits)
 {
-	uint8_t code_lengths[UFBXI_HUFF_MAX_VALUE];
+	uint8_t code_lengths[UFBXI_HUFF_MAX_VALUE]; // ufbxi_uninit
 	ufbx_assert(num_symbols <= UFBXI_HUFF_MAX_VALUE);
 
 	uint64_t bits = dc->stream.bits;
 	size_t left = dc->stream.left;
 	const char *data = dc->stream.chunk_ptr;
-	uint32_t bits_counts[UFBXI_HUFF_MAX_BITS];
+	uint32_t bits_counts[UFBXI_HUFF_MAX_BITS]; // ufbxi_uninit
 	memset(bits_counts, 0, sizeof(bits_counts));
 
 	uint32_t symbol_index = 0;
@@ -2162,7 +2162,7 @@ ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	// Code lengths for the "code length" Huffman tree are represented literally
 	// 3 bits in order of: 16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15 up to
 	// `num_code_lengths`, rest of the code lengths are 0 (unused)
-	uint8_t code_lengths[19];
+	uint8_t code_lengths[19]; // ufbxi_uninit
 	memset(code_lengths, 0, sizeof(code_lengths));
 	for (size_t len_i = 0; len_i < num_code_lengths; len_i++) {
 		if (len_i == 14) {
@@ -2178,8 +2178,8 @@ ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	dc->stream.left = left;
 	dc->stream.chunk_ptr = data;
 
-	ufbxi_huff_tree huff_code_length;
-	ptrdiff_t err;
+	ufbxi_huff_tree huff_code_length; // ufbxi_uninit
+	ptrdiff_t err; // ufbxi_uninit
 
 	// Build the temporary "code length" Huffman tree used to encode the actual
 	// trees used to compress the data. Use that to build the literal/length and
@@ -2730,8 +2730,8 @@ ufbxi_extern_c ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inf
 			dc.stream.left = left;
 			dc.stream.chunk_ptr = data;
 
-			ufbxi_trees tree_data;
-			ufbxi_trees *trees;
+			ufbxi_trees tree_data; // ufbxi_uninit
+			ufbxi_trees *trees; // ufbxi_uninit
 			if (type == 1) {
 				// Static Huffman: Initialize the trees once and cache them in `retain`.
 				if (!ret_imp->initialized) {
@@ -2823,7 +2823,7 @@ static ufbxi_noinline int ufbxi_vsnprintf(char *buf, size_t buf_size, const char
 
 static ufbxi_noinline int ufbxi_snprintf(char *buf, size_t buf_size, const char *fmt, ...)
 {
-	va_list args;
+	va_list args; // ufbxi_uninit
 	va_start(args, fmt);
 	int result = ufbxi_vsnprintf(buf, buf_size, fmt, args);
 	va_end(args);
@@ -5459,7 +5459,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_thread_pool_init(ufbxi_thread_po
 
 	pool->opts = *opts;
 	if (pool->opts.pool.init_fn) {
-		ufbx_thread_pool_info info;
+		ufbx_thread_pool_info info; // ufbxi_uninit
 		info.max_concurrent_tasks = num_tasks;
 		ufbxi_check_err(error, pool->opts.pool.init_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool, &info));
 	}
@@ -22058,8 +22058,8 @@ ufbxi_noinline static void ufbxi_update_constraint(ufbx_constraint *constraint)
 			weight_scale = (ufbx_real)1.0;
 		}
 
-		ufbx_prop *prop;
-		ufbx_string parts[2];
+		ufbx_prop *prop; // ufbxi_uninit
+		ufbx_string parts[2]; // ufbxi_uninit
 		parts[0] = node->name;
 		parts[1] = ufbxi_str_c(".Weight");
 		prop = ufbx_find_prop_concat(props, parts, 2);
@@ -29349,7 +29349,7 @@ ufbx_abi ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_
 		ufbxi_DeformPercent,
 	};
 
-	ufbx_prop buf[ufbxi_arraycount(prop_names)];
+	ufbx_prop buf[ufbxi_arraycount(prop_names)]; // ufbxi_uninit
 	ufbx_props props = ufbxi_evaluate_selected_props(anim, &channel->element, time, buf, prop_names, ufbxi_arraycount(prop_names));
 	return ufbxi_find_real(&props, ufbxi_DeformPercent, channel->weight * (ufbx_real)100.0) * (ufbx_real)0.01;
 }
