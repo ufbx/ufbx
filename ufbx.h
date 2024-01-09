@@ -3854,6 +3854,9 @@ typedef enum ufbx_error_type UFBX_ENUM_REPR {
 	// File not found.
 	UFBX_ERROR_FILE_NOT_FOUND,
 
+	// Empty file.
+	UFBX_ERROR_EMPTY_FILE,
+
 	// External file not found.
 	// See `ufbx_load_opts.load_external_files` for more information.
 	UFBX_ERROR_EXTERNAL_FILE_NOT_FOUND,

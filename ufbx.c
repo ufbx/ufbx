@@ -3019,6 +3019,8 @@ static ufbxi_noinline void ufbxi_fix_error_type(ufbx_error *error, const char *d
 		error->type = UFBX_ERROR_UNRECOGNIZED_FILE_FORMAT;
 	} else if (!strcmp(desc, "File not found")) {
 		error->type = UFBX_ERROR_FILE_NOT_FOUND;
+	} else if (!strcmp(desc, "Empty file")) {
+		error->type = UFBX_ERROR_EMPTY_FILE;
 	} else if (!strcmp(desc, "External file not found")) {
 		error->type = UFBX_ERROR_EXTERNAL_FILE_NOT_FOUND;
 	} else if (!strcmp(desc, "Uninitialized options")) {
@@ -6007,6 +6009,8 @@ typedef struct {
 
 	ufbxi_warnings warnings;
 
+	bool deferred_failure;
+
 	bool parse_threaded;
 	ufbxi_thread_pool thread_pool;
 
@@ -6074,6 +6078,7 @@ static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size, b
 	ufbx_assert(uc->data_size < size);
 	ufbxi_check_return(!uc->eof, NULL);
 	if (require_size) {
+		ufbxi_check_return_msg(uc->read_fn || uc->data_size > 0, NULL, "Empty file");
 		ufbxi_check_return_msg(uc->read_fn, NULL, "Truncated file");
 	} else if (!uc->read_fn) {
 		uc->eof = true;
@@ -6122,6 +6127,9 @@ static ufbxi_noinline const char *ufbxi_refill(ufbxi_context *uc, size_t size, b
 	}
 
 	if (require_size) {
+		if (uc->data_offset == 0) {
+			ufbxi_check_return_msg(data_size > 0, NULL, "Empty file");
+		}
 		ufbxi_check_return_msg(data_size >= size, NULL, "Truncated file");
 	}
 
@@ -10293,6 +10301,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_determine_format(ufbxi_context *
 			}
 
 			size_t data_size = ufbxi_min_sz(lookahead, uc->data_size);
+			ufbxi_check_msg(data_size > 0, "Empty file");
+
 			for (uint32_t fmt = UFBX_FILE_FORMAT_FBX; fmt < UFBX_FILE_FORMAT_COUNT; fmt++) {
 				if (ufbxi_is_format(uc->data, data_size, (ufbx_file_format)fmt)) {
 					format = (ufbx_file_format)fmt;
@@ -23808,6 +23818,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_resolve_warning_elements(ufbxi_c
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 {
+	// Check for deferred failure
+	if (uc->deferred_failure) return 0;
+
 	// `ufbx_load_opts` must be cleared to zero first!
 	ufbx_assert(uc->opts._begin_zero == 0 && uc->opts._end_zero == 0);
 	ufbxi_check_msg(uc->opts._begin_zero == 0 && uc->opts._end_zero == 0, "Uninitialized options");
@@ -23838,6 +23851,10 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 	uc->scene.metadata.creator.data = ufbxi_empty_char;
 
 	uc->unit_scale = 1.0f;
+	if (uc->data == NULL) {
+		ufbxi_dev_assert(uc->data_begin == NULL);
+		uc->data_begin = uc->data = ufbxi_zero_size_buffer;
+	}
 
 	ufbxi_check(ufbxi_load_strings(uc));
 	ufbxi_check(ufbxi_load_maps(uc));
@@ -24160,6 +24177,15 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 		ufbxi_free_result(uc);
 		return NULL;
 	}
+}
+
+static ufbxi_noinline ufbx_scene *ufbxi_load_not_found(const char *filename, size_t filename_len, ufbx_error *p_error)
+{
+	ufbxi_context uc = { UFBX_ERROR_NONE };
+	ufbxi_set_err_info(&uc.error, filename, filename_len);
+	ufbxi_report_err_msg(&uc.error, "File not found", "File not found");
+	uc.deferred_failure = true;
+	return ufbxi_load(&uc, NULL, p_error);
 }
 
 // -- Animation evaluation
@@ -28683,18 +28709,7 @@ ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_le
 		if (ufbxi_open_file(&opts->open_file_cb, &stream, filename, filename_len, NULL, NULL, UFBX_OPEN_FILE_MAIN_MODEL)) {
 			return ufbx_load_stream_prefix(&stream, NULL, 0, &opts_copy, error);
 		} else {
-			// TODO: Factor this?
-			ufbxi_set_err_info(error, filename, filename_len);
-			error->stack_size = 1;
-			error->type = UFBX_ERROR_FILE_NOT_FOUND;
-			error->description.data = "File not found";
-			error->description.length = strlen(error->description.data);
-			error->stack[0].description.data = "File not found";
-			error->stack[0].description.length = strlen(error->stack[0].description.data);
-			error->stack[0].function.data = ufbxi_function;
-			error->stack[0].function.length = strlen(ufbxi_function);
-			error->stack[0].source_line = ufbxi_line;
-			return NULL;
+			return ufbxi_load_not_found(filename, filename_len, error);
 		}
 	}
 
@@ -28704,19 +28719,7 @@ ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_le
 
 	FILE *file = ufbxi_fopen(filename, filename_len, &tmp_ator);
 	if (!file) {
-		if (error) {
-			ufbxi_set_err_info(error, filename, filename_len);
-			error->stack_size = 1;
-			error->type = UFBX_ERROR_FILE_NOT_FOUND;
-			error->description.data = "File not found";
-			error->description.length = strlen(error->description.data);
-			error->stack[0].description.data = "File not found";
-			error->stack[0].description.length = strlen(error->stack[0].description.data);
-			error->stack[0].function.data = ufbxi_function;
-			error->stack[0].function.length = strlen(ufbxi_function);
-			error->stack[0].source_line = ufbxi_line;
-		}
-		return NULL;
+		return ufbxi_load_not_found(filename, filename_len, error);
 	}
 
 	ufbx_scene *scene = ufbx_load_stdio(file, &opts_copy, error);

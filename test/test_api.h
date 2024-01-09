@@ -150,3 +150,265 @@ UFBXT_TEST(retain_free_null)
 	ufbx_free_baked_anim(NULL);
 }
 #endif
+
+UFBXT_TEST(thread_memory)
+#if UFBXT_IMPL
+{
+	ufbx_retain_scene(NULL);
+	ufbx_free_scene(NULL);
+	ufbx_retain_mesh(NULL);
+	ufbx_free_mesh(NULL);
+	ufbx_retain_line_curve(NULL);
+	ufbx_free_line_curve(NULL);
+	ufbx_retain_geometry_cache(NULL);
+	ufbx_free_geometry_cache(NULL);
+	ufbx_retain_anim(NULL);
+	ufbx_free_anim(NULL);
+	ufbx_retain_baked_anim(NULL);
+	ufbx_free_baked_anim(NULL);
+}
+#endif
+
+#if UFBXT_IMPL
+typedef struct {
+	bool immediate;
+	bool initialized;
+	bool freed;
+	uint32_t wait_index;
+} ufbxt_single_thread_pool;
+
+static bool ufbxt_single_thread_pool_init_fn(void *user, ufbx_thread_pool_context ctx, const ufbx_thread_pool_info *info)
+{
+	ufbxt_single_thread_pool *pool = (ufbxt_single_thread_pool*)user;
+	pool->initialized = true;
+
+	return true;
+}
+
+static bool ufbxt_single_thread_pool_run_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count)
+{
+	ufbxt_single_thread_pool *pool = (ufbxt_single_thread_pool*)user;
+	ufbxt_assert(pool->initialized);
+	if (!pool->immediate) return true;
+
+	for (uint32_t i = 0; i < count; i++) {
+		ufbx_thread_pool_run_task(ctx, start_index + i);
+	}
+
+	return true;
+}
+
+static bool ufbxt_single_thread_pool_wait_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index)
+{
+	ufbxt_single_thread_pool *pool = (ufbxt_single_thread_pool*)user;
+	ufbxt_assert(pool->initialized);
+
+	if (!pool->immediate) {
+		for (uint32_t i = pool->wait_index; i < max_index; i++) {
+			ufbx_thread_pool_run_task(ctx, i);
+		}
+	}
+
+	pool->wait_index = max_index;
+
+	return true;
+}
+
+static void ufbxt_single_thread_pool_free_fn(void *user, ufbx_thread_pool_context ctx)
+{
+	ufbxt_single_thread_pool *pool = (ufbxt_single_thread_pool*)user;
+	pool->freed = true;
+}
+
+static void ufbxt_single_thread_pool_init(ufbx_thread_pool *dst, ufbxt_single_thread_pool *pool, bool immediate)
+{
+	memset(pool, 0, sizeof(ufbxt_single_thread_pool));
+	pool->immediate = immediate;
+
+	dst->init_fn = ufbxt_single_thread_pool_init_fn;
+	dst->run_fn = ufbxt_single_thread_pool_run_fn;
+	dst->wait_fn = ufbxt_single_thread_pool_wait_fn;
+	dst->free_fn = ufbxt_single_thread_pool_free_fn;
+	dst->user = pool;
+}
+#endif
+
+UFBXT_TEST(single_thread_immediate_stream)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "blender_293_barbarian" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbxt_single_thread_pool pool;
+		ufbx_load_opts opts = { 0 };
+		ufbxt_single_thread_pool_init(&opts.thread_opts.pool, &pool, true);
+
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+		if (!scene) ufbxt_log_error(&error);
+		ufbxt_assert(scene);
+
+		ufbxt_assert(pool.initialized);
+		ufbxt_assert(pool.freed);
+		ufbxt_assert(pool.wait_index >= 100);
+
+		ufbxt_check_scene(scene);
+		ufbx_free_scene(scene);
+	}
+}
+#endif
+
+UFBXT_TEST(single_thread_immediate_memory)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "blender_293_barbarian" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbxt_single_thread_pool pool;
+		ufbx_load_opts opts = { 0 };
+		ufbxt_single_thread_pool_init(&opts.thread_opts.pool, &pool, true);
+
+		size_t size = 0;
+		void *data = ufbxt_read_file(path, &size);
+		ufbxt_assert(data);
+
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_memory(data, size, &opts, &error);
+		if (!scene) ufbxt_log_error(&error);
+		ufbxt_assert(scene);
+
+		ufbxt_assert(pool.initialized);
+		ufbxt_assert(pool.freed);
+		ufbxt_assert(pool.wait_index >= 100);
+
+		ufbxt_check_scene(scene);
+		ufbx_free_scene(scene);
+	}
+}
+#endif
+
+UFBXT_TEST(single_thread_deferred_stream)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "blender_293_barbarian" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbxt_single_thread_pool pool;
+		ufbx_load_opts opts = { 0 };
+		ufbxt_single_thread_pool_init(&opts.thread_opts.pool, &pool, false);
+
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+		if (!scene) ufbxt_log_error(&error);
+		ufbxt_assert(scene);
+
+		ufbxt_assert(pool.initialized);
+		ufbxt_assert(pool.freed);
+		ufbxt_assert(pool.wait_index >= 100);
+
+		ufbxt_check_scene(scene);
+		ufbx_free_scene(scene);
+	}
+}
+#endif
+
+UFBXT_TEST(single_thread_deferred_memory)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "blender_293_barbarian" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbxt_single_thread_pool pool;
+		ufbx_load_opts opts = { 0 };
+		ufbxt_single_thread_pool_init(&opts.thread_opts.pool, &pool, false);
+
+		size_t size = 0;
+		void *data = ufbxt_read_file(path, &size);
+		ufbxt_assert(data);
+
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_memory(data, size, &opts, &error);
+		if (!scene) ufbxt_log_error(&error);
+		ufbxt_assert(scene);
+
+		ufbxt_assert(pool.initialized);
+		ufbxt_assert(pool.freed);
+		ufbxt_assert(pool.wait_index >= 100);
+
+		ufbxt_check_scene(scene);
+		ufbx_free_scene(scene);
+	}
+}
+#endif
+
+UFBXT_TEST(single_thread_file_not_found)
+#if UFBXT_IMPL
+{
+	ufbxt_single_thread_pool pool;
+	ufbx_load_opts opts = { 0 };
+	ufbxt_single_thread_pool_init(&opts.thread_opts.pool, &pool, true);
+
+	ufbx_error error;
+	ufbx_scene *scene = ufbx_load_file("<doesnotexist>.fbx", &opts, &error);
+	ufbxt_assert(!scene);
+	ufbxt_assert(error.type == UFBX_ERROR_FILE_NOT_FOUND);
+	ufbxt_assert(strstr(error.info, "<doesnotexist>.fbx"));
+
+	ufbxt_assert(!pool.initialized);
+	ufbxt_assert(!pool.freed);
+	ufbxt_assert(pool.wait_index == 0);
+}
+#endif
+
+UFBXT_TEST(empty_file_memory)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_memory(NULL, 0, NULL, &error);
+		ufbxt_assert(!scene);
+		ufbxt_assert(error.type == UFBX_ERROR_EMPTY_FILE);
+	}
+
+	{
+		ufbx_load_opts opts = { 0 };
+		opts.file_format = UFBX_FILE_FORMAT_FBX;
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_memory(NULL, 0, &opts, &error);
+		ufbxt_assert(!scene);
+		ufbxt_assert(error.type == UFBX_ERROR_EMPTY_FILE);
+	}
+}
+#endif
+
+#if UFBXT_IMPL
+static size_t ufbxt_empty_stream_read_fn(void *user, void *data, size_t size)
+{
+	return 0;
+}
+#endif
+
+UFBXT_TEST(empty_file_stream)
+#if UFBXT_IMPL
+{
+	ufbx_stream stream = { 0 };
+	stream.read_fn = &ufbxt_empty_stream_read_fn;
+
+	{
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_stream(&stream, NULL, &error);
+		ufbxt_assert(!scene);
+		ufbxt_assert(error.type == UFBX_ERROR_EMPTY_FILE);
+	}
+
+	{
+		ufbx_load_opts opts = { 0 };
+		opts.file_format = UFBX_FILE_FORMAT_FBX;
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_stream(&stream, &opts, &error);
+		ufbxt_assert(!scene);
+		ufbxt_assert(error.type == UFBX_ERROR_EMPTY_FILE);
+	}
+}
+#endif
+
