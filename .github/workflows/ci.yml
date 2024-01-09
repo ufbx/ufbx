@@ -519,9 +519,7 @@ jobs:
       - name: Create build directory
         run: mkdir build
       - name: Compile check_fbx.c with coverage
-        run: |
-          clang++ -c -x c++ -coverage -DUFBX_COVERAGE_LCOV -DUFBX_DEV=1 -O2 ufbx.c -o build/ufbx_cov.o
-          clang -coverage -DUFBX_COVERAGE_LCOV -DEXTERNAL_UFBX -O2 build/ufbx_cov.o test/check_fbx.c -lm -o build/check_fbx
+        run: clang -coverage -DUFBX_DEV=1 -DEXTERNAL_UFBX -O2 ufbx.c test/check_fbx.c -lm -o build/check_fbx
       - name: Run dataset tests
         run: python3 misc/check_dataset.py --exe build/check_fbx --root /mnt/fbx-files --host-url https://ufbx-dataset.b-cdn.net
       - name: Generate coverage
@@ -538,9 +536,7 @@ jobs:
       - name: Create build directory
         run: mkdir build
       - name: Compile check_fbx.c with coverage
-        run: |
-          clang++ -c -x c++ -coverage -DUFBX_COVERAGE_LCOV -DUFBX_DEV=1 -O2 ufbx.c -o build/ufbx_cov.o
-          clang -coverage -DUFBX_COVERAGE_LCOV -DEXTERNAL_UFBX -O2 build/ufbx_cov.o test/check_fbx.c -lm -o build/check_fbx
+        run: clang -coverage -DUFBX_DEV=1 -DEXTERNAL_UFBX -O2 ufbx.c test/check_fbx.c -lm -o build/check_fbx
       - name: Check fuzz files
         run: |
           build/check_fbx -d /mnt/fbx-files/fuzz/fuzz-fa
