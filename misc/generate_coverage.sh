@@ -15,4 +15,4 @@ clang -lm -coverage -g -std=gnu99 -DUFBX_COVERAGE_LCOV -DUFBX_DEV=1 -DUFBX_REGRE
 
 build/cov-runner -d data
 $LLVM_COV gcov ufbx runner -b
-lcov --directory . --base-directory . --gcov-tool $LLVM_GCOV --rc lcov_branch_coverage=1 --capture -o coverage.lcov
+lcov --directory . --base-directory . --gcov-tool $LLVM_GCOV --config-file misc/lcovrc --capture -o coverage.lcov
