@@ -1188,6 +1188,21 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_unsafe_cube_underscore_no_index, synthe
 	for (size_t i = 3; i <= 6; i++) {
 		ufbx_vec2 v = ufbx_get_vertex_vec2(&mesh->vertex_uv, i);
 		ufbxt_assert_close_vec2(err, v, ufbx_zero_vec2);
+
+		ufbx_panic panic;
+		panic.did_panic = false;
+		v = ufbx_catch_get_vertex_vec2(&panic, &mesh->vertex_uv, i);
+		ufbxt_assert(!panic.did_panic);
+		ufbxt_assert_close_vec2(err, v, ufbx_zero_vec2);
+	}
+
+	{
+		ufbx_panic panic;
+		panic.did_panic = false;
+		ufbx_vec2 v = ufbx_catch_get_vertex_vec2(&panic, &mesh->vertex_uv, 4096);
+		ufbxt_assert(panic.did_panic);
+		ufbxt_assert(!strcmp(panic.message, "index (4096) out of range (24)"));
+		ufbxt_assert_close_vec2(err, v, ufbx_zero_vec2);
 	}
 }
 #endif
