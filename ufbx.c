@@ -879,7 +879,7 @@ static ufbxi_forceinline int64_t ufbxi_f64_to_i64(double value)
 // Stable sort array `m_type m_data[m_size]` using the predicate `m_cmp_lambda(a, b)`
 // `m_linear_size` is a hint for how large blocks handle initially do with insertion sort
 // `m_tmp` must be a memory buffer with at least the same size and alignment as `m_data`
-#define ufbxi_macro_stable_sort(m_type, m_linear_size, m_data, m_tmp, m_size, m_cmp_lambda) do { \
+#define ufbxi_macro_stable_sort(m_type, m_linear_size, m_data, m_tmp, m_size, m_cmp_lambda) do { UFBX_COVERAGE_NO_BRANCH \
 	typedef m_type mi_type; \
 	mi_type *mi_src = (mi_type*)(m_tmp); \
 	mi_type *mi_data = m_data, *mi_dst = mi_data; \
@@ -925,7 +925,7 @@ static ufbxi_forceinline int64_t ufbxi_f64_to_i64(double value)
 	if (mi_dst != mi_data) memcpy((void*)mi_data, mi_dst, sizeof(mi_type) * mi_size); \
 	} while (0)
 
-#define ufbxi_macro_lower_bound_eq(m_type, m_linear_size, m_result_ptr, m_data, m_begin, m_size, m_cmp_lambda, m_eq_lambda) do { \
+#define ufbxi_macro_lower_bound_eq(m_type, m_linear_size, m_result_ptr, m_data, m_begin, m_size, m_cmp_lambda, m_eq_lambda) do { UFBX_COVERAGE_NO_BRANCH \
 	typedef m_type mi_type; \
 	const mi_type *mi_data = (m_data); \
 	size_t mi_lo = m_begin, mi_hi = m_size, mi_linear_size = ufbxi_clamp_linear_threshold(m_linear_size); \
@@ -943,7 +943,7 @@ static ufbxi_forceinline int64_t ufbxi_f64_to_i64(double value)
 	} \
 	} while (0)
 
-#define ufbxi_macro_upper_bound_eq(m_type, m_linear_size, m_result_ptr, m_data, m_begin, m_size, m_eq_lambda) do { \
+#define ufbxi_macro_upper_bound_eq(m_type, m_linear_size, m_result_ptr, m_data, m_begin, m_size, m_eq_lambda) do { UFBX_COVERAGE_NO_BRANCH \
 	typedef m_type mi_type; \
 	const mi_type *mi_data = (m_data); \
 	size_t mi_lo = m_begin, mi_hi = m_size, mi_linear_size = ufbxi_clamp_linear_threshold(m_linear_size); \
