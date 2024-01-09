@@ -225,6 +225,10 @@ UFBXT_TEST(cache_skip_read)
 		free(vertices);
 	}
 
+	// Retain and free for fun
+	ufbx_retain_geometry_cache(cache);
+	ufbx_free_geometry_cache(cache);
+
 	ufbx_free_geometry_cache(cache);
 }
 #endif
