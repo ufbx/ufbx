@@ -1044,6 +1044,16 @@ UFBXT_FILE_TEST(maya_child_pivots)
 }
 #endif
 
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_lefthanded_y_up_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_axes = ufbx_axes_left_handed_y_up;
+	opts.handedness_conversion_axis = UFBX_MIRROR_AXIS_X;
+	return opts;
+}
+#endif
+
 UFBXT_FILE_TEST(maya_axes)
 #if UFBXT_IMPL
 {
@@ -1098,6 +1108,12 @@ UFBXT_TEST(maya_axes_lefthanded)
 
 	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
 	free(obj_file);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_axes_lefthanded_file, maya_axes, ufbxt_lefthanded_y_up_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
 }
 #endif
 
@@ -1239,6 +1255,12 @@ UFBXT_TEST(maya_axes_anim_lefthanded)
 	}
 
 	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_axes_anim_lefthanded_file, maya_axes_anim, ufbxt_lefthanded_y_up_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
 }
 #endif
 
