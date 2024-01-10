@@ -509,4 +509,39 @@ UFBXT_TEST(file_format_lookahead)
 }
 #endif
 
+#if UFBXT_IMPL
+static void *ufbxt_multiuse_realloc(void *user, void *old_ptr, size_t old_size, size_t new_size)
+{
+	if (new_size == 0) {
+		free(old_ptr);
+		return NULL;
+	} else if (old_size > 0) {
+		return realloc(old_ptr, new_size);
+	} else {
+		return malloc(new_size);
+	}
+}
+#endif
+
+UFBXT_TEST(multiuse_realloc)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (size_t i = 0; i <= 16; i++) {
+			ufbx_load_opts opts = { 0 };
+			opts.temp_allocator.allocator.realloc_fn = &ufbxt_multiuse_realloc;
+			opts.result_allocator.allocator.realloc_fn = &ufbxt_multiuse_realloc;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_assert(scene);
+			ufbxt_check_scene(scene);
+			ufbx_free_scene(scene);
+		}
+	}
+}
+#endif
 
