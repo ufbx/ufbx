@@ -3114,8 +3114,6 @@ static ufbxi_noinline void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size,
 	}
 	ator->num_allocs++;
 
-	ator->current_size += total;
-
 	void *ptr;
 	if (ator->ator.allocator.alloc_fn) {
 		ptr = ator->ator.allocator.alloc_fn(ator->ator.allocator.user, total);
@@ -3131,6 +3129,8 @@ static ufbxi_noinline void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size,
 		return NULL;
 	}
 	ufbx_assert(((uintptr_t)ptr & ufbxi_size_align_mask(total)) == 0);
+
+	ator->current_size += total;
 
 	return ptr;
 }
@@ -3156,9 +3156,6 @@ static ufbxi_noinline void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t siz
 	ufbxi_check_return_err_msg(ator->error, ator->num_allocs < ator->max_allocs, NULL, "Allocation limit exceeded");
 	ator->num_allocs++;
 
-	ator->current_size += total;
-	ator->current_size -= old_total;
-
 	void *ptr;
 	if (ator->ator.allocator.realloc_fn) {
 		ptr = ator->ator.allocator.realloc_fn(ator->ator.allocator.user, old_ptr, old_total, total);
@@ -3175,6 +3172,9 @@ static ufbxi_noinline void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t siz
 
 	ufbxi_check_return_err_msg(ator->error, ptr, NULL, "Out of memory");
 	ufbx_assert(((uintptr_t)ptr & ufbxi_size_align_mask(total)) == 0);
+
+	ator->current_size += total;
+	ator->current_size -= old_total;
 
 	return ptr;
 }

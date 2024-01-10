@@ -521,6 +521,18 @@ static void *ufbxt_multiuse_realloc(void *user, void *old_ptr, size_t old_size, 
 		return malloc(new_size);
 	}
 }
+static void *ufbxt_null_realloc(void *user, void *old_ptr, size_t old_size, size_t new_size)
+{
+	return NULL;
+}
+static void *ufbxt_alloc_malloc(void *user, size_t size)
+{
+	return malloc(size);
+}
+static void ufbxt_free_free(void *user, void *ptr, size_t size)
+{
+	free(ptr);
+}
 #endif
 
 UFBXT_TEST(multiuse_realloc)
@@ -529,17 +541,62 @@ UFBXT_TEST(multiuse_realloc)
 	char path[512];
 	ufbxt_file_iterator iter = { "maya_cube" };
 	while (ufbxt_next_file(&iter, path, sizeof(path))) {
-		for (size_t i = 0; i <= 16; i++) {
+		ufbx_load_opts opts = { 0 };
+		opts.temp_allocator.allocator.realloc_fn = &ufbxt_multiuse_realloc;
+		opts.result_allocator.allocator.realloc_fn = &ufbxt_multiuse_realloc;
+
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+		if (!scene) ufbxt_log_error(&error);
+		ufbxt_assert(scene);
+		ufbxt_check_scene(scene);
+		ufbx_free_scene(scene);
+	}
+}
+#endif
+
+UFBXT_TEST(null_realloc)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbx_load_opts opts = { 0 };
+		opts.temp_allocator.allocator.alloc_fn = &ufbxt_alloc_malloc;
+		opts.temp_allocator.allocator.realloc_fn = &ufbxt_null_realloc;
+		opts.temp_allocator.allocator.free_fn = &ufbxt_free_free;
+
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+		ufbxt_assert(!scene);
+		ufbxt_assert(error.type == UFBX_ERROR_OUT_OF_MEMORY);
+	}
+}
+#endif
+
+UFBXT_TEST(null_realloc_only)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		{
 			ufbx_load_opts opts = { 0 };
-			opts.temp_allocator.allocator.realloc_fn = &ufbxt_multiuse_realloc;
-			opts.result_allocator.allocator.realloc_fn = &ufbxt_multiuse_realloc;
+			opts.temp_allocator.allocator.realloc_fn = &ufbxt_null_realloc;
 
 			ufbx_error error;
 			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
-			if (!scene) ufbxt_log_error(&error);
-			ufbxt_assert(scene);
-			ufbxt_check_scene(scene);
-			ufbx_free_scene(scene);
+			ufbxt_assert(!scene);
+			ufbxt_assert(error.type == UFBX_ERROR_OUT_OF_MEMORY);
+		}
+		{
+			ufbx_load_opts opts = { 0 };
+			opts.result_allocator.allocator.realloc_fn = &ufbxt_null_realloc;
+
+			ufbx_error error;
+			ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+			ufbxt_assert(!scene);
+			ufbxt_assert(error.type == UFBX_ERROR_OUT_OF_MEMORY);
 		}
 	}
 }
