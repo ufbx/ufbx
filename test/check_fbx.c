@@ -481,7 +481,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		#endif
 
 		ufbx_scene *state;
-		if (obj_file->animation_frame >= 0 || frame != INT_MIN) {
+		if (obj_file->animation_frame >= 0 || frame != INT_MIN || obj_file->bind_pose) {
 			ufbx_anim *anim = scene->anim;
 
 			if (obj_file->animation_name[0]) {
@@ -553,6 +553,60 @@ int check_fbx_main(int argc, char **argv, const char *path)
 
 				anim = ufbx_create_anim(scene, &anim_opts, NULL);
 				ufbxt_assert(anim);
+
+				free(prop_overrides);
+				free(transform_overrides);
+
+			} else if (obj_file->bind_pose) {
+
+				ufbx_matrix *nodes_to_world = (ufbx_matrix*)calloc(scene->nodes.count, sizeof(ufbx_matrix));
+				ufbx_transform_override *transform_overrides = (ufbx_transform_override*)calloc(scene->nodes.count, sizeof(ufbx_transform_override));
+				bool *use_transform_override = (bool*)calloc(scene->nodes.count, sizeof(bool));
+				for (size_t i = 0; i < scene->nodes.count; i++) {
+					nodes_to_world[i] = scene->nodes.data[i]->node_to_world;
+				}
+
+				for (size_t pose_ix = 0; pose_ix < scene->poses.count; pose_ix++) {
+					ufbx_pose *pose = scene->poses.data[pose_ix];
+					if (!pose->is_bind_pose) continue;
+
+					for (size_t i = 0; i < pose->bone_poses.count; i++) {
+						ufbx_bone_pose *bone = &pose->bone_poses.data[i];
+						ufbx_node *node = bone->bone_node;
+						nodes_to_world[node->typed_id] = bone->bone_to_world;
+						use_transform_override[node->typed_id] = true;
+					}
+				}
+
+				size_t num_transform_overrides = 0;
+				for (size_t i = 0; i < scene->nodes.count; i++) {
+					if (!use_transform_override[i]) continue;
+
+					ufbx_node *node = scene->nodes.data[i];
+					ufbxt_assert(!node->is_root);
+					ufbxt_assert(node->parent);
+
+					ufbx_matrix node_to_world = nodes_to_world[node->typed_id];
+					ufbx_matrix parent_to_world = nodes_to_world[node->parent->typed_id];
+					ufbx_matrix world_to_parent = ufbx_matrix_invert(&parent_to_world);
+					ufbx_matrix node_to_parent = ufbx_matrix_mul(&world_to_parent, &node_to_world);
+					ufbx_transform local_transform = ufbx_matrix_to_transform(&node_to_parent);
+
+					ufbx_transform_override *over = &transform_overrides[num_transform_overrides++];
+					over->node_id = node->typed_id;
+					over->transform = local_transform;
+				}
+
+				ufbx_anim_opts anim_opts = { 0 };
+				anim_opts.transform_overrides.data = transform_overrides;
+				anim_opts.transform_overrides.count = num_transform_overrides;
+
+				anim = ufbx_create_anim(scene, &anim_opts, NULL);
+				ufbxt_assert(anim);
+
+				free(nodes_to_world);
+				free(transform_overrides);
+				free(use_transform_override);
 			}
 
 			ufbx_evaluate_opts eval_opts = { 0 };

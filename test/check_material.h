@@ -248,19 +248,24 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 	bool seen_materials[256];
 
 	ufbx_material *material = NULL;
+	ufbx_display_layer *display_layer = NULL;
+
 	size_t num_materials = 0;
 	size_t num_props = 0;
+	size_t num_display_layers = 0;
+	size_t num_display_layer_nodes = 0;
 
 	double err_sum = 0.0;
 	double err_max = 0.0;
 	size_t err_num = 0;
 
 	bool material_error = false;
+	bool display_layer_error = false;
 	bool require_all = false;
 
 	long version = 0;
 
-	const long current_version = 3;
+	const long current_version = 4;
 
 	int line = 0;
 	while (*spec != '\0') {
@@ -324,6 +329,60 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 			}
 
 			num_materials++;
+			continue;
+		} else if (!strcmp(dots[0], "display_layer")) {
+			if (dots[1] && !strcmp(dots[1], "node")) {
+				if (*tokens[1] == '\0') {
+					fprintf(stderr, "%s:%d: Expected ndoe name for 'display_layer.node'\n", filename, line);
+					ok = false;
+				}
+
+				if (!display_layer) {
+					if (!display_layer_error) {
+						fprintf(stderr, "%s:%d: Statement '%s' needs to have a display_layer defined\n", filename, line, tokens[0]);
+					}
+					ok = false;
+					continue;
+				}
+
+				ufbx_node *node = ufbx_find_node(scene, tokens[1]);
+				if (!node) {
+					fprintf(stderr, "%s:%d: display_layer.node: Could not find node '%s'\n", filename, line, tokens[1]);
+					ok = false;
+					continue;
+				}
+
+				bool found = false;
+				for (size_t i = 0; i < display_layer->nodes.count; i++) {
+					if (display_layer->nodes.data[i] == node) {
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					fprintf(stderr, "%s:%d: display_layer.node: Node '%s' not found in display layer '%s'\n", filename, line, tokens[1],
+						display_layer->name.data);
+					ok = false;
+					continue;
+				}
+
+				num_display_layer_nodes++;
+
+			} else {
+				if (*tokens[1] == '\0') {
+					fprintf(stderr, "%s:%d: Expected display layer name for 'display_layer'\n", filename, line);
+					ok = false;
+				}
+
+				display_layer = ufbx_as_display_layer(ufbx_find_element(scene, UFBX_ELEMENT_DISPLAY_LAYER, tokens[1]));
+				if (!display_layer) {
+					fprintf(stderr, "%s:%d: Display layer not found: '%s'\n", filename, line, tokens[1]);
+					ok = false;
+				}
+				display_layer_error = !material;
+				num_display_layers++;
+			}
+
 			continue;
 		}
 
@@ -578,6 +637,9 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 	if (ok) {
 		double avg = err_num > 0 ? err_sum / (double)err_num : 0.0;
 		printf("Checked %zu materials, %zu properties (error avg %.3g, max %.3g, %zu tests)\n", num_materials, num_props, avg, err_max, err_num);
+		if (num_display_layers > 0) {
+			printf(".. also %zu display layers with %zu nodes\n", num_display_layers, num_display_layer_nodes);
+		}
 	}
 
 	return ok;

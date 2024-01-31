@@ -152,6 +152,7 @@ typedef struct {
 	bool remove_namespaces;
 	bool match_by_order;
 	bool negate_xz;
+	bool bind_pose;
 	ufbx_real tolerance;
 	ufbx_real uv_tolerance;
 	uint32_t allow_missing;
@@ -735,6 +736,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			}
 			if (!strcmp(line, "ufbx:negate_xz")) {
 				obj->negate_xz = true;
+			}
+			if (!strcmp(line, "ufbx:bind_pose")) {
+				obj->bind_pose = true;
 			}
 			if (!strcmp(line, "www.blender.org")) {
 				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
