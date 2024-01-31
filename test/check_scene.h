@@ -425,6 +425,13 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 			ufbxt_assert(node->parent->geometry_transform_helper == node);
 		}
 	}
+
+	ufbxt_check_element_ptr(scene, node->bind_pose, UFBX_ELEMENT_POSE);
+	if (node->bind_pose) {
+		ufbx_bone_pose *pose = ufbx_get_bone_pose(node->bind_pose, node);
+		ufbxt_assert(pose);
+		ufbxt_assert(pose->bone_node == node);
+	}
 }
 
 static void ufbxt_check_mesh_part(ufbx_scene *scene, ufbx_mesh *mesh, ufbx_mesh_part *part, uint32_t index, uint32_t *source_list)
@@ -1154,6 +1161,14 @@ static void ufbxt_check_pose(ufbx_scene *scene, ufbx_pose *pose)
 		ufbx_bone_pose bone_pose = pose->bone_poses.data[i];
 		ufbxt_assert(bone_pose.bone_node);
 		ufbxt_check_element_ptr(scene, bone_pose.bone_node, UFBX_ELEMENT_NODE);
+
+		if (i > 0) {
+			ufbxt_assert(pose->bone_poses.data[i - 1].bone_node->typed_id <= bone_pose.bone_node->typed_id);
+		}
+
+		ufbx_bone_pose *pose_ref = ufbx_get_bone_pose(pose, bone_pose.bone_node);
+		ufbxt_assert(pose_ref);
+		ufbxt_assert(pose_ref->bone_node == bone_pose.bone_node);
 	}
 }
 

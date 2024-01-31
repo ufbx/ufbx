@@ -18185,6 +18185,13 @@ ufbxi_noinline static bool ufbxi_video_ptr_less(void *user, const void *va, cons
 	return ufbxi_str_less(a->absolute_filename, b->absolute_filename);
 }
 
+static ufbxi_noinline bool ufbxi_bone_pose_less(void *user, const void *va, const void *vb)
+{
+	(void)user;
+	const ufbx_bone_pose *a = (const ufbx_bone_pose *)va, *b = (const ufbx_bone_pose *)vb;
+	return a->bone_node->typed_id < b->bone_node->typed_id;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_videos_by_filename(ufbxi_context *uc, ufbx_video **videos, size_t count)
 {
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_video*)));
@@ -18198,6 +18205,14 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_anim_prop *ufbxi_find_anim_prop_start
 	ufbxi_macro_lower_bound_eq(ufbx_anim_prop, 16, &index, layer->anim_props.data, 0, layer->anim_props.count,
 		(a->element < element), (a->element == element));
 	return index != SIZE_MAX ? &layer->anim_props.data[index] : NULL;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_bone_poses(ufbxi_context *uc, ufbx_pose *pose)
+{
+	size_t count = pose->bone_poses.count;
+	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, pose->bone_poses.count * sizeof(ufbx_bone_pose)));
+	ufbxi_stable_sort(sizeof(ufbx_bone_pose), 16, pose->bone_poses.data, uc->tmp_arr, count, &ufbxi_bone_pose_less, NULL);
+	return 1;
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_skin_weights(ufbxi_context *uc, ufbx_skin_deformer *skin)
@@ -20483,11 +20498,16 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			ufbx_element *elem = ufbxi_find_element_by_fbx_id(uc, tmp_poses[i].bone_fbx_id);
 			if (!elem || elem->type != UFBX_ELEMENT_NODE) continue;
 
+			ufbx_node *node = (ufbx_node*)elem;
 			ufbx_bone_pose *bone = &pose->bone_poses.data[pose->bone_poses.count++];
-			bone->bone_node = (ufbx_node*)elem;
+			bone->bone_node = node;
 			bone->bone_to_world = tmp_poses[i].bone_to_world;
 
 			if (pose->is_bind_pose) {
+				if (node->bind_pose == NULL) {
+					node->bind_pose = pose;
+				}
+
 				ufbx_connection_list node_conns = ufbxi_find_src_connections(elem, NULL);
 				ufbxi_for_list(ufbx_connection, conn, node_conns) {
 					if (conn->dst->type != UFBX_ELEMENT_SKIN_CLUSTER) continue;
@@ -20498,6 +20518,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				}
 			}
 		}
+		ufbxi_check(ufbxi_sort_bone_poses(uc, pose));
 	}
 
 	// Fetch pointers that may break elements
@@ -21922,6 +21943,24 @@ ufbxi_noinline static void ufbxi_update_line_curve(ufbx_line_curve *line)
 	line->color = ufbxi_find_vec3(&line->props, ufbxi_Color, 1.0f, 1.0f, 1.0f);
 }
 
+ufbxi_noinline static void ufbxi_update_pose(ufbx_pose *pose)
+{
+	ufbxi_for_list(ufbx_bone_pose, bone, pose->bone_poses) {
+		ufbx_node *node = bone->bone_node;
+
+		const ufbx_matrix *parent_to_world = &ufbx_identity_matrix;
+		ufbx_bone_pose *bone_pose = ufbx_get_bone_pose(pose, node->parent);
+		if (bone_pose) {
+			parent_to_world = &bone_pose->bone_to_world;
+		} else if (node->parent) {
+			parent_to_world = &node->parent->node_to_world;
+		}
+
+		ufbx_matrix world_to_parent = ufbx_matrix_invert(parent_to_world);
+		bone->bone_to_parent = ufbx_matrix_mul(&world_to_parent, &bone->bone_to_world);
+	}
+}
+
 ufbxi_noinline static void ufbxi_update_skin_cluster(ufbx_skin_cluster *cluster)
 {
 	if (cluster->bone_node) {
@@ -22455,6 +22494,10 @@ ufbxi_noinline static void ufbxi_update_scene(ufbx_scene *scene, bool initial, c
 
 	if (initial) {
 		ufbxi_update_initial_clusters(scene);
+
+		ufbxi_for_ptr_list(ufbx_pose, p_pose, scene->poses) {
+			ufbxi_update_pose(*p_pose);
+		}
 	}
 
 	ufbxi_for_ptr_list(ufbx_skin_cluster, p_cluster, scene->skin_clusters) {
@@ -24667,6 +24710,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 		node->camera = (ufbx_camera*)ufbxi_translate_element(ec, node->camera);
 		node->inherit_scale_node = (ufbx_node*)ufbxi_translate_element(ec, node->inherit_scale_node);
 		node->scale_helper = (ufbx_node*)ufbxi_translate_element(ec, node->scale_helper);
+		node->bind_pose = (ufbx_pose*)ufbxi_translate_element(ec, node->bind_pose);
 
 		if (node->all_attribs.count > 1) {
 			ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &node->all_attribs));
@@ -29541,6 +29585,15 @@ ufbx_abi ufbx_quat ufbx_evaluate_baked_quat(ufbx_baked_quat_list keyframes, doub
 	}
 
 	return keyframes.data[keyframes.count - 1].value;
+}
+
+ufbx_abi ufbx_bone_pose *ufbx_get_bone_pose(const ufbx_pose *pose, const ufbx_node *node)
+{
+	if (!pose || !node) return NULL;
+	size_t index = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbx_bone_pose, 8, &index, pose->bone_poses.data, 0, pose->bone_poses.count,
+		( a->bone_node->typed_id < node->typed_id ), ( a->bone_node == node ));
+	return index < SIZE_MAX ? &pose->bone_poses.data[index] : NULL;
 }
 
 ufbx_abi ufbx_texture *ufbx_find_prop_texture_len(const ufbx_material *material, const char *name, size_t name_len)
