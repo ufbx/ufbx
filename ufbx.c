@@ -484,7 +484,7 @@
 	typedef double ufbxi_unaligned_f64;
 #endif
 
-#if defined(UFBXI_HAS_UNALIGNED) && ((defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__) || defined(__wasm__) || defined(__EMSCRIPTEN__)) && !defined(UFBX_NO_UNALIGNED_LOADS) || defined(UFBX_USE_UNALIGNED_LOADS))
+#if (defined(UFBXI_HAS_UNALIGNED) && UFBX_LITTLE_ENDIAN && !defined(UFBX_NO_UNALIGNED_LOADS)) || defined(UFBX_USE_UNALIGNED_LOADS)
 	#define ufbxi_read_u16(ptr) (*(const ufbxi_unaligned ufbxi_unaligned_u16*)(ptr))
 	#define ufbxi_read_u32(ptr) (*(const ufbxi_unaligned ufbxi_unaligned_u32*)(ptr))
 	#define ufbxi_read_u64(ptr) (*(const ufbxi_unaligned ufbxi_unaligned_u64*)(ptr))
