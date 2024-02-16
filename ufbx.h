@@ -3300,6 +3300,10 @@ typedef enum ufbx_warning_type UFBX_ENUM_REPR {
 	// Duplicated connection between two elements that shouldn't have.
 	UFBX_WARNING_DUPLICATE_CONNECTION,
 
+	// File references a dependency (eg. a texture) with only an absolute path.
+	// In these cases the base filename is used for eg. `ufbx_texture.filename`.
+	UFBX_WARNING_ABSOLUTE_FILENAME,
+
 	// Out-of-bounds index has been clamped to be in-bounds.
 	// HINT: You can use `ufbx_index_error_handling` to adjust behavior.
 	UFBX_WARNING_INDEX_CLAMPED,

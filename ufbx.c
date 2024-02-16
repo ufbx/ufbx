@@ -15506,6 +15506,16 @@ static ufbxi_forceinline size_t ufbxi_strblob_length(const ufbxi_strblob *strblo
 	return raw ? strblob->blob.size : strblob->str.length;
 }
 
+ufbxi_nodiscard ufbxi_noinline static bool ufbxi_is_absolute_path(const char *path, size_t length)
+{
+	if (length > 0 && (path[0] == '/' || path[0] == '\\')) {
+		return true;
+	} else if (length > 2 && path[1] == ':' && (path[2] == '\\' || path[2] == '/')) {
+		return true;
+	}
+	return false;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_context *uc, ufbxi_strblob *p_dst, const ufbxi_strblob *p_src, bool raw)
 {
 	const char *src = ufbxi_strblob_data(p_src, raw);
@@ -15529,6 +15539,22 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_
 	} else {
 		prefix_data = (const char*)uc->scene.metadata.relative_root.data;
 		prefix_length = uc->scene.metadata.relative_root.length;
+	}
+
+	// Convert absolute paths to filename
+	if (prefix_length > 0 && ufbxi_is_absolute_path(src, src_length)) {
+		ufbxi_check(ufbxi_warnf(UFBX_WARNING_ABSOLUTE_FILENAME, "Absolute filename reference: %.*s", (int)src_length, src));
+
+		size_t filename_start = src_length;
+		while (filename_start > 0) {
+			char c = src[filename_start - 1];
+			if (c == '/' || c == '\\') break;
+			filename_start--;
+		}
+		if (filename_start > 0) {
+			src = src + filename_start;
+			src_length -= filename_start;
+		}
 	}
 
 	// Undo directories from `prefix` for every `..`

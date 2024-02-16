@@ -1664,3 +1664,40 @@ UFBXT_FILE_TEST(maya_duplicated_texture)
 	}
 }
 #endif
+
+#if UFBXT_IMPL
+static void ufbxt_normalize_dirs(char *data)
+{
+	for (char *c = data; *c; c++) {
+		if (*c == '\\') {
+			*c = '/';
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(maya_absolute_texture)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = ufbx_find_material(scene, "lambert1");
+	ufbxt_assert(material);
+
+	ufbx_texture *texture = material->fbx.diffuse_color.texture;
+	ufbxt_assert(texture);
+	ufbxt_assert(!strcmp(texture->relative_filename.data, "W:\\checkerboard_diffuse.png"));
+	ufbxt_assert(!strcmp(texture->absolute_filename.data, "W:/checkerboard_diffuse.png"));
+
+	char filename_normalized[512];
+	snprintf(filename_normalized, sizeof(filename_normalized), "%s", texture->filename.data);
+
+	char filename_ref[512];
+	snprintf(filename_ref, sizeof(filename_ref), "%s%s", data_root, "checkerboard_diffuse.png");
+
+	ufbxt_normalize_dirs(filename_normalized);
+	ufbxt_normalize_dirs(filename_ref);
+
+	ufbxt_assert(!strcmp(filename_normalized, filename_ref));
+
+	ufbxt_check_warning(scene, UFBX_WARNING_ABSOLUTE_FILENAME, UFBX_ELEMENT_UNKNOWN, NULL, 1, "Absolute filename reference: W:\\checkerboard_diffuse.png");
+}
+#endif
