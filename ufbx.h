@@ -2154,11 +2154,24 @@ struct ufbx_cache_file {
 		uint32_t typed_id;
 	}; };
 
+	// Filename relative to the currently loaded file.
+	// HINT: If using functions other than `ufbx_load_file()`, you can provide
+	// `ufbx_load_opts.filename/raw_filename` to let ufbx resolve this.
 	ufbx_string filename;
+	// Absolute filename specified in the file.
 	ufbx_string absolute_filename;
+	// Relative filename specified in the file.
+	// NOTE: May be absolute if the file is saved in a different drive.
 	ufbx_string relative_filename;
+
+	// Filename relative to the loaded file, non-UTF-8 encoded.
+	// HINT: If using functions other than `ufbx_load_file()`, you can provide
+	// `ufbx_load_opts.filename/raw_filename` to let ufbx resolve this.
 	ufbx_blob raw_filename;
+	// Absolute filename specified in the file, non-UTF-8 encoded.
 	ufbx_blob raw_absolute_filename;
+	// Relative filename specified in the file, non-UTF-8 encoded.
+	// NOTE: May be absolute if the file is saved in a different drive.
 	ufbx_blob raw_relative_filename;
 
 	ufbx_cache_file_format format;
@@ -2729,11 +2742,25 @@ typedef struct ufbx_texture_file {
 	uint32_t index;
 
 	// Paths to the resource.
+
+	// Filename relative to the currently loaded file.
+	// HINT: If using functions other than `ufbx_load_file()`, you can provide
+	// `ufbx_load_opts.filename/raw_filename` to let ufbx resolve this.
 	ufbx_string filename;
+	// Absolute filename specified in the file.
 	ufbx_string absolute_filename;
+	// Relative filename specified in the file.
+	// NOTE: May be absolute if the file is saved in a different drive.
 	ufbx_string relative_filename;
+
+	// Filename relative to the loaded file, non-UTF-8 encoded.
+	// HINT: If using functions other than `ufbx_load_file()`, you can provide
+	// `ufbx_load_opts.filename/raw_filename` to let ufbx resolve this.
 	ufbx_blob raw_filename;
+	// Absolute filename specified in the file, non-UTF-8 encoded.
 	ufbx_blob raw_absolute_filename;
+	// Relative filename specified in the file, non-UTF-8 encoded.
+	// NOTE: May be absolute if the file is saved in a different drive.
 	ufbx_blob raw_relative_filename;
 
 	// Optional embedded content blob, eg. raw .png format data
@@ -2756,11 +2783,25 @@ struct ufbx_texture {
 	ufbx_texture_type type;
 
 	// FILE: Paths to the resource
+
+	// Filename relative to the currently loaded file.
+	// HINT: If using functions other than `ufbx_load_file()`, you can provide
+	// `ufbx_load_opts.filename/raw_filename` to let ufbx resolve this.
 	ufbx_string filename;
+	// Absolute filename specified in the file.
 	ufbx_string absolute_filename;
+	// Relative filename specified in the file.
+	// NOTE: May be absolute if the file is saved in a different drive.
 	ufbx_string relative_filename;
+
+	// Filename relative to the loaded file, non-UTF-8 encoded.
+	// HINT: If using functions other than `ufbx_load_file()`, you can provide
+	// `ufbx_load_opts.filename/raw_filename` to let ufbx resolve this.
 	ufbx_blob raw_filename;
+	// Absolute filename specified in the file, non-UTF-8 encoded.
 	ufbx_blob raw_absolute_filename;
+	// Relative filename specified in the file, non-UTF-8 encoded.
+	// NOTE: May be absolute if the file is saved in a different drive.
 	ufbx_blob raw_relative_filename;
 
 	// FILE: Optional embedded content blob, eg. raw .png format data
@@ -2811,11 +2852,25 @@ struct ufbx_video {
 	}; };
 
 	// Paths to the resource
+
+	// Filename relative to the currently loaded file.
+	// HINT: If using functions other than `ufbx_load_file()`, you can provide
+	// `ufbx_load_opts.filename/raw_filename` to let ufbx resolve this.
 	ufbx_string filename;
+	// Absolute filename specified in the file.
 	ufbx_string absolute_filename;
+	// Relative filename specified in the file.
+	// NOTE: May be absolute if the file is saved in a different drive.
 	ufbx_string relative_filename;
+
+	// Filename relative to the loaded file, non-UTF-8 encoded.
+	// HINT: If using functions other than `ufbx_load_file()`, you can provide
+	// `ufbx_load_opts.filename/raw_filename` to let ufbx resolve this.
 	ufbx_blob raw_filename;
+	// Absolute filename specified in the file, non-UTF-8 encoded.
 	ufbx_blob raw_absolute_filename;
+	// Relative filename specified in the file, non-UTF-8 encoded.
+	// NOTE: May be absolute if the file is saved in a different drive.
 	ufbx_blob raw_relative_filename;
 
 	// Optional embedded content blob
