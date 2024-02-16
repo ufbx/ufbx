@@ -171,6 +171,7 @@ typedef struct {
 	ufbx_quat fbx_rotation;
 
 	char animation_name[128];
+	char model_name[128];
 
 } ufbxt_obj_file;
 
@@ -748,6 +749,12 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 				size_t len = strcspn(line, "\r\n");
 				ufbxt_assert(len + 1 < sizeof(obj->animation_name));
 				memcpy(obj->animation_name, line, len);
+			}
+			if (!strncmp(line, "ufbx:model=", 11)) {
+				line += 11;
+				size_t len = strcspn(line, "\r\n");
+				ufbxt_assert(len + 1 < sizeof(obj->model_name));
+				memcpy(obj->model_name, line, len);
 			}
 			double tolerance = 0.0;
 			if (sscanf(line, "ufbx:tolerance=%lf", &tolerance) == 1) {
