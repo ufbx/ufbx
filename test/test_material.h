@@ -1666,17 +1666,21 @@ UFBXT_FILE_TEST(maya_duplicated_texture)
 #endif
 
 #if UFBXT_IMPL
-static void ufbxt_normalize_dirs(char *data)
+static ufbx_load_opts ufbxt_slash_separator_opts()
 {
-	for (char *c = data; *c; c++) {
-		if (*c == '\\') {
-			*c = '/';
-		}
-	}
+	ufbx_load_opts opts = { 0 };
+	opts.path_separator = '/';
+	return opts;
+}
+static ufbx_load_opts ufbxt_backslash_separator_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.path_separator = '\\';
+	return opts;
 }
 #endif
 
-UFBXT_FILE_TEST(maya_absolute_texture)
+UFBXT_FILE_TEST_OPTS(maya_absolute_texture, ufbxt_slash_separator_opts)
 #if UFBXT_IMPL
 {
 	ufbx_material *material = ufbx_find_material(scene, "lambert1");
@@ -1686,18 +1690,20 @@ UFBXT_FILE_TEST(maya_absolute_texture)
 	ufbxt_assert(texture);
 	ufbxt_assert(!strcmp(texture->relative_filename.data, "W:\\checkerboard_diffuse.png"));
 	ufbxt_assert(!strcmp(texture->absolute_filename.data, "W:/checkerboard_diffuse.png"));
+	ufbxt_assert(!strcmp(texture->filename.data, "W:/checkerboard_diffuse.png"));
+}
+#endif
 
-	char filename_normalized[512];
-	snprintf(filename_normalized, sizeof(filename_normalized), "%s", texture->filename.data);
+UFBXT_FILE_TEST_OPTS_ALT(maya_absolute_texture_backslash, maya_absolute_texture, ufbxt_backslash_separator_opts)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = ufbx_find_material(scene, "lambert1");
+	ufbxt_assert(material);
 
-	char filename_ref[512];
-	snprintf(filename_ref, sizeof(filename_ref), "%s%s", data_root, "checkerboard_diffuse.png");
-
-	ufbxt_normalize_dirs(filename_normalized);
-	ufbxt_normalize_dirs(filename_ref);
-
-	ufbxt_assert(!strcmp(filename_normalized, filename_ref));
-
-	ufbxt_check_warning(scene, UFBX_WARNING_ABSOLUTE_FILENAME, UFBX_ELEMENT_UNKNOWN, NULL, 1, "Absolute filename reference: W:\\checkerboard_diffuse.png");
+	ufbx_texture *texture = material->fbx.diffuse_color.texture;
+	ufbxt_assert(texture);
+	ufbxt_assert(!strcmp(texture->relative_filename.data, "W:\\checkerboard_diffuse.png"));
+	ufbxt_assert(!strcmp(texture->absolute_filename.data, "W:/checkerboard_diffuse.png"));
+	ufbxt_assert(!strcmp(texture->filename.data, "W:\\checkerboard_diffuse.png"));
 }
 #endif

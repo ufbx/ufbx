@@ -15541,20 +15541,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_
 		prefix_length = uc->scene.metadata.relative_root.length;
 	}
 
-	// Convert absolute paths to filename
-	if (prefix_length > 0 && ufbxi_is_absolute_path(src, src_length)) {
-		ufbxi_check(ufbxi_warnf(UFBX_WARNING_ABSOLUTE_FILENAME, "Absolute filename reference: %.*s", (int)src_length, src));
-
-		size_t filename_start = src_length;
-		while (filename_start > 0) {
-			char c = src[filename_start - 1];
-			if (c == '/' || c == '\\') break;
-			filename_start--;
-		}
-		if (filename_start > 0) {
-			src = src + filename_start;
-			src_length -= filename_start;
-		}
+	// Retain absolute paths
+	if (ufbxi_is_absolute_path(src, src_length)) {
+		prefix_length = 0;
 	}
 
 	// Undo directories from `prefix` for every `..`
