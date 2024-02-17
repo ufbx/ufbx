@@ -10,7 +10,7 @@ import math
 import itertools
 import datetime
 
-LATEST_SUPPORTED_DATE = "2023-11-13"
+LATEST_SUPPORTED_DATE = "2024-02-18"
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -180,6 +180,10 @@ def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time):
                 elif feature == "inherit-mode":
                     append_unique_opt(options, "inherit-mode-handling", [
                         "preserve", "helper-nodes", "compensate",
+                    ])
+                elif feature == "pivot":
+                    append_unique_opt(options, "pivot-handling", [
+                        "retain", "adjust-to-pivot",
                     ])
                 elif feature == "bake":
                     append_unique_opt(options, "bake", [False, True])

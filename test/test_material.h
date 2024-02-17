@@ -887,6 +887,30 @@ UFBXT_FILE_TEST(maya_arnold_properties)
 }
 #endif
 
+UFBXT_FILE_TEST_ALT(maya_arnold_properties_shader, maya_arnold_properties)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "aiStandardSurface1");
+	ufbxt_assert(material);
+	ufbxt_assert(material->shader_type == UFBX_SHADER_ARNOLD_STANDARD_SURFACE);
+
+	ufbx_shader *shader = material->shader;
+	ufbxt_assert(shader);
+	ufbxt_assert(shader->type == UFBX_SHADER_ARNOLD_STANDARD_SURFACE);
+
+	ufbx_string prop = ufbx_find_shader_prop(shader, "baseColor");
+	ufbxt_assert(!strcmp(prop.data, "Maya|baseColor"));
+
+	ufbx_vec3 base_color = ufbx_find_vec3(&material->props, prop.data, ufbx_zero_vec3);
+	ufbxt_assert(2 == (int)round(100.0f * base_color.x));
+	ufbxt_assert(3 == (int)round(100.0f * base_color.y));
+	ufbxt_assert(4 == (int)round(100.0f * base_color.z));
+
+	ufbx_string prop_none = ufbx_find_shader_prop(shader, "nonexistent");
+	ufbxt_assert(prop_none.length == 0);
+}
+#endif
+
 UFBXT_FILE_TEST(maya_osl_properties)
 #if UFBXT_IMPL
 {
@@ -1638,5 +1662,48 @@ UFBXT_FILE_TEST(maya_duplicated_texture)
 		ufbxt_assert(!strcmp(texture->uv_set.data, "second"));
 		ufbxt_assert(!texture->has_uv_transform);
 	}
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_slash_separator_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.path_separator = '/';
+	return opts;
+}
+static ufbx_load_opts ufbxt_backslash_separator_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.path_separator = '\\';
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(maya_absolute_texture, ufbxt_slash_separator_opts)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = ufbx_find_material(scene, "lambert1");
+	ufbxt_assert(material);
+
+	ufbx_texture *texture = material->fbx.diffuse_color.texture;
+	ufbxt_assert(texture);
+	ufbxt_assert(!strcmp(texture->relative_filename.data, "W:\\checkerboard_diffuse.png"));
+	ufbxt_assert(!strcmp(texture->absolute_filename.data, "W:/checkerboard_diffuse.png"));
+	ufbxt_assert(!strcmp(texture->filename.data, "W:/checkerboard_diffuse.png"));
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_absolute_texture_backslash, maya_absolute_texture, ufbxt_backslash_separator_opts)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = ufbx_find_material(scene, "lambert1");
+	ufbxt_assert(material);
+
+	ufbx_texture *texture = material->fbx.diffuse_color.texture;
+	ufbxt_assert(texture);
+	ufbxt_assert(!strcmp(texture->relative_filename.data, "W:\\checkerboard_diffuse.png"));
+	ufbxt_assert(!strcmp(texture->absolute_filename.data, "W:/checkerboard_diffuse.png"));
+	ufbxt_assert(!strcmp(texture->filename.data, "W:\\checkerboard_diffuse.png"));
 }
 #endif

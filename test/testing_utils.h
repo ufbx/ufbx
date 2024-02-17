@@ -92,6 +92,11 @@ static ufbx_vec3 ufbxt_cross3(ufbx_vec3 a, ufbx_vec3 b)
 	return v;
 }
 
+static bool ufbxt_eq3(ufbx_vec3 a, ufbx_vec3 b)
+{
+	return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
 static ufbx_vec3 ufbxt_normalize(ufbx_vec3 a) {
 	ufbx_real len = (ufbx_real)sqrt(ufbxt_dot3(a, a));
 	if (len != 0.0) {
@@ -147,6 +152,7 @@ typedef struct {
 	bool remove_namespaces;
 	bool match_by_order;
 	bool negate_xz;
+	bool bind_pose;
 	ufbx_real tolerance;
 	ufbx_real uv_tolerance;
 	uint32_t allow_missing;
@@ -165,6 +171,7 @@ typedef struct {
 	ufbx_quat fbx_rotation;
 
 	char animation_name[128];
+	char model_name[128];
 
 } ufbxt_obj_file;
 
@@ -731,6 +738,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			if (!strcmp(line, "ufbx:negate_xz")) {
 				obj->negate_xz = true;
 			}
+			if (!strcmp(line, "ufbx:bind_pose")) {
+				obj->bind_pose = true;
+			}
 			if (!strcmp(line, "www.blender.org")) {
 				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
 			}
@@ -739,6 +749,12 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 				size_t len = strcspn(line, "\r\n");
 				ufbxt_assert(len + 1 < sizeof(obj->animation_name));
 				memcpy(obj->animation_name, line, len);
+			}
+			if (!strncmp(line, "ufbx:model=", 11)) {
+				line += 11;
+				size_t len = strcspn(line, "\r\n");
+				ufbxt_assert(len + 1 < sizeof(obj->model_name));
+				memcpy(obj->model_name, line, len);
 			}
 			double tolerance = 0.0;
 			if (sscanf(line, "ufbx:tolerance=%lf", &tolerance) == 1) {

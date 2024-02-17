@@ -69,6 +69,11 @@ static const ufbxt_enum_name ufbxt_names_ufbx_index_error_handling[] = {
 	{ "unsafe-ignore", UFBX_INDEX_ERROR_HANDLING_UNSAFE_IGNORE },
 };
 
+static const ufbxt_enum_name ufbxt_names_ufbx_pivot_handling[] = {
+	{ "retain", UFBX_PIVOT_HANDLING_RETAIN },
+	{ "adjust-to-pivot", UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT },
+};
+
 static int ufbxt_str_to_enum_imp(const ufbxt_enum_name *names, size_t count, const char *type_name, const char *name)
 {
 	for (size_t i = 0; i < count; i++) {
@@ -190,6 +195,8 @@ int check_fbx_main(int argc, char **argv, const char *path)
 			if (++i < argc) opts.geometry_transform_handling = ufbxt_str_to_enum(ufbx_geometry_transform_handling, argv[i]);
 		} else if (!strcmp(argv[i], "--inherit-mode-handling")) {
 			if (++i < argc) opts.inherit_mode_handling = ufbxt_str_to_enum(ufbx_inherit_mode_handling, argv[i]);
+		} else if (!strcmp(argv[i], "--pivot-handling")) {
+			if (++i < argc) opts.pivot_handling = ufbxt_str_to_enum(ufbx_pivot_handling, argv[i]);
 		} else if (!strcmp(argv[i], "--space-conversion")) {
 			if (++i < argc) opts.space_conversion = ufbxt_str_to_enum(ufbx_space_conversion, argv[i]);
 		} else if (!strcmp(argv[i], "--index-error-handling")) {
@@ -417,6 +424,16 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		if (node->has_geometry_transform) {
 			ufbxt_add_feature(&features, "geometry-transform");
 		}
+
+		ufbx_vec3 rotation_pivot = ufbx_find_vec3(&node->props, "RotationPivot", ufbx_zero_vec3);
+		ufbx_vec3 scale_pivot = ufbx_find_vec3(&node->props, "ScalingPivot", ufbx_zero_vec3);
+		if (!ufbxt_eq3(rotation_pivot, ufbx_zero_vec3)) {
+			if (ufbxt_eq3(rotation_pivot, scale_pivot)) {
+				ufbxt_add_feature(&features, "simple-pivot");
+			} else {
+				ufbxt_add_feature(&features, "complex-pivot");
+			}
+		}
 	}
 
 	for (size_t i = 0; i < scene->meshes.count; i++) {
@@ -464,7 +481,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		#endif
 
 		ufbx_scene *state;
-		if (obj_file->animation_frame >= 0 || frame != INT_MIN) {
+		if (obj_file->animation_frame >= 0 || frame != INT_MIN || obj_file->bind_pose) {
 			ufbx_anim *anim = scene->anim;
 
 			if (obj_file->animation_name[0]) {
@@ -536,6 +553,36 @@ int check_fbx_main(int argc, char **argv, const char *path)
 
 				anim = ufbx_create_anim(scene, &anim_opts, NULL);
 				ufbxt_assert(anim);
+
+				free(prop_overrides);
+				free(transform_overrides);
+
+			} else if (obj_file->bind_pose) {
+
+				ufbx_transform_override *transform_overrides = (ufbx_transform_override*)calloc(scene->nodes.count, sizeof(ufbx_transform_override));
+
+				size_t num_transform_overrides = 0;
+				for (size_t i = 0; i < scene->nodes.count; i++) {
+					ufbx_node *node = scene->nodes.data[i];
+					if (!node->bind_pose) continue;
+
+					ufbx_bone_pose *pose = ufbx_get_bone_pose(node->bind_pose, node);
+					ufbxt_assert(pose);
+					ufbx_transform local_transform = ufbx_matrix_to_transform(&pose->bone_to_parent);
+
+					ufbx_transform_override *over = &transform_overrides[num_transform_overrides++];
+					over->node_id = node->typed_id;
+					over->transform = local_transform;
+				}
+
+				ufbx_anim_opts anim_opts = { 0 };
+				anim_opts.transform_overrides.data = transform_overrides;
+				anim_opts.transform_overrides.count = num_transform_overrides;
+
+				anim = ufbx_create_anim(scene, &anim_opts, NULL);
+				ufbxt_assert(anim);
+
+				free(transform_overrides);
 			}
 
 			ufbx_evaluate_opts eval_opts = { 0 };
@@ -551,8 +598,69 @@ int check_fbx_main(int argc, char **argv, const char *path)
 			ufbx_retain_scene(state);
 		}
 
+		ufbx_scene *model;
+		if (obj_file->model_name[0]) {
+			char model_path[512];
+			size_t base_length = strlen(path);
+			while (base_length > 0) {
+				char c = path[base_length - 1];
+				if (c == '/' || c == '\\') break;
+				base_length -= 1;
+			}
+
+			int model_path_len = snprintf(model_path, sizeof(model_path), "%.*s%s",
+				(int)base_length, path, obj_file->model_name);
+			ufbxt_assert(model_path_len > 0 && model_path_len < sizeof(model_path));
+
+			ufbx_scene *model_scene = ufbx_load_file(model_path, &opts, &error);
+			if (!model_scene) {
+				char buf[1024];
+				ufbx_format_error(buf, sizeof(buf), &error);
+				fprintf(stderr, "%s\n", buf);
+				return 1;
+			}
+
+			ufbxt_check_scene(model_scene);
+
+			ufbx_transform_override *transform_overrides = (ufbx_transform_override*)calloc(state->nodes.count, sizeof(ufbx_transform_override));
+			ufbxt_assert(transform_overrides);
+			size_t num_transform_overrides = 0;
+
+			for (size_t i = 0; i < state->nodes.count; i++) {
+				ufbx_node *state_node = state->nodes.data[i];
+				if (state_node->is_root) continue;
+
+				ufbx_node *model_node = ufbx_find_node(model_scene, state_node->name.data);
+				if (!model_node) continue;
+
+				ufbx_transform_override *over = &transform_overrides[num_transform_overrides++];
+				over->node_id = model_node->typed_id;
+				over->transform = state_node->local_transform;
+			}
+
+			ufbx_anim_opts anim_opts = { 0 };
+			anim_opts.transform_overrides.data = transform_overrides;
+			anim_opts.transform_overrides.count = num_transform_overrides;
+
+			ufbx_anim *model_anim = ufbx_create_anim(model_scene, &anim_opts, NULL);
+			ufbxt_assert(model_anim);
+
+			ufbx_evaluate_opts eval_opts = { 0 };
+			eval_opts.evaluate_skinning = true;
+			eval_opts.evaluate_caches = true;
+			eval_opts.load_external_files = true;
+			model = ufbx_evaluate_scene(model_scene, model_anim, 0.0, &eval_opts, NULL);
+			ufbxt_assert(model);
+
+			ufbx_free_scene(model_scene);
+			free(transform_overrides);
+		} else {
+			model = state;
+			ufbx_retain_scene(model);
+		}
+
 		if (dump_obj_path) {
-			ufbxt_debug_dump_obj_scene(dump_obj_path, state);
+			ufbxt_debug_dump_obj_scene(dump_obj_path, model);
 			printf("Dumped .obj to %s\n", dump_obj_path);
 		}
 
@@ -564,13 +672,14 @@ int check_fbx_main(int argc, char **argv, const char *path)
 			diff_flags |= UFBXT_OBJ_DIFF_FLAG_BAKED_ANIM;
 		}
 
-		ufbxt_diff_to_obj(state, obj_file, &err, diff_flags);
+		ufbxt_diff_to_obj(model, obj_file, &err, diff_flags);
 
 		if (err.num > 0) {
 			ufbx_real avg = err.sum / (ufbx_real)err.num;
 			printf("Absolute diff: avg %.3g, max %.3g (%zu tests)\n", avg, err.max, err.num);
 		}
 
+		ufbx_free_scene(model);
 		ufbx_free_scene(state);
 		free(obj_file);
 	} else {

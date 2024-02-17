@@ -916,3 +916,164 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(motionbuilder_sausage_rrss_helper, motionbuilder_
 }
 #endif
 
+UFBXT_FILE_TEST(maya_poses)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_pose *pose = ufbx_as_pose(ufbx_find_element(scene, UFBX_ELEMENT_POSE, "skinCluster1"));
+		ufbxt_assert(pose);
+
+		ufbx_transform_override transform_overrides[5];
+		ufbxt_assert(pose->bone_poses.count == ufbxt_arraycount(transform_overrides));
+
+		for (size_t i = 0; i < pose->bone_poses.count; i++) {
+			ufbx_bone_pose *bone = &pose->bone_poses.data[i];
+			ufbx_transform transform = ufbx_matrix_to_transform(&bone->bone_to_parent);
+			transform_overrides[i].node_id = bone->bone_node->typed_id;
+			transform_overrides[i].transform = transform;
+		}
+
+		ufbx_anim_opts opts = { 0 };
+		opts.transform_overrides.data = transform_overrides;
+		opts.transform_overrides.count = ufbxt_arraycount(transform_overrides);
+		ufbx_anim *anim = ufbx_create_anim(scene, &opts, NULL);
+		ufbxt_assert(anim);
+
+		ufbx_evaluate_opts eval_opts = { 0 };
+		eval_opts.evaluate_skinning = true;
+
+		ufbx_scene *state = ufbx_evaluate_scene(scene, anim, 0.0, &eval_opts, NULL);
+		ufbxt_assert(state);
+
+		ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_poses_bind1", NULL);
+
+		ufbxt_diff_to_obj(state, obj_file, err, 0);
+
+		free(obj_file);
+		ufbx_free_scene(state);
+		ufbx_free_anim(anim);
+	}
+
+	{
+		ufbx_pose *pose = ufbx_as_pose(ufbx_find_element(scene, UFBX_ELEMENT_POSE, "skinCluster2"));
+		ufbxt_assert(pose);
+
+		ufbx_transform_override transform_overrides[5];
+		ufbxt_assert(pose->bone_poses.count == ufbxt_arraycount(transform_overrides));
+
+		for (size_t i = 0; i < pose->bone_poses.count; i++) {
+			ufbx_bone_pose *bone = &pose->bone_poses.data[i];
+			ufbx_transform transform = ufbx_matrix_to_transform(&bone->bone_to_parent);
+			transform_overrides[i].node_id = bone->bone_node->typed_id;
+			transform_overrides[i].transform = transform;
+		}
+
+		ufbx_anim_opts opts = { 0 };
+		opts.transform_overrides.data = transform_overrides;
+		opts.transform_overrides.count = ufbxt_arraycount(transform_overrides);
+		ufbx_anim *anim = ufbx_create_anim(scene, &opts, NULL);
+		ufbxt_assert(anim);
+
+		ufbx_evaluate_opts eval_opts = { 0 };
+		eval_opts.evaluate_skinning = true;
+
+		ufbx_scene *state = ufbx_evaluate_scene(scene, anim, 0.0, &eval_opts, NULL);
+		ufbxt_assert(state);
+
+		ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_poses_bind2", NULL);
+
+		ufbxt_diff_to_obj(state, obj_file, err, 0);
+
+		free(obj_file);
+		ufbx_free_scene(state);
+		ufbx_free_anim(anim);
+	}
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_lefthanded_y_up_z_flip_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.target_axes = ufbx_axes_left_handed_y_up;
+	opts.handedness_conversion_axis = UFBX_MIRROR_AXIS_Z;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_poses_lefthanded, maya_poses, ufbxt_lefthanded_y_up_z_flip_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_pose *pose = ufbx_as_pose(ufbx_find_element(scene, UFBX_ELEMENT_POSE, "skinCluster1"));
+		ufbxt_assert(pose);
+
+		ufbx_transform_override transform_overrides[5];
+		ufbxt_assert(pose->bone_poses.count == ufbxt_arraycount(transform_overrides));
+
+		for (size_t i = 0; i < pose->bone_poses.count; i++) {
+			ufbx_bone_pose *bone = &pose->bone_poses.data[i];
+			ufbx_transform transform = ufbx_matrix_to_transform(&bone->bone_to_parent);
+			transform_overrides[i].node_id = bone->bone_node->typed_id;
+			transform_overrides[i].transform = transform;
+		}
+
+		ufbx_anim_opts opts = { 0 };
+		opts.transform_overrides.data = transform_overrides;
+		opts.transform_overrides.count = ufbxt_arraycount(transform_overrides);
+		ufbx_anim *anim = ufbx_create_anim(scene, &opts, NULL);
+		ufbxt_assert(anim);
+
+		ufbx_evaluate_opts eval_opts = { 0 };
+		eval_opts.evaluate_skinning = true;
+
+		ufbx_scene *state = ufbx_evaluate_scene(scene, anim, 0.0, &eval_opts, NULL);
+		ufbxt_assert(state);
+
+		ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_poses_bind1_lefthanded", NULL);
+
+		ufbxt_diff_to_obj(state, obj_file, err, 0);
+
+		free(obj_file);
+		ufbx_free_scene(state);
+		ufbx_free_anim(anim);
+	}
+
+	{
+		ufbx_pose *pose = ufbx_as_pose(ufbx_find_element(scene, UFBX_ELEMENT_POSE, "skinCluster2"));
+		ufbxt_assert(pose);
+
+		ufbx_transform_override transform_overrides[5];
+		ufbxt_assert(pose->bone_poses.count == ufbxt_arraycount(transform_overrides));
+
+		for (size_t i = 0; i < pose->bone_poses.count; i++) {
+			ufbx_bone_pose *bone = &pose->bone_poses.data[i];
+			ufbx_transform transform = ufbx_matrix_to_transform(&bone->bone_to_parent);
+			transform_overrides[i].node_id = bone->bone_node->typed_id;
+			transform_overrides[i].transform = transform;
+		}
+
+		ufbx_anim_opts opts = { 0 };
+		opts.transform_overrides.data = transform_overrides;
+		opts.transform_overrides.count = ufbxt_arraycount(transform_overrides);
+		ufbx_anim *anim = ufbx_create_anim(scene, &opts, NULL);
+		ufbxt_assert(anim);
+
+		ufbx_evaluate_opts eval_opts = { 0 };
+		eval_opts.evaluate_skinning = true;
+
+		ufbx_scene *state = ufbx_evaluate_scene(scene, anim, 0.0, &eval_opts, NULL);
+		ufbxt_assert(state);
+
+		ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_poses_bind2_lefthanded", NULL);
+
+		ufbxt_diff_to_obj(state, obj_file, err, 0);
+
+		free(obj_file);
+		ufbx_free_scene(state);
+		ufbx_free_anim(anim);
+	}
+}
+#endif
+
+

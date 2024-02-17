@@ -7,6 +7,10 @@ UFBXT_FILE_TEST_FLAGS(maya_slime, UFBXT_FILE_TEST_FLAG_HEAVY_TO_FUZZ)
 	ufbx_node *node_high = ufbx_find_node(scene, "Slime_002:Slime_Body_high");
 	ufbxt_assert(node_high);
 	ufbxt_assert(!node_high->visible);
+
+	ufbxt_assert(scene->textures.count == 1);
+	ufbx_texture *texture = scene->textures.data[0];
+	ufbxt_assert(texture->content.size == 306577);
 }
 #endif
 
@@ -144,5 +148,38 @@ UFBXT_FILE_TEST(maya_kenney_character)
 
 		ufbx_free_scene(state);
 	}
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_ignore_content_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.ignore_all_content = true;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_slime_ignore, maya_slime, ufbxt_ignore_content_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node_high = ufbx_find_node(scene, "Slime_002:Slime_Body_high");
+	ufbxt_assert(node_high);
+	ufbxt_assert(!node_high->visible);
+
+	ufbx_mesh *mesh = node_high->mesh;
+	ufbxt_assert(mesh);
+	ufbxt_assert(mesh->num_faces == 0);
+	ufbxt_assert(mesh->num_vertices == 0);
+
+	ufbxt_assert(scene->anim_curves.count == 76);
+	for (size_t i = 0; i < scene->anim_curves.count; i++) {
+		ufbx_anim_curve *curve = scene->anim_curves.data[i];
+		ufbxt_assert(curve->keyframes.count == 0);
+	}
+
+	ufbxt_assert(scene->textures.count == 1);
+	ufbx_texture *texture = scene->textures.data[0];
+	ufbxt_assert(texture->content.size == 0);
 }
 #endif

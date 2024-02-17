@@ -317,3 +317,31 @@ UFBXT_TEST(matrix_inverse_random)
 	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
 }
 #endif
+
+UFBXT_TEST(quat_normalize)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	{
+		ufbx_quat q = { 1.0f, -1.0f, 2.0f, 0.0f };
+		ufbx_quat n = ufbx_quat_normalize(q);
+
+		ufbx_real len = (ufbx_real)sqrt(1*1 + 1*1 + 2*2);
+		ufbx_quat ref;
+		ref.x = (ufbx_real)1.0 / len;
+		ref.y = (ufbx_real)-1.0 / len;
+		ref.z = (ufbx_real)2.0 / len;
+		ref.w = 0.0f;
+		ufbxt_assert_close_quat(&err, n, ref);
+	}
+
+	{
+		ufbx_quat q = { 0.0f };
+		ufbx_quat n = ufbx_quat_normalize(q);
+		ufbxt_assert_close_quat(&err, n, ufbx_identity_quat);
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
