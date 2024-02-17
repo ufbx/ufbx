@@ -1659,3 +1659,72 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(node_depth_limit_ok, maya_game_sausage, ufbxt_dep
 }
 #endif
 
+UFBXT_TEST(filename_option_unicode)
+#if UFBXT_IMPL
+{
+	ufbx_error error;
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_textured_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		size_t data_size = 0;
+		char *data = ufbxt_read_file(path, &data_size);
+		ufbxt_assert(data);
+
+		{
+			ufbx_load_opts opts = { 0 };
+			opts.filename.data = "path\0/file.fbx";
+			opts.filename.length = 14;
+			opts.path_separator = '/';
+
+			ufbx_scene *scene = ufbx_load_memory(data, data_size, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_check_scene(scene);
+
+			ufbxt_assert(!strcmp(scene->metadata.filename.data, "path\xef\xbf\xbd/file.fbx"));
+			ufbxt_assert(scene->metadata.raw_filename.size == 14);
+			ufbxt_assert(!memcmp(scene->metadata.raw_filename.data, "path\0/file.fbx", 9));
+
+			ufbx_material *material = ufbx_find_material(scene, "phong1");
+			ufbxt_assert(material);
+			ufbx_texture *texture = material->fbx.diffuse_color.texture;
+			ufbxt_assert(texture);
+
+			ufbxt_assert(!strcmp(texture->filename.data, "path\xef\xbf\xbd/textures/checkerboard_diffuse.png"));
+			ufbxt_assert(texture->raw_filename.size == 39);
+			ufbxt_assert(!memcmp(texture->raw_filename.data, "path\0/textures/checkerboard_diffuse.png", 39));
+
+			ufbx_free_scene(scene);
+		}
+
+		{
+			ufbx_load_opts opts = { 0 };
+			opts.raw_filename.data = "path\0/file.fbx";
+			opts.raw_filename.size = 14;
+			opts.path_separator = '\\';
+
+			ufbx_scene *scene = ufbx_load_memory(data, data_size, &opts, &error);
+			if (!scene) ufbxt_log_error(&error);
+			ufbxt_check_scene(scene);
+
+			ufbxt_assert(!strcmp(scene->metadata.filename.data, "path\xef\xbf\xbd/file.fbx"));
+			ufbxt_assert(scene->metadata.raw_filename.size == 14);
+			ufbxt_assert(!memcmp(scene->metadata.raw_filename.data, "path\0/file.fbx", 14));
+
+			ufbx_material *material = ufbx_find_material(scene, "phong1");
+			ufbxt_assert(material);
+			ufbx_texture *texture = material->fbx.diffuse_color.texture;
+			ufbxt_assert(texture);
+
+			ufbxt_assert(!strcmp(texture->filename.data, "path\xef\xbf\xbd\\textures\\checkerboard_diffuse.png"));
+			ufbxt_assert(texture->raw_filename.size == 39);
+			ufbxt_assert(!memcmp(texture->raw_filename.data, "path\0\\textures\\checkerboard_diffuse.png", 39));
+
+			ufbx_free_scene(scene);
+		}
+
+		free(data);
+	}
+}
+#endif
+
