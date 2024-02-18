@@ -1375,4 +1375,18 @@ UFBXT_FILE_TEST(synthetic_direct_by_polygon)
 }
 #endif
 
+UFBXT_FILE_TEST_FLAGS(blender_292_circle, UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Circle");
+	ufbxt_assert(node);
+	ufbxt_assert(node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->num_vertices == 8);
+
+	for (size_t i = 0; i < mesh->num_vertices; i++) {
+		ufbxt_assert(mesh->vertex_first_index.data[i] == UFBX_NO_INDEX);
+	}
+}
+#endif
 

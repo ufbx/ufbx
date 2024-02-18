@@ -12559,24 +12559,25 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 	// TODO: Should these be included in output? option? strict mode?
 	ufbxi_node *node_vertices = ufbxi_find_child(node, ufbxi_Vertices);
 	ufbxi_node *node_indices = ufbxi_find_child(node, ufbxi_PolygonVertexIndex);
-	if (!node_vertices || !node_indices) return 1;
+	if (!node_vertices) return 1;
 
 	if (uc->opts.ignore_geometry) return 1;
 
 	ufbxi_value_array *vertices = ufbxi_get_array(node_vertices, 'r');
-	ufbxi_value_array *indices = ufbxi_get_array(node_indices, 'i');
+	ufbxi_value_array *indices = node_indices ? ufbxi_get_array(node_indices, 'i') : NULL;
 	ufbxi_value_array *edge_indices = ufbxi_find_array(node, ufbxi_Edges, 'i');
-	ufbxi_check(vertices && indices);
+	ufbxi_check(vertices);
+	ufbxi_check(!node_indices || indices); // If node_indices exists, it must be an array
 	ufbxi_check(vertices->size % 3 == 0);
 
 	mesh->num_vertices = vertices->size / 3;
-	mesh->num_indices = indices->size;
+	mesh->num_indices = indices ? indices->size : 0;
 
-	uint32_t *index_data = (uint32_t*)indices->data;
+	uint32_t *index_data = indices ? (uint32_t*)indices->data : NULL;
 
 	// Duplicate `index_data` for modification if we retain DOM
 	if (uc->opts.retain_dom) {
-		index_data = ufbxi_push_copy(&uc->result, uint32_t, indices->size, index_data);
+		index_data = ufbxi_push_copy(&uc->result, uint32_t, mesh->num_indices, index_data);
 		ufbxi_check(index_data);
 	}
 
