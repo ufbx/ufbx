@@ -4274,7 +4274,7 @@ UFBX_LIST_TYPE(ufbx_baked_element_list, ufbx_baked_element);
 typedef struct ufbx_baked_anim {
 
 	// Nodes that are modified by the animation.
-	// Some nodes may be missing if the specified animation does not trasnform them.
+	// Some nodes may be missing if the specified animation does not transform them.
 	// Conversely, some non-obviously animated nodes may be included as exporters
 	// often may add dummy keyframes for objects.
 	ufbx_baked_node_list nodes;
