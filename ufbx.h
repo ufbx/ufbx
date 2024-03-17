@@ -4208,50 +4208,80 @@ typedef enum ufbx_pivot_handling UFBX_ENUM_REPR {
 UFBX_ENUM_TYPE(ufbx_pivot_handling, UFBX_PIVOT_HANDLING, UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT);
 
 typedef struct ufbx_baked_vec3 {
-	double time;
-	ufbx_vec3 value;
+	double time;     // < Time of the keyframe, in seconds
+	ufbx_vec3 value; // < Value at `time`, can be linearly interpolated
 } ufbx_baked_vec3;
 
 UFBX_LIST_TYPE(ufbx_baked_vec3_list, ufbx_baked_vec3);
 
 typedef struct ufbx_baked_quat {
-	double time;
-	ufbx_quat value;
+	double time;     // < Time of the keyframe, in seconds
+	ufbx_quat value; // < Value at `time`, can be (spherically) linearly interpolated
 } ufbx_baked_quat;
 
 UFBX_LIST_TYPE(ufbx_baked_quat_list, ufbx_baked_quat);
 
+// Baked transform animation for a single node.
 typedef struct ufbx_baked_node {
+
+	// Typed ID of the node, maps to `ufbx_scene.nodes[]`.
 	uint32_t typed_id;
+	// Element ID of the element, maps to `ufbx_scene.elements[]`.
 	uint32_t element_id;
+
+	// The translation channel has constant values for the whole animation.
 	bool constant_translation;
+	// The rotation channel has constant values for the whole animation.
 	bool constant_rotation;
+	// The scale channel has constant values for the whole animation.
 	bool constant_scale;
+
+	// Translation keys for the animation, maps to `ufbx_node.local_transform.translation`.
 	ufbx_baked_vec3_list translation_keys;
+	// Rotation keyframes, maps to `ufbx_node.local_transform.rotation`.
 	ufbx_baked_quat_list rotation_keys;
+	// Scale keyframes, maps to `ufbx_node.local_transform.scale`.
 	ufbx_baked_vec3_list scale_keys;
+
 } ufbx_baked_node;
 
 UFBX_LIST_TYPE(ufbx_baked_node_list, ufbx_baked_node);
 
+// Baked property animation.
 typedef struct ufbx_baked_prop {
+	// Name of the property, eg. `"Visibility"`.
 	ufbx_string name;
+	// The value of the property is constant for the whole animation.
 	bool constant_value;
+	// Property value keys.
 	ufbx_baked_vec3_list keys;
 } ufbx_baked_prop;
 
 UFBX_LIST_TYPE(ufbx_baked_prop_list, ufbx_baked_prop);
 
+// Baked property animation for a single element.
 typedef struct ufbx_baked_element {
+	// Element ID of the element, maps to `ufbx_scene.elements[]`.
 	uint32_t element_id;
+	// List of properties the animation modifies.
 	ufbx_baked_prop_list props;
 } ufbx_baked_element;
 
 UFBX_LIST_TYPE(ufbx_baked_element_list, ufbx_baked_element);
 
+// Animation baked into linearly interpolated keyframes.
+// See `ufbx_bake_anim()`.
 typedef struct ufbx_baked_anim {
+
+	// Nodes that are modified by the animation.
+	// Some nodes may be missing if the specified animation does not trasnform them.
+	// Conversely, some non-obviously animated nodes may be included as exporters
+	// often may add dummy keyframes for objects.
 	ufbx_baked_node_list nodes;
+
+	// Element properties modified by the animation.
 	ufbx_baked_element_list elements;
+
 } ufbx_baked_anim;
 
 // -- Thread API
@@ -5014,6 +5044,8 @@ ufbx_abi void ufbx_free_anim(ufbx_anim *anim);
 
 // Animation baking
 
+// "Bake" an animation to linearly interpolated keyframes.
+// Composites the FBX transformation chain into quaternion rotations.
 ufbx_abi ufbx_baked_anim *ufbx_bake_anim(const ufbx_scene *scene, const ufbx_anim *anim, const ufbx_bake_opts *opts, ufbx_error *error);
 
 ufbx_abi void ufbx_retain_baked_anim(ufbx_baked_anim *bake);
