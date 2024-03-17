@@ -15,7 +15,7 @@ concurrency:
 jobs:
 
   ci_pre_hashes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
         with:
@@ -34,7 +34,7 @@ jobs:
           path: build/hashes.txt
 
   ci_ubuntu:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
@@ -134,7 +134,7 @@ jobs:
 
 
   ci_cpp:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - name: Update apt
@@ -146,7 +146,7 @@ jobs:
 
 
   ci_picort:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - name: Run picort
@@ -168,21 +168,21 @@ jobs:
           curl -sS -w " -> $DST_URL/slime-big.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-big.png --data-binary @build/images/slime-big.png
 
   ci_domfuzz:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - name: Run domfuzz/objfuzz
         run: python misc/run_tests.py domfuzz objfuzz
 
   ci_viewer:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - name: Run viewer
         run: python misc/run_tests.py viewer
 
   ci_features:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - name: Update apt
@@ -195,7 +195,7 @@ jobs:
         run: python misc/run_tests.py features --heavy --additional-compiler tcc --compiler tcc
 
   ci_analysis:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - name: Update apt
@@ -240,7 +240,7 @@ jobs:
         run: python3 misc/analyze_stack.py build/ufbx-gcc-release.su --limit 0x20000 --cache build/ufbx-cache.pickle
 
   ci_compat:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
         with:
@@ -259,7 +259,7 @@ jobs:
         run: python3 misc/run_tests.py tests --no-sanitize-arch x86 --runner ci_compat --define UFBX_HEADER_PATH=\"ufbx_new.h\"
 
   ci_lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - name: Check formatting
@@ -273,7 +273,7 @@ jobs:
           config: ./misc/typos.toml
 
   ci_bindgen:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - name: Create bindgen/build directory
@@ -284,7 +284,7 @@ jobs:
         run: python3 bindgen/ufbx_ir.py
 
   ci_exotic:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
@@ -380,7 +380,7 @@ jobs:
         run: python3 misc/run_tests.py tests --no-sanitize --force-opt O0 --additional-compiler gcc-5 --additional-compiler gcc-6 --additional-compiler gcc-7 --additional-compiler gcc-8 --additional-compiler gcc-9 --additional-compiler gcc-10 --additional-compiler clang-6.0 --additional-compiler clang-7 --additional-compiler clang-8 --additional-compiler clang-9 --additional-compiler clang-10 --additional-compiler clang-11 --additional-compiler clang-12 --additional-compiler clang-13
 
   ci_hasher:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
@@ -426,7 +426,7 @@ jobs:
           path: build/hashdump_ci_hasher.txt.gz
 
   ci_wasm:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
@@ -547,7 +547,7 @@ jobs:
         run: bash /codecov.sh -F fuzz -f coverage.lcov -y .github/codecov.yml
 
   ci_post_hashes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     if: ${{ always() }}
     needs: [ci_ubuntu, ci_windows, ci_macos, ci_wasm, ci_arm32, ci_arm64, ci_exotic, ci_hasher]
     steps:
