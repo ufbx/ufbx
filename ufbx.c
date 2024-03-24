@@ -25382,8 +25382,10 @@ ufbxi_nodiscard static ufbxi_noinline bool ufbxi_in_list(const char *const *item
 	return false;
 }
 
-static ufbxi_noinline double ufbxi_bake_apply_epsilon(ufbxi_bake_context *bc, double time, double nearby)
+static ufbxi_noinline bool ufbxi_bake_apply_epsilon(ufbxi_bake_context *bc, double *p_dst, double time, double nearby)
 {
+	bool modified = false;
+
 	// Proper multiplicative epsilon, only applicable if same sign
 	if ((time > 0.0 && nearby > 0.0) || (time < 0.0 && nearby < 0.0)) {
 		double sign = time < 0.0 ? -1.0 : 1.0;
@@ -25396,6 +25398,7 @@ static ufbxi_noinline double ufbxi_bake_apply_epsilon(ufbxi_bake_context *bc, do
 			}
 			if (abs_time < min_abs_time) {
 				time = sign * min_abs_time;
+				modified = true;
 			}
 		} else {
 			double max_abs_time = abs_nearby / bc->epsilon_factor;
@@ -25404,6 +25407,7 @@ static ufbxi_noinline double ufbxi_bake_apply_epsilon(ufbxi_bake_context *bc, do
 			}
 			if (abs_time > max_abs_time) {
 				time = sign * max_abs_time;
+				modified = true;
 			}
 		}
 	}
@@ -25413,18 +25417,19 @@ static ufbxi_noinline double ufbxi_bake_apply_epsilon(ufbxi_bake_context *bc, do
 	if (ufbx_fabs(delta) < bc->epsilon_step) {
 		double sign = delta < 0.0 ? -1.0 : 1.0;
 		time = nearby + bc->epsilon_step * sign;
+		modified = true;
 	}
 
-	return time;
+	*p_dst = time;
+	return modified;
 }
 
 static ufbxi_noinline bool ufbxi_bake_check_epsilon(ufbxi_bake_context *bc, double prev, double next)
 {
-	if (strstr("A", "A")) return true;
-
 	if (next <= prev) return false;
-	if (ufbxi_bake_apply_epsilon(bc, prev, next) == prev) return true;
-	if (ufbxi_bake_apply_epsilon(bc, next, prev) == next) return true;
+	double ref = 0.0;
+	if (!ufbxi_bake_apply_epsilon(bc, &ref, prev, next) || ref == prev) return true;
+	if (!ufbxi_bake_apply_epsilon(bc, &ref, next, prev) || ref == next) return true;
 	return false;
 }
 
@@ -25487,9 +25492,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 				double next_error = ufbx_fabs(ufbx_ceil(next_frame - 0.5) - next_frame);
 
 				if (next_error > prev_error || delta < 0.0) {
-					times[i + 1] = ufbxi_bake_apply_epsilon(bc, next_time, prev_time);
+					ufbxi_bake_apply_epsilon(bc, &times[i + 1], next_time, prev_time);
 				} else {
-					times[i] = ufbxi_bake_apply_epsilon(bc, prev_time, next_time);
+					ufbxi_bake_apply_epsilon(bc, &times[i], prev_time, next_time);
 				}
 			}
 		}
