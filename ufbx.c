@@ -25410,6 +25410,53 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 		num_times = dst;
 	}
 
+	// Enforce minimum duration between keyframes
+	if (bc->opts.minimum_absolute_timestep >= DBL_EPSILON || bc->opts.minimum_relative_timestep >= DBL_EPSILON) {
+		double min_abs = bc->opts.minimum_absolute_timestep;
+		double min_rel = bc->opts.minimum_relative_timestep;
+
+		double frame_factor = (double)bc->scene->metadata.ktime_second;
+		for (size_t i = 0; i + 1 < num_times; i++) {
+			double prev_time = times[i];
+			double next_time = times[i + 1];
+
+			double delta = next_time - prev_time;
+			double scale = ufbx_fmax(ufbx_fabs(prev_time), ufbx_fabs(next_time));
+			double min_delta = ufbx_fmax(scale * min_rel, min_abs);
+
+			if (delta < min_delta) {
+				// Try to determine which time is nearer to an original keyframe and retain that
+				double prev_frame = prev_time * frame_factor;
+				double next_frame = next_time * frame_factor;
+				double prev_error = ufbx_fabs(ufbx_ceil(prev_frame - 0.5) - prev_frame);
+				double next_error = ufbx_fabs(ufbx_ceil(next_frame - 0.5) - next_frame);
+
+				if (next_error > prev_error || delta < 0.0) {
+					times[i + 1] = prev_time + min_delta;
+				} else {
+					times[i] = next_time - min_delta;
+				}
+			}
+		}
+
+		// Remove any inverted or too close keys
+		size_t dst = 1, src = 1;
+		double prev_time = times[0];
+		while (src < num_times) {
+			double next_time = times[src++];
+			double delta = next_time - prev_time;
+			double scale = ufbx_fmax(ufbx_fabs(prev_time), ufbx_fabs(next_time));
+			double min_delta = ufbx_fmax(scale * min_rel, min_abs);
+
+			if (delta >= min_delta) {
+				times[dst++] = next_time;
+				prev_time = next_time;
+			}
+		}
+
+		num_times = dst;
+	}
+
 	// Enforce maximum sample rate
 	if (bc->opts.maximum_sample_rate > 0.0) {
 		const double epsilon = 0.0078125 / bc->opts.maximum_sample_rate;
@@ -26005,6 +26052,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim_imp(ufbxi_bake_context
 	if (bc->opts.key_reduction_threshold == 0) bc->opts.key_reduction_threshold = 0.000001;
 	if (bc->opts.key_reduction_passes == 0) bc->opts.key_reduction_passes = 4;
 	if (bc->opts.constant_timestep <= 0.0) bc->opts.constant_timestep = 0.0;
+
+	if (!bc->opts.no_minimum_timestep) {
+		if (bc->opts.minimum_absolute_timestep == 0.0) bc->opts.minimum_absolute_timestep = 0.001;
+		if (bc->opts.minimum_relative_timestep == 0.0) bc->opts.minimum_relative_timestep = (double)FLT_EPSILON * 4.0;
+	}
 
 	ufbxi_init_ator(&bc->error, &bc->ator_tmp, &bc->opts.temp_allocator, "temp");
 	ufbxi_init_ator(&bc->error, &bc->ator_result, &bc->opts.result_allocator, "result");

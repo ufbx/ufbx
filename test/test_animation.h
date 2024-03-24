@@ -1835,8 +1835,11 @@ static void ufbxt_diff_baked_quat_imp(ufbxt_diff_error *err, const ufbx_baked_ve
 UFBXT_FILE_TEST(maya_anim_linear)
 #if UFBXT_IMPL
 {
+	ufbx_bake_opts opts = { 0 };
+	opts.no_minimum_timestep = true;
+
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, NULL, &error);
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -1847,6 +1850,32 @@ UFBXT_FILE_TEST(maya_anim_linear)
 		{ nextafter(12.0/24.0, -INFINITY), { 2.0f, 0.0f, 0.0f } },
 		{ 12.0/24.0, { 2.0f, 0.0f, 2.0f } },
 		{ nextafter(12.0/24.0, INFINITY), { 2.0f, 0.0f, 0.0f } },
+		{ 14.0/24.0, { 2.0f, 0.0f, 0.0f } },
+	};
+
+	ufbxt_assert(bake->nodes.count == 1);
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(maya_anim_linear_minimum_timestep, maya_anim_linear)
+#if UFBXT_IMPL
+{
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, NULL, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	ufbx_baked_vec3 translation_ref[] = {
+		{ 0.0/24.0, { 0.0f, 0.0f, 0.0f } },
+		{ 2.0/24.0, { 0.5f, 2.0f, 0.0f } },
+		{ 8.0/24.0, { 2.0f, 0.0f, 0.0f } },
+		{ 12.0/24.0 - 0.001, { 2.0f, 0.0f, 0.0f } },
+		{ 12.0/24.0, { 2.0f, 0.0f, 2.0f } },
+		{ 12.0/24.0 + 0.001, { 2.0f, 0.0f, 0.0f } },
 		{ 14.0/24.0, { 2.0f, 0.0f, 0.0f } },
 	};
 

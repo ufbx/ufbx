@@ -4650,8 +4650,21 @@ typedef struct ufbx_bake_opts {
 	// Default: 32
 	size_t max_keyframe_segments;
 
+	// Allow timesteps to be as close in time as possible.
+	bool no_minimum_timestep;
+
+	// Controls how close keyframes are allowed to be placed.
+	// Default: `FLT_EPSILON * 4`, unless `no_minimum_timestep` is set.
+	double minimum_relative_timestep;
+
+	// Controls how close keyframes are allowed to be placed.
+	// Default: `0.001`, unless `no_minimum_timestep` is set.
+	double minimum_absolute_timestep;
+
 	// Timestep in seconds for constant interpolation.
 	// Default of `0.0` uses the smallest representable time offset.
+	// NOTE: This offset will be clamped by minimum timestep by default,
+	// enable `ufbx_bake_opts.no_minimum_timestep` to allow close keyframes.
 	double constant_timestep;
 
 	// Enable key reduction.
