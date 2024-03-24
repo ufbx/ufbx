@@ -4704,10 +4704,6 @@ typedef struct ufbx_bake_opts {
 	// Default: `4`
 	size_t key_reduction_passes;
 
-	// Compensate for `UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE` by adjusting child scale.
-	// NOTE: This is an lossy operation, and properly works only for uniform scaling.
-	bool compensate_inherit_no_scale;
-
 	uint32_t _end_zero;
 } ufbx_bake_opts;
 
