@@ -4609,6 +4609,9 @@ typedef struct ufbx_anim_opts {
 	uint32_t _end_zero;
 } ufbx_anim_opts;
 
+// Controls how close keyframe time values can be in baked animation.
+// Further adjustments for all options can be done via `ufbx_bake_opts.timestep_absolute`
+// and `ufbx_bake_opts.timestep_relative`.
 typedef enum ufbx_bake_timestep UFBX_ENUM_REPR {
 
 	// Default bake timestep: safe spacing to guard against less robust interpolation functions.
@@ -4616,13 +4619,9 @@ typedef enum ufbx_bake_timestep UFBX_ENUM_REPR {
 	UFBX_BAKE_TIMESTEP_DEFAULT,
 
 	// Key times are represented as unique `float` values.
-	// Use `ufbx_bake_opts.timestep_absolute` and `ufbx_bake_opts.timestep_relative`
-	// to control additional spacing between keyframes.
 	UFBX_BAKE_TIMESTEP_FLOAT,
 
 	// Key times are represented as unique `double` values.
-	// Use `ufbx_bake_opts.timestep_absolute` and `ufbx_bake_opts.timestep_relative`
-	// to control additional spacing between keyframes.
 	UFBX_BAKE_TIMESTEP_DOUBLE,
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_BAKE_TIMESTEP)
@@ -4684,9 +4683,9 @@ typedef struct ufbx_bake_opts {
 	double timestep_relative;
 
 	// Timestep in seconds for constant interpolation.
-	// Default of `0.0` uses the smallest representable time offset.
-	// NOTE: This offset will be clamped by minimum timestep by default,
-	// enable `ufbx_bake_opts.no_minimum_timestep` to allow close keyframes.
+	// Default of `0.0` uses the smallest representable time offset, which is determined by
+	// `ufbx_bake_opts.timestep`. On default settings this will result in `0.001` second
+	// interpolation for constant tangents, see `ufbx_bake_timestep`.
 	double constant_timestep;
 
 	// Enable key reduction.
