@@ -210,6 +210,7 @@
 	#define ufbx_fmin ufbxi_math_fn(fmin)
 	#define ufbx_fmax ufbxi_math_fn(fmax)
 	#define ufbx_nextafter ufbxi_math_fn(nextafter)
+	#define ufbx_nextafterf ufbxi_math_fn(nextafterf)
 	#define ufbx_ceil ufbxi_math_fn(ceil)
 	#define ufbx_isnan ufbxi_math_fn(isnan)
 #endif
@@ -229,6 +230,7 @@
 	double ufbx_fabs(double x);
 	double ufbx_copysign(double x, double y);
 	double ufbx_nextafter(double x, double y);
+	double ufbx_nextafterf(float x, float y);
 	double ufbx_ceil(double x);
 	int ufbx_isnan(double x);
 #endif
@@ -25255,6 +25257,9 @@ typedef struct {
 	const ufbx_scene *scene;
 	const ufbx_anim *anim;
 	ufbx_bake_opts opts;
+	double epsilon_factor;
+	double epsilon_step;
+	bool epsilon_float;
 
 	double time_begin;
 	double time_end;
@@ -25377,6 +25382,50 @@ ufbxi_nodiscard static ufbxi_noinline bool ufbxi_in_list(const char *const *item
 	return false;
 }
 
+static ufbxi_noinline double ufbxi_bake_apply_epsilon(ufbxi_bake_context *bc, double time, double nearby)
+{
+	// Proper multiplicative epsilon, only applicable if same sign
+	if ((time > 0.0 && nearby > 0.0) || (time < 0.0 && nearby < 0.0)) {
+		double sign = time < 0.0 ? -1.0 : 1.0;
+		double abs_time = ufbx_fabs(time);
+		double abs_nearby = ufbx_fabs(nearby);
+		if (abs_time > abs_nearby) {
+			double min_abs_time = abs_nearby * bc->epsilon_factor;
+			if (bc->epsilon_float && (float)min_abs_time == (float)abs_nearby) {
+				min_abs_time = (float)ufbx_nextafterf((float)min_abs_time, UFBX_INFINITY);
+			}
+			if (abs_time < min_abs_time) {
+				time = sign * min_abs_time;
+			}
+		} else {
+			double max_abs_time = abs_nearby / bc->epsilon_factor;
+			if (bc->epsilon_float && (float)max_abs_time == (float)abs_nearby) {
+				max_abs_time = (float)ufbx_nextafterf((float)max_abs_time, -UFBX_INFINITY);
+			}
+			if (abs_time > max_abs_time) {
+				time = sign * max_abs_time;
+			}
+		}
+	}
+
+	// Minimum absolute timestep
+	double delta = time - nearby;
+	if (ufbx_fabs(delta) < bc->epsilon_step) {
+		double sign = delta < 0.0 ? -1.0 : 1.0;
+		time = nearby + bc->epsilon_step * sign;
+	}
+
+	return time;
+}
+
+static ufbxi_noinline bool ufbxi_bake_check_epsilon(ufbxi_bake_context *bc, double prev, double next)
+{
+	if (next <= prev) return false;
+	if (ufbxi_bake_apply_epsilon(bc, prev, next) == prev) return true;
+	if (ufbxi_bake_apply_epsilon(bc, next, prev) == next) return true;
+	return false;
+}
+
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_context *bc, ufbxi_double_list *p_dst)
 {
 	if (bc->layer_weight_times.count > 0) {
@@ -25411,20 +25460,25 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 	}
 
 	// Enforce minimum duration between keyframes
-	if (bc->opts.minimum_absolute_timestep >= DBL_EPSILON || bc->opts.minimum_relative_timestep >= DBL_EPSILON) {
-		double min_abs = bc->opts.minimum_absolute_timestep;
-		double min_rel = bc->opts.minimum_relative_timestep;
+	if (bc->epsilon_factor > 1.0 || bc->epsilon_step > 0.0 || bc->epsilon_float) {
+		double min_abs = bc->epsilon_step * 2.0f;
+		double min_rel = (bc->epsilon_factor - 1.0) * 2.0;
+		if (bc->epsilon_float) {
+			min_abs = ufbx_fmax(min_abs, FLT_EPSILON * 2.0f);
+			min_rel = ufbx_fmax(min_rel, FLT_EPSILON * 2.0f);
+		}
 
 		double frame_factor = (double)bc->scene->metadata.ktime_second;
 		for (size_t i = 0; i + 1 < num_times; i++) {
 			double prev_time = times[i];
 			double next_time = times[i + 1];
+			if (prev_time >= next_time) continue;
 
 			double delta = next_time - prev_time;
 			double scale = ufbx_fmax(ufbx_fabs(prev_time), ufbx_fabs(next_time));
 			double min_delta = ufbx_fmax(scale * min_rel, min_abs);
 
-			if (delta < min_delta) {
+			if (delta <= min_delta) {
 				// Try to determine which time is nearer to an original keyframe and retain that
 				double prev_frame = prev_time * frame_factor;
 				double next_frame = next_time * frame_factor;
@@ -25432,9 +25486,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 				double next_error = ufbx_fabs(ufbx_ceil(next_frame - 0.5) - next_frame);
 
 				if (next_error > prev_error || delta < 0.0) {
-					times[i + 1] = prev_time + min_delta;
+					times[i + 1] = ufbxi_bake_apply_epsilon(bc, next_time, prev_time);
 				} else {
-					times[i] = next_time - min_delta;
+					times[i] = ufbxi_bake_apply_epsilon(bc, prev_time, next_time);
 				}
 			}
 		}
@@ -25446,9 +25500,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 			double next_time = times[src++];
 			double delta = next_time - prev_time;
 			double scale = ufbx_fmax(ufbx_fabs(prev_time), ufbx_fabs(next_time));
-			double min_delta = ufbx_fmax(scale * min_rel, min_abs) * 0.5f;
+			double min_delta = ufbx_fmax(scale * min_rel, min_abs);
 
-			if (delta >= min_delta) {
+			if (delta > min_delta || ufbxi_bake_check_epsilon(bc, prev_time, next_time)) {
 				times[dst++] = next_time;
 				prev_time = next_time;
 			}
@@ -26053,9 +26107,19 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim_imp(ufbxi_bake_context
 	if (bc->opts.key_reduction_passes == 0) bc->opts.key_reduction_passes = 4;
 	if (bc->opts.constant_timestep <= 0.0) bc->opts.constant_timestep = 0.0;
 
-	if (!bc->opts.no_minimum_timestep) {
-		if (bc->opts.minimum_absolute_timestep == 0.0) bc->opts.minimum_absolute_timestep = 0.001;
-		if (bc->opts.minimum_relative_timestep == 0.0) bc->opts.minimum_relative_timestep = (double)FLT_EPSILON * 4.0;
+	if (bc->opts.timestep == UFBX_BAKE_TIMESTEP_DEFAULT) {
+		if (bc->opts.timestep_absolute == 0.0) bc->opts.timestep_absolute = 0.001;
+		if (bc->opts.timestep_relative == 0.0) bc->opts.timestep_relative = (double)FLT_EPSILON * 4.0;
+	}
+
+	bc->epsilon_float = bc->opts.timestep == UFBX_BAKE_TIMESTEP_DEFAULT || bc->opts.timestep == UFBX_BAKE_TIMESTEP_FLOAT;
+	bc->epsilon_factor = 1.0;
+
+	if (bc->opts.timestep_relative > 0.0) {
+		bc->epsilon_factor = 1.0 + bc->opts.timestep_relative;
+	}
+	if (bc->opts.timestep_absolute > 0.0) {
+		bc->epsilon_step = bc->opts.timestep_absolute;
 	}
 
 	ufbxi_init_ator(&bc->error, &bc->ator_tmp, &bc->opts.temp_allocator, "temp");

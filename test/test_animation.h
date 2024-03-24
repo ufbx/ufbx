@@ -1836,7 +1836,7 @@ UFBXT_FILE_TEST(maya_anim_linear)
 #if UFBXT_IMPL
 {
 	ufbx_bake_opts opts = { 0 };
-	opts.no_minimum_timestep = true;
+	opts.timestep = UFBX_BAKE_TIMESTEP_DOUBLE;
 
 	ufbx_error error;
 	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
@@ -1891,7 +1891,7 @@ UFBXT_FILE_TEST(maya_huge_stepped_tangents)
 #if UFBXT_IMPL
 {
 	ufbx_bake_opts opts = { 0 };
-	// opts.no_minimum_timestep = true;
+	opts.timestep = UFBX_BAKE_TIMESTEP_DOUBLE;
 
 	ufbx_error error;
 	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
@@ -1899,13 +1899,362 @@ UFBXT_FILE_TEST(maya_huge_stepped_tangents)
 	ufbxt_assert(bake);
 
 	ufbx_baked_vec3 translation_ref[] = {
-		{ 0.0/24.0, { 0.0f, 0.0f, 0.0f } },
-		{ 2.0/24.0, { 0.5f, 2.0f, 0.0f } },
-		{ 8.0/24.0, { 2.0f, 0.0f, 0.0f } },
-		{ nextafter(12.0/24.0, -INFINITY), { 2.0f, 0.0f, 0.0f } },
-		{ 12.0/24.0, { 2.0f, 0.0f, 2.0f } },
-		{ nextafter(12.0/24.0, INFINITY), { 2.0f, 0.0f, 0.0f } },
-		{ 14.0/24.0, { 2.0f, 0.0f, 0.0f } },
+		{ 0.0, { 0.0f } },
+		{ nextafter(10.0, -INFINITY), { 0.0f } },
+		{ 10.0, { 1.0f } },
+		{ nextafter(10.0, +INFINITY), { 2.0f } },
+		{ 20.0, { 2.0f } },
+		{ nextafter(100.0, -INFINITY), { 2.0f } },
+		{ 100.0, { 3.0f } },
+		{ nextafter(100.0, +INFINITY), { 4.0f } },
+		{ 200.0, { 4.0f } },
+		{ nextafter(1000.0, -INFINITY), { 4.0f } },
+		{ 1000.0, { 5.0f } },
+		{ nextafter(1000.0, +INFINITY), { 6.0f } },
+		{ 2000.0, { 6.0f } },
+		{ nextafter(10000.0, -INFINITY), { 6.0f } },
+		{ 10000.0, { 7.0f } },
+		{ nextafter(10000.0, +INFINITY), { 8.0f } },
+		{ 20000.0, { 8.0f } },
+		{ nextafter(100000.0, -INFINITY), { 8.0f } },
+		{ 100000.0, { 9.0f } },
+		{ nextafter(100000.0, +INFINITY), { 10.0f } },
+		{ 200000.0, { 10.0f } },
+	};
+
+	ufbxt_assert(bake->nodes.count == 1);
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(maya_huge_stepped_tangents_minimum_timestep, maya_huge_stepped_tangents)
+#if UFBXT_IMPL
+{
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, NULL, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	const double step = 0.001;
+	const double epsilon = 1.0 + (double)FLT_EPSILON * 4.0;
+	ufbx_baked_vec3 translation_ref[] = {
+		{ 0.0, { 0.0f } },
+		{ 10.0 - step, { 0.0f } },
+		{ 10.0, { 1.0f } },
+		{ 10.0 + step, { 2.0f } },
+		{ 20.0, { 2.0f } },
+		{ 100.0 - step, { 2.0f } },
+		{ 100.0, { 3.0f } },
+		{ 100.0 + step, { 4.0f } },
+		{ 200.0, { 4.0f } },
+		{ 1000.0 - step, { 4.0f } },
+		{ 1000.0, { 5.0f } },
+		{ 1000.0 + step, { 6.0f } },
+		{ 2000.0, { 6.0f } },
+		{ 10000.0 / epsilon, { 6.0f } },
+		{ 10000.0, { 7.0f } },
+		{ 10000.0 * epsilon, { 8.0f } },
+		{ 20000.0, { 8.0f } },
+		{ 100000.0 / epsilon, { 8.0f } },
+		{ 100000.0, { 9.0f } },
+		{ 100000.0 * epsilon, { 10.0f } },
+		{ 200000.0, { 10.0f } },
+	};
+
+	ufbxt_assert(bake->nodes.count == 1);
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(maya_huge_stepped_tangents_custom_timestep, maya_huge_stepped_tangents)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.timestep = UFBX_BAKE_TIMESTEP_DOUBLE;
+	opts.timestep_absolute = 0.1;
+	opts.timestep_relative = 0.0005;
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	const double step = 0.1;
+	const double epsilon = 1.0 + 0.0005;
+	ufbx_baked_vec3 translation_ref[] = {
+		{ 0.0, { 0.0f } },
+		{ 10.0 - step, { 0.0f } },
+		{ 10.0, { 1.0f } },
+		{ 10.0 + step, { 2.0f } },
+		{ 20.0, { 2.0f } },
+		{ 100.0 - step, { 2.0f } },
+		{ 100.0, { 3.0f } },
+		{ 100.0 + step, { 4.0f } },
+		{ 200.0, { 4.0f } },
+		{ 1000.0 / epsilon, { 4.0f } },
+		{ 1000.0, { 5.0f } },
+		{ 1000.0 * epsilon, { 6.0f } },
+		{ 2000.0, { 6.0f } },
+		{ 10000.0 / epsilon, { 6.0f } },
+		{ 10000.0, { 7.0f } },
+		{ 10000.0 * epsilon, { 8.0f } },
+		{ 20000.0, { 8.0f } },
+		{ 100000.0 / epsilon, { 8.0f } },
+		{ 100000.0, { 9.0f } },
+		{ 100000.0 * epsilon, { 10.0f } },
+		{ 200000.0, { 10.0f } },
+	};
+
+	ufbxt_assert(bake->nodes.count == 1);
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(maya_huge_stepped_tangents_huge_timestep, maya_huge_stepped_tangents)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.timestep = UFBX_BAKE_TIMESTEP_DOUBLE;
+	opts.timestep_absolute = 100.0;
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	const double step = 100.0;
+	ufbx_baked_vec3 translation_ref[] = {
+		{ 0.0, { 0.0f } },
+		{ 100.0, { 3.0f } },
+		{ 200.0, { 4.0f } },
+		{ 1000.0 - step, { 4.0f } },
+		{ 1000.0, { 5.0f } },
+		{ 1000.0 + step, { 6.0f } },
+		{ 2000.0, { 6.0f } },
+		{ 10000.0 - step, { 6.0f } },
+		{ 10000.0, { 7.0f } },
+		{ 10000.0 + step, { 8.0f } },
+		{ 20000.0, { 8.0f } },
+		{ 100000.0 - step, { 8.0f } },
+		{ 100000.0, { 9.0f } },
+		{ 100000.0 + step, { 10.0f } },
+		{ 200000.0, { 10.0f } },
+	};
+
+	ufbxt_assert(bake->nodes.count == 1);
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(maya_huge_stepped_tangents_float_epsilon, maya_huge_stepped_tangents)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.timestep = UFBX_BAKE_TIMESTEP_FLOAT;
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	ufbx_baked_vec3 translation_ref[] = {
+		{ 0.0, { 0.0f } },
+		{ nextafterf(10.0, -INFINITY), { 0.0f } },
+		{ 10.0, { 1.0f } },
+		{ nextafterf(10.0, +INFINITY), { 2.0f } },
+		{ 20.0, { 2.0f } },
+		{ nextafterf(100.0, -INFINITY), { 2.0f } },
+		{ 100.0, { 3.0f } },
+		{ nextafterf(100.0, +INFINITY), { 4.0f } },
+		{ 200.0, { 4.0f } },
+		{ nextafterf(1000.0, -INFINITY), { 4.0f } },
+		{ 1000.0, { 5.0f } },
+		{ nextafterf(1000.0, +INFINITY), { 6.0f } },
+		{ 2000.0, { 6.0f } },
+		{ nextafterf(10000.0, -INFINITY), { 6.0f } },
+		{ 10000.0, { 7.0f } },
+		{ nextafterf(10000.0, +INFINITY), { 8.0f } },
+		{ 20000.0, { 8.0f } },
+		{ nextafterf(100000.0, -INFINITY), { 8.0f } },
+		{ 100000.0, { 9.0f } },
+		{ nextafterf(100000.0, +INFINITY), { 10.0f } },
+		{ 200000.0, { 10.0f } },
+	};
+
+	ufbxt_assert(bake->nodes.count == 1);
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_stepped_tangent_sign)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.timestep = UFBX_BAKE_TIMESTEP_DOUBLE;
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	ufbx_baked_vec3 translation_ref[] = {
+		{ -2.0, { -3.0f } },
+		{ nextafter(-1.0, -INFINITY), { -3.0f } },
+		{ -1.0, { -2.0f } },
+		{ nextafter(-1.0, +INFINITY), { -1.0f } },
+		{ -0.1, { -1.0f } },
+		{ 0.1, { 1.0f } },
+		{ nextafter(1.0, -INFINITY), { 1.0f } },
+		{ 1.0, { 2.0f } },
+		{ nextafter(1.0, +INFINITY), { 3.0f } },
+		{ 2.0, { 3.0f } },
+	};
+
+	ufbxt_assert(bake->nodes.count == 1);
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(maya_stepped_tangent_sign_default, maya_stepped_tangent_sign)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	double step = 0.001;
+	ufbx_baked_vec3 translation_ref[] = {
+		{ -2.0, { -3.0f } },
+		{ -1.0 - step, { -3.0f } },
+		{ -1.0, { -2.0f } },
+		{ -1.0 + step, { -1.0f } },
+		{ -0.1, { -1.0f } },
+		{ 0.1, { 1.0f } },
+		{ 1.0 - step, { 1.0f } },
+		{ 1.0, { 2.0f } },
+		{ 1.0 + step, { 3.0f } },
+		{ 2.0, { 3.0f } },
+	};
+
+	ufbxt_assert(bake->nodes.count == 1);
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(maya_stepped_tangent_sign_epsilon, maya_stepped_tangent_sign)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.timestep = UFBX_BAKE_TIMESTEP_DOUBLE;
+	opts.timestep_relative = 0.05;
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	const double epsilon = 1.0 + 0.05;
+	ufbx_baked_vec3 translation_ref[] = {
+		{ -2.0, { -3.0f } },
+		{ -1.0 * epsilon, { -3.0f } },
+		{ -1.0, { -2.0f } },
+		{ -1.0 / epsilon, { -1.0f } },
+		{ -0.1, { -1.0f } },
+		{ 0.1, { 1.0f } },
+		{ 1.0 / epsilon, { 1.0f } },
+		{ 1.0, { 2.0f } },
+		{ 1.0 * epsilon, { 3.0f } },
+		{ 2.0, { 3.0f } },
+	};
+
+	ufbxt_assert(bake->nodes.count == 1);
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(maya_stepped_tangent_sign_float, maya_stepped_tangent_sign)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.timestep = UFBX_BAKE_TIMESTEP_FLOAT;
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	ufbx_baked_vec3 translation_ref[] = {
+		{ -2.0, { -3.0f } },
+		{ nextafterf(-1.0f, -INFINITY), { -3.0f } },
+		{ -1.0, { -2.0f } },
+		{ nextafterf(-1.0f, +INFINITY), { -1.0f } },
+		{ -0.1, { -1.0f } },
+		{ 0.1, { 1.0f } },
+		{ nextafterf(1.0f, -INFINITY), { 1.0f } },
+		{ 1.0, { 2.0f } },
+		{ nextafterf(1.0f, +INFINITY), { 3.0f } },
+		{ 2.0, { 3.0f } },
+	};
+
+	ufbxt_assert(bake->nodes.count == 1);
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(maya_stepped_tangent_sign_huge_step, maya_stepped_tangent_sign)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.timestep = UFBX_BAKE_TIMESTEP_DOUBLE;
+	opts.timestep_absolute = 0.25;
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	double step = 0.25;
+	ufbx_baked_vec3 translation_ref[] = {
+		{ -2.0, { -3.0f } },
+		{ -1.0 - step, { -3.0f } },
+		{ -1.0, { -2.0f } },
+		{ -1.0 + step, { -1.0f } },
+		{ 0.1 - step, { -1.0f } },
+		{ 0.1, { 1.0f } },
+		{ 1.0 - step, { 1.0f } },
+		{ 1.0, { 2.0f } },
+		{ 1.0 + step, { 3.0f } },
+		{ 2.0, { 3.0f } },
 	};
 
 	ufbxt_assert(bake->nodes.count == 1);
@@ -1923,6 +2272,7 @@ UFBXT_FILE_TEST(maya_anim_diffuse_curve)
 
 	ufbx_bake_opts opts = { 0 };
 	opts.resample_rate = 24.0;
+	opts.timestep = UFBX_BAKE_TIMESTEP_DOUBLE;
 
 	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);

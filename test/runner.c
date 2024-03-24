@@ -19,6 +19,7 @@ static void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
 #include <stdio.h>
 #include <stdarg.h>
 #include <math.h>
+#include <float.h>
 
 #if defined(UFBXT_STACK_LIMIT)
 	static int ufbxt_main_argc;

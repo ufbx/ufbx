@@ -4609,6 +4609,27 @@ typedef struct ufbx_anim_opts {
 	uint32_t _end_zero;
 } ufbx_anim_opts;
 
+typedef enum ufbx_bake_timestep UFBX_ENUM_REPR {
+
+	// Default bake timestep: safe spacing to guard against less robust interpolation functions.
+	// Uses `0.001` second (1ms) spacing between keyframes and `4 * FLT_EPSILON` epsilon.
+	UFBX_BAKE_TIMESTEP_DEFAULT,
+
+	// Key times are represented as unique `float` values.
+	// Use `ufbx_bake_opts.timestep_absolute` and `ufbx_bake_opts.timestep_relative`
+	// to control additional spacing between keyframes.
+	UFBX_BAKE_TIMESTEP_FLOAT,
+
+	// Key times are represented as unique `double` values.
+	// Use `ufbx_bake_opts.timestep_absolute` and `ufbx_bake_opts.timestep_relative`
+	// to control additional spacing between keyframes.
+	UFBX_BAKE_TIMESTEP_DOUBLE,
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_BAKE_TIMESTEP)
+} ufbx_bake_timestep;
+
+UFBX_ENUM_TYPE(ufbx_bake_timestep, UFBX_BAKE_TIMESTEP, UFBX_BAKE_TIMESTEP_DOUBLE);
+
 typedef struct ufbx_bake_opts {
 	uint32_t _begin_zero;
 
@@ -4650,16 +4671,17 @@ typedef struct ufbx_bake_opts {
 	// Default: 32
 	size_t max_keyframe_segments;
 
-	// Allow timesteps to be as close in time as possible.
-	bool no_minimum_timestep;
-
 	// Controls how close keyframes are allowed to be placed.
-	// Default: `FLT_EPSILON * 4`, unless `no_minimum_timestep` is set.
-	double minimum_relative_timestep;
+	// Default maintains an 1ms spacing between keyframes and `4*FLT_EPSILON` spacing.
+	ufbx_bake_timestep timestep;
 
-	// Controls how close keyframes are allowed to be placed.
-	// Default: `0.001`, unless `no_minimum_timestep` is set.
-	double minimum_absolute_timestep;
+	// Minimum absolute timestep.
+	// Defaults to `0.001` if `timestep == UFBX_BAKE_TIMESTEP_DEFAULT`.
+	double timestep_absolute;
+
+	// Minimum relative timestep.
+	// Defaults to `4 * FLT_EPSILON` if `timestep == UFBX_BAKE_TIMESTEP_DEFAULT`.
+	double timestep_relative;
 
 	// Timestep in seconds for constant interpolation.
 	// Default of `0.0` uses the smallest representable time offset.
