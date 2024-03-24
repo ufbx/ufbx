@@ -21,6 +21,11 @@ typedef union {
 	int i[2];
 } fdlibm_bits;
 
+typedef union {
+	float f;
+	int i;
+} fdlibmf_bits;
+
 #ifdef __LITTLE_ENDIAN
 	#define __HI(x) (((fdlibm_bits*)&(x))->i[1])
 	#define __LO(x) (((fdlibm_bits*)&(x))->i[0])
@@ -28,6 +33,7 @@ typedef union {
 	#define __HI(x) (((fdlibm_bits*)&(x))->i[0])
 	#define __LO(x) (((fdlibm_bits*)&(x))->i[1])
 #endif
+#define __FLT(x) (((fdlibmf_bits*)&(x))->i)
 
 /* 
  * set X_TLOSS = pi*2**52, which is possibly defined in <values.h>
@@ -1392,6 +1398,54 @@ double fdlibm_nextafter(double x, double y)
 	    }
 	}
 	__HI(x) = hx; __LO(x) = lx;
+	return x;
+}
+
+float fdlibm_nextafterf(float x, float y)
+{
+	int hx, hy, ix, iy;
+
+	hx = __FLT(x);
+	hy = __FLT(y);
+	ix = hx & 0x7fffffff;			/* |x| */
+	iy = hy & 0x7fffffff;			/* |y| */
+
+	if ((ix > 0x7f800000) ||		/* x is nan */
+		(iy > 0x7f800000))			/* y is nan */
+		return x + y;
+	if (x == y)
+		return y;						/* x=y, return y */
+	if (ix == 0)
+	{									/* x == 0 */
+		__FLT(x) = ((hy & 0x80000000) | 1);	/* return +-minsubnormal */
+		return x;
+	}
+	if (hx >= 0)
+	{									/* x > 0 */
+		if (hx > hy)
+		{								/* x > y, x -= ulp */
+			hx -= 1;
+		} else
+		{								/* x < y, x += ulp */
+			hx += 1;
+		}
+	} else
+	{									/* x < 0 */
+		if (hy >= 0 || hx > hy)
+		{								/* x < y, x -= ulp */
+			hx -= 1;
+		} else
+		{								/* x > y, x += ulp */
+			hx += 1;
+		}
+	}
+	hy = hx & 0x7f800000;
+	if (hy >= 0x7f800000)
+	{
+		x = x + x;						/* overflow  */
+		return x;						/* overflow  */
+	}
+	__FLT(x) = hx;
 	return x;
 }
 
