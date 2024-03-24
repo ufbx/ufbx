@@ -1805,6 +1805,7 @@ static void ufbxt_diff_baked_vec3_imp(ufbxt_diff_error *err, const ufbx_baked_ve
 		ufbx_baked_vec3 ref = refs[i];
 		ufbx_baked_vec3 key = list.data[i];
 
+		if (key.time != ref.time) ufbxt_logf("key.time=%f, ref.time=%f", key.time, ref.time);
 		ufbxt_assert(key.time == ref.time);
 		ufbxt_assert_close_vec3(err, key.value, ref.value);
 	}
@@ -1821,6 +1822,7 @@ static void ufbxt_diff_baked_quat_imp(ufbxt_diff_error *err, const ufbx_baked_ve
 
 		ufbx_vec3 key_euler = ufbx_quat_to_euler(key.value, UFBX_ROTATION_ORDER_XYZ);
 
+		if (key.time != ref.time) ufbxt_logf("key.time=%f, ref.time=%f", key.time, ref.time);
 		ufbxt_assert(key.time == ref.time);
 		ufbxt_assert_close_vec3(err, key_euler, ref.value);
 	}
