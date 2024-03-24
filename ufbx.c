@@ -553,7 +553,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 
 // -- Version
 
-#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 11, 2)
+#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 12, 0)
 const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
 
 ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEADER_VERSION/1000u);
@@ -25477,7 +25477,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 			double delta = next_time - prev_time;
 			double scale = ufbx_fmax(ufbx_fabs(prev_time), ufbx_fabs(next_time));
 			double min_delta = ufbx_fmax(scale * min_rel, min_abs);
-
 			if (delta <= min_delta) {
 				// Try to determine which time is nearer to an original keyframe and retain that
 				double prev_frame = prev_time * frame_factor;
@@ -25501,7 +25500,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 			double delta = next_time - prev_time;
 			double scale = ufbx_fmax(ufbx_fabs(prev_time), ufbx_fabs(next_time));
 			double min_delta = ufbx_fmax(scale * min_rel, min_abs);
-
 			if (delta > min_delta || ufbxi_bake_check_epsilon(bc, prev_time, next_time)) {
 				times[dst++] = next_time;
 				prev_time = next_time;
