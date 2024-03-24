@@ -25446,7 +25446,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 			double next_time = times[src++];
 			double delta = next_time - prev_time;
 			double scale = ufbx_fmax(ufbx_fabs(prev_time), ufbx_fabs(next_time));
-			double min_delta = ufbx_fmax(scale * min_rel, min_abs);
+			double min_delta = ufbx_fmax(scale * min_rel, min_abs) * 0.5f;
 
 			if (delta >= min_delta) {
 				times[dst++] = next_time;
