@@ -230,7 +230,7 @@
 	double ufbx_fabs(double x);
 	double ufbx_copysign(double x, double y);
 	double ufbx_nextafter(double x, double y);
-	double ufbx_nextafterf(float x, float y);
+	float ufbx_nextafterf(float x, float y);
 	double ufbx_ceil(double x);
 	int ufbx_isnan(double x);
 #endif
@@ -25394,7 +25394,7 @@ static ufbxi_noinline bool ufbxi_bake_apply_epsilon(ufbxi_bake_context *bc, doub
 		if (abs_time > abs_nearby) {
 			double min_abs_time = abs_nearby * bc->epsilon_factor;
 			if (bc->epsilon_float && (float)min_abs_time == (float)abs_nearby) {
-				min_abs_time = (float)ufbx_nextafterf((float)min_abs_time, UFBX_INFINITY);
+				min_abs_time = ufbx_nextafterf((float)min_abs_time, UFBX_INFINITY);
 			}
 			if (abs_time < min_abs_time) {
 				time = sign * min_abs_time;
@@ -25403,7 +25403,7 @@ static ufbxi_noinline bool ufbxi_bake_apply_epsilon(ufbxi_bake_context *bc, doub
 		} else {
 			double max_abs_time = abs_nearby / bc->epsilon_factor;
 			if (bc->epsilon_float && (float)max_abs_time == (float)abs_nearby) {
-				max_abs_time = (float)ufbx_nextafterf((float)max_abs_time, -UFBX_INFINITY);
+				max_abs_time = ufbx_nextafterf((float)max_abs_time, -UFBX_INFINITY);
 			}
 			if (abs_time > max_abs_time) {
 				time = sign * max_abs_time;
