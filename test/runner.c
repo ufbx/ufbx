@@ -19,6 +19,7 @@ static void ufbxt_assert_fail(const char *file, uint32_t line, const char *expr)
 #include <stdio.h>
 #include <stdarg.h>
 #include <math.h>
+#include <float.h>
 
 #if defined(UFBXT_STACK_LIMIT)
 	static int ufbxt_main_argc;
@@ -3229,6 +3230,11 @@ void ufbxt_do_deflate_test(const char *name, void (*test_fn)(const ufbxt_inflate
 	ufbx_load_opts user_opts = { 0 }; \
 	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name##_##suffix, #suffix, user_opts, flags | UFBXT_FILE_TEST_FLAG_ALTERNATIVE); } \
 	void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
+#define UFBXT_FILE_TEST_ALT_SUFFIX_FLAGS(name, file, suffix, flags) void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
+	void ufbxt_test_fn_file_##name(void) { \
+	ufbx_load_opts user_opts = { 0 }; \
+	ufbxt_do_file_test(#file, &ufbxt_test_fn_imp_file_##name, #suffix, user_opts, flags | UFBXT_FILE_TEST_FLAG_ALTERNATIVE); } \
+	void ufbxt_test_fn_imp_file_##name(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error)
 #define UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS(name, suffix, get_opts, flags) void ufbxt_test_fn_imp_file_##name##_##suffix(ufbx_scene *scene, ufbxt_diff_error *err, ufbx_error *load_error); \
 	void ufbxt_test_fn_file_##name##_##suffix(void) { \
 	ufbxt_do_file_test(#name, &ufbxt_test_fn_imp_file_##name##_##suffix, #suffix, get_opts(), flags | UFBXT_FILE_TEST_FLAG_ALTERNATIVE); } \
@@ -3252,6 +3258,7 @@ void ufbxt_do_deflate_test(const char *name, void (*test_fn)(const ufbxt_inflate
 #define UFBXT_FILE_TEST_OPTS(name, get_opts) UFBXT_FILE_TEST_OPTS_FLAGS(name, get_opts, 0)
 #define UFBXT_FILE_TEST_SUFFIX(name, suffix) UFBXT_FILE_TEST_SUFFIX_FLAGS(name, suffix, 0)
 #define UFBXT_FILE_TEST_SUFFIX_OPTS(name, suffix, get_opts) UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS(name, suffix, get_opts, 0)
+#define UFBXT_FILE_TEST_ALT_SUFFIX(name, file, suffix) UFBXT_FILE_TEST_ALT_SUFFIX_FLAGS(name, file, suffix, 0)
 #define UFBXT_FILE_TEST_ALT(name, file) UFBXT_FILE_TEST_ALT_FLAGS(name, file, 0)
 #define UFBXT_FILE_TEST_OPTS_ALT(name, file, get_opts) UFBXT_FILE_TEST_OPTS_ALT_FLAGS(name, file, get_opts, 0)
 
@@ -3263,6 +3270,7 @@ void ufbxt_do_deflate_test(const char *name, void (*test_fn)(const ufbxt_inflate
 #undef UFBXT_FILE_TEST_PATH_FLAGS
 #undef UFBXT_FILE_TEST_OPTS_FLAGS
 #undef UFBXT_FILE_TEST_SUFFIX_FLAGS
+#undef UFBXT_FILE_TEST_ALT_SUFFIX_FLAGS
 #undef UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS
 #undef UFBXT_FILE_TEST_ALT_FLAGS
 #undef UFBXT_FILE_TEST_OPTS_ALT_FLAGS
@@ -3273,6 +3281,7 @@ void ufbxt_do_deflate_test(const char *name, void (*test_fn)(const ufbxt_inflate
 #define UFBXT_FILE_TEST_PATH_FLAGS(name, path, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
 #define UFBXT_FILE_TEST_OPTS_FLAGS(name, get_opts, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
 #define UFBXT_FILE_TEST_SUFFIX_FLAGS(name, suffix, flags) { UFBXT_TEST_GROUP, #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
+#define UFBXT_FILE_TEST_ALT_SUFFIX_FLAGS(name, file, suffix, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
 #define UFBXT_FILE_TEST_SUFFIX_OPTS_FLAGS(name, suffix, get_opts, flags) { UFBXT_TEST_GROUP, #name "_" #suffix, &ufbxt_test_fn_file_##name##_##suffix },
 #define UFBXT_FILE_TEST_ALT_FLAGS(name, file, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },
 #define UFBXT_FILE_TEST_OPTS_ALT_FLAGS(name, file, get_opts, flags) { UFBXT_TEST_GROUP, #name, &ufbxt_test_fn_file_##name },

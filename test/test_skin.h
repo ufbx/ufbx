@@ -123,6 +123,45 @@ UFBXT_FILE_TEST_SUFFIX(maya_game_sausage, combined)
 }
 #endif
 
+UFBXT_FILE_TEST_ALT_SUFFIX(maya_game_sausage_combined_bake, maya_game_sausage, combined)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_anim_stack *stack = ufbx_find_anim_stack(scene, "spin");
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, stack->anim, NULL, NULL);
+		ufbxt_assert(bake);
+
+		ufbxt_assert(bake->key_time_min == 20.0/24.0);
+		ufbxt_assert(bake->key_time_max == 40.0/24.0);
+
+		ufbxt_assert(bake->playback_time_begin == 20.0/24.0);
+		ufbxt_assert(bake->playback_time_end == 40.0/24.0);
+		ufbxt_assert_close_double(err, bake->playback_duration, 40.0/24.0 - 20.0/24.0);
+
+		ufbx_free_baked_anim(bake);
+	}
+
+	{
+		ufbx_anim_stack *stack = ufbx_find_anim_stack(scene, "spin");
+
+		ufbx_bake_opts opts = { 0 };
+		opts.trim_start_time = true;
+
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, stack->anim, &opts, NULL);
+		ufbxt_assert(bake);
+
+		ufbxt_assert(bake->key_time_min == 20.0/24.0);
+		ufbxt_assert(bake->key_time_max == 40.0/24.0);
+
+		ufbxt_assert(bake->playback_time_begin == 20.0/24.0);
+		ufbxt_assert(bake->playback_time_end == 40.0/24.0);
+		ufbxt_assert_close_double(err, bake->playback_duration, 40.0/24.0 - 20.0/24.0);
+
+		ufbx_free_baked_anim(bake);
+	}
+}
+#endif
+
 UFBXT_FILE_TEST(synthetic_sausage_wiggle_no_link)
 #if UFBXT_IMPL
 {
