@@ -25409,13 +25409,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 	ufbxi_bake_time *times = ufbxi_push_pop(&bc->tmp_prop, &bc->tmp_times, ufbxi_bake_time, num_times);
 	ufbxi_check_err(&bc->error, times);
 
-	if (num_times == 0) return 1;
-
 	// TODO: Something better
 	qsort(times, num_times, sizeof(ufbxi_bake_time), &ufbxi_cmp_bake_time_fn);
 
 	// Deduplicate times
-	{
+	if (num_times > 0) {
 		size_t dst = 0;
 		ufbxi_bake_time prev = times[0];
 		for (size_t src = 1; src < num_times; src++) {
