@@ -4662,7 +4662,7 @@ typedef enum ufbx_bake_step_handling UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(ufbx_bake_step_handling)
 } ufbx_bake_step_handling;
 
-UFBX_ENUM_TYPE(ufbx_bake_step_handling, ufbx_bake_step_handling, UFBX_BAKE_STEP_HANDLING_IGNORE);
+UFBX_ENUM_TYPE(ufbx_bake_step_handling, UFBX_BAKE_STEP_HANDLING, UFBX_BAKE_STEP_HANDLING_IGNORE);
 
 typedef struct ufbx_bake_opts {
 	uint32_t _begin_zero;
