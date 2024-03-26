@@ -25293,7 +25293,7 @@ static int ufbxi_cmp_bake_prop(const void *va, const void *vb)
 
 ufbx_static_assert(bake_step_left, UFBX_BAKED_KEY_STEP_LEFT == 0x1);
 ufbx_static_assert(bake_step_right, UFBX_BAKED_KEY_STEP_RIGHT == 0x2);
-ufbx_static_assert(bake_step_right, UFBX_BAKED_KEY_STEP_KEY == 0x4);
+ufbx_static_assert(bake_step_key, UFBX_BAKED_KEY_STEP_KEY == 0x4);
 static ufbxi_forceinline int ufbxi_cmp_bake_time(ufbxi_bake_time a, ufbxi_bake_time b)
 {
 	if (a.time != b.time) return a.time < b.time ? -1 : 1;
