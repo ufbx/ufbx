@@ -26043,7 +26043,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim_prop(ufbxi_bake_contex
 		ufbx_prop prop = ufbx_evaluate_prop_len(bc->anim, element, name.data, name.length, eval_time);
 		keys.data[i].time = bake_time.time;
 		keys.data[i].value = prop.value_vec3;
-		keys.data[i].flags = bake_time.flags;
+		keys.data[i].flags = (ufbx_baked_key_flags)bake_time.flags;
 	}
 
 	ufbx_baked_prop *baked_prop = ufbxi_push_zero(&bc->tmp_props, ufbx_baked_prop, 1);
