@@ -25319,7 +25319,7 @@ ufbxi_nodiscard static ufbxi_forceinline int ufbxi_bake_push_time(ufbxi_bake_con
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_times(ufbxi_bake_context *bc, const ufbx_anim_value *anim_value, bool resample_linear)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_times(ufbxi_bake_context *bc, const ufbx_anim_value *anim_value, bool resample_linear, uint32_t key_flag)
 {
 	double sample_rate = bc->opts.resample_rate;
 	double min_duration = bc->opts.minimum_sample_rate > 0.0 ? 1.0 / bc->opts.minimum_sample_rate : 0.0;
@@ -25333,7 +25333,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_times(ufbxi_bake_context *b
 		for (size_t key_ix = 0; key_ix < num_keys; key_ix++) {
 			ufbx_keyframe a = keys[key_ix];
 			double a_time = a.time;
-			ufbxi_check_err(&bc->error, ufbxi_bake_push_time(bc, a_time, UFBX_BAKED_KEY_KEYFRAME));
+			ufbxi_check_err(&bc->error, ufbxi_bake_push_time(bc, a_time, key_flag));
 			if (key_ix + 1 >= num_keys) break;
 			ufbx_keyframe b = keys[key_ix + 1];
 			double b_time = b.time;
@@ -25436,8 +25436,21 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 	if (bc->opts.maximum_sample_rate > 0.0) {
 		const double epsilon = 0.0078125 / bc->opts.maximum_sample_rate;
 		double sample_rate = bc->opts.maximum_sample_rate;
+		double max_interval = 1.0 / bc->opts.maximum_sample_rate;
 		double min_interval = 1.0 / bc->opts.maximum_sample_rate - epsilon;
 		size_t dst = 0, src = 0;
+
+		// Pre-expand constant keyframes
+		for (size_t i = 0; i < num_times; i++) {
+			if ((times[i].flags & (UFBX_BAKED_KEY_STEP_LEFT|UFBX_BAKED_KEY_STEP_RIGHT)) != 0) {
+				double sign = (times[i].flags & UFBX_BAKED_KEY_STEP_LEFT) != 0 ? -1.0 : 1.0;
+				double time = times[i].time + sign * max_interval;
+				if (i > 0) time = ufbx_fmax(time, times[i - 1].time);
+				if (i + 1 < num_times) time = ufbx_fmin(time, times[i + 1].time);
+				times[i].time = time;
+				times[i].flags = UFBX_BAKED_KEY_REDUCED;
+			}
+		}
 
 		ufbxi_bake_time prev_time = { -UFBX_INFINITY };
 		while (src < num_times) {
@@ -25734,7 +25747,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_resampled_times(ufbxi_bake_
 			time = keys.data[i - 1].time;
 		}
 		times[i].time = time;
-		times[i].flags = flags;
+		times[i].flags = flags & 0x3;
 	}
 
 	return 1;
@@ -25798,13 +25811,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 			// Literally any transform related property can affect complex translation
 			if (ufbxi_in_list(ufbxi_transform_props, ufbxi_arraycount(ufbxi_transform_props), prop->prop_name)) {
 				bool resample_linear = resample_translation || prop->prop_name != ufbxi_Lcl_Translation;
-				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, resample_linear));
+				uint32_t key_flag = prop->prop_name == ufbxi_Lcl_Translation ? UFBX_BAKED_KEY_KEYFRAME : 0;
+				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, resample_linear, key_flag));
 			}
 		}
 	} else {
 		ufbxi_for(ufbxi_bake_prop, prop, props, count) {
 			if (prop->prop_name == ufbxi_Lcl_Translation) {
-				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, resample_translation));
+				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, resample_translation, UFBX_BAKED_KEY_KEYFRAME));
 			}
 		}
 	}
@@ -25816,13 +25830,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 		ufbxi_for(ufbxi_bake_prop, prop, props, count) {
 			if (ufbxi_in_list(ufbxi_complex_rotation_sources, ufbxi_arraycount(ufbxi_complex_rotation_sources), prop->prop_name)) {
 				bool resample_linear = !bc->opts.no_resample_rotation || prop->prop_name != ufbxi_Lcl_Rotation;
-				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, resample_linear));
+				uint32_t key_flag = prop->prop_name == ufbxi_Lcl_Rotation ? UFBX_BAKED_KEY_KEYFRAME : 0;
+				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, resample_linear, key_flag));
 			}
 		}
 	} else {
 		ufbxi_for(ufbxi_bake_prop, prop, props, count) {
 			if (prop->prop_name == ufbxi_Lcl_Rotation) {
-				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, !bc->opts.no_resample_rotation));
+				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, !bc->opts.no_resample_rotation, UFBX_BAKED_KEY_KEYFRAME));
 			}
 		}
 	}
@@ -25849,7 +25864,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 
 	ufbxi_for(ufbxi_bake_prop, prop, props, count) {
 		if (prop->prop_name == ufbxi_Lcl_Scaling) {
-			ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, resample_scale));
+			ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, resample_scale, UFBX_BAKED_KEY_KEYFRAME));
 		}
 	}
 	ufbxi_check_err(&bc->error, ufbxi_finalize_bake_times(bc, &times_s));
@@ -26007,7 +26022,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node(ufbxi_bake_context *bc
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim_prop(ufbxi_bake_context *bc, ufbx_element *element, const char *prop_name, ufbxi_bake_prop *props, size_t count)
 {
 	ufbxi_for(ufbxi_bake_prop, prop, props, count) {
-		ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, false));
+		ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, false, UFBX_BAKED_KEY_KEYFRAME));
 	}
 
 	ufbxi_bake_time_list times;
@@ -26139,7 +26154,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim(ufbxi_bake_context *bc
 			if (prop->prop_name != ufbxi_Weight) continue;
 			ufbx_element *element = scene->elements.data[prop->element_id];
 			if (element->type == UFBX_ELEMENT_ANIM_LAYER) {
-				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, true));
+				ufbxi_check_err(&bc->error, ufbxi_bake_times(bc, prop->anim_value, true, 0));
 				has_weight_times = true;
 			}
 		}
@@ -29770,7 +29785,11 @@ ufbx_abi ufbx_vec3 ufbx_evaluate_baked_vec3(ufbx_baked_vec3_list keyframes, doub
 		if (begin == 0) return next->value;
 
 		const ufbx_baked_vec3 *prev = next - 1;
+		if (prev > keys && (prev->flags & UFBX_BAKED_KEY_STEP_RIGHT) != 0 && prev[-1].time == time) prev--;
+		if (time == prev->time) return prev->value;
 		double t = (time - prev->time) / (next->time - prev->time);
+		if (prev->flags & UFBX_BAKED_KEY_STEP_LEFT) t = 0.0;
+		if (next->flags & UFBX_BAKED_KEY_STEP_RIGHT) t = 1.0;
 		return ufbxi_lerp3(prev->value, next->value, (ufbx_real)t);
 	}
 
@@ -29798,7 +29817,12 @@ ufbx_abi ufbx_quat ufbx_evaluate_baked_quat(ufbx_baked_quat_list keyframes, doub
 		if (begin == 0) return next->value;
 
 		const ufbx_baked_quat *prev = next - 1;
+		if (prev > keys && prev[-1].time == time) prev--;
+		if (time == prev->time) return prev->value;
 		double t = (time - prev->time) / (next->time - prev->time);
+		if (prev > keys && (prev->flags & UFBX_BAKED_KEY_STEP_RIGHT) != 0 && prev[-1].time == time) prev--;
+		if (prev->flags & UFBX_BAKED_KEY_STEP_LEFT) t = 0.0;
+		if (next->flags & UFBX_BAKED_KEY_STEP_RIGHT) t = 1.0;
 		return ufbx_quat_slerp(prev->value, next->value, (ufbx_real)t);
 	}
 

@@ -5113,11 +5113,13 @@ ufbx_abi void ufbx_retain_baked_anim(ufbx_baked_anim *bake);
 ufbx_abi void ufbx_free_baked_anim(ufbx_baked_anim *bake);
 
 // Evaluate baked animation `keyframes` at `time`.
-// Internally simply linearly interpolates between two adjacent keyframes.
+// Internally linearly interpolates between two adjacent keyframes.
+// Handles stepped tangents cleanly, which is not strictly necessary for custom interpolation.
 ufbx_abi ufbx_vec3 ufbx_evaluate_baked_vec3(ufbx_baked_vec3_list keyframes, double time);
 
 // Evaluate baked animation `keyframes` at `time`.
-// Internally simply spherically interpolates (`ufbx_quat_slerp()`) between two adjacent keyframes.
+// Internally spherically interpolates (`ufbx_quat_slerp()`) between two adjacent keyframes.
+// Handles stepped tangents cleanly, which is not strictly necessary for custom interpolation.
 ufbx_abi ufbx_quat ufbx_evaluate_baked_quat(ufbx_baked_quat_list keyframes, double time);
 
 // Poses

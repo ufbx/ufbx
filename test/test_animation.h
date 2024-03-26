@@ -1888,6 +1888,10 @@ UFBXT_FILE_TEST_ALT(maya_anim_linear_default, maya_anim_linear)
 	ufbx_baked_node *node = &bake->nodes.data[0];
 	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
 
+	ufbxt_assert(ufbx_evaluate_baked_vec3(node->translation_keys, nextafter(12.0/24.0, -INFINITY)).z == 0.0f);
+	ufbxt_assert(ufbx_evaluate_baked_vec3(node->translation_keys, 12.0/24.0).z == 2.0f);
+	ufbxt_assert(ufbx_evaluate_baked_vec3(node->translation_keys, nextafter(12.0/24.0, INFINITY)).z == 0.0f);
+
 	ufbx_free_baked_anim(bake);
 }
 #endif
@@ -1930,6 +1934,10 @@ UFBXT_FILE_TEST(maya_huge_stepped_tangents)
 	ufbxt_assert(bake->nodes.count == 1);
 	ufbx_baked_node *node = &bake->nodes.data[0];
 	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbxt_assert(ufbx_evaluate_baked_vec3(node->translation_keys, nextafter(10.0, -INFINITY)).x == 0.0f);
+	ufbxt_assert(ufbx_evaluate_baked_vec3(node->translation_keys, 10.0).x == 1.0f);
+	ufbxt_assert(ufbx_evaluate_baked_vec3(node->translation_keys, nextafter(10.0, INFINITY)).x == 2.0f);
 
 	ufbx_free_baked_anim(bake);
 }
@@ -1974,6 +1982,10 @@ UFBXT_FILE_TEST_ALT(maya_huge_stepped_tangents_identical, maya_huge_stepped_tang
 	ufbx_baked_node *node = &bake->nodes.data[0];
 	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
 
+	ufbxt_assert(ufbx_evaluate_baked_vec3(node->translation_keys, nextafter(10.0, -INFINITY)).x == 0.0f);
+	ufbxt_assert(ufbx_evaluate_baked_vec3(node->translation_keys, 10.0).x == 1.0f);
+	ufbxt_assert(ufbx_evaluate_baked_vec3(node->translation_keys, nextafter(10.0, INFINITY)).x == 2.0f);
+
 	ufbx_free_baked_anim(bake);
 }
 #endif
@@ -2015,6 +2027,10 @@ UFBXT_FILE_TEST_ALT(maya_huge_stepped_tangents_default, maya_huge_stepped_tangen
 	ufbxt_assert(bake->nodes.count == 1);
 	ufbx_baked_node *node = &bake->nodes.data[0];
 	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbxt_assert(ufbx_evaluate_baked_vec3(node->translation_keys, nextafter(10.0, -INFINITY)).x == 0.0f);
+	ufbxt_assert(ufbx_evaluate_baked_vec3(node->translation_keys, 10.0).x == 1.0f);
+	ufbxt_assert(ufbx_evaluate_baked_vec3(node->translation_keys, nextafter(10.0, INFINITY)).x == 2.0f);
 
 	ufbx_free_baked_anim(bake);
 }
@@ -2097,6 +2113,50 @@ UFBXT_FILE_TEST_ALT(maya_huge_stepped_tangents_huge_custom, maya_huge_stepped_ta
 		{ 100000.0 - step, { 8.0f }, UFBX_BAKED_KEY_STEP_LEFT },
 		{ 100000.0, { 9.0f }, UFBX_BAKED_KEY_KEYFRAME },
 		{ 100000.0 + step, { 10.0f }, UFBX_BAKED_KEY_STEP_RIGHT },
+		{ 200000.0, { 10.0f }, UFBX_BAKED_KEY_KEYFRAME },
+	};
+
+	ufbxt_assert(bake->nodes.count == 1);
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(maya_huge_stepped_tangents_huge_resample, maya_huge_stepped_tangents)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.maximum_sample_rate = 100.0;
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	const double step = 1.0 / 100.0;
+	ufbx_baked_vec3 translation_ref[] = {
+		{ 0.0, { 0.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 10.0 - step, { 0.0f }, UFBX_BAKED_KEY_REDUCED },
+		{ 10.0, { 1.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 10.0 + step, { 2.0f }, UFBX_BAKED_KEY_REDUCED },
+		{ 20.0, { 2.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 100.0 - step, { 2.0f }, UFBX_BAKED_KEY_REDUCED },
+		{ 100.0, { 3.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 100.0 + step, { 4.0f }, UFBX_BAKED_KEY_REDUCED },
+		{ 200.0, { 4.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 1000.0 - step, { 4.0f }, UFBX_BAKED_KEY_REDUCED },
+		{ 1000.0, { 5.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 1000.0 + step, { 6.0f }, UFBX_BAKED_KEY_REDUCED },
+		{ 2000.0, { 6.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 10000.0 - step, { 6.0f }, UFBX_BAKED_KEY_REDUCED },
+		{ 10000.0, { 7.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 10000.0 + step, { 8.0f }, UFBX_BAKED_KEY_REDUCED },
+		{ 20000.0, { 8.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 100000.0 - step, { 8.0f }, UFBX_BAKED_KEY_REDUCED },
+		{ 100000.0, { 9.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 100000.0 + step, { 10.0f }, UFBX_BAKED_KEY_REDUCED },
 		{ 200000.0, { 10.0f }, UFBX_BAKED_KEY_KEYFRAME },
 	};
 
@@ -2844,3 +2904,200 @@ UFBXT_FILE_TEST(maya_keyframe_spacing)
 	}
 }
 #endif
+
+#if UFBXT_IMPL
+static ufbx_baked_node *ufbxt_find_baked_node(ufbx_baked_anim *bake, ufbx_node *node)
+{
+	for (size_t i = 0; i < bake->nodes.count; i++) {
+		if (bake->nodes.data[i].typed_id == node->typed_id) {
+			return &bake->nodes.data[i];
+		}
+	}
+	return NULL;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(maya_scale_no_inherit_step, ufbxt_scale_helper_opts)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	ufbx_baked_vec3 scale_ref[] = {
+		{ 0.0/24.0, { 2.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 5.0/24.0 - 0.001, { 2.0, 1.0, 1.0 }, UFBX_BAKED_KEY_STEP_LEFT },
+		{ 5.0/24.0, { 3.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 10.0/24.0, { 4.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 10.0/24.0 + 0.001, { 5.0, 1.0, 1.0 }, UFBX_BAKED_KEY_STEP_RIGHT },
+		{ 15.0/24.0, { 5.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+	};
+
+	ufbx_baked_vec3 translation_ref[] = {
+		{ 0.0/24.0, { 10.0 }, 0 },
+		{ 5.0/24.0 - 0.001, { 10.0 }, UFBX_BAKED_KEY_STEP_LEFT },
+		{ 5.0/24.0, { 15.0 }, 0 },
+		{ 10.0/24.0, { 20.0 }, 0 },
+		{ 10.0/24.0 + 0.001, { 25.0 }, UFBX_BAKED_KEY_STEP_RIGHT },
+		{ 15.0/24.0, { 25.0 }, 0 },
+	};
+
+	ufbx_node *joint1_node = ufbx_find_node(scene, "joint1");
+	ufbx_node *joint2_node = ufbx_find_node(scene, "joint2");
+	ufbxt_assert(joint1_node);
+	ufbxt_assert(joint1_node->scale_helper);
+	ufbxt_assert(joint2_node);
+
+	ufbx_baked_node *joint1_helper = ufbxt_find_baked_node(bake, joint1_node->scale_helper);
+	ufbx_baked_node *joint2 = ufbxt_find_baked_node(bake, joint2_node);
+	ufbxt_assert(joint1_helper);
+	ufbxt_assert(joint2);
+	ufbxt_diff_baked_vec3(err, scale_ref, joint1_helper->scale_keys);
+	ufbxt_diff_baked_vec3(err, translation_ref, joint2->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_scale_no_inherit_step_identical, maya_scale_no_inherit_step, ufbxt_scale_helper_opts)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.step_handling = UFBX_BAKE_STEP_HANDLING_IDENTICAL_TIME;
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	ufbx_baked_vec3 scale_ref[] = {
+		{ 0.0/24.0, { 2.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 5.0/24.0, { 2.0, 1.0, 1.0 }, UFBX_BAKED_KEY_STEP_LEFT },
+		{ 5.0/24.0, { 3.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 10.0/24.0, { 4.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 10.0/24.0, { 5.0, 1.0, 1.0 }, UFBX_BAKED_KEY_STEP_RIGHT },
+		{ 15.0/24.0, { 5.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+	};
+
+	ufbx_baked_vec3 translation_ref[] = {
+		{ 0.0/24.0, { 10.0 }, 0 },
+		{ 5.0/24.0, { 10.0 }, UFBX_BAKED_KEY_STEP_LEFT },
+		{ 5.0/24.0, { 15.0 }, 0 },
+		{ 10.0/24.0, { 20.0 }, 0 },
+		{ 10.0/24.0, { 25.0 }, UFBX_BAKED_KEY_STEP_RIGHT },
+		{ 15.0/24.0, { 25.0 }, 0 },
+	};
+
+	ufbx_node *joint1_node = ufbx_find_node(scene, "joint1");
+	ufbx_node *joint2_node = ufbx_find_node(scene, "joint2");
+	ufbxt_assert(joint1_node);
+	ufbxt_assert(joint1_node->scale_helper);
+	ufbxt_assert(joint2_node);
+
+	ufbx_baked_node *joint1_helper = ufbxt_find_baked_node(bake, joint1_node->scale_helper);
+	ufbx_baked_node *joint2 = ufbxt_find_baked_node(bake, joint2_node);
+	ufbxt_assert(joint1_helper);
+	ufbxt_assert(joint2);
+	ufbxt_diff_baked_vec3(err, scale_ref, joint1_helper->scale_keys);
+	ufbxt_diff_baked_vec3(err, translation_ref, joint2->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_scale_no_inherit_step_adjacent, maya_scale_no_inherit_step, ufbxt_scale_helper_opts)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.step_handling = UFBX_BAKE_STEP_HANDLING_ADJACENT_DOUBLE;
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	ufbx_baked_vec3 scale_ref[] = {
+		{ 0.0/24.0, { 2.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+		{ nextafter(5.0/24.0, -INFINITY), { 2.0, 1.0, 1.0 }, UFBX_BAKED_KEY_STEP_LEFT },
+		{ 5.0/24.0, { 3.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 10.0/24.0, { 4.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+		{ nextafter(10.0/24.0, INFINITY), { 5.0, 1.0, 1.0 }, UFBX_BAKED_KEY_STEP_RIGHT },
+		{ 15.0/24.0, { 5.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+	};
+
+	ufbx_baked_vec3 translation_ref[] = {
+		{ 0.0/24.0, { 10.0 }, 0 },
+		{ nextafter(5.0/24.0, -INFINITY), { 10.0 }, UFBX_BAKED_KEY_STEP_LEFT },
+		{ 5.0/24.0, { 15.0 }, 0 },
+		{ 10.0/24.0, { 20.0 }, 0 },
+		{ nextafter(10.0/24.0, INFINITY), { 25.0 }, UFBX_BAKED_KEY_STEP_RIGHT },
+		{ 15.0/24.0, { 25.0 }, 0 },
+	};
+
+	ufbx_node *joint1_node = ufbx_find_node(scene, "joint1");
+	ufbx_node *joint2_node = ufbx_find_node(scene, "joint2");
+	ufbxt_assert(joint1_node);
+	ufbxt_assert(joint1_node->scale_helper);
+	ufbxt_assert(joint2_node);
+
+	ufbx_baked_node *joint1_helper = ufbxt_find_baked_node(bake, joint1_node->scale_helper);
+	ufbx_baked_node *joint2 = ufbxt_find_baked_node(bake, joint2_node);
+	ufbxt_assert(joint1_helper);
+	ufbxt_assert(joint2);
+	ufbxt_diff_baked_vec3(err, scale_ref, joint1_helper->scale_keys);
+	ufbxt_diff_baked_vec3(err, translation_ref, joint2->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_scale_no_inherit_step_resmaple, maya_scale_no_inherit_step, ufbxt_scale_helper_opts)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.maximum_sample_rate = 100.0;
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	double step = 1.0 / 100.0;
+	ufbx_baked_vec3 scale_ref[] = {
+		{ 0.0/24.0, { 2.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 5.0/24.0 - step, { 2.0, 1.0, 1.0 }, UFBX_BAKED_KEY_REDUCED },
+		{ 5.0/24.0, { 3.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 10.0/24.0, { 4.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 10.0/24.0 + step, { 5.0, 1.0, 1.0 }, UFBX_BAKED_KEY_REDUCED },
+		{ 15.0/24.0, { 5.0, 1.0, 1.0 }, UFBX_BAKED_KEY_KEYFRAME },
+	};
+
+	ufbx_baked_vec3 translation_ref[] = {
+		{ 0.0/24.0, { 10.0 }, 0 },
+		{ 5.0/24.0 - step, { 10.0 }, 0 },
+		{ 5.0/24.0, { 15.0 }, 0 },
+		{ 10.0/24.0, { 20.0 }, 0 },
+		{ 10.0/24.0 + step, { 25.0 }, 0 },
+		{ 15.0/24.0, { 25.0 }, 0 },
+	};
+
+	ufbx_node *joint1_node = ufbx_find_node(scene, "joint1");
+	ufbx_node *joint2_node = ufbx_find_node(scene, "joint2");
+	ufbxt_assert(joint1_node);
+	ufbxt_assert(joint1_node->scale_helper);
+	ufbxt_assert(joint2_node);
+
+	ufbx_baked_node *joint1_helper = ufbxt_find_baked_node(bake, joint1_node->scale_helper);
+	ufbx_baked_node *joint2 = ufbxt_find_baked_node(bake, joint2_node);
+	ufbxt_assert(joint1_helper);
+	ufbxt_assert(joint2);
+	ufbxt_diff_baked_vec3(err, scale_ref, joint1_helper->scale_keys);
+	ufbxt_diff_baked_vec3(err, translation_ref, joint2->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
