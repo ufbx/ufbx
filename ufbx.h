@@ -4212,11 +4212,14 @@ typedef enum ufbx_baked_key_flags UFBX_FLAG_REPR {
 	UFBX_BAKED_KEY_STEP_LEFT = 0x1,
 	// This keyframe represents a constant step from the right side
 	UFBX_BAKED_KEY_STEP_RIGHT = 0x2,
+	// This keyframe is the main part of a step
+	// Bordering either `UFBX_BAKED_KEY_STEP_LEFT` or `UFBX_BAKED_KEY_STEP_RIGHT`.
+	UFBX_BAKED_KEY_STEP_KEY = 0x4,
 	// This keyframe is a real keyframe in the source animation
-	UFBX_BAKED_KEY_KEYFRAME = 0x4,
+	UFBX_BAKED_KEY_KEYFRAME = 0x8,
 	// This keyframe has been reduced by maximum sample rate.
 	// See `ufbx_bake_opts.maximum_sample_rate`.
-	UFBX_BAKED_KEY_REDUCED = 0x8,
+	UFBX_BAKED_KEY_REDUCED = 0x10,
 
 	UFBX_FLAG_FORCE_WIDTH(UFBX_BAKED_KEY)
 } ufbx_baked_key_flags;

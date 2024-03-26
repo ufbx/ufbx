@@ -25293,6 +25293,7 @@ static int ufbxi_cmp_bake_prop(const void *va, const void *vb)
 
 ufbx_static_assert(bake_step_left, UFBX_BAKED_KEY_STEP_LEFT == 0x1);
 ufbx_static_assert(bake_step_right, UFBX_BAKED_KEY_STEP_RIGHT == 0x2);
+ufbx_static_assert(bake_step_right, UFBX_BAKED_KEY_STEP_KEY == 0x4);
 static ufbxi_forceinline int ufbxi_cmp_bake_time(ufbxi_bake_time a, ufbxi_bake_time b)
 {
 	if (a.time != b.time) return a.time < b.time ? -1 : 1;
@@ -25419,14 +25420,44 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 		for (size_t src = 1; src < num_times; src++) {
 			ufbxi_bake_time next = times[src];
 			// Merge keys with the same time and step flags `(0x1, 0x2)`
-			if (next.time == prev.time && ((next.flags ^ prev.flags) & 0x3) == 0) {
-				prev.flags |= next.flags;
-			} else {
-				times[dst++] = prev;
-				prev = next;
+			if (next.time == prev.time) {
+				if (((next.flags ^ prev.flags) & 0x3) == 0) {
+					prev.flags |= next.flags;
+					continue;
+				} else if (prev.flags & UFBX_BAKED_KEY_STEP_LEFT) {
+					next.flags |= UFBX_BAKED_KEY_STEP_KEY;
+				} else if (next.flags & UFBX_BAKED_KEY_STEP_RIGHT) {
+					prev.flags |= UFBX_BAKED_KEY_STEP_KEY;
+				}
 			}
+
+			times[dst++] = prev;
+			prev = next;
 		}
 		times[dst++] = prev;
+		num_times = dst;
+	}
+
+	// Cull too close resampled keys, these may arise during merging multiple times
+	if (num_times > 0) {
+		double min_dist = 0.25 / bc->opts.resample_rate;
+		uint32_t keep_flags = UFBX_BAKED_KEY_STEP_LEFT|UFBX_BAKED_KEY_STEP_RIGHT|UFBX_BAKED_KEY_STEP_KEY|UFBX_BAKED_KEY_KEYFRAME;
+
+		size_t dst = 0;
+		for (size_t src = 0; src < num_times; src++) {
+			ufbxi_bake_time cur = times[src];
+			double delta = UFBX_INFINITY;
+
+			bool keep = true;
+			if ((cur.flags & keep_flags) == 0) {
+				if (dst > 0) delta = cur.time - times[dst - 1].time;
+				if (src + 1 < num_times) delta = ufbx_fmin(delta, times[src + 1].time - cur.time);
+				if (delta < min_dist) keep = false;
+			}
+			if (keep) {
+				times[dst++] = cur;
+			}
+		}
 		num_times = dst;
 	}
 
@@ -25739,13 +25770,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_resampled_times(ufbxi_bake_
 	for (size_t i = 0; i < keys.count; i++) {
 		uint32_t flags = keys.data[i].flags;
 		double time = keys.data[i].time;
-		if ((flags & UFBX_BAKED_KEY_STEP_LEFT) != 0 && i + 1 < keys.count && (keys.data[i + 1].flags & UFBX_BAKED_KEY_KEYFRAME) != 0) {
+		if ((flags & UFBX_BAKED_KEY_STEP_LEFT) != 0 && i + 1 < keys.count && (keys.data[i + 1].flags & UFBX_BAKED_KEY_STEP_KEY) != 0) {
 			time = keys.data[i + 1].time;
-		} else if ((flags & UFBX_BAKED_KEY_STEP_RIGHT) != 0 && i > 0 && (keys.data[i - 1].flags & UFBX_BAKED_KEY_KEYFRAME) != 0) {
+		} else if ((flags & UFBX_BAKED_KEY_STEP_RIGHT) != 0 && i > 0 && (keys.data[i - 1].flags & UFBX_BAKED_KEY_STEP_KEY) != 0) {
 			time = keys.data[i - 1].time;
 		}
 		times[i].time = time;
-		times[i].flags = flags & 0x3;
+		times[i].flags = flags & 0x7;
 	}
 
 	return 1;
@@ -25886,10 +25917,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 	size_t ix_t = 0, ix_r = 0, ix_s = 0;
 	while (ix_t < times_t.count || ix_r < times_r.count || ix_s < times_s.count) {
 		ufbxi_bake_time bake_time = { UFBX_INFINITY };
+		uint32_t flags_r = 0, flags_t = 0, flags_s = 0;
 
 		uint32_t flags = 0;
 		if (ix_r < times_r.count) {
 			bake_time = times_r.data[ix_r];
+			flags_r = bake_time.flags;
+			bake_time.flags &= 0x7;
 			flags |= UFBX_TRANSFORM_FLAG_INCLUDE_ROTATION;
 		}
 		if (ix_t < times_t.count) {
@@ -25900,7 +25934,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 					bake_time = t;
 					flags = 0;
 				}
-				bake_time.flags |= t.flags;
+				bake_time.flags |= t.flags & 0x7;
+				flags_t = t.flags;
 				flags |= UFBX_TRANSFORM_FLAG_INCLUDE_TRANSLATION;
 			}
 		}
@@ -25912,7 +25947,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 					bake_time = t;
 					flags = 0;
 				}
-				bake_time.flags |= t.flags;
+				bake_time.flags |= t.flags & 0x7;
+				flags_s = t.flags;
 				flags |= UFBX_TRANSFORM_FLAG_INCLUDE_SCALE;
 			}
 		}
@@ -25936,13 +25972,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 
 			keys_t.data[ix_t].time = bake_time.time;
 			keys_t.data[ix_t].value = transform.translation;
-			keys_t.data[ix_t].flags = (ufbx_baked_key_flags)bake_time.flags;
+			keys_t.data[ix_t].flags = (ufbx_baked_key_flags)(bake_time.flags | flags_t);
 			ix_t++;
 		}
 		if (flags & UFBX_TRANSFORM_FLAG_INCLUDE_ROTATION) {
 			keys_r.data[ix_r].time = bake_time.time;
 			keys_r.data[ix_r].value = transform.rotation;
-			keys_r.data[ix_r].flags = (ufbx_baked_key_flags)bake_time.flags;
+			keys_r.data[ix_r].flags = (ufbx_baked_key_flags)(bake_time.flags | flags_r);
 			ix_r++;
 		}
 		if (flags & UFBX_TRANSFORM_FLAG_INCLUDE_SCALE) {
@@ -25959,7 +25995,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 
 			keys_s.data[ix_s].time = bake_time.time;
 			keys_s.data[ix_s].value = transform.scale;
-			keys_s.data[ix_s].flags = (ufbx_baked_key_flags)bake_time.flags;
+			keys_s.data[ix_s].flags = (ufbx_baked_key_flags)(bake_time.flags | flags_s);
 			ix_s++;
 		}
 	}
