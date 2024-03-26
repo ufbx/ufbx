@@ -22,12 +22,6 @@ typedef union
 	int i[2];
 } fdlibm_bits;
 
-typedef union
-{
-	float f;
-	int i;
-} fdlibmf_bits;
-
 #ifdef __LITTLE_ENDIAN
 	#define __HI(x) (((fdlibm_bits *)&(x))->i[1])
 	#define __LO(x) (((fdlibm_bits *)&(x))->i[0])
@@ -35,7 +29,6 @@ typedef union
 	#define __HI(x) (((fdlibm_bits *)&(x))->i[0])
 	#define __LO(x) (((fdlibm_bits *)&(x))->i[1])
 #endif
-#define __FLT(x) (((fdlibmf_bits *)&(x))->i)
 
 /*
  * set X_TLOSS = pi*2**52, which is possibly defined in <values.h>
@@ -1845,31 +1838,6 @@ double fdlibm_nextafter(double x, double y)
 	return x;
 }
 
-float fdlibm_nextafterf(float x, float y)
-{
-	int ix = __FLT(x);
-	int iy = __FLT(y);
-	int ax = ix & 0x7fffffff;
-	int ay = iy & 0x7fffffff;
-
-	if (ax > 0x7f800000 || ay > 0x7f800000)
-		return x + y;
-	if (ix == iy)
-		return y;
-	if (ax == 0)
-	{
-		if (ay == 0)
-			return y;
-		ix = (iy & 0x80000000) | 1;
-	}
-	else if (ax > ay || ((ix ^ iy) & 0x80000000))
-		ix--;
-	else
-		ix++;
-	__FLT(x) = ix;
-	return x;
-}
-
 double fdlibm_ceil(double x)
 {
 	static const double huge = 1.0e300;
@@ -1943,6 +1911,56 @@ double fdlibm_ceil(double x)
 	__HI(x) = i0;
 	__LO(x) = i1;
 	return x;
+}
+
+double fdlibm_rint(double x)
+{
+	static const double TWO52[2]={
+		4.50359962737049600000e+15, /* 0x43300000, 0x00000000 */
+		-4.50359962737049600000e+15, /* 0xC3300000, 0x00000000 */
+	};
+
+	int i0,j0,sx;
+	unsigned i,i1;
+	double w,t;
+	i0 =  __HI(x);
+	sx = (i0>>31)&1;
+	i1 =  __LO(x);
+	j0 = ((i0>>20)&0x7ff)-0x3ff;
+	if(j0<20) {
+		if(j0<0) { 	
+		if(((i0&0x7fffffff)|i1)==0) return x;
+		i1 |= (i0&0x0fffff);
+		i0 &= 0xfffe0000;
+		i0 |= ((i1|-i1)>>12)&0x80000;
+		__HI(x)=i0;
+			w = TWO52[sx]+x;
+			t =  w-TWO52[sx];
+			i0 = __HI(t);
+			__HI(t) = (i0&0x7fffffff)|(sx<<31);
+			return t;
+		} else {
+		i = (0x000fffff)>>j0;
+		if(((i0&i)|i1)==0) return x; /* x is integral */
+		i>>=1;
+		if(((i0&i)|i1)!=0) {
+			if(j0==19) i1 = 0x40000000; else
+			i0 = (i0&(~i))|((0x20000)>>j0);
+		}
+		}
+	} else if (j0>51) {
+		if(j0==0x400) return x+x;	/* inf or NaN */
+		else return x;		/* x is integral */
+	} else {
+		i = ((unsigned)(0xffffffff))>>(j0-20);
+		if((i1&i)==0) return x;	/* x is integral */
+		i>>=1;
+		if((i1&i)!=0) i1 = (i1&(~i))|((0x40000000)>>(j0-20));
+	}
+	__HI(x) = i0;
+	__LO(x) = i1;
+	w = TWO52[sx]+x;
+	return w-TWO52[sx];
 }
 
 int fdlibm_isnan(double x)

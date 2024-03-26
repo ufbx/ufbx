@@ -4207,16 +4207,32 @@ typedef enum ufbx_pivot_handling UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_pivot_handling, UFBX_PIVOT_HANDLING, UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT);
 
+typedef enum ufbx_baked_key_flags UFBX_FLAG_REPR {
+	// This keyframe represents a constant step from the left side
+	UFBX_BAKED_KEY_STEP_LEFT = 0x1,
+	// This keyframe represents a constant step from the right side
+	UFBX_BAKED_KEY_STEP_RIGHT = 0x2,
+	// This keyframe is a real keyframe in the source animation
+	UFBX_BAKED_KEY_KEYFRAME = 0x4,
+	// This keyframe has been reduced by maximum sample rate.
+	// See `ufbx_bake_opts.maximum_sample_rate`.
+	UFBX_BAKED_KEY_REDUCED = 0x8,
+
+	UFBX_FLAG_FORCE_WIDTH(UFBX_BAKED_KEY)
+} ufbx_baked_key_flags;
+
 typedef struct ufbx_baked_vec3 {
-	double time;     // < Time of the keyframe, in seconds
-	ufbx_vec3 value; // < Value at `time`, can be linearly interpolated
+	double time;                // < Time of the keyframe, in seconds
+	ufbx_vec3 value;            // < Value at `time`, can be linearly interpolated
+	ufbx_baked_key_flags flags; // < Additional information about the keyframe
 } ufbx_baked_vec3;
 
 UFBX_LIST_TYPE(ufbx_baked_vec3_list, ufbx_baked_vec3);
 
 typedef struct ufbx_baked_quat {
-	double time;     // < Time of the keyframe, in seconds
-	ufbx_quat value; // < Value at `time`, can be (spherically) linearly interpolated
+	double time;                // < Time of the keyframe, in seconds
+	ufbx_quat value;            // < Value at `time`, can be (spherically) linearly interpolated
+	ufbx_baked_key_flags flags; // < Additional information about the keyframe
 } ufbx_baked_quat;
 
 UFBX_LIST_TYPE(ufbx_baked_quat_list, ufbx_baked_quat);
@@ -4281,6 +4297,15 @@ typedef struct ufbx_baked_anim {
 
 	// Element properties modified by the animation.
 	ufbx_baked_element_list elements;
+
+	// Playback time range for the animation.
+	double playback_time_begin;
+	double playback_time_end;
+	double playback_duration;
+
+	// Keyframe time range.
+	double key_time_min;
+	double key_time_max;
 
 } ufbx_baked_anim;
 
@@ -4609,25 +4634,35 @@ typedef struct ufbx_anim_opts {
 	uint32_t _end_zero;
 } ufbx_anim_opts;
 
-// Controls how close keyframe time values can be in baked animation.
-// Further adjustments for all options can be done via `ufbx_bake_opts.timestep_absolute`
-// and `ufbx_bake_opts.timestep_relative`.
-typedef enum ufbx_bake_timestep UFBX_ENUM_REPR {
+// Specifies how to handle stepped tangents.
+typedef enum ufbx_bake_step_handling UFBX_ENUM_REPR {
 
-	// Default bake timestep: safe spacing to guard against less robust interpolation functions.
-	// Uses `0.001` second (1ms) spacing between keyframes and `4 * FLT_EPSILON` epsilon.
-	UFBX_BAKE_TIMESTEP_DEFAULT,
+	// One millisecond default step duration, with potential extra slack for converting to `float`.
+	UFBX_BAKE_STEP_HANDLING_DEFAULT,
 
-	// Key times are represented as unique `float` values.
-	UFBX_BAKE_TIMESTEP_FLOAT,
+	// Use a custom interpolation duration for the constant step.
+	// See `ufbx_bake_opts.step_custom_duration` and optionally `ufbx_bake_opts.step_custom_epsilon`.
+	UFBX_BAKE_STEP_HANDLING_CUSTOM_DURATION,
 
-	// Key times are represented as unique `double` values.
-	UFBX_BAKE_TIMESTEP_DOUBLE,
+	// Stepped keyframes are represented as keyframes at the exact same time.
+	// Use flags `UFBX_BAKED_KEY_STEP_LEFT` and `UFBX_BAKED_KEY_STEP_RIGHT` to differentiate
+	// between the primary key and edge limits.
+	UFBX_BAKE_STEP_HANDLING_IDENTICAL_TIME,
 
-	UFBX_ENUM_FORCE_WIDTH(UFBX_BAKE_TIMESTEP)
-} ufbx_bake_timestep;
+	// Represent stepped keyframe times as the previous/next representable `double` value.
+	// Using this and robust linear interpolation will handle stepped tangents correctly
+	// without having to look at the key flags.
+	// NOTE: Casting these values to `float` or otherwise modifying them can collapse
+	// the keyframes to have the identical time.
+	UFBX_BAKE_STEP_HANDLING_ADJACENT_DOUBLE,
 
-UFBX_ENUM_TYPE(ufbx_bake_timestep, UFBX_BAKE_TIMESTEP, UFBX_BAKE_TIMESTEP_DOUBLE);
+	// Treat all stepped tangents as linearly interpolated.
+	UFBX_BAKE_STEP_HANDLING_IGNORE,
+
+	UFBX_ENUM_FORCE_WIDTH(ufbx_bake_step_handling)
+} ufbx_bake_step_handling;
+
+UFBX_ENUM_TYPE(ufbx_bake_step_handling, ufbx_bake_step_handling, UFBX_BAKE_STEP_HANDLING_IGNORE);
 
 typedef struct ufbx_bake_opts {
 	uint32_t _begin_zero;
@@ -4635,10 +4670,13 @@ typedef struct ufbx_bake_opts {
 	ufbx_allocator_opts temp_allocator;   // < Allocator used during loading
 	ufbx_allocator_opts result_allocator; // < Allocator used for the final baked animation
 
-	// Offset to start the evaluation from.
-	double time_start_offset;
+	// Move the keyframe times to start from zero regardless of the animation start time.
+	// For example, for an animation spanning between frames [30, 60] will be moved to
+	// [0, 30] in the baked animation.
+	// NOTE: This is in general not equivalent to subtracting `ufbx_anim.time_begin`
+	// from each keyframe, as this trimming is done exactly using internal FBX ticks.
+	bool trim_start_time;
 
-	// Sample rate in seconds.
 	// Samples per second to use for resampling non-linear animation.
 	// Default: 30
 	double resample_rate;
@@ -4670,23 +4708,16 @@ typedef struct ufbx_bake_opts {
 	// Default: 32
 	size_t max_keyframe_segments;
 
-	// Controls how close keyframes are allowed to be placed.
-	// Default maintains an 1ms spacing between keyframes and `4*FLT_EPSILON` spacing.
-	ufbx_bake_timestep timestep;
+	// How to handle stepped tangents.
+	ufbx_bake_step_handling step_handling;
 
-	// Minimum absolute timestep.
-	// Defaults to `0.001` if `timestep == UFBX_BAKE_TIMESTEP_DEFAULT`.
-	double timestep_absolute;
+	// Interpolation duration used by `UFBX_BAKE_STEP_HANDLING_CUSTOM_DURATION`.
+	double step_custom_duration;
 
-	// Minimum relative timestep.
-	// Defaults to `4 * FLT_EPSILON` if `timestep == UFBX_BAKE_TIMESTEP_DEFAULT`.
-	double timestep_relative;
-
-	// Timestep in seconds for constant interpolation.
-	// Default of `0.0` uses the smallest representable time offset, which is determined by
-	// `ufbx_bake_opts.timestep`. On default settings this will result in `0.001` second
-	// interpolation for constant tangents, see `ufbx_bake_timestep`.
-	double constant_timestep;
+	// Interpolation epsilon used by `UFBX_BAKE_STEP_HANDLING_CUSTOM_DURATION`.
+	// Defined as the minimum fractional decrease/increase in key time, ie.
+	// `time / (1.0 + step_custom_epsilon)` and `time * (1.0 + step_custom_epsilon)`.
+	double step_custom_epsilon;
 
 	// Enable key reduction.
 	bool key_reduction_enabled;
