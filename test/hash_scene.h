@@ -1178,6 +1178,20 @@ ufbxt_noinline static void ufbxt_hash_constraint_imp(ufbxt_hash *h, const ufbx_c
 	ufbxt_hash_vec3(h, v->ik_pole_vector);
 }
 
+ufbxt_noinline static void ufbxt_hash_audio_layer_imp(ufbxt_hash *h, const ufbx_audio_layer *v)
+{
+	ufbxt_hash_list(h, v->clips, ufbxt_hash_element_ref_imp);
+}
+
+ufbxt_noinline static void ufbxt_hash_audio_clip_imp(ufbxt_hash *h, const ufbx_audio_clip *v)
+{
+	ufbxt_hash_string(h, v->absolute_filename);
+	ufbxt_hash_string(h, v->relative_filename);
+	ufbxt_hash_blob(h, v->raw_absolute_filename);
+	ufbxt_hash_blob(h, v->raw_relative_filename);
+	ufbxt_hash_blob(h, v->content);
+}
+
 ufbxt_noinline static void ufbxt_hash_bone_pose_imp(ufbxt_hash *h, const ufbx_bone_pose *v)
 {
 	ufbxt_hash_element_ref(h, v->bone_node);
@@ -1310,6 +1324,8 @@ ufbxt_noinline static void ufbxt_hash_scene_imp(ufbxt_hash *h, const ufbx_scene 
 	ufbxt_hash_list(h, v->selection_nodes, ufbxt_hash_selection_node_imp);
 	ufbxt_hash_list(h, v->characters, ufbxt_hash_character_imp);
 	ufbxt_hash_list(h, v->constraints, ufbxt_hash_constraint_imp);
+	ufbxt_hash_list(h, v->audio_layers, ufbxt_hash_audio_layer_imp);
+	ufbxt_hash_list(h, v->audio_clips, ufbxt_hash_audio_clip_imp);
 	ufbxt_hash_list(h, v->poses, ufbxt_hash_pose_imp);
 	ufbxt_hash_list(h, v->metadata_objects, ufbxt_hash_metadata_object_imp);
 

@@ -11,12 +11,12 @@ void ufbxt_check_blob_content(ufbx_blob blob, const char *filename)
 	ufbxt_assert(blob.data);
 
 	snprintf(buf, sizeof(buf), "%s%s", data_root, filename);
-	void *ref = malloc(blob.size);
+	void *ref = malloc(blob.size + 1);
 	ufbxt_assert(ref);
 
 	FILE *f = fopen(buf, "rb");
 	ufbxt_assert(f);
-	size_t num_read = fread(ref, 1, blob.size, f);
+	size_t num_read = fread(ref, 1, blob.size + 1, f);
 	fclose(f);
 
 	ufbxt_assert(num_read == blob.size);

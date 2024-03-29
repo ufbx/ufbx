@@ -602,3 +602,66 @@ UFBXT_TEST(null_realloc_only)
 }
 #endif
 
+#if UFBXT_IMPL
+typedef struct {
+	ufbx_element_type type;
+	size_t size;
+} ufbxt_element_type_size;
+#endif
+
+UFBXT_TEST(element_type_sizes)
+#if UFBXT_IMPL
+{
+	const ufbxt_element_type_size element_type_sizes[] = {
+		{ UFBX_ELEMENT_UNKNOWN, sizeof(ufbx_unknown) },
+		{ UFBX_ELEMENT_NODE, sizeof(ufbx_node) },
+		{ UFBX_ELEMENT_MESH, sizeof(ufbx_mesh) },
+		{ UFBX_ELEMENT_LIGHT, sizeof(ufbx_light) },
+		{ UFBX_ELEMENT_CAMERA, sizeof(ufbx_camera) },
+		{ UFBX_ELEMENT_BONE, sizeof(ufbx_bone) },
+		{ UFBX_ELEMENT_EMPTY, sizeof(ufbx_empty) },
+		{ UFBX_ELEMENT_LINE_CURVE, sizeof(ufbx_line_curve) },
+		{ UFBX_ELEMENT_NURBS_CURVE, sizeof(ufbx_nurbs_curve) },
+		{ UFBX_ELEMENT_NURBS_SURFACE, sizeof(ufbx_nurbs_surface) },
+		{ UFBX_ELEMENT_NURBS_TRIM_SURFACE, sizeof(ufbx_nurbs_trim_surface) },
+		{ UFBX_ELEMENT_NURBS_TRIM_BOUNDARY, sizeof(ufbx_nurbs_trim_boundary) },
+		{ UFBX_ELEMENT_PROCEDURAL_GEOMETRY, sizeof(ufbx_procedural_geometry) },
+		{ UFBX_ELEMENT_STEREO_CAMERA, sizeof(ufbx_stereo_camera) },
+		{ UFBX_ELEMENT_CAMERA_SWITCHER, sizeof(ufbx_camera_switcher) },
+		{ UFBX_ELEMENT_MARKER, sizeof(ufbx_marker) },
+		{ UFBX_ELEMENT_LOD_GROUP, sizeof(ufbx_lod_group) },
+		{ UFBX_ELEMENT_SKIN_DEFORMER, sizeof(ufbx_skin_deformer) },
+		{ UFBX_ELEMENT_SKIN_CLUSTER, sizeof(ufbx_skin_cluster) },
+		{ UFBX_ELEMENT_BLEND_DEFORMER, sizeof(ufbx_blend_deformer) },
+		{ UFBX_ELEMENT_BLEND_CHANNEL, sizeof(ufbx_blend_channel) },
+		{ UFBX_ELEMENT_BLEND_SHAPE, sizeof(ufbx_blend_shape) },
+		{ UFBX_ELEMENT_CACHE_DEFORMER, sizeof(ufbx_cache_deformer) },
+		{ UFBX_ELEMENT_CACHE_FILE, sizeof(ufbx_cache_file) },
+		{ UFBX_ELEMENT_MATERIAL, sizeof(ufbx_material) },
+		{ UFBX_ELEMENT_TEXTURE, sizeof(ufbx_texture) },
+		{ UFBX_ELEMENT_VIDEO, sizeof(ufbx_video) },
+		{ UFBX_ELEMENT_SHADER, sizeof(ufbx_shader) },
+		{ UFBX_ELEMENT_SHADER_BINDING, sizeof(ufbx_shader_binding) },
+		{ UFBX_ELEMENT_ANIM_STACK, sizeof(ufbx_anim_stack) },
+		{ UFBX_ELEMENT_ANIM_LAYER, sizeof(ufbx_anim_layer) },
+		{ UFBX_ELEMENT_ANIM_VALUE, sizeof(ufbx_anim_value) },
+		{ UFBX_ELEMENT_ANIM_CURVE, sizeof(ufbx_anim_curve) },
+		{ UFBX_ELEMENT_DISPLAY_LAYER, sizeof(ufbx_display_layer) },
+		{ UFBX_ELEMENT_SELECTION_SET, sizeof(ufbx_selection_set) },
+		{ UFBX_ELEMENT_SELECTION_NODE, sizeof(ufbx_selection_node) },
+		{ UFBX_ELEMENT_CHARACTER, sizeof(ufbx_character) },
+		{ UFBX_ELEMENT_CONSTRAINT, sizeof(ufbx_constraint) },
+		{ UFBX_ELEMENT_AUDIO_LAYER, sizeof(ufbx_audio_layer) },
+		{ UFBX_ELEMENT_AUDIO_CLIP, sizeof(ufbx_audio_clip) },
+		{ UFBX_ELEMENT_POSE, sizeof(ufbx_pose) },
+		{ UFBX_ELEMENT_METADATA_OBJECT, sizeof(ufbx_metadata_object) },
+	};
+	ufbxt_assert(ufbxt_arraycount(element_type_sizes) == UFBX_ELEMENT_TYPE_COUNT);
+	ufbxt_assert(ufbxt_arraycount(ufbx_element_type_size) == UFBX_ELEMENT_TYPE_COUNT);
+
+	for (size_t i = 0; i < ufbxt_arraycount(element_type_sizes); i++) {
+		ufbxt_element_type_size ref = element_type_sizes[i];
+		ufbxt_assert(ufbx_element_type_size[(size_t)ref.type] == ref.size);
+	}
+}
+#endif

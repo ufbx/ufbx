@@ -4708,6 +4708,7 @@ static const char ufbxi_AspectRatioMode[] = "AspectRatioMode";
 static const char ufbxi_AspectW[] = "AspectW";
 static const char ufbxi_AspectWidth[] = "AspectWidth";
 static const char ufbxi_Audio[] = "Audio";
+static const char ufbxi_AudioLayer[] = "AudioLayer";
 static const char ufbxi_BaseLayer[] = "BaseLayer";
 static const char ufbxi_BinaryData[] = "BinaryData";
 static const char ufbxi_BindPose[] = "BindPose";
@@ -5002,6 +5003,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AspectW, 7 },
 	{ ufbxi_AspectWidth, 11 },
 	{ ufbxi_Audio, 5 },
+	{ ufbxi_AudioLayer, 10 },
 	{ ufbxi_BaseLayer, 9 },
 	{ ufbxi_BinaryData, 10 },
 	{ ufbxi_BindPose, 8 },
@@ -7725,6 +7727,13 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 	case UFBXI_PARSE_CHANNEL:
 		if (name == ufbxi_Key) {
 			info->type = uc->opts.ignore_animation ? '-' : 'd';
+			return true;
+		}
+		break;
+
+	case UFBXI_PARSE_AUDIO:
+		if (name == ufbxi_Content) {
+			info->type = uc->opts.ignore_embedded ? '-' : 'C';
 			return true;
 		}
 		break;
@@ -13843,6 +13852,21 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_character(ufbxi_context *uc
 	return 1;
 }
 
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_audio_clip(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_audio_clip *audio = ufbxi_push_element(uc, info, ufbx_audio_clip, UFBX_ELEMENT_AUDIO_CLIP);
+	ufbxi_check(audio);
+
+	audio->filename = ufbx_empty_string;
+	audio->absolute_filename = ufbx_empty_string;
+	audio->relative_filename = ufbx_empty_string;
+
+	ufbxi_node *content_node = ufbxi_find_child(node, ufbxi_Content);
+	ufbxi_check(ufbxi_read_embedded_blob(uc, &audio->content, content_node));
+
+	return 1;
+}
+
 typedef struct {
 	ufbx_constraint_type type;
 	const char *name;
@@ -14122,6 +14146,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_object(ufbxi_context *uc, u
 		ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_cache_file), UFBX_ELEMENT_CACHE_FILE));
 	} else if (name == ufbxi_ObjectMetaData) {
 		ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_metadata_object), UFBX_ELEMENT_METADATA_OBJECT));
+	} else if (name == ufbxi_AudioLayer) {
+		ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_audio_layer), UFBX_ELEMENT_AUDIO_LAYER));
+	} else if (name == ufbxi_Audio) {
+		ufbxi_check(ufbxi_read_audio_clip(uc, node, &info));
 	} else {
 		ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
 	}
@@ -21312,6 +21340,21 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		ufbxi_check(constraint->targets.data);
 	}
 
+	ufbxi_for_ptr_list(ufbx_audio_layer, p_layer, uc->scene.audio_layers) {
+		ufbx_audio_layer *layer = *p_layer;
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &layer->clips, &layer->element, false, true, NULL, UFBX_ELEMENT_AUDIO_CLIP));
+	}
+
+	ufbxi_for_ptr_list(ufbx_audio_clip, p_clip, uc->scene.audio_clips) {
+		ufbx_audio_clip *clip = *p_clip;
+		clip->absolute_filename = ufbx_find_string(&clip->props, "Path", ufbx_empty_string);
+		clip->relative_filename = ufbx_find_string(&clip->props, "RelPath", ufbx_empty_string);
+		clip->raw_absolute_filename = ufbx_find_blob(&clip->props, "Path", ufbx_empty_blob);
+		clip->raw_relative_filename = ufbx_find_blob(&clip->props, "RelPath", ufbx_empty_blob);
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&clip->filename, (ufbxi_strblob*)&clip->absolute_filename, (ufbxi_strblob*)&clip->relative_filename, false));
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&clip->raw_filename, (ufbxi_strblob*)&clip->raw_absolute_filename, (ufbxi_strblob*)&clip->raw_relative_filename, true));
+	}
+
 	ufbxi_for_ptr_list(ufbx_lod_group, p_lod, uc->scene.lod_groups) {
 		ufbxi_check(ufbxi_finalize_lod_group(uc, *p_lod));
 	}
@@ -24884,6 +24927,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 			targets[i].node = (ufbx_node*)ufbxi_translate_element(ec, targets[i].node);
 		}
 		constraint->targets.data = targets;
+	}
+
+	ufbxi_for_ptr_list(ufbx_audio_layer, p_layer, ec->scene.audio_layers) {
+		ufbx_audio_layer *layer = *p_layer;
+
+		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &layer->clips));
 	}
 
 	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, ec->scene.anim_stacks) {
@@ -28868,7 +28917,6 @@ const ufbx_coordinate_axes ufbx_axes_left_handed_z_up = {
 	UFBX_COORDINATE_AXIS_POSITIVE_X, UFBX_COORDINATE_AXIS_POSITIVE_Z, UFBX_COORDINATE_AXIS_POSITIVE_Y,
 };
 
-
 const size_t ufbx_element_type_size[UFBX_ELEMENT_TYPE_COUNT] = {
 	sizeof(ufbx_unknown),
 	sizeof(ufbx_node),
@@ -28908,6 +28956,8 @@ const size_t ufbx_element_type_size[UFBX_ELEMENT_TYPE_COUNT] = {
 	sizeof(ufbx_selection_node),
 	sizeof(ufbx_character),
 	sizeof(ufbx_constraint),
+	sizeof(ufbx_audio_layer),
+	sizeof(ufbx_audio_clip),
 	sizeof(ufbx_pose),
 	sizeof(ufbx_metadata_object),
 };
@@ -31597,6 +31647,8 @@ ufbx_abi ufbx_selection_set *ufbx_as_selection_set(const ufbx_element *element) 
 ufbx_abi ufbx_selection_node *ufbx_as_selection_node(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_SELECTION_NODE ? (ufbx_selection_node*)element : NULL; }
 ufbx_abi ufbx_character *ufbx_as_character(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_CHARACTER ? (ufbx_character*)element : NULL; }
 ufbx_abi ufbx_constraint *ufbx_as_constraint(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_CONSTRAINT ? (ufbx_constraint*)element : NULL; }
+ufbx_abi ufbx_audio_layer *ufbx_as_audio_layer(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_AUDIO_LAYER ? (ufbx_audio_layer*)element : NULL; }
+ufbx_abi ufbx_audio_clip *ufbx_as_audio_clip(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_AUDIO_CLIP ? (ufbx_audio_clip*)element : NULL; }
 ufbx_abi ufbx_pose *ufbx_as_pose(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_POSE ? (ufbx_pose*)element : NULL; }
 ufbx_abi ufbx_metadata_object *ufbx_as_metadata_object(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_METADATA_OBJECT ? (ufbx_metadata_object*)element : NULL; }
 

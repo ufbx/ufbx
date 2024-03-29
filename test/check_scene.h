@@ -252,6 +252,8 @@ static void ufbxt_check_element_cast(ufbx_element *element)
 	if (ufbx_as_selection_node(element)) ufbxt_assert(element->type == UFBX_ELEMENT_SELECTION_NODE);
 	if (ufbx_as_character(element)) ufbxt_assert(element->type == UFBX_ELEMENT_CHARACTER);
 	if (ufbx_as_constraint(element)) ufbxt_assert(element->type == UFBX_ELEMENT_CONSTRAINT);
+	if (ufbx_as_audio_layer(element)) ufbxt_assert(element->type == UFBX_ELEMENT_AUDIO_LAYER);
+	if (ufbx_as_audio_clip(element)) ufbxt_assert(element->type == UFBX_ELEMENT_AUDIO_CLIP);
 	if (ufbx_as_pose(element)) ufbxt_assert(element->type == UFBX_ELEMENT_POSE);
 	if (ufbx_as_metadata_object(element)) ufbxt_assert(element->type == UFBX_ELEMENT_METADATA_OBJECT);
 }
@@ -1155,6 +1157,24 @@ static void ufbxt_check_constraint(ufbx_scene *scene, ufbx_constraint *constrain
 	}
 }
 
+static void ufbxt_check_audio_layer(ufbx_scene *scene, ufbx_audio_layer *layer)
+{
+	for (size_t i = 0; i < layer->clips.count; i++) {
+		ufbxt_check_element_ptr(scene, layer->clips.data[i], UFBX_ELEMENT_AUDIO_CLIP);
+	}
+}
+
+static void ufbxt_check_audio_clip(ufbx_scene *scene, ufbx_audio_clip *clip)
+{
+	ufbxt_check_string(clip->filename);
+	ufbxt_check_string(clip->absolute_filename);
+	ufbxt_check_string(clip->relative_filename);
+	ufbxt_check_blob(clip->raw_filename);
+	ufbxt_check_blob(clip->raw_absolute_filename);
+	ufbxt_check_blob(clip->raw_relative_filename);
+	ufbxt_check_blob(clip->content);
+}
+
 static void ufbxt_check_pose(ufbx_scene *scene, ufbx_pose *pose)
 {
 	for (size_t i = 0; i < pose->bone_poses.count; i++) {
@@ -1455,6 +1475,14 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 
 	for (size_t i = 0; i < scene->constraints.count; i++) {
 		ufbxt_check_constraint(scene, scene->constraints.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->audio_layers.count; i++) {
+		ufbxt_check_audio_layer(scene, scene->audio_layers.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->audio_clips.count; i++) {
+		ufbxt_check_audio_clip(scene, scene->audio_clips.data[i]);
 	}
 
 	for (size_t i = 0; i < scene->poses.count; i++) {

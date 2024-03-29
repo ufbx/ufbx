@@ -578,6 +578,10 @@ typedef struct ufbx_selection_node ufbx_selection_node;
 typedef struct ufbx_character ufbx_character;
 typedef struct ufbx_constraint ufbx_constraint;
 
+// Audio
+typedef struct ufbx_audio_layer ufbx_audio_layer;
+typedef struct ufbx_audio_clip ufbx_audio_clip;
+
 // Miscellaneous
 typedef struct ufbx_pose ufbx_pose;
 typedef struct ufbx_metadata_object ufbx_metadata_object;
@@ -621,6 +625,8 @@ UFBX_LIST_TYPE(ufbx_selection_set_list, ufbx_selection_set*);
 UFBX_LIST_TYPE(ufbx_selection_node_list, ufbx_selection_node*);
 UFBX_LIST_TYPE(ufbx_character_list, ufbx_character*);
 UFBX_LIST_TYPE(ufbx_constraint_list, ufbx_constraint*);
+UFBX_LIST_TYPE(ufbx_audio_layer_list, ufbx_audio_layer*);
+UFBX_LIST_TYPE(ufbx_audio_clip_list, ufbx_audio_clip*);
 UFBX_LIST_TYPE(ufbx_pose_list, ufbx_pose*);
 UFBX_LIST_TYPE(ufbx_metadata_object_list, ufbx_metadata_object*);
 
@@ -663,6 +669,8 @@ typedef enum ufbx_element_type UFBX_ENUM_REPR {
 	UFBX_ELEMENT_SELECTION_NODE,      // < `ufbx_selection_node`
 	UFBX_ELEMENT_CHARACTER,           // < `ufbx_character`
 	UFBX_ELEMENT_CONSTRAINT,          // < `ufbx_constraint`
+	UFBX_ELEMENT_AUDIO_LAYER,         // < `ufbx_audio_layer`
+	UFBX_ELEMENT_AUDIO_CLIP,          // < `ufbx_audio_clip`
 	UFBX_ELEMENT_POSE,                // < `ufbx_pose`
 	UFBX_ELEMENT_METADATA_OBJECT,     // < `ufbx_metadata_object`
 
@@ -3246,6 +3254,52 @@ struct ufbx_constraint {
 	ufbx_vec3 ik_pole_vector;
 };
 
+// -- Audio
+
+struct ufbx_audio_layer {
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t typed_id;
+	}; };
+
+	// Clips contained in this layer.
+	ufbx_audio_clip_list clips;
+};
+
+struct ufbx_audio_clip {
+	union { ufbx_element element; struct {
+		ufbx_string name;
+		ufbx_props props;
+		uint32_t element_id;
+		uint32_t typed_id;
+	}; };
+
+	// Filename relative to the currently loaded file.
+	// HINT: If using functions other than `ufbx_load_file()`, you can provide
+	// `ufbx_load_opts.filename/raw_filename` to let ufbx resolve this.
+	ufbx_string filename;
+	// Absolute filename specified in the file.
+	ufbx_string absolute_filename;
+	// Relative filename specified in the file.
+	// NOTE: May be absolute if the file is saved in a different drive.
+	ufbx_string relative_filename;
+
+	// Filename relative to the loaded file, non-UTF-8 encoded.
+	// HINT: If using functions other than `ufbx_load_file()`, you can provide
+	// `ufbx_load_opts.filename/raw_filename` to let ufbx resolve this.
+	ufbx_blob raw_filename;
+	// Absolute filename specified in the file, non-UTF-8 encoded.
+	ufbx_blob raw_absolute_filename;
+	// Relative filename specified in the file, non-UTF-8 encoded.
+	// NOTE: May be absolute if the file is saved in a different drive.
+	ufbx_blob raw_relative_filename;
+
+	// Optional embedded content blob, eg. raw .png format data
+	ufbx_blob content;
+};
+
 // -- Miscellaneous
 
 typedef struct ufbx_bone_pose {
@@ -3690,6 +3744,10 @@ struct ufbx_scene {
 			// Constraints
 			ufbx_character_list characters;
 			ufbx_constraint_list constraints;
+
+			// Audio
+			ufbx_audio_layer_list audio_layers;
+			ufbx_audio_clip_list audio_clips;
 
 			// Miscellaneous
 			ufbx_pose_list poses;
@@ -5341,6 +5399,8 @@ ufbx_abi ufbx_selection_set *ufbx_as_selection_set(const ufbx_element *element);
 ufbx_abi ufbx_selection_node *ufbx_as_selection_node(const ufbx_element *element);
 ufbx_abi ufbx_character *ufbx_as_character(const ufbx_element *element);
 ufbx_abi ufbx_constraint *ufbx_as_constraint(const ufbx_element *element);
+ufbx_abi ufbx_audio_layer *ufbx_as_audio_layer(const ufbx_element *element);
+ufbx_abi ufbx_audio_clip *ufbx_as_audio_clip(const ufbx_element *element);
 ufbx_abi ufbx_pose *ufbx_as_pose(const ufbx_element *element);
 ufbx_abi ufbx_metadata_object *ufbx_as_metadata_object(const ufbx_element *element);
 
