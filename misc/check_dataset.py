@@ -10,7 +10,7 @@ import math
 import itertools
 import datetime
 
-LATEST_SUPPORTED_DATE = "2024-02-18"
+LATEST_SUPPORTED_DATE = "2024-03-30"
 
 class TestModel(NamedTuple):
     fbx_path: str
