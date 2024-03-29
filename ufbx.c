@@ -4707,6 +4707,7 @@ static const char ufbxi_AspectHeight[] = "AspectHeight";
 static const char ufbxi_AspectRatioMode[] = "AspectRatioMode";
 static const char ufbxi_AspectW[] = "AspectW";
 static const char ufbxi_AspectWidth[] = "AspectWidth";
+static const char ufbxi_Audio[] = "Audio";
 static const char ufbxi_BaseLayer[] = "BaseLayer";
 static const char ufbxi_BinaryData[] = "BinaryData";
 static const char ufbxi_BindPose[] = "BindPose";
@@ -5000,6 +5001,7 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AspectRatioMode, 15 },
 	{ ufbxi_AspectW, 7 },
 	{ ufbxi_AspectWidth, 11 },
+	{ ufbxi_Audio, 5 },
 	{ ufbxi_BaseLayer, 9 },
 	{ ufbxi_BinaryData, 10 },
 	{ ufbxi_BindPose, 8 },
@@ -7179,6 +7181,7 @@ typedef enum {
 	UFBXI_PARSE_LAYERED_TEXTURE,
 	UFBXI_PARSE_SELECTION_NODE,
 	UFBXI_PARSE_COLLECTION,
+	UFBXI_PARSE_AUDIO,
 	UFBXI_PARSE_UNKNOWN_OBJECT,
 	UFBXI_PARSE_LAYER_ELEMENT_NORMAL,
 	UFBXI_PARSE_LAYER_ELEMENT_BINORMAL,
@@ -7252,6 +7255,7 @@ static ufbxi_noinline ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_sta
 		if (name == ufbxi_LayeredTexture) return UFBXI_PARSE_LAYERED_TEXTURE;
 		if (name == ufbxi_SelectionNode) return UFBXI_PARSE_SELECTION_NODE;
 		if (name == ufbxi_Collection) return UFBXI_PARSE_COLLECTION;
+		if (name == ufbxi_Audio) return UFBXI_PARSE_AUDIO;
 		return UFBXI_PARSE_UNKNOWN_OBJECT;
 
 	case UFBXI_PARSE_MODEL:
@@ -7800,6 +7804,10 @@ static ufbxi_noinline bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_st
 
 	case UFBXI_PARSE_COLLECTION:
 		if (!strcmp(name, "Member")) return true;
+		break;
+
+	case UFBXI_PARSE_AUDIO:
+		if (name == ufbxi_Content) return true;
 		break;
 
 	case UFBXI_PARSE_LEGACY_MODEL:
@@ -8509,9 +8517,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 
 			switch (type) {
 
-			case 'C': case 'B':
+			case 'C': case 'B': case 'Z':
 				type_mask |= (uint32_t)UFBXI_VALUE_NUMBER << (i*2);
-				vals[i].f = (double)(vals[i].i = (int64_t)value[0]);
+				vals[i].f = (double)(vals[i].i = (int64_t)(uint8_t)value[0]);
 				ufbxi_consume_bytes(uc, 2);
 				break;
 
