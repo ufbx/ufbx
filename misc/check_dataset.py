@@ -1,7 +1,6 @@
 import os
 import json
 from typing import NamedTuple, Optional, List, Mapping
-import subprocess
 import glob
 import re
 import urllib.parse
@@ -9,6 +8,8 @@ import time
 import math
 import itertools
 import datetime
+import asyncio
+import asyncio.subprocess
 
 LATEST_SUPPORTED_DATE = "2024-03-30"
 
@@ -230,6 +231,7 @@ if __name__ == "__main__":
     parser.add_argument("--heavy", action="store_true", help="Run heavy checks")
     parser.add_argument("--allow-unknown", action="store_true", help="Allow unknown fields")
     parser.add_argument("--include-recent", action="store_true", help="Run tests that are too recent")
+    parser.add_argument("--threads", type=int, default=1, help="Number of threads to use for running")
     argv = parser.parse_args()
 
     host_url = argv.host_url if argv.host_url else argv.root
@@ -261,9 +263,26 @@ if __name__ == "__main__":
     case_run_count = 0
     case_skip_count = 0
 
+    num_threads = max(argv.threads, 1)
+
     begin_time = time.time()
 
-    for case in cases:
+    unbuffered_log = log
+
+    async def run_case(buffered, case):
+        global ok_count
+        global test_count
+        global case_ok_count
+        global case_run_count
+        global case_skip_count
+
+        lines = []
+        def buffered_log(s=""):
+            lines.append(s)
+        if buffered:
+            log = buffered_log
+        else:
+            log = unbuffered_log
 
         title = case.title if case.title else "(unknown)"
         author = case.author if case.author else "(unknown)"
@@ -284,7 +303,7 @@ if __name__ == "__main__":
             log("-- SKIP --")
             log()
             case_skip_count += 1
-            continue
+            return
 
         case_run_count += 1
 
@@ -337,12 +356,22 @@ if __name__ == "__main__":
                 log("$ " + " ".join(args))
                 log()
 
-                try:
-                    subprocess.check_call(args)
+                proc = await asyncio.create_subprocess_exec(
+                        args[0], *args[1:],
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE)
+                stdout, stderr = await proc.communicate()
+                stdout = stdout.decode("utf-8", errors="replace").strip()
+                stderr = stderr.decode("utf-8", errors="replace").strip()
+                if stdout:
+                    log(stdout)
+                if stderr:
+                    log(stderr)
+                if proc.returncode == 0:
                     log()
                     log("-- PASS --")
                     ok_count += 1
-                except subprocess.CalledProcessError:
+                else:
                     log()
                     log("-- FAIL --")
                     case_ok = False
@@ -350,6 +379,37 @@ if __name__ == "__main__":
 
         if case_ok:
             case_ok_count += 1
+
+        return lines
+
+    async def run_cases_simple():
+        for case in cases:
+            await run_case(False, case)
+
+    async def run_cases_threaded():
+        tasks = []
+
+        async def resolve_tasks():
+            nonlocal tasks
+            if not tasks: return
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            tasks = list(pending)
+            for task in done:
+                print("\n".join(task.result()))
+
+        for case in cases:
+            if len(tasks) >= num_threads:
+                await resolve_tasks()
+            coro = run_case(True, case)
+            task = asyncio.create_task(coro)
+            tasks.append(task)
+        while tasks:
+            await resolve_tasks()
+
+    if num_threads > 1:
+        asyncio.run(run_cases_threaded())
+    else:
+        asyncio.run(run_cases_simple())
 
     end_time = time.time()
 
