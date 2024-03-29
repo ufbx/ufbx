@@ -523,7 +523,7 @@ jobs:
           path: build/hashdump_ci_arm64.txt.gz
 
   ci_dataset:
-    runs-on: [self-hosted, ARM64]
+    runs-on: [self-hosted, dataset]
     steps:
       - uses: actions/checkout@v3
         with:
