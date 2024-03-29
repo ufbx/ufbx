@@ -11,7 +11,7 @@ import datetime
 import asyncio
 import asyncio.subprocess
 
-LATEST_SUPPORTED_DATE = "2024-03-30"
+LATEST_SUPPORTED_DATE = "2024-03-31"
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -303,7 +303,7 @@ if __name__ == "__main__":
             log("-- SKIP --")
             log()
             case_skip_count += 1
-            return
+            return []
 
         case_run_count += 1
 
