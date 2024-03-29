@@ -499,7 +499,7 @@ jobs:
           path: build/hashdump_ci_arm32.txt.gz
 
   ci_arm64:
-    runs-on: [self-hosted, ARM64]
+    runs-on: [self-hosted, ARM64, legacy]
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
@@ -540,7 +540,7 @@ jobs:
         run: bash /codecov.sh -F dataset -f coverage.lcov -y .github/codecov.yml
 
   ci_fuzz:
-    runs-on: [self-hosted, ARM64]
+    runs-on: [self-hosted, ARM64, legacy]
     steps:
       - uses: actions/checkout@v3
         with:
