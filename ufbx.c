@@ -20337,7 +20337,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_file_content(ufbxi_conte
 {
 	size_t initial_stack = uc->tmp_stack.num_items;
 
-	size_t num_content_videos = 0;
 	ufbxi_for_ptr_list(ufbx_video, p_video, uc->scene.videos) {
 		ufbx_video *video = *p_video;
 		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&video->filename, (ufbxi_strblob*)&video->absolute_filename, (ufbxi_strblob*)&video->relative_filename, false));
