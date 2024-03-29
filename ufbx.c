@@ -4707,6 +4707,8 @@ static const char ufbxi_AspectHeight[] = "AspectHeight";
 static const char ufbxi_AspectRatioMode[] = "AspectRatioMode";
 static const char ufbxi_AspectW[] = "AspectW";
 static const char ufbxi_AspectWidth[] = "AspectWidth";
+static const char ufbxi_Audio[] = "Audio";
+static const char ufbxi_AudioLayer[] = "AudioLayer";
 static const char ufbxi_BaseLayer[] = "BaseLayer";
 static const char ufbxi_BinaryData[] = "BinaryData";
 static const char ufbxi_BindPose[] = "BindPose";
@@ -5000,6 +5002,8 @@ static ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AspectRatioMode, 15 },
 	{ ufbxi_AspectW, 7 },
 	{ ufbxi_AspectWidth, 11 },
+	{ ufbxi_Audio, 5 },
+	{ ufbxi_AudioLayer, 10 },
 	{ ufbxi_BaseLayer, 9 },
 	{ ufbxi_BinaryData, 10 },
 	{ ufbxi_BindPose, 8 },
@@ -5794,6 +5798,11 @@ typedef struct {
 } ufbxi_tmp_anim_stack;
 
 typedef struct {
+	ufbx_string absolute_filename;
+	ufbx_blob content;
+} ufbxi_file_content;
+
+typedef struct {
 
 	// Current line and tokens.
 	// NOTE: `line` and `tokens` are not NULL-terminated nor UTF-8!
@@ -5998,6 +6007,9 @@ typedef struct {
 
 	ufbxi_node legacy_node;
 	uint64_t legacy_implicit_anim_layer_id;
+
+	ufbxi_file_content *file_content;
+	size_t num_file_content;
 
 	int64_t ktime_sec;
 	double ktime_sec_double;
@@ -7179,6 +7191,7 @@ typedef enum {
 	UFBXI_PARSE_LAYERED_TEXTURE,
 	UFBXI_PARSE_SELECTION_NODE,
 	UFBXI_PARSE_COLLECTION,
+	UFBXI_PARSE_AUDIO,
 	UFBXI_PARSE_UNKNOWN_OBJECT,
 	UFBXI_PARSE_LAYER_ELEMENT_NORMAL,
 	UFBXI_PARSE_LAYER_ELEMENT_BINORMAL,
@@ -7252,6 +7265,7 @@ static ufbxi_noinline ufbxi_parse_state ufbxi_update_parse_state(ufbxi_parse_sta
 		if (name == ufbxi_LayeredTexture) return UFBXI_PARSE_LAYERED_TEXTURE;
 		if (name == ufbxi_SelectionNode) return UFBXI_PARSE_SELECTION_NODE;
 		if (name == ufbxi_Collection) return UFBXI_PARSE_COLLECTION;
+		if (name == ufbxi_Audio) return UFBXI_PARSE_AUDIO;
 		return UFBXI_PARSE_UNKNOWN_OBJECT;
 
 	case UFBXI_PARSE_MODEL:
@@ -7725,6 +7739,13 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 		}
 		break;
 
+	case UFBXI_PARSE_AUDIO:
+		if (name == ufbxi_Content) {
+			info->type = uc->opts.ignore_embedded ? '-' : 'C';
+			return true;
+		}
+		break;
+
 	default:
 		if (name == ufbxi_BinaryData) {
 			info->type = uc->opts.ignore_embedded ? '-' : 'C';
@@ -7800,6 +7821,10 @@ static ufbxi_noinline bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_st
 
 	case UFBXI_PARSE_COLLECTION:
 		if (!strcmp(name, "Member")) return true;
+		break;
+
+	case UFBXI_PARSE_AUDIO:
+		if (name == ufbxi_Content) return true;
 		break;
 
 	case UFBXI_PARSE_LEGACY_MODEL:
@@ -8509,9 +8534,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 
 			switch (type) {
 
-			case 'C': case 'B':
+			case 'C': case 'B': case 'Z':
 				type_mask |= (uint32_t)UFBXI_VALUE_NUMBER << (i*2);
-				vals[i].f = (double)(vals[i].i = (int64_t)value[0]);
+				vals[i].f = (double)(vals[i].i = (int64_t)(uint8_t)value[0]);
 				ufbxi_consume_bytes(uc, 2);
 				break;
 
@@ -13835,6 +13860,21 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_character(ufbxi_context *uc
 	return 1;
 }
 
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_audio_clip(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
+{
+	ufbx_audio_clip *audio = ufbxi_push_element(uc, info, ufbx_audio_clip, UFBX_ELEMENT_AUDIO_CLIP);
+	ufbxi_check(audio);
+
+	audio->filename = ufbx_empty_string;
+	audio->absolute_filename = ufbx_empty_string;
+	audio->relative_filename = ufbx_empty_string;
+
+	ufbxi_node *content_node = ufbxi_find_child(node, ufbxi_Content);
+	ufbxi_check(ufbxi_read_embedded_blob(uc, &audio->content, content_node));
+
+	return 1;
+}
+
 typedef struct {
 	ufbx_constraint_type type;
 	const char *name;
@@ -14114,6 +14154,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_object(ufbxi_context *uc, u
 		ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_cache_file), UFBX_ELEMENT_CACHE_FILE));
 	} else if (name == ufbxi_ObjectMetaData) {
 		ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_metadata_object), UFBX_ELEMENT_METADATA_OBJECT));
+	} else if (name == ufbxi_AudioLayer) {
+		ufbxi_check(ufbxi_read_element(uc, node, &info, sizeof(ufbx_audio_layer), UFBX_ELEMENT_AUDIO_LAYER));
+	} else if (name == ufbxi_Audio) {
+		ufbxi_check(ufbxi_read_audio_clip(uc, node, &info));
 	} else {
 		ufbxi_check(ufbxi_read_unknown(uc, node, &info, type_str, sub_type_str, name));
 	}
@@ -18196,25 +18240,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_material_textures(ufbxi_con
 	return 1;
 }
 
-ufbxi_noinline static bool ufbxi_video_ptr_less(void *user, const void *va, const void *vb)
-{
-	(void)user;
-	const ufbx_video *a = *(const ufbx_video**)va, *b = *(const ufbx_video**)vb;
-	return ufbxi_str_less(a->absolute_filename, b->absolute_filename);
-}
-
 static ufbxi_noinline bool ufbxi_bone_pose_less(void *user, const void *va, const void *vb)
 {
 	(void)user;
 	const ufbx_bone_pose *a = (const ufbx_bone_pose *)va, *b = (const ufbx_bone_pose *)vb;
 	return a->bone_node->typed_id < b->bone_node->typed_id;
-}
-
-ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_videos_by_filename(ufbxi_context *uc, ufbx_video **videos, size_t count)
-{
-	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbx_video*)));
-	ufbxi_stable_sort(sizeof(ufbx_video*), 32, videos, uc->tmp_arr, count, &ufbxi_video_ptr_less, NULL);
-	return 1;
 }
 
 ufbxi_nodiscard ufbxi_noinline static ufbx_anim_prop *ufbxi_find_anim_prop_start(ufbx_anim_layer *layer, const ufbx_element *element)
@@ -20265,6 +20295,84 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_filenames(ufbxi_context 
 	return 1;
 }
 
+ufbxi_noinline static bool ufbxi_file_content_less(void *user, const void *va, const void *vb)
+{
+	(void)user;
+	const ufbxi_file_content *a = (const ufbxi_file_content*)va, *b = (const ufbxi_file_content*)vb;
+	return ufbxi_str_less(a->absolute_filename, b->absolute_filename);
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_sort_file_contents(ufbxi_context *uc, ufbxi_file_content *content, size_t count)
+{
+	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, count * sizeof(ufbxi_file_content)));
+	ufbxi_stable_sort(sizeof(ufbxi_file_content), 32, content, uc->tmp_arr, count, &ufbxi_file_content_less, NULL);
+	return 1;
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_push_file_content(ufbxi_context *uc, ufbx_string *p_filename, ufbx_blob *p_data)
+{
+	if (p_data->size == 0 || p_filename->length == 0) return 1;
+	ufbxi_file_content *content = ufbxi_push(&uc->tmp_stack, ufbxi_file_content, 1);
+	ufbxi_check(content);
+
+	content->absolute_filename = *p_filename;
+	content->content = *p_data;
+	return 1;
+}
+
+ufbxi_noinline static void ufbxi_fetch_file_content(ufbxi_context *uc, ufbx_string *p_filename, ufbx_blob *p_data)
+{
+	if (p_data->size > 0) return;
+	ufbx_string filename = *p_filename;
+	size_t index = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbxi_file_content, 8, &index, uc->file_content, 0, uc->num_file_content,
+		( ufbxi_str_less(a->absolute_filename, filename) ),
+		( a->absolute_filename.data == filename.data ));
+	if (index != SIZE_MAX) {
+		*p_data = uc->file_content[index].content;
+	}
+}
+
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_file_content(ufbxi_context *uc)
+{
+	size_t initial_stack = uc->tmp_stack.num_items;
+
+	ufbxi_for_ptr_list(ufbx_video, p_video, uc->scene.videos) {
+		ufbx_video *video = *p_video;
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&video->filename, (ufbxi_strblob*)&video->absolute_filename, (ufbxi_strblob*)&video->relative_filename, false));
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&video->raw_filename, (ufbxi_strblob*)&video->raw_absolute_filename, (ufbxi_strblob*)&video->raw_relative_filename, true));
+		ufbxi_check(ufbxi_push_file_content(uc, &video->absolute_filename, &video->content));
+	}
+
+	ufbxi_for_ptr_list(ufbx_audio_clip, p_clip, uc->scene.audio_clips) {
+		ufbx_audio_clip *clip = *p_clip;
+		clip->absolute_filename = ufbx_find_string(&clip->props, "Path", ufbx_empty_string);
+		clip->relative_filename = ufbx_find_string(&clip->props, "RelPath", ufbx_empty_string);
+		clip->raw_absolute_filename = ufbx_find_blob(&clip->props, "Path", ufbx_empty_blob);
+		clip->raw_relative_filename = ufbx_find_blob(&clip->props, "RelPath", ufbx_empty_blob);
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&clip->filename, (ufbxi_strblob*)&clip->absolute_filename, (ufbxi_strblob*)&clip->relative_filename, false));
+		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&clip->raw_filename, (ufbxi_strblob*)&clip->raw_absolute_filename, (ufbxi_strblob*)&clip->raw_relative_filename, true));
+		ufbxi_check(ufbxi_push_file_content(uc, &clip->absolute_filename, &clip->content));
+	}
+
+	uc->num_file_content = uc->tmp_stack.num_items - initial_stack;
+	uc->file_content = ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_file_content, uc->num_file_content);
+	ufbxi_check(uc->file_content);
+	ufbxi_check(ufbxi_sort_file_contents(uc, uc->file_content, uc->num_file_content));
+
+	ufbxi_for_ptr_list(ufbx_video, p_video, uc->scene.videos) {
+		ufbx_video *video = *p_video;
+		ufbxi_fetch_file_content(uc, &video->absolute_filename, &video->content);
+	}
+
+	ufbxi_for_ptr_list(ufbx_audio_clip, p_clip, uc->scene.audio_clips) {
+		ufbx_audio_clip *clip = *p_clip;
+		ufbxi_fetch_file_content(uc, &clip->absolute_filename, &clip->content);
+	}
+
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_validate_indices(ufbxi_context *uc, ufbx_uint32_list *indices, size_t max_index)
 {
 	if (max_index == 0 && uc->opts.index_error_handling == UFBX_INDEX_ERROR_HANDLING_CLAMP) {
@@ -21151,39 +21259,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		}
 	}
 
-	// HACK: If there are multiple textures in an FBX file that use the same embedded
-	// texture they get duplicated Video elements instead of a shared one _and only one
-	// of them has the content?!_ So let's gather all Video instances with content and
-	// sort them by filename so we can patch the other ones..
-	ufbx_video **content_videos = ufbxi_push(&uc->tmp, ufbx_video*, uc->scene.videos.count);
-	ufbxi_check(content_videos);
-
-	size_t num_content_videos = 0;
-	ufbxi_for_ptr_list(ufbx_video, p_video, uc->scene.videos) {
-		ufbx_video *video = *p_video;
-		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&video->filename, (ufbxi_strblob*)&video->absolute_filename, (ufbxi_strblob*)&video->relative_filename, false));
-		ufbxi_check(ufbxi_resolve_filenames(uc, (ufbxi_strblob*)&video->raw_filename, (ufbxi_strblob*)&video->raw_absolute_filename, (ufbxi_strblob*)&video->raw_relative_filename, true));
-		if (video->content.size > 0) {
-			content_videos[num_content_videos++] = video;
-		}
-	}
-
-	if (num_content_videos > 0) {
-		ufbxi_check(ufbxi_sort_videos_by_filename(uc, content_videos, num_content_videos));
-
-		ufbxi_for_ptr_list(ufbx_video, p_video, uc->scene.videos) {
-			ufbx_video *video = *p_video;
-			if (video->content.size > 0) continue;
-
-			size_t index = SIZE_MAX;
-			ufbxi_macro_lower_bound_eq(ufbx_video*, 16, &index, content_videos, 0, num_content_videos,
-				( ufbxi_str_less((*a)->absolute_filename, video->absolute_filename) ),
-				( (*a)->absolute_filename.data == video->absolute_filename.data ));
-			if (index != SIZE_MAX) {
-				video->content = content_videos[index]->content;
-			}
-		}
-	}
+	ufbxi_check(ufbxi_resolve_file_content(uc));
 
 	ufbxi_for_ptr_list(ufbx_texture, p_texture, uc->scene.textures) {
 		ufbx_texture *texture = *p_texture;
@@ -21302,6 +21378,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		constraint->targets.count = num_targets;
 		constraint->targets.data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_constraint_target, num_targets);
 		ufbxi_check(constraint->targets.data);
+	}
+
+	ufbxi_for_ptr_list(ufbx_audio_layer, p_layer, uc->scene.audio_layers) {
+		ufbx_audio_layer *layer = *p_layer;
+		ufbxi_check(ufbxi_fetch_dst_elements(uc, &layer->clips, &layer->element, false, true, NULL, UFBX_ELEMENT_AUDIO_CLIP));
 	}
 
 	ufbxi_for_ptr_list(ufbx_lod_group, p_lod, uc->scene.lod_groups) {
@@ -24876,6 +24957,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 			targets[i].node = (ufbx_node*)ufbxi_translate_element(ec, targets[i].node);
 		}
 		constraint->targets.data = targets;
+	}
+
+	ufbxi_for_ptr_list(ufbx_audio_layer, p_layer, ec->scene.audio_layers) {
+		ufbx_audio_layer *layer = *p_layer;
+
+		ufbxi_check_err(&ec->error, ufbxi_translate_element_list(ec, &layer->clips));
 	}
 
 	ufbxi_for_ptr_list(ufbx_anim_stack, p_stack, ec->scene.anim_stacks) {
@@ -28860,7 +28947,6 @@ const ufbx_coordinate_axes ufbx_axes_left_handed_z_up = {
 	UFBX_COORDINATE_AXIS_POSITIVE_X, UFBX_COORDINATE_AXIS_POSITIVE_Z, UFBX_COORDINATE_AXIS_POSITIVE_Y,
 };
 
-
 const size_t ufbx_element_type_size[UFBX_ELEMENT_TYPE_COUNT] = {
 	sizeof(ufbx_unknown),
 	sizeof(ufbx_node),
@@ -28900,6 +28986,8 @@ const size_t ufbx_element_type_size[UFBX_ELEMENT_TYPE_COUNT] = {
 	sizeof(ufbx_selection_node),
 	sizeof(ufbx_character),
 	sizeof(ufbx_constraint),
+	sizeof(ufbx_audio_layer),
+	sizeof(ufbx_audio_clip),
 	sizeof(ufbx_pose),
 	sizeof(ufbx_metadata_object),
 };
@@ -31589,6 +31677,8 @@ ufbx_abi ufbx_selection_set *ufbx_as_selection_set(const ufbx_element *element) 
 ufbx_abi ufbx_selection_node *ufbx_as_selection_node(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_SELECTION_NODE ? (ufbx_selection_node*)element : NULL; }
 ufbx_abi ufbx_character *ufbx_as_character(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_CHARACTER ? (ufbx_character*)element : NULL; }
 ufbx_abi ufbx_constraint *ufbx_as_constraint(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_CONSTRAINT ? (ufbx_constraint*)element : NULL; }
+ufbx_abi ufbx_audio_layer *ufbx_as_audio_layer(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_AUDIO_LAYER ? (ufbx_audio_layer*)element : NULL; }
+ufbx_abi ufbx_audio_clip *ufbx_as_audio_clip(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_AUDIO_CLIP ? (ufbx_audio_clip*)element : NULL; }
 ufbx_abi ufbx_pose *ufbx_as_pose(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_POSE ? (ufbx_pose*)element : NULL; }
 ufbx_abi ufbx_metadata_object *ufbx_as_metadata_object(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_METADATA_OBJECT ? (ufbx_metadata_object*)element : NULL; }
 
