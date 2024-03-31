@@ -17,7 +17,7 @@ TComment = lexer.rule("comment", r"//[^\r\n]*", prefix="/")
 TPreproc = lexer.rule("preproc", r"#[^\n\\]*(\\\r?\n[^\n\\]*?)*\n", prefix="#")
 TString = lexer.rule("string", r"\"[^\"]*\"", prefix="\"")
 lexer.literals(*"const typedef struct union enum extern ufbx_abi ufbx_abi_data ufbx_abi_data_def ufbx_inline ufbx_nullable ufbx_unsafe UFBX_LIST_TYPE UFBX_ENUM_REPR UFBX_FLAG_REPR UFBX_ENUM_FORCE_WIDTH UFBX_FLAG_FORCE_WIDTH UFBX_ENUM_TYPE".split())
-lexer.literals(*",.*[]{}()<>=-?;")
+lexer.literals(*",.*[]{}()<>=-?:;")
 lexer.ignore("disable", re.compile(r"//\s*bindgen-disable.*?//\s*bindgen-enable", flags=re.DOTALL))
 
 Token = parsette.Token
