@@ -11,7 +11,7 @@ import datetime
 import asyncio
 import asyncio.subprocess
 
-LATEST_SUPPORTED_DATE = "2024-03-31"
+LATEST_SUPPORTED_DATE = "2024-04-01"
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -133,92 +133,100 @@ def get_field(path, desc, name, allow_unknown):
     else:
         raise RuntimeError(f"{path}: Bad value for '{name}': {value!r}")
 
+def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_supported_time):
+    path = os.path.join(root, filename)
+
+    with open(path, "rt", encoding="utf-8") as f:
+        desc = json.load(f)
+
+    flag_separator = desc.get("flagSeparator", "_")
+
+    features = desc.get("features", [])
+
+    extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
+    options = { k: as_list(v) for k,v in desc.get("options", {}).items() }
+
+    if heavy:
+        append_unique_opt(options, "geometry-transform-handling", [
+            "preserve", "helper-nodes", "modify-geometry",
+        ])
+
+        append_unique_opt(options, "inherit-mode-handling", [
+            "preserve", "helper-nodes", "compensate",
+        ])
+
+        append_unique_opt(options, "space-conversion", [
+            "transform-root", "adjust-transforms", "modify-geometry",
+        ])
+
+        append_unique_opt(options, "bake", [False, True])
+
+    for feature in features:
+        if feature == "geometry-transform":
+            append_unique_opt(options, "geometry-transform-handling", [
+                "preserve", "helper-nodes", "modify-geometry",
+            ])
+        elif feature == "geometry-transform-no-instances":
+            append_unique_opt(options, "geometry-transform-handling", [
+                "preserve", "helper-nodes", "modify-geometry", "modify-geometry-no-fallback",
+            ])
+        elif feature == "space-conversion":
+            append_unique_opt(options, "space-conversion", [
+                "transform-root", "adjust-transforms", "modify-geometry",
+            ])
+        elif feature == "inherit-mode":
+            append_unique_opt(options, "inherit-mode-handling", [
+                "preserve", "helper-nodes", "compensate",
+            ])
+        elif feature == "pivot":
+            append_unique_opt(options, "pivot-handling", [
+                "retain", "adjust-to-pivot",
+            ])
+        elif feature == "bake":
+            append_unique_opt(options, "bake", [False, True])
+        elif feature == "ignore-missing-external":
+            options["ignore-missing-external"] = [True]
+        else:
+            raise RuntimeError(f"Unknown feature: {feature}")
+    mtime = os.path.getmtime(path)
+    
+    skip = False
+    if last_supported_time and mtime > latest_supported_time.timestamp():
+        skip = True
+
+    models = []
+    extra_files = []
+    if not skip:
+        models = list(gather_case_models(path, flag_separator))
+        if not models:
+            raise RuntimeError(f"No models found for {path}")
+
+        extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
+
+    yield TestCase(
+        root=root_dir,
+        json_path=path,
+        title=get_field(path, desc, "title", allow_unknown),
+        author=get_field(path, desc, "author", allow_unknown),
+        license=get_field(path, desc, "license", allow_unknown),
+        url=get_field(path, desc, "url", allow_unknown),
+        skip=skip,
+        extra_files=extra_files,
+        models=models,
+        options=options,
+    )
+
 def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time):
+    if os.path.isfile(root_dir):
+        head, tail = os.path.split(root_dir)
+        yield from create_dataset_task(head, head, tail, heavy, allow_unknown, last_supported_time)
+        return
+
     for root, _, files in os.walk(root_dir):
         for filename in files:
             if not filename.endswith(".json"):
                 continue
-
-            path = os.path.join(root, filename)
-            with open(path, "rt", encoding="utf-8") as f:
-                desc = json.load(f)
-
-            flag_separator = desc.get("flagSeparator", "_")
-
-            features = desc.get("features", [])
-
-            extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
-            options = { k: as_list(v) for k,v in desc.get("options", {}).items() }
-
-            if heavy:
-                append_unique_opt(options, "geometry-transform-handling", [
-                    "preserve", "helper-nodes", "modify-geometry",
-                ])
-
-                append_unique_opt(options, "inherit-mode-handling", [
-                    "preserve", "helper-nodes", "compensate",
-                ])
-
-                append_unique_opt(options, "space-conversion", [
-                    "transform-root", "adjust-transforms", "modify-geometry",
-                ])
-
-                append_unique_opt(options, "bake", [False, True])
-
-            for feature in features:
-                if feature == "geometry-transform":
-                    append_unique_opt(options, "geometry-transform-handling", [
-                        "preserve", "helper-nodes", "modify-geometry",
-                    ])
-                elif feature == "geometry-transform-no-instances":
-                    append_unique_opt(options, "geometry-transform-handling", [
-                        "preserve", "helper-nodes", "modify-geometry", "modify-geometry-no-fallback",
-                    ])
-                elif feature == "space-conversion":
-                    append_unique_opt(options, "space-conversion", [
-                        "transform-root", "adjust-transforms", "modify-geometry",
-                    ])
-                elif feature == "inherit-mode":
-                    append_unique_opt(options, "inherit-mode-handling", [
-                        "preserve", "helper-nodes", "compensate",
-                    ])
-                elif feature == "pivot":
-                    append_unique_opt(options, "pivot-handling", [
-                        "retain", "adjust-to-pivot",
-                    ])
-                elif feature == "bake":
-                    append_unique_opt(options, "bake", [False, True])
-                elif feature == "ignore-missing-external":
-                    options["ignore-missing-external"] = [True]
-                else:
-                    raise RuntimeError(f"Unknown feature: {feature}")
-            mtime = os.path.getmtime(path)
-            
-            skip = False
-            if last_supported_time and mtime > latest_supported_time.timestamp():
-                skip = True
-
-            models = []
-            extra_files = []
-            if not skip:
-                models = list(gather_case_models(path, flag_separator))
-                if not models:
-                    raise RuntimeError(f"No models found for {path}")
-
-                extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
-
-            yield TestCase(
-                root=root_dir,
-                json_path=path,
-                title=get_field(path, desc, "title", allow_unknown),
-                author=get_field(path, desc, "author", allow_unknown),
-                license=get_field(path, desc, "license", allow_unknown),
-                url=get_field(path, desc, "url", allow_unknown),
-                skip=skip,
-                extra_files=extra_files,
-                models=models,
-                options=options,
-            )
+            yield from create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_supported_time)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
