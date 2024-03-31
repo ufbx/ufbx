@@ -8353,6 +8353,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 					t->array_size = size;
 					t->src_type = src_type;
 					t->dst_type = dst_type;
+					t->arr_type = arr->type;
 					t->dst_data = arr_data;
 					t->inflate_retain = uc->inflate_retain;
 
