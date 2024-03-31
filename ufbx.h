@@ -993,11 +993,23 @@ struct ufbx_node {
 // single defined value per vertex accessible via:
 //   attrib.values.data[attrib.indices.data[mesh->vertex_first_index[vertex_ix]]
 typedef struct ufbx_vertex_attrib {
+	// Is this attribute defined by the mesh.
 	bool exists;
+	// List of values the attribute uses.
 	ufbx_void_list values;
+	// Indices into `values[]`, indexed up to `ufbx_mesh.num_indices`.
 	ufbx_uint32_list indices;
+	// Number of `ufbx_real` entries per value.
 	size_t value_reals;
+	// `true` if this attribute is defined per vertex, instead of per index.
 	bool unique_per_vertex;
+	// Optional 4th 'W' component for the attribute.
+	// May be defined for the following:
+	//   ufbx_mesh.vertex_normal
+	//   ufbx_mesh.vertex_tangent / ufbx_uv_set.vertex_tangent
+	//   ufbx_mesh.vertex_bitangent / ufbx_uv_set.vertex_bitangent
+	// NOTE: This is not loaded by default, set `ufbx_load_opts.retain_vertex_attrib_w`.
+	ufbx_real_list values_w;
 } ufbx_vertex_attrib;
 
 // 1D vertex attribute, see `ufbx_vertex_attrib` for information
@@ -1007,6 +1019,7 @@ typedef struct ufbx_vertex_real {
 	ufbx_uint32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
+	ufbx_real_list values_w;
 
 	UFBX_VERTEX_ATTRIB_IMPL(ufbx_real)
 } ufbx_vertex_real;
@@ -1018,6 +1031,7 @@ typedef struct ufbx_vertex_vec2 {
 	ufbx_uint32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
+	ufbx_real_list values_w;
 
 	UFBX_VERTEX_ATTRIB_IMPL(ufbx_vec2)
 } ufbx_vertex_vec2;
@@ -1029,6 +1043,7 @@ typedef struct ufbx_vertex_vec3 {
 	ufbx_uint32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
+	ufbx_real_list values_w;
 
 	UFBX_VERTEX_ATTRIB_IMPL(ufbx_vec3)
 } ufbx_vertex_vec3;
@@ -1040,6 +1055,7 @@ typedef struct ufbx_vertex_vec4 {
 	ufbx_uint32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
+	ufbx_real_list values_w;
 
 	UFBX_VERTEX_ATTRIB_IMPL(ufbx_vec4)
 } ufbx_vertex_vec4;
@@ -3472,6 +3488,9 @@ typedef enum ufbx_warning_type UFBX_ENUM_REPR {
 	// Duplicated connection between two elements that shouldn't have.
 	UFBX_WARNING_DUPLICATE_CONNECTION,
 
+	// Vertex 'W' attribute length differs from main attribute.
+	UFBX_WARNING_BAD_VERTEX_W_ATTRIBUTE,
+
 	// Out-of-bounds index has been clamped to be in-bounds.
 	// HINT: You can use `ufbx_index_error_handling` to adjust behavior.
 	UFBX_WARNING_INDEX_CLAMPED,
@@ -4655,6 +4674,10 @@ typedef struct ufbx_load_opts {
 	// Specify how to handle Unicode errors in strings.
 	ufbx_unicode_error_handling unicode_error_handling;
 
+	// Retain the 'W' component of mesh normal/tangent/bitangent.
+	// See `ufbx_vertex_attrib.values_w`.
+	bool retain_vertex_attrib_w;
+
 	// Retain the raw document structure using `ufbx_dom_node`.
 	bool retain_dom;
 
@@ -5508,6 +5531,9 @@ ufbx_inline ufbx_real ufbx_get_vertex_real(const ufbx_vertex_real *v, size_t ind
 ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[(int32_t)v->indices.data[index]]; }
 ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[(int32_t)v->indices.data[index]]; }
 ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[(int32_t)v->indices.data[index]]; }
+
+ufbx_abi ufbx_real ufbx_catch_get_vertex_vec3_w(ufbx_panic *panic, const ufbx_vertex_vec3 *v, size_t index);
+ufbx_inline ufbx_real ufbx_get_vertex_vec3_w(const ufbx_vertex_vec3 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values_w.count > 0 ? v->values_w.data[(int32_t)v->indices.data[index]] : 0.0f; }
 
 // Functions for converting an untyped `ufbx_element` to a concrete type.
 // Returns `NULL` if the element is not that type.

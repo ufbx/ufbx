@@ -1390,3 +1390,216 @@ UFBXT_FILE_TEST_FLAGS(blender_292_circle, UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERRO
 }
 #endif
 
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_retain_vertex_w_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.retain_vertex_attrib_w = true;
+	return opts;
+}
+#endif
+
+#if UFBXT_IMPL
+static void ufbxt_check_tangent_sign(ufbx_mesh *mesh, ufbx_real ref_sign)
+{
+	if (mesh->element.scene->metadata.version < 7000) {
+		ufbxt_assert(mesh->vertex_normal.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_tangent.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_bitangent.values_w.count == 0);
+		return;
+	}
+
+	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
+		ufbx_vec3 normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, ix);
+		ufbx_vec3 tangent = ufbx_get_vertex_vec3(&mesh->vertex_tangent, ix);
+		ufbx_vec3 bitangent = ufbx_get_vertex_vec3(&mesh->vertex_bitangent, ix);
+
+		ufbx_vec3 b = ufbxt_cross3(normal, tangent);
+		ufbx_real dot = ufbxt_dot3(bitangent, b);
+		ufbx_real sign = dot > 0.0f ? 1.0f : -1.0f;
+
+		ufbx_real tangent_w = ufbx_get_vertex_vec3_w(&mesh->vertex_tangent, ix);
+		ufbxt_assert(tangent_w == sign);
+		if (ref_sign != 0.0f) {
+			ufbxt_assert(sign == ref_sign);
+		}
+	}
+}
+static void ufbxt_check_vertex_w(ufbx_mesh *mesh, ufbx_vertex_vec3 *attrib, ufbx_real ref)
+{
+	if (mesh->element.scene->metadata.version < 7000) {
+		ufbxt_assert(attrib->values_w.count == 0);
+		return;
+	}
+
+	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
+		ufbx_real value_w = ufbx_get_vertex_vec3_w(attrib, ix);
+		ufbxt_assert(value_w == ref);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(maya_tangent_sign, ufbxt_retain_vertex_w_opts)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Positive");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_check_tangent_sign(mesh, 1.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_normal, 1.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_bitangent, 1.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "FlipX");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_check_tangent_sign(mesh, -1.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_normal, 1.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_bitangent, 1.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "FlipY");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_check_tangent_sign(mesh, -1.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_normal, 1.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_bitangent, 1.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "FlipBoth");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_check_tangent_sign(mesh, 1.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_normal, 1.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_bitangent, 1.0f);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(max_tangent_sign, ufbxt_retain_vertex_w_opts)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Positive");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_check_tangent_sign(mesh, 1.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_normal, 0.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_bitangent, 1.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "FlipX");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_check_tangent_sign(mesh, -1.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_normal, 0.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_bitangent, 1.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "FlipY");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_check_tangent_sign(mesh, -1.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_normal, 0.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_bitangent, 1.0f);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "FlipBoth");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_check_tangent_sign(mesh, 1.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_normal, 0.0f);
+		ufbxt_check_vertex_w(mesh, &mesh->vertex_bitangent, 1.0f);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(blender340_tangent_sign, ufbxt_retain_vertex_w_opts)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Positive");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->vertex_normal.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_tangent.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_bitangent.values_w.count == 0);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "FlipX");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->vertex_normal.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_tangent.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_bitangent.values_w.count == 0);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "FlipY");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->vertex_normal.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_tangent.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_bitangent.values_w.count == 0);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "FlipXY");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->vertex_normal.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_tangent.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_bitangent.values_w.count == 0);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(maya_tangent_sign_default, maya_tangent_sign)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Positive");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->vertex_normal.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_tangent.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_bitangent.values_w.count == 0);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "FlipX");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->vertex_normal.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_tangent.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_bitangent.values_w.count == 0);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "FlipY");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->vertex_normal.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_tangent.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_bitangent.values_w.count == 0);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "FlipBoth");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbxt_assert(mesh->vertex_normal.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_tangent.values_w.count == 0);
+		ufbxt_assert(mesh->vertex_bitangent.values_w.count == 0);
+	}
+}
+#endif
+

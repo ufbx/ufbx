@@ -5977,6 +5977,7 @@ typedef struct {
 
 	bool has_geometry_transform_nodes;
 	bool has_scale_helper_nodes;
+	bool retain_vertex_w;
 
 	ufbx_mirror_axis mirror_axis;
 
@@ -7487,7 +7488,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_NormalsW) {
-			info->type = uc->opts.retain_dom ? 'r' : '-';
+			info->type = uc->retain_vertex_w ? 'r' : '-';
 			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		}
@@ -7503,7 +7504,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_BinormalsW) {
-			info->type = uc->opts.retain_dom ? 'r' : '-';
+			info->type = uc->retain_vertex_w ? 'r' : '-';
 			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		}
@@ -7519,7 +7520,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_TangentsW) {
-			info->type = uc->opts.retain_dom ? 'r' : '-';
+			info->type = uc->retain_vertex_w ? 'r' : '-';
 			info->flags = UFBXI_ARRAY_FLAG_RESULT | UFBXI_ARRAY_FLAG_PAD_BEGIN;
 			return true;
 		}
@@ -11884,7 +11885,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_check_indices(ufbxi_context *uc,
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mesh *mesh, ufbxi_node *node,
-	ufbx_vertex_attrib *attrib, const char *data_name, const char *index_name, char data_type, size_t num_components)
+	ufbx_vertex_attrib *attrib, const char *data_name, const char *index_name, const char *w_name, char data_type, size_t num_components)
 {
 	ufbx_real **p_dst_data = (ufbx_real**)&attrib->values.data;
 
@@ -12047,6 +12048,19 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 
 		} else {
 			ufbxi_fail("Invalid mapping");
+		}
+	}
+
+	if (uc->opts.retain_vertex_attrib_w && w_name) {
+		ufbxi_value_array *w_data = ufbxi_find_array(node, w_name, 'r');
+		if (w_data) {
+			if (w_data->size == num_elems) {
+				attrib->values_w.count = w_data->size;
+				attrib->values_w.data = (ufbx_real*)w_data->data;
+			} else {
+				ufbxi_check(ufbxi_warnf(UFBX_WARNING_BAD_VERTEX_W_ATTRIBUTE, "Bad W array size %s=%zu, %s=%zu",
+					w_name, w_data->size, data_name, num_elems));
+			}
 		}
 	}
 
@@ -12684,13 +12698,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 		if (n->name == ufbxi_LayerElementNormal) {
 			if (mesh->vertex_normal.exists) continue;
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_attrib*)&mesh->vertex_normal,
-				ufbxi_Normals, ufbxi_NormalsIndex, 'r', 3));
+				ufbxi_Normals, ufbxi_NormalsIndex, ufbxi_NormalsW, 'r', 3));
 		} else if (n->name == ufbxi_LayerElementBinormal) {
 			ufbxi_tangent_layer *layer = &bitangents[num_bitangents_read++];
 
 			ufbxi_ignore(ufbxi_get_val1(n, "I", &layer->index));
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_attrib*)&layer->elem,
-				ufbxi_Binormals, ufbxi_BinormalsIndex, 'r', 3));
+				ufbxi_Binormals, ufbxi_BinormalsIndex, ufbxi_BinormalsW, 'r', 3));
 			if (!layer->elem.exists) num_bitangents_read--;
 
 		} else if (n->name == ufbxi_LayerElementTangent) {
@@ -12698,7 +12712,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 
 			ufbxi_ignore(ufbxi_get_val1(n, "I", &layer->index));
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_attrib*)&layer->elem,
-				ufbxi_Tangents, ufbxi_TangentsIndex, 'r', 3));
+				ufbxi_Tangents, ufbxi_TangentsIndex, ufbxi_TangentsW, 'r', 3));
 			if (!layer->elem.exists) num_tangents_read--;
 
 		} else if (n->name == ufbxi_LayerElementUV) {
@@ -12710,7 +12724,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 			}
 
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_attrib*)&set->vertex_uv,
-				ufbxi_UV, ufbxi_UVIndex, 'r', 2));
+				ufbxi_UV, ufbxi_UVIndex, NULL, 'r', 2));
 			if (!set->vertex_uv.exists) mesh->uv_sets.count--;
 
 		} else if (n->name == ufbxi_LayerElementColor) {
@@ -12722,12 +12736,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 			}
 
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_attrib*)&set->vertex_color,
-				ufbxi_Colors, ufbxi_ColorIndex, 'r', 4));
+				ufbxi_Colors, ufbxi_ColorIndex, NULL, 'r', 4));
 			if (!set->vertex_color.exists) mesh->color_sets.count--;
 
 		} else if (n->name == ufbxi_LayerElementVertexCrease) {
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_attrib*)&mesh->vertex_crease,
-				ufbxi_VertexCrease, ufbxi_VertexCreaseIndex, 'r', 1));
+				ufbxi_VertexCrease, ufbxi_VertexCreaseIndex, NULL, 'r', 1));
 		} else if (n->name == ufbxi_LayerElementEdgeCrease) {
 			const char *mapping = NULL;
 			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
@@ -15246,7 +15260,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 		set->index = 0;
 		set->name.data = ufbxi_empty_char;
 		ufbxi_check(ufbxi_read_vertex_element(uc, mesh, uv_info, (ufbx_vertex_attrib*)&set->vertex_uv,
-			ufbxi_TextureUV, ufbxi_TextureUVVerticeIndex, 'r', 2));
+			ufbxi_TextureUV, ufbxi_TextureUVVerticeIndex, NULL, 'r', 2));
 
 		mesh->uv_sets.data = set;
 		mesh->uv_sets.count = 1;
@@ -23992,6 +24006,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 		uc->data_begin = uc->data = ufbxi_zero_size_buffer;
 	}
 
+	uc->retain_vertex_w = (uc->opts.retain_dom || uc->opts.retain_vertex_attrib_w) && !uc->opts.ignore_geometry;
+
 	ufbxi_check(ufbxi_load_strings(uc));
 	ufbxi_check(ufbxi_load_maps(uc));
 	ufbxi_check(ufbxi_determine_format(uc));
@@ -31612,6 +31628,15 @@ ufbx_abi ufbxi_noinline ufbx_vec4 ufbx_catch_get_vertex_vec4(ufbx_panic *panic, 
 	uint32_t ix = v->indices.data[index];
 	if (ufbxi_panicf(panic, (size_t)ix < v->values.count || ix == UFBX_NO_INDEX, "Corrupted or missing vertex attribute (%u) at %zu", ix, index)) return ufbx_zero_vec4;
 	return v->values.data[(int32_t)ix];
+}
+
+ufbx_abi ufbx_real ufbx_catch_get_vertex_vec3_w(ufbx_panic *panic, const ufbx_vertex_vec3 *v, size_t index)
+{
+	if (ufbxi_panicf(panic, index < v->indices.count, "index (%zu) out of range (%zu)", index, v->indices.count)) return 0.0f;
+	if (v->values_w.count == 0) return 0.0f;
+	uint32_t ix = v->indices.data[index];
+	if (ufbxi_panicf(panic, (size_t)ix < v->values.count || ix == UFBX_NO_INDEX, "Corrupted or missing vertex attribute (%u) at %zu", ix, index)) return 0.0f;
+	return v->values_w.data[(int32_t)ix];
 }
 
 ufbx_abi ufbx_unknown *ufbx_as_unknown(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_UNKNOWN ? (ufbx_unknown*)element : NULL; }
