@@ -5532,8 +5532,8 @@ ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t ind
 ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[(int32_t)v->indices.data[index]]; }
 ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[(int32_t)v->indices.data[index]]; }
 
-ufbx_abi ufbx_real ufbx_catch_get_vertex_vec3_w(ufbx_panic *panic, const ufbx_vertex_vec3 *v, size_t index);
-ufbx_inline ufbx_real ufbx_get_vertex_vec3_w(const ufbx_vertex_vec3 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values_w.count > 0 ? v->values_w.data[(int32_t)v->indices.data[index]] : 0.0f; }
+ufbx_abi ufbx_real ufbx_catch_get_vertex_w_vec3(ufbx_panic *panic, const ufbx_vertex_vec3 *v, size_t index);
+ufbx_inline ufbx_real ufbx_get_vertex_w_vec3(const ufbx_vertex_vec3 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values_w.count > 0 ? v->values_w.data[(int32_t)v->indices.data[index]] : 0.0f; }
 
 // Functions for converting an untyped `ufbx_element` to a concrete type.
 // Returns `NULL` if the element is not that type.

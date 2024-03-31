@@ -1418,7 +1418,32 @@ static void ufbxt_check_tangent_sign(ufbx_mesh *mesh, ufbx_real ref_sign)
 		ufbx_real dot = ufbxt_dot3(bitangent, b);
 		ufbx_real sign = dot > 0.0f ? 1.0f : -1.0f;
 
-		ufbx_real tangent_w = ufbx_get_vertex_vec3_w(&mesh->vertex_tangent, ix);
+		ufbx_real tangent_w = ufbx_get_vertex_w_vec3(&mesh->vertex_tangent, ix);
+		ufbxt_assert(tangent_w == sign);
+		if (ref_sign != 0.0f) {
+			ufbxt_assert(sign == ref_sign);
+		}
+	}
+}
+static void ufbxt_check_tangent_sign_set(ufbx_mesh *mesh, ufbx_uv_set *set, ufbx_real ref_sign)
+{
+	if (mesh->element.scene->metadata.version < 7000) {
+		ufbxt_assert(mesh->vertex_normal.values_w.count == 0);
+		ufbxt_assert(set->vertex_tangent.values_w.count == 0);
+		ufbxt_assert(set->vertex_bitangent.values_w.count == 0);
+		return;
+	}
+
+	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
+		ufbx_vec3 normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, ix);
+		ufbx_vec3 tangent = ufbx_get_vertex_vec3(&set->vertex_tangent, ix);
+		ufbx_vec3 bitangent = ufbx_get_vertex_vec3(&set->vertex_bitangent, ix);
+
+		ufbx_vec3 b = ufbxt_cross3(normal, tangent);
+		ufbx_real dot = ufbxt_dot3(bitangent, b);
+		ufbx_real sign = dot > 0.0f ? 1.0f : -1.0f;
+
+		ufbx_real tangent_w = ufbx_get_vertex_w_vec3(&set->vertex_tangent, ix);
 		ufbxt_assert(tangent_w == sign);
 		if (ref_sign != 0.0f) {
 			ufbxt_assert(sign == ref_sign);
@@ -1433,7 +1458,7 @@ static void ufbxt_check_vertex_w(ufbx_mesh *mesh, ufbx_vertex_vec3 *attrib, ufbx
 	}
 
 	for (size_t ix = 0; ix < mesh->num_indices; ix++) {
-		ufbx_real value_w = ufbx_get_vertex_vec3_w(attrib, ix);
+		ufbx_real value_w = ufbx_get_vertex_w_vec3(attrib, ix);
 		ufbxt_assert(value_w == ref);
 	}
 }
@@ -1603,3 +1628,86 @@ UFBXT_FILE_TEST_ALT(maya_tangent_sign_default, maya_tangent_sign)
 }
 #endif
 
+UFBXT_FILE_TEST_OPTS(maya_tangent_sign_mixed_split, ufbxt_retain_vertex_w_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "polySurface2");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_check_vertex_w(mesh, &mesh->vertex_normal, 1.0f);
+	ufbxt_check_vertex_w(mesh, &mesh->vertex_bitangent, 1.0f);
+	ufbxt_check_tangent_sign(mesh, 0.0f);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(maya_tangent_sign_mixed, ufbxt_retain_vertex_w_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_check_vertex_w(mesh, &mesh->vertex_normal, 1.0f);
+	ufbxt_check_vertex_w(mesh, &mesh->vertex_bitangent, 1.0f);
+
+	// ???: The tangent sign seems absolutely arbitrary here
+	static const ufbx_real tangent_w_ref[] = {
+		-1.0f,-1.0f, 1.0f, -1.0f, -1.0f, -1.0f, 1.0f, 1.0f,
+	};
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		ufbx_real w = ufbx_get_vertex_w_vec3(&mesh->vertex_tangent, i);
+		ufbxt_assert(w == tangent_w_ref[i]);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(maya_uv_set_tangent_w, ufbxt_retain_vertex_w_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->uv_sets.count == 3);
+	ufbxt_check_vertex_w(mesh, &mesh->vertex_normal, 1.0f);
+
+	ufbx_uv_set *uv_map1 = &mesh->uv_sets.data[0];
+	ufbxt_assert(!strcmp(uv_map1->name.data, "map1"));
+	ufbxt_check_tangent_sign_set(mesh, uv_map1, 1.0f);
+	ufbxt_check_vertex_w(mesh, &uv_map1->vertex_bitangent, 1.0f);
+
+	ufbx_uv_set *uv_left = &mesh->uv_sets.data[1];
+	ufbxt_assert(!strcmp(uv_left->name.data, "FlipLeft"));
+	ufbxt_check_vertex_w(mesh, &uv_left->vertex_bitangent, 1.0f);
+
+	// ???: The tangent sign seems absolutely arbitrary here
+	static const ufbx_real tangent_w_left[] = {
+		-1.0f, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, 1.0f, 1.0f,
+	};
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		ufbx_real w = ufbx_get_vertex_w_vec3(&uv_left->vertex_tangent, i);
+		if (scene->metadata.version >= 7000) {
+			ufbxt_assert(w == tangent_w_left[i]);
+		} else {
+			ufbxt_assert(w == 0.0f);
+		}
+	}
+
+	ufbx_uv_set *uv_right = &mesh->uv_sets.data[2];
+	ufbxt_assert(!strcmp(uv_right->name.data, "FlipRight"));
+	ufbxt_check_vertex_w(mesh, &uv_right->vertex_bitangent, 1.0f);
+
+	// ???: The tangent sign seems absolutely arbitrary here,
+	// they are however inverted compared to `uv_left` whivch makes sense,
+	// so there is a chance that they do encode something useful (?)
+	static const ufbx_real tangent_w_right[] = {
+		1.0f, 1.0f, -1.0f, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f,
+	};
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		ufbx_real w = ufbx_get_vertex_w_vec3(&uv_right->vertex_tangent, i);
+		if (scene->metadata.version >= 7000) {
+			ufbxt_assert(w == tangent_w_right[i]);
+		} else {
+			ufbxt_assert(w == 0.0f);
+		}
+	}
+}
+#endif

@@ -31630,7 +31630,7 @@ ufbx_abi ufbxi_noinline ufbx_vec4 ufbx_catch_get_vertex_vec4(ufbx_panic *panic, 
 	return v->values.data[(int32_t)ix];
 }
 
-ufbx_abi ufbx_real ufbx_catch_get_vertex_vec3_w(ufbx_panic *panic, const ufbx_vertex_vec3 *v, size_t index)
+ufbx_abi ufbx_real ufbx_catch_get_vertex_w_vec3(ufbx_panic *panic, const ufbx_vertex_vec3 *v, size_t index)
 {
 	if (ufbxi_panicf(panic, index < v->indices.count, "index (%zu) out of range (%zu)", index, v->indices.count)) return 0.0f;
 	if (v->values_w.count == 0) return 0.0f;
