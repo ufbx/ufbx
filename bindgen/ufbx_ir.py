@@ -569,6 +569,7 @@ sizes_base = {
     "float": 4,
     "double": 8,
     "enum": 4,
+    "UFBX_REAL_TYPE": 8,
 }
 
 sizes_32bit = {
