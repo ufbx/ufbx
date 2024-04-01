@@ -24867,6 +24867,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 			keys[i].shape = (ufbx_blend_shape*)ufbxi_translate_element(ec, keys[i].shape);
 		}
 		chan->keyframes.data = keys;
+		chan->target_shape = (ufbx_blend_shape*)ufbxi_translate_element(ec, chan->target_shape);
 	}
 
 	ufbxi_for_ptr_list(ufbx_cache_deformer, p_deformer, ec->scene.cache_deformers) {
