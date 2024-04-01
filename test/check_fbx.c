@@ -500,7 +500,33 @@ int check_fbx_main(int argc, char **argv, const char *path)
 				time = (double)frame / fps;
 			}
 
-			if (bake) {
+			if (obj_file->bind_pose) {
+				ufbx_transform_override *transform_overrides = (ufbx_transform_override*)calloc(scene->nodes.count, sizeof(ufbx_transform_override));
+
+				size_t num_transform_overrides = 0;
+				for (size_t i = 0; i < scene->nodes.count; i++) {
+					ufbx_node *node = scene->nodes.data[i];
+					if (!node->bind_pose) continue;
+
+					ufbx_bone_pose *pose = ufbx_get_bone_pose(node->bind_pose, node);
+					ufbxt_assert(pose);
+					ufbx_transform local_transform = ufbx_matrix_to_transform(&pose->bone_to_parent);
+
+					ufbx_transform_override *over = &transform_overrides[num_transform_overrides++];
+					over->node_id = node->typed_id;
+					over->transform = local_transform;
+				}
+
+				ufbx_anim_opts anim_opts = { 0 };
+				anim_opts.transform_overrides.data = transform_overrides;
+				anim_opts.transform_overrides.count = num_transform_overrides;
+
+				anim = ufbx_create_anim(scene, &anim_opts, NULL);
+				ufbxt_assert(anim);
+
+				free(transform_overrides);
+
+			} else if (bake) {
 				ufbx_bake_opts opts = { 0 };
 				opts.max_keyframe_segments = 4096;
 				if (bake_fps > 0) {
@@ -555,33 +581,6 @@ int check_fbx_main(int argc, char **argv, const char *path)
 				ufbxt_assert(anim);
 
 				free(prop_overrides);
-				free(transform_overrides);
-
-			} else if (obj_file->bind_pose) {
-
-				ufbx_transform_override *transform_overrides = (ufbx_transform_override*)calloc(scene->nodes.count, sizeof(ufbx_transform_override));
-
-				size_t num_transform_overrides = 0;
-				for (size_t i = 0; i < scene->nodes.count; i++) {
-					ufbx_node *node = scene->nodes.data[i];
-					if (!node->bind_pose) continue;
-
-					ufbx_bone_pose *pose = ufbx_get_bone_pose(node->bind_pose, node);
-					ufbxt_assert(pose);
-					ufbx_transform local_transform = ufbx_matrix_to_transform(&pose->bone_to_parent);
-
-					ufbx_transform_override *over = &transform_overrides[num_transform_overrides++];
-					over->node_id = node->typed_id;
-					over->transform = local_transform;
-				}
-
-				ufbx_anim_opts anim_opts = { 0 };
-				anim_opts.transform_overrides.data = transform_overrides;
-				anim_opts.transform_overrides.count = num_transform_overrides;
-
-				anim = ufbx_create_anim(scene, &anim_opts, NULL);
-				ufbxt_assert(anim);
-
 				free(transform_overrides);
 			}
 
