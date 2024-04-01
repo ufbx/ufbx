@@ -20826,6 +20826,10 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 		ufbxi_check(ufbxi_sort_blend_keyframes(uc, channel->keyframes.data, channel->keyframes.count));
 		full_weights++;
+
+		if (channel->keyframes.count > 0) {
+			channel->target_shape = channel->keyframes.data[channel->keyframes.count - 1].shape;
+		}
 	}
 	ufbxi_buf_free(&uc->tmp_full_weights);
 
