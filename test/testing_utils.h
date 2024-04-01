@@ -1384,7 +1384,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		}
 
 		if (obj->ignore_duplicates) {
-			if (!node) {
+			if (!node || !ufbxt_has_mesh(node)) {
 				bool is_ncl = false;
 				for (size_t i = 0; i < obj_mesh->num_groups; i++) {
 					if (strstr(obj_mesh->groups[i], "_ncl1_")) {
