@@ -3544,14 +3544,14 @@ static ufbxi_forceinline void *ufbxi_push_size_fast(ufbxi_buf *b, size_t size, s
 	}
 }
 
-static ufbxi_forceinline void *ufbxi_push_size_zero(ufbxi_buf *b, size_t size, size_t n)
+static ufbxi_noinline void *ufbxi_push_size_zero(ufbxi_buf *b, size_t size, size_t n)
 {
 	void *ptr = ufbxi_push_size(b, size, n);
 	if (ptr) memset(ptr, 0, size * n);
 	return ptr;
 }
 
-ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_push_size_copy(ufbxi_buf *b, size_t size, size_t n, const void *data)
+ufbxi_nodiscard static ufbxi_noinline void *ufbxi_push_size_copy(ufbxi_buf *b, size_t size, size_t n, const void *data)
 {
 	// Always succeed with an empty non-NULL buffer for empty allocations, even if `data == NULL`
 	ufbx_assert(size > 0);
@@ -10750,9 +10750,9 @@ static ufbxi_forceinline bool ufbxi_is_quat_identity(ufbx_quat v)
 	return (v.x == 0.0) & (v.y == 0.0) & (v.z == 0.0) & (v.w == 1.0);
 }
 
-static ufbxi_forceinline bool ufbxi_is_transform_identity(ufbx_transform t)
+static ufbxi_noinline bool ufbxi_is_transform_identity(const ufbx_transform *t)
 {
-	return (bool)((int)ufbxi_is_vec3_zero(t.translation) & (int)ufbxi_is_quat_identity(t.rotation) & (int)ufbxi_is_vec3_one(t.scale));
+	return (bool)((int)ufbxi_is_vec3_zero(t->translation) & (int)ufbxi_is_quat_identity(t->rotation) & (int)ufbxi_is_vec3_one(t->scale));
 }
 
 static ufbxi_forceinline uint32_t ufbxi_get_name_key(const char *name, size_t len)
@@ -11409,7 +11409,7 @@ static ufbxi_noinline int ufbxi_push_synthetic_id(ufbxi_context *uc, uint64_t *p
 	return 1;
 }
 
-ufbxi_nodiscard static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_string type_and_name, ufbx_string *type, ufbx_string *name)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_split_type_and_name(ufbxi_context *uc, ufbx_string type_and_name, ufbx_string *type, ufbx_string *name)
 {
 	// Name and type are packed in a single property as Type::Name (in ASCII)
 	// or Name\x00\x01Type (in binary)
@@ -17958,7 +17958,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_dst_elements(ufbxi_context
 					}
 					uc->tmp_element_flag[element_id] = 1;
 				}
-				ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_element*, 1, &conn->src));
+				ufbx_element **p_elem = ufbxi_push(&uc->tmp_stack, ufbx_element*, 1);
+				ufbxi_check(p_elem);
+				*p_elem = conn->src;
 				num_elements++;
 			}
 		}
@@ -17994,7 +17996,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_fetch_src_elements(ufbxi_context
 					}
 					uc->tmp_element_flag[element_id] = 1;
 				}
-				ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_element*, 1, &conn->dst));
+				ufbx_element **p_elem = ufbxi_push(&uc->tmp_stack, ufbx_element*, 1);
+				ufbxi_check(p_elem);
+				*p_elem = conn->dst;
 				num_elements++;
 			}
 		}
@@ -20001,7 +20005,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_modify_geometry(ufbxi_context *u
 			if (node->is_root) continue;
 
 			node->geometry_transform = ufbxi_get_geometry_transform(&node->props, node);
-			if (!ufbxi_is_transform_identity(node->geometry_transform)) {
+			if (!ufbxi_is_transform_identity(&node->geometry_transform)) {
 				node->geometry_to_node = ufbx_transform_to_matrix(&node->geometry_transform);
 				node->has_geometry_transform = true;
 			} else {
@@ -21430,7 +21434,7 @@ static ufbxi_forceinline void ufbxi_mul_scale_real(ufbx_transform *t, ufbx_real 
 	t->scale.z *= v;
 }
 
-static ufbxi_forceinline ufbx_quat ufbxi_mul_quat(ufbx_quat a, ufbx_quat b)
+static ufbxi_noinline ufbx_quat ufbxi_mul_quat(ufbx_quat a, ufbx_quat b)
 {
 	ufbx_quat r;
 	r.x = a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y;
@@ -21455,7 +21459,7 @@ static ufbxi_forceinline void ufbxi_add_weighted_quat(ufbx_quat *r, ufbx_quat b,
 	r->w += b.w * w;
 }
 
-static ufbxi_forceinline void ufbxi_add_weighted_mat(ufbx_matrix *r, const ufbx_matrix *b, ufbx_real w)
+static ufbxi_noinline void ufbxi_add_weighted_mat(ufbx_matrix *r, const ufbx_matrix *b, ufbx_real w)
 {
 	ufbxi_add_weighted_vec3(&r->cols[0], b->cols[0], w);
 	ufbxi_add_weighted_vec3(&r->cols[1], b->cols[1], w);
@@ -21779,7 +21783,7 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node, const ufbx_transfo
 		node->unscaled_node_to_world = unscaled_node_to_parent;
 	}
 
-	if (!ufbxi_is_transform_identity(node->geometry_transform)) {
+	if (!ufbxi_is_transform_identity(&node->geometry_transform)) {
 		node->geometry_to_node = ufbx_transform_to_matrix(&node->geometry_transform);
 		node->geometry_to_world = ufbx_matrix_mul(&node->node_to_world, &node->geometry_to_node);
 		node->has_geometry_transform = true;
@@ -22102,7 +22106,7 @@ ufbxi_noinline static void ufbxi_update_material(ufbx_scene *scene, ufbx_materia
 ufbxi_noinline static void ufbxi_update_texture(ufbx_texture *texture)
 {
 	texture->uv_transform = ufbxi_get_texture_transform(&texture->props);
-	if (!ufbxi_is_transform_identity(texture->uv_transform)) {
+	if (!ufbxi_is_transform_identity(&texture->uv_transform)) {
 		texture->has_uv_transform = true;
 		texture->texture_to_uv = ufbx_transform_to_matrix(&texture->uv_transform);
 		texture->uv_to_texture = ufbx_matrix_invert(&texture->texture_to_uv);
@@ -22264,7 +22268,7 @@ static ufbxi_forceinline void ufbxi_mirror_matrix_src(ufbx_matrix *m, ufbx_mirro
 	m->cols[ax].z = -m->cols[ax].z;
 }
 
-static ufbxi_forceinline void ufbxi_mirror_matrix(ufbx_matrix *m, ufbx_mirror_axis axis)
+static ufbxi_noinline void ufbxi_mirror_matrix(ufbx_matrix *m, ufbx_mirror_axis axis)
 {
 	if (axis == 0) return;
 	ufbxi_mirror_matrix_src(m, axis);
@@ -23701,7 +23705,7 @@ static ufbxi_noinline void ufbxi_transform_to_axes(ufbxi_context *uc, ufbx_coord
 
 	if (uc->opts.space_conversion == UFBX_SPACE_CONVERSION_TRANSFORM_ROOT) {
 		ufbx_matrix axis_mat = uc->axis_matrix;
-		if (!ufbxi_is_transform_identity(uc->scene.root_node->local_transform)) {
+		if (!ufbxi_is_transform_identity(&uc->scene.root_node->local_transform)) {
 			ufbx_matrix root_mat = ufbx_transform_to_matrix(&uc->scene.root_node->local_transform);
 			axis_mat = ufbx_matrix_mul(&root_mat, &axis_mat);
 		}
@@ -24368,7 +24372,7 @@ typedef struct ufbxi_anim_layer_combine_ctx {
 	bool has_rotation_order;
 } ufbxi_anim_layer_combine_ctx;
 
-static double ufbxi_pow_abs(double v, double e)
+static ufbxi_noinline double ufbxi_pow_abs(double v, double e)
 {
 	if (e <= 0.0) return 1.0;
 	if (e >= 1.0) return v;
@@ -26875,11 +26879,11 @@ typedef struct {
 	uint32_t indices[3];
 } ufbxi_kd_triangle;
 
-ufbxi_forceinline static ufbx_vec2 ufbxi_ngon_project(ufbxi_ngon_context *nc, ufbx_vec3 point)
+ufbxi_noinline static ufbx_vec2 ufbxi_ngon_project(ufbxi_ngon_context *nc, const ufbx_vec3 *point)
 {
 	ufbx_vec2 p;
-	p.x = ufbxi_dot3(nc->axes[0], point);
-	p.y = ufbxi_dot3(nc->axes[1], point);
+	p.x = ufbxi_dot3(nc->axes[0], *point);
+	p.y = ufbxi_dot3(nc->axes[1], *point);
 	return p;
 }
 
@@ -26888,7 +26892,7 @@ ufbxi_forceinline static ufbx_real ufbxi_orient2d(ufbx_vec2 a, ufbx_vec2 b, ufbx
 	return (b.x - a.x)*(c.y - a.y) - (b.y - a.y)*(c.x - a.x);
 }
 
-ufbxi_forceinline static bool ufbxi_kd_check_point(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t index, ufbx_vec3 point)
+ufbxi_noinline static bool ufbxi_kd_check_point(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t index, const ufbx_vec3 *point)
 {
 	if (index == tri->indices[0] || index == tri->indices[1] || index == tri->indices[2]) return false;
 	ufbx_vec2 p = ufbxi_ngon_project(nc, point);
@@ -26922,7 +26926,7 @@ ufbxi_noinline static bool ufbxi_kd_check_slow(ufbxi_ngon_context *nc, const ufb
 		bool hit_right = tri->max_t[axis] >= split;
 
 		if (hit_left && hit_right) {
-			if (ufbxi_kd_check_point(nc, tri, index, point)) {
+			if (ufbxi_kd_check_point(nc, tri, index, &point)) {
 				return true;
 			}
 
@@ -26962,7 +26966,7 @@ ufbxi_noinline static bool ufbxi_kd_check_fast(ufbxi_ngon_context *nc, const ufb
 		if (hit_left && hit_right) {
 
 			// Check for the point on the split plane
-			ufbx_vec3 point = pos.values.data[pos.indices.data[nc->face.index_begin + node.index]];
+			const ufbx_vec3 *point = &pos.values.data[pos.indices.data[nc->face.index_begin + node.index]];
 			if (ufbxi_kd_check_point(nc, tri, node.index, point)) {
 				return true;
 			}
@@ -27097,11 +27101,11 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	// Collect all the reflex corners for intersection testing.
 	uint32_t num_kd_indices = 0;
 	{
-		ufbx_vec2 a = ufbxi_ngon_project(nc, pos.values.data[pos.indices.data[face.index_begin + face.num_indices - 1]]);
-		ufbx_vec2 b = ufbxi_ngon_project(nc, pos.values.data[pos.indices.data[face.index_begin + 0]]);
+		ufbx_vec2 a = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + face.num_indices - 1]]);
+		ufbx_vec2 b = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + 0]]);
 		for (uint32_t i = 0; i < face.num_indices; i++) {
 			uint32_t next = i + 1 < face.num_indices ? i + 1 : 0;
-			ufbx_vec2 c = ufbxi_ngon_project(nc, pos.values.data[pos.indices.data[face.index_begin + next]]);
+			ufbx_vec2 c = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + next]]);
 
 			if (ufbxi_orient2d(a, b, c) < 0.0f) {
 				kd_indices[num_kd_indices++] = i;
@@ -27141,9 +27145,9 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 		ufbxi_kd_triangle tri; // ufbxi_uninit
 
 		uint32_t ix = 1;
-		ufbx_vec2 a = ufbxi_ngon_project(nc, pos.values.data[pos.indices.data[face.index_begin + 0]]);
-		ufbx_vec2 b = ufbxi_ngon_project(nc, pos.values.data[pos.indices.data[face.index_begin + 1]]);
-		ufbx_vec2 c = ufbxi_ngon_project(nc, pos.values.data[pos.indices.data[face.index_begin + 2]]);
+		ufbx_vec2 a = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + 0]]);
+		ufbx_vec2 b = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + 1]]);
+		ufbx_vec2 c = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + 2]]);
 		bool prev_was_reflex = false;
 
 		uint32_t num_steps = 0;
@@ -27184,12 +27188,12 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 						ix = prev;
 						b = a;
 						uint32_t prev_prev = edges[prev*2 + 0];
-						a = ufbxi_ngon_project(nc, pos.values.data[pos.indices.data[face.index_begin + prev_prev]]);
+						a = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + prev_prev]]);
 					} else {
 						ix = next;
 						b = c;
 						uint32_t next_next = edges[next*2 + 1];
-						c = ufbxi_ngon_project(nc, pos.values.data[pos.indices.data[face.index_begin + next_next]]);
+						c = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + next_next]]);
 					}
 					continue;
 				}
@@ -27204,7 +27208,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 			a = b;
 			b = c;
 			next = edges[next*2 + 1];
-			c = ufbxi_ngon_project(nc, pos.values.data[pos.indices.data[face.index_begin + next]]);
+			c = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + next]]);
 			num_steps++;
 
 			// If we have walked around the entire polygon it is irregular and
@@ -31579,7 +31583,7 @@ ufbx_abi void *ufbx_thread_pool_get_user_ptr(ufbx_thread_pool_context ctx)
 	return pool->user_ptr;
 }
 
-ufbx_abi ufbx_real ufbx_catch_get_vertex_real(ufbx_panic *panic, const ufbx_vertex_real *v, size_t index)
+ufbx_abi ufbxi_noinline ufbx_real ufbx_catch_get_vertex_real(ufbx_panic *panic, const ufbx_vertex_real *v, size_t index)
 {
 	if (ufbxi_panicf(panic, index < v->indices.count, "index (%zu) out of range (%zu)", index, v->indices.count)) return 0.0f;
 	uint32_t ix = v->indices.data[index];
@@ -31587,7 +31591,7 @@ ufbx_abi ufbx_real ufbx_catch_get_vertex_real(ufbx_panic *panic, const ufbx_vert
 	return v->values.data[(int32_t)ix];
 }
 
-ufbx_abi ufbx_vec2 ufbx_catch_get_vertex_vec2(ufbx_panic *panic, const ufbx_vertex_vec2 *v, size_t index)
+ufbx_abi ufbxi_noinline ufbx_vec2 ufbx_catch_get_vertex_vec2(ufbx_panic *panic, const ufbx_vertex_vec2 *v, size_t index)
 {
 	if (ufbxi_panicf(panic, index < v->indices.count, "index (%zu) out of range (%zu)", index, v->indices.count)) return ufbx_zero_vec2;
 	uint32_t ix = v->indices.data[index];
@@ -31595,7 +31599,7 @@ ufbx_abi ufbx_vec2 ufbx_catch_get_vertex_vec2(ufbx_panic *panic, const ufbx_vert
 	return v->values.data[(int32_t)ix];
 }
 
-ufbx_abi ufbx_vec3 ufbx_catch_get_vertex_vec3(ufbx_panic *panic, const ufbx_vertex_vec3 *v, size_t index)
+ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_catch_get_vertex_vec3(ufbx_panic *panic, const ufbx_vertex_vec3 *v, size_t index)
 {
 	if (ufbxi_panicf(panic, index < v->indices.count, "index (%zu) out of range (%zu)", index, v->indices.count)) return ufbx_zero_vec3;
 	uint32_t ix = v->indices.data[index];
@@ -31603,7 +31607,7 @@ ufbx_abi ufbx_vec3 ufbx_catch_get_vertex_vec3(ufbx_panic *panic, const ufbx_vert
 	return v->values.data[(int32_t)ix];
 }
 
-ufbx_abi ufbx_vec4 ufbx_catch_get_vertex_vec4(ufbx_panic *panic, const ufbx_vertex_vec4 *v, size_t index)
+ufbx_abi ufbxi_noinline ufbx_vec4 ufbx_catch_get_vertex_vec4(ufbx_panic *panic, const ufbx_vertex_vec4 *v, size_t index)
 {
 	if (ufbxi_panicf(panic, index < v->indices.count, "index (%zu) out of range (%zu)", index, v->indices.count)) return ufbx_zero_vec4;
 	uint32_t ix = v->indices.data[index];
