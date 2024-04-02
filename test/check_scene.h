@@ -878,6 +878,12 @@ static void ufbxt_check_blend_channel(ufbx_scene *scene, ufbx_blend_channel *cha
 		ufbxt_check_element_ptr(scene, channel->keyframes.data[i].shape, UFBX_ELEMENT_BLEND_SHAPE);
 	}
 	ufbxt_check_element_ptr(scene, channel->target_shape, UFBX_ELEMENT_BLEND_SHAPE);
+
+	if (channel->keyframes.count > 0) {
+		ufbxt_assert(channel->target_shape == channel->keyframes.data[channel->keyframes.count - 1].shape);
+	} else {
+		ufbxt_assert(channel->target_shape == NULL);
+	}
 }
 
 static void ufbxt_check_blend_shape(ufbx_scene *scene, ufbx_blend_shape *shape)

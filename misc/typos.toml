@@ -12,3 +12,6 @@ PreferedAngleZ = "PreferedAngleZ"
 
 # Level of Detail
 lod = "lod"
+
+# False positive as 'was', used as identifier in ufbx.c
+ws = "ws"
