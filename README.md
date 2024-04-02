@@ -2,8 +2,6 @@
 
 Single source file FBX file loader.
 
-### [Documentation](https://ufbx.github.io/)
-
 ```cpp
 ufbx_load_opts opts = { 0 }; // Optional, pass NULL for defaults
 ufbx_error error; // Optional, pass NULL if you don't care about errors
@@ -28,6 +26,10 @@ for (size_t i = 0; i < scene->nodes.count; i++) {
 
 ufbx_free_scene(scene);
 ```
+
+## Documentation
+
+[Online documentation](https://ufbx.github.io/)
 
 ## Setup
 
