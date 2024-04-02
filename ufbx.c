@@ -441,6 +441,22 @@
 	#endif
 #endif
 
+#if !defined(UFBX_STANDARD_C) && (defined(_MSC_VER) && defined(_M_X64)) || ((defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)) || defined(UFBX_USE_SSE)
+	#define UFBXI_HAS_SSE 1
+	#include <xmmintrin.h>
+	#include <emmintrin.h>
+#else
+	#define UFBXI_HAS_SSE 0
+#endif
+
+#if !defined(UFBX_LITTLE_ENDIAN)
+	#if !defined(UFBX_STANDARD_C) && (defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__) || defined(__wasm__) || defined(__EMSCRIPTEN__))
+		#define UFBX_LITTLE_ENDIAN 1
+	#else
+		#define UFBX_LITTLE_ENDIAN 0
+	#endif
+#endif
+
 // Unaligned little-endian load functions
 // On platforms that support unaligned access natively (x86, x64, ARM64) just use normal loads,
 // with unaligned attributes, otherwise do manual byte-wise load.
@@ -557,24 +573,6 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
 
 ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEADER_VERSION/1000u);
-
-// -- Architecture
-
-#if !defined(UFBX_STANDARD_C) && (defined(_MSC_VER) && defined(_M_X64)) || ((defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)) || defined(UFBX_USE_SSE)
-	#define UFBXI_HAS_SSE 1
-	#include <xmmintrin.h>
-	#include <emmintrin.h>
-#else
-	#define UFBXI_HAS_SSE 0
-#endif
-
-#if !defined(UFBX_LITTLE_ENDIAN)
-	#if !defined(UFBX_STANDARD_C) && (defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__) || defined(__wasm__) || defined(__EMSCRIPTEN__))
-		#define UFBX_LITTLE_ENDIAN 1
-	#else
-		#define UFBX_LITTLE_ENDIAN 0
-	#endif
-#endif
 
 // -- Fast copy
 
