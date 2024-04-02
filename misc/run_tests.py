@@ -327,6 +327,8 @@ class GCCCompiler(Compiler):
                 if "clang" in self.name:
                     args += [
                         "-Wunreachable-code-break",
+                        "-Wmissing-variable-declarations",
+                        "-Wfloat-conversion",
                     ]
                     if self.version_tuple >= (8,0,0):
                         args += [
