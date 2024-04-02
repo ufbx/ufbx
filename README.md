@@ -2,6 +2,8 @@
 
 Single source file FBX file loader.
 
+### [Documentation](https://ufbx.github.io/)
+
 ```cpp
 ufbx_load_opts opts = { 0 }; // Optional, pass NULL for defaults
 ufbx_error error; // Optional, pass NULL if you don't care about errors
