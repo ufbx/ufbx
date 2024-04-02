@@ -553,11 +553,18 @@ def to_sbody(typ: AType):
     else:
         raise TypeError(f"Unhandled type {type(typ)}")
 
-def top_sdecls(top: ATop) -> List[SCommentDecl]:
+class TopState:
+    def __init__(self):
+        self.preproc_line = -1
+        self.preproc_start = -1
+
+def top_sdecls(top: ATop, state: TopState = None) -> List[SCommentDecl]:
+    if not state:
+        state = TopState()
     if isinstance(top, ATopFile):
         decls = []
         for t in top.tops:
-            decls += top_sdecls(t)
+            decls += top_sdecls(t, state)
         return decls
     elif isinstance(top, ATopTypedef):
         return [to_sdecl(top.decl, "typedef")]
@@ -588,10 +595,13 @@ def top_sdecls(top: ATop) -> List[SCommentDecl]:
             )]
         )]
     elif isinstance(top, ATopPreproc):
-        line = top.preproc.location.line
+        line = top.preproc.location.line - 1
         text = top.preproc.text()
         m = re.match(r"#\s*define\s+(\w+)(\([^\)]*\))?\s+(.*)", text)
         if m:
+            start_line = line
+            if line == state.preproc_line + 1:
+                start_line = state.preproc_start
             name = m.group(1)
             args = m.group(2)
             if args:
@@ -599,10 +609,13 @@ def top_sdecls(top: ATop) -> List[SCommentDecl]:
             else:
                 args = None
             value = m.group(3)
-            return [SDecl(line, line, "define", [SName(name, SType("define", "define"))],
+            return [SDecl(start_line, line, "define", [SName(name, SType("define", "define"))],
                 define_args=args,
                 value=value)]
         else:
+            if line != state.preproc_line + 1:
+                state.preproc_start = line
+            state.preproc_line = line
             return [] # TODO
     else:
         raise TypeError(f"Unhandled type {type(top)}")
