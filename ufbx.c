@@ -1158,7 +1158,7 @@ typedef enum {
 	UFBXI_PARSE_DOUBLE_VERIFY_LENGTH = 0x2,
 } ufbxi_parse_double_flag;
 
-static uint64_t ufbxi_pow5_tab[] = {
+static const uint64_t ufbxi_pow5_tab[] = {
 	UINT64_C(0x8000000000000000), // 5^0 * 2^63
 	UINT64_C(0xa000000000000000), // 5^1 * 2^61
 	UINT64_C(0xc800000000000000), // 5^2 * 2^59
@@ -1188,10 +1188,10 @@ static uint64_t ufbxi_pow5_tab[] = {
 	UINT64_C(0xa56fa5b99019a5c8), // 5^26 * 2^3
 	UINT64_C(0xcecb8f27f4200f3a), // 5^27 * 2^1
 };
-static int8_t ufbxi_pow2_tab[] = {
+static const int8_t ufbxi_pow2_tab[] = {
 	62, 59, 56, 53, 49, 46, 43, 39, 36, 33, 29, 26, 23, 19, 16, 13, 9, 6, 3, -1, -4, -7, -11, -14, -17, -21, -24, -27,
 };
-const double ufbxi_pow10_tab_f64[] = {
+static const double ufbxi_pow10_tab_f64[] = {
 	1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
 };
 
@@ -25629,7 +25629,7 @@ static ufbxi_noinline bool ufbxi_postprocess_step(ufbxi_bake_context *bc, double
 		epsilon = 1.0 + bc->opts.step_custom_epsilon;
 		break;
 	case UFBX_BAKE_STEP_HANDLING_IDENTICAL_TIME:
-		return time;
+		return true;
 	case UFBX_BAKE_STEP_HANDLING_ADJACENT_DOUBLE:
 		if (left) {
 			*p_time = time = ufbx_nextafter(time, -UFBX_INFINITY);
