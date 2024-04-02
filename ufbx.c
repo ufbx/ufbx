@@ -5388,8 +5388,6 @@ struct ufbxi_thread_pool {
 	ufbxi_task_group groups[UFBX_THREAD_GROUP_COUNT];
 	uint32_t group;
 
-	double accumulated_cost;
-
 	uint32_t num_tasks;
 	ufbxi_task_imp *tasks;
 };
@@ -5500,22 +5498,7 @@ ufbxi_nodiscard ufbxi_noinline static uint32_t ufbxi_thread_pool_available_tasks
 	return pool->num_tasks - (pool->start_index - pool->wait_index);
 }
 
-static void ufbxi_thread_pool_flush(ufbxi_thread_pool *pool)
-{
-	uint32_t start_index = pool->execute_index;
-	uint32_t count = pool->start_index - start_index;
-	if (count > 0) {
-#if 0
-		if (pool->opts.pool.run_fn) {
-			uint32_t ran_count = pool->opts.pool.run_fn(pool->opts.pool.user, (ufbx_thread_pool_context)pool, pool->group, start_index, count);
-			pool->execute_index = start_index + ran_count;
-		}
-#endif
-	}
-	pool->accumulated_cost = 0.0;
-}
-
-static void ufbxi_thread_pool_flush_group(ufbxi_thread_pool *pool)
+ufbxi_noinline static void ufbxi_thread_pool_flush_group(ufbxi_thread_pool *pool)
 {
 	uint32_t group = pool->group;
 	uint32_t start_index = pool->execute_index;
@@ -5527,7 +5510,6 @@ static void ufbxi_thread_pool_flush_group(ufbxi_thread_pool *pool)
 		pool->groups[group].max_index = start_index + count;
 		pool->execute_index = start_index + count;
 	}
-	pool->accumulated_cost = 0.0;
 	pool->group = (group + 1) % UFBX_THREAD_GROUP_COUNT;
 }
 
@@ -5554,17 +5536,12 @@ ufbxi_nodiscard ufbxi_noinline static ufbxi_task *ufbxi_thread_pool_create_task(
 	return &imp->task;
 }
 
-static void ufbxi_thread_pool_run_task(ufbxi_thread_pool *pool, ufbxi_task *task, double cost)
+static void ufbxi_thread_pool_run_task(ufbxi_thread_pool *pool, ufbxi_task *task)
 {
 	(void)task;
 	uint32_t index = pool->start_index;
 	ufbx_assert(task == &pool->tasks[index % pool->num_tasks].task);
 	pool->start_index = index + 1;
-	pool->accumulated_cost += cost;
-
-	if (pool->accumulated_cost >= 256*1024) {
-		ufbxi_thread_pool_flush(pool);
-	}
 }
 
 // -- Type definitions
@@ -8384,7 +8361,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 					}
 
 					task->data = t;
-					ufbxi_thread_pool_run_task(&uc->thread_pool, task, (double)encoded_size);
+					ufbxi_thread_pool_run_task(&uc->thread_pool, task);
 					deferred = true;
 				}
 			}
@@ -9837,7 +9814,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 				if (task) {
 					task->data = ufbxi_push_copy(tmp_buf, ufbxi_ascii_array_task, 1, &t);
 					ufbxi_check(task->data);
-					ufbxi_thread_pool_run_task(&uc->thread_pool, task, deferred_size * 10.0);
+					ufbxi_thread_pool_run_task(&uc->thread_pool, task);
 				} else {
 					ufbxi_check_msg(ufbxi_ascii_array_task_imp(&t), "Threaded ASCII parse error");
 				}
@@ -14222,8 +14199,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_objects_threaded(ufbxi_cont
 				uc->p_element_id = NULL;
 			}
 			batch->num_nodes = 0;
-
-			ufbxi_thread_pool_flush(&uc->thread_pool);
 		}
 
 		ufbxi_buf *tmp_buf = &uc->tmp_thread_parse[batch_index];
