@@ -3563,6 +3563,18 @@ ufbxi_nodiscard static ufbxi_noinline void *ufbxi_push_size_copy(ufbxi_buf *b, s
 	return ptr;
 }
 
+ufbxi_nodiscard static ufbxi_forceinline void *ufbxi_push_size_copy_fast(ufbxi_buf *b, size_t size, size_t n, const void *data)
+{
+	// Always succeed with an empty non-NULL buffer for empty allocations, even if `data == NULL`
+	ufbx_assert(size > 0);
+	if (n == 0) return (void*)ufbxi_zero_size_buffer;
+
+	ufbx_assert(data);
+	void *ptr = ufbxi_push_size_fast(b, size, n);
+	if (ptr) memcpy(ptr, data, size * n);
+	return ptr;
+}
+
 static ufbxi_noinline void ufbxi_buf_free_unused(ufbxi_buf *b)
 {
 	ufbx_assert(!b->unordered);
@@ -3774,6 +3786,7 @@ static ufbxi_noinline void ufbxi_buf_clear(ufbxi_buf *buf)
 #define ufbxi_push(b, type, n) ufbxi_maybe_null((type*)ufbxi_push_size((b), sizeof(type), (n)))
 #define ufbxi_push_zero(b, type, n) ufbxi_maybe_null((type*)ufbxi_push_size_zero((b), sizeof(type), (n)))
 #define ufbxi_push_copy(b, type, n, data) ufbxi_maybe_null((type*)ufbxi_push_size_copy((b), sizeof(type), (n), (data)))
+#define ufbxi_push_copy_fast(b, type, n, data) ufbxi_maybe_null((type*)ufbxi_push_size_copy_fast((b), sizeof(type), (n), (data)))
 #define ufbxi_push_fast(b, type, n) ufbxi_maybe_null((type*)ufbxi_push_size_fast((b), sizeof(type), (n)))
 #define ufbxi_pop(b, type, n, dst) ufbxi_pop_size((b), sizeof(type), (n), (dst), false)
 #define ufbxi_peek(b, type, n, dst) ufbxi_pop_size((b), sizeof(type), (n), (dst), true)
@@ -11497,9 +11510,9 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_element_size(ufbx
 	uint32_t typed_id = (uint32_t)uc->tmp_typed_element_offsets[type].num_items;
 	uint32_t element_id = uc->num_elements++;
 
-	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_typed_element_offsets[type], size_t, 1, &uc->tmp_element_byte_offset), NULL);
-	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_element_offsets, size_t, 1, &uc->tmp_element_byte_offset), NULL);
-	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_element_fbx_ids, uint64_t, 1, &info->fbx_id), NULL);
+	ufbxi_check_return(ufbxi_push_copy_fast(&uc->tmp_typed_element_offsets[type], size_t, 1, &uc->tmp_element_byte_offset), NULL);
+	ufbxi_check_return(ufbxi_push_copy_fast(&uc->tmp_element_offsets, size_t, 1, &uc->tmp_element_byte_offset), NULL);
+	ufbxi_check_return(ufbxi_push_copy_fast(&uc->tmp_element_fbx_ids, uint64_t, 1, &info->fbx_id), NULL);
 	uc->tmp_element_byte_offset += aligned_size;
 
 	ufbx_element *elem = (ufbx_element*)ufbxi_push_zero(&uc->tmp_elements, uint64_t, aligned_size/8);
@@ -11515,7 +11528,7 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_element_size(ufbx
 		*uc->p_element_id = element_id;
 	}
 
-	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_element_ptrs, ufbx_element*, 1, &elem), NULL);
+	ufbxi_check_return(ufbxi_push_copy_fast(&uc->tmp_element_ptrs, ufbx_element*, 1, &elem), NULL);
 
 	ufbxi_check_return(ufbxi_insert_fbx_id(uc, info->fbx_id, element_id), NULL);
 
@@ -11529,8 +11542,8 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 	uint32_t typed_id = (uint32_t)uc->tmp_typed_element_offsets[type].num_items;
 	uint32_t element_id = uc->num_elements++;
 
-	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_typed_element_offsets[type], size_t, 1, &uc->tmp_element_byte_offset), NULL);
-	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_element_offsets, size_t, 1, &uc->tmp_element_byte_offset), NULL);
+	ufbxi_check_return(ufbxi_push_copy_fast(&uc->tmp_typed_element_offsets[type], size_t, 1, &uc->tmp_element_byte_offset), NULL);
+	ufbxi_check_return(ufbxi_push_copy_fast(&uc->tmp_element_offsets, size_t, 1, &uc->tmp_element_byte_offset), NULL);
 	uc->tmp_element_byte_offset += aligned_size;
 
 	ufbx_element *elem = (ufbx_element*)ufbxi_push_zero(&uc->tmp_elements, uint64_t, aligned_size/8);
@@ -11544,12 +11557,12 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 		elem->name.length = strlen(name);
 	}
 
-	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_element_ptrs, ufbx_element*, 1, &elem), NULL);
+	ufbxi_check_return(ufbxi_push_copy_fast(&uc->tmp_element_ptrs, ufbx_element*, 1, &elem), NULL);
 
 	uint64_t fbx_id = ufbxi_synthetic_id_from_pointer(elem);
 	*p_fbx_id = fbx_id;
 
-	ufbxi_check_return(ufbxi_push_copy(&uc->tmp_element_fbx_ids, uint64_t, 1, &fbx_id), NULL);
+	ufbxi_check_return(ufbxi_push_copy_fast(&uc->tmp_element_fbx_ids, uint64_t, 1, &fbx_id), NULL);
 	ufbxi_check_return(ufbxi_insert_fbx_id(uc, fbx_id, element_id), NULL);
 
 	return elem;
