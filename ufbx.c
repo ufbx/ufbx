@@ -24717,6 +24717,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_translate_element_list(ufbxi_eva
 	return 1;
 }
 
+static ufbxi_noinline void ufbxi_translate_maps(ufbxi_eval_context *ec, ufbx_material_map *maps, size_t count)
+{
+	ufbxi_nounroll ufbxi_for(ufbx_material_map, map, maps, count) {
+		map->texture = (ufbx_texture*)ufbxi_translate_element(ec, map->texture);
+	}
+}
+
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_translate_anim(ufbxi_eval_context *ec, ufbx_anim **p_anim)
 {
 	ufbx_anim *anim = ufbxi_push_copy(&ec->result, ufbx_anim, 1, *p_anim);
@@ -24869,14 +24876,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 		ufbx_material *material = *p_material;
 
 		material->shader = (ufbx_shader*)ufbxi_translate_element(ec, material->shader);
-		for (size_t i = 0; i < UFBX_MATERIAL_FBX_MAP_COUNT; i++) {
-			ufbx_material_map *map = &material->fbx.maps[i];
-			map->texture = (ufbx_texture*)ufbxi_translate_element(ec, map->texture);
-		}
-		for (size_t i = 0; i < UFBX_MATERIAL_PBR_MAP_COUNT; i++) {
-			ufbx_material_map *map = &material->pbr.maps[i];
-			map->texture = (ufbx_texture*)ufbxi_translate_element(ec, map->texture);
-		}
+		ufbxi_translate_maps(ec, material->fbx.maps, UFBX_MATERIAL_FBX_MAP_COUNT);
+		ufbxi_translate_maps(ec, material->pbr.maps, UFBX_MATERIAL_PBR_MAP_COUNT);
 
 		ufbx_material_texture *textures = ufbxi_push(&ec->result, ufbx_material_texture, material->textures.count);
 		ufbxi_check_err(&ec->error, textures);
