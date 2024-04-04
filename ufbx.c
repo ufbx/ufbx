@@ -31370,22 +31370,14 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 			}
 
 			if (dst) {
-				ufbx_real weight = opts.weight;
-				if (opts.additive && opts.use_weight) {
-					for (size_t i = 0; i < num_read; i++) {
+				ufbx_real weight = opts.use_weight ? opts.weight : 1.0f;
+				if (opts.additive) {
+					ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
 						dst[i] += (ufbx_real)buffer[i] * weight;
 					}
-				} else if (opts.additive) {
-					for (size_t i = 0; i < num_read; i++) {
-						dst[i] += (ufbx_real)buffer[i];
-					}
-				} else if (opts.use_weight) {
-					for (size_t i = 0; i < num_read; i++) {
-						dst[i] = (ufbx_real)buffer[i] * weight;
-					}
 				} else {
-					for (size_t i = 0; i < num_read; i++) {
-						dst[i] = (ufbx_real)buffer[i];
+					ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
+						dst[i] = (ufbx_real)buffer[i] * weight;
 					}
 				}
 				dst += num_read;
@@ -31427,22 +31419,14 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 			}
 
 			if (dst) {
-				ufbx_real weight = opts.weight;
-				if (opts.additive && opts.use_weight) {
-					for (size_t i = 0; i < num_read; i++) {
+				ufbx_real weight = opts.use_weight ? opts.weight : 1.0f;
+				if (opts.additive) {
+					ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
 						dst[i] += (ufbx_real)buffer[i] * weight;
 					}
-				} else if (opts.additive) {
-					for (size_t i = 0; i < num_read; i++) {
-						dst[i] += (ufbx_real)buffer[i];
-					}
-				} else if (opts.use_weight) {
-					for (size_t i = 0; i < num_read; i++) {
-						dst[i] = (ufbx_real)buffer[i] * weight;
-					}
 				} else {
-					for (size_t i = 0; i < num_read; i++) {
-						dst[i] = (ufbx_real)buffer[i];
+					ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
+						dst[i] = (ufbx_real)buffer[i] * weight;
 					}
 				}
 				dst += num_read;
