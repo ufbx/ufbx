@@ -1201,8 +1201,8 @@ static ufbxi_noinline uint32_t ufbxi_parse_double_init_flags()
 	// and rounding to nearest, which we can check for with `1 + eps == 1 - eps`.
 	#if defined(FLT_EVAL_METHOD)
 		#if FLT_EVAL_METHOD == 0 || FLT_EVAL_METHOD == 1
-			static volatile double eps = 2.2250738585072014e-308;
-			if (1.0 + eps == 1.0 - eps) return UFBXI_PARSE_DOUBLE_ALLOW_FAST_PATH;
+			static volatile double ufbxi_volatile_eps = 2.2250738585072014e-308;
+			if (1.0 + ufbxi_volatile_eps == 1.0 - ufbxi_volatile_eps) return UFBXI_PARSE_DOUBLE_ALLOW_FAST_PATH;
 		#endif
 	#endif
 
