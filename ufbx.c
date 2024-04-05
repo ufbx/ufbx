@@ -43,6 +43,7 @@
 #define UFBXI_FACE_GROUP_HASH_BITS 8
 #define UFBXI_MIN_THREADED_DEFLATE_BYTES 256
 #define UFBXI_MIN_THREADED_ASCII_VALUES 64
+#define UFBXI_GEOMETRY_CACHE_BUFFER_SIZE 512
 
 #ifndef UFBXI_MAX_NURBS_ORDER
 #define UFBXI_MAX_NURBS_ORDER 128
@@ -31252,6 +31253,14 @@ ufbx_abi void ufbx_retain_geometry_cache(ufbx_geometry_cache *cache)
 	ufbxi_retain_ref(&imp->refcount);
 }
 
+typedef struct {
+	union {
+		double f64[UFBXI_GEOMETRY_CACHE_BUFFER_SIZE];
+		float f32[UFBXI_GEOMETRY_CACHE_BUFFER_SIZE];
+	} src;
+	ufbx_real dst[UFBXI_GEOMETRY_CACHE_BUFFER_SIZE];
+} ufbxi_geometry_cache_buffer;
+
 ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *frame, ufbx_real *data, size_t count, const ufbx_geometry_cache_data_opts *user_opts)
 {
 #if UFBXI_FEATURE_GEOMETRY_CACHE
@@ -31340,106 +31349,74 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 
 	ufbx_real *dst = data;
 	size_t mirror_ix = (size_t)frame->mirror_axis - 1;
-	if (use_double) {
-		double buffer[512]; // ufbxi_uninit
-		while (src_count > 0) {
-			size_t to_read = ufbxi_min_sz(src_count, ufbxi_arraycount(buffer));
-			src_count -= to_read;
-			size_t bytes_read = stream.read_fn(stream.user, buffer, to_read * sizeof(double));
+	ufbxi_geometry_cache_buffer buffer; // ufbxi_uninit
+	while (src_count > 0) {
+		size_t to_read = ufbxi_min_sz(src_count, UFBXI_GEOMETRY_CACHE_BUFFER_SIZE);
+		src_count -= to_read;
+		size_t num_read = 0;
+		if (use_double) {
+			size_t bytes_read = stream.read_fn(stream.user, buffer.src.f64, to_read * sizeof(double));
 			if (bytes_read == SIZE_MAX) bytes_read = 0;
-			size_t num_read = bytes_read / sizeof(double);
-
+			num_read = bytes_read / sizeof(double);
 			if (src_big_endian != dst_big_endian) {
 				for (size_t i = 0; i < num_read; i++) {
-					char t, *v = (char*)&buffer[i];
+					char t, *v = (char*)&buffer.src.f64[i];
 					t = v[0]; v[0] = v[7]; v[7] = t;
 					t = v[1]; v[1] = v[6]; v[6] = t;
 					t = v[2]; v[2] = v[5]; v[5] = t;
 					t = v[3]; v[3] = v[4]; v[4] = t;
 				}
 			}
-
-			if (!opts.ignore_transform) {
-				double scale = frame->scale_factor;
-				if (scale != 1.0f) {
-					for (size_t i = 0; i < num_read; i++) {
-						buffer[i] *= scale;
-					}
-				}
-				if (frame->mirror_axis) {
-					while (mirror_ix < num_read) {
-						buffer[mirror_ix] = -buffer[mirror_ix];
-						mirror_ix += 3;
-					}
-					mirror_ix -= num_read;
-				}
+			ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
+				buffer.dst[i] = buffer.src.f64[i];
 			}
-
-			if (dst) {
-				ufbx_real weight = opts.use_weight ? opts.weight : 1.0f;
-				if (opts.additive) {
-					ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
-						dst[i] += (ufbx_real)buffer[i] * weight;
-					}
-				} else {
-					ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
-						dst[i] = (ufbx_real)buffer[i] * weight;
-					}
-				}
-				dst += num_read;
-			}
-
-			if (num_read != to_read) break;
-		}
-	} else {
-		float buffer[1024]; // ufbxi_uninit
-		while (src_count > 0) {
-			size_t to_read = ufbxi_min_sz(src_count, ufbxi_arraycount(buffer));
-			src_count -= to_read;
-			size_t bytes_read = stream.read_fn(stream.user, buffer, to_read * sizeof(float));
+		} else {
+			size_t bytes_read = stream.read_fn(stream.user, buffer.src.f32, to_read * sizeof(float));
 			if (bytes_read == SIZE_MAX) bytes_read = 0;
-			size_t num_read = bytes_read / sizeof(float);
-
+			num_read = bytes_read / sizeof(float);
 			if (src_big_endian != dst_big_endian) {
 				for (size_t i = 0; i < num_read; i++) {
-					char t, *v = (char*)&buffer[i];
+					char t, *v = (char*)&buffer.src.f32[i];
 					t = v[0]; v[0] = v[3]; v[3] = t;
 					t = v[1]; v[1] = v[2]; v[2] = t;
 				}
 			}
-
-			if (!opts.ignore_transform) {
-				float scale = (float)frame->scale_factor;
-				if (scale != 1.0f) {
-					for (size_t i = 0; i < num_read; i++) {
-						buffer[i] *= scale;
-					}
-				}
-				if (frame->mirror_axis) {
-					while (mirror_ix < num_read) {
-						buffer[mirror_ix] = -buffer[mirror_ix];
-						mirror_ix += 3;
-					}
-					mirror_ix -= num_read;
-				}
+			ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
+				buffer.dst[i] = buffer.src.f32[i];
 			}
-
-			if (dst) {
-				ufbx_real weight = opts.use_weight ? opts.weight : 1.0f;
-				if (opts.additive) {
-					ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
-						dst[i] += (ufbx_real)buffer[i] * weight;
-					}
-				} else {
-					ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
-						dst[i] = (ufbx_real)buffer[i] * weight;
-					}
-				}
-				dst += num_read;
-			}
-
-			if (num_read != to_read) break;
 		}
+
+		if (!opts.ignore_transform) {
+			ufbx_real scale = frame->scale_factor;
+			if (scale != 1.0f) {
+				for (size_t i = 0; i < num_read; i++) {
+					buffer.dst[i] *= scale;
+				}
+			}
+			if (frame->mirror_axis) {
+				while (mirror_ix < num_read) {
+					buffer.dst[mirror_ix] = -buffer.dst[mirror_ix];
+					mirror_ix += 3;
+				}
+				mirror_ix -= num_read;
+			}
+		}
+
+		if (dst) {
+			ufbx_real weight = opts.use_weight ? opts.weight : 1.0f;
+			if (opts.additive) {
+				ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
+					dst[i] += buffer.dst[i] * weight;
+				}
+			} else {
+				ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
+					dst[i] = buffer.dst[i] * weight;
+				}
+			}
+			dst += num_read;
+		}
+
+		if (num_read != to_read) break;
 	}
 
 	if (stream.close_fn) {
