@@ -238,6 +238,18 @@ jobs:
       - name: Analyze GCC release stack
         if: ${{ always() && !cancelled() }}
         run: python3 misc/analyze_stack.py build/ufbx-gcc-release.su --limit 0x20000 --cache build/ufbx-cache.pickle
+      - name: Analyze symbols (linked)
+        if: ${{ always() && !cancelled() }}
+        run: |
+          clang -c ufbx.c -o build/ufbx-linked.o
+          objdump -d build/ufbx-linked.o > build/ufbx-linked.syms
+          python3 misc/analyze_symbols.py build/ufbx-linked.syms
+      - name: Analyze symbols (static)
+        if: ${{ always() && !cancelled() }}
+        run: |
+          clang -DUFBX_STATIC -c ufbx.c -o build/ufbx-static.o
+          objdump -d build/ufbx-static.o > build/ufbx-static.syms
+          python3 misc/analyze_symbols.py build/ufbx-static.syms --all-local
 
   ci_compat:
     runs-on: ubuntu-latest
