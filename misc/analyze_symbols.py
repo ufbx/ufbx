@@ -1,6 +1,6 @@
 import argparse
 import re
-from typing import NamedTuple, List
+from typing import NamedTuple, List, Optional
 
 class Symbol(NamedTuple):
     address: int
@@ -26,10 +26,17 @@ def parse_symbols(f):
 
 errors = []
 
-def error(symbol: Symbol, message: str):
-    errors.append((symbol, message))
+def error(symbol: Optional[Symbol], message: str):
+    if symbol:
+        name = symbol.name
+    else:
+        name = ""
+    errors.append((name, message))
 
 def check_symbols(symbols: List[Symbol], argv):
+    if len(symbols) < 64:
+        error(None, "less than 64 symbols, bad objdump syntax?")
+
     for s in symbols:
         if s.name.startswith("."):
             continue
@@ -59,8 +66,8 @@ if __name__ == "__main__":
     check_symbols(symbols, argv)
 
     if errors:
-        name_width = max(len(e[0].name) for e in errors)
-        for symbol, message in errors:
-            print(f"{symbol.name:<{name_width}}  {message}")
+        name_width = max(len(e[0]) for e in errors)
+        for name, message in errors:
+            print(f"{name:<{name_width}}  {message}")
         if errors:
             exit(1)
