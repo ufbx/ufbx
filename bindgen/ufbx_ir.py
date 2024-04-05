@@ -1065,7 +1065,7 @@ if __name__ == "__main__":
     file.functions["ufbx_retain_baked_anim"].kind = "retain"
 
     file.functions["ufbx_triangulate_face"].return_array_scale = 3
-    file.functions["ufbx_ffi_triangulate_face"].return_array_scale = 3
+    # file.functions["ufbx_ffi_triangulate_face"].return_array_scale = 3
     file.functions["ufbx_read_geometry_cache_real"].return_array_scale = 1
     file.functions["ufbx_sample_geometry_cache_real"].return_array_scale = 1
     file.functions["ufbx_read_geometry_cache_vec3"].return_array_scale = 1
