@@ -247,7 +247,7 @@ jobs:
       - name: Analyze symbols (static)
         if: ${{ always() && !cancelled() }}
         run: |
-          clang -DUFBX_STATIC -c ufbx.c -o build/ufbx-static.o
+          gcc -DUFBX_STATIC -c ufbx.c -o build/ufbx-static.o
           objdump -t build/ufbx-static.o > build/ufbx-static.syms
           python3 misc/analyze_symbols.py build/ufbx-static.syms --all-local
 
