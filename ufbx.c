@@ -4997,7 +4997,7 @@ static const char ufbxi_d_X[] = "d|X";
 static const char ufbxi_d_Y[] = "d|Y";
 static const char ufbxi_d_Z[] = "d|Z";
 
-static ufbx_string ufbxi_strings[] = {
+static const ufbx_string ufbxi_strings[] = {
 	{ ufbxi_AllSame, 7 },
 	{ ufbxi_Alphas, 6 },
 	{ ufbxi_AmbientColor, 12 },
@@ -10589,7 +10589,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_strings(ufbxi_context *uc)
 
 	// Push all the global 'ufbxi_*' strings into the pool without copying them
 	// This allows us to compare name pointers to the global values
-	ufbxi_for(ufbx_string, str, ufbxi_strings, ufbxi_arraycount(ufbxi_strings)) {
+	ufbxi_for(const ufbx_string, str, ufbxi_strings, ufbxi_arraycount(ufbxi_strings)) {
 #if defined(UFBX_REGRESSION)
 		ufbx_assert(strlen(str->data) == str->length);
 		ufbx_assert(ufbxi_str_less(reg_prev, *str));
@@ -10804,7 +10804,7 @@ static ufbxi_forceinline bool ufbxi_name_key_less(ufbx_prop *prop, const char *d
 	return prop_len < name_len;
 }
 
-static const char *ufbxi_node_prop_names[] = {
+static const char *const ufbxi_node_prop_names[] = {
 	"AxisLen",
 	"DefaultAttributeIndex",
 	"Freeze",
@@ -10882,8 +10882,8 @@ static const char *ufbxi_node_prop_names[] = {
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_init_node_prop_names(ufbxi_context *uc)
 {
 	ufbxi_check(ufbxi_map_grow(&uc->node_prop_set, const char*, ufbxi_arraycount(ufbxi_node_prop_names)));
-	ufbxi_for_ptr(const char, p_name, ufbxi_node_prop_names, ufbxi_arraycount(ufbxi_node_prop_names)) {
-		const char *name = *p_name;
+	for (size_t i = 0; i < ufbxi_arraycount(ufbxi_node_prop_names); i++) {
+		const char *name = ufbxi_node_prop_names[i];
 		const char *pooled = ufbxi_push_string_imp(&uc->string_pool, name, strlen(name), NULL, false, true);
 		ufbxi_check(pooled);
 		uint32_t hash = ufbxi_hash_ptr(pooled);
@@ -19402,11 +19402,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_shader_texture(ufbxi_co
 
 	shader->type = type;
 
-	static const char *name_props[] = {
+	static const char *const name_props[] = {
 		"3dsMax|params|OSLShaderName",
 	};
 
-	static const char *source_props[] = {
+	static const char *const source_props[] = {
 		"3dsMax|params|OSLCode",
 	};
 
@@ -27618,7 +27618,7 @@ static int ufbxi_subdivide_sum_vertex_weights(void *user, void *output, const uf
 	return 1;
 }
 
-static ufbxi_subdivide_sum_fn *ufbxi_real_sum_fns[] = {
+static ufbxi_subdivide_sum_fn *const ufbxi_real_sum_fns[] = {
 	&ufbxi_subdivide_sum_real,
 	&ufbxi_subdivide_sum_vec2,
 	&ufbxi_subdivide_sum_vec3,
