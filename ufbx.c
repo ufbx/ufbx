@@ -27506,20 +27506,6 @@ typedef struct {
 
 } ufbxi_subdivide_context;
 
-static int ufbxi_subdivide_sum_real(void *user, void *output, const ufbxi_subdivide_input *inputs, size_t num_inputs)
-{
-	(void)user;
-	ufbx_real dst = 0.0f;
-	ufbxi_nounroll for (size_t i = 0; i != num_inputs; i++) {
-		ufbx_real src = *(const ufbx_real*)inputs[i].data;
-		ufbx_real weight = inputs[i].weight;
-		dst += src * weight;
-	}
-	*(ufbx_real*)output = dst;
-
-	return 1;
-}
-
 static int ufbxi_subdivide_sum_vec2(void *user, void *output, const ufbxi_subdivide_input *inputs, size_t num_inputs)
 {
 	(void)user;
@@ -27636,7 +27622,7 @@ static int ufbxi_subdivide_sum_vertex_weights(void *user, void *output, const uf
 }
 
 static ufbxi_subdivide_sum_fn *const ufbxi_real_sum_fns[] = {
-	&ufbxi_subdivide_sum_real,
+	NULL,
 	&ufbxi_subdivide_sum_vec2,
 	&ufbxi_subdivide_sum_vec3,
 	&ufbxi_subdivide_sum_vec4,
@@ -28096,7 +28082,7 @@ static ufbxi_noinline int ufbxi_subdivide_attrib(ufbxi_subdivide_context *sc, uf
 {
 	if (!attrib->exists) return 1;
 
-	ufbx_assert(attrib->value_reals >= 1 && attrib->value_reals <= 4);
+	ufbx_assert(attrib->value_reals >= 2 && attrib->value_reals <= 4);
 
 	ufbxi_subdivide_layer_input input; // ufbxi_uninit
 	input.sum_fn = ufbxi_real_sum_fns[attrib->value_reals - 1];
