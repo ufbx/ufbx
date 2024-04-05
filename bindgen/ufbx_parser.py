@@ -16,7 +16,7 @@ TNumber = lexer.rule("number", r"(0[Xx][0-9A-Fa-f]+)|([0-9]+)", prefix=string.di
 TComment = lexer.rule("comment", r"//[^\r\n]*", prefix="/")
 TPreproc = lexer.rule("preproc", r"#[^\n\\]*(\\\r?\n[^\n\\]*?)*\n", prefix="#")
 TString = lexer.rule("string", r"\"[^\"]*\"", prefix="\"")
-lexer.literals(*"const typedef struct union enum extern ufbx_abi ufbx_inline ufbx_nullable ufbx_unsafe UFBX_LIST_TYPE UFBX_ENUM_REPR UFBX_FLAG_REPR UFBX_ENUM_FORCE_WIDTH UFBX_FLAG_FORCE_WIDTH UFBX_ENUM_TYPE".split())
+lexer.literals(*"const typedef struct union enum extern ufbx_abi ufbx_abi_data ufbx_abi_data_def ufbx_inline ufbx_nullable ufbx_unsafe UFBX_LIST_TYPE UFBX_ENUM_REPR UFBX_FLAG_REPR UFBX_ENUM_FORCE_WIDTH UFBX_FLAG_FORCE_WIDTH UFBX_ENUM_TYPE".split())
 lexer.literals(*",.*[]{}()<>=-;")
 lexer.ignore("disable", re.compile(r"//\s*bindgen-disable.*?//\s*bindgen-enable", flags=re.DOTALL))
 
@@ -202,7 +202,7 @@ class Parser(parsette.Parser):
         if self.accept("const"):
             inner = self.parse_type()
             return ATypeConst(inner)
-        elif self.accept(["ufbx_nullable", "ufbx_abi", "ufbx_unsafe", "ufbx_inline"]):
+        elif self.accept(["ufbx_nullable", "ufbx_abi", "ufbx_abi_data", "ufbx_unsafe", "ufbx_inline"]):
             inner = self.parse_type()
             return ATypeSpec(inner, token)
         elif self.accept(["struct", "union"]):
@@ -346,6 +346,7 @@ class SModConst(SMod): pass
 class SModNullable(SMod): pass
 class SModInline(SMod): pass
 class SModAbi(SMod): pass
+class SModAbiData(SMod): pass
 class SModUnsafe(SMod): pass
 class SModPointer(SMod): pass
 class SModArray(SMod):
@@ -425,6 +426,7 @@ def type_line(typ: AType):
 
 spec_to_mod = {
     "ufbx_abi": SModAbi,
+    "ufbx_abi_data": SModAbiData,
     "ufbx_nullable": SModNullable,
     "ufbx_inline": SModInline,
     "ufbx_unsafe": SModUnsafe,
@@ -692,6 +694,8 @@ def format_mod(mod: SMod):
         return { "type": "inline" }
     elif isinstance(mod, SModAbi):
         return { "type": "abi" }
+    elif isinstance(mod, SModAbiData):
+        return { "type": "abi_data" }
     elif isinstance(mod, SModPointer):
         return { "type": "pointer" }
     elif isinstance(mod, SModUnsafe):
