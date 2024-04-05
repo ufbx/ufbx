@@ -27597,8 +27597,8 @@ static int ufbxi_subdivide_sum_vertex_weights(void *user, void *output, const uf
 
 	qsort(tmp_weights, num_weights, sizeof(ufbx_subdivision_weight), ufbxi_cmp_subdivision_weight);
 
-	if (num_weights > sc->max_vertex_weights) {
-		num_weights = sc->max_vertex_weights;
+	if (sc->max_vertex_weights != SIZE_MAX) {
+		num_weights = ufbxi_min_sz(sc->max_vertex_weights, num_weights);
 
 		// Normalize weights
 		ufbx_real prefix_weight = 0.0f;

@@ -1015,8 +1015,10 @@ static void ufbxt_assert_close_quat_threshold(ufbxt_diff_error *p_err, ufbx_quat
 	ufbxt_assert_close_real_threshold(p_err, a.w, b.w, threshold);
 }
 
-static ufbxt_noinline void ufbxt_check_source_vertices(ufbx_mesh *mesh, ufbx_mesh *src_mesh, ufbxt_diff_error *p_err)
+static ufbxt_noinline void ufbxt_check_source_vertices(ufbx_mesh *mesh, ufbx_mesh *src_mesh, ufbxt_diff_error *p_err, ufbx_real threshold)
 {
+	if (threshold == 0.0) threshold = 0.001;
+
 	ufbx_subdivision_result *sub = mesh->subdivision_result;
 	ufbxt_assert(sub);
 
@@ -1035,7 +1037,7 @@ static ufbxt_noinline void ufbxt_check_source_vertices(ufbx_mesh *mesh, ufbx_mes
 		}
 
 		ufbx_vec3 ref = mesh->vertices.data[vi];
-		ufbxt_assert_close_vec3(p_err, ref, sum);
+		ufbxt_assert_close_vec3_threshold(p_err, ref, sum, threshold);
 		ref = ref;
 	}
 }
@@ -1488,7 +1490,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			// Check that we didn't break the original mesh
 			ufbxt_check_mesh(scene, mesh);
 
-			ufbxt_check_source_vertices(sub_mesh, mesh, p_err);
+			ufbxt_check_source_vertices(sub_mesh, mesh, p_err, 0.0);
 
 			ufbxt_check_mesh(scene, sub_mesh);
 			ufbxt_match_obj_mesh(obj, node, sub_mesh, obj_mesh, p_err, (ufbx_real)scale);
