@@ -28583,14 +28583,17 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivi
 	ufbxi_buf_free(&sc->tmp);
 
 	ufbx_mesh *mesh = &sc->dst_mesh;
-	memset(&mesh->vertex_normal, 0, sizeof(mesh->vertex_normal));
-	memset(&mesh->skinned_normal, 0, sizeof(mesh->skinned_normal));
 
 	// Subdivision always results in a mesh that consists only of quads
 	mesh->max_face_triangles = 2;
 	mesh->num_empty_faces = 0;
 	mesh->num_point_faces = 0;
 	mesh->num_line_faces = 0;
+
+	if (!sc->opts.interpolate_normals) {
+		memset(&mesh->vertex_normal, 0, sizeof(mesh->vertex_normal));
+		memset(&mesh->skinned_normal, 0, sizeof(mesh->skinned_normal));
+	}
 
 	if (!sc->opts.interpolate_normals && !sc->opts.ignore_normals) {
 

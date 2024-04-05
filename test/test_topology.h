@@ -720,3 +720,94 @@ UFBXT_FILE_TEST_ALT(generate_indices_huge_streams, blender_293_half_smooth_cube)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST_ALT(subsurf_interpolate, maya_cube)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->vertex_tangent.exists);
+
+	ufbx_subdivide_opts opts = { 0 };
+	opts.interpolate_normals = true;
+	opts.interpolate_tangents = true;
+	ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 1, &opts, NULL);
+	ufbxt_assert(sub_mesh);
+	ufbx_retain_mesh(sub_mesh);
+
+	ufbxt_assert(sub_mesh->faces.count == mesh->faces.count * 4);
+	for (size_t src_face_ix = 0; src_face_ix < mesh->faces.count; src_face_ix++) {
+		ufbx_face src_face = mesh->faces.data[src_face_ix];
+
+		ufbx_vec3 normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, src_face.index_begin);
+		ufbx_vec3 tangent = ufbx_get_vertex_vec3(&mesh->vertex_tangent, src_face.index_begin);
+		ufbx_vec3 bitangent = ufbx_get_vertex_vec3(&mesh->vertex_bitangent, src_face.index_begin);
+
+		for (size_t i = 0; i < src_face.num_indices; i++) {
+			ufbxt_assert_close_vec3(err, normal, ufbx_get_vertex_vec3(&mesh->vertex_normal, src_face.index_begin + i));
+			ufbxt_assert_close_vec3(err, tangent, ufbx_get_vertex_vec3(&mesh->vertex_tangent, src_face.index_begin + i));
+			ufbxt_assert_close_vec3(err, bitangent, ufbx_get_vertex_vec3(&mesh->vertex_bitangent, src_face.index_begin + i));
+		}
+
+		for (size_t dst_subface = 0; dst_subface < 4; dst_subface++) {
+			size_t dst_face_ix = src_face_ix * 4 + dst_subface;
+			ufbx_face dst_face = sub_mesh->faces.data[dst_face_ix];
+
+			for (size_t i = 0; i < dst_face.num_indices; i++) {
+				ufbxt_assert_close_vec3(err, normal, ufbx_get_vertex_vec3(&sub_mesh->vertex_normal, dst_face.index_begin + i));
+				ufbxt_assert_close_vec3(err, tangent, ufbx_get_vertex_vec3(&sub_mesh->vertex_tangent, dst_face.index_begin + i));
+				ufbxt_assert_close_vec3(err, bitangent, ufbx_get_vertex_vec3(&sub_mesh->vertex_bitangent, dst_face.index_begin + i));
+			}
+		}
+	}
+
+	ufbx_free_mesh(sub_mesh);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(subsurf_interpolate_ignore, maya_cube)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->vertex_tangent.exists);
+
+	ufbx_subdivide_opts opts = { 0 };
+	opts.ignore_normals = true;
+	opts.interpolate_tangents = true;
+	ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 1, &opts, NULL);
+	ufbxt_assert(sub_mesh);
+	ufbx_retain_mesh(sub_mesh);
+	ufbxt_assert(!sub_mesh->vertex_normal.exists);
+
+	ufbxt_assert(sub_mesh->faces.count == mesh->faces.count * 4);
+	for (size_t src_face_ix = 0; src_face_ix < mesh->faces.count; src_face_ix++) {
+		ufbx_face src_face = mesh->faces.data[src_face_ix];
+
+		ufbx_vec3 normal = ufbx_get_vertex_vec3(&mesh->vertex_normal, src_face.index_begin);
+		ufbx_vec3 tangent = ufbx_get_vertex_vec3(&mesh->vertex_tangent, src_face.index_begin);
+		ufbx_vec3 bitangent = ufbx_get_vertex_vec3(&mesh->vertex_bitangent, src_face.index_begin);
+
+		for (size_t i = 0; i < src_face.num_indices; i++) {
+			ufbxt_assert_close_vec3(err, normal, ufbx_get_vertex_vec3(&mesh->vertex_normal, src_face.index_begin + i));
+			ufbxt_assert_close_vec3(err, tangent, ufbx_get_vertex_vec3(&mesh->vertex_tangent, src_face.index_begin + i));
+			ufbxt_assert_close_vec3(err, bitangent, ufbx_get_vertex_vec3(&mesh->vertex_bitangent, src_face.index_begin + i));
+		}
+
+		for (size_t dst_subface = 0; dst_subface < 4; dst_subface++) {
+			size_t dst_face_ix = src_face_ix * 4 + dst_subface;
+			ufbx_face dst_face = sub_mesh->faces.data[dst_face_ix];
+
+			for (size_t i = 0; i < dst_face.num_indices; i++) {
+				ufbxt_assert_close_vec3(err, tangent, ufbx_get_vertex_vec3(&sub_mesh->vertex_tangent, dst_face.index_begin + i));
+				ufbxt_assert_close_vec3(err, bitangent, ufbx_get_vertex_vec3(&sub_mesh->vertex_bitangent, dst_face.index_begin + i));
+			}
+		}
+	}
+
+	ufbx_free_mesh(sub_mesh);
+}
+#endif
+
