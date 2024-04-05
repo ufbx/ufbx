@@ -114,13 +114,38 @@
 // breaking API guarantees.
 #define ufbx_unsafe
 
-// Calling convention of the main ufbx API functions.
+// Linkage of the main ufbx API functions.
+// Defaults to nothing, or `static` if `UFBX_STATIC` is defined.
 // If you want to isolate ufbx to a single translation unit you can do the following:
-//   #define ufbx_abi static
+//   #define UFBX_STATIC
 //   #include "ufbx.h"
 //   #include "ufbx.c"
 #ifndef ufbx_abi
-	#define ufbx_abi
+	#if defined(UFBX_STATIC)
+		#define ufbx_abi static
+	#else
+		#define ufbx_abi
+	#endif
+#endif
+
+// Linkage of the main ufbx data fields in the header.
+// Defaults to `extern`, or `static` if `UFBX_STATIC` is defined.
+#ifndef ufbx_abi_data
+	#if defined(UFBX_STATIC)
+		#define ufbx_abi_data static
+	#else
+		#define ufbx_abi_data extern
+	#endif
+#endif
+
+// Linkage of the main ufbx data fields in the source.
+// Defaults to nothing, or `static` if `UFBX_STATIC` is defined.
+#ifndef ufbx_abi_data_definition
+	#if defined(UFBX_STATIC)
+		#define ufbx_abi_data_def static
+	#else
+		#define ufbx_abi_data_def
+	#endif
 #endif
 
 // -- Configuration
@@ -4980,26 +5005,26 @@ extern "C" {
 #endif
 
 // Various zero/empty/identity values
-extern const ufbx_string ufbx_empty_string;
-extern const ufbx_blob ufbx_empty_blob;
-extern const ufbx_matrix ufbx_identity_matrix;
-extern const ufbx_transform ufbx_identity_transform;
-extern const ufbx_vec2 ufbx_zero_vec2;
-extern const ufbx_vec3 ufbx_zero_vec3;
-extern const ufbx_vec4 ufbx_zero_vec4;
-extern const ufbx_quat ufbx_identity_quat;
+ufbx_abi_data const ufbx_string ufbx_empty_string;
+ufbx_abi_data const ufbx_blob ufbx_empty_blob;
+ufbx_abi_data const ufbx_matrix ufbx_identity_matrix;
+ufbx_abi_data const ufbx_transform ufbx_identity_transform;
+ufbx_abi_data const ufbx_vec2 ufbx_zero_vec2;
+ufbx_abi_data const ufbx_vec3 ufbx_zero_vec3;
+ufbx_abi_data const ufbx_vec4 ufbx_zero_vec4;
+ufbx_abi_data const ufbx_quat ufbx_identity_quat;
 
 // Commonly used coordinate axes.
-extern const ufbx_coordinate_axes ufbx_axes_right_handed_y_up;
-extern const ufbx_coordinate_axes ufbx_axes_right_handed_z_up;
-extern const ufbx_coordinate_axes ufbx_axes_left_handed_y_up;
-extern const ufbx_coordinate_axes ufbx_axes_left_handed_z_up;
+ufbx_abi_data const ufbx_coordinate_axes ufbx_axes_right_handed_y_up;
+ufbx_abi_data const ufbx_coordinate_axes ufbx_axes_right_handed_z_up;
+ufbx_abi_data const ufbx_coordinate_axes ufbx_axes_left_handed_y_up;
+ufbx_abi_data const ufbx_coordinate_axes ufbx_axes_left_handed_z_up;
 
 // Sizes of element types. eg `sizeof(ufbx_node)`
-extern const size_t ufbx_element_type_size[UFBX_ELEMENT_TYPE_COUNT];
+ufbx_abi_data const size_t ufbx_element_type_size[UFBX_ELEMENT_TYPE_COUNT];
 
 // Version of the source file, comparable to `UFBX_HEADER_VERSION`
-extern const uint32_t ufbx_source_version;
+ufbx_abi_data const uint32_t ufbx_source_version;
 
 // Practically always `true` (see below), if not you need to be careful with threads.
 //

@@ -570,7 +570,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 // -- Version
 
 #define UFBX_SOURCE_VERSION ufbx_pack_version(0, 12, 0)
-const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
+ufbx_abi_data_def const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
 
 ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEADER_VERSION/1000u);
 
@@ -28921,29 +28921,29 @@ static ufbxi_noinline void ufbxi_release_ref(ufbxi_refcount *refcount)
 extern "C" {
 #endif
 
-const ufbx_string ufbx_empty_string = { ufbxi_empty_char, 0 };
-const ufbx_blob ufbx_empty_blob = { NULL, 0 };
-const ufbx_matrix ufbx_identity_matrix = { 1,0,0, 0,1,0, 0,0,1, 0,0,0 };
-const ufbx_transform ufbx_identity_transform = { {0,0,0}, {0,0,0,1}, {1,1,1} };
-const ufbx_vec2 ufbx_zero_vec2 = { 0,0 };
-const ufbx_vec3 ufbx_zero_vec3 = { 0,0,0 };
-const ufbx_vec4 ufbx_zero_vec4 = { 0,0,0,0 };
-const ufbx_quat ufbx_identity_quat = { 0,0,0,1 };
+ufbx_abi_data_def const ufbx_string ufbx_empty_string = { ufbxi_empty_char, 0 };
+ufbx_abi_data_def const ufbx_blob ufbx_empty_blob = { NULL, 0 };
+ufbx_abi_data_def const ufbx_matrix ufbx_identity_matrix = { 1,0,0, 0,1,0, 0,0,1, 0,0,0 };
+ufbx_abi_data_def const ufbx_transform ufbx_identity_transform = { {0,0,0}, {0,0,0,1}, {1,1,1} };
+ufbx_abi_data_def const ufbx_vec2 ufbx_zero_vec2 = { 0,0 };
+ufbx_abi_data_def const ufbx_vec3 ufbx_zero_vec3 = { 0,0,0 };
+ufbx_abi_data_def const ufbx_vec4 ufbx_zero_vec4 = { 0,0,0,0 };
+ufbx_abi_data_def const ufbx_quat ufbx_identity_quat = { 0,0,0,1 };
 
-const ufbx_coordinate_axes ufbx_axes_right_handed_y_up = {
+ufbx_abi_data_def const ufbx_coordinate_axes ufbx_axes_right_handed_y_up = {
 	UFBX_COORDINATE_AXIS_POSITIVE_X, UFBX_COORDINATE_AXIS_POSITIVE_Y, UFBX_COORDINATE_AXIS_POSITIVE_Z,
 };
-const ufbx_coordinate_axes ufbx_axes_right_handed_z_up = {
+ufbx_abi_data_def const ufbx_coordinate_axes ufbx_axes_right_handed_z_up = {
 	UFBX_COORDINATE_AXIS_POSITIVE_X, UFBX_COORDINATE_AXIS_POSITIVE_Z, UFBX_COORDINATE_AXIS_NEGATIVE_Y,
 };
-const ufbx_coordinate_axes ufbx_axes_left_handed_y_up = {
+ufbx_abi_data_def const ufbx_coordinate_axes ufbx_axes_left_handed_y_up = {
 	UFBX_COORDINATE_AXIS_POSITIVE_X, UFBX_COORDINATE_AXIS_POSITIVE_Y, UFBX_COORDINATE_AXIS_NEGATIVE_Z,
 };
-const ufbx_coordinate_axes ufbx_axes_left_handed_z_up = {
+ufbx_abi_data_def const ufbx_coordinate_axes ufbx_axes_left_handed_z_up = {
 	UFBX_COORDINATE_AXIS_POSITIVE_X, UFBX_COORDINATE_AXIS_POSITIVE_Z, UFBX_COORDINATE_AXIS_POSITIVE_Y,
 };
 
-const size_t ufbx_element_type_size[UFBX_ELEMENT_TYPE_COUNT] = {
+ufbx_abi_data_def const size_t ufbx_element_type_size[UFBX_ELEMENT_TYPE_COUNT] = {
 	sizeof(ufbx_unknown),
 	sizeof(ufbx_node),
 	sizeof(ufbx_mesh),
