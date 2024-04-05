@@ -350,6 +350,8 @@ def parse_type(file, typ, in_func=False):
     mods = typ["mods"]
     if in_func:
         mods = [m for m in mods if m["type"] not in ("function", "inline", "abi", "unsafe")]
+    else:
+        mods = [m for m in mods if m["type"] not in ("abi_data", )]
     return parse_type_imp(file, typ, mods)
 
 def parse_field(file: File, st: Struct, decl, anon_path):
