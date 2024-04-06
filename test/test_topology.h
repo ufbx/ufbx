@@ -735,6 +735,7 @@ UFBXT_FILE_TEST_ALT(subsurf_interpolate, maya_cube)
 	ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 1, &opts, NULL);
 	ufbxt_assert(sub_mesh);
 	ufbx_retain_mesh(sub_mesh);
+	ufbx_free_mesh(sub_mesh);
 
 	ufbxt_assert(sub_mesh->faces.count == mesh->faces.count * 4);
 	for (size_t src_face_ix = 0; src_face_ix < mesh->faces.count; src_face_ix++) {
@@ -780,6 +781,7 @@ UFBXT_FILE_TEST_ALT(subsurf_interpolate_ignore, maya_cube)
 	ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 1, &opts, NULL);
 	ufbxt_assert(sub_mesh);
 	ufbx_retain_mesh(sub_mesh);
+	ufbx_free_mesh(sub_mesh);
 	ufbxt_assert(!sub_mesh->vertex_normal.exists);
 
 	ufbxt_assert(sub_mesh->faces.count == mesh->faces.count * 4);
