@@ -836,3 +836,82 @@ UFBXT_TEST(cache_fail_skip)
 	}
 }
 #endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_retain_w_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.retain_vertex_attrib_w = true;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(catch_get_vertex_vec, maya_color_sets, ufbxt_retain_w_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbx_panic panic;
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		panic.did_panic = false;
+		ufbx_catch_get_vertex_vec3(&panic, &mesh->vertex_position, i);
+		ufbxt_assert(!panic.did_panic);
+		ufbx_catch_get_vertex_vec2(&panic, &mesh->vertex_uv, i);
+		ufbxt_assert(!panic.did_panic);
+		ufbx_catch_get_vertex_vec4(&panic, &mesh->vertex_color, i);
+		ufbxt_assert(!panic.did_panic);
+		ufbx_real w = ufbx_catch_get_vertex_w_vec3(&panic, &mesh->vertex_tangent, i);
+		ufbxt_assert(!panic.did_panic);
+		if (scene->metadata.version >= 7000) {
+			ufbxt_assert(w == 1.0f);
+		} else {
+			ufbxt_assert(w == 0.0f);
+		}
+	}
+
+	{
+		size_t index = 24;
+		panic.did_panic = false;
+		ufbx_catch_get_vertex_vec3(&panic, &mesh->vertex_position, index);
+		ufbxt_assert(panic.did_panic);
+		ufbxt_assert(!strcmp(panic.message, "index (24) out of range (24)"));
+		panic.did_panic = false;
+		ufbx_catch_get_vertex_vec2(&panic, &mesh->vertex_uv, index);
+		ufbxt_assert(panic.did_panic);
+		ufbxt_assert(!strcmp(panic.message, "index (24) out of range (24)"));
+		panic.did_panic = false;
+		ufbx_catch_get_vertex_vec4(&panic, &mesh->vertex_color, index);
+		ufbxt_assert(panic.did_panic);
+		ufbxt_assert(!strcmp(panic.message, "index (24) out of range (24)"));
+		ufbx_catch_get_vertex_w_vec3(&panic, &mesh->vertex_tangent, index);
+		ufbxt_assert(panic.did_panic);
+		ufbxt_assert(!strcmp(panic.message, "index (24) out of range (24)"));
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(catch_get_vertex_real, maya_vertex_crease)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbx_panic panic;
+	panic.did_panic = false;
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		ufbx_catch_get_vertex_real(&panic, &mesh->vertex_crease, i);
+		ufbxt_assert(!panic.did_panic);
+	}
+
+	{
+		size_t index = 24;
+		panic.did_panic = false;
+		ufbx_catch_get_vertex_real(&panic, &mesh->vertex_crease, index);
+		ufbxt_assert(panic.did_panic);
+		ufbxt_assert(!strcmp(panic.message, "index (24) out of range (24)"));
+	}
+}
+#endif
