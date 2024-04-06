@@ -781,3 +781,58 @@ UFBXT_TEST(catch_face_normal)
 	}
 }
 #endif
+
+#if UFBXT_IMPL
+static bool ufbxt_open_file_fail(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info)
+{
+	return false;
+}
+
+static bool ufbxt_fail_skip(void *user, size_t size)
+{
+	return false;
+}
+
+static bool ufbxt_open_file_bad_skip(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info)
+{
+	bool ok = ufbx_open_file(stream, path, path_len);
+	ufbxt_assert(ok);
+	stream->skip_fn = &ufbxt_fail_skip;
+	return true;
+}
+#endif
+
+UFBXT_TEST(cache_fail_skip)
+#if UFBXT_IMPL
+{
+	const char *path = "caches/sine_mxsf_regular/cache.xml";
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s", data_root, path);
+
+	ufbx_geometry_cache *cache = ufbx_load_geometry_cache(buf, NULL, NULL);
+	ufbxt_assert(cache);
+
+	ufbxt_assert(cache->frames.count > 2);
+	ufbx_cache_frame *frame = &cache->frames.data[1];
+	ufbx_real data[256];
+
+	{
+		size_t num_read = ufbx_read_geometry_cache_real(frame, data, ufbxt_arraycount(data), NULL);
+		ufbxt_assert(num_read == 108);
+	}
+
+	{
+		ufbx_geometry_cache_data_opts opts = { 0 };
+		opts.open_file_cb.fn = &ufbxt_open_file_fail;
+		size_t num_read = ufbx_read_geometry_cache_real(frame, data, ufbxt_arraycount(data), &opts);
+		ufbxt_assert(num_read == 0);
+	}
+
+	{
+		ufbx_geometry_cache_data_opts opts = { 0 };
+		opts.open_file_cb.fn = &ufbxt_open_file_bad_skip;
+		size_t num_read = ufbx_read_geometry_cache_real(frame, data, ufbxt_arraycount(data), &opts);
+		ufbxt_assert(num_read == 0);
+	}
+}
+#endif
