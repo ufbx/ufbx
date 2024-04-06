@@ -1631,6 +1631,37 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 	free(used_nodes);
 }
 
+static ufbx_mesh *ufbxt_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error)
+{
+	ufbx_mesh *result = ufbx_subdivide_mesh(mesh, level, opts, error);
+	if (!result) return result;
+
+	ufbx_subdivision_result *res = result->subdivision_result;
+	ufbxt_assert(res);
+
+	for (size_t i = 1; i < res->temp_allocs; i++) {
+		ufbx_error fail_error;
+		ufbx_subdivide_opts fail_opts = { 0 };
+		if (opts) fail_opts = *opts;
+		fail_opts.temp_allocator.allocation_limit = i;
+		ufbx_mesh *fail_result = ufbx_subdivide_mesh(mesh, level, &fail_opts, &fail_error);
+		ufbxt_assert(!fail_result);
+		ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+
+	for (size_t i = 1; i < res->result_allocs; i++) {
+		ufbx_error fail_error;
+		ufbx_subdivide_opts fail_opts = { 0 };
+		if (opts) fail_opts = *opts;
+		fail_opts.result_allocator.allocation_limit = i;
+		ufbx_mesh *fail_result = ufbx_subdivide_mesh(mesh, level, &fail_opts, &fail_error);
+		ufbxt_assert(!fail_result);
+		ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+
+	return result;
+}
+
 // -- IO
 
 static ufbxt_noinline size_t ufbxt_file_size(const char *name)

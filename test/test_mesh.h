@@ -828,7 +828,7 @@ UFBXT_FILE_TEST(max_edge_visibility)
 			ufbxt_assert(num_visible == 12);
 		}
 
-		ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 2, NULL, NULL);
+		ufbx_mesh *sub_mesh = ufbxt_subdivide_mesh(mesh, 2, NULL, NULL);
 		ufbxt_assert(sub_mesh);
 		ufbxt_check_mesh(scene, sub_mesh);
 
@@ -933,7 +933,7 @@ UFBXT_FILE_TEST(zbrush_d20)
 		}
 
 		// Check that poly groups work in subdivision
-		ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 2, NULL, NULL);
+		ufbx_mesh *sub_mesh = ufbxt_subdivide_mesh(mesh, 2, NULL, NULL);
 		ufbxt_assert(sub_mesh);
 		ufbxt_check_mesh(scene, sub_mesh);
 
@@ -1020,7 +1020,7 @@ UFBXT_FILE_TEST(maya_polygon_hole)
 		ufbxt_assert(num_holes == 2);
 	}
 
-	ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 2, NULL, NULL);
+	ufbx_mesh *sub_mesh = ufbxt_subdivide_mesh(mesh, 2, NULL, NULL);
 	ufbxt_assert(sub_mesh);
 	ufbxt_check_mesh(scene, sub_mesh);
 
@@ -1062,7 +1062,7 @@ UFBXT_FILE_TEST_OPTS(synthetic_cursed_geometry, ufbxt_generate_normals_opts)
 		ufbxt_assert(num_tris == 0 || num_tris == face.num_indices - 2);
 	}
 
-	ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 2, NULL, NULL);
+	ufbx_mesh *sub_mesh = ufbxt_subdivide_mesh(mesh, 2, NULL, NULL);
 	ufbx_free_mesh(sub_mesh);
 }
 #endif
