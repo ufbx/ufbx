@@ -990,3 +990,73 @@ UFBXT_FILE_TEST_ALT(tessellate_curve_overflow, max_nurbs_to_line)
 	}
 }
 #endif
+
+UFBXT_TEST(coordinate_axes_valid)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Y;
+		axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
+		ufbxt_assert(ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.up = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = (ufbx_coordinate_axis)-1;
+		axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Y;
+		axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = (ufbx_coordinate_axis)100;
+		axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Y;
+		axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.up = (ufbx_coordinate_axis)-1;
+		axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.up = (ufbx_coordinate_axis)100;
+		axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Y;
+		axes.front = (ufbx_coordinate_axis)-1;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Y;
+		axes.front = (ufbx_coordinate_axis)100;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+}
+#endif
+
