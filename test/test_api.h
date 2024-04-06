@@ -665,3 +665,14 @@ UFBXT_TEST(element_type_sizes)
 	}
 }
 #endif
+
+UFBXT_TEST(evaluate_anim_null)
+#if UFBXT_IMPL
+{
+	ufbx_real r = ufbx_evaluate_anim_value_real(NULL, 0.0);
+	ufbxt_assert(r == 0.0f);
+
+	ufbx_vec3 v = ufbx_evaluate_anim_value_vec3(NULL, 0.0);
+	ufbxt_assert(v.x == 0.0f && v.y == 0.0f && v.z == 0.0f);
+}
+#endif
