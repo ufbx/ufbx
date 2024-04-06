@@ -676,3 +676,63 @@ UFBXT_TEST(evaluate_anim_null)
 	ufbxt_assert(v.x == 0.0f && v.y == 0.0f && v.z == 0.0f);
 }
 #endif
+
+UFBXT_TEST(catch_triangulate)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbx_scene *scene = ufbx_load_file(path, NULL, NULL);
+		ufbxt_assert(scene);
+
+		ufbx_node *node = ufbx_find_node(scene, "pCube1");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbx_face face = mesh->faces.data[0];
+		ufbxt_assert(face.index_begin == 0);
+		ufbxt_assert(face.num_indices == 4);
+
+		ufbx_panic panic;
+
+		{
+			uint32_t indices[6];
+			panic.did_panic = false;
+			uint32_t num_tris = ufbx_catch_triangulate_face(&panic, indices, 6, mesh, face);
+			ufbxt_assert(num_tris == 2);
+			ufbxt_assert(!panic.did_panic);
+		}
+
+		{
+			uint32_t indices[4];
+			panic.did_panic = false;
+			uint32_t num_tris = ufbx_catch_triangulate_face(&panic, indices, 4, mesh, face);
+			ufbxt_assert(num_tris == 0);
+			ufbxt_assert(panic.did_panic);
+			ufbxt_assert(!strcmp(panic.message, "Face needs at least 6 indices for triangles, got space for 4"));
+		}
+
+		{
+			ufbx_face bad_face = { 100, 4 };
+			uint32_t indices[6];
+			panic.did_panic = false;
+			uint32_t num_tris = ufbx_catch_triangulate_face(&panic, indices, 6, mesh, bad_face);
+			ufbxt_assert(num_tris == 0);
+			ufbxt_assert(panic.did_panic);
+			ufbxt_assert(!strcmp(panic.message, "Face index begin (100) out of bounds (24)"));
+		}
+
+		{
+			ufbx_face bad_face = { 22, 4 };
+			uint32_t indices[6];
+			panic.did_panic = false;
+			uint32_t num_tris = ufbx_catch_triangulate_face(&panic, indices, 6, mesh, bad_face);
+			ufbxt_assert(num_tris == 0);
+			ufbxt_assert(panic.did_panic);
+			ufbxt_assert(!strcmp(panic.message, "Face index end (22 + 4) out of bounds (24)"));
+		}
+
+		ufbx_free_scene(scene);
+	}
+}
+#endif
