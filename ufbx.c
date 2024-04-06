@@ -29509,7 +29509,7 @@ ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time
 	return curve->keyframes.data[curve->keyframes.count - 1].value;
 }
 
-ufbx_abi ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, double time)
+ufbx_abi ufbxi_noinline ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, double time)
 {
 	if (!anim_value) {
 		return 0.0f;
@@ -29517,19 +29517,6 @@ ufbx_abi ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_val
 
 	ufbx_real res = anim_value->default_value.x;
 	if (anim_value->curves[0]) res = ufbx_evaluate_curve(anim_value->curves[0], time, res);
-	return res;
-}
-
-ufbx_abi ufbxi_noinline ufbx_vec2 ufbx_evaluate_anim_value_vec2(const ufbx_anim_value *anim_value, double time)
-{
-	if (!anim_value) {
-		ufbx_vec2 zero = { 0.0f };
-		return zero;
-	}
-
-	ufbx_vec2 res = { anim_value->default_value.x, anim_value->default_value.y };
-	if (anim_value->curves[0]) res.x = ufbx_evaluate_curve(anim_value->curves[0], time, res.x);
-	if (anim_value->curves[1]) res.y = ufbx_evaluate_curve(anim_value->curves[1], time, res.y);
 	return res;
 }
 
