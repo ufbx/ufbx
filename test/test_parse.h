@@ -1787,3 +1787,16 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_integer_holes_threads, synthetic_integer_hole
 	}
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_comment_cube)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_comment_cube_threads, synthetic_comment_cube, ufbxt_immediate_thread_opts, UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
+}
+#endif
+
