@@ -11279,16 +11279,6 @@ ufbxi_nodiscard static int ufbxi_match_exporter(ufbxi_context *uc)
 	} else if (ufbxi_match_version_string("motionbuilder/mocap/online version ?.?", creator, version)) {
 		uc->exporter = UFBX_EXPORTER_MOTION_BUILDER;
 		uc->exporter_version = ufbx_pack_version(version[0], version[1], 0);
-	} else if (ufbxi_match_version_string("fbx unity export version ?.?", creator, version)) {
-		uc->exporter = UFBX_EXPORTER_BC_UNITY_EXPORTER;
-		uc->exporter_version = ufbx_pack_version(version[0], version[1], 0);
-	} else if (ufbxi_match_version_string("fbx unity export version ?.?.?", creator, version)) {
-		uc->exporter = UFBX_EXPORTER_BC_UNITY_EXPORTER;
-		uc->exporter_version = ufbx_pack_version(version[0], version[1], version[2]);
-	} else if (ufbxi_match_version_string("made using asset forge", creator, version)) {
-		uc->exporter = UFBX_EXPORTER_BC_UNITY_EXPORTER;
-	} else if (ufbxi_match_version_string("model created by kenney", creator, version)) {
-		uc->exporter = UFBX_EXPORTER_BC_UNITY_EXPORTER;
 	}
 
 	uc->scene.metadata.exporter = uc->exporter;

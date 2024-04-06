@@ -328,7 +328,6 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		"Blender Binary",
 		"Blender ASCII",
 		"MotionBuilder",
-		"Unity Exporter (from Building Crafter)",
 	};
 
 	const char *formats[2][2] = {
