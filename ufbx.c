@@ -7862,19 +7862,19 @@ ufbxi_nodiscard static ufbxi_noinline char *ufbxi_swap_endian(ufbxi_context *uc,
 	const char *s = (const char*)src;
 	switch (elem_size) {
 	case 2:
-		for (size_t i = 0; i < count; i++) {
+		ufbxi_nounroll for (size_t i = 0; i < count; i++) {
 			d[0] = s[1]; d[1] = s[0];
 			d += 2; s += 2;
 		}
 		break;
 	case 4:
-		for (size_t i = 0; i < count; i++) {
+		ufbxi_nounroll for (size_t i = 0; i < count; i++) {
 			d[0] = s[3]; d[1] = s[2]; d[2] = s[1]; d[3] = s[0];
 			d += 4; s += 4;
 		}
 		break;
 	case 8:
-		for (size_t i = 0; i < count; i++) {
+		ufbxi_nounroll for (size_t i = 0; i < count; i++) {
 			d[0] = s[7]; d[1] = s[6]; d[2] = s[5]; d[3] = s[4];
 			d[4] = s[3]; d[5] = s[2]; d[6] = s[1]; d[7] = s[0];
 			d += 8; s += 8;
