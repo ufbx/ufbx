@@ -1470,6 +1470,9 @@ UFBXT_FILE_TEST(synthetic_rotation_order_layers)
 	ufbxt_assert(anim);
 	ufbxt_check_anim(scene, anim);
 
+	ufbx_retain_anim(anim);
+	ufbx_free_anim(anim);
+
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node);
 
