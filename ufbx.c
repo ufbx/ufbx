@@ -31037,30 +31037,15 @@ ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_catch_get_weighted_face_normal(ufbx_panic
 	if (face.num_indices < 3) {
 		return ufbx_zero_vec3;
 	} else if (face.num_indices == 3) {
-		ufbx_vec3 a, b, c;
-		if (panic) {
-			a = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 0);
-			b = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 1);
-			c = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 2);
-		} else {
-			a = ufbx_get_vertex_vec3(positions, face.index_begin + 0);
-			b = ufbx_get_vertex_vec3(positions, face.index_begin + 1);
-			c = ufbx_get_vertex_vec3(positions, face.index_begin + 2);
-		}
+		ufbx_vec3 a = ufbx_get_vertex_vec3(positions, face.index_begin + 0);
+		ufbx_vec3 b = ufbx_get_vertex_vec3(positions, face.index_begin + 1);
+		ufbx_vec3 c = ufbx_get_vertex_vec3(positions, face.index_begin + 2);
 		return ufbxi_cross3(ufbxi_sub3(b, a), ufbxi_sub3(c, a));
 	} else if (face.num_indices == 4) {
-		ufbx_vec3 a, b, c, d;
-		if (panic) {
-			a = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 0);
-			b = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 1);
-			c = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 2);
-			d = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + 3);
-		} else {
-			a = ufbx_get_vertex_vec3(positions, face.index_begin + 0);
-			b = ufbx_get_vertex_vec3(positions, face.index_begin + 1);
-			c = ufbx_get_vertex_vec3(positions, face.index_begin + 2);
-			d = ufbx_get_vertex_vec3(positions, face.index_begin + 3);
-		}
+		ufbx_vec3 a = ufbx_get_vertex_vec3(positions, face.index_begin + 0);
+		ufbx_vec3 b = ufbx_get_vertex_vec3(positions, face.index_begin + 1);
+		ufbx_vec3 c = ufbx_get_vertex_vec3(positions, face.index_begin + 2);
+		ufbx_vec3 d = ufbx_get_vertex_vec3(positions, face.index_begin + 3);
 		return ufbxi_cross3(ufbxi_sub3(c, a), ufbxi_sub3(d, b));
 	} else {
 		ufbx_vec3 a, b;
@@ -31069,13 +31054,8 @@ ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_catch_get_weighted_face_normal(ufbx_panic
 		ufbx_vec3 result = ufbx_zero_vec3;
 		for (size_t i = 0; i < face.num_indices; i++) {
 			size_t next = i + 1 < face.num_indices ? i + 1 : 0;
-			if (panic) {
-				a = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + i);
-				b = ufbx_catch_get_vertex_vec3(panic, positions, face.index_begin + next);
-			} else {
-				a = ufbx_get_vertex_vec3(positions, face.index_begin + i);
-				b = ufbx_get_vertex_vec3(positions, face.index_begin + next);
-			}
+			ufbx_vec3 a = ufbx_get_vertex_vec3(positions, face.index_begin + i);
+			ufbx_vec3 b = ufbx_get_vertex_vec3(positions, face.index_begin + next);
 			result.x += (a.y - b.y) * (a.z + b.z);
 			result.y += (a.z - b.z) * (a.x + b.x);
 			result.z += (a.x - b.x) * (a.y + b.y);
