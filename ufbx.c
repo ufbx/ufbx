@@ -31368,7 +31368,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 				}
 			}
 			ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
-				buffer.dst[i] = buffer.src.f64[i];
+				buffer.dst[i] = (ufbx_real)buffer.src.f64[i];
 			}
 		} else {
 			size_t bytes_read = stream.read_fn(stream.user, buffer.src.f32, to_read * sizeof(float));
@@ -31382,7 +31382,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 				}
 			}
 			ufbxi_nounroll for (size_t i = 0; i < num_read; i++) {
-				buffer.dst[i] = buffer.src.f32[i];
+				buffer.dst[i] = (ufbx_real)buffer.src.f32[i];
 			}
 		}
 
