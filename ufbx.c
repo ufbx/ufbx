@@ -15942,11 +15942,7 @@ static ufbxi_noinline void ufbxi_obj_free(ufbxi_context *uc)
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_read_line(ufbxi_context *uc)
 {
-	if (uc->obj.eof) {
-		uc->obj.line.data = "\n";
-		uc->obj.line.length = 1;
-		return 1;
-	}
+	ufbxi_dev_assert(!uc->obj.eof);
 
 	size_t offset = 0;
 
