@@ -7851,6 +7851,7 @@ static ufbxi_noinline bool ufbxi_is_raw_string(ufbxi_context *uc, ufbxi_parse_st
 
 ufbxi_nodiscard static ufbxi_noinline char *ufbxi_swap_endian(ufbxi_context *uc, const void *src, size_t count, size_t elem_size)
 {
+	ufbxi_dev_assert(elem_size > 1);
 	size_t total_size = count * elem_size;
 	ufbxi_check_return(!ufbxi_does_overflow(total_size, count, elem_size), NULL);
 	if (uc->swap_arr_size < total_size) {
@@ -7860,12 +7861,6 @@ ufbxi_nodiscard static ufbxi_noinline char *ufbxi_swap_endian(ufbxi_context *uc,
 
 	const char *s = (const char*)src;
 	switch (elem_size) {
-	case 1:
-		for (size_t i = 0; i < count; i++) {
-			d[0] = s[0];
-			d += 1; s += 1;
-		}
-		break;
 	case 2:
 		for (size_t i = 0; i < count; i++) {
 			d[0] = s[1]; d[1] = s[0];
