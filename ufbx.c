@@ -2835,7 +2835,7 @@ static ufbxi_noinline void ufbxi_panicf_imp(ufbx_panic *panic, const char *fmt, 
 {
 	if (panic && panic->did_panic) return;
 
-	va_list args;
+	va_list args; // ufbxi_uninit
 	va_start(args, fmt);
 
 	if (panic) {
@@ -2961,7 +2961,7 @@ static ufbxi_noinline void ufbxi_fmt_err_info(ufbx_error *err, const char *fmt, 
 {
 	if (!err) return;
 
-	va_list args;
+	va_list args; // ufbxi_uninit
 	va_start(args, fmt);
 	err->info_length = (size_t)ufbxi_vsnprintf(err->info, sizeof(err->info), fmt, args);
 	va_end(args);
@@ -4287,7 +4287,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_vwarnf_imp(ufbxi_warnings *ws, u
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_warnf_imp(ufbxi_warnings *ws, ufbx_warning_type type, uint32_t element_id, const char *fmt, ...)
 {
 	// NOTE: `ws` may be `NULL` here, handled by `ufbxi_vwarnf()`
-	va_list args;
+	va_list args; // ufbxi_uninit
 	va_start(args, fmt);
 	int ok = ufbxi_vwarnf_imp(ws, type, element_id, fmt, args);
 	va_end(args);
