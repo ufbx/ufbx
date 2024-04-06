@@ -31048,8 +31048,6 @@ ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_catch_get_weighted_face_normal(ufbx_panic
 		ufbx_vec3 d = ufbx_get_vertex_vec3(positions, face.index_begin + 3);
 		return ufbxi_cross3(ufbxi_sub3(c, a), ufbxi_sub3(d, b));
 	} else {
-		ufbx_vec3 a, b;
-
 		// Newell's Method
 		ufbx_vec3 result = ufbx_zero_vec3;
 		for (size_t i = 0; i < face.num_indices; i++) {
