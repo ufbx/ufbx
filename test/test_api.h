@@ -811,6 +811,8 @@ UFBXT_TEST(cache_fail_skip)
 
 	ufbx_geometry_cache *cache = ufbx_load_geometry_cache(buf, NULL, NULL);
 	ufbxt_assert(cache);
+	ufbx_retain_geometry_cache(cache);
+	ufbx_free_geometry_cache(cache);
 
 	ufbxt_assert(cache->frames.count > 2);
 	ufbx_cache_frame *frame = &cache->frames.data[1];
@@ -834,6 +836,8 @@ UFBXT_TEST(cache_fail_skip)
 		size_t num_read = ufbx_read_geometry_cache_real(frame, data, ufbxt_arraycount(data), &opts);
 		ufbxt_assert(num_read == 0);
 	}
+
+	ufbx_free_geometry_cache(cache);
 }
 #endif
 
