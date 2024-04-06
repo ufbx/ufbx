@@ -1800,3 +1800,9 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_comment_cube_threads, synthetic_comment
 }
 #endif
 
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_cube_threads, maya_cube, ufbxt_immediate_thread_opts, UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
+}
+#endif
+
