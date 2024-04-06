@@ -345,3 +345,73 @@ UFBXT_TEST(quat_normalize)
 	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
 }
 #endif
+
+UFBXT_TEST(quat_mul)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	uint32_t indices[3];
+
+	for (int iorder = 0; iorder < 6; iorder++) {
+		ufbx_rotation_order order = (ufbx_rotation_order)iorder;
+
+		switch (order) {
+		case UFBX_ROTATION_ORDER_XYZ:
+			indices[0] = 0;
+			indices[1] = 1;
+			indices[2] = 2;
+			break;
+		case UFBX_ROTATION_ORDER_XZY:
+			indices[0] = 0;
+			indices[1] = 2;
+			indices[2] = 1;
+			break;
+		case UFBX_ROTATION_ORDER_YZX:
+			indices[0] = 1;
+			indices[1] = 2;
+			indices[2] = 0;
+			break;
+		case UFBX_ROTATION_ORDER_YXZ:
+			indices[0] = 1;
+			indices[1] = 0;
+			indices[2] = 2;
+			break;
+		case UFBX_ROTATION_ORDER_ZXY:
+			indices[0] = 2;
+			indices[1] = 0;
+			indices[2] = 1;
+			break;
+		case UFBX_ROTATION_ORDER_ZYX:
+			indices[0] = 2;
+			indices[1] = 1;
+			indices[2] = 0;
+			break;
+		}
+
+		for (int x = -360; x <= 360; x += 45)
+		for (int y = -360; y <= 360; y += 45)
+		for (int z = -360; z <= 360; z += 45) {
+			ufbx_vec3 v = { (ufbx_real)x, (ufbx_real)y, (ufbx_real)z };
+			ufbx_vec3 vs[3] = { 0 };
+			vs[0].x = v.x;
+			vs[1].y = v.y;
+			vs[2].z = v.z;
+
+			ufbx_quat q0 = ufbx_euler_to_quat(vs[indices[2]], UFBX_ROTATION_ORDER_XYZ);
+			ufbx_quat q1 = ufbx_euler_to_quat(vs[indices[1]], UFBX_ROTATION_ORDER_YZX);
+			ufbx_quat q2 = ufbx_euler_to_quat(vs[indices[0]], UFBX_ROTATION_ORDER_ZXY);
+
+			ufbx_quat q01 = ufbx_quat_mul(q0, q1);
+			ufbx_quat q012 = ufbx_quat_mul(q01, q2);
+
+			ufbx_quat ref = ufbx_euler_to_quat(v, order);
+
+			ufbxt_assert_close_quat(&err, q012, ref);
+			ufbxt_assert_close_quat(&err, q012, ref);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
