@@ -4902,7 +4902,7 @@ typedef struct ufbx_tessellate_curve_opts {
 	ufbx_allocator_opts result_allocator; // < Allocator used for the final line curve
 
 	// How many segments tessellate each span in `ufbx_nurbs_basis.spans`.
-	uint32_t span_subdivision;
+	size_t span_subdivision;
 
 	uint32_t _end_zero;
 } ufbx_tessellate_curve_opts;
@@ -4920,8 +4920,8 @@ typedef struct ufbx_tessellate_surface_opts {
 	// would make it easy to create an FBX file with an absurdly high subdivision
 	// rate (similar to mesh subdivision). Please enforce copy the value yourself
 	// enforcing whatever limits you deem reasonable.
-	uint32_t span_subdivision_u;
-	uint32_t span_subdivision_v;
+	size_t span_subdivision_u;
+	size_t span_subdivision_v;
 
 	// Skip computing `ufbx_mesh.material_parts[]`
 	bool skip_mesh_parts;

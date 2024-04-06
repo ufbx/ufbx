@@ -919,3 +919,74 @@ UFBXT_FILE_TEST_ALT(catch_get_vertex_real, maya_vertex_crease)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST_ALT(tessellate_surface_overflow, maya_nurbs_surface_plane)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "nurbsPlane1");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_NURBS_SURFACE);
+	ufbx_nurbs_surface *surface = ufbx_as_nurbs_surface(node->attrib);
+	ufbxt_assert(surface);
+	ufbx_error error;
+
+	{
+		ufbx_mesh *mesh = ufbx_tessellate_nurbs_surface(surface, NULL, NULL);
+		ufbxt_assert(mesh);
+		ufbx_retain_mesh(mesh);
+		ufbx_free_mesh(mesh);
+		ufbx_free_mesh(mesh);
+	}
+
+	for (size_t i = 1; i <= sizeof(ufbx_real); i++) {
+		ufbx_tessellate_surface_opts opts = { 0 };
+		opts.span_subdivision_u = SIZE_MAX / i;
+		ufbx_mesh *mesh = ufbx_tessellate_nurbs_surface(surface, &opts, &error);
+		ufbxt_assert(!mesh);
+		ufbxt_assert(error.type == UFBX_ERROR_UNKNOWN);
+	}
+
+	for (size_t i = 1; i <= sizeof(ufbx_real); i++) {
+		ufbx_tessellate_surface_opts opts = { 0 };
+		opts.span_subdivision_v = SIZE_MAX / i;
+		ufbx_mesh *mesh = ufbx_tessellate_nurbs_surface(surface, &opts, &error);
+		ufbxt_assert(!mesh);
+		ufbxt_assert(error.type == UFBX_ERROR_UNKNOWN);
+	}
+
+	for (size_t i = 1; i <= sizeof(ufbx_real) / 2; i++) {
+		ufbx_tessellate_surface_opts opts = { 0 };
+		opts.span_subdivision_u = opts.span_subdivision_v = (size_t)sqrt((double)SIZE_MAX) / i;
+		ufbx_mesh *mesh = ufbx_tessellate_nurbs_surface(surface, &opts, &error);
+		ufbxt_assert(!mesh);
+		ufbxt_assert(error.type == UFBX_ERROR_UNKNOWN);
+	}
+
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(tessellate_curve_overflow, max_nurbs_to_line)
+#if UFBXT_IMPL
+{
+	ufbx_node *nurbs_node = ufbx_find_node(scene, "Nurbs");
+	ufbxt_assert(nurbs_node);
+	ufbx_nurbs_curve *nurbs = ufbx_as_nurbs_curve(nurbs_node->attrib);
+	ufbxt_assert(nurbs);
+	ufbx_error error;
+
+	{
+		ufbx_line_curve *tess_line = ufbx_tessellate_nurbs_curve(nurbs, NULL, NULL);
+		ufbxt_assert(tess_line);
+		ufbx_retain_line_curve(tess_line);
+		ufbx_free_line_curve(tess_line);
+		ufbx_free_line_curve(tess_line);
+	}
+
+	for (size_t i = 1; i <= sizeof(ufbx_real); i++) {
+		ufbx_tessellate_curve_opts opts = { 0 };
+		opts.span_subdivision = SIZE_MAX / i;
+		ufbx_line_curve *line = ufbx_tessellate_nurbs_curve(nurbs, &opts, &error);
+		ufbxt_assert(!line);
+		ufbxt_assert(error.type == UFBX_ERROR_UNKNOWN);
+	}
+}
+#endif
