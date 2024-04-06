@@ -27098,6 +27098,7 @@ ufbxi_noinline static void ufbxi_kd_build(ufbxi_ngon_context *nc, uint32_t *indi
 ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, uint32_t *indices, uint32_t num_indices)
 {
 	ufbx_face face = nc->face;
+	ufbx_assert(face.num_indices > 4);
 
 	// Form an orthonormal basis to project the polygon into a 2D plane
 	ufbx_vec3 normal = ufbx_get_weighted_face_normal(&nc->positions, face);
