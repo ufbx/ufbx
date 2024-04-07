@@ -1770,7 +1770,7 @@ static ufbx_load_opts ufbxt_immediate_thread_opts()
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT(synthetic_integer_holes_threads, synthetic_integer_holes, ufbxt_immediate_thread_opts)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_integer_holes_threads, synthetic_integer_holes, ufbxt_immediate_thread_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "pPlane1");

@@ -769,7 +769,7 @@ static ufbx_load_opts ufbxt_generate_normals_opts()
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT(synthetic_missing_normals_generated, synthetic_missing_normals, ufbxt_generate_normals_opts)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_missing_normals_generated, synthetic_missing_normals, ufbxt_generate_normals_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
@@ -1464,7 +1464,7 @@ static void ufbxt_check_vertex_w(ufbx_mesh *mesh, ufbx_vertex_vec3 *attrib, ufbx
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS(maya_tangent_sign, ufbxt_retain_vertex_w_opts)
+UFBXT_FILE_TEST_OPTS_FLAGS(maya_tangent_sign, ufbxt_retain_vertex_w_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
 	{
