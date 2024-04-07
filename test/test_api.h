@@ -1060,3 +1060,23 @@ UFBXT_TEST(coordinate_axes_valid)
 }
 #endif
 
+#if UFBXT_IMPL
+static size_t ufbxt_fail_read_fn(void *user, void *data, size_t size)
+{
+	return SIZE_MAX;
+}
+#endif
+
+UFBXT_TEST(io_error)
+#if UFBXT_IMPL
+{
+	ufbx_stream stream = { 0 };
+	stream.read_fn = &ufbxt_fail_read_fn;
+
+	ufbx_error error;
+	ufbx_scene *scene = ufbx_load_stream(&stream, NULL, &error);
+	ufbxt_assert(!scene);
+	ufbxt_assert(error.type == UFBX_ERROR_IO);
+}
+#endif
+
