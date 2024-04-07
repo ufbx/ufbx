@@ -317,14 +317,18 @@ class GCCCompiler(Compiler):
             args += ["--sysroot", self.sysroot]
 
         if config.get("warnings", False):
-            args += ["-Wall", "-Wextra", "-Wsign-conversion", "-Wmissing-prototypes"]
+            args += ["-Wall", "-Wextra", "-Wsign-conversion"]
+            if not self.has_cpp:
+                args += ["-Wmissing-prototypes"]
 
             ufbx_version = get_ufbx_header_version()
             if ufbx_version >= (0, 5, 1):
-                args += ["-Wshadow"]
+                args += ["-Wshadow", "-Wundef"]
                 if "clang" in self.name:
                     args += [
                         "-Wunreachable-code-break",
+                        "-Wmissing-variable-declarations",
+                        "-Wfloat-conversion",
                     ]
                     if self.version_tuple >= (8,0,0):
                         args += [

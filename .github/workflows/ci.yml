@@ -238,6 +238,18 @@ jobs:
       - name: Analyze GCC release stack
         if: ${{ always() && !cancelled() }}
         run: python3 misc/analyze_stack.py build/ufbx-gcc-release.su --limit 0x20000 --cache build/ufbx-cache.pickle
+      - name: Analyze symbols (linked)
+        if: ${{ always() && !cancelled() }}
+        run: |
+          clang -c ufbx.c -o build/ufbx-linked.o
+          objdump -t build/ufbx-linked.o > build/ufbx-linked.syms
+          python3 misc/analyze_symbols.py build/ufbx-linked.syms
+      - name: Analyze symbols (static)
+        if: ${{ always() && !cancelled() }}
+        run: |
+          gcc -DUFBX_STATIC -c ufbx.c -o build/ufbx-static.o
+          objdump -t build/ufbx-static.o > build/ufbx-static.syms
+          python3 misc/analyze_symbols.py build/ufbx-static.syms --all-local
 
   ci_compat:
     runs-on: ubuntu-latest
@@ -475,7 +487,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests stack hashes --no-sanitize --threads 2 --runner ci_arm64
+        run: python3 misc/run_tests.py tests hashes --no-sanitize --threads 2 --runner ci_arm64
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_arm32.txt.gz
@@ -487,7 +499,7 @@ jobs:
           path: build/hashdump_ci_arm32.txt.gz
 
   ci_arm64:
-    runs-on: [self-hosted, ARM64]
+    runs-on: [self-hosted, ARM64, legacy]
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
@@ -499,7 +511,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests stack hashes --no-sanitize --threads 2 --runner ci_arm64
+        run: python3 misc/run_tests.py tests hashes --no-sanitize --threads 2 --runner ci_arm64
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_arm64.txt.gz
@@ -511,7 +523,7 @@ jobs:
           path: build/hashdump_ci_arm64.txt.gz
 
   ci_dataset:
-    runs-on: [self-hosted, ARM64]
+    runs-on: [self-hosted, dataset]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -519,16 +531,16 @@ jobs:
       - name: Create build directory
         run: mkdir build
       - name: Compile check_fbx.c with coverage
-        run: clang -coverage -DUFBX_DEV=1 -DEXTERNAL_UFBX -O2 ufbx.c test/check_fbx.c -lm -o build/check_fbx
+        run: clang -coverage -DUFBX_DEV=1 -DEXTERNAL_UFBX -g -Og ufbx.c test/check_fbx.c -lm -o build/check_fbx
       - name: Run dataset tests
-        run: python3 misc/check_dataset.py --exe build/check_fbx --root /mnt/fbx-files --host-url https://ufbx-dataset.b-cdn.net
+        run: python3 misc/check_dataset.py --exe build/check_fbx --root /mnt/fbx-files --host-url https://ufbx-dataset.b-cdn.net --threads 4
       - name: Generate coverage
         run: LLVM_COV=llvm-cov bash misc/generate_lcov.sh
       - name: Upload coverage
         run: bash /codecov.sh -F dataset -f coverage.lcov -y .github/codecov.yml
 
   ci_fuzz:
-    runs-on: [self-hosted, ARM64]
+    runs-on: [self-hosted, ARM64, legacy]
     steps:
       - uses: actions/checkout@v3
         with:

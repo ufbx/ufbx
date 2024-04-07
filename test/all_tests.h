@@ -19,6 +19,7 @@
 #include "test_curves.h"
 #include "test_cache.h"
 #include "test_nurbs.h"
+#include "test_audio.h"
 #include "test_obj.h"
 #include "test_convert.h"
 #include "test_api.h"

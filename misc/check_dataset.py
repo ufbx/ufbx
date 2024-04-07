@@ -1,7 +1,6 @@
 import os
 import json
 from typing import NamedTuple, Optional, List, Mapping
-import subprocess
 import glob
 import re
 import urllib.parse
@@ -9,8 +8,10 @@ import time
 import math
 import itertools
 import datetime
+import asyncio
+import asyncio.subprocess
 
-LATEST_SUPPORTED_DATE = "2024-02-18"
+LATEST_SUPPORTED_DATE = "2024-04-08"
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -132,92 +133,100 @@ def get_field(path, desc, name, allow_unknown):
     else:
         raise RuntimeError(f"{path}: Bad value for '{name}': {value!r}")
 
+def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_supported_time):
+    path = os.path.join(root, filename)
+
+    with open(path, "rt", encoding="utf-8") as f:
+        desc = json.load(f)
+
+    flag_separator = desc.get("flagSeparator", "_")
+
+    features = desc.get("features", [])
+
+    extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
+    options = { k: as_list(v) for k,v in desc.get("options", {}).items() }
+
+    if heavy:
+        append_unique_opt(options, "geometry-transform-handling", [
+            "preserve", "helper-nodes", "modify-geometry",
+        ])
+
+        append_unique_opt(options, "inherit-mode-handling", [
+            "preserve", "helper-nodes", "compensate",
+        ])
+
+        append_unique_opt(options, "space-conversion", [
+            "transform-root", "adjust-transforms", "modify-geometry",
+        ])
+
+        append_unique_opt(options, "bake", [False, True])
+
+    for feature in features:
+        if feature == "geometry-transform":
+            append_unique_opt(options, "geometry-transform-handling", [
+                "preserve", "helper-nodes", "modify-geometry",
+            ])
+        elif feature == "geometry-transform-no-instances":
+            append_unique_opt(options, "geometry-transform-handling", [
+                "preserve", "helper-nodes", "modify-geometry", "modify-geometry-no-fallback",
+            ])
+        elif feature == "space-conversion":
+            append_unique_opt(options, "space-conversion", [
+                "transform-root", "adjust-transforms", "modify-geometry",
+            ])
+        elif feature == "inherit-mode":
+            append_unique_opt(options, "inherit-mode-handling", [
+                "preserve", "helper-nodes", "compensate",
+            ])
+        elif feature == "pivot":
+            append_unique_opt(options, "pivot-handling", [
+                "retain", "adjust-to-pivot",
+            ])
+        elif feature == "bake":
+            append_unique_opt(options, "bake", [False, True])
+        elif feature == "ignore-missing-external":
+            options["ignore-missing-external"] = [True]
+        else:
+            raise RuntimeError(f"Unknown feature: {feature}")
+    mtime = os.path.getmtime(path)
+    
+    skip = False
+    if last_supported_time and mtime > latest_supported_time.timestamp():
+        skip = True
+
+    models = []
+    extra_files = []
+    if not skip:
+        models = list(gather_case_models(path, flag_separator))
+        if not models:
+            raise RuntimeError(f"No models found for {path}")
+
+        extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
+
+    yield TestCase(
+        root=root_dir,
+        json_path=path,
+        title=get_field(path, desc, "title", allow_unknown),
+        author=get_field(path, desc, "author", allow_unknown),
+        license=get_field(path, desc, "license", allow_unknown),
+        url=get_field(path, desc, "url", allow_unknown),
+        skip=skip,
+        extra_files=extra_files,
+        models=models,
+        options=options,
+    )
+
 def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time):
+    if os.path.isfile(root_dir):
+        head, tail = os.path.split(root_dir)
+        yield from create_dataset_task(head, head, tail, heavy, allow_unknown, last_supported_time)
+        return
+
     for root, _, files in os.walk(root_dir):
         for filename in files:
             if not filename.endswith(".json"):
                 continue
-
-            path = os.path.join(root, filename)
-            with open(path, "rt", encoding="utf-8") as f:
-                desc = json.load(f)
-
-            flag_separator = desc.get("flagSeparator", "_")
-
-            features = desc.get("features", [])
-
-            extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
-            options = { k: as_list(v) for k,v in desc.get("options", {}).items() }
-
-            if heavy:
-                append_unique_opt(options, "geometry-transform-handling", [
-                    "preserve", "helper-nodes", "modify-geometry",
-                ])
-
-                append_unique_opt(options, "inherit-mode-handling", [
-                    "preserve", "helper-nodes", "compensate",
-                ])
-
-                append_unique_opt(options, "space-conversion", [
-                    "transform-root", "adjust-transforms", "modify-geometry",
-                ])
-
-                append_unique_opt(options, "bake", [False, True])
-
-            for feature in features:
-                if feature == "geometry-transform":
-                    append_unique_opt(options, "geometry-transform-handling", [
-                        "preserve", "helper-nodes", "modify-geometry",
-                    ])
-                elif feature == "geometry-transform-no-instances":
-                    append_unique_opt(options, "geometry-transform-handling", [
-                        "preserve", "helper-nodes", "modify-geometry", "modify-geometry-no-fallback",
-                    ])
-                elif feature == "space-conversion":
-                    append_unique_opt(options, "space-conversion", [
-                        "transform-root", "adjust-transforms", "modify-geometry",
-                    ])
-                elif feature == "inherit-mode":
-                    append_unique_opt(options, "inherit-mode-handling", [
-                        "preserve", "helper-nodes", "compensate",
-                    ])
-                elif feature == "pivot":
-                    append_unique_opt(options, "pivot-handling", [
-                        "retain", "adjust-to-pivot",
-                    ])
-                elif feature == "bake":
-                    append_unique_opt(options, "bake", [False, True])
-                elif feature == "ignore-missing-external":
-                    options["ignore-missing-external"] = [True]
-                else:
-                    raise RuntimeError(f"Unknown feature: {feature}")
-            mtime = os.path.getmtime(path)
-            
-            skip = False
-            if last_supported_time and mtime > latest_supported_time.timestamp():
-                skip = True
-
-            models = []
-            extra_files = []
-            if not skip:
-                models = list(gather_case_models(path, flag_separator))
-                if not models:
-                    raise RuntimeError(f"No models found for {path}")
-
-                extra_files = [os.path.join(root, ex) for ex in desc.get("extra-files", [])]
-
-            yield TestCase(
-                root=root_dir,
-                json_path=path,
-                title=get_field(path, desc, "title", allow_unknown),
-                author=get_field(path, desc, "author", allow_unknown),
-                license=get_field(path, desc, "license", allow_unknown),
-                url=get_field(path, desc, "url", allow_unknown),
-                skip=skip,
-                extra_files=extra_files,
-                models=models,
-                options=options,
-            )
+            yield from create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_supported_time)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -230,6 +239,7 @@ if __name__ == "__main__":
     parser.add_argument("--heavy", action="store_true", help="Run heavy checks")
     parser.add_argument("--allow-unknown", action="store_true", help="Allow unknown fields")
     parser.add_argument("--include-recent", action="store_true", help="Run tests that are too recent")
+    parser.add_argument("--threads", type=int, default=1, help="Number of threads to use for running")
     argv = parser.parse_args()
 
     host_url = argv.host_url if argv.host_url else argv.root
@@ -261,9 +271,26 @@ if __name__ == "__main__":
     case_run_count = 0
     case_skip_count = 0
 
+    num_threads = max(argv.threads, 1)
+
     begin_time = time.time()
 
-    for case in cases:
+    unbuffered_log = log
+
+    async def run_case(buffered, case):
+        global ok_count
+        global test_count
+        global case_ok_count
+        global case_run_count
+        global case_skip_count
+
+        lines = []
+        def buffered_log(s=""):
+            lines.append(s)
+        if buffered:
+            log = buffered_log
+        else:
+            log = unbuffered_log
 
         title = case.title if case.title else "(unknown)"
         author = case.author if case.author else "(unknown)"
@@ -284,7 +311,7 @@ if __name__ == "__main__":
             log("-- SKIP --")
             log()
             case_skip_count += 1
-            continue
+            return []
 
         case_run_count += 1
 
@@ -337,12 +364,22 @@ if __name__ == "__main__":
                 log("$ " + " ".join(args))
                 log()
 
-                try:
-                    subprocess.check_call(args)
+                proc = await asyncio.create_subprocess_exec(
+                        args[0], *args[1:],
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE)
+                stdout, stderr = await proc.communicate()
+                stdout = stdout.decode("utf-8", errors="replace").strip()
+                stderr = stderr.decode("utf-8", errors="replace").strip()
+                if stdout:
+                    log(stdout)
+                if stderr:
+                    log(stderr)
+                if proc.returncode == 0:
                     log()
                     log("-- PASS --")
                     ok_count += 1
-                except subprocess.CalledProcessError:
+                else:
                     log()
                     log("-- FAIL --")
                     case_ok = False
@@ -350,6 +387,37 @@ if __name__ == "__main__":
 
         if case_ok:
             case_ok_count += 1
+
+        return lines
+
+    async def run_cases_simple():
+        for case in cases:
+            await run_case(False, case)
+
+    async def run_cases_threaded():
+        tasks = []
+
+        async def resolve_tasks():
+            nonlocal tasks
+            if not tasks: return
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            tasks = list(pending)
+            for task in done:
+                print("\n".join(task.result()))
+
+        for case in cases:
+            if len(tasks) >= num_threads:
+                await resolve_tasks()
+            coro = run_case(True, case)
+            task = asyncio.create_task(coro)
+            tasks.append(task)
+        while tasks:
+            await resolve_tasks()
+
+    if num_threads > 1:
+        asyncio.run(run_cases_threaded())
+    else:
+        asyncio.run(run_cases_simple())
 
     end_time = time.time()
 

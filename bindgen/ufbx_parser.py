@@ -16,8 +16,8 @@ TNumber = lexer.rule("number", r"(0[Xx][0-9A-Fa-f]+)|([0-9]+)", prefix=string.di
 TComment = lexer.rule("comment", r"//[^\r\n]*", prefix="/")
 TPreproc = lexer.rule("preproc", r"#[^\n\\]*(\\\r?\n[^\n\\]*?)*\n", prefix="#")
 TString = lexer.rule("string", r"\"[^\"]*\"", prefix="\"")
-lexer.literals(*"const typedef struct union enum extern ufbx_abi ufbx_inline ufbx_nullable ufbx_unsafe UFBX_LIST_TYPE UFBX_ENUM_REPR UFBX_FLAG_REPR UFBX_ENUM_FORCE_WIDTH UFBX_FLAG_FORCE_WIDTH UFBX_ENUM_TYPE".split())
-lexer.literals(*",.*[]{}()<>=-;")
+lexer.literals(*"const typedef struct union enum extern ufbx_abi ufbx_abi_data ufbx_abi_data_def ufbx_inline ufbx_nullable ufbx_unsafe UFBX_LIST_TYPE UFBX_ENUM_REPR UFBX_FLAG_REPR UFBX_ENUM_FORCE_WIDTH UFBX_FLAG_FORCE_WIDTH UFBX_ENUM_TYPE".split())
+lexer.literals(*",.*[]{}()<>=-?:;")
 lexer.ignore("disable", re.compile(r"//\s*bindgen-disable.*?//\s*bindgen-enable", flags=re.DOTALL))
 
 Token = parsette.Token
@@ -202,7 +202,7 @@ class Parser(parsette.Parser):
         if self.accept("const"):
             inner = self.parse_type()
             return ATypeConst(inner)
-        elif self.accept(["ufbx_nullable", "ufbx_abi", "ufbx_unsafe", "ufbx_inline"]):
+        elif self.accept(["ufbx_nullable", "ufbx_abi", "ufbx_abi_data", "ufbx_unsafe", "ufbx_inline"]):
             inner = self.parse_type()
             return ATypeSpec(inner, token)
         elif self.accept(["struct", "union"]):
@@ -346,6 +346,7 @@ class SModConst(SMod): pass
 class SModNullable(SMod): pass
 class SModInline(SMod): pass
 class SModAbi(SMod): pass
+class SModAbiData(SMod): pass
 class SModUnsafe(SMod): pass
 class SModPointer(SMod): pass
 class SModArray(SMod):
@@ -425,6 +426,7 @@ def type_line(typ: AType):
 
 spec_to_mod = {
     "ufbx_abi": SModAbi,
+    "ufbx_abi_data": SModAbiData,
     "ufbx_nullable": SModNullable,
     "ufbx_inline": SModInline,
     "ufbx_unsafe": SModUnsafe,
@@ -553,11 +555,18 @@ def to_sbody(typ: AType):
     else:
         raise TypeError(f"Unhandled type {type(typ)}")
 
-def top_sdecls(top: ATop) -> List[SCommentDecl]:
+class TopState:
+    def __init__(self):
+        self.preproc_line = -1
+        self.preproc_start = -1
+
+def top_sdecls(top: ATop, state: TopState = None) -> List[SCommentDecl]:
+    if not state:
+        state = TopState()
     if isinstance(top, ATopFile):
         decls = []
         for t in top.tops:
-            decls += top_sdecls(t)
+            decls += top_sdecls(t, state)
         return decls
     elif isinstance(top, ATopTypedef):
         return [to_sdecl(top.decl, "typedef")]
@@ -588,10 +597,13 @@ def top_sdecls(top: ATop) -> List[SCommentDecl]:
             )]
         )]
     elif isinstance(top, ATopPreproc):
-        line = top.preproc.location.line
+        line = top.preproc.location.line - 1
         text = top.preproc.text()
         m = re.match(r"#\s*define\s+(\w+)(\([^\)]*\))?\s+(.*)", text)
         if m:
+            start_line = line
+            if line == state.preproc_line + 1:
+                start_line = state.preproc_start
             name = m.group(1)
             args = m.group(2)
             if args:
@@ -599,10 +611,13 @@ def top_sdecls(top: ATop) -> List[SCommentDecl]:
             else:
                 args = None
             value = m.group(3)
-            return [SDecl(line, line, "define", [SName(name, SType("define", "define"))],
+            return [SDecl(start_line, line, "define", [SName(name, SType("define", "define"))],
                 define_args=args,
                 value=value)]
         else:
+            if line != state.preproc_line + 1:
+                state.preproc_start = line
+            state.preproc_line = line
             return [] # TODO
     else:
         raise TypeError(f"Unhandled type {type(top)}")
@@ -679,6 +694,8 @@ def format_mod(mod: SMod):
         return { "type": "inline" }
     elif isinstance(mod, SModAbi):
         return { "type": "abi" }
+    elif isinstance(mod, SModAbiData):
+        return { "type": "abi_data" }
     elif isinstance(mod, SModPointer):
         return { "type": "pointer" }
     elif isinstance(mod, SModUnsafe):

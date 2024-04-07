@@ -350,6 +350,8 @@ def parse_type(file, typ, in_func=False):
     mods = typ["mods"]
     if in_func:
         mods = [m for m in mods if m["type"] not in ("function", "inline", "abi", "unsafe")]
+    else:
+        mods = [m for m in mods if m["type"] not in ("abi_data", )]
     return parse_type_imp(file, typ, mods)
 
 def parse_field(file: File, st: Struct, decl, anon_path):
@@ -569,6 +571,7 @@ sizes_base = {
     "float": 4,
     "double": 8,
     "enum": 4,
+    "UFBX_REAL_TYPE": 8,
 }
 
 sizes_32bit = {
@@ -801,7 +804,7 @@ member_functions = [
     MemberFunction(func="ufbx_get_compatible_matrix_for_normals", self_type="ufbx_node"),
     MemberFunction(func="ufbx_evaluate_curve", self_type="ufbx_anim_curve", member_name="evaluate"),
     MemberFunction(func="ufbx_evaluate_anim_value_real", self_type="ufbx_anim_value", member_name="evaluate_real"),
-    MemberFunction(func="ufbx_evaluate_anim_value_vec2", self_type="ufbx_anim_value", member_name="evaluate_vec2"),
+    # MemberFunction(func="ufbx_evaluate_anim_value_vec2", self_type="ufbx_anim_value", member_name="evaluate_vec2"),
     MemberFunction(func="ufbx_evaluate_anim_value_vec3", self_type="ufbx_anim_value", member_name="evaluate_vec3"),
     MemberFunction(func="ufbx_evaluate_transform", self_type="ufbx_node"),
     MemberFunction(func="ufbx_evaluate_blend_weight", self_type="ufbx_blend_channel"),
@@ -1062,7 +1065,7 @@ if __name__ == "__main__":
     file.functions["ufbx_retain_baked_anim"].kind = "retain"
 
     file.functions["ufbx_triangulate_face"].return_array_scale = 3
-    file.functions["ufbx_ffi_triangulate_face"].return_array_scale = 3
+    # file.functions["ufbx_ffi_triangulate_face"].return_array_scale = 3
     file.functions["ufbx_read_geometry_cache_real"].return_array_scale = 1
     file.functions["ufbx_sample_geometry_cache_real"].return_array_scale = 1
     file.functions["ufbx_read_geometry_cache_vec3"].return_array_scale = 1

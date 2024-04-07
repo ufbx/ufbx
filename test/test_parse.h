@@ -1470,6 +1470,9 @@ UFBXT_FILE_TEST(synthetic_rotation_order_layers)
 	ufbxt_assert(anim);
 	ufbxt_check_anim(scene, anim);
 
+	ufbx_retain_anim(anim);
+	ufbx_free_anim(anim);
+
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node);
 
@@ -1725,6 +1728,81 @@ UFBXT_TEST(filename_option_unicode)
 
 		free(data);
 	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_integer_holes)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	static int hole_ref[] = { 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 0, 0, 0 };
+
+	ufbxt_assert(mesh->face_hole.count == 16);
+	for (size_t i = 0;  i < 16; i++) {
+		bool hole = mesh->face_hole.data[i];
+		bool ref = hole_ref[i] != 0;
+		ufbxt_assert(hole == ref);
+	}
+}
+#endif
+
+#if UFBXT_IMPL
+static bool ufbxt_immediate_run_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count)
+{
+	for (uint32_t i = 0; i < count; i++) {
+		ufbx_thread_pool_run_task(ctx, start_index + i);
+	}
+	return true;
+}
+static bool ufbxt_immediate_wait_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index)
+{
+	return true;
+}
+static ufbx_load_opts ufbxt_immediate_thread_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.thread_opts.pool.run_fn = &ufbxt_immediate_run_fn;
+	opts.thread_opts.pool.wait_fn = &ufbxt_immediate_wait_fn;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_integer_holes_threads, synthetic_integer_holes, ufbxt_immediate_thread_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pPlane1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	static int hole_ref[] = { 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 0, 0, 0 };
+
+	ufbxt_assert(mesh->face_hole.count == 16);
+	for (size_t i = 0;  i < 16; i++) {
+		bool hole = mesh->face_hole.data[i];
+		bool ref = hole_ref[i] != 0;
+		ufbxt_assert(hole == ref);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_comment_cube)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_comment_cube_threads, synthetic_comment_cube, ufbxt_immediate_thread_opts, UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_cube_threads, maya_cube, ufbxt_immediate_thread_opts, UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
 }
 #endif
 

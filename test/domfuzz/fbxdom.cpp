@@ -142,7 +142,7 @@ struct binary_parser
 		char type = reader.read<char>();
 		v.type = type;
 		switch (type) {
-		case 'B': case 'C': v.data_float = (double)(v.data_int = reader.read<int8_t>()); break;
+		case 'B': case 'C': case 'Z': v.data_float = (double)(v.data_int = reader.read<uint8_t>()); break;
 		case 'Y': v.data_float = (double)(v.data_int = reader.read<int16_t>()); break;
 		case 'I': v.data_float = (double)(v.data_int = reader.read<int32_t>()); break;
 		case 'L': v.data_float = (double)(v.data_int = reader.read<int64_t>()); break;

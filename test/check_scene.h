@@ -162,6 +162,14 @@ static void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void 
 		ufbxt_assert(elem_size <= 32);
 		ufbxt_assert(!memcmp((char*)elem->values.data - elem_size, zero, elem_size));
 	}
+
+	// Check attrib W if defined
+	if (elem->values_w.count > 0) {
+		if (elem->indices.count > 0) {
+			ufbxt_assert(elem->values_w.data[-1] == 0.0);
+		}
+		ufbxt_assert(elem->values_w.count == elem->values.count);
+	}
 }
 
 static void ufbxt_check_mesh_list_count(ufbx_scene *scene, ufbx_mesh *mesh, size_t count, size_t required_count, bool optional)
@@ -252,6 +260,8 @@ static void ufbxt_check_element_cast(ufbx_element *element)
 	if (ufbx_as_selection_node(element)) ufbxt_assert(element->type == UFBX_ELEMENT_SELECTION_NODE);
 	if (ufbx_as_character(element)) ufbxt_assert(element->type == UFBX_ELEMENT_CHARACTER);
 	if (ufbx_as_constraint(element)) ufbxt_assert(element->type == UFBX_ELEMENT_CONSTRAINT);
+	if (ufbx_as_audio_layer(element)) ufbxt_assert(element->type == UFBX_ELEMENT_AUDIO_LAYER);
+	if (ufbx_as_audio_clip(element)) ufbxt_assert(element->type == UFBX_ELEMENT_AUDIO_CLIP);
 	if (ufbx_as_pose(element)) ufbxt_assert(element->type == UFBX_ELEMENT_POSE);
 	if (ufbx_as_metadata_object(element)) ufbxt_assert(element->type == UFBX_ELEMENT_METADATA_OBJECT);
 }
@@ -876,6 +886,12 @@ static void ufbxt_check_blend_channel(ufbx_scene *scene, ufbx_blend_channel *cha
 		ufbxt_check_element_ptr(scene, channel->keyframes.data[i].shape, UFBX_ELEMENT_BLEND_SHAPE);
 	}
 	ufbxt_check_element_ptr(scene, channel->target_shape, UFBX_ELEMENT_BLEND_SHAPE);
+
+	if (channel->keyframes.count > 0) {
+		ufbxt_assert(channel->target_shape == channel->keyframes.data[channel->keyframes.count - 1].shape);
+	} else {
+		ufbxt_assert(channel->target_shape == NULL);
+	}
 }
 
 static void ufbxt_check_blend_shape(ufbx_scene *scene, ufbx_blend_shape *shape)
@@ -1153,6 +1169,24 @@ static void ufbxt_check_constraint(ufbx_scene *scene, ufbx_constraint *constrain
 		ufbxt_assert(constraint->targets.data[i].node);
 		ufbxt_check_element_ptr(scene, constraint->targets.data[i].node, UFBX_ELEMENT_NODE);
 	}
+}
+
+static void ufbxt_check_audio_layer(ufbx_scene *scene, ufbx_audio_layer *layer)
+{
+	for (size_t i = 0; i < layer->clips.count; i++) {
+		ufbxt_check_element_ptr(scene, layer->clips.data[i], UFBX_ELEMENT_AUDIO_CLIP);
+	}
+}
+
+static void ufbxt_check_audio_clip(ufbx_scene *scene, ufbx_audio_clip *clip)
+{
+	ufbxt_check_string(clip->filename);
+	ufbxt_check_string(clip->absolute_filename);
+	ufbxt_check_string(clip->relative_filename);
+	ufbxt_check_blob(clip->raw_filename);
+	ufbxt_check_blob(clip->raw_absolute_filename);
+	ufbxt_check_blob(clip->raw_relative_filename);
+	ufbxt_check_blob(clip->content);
 }
 
 static void ufbxt_check_pose(ufbx_scene *scene, ufbx_pose *pose)
@@ -1455,6 +1489,14 @@ static void ufbxt_check_scene(ufbx_scene *scene)
 
 	for (size_t i = 0; i < scene->constraints.count; i++) {
 		ufbxt_check_constraint(scene, scene->constraints.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->audio_layers.count; i++) {
+		ufbxt_check_audio_layer(scene, scene->audio_layers.data[i]);
+	}
+
+	for (size_t i = 0; i < scene->audio_clips.count; i++) {
+		ufbxt_check_audio_clip(scene, scene->audio_clips.data[i]);
 	}
 
 	for (size_t i = 0; i < scene->poses.count; i++) {

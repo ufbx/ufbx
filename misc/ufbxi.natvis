@@ -115,7 +115,7 @@
     </Expand>
   </Type>
 
-  <Type Name="ufbxi_double_list"><DisplayString>{{ count={count} }}</DisplayString><Expand><ArrayItems><Size>count</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
+  <Type Name="ufbxi_bake_time_list"><DisplayString>{{ count={count} }}</DisplayString><Expand><ArrayItems><Size>count</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
 
   <Type Name="ufbxos_wait_sema">
 	  <Expand>
