@@ -1015,8 +1015,10 @@ static void ufbxt_assert_close_quat_threshold(ufbxt_diff_error *p_err, ufbx_quat
 	ufbxt_assert_close_real_threshold(p_err, a.w, b.w, threshold);
 }
 
-static ufbxt_noinline void ufbxt_check_source_vertices(ufbx_mesh *mesh, ufbx_mesh *src_mesh, ufbxt_diff_error *p_err)
+static ufbxt_noinline void ufbxt_check_source_vertices(ufbx_mesh *mesh, ufbx_mesh *src_mesh, ufbxt_diff_error *p_err, ufbx_real threshold)
 {
+	if (threshold == 0.0) threshold = 0.001;
+
 	ufbx_subdivision_result *sub = mesh->subdivision_result;
 	ufbxt_assert(sub);
 
@@ -1035,7 +1037,7 @@ static ufbxt_noinline void ufbxt_check_source_vertices(ufbx_mesh *mesh, ufbx_mes
 		}
 
 		ufbx_vec3 ref = mesh->vertices.data[vi];
-		ufbxt_assert_close_vec3(p_err, ref, sum);
+		ufbxt_assert_close_vec3_threshold(p_err, ref, sum, threshold);
 		ref = ref;
 	}
 }
@@ -1384,7 +1386,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		}
 
 		if (obj->ignore_duplicates) {
-			if (!node) {
+			if (!node || !ufbxt_has_mesh(node)) {
 				bool is_ncl = false;
 				for (size_t i = 0; i < obj_mesh->num_groups; i++) {
 					if (strstr(obj_mesh->groups[i], "_ncl1_")) {
@@ -1488,7 +1490,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 			// Check that we didn't break the original mesh
 			ufbxt_check_mesh(scene, mesh);
 
-			ufbxt_check_source_vertices(sub_mesh, mesh, p_err);
+			ufbxt_check_source_vertices(sub_mesh, mesh, p_err, 0.0);
 
 			ufbxt_check_mesh(scene, sub_mesh);
 			ufbxt_match_obj_mesh(obj, node, sub_mesh, obj_mesh, p_err, (ufbx_real)scale);
@@ -1627,6 +1629,37 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 	free(obj_nodes);
 	free(cat_name_data);
 	free(used_nodes);
+}
+
+static ufbx_mesh *ufbxt_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error)
+{
+	ufbx_mesh *result = ufbx_subdivide_mesh(mesh, level, opts, error);
+	if (!result) return result;
+
+	ufbx_subdivision_result *res = result->subdivision_result;
+	ufbxt_assert(res);
+
+	for (size_t i = 1; i < res->temp_allocs; i++) {
+		ufbx_error fail_error;
+		ufbx_subdivide_opts fail_opts = { 0 };
+		if (opts) fail_opts = *opts;
+		fail_opts.temp_allocator.allocation_limit = i;
+		ufbx_mesh *fail_result = ufbx_subdivide_mesh(mesh, level, &fail_opts, &fail_error);
+		ufbxt_assert(!fail_result);
+		ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+
+	for (size_t i = 1; i < res->result_allocs; i++) {
+		ufbx_error fail_error;
+		ufbx_subdivide_opts fail_opts = { 0 };
+		if (opts) fail_opts = *opts;
+		fail_opts.result_allocator.allocation_limit = i;
+		ufbx_mesh *fail_result = ufbx_subdivide_mesh(mesh, level, &fail_opts, &fail_error);
+		ufbxt_assert(!fail_result);
+		ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	}
+
+	return result;
 }
 
 // -- IO

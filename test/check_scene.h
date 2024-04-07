@@ -162,6 +162,14 @@ static void ufbxt_check_vertex_element(ufbx_scene *scene, ufbx_mesh *mesh, void 
 		ufbxt_assert(elem_size <= 32);
 		ufbxt_assert(!memcmp((char*)elem->values.data - elem_size, zero, elem_size));
 	}
+
+	// Check attrib W if defined
+	if (elem->values_w.count > 0) {
+		if (elem->indices.count > 0) {
+			ufbxt_assert(elem->values_w.data[-1] == 0.0);
+		}
+		ufbxt_assert(elem->values_w.count == elem->values.count);
+	}
 }
 
 static void ufbxt_check_mesh_list_count(ufbx_scene *scene, ufbx_mesh *mesh, size_t count, size_t required_count, bool optional)

@@ -1084,7 +1084,7 @@ static ufbx_load_opts ufbxt_search_mtl_by_filename_opts()
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS(synthetic_filename_mtl, ufbxt_search_mtl_by_filename_opts)
+UFBXT_FILE_TEST_OPTS_FLAGS(synthetic_filename_mtl, ufbxt_search_mtl_by_filename_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
 	ufbxt_check_warning(scene, UFBX_WARNING_MISSING_EXTERNAL_FILE, UFBX_ELEMENT_UNKNOWN, NULL, 1, "materials.mtl");

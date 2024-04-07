@@ -665,3 +665,398 @@ UFBXT_TEST(element_type_sizes)
 	}
 }
 #endif
+
+UFBXT_TEST(evaluate_anim_null)
+#if UFBXT_IMPL
+{
+	ufbx_real r = ufbx_evaluate_anim_value_real(NULL, 0.0);
+	ufbxt_assert(r == 0.0f);
+
+	ufbx_vec3 v = ufbx_evaluate_anim_value_vec3(NULL, 0.0);
+	ufbxt_assert(v.x == 0.0f && v.y == 0.0f && v.z == 0.0f);
+}
+#endif
+
+UFBXT_TEST(catch_triangulate)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbx_scene *scene = ufbx_load_file(path, NULL, NULL);
+		ufbxt_assert(scene);
+
+		ufbx_node *node = ufbx_find_node(scene, "pCube1");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbx_face face = mesh->faces.data[0];
+		ufbxt_assert(face.index_begin == 0);
+		ufbxt_assert(face.num_indices == 4);
+
+		ufbx_panic panic;
+
+		{
+			uint32_t indices[6];
+			panic.did_panic = false;
+			uint32_t num_tris = ufbx_catch_triangulate_face(&panic, indices, 6, mesh, face);
+			ufbxt_assert(num_tris == 2);
+			ufbxt_assert(!panic.did_panic);
+		}
+
+		{
+			uint32_t indices[4];
+			panic.did_panic = false;
+			uint32_t num_tris = ufbx_catch_triangulate_face(&panic, indices, 4, mesh, face);
+			ufbxt_assert(num_tris == 0);
+			ufbxt_assert(panic.did_panic);
+			ufbxt_assert(!strcmp(panic.message, "Face needs at least 6 indices for triangles, got space for 4"));
+		}
+
+		{
+			ufbx_face bad_face = { 100, 4 };
+			uint32_t indices[6];
+			panic.did_panic = false;
+			uint32_t num_tris = ufbx_catch_triangulate_face(&panic, indices, 6, mesh, bad_face);
+			ufbxt_assert(num_tris == 0);
+			ufbxt_assert(panic.did_panic);
+			ufbxt_assert(!strcmp(panic.message, "Face index begin (100) out of bounds (24)"));
+		}
+
+		{
+			ufbx_face bad_face = { 22, 4 };
+			uint32_t indices[6];
+			panic.did_panic = false;
+			uint32_t num_tris = ufbx_catch_triangulate_face(&panic, indices, 6, mesh, bad_face);
+			ufbxt_assert(num_tris == 0);
+			ufbxt_assert(panic.did_panic);
+			ufbxt_assert(!strcmp(panic.message, "Face index end (22 + 4) out of bounds (24)"));
+		}
+
+		ufbx_free_scene(scene);
+	}
+}
+#endif
+
+UFBXT_TEST(catch_face_normal)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbx_scene *scene = ufbx_load_file(path, NULL, NULL);
+		ufbxt_assert(scene);
+
+		ufbx_node *node = ufbx_find_node(scene, "pCube1");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+		ufbx_face face = mesh->faces.data[0];
+		ufbxt_assert(face.index_begin == 0);
+		ufbxt_assert(face.num_indices == 4);
+
+		ufbx_panic panic;
+
+		{
+			panic.did_panic = false;
+			ufbx_catch_get_weighted_face_normal(&panic, &mesh->vertex_position, face);
+			ufbxt_assert(!panic.did_panic);
+		}
+
+		{
+			ufbx_face bad_face = { 100, 4 };
+			panic.did_panic = false;
+			ufbx_catch_get_weighted_face_normal(&panic, &mesh->vertex_position, bad_face);
+			ufbxt_assert(panic.did_panic);
+			ufbxt_assert(!strcmp(panic.message, "Face index begin (100) out of bounds (24)"));
+		}
+
+		{
+			ufbx_face bad_face = { 22, 4 };
+			panic.did_panic = false;
+			ufbx_catch_get_weighted_face_normal(&panic, &mesh->vertex_position, bad_face);
+			ufbxt_assert(panic.did_panic);
+			ufbxt_assert(!strcmp(panic.message, "Face index end (22 + 4) out of bounds (24)"));
+		}
+
+		ufbx_free_scene(scene);
+	}
+}
+#endif
+
+#if UFBXT_IMPL
+static bool ufbxt_open_file_fail(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info)
+{
+	return false;
+}
+
+static bool ufbxt_fail_skip(void *user, size_t size)
+{
+	return false;
+}
+
+static bool ufbxt_open_file_bad_skip(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info)
+{
+	bool ok = ufbx_open_file(stream, path, path_len);
+	ufbxt_assert(ok);
+	stream->skip_fn = &ufbxt_fail_skip;
+	return true;
+}
+#endif
+
+UFBXT_TEST(cache_fail_skip)
+#if UFBXT_IMPL
+{
+	const char *path = "caches/sine_mxsf_regular/cache.xml";
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s", data_root, path);
+
+	ufbx_geometry_cache *cache = ufbx_load_geometry_cache(buf, NULL, NULL);
+	ufbxt_assert(cache);
+	ufbx_retain_geometry_cache(cache);
+	ufbx_free_geometry_cache(cache);
+
+	ufbxt_assert(cache->frames.count > 2);
+	ufbx_cache_frame *frame = &cache->frames.data[1];
+	ufbx_real data[256];
+
+	{
+		size_t num_read = ufbx_read_geometry_cache_real(frame, data, ufbxt_arraycount(data), NULL);
+		ufbxt_assert(num_read == 108);
+	}
+
+	{
+		ufbx_geometry_cache_data_opts opts = { 0 };
+		opts.open_file_cb.fn = &ufbxt_open_file_fail;
+		size_t num_read = ufbx_read_geometry_cache_real(frame, data, ufbxt_arraycount(data), &opts);
+		ufbxt_assert(num_read == 0);
+	}
+
+	{
+		ufbx_geometry_cache_data_opts opts = { 0 };
+		opts.open_file_cb.fn = &ufbxt_open_file_bad_skip;
+		size_t num_read = ufbx_read_geometry_cache_real(frame, data, ufbxt_arraycount(data), &opts);
+		ufbxt_assert(num_read == 0);
+	}
+
+	ufbx_free_geometry_cache(cache);
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_retain_w_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.retain_vertex_attrib_w = true;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(catch_get_vertex_vec, maya_color_sets, ufbxt_retain_w_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbx_panic panic;
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		panic.did_panic = false;
+		ufbx_catch_get_vertex_vec3(&panic, &mesh->vertex_position, i);
+		ufbxt_assert(!panic.did_panic);
+		ufbx_catch_get_vertex_vec2(&panic, &mesh->vertex_uv, i);
+		ufbxt_assert(!panic.did_panic);
+		ufbx_catch_get_vertex_vec4(&panic, &mesh->vertex_color, i);
+		ufbxt_assert(!panic.did_panic);
+		ufbx_real w = ufbx_catch_get_vertex_w_vec3(&panic, &mesh->vertex_tangent, i);
+		ufbxt_assert(!panic.did_panic);
+		if (scene->metadata.version >= 7000) {
+			ufbxt_assert(w == 1.0f);
+		} else {
+			ufbxt_assert(w == 0.0f);
+		}
+	}
+
+	{
+		size_t index = 24;
+		panic.did_panic = false;
+		ufbx_catch_get_vertex_vec3(&panic, &mesh->vertex_position, index);
+		ufbxt_assert(panic.did_panic);
+		ufbxt_assert(!strcmp(panic.message, "index (24) out of range (24)"));
+		panic.did_panic = false;
+		ufbx_catch_get_vertex_vec2(&panic, &mesh->vertex_uv, index);
+		ufbxt_assert(panic.did_panic);
+		ufbxt_assert(!strcmp(panic.message, "index (24) out of range (24)"));
+		panic.did_panic = false;
+		ufbx_catch_get_vertex_vec4(&panic, &mesh->vertex_color, index);
+		ufbxt_assert(panic.did_panic);
+		ufbxt_assert(!strcmp(panic.message, "index (24) out of range (24)"));
+		ufbx_catch_get_vertex_w_vec3(&panic, &mesh->vertex_tangent, index);
+		ufbxt_assert(panic.did_panic);
+		ufbxt_assert(!strcmp(panic.message, "index (24) out of range (24)"));
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(catch_get_vertex_real, maya_vertex_crease)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbx_panic panic;
+	panic.did_panic = false;
+	for (size_t i = 0; i < mesh->num_indices; i++) {
+		ufbx_catch_get_vertex_real(&panic, &mesh->vertex_crease, i);
+		ufbxt_assert(!panic.did_panic);
+	}
+
+	{
+		size_t index = 24;
+		panic.did_panic = false;
+		ufbx_catch_get_vertex_real(&panic, &mesh->vertex_crease, index);
+		ufbxt_assert(panic.did_panic);
+		ufbxt_assert(!strcmp(panic.message, "index (24) out of range (24)"));
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(tessellate_surface_overflow, maya_nurbs_surface_plane)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "nurbsPlane1");
+	ufbxt_assert(node && node->attrib_type == UFBX_ELEMENT_NURBS_SURFACE);
+	ufbx_nurbs_surface *surface = ufbx_as_nurbs_surface(node->attrib);
+	ufbxt_assert(surface);
+	ufbx_error error;
+
+	{
+		ufbx_mesh *mesh = ufbx_tessellate_nurbs_surface(surface, NULL, NULL);
+		ufbxt_assert(mesh);
+		ufbx_retain_mesh(mesh);
+		ufbx_free_mesh(mesh);
+		ufbx_free_mesh(mesh);
+	}
+
+	for (size_t i = 1; i <= sizeof(ufbx_real); i++) {
+		ufbx_tessellate_surface_opts opts = { 0 };
+		opts.span_subdivision_u = SIZE_MAX / i;
+		ufbx_mesh *mesh = ufbx_tessellate_nurbs_surface(surface, &opts, &error);
+		ufbxt_assert(!mesh);
+		ufbxt_assert(error.type == UFBX_ERROR_UNKNOWN);
+	}
+
+	for (size_t i = 1; i <= sizeof(ufbx_real); i++) {
+		ufbx_tessellate_surface_opts opts = { 0 };
+		opts.span_subdivision_v = SIZE_MAX / i;
+		ufbx_mesh *mesh = ufbx_tessellate_nurbs_surface(surface, &opts, &error);
+		ufbxt_assert(!mesh);
+		ufbxt_assert(error.type == UFBX_ERROR_UNKNOWN);
+	}
+
+	for (size_t i = 1; i <= sizeof(ufbx_real) / 2; i++) {
+		ufbx_tessellate_surface_opts opts = { 0 };
+		opts.span_subdivision_u = opts.span_subdivision_v = (size_t)sqrt((double)SIZE_MAX) / i;
+		ufbx_mesh *mesh = ufbx_tessellate_nurbs_surface(surface, &opts, &error);
+		ufbxt_assert(!mesh);
+		ufbxt_assert(error.type == UFBX_ERROR_UNKNOWN);
+	}
+
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(tessellate_curve_overflow, max_nurbs_to_line)
+#if UFBXT_IMPL
+{
+	ufbx_node *nurbs_node = ufbx_find_node(scene, "Nurbs");
+	ufbxt_assert(nurbs_node);
+	ufbx_nurbs_curve *nurbs = ufbx_as_nurbs_curve(nurbs_node->attrib);
+	ufbxt_assert(nurbs);
+	ufbx_error error;
+
+	{
+		ufbx_line_curve *tess_line = ufbx_tessellate_nurbs_curve(nurbs, NULL, NULL);
+		ufbxt_assert(tess_line);
+		ufbx_retain_line_curve(tess_line);
+		ufbx_free_line_curve(tess_line);
+		ufbx_free_line_curve(tess_line);
+	}
+
+	for (size_t i = 1; i <= sizeof(ufbx_real); i++) {
+		ufbx_tessellate_curve_opts opts = { 0 };
+		opts.span_subdivision = SIZE_MAX / i;
+		ufbx_line_curve *line = ufbx_tessellate_nurbs_curve(nurbs, &opts, &error);
+		ufbxt_assert(!line);
+		ufbxt_assert(error.type == UFBX_ERROR_UNKNOWN);
+	}
+}
+#endif
+
+UFBXT_TEST(coordinate_axes_valid)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Y;
+		axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
+		ufbxt_assert(ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.up = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = (ufbx_coordinate_axis)-1;
+		axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Y;
+		axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = (ufbx_coordinate_axis)100;
+		axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Y;
+		axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.up = (ufbx_coordinate_axis)-1;
+		axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.up = (ufbx_coordinate_axis)100;
+		axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Y;
+		axes.front = (ufbx_coordinate_axis)-1;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+
+	{
+		ufbx_coordinate_axes axes;
+		axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
+		axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Y;
+		axes.front = (ufbx_coordinate_axis)100;
+		ufbxt_assert(!ufbx_coordinate_axes_valid(axes));
+	}
+}
+#endif
+

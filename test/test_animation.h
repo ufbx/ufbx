@@ -1896,6 +1896,33 @@ UFBXT_FILE_TEST_ALT(maya_anim_linear_default, maya_anim_linear)
 }
 #endif
 
+UFBXT_FILE_TEST_ALT(maya_anim_linear_ignore, maya_anim_linear)
+#if UFBXT_IMPL
+{
+	ufbx_bake_opts opts = { 0 };
+	opts.step_handling = UFBX_BAKE_STEP_HANDLING_IGNORE;
+
+	ufbx_error error;
+	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	ufbx_baked_vec3 translation_ref[] = {
+		{ 0.0/24.0, { 0.0f, 0.0f, 0.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 2.0/24.0, { 0.5f, 2.0f, 0.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 8.0/24.0, { 2.0f, 0.0f, 0.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		{ 12.0/24.0, { 2.0f, 0.0f, 2.0f }, UFBX_BAKED_KEY_KEYFRAME|UFBX_BAKED_KEY_STEP_KEY },
+		{ 14.0/24.0, { 2.0f, 0.0f, 0.0f }, UFBX_BAKED_KEY_KEYFRAME },
+	};
+
+	ufbxt_assert(bake->nodes.count == 1);
+	ufbx_baked_node *node = &bake->nodes.data[0];
+	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+	ufbx_free_baked_anim(bake);
+}
+#endif
+
 UFBXT_FILE_TEST(maya_huge_stepped_tangents)
 #if UFBXT_IMPL
 {
@@ -3187,6 +3214,171 @@ UFBXT_FILE_TEST(maya_keyframe_offset_step)
 	ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
 
 	ufbx_free_baked_anim(bake);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_linear_spline)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_bake_opts opts = { 0 };
+		opts.resample_rate = 24.0;
+		opts.bake_transform_props = true;
+
+		ufbx_error error;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (!bake) ufbxt_log_error(&error);
+		ufbxt_assert(bake);
+
+		ufbx_baked_vec3 translation_ref[] = {
+			{ 0.0/24.0, { 0.0f }, UFBX_BAKED_KEY_KEYFRAME },
+			{ 1.0/24.0, { 0.333333f }, 0 },
+			{ 2.0/24.0, { 0.666666f }, 0 },
+			{ 3.0/24.0, { 1.0f }, 0 },
+			{ 4.0/24.0, { 1.333333f }, 0 },
+			{ 5.0/24.0, { 1.666666f }, 0 },
+			{ 6.0/24.0, { 2.0f }, 0 },
+			{ 7.0/24.0, { 2.333333f }, 0 },
+			{ 8.0/24.0, { 2.666666f }, 0 },
+			{ 9.0/24.0, { 3.0f }, 0 },
+			{ 10.0/24.0, { 3.333333f }, 0 },
+			{ 11.0/24.0, { 3.666666f }, 0 },
+			{ 12.0/24.0, { 4.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		};
+
+		ufbxt_assert(bake->nodes.count == 1);
+		ufbx_baked_node *node = &bake->nodes.data[0];
+		ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+		ufbxt_assert(bake->elements.count == 1);
+		ufbx_baked_element *elem = &bake->elements.data[0];
+		ufbxt_assert(elem->element_id == node->element_id);
+		ufbx_baked_prop *prop = NULL;
+		for (size_t i = 0; i < elem->props.count; i++) {
+			if (!strcmp(elem->props.data[i].name.data, UFBX_Lcl_Translation)) {
+				prop = &elem->props.data[i];
+				break;
+			}
+		}
+		ufbxt_assert(prop);
+		ufbxt_diff_baked_vec3(err, translation_ref, prop->keys);
+
+		ufbx_free_baked_anim(bake);
+	}
+
+	{
+		ufbx_bake_opts opts = { 0 };
+		opts.resample_rate = 24.0;
+		opts.bake_transform_props = true;
+		opts.key_reduction_enabled = true;
+		opts.key_reduction_passes = 16;
+
+		ufbx_error error;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (!bake) ufbxt_log_error(&error);
+		ufbxt_assert(bake);
+
+		ufbx_baked_vec3 translation_ref[] = {
+			{ 0.0/24.0, { 0.0f }, UFBX_BAKED_KEY_KEYFRAME },
+			{ 12.0/24.0, { 4.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		};
+
+		ufbxt_assert(bake->nodes.count == 1);
+		ufbx_baked_node *node = &bake->nodes.data[0];
+		ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+		ufbxt_assert(bake->elements.count == 1);
+		ufbx_baked_element *elem = &bake->elements.data[0];
+		ufbxt_assert(elem->element_id == node->element_id);
+		ufbx_baked_prop *prop = NULL;
+		for (size_t i = 0; i < elem->props.count; i++) {
+			if (!strcmp(elem->props.data[i].name.data, UFBX_Lcl_Translation)) {
+				prop = &elem->props.data[i];
+				break;
+			}
+		}
+		ufbxt_assert(prop);
+		ufbxt_diff_baked_vec3(err, translation_ref, prop->keys);
+
+		ufbx_free_baked_anim(bake);
+	}
+
+	{
+		ufbx_bake_opts opts = { 0 };
+		opts.resample_rate = 24.0;
+		opts.bake_transform_props = true;
+		opts.key_reduction_enabled = true;
+		opts.key_reduction_passes = 1;
+
+		ufbx_error error;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (!bake) ufbxt_log_error(&error);
+		ufbxt_assert(bake);
+
+		ufbx_baked_vec3 translation_ref[] = {
+			{ 0.0/24.0, { 0.0f }, UFBX_BAKED_KEY_KEYFRAME },
+			{ 2.0/24.0, { 0.666666f }, 0 },
+			{ 4.0/24.0, { 1.333333f }, 0 },
+			{ 6.0/24.0, { 2.0f }, 0 },
+			{ 8.0/24.0, { 2.666666f }, 0 },
+			{ 10.0/24.0, { 3.333333f }, 0 },
+			{ 12.0/24.0, { 4.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		};
+
+		ufbxt_assert(bake->nodes.count == 1);
+		ufbx_baked_node *node = &bake->nodes.data[0];
+		ufbxt_diff_baked_vec3(err, translation_ref, node->translation_keys);
+
+		ufbxt_assert(bake->elements.count == 1);
+		ufbx_baked_element *elem = &bake->elements.data[0];
+		ufbxt_assert(elem->element_id == node->element_id);
+		ufbx_baked_prop *prop = NULL;
+		for (size_t i = 0; i < elem->props.count; i++) {
+			if (!strcmp(elem->props.data[i].name.data, UFBX_Lcl_Translation)) {
+				prop = &elem->props.data[i];
+				break;
+			}
+		}
+		ufbxt_assert(prop);
+		ufbxt_diff_baked_vec3(err, translation_ref, prop->keys);
+
+		ufbx_free_baked_anim(bake);
+	}
+
+	{
+		ufbx_bake_opts opts = { 0 };
+		opts.resample_rate = 24.0;
+		opts.bake_transform_props = true;
+		opts.key_reduction_enabled = true;
+		opts.skip_node_transforms = true;
+		opts.key_reduction_passes = 16;
+
+		ufbx_error error;
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		if (!bake) ufbxt_log_error(&error);
+		ufbxt_assert(bake);
+
+		ufbx_baked_vec3 translation_ref[] = {
+			{ 0.0/24.0, { 0.0f }, UFBX_BAKED_KEY_KEYFRAME },
+			{ 12.0/24.0, { 4.0f }, UFBX_BAKED_KEY_KEYFRAME },
+		};
+
+		ufbxt_assert(bake->nodes.count == 0);
+
+		ufbxt_assert(bake->elements.count == 1);
+		ufbx_baked_element *elem = &bake->elements.data[0];
+		ufbx_baked_prop *prop = NULL;
+		for (size_t i = 0; i < elem->props.count; i++) {
+			if (!strcmp(elem->props.data[i].name.data, UFBX_Lcl_Translation)) {
+				prop = &elem->props.data[i];
+				break;
+			}
+		}
+		ufbxt_assert(prop);
+		ufbxt_diff_baked_vec3(err, translation_ref, prop->keys);
+
+		ufbx_free_baked_anim(bake);
+	}
 }
 #endif
 

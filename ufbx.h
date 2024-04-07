@@ -993,11 +993,23 @@ struct ufbx_node {
 // single defined value per vertex accessible via:
 //   attrib.values.data[attrib.indices.data[mesh->vertex_first_index[vertex_ix]]
 typedef struct ufbx_vertex_attrib {
+	// Is this attribute defined by the mesh.
 	bool exists;
+	// List of values the attribute uses.
 	ufbx_void_list values;
+	// Indices into `values[]`, indexed up to `ufbx_mesh.num_indices`.
 	ufbx_uint32_list indices;
+	// Number of `ufbx_real` entries per value.
 	size_t value_reals;
+	// `true` if this attribute is defined per vertex, instead of per index.
 	bool unique_per_vertex;
+	// Optional 4th 'W' component for the attribute.
+	// May be defined for the following:
+	//   ufbx_mesh.vertex_normal
+	//   ufbx_mesh.vertex_tangent / ufbx_uv_set.vertex_tangent
+	//   ufbx_mesh.vertex_bitangent / ufbx_uv_set.vertex_bitangent
+	// NOTE: This is not loaded by default, set `ufbx_load_opts.retain_vertex_attrib_w`.
+	ufbx_real_list values_w;
 } ufbx_vertex_attrib;
 
 // 1D vertex attribute, see `ufbx_vertex_attrib` for information
@@ -1007,6 +1019,7 @@ typedef struct ufbx_vertex_real {
 	ufbx_uint32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
+	ufbx_real_list values_w;
 
 	UFBX_VERTEX_ATTRIB_IMPL(ufbx_real)
 } ufbx_vertex_real;
@@ -1018,6 +1031,7 @@ typedef struct ufbx_vertex_vec2 {
 	ufbx_uint32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
+	ufbx_real_list values_w;
 
 	UFBX_VERTEX_ATTRIB_IMPL(ufbx_vec2)
 } ufbx_vertex_vec2;
@@ -1029,6 +1043,7 @@ typedef struct ufbx_vertex_vec3 {
 	ufbx_uint32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
+	ufbx_real_list values_w;
 
 	UFBX_VERTEX_ATTRIB_IMPL(ufbx_vec3)
 } ufbx_vertex_vec3;
@@ -1040,6 +1055,7 @@ typedef struct ufbx_vertex_vec4 {
 	ufbx_uint32_list indices;
 	size_t value_reals;
 	bool unique_per_vertex;
+	ufbx_real_list values_w;
 
 	UFBX_VERTEX_ATTRIB_IMPL(ufbx_vec4)
 } ufbx_vertex_vec4;
@@ -3430,12 +3446,11 @@ typedef enum ufbx_exporter UFBX_ENUM_REPR {
 	UFBX_EXPORTER_BLENDER_BINARY,
 	UFBX_EXPORTER_BLENDER_ASCII,
 	UFBX_EXPORTER_MOTION_BUILDER,
-	UFBX_EXPORTER_BC_UNITY_EXPORTER,
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_EXPORTER)
 } ufbx_exporter;
 
-UFBX_ENUM_TYPE(ufbx_exporter, UFBX_EXPORTER, UFBX_EXPORTER_BC_UNITY_EXPORTER);
+UFBX_ENUM_TYPE(ufbx_exporter, UFBX_EXPORTER, UFBX_EXPORTER_MOTION_BUILDER);
 
 typedef struct ufbx_application {
 	ufbx_string vendor;
@@ -3471,6 +3486,9 @@ typedef enum ufbx_warning_type UFBX_ENUM_REPR {
 
 	// Duplicated connection between two elements that shouldn't have.
 	UFBX_WARNING_DUPLICATE_CONNECTION,
+
+	// Vertex 'W' attribute length differs from main attribute.
+	UFBX_WARNING_BAD_VERTEX_W_ATTRIBUTE,
 
 	// Out-of-bounds index has been clamped to be in-bounds.
 	// HINT: You can use `ufbx_index_error_handling` to adjust behavior.
@@ -4655,6 +4673,10 @@ typedef struct ufbx_load_opts {
 	// Specify how to handle Unicode errors in strings.
 	ufbx_unicode_error_handling unicode_error_handling;
 
+	// Retain the 'W' component of mesh normal/tangent/bitangent.
+	// See `ufbx_vertex_attrib.values_w`.
+	bool retain_vertex_attrib_w;
+
 	// Retain the raw document structure using `ufbx_dom_node`.
 	bool retain_dom;
 
@@ -4880,7 +4902,7 @@ typedef struct ufbx_tessellate_curve_opts {
 	ufbx_allocator_opts result_allocator; // < Allocator used for the final line curve
 
 	// How many segments tessellate each span in `ufbx_nurbs_basis.spans`.
-	uint32_t span_subdivision;
+	size_t span_subdivision;
 
 	uint32_t _end_zero;
 } ufbx_tessellate_curve_opts;
@@ -4898,8 +4920,8 @@ typedef struct ufbx_tessellate_surface_opts {
 	// would make it easy to create an FBX file with an absurdly high subdivision
 	// rate (similar to mesh subdivision). Please enforce copy the value yourself
 	// enforcing whatever limits you deem reasonable.
-	uint32_t span_subdivision_u;
-	uint32_t span_subdivision_v;
+	size_t span_subdivision_u;
+	size_t span_subdivision_v;
 
 	// Skip computing `ufbx_mesh.material_parts[]`
 	bool skip_mesh_parts;
@@ -5181,7 +5203,6 @@ ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time
 
 // Evaluate a value from bundled animation curves.
 ufbx_abi ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, double time);
-ufbx_abi ufbx_vec2 ufbx_evaluate_anim_value_vec2(const ufbx_anim_value *anim_value, double time);
 ufbx_abi ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, double time);
 
 // Evaluate an animated property `name` from `element` at `time`.
@@ -5509,6 +5530,9 @@ ufbx_inline ufbx_vec2 ufbx_get_vertex_vec2(const ufbx_vertex_vec2 *v, size_t ind
 ufbx_inline ufbx_vec3 ufbx_get_vertex_vec3(const ufbx_vertex_vec3 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[(int32_t)v->indices.data[index]]; }
 ufbx_inline ufbx_vec4 ufbx_get_vertex_vec4(const ufbx_vertex_vec4 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values.data[(int32_t)v->indices.data[index]]; }
 
+ufbx_abi ufbx_real ufbx_catch_get_vertex_w_vec3(ufbx_panic *panic, const ufbx_vertex_vec3 *v, size_t index);
+ufbx_inline ufbx_real ufbx_get_vertex_w_vec3(const ufbx_vertex_vec3 *v, size_t index) { ufbx_assert(index < v->indices.count); return v->values_w.count > 0 ? v->values_w.data[(int32_t)v->indices.data[index]] : 0.0f; }
+
 // Functions for converting an untyped `ufbx_element` to a concrete type.
 // Returns `NULL` if the element is not that type.
 ufbx_abi ufbx_unknown *ufbx_as_unknown(const ufbx_element *element);
@@ -5553,43 +5577,6 @@ ufbx_abi ufbx_audio_layer *ufbx_as_audio_layer(const ufbx_element *element);
 ufbx_abi ufbx_audio_clip *ufbx_as_audio_clip(const ufbx_element *element);
 ufbx_abi ufbx_pose *ufbx_as_pose(const ufbx_element *element);
 ufbx_abi ufbx_metadata_object *ufbx_as_metadata_object(const ufbx_element *element);
-
-// -- FFI API
-
-ufbx_abi void ufbx_ffi_find_int_len(int64_t *retval, const ufbx_props *props, const char *name, size_t name_len, const int64_t *def);
-ufbx_abi void ufbx_ffi_find_vec3_len(ufbx_vec3 *retval, const ufbx_props *props, const char *name, size_t name_len, const ufbx_vec3 *def);
-ufbx_abi void ufbx_ffi_find_string_len(ufbx_string *retval, const ufbx_props *props, const char *name, size_t name_len, const ufbx_string *def);
-ufbx_abi void ufbx_ffi_find_anim_props(ufbx_anim_prop_list *retval, const ufbx_anim_layer *layer, const ufbx_element *element);
-ufbx_abi void ufbx_ffi_get_compatible_matrix_for_normals(ufbx_matrix *retval, const ufbx_node *node);
-ufbx_abi void ufbx_ffi_evaluate_anim_value_vec2(ufbx_vec2 *retval, const ufbx_anim_value *anim_value, double time);
-ufbx_abi void ufbx_ffi_evaluate_anim_value_vec3(ufbx_vec3 *retval, const ufbx_anim_value *anim_value, double time);
-ufbx_abi void ufbx_ffi_evaluate_prop_len(ufbx_prop *retval, const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time);
-ufbx_abi void ufbx_ffi_evaluate_props(ufbx_props *retval, const ufbx_anim *anim, ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
-ufbx_abi void ufbx_ffi_evaluate_transform(ufbx_transform *retval, const ufbx_anim *anim, const ufbx_node *node, double time);
-ufbx_abi ufbx_real ufbx_ffi_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time);
-ufbx_abi void ufbx_ffi_quat_mul(ufbx_quat *retval, const ufbx_quat *a, const ufbx_quat *b);
-ufbx_abi void ufbx_ffi_quat_normalize(ufbx_quat *retval, const ufbx_quat *q);
-ufbx_abi void ufbx_ffi_quat_fix_antipodal(ufbx_quat *retval, const ufbx_quat *q, const ufbx_quat *reference);
-ufbx_abi void ufbx_ffi_quat_slerp(ufbx_quat *retval, const ufbx_quat *a, const ufbx_quat *b, ufbx_real t);
-ufbx_abi void ufbx_ffi_quat_rotate_vec3(ufbx_vec3 *retval, const ufbx_quat *q, const ufbx_vec3 *v);
-ufbx_abi void ufbx_ffi_quat_to_euler(ufbx_vec3 *retval, const ufbx_quat *q, ufbx_rotation_order order);
-ufbx_abi void ufbx_ffi_euler_to_quat(ufbx_quat *retval, const ufbx_vec3 *v, ufbx_rotation_order order);
-ufbx_abi void ufbx_ffi_matrix_mul(ufbx_matrix *retval, const ufbx_matrix *a, const ufbx_matrix *b);
-ufbx_abi void ufbx_ffi_matrix_invert(ufbx_matrix *retval, const ufbx_matrix *m);
-ufbx_abi void ufbx_ffi_matrix_for_normals(ufbx_matrix *retval, const ufbx_matrix *m);
-ufbx_abi void ufbx_ffi_transform_position(ufbx_vec3 *retval, const ufbx_matrix *m, const ufbx_vec3 *v);
-ufbx_abi void ufbx_ffi_transform_direction(ufbx_vec3 *retval, const ufbx_matrix *m, const ufbx_vec3 *v);
-ufbx_abi void ufbx_ffi_transform_to_matrix(ufbx_matrix *retval, const ufbx_transform *t);
-ufbx_abi void ufbx_ffi_matrix_to_transform(ufbx_transform *retval, const ufbx_matrix *m);
-ufbx_abi void ufbx_ffi_get_skin_vertex_matrix(ufbx_matrix *retval, const ufbx_skin_deformer *skin, size_t vertex, const ufbx_matrix *fallback);
-ufbx_abi void ufbx_ffi_get_blend_shape_vertex_offset(ufbx_vec3 *retval, const ufbx_blend_shape *shape, size_t vertex);
-ufbx_abi void ufbx_ffi_get_blend_vertex_offset(ufbx_vec3 *retval, const ufbx_blend_deformer *blend, size_t vertex);
-ufbx_abi void ufbx_ffi_evaluate_nurbs_curve(ufbx_curve_point *retval, const ufbx_nurbs_curve *curve, ufbx_real u);
-ufbx_abi void ufbx_ffi_evaluate_nurbs_surface(ufbx_surface_point *retval, const ufbx_nurbs_surface *surface, ufbx_real u, ufbx_real v);
-ufbx_abi void ufbx_ffi_get_weighted_face_normal(ufbx_vec3 *retval, const ufbx_vertex_vec3 *positions, const ufbx_face *face);
-ufbx_abi uint32_t ufbx_ffi_triangulate_face(uint32_t *indices, size_t num_indices, const ufbx_mesh *mesh, const ufbx_face *face);
-ufbx_abi ufbx_vec3 ufbx_ffi_evaluate_baked_vec3(const ufbx_baked_vec3 *keyframes, size_t num_keyframes, double time);
-ufbx_abi ufbx_quat ufbx_ffi_evaluate_baked_quat(const ufbx_baked_quat *keyframes, size_t num_keyframes, double time);
 
 #ifdef __cplusplus
 }
