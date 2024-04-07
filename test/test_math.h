@@ -387,6 +387,9 @@ UFBXT_TEST(quat_mul)
 			indices[1] = 1;
 			indices[2] = 0;
 			break;
+		default:
+			ufbxt_assert(0 && "Bad order");
+			break;
 		}
 
 		for (int x = -360; x <= 360; x += 45)
