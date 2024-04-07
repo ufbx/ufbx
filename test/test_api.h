@@ -1080,3 +1080,70 @@ UFBXT_TEST(io_error)
 }
 #endif
 
+UFBXT_TEST(huge_filename)
+#if UFBXT_IMPL
+{
+	char filename[2048];
+	size_t pos = 0;
+
+	size_t root_len = strlen(data_root);
+	memcpy(filename + pos, data_root, root_len);
+	pos += root_len;
+
+	const char *path = "maya_cube_7500_ascii.fbx";
+	size_t path_len = strlen(path);
+	while (pos + path_len < 2040) {
+		filename[pos + 0] = '.';
+		filename[pos + 1] = '/';
+		pos += 2;
+	}
+
+	memcpy(filename + pos, path, path_len + 1);
+
+	ufbx_error error;
+	ufbx_scene *scene = ufbx_load_file(filename, NULL, &error);
+	if (!scene) ufbxt_log_error(&error);
+
+	// Windows would need UNC paths here, but \\?\ does not support the relative path spam
+	// we are doing here. Would need an actual long path for testing but that causes
+	// portability issues as Git cannot handle it natively and creating files is not great.
+	#if !defined(_WIN32)
+		ufbxt_assert(scene);
+	#endif
+
+	if (scene) {
+		ufbxt_check_scene(scene);
+		ufbx_free_scene(scene);
+	}
+}
+#endif
+
+UFBXT_TEST(huge_filename_not_found)
+#if UFBXT_IMPL
+{
+	char filename[2048];
+	size_t pos = 0;
+
+	size_t root_len = strlen(data_root);
+	memcpy(filename + pos, data_root, root_len);
+	pos += root_len;
+
+	const char *path = "does_not_exist.fbx";
+	size_t path_len = strlen(path);
+	while (pos + path_len < 2040) {
+		filename[pos + 0] = '.';
+		filename[pos + 1] = '/';
+		pos += 2;
+	}
+
+	memcpy(filename + pos, path, path_len + 1);
+
+	ufbx_error error;
+	ufbx_scene *scene = ufbx_load_file(filename, NULL, &error);
+	ufbxt_assert(!scene);
+
+	ufbxt_assert(error.type == UFBX_ERROR_FILE_NOT_FOUND);
+	ufbxt_assert(error.info_length == strlen(error.info));
+	ufbxt_assert(error.info_length == UFBX_ERROR_INFO_LENGTH - 1);
+}
+#endif
