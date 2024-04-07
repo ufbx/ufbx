@@ -1083,16 +1083,21 @@ UFBXT_TEST(io_error)
 UFBXT_TEST(huge_filename)
 #if UFBXT_IMPL
 {
-	char filename[2048];
+	#if defined(__APPLE__)
+		char filename[1024];
+	#else
+		char filename[2048];
+	#endif
 	size_t pos = 0;
 
 	size_t root_len = strlen(data_root);
+	ufbxt_assert(root_len < sizeof(filename) / 2);
 	memcpy(filename + pos, data_root, root_len);
 	pos += root_len;
 
 	const char *path = "maya_cube_7500_ascii.fbx";
 	size_t path_len = strlen(path);
-	while (pos + path_len < 2040) {
+	while (pos + path_len < sizeof(filename) - 8) {
 		filename[pos + 0] = '.';
 		filename[pos + 1] = '/';
 		pos += 2;
@@ -1121,16 +1126,21 @@ UFBXT_TEST(huge_filename)
 UFBXT_TEST(huge_filename_not_found)
 #if UFBXT_IMPL
 {
-	char filename[2048];
+	#if defined(__APPLE__)
+		char filename[1024];
+	#else
+		char filename[2048];
+	#endif
 	size_t pos = 0;
 
 	size_t root_len = strlen(data_root);
+	ufbxt_assert(root_len < sizeof(filename) / 2);
 	memcpy(filename + pos, data_root, root_len);
 	pos += root_len;
 
 	const char *path = "does_not_exist.fbx";
 	size_t path_len = strlen(path);
-	while (pos + path_len < 2040) {
+	while (pos + path_len < sizeof(filename) - 8) {
 		filename[pos + 0] = '.';
 		filename[pos + 1] = '/';
 		pos += 2;
