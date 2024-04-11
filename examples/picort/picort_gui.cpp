@@ -165,7 +165,7 @@ void wait_gui()
 #else
 
 void enable_gui(const Framebuffer *fb) { }
-void disable_gui(Framebuffer &&fb) { }
+void disable_gui(Framebuffer &&fb, std::unique_ptr<DebugTracerBase> tracer) { }
 void close_gui() { }
 void wait_gui() { }
 
