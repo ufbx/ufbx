@@ -1,5 +1,5 @@
 input ../maya_material_chart_7700_ascii.fbx
-reference ../maya_images/material-chart.png
+reference ../images/material-chart.png
 output ../../build/images/material-chart.png
 
 samples 64
