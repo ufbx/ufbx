@@ -392,7 +392,8 @@ Surface eval_surface(const Material &material, const Vec2 &uv)
 		Real metallic = eval_texture(material.metallic, uv).x;
 		s.diffuse = lerp(base_color, Vec3{}, metallic);
 		s.specular = lerp(Vec3{0.04f,0.04f,0.04f}, base_color, metallic);
-	} else if (material.has_specular) {
+	}
+	if (material.has_specular) {
 		s.specular = s.specular * specular_color;
 	}
 	s.emission = emission;
