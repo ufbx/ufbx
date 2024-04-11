@@ -1104,7 +1104,14 @@ async def main():
         }
 
         picort_config = {
-            "sources": ["ufbx.c", "examples/picort/picort.cpp"],
+            "sources": [
+                "ufbx.c",
+                "examples/picort/picort.cpp",
+                "examples/picort/picort_bvh.cpp",
+                "examples/picort/picort_gui.cpp",
+                "examples/picort/picort_opts.cpp",
+                "examples/picort/picort_png.cpp",
+            ],
             "output": "picort" + exe_suffix,
             "cpp": True,
             "optimize": True,
@@ -1139,27 +1146,10 @@ async def main():
             os.makedirs(image_path, exist_ok=True)
             log_mkdir(image_path)
 
-        scalar_target = max(targets, key=lambda t: target_score(t, False))
-        sse_target = max(targets, key=lambda t: target_score(t, True))
-
-        if scalar_target.compiled and scalar_target != sse_target:
-            log_comment(f"-- Rendering scenes with {scalar_target.name} --")
-
-            scalar_target.log.clear()
-            scalar_target.ran = False
-            args = [
-                "data/picort/barbarian.picort.txt",
-                "-o", "build/images/barbarian-scalar.png",
-                "--samples", "64",
-                "--error-threshold", "0.02",
-            ]
-            await run_target(scalar_target, args)
-            if scalar_target.ran:
-                for line in scalar_target.log[1].splitlines(keepends=False):
-                    log_comment(line)
+        target = max(targets, key=lambda t: target_score(t, True))
         
-        if sse_target.compiled:
-            log_comment(f"-- Rendering scenes with {sse_target.name} --")
+        if target.compiled:
+            log_comment(f"-- Rendering scenes with {target.name} --")
 
             scenes = [
                 "data/picort/barbarian.picort.txt",
@@ -1168,12 +1158,12 @@ async def main():
             ]
 
             for scene in scenes:
-                sse_target.log.clear()
-                sse_target.ran = False
-                await run_target(sse_target, [scene])
-                if not sse_target.ran:
+                target.log.clear()
+                target.ran = False
+                await run_target(target, [scene])
+                if not target.ran:
                     break
-                for line in sse_target.log[1].splitlines(keepends=False):
+                for line in target.log[1].splitlines(keepends=False):
                     log_comment(line)
 
     if "viewer" in tests:
