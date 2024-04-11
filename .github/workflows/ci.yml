@@ -163,10 +163,7 @@ jobs:
           DST_URL="https://ufbx-images.b-cdn.net/$HASH"
           curl -sS -w " -> $DST_URL/barbarian.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian.png --data-binary @build/images/barbarian.png
           curl -sS -w " -> $DST_URL/barbarian-scalar.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian-scalar.png --data-binary @build/images/barbarian-scalar.png
-          curl -sS -w " -> $DST_URL/barbarian-big.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian-big.png --data-binary @build/images/barbarian-big.png
           curl -sS -w " -> $DST_URL/slime-binary.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-binary.png --data-binary @build/images/slime-binary.png
-          curl -sS -w " -> $DST_URL/slime-ascii.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-ascii.png --data-binary @build/images/slime-ascii.png
-          curl -sS -w " -> $DST_URL/slime-big.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-big.png --data-binary @build/images/slime-big.png
 
   ci_domfuzz:
     runs-on: ubuntu-latest

@@ -1,0 +1,9 @@
+input ../maya_material_chart_7700_ascii.fbx
+reference ../maya_images/material-chart.png
+output ../../build/images/material-chart.png
+
+samples 64
+resolution 320 160
+bounces 0
+exposure 1.6
+error-threshold 0.01
