@@ -758,7 +758,7 @@ def decorate_arch(compiler, arch):
 tests = set(argv.tests)
 implicit_tests = False
 if not tests:
-    tests = ["tests", "cpp", "stack", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
+    tests = ["tests", "cpp", "stack", "unit", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
     implicit_tests = True
 
 async def main():
@@ -1048,6 +1048,21 @@ async def main():
         }
 
         target_tasks += compile_permutations("runner_release_stack", release_stack_config, arch_configs, ["-d", "data"])
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+    if "unit" in tests:
+        log_comment("-- Compiling and running unit tests --")
+
+        target_tasks = []
+
+        runner_config = {
+            "sources": ["test/unit_tests.c"],
+            "output": "unit_tests" + exe_suffix,
+            "defines": { },
+        }
+        target_tasks += compile_permutations("unit_tests", runner_config, all_configs, [])
 
         targets = await gather(target_tasks)
         all_targets += targets
