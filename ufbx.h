@@ -1324,7 +1324,7 @@ struct ufbx_mesh {
 	ufbx_mesh_part_list face_group_parts;
 
 	// Order of `material_parts` by first face that refers to it.
-	// Useful for compatability with FBX SDK and various importers using it,
+	// Useful for compatibility with FBX SDK and various importers using it,
 	// as they use this material order by default.
 	ufbx_uint32_list material_part_usage_order;
 
