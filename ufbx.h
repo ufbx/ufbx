@@ -266,7 +266,7 @@ struct ufbx_converter { };
 // `ufbx_source_version` contains the version of the corresponding source file.
 // HINT: The version can be compared numerically to the result of `ufbx_pack_version()`,
 // for example `#if UFBX_VERSION >= ufbx_pack_version(0, 12, 0)`.
-#define UFBX_HEADER_VERSION ufbx_pack_version(0, 12, 0)
+#define UFBX_HEADER_VERSION ufbx_pack_version(0, 13, 0)
 #define UFBX_VERSION UFBX_HEADER_VERSION
 
 // -- Basic types
@@ -1323,6 +1323,11 @@ struct ufbx_mesh {
 	// Segments for each face group.
 	ufbx_mesh_part_list face_group_parts;
 
+	// Order of `material_parts` by first face that refers to it.
+	// Useful for compatibility with FBX SDK and various importers using it,
+	// as they use this material order by default.
+	ufbx_uint32_list material_part_usage_order;
+
 	// Skinned vertex positions, for efficiency the skinned positions are the
 	// same as the static ones for non-skinned meshes and `skinned_is_local`
 	// is set to true meaning you need to transform them manually using
@@ -2351,6 +2356,7 @@ typedef enum ufbx_shader_type UFBX_ENUM_REPR {
 	UFBX_SHADER_SHADERFX_GRAPH,
 	// Variation of the FBX phong shader that can recover PBR properties like
 	// `metalness` or `roughness` from the FBX non-physical values.
+	// NOTE: Enable `ufbx_load_opts.use_blender_pbr_material`.
 	UFBX_SHADER_BLENDER_PHONG,
 	// Wavefront .mtl format shader (used by .obj files)
 	UFBX_SHADER_WAVEFRONT_MTL,
@@ -3659,6 +3665,9 @@ typedef struct ufbx_metadata {
 
 	ufbx_real bone_prop_size_unit;
 	bool bone_prop_limb_length_relative;
+
+	ufbx_real ortho_size_unit;
+
 	int64_t ktime_second; // < One second in internal KTime units
 
 	ufbx_string original_file_path;
@@ -4531,6 +4540,12 @@ typedef struct ufbx_load_opts {
 
 	// Clean-up skin weights by removing negative, zero and NAN weights.
 	bool clean_skin_weights;
+
+	// Read Blender materials as PBR values.
+	// Blender converts PBR materials to legacy FBX Phong materials in a deterministic way.
+	// If this setting is enabled, such materials will be read as `UFBX_SHADER_BLENDER_PHONG`,
+	// which means ufbx will be able to parse roughness and metallic textures.
+	bool use_blender_pbr_material;
 
 	// Don't adjust reading the FBX file depending on the detected exporter
 	bool disable_quirks;

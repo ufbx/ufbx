@@ -1,0 +1,9 @@
+input ../blender_402_material_chart_7400_binary.fbx
+reference ../images/blender-material-chart.png
+output ../../build/images/blender-material-chart.png
+
+samples 128
+resolution 320 160
+bounces 0
+exposure 1.6
+error-threshold 0.01
