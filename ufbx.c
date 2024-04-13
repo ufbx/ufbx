@@ -21138,7 +21138,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		if (material->shader) {
 			material->shader_type = material->shader->type;
 		} else {
-			if (uc->exporter == UFBX_EXPORTER_BLENDER_BINARY && uc->exporter_version >= ufbx_pack_version(4,12,0)) {
+			if (uc->opts.use_blender_pbr_material && uc->exporter == UFBX_EXPORTER_BLENDER_BINARY && uc->exporter_version >= ufbx_pack_version(4,12,0)) {
 				material->shader_type = UFBX_SHADER_BLENDER_PHONG;
 			}
 

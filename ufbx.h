@@ -2351,6 +2351,7 @@ typedef enum ufbx_shader_type UFBX_ENUM_REPR {
 	UFBX_SHADER_SHADERFX_GRAPH,
 	// Variation of the FBX phong shader that can recover PBR properties like
 	// `metalness` or `roughness` from the FBX non-physical values.
+	// NOTE: Enable `ufbx_load_opts.use_blender_pbr_material`.
 	UFBX_SHADER_BLENDER_PHONG,
 	// Wavefront .mtl format shader (used by .obj files)
 	UFBX_SHADER_WAVEFRONT_MTL,
@@ -4534,6 +4535,12 @@ typedef struct ufbx_load_opts {
 
 	// Clean-up skin weights by removing negative, zero and NAN weights.
 	bool clean_skin_weights;
+
+	// Read Blender materials as PBR values.
+	// Blender converts PBR materials to legacy FBX Phong materials in a deterministic way.
+	// If this setting is enabled, such materials will be read as `UFBX_SHADER_BLENDER_PHONG`,
+	// which means ufbx will be able to parse roughness and metallic textures.
+	bool use_blender_pbr_material;
 
 	// Don't adjust reading the FBX file depending on the detected exporter
 	bool disable_quirks;
