@@ -118,7 +118,6 @@ jobs:
 
   ci_coverage:
     runs-on: ubuntu-20.04
-    needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
         with:
@@ -367,7 +366,6 @@ jobs:
 
   ci_compilers:
     runs-on: ubuntu-22.04
-    needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
       - name: Add Ubuntu sources
