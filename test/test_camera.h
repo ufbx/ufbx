@@ -49,3 +49,73 @@ UFBXT_FILE_TEST(maya_ortho_camera_size)
 }
 #endif
 
+UFBXT_FILE_TEST(blender_402_ortho_scale_local)
+#if UFBXT_IMPL
+{
+	ufbxt_check_ortho_camera(err, scene, "Ortho_1", UFBX_GATE_FIT_HORIZONTAL, 1.0f, 1.0f, 1.0f);
+	ufbxt_check_ortho_camera(err, scene, "Ortho_2", UFBX_GATE_FIT_HORIZONTAL, 2.0f, 2.0f, 2.0f);
+	ufbxt_check_ortho_camera(err, scene, "Ortho_3", UFBX_GATE_FIT_HORIZONTAL, 3.0f, 3.0f, 3.0f);
+}
+#endif
+
+UFBXT_TEST(blender_402_ortho_scale_local_conversion)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "blender_402_ortho_scale_local" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 0; i < UFBX_SPACE_CONVERSION_COUNT; i++) {
+			ufbx_load_opts opts = { 0 };
+			opts.space_conversion = i;
+			opts.target_unit_meters = 1.0f;
+
+			ufbx_scene *scene = ufbx_load_file(path, &opts, NULL);
+			ufbxt_assert(scene);
+			ufbxt_check_ortho_camera(&err, scene, "Ortho_1", UFBX_GATE_FIT_HORIZONTAL, 1.0f, 1.0f, 1.0f);
+			ufbxt_check_ortho_camera(&err, scene, "Ortho_2", UFBX_GATE_FIT_HORIZONTAL, 2.0f, 2.0f, 2.0f);
+			ufbxt_check_ortho_camera(&err, scene, "Ortho_3", UFBX_GATE_FIT_HORIZONTAL, 3.0f, 3.0f, 3.0f);
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+
+UFBXT_FILE_TEST(blender_402_ortho_scale_unit)
+#if UFBXT_IMPL
+{
+	ufbxt_check_ortho_camera(err, scene, "Ortho_1", UFBX_GATE_FIT_HORIZONTAL, 1.0f, 1.0f, 1.0f);
+	ufbxt_check_ortho_camera(err, scene, "Ortho_2", UFBX_GATE_FIT_HORIZONTAL, 2.0f, 2.0f, 2.0f);
+	ufbxt_check_ortho_camera(err, scene, "Ortho_3", UFBX_GATE_FIT_HORIZONTAL, 3.0f, 3.0f, 3.0f);
+}
+#endif
+
+UFBXT_TEST(blender_402_ortho_scale_unit_conversion)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	char path[512];
+	ufbxt_file_iterator iter = { "blender_402_ortho_scale_unit" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t i = 0; i < UFBX_SPACE_CONVERSION_COUNT; i++) {
+			ufbx_load_opts opts = { 0 };
+			opts.space_conversion = i;
+			opts.target_unit_meters = 1.0f;
+
+			ufbx_scene *scene = ufbx_load_file(path, &opts, NULL);
+			ufbxt_assert(scene);
+			ufbxt_check_ortho_camera(&err, scene, "Ortho_1", UFBX_GATE_FIT_HORIZONTAL, 1.0f, 1.0f, 1.0f);
+			ufbxt_check_ortho_camera(&err, scene, "Ortho_2", UFBX_GATE_FIT_HORIZONTAL, 2.0f, 2.0f, 2.0f);
+			ufbxt_check_ortho_camera(&err, scene, "Ortho_3", UFBX_GATE_FIT_HORIZONTAL, 3.0f, 3.0f, 3.0f);
+			ufbx_free_scene(scene);
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+}
+#endif
+

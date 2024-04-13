@@ -20188,7 +20188,7 @@ ufbxi_noinline static void ufbxi_postprocess_scene(ufbxi_context *uc)
 	}
 
 	if (uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
-		uc->scene.metadata.ortho_size_unit = 1.0f / uc->scene.settings.unit_meters;
+		uc->scene.metadata.ortho_size_unit = 1.0f / uc->scene.metadata.geometry_scale;
 	} else {
 		uc->scene.metadata.ortho_size_unit = 30.0f;
 	}
