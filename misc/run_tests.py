@@ -1145,6 +1145,8 @@ async def main():
                 score += 100
             if config["arch"] == "x64":
                 score += 10
+            if "vs_cl64" in compiler.name:
+                score += 20
             if "clang" in compiler.name:
                 score += 10
             if "msvc" in compiler.name:
