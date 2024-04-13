@@ -1157,3 +1157,26 @@ UFBXT_TEST(huge_filename_not_found)
 	ufbxt_assert(error.info_length == UFBX_ERROR_INFO_LENGTH - 1);
 }
 #endif
+
+UFBXT_TEST(missing_explicit_mtl)
+#if UFBXT_IMPL
+{
+	char obj_path[512];
+	char mtl_path[512];
+	snprintf(obj_path, sizeof(obj_path), "%s%s", data_root, "maya_cube.obj");
+	snprintf(mtl_path, sizeof(mtl_path), "%s%s", data_root, "maya_cube_nonexistent.obj");
+
+	ufbx_load_opts opts = { 0 };
+	opts.obj_mtl_path.data = mtl_path;
+	opts.obj_mtl_path.length = SIZE_MAX;
+	opts.ignore_missing_external_files = true;
+
+	ufbx_error error;
+	ufbx_scene *scene = ufbx_load_file(obj_path, &opts, &error);
+	if (!scene) ufbxt_log_error(&error);
+
+	ufbxt_check_warning(scene, UFBX_WARNING_MISSING_EXTERNAL_FILE, UFBX_ELEMENT_UNKNOWN, NULL, 1, "maya_cube_nonexistent.obj");
+
+	ufbx_free_scene(scene);
+}
+#endif
