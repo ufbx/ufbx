@@ -1827,3 +1827,15 @@ UFBXT_FILE_TEST(maya_material_chart)
 }
 #endif
 
+UFBXT_FILE_TEST(blender_402_material_chart)
+#if UFBXT_IMPL
+{
+	ufbx_vec3 ref = { 0.25f, 0.125f, 0.5f };
+	ufbxt_assert(scene->materials.count == 6);
+	for (size_t i = 0; i < scene->materials.count; i++) {
+		ufbx_material *material = scene->materials.data[i];
+		ufbxt_check_chart_material(err, material, ref);
+	}
+}
+#endif
+

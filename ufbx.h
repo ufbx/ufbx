@@ -3663,6 +3663,9 @@ typedef struct ufbx_metadata {
 
 	ufbx_real bone_prop_size_unit;
 	bool bone_prop_limb_length_relative;
+
+	ufbx_real ortho_size_unit;
+
 	int64_t ktime_second; // < One second in internal KTime units
 
 	ufbx_string original_file_path;
