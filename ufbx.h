@@ -1323,6 +1323,11 @@ struct ufbx_mesh {
 	// Segments for each face group.
 	ufbx_mesh_part_list face_group_parts;
 
+	// Order of `material_parts` by first face that refers to it.
+	// Useful for compatability with FBX SDK and various importers using it,
+	// as they use this material order by default.
+	ufbx_uint32_list material_part_usage_order;
+
 	// Skinned vertex positions, for efficiency the skinned positions are the
 	// same as the static ones for non-skinned meshes and `skinned_is_local`
 	// is set to true meaning you need to transform them manually using

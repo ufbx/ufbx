@@ -659,6 +659,22 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_assert(total_material_tris == mesh->num_triangles);
 	}
 
+	for (size_t i = 0; i < mesh->material_part_usage_order.count; i++) {
+		ufbxt_assert(mesh->material_part_usage_order.data[i] < mesh->material_parts.count);
+		if (i > 0) {
+			ufbx_mesh_part *pa = &mesh->material_parts.data[mesh->material_part_usage_order.data[i - 1]];
+			ufbx_mesh_part *pb = &mesh->material_parts.data[mesh->material_part_usage_order.data[i]];
+			if (pa->face_indices.count > 0 && pb->face_indices.count > 0) {
+				ufbxt_assert(pa->face_indices.data[0] < pb->face_indices.data[0]);
+			} else if (pa->face_indices.count == pb->face_indices.count) {
+				ufbxt_assert(pa < pb);
+			} else {
+				ufbxt_assert(pa->face_indices.count > pb->face_indices.count);
+			}
+		}
+	}
+	ufbxt_assert(mesh->material_part_usage_order.count == mesh->material_parts.count);
+
 	if (mesh->face_group.count) {
 		ufbxt_assert(mesh->face_group.count == mesh->num_faces);
 		for (size_t i = 0; i < mesh->num_faces; i++) {

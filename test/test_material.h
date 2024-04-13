@@ -1839,3 +1839,35 @@ UFBXT_FILE_TEST(blender_402_material_chart)
 }
 #endif
 
+UFBXT_FILE_TEST(blender_suzanne_multimaterial)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Suzanne");
+	ufbxt_assert(node);
+	ufbxt_assert(node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	static const uint32_t order_ref[] = { 0, 4, 6, 1, 5, 2, 3 };
+	ufbxt_assert(mesh->material_part_usage_order.count == ufbxt_arraycount(order_ref));
+	for (size_t i = 0; i < mesh->material_part_usage_order.count; i++) {
+		ufbxt_assert(mesh->material_part_usage_order.data[i] == order_ref[i]);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(blender_suzanne_multimaterial_reorder)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Suzanne");
+	ufbxt_assert(node);
+	ufbxt_assert(node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	static const uint32_t order_ref[] = { 4, 0, 6, 1, 5, 2, 3 };
+	ufbxt_assert(mesh->material_part_usage_order.count == ufbxt_arraycount(order_ref));
+	for (size_t i = 0; i < mesh->material_part_usage_order.count; i++) {
+		ufbxt_assert(mesh->material_part_usage_order.data[i] == order_ref[i]);
+	}
+}
+#endif
+

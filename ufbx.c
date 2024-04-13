@@ -20453,6 +20453,19 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_validate_indices(ufbxi_context *
 	return 1;
 }
 
+static bool ufbxi_material_part_usage_less(void *user, const void *va, const void *vb)
+{
+	ufbx_mesh_part *parts = (ufbx_mesh_part*)user;
+	uint32_t a = *(const uint32_t*)va, b = *(const uint32_t*)vb;
+	ufbx_mesh_part *pa = &parts[a];
+	ufbx_mesh_part *pb = &parts[b];
+	if (pa->face_indices.count == 0 || pb->face_indices.count == 0) {
+		if (pa->face_indices.count == pb->face_indices.count) return a < b;
+		return pa->face_indices.count > pb->face_indices.count;
+	}
+	return pa->face_indices.data[0] < pb->face_indices.data[0];
+}
+
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh_material(ufbxi_buf *buf, ufbx_error *error, ufbx_mesh *mesh)
 {
 	size_t num_materials = mesh->materials.count;
@@ -20502,6 +20515,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_mesh_material(ufbxi_buf
 				part->face_indices.data[part->num_faces++] = (uint32_t)i;
 			}
 		}
+
+		mesh->material_part_usage_order.count = num_parts;
+		mesh->material_part_usage_order.data = ufbxi_push(buf, uint32_t, num_parts);
+		ufbxi_check_err(error, mesh->material_part_usage_order.data);
+		for (size_t i = 0; i < num_parts; i++) {
+			mesh->material_part_usage_order.data[i] = (uint32_t)i;
+		}
+		ufbxi_unstable_sort(mesh->material_part_usage_order.data, num_parts, sizeof(uint32_t), &ufbxi_material_part_usage_less, parts);
 	}
 
 	return 1;
@@ -20991,6 +21012,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 					part->num_line_faces = mesh->num_line_faces;
 					part->face_indices.data = uc->consecutive_indices;
 					part->face_indices.count = mesh->num_faces;
+					mesh->material_part_usage_order.data = uc->zero_indices;
+					mesh->material_part_usage_order.count = 1;
 				}
 
 				if (mesh->materials.count == 1) {
