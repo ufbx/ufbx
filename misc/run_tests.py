@@ -1113,10 +1113,6 @@ async def main():
 
         picort_configs = {
             "arch": arch_configs["arch"],
-            "sse": {
-                "scalar": { "sse": False },
-                "sse": { "sse": True },
-            },
         }
 
         picort_config = {
