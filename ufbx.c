@@ -1033,6 +1033,53 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 	if (dst != data) memcpy((void*)data, dst, size * stride);
 }
 
+static ufbxi_forceinline void ufbxi_swap(void *a, void *b, size_t size)
+{
+	char *ca = (char*)a, *cb = (char*)b;
+#if defined(UFBXI_HAS_UNALIGNED)
+	ufbxi_nounroll while (size >= 4) {
+		uint32_t t = *(ufbxi_unaligned ufbxi_unaligned_u32*)ca;
+		*(ufbxi_unaligned ufbxi_unaligned_u32*)ca = *(ufbxi_unaligned ufbxi_unaligned_u32*)cb;
+		*(ufbxi_unaligned ufbxi_unaligned_u32*)cb = t;
+		ca += 4; cb += 4; size -= 4;
+	}
+#endif
+	ufbxi_nounroll while (size > 0) {
+		char t = *ca; *ca = *cb; *cb = t;
+		ca++; cb++; size--;
+	}
+}
+
+static ufbxi_noinline void ufbxi_unstable_sort(void *in_data, size_t size, size_t stride, ufbxi_less_fn *less_fn, void *less_user)
+{
+	if (size <= 1) return;
+	char *data = (char*)in_data, *data_end = data + size * stride;
+	size_t start = (size - 1) >> 1;
+	size_t end = size - 1;
+	for (;;) {
+		size_t root = start;
+		size_t child;
+		while ((child = root*2 + 1) <= end) {
+			size_t next = less_fn(less_user, data + child * stride, data + root * stride) ? root : child;
+			if (child + 1 <= end && less_fn(less_user, data + next * stride, data + (child + 1) * stride)) {
+				next = child + 1;
+			}
+			if (next == root) break;
+			ufbxi_swap(data + root * stride, data + next * stride, stride);
+			root = next;
+		}
+
+		if (start > 0) {
+			start--;
+		} else if (end > 0) {
+			ufbxi_swap(data + end * stride, data, stride);
+			end--;
+		} else {
+			break;
+		}
+	}
+}
+
 // -- Float parsing
 //
 // Custom float parsing that handles floats up to (-)ddddddddddddddddddd.ddddddddddddddddddd
@@ -12371,11 +12418,10 @@ typedef struct {
 	uint32_t id, index;
 } ufbxi_id_group;
 
-static int ufbxi_cmp_int32(const void *va, const void *vb)
+static bool ufbxi_less_int32(void *user, const void *va, const void *vb)
 {
 	const int32_t a = *(const int32_t*)va, b = *(const int32_t*)vb;
-	if (a != b) return a < b ? -1 : +1;
-	return 0;
+	return a < b;
 }
 
 ufbx_static_assert(mesh_mat_point_faces, offsetof(ufbx_mesh_part, num_point_faces) - offsetof(ufbx_mesh_part, num_empty_faces) == 1 * sizeof(size_t));
@@ -12425,7 +12471,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_assign_face_groups(ufbxi_buf *bu
 	}
 
 	// Sort and deduplicate remaining IDs
-	qsort(ids, num_ids, sizeof(uint32_t), &ufbxi_cmp_int32);
+	ufbxi_unstable_sort(ids, num_ids, sizeof(uint32_t), &ufbxi_less_int32, NULL);
 
 	size_t num_groups = 0;
 	for (size_t i = 0; i < num_ids; ) {
@@ -23553,14 +23599,14 @@ typedef struct {
 	size_t data_size;
 } ufbxi_external_file;
 
-static int ufbxi_cmp_external_file(const void *va, const void *vb)
+static bool ufbxi_less_external_file(void *user, const void *va, const void *vb)
 {
 	const ufbxi_external_file *a = (const ufbxi_external_file*)va, *b = (const ufbxi_external_file*)vb;
-	if (a->type != b->type) return a->type < b->type ? -1 : 1;
+	if (a->type != b->type) return a->type < b->type;
 	int cmp = ufbxi_str_cmp(a->filename, b->filename);
-	if (cmp != 0) return cmp;
-	if (a->index != b->index) return a->index < b->index ? -1 : 1;
-	return 0;
+	if (cmp != 0) return cmp < 0;
+	if (a->index != b->index) return a->index < b->index;
+	return false;
 }
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_cache(ufbxi_context *uc, ufbxi_external_file *file)
@@ -23648,7 +23694,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_external_files(ufbxi_contex
 	// Sort and load the external files
 	ufbxi_external_file *files = ufbxi_push_pop(&uc->tmp, &uc->tmp_stack, ufbxi_external_file, num_files);
 	ufbxi_check(files);
-	qsort(files, num_files, sizeof(ufbxi_external_file), &ufbxi_cmp_external_file);
+	ufbxi_unstable_sort(files, num_files, sizeof(ufbxi_external_file), &ufbxi_less_external_file, NULL);
 
 	ufbxi_external_file_type prev_type = UFBXI_EXTERNAL_FILE_GEOMETRY_CACHE;
 	const char *prev_name = NULL;
@@ -25165,19 +25211,19 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_anim_string(ufbxi_create_an
 	return 1;
 }
 
-static int ufbxi_cmp_prop_override_prop_name(const void *va, const void *vb)
+static bool ufbxi_prop_override_prop_name_less(void *user, const void *va, const void *vb)
 {
 	const ufbx_prop_override *a = (const ufbx_prop_override*)va, *b = (const ufbx_prop_override*)vb;
-	if (a->_internal_key != b->_internal_key) return a->_internal_key < b->_internal_key ? -1 : 1;
-	return ufbxi_str_cmp(a->prop_name, b->prop_name);
+	if (a->_internal_key != b->_internal_key) return a->_internal_key < b->_internal_key;
+	return ufbxi_str_less(a->prop_name, b->prop_name);
 }
 
-static int ufbxi_cmp_prop_override(const void *va, const void *vb)
+static bool ufbxi_prop_override_less(void *user, const void *va, const void *vb)
 {
 	const ufbx_prop_override *a = (const ufbx_prop_override*)va, *b = (const ufbx_prop_override*)vb;
-	if (a->element_id != b->element_id) return a->element_id < b->element_id ? -1 : 1;
-	if (a->_internal_key != b->_internal_key) return a->_internal_key < b->_internal_key ? -1 : 1;
-	return strcmp(a->prop_name.data, b->prop_name.data);
+	if (a->element_id != b->element_id) return a->element_id < b->element_id;
+	if (a->_internal_key != b->_internal_key) return a->_internal_key < b->_internal_key;
+	return strcmp(a->prop_name.data, b->prop_name.data) < 0;
 }
 
 static int ufbxi_cmp_transform_override(const void *va, const void *vb)
@@ -25249,7 +25295,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_create_anim_imp(ufbxi_create_ani
 
 		// Sort `anim->prop_overrides` first by `prop_name` only so we can deduplicate and
 		// convert them to global strings in `ufbxi_strings[]` if possible.
-		qsort(anim->prop_overrides.data, anim->prop_overrides.count, sizeof(ufbx_prop_override), &ufbxi_cmp_prop_override_prop_name);
+		ufbxi_unstable_sort(anim->prop_overrides.data, anim->prop_overrides.count, sizeof(ufbx_prop_override), &ufbxi_prop_override_prop_name_less, NULL);
 
 		const ufbx_string *global_str = ufbxi_strings, *global_end = global_str + ufbxi_arraycount(ufbxi_strings);
 		ufbx_string prev_name = { ufbxi_empty_char };
@@ -25277,7 +25323,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_create_anim_imp(ufbxi_create_ani
 		}
 
 		// Sort `anim->prop_overrides` to the actual order expected by evaluation.
-		qsort(anim->prop_overrides.data, anim->prop_overrides.count, sizeof(ufbx_prop_override), &ufbxi_cmp_prop_override);
+		ufbxi_unstable_sort(anim->prop_overrides.data, anim->prop_overrides.count, sizeof(ufbx_prop_override), &ufbxi_prop_override_less, NULL);
 
 		for (size_t i = 1; i < prop_overrides.count; i++) {
 			const ufbx_prop_override *prev = &anim->prop_overrides.data[i - 1];
