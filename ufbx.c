@@ -12435,6 +12435,7 @@ typedef struct {
 
 static bool ufbxi_less_int32(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const int32_t a = *(const int32_t*)va, b = *(const int32_t*)vb;
 	return a < b;
 }
@@ -23647,6 +23648,7 @@ typedef struct {
 
 static bool ufbxi_less_external_file(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbxi_external_file *a = (const ufbxi_external_file*)va, *b = (const ufbxi_external_file*)vb;
 	if (a->type != b->type) return a->type < b->type;
 	int cmp = ufbxi_str_cmp(a->filename, b->filename);
@@ -25259,6 +25261,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_anim_string(ufbxi_create_an
 
 static bool ufbxi_prop_override_prop_name_less(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbx_prop_override *a = (const ufbx_prop_override*)va, *b = (const ufbx_prop_override*)vb;
 	if (a->_internal_key != b->_internal_key) return a->_internal_key < b->_internal_key;
 	return ufbxi_str_less(a->prop_name, b->prop_name);
@@ -25266,6 +25269,7 @@ static bool ufbxi_prop_override_prop_name_less(void *user, const void *va, const
 
 static bool ufbxi_prop_override_less(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbx_prop_override *a = (const ufbx_prop_override*)va, *b = (const ufbx_prop_override*)vb;
 	if (a->element_id != b->element_id) return a->element_id < b->element_id;
 	if (a->_internal_key != b->_internal_key) return a->_internal_key < b->_internal_key;
