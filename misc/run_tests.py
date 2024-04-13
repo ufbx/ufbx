@@ -31,6 +31,7 @@ parser.add_argument("--verbose", action="store_true", help="Verbose output")
 parser.add_argument("--hash-file", help="Hash test input file")
 parser.add_argument("--runner", help="Descriptive name for the runner")
 parser.add_argument("--heavy", action="store_true", help="Run heavy tests")
+parser.add_argument("--strict", action="store_true", help="Require strict checks")
 parser.add_argument("--hash-threads", action="store_true", help="Use threading for hashes")
 parser.add_argument("--fail-on-pre-test", action="store_true", help="Indicate failure if pre-test checks fail")
 parser.add_argument("--force-opt", help="Force compiler optimization level")
@@ -1175,7 +1176,10 @@ async def main():
             for scene in scenes:
                 target.log.clear()
                 target.ran = False
-                await run_target(target, [scene])
+                args = [scene]
+                if argv.strict:
+                    args += ["--error-threshold", "0.000001"]
+                await run_target(target, args)
                 if not target.ran:
                     break
                 for line in target.log[1].splitlines(keepends=False):
