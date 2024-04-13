@@ -1707,3 +1707,64 @@ UFBXT_FILE_TEST_OPTS_ALT(maya_absolute_texture_backslash, maya_absolute_texture,
 	ufbxt_assert(!strcmp(texture->filename.data, "W:\\checkerboard_diffuse.png"));
 }
 #endif
+
+#if UFBXT_IMPL
+static ufbx_vec3 ufbxt_load_pixel(ufbx_texture *texture)
+{
+	const char *error = NULL;
+	ufbxt_image16 image = ufbxt_read_png(texture->content.data, texture->content.size, &error);
+	if (error) ufbxt_logf("failed to read embedded png %s: %s", texture->relative_filename.data, error);
+	ufbxt_assert(image.width >= 1 && image.height >= 1);
+	ufbxt_pixel16 pixel = image.pixels[0];
+	ufbx_vec3 color;
+	color.x = ufbxt_srgb_to_linear((ufbx_real)pixel.r / 65535.0f);
+	color.y = ufbxt_srgb_to_linear((ufbx_real)pixel.g / 65535.0f);
+	color.z = ufbxt_srgb_to_linear((ufbx_real)pixel.b / 65535.0f);
+	free(image.pixels);
+	return color;
+}
+static void ufbxt_check_chart_material(ufbxt_diff_error *err, ufbx_material *mat, ufbx_vec3 ref)
+{
+	ufbxt_hintf("material = %s", mat->name.data);
+
+	ufbx_texture *base_texture = mat->pbr.base_color.texture;
+	ufbx_vec3 base_color = mat->pbr.base_color.value_vec3;
+	ufbx_real base_factor = mat->pbr.base_factor.value_real;
+	if (base_texture) {
+		base_color = ufbxt_load_pixel(base_texture);
+	}
+
+	ufbx_texture *emit_texture = mat->pbr.emission_color.texture;
+	ufbx_vec3 emit_color = mat->pbr.emission_color.value_vec3;
+	ufbx_real emit_factor = mat->pbr.emission_factor.value_real;
+	if (emit_texture) {
+		emit_color = ufbxt_load_pixel(emit_texture);
+	}
+
+	ufbx_vec3 sum = ufbxt_add3(ufbxt_mul3(base_color, base_factor), ufbxt_mul3(emit_color, emit_factor));
+	if (base_texture || emit_texture) {
+		ufbxt_assert_close_vec3_threshold(err, sum, ref, 0.01f);
+	} else {
+		ufbxt_assert_close_vec3(err, sum, ref);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(maya_material_chart)
+#if UFBXT_IMPL
+{
+	ufbx_display_layer *layer = ufbx_as_display_layer(ufbx_find_element(scene, UFBX_ELEMENT_DISPLAY_LAYER, "Sheets"));
+	ufbxt_assert(layer);
+	ufbxt_assert(layer->nodes.count == 12);
+
+	ufbx_vec3 ref = { 0.125f, 0.25f, 0.5f };
+	for (size_t i = 0; i < layer->nodes.count; i++) {
+		ufbx_node *node = layer->nodes.data[i];
+		ufbxt_assert(node->mesh);
+		ufbxt_assert(node->materials.count == 1);
+		ufbx_material *material = node->materials.data[0];
+		ufbxt_check_chart_material(err, material, ref);
+	}
+}
+#endif
+
