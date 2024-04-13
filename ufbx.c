@@ -1053,7 +1053,7 @@ static ufbxi_forceinline void ufbxi_swap(void *a, void *b, size_t size)
 static ufbxi_noinline void ufbxi_unstable_sort(void *in_data, size_t size, size_t stride, ufbxi_less_fn *less_fn, void *less_user)
 {
 	if (size <= 1) return;
-	char *data = (char*)in_data, *data_end = data + size * stride;
+	char *data = (char*)in_data;
 	size_t start = (size - 1) >> 1;
 	size_t end = size - 1;
 	for (;;) {
