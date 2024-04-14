@@ -153,6 +153,7 @@ typedef struct {
 	bool match_by_order;
 	bool negate_xz;
 	bool bind_pose;
+	bool ignore_unskinned;
 	ufbx_real tolerance;
 	ufbx_real uv_tolerance;
 	uint32_t allow_missing;
@@ -740,6 +741,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			}
 			if (!strcmp(line, "ufbx:bind_pose")) {
 				obj->bind_pose = true;
+			}
+			if (!strcmp(line, "ufbx:ignore_unskinned")) {
+				obj->ignore_unskinned = true;
 			}
 			if (!strcmp(line, "www.blender.org")) {
 				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
@@ -1594,6 +1598,14 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 						op.z *= -1.0f;
 						on.x *= -1.0f;
 						on.z *= -1.0f;
+					}
+
+					if (obj->ignore_unskinned && mesh->skin_deformers.count > 0) {
+						ufbx_skin_deformer *skin = mesh->skin_deformers.data[0];
+						ufbx_skin_vertex vert = skin->vertices.data[mesh->vertex_indices.data[fix]];
+						if (vert.num_weights == 0) {
+							continue;
+						}
 					}
 
 					ufbxt_assert_close_vec3(p_err, op, fp);
