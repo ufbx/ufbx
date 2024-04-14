@@ -1169,7 +1169,7 @@ static ufbx_load_opts ufbxt_missing_obj_mtl_path_opts()
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(missing_explicit_mtl, blender_279_ball, ufbxt_missing_obj_mtl_path_opts, UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(missing_explicit_mtl, blender_279_ball, ufbxt_missing_obj_mtl_path_opts, UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS)
 #if UFBXT_IMPL
 {
 	if (scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ) {
