@@ -13231,6 +13231,24 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_blend_channel(ufbxi_context
 	}
 	ufbxi_check(ufbxi_push_copy(&uc->tmp_full_weights, ufbx_real_list, 1, &list));
 
+	// Blender saves blend shapes with DeformPercent as a field, not a property.
+	// However, the animations are mapped to the DeformPercent property.
+	ufbxi_node *deform_percent = ufbxi_find_child(node, ufbxi_DeformPercent);
+	if (channel->props.props.count == 0 && deform_percent) {
+		size_t num_shape_props = 1;
+		ufbx_prop *shape_props = ufbxi_push_zero(&uc->result, ufbx_prop, num_shape_props);
+		ufbxi_check(shape_props);
+		shape_props[0].name.data = ufbxi_DeformPercent;
+		shape_props[0].name.length = sizeof(ufbxi_DeformPercent) - 1;
+		shape_props[0]._internal_key = ufbxi_get_name_key_c(ufbxi_DeformPercent);
+		shape_props[0].type = UFBX_PROP_NUMBER;
+		shape_props[0].value_str = ufbx_empty_string;
+		shape_props[0].value_real = 100.0f;
+		ufbxi_ignore(ufbxi_get_val1(deform_percent, "R", &shape_props[0].value_real));
+		channel->props.props.data = shape_props;
+		channel->props.props.count = num_shape_props;
+	}
+
 	return 1;
 }
 
