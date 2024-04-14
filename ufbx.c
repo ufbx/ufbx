@@ -9261,22 +9261,17 @@ typedef struct {
 	void *arr_data;
 	char arr_type;
 	size_t arr_size;
-	uint32_t parse_flags;
-
 	const ufbxi_ascii_span *spans;
 	size_t num_spans;
-
 	size_t offset;
-
 } ufbxi_ascii_array_task;
 
-ufbxi_noinline static const char *ufbxi_ascii_array_task_parse_floats(ufbxi_ascii_array_task *t, const char *src, const char *src_end)
+ufbxi_noinline static const char *ufbxi_ascii_array_task_parse_floats(ufbxi_ascii_array_task *t, const char *src, const char *src_end, uint32_t parse_flags)
 {
 	size_t offset = t->offset;
 	float *dst_float = t->arr_type == 'f' ? (float*)t->arr_data + offset : NULL;
 	double *dst_double = t->arr_type == 'd' ? (double*)t->arr_data + offset : NULL;
 	ufbx_assert(dst_float || dst_double);
-	uint32_t parse_flags = t->parse_flags;
 	const char *src_begin = src;
 
 	while (src != src_end) {
@@ -9341,7 +9336,8 @@ ufbxi_noinline static const char *ufbxi_ascii_array_task_parse_ints(ufbxi_ascii_
 ufbxi_noinline static const char *ufbxi_ascii_array_task_parse(ufbxi_ascii_array_task *t, const char *src, const char *src_end)
 {
 	if (t->arr_type == 'f' || t->arr_type == 'd') {
-		return ufbxi_ascii_array_task_parse_floats(t, src, src_end);
+		uint32_t flags = ufbxi_parse_double_init_flags();
+		return ufbxi_ascii_array_task_parse_floats(t, src, src_end, flags);
 	} else {
 		return ufbxi_ascii_array_task_parse_ints(t, src, src_end);
 	}
@@ -9864,7 +9860,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 				t.arr_size = deferred_size;
 				t.num_spans = num_spans;
 				t.spans = spans;
-				t.parse_flags = uc->double_parse_flags;
 				t.offset = 0;
 
 				// TODO: Split these further
