@@ -2218,6 +2218,9 @@ static const ufbxt_fuzz_check g_fuzz_checks[] = {
 	{ "zbrush_vertex_color_obj", 16969, -1, 0, 0, 20, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prop, 0)" },
 	{ "zbrush_vertex_color_obj", 16969, -1, 0, 1075, 0, 0, 0, "ufbxi_push_string_place_str(&uc->string_pool, &prop, 0)" },
 	{ "zbrush_vertex_color_obj", 16972, -1, 0, 1077, 0, 0, 0, "ufbxi_connect_op(uc, fbx_id, uc->obj.usemtl_fbx_id, pro..." },
+	{ "zbrush_vertex_color_obj", 16972, -1, 0, 84, 0, 0, 0, "ufbxi_connect_op(uc, fbx_id, uc->obj.usemtl_fbx_id, pro..." },
+	{ "zbrush_vertex_color_obj", 16994, -1, 0, 1055, 0, 0, 0, "ufbxi_obj_parse_mtl_map(uc, 4)" },
+	{ "zbrush_vertex_color_obj", 16994, -1, 0, 78, 0, 0, 0, "ufbxi_obj_parse_mtl_map(uc, 4)" },
 };
 
 typedef struct {
