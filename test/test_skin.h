@@ -1040,7 +1040,7 @@ static ufbx_load_opts ufbxt_lefthanded_y_up_z_flip_opts()
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_poses_lefthanded, maya_poses, ufbxt_lefthanded_y_up_z_flip_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_poses_lefthanded, maya_poses, ufbxt_lefthanded_y_up_z_flip_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
 	{
@@ -1115,4 +1115,10 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_poses_lefthanded, maya_poses, ufbxt_lefthand
 }
 #endif
 
+UFBXT_FILE_TEST(blender_331_static_blend_shape)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->anim_stacks.count == 0);
+}
+#endif
 
