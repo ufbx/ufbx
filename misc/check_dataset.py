@@ -11,7 +11,7 @@ import datetime
 import asyncio
 import asyncio.subprocess
 
-LATEST_SUPPORTED_DATE = "2024-04-08"
+LATEST_SUPPORTED_DATE = "2024-04-15"
 
 class TestModel(NamedTuple):
     fbx_path: str
