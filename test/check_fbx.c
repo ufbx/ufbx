@@ -425,7 +425,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		if (node->has_geometry_transform) {
 			ufbxt_add_feature(&features, "geometry-transform");
 		}
-		if (node->inherit_mode == UFBX_INHERIT_MODE_NORMAL) {
+		if (node->inherit_mode != UFBX_INHERIT_MODE_NORMAL) {
 			ufbxt_add_feature(&features, "inherit-mode");
 		}
 
