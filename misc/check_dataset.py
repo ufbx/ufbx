@@ -11,7 +11,7 @@ import datetime
 import asyncio
 import asyncio.subprocess
 
-LATEST_SUPPORTED_DATE = "2024-04-15"
+LATEST_SUPPORTED_DATE = "2024-04-17"
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -177,6 +177,10 @@ def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_sup
         elif feature == "inherit-mode":
             append_unique_opt(options, "inherit-mode-handling", [
                 "preserve", "helper-nodes", "compensate",
+            ])
+        elif feature == "inherit-mode-no-fallback":
+            append_unique_opt(options, "inherit-mode-handling", [
+                "preserve", "helper-nodes", "compensate", "compensate-no-fallback",
             ])
         elif feature == "pivot":
             append_unique_opt(options, "pivot-handling", [

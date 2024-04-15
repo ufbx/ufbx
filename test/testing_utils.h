@@ -167,6 +167,7 @@ typedef struct {
 	double position_scale;
 	double position_scale_float;
 	double position_scale_bake;
+	double position_scale_compensate;
 
 	double fbx_position_scale;
 	ufbx_quat fbx_rotation;
@@ -556,6 +557,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 	obj->position_scale = 1.0;
 	obj->position_scale_float = 1.0;
 	obj->position_scale_bake = 1.0;
+	obj->position_scale_compensate = 1.0;
 	obj->fbx_position_scale = 1.0;
 	obj->fbx_rotation = ufbx_identity_quat;
 
@@ -783,6 +785,10 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			double position_scale_bake = 0.0;
 			if (sscanf(line, "ufbx:position_scale_bake=%lf", &position_scale_bake) == 1) {
 				obj->position_scale_bake = position_scale_bake;
+			}
+			double position_scale_compensate = 0.0;
+			if (sscanf(line, "ufbx:position_scale_compensate=%lf", &position_scale_compensate) == 1) {
+				obj->position_scale_compensate = position_scale_compensate;
 			}
 			int frame = 0;
 			if (sscanf(line, "ufbx:frame=%d", &frame) == 1) {
@@ -1260,6 +1266,7 @@ enum {
 	UFBXT_OBJ_DIFF_FLAG_CHECK_DEFORMED_NORMALS = 0x1,
 	UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS = 0x2,
 	UFBXT_OBJ_DIFF_FLAG_BAKED_ANIM = 0x4,
+	UFBXT_OBJ_DIFF_FLAG_INHERIT_COMPENSATE = 0x4,
 };
 
 static bool ufbxt_has_mesh(ufbx_node *node)
@@ -1446,6 +1453,9 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		#endif
 		if (flags & UFBXT_OBJ_DIFF_FLAG_BAKED_ANIM) {
 			scale *= obj->position_scale_bake;
+		}
+		if (flags & UFBXT_OBJ_DIFF_FLAG_INHERIT_COMPENSATE) {
+			scale *= obj->position_scale_compensate;
 		}
 
 		used_nodes[num_used_nodes++] = node;
