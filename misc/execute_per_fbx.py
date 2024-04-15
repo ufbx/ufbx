@@ -12,6 +12,7 @@ parser.add_argument("--list", default="", help="List of files to use instead of 
 parser.add_argument("--verbose", action="store_true", help="Verbose information")
 parser.add_argument("--allow-fail", action="store_true", help="Verbose information")
 parser.add_argument("--cycles", default=1, type=int, help="Number of cycles to load the data")
+parser.add_argument("-p", action="append", help="Run multiple permutations, use with #p")
 parser.add_argument('remainder', nargs="...")
 argv = parser.parse_args()
 
@@ -46,28 +47,38 @@ for cycle in range(argv.cycles):
             continue
 
         print(f"-- {display}", flush=True)
-
         total_size += size
-        if argv.exe:
-            rest = argv.remainder[1:]
-            if "#" in rest:
-                ix = rest.index("#")
-                rest[ix] = path.encode("utf-8")
-                args = [argv.exe] + rest
-            else:
-                args = [argv.exe, path.encode("utf-8")] + rest
 
-            if argv.verbose:
-                cmdline = subprocess.list2cmdline(args)
-                print(f"$ {cmdline}")
+        ps = [""]
+        if argv.p:
+            ps = argv.p
 
-            if argv.allow_fail:
-                try:
+        for p in ps:
+            if argv.exe:
+                rest = argv.remainder[1:]
+
+                if "#p" in rest:
+                    ix = rest.index("#p")
+                    rest[ix] = p.encode("utf-8")
+
+                if "#" in rest:
+                    ix = rest.index("#")
+                    rest[ix] = path.encode("utf-8")
+                    args = [argv.exe] + rest
+                else:
+                    args = [argv.exe, path.encode("utf-8")] + rest
+
+                if argv.verbose:
+                    cmdline = subprocess.list2cmdline(args)
+                    print(f"$ {cmdline}")
+
+                if argv.allow_fail:
+                    try:
+                        subprocess.check_call(args)
+                    except Exception as e:
+                        print("Failed to load")
+                else:
                     subprocess.check_call(args)
-                except Exception as e:
-                    print("Failed to load")
-            else:
-                subprocess.check_call(args)
         num_tested += 1
 
 end = time.time()
