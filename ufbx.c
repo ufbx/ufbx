@@ -17167,7 +17167,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 {
 	bool required = false;
 	if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES || uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY) required = true;
-	if (uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_HELPER_NODES || uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_COMPENSATE) required = true;
+	if (uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_HELPER_NODES || uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_COMPENSATE || uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_COMPENSATE_NO_FALLBACK) required = true;
 	if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT) required = true;
 #if defined(UFBX_REGRESSION)
 	required = true;
@@ -17465,7 +17465,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 				ufbx_real dx = (ufbx_real)ufbx_fabs(scale.x - ref);
 				ufbx_real dy = (ufbx_real)ufbx_fabs(scale.y - ref);
 				ufbx_real dz = (ufbx_real)ufbx_fabs(scale.z - ref);
-				if (dx + dy + dz >= scale_epsilon || !pre_node->has_constant_scale || (ufbx_real)ufbx_fabs(scale.x) <= compensate_epsilon) {
+				if ((dx + dy + dz >= scale_epsilon || !pre_node->has_constant_scale || (ufbx_real)ufbx_fabs(scale.x) <= compensate_epsilon)
+						&& uc->opts.inherit_mode_handling != UFBX_INHERIT_MODE_HANDLING_COMPENSATE_NO_FALLBACK) {
 					ufbxi_check(ufbxi_setup_scale_helper(uc, node, fbx_id));
 
 					// If we added a geometry transform helper that may scale further helpers
@@ -17504,7 +17505,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 						}
 					}
 
-				} else if (uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_COMPENSATE) {
+				} else if (uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_COMPENSATE || uc->opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_COMPENSATE_NO_FALLBACK) {
 					if ((ufbx_real)ufbx_fabs(scale.x - 1.0f) >= scale_epsilon) {
 						node->is_scale_compensate_parent = true;
 					}
@@ -22629,7 +22630,10 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 			}
 			if (parent->is_scale_compensate_parent && node->original_inherit_mode == UFBX_INHERIT_MODE_IGNORE_PARENT_SCALE) {
 				ufbx_vec3 scale = ufbxi_find_vec3(&parent->props, ufbxi_Lcl_Scaling, 1.0f, 1.0f, 1.0f);
-				node->adjust_post_scale *= 1.0f / scale.x;
+				ufbx_real size = scale.x;
+				if (ufbx_fabs(scale.y - 1.0f) < ufbx_fabs(size - 1.0f)) size = scale.y;
+				if (ufbx_fabs(scale.z - 1.0f) < ufbx_fabs(size - 1.0f)) size = scale.z;
+				node->adjust_post_scale *= 1.0f / size;
 				node->has_adjust_transform = true;
 			}
 		}

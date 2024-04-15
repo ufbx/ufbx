@@ -4333,6 +4333,10 @@ typedef enum ufbx_inherit_mode_handling UFBX_ENUM_REPR {
 	// as `UFBX_INHERIT_MODE_HANDLING_HELPER_NODES`.
 	UFBX_INHERIT_MODE_HANDLING_COMPENSATE,
 
+	// Attempt to compensate for bone scale by inversely scaling children.
+	// Will never create helper nodes.
+	UFBX_INHERIT_MODE_HANDLING_COMPENSATE_NO_FALLBACK,
+
 	// Ignore non-standard inheritance modes.
 	// Forces all nodes to have `UFBX_INHERIT_MODE_NORMAL` regardless of the
 	// inherit mode specified in the file. This can be useful for emulating
