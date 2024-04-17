@@ -17367,6 +17367,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 							pre_nodes[dst->typed_id].has_skin_deformer = true;
 						}
 					}
+				} else if (src->type == UFBX_ELEMENT_SKIN_DEFORMER) {
+					pre_nodes[dst->typed_id].has_skin_deformer = true;
 				}
 			}
 		} else if (tmp->src_prop.length == 0 && tmp->dst_prop.length != 0) {
