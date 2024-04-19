@@ -4742,6 +4742,16 @@ typedef struct ufbx_load_opts {
 	// (.obj) Data for the .mtl file.
 	ufbx_blob obj_mtl_data;
 
+	// The world unit in meters that .obj files are assumed to be in.
+	// .obj files do not define the working units. By default the unit scale
+	// is read as zero, and no unit conversion is performed.
+	ufbx_real obj_unit_meters;
+
+	// Coordinate space .obj files are assumed to be in.
+	// .obj files do not define the coordinate space they use. By default no
+	// coordinate space is assumed and no conversion is performed.
+	ufbx_coordinate_axes obj_axes;
+
 	uint32_t _end_zero;
 } ufbx_load_opts;
 

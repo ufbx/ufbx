@@ -22806,6 +22806,19 @@ static ufbxi_noinline void ufbxi_update_scene_settings(ufbx_scene_settings *sett
 	}
 }
 
+static ufbxi_noinline void ufbxi_update_scene_settings_obj(ufbxi_context *uc)
+{
+	ufbx_scene_settings *settings = &uc->scene.settings;
+	settings->original_unit_meters = settings->unit_meters = uc->opts.obj_unit_meters;
+	if (ufbx_coordinate_axes_valid(uc->opts.obj_axes)) {
+		settings->axes = uc->opts.obj_axes;
+	} else {
+		settings->axes.right = UFBX_COORDINATE_AXIS_UNKNOWN;
+		settings->axes.up = UFBX_COORDINATE_AXIS_UNKNOWN;
+		settings->axes.front = UFBX_COORDINATE_AXIS_UNKNOWN;
+	}
+}
+
 // -- Geometry caches
 
 #if UFBXI_FEATURE_GEOMETRY_CACHE
@@ -24149,6 +24162,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 	ufbxi_check(ufbxi_finalize_scene(uc));
 
 	ufbxi_update_scene_settings(&uc->scene.settings);
+	if (uc->scene.metadata.file_format == UFBX_FILE_FORMAT_OBJ) {
+		ufbxi_update_scene_settings_obj(uc);
+	}
 
 	// Axis conversion
 	if (ufbx_coordinate_axes_valid(uc->opts.target_axes)) {
