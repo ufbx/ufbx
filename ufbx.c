@@ -24904,6 +24904,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 		node->mesh = (ufbx_mesh*)ufbxi_translate_element(ec, node->mesh);
 		node->light = (ufbx_light*)ufbxi_translate_element(ec, node->light);
 		node->camera = (ufbx_camera*)ufbxi_translate_element(ec, node->camera);
+		node->bone = (ufbx_bone*)ufbxi_translate_element(ec, node->bone);
 		node->inherit_scale_node = (ufbx_node*)ufbxi_translate_element(ec, node->inherit_scale_node);
 		node->scale_helper = (ufbx_node*)ufbxi_translate_element(ec, node->scale_helper);
 		node->bind_pose = (ufbx_pose*)ufbxi_translate_element(ec, node->bind_pose);
