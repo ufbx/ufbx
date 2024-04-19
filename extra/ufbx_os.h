@@ -18,6 +18,10 @@
 #define UFBX_OS_DEFAULT_MAX_THREADS 8
 #endif
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 typedef struct ufbx_os_thread_pool_opts {
 	uint32_t _begin_zero;
 
@@ -41,13 +45,17 @@ ufbx_os_abi uint64_t ufbx_os_thread_pool_run(ufbx_os_thread_pool *pool, ufbx_os_
 ufbx_os_abi bool ufbx_os_thread_pool_try_wait(ufbx_os_thread_pool *pool, uint64_t task_id);
 ufbx_os_abi void ufbx_os_thread_pool_wait(ufbx_os_thread_pool *pool, uint64_t task_id);
 
-#define ufbxos_assert(cond) ufbx_assert(cond)
+#if defined(__cplusplus)
+}
+#endif
 
 #endif
 
 #if defined(UFBX_OS_IMPLEMENTATION)
 #ifndef UFBX_OS_H_IMPLEMENTED
 #define UFBX_OS_H_IMPLEMENTED
+
+#define ufbxos_assert(cond) ufbx_assert(cond)
 
 #include <stdlib.h>
 
@@ -915,6 +923,10 @@ static void ufbxos_thread_pool_entry(ufbx_os_thread_pool *pool)
 
 // -- API
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 ufbx_os_abi ufbx_os_thread_pool *ufbx_os_create_thread_pool(const ufbx_os_thread_pool_opts *user_opts)
 {
 	ufbx_os_thread_pool_opts opts;
@@ -1081,6 +1093,10 @@ ufbx_os_abi void ufbx_os_init_ufbx_thread_pool(ufbx_thread_pool *dst, ufbx_os_th
 	dst->wait_fn = &ufbxos_ufbx_thread_pool_wait;
 	dst->free_fn = &ufbxos_ufbx_thread_pool_free;
 }
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif
 #endif
