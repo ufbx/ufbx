@@ -459,6 +459,7 @@ ufbxt_noinline static void ufbxt_hash_vertex_real_imp(ufbxt_hash *h, const ufbx_
 	ufbxt_hash_list(h, v->indices, ufbxt_hash_pod_imp);
 	ufbxt_hash_size_t(h, v->value_reals);
 	ufbxt_hash_pod(h, v->unique_per_vertex);
+	ufbxt_hash_list(h, v->values_w, ufbxt_hash_real_imp);
 }
 
 ufbxt_noinline static void ufbxt_hash_vertex_vec2_imp(ufbxt_hash *h, const ufbx_vertex_vec2 *v)
@@ -468,6 +469,7 @@ ufbxt_noinline static void ufbxt_hash_vertex_vec2_imp(ufbxt_hash *h, const ufbx_
 	ufbxt_hash_list(h, v->indices, ufbxt_hash_pod_imp);
 	ufbxt_hash_size_t(h, v->value_reals);
 	ufbxt_hash_pod(h, v->unique_per_vertex);
+	ufbxt_hash_list(h, v->values_w, ufbxt_hash_real_imp);
 }
 
 ufbxt_noinline static void ufbxt_hash_vertex_vec3_imp(ufbxt_hash *h, const ufbx_vertex_vec3 *v)
@@ -477,6 +479,7 @@ ufbxt_noinline static void ufbxt_hash_vertex_vec3_imp(ufbxt_hash *h, const ufbx_
 	ufbxt_hash_list(h, v->indices, ufbxt_hash_pod_imp);
 	ufbxt_hash_size_t(h, v->value_reals);
 	ufbxt_hash_pod(h, v->unique_per_vertex);
+	ufbxt_hash_list(h, v->values_w, ufbxt_hash_real_imp);
 }
 
 ufbxt_noinline static void ufbxt_hash_vertex_vec4_imp(ufbxt_hash *h, const ufbx_vertex_vec4 *v)
@@ -486,6 +489,7 @@ ufbxt_noinline static void ufbxt_hash_vertex_vec4_imp(ufbxt_hash *h, const ufbx_
 	ufbxt_hash_list(h, v->indices, ufbxt_hash_pod);
 	ufbxt_hash_size_t(h, v->value_reals);
 	ufbxt_hash_pod(h, v->unique_per_vertex);
+	ufbxt_hash_list(h, v->values_w, ufbxt_hash_real_imp);
 }
 
 #define ufbxt_hash_vertex_real(h, v) (ufbxt_push_tag(h, #v), ufbxt_hash_vertex_real_imp(h, v), ufbxt_pop_tag(h))
