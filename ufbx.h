@@ -862,6 +862,7 @@ struct ufbx_node {
 	ufbx_nullable ufbx_mesh *mesh;
 	ufbx_nullable ufbx_light *light;
 	ufbx_nullable ufbx_camera *camera;
+	ufbx_nullable ufbx_bone *bone;
 
 	// Less common attributes use these fields.
 	//

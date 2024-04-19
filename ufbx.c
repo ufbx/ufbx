@@ -20671,6 +20671,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			case UFBX_ELEMENT_MESH: node->mesh = (ufbx_mesh*)elem; break;
 			case UFBX_ELEMENT_LIGHT: node->light = (ufbx_light*)elem; break;
 			case UFBX_ELEMENT_CAMERA: node->camera = (ufbx_camera*)elem; break;
+			case UFBX_ELEMENT_BONE: node->bone = (ufbx_bone*)elem; break;
 			default: /* No shorthand */ break;
 			}
 		}
