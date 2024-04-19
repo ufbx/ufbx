@@ -1580,10 +1580,11 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(obj_space_manual_convert, blender_279_ball, obj_a
 
 		ufbx_node *node = scene->root_node;
 		ufbx_vec3 scale = { 0.1f, 0.1f, 0.1f };
-		ufbx_quat 
+		ufbx_vec3 euler = { -90.0f, 0.0f, 0.0f };
+		ufbx_quat rotation = ufbx_euler_to_quat(euler, UFBX_ROTATION_ORDER_XYZ);
 
 		ufbxt_assert_close_vec3(err, node->local_transform.scale, scale);
-		ufbxt_assert_close_vec3(err, node->local_transform.scale, scale);
+		ufbxt_assert_close_quat(err, node->local_transform.rotation, rotation);
 	} else {
 		ufbxt_assert(scene->settings.axes.right == UFBX_COORDINATE_AXIS_POSITIVE_X);
 		ufbxt_assert(scene->settings.axes.up == UFBX_COORDINATE_AXIS_POSITIVE_Y);
