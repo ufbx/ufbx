@@ -1508,3 +1508,89 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_empty_face_allow, synthetic_empty_face, ufbxt
 }
 #endif
 
+UFBXT_FILE_TEST_ALT_FLAGS(obj_space_default, blender_279_ball, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS)
+#if UFBXT_IMPL
+{
+	if (scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ) {
+		ufbxt_assert(scene->settings.axes.right == UFBX_COORDINATE_AXIS_UNKNOWN);
+		ufbxt_assert(scene->settings.axes.up == UFBX_COORDINATE_AXIS_UNKNOWN);
+		ufbxt_assert(scene->settings.axes.front == UFBX_COORDINATE_AXIS_UNKNOWN);
+		ufbxt_assert(scene->settings.unit_meters == 0.0f);
+		ufbxt_assert(scene->settings.original_unit_meters == 0.0f);
+	} else {
+		ufbxt_assert(scene->settings.axes.right == UFBX_COORDINATE_AXIS_POSITIVE_X);
+		ufbxt_assert(scene->settings.axes.up == UFBX_COORDINATE_AXIS_POSITIVE_Y);
+		ufbxt_assert(scene->settings.axes.front == UFBX_COORDINATE_AXIS_POSITIVE_Z);
+		ufbxt_assert(scene->settings.unit_meters == (ufbx_real)0.01);
+		ufbxt_assert(scene->settings.original_unit_meters == (ufbx_real)0.01);
+	}
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts obj_axes_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.obj_unit_meters = (ufbx_real)0.1;
+	opts.obj_axes = ufbx_axes_right_handed_z_up;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(obj_space_manual_axes, blender_279_ball, obj_axes_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS)
+#if UFBXT_IMPL
+{
+	if (scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ) {
+		ufbxt_assert(scene->settings.axes.right == UFBX_COORDINATE_AXIS_POSITIVE_X);
+		ufbxt_assert(scene->settings.axes.up == UFBX_COORDINATE_AXIS_POSITIVE_Z);
+		ufbxt_assert(scene->settings.axes.front == UFBX_COORDINATE_AXIS_NEGATIVE_Y);
+		ufbxt_assert(scene->settings.unit_meters == (ufbx_real)0.1);
+		ufbxt_assert(scene->settings.original_unit_meters == (ufbx_real)0.1);
+	} else {
+		ufbxt_assert(scene->settings.axes.right == UFBX_COORDINATE_AXIS_POSITIVE_X);
+		ufbxt_assert(scene->settings.axes.up == UFBX_COORDINATE_AXIS_POSITIVE_Y);
+		ufbxt_assert(scene->settings.axes.front == UFBX_COORDINATE_AXIS_POSITIVE_Z);
+		ufbxt_assert(scene->settings.unit_meters == (ufbx_real)0.01);
+		ufbxt_assert(scene->settings.original_unit_meters == (ufbx_real)0.01);
+	}
+}
+#endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts obj_axes_convert_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.obj_unit_meters = (ufbx_real)0.1;
+	opts.obj_axes = ufbx_axes_right_handed_z_up;
+	opts.target_unit_meters = 1.0f;
+	opts.target_axes = ufbx_axes_right_handed_y_up;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(obj_space_manual_convert, blender_279_ball, obj_axes_convert_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS)
+#if UFBXT_IMPL
+{
+	if (scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ) {
+		ufbxt_assert(scene->settings.axes.right == UFBX_COORDINATE_AXIS_POSITIVE_X);
+		ufbxt_assert(scene->settings.axes.up == UFBX_COORDINATE_AXIS_POSITIVE_Z);
+		ufbxt_assert(scene->settings.axes.front == UFBX_COORDINATE_AXIS_NEGATIVE_Y);
+		ufbxt_assert(scene->settings.unit_meters == (ufbx_real)0.1);
+		ufbxt_assert(scene->settings.original_unit_meters == (ufbx_real)0.1);
+
+		ufbx_node *node = scene->root_node;
+		ufbx_vec3 scale = { 0.1f, 0.1f, 0.1f };
+		ufbx_quat 
+
+		ufbxt_assert_close_vec3(err, node->local_transform.scale, scale);
+		ufbxt_assert_close_vec3(err, node->local_transform.scale, scale);
+	} else {
+		ufbxt_assert(scene->settings.axes.right == UFBX_COORDINATE_AXIS_POSITIVE_X);
+		ufbxt_assert(scene->settings.axes.up == UFBX_COORDINATE_AXIS_POSITIVE_Y);
+		ufbxt_assert(scene->settings.axes.front == UFBX_COORDINATE_AXIS_POSITIVE_Z);
+		ufbxt_assert(scene->settings.unit_meters == (ufbx_real)0.01);
+		ufbxt_assert(scene->settings.original_unit_meters == (ufbx_real)0.01);
+	}
+}
+#endif
+
