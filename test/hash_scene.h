@@ -418,6 +418,7 @@ ufbxt_noinline static void ufbxt_hash_node_imp(ufbxt_hash *h, const ufbx_node *v
 	ufbxt_hash_element_ref(h, v->mesh);
 	ufbxt_hash_element_ref(h, v->light);
 	ufbxt_hash_element_ref(h, v->camera);
+	ufbxt_hash_element_ref(h, v->bone);
 	ufbxt_hash_element_ref(h, v->attrib);
 	ufbxt_hash_element_ref(h, v->geometry_transform_helper);
 	ufbxt_hash_element_ref(h, v->scale_helper);
