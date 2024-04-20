@@ -26315,6 +26315,20 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_element(ufbxi_bake_context 
 	return 1;
 }
 
+static ufbxi_noinline bool ufbxi_baked_node_less(void *user, const void *va, const void *vb)
+{
+	(void)user;
+	const ufbx_baked_node *a = (const ufbx_baked_node*)va, *b = (const ufbx_baked_node*)vb;
+	return a->typed_id < b->typed_id;
+}
+
+static ufbxi_noinline bool ufbxi_baked_element_less(void *user, const void *va, const void *vb)
+{
+	(void)user;
+	const ufbx_baked_element *a = (const ufbx_baked_element*)va, *b = (const ufbx_baked_element*)vb;
+	return a->element_id < b->element_id;
+}
+
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim(ufbxi_bake_context *bc)
 {
 	const ufbx_anim *anim = bc->anim;
@@ -26405,6 +26419,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim(ufbxi_bake_context *bc
 	bc->bake.elements.data = ufbxi_push_pop(&bc->result, &bc->tmp_elements, ufbx_baked_element, num_elements);
 	ufbxi_check_err(&bc->error, bc->bake.elements.data);
 
+	ufbxi_unstable_sort(bc->bake.nodes.data, bc->bake.nodes.count, sizeof(ufbx_baked_node), &ufbxi_baked_node_less, NULL);
+	ufbxi_unstable_sort(bc->bake.elements.data, bc->bake.elements.count, sizeof(ufbx_baked_element), &ufbxi_baked_element_less, NULL);
+
 	if (bc->time_min < bc->time_max) {
 		bc->bake.key_time_min = bc->time_min;
 		bc->bake.key_time_max = bc->time_max;
@@ -26466,10 +26483,16 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim_imp(ufbxi_bake_context
 
 	ufbxi_init_ref(&bc->imp->refcount, UFBXI_BAKED_ANIM_IMP_MAGIC, NULL);
 
+	bc->bake.metadata.result_memory_used = bc->ator_result.current_size;
+	bc->bake.metadata.temp_memory_used = bc->ator_tmp.current_size;
+	bc->bake.metadata.result_allocs = bc->ator_result.num_allocs;
+	bc->bake.metadata.temp_allocs = bc->ator_tmp.num_allocs;
+
 	bc->imp->magic = UFBXI_BAKED_ANIM_IMP_MAGIC;
 	bc->imp->bake = bc->bake;
 	bc->imp->refcount.ator = bc->ator_result;
 	bc->imp->refcount.buf = bc->result;
+
 	return 1;
 }
 
@@ -29980,6 +30003,35 @@ ufbx_abi void ufbx_free_baked_anim(ufbx_baked_anim *bake)
 	ufbxi_release_ref(&imp->refcount);
 }
 
+
+ufbx_abi ufbx_baked_node *ufbx_find_baked_node_by_typed_id(ufbx_baked_anim *bake, uint32_t typed_id)
+{
+	size_t index = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbx_baked_node, 8, &index, bake->nodes.data, 0, bake->nodes.count,
+		( a->typed_id < typed_id ), ( a->typed_id == typed_id) );
+	return index < SIZE_MAX ? &bake->nodes.data[index] : NULL;
+}
+
+ufbx_abi ufbx_baked_node *ufbx_find_baked_node(ufbx_baked_anim *bake, ufbx_node *node)
+{
+	if (!bake || !node) return NULL;
+	return ufbx_find_baked_node_by_typed_id(bake, node->typed_id);
+}
+
+ufbx_abi ufbx_baked_element *ufbx_find_baked_element_by_element_id(ufbx_baked_anim *bake, uint32_t element_id)
+{
+	size_t index = SIZE_MAX;
+	ufbxi_macro_lower_bound_eq(ufbx_baked_element, 8, &index, bake->elements.data, 0, bake->elements.count,
+		( a->element_id < element_id ), ( a->element_id == element_id) );
+	return index < SIZE_MAX ? &bake->elements.data[index] : NULL;
+}
+
+ufbx_abi ufbx_baked_element *ufbx_find_baked_element(ufbx_baked_anim *bake, ufbx_element *element)
+{
+	if (!bake || !element) return NULL;
+	return ufbx_find_baked_element_by_element_id(bake, element->element_id);
+}
+
 ufbx_abi ufbx_vec3 ufbx_evaluate_baked_vec3(ufbx_baked_vec3_list keyframes, double time)
 {
 	size_t begin = 0;
@@ -30135,6 +30187,11 @@ ufbx_abi bool ufbx_coordinate_axes_valid(ufbx_coordinate_axes axes)
 ufbx_abi ufbx_quat ufbx_quat_mul(ufbx_quat a, ufbx_quat b)
 {
 	return ufbxi_mul_quat(a, b);
+}
+
+ufbx_abi ufbx_vec3 ufbx_vec3_normalize(ufbx_vec3 v)
+{
+	return ufbxi_normalize3(v);
 }
 
 ufbx_abi ufbxi_noinline ufbx_real ufbx_quat_dot(ufbx_quat a, ufbx_quat b)
@@ -30422,24 +30479,18 @@ ufbx_abi ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m)
 ufbx_abi ufbxi_noinline ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m)
 {
 	ufbx_real det = ufbx_matrix_determinant(m);
+	ufbx_real det_sign = det >= 0.0f ? 1.0f : -1.0f;
 
 	ufbx_matrix r;
-	if (ufbx_fabs(det) <= UFBX_EPSILON) {
-		memset(&r, 0, sizeof(r));
-		return r;
-	}
-
-	ufbx_real rcp_det = 1.0f / det;
-
-	r.m00 = ( - m->m12*m->m21 + m->m11*m->m22) * rcp_det;
-	r.m01 = ( + m->m12*m->m20 - m->m10*m->m22) * rcp_det;
-	r.m02 = ( - m->m11*m->m20 + m->m10*m->m21) * rcp_det;
-	r.m10 = ( + m->m02*m->m21 - m->m01*m->m22) * rcp_det;
-	r.m11 = ( - m->m02*m->m20 + m->m00*m->m22) * rcp_det;
-	r.m12 = ( + m->m01*m->m20 - m->m00*m->m21) * rcp_det;
-	r.m20 = ( - m->m02*m->m11 + m->m01*m->m12) * rcp_det;
-	r.m21 = ( + m->m02*m->m10 - m->m00*m->m12) * rcp_det;
-	r.m22 = ( - m->m01*m->m10 + m->m00*m->m11) * rcp_det;
+	r.m00 = ( - m->m12*m->m21 + m->m11*m->m22) * det_sign;
+	r.m01 = ( + m->m12*m->m20 - m->m10*m->m22) * det_sign;
+	r.m02 = ( - m->m11*m->m20 + m->m10*m->m21) * det_sign;
+	r.m10 = ( + m->m02*m->m21 - m->m01*m->m22) * det_sign;
+	r.m11 = ( - m->m02*m->m20 + m->m00*m->m22) * det_sign;
+	r.m12 = ( + m->m01*m->m20 - m->m00*m->m21) * det_sign;
+	r.m20 = ( - m->m02*m->m11 + m->m01*m->m12) * det_sign;
+	r.m21 = ( + m->m02*m->m10 - m->m00*m->m12) * det_sign;
+	r.m22 = ( - m->m01*m->m10 + m->m00*m->m11) * det_sign;
 	r.m03 = r.m13 = r.m23 = 0.0f;
 
 	return r;

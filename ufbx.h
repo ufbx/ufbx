@@ -4447,6 +4447,14 @@ typedef struct ufbx_baked_element {
 
 UFBX_LIST_TYPE(ufbx_baked_element_list, ufbx_baked_element);
 
+typedef struct ufbx_baked_anim_metadata {
+	// Memory statistics
+	size_t result_memory_used;
+	size_t temp_memory_used;
+	size_t result_allocs;
+	size_t temp_allocs;
+} ufbx_baked_anim_metadata;
+
 // Animation baked into linearly interpolated keyframes.
 // See `ufbx_bake_anim()`.
 typedef struct ufbx_baked_anim {
@@ -4468,6 +4476,9 @@ typedef struct ufbx_baked_anim {
 	// Keyframe time range.
 	double key_time_min;
 	double key_time_max;
+
+	// Additional bake information.
+	ufbx_baked_anim_metadata metadata;
 
 } ufbx_baked_anim;
 
@@ -5309,6 +5320,12 @@ ufbx_abi ufbx_baked_anim *ufbx_bake_anim(const ufbx_scene *scene, const ufbx_ani
 ufbx_abi void ufbx_retain_baked_anim(ufbx_baked_anim *bake);
 ufbx_abi void ufbx_free_baked_anim(ufbx_baked_anim *bake);
 
+ufbx_abi ufbx_baked_node *ufbx_find_baked_node_by_typed_id(ufbx_baked_anim *bake, uint32_t typed_id);
+ufbx_abi ufbx_baked_node *ufbx_find_baked_node(ufbx_baked_anim *bake, ufbx_node *node);
+
+ufbx_abi ufbx_baked_element *ufbx_find_baked_element_by_element_id(ufbx_baked_anim *bake, uint32_t element_id);
+ufbx_abi ufbx_baked_element *ufbx_find_baked_element(ufbx_baked_anim *bake, ufbx_element *element);
+
 // Evaluate baked animation `keyframes` at `time`.
 // Internally linearly interpolates between two adjacent keyframes.
 // Handles stepped tangents cleanly, which is not strictly necessary for custom interpolation.
@@ -5356,6 +5373,9 @@ ufbx_inline ufbx_shader_texture_input *ufbx_find_shader_texture_input(const ufbx
 // Returns `true` if `axes` forms a valid coordinate space.
 ufbx_abi bool ufbx_coordinate_axes_valid(ufbx_coordinate_axes axes);
 
+// Vector math utility functions.
+ufbx_abi ufbx_vec3 ufbx_vec3_normalize(ufbx_vec3 v);
+
 // Quaternion math utility functions.
 ufbx_abi ufbx_real ufbx_quat_dot(ufbx_quat a, ufbx_quat b);
 ufbx_abi ufbx_quat ufbx_quat_mul(ufbx_quat a, ufbx_quat b);
@@ -5370,7 +5390,14 @@ ufbx_abi ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order);
 ufbx_abi ufbx_matrix ufbx_matrix_mul(const ufbx_matrix *a, const ufbx_matrix *b);
 ufbx_abi ufbx_real ufbx_matrix_determinant(const ufbx_matrix *m);
 ufbx_abi ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m);
+
+// Get a matrix that can be used to transform geometry normals.
+// NOTE: You must normalize the normals after transforming them with this matrix,
+// eg. using `ufbx_vec3_normalize()`.
+// NOTE: This function flips the normals if the determinant is negative.
 ufbx_abi ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m);
+
+// Matrix transformation utilities.
 ufbx_abi ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v);
 ufbx_abi ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v);
 
