@@ -3382,3 +3382,53 @@ UFBXT_FILE_TEST(maya_linear_spline)
 }
 #endif
 
+UFBXT_FILE_TEST_ALT(bake_search_node, maya_anim_linear)
+#if UFBXT_IMPL
+{
+	ufbx_error error;
+
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, NULL, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	ufbx_node *scene_node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(scene_node);
+
+	ufbx_baked_node *node = ufbx_find_baked_node(bake, scene_node);
+	ufbxt_assert(node);
+	ufbxt_assert(node->typed_id == scene_node->typed_id);
+	ufbxt_assert(node->element_id == scene_node->element_id);
+
+	ufbxt_assert(ufbx_find_baked_node_by_typed_id(bake, node->typed_id) == node);
+
+	ufbxt_assert(ufbx_find_baked_node(NULL, NULL) == NULL);
+	ufbxt_assert(ufbx_find_baked_node(bake, NULL) == NULL);
+	ufbxt_assert(ufbx_find_baked_node_by_typed_id(bake, UINT32_MAX) == NULL);
+	ufbxt_assert(ufbx_find_baked_node(bake, scene->root_node) == NULL);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT(bake_search_element, maya_anim_diffuse_curve)
+#if UFBXT_IMPL
+{
+	ufbx_error error;
+
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, NULL, &error);
+	if (!bake) ufbxt_log_error(&error);
+	ufbxt_assert(bake);
+
+	ufbx_material *material = ufbx_find_material(scene, "lambert1");
+	ufbxt_assert(material);
+
+	ufbx_baked_element *element = ufbx_find_baked_element(bake, &material->element);
+	ufbxt_assert(element);
+	ufbxt_assert(element->element_id == material->element_id);
+
+	ufbxt_assert(ufbx_find_baked_element_by_element_id(bake, material->element_id) == element);
+
+	ufbxt_assert(ufbx_find_baked_element(NULL, NULL) == NULL);
+	ufbxt_assert(ufbx_find_baked_element(bake, NULL) == NULL);
+	ufbxt_assert(ufbx_find_baked_element_by_element_id(bake, UINT32_MAX) == NULL);
+	ufbxt_assert(ufbx_find_baked_element(bake, &scene->root_node->element) == NULL);
+}
+#endif
