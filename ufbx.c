@@ -23512,10 +23512,6 @@ static ufbxi_noinline int ufbxi_cache_setup_channels(ufbxi_cache_context *cc)
 
 static ufbxi_noinline int ufbxi_cache_load_imp(ufbxi_cache_context *cc, ufbx_string filename)
 {
-	// `ufbx_geometry_cache_opts` must be cleared to zero first!
-	ufbx_assert(cc->opts._begin_zero == 0 && cc->opts._end_zero == 0);
-	ufbxi_check_err_msg(&cc->error, cc->opts._begin_zero == 0 && cc->opts._end_zero == 0, "Uninitialized options");
-
 	cc->tmp.ator = cc->ator_tmp;
 	cc->tmp_stack.ator = cc->ator_tmp;
 
@@ -24085,10 +24081,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 {
 	// Check for deferred failure
 	if (uc->deferred_failure) return 0;
-
-	// `ufbx_load_opts` must be cleared to zero first!
-	ufbx_assert(uc->opts._begin_zero == 0 && uc->opts._end_zero == 0);
-	ufbxi_check_msg(uc->opts._begin_zero == 0 && uc->opts._end_zero == 0, "Uninitialized options");
 	ufbxi_check(uc->opts.path_separator >= 0x20 && uc->opts.path_separator <= 0x7e);
 
 	ufbxi_check(ufbxi_fixup_opts_string(uc, &uc->opts.filename, false));
@@ -24870,10 +24862,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_translate_anim(ufbxi_eval_contex
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context *ec)
 {
-	// `ufbx_evaluate_opts` must be cleared to zero first!
-	ufbx_assert(ec->opts._begin_zero == 0 && ec->opts._end_zero == 0);
-	ufbxi_check_err_msg(&ec->error, ec->opts._begin_zero == 0 && ec->opts._end_zero == 0, "Uninitialized options");
-
 	ec->scene = ec->src_scene;
 	size_t num_elements = ec->scene.elements.count;
 
@@ -25324,10 +25312,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_create_anim_imp(ufbxi_create_ani
 {
 	const ufbx_scene *scene = ac->scene;
 	ufbx_anim *anim = &ac->anim;
-
-	// `ufbx_anim_opts` must be cleared to zero first!
-	ufbx_assert(ac->opts._begin_zero == 0 && ac->opts._end_zero == 0);
-	ufbxi_check_err_msg(&ac->error, ac->opts._begin_zero == 0 && ac->opts._end_zero == 0, "Uninitialized options");
 
 	ufbxi_init_ator(&ac->error, &ac->ator_result, &ac->opts.result_allocator, "result");
 	ac->result.unordered = true;
@@ -26356,10 +26340,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_element(ufbxi_bake_context 
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim(ufbxi_bake_context *bc)
 {
-	// `ufbx_bake_opts` must be cleared to zero first!
-	ufbx_assert(bc->opts._begin_zero == 0 && bc->opts._end_zero == 0);
-	ufbxi_check_err_msg(&bc->error, bc->opts._begin_zero == 0 && bc->opts._end_zero == 0, "Uninitialized options");
-
 	const ufbx_anim *anim = bc->anim;
 	const ufbx_scene *scene = bc->scene;
 
@@ -26591,10 +26571,6 @@ typedef struct {
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_curve_imp(ufbxi_tessellate_curve_context *tc)
 {
-	// `ufbx_tessellate_opts` must be cleared to zero first!
-	ufbx_assert(tc->opts._begin_zero == 0 && tc->opts._end_zero == 0);
-	ufbxi_check_err_msg(&tc->error, tc->opts._begin_zero == 0 && tc->opts._end_zero == 0, "Uninitialized options");
-
 	if (tc->opts.span_subdivision <= 0) {
 		tc->opts.span_subdivision = 4;
 	}
@@ -26688,10 +26664,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_curve_imp(ufbxi
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufbxi_tessellate_surface_context *tc)
 {
-	// `ufbx_tessellate_opts` must be cleared to zero first!
-	ufbx_assert(tc->opts._begin_zero == 0 && tc->opts._end_zero == 0);
-	ufbxi_check_err_msg(&tc->error, tc->opts._begin_zero == 0 && tc->opts._end_zero == 0, "Uninitialized options");
-
 	if (tc->opts.span_subdivision_u <= 0) {
 		tc->opts.span_subdivision_u = 4;
 	}
@@ -28665,10 +28637,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_level(ufbxi_subdi
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_subdivide_mesh_imp(ufbxi_subdivide_context *sc, size_t level)
 {
-	// `ufbx_subdivide_opts` must be cleared to zero first!
-	ufbx_assert(sc->opts._begin_zero == 0 && sc->opts._end_zero == 0);
-	ufbxi_check_err_msg(&sc->error, sc->opts._begin_zero == 0 && sc->opts._end_zero == 0, "Uninitialized options");
-
 	if (sc->opts.boundary == UFBX_SUBDIVISION_BOUNDARY_DEFAULT) {
 		sc->opts.boundary = sc->src_mesh.subdivision_boundary;
 	}
@@ -29043,6 +29011,37 @@ static ufbxi_noinline void ufbxi_release_ref(ufbxi_refcount *refcount)
 	}
 }
 
+static ufbxi_noinline void *ufbxi_uninitialized_options(ufbx_error *p_error)
+{
+	if (p_error) {
+		memset(p_error, 0, sizeof(ufbx_error));
+		p_error->type = UFBX_ERROR_UNINITIALIZED_OPTIONS;
+		p_error->description.data = "Uninitialized options";
+		p_error->description.length = strlen("Uninitialized options");
+	}
+	return NULL;
+}
+
+#define ufbxi_check_opts_ptr(m_type, m_opts, m_error) do { if (m_opts) { \
+		uint32_t opts_cleared_to_zero = m_opts->_begin_zero | m_opts->_end_zero; \
+		ufbx_assert(opts_cleared_to_zero == 0); \
+		if (opts_cleared_to_zero != 0) return (m_type*)ufbxi_uninitialized_options(m_error); \
+	} } while(0)
+
+#define ufbxi_check_opts_return(m_value, m_opts, m_error) do { if (m_opts) { \
+		uint32_t opts_cleared_to_zero = m_opts->_begin_zero | m_opts->_end_zero; \
+		ufbx_assert(opts_cleared_to_zero == 0); \
+		if (opts_cleared_to_zero != 0) { \
+			ufbxi_uninitialized_options(m_error); \
+			return m_value; \
+		} \
+	} } while(0)
+
+#define ufbxi_check_opts_return_no_error(m_value, m_opts) do { if (m_opts) { \
+		uint32_t opts_cleared_to_zero = m_opts->_begin_zero | m_opts->_end_zero; \
+		if (opts_cleared_to_zero != 0) return m_value; \
+	} } while(0)
+
 // -- API
 
 #ifdef __cplusplus
@@ -29199,6 +29198,7 @@ ufbx_abi bool ufbx_is_thread_safe(void)
 
 ufbx_abi ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)
 {
+	ufbxi_check_opts_ptr(ufbx_scene, opts, error);
 	ufbxi_context uc = { UFBX_ERROR_NONE };
 	uc.data_begin = uc.data = (const char *)data;
 	uc.data_size = size;
@@ -29213,6 +29213,7 @@ ufbx_abi ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *
 
 ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_len, const ufbx_load_opts *opts, ufbx_error *error)
 {
+	ufbxi_check_opts_ptr(ufbx_scene, opts, error);
 	ufbx_load_opts opts_copy;
 	if (opts) {
 		opts_copy = *opts;
@@ -29258,6 +29259,7 @@ ufbx_abi ufbx_scene *ufbx_load_stdio(void *file_void, const ufbx_load_opts *opts
 
 ufbx_abi ufbx_scene *ufbx_load_stdio_prefix(void *file_void, const void *prefix, size_t prefix_size, const ufbx_load_opts *opts, ufbx_error *error)
 {
+	ufbxi_check_opts_ptr(ufbx_scene, opts, error);
 	FILE *file = (FILE*)file_void;
 
 	ufbxi_context uc = { UFBX_ERROR_NONE };
@@ -29297,6 +29299,7 @@ ufbx_abi ufbx_scene *ufbx_load_stream(const ufbx_stream *stream, const ufbx_load
 
 ufbx_abi ufbx_scene *ufbx_load_stream_prefix(const ufbx_stream *stream, const void *prefix, size_t prefix_size, const ufbx_load_opts *opts, ufbx_error *error)
 {
+	ufbxi_check_opts_ptr(ufbx_scene, opts, error);
 	ufbxi_context uc = { UFBX_ERROR_NONE };
 	uc.data_begin = uc.data = (const char *)prefix;
 	uc.data_size = prefix_size;
@@ -29868,6 +29871,7 @@ ufbx_abi ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_
 
 ufbx_abi ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_anim *anim, double time, const ufbx_evaluate_opts *opts, ufbx_error *error)
 {
+	ufbxi_check_opts_ptr(ufbx_scene, opts, error);
 #if UFBXI_FEATURE_SCENE_EVALUATION
 	ufbxi_eval_context ec = { 0 };
 	return ufbxi_evaluate_scene(&ec, (ufbx_scene*)scene, anim, time, opts, error);
@@ -29883,6 +29887,7 @@ ufbx_abi ufbx_scene *ufbx_evaluate_scene(const ufbx_scene *scene, const ufbx_ani
 
 ufbx_abi ufbx_anim *ufbx_create_anim(const ufbx_scene *scene, const ufbx_anim_opts *opts, ufbx_error *error)
 {
+	ufbxi_check_opts_ptr(ufbx_anim, opts, error);
 	ufbx_assert(scene);
 
 	ufbxi_create_anim_context ac = { UFBX_ERROR_NONE };
@@ -29933,6 +29938,7 @@ ufbx_abi ufbx_baked_anim *ufbx_bake_anim(const ufbx_scene *scene, const ufbx_ani
 {
 	ufbx_assert(scene);
 #if UFBXI_FEATURE_ANIMATION_BAKING
+	ufbxi_check_opts_ptr(ufbx_baked_anim, opts, error);
 	if (!anim) {
 		anim = scene->anim;
 	}
@@ -30938,6 +30944,7 @@ ufbx_abi ufbxi_noinline ufbx_surface_point ufbx_evaluate_nurbs_surface(const ufb
 ufbx_abi ufbx_line_curve *ufbx_tessellate_nurbs_curve(const ufbx_nurbs_curve *curve, const ufbx_tessellate_curve_opts *opts, ufbx_error *error)
 {
 #if UFBXI_FEATURE_TESSELLATION
+	ufbxi_check_opts_ptr(ufbx_line_curve, opts, error);
 	ufbx_assert(curve);
 	if (!curve) return NULL;
 
@@ -30977,6 +30984,7 @@ ufbx_abi ufbx_mesh *ufbx_tessellate_nurbs_surface(const ufbx_nurbs_surface *surf
 {
 #if UFBXI_FEATURE_TESSELLATION
 	ufbx_assert(surface);
+	ufbxi_check_opts_ptr(ufbx_mesh, opts, error);
 	if (!surface) return NULL;
 
 	ufbxi_tessellate_surface_context tc = { UFBX_ERROR_NONE };
@@ -31274,6 +31282,7 @@ ufbx_abi void ufbx_compute_normals(const ufbx_mesh *mesh, const ufbx_vertex_vec3
 
 ufbx_abi ufbx_mesh *ufbx_subdivide_mesh(const ufbx_mesh *mesh, size_t level, const ufbx_subdivide_opts *opts, ufbx_error *error)
 {
+	ufbxi_check_opts_ptr(ufbx_mesh, opts, error);
 	if (!mesh) return NULL;
 	if (level == 0) return (ufbx_mesh*)mesh;
 	return ufbxi_subdivide_mesh(mesh, level, opts, error);
@@ -31313,6 +31322,7 @@ ufbx_abi ufbx_geometry_cache *ufbx_load_geometry_cache_len(
 	const char *filename, size_t filename_len,
 	const ufbx_geometry_cache_opts *opts, ufbx_error *error)
 {
+	ufbxi_check_opts_ptr(ufbx_geometry_cache, opts, error);
 	ufbx_string str = ufbxi_safe_string(filename, filename_len);
 	return ufbxi_load_geometry_cache(str, opts, error);
 }
@@ -31350,6 +31360,7 @@ typedef struct {
 ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_frame *frame, ufbx_real *data, size_t count, const ufbx_geometry_cache_data_opts *user_opts)
 {
 #if UFBXI_FEATURE_GEOMETRY_CACHE
+	ufbxi_check_opts_return_no_error(0, user_opts);
 	if (!frame || count == 0) return 0;
 	ufbx_assert(data);
 	if (!data) return 0;
@@ -31364,10 +31375,6 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 	if (!opts.open_file_cb.fn) {
 		opts.open_file_cb.fn = ufbx_default_open_file;
 	}
-
-	// `ufbx_geometry_cache_data_opts` must be cleared to zero first!
-	ufbx_assert(opts._begin_zero == 0 && opts._end_zero == 0);
-	if (!(opts._begin_zero == 0 && opts._end_zero == 0)) return 0;
 
 	bool use_double = false;
 
@@ -31518,6 +31525,7 @@ ufbx_abi ufbxi_noinline size_t ufbx_read_geometry_cache_real(const ufbx_cache_fr
 ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_real(const ufbx_cache_channel *channel, double time, ufbx_real *data, size_t count, const ufbx_geometry_cache_data_opts *user_opts)
 {
 #if UFBXI_FEATURE_GEOMETRY_CACHE
+	ufbxi_check_opts_return_no_error(0, user_opts);
 	if (!channel || count == 0) return 0;
 	ufbx_assert(data);
 	if (!data) return 0;
@@ -31529,10 +31537,6 @@ ufbx_abi ufbxi_noinline size_t ufbx_sample_geometry_cache_real(const ufbx_cache_
 	} else {
 		memset(&opts, 0, sizeof(opts));
 	}
-
-	// `ufbx_geometry_cache_data_opts` must be cleared to zero first!
-	ufbx_assert(opts._begin_zero == 0 && opts._end_zero == 0);
-	if (!(opts._begin_zero == 0 && opts._end_zero == 0)) return 0;
 
 	size_t begin = 0;
 	size_t end = channel->frames.count;

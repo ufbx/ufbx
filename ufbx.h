@@ -97,7 +97,7 @@
 // Assertion function used in ufbx, defaults to C standard `assert()`.
 // You can define this to your custom preferred assert macro, but in that case
 // make sure that it is also used within `ufbx.c`.
-// Defining `UFBX_NO_ASSERT` to any valuedisables assertions.
+// Defining `UFBX_NO_ASSERT` to any value disables assertions.
 #ifndef ufbx_assert
 	#if defined(UFBX_NO_ASSERT)
 		#define ufbx_assert(cond) (void)0
