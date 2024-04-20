@@ -5376,6 +5376,9 @@ ufbx_inline ufbx_shader_texture_input *ufbx_find_shader_texture_input(const ufbx
 // Returns `true` if `axes` forms a valid coordinate space.
 ufbx_abi bool ufbx_coordinate_axes_valid(ufbx_coordinate_axes axes);
 
+// Vector math utility functions.
+ufbx_abi ufbx_vec3 ufbx_vec3_normalize(ufbx_vec3 v);
+
 // Quaternion math utility functions.
 ufbx_abi ufbx_real ufbx_quat_dot(ufbx_quat a, ufbx_quat b);
 ufbx_abi ufbx_quat ufbx_quat_mul(ufbx_quat a, ufbx_quat b);
