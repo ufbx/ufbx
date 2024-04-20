@@ -476,6 +476,39 @@ UFBXT_TEST(matrix_for_normals_scale)
 		ufbxt_assert_close_vec3(&err, normal, ref_normal);
 	}
 
+	{
+		ufbx_matrix geometry_to_world = { 0 };
+		geometry_to_world.m00 = 1.0f;
+		geometry_to_world.m11 = 0.0f;
+		geometry_to_world.m22 = 1.0f;
+
+		ufbx_matrix normal_to_world = ufbx_matrix_for_normals(&geometry_to_world);
+
+		ufbx_vec3 basis[] = {
+			{ 0.0f, 0.0f, 0.0f },
+			{ 0.0f, 1.0f, 0.0f },
+			{ 0.0f, 0.0f, 0.0f },
+		};
+		ufbxt_assert_close_vec3(&err, normal_to_world.cols[0], basis[0]);
+		ufbxt_assert_close_vec3(&err, normal_to_world.cols[1], basis[1]);
+		ufbxt_assert_close_vec3(&err, normal_to_world.cols[2], basis[2]);
+		ufbxt_assert_close_vec3(&err, normal_to_world.cols[3], ufbx_zero_vec3);
+
+		ufbx_vec3 geo_normal = { 1.0f, 1.0f, 0.0f };
+		ufbx_vec3 world_normal = ufbx_transform_direction(&normal_to_world, geo_normal);
+		ufbx_vec3 geo_tangent = { 1.0f, -1.0f, 0.0f };
+		ufbx_vec3 geo_bitangent = { 0.0f, 0.0f, -1.0f };
+		ufbx_vec3 world_tangent = ufbx_transform_direction(&geometry_to_world, geo_tangent);
+		ufbx_vec3 world_bitangent = ufbx_transform_direction(&geometry_to_world, geo_bitangent);
+
+		ufbx_vec3 normal = ufbx_vec3_normalize(world_normal);
+		ufbx_vec3 ref_normal = ufbx_vec3_normalize(ufbxt_cross3(world_tangent, world_bitangent));
+		ufbxt_assert_close_vec3(&err, normal, ref_normal);
+
+		ufbx_vec3 up_normal = { 0.0f, 1.0f, 0.0f };
+		ufbxt_assert_close_vec3(&err, normal, up_normal);
+	}
+
 	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
 }
 #endif
