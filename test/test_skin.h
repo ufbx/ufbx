@@ -1122,3 +1122,26 @@ UFBXT_FILE_TEST(blender_331_static_blend_shape)
 }
 #endif
 
+UFBXT_FILE_TEST(maya_transformed_skin)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_transformed_skin_0", NULL, 0.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_transformed_skin_4", NULL, 4.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_transformed_skin_8", NULL, 8.0/24.0);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_instanced_skin)
+#if UFBXT_IMPL
+{
+	// TODO: This is broken on 6100 files currently, as the skin is attached
+	// only to pCube1, but somehow it should be attached to pCube2 as well..
+	// Probably somehow hacked through `NodeAttributeName: "Geometry::pCube1_ncl1_1"`
+	if (scene->metadata.version >= 7000) {
+		ufbxt_check_frame(scene, err, true, "maya_instanced_skin_0", NULL, 0.0/24.0);
+		ufbxt_check_frame(scene, err, true, "maya_instanced_skin_4", NULL, 4.0/24.0);
+		ufbxt_check_frame(scene, err, true, "maya_instanced_skin_8", NULL, 8.0/24.0);
+	}
+}
+#endif
+
