@@ -1844,7 +1844,7 @@ UFBXT_FILE_TEST(maya_anim_linear)
 	opts.step_handling = UFBX_BAKE_STEP_HANDLING_ADJACENT_DOUBLE;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -1870,7 +1870,7 @@ UFBXT_FILE_TEST_ALT(maya_anim_linear_default, maya_anim_linear)
 #if UFBXT_IMPL
 {
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, NULL, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, NULL, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -1903,7 +1903,7 @@ UFBXT_FILE_TEST_ALT(maya_anim_linear_ignore, maya_anim_linear)
 	opts.step_handling = UFBX_BAKE_STEP_HANDLING_IGNORE;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -1930,7 +1930,7 @@ UFBXT_FILE_TEST(maya_huge_stepped_tangents)
 	opts.step_handling = UFBX_BAKE_STEP_HANDLING_ADJACENT_DOUBLE;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -1977,7 +1977,7 @@ UFBXT_FILE_TEST_ALT(maya_huge_stepped_tangents_identical, maya_huge_stepped_tang
 	opts.step_handling = UFBX_BAKE_STEP_HANDLING_IDENTICAL_TIME;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2021,7 +2021,7 @@ UFBXT_FILE_TEST_ALT(maya_huge_stepped_tangents_default, maya_huge_stepped_tangen
 #if UFBXT_IMPL
 {
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, NULL, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, NULL, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2072,7 +2072,7 @@ UFBXT_FILE_TEST_ALT(maya_huge_stepped_tangents_custom, maya_huge_stepped_tangent
 	opts.step_custom_epsilon = 0.0005;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2118,7 +2118,7 @@ UFBXT_FILE_TEST_ALT(maya_huge_stepped_tangents_huge_custom, maya_huge_stepped_ta
 	opts.step_custom_duration = 100.0;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2158,7 +2158,7 @@ UFBXT_FILE_TEST_ALT(maya_huge_stepped_tangents_huge_resample, maya_huge_stepped_
 	opts.maximum_sample_rate = 100.0;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2202,7 +2202,7 @@ UFBXT_FILE_TEST(maya_stepped_tangent_sign)
 	opts.step_handling = UFBX_BAKE_STEP_HANDLING_ADJACENT_DOUBLE;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2233,7 +2233,7 @@ UFBXT_FILE_TEST_ALT(maya_stepped_tangent_sign_default, maya_stepped_tangent_sign
 	ufbx_bake_opts opts = { 0 };
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2267,7 +2267,7 @@ UFBXT_FILE_TEST_ALT(maya_stepped_tangent_sign_epsilon, maya_stepped_tangent_sign
 	opts.step_custom_epsilon = 0.05;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2301,7 +2301,7 @@ UFBXT_FILE_TEST_ALT(maya_stepped_tangent_sign_huge_step, maya_stepped_tangent_si
 	opts.step_custom_duration = 0.25;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2334,7 +2334,7 @@ UFBXT_FILE_TEST(maya_late_stepped_tangents)
 	opts.step_handling = UFBX_BAKE_STEP_HANDLING_ADJACENT_DOUBLE;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2366,7 +2366,7 @@ UFBXT_FILE_TEST_ALT(maya_late_stepped_tangents_trim, maya_late_stepped_tangents)
 	opts.trim_start_time = true;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2398,7 +2398,7 @@ UFBXT_FILE_TEST(maya_anim_diffuse_curve)
 	ufbx_bake_opts opts = { 0 };
 	opts.resample_rate = 24.0;
 
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2451,7 +2451,7 @@ UFBXT_FILE_TEST_ALT(anim_bake_alloc_fail, maya_anim_diffuse_curve)
 		ufbxt_hintf("Temp limit: %zu", max_temp);
 
 		ufbx_error error;
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 		if (bake) {
 			ufbxt_logf(".. Tested up to %zu temporary allocations", max_temp);
 			ufbx_free_baked_anim(bake);
@@ -2468,7 +2468,7 @@ UFBXT_FILE_TEST_ALT(anim_bake_alloc_fail, maya_anim_diffuse_curve)
 		ufbxt_hintf("Result limit: %zu", max_result);
 
 		ufbx_error error;
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 		if (bake) {
 			ufbxt_logf(".. Tested up to %zu result allocations", max_result);
 			ufbx_free_baked_anim(bake);
@@ -2490,7 +2490,7 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(anim_bake_alloc_fail_alt, motionbuilder_sausage_r
 		ufbxt_hintf("Temp limit: %zu", max_temp);
 
 		ufbx_error error;
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 		if (bake) {
 			ufbxt_logf(".. Tested up to %zu temporary allocations", max_temp);
 			ufbx_free_baked_anim(bake);
@@ -2507,7 +2507,7 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(anim_bake_alloc_fail_alt, motionbuilder_sausage_r
 		ufbxt_hintf("Result limit: %zu", max_result);
 
 		ufbx_error error;
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 		if (bake) {
 			ufbxt_logf(".. Tested up to %zu result allocations", max_result);
 			ufbx_free_baked_anim(bake);
@@ -2539,7 +2539,7 @@ UFBXT_FILE_TEST(maya_anim_pivot_rotate)
 		opts.key_reduction_enabled = true;
 		opts.key_reduction_rotation = true;
 
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 		if (!bake) ufbxt_log_error(&error);
 		ufbxt_assert(bake);
 
@@ -2566,7 +2566,7 @@ UFBXT_FILE_TEST(maya_anim_pivot_rotate)
 		opts.resample_rate = 24.0;
 		opts.key_reduction_enabled = true;
 
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 		if (!bake) ufbxt_log_error(&error);
 		ufbxt_assert(bake);
 
@@ -2731,7 +2731,7 @@ UFBXT_FILE_TEST_OPTS_ALT(maya_anim_no_inherit_scale_helper, maya_anim_no_inherit
 
 	ufbx_error error;
 	ufbx_bake_opts opts = { 0 };
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2768,7 +2768,7 @@ UFBXT_FILE_TEST(maya_anim_layer_anim)
 	ufbx_bake_opts opts = { 0 };
 	opts.resample_rate = 24.0;
 
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, NULL);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, NULL);
 	ufbxt_assert(bake);
 
 	ufbxt_assert(bake->nodes.count == 1);
@@ -2839,7 +2839,7 @@ UFBXT_FILE_TEST(maya_keyframe_spacing)
 	{
 		ufbx_bake_opts opts = { 0 };
 		opts.maximum_sample_rate = 10.0;
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, NULL);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, NULL);
 		ufbxt_assert(bake);
 
 		static const double ref_times[] = {
@@ -2868,7 +2868,7 @@ UFBXT_FILE_TEST(maya_keyframe_spacing)
 	{
 		ufbx_bake_opts opts = { 0 };
 		opts.maximum_sample_rate = 20.0;
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, NULL);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, NULL);
 		ufbxt_assert(bake);
 
 		static const double ref_times[] = {
@@ -2900,7 +2900,7 @@ UFBXT_FILE_TEST(maya_keyframe_spacing)
 	{
 		ufbx_bake_opts opts = { 0 };
 		opts.maximum_sample_rate = 30.0;
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, NULL);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, NULL);
 		ufbxt_assert(bake);
 
 		static const double ref_times[] = {
@@ -2950,7 +2950,7 @@ UFBXT_FILE_TEST_OPTS(maya_scale_no_inherit_step, ufbxt_scale_helper_opts)
 	ufbx_bake_opts opts = { 0 };
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -2996,7 +2996,7 @@ UFBXT_FILE_TEST_OPTS_ALT(maya_scale_no_inherit_step_identical, maya_scale_no_inh
 	opts.step_handling = UFBX_BAKE_STEP_HANDLING_IDENTICAL_TIME;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -3042,7 +3042,7 @@ UFBXT_FILE_TEST_OPTS_ALT(maya_scale_no_inherit_step_adjacent, maya_scale_no_inhe
 	opts.step_handling = UFBX_BAKE_STEP_HANDLING_ADJACENT_DOUBLE;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -3088,7 +3088,7 @@ UFBXT_FILE_TEST_OPTS_ALT(maya_scale_no_inherit_step_resmaple, maya_scale_no_inhe
 	opts.maximum_sample_rate = 100.0;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -3135,7 +3135,7 @@ UFBXT_FILE_TEST(maya_keyframe_offset)
 	opts.resample_rate = 30.0;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -3181,7 +3181,7 @@ UFBXT_FILE_TEST(maya_keyframe_offset_step)
 	opts.resample_rate = 30.0;
 
 	ufbx_error error;
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 	if (!bake) ufbxt_log_error(&error);
 	ufbxt_assert(bake);
 
@@ -3226,7 +3226,7 @@ UFBXT_FILE_TEST(maya_linear_spline)
 		opts.bake_transform_props = true;
 
 		ufbx_error error;
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 		if (!bake) ufbxt_log_error(&error);
 		ufbxt_assert(bake);
 
@@ -3274,7 +3274,7 @@ UFBXT_FILE_TEST(maya_linear_spline)
 		opts.key_reduction_passes = 16;
 
 		ufbx_error error;
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 		if (!bake) ufbxt_log_error(&error);
 		ufbxt_assert(bake);
 
@@ -3311,7 +3311,7 @@ UFBXT_FILE_TEST(maya_linear_spline)
 		opts.key_reduction_passes = 1;
 
 		ufbx_error error;
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 		if (!bake) ufbxt_log_error(&error);
 		ufbxt_assert(bake);
 
@@ -3354,7 +3354,7 @@ UFBXT_FILE_TEST(maya_linear_spline)
 		opts.key_reduction_passes = 16;
 
 		ufbx_error error;
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, &opts, &error);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, &opts, &error);
 		if (!bake) ufbxt_log_error(&error);
 		ufbxt_assert(bake);
 
