@@ -154,6 +154,7 @@ typedef struct {
 	bool negate_xz;
 	bool bind_pose;
 	bool ignore_unskinned;
+	bool transform_skin;
 	ufbx_real tolerance;
 	ufbx_real uv_tolerance;
 	uint32_t allow_missing;
@@ -746,6 +747,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			}
 			if (!strcmp(line, "ufbx:ignore_unskinned")) {
 				obj->ignore_unskinned = true;
+			}
+			if (!strcmp(line, "ufbx:transform_skin")) {
+				obj->transform_skin = true;
 			}
 			if (!strcmp(line, "www.blender.org")) {
 				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
@@ -1588,7 +1592,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 					ufbx_vec3 on = check_normals ? ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, oix) : ufbx_zero_vec3;
 					ufbx_vec3 fn = check_normals ? ufbx_get_vertex_vec3(&mesh->skinned_normal, fix) : ufbx_zero_vec3;
 
-					if (mesh->skinned_is_local) {
+					if (mesh->skinned_is_local || obj->transform_skin) {
 						fp = ufbx_transform_position(mat, fp);
 						fn = ufbx_transform_direction(&norm_mat, fn);
 
