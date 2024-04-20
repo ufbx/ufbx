@@ -1484,6 +1484,28 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 
 		ufbx_matrix *mat = &node->geometry_to_world;
 		ufbx_matrix norm_mat = ufbx_get_compatible_matrix_for_normals(node);
+		ufbx_matrix skin_mat;
+
+		if (obj->transform_skin && mesh->skin_deformers.count > 0) {
+			ufbx_pose *pose = node->bind_pose;
+			ufbx_bone_pose *node_bone = ufbx_get_bone_pose(pose, node);
+
+			// Try to find a shared bind pose
+			if (!node_bone) {
+				for (size_t i = 0; i < mesh->instances.count; i++) {
+					ufbx_node *inst = mesh->instances.data[i];
+					pose = inst->bind_pose;
+					node_bone = ufbx_get_bone_pose(pose, inst);
+					if (node_bone) break;
+				}
+			}
+
+			ufbxt_assert(node_bone);
+			ufbx_matrix inv_bind = ufbx_matrix_invert(&node_bone->bone_to_world);
+			skin_mat = ufbx_matrix_mul(mat, &inv_bind);
+			mat = &skin_mat;
+			norm_mat = ufbx_matrix_for_normals(mat);
+		}
 
 		if (!obj->no_subdivision && (mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_SMOOTH || mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_HULL_AND_SMOOTH)) {
 			ufbx_subdivide_opts opts = { 0 };
