@@ -5393,7 +5393,14 @@ ufbx_abi ufbx_quat ufbx_euler_to_quat(ufbx_vec3 v, ufbx_rotation_order order);
 ufbx_abi ufbx_matrix ufbx_matrix_mul(const ufbx_matrix *a, const ufbx_matrix *b);
 ufbx_abi ufbx_real ufbx_matrix_determinant(const ufbx_matrix *m);
 ufbx_abi ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m);
+
+// Get a matrix that can be used to transform geometry normals.
+// NOTE: You must normalize the normals after transforming them with this matrix,
+// eg. using `ufbx_vec3_normalize()`.
+// NOTE: This function flips the normals if the determinant is negative.
 ufbx_abi ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m);
+
+// Matrix transformation utilities.
 ufbx_abi ufbx_vec3 ufbx_transform_position(const ufbx_matrix *m, ufbx_vec3 v);
 ufbx_abi ufbx_vec3 ufbx_transform_direction(const ufbx_matrix *m, ufbx_vec3 v);
 

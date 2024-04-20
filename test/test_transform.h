@@ -1745,3 +1745,8 @@ UFBXT_TEST(maya_advanced_skinned_pivot_opts)
 }
 #endif
 
+UFBXT_FILE_TEST(blender_340_mirrored_normals)
+#if UFBXT_IMPL
+{
+}
+#endif
