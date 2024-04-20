@@ -29003,7 +29003,7 @@ static ufbxi_noinline void *ufbxi_uninitialized_options(ufbx_error *p_error)
 		uint32_t opts_cleared_to_zero = m_opts->_begin_zero | m_opts->_end_zero; \
 		ufbx_assert(opts_cleared_to_zero == 0); \
 		if (opts_cleared_to_zero != 0) return (m_type*)ufbxi_uninitialized_options(m_error); \
-	} } while(0)
+	} } while (0)
 
 #define ufbxi_check_opts_return(m_value, m_opts, m_error) do { if (m_opts) { \
 		uint32_t opts_cleared_to_zero = m_opts->_begin_zero | m_opts->_end_zero; \
@@ -29012,12 +29012,12 @@ static ufbxi_noinline void *ufbxi_uninitialized_options(ufbx_error *p_error)
 			ufbxi_uninitialized_options(m_error); \
 			return m_value; \
 		} \
-	} } while(0)
+	} } while (0)
 
 #define ufbxi_check_opts_return_no_error(m_value, m_opts) do { if (m_opts) { \
 		uint32_t opts_cleared_to_zero = m_opts->_begin_zero | m_opts->_end_zero; \
 		if (opts_cleared_to_zero != 0) return m_value; \
-	} } while(0)
+	} } while (0)
 
 // -- API
 
