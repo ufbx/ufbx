@@ -1658,27 +1658,105 @@ static ufbx_mesh *ufbxt_subdivide_mesh(const ufbx_mesh *mesh, size_t level, cons
 	ufbx_mesh *result = ufbx_subdivide_mesh(mesh, level, opts, error);
 	if (!result) return result;
 
-	ufbx_subdivision_result *res = result->subdivision_result;
-	ufbxt_assert(res);
+	if (result) {
+		ufbx_subdivide_opts memory_opts = { 0 };
+		if (opts) memory_opts = *opts;
+		memory_opts.temp_allocator.huge_threshold = 1;
+		memory_opts.result_allocator.huge_threshold = 1;
 
-	for (size_t i = 1; i < res->temp_allocs; i++) {
-		ufbx_error fail_error;
-		ufbx_subdivide_opts fail_opts = { 0 };
-		if (opts) fail_opts = *opts;
-		fail_opts.temp_allocator.allocation_limit = i;
-		ufbx_mesh *fail_result = ufbx_subdivide_mesh(mesh, level, &fail_opts, &fail_error);
-		ufbxt_assert(!fail_result);
-		ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+		ufbx_mesh *memory_result = ufbx_subdivide_mesh(mesh, level, &memory_opts, NULL);
+		ufbxt_assert(memory_result);
+
+		ufbx_subdivision_result *res = memory_result->subdivision_result;
+		ufbxt_assert(res);
+
+		for (size_t i = 1; i < res->temp_allocs; i++) {
+			ufbx_error fail_error;
+			ufbx_subdivide_opts fail_opts = memory_opts;
+			fail_opts.temp_allocator.allocation_limit = i;
+			ufbx_mesh *fail_result = ufbx_subdivide_mesh(mesh, level, &fail_opts, &fail_error);
+			ufbxt_assert(!fail_result);
+			ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+		}
+
+		for (size_t i = 1; i < res->result_allocs; i++) {
+			ufbx_error fail_error;
+			ufbx_subdivide_opts fail_opts = memory_opts;
+			fail_opts.result_allocator.allocation_limit = i;
+			ufbx_mesh *fail_result = ufbx_subdivide_mesh(mesh, level, &fail_opts, &fail_error);
+			ufbxt_assert(!fail_result);
+			ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+		}
+
+		ufbx_free_mesh(memory_result);
 	}
 
-	for (size_t i = 1; i < res->result_allocs; i++) {
-		ufbx_error fail_error;
-		ufbx_subdivide_opts fail_opts = { 0 };
-		if (opts) fail_opts = *opts;
-		fail_opts.result_allocator.allocation_limit = i;
-		ufbx_mesh *fail_result = ufbx_subdivide_mesh(mesh, level, &fail_opts, &fail_error);
-		ufbxt_assert(!fail_result);
-		ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+	return result;
+}
+
+static void ufbxt_check_baked_anim(const ufbx_scene *scene, ufbx_baked_anim *bake)
+{
+	if (!bake) return;
+
+	for (size_t i = 0; i < bake->nodes.count; i++) {
+		if (i > 0) {
+			ufbxt_assert(bake->nodes.data[i - 1].typed_id < bake->nodes.data[i].typed_id);
+		}
+
+		ufbx_baked_node *bake_node = &bake->nodes.data[i];
+		ufbx_node *scene_node = scene->nodes.data[bake_node->typed_id];
+		ufbxt_assert(scene_node->element_id == bake_node->element_id);
+
+		ufbx_baked_node *ref = ufbx_find_baked_node(bake, scene_node);
+		ufbxt_assert(ref == bake_node);
+	}
+	for (size_t i = 0; i < bake->elements.count; i++) {
+		if (i > 0) {
+			ufbxt_assert(bake->elements.data[i - 1].element_id < bake->elements.data[i].element_id);
+		}
+
+		ufbx_baked_element *bake_element = &bake->elements.data[i];
+		ufbx_element *scene_element = scene->elements.data[bake_element->element_id];
+
+		ufbx_baked_element *ref = ufbx_find_baked_element(bake, scene_element);
+		ufbxt_assert(ref == bake_element);
+	}
+}
+
+static ufbx_baked_anim *ufbxt_bake_anim(const ufbx_scene *scene, const ufbx_anim *anim, const ufbx_bake_opts *opts, ufbx_error *error)
+{
+	ufbx_baked_anim *result = ufbx_bake_anim(scene, anim, opts, error);
+	if (!result) return result;
+	ufbxt_check_baked_anim(scene, result);
+
+	if (result) {
+		ufbx_bake_opts memory_opts = { 0 };
+		if (opts) memory_opts = *opts;
+		memory_opts.temp_allocator.huge_threshold = 1;
+		memory_opts.result_allocator.huge_threshold = 1;
+
+		ufbx_baked_anim *memory_result = ufbx_bake_anim(scene, anim, &memory_opts, NULL);
+		ufbxt_assert(memory_result);
+
+		for (size_t i = 1; i < memory_result->metadata.temp_allocs; i++) {
+			ufbx_error fail_error;
+			ufbx_bake_opts fail_opts = memory_opts;
+			fail_opts.temp_allocator.allocation_limit = i;
+			ufbx_baked_anim *fail_result = ufbx_bake_anim(scene, anim, &fail_opts, &fail_error);
+			ufbxt_assert(!fail_result);
+			ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+		}
+
+		for (size_t i = 1; i < memory_result->metadata.result_allocs; i++) {
+			ufbx_error fail_error;
+			ufbx_bake_opts fail_opts = memory_opts;
+			fail_opts.result_allocator.allocation_limit = i;
+			ufbx_baked_anim *fail_result = ufbx_bake_anim(scene, anim, &fail_opts, &fail_error);
+			ufbxt_assert(!fail_result);
+			ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+		}
+
+		ufbx_free_baked_anim(memory_result);
 	}
 
 	return result;

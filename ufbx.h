@@ -4450,6 +4450,14 @@ typedef struct ufbx_baked_element {
 
 UFBX_LIST_TYPE(ufbx_baked_element_list, ufbx_baked_element);
 
+typedef struct ufbx_baked_anim_metadata {
+	// Memory statistics
+	size_t result_memory_used;
+	size_t temp_memory_used;
+	size_t result_allocs;
+	size_t temp_allocs;
+} ufbx_baked_anim_metadata;
+
 // Animation baked into linearly interpolated keyframes.
 // See `ufbx_bake_anim()`.
 typedef struct ufbx_baked_anim {
@@ -4471,6 +4479,9 @@ typedef struct ufbx_baked_anim {
 	// Keyframe time range.
 	double key_time_min;
 	double key_time_max;
+
+	// Additional bake information.
+	ufbx_baked_anim_metadata metadata;
 
 } ufbx_baked_anim;
 
@@ -5311,6 +5322,12 @@ ufbx_abi ufbx_baked_anim *ufbx_bake_anim(const ufbx_scene *scene, const ufbx_ani
 
 ufbx_abi void ufbx_retain_baked_anim(ufbx_baked_anim *bake);
 ufbx_abi void ufbx_free_baked_anim(ufbx_baked_anim *bake);
+
+ufbx_abi ufbx_baked_node *ufbx_find_baked_node_by_typed_id(ufbx_baked_anim *bake, uint32_t typed_id);
+ufbx_abi ufbx_baked_node *ufbx_find_baked_node(ufbx_baked_anim *bake, ufbx_node *node);
+
+ufbx_abi ufbx_baked_element *ufbx_find_baked_element_by_element_id(ufbx_baked_anim *bake, uint32_t element_id);
+ufbx_abi ufbx_baked_element *ufbx_find_baked_element(ufbx_baked_anim *bake, ufbx_element *element);
 
 // Evaluate baked animation `keyframes` at `time`.
 // Internally linearly interpolates between two adjacent keyframes.
