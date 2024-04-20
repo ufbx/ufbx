@@ -30189,6 +30189,11 @@ ufbx_abi ufbx_quat ufbx_quat_mul(ufbx_quat a, ufbx_quat b)
 	return ufbxi_mul_quat(a, b);
 }
 
+ufbx_abi ufbx_vec3 ufbx_vec3_normalize(ufbx_vec3 v)
+{
+	return ufbxi_normalize3(v);
+}
+
 ufbx_abi ufbxi_noinline ufbx_real ufbx_quat_dot(ufbx_quat a, ufbx_quat b)
 {
 	return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
@@ -30473,25 +30478,16 @@ ufbx_abi ufbx_matrix ufbx_matrix_invert(const ufbx_matrix *m)
 
 ufbx_abi ufbxi_noinline ufbx_matrix ufbx_matrix_for_normals(const ufbx_matrix *m)
 {
-	ufbx_real det = ufbx_matrix_determinant(m);
-
 	ufbx_matrix r;
-	if (ufbx_fabs(det) <= UFBX_EPSILON) {
-		memset(&r, 0, sizeof(r));
-		return r;
-	}
-
-	ufbx_real rcp_det = 1.0f / det;
-
-	r.m00 = ( - m->m12*m->m21 + m->m11*m->m22) * rcp_det;
-	r.m01 = ( + m->m12*m->m20 - m->m10*m->m22) * rcp_det;
-	r.m02 = ( - m->m11*m->m20 + m->m10*m->m21) * rcp_det;
-	r.m10 = ( + m->m02*m->m21 - m->m01*m->m22) * rcp_det;
-	r.m11 = ( - m->m02*m->m20 + m->m00*m->m22) * rcp_det;
-	r.m12 = ( + m->m01*m->m20 - m->m00*m->m21) * rcp_det;
-	r.m20 = ( - m->m02*m->m11 + m->m01*m->m12) * rcp_det;
-	r.m21 = ( + m->m02*m->m10 - m->m00*m->m12) * rcp_det;
-	r.m22 = ( - m->m01*m->m10 + m->m00*m->m11) * rcp_det;
+	r.m00 = ( - m->m12*m->m21 + m->m11*m->m22);
+	r.m01 = ( + m->m12*m->m20 - m->m10*m->m22);
+	r.m02 = ( - m->m11*m->m20 + m->m10*m->m21);
+	r.m10 = ( + m->m02*m->m21 - m->m01*m->m22);
+	r.m11 = ( - m->m02*m->m20 + m->m00*m->m22);
+	r.m12 = ( + m->m01*m->m20 - m->m00*m->m21);
+	r.m20 = ( - m->m02*m->m11 + m->m01*m->m12);
+	r.m21 = ( + m->m02*m->m10 - m->m00*m->m12);
+	r.m22 = ( - m->m01*m->m10 + m->m00*m->m11);
 	r.m03 = r.m13 = r.m23 = 0.0f;
 
 	return r;
