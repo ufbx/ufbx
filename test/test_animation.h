@@ -3405,6 +3405,8 @@ UFBXT_FILE_TEST_ALT(bake_search_node, maya_anim_linear)
 	ufbxt_assert(ufbx_find_baked_node(bake, NULL) == NULL);
 	ufbxt_assert(ufbx_find_baked_node_by_typed_id(bake, UINT32_MAX) == NULL);
 	ufbxt_assert(ufbx_find_baked_node(bake, scene->root_node) == NULL);
+
+	ufbx_free_baked_anim(bake);
 }
 #endif
 
@@ -3430,5 +3432,7 @@ UFBXT_FILE_TEST_ALT(bake_search_element, maya_anim_diffuse_curve)
 	ufbxt_assert(ufbx_find_baked_element(bake, NULL) == NULL);
 	ufbxt_assert(ufbx_find_baked_element_by_element_id(bake, UINT32_MAX) == NULL);
 	ufbxt_assert(ufbx_find_baked_element(bake, &scene->root_node->element) == NULL);
+
+	ufbx_free_baked_anim(bake);
 }
 #endif
