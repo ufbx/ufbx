@@ -83,7 +83,7 @@ The following platforms are tested on CI and produce bit-exact results:
 ## Testing
 
 * Internal tests run on all platforms listed above
-  * 525 test cases / 563 FBX files
+  * 592 test cases / 604 FBX files
 * Fuzzed in multiple layers
   * Parsers (fbx binary/fbx ascii/deflate/xml/mcx/obj/mtl) fuzzed using AFL
   * Structured FBX binary/ascii fuzzing using AFL
