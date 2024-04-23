@@ -94,6 +94,7 @@ The following platforms are tested on CI and produce bit-exact results:
 * Private dataset: 33.6GB / 12618 files
   * Loaded and validated
 * Static analysis for maximum stack depth on Linux GCC/Clang
+* In total 95% branch line coverage (99% partial line coverage)
 
 ## Versioning
 
