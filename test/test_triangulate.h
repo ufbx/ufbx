@@ -319,3 +319,26 @@ UFBXT_FILE_TEST(maya_ngon_gs)
 }
 #endif
 
+UFBXT_FILE_TEST(maya_ngon_maze_segment)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Grid");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+
+		ufbxt_assert(mesh->num_faces == 1);
+		ufbx_face face = mesh->faces.data[0];
+
+		uint32_t indices[64*3];
+		size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, face);
+		ufbxt_assert(num_tris == 60);
+
+		const ufbx_vec3 basis[2] = {
+			{ { 1.0f, 0.0f, 0.0f } },
+			{ { 0.0f, 1.0f, 0.0f } },
+		};
+		ufbxt_check_ngon_triangulation(err, mesh, face, indices, num_tris, basis);
+	}
+}
+#endif
