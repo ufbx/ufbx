@@ -27224,24 +27224,14 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	ufbx_vertex_vec3 pos = nc->positions;
 
 	// Collect all the reflex corners for intersection testing.
-	uint32_t num_kd_indices = 0;
-	{
-		ufbx_vec2 a = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + face.num_indices - 1]]);
-		ufbx_vec2 b = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + 0]]);
-		for (uint32_t i = 0; i < face.num_indices; i++) {
-			uint32_t next = i + 1 < face.num_indices ? i + 1 : 0;
-			ufbx_vec2 c = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + next]]);
-
-			if (ufbxi_orient2d(a, b, c) < 0.0f) {
-				kd_indices[num_kd_indices++] = i;
-			}
-
-			a = b;
-			b = c;
-		}
+	// TODO: Can we ignore some here, previously it skipped all non-reflex corners,
+	// but this was too strict of a condition.
+	uint32_t num_kd_indices = (uint32_t)face.num_indices;
+	for (uint32_t i = 0; i < face.num_indices; i++) {
+		kd_indices[i] = i;
 	}
 
-	// Build a KD-tree out of the collected reflex vertices.
+	// Build a KD-tree of the vertices.
 	uint32_t num_skip_indices = (1u << (UFBXI_KD_FAST_DEPTH + 1)) - 1;
 	uint32_t kd_slow_indices = num_kd_indices > num_skip_indices ? num_kd_indices - num_skip_indices : 0;
 	ufbxi_ignore(kd_slow_indices);
@@ -27305,6 +27295,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 					edges[prev*2 + 1] = next;
 
 					indices_left -= 1;
+					num_steps = 0;
 
 					// Move backwards only if the previous was reflex as now it would
 					// cover a superset of the previous area, failing the intersection test.
