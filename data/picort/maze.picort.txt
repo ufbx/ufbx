@@ -1,0 +1,8 @@
+input ../maya_ngon_maze_7700_binary.fbx
+output ../../build/images/maze.png
+
+samples 128
+resolution 640 360
+bounces 0
+exposure 1.6
+error-threshold 0.01

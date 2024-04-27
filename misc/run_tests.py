@@ -1170,6 +1170,7 @@ async def main():
                 "data/picort/slime-binary.picort.txt",
                 "data/picort/material-chart.picort.txt",
                 "data/picort/blender-material-chart.picort.txt",
+                "data/picort/maze.picort.txt",
             ]
 
             for scene in scenes:
