@@ -27303,16 +27303,16 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	// to iterate the polygon once if we move backwards one step every time we clip an ear.
 	uint32_t indices_left = face.num_indices;
 	{
-		uint32_t indices[4] = { 0, 1, 2, 3 };
+		uint32_t point_indices[4] = { 0, 1, 2, 3 };
 		ufbx_real weights[2]; // ufbxi_uninit
 		ufbx_vec2 points[4]; // ufbxi_uninit
 
 		uint32_t num_steps = 0;
 		while (indices_left > 3) {
-			points[0] = ufbxi_ngon_project(nc, indices[0]);
-			points[1] = ufbxi_ngon_project(nc, indices[1]);
-			points[2] = ufbxi_ngon_project(nc, indices[2]);
-			points[3] = ufbxi_ngon_project(nc, indices[3]);
+			points[0] = ufbxi_ngon_project(nc, point_indices[0]);
+			points[1] = ufbxi_ngon_project(nc, point_indices[1]);
+			points[2] = ufbxi_ngon_project(nc, point_indices[2]);
+			points[3] = ufbxi_ngon_project(nc, point_indices[3]);
 
 			weights[0] = ufbxi_ngon_tri_weight(points + 0);
 			weights[1] = ufbxi_ngon_tri_weight(points + 1);
@@ -27325,10 +27325,10 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 
 				// If there is no reflex angle contained within the triangle formed
 				// by `{ a, b, c }` connect the vertices `a - c` (prev, next) directly.
-				if (!ufbxi_kd_check(nc, points + side, indices + side)) {
-					uint32_t ia = indices[side + 0];
-					uint32_t ib = indices[side + 1];
-					uint32_t ic = indices[side + 2];
+				if (!ufbxi_kd_check(nc, points + side, point_indices + side)) {
+					uint32_t ia = point_indices[side + 0];
+					uint32_t ib = point_indices[side + 1];
+					uint32_t ic = point_indices[side + 2];
 
 					// Mark as clipped
 					edges[ib*2 + 0] |= 0x80000000;
@@ -27343,11 +27343,11 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 					num_steps = 0;
 
 					if (side == 1) {
-						indices[2] = indices[3];
-						indices[3] = edges[indices[3]*2 + 1];
+						point_indices[2] = point_indices[3];
+						point_indices[3] = edges[point_indices[3]*2 + 1];
 					} else {
-						indices[1] = indices[0];
-						indices[0] = edges[indices[0]*2 + 0];
+						point_indices[1] = point_indices[0];
+						point_indices[0] = edges[point_indices[0]*2 + 0];
 					}
 
 					clipped = true;
@@ -27357,10 +27357,10 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 			if (clipped) continue;
 
 			// Continue forward
-			indices[0] = indices[1];
-			indices[1] = indices[2];
-			indices[2] = indices[3];
-			indices[3] = edges[indices[3]*2 + 1];
+			point_indices[0] = point_indices[1];
+			point_indices[1] = point_indices[2];
+			point_indices[2] = point_indices[3];
+			point_indices[3] = edges[point_indices[3]*2 + 1];
 			num_steps++;
 
 			// If we have walked around the entire polygon it is irregular and
@@ -27371,7 +27371,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 
 		// Fallback: Cut non-ears until the polygon is completed.
 		// TODO: Could do something better here..
-		uint32_t ix = indices[1];
+		uint32_t ix = point_indices[1];
 		while (indices_left > 3) {
 			uint32_t prev = edges[ix*2 + 0];
 			uint32_t next = edges[ix*2 + 1];
