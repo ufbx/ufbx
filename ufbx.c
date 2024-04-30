@@ -5401,6 +5401,11 @@ ufbx_inline ufbx_vec3 ufbxi_normalize3(ufbx_vec3 a) {
 	}
 }
 
+ufbx_inline ufbx_real ufbxi_distsq2(ufbx_vec2 a, ufbx_vec2 b) {
+	ufbx_real dx = a.x - b.x, dy = a.y - b.y;
+	return dx*dx + dy*dy;
+}
+
 static ufbxi_noinline ufbx_vec3 ufbxi_slow_normalize3(const ufbx_vec3 *a) {
 	return ufbxi_normalize3(*a);
 }
@@ -26978,7 +26983,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_tessellate_nurbs_surface_imp(ufb
 
 typedef struct {
 	ufbx_real split;
-	uint32_t index;
+	uint32_t index_plus_one; // 0 for empty
 	uint32_t slow_left;
 	uint32_t slow_right;
 	uint32_t slow_end;
@@ -27003,11 +27008,13 @@ typedef struct {
 	uint32_t indices[3];
 } ufbxi_kd_triangle;
 
-ufbxi_noinline static ufbx_vec2 ufbxi_ngon_project(ufbxi_ngon_context *nc, const ufbx_vec3 *point)
+ufbxi_noinline static ufbx_vec2 ufbxi_ngon_project(ufbxi_ngon_context *nc, uint32_t index)
 {
+	ufbx_vec3 point = nc->positions.values.data[nc->positions.indices.data[nc->face.index_begin + index]];
+
 	ufbx_vec2 p;
-	p.x = ufbxi_dot3(nc->axes[0], *point);
-	p.y = ufbxi_dot3(nc->axes[1], *point);
+	p.x = ufbxi_dot3(nc->axes[0], point);
+	p.y = ufbxi_dot3(nc->axes[1], point);
 	return p;
 }
 
@@ -27016,10 +27023,10 @@ ufbxi_forceinline static ufbx_real ufbxi_orient2d(ufbx_vec2 a, ufbx_vec2 b, ufbx
 	return (b.x - a.x)*(c.y - a.y) - (b.y - a.y)*(c.x - a.x);
 }
 
-ufbxi_noinline static bool ufbxi_kd_check_point(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t index, const ufbx_vec3 *point)
+ufbxi_noinline static bool ufbxi_kd_check_point(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t index)
 {
 	if (index == tri->indices[0] || index == tri->indices[1] || index == tri->indices[2]) return false;
-	ufbx_vec2 p = ufbxi_ngon_project(nc, point);
+	ufbx_vec2 p = ufbxi_ngon_project(nc, index);
 
 	ufbx_real u = ufbxi_orient2d(p, tri->points[0], tri->points[1]);
 	ufbx_real v = ufbxi_orient2d(p, tri->points[1], tri->points[2]);
@@ -27050,7 +27057,7 @@ ufbxi_noinline static bool ufbxi_kd_check_slow(ufbxi_ngon_context *nc, const ufb
 		bool hit_right = tri->max_t[axis] >= split;
 
 		if (hit_left && hit_right) {
-			if (ufbxi_kd_check_point(nc, tri, index, &point)) {
+			if (ufbxi_kd_check_point(nc, tri, index)) {
 				return true;
 			}
 
@@ -27076,11 +27083,9 @@ ufbxi_noinline static bool ufbxi_kd_check_fast(ufbxi_ngon_context *nc, const ufb
 	ufbxi_recursive_function(bool, ufbxi_kd_check_fast, (nc, tri, kd_index, axis, depth), UFBXI_KD_FAST_DEPTH,
 		(ufbxi_ngon_context *nc, const ufbxi_kd_triangle *tri, uint32_t kd_index, uint32_t axis, uint32_t depth))
 {
-	ufbx_vertex_vec3 pos = nc->positions;
-
 	for (;;) {
 		ufbxi_kd_node node = nc->kd_nodes[kd_index];
-		if (node.slow_end == 0) return false;
+		if (node.index_plus_one == 0) return false;
 
 		bool hit_left = tri->min_t[axis] <= node.split;
 		bool hit_right = tri->max_t[axis] >= node.split;
@@ -27090,8 +27095,8 @@ ufbxi_noinline static bool ufbxi_kd_check_fast(ufbxi_ngon_context *nc, const ufb
 		if (hit_left && hit_right) {
 
 			// Check for the point on the split plane
-			const ufbx_vec3 *point = &pos.values.data[pos.indices.data[nc->face.index_begin + node.index]];
-			if (ufbxi_kd_check_point(nc, tri, node.index, point)) {
+			uint32_t index = node.index_plus_one - 1;
+			if (ufbxi_kd_check_point(nc, tri, index)) {
 				return true;
 			}
 
@@ -27119,6 +27124,22 @@ ufbxi_noinline static bool ufbxi_kd_check_fast(ufbxi_ngon_context *nc, const ufb
 			}
 		}
 	}
+}
+
+ufbxi_noinline static bool ufbxi_kd_check(ufbxi_ngon_context *nc, const ufbx_vec2 *points, const uint32_t *indices)
+{
+	ufbxi_kd_triangle tri; // ufbxi_uninit
+	tri.points[0] = points[0];
+	tri.points[1] = points[1];
+	tri.points[2] = points[2];
+	tri.indices[0] = indices[0];
+	tri.indices[1] = indices[1];
+	tri.indices[2] = indices[2];
+	tri.min_t[0] = ufbxi_min_real(ufbxi_min_real(points[0].x, points[1].x), points[2].x);
+	tri.min_t[1] = ufbxi_min_real(ufbxi_min_real(points[0].y, points[1].y), points[2].y);
+	tri.max_t[0] = ufbxi_max_real(ufbxi_max_real(points[0].x, points[1].x), points[2].x);
+	tri.max_t[1] = ufbxi_max_real(ufbxi_max_real(points[0].y, points[1].y), points[2].y);
+	return ufbxi_kd_check_fast(nc, &tri, 0, 0, 0);
 }
 
 ufbxi_noinline static bool ufbxi_kd_index_less(void *user, const void *va, const void *vb)
@@ -27160,7 +27181,7 @@ ufbxi_noinline static void ufbxi_kd_build(ufbxi_ngon_context *nc, uint32_t *indi
 		ufbxi_kd_node *kd = &nc->kd_nodes[fast_index];
 
 		kd->split = ufbxi_dot3(axis_dir, pos.values.data[pos.indices.data[face.index_begin + index]]);
-		kd->index = index;
+		kd->index_plus_one = index + 1;
 
 		if (depth + 1 == UFBXI_KD_FAST_DEPTH) {
 			kd->slow_left = (uint32_t)(indices - nc->kd_indices);
@@ -27186,6 +27207,22 @@ ufbxi_noinline static void ufbxi_kd_build(ufbxi_ngon_context *nc, uint32_t *indi
 #endif
 
 #if UFBXI_FEATURE_TRIANGULATION
+
+ufbxi_noinline static ufbx_real ufbxi_ngon_tri_weight(const ufbx_vec2 *points)
+{
+	ufbx_vec2 p0 = points[0], p1 = points[1], p2 = points[2];
+	ufbx_real orient = ufbxi_orient2d(p0, p1, p2);
+	if (orient <= 0.0f) return -1.0f;
+	if (orient < UFBX_EPSILON) return 0.0f;
+
+	ufbx_real a = ufbxi_distsq2(p0, p1);
+	ufbx_real b = ufbxi_distsq2(p1, p2);
+	ufbx_real c = ufbxi_distsq2(p2, p0);
+	ufbx_real ab = (a + b - c) / (ufbx_real)ufbx_sqrt(4.0f * a * b);
+	ufbx_real bc = (b + c - a) / (ufbx_real)ufbx_sqrt(4.0f * b * c);
+	ufbx_real ca = (c + a - b) / (ufbx_real)ufbx_sqrt(4.0f * c * a);
+	return (ufbx_real)ufbx_fmax(UFBX_EPSILON, 2.0f - ufbx_fmax(ufbx_fmax(ab, bc), ca));
+}
 
 ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, uint32_t *indices, uint32_t num_indices)
 {
@@ -27221,14 +27258,23 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	nc->kd_indices = kd_indices;
 
 	uint32_t *kd_tmp = indices + face.num_indices;
-	ufbx_vertex_vec3 pos = nc->positions;
 
 	// Collect all the reflex corners for intersection testing.
-	// TODO: Can we ignore some here, previously it skipped all non-reflex corners,
-	// but this was too strict of a condition.
-	uint32_t num_kd_indices = (uint32_t)face.num_indices;
-	for (uint32_t i = 0; i < face.num_indices; i++) {
-		kd_indices[i] = i;
+	uint32_t num_kd_indices = 0;
+	{
+		ufbx_vec2 a = ufbxi_ngon_project(nc, face.num_indices - 1);
+		ufbx_vec2 b = ufbxi_ngon_project(nc, 0);
+		for (uint32_t i = 0; i < face.num_indices; i++) {
+			uint32_t next = i + 1 < face.num_indices ? i + 1 : 0;
+			ufbx_vec2 c = ufbxi_ngon_project(nc, next);
+
+			if (ufbxi_orient2d(a, b, c) <= 0.0f) {
+				kd_indices[num_kd_indices++] = i;
+			}
+
+			a = b;
+			b = c;
+		}
 	}
 
 	// Build a KD-tree of the vertices.
@@ -27257,74 +27303,64 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 	// to iterate the polygon once if we move backwards one step every time we clip an ear.
 	uint32_t indices_left = face.num_indices;
 	{
-		ufbxi_kd_triangle tri; // ufbxi_uninit
-
-		uint32_t ix = 1;
-		ufbx_vec2 a = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + 0]]);
-		ufbx_vec2 b = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + 1]]);
-		ufbx_vec2 c = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + 2]]);
-		bool prev_was_reflex = false;
+		uint32_t indices[4] = { 0, 1, 2, 3 };
+		ufbx_real weights[2]; // ufbxi_uninit
+		ufbx_vec2 points[4]; // ufbxi_uninit
 
 		uint32_t num_steps = 0;
-
 		while (indices_left > 3) {
-			uint32_t prev = edges[ix*2 + 0];
-			uint32_t next = edges[ix*2 + 1];
-			if (ufbxi_orient2d(a, b, c) > 0.0f) {
+			points[0] = ufbxi_ngon_project(nc, indices[0]);
+			points[1] = ufbxi_ngon_project(nc, indices[1]);
+			points[2] = ufbxi_ngon_project(nc, indices[2]);
+			points[3] = ufbxi_ngon_project(nc, indices[3]);
 
-				tri.points[0] = a;
-				tri.points[1] = b;
-				tri.points[2] = c;
-				tri.indices[0] = prev;
-				tri.indices[1] = ix;
-				tri.indices[2] = next;
-				tri.min_t[0] = ufbxi_min_real(ufbxi_min_real(a.x, b.x), c.x);
-				tri.min_t[1] = ufbxi_min_real(ufbxi_min_real(a.y, b.y), c.y);
-				tri.max_t[0] = ufbxi_max_real(ufbxi_max_real(a.x, b.x), c.x);
-				tri.max_t[1] = ufbxi_max_real(ufbxi_max_real(a.y, b.y), c.y);
+			weights[0] = ufbxi_ngon_tri_weight(points + 0);
+			weights[1] = ufbxi_ngon_tri_weight(points + 1);
+
+			uint32_t first_side = weights[1] > weights[0] ? 1 : 0;
+			bool clipped = false;
+			ufbxi_nounroll for (uint32_t side_ix = 0; side_ix < 2; side_ix++) {
+				uint32_t side = side_ix ^ first_side;
+				if (!(weights[side] >= 0.0f)) break;
 
 				// If there is no reflex angle contained within the triangle formed
 				// by `{ a, b, c }` connect the vertices `a - c` (prev, next) directly.
-				if (!ufbxi_kd_check_fast(nc, &tri, 0, 0, 0)) {
+				if (!ufbxi_kd_check(nc, points + side, indices + side)) {
+					uint32_t ia = indices[side + 0];
+					uint32_t ib = indices[side + 1];
+					uint32_t ic = indices[side + 2];
 
 					// Mark as clipped
-					edges[ix*2 + 0] |= 0x80000000;
-					edges[ix*2 + 1] |= 0x80000000;
+					edges[ib*2 + 0] |= 0x80000000;
+					edges[ib*2 + 1] |= 0x80000000;
 
-					edges[next*2 + 0] = prev;
-					edges[prev*2 + 1] = next;
+					edges[ic*2 + 0] = ia;
+					edges[ia*2 + 1] = ic;
 
 					indices_left -= 1;
+
+					// TODO: This may cause O(n^2) behavior!
 					num_steps = 0;
 
-					// Move backwards only if the previous was reflex as now it would
-					// cover a superset of the previous area, failing the intersection test.
-					if (prev_was_reflex) {
-						prev_was_reflex = false;
-						ix = prev;
-						b = a;
-						uint32_t prev_prev = edges[prev*2 + 0];
-						a = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + prev_prev]]);
+					if (side == 1) {
+						indices[2] = indices[3];
+						indices[3] = edges[indices[3]*2 + 1];
 					} else {
-						ix = next;
-						b = c;
-						uint32_t next_next = edges[next*2 + 1];
-						c = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + next_next]]);
+						indices[1] = indices[0];
+						indices[0] = edges[indices[0]*2 + 0];
 					}
-					continue;
-				}
 
-				prev_was_reflex = false;
-			} else {
-				prev_was_reflex = true;
+					clipped = true;
+					break;
+				}
 			}
+			if (clipped) continue;
 
 			// Continue forward
-			ix = next;
-			a = b;
-			b = c;
-			next = edges[next*2 + 1];
-			c = ufbxi_ngon_project(nc, &pos.values.data[pos.indices.data[face.index_begin + next]]);
+			indices[0] = indices[1];
+			indices[1] = indices[2];
+			indices[2] = indices[3];
+			indices[3] = edges[indices[3]*2 + 1];
 			num_steps++;
 
 			// If we have walked around the entire polygon it is irregular and
@@ -27335,6 +27371,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 
 		// Fallback: Cut non-ears until the polygon is completed.
 		// TODO: Could do something better here..
+		uint32_t ix = indices[1];
 		while (indices_left > 3) {
 			uint32_t prev = edges[ix*2 + 0];
 			uint32_t next = edges[ix*2 + 1];
