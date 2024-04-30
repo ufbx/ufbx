@@ -146,7 +146,11 @@ static void ufbxt_check_ngon_triangulation(ufbxt_diff_error *err, ufbx_mesh *mes
 		tri_area += area;
 	}
 
-	ufbxt_assert_close_real(err, poly_area, tri_area);
+	#if defined(UFBX_REAL_IS_FLOAT)
+		ufbxt_assert_close_real_threshold(err, poly_area, tri_area, (ufbx_real)fabs(poly_area) * 0.001f);
+	#else
+		ufbxt_assert_close_real(err, poly_area, tri_area);
+	#endif
 }
 
 #endif
