@@ -27213,7 +27213,6 @@ ufbxi_noinline static ufbx_real ufbxi_ngon_tri_weight(const ufbx_vec2 *points)
 	ufbx_vec2 p0 = points[0], p1 = points[1], p2 = points[2];
 	ufbx_real orient = ufbxi_orient2d(p0, p1, p2);
 	if (orient <= 0.0f) return -1.0f;
-	if (orient < UFBX_EPSILON) return 0.0f;
 
 	ufbx_real a = ufbxi_distsq2(p0, p1);
 	ufbx_real b = ufbxi_distsq2(p1, p2);
