@@ -472,6 +472,15 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		printf("\n");
 	}
 
+	for (size_t i = 0; i < scene->metadata.warnings.count; i++) {
+		ufbx_warning *warning = &scene->metadata.warnings.data[i];
+		if (warning->count > 1) {
+			printf("Warning: %s (x%zu)\n", warning->description.data, warning->count);
+		} else {
+			printf("Warning: %s\n", warning->description.data);
+		}
+	}
+
 	if (obj_path) {
 		#if defined(THREADS)
 			ufbx_os_thread_pool_wait(thread_pool, obj_task_id);
