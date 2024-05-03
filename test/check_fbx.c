@@ -412,6 +412,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 	bool known_unknown = false;
 	if (strstr(scene->metadata.creator.data, "kenney")) known_unknown = true;
 	if (strstr(scene->metadata.creator.data, "assetforge")) known_unknown = true;
+	if (strstr(scene->metadata.creator.data, "SmallFBX")) known_unknown = true;
 	if (scene->metadata.version < 5800) known_unknown = true;
 	ufbxt_assert(scene->metadata.exporter != UFBX_EXPORTER_UNKNOWN || known_unknown || is_fuzz);
 
