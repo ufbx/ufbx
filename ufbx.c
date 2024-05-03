@@ -11870,6 +11870,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_check_indices(ufbxi_context *uc,
 	return 1;
 }
 
+ufbx_static_assert(vertex_real_size, sizeof(ufbx_vertex_real) == sizeof(ufbx_vertex_attrib));
+ufbx_static_assert(vertex_vec2_size, sizeof(ufbx_vertex_vec2) == sizeof(ufbx_vertex_attrib));
+ufbx_static_assert(vertex_vec3_size, sizeof(ufbx_vertex_vec3) == sizeof(ufbx_vertex_attrib));
+ufbx_static_assert(vertex_vec4_size, sizeof(ufbx_vertex_vec4) == sizeof(ufbx_vertex_attrib));
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mesh *mesh, ufbxi_node *node,
 	ufbx_vertex_attrib *attrib, const char *data_name, const char *index_name, const char *w_name, char data_type, size_t num_components)
 {
@@ -11982,7 +11987,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 			attrib->unique_per_vertex = true;
 
 		} else {
-			ufbxi_fail("Invalid mapping");
+			memset(attrib, 0, sizeof(ufbx_vertex_attrib));
+			ufbxi_check(ufbxi_warnf(UFBX_WARNING_MISSING_POLYGON_MAPPING, "Ignoring geometry '%s' with bad polygon mapping mode '%s'", data_name, mapping));
+			return 1;
 		}
 
 	} else {
@@ -12033,7 +12040,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 			attrib->unique_per_vertex = true;
 
 		} else {
-			ufbxi_fail("Invalid mapping");
+			memset(attrib, 0, sizeof(ufbx_vertex_attrib));
+			ufbxi_check(ufbxi_warnf(UFBX_WARNING_MISSING_POLYGON_MAPPING, "Ignoring geometry '%s' with bad polygon mapping mode '%s'", data_name, mapping));
+			return 1;
 		}
 	}
 

@@ -3490,6 +3490,9 @@ typedef enum ufbx_warning_type UFBX_ENUM_REPR {
 	// Vertex 'W' attribute length differs from main attribute.
 	UFBX_WARNING_BAD_VERTEX_W_ATTRIBUTE,
 
+	// Missing polygon mapping type.
+	UFBX_WARNING_MISSING_POLYGON_MAPPING,
+
 	// Out-of-bounds index has been clamped to be in-bounds.
 	// HINT: You can use `ufbx_index_error_handling` to adjust behavior.
 	UFBX_WARNING_INDEX_CLAMPED,
