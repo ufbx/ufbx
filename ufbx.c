@@ -11875,6 +11875,12 @@ ufbx_static_assert(vertex_vec2_size, sizeof(ufbx_vertex_vec2) == sizeof(ufbx_ver
 ufbx_static_assert(vertex_vec3_size, sizeof(ufbx_vertex_vec3) == sizeof(ufbx_vertex_attrib));
 ufbx_static_assert(vertex_vec4_size, sizeof(ufbx_vertex_vec4) == sizeof(ufbx_vertex_attrib));
 
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_warn_polygon_mapping(ufbxi_context *uc, const char *data_name, const char *mapping)
+{
+	ufbxi_check(ufbxi_warnf(UFBX_WARNING_MISSING_POLYGON_MAPPING, "Ignoring geometry '%s' with bad mapping mode '%s'", data_name, mapping));
+	return 1;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_context *uc, ufbx_mesh *mesh, ufbxi_node *node,
 	ufbx_vertex_attrib *attrib, const char *data_name, const char *index_name, const char *w_name, char data_type, size_t num_components)
 {
@@ -11903,8 +11909,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 	attrib->exists = true;
 	attrib->indices.count = mesh->num_indices;
 
-	const char *mapping = NULL;
-	ufbxi_check(ufbxi_find_val1(node, ufbxi_MappingInformationType, "C", (char**)&mapping));
+	const char *mapping = "";
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_MappingInformationType, "C", (char**)&mapping));
 
 	attrib->values.count = num_elems ? num_elems : 1;
 
@@ -11988,7 +11994,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 
 		} else {
 			memset(attrib, 0, sizeof(ufbx_vertex_attrib));
-			ufbxi_check(ufbxi_warnf(UFBX_WARNING_MISSING_POLYGON_MAPPING, "Ignoring geometry '%s' with bad polygon mapping mode '%s'", data_name, mapping));
+			ufbxi_check(ufbxi_warn_polygon_mapping(uc, data_name, mapping));
 			return 1;
 		}
 
@@ -12041,7 +12047,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_vertex_element(ufbxi_contex
 
 		} else {
 			memset(attrib, 0, sizeof(ufbx_vertex_attrib));
-			ufbxi_check(ufbxi_warnf(UFBX_WARNING_MISSING_POLYGON_MAPPING, "Ignoring geometry '%s' with bad polygon mapping mode '%s'", data_name, mapping));
+			ufbxi_check(ufbxi_warn_polygon_mapping(uc, data_name, mapping));
 			return 1;
 		}
 	}
@@ -12738,33 +12744,39 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 			ufbxi_check(ufbxi_read_vertex_element(uc, mesh, n, (ufbx_vertex_attrib*)&mesh->vertex_crease,
 				ufbxi_VertexCrease, ufbxi_VertexCreaseIndex, NULL, 'r', 1));
 		} else if (n->name == ufbxi_LayerElementEdgeCrease) {
-			const char *mapping = NULL;
-			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
+			const char *mapping = "";
+			ufbxi_ignore(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
 			if (mapping == ufbxi_ByEdge) {
 				if (mesh->edge_crease.count) continue;
 				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->edge_crease.data, &mesh->edge_crease.count, n, ufbxi_EdgeCrease, 'r', mesh->num_edges));
+			} else {
+				ufbxi_check(ufbxi_warn_polygon_mapping(uc, ufbxi_EdgeCrease, mapping));
 			}
 		} else if (n->name == ufbxi_LayerElementSmoothing) {
-			const char *mapping = NULL;
-			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
+			const char *mapping = "";
+			ufbxi_ignore(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
 			if (mapping == ufbxi_ByEdge) {
 				if (mesh->edge_smoothing.count) continue;
 				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->edge_smoothing.data, &mesh->edge_smoothing.count, n, ufbxi_Smoothing, 'b', mesh->num_edges));
 			} else if (mapping == ufbxi_ByPolygon) {
 				if (mesh->face_smoothing.count) continue;
 				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->face_smoothing.data, &mesh->face_smoothing.count, n, ufbxi_Smoothing, 'b', mesh->num_faces));
+			} else {
+				ufbxi_check(ufbxi_warn_polygon_mapping(uc, ufbxi_Smoothing, mapping));
 			}
 		} else if (n->name == ufbxi_LayerElementVisibility) {
-			const char *mapping = NULL;
-			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
+			const char *mapping = "";
+			ufbxi_ignore(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
 			if (mapping == ufbxi_ByEdge) {
 				if (mesh->edge_visibility.count) continue;
 				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->edge_visibility.data, &mesh->edge_visibility.count, n, ufbxi_Visibility, 'b', mesh->num_edges));
+			} else {
+				ufbxi_check(ufbxi_warn_polygon_mapping(uc, ufbxi_Visibility, mapping));
 			}
 		} else if (n->name == ufbxi_LayerElementMaterial) {
 			if (mesh->face_material.count) continue;
-			const char *mapping = NULL;
-			ufbxi_check(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
+			const char *mapping = "";
+			ufbxi_ignore(ufbxi_find_val1(n, ufbxi_MappingInformationType, "c", (char**)&mapping));
 			if (mapping == ufbxi_ByPolygon) {
 				ufbxi_check(ufbxi_read_truncated_array(uc, &mesh->face_material.data, &mesh->face_material.count, n, ufbxi_Materials, 'i', mesh->num_faces));
 			} else if (mapping == ufbxi_AllSame) {
@@ -12781,6 +12793,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_mesh(ufbxi_context *uc, ufb
 						*p_mat = material;
 					}
 				}
+			} else {
+				ufbxi_check(ufbxi_warn_polygon_mapping(uc, ufbxi_Materials, mapping));
 			}
 		} else if (n->name == ufbxi_LayerElementPolygonGroup) {
 			if (mesh->face_group.count) continue;
