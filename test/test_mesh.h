@@ -1720,15 +1720,16 @@ UFBXT_FILE_TEST_FLAGS(synthetic_missing_mapping, UFBXT_FILE_TEST_FLAG_ALLOW_STRI
 	ufbx_mesh *mesh = node->mesh;
 
 	static const char *const ref_warnings[] = {
-		"Ignoring geometry 'Normals' with bad polygon mapping mode ''",
-		"Ignoring geometry 'Binormals' with bad polygon mapping mode ''",
-		"Ignoring geometry 'Tangents' with bad polygon mapping mode 'Missing'",
-		"Ignoring geometry 'UV' with bad polygon mapping mode ''",
-		"Ignoring geometry 'Smoothing' with bad polygon mapping mode ''",
+		"Ignoring geometry 'Normals' with bad mapping mode ''",
+		"Ignoring geometry 'Binormals' with bad mapping mode ''",
+		"Ignoring geometry 'Tangents' with bad mapping mode 'Missing'",
+		"Ignoring geometry 'UV' with bad mapping mode ''",
+		"Ignoring geometry 'Smoothing' with bad mapping mode ''",
+		"Ignoring geometry 'Materials' with bad mapping mode ''",
 	};
 	bool found[ufbxt_arraycount(ref_warnings)] = { 0 };
 
-	ufbxt_assert(scene->metadata.warnings.count == 5);
+	ufbxt_assert(scene->metadata.warnings.count == 6);
 	for (size_t i = 0; i < scene->metadata.warnings.count; i++) {
 		ufbx_warning *warning = &scene->metadata.warnings.data[i];
 		ufbxt_assert(warning->type == UFBX_WARNING_MISSING_POLYGON_MAPPING);
