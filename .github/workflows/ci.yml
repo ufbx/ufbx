@@ -130,8 +130,9 @@ jobs:
       - name: Generate coverage
         run: LLVM_COV=llvm-cov-11 bash misc/generate_coverage.sh
       - name: Upload coverage
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov -y .github/codecov.yml
-
 
   ci_cpp:
     runs-on: ubuntu-latest
@@ -537,7 +538,9 @@ jobs:
       - name: Generate coverage
         run: LLVM_COV=llvm-cov bash misc/generate_lcov.sh
       - name: Upload coverage
-        run: bash /codecov.sh -F dataset -f coverage.lcov -y .github/codecov.yml
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov -y .github/codecov.yml
 
   ci_fuzz:
     runs-on: [self-hosted, ARM64, legacy]
@@ -556,7 +559,9 @@ jobs:
       - name: Generate coverage
         run: LLVM_COV=llvm-cov bash misc/generate_lcov.sh
       - name: Upload coverage
-        run: bash /codecov.sh -F fuzz -f coverage.lcov -y .github/codecov.yml
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov -y .github/codecov.yml
 
   ci_post_hashes:
     runs-on: ubuntu-latest

@@ -161,6 +161,11 @@ def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_sup
 
         append_unique_opt(options, "bake", [False, True])
 
+    skip = False
+    mtime = os.path.getmtime(path)
+    if last_supported_time and mtime > latest_supported_time.timestamp():
+        skip = True
+
     for feature in features:
         if feature == "geometry-transform":
             append_unique_opt(options, "geometry-transform-handling", [
@@ -186,13 +191,8 @@ def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_sup
             append_unique_opt(options, "bake", [False, True])
         elif feature == "ignore-missing-external":
             options["ignore-missing-external"] = [True]
-        else:
+        elif not skip:
             raise RuntimeError(f"Unknown feature: {feature}")
-    mtime = os.path.getmtime(path)
-    
-    skip = False
-    if last_supported_time and mtime > latest_supported_time.timestamp():
-        skip = True
 
     models = []
     extra_files = []

@@ -1711,3 +1711,40 @@ UFBXT_FILE_TEST_OPTS(maya_uv_set_tangent_w, ufbxt_retain_vertex_w_opts)
 	}
 }
 #endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_missing_mapping, UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	static const char *const ref_warnings[] = {
+		"Ignoring geometry 'Normals' with bad mapping mode ''",
+		"Ignoring geometry 'Binormals' with bad mapping mode ''",
+		"Ignoring geometry 'Tangents' with bad mapping mode 'Missing'",
+		"Ignoring geometry 'UV' with bad mapping mode ''",
+		"Ignoring geometry 'Smoothing' with bad mapping mode ''",
+		"Ignoring geometry 'Materials' with bad mapping mode ''",
+	};
+	bool found[ufbxt_arraycount(ref_warnings)] = { 0 };
+
+	ufbxt_assert(scene->metadata.warnings.count == 6);
+	for (size_t i = 0; i < scene->metadata.warnings.count; i++) {
+		ufbx_warning *warning = &scene->metadata.warnings.data[i];
+		ufbxt_assert(warning->type == UFBX_WARNING_MISSING_POLYGON_MAPPING);
+		ufbxt_assert(warning->element_id == mesh->element_id);
+		for (size_t j = 0; j < ufbxt_arraycount(ref_warnings); j++) {
+			if (!strcmp(warning->description.data, ref_warnings[j])) {
+				found[j] = true;
+				break;
+			}
+		}
+	}
+
+	for (size_t i = 0; i < ufbxt_arraycount(ref_warnings); i++) {
+		ufbxt_hintf("i=%zu", i);
+		ufbxt_assert(found[i]);
+	}
+}
+#endif
