@@ -29,6 +29,7 @@ void ufbxt_check_texture_content(ufbx_scene *scene, ufbx_texture *texture, const
 {
 	char buf[512];
 	snprintf(buf, sizeof(buf), "textures/%s", filename);
+	ufbxt_assert(texture);
 	ufbxt_check_blob_content(texture->content, buf);
 }
 
@@ -620,7 +621,16 @@ UFBXT_FILE_TEST(blender_279_internal_textures)
 }
 #endif
 
-UFBXT_FILE_TEST(blender_293_textures)
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_blender_pbr_load_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.use_blender_pbr_material = true;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_FLAGS(blender_293_textures, ufbxt_blender_pbr_load_opts, UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
 	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Material.001");
@@ -636,7 +646,23 @@ UFBXT_FILE_TEST(blender_293_textures)
 }
 #endif
 
-UFBXT_FILE_TEST(blender_293_embedded_textures)
+UFBXT_FILE_TEST_ALT_FLAGS(blender_293_textures_default, blender_293_textures, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Material.001");
+	ufbxt_assert(material);
+	ufbxt_assert(material->textures.count == 5);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_PHONG);
+	ufbxt_assert(!strcmp(material->pbr.base_color.texture->relative_filename.data, "textures\\checkerboard_diffuse.png"));
+	ufbxt_assert(!strcmp(material->pbr.roughness.texture->relative_filename.data, "textures\\checkerboard_roughness.png"));
+	ufbxt_assert(!material->pbr.metalness.texture);
+	ufbxt_assert(!strcmp(material->pbr.emission_color.texture->relative_filename.data, "textures\\checkerboard_emissive.png"));
+	ufbxt_assert(!material->pbr.opacity.texture);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_FLAGS(blender_293_embedded_textures, ufbxt_blender_pbr_load_opts, UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
 	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Material.001");
@@ -652,7 +678,25 @@ UFBXT_FILE_TEST(blender_293_embedded_textures)
 }
 #endif
 
-UFBXT_FILE_TEST(blender_293_material_mapping)
+UFBXT_FILE_TEST_ALT_FLAGS(blender_293_embedded_textures_default, blender_293_embedded_textures, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Material.001");
+	ufbxt_assert(material);
+	ufbxt_assert(material->textures.count == 5);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_PHONG);
+	ufbxt_check_texture_content(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png");
+	ufbxt_check_texture_content(scene, material->pbr.roughness.texture, "checkerboard_roughness.png");
+	ufbxt_assert(!material->pbr.metalness.texture);
+	ufbxt_check_texture_content(scene, ufbx_find_prop_texture(material, "ReflectionFactor"), "checkerboard_metallic.png");
+	ufbxt_check_texture_content(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png");
+	ufbxt_assert(!material->pbr.opacity.texture);
+	ufbxt_check_texture_content(scene, ufbx_find_prop_texture(material, "TransparencyFactor"), "checkerboard_weight.png");
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_FLAGS(blender_293_material_mapping, ufbxt_blender_pbr_load_opts, UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
 	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Material.001");
@@ -662,6 +706,20 @@ UFBXT_FILE_TEST(blender_293_material_mapping)
 	ufbxt_assert_close_real(err, material->fbx.specular_exponent.value_vec3.x, 76.913f);
 	ufbxt_assert_close_real(err, material->fbx.transparency_factor.value_vec3.x, 0.544f);
 	ufbxt_assert_close_real(err, material->pbr.opacity.value_vec3.x, 0.456f);
+	ufbxt_assert_close_real(err, material->pbr.roughness.value_vec3.x, 0.123f);
+}
+#endif
+
+UFBXT_FILE_TEST_ALT_FLAGS(blender_293_material_mapping_default, blender_293_material_mapping, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "Material.001");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_FBX_PHONG);
+	ufbxt_assert_close_real(err, material->fbx.specular_exponent.value_vec3.x, 76.913f);
+	ufbxt_assert_close_real(err, material->fbx.transparency_factor.value_vec3.x, 0.544f);
+	ufbxt_assert(!material->pbr.opacity.has_value);
 	ufbxt_assert_close_real(err, material->pbr.roughness.value_vec3.x, 0.123f);
 }
 #endif
@@ -702,6 +760,7 @@ UFBXT_TEST(blender_phong_quirks)
 	for (int quirks = 0; quirks <= 1; quirks++) {
 		ufbx_load_opts opts = { 0 };
 		opts.disable_quirks = (quirks == 0);
+		opts.use_blender_pbr_material = true;
 
 		char buf[512];
 		snprintf(buf, sizeof(buf), "%s%s", data_root, "blender_293_textures_7400_binary.fbx");
@@ -1707,3 +1766,108 @@ UFBXT_FILE_TEST_OPTS_ALT(maya_absolute_texture_backslash, maya_absolute_texture,
 	ufbxt_assert(!strcmp(texture->filename.data, "W:\\checkerboard_diffuse.png"));
 }
 #endif
+
+#if UFBXT_IMPL
+static ufbx_vec3 ufbxt_load_pixel(ufbx_texture *texture)
+{
+	const char *error = NULL;
+	ufbxt_image16 image = ufbxt_read_png(texture->content.data, texture->content.size, &error);
+	if (error) ufbxt_logf("failed to read embedded png %s: %s", texture->relative_filename.data, error);
+	ufbxt_assert(image.width >= 1 && image.height >= 1);
+	ufbxt_pixel16 pixel = image.pixels[0];
+	ufbx_vec3 color;
+	color.x = ufbxt_srgb_to_linear((ufbx_real)pixel.r / 65535.0f);
+	color.y = ufbxt_srgb_to_linear((ufbx_real)pixel.g / 65535.0f);
+	color.z = ufbxt_srgb_to_linear((ufbx_real)pixel.b / 65535.0f);
+	free(image.pixels);
+	return color;
+}
+static void ufbxt_check_chart_material(ufbxt_diff_error *err, ufbx_material *mat, ufbx_vec3 ref)
+{
+	ufbxt_hintf("material = %s", mat->name.data);
+
+	ufbx_texture *base_texture = mat->pbr.base_color.texture;
+	ufbx_vec3 base_color = mat->pbr.base_color.value_vec3;
+	ufbx_real base_factor = mat->pbr.base_factor.value_real;
+	if (base_texture) {
+		base_color = ufbxt_load_pixel(base_texture);
+	}
+
+	ufbx_texture *emit_texture = mat->pbr.emission_color.texture;
+	ufbx_vec3 emit_color = mat->pbr.emission_color.value_vec3;
+	ufbx_real emit_factor = mat->pbr.emission_factor.value_real;
+	if (emit_texture) {
+		emit_color = ufbxt_load_pixel(emit_texture);
+	}
+
+	ufbx_vec3 sum = ufbxt_add3(ufbxt_mul3(base_color, base_factor), ufbxt_mul3(emit_color, emit_factor));
+	if (base_texture || emit_texture) {
+		ufbxt_assert_close_vec3_threshold(err, sum, ref, 0.01f);
+	} else {
+		ufbxt_assert_close_vec3(err, sum, ref);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(maya_material_chart)
+#if UFBXT_IMPL
+{
+	ufbx_display_layer *layer = ufbx_as_display_layer(ufbx_find_element(scene, UFBX_ELEMENT_DISPLAY_LAYER, "Sheets"));
+	ufbxt_assert(layer);
+	ufbxt_assert(layer->nodes.count == 12);
+
+	ufbx_vec3 ref = { 0.125f, 0.25f, 0.5f };
+	for (size_t i = 0; i < layer->nodes.count; i++) {
+		ufbx_node *node = layer->nodes.data[i];
+		ufbxt_assert(node->mesh);
+		ufbxt_assert(node->materials.count == 1);
+		ufbx_material *material = node->materials.data[0];
+		ufbxt_check_chart_material(err, material, ref);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(blender_402_material_chart)
+#if UFBXT_IMPL
+{
+	ufbx_vec3 ref = { 0.25f, 0.125f, 0.5f };
+	ufbxt_assert(scene->materials.count == 6);
+	for (size_t i = 0; i < scene->materials.count; i++) {
+		ufbx_material *material = scene->materials.data[i];
+		ufbxt_check_chart_material(err, material, ref);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(blender_suzanne_multimaterial)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Suzanne");
+	ufbxt_assert(node);
+	ufbxt_assert(node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	static const uint32_t order_ref[] = { 0, 4, 6, 1, 5, 2, 3 };
+	ufbxt_assert(mesh->material_part_usage_order.count == ufbxt_arraycount(order_ref));
+	for (size_t i = 0; i < mesh->material_part_usage_order.count; i++) {
+		ufbxt_assert(mesh->material_part_usage_order.data[i] == order_ref[i]);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(blender_suzanne_multimaterial_reorder)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Suzanne");
+	ufbxt_assert(node);
+	ufbxt_assert(node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	static const uint32_t order_ref[] = { 4, 0, 6, 1, 5, 2, 3 };
+	ufbxt_assert(mesh->material_part_usage_order.count == ufbxt_arraycount(order_ref));
+	for (size_t i = 0; i < mesh->material_part_usage_order.count; i++) {
+		ufbxt_assert(mesh->material_part_usage_order.data[i] == order_ref[i]);
+	}
+}
+#endif
+

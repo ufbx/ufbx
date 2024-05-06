@@ -31,6 +31,7 @@ parser.add_argument("--verbose", action="store_true", help="Verbose output")
 parser.add_argument("--hash-file", help="Hash test input file")
 parser.add_argument("--runner", help="Descriptive name for the runner")
 parser.add_argument("--heavy", action="store_true", help="Run heavy tests")
+parser.add_argument("--strict", action="store_true", help="Require strict checks")
 parser.add_argument("--hash-threads", action="store_true", help="Use threading for hashes")
 parser.add_argument("--fail-on-pre-test", action="store_true", help="Indicate failure if pre-test checks fail")
 parser.add_argument("--force-opt", help="Force compiler optimization level")
@@ -758,7 +759,7 @@ def decorate_arch(compiler, arch):
 tests = set(argv.tests)
 implicit_tests = False
 if not tests:
-    tests = ["tests", "cpp", "stack", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
+    tests = ["tests", "cpp", "stack", "unit", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
     implicit_tests = True
 
 async def main():
@@ -1052,6 +1053,21 @@ async def main():
         targets = await gather(target_tasks)
         all_targets += targets
 
+    if "unit" in tests:
+        log_comment("-- Compiling and running unit tests --")
+
+        target_tasks = []
+
+        runner_config = {
+            "sources": ["test/unit_tests.c"],
+            "output": "unit_tests" + exe_suffix,
+            "defines": { },
+        }
+        target_tasks += compile_permutations("unit_tests", runner_config, all_configs, [])
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
     if "features" in tests:
         log_comment("-- Compiling and running partial features --")
 
@@ -1097,14 +1113,17 @@ async def main():
 
         picort_configs = {
             "arch": arch_configs["arch"],
-            "sse": {
-                "scalar": { "sse": False },
-                "sse": { "sse": True },
-            },
         }
 
         picort_config = {
-            "sources": ["ufbx.c", "examples/picort/picort.cpp"],
+            "sources": [
+                "ufbx.c",
+                "examples/picort/picort.cpp",
+                "examples/picort/picort_bvh.cpp",
+                "examples/picort/picort_gui.cpp",
+                "examples/picort/picort_opts.cpp",
+                "examples/picort/picort_png.cpp",
+            ],
             "output": "picort" + exe_suffix,
             "cpp": True,
             "optimize": True,
@@ -1126,6 +1145,8 @@ async def main():
                 score += 100
             if config["arch"] == "x64":
                 score += 10
+            if "vs_cl64" in compiler.name:
+                score += 20
             if "clang" in compiler.name:
                 score += 10
             if "msvc" in compiler.name:
@@ -1139,43 +1160,29 @@ async def main():
             os.makedirs(image_path, exist_ok=True)
             log_mkdir(image_path)
 
-        scalar_target = max(targets, key=lambda t: target_score(t, False))
-        sse_target = max(targets, key=lambda t: target_score(t, True))
-
-        if scalar_target.compiled and scalar_target != sse_target:
-            log_comment(f"-- Rendering scenes with {scalar_target.name} --")
-
-            scalar_target.log.clear()
-            scalar_target.ran = False
-            args = [
-                "data/picort/barbarian.picort.txt",
-                "-o", "build/images/barbarian-scalar.png",
-                "--samples", "64",
-                "--error-threshold", "0.02",
-            ]
-            await run_target(scalar_target, args)
-            if scalar_target.ran:
-                for line in scalar_target.log[1].splitlines(keepends=False):
-                    log_comment(line)
+        target = max(targets, key=lambda t: target_score(t, True))
         
-        if sse_target.compiled:
-            log_comment(f"-- Rendering scenes with {sse_target.name} --")
+        if target.compiled:
+            log_comment(f"-- Rendering scenes with {target.name} --")
 
             scenes = [
                 "data/picort/barbarian.picort.txt",
-                "data/picort/barbarian-big.picort.txt",
                 "data/picort/slime-binary.picort.txt",
-                "data/picort/slime-ascii.picort.txt",
-                "data/picort/slime-big.picort.txt",
+                "data/picort/material-chart.picort.txt",
+                "data/picort/blender-material-chart.picort.txt",
+                "data/picort/maze.picort.txt",
             ]
 
             for scene in scenes:
-                sse_target.log.clear()
-                sse_target.ran = False
-                await run_target(sse_target, [scene])
-                if not sse_target.ran:
+                target.log.clear()
+                target.ran = False
+                args = [scene]
+                if argv.strict:
+                    args += ["--error-threshold", "0.000001"]
+                await run_target(target, args)
+                if not target.ran:
                     break
-                for line in sse_target.log[1].splitlines(keepends=False):
+                for line in target.log[1].splitlines(keepends=False):
                     log_comment(line)
 
     if "viewer" in tests:

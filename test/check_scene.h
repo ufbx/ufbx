@@ -393,6 +393,7 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	ufbxt_check_element_ptr(scene, node->mesh, UFBX_ELEMENT_MESH);
 	ufbxt_check_element_ptr(scene, node->light, UFBX_ELEMENT_LIGHT);
 	ufbxt_check_element_ptr(scene, node->camera, UFBX_ELEMENT_CAMERA);
+	ufbxt_check_element_ptr(scene, node->bone, UFBX_ELEMENT_BONE);
 	ufbxt_check_element_ptr(scene, node->inherit_scale_node, UFBX_ELEMENT_NODE);
 	ufbxt_check_element_ptr(scene, node->scale_helper, UFBX_ELEMENT_NODE);
 	ufbxt_check_element_ptr(scene, node->geometry_transform_helper, UFBX_ELEMENT_NODE);
@@ -401,6 +402,7 @@ static void ufbxt_check_node(ufbx_scene *scene, ufbx_node *node)
 	case UFBX_ELEMENT_MESH: ufbxt_assert(node->mesh); break;
 	case UFBX_ELEMENT_LIGHT: ufbxt_assert(node->light); break;
 	case UFBX_ELEMENT_CAMERA: ufbxt_assert(node->camera); break;
+	case UFBX_ELEMENT_BONE: ufbxt_assert(node->bone); break;
 	default: /* No shorthand */ break;
 	}
 
@@ -658,6 +660,22 @@ static void ufbxt_check_mesh(ufbx_scene *scene, ufbx_mesh *mesh)
 		ufbxt_assert(total_material_faces == mesh->num_faces);
 		ufbxt_assert(total_material_tris == mesh->num_triangles);
 	}
+
+	for (size_t i = 0; i < mesh->material_part_usage_order.count; i++) {
+		ufbxt_assert(mesh->material_part_usage_order.data[i] < mesh->material_parts.count);
+		if (i > 0) {
+			ufbx_mesh_part *pa = &mesh->material_parts.data[mesh->material_part_usage_order.data[i - 1]];
+			ufbx_mesh_part *pb = &mesh->material_parts.data[mesh->material_part_usage_order.data[i]];
+			if (pa->face_indices.count > 0 && pb->face_indices.count > 0) {
+				ufbxt_assert(pa->face_indices.data[0] < pb->face_indices.data[0]);
+			} else if (pa->face_indices.count == pb->face_indices.count) {
+				ufbxt_assert(pa < pb);
+			} else {
+				ufbxt_assert(pa->face_indices.count > pb->face_indices.count);
+			}
+		}
+	}
+	ufbxt_assert(mesh->material_part_usage_order.count == mesh->material_parts.count);
 
 	if (mesh->face_group.count) {
 		ufbxt_assert(mesh->face_group.count == mesh->num_faces);

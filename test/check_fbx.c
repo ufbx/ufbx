@@ -54,6 +54,7 @@ static const ufbxt_enum_name ufbxt_names_ufbx_inherit_mode_handling[] = {
 	{ "preserve", UFBX_INHERIT_MODE_HANDLING_PRESERVE },
 	{ "helper-nodes", UFBX_INHERIT_MODE_HANDLING_HELPER_NODES },
 	{ "compensate", UFBX_INHERIT_MODE_HANDLING_COMPENSATE },
+	{ "compensate-no-fallback", UFBX_INHERIT_MODE_HANDLING_COMPENSATE_NO_FALLBACK },
 };
 
 static const ufbxt_enum_name ufbxt_names_ufbx_space_conversion[] = {
@@ -424,6 +425,9 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		if (node->has_geometry_transform) {
 			ufbxt_add_feature(&features, "geometry-transform");
 		}
+		if (node->inherit_mode != UFBX_INHERIT_MODE_NORMAL) {
+			ufbxt_add_feature(&features, "inherit-mode");
+		}
 
 		ufbx_vec3 rotation_pivot = ufbx_find_vec3(&node->props, "RotationPivot", ufbx_zero_vec3);
 		ufbx_vec3 scale_pivot = ufbx_find_vec3(&node->props, "ScalingPivot", ufbx_zero_vec3);
@@ -677,6 +681,10 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		uint32_t diff_flags = 0;
 
 		if (bake) {
+			diff_flags |= UFBXT_OBJ_DIFF_FLAG_BAKED_ANIM;
+		}
+
+		if (opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_COMPENSATE || opts.inherit_mode_handling == UFBX_INHERIT_MODE_HANDLING_COMPENSATE_NO_FALLBACK) {
 			diff_flags |= UFBXT_OBJ_DIFF_FLAG_BAKED_ANIM;
 		}
 

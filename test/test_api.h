@@ -238,10 +238,10 @@ static void ufbxt_single_thread_pool_init(ufbx_thread_pool *dst, ufbxt_single_th
 #if UFBXT_IMPL
 static bool ufbxt_is_big_endian()
 {
-		uint8_t buf[2];
-		uint16_t val = 0xbbaa;
-		memcpy(buf, &val, 2);
-		return buf[0] == 0xbb;
+	uint8_t buf[2];
+	uint16_t val = 0xbbaa;
+	memcpy(buf, &val, 2);
+	return buf[0] == 0xbb;
 }
 #endif
 
@@ -1157,3 +1157,261 @@ UFBXT_TEST(huge_filename_not_found)
 	ufbxt_assert(error.info_length == UFBX_ERROR_INFO_LENGTH - 1);
 }
 #endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_missing_obj_mtl_path_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.obj_mtl_path.data = "nonexistent_path.mtl";
+	opts.obj_mtl_path.length = SIZE_MAX;
+	opts.ignore_missing_external_files = true;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(missing_explicit_mtl, blender_279_ball, ufbxt_missing_obj_mtl_path_opts, UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS)
+#if UFBXT_IMPL
+{
+	if (scene->metadata.file_format == UFBX_FILE_FORMAT_OBJ) {
+		ufbxt_check_warning(scene, UFBX_WARNING_MISSING_EXTERNAL_FILE, UFBX_ELEMENT_UNKNOWN, NULL, 1, "nonexistent_path.mtl");
+	}
+}
+#endif
+
+UFBXT_TEST(load_scene_bad_opts)
+#if UFBXT_IMPL
+{
+#if defined(UFBX_NO_ASSERT)
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbx_error error;
+		ufbx_load_opts opts;
+		memset(&opts, 0xff, sizeof(opts));
+		ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+		ufbxt_assert(!scene);
+		ufbxt_assert(error.type == UFBX_ERROR_UNINITIALIZED_OPTIONS);
+	}
+#endif
+}
+#endif
+
+UFBXT_TEST(subdivide_bad_opts)
+#if UFBXT_IMPL
+{
+#if defined(UFBX_NO_ASSERT)
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbx_scene *scene = ufbx_load_file(path, NULL, NULL);
+		ufbxt_assert(scene);
+		ufbxt_assert(scene->meshes.count > 0);
+		ufbx_mesh *mesh = scene->meshes.data[0];
+
+		ufbx_error error;
+		ufbx_subdivide_opts opts;
+		memset(&opts, 0xff, sizeof(opts));
+		ufbx_mesh *sub_mesh = ufbx_subdivide_mesh(mesh, 1, &opts, &error);
+		ufbxt_assert(!sub_mesh);
+		ufbxt_assert(error.type == UFBX_ERROR_UNINITIALIZED_OPTIONS);
+		ufbx_free_scene(scene);
+	}
+#endif
+}
+#endif
+
+UFBXT_TEST(evaluate_bad_opts)
+#if UFBXT_IMPL
+{
+#if defined(UFBX_NO_ASSERT)
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbx_scene *scene = ufbx_load_file(path, NULL, NULL);
+		ufbxt_assert(scene);
+
+		ufbx_error error;
+		ufbx_evaluate_opts opts;
+		memset(&opts, 0xff, sizeof(opts));
+		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, 0.0, &opts, &error);
+		ufbxt_assert(!state);
+		ufbxt_assert(error.type == UFBX_ERROR_UNINITIALIZED_OPTIONS);
+		ufbx_free_scene(scene);
+	}
+#endif
+}
+#endif
+
+UFBXT_TEST(bake_bad_opts)
+#if UFBXT_IMPL
+{
+#if defined(UFBX_NO_ASSERT)
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_cube" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbx_scene *scene = ufbx_load_file(path, NULL, NULL);
+		ufbxt_assert(scene);
+
+		ufbx_error error;
+		ufbx_bake_opts opts;
+		memset(&opts, 0xff, sizeof(opts));
+		ufbx_baked_anim *bake = ufbx_bake_anim(scene, scene->anim, &opts, &error);
+		ufbxt_assert(!bake);
+		ufbxt_assert(error.type == UFBX_ERROR_UNINITIALIZED_OPTIONS);
+		ufbx_free_scene(scene);
+	}
+#endif
+}
+#endif
+
+UFBXT_TEST(tessellate_curve_bad_opts)
+#if UFBXT_IMPL
+{
+#if defined(UFBX_NO_ASSERT)
+
+	char path[512];
+	ufbxt_file_iterator iter = { "max_nurbs_to_line" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbx_scene *scene = ufbx_load_file(path, NULL, NULL);
+		ufbxt_assert(scene);
+		ufbxt_assert(scene->nurbs_curves.count > 0);
+		ufbx_nurbs_curve *nurbs = scene->nurbs_curves.data[0];
+
+		ufbx_error error;
+		ufbx_tessellate_curve_opts opts;
+		memset(&opts, 0xff, sizeof(opts));
+		ufbx_line_curve *line = ufbx_tessellate_nurbs_curve(nurbs, &opts, &error);
+		ufbxt_assert(!line);
+		ufbxt_assert(error.type == UFBX_ERROR_UNINITIALIZED_OPTIONS);
+		ufbx_free_scene(scene);
+	}
+#endif
+}
+#endif
+
+UFBXT_TEST(tessellate_surface_bad_opts)
+#if UFBXT_IMPL
+{
+#if defined(UFBX_NO_ASSERT)
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_nurbs_surface_plane" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		ufbx_scene *scene = ufbx_load_file(path, NULL, NULL);
+		ufbxt_assert(scene);
+		ufbxt_assert(scene->nurbs_surfaces.count > 0);
+		ufbx_nurbs_surface *nurbs = scene->nurbs_surfaces.data[0];
+
+		ufbx_error error;
+		ufbx_tessellate_surface_opts opts;
+		memset(&opts, 0xff, sizeof(opts));
+		ufbx_mesh *mesh = ufbx_tessellate_nurbs_surface(nurbs, &opts, &error);
+		ufbxt_assert(!mesh);
+		ufbxt_assert(error.type == UFBX_ERROR_UNINITIALIZED_OPTIONS);
+		ufbx_free_scene(scene);
+	}
+#endif
+}
+#endif
+
+UFBXT_TEST(load_cache_bad_opts)
+#if UFBXT_IMPL
+{
+#if defined(UFBX_NO_ASSERT)
+	const char *path = "caches/sine_mxsf_regular/cache.xml";
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s", data_root, path);
+
+	ufbx_error error;
+	ufbx_geometry_cache_opts opts;
+	memset(&opts, 0xff, sizeof(opts));
+	ufbx_geometry_cache *cache = ufbx_load_geometry_cache(buf, &opts, &error);
+	ufbxt_assert(!cache);
+	ufbxt_assert(error.type == UFBX_ERROR_UNINITIALIZED_OPTIONS);
+#endif
+}
+#endif
+
+UFBXT_TEST(read_cache_bad_opts)
+#if UFBXT_IMPL
+{
+#if defined(UFBX_NO_ASSERT)
+	const char *path = "caches/sine_mxsf_regular/cache.xml";
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s", data_root, path);
+
+	ufbx_geometry_cache *cache = ufbx_load_geometry_cache(buf, NULL, NULL);
+	ufbxt_assert(cache);
+	ufbxt_assert(cache->frames.count > 0);
+	ufbx_vec3 data[512];
+
+	size_t result_ok = ufbx_read_geometry_cache_vec3(&cache->frames.data[0], data, ufbxt_arraycount(data), NULL);
+	ufbxt_assert(result_ok == 36);
+
+	ufbx_geometry_cache_data_opts opts;
+	memset(&opts, 0xff, sizeof(opts));
+	size_t result_bad = ufbx_read_geometry_cache_vec3(&cache->frames.data[0], data, ufbxt_arraycount(data), &opts);
+	ufbxt_assert(result_bad == 0);
+
+	ufbx_free_geometry_cache(cache);
+#endif
+}
+#endif
+
+UFBXT_TEST(sample_cache_bad_opts)
+#if UFBXT_IMPL
+{
+#if defined(UFBX_NO_ASSERT)
+	const char *path = "caches/sine_mxsf_regular/cache.xml";
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s", data_root, path);
+
+	ufbx_geometry_cache *cache = ufbx_load_geometry_cache(buf, NULL, NULL);
+	ufbxt_assert(cache);
+	ufbxt_assert(cache->channels.count > 0);
+	ufbx_vec3 data[512];
+
+	size_t result_ok = ufbx_sample_geometry_cache_vec3(&cache->channels.data[0], 0.0, data, ufbxt_arraycount(data), NULL);
+	ufbxt_assert(result_ok == 36);
+
+	ufbx_geometry_cache_data_opts opts;
+	memset(&opts, 0xff, sizeof(opts));
+	size_t result_bad = ufbx_sample_geometry_cache_vec3(&cache->channels.data[0], 0.0, data, ufbxt_arraycount(data), &opts);
+	ufbxt_assert(result_bad == 0);
+
+	ufbx_free_geometry_cache(cache);
+#endif
+}
+#endif
+
+UFBXT_TEST(retain_free_garbage)
+#if UFBXT_IMPL
+{
+	size_t buffer_size = 16*1024;
+	void *data = malloc(buffer_size);
+	memset(data, 0xff, buffer_size);
+	ufbxt_assert(buffer_size >= sizeof(ufbx_scene) * 2);
+
+#if defined(UFBX_NO_ASSERT)
+	ufbx_retain_scene((ufbx_scene*)data);
+	ufbx_free_scene((ufbx_scene*)data);
+	ufbx_retain_anim((ufbx_anim*)data);
+	ufbx_free_anim((ufbx_anim*)data);
+	ufbx_retain_baked_anim((ufbx_baked_anim*)data);
+	ufbx_free_baked_anim((ufbx_baked_anim*)data);
+	ufbx_retain_mesh((ufbx_mesh*)data);
+	ufbx_free_mesh((ufbx_mesh*)data);
+	ufbx_retain_line_curve((ufbx_line_curve*)data);
+	ufbx_free_line_curve((ufbx_line_curve*)data);
+	ufbx_retain_geometry_cache((ufbx_geometry_cache*)data);
+	ufbx_free_geometry_cache((ufbx_geometry_cache*)data);
+#endif
+
+	free(data);
+}
+#endif
+

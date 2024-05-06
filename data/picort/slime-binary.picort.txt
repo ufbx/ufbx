@@ -1,5 +1,5 @@
 input ../maya_slime_7500_binary.fbx
-reference ../images/slime.png
+reference ../images/slime-binary.png
 output ../../build/images/slime-binary.png
 
 samples 256

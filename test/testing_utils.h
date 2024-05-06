@@ -153,6 +153,8 @@ typedef struct {
 	bool match_by_order;
 	bool negate_xz;
 	bool bind_pose;
+	bool ignore_unskinned;
+	bool transform_skin;
 	ufbx_real tolerance;
 	ufbx_real uv_tolerance;
 	uint32_t allow_missing;
@@ -166,6 +168,7 @@ typedef struct {
 	double position_scale;
 	double position_scale_float;
 	double position_scale_bake;
+	double position_scale_compensate;
 
 	double fbx_position_scale;
 	ufbx_quat fbx_rotation;
@@ -555,6 +558,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 	obj->position_scale = 1.0;
 	obj->position_scale_float = 1.0;
 	obj->position_scale_bake = 1.0;
+	obj->position_scale_compensate = 1.0;
 	obj->fbx_position_scale = 1.0;
 	obj->fbx_rotation = ufbx_identity_quat;
 
@@ -741,6 +745,12 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			if (!strcmp(line, "ufbx:bind_pose")) {
 				obj->bind_pose = true;
 			}
+			if (!strcmp(line, "ufbx:ignore_unskinned")) {
+				obj->ignore_unskinned = true;
+			}
+			if (!strcmp(line, "ufbx:transform_skin")) {
+				obj->transform_skin = true;
+			}
 			if (!strcmp(line, "www.blender.org")) {
 				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;
 			}
@@ -779,6 +789,10 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			double position_scale_bake = 0.0;
 			if (sscanf(line, "ufbx:position_scale_bake=%lf", &position_scale_bake) == 1) {
 				obj->position_scale_bake = position_scale_bake;
+			}
+			double position_scale_compensate = 0.0;
+			if (sscanf(line, "ufbx:position_scale_compensate=%lf", &position_scale_compensate) == 1) {
+				obj->position_scale_compensate = position_scale_compensate;
 			}
 			int frame = 0;
 			if (sscanf(line, "ufbx:frame=%d", &frame) == 1) {
@@ -1256,6 +1270,7 @@ enum {
 	UFBXT_OBJ_DIFF_FLAG_CHECK_DEFORMED_NORMALS = 0x1,
 	UFBXT_OBJ_DIFF_FLAG_IGNORE_NORMALS = 0x2,
 	UFBXT_OBJ_DIFF_FLAG_BAKED_ANIM = 0x4,
+	UFBXT_OBJ_DIFF_FLAG_INHERIT_COMPENSATE = 0x4,
 };
 
 static bool ufbxt_has_mesh(ufbx_node *node)
@@ -1443,6 +1458,9 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 		if (flags & UFBXT_OBJ_DIFF_FLAG_BAKED_ANIM) {
 			scale *= obj->position_scale_bake;
 		}
+		if (flags & UFBXT_OBJ_DIFF_FLAG_INHERIT_COMPENSATE) {
+			scale *= obj->position_scale_compensate;
+		}
 
 		used_nodes[num_used_nodes++] = node;
 
@@ -1470,6 +1488,28 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 
 		ufbx_matrix *mat = &node->geometry_to_world;
 		ufbx_matrix norm_mat = ufbx_get_compatible_matrix_for_normals(node);
+		ufbx_matrix skin_mat;
+
+		if (obj->transform_skin && mesh->skin_deformers.count > 0) {
+			ufbx_pose *pose = node->bind_pose;
+			ufbx_bone_pose *node_bone = ufbx_get_bone_pose(pose, node);
+
+			// Try to find a shared bind pose
+			if (!node_bone) {
+				for (size_t i = 0; i < mesh->instances.count; i++) {
+					ufbx_node *inst = mesh->instances.data[i];
+					pose = inst->bind_pose;
+					node_bone = ufbx_get_bone_pose(pose, inst);
+					if (node_bone) break;
+				}
+			}
+
+			ufbxt_assert(node_bone);
+			ufbx_matrix inv_bind = ufbx_matrix_invert(&node_bone->bone_to_world);
+			skin_mat = ufbx_matrix_mul(mat, &inv_bind);
+			mat = &skin_mat;
+			norm_mat = ufbx_matrix_for_normals(mat);
+		}
 
 		if (!obj->no_subdivision && (mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_SMOOTH || mesh->subdivision_display_mode == UFBX_SUBDIVISION_DISPLAY_HULL_AND_SMOOTH)) {
 			ufbx_subdivide_opts opts = { 0 };
@@ -1552,7 +1592,7 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 					ufbx_vec3 on = check_normals ? ufbx_get_vertex_vec3(&obj_mesh->vertex_normal, oix) : ufbx_zero_vec3;
 					ufbx_vec3 fn = check_normals ? ufbx_get_vertex_vec3(&mesh->skinned_normal, fix) : ufbx_zero_vec3;
 
-					if (mesh->skinned_is_local) {
+					if (mesh->skinned_is_local || obj->transform_skin) {
 						fp = ufbx_transform_position(mat, fp);
 						fn = ufbx_transform_direction(&norm_mat, fn);
 
@@ -1596,6 +1636,14 @@ static ufbxt_noinline void ufbxt_diff_to_obj(ufbx_scene *scene, ufbxt_obj_file *
 						on.z *= -1.0f;
 					}
 
+					if (obj->ignore_unskinned && mesh->skin_deformers.count > 0) {
+						ufbx_skin_deformer *skin = mesh->skin_deformers.data[0];
+						ufbx_skin_vertex vert = skin->vertices.data[mesh->vertex_indices.data[fix]];
+						if (vert.num_weights == 0) {
+							continue;
+						}
+					}
+
 					ufbxt_assert_close_vec3(p_err, op, fp);
 
 					if (check_normals && !mesh->generated_normals) {
@@ -1636,30 +1684,335 @@ static ufbx_mesh *ufbxt_subdivide_mesh(const ufbx_mesh *mesh, size_t level, cons
 	ufbx_mesh *result = ufbx_subdivide_mesh(mesh, level, opts, error);
 	if (!result) return result;
 
-	ufbx_subdivision_result *res = result->subdivision_result;
-	ufbxt_assert(res);
+	if (result) {
+		ufbx_subdivide_opts memory_opts = { 0 };
+		if (opts) memory_opts = *opts;
+		memory_opts.temp_allocator.huge_threshold = 1;
+		memory_opts.result_allocator.huge_threshold = 1;
 
-	for (size_t i = 1; i < res->temp_allocs; i++) {
-		ufbx_error fail_error;
-		ufbx_subdivide_opts fail_opts = { 0 };
-		if (opts) fail_opts = *opts;
-		fail_opts.temp_allocator.allocation_limit = i;
-		ufbx_mesh *fail_result = ufbx_subdivide_mesh(mesh, level, &fail_opts, &fail_error);
-		ufbxt_assert(!fail_result);
-		ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
-	}
+		ufbx_mesh *memory_result = ufbx_subdivide_mesh(mesh, level, &memory_opts, NULL);
+		ufbxt_assert(memory_result);
 
-	for (size_t i = 1; i < res->result_allocs; i++) {
-		ufbx_error fail_error;
-		ufbx_subdivide_opts fail_opts = { 0 };
-		if (opts) fail_opts = *opts;
-		fail_opts.result_allocator.allocation_limit = i;
-		ufbx_mesh *fail_result = ufbx_subdivide_mesh(mesh, level, &fail_opts, &fail_error);
-		ufbxt_assert(!fail_result);
-		ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+		ufbx_subdivision_result *res = memory_result->subdivision_result;
+		ufbxt_assert(res);
+
+		for (size_t i = 1; i < res->temp_allocs; i++) {
+			ufbx_error fail_error;
+			ufbx_subdivide_opts fail_opts = memory_opts;
+			fail_opts.temp_allocator.allocation_limit = i;
+			ufbx_mesh *fail_result = ufbx_subdivide_mesh(mesh, level, &fail_opts, &fail_error);
+			ufbxt_assert(!fail_result);
+			ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+		}
+
+		for (size_t i = 1; i < res->result_allocs; i++) {
+			ufbx_error fail_error;
+			ufbx_subdivide_opts fail_opts = memory_opts;
+			fail_opts.result_allocator.allocation_limit = i;
+			ufbx_mesh *fail_result = ufbx_subdivide_mesh(mesh, level, &fail_opts, &fail_error);
+			ufbxt_assert(!fail_result);
+			ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+		}
+
+		ufbx_free_mesh(memory_result);
 	}
 
 	return result;
+}
+
+static void ufbxt_check_baked_anim(const ufbx_scene *scene, ufbx_baked_anim *bake)
+{
+	if (!bake) return;
+
+	for (size_t i = 0; i < bake->nodes.count; i++) {
+		if (i > 0) {
+			ufbxt_assert(bake->nodes.data[i - 1].typed_id < bake->nodes.data[i].typed_id);
+		}
+
+		ufbx_baked_node *bake_node = &bake->nodes.data[i];
+		ufbx_node *scene_node = scene->nodes.data[bake_node->typed_id];
+		ufbxt_assert(scene_node->element_id == bake_node->element_id);
+
+		ufbx_baked_node *ref = ufbx_find_baked_node(bake, scene_node);
+		ufbxt_assert(ref == bake_node);
+	}
+	for (size_t i = 0; i < bake->elements.count; i++) {
+		if (i > 0) {
+			ufbxt_assert(bake->elements.data[i - 1].element_id < bake->elements.data[i].element_id);
+		}
+
+		ufbx_baked_element *bake_element = &bake->elements.data[i];
+		ufbx_element *scene_element = scene->elements.data[bake_element->element_id];
+
+		ufbx_baked_element *ref = ufbx_find_baked_element(bake, scene_element);
+		ufbxt_assert(ref == bake_element);
+	}
+}
+
+static ufbx_baked_anim *ufbxt_bake_anim(const ufbx_scene *scene, const ufbx_anim *anim, const ufbx_bake_opts *opts, ufbx_error *error)
+{
+	ufbx_baked_anim *result = ufbx_bake_anim(scene, anim, opts, error);
+	if (!result) return result;
+	ufbxt_check_baked_anim(scene, result);
+
+	if (result) {
+		ufbx_bake_opts memory_opts = { 0 };
+		if (opts) memory_opts = *opts;
+		memory_opts.temp_allocator.huge_threshold = 1;
+		memory_opts.result_allocator.huge_threshold = 1;
+
+		ufbx_baked_anim *memory_result = ufbx_bake_anim(scene, anim, &memory_opts, NULL);
+		ufbxt_assert(memory_result);
+
+		for (size_t i = 1; i < memory_result->metadata.temp_allocs; i++) {
+			ufbx_error fail_error;
+			ufbx_bake_opts fail_opts = memory_opts;
+			fail_opts.temp_allocator.allocation_limit = i;
+			ufbx_baked_anim *fail_result = ufbx_bake_anim(scene, anim, &fail_opts, &fail_error);
+			ufbxt_assert(!fail_result);
+			ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+		}
+
+		for (size_t i = 1; i < memory_result->metadata.result_allocs; i++) {
+			ufbx_error fail_error;
+			ufbx_bake_opts fail_opts = memory_opts;
+			fail_opts.result_allocator.allocation_limit = i;
+			ufbx_baked_anim *fail_result = ufbx_bake_anim(scene, anim, &fail_opts, &fail_error);
+			ufbxt_assert(!fail_result);
+			ufbxt_assert(fail_error.type == UFBX_ERROR_ALLOCATION_LIMIT);
+		}
+
+		ufbx_free_baked_anim(memory_result);
+	}
+
+	return result;
+}
+
+typedef struct {
+	uint16_t r, g, b, a;
+} ufbxt_pixel16;
+
+typedef struct {
+	ufbxt_pixel16 *pixels;
+	uint32_t width;
+	uint32_t height;
+} ufbxt_image16;
+
+static ufbxt_pixel16 ufbxt_px16(uint16_t r, uint16_t g, uint16_t b, uint16_t a) {
+	ufbxt_pixel16 px = { r, g, b, a };
+	return px;
+}
+
+// Load a PNG image file
+// http://www.libpng.org/pub/png/spec/1.2/PNG-Contents.html
+static ufbxt_image16 ufbxt_read_png(const void *data, size_t size, const char **p_error)
+{
+	ufbxt_image16 image = { 0 };
+	const ufbxt_pixel16 empty_pixel = { 0 };
+
+	const uint8_t *ptr = (const uint8_t*)data, *end = ptr + size;
+	uint8_t bit_depth = 0, pixel_values = 0, pixel_format;
+	uint8_t *deflate_data = NULL, *src = NULL, *dst = NULL;
+	ufbxt_pixel16 *palette = NULL;
+	size_t deflate_size = 0, palette_size = 0;
+	static const uint8_t lace_none[] = { 0,0,1,1, 0,0,0,0 };
+	static const uint8_t lace_adam7[] = {
+		0,0,8,8, 4,0,8,8, 0,4,4,8, 2,0,4,4, 0,2,2,4, 1,0,2,2, 0,1,1,2, 0,0,0,0, };
+	uint32_t scale = 1;
+	const uint8_t *lace = lace_none; // Interlacing pattern (x0,y0,dx,dy)
+	ufbxt_pixel16 trns = { 0, 0, 0, 0 }; // Transparent pixel value for RGB
+	const char *error = NULL;
+
+	if (end - ptr < 8) error = "file header truncated";
+	if (!error && memcmp(ptr, "\x89PNG\r\n\x1a\n", 8)) error = "bad_file_header";
+	ptr += 8;
+
+	// Iterate chunks: gather IDAT into a single buffer
+	while (!error) {
+		if (end - ptr < 8) {
+			error = "chunk header truncated";
+			break;
+		}
+		uint32_t chunk_len = ptr[0]<<24 | ptr[1]<<16 | ptr[2]<<8 | ptr[3];
+		const uint8_t *tag = ptr + 4;
+		ptr += 8;
+		if ((uint32_t)(end - ptr) < chunk_len + 4) {
+			error = "chunk data truncated";
+			break;
+		}
+		if (!memcmp(tag, "IHDR", 4) && chunk_len >= 13) {
+			image.width  = ptr[0]<<24 | ptr[1]<<16 | ptr[2]<<8 | ptr[3];
+			image.height = ptr[4]<<24 | ptr[5]<<16 | ptr[6]<<8 | ptr[7];
+			bit_depth = ptr[8];
+			pixel_format = ptr[9];
+			switch (pixel_format) {
+			case 0: pixel_values = 1; break;
+			case 2: pixel_values = 3; break;
+			case 3: pixel_values = 1; break;
+			case 4: pixel_values = 2; break;
+			case 6: pixel_values = 4; break;
+			default:
+				error = "unknown pixel format";
+				continue;
+			}
+			for (uint32_t i = 0; i < 16 && pixel_format != 3; i += bit_depth) scale |= 1u << i;
+			if (ptr[12] != 0) lace = lace_adam7;
+			if (ptr[10] != 0 || ptr[11] != 0) {
+				error = "unknown settings";
+				break;
+			}
+		} else if (!memcmp(tag, "IDAT", 4)) {
+			deflate_data = (uint8_t*)realloc(deflate_data, deflate_size + chunk_len);
+			if (!deflate_data) {
+				error = "allocation failure";
+				continue;
+			}
+			memcpy(deflate_data + deflate_size, ptr, chunk_len);
+			deflate_size += chunk_len;
+		} else if (!memcmp(tag, "PLTE", 4)) {
+			palette_size = chunk_len / 3;
+			palette = (ufbxt_pixel16*)malloc(palette_size);
+			if (!palette) {
+				error = "allocation failure";
+				continue;
+			}
+			for (size_t i = 0; i < palette_size; i++) {
+				palette[i].r = (uint16_t)(ptr[i*3 + 0]*0x101);
+				palette[i].g = (uint16_t)(ptr[i*3 + 1]*0x101);
+				palette[i].b = (uint16_t)(ptr[i*3 + 2]*0x101);
+				palette[i].a = 0;
+			}
+		} else if (!memcmp(tag, "IEND", 4)) {
+			break;
+		} else if (!memcmp(tag, "tRNS", 4)) {
+			if (pixel_format == 2 && chunk_len >= 6) {
+				trns.r = (uint16_t)((ptr[0]<<8 | ptr[1]) * scale);
+				trns.g = (uint16_t)((ptr[2]<<8 | ptr[3]) * scale);
+				trns.b = (uint16_t)((ptr[4]<<8 | ptr[5]) * scale);
+			} else if (pixel_format == 0 && chunk_len >= 2) {
+				uint16_t v = (uint16_t)(ptr[0]<<8 | ptr[1]) * scale;
+				trns.r = trns.g = trns.b = v;
+			} else if (pixel_format == 3) {
+				for (size_t i = 0; i < chunk_len; i++) {
+					if (palette_size) palette[i].a = ptr[i] * 0x101;
+				}
+			}
+		}
+		ptr += chunk_len + 4; // Skip data and CRC
+	}
+
+	size_t bpp = (pixel_values * bit_depth + 7) / 8;
+	size_t stride = (image.width * pixel_values * bit_depth + 7) / 8;
+	if (image.width == 0 || image.height == 0) {
+		error = "bad image size";
+	}
+	size_t src_size = image.height * stride + image.height * (lace == lace_adam7 ? 14 : 1);
+	if (!error) {
+		src = (uint8_t*)calloc(src_size, sizeof(uint8_t));
+		dst = (uint8_t*)calloc((image.height + 1) * (stride + bpp), sizeof(uint8_t));
+		image.pixels = (ufbxt_pixel16*)calloc(image.width * image.height, sizeof(ufbxt_pixel16));
+	}
+	if (!src || !dst || !image.pixels) {
+		error = "allocation failure";
+	}
+
+	// Decompress the combined IDAT chunks
+	ufbx_inflate_retain retain;
+	retain.initialized = false;
+
+	ufbx_inflate_input input = { 0 };
+	input.total_size = deflate_size;
+	input.data_size = deflate_size;
+	input.data = deflate_data;
+
+	ptrdiff_t res = ufbx_inflate(src, src_size, &input, &retain);
+	if (res != (ptrdiff_t)src_size) {
+		error = "deflate error";
+	}
+	uint8_t *sp = src, *sp_end = sp + src_size;
+
+	for (; !error && lace[2]; lace += 4) {
+		int32_t width = ((int32_t)image.width - lace[0] + lace[2] - 1) / lace[2];
+		int32_t height = ((int32_t)image.height - lace[1] + lace[3] - 1) / lace[3];
+		if (width <= 0 || height <= 0) continue;
+		size_t lace_stride = (width * pixel_values * bit_depth + 7) / 8;
+		if ((size_t)(sp_end - sp) < height * (1 + lace_stride)) {
+			error = "data truncated";
+			break;
+		}
+
+		// Unfilter the scanlines
+		ptrdiff_t dx = bpp, dy = stride + bpp;
+		for (int32_t y = 0; y < height; y++) {
+			uint8_t *dp = dst + (stride + bpp) * (1 + y) + bpp;
+			uint8_t filter = *sp++;
+			for (int32_t x = 0; x < lace_stride; x++) {
+				uint8_t s = *sp++, *d = dp++;
+				switch (filter) {
+				case 0: d[0] = s; break; // 6.2: No filter
+				case 1: d[0] = d[-dx] + s; break; // 6.3: Sub (predict left)
+				case 2: d[0] = d[-dy] + s; break; // 6.4: Up (predict top)
+				case 3: d[0] = (d[-dx] + d[-dy]) / 2 + s; break; // 6.5: Average (top+left)
+				case 4: { // 6.6: Paeth (choose closest of 3 to estimate)
+					int32_t a = d[-dx], b = d[-dy], c = d[-dx - dy], p = a+b-c;
+					int32_t pa = abs(p-a), pb = abs(p-b), pc = abs(p-c);
+					if (pa <= pb && pa <= pc) d[0] = (uint8_t)(a + s);
+					else if (pb <= pc) d[0] = (uint8_t)(b + s);
+					else d[0] = (uint8_t)(c + s);
+				} break;
+				default:
+					error = "unknown filter";
+					break;
+				}
+			}
+		}
+
+		// Expand to RGBA pixels
+		for (int32_t y = 0; y < height; y++) {
+			uint8_t *dr = dst + (stride + bpp) * (y + 1) + bpp;
+			for (int32_t x = 0; x < width; x++) {
+				uint16_t v[4];
+				for (uint32_t c = 0; c < pixel_values; c++) {
+					ptrdiff_t bit = (x * pixel_values + c + 1) * bit_depth;
+					uint32_t raw = (dr[(bit - 9) >> 3] << 8 | dr[(bit - 1) >> 3]) >> ((8 - bit) & 7);
+					v[c] = (raw & ((1 << bit_depth) - 1)) * scale;
+				}
+
+				ufbxt_pixel16 px;
+				switch (pixel_format) {
+				case 0: px = ufbxt_px16(v[0], v[0], v[0], 0xffff); break;
+				case 2: px = ufbxt_px16(v[0], v[1], v[2], 0xffff); break;
+				case 3: px = v[0] < palette_size ? palette[v[0]] : empty_pixel; break;
+				case 4: px = ufbxt_px16(v[0], v[0], v[0], v[1]); break;
+				case 6: px = ufbxt_px16(v[0], v[1], v[2], v[3]); break;
+				}
+				if (px.r == trns.r && px.g == trns.g && px.b == trns.b && px.a == trns.a) px = empty_pixel;
+				image.pixels[(lace[1]+y*lace[3]) * image.width + (lace[0]+x*lace[2])] = px;
+			}
+		}
+	}
+
+	free(deflate_data);
+	free(palette);
+	free(src);
+	free(dst);
+	if (error) {
+		if (p_error) *p_error = error;
+		free(image.pixels);
+		image.pixels = NULL;
+		image.width = 0;
+		image.height = 0;
+	}
+
+	return image;
+}
+
+static ufbx_real ufbxt_srgb_to_linear(ufbx_real a)
+{
+	a = ufbxt_clamp(a, 0.0f, 1.0f);
+	return a <= (ufbx_real)0.04045
+		? (ufbx_real)0.0773993808 * a
+		: (ufbx_real)pow((double)a*0.947867298578f+0.0521327014218, 2.4);
 }
 
 // -- IO

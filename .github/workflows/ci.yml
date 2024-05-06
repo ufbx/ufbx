@@ -118,7 +118,6 @@ jobs:
 
   ci_coverage:
     runs-on: ubuntu-20.04
-    needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
         with:
@@ -129,6 +128,40 @@ jobs:
         run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm-11
       - name: Generate coverage
         run: LLVM_COV=llvm-cov-11 bash misc/generate_coverage.sh
+      - name: Upload coverage
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov -y .github/codecov.yml
+
+  ci_coverage32:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - name: Update apt
+        run: sudo apt-get update
+      - name: Install apt dependencies
+        run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm-11
+      - name: Generate coverage
+        run: LLVM_COV=llvm-cov-11 bash misc/generate_coverage_32.sh
+      - name: Upload coverage
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov -y .github/codecov.yml
+
+  ci_no_assert:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - name: Update apt
+        run: sudo apt-get update
+      - name: Install apt dependencies
+        run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm-11
+      - name: Generate coverage
+        run: LLVM_COV=llvm-cov-11 bash misc/generate_coverage_no_assert.sh
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -152,21 +185,6 @@ jobs:
       - uses: actions/checkout@v3
       - name: Run picort
         run: python misc/run_tests.py picort
-      - name: Upload result images
-        env:
-          BUNNY_API_TOKEN: ${{ secrets.BUNNY_API_TOKEN }}
-        if: ${{ always() && !cancelled() }}
-        continue-on-error: true
-        run: |
-          HASH="$(git rev-parse --short=16 HEAD)"
-          URL="https://storage.bunnycdn.com/ufbx-images/$HASH"
-          DST_URL="https://ufbx-images.b-cdn.net/$HASH"
-          curl -sS -w " -> $DST_URL/barbarian.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian.png --data-binary @build/images/barbarian.png
-          curl -sS -w " -> $DST_URL/barbarian-scalar.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian-scalar.png --data-binary @build/images/barbarian-scalar.png
-          curl -sS -w " -> $DST_URL/barbarian-big.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/barbarian-big.png --data-binary @build/images/barbarian-big.png
-          curl -sS -w " -> $DST_URL/slime-binary.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-binary.png --data-binary @build/images/slime-binary.png
-          curl -sS -w " -> $DST_URL/slime-ascii.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-ascii.png --data-binary @build/images/slime-ascii.png
-          curl -sS -w " -> $DST_URL/slime-big.png \n" --request PUT --header "AccessKey: $BUNNY_API_TOKEN" --header "Content-Type: image/png" --url $URL/slime-big.png --data-binary @build/images/slime-big.png
 
   ci_domfuzz:
     runs-on: ubuntu-latest
@@ -174,6 +192,13 @@ jobs:
       - uses: actions/checkout@v3
       - name: Run domfuzz/objfuzz
         run: python misc/run_tests.py domfuzz objfuzz
+
+  ci_unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run unit tests
+        run: python misc/run_tests.py unit
 
   ci_viewer:
     runs-on: ubuntu-latest
@@ -375,7 +400,6 @@ jobs:
 
   ci_compilers:
     runs-on: ubuntu-22.04
-    needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
       - name: Add Ubuntu sources

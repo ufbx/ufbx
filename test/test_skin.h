@@ -128,7 +128,7 @@ UFBXT_FILE_TEST_ALT_SUFFIX(maya_game_sausage_combined_bake, maya_game_sausage, c
 {
 	{
 		ufbx_anim_stack *stack = ufbx_find_anim_stack(scene, "spin");
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, stack->anim, NULL, NULL);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, stack->anim, NULL, NULL);
 		ufbxt_assert(bake);
 
 		ufbxt_assert(bake->key_time_min == 20.0/24.0);
@@ -147,7 +147,7 @@ UFBXT_FILE_TEST_ALT_SUFFIX(maya_game_sausage_combined_bake, maya_game_sausage, c
 		ufbx_bake_opts opts = { 0 };
 		opts.trim_start_time = true;
 
-		ufbx_baked_anim *bake = ufbx_bake_anim(scene, stack->anim, &opts, NULL);
+		ufbx_baked_anim *bake = ufbxt_bake_anim(scene, stack->anim, &opts, NULL);
 		ufbxt_assert(bake);
 
 		ufbxt_assert(bake->key_time_min == 20.0/24.0);
@@ -869,7 +869,7 @@ UFBXT_FILE_TEST_OPTS_ALT(maya_mixed_inherit_mode_helper, maya_mixed_inherit_mode
 	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_6", NULL, 6.0/24.0);
 	ufbxt_check_frame(scene, err, false, "maya_mixed_inherit_mode_7", NULL, 7.0/24.0);
 
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, NULL, NULL);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, NULL, NULL);
 	ufbxt_assert(bake);
 
 	for (int frame = 0; frame <= 7; frame++) {
@@ -922,7 +922,7 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(motionbuilder_sausage_rrss_helper, motionbuilder_
 	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_36", NULL, 36.0/24.0);
 	ufbxt_check_frame(scene, err, false, "motionbuilder_sausage_rrss_48", NULL, 48.0/24.0);
 
-	ufbx_baked_anim *bake = ufbx_bake_anim(scene, NULL, NULL, NULL);
+	ufbx_baked_anim *bake = ufbxt_bake_anim(scene, NULL, NULL, NULL);
 	ufbxt_assert(bake);
 
 	for (int frame = 0; frame <= 48; frame += 12) {
@@ -1040,7 +1040,7 @@ static ufbx_load_opts ufbxt_lefthanded_y_up_z_flip_opts()
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_poses_lefthanded, maya_poses, ufbxt_lefthanded_y_up_z_flip_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_poses_lefthanded, maya_poses, ufbxt_lefthanded_y_up_z_flip_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
 #if UFBXT_IMPL
 {
 	{
@@ -1115,4 +1115,33 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_poses_lefthanded, maya_poses, ufbxt_lefthand
 }
 #endif
 
+UFBXT_FILE_TEST(blender_331_static_blend_shape)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->anim_stacks.count == 0);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_transformed_skin)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_transformed_skin_0", NULL, 0.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_transformed_skin_4", NULL, 4.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_transformed_skin_8", NULL, 8.0/24.0);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_instanced_skin)
+#if UFBXT_IMPL
+{
+	// TODO: This is broken on 6100 files currently, as the skin is attached
+	// only to pCube1, but somehow it should be attached to pCube2 as well..
+	// Probably somehow hacked through `NodeAttributeName: "Geometry::pCube1_ncl1_1"`
+	if (scene->metadata.version >= 7000) {
+		ufbxt_check_frame(scene, err, true, "maya_instanced_skin_0", NULL, 0.0/24.0);
+		ufbxt_check_frame(scene, err, true, "maya_instanced_skin_4", NULL, 4.0/24.0);
+		ufbxt_check_frame(scene, err, true, "maya_instanced_skin_8", NULL, 8.0/24.0);
+	}
+}
+#endif
 

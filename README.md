@@ -83,7 +83,7 @@ The following platforms are tested on CI and produce bit-exact results:
 ## Testing
 
 * Internal tests run on all platforms listed above
-  * 525 test cases / 563 FBX files
+  * 592 test cases / 604 FBX files
 * Fuzzed in multiple layers
   * Parsers (fbx binary/fbx ascii/deflate/xml/mcx/obj/mtl) fuzzed using AFL
   * Structured FBX binary/ascii fuzzing using AFL
@@ -94,6 +94,7 @@ The following platforms are tested on CI and produce bit-exact results:
 * Private dataset: 33.6GB / 12618 files
   * Loaded and validated
 * Static analysis for maximum stack depth on Linux GCC/Clang
+* In total 95% branch line coverage (99% partial line coverage)
 
 ## Versioning
 

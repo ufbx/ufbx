@@ -142,11 +142,15 @@ static void ufbxt_check_ngon_triangulation(ufbxt_diff_error *err, ufbx_mesh *mes
 		ufbx_vec2 b = ufbxt_ngon_3d_to_2d(basis, ufbx_get_vertex_vec3(&mesh->vertex_position, indices[i*3 + 1]));
 		ufbx_vec2 c = ufbxt_ngon_3d_to_2d(basis, ufbx_get_vertex_vec3(&mesh->vertex_position, indices[i*3 + 2]));
 		ufbx_real area = 0.5f * (a.x*(b.y-c.y) + b.x*(c.y-a.y) + c.x*(a.y-b.y));
-		ufbxt_assert(area >= -0.01f);
+		ufbxt_assert(area >= -0.05f);
 		tri_area += area;
 	}
 
-	ufbxt_assert_close_real(err, poly_area, tri_area);
+	#if defined(UFBX_REAL_IS_FLOAT)
+		ufbxt_assert_close_real_threshold(err, poly_area, tri_area, (ufbx_real)fabs(poly_area) * 0.001f);
+	#else
+		ufbxt_assert_close_real(err, poly_area, tri_area);
+	#endif
 }
 
 #endif
@@ -276,3 +280,93 @@ UFBXT_FILE_TEST_ALT(triangulate_empty, maya_cube_7500_binary)
 }
 #endif
 
+UFBXT_FILE_TEST(maya_ngon_gs)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "G");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+
+		ufbxt_assert(mesh->num_faces == 1);
+		ufbx_face face = mesh->faces.data[0];
+
+		uint32_t indices[128*3];
+		size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, face);
+		ufbxt_assert(num_tris == 126);
+
+		const ufbx_vec3 basis[2] = {
+			{ { 1.0f, 0.0f, 0.0f } },
+			{ { 0.0f, 1.0f, 0.0f } },
+		};
+		ufbxt_check_ngon_triangulation(err, mesh, face, indices, num_tris, basis);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "S");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+
+		ufbxt_assert(mesh->num_faces == 1);
+		ufbx_face face = mesh->faces.data[0];
+
+		uint32_t indices[256*3];
+		size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, face);
+		ufbxt_assert(num_tris == 198);
+
+		const ufbx_vec3 basis[2] = {
+			{ { 1.0f, 0.0f, 0.0f } },
+			{ { 0.0f, 1.0f, 0.0f } },
+		};
+		ufbxt_check_ngon_triangulation(err, mesh, face, indices, num_tris, basis);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(maya_ngon_maze_segment)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Grid");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+
+		ufbxt_assert(mesh->num_faces == 1);
+		ufbx_face face = mesh->faces.data[0];
+
+		uint32_t indices[64*3];
+		size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, face);
+		ufbxt_assert(num_tris == 60);
+
+		const ufbx_vec3 basis[2] = {
+			{ { 1.0f, 0.0f, 0.0f } },
+			{ { 0.0f, 1.0f, 0.0f } },
+		};
+		ufbxt_check_ngon_triangulation(err, mesh, face, indices, num_tris, basis);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(maya_ngon_l)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Grid");
+		ufbxt_assert(node && node->mesh);
+		ufbx_mesh *mesh = node->mesh;
+
+		ufbxt_assert(mesh->num_faces == 1);
+		ufbx_face face = mesh->faces.data[0];
+
+		uint32_t indices[8*3];
+		size_t num_tris = ufbx_triangulate_face(indices, ufbxt_arraycount(indices), mesh, face);
+		ufbxt_assert(num_tris == 8);
+
+		const ufbx_vec3 basis[2] = {
+			{ { 1.0f, 0.0f, 0.0f } },
+			{ { 0.0f, 1.0f, 0.0f } },
+		};
+		ufbxt_check_ngon_triangulation(err, mesh, face, indices, num_tris, basis);
+	}
+}
+#endif

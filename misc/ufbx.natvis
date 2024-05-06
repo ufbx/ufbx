@@ -107,21 +107,21 @@
   <Type Name="ufbx_const_transform_override_list"><DisplayString>{{ count={count} }}</DisplayString><Expand><ArrayItems><Size>count</Size><ValuePointer>data</ValuePointer></ArrayItems></Expand></Type>
 
   <Type Name="ufbx_prop">
-    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_STR &amp;&amp; flags &amp; UFBX_PROP_FLAG_VALUE_VEC4">{name,sb}: ({value_vec4.x,g}, {value_vec4.y,g}, {value_vec4.z,g}, {value_vec4.w,g}), {value_str}</DisplayString>
-    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_STR &amp;&amp; flags &amp; UFBX_PROP_FLAG_VALUE_VEC3">{name,sb}: ({value_vec4.x,g}, {value_vec4.y,g}, {value_vec4.z,g}), {value_str}</DisplayString>
-    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_STR &amp;&amp; flags &amp; UFBX_PROP_FLAG_VALUE_VEC2">{name,sb}: ({value_vec4.x,g}, {value_vec4.y,g}), {value_str}</DisplayString>
-    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_STR &amp;&amp; flags &amp; UFBX_PROP_FLAG_VALUE_INT">{name,sb}: {value_int}, {value_str}</DisplayString>
-    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_STR &amp;&amp; flags &amp; UFBX_PROP_FLAG_VALUE_REAL">{name,sb}: {value_vec4.x,g}, {value_str}</DisplayString>
+    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_STR &amp;&amp; flags &amp; UFBX_PROP_FLAG_VALUE_VEC4">{name.data,sb}: ({value_vec4.x,g}, {value_vec4.y,g}, {value_vec4.z,g}, {value_vec4.w,g}), {value_str}</DisplayString>
+    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_STR &amp;&amp; flags &amp; UFBX_PROP_FLAG_VALUE_VEC3">{name.data,sb}: ({value_vec4.x,g}, {value_vec4.y,g}, {value_vec4.z,g}), {value_str}</DisplayString>
+    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_STR &amp;&amp; flags &amp; UFBX_PROP_FLAG_VALUE_VEC2">{name.data,sb}: ({value_vec4.x,g}, {value_vec4.y,g}), {value_str}</DisplayString>
+    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_STR &amp;&amp; flags &amp; UFBX_PROP_FLAG_VALUE_INT">{name.data,sb}: {value_int}, {value_str}</DisplayString>
+    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_STR &amp;&amp; flags &amp; UFBX_PROP_FLAG_VALUE_REAL">{name.data,sb}: {value_vec4.x,g}, {value_str}</DisplayString>
 
-    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_VEC4">{name,sb}: ({value_vec4.x,g}, {value_vec4.y,g}, {value_vec4.z,g}, {value_vec4.w,g})</DisplayString>
-    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_VEC3">{name,sb}: ({value_vec4.x,g}, {value_vec4.y,g}, {value_vec4.z,g})</DisplayString>
-    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_VEC2">{name,sb}: ({value_vec4.x,g}, {value_vec4.y,g})</DisplayString>
-    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_INT">{name,sb}: {value_int}</DisplayString>
-    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_REAL">{name,sb}: {value_vec4.x,g}</DisplayString>
+    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_VEC4">{name.data,sb}: ({value_vec4.x,g}, {value_vec4.y,g}, {value_vec4.z,g}, {value_vec4.w,g})</DisplayString>
+    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_VEC3">{name.data,sb}: ({value_vec4.x,g}, {value_vec4.y,g}, {value_vec4.z,g})</DisplayString>
+    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_VEC2">{name.data,sb}: ({value_vec4.x,g}, {value_vec4.y,g})</DisplayString>
+    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_INT">{name.data,sb}: {value_int}</DisplayString>
+    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_REAL">{name.data,sb}: {value_vec4.x,g}</DisplayString>
 
-    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_STR">{name,sb}: {value_str}</DisplayString>
-    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_BLOB">{name,sb}: {value_blob}</DisplayString>
-    <DisplayString Condition="type == UFBX_PROP_COMPOUND">{name,sb}|</DisplayString>
+    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_STR">{name.data,sb}: {value_str}</DisplayString>
+    <DisplayString Condition="flags &amp; UFBX_PROP_FLAG_VALUE_BLOB">{name.data,sb}: {value_blob}</DisplayString>
+    <DisplayString Condition="type == UFBX_PROP_COMPOUND">{name.data,sb}|</DisplayString>
     <DisplayString>{name,sb}: {value_vec4}</DisplayString>
   </Type>
 

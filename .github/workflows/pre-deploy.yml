@@ -36,6 +36,13 @@ jobs:
   pd_documentation:
     uses: ufbx/ufbx.github.io/.github/workflows/test.yml@master
     with:
-      ufbx-documentation-ref: master
+      ufbx-documentation-ref: integration
       ufbx-rust-ref: main
       ufbx-ref: ${{ github.ref }}
+
+  pd_picort:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run picort
+        run: python misc/run_tests.py picort --strict
