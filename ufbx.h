@@ -5286,6 +5286,8 @@ typedef enum ufbx_transform_flags UFBX_FLAG_REPR {
 } ufbx_transform_flags;
 
 // Evaluate the animated transform of a node given a time.
+// The returned transform is the local transform of the node (ie. relative to the parent),
+// comparable to `ufbx_node.local_transform`.
 ufbx_abi ufbx_transform ufbx_evaluate_transform(const ufbx_anim *anim, const ufbx_node *node, double time);
 ufbx_abi ufbx_transform ufbx_evaluate_transform_flags(const ufbx_anim *anim, const ufbx_node *node, double time, uint32_t flags);
 
