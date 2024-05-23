@@ -357,7 +357,15 @@ static bool ufbxt_parse_reals(ufbx_real *p_result, size_t count, const char *str
 
 		int32_t exponent = 0;
 
-		if (!(*c >= '0' && *c <= '9')) return false;
+		if (!(*c >= '0' && *c <= '9')) {
+			if (!strncmp(c, "nan(ind)", 8)) {
+				*p_result = NAN;
+				c += 8;
+				continue;
+			}
+
+			return false;
+		}
 
 		do {
 			if (value < max_value) {

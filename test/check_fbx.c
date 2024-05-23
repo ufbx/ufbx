@@ -157,6 +157,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 	bool sink = false;
 	bool dedicated_allocs = false;
 	bool bake = false;
+	bool ignore_warnings = false;
 	double bake_fps = -1.0;
 	double override_fps = -1.0;
 
@@ -208,6 +209,8 @@ int check_fbx_main(int argc, char **argv, const char *path)
 			++i; // Handled in main()
 		} else if (!strcmp(argv[i], "--bake")) {
 			bake = true;
+		} else if (!strcmp(argv[i], "--ignore-warnings")) {
+			ignore_warnings = true;
 		} else if (!strcmp(argv[i], "--bake-fps")) {
 			if (++i < argc) bake_fps = strtod(argv[i], NULL);
 		} else if (argv[i][0] == '-') {
@@ -476,12 +479,14 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		printf("\n");
 	}
 
-	for (size_t i = 0; i < scene->metadata.warnings.count; i++) {
-		ufbx_warning *warning = &scene->metadata.warnings.data[i];
-		if (warning->count > 1) {
-			printf("Warning: %s (x%zu)\n", warning->description.data, warning->count);
-		} else {
-			printf("Warning: %s\n", warning->description.data);
+	if (!ignore_warnings) {
+		for (size_t i = 0; i < scene->metadata.warnings.count; i++) {
+			ufbx_warning *warning = &scene->metadata.warnings.data[i];
+			if (warning->count > 1) {
+				printf("Warning: %s (x%zu)\n", warning->description.data, warning->count);
+			} else {
+				printf("Warning: %s\n", warning->description.data);
+			}
 		}
 	}
 
