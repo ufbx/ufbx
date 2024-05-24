@@ -266,7 +266,7 @@ struct ufbx_converter { };
 // `ufbx_source_version` contains the version of the corresponding source file.
 // HINT: The version can be compared numerically to the result of `ufbx_pack_version()`,
 // for example `#if UFBX_VERSION >= ufbx_pack_version(0, 12, 0)`.
-#define UFBX_HEADER_VERSION ufbx_pack_version(0, 14, 0)
+#define UFBX_HEADER_VERSION ufbx_pack_version(0, 14, 2)
 #define UFBX_VERSION UFBX_HEADER_VERSION
 
 // -- Basic types
