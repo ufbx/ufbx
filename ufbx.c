@@ -21772,6 +21772,10 @@ ufbxi_noinline static ufbx_quat ufbxi_get_rotation(const ufbx_props *props, ufbx
 		ufbxi_mul_rotate_quat(&t, node->adjust_pre_rotation);
 	}
 
+	if (node->adjust_mirror_axis) {
+		ufbxi_mirror_rotation(&t.rotation, node->adjust_mirror_axis);
+	}
+
 	return t.rotation;
 }
 
