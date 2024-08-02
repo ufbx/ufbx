@@ -7257,8 +7257,8 @@ typedef enum {
 } ufbxi_parse_state;
 
 typedef enum {
-	UFBXI_ARRAY_FLAG_RESULT       = 0x1, // < Alloacte the array from the result buffer
-	UFBXI_ARRAY_FLAG_TMP_BUF      = 0x2, // < Alloacte the array from the result buffer
+	UFBXI_ARRAY_FLAG_RESULT       = 0x1, // < Allocate the array from the result buffer
+	UFBXI_ARRAY_FLAG_TMP_BUF      = 0x2, // < Allocate the array from the result buffer
 	UFBXI_ARRAY_FLAG_PAD_BEGIN    = 0x4, // < Pad the begin of the array with 4 zero elements to guard from invalid -1 index accesses
 	UFBXI_ARRAY_FLAG_ACCURATE_F32 = 0x8, // < Must be parsed as bit-accurate 32-bit floats
 } ufbxi_array_flags;
@@ -24714,7 +24714,7 @@ static ufbxi_noinline const ufbx_prop *ufbxi_next_prop_slow(ufbxi_prop_iter *ite
 	const ufbx_prop_override *over = iter->over;
 	if (prop == iter->prop_end && over == iter->over_end) return NULL;
 
-	// We can use `UINT32_MAX` as a termianting key (aka prefix) as prop names must
+	// We can use `UINT32_MAX` as a terminating key (aka prefix) as prop names must
 	// be valid UTF-8 and the byte sequence "\xff\xff\xff\xff" is not valid.
 	uint32_t prop_key = prop != iter->prop_end ? prop->_internal_key : UINT32_MAX;
 	uint32_t over_key = over != iter->over_end ? over->_internal_key : UINT32_MAX;
