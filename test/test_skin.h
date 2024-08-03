@@ -792,6 +792,8 @@ UFBXT_TEST(max_transformed_skin_lefthanded)
 			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_5", NULL, 5.0/30.0);
 			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_15", NULL, 15.0/30.0);
 
+			ufbxt_check_transform_consistency(&err, scene, 30.0, 30);
+
 			ufbx_free_scene(scene);
 		}
 	}
@@ -825,6 +827,8 @@ UFBXT_TEST(max_transformed_skin_lefthanded_adjust)
 			ufbxt_check_scene(scene);
 			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_5", NULL, 5.0/30.0);
 			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_15", NULL, 15.0/30.0);
+
+			ufbxt_check_transform_consistency(&err, scene, 30.0, 30);
 
 			ufbx_free_scene(scene);
 		}

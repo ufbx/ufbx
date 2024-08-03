@@ -93,7 +93,7 @@ jobs:
           path: build/hashdump_ci_windows.txt.gz
 
   ci_macos:
-    runs-on: macos-11
+    runs-on: macos-14
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v3
