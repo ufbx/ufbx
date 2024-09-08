@@ -29193,6 +29193,9 @@ ufbx_abi bool ufbx_open_file(ufbx_stream *stream, const char *path, size_t path_
 	stream->user = f;
 	return true;
 #else
+	(void)stream;
+	(void)path;
+	(void)path_len;
 	return false;
 #endif
 }
@@ -29362,6 +29365,11 @@ ufbx_abi ufbx_scene *ufbx_load_stdio_prefix(void *file_void, const void *prefix,
 	ufbx_scene *scene = ufbxi_load(&uc, opts, error);
 	return scene;
 #else
+	(void)file_void;
+	(void)prefix;
+	(void)prefix_size;
+	(void)opts;
+
 	ufbxi_context uc = { UFBX_ERROR_NONE };
 	ufbxi_fmt_err_info(&uc.error, "UFBX_NO_STDIO");
 	ufbxi_report_err_msg(&uc.error, "UFBX_NO_STDIO", "Feature disabled");
