@@ -2889,9 +2889,11 @@ static ufbxi_noinline void ufbxi_panicf_imp(ufbx_panic *panic, const char *fmt, 
 		panic->did_panic = true;
 		panic->message_length = (size_t)ufbxi_vsnprintf(panic->message, sizeof(panic->message), fmt, args);
 	} else {
+#if !defined(UFBX_NO_STDIO)
 		fprintf(stderr, "ufbx panic: ");
 		vfprintf(stderr, fmt, args);
 		fprintf(stderr, "\n");
+#endif
 	}
 
 	va_end(args);
@@ -6348,8 +6350,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_to(ufbxi_context *uc, void 
 	return 1;
 }
 
-// -- File IO
-
 static ufbxi_noinline void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *ator, const ufbx_allocator_opts *opts, const char *name)
 {
 	ufbx_allocator_opts zero_opts;
@@ -6368,6 +6368,10 @@ static ufbxi_noinline void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *a
 	ator->chunk_max = opts->max_chunk_size ? opts->max_chunk_size : 0x1000000;
 	ator->name = name;
 }
+
+// -- File IO
+
+#if !defined(UFBX_NO_STDIO)
 
 static ufbxi_noinline FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp_ator)
 {
@@ -6493,6 +6497,10 @@ static void ufbxi_file_close(void *user)
 	FILE *file = (FILE*)user;
 	fclose(file);
 }
+
+#endif
+
+// -- Memory IO
 
 typedef struct {
 	const void *data;
@@ -29171,6 +29179,7 @@ ufbx_abi_data_def const size_t ufbx_element_type_size[UFBX_ELEMENT_TYPE_COUNT] =
 
 ufbx_abi bool ufbx_open_file(ufbx_stream *stream, const char *path, size_t path_len)
 {
+#if !defined(UFBX_NO_STDIO)
 	ufbxi_allocator tmp_ator = { 0 };
 	ufbx_error tmp_error = { UFBX_ERROR_NONE };
 	ufbxi_init_ator(&tmp_error, &tmp_ator, NULL, "filename");
@@ -29182,6 +29191,9 @@ ufbx_abi bool ufbx_open_file(ufbx_stream *stream, const char *path, size_t path_
 	stream->close_fn = &ufbxi_file_close;
 	stream->user = f;
 	return true;
+#else
+	return false;
+#endif
 }
 
 ufbx_abi bool ufbx_default_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info)
@@ -29290,6 +29302,7 @@ ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_le
 		}
 	}
 
+#if !defined(UFBX_NO_STDIO)
 	ufbxi_allocator tmp_ator = { 0 };
 	ufbx_error tmp_error = { UFBX_ERROR_NONE };
 	ufbxi_init_ator(&tmp_error, &tmp_ator, opts ? &opts->temp_allocator : NULL, "filename");
@@ -29302,8 +29315,10 @@ ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_le
 	ufbx_scene *scene = ufbx_load_stdio(file, &opts_copy, error);
 
 	fclose(file);
-
 	return scene;
+#else
+	return ufbx_load_stdio(NULL, opts, error);
+#endif
 }
 
 ufbx_abi ufbx_scene *ufbx_load_stdio(void *file_void, const ufbx_load_opts *opts, ufbx_error *error)
@@ -29313,6 +29328,7 @@ ufbx_abi ufbx_scene *ufbx_load_stdio(void *file_void, const ufbx_load_opts *opts
 
 ufbx_abi ufbx_scene *ufbx_load_stdio_prefix(void *file_void, const void *prefix, size_t prefix_size, const ufbx_load_opts *opts, ufbx_error *error)
 {
+#if !defined(UFBX_NO_STDIO)
 	ufbxi_check_opts_ptr(ufbx_scene, opts, error);
 	FILE *file = (FILE*)file_void;
 
@@ -29344,6 +29360,13 @@ ufbx_abi ufbx_scene *ufbx_load_stdio_prefix(void *file_void, const void *prefix,
 
 	ufbx_scene *scene = ufbxi_load(&uc, opts, error);
 	return scene;
+#else
+	ufbxi_context uc = { UFBX_ERROR_NONE };
+	ufbxi_fmt_err_info(&uc.error, "UFBX_NO_STDIO");
+	ufbxi_report_err_msg(&uc.error, "UFBX_NO_STDIO", "Feature disabled");
+	uc.deferred_failure = true;
+	return ufbxi_load(&uc, NULL, error);
+#endif
 }
 
 ufbx_abi ufbx_scene *ufbx_load_stream(const ufbx_stream *stream, const ufbx_load_opts *opts, ufbx_error *error)
