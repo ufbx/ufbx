@@ -2,7 +2,6 @@
 
 #include "picort.h"
 #include <stdio.h>
-#include <string.h>
 #include <algorithm>
 #include <memory>
 #include <thread>
