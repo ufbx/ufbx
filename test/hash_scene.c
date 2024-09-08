@@ -1,9 +1,10 @@
 #define _CRT_SECURE_NO_WARNINGS
 
+#include <string.h>
+
 #include "../ufbx.h"
 #include "hash_scene.h"
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 #include <inttypes.h>
 #include <assert.h>
