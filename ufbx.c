@@ -23199,6 +23199,12 @@ static ufbxi_noinline int ufbxi_cache_sort_tmp_channels(ufbxi_cache_context *cc,
 	return 1;
 }
 
+static ufbxi_noinline uint32_t ufbxi_parse_u32(const char *str)
+{
+	unsigned long result = strtoul(str, NULL, 10);
+	return result <= UINT32_MAX ? (uint32_t)result : 0;
+}
+
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_xml_imp(ufbxi_cache_context *cc, ufbxi_xml_document *doc)
 {
 	cc->xml_ticks_per_frame = 250;
@@ -23246,7 +23252,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_xml_imp(ufbxi_cache_c
 		if (tag_fps) {
 			ufbxi_xml_attrib *fps = ufbxi_xml_find_attrib(tag_fps, "TimePerFrame");
 			if (fps) {
-				int value = atoi(fps->value.data);
+				uint32_t value = ufbxi_parse_u32(fps->value.data);
 				if (value > 0) {
 					cc->xml_ticks_per_frame = (uint32_t)value;
 				}
@@ -23273,9 +23279,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_xml_imp(ufbxi_cache_c
 				ufbxi_xml_attrib *start_time = ufbxi_xml_find_attrib(tag, "StartTime");
 				ufbxi_xml_attrib *end_time = ufbxi_xml_find_attrib(tag, "EndTime");
 				if (sampling_rate && start_time && end_time) {
-					channel->sample_rate = (uint32_t)atoi(sampling_rate->value.data);
-					channel->start_time = (uint32_t)atoi(start_time->value.data);
-					channel->end_time = (uint32_t)atoi(end_time->value.data);
+					channel->sample_rate = ufbxi_parse_u32(sampling_rate->value.data);
+					channel->start_time = ufbxi_parse_u32(start_time->value.data);
+					channel->end_time = ufbxi_parse_u32(end_time->value.data);
 					channel->current_time = channel->start_time;
 					channel->try_load = true;
 				}
