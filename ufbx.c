@@ -20,6 +20,7 @@
 //   UFBX_TRACE                Log calls of `ufbxi_check()` for tracing execution
 //   UFBX_LITTLE_ENDIAN=0/1    Explicitly define little/big endian architecture
 //   UFBX_PATH_SEPARATOR=''    Specify default platform path separator
+//   UFBX_NO_STDIO             Disable stdio FILE API
 
 // Mostly internal for debugging:
 //   UFBX_STATIC_ANALYSIS      Enable static analysis augmentation
