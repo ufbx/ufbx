@@ -1083,6 +1083,7 @@ async def main():
             "UFBX_NO_TRIANGULATION",
             "UFBX_NO_ERROR_STACK",
             "UFBX_REAL_IS_FLOAT",
+            "UFBX_NO_STDIO",
         ]
 
         target_tasks = []
