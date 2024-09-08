@@ -243,6 +243,13 @@
 #if !defined(UFBX_NAN)
 	#define UFBX_NAN (UFBX_INFINITY * 0.0f)
 #endif
+#if !defined(UFBX_FLT_EPSILON)
+	#if defined(FLT_EPSILON)
+		#define UFBX_FLT_EPSILON FLT_EPSILON
+	#else
+		#define UFBX_FLT_EPSILON 1.192092896e-07f
+	#endif
+#endif
 
 // -- Platform
 
@@ -25757,7 +25764,7 @@ static ufbxi_noinline bool ufbxi_postprocess_step(ufbxi_bake_context *bc, double
 	bool left = (flags & UFBX_BAKED_KEY_STEP_LEFT) != 0;
 
 	double step = 0.001;
-	double epsilon = 1.0 + FLT_EPSILON * 4.0f;
+	double epsilon = 1.0 + UFBX_FLT_EPSILON * 4.0f;
 
 	double time = *p_time;
 	switch (bc->opts.step_handling) {
