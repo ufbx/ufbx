@@ -34,6 +34,7 @@ ufbxt_cpp_test *ufbxt_cpp_test::last = nullptr;
 	void p_name()
 
 #include <stdio.h>
+#include <string.h>
 #include <string>
 #include <memory>
 #include <vector>
