@@ -25744,7 +25744,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 #define ufbxi_add_epsilon(a, epsilon) ((a)>0 ? (a)*(epsilon) : (a)/(epsilon))
 #define ufbxi_sub_epsilon(a, epsilon) ((a)>0 ? (a)/(epsilon) : (a)*(epsilon))
 
-static ufbxi_noinline bool ufbxi_postprocess_step(ufbxi_bake_context *bc, double prev_time, double next_time, double *p_time, uint32_t flags)
+static ufbxi_noinline bool ufbxi_postprocess_step(ufbxi_bake_context *bc, double prev_time, double next_time, double *p_time, ufbx_baked_key_flags flags)
 {
 	ufbxi_dev_assert((flags & (UFBX_BAKED_KEY_STEP_LEFT|UFBX_BAKED_KEY_STEP_RIGHT)) != 0);
 	bool left = (flags & UFBX_BAKED_KEY_STEP_LEFT) != 0;
@@ -25990,7 +25990,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_resampled_times(ufbxi_bake_
 	ufbxi_bake_time *times = ufbxi_push(&bc->tmp_times, ufbxi_bake_time, keys.count);
 	ufbxi_check_err(&bc->error, times);
 	for (size_t i = 0; i < keys.count; i++) {
-		uint32_t flags = keys.data[i].flags;
+		ufbx_baked_key_flags flags = keys.data[i].flags;
 		double time = keys.data[i].time;
 		if ((flags & UFBX_BAKED_KEY_STEP_LEFT) != 0 && i + 1 < keys.count && (keys.data[i + 1].flags & UFBX_BAKED_KEY_STEP_KEY) != 0) {
 			time = keys.data[i + 1].time;
