@@ -360,8 +360,6 @@ static double bigfloat_parse_double(const char *str, char **p_end)
 
 #if defined(UFBXC_HAS_MALLOC)
 
-// Small allocator interface, NOT thread safe!
-
 void *ufbxc_os_allocate(size_t size, size_t *p_allocated_size);
 bool ufbxc_os_free(void *pointer, size_t allocated_size);
 
@@ -370,31 +368,72 @@ bool ufbxc_os_free(void *pointer, size_t allocated_size);
 #define UFMALLOC_BLOCK 0x4
 
 typedef struct ufmalloc_node {
-	struct ufmalloc_node *prev, *next;
+	struct ufmalloc_node *prev_all, *next_all;
+	struct ufmalloc_node **prev_next_free, *next_free;
 	size_t flags;
 	size_t size;
 } ufmalloc_node;
 
+#define UFMALLOC_NUM_SIZE_CLASSES 32
+
 static ufmalloc_node ufmalloc_root;
+static ufmalloc_node *ufmalloc_free_list[UFMALLOC_NUM_SIZE_CLASSES];
 
-static void ufmalloc_link(ufmalloc_node *prev, ufmalloc_node *next, size_t size, size_t flags)
+static size_t ufmalloc_size_class(size_t size)
 {
-	if (prev->next) prev->next->prev = next;
+	size_t sc = 0;
+	while (size > 16 && sc + 1 < UFMALLOC_NUM_SIZE_CLASSES) {
+		sc++;
+		size /= 2;
+	}
+	return sc;
+}
 
-	next->next = prev->next;
-	next->prev = prev;
-	next->size = size;
-	next->flags = flags;
-
-	prev->next = next;
+static void ufmalloc_link(ufmalloc_node *prev, ufmalloc_node *next)
+{
+	if (prev->next_all) prev->next_all->prev_all = next;
+	next->next_all = prev->next_all;
+	next->prev_all = prev;
+	prev->next_all = next;
 }
 
 static void ufmalloc_unlink(ufmalloc_node *node)
 {
-	ufmalloc_node *prev = node->prev, *next = node->next;
-	if (next) next->prev = prev;
-	prev->next = next;
-	node->prev = node->next = NULL;
+	ufmalloc_node *prev = node->prev_all, *next = node->next_all;
+	if (next) next->prev_all = prev;
+	prev->next_all = next;
+	node->prev_all = node->next_all = NULL;
+}
+
+static void ufmalloc_create(ufmalloc_node *prev, ufmalloc_node *node, size_t size, uint32_t flags)
+{
+	ufmalloc_link(prev, node);
+	node->size = size;
+	node->flags = flags;
+	node->prev_next_free = NULL;
+	node->next_free = NULL;
+}
+
+static void ufmalloc_link_free(ufmalloc_node *node)
+{
+	ufbxc_assert(node->flags == UFMALLOC_FREE);
+
+	size_t sc = ufmalloc_size_class(node->size);
+	ufmalloc_node **p_free = &ufmalloc_free_list[sc];
+	ufmalloc_node *free_node = *p_free;
+	if (free_node) free_node->prev_next_free = &node->next_free;
+	node->prev_next_free = p_free;
+	node->next_free = *p_free;
+	*p_free = node;
+}
+
+static void ufmalloc_unlink_free(ufmalloc_node *node)
+{
+	if (node->next_free) node->next_free->prev_next_free = node->prev_next_free;
+	ufbxc_assert(node->prev_next_free);
+	*node->prev_next_free = node->next_free;
+	node->prev_next_free = NULL;
+	node->next_free = NULL;
 }
 
 static bool ufmalloc_block_end(ufmalloc_node *node)
@@ -402,34 +441,6 @@ static bool ufmalloc_block_end(ufmalloc_node *node)
 	if (!node) return true;
 	if (!node->flags || node->flags == UFMALLOC_BLOCK) return true;
 	return false;
-}
-
-static int serial = 0;
-static int valid_serial = 0;
-
-static void ufmalloc_validate()
-{
-	valid_serial++;
-
-	ufmalloc_node *node = ufmalloc_root.next;
-
-	if (node) {
-		ufbxc_assert(node->flags == UFMALLOC_BLOCK);
-	}
-
-	while (node) {
-		ufbxc_assert(node->flags <= 4);
-
-		if (node->flags == UFMALLOC_FREE || node->flags == UFMALLOC_USED) {
-			ufmalloc_node *next = node->next;
-			if (next && (next->flags == UFMALLOC_FREE || next->flags == UFMALLOC_USED)) {
-				size_t expected_size = (size_t)((char*)next - (char*)(node + 1));
-				ufbxc_assert(node->size == expected_size);
-			}
-		}
-
-		node = node->next;
-	}
 }
 
 static void *ufmalloc_alloc(size_t size)
@@ -441,58 +452,74 @@ static void *ufmalloc_alloc(size_t size)
 	size_t align = 2 * sizeof(void*);
 	size = (size + align - 1) & ~(align - 1);
 
-	serial++;
+	ufmalloc_node *node = NULL;
 
-	ufmalloc_validate();
+	size_t search_attempts = 16;
+	size_t sc = ufmalloc_size_class(size);
+	for (; !node && sc < UFMALLOC_NUM_SIZE_CLASSES; sc++) {
+		ufmalloc_node *free_node = ufmalloc_free_list[sc];
+		if (!free_node) continue;
 
-	ufmalloc_node *node = ufmalloc_root.next;
-	while (node) {
-		if (node->flags & UFMALLOC_FREE) {
-			if (size <= node->size) {
-				char *data = (char*)(node + 1);
+		for (size_t i = 0; i < search_attempts; i++) {
+			if (!free_node) break;
 
-				size_t slack = node->size - size;
-				if (slack >= 2 * sizeof(ufmalloc_node)) {
-					ufmalloc_node *next = (ufmalloc_node*)(data + size);
-					ufmalloc_link(node, next, slack - sizeof(ufmalloc_node), UFMALLOC_FREE);
-					ufbxc_assert(size + next->size + sizeof(ufmalloc_node) == node->size);
-					node->size = size;
-				}
-
-				node->flags = UFMALLOC_USED;
-				ufmalloc_validate();
-
-				return data;
+			if (free_node->size >= size) {
+				node = free_node;
+				ufmalloc_unlink_free(node);
+				ufbxc_assert(node->flags == UFMALLOC_FREE);
+				break;
 			}
+
+			free_node = free_node->next_free;
+		}
+	}
+
+	if (node == NULL) {
+		size_t allocated_size = 0;
+		void *memory = ufbxc_os_allocate(2 * sizeof(ufmalloc_node) + size + align, &allocated_size);
+		if (!memory) return NULL;
+
+		// Can't do anything if the memory is too small
+		if (allocated_size <= 2 * sizeof(ufmalloc_node) + align) {
+			ufbxc_os_free(memory, allocated_size);
+			return NULL;
 		}
 
-		node = node->next;
+		size_t align_bytes = (align - (uintptr_t)memory % align) % align;
+		char *aligned_memory = (char*)memory + align_bytes;
+		size_t aligned_size = allocated_size - align_bytes;
+		size_t free_space = aligned_size - sizeof(ufmalloc_node) * 2;
+
+		ufmalloc_node *header = (ufmalloc_node*)aligned_memory;
+		ufmalloc_node *block = header + 1;
+
+		ufmalloc_create(&ufmalloc_root, header, allocated_size, UFMALLOC_BLOCK);
+		header->next_free = memory;
+
+		ufmalloc_create(header, block, free_space, UFMALLOC_FREE);
+
+		if (free_space >= size) {
+			node = block;
+		} else {
+			return NULL;
+		}
 	}
 
-	size_t allocated_size = 0;
-	void *memory = ufbxc_os_allocate(2 * sizeof(ufmalloc_node) + size, &allocated_size);
-	if (!memory) return NULL;
+	if (node == NULL) return NULL;
 
-	// Can't do anything if the memory is too small
-	if (allocated_size <= 2 * sizeof(ufmalloc_node)) {
-		ufbxc_os_free(memory, allocated_size);
-		return NULL;
+	char *data = (char*)(node + 1);
+
+	size_t slack = node->size - size;
+	if (slack >= 2 * sizeof(ufmalloc_node)) {
+		ufmalloc_node *next = (ufmalloc_node*)(data + size);
+		ufmalloc_create(node, next, slack - sizeof(ufmalloc_node), UFMALLOC_FREE);
+		ufmalloc_link_free(next);
+		ufbxc_assert(size + next->size + sizeof(ufmalloc_node) == node->size);
+		node->size = size;
 	}
 
-	ufmalloc_node *header = (ufmalloc_node*)memory;
-	ufmalloc_node *block = header + 1;
-
-	size_t free_space = allocated_size - sizeof(ufmalloc_node) * 2;
-	ufmalloc_link(&ufmalloc_root, header, allocated_size, UFMALLOC_BLOCK);
-	ufmalloc_link(header, block, free_space, UFMALLOC_FREE);
-
-	ufmalloc_validate();
-
-	if (free_space >= size) {
-		return ufmalloc_alloc(size);
-	} else {
-		return NULL;
-	}
+	node->flags = UFMALLOC_USED;
+	return data;
 }
 
 static void ufmalloc_free(void *ptr)
@@ -501,29 +528,33 @@ static void ufmalloc_free(void *ptr)
 	ufbxc_assert(node->flags == UFMALLOC_USED);
 	node->flags = UFMALLOC_FREE;
 
-	serial++;
-
-	while (node->prev->flags == UFMALLOC_FREE) {
-		node = node->prev;
-		node->size += node->next->size + sizeof(ufmalloc_node);
-		ufmalloc_unlink(node->next);
+	while (node->prev_all->flags == UFMALLOC_FREE) {
+		node = node->prev_all;
+		node->size += node->next_all->size + sizeof(ufmalloc_node);
+		ufmalloc_unlink_free(node);
+		ufmalloc_unlink(node->next_all);
 	}
-	while (node->next && node->next->flags == UFMALLOC_FREE) {
-		node->size += node->next->size + sizeof(ufmalloc_node);
-		ufmalloc_unlink(node->next);
+	while (node->next_all && node->next_all->flags == UFMALLOC_FREE) {
+		node->size += node->next_all->size + sizeof(ufmalloc_node);
+		ufmalloc_unlink_free(node->next_all);
+		ufmalloc_unlink(node->next_all);
 	}
 
-	if (node->prev->flags == UFMALLOC_BLOCK && ufmalloc_block_end(node->next)) {
-		ufmalloc_node *header = node->prev;
+	if (node->prev_all->flags == UFMALLOC_BLOCK && ufmalloc_block_end(node->next_all)) {
+		ufmalloc_node *header = node->prev_all;
 		ufmalloc_unlink(header);
 		ufmalloc_unlink(node);
-		if (!ufbxc_os_free(header, header->size)) {
-			ufmalloc_link(&ufmalloc_root, header, header->size, header->flags);
-			ufmalloc_link(header, node, node->size, node->flags);
+		if (!ufbxc_os_free(header->next_free, header->size)) {
+			ufmalloc_link(&ufmalloc_root, header);
+			ufmalloc_link(header, node);
+		} else {
+			node = NULL;
 		}
 	}
 
-	ufmalloc_validate();
+	if (node) {
+		ufmalloc_link_free(node);
+	}
 }
 
 static size_t ufmalloc_size(void *ptr)
@@ -534,6 +565,229 @@ static size_t ufmalloc_size(void *ptr)
 }
 
 #endif
+
+// -- print
+
+typedef struct {
+	char *dst;
+	size_t length;
+	size_t pos;
+} print_buffer;
+
+// Flags
+#define PRINT_ALIGN_LEFT 0x1
+#define PRINT_PAD_ZERO 0x2
+#define PRINT_SIGN_PLUS 0x4
+#define PRINT_SIGN_SPACE 0x8
+#define PRINT_ALT 0x10
+#define PRINT_64BIT 0x20
+// Formatting flags
+#define PRINT_SIGNED 0x100
+#define PRINT_UPPERCASE 0x200
+// Type
+#define PRINT_INT 0x100
+#define PRINT_CHAR 0x200
+#define PRINT_STRING 0x400
+// Radix
+#define PRINT_RADIX_BIN 0x020000
+#define PRINT_RADIX_OCT 0x080000
+#define PRINT_RADIX_DEC 0x0a0000
+#define PRINT_RADIX_HEX 0x100000
+
+#define print_radix(flags) ((flags) >> 16)
+
+static void print_pad(print_buffer *buf, uint32_t flags, size_t count)
+{
+	char pad_char = (flags & (PRINT_ALIGN_LEFT|PRINT_PAD_ZERO)) == PRINT_PAD_ZERO ? '0' : ' ';
+	for (size_t i = 0; i < count; i++) {
+		if (buf->dst && buf->pos < buf->length) buf->dst[buf->pos] = pad_char;
+		buf->pos++;
+	}
+}
+
+static void print_append(print_buffer *buf, size_t min_width, size_t max_width, uint32_t flags, const char *str)
+{
+	size_t width = 0;
+	for (width = 0; width < max_width; width++) {
+		if (!str[width]) break;
+	}
+
+	size_t pad = min_width > width ? min_width - width : 0;
+	if (pad > 0 && (flags & PRINT_ALIGN_LEFT) == 0) {
+		print_pad(buf, flags, pad);
+	}
+
+	for (size_t i = 0; i < width; i++) {
+		if (buf->dst && buf->pos < buf->length) buf->dst[buf->pos] = str[i];
+		buf->pos++;
+	}
+
+	if (pad > 0 && (flags & PRINT_ALIGN_LEFT) != 0) {
+		print_pad(buf, flags, pad);
+	}
+}
+
+static uint32_t print_fmt_flags(const char **p_fmt)
+{
+	const char *fmt = *p_fmt;
+	uint32_t flags = 0;
+	for (;;) {
+		char c = *fmt;
+		switch (c) {
+		case '-': flags |= PRINT_ALIGN_LEFT; break;
+		case '+': flags |= PRINT_SIGN_PLUS; break;
+		case ' ': flags |= PRINT_SIGN_SPACE; break;
+		case '0': flags |= PRINT_PAD_ZERO; break;
+		case '#': flags |= PRINT_ALT; break;
+		default:
+			*p_fmt = fmt;
+			return flags;
+		}
+		fmt++;
+	}
+	*p_fmt = fmt;
+}
+
+static size_t print_fmt_count(const char **p_fmt, size_t def, int count_arg)
+{
+	const char *fmt = *p_fmt;
+	int count = -1;
+	if (*fmt >= '0' && *fmt <= '9') {
+		count = 0;
+		while (*fmt >= '0' && *fmt <= '9') {
+			count = count * 10 + (*fmt - '0');
+			fmt++;
+		}
+	} else if (*fmt == '*') {
+		fmt++;
+		count = count_arg;
+	}
+	*p_fmt = fmt;
+	return count >= 0 ? (size_t)count : def;
+}
+
+static uint32_t print_fmt_type(const char **p_fmt)
+{
+	const char *fmt = *p_fmt;
+	size_t size = sizeof(int);
+	switch (*fmt) {
+	case 'l':
+		size = sizeof(long);
+		if (*++fmt == 'l') {
+			size = sizeof(long long);
+			fmt++;
+		}
+		break;
+	case 'I':
+		fmt++;
+		size = sizeof(size_t);
+		if (fmt[1] == '3' && fmt[2] == '2') {
+			fmt += 2;
+			size = sizeof(uint32_t);
+		} else if (fmt[1] == '6' && fmt[2] == '4') {
+			fmt += 2;
+			size = sizeof(uint64_t);
+		}
+		break;
+	case 'h': fmt++; if (*fmt == 'h') fmt++; break;
+	case 'z': fmt++; size = sizeof(size_t); break;
+	case 'j': fmt++; size = sizeof(intmax_t); break;
+	case 't': fmt++; size = sizeof(ptrdiff_t); 
+	}
+
+	uint32_t flags = 0;
+	switch (*fmt++) {
+	case 'd': case 'i': flags = PRINT_INT | PRINT_SIGNED | PRINT_RADIX_DEC; break;
+	case 'u': flags = PRINT_INT | PRINT_RADIX_DEC; break;
+	case 'x': flags = PRINT_INT | PRINT_RADIX_HEX; break;
+	case 'X': flags = PRINT_INT | PRINT_UPPERCASE | PRINT_RADIX_HEX; break;
+	case 'o': flags = PRINT_INT | PRINT_RADIX_OCT; break;
+	case 'b': flags = PRINT_INT | PRINT_RADIX_BIN; break;
+	case 's': flags = PRINT_STRING; break;
+	case 'c': flags = PRINT_CHAR; break;
+	case 'p': flags = PRINT_INT | PRINT_RADIX_HEX; size = sizeof(void*); break;
+	}
+
+	if (size == 8) flags |= PRINT_64BIT;
+	*p_fmt = fmt;
+
+	return flags;
+}
+
+static char *print_format_int(char *buffer, uint32_t flags, uint64_t value)
+{
+	bool sign = false;
+	if (flags & PRINT_64BIT) {
+		if ((flags & PRINT_SIGNED) != 0 && (int64_t)value < 0) {
+			value = -(int64_t)value;
+			sign = true;
+		}
+	} else {
+		if ((flags & PRINT_SIGNED) != 0 && (int32_t)value < 0) {
+			value = -(int32_t)value;
+			sign = true;
+		}
+	}
+
+	const char *chars = (flags & PRINT_UPPERCASE) != 0 ? "0123456789ABCDEFX" : "0123456789abcdefx";
+	uint32_t radix = print_radix(flags);
+	*--buffer = '\0';
+	do {
+		uint64_t digit = (uint32_t)(value % radix);
+		value = value / radix;
+		*--buffer = chars[digit];
+	} while (value > 0);
+
+	if (radix == 16 && (flags & PRINT_ALT) != 0) {
+		*--buffer = chars[16];
+		*--buffer = '0';
+	}
+
+	if (sign) {
+		*--buffer = '-';
+	} else if (flags & (PRINT_SIGN_PLUS|PRINT_SIGN_SPACE)) {
+		*--buffer = (flags & PRINT_SIGN_PLUS) != 0 ? '+' : ' ';
+	}
+
+	return buffer;
+}
+
+static void vprint(print_buffer *buf, const char *fmt, va_list args)
+{
+	char buffer[96];
+	for (const char *p = fmt; *p;) {
+		if (*p == '%' && *++p != '%') {
+			uint32_t flags = print_fmt_flags(&p);
+			size_t min_width = print_fmt_count(&p, 0, *p == '*' ? va_arg(args, int) : -1);
+			size_t max_width = SIZE_MAX;
+			if (*p == '.') {
+				p++;
+				max_width = print_fmt_count(&p, max_width, *p == '*' ? va_arg(args, int) : -1);
+			}
+			flags |= print_fmt_type(&p);
+
+			if (flags & PRINT_STRING) {
+				const char *str = va_arg(args, const char*);
+				print_append(buf, min_width, max_width, flags, str);
+			} else if (flags & PRINT_INT) {
+				uint64_t value = (flags & PRINT_64BIT) != 0 ? va_arg(args, uint64_t) : va_arg(args, uint32_t);
+				char *str = print_format_int(buffer + sizeof(buffer), flags, value);
+				print_append(buf, min_width, max_width, flags, str);
+			} else if (flags & PRINT_CHAR) {
+				char ch = (char)va_arg(args, int);
+				print_append(buf, min_width, max_width, 0, &ch);
+			}
+		} else {
+			if (buf->dst && buf->pos < buf->length) buf->dst[buf->pos] = *p;
+			buf->pos++;
+			p++;
+		}
+	}
+	if (buf->length && buf->dst) {
+		size_t end = buf->pos <= buf->length - 1 ? buf->pos : buf->length - 1;
+		buf->dst[end] = '\0';
+	}
+}
 
 // -- utility
 
@@ -758,101 +1012,26 @@ void ufbxc_free(void *ptr)
 
 int ufbxc_vsnprintf(char *buffer, size_t count, const char *format, va_list args)
 {
-	if (count == 0) return 0;
-
-	char *dst = buffer, *cap = buffer + count - 1;
-	for (const char *p = format; *p; ) {
-		if (*p == '%') {
-			size_t max_len = SIZE_MAX;
-			if (!ufbxc_strncmp(p, "%s", 2)) {
-				p += 2;
-				const char *str = va_arg(args, const char*);
-				for (const char *s = str; *s; s++) {
-					*dst = *s;
-					if (dst < cap) dst++;
-				}
-			} else if (!ufbxc_strncmp(p, "%.*s", 4)) {
-				p += 4;
-				int len = va_arg(args, int);
-				const char *str = va_arg(args, const char*);
-				for (const char *s = str; *s; s++) {
-					if (len-- <= 0) break;
-					*dst = *s;
-					if (dst < cap) dst++;
-				}
-			} else if (!ufbxc_strncmp(p, "%u", 2)) {
-				p += 2;
-				unsigned value = va_arg(args, unsigned);
-				char buffer[sizeof(unsigned) * 8 / 2];
-				size_t len = 0;
-				do {
-					buffer[len] = (char)('0' + value % 10);
-					value /= 10;
-					len++;
-				} while (value != 0);
-				for (size_t i = 0; i < len; i++) {
-					*dst = buffer[len - i - 1];
-					if (dst < cap) dst++;
-				}
-			} else if (!ufbxc_strncmp(p, "%6u", 3)) {
-				p += 3;
-				unsigned value = va_arg(args, unsigned);
-				char buffer[sizeof(unsigned) * 8 / 2];
-				size_t len = 0;
-				do {
-					buffer[len] = (char)('0' + value % 10);
-					value /= 10;
-					len++;
-				} while (value != 0);
-				for (size_t i = len; i < 6; i++ ){
-					*dst = ' ';
-					if (dst < cap) dst++;
-				}
-				for (size_t i = 0; i < len; i++) {
-					*dst = buffer[len - i - 1];
-					if (dst < cap) dst++;
-				}
-			} else if (!ufbxc_strncmp(p, "%zu", 2)) {
-				p += 3;
-				size_t value = va_arg(args, size_t);
-				char buffer[sizeof(size_t) * 8 / 2];
-				size_t len = 0;
-				do {
-					buffer[len] = (char)('0' + value % 10);
-					value /= 10;
-					len++;
-				} while (value != 0);
-				for (size_t i = 0; i < len; i++) {
-					*dst = buffer[len - i - 1];
-					if (dst < cap) dst++;
-				}
-			} else {
-				ufbxc_assert(0 && "Bad format specifier");
-				return -1;
-			}
-		} else {
-			*dst = *p++;
-			if (dst < cap) dst++;
-		}
-	}
-
-	*dst = '\0';
-	return (int)(dst - buffer);
+	print_buffer buf = { buffer, count };
+	vprint(&buf, format, args);
+	return (int)buf.pos;
 }
 
 #if defined(UFBXC_HAS_STDIO)
 
-void *ufbxc_os_read_file(size_t index, const char *filename, size_t *p_size);
-void ufbxc_os_free_file(size_t index, void *data);
+bool ufbxc_os_open_file(size_t index, const char *filename, size_t *p_file_size);
+size_t ufbxc_os_read_file(size_t index, void *dst, size_t offset, size_t count);
+void ufbxc_os_close_file(size_t index);
 
 struct ufbxc_file {
-	size_t used;
+	bool used;
+	bool read;
+	bool error;
 	size_t position;
 	size_t size;
-	void *data;
 };
 
-#define UFBXC_MAX_FILES 128
+#define UFBXC_MAX_FILES 256
 static ufbxc_file ufbxc_files[UFBXC_MAX_FILES];
 
 FILE *ufbxc_fopen(const char *filename, const char *mode)
@@ -860,14 +1039,12 @@ FILE *ufbxc_fopen(const char *filename, const char *mode)
 	for (uint32_t i = 0; i < UFBXC_MAX_FILES; i++) {
 		ufbxc_file *file = &ufbxc_files[i];
 		if (!file->used) {
-			size_t size = 0;
-			void *data = ufbxc_os_read_file(i, filename, &size);
-			if (!data) return NULL;
+			size_t file_size = SIZE_MAX;
+			bool ok = ufbxc_os_open_file(i, filename, &file_size);
+			if (!ok) return NULL;
 
-			file->position = 0;
-			file->data = data;
-			file->size = size;
-			file->used = 1;
+			file->size = file_size;
+			file->used = true;
 			return file;
 		}
 	}
@@ -878,16 +1055,24 @@ FILE *ufbxc_fopen(const char *filename, const char *mode)
 size_t ufbxc_fread(void *buffer, size_t size, size_t count, FILE *f)
 {
 	ufbxc_assert(f && f->used);
+	if (f->error) return 0;
 
+	f->read = true;
 	size_t to_read = size * count;
 	size_t left = f->size - f->position;
 	if (to_read > left) {
 		to_read = left;
 	}
 
-	ufbxc_memcpy(buffer, (const char*)f->data + f->position, to_read);
-	f->position += to_read;
-	return to_read / size;
+	size_t index = f - ufbxc_files;
+	size_t num_read = ufbxc_os_read_file(index, buffer, f->position, to_read);
+	if (num_read == SIZE_MAX) {
+		f->error = true;
+		num_read = 0;
+	}
+
+	f->position += num_read;
+	return num_read / size;
 }
 
 void ufbxc_fclose(FILE *f)
@@ -896,7 +1081,7 @@ void ufbxc_fclose(FILE *f)
 	size_t index = f - ufbxc_files;
 	ufbxc_assert(index < UFBXC_MAX_FILES);
 	ufbxc_assert(f->used);
-	ufbxc_os_free_file(index, f->data);
+	ufbxc_os_close_file(index);
 	ufbxc_memset(f, 0, sizeof(ufbxc_file));
 }
 
@@ -915,9 +1100,12 @@ int ufbxc_ferror(FILE *f)
 int ufbxc_fseek(FILE *f, long offset, int origin)
 {
 	ufbxc_assert(f && f->used);
+	if (f->size == SIZE_MAX) return 1;
 	if (origin == SEEK_END) {
+		ufbxc_assert(!f->read);
 		f->position = ufbxci_clamp_pos(f->size, (long)f->size + offset);
 	} else if (origin == SEEK_CUR) {
+		ufbxc_assert(offset >= 0);
 		f->position = ufbxci_clamp_pos(f->size, (long)f->position + offset);
 	} else {
 		ufbxc_assert(0 && "Bad seek mode");
@@ -929,6 +1117,7 @@ int ufbxc_fseek(FILE *f, long offset, int origin)
 int ufbxc_fgetpos(FILE *f, fpos_t *pos)
 {
 	ufbxc_assert(f && f->used);
+	ufbxc_assert(!f->read);
 	*pos = (int64_t)f->position;
 	return 0;
 }
@@ -936,6 +1125,8 @@ int ufbxc_fgetpos(FILE *f, fpos_t *pos)
 int ufbxc_fsetpos(FILE *f, const fpos_t *pos)
 {
 	ufbxc_assert(f && f->used);
+	ufbxc_assert(!f->read);
+	if (f->size == SIZE_MAX) return 1;
 	f->position = (size_t)*pos;
 	return 0;
 }
@@ -943,6 +1134,7 @@ int ufbxc_fsetpos(FILE *f, const fpos_t *pos)
 void ufbxc_rewind(FILE *f)
 {
 	ufbxc_assert(f && f->used);
+	ufbxc_assert(!f->read);
 	f->position = 0;
 }
 

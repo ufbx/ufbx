@@ -36,61 +36,59 @@ bool ufbxc_os_free(void *pointer, size_t allocated_size)
 
 #if defined(UFBXC_HAS_STDIO)
 
-#define MAX_OPEN_FILES 128
+#define MAX_OPEN_FILES 256
 
 typedef struct {
 	HANDLE file;
-	HANDLE mapping;
-	void *pointer;
+	size_t prev_end;
 } win32_file;
 
 static win32_file files[MAX_OPEN_FILES];
 
 #define MAX_FILENAME_WCHAR 1024
 
-void *ufbxc_os_read_file(size_t index, const char *filename, size_t *p_size)
+bool ufbxc_os_open_file(size_t index, const char *filename, size_t *p_file_size)
 {
-	if (index >= MAX_OPEN_FILES) return NULL;
+	if (index >= MAX_OPEN_FILES) return false;
 
 	WCHAR filename_wide[MAX_FILENAME_WCHAR + 1] = { 0 };
 	MultiByteToWideChar(CP_UTF8, 0, filename, -1, filename_wide, MAX_FILENAME_WCHAR);
 
 	HANDLE file = CreateFileW(filename_wide, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (file == NULL || file == INVALID_HANDLE_VALUE) return NULL;
+	if (file == NULL || file == INVALID_HANDLE_VALUE) return false;
+
+	win32_file *f = &files[index];
+	f->file = file;
 
 	DWORD size_hi = 0;
 	DWORD size_lo = GetFileSize(file, &size_hi);
 
-	HANDLE mapping = CreateFileMappingW(file, NULL, PAGE_READONLY, size_hi, size_lo, NULL);
-	if (mapping == NULL || mapping ==  INVALID_HANDLE_VALUE) {
-		CloseHandle(file);
-		return NULL;
-	}
-
-	size_t size = (size_t)((uint64_t)size_hi << 32u | size_lo);
-	void *pointer = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, size);
-	if (!pointer) {
-		CloseHandle(file);
-		CloseHandle(mapping);
-		return NULL;
-	}
-
-	win32_file *f = &files[index];
-	ZeroMemory(f, sizeof(win32_file));
-
-	f->file = file;
-	f->mapping = mapping;
-	f->pointer = pointer;
-
-	*p_size = size;
-	return pointer;
+	*p_file_size = (size_t)((uint64_t)size_hi << 32u | size_lo);
+	return true;
 }
 
-void ufbxc_os_free_file(size_t index, void *data)
+size_t ufbxc_os_read_file(size_t index, void *dst, size_t offset, size_t count)
 {
 	win32_file *f = &files[index];
-	UnmapViewOfFile(f->pointer);
-	CloseHandle(f->mapping);
+
+	size_t skip = offset - f->prev_end;
+	if (skip > 0) {
+		LARGE_INTEGER move;
+		move.QuadPart = (LONGLONG)skip;
+		if (!SetFilePointerEx(f->file, move, NULL, FILE_CURRENT)) return SIZE_MAX;
+	}
+
+	DWORD read_count;
+	if (!ReadFile(f->file, dst, (DWORD)count, &read_count, NULL)) return SIZE_MAX;
+
+	f->prev_end = offset + read_count;
+
+	return read_count;
+}
+
+void ufbxc_os_close_file(size_t index)
+{
+	win32_file *f = &files[index];
 	CloseHandle(f->file);
 	ZeroMemory(f, sizeof(win32_file));
 }

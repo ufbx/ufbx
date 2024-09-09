@@ -29,11 +29,21 @@
 #endif
 
 #if defined(UFBXC_HAS_STDIO)
-	// Read and return file contents.
-	void *ufbxc_os_read_file(size_t index, const char *filename, size_t *p_size);
+	// Open a file for reading.
+	// You may optionally specify the file size `p_file_size` which changes the read behavior.
+	bool ufbxc_os_open_file(size_t index, const char *filename, size_t *p_file_size);
+
+	// Read `count` bytes from the file into `dst`.
+	// Offset is guaranteed to be always past the previous read end position.
+	//
+	// `p_file_size` specified: `offset + count` is guaranteed to be in bounds of the reported file size.
+	//
+	// `p_file_size` not specified: If you do not specify `p_file_size` in `ufbxc_os_open_file()`,
+	//  this is guaranteed to be called with sequential offsets with no gaps.
+	size_t ufbxc_os_read_file(size_t index, void *dst, size_t offset, size_t count);
 
 	// Free previously read file.
-	void ufbxc_os_free_file(size_t index, void *data);
+	void ufbxc_os_close_file(size_t index);
 #endif
 
 #if defined(UFBXC_HAS_STDERR)
