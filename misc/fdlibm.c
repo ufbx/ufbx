@@ -1932,7 +1932,7 @@ double fdlibm_rint(double x)
 		if(((i0&0x7fffffff)|i1)==0) return x;
 		i1 |= (i0&0x0fffff);
 		i0 &= 0xfffe0000;
-		i0 |= ((i1|-i1)>>12)&0x80000;
+		i0 |= ((i1|(unsigned)-(int)i1)>>12)&0x80000;
 		__HI(x)=i0;
 			w = TWO52[sx]+x;
 			t =  w-TWO52[sx];
