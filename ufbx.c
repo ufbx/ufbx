@@ -21,6 +21,9 @@
 //   UFBX_LITTLE_ENDIAN=0/1    Explicitly define little/big endian architecture
 //   UFBX_PATH_SEPARATOR=''    Specify default platform path separator
 //   UFBX_NO_STDIO             Disable stdio FILE API
+//   UFBX_NO_STDERR            Disable printing errors to stderr
+//   UFBX_NO_MALLOC            Disable default malloc/realloc/free
+//   UFBX_NO_SSE               Do not try to include SSE
 
 // Mostly internal for debugging:
 //   UFBX_STATIC_ANALYSIS      Enable static analysis augmentation
@@ -176,15 +179,18 @@
 
 // -- Headers
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <locale.h>
-#include <float.h>
+#if !defined(UFBX_NO_LIBC)
+	#include <string.h>
+	#include <stdlib.h>
+	#include <stdio.h>
+	#include <stdarg.h>
+	#include <float.h>
+#endif
 
 #if !defined(UFBX_NO_MATH_H)
-	#include <math.h>
+	#if !defined(UFBX_NO_LIBC)
+		#include <math.h>
+	#endif
 	#define UFBX_INFINITY INFINITY
 	#define UFBX_NAN NAN
 #endif
@@ -249,6 +255,21 @@
 	#else
 		#define UFBX_FLT_EPSILON 1.192092896e-07f
 	#endif
+#endif
+
+#if defined(ufbx_malloc) || defined(ufbx_realloc) || defined(ufbx_free)
+	// User provided allocators
+	#if !defined(ufbx_malloc) || !defined(ufbx_realloc) || !defined(ufbx_free)
+		#error Inconsistent custom global allocator
+	#endif
+#elif !defined(UFBX_NO_MALLOC)
+	#define ufbx_malloc(size) malloc((size))
+	#define ufbx_realloc(ptr, old_size, new_size) realloc((ptr), (new_size))
+	#define ufbx_free(ptr, old_size) free((ptr))
+#else
+	#define ufbx_malloc(size) ((void)(size), (void*)NULL)
+	#define ufbx_realloc(ptr, old_size, new_size) ((void)(ptr), (void)(old_size), (void)(new_size), (void*)NULL)
+	#define ufbx_free(ptr, old_size) ((void)(ptr), (void*)(old_size))
 #endif
 
 // -- Platform
@@ -442,7 +463,7 @@
 	#endif
 #endif
 
-#if !defined(UFBX_STANDARD_C) && defined(_POSIX_C_SOURCE)
+#if !defined(UFBX_STANDARD_C) && defined(_POSIX_C_SOURCE) && !defined(UFBX_NO_LIBC)
 	#if _POSIX_C_SOURCE >= 200112l
 		#ifndef UFBX_HAS_FTELLO
 			#define UFBX_HAS_FTELLO
@@ -450,7 +471,7 @@
 	#endif
 #endif
 
-#if !defined(UFBX_STANDARD_C) && (defined(_MSC_VER) && defined(_M_X64) && !defined(_M_ARM64EC)) || ((defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)) || defined(UFBX_USE_SSE)
+#if !defined(UFBX_STANDARD_C) && !defined(UFBX_NO_SSE) && (defined(_MSC_VER) && defined(_M_X64) && !defined(_M_ARM64EC)) || ((defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)) || defined(UFBX_USE_SSE)
 	#define UFBXI_HAS_SSE 1
 	#include <xmmintrin.h>
 	#include <emmintrin.h>
@@ -828,6 +849,17 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 #else
 	#define ufbxi_recursive_function(m_ret, m_name, m_args, m_max_depth, m_params)
 	#define ufbxi_recursive_function_void(m_name, m_args, m_max_depth, m_params)
+#endif
+
+#if !defined(ufbx_panic_handler)
+	static void ufbxi_panic_handler(const char *message)
+	{
+		#if !defined(UFBX_NO_STDIO) && !defined(UFBX_NO_STDERR)
+			fprintf(stderr, "ufbx panic: %s\n", message);
+		#endif
+		ufbx_assert(false && "ufbx panic: See stderr for more information");
+	}
+	#define ufbx_panic_handler ufbxi_panic_handler
 #endif
 
 // -- Utility
@@ -2896,18 +2928,13 @@ static ufbxi_noinline void ufbxi_panicf_imp(ufbx_panic *panic, const char *fmt, 
 	if (panic) {
 		panic->did_panic = true;
 		panic->message_length = (size_t)ufbxi_vsnprintf(panic->message, sizeof(panic->message), fmt, args);
+		va_end(args);
 	} else {
-#if !defined(UFBX_NO_STDIO)
-		fprintf(stderr, "ufbx panic: ");
-		vfprintf(stderr, fmt, args);
-		fprintf(stderr, "\n");
-#endif
-	}
+		char message[UFBX_PANIC_MESSAGE_LENGTH];
+		ufbxi_vsnprintf(message, sizeof(message), fmt, args);
+		va_end(args);
 
-	va_end(args);
-
-	if (!panic) {
-		ufbx_assert(false && "ufbx panic: See stderr for more information");
+		ufbx_panic_handler(message);
 	}
 }
 
@@ -3178,7 +3205,7 @@ static ufbxi_noinline void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size,
 	} else if (ator->ator.allocator.realloc_fn) {
 		ptr = ator->ator.allocator.realloc_fn(ator->ator.allocator.user, NULL, 0, total);
 	} else {
-		ptr = malloc(total);
+		ptr = ufbx_malloc(total);
 	}
 
 	if (!ptr) {
@@ -3225,7 +3252,7 @@ static ufbxi_noinline void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t siz
 			ator->ator.allocator.free_fn(ator->ator.allocator.user, old_ptr, old_total);
 		}
 	} else {
-		ptr = realloc(old_ptr, total);
+		ptr = ufbx_realloc(old_ptr, old_total, total);
 	}
 
 	ufbxi_check_return_err_msg(ator->error, ptr, NULL, "Out of memory");
@@ -3259,7 +3286,7 @@ static ufbxi_noinline void ufbxi_free_size(ufbxi_allocator *ator, size_t size, v
 			ator->ator.allocator.realloc_fn(ator->ator.allocator.user, ptr, total, 0);
 		}
 	} else {
-		free(ptr);
+		ufbx_free(ptr, total);
 	}
 }
 
@@ -3898,7 +3925,7 @@ static ufbxi_noinline void ufbxi_map_init(ufbxi_map *map, ufbxi_allocator *ator,
 	// allocation counts. We can work around this using a local allocator that doesn't
 	// count the allocations.
 	{
-		ufbxi_allocator *regression_ator = (ufbxi_allocator*)malloc(sizeof(ufbxi_allocator));
+		ufbxi_allocator *regression_ator = (ufbxi_allocator*)ufbx_malloc(sizeof(ufbxi_allocator));
 		ufbx_assert(regression_ator);
 		memset(regression_ator, 0, sizeof(ufbxi_allocator));
 		regression_ator->name = "regression";
@@ -3932,7 +3959,7 @@ static ufbxi_noinline void ufbxi_map_free(ufbxi_map *map)
 #if defined(UFBX_REGRESSION)
 	if (regression_ator) {
 		ufbxi_free_ator(regression_ator);
-		free(regression_ator);
+		ufbx_free(regression_ator);
 	}
 #endif
 }
@@ -6383,7 +6410,7 @@ static ufbxi_noinline void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *a
 
 static ufbxi_noinline FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp_ator)
 {
-#if !defined(UFBX_STANDARD_C) && defined(_WIN32)
+#if !defined(UFBX_STANDARD_C) && defined(_WIN32) && !defined(UFBX_NO_LIBC)
 	wchar_t wpath_buf[256];
 	wchar_t *wpath = NULL;
 
@@ -6471,10 +6498,10 @@ static ufbxi_noinline FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi
 
 static uint64_t ufbxi_ftell(FILE *file)
 {
-#if !defined(UFBX_STANDARD_C) && defined(UFBX_HAS_FTELLO)
+#if !defined(UFBX_STANDARD_C) && defined(UFBX_HAS_FTELLO) && !defined(UFBX_NO_LIBC)
 	off_t result = ftello(file);
 	if (result >= 0) return (uint64_t)result;
-#elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
+#elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER) && !defined(UFBX_NO_LIBC)
 	int64_t result = _ftelli64(file);
 	if (result >= 0) return (uint64_t)result;
 #else
@@ -31275,7 +31302,7 @@ ufbx_abi void ufbx_catch_compute_topology(ufbx_panic *panic, const ufbx_mesh *me
 ufbx_abi uint32_t ufbx_catch_topo_next_vertex_edge(ufbx_panic *panic, const ufbx_topo_edge *topo, size_t num_topo, uint32_t index)
 {
 	if (index == UFBX_NO_INDEX) return UFBX_NO_INDEX;
-	if (ufbxi_panicf(panic, (size_t)index < num_topo, "index (%d) out of bounds (%zu)", index, num_topo)) return UFBX_NO_INDEX;
+	if (ufbxi_panicf(panic, (size_t)index < num_topo, "index (%u) out of bounds (%zu)", index, num_topo)) return UFBX_NO_INDEX;
 	uint32_t twin = topo[index].twin;
 	if (twin == UFBX_NO_INDEX) return UFBX_NO_INDEX;
 	if (ufbxi_panicf(panic, (size_t)twin < num_topo, "Corrupted topology structure")) return UFBX_NO_INDEX;
@@ -31285,7 +31312,7 @@ ufbx_abi uint32_t ufbx_catch_topo_next_vertex_edge(ufbx_panic *panic, const ufbx
 ufbx_abi uint32_t ufbx_catch_topo_prev_vertex_edge(ufbx_panic *panic, const ufbx_topo_edge *topo, size_t num_topo, uint32_t index)
 {
 	if (index == UFBX_NO_INDEX) return UFBX_NO_INDEX;
-	if (ufbxi_panicf(panic, (size_t)index < num_topo, "index (%d) out of bounds (%zu)", index, num_topo)) return UFBX_NO_INDEX;
+	if (ufbxi_panicf(panic, (size_t)index < num_topo, "index (%u) out of bounds (%zu)", index, num_topo)) return UFBX_NO_INDEX;
 	return topo[topo[index].prev].twin;
 }
 
@@ -31385,7 +31412,7 @@ ufbx_abi void ufbx_catch_compute_normals(ufbx_panic *panic, const ufbx_mesh *mes
 		for (size_t ix = 0; ix < face.num_indices; ix++) {
 			uint32_t index = normal_indices[face.index_begin + ix];
 
-			if (ufbxi_panicf(panic, index < num_normals, "Normal index (%d) out of bounds (%zu) at %zu", index, num_normals, ix)) return;
+			if (ufbxi_panicf(panic, index < num_normals, "Normal index (%u) out of bounds (%zu) at %zu", index, num_normals, ix)) return;
 
 			ufbx_vec3 *n = &normals[index];
 			*n = ufbxi_add3(*n, normal);

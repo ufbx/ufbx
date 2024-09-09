@@ -3,20 +3,29 @@
 
 #include "testing_basics.h"
 
-#include <stdio.h>
-#include <assert.h>
+#if !defined(UFBX_NO_LIBC)
+	#include <stdio.h>
+	#include <string.h>
+	#include <assert.h>
+	#define ufbxh_assert(cond) assert(cond)
+	#define ufbxh_FILE FILE
+	#define ufbxh_fprintf fprintf
+	#define ufbxh_snprintf snprintf
+	#define ufbxh_fflush fflush
+	#define ufbxh_fopen fopen
+#endif
 
 typedef struct ufbxt_hash {
 	uint64_t state;
 	bool dumping;
-	FILE *dump_file;
+	ufbxh_FILE *dump_file;
 	size_t indent;
 	bool at_tag;
 	bool at_value;
 	bool big_endian;
 } ufbxt_hash;
 
-ufbxt_noinline static void ufbxt_hash_init(ufbxt_hash *h, FILE *dump_file)
+ufbxt_noinline static void ufbxt_hash_init(ufbxt_hash *h, ufbxh_FILE *dump_file)
 {
 	memset(h, 0, sizeof(ufbxt_hash));
 	h->state = UINT64_C(0xcbf29ce484222325);
@@ -36,7 +45,7 @@ ufbxt_noinline static void ufbxt_hash_init(ufbxt_hash *h, FILE *dump_file)
 ufbxt_noinline static uint64_t ufbxt_hash_finish(ufbxt_hash *h)
 {
 	if (h->dump_file) {
-		fflush(h->dump_file);
+		ufbxh_fflush(h->dump_file);
 	}
 	return h->state;
 }
@@ -54,13 +63,13 @@ ufbxt_noinline static void ufbxt_push_tag(ufbxt_hash *h, const char *tag)
 	}
 
 	if (h->at_tag) {
-		fprintf(h->dump_file, "{\n");
+		ufbxh_fprintf(h->dump_file, "{\n");
 		h->indent += 1;
 	}
 	for (size_t i = 0; i < h->indent; i++) {
-		fprintf(h->dump_file, "  ");
+		ufbxh_fprintf(h->dump_file, "  ");
 	}
-	fprintf(h->dump_file, "%s: ", tag);
+	ufbxh_fprintf(h->dump_file, "%s: ", tag);
 	h->at_tag = true;
 }
 
@@ -68,7 +77,7 @@ ufbxt_noinline static void ufbxt_push_tag_index(ufbxt_hash *h, size_t index)
 {
 	if (!h->dumping) return;
 	char buf[128];
-	snprintf(buf, sizeof(buf), "[%zu]", index);
+	ufbxh_snprintf(buf, sizeof(buf), "[%zu]", index);
 	ufbxt_push_tag(h, buf);
 }
 
@@ -76,21 +85,21 @@ ufbxt_noinline static void ufbxt_pop_tag(ufbxt_hash *h)
 {
 	if (!h->dumping) return;
 	if (h->at_value || h->at_tag) {
-		fprintf(h->dump_file, "\n");
+		ufbxh_fprintf(h->dump_file, "\n");
 		h->at_value = false;
 		h->at_tag = false;
 	} else {
 		h->indent -= 1;
 		for (size_t i = 0; i < h->indent; i++) {
-			fprintf(h->dump_file, "  ");
+			ufbxh_fprintf(h->dump_file, "  ");
 		}
-		fprintf(h->dump_file, "}\n");
+		ufbxh_fprintf(h->dump_file, "}\n");
 	}
 }
 
 ufbxt_noinline static void ufbxt_dump_data(ufbxt_hash *h, const void *data, size_t size, bool reverse)
 {
-	assert(h->at_tag && !h->at_value);
+	ufbxh_assert(h->at_tag && !h->at_value);
 	h->at_tag = false;
 	h->at_value = true;
 
@@ -98,12 +107,12 @@ ufbxt_noinline static void ufbxt_dump_data(ufbxt_hash *h, const void *data, size
 	if (reverse) {
 		for (size_t i = size; i > 0; i--) {
 			uint32_t b = (uint32_t)(uint8_t)d[i - 1];
-			fprintf(h->dump_file, "%02x", b);
+			ufbxh_fprintf(h->dump_file, "%02x", b);
 		}
 	} else {
 		for (size_t i = 0; i < size; i++) {
 			uint32_t b = (uint32_t)(uint8_t)d[i];
-			fprintf(h->dump_file, "%02x", b);
+			ufbxh_fprintf(h->dump_file, "%02x", b);
 		}
 	}
 }
@@ -125,7 +134,7 @@ ufbxt_noinline static void ufbxt_hash_data(ufbxt_hash *h, const void *data, size
 ufbxt_noinline static void ufbxt_hash_endian_data(ufbxt_hash *h, const void *data, size_t size)
 {
 	bool reverse = !h->big_endian;
-	assert(size == 1 || size == 2 || size == 4 || size == 8);
+	ufbxh_assert(size == 1 || size == 2 || size == 4 || size == 8);
 
 	const char *d = (const char*)data;
 	uint64_t state = h->state;
@@ -1343,7 +1352,7 @@ ufbxt_noinline static void ufbxt_hash_scene_imp(ufbxt_hash *h, const ufbx_scene 
 	if (v->dom_root) ufbxt_hash_dom_node(h, v->dom_root);
 }
 
-ufbxt_noinline static uint64_t ufbxt_hash_scene(const ufbx_scene *v, FILE *dump_file)
+ufbxt_noinline static uint64_t ufbxt_hash_scene(const ufbx_scene *v, ufbxh_FILE *dump_file)
 {
 	ufbxt_hash h;
 	ufbxt_hash_init(&h, dump_file);

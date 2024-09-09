@@ -9,9 +9,11 @@
 
 // -- Headers
 
-#include <stdint.h>
-#include <stddef.h>
-#include <stdbool.h>
+#if !defined(UFBX_NO_LIBC_TYPES)
+	#include <stdint.h>
+	#include <stddef.h>
+	#include <stdbool.h>
+#endif
 
 // -- Platform
 
@@ -98,7 +100,7 @@
 // make sure that it is also used within `ufbx.c`.
 // Defining `UFBX_NO_ASSERT` to any value disables assertions.
 #ifndef ufbx_assert
-	#if defined(UFBX_NO_ASSERT)
+	#if defined(UFBX_NO_ASSERT) || defined(UFBX_NO_LIBC)
 		#define ufbx_assert(cond) (void)0
 	#else
 		#include <assert.h>
