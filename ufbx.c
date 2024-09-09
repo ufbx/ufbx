@@ -2924,13 +2924,14 @@ static ufbxi_noinline void ufbxi_panicf_imp(ufbx_panic *panic, const char *fmt, 
 	if (panic && panic->did_panic) return;
 
 	va_list args; // ufbxi_uninit
-	va_start(args, fmt);
 
 	if (panic) {
+		va_start(args, fmt);
 		panic->did_panic = true;
 		panic->message_length = (size_t)ufbxi_vsnprintf(panic->message, sizeof(panic->message), fmt, args);
 		va_end(args);
 	} else {
+		va_start(args, fmt);
 		char message[UFBX_PANIC_MESSAGE_LENGTH];
 		ufbxi_vsnprintf(message, sizeof(message), fmt, args);
 		va_end(args);
