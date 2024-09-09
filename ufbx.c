@@ -272,6 +272,18 @@
 	#define ufbx_free(ptr, old_size) ((void)(ptr), (void*)(old_size))
 #endif
 
+#if !defined(ufbx_panic_handler)
+	static void ufbxi_panic_handler(const char *message)
+	{
+		(void)message;
+		#if !defined(UFBX_NO_STDIO) && !defined(UFBX_NO_STDERR)
+			fprintf(stderr, "ufbx panic: %s\n", message);
+		#endif
+		ufbx_assert(false && "ufbx panic: See stderr for more information");
+	}
+	#define ufbx_panic_handler ufbxi_panic_handler
+#endif
+
 // -- Platform
 
 #if defined(_MSC_VER)
@@ -849,17 +861,6 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 #else
 	#define ufbxi_recursive_function(m_ret, m_name, m_args, m_max_depth, m_params)
 	#define ufbxi_recursive_function_void(m_name, m_args, m_max_depth, m_params)
-#endif
-
-#if !defined(ufbx_panic_handler)
-	static void ufbxi_panic_handler(const char *message)
-	{
-		#if !defined(UFBX_NO_STDIO) && !defined(UFBX_NO_STDERR)
-			fprintf(stderr, "ufbx panic: %s\n", message);
-		#endif
-		ufbx_assert(false && "ufbx panic: See stderr for more information");
-	}
-	#define ufbx_panic_handler ufbxi_panic_handler
 #endif
 
 // -- Utility
