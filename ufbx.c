@@ -24,6 +24,9 @@
 //   UFBX_NO_STDERR            Disable printing errors to stderr
 //   UFBX_NO_MALLOC            Disable default malloc/realloc/free
 //   UFBX_NO_SSE               Do not try to include SSE
+//   UFBX_NO_LIBC              Do not include libc
+//   UFBX_MATH_PREFIX=''       Prefix for <math.h> functions used
+//   UFBX_STRING_PREFIX=''     Prefix for <string.h> functions used
 
 // Mostly internal for debugging:
 //   UFBX_STATIC_ANALYSIS      Enable static analysis augmentation
@@ -191,17 +194,21 @@
 	#if !defined(UFBX_NO_LIBC)
 		#include <math.h>
 	#endif
-	#define UFBX_INFINITY INFINITY
-	#define UFBX_NAN NAN
+	#ifndef UFBX_INFINITY
+		#define UFBX_INFINITY INFINITY
+	#endif
+	#ifndef UFBX_NAN
+		#define UFBX_NAN NAN
+	#endif
 #endif
 
 #if !defined(UFBX_MATH_PREFIX)
 	#define UFBX_MATH_PREFIX
 #endif
 
-#define ufbxi_math_cat2(a, b) a##b
-#define ufbxi_math_cat(a, b) ufbxi_math_cat2(a, b)
-#define ufbxi_math_fn(name) ufbxi_math_cat(UFBX_MATH_PREFIX, name)
+#define ufbxi_pre_cat2(a, b) a##b
+#define ufbxi_pre_cat(a, b) ufbxi_pre_cat2(a, b)
+#define ufbxi_math_fn(name) ufbxi_pre_cat(UFBX_MATH_PREFIX, name)
 
 #if !defined(UFBX_NO_MATH_DEFINES)
 	#define ufbx_sqrt ufbxi_math_fn(sqrt)
@@ -221,6 +228,34 @@
 	#define ufbx_rint ufbxi_math_fn(rint)
 	#define ufbx_ceil ufbxi_math_fn(ceil)
 	#define ufbx_isnan ufbxi_math_fn(isnan)
+#endif
+
+#if !defined(UFBX_NO_LIBC)
+	// <stdlib.h>
+	#define ufbxc_strtof strtof 
+	#define ufbxc_strtod strtod 
+	#define ufbxc_strtoul strtoul 
+	#define ufbxc_qsort qsort 
+	#define ufbxc_malloc malloc
+	#define ufbxc_realloc realloc
+	#define ufbxc_free free
+	// <stdio.h>
+	#define ufbxc_FILE FILE
+	#define ufbxc_fpos fpos_t
+	#define ufbxc_SEEK_CUR SEEK_CUR
+	#define ufbxc_SEEK_END SEEK_END
+	#define ufbxc_stderr stderr 
+	#define ufbxc_vsnprintf vsnprintf 
+	#define ufbxc_fopen fopen 
+	#define ufbxc_fread fread 
+	#define ufbxc_fclose fclose 
+	#define ufbxc_ftell ftell 
+	#define ufbxc_ferror ferror 
+	#define ufbxc_fseek fseek 
+	#define ufbxc_fgetpos fgetpos 
+	#define ufbxc_fsetpos fsetpos 
+	#define ufbxc_rewind rewind 
+	#define ufbxc_fprintf fprintf 
 #endif
 
 #if defined(UFBX_NO_MATH_H) && !defined(UFBX_NO_MATH_DECLARATIONS)
@@ -263,9 +298,9 @@
 		#error Inconsistent custom global allocator
 	#endif
 #elif !defined(UFBX_NO_MALLOC)
-	#define ufbx_malloc(size) malloc((size))
-	#define ufbx_realloc(ptr, old_size, new_size) realloc((ptr), (new_size))
-	#define ufbx_free(ptr, old_size) free((ptr))
+	#define ufbx_malloc(size) ufbxc_malloc((size))
+	#define ufbx_realloc(ptr, old_size, new_size) ufbxc_realloc((ptr), (new_size))
+	#define ufbx_free(ptr, old_size) ufbxc_free((ptr))
 #else
 	#define ufbx_malloc(size) ((void)(size), (void*)NULL)
 	#define ufbx_realloc(ptr, old_size, new_size) ((void)(ptr), (void)(old_size), (void)(new_size), (void*)NULL)
@@ -277,7 +312,7 @@
 	{
 		(void)message;
 		#if !defined(UFBX_NO_STDIO) && !defined(UFBX_NO_STDERR)
-			fprintf(stderr, "ufbx panic: %s\n", message);
+			ufbxc_fprintf(ufbxc_stderr, "ufbx panic: %s\n", message);
 		#endif
 		ufbx_assert(false && "ufbx panic: See stderr for more information");
 	}
@@ -491,6 +526,109 @@
 	#define UFBXI_HAS_SSE 0
 #endif
 
+// -- Atomic counter
+
+#define UFBXI_THREAD_SAFE 1
+
+#if defined(__cplusplus)
+	#define ufbxi_extern_c extern "C"
+#else
+	#define ufbxi_extern_c
+#endif
+
+#if !defined(UFBX_STANDARD_C) && (defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER))
+	typedef size_t ufbxi_atomic_counter;
+	#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+	#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
+	#define ufbxi_atomic_counter_inc(ptr) __sync_fetch_and_add((ptr), 1)
+	#define ufbxi_atomic_counter_dec(ptr) __sync_fetch_and_sub((ptr), 1)
+	#define ufbxi_atomic_counter_load(ptr) __sync_fetch_and_add((ptr), 0) // TODO: Proper atomic load
+#elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
+	#if defined(_M_X64) || defined(_M_ARM64)
+		ufbxi_extern_c __int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
+		ufbxi_extern_c __int64 _InterlockedDecrement64(__int64 volatile * lpAddend);
+		ufbxi_extern_c __int64 _InterlockedExchangeAdd64(__int64 volatile * lpAddend, __int64 Value);
+		typedef volatile __int64 ufbxi_atomic_counter;
+		#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+		#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
+		#define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement64(ptr) - 1)
+		#define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement64(ptr) + 1)
+		#define ufbxi_atomic_counter_load(ptr) ((size_t)_InterlockedExchangeAdd64((ptr), 0))
+	#else
+		ufbxi_extern_c long __cdecl _InterlockedIncrement(long volatile * lpAddend);
+		ufbxi_extern_c long __cdecl _InterlockedDecrement(long volatile * lpAddend);
+		ufbxi_extern_c long __cdecl _InterlockedExchangeAdd(long volatile * lpAddend, long Value);
+		typedef volatile long ufbxi_atomic_counter;
+		#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+		#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
+		#define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement(ptr) - 1)
+		#define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement(ptr) + 1)
+		#define ufbxi_atomic_counter_load(ptr) ((size_t)_InterlockedExchangeAdd((ptr), 0))
+	#endif
+#elif !defined(UFBX_STANDARD_C) && defined(__TINYC__)
+	#if defined(__x86_64__) || defined(_AMD64_)
+		static size_t ufbxi_tcc_atomic_add(volatile size_t *dst, size_t value) {
+			__asm__ __volatile__("lock; xaddq %0, %1;" : "+r" (value), "=m" (*dst) : "m" (dst));
+			return value;
+		}
+	#elif defined(__i386__) || defined(_X86_)
+		static size_t ufbxi_tcc_atomic_add(volatile size_t *dst, size_t value) {
+			__asm__ __volatile__("lock; xaddl %0, %1;" : "+r" (value), "=m" (*dst) : "m" (dst));
+			return value;
+		}
+	#else
+		#error Unexpected TCC architecture
+	#endif
+	typedef volatile size_t ufbxi_atomic_counter;
+	#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+	#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
+	#define ufbxi_atomic_counter_inc(ptr) ufbxi_tcc_atomic_add((ptr), 1)
+	#define ufbxi_atomic_counter_dec(ptr) ufbxi_tcc_atomic_add((ptr), SIZE_MAX)
+	#define ufbxi_atomic_counter_load(ptr) ufbxi_tcc_atomic_add((ptr), 0)
+#elif defined(__cplusplus) && (__cplusplus >= 201103L)
+	#include <new>
+	#include <atomic>
+	typedef struct { alignas(std::atomic_size_t) char data[sizeof(std::atomic_size_t)]; } ufbxi_atomic_counter;
+	#define ufbxi_atomic_counter_init(ptr) (new (&(ptr)->data) std::atomic_size_t(0))
+	#define ufbxi_atomic_counter_free(ptr) (((std::atomic_size_t*)(ptr)->data)->~atomic())
+	#define ufbxi_atomic_counter_inc(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_add(1)
+	#define ufbxi_atomic_counter_dec(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_sub(1)
+	#define ufbxi_atomic_counter_load(ptr) ((std::atomic_size_t*)(ptr)->data)->load(std::memory_order_acquire)
+#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(__STDC_NO_ATOMICS__)
+	#include <stdatomic.h>
+	typedef volatile atomic_size_t ufbxi_atomic_counter;
+	#define ufbxi_atomic_counter_init(ptr) atomic_init(ptr, 0)
+	#define ufbxi_atomic_counter_free(ptr) (void)(ptr)
+	#define ufbxi_atomic_counter_inc(ptr) atomic_fetch_add((ptr), 1)
+	#define ufbxi_atomic_counter_dec(ptr) atomic_fetch_sub((ptr), 1)
+	#define ufbxi_atomic_counter_load(ptr) atomic_load_explicit((ptr), memory_order_acquire)
+#else
+	typedef volatile size_t ufbxi_atomic_counter;
+	#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
+	#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
+	#define ufbxi_atomic_counter_inc(ptr) ((*(ptr))++)
+	#define ufbxi_atomic_counter_dec(ptr) ((*(ptr))--)
+	#define ufbxi_atomic_counter_load(ptr) (*(ptr))
+	#undef UFBXI_THREAD_SAFE
+	#define UFBXI_THREAD_SAFE 0
+#endif
+
+// ^^ No references to <string.h> before this point ^^
+// vv No more includes past this point vv
+
+#if defined(UFBX_STRING_PREFIX)
+	#define ufbxi_string_fn(name) ufbxi_pre_cat(UFBX_STRING_PREFIX, name)
+
+	#define strlen ufbxi_string_fn(strlen)
+	#define memcpy ufbxi_string_fn(memcpy)
+	#define memmove ufbxi_string_fn(memmove)
+	#define memset ufbxi_string_fn(memset)
+	#define memchr ufbxi_string_fn(memchr)
+	#define memcmp ufbxi_string_fn(memcmp)
+	#define strcmp ufbxi_string_fn(strcmp)
+	#define strncmp ufbxi_string_fn(strncmp)
+#endif
+
 #if !defined(UFBX_LITTLE_ENDIAN)
 	#if !defined(UFBX_STANDARD_C) && (defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__) || defined(__wasm__) || defined(__EMSCRIPTEN__))
 		#define UFBX_LITTLE_ENDIAN 1
@@ -646,93 +784,6 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 	#define ufbxi_wrap_shr64(a, b) ((a) >> (b))
 #else
 	#define ufbxi_wrap_shr64(a, b) ((a) >> ((b) & 63))
-#endif
-
-// -- Atomic counter
-
-#define UFBXI_THREAD_SAFE 1
-
-#if defined(__cplusplus)
-	#define ufbxi_extern_c extern "C"
-#else
-	#define ufbxi_extern_c
-#endif
-
-#if !defined(UFBX_STANDARD_C) && (defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER))
-	typedef size_t ufbxi_atomic_counter;
-	#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
-	#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
-	#define ufbxi_atomic_counter_inc(ptr) __sync_fetch_and_add((ptr), 1)
-	#define ufbxi_atomic_counter_dec(ptr) __sync_fetch_and_sub((ptr), 1)
-	#define ufbxi_atomic_counter_load(ptr) __sync_fetch_and_add((ptr), 0) // TODO: Proper atomic load
-#elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
-	#if defined(_M_X64) || defined(_M_ARM64)
-		ufbxi_extern_c __int64 _InterlockedIncrement64(__int64 volatile * lpAddend);
-		ufbxi_extern_c __int64 _InterlockedDecrement64(__int64 volatile * lpAddend);
-		ufbxi_extern_c __int64 _InterlockedExchangeAdd64(__int64 volatile * lpAddend, __int64 Value);
-		typedef volatile __int64 ufbxi_atomic_counter;
-		#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
-		#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
-		#define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement64(ptr) - 1)
-		#define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement64(ptr) + 1)
-		#define ufbxi_atomic_counter_load(ptr) ((size_t)_InterlockedExchangeAdd64((ptr), 0))
-	#else
-		ufbxi_extern_c long __cdecl _InterlockedIncrement(long volatile * lpAddend);
-		ufbxi_extern_c long __cdecl _InterlockedDecrement(long volatile * lpAddend);
-		ufbxi_extern_c long __cdecl _InterlockedExchangeAdd(long volatile * lpAddend, long Value);
-		typedef volatile long ufbxi_atomic_counter;
-		#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
-		#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
-		#define ufbxi_atomic_counter_inc(ptr) ((size_t)_InterlockedIncrement(ptr) - 1)
-		#define ufbxi_atomic_counter_dec(ptr) ((size_t)_InterlockedDecrement(ptr) + 1)
-		#define ufbxi_atomic_counter_load(ptr) ((size_t)_InterlockedExchangeAdd((ptr), 0))
-	#endif
-#elif !defined(UFBX_STANDARD_C) && defined(__TINYC__)
-	#if defined(__x86_64__) || defined(_AMD64_)
-		static size_t ufbxi_tcc_atomic_add(volatile size_t *dst, size_t value) {
-			__asm__ __volatile__("lock; xaddq %0, %1;" : "+r" (value), "=m" (*dst) : "m" (dst));
-			return value;
-		}
-	#elif defined(__i386__) || defined(_X86_)
-		static size_t ufbxi_tcc_atomic_add(volatile size_t *dst, size_t value) {
-			__asm__ __volatile__("lock; xaddl %0, %1;" : "+r" (value), "=m" (*dst) : "m" (dst));
-			return value;
-		}
-	#else
-		#error Unexpected TCC architecture
-	#endif
-	typedef volatile size_t ufbxi_atomic_counter;
-	#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
-	#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
-	#define ufbxi_atomic_counter_inc(ptr) ufbxi_tcc_atomic_add((ptr), 1)
-	#define ufbxi_atomic_counter_dec(ptr) ufbxi_tcc_atomic_add((ptr), SIZE_MAX)
-	#define ufbxi_atomic_counter_load(ptr) ufbxi_tcc_atomic_add((ptr), 0)
-#elif defined(__cplusplus) && (__cplusplus >= 201103L)
-	#include <new>
-	#include <atomic>
-	typedef struct { alignas(std::atomic_size_t) char data[sizeof(std::atomic_size_t)]; } ufbxi_atomic_counter;
-	#define ufbxi_atomic_counter_init(ptr) (new (&(ptr)->data) std::atomic_size_t(0))
-	#define ufbxi_atomic_counter_free(ptr) (((std::atomic_size_t*)(ptr)->data)->~atomic())
-	#define ufbxi_atomic_counter_inc(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_add(1)
-	#define ufbxi_atomic_counter_dec(ptr) ((std::atomic_size_t*)(ptr)->data)->fetch_sub(1)
-	#define ufbxi_atomic_counter_load(ptr) ((std::atomic_size_t*)(ptr)->data)->load(std::memory_order_acquire)
-#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(__STDC_NO_ATOMICS__)
-	#include <stdatomic.h>
-	typedef volatile atomic_size_t ufbxi_atomic_counter;
-	#define ufbxi_atomic_counter_init(ptr) atomic_init(ptr, 0)
-	#define ufbxi_atomic_counter_free(ptr) (void)(ptr)
-	#define ufbxi_atomic_counter_inc(ptr) atomic_fetch_add((ptr), 1)
-	#define ufbxi_atomic_counter_dec(ptr) atomic_fetch_sub((ptr), 1)
-	#define ufbxi_atomic_counter_load(ptr) atomic_load_explicit((ptr), memory_order_acquire)
-#else
-	typedef volatile size_t ufbxi_atomic_counter;
-	#define ufbxi_atomic_counter_init(ptr) (*(ptr) = 0)
-	#define ufbxi_atomic_counter_free(ptr) (*(ptr) = 0)
-	#define ufbxi_atomic_counter_inc(ptr) ((*(ptr))++)
-	#define ufbxi_atomic_counter_dec(ptr) ((*(ptr))--)
-	#define ufbxi_atomic_counter_load(ptr) (*(ptr))
-	#undef UFBXI_THREAD_SAFE
-	#define UFBXI_THREAD_SAFE 0
 #endif
 
 // -- Bit manipulation
@@ -1301,7 +1352,7 @@ static ufbxi_noinline uint32_t ufbxi_parse_double_init_flags()
 static ufbxi_noinline double ufbxi_parse_double_slow(const char *str, char **end)
 {
 	// TODO: Locales
-	return strtod(str, end);
+	return ufbxc_strtod(str, end);
 }
 
 static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_length, char **end, uint32_t flags)
@@ -2897,7 +2948,7 @@ static const char ufbxi_empty_char[1] = { '\0' };
 
 static ufbxi_noinline int ufbxi_vsnprintf(char *buf, size_t buf_size, const char *fmt, va_list args)
 {
-	int result = vsnprintf(buf, buf_size, fmt, args);
+	int result = ufbxc_vsnprintf(buf, buf_size, fmt, args);
 
 	if (result < 0) result = 0;
 	if ((size_t)result >= buf_size - 1) result = (int)buf_size - 1;
@@ -6410,7 +6461,7 @@ static ufbxi_noinline void ufbxi_init_ator(ufbx_error *error, ufbxi_allocator *a
 
 #if !defined(UFBX_NO_STDIO)
 
-static ufbxi_noinline FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp_ator)
+static ufbxi_noinline ufbxc_FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi_allocator *tmp_ator)
 {
 #if !defined(UFBX_STANDARD_C) && defined(_WIN32) && !defined(UFBX_NO_LIBC)
 	wchar_t wpath_buf[256];
@@ -6457,7 +6508,7 @@ static ufbxi_noinline FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi
 	}
 	wpath[wlen] = 0;
 
-	FILE *file = NULL;
+	ufbxc_FILE *file = NULL;
 #if UFBXI_MSC_VER >= 1400
 	if (_wfopen_s(&file, wpath, L"rb") != 0) {
 		file = NULL;
@@ -6473,7 +6524,7 @@ static ufbxi_noinline FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi
 	return file;
 #else
 	if (path_len == SIZE_MAX) {
-		return fopen(path, "rb");
+		return ufbxc_fopen(path, "rb");
 	}
 
 	char copy_buf[256]; // ufbxi_uninit
@@ -6488,7 +6539,7 @@ static ufbxi_noinline FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi
 	memcpy(copy, path, path_len);
 	copy[path_len] = '\0';
 
-	FILE *file = fopen(copy, "rb");
+	ufbxc_FILE *file = ufbxc_fopen(copy, "rb");
 
 	if (copy != copy_buf) {
 		ufbxi_free(tmp_ator, char, copy, path_len + 1);
@@ -6498,7 +6549,7 @@ static ufbxi_noinline FILE *ufbxi_fopen(const char *path, size_t path_len, ufbxi
 #endif
 }
 
-static uint64_t ufbxi_ftell(FILE *file)
+static uint64_t ufbxi_ftell(ufbxc_FILE *file)
 {
 #if !defined(UFBX_STANDARD_C) && defined(UFBX_HAS_FTELLO) && !defined(UFBX_NO_LIBC)
 	off_t result = ftello(file);
@@ -6507,7 +6558,7 @@ static uint64_t ufbxi_ftell(FILE *file)
 	int64_t result = _ftelli64(file);
 	if (result >= 0) return (uint64_t)result;
 #else
-	long result = ftell(file);
+	int64_t result = ufbxc_ftell(file);
 	if (result >= 0) return (uint64_t)result;
 #endif
 	return UINT64_MAX;
@@ -6515,24 +6566,24 @@ static uint64_t ufbxi_ftell(FILE *file)
 
 static size_t ufbxi_file_read(void *user, void *data, size_t max_size)
 {
-	FILE *file = (FILE*)user;
-	if (ferror(file)) return SIZE_MAX;
-	return fread(data, 1, max_size, file);
+	ufbxc_FILE *file = (ufbxc_FILE*)user;
+	if (ufbxc_ferror(file)) return SIZE_MAX;
+	return ufbxc_fread(data, 1, max_size, file);
 }
 
 static bool ufbxi_file_skip(void *user, size_t size)
 {
-	FILE *file = (FILE*)user;
+	ufbxc_FILE *file = (ufbxc_FILE*)user;
 	ufbx_assert(size <= UFBXI_MAX_SKIP_SIZE);
-	if (fseek(file, (long)size, SEEK_CUR) != 0) return false;
-	if (ferror(file)) return false;
+	if (ufbxc_fseek(file, (long)size, ufbxc_SEEK_CUR) != 0) return false;
+	if (ufbxc_ferror(file)) return false;
 	return true;
 }
 
 static void ufbxi_file_close(void *user)
 {
-	FILE *file = (FILE*)user;
-	fclose(file);
+	ufbxc_FILE *file = (ufbxc_FILE*)user;
+	ufbxc_fclose(file);
 }
 
 #endif
@@ -6748,9 +6799,9 @@ static ufbxi_noinline int ufbxi_xml_read_until(ufbxi_xml_context *xc, ufbx_strin
 			if (entity[0] == '#') {
 				unsigned long code = 0;
 				if (entity[1] == 'x') {
-					code = strtoul(entity + 2, NULL, 16);
+					code = ufbxc_strtoul(entity + 2, NULL, 16);
 				} else {
-					code = strtoul(entity + 1, NULL, 10);
+					code = ufbxc_strtoul(entity + 1, NULL, 10);
 				}
 
 				char bytes[5] = { 0 };
@@ -9144,7 +9195,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 				ufbxi_check(end == token->str_data + token->str_len - 1);
 			} else if (token->type == UFBXI_ASCII_FLOAT) {
 				if (ua->parse_as_f32) {
-					token->value.f64 = strtof(token->str_data, &end);
+					token->value.f64 = ufbxc_strtof(token->str_data, &end);
 				} else {
 					token->value.f64 = ufbxi_parse_double(token->str_data, token->str_len, &end, uc->double_parse_flags);
 				}
@@ -23237,7 +23288,7 @@ static ufbxi_noinline int ufbxi_cache_sort_tmp_channels(ufbxi_cache_context *cc,
 
 static ufbxi_noinline uint32_t ufbxi_parse_u32(const char *str)
 {
-	unsigned long result = strtoul(str, NULL, 10);
+	unsigned long result = ufbxc_strtoul(str, NULL, 10);
 	return result <= UINT32_MAX ? (uint32_t)result : 0;
 }
 
@@ -25471,7 +25522,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_create_anim_imp(ufbxi_create_ani
 		anim->transform_overrides.data = ufbxi_push_copy(&ac->result, ufbx_transform_override, anim->transform_overrides.count, ac->opts.transform_overrides.data);
 		ufbxi_check_err(&ac->error, anim->transform_overrides.data);
 
-		qsort(anim->transform_overrides.data, anim->transform_overrides.count, sizeof(ufbx_transform_override), &ufbxi_cmp_transform_override);
+		ufbxc_qsort(anim->transform_overrides.data, anim->transform_overrides.count, sizeof(ufbx_transform_override), &ufbxi_cmp_transform_override);
 	}
 
 	ac->imp = ufbxi_push(&ac->result, ufbxi_anim_imp, 1);
@@ -25676,7 +25727,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_finalize_bake_times(ufbxi_bake_c
 	ufbxi_check_err(&bc->error, times);
 
 	// TODO: Something better
-	qsort(times, num_times, sizeof(ufbxi_bake_time), &ufbxi_cmp_bake_time_fn);
+	ufbxc_qsort(times, num_times, sizeof(ufbxi_bake_time), &ufbxi_cmp_bake_time_fn);
 
 	// Deduplicate times
 	if (num_times > 0) {
@@ -26454,7 +26505,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim(ufbxi_bake_context *bc
 	ufbxi_check_err(&bc->error, props);
 
 	// TODO: Macro unstable/non allocating sort
-	qsort(props, num_props, sizeof(ufbxi_bake_prop), &ufbxi_cmp_bake_prop);
+	ufbxc_qsort(props, num_props, sizeof(ufbxi_bake_prop), &ufbxi_cmp_bake_prop);
 
 	// Pre-bake layer weight times
 	if (!bc->opts.ignore_layer_weight_animation) {
@@ -27546,7 +27597,7 @@ ufbxi_noinline static void ufbxi_compute_topology(const ufbx_mesh *mesh, ufbx_to
 	}
 
 	// TODO: Macro unstable/non allocating sort
-	qsort(topo, num_indices, sizeof(ufbx_topo_edge), &ufbxi_cmp_topo_index_prev_next);
+	ufbxc_qsort(topo, num_indices, sizeof(ufbx_topo_edge), &ufbxi_cmp_topo_index_prev_next);
 
 	if (mesh->edges.data) {
 		for (uint32_t ei = 0; ei < mesh->num_edges; ei++) {
@@ -27587,7 +27638,7 @@ ufbxi_noinline static void ufbxi_compute_topology(const ufbx_mesh *mesh, ufbx_to
 	}
 
 	// TODO: Macro unstable/non allocating sort
-	qsort(topo, num_indices, sizeof(ufbx_topo_edge), &ufbxi_cmp_topo_index_index);
+	ufbxc_qsort(topo, num_indices, sizeof(ufbx_topo_edge), &ufbxi_cmp_topo_index_index);
 
 	// Fix `prev` and `next` to the actual index values
 	for (uint32_t fi = 0; fi < mesh->num_faces; fi++) {
@@ -27794,7 +27845,7 @@ static int ufbxi_subdivide_sum_vertex_weights(void *user, void *output, const uf
 		vertex_weights[vx] = 0.0f;
 	}
 
-	qsort(tmp_weights, num_weights, sizeof(ufbx_subdivision_weight), ufbxi_cmp_subdivision_weight);
+	ufbxc_qsort(tmp_weights, num_weights, sizeof(ufbx_subdivision_weight), ufbxi_cmp_subdivision_weight);
 
 	if (sc->max_vertex_weights != SIZE_MAX) {
 		num_weights = ufbxi_min_sz(sc->max_vertex_weights, num_weights);
@@ -29226,7 +29277,7 @@ ufbx_abi bool ufbx_open_file(ufbx_stream *stream, const char *path, size_t path_
 	ufbxi_allocator tmp_ator = { 0 };
 	ufbx_error tmp_error = { UFBX_ERROR_NONE };
 	ufbxi_init_ator(&tmp_error, &tmp_ator, NULL, "filename");
-	FILE *f = ufbxi_fopen(path, path_len, &tmp_ator);
+	ufbxc_FILE *f = ufbxi_fopen(path, path_len, &tmp_ator);
 	if (!f) return false;
 
 	stream->read_fn = &ufbxi_file_read;
@@ -29353,14 +29404,14 @@ ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_le
 	ufbx_error tmp_error = { UFBX_ERROR_NONE };
 	ufbxi_init_ator(&tmp_error, &tmp_ator, opts ? &opts->temp_allocator : NULL, "filename");
 
-	FILE *file = ufbxi_fopen(filename, filename_len, &tmp_ator);
+	ufbxc_FILE *file = ufbxi_fopen(filename, filename_len, &tmp_ator);
 	if (!file) {
 		return ufbxi_load_not_found(filename, filename_len, error);
 	}
 
 	ufbx_scene *scene = ufbx_load_stdio(file, &opts_copy, error);
 
-	fclose(file);
+	ufbxc_fclose(file);
 	return scene;
 #else
 	return ufbx_load_stdio(NULL, opts, error);
@@ -29376,7 +29427,7 @@ ufbx_abi ufbx_scene *ufbx_load_stdio_prefix(void *file_void, const void *prefix,
 {
 #if !defined(UFBX_NO_STDIO)
 	ufbxi_check_opts_ptr(ufbx_scene, opts, error);
-	FILE *file = (FILE*)file_void;
+	ufbxc_FILE *file = (ufbxc_FILE*)file_void;
 
 	ufbxi_context uc = { UFBX_ERROR_NONE };
 	uc.data_begin = uc.data = (const char *)prefix;
@@ -29388,17 +29439,17 @@ ufbx_abi ufbx_scene *ufbx_load_stdio_prefix(void *file_void, const void *prefix,
 	if (opts && opts->progress_cb.fn && opts->file_size_estimate == 0) {
 		uint64_t begin = ufbxi_ftell(file);
 		if (begin < UINT64_MAX) {
-			fpos_t pos; // ufbxi_uninit
-			if (fgetpos(file, &pos) == 0) {
-				if (fseek(file, 0, SEEK_END) == 0) {
+			ufbxc_fpos pos; // ufbxi_uninit
+			if (ufbxc_fgetpos(file, &pos) == 0) {
+				if (ufbxc_fseek(file, 0, ufbxc_SEEK_END) == 0) {
 					uint64_t end = ufbxi_ftell(file);
 					if (end != UINT64_MAX && begin < end) {
 						uc.progress_bytes_total = end - begin;
 					}
 
 					// Both `rewind()` and `fsetpos()` to reset error and EOF
-					rewind(file);
-					fsetpos(file, &pos);
+					ufbxc_rewind(file);
+					ufbxc_fsetpos(file, &pos);
 				}
 			}
 		}
@@ -31938,6 +31989,17 @@ ufbx_abi ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positio
 }
 #endif
 
+#endif
+
+#if defined(UFBX_STRING_PREFIX)
+	#undef strlen
+	#undef memcpy
+	#undef memmove
+	#undef memset
+	#undef memchr
+	#undef memcmp
+	#undef strcmp
+	#undef strncmp
 #endif
 
 #if defined(_MSC_VER)

@@ -201,6 +201,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run unit tests
         run: python misc/run_tests.py unit
+      - name: Run libc tests
+        run: python misc/run_tests.py libc
 
   ci_viewer:
     runs-on: ubuntu-latest

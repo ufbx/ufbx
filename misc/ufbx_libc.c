@@ -1,23 +1,17 @@
 #include "ufbx_libc.h"
 
-#if defined(UFBXC_HAS_EXIT)
-	void ufbxc_os_exit(int code);
-#endif
-
-static void ufbxc_assert_fail(const char *message)
+void ufbxc_assert_fail(const char *message, const char *file, int line)
 {
 	(void)message;
 
 #if defined(UFBXC_HAS_STDERR)
-	ufbxc_fprintf(stderr, "ufbxc_assert() fail: %s\n", message);
+	ufbxc_fprintf(ufbxc_stderr, "ufbxc_assert() fail: %s\nat %s:%d\n", message, file, line);
 #endif
 
 #if defined(UFBXC_HAS_EXIT)
 	ufbxc_os_exit(1);
 #endif
 }
-
-#define ufbxc_assert(cond) do { if (!(cond)) ufbxc_assert_fail(#cond); } while (0)
 
 // -- bigint
 
@@ -216,6 +210,7 @@ static void bigfloat_parse(bigfloat *bf, const char *str)
 		p++;
 	}
 
+	const char *sp = p;
 	for (;;) {
 		char c = *p;
 		if (c >= '0' && c <= '9') {
@@ -272,7 +267,8 @@ static void bigfloat_parse(bigfloat *bf, const char *str)
 	}
 
 	if (dec_exponent < 0) {
-		uint32_t limb_shift = bigint_limbs_for_bits(4 * -dec_exponent + 64) + 1;
+		uint32_t log2_dec = ((int64_t)-dec_exponent * 851) >> 8; // >= log2 10
+		uint32_t limb_shift = bigint_limbs_for_bits(log2_dec + 64) + 1;
 		if (limb_shift > bf->mantissa.capacity) {
 			limb_shift = bf->mantissa.capacity;
 		}
@@ -283,9 +279,11 @@ static void bigfloat_parse(bigfloat *bf, const char *str)
 			bf->exponent = -(int32_t)shift * BIGINT_LIMB_BITS;
 		}
 
-		bf->tail = bigint_div_pow(&bf->mantissa, 10, (uint32_t)-dec_exponent);
+		bf->exponent += dec_exponent;
+		bf->tail = bigint_div_pow(&bf->mantissa, 5, (uint32_t)-dec_exponent);
 	} else if (dec_exponent > 0) {
-		bigint_mul_pow(&bf->mantissa, 10, dec_exponent);
+		bf->exponent += dec_exponent;
+		bigint_mul_pow(&bf->mantissa, 5, dec_exponent);
 	}
 
 	int32_t mantissa_exp = 0;
@@ -339,7 +337,7 @@ static float bigfloat_parse_float(const char *str, char **p_end)
 	uint32_t bits = (uint32_t)bigfloat_assemble(&bf, 24, -127, 127, 31);
 
 	float d;
-	memcpy(&d, &bits, sizeof(float));
+	ufbxc_memcpy(&d, &bits, sizeof(float));
 	return d;
 }
 
@@ -352,16 +350,13 @@ static double bigfloat_parse_double(const char *str, char **p_end)
 	uint64_t bits = bigfloat_assemble(&bf, 53, -1023, 1023, 63);
 
 	double d;
-	memcpy(&d, &bits, sizeof(double));
+	ufbxc_memcpy(&d, &bits, sizeof(double));
 	return d;
 }
 
 // -- ufmalloc
 
 #if defined(UFBXC_HAS_MALLOC)
-
-void *ufbxc_os_allocate(size_t size, size_t *p_allocated_size);
-bool ufbxc_os_free(void *pointer, size_t allocated_size);
 
 #define UFMALLOC_FREE 0x1
 #define UFMALLOC_USED 0x2
@@ -475,8 +470,8 @@ static void *ufmalloc_alloc(size_t size)
 	}
 
 	if (node == NULL) {
-		size_t allocated_size = 0;
-		void *memory = ufbxc_os_allocate(2 * sizeof(ufmalloc_node) + size + align, &allocated_size);
+		size_t allocated_size = 2 * sizeof(ufmalloc_node) + size + align;
+		void *memory = ufbxc_os_allocate(allocated_size, &allocated_size);
 		if (!memory) return NULL;
 
 		// Can't do anything if the memory is too small
@@ -994,15 +989,18 @@ void *ufbxc_realloc(void *ptr, size_t new_size)
 	void *new_ptr = ufbxc_malloc(new_size);
 	if (!new_ptr) return NULL;
 
-	size_t size = ufmalloc_size(ptr);
-	ufbxc_memcpy(new_ptr, ptr, size < new_size ? size : new_size);
-	ufmalloc_free(ptr);
+	if (ptr) {
+		size_t size = ufmalloc_size(ptr);
+		ufbxc_memcpy(new_ptr, ptr, size < new_size ? size : new_size);
+		ufmalloc_free(ptr);
+	}
 
 	return new_ptr;
 }
 
 void ufbxc_free(void *ptr)
 {
+	if (!ptr) return;
 	ufmalloc_free(ptr);
 }
 
@@ -1019,11 +1017,7 @@ int ufbxc_vsnprintf(char *buffer, size_t count, const char *format, va_list args
 
 #if defined(UFBXC_HAS_STDIO)
 
-bool ufbxc_os_open_file(size_t index, const char *filename, size_t *p_file_size);
-size_t ufbxc_os_read_file(size_t index, void *dst, size_t offset, size_t count);
-void ufbxc_os_close_file(size_t index);
-
-struct ufbxc_file {
+struct ufbxc_FILE {
 	bool used;
 	bool read;
 	bool error;
@@ -1032,12 +1026,12 @@ struct ufbxc_file {
 };
 
 #define UFBXC_MAX_FILES 256
-static ufbxc_file ufbxc_files[UFBXC_MAX_FILES];
+static ufbxc_FILE ufbxc_files[UFBXC_MAX_FILES];
 
-FILE *ufbxc_fopen(const char *filename, const char *mode)
+ufbxc_FILE *ufbxc_fopen(const char *filename, const char *mode)
 {
 	for (uint32_t i = 0; i < UFBXC_MAX_FILES; i++) {
-		ufbxc_file *file = &ufbxc_files[i];
+		ufbxc_FILE *file = &ufbxc_files[i];
 		if (!file->used) {
 			size_t file_size = SIZE_MAX;
 			bool ok = ufbxc_os_open_file(i, filename, &file_size);
@@ -1052,7 +1046,7 @@ FILE *ufbxc_fopen(const char *filename, const char *mode)
 	return NULL;
 }
 
-size_t ufbxc_fread(void *buffer, size_t size, size_t count, FILE *f)
+size_t ufbxc_fread(void *buffer, size_t size, size_t count, ufbxc_FILE *f)
 {
 	ufbxc_assert(f && f->used);
 	if (f->error) return 0;
@@ -1075,36 +1069,36 @@ size_t ufbxc_fread(void *buffer, size_t size, size_t count, FILE *f)
 	return num_read / size;
 }
 
-void ufbxc_fclose(FILE *f)
+void ufbxc_fclose(ufbxc_FILE *f)
 {
 	if (!f) return;
 	size_t index = f - ufbxc_files;
 	ufbxc_assert(index < UFBXC_MAX_FILES);
 	ufbxc_assert(f->used);
 	ufbxc_os_close_file(index);
-	ufbxc_memset(f, 0, sizeof(ufbxc_file));
+	ufbxc_memset(f, 0, sizeof(ufbxc_FILE));
 }
 
-long ufbxc_ftell(FILE *f)
+long ufbxc_ftell(ufbxc_FILE *f)
 {
 	ufbxc_assert(f && f->used);
 	return (long)f->position;
 }
 
-int ufbxc_ferror(FILE *f)
+int ufbxc_ferror(ufbxc_FILE *f)
 {
 	ufbxc_assert(f && f->used);
 	return 0;
 }
 
-int ufbxc_fseek(FILE *f, long offset, int origin)
+int ufbxc_fseek(ufbxc_FILE *f, long offset, int origin)
 {
 	ufbxc_assert(f && f->used);
 	if (f->size == SIZE_MAX) return 1;
-	if (origin == SEEK_END) {
+	if (origin == ufbxc_SEEK_END) {
 		ufbxc_assert(!f->read);
 		f->position = ufbxci_clamp_pos(f->size, (long)f->size + offset);
-	} else if (origin == SEEK_CUR) {
+	} else if (origin == ufbxc_SEEK_CUR) {
 		ufbxc_assert(offset >= 0);
 		f->position = ufbxci_clamp_pos(f->size, (long)f->position + offset);
 	} else {
@@ -1114,7 +1108,7 @@ int ufbxc_fseek(FILE *f, long offset, int origin)
 	return 0;
 }
 
-int ufbxc_fgetpos(FILE *f, fpos_t *pos)
+int ufbxc_fgetpos(ufbxc_FILE *f, ufbxc_fpos *pos)
 {
 	ufbxc_assert(f && f->used);
 	ufbxc_assert(!f->read);
@@ -1122,7 +1116,7 @@ int ufbxc_fgetpos(FILE *f, fpos_t *pos)
 	return 0;
 }
 
-int ufbxc_fsetpos(FILE *f, const fpos_t *pos)
+int ufbxc_fsetpos(ufbxc_FILE *f, const ufbxc_fpos *pos)
 {
 	ufbxc_assert(f && f->used);
 	ufbxc_assert(!f->read);
@@ -1131,7 +1125,7 @@ int ufbxc_fsetpos(FILE *f, const fpos_t *pos)
 	return 0;
 }
 
-void ufbxc_rewind(FILE *f)
+void ufbxc_rewind(ufbxc_FILE *f)
 {
 	ufbxc_assert(f && f->used);
 	ufbxc_assert(!f->read);
@@ -1142,9 +1136,7 @@ void ufbxc_rewind(FILE *f)
 
 #if defined(UFBXC_HAS_STDERR)
 
-void ufbxc_os_print_error(const char *message, size_t length);
-
-void ufbxc_fprintf(FILE *file, const char *fmt, ...)
+void ufbxc_fprintf(ufbxc_FILE *file, const char *fmt, ...)
 {
 	char buffer[512];
 

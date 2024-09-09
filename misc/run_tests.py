@@ -759,7 +759,7 @@ def decorate_arch(compiler, arch):
 tests = set(argv.tests)
 implicit_tests = False
 if not tests:
-    tests = ["tests", "cpp", "stack", "unit", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
+    tests = ["tests", "cpp", "stack", "unit", "libc", "picort", "viewer", "domfuzz", "objfuzz", "readme", "threadcheck", "hashes"]
     implicit_tests = True
 
 async def main():
@@ -1085,6 +1085,23 @@ async def main():
             "defines": { },
         }
         target_tasks += compile_permutations("unit_tests", runner_config, all_configs, [])
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+    if "libc" in tests:
+        log_comment("-- Compiling and running unit tests --")
+
+        target_tasks = []
+
+        runner_config = {
+            "sources": ["test/libc_test.c"],
+            "output": "libc_test" + exe_suffix,
+            "optimize": True,
+            "ieee754": True,
+            "defines": { },
+        }
+        target_tasks += compile_permutations("libc_test", runner_config, arch_configs, [])
 
         targets = await gather(target_tasks)
         all_targets += targets
