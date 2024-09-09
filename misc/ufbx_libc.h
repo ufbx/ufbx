@@ -60,6 +60,7 @@ int fdlibm_isnan(double x);
 
 #define INFINITY (1e+300 * 1e+300)
 #define NAN (INFINITY * 0.0f)
+#define FLT_EVAL_METHOD 0
 
 // <string.h>
 
