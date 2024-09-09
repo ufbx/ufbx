@@ -232,10 +232,10 @@
 
 #if !defined(UFBX_NO_LIBC)
 	// <stdlib.h>
-	#define ufbxc_strtof strtof 
-	#define ufbxc_strtod strtod 
-	#define ufbxc_strtoul strtoul 
-	#define ufbxc_qsort qsort 
+	#define ufbxc_strtof strtof
+	#define ufbxc_strtod strtod
+	#define ufbxc_strtoul strtoul
+	#define ufbxc_qsort qsort
 	#define ufbxc_malloc malloc
 	#define ufbxc_realloc realloc
 	#define ufbxc_free free
@@ -244,18 +244,18 @@
 	#define ufbxc_fpos fpos_t
 	#define ufbxc_SEEK_CUR SEEK_CUR
 	#define ufbxc_SEEK_END SEEK_END
-	#define ufbxc_stderr stderr 
-	#define ufbxc_vsnprintf vsnprintf 
-	#define ufbxc_fopen fopen 
-	#define ufbxc_fread fread 
-	#define ufbxc_fclose fclose 
-	#define ufbxc_ftell ftell 
-	#define ufbxc_ferror ferror 
-	#define ufbxc_fseek fseek 
-	#define ufbxc_fgetpos fgetpos 
-	#define ufbxc_fsetpos fsetpos 
-	#define ufbxc_rewind rewind 
-	#define ufbxc_fprintf fprintf 
+	#define ufbxc_stderr stderr
+	#define ufbxc_vsnprintf vsnprintf
+	#define ufbxc_fopen fopen
+	#define ufbxc_fread fread
+	#define ufbxc_fclose fclose
+	#define ufbxc_ftell ftell
+	#define ufbxc_ferror ferror
+	#define ufbxc_fseek fseek
+	#define ufbxc_fgetpos fgetpos
+	#define ufbxc_fsetpos fsetpos
+	#define ufbxc_rewind rewind
+	#define ufbxc_fprintf fprintf
 #endif
 
 #if defined(UFBX_NO_MATH_H) && !defined(UFBX_NO_MATH_DECLARATIONS)
