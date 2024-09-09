@@ -3959,7 +3959,7 @@ static ufbxi_noinline void ufbxi_map_free(ufbxi_map *map)
 #if defined(UFBX_REGRESSION)
 	if (regression_ator) {
 		ufbxi_free_ator(regression_ator);
-		ufbx_free(regression_ator);
+		ufbx_free(regression_ator, sizeof(ufbxi_allocator));
 	}
 #endif
 }
