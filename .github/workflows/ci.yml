@@ -82,6 +82,8 @@ jobs:
         run: python misc/run_tests.py cpp --compiler vs_cl64
       - name: Check features
         run: python misc/run_tests.py features --compiler vs_cl64
+      - name: Check freestanding
+        run: python misc/run_tests.py freestanding --compiler vs_cl64
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_windows.txt.gz

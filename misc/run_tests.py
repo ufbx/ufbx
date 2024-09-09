@@ -966,6 +966,27 @@ async def main():
         targets = await gather(target_tasks)
         all_targets += targets
 
+    if "freestanding" in tests:
+        log_comment("-- Compiling and running freestanding tests --")
+
+        target_tasks = []
+
+        freestanding_config = {
+            "sources": ["misc/fdlibm.c", "misc/ufbx_libc.c", "misc/ufbx_libc_os.c", "test/runner.c", "ufbx.c"],
+            "output": "freestanding_runner" + exe_suffix,
+            "defines": {
+                "UFBX_CONFIG_SOURCE": "\"misc/ufbx_libc.h\"",
+                "UFBXC_HAS_MALLOC": "",
+                "UFBXC_HAS_STDIO": "",
+                "UFBXC_HAS_STDERR": "",
+                "UFBXC_HAS_EXIT": "",
+            },
+        }
+        target_tasks += compile_permutations("freestanding_runner", freestanding_config, all_configs, ["-d", "data"])
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
     if "cpp" in tests:
         log_comment("-- Compiling and running C++ tests --")
 
