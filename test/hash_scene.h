@@ -12,7 +12,6 @@
 	#define ufbxh_fprintf fprintf
 	#define ufbxh_snprintf snprintf
 	#define ufbxh_fflush fflush
-	#define ufbxh_fopen fopen
 #endif
 
 typedef struct ufbxt_hash {
