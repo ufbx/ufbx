@@ -360,7 +360,7 @@ jobs:
       - name: Compile freestanding WASM hasher
         run: clang -O2 misc/wasm_hasher/wasm_hasher.c --target=wasm32 -mbulk-memory --no-standard-libraries -Wl,--no-entry -o build/ufbx_hasher.wasm
       - name: Check freestanding WASM hashes
-        run: node misc/wasm_hasher/wasm_hasher.js --check build/hashdumps/ci_exotic_wasm_freestanding.txt
+        run: node misc/wasm_hasher/wasm_hasher.js --check builds/hashes.txt --dump build/hashdumps/ci_exotic_wasm_freestanding.txt --max-dump-errors 3
       - name: Compile runner with fdlibm
         run: clang -DUFBX_NO_MATH_H -DUFBX_MATH_PREFIX=fdlibm_ ufbx.c test/runner.c misc/fdlibm.c -lm -o build/fdlibm_runner
       - name: Run tests using fdlibm
