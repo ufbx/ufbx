@@ -46,6 +46,35 @@ void ufbxc_os_exit(int code)
 
 // -- Tests
 
+char print_buf[1024];
+
+static int test_sprintf(const char *expected, const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	int result = ufbxc_vsnprintf(print_buf, sizeof(print_buf), fmt, args);
+	va_end(args);
+
+
+	ufbxc_assert(strcmp(print_buf, expected) == 0);
+	ufbxc_assert((int)strlen(print_buf) == result);
+}
+
+void test_printf()
+{
+	printf("test_printf()\n");
+
+	test_sprintf("Hello", "Hello");
+	test_sprintf("Hello", "%s", "Hello");
+	test_sprintf("Hello world", "%s %s", "Hello", "world");
+	test_sprintf("Hel", "%.3s", "Hello");
+	test_sprintf("Hel", "%.3s", "Hello");
+	test_sprintf("Hel", "%.*s", 3, "Hello");
+	test_sprintf("00beef", "%06x", 0xbeef);
+	test_sprintf("beef  ", "%-6x", 0xbeef);
+	test_sprintf("0XBEEF", "%#X", 0xbeef);
+}
+
 void test_float(const char *str)
 {
 	double ref_d = strtod(str, NULL);
@@ -187,6 +216,7 @@ void test_malloc(uint32_t rounds)
 
 int main(int argc, char **argv)
 {
+	test_printf();
 #if 1
 	test_float_parse(14);
 	test_malloc(8*1024*1024);
