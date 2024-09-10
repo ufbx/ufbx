@@ -651,7 +651,7 @@ static bool ufbxos_atomic_try_wait(ufbx_os_thread_pool *pool, uint32_t *p_sema_i
 			bool ok = false;
 			if (ufbxos_hash_is(s.hash, hash)) ok = true;
 			if (attempt >= 1 && s.hash == 0) ok = true;
-			if (attempt >= 2 && !ufbxos_hash_contains(s.hash, hash)) ok = true;
+			if (attempt >= 2 && ufbxos_hash_contains(s.hash, hash)) ok = true;
 			if (attempt >= 3) ok = false;
 			if (!ok) break;
 
