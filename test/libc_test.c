@@ -231,10 +231,10 @@ void test_float_decimal()
 	bigdecimal pow2, pow5;
 	bigdecimal_init(&pow2, 1);
 
-	int max_pow2 = 64;
-	int max_pow5 = 64;
-	int min_exp = -30;
-	int max_exp = 30;
+	int max_pow2 = 96;
+	int max_pow5 = 96;
+	int min_exp = -128;
+	int max_exp = 128;
 	int max_delta = 8;
 
 	for (int p2 = 0; p2 < max_pow2; p2++) {
