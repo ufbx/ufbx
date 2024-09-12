@@ -44,6 +44,83 @@ void ufbxc_os_exit(int code)
 	exit(code);
 }
 
+// -- Bigdecimal
+
+#define BIGDECIMAL_DIGITS 256
+#define BIGDECIMAL_SUFFIX 32
+
+typedef struct {
+	char digits[BIGDECIMAL_DIGITS + 2 + BIGDECIMAL_SUFFIX];
+	size_t length;
+} bigdecimal;
+
+void bigdecimal_init(bigdecimal *d, int initial)
+{
+	ufbxc_assert(initial >= 0 && initial <= 9);
+	d->digits[BIGDECIMAL_DIGITS + 1] = '\0';
+	d->digits[BIGDECIMAL_DIGITS] = (char)(initial + '0');
+	d->length = 1;
+}
+
+void bigdecimal_suffixf(bigdecimal *d, const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	ufbxc_vsnprintf(d->digits + BIGDECIMAL_DIGITS + 1, BIGDECIMAL_SUFFIX, fmt, args);
+	va_end(args);
+}
+
+const char *bigdecimal_string(bigdecimal *d)
+{
+	for (size_t i = d->length; i > 0; i--) {
+		if (d->digits[BIGDECIMAL_DIGITS - i + 1] != '0') {
+			return d->digits + BIGDECIMAL_DIGITS - i + 1;
+		}
+	}
+	return "";
+}
+
+void bigdecimal_mul(bigdecimal *d, int multiplicand)
+{
+	int carry = 0;
+	for (uint32_t i = 0; i < d->length; i++) {
+		int digit = d->digits[BIGDECIMAL_DIGITS - i] - '0';
+		int product = digit * multiplicand + carry;
+		d->digits[BIGDECIMAL_DIGITS - i] = (char)((product % 10) + '0');
+		carry = product / 10;
+	}
+	if (carry) {
+		ufbxc_assert(d->length < BIGDECIMAL_DIGITS);
+		d->digits[BIGDECIMAL_DIGITS - d->length++] = (char)(carry + '0');
+	}
+}
+
+void bigdecimal_add(bigdecimal *d, int addend)
+{
+	int carry = addend;
+	for (uint32_t i = 0; i < d->length; i++) {
+		int digit = d->digits[BIGDECIMAL_DIGITS - i] - '0';
+		int sum = digit + carry;
+		if (sum >= 0 && sum < 10) {
+			d->digits[BIGDECIMAL_DIGITS - i] = (char)(sum + '0');
+			carry = 0;
+			break;
+		} else if (sum < 0) {
+			d->digits[BIGDECIMAL_DIGITS - i] = (char)((sum + 10) + '0');
+			carry = -1;
+		} else if (sum >= 10) {
+			d->digits[BIGDECIMAL_DIGITS - i] = (char)((sum % 10) + '0');
+			carry = 1;
+		}
+	}
+	if (carry > 0) {
+		ufbxc_assert(d->length < BIGDECIMAL_DIGITS);
+		d->digits[BIGDECIMAL_DIGITS - d->length++] = (char)(carry + '0');
+	} else if (carry < 0) {
+		ufbxc_assert(0 && "Negative bigdecimal");
+	}
+}
+
 // -- Tests
 
 char print_buf[1024];
@@ -139,12 +216,59 @@ void test_float_parse(uint32_t bits)
 	test_float("1e10000");
 	test_float("1e-10000");
 	test_float("7.67844768714563e-239");
+	test_float("4656612873077392578125e-8");
 
 	for (int width = 4; width <= 20; width++) {
 		test_float_parse_fmt("%.*f", width, bits);
 	}
 	for (int width = 4; width <= 20; width++) {
 		test_float_parse_fmt("%.*e", width, bits);
+	}
+}
+
+void test_float_decimal()
+{
+	bigdecimal pow2, pow5;
+	bigdecimal_init(&pow2, 1);
+
+	int max_pow2 = 64;
+	int max_pow5 = 64;
+	int min_exp = -30;
+	int max_exp = 30;
+	int max_delta = 8;
+
+	for (int p2 = 0; p2 < max_pow2; p2++) {
+		memcpy(&pow5, &pow2, sizeof(bigdecimal));
+
+		for (int p5 = 0; p5 < max_pow5; p5++) {
+
+			if (pow5.length >= 2) {
+				bigdecimal_add(&pow5, -max_delta);
+				for (int d = -max_delta; d <= max_delta; d++) {
+
+					for (int exp = min_exp; exp <= max_exp; exp++) {
+						bigdecimal_suffixf(&pow5, "e%+d", exp);
+
+						const char *str = bigdecimal_string(&pow5);
+						test_float(str);
+					}
+
+					bigdecimal_add(&pow5, 1);
+				}
+				bigdecimal_add(&pow5, -max_delta - 1);
+			} else {
+				for (int exp = min_exp; exp <= max_exp; exp++) {
+					bigdecimal_suffixf(&pow5, "e%+d", exp);
+
+					const char *str = bigdecimal_string(&pow5);
+					test_float(str);
+				}
+			}
+				
+			bigdecimal_mul(&pow5, 5);
+		}
+
+		bigdecimal_mul(&pow2, 2);
 	}
 }
 
@@ -216,14 +340,18 @@ void test_malloc(uint32_t rounds)
 
 int main(int argc, char **argv)
 {
+	test_float_decimal();
+
 	test_printf();
-#if 1
 	test_float_parse(14);
 	test_malloc(8*1024*1024);
-#else
+	test_float_decimal();
+
+#if 0
 	test_float_parse(18);
 	test_malloc(64*1024*1024);
 #endif
 }
 
 #include "../misc/ufbx_libc.c"
+

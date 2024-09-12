@@ -267,7 +267,7 @@ static void bigfloat_parse(bigfloat *bf, const char *str)
 	}
 
 	if (dec_exponent < 0) {
-		uint32_t log2_dec = ((int64_t)-dec_exponent * 851) >> 8; // >= log2 10
+		uint32_t log2_dec = ((int64_t)-dec_exponent * 595) >> 8; // >= log2 5
 		uint32_t limb_shift = bigint_limbs_for_bits(log2_dec + 64) + 1;
 		if (limb_shift > bf->mantissa.capacity) {
 			limb_shift = bf->mantissa.capacity;
