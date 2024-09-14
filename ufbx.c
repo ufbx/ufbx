@@ -852,6 +852,16 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 	}
 #endif
 
+// -- Bit conversion
+
+#if defined(__cplusplus)
+	#define ufbxi_bit_cast(m_dst_type, m_dst, m_src_type, m_src) memcpy(&(m_dst), &(m_src), sizeof(m_dst_type))
+#else
+	#define ufbxi_bit_cast(m_dst_type, m_dst, m_src_type, m_src) do { \
+		union { m_dst_type mi_dst; m_src_type mi_src; } mi_union; \
+		mi_union.mi_src = (m_src); (m_dst) = mi_union.mi_dst; } while (0)
+#endif
+
 // -- Debug
 
 #if defined(UFBX_DEBUG_BINARY_SEARCH) || defined(UFBX_REGRESSION)
@@ -1567,11 +1577,11 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	if (flags & UFBXI_PARSE_DOUBLE_AS_BINARY32) {
 		uint32_t bits_lo = (uint32_t)bits;
 		float result;
-		memcpy(&result, &bits_lo, sizeof(float));
+		ufbxi_bit_cast(float, result, uint32_t, bits_lo);
 		return result;
 	} else {
 		double result;
-		memcpy(&result, &bits, sizeof(double));
+		ufbxi_bit_cast(double, result, uint64_t, bits);
 		return result;
 	}
 }
