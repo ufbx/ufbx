@@ -1396,7 +1396,6 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 			if (big_mantissa.length < max_limbs) {
 				digits = digits * 10 + (uint64_t)(c - '0');
 				num_digits++;
-				total_digits++;
 				if (num_digits >= 18) {
 					ufbxi_bigint_mad(&big_mantissa, ufbxi_pow5_tab[num_digits] << num_digits, digits);
 					digits = 0;
