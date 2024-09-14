@@ -821,7 +821,7 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 		v |= v >> 4;
 		v |= v >> 8;
 		v |= v >> 16;
-		return ufbxi_lzcnt64_table[(v * 0x07c4acddu) >> 27];
+		return ufbxi_lzcnt32_table[(v * 0x07c4acddu) >> 27];
 	}
 	static ufbxi_noinline ufbxi_unused uint32_t ufbxi_lzcnt64(uint64_t v) {
 		v |= v >> 1;
