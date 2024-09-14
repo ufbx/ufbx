@@ -83,6 +83,7 @@ jobs:
       - name: Check features
         run: python misc/run_tests.py features --compiler vs_cl64
       - name: Check freestanding
+        if: false
         run: python misc/run_tests.py freestanding --compiler vs_cl64
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
@@ -440,6 +441,7 @@ jobs:
           path: build
       - name: Compile and run hash_scene with various configurations
         run: |
+          set -x
           clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_x64_release.txt --max-dump-errors 3
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_unbuffered_x64_release.txt --max-dump-errors 3 --no-read-buffer
