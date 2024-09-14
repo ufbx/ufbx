@@ -1243,8 +1243,8 @@ static ufbxi_noinline void ufbxi_bigint_mad(ufbxi_bigint *bigint, ufbxi_bigint_a
 
 static ufbxi_noinline bool ufbxi_bigint_div(ufbxi_bigint *q, ufbxi_bigint *u, ufbxi_bigint *v)
 {
-	int32_t n = v->length;
-	int32_t m = u->length - n;
+	int32_t n = (int32_t)v->length;
+	int32_t m = (int32_t)u->length - n;
 	ufbxi_bigint_limb v_hi = v->limbs[v->length - 1];
 	ufbxi_bigint_limb *un = u->limbs, *vn = v->limbs;
 	ufbxi_dev_assert(n >= 2 && m >= 1 && v_hi >> (UFBXI_BIGINT_LIMB_BITS - 1) != 0 && un[n+m - 1] >> (UFBXI_BIGINT_LIMB_BITS - 1) == 0);
@@ -1259,7 +1259,7 @@ static ufbxi_noinline bool ufbxi_bigint_div(ufbxi_bigint *q, ufbxi_bigint *u, uf
 			if (rhat >> UFBXI_BIGINT_LIMB_BITS != 0) break;
 		}
 		ufbxi_bigint_limb carry = 0;
-		for (size_t i = 0; i < n; i++) {
+		for (int32_t i = 0; i < n; i++) {
 			ufbxi_bigint_accum p = qhat * vn[i];
 			t = (ufbxi_bigint_accum)un[i+j] - carry - (ufbxi_bigint_limb)p;
 			un[i+j] = (ufbxi_bigint_limb)t;
@@ -1270,7 +1270,7 @@ static ufbxi_noinline bool ufbxi_bigint_div(ufbxi_bigint *q, ufbxi_bigint *u, uf
 		if (t >> UFBXI_BIGINT_LIMB_BITS != 0) {
 			qhat -= 1;
 			carry = 0;
-			for (size_t i = 0; i < n; i++) {
+			for (int32_t i = 0; i < n; i++) {
 				t = (ufbxi_bigint_accum)un[i+j] + vn[i] + carry;
 				un[i+j] = (ufbxi_bigint_limb)t;
 				carry = (ufbxi_bigint_limb)(t >> UFBXI_BIGINT_LIMB_BITS);
@@ -1280,7 +1280,7 @@ static ufbxi_noinline bool ufbxi_bigint_div(ufbxi_bigint *q, ufbxi_bigint *u, uf
 		q->limbs[j] = (ufbxi_bigint_limb)qhat;
 		if (qhat && !q->length) {
 			ufbxi_dev_assert(j + 1 < (int32_t)q->capacity);
-			q->length = j + 1;
+			q->length = (size_t)(j + 1);
 		}
 	}
 	for (int32_t i = 0; i < n; i++) {
@@ -1395,7 +1395,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 		char c = *p++;
 		if (c >= '0' && c <= '9') {
 			if (big_mantissa.length < max_limbs) {
-				digits = digits * 10 + (c - '0');
+				digits = digits * 10 + (uint64_t)(c - '0');
 				num_digits++;
 				total_digits++;
 				if (num_digits >= 18) {
@@ -1529,7 +1529,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 		if (dec_exponent + (int32_t)(big_mantissa.length - 1) * 9 >= 310) return negative ? -UFBX_INFINITY : UFBX_INFINITY;
 
 		exponent += dec_exponent;
-		ufbxi_bigint_mul_pow5(&big_mantissa, dec_exponent);
+		ufbxi_bigint_mul_pow5(&big_mantissa, (uint32_t)dec_exponent);
 	}
 
 	uint64_t mantissa = ufbxi_bigint_extract_high(big_mantissa, &exponent, &tail);
@@ -25506,6 +25506,7 @@ static bool ufbxi_prop_override_less(void *user, const void *va, const void *vb)
 
 static bool ufbxi_transform_override_less(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbx_transform_override *a = (const ufbx_transform_override*)va, *b = (const ufbx_transform_override*)vb;
 	return a->node_id < b->node_id;
 }
@@ -25692,6 +25693,7 @@ typedef struct {
 
 static bool ufbxi_bake_prop_less(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbxi_bake_prop *a = (const ufbxi_bake_prop*)va;
 	const ufbxi_bake_prop *b = (const ufbxi_bake_prop*)vb;
 	if (a->sort_id != b->sort_id) return a->sort_id < b->sort_id;
@@ -27648,6 +27650,7 @@ ufbxi_noinline static uint32_t ufbxi_triangulate_ngon(ufbxi_ngon_context *nc, ui
 
 static bool ufbxi_topo_less_index_prev_next(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbx_topo_edge *a = (const ufbx_topo_edge*)va, *b = (const ufbx_topo_edge*)vb;
 	if ((int32_t)a->prev != (int32_t)b->prev) return (int32_t)a->prev < (int32_t)b->prev;
 	return (int32_t)a->next < (int32_t)b->next;
@@ -27655,6 +27658,7 @@ static bool ufbxi_topo_less_index_prev_next(void *user, const void *va, const vo
 
 static bool ufbxi_topo_less_index_index(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	const ufbx_topo_edge *a = (const ufbx_topo_edge*)va, *b = (const ufbx_topo_edge*)vb;
 	return (int32_t)a->index < (int32_t)b->index;
 }
@@ -27893,6 +27897,7 @@ static int ufbxi_subdivide_sum_vec4(void *user, void *output, const ufbxi_subdiv
 
 static ufbxi_noinline bool ufbxi_subdivision_weight_less(void *user, const void *va, const void *vb)
 {
+	(void)user;
 	ufbx_subdivision_weight a = *(const ufbx_subdivision_weight*)va, b = *(const ufbx_subdivision_weight*)vb;
 	ufbxi_dev_assert(a.index != b.index);
 	if (a.weight != b.weight) return a.weight > b.weight;
