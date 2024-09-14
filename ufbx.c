@@ -1311,7 +1311,7 @@ static ufbxi_noinline void ufbxi_bigint_shift_left(ufbxi_bigint *bigint, uint32_
 	uint32_t bits_down = UFBXI_BIGINT_LIMB_BITS - bits - 1;
 	bigint->length += words + (b.limbs[b.length - 1] >> 1 >> bits_down != 0 ? 1 : 0);
 	b.limbs[b.length] = 0;
-	if (b.length <= 3 && words <= 3) {
+	if (b.length <= 3 && words <= 3 && false) { // TEMP HACK
 		ufbxi_bigint_limb l0 = ufbxi_maybe_uninit(b.length >= 1, b.limbs[0], ~0u);
 		ufbxi_bigint_limb l1 = ufbxi_maybe_uninit(b.length >= 2, b.limbs[1], ~0u);
 		ufbxi_bigint_limb l2 = ufbxi_maybe_uninit(b.length >= 3, b.limbs[2], ~0u);
