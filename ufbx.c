@@ -1280,7 +1280,7 @@ static ufbxi_noinline bool ufbxi_bigint_div(ufbxi_bigint *q, ufbxi_bigint *u, uf
 		q->limbs[j] = (ufbxi_bigint_limb)qhat;
 		if (qhat && !q->length) {
 			ufbxi_dev_assert(j + 1 < (int32_t)q->capacity);
-			q->length = (size_t)(j + 1);
+			q->length = (uint32_t)(j + 1);
 		}
 	}
 	for (int32_t i = 0; i < n; i++) {
@@ -1349,7 +1349,7 @@ static ufbxi_noinline uint64_t ufbxi_bigint_extract_high(const ufbxi_bigint b, i
 	for (uint32_t i = limb_count + 1; i < b.length; i++) {
 		*p_tail |= ufbxi_bigint_top_limb(b, i) != 0;
 	}
-	*p_exponent += b.length * UFBXI_BIGINT_LIMB_BITS - shift - 1;
+	*p_exponent += (int32_t)(b.length * UFBXI_BIGINT_LIMB_BITS - shift - 1);
 	return result;
 }
 
@@ -1385,7 +1385,6 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	bool negative = false, tail = false, digits_valid = true;
 	uint64_t digits = 0;
 	uint32_t num_digits = 0;
-	uint32_t total_digits = 0;
 
 	const char *p = str;
 	if (*p == '+' || *p == '-') {
