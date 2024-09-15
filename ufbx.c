@@ -21,7 +21,6 @@
 //   UFBX_LITTLE_ENDIAN=0/1    Explicitly define little/big endian architecture
 //   UFBX_PATH_SEPARATOR=''    Specify default platform path separator
 //   UFBX_NO_STDIO             Disable stdio FILE API
-//   UFBX_NO_STDERR            Disable printing errors to stderr
 //   UFBX_NO_MALLOC            Disable default malloc/realloc/free
 //   UFBX_NO_SSE               Do not try to include SSE
 //   UFBX_NO_LIBC              Do not include libc
@@ -186,7 +185,7 @@
 	#include <string.h>
 	#include <stdarg.h>
 	#include <float.h>
-	#if !defined(UFBX_NO_STDIO) || !defined(UFBX_NO_STDERR)
+	#if !defined(UFBX_NO_STDIO)
 		#include <stdio.h>
 	#endif
 	#if !defined(UFBX_NO_MALLOC)
@@ -298,7 +297,7 @@
 	static void ufbxi_panic_handler(const char *message)
 	{
 		(void)message;
-		#if !defined(UFBX_NO_STDIO) && !defined(UFBX_NO_STDERR) && !defined(UFBX_NO_LIBC)
+		#if !defined(UFBX_NO_STDIO) && !defined(UFBX_NO_LIBC)
 			fprintf(stderr, "ufbx panic: %s\n", message);
 		#endif
 		ufbx_assert(false && "ufbx panic: See stderr for more information");
