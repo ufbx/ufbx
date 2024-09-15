@@ -1,27 +1,28 @@
+void ufbxt_assert_fail(const char *message);
+#define ufbxt_assert(cond) do { if (!(cond)) ufbxt_assert_fail(#cond); } while (0)
+#define ufbxh_assert(cond) ufbxt_assert(cond)
+#define ufbx_assert(cond) ufbxt_assert(cond)
 
+#define UFBX_NO_LIBC
 #define UFBX_DEV
 #define UFBX_NO_ASSERT
 #include "../../ufbx.h"
 
-#define UFBXC_HAS_MALLOC
-#define UFBXC_HAS_STDIO
-#define UFBXC_HAS_STDERR
-#define UFBXC_HAS_EXIT
-#include "../ufbx_libc.h"
+#include "../../extra/ufbx_libc.h"
+#include "../../extra/ufbx_math.h"
+#include "../ufbx_printf.h"
 
-#define isnan(v) fdlibm_isnan(v)
-#define vsnprintf ufbxc_vsnprintf
+#define isnan(v) ufbx_isnan(v)
+#define vsnprintf ufbx_vsnprintf
 
-#define strlen ufbxc_strlen
-#define memcpy ufbxc_memcpy
-#define memmove ufbxc_memmove
-#define memset ufbxc_memset
-#define memchr ufbxc_memchr
-#define memcmp ufbxc_memcmp
-#define strcmp ufbxc_strcmp
-#define strncmp ufbxc_strncmp
-
-void ufbxt_assert_fail(const char *message);
+#define strlen ufbx_strlen
+#define memcpy ufbx_memcpy
+#define memmove ufbx_memmove
+#define memset ufbx_memset
+#define memchr ufbx_memchr
+#define memcmp ufbx_memcmp
+#define strcmp ufbx_strcmp
+#define strncmp ufbx_strncmp
 
 #if defined(__wasm__)
 	#define wasm_import(name) __attribute__((import_module("host"), import_name(name)))
@@ -30,9 +31,6 @@ void ufbxt_assert_fail(const char *message);
 	#define wasm_import(name)
 	#define wasm_export(name)
 #endif
-
-#define ufbxt_assert(cond) do { if (!(cond)) ufbxt_assert_fail(#cond); } while (0)
-#define ufbxh_assert(cond) ufbxt_assert(cond)
 
 int ufbxh_snprintf(char *buffer, size_t size, const char *fmt, ...)
 {
@@ -76,9 +74,22 @@ void verbosef(const char *fmt, ...)
 	}
 }
 
+void errorf(const char *fmt, ...)
+{
+	char buffer[512];
+	va_list args;
+	va_start(args, fmt);
+	int ret = vsnprintf(buffer, sizeof(buffer), fmt, args);
+	va_end(args);
+
+	if (ret > 0) {
+		host_error(buffer, (size_t)ret);
+	}
+}
+
 char g_memory[32*1024*1024];
 
-void *ufbxc_os_allocate(size_t size, size_t *p_allocated_size)
+void *ufbx_libc_allocate(size_t size, size_t *p_allocated_size)
 {
 	static bool allocated = false;
 	if (allocated) return NULL;
@@ -88,46 +99,34 @@ void *ufbxc_os_allocate(size_t size, size_t *p_allocated_size)
 	return g_memory;
 }
 
-bool ufbxc_os_free(void *pointer, size_t allocated_size)
+bool ufbx_libc_free(void *pointer, size_t allocated_size)
 {
 	return false;
 }
 
-void ufbxc_os_print_error(const char *message, size_t length)
+bool ufbx_libc_open_file(size_t index, const char *filename, size_t filename_len, void **p_handle, uint64_t *p_file_size)
 {
-	host_error(message, length);
-}
-
-void ufbxc_os_exit(int code)
-{
-	host_exit(code);
-}
-
-bool ufbxc_os_open_file(size_t index, const char *filename, size_t *p_file_size)
-{
-	size_t len = ufbxc_strlen(filename);
-	int size = host_open_file(index, filename, len);
+	int size = host_open_file(index, filename, filename_len);
 	if (size < 0) return false;
-
-	*p_file_size = (size_t)size;
+	*p_file_size = (uint64_t)size;
 	return true;
 }
 
-size_t ufbxc_os_read_file(size_t index, void *dst, size_t offset, size_t count)
+size_t ufbx_libc_read_file(size_t index, void *handle, void *dst, uint64_t offset, uint32_t count, uint32_t skipped_bytes)
 {
 	host_read_file(index, dst, offset, count);
 	return count;
 }
 
-void ufbxc_os_close_file(size_t index)
+void ufbx_libc_close_file(size_t index, void *handle)
 {
 	host_close_file(index);
 }
 
 void ufbxt_assert_fail(const char *message)
 {
-	ufbxc_fprintf(ufbxc_stderr, "ufbxc_assert() fail: %s\n", message);
-	ufbxc_os_exit(1);
+	errorf("ufbxc_assert() fail: %s\n", message);
+	host_exit(1);
 }
 
 static char dump_buffer[4096];
@@ -165,13 +164,13 @@ int ufbxh_fprintf(ufbxh_FILE *f, const char *fmt, ...)
 wasm_export("hashAlloc")
 void *hash_alloc(size_t size)
 {
-	return ufbxc_malloc(size);
+	return ufbx_malloc(size);
 }
 
 wasm_export("hashFree")
 void hash_free(void *pointer)
 {
-	ufbxc_free(pointer);
+	ufbx_free(pointer, 0);
 }
 
 wasm_export("hashScene")
@@ -195,7 +194,7 @@ int hash_scene(uint64_t *p_hash, const void *data, size_t size, const char *file
 		char err[512];
 		verbosef("Failed to load the scene: %u", error.type);
 		ufbx_format_error(err, sizeof(err), &error);
-		ufbxc_fprintf(ufbxc_stderr, "%s\n", err);
+		errorf("%s\n", err);
 		return 1;
 	}
 
@@ -212,7 +211,7 @@ int hash_scene(uint64_t *p_hash, const void *data, size_t size, const char *file
 		double time = scene->anim->time_begin + frame / scene->settings.frames_per_second;
 		ufbx_scene *state = ufbx_evaluate_scene(scene, NULL, time, NULL, &error);
 		if (!state) {
-			ufbxc_fprintf(ufbxc_stderr, "Failed to evaluate scene: %s\n", error.description.data);
+			errorf("Failed to evaluate scene: %s\n", error.description.data);
 			return 2;
 		}
 
@@ -244,6 +243,7 @@ int hash_scene(uint64_t *p_hash, const void *data, size_t size, const char *file
 #undef strcmp
 #undef strncmp
 
-#include "../ufbx_libc.c"
-#include "../fdlibm.c"
 #include "../../ufbx.c"
+#include "../../extra/ufbx_math.c"
+#include "../../extra/ufbx_libc.c"
+#include "../ufbx_printf.c"
