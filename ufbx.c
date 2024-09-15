@@ -535,8 +535,10 @@ extern "C" {
 #if defined(UFBX_STATIC_ANALYSIS)
 	bool ufbxi_analysis_opaque;
 	#define ufbxi_maybe_null(ptr) (ufbxi_analysis_opaque ? (ptr) : NULL)
+	#define ufbxi_analysis_assert(cond) ufbx_assert(cond)
 #else
 	#define ufbxi_maybe_null(ptr) (ptr)
+	#define ufbxi_analysis_assert(cond) (void)0
 #endif
 
 #if defined(UFBX_STATIC_ANALYSIS) || defined(UFBX_UBSAN)
@@ -17505,6 +17507,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_load_mtl(ufbxi_context *uc)
 		if (!has_stream && uc->opts.load_external_files && uc->opts.obj_search_mtl_by_filename && path.length > 4) {
 			ufbx_string ext = { path.data + path.length - 4, 4 };
 			if (ufbxi_match(&ext, "\\c.obj")) {
+				ufbxi_analysis_assert(path.length < SIZE_MAX - 1);
 				char *copy = ufbxi_push_copy(&uc->tmp, char, path.length + 1, path.data);
 				ufbxi_check(copy);
 				copy[path.length - 3] = copy[path.length - 3] == 'O' ? 'M' : 'm';
