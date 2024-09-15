@@ -610,7 +610,6 @@
 
 #if defined(UFBX_STRING_PREFIX)
 	#define ufbxi_string_fn(name) ufbxi_pre_cat(UFBX_STRING_PREFIX, name)
-
 	#define strlen ufbxi_string_fn(strlen)
 	#define memcpy ufbxi_string_fn(memcpy)
 	#define memmove ufbxi_string_fn(memmove)
