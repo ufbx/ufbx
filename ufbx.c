@@ -3096,8 +3096,8 @@ static void ufbxi_vprint(ufbxi_print_buffer *buf, const char *fmt, va_list args)
 				min_width = (size_t)va_arg(args, int);
 			}
 			if (*p == '.') {
-				p++;
-				ufbxi_dev_assert(*p++ == '*');
+				ufbxi_dev_assert(p[1] == '*');
+				p += 2;
 				max_width = (size_t)va_arg(args, int);
 			}
 			uint32_t flags = 0;
