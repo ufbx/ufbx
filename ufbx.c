@@ -3047,23 +3047,97 @@ ufbxi_extern_c ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inf
 
 #endif // !defined(ufbx_inflate)
 
+// -- Printf
+
+typedef struct {
+	char *dst;
+	size_t length;
+	size_t pos;
+} ufbxi_print_buffer;
+
+#define UFBXI_PRINT_UNSIGNED 0x1
+#define UFBXI_PRINT_STRING 0x2
+#define UFBXI_PRINT_SIZE_T 0x10
+
+static void ufbxi_print_append(ufbxi_print_buffer *buf, size_t min_width, size_t max_width, uint32_t flags, const char *str)
+{
+	size_t width = 0;
+	for (width = 0; width < max_width; width++) {
+		if (!str[width]) break;
+	}
+	size_t pad = min_width > width ? min_width - width : 0;
+	for (size_t i = 0; i < pad; i++) {
+		if (buf->pos < buf->length) buf->dst[buf->pos++] = ' ';
+	}
+	for (size_t i = 0; i < width; i++) {
+		if (buf->pos < buf->length) buf->dst[buf->pos++] = str[i];
+	}
+}
+
+static char *ufbxi_print_format_int(char *buffer, uint64_t value)
+{
+	*--buffer = '\0';
+	do {
+		uint32_t digit = (uint32_t)(value % 10);
+		value = value / 10;
+		*--buffer = (char)('0' + digit);
+	} while (value > 0);
+	return buffer;
+}
+
+static void ufbxi_vprint(ufbxi_print_buffer *buf, const char *fmt, va_list args)
+{
+	char buffer[96]; // ufbxi_uninit
+	for (const char *p = fmt; *p;) {
+		if (*p == '%' && *++p != '%') {
+			size_t min_width = 0, max_width = SIZE_MAX;
+			if (*p == '*') {
+				p++;
+				min_width = (size_t)va_arg(args, int);
+			}
+			if (*p == '.') {
+				p++;
+				ufbxi_dev_assert(*p++ == '*');
+				max_width = (size_t)va_arg(args, int);
+			}
+			uint32_t flags = 0;
+			switch (*p) {
+			case 'z': p++; flags |= UFBXI_PRINT_SIZE_T; break;
+			}
+			switch (*p++) {
+			case 'u': flags |= UFBXI_PRINT_UNSIGNED; break;
+			case 's': flags |= UFBXI_PRINT_STRING; break;
+			}
+			if (flags & UFBXI_PRINT_STRING) {
+				const char *str = va_arg(args, const char*);
+				ufbxi_print_append(buf, min_width, max_width, flags, str);
+			} else if (flags & UFBXI_PRINT_UNSIGNED) {
+				uint64_t value = (flags & UFBXI_PRINT_SIZE_T) != 0 ? (uint64_t)va_arg(args, size_t) : (uint64_t)va_arg(args, uint32_t);
+				char *str = ufbxi_print_format_int(buffer + sizeof(buffer), value);
+				ufbxi_print_append(buf, min_width, max_width, flags, str);
+			} else {
+				ufbxi_unreachable("Bad printf format");
+			}
+		} else {
+			if (buf->pos < buf->length) buf->dst[buf->pos++] = *p;
+			p++;
+		}
+	}
+	if (buf->length && buf->dst) {
+		size_t end = buf->pos <= buf->length - 1 ? buf->pos : buf->length - 1;
+		buf->dst[end] = '\0';
+	}
+}
+
 // -- Errors
 
 static const char ufbxi_empty_char[1] = { '\0' };
 
 static ufbxi_noinline int ufbxi_vsnprintf(char *buf, size_t buf_size, const char *fmt, va_list args)
 {
-	int result = vsnprintf(buf, buf_size, fmt, args);
-
-	if (result < 0) result = 0;
-	if ((size_t)result >= buf_size - 1) result = (int)buf_size - 1;
-
-	// HACK: On some MSYS/MinGW implementations `vsnprintf` is broken and does
-	// not write the null terminator on truncation, it's always safe to do so
-	// let's just do it unconditionally here...
-	buf[result] = '\0';
-
-	return result;
+	ufbxi_print_buffer buffer = { buf, buf_size };
+	ufbxi_vprint(&buffer, fmt, args);
+	return (int)ufbxi_min_sz(buffer.pos, buf_size - 1);
 }
 
 static ufbxi_noinline int ufbxi_snprintf(char *buf, size_t buf_size, const char *fmt, ...)
