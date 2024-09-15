@@ -236,6 +236,27 @@
 	#endif
 #endif
 
+#if defined(UFBX_MATH_PREFIX)
+	#define ufbxi_math_fn(name) ufbxi_pre_cat(UFBX_MATH_PREFIX, name)
+	#define ufbx_sqrt ufbxi_math_fn(sqrt)
+	#define ufbx_fabs ufbxi_math_fn(fabs)
+	#define ufbx_pow ufbxi_math_fn(pow)
+	#define ufbx_sin ufbxi_math_fn(sin)
+	#define ufbx_cos ufbxi_math_fn(cos)
+	#define ufbx_tan ufbxi_math_fn(tan)
+	#define ufbx_asin ufbxi_math_fn(asin)
+	#define ufbx_acos ufbxi_math_fn(acos)
+	#define ufbx_atan ufbxi_math_fn(atan)
+	#define ufbx_atan2 ufbxi_math_fn(atan2)
+	#define ufbx_copysign ufbxi_math_fn(copysign)
+	#define ufbx_fmin ufbxi_math_fn(fmin)
+	#define ufbx_fmax ufbxi_math_fn(fmax)
+	#define ufbx_nextafter ufbxi_math_fn(nextafter)
+	#define ufbx_rint ufbxi_math_fn(rint)
+	#define ufbx_ceil ufbxi_math_fn(ceil)
+	#define ufbx_isnan ufbxi_math_fn(isnan)
+#endif
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -645,27 +666,6 @@ extern "C" {
 
 // ^^ No references to <string.h> before this point ^^
 // vv No more includes past this point vv
-
-#if defined(UFBX_MATH_PREFIX)
-	#define ufbxi_math_fn(name) ufbxi_pre_cat(UFBX_MATH_PREFIX, name)
-	#define ufbx_sqrt ufbxi_math_fn(sqrt)
-	#define ufbx_fabs ufbxi_math_fn(fabs)
-	#define ufbx_pow ufbxi_math_fn(pow)
-	#define ufbx_sin ufbxi_math_fn(sin)
-	#define ufbx_cos ufbxi_math_fn(cos)
-	#define ufbx_tan ufbxi_math_fn(tan)
-	#define ufbx_asin ufbxi_math_fn(asin)
-	#define ufbx_acos ufbxi_math_fn(acos)
-	#define ufbx_atan ufbxi_math_fn(atan)
-	#define ufbx_atan2 ufbxi_math_fn(atan2)
-	#define ufbx_copysign ufbxi_math_fn(copysign)
-	#define ufbx_fmin ufbxi_math_fn(fmin)
-	#define ufbx_fmax ufbxi_math_fn(fmax)
-	#define ufbx_nextafter ufbxi_math_fn(nextafter)
-	#define ufbx_rint ufbxi_math_fn(rint)
-	#define ufbx_ceil ufbxi_math_fn(ceil)
-	#define ufbx_isnan ufbxi_math_fn(isnan)
-#endif
 
 #if defined(UFBX_STRING_PREFIX)
 	#define ufbxi_string_fn(name) ufbxi_pre_cat(UFBX_STRING_PREFIX, name)
@@ -24535,6 +24535,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 		}
 		if (!ok) {
 			if (error.type != UFBX_ERROR_NONE) {
+				// cppcheck-suppress uninitStructMember
 				uc->error = error;
 			} else {
 				ufbxi_set_err_info(&uc->error, filename, filename_len);
