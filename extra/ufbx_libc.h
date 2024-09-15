@@ -31,7 +31,7 @@ ufbx_libc_abi int ufbx_strncmp(const char *a, const char *b, size_t count);
 #if !defined(UFBX_NO_MALLOC)
 	ufbx_libc_abi void *ufbx_malloc(size_t size);
 	ufbx_libc_abi void *ufbx_realloc(void *ptr, size_t old_size, size_t new_size);
-	ufbx_libc_abi void *ufbx_free(void *ptr, size_t old_size);
+	ufbx_libc_abi void ufbx_free(void *ptr, size_t old_size);
 #endif
 
 #if !defined(UFBX_NO_STDIO)

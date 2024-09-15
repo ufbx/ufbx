@@ -295,7 +295,7 @@ extern "C" {
 #if defined(UFBX_NO_LIBC) && !defined(UFBX_NO_MALLOC) && !defined(UFBX_NO_LIBC_DEFINES)
 	ufbx_extern_abi void *ufbx_malloc(size_t size);
 	ufbx_extern_abi void *ufbx_realloc(void *ptr, size_t old_size, size_t new_size);
-	ufbx_extern_abi void *ufbx_free(void *ptr, size_t old_size);
+	ufbx_extern_abi void ufbx_free(void *ptr, size_t old_size);
 #endif
 
 #if defined(UFBX_NO_LIBC) && !defined(UFBX_NO_STDIO) && !defined(UFBX_NO_LIBC_DEFINES)
