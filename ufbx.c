@@ -6750,7 +6750,8 @@ static ufbxi_noinline void ufbxi_end_file_context(ufbxi_file_context *fc, ufbx_e
 
 static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path, size_t path_len, bool null_terminated)
 {
-#if !defined(UFBX_STANDARD_C) && defined(_WIN32) && !defined(UFBX_NO_LIBC)
+	FILE *file = NULL;
+#if !defined(UFBX_STANDARD_C) && defined(_WIN32)
 	(void)null_terminated;
 	wchar_t wpath_buf[256];
 	wchar_t *wpath = NULL;
@@ -6793,23 +6794,17 @@ static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path
 	}
 	wpath[wlen] = 0;
 
-	FILE *file = NULL;
 #if UFBXI_MSC_VER >= 1400
 	if (_wfopen_s(&file, wpath, L"rb") != 0) {
-		ufbxi_set_err_info(&fc->error, path, path_len);
-		ufbxi_report_err_msg(&fc->error, "file", "File not found");
 		file = NULL;
 	}
 #else
 	file = _wfopen(wpath, L"rb");
 #endif
-
 	if (wpath != wpath_buf) {
 		ufbxi_free(&fc->ator, wchar_t, wpath, path_len + 1);
 	}
-	return file;
 #else
-	FILE *file = NULL;
 	if (null_terminated) {
 		file = fopen(path, "rb");
 	} else {
@@ -6830,12 +6825,12 @@ static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path
 			ufbxi_free(&fc->ator, char, copy, path_len + 1);
 		}
 	}
+#endif
 	if (!file) {
 		ufbxi_set_err_info(&fc->error, path, path_len);
 		ufbxi_report_err_msg(&fc->error, "file", "File not found");
 	}
 	return file;
-#endif
 }
 
 static uint64_t ufbxi_ftell(FILE *file)
