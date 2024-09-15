@@ -5263,7 +5263,7 @@ ufbx_unsafe ufbx_abi bool ufbx_open_file_ctx(ufbx_stream *stream, ufbx_open_file
 
 // NOTE: Uses the default ufbx allocator!
 ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t data_size, const ufbx_open_memory_opts *opts, ufbx_error *error);
-ufbx_unsafe ufbx_abi bool ufbx_open_memory_ctx(ufbx_stream *stream, ufbx_open_file_context ctx, const void *data, size_t data_size, const ufbx_open_memory_opts *opts, ufbx_error *error); 
+ufbx_unsafe ufbx_abi bool ufbx_open_memory_ctx(ufbx_stream *stream, ufbx_open_file_context ctx, const void *data, size_t data_size, const ufbx_open_memory_opts *opts, ufbx_error *error);
 
 // Animation evaluation
 
