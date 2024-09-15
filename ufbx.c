@@ -3059,7 +3059,7 @@ typedef struct {
 #define UFBXI_PRINT_STRING 0x2
 #define UFBXI_PRINT_SIZE_T 0x10
 
-static void ufbxi_print_append(ufbxi_print_buffer *buf, size_t min_width, size_t max_width, uint32_t flags, const char *str)
+static void ufbxi_print_append(ufbxi_print_buffer *buf, size_t min_width, size_t max_width, const char *str)
 {
 	size_t width = 0;
 	for (width = 0; width < max_width; width++) {
@@ -3110,11 +3110,11 @@ static void ufbxi_vprint(ufbxi_print_buffer *buf, const char *fmt, va_list args)
 			}
 			if (flags & UFBXI_PRINT_STRING) {
 				const char *str = va_arg(args, const char*);
-				ufbxi_print_append(buf, min_width, max_width, flags, str);
+				ufbxi_print_append(buf, min_width, max_width, str);
 			} else if (flags & UFBXI_PRINT_UNSIGNED) {
 				uint64_t value = (flags & UFBXI_PRINT_SIZE_T) != 0 ? (uint64_t)va_arg(args, size_t) : (uint64_t)va_arg(args, uint32_t);
 				char *str = ufbxi_print_format_int(buffer + sizeof(buffer), value);
-				ufbxi_print_append(buf, min_width, max_width, flags, str);
+				ufbxi_print_append(buf, min_width, max_width, str);
 			} else {
 				ufbxi_unreachable("Bad printf format");
 			}
