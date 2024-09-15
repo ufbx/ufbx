@@ -16110,15 +16110,6 @@ static void ufbxi_ator_free(void *user, void *ptr, size_t size)
 	ufbxi_free(ator, char, ptr, size);
 }
 
-static ufbxi_noinline void ufbxi_setup_ator_allocator(ufbx_allocator *allocator, ufbxi_allocator *ator)
-{
-	allocator->alloc_fn = &ufbxi_ator_alloc;
-	allocator->realloc_fn = &ufbxi_ator_realloc;
-	allocator->free_fn = &ufbxi_ator_free;
-	allocator->free_allocator_fn = NULL;
-	allocator->user = ator;
-}
-
 static ufbxi_noinline bool ufbxi_open_file(const ufbx_open_file_cb *cb, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_blob *original_filename, ufbxi_allocator *ator, ufbx_open_file_type type)
 {
 	if (!cb || !cb->fn) return false;
