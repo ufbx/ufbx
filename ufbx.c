@@ -16092,24 +16092,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_relative_filename(ufbxi_
 
 // Open file utility
 
-static void *ufbxi_ator_alloc(void *user, size_t size)
-{
-	ufbxi_allocator *ator = (ufbxi_allocator*)user;
-	return ufbxi_alloc(ator, char, size);
-}
-
-static void *ufbxi_ator_realloc(void *user, void *old_ptr, size_t old_size, size_t new_size)
-{
-	ufbxi_allocator *ator = (ufbxi_allocator*)user;
-	return ufbxi_realloc(ator, char, old_ptr, old_size, new_size);
-}
-
-static void ufbxi_ator_free(void *user, void *ptr, size_t size)
-{
-	ufbxi_allocator *ator = (ufbxi_allocator*)user;
-	ufbxi_free(ator, char, ptr, size);
-}
-
 static ufbxi_noinline bool ufbxi_open_file(const ufbx_open_file_cb *cb, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_blob *original_filename, ufbxi_allocator *ator, ufbx_open_file_type type)
 {
 	if (!cb || !cb->fn) return false;
