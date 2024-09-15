@@ -6755,7 +6755,7 @@ static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path
 		if (path_len < ufbxi_arraycount(copy_buf) - 1) {
 			copy = copy_buf;
 		} else {
-			copy = ufbxi_alloc(tmp_ator, char, path_len + 1);
+			copy = ufbxi_alloc(&fc->ator, char, path_len + 1);
 			if (!copy) return NULL;
 		}
 		memcpy(copy, path, path_len);
@@ -6763,12 +6763,12 @@ static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path
 
 		FILE *file = fopen(copy, "rb");
 		if (copy != copy_buf) {
-			ufbxi_free(tmp_ator, char, copy, path_len + 1);
+			ufbxi_free(&fc->ator, char, copy, path_len + 1);
 		}
 	}
 	if (!file) {
-		ufbxi_set_err_info(fc->error, path, path_len);
-		ufbxi_report_err_msg(fc->error, "file", "File not found");
+		ufbxi_set_err_info(&fc->error, path, path_len);
+		ufbxi_report_err_msg(&fc->error, "file", "File not found");
 	}
 	return file;
 #endif
