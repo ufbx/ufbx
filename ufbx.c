@@ -6761,7 +6761,7 @@ static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path
 		memcpy(copy, path, path_len);
 		copy[path_len] = '\0';
 
-		FILE *file = fopen(copy, "rb");
+		file = fopen(copy, "rb");
 		if (copy != copy_buf) {
 			ufbxi_free(&fc->ator, char, copy, path_len + 1);
 		}
