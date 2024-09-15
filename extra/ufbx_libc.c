@@ -315,6 +315,7 @@ ufbx_libc_abi void *ufbx_realloc(void *ptr, size_t old_size, size_t new_size)
 	void *new_ptr = ufbx_malloc(new_size);
 	if (!new_ptr) return NULL;
 	ufbx_memcpy(new_ptr, ptr, old_size < new_size ? old_size : new_size);
+	ufbx_free(ptr, old_size);
 	return new_ptr;
 }
 
