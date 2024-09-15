@@ -3103,10 +3103,12 @@ static void ufbxi_vprint(ufbxi_print_buffer *buf, const char *fmt, va_list args)
 			uint32_t flags = 0;
 			switch (*p) {
 			case 'z': p++; flags |= UFBXI_PRINT_SIZE_T; break;
+			default: break;
 			}
 			switch (*p++) {
 			case 'u': flags |= UFBXI_PRINT_UNSIGNED; break;
 			case 's': flags |= UFBXI_PRINT_STRING; break;
+			default: break;
 			}
 			if (flags & UFBXI_PRINT_STRING) {
 				const char *str = va_arg(args, const char*);
