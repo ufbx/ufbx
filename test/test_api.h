@@ -21,7 +21,7 @@ static bool ufbxt_open_file_memory_default(void *user, ufbx_stream *stream, cons
 	return ok;
 }
 
-static bool ufbxt_open_file_memory_temp(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info)
+static bool ufbxt_open_file_memory_ctx(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info)
 {
 	++*(size_t*)user;
 
@@ -29,10 +29,7 @@ static bool ufbxt_open_file_memory_temp(void *user, ufbx_stream *stream, const c
 	void *data = ufbxt_read_file(path, &size);
 	if (!data) return false;
 
-	ufbx_open_memory_opts opts = { 0 };
-	opts.allocator.allocator = info->temp_allocator;
-
-	bool ok = ufbx_open_memory(stream, data, size, &opts, NULL);
+	bool ok = ufbx_open_memory_ctx(stream, info->context, data, size, NULL, NULL);
 	free(data);
 	return ok;
 }
@@ -98,10 +95,10 @@ UFBXT_TEST(open_memory_default)
 }
 #endif
 
-UFBXT_TEST(open_memory_temp)
+UFBXT_TEST(open_memory_ctx)
 #if UFBXT_IMPL
 {
-	ufbxt_do_open_memory_test("maya_cache_sine", 5, 0, ufbxt_open_file_memory_temp);
+	ufbxt_do_open_memory_test("maya_cache_sine", 5, 0, ufbxt_open_file_memory_ctx);
 }
 #endif
 
@@ -119,10 +116,10 @@ UFBXT_TEST(obj_open_memory_default)
 }
 #endif
 
-UFBXT_TEST(obj_open_memory_temp)
+UFBXT_TEST(obj_open_memory_ctx)
 #if UFBXT_IMPL
 {
-	ufbxt_do_open_memory_test("blender_279_ball", 1, 2, ufbxt_open_file_memory_temp);
+	ufbxt_do_open_memory_test("blender_279_ball", 1, 2, ufbxt_open_file_memory_ctx);
 }
 #endif
 
@@ -795,7 +792,7 @@ static bool ufbxt_fail_skip(void *user, size_t size)
 
 static bool ufbxt_open_file_bad_skip(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info)
 {
-	bool ok = ufbx_open_file(stream, path, path_len);
+	bool ok = ufbx_open_file(stream, path, path_len, NULL, NULL);
 	ufbxt_assert(ok);
 	stream->skip_fn = &ufbxt_fail_skip;
 	return true;

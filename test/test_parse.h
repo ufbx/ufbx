@@ -515,10 +515,11 @@ UFBXT_TEST(open_file)
 
 	for (size_t i = 0; i < 2; i++) {
 		ufbx_stream stream = { 0 };
-		bool ok = ufbx_open_file(&stream, buf, i == 0 ? SIZE_MAX : strlen(buf));
+		bool ok = ufbx_open_file(&stream, buf, i == 0 ? SIZE_MAX : strlen(buf), NULL, NULL);
 		ufbxt_assert(ok);
 		ufbxt_assert(stream.skip_fn);
 		ufbxt_assert(stream.read_fn);
+		ufbxt_assert(stream.size_fn);
 		ufbxt_assert(stream.close_fn);
 
 		ufbxt_assert(stream.skip_fn(stream.user, 2));

@@ -3985,12 +3985,17 @@ typedef size_t ufbx_read_fn(void *user, void *data, size_t size);
 // Skip `size` bytes in the file.
 typedef bool ufbx_skip_fn(void *user, size_t size);
 
+// Get the size of the file.
+// Return `0` if unknown, `UINT64_MAX` if error.
+typedef uint64_t ufbx_size_fn(void *user);
+
 // Close the file
 typedef void ufbx_close_fn(void *user);
 
 typedef struct ufbx_stream {
 	ufbx_read_fn *read_fn;   // < Required
 	ufbx_skip_fn *skip_fn;   // < Optional: Will use `read_fn()` if missing
+	ufbx_size_fn *size_fn;   // < Optional
 	ufbx_close_fn *close_fn; // < Optional
 
 	// Context passed to other functions
@@ -4007,12 +4012,16 @@ typedef enum ufbx_open_file_type UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_open_file_type, UFBX_OPEN_FILE_TYPE, UFBX_OPEN_FILE_OBJ_MTL);
 
+typedef uintptr_t ufbx_open_file_context;
+
 typedef struct ufbx_open_file_info {
+	// Context that can be passed to the following functions to use a shared allocator:
+	//   ufbx_open_file_ctx()
+	//   ufbx_open_memory_ctx()
+	ufbx_open_file_context context;
+
 	// Kind of file to load.
 	ufbx_open_file_type type;
-
-	// Temporary allocator to use.
-	ufbx_allocator temp_allocator;
 
 	// Original filename in the file, not resolved or UTF-8 encoded.
 	// NOTE: Not necessarily NULL-terminated!
@@ -4030,6 +4039,19 @@ typedef struct ufbx_open_file_cb {
 		(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info),
 		(stream, path, path_len, info))
 } ufbx_open_file_cb;
+
+// Options for `ufbx_open_file()`.
+typedef struct ufbx_open_file_opts {
+	uint32_t _begin_zero;
+
+	// Allocator to allocate the memory with.
+	ufbx_allocator_opts allocator;
+
+	// The filename is guaranteed to be NULL-terminated.
+	ufbx_unsafe bool filename_null_terminated;
+
+	uint32_t _end_zero;
+} ufbx_open_file_opts;
 
 // Memory stream options
 typedef void ufbx_close_memory_fn(void *user, void *data, size_t data_size);
@@ -5093,6 +5115,7 @@ ufbx_abi_data const size_t ufbx_element_type_size[UFBX_ELEMENT_TYPE_COUNT];
 // Version of the source file, comparable to `UFBX_HEADER_VERSION`
 ufbx_abi_data const uint32_t ufbx_source_version;
 
+
 // Practically always `true` (see below), if not you need to be careful with threads.
 //
 // Guaranteed to be `true` in _any_ of the following conditions:
@@ -5229,16 +5252,18 @@ ufbx_abi ufbx_matrix ufbx_get_compatible_matrix_for_normals(const ufbx_node *nod
 // but the rest can be uninitialized.
 ufbx_abi ptrdiff_t ufbx_inflate(void *dst, size_t dst_size, const ufbx_inflate_input *input, ufbx_inflate_retain *retain);
 
-// Open a `ufbx_stream` from a file.
-// Use `path_len == SIZE_MAX` for NULL terminated string.
-ufbx_abi bool ufbx_open_file(ufbx_stream *stream, const char *path, size_t path_len);
-
 // Same as `ufbx_open_file()` but compatible with the callback in `ufbx_open_file_fn`.
 // The `user` parameter is actually not used here.
 ufbx_abi bool ufbx_default_open_file(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info);
 
+// Open a `ufbx_stream` from a file.
+// Use `path_len == SIZE_MAX` for NULL terminated string.
+ufbx_abi bool ufbx_open_file(ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_opts *opts, ufbx_error *error);
+ufbx_unsafe ufbx_abi bool ufbx_open_file_ctx(ufbx_stream *stream, ufbx_open_file_context ctx, const char *path, size_t path_len, const ufbx_open_file_opts *opts, ufbx_error *error);
+
 // NOTE: Uses the default ufbx allocator!
 ufbx_abi bool ufbx_open_memory(ufbx_stream *stream, const void *data, size_t data_size, const ufbx_open_memory_opts *opts, ufbx_error *error);
+ufbx_unsafe ufbx_abi bool ufbx_open_memory_ctx(ufbx_stream *stream, ufbx_open_file_context ctx, const void *data, size_t data_size, const ufbx_open_memory_opts *opts, ufbx_error *error); 
 
 // Animation evaluation
 
