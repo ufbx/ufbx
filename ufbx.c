@@ -6689,6 +6689,7 @@ static ufbxi_noinline void ufbxi_end_file_context(ufbxi_file_context *fc, ufbx_e
 static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path, size_t path_len, bool null_terminated)
 {
 #if !defined(UFBX_STANDARD_C) && defined(_WIN32) && !defined(UFBX_NO_LIBC)
+	(void)null_terminated;
 	wchar_t wpath_buf[256];
 	wchar_t *wpath = NULL;
 
