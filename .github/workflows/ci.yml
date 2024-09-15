@@ -83,7 +83,6 @@ jobs:
       - name: Check features
         run: python misc/run_tests.py features --compiler vs_cl64
       - name: Check freestanding
-        if: false
         run: python misc/run_tests.py freestanding --compiler vs_cl64
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
