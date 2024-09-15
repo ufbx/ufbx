@@ -181,76 +181,112 @@
 
 // -- Headers
 
+// Legacy mapping
+#if !defined(UFBX_NO_MATH) && defined(UFBX_NO_MATH_H)
+	#define UFBX_NO_MATH
+#endif
+
+#if !defined(UFBX_NO_LIBC_TYPES)
+	#include <stdarg.h>
+#endif
+
 #if !defined(UFBX_NO_LIBC)
 	#include <string.h>
-	#include <stdarg.h>
 	#include <float.h>
+	#if !defined(UFBX_NO_MATH)
+		#include <math.h>
+	#endif
 	#if !defined(UFBX_NO_STDIO)
 		#include <stdio.h>
 	#endif
 	#if !defined(UFBX_NO_MALLOC)
 		#include <stdlib.h>
 	#endif
+#else
+	#if !defined(UFBX_NO_MATH)
+		#define UFBX_NO_MATH
+	#endif
+	#if !defined(UFBX_STRING_PREFIX)
+		#define UFBX_STRING_PREFIX ufbx_
+	#endif
 #endif
 
-#if !defined(UFBX_NO_MATH_H)
-	#if !defined(UFBX_NO_LIBC)
-		#include <math.h>
-	#endif
+#if !defined(UFBX_NO_MATH)
 	#ifndef UFBX_INFINITY
 		#define UFBX_INFINITY INFINITY
 	#endif
 	#ifndef UFBX_NAN
 		#define UFBX_NAN NAN
 	#endif
-#endif
-
-#if !defined(UFBX_MATH_PREFIX)
-	#define UFBX_MATH_PREFIX
+	#if !defined(UFBX_MATH_PREFIX)
+		#define UFBX_MATH_PREFIX
+	#endif
 #endif
 
 #define ufbxi_pre_cat2(a, b) a##b
 #define ufbxi_pre_cat(a, b) ufbxi_pre_cat2(a, b)
-#define ufbxi_math_fn(name) ufbxi_pre_cat(UFBX_MATH_PREFIX, name)
 
-#if !defined(UFBX_NO_MATH_DEFINES)
-	#define ufbx_sqrt ufbxi_math_fn(sqrt)
-	#define ufbx_fabs ufbxi_math_fn(fabs)
-	#define ufbx_pow ufbxi_math_fn(pow)
-	#define ufbx_sin ufbxi_math_fn(sin)
-	#define ufbx_cos ufbxi_math_fn(cos)
-	#define ufbx_tan ufbxi_math_fn(tan)
-	#define ufbx_asin ufbxi_math_fn(asin)
-	#define ufbx_acos ufbxi_math_fn(acos)
-	#define ufbx_atan ufbxi_math_fn(atan)
-	#define ufbx_atan2 ufbxi_math_fn(atan2)
-	#define ufbx_copysign ufbxi_math_fn(copysign)
-	#define ufbx_fmin ufbxi_math_fn(fmin)
-	#define ufbx_fmax ufbxi_math_fn(fmax)
-	#define ufbx_nextafter ufbxi_math_fn(nextafter)
-	#define ufbx_rint ufbxi_math_fn(rint)
-	#define ufbx_ceil ufbxi_math_fn(ceil)
-	#define ufbx_isnan ufbxi_math_fn(isnan)
+// -- External functions
+
+#ifndef ufbx_extern_abi
+	#if defined(UFBX_STATIC)
+		#define ufbx_extern_abi static
+	#else
+		#define ufbx_extern_abi
+	#endif
 #endif
 
-#if defined(UFBX_NO_MATH_H) && !defined(UFBX_NO_MATH_DECLARATIONS)
-	double ufbx_sqrt(double x);
-	double ufbx_sin(double x);
-	double ufbx_cos(double x);
-	double ufbx_tan(double x);
-	double ufbx_asin(double x);
-	double ufbx_acos(double x);
-	double ufbx_atan(double x);
-	double ufbx_atan2(double y, double x);
-	double ufbx_pow(double x, double y);
-	double ufbx_fmin(double a, double b);
-	double ufbx_fmax(double a, double b);
-	double ufbx_fabs(double x);
-	double ufbx_copysign(double x, double y);
-	double ufbx_nextafter(double x, double y);
-	double ufbx_rint(double x);
-	double ufbx_ceil(double x);
-	int ufbx_isnan(double x);
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+#if defined(UFBX_NO_MATH) && !defined(UFBX_NO_MATH_DEFINES)
+	ufbx_extern_abi double ufbx_sqrt(double x);
+	ufbx_extern_abi double ufbx_sin(double x);
+	ufbx_extern_abi double ufbx_cos(double x);
+	ufbx_extern_abi double ufbx_tan(double x);
+	ufbx_extern_abi double ufbx_asin(double x);
+	ufbx_extern_abi double ufbx_acos(double x);
+	ufbx_extern_abi double ufbx_atan(double x);
+	ufbx_extern_abi double ufbx_atan2(double y, double x);
+	ufbx_extern_abi double ufbx_pow(double x, double y);
+	ufbx_extern_abi double ufbx_fmin(double a, double b);
+	ufbx_extern_abi double ufbx_fmax(double a, double b);
+	ufbx_extern_abi double ufbx_fabs(double x);
+	ufbx_extern_abi double ufbx_copysign(double x, double y);
+	ufbx_extern_abi double ufbx_nextafter(double x, double y);
+	ufbx_extern_abi double ufbx_rint(double x);
+	ufbx_extern_abi double ufbx_ceil(double x);
+	ufbx_extern_abi int ufbx_isnan(double x);
+#endif
+
+#if defined(UFBX_NO_LIBC) && !defined(UFBX_NO_LIBC_DEFINES)
+	ufbx_extern_abi size_t ufbx_strlen(const char *str);
+	ufbx_extern_abi void *ufbx_memcpy(void *dst, const void *src, size_t count);
+	ufbx_extern_abi void *ufbx_memmove(void *dst, const void *src, size_t count);
+	ufbx_extern_abi void *ufbx_memset(void *dst, int ch, size_t count);
+	ufbx_extern_abi const void *ufbx_memchr(const void *ptr, int value, size_t count);
+	ufbx_extern_abi int ufbx_memcmp(const void *a, const void *b, size_t count);
+	ufbx_extern_abi int ufbx_strcmp(const char *a, const char *b);
+	ufbx_extern_abi int ufbx_strncmp(const char *a, const char *b, size_t count);
+#endif
+
+#if defined(UFBX_NO_LIBC) && !defined(UFBX_NO_MALLOC) && !defined(UFBX_NO_LIBC_DEFINES)
+	ufbx_extern_abi void *ufbx_malloc(size_t size);
+	ufbx_extern_abi void *ufbx_realloc(void *ptr, size_t old_size, size_t new_size);
+	ufbx_extern_abi void *ufbx_free(void *ptr, size_t old_size);
+#endif
+
+#if defined(UFBX_NO_LIBC) && !defined(UFBX_NO_STDIO) && !defined(UFBX_NO_LIBC_DEFINES)
+	ufbx_extern_abi void *ufbx_stdio_open(const char *path, size_t path_len);
+	ufbx_extern_abi size_t ufbx_stdio_read(void *file, void *data, size_t size);
+	ufbx_extern_abi bool ufbx_stdio_skip(void *file, size_t size);
+	ufbx_extern_abi uint64_t ufbx_stdio_size(void *file);
+	ufbx_extern_abi void ufbx_stdio_close(void *file);
+#endif
+
+#if defined(__cplusplus)
+}
 #endif
 
 #if !defined(UFBX_INFINITY)
@@ -283,14 +319,16 @@
 	#if !defined(ufbx_malloc) || !defined(ufbx_realloc) || !defined(ufbx_free)
 		#error Inconsistent custom global allocator
 	#endif
-#elif !defined(UFBX_NO_MALLOC) && !defined(UFBX_NO_LIBC)
-	#define ufbx_malloc(size) malloc((size))
-	#define ufbx_realloc(ptr, old_size, new_size) realloc((ptr), (new_size))
-	#define ufbx_free(ptr, old_size) free((ptr))
-#else
+#elif defined(UFBX_EXTERNAL_MALLOC) || defined(UFBX_NO_LIBC)
+	// Nop
+#elif defined(UFBX_NO_MALLOC)
 	#define ufbx_malloc(size) ((void)(size), (void*)NULL)
 	#define ufbx_realloc(ptr, old_size, new_size) ((void)(ptr), (void)(old_size), (void)(new_size), (void*)NULL)
 	#define ufbx_free(ptr, old_size) ((void)(ptr), (void*)(old_size))
+#else
+	#define ufbx_malloc(size) malloc((size))
+	#define ufbx_realloc(ptr, old_size, new_size) realloc((ptr), (new_size))
+	#define ufbx_free(ptr, old_size) free((ptr))
 #endif
 
 #if !defined(ufbx_panic_handler)
@@ -607,6 +645,27 @@
 
 // ^^ No references to <string.h> before this point ^^
 // vv No more includes past this point vv
+
+#if defined(UFBX_MATH_PREFIX)
+	#define ufbxi_math_fn(name) ufbxi_pre_cat(UFBX_MATH_PREFIX, name)
+	#define ufbx_sqrt ufbxi_math_fn(sqrt)
+	#define ufbx_fabs ufbxi_math_fn(fabs)
+	#define ufbx_pow ufbxi_math_fn(pow)
+	#define ufbx_sin ufbxi_math_fn(sin)
+	#define ufbx_cos ufbxi_math_fn(cos)
+	#define ufbx_tan ufbxi_math_fn(tan)
+	#define ufbx_asin ufbxi_math_fn(asin)
+	#define ufbx_acos ufbxi_math_fn(acos)
+	#define ufbx_atan ufbxi_math_fn(atan)
+	#define ufbx_atan2 ufbxi_math_fn(atan2)
+	#define ufbx_copysign ufbxi_math_fn(copysign)
+	#define ufbx_fmin ufbxi_math_fn(fmin)
+	#define ufbx_fmax ufbxi_math_fn(fmax)
+	#define ufbx_nextafter ufbxi_math_fn(nextafter)
+	#define ufbx_rint ufbxi_math_fn(rint)
+	#define ufbx_ceil ufbxi_math_fn(ceil)
+	#define ufbx_isnan ufbxi_math_fn(isnan)
+#endif
 
 #if defined(UFBX_STRING_PREFIX)
 	#define ufbxi_string_fn(name) ufbxi_pre_cat(UFBX_STRING_PREFIX, name)
@@ -6685,6 +6744,7 @@ static ufbxi_noinline void ufbxi_end_file_context(ufbxi_file_context *fc, ufbx_e
 // -- File IO
 
 #if !defined(UFBX_NO_STDIO)
+#if !defined(UFBX_NO_LIBC)
 
 static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path, size_t path_len, bool null_terminated)
 {
@@ -6835,7 +6895,7 @@ static void ufbxi_stdio_close(void *user)
 	fclose(file);
 }
 
-static ufbxi_noinline void ufbxi_stdio_init(ufbx_stream *stream, FILE *file, bool close)
+static ufbxi_noinline void ufbxi_stdio_init(ufbx_stream *stream, void *file, bool close)
 {
 	stream->read_fn = &ufbxi_stdio_read;
 	stream->skip_fn = &ufbxi_stdio_skip;
@@ -6852,6 +6912,30 @@ static ufbxi_noinline bool ufbxi_stdio_open(ufbxi_file_context *fc, ufbx_stream 
 	return true;
 }
 
+#else
+
+static ufbxi_noinline void ufbxi_stdio_init(ufbx_stream *stream, void *file, bool close)
+{
+	stream->read_fn = &ufbx_stdio_read;
+	stream->skip_fn = &ufbx_stdio_skip;
+	stream->size_fn = &ufbx_stdio_size;
+	stream->close_fn = close ? &ufbx_stdio_close : NULL;
+	stream->user = file;
+}
+
+static ufbxi_noinline bool ufbxi_stdio_open(ufbxi_file_context *fc, ufbx_stream *stream, const char *path, size_t path_len, bool null_terminated)
+{
+	void *file = ufbx_stdio_open(path, path_len);
+	if (!file) {
+		ufbxi_set_err_info(&fc->error, path, path_len);
+		ufbxi_report_err_msg(&fc->error, "file", "File not found");
+		return false;
+	}
+	ufbxi_stdio_init(stream, file, true);
+	return true;
+}
+
+#endif
 #endif
 
 // -- Memory IO
@@ -29636,7 +29720,8 @@ ufbx_abi bool ufbx_is_thread_safe(void)
 ufbx_abi ufbx_scene *ufbx_load_memory(const void *data, size_t size, const ufbx_load_opts *opts, ufbx_error *error)
 {
 	ufbxi_check_opts_ptr(ufbx_scene, opts, error);
-	ufbxi_context uc = { UFBX_ERROR_NONE };
+	ufbxi_context uc; // ufbxi_uninit
+	memset(&uc, 0, sizeof(ufbxi_context));
 	uc.data_begin = uc.data = (const char *)data;
 	uc.data_size = size;
 	uc.progress_bytes_total = size;
@@ -29651,7 +29736,8 @@ ufbx_abi ufbx_scene *ufbx_load_file(const char *filename, const ufbx_load_opts *
 ufbx_abi ufbx_scene *ufbx_load_file_len(const char *filename, size_t filename_len, const ufbx_load_opts *opts, ufbx_error *error)
 {
 	ufbxi_check_opts_ptr(ufbx_scene, opts, error);
-	ufbxi_context uc = { UFBX_ERROR_NONE };
+	ufbxi_context uc; // ufbxi_uninit
+	memset(&uc, 0, sizeof(ufbxi_context));
 	uc.deferred_load = true;
 	uc.load_filename = filename;
 	uc.load_filename_len = filename_len;
@@ -29668,7 +29754,7 @@ ufbx_abi ufbx_scene *ufbx_load_stdio_prefix(void *file_void, const void *prefix,
 #if !defined(UFBX_NO_STDIO)
 	if (!file_void) return NULL;
 	ufbx_stream stream = { 0 };
-	ufbxi_stdio_init(&stream, (FILE*)file_void, false);
+	ufbxi_stdio_init(&stream, file_void, false);
 	return ufbx_load_stream_prefix(&stream, prefix, prefix_size, opts, error);
 #else
 	(void)file_void;
@@ -29676,7 +29762,8 @@ ufbx_abi ufbx_scene *ufbx_load_stdio_prefix(void *file_void, const void *prefix,
 	(void)prefix_size;
 	(void)opts;
 
-	ufbxi_context uc = { UFBX_ERROR_NONE };
+	ufbxi_context uc; // ufbxi_uninit
+	memset(&uc, 0, sizeof(ufbxi_context));
 	ufbxi_fmt_err_info(&uc.error, "UFBX_NO_STDIO");
 	ufbxi_report_err_msg(&uc.error, "UFBX_NO_STDIO", "Feature disabled");
 	uc.deferred_failure = true;
@@ -29692,7 +29779,8 @@ ufbx_abi ufbx_scene *ufbx_load_stream(const ufbx_stream *stream, const ufbx_load
 ufbx_abi ufbx_scene *ufbx_load_stream_prefix(const ufbx_stream *stream, const void *prefix, size_t prefix_size, const ufbx_load_opts *opts, ufbx_error *error)
 {
 	ufbxi_check_opts_ptr(ufbx_scene, opts, error);
-	ufbxi_context uc = { UFBX_ERROR_NONE };
+	ufbxi_context uc; // ufbxi_uninit
+	memset(&uc, 0, sizeof(ufbxi_context));
 	uc.data_begin = uc.data = (const char *)prefix;
 	uc.data_size = prefix_size;
 	uc.read_fn = stream->read_fn;
