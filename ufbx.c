@@ -20,12 +20,21 @@
 //   UFBX_TRACE                Log calls of `ufbxi_check()` for tracing execution
 //   UFBX_LITTLE_ENDIAN=0/1    Explicitly define little/big endian architecture
 //   UFBX_PATH_SEPARATOR=''    Specify default platform path separator
-//   UFBX_NO_STDIO             Disable stdio FILE API
-//   UFBX_NO_MALLOC            Disable default malloc/realloc/free
 //   UFBX_NO_SSE               Do not try to include SSE
-//   UFBX_NO_LIBC              Do not include libc
-//   UFBX_MATH_PREFIX=''       Prefix for <math.h> functions used
-//   UFBX_STRING_PREFIX=''     Prefix for <string.h> functions used
+
+// Dependencies:
+//   UFBX_NO_MALLOC              Disable default malloc/realloc/free
+//   UFBX_NO_STDIO               Disable stdio FILE API
+//   UFBX_EXTERNAL_MALLOC        Link to external ufbx_malloc() interface
+//   UFBX_EXTERNAL_STDIO         Link to external ufbx_stdio_() interface
+//   UFBX_EXTERNAL_MATH          Link to external <math.h> interface
+//   UFBX_EXTERNAL_STRING        Link to external <string.h> interface
+
+// Freestanding:
+//   UFBX_MATH_PREFIX='ufbx_'    Prefix for external <math.h> functions used
+//   UFBX_STRING_PREFIX='ufbx_'  Prefix for external <string.h> functions used
+//   UFBX_NO_LIBC                Do not include libc (implies UFBX_EXTERNAL_MATH/STRING/MALLOC/STDIO by default)
+//   UFBX_NO_LIBC_TYPES          Do not include any libc headers, you must define all types in <stdint.h/stddef.h/etc>
 
 // Mostly internal for debugging:
 //   UFBX_STATIC_ANALYSIS      Enable static analysis augmentation
@@ -182,8 +191,8 @@
 // -- Headers
 
 // Legacy mapping
-#if !defined(UFBX_NO_MATH) && defined(UFBX_NO_MATH_H)
-	#define UFBX_NO_MATH
+#if !defined(UFBX_EXTERNAL_MATH) && defined(UFBX_NO_MATH_H)
+	#define UFBX_EXTERNAL_MATH
 #endif
 
 #if !defined(UFBX_NO_LIBC_TYPES)
@@ -193,7 +202,7 @@
 #if !defined(UFBX_NO_LIBC)
 	#include <string.h>
 	#include <float.h>
-	#if !defined(UFBX_NO_MATH)
+	#if !defined(UFBX_EXTERNAL_MATH)
 		#include <math.h>
 	#endif
 	#if !defined(UFBX_NO_STDIO)
@@ -203,21 +212,25 @@
 		#include <stdlib.h>
 	#endif
 #else
-	#if !defined(UFBX_NO_MATH)
-		#define UFBX_NO_MATH
+	#if !defined(UFBX_EXTERNAL_MATH) && !defined(UFBX_NO_EXTERNAL_MATH)
+		#define UFBX_EXTERNAL_MATH
 	#endif
-	#if !defined(UFBX_STRING_PREFIX)
-		#define UFBX_STRING_PREFIX ufbx_
+	#if !defined(UFBX_EXTERNAL_STRING) && !defined(UFBX_NO_EXTERNAL_STRING)
+		#define UFBX_EXTERNAL_STRING
+	#endif
+	#if !defined(UFBX_EXTERNAL_MALLOC) && !defined(UFBX_NO_EXTERNAL_MALLOC) && !defined(UFBX_NO_MALLOC)
+		#define UFBX_EXTERNAL_MALLOC
+	#endif
+	#if !defined(UFBX_EXTERNAL_STDIO) && !defined(UFBX_NO_EXTERNAL_STDIO) && !defined(UFBX_NO_STDIO)
+		#define UFBX_EXTERNAL_STDIO
 	#endif
 #endif
 
-#if !defined(UFBX_NO_MATH)
-	#ifndef UFBX_INFINITY
-		#define UFBX_INFINITY INFINITY
-	#endif
-	#ifndef UFBX_NAN
-		#define UFBX_NAN NAN
-	#endif
+#if defined(UFBX_EXTERNAL_STRING) && !defined(UFBX_STRING_PREFIX)
+	#define UFBX_STRING_PREFIX ufbx_
+#endif
+
+#if !defined(UFBX_EXTERNAL_MATH)
 	#if !defined(UFBX_MATH_PREFIX)
 		#define UFBX_MATH_PREFIX
 	#endif
@@ -257,11 +270,13 @@
 	#define ufbx_isnan ufbxi_math_fn(isnan)
 #endif
 
+#if !defined(UFBX_NO_EXTERNAL_DEFINES)
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
-#if defined(UFBX_NO_MATH) && !defined(UFBX_NO_MATH_DEFINES)
+#if defined(UFBX_EXTERNAL_MATH)
 	ufbx_extern_abi double ufbx_sqrt(double x);
 	ufbx_extern_abi double ufbx_sin(double x);
 	ufbx_extern_abi double ufbx_cos(double x);
@@ -281,7 +296,7 @@ extern "C" {
 	ufbx_extern_abi int ufbx_isnan(double x);
 #endif
 
-#if defined(UFBX_NO_LIBC) && !defined(UFBX_NO_LIBC_DEFINES)
+#if defined(UFBX_EXTERNAL_STRING)
 	ufbx_extern_abi size_t ufbx_strlen(const char *str);
 	ufbx_extern_abi void *ufbx_memcpy(void *dst, const void *src, size_t count);
 	ufbx_extern_abi void *ufbx_memmove(void *dst, const void *src, size_t count);
@@ -292,13 +307,13 @@ extern "C" {
 	ufbx_extern_abi int ufbx_strncmp(const char *a, const char *b, size_t count);
 #endif
 
-#if defined(UFBX_NO_LIBC) && !defined(UFBX_NO_MALLOC) && !defined(UFBX_NO_LIBC_DEFINES)
+#if defined(UFBX_EXTERNAL_MALLOC)
 	ufbx_extern_abi void *ufbx_malloc(size_t size);
 	ufbx_extern_abi void *ufbx_realloc(void *ptr, size_t old_size, size_t new_size);
 	ufbx_extern_abi void ufbx_free(void *ptr, size_t old_size);
 #endif
 
-#if defined(UFBX_NO_LIBC) && !defined(UFBX_NO_STDIO) && !defined(UFBX_NO_LIBC_DEFINES)
+#if defined(UFBX_EXTERNAL_STDIO)
 	ufbx_extern_abi void *ufbx_stdio_open(const char *path, size_t path_len);
 	ufbx_extern_abi size_t ufbx_stdio_read(void *file, void *data, size_t size);
 	ufbx_extern_abi bool ufbx_stdio_skip(void *file, size_t size);
@@ -310,11 +325,21 @@ extern "C" {
 }
 #endif
 
+#endif
+
 #if !defined(UFBX_INFINITY)
-	#define UFBX_INFINITY (1e+300 * 1e+300)
+	#if defined(INFINITY)
+		#define UFBX_INFINITY INFINITY
+	#else
+		#define UFBX_INFINITY (1e+300 * 1e+300)
+	#endif
 #endif
 #if !defined(UFBX_NAN)
-	#define UFBX_NAN (UFBX_INFINITY * 0.0f)
+	#if defined(NAN)
+		#define UFBX_INFINITY NAN
+	#else
+		#define UFBX_NAN (UFBX_INFINITY * 0.0f)
+	#endif
 #endif
 #if !defined(UFBX_FLT_EPSILON)
 	#if defined(FLT_EPSILON)
@@ -340,7 +365,7 @@ extern "C" {
 	#if !defined(ufbx_malloc) || !defined(ufbx_realloc) || !defined(ufbx_free)
 		#error Inconsistent custom global allocator
 	#endif
-#elif defined(UFBX_EXTERNAL_MALLOC) || defined(UFBX_NO_LIBC)
+#elif defined(UFBX_EXTERNAL_MALLOC)
 	// Nop
 #elif defined(UFBX_NO_MALLOC)
 	#define ufbx_malloc(size) ((void)(size), (void*)NULL)
@@ -6753,9 +6778,7 @@ static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path
 	FILE *file = NULL;
 #if !defined(UFBX_STANDARD_C) && defined(_WIN32)
 	(void)null_terminated;
-	wchar_t wpath_buf[256];
-	wchar_t *wpath = NULL;
-
+	wchar_t wpath_buf[256], *wpath = NULL; // ufbxi_uninit
 	if (path_len < ufbxi_arraycount(wpath_buf) - 1) {
 		wpath = wpath_buf;
 	} else {
@@ -6794,23 +6817,19 @@ static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path
 	}
 	wpath[wlen] = 0;
 
-#if UFBXI_MSC_VER >= 1400
-	if (_wfopen_s(&file, wpath, L"rb") != 0) {
-		file = NULL;
-	}
-#else
-	file = _wfopen(wpath, L"rb");
-#endif
+	#if UFBXI_MSC_VER >= 1400
+		if (_wfopen_s(&file, wpath, L"rb") != 0) file = NULL;
+	#else
+		file = _wfopen(wpath, L"rb");
+	#endif
 	if (wpath != wpath_buf) {
 		ufbxi_free(&fc->ator, wchar_t, wpath, path_len + 1);
 	}
 #else
+	char copy_buf[256], *copy = NULL; // ufbxi_uninit
 	if (null_terminated) {
-		file = fopen(path, "rb");
+		copy = (char*)path;
 	} else {
-		char copy_buf[256]; // ufbxi_uninit
-		char *copy = NULL;
-
 		if (path_len < ufbxi_arraycount(copy_buf) - 1) {
 			copy = copy_buf;
 		} else {
@@ -6819,11 +6838,10 @@ static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path
 		}
 		memcpy(copy, path, path_len);
 		copy[path_len] = '\0';
-
-		file = fopen(copy, "rb");
-		if (copy != copy_buf) {
-			ufbxi_free(&fc->ator, char, copy, path_len + 1);
-		}
+	}
+	file = fopen(copy, "rb");
+	if (!null_terminated && copy != copy_buf) {
+		ufbxi_free(&fc->ator, char, copy, path_len + 1);
 	}
 #endif
 	if (!file) {
@@ -6922,7 +6940,23 @@ static ufbxi_noinline void ufbxi_stdio_init(ufbx_stream *stream, void *file, boo
 
 static ufbxi_noinline bool ufbxi_stdio_open(ufbxi_file_context *fc, ufbx_stream *stream, const char *path, size_t path_len, bool null_terminated)
 {
+	char copy_buf[256], *copy = NULL; // ufbxi_uninit
+	if (null_terminated) {
+		copy = (char*)path;
+	} else {
+		if (path_len < ufbxi_arraycount(copy_buf) - 1) {
+			copy = copy_buf;
+		} else {
+			copy = ufbxi_alloc(&fc->ator, char, path_len + 1);
+			if (!copy) return false;
+		}
+		memcpy(copy, path, path_len);
+		copy[path_len] = '\0';
+	}
 	void *file = ufbx_stdio_open(path, path_len);
+	if (!null_terminated && copy != copy_buf) {
+		ufbxi_free(&fc->ator, char, copy, path_len + 1);
+	}
 	if (!file) {
 		ufbxi_set_err_info(&fc->error, path, path_len);
 		ufbxi_report_err_msg(&fc->error, "file", "File not found");

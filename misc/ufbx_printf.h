@@ -1,8 +1,8 @@
 #ifndef UFBX_LIBC_H
 #define UFBX_LIBC_H
 
-#include <stdarg.h>
 #include <stddef.h>
+#include <stdarg.h>
 
 #if defined(__cplusplus)
 extern "C" {

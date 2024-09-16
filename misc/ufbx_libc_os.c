@@ -11,7 +11,30 @@
 
 static uint64_t ufbxi_win32_total_memory = 0;
 
-void *ufbx_libc_allocate(size_t size, size_t *p_allocated_size)
+volatile LONG ufbxi_win32_lock_init;
+CRITICAL_SECTION ufbxi_win32_lock;
+
+void ufbx_malloc_os_lock()
+{
+	LONG prev = InterlockedOr(&ufbxi_win32_lock_init, 1);
+	if (prev == 0) {
+		InitializeCriticalSectionAndSpinCount(&ufbxi_win32_lock, 100);
+		InterlockedOr(&ufbxi_win32_lock_init, 2);
+		prev = 3;
+	}
+	while (prev < 2) {
+		prev = InterlockedOr(&ufbxi_win32_lock_init, 0);
+	}
+
+	EnterCriticalSection(&ufbxi_win32_lock);
+}
+
+void ufbx_malloc_os_unlock()
+{
+	LeaveCriticalSection(&ufbxi_win32_lock);
+}
+
+void *ufbx_malloc_os_allocate(size_t size, size_t *p_allocated_size)
 {
 	size_t min_size = 4*1024*1024;
 	size_t alloc_size = size > min_size ? size : min_size;
@@ -24,7 +47,7 @@ void *ufbx_libc_allocate(size_t size, size_t *p_allocated_size)
 	return pointer;
 }
 
-bool ufbx_libc_free(void *pointer, size_t allocated_size)
+bool ufbx_malloc_os_free(void *pointer, size_t allocated_size)
 {
 	if (ufbxi_win32_total_memory >= 32*1024*1024) {
 		ufbxi_win32_total_memory -= allocated_size;
@@ -37,44 +60,56 @@ bool ufbx_libc_free(void *pointer, size_t allocated_size)
 
 #endif
 
-#if !defined(UFBX_NO_STDIO)
-
 #define UFBXI_WIN32_MAX_FILENAME_WCHAR 1024
 
-bool ufbx_libc_open_file(size_t index, const char *filename, size_t filename_len, void **p_handle, uint64_t *p_file_size)
+void *ufbx_stdio_open(const char *path, size_t path_len)
 {
 	WCHAR filename_wide[UFBXI_WIN32_MAX_FILENAME_WCHAR + 1] = { 0 };
-	MultiByteToWideChar(CP_UTF8, 0, filename, -1, filename_wide, UFBXI_WIN32_MAX_FILENAME_WCHAR);
+	int len = MultiByteToWideChar(CP_UTF8, 0, path, path_len, filename_wide, UFBXI_WIN32_MAX_FILENAME_WCHAR);
+	if (len < 0 || len >= UFBXI_WIN32_MAX_FILENAME_WCHAR) return NULL;
+	filename_wide[len] = 0;
 
 	HANDLE file = CreateFileW(filename_wide, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (file == NULL || file == INVALID_HANDLE_VALUE) return false;
+	if (file == NULL || file == INVALID_HANDLE_VALUE) return NULL;
 
-	DWORD size_hi = 0;
-	DWORD size_lo = GetFileSize(file, &size_hi);
-
-	*p_file_size = (uint64_t)size_hi << 32u | size_lo;
-	*p_handle = file;
-	return true;
+	return file;
 }
 
-size_t ufbx_libc_read_file(size_t index, void *handle, void *dst, uint64_t offset, uint32_t count, uint32_t skipped_bytes)
+size_t ufbx_stdio_read(void *file, void *data, size_t size)
 {
-	HANDLE h = (HANDLE)handle;
-	if (skipped_bytes > 0) {
-		if (!SetFilePointer(h, skipped_bytes, NULL, FILE_CURRENT)) return SIZE_MAX;
+	HANDLE h = (HANDLE)file;
+	size_t offset = 0;
+	while (offset < size) {
+		size_t to_read = size - offset;
+		if (to_read >= 0x20000000) to_read = 0x20000000;
+		DWORD num_read = 0;
+		BOOL ok = ReadFile(h, (char*)data + offset, (DWORD)to_read, &num_read, NULL);
+		if (!ok) return SIZE_MAX;
+		if (num_read == 0) break;
+		offset += num_read;
 	}
-
-	DWORD read_count;
-	if (!ReadFile(h, dst, (DWORD)count, &read_count, NULL)) return SIZE_MAX;
-	return read_count;
+	return offset;
 }
 
-void ufbx_libc_close_file(size_t index, void *handle)
+bool ufbx_stdio_skip(void *file, size_t size)
 {
-	HANDLE h = (HANDLE)handle;
+	HANDLE h = (HANDLE)file;
+	LARGE_INTEGER move_amount;
+	move_amount.QuadPart = size;
+	return SetFilePointerEx(h, move_amount, NULL, FILE_CURRENT);
+}
+
+uint64_t ufbx_stdio_size(void *file)
+{
+	LARGE_INTEGER size;
+	if (!GetFileSizeEx(file, &size)) return 0;
+	return size.QuadPart;
+}
+
+void ufbx_stdio_close(void *file)
+{
+	HANDLE h = (HANDLE)file;
 	CloseHandle(h);
 }
-
-#endif
 
 #endif

@@ -1,6 +1,9 @@
-#include "ufbx_printf.h"
+#ifndef UFBX_PRINTF_C
+#define UFBX_PRINTF_C
+
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdarg.h>
 
 // -- print
 
@@ -225,126 +228,9 @@ static void vprint(print_buffer *buf, const char *fmt, va_list args)
 	}
 }
 
-// -- utility
-
-static void ufbxci_swap(void *a, void *b, size_t size)
-{
-	char *ca = (char*)a, *cb = (char*)b;
-	for (size_t i = 0; i < size; i++) {
-		char t = ca[i];
-		ca[i] = cb[i];
-		cb[i] = t;
-	}
-}
-
-static size_t ufbxci_clamp_pos(size_t size, long offset)
-{
-	if (offset < 0) {
-		return 0;
-	}
-	if (offset >= (long)size || (size_t)offset >= size) {
-		return size;
-	}
-	return (size_t) offset;
-}
-
-// -- string.h
-
-size_t ufbxc_strlen(const char *str)
-{
-	size_t length = 0;
-	while (str[length]) {
-		length++;
-	}
-	return length;
-}
-
-void *ufbxc_memcpy(void *dst, const void *src, size_t count)
-{
-	char *d = (char*)dst;
-	const char *s = (const char*)src;
-	for (size_t i = 0; i < count; i++) {
-		d[i] = s[i];
-	}
-	return dst;
-}
-
-void *ufbxc_memmove(void *dst, const void *src, size_t count)
-{
-	char *d = (char*)dst;
-	const char *s = (const char*)src;
-	if ((uintptr_t)d < (uintptr_t)s) {
-		for (size_t i = 0; i < count; i++) {
-			d[i] = s[i];
-		}
-	} else {
-		for (size_t i = count; i-- > 0; ) {
-			d[i] = s[i];
-		}
-	}
-	return dst;
-}
-
-void *ufbxc_memset(void *dst, int ch, size_t count)
-{
-	char *d = (char*)dst;
-	char c = (char)ch;
-	for (size_t i = 0; i < count; i++) {
-		d[i] = c;
-	}
-	return dst;
-}
-
-const void *ufbxc_memchr(const void *ptr, int value, size_t num)
-{
-	const char *p = (const char*)ptr;
-	char c = (char)value;
-	for (size_t i = 0; i < num; i++) {
-		if (p[i] == c) {
-			return p + i;
-		}
-	}
-	return NULL;
-}
-
-int ufbxc_memcmp(const void *a, const void *b, size_t count)
-{
-	const char *pa = (const char*)a;
-	const char *pb = (const char*)b;
-	for (size_t i = 0; i < count; i++) {
-		if (pa[i] != pb[i]) {
-			return (unsigned char)pa[i] < (unsigned char)pb[i] ? -1 : 1;
-		}
-	}
-	return 0;
-}
-
-int ufbxc_strcmp(const char *a, const char *b)
-{
-	const char *pa = (const char*)a;
-	const char *pb = (const char*)b;
-	for (size_t i = 0; ; i++) {
-		if (pa[i] != pb[i]) {
-			return (unsigned char)pa[i] < (unsigned char)pb[i] ? -1 : 1;
-		} else if (pa[i] == 0) {
-			return 0;
-		}
-	}
-}
-
-int ufbxc_strncmp(const char *a, const char *b, size_t count)
-{
-	const char *pa = (const char*)a;
-	const char *pb = (const char*)b;
-	for (size_t i = 0; i < count; i++) {
-		if (pa[i] != pb[i]) {
-			return (unsigned char)pa[i] < (unsigned char)pb[i] ? -1 : 1;
-		} else if (pa[i] == 0) {
-			return 0;
-		}
-	}
-	return 0;
-}
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
 int ufbx_vsnprintf(char *buffer, size_t count, const char *format, va_list args)
 {
@@ -362,3 +248,8 @@ int ufbx_snprintf(char *buffer, size_t count, const char *format, ...)
 	return len;
 }
 
+#if defined(__cplusplus)
+}
+#endif
+
+#endif

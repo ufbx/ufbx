@@ -10,6 +10,7 @@ void ufbxt_assert_fail(const char *message);
 
 #include "../../extra/ufbx_libc.h"
 #include "../../extra/ufbx_math.h"
+#include "../ufbx_malloc.h"
 #include "../ufbx_printf.h"
 
 #define isnan(v) ufbx_isnan(v)
@@ -89,7 +90,10 @@ void errorf(const char *fmt, ...)
 
 char g_memory[32*1024*1024];
 
-void *ufbx_libc_allocate(size_t size, size_t *p_allocated_size)
+void ufbx_malloc_os_lock() { }
+void ufbx_malloc_os_unlock() { }
+
+void *ufbx_malloc_os_allocate(size_t size, size_t *p_allocated_size)
 {
 	static bool allocated = false;
 	if (allocated) return NULL;
@@ -99,28 +103,74 @@ void *ufbx_libc_allocate(size_t size, size_t *p_allocated_size)
 	return g_memory;
 }
 
-bool ufbx_libc_free(void *pointer, size_t allocated_size)
+bool ufbx_malloc_os_free(void *pointer, size_t allocated_size)
 {
 	return false;
 }
 
-bool ufbx_libc_open_file(size_t index, const char *filename, size_t filename_len, void **p_handle, uint64_t *p_file_size)
+typedef struct {
+	bool used;
+	size_t size;
+	size_t offset;
+	size_t index;
+} wasm_file;
+
+#define MAX_OPEN_FILES 64
+wasm_file open_files[MAX_OPEN_FILES];
+
+void *ufbx_stdio_open(const char *path, size_t path_len)
 {
-	int size = host_open_file(index, filename, filename_len);
-	if (size < 0) return false;
-	*p_file_size = (uint64_t)size;
+	size_t index = SIZE_MAX;
+	for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
+		if (!open_files[i].used) {
+			index = i;
+			break;
+		}
+	}
+	if (index == SIZE_MAX) return NULL;
+
+	int size = host_open_file(index, path, path_len);
+	if (size < 0) return NULL;
+
+	verbosef("Opened file: %s (%d bytes)", path, size);
+
+	wasm_file *file = &open_files[index];
+	file->used = true;
+	file->index = index;
+	file->size = (size_t)size;
+	file->offset = 0;
+	return file;
+}
+
+size_t ufbx_stdio_read(void *file, void *data, size_t size)
+{
+	wasm_file *f = (wasm_file*)file;
+
+	size_t max_read = f->size - f->offset;
+	size_t to_read = size < max_read ? size : max_read;
+	host_read_file(f->index, data, f->offset, to_read);
+	f->offset += to_read;
+	return to_read;
+}
+
+bool ufbx_stdio_skip(void *file, size_t size)
+{
+	wasm_file *f = (wasm_file*)file;
+	if (f->size - f->offset < size) return false;
+	f->offset += size;
 	return true;
 }
 
-size_t ufbx_libc_read_file(size_t index, void *handle, void *dst, uint64_t offset, uint32_t count, uint32_t skipped_bytes)
+uint64_t ufbx_stdio_size(void *file)
 {
-	host_read_file(index, dst, offset, count);
-	return count;
+	wasm_file *f = (wasm_file*)file;
+	return f->size;
 }
 
-void ufbx_libc_close_file(size_t index, void *handle)
+void ufbx_stdio_close(void *file)
 {
-	host_close_file(index);
+	wasm_file *f = (wasm_file*)file;
+	memset(f, 0, sizeof(wasm_file));
 }
 
 void ufbxt_assert_fail(const char *message)
@@ -170,7 +220,7 @@ void *hash_alloc(size_t size)
 wasm_export("hashFree")
 void hash_free(void *pointer)
 {
-	ufbx_free(pointer, 0);
+	ufbx_free(pointer, SIZE_MAX);
 }
 
 wasm_export("hashScene")
@@ -186,7 +236,7 @@ int hash_scene(uint64_t *p_hash, const void *data, size_t size, const char *file
 	opts.filename.data = filename;
 	opts.filename.length = strlen(filename);
 
-	verbosef("Loading scene... %zu bytes", size);
+	verbosef("Loading scene... %s (%zu bytes)", filename, size);
 
 	ufbx_error error;
 	ufbx_scene *scene = ufbx_load_memory(data, size, &opts, &error);
@@ -247,3 +297,4 @@ int hash_scene(uint64_t *p_hash, const void *data, size_t size, const char *file
 #include "../../extra/ufbx_math.c"
 #include "../../extra/ufbx_libc.c"
 #include "../ufbx_printf.c"
+#include "../ufbx_malloc.c"
