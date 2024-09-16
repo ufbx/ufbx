@@ -1,5 +1,5 @@
-#ifndef UFBX_UFBX_MATH_INCLUDED
-#define UFBX_UFBX_MATH_INCLUDED
+#ifndef UFBX_UFBX_MATH_C_INCLUDED
+#define UFBX_UFBX_MATH_C_INCLUDED
 
 // Based on LIBM
 // https://www.netlib.org/libm/
@@ -26,27 +26,27 @@
 	#define UFBXM_LITTLE_ENDIAN
 #endif
 
-typedef int ufbxmi_int;
-typedef unsigned ufbxmi_uint;
+typedef int ufbxm_int;
+typedef unsigned ufbxm_uint;
 
 typedef struct
 {
 #if defined(UFBXM_LITTLE_ENDIAN)
-	ufbxmi_uint lo;
-	ufbxmi_int hi;
+	ufbxm_uint lo;
+	ufbxm_int hi;
 #elif defined(UFBXM_BIG_ENDIAN)
-	ufbxmi_int hi;
-	ufbxmi_uint lo;
+	ufbxm_int hi;
+	ufbxm_uint lo;
 #else
 	#error "Neither little or big endian specified"
 #endif
-} ufbxmi_bits;
+} ufbxm_bits;
 
 typedef union
 {
 	double d;
-	ufbxmi_bits b;
-} ufbxmi_double_bits;
+	ufbxm_bits b;
+} ufbxm_double_bits;
 
 // -- double/bits conversion
 
@@ -54,39 +54,39 @@ typedef union
 // We cannot call memcpy() here as this header is designed to be used in non-libc
 // environments.
 
-static ufbxmi_bits ufbxmi_to_bits(double x)
+static ufbxm_bits ufbxm_to_bits(double x)
 {
-	ufbxmi_double_bits db;
+	ufbxm_double_bits db;
 	db.d = x;
 	return db.b;
 }
 
-static double ufbxmi_from_bits(ufbxmi_int hi, ufbxmi_uint lo)
+static double ufbxm_from_bits(ufbxm_int hi, ufbxm_uint lo)
 {
-	ufbxmi_double_bits db;
+	ufbxm_double_bits db;
 	db.b.hi = hi;
 	db.b.lo = lo;
 	return db.d;
 }
 
-static ufbxmi_int ufbxmi_hi(double x)
+static ufbxm_int ufbxm_hi(double x)
 {
-	ufbxmi_double_bits db;
+	ufbxm_double_bits db;
 	db.d = x;
 	return db.b.hi;
 }
 
-static double ufbxmi_zero_lo(double x)
+static double ufbxm_zero_lo(double x)
 {
-	ufbxmi_double_bits db;
+	ufbxm_double_bits db;
 	db.d = x;
 	db.b.lo = 0;
 	return db.d;
 }
 
-static double ufbxmi_set_hi(double x, ufbxmi_int hi)
+static double ufbxm_set_hi(double x, ufbxm_int hi)
 {
-	ufbxmi_double_bits db;
+	ufbxm_double_bits db;
 	db.d = x;
 	db.b.hi = hi;
 	return db.d;
@@ -103,18 +103,18 @@ extern "C" {
 
 ufbx_math_abi double ufbx_copysign(double x, double y)
 {
-	ufbxmi_bits xb = ufbxmi_to_bits(x);
-	ufbxmi_bits yb = ufbxmi_to_bits(y);
-	return ufbxmi_from_bits((xb.hi & 0x7fffffff) | (yb.hi & (ufbxmi_int)0x80000000u), xb.lo);
+	ufbxm_bits xb = ufbxm_to_bits(x);
+	ufbxm_bits yb = ufbxm_to_bits(y);
+	return ufbxm_from_bits((xb.hi & 0x7fffffff) | (yb.hi & (ufbxm_int)0x80000000u), xb.lo);
 }
 
 ufbx_math_abi double ufbx_fabs(double x)
 {
-	ufbxmi_bits xb = ufbxmi_to_bits(x);
-	return ufbxmi_from_bits(xb.hi & 0x7fffffff, xb.lo);
+	ufbxm_bits xb = ufbxm_to_bits(x);
+	return ufbxm_from_bits(xb.hi & 0x7fffffff, xb.lo);
 }
 
-ufbx_math_abi double ufbx_scalbn(double x, ufbxmi_int n)
+ufbx_math_abi double ufbx_scalbn(double x, ufbxm_int n)
 {
 	static const double
 		two54 = 1.80143985094819840000e+16,	 /* 0x43500000, 0x00000000 */
@@ -122,17 +122,17 @@ ufbx_math_abi double ufbx_scalbn(double x, ufbxmi_int n)
 		huge = 1.0e+300,
 		tiny = 1.0e-300;
 
-	ufbxmi_int k, hx, lx;
-	ufbxmi_bits bx = ufbxmi_to_bits(x);
+	ufbxm_int k, hx, lx;
+	ufbxm_bits bx = ufbxm_to_bits(x);
 	hx = bx.hi;
-	lx = (ufbxmi_int)bx.lo;
+	lx = (ufbxm_int)bx.lo;
 	k = (hx & 0x7ff00000) >> 20; /* extract exponent */
 	if (k == 0)
 	{ /* 0 or subnormal x */
 		if ((lx | (hx & 0x7fffffff)) == 0)
 			return x; /* +-0 */
 		x *= two54;
-		bx = ufbxmi_to_bits(x);
+		bx = ufbxm_to_bits(x);
 		hx = bx.hi;
 		k = ((hx & 0x7ff00000) >> 20) - 54;
 		if (n < -50000)
@@ -145,8 +145,8 @@ ufbx_math_abi double ufbx_scalbn(double x, ufbxmi_int n)
 		return huge * ufbx_copysign(huge, x); /* overflow  */
 	if (k > 0)									/* normal result */
 	{
-		hx = (hx & (ufbxmi_int)0x800fffffu) | (k << 20);
-		return ufbxmi_from_bits(hx, bx.lo);
+		hx = (hx & (ufbxm_int)0x800fffffu) | (k << 20);
+		return ufbxm_from_bits(hx, bx.lo);
 	}
 	if (k <= -54)
 	{
@@ -156,19 +156,19 @@ ufbx_math_abi double ufbx_scalbn(double x, ufbxmi_int n)
 			return tiny * ufbx_copysign(tiny, x); /*underflow*/
 	}
 	k += 54; /* subnormal result */
-	hx = (hx & (ufbxmi_int)0x800fffffu) | (k << 20);
-	return ufbxmi_from_bits(hx, bx.lo) * twom54;
+	hx = (hx & (ufbxm_int)0x800fffffu) | (k << 20);
+	return ufbxm_from_bits(hx, bx.lo) * twom54;
 }
 
 ufbx_math_abi double ufbx_floor(double x)
 {
 	static const double huge = 1.0e300;
 
-	ufbxmi_int i0, i1, j0;
-	ufbxmi_uint i, j;
-	ufbxmi_bits xb = ufbxmi_to_bits(x);
+	ufbxm_int i0, i1, j0;
+	ufbxm_uint i, j;
+	ufbxm_bits xb = ufbxm_to_bits(x);
 	i0 = xb.hi;
-	i1 = (ufbxmi_int)xb.lo;
+	i1 = (ufbxm_int)xb.lo;
 	j0 = ((i0 >> 20) & 0x7ff) - 0x3ff;
 	if (j0 < 20)
 	{
@@ -210,7 +210,7 @@ ufbx_math_abi double ufbx_floor(double x)
 	}
 	else
 	{
-		i = ((ufbxmi_uint)(0xffffffff)) >> (j0 - 20);
+		i = ((ufbxm_uint)(0xffffffff)) >> (j0 - 20);
 		if ((i1 & i) == 0)
 			return x; /* x is integral */
 		if (huge + x > 0.0)
@@ -221,27 +221,27 @@ ufbx_math_abi double ufbx_floor(double x)
 					i0 += 1;
 				else
 				{
-					j = (ufbxmi_uint)i1 + (1u << (52 - j0));
-					if (j < (ufbxmi_uint)i1)
+					j = (ufbxm_uint)i1 + (1u << (52 - j0));
+					if (j < (ufbxm_uint)i1)
 						i0 += 1; /* got a carry */
-					i1 = (ufbxmi_int)j;
+					i1 = (ufbxm_int)j;
 				}
 			}
 			i1 &= (~i);
 		}
 	}
-	return ufbxmi_from_bits(i0, (ufbxmi_uint)i1);
+	return ufbxm_from_bits(i0, (ufbxm_uint)i1);
 }
 
-ufbx_math_abi double ufbx_frexp(double x, ufbxmi_int *eptr)
+ufbx_math_abi double ufbx_frexp(double x, ufbxm_int *eptr)
 {
 	static const double
 		two54 = 1.80143985094819840000e+16; /* 0x43500000, 0x00000000 */
 
-	ufbxmi_int hx, ix, lx;
-	ufbxmi_bits bx = ufbxmi_to_bits(x);
+	ufbxm_int hx, ix, lx;
+	ufbxm_bits bx = ufbxm_to_bits(x);
 	hx = bx.hi;
-	lx = (ufbxmi_int)bx.lo;
+	lx = (ufbxm_int)bx.lo;
 	ix = 0x7fffffff & hx;
 	*eptr = 0;
 	if (ix >= 0x7ff00000 || ((ix | lx) == 0))
@@ -249,14 +249,14 @@ ufbx_math_abi double ufbx_frexp(double x, ufbxmi_int *eptr)
 	if (ix < 0x00100000)
 	{ /* subnormal */
 		x *= two54;
-		bx = ufbxmi_to_bits(x);
+		bx = ufbxm_to_bits(x);
 		hx = bx.hi;
 		ix = hx & 0x7fffffff;
 		*eptr = -54;
 	}
 	*eptr += (ix >> 20) - 1022;
-	hx = (hx & (ufbxmi_int)0x800fffffu) | 0x3fe00000;
-	return ufbxmi_from_bits(hx, bx.lo);
+	hx = (hx & (ufbxm_int)0x800fffffu) | 0x3fe00000;
+	return ufbxm_from_bits(hx, bx.lo);
 }
 
 ufbx_math_abi double ufbx_atan(double x)
@@ -294,9 +294,9 @@ ufbx_math_abi double ufbx_atan(double x)
 		huge = 1.0e300;
 
 	double w, s1, s2, z;
-	ufbxmi_int ix, hx, id;
+	ufbxm_int ix, hx, id;
 
-	ufbxmi_bits bx = ufbxmi_to_bits(x);
+	ufbxm_bits bx = ufbxm_to_bits(x);
 	hx = bx.hi;
 	ix = hx & 0x7fffffff;
 	if (ix >= 0x44100000)
@@ -368,11 +368,11 @@ ufbx_math_abi double ufbx_sqrt(double x)
 	static const double one = 1.0, tiny = 1.0e-300;
 
 	double z;
-	ufbxmi_int sign = (ufbxmi_int)0x80000000;
-	ufbxmi_uint r, t1, s1, ix1, q1;
-	ufbxmi_int ix0, s0, q, m, t, i;
+	ufbxm_int sign = (ufbxm_int)0x80000000;
+	ufbxm_uint r, t1, s1, ix1, q1;
+	ufbxm_int ix0, s0, q, m, t, i;
 
-	ufbxmi_bits bx = ufbxmi_to_bits(x);
+	ufbxm_bits bx = ufbxm_to_bits(x);
 	ix0 = bx.hi; /* high word of x */
 	ix1 = bx.lo; /* low word of x */
 
@@ -424,19 +424,19 @@ ufbx_math_abi double ufbx_sqrt(double x)
 
 	while (r != 0)
 	{
-		t = s0 + (ufbxmi_int)r;
+		t = s0 + (ufbxm_int)r;
 		if (t <= ix0)
 		{
-			s0 = t + (ufbxmi_int)r;
+			s0 = t + (ufbxm_int)r;
 			ix0 -= t;
-			q += (ufbxmi_int)r;
+			q += (ufbxm_int)r;
 		}
 		ix0 += ix0 + ((ix1 & sign) >> 31);
 		ix1 += ix1;
 		r >>= 1;
 	}
 
-	r = (ufbxmi_uint)sign;
+	r = (ufbxm_uint)sign;
 	while (r != 0)
 	{
 		t1 = s1 + r;
@@ -444,7 +444,7 @@ ufbx_math_abi double ufbx_sqrt(double x)
 		if ((t < ix0) || ((t == ix0) && (t1 <= ix1)))
 		{
 			s1 = t1 + r;
-			if (((t1 & (ufbxmi_uint)sign) == (ufbxmi_uint)sign) && (s1 & sign) == 0)
+			if (((t1 & (ufbxm_uint)sign) == (ufbxm_uint)sign) && (s1 & sign) == 0)
 				s0 += 1;
 			ix0 -= t;
 			if (ix1 < t1)
@@ -464,14 +464,14 @@ ufbx_math_abi double ufbx_sqrt(double x)
 		if (z >= one)
 		{
 			z = one + tiny;
-			if (q1 == (ufbxmi_uint)0xffffffff)
+			if (q1 == (ufbxm_uint)0xffffffff)
 			{
 				q1 = 0;
 				q += 1;
 			}
 			else if (z > one)
 			{
-				if (q1 == (ufbxmi_uint)0xfffffffe)
+				if (q1 == (ufbxm_uint)0xfffffffe)
 					q += 1;
 				q1 += 2;
 			}
@@ -484,13 +484,13 @@ ufbx_math_abi double ufbx_sqrt(double x)
 	if ((q & 1) == 1)
 		ix1 |= sign;
 	ix0 += (m << 20);
-	return ufbxmi_from_bits(ix0, ix1);
+	return ufbxm_from_bits(ix0, ix1);
 }
 
 /*
  * Table of constants for 2/pi, 396 Hex digits (476 decimal) of 2/pi
  */
-static const ufbxmi_int ufbxmi_two_over_pi[] = {
+static const ufbxm_int ufbxm_two_over_pi[] = {
 	0xA2F983,
 	0x6E4E44,
 	0x1529FC,
@@ -559,7 +559,7 @@ static const ufbxmi_int ufbxmi_two_over_pi[] = {
 	0xC08C6B,
 };
 
-static const ufbxmi_int ufbxmi_npio2_hw[] = {
+static const ufbxm_int ufbxm_npio2_hw[] = {
 	0x3FF921FB,
 	0x400921FB,
 	0x4012D97C,
@@ -594,9 +594,9 @@ static const ufbxmi_int ufbxmi_npio2_hw[] = {
 	0x404921FB,
 };
 
-static ufbxmi_int ufbxmi_kernel_rem_pio2(double *x, double *y, ufbxmi_int e0, ufbxmi_int nx, ufbxmi_int prec, const ufbxmi_int *ipio2)
+static ufbxm_int ufbxm_kernel_rem_pio2(double *x, double *y, ufbxm_int e0, ufbxm_int nx, ufbxm_int prec, const ufbxm_int *ipio2)
 {
-	static const ufbxmi_int init_jk[] = {2, 3, 4, 6}; /* initial value for jk */
+	static const ufbxm_int init_jk[] = {2, 3, 4, 6}; /* initial value for jk */
 
 	static const double PIo2[] = {
 		1.57079625129699707031e+00, /* 0x3FF921FB, 0x40000000 */
@@ -615,7 +615,7 @@ static ufbxmi_int ufbxmi_kernel_rem_pio2(double *x, double *y, ufbxmi_int e0, uf
 		two24 = 1.67772160000000000000e+07,	 /* 0x41700000, 0x00000000 */
 		twon24 = 5.96046447753906250000e-08; /* 0x3E700000, 0x00000000 */
 
-	ufbxmi_int jz, jx, jv, jp, jk, carry, n, iq[20], i, j, k, m, q0, ih;
+	ufbxm_int jz, jx, jv, jp, jk, carry, n, iq[20], i, j, k, m, q0, ih;
 	double z, fw, f[20], fq[20], q[20];
 
 	/* initialize jk*/
@@ -649,15 +649,15 @@ static ufbxmi_int ufbxmi_kernel_rem_pio2(double *x, double *y, ufbxmi_int e0, uf
 		/* distill q[] into iq[] reversingly */
 		for (i = 0, j = jz, z = q[jz]; j > 0; i++, j--)
 		{
-			fw = (double)((ufbxmi_int)(twon24 * z));
-			iq[i] = (ufbxmi_int)(z - two24 * fw);
+			fw = (double)((ufbxm_int)(twon24 * z));
+			iq[i] = (ufbxm_int)(z - two24 * fw);
 			z = q[j - 1] + fw;
 		}
 
 		/* compute n */
 		z = ufbx_scalbn(z, q0);			/* actual value of z */
 		z -= 8.0 * ufbx_floor(z * 0.125); /* trim off integer >= 8 */
-		n = (ufbxmi_int)z;
+		n = (ufbxm_int)z;
 		z -= (double)n;
 		ih = 0;
 		if (q0 > 0)
@@ -751,14 +751,14 @@ static ufbxmi_int ufbxmi_kernel_rem_pio2(double *x, double *y, ufbxmi_int e0, uf
 		z = ufbx_scalbn(z, -q0);
 		if (z >= two24)
 		{
-			fw = (double)((ufbxmi_int)(twon24 * z));
-			iq[jz] = (ufbxmi_int)(z - two24 * fw);
+			fw = (double)((ufbxm_int)(twon24 * z));
+			iq[jz] = (ufbxm_int)(z - two24 * fw);
 			jz += 1;
 			q0 += 24;
-			iq[jz] = (ufbxmi_int)fw;
+			iq[jz] = (ufbxm_int)fw;
 		}
 		else
-			iq[jz] = (ufbxmi_int)z;
+			iq[jz] = (ufbxm_int)z;
 	}
 
 	/* convert integer "bit" chunk to floating-point value */
@@ -838,7 +838,7 @@ static ufbxmi_int ufbxmi_kernel_rem_pio2(double *x, double *y, ufbxmi_int e0, uf
  * pio2_3t:  pi/2 - (pio2_1+pio2_2+pio2_3)
  */
 
-ufbxmi_int ufbxmi_rem_pio2(double x, double *y)
+ufbxm_int ufbxm_rem_pio2(double x, double *y)
 {
 	static const double
 		zero = 0.00000000000000000000e+00,	  /* 0x00000000, 0x00000000 */
@@ -854,9 +854,9 @@ ufbxmi_int ufbxmi_rem_pio2(double x, double *y)
 
 	double z, w, t, r, fn;
 	double tx[3];
-	ufbxmi_int e0, i, j, nx, n, ix, hx;
+	ufbxm_int e0, i, j, nx, n, ix, hx;
 
-	ufbxmi_bits bx = ufbxmi_to_bits(x);
+	ufbxm_bits bx = ufbxm_to_bits(x);
 	hx = bx.hi; /* high word of x */
 	ix = hx & 0x7fffffff;
 	if (ix <= 0x3fe921fb) /* |x| ~<= pi/4 , no need for reduction */
@@ -903,11 +903,11 @@ ufbxmi_int ufbxmi_rem_pio2(double x, double *y)
 	if (ix <= 0x413921fb)
 	{ /* |x| ~<= 2^19*(pi/2), medium size */
 		t = ufbx_fabs(x);
-		n = (ufbxmi_int)(t * invpio2 + half);
+		n = (ufbxm_int)(t * invpio2 + half);
 		fn = (double)n;
 		r = t - fn * pio2_1;
 		w = fn * pio2_1t; /* 1st round good to 85 bit */
-		if (n < 32 && ix != ufbxmi_npio2_hw[n - 1])
+		if (n < 32 && ix != ufbxm_npio2_hw[n - 1])
 		{
 			y[0] = r - w; /* quick check no cancellation */
 		}
@@ -915,7 +915,7 @@ ufbxmi_int ufbxmi_rem_pio2(double x, double *y)
 		{
 			j = ix >> 20;
 			y[0] = r - w;
-			i = j - ((ufbxmi_hi(y[0]) >> 20) & 0x7ff);
+			i = j - ((ufbxm_hi(y[0]) >> 20) & 0x7ff);
 			if (i > 16)
 			{ /* 2nd iteration needed, good to 118 */
 				t = r;
@@ -923,7 +923,7 @@ ufbxmi_int ufbxmi_rem_pio2(double x, double *y)
 				r = t - w;
 				w = fn * pio2_2t - ((t - r) - w);
 				y[0] = r - w;
-				i = j - ((ufbxmi_hi(y[0]) >> 20) & 0x7ff);
+				i = j - ((ufbxm_hi(y[0]) >> 20) & 0x7ff);
 				if (i > 49)
 				{		   /* 3rd iteration need, 151 bits acc */
 					t = r; /* will cover all possible cases */
@@ -954,17 +954,17 @@ ufbxmi_int ufbxmi_rem_pio2(double x, double *y)
 	}
 	/* set z = scalbn(|x|,ilogb(x)-23) */
 	e0 = (ix >> 20) - 1046; /* e0 = ilogb(z)-23; */
-	z = ufbxmi_from_bits(ix - (e0 << 20), bx.lo);
+	z = ufbxm_from_bits(ix - (e0 << 20), bx.lo);
 	for (i = 0; i < 2; i++)
 	{
-		tx[i] = (double)((ufbxmi_int)(z));
+		tx[i] = (double)((ufbxm_int)(z));
 		z = (z - tx[i]) * two24;
 	}
 	tx[2] = z;
 	nx = 3;
 	while (tx[nx - 1] == zero)
 		nx--; /* skip zero term */
-	n = ufbxmi_kernel_rem_pio2(tx, y, e0, nx, 2, ufbxmi_two_over_pi);
+	n = ufbxm_kernel_rem_pio2(tx, y, e0, nx, 2, ufbxm_two_over_pi);
 	if (hx < 0)
 	{
 		y[0] = -y[0];
@@ -974,7 +974,7 @@ ufbxmi_int ufbxmi_rem_pio2(double x, double *y)
 	return n;
 }
 
-static double ufbxmi_kernel_sin(double x, double y, ufbxmi_int iy)
+static double ufbxm_kernel_sin(double x, double y, ufbxm_int iy)
 {
 
 	static const double
@@ -987,11 +987,11 @@ static double ufbxmi_kernel_sin(double x, double y, ufbxmi_int iy)
 		S6 = 1.58969099521155010221e-10;   /* 0x3DE5D93A, 0x5ACFD57C */
 
 	double z, r, v;
-	ufbxmi_int ix;
-	ix = ufbxmi_hi(x) & 0x7fffffff; /* high word of x */
+	ufbxm_int ix;
+	ix = ufbxm_hi(x) & 0x7fffffff; /* high word of x */
 	if (ix < 0x3e400000)	   /* |x| < 2**-27 */
 	{
-		if ((ufbxmi_int)x == 0)
+		if ((ufbxm_int)x == 0)
 			return x;
 	} /* generate inexact */
 	z = x * x;
@@ -1003,7 +1003,7 @@ static double ufbxmi_kernel_sin(double x, double y, ufbxmi_int iy)
 		return x - ((z * (half * y - v * r) - y) - v * S1);
 }
 
-static double ufbxmi_kernel_cos(double x, double y)
+static double ufbxm_kernel_cos(double x, double y)
 {
 	static const double
 		one = 1.00000000000000000000e+00, /* 0x3FF00000, 0x00000000 */
@@ -1015,11 +1015,11 @@ static double ufbxmi_kernel_cos(double x, double y)
 		C6 = -1.13596475577881948265e-11; /* 0xBDA8FAE9, 0xBE8838D4 */
 
 	double a, hz, z, r, qx;
-	ufbxmi_int ix;
-	ix = ufbxmi_hi(x) & 0x7fffffff; /* ix = |x|'s high word*/
+	ufbxm_int ix;
+	ix = ufbxm_hi(x) & 0x7fffffff; /* ix = |x|'s high word*/
 	if (ix < 0x3e400000)
 	{ /* if x < 2**27 */
-		if (((ufbxmi_int)x) == 0)
+		if (((ufbxm_int)x) == 0)
 			return one; /* generate inexact */
 	}
 	z = x * x;
@@ -1034,7 +1034,7 @@ static double ufbxmi_kernel_cos(double x, double y)
 		}
 		else
 		{
-			qx = ufbxmi_from_bits(ix - 0x00200000, 0); /* x/4 */
+			qx = ufbxm_from_bits(ix - 0x00200000, 0); /* x/4 */
 		}
 		hz = 0.5 * z - qx;
 		a = one - qx;
@@ -1042,10 +1042,10 @@ static double ufbxmi_kernel_cos(double x, double y)
 	}
 }
 
-static double ufbxmi_kernel_tan(double x, double y, ufbxmi_int iy)
+static double ufbxm_kernel_tan(double x, double y, ufbxm_int iy)
 {
 	double z, r, v, w, s;
-	ufbxmi_int ix, hx;
+	ufbxm_int ix, hx;
 
 	static const double xxx[] = {
 		3.33333333333334091986e-01,				/* 3FD55555, 55555563 */
@@ -1070,12 +1070,12 @@ static double ufbxmi_kernel_tan(double x, double y, ufbxmi_int iy)
 	const double pio4lo = xxx[15];
 	const double *const T = xxx;
 
-	ufbxmi_bits bx = ufbxmi_to_bits(x);
+	ufbxm_bits bx = ufbxm_to_bits(x);
 	hx = bx.hi;           /* high word of x */
 	ix = hx & 0x7fffffff; /* high word of |x| */
 	if (ix < 0x3e300000)
 	{ /* x < 2**-28 */
-		if ((ufbxmi_int)x == 0)
+		if ((ufbxm_int)x == 0)
 		{ /* generate inexact */
 			if (((ix | bx.lo) | (iy + 1)) == 0)
 				return one / ufbx_fabs(x);
@@ -1088,10 +1088,10 @@ static double ufbxmi_kernel_tan(double x, double y, ufbxmi_int iy)
 					double a, t;
 
 					z = w = x + y;
-					z = ufbxmi_zero_lo(z);
+					z = ufbxm_zero_lo(z);
 					v = y - (z - x);
 					t = a = -one / w;
-					t = ufbxmi_zero_lo(t);
+					t = ufbxm_zero_lo(t);
 					s = one + t * z;
 					return t + a * (s + t * v);
 				}
@@ -1142,10 +1142,10 @@ static double ufbxmi_kernel_tan(double x, double y, ufbxmi_int iy)
 		/* compute -1.0 / (x+r) accurately */
 		double a, t;
 		z = w;
-		z = ufbxmi_zero_lo(z);
+		z = ufbxm_zero_lo(z);
 		v = r - (z - x);  /* z+v = r+x */
 		t = a = -1.0 / w; /* a = -1.0/w */
-		t = ufbxmi_zero_lo(t);
+		t = ufbxm_zero_lo(t);
 		s = 1.0 + t * z;
 		return t + a * (s + t * v);
 	}
@@ -1154,15 +1154,15 @@ static double ufbxmi_kernel_tan(double x, double y, ufbxmi_int iy)
 ufbx_math_abi double ufbx_sin(double x)
 {
 	double y[2], z = 0.0;
-	ufbxmi_int n, ix;
+	ufbxm_int n, ix;
 
 	/* High word of x. */
-	ix = ufbxmi_hi(x);
+	ix = ufbxm_hi(x);
 
 	/* |x| ~< pi/4 */
 	ix &= 0x7fffffff;
 	if (ix <= 0x3fe921fb)
-		return ufbxmi_kernel_sin(x, z, 0);
+		return ufbxm_kernel_sin(x, z, 0);
 
 	/* sin(Inf or NaN) is NaN */
 	else if (ix >= 0x7ff00000)
@@ -1171,17 +1171,17 @@ ufbx_math_abi double ufbx_sin(double x)
 	/* argument reduction needed */
 	else
 	{
-		n = ufbxmi_rem_pio2(x, y);
+		n = ufbxm_rem_pio2(x, y);
 		switch (n & 3)
 		{
 		case 0:
-			return ufbxmi_kernel_sin(y[0], y[1], 1);
+			return ufbxm_kernel_sin(y[0], y[1], 1);
 		case 1:
-			return ufbxmi_kernel_cos(y[0], y[1]);
+			return ufbxm_kernel_cos(y[0], y[1]);
 		case 2:
-			return -ufbxmi_kernel_sin(y[0], y[1], 1);
+			return -ufbxm_kernel_sin(y[0], y[1], 1);
 		default:
-			return -ufbxmi_kernel_cos(y[0], y[1]);
+			return -ufbxm_kernel_cos(y[0], y[1]);
 		}
 	}
 }
@@ -1189,15 +1189,15 @@ ufbx_math_abi double ufbx_sin(double x)
 ufbx_math_abi double ufbx_cos(double x)
 {
 	double y[2], z = 0.0;
-	ufbxmi_int n, ix;
+	ufbxm_int n, ix;
 
 	/* High word of x. */
-	ix = ufbxmi_hi(x);
+	ix = ufbxm_hi(x);
 
 	/* |x| ~< pi/4 */
 	ix &= 0x7fffffff;
 	if (ix <= 0x3fe921fb)
-		return ufbxmi_kernel_cos(x, z);
+		return ufbxm_kernel_cos(x, z);
 
 	/* cos(Inf or NaN) is NaN */
 	else if (ix >= 0x7ff00000)
@@ -1206,17 +1206,17 @@ ufbx_math_abi double ufbx_cos(double x)
 	/* argument reduction needed */
 	else
 	{
-		n = ufbxmi_rem_pio2(x, y);
+		n = ufbxm_rem_pio2(x, y);
 		switch (n & 3)
 		{
 		case 0:
-			return ufbxmi_kernel_cos(y[0], y[1]);
+			return ufbxm_kernel_cos(y[0], y[1]);
 		case 1:
-			return -ufbxmi_kernel_sin(y[0], y[1], 1);
+			return -ufbxm_kernel_sin(y[0], y[1], 1);
 		case 2:
-			return -ufbxmi_kernel_cos(y[0], y[1]);
+			return -ufbxm_kernel_cos(y[0], y[1]);
 		default:
-			return ufbxmi_kernel_sin(y[0], y[1], 1);
+			return ufbxm_kernel_sin(y[0], y[1], 1);
 		}
 	}
 }
@@ -1224,15 +1224,15 @@ ufbx_math_abi double ufbx_cos(double x)
 ufbx_math_abi double ufbx_tan(double x)
 {
 	double y[2], z = 0.0;
-	ufbxmi_int n, ix;
+	ufbxm_int n, ix;
 
 	/* High word of x. */
-	ix = ufbxmi_hi(x);
+	ix = ufbxm_hi(x);
 
 	/* |x| ~< pi/4 */
 	ix &= 0x7fffffff;
 	if (ix <= 0x3fe921fb)
-		return ufbxmi_kernel_tan(x, z, 1);
+		return ufbxm_kernel_tan(x, z, 1);
 
 	/* tan(Inf or NaN) is NaN */
 	else if (ix >= 0x7ff00000)
@@ -1241,8 +1241,8 @@ ufbx_math_abi double ufbx_tan(double x)
 	/* argument reduction needed */
 	else
 	{
-		n = ufbxmi_rem_pio2(x, y);
-		return ufbxmi_kernel_tan(y[0], y[1], 1 - ((n & 1) << 1)); /*   1 -- n even
+		n = ufbxm_rem_pio2(x, y);
+		return ufbxm_kernel_tan(y[0], y[1], 1 - ((n & 1) << 1)); /*   1 -- n even
 									-1 -- n odd */
 	}
 }
@@ -1268,8 +1268,8 @@ ufbx_math_abi double ufbx_asin(double x) /* wrapper asin */
 		qS4 = 7.70381505559019352791e-02;	  /* 0x3FB3B8C5, 0xB12E9282 */
 
 	double t = 0.0, w, p, q, c, r, s;
-	ufbxmi_int hx, ix;
-	ufbxmi_bits bx = ufbxmi_to_bits(x);
+	ufbxm_int hx, ix;
+	ufbxm_bits bx = ufbxm_to_bits(x);
 	hx = bx.hi;
 	ix = hx & 0x7fffffff;
 	if (ix >= 0x3ff00000)
@@ -1307,7 +1307,7 @@ ufbx_math_abi double ufbx_asin(double x) /* wrapper asin */
 	else
 	{
 		w = s;
-		w = ufbxmi_zero_lo(w);
+		w = ufbxm_zero_lo(w);
 		c = (t - w * w) / (s + w);
 		r = p / q;
 		p = 2.0 * s * r - (pio2_lo - 2.0 * c);
@@ -1339,8 +1339,8 @@ ufbx_math_abi double ufbx_acos(double x) /* wrapper acos */
 		qS4 = 7.70381505559019352791e-02;	  /* 0x3FB3B8C5, 0xB12E9282 */
 
 	double z, p, q, r, w, s, c, df;
-	ufbxmi_int hx, ix;
-	ufbxmi_bits bx = ufbxmi_to_bits(x);
+	ufbxm_int hx, ix;
+	ufbxm_bits bx = ufbxm_to_bits(x);
 	hx = bx.hi;
 	ix = hx & 0x7fffffff;
 	if (ix >= 0x3ff00000)
@@ -1379,7 +1379,7 @@ ufbx_math_abi double ufbx_acos(double x) /* wrapper acos */
 		z = (one - x) * 0.5;
 		s = ufbx_sqrt(z);
 		df = s;
-		df = ufbxmi_zero_lo(df);
+		df = ufbxm_zero_lo(df);
 		c = (z - df * df) / (s + df);
 		p = z * (pS0 + z * (pS1 + z * (pS2 + z * (pS3 + z * (pS4 + z * pS5)))));
 		q = one + z * (qS1 + z * (qS2 + z * (qS3 + z * qS4)));
@@ -1400,10 +1400,10 @@ ufbx_math_abi double ufbx_atan2(double y, double x) /* wrapper atan2 */
 		pi_lo = 1.2246467991473531772E-16;	/* 0x3CA1A626, 0x33145C07 */
 
 	double z;
-	ufbxmi_int k, m, hx, hy, ix, iy;
-	ufbxmi_uint lx, ly;
-	ufbxmi_bits bx = ufbxmi_to_bits(x);
-	ufbxmi_bits by = ufbxmi_to_bits(y);
+	ufbxm_int k, m, hx, hy, ix, iy;
+	ufbxm_uint lx, ly;
+	ufbxm_bits bx = ufbxm_to_bits(x);
+	ufbxm_bits by = ufbxm_to_bits(y);
 
 	hx = bx.hi;
 	lx = bx.lo;
@@ -1411,8 +1411,8 @@ ufbx_math_abi double ufbx_atan2(double y, double x) /* wrapper atan2 */
 	ly = by.lo;
 	ix = hx & 0x7fffffff;
 	iy = hy & 0x7fffffff;
-	if (((ix | ((lx | (ufbxmi_uint)-(ufbxmi_int)lx) >> 31)) > 0x7ff00000) ||
-		((iy | ((ly | (ufbxmi_uint)-(ufbxmi_int)ly) >> 31)) > 0x7ff00000)) /* x or y is NaN */
+	if (((ix | ((lx | (ufbxm_uint)-(ufbxm_int)lx) >> 31)) > 0x7ff00000) ||
+		((iy | ((ly | (ufbxm_uint)-(ufbxm_int)ly) >> 31)) > 0x7ff00000)) /* x or y is NaN */
 		return x + y;
 	if ((hx - 0x3ff00000 | lx) == 0)
 		return ufbx_atan(y);				 /* x=1.0 */
@@ -1535,14 +1535,14 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 
 	double z, ax, z_h, z_l, p_h, p_l;
 	double y1, t1, t2, r, s, t, u, v, w;
-	ufbxmi_int i0, i1, i, j, k, yisint, n;
-	ufbxmi_int hx, hy, ix, iy;
-	ufbxmi_uint lx, ly;
-	ufbxmi_bits bx = ufbxmi_to_bits(x);
-	ufbxmi_bits by = ufbxmi_to_bits(y);
-	ufbxmi_bits bz;
+	ufbxm_int i0, i1, i, j, k, yisint, n;
+	ufbxm_int hx, hy, ix, iy;
+	ufbxm_uint lx, ly;
+	ufbxm_bits bx = ufbxm_to_bits(x);
+	ufbxm_bits by = ufbxm_to_bits(y);
+	ufbxm_bits bz;
 
-	i0 = ((*(ufbxmi_int *)&one) >> 29) ^ 1;
+	i0 = ((*(ufbxm_int *)&one) >> 29) ^ 1;
 	i1 = 1 - i0;
 	hx = bx.hi;
 	lx = bx.lo;
@@ -1560,10 +1560,10 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 		iy > 0x7ff00000 || ((iy == 0x7ff00000) && (ly != 0)))
 		return x + y;
 
-	/* determine if y is an odd ufbxmi_int when x < 0
+	/* determine if y is an odd ufbxm_int when x < 0
 	 * yisint = 0	... y is not an integer
-	 * yisint = 1	... y is an odd ufbxmi_int
-	 * yisint = 2	... y is an even ufbxmi_int
+	 * yisint = 1	... y is an odd ufbxm_int
+	 * yisint = 2	... y is an even ufbxm_int
 	 */
 	yisint = 0;
 	if (hx < 0)
@@ -1575,8 +1575,8 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 			k = (iy >> 20) - 0x3ff; /* exponent */
 			if (k > 20)
 			{
-				j = (ufbxmi_int)(ly >> (52 - k));
-				if ((j << (52 - k)) == (ufbxmi_int)ly)
+				j = (ufbxm_int)(ly >> (52 - k));
+				if ((j << (52 - k)) == (ufbxm_int)ly)
 					yisint = 2 - (j & 1);
 			}
 			else if (ly == 0)
@@ -1629,7 +1629,7 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 			{
 				if (((ix - 0x3ff00000) | yisint) == 0)
 				{
-					z = (z - z) / (z - z); /* (-1)**non-ufbxmi_int is NaN */
+					z = (z - z) / (z - z); /* (-1)**non-ufbxm_int is NaN */
 				}
 				else if (yisint == 1)
 					z = -z; /* (x<0)**odd = -(|x|**odd) */
@@ -1640,13 +1640,13 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 
 	n = (hx >> 31) + 1;
 
-	/* (x<0)**(non-ufbxmi_int) is NaN */
+	/* (x<0)**(non-ufbxm_int) is NaN */
 	if ((n | yisint) == 0)
 		return (x - x) / (x - x);
 
 	s = one; /* s (sign of result -ve**odd) = -1 else = 1 */
 	if ((n | (yisint - 1)) == 0)
-		s = -one; /* (-ve)**(odd ufbxmi_int) */
+		s = -one; /* (-ve)**(odd ufbxm_int) */
 
 	/* |y| is huge */
 	if (iy > 0x41e00000)
@@ -1670,7 +1670,7 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 		u = ivln2_h * t; /* ivln2_h has 21 sig. bits */
 		v = t * ivln2_l - w * ivln2;
 		t1 = u + v;
-		t1 = ufbxmi_zero_lo(t1);
+		t1 = ufbxm_zero_lo(t1);
 		t2 = v - (t1 - u);
 	}
 	else
@@ -1682,7 +1682,7 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 		{
 			ax *= two53;
 			n -= 53;
-			ix = ufbxmi_hi(ax);
+			ix = ufbxm_hi(ax);
 		}
 		n += ((ix) >> 20) - 0x3ff;
 		j = ix & 0x000fffff;
@@ -1698,17 +1698,17 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 			n += 1;
 			ix -= 0x00100000;
 		}
-		ax = ufbxmi_set_hi(ax, ix);
+		ax = ufbxm_set_hi(ax, ix);
 
 		/* compute ss = s_h+s_l = (x-1)/(x+1) or (x-1.5)/(x+1.5) */
 		u = ax - bp[k]; /* bp[0]=1.0, bp[1]=1.5 */
 		v = one / (ax + bp[k]);
 		ss = u * v;
 		s_h = ss;
-		s_h = ufbxmi_zero_lo(s_h);
+		s_h = ufbxm_zero_lo(s_h);
 		/* t_h=ax+bp[k] High */
 		t_h = zero;
-		t_h = ufbxmi_set_hi(t_h, ((ix >> 1) | 0x20000000) + 0x00080000 + (k << 18));
+		t_h = ufbxm_set_hi(t_h, ((ix >> 1) | 0x20000000) + 0x00080000 + (k << 18));
 		t_l = ax - (t_h - bp[k]);
 		s_l = v * ((u - s_h * t_h) - s_h * t_l);
 		/* compute log(ax) */
@@ -1717,33 +1717,33 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 		r += s_l * (s_h + ss);
 		s2 = s_h * s_h;
 		t_h = 3.0 + s2 + r;
-		t_h = ufbxmi_zero_lo(t_h);
+		t_h = ufbxm_zero_lo(t_h);
 		t_l = r - ((t_h - 3.0) - s2);
 		/* u+v = ss*(1+...) */
 		u = s_h * t_h;
 		v = s_l * t_h + t_l * ss;
 		/* 2/(3log2)*(ss+...) */
 		p_h = u + v;
-		p_h = ufbxmi_zero_lo(p_h);
+		p_h = ufbxm_zero_lo(p_h);
 		p_l = v - (p_h - u);
 		z_h = cp_h * p_h; /* cp_h+cp_l = 2/(3*log2) */
 		z_l = cp_l * p_h + p_l * cp + dp_l[k];
 		/* log2(ax) = (ss+..)*2/(3*log2) = n + dp_h + z_h + z_l */
 		t = (double)n;
 		t1 = (((z_h + z_l) + dp_h[k]) + t);
-		t1 = ufbxmi_zero_lo(t1);
+		t1 = ufbxm_zero_lo(t1);
 		t2 = z_l - (((t1 - t) - dp_h[k]) - z_h);
 	}
 
 	/* split up y into y1+y2 and compute (y1+y2)*(t1+t2) */
 	y1 = y;
-	y1 = ufbxmi_zero_lo(y1);
+	y1 = ufbxm_zero_lo(y1);
 	p_l = (y - y1) * t1 + y * t2;
 	p_h = y1 * t1;
 	z = p_l + p_h;
-	bz = ufbxmi_to_bits(z);
+	bz = ufbxm_to_bits(z);
 	j = bz.hi;
-	i = (ufbxmi_int)bz.lo;
+	i = (ufbxm_int)bz.lo;
 	if (j >= 0x40900000)
 	{									 /* z >= 1024 */
 		if (((j - 0x40900000) | i) != 0) /* if z > 1024 */
@@ -1775,14 +1775,14 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 		n = j + (0x00100000 >> (k + 1));
 		k = ((n & 0x7fffffff) >> 20) - 0x3ff; /* new k for n */
 		t = zero;
-		t = ufbxmi_set_hi(t, (n & ~(0x000fffff >> k)));
+		t = ufbxm_set_hi(t, (n & ~(0x000fffff >> k)));
 		n = ((n & 0x000fffff) | 0x00100000) >> (20 - k);
 		if (j < 0)
 			n = -n;
 		p_h -= t;
 	}
 	t = p_l + p_h;
-	t = ufbxmi_zero_lo(t);
+	t = ufbxm_zero_lo(t);
 	u = t * lg2_h;
 	v = (p_l - (t - p_h)) * lg2 + t * lg2_l;
 	z = u + v;
@@ -1791,14 +1791,14 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 	t1 = z - t * (P1 + t * (P2 + t * (P3 + t * (P4 + t * P5))));
 	r = (z * t1) / (t1 - two) - (w + z * w);
 	z = one - (r - z);
-	j = ufbxmi_hi(z);
+	j = ufbxm_hi(z);
 	j += (n << 20);
 	if ((j >> 20) <= 0) {
 		z = ufbx_scalbn(z, n); /* subnormal output */
 	} else {
-		bz = ufbxmi_to_bits(z);
+		bz = ufbxm_to_bits(z);
 		bz.hi += (n << 20);
-		z = ufbxmi_from_bits(bz.hi, bz.lo);
+		z = ufbxm_from_bits(bz.hi, bz.lo);
 	}
 	return s * z;
 }
@@ -1815,10 +1815,10 @@ ufbx_math_abi double ufbx_fmax(double a, double b)
 
 ufbx_math_abi double ufbx_nextafter(double x, double y)
 {
-	ufbxmi_int hx, hy, ix, iy;
-	ufbxmi_uint lx, ly;
-	ufbxmi_bits bx = ufbxmi_to_bits(x);
-	ufbxmi_bits by = ufbxmi_to_bits(y);
+	ufbxm_int hx, hy, ix, iy;
+	ufbxm_uint lx, ly;
+	ufbxm_bits bx = ufbxm_to_bits(x);
+	ufbxm_bits by = ufbxm_to_bits(y);
 
 	hx = bx.hi;		  /* high word of x */
 	lx = bx.lo;		  /* low  word of x */
@@ -1834,7 +1834,7 @@ ufbx_math_abi double ufbx_nextafter(double x, double y)
 		return x; /* x=y, return x */
 	if ((ix | lx) == 0)
 	{							   /* x == 0 */
-		x = ufbxmi_from_bits(hy & (ufbxmi_int)0x80000000u, 1);
+		x = ufbxm_from_bits(hy & (ufbxm_int)0x80000000u, 1);
 		y = x * x;
 		if (y == x)
 			return y;
@@ -1879,21 +1879,21 @@ ufbx_math_abi double ufbx_nextafter(double x, double y)
 		y = x * x;
 		if (y != x)
 		{ /* raise underflow flag */
-			return ufbxmi_from_bits(hx, lx);
+			return ufbxm_from_bits(hx, lx);
 		}
 	}
-	return ufbxmi_from_bits(hx, lx);
+	return ufbxm_from_bits(hx, lx);
 }
 
 ufbx_math_abi double ufbx_ceil(double x)
 {
 	static const double huge = 1.0e300;
 
-	ufbxmi_int i0, i1, j0;
-	ufbxmi_uint i, j;
-	ufbxmi_bits bx = ufbxmi_to_bits(x);
+	ufbxm_int i0, i1, j0;
+	ufbxm_uint i, j;
+	ufbxm_bits bx = ufbxm_to_bits(x);
 	i0 = bx.hi;
-	i1 = (ufbxmi_int)bx.lo;
+	i1 = (ufbxm_int)bx.lo;
 	j0 = ((i0 >> 20) & 0x7ff) - 0x3ff;
 	if (j0 < 20)
 	{
@@ -1936,7 +1936,7 @@ ufbx_math_abi double ufbx_ceil(double x)
 	}
 	else
 	{
-		i = ((ufbxmi_uint)(0xffffffff)) >> (j0 - 20);
+		i = ((ufbxm_uint)(0xffffffff)) >> (j0 - 20);
 		if ((i1 & i) == 0)
 			return x; /* x is integral */
 		if (huge + x > 0.0)
@@ -1947,16 +1947,16 @@ ufbx_math_abi double ufbx_ceil(double x)
 					i0 += 1;
 				else
 				{
-					j = (ufbxmi_uint)i1 + (1u << (52 - j0));
-					if (j < (ufbxmi_uint)i1)
+					j = (ufbxm_uint)i1 + (1u << (52 - j0));
+					if (j < (ufbxm_uint)i1)
 						i0 += 1; /* got a carry */
-					i1 = (ufbxmi_int)j;
+					i1 = (ufbxm_int)j;
 				}
 			}
 			i1 &= (~i);
 		}
 	}
-	return ufbxmi_from_bits(i0, (ufbxmi_uint)i1);
+	return ufbxm_from_bits(i0, (ufbxm_uint)i1);
 }
 
 ufbx_math_abi double ufbx_rint(double x)
@@ -1966,10 +1966,10 @@ ufbx_math_abi double ufbx_rint(double x)
 		-4.50359962737049600000e+15, /* 0xC3300000, 0x00000000 */
 	};
 
-	ufbxmi_int i0, j0, sx;
-	ufbxmi_uint i, i1;
+	ufbxm_int i0, j0, sx;
+	ufbxm_uint i, i1;
 	double w, t;
-	ufbxmi_bits bt, bx = ufbxmi_to_bits(x);
+	ufbxm_bits bt, bx = ufbxm_to_bits(x);
 	i0 = bx.hi;
 	i1 = bx.lo;
 	sx = (i0 >> 31) & 1;
@@ -1979,13 +1979,13 @@ ufbx_math_abi double ufbx_rint(double x)
 			if (((i0 & 0x7fffffff) | i1) == 0) return x;
 			i1 |= (i0 & 0x0fffff);
 			i0 &= 0xfffe0000;
-			i0 |= ((i1 | (ufbxmi_uint)-(ufbxmi_int)i1) >> 12) & 0x80000;
-			x = ufbxmi_set_hi(x, i0);
+			i0 |= ((i1 | (ufbxm_uint)-(ufbxm_int)i1) >> 12) & 0x80000;
+			x = ufbxm_set_hi(x, i0);
 			w = TWO52[sx] + x;
 			t = w - TWO52[sx];
-			bt = ufbxmi_to_bits(t);
+			bt = ufbxm_to_bits(t);
 			i0 = bt.hi;
-			t = ufbxmi_from_bits((i0 & 0x7fffffff) | (sx << 31), bt.lo);
+			t = ufbxm_from_bits((i0 & 0x7fffffff) | (sx << 31), bt.lo);
 			return t;
 		}
 		else {
@@ -1994,7 +1994,7 @@ ufbx_math_abi double ufbx_rint(double x)
 			i >>= 1;
 			if (((i0 & i) | i1) != 0) {
 				if (j0 == 19) i1 = 0x40000000; else
-					i0 = (i0 & (ufbxmi_int)(~i)) | ((0x20000) >> j0);
+					i0 = (i0 & (ufbxm_int)(~i)) | ((0x20000) >> j0);
 			}
 		}
 	}
@@ -2003,25 +2003,25 @@ ufbx_math_abi double ufbx_rint(double x)
 		else return x;		/* x is integral */
 	}
 	else {
-		i = ((ufbxmi_uint)(0xffffffff)) >> (j0 - 20);
+		i = ((ufbxm_uint)(0xffffffff)) >> (j0 - 20);
 		if ((i1 & i) == 0) return x;	/* x is integral */
 		i >>= 1;
 		if ((i1 & i) != 0) i1 = (i1 & (~i)) | ((0x40000000) >> (j0 - 20));
 	}
-	x = ufbxmi_from_bits(i0, i1);
+	x = ufbxm_from_bits(i0, i1);
 	w = TWO52[sx] + x;
 	return w - TWO52[sx];
 }
 
 ufbx_math_abi int ufbx_isnan(double x)
 {
-	ufbxmi_int hx, lx;
-	ufbxmi_bits bx = ufbxmi_to_bits(x);
+	ufbxm_int hx, lx;
+	ufbxm_bits bx = ufbxm_to_bits(x);
 	hx = (bx.hi & 0x7fffffff);
-	lx = (ufbxmi_int)bx.lo;
-	hx |= (ufbxmi_uint)(lx | (-lx)) >> 31;
+	lx = (ufbxm_int)bx.lo;
+	hx |= (ufbxm_uint)(lx | (-lx)) >> 31;
 	hx = 0x7ff00000 - hx;
-	return (int)(((ufbxmi_uint)(hx)) >> 31);
+	return (int)(((ufbxm_uint)(hx)) >> 31);
 }
 
 #if defined(__cplusplus)
