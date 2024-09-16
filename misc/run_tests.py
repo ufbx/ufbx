@@ -972,7 +972,7 @@ async def main():
         target_tasks = []
 
         freestanding_config = {
-            "sources": ["extra/ufbx_math.c", "extra/ufbx_libc.c", "misc/ufbx_libc_os.c", "test/runner.c", "ufbx.c"],
+            "sources": ["extra/ufbx_math.c", "extra/ufbx_libc.c", "misc/ufbx_malloc.c", "misc/ufbx_libc_os.c", "test/runner.c", "ufbx.c"],
             "output": "freestanding_runner" + exe_suffix,
             "defines": {
                 "UFBX_NO_LIBC": "",
