@@ -336,7 +336,7 @@ extern "C" {
 #endif
 #if !defined(UFBX_NAN)
 	#if defined(NAN)
-		#define UFBX_INFINITY NAN
+		#define UFBX_NAN NAN
 	#else
 		#define UFBX_NAN (UFBX_INFINITY * 0.0f)
 	#endif
