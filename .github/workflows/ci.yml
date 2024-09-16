@@ -131,7 +131,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov -y .github/codecov.yml
+        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov
 
   ci_coverage32:
     runs-on: ubuntu-20.04
@@ -148,7 +148,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov -y .github/codecov.yml
+        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov
 
   ci_no_assert:
     runs-on: ubuntu-20.04
@@ -165,7 +165,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov -y .github/codecov.yml
+        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov
 
   ci_cpp:
     runs-on: ubuntu-latest
@@ -564,7 +564,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov -y .github/codecov.yml
+        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov
 
   ci_fuzz:
     runs-on: [self-hosted, ARM64, legacy]
@@ -585,7 +585,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov -y .github/codecov.yml
+        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov
 
   ci_post_hashes:
     runs-on: ubuntu-latest
