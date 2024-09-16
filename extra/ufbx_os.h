@@ -58,6 +58,7 @@ ufbx_os_abi void ufbx_os_thread_pool_wait(ufbx_os_thread_pool *pool, uint64_t ta
 #define ufbxos_assert(cond) ufbx_assert(cond)
 
 #include <stdlib.h>
+#include <string.h>
 
 static void ufbxos_thread_pool_entry(ufbx_os_thread_pool *pool);
 
