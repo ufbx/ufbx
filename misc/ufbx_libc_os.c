@@ -65,7 +65,7 @@ bool ufbx_malloc_os_free(void *pointer, size_t allocated_size)
 void *ufbx_stdio_open(const char *path, size_t path_len)
 {
 	WCHAR filename_wide[UFBXI_WIN32_MAX_FILENAME_WCHAR + 1] = { 0 };
-	int len = MultiByteToWideChar(CP_UTF8, 0, path, path_len, filename_wide, UFBXI_WIN32_MAX_FILENAME_WCHAR);
+	int len = MultiByteToWideChar(CP_UTF8, 0, path, (int)path_len, filename_wide, UFBXI_WIN32_MAX_FILENAME_WCHAR);
 	if (len < 0 || len >= UFBXI_WIN32_MAX_FILENAME_WCHAR) return NULL;
 	filename_wide[len] = 0;
 
