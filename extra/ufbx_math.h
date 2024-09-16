@@ -1,10 +1,16 @@
+#ifndef UFBX_UFBX_MATH_H_INCLUDED
+#define UFBX_UFBX_MATH_H_INCLUDED
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
 #ifndef ufbx_math_abi
-#define ufbx_math_abi
+    #if defined(UFBX_STATIC)
+        #define ufbx_math_abi static
+    #else
+        #define ufbx_math_abi
+    #endif
 #endif
 
 ufbx_math_abi double ufbx_sqrt(double x);
@@ -27,4 +33,6 @@ ufbx_math_abi int ufbx_isnan(double x);
 
 #if defined(__cplusplus)
 }
+#endif
+
 #endif

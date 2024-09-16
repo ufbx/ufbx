@@ -16,7 +16,11 @@
  */
 
 #ifndef ufbx_math_abi
-#define ufbx_math_abi
+    #if defined(UFBX_STATIC)
+        #define ufbx_math_abi static
+    #else
+        #define ufbx_math_abi
+    #endif
 #endif
 
 /* Sometimes it's necessary to define UFBXM_LITTLE_ENDIAN explicitly
