@@ -200,10 +200,12 @@
 #endif
 
 #if !defined(UFBX_NO_LIBC)
-	#include <string.h>
 	#include <float.h>
 	#if !defined(UFBX_EXTERNAL_MATH)
 		#include <math.h>
+	#endif
+	#if !defined(UFBX_EXTERNAL_STRING)
+		#include <string.h>
 	#endif
 	#if !defined(UFBX_NO_STDIO) && !defined(UFBX_EXTERNAL_STDIO)
 		#include <stdio.h>
