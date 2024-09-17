@@ -200,7 +200,9 @@
 #endif
 
 #if !defined(UFBX_NO_LIBC)
-	#include <float.h>
+	#if !defined(UFBX_NO_FLOAT_H)
+		#include <float.h>
+	#endif
 	#if !defined(UFBX_EXTERNAL_MATH)
 		#include <math.h>
 	#endif
