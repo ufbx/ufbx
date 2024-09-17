@@ -6966,7 +6966,6 @@ static ufbxi_noinline bool ufbxi_stdio_open(ufbxi_file_context *fc, ufbx_stream 
 }
 
 #endif
-#endif
 
 // -- Memory IO
 
