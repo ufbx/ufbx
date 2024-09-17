@@ -205,10 +205,10 @@
 	#if !defined(UFBX_EXTERNAL_MATH)
 		#include <math.h>
 	#endif
-	#if !defined(UFBX_NO_STDIO)
+	#if !defined(UFBX_NO_STDIO) && !defined(UFBX_EXTERNAL_STDIO)
 		#include <stdio.h>
 	#endif
-	#if !defined(UFBX_NO_MALLOC)
+	#if !defined(UFBX_NO_MALLOC) && !defined(UFBX_EXTERNAL_MALLOC)
 		#include <stdlib.h>
 	#endif
 #else
@@ -365,12 +365,12 @@ extern "C" {
 	#if !defined(ufbx_malloc) || !defined(ufbx_realloc) || !defined(ufbx_free)
 		#error Inconsistent custom global allocator
 	#endif
-#elif defined(UFBX_EXTERNAL_MALLOC)
-	// Nop
 #elif defined(UFBX_NO_MALLOC)
 	#define ufbx_malloc(size) ((void)(size), (void*)NULL)
 	#define ufbx_realloc(ptr, old_size, new_size) ((void)(ptr), (void)(old_size), (void)(new_size), (void*)NULL)
 	#define ufbx_free(ptr, old_size) ((void)(ptr), (void*)(old_size))
+#elif defined(UFBX_EXTERNAL_MALLOC)
+	// Nop
 #else
 	#define ufbx_malloc(size) malloc((size))
 	#define ufbx_realloc(ptr, old_size, new_size) realloc((ptr), (new_size))
@@ -381,7 +381,7 @@ extern "C" {
 	static void ufbxi_panic_handler(const char *message)
 	{
 		(void)message;
-		#if !defined(UFBX_NO_STDIO) && !defined(UFBX_NO_LIBC)
+		#if !defined(UFBX_NO_STDIO) && !defined(UFBX_EXTERNAL_STDIO)
 			fprintf(stderr, "ufbx panic: %s\n", message);
 		#endif
 		ufbx_assert(false && "ufbx panic: See stderr for more information");
@@ -588,7 +588,7 @@ extern "C" {
 	#endif
 #endif
 
-#if !defined(UFBX_STANDARD_C) && defined(_POSIX_C_SOURCE) && !defined(UFBX_NO_LIBC)
+#if !defined(UFBX_STANDARD_C) && defined(_POSIX_C_SOURCE)
 	#if _POSIX_C_SOURCE >= 200112l
 		#ifndef UFBX_HAS_FTELLO
 			#define UFBX_HAS_FTELLO
@@ -6770,8 +6770,7 @@ static ufbxi_noinline void ufbxi_end_file_context(ufbxi_file_context *fc, ufbx_e
 
 // -- File IO
 
-#if !defined(UFBX_NO_STDIO)
-#if !defined(UFBX_NO_LIBC)
+#if !defined(UFBX_NO_STDIO) && !defined(UFBX_EXTERNAL_STDIO)
 
 static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path, size_t path_len, bool null_terminated)
 {
@@ -6853,10 +6852,10 @@ static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path
 
 static uint64_t ufbxi_ftell(FILE *file)
 {
-#if !defined(UFBX_STANDARD_C) && defined(UFBX_HAS_FTELLO) && !defined(UFBX_NO_LIBC)
+#if !defined(UFBX_STANDARD_C) && defined(UFBX_HAS_FTELLO)
 	off_t result = ftello(file);
 	if (result >= 0) return (uint64_t)result;
-#elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER) && !defined(UFBX_NO_LIBC)
+#elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
 	int64_t result = _ftelli64(file);
 	if (result >= 0) return (uint64_t)result;
 #else
@@ -6927,7 +6926,7 @@ static ufbxi_noinline bool ufbxi_stdio_open(ufbxi_file_context *fc, ufbx_stream 
 	return true;
 }
 
-#else
+#elif defined(UFBX_EXTERNAL_STDIO)
 
 static ufbxi_noinline void ufbxi_stdio_init(ufbx_stream *stream, void *file, bool close)
 {
