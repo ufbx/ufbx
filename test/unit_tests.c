@@ -714,7 +714,10 @@ void test_double_parse()
 	ufbxt_check_float(TEST_NINES ".999999999999999999999999999999999999999");
 	ufbxt_check_float(TEST_NINES "e+108");
 	ufbxt_check_float(TEST_NINES "e+109");
+	ufbxt_check_float(TEST_NINES "e+118");
+	ufbxt_check_float(TEST_NINES "e+119");
 	ufbxt_check_float(TEST_NINES "e+120");
+	ufbxt_check_float(TEST_NINES "e+300");
 	ufbxt_check_float(TEST_NINES "e-200");
 	ufbxt_check_float(TEST_NINES "e-400");
 	ufbxt_check_float(TEST_NINES "e-520");
