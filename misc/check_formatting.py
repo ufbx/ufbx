@@ -56,7 +56,7 @@ def identifier_prefix(line):
                 return "forbidden ufbx prefix variant", begin, end
             g_ufbx_idenitfiers.add(ident)
         elif g_filename == "ufbx.c":
-            if prefix not in ("ufbx", "ufbxi", "ufbxc"):
+            if prefix not in ("ufbx", "ufbxi"):
                 return "forbidden ufbx prefix variant", begin, end
             if not g_platform_seen:
                 g_ufbx_idenitfiers.add(ident)
