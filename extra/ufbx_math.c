@@ -214,7 +214,7 @@ ufbx_math_abi double ufbx_floor(double x)
 				}
 				else if (((i0 & 0x7fffffff) | i1) != 0)
 				{
-					i0 = 0xbff00000;
+					i0 = (ufbxm_int)0xbff00000u;
 					i1 = 0;
 				}
 			}
@@ -222,13 +222,13 @@ ufbx_math_abi double ufbx_floor(double x)
 		else
 		{
 			i = 0x000fffffu >> j0;
-			if (((i0 & i) | i1) == 0)
+			if (((i0 & (ufbxm_int)i) | i1) == 0)
 				return x; /* x is integral */
 			if (huge + x > 0.0)
 			{ /* raise inexact flag */
 				if (i0 < 0)
 					i0 += (0x00100000) >> j0;
-				i0 &= (~i);
+				i0 &= (ufbxm_int)(~i);
 				i1 = 0;
 			}
 		}
@@ -243,7 +243,7 @@ ufbx_math_abi double ufbx_floor(double x)
 	else
 	{
 		i = ((ufbxm_uint)(0xffffffff)) >> (j0 - 20);
-		if ((i1 & i) == 0)
+		if ((i1 & (ufbxm_int)i) == 0)
 			return x; /* x is integral */
 		if (huge + x > 0.0)
 		{ /* raise inexact flag */
@@ -259,7 +259,7 @@ ufbx_math_abi double ufbx_floor(double x)
 					i1 = (ufbxm_int)j;
 				}
 			}
-			i1 &= (~i);
+			i1 &= (ufbxm_int)(~i);
 		}
 	}
 	return ufbxm_from_bits(i0, (ufbxm_uint)i1);
@@ -736,6 +736,7 @@ static ufbxm_int ufbxm_kernel_rem_pio2(double *x, double *y, ufbxm_int e0, ufbxm
 				case 2:
 					iq[jz - 1] &= 0x3fffff;
 					break;
+				default: break;
 				}
 			}
 			if (ih == 2)
@@ -860,6 +861,7 @@ static ufbxm_int ufbxm_kernel_rem_pio2(double *x, double *y, ufbxm_int e0, ufbxm
 			y[1] = -fq[1];
 			y[2] = -fw;
 		}
+	default: break;
 	}
 	return n & 7;
 }
@@ -1113,7 +1115,7 @@ static double ufbxm_kernel_tan(double x, double y, ufbxm_int iy)
 	{ /* x < 2**-28 */
 		if ((ufbxm_int)x == 0)
 		{ /* generate inexact */
-			if (((ix | bx.lo) | (iy + 1)) == 0)
+			if (((ix | (ufbxm_int)bx.lo) | (iy + 1)) == 0)
 				return one / ufbx_fabs(x);
 			else
 			{
@@ -1310,7 +1312,7 @@ ufbx_math_abi double ufbx_asin(double x) /* wrapper asin */
 	ix = hx & 0x7fffffff;
 	if (ix >= 0x3ff00000)
 	{ /* |x|>= 1 */
-		if (((ix - 0x3ff00000) | bx.lo) == 0)
+		if (((ix - 0x3ff00000) | (ufbxm_int)bx.lo) == 0)
 			/* asin(1)=+-pi/2 with inexact */
 			return x * pio2_hi + x * pio2_lo;
 		return (x - x) / (x - x); /* asin(|x|>1) is NaN */
@@ -1381,7 +1383,7 @@ ufbx_math_abi double ufbx_acos(double x) /* wrapper acos */
 	ix = hx & 0x7fffffff;
 	if (ix >= 0x3ff00000)
 	{ /* |x| >= 1 */
-		if (((ix - 0x3ff00000) | bx.lo) == 0)
+		if (((ix - 0x3ff00000) | (ufbxm_int)bx.lo) == 0)
 		{ /* |x|==1 */
 			if (hx > 0)
 				return 0.0; /* acos(1) = 0  */
@@ -1447,15 +1449,15 @@ ufbx_math_abi double ufbx_atan2(double y, double x) /* wrapper atan2 */
 	ly = by.lo;
 	ix = hx & 0x7fffffff;
 	iy = hy & 0x7fffffff;
-	if (((ix | ((lx | (ufbxm_uint)-(ufbxm_int)lx) >> 31)) > 0x7ff00000) ||
-		((iy | ((ly | (ufbxm_uint)-(ufbxm_int)ly) >> 31)) > 0x7ff00000)) /* x or y is NaN */
+	if ((((ufbxm_uint)ix | ((lx | (ufbxm_uint)-(ufbxm_int)lx) >> 31)) > 0x7ff00000) ||
+		(((ufbxm_uint)iy | ((ly | (ufbxm_uint)-(ufbxm_int)ly) >> 31)) > 0x7ff00000)) /* x or y is NaN */
 		return x + y;
-	if ((hx - 0x3ff00000 | lx) == 0)
+	if (((hx - 0x3ff00000) | (ufbxm_int)lx) == 0)
 		return ufbx_atan(y);				 /* x=1.0 */
 	m = ((hy >> 31) & 1) | ((hx >> 30) & 2); /* 2*sign(x)+sign(y) */
 
 	/* when y = 0 */
-	if ((iy | ly) == 0)
+	if ((iy | (ufbxm_int)ly) == 0)
 	{
 		switch (m)
 		{
@@ -1466,10 +1468,11 @@ ufbx_math_abi double ufbx_atan2(double y, double x) /* wrapper atan2 */
 			return pi + tiny; /* atan(+0,-anything) = pi */
 		case 3:
 			return -pi - tiny; /* atan(-0,-anything) =-pi */
+		default: break;
 		}
 	}
 	/* when x = 0 */
-	if ((ix | lx) == 0)
+	if ((ix | (ufbxm_int)lx) == 0)
 		return (hy < 0) ? -pi_o_2 - tiny : pi_o_2 + tiny;
 
 	/* when x is INF */
@@ -1487,6 +1490,7 @@ ufbx_math_abi double ufbx_atan2(double y, double x) /* wrapper atan2 */
 				return 3.0 * pi_o_4 + tiny; /*atan(+INF,-INF)*/
 			case 3:
 				return -3.0 * pi_o_4 - tiny; /*atan(-INF,-INF)*/
+			default: break;
 			}
 		}
 		else
@@ -1501,6 +1505,7 @@ ufbx_math_abi double ufbx_atan2(double y, double x) /* wrapper atan2 */
 				return pi + tiny; /* atan(+...,-INF) */
 			case 3:
 				return -pi - tiny; /* atan(-...,-INF) */
+			default: break;
 			}
 		}
 	}
@@ -1571,15 +1576,13 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 
 	double z, ax, z_h, z_l, p_h, p_l;
 	double y1, t1, t2, r, s, t, u, v, w;
-	ufbxm_int i0, i1, i, j, k, yisint, n;
+	ufbxm_int i, j, k, yisint, n;
 	ufbxm_int hx, hy, ix, iy;
 	ufbxm_uint lx, ly;
 	ufbxm_bits bx = ufbxm_to_bits(x);
 	ufbxm_bits by = ufbxm_to_bits(y);
 	ufbxm_bits bz;
 
-	i0 = ((*(ufbxm_int *)&one) >> 29) ^ 1;
-	i1 = 1 - i0;
 	hx = bx.hi;
 	lx = bx.lo;
 	hy = by.hi;
@@ -1588,7 +1591,7 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 	iy = hy & 0x7fffffff;
 
 	/* y==zero: x**0 = 1 */
-	if ((iy | ly) == 0)
+	if ((iy | (ufbxm_int)ly) == 0)
 		return one;
 
 	/* +-NaN return x+y */
@@ -1629,7 +1632,7 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 	{
 		if (iy == 0x7ff00000)
 		{ /* y is +-inf */
-			if (((ix - 0x3ff00000) | lx) == 0)
+			if (((ix - 0x3ff00000) | (ufbxm_int)lx) == 0)
 				return y - y;		   /* inf**+-1 is NaN */
 			else if (ix >= 0x3ff00000) /* (|x|>1)**+-inf = inf,0 */
 				return (hy >= 0) ? y : zero;
@@ -1792,7 +1795,7 @@ ufbx_math_abi double ufbx_pow(double x, double y) /* wrapper pow */
 	}
 	else if ((j & 0x7fffffff) >= 0x4090cc00)
 	{									 /* z <= -1075 */
-		if (((j - 0xc090cc00) | i) != 0) /* z < -1075 */
+		if (((j - (ufbxm_int)0xc090cc00u) | i) != 0) /* z < -1075 */
 			return s * tiny * tiny;		 /* underflow */
 		else
 		{
@@ -1863,12 +1866,12 @@ ufbx_math_abi double ufbx_nextafter(double x, double y)
 	ix = hx & 0x7fffffff; /* |x| */
 	iy = hy & 0x7fffffff; /* |y| */
 
-	if (((ix >= 0x7ff00000) && ((ix - 0x7ff00000) | lx) != 0) || /* x is nan */
-		((iy >= 0x7ff00000) && ((iy - 0x7ff00000) | ly) != 0))	 /* y is nan */
+	if (((ix >= 0x7ff00000) && ((ix - 0x7ff00000) | (ufbxm_int)lx) != 0) || /* x is nan */
+		((iy >= 0x7ff00000) && ((iy - 0x7ff00000) | (ufbxm_int)ly) != 0))	 /* y is nan */
 		return x + y;
 	if (x == y)
 		return x; /* x=y, return x */
-	if ((ix | lx) == 0)
+	if ((ix | (ufbxm_int)lx) == 0)
 	{							   /* x == 0 */
 		x = ufbxm_from_bits(hy & (ufbxm_int)0x80000000u, 1);
 		y = x * x;
@@ -1939,12 +1942,12 @@ ufbx_math_abi double ufbx_ceil(double x)
 			{ /* return 0*sign(x) if |x|<1 */
 				if (i0 < 0)
 				{
-					i0 = 0x80000000;
+					i0 = (ufbxm_int)0x80000000u;
 					i1 = 0;
 				}
 				else if ((i0 | i1) != 0)
 				{
-					i0 = 0x3ff00000;
+					i0 = (ufbxm_int)0x3ff00000u;
 					i1 = 0;
 				}
 			}
@@ -1952,13 +1955,13 @@ ufbx_math_abi double ufbx_ceil(double x)
 		else
 		{
 			i = 0x000fffffu >> j0;
-			if (((i0 & i) | i1) == 0)
+			if (((i0 & (ufbxm_int)i) | i1) == 0)
 				return x; /* x is integral */
 			if (huge + x > 0.0)
 			{ /* raise inexact flag */
 				if (i0 > 0)
 					i0 += 0x00100000 >> j0;
-				i0 &= (~i);
+				i0 &= (ufbxm_int)(~i);
 				i1 = 0;
 			}
 		}
@@ -1973,7 +1976,7 @@ ufbx_math_abi double ufbx_ceil(double x)
 	else
 	{
 		i = ((ufbxm_uint)(0xffffffff)) >> (j0 - 20);
-		if ((i1 & i) == 0)
+		if ((i1 & (ufbxm_int)i) == 0)
 			return x; /* x is integral */
 		if (huge + x > 0.0)
 		{ /* raise inexact flag */
@@ -1989,7 +1992,7 @@ ufbx_math_abi double ufbx_ceil(double x)
 					i1 = (ufbxm_int)j;
 				}
 			}
-			i1 &= (~i);
+			i1 &= (ufbxm_int)(~i);
 		}
 	}
 	return ufbxm_from_bits(i0, (ufbxm_uint)i1);
@@ -2014,8 +2017,8 @@ ufbx_math_abi double ufbx_rint(double x)
 		if (j0 < 0) {
 			if (((i0 & 0x7fffffff) | i1) == 0) return x;
 			i1 |= (i0 & 0x0fffff);
-			i0 &= 0xfffe0000;
-			i0 |= ((i1 | (ufbxm_uint)-(ufbxm_int)i1) >> 12) & 0x80000;
+			i0 &= (ufbxm_int)0xfffe0000u;
+			i0 |= (ufbxm_int)((i1 | (ufbxm_uint)-(ufbxm_int)i1) >> 12) & 0x80000;
 			x = ufbxm_set_hi(x, i0);
 			w = TWO52[sx] + x;
 			t = w - TWO52[sx];
@@ -2026,9 +2029,9 @@ ufbx_math_abi double ufbx_rint(double x)
 		}
 		else {
 			i = 0x000fffffu >> j0;
-			if (((i0 & i) | i1) == 0) return x; /* x is integral */
+			if (((i0 & (ufbxm_int)i) | (ufbxm_int)i1) == 0) return x; /* x is integral */
 			i >>= 1;
-			if (((i0 & i) | i1) != 0) {
+			if (((i0 & (ufbxm_int)i) | (ufbxm_int)i1) != 0) {
 				if (j0 == 19) i1 = 0x40000000; else
 					i0 = (i0 & (ufbxm_int)(~i)) | ((0x20000) >> j0);
 			}
@@ -2042,7 +2045,7 @@ ufbx_math_abi double ufbx_rint(double x)
 		i = ((ufbxm_uint)(0xffffffff)) >> (j0 - 20);
 		if ((i1 & i) == 0) return x;	/* x is integral */
 		i >>= 1;
-		if ((i1 & i) != 0) i1 = (i1 & (~i)) | ((0x40000000) >> (j0 - 20));
+		if ((i1 & i) != 0) i1 = (i1 & (~i)) | ((0x40000000u) >> (j0 - 20));
 	}
 	x = ufbxm_from_bits(i0, i1);
 	w = TWO52[sx] + x;
@@ -2055,7 +2058,7 @@ ufbx_math_abi int ufbx_isnan(double x)
 	ufbxm_bits bx = ufbxm_to_bits(x);
 	hx = (bx.hi & 0x7fffffff);
 	lx = (ufbxm_int)bx.lo;
-	hx |= (ufbxm_uint)(lx | (-lx)) >> 31;
+	hx |= (ufbxm_int)((ufbxm_uint)(lx | (-lx)) >> 31);
 	hx = 0x7ff00000 - hx;
 	return (int)(((ufbxm_uint)(hx)) >> 31);
 }
