@@ -6956,7 +6956,7 @@ static ufbxi_noinline bool ufbxi_stdio_open(ufbxi_file_context *fc, ufbx_stream 
 		memcpy(copy, path, path_len);
 		copy[path_len] = '\0';
 	}
-	void *file = ufbx_stdio_open(path, path_len);
+	void *file = ufbx_stdio_open(copy, path_len);
 	if (!null_terminated && copy != copy_buf) {
 		ufbxi_free(&fc->ator, char, copy, path_len + 1);
 	}
