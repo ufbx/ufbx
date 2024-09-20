@@ -161,11 +161,11 @@ static void ufbxos_os_yield(void)
 
 #if defined(__GNUC__) || defined(__clang__)
 typedef volatile uint32_t ufbxos_atomic_u32;
-static uint32_t ufbxos_atomic_u32_load_relaxed(ufbxos_atomic_u32 *ptr) { uint32_t r; __atomic_load(ptr, &r, __ATOMIC_RELAXED); return r; }
-static uint32_t ufbxos_atomic_u32_load(ufbxos_atomic_u32 *ptr) { uint32_t r; __atomic_load(ptr, &r, __ATOMIC_SEQ_CST); return r; }
-static void ufbxos_atomic_u32_store(ufbxos_atomic_u32 *ptr, uint32_t value) { __atomic_store(ptr, &value, __ATOMIC_SEQ_CST); }
-static uint32_t ufbxos_atomic_u32_inc(ufbxos_atomic_u32 *ptr) { return __atomic_fetch_add(ptr, 1, __ATOMIC_SEQ_CST); }
-static bool ufbxos_atomic_u32_cas(ufbxos_atomic_u32 *ptr, uint32_t ref, uint32_t value) { return __atomic_compare_exchange(ptr, &ref, &value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }
+static uint32_t ufbxos_atomic_u32_load_relaxed(ufbxos_atomic_u32 *ptr) { uint32_t r; (void)ptr; __atomic_load(ptr, &r, __ATOMIC_RELAXED); return r; }
+static uint32_t ufbxos_atomic_u32_load(ufbxos_atomic_u32 *ptr) { uint32_t r; (void)ptr; __atomic_load(ptr, &r, __ATOMIC_SEQ_CST); return r; }
+static void ufbxos_atomic_u32_store(ufbxos_atomic_u32 *ptr, uint32_t value) { (void)ptr; __atomic_store(ptr, &value, __ATOMIC_SEQ_CST); }
+static uint32_t ufbxos_atomic_u32_inc(ufbxos_atomic_u32 *ptr) { (void)ptr; return __atomic_fetch_add(ptr, 1, __ATOMIC_SEQ_CST); }
+static bool ufbxos_atomic_u32_cas(ufbxos_atomic_u32 *ptr, uint32_t ref, uint32_t value) { return (void)ptr; __atomic_compare_exchange(ptr, &ref, &value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }
 
 #if defined(__i386__) || defined(__i386)
 typedef volatile uint64_t ufbxos_atomic_u64;
@@ -186,9 +186,9 @@ static void ufbxos_atomic_u64_store(ufbxos_atomic_u64 *ptr, uint64_t value) {
 }
 #else
 typedef volatile uint64_t ufbxos_atomic_u64;
-static uint64_t ufbxos_atomic_u64_load(ufbxos_atomic_u64 *ptr) { uint64_t r; __atomic_load(ptr, &r, __ATOMIC_SEQ_CST); return r; }
-static void ufbxos_atomic_u64_store(ufbxos_atomic_u64 *ptr, uint64_t value) { __atomic_store(ptr, &value, __ATOMIC_SEQ_CST); }
-static bool ufbxos_atomic_u64_cas(ufbxos_atomic_u64 *ptr, uint64_t *ref, uint64_t value) { return __atomic_compare_exchange(ptr, ref, &value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }
+static uint64_t ufbxos_atomic_u64_load(ufbxos_atomic_u64 *ptr) { uint64_t r; (void)ptr; __atomic_load(ptr, &r, __ATOMIC_SEQ_CST); return r; }
+static void ufbxos_atomic_u64_store(ufbxos_atomic_u64 *ptr, uint64_t value) { (void)ptr; __atomic_store(ptr, &value, __ATOMIC_SEQ_CST); }
+static bool ufbxos_atomic_u64_cas(ufbxos_atomic_u64 *ptr, uint64_t *ref, uint64_t value) { (void)ptr; return __atomic_compare_exchange(ptr, ref, &value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }
 #endif
 
 #else
