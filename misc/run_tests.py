@@ -978,7 +978,7 @@ async def main():
                 "UFBX_NO_LIBC": "",
             },
         }
-        target_tasks += compile_permutations("freestanding_runner", freestanding_config, all_configs, ["-d", "data"])
+        target_tasks += compile_permutations("freestanding_runner", freestanding_config, arch_configs, ["-d", "data"])
 
         targets = await gather(target_tasks)
         all_targets += targets
