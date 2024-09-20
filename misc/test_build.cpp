@@ -5,7 +5,6 @@
 
 #include "../ufbx.h"
 
-#include "../extra/ufbx_stl.h"
 #ifdef UFBXT_THREADS
 	#define UFBX_OS_IMPLEMENTATION
 	#include "../extra/ufbx_os.h"
