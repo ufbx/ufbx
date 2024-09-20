@@ -23,6 +23,30 @@
     #endif
 #endif
 
+#if !defined(UFBX_STANDARD_C) && !defined(UFBX_MATH_NO_INTRINSICS)
+	#if !defined(UFBX_NO_SSE) && (defined(_MSC_VER) && defined(_M_X64)) || ((defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)) || defined(UFBX_USE_SSE)
+		#define UFBXM_HAS_SSE
+		#include <xmmintrin.h>
+		#include <emmintrin.h>
+	#elif !defined(UFBX_NO_NEON) && (defined(_MSC_VER) && defined(_M_ARM64)) && ((defined(__GNUC__) || defined(__clang__)) && defined(__aarch64__)) || defined(UFBX_USE_NEON)
+		#define UFBXM_HAS_NEON
+		#include <arm_neon.h>
+	#elif (defined(__clang__) && defined(__wasm__))
+		#define UFBXM_HAS_BUILTIN
+	#endif
+#endif
+
+#if defined(UFBXM_HAS_SSE)
+	#define ufbxm_sqrt(x) _mm_cvtsd_f64(_mm_sqrt_sd(_mm_setzero_pd(), _mm_set_sd((x))))
+	#define ufbxm_fabs(x) _mm_cvtsd_f64(_mm_andnot_pd(_mm_set_sd(-0.0), _mm_set_sd((x))))
+#elif defined(UFBXM_HAS_NEON)
+	#define ufbxm_sqrt(x) vget_lane_f64(vsqrt_f64(vmov_n_f64(x)), 0)
+	#define ufbxm_fabs(x) vget_lane_f64(vabs_f64(vmov_n_f64(x)), 0)
+#elif defined(UFBXM_HAS_BUILTIN)
+	#define ufbxm_sqrt(x) __builtin_sqrt((x))
+	#define ufbxm_fabs(x) __builtin_fabs((x))
+#endif
+
 /* Sometimes it's necessary to define UFBXM_LITTLE_ENDIAN explicitly
    but these catch some common cases. */
 
@@ -114,8 +138,12 @@ ufbx_math_abi double ufbx_copysign(double x, double y)
 
 ufbx_math_abi double ufbx_fabs(double x)
 {
+#if defined(ufbxm_fabs)
+	return ufbxm_fabs(x);
+#else
 	ufbxm_bits xb = ufbxm_to_bits(x);
 	return ufbxm_from_bits(xb.hi & 0x7fffffff, xb.lo);
+#endif
 }
 
 ufbx_math_abi double ufbx_scalbn(double x, ufbxm_int n)
@@ -369,6 +397,9 @@ ufbx_math_abi double ufbx_atan(double x)
 
 ufbx_math_abi double ufbx_sqrt(double x)
 {
+#if defined(ufbxm_sqrt)
+	return ufbxm_sqrt(x);
+#else
 	static const double one = 1.0, tiny = 1.0e-300;
 
 	double z;
@@ -489,6 +520,7 @@ ufbx_math_abi double ufbx_sqrt(double x)
 		ix1 |= sign;
 	ix0 += (m << 20);
 	return ufbxm_from_bits(ix0, ix1);
+#endif
 }
 
 /*
