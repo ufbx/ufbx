@@ -950,6 +950,7 @@ async def main():
             "output": "cpp" + exe_suffix,
             "cpp": True,
             "warnings": True,
+            "overrides": platform_overrides,
         }
         target_tasks += compile_permutations("cpp", cpp_config, arch_configs, [])
 
@@ -960,6 +961,7 @@ async def main():
             "warnings": True,
             "optimize": True,
             "dev": False,
+            "overrides": platform_overrides,
         }
         target_tasks += compile_permutations("cpp_no_dev", cpp_no_dev_config, arch_configs, [])
 
