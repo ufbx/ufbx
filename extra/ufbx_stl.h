@@ -12,7 +12,7 @@
 		static inline ufbx_string_view to(const std::string &str) { return { str.data(), str.size() }; }
 	};
 
-	inline std::string ufbx_format_error(const ufbx_error &error)
+	inline std::string ufbx_format_error_string(const ufbx_error &error)
 	{
 		char buf[1024];
 		ufbx_format_error(buf, sizeof(buf), &error);
