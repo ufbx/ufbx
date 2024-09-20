@@ -165,7 +165,7 @@ static uint32_t ufbxos_atomic_u32_load_relaxed(ufbxos_atomic_u32 *ptr) { uint32_
 static uint32_t ufbxos_atomic_u32_load(ufbxos_atomic_u32 *ptr) { uint32_t r; (void)ptr; __atomic_load(ptr, &r, __ATOMIC_SEQ_CST); return r; }
 static void ufbxos_atomic_u32_store(ufbxos_atomic_u32 *ptr, uint32_t value) { (void)ptr; __atomic_store(ptr, &value, __ATOMIC_SEQ_CST); }
 static uint32_t ufbxos_atomic_u32_inc(ufbxos_atomic_u32 *ptr) { (void)ptr; return __atomic_fetch_add(ptr, 1, __ATOMIC_SEQ_CST); }
-static bool ufbxos_atomic_u32_cas(ufbxos_atomic_u32 *ptr, uint32_t ref, uint32_t value) { return (void)ptr; __atomic_compare_exchange(ptr, &ref, &value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }
+static bool ufbxos_atomic_u32_cas(ufbxos_atomic_u32 *ptr, uint32_t ref, uint32_t value) { (void)ptr; return __atomic_compare_exchange(ptr, &ref, &value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }
 
 #if defined(__i386__) || defined(__i386)
 typedef volatile uint64_t ufbxos_atomic_u64;
