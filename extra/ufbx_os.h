@@ -71,14 +71,14 @@ static void ufbxos_thread_pool_entry(ufbx_os_thread_pool *pool);
 
 typedef volatile long ufbxos_atomic_u32;
 static uint32_t ufbxos_atomic_u32_load_relaxed(ufbxos_atomic_u32 *ptr) { return *(uint32_t*)ptr; }
-static uint32_t ufbxos_atomic_u32_load(ufbxos_atomic_u32 *ptr) { return _InterlockedOr(ptr, 0); }
-static void ufbxos_atomic_u32_store(ufbxos_atomic_u32 *ptr, uint32_t value) { _InterlockedExchange(ptr, (LONG)value); }
-static uint32_t ufbxos_atomic_u32_inc(ufbxos_atomic_u32 *ptr) { return _InterlockedIncrement(ptr) - 1; }
-static bool ufbxos_atomic_u32_cas(ufbxos_atomic_u32 *ptr, uint32_t ref, uint32_t value) { return (uint32_t)_InterlockedCompareExchange(ptr, value, ref) == ref; }
+static uint32_t ufbxos_atomic_u32_load(ufbxos_atomic_u32 *ptr) { return (uint32_t)_InterlockedOr(ptr, 0); }
+static void ufbxos_atomic_u32_store(ufbxos_atomic_u32 *ptr, uint32_t value) { _InterlockedExchange(ptr, (long)value); }
+static uint32_t ufbxos_atomic_u32_inc(ufbxos_atomic_u32 *ptr) { return (uint32_t)_InterlockedIncrement(ptr) - 1; }
+static bool ufbxos_atomic_u32_cas(ufbxos_atomic_u32 *ptr, uint32_t ref, uint32_t value) { return (uint32_t)_InterlockedCompareExchange(ptr, (long)value, (long)ref) == ref; }
 
 typedef volatile LONG64 ufbxos_atomic_u64;
 static uint64_t ufbxos_atomic_u64_load(ufbxos_atomic_u64 *ptr) { return (uint64_t)_InterlockedCompareExchange64(ptr, 0, 0); }
-static void ufbxos_atomic_u64_store(ufbxos_atomic_u64 *ptr, uint64_t value) { InterlockedExchange64(ptr, value); }
+static void ufbxos_atomic_u64_store(ufbxos_atomic_u64 *ptr, uint64_t value) { InterlockedExchange64(ptr, (LONG64)value); }
 static bool ufbxos_atomic_u64_cas(ufbxos_atomic_u64 *ptr, uint64_t *ref, uint64_t value)
 {
 	uint64_t prev = *ref;
