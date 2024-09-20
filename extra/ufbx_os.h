@@ -64,10 +64,24 @@ static void ufbxos_thread_pool_entry(ufbx_os_thread_pool *pool);
 
 #if defined(_WIN32)
 
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
+#if !defined(WIN32_LEAN_AND_MEAN)
+	#define UFBXOS_LEAN_AND_MEAN
+	#define WIN32_LEAN_AND_MEAN
+#endif
+#if !defined(NOMINMAX)
+	#define UFBXOS_NOMINMAX
+	#define NOMINMAX
+#endif
+
 #include <Windows.h>
 #include <intrin.h>
+
+#if defined(UFBXOS_LEAN_AND_MEAN)
+	#undef WIN32_LEAN_AND_MEAN
+#endif
+#if defined(UFBXOS_NOMINMAX)
+	#undef NOOMINMAX
+#endif
 
 typedef volatile long ufbxos_atomic_u32;
 static uint32_t ufbxos_atomic_u32_load_relaxed(ufbxos_atomic_u32 *ptr) { return *(uint32_t*)ptr; }

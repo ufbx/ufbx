@@ -432,13 +432,13 @@ ufbx_math_abi double ufbx_sqrt(double x)
 		while (ix0 == 0)
 		{
 			m -= 21;
-			ix0 |= (ix1 >> 11);
+			ix0 |= (ufbxm_int)(ix1 >> 11);
 			ix1 <<= 21;
 		}
 		for (i = 0; (ix0 & 0x00100000) == 0; i++)
 			ix0 <<= 1;
 		m -= i - 1;
-		ix0 |= (ix1 >> (32 - i));
+		ix0 |= (ufbxm_int)(ix1 >> (32 - i));
 		ix1 <<= i;
 	}
 	m -= 1023; /* unbias exponent */
@@ -807,6 +807,7 @@ static ufbxm_int ufbxm_kernel_rem_pio2(double *x, double *y, ufbxm_int e0, ufbxm
 	}
 
 	/* compute PIo2[0,...,jp]*q[jz,...,0] */
+	fq[0] = 0.0; /* dumb warning fix */
 	for (i = jz; i >= 0; i--)
 	{
 		for (fw = 0.0, k = 0; k <= jp && k <= jz - i; k++)
