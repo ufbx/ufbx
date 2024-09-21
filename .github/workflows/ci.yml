@@ -23,7 +23,7 @@ jobs:
       - name: Compile hash_scene
         run: |
           mkdir build
-          clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+          clang test/hash_scene.c extra/ufbx_math.c -O2 -o build/hash_scene
       - name: Generate reference hashes
         run: |
           python3 misc/generate_hashses.py --exe build/hash_scene -o build/hashes.txt --verbose
@@ -358,8 +358,8 @@ jobs:
         run: qemu-ppc build/ppc-runner -d data
       - name: Compile PowerPC hash_scene
         run: |
-          python3 -m ziglang cc -fno-sanitize=undefined -ffp-contract=off -target powerpc-linux misc/fdlibm.c test/hash_scene.c -g -o build/ppc_hasher_debug
-          python3 -m ziglang cc -fno-sanitize=undefined -ffp-contract=off -O2 -target powerpc-linux misc/fdlibm.c test/hash_scene.c -g -o build/ppc_hasher_release
+          python3 -m ziglang cc -fno-sanitize=undefined -ffp-contract=off -target powerpc-linux extra/ufbx_math.c test/hash_scene.c -g -o build/ppc_hasher_debug
+          python3 -m ziglang cc -fno-sanitize=undefined -ffp-contract=off -O2 -target powerpc-linux extra/ufbx_math.c test/hash_scene.c -g -o build/ppc_hasher_release
       - name: Check PowerPC hashes
         run: |
           qemu-ppc build/ppc_hasher_debug --check build/hashes.txt --dump build/hashdumps/ci_exotic_powerpc_debug.txt --max-dump-errors 3
@@ -369,7 +369,7 @@ jobs:
       - name: Check freestanding WASM hashes
         run: node misc/wasm_hasher/wasm_hasher.js --check build/hashes.txt --dump build/hashdumps/ci_exotic_wasm_freestanding.txt --max-dump-errors 3
       - name: Compile runner with fdlibm
-        run: clang -DUFBX_NO_MATH_H -DUFBX_MATH_PREFIX=fdlibm_ ufbx.c test/runner.c misc/fdlibm.c -lm -o build/fdlibm_runner
+        run: clang -DUFBX_NO_MATH_H -DUFBX_MATH_PREFIX=fdlibm_ ufbx.c test/runner.c extra/ufbx_math.c -lm -o build/fdlibm_runner
       - name: Run tests using fdlibm
         run: build/fdlibm_runner -d data
       - name: Compile runner.c
@@ -448,25 +448,25 @@ jobs:
       - name: Compile and run hash_scene with various configurations
         run: |
           set -x
-          clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+          clang test/hash_scene.c extra/ufbx_math.c -O2 -o build/hash_scene
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_x64_release.txt --max-dump-errors 3
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_unbuffered_x64_release.txt --max-dump-errors 3 --no-read-buffer
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_dedicated_x64_release.txt --max-dump-errors 3 --dedicated-allocs
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_linear_x64_release.txt --max-dump-errors 3 --dedicated-allocs --allocator linear
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_linear_reverse_x64_release.txt --max-dump-errors 3 --dedicated-allocs --allocator linear-reverse
-          clang -DUFBX_DEV -DUFBX_REGRESSION test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+          clang -DUFBX_DEV -DUFBX_REGRESSION test/hash_scene.c extra/ufbx_math.c -O2 -o build/hash_scene
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_regression_x64_release.txt --max-dump-errors 3
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_regression_unbuffered_x64_release.txt --max-dump-errors 3 --no-read-buffer
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_regression_dedicated_x64_release.txt --max-dump-errors 3 --dedicated-allocs
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_regression_linear_x64_release.txt --max-dump-errors 3 --dedicated-allocs --allocator linear
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_regression_linear_reverse_x64_release.txt --max-dump-errors 3 --dedicated-allocs --allocator linear-reverse
-          clang -fshort-enums -fshort-wchar test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+          clang -fshort-enums -fshort-wchar test/hash_scene.c extra/ufbx_math.c -O2 -o build/hash_scene
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_short_x64_release.txt --max-dump-errors 3
-          clang -fsigned-char test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+          clang -fsigned-char test/hash_scene.c extra/ufbx_math.c -O2 -o build/hash_scene
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_schar_x64_release.txt --max-dump-errors 3
-          clang -funsigned-char test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+          clang -funsigned-char test/hash_scene.c extra/ufbx_math.c -O2 -o build/hash_scene
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_uchar_x64_release.txt --max-dump-errors 3
-          clang -DUFBX_STANDARD_C -DUFBX_DEV -DUFBX_REGRESSION test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+          clang -DUFBX_STANDARD_C -DUFBX_DEV -DUFBX_REGRESSION test/hash_scene.c extra/ufbx_math.c -O2 -o build/hash_scene
           build/hash_scene --check build/hashes.txt --dump build/hashdumps/ci_hasher_stdc_x64_release.txt --max-dump-errors 3
       - name: Compress hashdumps
         if: ${{ always() && !cancelled() }}
@@ -649,7 +649,7 @@ jobs:
       - name: Compile hash_scene
         run: |
           mkdir build
-          clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
+          clang test/hash_scene.c extra/ufbx_math.c -O2 -o build/hash_scene
       - name: Download combined hashdumps
         uses: actions/download-artifact@v4
         with:

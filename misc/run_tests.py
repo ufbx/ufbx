@@ -1512,7 +1512,7 @@ async def main():
             }
 
             hash_scene_config = {
-                "sources": ["test/hash_scene.c", "misc/fdlibm.c"],
+                "sources": ["test/hash_scene.c", "extra/ufbx_math.c"],
                 "output": "hash_scene" + exe_suffix,
                 "ieee754": True,
                 "defines": { },

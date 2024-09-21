@@ -279,8 +279,7 @@ int main(int argc, char **argv)
 	return num_fail > 0 ? 3 : 0;
 }
 
-#define UFBX_NO_MATH_H
-#define UFBX_MATH_PREFIX fdlibm_
+#define UFBX_EXTERNAL_MATH
 
 #include "../ufbx.c"
 
