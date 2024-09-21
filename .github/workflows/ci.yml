@@ -571,7 +571,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov
+        run: bash <(curl -s https://codecov.io/bash) -F dataset -f coverage.lcov
 
   ci_fuzz:
     runs-on: [self-hosted, ARM64, legacy]
@@ -592,7 +592,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov
+        run: bash <(curl -s https://codecov.io/bash) -F fuzz -f coverage.lcov
 
   ci_msvc_arch:
     runs-on: windows-2022
