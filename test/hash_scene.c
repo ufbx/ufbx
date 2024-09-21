@@ -241,7 +241,7 @@ int main(int argc, char **argv)
 				}
 			} else {
 				if (verbose) {
-					printf("%s: OK\n", fbx_file);
+					printf("%s %d: OK\n", fbx_file, frame);
 				}
 			}
 			num_total++;
