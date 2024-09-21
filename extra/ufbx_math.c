@@ -695,7 +695,7 @@ static ufbxm_int ufbxm_kernel_rem_pio2(double *x, double *y, ufbxm_int e0, ufbxm
 
 	jz = jk;
 
-	do {
+	for (;;) {
 		/* distill q[] into iq[] reversingly */
 		for (i = 0, j = jz, z = q[jz]; j > 0; i++, j--)
 		{
@@ -784,7 +784,9 @@ static ufbxm_int ufbxm_kernel_rem_pio2(double *x, double *y, ufbxm_int e0, ufbxm
 				continue;
 			}
 		}
-	} while (0);
+
+		break;
+	}
 
 	/* chop off zero terms */
 	if (z == 0.0)
