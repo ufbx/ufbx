@@ -245,6 +245,8 @@ int main(int argc, char **argv)
 				}
 			}
 			num_total++;
+
+			ufbx_free_scene(scene);
 		}
 
 		fclose(f);
