@@ -86,7 +86,9 @@ static bool ufbxt_next_double(ufbxt_double_iterator *it)
 		return false;
 	}
 
-	uint64_t bits_d = (it->hi << (64u - it->bits)) + (uint64_t)(int64_t)it->delta;
+	int64_t delta = it->delta;
+	delta = delta * delta * delta;
+	uint64_t bits_d = (it->hi << (64u - it->bits)) + (uint64_t)delta;
 	memcpy(&it->value, &bits_d, sizeof(double));
 	it->iter_count++;
 
@@ -162,10 +164,10 @@ static void ufbxt_check_binary_relative(const char *name, double a, double b, do
 int main(int argc, char **argv)
 {
 #if 1
-	uint32_t bits = 16;
+	uint32_t bits = 18;
 	uint32_t delta = 16;
-	uint32_t binary_bits = 8;
-	uint32_t binary_delta = 16;
+	uint32_t binary_bits = 9;
+	uint32_t binary_delta = 4;
 #else
 	uint32_t bits = 19;
 	uint32_t delta = 1024;
