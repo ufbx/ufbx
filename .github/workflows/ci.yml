@@ -136,7 +136,7 @@ jobs:
         run: |
           curl -Os https://cli.codecov.io/latest/linux/codecov
           sudo chmod +x codecov
-          ./codecov --verbose upload-process --disable-search --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -F service -f coverage.lcov
+          ./codecov --verbose upload-process --disable-search --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -F test -f coverage.lcov
 
   ci_coverage32:
     runs-on: ubuntu-20.04
@@ -153,7 +153,10 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov
+        run: |
+          curl -Os https://cli.codecov.io/latest/linux/codecov
+          sudo chmod +x codecov
+          ./codecov --verbose upload-process --disable-search --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -F test -f coverage.lcov
 
   ci_no_assert:
     runs-on: ubuntu-20.04
@@ -170,7 +173,10 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov
+        run: |
+          curl -Os https://cli.codecov.io/latest/linux/codecov
+          sudo chmod +x codecov
+          ./codecov --verbose upload-process --disable-search --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -F test -f coverage.lcov
 
   ci_cpp:
     runs-on: ubuntu-latest
@@ -574,7 +580,10 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: bash <(curl -s https://codecov.io/bash) -F dataset -f coverage.lcov
+        run: |
+          curl -Os https://cli.codecov.io/latest/linux/codecov
+          sudo chmod +x codecov
+          ./codecov --verbose upload-process --disable-search --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -F dataset -f coverage.lcov
 
   ci_fuzz:
     runs-on: [self-hosted, ARM64, legacy]
@@ -595,7 +604,10 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: bash <(curl -s https://codecov.io/bash) -F fuzz -f coverage.lcov
+        run: |
+          curl -Os https://cli.codecov.io/latest/linux/codecov
+          sudo chmod +x codecov
+          ./codecov --verbose upload-process --disable-search --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -F fuzz -f coverage.lcov
 
   ci_msvc_arch:
     runs-on: windows-2022
