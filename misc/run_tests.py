@@ -1084,6 +1084,14 @@ async def main():
         }
         target_tasks += compile_permutations("unit_tests", runner_config, all_configs, [])
 
+        runner_config = {
+            "sources": ["test/extra/test_math.c"],
+            "output": "math_tests" + exe_suffix,
+            "optimize": True,
+            "defines": { },
+        }
+        target_tasks += compile_permutations("math_tests", runner_config, arch_configs, [])
+
         targets = await gather(target_tasks)
         all_targets += targets
 

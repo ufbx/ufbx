@@ -162,15 +162,15 @@ static void ufbxt_check_binary_relative(const char *name, double a, double b, do
 int main(int argc, char **argv)
 {
 #if 1
-	uint32_t bits = 15;
+	uint32_t bits = 16;
 	uint32_t delta = 16;
-	uint32_t binary_bits = 6;
+	uint32_t binary_bits = 8;
 	uint32_t binary_delta = 16;
 #else
-	uint32_t bits = 18;
+	uint32_t bits = 19;
 	uint32_t delta = 1024;
 	uint32_t binary_bits = 10;
-	uint32_t binary_delta = 256;
+	uint32_t binary_delta = 32;
 #endif
 
 	// -- Unary, exact
