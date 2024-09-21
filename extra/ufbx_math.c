@@ -47,11 +47,25 @@
 	#define ufbxm_fabs(x) __builtin_fabs((x))
 #endif
 
-/* Sometimes it's necessary to define UFBXM_LITTLE_ENDIAN explicitly
-   but these catch some common cases. */
+// Use supplied endianness if we have one
+#if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__)
+	#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+		#define UFBXM_LITTLE_ENDIAN
+	#endif
+#endif
+#if defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__)
+	#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+		#define UFBXM_BIG_ENDIAN
+	#endif
+#endif
 
-#if defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__) || defined(_M_ARM) || defined(__arm__) || defined(__wasm__) || defined(__EMSCRIPTEN__)
-	#define UFBXM_LITTLE_ENDIAN
+// Try to detect based endianness on architecture
+#if !defined(UFBXM_LITTLE_ENDIAN) && !defined(UFBXM_BIG_ENDIAN)
+	#if defined(_M_IX86) || defined(__i386__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__) || defined(_M_ARM) || defined(__arm__) || defined(__wasm__) || defined(__EMSCRIPTEN__) || defined(__riscv__)
+		#define UFBXM_LITTLE_ENDIAN
+	#elif defined(__powerpc__) || defined(_M_PPC)
+		#define UFBXM_BIG_ENDIAN
+	#endif
 #endif
 
 typedef int ufbxm_int;
