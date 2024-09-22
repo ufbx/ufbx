@@ -210,7 +210,7 @@ int main(int argc, char **argv)
 	FILE *dump_file = NULL;
 
 	if (do_check) {
-		FILE *f = fopen(filename, "r");
+		FILE *f = fopen(filename, "rb");
 		if (!f) {
 			fprintf(stderr, "Failed to open hash file\n");
 			return 1;
@@ -218,7 +218,7 @@ int main(int argc, char **argv)
 
 		uint64_t fbx_hash = 0;
 		char fbx_file[1024];
-		while (fscanf(f, "%" SCNx64 " %d %s", &fbx_hash, &frame, fbx_file) == 3) {
+		while (fscanf(f, "%" SCNx64 " %d %[^\r\n]", &fbx_hash, &frame, fbx_file) == 3) {
 			ufbx_scene *scene = load_scene(fbx_file, frame, &hasher_opts);
 			if (!scene) continue;
 
