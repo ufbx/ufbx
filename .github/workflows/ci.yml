@@ -136,7 +136,7 @@ jobs:
         run: |
           curl -Os https://cli.codecov.io/latest/linux/codecov
           sudo chmod +x codecov
-          ./codecov --verbose upload-process --disable-search --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -n ci_coverage-${{ github.run_id }} -F tests -f coverage.lcov
+          ./codecov --verbose upload-process --disable-search --fail-on-error --plugin noop -t ${{ secrets.CODECOV_TOKEN }} -n ci_coverage-${{ github.run_id }} -F tests -f coverage.lcov
 
   ci_coverage32:
     runs-on: ubuntu-20.04
@@ -156,7 +156,7 @@ jobs:
         run: |
           curl -Os https://cli.codecov.io/latest/linux/codecov
           sudo chmod +x codecov
-          ./codecov --verbose upload-process --disable-search --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -n ci_coverage32-${{ github.run_id }} -F tests -f coverage.lcov
+          ./codecov --verbose upload-process --disable-search --fail-on-error --plugin noop -t ${{ secrets.CODECOV_TOKEN }} -n ci_coverage32-${{ github.run_id }} -F tests -f coverage.lcov
 
   ci_no_assert:
     runs-on: ubuntu-20.04
@@ -176,7 +176,7 @@ jobs:
         run: |
           curl -Os https://cli.codecov.io/latest/linux/codecov
           sudo chmod +x codecov
-          ./codecov --verbose upload-process --disable-search --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -n ci_no_assert-${{ github.run_id }} -F tests -f coverage.lcov
+          ./codecov --verbose upload-process --disable-search --fail-on-error --plugin noop -t ${{ secrets.CODECOV_TOKEN }} -n ci_no_assert-${{ github.run_id }} -F tests -f coverage.lcov
 
   ci_cpp:
     runs-on: ubuntu-latest
@@ -584,7 +584,7 @@ jobs:
           set -x
           curl -Os https://cli.codecov.io/latest/linux-arm64/codecov
           chmod +x codecov
-          ./codecov --verbose upload-process --disable-search --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -n ci_dataset-${{ github.run_id }} -F dataset -f coverage.lcov
+          ./codecov --verbose upload-process --disable-search --fail-on-error --plugin noop -t ${{ secrets.CODECOV_TOKEN }} -n ci_dataset-${{ github.run_id }} -F dataset -f coverage.lcov
 
   ci_fuzz:
     runs-on: [self-hosted, ARM64, legacy]
@@ -609,7 +609,7 @@ jobs:
           set -x
           curl -Os https://cli.codecov.io/latest/linux-arm64/codecov
           chmod +x codecov
-          ./codecov --verbose upload-process --disable-search --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -n ci_fuzz-${{ github.run_id }} -F fuzz -f coverage.lcov
+          ./codecov --verbose upload-process --disable-search --fail-on-error --plugin noop -t ${{ secrets.CODECOV_TOKEN }} -n ci_fuzz-${{ github.run_id }} -F fuzz -f coverage.lcov
 
   ci_msvc_arch:
     runs-on: windows-2022
