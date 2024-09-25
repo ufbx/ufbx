@@ -95,6 +95,8 @@ jobs:
   ci_windows_cmake:
     runs-on: windows-2022
     steps:
+      - name: Create build directory
+        run: mkdir build
       - name: Build x86
         run: |
           cmake -S misc/cmake -B build/cmake-x86 --preset x86 -DCMAKE_SYSTEM_VERSION=10
