@@ -28,7 +28,7 @@ jobs:
         run: |
           python3 misc/generate_hashses.py --exe build/hash_scene -o build/hashes.txt --verbose
       - name: Upload reference hashes
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: reference-hashes
           path: build/hashes.txt
@@ -45,7 +45,7 @@ jobs:
       - name: Install apt dependencies
         run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm-11
       - name: Download reference hashes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: reference-hashes
           path: build
@@ -57,7 +57,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_linux.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -69,7 +69,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download reference hashes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: reference-hashes
           path: build
@@ -86,7 +86,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_windows.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -98,7 +98,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download reference hashes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: reference-hashes
           path: build
@@ -110,7 +110,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_macos.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -327,7 +327,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download reference hashes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: reference-hashes
           path: build
@@ -392,7 +392,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_exotic.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -426,7 +426,7 @@ jobs:
           mkdir build
           mkdir build/hashdumps
       - name: Download reference hashes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: reference-hashes
           path: build
@@ -456,7 +456,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_hasher.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -483,7 +483,7 @@ jobs:
       - name: Test wasmtime
         run: wasmtime --version
       - name: Download reference hashes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: reference-hashes
           path: build
@@ -493,7 +493,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_wasm.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -507,7 +507,7 @@ jobs:
         with:
           fetch-depth: 2
       - name: Download reference hashes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: reference-hashes
           path: build
@@ -517,7 +517,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_arm32.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -531,7 +531,7 @@ jobs:
         with:
           fetch-depth: 2
       - name: Download reference hashes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: reference-hashes
           path: build
@@ -541,7 +541,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_arm64.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -627,7 +627,7 @@ jobs:
           mkdir build
           clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
       - name: Download combined hashdumps
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: hash-dumps
           path: build/ci-hashdumps
@@ -642,7 +642,7 @@ jobs:
       - name: Diff CI and reference dumps
         run: python3 misc/hash_diff.py diff build/ci-hashdumps --ref build/hashdump_ci_reference.txt.gz
       - name: Upload reference hashdumps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
