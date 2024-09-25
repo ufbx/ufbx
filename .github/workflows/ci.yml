@@ -17,7 +17,7 @@ jobs:
   ci_pre_hashes:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Compile hash_scene
@@ -28,7 +28,7 @@ jobs:
         run: |
           python3 misc/generate_hashses.py --exe build/hash_scene -o build/hashes.txt --verbose
       - name: Upload reference hashes
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: reference-hashes
           path: build/hashes.txt
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Update apt
@@ -45,7 +45,7 @@ jobs:
       - name: Install apt dependencies
         run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm-11
       - name: Download reference hashes
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: reference-hashes
           path: build
@@ -57,7 +57,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_linux.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -67,9 +67,9 @@ jobs:
     runs-on: windows-2022
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Download reference hashes
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: reference-hashes
           path: build
@@ -86,7 +86,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_windows.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -96,9 +96,9 @@ jobs:
     runs-on: macos-14
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Download reference hashes
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: reference-hashes
           path: build
@@ -110,7 +110,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_macos.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -119,7 +119,7 @@ jobs:
   ci_coverage:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Update apt
@@ -136,7 +136,7 @@ jobs:
   ci_coverage32:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Update apt
@@ -153,7 +153,7 @@ jobs:
   ci_no_assert:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Update apt
@@ -170,7 +170,7 @@ jobs:
   ci_cpp:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Update apt
         run: sudo apt-get update
       - name: Install apt dependencies
@@ -182,35 +182,35 @@ jobs:
   ci_picort:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run picort
         run: python misc/run_tests.py picort
 
   ci_domfuzz:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run domfuzz/objfuzz
         run: python misc/run_tests.py domfuzz objfuzz
 
   ci_unit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run unit tests
         run: python misc/run_tests.py unit
 
   ci_viewer:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run viewer
         run: python misc/run_tests.py viewer
 
   ci_features:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Update apt
         run: sudo apt-get update
       - name: Install apt dependencies
@@ -223,7 +223,7 @@ jobs:
   ci_analysis:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Update apt
         run: sudo apt-get update
       - name: Install apt dependencies
@@ -280,7 +280,7 @@ jobs:
   ci_compat:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Update apt
@@ -299,7 +299,7 @@ jobs:
   ci_lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Check formatting
         if: ${{ always() && !cancelled() }}
         run: python3 misc/check_formatting.py ufbx.h ufbx.c
@@ -313,7 +313,7 @@ jobs:
   ci_bindgen:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Create bindgen/build directory
         run: mkdir bindgen/build
       - name: Parse ufbx.h
@@ -325,9 +325,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Download reference hashes
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: reference-hashes
           path: build
@@ -392,7 +392,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_exotic.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -401,7 +401,7 @@ jobs:
   ci_compilers:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Add Ubuntu sources
         run: |
           echo "deb http://azure.archive.ubuntu.com/ubuntu/ xenial main universe" | sudo tee -a /etc/apt/sources.list
@@ -420,13 +420,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Prepare directories
         run: |
           mkdir build
           mkdir build/hashdumps
       - name: Download reference hashes
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: reference-hashes
           path: build
@@ -456,7 +456,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_hasher.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -466,7 +466,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install wasi-sdk
         run: |
           mkdir build
@@ -483,7 +483,7 @@ jobs:
       - name: Test wasmtime
         run: wasmtime --version
       - name: Download reference hashes
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: reference-hashes
           path: build
@@ -493,7 +493,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_wasm.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -503,11 +503,11 @@ jobs:
     runs-on: [self-hosted, ARM]
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Download reference hashes
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: reference-hashes
           path: build
@@ -517,7 +517,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_arm32.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -527,11 +527,11 @@ jobs:
     runs-on: [self-hosted, ARM64, legacy]
     needs: ci_pre_hashes
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Download reference hashes
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: reference-hashes
           path: build
@@ -541,7 +541,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_arm64.txt.gz
       - name: Upload hashdumps
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
@@ -550,7 +550,7 @@ jobs:
   ci_dataset:
     runs-on: [self-hosted, dataset]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Create build directory
@@ -569,7 +569,7 @@ jobs:
   ci_fuzz:
     runs-on: [self-hosted, ARM64, legacy]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Create build directory
@@ -590,7 +590,7 @@ jobs:
   ci_msvc_arch:
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Create build directory
         run: mkdir build
       - name: Build x86
@@ -619,7 +619,7 @@ jobs:
     if: ${{ always() }}
     needs: [ci_ubuntu, ci_windows, ci_macos, ci_wasm, ci_arm32, ci_arm64, ci_exotic, ci_hasher]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Compile hash_scene
@@ -627,7 +627,7 @@ jobs:
           mkdir build
           clang test/hash_scene.c misc/fdlibm.c -O2 -o build/hash_scene
       - name: Download combined hashdumps
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: hash-dumps
           path: build/ci-hashdumps
@@ -642,7 +642,7 @@ jobs:
       - name: Diff CI and reference dumps
         run: python3 misc/hash_diff.py diff build/ci-hashdumps --ref build/hashdump_ci_reference.txt.gz
       - name: Upload reference hashdumps
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ always() && !cancelled() }}
         with:
           name: hash-dumps
