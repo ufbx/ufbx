@@ -1087,7 +1087,7 @@ static ufbxi_noinline void ufbxi_unstable_sort(void *in_data, size_t size, size_
 // For the algorithm we need 128-bit division that is either provided by hardware on x64 or
 // a custom implementation below.
 
-#if !defined(UFBX_STANDARD_C) && UFBXI_MSC_VER >= 1920 && defined(_M_X64) && !defined(__clang__)
+#if !defined(UFBX_STANDARD_C) && UFBXI_MSC_VER >= 1920 && defined(_M_X64) && !defined(__clang__) && !defined(_M_ARM64EC)
 	ufbxi_extern_c extern unsigned __int64 __cdecl _udiv128(unsigned __int64  highdividend,
 		unsigned __int64 lowdividend, unsigned __int64 divisor, unsigned __int64 *remainder);
 	#define ufbxi_div128(a_hi, a_lo, b, p_rem) (_udiv128((a_hi), (a_lo), (b), (p_rem)))
