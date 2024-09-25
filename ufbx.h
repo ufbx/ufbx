@@ -1524,8 +1524,6 @@ typedef enum ufbx_aperture_format UFBX_ENUM_REPR {
 	UFBX_APERTURE_FORMAT_VISTAVISION,         // < 1.485 x 0.991 inches
 	UFBX_APERTURE_FORMAT_DYNAVISION,          // < 2.080 x 1.480 inches
 	UFBX_APERTURE_FORMAT_IMAX,                // < 2.772 x 2.072 inches
-
-	UFBX_ENUM_FORCE_WIDTH(UFBX_APERTURE_FORMAT)
 } ufbx_aperture_format;
 
 UFBX_ENUM_TYPE(ufbx_aperture_format, UFBX_APERTURE_FORMAT, UFBX_APERTURE_FORMAT_IMAX);
