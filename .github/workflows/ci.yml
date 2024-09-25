@@ -95,6 +95,7 @@ jobs:
   ci_windows_cmake:
     runs-on: windows-2022
     steps:
+      - uses: actions/checkout@v3
       - name: Create build directory
         run: mkdir build
       - name: Build x86
