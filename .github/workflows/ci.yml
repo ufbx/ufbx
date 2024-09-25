@@ -103,7 +103,7 @@ jobs:
           name: reference-hashes
           path: build
       - name: Run tests
-        run: python3 misc/run_tests.py tests cpp stack readme threadcheck hashes --remove-compiler gcc --additional-compiler gcc-11 --remove-arch x86 --runner ci_macos
+        run: python3 misc/run_tests.py tests cpp stack readme threadcheck hashes --remove-compiler gcc --additional-compiler gcc-14 --remove-arch x86 --runner ci_macos
       - name: Compile ufbx as Objective C
         run: clang -Wall -Wextra -Werror -ObjC -c ufbx.c -o build/ufbx-objc.o
       - name: Compress hashdumps
