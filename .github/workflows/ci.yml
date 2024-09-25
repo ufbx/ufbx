@@ -92,33 +92,6 @@ jobs:
           name: hash-dumps
           path: build/hashdump_ci_windows.txt.gz
 
-  ci_windows_cmake:
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v3
-      - name: Create build directory
-        run: mkdir build
-      - name: Build x86
-        run: |
-          cmake -S misc/cmake -B build/cmake-x86 --preset x86 -DCMAKE_SYSTEM_VERSION=10
-          cmake --build build/cmake-x86
-      - name: Build x64
-        run: |
-          cmake -S misc/cmake -B build/cmake-x64 --preset x64 -DCMAKE_SYSTEM_VERSION=10
-          cmake --build build/cmake-x64
-      - name: Build ARM
-        run: |
-          cmake -S misc/cmake -B build/cmake-arm --preset arm -DCMAKE_SYSTEM_VERSION=10
-          cmake --build build/cmake-arm
-      - name: Build ARM64
-        run: |
-          cmake -S misc/cmake -B build/cmake-arm64 --preset arm64 -DCMAKE_SYSTEM_VERSION=10
-          cmake --build build/cmake-arm64
-      - name: Build ARM64 EC
-        run: |
-          cmake -S misc/cmake -B build/cmake-arm64ec --preset arm64ec -DCMAKE_SYSTEM_VERSION=10
-          cmake --build build/cmake-arm64ec
-
   ci_macos:
     runs-on: macos-14
     needs: ci_pre_hashes
@@ -613,6 +586,33 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov -y .github/codecov.yml
+
+  ci_windows_cmake:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v3
+      - name: Create build directory
+        run: mkdir build
+      - name: Build x86
+        run: |
+          cmake -S misc/cmake -B build/cmake-x86 --preset x86 -DCMAKE_SYSTEM_VERSION=10
+          cmake --build build/cmake-x86
+      - name: Build x64
+        run: |
+          cmake -S misc/cmake -B build/cmake-x64 --preset x64 -DCMAKE_SYSTEM_VERSION=10
+          cmake --build build/cmake-x64
+      - name: Build ARM
+        run: |
+          cmake -S misc/cmake -B build/cmake-arm --preset arm -DCMAKE_SYSTEM_VERSION=10
+          cmake --build build/cmake-arm
+      - name: Build ARM64
+        run: |
+          cmake -S misc/cmake -B build/cmake-arm64 --preset arm64 -DCMAKE_SYSTEM_VERSION=10
+          cmake --build build/cmake-arm64
+      - name: Build ARM64 EC
+        run: |
+          cmake -S misc/cmake -B build/cmake-arm64ec --preset arm64ec -DCMAKE_SYSTEM_VERSION=10
+          cmake --build build/cmake-arm64ec
 
   ci_post_hashes:
     runs-on: ubuntu-latest
