@@ -587,7 +587,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: bash <(curl -s https://codecov.io/bash) -F tests -f coverage.lcov -y .github/codecov.yml
 
-  ci_windows_cmake:
+  ci_msvc_arch:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v3
