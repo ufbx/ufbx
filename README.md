@@ -107,7 +107,7 @@ Minor versions within a major verision (`X`) are expected to be source
 compatible after `1.0.0` but the `0.Y.Z` releases can break for every minor
 release.
 
-(codecov issue poke: 1)
+(codecov issue poke: 2)
 
 ## License
 
