@@ -187,7 +187,7 @@ UFBXT_FILE_TEST_FLAGS(synthetic_missing_cache_fail, UFBXT_FILE_TEST_FLAG_ALLOW_E
 #if UFBXT_IMPL
 static bool ufbxt_open_file_no_skip(void *user, ufbx_stream *stream, const char *path, size_t path_len, const ufbx_open_file_info *info)
 {
-	if (!ufbx_open_file(stream, path, path_len)) return false;
+	if (!ufbx_open_file(stream, path, path_len, NULL, NULL)) return false;
 	stream->skip_fn = NULL;
 	return true;
 }

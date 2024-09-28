@@ -950,6 +950,7 @@ async def main():
             "output": "cpp" + exe_suffix,
             "cpp": True,
             "warnings": True,
+            "overrides": platform_overrides,
         }
         target_tasks += compile_permutations("cpp", cpp_config, arch_configs, [])
 
@@ -960,8 +961,26 @@ async def main():
             "warnings": True,
             "optimize": True,
             "dev": False,
+            "overrides": platform_overrides,
         }
         target_tasks += compile_permutations("cpp_no_dev", cpp_no_dev_config, arch_configs, [])
+
+        targets = await gather(target_tasks)
+        all_targets += targets
+
+    if "freestanding" in tests:
+        log_comment("-- Compiling and running freestanding tests --")
+
+        target_tasks = []
+
+        freestanding_config = {
+            "sources": ["extra/ufbx_math.c", "extra/ufbx_libc.c", "misc/ufbx_malloc.c", "misc/ufbx_libc_os.c", "test/runner.c", "ufbx.c"],
+            "output": "freestanding_runner" + exe_suffix,
+            "defines": {
+                "UFBX_NO_LIBC": "",
+            },
+        }
+        target_tasks += compile_permutations("freestanding_runner", freestanding_config, arch_configs, ["-d", "data"])
 
         targets = await gather(target_tasks)
         all_targets += targets
@@ -1065,6 +1084,14 @@ async def main():
         }
         target_tasks += compile_permutations("unit_tests", runner_config, all_configs, [])
 
+        runner_config = {
+            "sources": ["test/extra/test_math.c"],
+            "output": "math_tests" + exe_suffix,
+            "optimize": True,
+            "defines": { },
+        }
+        target_tasks += compile_permutations("math_tests", runner_config, arch_configs, [])
+
         targets = await gather(target_tasks)
         all_targets += targets
 
@@ -1083,6 +1110,7 @@ async def main():
             "UFBX_NO_TRIANGULATION",
             "UFBX_NO_ERROR_STACK",
             "UFBX_REAL_IS_FLOAT",
+            "UFBX_NO_STDIO",
         ]
 
         target_tasks = []
@@ -1492,7 +1520,7 @@ async def main():
             }
 
             hash_scene_config = {
-                "sources": ["test/hash_scene.c", "misc/fdlibm.c"],
+                "sources": ["test/hash_scene.c", "extra/ufbx_math.c"],
                 "output": "hash_scene" + exe_suffix,
                 "ieee754": True,
                 "defines": { },

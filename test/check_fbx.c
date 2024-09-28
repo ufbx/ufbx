@@ -417,6 +417,8 @@ int check_fbx_main(int argc, char **argv, const char *path)
 	if (strstr(scene->metadata.creator.data, "kenney")) known_unknown = true;
 	if (strstr(scene->metadata.creator.data, "assetforge")) known_unknown = true;
 	if (strstr(scene->metadata.creator.data, "SmallFBX")) known_unknown = true;
+	if (strstr(scene->metadata.creator.data, "FBX Unity Export")) known_unknown = true;
+	if (strstr(scene->metadata.creator.data, "Open Asset Import Library")) known_unknown = true;
 	if (scene->metadata.version < 5800) known_unknown = true;
 	ufbxt_assert(scene->metadata.exporter != UFBX_EXPORTER_UNKNOWN || known_unknown || is_fuzz);
 
@@ -480,12 +482,30 @@ int check_fbx_main(int argc, char **argv, const char *path)
 	}
 
 	if (!ignore_warnings) {
+		bool warning_seen[UFBX_WARNING_TYPE_COUNT] = { false };
+		size_t warning_count[UFBX_WARNING_TYPE_COUNT] = { 0 };
 		for (size_t i = 0; i < scene->metadata.warnings.count; i++) {
 			ufbx_warning *warning = &scene->metadata.warnings.data[i];
-			if (warning->count > 1) {
-				printf("Warning: %s (x%zu)\n", warning->description.data, warning->count);
+			size_t count = warning->count > 0 ? warning->count : 1;
+			warning_count[warning->type] += count;
+		}
+		for (size_t i = 0; i < scene->metadata.warnings.count; i++) {
+			ufbx_warning *warning = &scene->metadata.warnings.data[i];
+			if (warning_seen[warning->type]) continue;
+			warning_seen[warning->type] = true;
+			size_t extra = warning_count[warning->type] - warning->count;
+			if (extra > 0) {
+				if (warning->count > 1) {
+					printf("Warning: %s (x%zu) + %zu\n", warning->description.data, warning->count, extra);
+				} else {
+					printf("Warning: %s + %zu\n", warning->description.data, extra);
+				}
 			} else {
-				printf("Warning: %s\n", warning->description.data);
+				if (warning->count > 1) {
+					printf("Warning: %s (x%zu)\n", warning->description.data, warning->count);
+				} else {
+					printf("Warning: %s\n", warning->description.data);
+				}
 			}
 		}
 	}

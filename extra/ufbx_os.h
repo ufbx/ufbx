@@ -58,26 +58,41 @@ ufbx_os_abi void ufbx_os_thread_pool_wait(ufbx_os_thread_pool *pool, uint64_t ta
 #define ufbxos_assert(cond) ufbx_assert(cond)
 
 #include <stdlib.h>
+#include <string.h>
 
 static void ufbxos_thread_pool_entry(ufbx_os_thread_pool *pool);
 
 #if defined(_WIN32)
 
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
+#if !defined(WIN32_LEAN_AND_MEAN)
+	#define UFBXOS_LEAN_AND_MEAN
+	#define WIN32_LEAN_AND_MEAN
+#endif
+#if !defined(NOMINMAX)
+	#define UFBXOS_NOMINMAX
+	#define NOMINMAX
+#endif
+
 #include <Windows.h>
 #include <intrin.h>
 
+#if defined(UFBXOS_LEAN_AND_MEAN)
+	#undef WIN32_LEAN_AND_MEAN
+#endif
+#if defined(UFBXOS_NOMINMAX)
+	#undef NOOMINMAX
+#endif
+
 typedef volatile long ufbxos_atomic_u32;
 static uint32_t ufbxos_atomic_u32_load_relaxed(ufbxos_atomic_u32 *ptr) { return *(uint32_t*)ptr; }
-static uint32_t ufbxos_atomic_u32_load(ufbxos_atomic_u32 *ptr) { return _InterlockedOr(ptr, 0); }
-static void ufbxos_atomic_u32_store(ufbxos_atomic_u32 *ptr, uint32_t value) { _InterlockedExchange(ptr, (LONG)value); }
-static uint32_t ufbxos_atomic_u32_inc(ufbxos_atomic_u32 *ptr) { return _InterlockedIncrement(ptr) - 1; }
-static bool ufbxos_atomic_u32_cas(ufbxos_atomic_u32 *ptr, uint32_t ref, uint32_t value) { return _InterlockedCompareExchange(ptr, value, ref) == ref; }
+static uint32_t ufbxos_atomic_u32_load(ufbxos_atomic_u32 *ptr) { return (uint32_t)_InterlockedOr(ptr, 0); }
+static void ufbxos_atomic_u32_store(ufbxos_atomic_u32 *ptr, uint32_t value) { _InterlockedExchange(ptr, (long)value); }
+static uint32_t ufbxos_atomic_u32_inc(ufbxos_atomic_u32 *ptr) { return (uint32_t)_InterlockedIncrement(ptr) - 1; }
+static bool ufbxos_atomic_u32_cas(ufbxos_atomic_u32 *ptr, uint32_t ref, uint32_t value) { return (uint32_t)_InterlockedCompareExchange(ptr, (long)value, (long)ref) == ref; }
 
 typedef volatile LONG64 ufbxos_atomic_u64;
 static uint64_t ufbxos_atomic_u64_load(ufbxos_atomic_u64 *ptr) { return (uint64_t)_InterlockedCompareExchange64(ptr, 0, 0); }
-static void ufbxos_atomic_u64_store(ufbxos_atomic_u64 *ptr, uint64_t value) { InterlockedExchange64(ptr, value); }
+static void ufbxos_atomic_u64_store(ufbxos_atomic_u64 *ptr, uint64_t value) { InterlockedExchange64(ptr, (LONG64)value); }
 static bool ufbxos_atomic_u64_cas(ufbxos_atomic_u64 *ptr, uint64_t *ref, uint64_t value)
 {
 	uint64_t prev = *ref;
@@ -146,11 +161,11 @@ static void ufbxos_os_yield(void)
 
 #if defined(__GNUC__) || defined(__clang__)
 typedef volatile uint32_t ufbxos_atomic_u32;
-static uint32_t ufbxos_atomic_u32_load_relaxed(ufbxos_atomic_u32 *ptr) { uint32_t r; __atomic_load(ptr, &r, __ATOMIC_RELAXED); return r; }
-static uint32_t ufbxos_atomic_u32_load(ufbxos_atomic_u32 *ptr) { uint32_t r; __atomic_load(ptr, &r, __ATOMIC_SEQ_CST); return r; }
-static void ufbxos_atomic_u32_store(ufbxos_atomic_u32 *ptr, uint32_t value) { __atomic_store(ptr, &value, __ATOMIC_SEQ_CST); }
-static uint32_t ufbxos_atomic_u32_inc(ufbxos_atomic_u32 *ptr) { return __atomic_fetch_add(ptr, 1, __ATOMIC_SEQ_CST); }
-static bool ufbxos_atomic_u32_cas(ufbxos_atomic_u32 *ptr, uint32_t ref, uint32_t value) { return __atomic_compare_exchange(ptr, &ref, &value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }
+static uint32_t ufbxos_atomic_u32_load_relaxed(ufbxos_atomic_u32 *ptr) { uint32_t r; (void)ptr; __atomic_load(ptr, &r, __ATOMIC_RELAXED); return r; }
+static uint32_t ufbxos_atomic_u32_load(ufbxos_atomic_u32 *ptr) { uint32_t r; (void)ptr; __atomic_load(ptr, &r, __ATOMIC_SEQ_CST); return r; }
+static void ufbxos_atomic_u32_store(ufbxos_atomic_u32 *ptr, uint32_t value) { (void)ptr; __atomic_store(ptr, &value, __ATOMIC_SEQ_CST); }
+static uint32_t ufbxos_atomic_u32_inc(ufbxos_atomic_u32 *ptr) { (void)ptr; return __atomic_fetch_add(ptr, 1, __ATOMIC_SEQ_CST); }
+static bool ufbxos_atomic_u32_cas(ufbxos_atomic_u32 *ptr, uint32_t ref, uint32_t value) { (void)ptr; (void)ref; return __atomic_compare_exchange(ptr, &ref, &value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }
 
 #if defined(__i386__) || defined(__i386)
 typedef volatile uint64_t ufbxos_atomic_u64;
@@ -171,9 +186,9 @@ static void ufbxos_atomic_u64_store(ufbxos_atomic_u64 *ptr, uint64_t value) {
 }
 #else
 typedef volatile uint64_t ufbxos_atomic_u64;
-static uint64_t ufbxos_atomic_u64_load(ufbxos_atomic_u64 *ptr) { uint64_t r; __atomic_load(ptr, &r, __ATOMIC_SEQ_CST); return r; }
-static void ufbxos_atomic_u64_store(ufbxos_atomic_u64 *ptr, uint64_t value) { __atomic_store(ptr, &value, __ATOMIC_SEQ_CST); }
-static bool ufbxos_atomic_u64_cas(ufbxos_atomic_u64 *ptr, uint64_t *ref, uint64_t value) { return __atomic_compare_exchange(ptr, ref, &value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }
+static uint64_t ufbxos_atomic_u64_load(ufbxos_atomic_u64 *ptr) { uint64_t r; (void)ptr; __atomic_load(ptr, &r, __ATOMIC_SEQ_CST); return r; }
+static void ufbxos_atomic_u64_store(ufbxos_atomic_u64 *ptr, uint64_t value) { (void)ptr; __atomic_store(ptr, &value, __ATOMIC_SEQ_CST); }
+static bool ufbxos_atomic_u64_cas(ufbxos_atomic_u64 *ptr, uint64_t *ref, uint64_t value) { (void)ptr; (void)ref; return __atomic_compare_exchange(ptr, ref, &value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }
 #endif
 
 #else
@@ -188,6 +203,7 @@ typedef dispatch_semaphore_t ufbxos_os_semaphore;
 
 static void ufbxos_os_semaphore_init(ufbxos_os_semaphore *os_sema, uint32_t max_count)
 {
+	(void)max_count;
     *os_sema = dispatch_semaphore_create(0);
 }
 
@@ -216,6 +232,7 @@ typedef sem_t ufbxos_os_semaphore;
 
 static void ufbxos_os_semaphore_init(ufbxos_os_semaphore *os_sema, uint32_t max_count)
 {
+	(void)max_count;
 	sem_init(os_sema, 0, 0);
 }
 
@@ -270,7 +287,7 @@ static void ufbxos_os_yield(void)
 
 static size_t ufbxos_os_get_logical_cores(void)
 {
-	return sysconf(_SC_NPROCESSORS_ONLN);
+	return (size_t)sysconf(_SC_NPROCESSORS_ONLN);
 }
 
 #endif
@@ -336,7 +353,7 @@ static ufbxos_wait_sema_state ufbxos_wait_sema_decode(uint64_t state)
 
 static uint64_t ufbxos_wait_sema_encode(ufbxos_wait_sema_state s)
 {
-	return (uint64_t)(s.waiters | s.sleepers << 15 | (s.signaled ? 1 : 0) << 30)
+	return (uint64_t)(s.waiters | s.sleepers << 15 | (s.signaled ? 1u : 0u) << 30)
 		| (uint64_t)s.revision << 32;
 }
 
@@ -651,7 +668,7 @@ static bool ufbxos_atomic_try_wait(ufbx_os_thread_pool *pool, uint32_t *p_sema_i
 			bool ok = false;
 			if (ufbxos_hash_is(s.hash, hash)) ok = true;
 			if (attempt >= 1 && s.hash == 0) ok = true;
-			if (attempt >= 2 && !ufbxos_hash_contains(s.hash, hash)) ok = true;
+			if (attempt >= 2 && ufbxos_hash_contains(s.hash, hash)) ok = true;
 			if (attempt >= 3) ok = false;
 			if (!ok) break;
 
@@ -691,6 +708,7 @@ static bool ufbxos_atomic_try_wait(ufbx_os_thread_pool *pool, uint32_t *p_sema_i
 	return false;
 }
 
+#if 0
 static void ufbxos_atomic_wait32(ufbx_os_thread_pool *pool, ufbxos_atomic_u32 *ptr, uint32_t value)
 {
 #if UFBXOS_OS_WAIT_NOTIFY
@@ -712,6 +730,7 @@ static void ufbxos_atomic_wait32(ufbx_os_thread_pool *pool, ufbxos_atomic_u32 *p
 	}
 #endif
 }
+#endif
 
 static void ufbxos_atomic_wait64(ufbx_os_thread_pool *pool, ufbxos_atomic_u64 *ptr, uint64_t value)
 {
@@ -755,6 +774,7 @@ static void ufbxos_atomic_notify(ufbx_os_thread_pool *pool, const void *ptr)
 	}
 }
 
+#if 0
 static void ufbxos_atomic_notify32(ufbx_os_thread_pool *pool, ufbxos_atomic_u32 *ptr)
 {
 #if UFBXOS_OS_WAIT_NOTIFY
@@ -763,6 +783,7 @@ static void ufbxos_atomic_notify32(ufbx_os_thread_pool *pool, ufbxos_atomic_u32 
 	ufbxos_atomic_notify(pool, (const void*)ptr);
 #endif
 }
+#endif
 
 static void ufbxos_atomic_notify64(ufbx_os_thread_pool *pool, ufbxos_atomic_u64 *ptr)
 {
@@ -815,7 +836,7 @@ static uint64_t ufbxos_push_task(ufbx_os_thread_pool *pool, ufbx_os_thread_pool_
 	}
 
 	uint32_t task_index = ufbxos_task_index(pool, task_id);
-	uint64_t task_cycle = ufbxos_task_cycle(pool, task_id);
+	// uint64_t task_cycle = ufbxos_task_cycle(pool, task_id);
 	ufbxos_task *task = &pool->tasks[task_index];
 
 	task->fn = fn;
@@ -1038,6 +1059,8 @@ static void ufbxos_ufbx_task(void *user, uint32_t index)
 
 static bool ufbxos_ufbx_thread_pool_init(void *user, ufbx_thread_pool_context ctx, const ufbx_thread_pool_info *info)
 {
+	(void)info;
+	(void)user;
 	void *allocation = calloc(1, sizeof(ufbxos_pool_ctx) + 128);
 	if (!allocation) return false;
 
@@ -1065,6 +1088,7 @@ static bool ufbxos_ufbx_thread_pool_run(void *user, ufbx_thread_pool_context ctx
 
 static bool ufbxos_ufbx_thread_pool_wait(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index)
 {
+	(void)max_index;
 	ufbx_os_thread_pool *pool = (ufbx_os_thread_pool*)user;
 	ufbxos_pool_ctx *up = (ufbxos_pool_ctx*)ufbx_thread_pool_get_user_ptr(ctx);
 	ufbxos_pool_group *ug = &up->groups[group].group;
@@ -1076,9 +1100,8 @@ static bool ufbxos_ufbx_thread_pool_wait(void *user, ufbx_thread_pool_context ct
 
 static void ufbxos_ufbx_thread_pool_free(void *user, ufbx_thread_pool_context ctx)
 {
-	ufbx_os_thread_pool *pool = (ufbx_os_thread_pool*)user;
+	(void)user;
 	ufbxos_pool_ctx *up = (ufbxos_pool_ctx*)ufbx_thread_pool_get_user_ptr(ctx);
-
 	free(up->allocation);
 }
 

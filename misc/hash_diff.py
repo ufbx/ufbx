@@ -14,6 +14,9 @@ def fetch_dumps(file):
             cur_file = { }
             files[name] = cur_file
         elif line.startswith("--"):
+            if not cur_file:
+                cur_file = { }
+                files["(default)"] = cur_file
             name = line[2:].strip()
             cur_dump = []
             cur_file[name] = cur_dump

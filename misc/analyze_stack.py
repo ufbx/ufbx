@@ -48,7 +48,8 @@ typedef long ptrdiff_t;
 """
 
 fake_includes["stdarg.h"] = """
-typedef int va_list;
+typedef void *va_list;
+#define va_arg(a, b) (*(b*)(a))
 """
 
 fake_includes["stdio.h"] = """

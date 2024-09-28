@@ -27,6 +27,10 @@ elif [ $cmd == "build-mtl" ]; then
     afl-clang-fast -DLOAD_MTL -static ../../misc/fuzz_ufbx_persist.c -lm -o fuzz_mtl
 elif [ $cmd == "build-mtl-asan" ]; then
     AFL_USE_ASAN=1 afl-clang-fast -DLOAD_MTL -DDISCRETE_ALLOCATIONS ../../misc/fuzz_ufbx_persist.c -lm -o fuzz_mtl_asan
+elif [ $cmd == "build-strtod" ]; then
+    afl-clang-fast -static ../../misc/fuzz_strtod_persist.c -lm -o fuzz_strtod
+elif [ $cmd == "build-strtod-binary" ]; then
+    afl-clang-fast -DBINARY -static ../../misc/fuzz_strtod_persist.c -lm -o fuzz_strtod_binary
 fi
 
 name=$1

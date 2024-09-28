@@ -1,5 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
+#include <string.h>
+
 #include "../ufbx.h"
 #include "hash_scene.h"
 #include <stdio.h>
@@ -208,7 +210,7 @@ int main(int argc, char **argv)
 	FILE *dump_file = NULL;
 
 	if (do_check) {
-		FILE *f = fopen(filename, "r");
+		FILE *f = fopen(filename, "rb");
 		if (!f) {
 			fprintf(stderr, "Failed to open hash file\n");
 			return 1;
@@ -216,7 +218,7 @@ int main(int argc, char **argv)
 
 		uint64_t fbx_hash = 0;
 		char fbx_file[1024];
-		while (fscanf(f, "%" SCNx64 " %d %s", &fbx_hash, &frame, fbx_file) == 3) {
+		while (fscanf(f, "%" SCNx64 " %d %[^\r\n]", &fbx_hash, &frame, fbx_file) == 3) {
 			ufbx_scene *scene = load_scene(fbx_file, frame, &hasher_opts);
 			if (!scene) continue;
 
@@ -239,10 +241,12 @@ int main(int argc, char **argv)
 				}
 			} else {
 				if (verbose) {
-					printf("%s: OK\n", fbx_file);
+					printf("%s %d: OK\n", fbx_file, frame);
 				}
 			}
 			num_total++;
+
+			ufbx_free_scene(scene);
 		}
 
 		fclose(f);
@@ -277,8 +281,7 @@ int main(int argc, char **argv)
 	return num_fail > 0 ? 3 : 0;
 }
 
-#define UFBX_NO_MATH_H
-#define UFBX_MATH_PREFIX fdlibm_
+#define UFBX_EXTERNAL_MATH
 
 #include "../ufbx.c"
 
