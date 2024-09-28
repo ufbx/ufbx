@@ -729,6 +729,8 @@ void test_double_parse()
 	ufbxt_check_float(TEST_ZEROS "." TEST_ZEROS "123" TEST_ZEROS);
 	ufbxt_check_float(TEST_ZEROS "." TEST_ZEROS TEST_ZEROS "123");
 	ufbxt_check_float("241309881603643e20");
+	ufbxt_check_float(".5.57999999993498");
+	ufbxt_check_float("-71862.4328795732984723456847839347829321867347892347893274982374982349872136217381623872E-273");
 	#if !defined(_MSC_VER)
 		ufbxt_check_float("4656612873077392578125e-8");
 	#endif
