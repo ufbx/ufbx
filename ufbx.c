@@ -1636,7 +1636,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	}
 
 	mantissa = ufbxi_shift_right_round(mantissa, mantissa_shift, tail);
-	if (mantissa == 0) return 0;
+	if (mantissa == 0) return negative ? -0.0 : 0.0;
 
 	uint64_t bits = mantissa;
 	bits += (uint64_t)(exponent + enc_max_exponent - 1) << (enc_mantissa_bits - 1);
