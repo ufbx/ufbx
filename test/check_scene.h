@@ -12,8 +12,11 @@
 
 static uint32_t ufbxt_sink = 0;
 
-#include <math.h>
-#include <string.h>
+#if !defined(UFBX_NO_LIBC)
+	#include <math.h>
+	#include <string.h>
+#endif
+
 #include "../ufbx.h"
 
 static int ufbxt_is_utf8(const char *str, size_t length)

@@ -34,6 +34,7 @@ ufbxt_cpp_test *ufbxt_cpp_test::last = nullptr;
 	void p_name()
 
 #include <stdio.h>
+#include <string.h>
 #include <string>
 #include <memory>
 #include <vector>
@@ -113,7 +114,7 @@ int main(int argc, char **argv)
 			printf("  Assertion failure: %s\n", fail.desc);
 		} catch (const ufbxt_error_exception &fail) {
 			printf("FAIL\n");
-			printf("  ufbx error: %s\n", ufbx_format_error(fail.error).c_str());
+			printf("  ufbx error: %s\n", ufbx_format_error_string(fail.error).c_str());
 		}
 	}
 
