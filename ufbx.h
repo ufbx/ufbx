@@ -1354,7 +1354,7 @@ struct ufbx_mesh {
 	// The winding of the faces has been reversed.
 	bool reversed_winding;
 
-	// Normals have been generated instead of evalauted.
+	// Normals have been generated instead of evaluated.
 	// Either from missing normals (via `ufbx_load_opts.generate_missing_normals`), skinning,
 	// tessellation, or subdivision.
 	bool generated_normals;
@@ -1566,7 +1566,7 @@ struct ufbx_camera {
 	// Projection mode (perspective/orthographic).
 	ufbx_projection_mode projection_mode;
 
-	// If set to `true`, `resolution` reprensents actual pixel values, otherwise
+	// If set to `true`, `resolution` represents actual pixel values, otherwise
 	// it's only useful for its aspect ratio.
 	bool resolution_is_pixels;
 
