@@ -651,7 +651,7 @@ um_abi um_vec3 um_transform_extent(const um_mat *a, um_vec3 b)
 	return um_v3(
 		um_abs(a->m11)*b.x + um_abs(a->m12)*b.y + um_abs(a->m13)*b.z,
 		um_abs(a->m21)*b.x + um_abs(a->m22)*b.y + um_abs(a->m23)*b.z,
-		um_abs(a->m31)*b.x + um_abs(a->m32)*b.y + um_abs(a->m23)*b.z);
+		um_abs(a->m31)*b.x + um_abs(a->m32)*b.y + um_abs(a->m33)*b.z);
 }
 
 #endif
