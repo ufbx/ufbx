@@ -13,6 +13,9 @@
       "architecture": {
         "value": "arm",
         "strategy": "set"
+      },
+      "cacheVariables": {
+        "CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION_MAXIMUM": "10.0.22621.0"
       }
     },
     {
