@@ -15,7 +15,8 @@
         "strategy": "set"
       },
       "cacheVariables": {
-        "CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION_MAXIMUM": "10.0.22621.0"
+        "CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION_MAXIMUM": "10.0.22621.0",
+        "CMAKE_C_COMPILER_WORKS": "1"
       }
     },
     {
