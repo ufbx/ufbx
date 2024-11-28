@@ -19,6 +19,7 @@ class TestModel(NamedTuple):
     mtl_path: Optional[str]
     mat_path: Optional[str]
     frame: Optional[int]
+    lefthanded: bool
 
 class TestCase(NamedTuple):
     root: str
@@ -86,6 +87,7 @@ def gather_case_models(json_path, flag_separator):
             obj_base = strip_ext(obj_path)
 
             flags = obj_base[len(fbx_base) + len(flag_separator):].split("_")
+            lefthanded = False
 
             # Parse flags
             frame = None
@@ -93,13 +95,16 @@ def gather_case_models(json_path, flag_separator):
                 m = re.match(r"frame(\d+)", flag)
                 if m:
                     frame = int(m.group(1))
+                if flag == "lefthanded":
+                    lefthanded = True
 
             yield TestModel(
                 fbx_path=fbx_path,
                 obj_path=obj_path,
                 mtl_path=mtl_path,
                 mat_path=mat_path,
-                frame=frame)
+                frame=frame,
+                lefthanded=lefthanded)
 
         else:
             # TODO: Handle objless fbx
@@ -193,6 +198,8 @@ def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_sup
             ])
         elif feature == "bake":
             append_unique_opt(options, "bake", [False, True])
+        elif feature == "mirror":
+            append_unique_opt(options, "mirror-axis", ["none", "x", "y", "z"])
         elif feature == "ignore-missing-external":
             options["ignore-missing-external"] = [True]
         elif not skip:
@@ -334,6 +341,9 @@ if __name__ == "__main__":
             if model.frame is not None:
                 extra.append(f"frame {model.frame}")
                 case_args += ["--frame", str(model.frame)]
+            if model.lefthanded:
+                extra.append(f"lefthanded")
+                case_args += ["--lefthanded"]
 
             name = fmt_rel(model.fbx_path, case.root)
 

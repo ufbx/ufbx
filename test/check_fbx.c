@@ -75,6 +75,13 @@ static const ufbxt_enum_name ufbxt_names_ufbx_pivot_handling[] = {
 	{ "adjust-to-pivot", UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT },
 };
 
+static const ufbxt_enum_name ufbxt_names_ufbx_mirror_axis[] = {
+	{ "none", UFBX_MIRROR_AXIS_NONE },
+	{ "x", UFBX_MIRROR_AXIS_X },
+	{ "y", UFBX_MIRROR_AXIS_Y },
+	{ "z", UFBX_MIRROR_AXIS_Z },
+};
+
 static int ufbxt_str_to_enum_imp(const ufbxt_enum_name *names, size_t count, const char *type_name, const char *name)
 {
 	for (size_t i = 0; i < count; i++) {
@@ -203,6 +210,9 @@ int check_fbx_main(int argc, char **argv, const char *path)
 			if (++i < argc) opts.space_conversion = ufbxt_str_to_enum(ufbx_space_conversion, argv[i]);
 		} else if (!strcmp(argv[i], "--index-error-handling")) {
 			if (++i < argc) opts.index_error_handling = ufbxt_str_to_enum(ufbx_index_error_handling, argv[i]);
+		} else if (!strcmp(argv[i], "--mirror-axis")) {
+			if (++i < argc) opts.handedness_conversion_axis = ufbxt_str_to_enum(ufbx_mirror_axis, argv[i]);
+			opts.handedness_conversion_retain_winding = true;
 		} else if (!strcmp(argv[i], "--fps")) {
 			if (++i < argc) override_fps = strtod(argv[i], NULL);
 		} else if (!strcmp(argv[i], "-d")) {
@@ -211,6 +221,8 @@ int check_fbx_main(int argc, char **argv, const char *path)
 			bake = true;
 		} else if (!strcmp(argv[i], "--ignore-warnings")) {
 			ignore_warnings = true;
+		} else if (!strcmp(argv[i], "--lefthanded")) {
+			opts.target_axes = ufbx_axes_left_handed_y_up;
 		} else if (!strcmp(argv[i], "--bake-fps")) {
 			if (++i < argc) bake_fps = strtod(argv[i], NULL);
 		} else if (argv[i][0] == '-') {
