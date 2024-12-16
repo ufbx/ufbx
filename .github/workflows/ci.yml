@@ -625,10 +625,6 @@ jobs:
         run: |
           cmake -S misc/cmake -B build/cmake-x64 --preset x64 -DCMAKE_SYSTEM_VERSION=10
           cmake --build build/cmake-x64
-      - name: Build ARM
-        run: |
-          cmake -S misc/cmake -B build/cmake-arm --preset arm -DCMAKE_SYSTEM_VERSION=10
-          cmake --build build/cmake-arm
       - name: Build ARM64
         run: |
           cmake -S misc/cmake -B build/cmake-arm64 --preset arm64 -DCMAKE_SYSTEM_VERSION=10
