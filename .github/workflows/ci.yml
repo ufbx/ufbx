@@ -133,6 +133,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: github.repository == 'ufbx/ufbx'
         run: |
           curl -Os https://cli.codecov.io/latest/linux/codecov
           sudo chmod +x codecov
@@ -153,6 +154,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: github.repository == 'ufbx/ufbx'
         run: |
           curl -Os https://cli.codecov.io/latest/linux/codecov
           sudo chmod +x codecov
@@ -173,6 +175,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: github.repository == 'ufbx/ufbx'
         run: |
           curl -Os https://cli.codecov.io/latest/linux/codecov
           sudo chmod +x codecov
@@ -580,6 +583,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: github.repository == 'ufbx/ufbx'
         run: |
           set -x
           curl -Os https://cli.codecov.io/latest/linux-arm64/codecov
@@ -605,6 +609,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: github.repository == 'ufbx/ufbx'
         run: |
           set -x
           curl -Os https://cli.codecov.io/latest/linux-arm64/codecov
@@ -625,10 +630,6 @@ jobs:
         run: |
           cmake -S misc/cmake -B build/cmake-x64 --preset x64 -DCMAKE_SYSTEM_VERSION=10
           cmake --build build/cmake-x64
-      - name: Build ARM
-        run: |
-          cmake -S misc/cmake -B build/cmake-arm --preset arm -DCMAKE_SYSTEM_VERSION=10
-          cmake --build build/cmake-arm
       - name: Build ARM64
         run: |
           cmake -S misc/cmake -B build/cmake-arm64 --preset arm64 -DCMAKE_SYSTEM_VERSION=10
