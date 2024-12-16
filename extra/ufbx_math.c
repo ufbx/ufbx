@@ -28,7 +28,7 @@
 		#define UFBXM_HAS_SSE
 		#include <xmmintrin.h>
 		#include <emmintrin.h>
-	#elif !defined(UFBX_NO_NEON) && (defined(_MSC_VER) && (defined(_M_ARM64) || defined(_M_ARM64EC))) && ((defined(__GNUC__) || defined(__clang__)) && defined(__aarch64__)) || defined(UFBX_USE_NEON)
+	#elif !defined(UFBX_NO_NEON) && (defined(_MSC_VER) && (defined(_M_ARM64) || defined(_M_ARM64EC))) || ((defined(__GNUC__) || defined(__clang__)) && defined(__aarch64__)) || defined(UFBX_USE_NEON)
 		#define UFBXM_HAS_NEON
 		#include <arm_neon.h>
 	#elif (defined(__clang__) && defined(__wasm__))
