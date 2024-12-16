@@ -133,6 +133,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: github.repository == 'ufbx/ufbx-citest'
         run: |
           curl -Os https://cli.codecov.io/latest/linux/codecov
           sudo chmod +x codecov
@@ -153,6 +154,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: github.repository == 'ufbx/ufbx-citest'
         run: |
           curl -Os https://cli.codecov.io/latest/linux/codecov
           sudo chmod +x codecov
@@ -173,6 +175,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: github.repository == 'ufbx/ufbx-citest'
         run: |
           curl -Os https://cli.codecov.io/latest/linux/codecov
           sudo chmod +x codecov
@@ -580,6 +583,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: github.repository == 'ufbx/ufbx-citest'
         run: |
           set -x
           curl -Os https://cli.codecov.io/latest/linux-arm64/codecov
@@ -605,6 +609,7 @@ jobs:
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: github.repository == 'ufbx/ufbx-citest'
         run: |
           set -x
           curl -Os https://cli.codecov.io/latest/linux-arm64/codecov
