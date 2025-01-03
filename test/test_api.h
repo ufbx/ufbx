@@ -183,21 +183,19 @@ static bool ufbxt_single_thread_pool_init_fn(void *user, ufbx_thread_pool_contex
 	return true;
 }
 
-static bool ufbxt_single_thread_pool_run_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count)
+static void ufbxt_single_thread_pool_run_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count)
 {
 	ufbxt_single_thread_pool *pool = (ufbxt_single_thread_pool*)user;
 	ufbxt_assert(pool->initialized);
 	pool->dispatches++;
-	if (!pool->immediate) return true;
+	if (!pool->immediate) return;
 
 	for (uint32_t i = 0; i < count; i++) {
 		ufbx_thread_pool_run_task(ctx, start_index + i);
 	}
-
-	return true;
 }
 
-static bool ufbxt_single_thread_pool_wait_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index)
+static void ufbxt_single_thread_pool_wait_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index)
 {
 	ufbxt_single_thread_pool *pool = (ufbxt_single_thread_pool*)user;
 	ufbxt_assert(pool->initialized);
@@ -209,8 +207,6 @@ static bool ufbxt_single_thread_pool_wait_fn(void *user, ufbx_thread_pool_contex
 	}
 
 	pool->wait_index = max_index;
-
-	return true;
 }
 
 static void ufbxt_single_thread_pool_free_fn(void *user, ufbx_thread_pool_context ctx)
