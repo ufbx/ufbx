@@ -188,7 +188,7 @@ static void ufbxt_single_thread_pool_run_fn(void *user, ufbx_thread_pool_context
 	ufbxt_single_thread_pool *pool = (ufbxt_single_thread_pool*)user;
 	ufbxt_assert(pool->initialized);
 	pool->dispatches++;
-	if (!pool->immediate) return true;
+	if (!pool->immediate) return;
 
 	for (uint32_t i = 0; i < count; i++) {
 		ufbx_thread_pool_run_task(ctx, start_index + i);
