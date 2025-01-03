@@ -1751,16 +1751,14 @@ UFBXT_FILE_TEST(synthetic_integer_holes)
 #endif
 
 #if UFBXT_IMPL
-static bool ufbxt_immediate_run_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count)
+static void ufbxt_immediate_run_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count)
 {
 	for (uint32_t i = 0; i < count; i++) {
 		ufbx_thread_pool_run_task(ctx, start_index + i);
 	}
-	return true;
 }
-static bool ufbxt_immediate_wait_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index)
+static void ufbxt_immediate_wait_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index)
 {
-	return true;
 }
 static ufbx_load_opts ufbxt_immediate_thread_opts()
 {
