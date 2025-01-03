@@ -4085,7 +4085,8 @@ typedef struct ufbx_open_memory_opts {
 	uint32_t _end_zero;
 } ufbx_open_memory_opts;
 
-// Detailed error stack frame
+// Detailed error stack frame.
+// NOTE: You must compile `ufbx.c` with `UFBX_ENABLE_ERROR_STACK` to enable the error stack.
 typedef struct ufbx_error_frame {
 	uint32_t source_line;
 	ufbx_string function;
@@ -4183,30 +4184,48 @@ UFBX_ENUM_TYPE(ufbx_error_type, UFBX_ERROR_TYPE, UFBX_ERROR_DUPLICATE_OVERRIDE);
 // Error description with detailed stack trace
 // HINT: You can use `ufbx_format_error()` for formatting the error
 typedef struct ufbx_error {
+
+	// Type of the error, or `UFBX_ERROR_NONE` if succesful.
 	ufbx_error_type type;
+
+	// Description of the error type.
 	ufbx_string description;
+
+	// Internal error stack.
+	// NOTE: You must compile `ufbx.c` with `UFBX_ENABLE_ERROR_STACK` to enable the error stack.
 	uint32_t stack_size;
 	ufbx_error_frame stack[UFBX_ERROR_STACK_MAX_DEPTH];
+
+	// Additional error information, such as missing file filename.
+	// `info` is a NULL-terminated UTF-8 string containing `info_length` bytes, excluding the trailing `'\0'`.
 	size_t info_length;
 	char info[UFBX_ERROR_INFO_LENGTH];
+
 } ufbx_error;
 
 // -- Progress callbacks
 
+// Loading progress information.
 typedef struct ufbx_progress {
 	uint64_t bytes_read;
 	uint64_t bytes_total;
 } ufbx_progress;
 
+// Progress result returned from `ufbx_progress_fn()` callback.
+// Determines whether ufbx should continue or abort the loading.
 typedef enum ufbx_progress_result UFBX_ENUM_REPR {
+
+	// Continue loading the file.
 	UFBX_PROGRESS_CONTINUE = 0x100,
+
+	// Cancel loading and fail with `UFBX_ERROR_CANCELLED`.
 	UFBX_PROGRESS_CANCEL = 0x200,
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_PROGRESS_RESULT)
 } ufbx_progress_result;
 
-// Called periodically with the current progress
-// Return `false` to cancel further processing
+// Called periodically with the current progress.
+// Return `UFBX_PROGRESS_CANCEL` to cancel further processing.
 typedef ufbx_progress_result ufbx_progress_fn(void *user, const ufbx_progress *progress);
 
 typedef struct ufbx_progress_cb {
