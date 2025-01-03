@@ -4185,7 +4185,7 @@ UFBX_ENUM_TYPE(ufbx_error_type, UFBX_ERROR_TYPE, UFBX_ERROR_DUPLICATE_OVERRIDE);
 // HINT: You can use `ufbx_format_error()` for formatting the error
 typedef struct ufbx_error {
 
-	// Type of the error, or `UFBX_ERROR_NONE` if succesful.
+	// Type of the error, or `UFBX_ERROR_NONE` if successful.
 	ufbx_error_type type;
 
 	// Description of the error type.
@@ -5259,7 +5259,7 @@ ufbx_abi ufbx_string ufbx_find_string(const ufbx_props *props, const char *name,
 ufbx_abi ufbx_blob ufbx_find_blob_len(const ufbx_props *props, const char *name, size_t name_len, ufbx_blob def);
 ufbx_abi ufbx_blob ufbx_find_blob(const ufbx_props *props, const char *name, ufbx_blob def);
 
-// Find property in `props` with concatendated `parts[num_parts]`.
+// Find property in `props` with concatenated `parts[num_parts]`.
 ufbx_abi ufbx_prop *ufbx_find_prop_concat(const ufbx_props *props, const ufbx_string *parts, size_t num_parts);
 
 // Get an element connected to a property.
