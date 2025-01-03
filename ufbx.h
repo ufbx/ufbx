@@ -4509,33 +4509,71 @@ typedef struct ufbx_baked_anim {
 } ufbx_baked_anim;
 
 // -- Thread API
-//
-// NOTE: This API is still experimental and may change.
-// Documentation is currently missing on purpose.
 
+// Internal thread pool handle.
+// Passed to `ufbx_thread_pool_run_task()` from an user thread to run ufbx tasks.
+// HINT: This context can store a user pointer via `ufbx_thread_pool_set_user_ptr()`.
 typedef uintptr_t ufbx_thread_pool_context;
 
+// Thread pool creation information from ufbx.
 typedef struct ufbx_thread_pool_info {
 	uint32_t max_concurrent_tasks;
 } ufbx_thread_pool_info;
 
+// Initialize the thread pool.
+// Return `true` on success.
 typedef bool ufbx_thread_pool_init_fn(void *user, ufbx_thread_pool_context ctx, const ufbx_thread_pool_info *info);
-typedef bool ufbx_thread_pool_run_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count);
-typedef bool ufbx_thread_pool_wait_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index);
+
+// Run tasks `count` tasks in threads.
+// You must call `ufbx_thread_pool_run_task()` with indices `[start_index, start_index + count)`.
+// The threads are launched in batches indicated by `group`, see `UFBX_THREAD_GROUP_COUNT` for more information.
+// Ideally, you should run all the task indices in parallel within each `ufbx_thread_pool_run_fn()` call.
+typedef void ufbx_thread_pool_run_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count);
+
+// Wait for previous tasks spawned in `ufbx_thread_pool_run_fn()` to finish.
+// `group` specifies the batch to wait for, `max_index` contains `start_index + count` from that group instance.
+typedef void ufbx_thread_pool_wait_fn(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index);
+
+// Free the thread pool.
 typedef void ufbx_thread_pool_free_fn(void *user, ufbx_thread_pool_context ctx);
 
+// Thread pool interface.
+// See functions above for more information.
+//
+// Hypothetical example of calls, where `UFBX_THREAD_GROUP_COUNT=2` for simplicity:
+//
+//   run_fn(group=0, start_index=0, count=4)   -> t0 := threaded { ufbx_thread_pool_run_task(0..3) }
+//   run_fn(group=1, start_index=4, count=10)  -> t1 := threaded { ufbx_thread_pool_run_task(4..10) }
+//   wait_fn(group=0, max_index=4)             -> wait_threads(t0)
+//   run_fn(group=0, start_index=10, count=15) -> t0 := threaded { ufbx_thread_pool_run_task(10..14) }
+//   wait_fn(group=1, max_index=10)            -> wait_threads(t1)
+//   wait_fn(group=0, max_index=15)            -> wait_threads(t0)
+//
 typedef struct ufbx_thread_pool {
-	ufbx_thread_pool_init_fn *init_fn;
-	ufbx_thread_pool_run_fn *run_fn;
-	ufbx_thread_pool_wait_fn *wait_fn;
-	ufbx_thread_pool_free_fn *free_fn;
+	ufbx_thread_pool_init_fn *init_fn; // < Optional
+	ufbx_thread_pool_run_fn *run_fn;   // < Required
+	ufbx_thread_pool_wait_fn *wait_fn; // < Required
+	ufbx_thread_pool_free_fn *free_fn; // < Optional
 	void *user;
 } ufbx_thread_pool;
 
+// Thread pool options.
 typedef struct ufbx_thread_opts {
+
+	// Thread pool interface.
+	// HINT: You can use `extra/ufbx_os.h` to provide a thread pool.
 	ufbx_thread_pool pool;
+
+	// Maximum of tasks to have in-flight.
+	// Default: 2048
 	size_t num_tasks;
+
+	// Maximum amount of memory to use for batched threaded processing.
+	// Default: 32MB
+	// NOTE: The actual used memory usage might be higher, if there are individual tasks
+	// that rqeuire a high amount of memory.
 	size_t memory_limit;
+
 } ufbx_thread_opts;
 
 // -- Main API
