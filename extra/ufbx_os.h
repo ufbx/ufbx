@@ -1073,7 +1073,7 @@ static bool ufbxos_ufbx_thread_pool_init(void *user, ufbx_thread_pool_context ct
 	return true;
 }
 
-static bool ufbxos_ufbx_thread_pool_run(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count)
+static void ufbxos_ufbx_thread_pool_run(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t start_index, uint32_t count)
 {
 	ufbx_os_thread_pool *pool = (ufbx_os_thread_pool*)user;
 	ufbxos_pool_ctx *up = (ufbxos_pool_ctx*)ufbx_thread_pool_get_user_ptr(ctx);
@@ -1082,11 +1082,9 @@ static bool ufbxos_ufbx_thread_pool_run(void *user, ufbx_thread_pool_context ctx
 	ug->start_index = start_index;
 	ug->ctx = ctx;
 	ug->task_id = ufbx_os_thread_pool_run(pool, &ufbxos_ufbx_task, ug, count);
-
-	return true;
 }
 
-static bool ufbxos_ufbx_thread_pool_wait(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index)
+static void ufbxos_ufbx_thread_pool_wait(void *user, ufbx_thread_pool_context ctx, uint32_t group, uint32_t max_index)
 {
 	(void)max_index;
 	ufbx_os_thread_pool *pool = (ufbx_os_thread_pool*)user;
@@ -1094,8 +1092,6 @@ static bool ufbxos_ufbx_thread_pool_wait(void *user, ufbx_thread_pool_context ct
 	ufbxos_pool_group *ug = &up->groups[group].group;
 
 	ufbx_os_thread_pool_wait(pool, ug->task_id);
-
-	return true;
 }
 
 static void ufbxos_ufbx_thread_pool_free(void *user, ufbx_thread_pool_context ctx)
