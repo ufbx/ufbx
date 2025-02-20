@@ -1871,3 +1871,13 @@ UFBXT_FILE_TEST(blender_suzanne_multimaterial_reorder)
 }
 #endif
 
+UFBXT_FILE_TEST(synthetic_embedded_base64)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "lambert1");
+	ufbxt_assert(material);
+
+	ufbxt_check_texture_content(scene, material->fbx.diffuse_color.texture, "tiny_clouds.png");
+}
+#endif
+
