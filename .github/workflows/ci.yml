@@ -292,7 +292,7 @@ jobs:
           python3 misc/analyze_symbols.py build/ufbx-static.syms --all-local
 
   ci_compat:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
