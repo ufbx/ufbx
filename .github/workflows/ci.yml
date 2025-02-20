@@ -34,7 +34,7 @@ jobs:
           path: build/hashes.txt
 
   ci_ubuntu:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v4
@@ -182,7 +182,7 @@ jobs:
           ./codecov --verbose upload-process --disable-search --fail-on-error --plugin noop -t ${{ secrets.CODECOV_TOKEN }} -n ci_no_assert-${{ github.run_id }} -F tests -f coverage.lcov
 
   ci_cpp:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - name: Update apt
@@ -336,7 +336,7 @@ jobs:
         run: python3 bindgen/ufbx_ir.py
 
   ci_exotic:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v4
