@@ -235,7 +235,7 @@ jobs:
         run: python misc/run_tests.py features --heavy --additional-compiler tcc --compiler tcc
 
   ci_analysis:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - name: Update apt
