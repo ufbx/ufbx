@@ -235,6 +235,132 @@ static size_t ufbxt_tokenize_line(char *buf, size_t buf_len, const char **tokens
 	return num_tokens;
 }
 
+typedef struct {
+	uint8_t chunk[64];
+	uint64_t len;
+	uint32_t a,b,c,d;
+} ufbxt_md5_ctx;
+
+static void ufbxt_md5_init(ufbxt_md5_ctx*v) {
+	v->len = 0;
+	v->a = 0x67452301u;
+	v->b = 0xEFCDAB89u;
+	v->c = 0x98BADCFEu;
+	v->d = 0x10325476u;
+}
+
+static void ufbxt_md5_step(ufbxt_md5_ctx *v)
+{
+	static const uint8_t s[64] = {
+		7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+		5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+		4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+		6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+	};
+	static const uint32_t k[64] = {
+		0xD76AA478u, 0xE8C7B756u, 0x242070DBu, 0xC1BDCEEEu,
+		0xF57C0FAFu, 0x4787C62Au, 0xA8304613u, 0xFD469501u,
+		0x698098D8u, 0x8B44F7AFu, 0xFFFF5BB1u, 0x895CD7BEu,
+		0x6B901122u, 0xFD987193u, 0xA679438Eu, 0x49B40821u,
+		0xF61E2562u, 0xC040B340u, 0x265E5A51u, 0xE9B6C7AAu,
+		0xD62F105Du, 0x02441453u, 0xD8A1E681u, 0xE7D3FBC8u,
+		0x21E1CDE6u, 0xC33707D6u, 0xF4D50D87u, 0x455A14EDu,
+		0xA9E3E905u, 0xFCEFA3F8u, 0x676F02D9u, 0x8D2A4C8Au,
+		0xFFFA3942u, 0x8771F681u, 0x6D9D6122u, 0xFDE5380Cu,
+		0xA4BEEA44u, 0x4BDECFA9u, 0xF6BB4B60u, 0xBEBFBC70u,
+		0x289B7EC6u, 0xEAA127FAu, 0xD4EF3085u, 0x04881D05u,
+		0xD9D4D039u, 0xE6DB99E5u, 0x1FA27CF8u, 0xC4AC5665u,
+		0xF4292244u, 0x432AFF97u, 0xAB9423A7u, 0xFC93A039u,
+		0x655B59C3u, 0x8F0CCC92u, 0xFFEFF47Du, 0x85845DD1u,
+		0x6FA87E4Fu, 0xFE2CE6E0u, 0xA3014314u, 0x4E0811A1u,
+		0xF7537E82u, 0xBD3AF235u, 0x2AD7D2BBu, 0xEB86D391u,
+	};
+	static const uint8_t g[64] = {
+		0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60,
+		4, 24, 44, 0, 20, 40, 60, 16, 36, 56, 12, 32, 52, 8, 28, 48,
+		20, 32, 44, 56, 4, 16, 28, 40, 52, 0, 12, 24, 36, 48, 60, 8,
+		0, 28, 56, 20, 48, 12, 40, 4, 32, 60, 24, 52, 16, 44, 8, 36,
+	};
+	uint32_t a = v->a, b = v->b, c = v->c, d = v->d;
+	for(uint32_t i = 0; i < 64; i++) {
+		uint32_t f = 0;
+		switch(i&0x30) {
+			case 0x00: f = (b&c)|(d&~b); break;
+			case 0x10: f = (b&d)|(c&~d); break;
+			case 0x20: f = b^c^d; break;
+			case 0x30: f = c^(b|~d); break;
+		}
+
+		f += a + k[i] + v -> chunk[g[i]] + (v -> chunk[g[i] + 1] << 8) + (v -> chunk[g[i] + 2] << 16) + (v -> chunk[g[i] + 3] << 24);
+		a = d; d = c; c = b;
+		b += (f << s[i]) | (f >> (32 - s[i]));
+	}
+	v->a += a; v->b += b; v->c += c; v->d += d;
+}
+
+static void ufbxt_md5_write(ufbxt_md5_ctx *v, const char *buf, size_t len)
+{
+	for (size_t i = 0; i < len; i++) {
+		v->chunk[v->len++ & 63] = buf[i];
+		if ((v->len & 63) == 0) {
+			ufbxt_md5_step(v);
+		}
+	}
+}
+
+static void ufbxt_md5_finish(ufbxt_md5_ctx *v, uint8_t *result)
+{
+	uint64_t n = v->len * 8;
+
+	uint8_t buf[8];
+	buf[0] = (uint8_t)(n >> 0x00); buf[1] = (uint8_t)(n >> 0x08); buf[2] = (uint8_t)(n >> 0x10); buf[3] = (uint8_t)(n >> 0x18);
+	buf[4] = (uint8_t)(n >> 0x20); buf[5] = (uint8_t)(n >> 0x28); buf[6] = (uint8_t)(n >> 0x30); buf[7] = (uint8_t)(n >> 0x38);
+	ufbxt_md5_write(v, "\x80", 1);
+
+	size_t offset = (size_t)v->len & 63;
+	memset(v->chunk + offset, 0, 64 - offset);
+
+	if(offset > 56) {
+		ufbxt_md5_step(v);
+		memset(v->chunk, 0, 56);
+	}
+	memcpy(v->chunk + 56, buf, 8);
+	ufbxt_md5_step(v);
+
+	result[0x0] = (uint8_t)(v->a); result[0x1] = (uint8_t)(v->a>>8); result[0x2] = (uint8_t)(v->a>>16); result[0x3] = (uint8_t)(v->a>>24);
+	result[0x4] = (uint8_t)(v->b); result[0x5] = (uint8_t)(v->b>>8); result[0x6] = (uint8_t)(v->b>>16); result[0x7] = (uint8_t)(v->b>>24);
+	result[0x8] = (uint8_t)(v->c); result[0x9] = (uint8_t)(v->c>>8); result[0xa] = (uint8_t)(v->c>>16); result[0xb] = (uint8_t)(v->c>>24);
+	result[0xc] = (uint8_t)(v->d); result[0xd] = (uint8_t)(v->d>>8); result[0xe] = (uint8_t)(v->d>>16); result[0xf] = (uint8_t)(v->d>>24);
+}
+
+static void ufbxt_md5(uint8_t result[16], const void *data, size_t length)
+{
+	ufbxt_md5_ctx ctx;
+	ufbxt_md5_init(&ctx);
+	ufbxt_md5_write(&ctx, (const char*)data, length);
+	ufbxt_md5_finish(&ctx, result);
+}
+
+static void ufbxt_to_hex(char *dst, size_t dst_len, uint8_t *src, size_t src_len)
+{
+	ufbxt_assert(dst_len >= src_len * 2 + 1);
+	static char hex_digits[] = "0123456789abcdef";
+	size_t di = 0;
+	for (size_t i = 0; i < src_len; i++) {
+		unsigned s = (unsigned)src[i];
+		dst[di++] = hex_digits[s >> 4];
+		dst[di++] = hex_digits[s & 0xf];
+	}
+	dst[di] = '\0';
+}
+
+static void ufbxt_md5_hex(char *result, size_t result_len, const void *data, size_t length)
+{
+	uint8_t hash[16];
+	ufbxt_md5(hash, data, length);
+	ufbxt_to_hex(result, result_len, hash, 16);
+}
+
 static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const char *filename)
 {
 	bool ok = true;
@@ -265,7 +391,7 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 
 	long version = 0;
 
-	const long current_version = 4;
+	const long current_version = 5;
 
 	int line = 0;
 	while (*spec != '\0') {
@@ -469,6 +595,24 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 						fprintf(stderr, "%s:%d: Material '%s' %s.%s expected content for the texture %s\n", filename, line,
 							material->name.data, dots[0], dots[1], tex_filename.data);
 						ok = false;
+					}
+
+					const char *hash = tokens[tok_start + 1];
+					if (*hash) {
+						if (map->texture->content.size == 0) {
+							fprintf(stderr, "%s:%d: Material '%s' %s.%s expected content for the texture %s, due to checksum\n", filename, line,
+								material->name.data, dots[0], dots[1], tex_filename.data);
+							ok = false;
+						} else {
+							char md5_hex[33];
+							ufbxt_md5_hex(md5_hex, sizeof(md5_hex), map->texture->content.data, map->texture->content.size);
+
+							if (strcmp(hash, md5_hex) != 0) {
+								fprintf(stderr, "%s:%d: Material '%s' %s.%s texture %s has incorrect MD5 checksum: %s (expected %s)\n", filename, line,
+									material->name.data, dots[0], dots[1], tex_filename.data, md5_hex, hash);
+								ok = false;
+							}
+						}
 					}
 				} else {
 					fprintf(stderr, "%s:%d: Material '%s' %s.%s missing texture, expected '%s'\n", filename, line,
