@@ -11454,7 +11454,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_maps(ufbxi_context *uc)
 
 // -- Reading the parsed data
 
-ufbxi_noinline static void ufbxi_decode_base64(char *dst, const char *src, size_t src_length)
+ufbxi_noinline static size_t ufbxi_decode_base64(char *dst, const char *src, size_t src_length)
 {
 	uint8_t table[256] = { 0 };
 	for (char c = 'A'; c <= 'Z'; c++) table[(size_t)c] = (uint8_t)(c - 'A');
@@ -11463,17 +11463,24 @@ ufbxi_noinline static void ufbxi_decode_base64(char *dst, const char *src, size_
 	table[(size_t)'+'] = 62;
 	table[(size_t)'/'] = 63;
 
+	char *p = dst;
 	for (size_t i = 0; i + 4 <= src_length; i += 4) {
+		char src_c = src[i + 2], src_d = src[i + 3];
 		uint32_t a = table[(size_t)(uint8_t)src[i + 0]];
 		uint32_t b = table[(size_t)(uint8_t)src[i + 1]];
-		uint32_t c = table[(size_t)(uint8_t)src[i + 2]];
-		uint32_t d = table[(size_t)(uint8_t)src[i + 3]];
+		uint32_t c = table[(size_t)(uint8_t)src_c];
+		uint32_t d = table[(size_t)(uint8_t)src_d];
 
-		dst[0] = (char)(uint8_t)(a << 2 | b >> 4);
-		dst[1] = (char)(uint8_t)(b << 4 | c >> 2);
-		dst[2] = (char)(uint8_t)(c << 6 | d);
-		dst += 3;
+		p[0] = (char)(uint8_t)(a << 2 | b >> 4);
+		p[1] = (char)(uint8_t)(b << 4 | c >> 2);
+		p[2] = (char)(uint8_t)(c << 6 | d);
+		if (ufbxi_unlikely(src_d == '=')) {
+			p += src_c == '=' ? 1 : 2;
+		} else {
+			p += 3;
+		}
 	}
+	return ufbxi_to_size(p - dst);
 }
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_embedded_blob(ufbxi_context *uc, ufbx_blob *dst_blob, ufbxi_node *node)
@@ -11505,16 +11512,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_embedded_blob(ufbxi_context
 
 		if (uc->from_ascii) {
 			if (content.length % 4 == 0) {
-				size_t padding = 0;
-				while (padding < 2 && padding < content.length && content.data[content.length - 1 - padding] == '=') {
-					padding++;
-				}
-
-				dst_blob->size = content.length / 4 * 3 - padding;
-				dst_blob->data = ufbxi_push(&uc->result, char, dst_blob->size + 3);
+				size_t capacity = content.length / 4 * 3 + 3;
+				dst_blob->data = ufbxi_push(&uc->result, char, capacity);
 				ufbxi_check(dst_blob->data);
 
-				ufbxi_decode_base64((char*)dst_blob->data, content.data, content.length);
+				dst_blob->size = ufbxi_decode_base64((char*)dst_blob->data, content.data, content.length);
+				ufbx_assert(dst_blob->size <= capacity);
 			}
 		} else {
 			dst_blob->data = content.data;
