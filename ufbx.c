@@ -10393,7 +10393,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 			} else if (arr_error) {
 				ufbxi_pop_size(&uc->tmp_stack, arr_elem_size, num_values, NULL, false);
 				num_values = 0;
-				arr_data = ufbxi_zero_size_buffer;
+				arr_data = (void*)ufbxi_zero_size_buffer;
 			} else {
 				arr_data = ufbxi_push_pop_size(arr_buf, &uc->tmp_stack, arr_elem_size, num_values);
 			}
