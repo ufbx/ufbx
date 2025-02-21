@@ -1,0 +1,252 @@
+; FBX 7.7.0 project file
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1004
+	FBXVersion: 7700
+	CreationTimeStamp:  {
+		Version: 1000
+		Year: 2025
+		Month: 2
+		Day: 21
+		Hour: 16
+		Minute: 33
+		Second: 16
+		Millisecond: 188
+	}
+	Creator: "FBX SDK/FBX Plugins version 2020.3"
+	OtherFlags:  {
+		TCDefinition: 127
+	}
+	SceneInfo: "SceneInfo::GlobalInfo", "UserData" {
+		Type: "UserData"
+		Version: 100
+		MetaData:  {
+			Version: 100
+			Title: ""
+			Subject: ""
+			Author: ""
+			Keywords: ""
+			Revision: ""
+			Comment: ""
+		}
+		Properties70:  {
+			P: "DocumentUrl", "KString", "Url", "", "D:\Dev\clean\ufbx\data\synthetic_base64_parse_7700_ascii.fbx"
+			P: "SrcDocumentUrl", "KString", "Url", "", "D:\Dev\clean\ufbx\data\synthetic_base64_parse_7700_ascii.fbx"
+			P: "Original", "Compound", "", ""
+			P: "Original|ApplicationVendor", "KString", "", "", "Autodesk"
+			P: "Original|ApplicationName", "KString", "", "", "Maya"
+			P: "Original|ApplicationVersion", "KString", "", "", "2023"
+			P: "Original|DateTime_GMT", "DateTime", "", "", "21/02/2025 14:33:16.186"
+			P: "Original|FileName", "KString", "", "", "D:\Dev\clean\ufbx\data\synthetic_base64_parse_7700_ascii.fbx"
+			P: "LastSaved", "Compound", "", ""
+			P: "LastSaved|ApplicationVendor", "KString", "", "", "Autodesk"
+			P: "LastSaved|ApplicationName", "KString", "", "", "Maya"
+			P: "LastSaved|ApplicationVersion", "KString", "", "", "2023"
+			P: "LastSaved|DateTime_GMT", "DateTime", "", "", "21/02/2025 14:33:16.186"
+			P: "Original|ApplicationActiveProject", "KString", "", "", "D:\Dev\clean\ufbx\data"
+		}
+	}
+}
+GlobalSettings:  {
+	Version: 1000
+	Properties70:  {
+		P: "UpAxis", "int", "Integer", "",1
+		P: "UpAxisSign", "int", "Integer", "",1
+		P: "FrontAxis", "int", "Integer", "",2
+		P: "FrontAxisSign", "int", "Integer", "",1
+		P: "CoordAxis", "int", "Integer", "",0
+		P: "CoordAxisSign", "int", "Integer", "",1
+		P: "OriginalUpAxis", "int", "Integer", "",1
+		P: "OriginalUpAxisSign", "int", "Integer", "",1
+		P: "UnitScaleFactor", "double", "Number", "",1
+		P: "OriginalUnitScaleFactor", "double", "Number", "",1
+		P: "AmbientColor", "ColorRGB", "Color", "",0,0,0
+		P: "DefaultCamera", "KString", "", "", "Producer Perspective"
+		P: "TimeMode", "enum", "", "",11
+		P: "TimeProtocol", "enum", "", "",2
+		P: "SnapOnFrameMode", "enum", "", "",0
+		P: "TimeSpanStart", "KTime", "Time", "",0
+		P: "TimeSpanStop", "KTime", "Time", "",192442325000
+		P: "CustomFrameRate", "double", "Number", "",-1
+		P: "TimeMarker", "Compound", "", ""
+		P: "CurrentTimeMarker", "int", "Integer", "",-1
+	}
+}
+
+; Documents Description
+;------------------------------------------------------------------
+
+Documents:  {
+	Count: 1
+	Document: 1822002628336, "", "Scene" {
+		Properties70:  {
+			P: "SourceObject", "object", "", ""
+			P: "ActiveAnimStackName", "KString", "", "", "Take 001"
+		}
+		RootNode: 0
+	}
+}
+
+; Document References
+;------------------------------------------------------------------
+
+References:  {
+}
+
+; Object definitions
+;------------------------------------------------------------------
+
+Definitions:  {
+	Version: 100
+	Count: 3
+	ObjectType: "GlobalSettings" {
+		Count: 1
+	}
+	ObjectType: "AnimationStack" {
+		Count: 1
+		PropertyTemplate: "FbxAnimStack" {
+			Properties70:  {
+				P: "Description", "KString", "", "", ""
+				P: "LocalStart", "KTime", "Time", "",0
+				P: "LocalStop", "KTime", "Time", "",0
+				P: "ReferenceStart", "KTime", "Time", "",0
+				P: "ReferenceStop", "KTime", "Time", "",0
+			}
+		}
+	}
+	ObjectType: "AnimationLayer" {
+		Count: 1
+		PropertyTemplate: "FbxAnimLayer" {
+			Properties70:  {
+				P: "Weight", "Number", "", "A",100
+				P: "Mute", "bool", "", "",0
+				P: "Solo", "bool", "", "",0
+				P: "Lock", "bool", "", "",0
+				P: "Color", "ColorRGB", "Color", "",0.8,0.8,0.8
+				P: "BlendMode", "enum", "", "",0
+				P: "RotationAccumulationMode", "enum", "", "",0
+				P: "ScaleAccumulationMode", "enum", "", "",0
+				P: "BlendModeBypass", "ULongLong", "", "",0
+			}
+		}
+	}
+}
+
+; Object properties
+;------------------------------------------------------------------
+
+Objects:  {
+	AnimationStack: 1820594424400, "AnimStack::Take 001", "" {
+		Properties70:  {
+			P: "LocalStop", "KTime", "Time", "",38488465000
+			P: "ReferenceStop", "KTime", "Time", "",38488465000
+		}
+	}
+	AnimationLayer: 1822006856880, "AnimLayer::BaseLayer", "" {
+	}
+	Video: 1000000000000, "Video::Hello", "Clip" {
+		Content: , "SGVsbG8gd29ybGQ="
+	}
+	Video: 1000000000001, "Video::Ufbx", "Clip" {
+		Content: , "SGVsbG8gdWZieA=="
+	}
+	Video: 1000000000002, "Video::World", "Clip" {
+		Content: , "SGVsbG8gd29ybGQh"
+	}
+	Video: 1000000000003, "Video::Empty", "Clip" {
+		Content: , ""
+	}
+
+	Video: 1100000000000, "Video::MidPad", "Clip" {
+		Content: , "SGVsb=8gd29ybGQh"
+	}
+	Video: 1100000000001, "Video::Len1", "Clip" {
+		Content: , "A"
+	}
+	Video: 1100000000002, "Video::Len2", "Clip" {
+		Content: , "AA"
+	}
+	Video: 1100000000003, "Video::Len3", "Clip" {
+		Content: , "AAA"
+	}
+	Video: 1100000000004, "Video::Len5", "Clip" {
+		Content: , "AAAAA"
+	}
+	Video: 1100000000005, "Video::BadChar", "Clip" {
+		Content: , "SGVsb?8gd29ybGQh"
+	}
+	Video: 1100000000006, "Video::BadCharEnd", "Clip" {
+		Content: , "SGVsbG8gd29ybGQ?"
+	}
+
+	Video: 1200000000000, "Video::Pad00", "Clip" {
+		Content: , "SGVsbG8gd29yAAAA"
+	}
+	Video: 1200000000001, "Video::Pad01", "Clip" {
+		Content: , "SGVsbG8gd29y=AAA"
+	}
+	Video: 1200000000002, "Video::Pad02", "Clip" {
+		Content: , "SGVsbG8gd29yA=AA"
+	}
+	Video: 1200000000003, "Video::Pad03", "Clip" {
+		Content: , "SGVsbG8gd29y==AA"
+	}
+	Video: 1200000000004, "Video::Pad04", "Clip" {
+		Content: , "SGVsbG8gd29yAA=A"
+	}
+	Video: 1200000000005, "Video::Pad05", "Clip" {
+		Content: , "SGVsbG8gd29y=A=A"
+	}
+	Video: 1200000000006, "Video::Pad06", "Clip" {
+		Content: , "SGVsbG8gd29yA==A"
+	}
+	Video: 1200000000007, "Video::Pad07", "Clip" {
+		Content: , "SGVsbG8gd29y===A"
+	}
+	Video: 1200000000008, "Video::Pad08", "Clip" {
+		Content: , "SGVsbG8gd29yAAA="
+	}
+	Video: 1200000000009, "Video::Pad09", "Clip" {
+		Content: , "SGVsbG8gd29y=AA="
+	}
+	Video: 1200000000010, "Video::Pad10", "Clip" {
+		Content: , "SGVsbG8gd29yA=A="
+	}
+	Video: 1200000000011, "Video::Pad11", "Clip" {
+		Content: , "SGVsbG8gd29y==A="
+	}
+	Video: 1200000000012, "Video::Pad12", "Clip" {
+		Content: , "SGVsbG8gd29yAA=="
+	}
+	Video: 1200000000013, "Video::Pad13", "Clip" {
+		Content: , "SGVsbG8gd29y=A=="
+	}
+	Video: 1100000000014, "Video::Pad14", "Clip" {
+		Content: , "SGVsbG8gd29yA==="
+	}
+	Video: 1100000000015, "Video::Pad15", "Clip" {
+		Content: , "SGVsbG8gd29y===="
+	}
+
+}
+
+; Object connections
+;------------------------------------------------------------------
+
+Connections:  {
+	
+	;AnimLayer::BaseLayer, AnimStack::Take 001
+	C: "OO",1822006856880,1820594424400
+}
+;Takes section
+;----------------------------------------------------
+
+Takes:  {
+	Current: "Take 001"
+	Take: "Take 001" {
+		FileName: "Take_001.tak"
+		LocalTime: 0,38488465000
+		ReferenceTime: 0,38488465000
+	}
+}

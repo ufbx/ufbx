@@ -3509,6 +3509,9 @@ typedef enum ufbx_warning_type UFBX_ENUM_REPR {
 	// HINT: You can use `ufbx_unicode_error_handling` to adjust behavior.
 	UFBX_WARNING_BAD_UNICODE,
 
+	// Invalid base64-encoded embedded content ignored.
+	UFBX_WARNING_BAD_BASE64_CONTENT,
+
 	// Non-node element connected to root.
 	UFBX_WARNING_BAD_ELEMENT_CONNECTED_TO_ROOT,
 
