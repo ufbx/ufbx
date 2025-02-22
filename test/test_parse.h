@@ -1805,3 +1805,60 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(maya_cube_threads, maya_cube, ufbxt_immediate_thr
 }
 #endif
 
+#if UFBXT_IMPL
+static void ufbxt_check_base64_len(ufbx_scene *scene, const char *name, const char *content, size_t length)
+{
+	ufbx_video *video = ufbx_as_video(ufbx_find_element(scene, UFBX_ELEMENT_VIDEO, name));
+	ufbxt_assert(video);
+
+	ufbxt_assert(video->content.size == length);
+	if (length > 0) {
+		ufbxt_assert(!memcmp(video->content.data, content, length));
+	}
+}
+static void ufbxt_check_base64(ufbx_scene *scene, const char *name, const char *content)
+{
+	ufbxt_check_base64_len(scene, name, content, content ? strlen(content) : 0);
+}
+static void ufbxt_check_base64_error(ufbx_scene *scene, const char *name)
+{
+	ufbxt_check_base64_len(scene, name, "", 0);
+	ufbxt_check_warning(scene, UFBX_WARNING_BAD_BASE64_CONTENT, UFBX_ELEMENT_VIDEO, name, 1, NULL);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_base64_parse)
+#if UFBXT_IMPL
+{
+	ufbxt_check_base64(scene, "Hello", "Hello world");
+	ufbxt_check_base64(scene, "Ufbx", "Hello ufbx");
+	ufbxt_check_base64(scene, "World", "Hello world!");
+	ufbxt_check_base64(scene, "Empty", "");
+
+	ufbxt_check_base64_error(scene, "MidPad");
+	ufbxt_check_base64_error(scene, "Len1");
+	ufbxt_check_base64_error(scene, "Len2");
+	ufbxt_check_base64_error(scene, "Len3");
+	ufbxt_check_base64_error(scene, "Len5");
+	ufbxt_check_base64_error(scene, "BadChar");
+	ufbxt_check_base64_error(scene, "BadCharEnd");
+
+	ufbxt_check_base64_len(scene, "Pad00", "Hello wor\0\0\0\0", 12);
+	ufbxt_check_base64_error(scene, "Pad01");
+	ufbxt_check_base64_error(scene, "Pad02");
+	ufbxt_check_base64_error(scene, "Pad03");
+	ufbxt_check_base64_error(scene, "Pad04");
+	ufbxt_check_base64_error(scene, "Pad05");
+	ufbxt_check_base64_error(scene, "Pad06");
+	ufbxt_check_base64_error(scene, "Pad07");
+	ufbxt_check_base64_len(scene, "Pad08", "Hello wor\0\0\0\0", 11);
+	ufbxt_check_base64_error(scene, "Pad09");
+	ufbxt_check_base64_error(scene, "Pad10");
+	ufbxt_check_base64_error(scene, "Pad11");
+	ufbxt_check_base64_len(scene, "Pad12", "Hello wor\0\0\0\0", 10);
+	ufbxt_check_base64_error(scene, "Pad13");
+	ufbxt_check_base64_error(scene, "Pad14");
+	ufbxt_check_base64_error(scene, "Pad15");
+}
+#endif
+

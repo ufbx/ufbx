@@ -379,6 +379,7 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 	size_t num_materials = 0;
 	size_t num_props = 0;
 	size_t num_display_layers = 0;
+	size_t num_selection_sets = 0;
 	size_t num_display_layer_nodes = 0;
 
 	double err_sum = 0.0;
@@ -391,7 +392,7 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 
 	long version = 0;
 
-	const long current_version = 5;
+	const long current_version = 6;
 
 	int line = 0;
 	while (*spec != '\0') {
@@ -509,6 +510,74 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 				num_display_layers++;
 			}
 
+			continue;
+		} else if (!strcmp(dots[0], "selection_set")) {
+			if (dots[1] && !strcmp(dots[1], "faces")) {
+				if (*tokens[1] == '\0') {
+					fprintf(stderr, "%s:%d: Expected node name for 'selection_set.faces'\n", filename, line);
+					ok = false;
+					continue;
+				}
+				int face_amount = atoi(tokens[2]);
+				if (face_amount <= 0) {
+					fprintf(stderr, "%s:%d: Expected a face amount for 'selection_set.faces'\n", filename, line);
+					ok = false;
+					continue;
+				}
+				int triangle_amount = atoi(tokens[3]);
+				if (triangle_amount <= 0) {
+					fprintf(stderr, "%s:%d: Expected a triangle amount for 'selection_set.faces'\n", filename, line);
+					ok = false;
+					continue;
+				}
+
+				ufbx_node *node = ufbx_find_node(scene, tokens[1]);
+				if (!node || !node->mesh) {
+					fprintf(stderr, "%s:%d: Could not find node '%s' with a mesh for 'selection_set.faces'\n", filename, line, tokens[1]);
+					ok = false;
+					continue;
+				}
+				ufbx_mesh *mesh = node->mesh;
+
+				ufbx_selection_node *sel_node = NULL;
+				for (size_t sel_i = 0; sel_i < scene->selection_nodes.count; sel_i++) {
+					ufbx_selection_node *sn = scene->selection_nodes.data[sel_i];
+					if (sn->target_node == node && sn->target_mesh == node->mesh) {
+						sel_node = sn;
+						break;
+					}
+				}
+				if (sel_node == NULL) {
+					fprintf(stderr, "%s:%d: Could not find selection node for '%s'\n", filename, line, node->name.data);
+					ok = false;
+					continue;
+				}
+
+				size_t triangle_count = 0;
+				for (size_t i = 0; i < sel_node->faces.count; i++) {
+					uint32_t face_ix = sel_node->faces.data[i];
+					ufbxt_assert(face_ix <= mesh->faces.count);
+					triangle_count += mesh->faces.data[face_ix].num_indices - 2;
+				}
+
+				if (sel_node->faces.count != (size_t)face_amount) {
+					fprintf(stderr, "%s:%d: Selection set for '%s' has the wrong amount of faces: %zu (expected %zu)\n", filename, line, node->name.data,
+						sel_node->faces.count, (size_t)face_amount);
+					ok = false;
+				}
+
+				if (triangle_count != (size_t)triangle_amount) {
+					fprintf(stderr, "%s:%d: Selection set for '%s' has the wrong amount of triangles: %zu (expected %zu)\n", filename, line, node->name.data,
+						triangle_count, (size_t)triangle_amount);
+					ok = false;
+				}
+
+			} else {
+				fprintf(stderr, "%s:%d: Unknown 'selection_set' specifier\n", filename, line);
+				ok = false;
+			}
+
+			num_selection_sets++;
 			continue;
 		}
 
@@ -783,6 +852,9 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 		printf("Checked %zu materials, %zu properties (error avg %.3g, max %.3g, %zu tests)\n", num_materials, num_props, avg, err_max, err_num);
 		if (num_display_layers > 0) {
 			printf(".. also %zu display layers with %zu nodes\n", num_display_layers, num_display_layer_nodes);
+		}
+		if (num_selection_sets > 0) {
+			printf(".. also %zu selection sets\n", num_selection_sets);
 		}
 	}
 

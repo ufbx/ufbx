@@ -81,10 +81,15 @@ UFBXT_FILE_TEST(synthetic_texture_split)
 
 	ufbxt_check_material_texture(scene, material->fbx.diffuse_color.texture, "checkerboard_diffuse.png", true);
 	ufbxt_check_material_texture(scene, material->fbx.specular_color.texture, "checkerboard_specular.png", true);
-	ufbxt_check_material_texture(scene, material->fbx.reflection_color.texture, "checkerboard_reflection.png", true);
-	ufbxt_check_material_texture(scene, material->fbx.transparency_color.texture, "checkerboard_transparency.png", true);
+	ufbxt_check_material_texture(scene, material->fbx.reflection_color.texture, "checkerboard_reflection.png", false);
+	ufbxt_check_material_texture(scene, material->fbx.transparency_color.texture, "checkerboard_transparency.png", false);
 	ufbxt_check_material_texture(scene, material->fbx.emission_color.texture, "checkerboard_emissive.png", true);
 	ufbxt_check_material_texture(scene, material->fbx.ambient_color.texture, "checkerboard_ambient.png", true);
+
+	if (scene->metadata.ascii) {
+		ufbxt_check_warning(scene, UFBX_WARNING_BAD_BASE64_CONTENT, UFBX_ELEMENT_VIDEO, "file2", 1, NULL);
+		ufbxt_check_warning(scene, UFBX_WARNING_BAD_BASE64_CONTENT, UFBX_ELEMENT_VIDEO, "file6", 1, NULL);
+	}
 }
 #endif
 
