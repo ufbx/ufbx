@@ -34,7 +34,7 @@ jobs:
           path: build/hashes.txt
 
   ci_ubuntu:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
       - name: Update apt
         run: sudo apt-get update
       - name: Install apt dependencies
-        run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm-11
+        run: sudo apt-get install -y gcc-multilib g++-multilib
       - name: Download reference hashes
         uses: actions/download-artifact@v4
         with:
