@@ -968,7 +968,7 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 	#define ufbxi_regression_assert(cond) (void)0
 #endif
 
-#if defined(UFBX_REGRESSION) || defined(UFBX_DEV)
+#if defined(UFBX_REGRESSION) || defined(UFBX_DEV) || defined(UFBX_UBSAN)
 	#define ufbxi_dev_assert(cond) ufbx_assert(cond)
 #else
 	#define ufbxi_dev_assert(cond) (void)0
@@ -1491,6 +1491,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 				digits = digits * 10 + (uint64_t)(c - '0');
 				num_digits++;
 				if (num_digits >= 18) {
+					ufbxi_dev_assert(num_digits < ufbxi_arraycount(ufbxi_pow5_tab));
 					ufbxi_bigint_mad(&big_mantissa, ufbxi_pow5_tab[num_digits] << num_digits, digits);
 					digits = 0;
 					num_digits = 0;
@@ -1553,6 +1554,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 		big_mantissa.length = (digits >> 32u) ? 2 : digits ? 1 : 0;
 		if (big_mantissa.length == 0) return negative ? -0.0 : 0.0;
 	} else {
+		ufbxi_dev_assert(num_digits < ufbxi_arraycount(ufbxi_pow5_tab));
 		ufbxi_bigint_mad(&big_mantissa, ufbxi_pow5_tab[num_digits] << num_digits, digits);
 	}
 
