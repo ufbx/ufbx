@@ -5198,6 +5198,7 @@ static const char ufbxi_Edges[] = "Edges";
 static const char ufbxi_EmissiveColor[] = "EmissiveColor";
 static const char ufbxi_Entry[] = "Entry";
 static const char ufbxi_FBXHeaderExtension[] = "FBXHeaderExtension";
+static const char ufbxi_FBXHeaderVersion[] = "FBXHeaderVersion";
 static const char ufbxi_FBXVersion[] = "FBXVersion";
 static const char ufbxi_FKEffector[] = "FKEffector";
 static const char ufbxi_FarPlane[] = "FarPlane";
@@ -5495,6 +5496,7 @@ static const ufbx_string ufbxi_strings[] = {
 	{ ufbxi_EmissiveColor, 13 },
 	{ ufbxi_Entry, 5 },
 	{ ufbxi_FBXHeaderExtension, 18 },
+	{ ufbxi_FBXHeaderVersion, 16 },
 	{ ufbxi_FBXVersion, 10 },
 	{ ufbxi_FKEffector, 10 },
 	{ ufbxi_FarPlane, 8 },
@@ -11746,7 +11748,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_scene_info(ufbxi_context *u
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_header_extension(ufbxi_context *uc)
 {
-	bool use_v7_ktime = true;
+	bool has_tc_definition = false;
+	int32_t tc_definition = 0;
+	int32_t header_version = 0;
 
 	for (;;) {
 		ufbxi_node *child;
@@ -11766,18 +11770,13 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_header_extension(ufbxi_cont
 			}
 		}
 
-		if (uc->version >= 7700 && child->name == ufbxi_OtherFlags) {
-			ufbxi_node *tc_def = ufbxi_find_child(child, ufbxi_TCDefinition);
-			if (tc_def) {
-				// When TCDefinition is present in 7700+ version, default to
-				// v8 ktime, unless the value is 127, which keeps v7.
-				use_v7_ktime = false;
-				int32_t value;
-				if (ufbxi_get_val1(tc_def, "I", &value)) {
-					if (value == 127) {
-						use_v7_ktime = true;
-					}
-				}
+		if (child->name == ufbxi_FBXHeaderVersion) {
+			ufbxi_ignore(ufbxi_get_val1(child, "I", &header_version));
+		}
+
+		if (child->name == ufbxi_OtherFlags) {
+			if (ufbxi_find_val1(child, ufbxi_TCDefinition, "I", &tc_definition)) {
+				has_tc_definition = true;
 			}
 		}
 
@@ -11787,8 +11786,12 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_header_extension(ufbxi_cont
 
 	}
 
-	if (uc->version >= 8000) {
-		use_v7_ktime = false;
+	// FBX 8000 will change the KTime units and the new units are opt-in currently via `TCDefinition`.
+	// `TCDefinition` seems be accounted in all versions, as long as `FBXHeaderVersion >= 1004`.
+	// The old KTime units are specified as the value `127` and all other values seem to use the new definition.
+	bool use_v7_ktime = uc->version < 8000;
+	if (header_version >= 1004 && has_tc_definition) {
+		use_v7_ktime = tc_definition == 127;
 	}
 
 	uc->ktime_sec = use_v7_ktime ? 46186158000 : 141120000;
