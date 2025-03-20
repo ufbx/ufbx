@@ -1862,3 +1862,52 @@ UFBXT_FILE_TEST(synthetic_base64_parse)
 }
 #endif
 
+#if UFBXT_IMPL
+static void ufbxt_check_tcdefinition(ufbx_scene *scene)
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim->layers.count == 1);
+	ufbx_anim_layer *layer = scene->anim->layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+	ufbxt_assert(anim_curve);
+
+	ufbxt_assert(anim_curve->keyframes.count == 2);
+	ufbxt_assert(anim_curve->keyframes.data[0].time == 0.0f);
+	ufbxt_assert(anim_curve->keyframes.data[1].time == 1.0f);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_tcdefinition_127)
+#if UFBXT_IMPL
+{
+	ufbxt_check_tcdefinition(scene);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_tcdefinition_0)
+#if UFBXT_IMPL
+{
+	ufbxt_check_tcdefinition(scene);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_tcdefinition_64)
+#if UFBXT_IMPL
+{
+	ufbxt_check_tcdefinition(scene);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_tcdefinition_0_old_header)
+#if UFBXT_IMPL
+{
+	ufbxt_check_tcdefinition(scene);
+}
+#endif
+
