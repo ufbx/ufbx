@@ -11788,7 +11788,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_header_extension(ufbxi_cont
 
 	// FBX 8000 will change the KTime units and the new units are opt-in currently via `TCDefinition`.
 	// `TCDefinition` seems be accounted in all versions, as long as `FBXHeaderVersion >= 1004`.
-	// The old `KTime` is specified as the value `127` and all other values seem to use the new definition.
+	// The old KTime units are specified as the value `127` and all other values seem to use the new definition.
 	bool use_v7_ktime = uc->version < 8000;
 	if (header_version >= 1004 && has_tc_definition) {
 		use_v7_ktime = tc_definition == 127;
