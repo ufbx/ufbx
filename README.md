@@ -1,6 +1,6 @@
 # ufbx [![CI](https://github.com/bqqbarbhg/ufbx/actions/workflows/ci.yml/badge.svg)](https://github.com/bqqbarbhg/ufbx/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/ufbx/ufbx/branch/master/graph/badge.svg)](https://codecov.io/gh/ufbx/ufbx)
 
-Single source file FBX file loader!
+Single source file FBX file loader?
 
 ```cpp
 ufbx_load_opts opts = { 0 }; // Optional, pass NULL for defaults
