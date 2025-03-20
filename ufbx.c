@@ -5307,6 +5307,7 @@ static const char ufbxi_OriginalUnitScaleFactor[] = "OriginalUnitScaleFactor";
 static const char ufbxi_OriginalUpAxis[] = "OriginalUpAxis";
 static const char ufbxi_OriginalUpAxisSign[] = "OriginalUpAxisSign";
 static const char ufbxi_OrthoZoom[] = "OrthoZoom";
+static const char ufbxi_OtherFlags[] = "OtherFlags";
 static const char ufbxi_OuterAngle[] = "OuterAngle";
 static const char ufbxi_PO[] = "PO\0";
 static const char ufbxi_PP[] = "PP\0";
@@ -5360,6 +5361,7 @@ static const char ufbxi_SpecularColor[] = "SpecularColor";
 static const char ufbxi_Step[] = "Step";
 static const char ufbxi_SubDeformer[] = "SubDeformer";
 static const char ufbxi_T[] = "T\0\0";
+static const char ufbxi_TCDefinition[] = "TCDefinition";
 static const char ufbxi_Take[] = "Take";
 static const char ufbxi_Takes[] = "Takes";
 static const char ufbxi_Tangents[] = "Tangents";
@@ -5602,6 +5604,7 @@ static const ufbx_string ufbxi_strings[] = {
 	{ ufbxi_OriginalUpAxis, 14 },
 	{ ufbxi_OriginalUpAxisSign, 18 },
 	{ ufbxi_OrthoZoom, 9 },
+	{ ufbxi_OtherFlags, 10 },
 	{ ufbxi_OuterAngle, 10 },
 	{ ufbxi_PO, 2 },
 	{ ufbxi_PP, 2 },
@@ -5655,6 +5658,7 @@ static const ufbx_string ufbxi_strings[] = {
 	{ ufbxi_Step, 4 },
 	{ ufbxi_SubDeformer, 11 },
 	{ ufbxi_T, 1 },
+	{ ufbxi_TCDefinition, 12 },
 	{ ufbxi_Take, 4 },
 	{ ufbxi_Takes, 5 },
 	{ ufbxi_Tangents, 8 },
@@ -11742,9 +11746,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_scene_info(ufbxi_context *u
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_header_extension(ufbxi_context *uc)
 {
-	// TODO: Read TCDefinition and adjust timestamps
-	uc->ktime_sec = 46186158000;
-	uc->ktime_sec_double = (double)uc->ktime_sec;
+	bool use_v7_ktime = true;
 
 	for (;;) {
 		ufbxi_node *child;
@@ -11764,11 +11766,33 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_header_extension(ufbxi_cont
 			}
 		}
 
+		if (uc->version >= 7700 && child->name == ufbxi_OtherFlags) {
+			ufbxi_node *tc_def = ufbxi_find_child(child, ufbxi_TCDefinition);
+			if (tc_def) {
+				// When TCDefinition is present in 7700+ version, default to
+				// v8 ktime, unless the value is 127, which keeps v7.
+				use_v7_ktime = false;
+				int32_t value;
+				if (ufbxi_get_val1(tc_def, "I", &value)) {
+					if (value == 127) {
+						use_v7_ktime = true;
+					}
+				}
+			}
+		}
+
 		if (child->name == ufbxi_SceneInfo) {
 			ufbxi_check(ufbxi_read_scene_info(uc, child));
 		}
 
 	}
+
+	if (uc->version >= 8000) {
+		use_v7_ktime = false;
+	}
+
+	uc->ktime_sec = use_v7_ktime ? 46186158000 : 141120000;
+	uc->ktime_sec_double = (double)uc->ktime_sec;
 
 	return 1;
 }
