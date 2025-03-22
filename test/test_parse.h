@@ -1928,7 +1928,7 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unsupported_cube, UFBXT_FILE_TEST_FLAG_ALLOW_WAR
 }
 #endif
 
-UFBXT_FILE_TEST_FLAGS(synthetic_unsupported_cube_error, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+UFBXT_FILE_TEST_FLAGS(synthetic_unsupported_cube_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(!scene);
