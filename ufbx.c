@@ -21731,6 +21731,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 		}
 	}
 
+	ufbxi_for_ptr_list(ufbx_anim_curve, p_curve, uc->scene.anim_curves) {
+		ufbx_anim_curve *curve = *p_curve;
+		if (curve->keyframes.count > 0) {
+			curve->min_time = curve->keyframes.data[0].time;
+			curve->max_time = curve->keyframes.data[curve->keyframes.count - 1].time;
+		}
+	}
+
 	ufbxi_for_ptr_list(ufbx_shader, p_shader, uc->scene.shaders) {
 		ufbx_shader *shader = *p_shader;
 		ufbxi_check(ufbxi_fetch_dst_elements(uc, &shader->bindings, &shader->element, false, false, NULL, UFBX_ELEMENT_SHADER_BINDING));
@@ -30164,6 +30172,11 @@ ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time
 		} else {
 			return default_value;
 		}
+	}
+
+	// TODO
+	if (time < curve->min_time) {
+	} else if (time > curve->max_time) {
 	}
 
 	size_t begin = 0;

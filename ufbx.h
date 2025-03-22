@@ -3141,6 +3141,26 @@ typedef enum ufbx_interpolation UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_interpolation, UFBX_INTERPOLATION, UFBX_INTERPOLATION_CUBIC);
 
+typedef enum ufbx_extrapolation_mode {
+	UFBX_EXTRAPOLATION_CONSTANT,        // < Use the value of the first/last keyframe
+	UFBX_EXTRAPOLATION_REPEAT,          // < Repeat the whole animation curve
+	UFBX_EXTRAPOLATION_MIRROR,          // < Repeat with mirroring
+	UFBX_EXTRAPOLATION_SLOPE,           // < Use the tangent of the last keyframe to linearly extrapolate
+	UFBX_EXTRAPOLATION_REPEAT_RELATIVE, // < Repeat the animation curve but connect the first and last keyframe values
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_EXTRAPOLATION)
+} ufbx_extrapolation_mode;
+
+UFBX_ENUM_TYPE(ufbxanim_extrapolation_mode, UFBX_EXTRAPOLATION, UFBX_EXTRAPOLATION_REPEAT_RELATIVE);
+
+typedef struct ufbx_extrapolation {
+	ufbx_extrapolation_mode mode;
+
+	// Count used for repeating modes.
+	// Negative values mean infinite repetition.
+	int32_t repeat_count;
+} ufbx_extrapolation;
+
 // Tangent vector at a keyframe, may be split into left/right
 typedef struct ufbx_tangent {
 	float dx; // < Derivative in the time axis
@@ -3177,10 +3197,21 @@ struct ufbx_anim_curve {
 		uint32_t typed_id;
 	}; };
 
+	// List of keyframes that define the curve.
 	ufbx_keyframe_list keyframes;
 
+	// Extrapolation before the curve.
+	ufbx_extrapolation extrapolation_before;
+	// Extrapolation after the curve.
+	ufbx_extrapolation extrapolation_after;
+
+	// Value range for all the keyframes.
 	ufbx_real min_value;
 	ufbx_real max_value;
+
+	// Time range for all the keyframes.
+	double min_time;
+	double max_time;
 };
 
 // -- Collections
