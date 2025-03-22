@@ -308,9 +308,11 @@ static void ufbxt_check_obj_index(ufbx_mesh *mesh, size_t index, int32_t v, int3
 
 #endif
 
-UFBXT_FILE_TEST(synthetic_partial_attrib)
+UFBXT_FILE_TEST_FLAGS(synthetic_partial_attrib, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
+	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, UFBX_ELEMENT_UNKNOWN, NULL, 60, NULL);
+
 	ufbx_node *node = ufbx_find_node(scene, "Mesh");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
@@ -375,9 +377,11 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_partial_attrib_strict, synthetic_partia
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_partial_attrib_face)
+UFBXT_FILE_TEST_FLAGS(synthetic_partial_attrib_face, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
+	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, UFBX_ELEMENT_UNKNOWN, NULL, 20, NULL);
+
 	ufbx_node *node = ufbx_find_node(scene, "Mesh");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
@@ -724,7 +728,7 @@ UFBXT_FILE_TEST_PATH(blender_331_space_texture, "blender_331_space texture")
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_obj_zoo)
+UFBXT_FILE_TEST_FLAGS(synthetic_obj_zoo, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbxt_check_warning(scene, UFBX_WARNING_UNKNOWN_OBJ_DIRECTIVE, UFBX_ELEMENT_UNKNOWN, NULL, 24, "Unknown .obj directive, skipped line");
@@ -1084,7 +1088,7 @@ static ufbx_load_opts ufbxt_search_mtl_by_filename_opts()
 }
 #endif
 
-UFBXT_FILE_TEST_OPTS_FLAGS(synthetic_filename_mtl, ufbxt_search_mtl_by_filename_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+UFBXT_FILE_TEST_OPTS_FLAGS(synthetic_filename_mtl, ufbxt_search_mtl_by_filename_opts, UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbxt_check_warning(scene, UFBX_WARNING_MISSING_EXTERNAL_FILE, UFBX_ELEMENT_UNKNOWN, NULL, 1, "materials.mtl");
@@ -1382,9 +1386,11 @@ UFBXT_FILE_TEST(synthetic_map_feature)
 }
 #endif
 
-UFBXT_FILE_TEST(blender_340_line_point)
+UFBXT_FILE_TEST_FLAGS(blender_340_line_point, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
+	ufbxt_assert(scene->metadata.has_warning[UFBX_WARNING_INDEX_CLAMPED]);
+
 	ufbx_node *node = ufbx_find_node(scene, "Cube");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;
@@ -1472,9 +1478,11 @@ UFBXT_FILE_TEST(synthetic_extended_points)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_empty_face)
+UFBXT_FILE_TEST_FLAGS(synthetic_empty_face, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
+	ufbxt_check_warning(scene, UFBX_WARNING_EMPTY_FACE_REMOVED, UFBX_ELEMENT_UNKNOWN, NULL, 1, NULL);
+
 	ufbx_node *node = ufbx_find_node(scene, "Object");
 	ufbxt_assert(node && node->mesh);
 	ufbx_mesh *mesh = node->mesh;

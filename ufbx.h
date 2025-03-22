@@ -267,7 +267,7 @@ struct ufbx_converter { };
 // `ufbx_source_version` contains the version of the corresponding source file.
 // HINT: The version can be compared numerically to the result of `ufbx_pack_version()`,
 // for example `#if UFBX_VERSION >= ufbx_pack_version(0, 12, 0)`.
-#define UFBX_HEADER_VERSION ufbx_pack_version(0, 17, 1)
+#define UFBX_HEADER_VERSION ufbx_pack_version(0, 18, 0)
 #define UFBX_VERSION UFBX_HEADER_VERSION
 
 // -- Basic types
@@ -3501,6 +3501,10 @@ typedef enum ufbx_warning_type UFBX_ENUM_REPR {
 	// Missing polygon mapping type.
 	UFBX_WARNING_MISSING_POLYGON_MAPPING,
 
+	// Unsupported version, loaded but may be incorrect.
+	// If the loading fails `UFBX_ERROR_UNSUPPORTED_VERSION` is issued instead.
+	UFBX_WARNING_UNSUPPORTED_VERSION,
+
 	// Out-of-bounds index has been clamped to be in-bounds.
 	// HINT: You can use `ufbx_index_error_handling` to adjust behavior.
 	UFBX_WARNING_INDEX_CLAMPED,
@@ -4179,10 +4183,14 @@ typedef enum ufbx_error_type UFBX_ENUM_REPR {
 	// Duplicated override property in `ufbx_create_anim()`
 	UFBX_ERROR_DUPLICATE_OVERRIDE,
 
+	// Unsupported file format version.
+	// ufbx still tries to load files with unsupported versions, see `UFBX_WARNING_UNSUPPORTED_VERSION`.
+	UFBX_ERROR_UNSUPPORTED_VERSION,
+
 	UFBX_ENUM_FORCE_WIDTH(UFBX_ERROR_TYPE)
 } ufbx_error_type;
 
-UFBX_ENUM_TYPE(ufbx_error_type, UFBX_ERROR_TYPE, UFBX_ERROR_DUPLICATE_OVERRIDE);
+UFBX_ENUM_TYPE(ufbx_error_type, UFBX_ERROR_TYPE, UFBX_ERROR_UNSUPPORTED_VERSION);
 
 // Error description with detailed stack trace
 // HINT: You can use `ufbx_format_error()` for formatting the error

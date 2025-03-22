@@ -757,9 +757,11 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_tangent_auto_bias_absolute_sign, UFBXT_FILE_
 }
 #endif
 
-UFBXT_FILE_TEST_FLAGS(motionbuilder_tangent_auto_bias_absolute_negative, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+UFBXT_FILE_TEST_FLAGS(motionbuilder_tangent_auto_bias_absolute_negative, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
+	ufbxt_assert(scene->metadata.has_warning[UFBX_WARNING_MISSING_GEOMETRY_DATA]);
+
 	// Curve evaluated values at 24fps
 	static const double values[] = {
 		0.000000, 11.652200, 16.689816, 16.484375, 12.407409, 5.830441, -1.874999, -9.337385, -15.185184,
