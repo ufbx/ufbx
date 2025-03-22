@@ -15562,11 +15562,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_root(ufbxi_context *uc)
 		ufbxi_check(ufbxi_parse_toplevel(uc, NULL));
 	}
 
-	// Warn about version if necessary
-	if (!ufbxi_supports_version(uc->version)) {
-		ufbxi_check(ufbxi_warnf(UFBX_WARNING_UNSUPPORTED_VERSION, "Unsupported FBX version (%u)", uc->version));
-	}
-
 	return 1;
 }
 
@@ -24710,6 +24705,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_load_imp(ufbxi_context *uc)
 		} else {
 			ufbxi_check(ufbxi_read_root(uc));
 		}
+		if (!ufbxi_supports_version(uc->version)) {
+			ufbxi_check(ufbxi_warnf(UFBX_WARNING_UNSUPPORTED_VERSION, "Unsupported FBX version (%u)", uc->version));
+		}
 		ufbxi_update_scene_metadata(&uc->scene.metadata);
 		ufbxi_check(ufbxi_init_file_paths(uc));
 	} else if (format == UFBX_FILE_FORMAT_OBJ) {
@@ -25017,11 +25015,11 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 		return &uc->scene_imp->scene;
 	} else {
 		ufbxi_fix_error_type(&uc->error, "Failed to load", p_error);
-		if (uc->error.type == UFBX_ERROR_UNKNOWN && uc->scene.metadata.file_format == UFBX_FILE_FORMAT_FBX && !ufbxi_supports_version(uc->version)) {
-			uc->error.description.data = "Unsupported version";
-			uc->error.description.length = strlen("Unsupported version");
-			uc->error.type = UFBX_ERROR_UNSUPPORTED_VERSION;
-			ufbxi_fmt_err_info(&uc->error, "%u", uc->version);
+		if (p_error && p_error->type == UFBX_ERROR_UNKNOWN && uc->scene.metadata.file_format == UFBX_FILE_FORMAT_FBX && !ufbxi_supports_version(uc->version)) {
+			p_error->description.data = "Unsupported version";
+			p_error->description.length = strlen("Unsupported version");
+			p_error->type = UFBX_ERROR_UNSUPPORTED_VERSION;
+			ufbxi_fmt_err_info(p_error, "%u", uc->version);
 		}
 		ufbxi_free_result(uc);
 		return NULL;

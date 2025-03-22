@@ -2548,7 +2548,7 @@ void ufbxt_do_fuzz(const char *base_name, void *data, size_t size, const char *f
 	}
 }
 
-const uint32_t ufbxt_file_versions[] = { 0, 1, 2, 3, 3000, 5000, 5800, 6100, 7100, 7200, 7300, 7400, 7500, 7700 };
+const uint32_t ufbxt_file_versions[] = { 0, 1, 2, 3, 2000, 3000, 5000, 5800, 6100, 7100, 7200, 7300, 7400, 7500, 7700, 8000 };
 
 typedef struct ufbxt_file_iterator {
 	// Input

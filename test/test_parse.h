@@ -1574,7 +1574,7 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_cube, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNI
 }
 #endif
 
-UFBXT_FILE_TEST_FLAGS(motionbuilder_thumbnail, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_ALLOW_FEWER_PROGRESS_CALLS|UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
+UFBXT_FILE_TEST_FLAGS(motionbuilder_thumbnail, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_ALLOW_FEWER_PROGRESS_CALLS)
 #if UFBXT_IMPL
 {
 	ufbx_thumbnail *thumbnail = &scene->metadata.thumbnail;
@@ -1913,3 +1913,28 @@ UFBXT_FILE_TEST(synthetic_tcdefinition_0_old_header)
 }
 #endif
 
+UFBXT_FILE_TEST_FLAGS(synthetic_unsupported_cube, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
+#if UFBXT_IMPL
+{
+	if (scene->metadata.version == 2000) {
+		ufbxt_assert(!scene->metadata.ascii);
+		ufbxt_check_warning(scene, UFBX_WARNING_UNSUPPORTED_VERSION, UFBX_ELEMENT_UNKNOWN, NULL, 1, "(2000)");
+	} else if (scene->metadata.version == 8000) {
+		ufbxt_assert(scene->metadata.ascii);
+		ufbxt_check_warning(scene, UFBX_WARNING_UNSUPPORTED_VERSION, UFBX_ELEMENT_UNKNOWN, NULL, 1, "(8000)");
+	} else {
+		ufbxt_assert(false);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_unsupported_cube_error, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!scene);
+	ufbxt_assert(!strcmp(load_error->description.data, "Unsupported version"));
+	ufbxt_assert(load_error->description.length == strlen(load_error->description.data));
+	ufbxt_assert(load_error->type == UFBX_ERROR_UNSUPPORTED_VERSION);
+	ufbxt_assert(!strcmp(load_error->info, "2000") || !strcmp(load_error->info, "8000"));
+}
+#endif
