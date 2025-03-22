@@ -72,7 +72,7 @@ UFBXT_FILE_TEST(maya_textured_cube)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_texture_split)
+UFBXT_FILE_TEST_FLAGS(synthetic_texture_split, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "phong1");

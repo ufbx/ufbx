@@ -2648,6 +2648,9 @@ typedef enum ufbxt_file_test_flags {
 	// Allow threaded parsing to fail
 	UFBXT_FILE_TEST_FLAG_ALLOW_THREAD_ERROR = 0x4000,
 
+	// Allow warnings
+	UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS = 0x8000,
+
 } ufbxt_file_test_flags;
 
 const char *ufbxt_file_formats[] = {
@@ -2860,6 +2863,20 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				ufbxt_check_scene(scene);
 				if ((flags & UFBXT_FILE_TEST_FLAG_ALLOW_FEWER_PROGRESS_CALLS) == 0) {
 					ufbxt_assert(progress_ctx.calls >= size / 0x4000 / 2);
+				}
+				if ((flags & UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS) == 0) {
+					for (size_t i = 0; i < scene->metadata.warnings.count; i++) {
+						ufbx_warning warning = scene->metadata.warnings.data[i];
+
+						if ((flags & UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE) != 0) {
+							if (warning.type == UFBX_WARNING_BAD_UNICODE) {
+								continue;
+							}
+						}
+
+						ufbxt_hintf("Unexpected warning: %s", warning.description.data);
+						ufbxt_assert(false);
+					}
 				}
 			} else if (!allow_error) {
 				ufbxt_log_error(&error);
