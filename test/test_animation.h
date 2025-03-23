@@ -3439,9 +3439,71 @@ UFBXT_FILE_TEST_ALT(bake_search_element, maya_anim_diffuse_curve)
 }
 #endif
 
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_ignore_animation_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.ignore_animation = true;
+	return opts;
+}
+#endif
+
 UFBXT_FILE_TEST(maya_anim_extrapolation)
 #if UFBXT_IMPL
 {
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *anim_layer = scene->anim_layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(anim_layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+	ufbxt_assert(anim_curve);
+
+	if (scene->metadata.version >= 7200) {
+		ufbxt_assert(anim_curve->pre_extrapolation.mode == UFBX_EXTRAPOLATION_REPEAT_RELATIVE);
+	} else {
+		ufbxt_assert(anim_curve->pre_extrapolation.mode == UFBX_EXTRAPOLATION_CONSTANT);
+	}
+	ufbxt_assert(anim_curve->pre_extrapolation.repeat_count == -1);
+	ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_REPEAT);
+	ufbxt_assert(anim_curve->post_extrapolation.repeat_count == -1);
+	ufbxt_assert(anim_curve->min_time == 1.0 / 24.0);
+	ufbxt_assert(anim_curve->max_time == 1.0);
+	ufbxt_assert(anim_curve->keyframes.count == 2);
 }
 #endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_anim_extrapolation_ignore, maya_anim_extrapolation, ufbxt_ignore_animation_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *anim_layer = scene->anim_layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(anim_layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	if (scene->metadata.version >= 7000) {
+		ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+		ufbxt_assert(anim_curve);
+
+		if (scene->metadata.version >= 7200) {
+			ufbxt_assert(anim_curve->pre_extrapolation.mode == UFBX_EXTRAPOLATION_REPEAT_RELATIVE);
+		} else {
+			ufbxt_assert(anim_curve->pre_extrapolation.mode == UFBX_EXTRAPOLATION_CONSTANT);
+		}
+		ufbxt_assert(anim_curve->pre_extrapolation.repeat_count == -1);
+		ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_REPEAT);
+		ufbxt_assert(anim_curve->post_extrapolation.repeat_count == -1);
+		ufbxt_assert(anim_curve->keyframes.count == 0);
+	}
+}
+#endif
+
 

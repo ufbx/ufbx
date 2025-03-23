@@ -3201,9 +3201,9 @@ struct ufbx_anim_curve {
 	ufbx_keyframe_list keyframes;
 
 	// Extrapolation before the curve.
-	ufbx_extrapolation extrapolation_before;
+	ufbx_extrapolation pre_extrapolation;
 	// Extrapolation after the curve.
-	ufbx_extrapolation extrapolation_after;
+	ufbx_extrapolation post_extrapolation;
 
 	// Value range for all the keyframes.
 	ufbx_real min_value;

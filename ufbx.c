@@ -5321,7 +5321,9 @@ static const char ufbxi_PolygonIndexArray[] = "PolygonIndexArray";
 static const char ufbxi_PolygonVertexIndex[] = "PolygonVertexIndex";
 static const char ufbxi_PoseNode[] = "PoseNode";
 static const char ufbxi_Pose[] = "Pose";
+static const char ufbxi_Post_Extrapolation[] = "Post-Extrapolation";
 static const char ufbxi_PostRotation[] = "PostRotation";
+static const char ufbxi_Pre_Extrapolation[] = "Pre-Extrapolation";
 static const char ufbxi_PreRotation[] = "PreRotation";
 static const char ufbxi_PreviewDivisionLevels[] = "PreviewDivisionLevels";
 static const char ufbxi_Properties60[] = "Properties60";
@@ -5334,6 +5336,7 @@ static const char ufbxi_ReferenceTime[] = "ReferenceTime";
 static const char ufbxi_RelativeFileName[] = "RelativeFileName";
 static const char ufbxi_RelativeFilename[] = "RelativeFilename";
 static const char ufbxi_RenderDivisionLevels[] = "RenderDivisionLevels";
+static const char ufbxi_Repetition[] = "Repetition";
 static const char ufbxi_RightCamera[] = "RightCamera";
 static const char ufbxi_RootNode[] = "RootNode";
 static const char ufbxi_Root[] = "Root";
@@ -5619,7 +5622,9 @@ static const ufbx_string ufbxi_strings[] = {
 	{ ufbxi_PolygonVertexIndex, 18 },
 	{ ufbxi_Pose, 4 },
 	{ ufbxi_PoseNode, 8 },
+	{ ufbxi_Post_Extrapolation, 18 },
 	{ ufbxi_PostRotation, 12 },
+	{ ufbxi_Pre_Extrapolation, 17 },
 	{ ufbxi_PreRotation, 11 },
 	{ ufbxi_PreviewDivisionLevels, 21 },
 	{ ufbxi_Properties60, 12 },
@@ -5632,6 +5637,7 @@ static const ufbx_string ufbxi_strings[] = {
 	{ ufbxi_RelativeFileName, 16 },
 	{ ufbxi_RelativeFilename, 16 },
 	{ ufbxi_RenderDivisionLevels, 20 },
+	{ ufbxi_Repetition, 10 },
 	{ ufbxi_RightCamera, 11 },
 	{ ufbxi_Root, 4 },
 	{ ufbxi_RootNode, 8 },
@@ -13964,10 +13970,41 @@ static void ufbxi_solve_tcb(float *p_slope_left, float *p_slope_right, double te
 	*p_slope_right = (float)(d10 * slope_left + d11 * slope_right);
 }
 
+ufbxi_noinline static void ufbxi_read_extrapolation(ufbx_extrapolation *p_extrapolation, ufbxi_node *node, const char *name)
+{
+	ufbxi_node *child = ufbxi_find_child(node, name);
+	ufbx_extrapolation_mode mode = UFBX_EXTRAPOLATION_CONSTANT;
+	int32_t repeat_count = -1;
+
+	if (child) {
+		int32_t mode_ch;
+		if (ufbxi_find_val1(child, ufbxi_Type, "I", &mode_ch)) {
+
+			switch (mode_ch) {
+			case 'A': mode = UFBX_EXTRAPOLATION_REPEAT_RELATIVE; break;
+			case 'C': mode = UFBX_EXTRAPOLATION_CONSTANT; break;
+			case 'R': mode = UFBX_EXTRAPOLATION_REPEAT; break;
+			default: /* Unknown */ break;
+			}
+			if (ufbxi_find_val1(child, ufbxi_Repetition, "I", &repeat_count)) {
+				if (repeat_count < 0) {
+					repeat_count = -1;
+				}
+			}
+		}
+	}
+
+	p_extrapolation->mode = mode;
+	p_extrapolation->repeat_count = repeat_count;
+}
+
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info)
 {
 	ufbx_anim_curve *curve = ufbxi_push_element(uc, info, ufbx_anim_curve, UFBX_ELEMENT_ANIM_CURVE);
 	ufbxi_check(curve);
+
+	ufbxi_read_extrapolation(&curve->pre_extrapolation, node, ufbxi_Pre_Extrapolation);
+	ufbxi_read_extrapolation(&curve->post_extrapolation, node, ufbxi_Post_Extrapolation);
 
 	if (uc->opts.ignore_animation) return 1;
 
@@ -15023,6 +15060,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 	ufbxi_check(curve);
 
 	ufbxi_check(ufbxi_connect_op(uc, curve_fbx_id, value_fbx_id, curve->name));
+
+	ufbxi_read_extrapolation(&curve->pre_extrapolation, node, ufbxi_Pre_Extrapolation);
+	ufbxi_read_extrapolation(&curve->post_extrapolation, node, ufbxi_Post_Extrapolation);
 
 	if (uc->opts.ignore_animation) return 1;
 
