@@ -272,7 +272,6 @@
 	#define ufbx_rint ufbxi_math_fn(rint)
 	#define ufbx_floor ufbxi_math_fn(floor)
 	#define ufbx_ceil ufbxi_math_fn(ceil)
-	#define ufbx_fmod ufbxi_math_fn(fmod)
 	#define ufbx_isnan ufbxi_math_fn(isnan)
 #endif
 
@@ -300,7 +299,6 @@ extern "C" {
 	ufbx_extern_abi double ufbx_rint(double x);
 	ufbx_extern_abi double ufbx_floor(double x);
 	ufbx_extern_abi double ufbx_ceil(double x);
-	ufbx_extern_abi double ufbx_fmod(double x, double y);
 	ufbx_extern_abi int ufbx_isnan(double x);
 #endif
 
