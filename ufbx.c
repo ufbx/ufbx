@@ -13984,6 +13984,7 @@ ufbxi_noinline static void ufbxi_read_extrapolation(ufbx_extrapolation *p_extrap
 			case 'A': mode = UFBX_EXTRAPOLATION_REPEAT_RELATIVE; break;
 			case 'C': mode = UFBX_EXTRAPOLATION_CONSTANT; break;
 			case 'K': mode = UFBX_EXTRAPOLATION_SLOPE; break;
+			case 'M': mode = UFBX_EXTRAPOLATION_MIRROR; break;
 			case 'R': mode = UFBX_EXTRAPOLATION_REPEAT; break;
 			default: /* Unknown */ break;
 			}
@@ -25469,7 +25470,8 @@ static ufbxi_noinline ufbx_real ufbxi_extrapolate_curve(const ufbx_anim_curve *c
 	}
 
 	if (ext.mode == UFBX_EXTRAPOLATION_MIRROR) {
-		if (ufbxi_f64_to_i64(rep_n) % 2 != 0) {
+		double rep_parity = rep_n*0.5 - ufbx_floor(rep_n*0.5);
+		if (rep_parity <= 0.25) {
 			rep_d = duration - rep_d;
 		}
 	}
