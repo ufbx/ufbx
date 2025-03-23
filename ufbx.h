@@ -3141,7 +3141,7 @@ typedef enum ufbx_interpolation UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_interpolation, UFBX_INTERPOLATION, UFBX_INTERPOLATION_CUBIC);
 
-typedef enum ufbx_extrapolation_mode {
+typedef enum ufbx_extrapolation_mode UFBX_ENUM_REPR {
 	UFBX_EXTRAPOLATION_CONSTANT,        // < Use the value of the first/last keyframe
 	UFBX_EXTRAPOLATION_REPEAT,          // < Repeat the whole animation curve
 	UFBX_EXTRAPOLATION_MIRROR,          // < Repeat with mirroring
