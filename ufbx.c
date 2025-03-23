@@ -30577,8 +30577,9 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform_flags(const ufbx_
 	}
 
 	uint32_t eval_flags = 0;
-	if (flags & UFBX_TRANSFORM_FLAG_NO_EXTRAPOLATION)
+	if (flags & UFBX_TRANSFORM_FLAG_NO_EXTRAPOLATION) {
 		eval_flags |= UFBX_EVALUATE_FLAG_NO_EXTRAPOLATION;
+	}
 
 	ufbx_prop buf[ufbxi_arraycount(ufbxi_transform_props_all)]; // ufbxi_uninit
 	ufbx_props props = ufbxi_evaluate_selected_props(anim, &node->element, time, buf, prop_names, num_prop_names, eval_flags);
