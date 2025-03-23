@@ -3497,9 +3497,9 @@ UFBXT_FILE_TEST(maya_anim_extrapolation)
 		{ 24, 10.0 },
 		{ 25, 0.055067 },
 		{ 37, 5.972713 },
-		{ 47, 0.0 },
-		{ 5820, 0.0 },
 		#if FLT_EVAL_METHOD == 0 // Too precise for x86
+			{ 47, 0.0 },
+			{ 5820, 0.0 },
 			{ 4459471, 0.0 },
 		#endif
 		{ 4459472, 0.055067 },
