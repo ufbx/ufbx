@@ -3438,3 +3438,10 @@ UFBXT_FILE_TEST_ALT(bake_search_element, maya_anim_diffuse_curve)
 	ufbx_free_baked_anim(bake);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_anim_extrapolation)
+#if UFBXT_IMPL
+{
+}
+#endif
+

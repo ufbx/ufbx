@@ -9552,7 +9552,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 	if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_') {
 		token->type = UFBXI_ASCII_BARE_WORD;
 		while ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-			|| (c >= '0' && c <= '9') || c == '_') {
+			|| (c >= '0' && c <= '9') || c == '_' || c == '-') {
 			ufbxi_check(ufbxi_ascii_push_token_char(uc, token, c));
 			c = ufbxi_ascii_next(uc);
 		}
