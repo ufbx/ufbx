@@ -25271,9 +25271,9 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 
 // Recursion limited by not calling `ufbx_evaluate_prop_len()` with a connected property,
 // meaning it will never call `ufbxi_evaluate_connected_prop()` again indirectly.
-static ufbxi_noinline void ufbxi_evaluate_connected_prop(ufbx_prop *prop, const ufbx_anim *anim, const ufbx_element *element, const char *name, double time)
-	ufbxi_recursive_function_void(ufbxi_evaluate_connected_prop, (prop, anim, element, name, time), 3,
-		(ufbx_prop *prop, const ufbx_anim *anim, const ufbx_element *element, const char *name, double time))
+static ufbxi_noinline void ufbxi_evaluate_connected_prop(ufbx_prop *prop, const ufbx_anim *anim, const ufbx_element *element, const char *name, double time, uint32_t flags)
+	ufbxi_recursive_function_void(ufbxi_evaluate_connected_prop, (prop, anim, element, name, time, flags), 3,
+		(ufbx_prop *prop, const ufbx_anim *anim, const ufbx_element *element, const char *name, double time, uint32_t flags))
 {
 	ufbx_connection *conn = ufbxi_find_prop_connection(element, name);
 
@@ -25285,7 +25285,7 @@ static ufbxi_noinline void ufbxi_evaluate_connected_prop(ufbx_prop *prop, const 
 
 	// Found a non-cyclic connection
 	if (conn && !ufbxi_find_prop_connection(conn->src, conn->src_prop.data)) {
-		ufbx_prop ep = ufbx_evaluate_prop_len(anim, conn->src, conn->src_prop.data, conn->src_prop.length, time);
+		ufbx_prop ep = ufbx_evaluate_prop_len_flags(anim, conn->src, conn->src_prop.data, conn->src_prop.length, time, flags);
 		prop->value_vec4 = ep.value_vec4;
 		prop->value_int = ep.value_int;
 		prop->value_str = ep.value_str;
@@ -25375,7 +25375,7 @@ static ufbxi_forceinline const ufbx_prop *ufbxi_next_prop(ufbxi_prop_iter *iter)
 	}
 }
 
-static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *props, const char *const *prop_names, size_t max_props)
+static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *props, const char *const *prop_names, size_t max_props, uint32_t flags)
 {
 	const char *name = prop_names[0];
 	uint32_t key = ufbxi_get_name_key_c(name);
@@ -25399,7 +25399,7 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 				if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim->ignore_connections) {
 					ufbx_prop *dst = &props[num_props++];
 					*dst = *prop;
-					ufbxi_evaluate_connected_prop(dst, anim, element, name, time);
+					ufbxi_evaluate_connected_prop(dst, anim, element, name, time, flags);
 				} else if ((prop->flags & (UFBX_PROP_FLAG_ANIMATED|UFBX_PROP_FLAG_OVERRIDDEN)) != 0) {
 					props[num_props++] = *prop;
 				}
@@ -30207,6 +30207,11 @@ ufbx_abi ufbxi_noinline ufbx_matrix ufbx_get_compatible_matrix_for_normals(const
 
 ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_real default_value)
 {
+	return ufbx_evaluate_curve_flags(curve, time, default_value, 0);
+}
+
+ufbx_abi ufbx_real ufbx_evaluate_curve_flags(const ufbx_anim_curve *curve, double time, ufbx_real default_value, uint32_t flags)
+{
 	if (!curve) return default_value;
 	if (curve->keyframes.count <= 1) {
 		if (curve->keyframes.count == 1) {
@@ -30290,16 +30295,26 @@ ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time
 
 ufbx_abi ufbxi_noinline ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, double time)
 {
+	return ufbx_evaluate_anim_value_real_flags(anim_value, time, 0);
+}
+
+ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, double time)
+{
+	return ufbx_evaluate_anim_value_vec3_flags(anim_value, time, 0);
+}
+
+ufbx_abi ufbxi_noinline ufbx_real ufbx_evaluate_anim_value_real_flags(const ufbx_anim_value *anim_value, double time, uint32_t flags)
+{
 	if (!anim_value) {
 		return 0.0f;
 	}
 
 	ufbx_real res = anim_value->default_value.x;
-	if (anim_value->curves[0]) res = ufbx_evaluate_curve(anim_value->curves[0], time, res);
+	if (anim_value->curves[0]) res = ufbx_evaluate_curve_flags(anim_value->curves[0], time, res, flags);
 	return res;
 }
 
-ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, double time)
+ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_evaluate_anim_value_vec3_flags(const ufbx_anim_value *anim_value, double time, uint32_t flags)
 {
 	if (!anim_value) {
 		ufbx_vec3 zero = { 0.0f };
@@ -30307,13 +30322,18 @@ ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_
 	}
 
 	ufbx_vec3 res = anim_value->default_value;
-	if (anim_value->curves[0]) res.x = ufbx_evaluate_curve(anim_value->curves[0], time, res.x);
-	if (anim_value->curves[1]) res.y = ufbx_evaluate_curve(anim_value->curves[1], time, res.y);
-	if (anim_value->curves[2]) res.z = ufbx_evaluate_curve(anim_value->curves[2], time, res.z);
+	if (anim_value->curves[0]) res.x = ufbx_evaluate_curve_flags(anim_value->curves[0], time, res.x, flags);
+	if (anim_value->curves[1]) res.y = ufbx_evaluate_curve_flags(anim_value->curves[1], time, res.y, flags);
+	if (anim_value->curves[2]) res.z = ufbx_evaluate_curve_flags(anim_value->curves[2], time, res.z, flags);
 	return res;
 }
 
 ufbx_abi ufbxi_noinline ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time)
+{
+	return ufbx_evaluate_prop_len_flags(anim, element, name, name_len, time, 0);
+}
+
+ufbx_abi ufbxi_noinline ufbx_prop ufbx_evaluate_prop_len_flags(const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time, uint32_t flags)
 {
 	ufbx_prop result;
 
@@ -30340,7 +30360,7 @@ ufbx_abi ufbxi_noinline ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, 
 	if ((result.flags & (UFBX_PROP_FLAG_ANIMATED|UFBX_PROP_FLAG_CONNECTED)) == 0) return result;
 
 	if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim->ignore_connections) {
-		ufbxi_evaluate_connected_prop(&result, anim, element, prop->name.data, time);
+		ufbxi_evaluate_connected_prop(&result, anim, element, prop->name.data, time, flags);
 	}
 
 	ufbxi_evaluate_props(anim, element, time, &result, 1);
@@ -30349,6 +30369,11 @@ ufbx_abi ufbxi_noinline ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, 
 }
 
 ufbx_abi ufbxi_noinline ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size)
+{
+	return ufbx_evaluate_props_flags(anim, element, time, buffer, buffer_size, 0);
+}
+
+ufbx_abi ufbxi_noinline ufbx_props ufbx_evaluate_props_flags(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size, uint32_t flags)
 {
 	ufbx_props ret = { NULL };
 	if (!element) return ret;
@@ -30365,7 +30390,7 @@ ufbx_abi ufbxi_noinline ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, co
 		*dst = *prop;
 
 		if ((prop->flags & UFBX_PROP_FLAG_CONNECTED) != 0 && !anim->ignore_connections) {
-			ufbxi_evaluate_connected_prop(dst, anim, element, prop->name.data, time);
+			ufbxi_evaluate_connected_prop(dst, anim, element, prop->name.data, time, flags);
 		}
 	}
 
@@ -30480,8 +30505,12 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform_flags(const ufbx_
 		}
 	}
 
+	uint32_t eval_flags = 0;
+	if (flags & UFBX_TRANSFORM_FLAG_NO_EXTRAPOLATION)
+		eval_flags |= UFBX_EVALUATE_FLAG_NO_EXTRAPOLATION;
+
 	ufbx_prop buf[ufbxi_arraycount(ufbxi_transform_props_all)]; // ufbxi_uninit
-	ufbx_props props = ufbxi_evaluate_selected_props(anim, &node->element, time, buf, prop_names, num_prop_names);
+	ufbx_props props = ufbxi_evaluate_selected_props(anim, &node->element, time, buf, prop_names, num_prop_names, eval_flags);
 	ufbx_rotation_order order = (ufbx_rotation_order)ufbxi_find_enum(&props, ufbxi_RotationOrder, UFBX_ROTATION_ORDER_XYZ, UFBX_ROTATION_ORDER_SPHERIC);
 
 	ufbx_transform transform; // ufbxi_uninit
@@ -30511,12 +30540,17 @@ ufbx_abi ufbxi_noinline ufbx_transform ufbx_evaluate_transform_flags(const ufbx_
 
 ufbx_abi ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time)
 {
+	return ufbx_evaluate_blend_weight_flags(anim, channel, time, 0);
+}
+
+ufbx_abi ufbx_real ufbx_evaluate_blend_weight_flags(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time, uint32_t flags)
+{
 	const char *prop_names[] = {
 		ufbxi_DeformPercent,
 	};
 
 	ufbx_prop buf[ufbxi_arraycount(prop_names)]; // ufbxi_uninit
-	ufbx_props props = ufbxi_evaluate_selected_props(anim, &channel->element, time, buf, prop_names, ufbxi_arraycount(prop_names));
+	ufbx_props props = ufbxi_evaluate_selected_props(anim, &channel->element, time, buf, prop_names, ufbxi_arraycount(prop_names), flags);
 	return ufbxi_find_real(&props, ufbxi_DeformPercent, channel->weight * (ufbx_real)100.0) * (ufbx_real)0.01;
 }
 
@@ -32430,6 +32464,7 @@ ufbx_abi ufbx_anim_stack *ufbx_find_anim_stack(const ufbx_scene *scene, const ch
 ufbx_abi ufbx_material *ufbx_find_material(const ufbx_scene *scene, const char *name) { return ufbx_find_material_len(scene, name, strlen(name)); }
 ufbx_abi ufbx_anim_prop *ufbx_find_anim_prop(const ufbx_anim_layer *layer, const ufbx_element *element, const char *prop) { return ufbx_find_anim_prop_len(layer, element, prop, strlen(prop)); }
 ufbx_abi ufbx_prop ufbx_evaluate_prop(const ufbx_anim *anim, const ufbx_element *element, const char *name, double time) { return ufbx_evaluate_prop_len(anim, element, name, strlen(name), time); }
+ufbx_abi ufbx_prop ufbx_evaluate_prop_flags(const ufbx_anim *anim, const ufbx_element *element, const char *name, double time, uint32_t flags) { return ufbx_evaluate_prop_len_flags(anim, element, name, strlen(name), time, flags); }
 ufbx_abi ufbx_texture *ufbx_find_prop_texture(const ufbx_material *material, const char *name) { return ufbx_find_prop_texture_len(material, name, strlen(name)); }
 ufbx_abi ufbx_string ufbx_find_shader_prop(const ufbx_shader *shader, const char *name) { return ufbx_find_shader_prop_len(shader, name, strlen(name)); }
 ufbx_abi ufbx_shader_prop_binding_list ufbx_find_shader_prop_bindings(const ufbx_shader *shader, const char *name) { return ufbx_find_shader_prop_bindings_len(shader, name, strlen(name)); }
