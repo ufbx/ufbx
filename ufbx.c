@@ -25445,6 +25445,8 @@ static ufbxi_noinline ufbx_real ufbxi_extrapolate_curve(const ufbx_anim_curve *c
 	} else if (ext.mode == UFBX_EXTRAPOLATION_SLOPE) {
 		ufbx_tangent tangent = *(pre ? &key->right : &key->left);
 		return key->value + tangent.dy * ((real_time - key->time) / tangent.dx);
+	} else if (ext.repeat_count == 0) {
+		return key->value;
 	}
 
 	// Perform all operations in KTime ticks to be frame perfect
@@ -25463,10 +25465,10 @@ static ufbxi_noinline ufbx_real ufbxi_extrapolate_curve(const ufbx_anim_curve *c
 	double rep_n = ufbx_floor(rep);
 	double rep_d = delta - rep_n * duration;
 
-	if (ext.repeat_count >= 0 && rep_n >= (double)ext.repeat_count) {
+	if (ext.repeat_count > 0 && rep_n >= (double)ext.repeat_count) {
 		// Clamp to the repeat count to handle mirroring
-		rep_n = (double)ext.repeat_count;
-		rep_d = 0.0;
+		rep_n = (double)(ext.repeat_count - 1);
+		rep_d = duration;
 	}
 
 	if (ext.mode == UFBX_EXTRAPOLATION_MIRROR) {
