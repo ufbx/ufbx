@@ -3461,7 +3461,6 @@ static void ufbxt_assert_close_extrapolation(ufbxt_diff_error *p_err, ufbx_real 
 
 	ufbx_real threshold = (ufbx_real)fmin(abs_error, rel_error);
 	ufbxt_assert_close_real_threshold(p_err, value, ref, threshold);
-	ufbxt_assert_close_real_threshold(p_err, value, ref, threshold);
 }
 #endif
 
@@ -3516,6 +3515,7 @@ UFBXT_FILE_TEST(maya_anim_extrapolation)
 	};
 
 	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		ufbxt_hintf("i=%zu", i);
 		int ref_frame = refs[i].frame;
 		ufbx_real ref_value = (ufbx_real)refs[i].value;
 
@@ -3598,6 +3598,7 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_slope, UFBXT_FILE_TEST_FLAG_AL
 	};
 
 	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		ufbxt_hintf("i=%zu", i);
 		int ref_frame = refs[i].frame;
 		ufbx_real ref_value = (ufbx_real)refs[i].value;
 
@@ -3659,6 +3660,7 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_mirror, UFBXT_FILE_TEST_FLAG_A
 	};
 
 	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		ufbxt_hintf("i=%zu", i);
 		int ref_frame = refs[i].frame;
 		ufbx_real ref_value = (ufbx_real)refs[i].value;
 
@@ -3717,6 +3719,7 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_mirror_count, UFBXT_FILE_TEST_
 	};
 
 	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		ufbxt_hintf("i=%zu", i);
 		int ref_frame = refs[i].frame;
 		ufbx_real ref_value = (ufbx_real)refs[i].value;
 
@@ -3773,6 +3776,7 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_repeat_count, UFBXT_FILE_TEST_
 	};
 
 	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		ufbxt_hintf("i=%zu", i);
 		int ref_frame = refs[i].frame;
 		ufbx_real ref_value = (ufbx_real)refs[i].value;
 
@@ -3834,6 +3838,7 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_relative_count, UFBXT_FILE_TES
 	};
 
 	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		ufbxt_hintf("i=%zu", i);
 		int ref_frame = refs[i].frame;
 		ufbx_real ref_value = (ufbx_real)refs[i].value;
 
