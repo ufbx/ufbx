@@ -13983,6 +13983,7 @@ ufbxi_noinline static void ufbxi_read_extrapolation(ufbx_extrapolation *p_extrap
 			switch (mode_ch) {
 			case 'A': mode = UFBX_EXTRAPOLATION_REPEAT_RELATIVE; break;
 			case 'C': mode = UFBX_EXTRAPOLATION_CONSTANT; break;
+			case 'K': mode = UFBX_EXTRAPOLATION_SLOPE; break;
 			case 'R': mode = UFBX_EXTRAPOLATION_REPEAT; break;
 			default: /* Unknown */ break;
 			}
