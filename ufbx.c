@@ -25427,7 +25427,10 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 	return prop_list;
 }
 
+// Recursion limited by not calling `ufbx_evaluate_curve()` with `UFBX_EVALUATE_FLAG_NO_EXTRAPOLATION`.
 static ufbxi_noinline ufbx_real ufbxi_extrapolate_curve(const ufbx_anim_curve *curve, double real_time, uint32_t flags)
+	ufbxi_recursive_function(ufbx_real, ufbxi_extrapolate_curve, (curve, real_time, flags), 3,
+		(const ufbx_anim_curve *curve, double real_time, uint32_t flags))
 {
 	bool pre = real_time < curve->min_time;
 	const ufbx_keyframe *key;
