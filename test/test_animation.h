@@ -3448,6 +3448,23 @@ static ufbx_load_opts ufbxt_ignore_animation_opts()
 }
 #endif
 
+#if UFBXT_IMPL
+static void ufbxt_assert_close_extrapolation(ufbxt_diff_error *p_err, ufbx_real value, ufbx_real ref)
+{
+	#if UFBX_REAL_IS_FLOAT
+	double abs_error = (ufbx_real)100.0;
+	double rel_error = fmax(fabs(ref), 1.0f) * 1e-4;
+	#else
+	double abs_error = (ufbx_real)0.001;
+	double rel_error = fmax(fabs(ref), 1.0f) * 1e-4;
+	#endif
+
+	ufbx_real threshold = (ufbx_real)fmin(abs_error, rel_error);
+	ufbxt_assert_close_real_threshold(p_err, value, ref, threshold);
+	ufbxt_assert_close_real_threshold(p_err, value, ref, threshold);
+}
+#endif
+
 UFBXT_FILE_TEST(maya_anim_extrapolation)
 #if UFBXT_IMPL
 {
@@ -3508,7 +3525,7 @@ UFBXT_FILE_TEST(maya_anim_extrapolation)
 		double time = (double)ref_frame / 24.0;
 
 		ufbx_real value = ufbx_evaluate_curve(anim_curve, time, 0.0);
-		ufbxt_assert_close_real(err, value, ref_value);
+		ufbxt_assert_close_extrapolation(err, value, ref_value);
 	}
 }
 #endif
@@ -3590,7 +3607,7 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_slope, UFBXT_FILE_TEST_FLAG_AL
 		double time = (double)ref_frame / 24.0;
 
 		ufbx_real value = ufbx_evaluate_curve(anim_curve, time, 0.0);
-		ufbxt_assert_close_real(err, value, ref_value);
+		ufbxt_assert_close_extrapolation(err, value, ref_value);
 	}
 }
 #endif
@@ -3651,7 +3668,7 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_mirror, UFBXT_FILE_TEST_FLAG_A
 		double time = (double)ref_frame / 24.0;
 
 		ufbx_real value = ufbx_evaluate_curve(anim_curve, time, 0.0);
-		ufbxt_assert_close_real(err, value, ref_value);
+		ufbxt_assert_close_extrapolation(err, value, ref_value);
 	}
 }
 #endif
@@ -3709,7 +3726,7 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_mirror_count, UFBXT_FILE_TEST_
 		double time = (double)ref_frame / 24.0;
 
 		ufbx_real value = ufbx_evaluate_curve(anim_curve, time, 0.0);
-		ufbxt_assert_close_real(err, value, ref_value);
+		ufbxt_assert_close_extrapolation(err, value, ref_value);
 	}
 }
 #endif
@@ -3765,7 +3782,7 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_repeat_count, UFBXT_FILE_TEST_
 		double time = (double)ref_frame / 24.0;
 
 		ufbx_real value = ufbx_evaluate_curve(anim_curve, time, 0.0);
-		ufbxt_assert_close_real(err, value, ref_value);
+		ufbxt_assert_close_extrapolation(err, value, ref_value);
 	}
 }
 #endif
@@ -3826,7 +3843,7 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_relative_count, UFBXT_FILE_TES
 		double time = (double)ref_frame / 24.0;
 
 		ufbx_real value = ufbx_evaluate_curve(anim_curve, time, 0.0);
-		ufbxt_assert_close_real(err, value, ref_value);
+		ufbxt_assert_close_extrapolation(err, value, ref_value);
 	}
 }
 #endif

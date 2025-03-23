@@ -25447,7 +25447,7 @@ static ufbxi_noinline ufbx_real ufbxi_extrapolate_curve(const ufbx_anim_curve *c
 		return key->value;
 	} else if (ext.mode == UFBX_EXTRAPOLATION_SLOPE) {
 		ufbx_tangent tangent = *(pre ? &key->right : &key->left);
-		return key->value + tangent.dy * ((real_time - key->time) / tangent.dx);
+		return key->value + (ufbx_real)(tangent.dy * ((real_time - key->time) / tangent.dx));
 	} else if (ext.repeat_count == 0) {
 		return key->value;
 	}
