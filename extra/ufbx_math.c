@@ -2088,8 +2088,8 @@ ufbx_math_abi double ufbx_fmod(double x, double y)
 	hy &= 0x7fffffff;	/* |y| */
 	
 	/* purge off exception values */
-	if((hy|ly)==0||(hx>=0x7ff00000)||	/* y=0,or x not finite */
-	((hy|((ly|(ufbxm_uint)-(ufbxm_int)ly)>>31))>0x7ff00000))	/* or y is NaN */
+	if(((ufbxm_uint)hy|ly)==0||(hx>=0x7ff00000)||	/* y=0,or x not finite */
+	(((ufbxm_uint)hy|((ly|(ufbxm_uint)-(ufbxm_int)ly)>>31))>0x7ff00000u))	/* or y is NaN */
 	return (x*y)/(x*y);
 	if(hx<=hy) {
 		if((hx<hy)||(lx<ly)) return x;	/* |x|<|y| return x */
@@ -2100,7 +2100,7 @@ ufbx_math_abi double ufbx_fmod(double x, double y)
 	/* determine ix = ilogb(x) */
 	if(hx<0x00100000) {	/* subnormal x */
 		if(hx==0) {
-			for (ix = -1043, i=lx; i>0; i<<=1) ix -=1;
+			for (ix = -1043, i=(ufbxm_int)lx; i>0; i<<=1) ix -=1;
 		} else {
 			for (ix = -1022,i=(hx<<11); i>0; i<<=1) ix -=1;
 		}
@@ -2109,7 +2109,7 @@ ufbx_math_abi double ufbx_fmod(double x, double y)
 	/* determine iy = ilogb(y) */
 	if(hy<0x00100000) {	/* subnormal y */
 		if(hy==0) {
-			for (iy = -1043, i=ly; i>0; i<<=1) iy -=1;
+			for (iy = -1043, i=(ufbxm_int)ly; i>0; i<<=1) iy -=1;
 		} else {
 			for (iy = -1022,i=(hy<<11); i>0; i<<=1) iy -=1;
 		}
@@ -2121,10 +2121,10 @@ ufbx_math_abi double ufbx_fmod(double x, double y)
 	else {		/* subnormal x, shift x to normal */
 		n = -1022-ix;
 		if(n<=31) {
-			hx = (hx<<n)|(lx>>(32-n));
+			hx = (hx<<n)|(ufbxm_int)(lx>>(32-n));
 			lx <<= n;
 		} else {
-			hx = lx<<(n-32);
+			hx = (ufbxm_int)(lx<<(n-32));
 			lx = 0;
 		}
 	}
@@ -2133,10 +2133,10 @@ ufbx_math_abi double ufbx_fmod(double x, double y)
 	else {		/* subnormal y, shift y to normal */
 		n = -1022-iy;
 		if(n<=31) {
-			hy = (hy<<n)|(ly>>(32-n));
+			hy = (hy<<n)|(ufbxm_int)(ly>>(32-n));
 			ly <<= n;
 		} else {
-			hy = ly<<(n-32);
+			hy = (ufbxm_int)(ly<<(n-32));
 			ly = 0;
 		}
 	}
@@ -2145,21 +2145,21 @@ ufbx_math_abi double ufbx_fmod(double x, double y)
 	n = ix - iy;
 	while(n--) {
 		hz=hx-hy;lz=lx-ly; if(lx<ly) hz -= 1;
-		if(hz<0){hx = hx+hx+(lx>>31); lx = lx+lx;}
+		if(hz<0){hx = hx+hx+(ufbxm_int)(lx>>31); lx = lx+lx;}
 		else {
-			if((hz|lz)==0) 		/* return sign(x)*0 */
+			if(((ufbxm_uint)hz|lz)==0) 		/* return sign(x)*0 */
 			return zero[(unsigned)sx>>31];
-			hx = hz+hz+(lz>>31); lx = lz+lz;
+			hx = hz+hz+(ufbxm_int)(lz>>31); lx = lz+lz;
 		}
 	}
 	hz=hx-hy;lz=lx-ly; if(lx<ly) hz -= 1;
 	if(hz>=0) {hx=hz;lx=lz;}
 	
 	/* convert back to floating value and restore the sign */
-	if((hx|lx)==0) 			/* return sign(x)*0 */
+	if(((ufbxm_uint)hx|lx)==0) 			/* return sign(x)*0 */
 	return zero[(unsigned)sx>>31];	
 	while(hx<0x00100000) {		/* normalize x */
-		hx = hx+hx+(lx>>31); lx = lx+lx;
+		hx = hx+hx+(ufbxm_int)(lx>>31); lx = lx+lx;
 		iy -= 1;
 	}
 	if(iy>= -1022) {	/* normalize output */
@@ -2171,9 +2171,9 @@ ufbx_math_abi double ufbx_fmod(double x, double y)
 			lx = (lx>>n)|((unsigned)hx<<(32-n));
 			hx >>= n;
 		} else if (n<=31) {
-			lx = (hx<<(32-n))|(lx>>n); hx = sx;
+			lx = (ufbxm_uint)(hx<<(32-n))|(lx>>n); hx = sx;
 		} else {
-			lx = hx>>(n-32); hx = sx;
+			lx = (ufbxm_uint)(hx>>(n-32)); hx = sx;
 		}
 		x = ufbxm_from_bits(hx|sx, lx);
 		x *= one;		/* create necessary signal */
