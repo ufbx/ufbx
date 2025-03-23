@@ -3151,7 +3151,7 @@ typedef enum ufbx_extrapolation_mode UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_EXTRAPOLATION)
 } ufbx_extrapolation_mode;
 
-UFBX_ENUM_TYPE(ufbx_extrapolation_mode, UFBX_EXTRAPOLATION, UFBX_EXTRAPOLATION_REPEAT_RELATIVE);
+UFBX_ENUM_TYPE(ufbx_extrapolation_mode, UFBX_EXTRAPOLATION_MODE, UFBX_EXTRAPOLATION_REPEAT_RELATIVE);
 
 typedef struct ufbx_extrapolation {
 	ufbx_extrapolation_mode mode;
