@@ -16,11 +16,11 @@
  */
 
 #ifndef ufbx_math_abi
-    #if defined(UFBX_STATIC)
-        #define ufbx_math_abi static
-    #else
-        #define ufbx_math_abi
-    #endif
+	#if defined(UFBX_STATIC)
+		#define ufbx_math_abi static
+	#else
+		#define ufbx_math_abi
+	#endif
 #endif
 
 #if !defined(UFBX_STANDARD_C) && !defined(UFBX_MATH_NO_INTRINSICS)
@@ -1941,6 +1941,52 @@ ufbx_math_abi double ufbx_nextafter(double x, double y)
 	return ufbxm_from_bits(hx, lx);
 }
 
+double ufbx_floor(double x)
+{
+	static const double huge = 1.0e300;
+	
+	ufbxm_int i0,i1,j0;
+	ufbxm_uint i,j;
+	ufbxm_bits xb = ufbxm_to_bits(x);
+	i0 = xb.hi;
+	i1 = (ufbxm_int)xb.lo;
+	j0 = ((i0>>20)&0x7ff)-0x3ff;
+	if(j0<20) {
+		if(j0<0) { 	/* raise inexact if x != 0 */
+			if(huge+x>0.0) {/* return 0*sign(x) if |x|<1 */
+				if(i0>=0) {i0=i1=0;} 
+				else if(((i0&0x7fffffff)|i1)!=0)
+				{ i0=0xbff00000;i1=0;}
+			}
+		} else {
+			i = (0x000fffff)>>j0;
+			if(((i0&i)|i1)==0) return x; /* x is integral */
+			if(huge+x>0.0) {	/* raise inexact flag */
+				if(i0<0) i0 += (0x00100000)>>j0;
+				i0 &= (~i); i1=0;
+			}
+		}
+	} else if (j0>51) {
+		if(j0==0x400) return x+x;	/* inf or NaN */
+		else return x;		/* x is integral */
+	} else {
+		i = ((unsigned)(0xffffffff))>>(j0-20);
+		if((i1&i)==0) return x;	/* x is integral */
+		if(huge+x>0.0) { 		/* raise inexact flag */
+			if(i0<0) {
+				if(j0==20) i0+=1; 
+				else {
+					j = i1+(1<<(52-j0));
+					if(j<i1) i0 +=1 ; 	/* got a carry */
+					i1=j;
+				}
+			}
+			i1 &= (~i);
+		}
+	}
+	return ufbxm_from_bits(i0, (ufbxm_uint)i1);
+}
+
 ufbx_math_abi double ufbx_ceil(double x)
 {
 	static const double huge = 1.0e300;
@@ -2067,6 +2113,118 @@ ufbx_math_abi double ufbx_rint(double x)
 	x = ufbxm_from_bits(i0, i1);
 	w = TWO52[sx] + x;
 	return w - TWO52[sx];
+}
+
+double ufbx_fmod(double x, double y)
+{
+	static const double one = 1.0, zero[] = {0.0, -0.0};
+	
+	ufbxm_int n,hx,hy,hz,ix,iy,sx,i;
+	ufbxm_uint lx,ly,lz;
+	
+	ufbxm_bits bx = ufbxm_to_bits(x);
+	ufbxm_bits by = ufbxm_to_bits(y);
+	
+	hx = bx.hi;		/* high word of x */
+	lx = bx.lo;		/* low  word of x */
+	hy = by.hi;		/* high word of y */
+	ly = by.lo;		/* low  word of y */
+	sx = hx&(ufbxm_int)0x80000000u;		/* sign of x */
+	hx ^=sx;		/* |x| */
+	hy &= 0x7fffffff;	/* |y| */
+	
+	/* purge off exception values */
+	if((hy|ly)==0||(hx>=0x7ff00000)||	/* y=0,or x not finite */
+	((hy|((ly|-ly)>>31))>0x7ff00000))	/* or y is NaN */
+	return (x*y)/(x*y);
+	if(hx<=hy) {
+		if((hx<hy)||(lx<ly)) return x;	/* |x|<|y| return x */
+		if(lx==ly) 
+		return zero[(unsigned)sx>>31];	/* |x|=|y| return x*0*/
+	}
+	
+	/* determine ix = ilogb(x) */
+	if(hx<0x00100000) {	/* subnormal x */
+		if(hx==0) {
+			for (ix = -1043, i=lx; i>0; i<<=1) ix -=1;
+		} else {
+			for (ix = -1022,i=(hx<<11); i>0; i<<=1) ix -=1;
+		}
+	} else ix = (hx>>20)-1023;
+	
+	/* determine iy = ilogb(y) */
+	if(hy<0x00100000) {	/* subnormal y */
+		if(hy==0) {
+			for (iy = -1043, i=ly; i>0; i<<=1) iy -=1;
+		} else {
+			for (iy = -1022,i=(hy<<11); i>0; i<<=1) iy -=1;
+		}
+	} else iy = (hy>>20)-1023;
+	
+	/* set up {hx,lx}, {hy,ly} and align y to x */
+	if(ix >= -1022) 
+	hx = 0x00100000|(0x000fffff&hx);
+	else {		/* subnormal x, shift x to normal */
+		n = -1022-ix;
+		if(n<=31) {
+			hx = (hx<<n)|(lx>>(32-n));
+			lx <<= n;
+		} else {
+			hx = lx<<(n-32);
+			lx = 0;
+		}
+	}
+	if(iy >= -1022) 
+	hy = 0x00100000|(0x000fffff&hy);
+	else {		/* subnormal y, shift y to normal */
+		n = -1022-iy;
+		if(n<=31) {
+			hy = (hy<<n)|(ly>>(32-n));
+			ly <<= n;
+		} else {
+			hy = ly<<(n-32);
+			ly = 0;
+		}
+	}
+	
+	/* fix point fmod */
+	n = ix - iy;
+	while(n--) {
+		hz=hx-hy;lz=lx-ly; if(lx<ly) hz -= 1;
+		if(hz<0){hx = hx+hx+(lx>>31); lx = lx+lx;}
+		else {
+			if((hz|lz)==0) 		/* return sign(x)*0 */
+			return zero[(unsigned)sx>>31];
+			hx = hz+hz+(lz>>31); lx = lz+lz;
+		}
+	}
+	hz=hx-hy;lz=lx-ly; if(lx<ly) hz -= 1;
+	if(hz>=0) {hx=hz;lx=lz;}
+	
+	/* convert back to floating value and restore the sign */
+	if((hx|lx)==0) 			/* return sign(x)*0 */
+	return zero[(unsigned)sx>>31];	
+	while(hx<0x00100000) {		/* normalize x */
+		hx = hx+hx+(lx>>31); lx = lx+lx;
+		iy -= 1;
+	}
+	if(iy>= -1022) {	/* normalize output */
+		hx = ((hx-0x00100000)|((iy+1023)<<20));
+		x = ufbxm_from_bits(hx|sx, lx);
+	} else {		/* subnormal output */
+		n = -1022 - iy;
+		if(n<=20) {
+			lx = (lx>>n)|((unsigned)hx<<(32-n));
+			hx >>= n;
+		} else if (n<=31) {
+			lx = (hx<<(32-n))|(lx>>n); hx = sx;
+		} else {
+			lx = hx>>(n-32); hx = sx;
+		}
+		x = ufbxm_from_bits(hx|sx, lx);
+		x *= one;		/* create necessary signal */
+	}
+	return x;		/* exact output */
 }
 
 ufbx_math_abi int ufbx_isnan(double x)
