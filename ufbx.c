@@ -25425,6 +25425,68 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 	return prop_list;
 }
 
+static ufbxi_noinline ufbx_real ufbxi_extrapolate_curve(const ufbx_anim_curve *curve, double real_time, uint32_t flags)
+{
+	bool pre = real_time < curve->min_time;
+	const ufbx_keyframe *key;
+	ufbx_extrapolation ext;
+	if (pre) {
+		key = &curve->keyframes.data[0];
+		ext = curve->pre_extrapolation;
+	} else {
+		key = &curve->keyframes.data[curve->keyframes.count - 1];
+		ext = curve->post_extrapolation;
+	}
+
+	if (ext.mode == UFBX_EXTRAPOLATION_CONSTANT) {
+		return key->value;
+	} else if (ext.mode == UFBX_EXTRAPOLATION_SLOPE) {
+		ufbx_tangent tangent = *(pre ? &key->right : &key->left);
+		return key->value + tangent.dy * ((real_time - key->time) / tangent.dx);
+	}
+
+	// Perform all operations in KTime ticks to be frame perfect
+	double scale = (double)curve->element.scene->metadata.ktime_second;
+	double min_time = ufbx_rint(curve->min_time * scale);
+	double max_time = ufbx_rint(curve->max_time * scale);
+	double time = real_time * scale;
+
+	double delta = pre ? min_time - time : time - max_time;
+	double duration = max_time - min_time;
+
+	// Require at least one KTime unit
+	if (!(duration >= 1.0)) return key->value;
+
+	double rep = delta / duration;
+	double rep_n = ufbx_floor(rep);
+	double rep_d = delta - rep_n * duration;
+
+	if (ext.repeat_count >= 0 && rep_n >= (double)ext.repeat_count) {
+		// Clamp to the repeat count to handle mirroring
+		rep_n = (double)ext.repeat_count;
+		rep_d = 0.0;
+	}
+
+	if (ext.mode == UFBX_EXTRAPOLATION_MIRROR) {
+		if (ufbxi_f64_to_i64(rep_n) % 2 != 0) {
+			rep_d = duration - rep_d;
+		}
+	}
+
+	if (pre) rep_d = duration - rep_d;
+	double new_time = (min_time + rep_d) / scale;
+
+	ufbx_real value = ufbx_evaluate_curve_flags(curve, new_time, key->value, flags | UFBX_EVALUATE_FLAG_NO_EXTRAPOLATION);
+
+	if (ext.mode == UFBX_EXTRAPOLATION_REPEAT_RELATIVE) {
+		ufbx_real val_delta = curve->keyframes.data[curve->keyframes.count - 1].value - curve->keyframes.data[0].value;
+		if (pre) val_delta = -val_delta;
+		value += val_delta * (ufbx_real)(rep_n + 1.0);
+	}
+
+	return value;
+}
+
 #if UFBXI_FEATURE_SCENE_EVALUATION
 
 typedef struct {
@@ -30221,9 +30283,10 @@ ufbx_abi ufbx_real ufbx_evaluate_curve_flags(const ufbx_anim_curve *curve, doubl
 		}
 	}
 
-	// TODO
-	if (time < curve->min_time) {
-	} else if (time > curve->max_time) {
+	if ((flags & UFBX_EVALUATE_FLAG_NO_EXTRAPOLATION) == 0) {
+		if (time < curve->min_time || time > curve->max_time) {
+			return ufbxi_extrapolate_curve(curve, time, flags);
+		}
 	}
 
 	size_t begin = 0;

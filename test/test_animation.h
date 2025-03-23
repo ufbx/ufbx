@@ -3474,6 +3474,42 @@ UFBXT_FILE_TEST(maya_anim_extrapolation)
 	ufbxt_assert(anim_curve->min_time == 1.0 / 24.0);
 	ufbxt_assert(anim_curve->max_time == 1.0);
 	ufbxt_assert(anim_curve->keyframes.count == 2);
+
+	static const ufbxt_key_ref refs[] = {
+		{ 1, 0.0 },
+		{ 12, 4.674119 },
+		{ 24, 10.0 },
+		{ 25, 0.055067 },
+		{ 37, 5.972713 },
+		{ 47, 0.0 },
+		{ 5820, 0.0 },
+		{ 4459471, 0.0 },
+		{ 4459472, 0.055067 },
+		{ 9514493, 5.972713 },
+		{ 100109698, 5.325881 },
+		{ 0, -0.055067 },
+		{ -12, -5.972713 },
+		{ -70, -30.213693 },
+		{ -4645, -2020.0 },
+		{ -100509, -43700 },
+		{ -100000181, -43478340 },
+		{ -500000000, -217391304.674119 },
+	};
+
+	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		int ref_frame = refs[i].frame;
+		ufbx_real ref_value = (ufbx_real)refs[i].value;
+
+		// Pre-7200 versions don't support relative repeat
+		if (ref_frame <= 0 && scene->metadata.version < 7200) {
+			ref_value = anim_curve->keyframes.data[0].value;
+		}
+
+		double time = (double)ref_frame / 24.0;
+
+		ufbx_real value = ufbx_evaluate_curve(anim_curve, time, 0.0);
+		ufbxt_assert_close_real(err, value, ref_value);
+	}
 }
 #endif
 
