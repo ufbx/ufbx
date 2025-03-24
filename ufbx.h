@@ -3141,6 +3141,26 @@ typedef enum ufbx_interpolation UFBX_ENUM_REPR {
 
 UFBX_ENUM_TYPE(ufbx_interpolation, UFBX_INTERPOLATION, UFBX_INTERPOLATION_CUBIC);
 
+typedef enum ufbx_extrapolation_mode UFBX_ENUM_REPR {
+	UFBX_EXTRAPOLATION_CONSTANT,        // < Use the value of the first/last keyframe
+	UFBX_EXTRAPOLATION_REPEAT,          // < Repeat the whole animation curve
+	UFBX_EXTRAPOLATION_MIRROR,          // < Repeat with mirroring
+	UFBX_EXTRAPOLATION_SLOPE,           // < Use the tangent of the last keyframe to linearly extrapolate
+	UFBX_EXTRAPOLATION_REPEAT_RELATIVE, // < Repeat the animation curve but connect the first and last keyframe values
+
+	UFBX_ENUM_FORCE_WIDTH(UFBX_EXTRAPOLATION)
+} ufbx_extrapolation_mode;
+
+UFBX_ENUM_TYPE(ufbx_extrapolation_mode, UFBX_EXTRAPOLATION_MODE, UFBX_EXTRAPOLATION_REPEAT_RELATIVE);
+
+typedef struct ufbx_extrapolation {
+	ufbx_extrapolation_mode mode;
+
+	// Count used for repeating modes.
+	// Negative values mean infinite repetition.
+	int32_t repeat_count;
+} ufbx_extrapolation;
+
 // Tangent vector at a keyframe, may be split into left/right
 typedef struct ufbx_tangent {
 	float dx; // < Derivative in the time axis
@@ -3177,10 +3197,21 @@ struct ufbx_anim_curve {
 		uint32_t typed_id;
 	}; };
 
+	// List of keyframes that define the curve.
 	ufbx_keyframe_list keyframes;
 
+	// Extrapolation before the curve.
+	ufbx_extrapolation pre_extrapolation;
+	// Extrapolation after the curve.
+	ufbx_extrapolation post_extrapolation;
+
+	// Value range for all the keyframes.
 	ufbx_real min_value;
 	ufbx_real max_value;
+
+	// Time range for all the keyframes.
+	double min_time;
+	double max_time;
 };
 
 // -- Collections
@@ -4606,6 +4637,15 @@ typedef struct ufbx_thread_opts {
 
 } ufbx_thread_opts;
 
+// Flags to control nanimation evaluation functions.
+typedef enum ufbx_evaluate_flags UFBX_FLAG_REPR {
+
+	// Do not extrapolate past the keyframes.
+	UFBX_EVALUATE_FLAG_NO_EXTRAPOLATION = 0x1,
+
+	UFBX_FLAG_FORCE_WIDTH(ufbx_evaluate_flags)
+} ufbx_evaluate_flags;
+
 // -- Main API
 
 // Options for `ufbx_load_file/memory/stream/stdio()`
@@ -4868,6 +4908,10 @@ typedef struct ufbx_evaluate_opts {
 	bool evaluate_skinning; // < Evaluate skinning (see ufbx_mesh.skinned_vertices)
 	bool evaluate_caches;   // < Evaluate vertex caches (see ufbx_mesh.skinned_vertices)
 
+	// Evaluation flags.
+	// See `ufbx_evaluate_flags` for information.
+	uint32_t evaluate_flags;
+
 	// WARNING: Potentially unsafe! Try to open external files such as geometry caches
 	bool load_external_files;
 
@@ -5008,6 +5052,10 @@ typedef struct ufbx_bake_opts {
 	// Defined as the minimum fractional decrease/increase in key time, ie.
 	// `time / (1.0 + step_custom_epsilon)` and `time * (1.0 + step_custom_epsilon)`.
 	double step_custom_epsilon;
+
+	// Flags passed to animation evaluation functions.
+	// See `ufbx_evaluate_flags`.
+	uint32_t evaluate_flags;
 
 	// Enable key reduction.
 	bool key_reduction_enabled;
@@ -5338,20 +5386,26 @@ ufbx_unsafe ufbx_abi bool ufbx_open_memory_ctx(ufbx_stream *stream, ufbx_open_fi
 // Evaluate a single animation `curve` at a `time`.
 // Returns `default_value` only if `curve == NULL` or it has no keyframes.
 ufbx_abi ufbx_real ufbx_evaluate_curve(const ufbx_anim_curve *curve, double time, ufbx_real default_value);
+ufbx_abi ufbx_real ufbx_evaluate_curve_flags(const ufbx_anim_curve *curve, double time, ufbx_real default_value, uint32_t flags);
 
 // Evaluate a value from bundled animation curves.
 ufbx_abi ufbx_real ufbx_evaluate_anim_value_real(const ufbx_anim_value *anim_value, double time);
 ufbx_abi ufbx_vec3 ufbx_evaluate_anim_value_vec3(const ufbx_anim_value *anim_value, double time);
+ufbx_abi ufbx_real ufbx_evaluate_anim_value_real_flags(const ufbx_anim_value *anim_value, double time, uint32_t flags);
+ufbx_abi ufbx_vec3 ufbx_evaluate_anim_value_vec3_flags(const ufbx_anim_value *anim_value, double time, uint32_t flags);
 
 // Evaluate an animated property `name` from `element` at `time`.
 // NOTE: If the property is not found it will have the flag `UFBX_PROP_FLAG_NOT_FOUND`.
 ufbx_abi ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time);
 ufbx_abi ufbx_prop ufbx_evaluate_prop(const ufbx_anim *anim, const ufbx_element *element, const char *name, double time);
+ufbx_abi ufbx_prop ufbx_evaluate_prop_len_flags(const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time, uint32_t flags);
+ufbx_abi ufbx_prop ufbx_evaluate_prop_flags(const ufbx_anim *anim, const ufbx_element *element, const char *name, double time, uint32_t flags);
 
 // Evaluate all _animated_ properties of `element`.
 // HINT: This function returns an `ufbx_props` structure with the original properties as
 // `ufbx_props.defaults`. This lets you use `ufbx_find_prop/value()` for the results.
 ufbx_abi ufbx_props ufbx_evaluate_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size);
+ufbx_abi ufbx_props ufbx_evaluate_props_flags(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *buffer, size_t buffer_size, uint32_t flags);
 
 // Flags to control `ufbx_evaluate_transform_flags()`.
 typedef enum ufbx_transform_flags UFBX_FLAG_REPR {
@@ -5374,6 +5428,10 @@ typedef enum ufbx_transform_flags UFBX_FLAG_REPR {
 	// If `UFBX_TRANSFORM_FLAG_EXPLICIT_INCLUDES`: Evaluate `ufbx_transform.scale`.
 	UFBX_TRANSFORM_FLAG_INCLUDE_SCALE = 0x40,
 
+	// Do not extrapolate keyframes.
+	// See `UFBX_EVALUATE_FLAG_NO_EXTRAPOLATION`.
+	UFBX_TRANSFORM_FLAG_NO_EXTRAPOLATION = 0x80,
+
 	UFBX_FLAG_FORCE_WIDTH(UFBX_TRANSFORM_FLAGS)
 } ufbx_transform_flags;
 
@@ -5386,6 +5444,7 @@ ufbx_abi ufbx_transform ufbx_evaluate_transform_flags(const ufbx_anim *anim, con
 // Evaluate the blend shape weight of a blend channel.
 // NOTE: Return value uses `1.0` for full weight, instead of `100.0` that the internal property `UFBX_Weight` uses.
 ufbx_abi ufbx_real ufbx_evaluate_blend_weight(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time);
+ufbx_abi ufbx_real ufbx_evaluate_blend_weight_flags(const ufbx_anim *anim, const ufbx_blend_channel *channel, double time, uint32_t flags);
 
 // Evaluate the whole `scene` at a specific `time` in the animation `anim`.
 // The returned scene behaves as if it had been exported at a specific time

@@ -3438,3 +3438,441 @@ UFBXT_FILE_TEST_ALT(bake_search_element, maya_anim_diffuse_curve)
 	ufbx_free_baked_anim(bake);
 }
 #endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_ignore_animation_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.ignore_animation = true;
+	return opts;
+}
+#endif
+
+#if UFBXT_IMPL
+static void ufbxt_assert_close_extrapolation(ufbxt_diff_error *p_err, ufbx_real value, ufbx_real ref)
+{
+	#if UFBX_REAL_IS_FLOAT
+	double abs_error = (ufbx_real)100.0;
+	double rel_error = fmax(fabs(ref), 1.0f) * 1e-4;
+	#else
+	double abs_error = (ufbx_real)0.001;
+	double rel_error = fmax(fabs(ref), 1.0f) * 1e-4;
+	#endif
+
+	ufbx_real threshold = (ufbx_real)fmin(abs_error, rel_error);
+	ufbxt_assert_close_real_threshold(p_err, value, ref, threshold);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_anim_extrapolation)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *anim_layer = scene->anim_layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(anim_layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+	ufbxt_assert(anim_curve);
+
+	if (scene->metadata.version >= 7200) {
+		ufbxt_assert(anim_curve->pre_extrapolation.mode == UFBX_EXTRAPOLATION_REPEAT_RELATIVE);
+	} else {
+		ufbxt_assert(anim_curve->pre_extrapolation.mode == UFBX_EXTRAPOLATION_CONSTANT);
+	}
+	ufbxt_assert(anim_curve->pre_extrapolation.repeat_count == -1);
+	ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_REPEAT);
+	ufbxt_assert(anim_curve->post_extrapolation.repeat_count == -1);
+	ufbxt_assert(anim_curve->min_time == 1.0 / 24.0);
+	ufbxt_assert(anim_curve->max_time == 1.0);
+	ufbxt_assert(anim_curve->keyframes.count == 2);
+
+	static const ufbxt_key_ref refs[] = {
+		{ 1, 0.0 },
+		{ 12, 4.674119 },
+		{ 24, 10.0 },
+		{ 25, 0.055067 },
+		{ 37, 5.972713 },
+		#if FLT_EVAL_METHOD == 0 // Too precise for x86
+			{ 47, 0.0 },
+			{ 5820, 0.0 },
+			{ 4459471, 0.0 },
+		#endif
+		{ 4459472, 0.055067 },
+		{ 9514493, 5.972713 },
+		{ 100109698, 5.325881 },
+		{ 0, -0.055067 },
+		{ -12, -5.972713 },
+		{ -70, -30.213693 },
+		{ -4645, -2020.0 },
+		{ -100509, -43700 },
+		{ -100000181, -43478340 },
+		{ -500000000, -217391304.674119 },
+	};
+
+	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		ufbxt_hintf("i=%zu", i);
+		int ref_frame = refs[i].frame;
+		ufbx_real ref_value = (ufbx_real)refs[i].value;
+
+		// Pre-7200 versions don't support relative repeat
+		if (ref_frame <= 0 && scene->metadata.version < 7200) {
+			ref_value = anim_curve->keyframes.data[0].value;
+		}
+
+		double time = (double)ref_frame / 24.0;
+
+		ufbx_real value = ufbx_evaluate_curve(anim_curve, time, 0.0);
+		ufbxt_assert_close_extrapolation(err, value, ref_value);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_anim_extrapolation_ignore, maya_anim_extrapolation, ufbxt_ignore_animation_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *anim_layer = scene->anim_layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(anim_layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	if (scene->metadata.version >= 7000) {
+		ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+		ufbxt_assert(anim_curve);
+
+		if (scene->metadata.version >= 7200) {
+			ufbxt_assert(anim_curve->pre_extrapolation.mode == UFBX_EXTRAPOLATION_REPEAT_RELATIVE);
+		} else {
+			ufbxt_assert(anim_curve->pre_extrapolation.mode == UFBX_EXTRAPOLATION_CONSTANT);
+		}
+		ufbxt_assert(anim_curve->pre_extrapolation.repeat_count == -1);
+		ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_REPEAT);
+		ufbxt_assert(anim_curve->post_extrapolation.repeat_count == -1);
+		ufbxt_assert(anim_curve->keyframes.count == 0);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_slope, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *anim_layer = scene->anim_layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(anim_layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+	ufbxt_assert(anim_curve);
+
+	ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_SLOPE);
+	ufbxt_assert(anim_curve->pre_extrapolation.repeat_count == -1);
+	ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_SLOPE);
+	ufbxt_assert(anim_curve->post_extrapolation.repeat_count == -1);
+	ufbxt_assert(anim_curve->min_time == 1.0 / 24.0);
+	ufbxt_assert(anim_curve->max_time == 1.0);
+	ufbxt_assert(anim_curve->keyframes.count == 2);
+
+	static const ufbxt_key_ref refs[] = {
+		{ 5, -2.051765 },
+		{ 20, 11.633479 },
+		{ 30, 3.016101 },
+		{ 61, -33.067375 },
+		{ 14614, -16972.513672 },
+		{ -5, 7.743417 },
+		{ -33, 43.879364 },
+		{ -94, 122.604103 },
+		{ -242, 313.608398 },
+		{ -14301, 18457.726562 },
+	};
+
+	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		ufbxt_hintf("i=%zu", i);
+		int ref_frame = refs[i].frame;
+		ufbx_real ref_value = (ufbx_real)refs[i].value;
+
+		// Pre-7200 versions don't support relative repeat
+		if (ref_frame <= 0 && scene->metadata.version < 7200) {
+			ref_value = anim_curve->keyframes.data[0].value;
+		}
+
+		double time = (double)ref_frame / 24.0;
+
+		ufbx_real value = ufbx_evaluate_curve(anim_curve, time, 0.0);
+		ufbxt_assert_close_extrapolation(err, value, ref_value);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_mirror, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *anim_layer = scene->anim_layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(anim_layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+	ufbxt_assert(anim_curve);
+
+	ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_MIRROR);
+	ufbxt_assert(anim_curve->pre_extrapolation.repeat_count == -1);
+	ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_MIRROR);
+	ufbxt_assert(anim_curve->post_extrapolation.repeat_count == -1);
+	ufbxt_assert(anim_curve->min_time == 1.0 / 24.0);
+	ufbxt_assert(anim_curve->max_time == 1.0);
+	ufbxt_assert(anim_curve->keyframes.count == 2);
+
+	static const ufbxt_key_ref refs[] = {
+		{ 18, 10.635811 },
+		{ 30, 10.635811 },
+		{ 42, -1.749766 },
+		{ 52, -1.749766 },
+		{ 70, 10.000000 },
+		{ 77, 9.815335 },
+		{ 355, 7.719610 },
+		{ 1706, -2.065491 },
+		{ 17357, 7.719610 },
+		{ 44874, 10.000000 },
+		{ 44897, 0.000000 },
+		{ -24, 11.522083 },
+		{ -52, -0.431755 },
+		{ -414, -1.077311 },
+		{ -2207, 0.000000 },
+		{ -27612, 6.519766 },
+		{ -36132, 10.000000 },
+		{ -36155, 0.000000 },
+	};
+
+	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		ufbxt_hintf("i=%zu", i);
+		int ref_frame = refs[i].frame;
+		ufbx_real ref_value = (ufbx_real)refs[i].value;
+
+		// Pre-7200 versions don't support relative repeat
+		if (ref_frame <= 0 && scene->metadata.version < 7200) {
+			ref_value = anim_curve->keyframes.data[0].value;
+		}
+
+		double time = (double)ref_frame / 24.0;
+
+		ufbx_real value = ufbx_evaluate_curve(anim_curve, time, 0.0);
+		ufbxt_assert_close_extrapolation(err, value, ref_value);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_mirror_count, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *anim_layer = scene->anim_layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(anim_layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+	ufbxt_assert(anim_curve);
+
+	ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_MIRROR);
+	ufbxt_assert(anim_curve->pre_extrapolation.repeat_count == 2);
+	ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_MIRROR);
+	ufbxt_assert(anim_curve->post_extrapolation.repeat_count == 3);
+	ufbxt_assert(anim_curve->min_time == 1.0 / 24.0);
+	ufbxt_assert(anim_curve->max_time == 1.0);
+	ufbxt_assert(anim_curve->keyframes.count == 2);
+
+	static const ufbxt_key_ref refs[] = {
+		{ 7, -1.197194 },
+		{ -16, 10.635811 },
+		{ -29, 9.815335 },
+		{ -42, -2.065491 },
+		{ -45, 0.000000 },
+		{ -73, 0.000000 },
+		{ -100000, 0.000000 },
+		{ 29, 11.254428 },
+		{ 42, -1.749766 },
+		{ 65, 11.254428 },
+		{ 74, 11.633479 },
+		{ 89, -2.051765 },
+		{ 93, 0.000000 },
+		{ 100, 0.000000 },
+		{ 100000, 0.000000 },
+	};
+
+	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		ufbxt_hintf("i=%zu", i);
+		int ref_frame = refs[i].frame;
+		ufbx_real ref_value = (ufbx_real)refs[i].value;
+
+		// Pre-7200 versions don't support relative repeat
+		if (ref_frame <= 0 && scene->metadata.version < 7200) {
+			ref_value = anim_curve->keyframes.data[0].value;
+		}
+
+		double time = (double)ref_frame / 24.0;
+
+		ufbx_real value = ufbx_evaluate_curve(anim_curve, time, 0.0);
+		ufbxt_assert_close_extrapolation(err, value, ref_value);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_repeat_count, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *anim_layer = scene->anim_layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(anim_layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+	ufbxt_assert(anim_curve);
+
+	ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_REPEAT);
+	ufbxt_assert(anim_curve->pre_extrapolation.repeat_count == 2);
+	ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_REPEAT);
+	ufbxt_assert(anim_curve->post_extrapolation.repeat_count == 0);
+	ufbxt_assert(anim_curve->min_time == 1.0 / 24.0);
+	ufbxt_assert(anim_curve->max_time == 1.0);
+	ufbxt_assert(anim_curve->keyframes.count == 2);
+
+	static const ufbxt_key_ref refs[] = {
+		{ 16, 8.830700 },
+		{ -5, 10.635811 },
+		{ -26, 11.633479 },
+		{ -43, -1.753241 },
+		{ -44, -1.077311 },
+		{ -45, 0.000000 },
+		{ -46, 0.000000 },
+		{ -100, 0.000000 },
+		{ -10000, 0.000000 },
+		{ 24, 10.000000 },
+		{ 25, 10.000000 },
+		{ 100, 10.000000 },
+		{ 10000, 10.000000 },
+	};
+
+	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		ufbxt_hintf("i=%zu", i);
+		int ref_frame = refs[i].frame;
+		ufbx_real ref_value = (ufbx_real)refs[i].value;
+
+		// Pre-7200 versions don't support relative repeat
+		if (ref_frame <= 0 && scene->metadata.version < 7200) {
+			ref_value = anim_curve->keyframes.data[0].value;
+		}
+
+		double time = (double)ref_frame / 24.0;
+
+		ufbx_real value = ufbx_evaluate_curve(anim_curve, time, 0.0);
+		ufbxt_assert_close_extrapolation(err, value, ref_value);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_relative_count, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *anim_layer = scene->anim_layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(anim_layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+	ufbxt_assert(anim_curve);
+
+	ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_REPEAT_RELATIVE);
+	ufbxt_assert(anim_curve->pre_extrapolation.repeat_count == 2);
+	ufbxt_assert(anim_curve->post_extrapolation.mode == UFBX_EXTRAPOLATION_REPEAT_RELATIVE);
+	ufbxt_assert(anim_curve->post_extrapolation.repeat_count == 1);
+	ufbxt_assert(anim_curve->min_time == 1.0 / 24.0);
+	ufbxt_assert(anim_curve->max_time == 1.0);
+	ufbxt_assert(anim_curve->keyframes.count == 2);
+
+	static const ufbxt_key_ref refs[] = {
+		{ 12, 4.004632 },
+		{ -8, -2.280390 },
+		{ -24, -8.477917 },
+		{ -41, -22.051765 },
+		{ -44, -21.077311 },
+		{ -45, -20.000000 },
+		{ -46, -20.000000 },
+		{ -50, -20.000000 },
+		{ -100, -20.000000 },
+		{ -10000, -20.000000 },
+		{ 25, 8.922688 },
+		{ 30, 8.802806 },
+		{ 43, 21.633480 },
+		{ 46, 20.956230 },
+		{ 47, 20.000000 },
+		{ 50, 20.000000 },
+		{ 100, 20.000000 },
+		{ 10000, 20.000000 },
+	};
+
+	for (size_t i = 0; i < ufbxt_arraycount(refs); i++) {
+		ufbxt_hintf("i=%zu", i);
+		int ref_frame = refs[i].frame;
+		ufbx_real ref_value = (ufbx_real)refs[i].value;
+
+		// Pre-7200 versions don't support relative repeat
+		if (ref_frame <= 0 && scene->metadata.version < 7200) {
+			ref_value = anim_curve->keyframes.data[0].value;
+		}
+
+		double time = (double)ref_frame / 24.0;
+
+		ufbx_real value = ufbx_evaluate_curve(anim_curve, time, 0.0);
+		ufbxt_assert_close_extrapolation(err, value, ref_value);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_unknown_extrapolation)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *anim_layer = scene->anim_layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(anim_layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+	ufbxt_assert(anim_curve);
+
+	ufbxt_assert(anim_curve->pre_extrapolation.mode == UFBX_EXTRAPOLATION_CONSTANT);
+	ufbxt_assert(anim_curve->pre_extrapolation.repeat_count == -1);
+	ufbxt_assert(anim_curve->pre_extrapolation.mode == UFBX_EXTRAPOLATION_CONSTANT);
+	ufbxt_assert(anim_curve->post_extrapolation.repeat_count == -1);
+}
+#endif

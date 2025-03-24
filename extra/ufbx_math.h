@@ -28,6 +28,7 @@ ufbx_math_abi double ufbx_fabs(double x);
 ufbx_math_abi double ufbx_copysign(double x, double y);
 ufbx_math_abi double ufbx_nextafter(double x, double y);
 ufbx_math_abi double ufbx_rint(double x);
+ufbx_math_abi double ufbx_floor(double x);
 ufbx_math_abi double ufbx_ceil(double x);
 ufbx_math_abi int ufbx_isnan(double x);
 

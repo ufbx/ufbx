@@ -16,11 +16,11 @@
  */
 
 #ifndef ufbx_math_abi
-    #if defined(UFBX_STATIC)
-        #define ufbx_math_abi static
-    #else
-        #define ufbx_math_abi
-    #endif
+	#if defined(UFBX_STATIC)
+		#define ufbx_math_abi static
+	#else
+		#define ufbx_math_abi
+	#endif
 #endif
 
 #if !defined(UFBX_STANDARD_C) && !defined(UFBX_MATH_NO_INTRINSICS)
