@@ -25210,7 +25210,7 @@ static ufbxi_forceinline bool ufbxi_anim_layer_might_contain_id(const ufbx_anim_
 	return ok;
 }
 
-static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *props, size_t num_props)
+static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufbx_element *element, double time, ufbx_prop *props, size_t num_props, uint32_t flags)
 {
 	ufbxi_anim_layer_combine_ctx combine_ctx = { anim, element, time };
 
@@ -25226,7 +25226,7 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 		if (layer->weight_is_animated && layer->blended) {
 			ufbx_anim_prop *weight_aprop = ufbxi_find_anim_prop_start(layer, &layer->element);
 			if (weight_aprop) {
-				weight = ufbx_evaluate_anim_value_real(weight_aprop->anim_value, time) / (ufbx_real)100.0;
+				weight = ufbx_evaluate_anim_value_real_flags(weight_aprop->anim_value, time, flags) / (ufbx_real)100.0;
 				if (weight < 0.0f) weight = 0.0f;
 				if (weight > 0.99999f) weight = 1.0f;
 			}
@@ -25255,7 +25255,7 @@ static ufbxi_noinline void ufbxi_evaluate_props(const ufbx_anim *anim, const ufb
 			// This could be done by having `UFBX_PROP_FLAG_ANIMATION_EVALUATED`
 			// that gets set for the first layer of animation that is applied.
 			if (aprop->prop_name.data == prop->name.data) {
-				ufbx_vec3 v = ufbx_evaluate_anim_value_vec3(aprop->anim_value, time);
+				ufbx_vec3 v = ufbx_evaluate_anim_value_vec3_flags(aprop->anim_value, time, flags);
 				if (layer_ix == 0) {
 					prop->value_vec3 = v;
 				} else {
@@ -25418,7 +25418,7 @@ static ufbxi_noinline ufbx_props ufbxi_evaluate_selected_props(const ufbx_anim *
 		}
 	}
 
-	ufbxi_evaluate_props(anim, element, time, props, num_props);
+	ufbxi_evaluate_props(anim, element, time, props, num_props, flags);
 
 	ufbx_props prop_list;
 	prop_list.props.data = props;
@@ -25849,7 +25849,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_evaluate_imp(ufbxi_eval_context 
 		ufbx_prop *props = ufbxi_push(&ec->result, ufbx_prop, num_animated);
 		ufbxi_check_err(&ec->error, props);
 
-		elem->props = ufbx_evaluate_props(&anim, elem, ec->time, props, num_animated);
+		elem->props = ufbx_evaluate_props_flags(&anim, elem, ec->time, props, num_animated, ec->opts.evaluate_flags);
 		elem->props.defaults = &ec->src_scene.elements.data[elem->element_id]->props;
 	}
 
@@ -26856,6 +26856,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_node_imp(ufbxi_bake_context
 		}
 
 		flags |= UFBX_TRANSFORM_FLAG_IGNORE_SCALE_HELPER|UFBX_TRANSFORM_FLAG_IGNORE_COMPONENTWISE_SCALE|UFBX_TRANSFORM_FLAG_EXPLICIT_INCLUDES;
+		if (bc->opts.evaluate_flags & UFBX_EVALUATE_FLAG_NO_EXTRAPOLATION) {
+			flags |= UFBX_TRANSFORM_FLAG_NO_EXTRAPOLATION;
+		}
 
 		double eval_time = ufbxi_bake_time_sample_time(bake_time);
 		ufbx_transform transform = ufbx_evaluate_transform_flags(bc->anim, node, eval_time, flags);
@@ -26976,7 +26979,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim_prop(ufbxi_bake_contex
 	for (size_t i = 0; i < times.count; i++) {
 		ufbxi_bake_time bake_time = times.data[i];
 		double eval_time = ufbxi_bake_time_sample_time(bake_time);
-		ufbx_prop prop = ufbx_evaluate_prop_len(bc->anim, element, name.data, name.length, eval_time);
+		ufbx_prop prop = ufbx_evaluate_prop_len_flags(bc->anim, element, name.data, name.length, eval_time, bc->opts.evaluate_flags);
 		keys.data[i].time = bake_time.time;
 		keys.data[i].value = prop.value_vec3;
 		keys.data[i].flags = (ufbx_baked_key_flags)bake_time.flags;
@@ -30434,7 +30437,7 @@ ufbx_abi ufbxi_noinline ufbx_prop ufbx_evaluate_prop_len_flags(const ufbx_anim *
 		ufbxi_evaluate_connected_prop(&result, anim, element, prop->name.data, time, flags);
 	}
 
-	ufbxi_evaluate_props(anim, element, time, &result, 1);
+	ufbxi_evaluate_props(anim, element, time, &result, 1, flags);
 
 	return result;
 }
@@ -30465,7 +30468,7 @@ ufbx_abi ufbxi_noinline ufbx_props ufbx_evaluate_props_flags(const ufbx_anim *an
 		}
 	}
 
-	ufbxi_evaluate_props(anim, element, time, buffer, num_anim);
+	ufbxi_evaluate_props(anim, element, time, buffer, num_anim, flags);
 
 	ret.props.data = buffer;
 	ret.props.count = ret.num_animated = num_anim;
