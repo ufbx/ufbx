@@ -3855,3 +3855,24 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_extrapolation_relative_count, UFBXT_FILE_TES
 }
 #endif
 
+UFBXT_FILE_TEST(synthetic_unknown_extrapolation)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *anim_layer = scene->anim_layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(anim_layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+	ufbxt_assert(anim_curve);
+
+	ufbxt_assert(anim_curve->pre_extrapolation.mode == UFBX_EXTRAPOLATION_CONSTANT);
+	ufbxt_assert(anim_curve->pre_extrapolation.repeat_count == -1);
+	ufbxt_assert(anim_curve->pre_extrapolation.mode == UFBX_EXTRAPOLATION_CONSTANT);
+	ufbxt_assert(anim_curve->post_extrapolation.repeat_count == -1);
+}
+#endif
