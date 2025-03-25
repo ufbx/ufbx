@@ -20,6 +20,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj_file(const char *file_name,
 typedef enum {
 	UFBXT_CHECK_FRAME_SCALE_100 = 0x1,
 	UFBXT_CHECK_FRAME_Z_TO_Y_UP = 0x2,
+	UFBXT_CHECK_FRAME_NO_EXTRAPOLATE = 0x4,
 } ufbxt_check_frame_flags;
 
 void ufbxt_check_frame_imp(ufbx_scene *scene, ufbxt_diff_error *err, bool check_normals, const char *file_name, const char *anim_name, double time, uint32_t flags)
@@ -32,6 +33,10 @@ void ufbxt_check_frame_imp(ufbx_scene *scene, ufbxt_diff_error *err, bool check_
 	opts.evaluate_skinning = true;
 	opts.evaluate_caches = true;
 	opts.load_external_files = true;
+
+	if (flags & UFBXT_CHECK_FRAME_NO_EXTRAPOLATE) {
+		opts.evaluate_flags |= UFBX_EVALUATE_FLAG_NO_EXTRAPOLATION;
+	}
 
 	ufbxt_obj_file *obj_file = ufbxt_load_obj_file(file_name, NULL);
 
@@ -1836,6 +1841,12 @@ UFBXT_FILE_TEST(maya_extrapolate_cube)
 	ufbxt_check_frame(scene, err, true, "maya_extrapolate_cube_60", NULL, 60.0/24.0);
 	ufbxt_check_frame(scene, err, true, "maya_extrapolate_cube_80", NULL, 80.0/24.0);
 	ufbxt_check_frame(scene, err, true, "maya_extrapolate_cube_100", NULL, 100.0/24.0);
+
+	ufbxt_check_frame_imp(scene, err, true, "maya_extrapolate_cube_noex_28", NULL, 28.0/24.0, UFBXT_CHECK_FRAME_NO_EXTRAPOLATE);
+	ufbxt_check_frame_imp(scene, err, true, "maya_extrapolate_cube_noex_34", NULL, 34.0/24.0, UFBXT_CHECK_FRAME_NO_EXTRAPOLATE);
+	ufbxt_check_frame_imp(scene, err, true, "maya_extrapolate_cube_noex_44", NULL, 44.0/24.0, UFBXT_CHECK_FRAME_NO_EXTRAPOLATE);
+	ufbxt_check_frame_imp(scene, err, true, "maya_extrapolate_cube_noex_68", NULL, 68.0/24.0, UFBXT_CHECK_FRAME_NO_EXTRAPOLATE);
+	ufbxt_check_frame_imp(scene, err, true, "maya_extrapolate_cube_noex_68", NULL, 100.0/24.0, UFBXT_CHECK_FRAME_NO_EXTRAPOLATE);
 
 	ufbxt_check_transform_consistency(err, scene, 24.0, 120, UFBXT_CHECK_TRANSFORM_CONSISTENCY_NO_BAKE);
 	ufbxt_check_transform_consistency(err, scene, 24.0, 120, UFBXT_CHECK_TRANSFORM_CONSISTENCY_NO_EXTRAPOLATION);
