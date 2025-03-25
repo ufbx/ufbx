@@ -14605,27 +14605,25 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_c
 
 	// 6x00: Link the node to the node attribute so property connections can be
 	// redirected from connections if necessary.
-	if (uc->version < 7000) {
-		ufbxi_check(ufbxi_insert_fbx_attr(uc, info->fbx_id, attrib_info.fbx_id));
+	ufbxi_check(ufbxi_insert_fbx_attr(uc, info->fbx_id, attrib_info.fbx_id));
 
-		// Split properties between the node and the attribute
-		ufbx_prop *ps = info->props.props.data;
-		size_t dst = 0, src = 0, end = info->props.props.count;
-		while (src < end) {
-			if (!ufbxi_is_node_property(uc, ps[src].name.data)) {
-				ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_prop, 1, &ps[src]));
-				src++;
-			} else if (dst != src) {
-				ps[dst++] = ps[src++];
-			} else {
-				dst++; src++;
-			}
+	// Split properties between the node and the attribute
+	ufbx_prop *ps = info->props.props.data;
+	size_t dst = 0, src = 0, end = info->props.props.count;
+	while (src < end) {
+		if (!ufbxi_is_node_property(uc, ps[src].name.data)) {
+			ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_prop, 1, &ps[src]));
+			src++;
+		} else if (dst != src) {
+			ps[dst++] = ps[src++];
+		} else {
+			dst++; src++;
 		}
-		attrib_info.props.props.count = end - dst;
-		attrib_info.props.props.data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_prop, attrib_info.props.props.count);
-		ufbxi_check(attrib_info.props.props.data);
-		info->props.props.count = dst;
 	}
+	attrib_info.props.props.count = end - dst;
+	attrib_info.props.props.data = ufbxi_push_pop(&uc->result, &uc->tmp_stack, ufbx_prop, attrib_info.props.props.count);
+	ufbxi_check(attrib_info.props.props.data);
+	info->props.props.count = dst;
 
 	if (sub_type == ufbxi_Mesh) {
 		ufbxi_check(ufbxi_read_mesh(uc, node, &attrib_info));
