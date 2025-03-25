@@ -7520,11 +7520,16 @@ static ufbxi_noinline ufbxi_node *ufbxi_find_child(ufbxi_node *node, const char 
 	return NULL;
 }
 
+// Retrieve the type of a given value
+ufbxi_forceinline static ufbxi_value_type ufbxi_get_val_type(ufbxi_node *node, size_t ix)
+{
+	return (ufbxi_value_type)((node->value_type_mask >> (ix*2)) & 0x3);
+}
+
 // Retrieve values from nodes with type codes:
 // Any: '_' (ignore)
 // NUMBER: 'I' int32_t 'L' int64_t 'F' float 'D' double 'R' ufbxi_real 'B' bool 'Z' size_t
 // STRING: 'S' ufbx_string 'C' const char* (checked) 's' ufbx_string 'c' const char * (unchecked) 'b' ufbx_blob
-
 ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, size_t ix, char fmt, void *v)
 {
 	ufbxi_dev_assert(ix < UFBXI_MAX_NON_ARRAY_VALUES);
@@ -11230,6 +11235,7 @@ static const ufbxi_prop_type_name ufbxi_prop_type_names[] = {
 	{ "Integer", UFBX_PROP_INTEGER },
 	{ "int", UFBX_PROP_INTEGER },
 	{ "enum", UFBX_PROP_INTEGER },
+	{ "Enum", UFBX_PROP_INTEGER },
 	{ "Visibility", UFBX_PROP_INTEGER },
 	{ "Visibility Inheritance", UFBX_PROP_INTEGER },
 	{ "KTime", UFBX_PROP_INTEGER },
@@ -11512,7 +11518,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_init_node_prop_names(ufbxi_conte
 	return 1;
 }
 
-static bool ufbxi_is_node_property(ufbxi_context *uc, const char *name)
+static bool ufbxi_is_node_property_name(ufbxi_context *uc, const char *name)
 {
 	// You need to call `ufbxi_init_node_prop_names()` before calling this
 	ufbx_assert(uc->node_prop_set.size > 0);
@@ -11618,8 +11624,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_property(ufbxi_context *uc,
 		flags |= (uint32_t)UFBX_PROP_FLAG_VALUE_REAL << (real_ix - 1);
 	}
 
-	// Distance properties have a string unit _after_ the real value, eg. `10, "cm"`
-	if (prop->type == UFBX_PROP_DISTANCE) {
+	// Skip one value forward in case the current value is not a string, as some properties
+	// contain mixed numbers and strings. Currenltly known cases:
+	//   Lod Distance:    P: "Thresholds|Level0", "Distance", "", "",64, "cm"
+	//   User Enum:       P: "User_Enum", "Enum", "", "A+U",1, "ValueA~ValueB~ValueC"
+	if (ufbxi_get_val_type(node, val_ix) != UFBXI_VALUE_STRING) {
 		val_ix++;
 	}
 
@@ -14607,11 +14616,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_c
 	// redirected from connections if necessary.
 	ufbxi_check(ufbxi_insert_fbx_attr(uc, info->fbx_id, attrib_info.fbx_id));
 
-	// Split properties between the node and the attribute
+	// Split properties between the node and the attribute.
+	// Consider all user properties as node properties.
 	ufbx_prop *ps = info->props.props.data;
 	size_t dst = 0, src = 0, end = info->props.props.count;
 	while (src < end) {
-		if (!ufbxi_is_node_property(uc, ps[src].name.data)) {
+		if (!ufbxi_is_node_property_name(uc, ps[src].name.data) && (ps[src].flags & UFBX_PROP_FLAG_USER_DEFINED) == 0) {
 			ufbxi_check(ufbxi_push_copy(&uc->tmp_stack, ufbx_prop, 1, &ps[src]));
 			src++;
 		} else if (dst != src) {
@@ -18244,15 +18254,21 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_resolve_connections(ufbxi_contex
 	uc->scene.connections_src.data = ufbxi_push(&uc->result, ufbx_connection, num_connections);
 	ufbxi_check(uc->scene.connections_src.data);
 
-	// HACK: Translate property connections from node to attribute if
-	// the property name is not included in the known node properties.
+	// HACK: Translate property connections from node to attribute if the property name is not included
+	// in the known node properties and is not a property of the node.
 	if (uc->version > 0 && uc->version < 7000) {
 		ufbxi_for(ufbxi_tmp_connection, tmp_conn, tmp_connections, num_connections) {
-			if (tmp_conn->src_prop.length > 0 && !ufbxi_is_node_property(uc, tmp_conn->src_prop.data)) {
-				tmp_conn->src = ufbxi_find_attribute_fbx_id(uc, tmp_conn->src);
+			if (tmp_conn->src_prop.length > 0 && !ufbxi_is_node_property_name(uc, tmp_conn->src_prop.data)) {
+				ufbx_element *src = ufbxi_find_element_by_fbx_id(uc, tmp_conn->src);
+				if (!src || !ufbx_find_prop_len(&src->props, tmp_conn->src_prop.data, tmp_conn->src_prop.length)) {
+					tmp_conn->src = ufbxi_find_attribute_fbx_id(uc, tmp_conn->src);
+				}
 			}
-			if (tmp_conn->dst_prop.length > 0 && !ufbxi_is_node_property(uc, tmp_conn->dst_prop.data)) {
-				tmp_conn->dst = ufbxi_find_attribute_fbx_id(uc, tmp_conn->dst);
+			if (tmp_conn->dst_prop.length > 0 && !ufbxi_is_node_property_name(uc, tmp_conn->dst_prop.data)) {
+				ufbx_element *dst = ufbxi_find_element_by_fbx_id(uc, tmp_conn->dst);
+				if (!dst || !ufbx_find_prop_len(&dst->props, tmp_conn->dst_prop.data, tmp_conn->dst_prop.length)) {
+					tmp_conn->dst = ufbxi_find_attribute_fbx_id(uc, tmp_conn->dst);
+				}
 			}
 		}
 	}

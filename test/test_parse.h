@@ -1938,3 +1938,132 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unsupported_cube_fail, UFBXT_FILE_TEST_FLAG_ALLO
 	ufbxt_assert(!strcmp(load_error->info, "2000") || !strcmp(load_error->info, "8000"));
 }
 #endif
+
+#if UFBXT_IMPL
+static void ufbxt_check_user_prop_int(ufbx_props *props, const char *name, ufbx_prop_type type, int64_t a, int64_t b, int64_t c)
+{
+	ufbxt_hintf("prop=%s", name);
+
+	ufbx_prop *prop = ufbx_find_prop(props, name);
+	ufbxt_assert(prop);
+
+	ufbxt_assert(prop->type == type);
+	ufbxt_assert(prop->value_int == a);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_ANIMATABLE);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_INT);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_VEC3);
+	ufbxt_assert(prop->value_real_arr[1] == (ufbx_real)b);
+	ufbxt_assert(prop->value_real_arr[2] == (ufbx_real)c);
+}
+
+static void ufbxt_check_user_prop_float(ufbxt_diff_error *err, ufbx_props *props, const char *name, ufbx_prop_type type, double a, double b, double c)
+{
+	ufbxt_hintf("prop=%s", name);
+
+	ufbx_prop *prop = ufbx_find_prop(props, name);
+	ufbxt_assert(prop);
+
+	ufbxt_assert(prop->type == type);
+	ufbxt_assert_close_real(err, prop->value_real, a);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_ANIMATABLE);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_VEC3);
+	ufbxt_assert_close_real(err, prop->value_real_arr[1], (ufbx_real)b);
+	ufbxt_assert_close_real(err, prop->value_real_arr[2], (ufbx_real)c);
+}
+
+static void ufbxt_check_user_prop_bool(ufbx_props *props, const char *name, ufbx_prop_type type, bool value)
+{
+	ufbxt_hintf("prop=%s", name);
+
+	ufbx_prop *prop = ufbx_find_prop(props, name);
+	ufbxt_assert(prop);
+
+	ufbxt_assert(prop->type == type);
+	ufbxt_assert(prop->value_int == value ? 1 : 0);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_ANIMATABLE);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_INT);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_REAL);
+}
+
+static void ufbxt_check_user_prop_string(ufbx_props *props, const char *name, ufbx_prop_type type, const char *str)
+{
+	ufbxt_hintf("prop=%s", name);
+
+	ufbx_prop *prop = ufbx_find_prop(props, name);
+	ufbxt_assert(prop);
+
+	ufbxt_assert(prop->type == type);
+	ufbxt_assert(!strcmp(prop->value_str.data, str));
+	ufbxt_assert((prop->flags & UFBX_PROP_FLAG_ANIMATABLE) == 0);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_STR);
+}
+
+static void ufbxt_check_user_prop_enum(ufbx_props *props, const char *name, ufbx_prop_type type, int64_t value, const char *str)
+{
+	ufbxt_hintf("prop=%s", name);
+
+	ufbx_prop *prop = ufbx_find_prop(props, name);
+	ufbxt_assert(prop);
+
+	ufbxt_assert(prop->type == type);
+	ufbxt_assert(prop->value_int == value);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_ANIMATABLE);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_INT);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_REAL);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_STR);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_user_props)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "pCube1");
+		ufbxt_assert(node);
+
+		ufbx_props *props = &node->props;
+
+		ufbxt_check_user_prop_int(props, "User_Int_Unbounded", UFBX_PROP_INTEGER, 1, 1, 1);
+		ufbxt_check_user_prop_int(props, "User_Int_Lower", UFBX_PROP_INTEGER, 2, 1, 1);
+		ufbxt_check_user_prop_int(props, "User_Int_Upper", UFBX_PROP_INTEGER, 3, 10, 10);
+		ufbxt_check_user_prop_int(props, "User_Int_Bounded", UFBX_PROP_INTEGER, 4, 1, 10);
+
+		ufbxt_check_user_prop_float(err, props, "User_Float_Unbounded", UFBX_PROP_NUMBER, 0.1, 0.1, 0.1);
+		ufbxt_check_user_prop_float(err, props, "User_Float_Lower", UFBX_PROP_NUMBER, 0.2, 0.1, 0.1);
+		ufbxt_check_user_prop_float(err, props, "User_Float_Upper", UFBX_PROP_NUMBER, 0.3, 1.0, 1.0);
+		ufbxt_check_user_prop_float(err, props, "User_Float_Bounded", UFBX_PROP_NUMBER, 0.4, 0.0, 1.0);
+
+		ufbxt_check_user_prop_float(err, props, "User_Vector", UFBX_PROP_VECTOR, 0.1, 0.2, 0.3);
+		ufbxt_check_user_prop_bool(props, "User_Bool", UFBX_PROP_BOOLEAN, true);
+		ufbxt_check_user_prop_string(props, "User_String", UFBX_PROP_STRING, "Hello");
+		ufbxt_check_user_prop_enum(props, "User_Enum", UFBX_PROP_INTEGER, 1, "ValueA~ValueB~ValueC");
+	}
+
+	{
+		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, 1.0, NULL, NULL);
+		ufbxt_assert(state);
+
+		ufbx_node *node = ufbx_find_node(state, "pCube1");
+		ufbxt_assert(node);
+
+		ufbx_props *props = &node->props;
+
+		ufbxt_check_user_prop_int(props, "User_Int_Unbounded", UFBX_PROP_INTEGER, 2, 0, 0);
+		ufbxt_check_user_prop_int(props, "User_Int_Lower", UFBX_PROP_INTEGER, 3, 0, 0);
+		ufbxt_check_user_prop_int(props, "User_Int_Upper", UFBX_PROP_INTEGER, 4, 0, 0);
+		ufbxt_check_user_prop_int(props, "User_Int_Bounded", UFBX_PROP_INTEGER, 5, 0, 0);
+
+		ufbxt_check_user_prop_float(err, props, "User_Float_Unbounded", UFBX_PROP_NUMBER, 1.0, 0, 0);
+		ufbxt_check_user_prop_float(err, props, "User_Float_Lower", UFBX_PROP_NUMBER, 2.0, 0, 0);
+		ufbxt_check_user_prop_float(err, props, "User_Float_Upper", UFBX_PROP_NUMBER, -1.0, 0, 0);
+		ufbxt_check_user_prop_float(err, props, "User_Float_Bounded", UFBX_PROP_NUMBER, 0.5, 0, 0);
+
+		ufbxt_check_user_prop_float(err, props, "User_Vector", UFBX_PROP_VECTOR, -0.1, 0.4, -0.6);
+		ufbxt_check_user_prop_bool(props, "User_Bool", UFBX_PROP_BOOLEAN, false);
+		ufbxt_check_user_prop_string(props, "User_String", UFBX_PROP_STRING, "Hello");
+		ufbxt_check_user_prop_enum(props, "User_Enum", UFBX_PROP_INTEGER, 2, "ValueA~ValueB~ValueC");
+
+		ufbx_free_scene(state);
+	}
+}
+#endif
