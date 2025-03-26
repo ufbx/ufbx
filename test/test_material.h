@@ -1066,7 +1066,7 @@ UFBXT_FILE_TEST(maya_arnold_properties)
 
 	// Computed
 	ufbxt_assert_close_real(err, material->pbr.transmission_roughness.value_real, 0.36f); // 11+25
-	ufbxt_assert(err, material->pbr.thin_film_factor.value_real == 1.0f);
+	ufbxt_assert(material->pbr.thin_film_factor.value_real == 1.0f);
 
 	ufbxt_assert(material->pbr.base_factor.value_components == 1);
 	ufbxt_assert(material->pbr.base_color.value_components == 3);
@@ -1204,7 +1204,7 @@ UFBXT_FILE_TEST(maya_osl_properties)
 
 	// Computed
 	ufbxt_assert_close_real(err, material->pbr.transmission_roughness.value_real, 0.36f); // 11+25
-	ufbxt_assert(err, material->pbr.thin_film_factor.value_real == 1.0f);
+	ufbxt_assert(material->pbr.thin_film_factor.value_real == 1.0f);
 
 	ufbxt_assert(material->features.thin_walled.enabled);
 	ufbxt_assert(material->features.thin_walled.is_explicit);
