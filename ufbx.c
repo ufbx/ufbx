@@ -535,7 +535,7 @@ extern "C" {
 		#endif
 	#endif
 	// MSC isnan() definition triggers this error on MinGW GCC
-	#if defined(__MINGW__)
+	#if defined(__MINGW32__)
 		#pragma GCC diagnostic ignored "-Wfloat-conversion"
 	#endif
 #endif
