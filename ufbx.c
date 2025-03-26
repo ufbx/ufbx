@@ -1658,7 +1658,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	}
 }
 
-static ufbxi_noinline uint32_t ufbxi_parse_double_init_flags()
+static ufbxi_noinline uint32_t ufbxi_parse_double_init_flags(void)
 {
 	// We require evaluation in double precision, either for doubles (0) or always (1)
 	// and rounding to nearest, which we can check for with `1 + eps == 1 - eps`.
