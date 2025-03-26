@@ -356,6 +356,8 @@ class GCCCompiler(Compiler):
 
             if self.has_cpp:
                 args += ["-Wconversion-null"]
+            else:
+                args += ["-Wstrict-prototypes"]
             args += ["-Werror"]
 
         args.append("-g")
@@ -944,6 +946,14 @@ async def main():
             }
         }
         target_tasks += compile_permutations("runner_float", float_config, arch_configs, ["-d", "data"])
+
+        warnings_config = {
+            "sources": ["misc/test_build.c"],
+            "output": "c" + exe_suffix,
+            "warnings": True,
+            "overrides": platform_overrides,
+        }
+        target_tasks += compile_permutations("warnings", warnings_config, arch_configs, [])
 
         cpp_config = {
             "sources": ["misc/test_build.cpp"],
