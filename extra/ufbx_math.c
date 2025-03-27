@@ -138,6 +138,10 @@ static double ufbxm_set_hi(double x, ufbxm_int hi)
 extern "C" {
 #endif
 
+// Currently not exposed in the header.
+ufbx_math_abi double ufbx_scalbn(double x, ufbxm_int n);
+ufbx_math_abi double ufbx_frexp(double x, ufbxm_int *eptr);
+
 /*
  * set X_TLOSS = pi*2**52, which is possibly defined in <values.h>
  * (one may replace the following line by "#include <values.h>")
@@ -893,7 +897,7 @@ static ufbxm_int ufbxm_kernel_rem_pio2(double *x, double *y, ufbxm_int e0, ufbxm
  * pio2_3t:  pi/2 - (pio2_1+pio2_2+pio2_3)
  */
 
-ufbxm_int ufbxm_rem_pio2(double x, double *y)
+static ufbxm_int ufbxm_rem_pio2(double x, double *y)
 {
 	static const double
 		zero = 0.00000000000000000000e+00,	  /* 0x00000000, 0x00000000 */
