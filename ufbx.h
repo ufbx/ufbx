@@ -2353,6 +2353,9 @@ typedef enum ufbx_shader_type UFBX_ENUM_REPR {
 	// 3ds glTF Material
 	// https://help.autodesk.com/view/3DSMAX/2023/ENU/?guid=GUID-7ABFB805-1D9F-417E-9C22-704BFDF160FA
 	UFBX_SHADER_GLTF_MATERIAL,
+	// 3ds OpenPBR Material
+	// https://help.autodesk.com/view/3DSMAX/2025/ENU/?guid=GUID-CD90329C-1E2B-4BBA-9285-3BB46253B9C2
+	UFBX_SHADER_OPENPBR_MATERIAL,
 	// Stingray ShaderFX shader graph.
 	// Contains a serialized `"ShaderGraph"` in `ufbx_props`.
 	UFBX_SHADER_SHADERFX_GRAPH,
@@ -2437,6 +2440,7 @@ typedef enum ufbx_material_pbr_map UFBX_ENUM_REPR {
 	UFBX_MATERIAL_PBR_COAT_NORMAL,
 	UFBX_MATERIAL_PBR_COAT_AFFECT_BASE_COLOR,
 	UFBX_MATERIAL_PBR_COAT_AFFECT_BASE_ROUGHNESS,
+	UFBX_MATERIAL_PBR_THIN_FILM_FACTOR,
 	UFBX_MATERIAL_PBR_THIN_FILM_THICKNESS,
 	UFBX_MATERIAL_PBR_THIN_FILM_IOR,
 	UFBX_MATERIAL_PBR_EMISSION_FACTOR,
@@ -2561,6 +2565,7 @@ typedef struct ufbx_material_pbr_maps {
 			ufbx_material_map coat_normal;
 			ufbx_material_map coat_affect_base_color;
 			ufbx_material_map coat_affect_base_roughness;
+			ufbx_material_map thin_film_factor;
 			ufbx_material_map thin_film_thickness;
 			ufbx_material_map thin_film_ior;
 			ufbx_material_map emission_factor;
