@@ -601,9 +601,11 @@ static void ufbxt_check_binary_prop(const ufbx_props *props)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_binary_props)
+UFBXT_FILE_TEST_FLAGS(synthetic_binary_props, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
+	ufbxt_check_warning(scene, UFBX_WARNING_BAD_BASE64_CONTENT, UFBX_ELEMENT_UNKNOWN, NULL, SIZE_MAX, NULL);
+
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");
 	ufbxt_assert(node && node->mesh);
 	ufbxt_check_binary_prop(&node->props);
@@ -670,7 +672,7 @@ static size_t ufbxt_decode_hex(uint8_t *dst, size_t dst_len, ufbx_string src)
 }
 #endif
 
-UFBXT_FILE_TEST_FLAGS(synthetic_unicode, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_HEAVY_TO_FUZZ|UFBXT_FILE_TEST_FLAG_SKIP_LOAD_OPTS_CHECKS)
+UFBXT_FILE_TEST_FLAGS(synthetic_unicode, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_HEAVY_TO_FUZZ|UFBXT_FILE_TEST_FLAG_SKIP_LOAD_OPTS_CHECKS|UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(scene->metadata.warnings.count == 1);
@@ -761,7 +763,7 @@ UFBXT_FILE_TEST_FLAGS(synthetic_unicode, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNIC
 }
 #endif
 
-UFBXT_FILE_TEST(max_quote)
+UFBXT_FILE_TEST_FLAGS(max_quote, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	if (scene->metadata.ascii && scene->metadata.version == 6100) {
@@ -1151,7 +1153,7 @@ static ufbx_load_opts ufbxt_fail_unicode_opts()
 }
 #endif
 
-UFBXT_FILE_TEST_FLAGS(synthetic_unsafe_cube, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+UFBXT_FILE_TEST_FLAGS(synthetic_unsafe_cube, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, UFBX_ELEMENT_MESH, "#" "pC" "\xef\xbf\xbd" "\xef\xbf\xbd" "e1", 4, NULL);
@@ -1353,7 +1355,7 @@ UFBXT_FILE_TEST_ALT(find_prop_concat, maya_node_attribute_zoo)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_duplicate_id)
+UFBXT_FILE_TEST_FLAGS(synthetic_duplicate_id, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	if (scene->metadata.version >= 7000) {
@@ -1572,7 +1574,7 @@ UFBXT_FILE_TEST_FLAGS(motionbuilder_cube, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNI
 }
 #endif
 
-UFBXT_FILE_TEST_FLAGS(motionbuilder_thumbnail, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_ALLOW_FEWER_PROGRESS_CALLS)
+UFBXT_FILE_TEST_FLAGS(motionbuilder_thumbnail, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_ALLOW_FEWER_PROGRESS_CALLS|UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbx_thumbnail *thumbnail = &scene->metadata.thumbnail;
@@ -1827,7 +1829,7 @@ static void ufbxt_check_base64_error(ufbx_scene *scene, const char *name)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_base64_parse)
+UFBXT_FILE_TEST_FLAGS(synthetic_base64_parse, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbxt_check_base64(scene, "Hello", "Hello world");
@@ -1862,3 +1864,206 @@ UFBXT_FILE_TEST(synthetic_base64_parse)
 }
 #endif
 
+#if UFBXT_IMPL
+static void ufbxt_check_tcdefinition(ufbx_scene *scene)
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbxt_assert(scene->anim->layers.count == 1);
+	ufbx_anim_layer *layer = scene->anim->layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+	ufbxt_assert(anim_curve);
+
+	ufbxt_assert(anim_curve->keyframes.count == 2);
+	ufbxt_assert(anim_curve->keyframes.data[0].time == 0.0f);
+	ufbxt_assert(anim_curve->keyframes.data[1].time == 1.0f);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_tcdefinition_127)
+#if UFBXT_IMPL
+{
+	ufbxt_check_tcdefinition(scene);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_tcdefinition_0)
+#if UFBXT_IMPL
+{
+	ufbxt_check_tcdefinition(scene);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_tcdefinition_64)
+#if UFBXT_IMPL
+{
+	ufbxt_check_tcdefinition(scene);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_tcdefinition_0_old_header)
+#if UFBXT_IMPL
+{
+	ufbxt_check_tcdefinition(scene);
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_unsupported_cube, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
+#if UFBXT_IMPL
+{
+	if (scene->metadata.version == 2000) {
+		ufbxt_assert(!scene->metadata.ascii);
+		ufbxt_check_warning(scene, UFBX_WARNING_UNSUPPORTED_VERSION, UFBX_ELEMENT_UNKNOWN, NULL, 1, "(2000)");
+	} else if (scene->metadata.version == 8000) {
+		ufbxt_assert(scene->metadata.ascii);
+		ufbxt_check_warning(scene, UFBX_WARNING_UNSUPPORTED_VERSION, UFBX_ELEMENT_UNKNOWN, NULL, 1, "(8000)");
+	} else {
+		ufbxt_assert(false);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_unsupported_cube_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!scene);
+	ufbxt_assert(!strcmp(load_error->description.data, "Unsupported version"));
+	ufbxt_assert(load_error->description.length == strlen(load_error->description.data));
+	ufbxt_assert(load_error->type == UFBX_ERROR_UNSUPPORTED_VERSION);
+	ufbxt_assert(!strcmp(load_error->info, "2000") || !strcmp(load_error->info, "8000"));
+}
+#endif
+
+#if UFBXT_IMPL
+static void ufbxt_check_user_prop_int(ufbx_props *props, const char *name, ufbx_prop_type type, int64_t a, int64_t b, int64_t c)
+{
+	ufbxt_hintf("prop=%s", name);
+
+	ufbx_prop *prop = ufbx_find_prop(props, name);
+	ufbxt_assert(prop);
+
+	ufbxt_assert(prop->type == type);
+	ufbxt_assert(prop->value_int == a);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_ANIMATABLE);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_INT);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_VEC3);
+	ufbxt_assert(prop->value_real_arr[1] == (ufbx_real)b);
+	ufbxt_assert(prop->value_real_arr[2] == (ufbx_real)c);
+}
+
+static void ufbxt_check_user_prop_float(ufbxt_diff_error *err, ufbx_props *props, const char *name, ufbx_prop_type type, double a, double b, double c)
+{
+	ufbxt_hintf("prop=%s", name);
+
+	ufbx_prop *prop = ufbx_find_prop(props, name);
+	ufbxt_assert(prop);
+
+	ufbxt_assert(prop->type == type);
+	ufbxt_assert_close_real(err, prop->value_real, a);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_ANIMATABLE);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_VEC3);
+	ufbxt_assert_close_real(err, prop->value_real_arr[1], (ufbx_real)b);
+	ufbxt_assert_close_real(err, prop->value_real_arr[2], (ufbx_real)c);
+}
+
+static void ufbxt_check_user_prop_bool(ufbx_props *props, const char *name, ufbx_prop_type type, bool value)
+{
+	ufbxt_hintf("prop=%s", name);
+
+	ufbx_prop *prop = ufbx_find_prop(props, name);
+	ufbxt_assert(prop);
+
+	ufbxt_assert(prop->type == type);
+	ufbxt_assert(prop->value_int == value ? 1 : 0);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_ANIMATABLE);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_INT);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_REAL);
+}
+
+static void ufbxt_check_user_prop_string(ufbx_props *props, const char *name, ufbx_prop_type type, const char *str)
+{
+	ufbxt_hintf("prop=%s", name);
+
+	ufbx_prop *prop = ufbx_find_prop(props, name);
+	ufbxt_assert(prop);
+
+	ufbxt_assert(prop->type == type);
+	ufbxt_assert(!strcmp(prop->value_str.data, str));
+	ufbxt_assert((prop->flags & UFBX_PROP_FLAG_ANIMATABLE) == 0);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_STR);
+}
+
+static void ufbxt_check_user_prop_enum(ufbx_props *props, const char *name, ufbx_prop_type type, int64_t value, const char *str)
+{
+	ufbxt_hintf("prop=%s", name);
+
+	ufbx_prop *prop = ufbx_find_prop(props, name);
+	ufbxt_assert(prop);
+
+	ufbxt_assert(prop->type == type);
+	ufbxt_assert(prop->value_int == value);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_ANIMATABLE);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_INT);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_REAL);
+	ufbxt_assert(prop->flags & UFBX_PROP_FLAG_VALUE_STR);
+}
+#endif
+
+UFBXT_FILE_TEST(maya_user_props)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *node = ufbx_find_node(scene, "pCube1");
+		ufbxt_assert(node);
+
+		ufbx_props *props = &node->props;
+
+		ufbxt_check_user_prop_int(props, "User_Int_Unbounded", UFBX_PROP_INTEGER, 1, 1, 1);
+		ufbxt_check_user_prop_int(props, "User_Int_Lower", UFBX_PROP_INTEGER, 2, 1, 1);
+		ufbxt_check_user_prop_int(props, "User_Int_Upper", UFBX_PROP_INTEGER, 3, 10, 10);
+		ufbxt_check_user_prop_int(props, "User_Int_Bounded", UFBX_PROP_INTEGER, 4, 1, 10);
+
+		ufbxt_check_user_prop_float(err, props, "User_Float_Unbounded", UFBX_PROP_NUMBER, 0.1, 0.1, 0.1);
+		ufbxt_check_user_prop_float(err, props, "User_Float_Lower", UFBX_PROP_NUMBER, 0.2, 0.1, 0.1);
+		ufbxt_check_user_prop_float(err, props, "User_Float_Upper", UFBX_PROP_NUMBER, 0.3, 1.0, 1.0);
+		ufbxt_check_user_prop_float(err, props, "User_Float_Bounded", UFBX_PROP_NUMBER, 0.4, 0.0, 1.0);
+
+		ufbxt_check_user_prop_float(err, props, "User_Vector", UFBX_PROP_VECTOR, 0.1, 0.2, 0.3);
+		ufbxt_check_user_prop_bool(props, "User_Bool", UFBX_PROP_BOOLEAN, true);
+		ufbxt_check_user_prop_string(props, "User_String", UFBX_PROP_STRING, "Hello");
+		ufbxt_check_user_prop_enum(props, "User_Enum", UFBX_PROP_INTEGER, 1, "ValueA~ValueB~ValueC");
+	}
+
+	{
+		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, 1.0, NULL, NULL);
+		ufbxt_assert(state);
+
+		ufbx_node *node = ufbx_find_node(state, "pCube1");
+		ufbxt_assert(node);
+
+		ufbx_props *props = &node->props;
+
+		ufbxt_check_user_prop_int(props, "User_Int_Unbounded", UFBX_PROP_INTEGER, 2, 0, 0);
+		ufbxt_check_user_prop_int(props, "User_Int_Lower", UFBX_PROP_INTEGER, 3, 0, 0);
+		ufbxt_check_user_prop_int(props, "User_Int_Upper", UFBX_PROP_INTEGER, 4, 0, 0);
+		ufbxt_check_user_prop_int(props, "User_Int_Bounded", UFBX_PROP_INTEGER, 5, 0, 0);
+
+		ufbxt_check_user_prop_float(err, props, "User_Float_Unbounded", UFBX_PROP_NUMBER, 1.0, 0, 0);
+		ufbxt_check_user_prop_float(err, props, "User_Float_Lower", UFBX_PROP_NUMBER, 2.0, 0, 0);
+		ufbxt_check_user_prop_float(err, props, "User_Float_Upper", UFBX_PROP_NUMBER, -1.0, 0, 0);
+		ufbxt_check_user_prop_float(err, props, "User_Float_Bounded", UFBX_PROP_NUMBER, 0.5, 0, 0);
+
+		ufbxt_check_user_prop_float(err, props, "User_Vector", UFBX_PROP_VECTOR, -0.1, 0.4, -0.6);
+		ufbxt_check_user_prop_bool(props, "User_Bool", UFBX_PROP_BOOLEAN, false);
+		ufbxt_check_user_prop_string(props, "User_String", UFBX_PROP_STRING, "Hello");
+		ufbxt_check_user_prop_enum(props, "User_Enum", UFBX_PROP_INTEGER, 2, "ValueA~ValueB~ValueC");
+
+		ufbx_free_scene(state);
+	}
+}
+#endif

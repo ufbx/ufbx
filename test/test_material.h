@@ -72,7 +72,7 @@ UFBXT_FILE_TEST(maya_textured_cube)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_texture_split)
+UFBXT_FILE_TEST_FLAGS(synthetic_texture_split, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "phong1");
@@ -610,6 +610,165 @@ UFBXT_FILE_TEST(maya_shaderfx_pbs_material)
 }
 #endif
 
+UFBXT_FILE_TEST(max_openpbr_material)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "OpenPBR");
+	ufbxt_assert(material);
+
+	ufbxt_assert(material->shader_type == UFBX_SHADER_OPENPBR_MATERIAL);
+
+	ufbxt_assert( 1 == (int)round(100.0f * material->pbr.base_factor.value_real));
+	ufbxt_assert( 2 == (int)round(100.0f * material->pbr.base_color.value_vec4.x));
+	ufbxt_assert( 3 == (int)round(100.0f * material->pbr.base_color.value_vec4.y));
+	ufbxt_assert( 4 == (int)round(100.0f * material->pbr.base_color.value_vec4.z));
+	ufbxt_assert( 5 == (int)round(100.0f * material->pbr.base_color.value_vec4.w));
+	ufbxt_assert( 6 == (int)round(100.0f * material->pbr.metalness.value_real));
+	ufbxt_assert( 7 == (int)round(100.0f * material->pbr.diffuse_roughness.value_real));
+	ufbxt_assert( 8 == (int)round(100.0f * material->pbr.specular_factor.value_real));
+	ufbxt_assert( 9 == (int)round(100.0f * material->pbr.specular_color.value_vec4.x));
+	ufbxt_assert(10 == (int)round(100.0f * material->pbr.specular_color.value_vec4.y));
+	ufbxt_assert(11 == (int)round(100.0f * material->pbr.specular_color.value_vec4.z));
+	ufbxt_assert(12 == (int)round(100.0f * material->pbr.specular_color.value_vec4.w));
+	// 13 specular_ior
+	ufbxt_assert(14 == (int)round(100.0f * material->pbr.roughness.value_real));
+	ufbxt_assert(15 == (int)round(100.0f * material->pbr.specular_anisotropy.value_real));
+	ufbxt_assert(16 == (int)round(100.0f * material->pbr.transmission_factor.value_real));
+	ufbxt_assert(17 == (int)round(100.0f * material->pbr.transmission_color.value_vec4.x));
+	ufbxt_assert(18 == (int)round(100.0f * material->pbr.transmission_color.value_vec4.y));
+	ufbxt_assert(19 == (int)round(100.0f * material->pbr.transmission_color.value_vec4.z));
+	ufbxt_assert(20 == (int)round(100.0f * material->pbr.transmission_color.value_vec4.w));
+	ufbxt_assert(21 == (int)round(100.0f * material->pbr.transmission_depth.value_real));
+	ufbxt_assert(22 == (int)round(100.0f * material->pbr.transmission_scatter.value_vec4.x));
+	ufbxt_assert(23 == (int)round(100.0f * material->pbr.transmission_scatter.value_vec4.y));
+	ufbxt_assert(24 == (int)round(100.0f * material->pbr.transmission_scatter.value_vec4.z));
+	ufbxt_assert(25 == (int)round(100.0f * material->pbr.transmission_scatter.value_vec4.w));
+	ufbxt_assert(26 == (int)round(100.0f * material->pbr.transmission_scatter_anisotropy.value_real));
+	ufbxt_assert(27 == (int)round(100.0f * material->pbr.transmission_dispersion.value_real));
+	// 28 Abbe number unsupported
+	ufbxt_assert(29 == (int)round(100.0f * material->pbr.subsurface_factor.value_real));
+	ufbxt_assert(30 == (int)round(100.0f * material->pbr.subsurface_color.value_vec4.x));
+	ufbxt_assert(31 == (int)round(100.0f * material->pbr.subsurface_color.value_vec4.y));
+	ufbxt_assert(32 == (int)round(100.0f * material->pbr.subsurface_color.value_vec4.z));
+	ufbxt_assert(33 == (int)round(100.0f * material->pbr.subsurface_color.value_vec4.w));
+	ufbxt_assert(34 == (int)round(100.0f * material->pbr.subsurface_anisotropy.value_real));
+	ufbxt_assert(35 == (int)round(100.0f * material->pbr.subsurface_radius.value_vec4.x));
+	ufbxt_assert(36 == (int)round(100.0f * material->pbr.subsurface_radius.value_vec4.y));
+	ufbxt_assert(37 == (int)round(100.0f * material->pbr.subsurface_radius.value_vec4.z));
+	ufbxt_assert(38 == (int)round(100.0f * material->pbr.subsurface_radius.value_vec4.w));
+	ufbxt_assert(39 == (int)round(100.0f * material->pbr.subsurface_scale.value_real));
+	ufbxt_assert(40 == (int)round(100.0f * material->pbr.coat_factor.value_real));
+	ufbxt_assert(41 == (int)round(100.0f * material->pbr.coat_color.value_vec4.x));
+	ufbxt_assert(42 == (int)round(100.0f * material->pbr.coat_color.value_vec4.y));
+	ufbxt_assert(43 == (int)round(100.0f * material->pbr.coat_color.value_vec4.z));
+	ufbxt_assert(44 == (int)round(100.0f * material->pbr.coat_color.value_vec4.w));
+	// 45 coat_ior
+	ufbxt_assert(46 == (int)round(100.0f * material->pbr.coat_roughness.value_real));
+	ufbxt_assert(47 == (int)round(100.0f * material->pbr.coat_anisotropy.value_real));
+	// 48 Coat roughness unsupported
+	ufbxt_assert(49 == (int)round(100.0f * material->pbr.sheen_factor.value_real));
+	ufbxt_assert(50 == (int)round(100.0f * material->pbr.sheen_color.value_vec4.x));
+	ufbxt_assert(51 == (int)round(100.0f * material->pbr.sheen_color.value_vec4.y));
+	ufbxt_assert(52 == (int)round(100.0f * material->pbr.sheen_color.value_vec4.z));
+	ufbxt_assert(53 == (int)round(100.0f * material->pbr.sheen_color.value_vec4.w));
+	ufbxt_assert(54 == (int)round(100.0f * material->pbr.sheen_roughness.value_real));
+	// 55 emission combined check below
+	ufbxt_assert(56 == (int)round(100.0f * material->pbr.emission_color.value_vec4.x));
+	ufbxt_assert(57 == (int)round(100.0f * material->pbr.emission_color.value_vec4.y));
+	ufbxt_assert(58 == (int)round(100.0f * material->pbr.emission_color.value_vec4.z));
+	ufbxt_assert(59 == (int)round(100.0f * material->pbr.emission_color.value_vec4.w));
+	// 60 luminance combined with emission_factor
+	ufbxt_assert(61 == (int)round(100.0f * material->pbr.thin_film_factor.value_real));
+	ufbxt_assert(62 == (int)round(100.0f * material->pbr.thin_film_thickness.value_real));
+	// 63 thin_film_ior
+	ufbxt_assert(64 == (int)round(100.0f * material->pbr.normal_map.value_real));
+	ufbxt_assert(65 == (int)round(100.0f * material->pbr.coat_normal.value_real));
+	ufbxt_assert(66 == (int)round(100.0f * material->pbr.displacement_map.value_real));
+	// 67 indirect_diffuse currently unparsed due to not having a prefix
+	// 68 indirecct_specular currently unparsed due to not having a prefix
+
+	ufbxt_assert(130 == (int)round(100.0f * material->pbr.specular_ior.value_real));
+	ufbxt_assert(450 == (int)round(100.0f * material->pbr.coat_ior.value_real));
+	ufbxt_assert(630 == (int)round(100.0f * material->pbr.thin_film_ior.value_real));
+
+	ufbxt_assert_close_real(err, material->pbr.emission_factor.value_real, 0.55f * 6000.0f);
+
+	ufbxt_check_material_texture(scene, material->pbr.base_color.texture, "checkerboard_diffuse.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.metalness.texture, "checkerboard_metallic.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.specular_color.texture, "checkerboard_specular.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.roughness.texture, "checkerboard_roughness.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.transmission_color.texture, "checkerboard_transparency.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.transmission_scatter.texture, "checkerboard_reflection.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.subsurface_color.texture, "checkerboard_ambient.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.coat_color.texture, "checkerboard_weight.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.emission_color.texture, "checkerboard_emissive.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.emission_factor.texture, "tiny_clouds.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.normal_map.texture, "checkerboard_normal.png", false);
+	ufbxt_check_material_texture(scene, material->pbr.displacement_map.texture, "checkerboard_vector_displacement.png", false);
+
+	ufbxt_assert(material->pbr.base_factor.texture_enabled);
+	ufbxt_assert(material->pbr.base_color.texture_enabled);
+	ufbxt_assert(material->pbr.specular_factor.texture_enabled);
+	ufbxt_assert(material->pbr.specular_color.texture_enabled);
+	ufbxt_assert(material->pbr.roughness.texture_enabled);
+	ufbxt_assert(material->pbr.metalness.texture_enabled);
+	ufbxt_assert(material->pbr.diffuse_roughness.texture_enabled);
+	ufbxt_assert(material->pbr.specular_anisotropy.texture_enabled);
+	ufbxt_assert(material->pbr.transmission_factor.texture_enabled);
+	ufbxt_assert(material->pbr.transmission_color.texture_enabled);
+	ufbxt_assert(material->pbr.specular_ior.texture_enabled);
+	ufbxt_assert(material->pbr.subsurface_factor.texture_enabled);
+	ufbxt_assert(material->pbr.subsurface_scale.texture_enabled);
+	ufbxt_assert(material->pbr.emission_factor.texture_enabled);
+	ufbxt_assert(material->pbr.emission_color.texture_enabled);
+	ufbxt_assert(material->pbr.coat_factor.texture_enabled);
+	ufbxt_assert(material->pbr.coat_color.texture_enabled);
+	ufbxt_assert(material->pbr.coat_roughness.texture_enabled);
+	ufbxt_assert(material->pbr.normal_map.texture_enabled);
+	ufbxt_assert(material->pbr.coat_normal.texture_enabled);
+	ufbxt_assert(material->pbr.displacement_map.texture_enabled);
+	ufbxt_assert(material->pbr.opacity.texture_enabled);
+
+	ufbxt_assert(material->pbr.base_factor.value_components == 1);
+	ufbxt_assert(material->pbr.base_color.value_components == 4);
+	ufbxt_assert(material->pbr.specular_factor.value_components == 1);
+	ufbxt_assert(material->pbr.specular_color.value_components == 4);
+	ufbxt_assert(material->pbr.roughness.value_components == 1);
+	ufbxt_assert(material->pbr.metalness.value_components == 1);
+	ufbxt_assert(material->pbr.diffuse_roughness.value_components == 1);
+	ufbxt_assert(material->pbr.specular_anisotropy.value_components == 1);
+	ufbxt_assert(material->pbr.transmission_factor.value_components == 1);
+	ufbxt_assert(material->pbr.transmission_color.value_components == 4);
+	ufbxt_assert(material->pbr.transmission_extra_roughness.value_components == 0);
+	ufbxt_assert(material->pbr.specular_ior.value_components == 1);
+	ufbxt_assert(material->pbr.subsurface_factor.value_components == 1);
+	ufbxt_assert(material->pbr.subsurface_color.value_components == 4);
+	ufbxt_assert(material->pbr.subsurface_radius.value_components == 4);
+	ufbxt_assert(material->pbr.subsurface_scale.value_components == 1);
+	ufbxt_assert(material->pbr.emission_factor.value_components == 1);
+	ufbxt_assert(material->pbr.emission_color.value_components == 4);
+	ufbxt_assert(material->pbr.coat_factor.value_components == 1);
+	ufbxt_assert(material->pbr.coat_color.value_components == 4);
+	ufbxt_assert(material->pbr.coat_roughness.value_components == 1);
+	ufbxt_assert(material->pbr.normal_map.value_components == 1);
+	ufbxt_assert(material->pbr.coat_normal.value_components == 1);
+	ufbxt_assert(material->pbr.displacement_map.value_components == 1);
+	ufbxt_assert(material->pbr.opacity.value_components == 0);
+
+	ufbxt_assert(material->features.diffuse.enabled);
+	ufbxt_assert(material->features.metalness.enabled);
+	ufbxt_assert(material->features.specular.enabled);
+	ufbxt_assert(material->features.coat.enabled);
+	ufbxt_assert(material->features.sheen.enabled);
+	ufbxt_assert(material->features.transmission.enabled);
+	ufbxt_assert(material->features.opacity.enabled);
+	ufbxt_assert(material->features.ior.enabled);
+	ufbxt_assert(material->features.diffuse_roughness.enabled);
+	ufbxt_assert(material->features.thin_walled.enabled);
+	ufbxt_assert(material->features.thin_walled.is_explicit);
+}
+#endif
+
 UFBXT_FILE_TEST(blender_279_internal_textures)
 #if UFBXT_IMPL
 {
@@ -907,6 +1066,7 @@ UFBXT_FILE_TEST(maya_arnold_properties)
 
 	// Computed
 	ufbxt_assert_close_real(err, material->pbr.transmission_roughness.value_real, 0.36f); // 11+25
+	ufbxt_assert(material->pbr.thin_film_factor.value_real == 1.0f);
 
 	ufbxt_assert(material->pbr.base_factor.value_components == 1);
 	ufbxt_assert(material->pbr.base_color.value_components == 3);
@@ -1044,6 +1204,7 @@ UFBXT_FILE_TEST(maya_osl_properties)
 
 	// Computed
 	ufbxt_assert_close_real(err, material->pbr.transmission_roughness.value_real, 0.36f); // 11+25
+	ufbxt_assert(material->pbr.thin_film_factor.value_real == 1.0f);
 
 	ufbxt_assert(material->features.thin_walled.enabled);
 	ufbxt_assert(material->features.thin_walled.is_explicit);

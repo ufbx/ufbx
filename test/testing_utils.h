@@ -156,6 +156,7 @@ typedef struct {
 	bool bind_pose;
 	bool ignore_unskinned;
 	bool transform_skin;
+	bool no_bake;
 	ufbx_real tolerance;
 	ufbx_real uv_tolerance;
 	uint32_t allow_missing;
@@ -762,6 +763,9 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj(void *obj_data, size_t obj_
 			}
 			if (!strcmp(line, "ufbx:transform_skin")) {
 				obj->transform_skin = true;
+			}
+			if (!strcmp(line, "ufbx:no_bake")) {
+				obj->no_bake = true;
 			}
 			if (!strcmp(line, "www.blender.org")) {
 				obj->exporter = UFBXT_OBJ_EXPORTER_BLENDER;

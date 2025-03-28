@@ -452,6 +452,13 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		}
 	}
 
+	for (size_t i = 0; i < scene->anim_curves.count; i++) {
+		ufbx_anim_curve *curve = scene->anim_curves.data[i];
+		if (curve->pre_extrapolation.mode != UFBX_EXTRAPOLATION_CONSTANT || curve->post_extrapolation.mode != UFBX_EXTRAPOLATION_CONSTANT) {
+			ufbxt_add_feature(&features, "anim-extrapolation");
+		}
+	}
+
 	ufbx_vec3 unit_axes[] = {
 		{ 1.0f, 0.0f, 0.0f },
 		{ -1.0f, 0.0f, 0.0f },
@@ -564,7 +571,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 
 				free(transform_overrides);
 
-			} else if (bake) {
+			} else if (bake && !obj_file->no_bake) {
 				ufbx_bake_opts opts = { 0 };
 				opts.max_keyframe_segments = 4096;
 				if (bake_fps > 0) {

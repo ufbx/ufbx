@@ -1120,7 +1120,7 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(max_geometry_transform_order_modify, max_geometry
 #endif
 
 
-UFBXT_FILE_TEST(synthetic_geometry_transform_camera)
+UFBXT_FILE_TEST_FLAGS(synthetic_geometry_transform_camera, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "Camera001");
@@ -1134,7 +1134,7 @@ UFBXT_FILE_TEST(synthetic_geometry_transform_camera)
 #endif
 
 UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_geometry_transform_camera_helper, synthetic_geometry_transform_camera, ufbxt_geometry_transform_helper_opts,
-	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "Camera001");
@@ -1152,7 +1152,7 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_geometry_transform_camera_helper, synth
 #endif
 
 UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_geometry_transform_camera_modify, synthetic_geometry_transform_camera, ufbxt_geometry_transform_modify_opts,
-	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "Camera001");
@@ -1170,7 +1170,7 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_geometry_transform_camera_modify, synth
 #endif
 
 UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_geometry_transform_camera_modify_no_fallback, synthetic_geometry_transform_camera, ufbxt_geometry_transform_modify_no_fallback_opts,
-	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS)
+	UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS|UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS|UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "Camera001");

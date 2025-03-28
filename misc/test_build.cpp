@@ -1,5 +1,7 @@
 
 // Check everything under extra/ as well
+#include "../extra/ufbx_libc.h"
+#include "../extra/ufbx_math.h"
 #include "../extra/ufbx_libc.c"
 #include "../extra/ufbx_math.c"
 

@@ -636,7 +636,7 @@ def collect_decl_comments(decls: List[SCommentDecl]):
                 n += 1
         else:
             if len(dc) >= 2 and isinstance(dc[1], SComment) and dc[0].line_end == dc[1].line_begin:
-                comment = dc[1]._replace(text=[re.sub("^\s*<\s*", "", t) for t in dc[1].text])
+                comment = dc[1]._replace(text=[re.sub(r"^\s*<\s*", "", t) for t in dc[1].text])
                 yield dc[0]._replace(comment=comment, comment_inline=True)
                 n += 2
             else:

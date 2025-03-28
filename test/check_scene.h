@@ -1120,6 +1120,7 @@ static void ufbxt_check_anim_layer(ufbx_scene *scene, ufbx_anim_layer *anim_laye
 		ufbxt_check_string(anim_prop->prop_name);
 		ufbxt_check_element_ptr_any(scene, anim_prop->element);
 		ufbxt_check_element_ptr(scene, anim_prop->anim_value, UFBX_ELEMENT_ANIM_VALUE);
+		ufbxt_assert(anim_prop->anim_value);
 
 		ufbx_anim_prop *ref = ufbx_find_anim_prop(anim_layer, anim_prop->element, anim_prop->prop_name.data);
 		ufbxt_assert(ref);

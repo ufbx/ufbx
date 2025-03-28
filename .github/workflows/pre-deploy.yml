@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   pd_users:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,12 +29,14 @@ jobs:
           bash misc/users/magnum-plugins/run.sh
 
   pd_rust:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     uses: ufbx/ufbx-rust/.github/workflows/test.yml@main
     with:
       ufbx-rust-ref: main
       ufbx-ref: ${{ github.ref }}
 
   pd_documentation:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     uses: ufbx/ufbx.github.io/.github/workflows/test.yml@integration
     with:
       ufbx-documentation-ref: integration
@@ -41,6 +44,7 @@ jobs:
       ufbx-ref: ${{ github.ref }}
 
   pd_picort:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

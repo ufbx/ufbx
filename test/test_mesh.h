@@ -648,7 +648,7 @@ UFBXT_FILE_TEST(synthetic_indexed_by_vertex)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_by_vertex_bad_index)
+UFBXT_FILE_TEST_FLAGS(synthetic_by_vertex_bad_index, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, UFBX_ELEMENT_MESH, "#pCube1", 9, NULL);
@@ -673,7 +673,7 @@ UFBXT_FILE_TEST(synthetic_by_vertex_bad_index)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_by_vertex_overflow)
+UFBXT_FILE_TEST_FLAGS(synthetic_by_vertex_overflow, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbxt_check_warning(scene, UFBX_WARNING_INDEX_CLAMPED, UFBX_ELEMENT_MESH, "#pCube1", 12, NULL);
@@ -874,7 +874,7 @@ UFBXT_FILE_TEST(max_edge_visibility)
 }
 #endif
 
-UFBXT_FILE_TEST(zbrush_d20)
+UFBXT_FILE_TEST_FLAGS(zbrush_d20, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(scene->nodes.count == 3);
@@ -959,7 +959,7 @@ UFBXT_FILE_TEST(zbrush_d20)
 }
 #endif
 
-UFBXT_FILE_TEST(zbrush_d20_selection_set)
+UFBXT_FILE_TEST_FLAGS(zbrush_d20_selection_set, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	{
@@ -1119,7 +1119,6 @@ typedef struct {
 UFBXT_FILE_TEST(zbrush_polygroup_mess)
 #if UFBXT_IMPL
 {
-
 	ufbxt_assert(scene->meshes.count == 1);
 	ufbx_mesh *mesh = scene->meshes.data[0];
 
@@ -1211,7 +1210,7 @@ UFBXT_FILE_TEST(blender_279_empty_cube)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_truncated_crease_partial)
+UFBXT_FILE_TEST_FLAGS(synthetic_truncated_crease_partial, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, UFBX_ELEMENT_MESH, "#pPlane1", 1, "Truncated array: EdgeCrease");
@@ -1227,7 +1226,7 @@ UFBXT_FILE_TEST(synthetic_truncated_crease_partial)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_truncated_crease_full)
+UFBXT_FILE_TEST_FLAGS(synthetic_truncated_crease_full, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbxt_check_warning(scene, UFBX_WARNING_TRUNCATED_ARRAY, UFBX_ELEMENT_MESH, "#pPlane1", 1, "Truncated array: EdgeCrease");
@@ -1243,7 +1242,7 @@ UFBXT_FILE_TEST(synthetic_truncated_crease_full)
 }
 #endif
 
-UFBXT_FILE_TEST_FLAGS(motionbuilder_smoothing, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+UFBXT_FILE_TEST_FLAGS(motionbuilder_smoothing, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbxt_check_warning(scene, UFBX_WARNING_MISSING_GEOMETRY_DATA, UFBX_ELEMENT_MESH, "#pCube1", 1, "Missing geometry data: Smoothing");
@@ -1712,7 +1711,7 @@ UFBXT_FILE_TEST_OPTS(maya_uv_set_tangent_w, ufbxt_retain_vertex_w_opts)
 }
 #endif
 
-UFBXT_FILE_TEST_FLAGS(synthetic_missing_mapping, UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR)
+UFBXT_FILE_TEST_FLAGS(synthetic_missing_mapping, UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR|UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbx_node *node = ufbx_find_node(scene, "pCube1");

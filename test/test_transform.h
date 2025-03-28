@@ -20,6 +20,7 @@ static ufbxt_noinline ufbxt_obj_file *ufbxt_load_obj_file(const char *file_name,
 typedef enum {
 	UFBXT_CHECK_FRAME_SCALE_100 = 0x1,
 	UFBXT_CHECK_FRAME_Z_TO_Y_UP = 0x2,
+	UFBXT_CHECK_FRAME_NO_EXTRAPOLATE = 0x4,
 } ufbxt_check_frame_flags;
 
 void ufbxt_check_frame_imp(ufbx_scene *scene, ufbxt_diff_error *err, bool check_normals, const char *file_name, const char *anim_name, double time, uint32_t flags)
@@ -32,6 +33,10 @@ void ufbxt_check_frame_imp(ufbx_scene *scene, ufbxt_diff_error *err, bool check_
 	opts.evaluate_skinning = true;
 	opts.evaluate_caches = true;
 	opts.load_external_files = true;
+
+	if (flags & UFBXT_CHECK_FRAME_NO_EXTRAPOLATE) {
+		opts.evaluate_flags |= UFBX_EVALUATE_FLAG_NO_EXTRAPOLATION;
+	}
 
 	ufbxt_obj_file *obj_file = ufbxt_load_obj_file(file_name, NULL);
 
@@ -77,10 +82,24 @@ void ufbxt_check_frame(ufbx_scene *scene, ufbxt_diff_error *err, bool check_norm
 #endif
 
 #if UFBXT_IMPL
-static void ufbxt_check_transform_consistency(ufbxt_diff_error *err, ufbx_scene *scene, double sample_rate, uint32_t frame_count)
+enum {
+	UFBXT_CHECK_TRANSFORM_CONSISTENCY_NO_BAKE = 0x1,
+	UFBXT_CHECK_TRANSFORM_CONSISTENCY_NO_EXTRAPOLATION = 0x2,
+};
+
+static void ufbxt_check_transform_consistency(ufbxt_diff_error *err, ufbx_scene *scene, double sample_rate, uint32_t frame_count, uint32_t flags)
 {
+	uint32_t eval_flags = 0;
+	uint32_t transform_flags = 0;
+	if (flags & UFBXT_CHECK_TRANSFORM_CONSISTENCY_NO_EXTRAPOLATION) {
+		eval_flags |= UFBX_EVALUATE_FLAG_NO_EXTRAPOLATION;
+		transform_flags |= UFBX_TRANSFORM_FLAG_NO_EXTRAPOLATION;
+	}
+
 	ufbx_bake_opts bake_opts = { 0 };
 	bake_opts.resample_rate = sample_rate;
+	bake_opts.evaluate_flags = eval_flags;
+	bake_opts.max_keyframe_segments = 4096;
 
 	ufbx_error error;
 	ufbx_baked_anim *bake = ufbx_bake_anim(scene, scene->anim, &bake_opts, &error);
@@ -88,8 +107,11 @@ static void ufbxt_check_transform_consistency(ufbxt_diff_error *err, ufbx_scene 
 	ufbxt_assert(bake);
 
 	for (uint32_t frame = 0; frame <= frame_count; frame++) {
+		ufbx_evaluate_opts eval_opts = { 0 };
+		eval_opts.evaluate_flags = eval_flags;
+
 		double time = (double)frame / sample_rate;
-		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, NULL, &error);
+		ufbx_scene *state = ufbx_evaluate_scene(scene, scene->anim, time, &eval_opts, &error);
 		if (!state) ufbxt_log_error(&error);
 		ufbxt_assert(state);
 
@@ -100,20 +122,22 @@ static void ufbxt_check_transform_consistency(ufbxt_diff_error *err, ufbx_scene 
 
 			ufbx_transform state_transform = state_node->local_transform;
 
-			ufbx_transform eval_transform = ufbx_evaluate_transform(scene->anim, scene_node, time);
-
-			ufbx_transform bake_transform = { 0 };
-			bake_transform.translation = ufbx_evaluate_baked_vec3(bake_node->translation_keys, time);
-			bake_transform.rotation = ufbx_evaluate_baked_quat(bake_node->rotation_keys, time);
-			bake_transform.scale = ufbx_evaluate_baked_vec3(bake_node->scale_keys, time);
+			ufbx_transform eval_transform = ufbx_evaluate_transform_flags(scene->anim, scene_node, time, transform_flags);
 
 			ufbxt_assert_close_vec3(err, state_transform.translation, eval_transform.translation);
 			ufbxt_assert_close_quat(err, state_transform.rotation, eval_transform.rotation);
 			ufbxt_assert_close_vec3(err, state_transform.scale, eval_transform.scale);
 
-			ufbxt_assert_close_vec3(err, state_transform.translation, bake_transform.translation);
-			ufbxt_assert_close_quat(err, state_transform.rotation, bake_transform.rotation);
-			ufbxt_assert_close_vec3(err, state_transform.scale, bake_transform.scale);
+			if ((flags & UFBXT_CHECK_TRANSFORM_CONSISTENCY_NO_BAKE) == 0) {
+				ufbx_transform bake_transform = { 0 };
+				bake_transform.translation = ufbx_evaluate_baked_vec3(bake_node->translation_keys, time);
+				bake_transform.rotation = ufbx_evaluate_baked_quat(bake_node->rotation_keys, time);
+				bake_transform.scale = ufbx_evaluate_baked_vec3(bake_node->scale_keys, time);
+
+				ufbxt_assert_close_vec3(err, state_transform.translation, bake_transform.translation);
+				ufbxt_assert_close_quat(err, state_transform.rotation, bake_transform.rotation);
+				ufbxt_assert_close_vec3(err, state_transform.scale, bake_transform.scale);
+			}
 		}
 
 		ufbx_free_scene(state);
@@ -1147,7 +1171,7 @@ UFBXT_TEST(maya_axes_lefthanded)
 			if (!scene) ufbxt_log_error(&error);
 			ufbxt_assert(scene);
 
-			ufbxt_check_transform_consistency(&err, scene, 24.0, 1);
+			ufbxt_check_transform_consistency(&err, scene, 24.0, 1, 0);
 
 			ufbxt_check_scene(scene);
 			ufbxt_diff_to_obj(scene, obj_file, &err, 0);
@@ -1190,7 +1214,7 @@ UFBXT_TEST(maya_axes_lefthanded_adjust)
 			if (!scene) ufbxt_log_error(&error);
 			ufbxt_assert(scene);
 
-			ufbxt_check_transform_consistency(&err, scene, 24.0, 1);
+			ufbxt_check_transform_consistency(&err, scene, 24.0, 1, 0);
 
 			ufbxt_check_scene(scene);
 			ufbxt_diff_to_obj(scene, obj_file, &err, 0);
@@ -1229,7 +1253,7 @@ UFBXT_TEST(maya_axes_lefthanded_modify)
 			if (!scene) ufbxt_log_error(&error);
 			ufbxt_assert(scene);
 
-			ufbxt_check_transform_consistency(&err, scene, 24.0, 1);
+			ufbxt_check_transform_consistency(&err, scene, 24.0, 1, 0);
 
 			ufbxt_check_scene(scene);
 			ufbxt_diff_to_obj(scene, obj_file, &err, 0);
@@ -1303,7 +1327,7 @@ UFBXT_TEST(maya_axes_anim_lefthanded)
 			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_5", NULL, 5.0/24.0);
 			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_8", NULL, 8.0/24.0);
 
-			ufbxt_check_transform_consistency(&err, scene, 24.0, 24);
+			ufbxt_check_transform_consistency(&err, scene, 24.0, 24, 0);
 
 			ufbx_free_scene(scene);
 		}
@@ -1347,7 +1371,7 @@ UFBXT_TEST(maya_axes_anim_lefthanded_adjust)
 			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_5", NULL, 5.0/24.0);
 			ufbxt_check_frame(scene, &err, false, "maya_axes_anim_lefthanded_8", NULL, 8.0/24.0);
 
-			ufbxt_check_transform_consistency(&err, scene, 24.0, 24);
+			ufbxt_check_transform_consistency(&err, scene, 24.0, 24, 0);
 
 			ufbx_free_scene(scene);
 		}
@@ -1386,7 +1410,7 @@ UFBXT_TEST(maya_axes_anim_lefthanded_modify)
 			ufbxt_check_frame_imp(scene, &err, false, "maya_axes_anim_lefthanded_5", NULL, 5.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
 			ufbxt_check_frame_imp(scene, &err, false, "maya_axes_anim_lefthanded_8", NULL, 8.0/24.0, UFBXT_CHECK_FRAME_SCALE_100);
 
-			ufbxt_check_transform_consistency(&err, scene, 24.0, 24);
+			ufbxt_check_transform_consistency(&err, scene, 24.0, 24, 0);
 
 			ufbx_free_scene(scene);
 		}
@@ -1807,5 +1831,24 @@ UFBXT_TEST(maya_advanced_skinned_pivot_opts)
 UFBXT_FILE_TEST(blender_340_mirrored_normals)
 #if UFBXT_IMPL
 {
+}
+#endif
+
+UFBXT_FILE_TEST(maya_extrapolate_cube)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_extrapolate_cube_26", NULL, 26.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_extrapolate_cube_60", NULL, 60.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_extrapolate_cube_80", NULL, 80.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_extrapolate_cube_100", NULL, 100.0/24.0);
+
+	ufbxt_check_frame_imp(scene, err, true, "maya_extrapolate_cube_noex_28", NULL, 28.0/24.0, UFBXT_CHECK_FRAME_NO_EXTRAPOLATE);
+	ufbxt_check_frame_imp(scene, err, true, "maya_extrapolate_cube_noex_34", NULL, 34.0/24.0, UFBXT_CHECK_FRAME_NO_EXTRAPOLATE);
+	ufbxt_check_frame_imp(scene, err, true, "maya_extrapolate_cube_noex_44", NULL, 44.0/24.0, UFBXT_CHECK_FRAME_NO_EXTRAPOLATE);
+	ufbxt_check_frame_imp(scene, err, true, "maya_extrapolate_cube_noex_68", NULL, 68.0/24.0, UFBXT_CHECK_FRAME_NO_EXTRAPOLATE);
+	ufbxt_check_frame_imp(scene, err, true, "maya_extrapolate_cube_noex_68", NULL, 100.0/24.0, UFBXT_CHECK_FRAME_NO_EXTRAPOLATE);
+
+	ufbxt_check_transform_consistency(err, scene, 24.0, 120, UFBXT_CHECK_TRANSFORM_CONSISTENCY_NO_BAKE);
+	ufbxt_check_transform_consistency(err, scene, 24.0, 120, UFBXT_CHECK_TRANSFORM_CONSISTENCY_NO_EXTRAPOLATION);
 }
 #endif

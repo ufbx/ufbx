@@ -792,7 +792,7 @@ UFBXT_TEST(max_transformed_skin_lefthanded)
 			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_5", NULL, 5.0/30.0);
 			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_15", NULL, 15.0/30.0);
 
-			ufbxt_check_transform_consistency(&err, scene, 30.0, 30);
+			ufbxt_check_transform_consistency(&err, scene, 30.0, 30, 0);
 
 			ufbx_free_scene(scene);
 		}
@@ -828,7 +828,7 @@ UFBXT_TEST(max_transformed_skin_lefthanded_adjust)
 			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_5", NULL, 5.0/30.0);
 			ufbxt_check_frame(scene, &err, false, "max_transformed_skin_lefthanded_15", NULL, 15.0/30.0);
 
-			ufbxt_check_transform_consistency(&err, scene, 30.0, 30);
+			ufbxt_check_transform_consistency(&err, scene, 30.0, 30, 0);
 
 			ufbx_free_scene(scene);
 		}
@@ -838,7 +838,7 @@ UFBXT_TEST(max_transformed_skin_lefthanded_adjust)
 }
 #endif
 
-UFBXT_FILE_TEST(synthetic_bind_to_root)
+UFBXT_FILE_TEST_FLAGS(synthetic_bind_to_root, UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
 #if UFBXT_IMPL
 {
 	ufbxt_check_warning(scene, UFBX_WARNING_BAD_ELEMENT_CONNECTED_TO_ROOT, UFBX_ELEMENT_SKIN_DEFORMER, "", SIZE_MAX, NULL);

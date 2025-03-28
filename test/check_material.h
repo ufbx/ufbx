@@ -78,6 +78,7 @@ static const char *ufbxt_pbr_map_name(ufbx_material_pbr_map map)
 	case UFBX_MATERIAL_PBR_COAT_NORMAL: return "coat_normal";
 	case UFBX_MATERIAL_PBR_COAT_AFFECT_BASE_COLOR: return "coat_affect_base_color";
 	case UFBX_MATERIAL_PBR_COAT_AFFECT_BASE_ROUGHNESS: return "coat_affect_base_roughness";
+	case UFBX_MATERIAL_PBR_THIN_FILM_FACTOR: return "thin_film_factor";
 	case UFBX_MATERIAL_PBR_THIN_FILM_THICKNESS: return "thin_film_thickness";
 	case UFBX_MATERIAL_PBR_THIN_FILM_IOR: return "thin_film_ior";
 	case UFBX_MATERIAL_PBR_EMISSION_FACTOR: return "emission_factor";
@@ -150,6 +151,7 @@ static const char *ufbxt_shader_type_name(ufbx_shader_type map)
 	case UFBX_SHADER_3DS_MAX_PBR_METAL_ROUGH: return "3ds_max_pbr_metal_rough";
 	case UFBX_SHADER_3DS_MAX_PBR_SPEC_GLOSS: return "3ds_max_pbr_spec_gloss";
 	case UFBX_SHADER_GLTF_MATERIAL: return "gltf_material";
+	case UFBX_SHADER_OPENPBR_MATERIAL: return "openpbr_material";
 	case UFBX_SHADER_SHADERFX_GRAPH: return "shaderfx_graph";
 	case UFBX_SHADER_BLENDER_PHONG: return "blender_phong";
 	case UFBX_SHADER_WAVEFRONT_MTL: return "wavefront_mtl";
@@ -158,7 +160,7 @@ static const char *ufbxt_shader_type_name(ufbx_shader_type map)
 #endif
 	}
 
-	ufbxt_assert(0 && "Unhandled material feature name");
+	ufbxt_assert(0 && "Unhandled shader type");
 	return 0;
 }
 
