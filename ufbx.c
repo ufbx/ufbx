@@ -41,6 +41,7 @@
 //   UFBX_DEBUG_BINARY_SEARCH  Force using binary search for debugging
 //   UFBX_EXTENSIVE_THREADING  Use threads for small inputs
 //   UFBX_POINTER_SIZE         Allow specifying sizeof(void*) as a preprocessor constant
+//   UFBX_MAXIMUM_ALIGNMENT    Maximum alignment used for allocation
 
 #if defined(UFBX_CONFIG_SOURCE)
 	#include UFBX_CONFIG_SOURCE
