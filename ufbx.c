@@ -12056,8 +12056,9 @@ static ufbxi_forceinline uint64_t ufbxi_synthetic_id_from_pointer(const void *pt
 	return (uptr >> 1u) | UFBXI_SYNTHETIC_ID_BIT;
 }
 
-static ufbxi_forceinline uint64_t ufbxi_synthetic_id_from_string(const char *str)
+static ufbxi_forceinline uint64_t ufbxi_synthetic_id_from_string(ufbxi_context *uc, const char *str)
 {
+	(void)uc;
 	uintptr_t uptr = (uintptr_t)str;
 	uptr &= ~(uintptr_t)1;
 	return (uptr >> 1u) | UFBXI_SYNTHETIC_ID_BIT;
@@ -14462,7 +14463,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_pose(ufbxi_context *uc, ufb
 		if (uc->version < 7000) {
 			char *name = NULL;
 			if (!ufbxi_find_val1(n, ufbxi_Node, "c", &name)) continue;
-			fbx_id = ufbxi_synthetic_id_from_string(name);
+			fbx_id = ufbxi_synthetic_id_from_string(uc, name);
+			ufbxi_check(fbx_id);
 		} else {
 			if (!ufbxi_find_val1(n, ufbxi_Node, "L", &fbx_id)) continue;
 		}
@@ -14653,7 +14655,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_c
 		ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &attrib_type_str, &attrib_name_str));
 		if (attrib_name_str.length > 0) {
 			attrib_info.name = attrib_name_str;
-			uint64_t attrib_id = ufbxi_synthetic_id_from_string(type_and_name.data);
+			uint64_t attrib_id = ufbxi_synthetic_id_from_string(uc, type_and_name.data);
+			ufbxi_check(attrib_id);
 			if (info->fbx_id != attrib_id && !ufbxi_fbx_id_exists(uc, attrib_id)) {
 				attrib_info.fbx_id = attrib_id;
 			}
@@ -14756,7 +14759,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_object(ufbxi_context *uc, u
 		ufbxi_check((info.fbx_id & UFBXI_SYNTHETIC_ID_BIT) == 0);
 	} else {
 		if (!ufbxi_get_val2(node, "ss", &type_and_name, &sub_type_str)) return 1;
-		info.fbx_id = ufbxi_synthetic_id_from_string(type_and_name.data);
+		info.fbx_id = ufbxi_synthetic_id_from_string(uc, type_and_name.data);
+		ufbxi_check(info.fbx_id);
 	}
 
 	// Remove the "Fbx" prefix from sub-types, remember to re-intern!
@@ -15061,8 +15065,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_connections(ufbxi_context *
 				ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &dst_prop, false));
 			}
 
-			src_id = ufbxi_synthetic_id_from_string(src_name);
-			dst_id = ufbxi_synthetic_id_from_string(dst_name);
+			src_id = ufbxi_synthetic_id_from_string(uc, src_name);
+			dst_id = ufbxi_synthetic_id_from_string(uc, dst_name);
+			ufbxi_check(src_id && dst_id);
 
 		} else {
 			// Post-7000 versions use proper unique 64-bit IDs
@@ -15402,7 +15407,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_object(ufbxi_context *
 	// pooled interned string pointers.
 	const char *type_and_name = NULL;
 	ufbxi_check(ufbxi_get_val1(node, "c", (char**)&type_and_name));
-	uint64_t target_fbx_id = ufbxi_synthetic_id_from_string(type_and_name);
+	uint64_t target_fbx_id = ufbxi_synthetic_id_from_string(uc, type_and_name);
+	ufbxi_check(target_fbx_id);
 
 	// Add all suitable Channels as animated properties
 	ufbxi_for(ufbxi_node, child, node->children, node->num_children) {
@@ -15604,7 +15610,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_root(ufbxi_context *uc)
 		const char *root_name = uc->from_ascii ? "Model::Scene" : "Scene\x00\x01Model";
 		root_name = ufbxi_push_string_imp(&uc->string_pool, root_name, 12, NULL, false, true);
 		ufbxi_check(root_name);
-		uc->root_id = ufbxi_synthetic_id_from_string(root_name);
+		uc->root_id = ufbxi_synthetic_id_from_string(uc, root_name);
+		ufbxi_check(uc->root_id);
 	}
 
 	// Add a nameless root node with the root ID
@@ -16039,7 +16046,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_mesh(ufbxi_context *
 			ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type, &name));
 			ufbxi_check(ufbxi_read_legacy_link(uc, child, &fbx_id, name.data));
 
-			uint64_t node_fbx_id = ufbxi_synthetic_id_from_string(type_and_name.data);
+			uint64_t node_fbx_id = ufbxi_synthetic_id_from_string(uc, type_and_name.data);
+			ufbxi_check(node_fbx_id);
 			ufbxi_check(ufbxi_connect_oo(uc, node_fbx_id, fbx_id));
 			if (!skin) {
 				skin = ufbxi_push_synthetic_element(uc, &skin_fbx_id, NULL, info->name.data, ufbx_skin_deformer, UFBX_ELEMENT_SKIN_DEFORMER);
@@ -16083,7 +16091,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_model(ufbxi_context 
 	ufbxi_check(ufbxi_split_type_and_name(uc, type_and_name, &type, &name));
 
 	ufbxi_element_info info = { 0 };
-	info.fbx_id = ufbxi_synthetic_id_from_string(type_and_name.data);
+	info.fbx_id = ufbxi_synthetic_id_from_string(uc, type_and_name.data);
+	ufbxi_check(info.fbx_id);
 	info.name = name;
 	info.dom_node = ufbxi_get_dom_node(uc, node);
 
@@ -16125,7 +16134,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_model(ufbxi_context 
 	if (children) {
 		ufbx_string *names = (ufbx_string*)children->data;
 		for (size_t i = 0; i < children->size; i++) {
-			uint64_t child_fbx_id = ufbxi_synthetic_id_from_string(names[i].data);
+			uint64_t child_fbx_id = ufbxi_synthetic_id_from_string(uc, names[i].data);
+			ufbxi_check(child_fbx_id);
 			ufbxi_check(ufbxi_connect_oo(uc, child_fbx_id, info.fbx_id));
 		}
 	}
@@ -17096,7 +17106,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context
 
 	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &name, false));
 
-	uint64_t fbx_id = ufbxi_synthetic_id_from_string(name.data);
+	uint64_t fbx_id = ufbxi_synthetic_id_from_string(uc, name.data);
+	ufbxi_check(fbx_id);
 
 	ufbxi_fbx_id_entry *entry = ufbxi_find_fbx_id(uc, fbx_id);
 
