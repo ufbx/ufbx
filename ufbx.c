@@ -949,10 +949,12 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 #if !defined(UFBX_STANDARD_C) && defined(__GNUC__) && defined(__has_builtin)
 	#if __has_builtin(__builtin_is_aligned)
 		#define ufbxi_is_aligned(m_ptr, m_align) __builtin_is_aligned((m_ptr), (m_align))
+		#define ufbxi_is_aligned_mask(m_ptr, m_align) __builtin_is_aligned((m_ptr), (m_align) + 1)
 	#endif
 #endif
 #ifndef ufbxi_is_aligned
 	#define ufbxi_is_aligned(m_ptr, m_align) (((uintptr_t)(m_ptr) & ((m_align) - 1)) == 0)
+	#define ufbxi_is_aligned_mask(m_ptr, m_align) (((uintptr_t)(m_ptr) & (m_align)) == 0)
 #endif
 
 // -- Debug
@@ -3564,7 +3566,7 @@ static ufbxi_noinline void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size,
 		ufbxi_fmt_err_info(ator->error, "%s", ator->name);
 		return NULL;
 	}
-	ufbx_assert(ufbxi_is_aligned(ptr, ufbxi_size_align_mask(total)) == 0);
+	ufbx_assert(ufbxi_is_aligned_mask(ptr, ufbxi_size_align_mask(total)) == 0);
 
 	ator->current_size += total;
 
@@ -3607,7 +3609,7 @@ static ufbxi_noinline void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t siz
 	}
 
 	ufbxi_check_return_err_msg(ator->error, ptr, NULL, "Out of memory");
-	ufbx_assert(ufbxi_is_aligned(ptr, ufbxi_size_align_mask(total)) == 0);
+	ufbx_assert(ufbxi_is_aligned_mask(ptr, ufbxi_size_align_mask(total)) == 0);
 
 	ator->current_size += total;
 	ator->current_size -= old_total;
