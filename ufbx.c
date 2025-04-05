@@ -1734,7 +1734,7 @@ static ufbxi_forceinline int64_t ufbxi_parse_int64(const char *str, char **end)
 
 	// TODO: Wrap/clamp?
 	*end = (char*)str + len;
-	return negative ? -(int64_t)abs_val : (int64_t)abs_val;
+	return negative ? (int64_t)(0 - abs_val) : (int64_t)abs_val;
 }
 
 static ufbxi_noinline uint32_t ufbxi_parse_uint32_radix(const char *str, uint32_t radix)
