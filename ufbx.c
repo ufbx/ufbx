@@ -606,7 +606,13 @@ extern "C" {
 	#endif
 #endif
 
-#if defined(UFBX_USE_SSE) || (!defined(UFBX_STANDARD_C) && !defined(UFBX_NO_SSE) && ((defined(_MSC_VER) && defined(_M_X64) && !defined(_M_ARM64EC)) || ((defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__))))
+#if !defined(UFBX_STANDARD_C) && ((defined(_MSC_VER) && defined(_M_X64) && !defined(_M_ARM64EC)) || ((defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)))
+	#define UFBXI_ARCH_X64 1
+#elif
+	#define UFBXI_ARCH_X64 0
+#endif
+
+#if defined(UFBX_USE_SSE) || (!defined(UFBX_STANDARD_C) && !defined(UFBX_NO_SSE) && UFBXI_ARCH_X64)
 	#define UFBXI_HAS_SSE 1
 	#include <xmmintrin.h>
 	#include <emmintrin.h>
@@ -867,7 +873,7 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 
 // -- Wrapping right shift
 
-#if !defined(UFBX_STANDARD_C) && defined(_MSC_VER) && defined(_M_X64)
+#if UFBXI_ARCH_X64
 	#define ufbxi_wrap_shr64(a, b) ((a) >> (b))
 #else
 	#define ufbxi_wrap_shr64(a, b) ((a) >> ((b) & 63))
