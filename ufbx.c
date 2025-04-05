@@ -12163,11 +12163,10 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 
 	ufbxi_check_return(ufbxi_push_copy_fast(&uc->tmp_element_ptrs, ufbx_element*, 1, &elem), NULL);
 
-	uint64_t fbx_id = ufbxi_synthetic_id_from_pointer(elem);
-	*p_fbx_id = fbx_id;
+	ufbxi_check_return(ufbxi_push_synthetic_id(uc, p_fbx_id), NULL);
 
-	ufbxi_check_return(ufbxi_push_copy_fast(&uc->tmp_element_fbx_ids, uint64_t, 1, &fbx_id), NULL);
-	ufbxi_check_return(ufbxi_insert_fbx_id(uc, fbx_id, element_id), NULL);
+	ufbxi_check_return(ufbxi_push_copy_fast(&uc->tmp_element_fbx_ids, uint64_t, 1, p_fbx_id), NULL);
+	ufbxi_check_return(ufbxi_insert_fbx_id(uc, *p_fbx_id, element_id), NULL);
 
 	return elem;
 }
