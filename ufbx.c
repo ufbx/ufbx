@@ -4583,6 +4583,20 @@ static int ufbxi_map_cmp_uintptr(void *user, const void *va, const void *vb)
 	return 0;
 }
 
+typedef struct {
+	uint64_t id;
+	uintptr_t ptr;
+} ufbxi_ptr_id;
+
+static int ufbxi_map_cmp_ptr_id(void *user, const void *va, const void *vb)
+{
+	(void)user;
+	ufbxi_ptr_id a = *(const ufbxi_ptr_id*)va, b = *(const ufbxi_ptr_id*)vb;
+	if (a.id != b.id) return a.id < b.id ? -1 : +1;
+	if (a.ptr != b.ptr) return a.ptr < b.ptr ? -1 : +1;
+	return 0;
+}
+
 // -- Hash functions
 
 static ufbxi_noinline uint32_t ufbxi_hash_string(const char *str, size_t length)
@@ -4693,6 +4707,12 @@ static ufbxi_forceinline uint32_t ufbxi_hash_uptr(uintptr_t ptr)
 	else if (sizeof(ptr) == 4) return ufbxi_hash32((uint32_t)ptr);
 	else return ufbxi_hash_string((const char*)&ptr, sizeof(uintptr_t));
 #endif
+}
+
+static ufbxi_forceinline uint32_t ufbxi_hash_ptr_id(ufbxi_ptr_id id)
+{
+	// Trivial reduction is fine: Only `ptr` or `id` is defined.
+	return ufbxi_hash_uptr(id.ptr) ^ ufbxi_hash64(id.id);
 }
 
 #define ufbxi_hash_ptr(ptr) ufbxi_hash_uptr((uintptr_t)(ptr))
@@ -6171,6 +6191,11 @@ typedef struct {
 } ufbxi_fbx_id_entry;
 
 typedef struct {
+	ufbxi_ptr_id ptr_id;
+	uint64_t fbx_id;
+} ufbxi_ptr_fbx_id_entry;
+
+typedef struct {
 	uint64_t node_fbx_id;
 	uint64_t attr_fbx_id;
 } ufbxi_fbx_attr_entry;
@@ -6370,10 +6395,11 @@ typedef struct {
 	ufbxi_allocator ator_tmp;
 
 	// Temporary maps
-	ufbxi_map prop_type_map;    // < `ufbxi_prop_type_name` Property type to enum
-	ufbxi_map fbx_id_map;       // < `ufbxi_fbx_id_entry` FBX ID to local ID
-	ufbxi_map texture_file_map; // < `ufbxi_texture_file_entry` absolute raw filename to element ID
-	ufbxi_map anim_stack_map;   // < `ufbxi_tmp_anim_stack` anim stacks by name before finalization
+	ufbxi_map prop_type_map;     // < `ufbxi_prop_type_name` Property type to enum
+	ufbxi_map fbx_id_map;        // < `ufbxi_fbx_id_entry` FBX ID to local ID
+	ufbxi_map ptr_fbx_id_map;    // < `ufbxi_ptr_fbx_id_entry` Pointer/negative ID to FBX ID
+	ufbxi_map texture_file_map;  // < `ufbxi_texture_file_entry` absolute raw filename to element ID
+	ufbxi_map anim_stack_map;    // < `ufbxi_tmp_anim_stack` anim stacks by name before finalization
 
 	// 6x00 specific maps
 	ufbxi_map fbx_attr_map;  // < `ufbxi_fbx_attr_entry` Node ID to attrib ID
@@ -6459,6 +6485,8 @@ typedef struct {
 	ufbx_size_fn *size_fn;
 
 	ufbxi_ascii ascii;
+
+	uint64_t synthetic_id_counter;
 
 	bool has_geometry_transform_nodes;
 	bool has_scale_helper_nodes;
@@ -12047,30 +12075,53 @@ ufbxi_nodiscard static ufbx_props *ufbxi_find_template(ufbxi_context *uc, const 
 }
 
 // Name ID categories
-#define UFBXI_SYNTHETIC_ID_BIT UINT64_C(0x8000000000000000)
+#if defined(UFBX_REGRESSION)
+	#define UFBXI_MAXIMUM_FAST_POINTER_ID UINT64_C(0x10000000)
+#else
+	#define UFBXI_MAXIMUM_FAST_POINTER_ID UINT64_C(0x4000000000000000)
+#endif
+#define UFBXI_POINTER_ID_START UINT64_C(0x8000000000000000)
+#define UFBXI_SYNTHETIC_ID_START (UFBXI_POINTER_ID_START + UFBXI_MAXIMUM_FAST_POINTER_ID)
 
-ufbx_static_assert(uptr_size, sizeof(uintptr_t) <= sizeof(uint64_t));
-
-static ufbxi_forceinline uint64_t ufbxi_synthetic_id_from_pointer(const void *ptr)
+static ufbxi_forceinline uint64_t ufbxi_push_synthetic_id(ufbxi_context *uc)
 {
-	uintptr_t uptr = (uintptr_t)ptr;
-	ufbx_assert((uptr & 0x1) == 0);
-	return (uptr >> 1u) | UFBXI_SYNTHETIC_ID_BIT;
+	return ++uc->synthetic_id_counter;
+}
+
+static ufbxi_noinline uint64_t ufbxi_synthetic_id_from_ptr_id(ufbxi_context *uc, uintptr_t ptr, uint64_t id)
+{
+	ufbxi_ptr_id ptr_id = { ptr, id };
+	uint32_t hash = ufbxi_hash_ptr_id(ptr_id);
+	ufbxi_ptr_fbx_id_entry *entry = ufbxi_map_find(&uc->ptr_fbx_id_map, ufbxi_ptr_fbx_id_entry, hash, &ptr_id);
+
+	if (!entry) {
+		entry = ufbxi_map_insert(&uc->ptr_fbx_id_map, ufbxi_ptr_fbx_id_entry, hash, &ptr_id);
+		ufbxi_check_return(entry, 0);
+		entry->ptr_id = ptr_id;
+		entry->fbx_id = ufbxi_push_synthetic_id(uc);
+	}
+
+	return entry->fbx_id;
 }
 
 static ufbxi_forceinline uint64_t ufbxi_synthetic_id_from_string(ufbxi_context *uc, const char *str)
 {
-	(void)uc;
 	uintptr_t uptr = (uintptr_t)str;
-	uptr &= ~(uintptr_t)1;
-	return (uptr >> 1u) | UFBXI_SYNTHETIC_ID_BIT;
+	if (uptr < UFBXI_MAXIMUM_FAST_POINTER_ID) {
+		return (uint64_t)uptr;
+	} else {
+		return ufbxi_synthetic_id_from_ptr_id(uc, uptr, 0);
+	}
 }
 
-static ufbxi_noinline int ufbxi_push_synthetic_id(ufbxi_context *uc, uint64_t *p_dst)
+ufbxi_nodiscard ufbxi_forceinline static int ufbxi_validate_fbx_id(ufbxi_context *uc, uint64_t *p_fbx_id)
 {
-	void *ptr = ufbxi_push_size(&uc->tmp, 8, 1);
-	ufbxi_check(ptr);
-	*p_dst = ufbxi_synthetic_id_from_pointer(ptr);
+	uint64_t fbx_id = *p_fbx_id;
+	if (fbx_id >= UFBXI_POINTER_ID_START) {
+		fbx_id = ufbxi_synthetic_id_from_ptr_id(uc, 0, fbx_id);
+		ufbxi_check(fbx_id);
+		*p_fbx_id = fbx_id;
+	}
 	return 1;
 }
 
@@ -12211,7 +12262,7 @@ ufbxi_nodiscard ufbxi_noinline static ufbx_element *ufbxi_push_synthetic_element
 
 	ufbxi_check_return(ufbxi_push_copy_fast(&uc->tmp_element_ptrs, ufbx_element*, 1, &elem), NULL);
 
-	ufbxi_check_return(ufbxi_push_synthetic_id(uc, p_fbx_id), NULL);
+	*p_fbx_id = ufbxi_push_synthetic_id(uc);
 
 	ufbxi_check_return(ufbxi_push_copy_fast(&uc->tmp_element_fbx_ids, uint64_t, 1, p_fbx_id), NULL);
 	ufbxi_check_return(ufbxi_insert_fbx_id(uc, *p_fbx_id, element_id), NULL);
@@ -12929,7 +12980,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_blend_shapes(ufbx
 
 		ufbxi_element_info shape_info = { 0 };
 
-		ufbxi_check(ufbxi_push_synthetic_id(uc, &shape_info.fbx_id));
+		shape_info.fbx_id = ufbxi_push_synthetic_id(uc);
 		shape_info.name = name;
 		shape_info.dom_node = ufbxi_get_dom_node(uc, n);
 
@@ -14469,6 +14520,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_pose(ufbxi_context *uc, ufb
 			ufbxi_check(fbx_id);
 		} else {
 			if (!ufbxi_find_val1(n, ufbxi_Node, "L", &fbx_id)) continue;
+			ufbxi_check(ufbxi_validate_fbx_id(uc, &fbx_id));
 		}
 
 		ufbxi_value_array *matrix = ufbxi_find_array(n, ufbxi_Matrix, 'r');
@@ -14648,7 +14700,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_c
 
 	ufbxi_element_info attrib_info = *info;
 
-	ufbxi_check(ufbxi_push_synthetic_id(uc, &attrib_info.fbx_id));
+	attrib_info.fbx_id = ufbxi_push_synthetic_id(uc);
 
 	// Use type and name from NodeAttributeName if it exists *uniquely*
 	ufbx_string type_and_name;
@@ -14758,7 +14810,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_object(ufbxi_context *uc, u
 	// use as IDs since all strings are interned into a string pool.
 	if (uc->version >= 7000) {
 		if (!ufbxi_get_val3(node, "Lss", &info.fbx_id, &type_and_name, &sub_type_str)) return 1;
-		ufbxi_check((info.fbx_id & UFBXI_SYNTHETIC_ID_BIT) == 0);
+		ufbxi_check(ufbxi_validate_fbx_id(uc, &info.fbx_id));
 	} else {
 		if (!ufbxi_get_val2(node, "ss", &type_and_name, &sub_type_str)) return 1;
 		info.fbx_id = ufbxi_synthetic_id_from_string(uc, type_and_name.data);
@@ -15088,6 +15140,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_connections(ufbxi_context *
 				// TODO: Strict mode?
 				continue;
 			}
+
+			ufbxi_check(ufbxi_validate_fbx_id(uc, &src_id));
+			ufbxi_check(ufbxi_validate_fbx_id(uc, &dst_id));
 		}
 
 		ufbxi_tmp_connection *conn = ufbxi_push(&uc->tmp_connections, ufbxi_tmp_connection, 1);
@@ -16076,7 +16131,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_media(ufbxi_context 
 		ufbxi_for(ufbxi_node, child, videos->children, videos->num_children) {
 			ufbxi_element_info video_info = { 0 };
 			ufbxi_check(ufbxi_get_val1(child, "S", &video_info.name));
-			ufbxi_check(ufbxi_push_synthetic_id(uc, &video_info.fbx_id));
+			video_info.fbx_id = ufbxi_push_synthetic_id(uc);
 			video_info.dom_node = ufbxi_get_dom_node(uc, node);
 
 			ufbxi_check(ufbxi_read_video(uc, child, &video_info));
@@ -16103,7 +16158,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_model(ufbxi_context 
 	ufbxi_check(ufbxi_push_copy(&uc->tmp_node_ids, uint32_t, 1, &elem_node->element.element_id));
 
 	ufbxi_element_info attrib_info = { 0 };
-	ufbxi_check(ufbxi_push_synthetic_id(uc, &attrib_info.fbx_id));
+	attrib_info.fbx_id = ufbxi_push_synthetic_id(uc);
 	attrib_info.name = name;
 	attrib_info.dom_node = info.dom_node;
 
@@ -16149,7 +16204,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_model(ufbxi_context 
 			if (ufbxi_get_val1(child, "S", &channel_name)) {
 				if (uc->legacy_implicit_anim_layer_id == 0) {
 					// Defer creation so we won't be the first animation stack..
-					ufbxi_check(ufbxi_push_synthetic_id(uc, &uc->legacy_implicit_anim_layer_id));
+					uc->legacy_implicit_anim_layer_id = ufbxi_push_synthetic_id(uc);
 				}
 				ufbxi_check(ufbxi_read_take_prop_channel(uc, child, info.fbx_id, uc->legacy_implicit_anim_layer_id, channel_name));
 			}
@@ -16211,7 +16266,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_legacy_root(ufbxi_context *
 		ufbxi_check(layer);
 
 		ufbxi_element_info stack_info = layer_info;
-		ufbxi_check(ufbxi_push_synthetic_id(uc, &stack_info.fbx_id));
+		stack_info.fbx_id = ufbxi_push_synthetic_id(uc);
 		ufbx_anim_stack *stack = ufbxi_push_element(uc, &stack_info, ufbx_anim_stack, UFBX_ELEMENT_ANIM_STACK);
 		ufbxi_check(stack);
 
@@ -25025,6 +25080,7 @@ static ufbxi_noinline void ufbxi_free_temp(ufbxi_context *uc)
 
 	ufbxi_map_free(&uc->prop_type_map);
 	ufbxi_map_free(&uc->fbx_id_map);
+	ufbxi_map_free(&uc->ptr_fbx_id_map);
 	ufbxi_map_free(&uc->texture_file_map);
 	ufbxi_map_free(&uc->anim_stack_map);
 	ufbxi_map_free(&uc->fbx_attr_map);
@@ -25139,6 +25195,8 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 		uc->opts.thread_opts.memory_limit = 32*1024*1024;
 	}
 
+	uc->synthetic_id_counter = UFBXI_SYNTHETIC_ID_START;
+
 	uc->string_pool.error = &uc->error;
 	ufbxi_map_init(&uc->string_pool.map, &uc->ator_tmp, &ufbxi_map_cmp_string, NULL);
 	uc->string_pool.buf.ator = &uc->ator_result;
@@ -25148,6 +25206,7 @@ static ufbxi_noinline ufbx_scene *ufbxi_load(ufbxi_context *uc, const ufbx_load_
 
 	ufbxi_map_init(&uc->prop_type_map, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
 	ufbxi_map_init(&uc->fbx_id_map, &uc->ator_tmp, &ufbxi_map_cmp_uint64, NULL);
+	ufbxi_map_init(&uc->ptr_fbx_id_map, &uc->ator_tmp, &ufbxi_map_cmp_ptr_id, NULL);
 	ufbxi_map_init(&uc->texture_file_map, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
 	ufbxi_map_init(&uc->anim_stack_map, &uc->ator_tmp, &ufbxi_map_cmp_const_char_ptr, NULL);
 	ufbxi_map_init(&uc->fbx_attr_map, &uc->ator_tmp, &ufbxi_map_cmp_uint64, NULL);
