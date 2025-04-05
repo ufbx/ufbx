@@ -12107,7 +12107,7 @@ static ufbxi_noinline uint64_t ufbxi_synthetic_id_from_ptr_id(ufbxi_context *uc,
 static ufbxi_forceinline uint64_t ufbxi_synthetic_id_from_string(ufbxi_context *uc, const char *str)
 {
 	uintptr_t uptr = (uintptr_t)str;
-	if (uptr < (UINTPTR_MAX < UFBXI_MAXIMUM_FAST_POINTER_ID ? (uintptr_t)UINTPTR_MAX : (uintptr_t)UFBXI_MAXIMUM_FAST_POINTER_ID)) {
+	if (uptr < (UINTPTR_MAX < UFBXI_MAXIMUM_FAST_POINTER_ID ? UINTPTR_MAX : UFBXI_MAXIMUM_FAST_POINTER_ID)) {
 		return (uint64_t)uptr;
 	} else {
 		return ufbxi_synthetic_id_from_ptr_id(uc, uptr, 0);
