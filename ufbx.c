@@ -40,6 +40,7 @@
 //   UFBX_STATIC_ANALYSIS      Enable static analysis augmentation
 //   UFBX_DEBUG_BINARY_SEARCH  Force using binary search for debugging
 //   UFBX_EXTENSIVE_THREADING  Use threads for small inputs
+//   UFBX_POINTER_SIZE         Allow specifying sizeof(void*) as a preprocessor constant
 
 #if defined(UFBX_CONFIG_SOURCE)
 	#include UFBX_CONFIG_SOURCE
