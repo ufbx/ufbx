@@ -597,7 +597,7 @@ jobs:
         with:
           fetch-depth: 2
       - name: Setup Morello environment
-        run: /setup-morello.sh
+        run: bash /setup-morello.sh
       - name: Create build directory
         run: mkdir build
       - name: Compile tests with Morello
