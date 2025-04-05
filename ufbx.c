@@ -489,6 +489,9 @@ extern "C" {
 	#if __has_warning("-Watomic-implicit-seq-cst")
 		#pragma clang diagnostic ignored "-Watomic-implicit-seq-cst"
 	#endif
+	#if __has_warning("-Wtautological-constant-out-of-range-compare")
+		#pragma clang diagnostic ignored "-Wtautological-constant-out-of-range-compare"
+	#endif
 	#if defined(UFBX_STANDARD_C)
 		#pragma clang diagnostic ignored "-Wunused-function"
 	#endif
