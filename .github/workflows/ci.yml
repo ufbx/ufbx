@@ -603,7 +603,7 @@ jobs:
       - name: Compile tests with Morello
         run: aarch64-none-linux-gnu-gcc -static -march=morello+c64 -mabi=purecap ufbx.c test/runner.c -lm -o build/runner
       - name: Run test
-        run: morelloie -- ufbx-runner -t synthetic_negative_fbx_id -d data
+        run: morelloie -- build/runner -d data -t synthetic_negative_fbx_id
 
   ci_fuzz:
     runs-on: [self-hosted, ARM64, legacy]
