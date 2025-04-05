@@ -489,9 +489,6 @@ extern "C" {
 	#if __has_warning("-Watomic-implicit-seq-cst")
 		#pragma clang diagnostic ignored "-Watomic-implicit-seq-cst"
 	#endif
-	#if __has_warning("-Wtautological-constant-out-of-range-compare")
-		#pragma clang diagnostic ignored "-Wtautological-constant-out-of-range-compare"
-	#endif
 	#if defined(UFBX_STANDARD_C)
 		#pragma clang diagnostic ignored "-Wunused-function"
 	#endif
@@ -12110,7 +12107,7 @@ static ufbxi_noinline uint64_t ufbxi_synthetic_id_from_ptr_id(ufbxi_context *uc,
 static ufbxi_forceinline uint64_t ufbxi_synthetic_id_from_string(ufbxi_context *uc, const char *str)
 {
 	uintptr_t uptr = (uintptr_t)str;
-	if (uptr < UFBXI_MAXIMUM_FAST_POINTER_ID) {
+	if (uptr < (UINTPTR_MAX < UFBXI_MAXIMUM_FAST_POINTER_ID ? (uintptr_t)UINTPTR_MAX : (uintptr_t)UFBXI_MAXIMUM_FAST_POINTER_ID)) {
 		return (uint64_t)uptr;
 	} else {
 		return ufbxi_synthetic_id_from_ptr_id(uc, uptr, 0);
