@@ -372,9 +372,9 @@ extern "C" {
 		#error Inconsistent custom global allocator
 	#endif
 #elif defined(UFBX_NO_MALLOC)
-	#define ufbx_malloc(size) ((void)(size), (void*)NULL)
-	#define ufbx_realloc(ptr, old_size, new_size) ((void)(ptr), (void)(old_size), (void)(new_size), (void*)NULL)
-	#define ufbx_free(ptr, old_size) ((void)(ptr), (void*)(old_size))
+	#define ufbx_malloc(size) ((void)(size), (void)NULL)
+	#define ufbx_realloc(ptr, old_size, new_size) ((void)(ptr), (void)(old_size), (void)(new_size), (void)NULL)
+	#define ufbx_free(ptr, old_size) ((void)(ptr), (void)(old_size))
 #elif defined(UFBX_EXTERNAL_MALLOC)
 	// Nop
 #else
