@@ -2067,3 +2067,40 @@ UFBXT_FILE_TEST(maya_user_props)
 	}
 }
 #endif
+
+#if UFBXT_IMPL
+static void ufbxt_check_dom_id(ufbx_node *node, int64_t id)
+{
+	ufbxt_hintf("node=%s", node->name.data);
+	ufbx_dom_node *dom_node = node->element.dom_node;
+	ufbxt_assert(dom_node);
+	ufbxt_assert(dom_node->values.data[0].type == UFBX_DOM_VALUE_NUMBER);
+	ufbxt_assert(dom_node->values.data[0].value_int == id);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(synthetic_negative_fbx_id, ufbxt_retain_dom_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *root = scene->root_node;
+	ufbx_node *minus_one = ufbx_find_node(scene, "MinusOne");
+	ufbx_node *min_node = ufbx_find_node(scene, "Min");
+	ufbx_node *max_node = ufbx_find_node(scene, "Max");
+	ufbx_node *one = ufbx_find_node(scene, "One");
+
+	ufbxt_assert(minus_one);
+	ufbxt_assert(min_node);
+	ufbxt_assert(max_node);
+	ufbxt_assert(one);
+
+	ufbxt_assert(minus_one->parent == root);
+	ufbxt_assert(min_node->parent == minus_one);
+	ufbxt_assert(max_node->parent == min_node);
+	ufbxt_assert(one->parent == max_node);
+
+	ufbxt_check_dom_id(minus_one, -1);
+	ufbxt_check_dom_id(min_node, INT64_MIN);
+	ufbxt_check_dom_id(max_node, INT64_MAX);
+	ufbxt_check_dom_id(one, 1);
+}
+#endif
