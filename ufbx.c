@@ -840,6 +840,12 @@ ufbx_static_assert(sizeof_u64, sizeof(uint64_t) == 8);
 ufbx_static_assert(sizeof_f32, sizeof(float) == 4);
 ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 
+// -- Alignment
+
+#ifndef UFBX_MAXIMUM_ALIGNMENT
+enum { UFBX_MAXIMUM_ALIGNMENT = sizeof(void*) > 8 ? sizeof(void*) : 8 };
+#endif
+
 // -- Version
 
 #define UFBX_SOURCE_VERSION ufbx_pack_version(0, 18, 0)
@@ -3505,9 +3511,8 @@ static ufbxi_forceinline size_t ufbxi_align_to_mask(size_t value, size_t align_m
 
 static ufbxi_forceinline size_t ufbxi_size_align_mask(size_t size)
 {
-	// Align to the all bits below the lowest set one in `size`
-	// up to a maximum of 0x7 (align to 8 bytes).
-	return ((size ^ (size - 1)) >> 1) & 0x7;
+	// Align to the all bits below the lowest set one in `size` up to the maximum alignment.
+	return ((size ^ (size - 1)) >> 1) & (UFBX_MAXIMUM_ALIGNMENT - 1);
 }
 
 typedef struct {
