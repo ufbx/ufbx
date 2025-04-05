@@ -944,6 +944,17 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 		mi_union.mi_src = (m_src); (m_dst) = mi_union.mi_dst; } while (0)
 #endif
 
+// -- Pointer alignment
+
+#if !defined(UFBX_STANDARD_C) && defined(__GNUC__) && defined(__has_builtin)
+	#if __has_builtin(__builtin_is_aligned)
+		#define ufbxi_is_aligned(m_ptr, m_align) __builtin_is_aligned((m_ptr), (m_align))
+	#endif
+#endif
+#ifndef ufbxi_is_aligned
+	#define ufbxi_is_aligned(m_ptr, m_align) (((uintptr_t)(m_ptr) & ((m_align) - 1)) == 0)
+#endif
+
 // -- Debug
 
 #if defined(UFBX_DEBUG_BINARY_SEARCH) || defined(UFBX_REGRESSION)
@@ -2559,7 +2570,7 @@ static ufbxi_noinline uint32_t ufbxi_adler32(const void *data, size_t size)
 		const char *end = p + num;
 
 		// Align to 16 bytes
-		while (p != end && ((uintptr_t)p & 0xf) != 0) {
+		while (p != end && !ufbxi_is_aligned(p, 16)) {
 			a += (ufbxi_fast_uint)(uint8_t)p[0]; b += a;
 			p++;
 		}
@@ -3553,7 +3564,7 @@ static ufbxi_noinline void *ufbxi_alloc_size(ufbxi_allocator *ator, size_t size,
 		ufbxi_fmt_err_info(ator->error, "%s", ator->name);
 		return NULL;
 	}
-	ufbx_assert(((uintptr_t)ptr & ufbxi_size_align_mask(total)) == 0);
+	ufbx_assert(ufbxi_is_aligned(ptr, ufbxi_size_align_mask(total)) == 0);
 
 	ator->current_size += total;
 
@@ -3596,7 +3607,7 @@ static ufbxi_noinline void *ufbxi_realloc_size(ufbxi_allocator *ator, size_t siz
 	}
 
 	ufbxi_check_return_err_msg(ator->error, ptr, NULL, "Out of memory");
-	ufbx_assert(((uintptr_t)ptr & ufbxi_size_align_mask(total)) == 0);
+	ufbx_assert(ufbxi_is_aligned(ptr, ufbxi_size_align_mask(total)) == 0);
 
 	ator->current_size += total;
 	ator->current_size -= old_total;
