@@ -4661,7 +4661,7 @@ static ufbxi_noinline uint32_t ufbxi_hash_string_check_ascii(const char *str, si
 	return hash;
 }
 
-static ufbxi_forceinline uint32_t ufbxi_hash32(uint32_t x)
+static ufbxi_unused ufbxi_forceinline uint32_t ufbxi_hash32(uint32_t x)
 {
 	x ^= x >> 16;
 	x *= UINT32_C(0x7feb352d);
@@ -4671,7 +4671,7 @@ static ufbxi_forceinline uint32_t ufbxi_hash32(uint32_t x)
 	return x;
 }
 
-static ufbxi_forceinline uint32_t ufbxi_hash64(uint64_t x)
+static ufbxi_unused ufbxi_forceinline uint32_t ufbxi_hash64(uint64_t x)
 {
 	x ^= x >> 32;
 	x *= UINT64_C(0xd6e8feb86659fd93);
