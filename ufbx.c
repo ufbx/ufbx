@@ -4584,8 +4584,8 @@ static int ufbxi_map_cmp_uintptr(void *user, const void *va, const void *vb)
 }
 
 typedef struct {
-	uint64_t id;
 	uintptr_t ptr;
+	uint64_t id;
 } ufbxi_ptr_id;
 
 static int ufbxi_map_cmp_ptr_id(void *user, const void *va, const void *vb)
