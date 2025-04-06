@@ -154,6 +154,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 	int profile_runs = 0;
 	int frame = INT_MIN;
 	bool allow_bad_unicode = false;
+	bool allow_unknown = false;
 	bool sink = false;
 	bool dedicated_allocs = false;
 	bool bake = false;
@@ -187,6 +188,8 @@ int check_fbx_main(int argc, char **argv, const char *path)
 			if (++i < argc) frame = atoi(argv[i]);
 		} else if (!strcmp(argv[i], "--allow-bad-unicode")) {
 			allow_bad_unicode = true;
+		} else if (!strcmp(argv[i], "--allow-unknown")) {
+			allow_unknown = true;
 		} else if (!strcmp(argv[i], "--dedicated-allocs")) {
 			dedicated_allocs = true;
 		} else if (!strcmp(argv[i], "--sink")) {
@@ -385,7 +388,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 
 	int result = 0;
 
-	if (!strstr(path, "ufbx-unknown") && !is_fuzz) {
+	if (!strstr(path, "ufbx-unknown") && !is_fuzz && !allow_unknown) {
 		bool ignore_unknowns = false;
 		bool has_unknowns = false;
 
@@ -420,7 +423,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 	if (strstr(scene->metadata.creator.data, "FBX Unity Export")) known_unknown = true;
 	if (strstr(scene->metadata.creator.data, "Open Asset Import Library")) known_unknown = true;
 	if (scene->metadata.version < 5800) known_unknown = true;
-	ufbxt_assert(scene->metadata.exporter != UFBX_EXPORTER_UNKNOWN || known_unknown || is_fuzz);
+	ufbxt_assert(scene->metadata.exporter != UFBX_EXPORTER_UNKNOWN || known_unknown || is_fuzz || allow_unknown);
 
 	ufbxt_check_scene(scene);
 
