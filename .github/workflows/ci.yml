@@ -603,7 +603,7 @@ jobs:
       - name: Compile tests with Morello
         run: aarch64-none-linux-gnu-gcc -static -O2 -march=morello+c64 -mabi=purecap test/check_fbx.c -lm -o build/check_fbx
       - name: Check test cases
-        run: python3 misc/execute_per_fbx.py --exe morelloie --root data --list misc/light_text_cases.txt --allow-non-fbx -- build/check_fbx '#' --allow-bad-unicode --allow-unknown --index-error-handling clamp
+        run: python3 misc/execute_per_fbx.py --exe morelloie --root data --list misc/light_test_cases.txt --allow-non-fbx -- build/check_fbx '#' --allow-bad-unicode --allow-unknown --index-error-handling clamp
 
   ci_fuzz:
     runs-on: [self-hosted, ARM64, legacy]
