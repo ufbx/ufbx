@@ -1279,26 +1279,26 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 	if (dst != data) memcpy((void*)data, dst, size * stride);
 }
 
-static ufbxi_forceinline void ufbxi_swap(void *a, void *b, size_t size)
+typedef union {
+	void *align_ptr;
+	uintptr_t align_uptr;
+	uint64_t align_u64;
+	char data[256];
+} ufbxi_swap_tmp;
+
+static ufbxi_forceinline void ufbxi_swap(ufbxi_swap_tmp *tmp, void *a, void *b, size_t size)
 {
-	char *ca = (char*)a, *cb = (char*)b;
-#if defined(UFBXI_HAS_UNALIGNED)
-	ufbxi_nounroll while (size >= 4) {
-		uint32_t t = *(ufbxi_unaligned ufbxi_unaligned_u32*)ca;
-		*(ufbxi_unaligned ufbxi_unaligned_u32*)ca = *(ufbxi_unaligned ufbxi_unaligned_u32*)cb;
-		*(ufbxi_unaligned ufbxi_unaligned_u32*)cb = t;
-		ca += 4; cb += 4; size -= 4;
-	}
-#endif
-	ufbxi_nounroll while (size > 0) {
-		char t = *ca; *ca = *cb; *cb = t;
-		ca++; cb++; size--;
-	}
+	memcpy(tmp, a, size);
+	memcpy(a, b, size);
+	memcpy(b, tmp, size);
 }
 
 static ufbxi_noinline void ufbxi_unstable_sort(void *in_data, size_t size, size_t stride, ufbxi_less_fn *less_fn, void *less_user)
 {
 	if (size <= 1) return;
+	ufbxi_swap_tmp tmp;
+	ufbxi_dev_assert(stride <= sizeof(tmp));
+
 	char *data = (char*)in_data;
 	size_t start = (size - 1) >> 1;
 	size_t end = size - 1;
@@ -1311,14 +1311,14 @@ static ufbxi_noinline void ufbxi_unstable_sort(void *in_data, size_t size, size_
 				next = child + 1;
 			}
 			if (next == root) break;
-			ufbxi_swap(data + root * stride, data + next * stride, stride);
+			ufbxi_swap(&tmp, data + root * stride, data + next * stride, stride);
 			root = next;
 		}
 
 		if (start > 0) {
 			start--;
 		} else if (end > 0) {
-			ufbxi_swap(data + end * stride, data, stride);
+			ufbxi_swap(&tmp, data + end * stride, data, stride);
 			end--;
 		} else {
 			break;
