@@ -756,12 +756,14 @@ extern "C" {
 
 #if defined(UFBXI_HAS_ATTRIBUTE_ALIGNED)
 	#define UFBXI_HAS_UNALIGNED 1
+	#define UFBXI_HAS_ALIASING 1
 	#define ufbxi_unaligned
 	typedef uint16_t __attribute__((aligned(1), may_alias)) ufbxi_unaligned_u16;
 	typedef uint32_t __attribute__((aligned(1), may_alias)) ufbxi_unaligned_u32;
 	typedef uint64_t __attribute__((aligned(1), may_alias)) ufbxi_unaligned_u64;
 	typedef float __attribute__((aligned(1), may_alias)) ufbxi_unaligned_f32;
 	typedef double __attribute__((aligned(1), may_alias)) ufbxi_unaligned_f64;
+	typedef uint32_t __attribute__((may_alias)) ufbxi_aliasing_u32;
 #elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
 	#define UFBXI_HAS_UNALIGNED 1
 	#if defined(_M_IX86)
@@ -775,6 +777,9 @@ extern "C" {
 	typedef uint64_t ufbxi_unaligned_u64;
 	typedef float ufbxi_unaligned_f32;
 	typedef double ufbxi_unaligned_f64;
+	// MSVC doesn't have aliasing types in theory, but it works in practice..
+	#define UFBXI_HAS_ALIASING 1
+	typedef uint32_t ufbxi_aliasing_u32;
 #endif
 
 #if (defined(UFBXI_HAS_UNALIGNED) && UFBX_LITTLE_ENDIAN && !defined(UFBX_NO_UNALIGNED_LOADS)) || defined(UFBX_USE_UNALIGNED_LOADS)
@@ -1279,25 +1284,34 @@ static ufbxi_noinline void ufbxi_stable_sort(size_t stride, size_t linear_size, 
 	if (dst != data) memcpy((void*)data, dst, size * stride);
 }
 
-typedef union {
-	void *align_ptr;
-	uintptr_t align_uptr;
-	uint64_t align_u64;
-	char data[256];
-} ufbxi_swap_tmp;
-
-static ufbxi_forceinline void ufbxi_swap(ufbxi_swap_tmp *tmp, void *a, void *b, size_t size)
+static ufbxi_forceinline void ufbxi_swap(void *a, void *b, size_t size)
 {
-	memcpy(tmp, a, size);
+#if UFBXI_HAS_ALIASING && !defined(__CHERI__) // CHERI needs to copy pointer metadata tag bits..
+	ufbxi_dev_assert(size % 4 == 0 && (uintptr_t)a % 4 == 0 && (uintptr_t)b % 4 == 0);
+	char *ca = (char*)a, *cb = (char*)b;
+	for (size_t i = 0; i < size; i += 4, ca += 4, cb += 4) {
+		ufbxi_aliasing_u32 *ua = (ufbxi_aliasing_u32*)ca, *ub = (ufbxi_aliasing_u32*)cb;
+		uint32_t va = *ua, vb = *ub;
+		*ua = vb;
+		*ub = va;
+	}
+#else
+	union {
+		void *align_ptr;
+		uintptr_t align_uptr;
+		uint64_t align_u64;
+		char data[256];
+	} tmp;
+	ufbxi_dev_assert(size <= sizeof(tmp));
+	memcpy(tmp.data, a, size);
 	memcpy(a, b, size);
-	memcpy(b, tmp, size);
+	memcpy(b, tmp.data, size);
+#endif
 }
 
 static ufbxi_noinline void ufbxi_unstable_sort(void *in_data, size_t size, size_t stride, ufbxi_less_fn *less_fn, void *less_user)
 {
 	if (size <= 1) return;
-	ufbxi_swap_tmp tmp;
-	ufbxi_dev_assert(stride <= sizeof(tmp));
 
 	char *data = (char*)in_data;
 	size_t start = (size - 1) >> 1;
@@ -1311,14 +1325,14 @@ static ufbxi_noinline void ufbxi_unstable_sort(void *in_data, size_t size, size_
 				next = child + 1;
 			}
 			if (next == root) break;
-			ufbxi_swap(&tmp, data + root * stride, data + next * stride, stride);
+			ufbxi_swap(data + root * stride, data + next * stride, stride);
 			root = next;
 		}
 
 		if (start > 0) {
 			start--;
 		} else if (end > 0) {
-			ufbxi_swap(&tmp, data + end * stride, data, stride);
+			ufbxi_swap(data + end * stride, data, stride);
 			end--;
 		} else {
 			break;
