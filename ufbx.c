@@ -757,11 +757,11 @@ extern "C" {
 #if defined(UFBXI_HAS_ATTRIBUTE_ALIGNED)
 	#define UFBXI_HAS_UNALIGNED 1
 	#define ufbxi_unaligned
-	typedef uint16_t __attribute__((aligned(1))) ufbxi_unaligned_u16;
-	typedef uint32_t __attribute__((aligned(1))) ufbxi_unaligned_u32;
-	typedef uint64_t __attribute__((aligned(1))) ufbxi_unaligned_u64;
-	typedef float __attribute__((aligned(1))) ufbxi_unaligned_f32;
-	typedef double __attribute__((aligned(1))) ufbxi_unaligned_f64;
+	typedef uint16_t __attribute__((aligned(1), may_alias)) ufbxi_unaligned_u16;
+	typedef uint32_t __attribute__((aligned(1), may_alias)) ufbxi_unaligned_u32;
+	typedef uint64_t __attribute__((aligned(1), may_alias)) ufbxi_unaligned_u64;
+	typedef float __attribute__((aligned(1), may_alias)) ufbxi_unaligned_f32;
+	typedef double __attribute__((aligned(1), may_alias)) ufbxi_unaligned_f64;
 #elif !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
 	#define UFBXI_HAS_UNALIGNED 1
 	#if defined(_M_IX86)
