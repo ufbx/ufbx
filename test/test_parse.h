@@ -2104,3 +2104,56 @@ UFBXT_FILE_TEST_OPTS(synthetic_negative_fbx_id, ufbxt_retain_dom_opts)
 	ufbxt_check_dom_id(one, 1);
 }
 #endif
+
+UFBXT_FILE_TEST(synthetic_inf_nan)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *inf_node = ufbx_find_node(scene, "INF");
+		ufbxt_assert(inf_node);
+		ufbx_mesh *inf = inf_node->mesh;
+		ufbx_real *values = (ufbx_real*)inf->vertex_position.values.data;
+		for (size_t i = 0; i < 12; i++) {
+			ufbxt_assert(isinf(values[i]));
+			ufbxt_assert((values[i] < 0) == (i >= 6));
+		}
+	}
+
+	{
+		ufbx_node *nan_node = ufbx_find_node(scene, "NAN");
+		ufbxt_assert(nan_node);
+		ufbx_mesh *nan = nan_node->mesh;
+		ufbx_real *values = (ufbx_real*)nan->vertex_position.values.data;
+		for (size_t i = 0; i < 12; i++) {
+			ufbxt_assert(isnan(values[i]));
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(synthetic_inf_nan_threaded, synthetic_inf_nan, ufbxt_immediate_thread_opts)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *inf_node = ufbx_find_node(scene, "INF");
+		ufbxt_assert(inf_node);
+		ufbx_mesh *inf = inf_node->mesh;
+		ufbx_real *values = (ufbx_real*)inf->vertex_position.values.data;
+		for (size_t i = 0; i < 12; i++) {
+			ufbxt_assert(isinf(values[i]));
+			ufbxt_assert((values[i] < 0) == (i >= 6));
+		}
+	}
+
+	{
+		ufbx_node *nan_node = ufbx_find_node(scene, "NAN");
+		ufbxt_assert(nan_node);
+		ufbx_mesh *nan = nan_node->mesh;
+		ufbx_real *values = (ufbx_real*)nan->vertex_position.values.data;
+		for (size_t i = 0; i < 12; i++) {
+			ufbxt_assert(isnan(values[i]));
+		}
+	}
+}
+#endif
+
