@@ -1535,7 +1535,7 @@ static bool ufbxi_scan_ignorecase(const char *p, const char *fmt)
 	return true;
 }
 
-static ufbxi_noinline bool ufbxi_parse_inf_nan(double *p_result, const char *str, size_t max_length, char **end, uint32_t flags)
+static ufbxi_noinline bool ufbxi_parse_inf_nan(double *p_result, const char *str, size_t max_length, char **end)
 {
 	(void)max_length;
 
@@ -1659,7 +1659,7 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 		char c = *p;
 		if (c == '#' || c == 'i' || c == 'I' || c == 'n' || c == 'N') {
 			double result;
-			if (ufbxi_parse_inf_nan(&result, str, max_length, end, flags)) {
+			if (ufbxi_parse_inf_nan(&result, str, max_length, end)) {
 				return result;
 			}
 		}
@@ -10490,7 +10490,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 					str_data[str_len] = '\0';
 					double inf_nan;
 					char *end = NULL;
-					if (ufbxi_parse_inf_nan(&inf_nan, str_data, str_len, &end, 0) && end == str_data + str_len) {
+					if (ufbxi_parse_inf_nan(&inf_nan, str_data, str_len, &end) && end == str_data + str_len) {
 						val = 0;
 						val_f = inf_nan;
 					}
