@@ -1582,7 +1582,7 @@ static ufbxi_noinline bool ufbxi_parse_inf_nan(double *p_result, const char *str
 		}
 	}
 
-	*end = p;
+	*end = (char*)p;
 	top_bits |= negative ? 0x8000 : 0;
 	uint64_t bits = (uint64_t)top_bits << 48;
 	double result;
@@ -9727,7 +9727,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 	if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_') {
 		token->type = UFBXI_ASCII_BARE_WORD;
 		while ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-			|| (c >= '0' && c <= '9') || c == '_' || c == '-') {
+			|| (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '(' || c == ')') {
 			ufbxi_check(ufbxi_ascii_push_token_char(uc, token, c));
 			c = ufbxi_ascii_next(uc);
 		}
@@ -9751,37 +9751,26 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 			c = ufbxi_ascii_next(uc);
 		}
 
-		if (c == '#') {
-			ufbxi_check(token->type == UFBXI_ASCII_FLOAT);
+		bool nan_like = false;
+		while ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '#' || c == '(' || c == ')') {
+			nan_like = true;
 			ufbxi_check(ufbxi_ascii_push_token_char(uc, token, c));
 			c = ufbxi_ascii_next(uc);
+		}
+		ufbxi_check(ufbxi_ascii_push_token_char(uc, token, '\0'));
+		if (nan_like) {
+			token->type = UFBXI_ASCII_FLOAT;
+		}
 
-			bool is_inf = c == 'I' || c == 'i';
-			while ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
-				ufbxi_check(ufbxi_ascii_push_token_char(uc, token, c));
-				c = ufbxi_ascii_next(uc);
-			}
-			ufbxi_check(ufbxi_ascii_push_token_char(uc, token, '\0'));
-
-			if (is_inf) {
-				token->value.f64 = token->str_data[0] == '-' ? -UFBX_INFINITY : UFBX_INFINITY;
-			} else {
-				token->value.f64 = UFBX_NAN;
-			}
-
-		} else {
-			ufbxi_check(ufbxi_ascii_push_token_char(uc, token, '\0'));
-
-			char *end;
-			if (token->type == UFBXI_ASCII_INT) {
-				token->value.i64 = ufbxi_parse_int64(token->str_data, &end);
-				ufbxi_check(end == token->str_data + token->str_len - 1);
-			} else if (token->type == UFBXI_ASCII_FLOAT) {
-				uint32_t flags = uc->double_parse_flags;
-				if (ua->parse_as_f32) flags = UFBXI_PARSE_DOUBLE_AS_BINARY32;
-				token->value.f64 = ufbxi_parse_double(token->str_data, token->str_len, &end, flags);
-				ufbxi_check(end == token->str_data + token->str_len - 1);
-			}
+		char *end;
+		if (token->type == UFBXI_ASCII_INT) {
+			token->value.i64 = ufbxi_parse_int64(token->str_data, &end);
+			ufbxi_check(end == token->str_data + token->str_len - 1);
+		} else if (token->type == UFBXI_ASCII_FLOAT) {
+			uint32_t flags = uc->double_parse_flags;
+			if (ua->parse_as_f32) flags = UFBXI_PARSE_DOUBLE_AS_BINARY32;
+			token->value.f64 = ufbxi_parse_double(token->str_data, token->str_len, &end, flags);
+			ufbxi_check(end == token->str_data + token->str_len - 1);
 		}
 	} else if (c == '"') {
 		token->type = UFBXI_ASCII_STRING;
@@ -10491,8 +10480,23 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 		} else if (ufbxi_ascii_accept(uc, UFBXI_ASCII_BARE_WORD)) {
 
 			int64_t val = 0;
+			double val_f = 0.0;
 			if (tok->str_len >= 1) {
 				val = (int64_t)tok->str_data[0];
+				val_f = (double)val;
+				if (tok->str_len > 1 && tok->str_len < 64) {
+					// Try to parse the bare word as NAN/INF
+					char str_data[64]; // ufbxi_uninit
+					size_t str_len = tok->str_len;
+					memcpy(str_data, tok->str_data, str_len);
+					str_data[str_len] = '\0';
+					double inf_nan;
+					char *end = NULL;
+					if (ufbxi_parse_inf_nan(&inf_nan, str_data, str_len, &end, 0) && end == str_data + str_len) {
+						val = 0;
+						val_f = inf_nan;
+					}
+				}
 			}
 
 			switch (arr_type) {
@@ -10503,7 +10507,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 					ufbxi_value *v = &vals[num_values];
 					// False positive: `v->f` and `v->i` do not overlap in the union.
 					// cppcheck-suppress overlappingWriteUnion
-					v->f = (double)(v->i = val);
+					v->i = val;
+					v->f = val_f;
 				}
 				break;
 
@@ -10511,8 +10516,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 			case 'c': { uint8_t *v = ufbxi_push(&uc->tmp_stack, uint8_t, 1); ufbxi_check(v); *v = (uint8_t)val; } break;
 			case 'i': { int32_t *v = ufbxi_push(&uc->tmp_stack, int32_t, 1); ufbxi_check(v); *v = (int32_t)val; } break;
 			case 'l': { int64_t *v = ufbxi_push(&uc->tmp_stack, int64_t, 1); ufbxi_check(v); *v = (int64_t)val; } break;
-			case 'f': { float *v = ufbxi_push(&uc->tmp_stack, float, 1); ufbxi_check(v); *v = (float)val; } break;
-			case 'd': { double *v = ufbxi_push(&uc->tmp_stack, double, 1); ufbxi_check(v); *v = (double)val; } break;
+			case 'f': { float *v = ufbxi_push(&uc->tmp_stack, float, 1); ufbxi_check(v); *v = (float)val_f; } break;
+			case 'd': { double *v = ufbxi_push(&uc->tmp_stack, double, 1); ufbxi_check(v); *v = (double)val_f; } break;
 			case '-': num_values--; break;
 
 			default:
