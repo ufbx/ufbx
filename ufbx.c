@@ -1527,63 +1527,63 @@ typedef enum {
 	UFBXI_PARSE_DOUBLE_AS_BINARY32 = 0x2,
 } ufbxi_parse_double_flag;
 
-static bool ufbxi_scan_ignorecase(const char *p, const char *fmt)
+static bool ufbxi_scan_ignorecase(const char *p, const char *end, const char *fmt)
 {
 	for (const char *f = fmt; *f; f++, p++) {
+		if (p >= end) return false;
 		if ((*p | 0x20) != *f) return false;
 	}
 	return true;
 }
 
-static ufbxi_noinline bool ufbxi_parse_inf_nan(double *p_result, const char *str, size_t max_length, char **end)
+static ufbxi_noinline bool ufbxi_parse_inf_nan(double *p_result, const char *str, size_t max_length, char **p_end)
 {
-	(void)max_length;
-
 	bool negative = false;
-	const char *p = str;
+	const char *p = str, *end = p + max_length;
 	if (*p == '+' || *p == '-') {
 		negative = *p++ == '-';
 	}
 
 	uint32_t top_bits = 0;
-	if ((p[0] >= '0' && p[0] <= '9') && p[1] == '.' && p[2] == '#') {
+	if (max_length >= 3 && (p[0] >= '0' && p[0] <= '9') && p[1] == '.' && p[2] == '#') {
 		// Legacy MSVC 1.#NAN
 		p += 3;
-		if (ufbxi_scan_ignorecase(p, "inf")) {
+		if (ufbxi_scan_ignorecase(p, end, "inf")) {
 			p += 3;
 			top_bits = 0x7ff0;
-		} else if (ufbxi_scan_ignorecase(p, "nan") || ufbxi_scan_ignorecase(p, "ind")) {
+		} else if (ufbxi_scan_ignorecase(p, end, "nan") || ufbxi_scan_ignorecase(p, end, "ind")) {
 			p += 3;
 			top_bits = 0x7ff8;
 		} else {
 			return false;
 		}
-		while (*p >= '0' && *p <= '9') {
+		while (p != end && *p >= '0' && *p <= '9') {
 			p++;
 		}
 	} else {
 		// Standard
-		if (ufbxi_scan_ignorecase(p, "nan")) {
+		if (ufbxi_scan_ignorecase(p, end, "nan")) {
 			p += 3;
 			top_bits = 0x7ff8;
-			if (*p == '(') {
+			if (p != end && *p == '(') {
 				p++;
-				while (*p != ')') {
+				while (p != end && *p != ')') {
 					char c = *p;
 					if (!((c>='0'&&c<='9') || (c>='a'&&c<='z') || (c>='A'&&c<='Z'))) {
 						return false;
 					}
 					p++;
 				}
+				if (p == end) return false;
 				p++;
 			}
-		} else if (ufbxi_scan_ignorecase(p, "inf")) {
-			p += ufbxi_scan_ignorecase(p + 3, "inity") ? 8 : 3;
+		} else if (ufbxi_scan_ignorecase(p, end, "inf")) {
+			p += ufbxi_scan_ignorecase(p + 3, end, "inity") ? 8 : 3;
 			top_bits = 0x7ff0;
 		}
 	}
 
-	*end = (char*)p;
+	*p_end = (char*)p;
 	top_bits |= negative ? 0x8000 : 0;
 	uint64_t bits = (uint64_t)top_bits << 48;
 	double result;
@@ -1592,10 +1592,8 @@ static ufbxi_noinline bool ufbxi_parse_inf_nan(double *p_result, const char *str
 	return true;
 }
 
-static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_length, char **end, uint32_t flags)
+static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_length, char **p_end, uint32_t flags)
 {
-	(void)max_length;
-
 	const uint32_t max_limbs = 14;
 
 	ufbxi_bigint_limb mantissa_limbs[42], divisor_limbs[42], quotient_limbs[42];
@@ -1606,12 +1604,12 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 	uint64_t digits = 0;
 	uint32_t num_digits = 0;
 
-	const char *p = str;
-	if (*p == '+' || *p == '-') {
+	const char *p = str, *end = p + max_length;
+	if (p != end && (*p == '+' || *p == '-')) {
 		negative = *p++ == '-';
 	}
-	for (;;) {
-		char c = *p++;
+	while (p != end) {
+		char c = *p;
 		if (c >= '0' && c <= '9') {
 			if (big_mantissa.length < max_limbs) {
 				digits = digits * 10 + (uint64_t)(c - '0');
@@ -1627,22 +1625,23 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 			} else {
 				dec_exponent += 1 - has_dot;
 			}
+			p++;
 		} else if (c == '.' && !has_dot) {
 			has_dot = true;
+			p++;
 		} else {
 			break;
 		}
 	}
-	p--;
-	if (*p == 'e' || *p == 'E') {
+	if (p != end && (*p == 'e' || *p == 'E')) {
 		p++;
 		bool exp_negative = false;
-		if (*p == '+' || *p == '-') {
+		if (p != end && (*p == '+' || *p == '-')) {
 			exp_negative = *p == '-';
 			p++;
 		}
 		int32_t exp = 0;
-		for (;;) {
+		while (p != end) {
 			char c = *p;
 			if (c >= '0' && c <= '9') {
 				p++;
@@ -1655,17 +1654,17 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 		dec_exponent += exp_negative ? -exp : exp;
 	}
 
-	{
+	if (p != end) {
 		char c = *p;
 		if (c == '#' || c == 'i' || c == 'I' || c == 'n' || c == 'N') {
 			double result;
-			if (ufbxi_parse_inf_nan(&result, str, max_length, end)) {
+			if (ufbxi_parse_inf_nan(&result, str, max_length, p_end)) {
 				return result;
 			}
 		}
 	}
 
-	*end = (char*)p;
+	*p_end = (char*)p;
 
 	// Both power of 10 and integer are exactly representable as doubles
 	// Powers of 10 are factored as 2*5, and 2^N can be always exactly represented.
@@ -9410,10 +9409,9 @@ static ufbxi_noinline char ufbxi_ascii_refill(ufbxi_context *uc)
 
 		// Read user data, return '\0' on EOF
 		// TODO: Very unoptimal for non-full-size reads in some cases
-		size_t num_read = uc->read_fn(uc->read_user, dst_buffer, dst_size - 1);
+		size_t num_read = uc->read_fn(uc->read_user, dst_buffer, dst_size);
 		ufbxi_check_return_msg(num_read != SIZE_MAX, '\0', "IO error");
-		ufbxi_check_return(num_read <= dst_size - 1, '\0');
-		dst_buffer[num_read] = '\0';
+		ufbxi_check_return(num_read <= dst_size, '\0');
 		if (num_read == 0) return '\0';
 
 		uc->data = uc->data_begin = ua->src = dst_buffer;

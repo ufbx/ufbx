@@ -650,10 +650,10 @@ void ufbxt_check_float(const char *str)
 {
 	char *end;
 	double ref_d = strtod(str, NULL);
-	double slow_d = ufbxi_parse_double(str, SIZE_MAX, &end, 0);
-	double fast_d = ufbxi_parse_double(str, SIZE_MAX, &end, UFBXI_PARSE_DOUBLE_ALLOW_FAST_PATH);
+	double slow_d = ufbxi_parse_double(str, strlen(str), &end, 0);
+	double fast_d = ufbxi_parse_double(str, strlen(str), &end, UFBXI_PARSE_DOUBLE_ALLOW_FAST_PATH);
 	float ref_f = strtof(str, NULL);
-	float slow_f = (float)ufbxi_parse_double(str, SIZE_MAX, &end, UFBXI_PARSE_DOUBLE_AS_BINARY32);
+	float slow_f = (float)ufbxi_parse_double(str, strlen(str), &end, UFBXI_PARSE_DOUBLE_AS_BINARY32);
 
 	if (isfinite(ref_d)) {
 		if (slow_d != ref_d) {
@@ -681,8 +681,8 @@ void ufbxt_check_float(const char *str)
 void ufbxt_check_nan(const char *str)
 {
 	char *end_d, *end_f;
-	double slow_d = ufbxi_parse_double(str, SIZE_MAX, &end_d, 0);
-	float slow_f = (float)ufbxi_parse_double(str, SIZE_MAX, &end_f, UFBXI_PARSE_DOUBLE_AS_BINARY32);
+	double slow_d = ufbxi_parse_double(str, strlen(str), &end_d, 0);
+	float slow_f = (float)ufbxi_parse_double(str, strlen(str), &end_f, UFBXI_PARSE_DOUBLE_AS_BINARY32);
 	ufbxt_assert(isnan(slow_d));
 	ufbxt_assert(isnan(slow_f));
 	ufbxt_assert(end_d == str + strlen(str));
@@ -692,8 +692,8 @@ void ufbxt_check_nan(const char *str)
 void ufbxt_check_inf(const char *str, int sign)
 {
 	char *end_d, *end_f;
-	double slow_d = ufbxi_parse_double(str, SIZE_MAX, &end_d, 0);
-	float slow_f = (float)ufbxi_parse_double(str, SIZE_MAX, &end_f, UFBXI_PARSE_DOUBLE_AS_BINARY32);
+	double slow_d = ufbxi_parse_double(str, strlen(str), &end_d, 0);
+	float slow_f = (float)ufbxi_parse_double(str, strlen(str), &end_f, UFBXI_PARSE_DOUBLE_AS_BINARY32);
 	ufbxt_assert(isinf(slow_d));
 	ufbxt_assert(isinf(slow_f));
 	ufbxt_assert(slow_d < 0 == sign < 0);
