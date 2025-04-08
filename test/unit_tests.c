@@ -689,12 +689,15 @@ void ufbxt_check_nan(const char *str)
 	ufbxt_assert(end_f == str + strlen(str));
 }
 
-void ufbxt_check_inf(const char *str)
+void ufbxt_check_inf(const char *str, int sign)
 {
 	char *end_d, *end_f;
 	double slow_d = ufbxi_parse_double(str, SIZE_MAX, &end_d, 0);
 	float slow_f = (float)ufbxi_parse_double(str, SIZE_MAX, &end_f, UFBXI_PARSE_DOUBLE_AS_BINARY32);
 	ufbxt_assert(isinf(slow_d));
+	ufbxt_assert(isinf(slow_f));
+	ufbxt_assert(slow_d < 0 == sign < 0);
+	ufbxt_assert(slow_f < 0 == sign < 0);
 	ufbxt_assert(isinf(slow_f));
 	ufbxt_assert(end_d == str + strlen(str));
 	ufbxt_assert(end_f == str + strlen(str));
@@ -770,16 +773,17 @@ void test_double_parse_nan()
 	ufbxt_check_nan("nan(nan)");
 	ufbxt_check_nan("nan(ind)");
 	ufbxt_check_nan("nan(nans)");
-	ufbxt_check_inf("inf");
-	ufbxt_check_inf("INF");
-	ufbxt_check_inf("INFINITY");
+	ufbxt_check_inf("inf", 1);
+	ufbxt_check_inf("-inf", -1);
+	ufbxt_check_inf("INF", 1);
+	ufbxt_check_inf("INFINITY", 1);
 
 	ufbxt_check_nan("1.#NAN");
 	ufbxt_check_nan("0.#NAN12345678");
 	ufbxt_check_nan("1.#IND");
 	ufbxt_check_nan("-7.#NAN00");
-	ufbxt_check_inf("1.#INF");
-	ufbxt_check_inf("-1.#INF");
+	ufbxt_check_inf("1.#INF", 1);
+	ufbxt_check_inf("-1.#INF", -1);
 }
 
 void test_double_parse_fmt(const char *fmt, int width, uint32_t bits)
