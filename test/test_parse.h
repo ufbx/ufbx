@@ -2113,6 +2113,7 @@ UFBXT_FILE_TEST(synthetic_inf_nan)
 		ufbxt_assert(inf_node);
 		ufbx_mesh *inf = inf_node->mesh;
 		ufbx_real *values = (ufbx_real*)inf->vertex_position.values.data;
+		ufbxt_assert(inf->vertex_position.values.count == 4);
 		for (size_t i = 0; i < 12; i++) {
 			ufbxt_assert(isinf(values[i]));
 			ufbxt_assert((values[i] < 0) == (i >= 6));
@@ -2124,6 +2125,7 @@ UFBXT_FILE_TEST(synthetic_inf_nan)
 		ufbxt_assert(nan_node);
 		ufbx_mesh *nan = nan_node->mesh;
 		ufbx_real *values = (ufbx_real*)nan->vertex_position.values.data;
+		ufbxt_assert(nan->vertex_position.values.count == 4);
 		for (size_t i = 0; i < 12; i++) {
 			ufbxt_assert(isnan(values[i]));
 		}
@@ -2139,6 +2141,7 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_inf_nan_threaded, synthetic_inf_nan, ufbxt_im
 		ufbxt_assert(inf_node);
 		ufbx_mesh *inf = inf_node->mesh;
 		ufbx_real *values = (ufbx_real*)inf->vertex_position.values.data;
+		ufbxt_assert(inf->vertex_position.values.count == 4);
 		for (size_t i = 0; i < 12; i++) {
 			ufbxt_assert(isinf(values[i]));
 			ufbxt_assert((values[i] < 0) == (i >= 6));
@@ -2150,10 +2153,40 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_inf_nan_threaded, synthetic_inf_nan, ufbxt_im
 		ufbxt_assert(nan_node);
 		ufbx_mesh *nan = nan_node->mesh;
 		ufbx_real *values = (ufbx_real*)nan->vertex_position.values.data;
+		ufbxt_assert(nan->vertex_position.values.count == 4);
 		for (size_t i = 0; i < 12; i++) {
 			ufbxt_assert(isnan(values[i]));
 		}
 	}
+}
+#endif
+
+#if UFBXT_IMPL
+static void ufbxt_assert_vec3_equal(ufbx_vec3 v, ufbx_real x, ufbx_real y, ufbx_real z)
+{
+	ufbxt_assert(isnan(x) ? isnan(v.x) : v.x == x);
+	ufbxt_assert(isnan(y) ? isnan(v.y) : v.y == y);
+	ufbxt_assert(isnan(z) ? isnan(v.z) : v.z == z);
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_bad_inf_nan, UFBXT_FILE_TEST_FLAG_ALLOW_THREAD_ERROR)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbx_vec3 *pos = mesh->vertices.data;
+	ufbxt_assert(mesh->vertices.count == 8);
+	ufbxt_assert_vec3_equal(pos[0], 1.0f, 2.0f, (ufbx_real)'s');
+	ufbxt_assert_vec3_equal(pos[1], 1.0f, 2.0f, (ufbx_real)'i');
+	ufbxt_assert_vec3_equal(pos[2], 1.0f, 2.0f, (ufbx_real)'i');
+	ufbxt_assert_vec3_equal(pos[3], 1.0f, 2.0f, (ufbx_real)'n');
+	ufbxt_assert_vec3_equal(pos[4], 1.0f, 2.0f, (ufbx_real)'n');
+	ufbxt_assert_vec3_equal(pos[5], 1.0f, 2.0f, NAN);
+	ufbxt_assert_vec3_equal(pos[6], 1.0f, 2.0f, (ufbx_real)'N');
+	ufbxt_assert_vec3_equal(pos[7], 1.0f, 2.0f, INFINITY);
 }
 #endif
 
