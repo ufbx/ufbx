@@ -678,6 +678,28 @@ void ufbxt_check_float(const char *str)
 	}
 }
 
+void ufbxt_check_nan(const char *str)
+{
+	char *end_d, *end_f;
+	double slow_d = ufbxi_parse_double(str, SIZE_MAX, &end_d, 0);
+	float slow_f = (float)ufbxi_parse_double(str, SIZE_MAX, &end_f, UFBXI_PARSE_DOUBLE_AS_BINARY32);
+	ufbxt_assert(isnan(slow_d));
+	ufbxt_assert(isnan(slow_f));
+	ufbxt_assert(end_d == str + strlen(str));
+	ufbxt_assert(end_f == str + strlen(str));
+}
+
+void ufbxt_check_inf(const char *str)
+{
+	char *end_d, *end_f;
+	double slow_d = ufbxi_parse_double(str, SIZE_MAX, &end_d, 0);
+	float slow_f = (float)ufbxi_parse_double(str, SIZE_MAX, &end_f, UFBXI_PARSE_DOUBLE_AS_BINARY32);
+	ufbxt_assert(isinf(slow_d));
+	ufbxt_assert(isinf(slow_f));
+	ufbxt_assert(end_d == str + strlen(str));
+	ufbxt_assert(end_f == str + strlen(str));
+}
+
 #define TEST_NINES \
 	"9999999999999999999999999999999999999999" \
 	"9999999999999999999999999999999999999999" \
@@ -734,6 +756,30 @@ void test_double_parse()
 	#if !defined(_MSC_VER)
 		ufbxt_check_float("4656612873077392578125e-8");
 	#endif
+}
+
+void test_double_parse_nan()
+{
+	ufbxt_check_nan("nan");
+	ufbxt_check_nan("NAN");
+	ufbxt_check_nan("NaN");
+	ufbxt_check_nan("-nan");
+	ufbxt_check_nan("+nan");
+	ufbxt_check_nan("nan(1234)");
+	ufbxt_check_nan("nan(0x123456789abcdef)");
+	ufbxt_check_nan("nan(nan)");
+	ufbxt_check_nan("nan(ind)");
+	ufbxt_check_nan("nan(nans)");
+	ufbxt_check_inf("inf");
+	ufbxt_check_inf("INF");
+	ufbxt_check_inf("INFINITY");
+
+	ufbxt_check_nan("1.#NAN");
+	ufbxt_check_nan("0.#NAN12345678");
+	ufbxt_check_nan("1.#IND");
+	ufbxt_check_nan("-7.#NAN00");
+	ufbxt_check_inf("1.#INF");
+	ufbxt_check_inf("-1.#INF");
 }
 
 void test_double_parse_fmt(const char *fmt, int width, uint32_t bits)
@@ -886,6 +932,7 @@ ufbxt_test tests[] = {
 	UFBXT_TEST(test_bigint_div_manual),
 	UFBXT_TEST(test_bigint_div),
 	UFBXT_TEST(test_double_parse),
+	UFBXT_TEST(test_double_parse_nan),
 	UFBXT_TEST(test_double_parse_bits),
 	UFBXT_TEST(test_double_parse_decimal),
 	UFBXT_TEST(test_sorts),
@@ -893,9 +940,23 @@ ufbxt_test tests[] = {
 
 int main(int argc, char **argv)
 {
+	const char *test_filter = NULL;
+
+	for (int i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "-t") || !strcmp(argv[i], "--test")) {
+			if (++i < argc) {
+				test_filter = argv[i];
+			}
+		}
+	}
+
 	size_t num_tests = sizeof(tests) / sizeof(*tests);
 	for (size_t i = 0; i < num_tests; i++) {
 		const ufbxt_test *test = &tests[i];
+		if (test_filter && strcmp(test->name, test_filter) != 0) {
+			continue;
+		}
+
 		printf("%s\n", test->name);
 		test->func();
 	}

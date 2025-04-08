@@ -1528,6 +1528,69 @@ typedef enum {
 	UFBXI_PARSE_DOUBLE_AS_BINARY32 = 0x4,
 } ufbxi_parse_double_flag;
 
+static bool ufbxi_scan_ignorecase(const char *p, const char *fmt)
+{
+	for (const char *f = fmt; *f; f++, p++) {
+		if ((*p | 0x20) != *f) return false;
+	}
+	return true;
+}
+
+static ufbxi_noinline bool ufbxi_parse_inf_nan(double *p_result, const char *str, size_t max_length, char **end, uint32_t flags)
+{
+	bool negative = false;
+	const char *p = str;
+	if (*p == '+' || *p == '-') {
+		negative = *p++ == '-';
+	}
+
+	uint32_t top_bits = 0;
+	if ((p[0] >= '0' && p[0] <= '9') && p[1] == '.' && p[2] == '#') {
+		// Legacy MSVC 1.#NAN
+		p += 3;
+		if (ufbxi_scan_ignorecase(p, "inf")) {
+			p += 3;
+			top_bits = 0x7ff0;
+		} else if (ufbxi_scan_ignorecase(p, "nan") || ufbxi_scan_ignorecase(p, "ind")) {
+			p += 3;
+			top_bits = 0x7ff8;
+		} else {
+			return false;
+		}
+		while (*p >= '0' && *p <= '9') {
+			p++;
+		}
+	} else {
+		// Standard
+		if (ufbxi_scan_ignorecase(p, "nan")) {
+			p += 3;
+			top_bits = 0x7ff8;
+			if (*p == '(') {
+				p++;
+				while (*p != ')') {
+					char c = *p;
+					if (!((c>='0'&&c<='9') || (c>='a'&&c<='z') || (c>='A'&&c<='Z'))) {
+						return false;
+					}
+					p++;
+				}
+				p++;
+			}
+		} else if (ufbxi_scan_ignorecase(p, "inf")) {
+			p += ufbxi_scan_ignorecase(p + 3, "inity") ? 8 : 3;
+			top_bits = 0x7ff0;
+		}
+	}
+
+	*end = p;
+	top_bits |= negative ? 0x8000 : 0;
+	uint64_t bits = (uint64_t)top_bits << 48;
+	double result;
+	ufbxi_bit_cast(double, result, uint64_t, bits);
+	*p_result = result;
+	return true;
+}
+
 static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_length, char **end, uint32_t flags)
 {
 	const uint32_t max_limbs = 14;
@@ -1587,6 +1650,16 @@ static ufbxi_noinline double ufbxi_parse_double(const char *str, size_t max_leng
 			}
 		}
 		dec_exponent += exp_negative ? -exp : exp;
+	}
+
+	{
+		char c = *p;
+		if (c == '#' || c == 'i' || c == 'I' || c == 'n' || c == 'N') {
+			double result;
+			if (ufbxi_parse_inf_nan(&result, str, max_length, end, flags)) {
+				return result;
+			}
+		}
 	}
 
 	*end = (char*)p;
