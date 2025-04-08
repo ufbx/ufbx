@@ -2190,3 +2190,11 @@ UFBXT_FILE_TEST_FLAGS(synthetic_bad_inf_nan, UFBXT_FILE_TEST_FLAG_ALLOW_THREAD_E
 }
 #endif
 
+UFBXT_FILE_TEST_FLAGS(synthetic_bad_inf_nan_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!scene);
+	ufbxt_assert(load_error->type == UFBX_ERROR_UNKNOWN);
+}
+#endif
+
