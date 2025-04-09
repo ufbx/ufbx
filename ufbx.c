@@ -1540,12 +1540,12 @@ static ufbxi_noinline bool ufbxi_parse_inf_nan(double *p_result, const char *str
 {
 	bool negative = false;
 	const char *p = str, *end = p + max_length;
-	if (*p == '+' || *p == '-') {
+	if (p != end && (*p == '+' || *p == '-')) {
 		negative = *p++ == '-';
 	}
 
 	uint32_t top_bits = 0;
-	if (max_length >= 3 && (p[0] >= '0' && p[0] <= '9') && p[1] == '.' && p[2] == '#') {
+	if (end - p >= 3 && (p[0] >= '0' && p[0] <= '9') && p[1] == '.' && p[2] == '#') {
 		// Legacy MSVC 1.#NAN
 		p += 3;
 		if (ufbxi_scan_ignorecase(p, end, "inf")) {
