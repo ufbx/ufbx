@@ -31,6 +31,8 @@ elif [ $cmd == "build-strtod" ]; then
     afl-clang-fast -static ../../misc/fuzz_strtod_persist.c -lm -o fuzz_strtod
 elif [ $cmd == "build-strtod-binary" ]; then
     afl-clang-fast -DBINARY -static ../../misc/fuzz_strtod_persist.c -lm -o fuzz_strtod_binary
+elif [ $cmd == "build-strtod-parse" ]; then
+    afl-clang-fast -static ../../misc/fuzz_strtod_parse_persist.c -lm -o fuzz_strtod_parse
 fi
 
 name=$1
