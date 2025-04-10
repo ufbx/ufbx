@@ -2105,12 +2105,24 @@ UFBXT_FILE_TEST_OPTS(synthetic_negative_fbx_id, ufbxt_retain_dom_opts)
 }
 #endif
 
+#if UFBXT_IMPL
+static void ufbxt_assert_vec3_equal(ufbx_vec3 v, ufbx_real x, ufbx_real y, ufbx_real z)
+{
+	ufbxt_assert(isnan(x) ? isnan(v.x) : v.x == x);
+	ufbxt_assert(isnan(y) ? isnan(v.y) : v.y == y);
+	ufbxt_assert(isnan(z) ? isnan(v.z) : v.z == z);
+}
+#endif
+
 UFBXT_FILE_TEST(synthetic_inf_nan)
 #if UFBXT_IMPL
 {
 	{
 		ufbx_node *inf_node = ufbx_find_node(scene, "INF");
 		ufbxt_assert(inf_node);
+		ufbx_vec3 scaling_max = ufbx_find_vec3(&inf_node->props, "ScalingMax", ufbx_zero_vec3);
+		ufbxt_assert_vec3_equal(scaling_max, INFINITY, -INFINITY, INFINITY);
+
 		ufbx_mesh *inf = inf_node->mesh;
 		ufbx_real *values = (ufbx_real*)inf->vertex_position.values.data;
 		ufbxt_assert(inf->vertex_position.values.count == 4);
@@ -2123,6 +2135,9 @@ UFBXT_FILE_TEST(synthetic_inf_nan)
 	{
 		ufbx_node *nan_node = ufbx_find_node(scene, "NAN");
 		ufbxt_assert(nan_node);
+		ufbx_vec3 scaling_max = ufbx_find_vec3(&nan_node->props, "ScalingMax", ufbx_zero_vec3);
+		ufbxt_assert_vec3_equal(scaling_max, NAN, NAN, NAN);
+
 		ufbx_mesh *nan = nan_node->mesh;
 		ufbx_real *values = (ufbx_real*)nan->vertex_position.values.data;
 		ufbxt_assert(nan->vertex_position.values.count == 4);
@@ -2139,6 +2154,9 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_inf_nan_threaded, synthetic_inf_nan, ufbxt_im
 	{
 		ufbx_node *inf_node = ufbx_find_node(scene, "INF");
 		ufbxt_assert(inf_node);
+		ufbx_vec3 scaling_max = ufbx_find_vec3(&inf_node->props, "ScalingMax", ufbx_zero_vec3);
+		ufbxt_assert_vec3_equal(scaling_max, INFINITY, -INFINITY, INFINITY);
+
 		ufbx_mesh *inf = inf_node->mesh;
 		ufbx_real *values = (ufbx_real*)inf->vertex_position.values.data;
 		ufbxt_assert(inf->vertex_position.values.count == 4);
@@ -2151,6 +2169,9 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_inf_nan_threaded, synthetic_inf_nan, ufbxt_im
 	{
 		ufbx_node *nan_node = ufbx_find_node(scene, "NAN");
 		ufbxt_assert(nan_node);
+		ufbx_vec3 scaling_max = ufbx_find_vec3(&nan_node->props, "ScalingMax", ufbx_zero_vec3);
+		ufbxt_assert_vec3_equal(scaling_max, NAN, NAN, NAN);
+
 		ufbx_mesh *nan = nan_node->mesh;
 		ufbx_real *values = (ufbx_real*)nan->vertex_position.values.data;
 		ufbxt_assert(nan->vertex_position.values.count == 4);
@@ -2158,15 +2179,6 @@ UFBXT_FILE_TEST_OPTS_ALT(synthetic_inf_nan_threaded, synthetic_inf_nan, ufbxt_im
 			ufbxt_assert(isnan(values[i]));
 		}
 	}
-}
-#endif
-
-#if UFBXT_IMPL
-static void ufbxt_assert_vec3_equal(ufbx_vec3 v, ufbx_real x, ufbx_real y, ufbx_real z)
-{
-	ufbxt_assert(isnan(x) ? isnan(v.x) : v.x == x);
-	ufbxt_assert(isnan(y) ? isnan(v.y) : v.y == y);
-	ufbxt_assert(isnan(z) ? isnan(v.z) : v.z == z);
 }
 #endif
 

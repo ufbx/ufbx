@@ -103,7 +103,7 @@ Objects:  {
 			Property: "InheritType", "enum", "",1
 			Property: "ScalingActive", "bool", "",0
 			Property: "ScalingMin", "Vector3D", "",0,0,0
-			Property: "ScalingMax", "Vector3D", "",0,0,0
+			Property: "ScalingMax", "Vector3D", "",1.#INF,-1.#INF,2.#INF3456
 			Property: "ScalingMinX", "bool", "",0
 			Property: "ScalingMinY", "bool", "",0
 			Property: "ScalingMinZ", "bool", "",0
@@ -234,7 +234,7 @@ Objects:  {
 			Property: "InheritType", "enum", "",1
 			Property: "ScalingActive", "bool", "",0
 			Property: "ScalingMin", "Vector3D", "",0,0,0
-			Property: "ScalingMax", "Vector3D", "",0,0,0
+			Property: "ScalingMax", "Vector3D", "",1.#NAN,-1.#IND,0.#NAN0000
 			Property: "ScalingMinX", "bool", "",0
 			Property: "ScalingMinY", "bool", "",0
 			Property: "ScalingMinZ", "bool", "",0

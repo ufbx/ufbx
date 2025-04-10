@@ -396,7 +396,7 @@ Objects:  {
 		Properties70:  {
 			P: "RotationActive", "bool", "", "",1
 			P: "InheritType", "enum", "", "",1
-			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "ScalingMax", "Vector3D", "Vector", "",inf,-inf,INFINITY
 			P: "DefaultAttributeIndex", "int", "Integer", "",0
 			P: "currentUVSet", "KString", "", "U", "map1"
 		}
@@ -408,7 +408,7 @@ Objects:  {
 		Properties70:  {
 			P: "RotationActive", "bool", "", "",1
 			P: "InheritType", "enum", "", "",1
-			P: "ScalingMax", "Vector3D", "Vector", "",0,0,0
+			P: "ScalingMax", "Vector3D", "Vector", "",nan,-nan,1.#IND
 			P: "DefaultAttributeIndex", "int", "Integer", "",0
 			P: "currentUVSet", "KString", "", "U", "map1"
 		}
