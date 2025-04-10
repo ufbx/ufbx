@@ -12164,7 +12164,7 @@ ufbxi_nodiscard static ufbx_props *ufbxi_find_template(ufbxi_context *uc, const 
 
 // Name ID categories
 #if defined(UFBX_REGRESSION)
-	#define UFBXI_MAXIMUM_FAST_POINTER_ID UINT64_C(0x10000000)
+	#define UFBXI_MAXIMUM_FAST_POINTER_ID UINT64_C(0x100)
 #else
 	#define UFBXI_MAXIMUM_FAST_POINTER_ID UINT64_C(0x4000000000000000)
 #endif
