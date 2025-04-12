@@ -2067,3 +2067,146 @@ UFBXT_FILE_TEST(maya_user_props)
 	}
 }
 #endif
+
+#if UFBXT_IMPL
+static void ufbxt_check_dom_id(ufbx_node *node, int64_t id)
+{
+	ufbxt_hintf("node=%s", node->name.data);
+	ufbx_dom_node *dom_node = node->element.dom_node;
+	ufbxt_assert(dom_node);
+	ufbxt_assert(dom_node->values.data[0].type == UFBX_DOM_VALUE_NUMBER);
+	ufbxt_assert(dom_node->values.data[0].value_int == id);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS(synthetic_negative_fbx_id, ufbxt_retain_dom_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *root = scene->root_node;
+	ufbx_node *minus_one = ufbx_find_node(scene, "MinusOne");
+	ufbx_node *min_node = ufbx_find_node(scene, "Min");
+	ufbx_node *max_node = ufbx_find_node(scene, "Max");
+	ufbx_node *one = ufbx_find_node(scene, "One");
+
+	ufbxt_assert(minus_one);
+	ufbxt_assert(min_node);
+	ufbxt_assert(max_node);
+	ufbxt_assert(one);
+
+	ufbxt_assert(minus_one->parent == root);
+	ufbxt_assert(min_node->parent == minus_one);
+	ufbxt_assert(max_node->parent == min_node);
+	ufbxt_assert(one->parent == max_node);
+
+	ufbxt_check_dom_id(minus_one, -1);
+	ufbxt_check_dom_id(min_node, INT64_MIN);
+	ufbxt_check_dom_id(max_node, INT64_MAX);
+	ufbxt_check_dom_id(one, 1);
+}
+#endif
+
+#if UFBXT_IMPL
+static void ufbxt_assert_vec3_equal(ufbx_vec3 v, ufbx_real x, ufbx_real y, ufbx_real z)
+{
+	ufbxt_assert(isnan(x) ? isnan(v.x) : v.x == x);
+	ufbxt_assert(isnan(y) ? isnan(v.y) : v.y == y);
+	ufbxt_assert(isnan(z) ? isnan(v.z) : v.z == z);
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_inf_nan)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *inf_node = ufbx_find_node(scene, "INF");
+		ufbxt_assert(inf_node);
+		ufbx_vec3 scaling_max = ufbx_find_vec3(&inf_node->props, "ScalingMax", ufbx_zero_vec3);
+		ufbxt_assert_vec3_equal(scaling_max, INFINITY, -INFINITY, INFINITY);
+
+		ufbx_mesh *inf = inf_node->mesh;
+		ufbx_real *values = (ufbx_real*)inf->vertex_position.values.data;
+		ufbxt_assert(inf->vertex_position.values.count == 4);
+		for (size_t i = 0; i < 12; i++) {
+			ufbxt_assert(isinf(values[i]));
+			ufbxt_assert((values[i] < 0) == (i >= 6));
+		}
+	}
+
+	{
+		ufbx_node *nan_node = ufbx_find_node(scene, "NAN");
+		ufbxt_assert(nan_node);
+		ufbx_vec3 scaling_max = ufbx_find_vec3(&nan_node->props, "ScalingMax", ufbx_zero_vec3);
+		ufbxt_assert_vec3_equal(scaling_max, NAN, NAN, NAN);
+
+		ufbx_mesh *nan = nan_node->mesh;
+		ufbx_real *values = (ufbx_real*)nan->vertex_position.values.data;
+		ufbxt_assert(nan->vertex_position.values.count == 4);
+		for (size_t i = 0; i < 12; i++) {
+			ufbxt_assert(isnan(values[i]));
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(synthetic_inf_nan_threaded, synthetic_inf_nan, ufbxt_immediate_thread_opts)
+#if UFBXT_IMPL
+{
+	{
+		ufbx_node *inf_node = ufbx_find_node(scene, "INF");
+		ufbxt_assert(inf_node);
+		ufbx_vec3 scaling_max = ufbx_find_vec3(&inf_node->props, "ScalingMax", ufbx_zero_vec3);
+		ufbxt_assert_vec3_equal(scaling_max, INFINITY, -INFINITY, INFINITY);
+
+		ufbx_mesh *inf = inf_node->mesh;
+		ufbx_real *values = (ufbx_real*)inf->vertex_position.values.data;
+		ufbxt_assert(inf->vertex_position.values.count == 4);
+		for (size_t i = 0; i < 12; i++) {
+			ufbxt_assert(isinf(values[i]));
+			ufbxt_assert((values[i] < 0) == (i >= 6));
+		}
+	}
+
+	{
+		ufbx_node *nan_node = ufbx_find_node(scene, "NAN");
+		ufbxt_assert(nan_node);
+		ufbx_vec3 scaling_max = ufbx_find_vec3(&nan_node->props, "ScalingMax", ufbx_zero_vec3);
+		ufbxt_assert_vec3_equal(scaling_max, NAN, NAN, NAN);
+
+		ufbx_mesh *nan = nan_node->mesh;
+		ufbx_real *values = (ufbx_real*)nan->vertex_position.values.data;
+		ufbxt_assert(nan->vertex_position.values.count == 4);
+		for (size_t i = 0; i < 12; i++) {
+			ufbxt_assert(isnan(values[i]));
+		}
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_bad_inf_nan, UFBXT_FILE_TEST_FLAG_ALLOW_THREAD_ERROR)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbx_vec3 *pos = mesh->vertices.data;
+	ufbxt_assert(mesh->vertices.count == 8);
+	ufbxt_assert_vec3_equal(pos[0], 1.0f, 2.0f, (ufbx_real)'s');
+	ufbxt_assert_vec3_equal(pos[1], 1.0f, 2.0f, (ufbx_real)'i');
+	ufbxt_assert_vec3_equal(pos[2], 1.0f, 2.0f, (ufbx_real)'i');
+	ufbxt_assert_vec3_equal(pos[3], 1.0f, 2.0f, (ufbx_real)'n');
+	ufbxt_assert_vec3_equal(pos[4], 1.0f, 2.0f, (ufbx_real)'n');
+	ufbxt_assert_vec3_equal(pos[5], 1.0f, 2.0f, NAN);
+	ufbxt_assert_vec3_equal(pos[6], 1.0f, 2.0f, (ufbx_real)'N');
+	ufbxt_assert_vec3_equal(pos[7], 1.0f, 2.0f, INFINITY);
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_bad_inf_nan_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!scene);
+	ufbxt_assert(load_error->type == UFBX_ERROR_UNKNOWN);
+}
+#endif
+

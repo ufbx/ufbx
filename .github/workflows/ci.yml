@@ -590,6 +590,21 @@ jobs:
           chmod +x codecov
           ./codecov --verbose upload-process --disable-search --fail-on-error --plugin noop -t ${{ secrets.CODECOV_TOKEN }} -n ci_dataset-${{ github.run_id }} -F dataset -f coverage.lcov
 
+  ci_cheri:
+    runs-on: [self-hosted, dataset]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Setup Morello environment
+        run: bash /setup-morello.sh
+      - name: Create build directory
+        run: mkdir build
+      - name: Compile tests with Morello
+        run: aarch64-none-linux-gnu-gcc -static -O2 -march=morello+c64 -mabi=purecap test/check_fbx.c -lm -o build/check_fbx
+      - name: Check test cases
+        run: python3 misc/execute_per_fbx.py --exe morelloie --root data --list misc/light_test_cases.txt --allow-non-fbx -- -- build/check_fbx '#' --allow-bad-unicode --allow-unknown --index-error-handling clamp
+
   ci_fuzz:
     runs-on: [self-hosted, ARM64, legacy]
     steps:
