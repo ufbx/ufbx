@@ -21806,7 +21806,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 			channel->target_shape = channel->keyframes.data[channel->keyframes.count - 1].shape;
 		}
 	}
-	ufbxi_buf_free(&uc->tmp_full_weights);
 
 	{
 		// Generate and patch procedural index buffers
