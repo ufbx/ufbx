@@ -3401,7 +3401,7 @@ static ufbxi_noinline void ufbxi_panicf_imp(ufbx_panic *panic, const char *fmt, 
 
 static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, const char *func, uint32_t line)
 {
-	if (cond[0] == '$') {
+	if (cond && cond[0] == '$') {
 		if (!err->description.data) {
 			err->description.data = cond + 1;
 			err->description.length = strlen(err->description.data);
@@ -3416,6 +3416,8 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 	// NOTE: This is the base function all fails boil down to, place a breakpoint here to
 	// break at the first error
 #if UFBXI_FEATURE_ERROR_STACK
+	ufbx_assert(cond);
+	ufbx_assert(func);
 	if (err->stack_size < UFBX_ERROR_STACK_MAX_DEPTH) {
 		ufbx_error_frame *frame = &err->stack[err->stack_size++];
 		frame->description.data = cond;
@@ -3434,7 +3436,7 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 
 static ufbxi_unused ufbxi_noinline int ufbxi_fail_imp_err_no_stack(ufbx_error *err)
 {
-	return ufbxi_fail_imp_err(err, "", "", 0);
+	return ufbxi_fail_imp_err(err, NULL, NULL, 0);
 }
 
 ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(const char *str, size_t length)
@@ -3529,7 +3531,7 @@ static ufbxi_noinline void ufbxi_clear_error(ufbx_error *err)
 	#define ufbxi_line __LINE__
 	#define ufbxi_cond_str(cond) #cond
 #else
-	#define ufbxi_function ""
+	#define ufbxi_function NULL
 	#define ufbxi_line 0
 	#define ufbxi_cond_str(cond) ""
 #endif
@@ -6639,7 +6641,7 @@ static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, co
 
 static ufbxi_unused ufbxi_noinline int ufbxi_fail_imp_no_stack(ufbxi_context *uc)
 {
-	return ufbxi_fail_imp_err(&uc->error, "", "", 0);
+	return ufbxi_fail_imp_err(&uc->error, NULL, NULL, 0);
 }
 
 #if UFBXI_FEATURE_ERROR_STACK
