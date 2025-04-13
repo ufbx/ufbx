@@ -3434,11 +3434,6 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 	return 0;
 }
 
-static ufbxi_unused ufbxi_noinline int ufbxi_fail_imp_err_no_stack(ufbx_error *err)
-{
-	return ufbxi_fail_imp_err(err, NULL, NULL, 0);
-}
-
 ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(const char *str, size_t length)
 {
 	size_t index = 0;
@@ -3539,6 +3534,7 @@ static ufbxi_noinline void ufbxi_clear_error(ufbx_error *err)
 #if UFBXI_FEATURE_ERROR_STACK
 	#define ufbxi_fail_err_no_msg(err, cond, func, line) ufbxi_fail_imp_err((err), (cond), (func), (line))
 #else
+	static ufbxi_noinline int ufbxi_fail_imp_err_no_stack(ufbx_error *err) { return ufbxi_fail_imp_err(err, NULL, NULL, 0); }
 	#define ufbxi_fail_err_no_msg(err, cond, func, line) ufbxi_fail_imp_err_no_stack((err))
 #endif
 
@@ -6639,14 +6635,10 @@ static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, co
 	return ufbxi_fail_imp_err(&uc->error, cond, func, line);
 }
 
-static ufbxi_unused ufbxi_noinline int ufbxi_fail_imp_no_stack(ufbxi_context *uc)
-{
-	return ufbxi_fail_imp_err(&uc->error, NULL, NULL, 0);
-}
-
 #if UFBXI_FEATURE_ERROR_STACK
 	#define ufbxi_fail_no_msg(uc, cond, func, line) ufbxi_fail_imp((uc), (cond), (func), (line))
 #else
+	static ufbxi_noinline int ufbxi_fail_imp_no_stack(ufbxi_context *uc) { return ufbxi_fail_imp_err(&uc->error, NULL, NULL, 0); }
 	#define ufbxi_fail_no_msg(uc, cond, func, line) ufbxi_fail_imp_no_stack((uc))
 #endif
 
