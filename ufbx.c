@@ -3432,6 +3432,11 @@ static ufbxi_noinline int ufbxi_fail_imp_err(ufbx_error *err, const char *cond, 
 	return 0;
 }
 
+static ufbxi_unused ufbxi_noinline int ufbxi_fail_imp_err_no_stack(ufbx_error *err)
+{
+	return ufbxi_fail_imp_err(err, "", "", 0);
+}
+
 ufbxi_nodiscard static ufbxi_noinline size_t ufbxi_utf8_valid_length(const char *str, size_t length)
 {
 	size_t index = 0;
@@ -3529,9 +3534,15 @@ static ufbxi_noinline void ufbxi_clear_error(ufbx_error *err)
 	#define ufbxi_cond_str(cond) ""
 #endif
 
-#define ufbxi_check_err(err, cond) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), ufbxi_function, ufbxi_line); return 0; } } while (0)
-#define ufbxi_check_return_err(err, cond, ret) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_cond_str(cond), ufbxi_function, ufbxi_line); return ret; } } while (0)
-#define ufbxi_fail_err(err, desc) return ufbxi_fail_imp_err(err, desc, ufbxi_function, ufbxi_line)
+#if UFBXI_FEATURE_ERROR_STACK
+	#define ufbxi_fail_err_no_msg(err, cond, func, line) ufbxi_fail_imp_err((err), (cond), (func), (line))
+#else
+	#define ufbxi_fail_err_no_msg(err, cond, func, line) ufbxi_fail_imp_err_no_stack((err))
+#endif
+
+#define ufbxi_check_err(err, cond) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_err_no_msg((err), ufbxi_cond_str(cond), ufbxi_function, ufbxi_line); return 0; } } while (0)
+#define ufbxi_check_return_err(err, cond, ret) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_err_no_msg((err), ufbxi_cond_str(cond), ufbxi_function, ufbxi_line); return ret; } } while (0)
+#define ufbxi_fail_err(err, desc) return ufbxi_fail_err_no_msg(err, desc, ufbxi_function, ufbxi_line)
 
 #define ufbxi_check_err_msg(err, cond, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), ufbxi_function, ufbxi_line); return 0; } } while (0)
 #define ufbxi_check_return_err_msg(err, cond, ret, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp_err((err), ufbxi_error_msg(ufbxi_cond_str(cond), msg), ufbxi_function, ufbxi_line); return ret; } } while (0)
@@ -6626,10 +6637,21 @@ static ufbxi_noinline int ufbxi_fail_imp(ufbxi_context *uc, const char *cond, co
 	return ufbxi_fail_imp_err(&uc->error, cond, func, line);
 }
 
-#define ufbxi_check(cond) if (ufbxi_unlikely(!ufbxi_trace(cond))) return ufbxi_fail_imp(uc, ufbxi_cond_str(cond), ufbxi_function, ufbxi_line)
-#define ufbxi_check_return(cond, ret) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp(uc, ufbxi_cond_str(cond), ufbxi_function, ufbxi_line); return ret; } } while (0)
-#define ufbxi_fail(desc) return ufbxi_fail_imp(uc, desc, ufbxi_function, ufbxi_line)
-#define ufbxi_fail_return(desc, ret) do { ufbxi_fail_imp(uc, desc, ufbxi_function, ufbxi_line); return ret; } while (0)
+static ufbxi_unused ufbxi_noinline int ufbxi_fail_imp_no_stack(ufbxi_context *uc)
+{
+	return ufbxi_fail_imp_err(&uc->error, "", "", 0);
+}
+
+#if UFBXI_FEATURE_ERROR_STACK
+	#define ufbxi_fail_no_msg(uc, cond, func, line) ufbxi_fail_imp((uc), (cond), (func), (line))
+#else
+	#define ufbxi_fail_no_msg(uc, cond, func, line) ufbxi_fail_imp_no_stack((uc))
+#endif
+
+#define ufbxi_check(cond) if (ufbxi_unlikely(!ufbxi_trace(cond))) return ufbxi_fail_no_msg(uc, ufbxi_cond_str(cond), ufbxi_function, ufbxi_line)
+#define ufbxi_check_return(cond, ret) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_no_msg(uc, ufbxi_cond_str(cond), ufbxi_function, ufbxi_line); return ret; } } while (0)
+#define ufbxi_fail(desc) return ufbxi_fail_no_msg(uc, desc, ufbxi_function, ufbxi_line)
+#define ufbxi_fail_return(desc, ret) do { ufbxi_fail_no_msg(uc, desc, ufbxi_function, ufbxi_line); return ret; } while (0)
 
 #define ufbxi_check_msg(cond, msg) if (ufbxi_unlikely(!ufbxi_trace(cond))) return ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), ufbxi_function, ufbxi_line)
 #define ufbxi_check_return_msg(cond, ret, msg) do { if (ufbxi_unlikely(!ufbxi_trace(cond))) { ufbxi_fail_imp(uc, ufbxi_error_msg(ufbxi_cond_str(cond), msg), ufbxi_function, ufbxi_line); return ret; } } while (0)
