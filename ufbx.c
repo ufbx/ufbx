@@ -21796,8 +21796,15 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 				if (!uc->blender_full_weights) {
 					key->target_weight = full_weights->data[i] / (ufbx_real)100.0;
 				} else if (full_weights->count == key->shape->num_offsets) {
-					ufbxi_for_list(ufbx_real, p_weight, *full_weights) {
-						*p_weight /= (ufbx_real)100.0;
+					if (i == 0) {
+						// Duplicate `index_data` for modification if we retain DOM
+						if (uc->opts.retain_dom) {
+							full_weights->data = ufbxi_push_copy(&uc->result, ufbx_real, full_weights->count, full_weights->data);
+							ufbxi_check(full_weights->data);
+						}
+						ufbxi_for_list(ufbx_real, p_weight, *full_weights) {
+							*p_weight /= (ufbx_real)100.0;
+						}
 					}
 					key->shape->offset_weights = *full_weights;
 				}
