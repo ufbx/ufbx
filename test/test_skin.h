@@ -1149,3 +1149,59 @@ UFBXT_FILE_TEST(maya_instanced_skin)
 }
 #endif
 
+UFBXT_FILE_TEST(blender_279_shape_weights)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh->blend_deformers.count == 1);
+	ufbx_blend_deformer *deformer = mesh->blend_deformers.data[0];
+	ufbxt_assert(deformer->channels.count == 1);
+	ufbx_blend_channel *channel = deformer->channels.data[0];
+	ufbxt_assert(channel->keyframes.count == 1);
+	ufbx_blend_keyframe *keyframe = &channel->keyframes.data[0];
+	ufbx_blend_shape *shape = keyframe->shape;
+
+	ufbxt_assert(!strcmp(channel->name.data, "Key"));
+
+	if (scene->metadata.version >= 7000) {
+		ufbxt_assert(shape->num_offsets == 4);
+		ufbxt_assert(shape->offset_weights.count == 4);
+
+		typedef struct {
+			ufbx_vec3 position;
+			ufbx_real weight;
+		} ufbxt_shape_weight_ref;
+
+		const ufbxt_shape_weight_ref weight_ref[] = {
+			{ { -1.0f, -1.0f, +1.0f }, 0.0f },
+			{ { +1.0f, -1.0f, +1.0f }, 0.25f },
+			{ { +1.0f, +1.0f, +1.0f }, 0.75f },
+			{ { -1.0f, +1.0f, +1.0f }, 1.0f },
+		};
+
+		for (size_t off_i = 0; off_i < shape->num_offsets; off_i++) {
+			ufbxt_assert_vec3_equal(shape->position_offsets.data[off_i], 0.0f, 0.0f, 2.0f);
+
+			ufbx_real weight = shape->offset_weights.data[off_i];
+			uint32_t index = shape->offset_vertices.data[off_i];
+			ufbxt_assert(index < mesh->num_vertices);
+			ufbx_vec3 vertex = mesh->vertices.data[index];
+
+			uint32_t num_found = 0;
+			for (size_t ref_i = 0; ref_i < ufbxt_arraycount(weight_ref); ref_i++) {
+				ufbxt_shape_weight_ref ref = weight_ref[ref_i];
+				if (ref.position.x == vertex.x && ref.position.y == vertex.y && ref.position.z == vertex.z) {
+					ufbxt_assert(weight == ref.weight);
+					num_found++;
+				}
+			}
+			ufbxt_assert(num_found == 1);
+		}
+	} else {
+		ufbxt_assert(shape->offset_weights.count == 0);
+	}
+}
+#endif
+

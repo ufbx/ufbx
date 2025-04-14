@@ -6584,6 +6584,7 @@ typedef struct {
 	bool has_geometry_transform_nodes;
 	bool has_scale_helper_nodes;
 	bool retain_vertex_w;
+	bool blender_full_weights;
 
 	ufbx_mirror_axis mirror_axis;
 
@@ -7950,7 +7951,7 @@ typedef enum {
 
 typedef enum {
 	UFBXI_ARRAY_FLAG_RESULT       = 0x1, // < Allocate the array from the result buffer
-	UFBXI_ARRAY_FLAG_TMP_BUF      = 0x2, // < Allocate the array from the result buffer
+	UFBXI_ARRAY_FLAG_TMP_BUF      = 0x2, // < Allocate the array from the long-term temporary buffer
 	UFBXI_ARRAY_FLAG_PAD_BEGIN    = 0x4, // < Pad the begin of the array with 4 zero elements to guard from invalid -1 index accesses
 	UFBXI_ARRAY_FLAG_ACCURATE_F32 = 0x8, // < Must be parsed as bit-accurate 32-bit floats
 } ufbxi_array_flags;
@@ -8419,14 +8420,8 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_FullWeights) {
-			// Ignore blend shape FullWeights as it's used in Blender for vertex groups
-			// which we don't currently handle. https://developer.blender.org/T90382
-			// TODO: Should we present this to users anyway somehow?
 			info->type = 'r';
-			if (!uc->opts.disable_quirks && uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
-				info->type = '-';
-			}
-			info->flags |= UFBXI_ARRAY_FLAG_TMP_BUF;
+			info->flags |= uc->blender_full_weights ? UFBXI_ARRAY_FLAG_RESULT : UFBXI_ARRAY_FLAG_TMP_BUF;
 			return true;
 		} else if (!strcmp(name, "TransformAssociateModel")) {
 			info->type = uc->opts.retain_dom ? 'r' : '-';
@@ -12049,7 +12044,7 @@ static bool ufbxi_match_version_string(const char *fmt, ufbx_string str, uint32_
 	return true;
 }
 
-ufbxi_nodiscard static int ufbxi_match_exporter(ufbxi_context *uc)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_match_exporter(ufbxi_context *uc)
 {
 	ufbx_string creator = uc->scene.metadata.creator;
 	uint32_t version[3] = { 0 };
@@ -12083,6 +12078,10 @@ ufbxi_nodiscard static int ufbxi_match_exporter(ufbxi_context *uc)
 	if (uc->opts.disable_quirks) {
 		uc->exporter = UFBX_EXPORTER_UNKNOWN;
 		uc->exporter_version = 0;
+	}
+
+	if (uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
+		uc->blender_full_weights = true;
 	}
 
 	return 1;
@@ -21792,10 +21791,16 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 		for (size_t i = 0; i < channel->keyframes.count; i++) {
 			ufbx_blend_keyframe *key = &channel->keyframes.data[i];
+			key->target_weight = 1.0f;
 			if (i < full_weights->count) {
-				key->target_weight = full_weights->data[i] / (ufbx_real)100.0;
-			} else {
-				key->target_weight = 1.0f;
+				if (!uc->blender_full_weights) {
+					key->target_weight = full_weights->data[i] / (ufbx_real)100.0;
+				} else if (full_weights->count == key->shape->num_offsets) {
+					ufbxi_for_list(ufbx_real, p_weight, *full_weights) {
+						*p_weight /= (ufbx_real)100.0;
+					}
+					key->shape->offset_weights = *full_weights;
+				}
 			}
 		}
 
@@ -31832,10 +31837,15 @@ ufbx_abi void ufbx_add_blend_shape_vertex_offsets(const ufbx_blend_shape *shape,
 	size_t num_offsets = shape->num_offsets;
 	uint32_t *vertex_indices = shape->offset_vertices.data;
 	ufbx_vec3 *offsets = shape->position_offsets.data;
+	ufbx_real_list weights = shape->offset_weights;
 	for (size_t i = 0; i < num_offsets; i++) {
 		uint32_t index = vertex_indices[i];
 		if (index < num_vertices) {
-			ufbxi_add_weighted_vec3(&vertices[index], offsets[i], weight);
+			ufbx_real vertex_weight = weight;
+			if (i < weights.count) {
+				vertex_weight *= weights.data[i];
+			}
+			ufbxi_add_weighted_vec3(&vertices[index], offsets[i], vertex_weight);
 		}
 	}
 }

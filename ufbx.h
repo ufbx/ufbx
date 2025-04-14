@@ -2097,6 +2097,10 @@ struct ufbx_blend_shape {
 	ufbx_uint32_list offset_vertices; // < Indices to `ufbx_mesh.vertices[]`
 	ufbx_vec3_list position_offsets;  // < Always specified per-vertex offsets
 	ufbx_vec3_list normal_offsets;    // < Empty if not specified
+
+	// Optional weights for the offsets.
+	// NOTE: These are technically not supported in FBX and are only written by Blender.
+	ufbx_real_list offset_weights;
 };
 
 typedef enum ufbx_cache_file_format UFBX_ENUM_REPR {
