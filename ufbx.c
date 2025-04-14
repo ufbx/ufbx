@@ -8421,7 +8421,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			return true;
 		} else if (name == ufbxi_FullWeights) {
 			info->type = 'r';
-			info->flags |= uc->blender_full_weights ? UFBXI_ARRAY_FLAG_RESULT : UFBXI_ARRAY_FLAG_TMP_BUF;
+			info->flags |= (uint8_t)(uc->blender_full_weights ? UFBXI_ARRAY_FLAG_RESULT : UFBXI_ARRAY_FLAG_TMP_BUF);
 			return true;
 		} else if (!strcmp(name, "TransformAssociateModel")) {
 			info->type = uc->opts.retain_dom ? 'r' : '-';
@@ -32857,7 +32857,7 @@ ufbx_abi bool ufbx_dom_is_array(const ufbx_dom_node *node) {
 	return v.type >= UFBX_DOM_VALUE_ARRAY_I32 && v.type <= UFBX_DOM_VALUE_ARRAY_BLOB;
 }
 ufbx_abi size_t ufbx_dom_array_size(const ufbx_dom_node *node) {
-	return ufbx_dom_is_array(node) ? node->values.data[0].value_int : 0;
+	return ufbx_dom_is_array(node) ? (size_t)node->values.data[0].value_int : (size_t)0;
 }
 ufbx_abi ufbx_int32_list ufbx_dom_as_int32_list(const ufbx_dom_node *node) {
 	ufbx_int32_list list = { NULL, 0 };
