@@ -10733,14 +10733,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_dom_node(ufbxi_context *u
 		val->value_float = (double)(val->value_int = (int64_t)arr->size);
 
 		switch (arr->type) {
-		case 'c': val->type = UFBX_DOM_VALUE_ARRAY_I8; break;
-		case 'b': val->type = UFBX_DOM_VALUE_ARRAY_I8; break;
+		case 'c': val->type = UFBX_DOM_VALUE_BLOB; break;
+		case 'b': val->type = UFBX_DOM_VALUE_BLOB; break;
 		case 'i': val->type = UFBX_DOM_VALUE_ARRAY_I32; break;
 		case 'l': val->type = UFBX_DOM_VALUE_ARRAY_I64; break;
 		case 'f': val->type = UFBX_DOM_VALUE_ARRAY_F32; break;
 		case 'd': val->type = UFBX_DOM_VALUE_ARRAY_F64; break;
-		case 's': val->type = UFBX_DOM_VALUE_ARRAY_RAW_STRING; break;
-		case 'C': val->type = UFBX_DOM_VALUE_ARRAY_RAW_STRING; break;
+		case 's': val->type = UFBX_DOM_VALUE_ARRAY_BLOB; break;
+		case 'C': val->type = UFBX_DOM_VALUE_ARRAY_BLOB; break;
 		case '-': val->type = UFBX_DOM_VALUE_ARRAY_IGNORED; break;
 		default: ufbxi_fail("Bad array type");
 		}
@@ -32843,6 +32843,69 @@ ufbx_abi ufbx_audio_layer *ufbx_as_audio_layer(const ufbx_element *element) { re
 ufbx_abi ufbx_audio_clip *ufbx_as_audio_clip(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_AUDIO_CLIP ? (ufbx_audio_clip*)element : NULL; }
 ufbx_abi ufbx_pose *ufbx_as_pose(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_POSE ? (ufbx_pose*)element : NULL; }
 ufbx_abi ufbx_metadata_object *ufbx_as_metadata_object(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_METADATA_OBJECT ? (ufbx_metadata_object*)element : NULL; }
+
+ufbx_abi bool ufbx_dom_is_array(const ufbx_dom_node *node) {
+	if (node->values.count != 1) return false;
+	ufbx_dom_value v = node->values.data[0];
+	return v.type >= UFBX_DOM_VALUE_ARRAY_I32 && v.type <= UFBX_DOM_VALUE_ARRAY_BLOB;
+}
+ufbx_abi size_t ufbx_dom_array_size(const ufbx_dom_node *node) {
+	return ufbx_dom_is_array(node) ? node->values.data[0].value_int : 0;
+}
+ufbx_abi ufbx_int32_list ufbx_dom_as_int32_list(const ufbx_dom_node *node) {
+	ufbx_int32_list list = { NULL, 0 };
+	if (node->values.count == 1 && node->values.data[0].type == UFBX_DOM_VALUE_ARRAY_I64) {
+		ufbx_dom_value value = node->values.data[0];
+		list.data = (int32_t*)value.value_blob.data;
+		list.count = value.value_blob.size / sizeof(int32_t);
+	}
+	return list;
+}
+ufbx_abi ufbx_int64_list ufbx_dom_as_int64_list(const ufbx_dom_node *node) {
+	ufbx_int64_list list = { NULL, 0 };
+	if (node->values.count == 1 && node->values.data[0].type == UFBX_DOM_VALUE_ARRAY_I64) {
+		ufbx_dom_value value = node->values.data[0];
+		list.data = (int64_t*)value.value_blob.data;
+		list.count = value.value_blob.size / sizeof(int64_t);
+	}
+	return list;
+}
+ufbx_abi ufbx_float32_list ufbx_dom_as_float_list(const ufbx_dom_node *node) {
+	ufbx_float32_list list = { NULL, 0 };
+	if (node->values.count == 1 && node->values.data[0].type == UFBX_DOM_VALUE_ARRAY_F32) {
+		ufbx_dom_value value = node->values.data[0];
+		list.data = (float*)value.value_blob.data;
+		list.count = value.value_blob.size / sizeof(float);
+	}
+	return list;
+}
+ufbx_abi ufbx_float64_list ufbx_dom_as_double_list(const ufbx_dom_node *node) {
+	ufbx_float64_list list = { NULL, 0 };
+	if (node->values.count == 1 && node->values.data[0].type == UFBX_DOM_VALUE_ARRAY_F64) {
+		ufbx_dom_value value = node->values.data[0];
+		list.data = (double*)value.value_blob.data;
+		list.count = value.value_blob.size / sizeof(double);
+	}
+	return list;
+}
+ufbx_abi ufbx_real_list ufbx_dom_as_real_list(const ufbx_dom_node *node) {
+	ufbx_real_list list = { NULL, 0 };
+	if (node->values.count == 1 && node->values.data[0].type == UFBX_DOM_VALUE_ARRAY_REAL) {
+		ufbx_dom_value value = node->values.data[0];
+		list.data = (ufbx_real*)value.value_blob.data;
+		list.count = value.value_blob.size / sizeof(ufbx_real);
+	}
+	return list;
+}
+ufbx_abi ufbx_blob_list ufbx_dom_as_blob_list(const ufbx_dom_node *node) {
+	ufbx_blob_list list = { NULL, 0 };
+	if (node->values.count == 1 && node->values.data[0].type == UFBX_DOM_VALUE_ARRAY_BLOB) {
+		ufbx_dom_value value = node->values.data[0];
+		list.data = (ufbx_blob*)value.value_blob.data;
+		list.count = value.value_blob.size / sizeof(ufbx_blob);
+	}
+	return list;
+}
 
 // -- String API
 

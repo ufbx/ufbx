@@ -400,13 +400,15 @@ UFBX_LIST_TYPE(ufbx_string_list, ufbx_string);
 typedef enum ufbx_dom_value_type UFBX_ENUM_REPR {
 	UFBX_DOM_VALUE_NUMBER,
 	UFBX_DOM_VALUE_STRING,
-	UFBX_DOM_VALUE_ARRAY_I8,
+	UFBX_DOM_VALUE_BLOB,
 	UFBX_DOM_VALUE_ARRAY_I32,
 	UFBX_DOM_VALUE_ARRAY_I64,
 	UFBX_DOM_VALUE_ARRAY_F32,
 	UFBX_DOM_VALUE_ARRAY_F64,
-	UFBX_DOM_VALUE_ARRAY_RAW_STRING,
+	UFBX_DOM_VALUE_ARRAY_BLOB,
 	UFBX_DOM_VALUE_ARRAY_IGNORED,
+
+	UFBX_DOM_VALUE_ARRAY_REAL = sizeof(ufbx_real) == sizeof(float) ? UFBX_DOM_VALUE_ARRAY_F32 : UFBX_DOM_VALUE_ARRAY_F64,
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_DOM_VALUE_TYPE)
 } ufbx_dom_value_type;
@@ -414,6 +416,12 @@ typedef enum ufbx_dom_value_type UFBX_ENUM_REPR {
 UFBX_ENUM_TYPE(ufbx_dom_value_type, UFBX_DOM_VALUE_TYPE, UFBX_DOM_VALUE_ARRAY_IGNORED);
 
 typedef struct ufbx_dom_node ufbx_dom_node;
+
+UFBX_LIST_TYPE(ufbx_int32_list, int32_t);
+UFBX_LIST_TYPE(ufbx_int64_list, int64_t);
+UFBX_LIST_TYPE(ufbx_float32_list, float);
+UFBX_LIST_TYPE(ufbx_float64_list, double);
+UFBX_LIST_TYPE(ufbx_blob_list, ufbx_blob);
 
 typedef struct ufbx_dom_value {
 	ufbx_dom_value_type type;
@@ -5781,6 +5789,16 @@ ufbx_abi ufbx_audio_layer *ufbx_as_audio_layer(const ufbx_element *element);
 ufbx_abi ufbx_audio_clip *ufbx_as_audio_clip(const ufbx_element *element);
 ufbx_abi ufbx_pose *ufbx_as_pose(const ufbx_element *element);
 ufbx_abi ufbx_metadata_object *ufbx_as_metadata_object(const ufbx_element *element);
+
+// Functions for interfacing with DOM lists
+ufbx_abi bool ufbx_dom_is_array(const ufbx_dom_node *node);
+ufbx_abi size_t ufbx_dom_array_size(const ufbx_dom_node *node);
+ufbx_abi ufbx_int32_list ufbx_dom_as_int32_list(const ufbx_dom_node *node);
+ufbx_abi ufbx_int64_list ufbx_dom_as_int64_list(const ufbx_dom_node *node);
+ufbx_abi ufbx_float32_list ufbx_dom_as_float_list(const ufbx_dom_node *node);
+ufbx_abi ufbx_float64_list ufbx_dom_as_double_list(const ufbx_dom_node *node);
+ufbx_abi ufbx_real_list ufbx_dom_as_real_list(const ufbx_dom_node *node);
+ufbx_abi ufbx_blob_list ufbx_dom_as_blob_list(const ufbx_dom_node *node);
 
 #ifdef __cplusplus
 }

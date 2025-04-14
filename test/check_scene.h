@@ -1297,7 +1297,7 @@ static void ufbxt_check_dom_value(ufbx_scene *scene, ufbx_dom_value *value)
 		break;
 	case UFBX_DOM_VALUE_STRING:
 		break;
-	case UFBX_DOM_VALUE_ARRAY_I8:
+	case UFBX_DOM_VALUE_BLOB:
 		array_stride = 1;
 		break;
 	case UFBX_DOM_VALUE_ARRAY_I32:
@@ -1312,7 +1312,7 @@ static void ufbxt_check_dom_value(ufbx_scene *scene, ufbx_dom_value *value)
 	case UFBX_DOM_VALUE_ARRAY_F64:
 		array_stride = 8;
 		break;
-	case UFBX_DOM_VALUE_ARRAY_RAW_STRING:
+	case UFBX_DOM_VALUE_ARRAY_BLOB:
 		array_stride = sizeof(ufbx_blob);
 		break;
 	case UFBX_DOM_VALUE_ARRAY_IGNORED:
@@ -1327,7 +1327,7 @@ static void ufbxt_check_dom_value(ufbx_scene *scene, ufbx_dom_value *value)
 		ufbxt_assert(value->value_blob.size == (size_t)value->value_int * array_stride);
 	}
 
-	if (value->type == UFBX_DOM_VALUE_ARRAY_RAW_STRING) {
+	if (value->type == UFBX_DOM_VALUE_ARRAY_BLOB) {
 		const ufbx_blob *blobs = (const ufbx_blob*)value->value_blob.data;
 		for (size_t i = 0; i < (size_t)value->value_int; i++) {
 			ufbxt_check_blob(blobs[i]);
