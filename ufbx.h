@@ -408,8 +408,6 @@ typedef enum ufbx_dom_value_type UFBX_ENUM_REPR {
 	UFBX_DOM_VALUE_ARRAY_BLOB,
 	UFBX_DOM_VALUE_ARRAY_IGNORED,
 
-	UFBX_DOM_VALUE_ARRAY_REAL = sizeof(ufbx_real) == sizeof(float) ? UFBX_DOM_VALUE_ARRAY_F32 : UFBX_DOM_VALUE_ARRAY_F64,
-
 	UFBX_ENUM_FORCE_WIDTH(UFBX_DOM_VALUE_TYPE)
 } ufbx_dom_value_type;
 
