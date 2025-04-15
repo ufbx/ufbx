@@ -1408,7 +1408,7 @@ UFBXT_TEST(retain_free_garbage)
 }
 #endif
 
-UFBXT_TEST(dom_helper_null)
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(dom_helper_null, maya_cube, ufbxt_retain_dom_opts, UFBXT_FILE_TEST_FLAG_NO_FUZZ)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(ufbx_dom_is_array(NULL) == false);
@@ -1419,6 +1419,49 @@ UFBXT_TEST(dom_helper_null)
 	ufbxt_assert(ufbx_dom_as_double_list(NULL).count == 0);
 	ufbxt_assert(ufbx_dom_as_real_list(NULL).count == 0);
 	ufbxt_assert(ufbx_dom_as_blob_list(NULL).count == 0);
+
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbx_dom_node *dom_node = node->element.dom_node;
+	ufbxt_assert(dom_node);
+
+	ufbxt_assert(ufbx_dom_is_array(dom_node) == false);
+	ufbxt_assert(ufbx_dom_array_size(dom_node) == 0);
+	ufbxt_assert(ufbx_dom_as_int32_list(dom_node).count == 0);
+	ufbxt_assert(ufbx_dom_as_int64_list(dom_node).count == 0);
+	ufbxt_assert(ufbx_dom_as_float_list(dom_node).count == 0);
+	ufbxt_assert(ufbx_dom_as_double_list(dom_node).count == 0);
+	ufbxt_assert(ufbx_dom_as_real_list(dom_node).count == 0);
+	ufbxt_assert(ufbx_dom_as_blob_list(dom_node).count == 0);
+
+	ufbx_dom_node *dom_version = ufbx_dom_find(dom_node, "Version");
+	ufbxt_assert(dom_version);
+
+	ufbxt_assert(ufbx_dom_is_array(dom_version) == false);
+	ufbxt_assert(ufbx_dom_array_size(dom_version) == 0);
+	ufbxt_assert(ufbx_dom_as_int32_list(dom_version).count == 0);
+	ufbxt_assert(ufbx_dom_as_int64_list(dom_version).count == 0);
+	ufbxt_assert(ufbx_dom_as_float_list(dom_version).count == 0);
+	ufbxt_assert(ufbx_dom_as_double_list(dom_version).count == 0);
+	ufbxt_assert(ufbx_dom_as_real_list(dom_version).count == 0);
+	ufbxt_assert(ufbx_dom_as_blob_list(dom_version).count == 0);
+
+	ufbx_mesh *mesh = node->mesh;
+	ufbxt_assert(mesh);
+
+	ufbx_dom_node *dom_mesh = mesh->element.dom_node;
+	ufbxt_assert(dom_mesh);
+
+	if (scene->metadata.version < 7000) {
+		ufbxt_assert(dom_mesh == dom_node);
+	} else {
+		ufbxt_assert(dom_mesh != dom_node);
+	}
+
+	ufbx_dom_node *dom_vertices = ufbx_dom_find(dom_mesh, "Vertices");
+	ufbxt_assert(ufbx_dom_is_array(dom_vertices) == true);
+	ufbxt_assert(ufbx_dom_array_size(dom_vertices) == 24);
 }
 #endif
 
