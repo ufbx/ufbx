@@ -868,7 +868,7 @@ enum { UFBX_MAXIMUM_ALIGNMENT = sizeof(void*) > 8 ? sizeof(void*) : 8 };
 
 // -- Version
 
-#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 18, 2)
+#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 19, 0)
 ufbx_abi_data_def const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
 
 ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEADER_VERSION/1000u);
@@ -6584,6 +6584,7 @@ typedef struct {
 	bool has_geometry_transform_nodes;
 	bool has_scale_helper_nodes;
 	bool retain_vertex_w;
+	bool blender_full_weights;
 
 	ufbx_mirror_axis mirror_axis;
 
@@ -7950,7 +7951,7 @@ typedef enum {
 
 typedef enum {
 	UFBXI_ARRAY_FLAG_RESULT       = 0x1, // < Allocate the array from the result buffer
-	UFBXI_ARRAY_FLAG_TMP_BUF      = 0x2, // < Allocate the array from the result buffer
+	UFBXI_ARRAY_FLAG_TMP_BUF      = 0x2, // < Allocate the array from the long-term temporary buffer
 	UFBXI_ARRAY_FLAG_PAD_BEGIN    = 0x4, // < Pad the begin of the array with 4 zero elements to guard from invalid -1 index accesses
 	UFBXI_ARRAY_FLAG_ACCURATE_F32 = 0x8, // < Must be parsed as bit-accurate 32-bit floats
 } ufbxi_array_flags;
@@ -8171,7 +8172,7 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			// in versions >= 7200 as some of the elements aren't actually floats (!)
 			info->type = uc->from_ascii && uc->version >= 7200 ? 'i' : 'f';
 			if (uc->opts.ignore_animation) info->type = '-';
-			if (uc->from_ascii && uc->version >= 7200) {
+			if (uc->from_ascii && uc->version < 7200) {
 				info->flags |= UFBXI_ARRAY_FLAG_ACCURATE_F32;
 			}
 			return true;
@@ -8419,14 +8420,8 @@ static bool ufbxi_is_array_node(ufbxi_context *uc, ufbxi_parse_state parent, con
 			info->flags = UFBXI_ARRAY_FLAG_RESULT;
 			return true;
 		} else if (name == ufbxi_FullWeights) {
-			// Ignore blend shape FullWeights as it's used in Blender for vertex groups
-			// which we don't currently handle. https://developer.blender.org/T90382
-			// TODO: Should we present this to users anyway somehow?
 			info->type = 'r';
-			if (!uc->opts.disable_quirks && uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
-				info->type = '-';
-			}
-			info->flags |= UFBXI_ARRAY_FLAG_TMP_BUF;
+			info->flags = (uint8_t)(info->flags | (uc->blender_full_weights ? UFBXI_ARRAY_FLAG_RESULT : UFBXI_ARRAY_FLAG_TMP_BUF));
 			return true;
 		} else if (!strcmp(name, "TransformAssociateModel")) {
 			info->type = uc->opts.retain_dom ? 'r' : '-';
@@ -10738,14 +10733,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_retain_dom_node(ufbxi_context *u
 		val->value_float = (double)(val->value_int = (int64_t)arr->size);
 
 		switch (arr->type) {
-		case 'c': val->type = UFBX_DOM_VALUE_ARRAY_I8; break;
-		case 'b': val->type = UFBX_DOM_VALUE_ARRAY_I8; break;
+		case 'c': val->type = UFBX_DOM_VALUE_BLOB; break;
+		case 'b': val->type = UFBX_DOM_VALUE_BLOB; break;
 		case 'i': val->type = UFBX_DOM_VALUE_ARRAY_I32; break;
 		case 'l': val->type = UFBX_DOM_VALUE_ARRAY_I64; break;
 		case 'f': val->type = UFBX_DOM_VALUE_ARRAY_F32; break;
 		case 'd': val->type = UFBX_DOM_VALUE_ARRAY_F64; break;
-		case 's': val->type = UFBX_DOM_VALUE_ARRAY_RAW_STRING; break;
-		case 'C': val->type = UFBX_DOM_VALUE_ARRAY_RAW_STRING; break;
+		case 's': val->type = UFBX_DOM_VALUE_ARRAY_BLOB; break;
+		case 'C': val->type = UFBX_DOM_VALUE_ARRAY_BLOB; break;
 		case '-': val->type = UFBX_DOM_VALUE_ARRAY_IGNORED; break;
 		default: ufbxi_fail("Bad array type");
 		}
@@ -12049,7 +12044,7 @@ static bool ufbxi_match_version_string(const char *fmt, ufbx_string str, uint32_
 	return true;
 }
 
-ufbxi_nodiscard static int ufbxi_match_exporter(ufbxi_context *uc)
+ufbxi_nodiscard ufbxi_noinline static int ufbxi_match_exporter(ufbxi_context *uc)
 {
 	ufbx_string creator = uc->scene.metadata.creator;
 	uint32_t version[3] = { 0 };
@@ -12083,6 +12078,10 @@ ufbxi_nodiscard static int ufbxi_match_exporter(ufbxi_context *uc)
 	if (uc->opts.disable_quirks) {
 		uc->exporter = UFBX_EXPORTER_UNKNOWN;
 		uc->exporter_version = 0;
+	}
+
+	if (uc->exporter == UFBX_EXPORTER_BLENDER_BINARY) {
+		uc->blender_full_weights = true;
 	}
 
 	return 1;
@@ -21792,10 +21791,23 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_scene(ufbxi_context *uc
 
 		for (size_t i = 0; i < channel->keyframes.count; i++) {
 			ufbx_blend_keyframe *key = &channel->keyframes.data[i];
+			key->target_weight = 1.0f;
 			if (i < full_weights->count) {
-				key->target_weight = full_weights->data[i] / (ufbx_real)100.0;
-			} else {
-				key->target_weight = 1.0f;
+				if (!uc->blender_full_weights) {
+					key->target_weight = full_weights->data[i] / (ufbx_real)100.0;
+				} else if (full_weights->count == key->shape->num_offsets) {
+					if (i == 0) {
+						// Duplicate `index_data` for modification if we retain DOM
+						if (uc->opts.retain_dom) {
+							full_weights->data = ufbxi_push_copy(&uc->result, ufbx_real, full_weights->count, full_weights->data);
+							ufbxi_check(full_weights->data);
+						}
+						ufbxi_for_list(ufbx_real, p_weight, *full_weights) {
+							*p_weight /= (ufbx_real)100.0;
+						}
+					}
+					key->shape->offset_weights = *full_weights;
+				}
 			}
 		}
 
@@ -31832,10 +31844,15 @@ ufbx_abi void ufbx_add_blend_shape_vertex_offsets(const ufbx_blend_shape *shape,
 	size_t num_offsets = shape->num_offsets;
 	uint32_t *vertex_indices = shape->offset_vertices.data;
 	ufbx_vec3 *offsets = shape->position_offsets.data;
+	ufbx_real_list weights = shape->offset_weights;
 	for (size_t i = 0; i < num_offsets; i++) {
 		uint32_t index = vertex_indices[i];
 		if (index < num_vertices) {
-			ufbxi_add_weighted_vec3(&vertices[index], offsets[i], weight);
+			ufbx_real vertex_weight = weight;
+			if (i < weights.count) {
+				vertex_weight *= weights.data[i];
+			}
+			ufbxi_add_weighted_vec3(&vertices[index], offsets[i], vertex_weight);
 		}
 	}
 }
@@ -32833,6 +32850,69 @@ ufbx_abi ufbx_audio_layer *ufbx_as_audio_layer(const ufbx_element *element) { re
 ufbx_abi ufbx_audio_clip *ufbx_as_audio_clip(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_AUDIO_CLIP ? (ufbx_audio_clip*)element : NULL; }
 ufbx_abi ufbx_pose *ufbx_as_pose(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_POSE ? (ufbx_pose*)element : NULL; }
 ufbx_abi ufbx_metadata_object *ufbx_as_metadata_object(const ufbx_element *element) { return element && element->type == UFBX_ELEMENT_METADATA_OBJECT ? (ufbx_metadata_object*)element : NULL; }
+
+ufbx_abi bool ufbx_dom_is_array(const ufbx_dom_node *node) {
+	if (!node || node->values.count != 1) return false;
+	ufbx_dom_value v = node->values.data[0];
+	return v.type >= UFBX_DOM_VALUE_ARRAY_I32 && v.type <= UFBX_DOM_VALUE_ARRAY_BLOB;
+}
+ufbx_abi size_t ufbx_dom_array_size(const ufbx_dom_node *node) {
+	return ufbx_dom_is_array(node) ? (size_t)node->values.data[0].value_int : (size_t)0;
+}
+ufbx_abi ufbx_int32_list ufbx_dom_as_int32_list(const ufbx_dom_node *node) {
+	ufbx_int32_list list = { NULL, 0 };
+	if (node && node->values.count == 1 && node->values.data[0].type == UFBX_DOM_VALUE_ARRAY_I32) {
+		ufbx_dom_value value = node->values.data[0];
+		list.data = (int32_t*)value.value_blob.data;
+		list.count = value.value_blob.size / sizeof(int32_t);
+	}
+	return list;
+}
+ufbx_abi ufbx_int64_list ufbx_dom_as_int64_list(const ufbx_dom_node *node) {
+	ufbx_int64_list list = { NULL, 0 };
+	if (node && node->values.count == 1 && node->values.data[0].type == UFBX_DOM_VALUE_ARRAY_I64) {
+		ufbx_dom_value value = node->values.data[0];
+		list.data = (int64_t*)value.value_blob.data;
+		list.count = value.value_blob.size / sizeof(int64_t);
+	}
+	return list;
+}
+ufbx_abi ufbx_float_list ufbx_dom_as_float_list(const ufbx_dom_node *node) {
+	ufbx_float_list list = { NULL, 0 };
+	if (node && node->values.count == 1 && node->values.data[0].type == UFBX_DOM_VALUE_ARRAY_F32) {
+		ufbx_dom_value value = node->values.data[0];
+		list.data = (float*)value.value_blob.data;
+		list.count = value.value_blob.size / sizeof(float);
+	}
+	return list;
+}
+ufbx_abi ufbx_double_list ufbx_dom_as_double_list(const ufbx_dom_node *node) {
+	ufbx_double_list list = { NULL, 0 };
+	if (node && node->values.count == 1 && node->values.data[0].type == UFBX_DOM_VALUE_ARRAY_F64) {
+		ufbx_dom_value value = node->values.data[0];
+		list.data = (double*)value.value_blob.data;
+		list.count = value.value_blob.size / sizeof(double);
+	}
+	return list;
+}
+ufbx_abi ufbx_real_list ufbx_dom_as_real_list(const ufbx_dom_node *node) {
+	ufbx_real_list list = { NULL, 0 };
+	if (node && node->values.count == 1 && node->values.data[0].type == (sizeof(ufbx_real) == sizeof(double) ? UFBX_DOM_VALUE_ARRAY_F64 : UFBX_DOM_VALUE_ARRAY_F32)) {
+		ufbx_dom_value value = node->values.data[0];
+		list.data = (ufbx_real*)value.value_blob.data;
+		list.count = value.value_blob.size / sizeof(ufbx_real);
+	}
+	return list;
+}
+ufbx_abi ufbx_blob_list ufbx_dom_as_blob_list(const ufbx_dom_node *node) {
+	ufbx_blob_list list = { NULL, 0 };
+	if (node && node->values.count == 1 && node->values.data[0].type == UFBX_DOM_VALUE_ARRAY_BLOB) {
+		ufbx_dom_value value = node->values.data[0];
+		list.data = (ufbx_blob*)value.value_blob.data;
+		list.count = value.value_blob.size / sizeof(ufbx_blob);
+	}
+	return list;
+}
 
 // -- String API
 
