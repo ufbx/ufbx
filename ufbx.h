@@ -417,8 +417,8 @@ typedef struct ufbx_dom_node ufbx_dom_node;
 
 UFBX_LIST_TYPE(ufbx_int32_list, int32_t);
 UFBX_LIST_TYPE(ufbx_int64_list, int64_t);
-UFBX_LIST_TYPE(ufbx_float32_list, float);
-UFBX_LIST_TYPE(ufbx_float64_list, double);
+UFBX_LIST_TYPE(ufbx_float_list, float);
+UFBX_LIST_TYPE(ufbx_double_list, double);
 UFBX_LIST_TYPE(ufbx_blob_list, ufbx_blob);
 
 typedef struct ufbx_dom_value {
@@ -5793,8 +5793,8 @@ ufbx_abi bool ufbx_dom_is_array(const ufbx_dom_node *node);
 ufbx_abi size_t ufbx_dom_array_size(const ufbx_dom_node *node);
 ufbx_abi ufbx_int32_list ufbx_dom_as_int32_list(const ufbx_dom_node *node);
 ufbx_abi ufbx_int64_list ufbx_dom_as_int64_list(const ufbx_dom_node *node);
-ufbx_abi ufbx_float32_list ufbx_dom_as_float_list(const ufbx_dom_node *node);
-ufbx_abi ufbx_float64_list ufbx_dom_as_double_list(const ufbx_dom_node *node);
+ufbx_abi ufbx_float_list ufbx_dom_as_float_list(const ufbx_dom_node *node);
+ufbx_abi ufbx_double_list ufbx_dom_as_double_list(const ufbx_dom_node *node);
 ufbx_abi ufbx_real_list ufbx_dom_as_real_list(const ufbx_dom_node *node);
 ufbx_abi ufbx_blob_list ufbx_dom_as_blob_list(const ufbx_dom_node *node);
 

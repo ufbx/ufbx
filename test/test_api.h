@@ -1408,3 +1408,17 @@ UFBXT_TEST(retain_free_garbage)
 }
 #endif
 
+UFBXT_TEST(dom_helper_null)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(ufbx_dom_is_array(NULL) == false);
+	ufbxt_assert(ufbx_dom_array_size(NULL) == 0);
+	ufbxt_assert(ufbx_dom_as_int32_list(NULL).count == 0);
+	ufbxt_assert(ufbx_dom_as_int64_list(NULL).count == 0);
+	ufbxt_assert(ufbx_dom_as_float_list(NULL).count == 0);
+	ufbxt_assert(ufbx_dom_as_double_list(NULL).count == 0);
+	ufbxt_assert(ufbx_dom_as_real_list(NULL).count == 0);
+	ufbxt_assert(ufbx_dom_as_blob_list(NULL).count == 0);
+}
+#endif
+

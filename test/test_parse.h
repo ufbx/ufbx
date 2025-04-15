@@ -2210,3 +2210,75 @@ UFBXT_FILE_TEST_FLAGS(synthetic_bad_inf_nan_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERR
 }
 #endif
 
+UFBXT_FILE_TEST_OPTS_ALT(dom_get_array, maya_anim_extrapolation, ufbxt_retain_dom_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbx_dom_node *dom_node = node->element.dom_node;
+	ufbxt_assert(dom_node);
+
+	ufbx_dom_node *dom_node_not_found = ufbx_dom_find(dom_node, "Non-Existent");
+	ufbxt_assert(!dom_node_not_found);
+
+	ufbxt_assert(scene->anim_layers.count == 1);
+	ufbx_anim_layer *anim_layer = scene->anim_layers.data[0];
+
+	ufbx_anim_prop *anim_prop = ufbx_find_anim_prop(anim_layer, &node->element, UFBX_Lcl_Translation);
+	ufbxt_assert(anim_prop);
+
+	ufbx_anim_curve *anim_curve = anim_prop->anim_value->curves[0];
+	ufbxt_assert(anim_curve);
+
+	ufbx_dom_node *dom_curve = anim_curve->element.dom_node;
+	ufbxt_assert(dom_curve);
+
+	if (scene->metadata.version >= 7000) {
+
+		ufbx_dom_node *attr_data = ufbx_dom_find(dom_curve, "KeyAttrDataFloat");
+		ufbx_int32_list attr_data_int32 = ufbx_dom_as_int32_list(attr_data);
+		ufbx_float_list attr_data_float = ufbx_dom_as_float_list(attr_data);
+
+		int32_t attr_int[8];
+		if (scene->metadata.ascii && scene->metadata.version >= 7200) {
+			ufbxt_assert(attr_data_int32.count == 8);
+			ufbxt_assert(attr_data_float.count == 0);
+			memcpy(attr_int, attr_data_int32.data, sizeof(attr_int));
+		} else {
+			ufbxt_assert(attr_data_float.count == 8);
+			ufbxt_assert(attr_data_int32.count == 0);
+			memcpy(attr_int, attr_data_float.data, sizeof(attr_int));
+		}
+
+		const int32_t attr_ref[] = { 0, 0, 218434821, 0, 0, 0, 218434821, 0 };
+		for (size_t i = 0; i < ufbxt_arraycount(attr_ref); i++) {
+			ufbxt_assert(attr_int[i] == attr_ref[i]);
+		}
+
+		ufbx_int64_list key_time = ufbx_dom_as_int64_list(ufbx_dom_find(dom_curve, "KeyTime"));
+		ufbxt_assert(key_time.count == 2);
+		ufbxt_assert(key_time.data[0] == 1924423250);
+		ufbxt_assert(key_time.data[1] == 46186158000);
+
+		ufbx_real_list key_value = ufbx_dom_as_real_list(ufbx_dom_find(dom_curve, "KeyValueFloat"));
+		ufbxt_assert(key_value.count == 2);
+		ufbxt_assert(key_value.data[0] == 0.0f);
+		ufbxt_assert(key_value.data[1] == 10.0f);
+	} else {
+		ufbx_dom_node *dom_key = ufbx_dom_find(dom_curve, "Key");
+		ufbxt_assert(dom_key);
+		ufbx_double_list key = ufbx_dom_as_double_list(dom_key);
+
+		const double key_ref[] = {
+			(double)1924423250, 0, (double)'U', (double)'s', 0, 0, (double)'n',
+			(double)46186158000, 10.0, (double)'U', (double)'s', 0, 0, (double)'n',
+		};
+		ufbxt_assert(key.count == ufbxt_arraycount(key_ref));
+		for (size_t i = 0; i < ufbxt_arraycount(key_ref); i++) {
+			ufbxt_assert(key.data[i] == key_ref[i]);
+		}
+	}
+}
+#endif
+
