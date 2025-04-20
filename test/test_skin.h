@@ -1274,3 +1274,12 @@ UFBXT_FILE_TEST_OPTS_ALT(blender_279_shape_weights_dom, blender_279_shape_weight
 }
 #endif
 
+UFBXT_FILE_TEST(blender440_shape_weight_anim)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "blender440_shape_weight_anim_5", NULL, 5.0/24.0);
+	ufbxt_check_frame(scene, err, true, "blender440_shape_weight_anim_15", NULL, 15.0/24.0);
+	ufbxt_check_frame(scene, err, true, "blender440_shape_weight_anim_25", NULL, 25.0/24.0);
+}
+#endif
+
