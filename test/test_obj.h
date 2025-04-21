@@ -1618,3 +1618,15 @@ UFBXT_FILE_TEST(blender_441_empty_material)
 }
 #endif
 
+UFBXT_FILE_TEST(synthetic_empty_material)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->materials.count == 0);
+	ufbxt_assert(mesh->face_material.count == 0);
+}
+#endif
+
