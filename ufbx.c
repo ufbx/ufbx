@@ -6423,7 +6423,6 @@ typedef struct {
 
 	uint64_t usemtl_fbx_id;
 	uint32_t usemtl_index;
-	ufbx_string usemtl_name;
 
 	uint32_t face_material;
 
@@ -17103,6 +17102,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_indices(ufbxi_context 
 				uc->obj.face_material = index - mesh->usemtl_base;
 			}
 			uc->obj.face_material = entry->user_id - mesh->usemtl_base;
+		} else {
+			uc->obj.face_material = UFBX_NO_INDEX;
 		}
 	}
 
@@ -17261,7 +17262,14 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_comment(ufbxi_context 
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context *uc)
 {
-	ufbxi_check(uc->obj.num_tokens >= 2);
+	uc->obj.material_dirty = true;
+
+	// Allow empty `usemtl` lines to specify "no material".
+	if (uc->obj.num_tokens < 2) {
+		uc->obj.usemtl_fbx_id = 0;
+		return 1;
+	}
+
 	ufbx_string name = ufbxi_obj_span_token(uc, 1, SIZE_MAX);
 
 	ufbxi_check(ufbxi_push_string_place_str(&uc->string_pool, &name, false));
@@ -17272,7 +17280,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context
 	ufbxi_fbx_id_entry *entry = ufbxi_find_fbx_id(uc, fbx_id);
 
 	uc->obj.usemtl_fbx_id = fbx_id;
-	uc->obj.usemtl_name = name;
 
 	if (!entry) {
 		ufbxi_element_info info = { 0 };
@@ -17290,8 +17297,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context
 		ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->obj.tmp_materials, &uc->obj.tmp_materials_cap, id + 1));
 		uc->obj.tmp_materials[id] = material;
 	}
-
-	uc->obj.material_dirty = true;
 
 	return 1;
 }
@@ -17804,7 +17809,8 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_mtl(ufbxi_context *uc)
 
 		ufbx_string cmd = uc->obj.tokens[0];
 		if (ufbxi_str_equal(cmd, ufbxi_str_c("newmtl"))) {
-			// HACK: Reuse mesh material parsing
+			// HACK: Reuse mesh material parsing, but don't allow for empty material name
+			ufbxi_check(uc->obj.num_tokens >= 2);
 			ufbxi_check(ufbxi_obj_flush_material(uc));
 			ufbxi_check(ufbxi_obj_parse_material(uc));
 		} else if (cmd.length > 4 && !memcmp(cmd.data, "map_", 4)) {
