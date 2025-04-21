@@ -17264,7 +17264,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_obj_parse_material(ufbxi_context
 {
 	uc->obj.material_dirty = true;
 
-	// Allow empty `usemtl` lines 
+	// Allow empty `usemtl` lines to specify "no material".
 	if (uc->obj.num_tokens < 2) {
 		uc->obj.usemtl_fbx_id = 0;
 		return 1;
