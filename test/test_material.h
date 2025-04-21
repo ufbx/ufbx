@@ -2047,3 +2047,45 @@ UFBXT_FILE_TEST(synthetic_embedded_base64)
 }
 #endif
 
+UFBXT_FILE_TEST_OPTS_ALT(synthetic_embedded_base64_dom, synthetic_embedded_base64, ufbxt_retain_dom_opts)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "lambert1");
+	ufbxt_assert(material);
+
+	ufbx_texture *texture = material->fbx.diffuse_color.texture;
+	ufbxt_assert(texture);
+
+	ufbx_video *video = texture->video;
+	ufbxt_assert(video);
+
+	ufbx_dom_node *dom_video = video->element.dom_node;
+	ufbxt_assert(dom_video);
+
+	ufbx_dom_node *dom_content = ufbx_dom_find(dom_video, "Content");
+	ufbxt_assert(dom_content);
+
+	ufbx_blob_list blobs = ufbx_dom_as_blob_list(dom_content);
+	ufbxt_assert(blobs.count == 71);
+
+	size_t total_size = 0;
+	for (size_t i = 0; i < blobs.count; i++) {
+		total_size += blobs.data[i].size;
+	}
+
+	size_t offset = 0;
+	char *data = malloc(total_size);
+	for (size_t i = 0; i < blobs.count; i++) {
+		ufbx_blob blob = blobs.data[i];
+		memcpy(data + offset, blob.data, blob.size);
+		offset += blob.size;
+	}
+	ufbxt_assert(offset == total_size);
+
+	ufbx_blob total_blob = { data, total_size };
+	ufbxt_check_blob_content(total_blob, "textures/tiny_clouds.png");
+
+	free(data);
+}
+#endif
+
