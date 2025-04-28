@@ -1603,3 +1603,30 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(obj_space_manual_convert, blender_279_ball, obj_a
 }
 #endif
 
+UFBXT_FILE_TEST(blender_441_empty_material)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Cube_Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->materials.count == 1);
+	for (size_t i = 0; i < mesh->face_material.count; i++) {
+		uint32_t index = mesh->face_material.data[i];
+		ufbxt_assert(index == 0);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST(synthetic_empty_material)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "Cube");
+	ufbxt_assert(node && node->mesh);
+	ufbx_mesh *mesh = node->mesh;
+
+	ufbxt_assert(mesh->materials.count == 0);
+	ufbxt_assert(mesh->face_material.count == 0);
+}
+#endif
+

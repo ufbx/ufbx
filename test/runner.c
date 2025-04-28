@@ -2652,6 +2652,9 @@ typedef enum ufbxt_file_test_flags {
 	// Allow warnings
 	UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS = 0x8000,
 
+	// Never run fuzz checks
+	UFBXT_FILE_TEST_FLAG_NO_FUZZ = 0x10000,
+
 } ufbxt_file_test_flags;
 
 const char *ufbxt_file_formats[] = {
@@ -2730,6 +2733,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 	bool allow_strict_error = (flags & UFBXT_FILE_TEST_FLAG_ALLOW_STRICT_ERROR) != 0;
 	bool skip_opts_checks = (flags & UFBXT_FILE_TEST_FLAG_SKIP_LOAD_OPTS_CHECKS) != 0;
 	// bool fuzz_always = (flags & UFBXT_FILE_TEST_FLAG_FUZZ_ALWAYS) != 0;
+	bool no_fuzz = (flags & UFBXT_FILE_TEST_FLAG_NO_FUZZ) != 0;
 	bool fuzz_always = true; // Always fuzz always
 	bool diff_always = (flags & UFBXT_FILE_TEST_FLAG_DIFF_ALWAYS) != 0;
 	bool allow_thread_error = (flags & UFBXT_FILE_TEST_FLAG_ALLOW_THREAD_ERROR) != 0;
@@ -2772,7 +2776,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 		ufbxt_assert(data);
 
 		snprintf(base_name, sizeof(base_name), "%s_obj", name);
-		if (!alternative || fuzz_always) {
+		if ((!alternative || fuzz_always) && !no_fuzz) {
 			ufbxt_do_fuzz(base_name, data, size, buf, allow_error, UFBX_FILE_FORMAT_UNKNOWN, fuzz_opts);
 		}
 
@@ -2941,7 +2945,7 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 			#endif
 
 			// Try a couple of read buffer sizes
-			if (g_fuzz && !g_fuzz_no_buffer && g_fuzz_step == SIZE_MAX && (!alternative || fuzz_always)) {
+			if (g_fuzz && !g_fuzz_no_buffer && g_fuzz_step == SIZE_MAX && (!alternative || fuzz_always) && !no_fuzz) {
 				ufbxt_begin_fuzz();
 
 				int fail_sz = -1;
@@ -3220,11 +3224,11 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				}
 			}
 
-			if (!alternative || fuzz_always) {
+			if ((!alternative || fuzz_always) && !no_fuzz) {
 				ufbxt_do_fuzz(base_name, data, size, buf, allow_error, UFBX_FILE_FORMAT_UNKNOWN, fuzz_opts);
 			}
 
-			if ((!alternative || fuzz_always) && scene && !g_no_fuzz) {
+			if ((!alternative || fuzz_always) && scene && !g_no_fuzz && !no_fuzz) {
 				// Run known buffer size checks
 				for (size_t i = 0; i < ufbxt_arraycount(g_buffer_checks); i++) {
 					const ufbxt_buffer_check *check = &g_buffer_checks[i];

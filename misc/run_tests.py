@@ -180,7 +180,7 @@ class CLCompiler(Compiler):
 
     async def check_version(self):
         _, out, err, _, _ = await self.run()
-        m = re.search(r"Version ([.0-9]+) for (\w+)", out + err, re.M)
+        m = re.search(r"Version ([.0-9]+) for (\w+)", out + err, flags=re.M)
         if not m: return False
         self.arch = m.group(2).lower()
         self.version = m.group(1)
@@ -461,7 +461,7 @@ class TCCCompiler(GCCCompiler):
     async def check_version(self):
         _, out, err, _, _ = await self.run("-v")
         print(out + err)
-        m = re.search(r"tcc version ([.0-9]+) \((\w+).*\)", out + err, re.M)
+        m = re.search(r"tcc version ([.0-9]+) \((\w+).*\)", out + err, flags=re.M)
         if not m: return False
         self.arch = m.group(2).lower()
         self.version = m.group(1)
@@ -582,13 +582,13 @@ for sdk in argv.wasi_sdk:
 for desc in argv.additional_compiler:
     name = re.sub(r"[^A-Za-z0-9\-]", "", desc)
     if "clang" in desc:
-        cpp = re.sub(r"clang", "clang++", desc, 1)
+        cpp = re.sub(r"clang", "clang++", desc, count=1)
         all_compilers += [
             ClangCompiler(name, desc, False),
             ClangCompiler(name, cpp, True),
         ]
     elif "gcc" in desc:
-        cpp = re.sub(r"gcc", "g++", desc, 1)
+        cpp = re.sub(r"gcc", "g++", desc, count=1)
         all_compilers += [
             GCCCompiler(name, desc, False),
             GCCCompiler(name, cpp, True),
