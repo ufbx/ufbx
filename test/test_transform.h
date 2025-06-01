@@ -1871,3 +1871,47 @@ UFBXT_FILE_TEST(maya_split_pivot)
 }
 #endif
 
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_adjust_to_rotation_pivot_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.pivot_handling = UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_split_pivot_adjust, maya_split_pivot, ufbxt_adjust_to_rotation_pivot_opts)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	{
+		ufbx_transform transform = node->local_transform;
+		ufbx_vec3 ref = { 2.0f, 0.0f, 0.0f };
+		ufbxt_assert_close_vec3(err, transform.translation, ref);
+	}
+
+	{
+		ufbx_transform transform = ufbx_evaluate_transform(scene->anim, node, 1.0/24.0);
+		ufbx_vec3 ref = { 2.0f, 0.0f, 0.0f };
+		ufbxt_assert_close_vec3(err, transform.translation, ref);
+	}
+
+	{
+		ufbx_transform transform = ufbx_evaluate_transform(scene->anim, node, 6.0/24.0);
+		ufbx_vec3 ref = { 2.0f, 0.0f, 0.0f };
+		ufbxt_assert_close_vec3(err, transform.translation, ref);
+	}
+
+	{
+		ufbx_transform transform = ufbx_evaluate_transform(scene->anim, node, 12.0/24.0);
+		ufbx_vec3 ref = { 2.0f, 3.0f, 0.0f };
+		ufbxt_assert_close_vec3(err, transform.translation, ref);
+	}
+
+	ufbxt_check_frame(scene, err, true, "maya_split_pivot", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_split_pivot_6", NULL, 6.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_split_pivot_12", NULL, 12.0/24.0);
+}
+#endif

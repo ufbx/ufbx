@@ -4463,10 +4463,15 @@ typedef enum ufbx_pivot_handling UFBX_ENUM_REPR {
 	// to interpret these in a standard scene graph.
 	UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT,
 
+	// Translate objects to be located at their rotation pivot.
+	// NOTE: Results in geometric translation. Use `ufbx_geometry_transform_handling`
+	// to interpret these in a standard scene graph.
+	UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT,
+
 	UFBX_ENUM_FORCE_WIDTH(UFBX_PIVOT_HANDLING)
 } ufbx_pivot_handling;
 
-UFBX_ENUM_TYPE(ufbx_pivot_handling, UFBX_PIVOT_HANDLING, UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT);
+UFBX_ENUM_TYPE(ufbx_pivot_handling, UFBX_PIVOT_HANDLING, UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT);
 
 typedef enum ufbx_baked_key_flags UFBX_FLAG_REPR {
 	// This keyframe represents a constant step from the left side
