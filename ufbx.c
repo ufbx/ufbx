@@ -18245,7 +18245,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 				if (can_modify_pivot && can_modify_geometry_transform) {
 					ufbx_vec3 geometric_translation = ufbxi_find_vec3(&node->props, ufbxi_GeometricTranslation, 0.0f, 0.0f, 0.0f);
 
-					ufbx_vec3 child_offset;
+					ufbx_vec3 child_offset = { 0.0f };
 					ufbx_prop *new_props = NULL;
 					size_t new_prop_count = 0;
 					if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT) {
