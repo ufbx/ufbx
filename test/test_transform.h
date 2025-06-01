@@ -1852,3 +1852,22 @@ UFBXT_FILE_TEST(maya_extrapolate_cube)
 	ufbxt_check_transform_consistency(err, scene, 24.0, 120, UFBXT_CHECK_TRANSFORM_CONSISTENCY_NO_EXTRAPOLATION);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_split_pivot)
+#if UFBXT_IMPL
+{
+	ufbx_node *node = ufbx_find_node(scene, "pCube1");
+	ufbxt_assert(node);
+
+	ufbx_vec3 rotation_pivot = ufbx_find_vec3(&node->props, UFBX_RotationPivot, ufbx_zero_vec3);
+	ufbx_vec3 scaling_pivot = ufbx_find_vec3(&node->props, UFBX_ScalingPivot, ufbx_zero_vec3);
+
+	ufbxt_assert_vec3_equal(rotation_pivot, 2.0f, 0.0f, 0.0f);
+	ufbxt_assert_vec3_equal(scaling_pivot, -0.5f, 0.0f, 0.0f);
+
+	ufbxt_check_frame(scene, err, true, "maya_split_pivot", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_split_pivot_6", NULL, 6.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_split_pivot_12", NULL, 12.0/24.0);
+}
+#endif
+
