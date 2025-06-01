@@ -1648,7 +1648,7 @@ UFBXT_TEST(maya_instanced_pivots)
 				ufbx_node *light_parent = light_attr->instances.data[0];
 				ufbxt_assert_close_vec3_xyz(&err, light_parent->geometry_to_world.cols[3], 0.0f, 1.414f, 0.586f);
 
-				if (pv == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT && gh != UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK) {
+				if ((pv == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT || pv == UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT) && gh != UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK) {
 					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube1->props, "RotationPivot", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
 					ufbxt_assert_close_vec3_xyz(&err, ufbx_find_vec3(&cube1->props, "ScalingPivot", ufbx_zero_vec3), 0.0f, 0.0f, 0.0f);
 					if (gh == UFBX_GEOMETRY_TRANSFORM_HANDLING_PRESERVE) {
