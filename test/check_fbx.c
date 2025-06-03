@@ -73,6 +73,7 @@ static const ufbxt_enum_name ufbxt_names_ufbx_index_error_handling[] = {
 static const ufbxt_enum_name ufbxt_names_ufbx_pivot_handling[] = {
 	{ "retain", UFBX_PIVOT_HANDLING_RETAIN },
 	{ "adjust-to-pivot", UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT },
+	{ "adjust-to-rotation-pivot", UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT },
 };
 
 static int ufbxt_str_to_enum_imp(const ufbxt_enum_name *names, size_t count, const char *type_name, const char *name)
