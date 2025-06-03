@@ -5970,7 +5970,6 @@ static ufbxi_noinline ufbx_vec3 ufbxi_slow_normalized_cross3(const ufbx_vec3 *a,
 // -- Threading
 
 typedef struct ufbxi_task ufbxi_task;
-typedef struct ufbxi_thread ufbxi_thread;
 typedef struct ufbxi_thread_pool ufbxi_thread_pool;
 
 typedef bool ufbxi_task_fn(ufbxi_task *task);
