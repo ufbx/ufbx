@@ -102,7 +102,7 @@ for cycle in range(argv.cycles):
             if argv.exe:
                 rest = argv.remainder[1:]
                 if "#" not in rest:
-                    rest = [path.encode("utf-8")] + rest
+                    rest = [path] + rest
                 rest = [filter_arg(r, p) for r in rest]
                 args = [argv.exe] + rest
 
