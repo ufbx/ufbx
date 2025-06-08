@@ -17989,6 +17989,13 @@ typedef struct {
 	ufbx_vec3 constant_value;
 } ufbxi_pre_anim_value;
 
+static bool ufbxi_pivot_nonzero(ufbx_vec3 offset)
+{
+	// TODO: Expose this as a setting?
+	const double epsilon = 0.0009765625;
+	return ufbx_fabs(offset.x) >= epsilon || ufbx_fabs(offset.y) >= epsilon || ufbx_fabs(offset.z) >= epsilon;
+}
+
 static ufbx_real ufbxi_pivot_div(ufbx_real offset, ufbx_real initial_scale)
 {
 	const double epsilon = 0.0078125;
@@ -18229,7 +18236,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 			if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT) {
 				should_modify_pivot = !ufbxi_is_vec3_zero(rotation_pivot);
 			} else if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT) {
-				should_modify_pivot = !ufbxi_is_vec3_zero(rotation_pivot) || !ufbxi_is_vec3_zero(scaling_pivot) || !ufbxi_is_vec3_zero(scaling_offset);
+				should_modify_pivot = ufbxi_pivot_nonzero(rotation_pivot) || ufbxi_pivot_nonzero(scaling_pivot) || ufbxi_pivot_nonzero(scaling_offset);
 			}
 
 			if (should_modify_pivot) {
