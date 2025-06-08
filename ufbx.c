@@ -18215,10 +18215,19 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 		for (size_t i = 0; i < num_nodes; i++) {
 			ufbxi_pre_node *pre_node = &pre_nodes[i];
 			ufbx_node *node = (ufbx_node*)elements[pre_node->element_id];
+
 			ufbx_vec3 rotation_pivot = ufbxi_find_vec3(&node->props, ufbxi_RotationPivot, 0.0f, 0.0f, 0.0f);
 			ufbx_vec3 scaling_pivot = ufbxi_find_vec3(&node->props, ufbxi_ScalingPivot, 0.0f, 0.0f, 0.0f);
-			if (!ufbxi_is_vec3_zero(rotation_pivot)) {
+			ufbx_vec3 scaling_offset = ufbxi_find_vec3(&node->props, ufbxi_ScalingOffset, 0.0f, 0.0f, 0.0f);
 
+			bool should_modify_pivot = false;
+			if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT) {
+				should_modify_pivot = !ufbxi_is_vec3_zero(rotation_pivot);
+			} else if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT) {
+				should_modify_pivot = !ufbxi_is_vec3_zero(rotation_pivot) || !ufbxi_is_vec3_zero(scaling_pivot) || !ufbxi_is_vec3_zero(scaling_offset);
+			}
+
+			if (should_modify_pivot) {
 				bool can_modify_geometry_transform = true;
 				if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK) {
 					if (instance_counts[node->element_id] > 1 || modify_not_supported[node->element_id]) {
@@ -18262,7 +18271,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 						ufbxi_init_synthetic_vec3_prop(&dst[2], ufbxi_GeometricTranslation, &geometric_translation, UFBX_PROP_VECTOR);
 						new_prop_count = num_props + 3;
 					} else if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT) {
-						ufbx_vec3 scaling_offset = ufbxi_find_vec3(&node->props, ufbxi_ScalingOffset, 0.0f, 0.0f, 0.0f);
 						ufbx_vec3 initial_scale = ufbxi_find_vec3(&node->props, ufbxi_Lcl_Scaling, 1.0f, 1.0f, 1.0f);
 
 						ufbx_vec3 scaled_offset = ufbxi_sub3(ufbxi_add3(scaling_offset, scaling_pivot), rotation_pivot);

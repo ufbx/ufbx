@@ -1915,3 +1915,95 @@ UFBXT_FILE_TEST_OPTS_ALT(maya_split_pivot_adjust, maya_split_pivot, ufbxt_adjust
 	ufbxt_check_frame(scene, err, true, "maya_split_pivot_12", NULL, 12.0/24.0);
 }
 #endif
+
+UFBXT_FILE_TEST(maya_pivot_offset)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_pivot_offset", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_pivot_offset_8", NULL, 8.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_pivot_offset_12", NULL, 12.0/24.0);
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "ScalingOffset");
+		ufbxt_assert(node);
+
+		ufbx_vec3 ref = { 20.0f, 0.0f, 0.0f };
+		ufbxt_assert_close_vec3(err, node->local_transform.translation, ref);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "RotationOffset");
+		ufbxt_assert(node);
+
+		ufbx_vec3 ref = { 10.0f, 0.0f, 10.0f };
+		ufbxt_assert_close_vec3(err, node->local_transform.translation, ref);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "BothOffsets");
+		ufbxt_assert(node);
+
+		ufbx_vec3 ref = { 20.0f, 0.0f, 00.0f };
+		ufbxt_assert_close_vec3(err, node->local_transform.translation, ref);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "PivotOffsets");
+		ufbxt_assert(node);
+
+		ufbx_vec3 ref = { 10.0f, 0.0f, 30.0f };
+		ufbxt_assert_close_vec3(err, node->local_transform.translation, ref);
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_pivot_offset_legacy_adjust, maya_pivot_offset, ufbxt_adjust_to_pivot_opts)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_pivot_offset", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_pivot_offset_8", NULL, 8.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_pivot_offset_12", NULL, 12.0/24.0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_pivot_offset_rotation_adjust, maya_pivot_offset, ufbxt_adjust_to_rotation_pivot_opts)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_pivot_offset", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_pivot_offset_8", NULL, 8.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_pivot_offset_12", NULL, 12.0/24.0);
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "ScalingOffset");
+		ufbxt_assert(node);
+
+		ufbx_vec3 ref = { 0.0f, 0.0f, 0.0f };
+		ufbxt_assert_close_vec3(err, node->local_transform.translation, ref);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "RotationOffset");
+		ufbxt_assert(node);
+
+		ufbx_vec3 ref = { 10.0f, 0.0f, 10.0f };
+		ufbxt_assert_close_vec3(err, node->local_transform.translation, ref);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "BothOffsets");
+		ufbxt_assert(node);
+
+		ufbx_vec3 ref = { 20.0f, 0.0f, 20.0f };
+		ufbxt_assert_close_vec3(err, node->local_transform.translation, ref);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "PivotOffsets");
+		ufbxt_assert(node);
+
+		ufbx_vec3 ref = { 10.0f, 0.0f, 20.0f };
+		ufbxt_assert_close_vec3(err, node->local_transform.translation, ref);
+	}
+}
+#endif
+
