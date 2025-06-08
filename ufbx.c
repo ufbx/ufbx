@@ -5944,11 +5944,6 @@ ufbx_inline ufbx_vec3 ufbxi_normalize3(ufbx_vec3 a) {
 	}
 }
 
-ufbx_inline ufbx_vec3 ufbxi_div3(ufbx_vec3 a, ufbx_vec3 b) {
-	ufbx_vec3 v = { a.x / b.x, a.y / b.y, a.z / b.z };
-	return v;
-}
-
 ufbx_inline ufbx_vec3 ufbxi_neg3(ufbx_vec3 a) {
 	ufbx_vec3 v = { -a.x, -a.y, -a.z };
 	return v;
@@ -17994,6 +17989,16 @@ typedef struct {
 	ufbx_vec3 constant_value;
 } ufbxi_pre_anim_value;
 
+static ufbx_real ufbxi_pivot_div(ufbx_real offset, ufbx_real initial_scale)
+{
+	const double epsilon = 0.0078125;
+	if (ufbx_fabs(initial_scale) >= epsilon) {
+		return offset / initial_scale;
+	} else {
+		return offset;
+	}
+}
+
 // Called between parsing and `ufbxi_finalize_scene()`.
 // This is a very messy function reminiscent of the _old_ ufbx, where we do
 // multiple passes over connections without having a proper scene graph.
@@ -18271,13 +18276,31 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 						ufbxi_init_synthetic_vec3_prop(&dst[2], ufbxi_GeometricTranslation, &geometric_translation, UFBX_PROP_VECTOR);
 						new_prop_count = num_props + 3;
 					} else if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT) {
+						// We can eliminate the post-rotation translation and move it to the geometry/children as follows.
+						// Let Z be the initial value of S in the transform (aka `initial_scale`):
+						//
+						//   (Rp-1+Soff+Sp) + S * (Sp-1)
+						//   S * (Sp-1 + (Rp-1+Soff+Sp)/S)
+						//   S * (Sp-1 + (Rp-1+Soff+Sp)/S - (Rp-1+Soff+Sp)/Z + (Rp-1+Soff+Sp)/Z)
+						//
+						//   (Rp-1 + Soff + Sp) + S * (-(Rp-1 + Soff + Sp)/Z + (Sp-1 + (Rp-1 + Soff + Sp)/Z))
+						//   ^-scaled_offset--^         ^-unscaled_offset--^           ^-unscaled_offset--^
+						//   ^---------------- 0, when S=Z ----------------^   ^------- child_offset ------^
+						//
+						// We need to be careful when doing this in case any component of Z is 0. Fortunately,
+						// the above holds for all `Z != 0`, it will just result in non-zero translation in the parent.
+
 						ufbx_vec3 initial_scale = ufbxi_find_vec3(&node->props, ufbxi_Lcl_Scaling, 1.0f, 1.0f, 1.0f);
-
 						ufbx_vec3 scaled_offset = ufbxi_sub3(ufbxi_add3(scaling_offset, scaling_pivot), rotation_pivot);
+						ufbx_vec3 unscaled_offset;
+						unscaled_offset.x = ufbxi_pivot_div(scaled_offset.x, initial_scale.x);
+						unscaled_offset.y = ufbxi_pivot_div(scaled_offset.y, initial_scale.y);
+						unscaled_offset.z = ufbxi_pivot_div(scaled_offset.z, initial_scale.z);
 
-						ufbx_vec3 new_scaling_pivot = ufbxi_div3(scaled_offset, initial_scale);
+						// Convert `scaled_offset + S*unscaled_offset` to FBX scaling pivot and offset.
+						ufbx_vec3 new_scaling_pivot = unscaled_offset;
 						ufbx_vec3 new_scaling_offset = ufbxi_sub3(scaled_offset, new_scaling_pivot);
-						child_offset = ufbxi_sub3(ufbxi_div3(scaled_offset, initial_scale), scaling_pivot);
+						child_offset = ufbxi_sub3(unscaled_offset, scaling_pivot);
 
 						size_t num_props = node->props.props.count;
 						new_props = ufbxi_push_zero(&uc->result, ufbx_prop, num_props + 4);

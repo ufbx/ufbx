@@ -2007,3 +2007,78 @@ UFBXT_FILE_TEST_OPTS_ALT(maya_pivot_offset_rotation_adjust, maya_pivot_offset, u
 }
 #endif
 
+UFBXT_FILE_TEST(maya_zero_scale_pivot)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_zero_scale_pivot", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_zero_scale_pivot_6", NULL, 6.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_zero_scale_pivot_12", NULL, 12.0/24.0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_zero_scale_pivot_legacy_adjust, maya_zero_scale_pivot, ufbxt_adjust_to_pivot_opts)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_zero_scale_pivot", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_zero_scale_pivot_6", NULL, 6.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_zero_scale_pivot_12", NULL, 12.0/24.0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_zero_scale_pivot_rotation_adjust, maya_zero_scale_pivot, ufbxt_adjust_to_rotation_pivot_opts)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_zero_scale_pivot", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_zero_scale_pivot_6", NULL, 6.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_zero_scale_pivot_12", NULL, 12.0/24.0);
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Ortho_Parent");
+		ufbxt_assert(node);
+
+		ufbx_vec3 begin_ref = { 10.0f, 0.0f, 0.0f };
+		ufbx_vec3 end_ref = { 10.0f, 0.0f, 0.0f };
+		ufbx_vec3 begin_pos = node->local_transform.translation;
+		ufbx_vec3 end_pos = ufbx_evaluate_transform(scene->anim, node, 1.0).translation;
+		ufbxt_assert_close_vec3(err, begin_pos, begin_ref);
+		ufbxt_assert_close_vec3(err, end_pos, end_ref);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Parallel_Parent");
+		ufbxt_assert(node);
+
+		ufbx_vec3 begin_ref = { 10.0f, 0.0f, 0.0f }; // incorrect due to zero scale
+		ufbx_vec3 end_ref = { -10.0f, 0.0f, 0.0f };
+		ufbx_vec3 begin_pos = node->local_transform.translation;
+		ufbx_vec3 end_pos = ufbx_evaluate_transform(scene->anim, node, 1.0).translation;
+		ufbxt_assert_close_vec3_threshold(err, begin_pos, begin_ref, 0.01f);
+		ufbxt_assert_close_vec3(err, end_pos, end_ref);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Align_Parent");
+		ufbxt_assert(node);
+
+		ufbx_vec3 begin_ref = { 0.0f, 0.0f, 10.0f };
+		ufbx_vec3 end_ref = { 0.0f, 0.0f, 10.0f };
+		ufbx_vec3 begin_pos = node->local_transform.translation;
+		ufbx_vec3 end_pos = ufbx_evaluate_transform(scene->anim, node, 1.0).translation;
+		ufbxt_assert_close_vec3(err, begin_pos, begin_ref);
+		ufbxt_assert_close_vec3(err, end_pos, end_ref);
+	}
+
+	{
+		ufbx_node *node = ufbx_find_node(scene, "Offset_Parent");
+		ufbxt_assert(node);
+
+		ufbx_vec3 begin_ref = { 0.0f, 0.0f, 0.0f }; // incorrect due to zero scale
+		ufbx_vec3 end_ref = { 0.0f, 0.0f, -10.0f };
+		ufbx_vec3 begin_pos = node->local_transform.translation;
+		ufbx_vec3 end_pos = ufbx_evaluate_transform(scene->anim, node, 1.0).translation;
+		ufbxt_assert_close_vec3(err, begin_pos, begin_ref);
+		ufbxt_assert_close_vec3(err, end_pos, end_ref);
+	}
+}
+#endif
+
