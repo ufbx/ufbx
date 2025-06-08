@@ -3718,6 +3718,8 @@ typedef enum ufbx_pivot_handling UFBX_ENUM_REPR {
 	// Translate objects to be located at their rotation pivot.
 	// NOTE: Results in geometric translation. Use `ufbx_geometry_transform_handling`
 	// to interpret these in a standard scene graph.
+	// NOTE: By default the original transforms of empties are not retained when using this,
+	// use `ufbx_load_opts.pivot_handling_retain_empties` to prevent adjusting these pivots.
 	UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT,
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_PIVOT_HANDLING)
@@ -4801,13 +4803,16 @@ typedef struct ufbx_load_opts {
 	// See `ufbx_inherit_mode_handling` for an explanation.
 	ufbx_inherit_mode_handling inherit_mode_handling;
 
+	// How to perform space conversion by `target_axes` and `target_unit_meters`.
+	// See `ufbx_space_conversion` for an explanation.
+	ufbx_space_conversion space_conversion;
+
 	// How to handle pivots.
 	// See `ufbx_pivot_handling` for an explanation.
 	ufbx_pivot_handling pivot_handling;
 
-	// How to perform space conversion by `target_axes` and `target_unit_meters`.
-	// See `ufbx_space_conversion` for an explanation.
-	ufbx_space_conversion space_conversion;
+	// Retain the original transforms of empties when converting pivots.
+	bool pivot_handling_retain_empties;
 
 	// Axis used to mirror for conversion between left-handed and right-handed coordinates.
 	ufbx_mirror_axis handedness_conversion_axis;

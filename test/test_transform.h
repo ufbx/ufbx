@@ -2082,3 +2082,133 @@ UFBXT_FILE_TEST_OPTS_ALT(maya_zero_scale_pivot_rotation_adjust, maya_zero_scale_
 }
 #endif
 
+UFBXT_FILE_TEST(maya_null_pivots)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_null_pivots", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_null_pivots_6", NULL, 6.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_null_pivots_12", NULL, 12.0/24.0);
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT(maya_null_pivots_adjust, maya_null_pivots, ufbxt_adjust_to_rotation_pivot_opts)
+#if UFBXT_IMPL
+{
+	ufbxt_check_frame(scene, err, true, "maya_null_pivots", NULL, 1.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_null_pivots_6", NULL, 6.0/24.0);
+	ufbxt_check_frame(scene, err, true, "maya_null_pivots_12", NULL, 12.0/24.0);
+}
+#endif
+
+UFBXT_TEST(maya_null_pivots_opts)
+#if UFBXT_IMPL
+{
+	ufbxt_diff_error err = { 0 };
+
+	ufbxt_obj_file *obj_file = ufbxt_load_obj_file("maya_null_pivots", NULL);
+
+	char path[512];
+	ufbxt_file_iterator iter = { "maya_null_pivots" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		for (uint32_t pv = 0; pv < UFBX_PIVOT_HANDLING_COUNT; pv++) {
+			for (uint32_t gh = 0; gh < UFBX_GEOMETRY_TRANSFORM_HANDLING_COUNT; gh++) {
+				for (uint32_t re = 0; re < 2; re++) {
+					ufbxt_hintf("pivot_handling=%u, geometry_transform_handling=%u, pivot_handling_retain_empties=%u", pv, gh, re);
+
+					ufbx_load_opts opts = { 0 };
+					opts.pivot_handling = (ufbx_pivot_handling)pv;
+					opts.pivot_handling_retain_empties = re != 0;
+					opts.geometry_transform_handling = (ufbx_geometry_transform_handling)gh;
+
+					bool top_adjusted = false;
+					bool mid_adjusted = false;
+					bool top_helper = false;
+					bool mid_helper = false;
+					switch (opts.pivot_handling) {
+					case UFBX_PIVOT_HANDLING_RETAIN:
+						break;
+
+					case UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT:
+						switch (opts.geometry_transform_handling) {
+						case UFBX_GEOMETRY_TRANSFORM_HANDLING_PRESERVE:
+							top_adjusted = true;
+							break;
+						case UFBX_GEOMETRY_TRANSFORM_HANDLING_HELPER_NODES:
+						case UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY:
+							top_adjusted = true;
+							top_helper = true;
+							break;
+						case UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK:
+							break;
+						}
+						break;
+
+					case UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT:
+						if (!opts.pivot_handling_retain_empties) {
+							top_adjusted = true;
+							mid_adjusted = true;
+						}
+						break;
+					}
+
+					ufbx_error error;
+					ufbx_scene *scene = ufbx_load_file(path, &opts, &error);
+					if (!scene) ufbxt_log_error(&error);
+					ufbxt_assert(scene);
+					ufbxt_check_scene(scene);
+
+					{
+						ufbx_node *node = ufbx_find_node(scene, "Top");
+						ufbxt_assert(node);
+						if (top_helper) {
+							ufbxt_assert(node->attrib_type == UFBX_ELEMENT_UNKNOWN);
+							ufbxt_assert(node->geometry_transform_helper);
+						} else {
+							ufbxt_assert(node->attrib_type == UFBX_ELEMENT_EMPTY);
+							ufbxt_assert(!node->geometry_transform_helper);
+						}
+
+						if (top_adjusted) {
+							ufbx_vec3 ref = { 10.0f, 0.0f, 0.0f };
+							ufbxt_assert_close_vec3(&err, node->local_transform.translation, ref);
+						} else {
+							ufbx_vec3 ref = { 0.0f, 0.0f, 0.0f };
+							ufbxt_assert_close_vec3(&err, node->local_transform.translation, ref);
+						}
+					}
+
+					{
+						ufbx_node *node = ufbx_find_node(scene, "Mid");
+						ufbxt_assert(node);
+						if (mid_helper) {
+							ufbxt_assert(node->attrib_type == UFBX_ELEMENT_UNKNOWN);
+							ufbxt_assert(node->geometry_transform_helper);
+						} else {
+							ufbxt_assert(node->attrib_type == UFBX_ELEMENT_EMPTY);
+							ufbxt_assert(!node->geometry_transform_helper);
+						}
+
+						if (mid_adjusted) {
+							ufbx_vec3 ref = { top_adjusted ? -20.0f : -10.0f, 0.0f, 0.0f };
+							ufbxt_assert_close_vec3(&err, node->local_transform.translation, ref);
+						} else {
+							ufbx_vec3 ref = { top_adjusted ? -5.0f : 5.0f, 0.0f, 0.0f };
+							ufbxt_assert_close_vec3(&err, node->local_transform.translation, ref);
+						}
+					}
+
+					ufbxt_diff_to_obj(scene, obj_file, &err, 0);
+					ufbxt_check_frame(scene, &err, true, "maya_null_pivots", NULL, 1.0/24.0);
+					ufbxt_check_frame(scene, &err, true, "maya_null_pivots_6", NULL, 6.0/24.0);
+					ufbxt_check_frame(scene, &err, true, "maya_null_pivots_12", NULL, 12.0/24.0);
+
+					ufbx_free_scene(scene);
+				}
+			}
+		}
+	}
+
+	ufbxt_logf(".. Absolute diff: avg %.3g, max %.3g (%zu tests)", err.sum / (ufbx_real)err.num, err.max, err.num);
+	free(obj_file);
+}
+#endif

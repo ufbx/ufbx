@@ -18043,6 +18043,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 	bool *modify_not_supported = ufbxi_push_zero(&uc->tmp_parse, bool, num_elements);
 	ufbxi_check(modify_not_supported);
 
+	ufbx_element_type *node_attrib_type = ufbxi_push_zero(&uc->tmp_parse, ufbx_element_type, num_nodes);
+	ufbxi_check(node_attrib_type);
+
 	bool *has_unscaled_children = ufbxi_push_zero(&uc->tmp_parse, bool, num_nodes);
 	ufbxi_check(has_unscaled_children);
 
@@ -18111,7 +18114,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 				ufbx_node *dst_node = (ufbx_node*)dst;
 
 				if (src->type >= UFBX_ELEMENT_TYPE_FIRST_ATTRIB && src->type <= UFBX_ELEMENT_TYPE_LAST_ATTRIB) {
-					++instance_counts[src->element_id];
+					uint32_t count = ++instance_counts[src->element_id];
+					node_attrib_type[dst->typed_id] = count == 1 ? src->type : UFBX_ELEMENT_UNKNOWN;
 
 					// These must match what can be trasnsformed in `ufbxi_modify_geometry()`
 					switch (src->type) {
@@ -18240,7 +18244,18 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 			}
 
 			if (should_modify_pivot) {
+				bool skip_geometry_transform = false;
 				bool can_modify_geometry_transform = true;
+				if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT) {
+					if (node_attrib_type[node->typed_id] == UFBX_ELEMENT_EMPTY) {
+						if (!uc->opts.pivot_handling_retain_empties) {
+							skip_geometry_transform = true;
+						} else {
+							can_modify_geometry_transform = false;
+						}
+					}
+				}
+
 				if (uc->opts.geometry_transform_handling == UFBX_GEOMETRY_TRANSFORM_HANDLING_MODIFY_GEOMETRY_NO_FALLBACK) {
 					if (instance_counts[node->element_id] > 1 || modify_not_supported[node->element_id]) {
 						can_modify_geometry_transform = false;
@@ -18262,26 +18277,25 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 					}
 				}
 
-				if (can_modify_pivot && can_modify_geometry_transform) {
+				if (can_modify_pivot && (can_modify_geometry_transform || skip_geometry_transform)) {
 					ufbx_vec3 geometric_translation = ufbxi_find_vec3(&node->props, ufbxi_GeometricTranslation, 0.0f, 0.0f, 0.0f);
 
 					ufbx_vec3 child_offset = { 0.0f };
 					ufbx_prop *new_props = NULL;
-					size_t new_prop_count = 0;
+					size_t num_props = node->props.props.count;
+					size_t new_prop_count = num_props;
 					if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT) {
+						ufbx_assert(!skip_geometry_transform); // not supporeted in legacy mode
 						child_offset = ufbxi_neg3(rotation_pivot);
 						geometric_translation = ufbxi_add3(geometric_translation, child_offset);
 
-						size_t num_props = node->props.props.count;
 						new_props = ufbxi_push_zero(&uc->result, ufbx_prop, num_props + 3);
 						ufbxi_check(new_props);
 						memcpy(new_props, node->props.props.data, num_props * sizeof(ufbx_prop));
 
-						ufbx_prop *dst = new_props + num_props;
-						ufbxi_init_synthetic_vec3_prop(&dst[0], ufbxi_RotationPivot, &ufbx_zero_vec3, UFBX_PROP_VECTOR);
-						ufbxi_init_synthetic_vec3_prop(&dst[1], ufbxi_ScalingPivot, &ufbx_zero_vec3, UFBX_PROP_VECTOR);
-						ufbxi_init_synthetic_vec3_prop(&dst[2], ufbxi_GeometricTranslation, &geometric_translation, UFBX_PROP_VECTOR);
-						new_prop_count = num_props + 3;
+						ufbxi_init_synthetic_vec3_prop(&new_props[new_prop_count++], ufbxi_RotationPivot, &ufbx_zero_vec3, UFBX_PROP_VECTOR);
+						ufbxi_init_synthetic_vec3_prop(&new_props[new_prop_count++], ufbxi_ScalingPivot, &ufbx_zero_vec3, UFBX_PROP_VECTOR);
+						ufbxi_init_synthetic_vec3_prop(&new_props[new_prop_count++], ufbxi_GeometricTranslation, &geometric_translation, UFBX_PROP_VECTOR);
 					} else if (uc->opts.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT) {
 						// We can eliminate the post-rotation translation and move it to the geometry/children as follows.
 						// Let Z be the initial value of S in the transform (aka `initial_scale`):
@@ -18296,7 +18310,6 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 						//
 						// We need to be careful when doing this in case any component of Z is 0. Fortunately,
 						// the above holds for all `Z != 0`, it will just result in non-zero translation in the parent.
-
 						ufbx_vec3 initial_scale = ufbxi_find_vec3(&node->props, ufbxi_Lcl_Scaling, 1.0f, 1.0f, 1.0f);
 						ufbx_vec3 scaled_offset = ufbxi_sub3(ufbxi_add3(scaling_offset, scaling_pivot), rotation_pivot);
 						ufbx_vec3 unscaled_offset;
@@ -18309,19 +18322,17 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_pre_finalize_scene(ufbxi_context
 						ufbx_vec3 new_scaling_offset = ufbxi_sub3(scaled_offset, new_scaling_pivot);
 						child_offset = ufbxi_sub3(unscaled_offset, scaling_pivot);
 
-						size_t num_props = node->props.props.count;
 						new_props = ufbxi_push_zero(&uc->result, ufbx_prop, num_props + 4);
 						ufbxi_check(new_props);
 						memcpy(new_props, node->props.props.data, num_props * sizeof(ufbx_prop));
 
-						geometric_translation = ufbxi_add3(geometric_translation, child_offset);
-
-						ufbx_prop *dst = new_props + num_props;
-						ufbxi_init_synthetic_vec3_prop(&dst[0], ufbxi_RotationPivot, &ufbx_zero_vec3, UFBX_PROP_VECTOR);
-						ufbxi_init_synthetic_vec3_prop(&dst[1], ufbxi_ScalingPivot, &new_scaling_pivot, UFBX_PROP_VECTOR);
-						ufbxi_init_synthetic_vec3_prop(&dst[2], ufbxi_ScalingOffset, &new_scaling_offset, UFBX_PROP_VECTOR);
-						ufbxi_init_synthetic_vec3_prop(&dst[3], ufbxi_GeometricTranslation, &geometric_translation, UFBX_PROP_VECTOR);
-						new_prop_count = num_props + 4;
+						ufbxi_init_synthetic_vec3_prop(&new_props[new_prop_count++], ufbxi_RotationPivot, &ufbx_zero_vec3, UFBX_PROP_VECTOR);
+						ufbxi_init_synthetic_vec3_prop(&new_props[new_prop_count++], ufbxi_ScalingPivot, &new_scaling_pivot, UFBX_PROP_VECTOR);
+						ufbxi_init_synthetic_vec3_prop(&new_props[new_prop_count++], ufbxi_ScalingOffset, &new_scaling_offset, UFBX_PROP_VECTOR);
+						if (!skip_geometry_transform) {
+							geometric_translation = ufbxi_add3(geometric_translation, child_offset);
+							ufbxi_init_synthetic_vec3_prop(&new_props[new_prop_count++], ufbxi_GeometricTranslation, &geometric_translation, UFBX_PROP_VECTOR);
+						}
 					}
 
 					node->props.props.data = new_props;
