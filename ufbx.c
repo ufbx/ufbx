@@ -23591,8 +23591,13 @@ ufbxi_noinline static void ufbxi_update_adjust_transforms(ufbxi_context *uc, ufb
 		light->local_direction.z = 0.0f;
 	}
 
-	ufbx_real root_scale = ufbxi_min3(root_transform.scale);
 	scene->metadata.space_conversion = conversion;
+	scene->metadata.geometry_transform_handling = uc->opts.geometry_transform_handling;
+	scene->metadata.inherit_mode_handling = uc->opts.inherit_mode_handling;
+	scene->metadata.pivot_handling = uc->opts.pivot_handling;
+	scene->metadata.handedness_conversion_axis = uc->opts.handedness_conversion_axis;
+
+	ufbx_real root_scale = ufbxi_min3(root_transform.scale);
 	if (conversion == UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY) {
 		scene->metadata.geometry_scale = root_scale;
 		scene->metadata.root_scale = 1.0f;
