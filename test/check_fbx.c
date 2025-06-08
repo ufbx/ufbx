@@ -447,6 +447,11 @@ int check_fbx_main(int argc, char **argv, const char *path)
 				ufbxt_add_feature(&features, "complex-pivot");
 			}
 		}
+
+		ufbx_vec3 scale_offset = ufbx_find_vec3(&node->props, "ScalingOffset", ufbx_zero_vec3);
+		if (!ufbxt_eq3(scale_offset, ufbx_zero_vec3)) {
+			ufbxt_add_feature(&features, "scaling-offset");
+		}
 	}
 
 	for (size_t i = 0; i < scene->meshes.count; i++) {
