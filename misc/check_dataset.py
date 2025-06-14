@@ -11,7 +11,7 @@ import datetime
 import asyncio
 import asyncio.subprocess
 
-LATEST_SUPPORTED_DATE = "2025-04-08"
+LATEST_SUPPORTED_DATE = "2025-06-10"
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -189,7 +189,7 @@ def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_sup
             ])
         elif feature == "pivot":
             append_unique_opt(options, "pivot-handling", [
-                "retain", "adjust-to-pivot",
+                "retain", "adjust-to-pivot", "adjust-to-rotation-pivot",
             ])
         elif feature == "bake":
             append_unique_opt(options, "bake", [False, True])

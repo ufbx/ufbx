@@ -383,10 +383,12 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 	size_t num_display_layers = 0;
 	size_t num_selection_sets = 0;
 	size_t num_display_layer_nodes = 0;
+	size_t num_pivots = 0;
 
 	double err_sum = 0.0;
 	double err_max = 0.0;
 	size_t err_num = 0;
+	double pivot_err_max = 0.0;
 
 	bool material_error = false;
 	bool display_layer_error = false;
@@ -394,7 +396,7 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 
 	long version = 0;
 
-	const long current_version = 6;
+	const long current_version = 8;
 
 	int line = 0;
 	while (*spec != '\0') {
@@ -580,6 +582,47 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 			}
 
 			num_selection_sets++;
+			continue;
+		} else if (!strcmp(dots[0], "pivot")) {
+			bool check_pivot = false;
+			if (dots[1] && !strcmp(dots[1], "adjusted")) {
+				check_pivot = scene->metadata.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_ROTATION_PIVOT;
+			} else if (dots[1] && !strcmp(dots[1], "original")) {
+				check_pivot = scene->metadata.pivot_handling == UFBX_PIVOT_HANDLING_RETAIN;
+			} else if (dots[1] && !strcmp(dots[1], "legacy")) {
+				check_pivot = scene->metadata.pivot_handling == UFBX_PIVOT_HANDLING_ADJUST_TO_PIVOT;
+			} else {
+				fprintf(stderr, "%s:%d: Unknown 'pivot' specifier '%s'\n", filename, line, dots[1] ? dots[1] : "");
+				ok = false;
+			}
+
+			if (check_pivot) {
+				ufbx_node *node = ufbx_find_node(scene, tokens[1]);
+				if (!node) {
+					fprintf(stderr, "%s:%d: Pivot node not found %s\n", filename, line, tokens[1]);
+					ok = false;
+					continue;
+				}
+
+				ufbx_vec3 translation = node->node_to_world.cols[3];
+				ufbx_vec3 ref;
+				ref.x = (ufbx_real)strtod(tokens[2], NULL);
+				ref.y = (ufbx_real)strtod(tokens[3], NULL);
+				ref.z = (ufbx_real)strtod(tokens[4], NULL);
+				double error = 0.0;
+				error = fmax(error, fabs(translation.x - ref.x));
+				error = fmax(error, fabs(translation.y - ref.y));
+				error = fmax(error, fabs(translation.z - ref.z));
+				if (error >= 0.01) {
+					fprintf(stderr, "%s:%d: Pivot is incorrect (%.3f, %.3f, %.3f), expected (%.3f, %.3f, %.3f)\n", filename, line,
+						translation.x, translation.y, translation.z, ref.x, ref.y, ref.z);
+					ok = false;
+				}
+
+				pivot_err_max = fmax(pivot_err_max, error);
+				num_pivots++;
+			}
+
 			continue;
 		}
 
@@ -857,6 +900,9 @@ static bool ufbxt_check_materials(ufbx_scene *scene, const char *spec, const cha
 		}
 		if (num_selection_sets > 0) {
 			printf(".. also %zu selection sets\n", num_selection_sets);
+		}
+		if (num_pivots > 0) {
+			printf(".. also %zu pivots (max error %.3g)\n", num_pivots, pivot_err_max);
 		}
 	}
 
