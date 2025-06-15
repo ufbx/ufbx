@@ -833,6 +833,14 @@ member_functions = [
     MemberFunction(func="ufbx_sample_geometry_cache_vec3", self_type="ufbx_cache_channel", member_name="sample_vec3"),
     MemberFunction(func="ufbx_dom_find_len", self_type="ufbx_dom_node", member_name="find_len"),
     MemberFunction(func="ufbx_dom_find", self_type="ufbx_dom_node", member_name="find"),
+    MemberFunction(func="ufbx_dom_is_array", self_type="ufbx_dom_node", member_name="is_array"),
+    MemberFunction(func="ufbx_dom_array_size", self_type="ufbx_dom_node", member_name="array_size"),
+    MemberFunction(func="ufbx_dom_as_int32_list", self_type="ufbx_dom_node", member_name="as_int32_list"),
+    MemberFunction(func="ufbx_dom_as_int64_list", self_type="ufbx_dom_node", member_name="as_int64_list"),
+    MemberFunction(func="ufbx_dom_as_float_list", self_type="ufbx_dom_node", member_name="as_float_list"),
+    MemberFunction(func="ufbx_dom_as_double_list", self_type="ufbx_dom_node", member_name="as_double_list"),
+    MemberFunction(func="ufbx_dom_as_real_list", self_type="ufbx_dom_node", member_name="as_real_list"),
+    MemberFunction(func="ufbx_dom_as_blob_list", self_type="ufbx_dom_node", member_name="as_blob_list"),
 ]
 
 member_globals = [
