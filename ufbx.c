@@ -407,8 +407,10 @@ extern "C" {
 
 #if defined(__GNUC__)
 	#define UFBXI_GNUC __GNUC__
+	#define UFBXI_GNUC_VERSION ufbx_pack_version(__GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__)
 #else
 	#define UFBXI_GNUC 0
+	#define UFBXI_GNUC_VERSION 0
 #endif
 
 #if !defined(UFBX_STANDARD_C) && defined(_MSC_VER)
@@ -539,6 +541,10 @@ extern "C" {
 	// MSC isnan() definition triggers this error on MinGW GCC
 	#if defined(__MINGW32__)
 		#pragma GCC diagnostic ignored "-Wfloat-conversion"
+	#endif
+	// `-Warray-bounds` results in warnings if UBsan is enabled and pre-GCC-14 has no way of detecting it..
+	#if UFBXI_GNUC_VERSION >= ufbx_pack_version(4, 3, 0) && UFBXI_GNUC_VERSION < ufbx_pack_version(14, 0, 0)
+		#pragma GCC diagnostic ignored "-Warray-bounds"
 	#endif
 #endif
 

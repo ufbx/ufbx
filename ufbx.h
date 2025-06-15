@@ -257,7 +257,7 @@ struct ufbx_converter { };
 // -- Version
 
 // Packing/unpacking for `UFBX_HEADER_VERSION` and `ufbx_source_version`.
-#define ufbx_pack_version(major, minor, patch) ((uint32_t)(major)*1000000u + (uint32_t)(minor)*1000u + (uint32_t)(patch))
+#define ufbx_pack_version(major, minor, patch) ((major)*1000000u + (minor)*1000u + (patch))
 #define ufbx_version_major(version) ((uint32_t)(version)/1000000u%1000u)
 #define ufbx_version_minor(version) ((uint32_t)(version)/1000u%1000u)
 #define ufbx_version_patch(version) ((uint32_t)(version)%1000u)
