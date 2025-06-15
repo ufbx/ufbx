@@ -4,6 +4,7 @@ import os
 import time
 import subprocess
 import glob
+import re
 
 parser = argparse.ArgumentParser(usage="execute_per_fbx.py --exe loader --root .")
 parser.add_argument("--exe", help="Executable to run")
@@ -17,6 +18,8 @@ parser.add_argument("--exclude", default=[], action="append", help="Patterns for
 parser.add_argument("--exclude-list", help="Name of a file with a list of excluded files")
 parser.add_argument("--cycles", default=1, type=int, help="Number of cycles to load the data")
 parser.add_argument("--allow-non-fbx", action="store_true", help="Allow non-FBX files")
+parser.add_argument("--stdout", help="Redirect standard output")
+parser.add_argument("--stderr", help="Redirect standard input")
 parser.add_argument("-p", action="append", help="Run multiple permutations, use with #p")
 parser.add_argument('remainder', nargs="...")
 argv = parser.parse_args()
@@ -83,20 +86,31 @@ for cycle in range(argv.cycles):
         if argv.p:
             ps = argv.p
 
+        name = re.sub(r"[^A-Za-z0-9/]+", "_", path)
+        name = name.replace("/", "-")
+
+        def filter_arg(r, p):
+            if r is None:
+                return None
+            if r == "#":
+                return path.encode("utf-8")
+            r = r.replace("#p", p)
+            r = r.replace("#n", name)
+            return r.encode("utf-8")
+
         for p in ps:
             if argv.exe:
                 rest = argv.remainder[1:]
+                if "#" not in rest:
+                    rest = [path] + rest
+                rest = [filter_arg(r, p) for r in rest]
+                args = [argv.exe] + rest
 
-                if "#p" in rest:
-                    ix = rest.index("#p")
-                    rest[ix] = p.encode("utf-8")
+                stdout_path = filter_arg(argv.stdout, p)
+                stderr_path = filter_arg(argv.stderr, p)
 
-                if "#" in rest:
-                    ix = rest.index("#")
-                    rest[ix] = path.encode("utf-8")
-                    args = [argv.exe] + rest
-                else:
-                    args = [argv.exe, path.encode("utf-8")] + rest
+                stdout = open(stdout_path, "w") if stdout_path else None
+                stderr = open(stderr_path, "w") if stderr_path else None
 
                 if argv.verbose:
                     cmdline = subprocess.list2cmdline(args)
@@ -104,11 +118,16 @@ for cycle in range(argv.cycles):
 
                 if argv.allow_fail:
                     try:
-                        subprocess.check_call(args)
+                        subprocess.check_call(args, stdout=stdout, stderr=stderr)
                     except Exception as e:
                         print("Failed to load")
                 else:
-                    subprocess.check_call(args)
+                    subprocess.check_call(args, stdout=stdout, stderr=stderr)
+
+                if stdout:
+                    stdout.close()
+                if stderr:
+                    stderr.close()
         num_tested += 1
 
 end = time.time()
