@@ -293,6 +293,18 @@ int hash_scene(uint64_t *p_hash, const void *data, size_t size, const char *file
 #undef strcmp
 #undef strncmp
 
+#if defined(WASM64_MULTI3_WORKAROUND)
+__int128 __multi3(__int128 a, __int128 b) {
+	__int128 r = 0;
+	for (size_t i = 0; i < 128; i++) {
+		if (a & 0x1) r += b;
+		a >>= 1;
+		b <<= 1;
+	}
+	return r;
+}
+#endif
+
 #include "../../ufbx.c"
 #include "../../extra/ufbx_math.c"
 #include "../../extra/ufbx_libc.c"
