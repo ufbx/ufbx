@@ -430,9 +430,10 @@ jobs:
         run: sudo apt-get update
       - name: Install apt dependencies
         run: sudo apt-get install -y clang-19 lld-19
-      - name: Setup Node version
+      - name: Install nvm
+        run: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+      - name: Setup Node 24
         run: |
-          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
           nvm install 24
           nvm alias default 24
       - name: Check node version
