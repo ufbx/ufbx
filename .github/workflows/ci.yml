@@ -416,6 +416,43 @@ jobs:
           name: hash-dumps-exotic
           path: build/hashdump_ci_exotic.txt.gz
 
+  ci_wasm64:
+    runs-on: ubuntu-24.04
+    needs: ci_pre_hashes
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare directories
+        run: |
+          mkdir build
+          mkdir build/hashdumps
+      - name: Download reference hashes
+        uses: actions/download-artifact@v4
+        with:
+          name: reference-hashes
+          path: build
+      - name: Update apt
+        run: sudo apt-get update
+      - name: Install apt dependencies
+        run: sudo apt-get install -y clang-19 lld-19
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Check node version
+        run: node -v
+      - name: Compile freestanding WASM64 hasher
+        run: clang -O2 misc/wasm_hasher/wasm_hasher.c --target=wasm64 -DWASM64_MULTI3_WORKAROUND -mbulk-memory --no-standard-libraries -Wl,--no-entry -o build/ufbx_hasher.wasm
+      - name: Check freestanding WASM64 hashes
+        run: node misc/wasm_hasher/wasm_hasher64.js --check build/hashes.txt --dump build/hashdumps/ci_wasm64_freestanding.txt --max-dump-errors 3
+      - name: Compress hashdumps
+        if: ${{ always() && !cancelled() }}
+        run: python3 misc/hash_diff.py compress build/hashdumps -o build/hashdump_ci_wasm64.txt.gz
+      - name: Upload hashdumps
+        uses: actions/upload-artifact@v4
+        if: ${{ always() && !cancelled() }}
+        with:
+          name: hash-dumps-wasm64
+          path: build/hashdump_ci_wasm64.txt.gz
+
   ci_compilers:
     runs-on: ubuntu-22.04
     steps:
