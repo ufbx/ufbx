@@ -859,10 +859,10 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 enum { UFBX_MAXIMUM_ALIGNMENT = sizeof(void*) > 8 ? sizeof(void*) : 8 };
 #endif
 
-#if !defined(UFBX_POINTER_SIZE) && !defined(UFBX_STANDARD_C)
-	#if (defined(__wasm64__) || defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64) || defined(__aarch64__)) && !defined(__CHERI__)
+#if !defined(UFBX_POINTER_SIZE)
+	#if UINTPTR_MAX == UINT64_MAX
 		#define UFBX_POINTER_SIZE 8
-	#elif defined(__wasm__) || defined(__EMSCRIPTEN__)
+	#elif UINTPTR_MAX == UINT32_MAX
 		#define UFBX_POINTER_SIZE 4
 	#endif
 #endif
