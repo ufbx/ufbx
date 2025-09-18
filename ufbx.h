@@ -1584,7 +1584,7 @@ struct ufbx_camera {
 	ufbx_vec2 field_of_view_deg;
 
 	// Component-wise `tan(field_of_view_deg)`, also represents the size of the
-	// proection frustum slice at distance of 1.
+	// frustum slice at distance of 1.
 	// Valid if `projection_mode == UFBX_PROJECTION_MODE_PERSPECTIVE`.
 	ufbx_vec2 field_of_view_tan;
 
