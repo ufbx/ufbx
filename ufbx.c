@@ -858,7 +858,7 @@ ufbx_static_assert(sizeof_f64, sizeof(double) == 8);
 enum { UFBX_MAXIMUM_ALIGNMENT = sizeof(void*) > 8 ? sizeof(void*) : 8 };
 #endif
 
-#if !defined(UFBXI_UINTPTR_SIZE)
+#if !defined(UFBXI_UINTPTR_SIZE) && !defined(__CHERI__) // CHERI lies about UINTPTR_MAX
 	#if UINTPTR_MAX == UINT64_MAX
 		#define UFBXI_UINTPTR_SIZE 8
 	#elif UINTPTR_MAX == UINT32_MAX
