@@ -336,7 +336,7 @@ jobs:
         run: python3 bindgen/ufbx_ir.py
 
   ci_exotic:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v4
