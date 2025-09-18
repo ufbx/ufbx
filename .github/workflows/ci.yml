@@ -421,6 +421,10 @@ jobs:
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare directories
+        run: |
+          mkdir build
+          mkdir build/hashdumps
       - name: Download reference hashes
         uses: actions/download-artifact@v4
         with:
