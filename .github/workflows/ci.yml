@@ -336,7 +336,7 @@ jobs:
         run: python3 bindgen/ufbx_ir.py
 
   ci_exotic:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: ci_pre_hashes
     steps:
       - uses: actions/checkout@v4
@@ -348,9 +348,16 @@ jobs:
       - name: Update apt
         run: sudo apt-get update
       - name: Install apt dependencies
-        run: sudo apt-get install -y tcc qemu qemu-user gcc-multilib
+        run: sudo apt-get install -y tcc qemu qemu-user gcc-multilib clang-19 lld-19
       - name: Install zig cc via PIP
         run: sudo pip3 install ziglang
+      - name: Setup Node version
+        run: |
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+          nvm install 24
+          nvm alias default 24
+      - name: Check node version
+        run: node -v
       - name: Run tests with TCC
         run: python3 misc/run_tests.py tests freestanding hashes --additional-compiler tcc --compiler tcc --remove-arch x86 --runner ci_exotic
       - name: Compile ufbx.c wth x86 TCC
@@ -371,6 +378,10 @@ jobs:
         run: clang -O2 misc/wasm_hasher/wasm_hasher.c --target=wasm32 -mbulk-memory --no-standard-libraries -Wl,--no-entry -o build/ufbx_hasher.wasm
       - name: Check freestanding WASM hashes
         run: node misc/wasm_hasher/wasm_hasher.js --check build/hashes.txt --dump build/hashdumps/ci_exotic_wasm_freestanding.txt --max-dump-errors 3
+      - name: Compile freestanding WASM64 hasher
+        run: clang -O2 misc/wasm_hasher/wasm_hasher.c --target=wasm64 -DWASM64_MULTI3_WORKAROUND -mbulk-memory --no-standard-libraries -Wl,--no-entry -o build/ufbx_hasher.wasm
+      - name: Check freestanding WASM64 hashes
+        run: node misc/wasm_hasher/wasm_hasher.js --check build/hashes.txt --dump build/hashdumps/ci_exotic_wasm64_freestanding.txt --max-dump-errors 3
       - name: Compile runner with ufbx_math
         run: clang -DUFBX_NO_MATH_H -DUFBX_EXTERNAL_MATH ufbx.c test/runner.c extra/ufbx_math.c -lm -o build/ufbx_math_runner
       - name: Run tests using ufbx_math
