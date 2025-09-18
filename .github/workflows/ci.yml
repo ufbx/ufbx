@@ -430,12 +430,9 @@ jobs:
         run: sudo apt-get update
       - name: Install apt dependencies
         run: sudo apt-get install -y clang-19 lld-19
-      - name: Install nvm
-        run: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-      - name: Setup Node 24
-        run: |
-          nvm install 24
-          nvm alias default 24
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
       - name: Check node version
         run: node -v
       - name: Compile freestanding WASM64 hasher
