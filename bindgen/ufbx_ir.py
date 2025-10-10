@@ -751,6 +751,7 @@ pod_structs = [
 input_structs = [
     "ufbx_allocator_opts",
     "ufbx_open_memory_opts",
+    "ufbx_open_file_opts",
     "ufbx_load_opts",
     "ufbx_evaluate_opts",
     "ufbx_tessellate_curve_opts",
