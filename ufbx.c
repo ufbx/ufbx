@@ -25720,7 +25720,7 @@ static ufbxi_noinline void ufbxi_evaluate_connected_prop(ufbx_prop *prop, const 
 
 	// Found a non-cyclic connection
 	if (conn && !ufbxi_find_prop_connection(conn->src, conn->src_prop.data)) {
-		ufbx_prop ep = ufbx_evaluate_prop_len_flags(anim, conn->src, conn->src_prop.data, conn->src_prop.length, time, flags);
+		ufbx_prop ep = ufbx_evaluate_prop_flags_len(anim, conn->src, conn->src_prop.data, conn->src_prop.length, time, flags);
 		prop->value_vec4 = ep.value_vec4;
 		prop->value_int = ep.value_int;
 		prop->value_str = ep.value_str;
@@ -27412,7 +27412,7 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_bake_anim_prop(ufbxi_bake_contex
 	for (size_t i = 0; i < times.count; i++) {
 		ufbxi_bake_time bake_time = times.data[i];
 		double eval_time = ufbxi_bake_time_sample_time(bake_time);
-		ufbx_prop prop = ufbx_evaluate_prop_len_flags(bc->anim, element, name.data, name.length, eval_time, bc->opts.evaluate_flags);
+		ufbx_prop prop = ufbx_evaluate_prop_flags_len(bc->anim, element, name.data, name.length, eval_time, bc->opts.evaluate_flags);
 		keys.data[i].time = bake_time.time;
 		keys.data[i].value = prop.value_vec3;
 		keys.data[i].flags = (ufbx_baked_key_flags)bake_time.flags;
@@ -30837,10 +30837,10 @@ ufbx_abi ufbxi_noinline ufbx_vec3 ufbx_evaluate_anim_value_vec3_flags(const ufbx
 
 ufbx_abi ufbxi_noinline ufbx_prop ufbx_evaluate_prop_len(const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time)
 {
-	return ufbx_evaluate_prop_len_flags(anim, element, name, name_len, time, 0);
+	return ufbx_evaluate_prop_flags_len(anim, element, name, name_len, time, 0);
 }
 
-ufbx_abi ufbxi_noinline ufbx_prop ufbx_evaluate_prop_len_flags(const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time, uint32_t flags)
+ufbx_abi ufbxi_noinline ufbx_prop ufbx_evaluate_prop_flags_len(const ufbx_anim *anim, const ufbx_element *element, const char *name, size_t name_len, double time, uint32_t flags)
 {
 	ufbx_prop result;
 
@@ -33040,7 +33040,7 @@ ufbx_abi ufbx_anim_stack *ufbx_find_anim_stack(const ufbx_scene *scene, const ch
 ufbx_abi ufbx_material *ufbx_find_material(const ufbx_scene *scene, const char *name) { return ufbx_find_material_len(scene, name, strlen(name)); }
 ufbx_abi ufbx_anim_prop *ufbx_find_anim_prop(const ufbx_anim_layer *layer, const ufbx_element *element, const char *prop) { return ufbx_find_anim_prop_len(layer, element, prop, strlen(prop)); }
 ufbx_abi ufbx_prop ufbx_evaluate_prop(const ufbx_anim *anim, const ufbx_element *element, const char *name, double time) { return ufbx_evaluate_prop_len(anim, element, name, strlen(name), time); }
-ufbx_abi ufbx_prop ufbx_evaluate_prop_flags(const ufbx_anim *anim, const ufbx_element *element, const char *name, double time, uint32_t flags) { return ufbx_evaluate_prop_len_flags(anim, element, name, strlen(name), time, flags); }
+ufbx_abi ufbx_prop ufbx_evaluate_prop_flags(const ufbx_anim *anim, const ufbx_element *element, const char *name, double time, uint32_t flags) { return ufbx_evaluate_prop_flags_len(anim, element, name, strlen(name), time, flags); }
 ufbx_abi ufbx_texture *ufbx_find_prop_texture(const ufbx_material *material, const char *name) { return ufbx_find_prop_texture_len(material, name, strlen(name)); }
 ufbx_abi ufbx_string ufbx_find_shader_prop(const ufbx_shader *shader, const char *name) { return ufbx_find_shader_prop_len(shader, name, strlen(name)); }
 ufbx_abi ufbx_shader_prop_binding_list ufbx_find_shader_prop_bindings(const ufbx_shader *shader, const char *name) { return ufbx_find_shader_prop_bindings_len(shader, name, strlen(name)); }
