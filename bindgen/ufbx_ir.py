@@ -778,6 +778,7 @@ union_prefer = {
     "ufbx_quat.0": 0,
     "ufbx_matrix.0": 0,
     "ufbx_scene.0": 0,
+    "ufbx_edge.0": 0,
 }
 
 member_functions = [
