@@ -873,7 +873,7 @@ enum { UFBX_MAXIMUM_ALIGNMENT = sizeof(void*) > 8 ? sizeof(void*) : 8 };
 
 // -- Version
 
-#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 20, 1)
+#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 21, 0)
 ufbx_abi_data_def const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
 
 ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEADER_VERSION/1000u);
@@ -1883,6 +1883,9 @@ static const uint8_t ufbxi_deflate_code_length_permutation[] = {
 
 #define UFBXI_HUFF_MAX_EXTRA_SYMS 32
 
+#define UFBXI_HUFF_CODELEN_SYMS 19
+#define UFBXI_HUFF_MAX_COMBINED_SYMS 320
+
 typedef struct {
 
 	// Number of bytes left to read from `read_fn()`
@@ -2536,17 +2539,11 @@ static ufbxi_noinline void ufbxi_init_static_huff(ufbxi_trees *trees, const ufbx
 // -5: Code 18 repeat overflow
 // -6: Bad length code
 // -7: Cancelled
-static ufbxi_noinline ptrdiff_t ufbxi_init_dynamic_huff_tree(ufbxi_deflate_context *dc, const ufbxi_huff_tree *huff_code_length, ufbxi_huff_tree *tree,
-	uint32_t num_symbols, const uint32_t *sym_extra, uint32_t sym_extra_offset, uint32_t fast_bits)
+static ufbxi_noinline ptrdiff_t ufbxi_decode_dynamic_huff_bits(ufbxi_deflate_context *dc, const ufbxi_huff_tree *huff_code_length, uint8_t *code_lengths, uint32_t num_symbols)
 {
-	uint8_t code_lengths[UFBXI_HUFF_MAX_VALUE]; // ufbxi_uninit
-	ufbx_assert(num_symbols <= UFBXI_HUFF_MAX_VALUE);
-
 	uint64_t bits = dc->stream.bits;
 	size_t left = dc->stream.left;
 	const char *data = dc->stream.chunk_ptr;
-	uint32_t bits_counts[UFBXI_HUFF_MAX_BITS]; // ufbxi_uninit
-	memset(bits_counts, 0, sizeof(bits_counts));
 
 	uint32_t symbol_index = 0;
 	uint8_t prev = 0;
@@ -2567,7 +2564,6 @@ static ufbxi_noinline ptrdiff_t ufbxi_init_dynamic_huff_tree(ufbxi_deflate_conte
 			// "0 - 15: Represent code lengths of 0 - 15"
 			prev = (uint8_t)inst;
 			code_lengths[symbol_index++] = (uint8_t)inst;
-			bits_counts[(int32_t)inst]++;
 		} else if (inst == 16) {
 			// "16: Copy the previous code length 3 - 6 times. The next 2 bits indicate repeat length."
 			uint32_t num = 3 + ((uint32_t)bits & 0x3);
@@ -2576,7 +2572,6 @@ static ufbxi_noinline ptrdiff_t ufbxi_init_dynamic_huff_tree(ufbxi_deflate_conte
 			if (symbol_index + num > num_symbols) return -3;
 			memset(code_lengths + symbol_index, prev, num);
 			symbol_index += num;
-			bits_counts[(int32_t)prev] += num;
 		} else if (inst == 17) {
 			// "17: Repeat a code length of 0 for 3 - 10 times. (3 bits of length)"
 			uint32_t num = 3 + ((uint32_t)bits & 0x7);
@@ -2586,7 +2581,6 @@ static ufbxi_noinline ptrdiff_t ufbxi_init_dynamic_huff_tree(ufbxi_deflate_conte
 			memset(code_lengths + symbol_index, 0, num);
 			symbol_index += num;
 			prev = 0;
-			bits_counts[0] += num;
 		} else if (inst == 18) {
 			// "18: Repeat a code length of 0 for 11 - 138 times (7 bits of length)"
 			uint32_t num = 11 + ((uint32_t)bits & 0x7f);
@@ -2596,14 +2590,10 @@ static ufbxi_noinline ptrdiff_t ufbxi_init_dynamic_huff_tree(ufbxi_deflate_conte
 			memset(code_lengths + symbol_index, 0, num);
 			symbol_index += num;
 			prev = 0;
-			bits_counts[0] += num;
 		} else {
 			return -6;
 		}
 	}
-
-	ptrdiff_t err = ufbxi_huff_build_imp(tree, code_lengths, num_symbols, sym_extra, sym_extra_offset, fast_bits, bits_counts);
-	if (err != 0) return err;
 
 	dc->stream.bits = bits;
 	dc->stream.left = left;
@@ -2630,11 +2620,13 @@ ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	bits >>= 14;
 	left -= 14;
 
+	uint8_t code_lengths[UFBXI_HUFF_MAX_COMBINED_SYMS]; // ufbxi_uninit
+
 	// Code lengths for the "code length" Huffman tree are represented literally
 	// 3 bits in order of: 16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15 up to
 	// `num_code_lengths`, rest of the code lengths are 0 (unused)
-	uint8_t code_lengths[19]; // ufbxi_uninit
-	memset(code_lengths, 0, sizeof(code_lengths));
+	memset(code_lengths, 0, UFBXI_HUFF_CODELEN_SYMS);
+
 	for (size_t len_i = 0; len_i < num_code_lengths; len_i++) {
 		if (len_i == 14) {
 			ufbxi_bit_refill(&bits, &left, &data, &dc->stream);
@@ -2655,11 +2647,16 @@ ufbxi_init_dynamic_huff(ufbxi_deflate_context *dc, ufbxi_trees *trees)
 	// Build the temporary "code length" Huffman tree used to encode the actual
 	// trees used to compress the data. Use that to build the literal/length and
 	// distance trees.
-	err = ufbxi_huff_build(&huff_code_length, code_lengths, ufbxi_arraycount(code_lengths), NULL, INT32_MAX, UFBXI_HUFF_CODELEN_FAST_BITS);
+	err = ufbxi_huff_build(&huff_code_length, code_lengths, UFBXI_HUFF_CODELEN_SYMS, NULL, INT32_MAX, UFBXI_HUFF_CODELEN_FAST_BITS);
 	if (err) return -14 + 1 + err;
-	err = ufbxi_init_dynamic_huff_tree(dc, &huff_code_length, &trees->lit_length, num_lit_lengths, ufbxi_deflate_length_lut, 256, dc->fast_bits);
+
+	err = ufbxi_decode_dynamic_huff_bits(dc, &huff_code_length, code_lengths, num_lit_lengths + num_dists);
 	if (err) return err == -7 ? -28 : -16 + 1 + err;
-	err = ufbxi_init_dynamic_huff_tree(dc, &huff_code_length, &trees->dist, num_dists, ufbxi_deflate_dist_lut, 0, dc->fast_bits);
+
+	err = ufbxi_huff_build(&trees->lit_length, code_lengths, num_lit_lengths, ufbxi_deflate_length_lut, 256, dc->fast_bits);
+	if (err) return err == -7 ? -28 : -16 + 1 + err;
+
+	err = ufbxi_huff_build(&trees->dist, code_lengths + num_lit_lengths, num_dists, ufbxi_deflate_dist_lut, 0, dc->fast_bits);
 	if (err) return err == -7 ? -28 : -22 + 1 + err;
 
 	return 0;
@@ -15365,7 +15362,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				// automatic tangents for now as they're the least likely to break with
 				// objectionable artifacts. We need to defer the automatic tangent resolve
 				// until we have read the next time/value.
-				// TODO: Solve what this is more throroughly
+				// TODO: Solve what this is more thoroughly
 				auto_slope = true;
 				if (uc->version == 5000) {
 					num_weights = 0;
@@ -24909,7 +24906,7 @@ static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, 
 	double t = x0;
 	double x1, t2, t3;
 
-	// Manually unroll three iterations of Newton-Rhapson, this is enough
+	// Manually unroll three iterations of Newton-Raphson, this is enough
 	// for most tangents
 	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
 	t -= x1 / (a_3*t2 + b_2*t + c);
