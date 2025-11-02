@@ -15362,7 +15362,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				// automatic tangents for now as they're the least likely to break with
 				// objectionable artifacts. We need to defer the automatic tangent resolve
 				// until we have read the next time/value.
-				// TODO: Solve what this is more throroughly
+				// TODO: Solve what this is more thoroughly
 				auto_slope = true;
 				if (uc->version == 5000) {
 					num_weights = 0;
@@ -24906,7 +24906,7 @@ static ufbxi_forceinline double ufbxi_find_cubic_bezier_t(double p1, double p2, 
 	double t = x0;
 	double x1, t2, t3;
 
-	// Manually unroll three iterations of Newton-Rhapson, this is enough
+	// Manually unroll three iterations of Newton-Raphson, this is enough
 	// for most tangents
 	t2 = t*t; t3 = t2*t; x1 = a*t3 + b*t2 + c*t - x0;
 	t -= x1 / (a_3*t2 + b_2*t + c);
