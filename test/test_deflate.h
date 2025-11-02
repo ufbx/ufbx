@@ -429,7 +429,7 @@ UFBXT_DEFLATE_TEST(deflate_fail_bad_checksum)
 UFBXT_DEFLATE_TEST(deflate_fail_codelen_16_overflow)
 #if UFBXT_IMPL
 {
-	char src[] = "\x78\x9c\x05\x80\x85\x0c\x00\x00\x00\xc0\xfc\xa1\x5f\xc3\x06\x05\xf5\x02\xfb";
+	char src[] = "\x78\x9c\x05\x80\x85\x0c\x00\x00\x00\xc0\xfc\xa1\x9f\xc3\x06\x05\xf5\x02\xfb";
 	char dst[64];
 	ptrdiff_t res = ufbxt_inflate(dst, sizeof(dst), src, sizeof(src) - 1, opts);
 	ufbxt_hintf("res = %d", (int)res);
@@ -440,7 +440,7 @@ UFBXT_DEFLATE_TEST(deflate_fail_codelen_16_overflow)
 UFBXT_DEFLATE_TEST(deflate_fail_codelen_17_overflow)
 #if UFBXT_IMPL
 {
-	char src[] = "\x78\x9c\x05\xc0\xb1\x0c\x00\x00\x00\x00\x20\x7f\xe7\xae\x26\x00\xfd\x00\xfd";
+	char src[] = "\x78\x9c\x05\xc0\xb1\x0c\x00\x00\x00\x00\x20\x7f\xe7\xbe\x26\x00\xfd\x00\xfd";
 	char dst[64];
 	ptrdiff_t res = ufbxt_inflate(dst, sizeof(dst), src, sizeof(src) - 1, opts);
 	ufbxt_hintf("res = %d", (int)res);
@@ -451,7 +451,7 @@ UFBXT_DEFLATE_TEST(deflate_fail_codelen_17_overflow)
 UFBXT_DEFLATE_TEST(deflate_fail_codelen_18_overflow)
 #if UFBXT_IMPL
 {
-	char src[] = "\x78\x9c\x05\xc0\x81\x08\x00\x00\x00\x00\x20\x7f\xdf\x09\x4e\x00\xf5\x00\xf5";
+	char src[] = "\x78\x9c\x05\xc0\x81\x08\x00\x00\x00\x00\x20\x7f\xdf\x0d\x4e\x00\xf5\x00\xf5";
 	char dst[64];
 	ptrdiff_t res = ufbxt_inflate(dst, sizeof(dst), src, sizeof(src) - 1, opts);
 	ufbxt_hintf("res = %d", (int)res);

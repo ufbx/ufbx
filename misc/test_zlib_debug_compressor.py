@@ -238,7 +238,7 @@ def test_fail_codelen_16_overflow():
     buf = zz.deflate(data, opts)
     
     # Patch Litlen 254-256 repeat extra N to 4
-    buf.patch(0x66, 1, 2)
+    buf.patch(0x66, 2, 2)
 
     return data, buf
 
@@ -248,8 +248,8 @@ def test_fail_codelen_17_overflow():
     opts = zz.Options(force_block_types=[2])
     buf = zz.deflate(data, opts)
     
-    # Patch Litlen 254-256 zero extra N to 5
-    buf.patch(0x6c, 2, 3)
+    # Patch Litlen 254-256 zero extra N to 6
+    buf.patch(0x6c, 3, 3)
 
     return data, buf
 
@@ -259,8 +259,8 @@ def test_fail_codelen_18_overflow():
     opts = zz.Options(force_block_types=[2])
     buf = zz.deflate(data, opts)
     
-    # Patch Litlen 254-256 extra N to 13
-    buf.patch(0x6a, 2, 7)
+    # Patch Litlen 254-256 extra N to 14
+    buf.patch(0x6a, 3, 7)
 
     return data, buf
 
