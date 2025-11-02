@@ -1588,11 +1588,5 @@ async def main():
         exit_code = 1
 
 if __name__ == "__main__":
-    if sys.platform == "win32":
-        loop = asyncio.ProactorEventLoop()
-    else:
-        loop = asyncio.get_event_loop()
-
-    loop.run_until_complete(main())
-    loop.close()
+    asyncio.run(main())
     sys.exit(exit_code)
