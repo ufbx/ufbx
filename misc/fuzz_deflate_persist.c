@@ -21,7 +21,7 @@
 #include <unistd.h>
 
 char g_buffer[1024*32];
-char g_dst[1024*256];
+char g_dst[128];
 
 __AFL_COVERAGE();
 __AFL_COVERAGE_START_OFF();
