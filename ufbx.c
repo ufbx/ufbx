@@ -3117,7 +3117,7 @@ static void ufbxi_inflate_init_retain(ufbx_inflate_retain *retain)
 // -14: Codelen Huffman Overfull
 // -15: Codelen Huffman Underfull
 // -16: Litlen Huffman Overfull 
-// -17: Litlen Huffman Underfull 
+// -17: Litlen Huffman Underfull
 // -18: Repeat 16 overflow
 // -19: Repeat 17 overflow
 // -20: Repeat 18 overflow
