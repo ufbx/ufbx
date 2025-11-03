@@ -20,6 +20,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <zlib.h>
+
 char g_buffer[1024*32];
 #ifdef FUZZ_SMALL
 	char g_dst[128];
@@ -55,7 +57,17 @@ int main(int argc, char **argv)
 
 		__AFL_COVERAGE_OFF();
 
-		ufbx_assert(result >= -100);
+		if (result < 0) {
+			result = -1;
+		}
+
+		uLongf zlib_len = sizeof(g_dst);
+		int ret = uncompress((Bytef*)g_dst, &zlib_len, (const Bytef*)g_buffer, size);
+		if (ret == Z_OK) {
+			ufbxt_assert(result == zlib_len);
+		} else {
+			ufbxt_assert(result < 0);
+		}
 	}
 
 	return 0;
