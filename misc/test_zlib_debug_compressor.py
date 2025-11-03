@@ -231,6 +231,18 @@ def test_two_symbol_bits():
 
     return data, zz.compress_message(*messages)
 
+def test_single_symbol():
+    """Dnamic Huffman with only a single symbol, but using both codes in the message"""
+    data = b""
+    message = []
+    opts = zz.Options(force_block_types=[2])
+    buf = zz.compress_message(message, opts)
+
+    # Patch End-of-block to use the unused code
+    buf.patch(0x6b, 1, 1)
+
+    return data, buf
+
 def test_fail_codelen_16_overflow():
     """Test oveflow of codelen symbol 16"""
     data = b"\xfd\xfe\xff"
@@ -416,6 +428,7 @@ test_cases = [
     test_long_codes,
     test_long_code_sequences,
     test_two_symbol_bits,
+    test_single_symbol,
 ]
 
 good = True
