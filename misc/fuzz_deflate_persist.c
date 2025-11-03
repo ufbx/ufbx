@@ -21,7 +21,11 @@
 #include <unistd.h>
 
 char g_buffer[1024*32];
-char g_dst[128];
+#ifdef FUZZ_SMALL
+	char g_dst[128];
+#else
+	char g_dst[65536];
+#endif
 
 __AFL_COVERAGE();
 __AFL_COVERAGE_START_OFF();

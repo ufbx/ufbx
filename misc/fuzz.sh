@@ -37,6 +37,8 @@ elif [ $cmd == "build-deflate" ]; then
     afl-clang-fast -static ../../misc/fuzz_deflate_persist.c -lm -o fuzz_deflate
 elif [ $cmd == "build-deflate-asan" ]; then
     AFL_USE_ASAN=1 afl-clang-fast ../../misc/fuzz_deflate_persist.c -lm -o fuzz_deflate_asan
+elif [ $cmd == "build-deflate-small-asan" ]; then
+    AFL_USE_ASAN=1 afl-clang-fast -DFUZZ_SMALL ../../misc/fuzz_deflate_persist.c -lm -o fuzz_deflate_small_asan
 fi
 
 name=$1
