@@ -1970,3 +1970,79 @@ UFBXT_DEFLATE_TEST(deflate_libdeflate_fail)
 }
 #endif
 
+UFBXT_DEFLATE_TEST(deflate_unused_code)
+#if UFBXT_IMPL
+{
+	char src[] =
+		"\x78\x9c\x05\xc0\x81\x08\x00\x00\x00\x00\x20\x7f\xeb\x0b\x00\x00\x00\x01";
+
+	char dst[128];
+	size_t dst_size = sizeof(dst);
+	ptrdiff_t res = ufbxt_inflate(dst, dst_size, src, sizeof(src) - 1, opts);
+	ufbxt_hintf("res = %d", (int)res);
+	ufbxt_assert(res == -13);
+}
+#endif
+
+UFBXT_DEFLATE_TEST(deflate_literal_blocks)
+#if UFBXT_IMPL
+{
+	char src[] =
+		"\x78\x9c\x00\x00\x00\xff\xff\x00\x01\x00\xfe\xff\x41\x00\x02\x00\xfd\xff\x42\x42\x00\x03\x00\xfc\xff\x43\x43\x43\x00\x01\x00\xfe"
+		"\xff\x44\x00\x00\x00\xff\xff\x00\x02\x00\xfd\xff\x45\x45\x01\x04\x00\xfb\xff\x46\x46\x46\x46\x17\xe8\x03\x75";
+
+	char dst[128];
+	size_t dst_size = sizeof(dst);
+	ptrdiff_t res = ufbxt_inflate(dst, dst_size, src, sizeof(src) - 1, opts);
+	ufbxt_hintf("res = %d", (int)res);
+	ufbxt_assert(res == 13);
+	ufbxt_assert(!memcmp(dst, "ABBCCCDEEFFFF", 13));
+}
+#endif
+
+UFBXT_DEFLATE_TEST(deflate_literal_mixed_blocks)
+#if UFBXT_IMPL
+{
+	char src[] =
+		"\x78\x9c\x00\x00\x00\xff\xff\x02\x00\x00\x00\xff\xff\x04\xc0\x81\x08\x00\x00\x00\x00\x20\x7f\xeb\x03\x00\x00\xff\xff\x72\x04\x00"
+		"\x01\x00\xfe\xff\x42\x00\x00\x00\xff\xff\x04\xc0\x81\x08\x00\x00\x00\x00\x20\xb8\xfd\x9d\x4e\x00\x00\x00\xff\xff\x72\x01\x08\x00"
+		"\x01\x00\xfe\xff\x45\x02\x08\x00\x00\x00\xff\xff\x72\x03\x04\x00\x00\xff\xff\x05\x7e\x01\x96";
+
+	char dst[128];
+	size_t dst_size = sizeof(dst);
+	ptrdiff_t res = ufbxt_inflate(dst, dst_size, src, sizeof(src) - 1, opts);
+	ufbxt_hintf("res = %d", (int)res);
+	ufbxt_assert(res == 6);
+	ufbxt_assert(!memcmp(dst, "ABCDEF", 6));
+}
+#endif
+
+UFBXT_DEFLATE_TEST(deflate_fuzz_nonstandard)
+#if UFBXT_IMPL
+{
+	typedef struct {
+		const char *name;
+		ptrdiff_t result;
+		const char *data;
+		size_t size;
+	} ufbxt_deflate_fuzz_entry;
+
+	// These are accepted by ufbx but rejected by zlib
+	static const ufbxt_deflate_fuzz_entry entries[] = {
+		{ "bad deflate window", -30, "\x88\x98\x75\xc0\x81\x00\x00\x00\x00\x80\x20\xb6\xfd\xa5\x26\xa8\x64\x52\x9e\x06\x5a", 21 },
+		{ "empty_copy_section", -9, "\x78\x9c\x01\x00\x00\xff\xff\xc9\x01\x00\x01\x00\xc0\x46\xde\xc9\x01\x00\x00\x00\x00\x00", 22 },
+		{ "empty_copy_section", -9, "\x78\x01\x41\x00\x00\xff\xff\x1b\x00\x00\x01\x01\x01\xff\x7f\x00\x00\x7f", 18 },
+		{ "bad_codelen_code", -21, "\x78\x9c\x05\x00\x80\x00\x00\x59\x96\x65\x00\x00\x00\x01\x80\xe4\xbf\x1b\xff\x00\x00\x00", 22 },
+	};
+
+	for (size_t i = 0; i < ufbxt_arraycount(entries); i++) {
+		ufbxt_hintf("case: %s", entries[i].name);
+
+		char dst[512];
+		size_t dst_size = sizeof(dst);
+		ptrdiff_t res = ufbxt_inflate(dst, dst_size, entries[i].data, entries[i].size, opts);
+		ufbxt_assert(res == entries[i].result);
+	}
+}
+#endif
+

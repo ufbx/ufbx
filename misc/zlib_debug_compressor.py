@@ -314,8 +314,11 @@ def match_block(data, opts=Options()):
 
 def compress_block_uncompressed(buf, data, align, final, opts):
     size = len(data)
+    first = True
     begin = 0
-    while begin < size:
+    while begin < size or first:
+        first = False
+
         amount = min(size - begin, opts.max_uncompressed_length)
         end = begin + amount
         real_final = final and end == size
