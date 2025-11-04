@@ -39,6 +39,12 @@ elif [ $cmd == "build-deflate-asan" ]; then
     AFL_USE_ASAN=1 afl-clang-fast ../../misc/fuzz_deflate_persist.c -lm -lz -o fuzz_deflate_asan
 elif [ $cmd == "build-deflate-small-asan" ]; then
     AFL_USE_ASAN=1 afl-clang-fast -DFUZZ_SMALL ../../misc/fuzz_deflate_persist.c -lm -lz -o fuzz_deflate_small_asan
+elif [ $cmd == "build-deflate-roundtrip" ]; then
+    afl-clang-fast -static ../../misc/fuzz_deflate_roundtrip.c ../libdeflate/libdeflate.c -lm -o fuzz_deflate_roundtrip
+elif [ $cmd == "build-deflate-roundtrip-asan" ]; then
+    AFL_USE_ASAN=1 afl-clang-fast ../../misc/fuzz_deflate_roundtrip.c ../libdeflate/libdeflate.c  -lm -lz -o fuzz_deflate_roundtrip_asan
+elif [ $cmd == "build-deflate-roundtrip-strict" ]; then
+    afl-clang-fast -DSTRICT -static ../../misc/fuzz_deflate_roundtrip.c ../libdeflate/libdeflate.c -lm -o fuzz_deflate_roundtrip_strict
 fi
 
 name=$1
