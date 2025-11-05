@@ -542,7 +542,8 @@ extern "C" {
 		#pragma GCC diagnostic ignored "-Wfloat-conversion"
 	#endif
 	// `-Warray-bounds` results in warnings if UBsan is enabled and pre-GCC-14 has no way of detecting it..
-	#if UFBXI_GNUC_VERSION >= ufbx_pack_version(4, 3, 0) && UFBXI_GNUC_VERSION < ufbx_pack_version(14, 0, 0)
+	// The workaround for this uses an assert, but if the user has both UBsan and asserts disabled we need to silence the warning.
+	#if (UFBXI_GNUC_VERSION >= ufbx_pack_version(4, 3, 0) && UFBXI_GNUC_VERSION < ufbx_pack_version(14, 0, 0)) || defined(NDEBUG)
 		#pragma GCC diagnostic ignored "-Warray-bounds"
 	#endif
 #endif
@@ -1081,7 +1082,7 @@ ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEAD
 // -- Utility
 
 #if defined(UFBX_UBSAN)
-	static void ufbxi_assert_zero(size_t offset) { ufbx_assert(offset == 0); }
+	static void ufbxi_assert_zero(size_t offset) { (void)offset; ufbx_assert(offset == 0); }
 	#define ufbxi_add_ptr(ptr, offset) ((ptr) ? (ptr) + (offset) : (ufbxi_assert_zero((size_t)(offset)), (ptr)))
 	#define ufbxi_sub_ptr(ptr, offset) ((ptr) ? (ptr) - (offset) : (ufbxi_assert_zero((size_t)(offset)), (ptr)))
 #else
