@@ -115,8 +115,10 @@ int main(int argc, char **argv)
 		fseek(g_json, -2, SEEK_CUR);
 	}
 
-	fprintf(g_json, "\n\t]\n"
-		"}\n");
+	fprintf(g_json, "\n\t],\n"
+		"\t\"data_size\": %zu\n"
+		"}\n",
+		g_data_offset);
 
 	fclose(g_json);
 	fclose(g_data);
