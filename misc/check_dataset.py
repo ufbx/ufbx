@@ -105,6 +105,29 @@ def gather_case_models(json_path, flag_separator):
             # TODO: Handle objless fbx
             pass
 
+def gather_override_models(root, override_root, models):
+    suffixes = [
+        "7500_ascii",
+        "7500_binary",
+    ]
+    for model in models:
+        rel_fbx = os.path.relpath(model.fbx_path, root)
+        rel_fbx, ext = os.path.splitext(rel_fbx)
+        if ext.lower() != ".fbx":
+            continue
+
+        override_base = os.path.join(override_root, rel_fbx)
+        found = False
+        for suffix in suffixes:
+            override_fbx = f"{override_base}_{suffix}.fbx"
+            if override_fbx:
+                found = True
+                yield model._replace(fbx_path=override_fbx)
+
+        if not found:
+            raise RuntimeError(f"No override found for {rel_fbx}")
+
+
 def as_list(v):
     return v if isinstance(v, list) else [v]
 
@@ -133,7 +156,7 @@ def get_field(path, desc, name, allow_unknown):
     else:
         raise RuntimeError(f"{path}: Bad value for '{name}': {value!r}")
 
-def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_supported_time):
+def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_supported_time, override_root):
     path = os.path.join(root, filename)
 
     with open(path, "rt", encoding="utf-8") as f:
@@ -202,6 +225,11 @@ def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_sup
     extra_files = []
     if not skip:
         models = list(gather_case_models(path, flag_separator))
+        if override_root:
+            models = list(gather_override_models(root_dir, override_root, models))
+            if not models:
+                return
+
         if not models:
             raise RuntimeError(f"No models found for {path}")
 
@@ -220,23 +248,24 @@ def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_sup
         options=options,
     )
 
-def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time):
+def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time, override_root):
     if os.path.isfile(root_dir):
         head, tail = os.path.split(root_dir)
-        yield from create_dataset_task(head, head, tail, heavy, allow_unknown, last_supported_time)
+        yield from create_dataset_task(head, head, tail, heavy, allow_unknown, last_supported_time, override_root)
         return
 
     for root, _, files in os.walk(root_dir):
         for filename in files:
             if not filename.endswith(".json"):
                 continue
-            yield from create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_supported_time)
+            yield from create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_supported_time, override_root)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
     parser = ArgumentParser("check_dataset.py --root <root>")
     parser.add_argument("--root", help="Root directory to search for .json files")
+    parser.add_argument("--override-root", help="Directory to override FBX files from")
     parser.add_argument("--host-url", default="", help="URL where the files are hosted")
     parser.add_argument("--exe", help="check_fbx.c executable")
     parser.add_argument("--verbose", action="store_true", help="Print verbose information")
@@ -253,7 +282,13 @@ if __name__ == "__main__":
     if argv.include_recent:
         latest_supported_time = None
 
-    cases = list(gather_dataset_tasks(root_dir=argv.root, heavy=argv.heavy, allow_unknown=argv.allow_unknown, last_supported_time=latest_supported_time))
+    cases = list(gather_dataset_tasks(
+        root_dir=argv.root,
+        heavy=argv.heavy,
+        allow_unknown=argv.allow_unknown,
+        last_supported_time=latest_supported_time,
+        override_root=argv.override_root,
+        ))
 
     def fmt_url(path, root=""):
         if root:

@@ -12032,7 +12032,7 @@ static bool ufbxi_match_version_string(const char *fmt, ufbx_string str, uint32_
 			}
 			if (pos >= str.length) return false;
 			pos++;
-		} else if (c == '/' || c == '.' || c == '(' || c == ')') {
+		} else if (c == '/' || c == '.' || c == '(' || c == ')' || c == '_') {
 			if (pos >= str.length) return false;
 			if (str.data[pos] != c) return false;
 			pos++;
@@ -12081,6 +12081,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_match_exporter(ufbxi_context *uc
 	} else if (ufbxi_match_version_string("motionbuilder/mocap/online version ?.?", creator, version)) {
 		uc->exporter = UFBX_EXPORTER_MOTION_BUILDER;
 		uc->exporter_version = ufbx_pack_version(version[0], version[1], 0);
+	} else if (ufbxi_match_version_string("ufbx_write", creator, version)) {
+		uc->exporter = UFBX_EXPORTER_UFBX_WRITE;
+		uc->exporter_version = ufbx_pack_version(0, 0, 1);
 	}
 
 	uc->scene.metadata.exporter = uc->exporter;
