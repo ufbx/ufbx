@@ -19,6 +19,7 @@ class TestModel(NamedTuple):
     mtl_path: Optional[str]
     mat_path: Optional[str]
     frame: Optional[int]
+    is_override: bool
 
 class TestCase(NamedTuple):
     root: str
@@ -99,7 +100,8 @@ def gather_case_models(json_path, flag_separator):
                 obj_path=obj_path,
                 mtl_path=mtl_path,
                 mat_path=mat_path,
-                frame=frame)
+                frame=frame,
+                is_override=False)
 
         else:
             # TODO: Handle objless fbx
@@ -122,7 +124,10 @@ def gather_override_models(root, override_root, models):
             override_fbx = f"{override_base}_{suffix}.fbx"
             if override_fbx:
                 found = True
-                yield model._replace(fbx_path=override_fbx)
+                yield model._replace(
+                    fbx_path=override_fbx,
+                    is_override=True,
+                )
 
         if not found:
             raise RuntimeError(f"No override found for {rel_fbx}")
@@ -275,7 +280,7 @@ if __name__ == "__main__":
     parser.add_argument("--threads", type=int, default=1, help="Number of threads to use for running")
     argv = parser.parse_args()
 
-    host_url = argv.host_url if argv.host_url else argv.root
+    host_url = argv.host_url if argv.host_url else argv.root.replace("\\", "/")
     host_url = host_url.rstrip("\\/")
 
     latest_supported_time = datetime.datetime.strptime(LATEST_SUPPORTED_DATE, "%Y-%m-%d")
@@ -378,7 +383,11 @@ if __name__ == "__main__":
 
             log(f"-- {name}{extra_str} --")
             log()
-            log(f"    .fbx url: {fmt_url(model.fbx_path, case.root)}")
+            if model.is_override:
+                over_path = model.fbx_path.replace("\\", "/")
+                log(f"    .fbx url: {over_path}")
+            else:
+                log(f"    .fbx url: {fmt_url(model.fbx_path, case.root)}")
             if model.obj_path:
                 log(f"    .obj url: {fmt_url(model.obj_path, case.root)}")
             if model.mtl_path:
