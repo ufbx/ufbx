@@ -20,6 +20,7 @@ class TestModel(NamedTuple):
     mat_path: Optional[str]
     frame: Optional[int]
     is_override: bool
+    override_suffix: Optional[str]
 
 class TestCase(NamedTuple):
     root: str
@@ -101,7 +102,9 @@ def gather_case_models(json_path, flag_separator):
                 mtl_path=mtl_path,
                 mat_path=mat_path,
                 frame=frame,
-                is_override=False)
+                is_override=False,
+                override_suffix=None,
+            )
 
         else:
             # TODO: Handle objless fbx
@@ -127,6 +130,7 @@ def gather_override_models(root, override_root, models):
                 yield model._replace(
                     fbx_path=override_fbx,
                     is_override=True,
+                    override_suffix=suffix,
                 )
 
         if not found:
@@ -408,6 +412,8 @@ if __name__ == "__main__":
                         args += [f"--{k}"]
                     else:
                         args += [f"--{k}", v]
+                if model.override_suffix:
+                    args += [f"--suffix", model.override_suffix]
 
                 log("$ " + " ".join(args))
                 log()
