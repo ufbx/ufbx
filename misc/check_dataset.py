@@ -230,6 +230,11 @@ def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_sup
         elif not skip:
             raise RuntimeError(f"Unknown feature: {feature}")
 
+    if override_root:
+        override_options = { k: as_list(v) for k,v in desc.get("override-options", {}).items() }
+        for k,v in override_options.items():
+            options[k] = v
+
     models = []
     extra_files = []
     if not skip:

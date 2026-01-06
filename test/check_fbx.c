@@ -163,6 +163,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 	bool ignore_warnings = false;
 	double bake_fps = -1.0;
 	double override_fps = -1.0;
+	double position_scale = 1.0;
 
 	ufbx_load_opts opts = { 0 };
 
@@ -218,6 +219,8 @@ int check_fbx_main(int argc, char **argv, const char *path)
 			ignore_warnings = true;
 		} else if (!strcmp(argv[i], "--bake-fps")) {
 			if (++i < argc) bake_fps = strtod(argv[i], NULL);
+		} else if (!strcmp(argv[i], "--position-scale")) {
+			if (++i < argc) position_scale = strtod(argv[i], NULL);
 		} else if (!strcmp(argv[i], "--suffix")) {
 			if (++i < argc) suffix = argv[i];
 		} else if (argv[i][0] == '-') {
@@ -542,6 +545,8 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		#else
 			ufbxt_obj_file *obj_file = ufbxt_load_obj_file(obj_path);
 		#endif
+
+		obj_file->position_scale *= position_scale;
 
 		ufbx_scene *state;
 		if (obj_file->animation_frame >= 0 || frame != INT_MIN || obj_file->bind_pose) {
