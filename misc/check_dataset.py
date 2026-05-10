@@ -287,6 +287,7 @@ if __name__ == "__main__":
     parser.add_argument("--allow-unknown", action="store_true", help="Allow unknown fields")
     parser.add_argument("--include-recent", action="store_true", help="Run tests that are too recent")
     parser.add_argument("--threads", type=int, default=1, help="Number of threads to use for running")
+    parser.add_argument("--quiet", action="store_true", help="Do not print successful test information")
     argv = parser.parse_args()
 
     host_url = argv.host_url if argv.host_url else argv.root.replace("\\", "/")
@@ -447,6 +448,9 @@ if __name__ == "__main__":
         if case_ok:
             case_ok_count += 1
 
+        if argv.quiet and case_ok:
+            lines = []
+
         return lines
 
     async def run_cases_simple():
@@ -462,7 +466,9 @@ if __name__ == "__main__":
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             tasks = list(pending)
             for task in done:
-                print("\n".join(task.result()))
+                lines = task.result()
+                if lines:
+                    print("\n".join(lines))
 
         for case in cases:
             if len(tasks) >= num_threads:
