@@ -3507,7 +3507,7 @@ typedef enum ufbx_exporter UFBX_ENUM_REPR {
 	UFBX_ENUM_FORCE_WIDTH(UFBX_EXPORTER)
 } ufbx_exporter;
 
-UFBX_ENUM_TYPE(ufbx_exporter, UFBX_EXPORTER, UFBX_EXPORTER_MOTION_BUILDER);
+UFBX_ENUM_TYPE(ufbx_exporter, UFBX_EXPORTER, UFBX_EXPORTER_UFBX_WRITE);
 
 typedef struct ufbx_application {
 	ufbx_string vendor;
