@@ -1627,6 +1627,7 @@ struct ufbx_camera {
 
 // Bone attached to a `ufbx_node`, provides the logical length of the bone
 // but most interesting information is directly in `ufbx_node`.
+// NOTE: The FBX format calls these Skeleton node attributes.
 struct ufbx_bone {
 	union { ufbx_element element; struct {
 		ufbx_string name;
@@ -1647,6 +1648,7 @@ struct ufbx_bone {
 };
 
 // Empty/NULL/locator connected to a node, actual details in `ufbx_node`
+// NOTE: The FBX format calls these Null node attributes.
 struct ufbx_empty {
 	union { ufbx_element element; struct {
 		ufbx_string name;
@@ -3916,9 +3918,13 @@ typedef struct ufbx_scene_settings {
 	ufbx_time_protocol time_protocol;
 	ufbx_snap_mode snap_mode;
 
-	// Original settings (?)
+	// Original `axes.up` value for the scene.
+	// NOTE: This may be `UFBX_COORDINATE_AXIS_UNKNOWN` if not specified in the file.
 	ufbx_coordinate_axis original_axis_up;
+
+	// Original `unit_meters` value for the scene.
 	ufbx_real original_unit_meters;
+
 } ufbx_scene_settings;
 
 struct ufbx_scene {
