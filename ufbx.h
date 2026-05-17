@@ -267,7 +267,7 @@ struct ufbx_converter { };
 // `ufbx_source_version` contains the version of the corresponding source file.
 // HINT: The version can be compared numerically to the result of `ufbx_pack_version()`,
 // for example `#if UFBX_VERSION >= ufbx_pack_version(0, 12, 0)`.
-#define UFBX_HEADER_VERSION ufbx_pack_version(0, 21, 4)
+#define UFBX_HEADER_VERSION ufbx_pack_version(0, 22, 0)
 #define UFBX_VERSION UFBX_HEADER_VERSION
 
 // -- Basic types
@@ -3502,11 +3502,12 @@ typedef enum ufbx_exporter UFBX_ENUM_REPR {
 	UFBX_EXPORTER_BLENDER_BINARY,
 	UFBX_EXPORTER_BLENDER_ASCII,
 	UFBX_EXPORTER_MOTION_BUILDER,
+	UFBX_EXPORTER_UFBX_WRITE,
 
 	UFBX_ENUM_FORCE_WIDTH(UFBX_EXPORTER)
 } ufbx_exporter;
 
-UFBX_ENUM_TYPE(ufbx_exporter, UFBX_EXPORTER, UFBX_EXPORTER_MOTION_BUILDER);
+UFBX_ENUM_TYPE(ufbx_exporter, UFBX_EXPORTER, UFBX_EXPORTER_UFBX_WRITE);
 
 typedef struct ufbx_application {
 	ufbx_string vendor;
