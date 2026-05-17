@@ -3,11 +3,11 @@ coverage:
     project:
       default:
         informational: true
-      master:
+      main:
         informational: false
         target: 95%
         branches: 
-          - master
+          - main
     patch:
       default:
         informational: true
