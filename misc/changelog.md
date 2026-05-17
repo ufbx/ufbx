@@ -1,3 +1,9 @@
+### v0.21.5 (2026-05-16)
+> `ufbx-rust 0.11.0`, `ufbx-python 0.0.6`
+
+- Documentation improvements
+- Automatic release process for documentation/Rust/Python
+
 ### v0.21.4 (2026-05-16)
 
 - Treat `map_Bump` as bump/normal map in `.mtl` files
