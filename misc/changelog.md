@@ -1,3 +1,8 @@
+### v0.22.0 (2026-05-18)
+> `ufbx-rust 0.11.1`, `ufbx-python 0.0.7`
+
+- Add `UFBX_EXPORTER_UFBX_WRITE` exporter
+
 ### v0.21.5 (2026-05-16)
 > `ufbx-rust 0.11.0`, `ufbx-python 0.0.6`
 
