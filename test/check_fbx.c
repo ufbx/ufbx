@@ -152,6 +152,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 	const char *obj_path = NULL;
 	const char *mat_path = NULL;
 	const char *dump_obj_path = NULL;
+	const char *suffix = NULL;
 	int profile_runs = 0;
 	int frame = INT_MIN;
 	bool allow_bad_unicode = false;
@@ -162,6 +163,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 	bool ignore_warnings = false;
 	double bake_fps = -1.0;
 	double override_fps = -1.0;
+	double position_scale = 1.0;
 
 	ufbx_load_opts opts = { 0 };
 
@@ -217,6 +219,10 @@ int check_fbx_main(int argc, char **argv, const char *path)
 			ignore_warnings = true;
 		} else if (!strcmp(argv[i], "--bake-fps")) {
 			if (++i < argc) bake_fps = strtod(argv[i], NULL);
+		} else if (!strcmp(argv[i], "--position-scale")) {
+			if (++i < argc) position_scale = strtod(argv[i], NULL);
+		} else if (!strcmp(argv[i], "--suffix")) {
+			if (++i < argc) suffix = argv[i];
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "Unrecognized flag: %s\n", argv[i]);
 			exit(1);
@@ -336,6 +342,7 @@ int check_fbx_main(int argc, char **argv, const char *path)
 		"Blender Binary",
 		"Blender ASCII",
 		"MotionBuilder",
+		"ufbx_write",
 	};
 
 	const char *formats[2][2] = {
@@ -539,6 +546,8 @@ int check_fbx_main(int argc, char **argv, const char *path)
 			ufbxt_obj_file *obj_file = ufbxt_load_obj_file(obj_path);
 		#endif
 
+		obj_file->position_scale *= position_scale;
+
 		ufbx_scene *state;
 		if (obj_file->animation_frame >= 0 || frame != INT_MIN || obj_file->bind_pose) {
 			ufbx_anim *anim = scene->anim;
@@ -668,6 +677,10 @@ int check_fbx_main(int argc, char **argv, const char *path)
 
 			int model_path_len = snprintf(model_path, sizeof(model_path), "%.*s%s",
 				(int)base_length, path, obj_file->model_name);
+			if (suffix && model_path_len >= 4) {
+				model_path_len -= 4;
+				model_path_len += snprintf(model_path + model_path_len, sizeof(model_path) - (size_t)model_path_len, "_%s.fbx", suffix);
+			}
 			ufbxt_assert(model_path_len > 0 && model_path_len < sizeof(model_path));
 
 			ufbx_scene *model_scene = ufbx_load_file(model_path, &opts, &error);

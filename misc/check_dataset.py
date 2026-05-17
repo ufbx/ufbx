@@ -19,6 +19,8 @@ class TestModel(NamedTuple):
     mtl_path: Optional[str]
     mat_path: Optional[str]
     frame: Optional[int]
+    is_override: bool
+    override_suffix: Optional[str]
 
 class TestCase(NamedTuple):
     root: str
@@ -99,11 +101,41 @@ def gather_case_models(json_path, flag_separator):
                 obj_path=obj_path,
                 mtl_path=mtl_path,
                 mat_path=mat_path,
-                frame=frame)
+                frame=frame,
+                is_override=False,
+                override_suffix=None,
+            )
 
         else:
             # TODO: Handle objless fbx
             pass
+
+def gather_override_models(root, override_root, models):
+    suffixes = [
+        "7500_ascii",
+        "7500_binary",
+    ]
+    for model in models:
+        rel_fbx = os.path.relpath(model.fbx_path, root)
+        rel_fbx, ext = os.path.splitext(rel_fbx)
+        if ext.lower() != ".fbx":
+            continue
+
+        override_base = os.path.join(override_root, rel_fbx)
+        found = False
+        for suffix in suffixes:
+            override_fbx = f"{override_base}_{suffix}.fbx"
+            if override_fbx:
+                found = True
+                yield model._replace(
+                    fbx_path=override_fbx,
+                    is_override=True,
+                    override_suffix=suffix,
+                )
+
+        if not found:
+            raise RuntimeError(f"No override found for {rel_fbx}")
+
 
 def as_list(v):
     return v if isinstance(v, list) else [v]
@@ -133,7 +165,7 @@ def get_field(path, desc, name, allow_unknown):
     else:
         raise RuntimeError(f"{path}: Bad value for '{name}': {value!r}")
 
-def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_supported_time):
+def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_supported_time, override_root):
     path = os.path.join(root, filename)
 
     with open(path, "rt", encoding="utf-8") as f:
@@ -198,10 +230,20 @@ def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_sup
         elif not skip:
             raise RuntimeError(f"Unknown feature: {feature}")
 
+    if override_root:
+        override_options = { k: as_list(v) for k,v in desc.get("override-options", {}).items() }
+        for k,v in override_options.items():
+            options[k] = v
+
     models = []
     extra_files = []
     if not skip:
         models = list(gather_case_models(path, flag_separator))
+        if override_root:
+            models = list(gather_override_models(root_dir, override_root, models))
+            if not models:
+                return
+
         if not models:
             raise RuntimeError(f"No models found for {path}")
 
@@ -220,23 +262,24 @@ def create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_sup
         options=options,
     )
 
-def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time):
+def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time, override_root):
     if os.path.isfile(root_dir):
         head, tail = os.path.split(root_dir)
-        yield from create_dataset_task(head, head, tail, heavy, allow_unknown, last_supported_time)
+        yield from create_dataset_task(head, head, tail, heavy, allow_unknown, last_supported_time, override_root)
         return
 
     for root, _, files in os.walk(root_dir):
         for filename in files:
             if not filename.endswith(".json"):
                 continue
-            yield from create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_supported_time)
+            yield from create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_supported_time, override_root)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
     parser = ArgumentParser("check_dataset.py --root <root>")
     parser.add_argument("--root", help="Root directory to search for .json files")
+    parser.add_argument("--override-root", help="Directory to override FBX files from")
     parser.add_argument("--host-url", default="", help="URL where the files are hosted")
     parser.add_argument("--exe", help="check_fbx.c executable")
     parser.add_argument("--verbose", action="store_true", help="Print verbose information")
@@ -244,16 +287,23 @@ if __name__ == "__main__":
     parser.add_argument("--allow-unknown", action="store_true", help="Allow unknown fields")
     parser.add_argument("--include-recent", action="store_true", help="Run tests that are too recent")
     parser.add_argument("--threads", type=int, default=1, help="Number of threads to use for running")
+    parser.add_argument("--quiet", action="store_true", help="Do not print successful test information")
     argv = parser.parse_args()
 
-    host_url = argv.host_url if argv.host_url else argv.root
+    host_url = argv.host_url if argv.host_url else argv.root.replace("\\", "/")
     host_url = host_url.rstrip("\\/")
 
     latest_supported_time = datetime.datetime.strptime(LATEST_SUPPORTED_DATE, "%Y-%m-%d")
     if argv.include_recent:
         latest_supported_time = None
 
-    cases = list(gather_dataset_tasks(root_dir=argv.root, heavy=argv.heavy, allow_unknown=argv.allow_unknown, last_supported_time=latest_supported_time))
+    cases = list(gather_dataset_tasks(
+        root_dir=argv.root,
+        heavy=argv.heavy,
+        allow_unknown=argv.allow_unknown,
+        last_supported_time=latest_supported_time,
+        override_root=argv.override_root,
+        ))
 
     def fmt_url(path, root=""):
         if root:
@@ -343,7 +393,11 @@ if __name__ == "__main__":
 
             log(f"-- {name}{extra_str} --")
             log()
-            log(f"    .fbx url: {fmt_url(model.fbx_path, case.root)}")
+            if model.is_override:
+                over_path = model.fbx_path.replace("\\", "/")
+                log(f"    .fbx url: {over_path}")
+            else:
+                log(f"    .fbx url: {fmt_url(model.fbx_path, case.root)}")
             if model.obj_path:
                 log(f"    .obj url: {fmt_url(model.obj_path, case.root)}")
             if model.mtl_path:
@@ -364,6 +418,8 @@ if __name__ == "__main__":
                         args += [f"--{k}"]
                     else:
                         args += [f"--{k}", v]
+                if model.override_suffix:
+                    args += [f"--suffix", model.override_suffix]
 
                 log("$ " + " ".join(args))
                 log()
@@ -392,6 +448,9 @@ if __name__ == "__main__":
         if case_ok:
             case_ok_count += 1
 
+        if argv.quiet and case_ok:
+            lines = []
+
         return lines
 
     async def run_cases_simple():
@@ -407,7 +466,9 @@ if __name__ == "__main__":
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             tasks = list(pending)
             for task in done:
-                print("\n".join(task.result()))
+                lines = task.result()
+                if lines:
+                    print("\n".join(lines))
 
         for case in cases:
             if len(tasks) >= num_threads:

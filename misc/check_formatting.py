@@ -8,6 +8,7 @@ g_ufbx_idenitfiers = {
     "ufbx_static_assert",
     "ufbx_source_version",
     "UFBX_SOURCE_VERSION",
+    "ufbx_write",
 }
 g_platform_seen = False
 g_header_seen = False
