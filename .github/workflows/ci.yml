@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master, integration ]
+    branches: [ main, integration ]
 
 # Cancel any in-flight jobs for the same PR/branch so there's only one active
 # at a time
