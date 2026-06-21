@@ -2212,3 +2212,16 @@ UFBXT_TEST(maya_null_pivots_opts)
 	free(obj_file);
 }
 #endif
+
+UFBXT_FILE_TEST(casegen_rotation_order)
+#if UFBXT_IMPL
+{
+}
+#endif
+
+UFBXT_FILE_TEST(casegen_rotation_space)
+#if UFBXT_IMPL
+{
+}
+#endif
+

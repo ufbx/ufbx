@@ -267,7 +267,7 @@ struct ufbx_converter { };
 // `ufbx_source_version` contains the version of the corresponding source file.
 // HINT: The version can be compared numerically to the result of `ufbx_pack_version()`,
 // for example `#if UFBX_VERSION >= ufbx_pack_version(0, 12, 0)`.
-#define UFBX_HEADER_VERSION ufbx_pack_version(0, 22, 0)
+#define UFBX_HEADER_VERSION ufbx_pack_version(0, 23, 0)
 #define UFBX_VERSION UFBX_HEADER_VERSION
 
 // -- Basic types
@@ -967,7 +967,11 @@ struct ufbx_node {
 	// True if the node has a non-identity `geometry_transform`.
 	bool has_geometry_transform;
 
-	// If `true` the transform is adjusted by ufbx, not enabled by default.
+	// If `true`, you should apply `RotationOrder`, `PreRotation` and `PostRotation` properties.
+	// See `UFBX_RotationOrder`, `UFBX_PreRotation`, `UFBX_PostRotation`.
+	bool use_rotation_space;
+
+	// If `true`, the transform is adjusted by ufbx, not enabled by default.
 	// See `adjust_pre_rotation`, `adjust_pre_scale`, `adjust_post_rotation`,
 	// and `adjust_post_scale`.
 	bool has_adjust_transform;

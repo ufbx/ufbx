@@ -11,7 +11,7 @@ import datetime
 import asyncio
 import asyncio.subprocess
 
-LATEST_SUPPORTED_DATE = "2025-06-10"
+LATEST_SUPPORTED_DATE = "2026-06-22"
 
 class TestModel(NamedTuple):
     fbx_path: str
@@ -272,6 +272,9 @@ def gather_dataset_tasks(root_dir, heavy, allow_unknown, last_supported_time, ov
         for filename in files:
             if not filename.endswith(".json"):
                 continue
+            if filename.endswith(".list.json"):
+                continue
+
             yield from create_dataset_task(root_dir, root, filename, heavy, allow_unknown, last_supported_time, override_root)
 
 if __name__ == "__main__":

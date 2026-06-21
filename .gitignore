@@ -5,6 +5,9 @@ proj/
 # Build output
 build/
 
+# Temporary files
+temp/
+
 # Python cache files
 __pycache__/
 
