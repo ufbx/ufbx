@@ -1,3 +1,8 @@
+### v0.23.0 (2026-06-21)
+> `ufbx-rust 0.11.2`, `ufbx-python 0.0.8`
+
+- Add support for `RotationActive` and `RotationSpaceForLimitOnly`
+
 ### v0.22.0 (2026-05-18)
 > `ufbx-rust 0.11.1`, `ufbx-python 0.0.7`
 
