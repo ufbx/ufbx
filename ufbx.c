@@ -22736,12 +22736,12 @@ ufbxi_noinline static ufbx_transform ufbxi_get_transform(const ufbx_props *props
 	ufbxi_add_translate(&t, scale_offset);
 
 	ufbxi_sub_translate(&t, rot_pivot);
-	if (node->use_pre_post_rotation) {
+	if (node->use_rotation_space) {
 		ufbxi_mul_inv_rotate(&t, post_rotation, UFBX_ROTATION_ORDER_XYZ);
-	}
-	ufbxi_mul_rotate(&t, rotation, order);
-	if (node->use_pre_post_rotation) {
+		ufbxi_mul_rotate(&t, rotation, order);
 		ufbxi_mul_rotate(&t, pre_rotation, UFBX_ROTATION_ORDER_XYZ);
+	} else {
+		ufbxi_mul_rotate(&t, rotation, UFBX_ROTATION_ORDER_XYZ);
 	}
 	ufbxi_add_translate(&t, rot_pivot);
 
@@ -22868,7 +22868,7 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node, const ufbx_transfo
 	if (!node->is_root) {
 		const bool rotation_active = ufbxi_find_int(&node->props, ufbxi_RotationActive, 1) != 0;
 		const bool rotation_limit_only = ufbxi_find_int(&node->props, ufbxi_RotationSpaceForLimitOnly, 0) != 0;
-		node->use_pre_post_rotation = rotation_active && !rotation_limit_only;
+		node->use_rotation_space = rotation_active && !rotation_limit_only;
 
 		const ufbx_vec3 *transform_scale = NULL;
 		if (node->parent && node->parent->scale_helper) {
