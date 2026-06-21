@@ -15462,6 +15462,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				ufbxi_check(data_end - data >= 3);
 				data += 3;
 				num_weights = 0;
+			} else if (slope_mode == 'd') {
+				// TODO: What is this mode? It has a single parameter (currently observed `0`)
+				// and a single weight.
+				ufbxi_check(data_end - data >= 1);
+				data += 1;
 			} else {
 				ufbxi_fail("Unknown slope mode");
 			}
