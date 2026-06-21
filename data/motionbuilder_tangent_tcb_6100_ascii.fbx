@@ -1,0 +1,829 @@
+; FBX 6.1.0 project file
+; Copyright (C) 1997-2010 Autodesk Inc. and/or its licensors.
+; All rights reserved.
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 6100
+	CreationTimeStamp:  {
+		Version: 1000
+		Year: 2026
+		Month: 6
+		Day: 22
+		Hour: 1
+		Minute: 12
+		Second: 57
+		Millisecond: 42
+	}
+	Creator: "FBX SDK/FBX Plugins version 2013.3"
+}
+
+; Document Description
+;------------------------------------------------------------------
+
+Document:  {
+	Name: "KFbxScene"
+}
+
+; Document References
+;------------------------------------------------------------------
+
+References:  {
+}
+
+; Object definitions
+;------------------------------------------------------------------
+
+Definitions:  {
+	Version: 100
+	Count: 30
+	ObjectType: "Model" {
+		Count: 1
+	}
+	ObjectType: "SceneInfo" {
+		Count: 1
+	}
+	ObjectType: "GlobalSettings" {
+		Count: 1
+	}
+	ObjectType: "MotionBuilder_System" {
+		Count: 26
+	}
+	ObjectType: "MotionBuilder_Generic" {
+		Count: 1
+	}
+}
+
+; Object properties
+;------------------------------------------------------------------
+
+Objects:  {
+	Model: "Model::pCube1", "Mesh" {
+		Version: 232
+		Properties60:  {
+			Property: "QuaternionInterpolate", "enum", "",0
+			Property: "RotationOffset", "Vector3D", "",0,0,0
+			Property: "RotationPivot", "Vector3D", "",0,0,0
+			Property: "ScalingOffset", "Vector3D", "",0,0,0
+			Property: "ScalingPivot", "Vector3D", "",0,0,0
+			Property: "TranslationActive", "bool", "",0
+			Property: "TranslationMin", "Vector3D", "",0,0,0
+			Property: "TranslationMax", "Vector3D", "",0,0,0
+			Property: "TranslationMinX", "bool", "",0
+			Property: "TranslationMinY", "bool", "",0
+			Property: "TranslationMinZ", "bool", "",0
+			Property: "TranslationMaxX", "bool", "",0
+			Property: "TranslationMaxY", "bool", "",0
+			Property: "TranslationMaxZ", "bool", "",0
+			Property: "RotationOrder", "enum", "",0
+			Property: "RotationSpaceForLimitOnly", "bool", "",0
+			Property: "RotationStiffnessX", "double", "",0
+			Property: "RotationStiffnessY", "double", "",0
+			Property: "RotationStiffnessZ", "double", "",0
+			Property: "AxisLen", "double", "",10
+			Property: "PreRotation", "Vector3D", "",0,0,0
+			Property: "PostRotation", "Vector3D", "",0,0,0
+			Property: "RotationActive", "bool", "",1
+			Property: "RotationMin", "Vector3D", "",0,0,0
+			Property: "RotationMax", "Vector3D", "",0,0,0
+			Property: "RotationMinX", "bool", "",0
+			Property: "RotationMinY", "bool", "",0
+			Property: "RotationMinZ", "bool", "",0
+			Property: "RotationMaxX", "bool", "",0
+			Property: "RotationMaxY", "bool", "",0
+			Property: "RotationMaxZ", "bool", "",0
+			Property: "InheritType", "enum", "",1
+			Property: "ScalingActive", "bool", "",0
+			Property: "ScalingMin", "Vector3D", "",0,0,0
+			Property: "ScalingMax", "Vector3D", "",0,0,0
+			Property: "ScalingMinX", "bool", "",0
+			Property: "ScalingMinY", "bool", "",0
+			Property: "ScalingMinZ", "bool", "",0
+			Property: "ScalingMaxX", "bool", "",0
+			Property: "ScalingMaxY", "bool", "",0
+			Property: "ScalingMaxZ", "bool", "",0
+			Property: "GeometricTranslation", "Vector3D", "",0,0,0
+			Property: "GeometricRotation", "Vector3D", "",0,0,0
+			Property: "GeometricScaling", "Vector3D", "",1,1,1
+			Property: "MinDampRangeX", "double", "",0
+			Property: "MinDampRangeY", "double", "",0
+			Property: "MinDampRangeZ", "double", "",0
+			Property: "MaxDampRangeX", "double", "",0
+			Property: "MaxDampRangeY", "double", "",0
+			Property: "MaxDampRangeZ", "double", "",0
+			Property: "MinDampStrengthX", "double", "",0
+			Property: "MinDampStrengthY", "double", "",0
+			Property: "MinDampStrengthZ", "double", "",0
+			Property: "MaxDampStrengthX", "double", "",0
+			Property: "MaxDampStrengthY", "double", "",0
+			Property: "MaxDampStrengthZ", "double", "",0
+			Property: "PreferedAngleX", "double", "",0
+			Property: "PreferedAngleY", "double", "",0
+			Property: "PreferedAngleZ", "double", "",0
+			Property: "LookAtProperty", "object", ""
+			Property: "UpVectorProperty", "object", ""
+			Property: "Show", "bool", "",1
+			Property: "NegativePercentShapeSupport", "bool", "",1
+			Property: "DefaultAttributeIndex", "int", "",0
+			Property: "Freeze", "bool", "",0
+			Property: "LODBox", "bool", "",0
+			Property: "Lcl Translation", "Lcl Translation", "A+",-0.83969908952713,0,0
+			Property: "Lcl Rotation", "Lcl Rotation", "A",0,0,0
+			Property: "Lcl Scaling", "Lcl Scaling", "A",1,1,1
+			Property: "Visibility", "Visibility", "A",1
+			Property: "MultiTake", "int", "",1
+			Property: "DefaultKeyingGroup", "int", "",0
+			Property: "DefaultKeyingGroupEnum", "enum", "",0
+			Property: "ManipulationMode", "enum", "",0
+			Property: "ScalingPivotUpdateOffset", "Vector3D", "",0,0,0
+			Property: "SetPreferedAngle", "Action", "",0
+			Property: "PivotsVisibility", "enum", "",1
+			Property: "RotationLimitsVisibility", "bool", "",0
+			Property: "LocalTranslationRefVisibility", "bool", "",0
+			Property: "RotationRefVisibility", "bool", "",0
+			Property: "RotationAxisVisibility", "bool", "",0
+			Property: "ScalingRefVisibility", "bool", "",0
+			Property: "HierarchicalCenterVisibility", "bool", "",0
+			Property: "GeometricCenterVisibility", "bool", "",0
+			Property: "ReferentialSize", "double", "",12
+			Property: "Pickable", "bool", "",1
+			Property: "Transformable", "bool", "",1
+			Property: "CullingMode", "enum", "",0
+			Property: "ShowTrajectories", "bool", "",0
+			Property: "currentUVSet", "charptr", "U", "map1"
+			Property: "Color", "ColorRGB", "N",0.8,0.8,0.8
+			Property: "BBoxMin", "Vector3D", "N",0,0,0
+			Property: "BBoxMax", "Vector3D", "N",0,0,0
+			Property: "Primary Visibility", "bool", "N",1
+			Property: "Casts Shadows", "bool", "N",1
+			Property: "Receive Shadows", "bool", "N",1
+		}
+		MultiLayer: 0
+		MultiTake: 0
+		Shading: T
+		Culling: "CullingOff"
+		Vertices: -0.5,-0.5,0.5,0.5,-0.5,0.5,-0.5,0.5,0.5,0.5,0.5,0.5,-0.5,0.5,-0.5,0.5,0.5,-0.5,-0.5,-0.5,-0.5,0.5,-0.5,-0.5
+		PolygonVertexIndex: 0,1,3,-3,2,3,5,-5,4,5,7,-7,6,7,1,-1,1,7,5,-4,6,0,2,-5
+		GeometryVersion: 124
+		LayerElementNormal: 0 {
+			Version: 101
+			Name: ""
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "Direct"
+			Normals: 0,0,1,0,1,0,1,0,0,0,1,0,1,0,0,0,0,1,0,0,-1,0,-1,0,-1,0,0,0,-1,0,-1,0,0,0,0,-1,1,0,0,0,0,1,0,1,0,-1,0,0,0,0,-1
+             ,0,-1,0
+		}
+		LayerElementBinormal: 0 {
+			Version: 101
+			Name: "map1"
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "Direct"
+			Binormals: 0,1,-0,1,-0,0,-0,0,1,0,0,-1,0,-1,0,-1,0,0,0,-1,0,-1,0,0,0,0,-1,0,0,1,0,1,0,1,0,0,-0,1,0,1,0,0,-0,-0,1,0,1,0,1
+             ,0,0,0,0,1
+		}
+		LayerElementTangent: 0 {
+			Version: 101
+			Name: "map1"
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "Direct"
+			Tangents: 1,-0,-0,-0,0,1,0,1,-0,1,-0,0,0,0,1,0,1,0,1,0,0,0,0,1,0,1,0,1,0,-0,0,-0,1,-0,1,0,0,0,-1,0,-1,0,-1,0,0,0,-0,1,-0
+             ,1,0,1,0,-0
+		}
+		LayerElementUV: 0 {
+			Version: 101
+			Name: "map1"
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "IndexToDirect"
+			UV: 0.375,0,0.625,0,0.375,0.25,0.625,0.25,0.375,0.5,0.625,0.5,0.375,0.75,0.625,0.75,0.375,1,0.625,1,0.875,0,0.875
+             ,0.25,0.125,0,0.125,0.25
+			UVIndex: 0,1,3,2,2,3,5,4,4,5,7,6,6,7,9,8,1,10,11,3,12,0,2,13
+		}
+		LayerElementSmoothing: 0 {
+			Version: 101
+			Name: ""
+			MappingInformationType: "ByEdge"
+			ReferenceInformationType: "Direct"
+			Smoothing: 0,0,0,0,0,0,0,0,0,0,0,0
+		}
+		LayerElementMaterial: 0 {
+			Version: 101
+			Name: ""
+			MappingInformationType: "AllSame"
+			ReferenceInformationType: "IndexToDirect"
+			Materials: -1
+		}
+		Layer: 0 {
+			Version: 100
+			LayerElement:  {
+				Type: "LayerElementNormal"
+				TypedIndex: 0
+			}
+			LayerElement:  {
+				Type: "LayerElementBinormal"
+				TypedIndex: 0
+			}
+			LayerElement:  {
+				Type: "LayerElementTangent"
+				TypedIndex: 0
+			}
+			LayerElement:  {
+				Type: "LayerElementMaterial"
+				TypedIndex: 0
+			}
+			LayerElement:  {
+				Type: "LayerElementSmoothing"
+				TypedIndex: 0
+			}
+			LayerElement:  {
+				Type: "LayerElementUV"
+				TypedIndex: 0
+			}
+		}
+		NodeAttributeName: "Geometry::pCube1_ncl1_1"
+	}
+	SceneInfo: "SceneInfo::GlobalInfo", "UserData" {
+		Type: "UserData"
+		Version: 100
+		MetaData:  {
+			Version: 100
+			Title: ""
+			Subject: ""
+			Author: ""
+			Keywords: ""
+			Revision: ""
+			Comment: ""
+		}
+		Properties60:  {
+			Property: "DocumentUrl", "KString", "", "D:\Dev\clean\ufbx\data\FBX 2006\motionbuilder_tangent_tcb_7700_ascii.fbx"
+			Property: "SrcDocumentUrl", "KString", "", "D:\Dev\clean\ufbx\data\FBX 2006\motionbuilder_tangent_tcb_7700_ascii.fbx"
+			Property: "Original", "Compound", ""
+			Property: "Original|ApplicationVendor", "KString", "", "Autodesk"
+			Property: "Original|ApplicationName", "KString", "", "MotionBuilder"
+			Property: "Original|ApplicationVersion", "KString", "", "2023"
+			Property: "Original|DateTime_GMT", "DateTime", "", "18/10/2023 14:29:32.903"
+			Property: "Original|FileName", "KString", "", ""
+			Property: "LastSaved", "Compound", ""
+			Property: "LastSaved|ApplicationVendor", "KString", "", "Autodesk"
+			Property: "LastSaved|ApplicationName", "KString", "", "MotionBuilder"
+			Property: "LastSaved|ApplicationVersion", "KString", "", "2023"
+			Property: "LastSaved|DateTime_GMT", "DateTime", "", "18/10/2023 14:29:32.903"
+		}
+	}
+	GlobalSettings:  {
+		Version: 1000
+		Properties60:  {
+			Property: "UpAxis", "int", "",1
+			Property: "UpAxisSign", "int", "",1
+			Property: "FrontAxis", "int", "",2
+			Property: "FrontAxisSign", "int", "",1
+			Property: "CoordAxis", "int", "",0
+			Property: "CoordAxisSign", "int", "",1
+			Property: "OriginalUpAxis", "int", "",-1
+			Property: "OriginalUpAxisSign", "int", "",1
+			Property: "UnitScaleFactor", "double", "",1
+			Property: "OriginalUnitScaleFactor", "double", "",1
+			Property: "AmbientColor", "ColorRGB", "",0,0,0
+			Property: "DefaultCamera", "KString", "", "Producer Perspective"
+			Property: "TimeMode", "enum", "",0
+			Property: "TimeSpanStart", "KTime", "",0
+			Property: "TimeSpanStop", "KTime", "",46186158000
+			Property: "CustomFrameRate", "double", "",-1
+			Property: "TimeProtocol", "enum", "",2
+			Property: "SnapOnFrameMode", "enum", "",0
+			Property: "CurrentTimeMarker", "int", "",-1
+		}
+	}
+	MotionBuilder_System: "KTimeWarpManager", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "Box"
+			Property: "MoBuObjectFullName", "KString", "", "KTimeWarpManager"
+			Property: "DefaultKeyingGroup", "int", "",0
+			Property: "DefaultKeyingGroupEnum", "enum", "",0
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "KVideoRenderer", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "Object"
+			Property: "MoBuSubTypeName", "KString", "", "KVideoRenderer"
+			Property: "MoBuObjectFullName", "KString", "", "KVideoRenderer"
+			Property: "MoBuAttrBlindData", "KString", "", "&lf;;Renderer Tool Options&lf;; ----------------------------------------------------&lf;RendererTools:  {&lf;    Version: 103&lf;    StartTime: &quot;0&quot;&lf;    StopTime: &quot;0&quot;&lf;    StepTime: &quot;1&quot;&lf;    OutputFormat: &quot;AVI&quot;&lf;    OutputPath: &quot;c:\temp\Output.avi&quot;&lf;    Format: &quot;From Camera&quot;&lf;    FieldMode: 0&lf;    Quality: 24&lf;    RendererAntialing: 0&lf;    ModelsOnly: 1&lf;    ViewingMode: 1&lf;    StereoDisplayMode: 10&lf;    RendererCallbackIndex: -2&lf;    RendererCallbackPrefIndex: -1&lf;    RenderAudio: 0&lf;    AudioFormat: 2098178&lf;    AudioOutputLocation: 0&lf;    AudioUseCustomStandalonePath: 0&lf;    AudioCustomStandalonePath: &quot;c:\temp\Output.wav&quot;&lf;    ShowCameraLabel: 0&lf;    ShowTimeCode: 0&lf;    ShowSafeArea: 0&lf;    GlobalViewingMode: 0&lf;    GlobalStereoDisplayMode: 0&lf;}&lf;&lf;"
+             
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "KSerialManager", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "KSerialManager"
+			Property: "MoBuObjectFullName", "KString", "", "KSerialManager"
+			Property: "MoBuAttrBlindData", "KString", "", "&lf;; Serial Manager Section &lf;; ----------------------------------------------------&lf;SerialManager:  {&lf;}&lf;"
+             
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "KCharacterHelper", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "Tool"
+			Property: "MoBuSubTypeName", "KString", "", "Character"
+			Property: "MoBuObjectFullName", "KString", "", "KCharacterHelper"
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", "CHARACTER_TOOL:  {&lf;    KEYING_MODE: 1&lf;    IK_MANIP: 0&lf;    SYMETRY_EDIT_T: 0&lf;    SYMETRY_EDIT_R: 0&lf;    SYMETRY_EDIT_S: 1&lf;    SYMETRY_EDIT: 1&lf;    MARKERSET_VISIBILITY: 1&lf;    FLOOR_CONTACT_VISIBILITY: 1&lf;    FINGER_TIPS_VISIBILITY: 0&lf;    REACH_OVERRIDE: 1&lf;    RESIST_OVERRIDE: 1&lf;}&lf;"
+             
+		}
+	}
+	MotionBuilder_System: "KNLEManager", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "KNLEManager"
+			Property: "MoBuObjectFullName", "KString", "", "KNLEManager"
+			Property: "MoBuAttrBlindData", "KString", "", "GlobalNLE:  {&lf;    Version: 7&lf;}&lf;"
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "KNamespacePropertiesManager", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "KNamespacePropertiesManager"
+			Property: "MoBuObjectFullName", "KString", "", "KNamespacePropertiesManager"
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "Constraints", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "Folder"
+			Property: "MoBuSubTypeName", "KString", "", "Category"
+			Property: "MoBuObjectFullName", "KString", "", "Folder::Constraints"
+			Property: "MoBuAttrBlindData", "KString", "", "FolderType: &quot;Constraints&quot;&lf;"
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "KAudioManager", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "KAudioManager"
+			Property: "MoBuObjectFullName", "KString", "", "KAudioManager"
+			Property: "MoBuAttrBlindData", "KString", "", "AudioInput:  {&lf;    Name: &quot;INPUT (3- Volt 1)&quot;&lf;    Format: 2098178&lf;    Online: 0&lf;    Record: 0&lf;    RecordPath: &quot;&quot;&lf;    Destination: &quot;&quot;&lf;    LiveDelay: 0&lf;}&lf;AudioInput:  {&lf;    Name: &quot;VoiceMeeter Aux Output (VB-Audio VoiceMeeter AUX VAIO)&quot;&lf;    Format: 2098178&lf;    Online: 0&lf;    Record: 0&lf;    RecordPath: &quot;&quot;&lf;    Destination: &quot;&quot;&lf;    LiveDelay: 0&lf;}&lf;AudioInput:  {&lf;    Name: &quot;VoiceMeeter Output (VB-Audio VoiceMeeter VAIO)&quot;&lf;    Format: 2098178&lf;    Online: 0&lf;    Record: 0&lf;    RecordPath: &quot;&quot;&lf;    Destination: &quot;&quot;&lf;    LiveDelay: 0&lf;}&lf;"
+             
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "KMotionTriggerManager", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "KMotionTriggerManager"
+			Property: "MoBuObjectFullName", "KString", "", "KMotionTriggerManager"
+			Property: "MoBuAttrBlindData", "KString", "", "KEEPACTIVE: 0&lf;"
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "KTimelineXManager", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "KTimelineXManager"
+			Property: "MoBuObjectFullName", "KString", "", "KTimelineXManager"
+			Property: "MoBuAttrBlindData", "KString", "", "; TimelineX section&lf;; ----------------------------------------------------&lf;&lf;GlobalTimelineX:  {&lf;    Mute: 0&lf;    TimeDiscontinuity: 1&lf;    TimeReferential: 0&lf;    EditStartEnd: 0,230930790000&lf;    EditZoomStartEnd: 0,230930790000&lf;}&lf;"
+             
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "KHUDManager", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "KHUDManager"
+			Property: "MoBuObjectFullName", "KString", "", "KHUDManager"
+			Property: "DefaultHUD", "object", ""
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "Poses", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "Folder"
+			Property: "MoBuSubTypeName", "KString", "", "Category"
+			Property: "MoBuObjectFullName", "KString", "", "Folder::Poses"
+			Property: "MoBuAttrBlindData", "KString", "", "FolderType: &quot;Poses&quot;&lf;"
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "Takes", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "Folder"
+			Property: "MoBuSubTypeName", "KString", "", "Category"
+			Property: "MoBuObjectFullName", "KString", "", "Folder::Takes"
+			Property: "MoBuAttrBlindData", "KString", "", "FolderType: &quot;Takes&quot;&lf;"
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "Renderer", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "Renderer"
+			Property: "MoBuSubTypeName", "KString", "", "Default"
+			Property: "MoBuObjectFullName", "KString", "", "Renderer::Renderer"
+			Property: "DisplayNormal", "bool", "",0
+			Property: "DisplayBoundingBox", "bool", "",0
+			Property: "DisplayHierarchicalBoundingBox", "bool", "",0
+			Property: "DisplayStereoManipulator", "bool", "",0
+			Property: "IDBufferPickingAlpha", "double", "",0.5
+			Property: "SelectionOverride", "bool", "",0
+			Property: "SelectionOverrideTransparency", "double", "",0.25
+			Property: "SelectionOverrideColor", "ColorRGB", "",0.05,0.5,0.05
+			Property: "SelectionForceSnapPointsDisplay", "bool", "",0
+			Property: "PickingEnabled", "bool", "",1
+			Property: "HideManipulatorsOnManip", "bool", "",0
+			Property: "HideManipulatorsOnPlayback", "bool", "",0
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "Python Tool Manager", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "__FBTool"
+			Property: "MoBuObjectFullName", "KString", "", "Python Tool Manager"
+			Property: "Caption", "charptr", "", ""
+			Property: "Enabled", "bool", "",1
+			Property: "ReadOnly", "bool", "",0
+			Property: "Visible", "bool", "",1
+			Property: "Left", "int", "",0
+			Property: "Top", "int", "",0
+			Property: "Width", "int", "",1
+			Property: "Height", "int", "",1
+			Property: "Anchors", "int", "",0
+			Property: "SkinContext", "enum", "",0
+			Property: "RenderingHints", "int", "",0
+			Property: "Hint", "charptr", "", ""
+			Property: "HintMouse", "charptr", "", ""
+			Property: "HintMouseLeft", "int", "",-1
+			Property: "HintMouseTop", "int", "",-1
+			Property: "HintMouseWidth", "int", "",-1
+			Property: "HintMouseHeight", "int", "",-1
+			Property: "HintIsTextCompletion", "bool", "",0
+			Property: "Active", "bool", "",0
+			Property: "ActiveControl", "object", ""
+			Property: "BackgroundBrush", "enum", "",4
+			Property: "BorderStyle", "int", "",0
+			Property: "Position", "int", "",0
+			Property: "StartWSize", "int", "",200
+			Property: "StartHSize", "int", "",200
+			Property: "MaxWSize", "int", "",-1
+			Property: "MaxHSize", "int", "",-1
+			Property: "MinWSize", "int", "",140
+			Property: "MinHSize", "int", "",-1
+			Property: "StartXPos", "int", "",-1
+			Property: "StartYPos", "int", "",-1
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "Batch Tool (scripted)", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "__FBTool"
+			Property: "MoBuObjectFullName", "KString", "", "Batch Tool (scripted)"
+			Property: "Caption", "charptr", "", ""
+			Property: "Enabled", "bool", "",1
+			Property: "ReadOnly", "bool", "",0
+			Property: "Visible", "bool", "",1
+			Property: "Left", "int", "",0
+			Property: "Top", "int", "",0
+			Property: "Width", "int", "",1
+			Property: "Height", "int", "",1
+			Property: "Anchors", "int", "",0
+			Property: "SkinContext", "enum", "",0
+			Property: "RenderingHints", "int", "",0
+			Property: "Hint", "charptr", "", ""
+			Property: "HintMouse", "charptr", "", ""
+			Property: "HintMouseLeft", "int", "",-1
+			Property: "HintMouseTop", "int", "",-1
+			Property: "HintMouseWidth", "int", "",-1
+			Property: "HintMouseHeight", "int", "",-1
+			Property: "HintIsTextCompletion", "bool", "",0
+			Property: "Active", "bool", "",0
+			Property: "ActiveControl", "object", ""
+			Property: "BackgroundBrush", "enum", "",4
+			Property: "BorderStyle", "int", "",0
+			Property: "Position", "int", "",0
+			Property: "StartWSize", "int", "",535
+			Property: "StartHSize", "int", "",365
+			Property: "MaxWSize", "int", "",-1
+			Property: "MaxHSize", "int", "",-1
+			Property: "MinWSize", "int", "",140
+			Property: "MinHSize", "int", "",-1
+			Property: "StartXPos", "int", "",-1
+			Property: "StartYPos", "int", "",-1
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "Character Selection/Key Controls", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "__FBTool"
+			Property: "MoBuObjectFullName", "KString", "", "Character Selection/Key Controls"
+			Property: "Caption", "charptr", "", ""
+			Property: "Enabled", "bool", "",1
+			Property: "ReadOnly", "bool", "",0
+			Property: "Visible", "bool", "",1
+			Property: "Left", "int", "",0
+			Property: "Top", "int", "",0
+			Property: "Width", "int", "",1
+			Property: "Height", "int", "",1
+			Property: "Anchors", "int", "",0
+			Property: "SkinContext", "enum", "",0
+			Property: "RenderingHints", "int", "",0
+			Property: "Hint", "charptr", "", ""
+			Property: "HintMouse", "charptr", "", ""
+			Property: "HintMouseLeft", "int", "",-1
+			Property: "HintMouseTop", "int", "",-1
+			Property: "HintMouseWidth", "int", "",-1
+			Property: "HintMouseHeight", "int", "",-1
+			Property: "HintIsTextCompletion", "bool", "",0
+			Property: "Active", "bool", "",0
+			Property: "ActiveControl", "object", ""
+			Property: "BackgroundBrush", "enum", "",4
+			Property: "BorderStyle", "int", "",0
+			Property: "Position", "int", "",0
+			Property: "StartWSize", "int", "",242
+			Property: "StartHSize", "int", "",120
+			Property: "MaxWSize", "int", "",-1
+			Property: "MaxHSize", "int", "",-1
+			Property: "MinWSize", "int", "",140
+			Property: "MinHSize", "int", "",-1
+			Property: "StartXPos", "int", "",-1
+			Property: "StartYPos", "int", "",-1
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "FBX Export", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "__FBTool"
+			Property: "MoBuObjectFullName", "KString", "", "FBX Export"
+			Property: "Caption", "charptr", "", ""
+			Property: "Enabled", "bool", "",1
+			Property: "ReadOnly", "bool", "",0
+			Property: "Visible", "bool", "",1
+			Property: "Left", "int", "",0
+			Property: "Top", "int", "",0
+			Property: "Width", "int", "",1
+			Property: "Height", "int", "",1
+			Property: "Anchors", "int", "",0
+			Property: "SkinContext", "enum", "",0
+			Property: "RenderingHints", "int", "",0
+			Property: "Hint", "charptr", "", ""
+			Property: "HintMouse", "charptr", "", ""
+			Property: "HintMouseLeft", "int", "",-1
+			Property: "HintMouseTop", "int", "",-1
+			Property: "HintMouseWidth", "int", "",-1
+			Property: "HintMouseHeight", "int", "",-1
+			Property: "HintIsTextCompletion", "bool", "",0
+			Property: "Active", "bool", "",0
+			Property: "ActiveControl", "object", ""
+			Property: "BackgroundBrush", "enum", "",4
+			Property: "BorderStyle", "int", "",0
+			Property: "Position", "int", "",0
+			Property: "StartWSize", "int", "",350
+			Property: "StartHSize", "int", "",170
+			Property: "MaxWSize", "int", "",-1
+			Property: "MaxHSize", "int", "",-1
+			Property: "MinWSize", "int", "",140
+			Property: "MinHSize", "int", "",-1
+			Property: "StartXPos", "int", "",-1
+			Property: "StartYPos", "int", "",-1
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "Keyboard Shortcuts Editor", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "__FBTool"
+			Property: "MoBuObjectFullName", "KString", "", "Keyboard Shortcuts Editor"
+			Property: "Caption", "charptr", "", ""
+			Property: "Enabled", "bool", "",1
+			Property: "ReadOnly", "bool", "",0
+			Property: "Visible", "bool", "",1
+			Property: "Left", "int", "",0
+			Property: "Top", "int", "",0
+			Property: "Width", "int", "",1
+			Property: "Height", "int", "",1
+			Property: "Anchors", "int", "",0
+			Property: "SkinContext", "enum", "",0
+			Property: "RenderingHints", "int", "",0
+			Property: "Hint", "charptr", "", ""
+			Property: "HintMouse", "charptr", "", ""
+			Property: "HintMouseLeft", "int", "",-1
+			Property: "HintMouseTop", "int", "",-1
+			Property: "HintMouseWidth", "int", "",-1
+			Property: "HintMouseHeight", "int", "",-1
+			Property: "HintIsTextCompletion", "bool", "",0
+			Property: "Active", "bool", "",0
+			Property: "ActiveControl", "object", ""
+			Property: "BackgroundBrush", "enum", "",4
+			Property: "BorderStyle", "int", "",0
+			Property: "Position", "int", "",0
+			Property: "StartWSize", "int", "",1
+			Property: "StartHSize", "int", "",1
+			Property: "MaxWSize", "int", "",-1
+			Property: "MaxHSize", "int", "",-1
+			Property: "MinWSize", "int", "",140
+			Property: "MinHSize", "int", "",-1
+			Property: "StartXPos", "int", "",-1
+			Property: "StartYPos", "int", "",-1
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "MainViewer", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "KtViewer"
+			Property: "MoBuObjectFullName", "KString", "", "MainViewer"
+			Property: "PaneCount", "int", "",0
+			Property: "DisplayStatistics", "bool", "",0
+			Property: "DisplayMemory", "bool", "",0
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "ModelView0", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "ModelView"
+			Property: "MoBuObjectFullName", "KString", "", "ModelView0"
+			Property: "RenderCallbackIndex", "int", "",-1
+			Property: "RenderCallbackPrefIndex", "int", "",0
+			Property: "CameraViewingMode", "int", "",0
+			Property: "CurrentCamera", "object", ""
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "ModelView1", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "ModelView"
+			Property: "MoBuObjectFullName", "KString", "", "ModelView1"
+			Property: "RenderCallbackIndex", "int", "",-1
+			Property: "RenderCallbackPrefIndex", "int", "",0
+			Property: "CameraViewingMode", "int", "",0
+			Property: "CurrentCamera", "object", ""
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "ModelView2", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "ModelView"
+			Property: "MoBuObjectFullName", "KString", "", "ModelView2"
+			Property: "RenderCallbackIndex", "int", "",-1
+			Property: "RenderCallbackPrefIndex", "int", "",0
+			Property: "CameraViewingMode", "int", "",0
+			Property: "CurrentCamera", "object", ""
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "ModelView3", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "ModelView"
+			Property: "MoBuObjectFullName", "KString", "", "ModelView3"
+			Property: "RenderCallbackIndex", "int", "",-1
+			Property: "RenderCallbackPrefIndex", "int", "",0
+			Property: "CameraViewingMode", "int", "",0
+			Property: "CurrentCamera", "object", ""
+			Property: "MoBuAttrBlindData", "KString", "", ""
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "HierarchyView", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "KtHierarchyView"
+			Property: "MoBuObjectFullName", "KString", "", "HierarchyView"
+			Property: "MoBuAttrBlindData", "KString", "", "; HierarchyView section &lf;; ----------------------------------------------------&lf;HierarchyView:  {&lf;    ShowGrid: 1&lf;    Zoom: 1&lf;    ViewportX: -50&lf;    ViewportY: -50&lf;    ObjectsAttributes:  {&lf;        Name: &quot;Model::pCube1&quot; {&lf;            X: 75&lf;            Y: 0&lf;            Expanded: 4&lf;        }&lf;    }&lf;}&lf;"
+             
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_System: "FCurve", "" {
+		Properties60:  {
+			Property: "MoBuObjectFullName", "KString", "", "FCurve"
+			Property: "Caption", "charptr", "", ""
+			Property: "Enabled", "bool", "",1
+			Property: "ReadOnly", "bool", "",0
+			Property: "Visible", "bool", "",1
+			Property: "Left", "int", "",0
+			Property: "Top", "int", "",1
+			Property: "Width", "int", "",0
+			Property: "Height", "int", "",0
+			Property: "Anchors", "int", "",0
+			Property: "SkinContext", "enum", "",0
+			Property: "RenderingHints", "int", "",0
+			Property: "Hint", "charptr", "", ""
+			Property: "HintMouse", "charptr", "", ""
+			Property: "HintMouseLeft", "int", "",-1
+			Property: "HintMouseTop", "int", "",-1
+			Property: "HintMouseWidth", "int", "",-1
+			Property: "HintMouseHeight", "int", "",-1
+			Property: "HintIsTextCompletion", "bool", "",0
+			Property: "Active", "bool", "",0
+			Property: "ActiveControl", "object", ""
+			Property: "BackgroundBrush", "enum", "",3
+			Property: "BorderStyle", "int", "",0
+			Property: "Position", "int", "",0
+			Property: "MoBuAttrBlindData", "KString", "", "&quot;FCurve Tool Settings&quot;:  {&lf;    &quot;FCurve Editor Settings&quot;:  {&lf;        &quot;Audio Display Settings&quot;:  {&lf;            AudioDisplay: 1&lf;            AudioClipName: &quot;&quot;&lf;            AudioTrackName: &quot;&quot;&lf;            AudioLeftChannelActive: 1&lf;            AudioRightChannelActive: 1&lf;        }&lf;    }&lf;    &quot;FCurve Editor Extended Settings&quot;:  {&lf;        &quot;Transport Original Values&quot;: 9223372036854775807,-9223372036854775807&lf;        &quot;Zoombar Original Values&quot;: 9223372036854775807,-9223372036854775807&lf;    }&lf;}&lf;"
+             
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+	MotionBuilder_Generic: "GlobalInfo", "" {
+		Properties60:  {
+			Property: "MoBuTypeName", "KString", "", "SceneInfo"
+			Property: "MoBuSubTypeName", "KString", "", "UserData"
+			Property: "MoBuObjectFullName", "KString", "", "SceneInfo::GlobalInfo"
+			Property: "MoBuAttrBlindData", "KString", "", "Version: 100&lf;MetaData:  {&lf;    Version: 100&lf;    Title: &quot;&quot;&lf;    Subject: &quot;&quot;&lf;    Author: &quot;&quot;&lf;    Keywords: &quot;&quot;&lf;    Revision: &quot;&quot;&lf;    Comment: &quot;&quot;&lf;}&lf;"
+             
+			Property: "MoBuRelationBlindData", "KString", "", ""
+		}
+	}
+}
+
+; Object connections
+;------------------------------------------------------------------
+
+Connections:  {
+	Connect: "OO", "Model::pCube1", "Model::Scene"
+}
+;Takes and animation section
+;----------------------------------------------------
+
+Takes:  {
+	Current: "Take 001"
+	Take: "Take 001" {
+		FileName: "Take_001.tak"
+		LocalTime: 0,230930790000
+		ReferenceTime: 0,230930790000
+		
+		;Models animation
+		;----------------------------------------------------
+		Model: "Model::pCube1" {
+			Version: 1.1
+			Channel: "Transform" {
+				Channel: "T" {
+					Channel: "X" {
+						Default: 0
+						KeyVer: 4005
+						KeyCount: 10
+						Key: 0,0,U,t,-0.5,0.5,0.75,11546539500,-2,U,t,-1,1,-1,23093079000,5,U,t,-1,0,1,46186158000
+                                        ,0,U,t,0,-1,-1,57732697500,10,U,t,0,-4,0,80825776500,6,U,t,-0.800000011920929,-0.200000002980232
+                                        ,0.600000023841858,92372316000,-2,U,t,0.800000011920929,0.200000002980232,-0.400000005960464
+                                        ,98145585750,4,U,t,0.5,1.5,-0.5,109692125250,-1,U,t,0.5,1.5,-0.5,115465395000,4,U
+                                        ,t,0.5,-0.5,-0.600000023841858
+						Color: 1,1,1
+					}
+					Channel: "Y" {
+						Default: 0
+						Color: 1,1,1
+					}
+					Channel: "Z" {
+						Default: 0
+						Color: 1,1,1
+					}
+					LayerType: 1
+				}
+			}
+		}
+		
+		;Generic nodes animation
+		;----------------------------------------------------
+		
+		;Textures animation
+		;----------------------------------------------------
+		
+		;Materials animation
+		;----------------------------------------------------
+		
+		
+		;Constraints animation
+		;----------------------------------------------------
+	}
+}
+;Version 5 settings
+;------------------------------------------------------------------
+
+Version5:  {
+	AmbientRenderSettings:  {
+		Version: 101
+		AmbientLightColor: 0,0,0,1
+	}
+	FogOptions:  {
+		FlogEnable: 0
+		FogMode: 0
+		FogDensity: 0.002
+		FogStart: 0.3
+		FogEnd: 1000
+		FogColor: 1,1,1,1
+	}
+	Settings:  {
+		FrameRate: "30"
+		TimeFormat: 1
+		SnapOnFrames: 0
+		ReferenceTimeIndex: -1
+		TimeLineStartTime: 0
+		TimeLineStopTime: 46186158000
+	}
+	RendererSetting:  {
+		DefaultCamera: "Producer Perspective"
+		DefaultViewingMode: 0
+	}
+}
