@@ -15330,8 +15330,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 	if (uc->opts.ignore_animation) return 1;
 
 	int32_t key_ver = 0;
-	ufbxi_find_val1(node, ufbxi_KeyVer, "I", &key_ver);
-	if (key_ver == 0) {
+	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_KeyVer, "I", &key_ver));
+	if (key_ver <= 0) {
 		if (uc->version < 5000) {
 			key_ver = 4003;
 		} else if (uc->version < 6000) {
