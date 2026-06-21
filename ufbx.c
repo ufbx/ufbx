@@ -15320,8 +15320,17 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 
 	if (uc->opts.ignore_animation) return 1;
 
-	int32_t key_ver = 4005;
+	int32_t key_ver = 0;
 	ufbxi_find_val1(node, ufbxi_KeyVer, "I", &key_ver);
+	if (key_ver == 0) {
+		if (uc->version < 5000) {
+			key_ver = 4003;
+		} else if (uc->version < 6000) {
+			key_ver = 4004;
+		} else {
+			key_ver = 4005;
+		}
+	}
 
 	size_t num_keys = 0;
 	ufbxi_check(ufbxi_find_val1(node, ufbxi_KeyCount, "Z", &num_keys));
@@ -15386,6 +15395,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				slope_right = (float)data[0];
 				next_slope_left = (float)data[1];
 				data += 2;
+				if (key_ver <= 4003) {
+					num_weights = 0;
+				}
 			} else if (slope_mode == 'a') {
 				// Parameterless slope mode 'a' seems to appear in baked animations. Let's just assume
 				// automatic tangents for now as they're the least likely to break with
@@ -15403,7 +15415,20 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				// Ignore unknown values for now
 				ufbxi_check(data_end - data >= 2);
 				data += 2;
-				num_weights = 2;
+				if (key_ver <= 4004) {
+					num_weights = 1;
+				} else {
+					num_weights = 2;
+				}
+			} else if (slope_mode == 'q') {
+				// TODO: What is this mode? It seems to have negative values sometimes?
+				// Also it seems to have _two_ trailing weights values, currently observed:
+				// `d,d` and `n`...
+				// Ignore unknown values for now
+				// TODO: This has only been observed with KeyVer=4003, it might have two weights in 4004
+				ufbxi_check(data_end - data >= 2);
+				data += 2;
+				num_weights = 1;
 			} else if (slope_mode == 't') {
 				// TODO: What is this mode? It seems that it does not have any weights and the
 				// third value seems _tiny_ (around 1e-30?)
@@ -15450,9 +15475,13 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 			key->interpolation = UFBX_INTERPOLATION_LINEAR;
 		} else if (mode == 'C') {
 			// Constant interpolation: Single parameter (use prev/next)
-			ufbxi_check(data_end - data >= 1);
-			key->interpolation = ufbxi_double_to_char(data[0]) == 'n' ? UFBX_INTERPOLATION_CONSTANT_NEXT : UFBX_INTERPOLATION_CONSTANT_PREV;
-			data += 1;
+			if (key_ver >= 4004) {
+				ufbxi_check(data_end - data >= 1);
+				key->interpolation = ufbxi_double_to_char(data[0]) == 'n' ? UFBX_INTERPOLATION_CONSTANT_NEXT : UFBX_INTERPOLATION_CONSTANT_PREV;
+				data += 1;
+			} else {
+				key->interpolation = UFBX_INTERPOLATION_CONSTANT_PREV;
+			}
 		} else {
 			ufbxi_fail("Unknown key mode");
 		}
