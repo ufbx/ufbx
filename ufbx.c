@@ -14815,6 +14815,16 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_constraint(ufbxi_context *u
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_synthetic_attribute(ufbxi_context *uc, ufbxi_node *node, ufbxi_element_info *info, ufbx_string type_str, const char *sub_type, const char *super_type)
 {
+	// Some legacy (version 6000) files store mesh nodes without any `sub_type`
+	// There seems to be no robust indicator, so detect it from `Vertices` and `PolygonVertexIndex`
+	if (sub_type == ufbxi_empty_char) {
+		ufbxi_node *node_vertices = ufbxi_find_child(node, ufbxi_Vertices);
+		ufbxi_node *node_indices = ufbxi_find_child(node, ufbxi_PolygonVertexIndex);
+		if (node_vertices && node_indices) {
+			sub_type = ufbxi_Mesh;
+		}
+	}
+
 	if ((sub_type == ufbxi_empty_char || sub_type == ufbxi_Model) && type_str.data == ufbxi_Model) {
 		// Plain model
 		return 1;
