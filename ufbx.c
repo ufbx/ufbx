@@ -5417,6 +5417,7 @@ static const char ufbxi_KeyAttrRefCount[] = "KeyAttrRefCount";
 static const char ufbxi_KeyCount[] = "KeyCount";
 static const char ufbxi_KeyTime[] = "KeyTime";
 static const char ufbxi_KeyValueFloat[] = "KeyValueFloat";
+static const char ufbxi_KeyVer[] = "KeyVer";
 static const char ufbxi_Key[] = "Key";
 static const char ufbxi_KnotVectorU[] = "KnotVectorU";
 static const char ufbxi_KnotVectorV[] = "KnotVectorV";
@@ -5721,6 +5722,7 @@ static const ufbx_string ufbxi_strings[] = {
 	{ ufbxi_KeyCount, 8 },
 	{ ufbxi_KeyTime, 7 },
 	{ ufbxi_KeyValueFloat, 13 },
+	{ ufbxi_KeyVer, 6 },
 	{ ufbxi_KnotVector, 10 },
 	{ ufbxi_KnotVectorU, 11 },
 	{ ufbxi_KnotVectorV, 11 },
@@ -15318,6 +15320,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 
 	if (uc->opts.ignore_animation) return 1;
 
+	int32_t key_ver = 4005;
+	ufbxi_find_val1(node, ufbxi_KeyVer, "I", &key_ver);
+
 	size_t num_keys = 0;
 	ufbxi_check(ufbxi_find_val1(node, ufbxi_KeyCount, "Z", &num_keys));
 	curve->keyframes.data = ufbxi_push(&uc->result, ufbx_keyframe, num_keys);
@@ -15388,7 +15393,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				// until we have read the next time/value.
 				// TODO: Solve what this is more thoroughly
 				auto_slope = true;
-				if (uc->version == 5000) {
+				if (key_ver <= 4004) {
 					num_weights = 0;
 				}
 			} else if (slope_mode == 'p') {
