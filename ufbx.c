@@ -11591,6 +11591,16 @@ static ufbxi_forceinline bool ufbxi_is_quat_identity(ufbx_quat v)
 	return (v.x == 0.0) & (v.y == 0.0) & (v.z == 0.0) & (v.w == 1.0);
 }
 
+static ufbxi_unused ufbxi_forceinline bool ufbxi_is_vec3_equal(ufbx_vec3 a, ufbx_vec3 b)
+{
+	return (a.x == b.x) & (a.y == b.y) & (a.z == b.z);
+}
+
+static ufbxi_unused ufbxi_forceinline bool ufbxi_is_quat_equal(ufbx_quat a, ufbx_quat b)
+{
+	return (a.x == b.x) & (a.y == b.y) & (a.z == b.z) & (a.w == b.w);
+}
+
 static ufbxi_noinline bool ufbxi_is_transform_identity(const ufbx_transform *t)
 {
 	return (bool)((int)ufbxi_is_vec3_zero(t->translation) & (int)ufbxi_is_quat_identity(t->rotation) & (int)ufbxi_is_vec3_one(t->scale));
@@ -22756,6 +22766,52 @@ ufbxi_noinline static ufbx_transform ufbxi_get_geometry_transform(const ufbx_pro
 	return t;
 }
 
+ufbxi_noinline static ufbx_quat ufbxi_get_rotation(const ufbx_props *props, ufbx_rotation_order order, const ufbx_node *node)
+{
+	ufbx_vec3 rotation = ufbxi_find_vec3(props, ufbxi_Lcl_Rotation, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 pre_rotation = ufbxi_find_vec3(props, ufbxi_PreRotation, 0.0f, 0.0f, 0.0f);
+	ufbx_vec3 post_rotation = ufbxi_find_vec3(props, ufbxi_PostRotation, 0.0f, 0.0f, 0.0f);
+
+	ufbx_transform t = { { 0,0,0 }, { 0,0,0,1 }, { 1,1,1 }};
+
+	if (node->has_adjust_transform) {
+		ufbxi_mul_rotate_quat(&t, node->adjust_post_rotation);
+	}
+
+	ufbxi_mul_inv_rotate(&t, post_rotation, UFBX_ROTATION_ORDER_XYZ);
+	ufbxi_mul_rotate(&t, rotation, order);
+	ufbxi_mul_rotate(&t, pre_rotation, UFBX_ROTATION_ORDER_XYZ);
+
+	if (node->has_adjust_transform) {
+		ufbxi_mul_rotate_quat(&t, node->adjust_pre_rotation);
+	}
+
+	if (node->adjust_mirror_axis) {
+		ufbxi_mirror_rotation(&t.rotation, node->adjust_mirror_axis);
+	}
+
+	return t.rotation;
+}
+
+ufbxi_noinline static ufbx_vec3 ufbxi_get_scale(const ufbx_props *props, const ufbx_node *node)
+{
+	ufbx_vec3 scaling = ufbxi_find_vec3(props, ufbxi_Lcl_Scaling, 1.0f, 1.0f, 1.0f);
+
+	ufbx_transform t = { { 0,0,0 }, { 0,0,0,1 }, { 1,1,1 }};
+
+	if (node->has_adjust_transform) {
+		ufbxi_mul_scale_real(&t, node->adjust_post_scale);
+	}
+
+	ufbxi_mul_scale(&t, scaling);
+
+	if (node->has_adjust_transform) {
+		ufbxi_mul_scale_real(&t, node->adjust_pre_scale);
+	}
+
+	return t.scale;
+}
+
 ufbxi_noinline static ufbx_transform ufbxi_get_transform(const ufbx_props *props, ufbx_rotation_order order, const ufbx_node *node, const ufbx_vec3 *translation_scale)
 {
 	ufbx_vec3 scale_pivot = ufbxi_find_vec3(props, ufbxi_ScalingPivot, 0.0f, 0.0f, 0.0f);
@@ -22820,53 +22876,11 @@ ufbxi_noinline static ufbx_transform ufbxi_get_transform(const ufbx_props *props
 		ufbxi_mirror_rotation(&t.rotation, node->adjust_mirror_axis);
 	}
 
+	// Make sure the fast paths are identical to this function.
+	ufbxi_regression_assert(ufbxi_is_quat_equal(t.rotation, ufbxi_get_rotation(props, order, node)));
+	ufbxi_regression_assert(ufbxi_is_vec3_equal(t.scale, ufbxi_get_scale(props, node)));
+
 	return t;
-}
-
-ufbxi_noinline static ufbx_quat ufbxi_get_rotation(const ufbx_props *props, ufbx_rotation_order order, const ufbx_node *node)
-{
-	ufbx_vec3 rotation = ufbxi_find_vec3(props, ufbxi_Lcl_Rotation, 0.0f, 0.0f, 0.0f);
-	ufbx_vec3 pre_rotation = ufbxi_find_vec3(props, ufbxi_PreRotation, 0.0f, 0.0f, 0.0f);
-	ufbx_vec3 post_rotation = ufbxi_find_vec3(props, ufbxi_PostRotation, 0.0f, 0.0f, 0.0f);
-
-	ufbx_transform t = { { 0,0,0 }, { 0,0,0,1 }, { 1,1,1 }};
-
-	if (node->has_adjust_transform) {
-		ufbxi_mul_rotate_quat(&t, node->adjust_post_rotation);
-	}
-
-	ufbxi_mul_inv_rotate(&t, post_rotation, UFBX_ROTATION_ORDER_XYZ);
-	ufbxi_mul_rotate(&t, rotation, order);
-	ufbxi_mul_rotate(&t, pre_rotation, UFBX_ROTATION_ORDER_XYZ);
-
-	if (node->has_adjust_transform) {
-		ufbxi_mul_rotate_quat(&t, node->adjust_pre_rotation);
-	}
-
-	if (node->adjust_mirror_axis) {
-		ufbxi_mirror_rotation(&t.rotation, node->adjust_mirror_axis);
-	}
-
-	return t.rotation;
-}
-
-ufbxi_noinline static ufbx_vec3 ufbxi_get_scale(const ufbx_props *props, const ufbx_node *node)
-{
-	ufbx_vec3 scaling = ufbxi_find_vec3(props, ufbxi_Lcl_Scaling, 1.0f, 1.0f, 1.0f);
-
-	ufbx_transform t = { { 0,0,0 }, { 0,0,0,1 }, { 1,1,1 }};
-
-	if (node->has_adjust_transform) {
-		ufbxi_mul_scale_real(&t, node->adjust_post_scale);
-	}
-
-	ufbxi_mul_scale(&t, scaling);
-
-	if (node->has_adjust_transform) {
-		ufbxi_mul_scale_real(&t, node->adjust_pre_scale);
-	}
-
-	return t.scale;
 }
 
 ufbxi_noinline static ufbx_transform ufbxi_get_texture_transform(const ufbx_props *props)
