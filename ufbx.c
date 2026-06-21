@@ -5514,9 +5514,11 @@ static const char ufbxi_RightCamera[] = "RightCamera";
 static const char ufbxi_RootNode[] = "RootNode";
 static const char ufbxi_Root[] = "Root";
 static const char ufbxi_RotationAccumulationMode[] = "RotationAccumulationMode";
+static const char ufbxi_RotationActive[] = "RotationActive";
 static const char ufbxi_RotationOffset[] = "RotationOffset";
 static const char ufbxi_RotationOrder[] = "RotationOrder";
 static const char ufbxi_RotationPivot[] = "RotationPivot";
+static const char ufbxi_RotationSpaceForLimitOnly[] = "RotationSpaceForLimitOnly";
 static const char ufbxi_Rotation[] = "Rotation";
 static const char ufbxi_S[] = "S\0\0";
 static const char ufbxi_ScaleAccumulationMode[] = "ScaleAccumulationMode";
@@ -5816,9 +5818,11 @@ static const ufbx_string ufbxi_strings[] = {
 	{ ufbxi_RootNode, 8 },
 	{ ufbxi_Rotation, 8 },
 	{ ufbxi_RotationAccumulationMode, 24 },
+	{ ufbxi_RotationActive, 14 },
 	{ ufbxi_RotationOffset, 14 },
 	{ ufbxi_RotationOrder, 13 },
 	{ ufbxi_RotationPivot, 13 },
+	{ ufbxi_RotationSpaceForLimitOnly, 25 },
 	{ ufbxi_S, 1 },
 	{ ufbxi_ScaleAccumulationMode, 21 },
 	{ ufbxi_Scaling, 7 },
@@ -22732,9 +22736,13 @@ ufbxi_noinline static ufbx_transform ufbxi_get_transform(const ufbx_props *props
 	ufbxi_add_translate(&t, scale_offset);
 
 	ufbxi_sub_translate(&t, rot_pivot);
-	ufbxi_mul_inv_rotate(&t, post_rotation, UFBX_ROTATION_ORDER_XYZ);
+	if (node->use_pre_post_rotation) {
+		ufbxi_mul_inv_rotate(&t, post_rotation, UFBX_ROTATION_ORDER_XYZ);
+	}
 	ufbxi_mul_rotate(&t, rotation, order);
-	ufbxi_mul_rotate(&t, pre_rotation, UFBX_ROTATION_ORDER_XYZ);
+	if (node->use_pre_post_rotation) {
+		ufbxi_mul_rotate(&t, pre_rotation, UFBX_ROTATION_ORDER_XYZ);
+	}
 	ufbxi_add_translate(&t, rot_pivot);
 
 	ufbxi_add_translate(&t, rot_offset);
@@ -22858,6 +22866,10 @@ ufbxi_noinline static void ufbxi_update_node(ufbx_node *node, const ufbx_transfo
 	node->euler_rotation = ufbxi_find_vec3(&node->props, ufbxi_Lcl_Rotation, 0.0f, 0.0f, 0.0f);
 
 	if (!node->is_root) {
+		const bool rotation_active = ufbxi_find_int(&node->props, ufbxi_RotationActive, 1) != 0;
+		const bool rotation_limit_only = ufbxi_find_int(&node->props, ufbxi_RotationSpaceForLimitOnly, 0) != 0;
+		node->use_pre_post_rotation = rotation_active && !rotation_limit_only;
+
 		const ufbx_vec3 *transform_scale = NULL;
 		if (node->parent && node->parent->scale_helper) {
 			transform_scale = &node->parent->scale_helper->local_transform.scale;
@@ -33098,4 +33110,3 @@ ufbx_abi ufbx_vec3 ufbx_get_weighted_face_normal(const ufbx_vertex_vec3 *positio
 #elif defined(__GNUC__)
 	#pragma GCC diagnostic pop
 #endif
-

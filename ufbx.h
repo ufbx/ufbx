@@ -967,7 +967,11 @@ struct ufbx_node {
 	// True if the node has a non-identity `geometry_transform`.
 	bool has_geometry_transform;
 
-	// If `true` the transform is adjusted by ufbx, not enabled by default.
+	// If `true`, you should apply `PreRotation` and `PostRotation` properties.
+	// See `UFBX_PreRotation`, `UFBX_PostRotation`.
+	bool use_pre_post_rotation;
+
+	// If `true`, the transform is adjusted by ufbx, not enabled by default.
 	// See `adjust_pre_rotation`, `adjust_pre_scale`, `adjust_post_rotation`,
 	// and `adjust_post_scale`.
 	bool has_adjust_transform;
