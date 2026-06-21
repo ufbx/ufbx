@@ -9876,7 +9876,16 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_next_token(ufbxi_context *
 			c = ufbxi_ascii_next(uc);
 		}
 		// Skip closing quote
-		ufbxi_ascii_next(uc);
+		char next = ufbxi_ascii_next(uc);
+
+		// Check if the next character is ':', in some legacy FBX files we have names with
+		// spaces, like `"Transport Tool Settings": { ... }`
+		if (next == ':') {
+			token->value.name_len = token->str_len;
+			token->type = UFBXI_ASCII_NAME;
+			ufbxi_ascii_next(uc);
+		}
+
 	} else {
 		// Single character token
 		token->type = c;
