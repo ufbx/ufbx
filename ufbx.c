@@ -15451,7 +15451,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				// TODO: This has only been observed with KeyVer=4003, it might have two weights in 4004
 				ufbxi_check(data_end - data >= 2);
 				data += 2;
-				num_weights = 1;
+				if (key_ver <= 4004) {
+					num_weights = 1;
+				} else {
+					num_weights = 2;
+				}
 			} else if (slope_mode == 't') {
 				// TODO: What is this mode? It seems that it does not have any weights and the
 				// third value seems _tiny_ (around 1e-30?)
