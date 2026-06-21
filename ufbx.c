@@ -15426,7 +15426,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				// automatic tangents for now as they're the least likely to break with
 				// objectionable artifacts. We need to defer the automatic tangent resolve
 				// until we have read the next time/value.
-				// TODO: Solve what this is more thoroughly
+				// TODO: Solve what this is more thoroughly, using auto slope for now to reduce artifacts
 				auto_slope = true;
 				if (key_ver <= 4004) {
 					num_weights = 0;
@@ -15436,6 +15436,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				// Also it seems to have _two_ trailing weights values, currently observed:
 				// `n,n` and `a,X,Y,n`...
 				// Ignore unknown values for now
+				// TODO: Solve what this is more thoroughly, using auto slope for now to reduce artifacts
+				auto_slope = true;
 				ufbxi_check(data_end - data >= 2);
 				data += 2;
 				if (key_ver <= 4004) {
@@ -15448,7 +15450,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				// Also it seems to have _two_ trailing weights values, currently observed:
 				// `d,d` and `n`...
 				// Ignore unknown values for now
-				// TODO: This has only been observed with KeyVer=4003, it might have two weights in 4004
+				// TODO: This has only been observed with KeyVer=4003/4005, it might have two weights in 4004
+				// TODO: Solve what this is more thoroughly, using auto slope for now to reduce artifacts
+				auto_slope = true;
 				ufbxi_check(data_end - data >= 2);
 				data += 2;
 				if (key_ver <= 4004) {
@@ -15459,12 +15463,16 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 			} else if (slope_mode == 't') {
 				// TODO: What is this mode? It seems that it does not have any weights and the
 				// third value seems _tiny_ (around 1e-30?)
+				// TODO: This looks like simple TCB parameters, currently falling back to auto.
+				auto_slope = true;
 				ufbxi_check(data_end - data >= 3);
 				data += 3;
 				num_weights = 0;
 			} else if (slope_mode == 'd') {
 				// TODO: What is this mode? It has a single parameter (currently observed `0`)
 				// and a single weight.
+				// TODO: Solve what this is more thoroughly, using auto slope for now to reduce artifacts
+				auto_slope = true;
 				ufbxi_check(data_end - data >= 1);
 				data += 1;
 			} else {
