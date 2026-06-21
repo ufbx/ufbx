@@ -73,10 +73,14 @@ void case_rotation_order(ufbxw_scene* scene)
 
 	typedef struct {
 		ufbxw_rotation_order order;
+		bool rotation_active;
 	} config_t;
 
 	params_t params[] = {
 		{ { 0.0, 0.0, 0.0 } },
+		{ { 45.0, 0.0, 0.0 } },
+		{ { 0.0, 45.0, 0.0 } },
+		{ { 0.0, 0.0, 45.0 } },
 		{ { 90.0, 45.0, 0.0 } },
 		{ { 90.0, 0.0, 45.0 } },
 		{ { 45.0, 90.0, 0.0 } },
@@ -89,12 +93,18 @@ void case_rotation_order(ufbxw_scene* scene)
 	};
 
 	config_t configs[] = {
-		{ { UFBXW_ROTATION_ORDER_XYZ } },
-		{ { UFBXW_ROTATION_ORDER_XZY } },
-		{ { UFBXW_ROTATION_ORDER_YZX } },
-		{ { UFBXW_ROTATION_ORDER_YXZ } },
-		{ { UFBXW_ROTATION_ORDER_ZXY } },
-		{ { UFBXW_ROTATION_ORDER_ZYX } },
+		{ UFBXW_ROTATION_ORDER_XYZ, true },
+		{ UFBXW_ROTATION_ORDER_XZY, true },
+		{ UFBXW_ROTATION_ORDER_YZX, true },
+		{ UFBXW_ROTATION_ORDER_YXZ, true },
+		{ UFBXW_ROTATION_ORDER_ZXY, true },
+		{ UFBXW_ROTATION_ORDER_ZYX, true },
+		{ UFBXW_ROTATION_ORDER_XYZ, false },
+		{ UFBXW_ROTATION_ORDER_XZY, false },
+		{ UFBXW_ROTATION_ORDER_YZX, false },
+		{ UFBXW_ROTATION_ORDER_YXZ, false },
+		{ UFBXW_ROTATION_ORDER_ZXY, false },
+		{ UFBXW_ROTATION_ORDER_ZYX, false },
 	};
 
 	for (uint32_t config_ix = 0; config_ix < arraycount(configs); config_ix++) {
@@ -114,6 +124,7 @@ void case_rotation_order(ufbxw_scene* scene)
 			position.z = (ufbxw_real)config_ix * 4.0f;
 			ufbxw_node_set_translation(scene, node, position);
 
+			ufbxw_set_bool(scene, node.id, "RotationActive", config.rotation_active);
 			ufbxw_node_set_rotation(scene, node, param.rotation);
 			ufbxw_node_set_rotation_order(scene, node, config.order);
 

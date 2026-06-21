@@ -9,9 +9,9 @@ FBXHeaderExtension:  {
 		Year: 2026
 		Month: 6
 		Day: 21
-		Hour: 3
-		Minute: 17
-		Second: 30
+		Hour: 15
+		Minute: 38
+		Second: 17
 		Millisecond: 0
 	}
 	Creator: "ufbx_write v0.2.0"
@@ -34,13 +34,13 @@ FBXHeaderExtension:  {
 			P: "Original|ApplicationVendor", "KString", "", "", "ufbx"
 			P: "Original|ApplicationName", "KString", "", "", "casegen"
 			P: "Original|ApplicationVersion", "KString", "", "", "0.1"
-			P: "Original|DateTime_GMT", "DateTime", "", "", "21/06/2026 00:17:30.000"
+			P: "Original|DateTime_GMT", "DateTime", "", "", "21/06/2026 12:38:17.000"
 			P: "Original|FileName", "KString", "", "", ""
 			P: "LastSaved", "Compound", "", ""
 			P: "LastSaved|ApplicationVendor", "KString", "", "", "ufbx"
 			P: "LastSaved|ApplicationName", "KString", "", "", "casegen"
 			P: "LastSaved|ApplicationVersion", "KString", "", "", "0.1"
-			P: "LastSaved|DateTime_GMT", "DateTime", "", "", "21/06/2026 00:17:30.000"
+			P: "LastSaved|DateTime_GMT", "DateTime", "", "", "21/06/2026 12:38:17.000"
 		}
 	}
 }
