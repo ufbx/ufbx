@@ -15395,17 +15395,11 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				slope_right = (float)data[0];
 				next_slope_left = (float)data[1];
 				data += 2;
-				if (key_ver <= 4003) {
-					num_weights = 0;
-				}
-			} else if (slope_mode == 'a') {
-				// Parameterless slope mode 'a' seems to appear in baked animations. Let's just assume
-				// automatic tangents for now as they're the least likely to break with
-				// objectionable artifacts. We need to defer the automatic tangent resolve
-				// until we have read the next time/value.
-				// TODO: Solve what this is more thoroughly
-				auto_slope = true;
-				if (key_ver <= 4004) {
+				// TODO: This looks very suspicious, but we have observed files with
+				// KeyVer=4002 -> followed by 'n', then next key
+				// KeyVer=4003 -> no weight mode, directly followed by key
+				// KeyVer=4004 -> followed by 'n', then next key
+				if (key_ver == 4003) {
 					num_weights = 0;
 				}
 			} else if (slope_mode == 'p') {
@@ -15435,6 +15429,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_take_anim_channel(ufbxi_con
 				ufbxi_check(data_end - data >= 3);
 				data += 3;
 				num_weights = 0;
+			} else if (slope_mode == 'a') {
+				// TODO: What is this mode? It does not seem to have any parameters.
+				// Assume automatic tangents for now.
+				if (key_ver <= 4004) {
+					num_weights = 0;
+				}
 			} else {
 				ufbxi_fail("Unknown slope mode");
 			}
