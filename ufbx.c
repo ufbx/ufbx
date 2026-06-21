@@ -22778,9 +22778,13 @@ ufbxi_noinline static ufbx_quat ufbxi_get_rotation(const ufbx_props *props, ufbx
 		ufbxi_mul_rotate_quat(&t, node->adjust_post_rotation);
 	}
 
-	ufbxi_mul_inv_rotate(&t, post_rotation, UFBX_ROTATION_ORDER_XYZ);
-	ufbxi_mul_rotate(&t, rotation, order);
-	ufbxi_mul_rotate(&t, pre_rotation, UFBX_ROTATION_ORDER_XYZ);
+	if (node->use_rotation_space) {
+		ufbxi_mul_inv_rotate(&t, post_rotation, UFBX_ROTATION_ORDER_XYZ);
+		ufbxi_mul_rotate(&t, rotation, order);
+		ufbxi_mul_rotate(&t, pre_rotation, UFBX_ROTATION_ORDER_XYZ);
+	} else {
+		ufbxi_mul_rotate(&t, rotation, UFBX_ROTATION_ORDER_XYZ);
+	}
 
 	if (node->has_adjust_transform) {
 		ufbxi_mul_rotate_quat(&t, node->adjust_pre_rotation);
