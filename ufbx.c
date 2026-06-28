@@ -14103,23 +14103,56 @@ typedef enum {
 	UFBXI_KEY_VELOCITY_NEXT_LEFT = 0x20000000,
 } ufbxi_key_flags;
 
-static ufbxi_noinline float ufbxi_solve_auto_tangent(ufbxi_context *uc, double prev_time, double time, double next_time, ufbx_real prev_value, ufbx_real value, ufbx_real next_value, float weight_left, float weight_right, float auto_bias, uint32_t flags)
+#define UFBXI_KEY_INFO_BATCH_SIZE 32
+
+typedef struct {
+	double time;
+	ufbx_real value;
+	uint32_t flags;
+
+	float weight_right;
+	float next_weight_left;
+
+	float bias_right;
+	float next_bias_left;
+
+	// We could use velocity, but FBX seems to have pre-baked the information to the keys
+	// This could be useful to tooling, but currently we do not expose it
+	float velocity_right;
+	float next_velocity_left;
+
+	float tcb_tension;
+	float tcb_continuity;
+	float tcb_bias;
+
+	// Solved result
+	ufbx_interpolation interpolation;
+	float slope_right;
+	float next_slope_left;
+
+} ufbxi_key_info;
+
+static ufbxi_noinline float ufbxi_solve_auto_tangent(ufbxi_context *uc, const ufbxi_key_info *keys, float auto_bias)
 {
+	const ufbxi_key_info *prev = &keys[-1];
+	const ufbxi_key_info *key = &keys[0];
+	const ufbxi_key_info *next = &keys[1];
+
 	// Clamp tangent to zero if near either left or right key
-	if (flags & UFBXI_KEY_CLAMP) {
-		if (ufbx_fmin(ufbx_fabs(prev_value - value), ufbx_fabs(next_value - value)) <= uc->opts.key_clamp_threshold) {
+	if (key->flags & UFBXI_KEY_CLAMP) {
+		if (ufbx_fmin(ufbx_fabs(prev->value - key->value), ufbx_fabs(next->value - key->value)) <= uc->opts.key_clamp_threshold) {
 			return 0.0f;
 		}
 	}
 
 	// Time-independent: Set the initial slope to be the difference between the two keyframes.
-	double slope = (next_value - prev_value) / (next_time - prev_time);
+	double slope = (next->value - prev->value) / (next->time - prev->time);
 
 	// Non-time-independent tangents seem to blend between left/right tangent and the total difference.
-	if ((flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
-		double slope_left = (value - prev_value) / (time - prev_time);
-		double slope_right = (next_value - value) / (next_time - time);
-		double delta = (time - prev_time) / (next_time - prev_time);
+	if ((key->flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
+		double slope_left = (key->value - prev->value) / (key->time - prev->time);
+		double slope_right = (next->value - key->value) / (next->time - key->time);
+		double delta = (key->time - prev->time) / (next->time - prev->time);
 		slope = slope * 0.5 + (slope_left * (1.0 - delta) + slope_right * delta) * 0.5;
 
 		double bias_weight = ufbx_fabs(auto_bias) / 100.0;
@@ -14141,16 +14174,16 @@ static ufbxi_noinline float ufbxi_solve_auto_tangent(ufbxi_context *uc, double p
 
 	// Prevent overshooting by clamping the slope in case either
 	// tangent goes above/below the endpoints.
-	if (flags & UFBXI_KEY_CLAMP_PROGRESSIVE) {
+	if (key->flags & UFBXI_KEY_CLAMP_PROGRESSIVE) {
 		// Split the slope to sign and a non-negative absolute value
 		double slope_sign = slope >= 0.0 ? 1.0 : -1.0;
 		double abs_slope = slope_sign * slope;
 
 		// Find limits for the absolute value of the slope
-		double range_left = weight_left * (time - prev_time);
-		double range_right = weight_right * (next_time - time);
-		double max_left = range_left > 0.0 ? slope_sign * (value - prev_value) / range_left : 0.0;
-		double max_right = range_right > 0.0 ? slope_sign * (next_value - value) / range_right : 0.0;
+		double range_left = prev->next_weight_left * (key->time - prev->time);
+		double range_right = key->weight_right * (next->time - key->time);
+		double max_left = range_left > 0.0 ? slope_sign * (key->value - prev->value) / range_left : 0.0;
+		double max_right = range_right > 0.0 ? slope_sign * (next->value - key->value) / range_right : 0.0;
 
 		// Clamp negative values and NaNs to zero
 		if (!(max_left > 0.0)) max_left = 0.0;
@@ -14166,19 +14199,21 @@ static ufbxi_noinline float ufbxi_solve_auto_tangent(ufbxi_context *uc, double p
 	return (float)slope;
 }
 
-static float ufbxi_solve_auto_tangent_left(ufbxi_context *uc, double prev_time, double time, ufbx_real prev_value, ufbx_real value, float weight_left, float auto_bias, uint32_t flags)
+static float ufbxi_solve_auto_tangent_left(ufbxi_context *uc, const ufbxi_key_info *keys, float auto_bias)
 {
-	(void)weight_left;
-	if (flags & UFBXI_KEY_CLAMP_PROGRESSIVE) return 0.0f;
-	if (flags & UFBXI_KEY_CLAMP) {
-		if (ufbx_fabs(prev_value - value) <= uc->opts.key_clamp_threshold) {
+	const ufbxi_key_info *prev = &keys[-1];
+	const ufbxi_key_info *key = &keys[0];
+
+	if (key->flags & UFBXI_KEY_CLAMP_PROGRESSIVE) return 0.0f;
+	if (key->flags & UFBXI_KEY_CLAMP) {
+		if (ufbx_fabs(prev->value - key->value) <= uc->opts.key_clamp_threshold) {
 			return 0.0f;
 		}
 	}
 
-	double slope = (value - prev_value) / (time - prev_time);
+	double slope = (key->value - prev->value) / (key->time - prev->time);
 
-	if ((flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
+	if ((key->flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
 		double abs_bias_weight = ufbx_fabs(auto_bias) / 100.0 - 5.0;
 		if (abs_bias_weight > 0.0) {
 			double bias_sign = auto_bias > 0.0 ? 1.0 : -1.0;
@@ -14189,19 +14224,21 @@ static float ufbxi_solve_auto_tangent_left(ufbxi_context *uc, double prev_time, 
 	return (float)slope;
 }
 
-static float ufbxi_solve_auto_tangent_right(ufbxi_context *uc, double time, double next_time, ufbx_real value, ufbx_real next_value, float weight_right, float auto_bias, uint32_t flags)
+static float ufbxi_solve_auto_tangent_right(ufbxi_context *uc, const ufbxi_key_info *keys, float auto_bias)
 {
-	(void)weight_right;
-	if (flags & UFBXI_KEY_CLAMP_PROGRESSIVE) return 0.0f;
-	if (flags & UFBXI_KEY_CLAMP) {
-		if (ufbx_fabs(next_value - value) <= uc->opts.key_clamp_threshold) {
+	const ufbxi_key_info *key = &keys[0];
+	const ufbxi_key_info *next = &keys[1];
+
+	if (key->flags & UFBXI_KEY_CLAMP_PROGRESSIVE) return 0.0f;
+	if (key->flags & UFBXI_KEY_CLAMP) {
+		if (ufbx_fabs(next->value - key->value) <= uc->opts.key_clamp_threshold) {
 			return 0.0f;
 		}
 	}
 
-	double slope = (next_value - value) / (next_time - time);
+	double slope = (next->value - key->value) / (next->time - key->time);
 
-	if ((flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
+	if ((key->flags & UFBXI_KEY_TIME_INDEPENDENT) == 0) {
 		double abs_bias_weight = ufbx_fabs(auto_bias) / 100.0 - 5.0;
 		if (abs_bias_weight > 0.0) {
 			double bias_sign = auto_bias > 0.0 ? 1.0 : -1.0;
@@ -14222,6 +14259,197 @@ static void ufbxi_solve_tcb(float *p_slope_left, float *p_slope_right, double te
 
 	*p_slope_left = (float)(d00 * slope_left + d01 * slope_right);
 	*p_slope_right = (float)(d10 * slope_left + d11 * slope_right);
+}
+
+static ufbxi_forceinline void ufbxi_reset_key(ufbxi_key_info *key, double time, ufbx_real value, uint32_t flags)
+{
+	key->time = time;
+	key->value = value;
+	key->flags = 0;
+	key->bias_right = 0.0f;
+	key->next_bias_left = 0.0f;
+	key->weight_right = 0.333333f;
+	key->next_weight_left = 0.333333f;
+	key->velocity_right = 0.0f;
+	key->next_velocity_left = 0.0f;
+	key->tcb_tension = 0.0f;
+	key->tcb_continuity = 0.0f;
+	key->tcb_bias = 0.0f;
+}
+
+static void ufbxi_output_keyframes(ufbxi_context *uc, ufbx_anim_curve *curve, ufbxi_key_info *keys, size_t count, size_t begin)
+{
+	// Create synthetic first/last keys if needed
+	if (begin == 0) {
+		ufbxi_reset_key(&keys[0], keys[1].time, keys[1].value, 0.0f);
+	}
+	if (begin + count - 1 == curve->keyframes.count) {
+		ufbxi_reset_key(&keys[count], keys[count - 1].time, keys[count - 1].value, 0.0f);
+	}
+
+	for (size_t i = 1; i < count; i++) {
+		size_t dst_ix = begin + i - 1;
+
+		ufbxi_key_info *key = &keys[i];
+		ufbxi_key_info *prev = &keys[i - 1];
+		ufbxi_key_info *next = &keys[i + 1];
+
+		double time = key->time;
+		ufbx_real value = key->value;
+		const uint32_t flags = key->flags;
+
+		if (dst_ix == 0) {
+			curve->min_value = value;
+			curve->max_value = value;
+		} else {
+			curve->min_value = ufbxi_min_real(curve->min_value, value);
+			curve->max_value = ufbxi_max_real(curve->max_value, value);
+		}
+
+		float weight_left = prev->next_weight_left;
+		float weight_right = key->weight_right;
+
+		if (flags & UFBXI_KEY_INTERPOLATION_CONSTANT) {
+			// Constant interpolation: Set cubic tangents to flat.
+
+			if (flags & UFBXI_KEY_CONSTANT_NEXT) {
+				// Take constant value from next key
+				key->interpolation = UFBX_INTERPOLATION_CONSTANT_NEXT;
+
+			} else {
+				// Take constant value from the previous key
+				key->interpolation = UFBX_INTERPOLATION_CONSTANT_PREV;
+			}
+
+			key->weight_right = key->next_weight_left = 0.333333f;
+			key->slope_right = key->next_slope_left = 0.0f;
+
+		} else if (flags & UFBXI_KEY_INTERPOLATION_CUBIC) {
+			// Cubic interpolation
+			key->interpolation = UFBX_INTERPOLATION_CUBIC;
+
+			if (flags & UFBXI_KEY_TANGENT_TCB) {
+				double tcb_slope_left = 0.0;
+				double tcb_slope_right = 0.0;
+				bool tcb_edge = false;
+				if (i > 0 && key->time > prev->time) {
+					tcb_slope_left = (key->value - prev->value) / (key->time - prev->time);
+				} else {
+					tcb_edge = true;
+				}
+				if (next->time > key->time) {
+					tcb_slope_right = (next->value - key->value) / (next->time - key->time);
+				} else {
+					tcb_edge = true;
+				}
+
+				ufbxi_solve_tcb(
+					&prev->next_slope_left, &key->slope_right,
+					key->tcb_tension, key->tcb_continuity, key->tcb_bias,
+					tcb_slope_left, tcb_slope_right, tcb_edge);
+
+				// TODO: How to handle these?
+				key->next_slope_left = 0.0f;
+				key->next_weight_left = 0.333333f;
+			} else if (flags & UFBXI_KEY_TANGENT_USER) {
+				// User tangents
+
+				if (flags & UFBXI_KEY_TANGENT_BROKEN) {
+					// Broken tangents: No need to modify slopes
+				} else {
+					// Unified tangents: Use right slope for both sides
+					// TODO: ??? slope_left = slope_right;
+				}
+
+			} else {
+				// TODO: Auto break (0x800)
+
+				if (i > 0 && i + 1 < num_keys && key->time > prev_time && next_time > key->time) {
+					if (ufbx_fabs(slope_left + slope_right) <= 0.0001f) {
+						slope_left = slope_right = ufbxi_solve_auto_tangent(uc,
+							prev_time, key->time, next_time,
+							p_value[-1], key->value, p_value[1],
+							weight_left, weight_right, slope_right, flags);
+					} else {
+						slope_left = ufbxi_solve_auto_tangent(uc,
+							prev_time, key->time, next_time,
+							p_value[-1], key->value, p_value[1],
+							weight_left, weight_right, -slope_left, flags);
+						slope_right = ufbxi_solve_auto_tangent(uc,
+							prev_time, key->time, next_time,
+							p_value[-1], key->value, p_value[1],
+							weight_left, weight_right, slope_right, flags);
+					}
+				} else if (i > 0 && key->time > prev_time) {
+					slope_left = slope_right = ufbxi_solve_auto_tangent_left(uc,
+						prev_time, key->time,
+						p_value[-1], key->value,
+						weight_left, -slope_left, flags);
+				} else if (i + 1 < num_keys && next_time > key->time) {
+					slope_left = slope_right = ufbxi_solve_auto_tangent_right(uc,
+						key->time, next_time,
+						key->value, p_value[1],
+						weight_right, slope_right, flags);
+				} else {
+					// Only / invalid keyframe: Set both slopes to zero
+					slope_left = slope_right = 0.0f;
+				}
+
+
+				// ??? Looks like at least MotionBuilder adjusts weight and auto bias to
+				// implement velocity and the velocity information in the file is purely
+				// for UI (?) If auto bias is not accounted for the velocity computation
+				// below results in the correct tangents, but with auto bias the velocity
+				// seems to be accounted for twice resulting in incorrect values...
+#if 0
+				if (weight_left >= UFBX_EPSILON) {
+					slope_left *= (float)(1.0 - ufbx_fmin(velocity_left / weight_left, 1.0));
+				}
+				if (weight_right >= UFBX_EPSILON) {
+					slope_right *= (float)(1.0 - ufbx_fmin(velocity_right / weight_right, 1.0));
+				}
+#endif
+			}
+
+		} else {
+			// Linear or unknown interpolation: Set cubic tangents to match
+			// the linear interpolation with weights of 1/3.
+			keyframe->interpolation = UFBX_INTERPOLATION_LINEAR;
+
+			if (next->time > key->time) {
+				double delta_time = next_time - key->time;
+				if (delta_time > 0.0) {
+					double slope = (p_value[1] - key->value) / delta_time;
+					slope_right = next_slope_left = (float)slope;
+				} else {
+					slope_right = next_slope_left = 0.0f;
+				}
+			} else {
+				slope_right = next_slope_left = 0.0f;
+			}
+		}
+
+		// Set the tangents based on weights (dx relative to the time difference
+		// between the previous/next key) and slope (simply d = slope * dx)
+		if (key->time > prev->time) {
+			double delta = key->time - prev->time;
+			keyframe->left.dx = (float)(weight_left * delta);
+			keyframe->left.dy = key->left.dx * slope_left;
+		} else {
+			keyframe->left.dx = 0.0f;
+			keyframe->left.dy = 0.0f;
+		}
+
+		if (next->time > key->time) {
+			double delta = next_time - key->time;
+			keyframe->right.dx = (float)(weight_right * delta);
+			keyframe->right.dy = key->right.dx * slope_right;
+		} else {
+			keyframe->right.dx = 0.0f;
+			keyframe->right.dy = 0.0f;
+		}
+		
+	}
 }
 
 ufbxi_noinline static void ufbxi_read_extrapolation(ufbx_extrapolation *p_extrapolation, ufbxi_node *node, const char *name)
@@ -14298,45 +14526,38 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 	float weight_left = 0.333333f;
 	// float velocity_left = 0.0f;
 
-	double prev_time = 0.0;
-	double next_time = 0.0;
-
 	int32_t refs_left = 0;
 	if (num_keys > 0) {
-		next_time = (double)p_time[0] / uc->ktime_sec_double;
 		if (p_ref < p_ref_end) refs_left = *p_ref;
 	}
 
+	ufbxi_key_info batch_keys[UFBXI_KEY_INFO_BATCH_SIZE];
+	size_t batch_size = 1;
+	size_t batch_start = 0;
+
 	for (size_t i = 0; i < num_keys; i++) {
-		ufbx_keyframe *key = &keys[i];
 		ufbxi_check(refs_left > 0);
 
+		if (batch_size == UFBXI_KEY_INFO_BATCH_SIZE - 1) {
+			ufbxi_output_keyframes(uc, curve, batch_keys, batch_size - 1, batch_start);
+			batch_keys[0] = batch_keys[UFBXI_KEY_INFO_BATCH_SIZE - 2];
+			batch_keys[1] = batch_keys[UFBXI_KEY_INFO_BATCH_SIZE - 1];
+
+			batch_start += batch_size - 2;
+			batch_size = 2;
+		}
+
+		ufbxi_key_info *key = &batch_keys[batch_size++];
+
+		double time = *p_time / uc->ktime_sec_double;
 		ufbx_real value = *p_value;
-		if (i == 0) {
-			curve->min_value = value;
-			curve->max_value = value;
-		} else {
-			curve->min_value = ufbxi_min_real(curve->min_value, value);
-			curve->max_value = ufbxi_max_real(curve->max_value, value);
-		}
+		const uint32_t flags = *p_flag;
 
-		key->time = next_time;
-		key->value = value;
+		ufbxi_reset_key(key, time, value, flags);
+		key->bias_right = p_attr[0]; 
+		key->next_bias_left = p_attr[1]; 
 
-		if (i + 1 < num_keys) {
-			next_time = (double)p_time[1] / uc->ktime_sec_double;
-		}
-
-		uint32_t flags = (uint32_t)*p_flag;
-
-		float slope_right = p_attr[0];
-		float weight_right = 0.333333f;
-		//float velocity_right = 0.0f;
-		float next_slope_left = p_attr[1];
-		float next_weight_left = 0.333333f;
-		// float next_velocity_left = 0.0f;
-
-		if ((flags & (UFBXI_KEY_WEIGHTED_RIGHT|UFBXI_KEY_WEIGHTED_NEXT_LEFT)) != 0) {
+		if (flags & (UFBXI_KEY_WEIGHTED_RIGHT|UFBXI_KEY_WEIGHTED_NEXT_LEFT)) {
 			// At least one of the tangents is weighted. The weights are encoded as
 			// two 0.4 _decimal_ fixed point values that are packed into 32 bits and
 			// interpreted as a 32-bit float.
@@ -14345,177 +14566,41 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 
 			if (flags & UFBXI_KEY_WEIGHTED_RIGHT) {
 				// Right tangent is weighted
-				weight_right = (float)(packed_weights & 0xffff) * 0.0001f;
+				key->weight_right = (float)(packed_weights & 0xffff) * 0.0001f;
 			}
 
 			if (flags & UFBXI_KEY_WEIGHTED_NEXT_LEFT) {
 				// Next left tangent is weighted
-				next_weight_left = (float)(packed_weights >> 16) * 0.0001f;
+				key->next_weight_left = (float)(packed_weights >> 16) * 0.0001f;
 			}
 		}
-#if 0
-		if ((flags & (UFBXI_KEY_VELOCITY_RIGHT|UFBXI_KEY_VELOCITY_NEXT_LEFT)) != 0) {
+
+		if (flags & (UFBXI_KEY_VELOCITY_RIGHT|UFBXI_KEY_VELOCITY_NEXT_LEFT)) {
 			// Velocities are encoded in the same way as weights, see above.
 			uint32_t packed_velocities;
 			memcpy(&packed_velocities, &p_attr[3], sizeof(uint32_t));
 
 			if (flags & UFBXI_KEY_VELOCITY_RIGHT) {
 				// Right tangent has velocity
-				velocity_right = (float)(int16_t)(packed_velocities & 0xffff) * 0.0001f;
+				key->velocity_right = (float)(int16_t)(packed_velocities & 0xffff) * 0.0001f;
 			}
 
 			if (flags & UFBXI_KEY_VELOCITY_NEXT_LEFT) {
 				// Next left tangent has velocity
-				next_velocity_left = (float)(int16_t)(packed_velocities >> 16) * 0.0001f;
-			}
-		}
-#endif
-
-		if (flags & UFBXI_KEY_INTERPOLATION_CONSTANT) {
-			// Constant interpolation: Set cubic tangents to flat.
-
-			if (flags & UFBXI_KEY_CONSTANT_NEXT) {
-				// Take constant value from next key
-				key->interpolation = UFBX_INTERPOLATION_CONSTANT_NEXT;
-
-			} else {
-				// Take constant value from the previous key
-				key->interpolation = UFBX_INTERPOLATION_CONSTANT_PREV;
-			}
-
-			weight_right = next_weight_left = 0.333333f;
-			slope_right = next_slope_left = 0.0f;
-
-		} else if (flags & UFBXI_KEY_INTERPOLATION_CUBIC) {
-			// Cubic interpolation
-			key->interpolation = UFBX_INTERPOLATION_CUBIC;
-
-			if (flags & UFBXI_KEY_TANGENT_TCB) {
-				double tcb_slope_left = 0.0;
-				double tcb_slope_right = 0.0;
-				bool tcb_edge = false;
-				if (i > 0 && key->time > prev_time) {
-					tcb_slope_left = (key->value - p_value[-1]) / (key->time - prev_time);
-				} else {
-					tcb_edge = true;
-				}
-				if (i + 1 < num_keys && next_time > key->time) {
-					tcb_slope_right = (p_value[1] - key->value) / (next_time - key->time);
-				} else {
-					tcb_edge = true;
-				}
-
-				ufbxi_solve_tcb(&slope_left, &slope_right, p_attr[0], p_attr[1], p_attr[2], tcb_slope_left, tcb_slope_right, tcb_edge);
-
-				// TODO: How to handle these?
-				next_slope_left = 0.0f;
-				next_weight_left = 0.333333f;
-				// next_velocity_left = 0.0f;
-			} else if (flags & UFBXI_KEY_TANGENT_USER) {
-				// User tangents
-
-				if (flags & UFBXI_KEY_TANGENT_BROKEN) {
-					// Broken tangents: No need to modify slopes
-				} else {
-					// Unified tangents: Use right slope for both sides
-					// TODO: ??? slope_left = slope_right;
-				}
-
-			} else {
-				// TODO: Auto break (0x800)
-
-				if (i > 0 && i + 1 < num_keys && key->time > prev_time && next_time > key->time) {
-					if (ufbx_fabs(slope_left + slope_right) <= 0.0001f) {
-						slope_left = slope_right = ufbxi_solve_auto_tangent(uc,
-							prev_time, key->time, next_time,
-							p_value[-1], key->value, p_value[1],
-							weight_left, weight_right, slope_right, flags);
-					} else {
-						slope_left = ufbxi_solve_auto_tangent(uc,
-							prev_time, key->time, next_time,
-							p_value[-1], key->value, p_value[1],
-							weight_left, weight_right, -slope_left, flags);
-						slope_right = ufbxi_solve_auto_tangent(uc,
-							prev_time, key->time, next_time,
-							p_value[-1], key->value, p_value[1],
-							weight_left, weight_right, slope_right, flags);
-					}
-				} else if (i > 0 && key->time > prev_time) {
-					slope_left = slope_right = ufbxi_solve_auto_tangent_left(uc,
-						prev_time, key->time,
-						p_value[-1], key->value,
-						weight_left, -slope_left, flags);
-				} else if (i + 1 < num_keys && next_time > key->time) {
-					slope_left = slope_right = ufbxi_solve_auto_tangent_right(uc,
-						key->time, next_time,
-						key->value, p_value[1],
-						weight_right, slope_right, flags);
-				} else {
-					// Only / invalid keyframe: Set both slopes to zero
-					slope_left = slope_right = 0.0f;
-				}
-
-
-				// ??? Looks like at least MotionBuilder adjusts weight and auto bias to
-				// implement velocity and the velocity information in the file is purely
-				// for UI (?) If auto bias is not accounted for the velocity computation
-				// below results in the correct tangents, but with auto bias the velocity
-				// seems to be accounted for twice resulting in incorrect values...
-#if 0
-				if (weight_left >= UFBX_EPSILON) {
-					slope_left *= (float)(1.0 - ufbx_fmin(velocity_left / weight_left, 1.0));
-				}
-				if (weight_right >= UFBX_EPSILON) {
-					slope_right *= (float)(1.0 - ufbx_fmin(velocity_right / weight_right, 1.0));
-				}
-#endif
-			}
-
-		} else {
-			// Linear or unknown interpolation: Set cubic tangents to match
-			// the linear interpolation with weights of 1/3.
-			key->interpolation = UFBX_INTERPOLATION_LINEAR;
-
-			weight_right = 0.333333f;
-			next_weight_left = 0.333333f;
-
-			if (next_time > key->time) {
-				double delta_time = next_time - key->time;
-				if (delta_time > 0.0) {
-					double slope = (p_value[1] - key->value) / delta_time;
-					slope_right = next_slope_left = (float)slope;
-				} else {
-					slope_right = next_slope_left = 0.0f;
-				}
-			} else {
-				slope_right = next_slope_left = 0.0f;
+				key->next_velocity_left = (float)(int16_t)(packed_velocities >> 16) * 0.0001f;
 			}
 		}
 
-		// Set the tangents based on weights (dx relative to the time difference
-		// between the previous/next key) and slope (simply d = slope * dx)
-		if (key->time > prev_time) {
-			double delta = key->time - prev_time;
-			key->left.dx = (float)(weight_left * delta);
-			key->left.dy = key->left.dx * slope_left;
-		} else {
-			key->left.dx = 0.0f;
-			key->left.dy = 0.0f;
-		}
+		if (flags & UFBXI_KEY_TANGENT_TCB) {
+			key->tcb_tension = p_attr[0];
+			key->tcb_continuity = p_attr[1];
+			key->tcb_bias = p_attr[2];
 
-		if (next_time > key->time) {
-			double delta = next_time - key->time;
-			key->right.dx = (float)(weight_right * delta);
-			key->right.dy = key->right.dx * slope_right;
-		} else {
-			key->right.dx = 0.0f;
-			key->right.dy = 0.0f;
+			// `p_attr` for TCB aliases with these properties, so reset them so we don't read dummy data
+			// TODO: How to handle these?
+			key->next_bias_left = 0.0f;
+			key->next_weight_left = 0.333333f;
 		}
-
-		slope_left = next_slope_left;
-		weight_left = next_weight_left;
-		// velocity_left = next_velocity_left;
-		prev_time = key->time;
 
 		// Decrement attribute refcount and potentially move to the next one.
 		if (--refs_left == 0) {
@@ -14527,6 +14612,8 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_animation_curve(ufbxi_conte
 		p_time++;
 		p_value++;
 	}
+
+	ufbxi_output_keyframes(uc, curve, batch_keys, batch_size, batch_start);
 
 	return 1;
 }
