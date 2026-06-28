@@ -61,6 +61,44 @@ void make_arrow(ufbxw_scene *scene, ufbxw_mesh mesh, ufbxw_real scale)
 	ufbxw_generate_flat_normals(scene, mesh);
 }
 
+void make_cube(ufbxw_scene *scene, ufbxw_mesh mesh, ufbxw_real scale)
+{
+	ufbxw_real w = 1.0f * scale;
+
+	ufbxw_vec3 positions[] = {
+		{ -w, -w, -w },
+		{  w, -w, -w },
+		{  w,  w, -w },
+		{ -w,  w, -w },
+		{ -w, -w,  w },
+		{  w, -w,  w },
+		{  w,  w,  w },
+		{ -w,  w,  w },
+	};
+
+	int32_t indices[] = {
+		0, 3, 2, 1,
+		4, 5, 6, 7,
+		0, 1, 5, 4,
+		1, 2, 6, 5,
+		2, 3, 7, 6,
+		3, 0, 4, 7,
+	};
+
+	int32_t face_offsets[] = {
+		0, 4, 8, 12, 16, 20, 24,
+	};
+
+	ufbxw_mesh_set_vertices(scene, mesh,
+		ufbxw_view_vec3_array(scene, positions, arraycount(positions)));
+
+	ufbxw_mesh_set_polygons(scene, mesh,
+		ufbxw_view_int_array(scene, indices, arraycount(indices)),
+		ufbxw_view_int_array(scene, face_offsets, arraycount(face_offsets)));
+
+	ufbxw_generate_flat_normals(scene, mesh);
+}
+
 void case_rotation_order(ufbxw_scene* scene)
 {
 	ufbxw_mesh arrow_mesh = ufbxw_create_mesh(scene);
@@ -209,6 +247,57 @@ void case_rotation_space(ufbxw_scene* scene)
 	}
 }
 
+void case_tangent_auto_linear_constant(ufbxw_scene* scene)
+{
+	ufbxw_mesh cube_mesh = ufbxw_create_mesh(scene);
+	ufbxw_set_name(scene, cube_mesh.id, "Cube");
+	make_cube(scene, cube_mesh, 1.0f);
+
+	ufbxw_node node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, node.id, "Cube");
+	ufbxw_mesh_add_instance(scene, cube_mesh, node);
+
+	ufbxw_anim_layer layer = ufbxw_get_default_anim_layer(scene);
+	ufbxw_anim_prop anim_prop = ufbxw_animate_prop(scene, node.id, "Lcl Translation", layer);
+
+	ufbxw_anim_curve curve_x = ufbxw_anim_get_curve(scene, anim_prop, 0);
+	ufbxw_anim_curve curve_z = ufbxw_anim_get_curve(scene, anim_prop, 2);
+
+	ufbxw_keyframe_real keys_x[] = {
+		{ 0 * UFBXW_KTIME_SECOND, 0.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+		{ 1 * UFBXW_KTIME_SECOND, 1.0f, UFBXW_KEYFRAME_INTERPOLATION_LINEAR },
+		{ 2 * UFBXW_KTIME_SECOND, 2.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+		{ 3 * UFBXW_KTIME_SECOND, 3.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+		{ 4 * UFBXW_KTIME_SECOND, 2.0f, UFBXW_KEYFRAME_INTERPOLATION_LINEAR },
+		{ 5 * UFBXW_KTIME_SECOND, 3.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+		{ 6 * UFBXW_KTIME_SECOND, 4.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+		{ 7 * UFBXW_KTIME_SECOND, 20.0f, UFBXW_KEYFRAME_INTERPOLATION_LINEAR },
+		{ 8 * UFBXW_KTIME_SECOND, 22.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+		{ 9 * UFBXW_KTIME_SECOND, 50.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+	};
+
+	ufbxw_keyframe_real keys_z[] = {
+		{ 0 * UFBXW_KTIME_SECOND, 0.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+		{ 1 * UFBXW_KTIME_SECOND, 1.0f, UFBXW_KEYFRAME_INTERPOLATION_CONSTANT },
+		{ 2 * UFBXW_KTIME_SECOND, 2.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+		{ 3 * UFBXW_KTIME_SECOND, 3.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+		{ 4 * UFBXW_KTIME_SECOND, 2.0f, UFBXW_KEYFRAME_INTERPOLATION_CONSTANT },
+		{ 5 * UFBXW_KTIME_SECOND, 3.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+		{ 6 * UFBXW_KTIME_SECOND, 4.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+		{ 7 * UFBXW_KTIME_SECOND, 20.0f, UFBXW_KEYFRAME_INTERPOLATION_CONSTANT },
+		{ 8 * UFBXW_KTIME_SECOND, 22.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+		{ 9 * UFBXW_KTIME_SECOND, 50.0f, UFBXW_KEYFRAME_INTERPOLATION_CUBIC | UFBXW_KEYFRAME_TANGENT_AUTO },
+	};
+	
+	for (size_t i = 0; i < arraycount(keys_x); i++) {
+		ufbxw_anim_curve_add_keyframe_key(scene, curve_x, keys_x[i]);
+	}
+	
+	for (size_t i = 0; i < arraycount(keys_z); i++) {
+		ufbxw_anim_curve_add_keyframe_key(scene, curve_z, keys_z[i]);
+	}
+}
+
 typedef void case_create_fn(ufbxw_scene *scene);
 
 typedef struct {
@@ -225,6 +314,7 @@ typedef struct {
 case_desc cases[] = {
 	{ "rotation_order", &case_rotation_order },
 	{ "rotation_space", &case_rotation_space },
+	{ "tangent_auto_linear_constant", &case_tangent_auto_linear_constant },
 };
 
 void generate_case(const case_desc *desc, const gen_settings *settings)
