@@ -3469,6 +3469,24 @@ int ufbxt_run_test(ufbxt_test *test)
 	}
 }
 
+static bool ufbxt_check_test_filter(const char *name, const char *filter)
+{
+	const char *nc = name;
+	for (const char *fc = filter; *fc; fc++, nc++) {
+		if (*fc == '*') {
+			++fc;
+			if (*fc == '\0') return true;
+			for (; *nc; nc++) {
+				if (ufbxt_check_test_filter(nc, fc)) return true;
+			}
+
+			return false;
+		}
+		if (*fc != *nc) return false;
+	}
+	return false;
+}
+
 #if defined(UFBXT_STACK_LIMIT)
 int ufbxt_thread_main(int argc, char **argv)
 #else
@@ -3643,7 +3661,7 @@ int main(int argc, char **argv)
 		ufbxt_test_stats *group_stats = ufbxt_get_test_group(test->group);
 		group_stats->num_total++;
 
-		if (test_filter && strcmp(test->name, test_filter)) {
+		if (test_filter && !ufbxt_check_test_filter(test->name, test_filter)) {
 			continue;
 		}
 		if (test_group && strcmp(test->group, test_group)) {
