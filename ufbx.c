@@ -14302,7 +14302,7 @@ static void ufbxi_output_keyframes(ufbxi_context *uc, ufbx_anim_curve *curve, uf
 		bool next_auto = (key->flags & (auto_flag_require|auto_flag_forbid)) == auto_flag_require;
 		if (!prev_auto && !next_auto) continue;
 
-		if (flags & UFBXI_KEY_TANGENT_TCB) {
+		if (key->flags & UFBXI_KEY_TANGENT_TCB) {
 			double tcb_slope_left = 0.0;
 			double tcb_slope_right = 0.0;
 			bool tcb_edge = false;
@@ -14325,7 +14325,26 @@ static void ufbxi_output_keyframes(ufbxi_context *uc, ufbx_anim_curve *curve, uf
 			continue;
 		}
 
+		float bias_left = prev->next_bias_left;
+		float bias_right = key->bias_right;
+		float slope_left, slope_right;
 
+		if (prev->time < key->time && key->time < next->time) {
+			bool bias_matters = (key->flags & UFBXI_KEY_TIME_INDEPENDENT) == 0;
+
+			// If we don't use bias, or if both sides have the same bias, solve the key in one pass.
+			// Otherwise, we need to solve left and right sides separately.
+			if (!bias_matters || ufbx_fabs(bias_left + bias_right) <= 0.0001f) {
+				slope_left = slope_right = ufbxi_solve_auto_tangent(uc, key, bias_right);
+			} else {
+				slope_left = ufbxi_solve_auto_tangent(uc, key, -bias_left);
+				slope_right = ufbxi_solve_auto_tangent(uc, key, bias_right);
+			}
+		} else if (prev->time < key->time) {
+			slope_left = slope_right = ufbxi_solve_auto_tangent(uc, key, -bias_left);
+		} else if (key->time < next->time) {
+			slope_left = slope_right = ufbxi_solve_auto_tangent(uc, key, bias_right);
+		}
 	}
 
 	for (size_t i = 1; i < count; i++) {
