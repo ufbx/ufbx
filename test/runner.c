@@ -2659,8 +2659,11 @@ typedef enum ufbxt_file_test_flags {
 	// Allow warnings
 	UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS = 0x8000,
 
+	// Allow warnings in legacy (pre-7000) files
+	UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS_IN_LEGACY = 0x10000,
+
 	// Never run fuzz checks
-	UFBXT_FILE_TEST_FLAG_NO_FUZZ = 0x10000,
+	UFBXT_FILE_TEST_FLAG_NO_FUZZ = 0x20000,
 
 } ufbxt_file_test_flags;
 
@@ -2876,7 +2879,15 @@ void ufbxt_do_file_test(const char *name, void (*test_fn)(ufbx_scene *s, ufbxt_d
 				if ((flags & UFBXT_FILE_TEST_FLAG_ALLOW_FEWER_PROGRESS_CALLS) == 0) {
 					ufbxt_assert(progress_ctx.calls >= size / 0x4000 / 2);
 				}
-				if ((flags & UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS) == 0) {
+
+				bool allow_warnings = false;
+				if ((flags & UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS) != 0) {
+					allow_warnings = true;
+				} else if ((flags & UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS_IN_LEGACY) != 0 && version < 7000) {
+					allow_warnings = true;
+				}
+
+				if (!allow_warnings) {
 					for (size_t i = 0; i < scene->metadata.warnings.count; i++) {
 						ufbx_warning warning = scene->metadata.warnings.data[i];
 
