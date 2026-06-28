@@ -14125,10 +14125,9 @@ typedef struct {
 	float tcb_continuity;
 	float tcb_bias;
 
-	// Solved result
-	ufbx_interpolation interpolation;
-	float slope_right;
-	float next_slope_left;
+	// Solved auto tangent
+	float auto_left;
+	float auto_right;
 
 } ufbxi_key_info;
 
@@ -14275,6 +14274,8 @@ static ufbxi_forceinline void ufbxi_reset_key(ufbxi_key_info *key, double time, 
 	key->tcb_tension = 0.0f;
 	key->tcb_continuity = 0.0f;
 	key->tcb_bias = 0.0f;
+	key->auto_left = 0.0f;
+	key->auto_right = 0.0f;
 }
 
 static void ufbxi_output_keyframes(ufbxi_context *uc, ufbx_anim_curve *curve, ufbxi_key_info *keys, size_t count, size_t begin)
@@ -14285,6 +14286,46 @@ static void ufbxi_output_keyframes(ufbxi_context *uc, ufbx_anim_curve *curve, uf
 	}
 	if (begin + count - 1 == curve->keyframes.count) {
 		ufbxi_reset_key(&keys[count], keys[count - 1].time, keys[count - 1].value, 0.0f);
+	}
+
+	// Solve auto tangents for keyframes that might need them
+	const uint32_t auto_flag_forbid = UFBXI_KEY_TANGENT_USER;
+	const uint32_t auto_flag_require = UFBXI_KEY_INTERPOLATION_CUBIC;
+	for (size_t i = 1; i < count; i++) {
+		ufbxi_key_info *key = &keys[i];
+		const ufbxi_key_info *prev = &keys[i - 1];
+		const ufbxi_key_info *next = &keys[i + 1];
+
+		// This is a bit awkward, as the previous key's attributes define the next key's left tangent.
+		// So if either the previous or current key use auto tangents, solve them fully for the given key.
+		bool prev_auto = (key->flags & (auto_flag_require|auto_flag_forbid)) == auto_flag_require;
+		bool next_auto = (key->flags & (auto_flag_require|auto_flag_forbid)) == auto_flag_require;
+		if (!prev_auto && !next_auto) continue;
+
+		if (flags & UFBXI_KEY_TANGENT_TCB) {
+			double tcb_slope_left = 0.0;
+			double tcb_slope_right = 0.0;
+			bool tcb_edge = false;
+			if (i > 0 && key->time > prev->time) {
+				tcb_slope_left = (key->value - prev->value) / (key->time - prev->time);
+			} else {
+				tcb_edge = true;
+			}
+			if (next->time > key->time) {
+				tcb_slope_right = (next->value - key->value) / (next->time - key->time);
+			} else {
+				tcb_edge = true;
+			}
+
+			ufbxi_solve_tcb(
+				&key->auto_left, &key->auto_right,
+				key->tcb_tension, key->tcb_continuity, key->tcb_bias,
+				tcb_slope_left, tcb_slope_right, tcb_edge);
+
+			continue;
+		}
+
+
 	}
 
 	for (size_t i = 1; i < count; i++) {
