@@ -1409,7 +1409,7 @@ static const ufbxt_fuzz_check g_fuzz_checks[] = {
 	{ "maya_cube_6100_binary", 25352, -1, 0, 3017, 0, 0, 0, "ufbxi_resolve_warning_elements(uc)" },
 	{ "maya_cube_6100_binary", 25352, -1, 0, 650, 0, 0, 0, "ufbxi_resolve_warning_elements(uc)" },
 	{ "maya_cube_6100_binary", 25365, -1, 0, 0, 164, 0, 0, "imp" },
-	{ "maya_cube_6100_binary", 25365, -1, 0, 0, 328, 0, 0, "imp" }
+	{ "maya_cube_6100_binary", 25365, -1, 0, 0, 328, 0, 0, "imp" },
 	{ "maya_cube_6100_binary", 3666, 6765, 255, 0, 0, 0, 0, "total <= ator->max_size - ator->current_size" },
 	{ "maya_cube_6100_binary", 3671, -1, 0, 1, 0, 0, 0, "ator->num_allocs < ator->max_allocs" },
 	{ "maya_cube_6100_binary", 3716, -1, 0, 1036, 0, 0, 0, "ator->num_allocs < ator->max_allocs" },
