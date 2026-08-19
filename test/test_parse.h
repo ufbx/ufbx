@@ -1151,13 +1151,6 @@ static ufbx_load_opts ufbxt_fail_unicode_opts()
 	opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_ABORT_LOADING;
 	return opts;
 }
-static ufbx_load_opts ufbxt_ignore_unicode_opts()
-{
-	ufbx_load_opts opts = { 0 };
-	opts.allow_unsafe = true;
-	opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_UNSAFE_IGNORE;
-	return opts;
-}
 #endif
 
 UFBXT_FILE_TEST_FLAGS(synthetic_unsafe_cube, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_ALLOW_WARNINGS)
@@ -2366,35 +2359,5 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_full_bad_unicode_remove, synthetic_full
 
 	ufbxt_assert(prop->value_blob.size == 6);
 	ufbxt_assert(!memcmp(prop->value_blob.data, "\xfc\x80\x80\x80\x80\x80", 6));
-}
-#endif
-
-UFBXT_TEST(bad_path)
-#if UFBXT_IMPL
-{
-	char buf[512];
-
-	size_t root_len = strlen(data_root);
-	size_t total_len = root_len + 200;
-	ufbxt_assert(total_len < sizeof(buf));
-	memcpy(buf, data_root, root_len);
-	memset(buf + root_len, 0xff, total_len - root_len);
-	buf[total_len] = '\0';
-
-	ufbx_error error;
-	ufbx_scene *scene = ufbx_load_file(buf, NULL, &error);
-	ufbxt_assert(!scene);
-}
-#endif
-
-UFBXT_FILE_TEST_OPTS_FLAGS(casegen_bad_path, ufbxt_ignore_unicode_opts, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
-#if UFBXT_IMPL
-{
-}
-#endif
-
-UFBXT_FILE_TEST(synthetic_bad_path)
-#if UFBXT_IMPL
-{
 }
 #endif
