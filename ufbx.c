@@ -7011,7 +7011,15 @@ static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path
 			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
 			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
 			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+		} else {
+			// Bad UTF-8 character, fail early.
+			if (wpath != wpath_buf) {
+				ufbxi_free(&fc->ator, wchar_t, wpath, path_len + 1);
+			}
+			ufbxi_report_err_msg(&fc->error, "file", "Invalid UTF-8");
+			return NULL;
 		}
+
 		if (code < 0x10000) {
 			wpath[wlen++] = (wchar_t)code;
 		} else {
