@@ -266,11 +266,46 @@ void case_animation(ufbxw_scene *scene)
 		1.0, UFBXW_KEYFRAME_CUBIC_AUTO);
 }
 
+void case_material(ufbxw_scene *scene)
+{
+	ufbxw_node node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, node.id, "Node");
+
+	ufbxw_material material = ufbxw_create_material(scene, UFBXW_MATERIAL_FBX_LAMBERT);
+	ufbxw_set_name(scene, material.id, "Material");
+	ufbxw_set_vec3(scene, material.id, "DiffuseColor", vec3(0.8, 0.4, 0.2));
+	ufbxw_set_real(scene, material.id, "DiffuseFactor", 1.0);
+	ufbxw_node_set_material(scene, node, 0, material);
+}
+
+void case_texture(ufbxw_scene *scene)
+{
+	ufbxw_texture texture = ufbxw_create_texture(scene, UFBXW_TEXTURE_FILE);
+	ufbxw_set_name(scene, texture.id, "Texture");
+	ufbxw_texture_set_filename(scene, texture, "/home/user/project/textures/diffuse.png");
+	ufbxw_texture_set_relative_filename(scene, texture, "textures/diffuse.png");
+}
+
+void case_texture_video(ufbxw_scene *scene)
+{
+	ufbxw_texture texture = ufbxw_create_texture(scene, UFBXW_TEXTURE_FILE);
+	ufbxw_set_name(scene, texture.id, "Texture");
+	ufbxw_texture_set_filename(scene, texture, "/home/user/project/textures/diffuse.png");
+	ufbxw_texture_set_relative_filename(scene, texture, "textures/diffuse.png");
+
+	ufbxw_video video = ufbxw_create_video(scene);
+	ufbxw_set_name(scene, video.id, "Video");
+	ufbxw_video_set_filename(scene, video, "/home/user/project/videos/diffuse.mp4");
+	ufbxw_video_set_relative_filename(scene, video, "videos/diffuse.mp4");
+	ufbxw_texture_set_video(scene, texture, video);
+}
+
 typedef void case_create_fn(ufbxw_scene *scene);
 
 typedef enum {
 	CASE_ANIMATION = 0x1,
 	CASE_GLOBAL_SETTINGS = 0x2,
+	CASE_NO_MISSING_VIDEOS = 0x4,
 } case_flags;
 
 typedef struct {
@@ -298,6 +333,9 @@ case_desc cases[] = {
 	{ "color_sets", &case_color_sets, 0 },
 	{ "deflate_array", &case_deflate_array, 0 },
 	{ "animation", &case_animation, CASE_ANIMATION },
+	{ "material", &case_material, 0 },
+	{ "texture", &case_texture, CASE_NO_MISSING_VIDEOS },
+	{ "texture_video", &case_texture_video, 0 },
 };
 
 void generate_case(const case_desc *desc, const gen_settings *settings)
@@ -315,8 +353,11 @@ void generate_case(const case_desc *desc, const gen_settings *settings)
 	ufbxw_scene *scene = ufbxw_create_scene(&scene_opts);
 
 	ufbxw_prepare_opts prepare = ufbxw_default_prepare_opts;
+	if ((desc->flags & CASE_NO_MISSING_VIDEOS) != 0) {
+		prepare.add_missing_videos = false;
+	}
 
-	desc->create_fn(scene, &prepare);
+	desc->create_fn(scene);
 
 	ufbxw_prepare_scene(scene, &prepare);
 
