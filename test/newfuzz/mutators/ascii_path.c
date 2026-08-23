@@ -131,7 +131,7 @@ size_t afl_custom_fuzz(ascii_path_mutator *mut, unsigned char *buf, size_t buf_s
     size_t insert_size = fragment_size * repeats;
     size_t out_size = buf_size + insert_size;
     if (out_size > mut->mutated_out_cap) {
-        mut->mutated_out = afl_realloc(mut->mutated_out, out_size);
+        afl_realloc((void**)&mut->mutated_out, out_size);
         mut->mutated_out_cap = out_size;
     }
 

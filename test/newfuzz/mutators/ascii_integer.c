@@ -50,7 +50,7 @@ static void find_integers(ascii_integer_mutator *mut, const unsigned char *buf, 
     mut->number_count = 0;
     size_t max_numbers = buf_size / 2 + 1;
     if (max_numbers > mut->numbers_cap) {
-        mut->numbers = afl_realloc(mut->numbers, max_numbers * sizeof(*mut->numbers));
+        mut->numbers = realloc(mut->numbers, max_numbers * sizeof(*mut->numbers));
         mut->numbers_cap = max_numbers;
     }
 
@@ -133,7 +133,7 @@ size_t afl_custom_fuzz(ascii_integer_mutator *mut, unsigned char *buf, size_t bu
         return 0;
     }
     if (out_size > mut->mutated_out_cap) {
-        mut->mutated_out = afl_realloc(mut->mutated_out, out_size);
+        afl_realloc((void**)&mut->mutated_out, out_size);
         mut->mutated_out_cap = out_size;
     }
 
