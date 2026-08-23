@@ -225,6 +225,31 @@ void case_color_sets(ufbxw_scene *scene)
 	ufbxw_node_set_attribute(scene, node, mesh.id);
 }
 
+void case_deflate_array(ufbxw_scene *scene)
+{
+	ufbxw_mesh mesh = ufbxw_create_mesh(scene);
+	ufbxw_set_name(scene, mesh.id, "Mesh");
+
+	ufbxw_vec3 vertices[32];
+	for (size_t i = 0; i < arraycount(vertices); i++) {
+		vertices[i] = vec3(
+			(ufbxw_real)(i * 3 + 1) * 0.001,
+			(ufbxw_real)(i * 3 + 2) * 0.001,
+			(ufbxw_real)(i * 3 + 3) * 0.001);
+	}
+	int32_t indices[32];
+	for (size_t i = 0; i < arraycount(indices); i++) {
+		indices[i] = (int32_t)i;
+	}
+	int32_t face_offsets[] = { 0, 32 };
+
+	ufbxw_mesh_set_vertices(scene, mesh,
+		ufbxw_view_vec3_array(scene, vertices, arraycount(vertices)));
+	ufbxw_mesh_set_polygons(scene, mesh,
+		ufbxw_view_int_array(scene, indices, arraycount(indices)),
+		ufbxw_view_int_array(scene, face_offsets, arraycount(face_offsets)));
+}
+
 typedef void case_create_fn(ufbxw_scene *scene);
 
 typedef enum {
@@ -255,6 +280,7 @@ case_desc cases[] = {
 	{ "mesh", &case_mesh, 0 },
 	{ "uv_sets", &case_uv_sets, 0 },
 	{ "color_sets", &case_color_sets, 0 },
+	{ "deflate_array", &case_deflate_array, 0 },
 };
 
 void generate_case(const case_desc *desc, const gen_settings *settings)
