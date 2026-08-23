@@ -1,5 +1,3 @@
-#include "ufbx.h"
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -23,6 +21,8 @@ __AFL_COVERAGE();
 
 #define ufbxt_assert_fail(file, line, msg) ufbx_assert(false)
 #define ufbxt_assert(m_cond) ufbx_assert(m_cond)
+
+#include "ufbx.h"
 
 #include "../check_scene.h"
 
