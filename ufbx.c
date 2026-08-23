@@ -24033,6 +24033,7 @@ typedef struct {
 
 	bool mc_for8;
 
+	bool xml_loaded;
 	ufbx_string xml_filename;
 	uint32_t xml_ticks_per_frame;
 	ufbxi_cache_xml_type xml_type;
@@ -24326,6 +24327,9 @@ static ufbxi_noinline int ufbxi_cache_sort_tmp_channels(ufbxi_cache_context *cc,
 
 ufbxi_nodiscard static ufbxi_noinline int ufbxi_cache_load_xml_imp(ufbxi_cache_context *cc, ufbxi_xml_document *doc)
 {
+	ufbxi_check_err(&cc->error, !cc->xml_loaded);
+
+	cc->xml_loaded = true;
 	cc->xml_ticks_per_frame = 250;
 	cc->xml_filename = cc->stream_filename;
 
@@ -24727,6 +24731,7 @@ ufbxi_noinline static ufbx_geometry_cache *ufbxi_cache_load(ufbxi_cache_context 
 	} else {
 		ufbxi_fix_error_type(&cc->error, "Failed to load geometry cache", NULL);
 		if (!cc->owned_by_scene) {
+			ufbxi_buf_free(&cc->result);
 			ufbxi_buf_free(&cc->string_pool.buf);
 			ufbxi_free_ator(&cc->ator_result);
 		}

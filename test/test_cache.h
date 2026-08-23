@@ -233,3 +233,14 @@ UFBXT_TEST(cache_skip_read)
 }
 #endif
 
+UFBXT_TEST(cache_indirect_xml)
+#if UFBXT_IMPL
+{
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%s%s", data_root, "caches/indirect_xml_fail/cache.xml");
+
+	ufbx_geometry_cache *cache = ufbx_load_geometry_cache(buf, NULL, NULL);
+	ufbxt_assert(!cache);
+}
+#endif
+
