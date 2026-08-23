@@ -456,6 +456,22 @@ void case_animation_stacks(ufbxw_scene *scene)
 		0.0, UFBXW_KEYFRAME_CUBIC_AUTO);
 }
 
+void case_material_texture(ufbxw_scene *scene)
+{
+	ufbxw_node node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, node.id, "Node");
+
+	ufbxw_material material = ufbxw_create_material(scene, UFBXW_MATERIAL_FBX_LAMBERT);
+	ufbxw_set_name(scene, material.id, "Material");
+
+	ufbxw_texture texture = ufbxw_create_texture(scene, UFBXW_TEXTURE_FILE);
+	ufbxw_set_name(scene, texture.id, "Texture");
+	ufbxw_texture_set_filename(scene, texture, "/home/user/project/textures/diffuse.png");
+	ufbxw_texture_set_relative_filename(scene, texture, "textures/diffuse.png");
+	ufbxw_material_set_texture(scene, material, "DiffuseColor", texture);
+	ufbxw_node_set_material(scene, node, 0, material);
+}
+
 typedef void case_create_fn(ufbxw_scene *scene);
 
 typedef enum {
@@ -496,6 +512,7 @@ case_desc cases[] = {
 	{ "blend_shape", &case_blend_shape, 0 },
 	{ "animation_layers", &case_animation_layers, 0 },
 	{ "animation_stacks", &case_animation_stacks, 0 },
+	{ "material_texture", &case_material_texture, CASE_NO_MISSING_VIDEOS },
 };
 
 void generate_case(const case_desc *desc, const gen_settings *settings)
