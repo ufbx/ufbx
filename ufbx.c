@@ -7742,7 +7742,9 @@ ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, 
 	case 'B': if (type == UFBXI_VALUE_NUMBER) { *(bool*)v = node->vals[ix].i != 0; return 1; } else return 0;
 	case 'Z': if (type == UFBXI_VALUE_NUMBER) {
 		if (node->vals[ix].i < 0) return 0;
-		if (node->vals[ix].i > SIZE_MAX) return 0;
+		#if SIZE_MAX < INT64_MAX
+			if (node->vals[ix].i > SIZE_MAX) return 0;
+		#endif
 		*(size_t*)v = (size_t)node->vals[ix].i;
 		return 1;
 	} else return 0;
