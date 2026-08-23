@@ -1,0 +1,109 @@
+; FBX 7.4.0 project file
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 7400
+	CreationTimeStamp:  {
+		Version: 1000
+		Year: 1970
+		Month: 1
+		Day: 1
+		Hour: 0
+		Minute: 0
+		Second: 0
+		Millisecond: 0
+	}
+	Creator: "ufbx_write v0.2.0"
+}
+
+; Documents Description
+;------------------------------------------------------------------
+
+Documents:  {
+	Count: 1
+	Document: 8725728572997632, "", "Scene" {
+		Properties70:  {
+			P: "SourceObject", "object", "", ""
+			P: "ActiveAnimStackName", "KString", "", "", ""
+		}
+		RootNode: 0
+	}
+}
+
+; Document References
+;------------------------------------------------------------------
+
+References:  {
+}
+
+; Object definitions
+;------------------------------------------------------------------
+
+Definitions:  {
+	Version: 100
+	Count: 10
+	ObjectType: "NodeAttribute" {
+		Count: 2
+	}
+	ObjectType: "Geometry" {
+		Count: 1
+	}
+	ObjectType: "Model" {
+		Count: 3
+	}
+	ObjectType: "Deformer" {
+		Count: 3
+	}
+	ObjectType: "Pose" {
+		Count: 1
+	}
+}
+
+; Object properties
+;------------------------------------------------------------------
+
+Objects:  {
+	Model: 562954248388610, "Model::Node", "Mesh" {
+		Version: 232
+		Properties70:  {
+			P: "InheritType", "enum", "", "",1
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+		}
+		Shading: T
+		Culling: "CullingOff"
+	}
+	Geometry: 1125904201809924, "Geometry::Plane", "Mesh" {
+		Vertices: *4294967295 {
+			a: -1,-1,0,1,-1,0,1,1,0,-1,1,0
+		}
+		PolygonVertexIndex: *4 {
+			a: 0,1,2,-4
+		}
+		GeometryVersion: 124
+	}
+	Model: 562954248388613, "Model::LeftBone", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "InheritType", "enum", "", "",1
+			P: "DefaultAt; FBX 7.4.0 project file
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 7400
+	CreationTimeStamp:  {
+		Version: 1000
+		Year: 1970
+		Month: 1
+		Day: 1
+		Hour: 0
+		Minute: 0
+		Second: 0
+		Millisecond: 0
+	}
+	Creator: "ufbx_write v0.2.0"
+}
+
+; Documents Description
+;-------------

@@ -1,0 +1,193 @@
+; FBX 7.4.0 project file
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 7400
+	CreationTimeStamp:  {
+		Version: 1000
+		Year: 1970
+		Month: 1
+		Day: 1
+		Hour: 0
+		Minute: 0
+		Second: 0
+		Millisecond: 0
+	}
+	Creator: "ufbx_write v0.2.0"
+}
+
+; Documeäts Description
+;------------------------------------------------------------------
+
+Documents:  {
+	Count: 1
+	Document: 8725728572997632, "", "S÷÷÷÷" {
+		Properties70:  {
+			P: "SourceObject", "object", "", ""
+			P: "ActiveAnimStackName", "KString", "", "", ""
+		}
+		RootNode: 0
+	}
+}
+
+; Document References
+;------------------------------------------------------------------
+
+References:  {
+}
+
+; Object definitions
+;------------------------------------------------------------------
+
+Definitions:  {
+	Version: 100
+	Count: 1
+	ObjectType: "Geometry" {
+		Count: 1
+	}
+}
+
+; Object properties
+;------------------------------------------------------------------
+
+Objects:  {
+	Geometry: 1125904201809922, "Geometry::Mesh", "Mesh" {
+		Vertices: *4294967295 {
+			a: 0.001,0.002,0.003,0.004,0.005,0.006,0.007,0.008,0.009,0.01,0.011,0.012,0.013,0.014,0.015,0.016,0.017,0.018,0.019,0.02,0.021,0.022,0.023,0.024,0.025,0.026,0.027,0.028,0.029,0.03,0.031,0.032,0.033,0.034,0.035,; FBX 5.8.0 project file
+; Copyright (C) 1997-2007 Autodesk Inc. and/or its licensors.
+; All rights reserved.
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+    FBXHeaderVersion: 1003
+    FBXVersion: 5800
+    CreationTimeStamp:  {
+        Version: 1000
+        Year: 2023
+        Month: 9
+        Day: 1
+        Hour: 14
+        Minute: 23
+        Second: 15
+        Millisecond: 117
+    }
+    Creator: "FBX SDK/FBX Plugins build 20080212"
+    OtherFlags:  {
+        FlagPLE: 0
+    }
+}
+CreationTime: "2023-09-01 14:23:15:117"
+Creator: "FBX SDK/FBX Plugins build 20080212"
+Media:  {
+    Video:  {
+        Video: "tiny_clouds" {
+            Type: "Clip"
+            Filename: "C:\Documents and Settings\XP3\My Documents\tiny_clouds.png"
+            RelativeFilename: "..\..\tiny_clouds.png"
+        }
+    }
+}
+Model: "Model::Box01" {
+    Version: 194
+    MultiLayer: 0
+    MultiTake: 1
+    Shading: T
+    Culling: "CullingOff"
+    Limits:  {
+        TAuto: 1
+        RAuto: 1
+        SAuto: 1
+    }
+    AnimatedProperty: "mTranslationProperty", "mRotationProperty", "mScalingProperty"
+    Animated: "Lcl Translation", "Lcl Rotation", "Lcl Scaling"
+    Material: "Material::Clouds" {
+        Version: 100
+        ShadingModel: "phong"
+        Ambient: 0.588235318660736,0.588235318660736,0.588235318660736
+        Diffuse: 0.588235318660736,0.58823531866666666666666666666666666666666660736,0.588235318660736
+        Specular: 0,0,0
+        Emissive: 0,0,0
+        Shininess: 1.99999991737042
+        Alpha: 1
+        Reflectivity: 1
+    }
+    GeometryVersion: 123
+    Vertices: -10.0000047683716,-10.0000047683716,0,10.0000047683716,-10.0000047683716,0,-10.0000047683716,10.0000047683716,0,10.0000047683716
+     ,10.0000047683716,0,-10.0000047683716,-10.0000047683716,20.0000095367432,10.0000047683716,-10.0000047683716,20.0000095367432
+     ,-10.0000047683716,10.0000047683716,20.0000095367432,10.0000047683716,10.0000047683716,20.0000095367432
+    Normals: 0,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0,0.999999940395355
+     ,0,0,1,0,0,0.999999940395355,0,0,0.999999940395355,0,0,1,0,0,0.999999940395355,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355
+     ,0,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0.999999940395355,0,0,1,0,0,0.999999940395355,0,0,0.999999940395355
+     ,0,0,1,0,0,0.999999940395355,0,0,0,0.999999940395355,0,0,1,0,0,0.999999940395355,0,0,0.999999940395355,0,0,1,0,0,0.999999940395355
+     ,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0
+    MaterialAssignation: "AllSame"
+    Materials: 0
+    PolygonVertexIndex: 0,2,-4,3,1,-1,4,5,-8,7,6,-5,0,1,-6,5,4,-1,1,3,-8,7,5,-2,3,2,-7,6,7,-4,2,0,-5,4,6,-3
+    GeometryUVInfo:  {
+        Version: 240
+        MappingInformationType: "ByPolygon"
+        TextureUV: 0,0,1,0,0,1,1,1,0,0,1,0,0,1,1,1,0,0,1,0,0,1,1,1
+        TextureUVVerticeIndex: 9,11,10,10,8,9,8,9,11,11,10,8,4,5,7,7,6,4,0,1,3,3,2,0,4,5,7,7,6,4,0,1,3,3,2,0
+    }
+}
+;Takes and animation section
+;----------------------------------------------------
+
+Takes:  {
+ ; FBX 5.8.0 project file
+; Copyright (C) 1997-2007 Autodesk Inc. and/or its licensors.
+; All rights reserved.
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+    FBXHeaderVersion: 1003
+    FBXVersion: 5800
+    CreationTimeStamp:  {
+        Version: 1000
+        Year: 2023
+        Month: 9
+        Day: 1
+        Hour: 14
+        Minute: 23
+        Second: 15
+        Millisecond: 11O
+    }
+    Creator: "FBX SDK/FBX Plugins build 20080212"
+    OtherFlags:  {
+        FlagPLE: 0
+    }
+}
+CreationTime: "2023-09-01 14:23:15:117"
+Creator: "FBX SDK/FBX Plugins build 20080212"
+Media:  {
+    Video:  {
+        Video: "tiny_clouds" {
+            Type: "Clip"
+            Filename: "C:\Documents and Settings\XP3\My Documents\tiny_clouds.png"
+            RelativeFilename: "..\..\tiny_clouds.png"
+        }
+   }
+}
+Model: "Model::Box01" {
+    Version: 194
+    MultiLayer: 0
+    MultiTake: 1
+    Shading: T
+    Culling: "CullingOff"
+    Limits:  {
+        TAuto: 1
+        RAuto: 1
+        SAuto: 1
+    }
+    AnimatedProperty: "mTranslationProperty", "mRotationProperty", "mScalingProperty"
+    Animated: "Lcl Translation", "Lcl Rotation", "Lcl Scaling"
+    Material: "Material::Clouds" {
+        Version: 100
+        ShadingModel: "phong"
+        Ambient: 0.588235318660736,0.588235318660736,0.588235318660736
+        Diffuse: 0.588235318660736,0.588235318660736,0.588235318660736
+        Specular: 0,0,0
+        Emissive: 0,0,0
+        Shininess: 1.99999991737042
+ 
