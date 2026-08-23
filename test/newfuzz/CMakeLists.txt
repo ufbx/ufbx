@@ -30,10 +30,23 @@ if(NOT AFL_INCLUDE_DIR)
         "containing alloc-inl.h")
 endif()
 
+find_program(MUTATOR_C_COMPILER NAMES clang)
+if(NOT MUTATOR_C_COMPILER)
+    message(FATAL_ERROR
+        "Could not find Clang for the AFL mutators. Set MUTATOR_C_COMPILER "
+        "to the Clang executable")
+endif()
+
 function(add_afl_mutator name)
-    add_library(${name} MODULE "mutators/${name}.c")
-    target_include_directories(${name} PRIVATE "${AFL_INCLUDE_DIR}")
-    set_target_properties(${name} PROPERTIES PREFIX "")
+    set(source "${CMAKE_CURRENT_SOURCE_DIR}/mutators/${name}.c")
+    set(output "${CMAKE_CURRENT_BINARY_DIR}/${name}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    add_custom_command(
+        OUTPUT "${output}"
+        COMMAND "${MUTATOR_C_COMPILER}" -shared -fPIC -Wall -O3
+            -I "${AFL_INCLUDE_DIR}" "${source}" -o "${output}"
+        DEPENDS "${source}"
+        VERBATIM)
+    add_custom_target(${name} ALL DEPENDS "${output}")
 endfunction()
 
 add_afl_mutator(ascii_integer)
