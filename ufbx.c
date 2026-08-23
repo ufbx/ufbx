@@ -9114,6 +9114,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 					if (!uc->read_fn) {
 						// From memory, no need to copy
 						t->encoded_data = uc->data;
+						ufbxi_check(ufbxi_skip_bytes(uc, encoded_size));
 					} else {
 						void *encoded_data = ufbxi_push(tmp_buf, char, encoded_size);
 						ufbxi_check(encoded_data);
