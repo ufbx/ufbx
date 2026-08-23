@@ -13867,18 +13867,19 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_nurbs_surface(ufbxi_context
 	ufbxi_check(ufbxi_find_val2(node, ufbxi_Step, "II", &step_u, &step_v));
 	ufbxi_check(ufbxi_find_val2(node, ufbxi_Form, "CC", (char**)&form_u, (char**)&form_v));
 	ufbxi_ignore(ufbxi_find_val1(node, ufbxi_FlipNormals, "B", &nurbs->flip_normals));
+
+	// Support control point area up to 2^32, as a larger control point array cannot be represented in binary FBX.
+	// This guards against users doing `dimension_u * dimension_v`, causing a 32-bit overflow.
+	if (dimension_u > 0) {
+		ufbxi_check(dimension_v <= UINT32_MAX / dimension_u);
+	}
+
 	nurbs->basis_u.topology = ufbxi_read_nurbs_topology(form_u);
 	nurbs->basis_v.topology = ufbxi_read_nurbs_topology(form_v);
 	nurbs->num_control_points_u = dimension_u;
 	nurbs->num_control_points_v = dimension_v;
 	nurbs->span_subdivision_u = step_u > 0 ? (uint32_t)step_u : 4u;
 	nurbs->span_subdivision_v = step_v > 0 ? (uint32_t)step_v : 4u;
-
-	// Only support control point area of 2^32 as a valid control point array cannot be represented in binary FBX.
-	// This guards against users doing `dimension_u * dimension_v`, causing a 32-bit overflow.
-	if (dimension_u > 0) {
-		ufbxi_check(nurbs->num_control_points_u <= UINT32_MAX / nurbs->num_control_points_v);
-	}
 
 	if (!uc->opts.ignore_geometry) {
 		ufbxi_value_array *points = ufbxi_find_array(node, ufbxi_Points, 'r');
@@ -20275,6 +20276,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_add_constraint_prop(ufbxi_contex
 
 ufbxi_nodiscard ufbxi_noinline static int ufbxi_finalize_nurbs_basis(ufbxi_context *uc, ufbx_nurbs_basis *basis)
 {
+	// Check that the basis is reasonable, and so we don't overflow in later code.
+	ufbxi_check(basis->order < UINT32_MAX / 4);
+
 	if (basis->topology == UFBX_NURBS_TOPOLOGY_CLOSED) {
 		basis->num_wrap_control_points = 1;
 	} else if (basis->topology == UFBX_NURBS_TOPOLOGY_PERIODIC) {
