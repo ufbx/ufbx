@@ -13874,6 +13874,12 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_nurbs_surface(ufbxi_context
 	nurbs->span_subdivision_u = step_u > 0 ? (uint32_t)step_u : 4u;
 	nurbs->span_subdivision_v = step_v > 0 ? (uint32_t)step_v : 4u;
 
+	// Only support control point area of 2^32 as a valid control point array cannot be represented in binary FBX.
+	// This guards against users doing `dimension_u * dimension_v`, causing a 32-bit overflow.
+	if (dimension_u > 0) {
+		ufbxi_check(nurbs->num_control_points_u <= UINT32_MAX / nurbs->num_control_points_v);
+	}
+
 	if (!uc->opts.ignore_geometry) {
 		ufbxi_value_array *points = ufbxi_find_array(node, ufbxi_Points, 'r');
 		ufbxi_value_array *knot_u = ufbxi_find_array(node, ufbxi_KnotVectorU, 'r');
