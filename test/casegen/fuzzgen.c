@@ -391,6 +391,71 @@ void case_blend_shape(ufbxw_scene *scene)
 	ufbxw_blend_channel_set_weight(scene, channel, 100.0);
 }
 
+void case_animation_layers(ufbxw_scene *scene)
+{
+	ufbxw_node node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, node.id, "Node");
+
+	ufbxw_anim_stack stack = ufbxw_create_anim_stack(scene);
+	ufbxw_set_name(scene, stack.id, "Stack");
+	ufbxw_anim_layer layer_a = ufbxw_create_anim_layer(scene, stack);
+	ufbxw_anim_layer layer_b = ufbxw_create_anim_layer(scene, stack);
+	ufbxw_set_name(scene, layer_a.id, "LayerA");
+	ufbxw_set_name(scene, layer_b.id, "LayerB");
+
+	ufbxw_anim_prop visibility_a = ufbxw_animate_prop(scene, node.id, "Visibility", layer_a);
+	ufbxw_anim_set_default_value(scene, visibility_a, 0, 1.0);
+	ufbxw_anim_add_keyframe_real(scene, visibility_a, 0 * UFBXW_KTIME_SECOND,
+		1.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+	ufbxw_anim_add_keyframe_real(scene, visibility_a, 1 * UFBXW_KTIME_SECOND,
+		0.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+	ufbxw_anim_add_keyframe_real(scene, visibility_a, 2 * UFBXW_KTIME_SECOND,
+		1.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+
+	ufbxw_anim_prop visibility_b = ufbxw_animate_prop(scene, node.id, "Visibility", layer_b);
+	ufbxw_anim_set_default_value(scene, visibility_b, 0, 0.0);
+	ufbxw_anim_add_keyframe_real(scene, visibility_b, 0 * UFBXW_KTIME_SECOND,
+		0.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+	ufbxw_anim_add_keyframe_real(scene, visibility_b, 1 * UFBXW_KTIME_SECOND,
+		1.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+	ufbxw_anim_add_keyframe_real(scene, visibility_b, 2 * UFBXW_KTIME_SECOND,
+		0.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+}
+
+void case_animation_stacks(ufbxw_scene *scene)
+{
+	ufbxw_node node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, node.id, "Node");
+
+	ufbxw_anim_stack stack_a = ufbxw_create_anim_stack(scene);
+	ufbxw_anim_layer layer_a = ufbxw_create_anim_layer(scene, stack_a);
+	ufbxw_set_name(scene, stack_a.id, "StackA");
+
+	ufbxw_anim_stack stack_b = ufbxw_create_anim_stack(scene);
+	ufbxw_anim_layer layer_b = ufbxw_create_anim_layer(scene, stack_b);
+	ufbxw_set_name(scene, layer_a.id, "LayerA");
+	ufbxw_set_name(scene, layer_b.id, "LayerB");
+	ufbxw_set_name(scene, stack_b.id, "StackB");
+
+	ufbxw_anim_prop visibility_a = ufbxw_animate_prop(scene, node.id, "Visibility", layer_a);
+	ufbxw_anim_set_default_value(scene, visibility_a, 0, 1.0);
+	ufbxw_anim_add_keyframe_real(scene, visibility_a, 0 * UFBXW_KTIME_SECOND,
+		1.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+	ufbxw_anim_add_keyframe_real(scene, visibility_a, 1 * UFBXW_KTIME_SECOND,
+		0.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+	ufbxw_anim_add_keyframe_real(scene, visibility_a, 2 * UFBXW_KTIME_SECOND,
+		1.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+
+	ufbxw_anim_prop visibility_b = ufbxw_animate_prop(scene, node.id, "Visibility", layer_b);
+	ufbxw_anim_set_default_value(scene, visibility_b, 0, 0.0);
+	ufbxw_anim_add_keyframe_real(scene, visibility_b, 0 * UFBXW_KTIME_SECOND,
+		0.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+	ufbxw_anim_add_keyframe_real(scene, visibility_b, 1 * UFBXW_KTIME_SECOND,
+		1.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+	ufbxw_anim_add_keyframe_real(scene, visibility_b, 2 * UFBXW_KTIME_SECOND,
+		0.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+}
+
 typedef void case_create_fn(ufbxw_scene *scene);
 
 typedef enum {
@@ -429,6 +494,8 @@ case_desc cases[] = {
 	{ "texture_video", &case_texture_video, 0 },
 	{ "skinning", &case_skinning, 0 },
 	{ "blend_shape", &case_blend_shape, 0 },
+	{ "animation_layers", &case_animation_layers, 0 },
+	{ "animation_stacks", &case_animation_stacks, 0 },
 };
 
 void generate_case(const case_desc *desc, const gen_settings *settings)
