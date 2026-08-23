@@ -10611,6 +10611,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 			void *arr_data = NULL;
 
 			if (deferred_size > 0) {
+				ufbxi_check(deferred_size < UINT32_MAX - num_values);
 				arr_data = ufbxi_push_size(arr_buf, arr_elem_size, num_values + deferred_size);
 				// Pop any previously pushed values
 				if (num_values > 0) {
