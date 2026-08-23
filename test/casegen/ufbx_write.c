@@ -11938,12 +11938,10 @@ static void ufbxwi_save_definitions(ufbxwi_save_context *sc)
 		ufbxwi_dom_value(sc, "Count", "I", (int32_t)obj_type->reference_count);
 
 		ufbxwi_element *tmpl_elem = ufbxwi_get_element(scene, obj_type->template_id.id);
-		if (tmpl_elem) {
+		if (tmpl_elem && !sc->opts.no_template_properties) {
 			ufbxwi_template *tmpl = (ufbxwi_template*)tmpl_elem;
 			ufbxwi_dom_open(sc, "PropertyTemplate", "T", tmpl->type);
-			if (!sc->opts.no_template_properties) {
-				ufbxwi_save_props(sc, &tmpl->element, NULL, NULL);
-			}
+			ufbxwi_save_props(sc, &tmpl->element, NULL, NULL);
 			ufbxwi_dom_close(sc);
 		}
 
