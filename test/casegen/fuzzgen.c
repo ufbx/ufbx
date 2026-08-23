@@ -250,6 +250,22 @@ void case_deflate_array(ufbxw_scene *scene)
 		ufbxw_view_int_array(scene, face_offsets, arraycount(face_offsets)));
 }
 
+void case_animation(ufbxw_scene *scene)
+{
+	ufbxw_node node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, node.id, "Node");
+
+	ufbxw_anim_layer layer = ufbxw_get_default_anim_layer(scene);
+	ufbxw_anim_prop visibility = ufbxw_animate_prop(scene, node.id, "Visibility", layer);
+	ufbxw_anim_set_default_value(scene, visibility, 0, 1.0);
+	ufbxw_anim_add_keyframe_real(scene, visibility, 0 * UFBXW_KTIME_SECOND,
+		1.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+	ufbxw_anim_add_keyframe_real(scene, visibility, 1 * UFBXW_KTIME_SECOND,
+		0.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+	ufbxw_anim_add_keyframe_real(scene, visibility, 2 * UFBXW_KTIME_SECOND,
+		1.0, UFBXW_KEYFRAME_CUBIC_AUTO);
+}
+
 typedef void case_create_fn(ufbxw_scene *scene);
 
 typedef enum {
@@ -281,6 +297,7 @@ case_desc cases[] = {
 	{ "uv_sets", &case_uv_sets, 0 },
 	{ "color_sets", &case_color_sets, 0 },
 	{ "deflate_array", &case_deflate_array, 0 },
+	{ "animation", &case_animation, CASE_ANIMATION },
 };
 
 void generate_case(const case_desc *desc, const gen_settings *settings)
