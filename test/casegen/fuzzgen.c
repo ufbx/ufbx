@@ -350,6 +350,47 @@ void case_skinning(ufbxw_scene *scene)
 		ufbxw_view_real_array(scene, right_weights, arraycount(right_weights)));
 }
 
+void case_blend_shape(ufbxw_scene *scene)
+{
+	ufbxw_node mesh_node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, mesh_node.id, "Node");
+
+	ufbxw_mesh mesh = ufbxw_create_mesh(scene);
+	ufbxw_set_name(scene, mesh.id, "Plane");
+
+	ufbxw_vec3 vertices[] = {
+		{ -1.0, -1.0, 0.0 },
+		{  1.0, -1.0, 0.0 },
+		{  1.0,  1.0, 0.0 },
+		{ -1.0,  1.0, 0.0 },
+	};
+	int32_t indices[] = { 0, 1, 2, 3 };
+	int32_t face_offsets[] = { 0, 4 };
+
+	ufbxw_mesh_set_vertices(scene, mesh,
+		ufbxw_view_vec3_array(scene, vertices, arraycount(vertices)));
+	ufbxw_mesh_set_polygons(scene, mesh,
+		ufbxw_view_int_array(scene, indices, arraycount(indices)),
+		ufbxw_view_int_array(scene, face_offsets, arraycount(face_offsets)));
+	ufbxw_node_set_attribute(scene, mesh_node, mesh.id);
+
+	ufbxw_blend_deformer deformer = ufbxw_create_blend_deformer(scene, mesh);
+	ufbxw_blend_channel channel = ufbxw_create_blend_channel(scene, deformer);
+	ufbxw_blend_shape shape = ufbxw_create_blend_shape(scene);
+	ufbxw_set_name(scene, shape.id, "Top");
+
+	int32_t shape_indices[] = { 2, 3 };
+	ufbxw_vec3 shape_offsets[] = {
+		{ 0.0, 0.0, 0.5 },
+		{ 0.0, 0.0, 0.5 },
+	};
+	ufbxw_blend_shape_set_offsets(scene, shape,
+		ufbxw_view_int_array(scene, shape_indices, arraycount(shape_indices)),
+		ufbxw_view_vec3_array(scene, shape_offsets, arraycount(shape_offsets)));
+	ufbxw_blend_channel_set_shape(scene, channel, shape);
+	ufbxw_blend_channel_set_weight(scene, channel, 100.0);
+}
+
 typedef void case_create_fn(ufbxw_scene *scene);
 
 typedef enum {
@@ -387,6 +428,7 @@ case_desc cases[] = {
 	{ "texture", &case_texture, CASE_NO_MISSING_VIDEOS },
 	{ "texture_video", &case_texture_video, 0 },
 	{ "skinning", &case_skinning, 0 },
+	{ "blend_shape", &case_blend_shape, 0 },
 };
 
 void generate_case(const case_desc *desc, const gen_settings *settings)
