@@ -820,7 +820,9 @@ static void ufbxt_check_nurbs_surface(ufbx_scene *scene, ufbx_nurbs_surface *sur
 
 	if (surface->num_control_points_u > 0 && surface->num_control_points_v > 0) {
 		ufbxt_assert(surface->num_control_points_u <= UINT32_MAX / surface->num_control_points_v);
-		ufbxt_assert(surface->control_points.count == surface->num_control_points_u * surface->num_control_points_v);
+		if (!scene->metadata.geometry_ignored) {
+			ufbxt_assert(surface->control_points.count == surface->num_control_points_u * surface->num_control_points_v);
+		}
 	} else {
 		ufbxt_assert(surface->control_points.count == 0);
 	}
