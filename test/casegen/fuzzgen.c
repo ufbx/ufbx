@@ -56,6 +56,37 @@ void case_node(ufbxw_scene *scene)
 	ufbxw_node_set_scaling(scene, node, vec3(1.0, 1.5, 2.0));
 }
 
+void case_light(ufbxw_scene *scene)
+{
+	ufbxw_node node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, node.id, "LightNode");
+
+	ufbxw_light light = ufbxw_create_light(scene, node);
+	ufbxw_set_name(scene, light.id, "Light");
+	ufbxw_light_set_color(scene, light, vec3(1.0, 0.8, 0.6));
+	ufbxw_light_set_intensity(scene, light, 50.0);
+	ufbxw_light_set_type(scene, light, UFBXW_LIGHT_POINT);
+	ufbxw_light_set_decay(scene, light, UFBXW_LIGHT_DECAY_QUADRATIC);
+}
+
+void case_camera(ufbxw_scene *scene)
+{
+	ufbxw_node node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, node.id, "CameraNode");
+
+	ufbxw_camera camera = ufbxw_create_camera(scene, node);
+	ufbxw_set_name(scene, camera.id, "Camera");
+}
+
+void case_bone(ufbxw_scene *scene)
+{
+	ufbxw_node node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, node.id, "BoneNode");
+
+	ufbxw_bone bone = ufbxw_create_bone(scene, UFBXW_BONE_LIMB_NODE, node);
+	ufbxw_set_name(scene, bone.id, "Bone");
+}
+
 typedef void case_create_fn(ufbxw_scene *scene);
 
 typedef enum {
@@ -80,6 +111,9 @@ case_desc cases[] = {
 	{ "scene_info", &case_scene_info, 0 },
 	{ "global_settings", &case_global_settings, CASE_GLOBAL_SETTINGS },
 	{ "node", &case_node, 0 },
+	{ "light", &case_light, 0 },
+	{ "camera", &case_camera, 0 },
+	{ "bone", &case_bone, 0 },
 };
 
 void generate_case(const case_desc *desc, const gen_settings *settings)
@@ -121,6 +155,7 @@ void generate_case(const case_desc *desc, const gen_settings *settings)
 	ufbxw_save_opts opts = { 0 };
 	opts.format = settings->format;
 	opts.version = settings->version;
+	opts.no_template_properties = true;
 	opts.local_timestamp.year = 1970;
 	opts.local_timestamp.month = 1;
 	opts.local_timestamp.day = 1;

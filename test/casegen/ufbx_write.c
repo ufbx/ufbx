@@ -11941,7 +11941,9 @@ static void ufbxwi_save_definitions(ufbxwi_save_context *sc)
 		if (tmpl_elem) {
 			ufbxwi_template *tmpl = (ufbxwi_template*)tmpl_elem;
 			ufbxwi_dom_open(sc, "PropertyTemplate", "T", tmpl->type);
-			ufbxwi_save_props(sc, &tmpl->element, NULL, NULL);
+			if (!sc->opts.no_template_properties) {
+				ufbxwi_save_props(sc, &tmpl->element, NULL, NULL);
+			}
 			ufbxwi_dom_close(sc);
 		}
 
