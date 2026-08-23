@@ -300,6 +300,56 @@ void case_texture_video(ufbxw_scene *scene)
 	ufbxw_texture_set_video(scene, texture, video);
 }
 
+void case_skinning(ufbxw_scene *scene)
+{
+	ufbxw_node mesh_node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, mesh_node.id, "Node");
+
+	ufbxw_mesh mesh = ufbxw_create_mesh(scene);
+	ufbxw_set_name(scene, mesh.id, "Plane");
+
+	ufbxw_vec3 vertices[] = {
+		{ -1.0, -1.0, 0.0 },
+		{  1.0, -1.0, 0.0 },
+		{  1.0,  1.0, 0.0 },
+		{ -1.0,  1.0, 0.0 },
+	};
+	int32_t indices[] = { 0, 1, 2, 3 };
+	int32_t face_offsets[] = { 0, 4 };
+
+	ufbxw_mesh_set_vertices(scene, mesh,
+		ufbxw_view_vec3_array(scene, vertices, arraycount(vertices)));
+	ufbxw_mesh_set_polygons(scene, mesh,
+		ufbxw_view_int_array(scene, indices, arraycount(indices)),
+		ufbxw_view_int_array(scene, face_offsets, arraycount(face_offsets)));
+	ufbxw_node_set_attribute(scene, mesh_node, mesh.id);
+
+	ufbxw_node left_node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, left_node.id, "LeftBone");
+	ufbxw_create_bone(scene, UFBXW_BONE_LIMB_NODE, left_node);
+
+	ufbxw_node right_node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, right_node.id, "RightBone");
+	ufbxw_create_bone(scene, UFBXW_BONE_LIMB_NODE, right_node);
+
+	ufbxw_skin_deformer skin = ufbxw_create_skin_deformer(scene, mesh);
+	ufbxw_skin_deformer_set_skinning_type(scene, skin, UFBXW_SKINNING_TYPE_LINEAR);
+
+	int32_t left_indices[] = { 0, 3 };
+	ufbxw_real left_weights[] = { 1.0, 1.0 };
+	ufbxw_skin_cluster left_cluster = ufbxw_create_skin_cluster(scene, skin, left_node);
+	ufbxw_skin_cluster_set_weights(scene, left_cluster,
+		ufbxw_view_int_array(scene, left_indices, arraycount(left_indices)),
+		ufbxw_view_real_array(scene, left_weights, arraycount(left_weights)));
+
+	int32_t right_indices[] = { 1, 2 };
+	ufbxw_real right_weights[] = { 1.0, 1.0 };
+	ufbxw_skin_cluster right_cluster = ufbxw_create_skin_cluster(scene, skin, right_node);
+	ufbxw_skin_cluster_set_weights(scene, right_cluster,
+		ufbxw_view_int_array(scene, right_indices, arraycount(right_indices)),
+		ufbxw_view_real_array(scene, right_weights, arraycount(right_weights)));
+}
+
 typedef void case_create_fn(ufbxw_scene *scene);
 
 typedef enum {
@@ -336,6 +386,7 @@ case_desc cases[] = {
 	{ "material", &case_material, 0 },
 	{ "texture", &case_texture, CASE_NO_MISSING_VIDEOS },
 	{ "texture_video", &case_texture_video, 0 },
+	{ "skinning", &case_skinning, 0 },
 };
 
 void generate_case(const case_desc *desc, const gen_settings *settings)
