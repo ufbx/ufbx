@@ -2282,3 +2282,33 @@ UFBXT_FILE_TEST_OPTS_ALT(dom_get_array, maya_anim_extrapolation, ufbxt_retain_do
 }
 #endif
 
+UFBXT_FILE_TEST_FLAGS(synthetic_truncated_compressed_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(!scene);
+}
+#endif
+
+UFBXT_TEST(synthetic_truncated_compressed_thread_memory)
+#if UFBXT_IMPL
+{
+	char path[512];
+	ufbxt_file_iterator iter = { "synthetic_truncated_compressed_fail" };
+	while (ufbxt_next_file(&iter, path, sizeof(path))) {
+		size_t data_size = 0;
+		char *data = ufbxt_read_file(path, &data_size);
+		ufbxt_assert(data);
+
+		ufbx_load_opts opts = { 0 };
+
+		#if defined(UFBXT_THREADS)
+			ufbx_os_init_ufbx_thread_pool(&opts.thread_opts.pool, g_thread_pool);
+		#endif
+
+		ufbx_scene *scene = ufbx_load_memory(data, data_size, &opts, NULL);
+		ufbxt_assert(!scene);
+
+		free(data);
+	}
+}
+#endif
