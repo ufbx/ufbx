@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 
 option(USE_AFL "Build the fuzz target with AFL instrumentation" ON)
 option(USE_ASAN "Build the fuzz target with AddressSanitizer" ON)
+option(USE_32BIT "Build the fuzz target in 32-bit mode" OFF)
 option(FUZZ_ASCII "Accept ASCII FBX inputs" OFF)
 option(FUZZ_BINARY "Accept binary FBX inputs" OFF)
 
@@ -53,6 +54,11 @@ if(USE_ASAN AND NOT USE_AFL)
     # AFL requires compiling with `AFL_USE_ASAN` environment variable
     target_compile_options(newfuzz PRIVATE -fsanitize=address -fno-omit-frame-pointer)
     target_link_options(newfuzz PRIVATE -fsanitize=address)
+endif()
+
+if(USE_32BIT AND NOT MSVC)
+    target_compile_options(newfuzz PRIVATE -m32)
+    target_link_options(newfuzz PRIVATE -m32)
 endif()
 
 if(UNIX)
