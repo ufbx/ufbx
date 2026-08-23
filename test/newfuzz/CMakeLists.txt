@@ -26,11 +26,17 @@ if(USE_AFL)
                     -I "${AFL_INCLUDE_DIR}" "${source}" -o "${output}"
                 DEPENDS "${source}"
                 VERBATIM)
-            add_cust_target_properties(${name} PROPERTIES PREFIX "")
+            add_custom_target(${name} ALL DEPENDS "${output}")
     endfunction()
 
     add_afl_mutator(ascii_integer)
     add_afl_mutator(ascii_path)
+endif()
+
+if(USE_AFL)
+    set(CMAKE_C_COMPILER afl-clang-fast)
+    set(CMAKE_C_COMPILER_LAUNCHER "${CMAKE_COMMAND};-E;env;AFL_USE_ASAN=1")
+    set(CMAKE_C_LINKER_LAUNCHER "${CMAKE_COMMAND};-E;env;AFL_USE_ASAN=1")
 endif()
 
 add_executable(newfuzz newfuzz.c ../../ufbx.c)
@@ -43,15 +49,10 @@ if(USE_AFL)
     target_compile_definitions(newfuzz PRIVATE USE_AFL)
 endif()
 
-if(USE_AFL)
-    set(CMAKE_C_COMPILER afl-clang-fast)
-    set(CMAKE_C_COMPILER_LAUNCHER "${CMAKE_COMMAND};-E;env;AFL_USE_ASAN=1")
-else()
-    if(USE_ASAN)
-        # AFL requires compiling with `AFL_USE_ASAN` environment variable
-        target_compile_options(newfuzz PRIVATE -fsanitize=address -fno-omit-frame-pointer)
-        target_link_options(newfuzz PRIVATE -fsanitize=address)
-    endif()
+if(USE_ASAN AND NOT USE_AFL)
+    # AFL requires compiling with `AFL_USE_ASAN` environment variable
+    target_compile_options(newfuzz PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(newfuzz PRIVATE -fsanitize=address)
 endif()
 
 if(UNIX)
