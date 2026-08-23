@@ -59,7 +59,7 @@ void case_node(ufbxw_scene *scene)
 void case_light(ufbxw_scene *scene)
 {
 	ufbxw_node node = ufbxw_create_node(scene);
-	ufbxw_set_name(scene, node.id, "LightNode");
+	ufbxw_set_name(scene, node.id, "Node");
 
 	ufbxw_light light = ufbxw_create_light(scene, node);
 	ufbxw_set_name(scene, light.id, "Light");
@@ -72,7 +72,7 @@ void case_light(ufbxw_scene *scene)
 void case_camera(ufbxw_scene *scene)
 {
 	ufbxw_node node = ufbxw_create_node(scene);
-	ufbxw_set_name(scene, node.id, "CameraNode");
+	ufbxw_set_name(scene, node.id, "Node");
 
 	ufbxw_camera camera = ufbxw_create_camera(scene, node);
 	ufbxw_set_name(scene, camera.id, "Camera");
@@ -81,10 +81,148 @@ void case_camera(ufbxw_scene *scene)
 void case_bone(ufbxw_scene *scene)
 {
 	ufbxw_node node = ufbxw_create_node(scene);
-	ufbxw_set_name(scene, node.id, "BoneNode");
+	ufbxw_set_name(scene, node.id, "Node");
 
 	ufbxw_bone bone = ufbxw_create_bone(scene, UFBXW_BONE_LIMB_NODE, node);
 	ufbxw_set_name(scene, bone.id, "Bone");
+}
+
+void case_mesh(ufbxw_scene *scene)
+{
+	ufbxw_node node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, node.id, "Node");
+
+	ufbxw_mesh mesh = ufbxw_create_mesh(scene);
+	ufbxw_set_name(scene, mesh.id, "Plane");
+
+	ufbxw_vec3 vertices[] = {
+		{ -1.0, -1.0, 0.0 },
+		{  1.0, -1.0, 0.0 },
+		{  1.0,  1.0, 0.0 },
+		{ -1.0,  1.0, 0.0 },
+	};
+	ufbxw_vec3 normals[] = {
+		{ 0.0, 0.0, 1.0 },
+		{ 0.0, 0.0, 1.0 },
+		{ 0.0, 0.0, 1.0 },
+		{ 0.0, 0.0, 1.0 },
+	};
+	int32_t indices[] = { 0, 1, 2, 3 };
+	int32_t face_offsets[] = { 0, 4 };
+
+	ufbxw_mesh_set_vertices(scene, mesh,
+		ufbxw_view_vec3_array(scene, vertices, arraycount(vertices)));
+	ufbxw_mesh_set_polygons(scene, mesh,
+		ufbxw_view_int_array(scene, indices, arraycount(indices)),
+		ufbxw_view_int_array(scene, face_offsets, arraycount(face_offsets)));
+	ufbxw_mesh_set_normals(scene, mesh,
+		ufbxw_view_vec3_array(scene, normals, arraycount(normals)),
+		UFBXW_ATTRIBUTE_MAPPING_VERTEX);
+	ufbxw_node_set_attribute(scene, node, mesh.id);
+}
+
+void case_uv_sets(ufbxw_scene *scene)
+{
+	ufbxw_node node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, node.id, "Node");
+
+	ufbxw_mesh mesh = ufbxw_create_mesh(scene);
+	ufbxw_set_name(scene, mesh.id, "Plane");
+
+	ufbxw_vec3 vertices[] = {
+		{ -1.0, -1.0, 0.0 },
+		{  1.0, -1.0, 0.0 },
+		{  1.0,  1.0, 0.0 },
+		{ -1.0,  1.0, 0.0 },
+	};
+	ufbxw_vec3 normals[] = {
+		{ 0.0, 0.0, 1.0 },
+		{ 0.0, 0.0, 1.0 },
+		{ 0.0, 0.0, 1.0 },
+		{ 0.0, 0.0, 1.0 },
+	};
+	ufbxw_vec2 uvs0[] = {
+		{ 0.0, 0.0 },
+		{ 1.0, 0.0 },
+		{ 1.0, 1.0 },
+		{ 0.0, 1.0 },
+	};
+	ufbxw_vec2 uvs1[] = {
+		{ 0.0, 0.0 },
+		{ 2.0, 0.0 },
+		{ 2.0, 2.0 },
+		{ 0.0, 2.0 },
+	};
+	int32_t indices[] = { 0, 1, 2, 3 };
+	int32_t face_offsets[] = { 0, 4 };
+
+	ufbxw_mesh_set_vertices(scene, mesh,
+		ufbxw_view_vec3_array(scene, vertices, arraycount(vertices)));
+	ufbxw_mesh_set_polygons(scene, mesh,
+		ufbxw_view_int_array(scene, indices, arraycount(indices)),
+		ufbxw_view_int_array(scene, face_offsets, arraycount(face_offsets)));
+	ufbxw_mesh_set_normals(scene, mesh,
+		ufbxw_view_vec3_array(scene, normals, arraycount(normals)),
+		UFBXW_ATTRIBUTE_MAPPING_VERTEX);
+	ufbxw_mesh_set_uvs(scene, mesh, 0,
+		ufbxw_view_vec2_array(scene, uvs0, arraycount(uvs0)),
+		UFBXW_ATTRIBUTE_MAPPING_VERTEX);
+	ufbxw_mesh_set_uvs(scene, mesh, 1,
+		ufbxw_view_vec2_array(scene, uvs1, arraycount(uvs1)),
+		UFBXW_ATTRIBUTE_MAPPING_VERTEX);
+	ufbxw_node_set_attribute(scene, node, mesh.id);
+}
+
+void case_color_sets(ufbxw_scene *scene)
+{
+	ufbxw_node node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, node.id, "Node");
+
+	ufbxw_mesh mesh = ufbxw_create_mesh(scene);
+	ufbxw_set_name(scene, mesh.id, "Plane");
+
+	ufbxw_vec3 vertices[] = {
+		{ -1.0, -1.0, 0.0 },
+		{  1.0, -1.0, 0.0 },
+		{  1.0,  1.0, 0.0 },
+		{ -1.0,  1.0, 0.0 },
+	};
+	ufbxw_vec3 normals[] = {
+		{ 0.0, 0.0, 1.0 },
+		{ 0.0, 0.0, 1.0 },
+		{ 0.0, 0.0, 1.0 },
+		{ 0.0, 0.0, 1.0 },
+	};
+	ufbxw_vec4 colors0[] = {
+		{ 1.0, 0.0, 0.0, 1.0 },
+		{ 0.0, 1.0, 0.0, 1.0 },
+		{ 0.0, 0.0, 1.0, 1.0 },
+		{ 1.0, 1.0, 0.0, 1.0 },
+	};
+	ufbxw_vec4 colors1[] = {
+		{ 0.0, 1.0, 1.0, 1.0 },
+		{ 1.0, 0.0, 1.0, 1.0 },
+		{ 1.0, 1.0, 1.0, 1.0 },
+		{ 0.0, 0.0, 0.0, 1.0 },
+	};
+	int32_t indices[] = { 0, 1, 2, 3 };
+	int32_t face_offsets[] = { 0, 4 };
+
+	ufbxw_mesh_set_vertices(scene, mesh,
+		ufbxw_view_vec3_array(scene, vertices, arraycount(vertices)));
+	ufbxw_mesh_set_polygons(scene, mesh,
+		ufbxw_view_int_array(scene, indices, arraycount(indices)),
+		ufbxw_view_int_array(scene, face_offsets, arraycount(face_offsets)));
+	ufbxw_mesh_set_normals(scene, mesh,
+		ufbxw_view_vec3_array(scene, normals, arraycount(normals)),
+		UFBXW_ATTRIBUTE_MAPPING_VERTEX);
+	ufbxw_mesh_set_colors(scene, mesh, 0,
+		ufbxw_view_vec4_array(scene, colors0, arraycount(colors0)),
+		UFBXW_ATTRIBUTE_MAPPING_VERTEX);
+	ufbxw_mesh_set_colors(scene, mesh, 1,
+		ufbxw_view_vec4_array(scene, colors1, arraycount(colors1)),
+		UFBXW_ATTRIBUTE_MAPPING_VERTEX);
+	ufbxw_node_set_attribute(scene, node, mesh.id);
 }
 
 typedef void case_create_fn(ufbxw_scene *scene);
@@ -114,6 +252,9 @@ case_desc cases[] = {
 	{ "light", &case_light, 0 },
 	{ "camera", &case_camera, 0 },
 	{ "bone", &case_bone, 0 },
+	{ "mesh", &case_mesh, 0 },
+	{ "uv_sets", &case_uv_sets, 0 },
+	{ "color_sets", &case_color_sets, 0 },
 };
 
 void generate_case(const case_desc *desc, const gen_settings *settings)
