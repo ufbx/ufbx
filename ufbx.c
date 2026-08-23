@@ -7740,7 +7740,12 @@ ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, 
 	case 'D': if (type == UFBXI_VALUE_NUMBER) { *(double*)v = (double)node->vals[ix].f; return 1; } else return 0;
 	case 'R': if (type == UFBXI_VALUE_NUMBER) { *(ufbx_real*)v = (ufbx_real)node->vals[ix].f; return 1; } else return 0;
 	case 'B': if (type == UFBXI_VALUE_NUMBER) { *(bool*)v = node->vals[ix].i != 0; return 1; } else return 0;
-	case 'Z': if (type == UFBXI_VALUE_NUMBER) { if (node->vals[ix].i < 0) return 0; *(size_t*)v = (size_t)node->vals[ix].i; return 1; } else return 0;
+	case 'Z': if (type == UFBXI_VALUE_NUMBER) {
+		if (node->vals[ix].i < 0) return 0;
+		if (node->vals[ix].i > SIZE_MAX) return 0;
+		*(size_t*)v = (size_t)node->vals[ix].i;
+		return 1;
+	} else return 0;
 	case 'S': if (type == UFBXI_VALUE_STRING) {
 		ufbxi_sanitized_string src = node->vals[ix].s;
 		ufbx_string *dst = (ufbx_string*)v;
