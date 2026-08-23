@@ -472,6 +472,20 @@ void case_material_texture(ufbxw_scene *scene)
 	ufbxw_node_set_material(scene, node, 0, material);
 }
 
+void case_node_hierarchy(ufbxw_scene *scene)
+{
+	ufbxw_node root = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, root.id, "Root");
+
+	ufbxw_node parent = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, parent.id, "Parent");
+	ufbxw_node_set_parent(scene, parent, root);
+
+	ufbxw_node child = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, child.id, "Child");
+	ufbxw_node_set_parent(scene, child, parent);
+}
+
 typedef void case_create_fn(ufbxw_scene *scene);
 
 typedef enum {
@@ -513,6 +527,7 @@ case_desc cases[] = {
 	{ "animation_layers", &case_animation_layers, 0 },
 	{ "animation_stacks", &case_animation_stacks, 0 },
 	{ "material_texture", &case_material_texture, CASE_NO_MISSING_VIDEOS },
+	{ "node_hierarchy", &case_node_hierarchy, 0 },
 };
 
 void generate_case(const case_desc *desc, const gen_settings *settings)
