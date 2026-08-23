@@ -549,7 +549,7 @@ void generate_case(const case_desc *desc, const gen_settings *settings)
 	}
 
 	char filename[256];
-	snprintf(filename, sizeof(filename), "casegen_%s_%u_%s.fbx", desc->name, settings->version, format_name);
+	snprintf(filename, sizeof(filename), "fuzzgen_%s_%u_%s.fbx", desc->name, settings->version, format_name);
 
 	char path[256];
 	snprintf(path, sizeof(path), "%s/%s", settings->output_path, filename);
