@@ -683,14 +683,14 @@ UFBXT_FILE_TEST_ALT(tessellate_line_alloc_fail, max_nurbs_to_line)
 }
 #endif
 
-UFBXT_FILE_TEST_FLAGS(synthetic_nurbs_dimension_overflow, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+UFBXT_FILE_TEST_FLAGS(synthetic_nurbs_dimension_overflow_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(!scene);
 }
 #endif
 
-UFBXT_FILE_TEST_FLAGS(synthetic_nurbs_order_overflow, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+UFBXT_FILE_TEST_FLAGS(synthetic_nurbs_order_overflow_fail, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
 #if UFBXT_IMPL
 {
 	ufbxt_assert(!scene);
