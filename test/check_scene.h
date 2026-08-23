@@ -817,6 +817,13 @@ static void ufbxt_check_nurbs_surface(ufbx_scene *scene, ufbx_nurbs_surface *sur
 	ufbxt_check_nurbs_basis(scene, &surface->basis_u);
 	ufbxt_check_nurbs_basis(scene, &surface->basis_v);
 	ufbxt_check_list(surface->control_points);
+
+	if (surface->num_control_points_u > 0 && surface->num_control_points_v > 0) {
+		ufbxt_assert(surface->num_control_points_u <= UINT32_MAX / surface->num_control_points_v);
+		ufbxt_assert(surface->control_points.count == surface->num_control_points_u * surface->num_control_points_v);
+	} else {
+		ufbxt_assert(surface->control_points.count == 0);
+	}
 }
 
 static void ufbxt_check_nurbs_trim_surface(ufbx_scene *scene, ufbx_nurbs_trim_surface *surface)
