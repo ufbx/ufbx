@@ -101,7 +101,7 @@ static void fuzz_input(const void *data, size_t size)
 	free(input);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
 #if defined(USE_AFL)
 	while (__AFL_LOOP(10000)) {
@@ -113,7 +113,12 @@ int main(void)
 		fuzz_input(g_buffer, size);
 	}
 #else
-	size_t size = fread(g_buffer, 1, sizeof(g_buffer), stdin);
+    FILE *f = stdin;
+    if (argc > 1) {
+        f = fopen(argv[1], "rb");
+    }
+
+	size_t size = fread(g_buffer, 1, sizeof(g_buffer), f);
 	if (accept_format(g_buffer, size)) {
 		fuzz_input(g_buffer, size);
 	}
