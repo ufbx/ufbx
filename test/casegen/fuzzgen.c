@@ -488,7 +488,11 @@ void case_node_hierarchy(ufbxw_scene *scene)
 
 void case_mesh_minimal(ufbxw_scene *scene)
 {
+	ufbxw_node node = ufbxw_create_node(scene);
+	ufbxw_set_name(scene, node.id, "Node");
+
 	ufbxw_mesh mesh = ufbxw_create_mesh(scene);
+	ufbxw_set_name(scene, mesh.id, "Plane");
 
 	ufbxw_vec3 vertices[] = {
 		{ -1.0, -1.0, 0.0 },
@@ -503,6 +507,7 @@ void case_mesh_minimal(ufbxw_scene *scene)
 	ufbxw_mesh_set_polygons(scene, mesh,
 		ufbxw_view_int_array(scene, indices, arraycount(indices)),
 		ufbxw_view_int_array(scene, face_offsets, arraycount(face_offsets)));
+	ufbxw_node_set_attribute(scene, node, mesh.id);
 }
 
 typedef void case_create_fn(ufbxw_scene *scene);
@@ -601,6 +606,7 @@ void generate_case(const case_desc *desc, const gen_settings *settings)
 	opts.local_timestamp.month = 1;
 	opts.local_timestamp.day = 1;
 	opts.no_default_timestamp = true;
+	opts.enable_override_creator = true;
 
 	ufbxw_error error;
 	bool ok = ufbxw_save_file(scene, path, &opts, &error);
