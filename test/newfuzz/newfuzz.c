@@ -1,12 +1,11 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #if defined(USE_AFL)
 #include <unistd.h>
 
 __AFL_COVERAGE();
-#else
-#include <stdio.h>
 #endif
 
 #if defined(_WIN32)
