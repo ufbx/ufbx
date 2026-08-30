@@ -11832,9 +11832,9 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_read_property(ufbxi_context *uc,
 	}
 
 	if (ufbxi_get_val_at(node, val_ix, 'S', &prop->value_str)) {
-		if (prop->value_str.length > 0) {
-			ufbxi_ignore(ufbxi_get_val_at(node, val_ix, 'b', &prop->value_blob));
-		}
+		// `vals[val_ix]` is known to be a string, fetch non-sanitized blob directly
+		prop->value_blob.data = node->vals[val_ix].s.raw_data;
+		prop->value_blob.size = node->vals[val_ix].s.raw_length;
 		flags |= (uint32_t)UFBX_PROP_FLAG_VALUE_STR;
 	} else {
 		prop->value_str = ufbx_empty_string;
@@ -16013,13 +16013,9 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_read_legacy_prop(ufbxi_node *nod
 		case 'S':
 			ufbx_assert(value_ix == 0);
 			if (!ufbxi_get_val_at(node, fmt_ix, 'S', &prop->value_str)) return 0;
-			if (prop->value_str.length > 0) {
-				int found = ufbxi_get_val_at(node, fmt_ix, 'b', &prop->value_blob);
-				ufbxi_ignore(found);
-				ufbx_assert(found);
-			} else {
-				prop->value_blob = ufbx_empty_blob;
-			}
+			// `vals[fmt_ix]` is known to be a string, fetch non-sanitized blob directly
+			prop->value_blob.data = node->vals[fmt_ix].s.raw_data;
+			prop->value_blob.size = node->vals[fmt_ix].s.raw_length;
 			prop->value_real = 0.0f;
 			prop->value_real_arr[1] = 0.0f;
 			prop->value_real_arr[2] = 0.0f;
