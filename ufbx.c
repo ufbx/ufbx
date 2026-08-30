@@ -8883,7 +8883,10 @@ ufbxi_nodiscard ufbxi_noinline static void *ufbxi_push_array_data(ufbxi_context 
 {
 	size_t elem_size = ufbxi_array_type_size(info->type);
 	uint32_t flags = info->flags;
-	if (flags & UFBXI_ARRAY_FLAG_PAD_BEGIN) size += 4;
+	if (flags & UFBXI_ARRAY_FLAG_PAD_BEGIN) {
+		ufbxi_check_return(size <= SIZE_MAX - 4, NULL);
+		size += 4;
+	}
 
 	// The array may be pushed either to the result or temporary buffer depending
 	// if it's already in the right format
@@ -9088,6 +9091,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 			if (src_type != 'r') src_type = ufbxi_normalize_array_type(src_type, 'c');
 			size_t src_elem_size = ufbxi_array_type_size(src_type);
 			size_t decoded_data_size = src_elem_size * size;
+			ufbxi_check(!ufbxi_does_overflow(decoded_data_size, src_elem_size, size));
 
 			// Allocate `size` elements for the array.
 			char *arr_data = (char*)ufbxi_push_array_data(uc, &arr_info, size, tmp_buf);
