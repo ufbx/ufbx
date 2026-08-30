@@ -486,12 +486,32 @@ void case_node_hierarchy(ufbxw_scene *scene)
 	ufbxw_node_set_parent(scene, child, parent);
 }
 
+void case_mesh_minimal(ufbxw_scene *scene)
+{
+	ufbxw_mesh mesh = ufbxw_create_mesh(scene);
+
+	ufbxw_vec3 vertices[] = {
+		{ -1.0, -1.0, 0.0 },
+		{  1.0, -1.0, 0.0 },
+		{  1.0,  1.0, 0.0 },
+	};
+	int32_t indices[] = { 0, 1, 2 };
+	int32_t face_offsets[] = { 0, 3 };
+
+	ufbxw_mesh_set_vertices(scene, mesh,
+		ufbxw_view_vec3_array(scene, vertices, arraycount(vertices)));
+	ufbxw_mesh_set_polygons(scene, mesh,
+		ufbxw_view_int_array(scene, indices, arraycount(indices)),
+		ufbxw_view_int_array(scene, face_offsets, arraycount(face_offsets)));
+}
+
 typedef void case_create_fn(ufbxw_scene *scene);
 
 typedef enum {
 	CASE_ANIMATION = 0x1,
 	CASE_GLOBAL_SETTINGS = 0x2,
 	CASE_NO_MISSING_VIDEOS = 0x4,
+	CASE_DOCUMENT = 0x8,
 } case_flags;
 
 typedef struct {
@@ -528,6 +548,7 @@ case_desc cases[] = {
 	{ "animation_stacks", &case_animation_stacks, 0 },
 	{ "material_texture", &case_material_texture, CASE_NO_MISSING_VIDEOS },
 	{ "node_hierarchy", &case_node_hierarchy, 0 },
+	{ "mesh_minimal", &case_mesh_minimal, 0 },
 };
 
 void generate_case(const case_desc *desc, const gen_settings *settings)
@@ -540,6 +561,9 @@ void generate_case(const case_desc *desc, const gen_settings *settings)
 	if ((desc->flags & CASE_ANIMATION) == 0) {
 		scene_opts.no_default_anim_layer = true;
 		scene_opts.no_default_anim_stack = true;
+	}
+	if ((desc->flags & CASE_DOCUMENT) == 0) {
+		scene_opts.no_default_document = true;
 	}
 
 	ufbxw_scene *scene = ufbxw_create_scene(&scene_opts);
