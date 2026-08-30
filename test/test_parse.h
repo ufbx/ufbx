@@ -2312,3 +2312,52 @@ UFBXT_TEST(synthetic_truncated_compressed_thread_memory)
 	}
 }
 #endif
+
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_unicode_remove_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_REMOVE;
+	return opts;
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_full_bad_unicode, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->metadata.original_file_path.length == 9);
+	ufbxt_assert(!memcmp(scene->metadata.original_file_path.data, "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd", 9));
+
+	ufbxt_assert(scene->metadata.raw_original_file_path.size == 3);
+	ufbxt_assert(!memcmp(scene->metadata.raw_original_file_path.data, "\xff\xff\xff", 3));
+
+	ufbx_prop *prop = ufbx_find_prop(&scene->metadata.scene_props, "SrcDocumentUrl");
+	ufbxt_assert(prop);
+
+	ufbxt_assert(prop->value_str.length == 18);
+	ufbxt_assert(!memcmp(prop->value_str.data, "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd", 18));
+
+	ufbxt_assert(prop->value_blob.size == 6);
+	ufbxt_assert(!memcmp(prop->value_blob.data, "\xfc\x80\x80\x80\x80\x80", 6));
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_ALT_FLAGS(synthetic_full_bad_unicode_remove, synthetic_full_bad_unicode, ufbxt_unicode_remove_opts, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_FUZZ_OPTS)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(scene->metadata.original_file_path.length == 0);
+	ufbxt_assert(!strcmp(scene->metadata.original_file_path.data, ""));
+
+	ufbxt_assert(scene->metadata.raw_original_file_path.size == 3);
+	ufbxt_assert(!memcmp(scene->metadata.raw_original_file_path.data, "\xff\xff\xff", 3));
+
+	ufbx_prop *prop = ufbx_find_prop(&scene->metadata.scene_props, "SrcDocumentUrl");
+	ufbxt_assert(prop);
+
+	ufbxt_assert(prop->value_str.length == 0);
+	ufbxt_assert(!strcmp(prop->value_str.data, ""));
+
+	ufbxt_assert(prop->value_blob.size == 6);
+	ufbxt_assert(!memcmp(prop->value_blob.data, "\xfc\x80\x80\x80\x80\x80", 6));
+}
+#endif
