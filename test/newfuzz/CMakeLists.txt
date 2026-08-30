@@ -31,7 +31,7 @@ if(USE_AFL)
     endfunction()
 
     add_afl_mutator(ascii_integer)
-    add_afl_mutator(ascii_path)
+    add_afl_mutator(ascii_string)
 endif()
 
 if(USE_AFL)
