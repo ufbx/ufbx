@@ -4913,9 +4913,10 @@ typedef struct {
 } ufbxi_string_pool;
 
 typedef struct {
-	const char *raw_data; // < UTF-8 data follows at `raw_length+1` if `utf8_length > 0`
-	uint32_t raw_length;  // < Length of the non-sanitized original string
-	uint32_t utf8_length; // < Length of sanitized UTF-8 string (or zero)
+	const char *raw_data;  // < Original non-sanitized string
+	const char *utf8_data; // < Sanitized UTF-8 string, may alias to `raw_data` or be `NULL`
+	uint32_t raw_length;   // < Length of the non-sanitized original string
+	uint32_t utf8_length;  // < Length of sanitized UTF-8 string
 } ufbxi_sanitized_string;
 
 static ufbxi_forceinline bool ufbxi_str_equal(ufbx_string a, ufbx_string b)
@@ -5034,6 +5035,35 @@ static void ufbxi_string_pool_temp_free(ufbxi_string_pool *pool)
 	ufbxi_map_free(&pool->map);
 }
 
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_string_entry(ufbxi_string_pool *pool, const char **p_data, size_t length, uint32_t hash, bool copy)
+{
+	if (length == 0) {
+		*p_data = ufbxi_empty_char;
+		return 1;
+	}
+
+	ufbx_string ref = { *p_data, length };
+	ufbxi_check_err(pool->error, ufbxi_map_grow(&pool->map, ufbx_string, pool->initial_size));
+	ufbx_string *entry = ufbxi_map_find(&pool->map, ufbx_string, hash, &ref);
+	if (!entry) {
+		entry = ufbxi_map_insert(&pool->map, ufbx_string, hash, &ref);
+		ufbxi_check_err(pool->error, entry);
+		entry->length = length;
+		if (copy) {
+			char *dst = ufbxi_push(&pool->buf, char, length + 1);
+			ufbxi_check_err(pool->error, dst);
+			memcpy(dst, ref.data, length);
+			dst[length] = '\0';
+			entry->data = dst;
+		} else {
+			entry->data = ref.data;
+		}
+	}
+
+	*p_data = entry->data;
+	return 1;
+}
+
 ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool, char *dst, char c)
 {
 	switch (pool->error_handling) {
@@ -5065,7 +5095,7 @@ ufbxi_nodiscard static size_t ufbxi_add_replacement_char(ufbxi_string_pool *pool
 	}
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_sanitize_string(ufbxi_string_pool *pool, ufbxi_sanitized_string *sanitized, const char *str, size_t length, size_t valid_length, bool push_both)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_sanitized_string_entry(ufbxi_string_pool *pool, ufbx_string *sanitized, const char *str, size_t length, size_t valid_length)
 {
 	// Handle only invalid cases here
 	ufbx_assert(valid_length < length);
@@ -5074,21 +5104,11 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_sanitize_string(ufbxi_string_poo
 
 	size_t index = valid_length;
 	size_t dst_len = index;
-	if (push_both) {
-		// Copy both the full raw string and the initial valid part
-		ufbxi_check_err(pool->error, length <= SIZE_MAX / 2 - 64);
-		ufbxi_check_err(pool->error, ufbxi_grow_array(pool->map.ator, &pool->temp_str, &pool->temp_cap, length * 2 + 64));
-		memcpy(pool->temp_str, str, length);
-		pool->temp_str[length] = '\0';
-		memcpy(pool->temp_str + length + 1, str, index);
-		dst_len += length + 1;
-	} else {
 
-		// Copy the initial valid part
-		ufbxi_check_err(pool->error, length <= SIZE_MAX - 64);
-		ufbxi_check_err(pool->error, ufbxi_grow_array(pool->map.ator, &pool->temp_str, &pool->temp_cap, length + 64));
-		memcpy(pool->temp_str, str, index);
-	}
+	// Copy the initial valid part
+	ufbxi_check_err(pool->error, length <= SIZE_MAX - 64);
+	ufbxi_check_err(pool->error, ufbxi_grow_array(pool->map.ator, &pool->temp_str, &pool->temp_cap, length + 64));
+	memcpy(pool->temp_str, str, index);
 
 	char *dst = pool->temp_str;
 	while (index < length) {
@@ -5147,65 +5167,43 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_sanitize_string(ufbxi_string_poo
 		index++;
 	}
 
-	// Sanitized strings are packed to 32-bit integers, in practice this should be fine
-	// as strings are limited to 32-bit length in FBX itself.
-	// The only problem case is a massive string that is full of unicode errors, ie.
-	// >1GB binary blob, but these should never be sanitized.
-	ufbxi_check_err(pool->error, length <= UINT32_MAX);
-	sanitized->raw_data = pool->temp_str;
-	if (push_both) {
-		// Reserve `UINT32_MAX` for invalid UTF-8 without sanitization
-		size_t utf8_length = dst_len - (length + 1);
-		ufbxi_check_err(pool->error, utf8_length < UINT32_MAX);
-		sanitized->raw_length = (uint32_t)length;
-		sanitized->utf8_length = (uint32_t)utf8_length;
-	} else {
-		ufbxi_check_err(pool->error, dst_len <= UINT32_MAX);
-		sanitized->raw_length = (uint32_t)dst_len;
-		sanitized->utf8_length = 0;
-	}
+	sanitized->data = pool->temp_str;
+	sanitized->length = dst_len;
+	uint32_t hash = ufbxi_hash_string(sanitized->data, sanitized->length);
+	ufbxi_check_err(pool->error, ufbxi_push_string_entry(pool, &sanitized->data, sanitized->length, hash, true));
 
 	return 1;
 }
 
-ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_sanitized_string(ufbxi_string_pool *pool, ufbxi_sanitized_string *sanitized, const char *str, size_t length, uint32_t hash, bool raw)
+ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_sanitized_string(ufbxi_string_pool *pool, ufbxi_sanitized_string *sanitized, const char *str, size_t length, uint32_t hash, bool non_ascii, bool raw)
 {
 	ufbxi_regression_assert(hash == ufbxi_hash_string(str, length));
 
 	ufbxi_check_err(pool->error, length <= UINT32_MAX);
-	ufbxi_check_err(pool->error, ufbxi_map_grow(&pool->map, ufbx_string, pool->initial_size));
 
-	const char *total_data = str;
-	size_t total_length = length;
-
+	sanitized->raw_data = str;
 	sanitized->raw_length = (uint32_t)length;
-	sanitized->utf8_length = 0;
 
-	if (!raw) {
+	ufbxi_check_err(pool->error, ufbxi_push_string_entry(pool, &sanitized->raw_data, sanitized->raw_length, hash, true));
+
+	if (raw) {
+		sanitized->utf8_data = NULL;
+		sanitized->utf8_length = 0;
+	} else if (!non_ascii) {
+		sanitized->utf8_data = sanitized->raw_data;
+		sanitized->utf8_length = sanitized->raw_length;
+	} else {
 		size_t valid_length = ufbxi_utf8_valid_length(str, length);
 		if (valid_length != length) {
-			ufbxi_check_err(pool->error, ufbxi_sanitize_string(pool, sanitized, str, length, valid_length, true));
-			total_data = sanitized->raw_data;
-			total_length = sanitized->raw_length + sanitized->utf8_length + 1;
-			hash = ufbxi_hash_string(str, length);
+			ufbx_string utf8;
+			ufbxi_check_err(pool->error, ufbxi_push_sanitized_string_entry(pool, &utf8, str, length, valid_length));
+			ufbxi_check_err(pool->error, utf8.length <= UINT32_MAX);
+			sanitized->utf8_data = utf8.data;
+			sanitized->utf8_length = (uint32_t)utf8.length;
+		} else {
+			sanitized->utf8_data = sanitized->raw_data;
+			sanitized->utf8_length = sanitized->raw_length;
 		}
-	}
-
-	ufbx_string ref = { total_data, total_length };
-
-	ufbx_string *entry = ufbxi_map_find(&pool->map, ufbx_string, hash, &ref);
-	if (entry) {
-		sanitized->raw_data = entry->data;
-	} else {
-		entry = ufbxi_map_insert(&pool->map, ufbx_string, hash, &ref);
-		ufbxi_check_err(pool->error, entry);
-		entry->length = total_length;
-		char *dst = ufbxi_push(&pool->buf, char, total_length + 1);
-		ufbxi_check_err(pool->error, dst);
-		memcpy(dst, total_data, total_length);
-		dst[total_length] = '\0';
-		entry->data = dst;
-		sanitized->raw_data = dst;
 	}
 
 	return 1;
@@ -5214,8 +5212,6 @@ ufbxi_nodiscard static ufbxi_noinline int ufbxi_push_sanitized_string(ufbxi_stri
 ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_push_string_imp(ufbxi_string_pool *pool, const char *str, size_t length, size_t *p_out_length, bool copy, bool raw)
 {
 	if (length == 0) return ufbxi_empty_char;
-
-	ufbxi_check_return_err(pool->error, ufbxi_map_grow(&pool->map, ufbx_string, pool->initial_size), NULL);
 
 	uint32_t hash;
 	if (raw) {
@@ -5226,33 +5222,16 @@ ufbxi_nodiscard static ufbxi_noinline const char *ufbxi_push_string_imp(ufbxi_st
 		if (non_ascii) {
 			size_t valid_length = ufbxi_utf8_valid_length(str, length);
 			if (valid_length < length) {
-				ufbxi_sanitized_string sanitized;
-				ufbxi_check_return_err(pool->error, ufbxi_sanitize_string(pool, &sanitized, str, length, valid_length, false), NULL);
-				str = sanitized.raw_data;
-				length = sanitized.raw_length;
-				hash = ufbxi_hash_string(str, length);
-				*p_out_length = length;
+				ufbx_string sanitized;
+				ufbxi_check_return_err(pool->error, ufbxi_push_sanitized_string_entry(pool, &sanitized, str, length, valid_length), NULL);
+				*p_out_length = sanitized.length;
+				return sanitized.data;
 			}
 		}
 	}
 
-	ufbx_string ref = { str, length };
-
-	ufbx_string *entry = ufbxi_map_find(&pool->map, ufbx_string, hash, &ref);
-	if (entry) return entry->data;
-	entry = ufbxi_map_insert(&pool->map, ufbx_string, hash, &ref);
-	ufbxi_check_return_err(pool->error, entry, NULL);
-	entry->length = length;
-	if (copy) {
-		char *dst = ufbxi_push(&pool->buf, char, length + 1);
-		ufbxi_check_return_err(pool->error, dst, NULL);
-		memcpy(dst, str, length);
-		dst[length] = '\0';
-		entry->data = dst;
-	} else {
-		entry->data = str;
-	}
-	return entry->data;
+	ufbxi_check_return_err(pool->error, ufbxi_push_string_entry(pool, &str, length, hash, copy), NULL);
+	return str;
 }
 
 ufbxi_nodiscard static ufbxi_forceinline const char *ufbxi_push_string(ufbxi_string_pool *pool, const char *str, size_t length, size_t *p_out_length, bool raw)
@@ -7754,14 +7733,9 @@ ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, 
 	case 'S': if (type == UFBXI_VALUE_STRING) {
 		ufbxi_sanitized_string src = node->vals[ix].s;
 		ufbx_string *dst = (ufbx_string*)v;
-		if (src.utf8_length > 0) {
-			if (src.utf8_length == UINT32_MAX) return 0;
-			dst->data = src.raw_data + src.raw_length + 1;
-			dst->length = src.utf8_length;
-		} else {
-			dst->data = src.raw_data;
-			dst->length = src.raw_length;
-		}
+		if (!src.utf8_data) return 0;
+		dst->data = src.utf8_data;
+		dst->length = src.utf8_length;
 		return 1;
 	} else return 0;
 	case 's': if (type == UFBXI_VALUE_STRING) {
@@ -7774,12 +7748,8 @@ ufbxi_nodiscard ufbxi_forceinline static int ufbxi_get_val_at(ufbxi_node *node, 
 	case 'C': if (type == UFBXI_VALUE_STRING) {
 		ufbxi_sanitized_string src = node->vals[ix].s;
 		const char **dst = (const char **)v;
-		if (src.utf8_length > 0) {
-			if (src.utf8_length == UINT32_MAX) return 0;
-			*dst = src.raw_data + src.raw_length + 1;
-		} else {
-			*dst = src.raw_data;
-		}
+		if (!src.utf8_data) return 0;
+		*dst = src.utf8_data;
 		return 1;
 	} else return 0;
 	case 'c': if (type == UFBXI_VALUE_STRING) {
@@ -9337,16 +9307,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_binary_parse_node(ufbxi_context 
 
 				if (length == 0) {
 					vals[i].s.raw_data = ufbxi_empty_char;
+					vals[i].s.utf8_data = ufbxi_empty_char;
 					vals[i].s.raw_length = 0;
 					vals[i].s.utf8_length = 0;
 				} else {
 					bool non_ascii = false;
 					uint32_t hash = ufbxi_hash_string_check_ascii(str, length, &non_ascii);
-					bool raw = !non_ascii || ufbxi_is_raw_string(uc, parent_state, name, i);
-					ufbxi_check(ufbxi_push_sanitized_string(&uc->string_pool, &vals[i].s, str, length, hash, raw));
-
-					// Mark the data as invalid UTF-8
-					if (non_ascii && raw) vals[i].s.utf8_length = UINT32_MAX;
+					bool raw = ufbxi_is_raw_string(uc, parent_state, name, i);
+					ufbxi_check(ufbxi_push_sanitized_string(&uc->string_pool, &vals[i].s, str, length, hash, non_ascii, raw));
 				}
 
 				type_mask |= (uint32_t)UFBXI_VALUE_STRING << (i*2);
@@ -10450,14 +10418,14 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_ascii_parse_node(ufbxi_context *
 
 				if (length == 0) {
 					v->s.raw_data = ufbxi_empty_char;
+					v->s.utf8_data = ufbxi_empty_char;
 					v->s.raw_length = 0;
 					v->s.utf8_length = 0;
 				} else {
 					bool non_ascii = false;
 					uint32_t hash = ufbxi_hash_string_check_ascii(str, length, &non_ascii);
-					bool raw = !non_ascii || ufbxi_is_raw_string(uc, parent_state, name, num_values);
-					ufbxi_check(ufbxi_push_sanitized_string(&uc->string_pool, &v->s, str, length, hash, raw));
-					if (non_ascii && raw) v->s.utf8_length = UINT32_MAX;
+					bool raw = ufbxi_is_raw_string(uc, parent_state, name, num_values);
+					ufbxi_check(ufbxi_push_sanitized_string(&uc->string_pool, &v->s, str, length, hash, non_ascii, raw));
 				}
 			}
 
