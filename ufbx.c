@@ -4028,6 +4028,9 @@ static ufbxi_noinline void *ufbxi_push_size(ufbxi_buf *b, size_t size, size_t n)
 	size_t total = size * n;
 	if (ufbxi_does_overflow(total, size, n)) return NULL;
 
+	// Keep some slack to avoid overflows
+	if (total >= SIZE_MAX / 2) return NULL;
+
 	#if defined(UFBX_REGRESSION)
 	{
 		ufbxi_allocator *ator = b->ator;
