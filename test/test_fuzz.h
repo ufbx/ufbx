@@ -38,23 +38,46 @@ UFBXT_TEST(fuzz_files)
 
 		bool temp_freed = false, result_freed = false;
 
-		ufbx_load_opts stream_opts = load_opts;
-		ufbxt_init_allocator(&stream_opts.temp_allocator, &temp_freed);
-		ufbxt_init_allocator(&stream_opts.result_allocator, &result_freed);
-		stream_opts.read_buffer_size = 1;
-		stream_opts.temp_allocator.huge_threshold = 1;
-		stream_opts.result_allocator.huge_threshold = 1;
-		stream_opts.progress_cb.fn = &ufbxt_measure_progress;
-		stream_opts.progress_cb.user = &stream_progress_ctx;
-		stream_opts.progress_interval_hint = 1;
-		ufbx_scene *streamed_scene = ufbx_load_file(buf, &stream_opts, &error);
-		if (streamed_scene) {
-			ufbxt_check_scene(streamed_scene);
-			ufbxt_assert(scene);
-		} else {
-			ufbxt_assert(!scene);
+		{
+			ufbx_load_opts stream_opts = load_opts;
+			ufbxt_init_allocator(&stream_opts.temp_allocator, &temp_freed);
+			ufbxt_init_allocator(&stream_opts.result_allocator, &result_freed);
+			stream_opts.read_buffer_size = 1;
+			stream_opts.temp_allocator.huge_threshold = 1;
+			stream_opts.result_allocator.huge_threshold = 1;
+			stream_opts.progress_cb.fn = &ufbxt_measure_progress;
+			stream_opts.progress_cb.user = &stream_progress_ctx;
+			stream_opts.progress_interval_hint = 1;
+			ufbx_scene *streamed_scene = ufbx_load_file(buf, &stream_opts, &error);
+			if (streamed_scene) {
+				ufbxt_check_scene(streamed_scene);
+				ufbxt_assert(scene);
+			} else {
+				ufbxt_assert(!scene);
+			}
+			ufbx_free_scene(streamed_scene);
 		}
-		ufbx_free_scene(streamed_scene);
+
+		#if defined(UFBXT_THREADS)
+		{
+			ufbx_load_opts thread_opts = load_opts;
+
+			ufbx_os_init_ufbx_thread_pool(&thread_opts.thread_opts.pool, g_thread_pool);
+
+			ufbx_error thread_error;
+			ufbx_scene *thread_scene = ufbx_load_file(buf, &thread_opts, &thread_error);
+
+			if (thread_scene) {
+				ufbxt_check_scene(thread_scene);
+				if (thread_error.type != UFBX_ERROR_THREADED_ASCII_PARSE) {
+					ufbxt_assert(scene);
+				}
+			} else {
+				ufbxt_assert(!thread_scene);
+			}
+			ufbx_free_scene(thread_scene);
+		}
+		#endif
 
 		ufbxt_assert(temp_freed);
 		ufbxt_assert(result_freed);
