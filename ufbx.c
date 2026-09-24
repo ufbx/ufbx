@@ -21387,6 +21387,7 @@ ufbxi_nodiscard ufbxi_noinline static int ufbxi_absolute_to_relative_path(ufbxi_
 	if (rel_length == 0) return 1;
 	char separator = rel[rel_length - 1];
 
+	ufbxi_check(rel_length <= (SIZE_MAX - src_length) / 3);
 	size_t max_length = rel_length * 3 + src_length;
 
 	ufbxi_check(ufbxi_grow_array(&uc->ator_tmp, &uc->tmp_arr, &uc->tmp_arr_size, max_length));
