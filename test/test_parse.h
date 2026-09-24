@@ -1059,6 +1059,34 @@ UFBXT_FILE_TEST_OPTS(synthetic_parent_directory, ufbxt_filename_load_opts)
 }
 #endif
 
+UFBXT_FILE_TEST_OPTS(synthetic_parent_directory_bad, ufbxt_filename_load_opts)
+#if UFBXT_IMPL
+{
+	ufbx_material *material = (ufbx_material*)ufbx_find_element(scene, UFBX_ELEMENT_MATERIAL, "lambert1");
+	ufbxt_assert(material);
+
+	ufbx_texture *temporary = material->fbx.diffuse_color.texture;
+	ufbxt_assert(temporary && temporary->video);
+	ufbx_video *temporary_video = temporary->video;
+
+	ufbx_texture *inner = material->fbx.transparency_color.texture;
+	ufbxt_assert(inner && inner->video);
+	ufbx_video *inner_video = inner->video;
+
+	ufbxt_assert(!strcmp(temporary->filename.data, "temporary.png"));
+	ufbxt_assert(!strcmp(temporary_video->filename.data, "fake/path/temporary.png"));
+	ufbxt_assert(!strcmp(inner->filename.data, "../directory/inner.png"));
+	ufbxt_assert(!strcmp(inner_video->filename.data,
+		"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../"
+		"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../"
+		"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../"
+		"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../"
+		"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../"
+		"../../../../directory/inner.png"
+	));
+}
+#endif
+
 #if UFBXT_IMPL
 static ufbx_load_opts ufbxt_parent_dir_filename_load_opts()
 {
