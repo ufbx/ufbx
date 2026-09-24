@@ -1497,7 +1497,7 @@ UFBXT_TEST(bad_path)
 		ufbxt_assert(!scene);
 
 		// On Windows, bad UTF-8 here is not allowed
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(UFBX_NO_LIBC) && !defined(UFBX_EXTERNAL_STDIO)
 		ufbxt_assert(error.type == UFBX_ERROR_INVALID_UTF8);
 #endif
 	}
