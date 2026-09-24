@@ -1697,6 +1697,10 @@ typedef struct ufbxw_save_opts {
 	size_t max_allocations;
 	size_t thread_max_allocations;
 
+	// Omit properties from templates.
+	// NOTE: This should only be used for testing
+	bool no_template_properties;
+
 	uint32_t _end_zero;
 } ufbxw_save_opts;
 

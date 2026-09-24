@@ -681,6 +681,14 @@ async def run_target(t, args, opts=RunOpts()):
 
     cwd = t.config.get("cwd")
 
+    env = None
+    if t.config.get("arch") in ("x86", "arm32") and t.config.get("san"):
+        env = os.environ.copy()
+        asan_options = env.get("ASAN_OPTIONS", "")
+        if asan_options:
+            asan_options += ":"
+        env["ASAN_OPTIONS"] = asan_options + "allocator_may_return_null=1"
+
     if opts.rerunnable and not t.ok:
         return
 
@@ -689,7 +697,7 @@ async def run_target(t, args, opts=RunOpts()):
         wasm_args += args
         ok, out, err, cmdline, time = await run_cmd(wasm_args, cwd=cwd)
     else:
-        ok, out, err, cmdline, time = await run_cmd(t.config["output"], args, cwd=cwd)
+        ok, out, err, cmdline, time = await run_cmd(t.config["output"], args, cwd=cwd, env=env)
 
 
     if opts.rerunnable:
