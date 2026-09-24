@@ -1465,3 +1465,57 @@ UFBXT_FILE_TEST_OPTS_ALT_FLAGS(dom_helper_null, maya_cube, ufbxt_retain_dom_opts
 }
 #endif
 
+#if UFBXT_IMPL
+static ufbx_load_opts ufbxt_allow_invalid_unicode_opts()
+{
+	ufbx_load_opts opts = { 0 };
+	opts.allow_unsafe = true;
+	opts.unicode_error_handling = UFBX_UNICODE_ERROR_HANDLING_UNSAFE_IGNORE;
+	return opts;
+}
+#endif
+
+UFBXT_TEST(bad_path)
+#if UFBXT_IMPL
+{
+	char buf[2048];
+
+	size_t bad_lengths[] = { 1, 16, 200, 1000 };
+
+	for (size_t i = 0; i < ufbxt_arraycount(bad_lengths); i++) {
+		const size_t root_len = strlen(data_root);
+		const size_t bad_length = bad_lengths[i];
+		const size_t total_len = root_len + bad_length;
+
+		ufbxt_assert(total_len < sizeof(buf));
+		memcpy(buf, data_root, root_len);
+		memset(buf + root_len, 0xff, bad_length);
+		buf[total_len] = '\0';
+
+		ufbx_error error;
+		ufbx_scene *scene = ufbx_load_file(buf, NULL, &error);
+		ufbxt_assert(!scene);
+
+		// On Windows, bad UTF-8 here is not allowed
+#ifdef _WIN32
+		ufbxt_assert(error.type == UFBX_ERROR_INVALID_UTF8);
+#endif
+	}
+}
+#endif
+
+UFBXT_FILE_TEST_OPTS_FLAGS(casegen_bad_path, ufbxt_allow_invalid_unicode_opts, UFBXT_FILE_TEST_FLAG_ALLOW_INVALID_UNICODE|UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(load_error->type == UFBX_ERROR_EXTERNAL_FILE_NOT_FOUND);
+	ufbxt_assert(!scene);
+}
+#endif
+
+UFBXT_FILE_TEST_FLAGS(synthetic_bad_path, UFBXT_FILE_TEST_FLAG_ALLOW_ERROR)
+#if UFBXT_IMPL
+{
+	ufbxt_assert(load_error->type == UFBX_ERROR_EXTERNAL_FILE_NOT_FOUND);
+	ufbxt_assert(!scene);
+}
+#endif

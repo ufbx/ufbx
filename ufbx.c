@@ -874,7 +874,7 @@ enum { UFBX_MAXIMUM_ALIGNMENT = sizeof(void*) > 8 ? sizeof(void*) : 8 };
 
 // -- Version
 
-#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 23, 0)
+#define UFBX_SOURCE_VERSION ufbx_pack_version(0, 23, 1)
 ufbx_abi_data_def const uint32_t ufbx_source_version = UFBX_SOURCE_VERSION;
 
 ufbx_static_assert(source_header_version, UFBX_SOURCE_VERSION/1000u == UFBX_HEADER_VERSION/1000u);
@@ -7011,7 +7011,15 @@ static ufbxi_noinline FILE *ufbxi_fopen(ufbxi_file_context *fc, const char *path
 			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
 			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
 			if (i < path_len) code = code << 6 | (uint32_t)(path[i++] & 0x3f);
+		} else {
+			// Bad UTF-8 character, fail early.
+			if (wpath != wpath_buf) {
+				ufbxi_free(&fc->ator, wchar_t, wpath, path_len + 1);
+			}
+			ufbxi_report_err_msg(&fc->error, "file", "Invalid UTF-8");
+			return NULL;
 		}
+
 		if (code < 0x10000) {
 			wpath[wlen++] = (wchar_t)code;
 		} else {
