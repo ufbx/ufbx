@@ -1,3 +1,13 @@
+### v0.23.1 (2026-09-24)
+> `ufbx-rust 0.11.5`, `ufbx-python 0.0.9`
+
+- Fix buffer overflow on Windows on adversarial filenames
+- Fix buffer overflow when generating relative paths on adversarial inputs
+- Fix integer overflows when loading malformed arrays and NURBS data
+- Fix out-of-bounds access when sanitizing malformed UTF-8 strings
+- Detect truncated DEFLATE data instead of reading past the end
+- Prevent XML geometry cache files from loading other XML files
+
 ### v0.23.0 (2026-06-21)
 > `ufbx-rust 0.11.2`, `ufbx-python 0.0.8`
 
