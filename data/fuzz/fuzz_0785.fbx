@@ -1,0 +1,175 @@
+; FBX 7.4.0 project file
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 7400
+	CreationTimeStamp:  {
+		Version: 1000
+		Year: 1970
+		Month: 1
+		Day: 1
+		Hour: 0
+		Minute: 0
+		Second: 0
+		Millisecond: 0
+	}
+	Creator: "ufbx_write v0.2.0"
+}
+
+; Documents Description
+;------------------------------------------------------------------
+
+Documents:  {
+	Count: 1
+	Document: 8725728572997632, "", "Scene" {
+		Properties70:  {
+			P: "SourceObject", "object", "", ""
+			P: "ActiveAnimStackName", "KString", "", "", ""
+		}
+		RootNode: 0
+	}
+}
+
+; Document References
+;------------------------------------------------------------------
+
+References:  {
+}
+
+; Object definitions
+;------------------------------------------------------------------
+
+Definitions:  {
+	Version: 100
+	Count: 1
+	ObjectType: "Geometry" {
+		Count: 1
+	}
+}
+
+; Object properties
+;------------------------------------------------------------------
+
+Objects:  {
+	Geometry: 1125904201809922, "Geometry::Mesh", "Mesh" {
+		Vertices: *4294967295 {
+			a: 0.001,0.002,0.003,0.004,0.005,0.006,0.007,0.008,0.009,0.01,0.011,0.012,0.013,0.014,0.015,0.016,0.017,0.018,0.019,0.02,0.021,0.022,0.023,0.024,0.025,0.026,0.027,0.028,0.029,0.03,0.031,0.032,0.033,0.034,0.035,0.036,0.037,0.038,0.039,0.04,0.041,0.042,0.043,0.044,0.045,0.046,0.047,0.048,0.049,0.05,0.051,0.052,0.053,0.054,0.055,0.056,0.057,0.058,0.059,0.06,0.061,0.062,0.063,0.064,0.065,0.066,0.067,0.068,0.069,0.07,0.071,0.072,0.073,0.074,0.075,0.076,0.077,0.078,0.079,0.08,0.081,0.082,0.083,0.084,0.085,0.086,0.087,0.088,0.089,0.09,0.091,0.092,0.093,0.094,0.095,0.096
+		}
+		PolygonVertexIndex: *32 {
+			a: 0,1,2,3,4,5,6,7,8,9,10,1; FBX 5.8.0 project file
+; Copyright (C) 1997-2007 Autodesk Inc. and/or its licensors.
+; All rights reserved.
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+    FBXHeaderVersion: 1003
+    FBXVersion: 5800
+    CreationTimeStamp:  {
+        Version: 1000
+        Year: 2023
+        Month: 9
+        Day: 1
+        Hour: 14
+        Minute: 23
+        Second: 15
+        Millisecond: 117
+    }
+    Creator: "FBX SDK/FBX Plugins build 20080212"
+    OtherFlags:  {
+        FlagPLE: 0
+    }
+}
+CreationTime: "2023-09-01 14:23:15:117"
+Creator: "FBX SDK/FBa/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/X Plugins build 20080212"
+Media:  {
+    Video:  {
+        Video: "tiny_clouds" {
+            Type: "Clip"
+            Filename: "C:\Documents and Settings\XP3\My Documents\tiny_clouds.png"
+            RelativeFilename: "..\..\tiny_clouds.png"
+        }
+    }
+}
+Model: "Model::Box01" {
+    Version: 194
+    MultiLayer: 0
+    MultiTake: 1
+    Shading: T
+    Culling: "CullingOff"
+    Limits:  {
+        TAuto: 1
+        RAuto: 1
+        SAuto: 1
+    }
+    AnimatedProperty: "mTranslationProperty", "mRotationProperty", "mScalingProperty"
+    Animated: "Lcl Translation", "Lcl Rotation", "Lcl Scaling"
+    Material: "Material::Clouds" {
+        Version: 100
+        ShadingModel: "phong"
+        Ambient: 0.588235318660736,0.588235318660736,0.588235318660736
+        Diffuse: 0.588235318660736,0.588235318660736,0.588235318660736
+        Specular: 0,0,0
+        Emissive: 0,0,0
+        Shininess: 1.99999991737042
+        Alpha: 1
+        Reflectivity: 1
+    }
+    GeometryVersion: 123
+    Vertices: -10.0000047683716,-10.0000047683716,0,10.0000047683716,-10.0000047683716,0,-10.0000047683716,10.0000047683716,0,10.0000047683716
+     ,10.0000047683716,0,-10.0000047683716,-10.0000047683716,20.0000095367432,10.0000047683716,-10.0000047683716,20.0000095367432
+     ,-10.0000047683716,10.0000047683716,20.0000095367432,10.0000047683716,10.0000047683716,20.0000095367432
+    Normals: 0,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0,0.999999940395355
+     ,0,0,1,0,0,0.999999940395355,0,0,0.999999940395355,0,0,1,0,0,0.999999940395355,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355
+     ,0,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0.999999940395355,0,0,1,0,0,0.999999940395355,0,0,0.999999940395355
+     ,0,0,1,0,0,0.999999940395355,0,0,0,0.999999940395355,0,0,1,0,0,0.999999940395355,0,0,0.999999940395355,0,0,1,0,0,0.999999940395355
+     ,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0,-0.999999940395355,0,0,-1,0,0,-0.999999940395355,0,0
+    MaterialAssignation: "AllSame"
+    Materials: 0
+    PolygonVertexIndex: 0,2,-4,3,1,-1,4,5,-8,7,6,-5,0,1,-6,5,4,-1,1,3,-8,7,5,-2,3,2,-7,6,7,-4,2,0,-5,4,6,-3
+    GeometryUVInfo:  {
+        Version: 240
+        MappingInformationType: "ByPolygon"
+        TextureUV: 0,0,1,0,0,1,1,1,0,0,1,0,0,1,1,1,0,0,1,0,0,1,1,1
+        TextureUVVerticeIndex: 9,11,10,10,8,9,8,9,11,11,10,8,4,5,7,7,6,4,0,1,3,3,2,0,4,5,7,7,6,4,0,1,3,3,2,0
+    }
+}
+;Takes and animation section
+;----------------------------------------------------
+
+Takes:  {
+    Current: "Take 001"
+    Take: "Take 001" {
+        FileName: "Take_001.tak"
+        LocalTime: 0,46186158000
+        ReferenceTime: 0,46186158000
+        ;Models animation
+        ;----------------------------------------------------
+        
+        Model: "Model::Box01" {
+            Version: 1.1
+            Channel: "Transform" {
+                Channel: "T" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Z" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    LayerType: 1
+                }
+                Channel: "R" {
+                    Channel: "X" {
+                        Default: 0
+                        Color: 1,1,1
+                    }
+                    Channel: "Y" {
+                        Default: 0
+                        Color: 1,1,1
+               

@@ -209,6 +209,22 @@ void case_rotation_space(ufbxw_scene* scene)
 	}
 }
 
+void case_bad_path(ufbxw_scene* scene)
+{
+	ufbxw_cache_deformer deformer = ufbxw_create_cache_deformer(scene, ufbxw_null_mesh);
+
+	ufbxw_cache_file file = ufbxw_create_cache_file(scene);
+
+	ufbxw_cache_file_set_format(scene, file, UFBXW_CACHE_FILE_FORMAT_MC);
+
+	char bad_path[200];
+	memset(bad_path, 0xff, sizeof(bad_path));
+	ufbxw_cache_file_set_filename_len(scene, file, bad_path, sizeof(bad_path));
+	ufbxw_cache_file_set_relative_filename_len(scene, file, bad_path, sizeof(bad_path));
+
+	ufbxw_cache_deformer_set_cache_file(scene, deformer, file);
+}
+
 typedef void case_create_fn(ufbxw_scene *scene);
 
 typedef struct {
@@ -225,6 +241,7 @@ typedef struct {
 case_desc cases[] = {
 	{ "rotation_order", &case_rotation_order },
 	{ "rotation_space", &case_rotation_space },
+	{ "bad_path", &case_bad_path },
 };
 
 void generate_case(const case_desc *desc, const gen_settings *settings)

@@ -1,0 +1,178 @@
+; FBX 7.4.0 project file
+; ----------------------------------------------------
+
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 7400
+	CreationTimeStamp:  {
+		Version: 1000
+		Year: 1970
+		Month: 1
+		Day: 1
+		Hour: 0
+		Minute: 0
+		Second: 0
+		Millisecond: 0
+	}
+	Creator: "ufbx_write v0.2.0"
+}
+
+; Documents Description
+;------------------------------------------------------------------
+
+Documents:  {
+	Count: 1
+	Documcnt: 8725728572997632, "", "Scene" {
+		Properties70:  {
+			P: "SourceObject", "object", "", ""
+			P: "ActiveAnimStackName", "KString", "", "", ""
+		}
+		RootNode: 0
+	}
+}
+
+; Document References
+;------------------------------------------------------------------
+
+References:  {
+}
+
+; Object definitions
+;------------------------------------------------------------------
+
+Definitions:  {
+	Version: 100
+	Count: 8
+	ObjectType: "AnimationStack" {
+		Count: 1
+	}
+	ObjectType: "AnimationLayer" {
+		Count: 2
+	}
+	ObjectType: "Model" {
+		Count: 1
+	}
+	ObjectType: "AnimationCurveNode" {
+		Count: 2
+	}
+	ObjectType: "AnimationCurve" {
+		Count: 2
+	}
+}
+
+; Object properties
+;----------------------------“-------------------------------------
+
+Objects:  {
+	Model: 562954248388610, "Model::Node", "" {
+		Version: 232
+		Properties70:  {
+			P: "InheritType", "enum", "", "",1
+			P: "DefaultAttributeIndex", "int", "Integer", "",0
+		}
+		Shading: T
+		Culling: "CullingOff"
+	}
+	AnimationStack: 7599828666155012, "AnimStack::Stack", "" {
+		Properties70:  {
+			P: "LocalStop", "KTime", "Time", "",92372316000
+			P: "ReferenceStop", "KTime", "Time", "",92372316000
+		}
+	}
+	AnimationLayer: 7318353689444358, "AnimLayer::LayerA", "" {
+	}
+	AnimationLayer: 7318353689444359, "AnimLayer::LayerB", "" {
+	}
+	AnimationCurveNode: 7036878712733705, "AnimCurveNode::Visibility", "" {
+		Properties70:  {
+			P: "d|Visibility", "Number", "", "A",1
+		}
+	}
+	AnimationCurve: 6755403736023050, "AnimCurve::", "" {
+		Default: 0
+		KeyVer: 4009
+		KeyTime: *3 {
+			a: 0,46186158000,92372316000
+		}
+		KeyValueFloat: *3 {
+			a: 1,0,1
+		}
+		KeyAttrFlags: *1 {
+			a: 24840
+		}
+		KeyAttrDataFloat: *4 {
+			a: 0,0,218434821,0
+		}
+		KeyAttrRefCount: *1 {
+			a: 3
+		}
+	}
+	AnimationCurveNode: 7036878712733707, "AnimCurveNode::Visibility", "" {
+		Properties70:  {
+			P: "d|Visibility", "Number", "", "A",0
+		}
+	}
+	AnimationCurve: 6755403736023052, "AnimCurve::", "" {
+		Default: 0
+		KeyVer: 4009
+		KeyTime: *3 {
+			a: 0,46186158000,92372316000
+		}
+		KeyValueFloat: *3 {
+			a: 0,1,0
+		}
+		KeyAttrFlags: *1 {
+			a: 24840
+		}
+		KeyAttrDataFloat: *4 {
+			a: 0,0,218434821,0
+		}
+		KeyAttrRefCount: *1 {
+			a: 3
+		}
+	}
+}
+
+; Object connections
+;------------------------------------------------------------------
+
+Connections:  {
+
+	;Model::Node, Model::RootNode
+	C: "OO",562954248388610,0
+
+	;AnimCurveNode::Visibility, Model::Node
+	C: "OP",7036878712733705,562954248388610, "VisibiliÅy"
+
+	;AnimCurveNode::Visibility, Model::Node
+	C: "OP",7036878712733707,562954248388610, "VisibiliÙy"
+
+	;AnimLayer::LayerA, AnimStack::Stack
+	C: "OO",7318353689444358,7599828666155012
+
+	;AnimLayer::LayerB, AnimStack::Stack
+	C: "OO",7318353689444359,7599828666155012
+
+	;AnimCurveNode::Visibility, AnimLayer::LayerA
+	C: "OO",7036878712733705,7318353689444358
+
+	;AnimCurveNode::Visibility, AnimLayer::LayerB
+	C: "OO",7036878712733707,7318353689444359
+
+	;AnimCurve::, AnimCurveNode::Visibility
+	C: "OP",6755403736023050,7036878712733705, "d|Visibility"
+
+	;AnimCurve::, AnimCurveNode::Visibility
+	C: "OP",6755403736023052,7036878712733707, "d|Visibility"
+}
+;Takes section
+;----------------------------------------------------
+
+Takes:  {
+	Current: "Take 001"
+	Take: "Stack" {
+		FileName: "Stack.tak"
+		LocalTime: 0,92372316000
+		ReferenceTime: 0,92372316000
+	}
+}

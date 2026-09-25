@@ -127,9 +127,9 @@ jobs:
       - name: Update apt
         run: sudo apt-get update
       - name: Install apt dependencies
-        run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm
+        run: sudo apt-get install -y clang-18 llvm-18 gcc-multilib g++-multilib lcov
       - name: Generate coverage
-        run: LLVM_COV=llvm-cov bash misc/generate_coverage.sh
+        run: CLANG=clang-18 LLVM_COV=llvm-cov-18 bash misc/generate_coverage.sh
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -148,9 +148,9 @@ jobs:
       - name: Update apt
         run: sudo apt-get update
       - name: Install apt dependencies
-        run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm
+        run: sudo apt-get install -y clang-18 llvm-18 gcc-multilib g++-multilib lcov
       - name: Generate coverage
-        run: LLVM_COV=llvm-cov bash misc/generate_coverage_32.sh
+        run: CLANG=clang-18 LLVM_COV=llvm-cov-18 bash misc/generate_coverage_32.sh
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -169,9 +169,9 @@ jobs:
       - name: Update apt
         run: sudo apt-get update
       - name: Install apt dependencies
-        run: sudo apt-get install -y gcc-multilib g++-multilib lcov llvm
+        run: sudo apt-get install -y clang-18 llvm-18 gcc-multilib g++-multilib lcov
       - name: Generate coverage
-        run: LLVM_COV=llvm-cov bash misc/generate_coverage_no_assert.sh
+        run: CLANG=clang-18 LLVM_COV=llvm-cov-18 bash misc/generate_coverage_no_assert.sh
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -607,17 +607,30 @@ jobs:
   ci_dataset:
     runs-on: [self-hosted, dataset]
     steps:
+      - name: Verify environment
+        shell: bash
+        run: |
+          set -x
+          cat /etc/os-release
+          uname -a
+          dpkg --print-architecture
+          git --version
+          clang-18 --version
+          llvm-cov-18 --version
+          lcov --version
+          python3 --version
+          curl --version
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Create build directory
         run: mkdir build
       - name: Compile check_fbx.c with coverage
-        run: clang -coverage -DUFBX_DEV=1 -DEXTERNAL_UFBX -g -Og ufbx.c test/check_fbx.c -lm -o build/check_fbx
+        run: clang-18 -coverage -DUFBX_DEV=1 -DEXTERNAL_UFBX -g -Og ufbx.c test/check_fbx.c -lm -o build/check_fbx
       - name: Run dataset tests
         run: python3 misc/check_dataset.py --exe build/check_fbx --root /mnt/fbx-files --host-url https://ufbx-dataset.b-cdn.net --threads 4
       - name: Generate coverage
-        run: LLVM_COV=llvm-cov bash misc/generate_lcov.sh
+        run: LLVM_COV=llvm-cov-18 bash misc/generate_lcov.sh
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -646,19 +659,32 @@ jobs:
   ci_fuzz:
     runs-on: [self-hosted, ARM64, legacy]
     steps:
+      - name: Verify environment
+        shell: bash
+        run: |
+          set -x
+          cat /etc/os-release
+          uname -a
+          dpkg --print-architecture
+          git --version
+          clang-18 --version
+          llvm-cov-18 --version
+          lcov --version
+          python3 --version
+          curl --version
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Create build directory
         run: mkdir build
       - name: Compile check_fbx.c with coverage
-        run: clang -coverage -DUFBX_DEV=1 -DEXTERNAL_UFBX -O2 ufbx.c test/check_fbx.c -lm -o build/check_fbx
+        run: clang-18 -coverage -DUFBX_DEV=1 -DEXTERNAL_UFBX -O2 ufbx.c test/check_fbx.c -lm -o build/check_fbx
       - name: Check fuzz files
         run: |
           build/check_fbx -d /mnt/fbx-files/fuzz/fuzz-fa
           build/check_fbx -d /mnt/fbx-files/fuzz/fuzz-fb
       - name: Generate coverage
-        run: LLVM_COV=llvm-cov bash misc/generate_lcov.sh
+        run: LLVM_COV=llvm-cov-18 bash misc/generate_lcov.sh
       - name: Upload coverage
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

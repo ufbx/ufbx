@@ -4,12 +4,13 @@ set -e
 
 mkdir -p build
 
+CLANG="${CLANG:-clang}"
 LLVM_COV="${LLVM_COV:-llvm-cov}"
 LLVM_GCOV=$(realpath misc/llvm_gcov.sh)
 chmod +x misc/llvm_gcov.sh
 
-clang -lm -coverage -g -m32 -std=gnu99 -DUFBX_DEV=1 -DUFBX_REGRESSION=1 -DUFBXT_THREADS=1 -pthread ufbx.c test/runner.c -o build/cov-runner
+"$CLANG" -lm -coverage -g -m32 -std=gnu99 -DUFBX_DEV=1 -DUFBX_REGRESSION=1 -DUFBXT_THREADS=1 -pthread ufbx.c test/runner.c -o build/cov-runner
 
 build/cov-runner -d data
 $LLVM_COV gcov ufbx runner -b
-lcov --directory . --base-directory . --gcov-tool $LLVM_GCOV --config-file misc/lcovrc --capture -o coverage.lcov
+lcov --directory . --base-directory . --gcov-tool $LLVM_GCOV --config-file misc/lcovrc --filter branch,brace --capture -o coverage.lcov
