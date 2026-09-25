@@ -607,6 +607,19 @@ jobs:
   ci_dataset:
     runs-on: [self-hosted, dataset]
     steps:
+      - name: Verify environment
+        shell: bash
+        run: |
+          set -x
+          cat /etc/os-release
+          uname -a
+          dpkg --print-architecture
+          git --version
+          clang-18 --version
+          llvm-cov-18 --version
+          lcov --version
+          python3 --version
+          curl --version
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
@@ -646,6 +659,19 @@ jobs:
   ci_fuzz:
     runs-on: [self-hosted, ARM64, legacy]
     steps:
+      - name: Verify environment
+        shell: bash
+        run: |
+          set -x
+          cat /etc/os-release
+          uname -a
+          dpkg --print-architecture
+          git --version
+          clang-18 --version
+          llvm-cov-18 --version
+          lcov --version
+          python3 --version
+          curl --version
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
