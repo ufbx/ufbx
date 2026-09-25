@@ -13,4 +13,4 @@ chmod +x misc/llvm_gcov.sh
 
 build/cov-runner -d data
 $LLVM_COV gcov ufbx runner -b
-lcov --directory . --base-directory . --gcov-tool $LLVM_GCOV --config-file misc/lcovrc --capture -o coverage.lcov
+lcov --directory . --base-directory . --gcov-tool $LLVM_GCOV --config-file misc/lcovrc --filter branch,brace --capture -o coverage.lcov
