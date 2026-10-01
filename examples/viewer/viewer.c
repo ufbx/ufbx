@@ -222,9 +222,9 @@ void read_node(viewer_node *vnode, ufbx_node *node)
 
 sg_image pack_blend_channels_to_image(ufbx_mesh *mesh, ufbx_blend_channel **channels, size_t num_channels)
 {
-	// We pack the blend shape data into a 1024xNxM texture array where each texel
-	// contains the vertex `Y*1024 + X` for blend shape `Z`.
-	uint32_t tex_width = 1024;
+	// We pack the blend shape data into a 2048xNxM texture array where each texel
+	// contains the vertex `Y*2048 + X` for blend shape `Z`.
+	uint32_t tex_width = 2048;
 	uint32_t tex_height_min = ((uint32_t)mesh->num_vertices + tex_width - 1) / tex_width;
 	uint32_t tex_slices = (uint32_t)num_channels;
 
